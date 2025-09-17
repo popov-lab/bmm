@@ -723,7 +723,7 @@ extract_stan_blocks <- function(stan_code, which_blocks = "all") {
   stan_blocks <- c("functions", "data", "transformed data","parameters","transformed parameters","model","generated quantities")
 
   # select blocks to be extracted
-  if(which_blocks == "all") {
+  if("all" %in% which_blocks) {
     selected_blocks <- stan_blocks
   } else {
     selected_blocks <- stan_blocks[stan_blocks %in% which_blocks]
