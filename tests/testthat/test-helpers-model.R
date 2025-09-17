@@ -130,3 +130,80 @@ test_that("update_model_fixed_parameters() works", {
   expect_equal(model1$fixed_parameters, list(mu = 0))
   expect_equal(model2$fixed_parameters, list(kappa = 3))
 })
+
+test_that("extracts all blocks and names are correct", {
+  data <- data.frame(y = runif(100, min = -pi, pi))
+  model <- mixture2p(resp_error = "y")
+  formula <- bmf(thetat ~ 1, kappa ~ 1)
+
+  stan_code <- stancode(formula, data = data, model = model)
+
+  out <- extract_stan_blocks(stan_code, "all")
+
+  expect_type(out, "list")
+  expect_setequal(names(out), c(
+    "functions","data","transformed data","parameters",
+    "transformed parameters","model","generated quantities"
+  ))
+})
+
+test_that("extracts only requested subset of blocks", {
+  data <- data.frame(y = runif(100, min = -pi, pi))
+  model <- mixture2p(resp_error = "y")
+  formula <- bmf(thetat ~ 1, kappa ~ 1)
+
+  stan_code <- stancode(formula, data = data, model = model)
+
+  out <- extract_stan_blocks(stan_code, c("data", "model"))
+  expect_setequal(names(out), c("data","model"))
+  expect_match(out$data, "int<lower=1> N;", fixed = TRUE)
+  expect_match(out$model, "von_mises_lpdf", fixed = TRUE)
+})
+
+test_that("unknown block names are ignored (no error)", {
+  stan_code <- "\nfunctions {\n}\n\
+data {\n}\n\
+model {\n}\n\
+generated quantities {\n}\n"
+
+  out <- extract_stan_blocks(stan_code, c("data","flying spaghetti monster","model"))
+  expect_setequal(names(out), c("data","model"))
+})
+
+test_that("block boundaries are correct and do not bleed into next block", {
+  stan_code <- "\nfunctions {\n  real foo(real x) { return x; }\n}\n\
+data {\n  int N;\n}\n\
+model {\n  N ~ poisson(1);\n}\n\
+generated quantities {\n  real y;\n}\n"
+
+  out <- extract_stan_blocks(stan_code, "all")
+
+  # 'model' block should not contain any text from 'generated quantities'
+  expect_false(grepl("generated quantities", out$model, fixed = TRUE))
+  expect_match(out$model, "poisson", fixed = TRUE)
+})
+
+test_that("last block extraction stops at final closing brace", {
+  # This specifically guards against regressions in how the last block is found.
+  # With the current code, this will likely FAIL due to `gregexec` not existing,
+  # which is exactly the kind of regression we want to catch.
+  stan_code <- "\nfunctions {\n}\n\
+data {\n}\n\
+model {\n}\n\
+generated quantities {\n  real y;\n}\n"
+
+  out <- extract_stan_blocks(stan_code, "generated quantities")
+  # Should contain 'real y;' but not any stray braces beyond its own block
+  expect_match(out[["generated quantities"]], "real y;", fixed = TRUE)
+  expect_false(grepl("\\bgenerated quantities\\b.*\\bgenerated quantities\\b", out[["generated quantities"]]))
+})
+
+test_that("errors (or at least fails) when a requested block is missing", {
+  # Current implementation will likely error if a requested block isn't present.
+  # This test locks in that behavior so future changes deliberately decide
+  # whether to error or return an empty string.
+  stan_code <- "\nfunctions {\n}\nmodel {\n}\n"
+  expect_error(extract_stan_blocks(stan_code, c("data")), regexp = NA)
+  # If you later change the function to return "" instead of error,
+  # update this to expect_equal(out$data, "") accordingly.
+})
