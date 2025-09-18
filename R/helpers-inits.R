@@ -86,7 +86,7 @@ create_initfun.bmmodel <- function(model, data, formula) {
             if(length(term_labels) == 1) {
               inits[[eval(init_name)]] <- link_transform(
                 runif(standata_list[[dims]], min = init_ranges[[parameter]][1], max = init_ranges[[parameter]][2]),
-                links[[paraneter]])
+                links[[parameter]])
             } else {
               if(grepl(term_labels[1],":")) {
                 first_term_variables <- unlist(strsplit(term_labels[1],":"))
