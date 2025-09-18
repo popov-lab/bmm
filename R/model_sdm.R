@@ -36,6 +36,11 @@
         kappa = list(main = "student_t(5, 1.75, 0.75)", effects = "normal(0, 1)"),
         c = list(main = "student_t(5, 2, 0.75)", effects = "normal(0, 1)")
       ),
+      init_ranges = list(
+        mu = c(-0.5,0.5),
+        kappa = c(2.5,3.5),
+        c = c(4,6)
+      ),
       void_mu = FALSE
     ),
     class = c("bmmodel", "circular", "sdm", paste0("sdm_", version)),

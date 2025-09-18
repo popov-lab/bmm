@@ -137,6 +137,9 @@ bmm <- function(formula, data, model,
   # configure the default prior and combine with user-specified prior
   prior <- configure_prior(model, data, config_args$formula, prior)
 
+  # configure initial values if necessary
+  config_args$init <- create_initfun(model, data, config_args$formula)
+
   # estimate the model
   fit_args <- combine_args(nlist(config_args, opts, dots, prior))
   fit <- brms::do_call(brms::brm, fit_args)
