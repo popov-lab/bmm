@@ -35,7 +35,7 @@ create_initfun.bmmodel <- function(model, data, formula) {
   )
 
   # create initfun based on generated information
-  my_initfun <- function(chain_id = 1) {
+  my_initfun <- function() {
     # force evaluation of required information
     force(stanpars_list)
     force(standata_list)
@@ -118,6 +118,8 @@ create_initfun.bmmodel <- function(model, data, formula) {
 
         if(grepl("sd_",init_name)) {
           inits[[eval(init_name)]] <- runif(standata_list[[dims]], min = 0.05, max = 0.1)
+          # if this is a single value wrap it in array to avoid dimension mismatch
+          if(standata_list[[dims]] == 1) inits[[eval(init_name)]] <- array(inits[[eval(init_name)]], dim = unlist(standata_list[[dims]]))
           next
         }
 
