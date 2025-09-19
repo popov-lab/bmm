@@ -115,7 +115,7 @@ combine_args <- function(args) {
   dots <- args$dots
   stopif("family" %in% names(dots), "Unsupported argument 'family'. Use the model argument instead.")
   config_args$prior <- args$prior %||% config_args$prior
-  config_args$init <- args$init
+  config_args$init <- args$init %||% config_args$init
   config_args[names(dots)] <- dots
   c(config_args, args$opts)
 }
