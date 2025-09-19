@@ -67,11 +67,13 @@ create_initfun.bmmodel <- function(model, data, formula) {
       init_name <- names(stanpars_list[i])
 
       if (type == "matrix") {
+        # these are typically Z values for random effects over group
         inits[[eval(init_name)]] <- matrix(
           data = runif(standata_list[[dims[1]]] * standata_list[[dims[2]]], min = -.5, max = .5),
           nrow = standata_list[[dims[1]]], ncol = standata_list[[dims[2]]]
         )
       } else if(type == "array") {
+        # these are typically Z values for random effects over group
         inits[[eval(init_name)]] <- array(
           data = runif(standata_list[[dims[1]]] * standata_list[[dims[2]]], min = -.5, max = .5),
           dim = standata_list[[dims[1]]]
@@ -114,10 +116,16 @@ create_initfun.bmmodel <- function(model, data, formula) {
         }
 
         stop2("Initial values for vectors are only specified for b-coefficients and sd-parameters")
-      } else if (type == "real") { # these will usually be Intercetps
-        inits[[eval(init_name)]] <- link_transform(
-          runif(1, min = init_ranges[[parameter]][1], max = init_ranges[[parameter]][2]),
-          links[[parameter]])
+      } else if (type == "real") { # these will usually be Interceps
+        if(grepl("Intercept",init_name)) {
+          inits[[eval(init_name)]] <- link_transform(
+            runif(1, min = init_ranges[[parameter]][1], max = init_ranges[[parameter]][2]),
+            links[[parameter]])
+        } else if (grepl("sd_",init_name)) {
+          inits[[eval(init_name)]] <- runif(standata_list[[dims]], min = 0.05, max = 0.1)
+        } else {
+          stop2("Initial values for reals are only specified for Intercepts and sd-parameters")
+        }
       }
     }
     # return inits
