@@ -21,6 +21,7 @@ create_initfun <- function(model, data, formula) {
 #' @export
 create_initfun.bmmodel <- function(model, data, formula) {
   # skip to default method if model object contains no init_ranges
+  # somehow this does not seem to work... only if I do this at the bottom
   if (is.null(model$init_ranges)) {
     NextMethod("create_initfun")
   }
@@ -123,7 +124,11 @@ create_initfun.bmmodel <- function(model, data, formula) {
     inits
   }
 
-  my_initfun
+  if (is.null(model$init_ranges)) {
+    NextMethod("create_initfun")
+  } else {
+    my_initfun
+  }
 }
 
 #' @export
