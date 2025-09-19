@@ -797,7 +797,7 @@ parse_parameters_line <- function(x) {
   x <- sub(";$", "", x)
   if (!nzchar(x)) stop("Empty or comment-only line.", call. = FALSE)
 
-  # 1) pull off an optional leading array[...] prefix and capture its dims
+  # 1) optional leading array[...] prefix
   array_dims <- character(0)
   if (grepl("^array\\s*\\[", x, perl = TRUE)) {
     m <- regexpr("^array\\s*\\[([^\\]]*)\\]\\s*", x, perl = TRUE)
@@ -805,26 +805,17 @@ parse_parameters_line <- function(x) {
       dims_str <- sub("^array\\s*\\[([^\\]]*)\\]\\s*.*$", "\\1", regmatches(x, m), perl = TRUE)
       array_dims <- trimws(unlist(strsplit(dims_str, ",")))
       array_dims <- array_dims[nzchar(array_dims)]
-      # remove the consumed prefix
       x <- sub("^array\\s*\\[[^\\]]*\\]\\s*", "", x, perl = TRUE)
     }
   }
+  is_array <- length(array_dims) > 0
 
-  # 2) detect base type (from a known set) right at the start
+  # 2) detect base type
   base_types <- c(
-    "cholesky_factor_corr",
-    "cholesky_factor_cov",
-    "corr_matrix",
-    "cov_matrix",
-    "row_vector",
-    "unit_vector",
-    "positive_ordered",
-    "simplex",
-    "ordered",
-    "vector",
-    "matrix",
-    "real",
-    "int"
+    "cholesky_factor_corr","cholesky_factor_cov",
+    "corr_matrix","cov_matrix",
+    "row_vector","unit_vector","positive_ordered","simplex","ordered",
+    "vector","matrix","real","int"
   )
   base_type <- NULL
   for (bt in base_types) {
@@ -835,25 +826,22 @@ parse_parameters_line <- function(x) {
   # consume the base type token
   x_after_bt <- sub(paste0("^", base_type), "", x, perl = TRUE)
 
-  # 3) capture and remove immediate <...> constraints if present
+  # 3) constraints <...>
   bounds <- parse_bounds(x_after_bt)
   if (!is.null(bounds)) {
     x_after_bt <- sub("^\\s*<[^>]*>\\s*", "", x_after_bt, perl = TRUE)
   }
 
-  # 4) capture optional base-type dims [ ... ] (required for most non-scalar types)
+  # 4) base-type dims [ ... ] (needed for most non-scalars)
   base_dims <- character(0)
   if (grepl("^\\s*\\[", x_after_bt, perl = TRUE)) {
-    # extract only the content inside the first [...] right after the base type
     m <- regexpr("(?<=\\[)[^\\]]+(?=\\])", x_after_bt, perl = TRUE)
     if (m[1] == -1) stop("Could not parse base dimensions.", call. = FALSE)
     dims_str  <- regmatches(x_after_bt, m)
     base_dims <- trimws(strsplit(dims_str, ",", fixed = TRUE)[[1]])
     base_dims <- base_dims[nzchar(base_dims)]
-    # remove the [ ... ] plus any whitespace/newlines that follow it
     x_after_bt <- sub("^\\s*\\[[^\\]]*\\]\\s*", "", x_after_bt, perl = TRUE)
   } else {
-    # For these types, dims are required
     if (base_type %in% c(
       "vector","row_vector","matrix",
       "simplex","unit_vector","ordered","positive_ordered",
@@ -863,11 +851,11 @@ parse_parameters_line <- function(x) {
     }
   }
 
-  # 5) the remainder should be the name
+  # 5) name
   name <- trimws(x_after_bt)
   if (!nzchar(name)) stop("Missing parameter name.", call. = FALSE)
 
-  # 6) normalize dims by type (expand square sizes to two dims, prepend array dims)
+  # 6) normalize dims by base type
   dims_by_type <- switch(
     base_type,
     real                 = 1,
@@ -885,14 +873,17 @@ parse_parameters_line <- function(x) {
     cholesky_factor_cov  = base_dims[1],
     character(0)
   )
-
   dims <- c(array_dims, dims_by_type)
 
+  # NEW: dual typing
+  types <- if (is_array) c("array", base_type) else base_type
+
   list(
-    name   = name,
-    type   = base_type,
-    dims   = dims,
-    bounds = bounds
+    name    = name,
+    type    = base_type,     # backward-compat: base type only
+    types   = types,         # NEW: includes "array" when applicable
+    dims    = dims,
+    bounds  = bounds
   )
 }
 
