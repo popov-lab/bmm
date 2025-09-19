@@ -64,19 +64,25 @@ create_initfun.bmmodel <- function(model, data, formula) {
       parameter <- ifelse(parameter == "Intercept", "mu", parameter)
       dims <- stanpars_list[[i]][["dims"]]
       type <- stanpars_list[[i]][["type"]]
+      is_array <-  "array" %in% stanpars_list[[i]][["types"]]
       init_name <- names(stanpars_list[i])
+
+      # deal with arrays first
+      if(is_array) {
+        if(grepl("z_",init_name)) {
+          inits[[eval(init_name)]] <- array(
+            data = runif(prod(unlist(standata_list[dims])), min = -.5, max = .5),
+            dim = unlist(standata_list[dims])
+          )
+        }
+        next
+      }
 
       if (type == "matrix") {
         # these are typically Z values for random effects over group
         inits[[eval(init_name)]] <- matrix(
           data = runif(standata_list[[dims[1]]] * standata_list[[dims[2]]], min = -.5, max = .5),
           nrow = standata_list[[dims[1]]], ncol = standata_list[[dims[2]]]
-        )
-      } else if(type == "array") {
-        # these are typically Z values for random effects over group
-        inits[[eval(init_name)]] <- array(
-          data = runif(standata_list[[dims[1]]] * standata_list[[dims[2]]], min = -.5, max = .5),
-          dim = standata_list[[dims[1]]]
         )
       } else if (type %in% c("cholesky_factor_corr","cholesky_factor_cov","cov_matrix","corr_matrix")) {
         inits[[eval(init_name)]] <- diag(1, standata_list[[dims]])
