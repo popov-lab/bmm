@@ -113,6 +113,7 @@ create_initfun.bmmodel <- function(model, data, formula) {
               }
             }
           }
+          if(standata_list[[dims]] == 1) inits[[eval(init_name)]] <- array(inits[[eval(init_name)]], dim = unlist(standata_list[[dims]]))
           next
         }
 
