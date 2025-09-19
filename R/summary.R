@@ -3,7 +3,7 @@
 #' @inheritParams brms::summary.brmsfit
 #' @param backend Choose whether to display the *bmm* summary method (default),
 #'   or to display the *brms* summary method.
-#' @seealso \code{\link{summary.brmsfit}}
+#' @seealso \code{\link[brms]{summary.brmsfit}}
 #' @note You can turn off the color output by setting the option
 #' options(bmm.color_summary = FALSE) or bmm_options(color_summary = FALSE)
 #'

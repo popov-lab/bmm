@@ -19,27 +19,35 @@ badge](https://popov-lab.r-universe.dev/badges/bmm)](https://popov-lab.r-univers
 
 The goal of the `bmm` (Bayesian Measurement Models) package is to make
 it easier to estimate common cognitive measurement models for behavioral
-research. It achieves this by combining the flexibility of the ‘brms’
-package for specifying linear model syntax with custom functions that
-translate cognitive measurement model into distributional families that
-can be estimated using Bayesian hierarchical estimation. Cognitive
-measurement models provide a more refined representation of the
-cognitive processes underlying observed behavior, because they decompose
-observed behavior into several theoretically meaningful parameters that
-each represent distinct cognitive processes.
+research. It achieves this by combining the flexibility of the `brms`
+(Bayesian Regression Models using Stan) package for specifying linear
+model syntax with custom functions that translate cognitive measurement
+model into distributional families that can be estimated using Bayesian
+hierarchical estimation.
+
+Cognitive measurement models provide a more refined representation of
+the cognitive processes underlying observed behavior, because they
+decompose observed behavior into several theoretically meaningful
+parameters that each represent distinct cognitive processes. Therefore,
+researchers can use these models to test specific hypotheses about the
+cognitive processes underlying behavioral data.
 
 ## Getting started
 
-See the following sections for more information on the `bmm` package:
+In the following sections you find more information on the `bmm`
+package:
 
-- [How to install bmm](#how-to-install-bmm)
-- [Available models](#available-models)
-- [Fitting models using bmm](#fitting-models-using-bmm)
-- [Exploring cogntive measurement
-  models](#exploring-cogntive-measurement-models)
-- [The general structure of the bmm
-  package](#the-general-structure-of-the-bmm-package)
-- [Contributing to the `bmm` package](#contributing-to-the-bmm-package)
+- [bmm](#bmm)
+  - [Overview](#overview)
+  - [Getting started](#getting-started)
+  - [How to install bmm](#how-to-install-bmm)
+  - [Available models](#available-models)
+  - [Fitting models using `bmm`](#fitting-models-using-bmm)
+  - [Exploring measurement models](#exploring-measurement-models)
+  - [The general structure of the `bmm`
+    package](#the-general-structure-of-the-bmm-package)
+  - [Contributing to the `bmm`
+    package](#contributing-to-the-bmm-package)
 
 ## How to install bmm
 
@@ -55,7 +63,9 @@ install the dependencies. If you are already using `brms`, you can skip
 this step.
 
 <details>
+
 <summary>
+
 <b> Install dependencies</b>
 </summary>
 
@@ -68,7 +78,7 @@ this step.
   and/or
   [cmdstanr](https://mc-stan.org/cmdstanr/articles/cmdstanr.html). We
   recommend using `cmdstanr`.
-- Install [brms](https://paul-buerkner.github.io/brms/#installation)
+- Install [brms](http://paulbuerkner.com/brms/#installation)
 
 </details>
 
@@ -76,7 +86,9 @@ this step.
 package or a specific version of the package from GitHub:
 
 <details>
+
 <summary>
+
 <b>Install the latest development version of bmm</b>
 </summary>
 
@@ -90,8 +102,11 @@ remotes::install_github("venpopov/bmm")
 ```
 
 </details>
+
 <details>
+
 <summary>
+
 <b>Install the 0.0.1 version of bmm (if following version 6 of the
 tutorial paper on OSF)</b>
 </summary>

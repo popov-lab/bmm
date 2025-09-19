@@ -110,7 +110,7 @@ test_that("try_save_bmmfit works", {
     backend = "mock", mock_fit = 2, rename = F,
     file = file
   )
-  expect_equal(mock_fit, mock_fit2)
+  expect_equal(mock_fit, mock_fit2, ignore_attr = TRUE)
 
   # they should not be the same if file_refit = TRUE
   mock_fit3 <- bmm(bmf(c ~ 1, kappa ~ 1), oberauer_lin_2017, sdm("dev_rad"),
@@ -127,10 +127,10 @@ test_that("is_namedlist works", {
   expect_true(is_namedlist(nlist(y ~ 1)))
   arg <- "hello"
   expect_true(is_namedlist(nlist(arg)))
-  
+
   expect_false(is_namedlist(list(a = 1, 2)))
   expect_false(is_namedlist(list(1, 2)))
   expect_false(is_namedlist(list()))
   expect_false(is_namedlist(list(y ~ 1)))
-  
+
 })

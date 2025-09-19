@@ -35,7 +35,7 @@ configure_prior.* method for the model. See configure_prior.imm_full for an
 example.
 }
 \examples{
-\dontshow{if (isTRUE(Sys.getenv("BMM_EXAMPLES"))) (if (getRversion() >= "3.4") withAutoprint else force)(\{ # examplesIf}
+\dontshow{if (isTRUE(Sys.getenv("BMM_EXAMPLES"))) withAutoprint(\{ # examplesIf}
 configure_prior.mixture3p <- function(model, data, formula, user_prior, ...) {
   # if there is set_size 1 in the data, set constant prior over thetant for set_size1
   prior <- brms::empty_prior()
