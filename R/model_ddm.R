@@ -3,104 +3,106 @@
 #############################################################################!
 # see file 'R/model_mixture3p.R' for an example
 .ddm_version_table <- list(
-  three_par = list(
+  "3par" = list(
     parameters = list(
       drift = "Drift rate = Average rate of evidence accumulation of the decision processes",
       bound = "Boundary separation = Distance between the decision boundaries that need to be reached",
-      ndt = "Non-decision time = Additional time required beyond the evidence accumulation process",
-      zr = "Relative startin point = Starting point between the decision thresholds relative to the upper bound.",
-      sdrift = "Trial-to-trial variability in the drift rate",
-      sndt = "Trial-to-trial variability in the non-decision time",
-      szr = "Trial-to-trial variability in the relative starting point"
+      ndt   = "Non-decision time = Additional time required beyond the evidence accumulation process"
     ),
     links = list(
       drift = "identity", bound = "log", ndt = "log", zr = "identity",
       sdrift = "identity", sndt = "identity", szr = "identity"
     ),
     fixed_parameters = list(
-      mu = 0, zr = 0.5, sdrift = 0, sndt = 0, szr = 0
+      zr = 0.5, sdrift = 0, sndt = 0, szr = 0
     ),
     priors = list(
       drift = list(main = "cauchy(0,1)", effects = "normal(0,0.5)"),
       bound = list(main = "normal(0,0.5)", effects = "normal(0,0.5)"),
-      ndt = list(main = "normal(-1.5,0.5)", effects = "normal(0,0.3)")
+      ndt   = list(main = "normal(-1.5,0.5)", effects = "normal(0,0.3)")
     ),
     init_ranges = list(
-      drift = list(main = c(-1,1), effects = c(-0.1,0.1)),
-      bound = list(main = c(1,2), effects = c(-0.1,0.1)),
-      ndt = list(main = c(0.05,0.1), effects = c(-0.01,0.01))
+      drift = c(-1,1),
+      bound = c(1,2),
+      ndt   = c(0.02,0.05)
     )
   ),
-  four_par = list(
+  "4par" = list(
     parameters = list(
       drift = "Drift rate = Average rate of evidence accumulation of the decision processes",
       bound = "Boundary separation = Distance between the decision boundaries that need to be reached",
-      ndt = "Non-decision time = Additional time required beyond the evidence accumulation process",
-      zr = "Relative startin point = Starting point between the decision thresholds relative to the upper bound.",
-      sdrift = "Trial-to-trial variability in the drift rate",
-      sndt = "Trial-to-trial variability in the non-decision time",
-      szr = "Trial-to-trial variability in the relative starting point"
+      ndt   = "Non-decision time = Additional time required beyond the evidence accumulation process",
+      zr    = "Relative startin point = Starting point between the decision thresholds relative to the upper bound."
     ),
     links = list(
       drift = "identity", bound = "log", ndt = "log", zr = "logit",
       sdrift = "identity", sndt = "identity", szr = "identity"
     ),
     fixed_parameters = list(
-      mu = 0, sdrift = 0, sndt = 0, szr = 0
+      sdrift = 0, sndt = 0, szr = 0
     ),
     priors = list(
       drift = list(main = "cauchy(0,1)", effects = "normal(0,0.5)"),
       bound = list(main = "normal(0,0.5)", effects = "normal(0,0.5)"),
-      ndt = list(main = "normal(-1.5,0.5)", effects = "normal(0,0.3)"),
-      zr = list(main = "normal(0,0.5)", effects = "normal(0,0.3)")
+      ndt   = list(main = "normal(-1.5,0.5)", effects = "normal(0,0.3)"),
+      zr    = list(main = "normal(0,0.5)", effects = "normal(0,0.3)")
     ),
     init_ranges = list(
-      drift = list(main = c(-1,1), effects = c(-0.1,0.1)),
-      bound = list(main = c(1,2), effects = c(-0.1,0.1)),
-      ndt = list(main = c(0.05,0.1), effects = c(-0.01,0.01)),
-      zr = list(main = c(0.4,0.6), effects = c(-0.01,0.01))
+      drift = c(-1,1),
+      bound = c(1,2),
+      ndt   = c(0.02,0.05),
+      zr    = c(0.45,0.55)
     )
   ),
-  seven_par = list(
+  "7par" = list(
     parameters = list(
-      drift = "Drift rate = Average rate of evidence accumulation of the decision processes",
-      bound = "Boundary separation = Distance between the decision boundaries that need to be reached",
-      ndt = "Non-decision time = Additional time required beyond the evidence accumulation process",
-      zr = "Relative startin point = Starting point between the decision thresholds relative to the upper bound.",
+      drift  = "Drift rate = Average rate of evidence accumulation of the decision processes",
+      bound  = "Boundary separation = Distance between the decision boundaries that need to be reached",
+      ndt    = "Non-decision time = Additional time required beyond the evidence accumulation process",
+      zr     = "Relative startin point = Starting point between the decision thresholds relative to the upper bound.",
       sdrift = "Trial-to-trial variability in the drift rate",
-      sndt = "Trial-to-trial variability in the non-decision time",
-      szr = "Trial-to-trial variability in the relative starting point"
+      sndt   = "Trial-to-trial variability in the non-decision time",
+      szr    = "Trial-to-trial variability in the relative starting point"
     ),
     links = list(
       drift = "identity", bound = "log", ndt = "log", zr = "logit",
       sdrift = "log", sndt = "log", szr = "logit"
     ),
-    fixed_parameters = list(
-      mu = 0
-    ),
+    fixed_parameters = list(),
     priors = list(
-      drift = list(main = "cauchy(0,1)", effects = "normal(0,0.5)"),
-      bound = list(main = "normal(0,0.5)", effects = "normal(0,0.5)"),
-      ndt = list(main = "normal(-1.5,0.5)", effects = "normal(0,0.3)"),
-      zr = list(main = "normal(0,0.5)", effects = "normal(0,0.3)"),
+      drift  = list(main = "cauchy(0,1)", effects = "normal(0,0.5)"),
+      bound  = list(main = "normal(0,0.5)", effects = "normal(0,0.5)"),
+      ndt    = list(main = "normal(-1.5,0.5)", effects = "normal(0,0.3)"),
+      zr     = list(main = "normal(0,0.5)", effects = "normal(0,0.3)"),
       sdrift = list(main = "normal(0,0.5)", effects = "normal(0,0.5)"),
-      sndt = list(main = "normal(0,0.5)", effects = "normal(0,0.5)"),
-      szr = list(main = "normal(0,0.5)", effects = "normal(0,0.5)")
+      sndt   = list(main = "normal(0,0.5)", effects = "normal(0,0.5)"),
+      szr    = list(main = "normal(0,0.5)", effects = "normal(0,0.5)")
     ),
     init_ranges = list(
-      drift = list(main = c(-1,1), effects = c(-0.1,0.1)),
-      bound = list(main = c(1,2), effects = c(-0.1,0.1)),
-      ndt = list(main = c(0.05,0.1), effects = c(-0.01,0.01)),
-      zr = list(main = c(0.4,0.6), effects = c(-0.05,0.05)),
-      sdrift = list(main = c(0,1), effects = c(-0.05,0.05)),
-      sndt = list(main = c(0,0.1), effects = c(-0.05,0.05)),
-      szr = list(main = c(0,0.1), effects = c(-0.05,0.05))
+      drift  = c(-1,1),
+      bound  = c(1,2),
+      ndt    = c(0.02,0.05),
+      zr     = c(0.45,0.55),
+      sdrift = c(0.01,0.1),
+      sndt   = c(0.01,0.1),
+      szr    = c(0.01,0.1)
     )
   )
 )
 
-
-.model_ddm <- function(rt = NULL, response = NULL, links = NULL, version = "three_par", call = NULL, ...) {
+.model_ddm <- function(rt = NULL, response = NULL, links = NULL, version = "7par", call = NULL, ...) {
+  # accomodate legacy versions that were introduced in the ESCoP 2025 workshop
+  if(grepl("_",version)) {
+    legacy_version <- version
+    version <- switch(
+      version,
+      three_par = "3par",
+      four_par = "4par",
+      seven_par = "7par"
+    )
+    warning(glue::glue("You have passed an outdated version label: {legacy_version}\n",
+                       "  We will internally convert the version to the corresponding current version label: {version}"))
+  }
   out <- structure(
     list(
       resp_vars = nlist(rt, response),
@@ -143,7 +145,7 @@
 #' \dontrun{
 #' # put a full example here (see 'R/model_mixture3p.R' for an example)
 #' }
-ddm <- function(rt, response, links = NULL, version = "three_par", ...) {
+ddm <- function(rt, response, links = NULL, version = "4par", ...) {
   call <- match.call()
   stop_missing_args()
   .model_ddm(rt = rt, response = response,
@@ -161,15 +163,89 @@ ddm <- function(rt, response, links = NULL, version = "three_par", ...) {
 
 #' @export
 check_data.ddm <- function(model, data, formula) {
-  # retrieve required arguments
+  # retrieve required response arguments
+  rt_var <- model$resp_vars$rt
+  response_var <- model$resp_vars$response
 
-  # check the data (required)
+  # stop due to missing information
+  stopif(
+    not_in(rt_var, colnames(data)),
+    "The response variable '{rt_var}' is not present in the data."
+  )
 
-  # compute any necessary transformations (optional)
+  stopif(
+    not_in(response_var, colnames(data)),
+    "The response variable '{response_var}' is not present in the data."
+  )
 
-  # save some variables as attributes of the data for later use (optional)
+  if(any(is.na(data[, rt_var]))){
+    data <- data[!is.na(data[, rt_var]),]
+    warning(glue::glue("Some values in {rt_var} were NA. These were removed from the analysis."))
+  }
 
-  NextMethod('check_data')
+  if(any(is.na(data[, response_var]))){
+    data <- data[!is.na(data[, response_var]),]
+    warning(glue::glue("Some values in {response_var} were NA. These were removed from the analysis."))
+  }
+
+  # checks for rt_var
+  if (typeof(data[, rt_var]) %in% c("double", "numerical")) {
+    stopif(
+      any(data[, rt_var] < 0, na.rm = TRUE),
+      glue("Some reaction times are lower than zero, please check your data.")
+    )
+
+    warnif(any(data[,rt_var] > 10, na.rm = TRUE),
+           glue::glue("Your data contains reaction times larger then 10.\n",
+                      "Either you have passed reaction times in milli-seconds, then please recode them to seconds and rerun the model.\n",
+                      "Or you have very long RTs in your data in which case you might want to consider outlier deletion."))
+
+    warnif(any(data[,rt_var] < .100, na.rm = TRUE),
+           glue::glue("Your data contains reaction times smaller the 0.100 seconds.\n",
+                      "It is likely that the model will not be able to sample with the current settings of the inital values.\n",
+                      "Either pass your own initial value function or consider filtering reaction times below 0.100 seconds"))
+  } else {
+    stop(glue(
+      "The rt variable: ",
+      rt_var,
+      " needs to be of type double or numerical."
+    ))
+  }
+
+  # checks for response_var
+  if (typeof(data[, response_var]) %in% c("integer", "double", "numerical")) {
+    stopif(any(!data[, response_var] %in% c(0, 1), na.rm = TRUE),
+           glue("The response variable {response_var} should only contain values of zero and one."))
+  } else if (typeof(data[, response_var]) == "logical") {
+    warning(glue::glue(
+      "The response variable you provided is boolean, it will be internally transformed ",
+      "to an integer variable with values 0 for FALSE and 1 for TRUE."
+    ))
+    data[, response_var] <- ifelse(data[, response_var], 1, 0)
+  } else if (typeof(data[, response_var]) == "character") {
+    data[,response_var] <- tolower(data[,response_var])
+    stopif(any(!data[,response_var] %in% c("upper","lower")),
+           glue::glue("You have passed a character variable as response variable containing invalid responses.\n",
+                      "Please pass only upper or lower responses as response variables either coded numerically (0 = \"lower\" and 1 = \"upper\")\n",
+                      "or characters that match \"upper\" and \"lower\"."))
+    warning(glue::glue(
+      "The response variable you provided is a character variable, it will be internally transformed ",
+      "to an integer variable with values 0 for \"lower\" and 1 for \"upper\"."
+    ))
+    data[,response_var] <- ifelse(data[,response_var] == "upper",1,0)
+  }else {
+    stop(glue(
+      "The response variable: ",
+      response_var,
+      " needs to be of type integer, numerical, or logical."
+    ))
+  }
+
+  stopif(any(!data[,response_var] %in% c(0,1)),
+         glue::glue("Invalid values in the response variable passed to ddm.\n",
+                    "Please pass either numeric or character variables that only contain 0 and 1 or  \"upper\" and \"lower\"."))
+
+  data
 }
 
 #############################################################################!
@@ -216,7 +292,9 @@ configure_model.ddm <- function(model, data, formula) {
       ub = c(NA,NA,NA ,NA,1,NA,NA,NA),
       type = 'real',
       vars = 'dec[n]',
-      loop = TRUE
+      loop = TRUE,
+      log_lik = log_lik_ddm,
+      posterior_predict = posterior_predict_ddm
     )
   }
   formula$family <- ddm_family(
@@ -235,6 +313,49 @@ configure_model.ddm <- function(model, data, formula) {
 
   stanvars <- brms::stanvar(scode = stan_functions, block = 'functions')
 
+  # create a custom initial value function to ensure proper sampling
+  init <- create_initfun_ddm(formula, data, model)
+
   # return the list
-  nlist(formula, data, stanvars)
+  nlist(formula, data, stanvars, init)
+}
+
+log_lik_ddm <- function(i, prep) {
+  args <- list(
+    drift = brms::get_dpar(prep, "drift", i),
+    bound = brms::get_dpar(prep, "bound", i = i),
+    ndt = brms::get_dpar(prep, "ndt", i = i),
+    zr = brms::get_dpar(prep, "zr", i = i),
+    sdrift = brms::get_dpar(prep, "sdrift", i = i),
+    sndt = brms::get_dpar(prep, "sndt", i = i),
+    szr = brms::get_dpar(prep, "szr", i = i),
+    response = prep$data[["dec"]][i]
+  )
+  out <- brms::do_call(dddm, c(prep$data$Y[i], args, log = TRUE))
+  out
+}
+
+posterior_predict_ddm <- function(i, prep, ...) {
+  dots <- list(...)
+
+  out <- rddm(
+    n = 1,
+    drift = brms::get_dpar(prep, "drift", i),
+    bound = brms::get_dpar(prep, "bound", i = i),
+    ndt = brms::get_dpar(prep, "ndt", i = i),
+    zr = brms::get_dpar(prep, "zr", i = i),
+    sdrift = brms::get_dpar(prep, "sdrift", i = i),
+    sndt = brms::get_dpar(prep, "sndt", i = i),
+    szr = brms::get_dpar(prep, "szr", i = i)
+  )
+
+  if(!is.null(dots$negative_rt) && dots$negative_rt) {
+    # code lower bound responses as negative RTs
+    out <- out[["rt"]] * ifelse(out[["response"]], 1, -1)
+  }
+
+  # TODO: use column names of rtdists in the output?
+  names(out)[names(out) == "rt"] <- "q"
+  names(out)[names(out) == "response"] <- "resp"
+  out
 }

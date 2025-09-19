@@ -5,7 +5,7 @@
 \alias{ddm}
 \title{Diffusion Decision Model}
 \usage{
-ddm(rt, response, links = NULL, version = "three_par", ...)
+ddm(rt, response, links = NULL, version = "4par", ...)
 }
 \arguments{
 \item{rt}{Name of the reaction time variable coding reaction time in seconds in the data.}
@@ -33,7 +33,7 @@ Diffusion Decision Model
 \itemize{
 \item 
 }
-\item \strong{Version:} three_par
+\item \strong{Version:} 7par
 \item \strong{Requirements:}
 \item \strong{Parameters:}
 \itemize{
@@ -46,16 +46,9 @@ Diffusion Decision Model
 \item \code{szr}: Trial-to-trial variability in the relative starting point
 }
 \item \strong{Fixed parameters:}
-\itemize{
-\item \code{mu} = 0
-\item \code{zr} = 0.5
-\item \code{sdrift} = 0
-\item \code{sndt} = 0
-\item \code{szr} = 0
-}
 \item \strong{Default parameter links:}
 \itemize{
-\item drift = identity; bound = log; ndt = log; zr = identity; sdrift = identity; sndt = identity; szr = identity
+\item drift = identity; bound = log; ndt = log; zr = logit; sdrift = log; sndt = log; szr = logit
 }
 \item \strong{Default priors:}
 \itemize{
@@ -73,6 +66,26 @@ Diffusion Decision Model
 \itemize{
 \item \code{main}: normal(-1.5,0.5)
 \item \code{effects}: normal(0,0.3)
+}
+\item \code{zr}:
+\itemize{
+\item \code{main}: normal(0,0.5)
+\item \code{effects}: normal(0,0.3)
+}
+\item \code{sdrift}:
+\itemize{
+\item \code{main}: normal(0,0.5)
+\item \code{effects}: normal(0,0.5)
+}
+\item \code{sndt}:
+\itemize{
+\item \code{main}: normal(0,0.5)
+\item \code{effects}: normal(0,0.5)
+}
+\item \code{szr}:
+\itemize{
+\item \code{main}: normal(0,0.5)
+\item \code{effects}: normal(0,0.5)
 }
 }
 }
