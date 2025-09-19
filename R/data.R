@@ -77,8 +77,8 @@
 #' fixation cross preceding the onset of the dot matrix had a variable presentation
 #' time coded in the `fix_duration` variable
 #'
-#' @format ## `oberauer_lewandowsky_2019_e1`
-#' A data frame with 120 rows and 10 columns:
+#' @format ## `data_color_judgement_task`
+#' A data frame with 9941 rows and 10 columns:
 #' \describe{
 #'   \item{ID}{Character String uniquely identifying each subject}
 #'   \item{trial}{The trial number of the experimental trials}

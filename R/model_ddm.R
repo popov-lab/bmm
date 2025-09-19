@@ -7,7 +7,11 @@
     parameters = list(
       drift = "Drift rate = Average rate of evidence accumulation of the decision processes",
       bound = "Boundary separation = Distance between the decision boundaries that need to be reached",
-      ndt   = "Non-decision time = Additional time required beyond the evidence accumulation process"
+      ndt   = "Non-decision time = Additional time required beyond the evidence accumulation process",
+      zr     = "Relative startin point = Starting point between the decision thresholds relative to the upper bound.",
+      sdrift = "Trial-to-trial variability in the drift rate",
+      sndt   = "Trial-to-trial variability in the non-decision time",
+      szr    = "Trial-to-trial variability in the relative starting point"
     ),
     links = list(
       drift = "identity", bound = "log", ndt = "log", zr = "identity",
@@ -22,9 +26,14 @@
       ndt   = list(main = "normal(-1.5,0.5)", effects = "normal(0,0.3)")
     ),
     init_ranges = list(
-      drift = c(-1,1),
-      bound = c(1,2),
-      ndt   = c(0.02,0.05)
+      mu    = c(0,1),
+      drift  = c(-1,1),
+      bound  = c(1,2),
+      ndt    = c(0.02,0.05),
+      zr     = c(0.45,0.55),
+      sdrift = c(0.01,0.1),
+      sndt   = c(0.01,0.1),
+      szr    = c(0.01,0.1)
     )
   ),
   "4par" = list(
@@ -32,7 +41,10 @@
       drift = "Drift rate = Average rate of evidence accumulation of the decision processes",
       bound = "Boundary separation = Distance between the decision boundaries that need to be reached",
       ndt   = "Non-decision time = Additional time required beyond the evidence accumulation process",
-      zr    = "Relative startin point = Starting point between the decision thresholds relative to the upper bound."
+      zr    = "Relative startin point = Starting point between the decision thresholds relative to the upper bound.",
+      sdrift = "Trial-to-trial variability in the drift rate",
+      sndt   = "Trial-to-trial variability in the non-decision time",
+      szr    = "Trial-to-trial variability in the relative starting point"
     ),
     links = list(
       drift = "identity", bound = "log", ndt = "log", zr = "logit",
@@ -48,10 +60,14 @@
       zr    = list(main = "normal(0,0.5)", effects = "normal(0,0.3)")
     ),
     init_ranges = list(
-      drift = c(-1,1),
-      bound = c(1,2),
-      ndt   = c(0.02,0.05),
-      zr    = c(0.45,0.55)
+      mu    = c(0,1),
+      drift  = c(-1,1),
+      bound  = c(1,2),
+      ndt    = c(0.02,0.05),
+      zr     = c(0.45,0.55),
+      sdrift = c(0.01,0.1),
+      sndt   = c(0.01,0.1),
+      szr    = c(0.01,0.1)
     )
   ),
   "7par" = list(
@@ -79,6 +95,7 @@
       szr    = list(main = "normal(0,0.5)", effects = "normal(0,0.5)")
     ),
     init_ranges = list(
+      mu    = c(0,1),
       drift  = c(-1,1),
       bound  = c(1,2),
       ndt    = c(0.02,0.05),
@@ -313,11 +330,8 @@ configure_model.ddm <- function(model, data, formula) {
 
   stanvars <- brms::stanvar(scode = stan_functions, block = 'functions')
 
-  # create a custom initial value function to ensure proper sampling
-  init <- create_initfun_ddm(formula, data, model)
-
   # return the list
-  nlist(formula, data, stanvars, init)
+  nlist(formula, data, stanvars)
 }
 
 log_lik_ddm <- function(i, prep) {

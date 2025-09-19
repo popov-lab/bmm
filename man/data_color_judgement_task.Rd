@@ -5,9 +5,9 @@
 \alias{data_color_judgement_task}
 \title{Example Data from a Color Judgement Task}
 \format{
-\subsection{\code{oberauer_lewandowsky_2019_e1}}{
+\subsection{\code{data_color_judgement_task}}{
 
-A data frame with 120 rows and 10 columns:
+A data frame with 9941 rows and 10 columns:
 \describe{
 \item{ID}{Character String uniquely identifying each subject}
 \item{trial}{The trial number of the experimental trials}
