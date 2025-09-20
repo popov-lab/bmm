@@ -368,8 +368,5 @@ posterior_predict_ddm <- function(i, prep, ...) {
     out <- out[["rt"]] * ifelse(out[["response"]], 1, -1)
   }
 
-  # TODO: use column names of rtdists in the output?
-  names(out)[names(out) == "rt"] <- "q"
-  names(out)[names(out) == "response"] <- "resp"
   out
 }

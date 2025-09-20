@@ -4,7 +4,7 @@
 \alias{link_transform}
 \title{Transform values from the native to parameter scale or vice versa according to a link function}
 \usage{
-link_transform(values, link, inverse = FALSE)
+link_transform(values, link = "identity", inverse = FALSE)
 }
 \arguments{
 \item{values}{A numerical vector of values the transformation should be applied to}

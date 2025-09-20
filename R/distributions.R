@@ -568,16 +568,16 @@ rimm <- function(n, mu = c(0, 2, -1.5), dist = c(0, 0.5, 2),
 #'
 #' @name m3dist
 #'
-#' @param x Integer vector of length `K` where K is the number of response categories 
+#' @param x Integer vector of length `K` where K is the number of response categories
 #'   and each value is the number of observed responses per category
 #' @param n Integer. Number of observations to generate data for
-#' @param size The total number of observations in all categories 
+#' @param size The total number of observations in all categories
 #' @param pars A named vector of parameters of the memory measurement model
 #' @param m3_model A `bmmodel` object specifying the m3 model that densities or
 #'   random samples should be generated for
 #' @param act_funs A `bmmformula` object specifying the activation functions for
-#'   the different response categories for the "custom" version of the M3. The 
-#'   default will attempt to construct the standard activation functions for the 
+#'   the different response categories for the "custom" version of the M3. The
+#'   default will attempt to construct the standard activation functions for the
 #'   "ss" and "cs" model version. For a custom m3 model you need to specify the
 #'   act_funs argument manually
 #' @param log Logical; if `TRUE` (default), values are returned on the log scale.
@@ -602,7 +602,7 @@ rimm <- function(n, mu = c(0, 2, -1.5), dist = c(0, 0.5, 2),
 #'  )
 #'  dm3(x = c(20, 10, 10), pars = c(a = 1, b = 1, c = 2), m3_model = model)
 #' @export
-dm3 <- function(x, pars, m3_model, act_funs = construct_m3_act_funs(m3_model, warnings = FALSE), 
+dm3 <- function(x, pars, m3_model, act_funs = construct_m3_act_funs(m3_model, warnings = FALSE),
                 log = TRUE, ...) {
   probs <- .compute_m3_probability_vector(pars, m3_model, act_funs, ...)
   dmultinom(x, prob = probs, log = log)
@@ -639,3 +639,68 @@ rm3 <- function(n, size, pars, m3_model, act_funs = construct_m3_act_funs(m3_mod
     acts <- acts * num_options
     acts / sum(acts)
   }
+
+
+#' @title Distribution function for the Diffusion Decision Model (`ddm`)
+#'
+#' @description
+#'   Density and random generation function for the Diffusion Decision Model.
+#'
+#' @name ddm_dist
+#'
+#' @param rt Vector of response times for which the density should be returned
+#' @param response Vector of responses for which the density should be returned
+#' @param n Number of random samples to generate
+#' @param drift Drift rates of the ddm
+#' @param bound Boundary separation of the ddm
+#' @param ndt Non-decision time of the ddm
+#' @param zr relative starting point of the ddm
+#' @param sdrift Trial-to-trial variability of the drift rate
+#' @param sndt Trial-to-trial variability of the non-decision time
+#' @param szr Trial-to-trial variability of the relative starting point
+#' @param log Logical, indicating if log-densities should be returned (default = TRUE)
+#'
+#' @keywords distributions
+#'
+#' @export
+dddm <- function(rt, response,drift, bound, ndt, zr = 0.5, sdrift = 0, sndt = 0, szr = 0, log = TRUE) {
+
+  stopif(any(rt < 0),
+         glue("Negative RTs are not allowed.\n",
+              "Please check your rt variable and pass only positive RTs."))
+
+  if(!is.character(response)){
+    response <- ifelse(response == 1, "upper","lower")
+  }
+
+  stopif(any(!response %in% c("upper","lower")),
+         glue("Invalid responses passed! Either pass a numeric vector with 0 as a lower bound response,",
+              "and 1 as upper bound response, or a character vector with \"upper\" and \"lower\" for the respecitve,",
+              "responses given."))
+
+  stopif(length(rt) != length(response),
+         glue("Different number of rts and responses passed to dddm. Please pass vectors of equal length."))
+
+  out <- rtdists::ddiffusion(rt = rt, response = response,
+                             a = bound, v = drift, t0 = ndt, z = zr * bound, sz = szr, sv = sdrift, st0 = sndt)
+
+  if(log) out <- log(out)
+  out
+}
+
+#' @name ddm_dist
+#' @export
+rddm <- function(n, drift, bound, ndt, zr = 0.5, sdrift = 0, sndt = 0, szr = 0) {
+  max_len <- max(lengths(list(drift, bound, ndt, zr, sdrift, sndt, szr)))
+
+  if (max_len > 1L) {
+    if (!n %in% c(1, max_len)) {
+      stop2("Can only sample exactly once for each condition.")
+    }
+    n <- max_len
+  }
+
+  sim_data <- rtdists::rdiffusion(n = n, a = bound, v = drift, t0 = ndt, z = zr * bound, sz = szr, sv = sdrift, st0 = sndt)
+  sim_data$response <- ifelse(sim_data$respons == "upper",1,0)
+  as.matrix(sim_data)
+}
