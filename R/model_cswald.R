@@ -1,6 +1,7 @@
 #############################################################################!
 # MODELS                                                                 ####
 #############################################################################!
+
 .cswald_version_table <- list(
   simple = list(
     parameters = list(
@@ -16,14 +17,20 @@
       s = "log"
     ),
     fixed_parameters = list(
-      mu = 0,
       s = 0
     ),
     priors = list(
       drift = list(main = "normal(0,1)", effects = "normal(0,0.3)"),
       bound = list(main = "normal(0,0.3)", effects = "normal(0,0.3)"),
       ndt = list(main = "normal(-2,0.3)", effects = "normal(0,0.3)"),
-      s = list(main = "normal(0,0.5)", effects = "normal(0,0.2)")
+      s = list(main = "normal(0,0.3)", effects = "normal(0,0.2)")
+    ),
+    init_ranges = list(
+      mu = c(0,1),
+      drift = c(1,2),
+      bound = c(1.5,2),
+      ndt = c(0.025, 0.05),
+      s = c(0.95,1.05)
     )
   ),
   crisk = list(
@@ -42,7 +49,6 @@
       s = "log"
     ),
     fixed_parameters = list(
-      mu = 0,
       zr = 0,
       s = 0
     ),
@@ -52,12 +58,27 @@
       ndt = list(main = "normal(-2,0.3)", effects = "normal(0,0.3)"),
       zr = list(main = "normal(0,0.3)", effects = "normal(0,0.2)"),
       s = list(main = "normal(0,0.5)", effects = "normal(0,0.2)")
+    ),
+    init_ranges = list(
+      mu = c(0,1),
+      drift = c(1,2),
+      bound = c(1.5,2),
+      ndt = c(0.025, 0.05),
+      zr = c(0.45, 0.55),
+      s = c(0.95,1.05)
     )
   )
 )
 
 
-.model_cswald <- function(rt = NULL, response = NULL, links = NULL, version = "simple", call = NULL, ...) {
+.model_cswald <- function(
+    rt = NULL,
+    response = NULL,
+    links = NULL,
+    version = "simple",
+    call = NULL,
+    ...
+) {
   out <- structure(
     list(
       resp_vars = nlist(rt, response),
@@ -74,20 +95,16 @@
       links = .cswald_version_table[[version]][["links"]],
       fixed_parameters = .cswald_version_table[[version]][["fixed_parameters"]],
       default_priors = .cswald_version_table[[version]][["priors"]],
-      init_ranges = list(
-        drift = list(main = c(0.5,2), effects = c(-0.1,0.1)),
-        bound = list(main = c(1,2), effects = c(-0.1,0.1)),
-        ndt = list(main = c(0.05,0.1), effects = c(-0.1,0.1)),
-        zr = list(main = c(0.4,0.6), effects = c(-0.1,0.1)),
-        s = list(main = c(0.9,1.1), effects = c(-0.1,0.1))
-      ),
+      init_ranges = .cswald_version_table[[version]][["init_ranges"]],
       void_mu = TRUE
     ),
     class = c("bmmodel", "cswald", paste0("cswald_", version)),
     call = call
   )
 
-  if(!is.null(version)) class(out) <- c(class(out))
+  if (!is.null(version)) {
+    class(out) <- c(class(out))
+  }
 
   out$links[names(links)] <- links
   out
@@ -103,6 +120,10 @@
 #' @param rt A description of the response variable
 #' @param response A description of the response variable
 #' @param links A list of links for the parameters.
+#' @param version A character string which version of the cswald model to use.
+#'   The standard cswald model is referred to as "simple" version, and the competing risk
+#'   version is referred to as "crisk". For more details on these model versions, please look
+#'   into Miller et al. (2017) given as the reference in the `cswald` model object.
 #' @param ... used internally for testing, ignore it
 #' @return An object of class `bmmodel`
 #' @export
@@ -113,7 +134,14 @@
 cswald <- function(rt, response, links = NULL, version = "simple", ...) {
   call <- match.call()
   stop_missing_args()
-  .model_cswald(rt = rt, response = response, links = links, version = version, call = call, ...)
+  .model_cswald(
+    rt = rt,
+    response = response,
+    links = links,
+    version = version,
+    call = call,
+    ...
+  )
 }
 
 #############################################################################!
@@ -143,26 +171,62 @@ check_data.cswald <- function(model, data, formula) {
   )
 
   # checks for rt_var
-  if (typeof(data[,rt_var]) %in% c("double","numerical")) {
-    stopif(any(data[,rt_var] < 0),
-           glue("Some reaction times are lower than zero, please check your data."))
+  if (typeof(data[, rt_var]) %in% c("double", "numerical")) {
+    stopif(
+      any(data[, rt_var] < 0),
+      glue("Some reaction times are lower than zero, please check your data.")
+    )
+
+    warnif(any(data[,rt_var] > 10),
+           glue::glue("Your data contains reaction times larger then 10.\n",
+                      "Either you have passed reaction times in milli-seconds, then please recode them to seconds and rerun the model.\n",
+                      "Or you have very long RTs in your data in which case you might want to consider outlier deletion."))
+
+    warnif(any(data[,rt_var] < .100),
+           glue::glue("Your data contains reaction times smaller the 0.100 seconds.\n",
+                      "It is likely that the model will not be able to sample with the current settings of the inital values.\n",
+                      "Either pass your own initial value function or consider filtering reaction times below 0.100 seconds"))
   } else {
-    stop(glue("The response variable: ", rt_var, " needs to be of type integer, numerical, or logical."))
+    stop(glue(
+      "The rt variable: ",
+      rt_var,
+      " needs to be of type double or numerical."
+    ))
   }
 
   # checks for response_var
-  if (typeof(data[,response_var]) %in% c("integer","double","numerical")) {
-    stopif(any(!data[,response_var] %in% c(0,1)),
-           glue("Only values of zero"))
-  } else if (typeof(data[,response_var]) == "logical"){
-    warning(glue("The response variable you provided is boolean, it will be internally transformed ",
-                 "to an integer variable with values 0 for FALSE and 1 for TRUE."))
-    data[,response_var] <- ifelse(data[,response_var],1,0)
-  } else {
-    stop(glue("The response variable: ", response_var, " needs to be of type integer, numerical, or logical."))
+  if (typeof(data[, response_var]) %in% c("integer", "double", "numerical")) {
+    stopif(any(!data[, response_var] %in% c(0, 1)), glue("Only values of zero"))
+  } else if (typeof(data[, response_var]) == "logical") {
+    warning(glue::glue(
+      "The response variable you provided is boolean, it will be internally transformed ",
+      "to an integer variable with values 0 for FALSE and 1 for TRUE."
+    ))
+    data[, response_var] <- ifelse(data[, response_var], 1, 0)
+  } else if (typeof(data[, response_var]) == "character") {
+    data[,response_var] <- tolower(data[,response_var])
+    stopif(any(!data[,response_var] %in% c("upper","lower")),
+           glue::glue("You have passed a character variable as response variable containing invalid responses.\n",
+                      "Please pass only upper or lower responses as response variables either coded numerically (0 = \"lower\" and 1 = \"upper\")\n",
+                      "or characters that match \"upper\" and \"lower\"."))
+    warning(glue::glue(
+      "The response variable you provided is a character variable, it will be internally transformed ",
+      "to an integer variable with values 0 for \"lower\" and 1 for \"upper\"."
+    ))
+    data[,response_var] <- ifelse(data[,response_var] == "upper",1,0)
+  }else {
+    stop(glue(
+      "The response variable: ",
+      response_var,
+      " needs to be of type integer, numerical, or logical."
+    ))
   }
 
-  NextMethod('check_data')
+  stopif(any(!data[,response_var] %in% c(0,1)),
+         glue::glue("Invalid values in the response variable passed to ddm.\n",
+                    "Please pass either numeric or character variables that only contain 0 and 1 or  \"upper\" and \"lower\"."))
+
+  data
 }
 
 #############################################################################!
@@ -198,17 +262,17 @@ configure_model.cswald_simple <- function(model, data, formula) {
   # retrieve required arguments
   rt_var <- model$other_vars$rt
   response_var <- model$other_vars$response
-  trials <- data[,response_var]
+  trials <- data[, response_var]
   links <- model$links
 
   # construct brms formula from the bmm formula
   formula <- bmf2bf(model, formula)
 
   # construct the family & add to formula object
-  cswald_family <- function (link_drift = links$drift, link_bound = links$bound, link_ndt = links$ndt, link_s = links$s) {
+  cswald_family <- function (link_drift, link_bound, link_ndt, link_s) {
     brms::custom_family(
       'cswald',
-      dpars = c("mu","drift","bound","ndt","s"),
+      dpars = c("mu", "drift", "bound", "ndt", "s"),
       links = c("identity", link_drift, link_bound, link_ndt, link_s),
       ub = c(NA, NA, NA, NA, NA), # upper bounds for parameters
       lb = c(NA, 0, 0, 0, 0), # lower bounds for parameters
@@ -217,37 +281,52 @@ configure_model.cswald_simple <- function(model, data, formula) {
       loop = TRUE, # is the likelihood vectorized
     )
   }
-  formula$family <- cswald_family()
+
+  formula$family <- cswald_family(
+    link_drift = links$drift,
+    link_bound = links$bound,
+    link_ndt = links$ndt,
+    link_s = links$s
+  )
 
   # prepare initial stanvars to pass to brms, model formula and priors
-  sc_path <- system.file('stan_chunks', package='bmm')
-  stan_functions <- read_lines2(paste0(sc_path, '/cswald_functions.stan'))
+  sc_path <- system.file('stan_chunks', package = 'bmm')
+  stan_helpers <- read_lines2(paste0(sc_path, "/cswald_helper_functions.stan"))
+  stan_functions <- read_lines2(paste0(sc_path, '/cswald_simple_functions.stan'))
 
-  stanvars <- brms::stanvar(scode = stan_functions, block = 'functions')
-
-  # get initfun for cswald model
-  # initfun_cswald <- construct_initfun(model, data, formula)
+  stanvars <- brms::stanvar(scode = stan_helpers, block = 'functions') +
+    brms::stanvar(scode = stan_functions, block = 'functions')
 
   # return the list
   nlist(formula, data, stanvars)
 }
 
+posterior_predict_cswald_simple <- function(i, prep, ...) {
+
+}
+
+log_lik_cswald_simple <- function(i, prep) {
+
+}
+
 #' @export
 configure_model.cswald_crisk <- function(model, data, formula) {
+  env_cswald_crisk <- new.env(parent = baseenv())
+
   # retrieve required arguments
   rt_var <- model$other_vars$rt
   response_var <- model$other_vars$response
-  trials <- data[,response_var]
+  trials <- data[, response_var]
   links <- model$links
 
   # construct brms formula from the bmm formula
   formula <- bmf2bf(model, formula)
 
   # construct the family & add to formula object
-  cswald_crsik_family <- function (link_drift = links$drift, link_bound = links$bound, link_ndt = links$ndt, link_zr = links$zr, link_s = links$s) {
+  cswald_crisk_family <- function(link_drift, link_bound, link_ndt, link_zr, link_s) {
     brms::custom_family(
       'cswald_crisk',
-      dpars = c("mu","drift","bound","ndt","zr","s"),
+      dpars = c("mu", "drift", "bound", "ndt", "zr", "s"),
       links = c("identity", link_drift, link_bound, link_ndt, link_zr, link_s),
       ub = c(NA, NA, NA, NA, 1, NA), # upper bounds for parameters
       lb = c(NA, 0, 0, 0, 0, 0), # lower bounds for parameters
@@ -256,154 +335,30 @@ configure_model.cswald_crisk <- function(model, data, formula) {
       loop = TRUE, # is the likelihood vectorized
     )
   }
-  formula$family <- cswald_crsik_family()
+  formula$family <- cswald_crisk_family(
+    link_drift = links$drift,
+    link_bound = links$bound,
+    link_ndt = links$ndt,
+    link_zr = links$zr,
+    link_s = links$s
+  )
 
   # prepare initial stanvars to pass to brms, model formula and priors
-  sc_path <- system.file('stan_chunks', package='bmm')
+  sc_path <- system.file('stan_chunks', package = 'bmm')
+  stan_helpers <- read_lines2(paste0(sc_path, "/cswald_helper_functions.stan"))
   stan_functions <- read_lines2(paste0(sc_path, '/cswald_crisk_functions.stan'))
 
-  stanvars <- brms::stanvar(scode = stan_functions, block = 'functions')
-
-  # get initfun for cswald model
-  # initfun_cswald_crisk <- construct_initfun(model, data, formula)
+  stanvars <- brms::stanvar(scode = stan_helpers, block = 'functions') +
+    brms::stanvar(scode = stan_functions, block = 'functions')
 
   # return the list
   nlist(formula, data, stanvars)
 }
 
-#' @export
-construct_initfun.cswald <- function(model, data, formula) {
-  family <- formula$family
+log_lik_cswald_crisk <- function(i, prep) {
 
-  # get model info
-  standata <- make_standata(formula, data, family)
-  prior_data <- get_prior(formula, data, family)
-  prior_data <- prior_data[which(prior_data$class %in% c("b","Intercept")),]
-  prior_data$base_par <- paste0(prior_data$nlpar,prior_data$dpar)
-  prior_data$par_name <- paste0(prior_data$class,"_",prior_data$base_par)
-  prior_data$K_name <- paste0("K_",prior_data$base_par)
-
-  prior_data <- prior_data[,c("base_par","par_name","K_name")]
-
-  # create initfun
-  # --- 2. The tailored init function to be returned ---
-  the_init_function <- function(chain_id = 1) {
-
-    init_list <- list()
-
-    # --- Initialize ALL Fixed Effects ---
-    for (i in 1:nrow(prior_data)) {
-
-      par <- prior_data$base_par[i]
-      K_name <- prior_data$K_name[i]
-      par_name <- prior_data$par_name[i]
-
-      if (K_name %in% names(standata)) {
-        n_coefs <- standata[[K_name]]
-
-        # --- THIS IS THE NEW LINK-AWARE LOGIC ---
-
-        # Get the link function for this parameter from the family object
-        link_fun <- family[[paste0("link_", par)]]
-
-        # Define safe value ranges for each parameter
-        if (par_name %in% c("b_bs", "b_ndt") && paste0("Intercept_", par) %in% prior_data$par_name) {
-          # For Intercept parameters, use a fixed safe value
-          safe_value <- switch(
-            par,
-            ndt = model$init_ranges,
-            bs  = c(-0.1, 0.1),
-            drift = c(-0.1, 0.1),
-            zr =
-          )
-          link_fun = "identity"
-        } else {
-          # Safe values for intercept or parameters in the formula without intercept
-          safe_value <- switch(
-            par,
-            ndt = c(0.05, 0.1),
-            bs  = c(0.5, 2),
-            drift = c(0.1, 1))
-        }
-
-        # Transform safe values according to the link function
-        init_val <- switch(
-          link_fun,
-          log      = log(safe_value),
-          logit    = qlogis(safe_value),
-          identity = safe_value,
-          {
-            warning(paste("Unrecognized link for", par, ". Using log-scale init."))
-            log(safe_value)
-          }
-        )
-
-        # Assign to init_list
-        init_list[[par_name]] <- runif(n_coefs, init_val[1], init_val[2])
-
-      }
-    }
-
-    # --- Initialize Random Effects ('sd', 'z', 'L') ---
-    # This logic remains the same, as it's already robust.
-    re_groups <- stringr::str_extract(names(standata), "M_\\d+") %>%
-      na.omit() %>% stringr::str_extract("\\d+") %>% as.integer()
-
-    for (i in re_groups) {
-      M <- standata[[paste0("M_", i)]]
-      N <- standata[[paste0("N_", i)]]
-
-      init_list[[paste0("sd_", i)]] <- runif(M, 0.01, 0.1) # Tiny but random sd
-      init_list[[paste0("z_", i)]] <- matrix(rnorm(M * N, 0, 0.01), nrow = M, ncol = N) # Tiny variance in z
-      init_list[[paste0("L_", i)]] <- diag(M) # Start with no correlation
-    }
-
-    return(init_list)
-  }
-
-  return(the_init_function)
 }
 
-#' @export
-construct_initfun.cswald_simple <- function(model, data, formula) {
-  # get model info
-  standata <- make_standata(formula, data, family)
-  prior_data <- get_prior(formula, data, family) %>%
-    filter(class %in% c("b", "Intercept")) %>%
-    mutate(
-      base_par = paste0(nlpar,dpar),
-      par_name = paste0(class, "_", base_par),
-      K_name = paste0("K_", base_par)) %>%
-    select(base_par, par_name, K_name) %>%
-    distinct()
+posterior_predict_cswald_crisk <- function(i, prep, ...) {
 
-  return()
-}
-
-#' @export
-construct_initfun.cswald_crisk <- function(model, data, formula) {
-  # get model info
-  standata <- make_standata(formula, data, family)
-  prior_data <- get_prior(formula, data, family) %>%
-    filter(class %in% c("b", "Intercept")) %>%
-    mutate(
-      base_par = paste0(nlpar,dpar),
-      par_name = paste0(class, "_", base_par),
-      K_name = paste0("K_", base_par)) %>%
-    select(base_par, par_name, K_name) %>%
-    distinct()
-
-  return()
-}
-
-#############################################################################!
-# POSTPROCESS METHODS                                                    ####
-#############################################################################!
-# A postprocess_brm.* function should be defined for the model class. See
-# ?postprocess_brm for details
-
-#' @export
-postprocess_brm.cswald <- function(model, fit, ...) {
-  # any required postprocessing (if none, delete this section)
-  fit
 }

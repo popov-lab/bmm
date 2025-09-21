@@ -13,6 +13,11 @@ cswald(rt, response, links = NULL, version = "simple", ...)
 
 \item{links}{A list of links for the parameters.}
 
+\item{version}{A character string which version of the cswald model to use.
+The standard cswald model is referred to as "simple" version, and the competing risk
+version is referred to as "crisk". For more details on these model versions, please look
+into Miller et al. (2017) given as the reference in the \code{cswald} model object.}
+
 \item{...}{used internally for testing, ignore it}
 }
 \value{
@@ -43,7 +48,6 @@ for Choice Response Times. Applied Psychological Measurement, 42(2), 116-135. ht
 }
 \item \strong{Fixed parameters:}
 \itemize{
-\item \code{mu} = 0
 \item \code{s} = 0
 }
 \item \strong{Default parameter links:}
@@ -69,7 +73,7 @@ for Choice Response Times. Applied Psychological Measurement, 42(2), 116-135. ht
 }
 \item \code{s}:
 \itemize{
-\item \code{main}: normal(0,0.5)
+\item \code{main}: normal(0,0.3)
 \item \code{effects}: normal(0,0.2)
 }
 }
