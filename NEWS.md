@@ -1,9 +1,9 @@
 # bmm (development version)
 
-# bmm 1.1.1
+# bmm 1.2.0
 
 ### New models
-* Add the Memory Measurement Model (Oberauer & Lewandowsky, 2019) and its generalization as the Multinomial Measurement Model for categorical decision tasks as new model class **m3** with three versions: simple span (**ss**), complex span (**cs**), and **custom**. For details, see the [article](https://venpopov.github.io/bmm/articles/bmm_m3.html) on the `bmm` website (#237). Thanks to @GidonFrischkorn and @chenyu-psy
+* Add the Memory Measurement Model (Oberauer & Lewandowsky, 2019) and its generalization as the Multinomial Measurement Model for categorical decision tasks as new model class **m3** with three versions: simple span (**ss**), complex span (**cs**), and **custom**. For details, see the [article](https://venpopov.github.io/bmm/dev/articles/bmm_m3.html) on the `bmm` website (#237). Thanks to @GidonFrischkorn and @chenyu-psy
 
 ### New features
 * Updates to the `bmf2bf` S3 methods for more flexible translation of `bmmformulas` into `brmsformulas` (#227).
@@ -19,7 +19,7 @@
 
 ### Documentation
 * Add documentation to the [continuous reproduction task](https://venpopov.github.io/bmm/articles/bmm_vwm_crt.html) article for pre-processing half-circular stimulus spaces when using `bmmodels` of the `circular` model class (#229, #233).
-* New online [article](https://venpopov.github.io/bmm/articles/bmm_m3.html) to accompany the m3 model
+* New online [article](https://venpopov.github.io/bmm/dev/articles/bmm_m3.html) to accompany the m3 model
 
 ### Other changes
 * vectorize `k2sd()` function for improved performance

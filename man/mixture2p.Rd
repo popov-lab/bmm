@@ -68,7 +68,7 @@ Two-parameter mixture model by Zhang and Luck (2008).
 }
 }
 \examples{
-\dontshow{if (isTRUE(Sys.getenv("BMM_EXAMPLES"))) (if (getRversion() >= "3.4") withAutoprint else force)(\{ # examplesIf}
+\dontshow{if (isTRUE(Sys.getenv("BMM_EXAMPLES"))) withAutoprint(\{ # examplesIf}
 # generate artificial data
 dat <- data.frame(y = rmixture2p(n = 2000))
 

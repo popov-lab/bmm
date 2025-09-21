@@ -1,6 +1,7 @@
 url: https://venpopov.github.io/bmm/
 template:
   bootstrap: 5
+  math-rendering: mathjax
 
 development:
   mode: auto

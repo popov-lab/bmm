@@ -63,3 +63,58 @@ c_bessel2sqrtexp <- function(c, kappa) {
   stopif(isTRUE(any(c < 0)), "c must be non-negative")
   c / (besselI(kappa, 0, expon.scaled = TRUE) * sqrt(2 * pi * kappa))
 }
+
+#' @title Transform values from the native to parameter scale or vice versa according to a link function
+#'
+#' @description
+#' This function transforms a vector of values from the native scale to the parameter scale,
+#' according to the specified link function. The function is mainly used internally, to ensure proper
+#' initial values
+#'
+#' @param values A numerical vector of values the transformation should be applied to
+#' @param link A character specifying the link to be applied.
+#' Available options are: "identity", "log", "log1p", "logm1", "inverse", "sqrt", "logit", "probit", "tan_half", and "cloglog".
+#' @param inverse A Boolean value indicating if values should be transformed from the native to
+#' the parameter scale (FALSE), or from the parameter scale to the native scale (TRUE)
+link_transform <- function(values, link = "identity", inverse = FALSE) {
+  stopif(!is.numeric(values),
+         glue("The values to be transformed need to be numeric."))
+
+  if(is.null(link)) link = "identity"
+
+  if(inverse) {
+    transformed_values <- switch(
+      link,
+      identity = values,
+      log = exp(values),
+      log1p = expm1(values),
+      logm1 = brms::expp1(values),
+      inverse = 1 / values,
+      sqrt = values^2,
+      logit = plogis(values),
+      probit = pnorm(values),
+      tan_half = 2 * atan(values),
+      loglog = exp(-exp(values)),
+      cloglog = 1 - exp(-exp(values)),
+      stop("Link not recognized.")
+    )
+  } else {
+    transformed_values <- switch(
+      link,
+      identity = values,
+      log = log(values),
+      log1p = log1p(values),
+      logm1 = brms::logm1(values),
+      inverse = 1 / values,
+      sqrt = sqrt(values),
+      logit = qlogis(values),
+      probit = qnorm(values),
+      tan_half = tan(values / 2),
+      loglog = log(-log(values)),
+      cloglog = log(-log1p(-values)),
+      stop("Link not recognized.")
+    )
+  }
+
+  return(transformed_values)
+}
