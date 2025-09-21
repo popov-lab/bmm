@@ -90,7 +90,10 @@
         On the Relation Between the (Censored) Shifted Wald and the Wiener Distribution as Measurement Models
         for Choice Response Times. Applied Psychological Measurement, 42(2), 116-135. https://doi.org/10.1177/0146621617710465",
       version = version,
-      requirements = "",
+      requirements = glue(
+        "- Reaction times should be passed in seconds","\n",
+        "- The response variable should be passed numerically: 0 = lower response, 1 = upper response"
+      ),
       parameters = .cswald_version_table[[version]][["parameters"]],
       links = .cswald_version_table[[version]][["links"]],
       fixed_parameters = .cswald_version_table[[version]][["fixed_parameters"]],
