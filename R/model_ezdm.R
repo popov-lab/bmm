@@ -71,9 +71,18 @@
       domain = "Processing Speed, Decision Making",
       task = "Choice Reaction Time tasks",
       name = "EZ-Diffusion Model",
-      citation = "",
+      citation = glue(
+        "Wagenmakers, E.-J., Van Der Maas, H. L. J., & Grasman, R. P. P. P. (2007). An EZ-diffusion model for response time and accuracy. Psychonomic Bulletin & Review, 14(1), 3–22. https://doi.org/10/fk447c","\n",
+        "- Chávez De la Peña, A. F., & Vandekerckhove, J. (2025). An EZ Bayesian hierarchical drift diffusion model for response time and accuracy. Psychonomic Bulletin & Review. https://doi.org/10.3758/s13423-025-02729-y"
+      ),
       version = version,
-      requirements = "",
+      requirements = glue(
+        "Provide aggregated statistics for each subject and condition that model parameters should vary over:","\n\n",
+        "  - Mean reaction times (mean_rt) in seconds","\n",
+        "  - Variance of reaction times (var_rt) in seconds","\n",
+        "  - Number of responses to the upper decision threshold (n_upper)", "\n",
+        "  - Total number of trials used to calculate aggregated statistics (n_trials)"
+      ),
       parameters = .ezdm_version_table[[version]][["parameters"]],
       links = .ezdm_version_table[[version]][["links"]],
       fixed_parameters = .ezdm_version_table[[version]][["fixed_parameters"]],
