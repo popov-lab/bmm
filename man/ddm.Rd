@@ -32,9 +32,25 @@ Diffusion Decision Model
 \item \strong{Citation:}
 \itemize{
 \item 
+\itemize{
+\item Ratcliff, R. (1978). A theory of memory retrieval. Psychological Review, 85(2), 59–108. https://doi.org/10/fjwm2f
 }
+}
+}
+\itemize{
+\item Henrich, F., Hartmann, R., Pratz, V., Voss, A., & Klauer, K. C. (2024). The Seven-parameter Diffusion Model: An Implementation in Stan for Bayesian Analyses. Behavior Research Methods, 56(4), 3102–3116. https://doi.org/10.3758/s13428-023-02179-1
+}
+\itemize{
 \item \strong{Version:} 7par
 \item \strong{Requirements:}
+\itemize{
+\item The response time should be in seconds and represent the time between onset of the target stimulus until the response execution
+}
+}
+\itemize{
+\item The response should be coded numerically: 0 = lower response, 1 = upper response
+}
+\itemize{
 \item \strong{Parameters:}
 \itemize{
 \item \code{drift}: Drift rate = Average rate of evidence accumulation of the decision processes
