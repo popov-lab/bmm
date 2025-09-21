@@ -102,6 +102,7 @@ backend interface to Stan.
 \section{Supported Models}{
 The following models are supported:
 \itemize{
+\item ezdm(mean_rt, var_rt, n_upper, n_trials, response, links, version)
 \item imm(resp_error, nt_features, nt_distances, set_size, regex, version)
 \item m3(resp_cats, num_options, choice_rule, version)
 \item mixture2p(resp_error)
