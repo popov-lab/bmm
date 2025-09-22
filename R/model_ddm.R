@@ -343,37 +343,36 @@ configure_model.ddm <- function(model, data, formula) {
 }
 
 log_lik_ddm <- function(i, prep) {
-  args <- list(
-    drift = brms::get_dpar(prep, "drift", i),
-    bound = brms::get_dpar(prep, "bound", i = i),
-    ndt = brms::get_dpar(prep, "ndt", i = i),
-    zr = brms::get_dpar(prep, "zr", i = i),
-    sdrift = brms::get_dpar(prep, "sdrift", i = i),
-    sndt = brms::get_dpar(prep, "sndt", i = i),
-    szr = brms::get_dpar(prep, "szr", i = i),
-    response = prep$data[["dec"]][i]
-  )
-  out <- brms::do_call(dddm, c(prep$data$Y[i], args, log = TRUE))
-  out
+  out <- rtdists::ddiffusion(rt = prep$data$Y[i], response = ifelse(prep$data[["dec"]][i] == 1, "upper","lower"),
+                             a = brms::get_dpar(prep, "bound", i = i),
+                             v = brms::get_dpar(prep, "drift", i),
+                             t0 = brms::get_dpar(prep, "ndt", i = i),
+                             z = brms::get_dpar(prep, "zr", i = i) * brms::get_dpar(prep, "bound", i = i),
+                             sz = brms::get_dpar(prep, "szr", i = i),
+                             sv = brms::get_dpar(prep, "sdrift", i = i),
+                             st0 = brms::get_dpar(prep, "sndt", i = i))
+  log(out)
 }
 
 posterior_predict_ddm <- function(i, prep, ...) {
   dots <- list(...)
 
-  out <- rddm(
+  out <- rtdists::rdiffusion(
     n = 1,
-    drift = brms::get_dpar(prep, "drift", i),
-    bound = brms::get_dpar(prep, "bound", i = i),
-    ndt = brms::get_dpar(prep, "ndt", i = i),
-    zr = brms::get_dpar(prep, "zr", i = i),
-    sdrift = brms::get_dpar(prep, "sdrift", i = i),
-    sndt = brms::get_dpar(prep, "sndt", i = i),
-    szr = brms::get_dpar(prep, "szr", i = i)
+    a = brms::get_dpar(prep, "bound", i = i),
+    v = brms::get_dpar(prep, "drift", i),
+    t0 = brms::get_dpar(prep, "ndt", i = i),
+    z = brms::get_dpar(prep, "zr", i = i) * brms::get_dpar(prep, "bound", i = i),
+    sz = brms::get_dpar(prep, "szr", i = i),
+    sv = brms::get_dpar(prep, "sdrift", i = i),
+    st0 = brms::get_dpar(prep, "sndt", i = i)
   )
 
   if(!is.null(dots$negative_rt) && dots$negative_rt) {
     # code lower bound responses as negative RTs
-    out <- out[["rt"]] * ifelse(out[["response"]], 1, -1)
+    out <- out[["rt"]] * ifelse(out[["response"]] == "upper", 1, -1)
+  } else {
+    out <- out[["rt"]]
   }
 
   out
