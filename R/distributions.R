@@ -568,16 +568,16 @@ rimm <- function(n, mu = c(0, 2, -1.5), dist = c(0, 0.5, 2),
 #'
 #' @name m3dist
 #'
-#' @param x Integer vector of length `K` where K is the number of response categories 
+#' @param x Integer vector of length `K` where K is the number of response categories
 #'   and each value is the number of observed responses per category
 #' @param n Integer. Number of observations to generate data for
-#' @param size The total number of observations in all categories 
+#' @param size The total number of observations in all categories
 #' @param pars A named vector of parameters of the memory measurement model
 #' @param m3_model A `bmmodel` object specifying the m3 model that densities or
 #'   random samples should be generated for
 #' @param act_funs A `bmmformula` object specifying the activation functions for
-#'   the different response categories for the "custom" version of the M3. The 
-#'   default will attempt to construct the standard activation functions for the 
+#'   the different response categories for the "custom" version of the M3. The
+#'   default will attempt to construct the standard activation functions for the
 #'   "ss" and "cs" model version. For a custom m3 model you need to specify the
 #'   act_funs argument manually
 #' @param log Logical; if `TRUE` (default), values are returned on the log scale.
@@ -602,7 +602,7 @@ rimm <- function(n, mu = c(0, 2, -1.5), dist = c(0, 0.5, 2),
 #'  )
 #'  dm3(x = c(20, 10, 10), pars = c(a = 1, b = 1, c = 2), m3_model = model)
 #' @export
-dm3 <- function(x, pars, m3_model, act_funs = construct_m3_act_funs(m3_model, warnings = FALSE), 
+dm3 <- function(x, pars, m3_model, act_funs = construct_m3_act_funs(m3_model, warnings = FALSE),
                 log = TRUE, ...) {
   probs <- .compute_m3_probability_vector(pars, m3_model, act_funs, ...)
   dmultinom(x, prob = probs, log = log)
@@ -639,3 +639,156 @@ rm3 <- function(n, size, pars, m3_model, act_funs = construct_m3_act_funs(m3_mod
     acts <- acts * num_options
     acts / sum(acts)
   }
+
+
+#' @title Distribution functions for the censored shifted Wald mode (`cswald`)
+#'
+#' @name cswald_dist
+#'
+#' @description
+#'   These functions provide the density and random generation function for the
+#'   censored shifted Wald model: `cswald`
+#'
+#' @param rt A vector of response times in seconds `x` for which the likelihood should be evaluated
+#' @param response A vector of responses coded numerically: 0 = lower response, 1 = upper response
+#' @param n The number of random samples that should be generated
+#' @param drift The drift rate for which the likelihood should be evaluated
+#' @param bound The boundary separation for which the likelihood should be evaluated
+#' @param ndt The non-decision time for which the
+#' @param zr The relative starting point, only available with `version = "crisk"`
+#' @param s The diffusion constant - that is standard deviation of the noise in the evidence accumulation. Default is `s = 1`
+#' @param version A character string specifying the version of the `cswald` for which the
+#'   likelihood should be returned. Available versions are "simple" and "crisk", the default is "simple."
+#' @param log A single logical value indicating if log-likelihoods should be returned, the default is `TRUE`
+#'
+#' @keywords distributions
+#'
+#'
+#' @export
+dcswald <- function(rt, response, drift, bound, ndt, zr = 0.5, s = 1, version = "simple", log = TRUE) {
+  validate_cswald_parameters(drift, bound, ndt, zr, s)
+
+  # obtain shifted rts
+  rt_shifted <- rt - ndt
+  stopif(any(rt_shifted <= 0),
+         glue::glue("Some reaction times are smaller than the non-decision time. \n",
+                    "You need to specify a non-decisiton time 'ndt' smaller than the shortest reaction time."))
+
+  # pre-allocate vector for log-likelihood
+  log_ll <- numeric(length(rt))
+
+  # check length of passed parameters
+  if(length(drift) == 1 && !length(drift) == length(rt)) drift <- rep(drift, length.out = length(rt))
+  if(length(bound) == 1 && !length(bound) == length(rt)) bound <- rep(bound, length.out = length(rt))
+  if(length(ndt) == 1 && !length(ndt) == length(rt)) ndt <- rep(ndt, length.out = length(rt))
+  if(length(zr) == 1 && !length(zr) == length(rt)) zr <- rep(zr, length.out = length(rt))
+  if(length(s) == 1 && !length(s) == length(rt)) s <- rep(s, length.out = length(rt))
+
+  if (version == "simple") {
+    log_ll[response == 1] = .dwald(rt_shifted[response == 1], drift = drift[response == 1], bound = bound[response == 1], s = s[response == 1], log = TRUE)
+    if(any(response == 0)) {
+      log_ll[response == 0] = .pwald(rt_shifted[response == 0], drift = drift[response == 0], bound = bound[response == 0], s = s[response == 0], lower.tail = FALSE, log.p = TRUE)
+    }
+  } else if(version == "crisk") {
+    log_ll[response == 1] = .dwald(rt_shifted[response == 1], drift = drift[response == 1], bound = (bound - (bound*zr))[response == 1], s = s[response == 1], log = TRUE) +
+      .pwald(rt_shifted[response == 0], drift = drift[response == 0], bound = (bound - (bound*zr))[response == 0], s = s[response == 0], lower.tail = FALSE, log.p = TRUE)
+    log_ll[response == 0] = .dwald(rt_shifted[response == 0], drift = -drift[response == 0], bound = (bound*zr)[response == 0], s = s[response == 1], log = TRUE) +
+      .pwald(rt_shifted[response == 1], drift = -drift[response == 1], bound = (bound*zr)[response == 1], s = s[response == 1], lower.tail = FALSE, log.p = TRUE)
+  } else {
+    stop2("The version you specified is not valid. Please choose between version = \"simple\" or \"crisk\".")
+  }
+
+  if (!log) {
+    return(exp(log_ll))
+  }
+  log_ll
+}
+
+#' @rdname cswald_dist
+#' @export
+rcswald <- function(n, drift, bound, ndt, zr = 0.5, s = 1) {
+  validate_cswald_parameters(drift, bound, ndt, zr, s)
+
+  # recycle scalars to length n
+  drift <- rep(drift, length.out = n)
+  bound <- rep(bound, length.out = n)
+  ndt   <- rep(ndt,   length.out = n)
+  zr    <- rep(zr,    length.out = n)
+  s     <- rep(s,     length.out = n)
+
+  # calucalte p_correct from parms
+
+  k_num <- -2 * drift * (zr * bound) / (s^2)
+  k_all <- -2 * drift * bound / (s^2)
+  p_correct <- -expm1(k_num)/-expm1(k_all)
+  response <- rbinom(n, size = 1, prob = p_correct)
+
+  # Draw latent decision times to each boundary independently (competing-risks approximation)
+  rt_decision <- numeric(n)
+  rt_decision[response == 1] <- .rwald(sum(response), drift = drift, bound = bound * (1-zr), s = s)
+  rt_decision[response == 0] <- .rwald(n - sum(response), drift = drift, bound = bound * zr, s = s)
+  rt <- ndt + rt_decision
+
+  data.frame(
+    rt = rt,
+    response = response   # 1 = upper, 0 = lower
+  )
+}
+
+validate_cswald_parameters <- function(drift, bound, ndt, zr, s) {
+  stopif(any(bound <= 0),
+         "Values for the boundary seperation 'bound' must be positive.")
+  stopif(any(ndt <= 0),
+         "Values for the non-decision time 'ndt' must be positive.")
+  stopif(any(zr <= 0 || zr >= 1),
+         "Values for the relative startin point 'zr' must be between 0 and 1")
+  stopif(any(s <= 0),
+         "Values for diffusion constant 's' must be positive.")
+}
+
+.dwald <- function(rt, drift, bound, s, log = TRUE) {
+  term1 <- bound/(s * sqrt(2*pi*rt^3))
+  term2 <- exp(-(bound-drift*rt)^2/(2*s^2*rt))
+  if(log) return(log(term1) + log(term2))
+}
+
+.pwald <- function(rt, drift, bound, s, lower.tail = TRUE, log.p = TRUE) {
+  z1 <- (drift * rt - bound)/(s * sqrt(rt))
+  z2 <- -(drift * rt + bound)/(s * sqrt(rt))
+  logE <- (2*drift*bound)/(s^2)
+
+  # log-CDF via log-sum-exp
+  a1 <- pnorm(z1, log.p = TRUE)
+  a2 <- logE + pnorm(z2, log.p = TRUE)
+  log_p <- matrixStats::logSumExp(c(a1, a2))
+
+  if (!lower.tail) log_p <- log1p(-exp(log_p))
+
+  if(!log.p) return(exp(log_p))
+  log_p
+}
+
+.rwald <- function(n, drift, bound, s = 1) {
+  # recycle to length n
+  v <- rep(drift, length.out = n)
+  a <- rep(bound, length.out = n)
+  s <- rep(s,     length.out = n)
+
+  stopifnot(all(a > 0), all(s > 0))
+
+  # choose effective drift component per trial
+  eps <- 1e-12
+  v_eff <- pmax(v, eps)
+
+  # Transform DDM parms to mu / lambda parametrization
+  mu <- a / v_eff
+  lambda <- (a / s)^2
+
+  # Michael–Schucany–Haas (1976) IG sampler
+  z <- rnorm(n)
+  y <- z * z
+  x <- mu + (mu^2 * y) / (2 * lambda) - (mu / (2 * lambda)) * sqrt(4 * mu * lambda * y + (mu^2) * (y^2))
+  u <- runif(n)
+  # return rts
+  ifelse(u <= mu / (mu + x), x, (mu^2) / x)
+}
