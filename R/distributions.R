@@ -691,9 +691,9 @@ dcswald <- function(rt, response, drift, bound, ndt, zr = 0.5, s = 1, version = 
     }
   } else if(version == "crisk") {
     log_ll[response == 1] = .dwald(rt_shifted[response == 1], drift = drift[response == 1], bound = (bound - (bound*zr))[response == 1], s = s[response == 1], log = TRUE) +
-      .pwald(rt_shifted[response == 0], drift = drift[response == 0], bound = (bound - (bound*zr))[response == 0], s = s[response == 0], lower.tail = FALSE, log.p = TRUE)
-    log_ll[response == 0] = .dwald(rt_shifted[response == 0], drift = -drift[response == 0], bound = (bound*zr)[response == 0], s = s[response == 1], log = TRUE) +
       .pwald(rt_shifted[response == 1], drift = -drift[response == 1], bound = (bound*zr)[response == 1], s = s[response == 1], lower.tail = FALSE, log.p = TRUE)
+    log_ll[response == 0] = .dwald(rt_shifted[response == 0], drift = -drift[response == 0], bound = (bound*zr)[response == 0], s = s[response == 0], log = TRUE) +
+      .pwald(rt_shifted[response == 0], drift = drift[response == 0], bound = (bound - (bound*zr))[response == 0], s = s[response == 0], lower.tail = FALSE, log.p = TRUE)
   } else {
     stop2("The version you specified is not valid. Please choose between version = \"simple\" or \"crisk\".")
   }
@@ -760,9 +760,10 @@ validate_cswald_parameters <- function(drift, bound, ndt, zr, s) {
   # log-CDF via log-sum-exp
   a1 <- pnorm(z1, log.p = TRUE)
   a2 <- logE + pnorm(z2, log.p = TRUE)
-  log_p <- matrixStats::logSumExp(c(a1, a2))
+  matrix_a <- cbind(a1,a2)
+  log_p <- apply(matrix_a, 1, matrixStats::logSumExp)
 
-  if (!lower.tail) log_p <- log1p(-exp(log_p))
+  if (!lower.tail) log_p <- log(1-exp(log_p))
 
   if(!log.p) return(exp(log_p))
   log_p
