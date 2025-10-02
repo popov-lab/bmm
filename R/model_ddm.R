@@ -90,9 +90,9 @@
       bound  = list(main = "normal(0,0.5)", effects = "normal(0,0.5)"),
       ndt    = list(main = "normal(-1.5,0.5)", effects = "normal(0,0.3)"),
       zr     = list(main = "normal(0,0.5)", effects = "normal(0,0.3)"),
-      sdrift = list(main = "normal(0,0.5)", effects = "normal(0,0.5)"),
-      sndt   = list(main = "normal(0,0.5)", effects = "normal(0,0.5)"),
-      szr    = list(main = "normal(0,0.5)", effects = "normal(0,0.5)")
+      sdrift = list(main = "normal(0,0.3)", effects = "normal(0,0.3)"),
+      sndt   = list(main = "normal(-2.5,0.3)", effects = "normal(0,0.3)"),
+      szr    = list(main = "normal(0,0.2)", effects = "normal(0,0.3)")
     ),
     init_ranges = list(
       mu    = c(0,1),
@@ -100,9 +100,9 @@
       bound  = c(1,2),
       ndt    = c(0.02,0.05),
       zr     = c(0.45,0.55),
-      sdrift = c(0.01,0.1),
+      sdrift = c(0.1,1),
       sndt   = c(0.01,0.1),
-      szr    = c(0.01,0.1)
+      szr    = c(0.45,0.55)
     )
   )
 )
@@ -357,20 +357,20 @@ log_lik_ddm <- function(i, prep) {
 posterior_predict_ddm <- function(i, prep, ...) {
   dots <- list(...)
 
-  out <- rtdists::rdiffusion(
-    n = 1,
-    a = brms::get_dpar(prep, "bound", i = i),
-    v = brms::get_dpar(prep, "drift", i),
-    t0 = brms::get_dpar(prep, "ndt", i = i),
-    z = brms::get_dpar(prep, "zr", i = i) * brms::get_dpar(prep, "bound", i = i),
-    sz = brms::get_dpar(prep, "szr", i = i),
-    sv = brms::get_dpar(prep, "sdrift", i = i),
-    st0 = brms::get_dpar(prep, "sndt", i = i)
+  out <- rddm(
+    n = length(brms::get_dpar(prep,"drift", i = i)),
+    bound = brms::get_dpar(prep, "bound", i = i),
+    drift = brms::get_dpar(prep, "drift", i),
+    ndt = brms::get_dpar(prep, "ndt", i = i),
+    zr = brms::get_dpar(prep, "zr", i = i),
+    szr = brms::get_dpar(prep, "szr", i = i),
+    sdrift = brms::get_dpar(prep, "sdrift", i = i),
+    sndt = brms::get_dpar(prep, "sndt", i = i)
   )
 
   if(!is.null(dots$negative_rt) && dots$negative_rt) {
     # code lower bound responses as negative RTs
-    out <- out[["rt"]] * ifelse(out[["response"]] == "upper", 1, -1)
+    out <- out[["rt"]] * ifelse(out[["response"]] == 1, 1, -1)
   } else {
     out <- out[["rt"]]
   }

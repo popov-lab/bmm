@@ -702,5 +702,5 @@ rddm <- function(n, drift, bound, ndt, zr = 0.5, sdrift = 0, sndt = 0, szr = 0) 
 
   sim_data <- rtdists::rdiffusion(n = n, a = bound, v = drift, t0 = ndt, z = zr * bound, sz = szr, sv = sdrift, st0 = sndt)
   sim_data$response <- ifelse(sim_data$response == "upper",1,0)
-  as.matrix(sim_data)
+  sim_data
 }
