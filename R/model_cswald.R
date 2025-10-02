@@ -282,6 +282,8 @@ configure_model.cswald_simple <- function(model, data, formula) {
       type = 'real', # real for continous dv, int for discrete dv
       vars = 'dec[n]',
       loop = TRUE, # is the likelihood vectorized
+      log_lik = log_lik_cswald_simple,
+      posterior_predict = posterior_predict_cswald_simple
     )
   }
 
@@ -305,7 +307,24 @@ configure_model.cswald_simple <- function(model, data, formula) {
 }
 
 posterior_predict_cswald_simple <- function(i, prep, ...) {
+  dots <- list(...)
 
+  out <- rcswald(
+    n = length(brms::get_dpar(prep,"drift",i = i)),
+    bound = brms::get_dpar(prep, "bound", i = i)*2,
+    drift = brms::get_dpar(prep, "drift", i),
+    ndt = brms::get_dpar(prep, "ndt", i = i),
+    s = brms::get_dpar(prep,"s", i = i)
+  )
+
+  if(!is.null(dots$negative_rt) && dots$negative_rt) {
+    # code lower bound responses as negative RTs
+    out <- out[["rt"]] * ifelse(out[["response"]] == 1, 1, -1)
+  } else {
+    out <- out[["rt"]]
+  }
+
+  out
 }
 
 log_lik_cswald_simple <- function(i, prep) {
@@ -336,6 +355,8 @@ configure_model.cswald_crisk <- function(model, data, formula) {
       type = 'real', # real for continous dv, int for discrete dv
       vars = 'dec[n]',
       loop = TRUE, # is the likelihood vectorized
+      log_lik = log_lik_cswald_crisk,
+      posterior_predict = posterior_predict_cswald_crisk
     )
   }
   formula$family <- cswald_crisk_family(
@@ -363,5 +384,23 @@ log_lik_cswald_crisk <- function(i, prep) {
 }
 
 posterior_predict_cswald_crisk <- function(i, prep, ...) {
+  dots <- list(...)
 
+  out <- rcswald(
+    n = length(brms::get_dpar(prep,"drift",i = i)),
+    bound = brms::get_dpar(prep, "bound", i = i),
+    drift = brms::get_dpar(prep, "drift", i),
+    ndt = brms::get_dpar(prep, "ndt", i = i),
+    zr = brms::get_dpar(prep,"zr",i = i),
+    s = brms::get_dpar(prep,"s", i = i)
+  )
+
+  if(!is.null(dots$negative_rt) && dots$negative_rt) {
+    # code lower bound responses as negative RTs
+    out <- out[["rt"]] * ifelse(out[["response"]] == 1, 1, -1)
+  } else {
+    out <- out[["rt"]]
+  }
+
+  out
 }

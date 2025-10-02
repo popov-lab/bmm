@@ -740,7 +740,7 @@ validate_cswald_parameters <- function(drift, bound, ndt, zr, s) {
          "Values for the boundary seperation 'bound' must be positive.")
   stopif(any(ndt <= 0),
          "Values for the non-decision time 'ndt' must be positive.")
-  stopif(any(zr <= 0 || zr >= 1),
+  stopif(any(zr <= 0) || any(zr >= 1),
          "Values for the relative startin point 'zr' must be between 0 and 1")
   stopif(any(s <= 0),
          "Values for diffusion constant 's' must be positive.")
