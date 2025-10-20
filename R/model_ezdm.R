@@ -63,10 +63,10 @@
 )
 
 
-.model_ezdm <- function(mean_rt = NULL, var_rt = NULL, n_upper = NULL, n_trials = NULL, response = NULL, version = "4par", links = NULL, call = NULL, ...) {
+.model_ezdm <- function(mean_rt = NULL, var_rt = NULL, n_upper = NULL, n_trials = NULL, version = "4par", links = NULL, call = NULL, ...) {
   out <- structure(
     list(
-      resp_vars = nlist(mean_rt, var_rt, n_upper, response),
+      resp_vars = nlist(mean_rt, var_rt, n_upper),
       other_vars = nlist(n_trials),
       domain = "Processing Speed, Decision Making",
       task = "Choice Reaction Time tasks",
@@ -119,10 +119,10 @@
 #' \dontrun{
 #' # put a full example here (see 'R/model_mixture3p.R' for an example)
 #' }
-ezdm <- function(mean_rt, var_rt, n_upper, n_trials, response = NULL, links = NULL, version = "3par", ...) {
+ezdm <- function(mean_rt, var_rt, n_upper, n_trials, links = NULL, version = "3par", ...) {
   call <- match.call()
   stop_missing_args()
-  .model_ezdm(mean_rt = mean_rt, var_rt = var_rt, n_upper = n_upper, n_trials = n_trials, response = response,
+  .model_ezdm(mean_rt = mean_rt, var_rt = var_rt, n_upper = n_upper, n_trials = n_trials,
               links = links, version = version, call = call, ...)
 }
 
@@ -172,7 +172,7 @@ bmf2bf.ezdm_4par <- function(model, formula) {
   response <- model$resp_vars$response
 
   # set the base brmsformula based
-  brms_formula <- brms::bf(paste0(mean_rt, " | vreal(", var_rt, ") + vint(", n_upper, ") + trials(", n_trials, ") + dec(",response,") ~ 1"))
+  brms_formula <- brms::bf(glue::glue("{mean_rt[1]} | vreal({mean_rt[2]}, {var_rt[1]}, {var_rt[2]}) + vint({n_upper}, {n_trials}) ~ 1"))
 
   # return the brms_formula to add the remaining bmmformulas to it.
   brms_formula
@@ -244,7 +244,7 @@ configure_model.ezdm_4par <- function(model, data, formula) {
       log_lik = log_lik_ezdm_4par,
       posterior_predict = posterior_predict_ezdm_4par,
       loop = TRUE, # is the likelihood vectorized
-      vars = c('vreal1[n]','vint1[n]','trials[n]','dec[n]')
+      vars = c('vreal1[n]','vreal2[n]','vreal3[n]','vint1[n]','vint2[n]')
     )
   }
 
@@ -263,12 +263,10 @@ configure_model.ezdm_4par <- function(model, data, formula) {
 
 
 log_lik_ezdm_4par <- function(i, prep) {
-
-  out
+  #out
 }
 
 posterior_predict_ezdm_4par <- function(i, prep, ...) {
   dots <- list(...)
-
   # out
 }

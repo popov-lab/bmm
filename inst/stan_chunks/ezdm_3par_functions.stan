@@ -2,9 +2,10 @@
 real ezdm_3par_lpdf (real mrt, real mu, real drift, real bound, real ndt, real s, real vrt, int hits, int trials) {
   if (abs(drift) < 1e-8) {
     return binomial_lpmf(hits | trials, 0.5) +
-    normal_lpdf(mrt | ndt + (square(bound) / (4 * square(s))), sqrt(pow(bound,4) / (24 * pow(s,4))/trials)) +
-    gamma_lpdf(vrt | ((trials-1)/2.0), ((trials-1)/(pow(bound,4) / (24 * pow(s,4)))));
+           normal_lpdf(mrt | ndt + (square(bound) / (4 * square(s))), sqrt(pow(bound,4) / (24 * pow(s,4))/trials)) +
+           gamma_lpdf(vrt | ((trials-1)/2.0), ((trials-1)/(pow(bound,4) / (24 * pow(s,4)))));
   }
+
   // compute helper variables
   real y   = -(bound * drift) / square(s);
   real expy   = exp(y);
