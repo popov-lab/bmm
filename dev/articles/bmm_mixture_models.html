@@ -264,7 +264,7 @@ p(\theta) = p_{mem} \cdot \text{vM}(\theta; 0, \kappa) + p_{nt} \cdot \frac{\sum
 <span><span class="fu"><a href="https://ggplot2.tidyverse.org/reference/ggplot.html" class="external-link">ggplot</a></span><span class="op">(</span><span class="va">dat</span>, <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/aes.html" class="external-link">aes</a></span><span class="op">(</span><span class="va">response</span><span class="op">)</span><span class="op">)</span> <span class="op">+</span></span>
 <span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/geom_histogram.html" class="external-link">geom_histogram</a></span><span class="op">(</span>binwidth <span class="op">=</span> <span class="fl">0.5</span>, fill <span class="op">=</span> <span class="st">"lightblue"</span>, color <span class="op">=</span> <span class="st">"black"</span><span class="op">)</span> <span class="op">+</span></span>
 <span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/labs.html" class="external-link">labs</a></span><span class="op">(</span>title <span class="op">=</span> <span class="st">"Response distribution"</span>, x <span class="op">=</span> <span class="st">"Response error (radians)"</span>, y <span class="op">=</span> <span class="st">"Frequency"</span><span class="op">)</span></span></code></pre></div>
-<p><img src="bmm_mixture_models_files/figure-html/unnamed-chunk-4-1.jpeg" width="400" style="display: block; margin: auto;"></p>
+<p><img src="bmm_mixture_models_files/figure-html/unnamed-chunk-4-1.jpeg" alt="" width="400" style="display: block; margin: auto;"></p>
 <p>We can center the response and non-target variables by subtracting the target value from them. We can do this with the <code>mutate</code> function from the <code>dplyr</code> package. We also need to make sure that the response is in the range of <span class="math inline">\((-\pi, \pi)\)</span>, and the non-target variables are in the range of <span class="math inline">\((-\pi, \pi)\)</span>. We can do this with the <code>wrap</code> function from the <code>bmm</code> package. As we can see from the new plot, the response distribution is now centered on 0.</p>
 <div class="sourceCode" id="cb4"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://dplyr.tidyverse.org" class="external-link">dplyr</a></span><span class="op">)</span></span>
@@ -281,7 +281,7 @@ p(\theta) = p_{mem} \cdot \text{vM}(\theta; 0, \kappa) + p_{nt} \cdot \frac{\sum
 <span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/geom_histogram.html" class="external-link">geom_histogram</a></span><span class="op">(</span>bins<span class="op">=</span><span class="fl">60</span>, fill <span class="op">=</span> <span class="st">"lightblue"</span>, color <span class="op">=</span> <span class="st">"black"</span><span class="op">)</span> <span class="op">+</span></span>
 <span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/labs.html" class="external-link">labs</a></span><span class="op">(</span>title <span class="op">=</span> <span class="st">"Response distribution"</span>, x <span class="op">=</span> <span class="st">"Response error (radians)"</span>, y <span class="op">=</span> <span class="st">"Frequency"</span><span class="op">)</span> <span class="op">+</span></span>
 <span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/facet_wrap.html" class="external-link">facet_wrap</a></span><span class="op">(</span><span class="op">~</span><span class="va">set_size</span><span class="op">)</span></span></code></pre></div>
-<p><img src="bmm_mixture_models_files/figure-html/unnamed-chunk-5-1.jpeg" width="800" style="display: block; margin: auto;"></p>
+<p><img src="bmm_mixture_models_files/figure-html/unnamed-chunk-5-1.jpeg" alt="" width="800" style="display: block; margin: auto;"></p>
 <p>From the plot above we can also see that performace gets substantially worse with increasing set size. Now, we can fit the two mixture models two understand what is driving this pattern.</p>
 </div>
 <div class="section level2" number="3">
@@ -436,7 +436,7 @@ scale reduction factor on split chains (at convergence, Rhat = 1).
 <span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/ggplot.html" class="external-link">ggplot</a></span><span class="op">(</span><span class="fu"><a href="https://ggplot2.tidyverse.org/reference/aes.html" class="external-link">aes</a></span><span class="op">(</span><span class="va">par</span>,<span class="va">value</span><span class="op">)</span><span class="op">)</span> <span class="op">+</span></span>
 <span>  <span class="fu">tidybayes</span><span class="fu">::</span><span class="fu"><a href="https://mjskay.github.io/tidybayes/reference/tidybayes-deprecated.html" class="external-link">stat_halfeyeh</a></span><span class="op">(</span>normalize <span class="op">=</span> <span class="st">"groups"</span>, orientation <span class="op">=</span> <span class="st">"vertical"</span><span class="op">)</span> <span class="op">+</span></span>
 <span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/labs.html" class="external-link">labs</a></span><span class="op">(</span>y <span class="op">=</span> <span class="st">"Memory imprecision (SD)"</span>, x <span class="op">=</span> <span class="st">"Set size"</span>, parse <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span></code></pre></div>
-<p><img src="bmm_mixture_models_files/figure-html/unnamed-chunk-14-1.jpeg" width="400"><img src="bmm_mixture_models_files/figure-html/unnamed-chunk-14-2.jpeg" width="400"></p>
+<p><img src="bmm_mixture_models_files/figure-html/unnamed-chunk-14-1.jpeg" alt="" width="400"><img src="bmm_mixture_models_files/figure-html/unnamed-chunk-14-2.jpeg" alt="" width="400"></p>
 <p>where the black dot represents the median of the posterior distribution, the thick line represents the 50% credible interval, and the thin line represents the 95% credible interval.</p>
 </div>
 <div class="section level2" number="5">
@@ -498,7 +498,7 @@ Zhang, Weiwei, and Steven J. Luck. 2008. <span>“Discrete Fixed-Resolution Repr
 </div>
 
 <div class="pkgdown-footer-right">
-  <p>Site built with <a href="https://pkgdown.r-lib.org/" class="external-link">pkgdown</a> 2.1.3.</p>
+  <p>Site built with <a href="https://pkgdown.r-lib.org/" class="external-link">pkgdown</a> 2.2.0.</p>
 </div>
 
     </footer>

@@ -240,7 +240,7 @@ margin-bottom: 1.5em ;
 <code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/base/summary.html" class="external-link">summary</a></span><span class="op">(</span><span class="va">bmmfit</span>, backend <span class="op">=</span> <span class="st">"brms"</span><span class="op">)</span></span>
 <span><span class="co">#&gt; Warning: There were 1 divergent transitions after warmup. Increasing adapt_delta above 0.8 may help. See http://mc-stan.org/misc/warnings.html#divergent-transitions-after-warmup</span></span>
 <span><span class="co">#&gt;  Family: mixture(von_mises, von_mises) </span></span>
-<span><span class="co">#&gt;   Links: mu1 = tan_half; kappa1 = log; mu2 = tan_half; kappa2 = log; theta1 = identity; theta2 = identity </span></span>
+<span><span class="co">#&gt;   Links: mu1 = tan_half; mu2 = tan_half; kappa2 = log; kappa1 = log; theta1 = identity </span></span>
 <span><span class="co">#&gt; Formula: error ~ 1 </span></span>
 <span><span class="co">#&gt;          mu1 ~ 1</span></span>
 <span><span class="co">#&gt;          kappa ~ 0 + set_size + (0 + set_size || id)</span></span>
@@ -338,7 +338,7 @@ scale reduction factor on split chains (at convergence, Rhat = 1).
 </div>
 
 <div class="pkgdown-footer-right">
-  <p>Site built with <a href="https://pkgdown.r-lib.org/" class="external-link">pkgdown</a> 2.1.3.</p>
+  <p>Site built with <a href="https://pkgdown.r-lib.org/" class="external-link">pkgdown</a> 2.2.0.</p>
 </div>
 
     </footer>

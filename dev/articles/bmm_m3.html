@@ -350,32 +350,32 @@ npi &amp; = b
 <span><span class="co">#&gt;          normal(1, 1)     b        Intercept                     c &lt;NA&gt; &lt;NA&gt;</span></span>
 <span><span class="co">#&gt;          normal(1, 1)     b        Intercept                     d &lt;NA&gt; &lt;NA&gt;</span></span>
 <span><span class="co">#&gt;         constant(0.1)     b        Intercept                     b &lt;NA&gt; &lt;NA&gt;</span></span>
-<span><span class="co">#&gt;        source</span></span>
-<span><span class="co">#&gt;  (vectorized)</span></span>
-<span><span class="co">#&gt;  (vectorized)</span></span>
-<span><span class="co">#&gt;       default</span></span>
-<span><span class="co">#&gt;  (vectorized)</span></span>
-<span><span class="co">#&gt;  (vectorized)</span></span>
-<span><span class="co">#&gt;  (vectorized)</span></span>
-<span><span class="co">#&gt;  (vectorized)</span></span>
-<span><span class="co">#&gt;       default</span></span>
-<span><span class="co">#&gt;  (vectorized)</span></span>
-<span><span class="co">#&gt;  (vectorized)</span></span>
-<span><span class="co">#&gt;       default</span></span>
-<span><span class="co">#&gt;  (vectorized)</span></span>
-<span><span class="co">#&gt;  (vectorized)</span></span>
-<span><span class="co">#&gt;  (vectorized)</span></span>
-<span><span class="co">#&gt;  (vectorized)</span></span>
-<span><span class="co">#&gt;       default</span></span>
-<span><span class="co">#&gt;       default</span></span>
-<span><span class="co">#&gt;  (vectorized)</span></span>
-<span><span class="co">#&gt;  (vectorized)</span></span>
-<span><span class="co">#&gt;          user</span></span>
-<span><span class="co">#&gt;          user</span></span>
-<span><span class="co">#&gt;          user</span></span>
-<span><span class="co">#&gt;          user</span></span>
-<span><span class="co">#&gt;          user</span></span>
-<span><span class="co">#&gt;          user</span></span></code></pre></div>
+<span><span class="co">#&gt;  tag       source</span></span>
+<span><span class="co">#&gt;      (vectorized)</span></span>
+<span><span class="co">#&gt;      (vectorized)</span></span>
+<span><span class="co">#&gt;           default</span></span>
+<span><span class="co">#&gt;      (vectorized)</span></span>
+<span><span class="co">#&gt;      (vectorized)</span></span>
+<span><span class="co">#&gt;      (vectorized)</span></span>
+<span><span class="co">#&gt;      (vectorized)</span></span>
+<span><span class="co">#&gt;           default</span></span>
+<span><span class="co">#&gt;      (vectorized)</span></span>
+<span><span class="co">#&gt;      (vectorized)</span></span>
+<span><span class="co">#&gt;           default</span></span>
+<span><span class="co">#&gt;      (vectorized)</span></span>
+<span><span class="co">#&gt;      (vectorized)</span></span>
+<span><span class="co">#&gt;      (vectorized)</span></span>
+<span><span class="co">#&gt;      (vectorized)</span></span>
+<span><span class="co">#&gt;           default</span></span>
+<span><span class="co">#&gt;           default</span></span>
+<span><span class="co">#&gt;      (vectorized)</span></span>
+<span><span class="co">#&gt;      (vectorized)</span></span>
+<span><span class="co">#&gt;              user</span></span>
+<span><span class="co">#&gt;              user</span></span>
+<span><span class="co">#&gt;              user</span></span>
+<span><span class="co">#&gt;              user</span></span>
+<span><span class="co">#&gt;              user</span></span>
+<span><span class="co">#&gt;              user</span></span></code></pre></div>
 </div>
 <div class="section level3" number="3.4">
 <h3 id="running-bmm-to-estimate-parameters">
@@ -548,19 +548,17 @@ scale reduction factor on split chains (at convergence, Rhat = 1).
 <span></span>
 <span><span class="co"># plot the posterior predictive draws against the observed data</span></span>
 <span><span class="fu"><a href="https://ggplot2.tidyverse.org/reference/ggplot.html" class="external-link">ggplot</a></span><span class="op">(</span>data <span class="op">=</span> <span class="va">pp_m3</span>,</span>
-<span>       <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/aes.html" class="external-link">aes</a></span><span class="op">(</span>y <span class="op">=</span> <span class="va">.epred</span>, x <span class="op">=</span> <span class="va">cond</span>, fill <span class="op">=</span> <span class="va">cond</span><span class="op">)</span><span class="op">)</span> <span class="op">+</span></span>
-<span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/facet_grid.html" class="external-link">facet_grid</a></span><span class="op">(</span><span class="va">.category</span> <span class="op">~</span> <span class="va">cond</span>, scales <span class="op">=</span> <span class="st">"free"</span><span class="op">)</span> <span class="op">+</span></span>
-<span>  <span class="fu">gghalves</span><span class="fu">::</span><span class="fu"><a href="https://rdrr.io/pkg/gghalves/man/geom_half_violin.html" class="external-link">geom_half_violin</a></span><span class="op">(</span></span>
-<span>    side <span class="op">=</span> <span class="st">"r"</span>, nudge <span class="op">=</span> <span class="fl">0.1</span>, trim <span class="op">=</span> <span class="cn">TRUE</span></span>
-<span>  <span class="op">)</span> <span class="op">+</span></span>
+<span>       <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/aes.html" class="external-link">aes</a></span><span class="op">(</span><span class="va">condition</span>, y <span class="op">=</span> <span class="va">.epred</span>, x <span class="op">=</span> <span class="va">cond</span>, fill <span class="op">=</span> <span class="va">cond</span><span class="op">)</span><span class="op">)</span> <span class="op">+</span></span>
+<span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/facet_wrap.html" class="external-link">facet_wrap</a></span><span class="op">(</span><span class="op">~</span><span class="va">.category</span>, scales <span class="op">=</span> <span class="st">"free"</span><span class="op">)</span> <span class="op">+</span></span>
+<span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/geom_violin.html" class="external-link">geom_violin</a></span><span class="op">(</span><span class="op">)</span> <span class="op">+</span></span>
 <span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/stat_summary.html" class="external-link">stat_summary</a></span><span class="op">(</span>data <span class="op">=</span> <span class="va">data_pp</span>, <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/aes.html" class="external-link">aes</a></span> <span class="op">(</span>y <span class="op">=</span> <span class="va">.value</span><span class="op">)</span>,</span>
-<span>               fun.data <span class="op">=</span> <span class="va">mean_se</span><span class="op">)</span> <span class="op">+</span></span>
+<span>               fun.data <span class="op">=</span> <span class="va">mean_se</span>, size <span class="op">=</span> <span class="fl">0.1</span><span class="op">)</span> <span class="op">+</span></span>
 <span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/labs.html" class="external-link">labs</a></span><span class="op">(</span>y <span class="op">=</span> <span class="st">"Response proportions"</span>,</span>
 <span>       x <span class="op">=</span> <span class="st">"Condition"</span>,</span>
 <span>       fill <span class="op">=</span> <span class="st">"Condition"</span>,</span>
 <span>       title <span class="op">=</span> <span class="st">"Model Fit"</span>,</span>
 <span>       subtitle <span class="op">=</span> <span class="st">"Posterior Predicitve vs. Observed Response Proportions"</span><span class="op">)</span></span></code></pre></div>
-<p><img src="bmm_m3_files/figure-html/model_fit-1.jpeg" width="80%" style="display: block; margin: auto;"></p>
+<p><img src="bmm_m3_files/figure-html/model_fit-1.jpeg" alt="" width="80%" style="display: block; margin: auto;"></p>
 <p>The generated plot illustrates that the distribution of posterior predictive response distributions is in line with the observed response distributions. This indicates that the model fits the data well. For this particular model, this is unsurprising as it is saturated with respect to the number of parameters and the number of observations.</p>
 </div>
 </div>
@@ -586,7 +584,7 @@ Oberauer, Klaus, and Stephan Lewandowsky. 2019. <span>“Simple Measurement Mode
 </div>
 
 <div class="pkgdown-footer-right">
-  <p>Site built with <a href="https://pkgdown.r-lib.org/" class="external-link">pkgdown</a> 2.1.3.</p>
+  <p>Site built with <a href="https://pkgdown.r-lib.org/" class="external-link">pkgdown</a> 2.2.0.</p>
 </div>
 
     </footer>

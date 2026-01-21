@@ -1,0 +1,523 @@
+# bmm
+
+## Overview
+
+The goal of the `bmm` (Bayesian Measurement Models) package is to make
+it easier to estimate common cognitive measurement models for behavioral
+research. It achieves this by combining the flexibility of the `brms`
+(Bayesian Regression Models using Stan) package for specifying linear
+model syntax with custom functions that translate cognitive measurement
+model into distributional families that can be estimated using Bayesian
+hierarchical estimation.
+
+Cognitive measurement models provide a more refined representation of
+the cognitive processes underlying observed behavior, because they
+decompose observed behavior into several theoretically meaningful
+parameters that each represent distinct cognitive processes. Therefore,
+researchers can use these models to test specific hypotheses about the
+cognitive processes underlying behavioral data.
+
+## Getting started
+
+In the following sections you find more information on the `bmm`
+package:
+
+- [bmm](#bmm)
+  - [Overview](#overview)
+  - [Getting started](#getting-started)
+  - [How to install bmm](#how-to-install-bmm)
+  - [Available models](#available-models)
+  - [Fitting models using `bmm`](#fitting-models-using-bmm)
+  - [Exploring measurement models](#exploring-measurement-models)
+  - [The general structure of the `bmm`
+    package](#the-general-structure-of-the-bmm-package)
+  - [Contributing to the `bmm`
+    package](#contributing-to-the-bmm-package)
+
+## How to install bmm
+
+You can install the latest version of the `bmm` package from CRAN:
+
+``` r
+install.packages("bmm")
+```
+
+Because `bmm` is based on `brms` and `stan` it requires a working C++
+compiler. If you have not used `brms` before, you will need to first
+install the dependencies. If you are already using `brms`, you can skip
+this step.
+
+**Install dependencies**
+
+- Install and configure a C++ compiler. Detailed instructions
+  [here](https://github.com/stan-dev/rstan/wiki/RStan-Getting-Started#configuring-c-toolchain)
+- Install
+  [rstan](https://github.com/stan-dev/rstan/wiki/RStan-Getting-Started)
+  and/or
+  [cmdstanr](https://mc-stan.org/cmdstanr/articles/cmdstanr.html). We
+  recommend using `cmdstanr`.
+- Install [brms](http://paulbuerkner.com/brms/#installation)
+
+Alternatively, you can install the development version of the package or
+a specific version of the package from GitHub:
+
+**Install the latest development version of bmm**
+
+``` r
+if (!requireNamespace("remotes")) {
+  install.packages("remotes")
+}
+remotes::install_github("venpopov/bmm")
+```
+
+**Install the 0.0.1 version of bmm (if following version 6 of the
+tutorial paper on OSF)**
+
+The package was significantly updated on Feb 03, 2024. If you are
+following older versions (earlier than Version 6) of the [Tutorial
+preprint](https://osf.io/preprints/psyarxiv/umt57), you need to install
+the 0.0.1 version of the bmm package with:
+
+``` r
+if (!requireNamespace("remotes")) {
+  install.packages("remotes")
+}
+remotes::install_github("venpopov/bmm@v0.0.1")
+```
+
+## Available models
+
+Currently the `bmm` package implements mainly models used in the domain
+of working memory research, such as:
+
+**Visual working memory**
+
+- Interference measurement model by Oberauer and Lin (2017).
+- Two-parameter mixture model by Zhang and Luck (2008).
+- Three-parameter mixture model by Bays et al (2009).
+- Signal Discrimination Model (SDM) by Oberauer (2023)
+
+**Working Memory (categorical), Categorical Decision Making**
+
+- The Multinomial / Memory Measurement Model
+
+However, the `bmm` package is setup to provide the foundation for the
+implementation of a broad range of cognitive measurement models. In
+fact, we are already working on implementing additional models, such as:
+
+- Signal-Detection Models
+- Evidence Accumulation Models
+
+If you have suggestions for models that should be added to the package
+or additional functionality that would improve the usability of the
+pacakge, feel free to create an
+[issue](https://github.com/venpopov/bmm/issues). Ideally this should
+describe the model, point towards literature that gives details on the
+model, and if possible link to code that has already implemented the
+model.
+
+Given the dynamic nature the `bmm` package is currently in, you can
+always view the latest list of supported models by running:
+
+``` r
+bmm::supported_models()
+#> The following models are supported:
+#> 
+#> -  imm(resp_error, nt_features, nt_distances, set_size, regex, version) 
+#> -  m3(resp_cats, num_options, choice_rule, version) 
+#> -  mixture2p(resp_error) 
+#> -  mixture3p(resp_error, nt_features, set_size, regex) 
+#> -  sdm(resp_error, version) 
+#> 
+#> Type  ?modelname  to get information about a specific model, e.g.  ?imm
+```
+
+## Fitting models using `bmm`
+
+The core function of the `bmm` package is the
+[`bmm()`](https://venpopov.github.io/bmm/dev/reference/bmm.md) function.
+This function takes:
+
+1.  a *linear model formula* specifying how parameters of the model
+    should vary as a function of experimental conditions
+2.  *data* containing the dependent variables, the variables predicting
+    model parameters, and potentially additional variables providing
+    information to identify the model
+3.  the *model object* defining the model that should be fit
+
+You can get more detailed information on the models implemented in `bmm`
+by invoking the documentation of each model typing `?bmmodel` into your
+console. For example, calling the information on Interference
+Measurement Model `imm` would look like this:
+
+``` r
+?imm
+```
+
+A complete call to fit a model using `bmm` could look like this. For
+this example, we are using the `oberauer_lin_2017` data that is provided
+with the package and we will show how to fit the Interference
+Measurement Model to this data. If you want a detailed description of
+this model and and in depth explanation of the parameters estimated in
+the model, please have a look at [the IMM
+article](https://venpopov.github.io/bmm/articles/bmm_imm.html).
+
+``` r
+library(bmm)
+
+formula <- bmmformula(c ~ 0 + set_size,
+                      a ~ 0 + set_size,
+                      s ~ 0 + set_size,
+                      kappa ~ 0 + set_size)
+
+model <- imm(resp_error = "dev_rad",
+             nt_features = paste0("col_nt", 1:7),
+             nt_distances = paste0("dist_nt",1:7),
+             set_size = "set_size")
+
+fit <- bmm(formula = formula, data = data, model = model)
+```
+
+Using this call, the `fit` object will save all the information about
+the fitted model. As `bmm` calls `brms` to fit the models, these objects
+can be handled the same way a normal `brmsfit` object is handled:
+
+``` r
+# print summary
+summary(fit)
+
+# plot posterior predicitive plot
+brms::pp_check(fit)
+```
+
+You can have a look at examples for how to fit all currently implemented
+models by reading the vignettes for each model [here for the released
+version of the
+package](https://venpopov.github.io/bmm/articles/index.html) or [here
+for the development
+version](https://venpopov.github.io/bmm/dev/articles/index.html).
+
+## Exploring measurement models
+
+To aid users in improving their intuition about what different models
+predict for observed data given a certain parameter set, the `bmm`
+package also includes density and random generation function for all
+implemented models.
+
+These function provide an easy way to see what a model predicts for data
+given a certain set of parameters. For example you can easily plot the
+probability density function of the data for the Interference
+Measurement model using the `dimm` function. In similar fashion the
+random generation function included for each model, generates random
+data based on a set of data generating parameters. For the IMM, you can
+use `rimm` to generate data given a set of parameters. Here is an
+example of how to use these functions. We are ploting a histogram of
+randomly generated data from the IMM with a setsize of four, and
+overlaying the probability density function of the model:
+
+``` r
+library(bmm)
+library(ggplot2)
+
+resp <- rimm(
+  n = 1000,
+  mu = c(0, -1.5, 2.5, 1),
+  dist = c(0, 2, 0.3, 1),
+  c = 1.5, a = 0.3, b = 0, s = 2, kappa = 10
+)
+
+hist(resp, freq = FALSE, breaks = 60)
+curve(
+  dimm(x,
+    mu = c(0, -1.5, 2.5, 1), 
+    dist = c(0, 2, 0.3, 1), 
+    c = 1.5, a = 0.3, b = 0, s = 2, kappa = 10
+  ),
+  from = -pi, to = pi, add = TRUE
+)
+```
+
+![](reference/figures/README-unnamed-chunk-4-1.png)
+
+## The general structure of the `bmm` package
+
+The main building block of the `bmm` package is that cognitive
+measurement models can often be specified as distributional models for
+which the distributional parameters of the generalized linear mixed
+model are a function of cognitive measurement model parameters. These
+functions that translate the cognitive measurement model parameters into
+distributional parameters is what we implement in the `bmm` package.
+
+![](reference/figures/README-bmmLogic.png)
+
+As these function can become complicated and their implementation
+changes with differences in experimental designs, the `bmm` package
+provides general translation functions that ease the use of the
+cognitive measurement models for end users. This way researchers that
+face challenges in writing their own STAN code to implement such models
+themselves can still use these models in almost any experimental design.
+
+Under the hood, the main
+[`bmm()`](https://venpopov.github.io/bmm/dev/reference/bmm.md) function
+will then call the appropriate functions for the specified model and
+will perform several steps:
+
+1.  Configure the sampler (e.g., set up prallelization & additional
+    settings)
+2.  Check the information passed to the
+    [`bmm()`](https://venpopov.github.io/bmm/dev/reference/bmm.md)
+    function:
+    - if the model is installed and all required arguments were provided
+    - if a valid formula was passed
+    - if the data contains all necessary variables
+3.  Configure the called model (including specifying priors were
+    necessary)
+4.  Calling `brms` and passing the specified arguments
+5.  Post-processing the output and passing it to the user
+
+This process is illustrated in the Figure below:
+
+![](reference/figures/README-fitModel_process.png)
+
+## Contributing to the `bmm` package
+
+Should be interested in contributing a model to the `bmm` package, you
+should first look into the [Developer
+Notes](https://venpopov.github.io/bmm/dev/dev-notes/index.html) as well
+as the [Contributor
+Guidelines](https://github.com/venpopov/bmm/blob/develop/.github/CONTRIBUTING.md).
+These give a more in depth description of the package architecture, the
+steps necessary to add your own model to the package, and how
+contributions will be acknowledged.
+
+# Package index
+
+## About bmm
+
+These pages provide a summary of the functionality available in bmm
+
+- [`bmm-package`](https://venpopov.github.io/bmm/dev/reference/bmm-package.md)
+  : Easy and Accesible Bayesian Measurement Models Using 'brms'
+
+- [`supported_models()`](https://venpopov.github.io/bmm/dev/reference/supported_models.md)
+  :
+
+  Measurement models available in `bmm`
+
+- [`bmm_options()`](https://venpopov.github.io/bmm/dev/reference/bmm_options.md)
+  : View or change global bmm options
+
+## Fitting models
+
+Main functions for model fitting
+
+- [`bmm()`](https://venpopov.github.io/bmm/dev/reference/bmm.md)
+  [`fit_model()`](https://venpopov.github.io/bmm/dev/reference/bmm.md) :
+  Fit Bayesian Measurement Models
+
+- [`bmmformula()`](https://venpopov.github.io/bmm/dev/reference/bmmformula.md)
+  [`bmf()`](https://venpopov.github.io/bmm/dev/reference/bmmformula.md)
+  :
+
+  Create formula for predicting parameters of a `bmmodel`
+
+- [`update(`*`<bmmfit>`*`)`](https://venpopov.github.io/bmm/dev/reference/update.bmmfit.md)
+  : Update a bmm model
+
+- [`summary(`*`<bmmfit>`*`)`](https://venpopov.github.io/bmm/dev/reference/summary.bmmfit.md)
+  :
+
+  Create a summary of a fitted model represented by a `bmmfit` object
+
+## Extract model information
+
+Utility functions for extracting default priors, generate stan code,
+stan data, etc.
+
+- [`default_prior(`*`<bmmformula>`*`)`](https://venpopov.github.io/bmm/dev/reference/default_prior.bmmformula.md)
+  : Get Default priors for Measurement Models specified in BMM
+
+- [`extract_parameter_dimensions()`](https://venpopov.github.io/bmm/dev/reference/extract_parameter_dimensions.md)
+  : Extract dimension from parameters in STAN parameter block
+
+- [`extract_stan_blocks()`](https://venpopov.github.io/bmm/dev/reference/extract_stan_blocks.md)
+  : Extract code from different STAN program blocks
+
+- [`fit_info()`](https://venpopov.github.io/bmm/dev/reference/fit_info.md)
+  : Extract information from a brmsfit object
+
+- [`stancode(`*`<bmmformula>`*`)`](https://venpopov.github.io/bmm/dev/reference/stancode.bmmformula.md)
+  : Generate Stan code for bmm models
+
+- [`standata(`*`<bmmformula>`*`)`](https://venpopov.github.io/bmm/dev/reference/standata.bmmformula.md)
+  :
+
+  Stan data for `bmm` models
+
+## Specifying models
+
+Functions for specifying which model to fit
+
+- [`imm()`](https://venpopov.github.io/bmm/dev/reference/imm.md)
+  [`IMMfull()`](https://venpopov.github.io/bmm/dev/reference/imm.md)
+  [`IMMbsc()`](https://venpopov.github.io/bmm/dev/reference/imm.md)
+  [`IMMabc()`](https://venpopov.github.io/bmm/dev/reference/imm.md) :
+  Interference measurement model by Oberauer and Lin (2017).
+- [`m3()`](https://venpopov.github.io/bmm/dev/reference/m3.md) : The
+  Multinomial / Memory Measurement Model
+- [`mixture2p()`](https://venpopov.github.io/bmm/dev/reference/mixture2p.md)
+  : Two-parameter mixture model by Zhang and Luck (2008).
+- [`mixture3p()`](https://venpopov.github.io/bmm/dev/reference/mixture3p.md)
+  : Three-parameter mixture model by Bays et al (2009).
+- [`sdm()`](https://venpopov.github.io/bmm/dev/reference/sdm.md)
+  [`sdmSimple()`](https://venpopov.github.io/bmm/dev/reference/sdm.md) :
+  Signal Discrimination Model (SDM) by Oberauer (2023)
+
+## Distributions
+
+Functions for special distributions
+
+- [`dimm()`](https://venpopov.github.io/bmm/dev/reference/IMMdist.md)
+  [`pimm()`](https://venpopov.github.io/bmm/dev/reference/IMMdist.md)
+  [`qimm()`](https://venpopov.github.io/bmm/dev/reference/IMMdist.md)
+  [`rimm()`](https://venpopov.github.io/bmm/dev/reference/IMMdist.md) :
+  Distribution functions for the Interference Measurement Model (IMM)
+- [`dsdm()`](https://venpopov.github.io/bmm/dev/reference/SDMdist.md)
+  [`psdm()`](https://venpopov.github.io/bmm/dev/reference/SDMdist.md)
+  [`qsdm()`](https://venpopov.github.io/bmm/dev/reference/SDMdist.md)
+  [`rsdm()`](https://venpopov.github.io/bmm/dev/reference/SDMdist.md) :
+  Distribution functions for the Signal Discrimination Model (SDM)
+- [`dm3()`](https://venpopov.github.io/bmm/dev/reference/m3dist.md)
+  [`rm3()`](https://venpopov.github.io/bmm/dev/reference/m3dist.md) :
+  Distribution functions for the Memory Measurement Model (M3)
+- [`dmixture2p()`](https://venpopov.github.io/bmm/dev/reference/mixture2p_dist.md)
+  [`pmixture2p()`](https://venpopov.github.io/bmm/dev/reference/mixture2p_dist.md)
+  [`qmixture2p()`](https://venpopov.github.io/bmm/dev/reference/mixture2p_dist.md)
+  [`rmixture2p()`](https://venpopov.github.io/bmm/dev/reference/mixture2p_dist.md)
+  : Distribution functions for the two-parameter mixture model
+  (mixture2p)
+- [`dmixture3p()`](https://venpopov.github.io/bmm/dev/reference/mixture3p_dist.md)
+  [`pmixture3p()`](https://venpopov.github.io/bmm/dev/reference/mixture3p_dist.md)
+  [`qmixture3p()`](https://venpopov.github.io/bmm/dev/reference/mixture3p_dist.md)
+  [`rmixture3p()`](https://venpopov.github.io/bmm/dev/reference/mixture3p_dist.md)
+  : Distribution functions for the three-parameter mixture model
+  (mixture3p)
+- [`rejection_sampling()`](https://venpopov.github.io/bmm/dev/reference/rejection_sampling.md)
+  : Rejection Sampling
+
+## Data, model and parameter transformations
+
+Utility functions for transforming data and parameters
+
+- [`c_sqrtexp2bessel()`](https://venpopov.github.io/bmm/dev/reference/c_parametrizations.md)
+  [`c_bessel2sqrtexp()`](https://venpopov.github.io/bmm/dev/reference/c_parametrizations.md)
+  : Convert between parametrizations of the c parameter of the SDM
+  distribution
+
+- [`calc_error_relative_to_nontargets()`](https://venpopov.github.io/bmm/dev/reference/calc_error_relative_to_nontargets.md)
+  : Calculate response error relative to non-target values
+
+- [`deg2rad()`](https://venpopov.github.io/bmm/dev/reference/circle_transform.md)
+  [`rad2deg()`](https://venpopov.github.io/bmm/dev/reference/circle_transform.md)
+  : Convert degrees to radians or radians to degrees.
+
+- [`construct_m3_act_funs()`](https://venpopov.github.io/bmm/dev/reference/construct_m3_act_funs.md)
+  : Get Activation Functions for different M3 versions
+
+- [`k2sd()`](https://venpopov.github.io/bmm/dev/reference/k2sd.md) :
+  Transform kappa of the von Mises distribution to the circular standard
+  deviation
+
+- [`restructure(`*`<bmmfit>`*`)`](https://venpopov.github.io/bmm/dev/reference/restructure.bmmfit.md)
+  :
+
+  Restructure Old `bmmfit` Objects
+
+- [`softmax()`](https://venpopov.github.io/bmm/dev/reference/softmax.md)
+  [`softmaxinv()`](https://venpopov.github.io/bmm/dev/reference/softmax.md)
+  : Softmax function and its inverse
+
+- [`wrap()`](https://venpopov.github.io/bmm/dev/reference/wrap.md) :
+  Wrap angles that extend beyond (-pi;pi)
+
+## Datasets
+
+Available datasets for fitting the models
+
+- [`oberauer_lewandowsky_2019_e1`](https://venpopov.github.io/bmm/dev/reference/oberauer_lewandowsky_2019_e1.md)
+  : Data from Experiment 1 reported by Oberauer & Lewandowsky (2019)
+- [`oberauer_lin_2017`](https://venpopov.github.io/bmm/dev/reference/oberauer_lin_2017.md)
+  : Data from Experiment 1 reported by Oberauer & Lin (2017)
+- [`zhang_luck_2008`](https://venpopov.github.io/bmm/dev/reference/zhang_luck_2008.md)
+  : Data from Experiment 2 reported by Zhang & Luck (2008)
+
+## Developers’ corner
+
+Functions to assist in developing new models
+
+- [`apply_links()`](https://venpopov.github.io/bmm/dev/reference/apply_links.md)
+  : Apply link functions for parameters in a formula or bmmformula
+
+- [`bmf2bf()`](https://venpopov.github.io/bmm/dev/reference/bmf2bf.md) :
+
+  Convert `bmmformula` objects to `brmsformula` objects
+
+- [`check_data()`](https://venpopov.github.io/bmm/dev/reference/check_data.md)
+  : Generic S3 method for checking data based on model type
+
+- [`check_formula()`](https://venpopov.github.io/bmm/dev/reference/check_formula.md)
+  : Generic S3 method for checking if the formula is valid for the
+  specified model
+
+- [`check_model()`](https://venpopov.github.io/bmm/dev/reference/check_model.md)
+  : Generic S3 method for checking if the model is supported and model
+  preprocessing
+
+- [`configure_model()`](https://venpopov.github.io/bmm/dev/reference/configure_model.md)
+  : Generic S3 method for configuring the model to be fit by brms
+
+- [`configure_prior()`](https://venpopov.github.io/bmm/dev/reference/configure_prior.md)
+  : Generic S3 method for configuring the default prior for a bmmodel
+
+- [`postprocess_brm()`](https://venpopov.github.io/bmm/dev/reference/postprocess_brm.md)
+  : Generic S3 method for postprocessing the fitted brm model
+
+- [`revert_postprocess_brm()`](https://venpopov.github.io/bmm/dev/reference/revert_postprocess_brm.md)
+  : Generic S3 method for reverting any postprocessing of the fitted brm
+  model
+
+- [`use_model_template()`](https://venpopov.github.io/bmm/dev/reference/use_model_template.md)
+  : Create a file with a template for adding a new model (for
+  developers)
+
+# Articles
+
+### Using the bmm package
+
+Guides to using various features of the **bmm** package
+
+- [Introduction to the bmmformula
+  syntax](https://venpopov.github.io/bmm/dev/articles/bmm_bmmformula.md):
+- [Extracting default priors, the generated Stan code and Stan
+  data](https://venpopov.github.io/bmm/dev/articles/bmm_extract_info.md):
+
+### Continuous reproduction tasks
+
+Fitting models to continuous reproduction tasks
+
+- [Continuous reproduction tasks
+  (CRT)](https://venpopov.github.io/bmm/dev/articles/bmm_vwm_crt.md):
+- [Mixture models for visual working
+  memory](https://venpopov.github.io/bmm/dev/articles/bmm_mixture_models.md):
+- [The Interference Measurement Model
+  (IMM)](https://venpopov.github.io/bmm/dev/articles/bmm_imm.md):
+- [The Signal Discrimination Model
+  (SDM)](https://venpopov.github.io/bmm/dev/articles/bmm_sdm_simple.md):
+
+### Categorical decision tasks
+
+Fitting models to categorical decision tasks (e.g. cued or free recall,
+n-AFC, etc)
+
+- [The Multinomial / Memory Measurement Model
+  (M3)](https://venpopov.github.io/bmm/dev/articles/bmm_m3.md):
