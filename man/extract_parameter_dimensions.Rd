@@ -21,12 +21,15 @@ initial values for bmm models.
 \examples{
 # generate simple stan code from brms
 stan_code <- stancode(brms::bf(x ~ 1 + cond + (1 + cond | ID)),
-                      data = data.frame(x = rnorm(100),
-                                        ID = rep(1:50, each = 2),
-                                        cond = rep(1:2, times = 50)))
+  data = data.frame(
+    x = rnorm(100),
+    ID = rep(1:50, each = 2),
+    cond = rep(1:2, times = 50)
+  )
+)
 
 extracted_program_blocks <- extract_stan_blocks(stan_code)
 
-par_dims <- extract_parameter_dimensions(extracted_program_blocks$parameters)#'
+par_dims <- extract_parameter_dimensions(extracted_program_blocks$parameters) #'
 
 }
