@@ -34,3 +34,4 @@ stan_code <- stancode(brms::bf(x ~ 1), data = data.frame(x = rnorm(100)))
 extracted_program_blocks <- extract_stan_blocks(stan_code)
 
 }
+\keyword{extract_info}

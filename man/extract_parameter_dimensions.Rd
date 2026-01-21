@@ -33,3 +33,4 @@ extracted_program_blocks <- extract_stan_blocks(stan_code)
 par_dims <- extract_parameter_dimensions(extracted_program_blocks$parameters) #'
 
 }
+\keyword{extract_info}
