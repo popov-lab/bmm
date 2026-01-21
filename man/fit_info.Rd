@@ -28,7 +28,7 @@ list or data.frame with the information for each fit is returned.
 Extract information from a brmsfit object
 }
 \examples{
-\dontshow{if (isTRUE(Sys.getenv("BMM_EXAMPLES"))) (if (getRversion() >= "3.4") withAutoprint else force)(\{ # examplesIf}
+\dontshow{if (isTRUE(Sys.getenv("BMM_EXAMPLES"))) withAutoprint(\{ # examplesIf}
 fit <- bmm(
   formula = bmmformula(c ~ 1, kappa ~ 1),
   data = data.frame(y = rsdm(1000)),
