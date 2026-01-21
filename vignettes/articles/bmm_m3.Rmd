@@ -403,13 +403,11 @@ levels(data_pp$cond) <- c("new", "old shuffled", "old same")
 
 # plot the posterior predictive draws against the observed data
 ggplot(data = pp_m3,
-       aes(y = .epred, x = cond, fill = cond)) +
-  facet_grid(.category ~ cond, scales = "free") +
-  gghalves::geom_half_violin(
-    side = "r", nudge = 0.1, trim = TRUE
-  ) +
+       aes(condition, y = .epred, x = cond, fill = cond)) +
+  facet_wrap(~.category, scales = "free") +
+  geom_violin() +
   stat_summary(data = data_pp, aes (y = .value),
-               fun.data = mean_se) +
+               fun.data = mean_se, size = 0.1) +
   labs(y = "Response proportions",
        x = "Condition",
        fill = "Condition",
