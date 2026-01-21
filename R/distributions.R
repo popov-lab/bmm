@@ -779,26 +779,31 @@ rezdm <- function(n, n_trials, drift, bound, ndt, zr = 0.5, s = 1,
 }
 
 # Internal: 3par density - vectorized
+# Handles both: (1) vector observations with scalar parameters, and
+#               (2) scalar observations with vector parameters (for log_lik)
 .dezdm_3par <- function(mean_rt, var_rt, n_upper, n_trials,
                         drift, bound, ndt, s) {
-  # determine common length from observations
-  n_obs <- max(length(mean_rt), length(var_rt), length(n_upper),
-               length(n_trials))
+  # determine common length from observations AND parameters
+  # this allows log_lik to work (scalar obs, vector params)
+  n <- max(length(mean_rt), length(var_rt), length(n_upper),
+           length(n_trials), length(drift), length(bound),
+           length(ndt), length(s))
 
-  # recycle observation inputs
-  mean_rt <- rep_len(mean_rt, n_obs)
-  var_rt <- rep_len(var_rt, n_obs)
-  n_upper <- rep_len(n_upper, n_obs)
-  n_trials <- rep_len(n_trials, n_obs)
-  ndt <- rep_len(ndt, n_obs)
+  # recycle all inputs to common length
+  mean_rt <- rep_len(mean_rt, n)
+  var_rt <- rep_len(var_rt, n)
+  n_upper <- rep_len(n_upper, n)
+  n_trials <- rep_len(n_trials, n)
+  ndt <- rep_len(ndt, n)
+  drift <- rep_len(drift, n)
+  bound <- rep_len(bound, n)
+  s <- rep_len(s, n)
 
-  # compute moments
+  # compute moments (already vectorized)
   moments <- .ezdm_moments_3par(drift, bound, s)
-
-  # recycle moment outputs to match observations
-  p_c <- rep_len(moments$pC, n_obs)
-  mdt <- rep_len(moments$MDT, n_obs)
-  vrt <- rep_len(moments$VRT, n_obs)
+  p_c <- moments$pC
+  mdt <- moments$MDT
+  vrt <- moments$VRT
 
   # binomial for n_upper
   ll <- stats::dbinom(n_upper, size = n_trials, prob = p_c, log = TRUE)
@@ -815,7 +820,9 @@ rezdm <- function(n, n_trials, drift, bound, ndt, zr = 0.5, s = 1,
   ll
 }
 
-# Internal: 4par density - vectorized over observations
+# Internal: 4par density - vectorized
+# Handles both: (1) vector observations with scalar parameters, and
+#               (2) scalar observations with vector parameters (for log_lik)
 # mean_rt, var_rt: matrices with 2 columns (upper, lower) and n rows
 #                  OR vectors of length 2 for single observation
 # n_upper, n_trials: vectors of length n (or scalars for single obs)
@@ -838,16 +845,31 @@ rezdm <- function(n, n_trials, drift, bound, ndt, zr = 0.5, s = 1,
     var_rt_lower <- var_rt[2]
   }
 
+  # determine common length from observations AND parameters
+
+  # this allows log_lik to work (scalar obs, vector params)
+  n <- max(n_obs, length(n_upper), length(n_trials),
+           length(drift), length(bound), length(ndt),
+           length(zr), length(s))
+
+  # recycle observation values to common length
+  mean_rt_upper <- rep_len(mean_rt_upper, n)
+  mean_rt_lower <- rep_len(mean_rt_lower, n)
+  var_rt_upper <- rep_len(var_rt_upper, n)
+  var_rt_lower <- rep_len(var_rt_lower, n)
+  n_upper <- rep_len(n_upper, n)
+  n_trials <- rep_len(n_trials, n)
+
   n_lower <- n_trials - n_upper
   moments <- .ezdm_moments_4par(drift, bound, zr, s)
 
-  # recycle moments to match n_obs
-  pC <- rep_len(moments$pC, n_obs)
-  mdt_upper <- rep_len(moments$mdt_upper, n_obs)
-  mdt_lower <- rep_len(moments$mdt_lower, n_obs)
-  vrt_upper <- rep_len(moments$vrt_upper, n_obs)
-  vrt_lower <- rep_len(moments$vrt_lower, n_obs)
-  ndt <- rep_len(ndt, n_obs)
+  # recycle moments and ndt to common length
+  pC <- rep_len(moments$pC, n)
+  mdt_upper <- rep_len(moments$mdt_upper, n)
+  mdt_lower <- rep_len(moments$mdt_lower, n)
+  vrt_upper <- rep_len(moments$vrt_upper, n)
+  vrt_lower <- rep_len(moments$vrt_lower, n)
+  ndt <- rep_len(ndt, n)
 
   # binomial for n_upper
   ll <- stats::dbinom(n_upper, size = n_trials, prob = pC, log = TRUE)
