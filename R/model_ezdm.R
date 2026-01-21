@@ -316,7 +316,9 @@ log_lik_ezdm_3par <- function(i, prep) {
 # By default returns mean_rt (the primary response Y)
 # Use dv argument to select other variables: "var_rt", "n_upper"
 # Usage: posterior_predict(fit, dv = "var_rt")
-posterior_predict_ezdm_3par <- function(i, prep, dv = "mean_rt", ...) {
+posterior_predict_ezdm_3par <- function(i, prep, ...) {
+  dots <- list(...)
+  dv <- if(is.null(dots$dv)) "mean_rt" else dots$dv
 
   # validate dv argument
   valid_dvs <- c("mean_rt", "var_rt", "n_upper")
@@ -431,7 +433,9 @@ log_lik_ezdm_4par <- function(i, prep) {
 # Use dv argument to select other variables:
 #   "mean_rt_upper", "mean_rt_lower", "var_rt_upper", "var_rt_lower", "n_upper"
 # Usage: posterior_predict(fit, dv = "var_rt_upper")
-posterior_predict_ezdm_4par <- function(i, prep, dv = "mean_rt_upper", ...) {
+posterior_predict_ezdm_4par <- function(i, prep, ...) {
+  dots <- list(...)
+  dv <- if(is.null(dots$dv)) "mean_rt_upper" else dots$dv
 
   # validate dv argument
   valid_dvs <- c("mean_rt_upper", "mean_rt_lower",
