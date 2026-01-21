@@ -138,6 +138,12 @@ check_data.ezdm <- function(model, data, formula) {
   n_upper <- model$resp_vars$n_upper
   n_trials <- model$other_vars$n_trials
 
+  # check that required model arguments were provided
+  stopif(
+    is.null(mean_rt) || is.null(var_rt) || is.null(n_upper) || is.null(n_trials),
+    "ezdm model requires mean_rt, var_rt, n_upper, and n_trials arguments"
+  )
+
   # for 4par model, mean_rt and var_rt can be vectors of length 2
   mean_rt_vars <- if (length(mean_rt) > 1) mean_rt else mean_rt
   var_rt_vars <- if (length(var_rt) > 1) var_rt else var_rt
