@@ -275,14 +275,76 @@ configure_model.ezdm_3par <- function(model, data, formula) {
   nlist(formula, data, stanvars)
 }
 
-# TODO: Implement log_lik for loo/waic calculations
+# log_lik for 3par ezdm
 log_lik_ezdm_3par <- function(i, prep) {
-  NULL
+
+  # extract posterior samples for distributional parameters
+  drift <- brms::get_dpar(prep, "drift", i = i)
+  bound <- brms::get_dpar(prep, "bound", i = i)
+  ndt <- brms::get_dpar(prep, "ndt", i = i)
+  s <- brms::get_dpar(prep, "s", i = i)
+
+  # extract observed data for observation i
+  mean_rt <- prep$data$Y[i]
+  var_rt <- prep$data$vreal1[i]
+  n_upper <- prep$data$vint1[i]
+  n_trials <- prep$data$trials[i]
+
+  # compute log-likelihood using dezdm (vectorized over posterior samples)
+  dezdm(
+    mean_rt = mean_rt,
+    var_rt = var_rt,
+    n_upper = n_upper,
+    n_trials = n_trials,
+    drift = drift,
+    bound = bound,
+    ndt = ndt,
+    s = s,
+    version = "3par",
+    log = TRUE
+  )
 }
 
-# TODO: Implement posterior_predict for pp_check
-posterior_predict_ezdm_3par <- function(i, prep, ...) {
-  NULL
+# posterior_predict for pp_check
+# Returns predictions for EZDM 3par dependent variables
+# By default returns mean_rt (the primary response Y)
+# Use dv argument to select other variables: "var_rt", "n_upper"
+# Usage: posterior_predict(fit, dv = "var_rt")
+posterior_predict_ezdm_3par <- function(i, prep, dv = "mean_rt", ...) {
+
+  # validate dv argument
+  valid_dvs <- c("mean_rt", "var_rt", "n_upper")
+  if (!dv %in% valid_dvs) {
+    stop("dv must be one of: ", paste(valid_dvs, collapse = ", "))
+  }
+
+  # extract posterior samples for distributional parameters
+  drift <- brms::get_dpar(prep, "drift", i = i)
+  bound <- brms::get_dpar(prep, "bound", i = i)
+  ndt <- brms::get_dpar(prep, "ndt", i = i)
+  s <- brms::get_dpar(prep, "s", i = i)
+
+  # extract n_trials for this observation
+  n_trials <- prep$data$trials[i]
+
+  # number of posterior draws
+  n_draws <- length(drift)
+
+  # generate predictions for each posterior draw
+  pred <- sapply(seq_len(n_draws), function(j) {
+    sim <- rezdm(
+      n = 1,
+      n_trials = n_trials,
+      drift = drift[j],
+      bound = bound[j],
+      ndt = ndt[j],
+      s = s[j],
+      version = "3par"
+    )
+    sim[[dv]]
+  })
+
+  pred
 }
 
 #' @export
@@ -319,12 +381,86 @@ configure_model.ezdm_4par <- function(model, data, formula) {
   nlist(formula, data, stanvars)
 }
 
-# TODO: Implement log_lik for loo/waic calculations
+# log_lik for 4par ezdm
 log_lik_ezdm_4par <- function(i, prep) {
-  NULL
+
+  # extract posterior samples for distributional parameters
+  drift <- brms::get_dpar(prep, "drift", i = i)
+  bound <- brms::get_dpar(prep, "bound", i = i)
+  ndt <- brms::get_dpar(prep, "ndt", i = i)
+  zr <- brms::get_dpar(prep, "zr", i = i)
+  s <- brms::get_dpar(prep, "s", i = i)
+
+  # extract observed data for observation i
+  # based on bmf2bf.ezdm_4par formula:
+  # Y = mean_rt_upper, vreal1 = mean_rt_lower
+  # vreal2 = var_rt_upper, vreal3 = var_rt_lower
+  # vint1 = n_upper, vint2 = n_trials
+  mean_rt_upper <- prep$data$Y[i]
+  mean_rt_lower <- prep$data$vreal1[i]
+  var_rt_upper <- prep$data$vreal2[i]
+  var_rt_lower <- prep$data$vreal3[i]
+  n_upper <- prep$data$vint1[i]
+  n_trials <- prep$data$vint2[i]
+
+  # compute log-likelihood using dezdm (vectorized over posterior samples)
+  dezdm(
+    mean_rt = c(mean_rt_upper, mean_rt_lower),
+    var_rt = c(var_rt_upper, var_rt_lower),
+    n_upper = n_upper,
+    n_trials = n_trials,
+    drift = drift,
+    bound = bound,
+    ndt = ndt,
+    zr = zr,
+    s = s,
+    version = "4par",
+    log = TRUE
+  )
 }
 
-# TODO: Implement posterior_predict for pp_check
-posterior_predict_ezdm_4par <- function(i, prep, ...) {
-  NULL
+# posterior_predict for pp_check
+# Returns predictions for EZDM 4par dependent variables
+# By default returns mean_rt_upper (the primary response Y)
+# Use dv argument to select other variables:
+#   "mean_rt_upper", "mean_rt_lower", "var_rt_upper", "var_rt_lower", "n_upper"
+# Usage: posterior_predict(fit, dv = "var_rt_upper")
+posterior_predict_ezdm_4par <- function(i, prep, dv = "mean_rt_upper", ...) {
+
+  # validate dv argument
+  valid_dvs <- c("mean_rt_upper", "mean_rt_lower",
+                 "var_rt_upper", "var_rt_lower", "n_upper")
+  if (!dv %in% valid_dvs) {
+    stop("dv must be one of: ", paste(valid_dvs, collapse = ", "))
+  }
+
+  # extract posterior samples for distributional parameters
+  drift <- brms::get_dpar(prep, "drift", i = i)
+  bound <- brms::get_dpar(prep, "bound", i = i)
+  ndt <- brms::get_dpar(prep, "ndt", i = i)
+  zr <- brms::get_dpar(prep, "zr", i = i)
+  s <- brms::get_dpar(prep, "s", i = i)
+
+  # extract n_trials for this observation
+  n_trials <- prep$data$vint2[i]
+
+  # number of posterior draws
+  n_draws <- length(drift)
+
+  # generate predictions for each posterior draw
+  pred <- sapply(seq_len(n_draws), function(j) {
+    sim <- rezdm(
+      n = 1,
+      n_trials = n_trials,
+      drift = drift[j],
+      bound = bound[j],
+      ndt = ndt[j],
+      zr = zr[j],
+      s = s[j],
+      version = "4par"
+    )
+    sim[[dv]]
+  })
+
+  pred
 }

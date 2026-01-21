@@ -5,16 +5,7 @@
 \alias{ezdm}
 \title{EZ-Diffusion Model}
 \usage{
-ezdm(
-  mean_rt,
-  var_rt,
-  n_upper,
-  n_trials,
-  response = NULL,
-  links = NULL,
-  version = "3par",
-  ...
-)
+ezdm(mean_rt, var_rt, n_upper, n_trials, links = NULL, version = "3par", ...)
 }
 \arguments{
 \item{mean_rt}{The variable coding the mean reaction time in seconds in the data.}
@@ -70,7 +61,7 @@ Provide aggregated statistics for each subject and condition that model paramete
 \item \code{drift}: Drift rate = Average rate of evidence accumulation of the decision processes
 \item \code{bound}: Boundary separation = Distance between the decision boundaries that need to be reached
 \item \code{ndt}: Non-decision time = Additional time required beyond the evidence accumulation process
-\item \code{zr}: Relative startin point = Starting point between the decision thresholds relative to the upper bound.
+\item \code{zr}: Relative starting point = Starting point between the decision thresholds relative to the upper bound.
 \item \code{s}: The diffusion constant, that is the standard deviation of the Gaussian noise during sampling
 }
 \item \strong{Fixed parameters:}
@@ -79,13 +70,13 @@ Provide aggregated statistics for each subject and condition that model paramete
 }
 \item \strong{Default parameter links:}
 \itemize{
-\item drift = identity; bound = log; ndt = log; zr = logit; s = log
+\item drift = log; bound = log; ndt = log; zr = logit; s = log
 }
 \item \strong{Default priors:}
 \itemize{
 \item \code{drift}:
 \itemize{
-\item \code{main}: cauchy(0,1)
+\item \code{main}: normal(0,1)
 \item \code{effects}: normal(0,0.5)
 }
 \item \code{bound}:
