@@ -639,3 +639,423 @@ rm3 <- function(n, size, pars, m3_model, act_funs = construct_m3_act_funs(m3_mod
     acts <- acts * num_options
     acts / sum(acts)
   }
+
+
+#' @title Distribution functions for the EZ-Diffusion Model (ezdm)
+#'
+#' @description Density and random generation functions for the EZ-Diffusion
+#'   Model. The model operates on aggregated data: mean
+#'   reaction time, variance of reaction time, and number of responses to the
+#'   upper boundary.
+#'
+#' @name ezdm_dist
+#'
+#' @param mean_rt Observed mean reaction time(s) in seconds. For version
+#'   "3par", a numeric vector or single value. For version "4par", either a vector
+#'   of length 2 (c(mean_rt_upper, mean_rt_lower)) for single observation, or a matrix with 2
+#'   columns for multiple observations.
+#' @param var_rt Observed variance of reaction times in seconds^2. For version
+#'   "3par", a numeric vector or single value. For version "4par", either a vector
+#'   of length 2 (c(var_rt_upper, var_rt_lower)) for single observation, or a matrix with 2
+#'   columns for multiple observations.
+#' @param n_upper Number of responses to the upper boundary
+#' @param n_trials Total number of trials
+#' @param drift Drift rate (positive, evidence accumulation rate).
+#' @param bound Boundary separation (distance between decision thresholds).
+#' @param ndt Non-decision time (seconds).
+#' @param zr Relative starting point (0 to 1). Only used for version "4par".
+#' @param s Diffusion constant (standard deviation of noise), default = 1.
+#' @param version Character; either "3par" (default) or "4par"
+#' @param n Number of samples to generate
+#' @param log Logical; if `TRUE`, values are returned on the log scale.
+#'
+#' @keywords distribution
+#'
+#' @references
+#' Wagenmakers, E.-J., Van Der Maas, H. L. J., & Grasman, R. P. P. P. (2007).
+#'   An EZ-diffusion model for response time and accuracy. Psychonomic Bulletin
+#'   & Review, 14(1), 3-22.
+#'
+#' Chávez De la Peña, A. F., & Vandekerckhove, J. (2025). An EZ Bayesian
+#'   hierarchical drift diffusion model for response time and accuracy.
+#'   Psychonomic Bulletin & Review.
+#'
+#' @return `dezdm` gives the log-density of the observed summary statistics
+#'   under the EZDM, and `rezdm` generates random summary statistics from the
+#'   implied sampling distributions.
+#'
+#' @export
+#'
+#' @examples
+#' # 3-parameter version (single observation)
+#' dezdm(mean_rt = 0.5, var_rt = 0.02, n_upper = 80, n_trials = 100,
+#'       drift = 2, bound = 1.5, ndt = 0.3)
+#'
+#' # 3-parameter version (vectorized)
+#' dezdm(mean_rt = c(0.5, 0.55), var_rt = c(0.02, 0.025),
+#'       n_upper = c(80, 75), n_trials = c(100, 100),
+#'       drift = 2, bound = 1.5, ndt = 0.3)
+#'
+#' # 4-parameter version (single observation)
+#' dezdm(mean_rt = c(0.45, 0.55), var_rt = c(0.018, 0.025),
+#'       n_upper = 80, n_trials = 100,
+#'       drift = 2, bound = 1.5, ndt = 0.3, zr = 0.55, version = "4par")
+#'
+#' # generate random summary statistics
+#' rezdm(n = 100, n_trials = 100, drift = 2, bound = 1.5, ndt = 0.3)
+#' rezdm(n = 100, n_trials = 100, drift = 2, bound = 1.5, ndt = 0.3,
+#'       zr = 0.55, version = "4par")
+#'
+dezdm <- function(mean_rt, var_rt, n_upper, n_trials,
+                  drift, bound, ndt, zr = 0.5, s = 1,
+                  version = "3par", log = TRUE) {
+  # validate version
+  stopif(
+    not_in(version, c("3par", "4par")),
+    "version must be either '3par' or '4par'"
+  )
+
+  # parameter validation
+  stopif(isTRUE(any(drift <= 0)), "drift must be positive")
+  stopif(isTRUE(any(bound <= 0)), "bound must be positive")
+  stopif(isTRUE(any(ndt <= 0)), "ndt must be positive")
+  stopif(isTRUE(any(s <= 0)), "s must be positive")
+  stopif(isTRUE(any(n_trials <= 0)), "n_trials must be positive")
+  stopif(isTRUE(any(n_upper < 0)), "n_upper cannot be negative")
+  stopif(isTRUE(any(n_upper > n_trials)), "n_upper cannot exceed n_trials")
+
+  if (version == "4par") {
+    stopif(isTRUE(any(zr <= 0 | zr >= 1)), "zr must be between 0 and 1")
+    if (!is.matrix(mean_rt)) {
+      stopif(
+        length(mean_rt) != 2,
+        "For version '4par', mean_rt must be length 2 or a matrix with 2 cols"
+      )
+      stopif(
+        length(var_rt) != 2,
+        "For version '4par', var_rt must be length 2 or a matrix with 2 cols"
+      )
+    } else {
+      stopif(ncol(mean_rt) != 2, "mean_rt matrix must have 2 columns")
+      stopif(ncol(var_rt) != 2, "var_rt matrix must have 2 columns")
+    }
+    ll <- .dezdm_4par(mean_rt, var_rt, n_upper, n_trials,
+                      drift, bound, ndt, zr, s)
+  } else {
+    ll <- .dezdm_3par(mean_rt, var_rt, n_upper, n_trials,
+                      drift, bound, ndt, s)
+  }
+
+  if (!log) {
+    return(exp(ll))
+  }
+  ll
+}
+
+#' @rdname ezdm_dist
+#' @export
+rezdm <- function(n, n_trials, drift, bound, ndt, zr = 0.5, s = 1,
+                  version = "3par") {
+
+  # validate version
+  stopif(
+    not_in(version, c("3par", "4par")),
+    "version must be either '3par' or '4par'"
+  )
+
+  # parameter validation
+  stopif(isTRUE(any(drift <= 0)), "drift must be positive")
+  stopif(isTRUE(any(bound <= 0)), "bound must be positive")
+  stopif(isTRUE(any(ndt <= 0)), "ndt must be positive")
+  stopif(isTRUE(any(s <= 0)), "s must be positive")
+  stopif(length(n) > 1, "n must be a single integer")
+
+  if (version == "4par") {
+    stopif(isTRUE(any(zr <= 0 | zr >= 1)), "zr must be between 0 and 1")
+    .rezdm_4par(n, n_trials, drift, bound, ndt, zr, s)
+  } else {
+    .rezdm_3par(n, n_trials, drift, bound, ndt, s)
+  }
+}
+
+# Internal: 3par density - vectorized
+.dezdm_3par <- function(mean_rt, var_rt, n_upper, n_trials,
+                        drift, bound, ndt, s) {
+  # determine common length from observations
+  n_obs <- max(length(mean_rt), length(var_rt), length(n_upper),
+               length(n_trials))
+
+  # recycle observation inputs
+  mean_rt <- rep_len(mean_rt, n_obs)
+  var_rt <- rep_len(var_rt, n_obs)
+  n_upper <- rep_len(n_upper, n_obs)
+  n_trials <- rep_len(n_trials, n_obs)
+  ndt <- rep_len(ndt, n_obs)
+
+  # compute moments
+  moments <- .ezdm_moments_3par(drift, bound, s)
+
+  # recycle moment outputs to match observations
+  p_c <- rep_len(moments$pC, n_obs)
+  mdt <- rep_len(moments$MDT, n_obs)
+  vrt <- rep_len(moments$VRT, n_obs)
+
+  # binomial for n_upper
+  ll <- stats::dbinom(n_upper, size = n_trials, prob = p_c, log = TRUE)
+
+  # normal for mean RT
+  ll <- ll + stats::dnorm(mean_rt, mean = ndt + mdt,
+                          sd = sqrt(vrt / n_trials), log = TRUE)
+
+  # gamma for variance RT
+  shape <- (n_trials - 1) / 2
+  rate <- (n_trials - 1) / (2 * vrt)
+  ll <- ll + stats::dgamma(var_rt, shape = shape, rate = rate, log = TRUE)
+
+  ll
+}
+
+# Internal: 4par density - vectorized over observations
+# mean_rt, var_rt: matrices with 2 columns (upper, lower) and n rows
+#                  OR vectors of length 2 for single observation
+# n_upper, n_trials: vectors of length n (or scalars for single obs)
+# drift, bound, ndt, zr, s: scalars or vectors (recycled)
+.dezdm_4par <- function(mean_rt, var_rt, n_upper, n_trials,
+                        drift, bound, ndt, zr, s) {
+  # handle single observation (vectors) vs multiple (matrices)
+  if (is.matrix(mean_rt)) {
+    n_obs <- nrow(mean_rt)
+    mean_rt_upper <- mean_rt[, 1]
+    mean_rt_lower <- mean_rt[, 2]
+    var_rt_upper <- var_rt[, 1]
+    var_rt_lower <- var_rt[, 2]
+  } else {
+    # single observation - length 2 vectors
+    n_obs <- 1
+    mean_rt_upper <- mean_rt[1]
+    mean_rt_lower <- mean_rt[2]
+    var_rt_upper <- var_rt[1]
+    var_rt_lower <- var_rt[2]
+  }
+
+  n_lower <- n_trials - n_upper
+  moments <- .ezdm_moments_4par(drift, bound, zr, s)
+
+  # recycle moments to match n_obs
+  pC <- rep_len(moments$pC, n_obs)
+  mdt_upper <- rep_len(moments$mdt_upper, n_obs)
+  mdt_lower <- rep_len(moments$mdt_lower, n_obs)
+  vrt_upper <- rep_len(moments$vrt_upper, n_obs)
+  vrt_lower <- rep_len(moments$vrt_lower, n_obs)
+  ndt <- rep_len(ndt, n_obs)
+
+  # binomial for n_upper
+  ll <- stats::dbinom(n_upper, size = n_trials, prob = pC, log = TRUE)
+
+  # upper boundary contributions (vectorized)
+  upper_valid <- n_upper >= 2
+  if (any(upper_valid)) {
+    ll[upper_valid] <- ll[upper_valid] +
+      stats::dnorm(mean_rt_upper[upper_valid],
+                   mean = ndt[upper_valid] + mdt_upper[upper_valid],
+                   sd = sqrt(vrt_upper[upper_valid] / n_upper[upper_valid]),
+                   log = TRUE) +
+      stats::dgamma(var_rt_upper[upper_valid],
+                    shape = (n_upper[upper_valid] - 1) / 2,
+                    rate = (n_upper[upper_valid] - 1) / (2 * vrt_upper[upper_valid]),
+                    log = TRUE)
+  }
+
+  # lower boundary contributions (vectorized)
+  lower_valid <- n_lower >= 2
+  if (any(lower_valid)) {
+    ll[lower_valid] <- ll[lower_valid] +
+      stats::dnorm(mean_rt_lower[lower_valid],
+                   mean = ndt[lower_valid] + mdt_lower[lower_valid],
+                   sd = sqrt(vrt_lower[lower_valid] / n_lower[lower_valid]),
+                   log = TRUE) +
+      stats::dgamma(var_rt_lower[lower_valid],
+                    shape = (n_lower[lower_valid] - 1) / 2,
+                    rate = (n_lower[lower_valid] - 1) / (2 * vrt_lower[lower_valid]),
+                    log = TRUE)
+  }
+
+  ll
+}
+
+# Internal: 3par random generation
+.rezdm_3par <- function(n, n_trials, drift, bound, ndt, s) {
+  moments <- .ezdm_moments_3par(drift, bound, s)
+
+  n_upper <- stats::rbinom(n, size = n_trials, prob = moments$pC)
+  var_rt <- moments$VRT * stats::rchisq(n, df = n_trials - 1) / (n_trials - 1)
+  mean_rt <- stats::rnorm(n, mean = ndt + moments$MDT, sd = sqrt(var_rt / n_trials))
+
+  data.frame(
+    mean_rt = mean_rt,
+    var_rt = var_rt,
+    n_upper = n_upper,
+    n_trials = rep(n_trials, n)
+  )
+}
+
+# Internal: 4par random generation
+.rezdm_4par <- function(n, n_trials, drift, bound, ndt, zr, s) {
+  moments <- .ezdm_moments_4par(drift, bound, zr, s)
+
+  n_upper <- stats::rbinom(n, size = n_trials, prob = moments$pC)
+  n_lower <- n_trials - n_upper
+
+  # pre-allocate
+  mean_rt_upper <- var_rt_upper <- rep(NA_real_, n)
+  mean_rt_lower <- var_rt_lower <- rep(NA_real_, n)
+
+  # generate upper boundary statistics where n_upper >= 2
+  idx_upper <- n_upper >= 2
+  if (any(idx_upper)) {
+    n_u <- n_upper[idx_upper]
+    var_rt_upper[idx_upper] <- moments$vrt_upper *
+      stats::rchisq(sum(idx_upper), df = n_u - 1) / (n_u - 1)
+    mean_rt_upper[idx_upper] <- stats::rnorm(
+      sum(idx_upper),
+      mean = ndt + moments$mdt_upper,
+      sd = sqrt(var_rt_upper[idx_upper] / n_u)
+    )
+  }
+
+  # generate lower boundary statistics where n_lower >= 2
+  idx_lower <- n_lower >= 2
+  if (any(idx_lower)) {
+    n_l <- n_lower[idx_lower]
+    var_rt_lower[idx_lower] <- moments$vrt_lower *
+      stats::rchisq(sum(idx_lower), df = n_l - 1) / (n_l - 1)
+    mean_rt_lower[idx_lower] <- stats::rnorm(
+      sum(idx_lower),
+      mean = ndt + moments$mdt_lower,
+      sd = sqrt(var_rt_lower[idx_lower] / n_l)
+    )
+  }
+
+  data.frame(
+    mean_rt_upper = mean_rt_upper,
+    mean_rt_lower = mean_rt_lower,
+    var_rt_upper = var_rt_upper,
+    var_rt_lower = var_rt_lower,
+    n_upper = n_upper,
+    n_trials = rep(n_trials, n)
+  )
+}
+
+# Internal: compute 3par moments (zr = 0.5) - vectorized
+.ezdm_moments_3par <- function(drift, bound, s) {
+  # pre-allocate based on longest input
+  n <- max(length(drift), length(bound), length(s))
+
+  # recycle to common length
+  drift <- rep_len(drift, n)
+  bound <- rep_len(bound, n)
+  s <- rep_len(s, n)
+
+  # initialize outputs
+  pC <- rep(NA_real_, n)
+  MDT <- rep(NA_real_, n)
+  VRT <- rep(NA_real_, n)
+
+  # identify near-zero drift cases
+  zero_drift <- abs(drift) < 1e-6
+
+  # zero-drift formulas
+  if (any(zero_drift)) {
+    pC[zero_drift] <- 0.5
+    MDT[zero_drift] <- bound[zero_drift]^2 / (4 * s[zero_drift]^2)
+    VRT[zero_drift] <- bound[zero_drift]^4 / (24 * s[zero_drift]^4)
+  }
+
+  # non-zero drift formulas
+  if (any(!zero_drift)) {
+    idx <- !zero_drift
+    y <- -(bound[idx] * drift[idx]) / s[idx]^2
+    expy <- exp(y)
+    pC[idx] <- 1 / (1 + expy)
+    MDT[idx] <- (bound[idx] / (2 * drift[idx])) * ((1 - expy) / (1 + expy))
+    VRT[idx] <- ((bound[idx] * s[idx]^2) / (2 * drift[idx]^3)) *
+      (2 * y * expy - exp(2 * y) + 1) / ((expy + 1)^2)
+  }
+
+  list(pC = pC, MDT = MDT, VRT = VRT)
+}
+
+# Internal: compute 4par moments (Srivastava et al. formulas) - vectorized
+.ezdm_moments_4par <- function(drift, bound, zr, s) {
+  # helper functions
+  coth <- function(x) cosh(x) / sinh(x)
+  csch <- function(x) 1 / sinh(x)
+
+  # pre-allocate based on longest input
+  n <- max(length(drift), length(bound), length(zr), length(s))
+
+  # recycle to common length
+  drift <- rep_len(drift, n)
+  bound <- rep_len(bound, n)
+  zr <- rep_len(zr, n)
+  s <- rep_len(s, n)
+
+  # compute intermediate values
+  a <- drift
+  z <- bound / 2
+  x0 <- (zr * bound) - z
+
+  k_z <- (a * z) / s^2
+  k_x <- (a * x0) / s^2
+
+  # proportion correct (works for all cases)
+  pC <- 1 - (exp(-2 * k_x) - exp(-2 * k_z)) / (exp(2 * k_z) - exp(-2 * k_z))
+
+  # initialize outputs
+  mdt_upper <- rep(NA_real_, n)
+  mdt_lower <- rep(NA_real_, n)
+  vrt_upper <- rep(NA_real_, n)
+  vrt_lower <- rep(NA_real_, n)
+
+  # identify near-zero drift cases
+  zero_drift <- abs(drift) < 1e-6
+
+  # zero-drift formulas
+  if (any(zero_drift)) {
+    idx <- zero_drift
+    mdt_upper[idx] <- (4 * z[idx]^2 - (z[idx] + x0[idx])^2) / (3 * s[idx]^2)
+    mdt_lower[idx] <- (4 * z[idx]^2 - (z[idx] - x0[idx])^2) / (3 * s[idx]^2)
+    vrt_upper[idx] <- (32 * z[idx]^4 - 2 * (z[idx] + x0[idx])^4) / (45 * s[idx]^4)
+    vrt_lower[idx] <- (32 * z[idx]^4 - 2 * (z[idx] - x0[idx])^4) / (45 * s[idx]^4)
+  }
+
+  # non-zero drift formulas
+  if (any(!zero_drift)) {
+    idx <- !zero_drift
+    mdt_upper[idx] <- (s[idx]^2 / a[idx]^2) *
+      (2 * k_z[idx] * coth(2 * k_z[idx]) -
+         (k_x[idx] + k_z[idx]) * coth(k_x[idx] + k_z[idx]))
+    mdt_lower[idx] <- (s[idx]^2 / a[idx]^2) *
+      (2 * k_z[idx] * coth(2 * k_z[idx]) -
+         (-k_x[idx] + k_z[idx]) * coth(-k_x[idx] + k_z[idx]))
+
+    vrt_upper[idx] <- (s[idx]^4 / a[idx]^4) *
+      (4 * k_z[idx]^2 * csch(2 * k_z[idx])^2 +
+         2 * k_z[idx] * coth(2 * k_z[idx]) -
+         (k_x[idx] + k_z[idx])^2 * csch(k_x[idx] + k_z[idx])^2 -
+         (k_x[idx] + k_z[idx]) * coth(k_x[idx] + k_z[idx]))
+    vrt_lower[idx] <- (s[idx]^4 / a[idx]^4) *
+      (4 * k_z[idx]^2 * csch(2 * k_z[idx])^2 +
+         2 * k_z[idx] * coth(2 * k_z[idx]) -
+         (-k_x[idx] + k_z[idx])^2 * csch(-k_x[idx] + k_z[idx])^2 -
+         (-k_x[idx] + k_z[idx]) * coth(-k_x[idx] + k_z[idx]))
+  }
+
+  list(
+    pC = pC,
+    mdt_upper = mdt_upper,
+    mdt_lower = mdt_lower,
+    vrt_upper = vrt_upper,
+    vrt_lower = vrt_lower
+  )
+}
