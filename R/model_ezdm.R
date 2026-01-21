@@ -11,7 +11,7 @@
       s = "The diffusion constant, that is the standard deviation of the Gaussian noise during sampling"
     ),
     links = list(
-      drift = "identity", bound = "log", ndt = "log", s = "log"
+      drift = "log", bound = "log", ndt = "log", s = "log"
     ),
     fixed_parameters = list(
       s = 0
@@ -24,7 +24,7 @@
     ),
     init_ranges = list(
       mu = c(0,1),
-      drift = c(0.5,1.5),
+      drift = c(0.5,2),
       bound = c(1,2),
       ndt = c(0.25, 0.5),
       s = c(0.99,1.01)
@@ -35,17 +35,17 @@
       drift = "Drift rate = Average rate of evidence accumulation of the decision processes",
       bound = "Boundary separation = Distance between the decision boundaries that need to be reached",
       ndt = "Non-decision time = Additional time required beyond the evidence accumulation process",
-      zr = "Relative startin point = Starting point between the decision thresholds relative to the upper bound.",
+      zr = "Relative starting point = Starting point between the decision thresholds relative to the upper bound.",
       s = "The diffusion constant, that is the standard deviation of the Gaussian noise during sampling"
     ),
     links = list(
-      drift = "identity", bound = "log", ndt = "log", zr = "logit", s = "log"
+      drift = "log", bound = "log", ndt = "log", zr = "logit", s = "log"
     ),
     fixed_parameters = list(
       s = 0
     ),
     priors = list(
-      drift = list(main = "cauchy(0,1)", effects = "normal(0,0.5)"),
+      drift = list(main = "normal(0,1)", effects = "normal(0,0.5)"),
       bound = list(main = "normal(0,0.5)", effects = "normal(0,0.5)"),
       ndt = list(main = "normal(-1.5,0.5)", effects = "normal(0,0.3)"),
       zr = list(main = "normal(0,0.5)", effects = "normal(0,0.3)"),
@@ -53,7 +53,7 @@
     ),
     init_ranges = list(
       mu = c(0,1),
-      drift = c(-0.5,0.5),
+      drift = c(0.5,2),
       bound = c(1,2),
       ndt = c(0.25, 0.5),
       zr = c(0.45, 0.55),
@@ -132,13 +132,74 @@ ezdm <- function(mean_rt, var_rt, n_upper, n_trials, links = NULL, version = "3p
 
 #' @export
 check_data.ezdm <- function(model, data, formula) {
-  # retrieve required arguments
+  # retrieve required variable names
+  mean_rt <- model$resp_vars$mean_rt
+  var_rt <- model$resp_vars$var_rt
+  n_upper <- model$resp_vars$n_upper
+  n_trials <- model$other_vars$n_trials
 
-  # check the data (required)
+  # for 4par model, mean_rt and var_rt can be vectors of length 2
+  mean_rt_vars <- if (length(mean_rt) > 1) mean_rt else mean_rt
+  var_rt_vars <- if (length(var_rt) > 1) var_rt else var_rt
 
-  # compute any necessary transformations (optional)
+  # check that all required variables exist in data
+  required_vars <- c(mean_rt_vars, var_rt_vars, n_upper, n_trials)
+  missing_vars <- setdiff(required_vars, colnames(data))
+  stopif(
+    length(missing_vars) > 0,
+    "The following required variables are missing from the data: {paste(missing_vars, collapse = ', ')}"
+  )
 
-  # save some variables as attributes of the data for later use (optional)
+  # check that mean RT values are plausible (warn if likely in milliseconds)
+  # typical RTs in seconds are 0.2-3s; values > 10 suggest milliseconds
+  mean_rt_values <- unlist(data[mean_rt_vars])
+  warnif(
+    any(mean_rt_values > 10, na.rm = TRUE),
+    "Some mean RT values are greater than 10. If your reaction times are in
+    milliseconds, please convert them to seconds before fitting the model.
+    The model assumes reaction times are measured in seconds."
+  )
+
+  # check that mean RT values are positive
+  stopif(
+    any(mean_rt_values <= 0, na.rm = TRUE),
+    "Mean RT values must be positive. Found non-positive values in the data."
+  )
+
+  # check that variance values are positive
+  var_rt_values <- unlist(data[var_rt_vars])
+  stopif(
+    any(var_rt_values <= 0, na.rm = TRUE),
+    "Variance of RT must be positive. Found non-positive values in the data."
+  )
+
+  # check that n_trials is a positive integer
+  n_trials_values <- data[[n_trials]]
+  stopif(
+    any(n_trials_values <= 0, na.rm = TRUE),
+    "Number of trials (n_trials) must be positive. Found non-positive values."
+  )
+  warnif(
+    any(n_trials_values != round(n_trials_values), na.rm = TRUE),
+    "Number of trials (n_trials) should be whole numbers. Found non-integer values."
+  )
+
+  # check that n_upper is a non-negative integer
+  n_upper_values <- data[[n_upper]]
+  stopif(
+    any(n_upper_values < 0, na.rm = TRUE),
+    "Number of upper boundary responses (n_upper) cannot be negative."
+  )
+  warnif(
+    any(n_upper_values != round(n_upper_values), na.rm = TRUE),
+    "Number of upper boundary responses (n_upper) should be whole numbers."
+  )
+
+  # check that n_upper <= n_trials (proportion correct between 0 and 1)
+  stopif(
+    any(n_upper_values > n_trials_values, na.rm = TRUE),
+    "Number of upper boundary responses (n_upper) cannot exceed total trials (n_trials)."
+  )
 
   NextMethod('check_data')
 }
@@ -169,7 +230,6 @@ bmf2bf.ezdm_4par <- function(model, formula) {
   var_rt <- model$resp_vars$var_rt
   n_upper <- model$resp_vars$n_upper
   n_trials <- model$other_vars$n_trials
-  response <- model$resp_vars$response
 
   # set the base brmsformula based
   brms_formula <- brms::bf(glue::glue("{mean_rt[1]} | vreal({mean_rt[2]}, {var_rt[1]}, {var_rt[2]}) + vint({n_upper}, {n_trials}) ~ 1"))
@@ -215,15 +275,14 @@ configure_model.ezdm_3par <- function(model, data, formula) {
   nlist(formula, data, stanvars)
 }
 
+# TODO: Implement log_lik for loo/waic calculations
 log_lik_ezdm_3par <- function(i, prep) {
-
-  out
+  NULL
 }
 
+# TODO: Implement posterior_predict for pp_check
 posterior_predict_ezdm_3par <- function(i, prep, ...) {
-  dots <- list(...)
-
-  # out
+  NULL
 }
 
 #' @export
@@ -260,13 +319,12 @@ configure_model.ezdm_4par <- function(model, data, formula) {
   nlist(formula, data, stanvars)
 }
 
-
-
+# TODO: Implement log_lik for loo/waic calculations
 log_lik_ezdm_4par <- function(i, prep) {
-  #out
+  NULL
 }
 
+# TODO: Implement posterior_predict for pp_check
 posterior_predict_ezdm_4par <- function(i, prep, ...) {
-  dots <- list(...)
-  # out
+  NULL
 }
