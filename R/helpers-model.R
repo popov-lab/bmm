@@ -712,18 +712,18 @@ add_bmm_version_to_stancode <- function(stancode) {
 #'   program blocks.
 #'
 #' @examples
-#'   # generate simple stan code from brms
-#'   stan_code <- stancode(brms::bf(x ~ 1), data = data.frame(x = rnorm(100)))
+#' # generate simple stan code from brms
+#' stan_code <- stancode(brms::bf(x ~ 1), data = data.frame(x = rnorm(100)))
 #'
-#'   extracted_program_blocks <- extract_stan_blocks(stan_code)
+#' extracted_program_blocks <- extract_stan_blocks(stan_code)
 #'
 #' @export
 extract_stan_blocks <- function(stan_code, which_blocks = "all") {
   # code all stan blocks
-  stan_blocks <- c("functions", "data", "transformed data","parameters","transformed parameters","model","generated quantities")
+  stan_blocks <- c("functions", "data", "transformed data", "parameters", "transformed parameters", "model", "generated quantities")
 
   # select blocks to be extracted
-  if("all" %in% which_blocks) {
+  if ("all" %in% which_blocks) {
     selected_blocks <- stan_blocks
   } else {
     selected_blocks <- stan_blocks[stan_blocks %in% which_blocks]
@@ -736,11 +736,11 @@ extract_stan_blocks <- function(stan_code, which_blocks = "all") {
   for (block in selected_blocks) {
     num_block <- which(block == stan_blocks)
 
-    block_match <- gregexpr(paste0("\n",block), stan_code)
-    if(num_block < 7) {
-      next_block_match <- gregexpr(paste0("\n",stan_blocks[num_block + 1]), stan_code)[[1]][1]
+    block_match <- gregexpr(paste0("\n", block), stan_code)
+    if (num_block < 7) {
+      next_block_match <- gregexpr(paste0("\n", stan_blocks[num_block + 1]), stan_code)[[1]][1]
     } else {
-      next_block_match <- gregexec("\\}",stan_code)[[1]]
+      next_block_match <- gregexec("\\}", stan_code)[[1]]
       next_block_match <- next_block_match[length(next_block_match)]
     }
 
@@ -748,7 +748,7 @@ extract_stan_blocks <- function(stan_code, which_blocks = "all") {
     stop_pos <- next_block_match - 2
 
     block_contents <- substr(stan_code, start_pos, stop_pos)
-    block_contents <- gsub("  ","",block_contents)
+    block_contents <- gsub("  ", "", block_contents)
     stan_block_text[[block]] <- block_contents
   }
 
@@ -770,13 +770,16 @@ extract_stan_blocks <- function(stan_code, which_blocks = "all") {
 #' @examples
 #' # generate simple stan code from brms
 #' stan_code <- stancode(brms::bf(x ~ 1 + cond + (1 + cond | ID)),
-#'                       data = data.frame(x = rnorm(100),
-#'                                         ID = rep(1:50, each = 2),
-#'                                         cond = rep(1:2, times = 50)))
+#'   data = data.frame(
+#'     x = rnorm(100),
+#'     ID = rep(1:50, each = 2),
+#'     cond = rep(1:2, times = 50)
+#'   )
+#' )
 #'
 #' extracted_program_blocks <- extract_stan_blocks(stan_code)
 #'
-#' par_dims <- extract_parameter_dimensions(extracted_program_blocks$parameters)#'
+#' par_dims <- extract_parameter_dimensions(extracted_program_blocks$parameters) #'
 #'
 #' @export
 extract_parameter_dimensions <- function(parameters_block) {
@@ -812,14 +815,17 @@ parse_parameters_line <- function(x) {
 
   # 2) detect base type
   base_types <- c(
-    "cholesky_factor_corr","cholesky_factor_cov",
-    "corr_matrix","cov_matrix",
-    "row_vector","unit_vector","positive_ordered","simplex","ordered",
-    "vector","matrix","real","int"
+    "cholesky_factor_corr", "cholesky_factor_cov",
+    "corr_matrix", "cov_matrix",
+    "row_vector", "unit_vector", "positive_ordered", "simplex", "ordered",
+    "vector", "matrix", "real", "int"
   )
   base_type <- NULL
   for (bt in base_types) {
-    if (grepl(paste0("^", bt, "\\b"), x, perl = TRUE)) { base_type <- bt; break }
+    if (grepl(paste0("^", bt, "\\b"), x, perl = TRUE)) {
+      base_type <- bt
+      break
+    }
   }
   if (is.null(base_type)) stop("Unknown or unsupported base type in: ", x, call. = FALSE)
 
@@ -837,15 +843,15 @@ parse_parameters_line <- function(x) {
   if (grepl("^\\s*\\[", x_after_bt, perl = TRUE)) {
     m <- regexpr("(?<=\\[)[^\\]]+(?=\\])", x_after_bt, perl = TRUE)
     if (m[1] == -1) stop("Could not parse base dimensions.", call. = FALSE)
-    dims_str  <- regmatches(x_after_bt, m)
+    dims_str <- regmatches(x_after_bt, m)
     base_dims <- trimws(strsplit(dims_str, ",", fixed = TRUE)[[1]])
     base_dims <- base_dims[nzchar(base_dims)]
     x_after_bt <- sub("^\\s*\\[[^\\]]*\\]\\s*", "", x_after_bt, perl = TRUE)
   } else {
     if (base_type %in% c(
-      "vector","row_vector","matrix",
-      "simplex","unit_vector","ordered","positive_ordered",
-      "corr_matrix","cov_matrix","cholesky_factor_corr","cholesky_factor_cov"
+      "vector", "row_vector", "matrix",
+      "simplex", "unit_vector", "ordered", "positive_ordered",
+      "corr_matrix", "cov_matrix", "cholesky_factor_corr", "cholesky_factor_cov"
     )) {
       stop("Missing dimensions for type ", base_type, ".", call. = FALSE)
     }
@@ -856,8 +862,7 @@ parse_parameters_line <- function(x) {
   if (!nzchar(name)) stop("Missing parameter name.", call. = FALSE)
 
   # 6) normalize dims by base type
-  dims_by_type <- switch(
-    base_type,
+  dims_by_type <- switch(base_type,
     real                 = 1,
     int                  = 1,
     vector               = base_dims[1],
@@ -880,8 +885,8 @@ parse_parameters_line <- function(x) {
 
   list(
     name    = name,
-    type    = base_type,     # backward-compat: base type only
-    types   = types,         # NEW: includes "array" when applicable
+    type    = base_type, # backward-compat: base type only
+    types   = types, # NEW: includes "array" when applicable
     dims    = dims,
     bounds  = bounds
   )
@@ -889,17 +894,22 @@ parse_parameters_line <- function(x) {
 
 # helper: parse <...> constraints into a named list
 parse_bounds <- function(s) {
-  if (!grepl("<[^>]*>", s, perl = TRUE)) return(NULL)
+  if (!grepl("<[^>]*>", s, perl = TRUE)) {
+    return(NULL)
+  }
   inside <- sub(".*?<([^>]*)>.*", "\\1", s, perl = TRUE)
   parts <- trimws(unlist(strsplit(inside, ",")))
   kvs <- lapply(parts, function(p) {
-    if (!grepl("=", p, fixed = TRUE)) return(NULL)
+    if (!grepl("=", p, fixed = TRUE)) {
+      return(NULL)
+    }
     sp <- strsplit(p, "=", fixed = TRUE)[[1]]
     setNames(list(trimws(sp[2])), trimws(sp[1]))
   })
   # merge into a single named list
   kvs <- Filter(Negate(is.null), kvs)
-  if (!length(kvs)) return(list())
+  if (!length(kvs)) {
+    return(list())
+  }
   Reduce(function(a, b) c(a, b), kvs)
 }
-

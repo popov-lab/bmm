@@ -142,8 +142,8 @@ test_that("extracts all blocks and names are correct", {
 
   expect_type(out, "list")
   expect_setequal(names(out), c(
-    "functions","data","transformed data","parameters",
-    "transformed parameters","model","generated quantities"
+    "functions", "data", "transformed data", "parameters",
+    "transformed parameters", "model", "generated quantities"
   ))
 })
 
@@ -155,7 +155,7 @@ test_that("extracts only requested subset of blocks", {
   stan_code <- stancode(formula, data = data, model = model)
 
   out <- extract_stan_blocks(stan_code, c("data", "model"))
-  expect_setequal(names(out), c("data","model"))
+  expect_setequal(names(out), c("data", "model"))
   expect_match(out$data, "int<lower=1> N;", fixed = TRUE)
   expect_match(out$model, "von_mises_lpdf", fixed = TRUE)
 })
@@ -166,8 +166,8 @@ data {\n}\n\
 model {\n}\n\
 generated quantities {\n}\n"
 
-  out <- extract_stan_blocks(stan_code, c("data","flying spaghetti monster","model"))
-  expect_setequal(names(out), c("data","model"))
+  out <- extract_stan_blocks(stan_code, c("data", "flying spaghetti monster", "model"))
+  expect_setequal(names(out), c("data", "model"))
 })
 
 test_that("block boundaries are correct and do not bleed into next block", {
@@ -208,6 +208,18 @@ test_that("errors (or at least fails) when a requested block is missing", {
   # update this to expect_equal(out$data, "") accordingly.
 })
 
+test_that("block extraction works when order of blocks is different from the brms/bmm default", {
+  # default order transformed parameters comes after parameters
+  stan_code <- "\nparameters {\nreal Intercept;}\ntransformed parameters {\n}"
+  extracted_program_blocks <- bmm::extract_stan_blocks(stan_code)
+  expect_equal(extracted_program_blocks$parameters, "real Intercept;")
+
+  # reversed
+  stan_code <- "\ntransformed parameters {\n}\nparameters {real Intercept;}"
+  extracted_program_blocks <- bmm::extract_stan_blocks(stan_code)
+  expect_equal(extracted_program_blocks$parameters, "real Intercept;")
+})
+
 test_that("real / int scalars parse with dims = 1", {
   out1 <- parse_parameters_line("real alpha;")
   out2 <- parse_parameters_line("int y;")
@@ -233,14 +245,14 @@ test_that("constraints are parsed into named list and comments stripped", {
 })
 
 test_that("vector/row_vector/simplex/unit_vector/ordered/positive_ordered need one dim", {
-  v  <- parse_parameters_line("vector[K] beta;")
+  v <- parse_parameters_line("vector[K] beta;")
   rv <- parse_parameters_line("row_vector[K] r;")
   sx <- parse_parameters_line("simplex[K] theta;")
   uv <- parse_parameters_line("unit_vector[K] u;")
   od <- parse_parameters_line("ordered[K] o;")
   po <- parse_parameters_line("positive_ordered[K] po;")
 
-  expect_identical(v$dims,  "K")
+  expect_identical(v$dims, "K")
   expect_identical(rv$dims, "K")
   expect_identical(sx$dims, "K")
   expect_identical(uv$dims, "K")
@@ -269,7 +281,7 @@ test_that("square matrix families return a single size (current behavior)", {
 test_that("array prefix dims are prepended and preserved in order", {
   # array of vectors
   out1 <- parse_parameters_line("array[N] vector[K] x;")
-  expect_identical(out1$type, "vector")  # base type remains the base
+  expect_identical(out1$type, "vector") # base type remains the base
   expect_identical(out1$dims, c("N", "K"))
 
   # 2D array of matrices
@@ -322,7 +334,7 @@ test_that("returns a named list keyed by parameter names, preserving order", {
   expect_identical(res$beta$type, "vector")
   expect_identical(res$A$type, "matrix")
   expect_identical(res$beta$dims, "K")
-  expect_identical(res$A$dims, c("M","N"))
+  expect_identical(res$A$dims, c("M", "N"))
 })
 
 test_that("handles arrays and square-matrix families", {
@@ -333,9 +345,9 @@ test_that("handles arrays and square-matrix families", {
   "
   res <- extract_parameter_dimensions(block)
 
-  expect_identical(names(res), c("x","Sigma","L"))
+  expect_identical(names(res), c("x", "Sigma", "L"))
   expect_identical(res$x$type, "vector")
-  expect_identical(res$x$dims, c("N","K"))
+  expect_identical(res$x$dims, c("N", "K"))
 
   # by your current parse_parameters_line(): single size for these families
   expect_identical(res$Sigma$type, "cov_matrix")
@@ -351,7 +363,7 @@ test_that("strips trailing comments but keeps code", {
   "
   res <- extract_parameter_dimensions(block)
 
-  expect_identical(names(res), c("p","r"))
+  expect_identical(names(res), c("p", "r"))
   expect_identical(res$p$type, "real")
   expect_identical(res$p$dims, "1")
   expect_true(is.list(res$p$bounds))
@@ -364,7 +376,7 @@ test_that("strips trailing comments but keeps code", {
 test_that("robust to Windows-style CRLF line endings", {
   block <- "\r\nreal a;\r\nvector[K] b;\r\nmatrix[M,N] A;\r\n"
   res <- extract_parameter_dimensions(block)
-  expect_identical(names(res), c("a","b","A"))
+  expect_identical(names(res), c("a", "b", "A"))
 })
 
 test_that("comment-only and blank lines are ignored (no errors) [guards ordering bug]", {
@@ -396,4 +408,3 @@ test_that("duplicate names result in last-one-wins (documented behavior)", {
   expect_identical(res$alpha$type, "real")
   expect_identical(res$beta$type, "vector")
 })
-
