@@ -138,7 +138,7 @@ test_that("extracts all blocks and names are correct", {
 
   stan_code <- stancode(formula, data = data, model = model)
 
-  out <- extract_stan_blocks(stan_code, "all")
+  out <- extract_stan_blocks(stan_code)
 
   expect_type(out, "list")
   expect_setequal(names(out), c(
@@ -176,7 +176,7 @@ data {\n  int N;\n}\n\
 model {\n  N ~ poisson(1);\n}\n\
 generated quantities {\n  real y;\n}\n"
 
-  out <- extract_stan_blocks(stan_code, "all")
+  out <- extract_stan_blocks(stan_code)
 
   # 'model' block should not contain any text from 'generated quantities'
   expect_false(grepl("generated quantities", out$model, fixed = TRUE))
@@ -407,4 +407,42 @@ test_that("duplicate names result in last-one-wins (documented behavior)", {
   # sanity: still accessible and type corresponds to the last declaration
   expect_identical(res$alpha$type, "real")
   expect_identical(res$beta$type, "vector")
+})
+
+# tests/testthat/test-find_matching_brace.R
+
+test_that("find_matching_brace matches the simplest pair", {
+  x <- "{}"
+  expect_equal(find_matching_brace(x, 1L), 2L)
+})
+
+test_that("find_matching_brace matches nested braces", {
+  x <- "{{}{}}"
+  expect_equal(find_matching_brace(x, 1L), 6L) # outer
+  expect_equal(find_matching_brace(x, 2L), 3L) # first inner {}
+  expect_equal(find_matching_brace(x, 4L), 5L) # second inner {}
+})
+
+test_that("find_matching_brace works with other text around braces", {
+  x <- "abc{def{ghi}jkl}mno"
+  # positions: abc(3) {(4) def{(8) ghi}(12) jkl}(16) mno
+  expect_equal(find_matching_brace(x, 4L), 16L)
+  expect_equal(find_matching_brace(x, 8L), 12L)
+})
+
+test_that("find_matching_brace errors if open_pos is not an opening brace", {
+  x <- "a{b}c"
+  expect_error(find_matching_brace(x, 1L), "not open_brace")
+  expect_error(find_matching_brace(x, 3L), "not open_brace")
+  expect_error(find_matching_brace(x, 4L), "not open_brace")
+})
+
+test_that("find_matching_brace errors on unbalanced braces", {
+  expect_error(find_matching_brace("{", 1L), "No matching")
+  expect_error(find_matching_brace("{ {", 1L), "No matching")
+})
+
+test_that("find_matching_brace handles lots of braces", {
+  x <- paste0("{", strrep("{}", 100), "}")
+  expect_equal(find_matching_brace(x, 1L), nchar(x))
 })
