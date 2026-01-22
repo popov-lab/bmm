@@ -463,8 +463,6 @@ log_lik_cswald_simple <- function(i, prep) {
 
 #' @export
 configure_model.cswald_crisk <- function(model, data, formula) {
-  env_cswald_crisk <- new.env(parent = baseenv())
-
   # retrieve required arguments
   rt_var <- model$other_vars$rt
   response_var <- model$other_vars$response
