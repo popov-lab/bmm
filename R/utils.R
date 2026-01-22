@@ -41,7 +41,7 @@ softmaxinv <- function(p, lambda = 1, ref_position = length(p), ref_value = 0) {
   stopif(length(ref_position) > 1, "Please provide a single reference value.")
   stopif(ref_position > len, "The reference value must be less or equal than the length of the probability vector.")
 
-  weights = (log(p) - log(p[len])) / lambda
+  weights <- (log(p) - log(p[len])) / lambda
   weights + (ref_value - weights[ref_position])
 }
 
@@ -351,12 +351,12 @@ order_data_query <- function(model, data, formula) {
           "Your data has been sorted by the following predictors: ",
           paste(predictors, collapse = ", "), "\n"
         )
-        data <- data[do.call(order, data[predictors]),]
+        data <- data[do.call(order, data[predictors]), ]
       }
     }
     message("\n\n", disable_msg)
   } else if (isTRUE(sort_data)) {
-    data <- data[do.call(order, data[predictors]),]
+    data <- data[do.call(order, data[predictors]), ]
     message(
       "\nYour data has been sorted by the following predictors: ",
       paste(predictors, collapse = ", "), "\n"
@@ -632,7 +632,7 @@ reset_env.brmsformula <- function(object, env = globalenv(), ...) {
 }
 
 #' @export
-reset_env.formula <- function(object, env =  globalenv(), ...) {
+reset_env.formula <- function(object, env = globalenv(), ...) {
   environment(object) <- env
   object
 }
