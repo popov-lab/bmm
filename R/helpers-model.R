@@ -773,7 +773,6 @@ find_matching_brace <- function(x, open_pos,
   pos[k0 + j - 1L]
 }
 
-
 #' @title Extract code from different STAN program blocks
 #'
 #' @description
@@ -994,3 +993,4 @@ parse_bounds <- function(s) {
   }
   Reduce(function(a, b) c(a, b), kvs)
 }
+
