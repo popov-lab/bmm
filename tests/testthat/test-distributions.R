@@ -420,3 +420,58 @@ test_that("dcswald errors when rt < ndt", {
     "smaller than the non-decision time"
   )
 })
+
+test_that("cswald functions error on invalid parameter vector lengths", {
+  # Parameter vectors must be length 1 or length n
+  expect_error(
+    dcswald(rt = c(0.5, 0.6, 0.7), response = 1, drift = c(1, 2),
+            bound = 1.5, ndt = 0.2),
+    "length 1 or 3"
+  )
+
+  expect_error(
+    pcswald(q = c(0.5, 0.6, 0.7), response = 1, drift = 2,
+            bound = c(1, 2), ndt = 0.2),
+    "length 1 or 3"
+  )
+
+  expect_error(
+    qcswald(p = c(0.3, 0.5, 0.7), response = 1, drift = 2,
+            bound = 1.5, ndt = c(0.1, 0.2)),
+    "length 1 or 3"
+  )
+})
+
+test_that("cswald simple and crisk give similar results for correct responses", {
+
+  # For high drift and unbiased starting point (zr=0.5), the simple version
+
+# should give similar densities to crisk for correct responses (response=1)
+  rt <- seq(0.4, 1.5, by = 0.1)
+  drift <- 3
+  bound_simple <- 1.5  # simple version: distance to correct boundary
+  bound_crisk <- 3.0   # crisk version: total boundary separation (2x simple)
+
+  # Get densities for correct responses
+  dens_simple <- dcswald(rt, response = 1, drift = drift, bound = bound_simple,
+                         ndt = 0.2, version = "simple", log = FALSE)
+  dens_crisk <- dcswald(rt, response = 1, drift = drift, bound = bound_crisk,
+                        ndt = 0.2, zr = 0.5, version = "crisk", log = FALSE)
+
+  # Densities should be correlated (similar shape) though not identical
+  # because crisk accounts for competing accumulator
+  cor_value <- cor(dens_simple, dens_crisk)
+  expect_true(cor_value > 0.95)
+})
+
+test_that("qcswald adaptive bounds work for slow drift", {
+  # With very slow drift, RTs can be very long
+  # The adaptive bounds should handle this
+  q <- qcswald(p = 0.5, response = 1, drift = 0.1, bound = 2, ndt = 0.3)
+  expect_true(is.finite(q))
+  expect_true(q > 0.3)  # greater than ndt
+
+  # Verify round-trip
+  p_back <- pcswald(q, response = 1, drift = 0.1, bound = 2, ndt = 0.3)
+  expect_equal(p_back, 0.5, tolerance = 0.01)
+})

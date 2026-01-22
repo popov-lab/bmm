@@ -687,24 +687,31 @@ rm3 <- function(n, size, pars, m3_model, act_funs = construct_m3_act_funs(m3_mod
 #'
 #'
 #' @export
-dcswald <- function(rt, response, drift, bound, ndt, zr = 0.5, s = 1, version = "simple", log = TRUE) {
+dcswald <- function(rt, response, drift, bound, ndt, zr = 0.5, s = 1,
+                    version = "simple", log = TRUE) {
   validate_cswald_parameters(drift, bound, ndt, zr, s)
+
+  n <- length(rt)
+
+  # validate and recycle parameters
+
+  params <- recycle_cswald_params(n, drift, bound, ndt, zr, s, response)
+  drift <- params$drift
+  bound <- params$bound
+  ndt <- params$ndt
+  zr <- params$zr
+  s <- params$s
+  response <- params$response
 
   # obtain shifted rts
   rt_shifted <- rt - ndt
   stopif(any(rt_shifted <= 0),
          glue::glue("Some reaction times are smaller than the non-decision time. \n",
-                    "You need to specify a non-decisiton time 'ndt' smaller than the shortest reaction time."))
+                    "You need to specify a non-decision time 'ndt' smaller than ",
+                    "the shortest reaction time."))
 
   # pre-allocate vector for log-likelihood
-  log_ll <- numeric(length(rt))
-
-  # check length of passed parameters
-  if(length(drift) == 1 && !length(drift) == length(rt)) drift <- rep(drift, length.out = length(rt))
-  if(length(bound) == 1 && !length(bound) == length(rt)) bound <- rep(bound, length.out = length(rt))
-  if(length(ndt) == 1 && !length(ndt) == length(rt)) ndt <- rep(ndt, length.out = length(rt))
-  if(length(zr) == 1 && !length(zr) == length(rt)) zr <- rep(zr, length.out = length(rt))
-  if(length(s) == 1 && !length(s) == length(rt)) s <- rep(s, length.out = length(rt))
+  log_ll <- numeric(n)
 
   if (version == "simple") {
     log_ll[response == 1] = .dwald(rt_shifted[response == 1], drift = drift[response == 1], bound = bound[response == 1], s = s[response == 1], log = TRUE)
@@ -793,14 +800,14 @@ pcswald <- function(q, response, drift, bound, ndt, zr = 0.5, s = 1,
 
   n <- length(q)
 
-  # handle vector parameters - recycle to length of q
-
-  if (length(drift) == 1) drift <- rep(drift, length.out = n)
-  if (length(bound) == 1) bound <- rep(bound, length.out = n)
-  if (length(ndt) == 1) ndt <- rep(ndt, length.out = n)
-  if (length(zr) == 1) zr <- rep(zr, length.out = n)
-  if (length(s) == 1) s <- rep(s, length.out = n)
-  if (length(response) == 1) response <- rep(response, length.out = n)
+  # validate and recycle parameters
+  params <- recycle_cswald_params(n, drift, bound, ndt, zr, s, response)
+  drift <- params$drift
+  bound <- params$bound
+  ndt <- params$ndt
+  zr <- params$zr
+  s <- params$s
+  response <- params$response
 
   # compute shifted response time
   q_shifted <- q - ndt
@@ -894,13 +901,14 @@ qcswald <- function(p, response, drift, bound, ndt, zr = 0.5, s = 1,
 
   n <- length(p)
 
-  # handle vector parameters - recycle to length of p
-  if (length(drift) == 1) drift <- rep(drift, length.out = n)
-  if (length(bound) == 1) bound <- rep(bound, length.out = n)
-  if (length(ndt) == 1) ndt <- rep(ndt, length.out = n)
-  if (length(zr) == 1) zr <- rep(zr, length.out = n)
-  if (length(s) == 1) s <- rep(s, length.out = n)
-  if (length(response) == 1) response <- rep(response, length.out = n)
+  # validate and recycle parameters
+  params <- recycle_cswald_params(n, drift, bound, ndt, zr, s, response)
+  drift <- params$drift
+  bound <- params$bound
+  ndt <- params$ndt
+  zr <- params$zr
+  s <- params$s
+  response <- params$response
 
   # pre-allocate output
   q <- numeric(n)
@@ -921,11 +929,16 @@ qcswald <- function(p, response, drift, bound, ndt, zr = 0.5, s = 1,
       } else if (p[i] >= 1) {
         q[i] <- Inf
       } else {
+        # adaptive upper bound based on expected RT (mean of Wald ~ bound/drift)
+        # use 20x the expected RT as upper bound, with minimum of 10 seconds
+        expected_rt <- bound[i] / max(abs(drift[i]), 0.01)
+        upper_bound <- ndt[i] + max(10, 20 * expected_rt)
+
         # numerical root finding to invert CDF
         q[i] <- stats::uniroot(
           function(x) .pwald(x - ndt[i], drift[i], bound[i], s[i],
                              lower.tail = TRUE, log.p = FALSE) - p[i],
-          interval = c(ndt[i] + 1e-10, ndt[i] + 100),
+          interval = c(ndt[i] + 1e-10, upper_bound),
           extendInt = "upX"
         )$root
       }
@@ -965,6 +978,24 @@ validate_cswald_parameters <- function(drift, bound, ndt, zr, s) {
          "Values for the relative starting point 'zr' must be between 0 and 1")
   stopif(any(s <= 0),
          "Values for diffusion constant 's' must be positive.")
+}
+
+# Helper function to validate and recycle parameter vectors
+# Returns recycled parameters or errors if lengths are incompatible
+recycle_cswald_params <- function(n, drift, bound, ndt, zr, s, response = NULL) {
+  params <- list(drift = drift, bound = bound, ndt = ndt, zr = zr, s = s)
+  if (!is.null(response)) params$response <- response
+
+  for (name in names(params)) {
+    len <- length(params[[name]])
+    if (len != 1 && len != n) {
+      stop2("Parameter '", name, "' has length ", len,
+            " but must have length 1 or ", n, ".")
+    }
+    params[[name]] <- rep(params[[name]], length.out = n)
+  }
+
+  params
 }
 
 .dwald <- function(rt, drift, bound, s, log = TRUE) {
