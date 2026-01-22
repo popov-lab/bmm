@@ -324,8 +324,9 @@ has_nonconsecutive_duplicates <- function(vec) {
 #'     \item Character/Factor: "upper"/"lower", "correct"/"error",
 #'       "acc"/"err", "hit"/"miss", "yes"/"no" (case-insensitive)
 #'   }
-#' @param ... Grouping variables (unquoted column names). Summary statistics
-#'   will be computed separately for each combination of these variables.
+#' @param .by A character vector of column names to group by before computing
+#'   summary statistics (e.g., `.by = c("subject", "condition")`). If NULL
+#'   (default), computes statistics across all data without grouping.
 #' @param version Character. Either "3par" (default) for pooled RTs or "4par"
 #'   for separate upper/lower boundary RTs
 #' @param distribution Character. The parametric distribution for the RT
@@ -388,20 +389,20 @@ has_nonconsecutive_duplicates <- function(vec) {
 #'
 #' # Compute summary statistics grouped by subject
 #' result <- ezdm_summary_stats(test_data, rt = "rt", response = "correct",
-#'                              subject)
+#'                              .by = "subject")
 #' print(result)
 #'
 #' # Group by multiple variables using simple method
 #' result_multi <- ezdm_summary_stats(test_data, rt = "rt",
 #'                                    response = "correct",
-#'                                    subject, condition,
+#'                                    .by = c("subject", "condition"),
 #'                                    method = "simple")
 #'
 ezdm_summary_stats <- function(
   data,
   rt,
   response,
-  ...,
+  .by = NULL,
   version = "3par",
   distribution = "exgaussian",
   method = "mixture",
@@ -539,7 +540,7 @@ ezdm_summary_stats <- function(
   data <- data[data[[rt]] > 0 & !is.na(data[[rt]]), ]
 
   # Process grouping variables
-  group_vars <- as.character(substitute(list(...)))[-1]
+  group_vars <- if (is.null(.by)) character(0) else .by
 
   # Validate grouping variables exist
   for (gv in group_vars) {
