@@ -103,8 +103,43 @@ Provide aggregated statistics for each subject and condition that model paramete
 }
 }
 \examples{
-\dontrun{
-# put a full example here (see 'R/model_mixture3p.R' for an example)
-}
+\dontshow{if (isTRUE(Sys.getenv("BMM_EXAMPLES"))) withAutoprint(\{ # examplesIf}
+# generate simulated summary statistics from the EZ-diffusion model
+# for 20 subjects with 100 trials each
+set.seed(123)
+dat <- data.frame(
+  subject = 1:20,
+  rezdm(n = 20, n_trials = 100, drift = 2, bound = 1.5, ndt = 0.3)
+)
+
+# define formula - estimate a single drift rate, boundary, and ndt
+ff <- bmmformula(
+  drift ~ 1,
+  bound ~ 1,
+  ndt ~ 1
+)
+
+# specify the 3-parameter EZ-diffusion model
+model <- ezdm(
+  mean_rt = "mean_rt",
+  var_rt = "var_rt",
+  n_upper = "n_upper",
+  n_trials = "n_trials",
+  version = "3par"
+)
+
+# fit the model
+fit <- bmm(
+  formula = ff,
+  data = dat,
+  model = model,
+  cores = 4,
+  iter = 500,
+  backend = "cmdstanr"
+)
+
+# view summary of the fitted model
+summary(fit)
+\dontshow{\}) # examplesIf}
 }
 \keyword{bmmodel}
