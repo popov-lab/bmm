@@ -46,9 +46,9 @@ fansi::set_knit_hooks(knitr::knit_hooks, which = c("output","message","error"))
 
 # Introduction to the model
 
-The diffusion model [@Ratcliff_1978] is one of the most influential models of speeded decision-making. It describes how participants accumulate noisy evidence over time until reaching one of two decision boundaries. Despite its theoretical elegance, the full diffusion model requires fitting to trial-level reaction time distributions, which can be computationally intensive and requires specialized software.
+The diffusion model [@Ratcliff_1978] is a widely used model in speeded decision-making. It describes how participants accumulate noisy evidence over time until reaching one of two decision boundaries. Usually, the diffusion model is fit to trial-level reaction time distributions, which can be computationally intensive, especially for hierarchical Bayeisian estiamtion.
 
-The **EZ-Diffusion Model** [@Wagenmakers_2007] provides a simpler alternative by establishing closed-form equations that relate the three core parameters of the diffusion model to easily computed summary statistics: mean reaction time (MRT), reaction time variance (VRT), and accuracy (proportion correct, Pc). This makes it possible to estimate diffusion model parameters from aggregated data without fitting to individual trials.
+The **EZ-Diffusion Model** [@Wagenmakers_2007] provides a simplified alternative building on closed-form equations that relate the parameters of the diffusion model to easily computed summary statistics: mean reaction time (MRT), reaction time variance (VRT), and accuracy (proportion correct, Pc). This makes it possible to calculate diffusion model parameters from aggregated data without fitting to individual trials.
 
 ## The Diffusion Model
 
@@ -57,7 +57,7 @@ In the standard diffusion model, evidence accumulates from a starting point towa
 - **Drift rate ($v$)**: The average rate of evidence accumulation, reflecting task difficulty or ability
 - **Boundary separation ($a$)**: The distance between the two decision boundaries, reflecting the speed-accuracy tradeoff
 - **Non-decision time ($T_{er}$)**: Time for processes outside the decision (encoding, motor response)
-- **Starting point ($z$)**: Where evidence accumulation begins relative to the boundaries
+- **Starting point ($z$)**: A response bias indicating where evidence accumulation begins relative to the boundaries
 
 ```{r diffusion-illustration, echo=FALSE, fig.cap="Illustration of the diffusion model. Evidence accumulates from the starting point until reaching the upper (correct) or lower (error) boundary.", out.width="70%"}
 # Simple illustration of diffusion process
@@ -73,7 +73,9 @@ for (j in 1:n_paths) {
   for (i in 2:n_steps) {
     paths[i, j] <- paths[i-1, j] + drift + rnorm(1, 0, 0.15)
     if (paths[i, j] > bound || paths[i, j] < -bound) {
-      paths[i:n_steps, j] <- paths[i, j]
+      # Clamp to boundary and make remaining path invisible (absorbed)
+      paths[i, j] <- pmax(pmin(paths[i, j], bound), -bound)
+      if (i < n_steps) paths[(i+1):n_steps, j] <- NA
       break
     }
   }
@@ -92,12 +94,21 @@ abline(h = -bound, col = "darkred", lwd = 2, lty = 2)
 abline(h = 0, col = "gray50", lty = 3)
 text(5, bound + 0.1, "Upper boundary (correct)", adj = 0, col = "darkgreen")
 text(5, -bound - 0.1, "Lower boundary (error)", adj = 0, col = "darkred")
-text(5, 0.1, "Starting point", adj = 0, col = "gray50")
+text(n_steps*0.8, 0.1, "Starting point", adj = 0, col = "gray50")
+
+# Add drift rate illustration (arrow showing average direction of accumulation)
+# Arrow starts at step 0 and ends at the upper bound
+drift_arrow_x_end <- bound / drift
+arrows(x0 = 0, y0 = 0,
+       x1 = drift_arrow_x_end, y1 = bound,
+       col = "darkorange", lwd = 2.5, length = 0.12)
+text((drift_arrow_x_end/2) + 25, (bound/2),
+     expression(italic(v)~"(drift rate)"), adj = 0, col = "darkorange")
 ```
 
 ## The EZ Equations
 
-@Wagenmakers_2007 derived closed-form solutions relating the diffusion model parameters to observable summary statistics. For the **3-parameter version** (assuming symmetric starting point, $z = a/2$):
+@Wagenmakers_2007 provided closed-form solutions relating the diffusion model parameters to observable summary statistics. For the **3-parameter version** (assuming symmetric starting point, $z = a/2$):
 
 Given the proportion correct ($P_c$), mean RT of correct responses ($MRT$), and variance of correct RTs ($VRT$), the parameters can be computed as:
 
@@ -117,23 +128,23 @@ where $L(P_c) = \ln\left(\frac{P_c}{1 - P_c}\right)$ is the logit function and $
 
 ## The 4-Parameter Extension
 
-The original EZ model assumes a symmetric starting point. @Srivastava_2016 derived the moments of first-passage times for the Wiener diffusion process with arbitrary starting points, enabling a **4-parameter version** that can estimate starting point bias ($z_r$, the relative starting point).
+The original EZ model assumes a symmetric starting point. @Srivastava_2016 derived the moments of first-passage times for the Wiener diffusion process with arbitrary starting points, enabling a **4-parameter version** that can estimate starting point bias ($z_r$, the relative starting point). This 4-parameter version, however, requires separate summary statistics for responses to each boundary:
 
-The 4-parameter version requires separate summary statistics for responses to each boundary:
 - Mean and variance of RTs for upper boundary responses (typically correct)
 - Mean and variance of RTs for lower boundary responses (typically errors)
 
-This allows estimation of response bias, which is important when participants favor one response over another.
+With sufficient responses at both the upper and lower bound, this allows estimation of response bias, which is important when participants favor one response over another.
 
 ## Bayesian Estimation
 
-@Chavez_Vandekerckhove_2025 introduced a Bayesian hierarchical approach to the EZ-diffusion model. Rather than using the closed-form equations to compute point estimates, this approach:
+So far, studies using the EZ-Diffuison model have adopted step-wise analyses approaches. First, diffusion model parameters are calculated for summary statistics for each individual in each design cell. Second, the calculated parameters are submitted to statistical tests evaluating differences between experimental conditions. This approach has two downsides: 1) uncertainty in parameter estimation is not sufficiently propagated between analysis steps, and 2) all parameters of the diffusion model were allowed to vary over all design cells, bearing the risk of overfitting. To address these issues, @Chavez_Vandekerckhove_2025 introduced a Bayesian hierarchical approach to the EZ-diffusion model. This approach combines the derivation of summary statistics from diffusion model paramters with a probablistic model of the sampling distributions of the summary statistics. Specifically, this approach:
 
 1. Treats the summary statistics as **observed data** generated from a known sampling distribution
 2. Uses **likelihood-based inference** to estimate parameters with proper uncertainty quantification
 3. Enables **hierarchical modeling** with random effects across participants
 
-The `bmm` package implements this Bayesian approach, allowing researchers to:
+@Chavez_Vandekerckhove_2025 shared JAGS code alongside their model. The downside of this implementation is that the model code has to be adapted to different experimental designs which likely leads to errors and increases the bar for using the implementation. The `bmm` package implements this Bayesian approach, allowing researchers to:
+
 - Estimate uncertainty in parameter estimates
 - Include random effects for participants
 - Compare conditions using Bayesian hypothesis testing
@@ -158,6 +169,7 @@ The diffusion constant `s` is fixed to 1 for identification.
 ## 4-Parameter Version (`version = "4par"`)
 
 Adds estimation of starting point bias:
+
 | Parameter | Description | Link Function |
 |-----------|-------------|---------------|
 | `drift` | Drift rate ($v$) | log |
@@ -186,7 +198,7 @@ For the **4-parameter version**, you need separate statistics for upper and lowe
 
 # Preparing data with `ezdm_summary_stats()`
 
-The `bmm` package provides the `ezdm_summary_stats()` function to convert trial-level data to the required aggregated format. This function also implements robust estimation via mixture modeling to handle contaminant responses (fast guesses, lapses).
+To ease the use of the `ezdm` implemented in `bmm`. We provide the `ezdm_summary_stats()` function to obtain the required aggregated statistics from trial-level data in the correct format. As previous research [@wagenmakers_EZDoesIt_2008] has shown that the EZ Diffusion model can provide biased parameter estimates when there are RT contaminants in the data, this function also implements robust estimation via mixture modeling [@ratcliff_EstimatingParametersDiffusion_2002] to handle contaminant responses (fast guesses, lapses). The robust estimation is the default in the function, but it also provides an option to return simple summary statistics.
 
 ## Basic usage
 
@@ -198,13 +210,14 @@ summary_data <- ezdm_summary_stats(
   data = trial_data,
   rt = "reaction_time",
   response = "correct",
+  method = "simple", # Return simple summary statistics
   .by = c("subject", "condition")
 )
 ```
 
 ## Robust estimation
 
-By default, `ezdm_summary_stats()` uses mixture modeling to separate true responses from contaminants:
+By default, `ezdm_summary_stats()` uses mixture modeling to separate true responses from contaminants. When using this approach you can choose with distribution should be assumed for the RT data: `exgaussian`, `lognormal`, or `invgaussian`. In addition, you can provide fixed bounds for the uniform distribution, or data driven bounds `c("min", "max")` via the `contaminant_bound` argument. For more details, please check out the documentation of the `ezdm_summary_stats` function.
 
 ```{r, eval=FALSE}
 # Robust estimation with mixture model
@@ -219,11 +232,11 @@ summary_data <- ezdm_summary_stats(
 )
 ```
 
-The function returns the estimated contaminant proportion, which can be useful for quality control.
+The function also returns the estimated contaminant proportion, which can be useful for quality control.
 
 # Fitting the model with `bmm`
 
-Begin by loading the `bmm` package:
+We start by loading the `bmm` package:
 
 ```{r setup, message=FALSE, warning=FALSE}
 library(bmm)
@@ -231,7 +244,7 @@ library(bmm)
 
 ## Generating simulated data
 
-For illustration, we will generate simulated data with known parameters using the `rezdm()` function:
+For illustration, we will generate simulated data with known parameters using the `rezdm()` function. As for all other models, `bmm` provides a density and random generation function for all implemented models. In the case of the `ezdm` there is no single dependent variable for the density function, which makes efficient illustration challenging. However, the `rezdm` function allows for evaluating parameter recovery simulations and predicitions based on the `ezdm`.
 
 ```{r}
 set.seed(123)
@@ -281,7 +294,7 @@ head(sim_data)
 
 ## Specifying the formula
 
-We specify the model formula using `bmmformula()` (or `bmf()`). For this example, we want to estimate separate drift rates for each condition while keeping boundary and non-decision time constant:
+Next, we specify the model formula using `bmmformula()` (or `bmf()`). For this example, we want to estimate separate drift rates for each condition while keeping boundary and non-decision time constant:
 
 ```{r}
 model_formula <- bmf(
@@ -293,7 +306,7 @@ model_formula <- bmf(
 
 ## Specifying the model
 
-Next, we specify the EZDM model with the variable names from our dataset:
+Next, we specify the `bmmodel`object for the EZDM model by calling `ezdm` and passing the respective variable names from our dataset:
 
 ```{r}
 model <- ezdm(
@@ -304,6 +317,8 @@ model <- ezdm(
   version = "3par"
 )
 ```
+
+As for all other `bmmodel` this provides the necessary information for `bmm` to properly set up the model for estimation.
 
 ## Fitting the model
 
@@ -341,7 +356,7 @@ First, check the model summary:
 summary(fit)
 ```
 
-All parameters use log link functions, so we need to exponentiate to get estimates on the natural scale:
+To provide stable sampling all parameters use log link functions, so we need to exponentiate to get estimates on the natural scale:
 
 ```{r}
 # Extract fixed effects
@@ -353,7 +368,8 @@ cat("Drift rate (hard):", exp(fixef_est["drift_conditionhard", "Estimate"]), "\n
 cat("Boundary:", exp(fixef_est["bound_Intercept", "Estimate"]), "\n")
 cat("Non-decision time:", exp(fixef_est["ndt_Intercept", "Estimate"]), "\n")
 ```
-Compare these to the true generating values:
+
+As you can see, these match the generating values well:
 
 ```{r}
 print(true_params)
@@ -384,6 +400,7 @@ true_vals <- data.frame(
 # Plot
 draws %>%
   pivot_longer(everything(), names_to = "par", values_to = "value") %>%
+  filter(par != "Intercept") %>%
   ggplot(aes(x = value, y = par)) +
   stat_halfeye(normalize = "groups", fill = "steelblue", alpha = 0.7) +
   geom_point(data = true_vals, aes(x = value, y = par),
@@ -391,16 +408,17 @@ draws %>%
   labs(x = "Parameter value", y = "",
        title = "Posterior distributions of EZDM parameters",
        subtitle = "Red diamonds indicate true generating values") +
+  coord_cartesian(xlim = c(0,5)) +
   theme_minimal()
 ```
 
 # Comparing conditions
 
-We can use Bayesian hypothesis testing to compare drift rates between conditions:
+As `bmm` feeds seamlessly into `brms`, we can use Bayesian hypothesis testing via Savage-Dickey density rations to compare drift rates between conditions:
 
 ```{r}
 # Test if drift rate is higher in easy vs hard condition
-hypothesis(fit, "exp(drift_conditioneasy) > exp(drift_conditionhard)")
+brms::hypothesis(fit, "exp(drift_conditioneasy) > exp(drift_conditionhard)")
 ```
 
 # Adding random effects

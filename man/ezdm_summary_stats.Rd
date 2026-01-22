@@ -52,17 +52,15 @@ component. One of "exgaussian" (default), "lognormal", or "invgaussian"}
 \item{method}{Character. Either "mixture" (default) for robust estimation
 via mixture modeling or "simple" for standard moment calculation}
 
-\item{contaminant_bound}{Vector of length 2 specifying the bounds (in seconds)
-for the uniform contaminant distribution. Can be numeric values or the
-special strings "min" and "max" to use data-driven bounds:
+\item{contaminant_bound}{Vector of length 2 specifying the bounds (in
+seconds) for the uniform contaminant distribution. Can be numeric values
+or the special strings "min" and "max" to use data-driven bounds:
 \itemize{
 \item Numeric: Fixed bounds, e.g., c(0.1, 3.0) (default)
 \item "min": Use the minimum RT in each group, minus a 50\\% buffer
 \item "max": Use the maximum RT in each group, plus a 50\\% buffer
 }
-The buffer (50\\% of the data range, minimum 100ms) extends data-driven
-bounds well beyond the observed range to ensure conservative contaminant
-estimates, especially for clean diffusion model data.
+The buffer extends data-driven bounds to ensure conservative estimates.
 Examples: c(0.1, 3.0), c("min", "max"), c(0.1, "max"), c("min", 3.0)}
 
 \item{min_trials}{Integer. Minimum number of trials required for fitting.
@@ -87,8 +85,7 @@ sampling. Default is FALSE}
 (random guessing). Default is 0.5 (appropriate for 2AFC tasks)}
 
 \item{seed}{Integer. Random seed for reproducibility of accuracy adjustment.
-If NULL (default), results will vary across runs. Set to a specific value
-for reproducible adjusted counts}
+If NULL (default), results will vary across runs}
 }
 \value{
 A \code{data.frame} with summary statistics. For version = "3par":
@@ -105,35 +102,11 @@ contaminant responses from true responses.
 }
 \details{
 RT outliers and contaminant responses (fast guesses, lapses of
-attention) can distort the mean and variance estimates used as input to the
-EZ-Diffusion equations. This function addresses this by fitting a mixture
-model with two components: a uniform distribution for contaminants and a
-parametric RT distribution for true responses. Robust moments are then
-extracted from the fitted parametric component.
-
-\strong{Data-driven contaminant bounds:} By default, the uniform contaminant
-distribution uses fixed bounds (0.1 to 3.0 seconds). However, different
-participants or conditions may have different RT ranges. Using \code{"min"} and
-\code{"max"} allows the bounds to adapt to each group's actual data range.
-To ensure conservative contaminant estimation, data-driven bounds are
-automatically extended by a 50\\% buffer (minimum 100ms) beyond the observed
-data range. This substantial buffer prevents the uniform distribution from
-becoming overly competitive with the parametric distribution, ensuring that
-clean data (e.g., from diffusion model simulations) yields near-zero
-contaminant estimates.
-
-\strong{Contaminant proportion clipping:} The \code{max_contaminant} parameter
-prevents the EM algorithm from estimating unrealistically high contaminant
-proportions. When the estimated proportion exceeds this threshold, it is
-clipped and a warning is issued. High contaminant proportions (e.g., > 0.3)
-typically indicate data quality issues that warrant investigation rather
-than statistical correction.
-
-\strong{Accuracy adjustment:} When \code{adjust_accuracy = TRUE}, the function
-estimates how many trials were contaminants and adjusts the accuracy counts
-assuming contaminants represent random guessing (at rate \code{guess_rate}).
-This uses binomial sampling to produce integer-valued adjusted counts,
-which can improve parameter recovery in the EZ-Diffusion Model.
+attention) can distort the mean and variance estimates used as input to
+the EZ-Diffusion equations. This function addresses this by fitting a
+mixture model with two components: a uniform distribution for
+contaminants and a parametric RT distribution for true responses.
+Robust moments are then extracted from the fitted parametric component.
 }
 \examples{
 # Generate example data
@@ -150,29 +123,11 @@ result <- ezdm_summary_stats(test_data, rt = "rt", response = "correct",
                              .by = "subject")
 print(result)
 
-# Group by multiple variables
-result_multi <- ezdm_summary_stats(test_data, rt = "rt", response = "correct",
+# Group by multiple variables using simple method
+result_multi <- ezdm_summary_stats(test_data, rt = "rt",
+                                   response = "correct",
                                    .by = c("subject", "condition"),
                                    method = "simple")
-
-# Use data-driven bounds for the uniform distribution
-result_adaptive <- ezdm_summary_stats(test_data, rt = "rt", response = "correct",
-                                      .by = "subject",
-                                      contaminant_bound = c("min", "max"))
-
-# Mix fixed and data-driven bounds (fixed lower, adaptive upper)
-result_mixed <- ezdm_summary_stats(test_data, rt = "rt", response = "correct",
-                                   .by = "subject",
-                                   contaminant_bound = c(0.1, "max"))
-
-# Limit maximum contaminant proportion to 30\%
-result_capped <- ezdm_summary_stats(test_data, rt = "rt", response = "correct",
-                                    .by = "subject", max_contaminant = 0.3)
-
-# Adjust accuracy counts for contaminant guessing
-result_adj <- ezdm_summary_stats(test_data, rt = "rt", response = "correct",
-                                 .by = "subject", adjust_accuracy = TRUE,
-                                 seed = 42)
 
 }
 \keyword{transform}
