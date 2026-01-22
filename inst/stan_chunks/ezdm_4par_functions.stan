@@ -1,15 +1,15 @@
 // Numerically stable hyperbolic functions
 real csch_stable(real x) {
   // For large |x|, sinh(x) overflows but csch(x) -> 0
-  if (fabs(x) > 20) {
-    return 2 * exp(-fabs(x)) * ((x > 0) ? 1 : -1);
+  if (abs(x) > 20) {
+    return 2 * exp(-abs(x)) * ((x > 0) ? 1 : -1);
   }
   return 1 / sinh(x);
 }
 
 real coth_stable(real x) {
   // For large |x|, coth(x) -> sign(x)
-  if (fabs(x) > 20) {
+  if (abs(x) > 20) {
     return (x > 0) ? 1 : -1;
   }
   return cosh(x) / sinh(x);
@@ -37,7 +37,7 @@ real ezdm_4par_lpdf(real mrt_upper, real mu, real drift, real bound, real ndt, r
   real pC = 1 - ((exp_neg2kx - exp_neg2kz) / (exp_2kz - exp_neg2kz));
 
   // drift is small: use functions not relying on drift rate
-  if (fabs(drift) < 1e-6) {
+  if (abs(drift) < 1e-6) {
     // Cache intermediate values
     real z_sq = square(z);
     real s_sq_sq = s_sq * s_sq;
