@@ -134,3 +134,135 @@ test_that("is_namedlist works", {
   expect_false(is_namedlist(list(y ~ 1)))
 
 })
+
+test_that("softmax produces valid probability distributions", {
+  # Basic test - output should sum to 1
+  eta <- c(1, 2, 3)
+  result <- softmax(eta)
+  expect_equal(sum(result), 1)
+  expect_true(all(result > 0))
+  expect_true(all(result < 1))
+
+  # Test with different lambda values
+  result_lambda2 <- softmax(eta, lambda = 2)
+  expect_equal(sum(result_lambda2), 1)
+  expect_true(all(result_lambda2 > 0))
+
+  # Higher lambda should increase difference between probabilities
+  expect_true(max(result_lambda2) > max(result))
+  expect_true(min(result_lambda2) < min(result))
+
+  # Test with negative values
+  eta_neg <- c(-2, -1, 0, 1, 2)
+  result_neg <- softmax(eta_neg)
+  expect_equal(sum(result_neg), 1)
+  expect_true(all(result_neg > 0))
+
+  # Test with all equal values - should produce uniform distribution
+  eta_equal <- rep(5, 4)
+  result_equal <- softmax(eta_equal)
+  expect_equal(result_equal, rep(0.25, 4))
+
+  # Test with single value
+  result_single <- softmax(10)
+  expect_equal(result_single, 1)
+
+  # Test ordering is preserved
+  eta_ordered <- 1:5
+  result_ordered <- softmax(eta_ordered)
+  expect_true(all(diff(result_ordered) > 0)) # should be monotonically increasing
+})
+
+test_that("softmax with extreme values doesn't overflow", {
+  # Very large values
+  eta_large <- c(100, 200, 300)
+  result_large <- softmax(eta_large)
+  expect_equal(sum(result_large), 1)
+  expect_false(any(is.na(result_large)))
+  expect_false(any(is.infinite(result_large)))
+
+  # Very small values
+  eta_small <- c(-300, -200, -100)
+  result_small <- softmax(eta_small)
+  expect_equal(sum(result_small), 1)
+  expect_false(any(is.na(result_small)))
+  expect_false(any(is.infinite(result_small)))
+})
+
+test_that("softmaxinv is the inverse of softmax", {
+  # Test basic inverse relationship
+  eta <- 5:7
+  p <- softmax(eta)
+  eta_recovered <- softmaxinv(p, ref_position = 1, ref_value = 5)
+  expect_equal(eta_recovered, eta, tolerance = 1e-10)
+
+  # Test with different reference positions
+  eta2 <- c(2, 4, 6, 8)
+  p2 <- softmax(eta2)
+
+  # Reference at position 1
+  eta_rec1 <- softmaxinv(p2, ref_position = 1, ref_value = 2)
+  expect_equal(eta_rec1, eta2, tolerance = 1e-10)
+
+  # Reference at position 2
+  eta_rec2 <- softmaxinv(p2, ref_position = 2, ref_value = 4)
+  expect_equal(eta_rec2, eta2, tolerance = 1e-10)
+
+  # Reference at position 4
+  eta_rec4 <- softmaxinv(p2, ref_position = 4, ref_value = 8)
+  expect_equal(eta_rec4, eta2, tolerance = 1e-10)
+
+  # Test with different lambda values
+  eta3 <- c(1, 3, 5)
+  lambda_val <- 2
+  p3 <- softmax(eta3, lambda = lambda_val)
+  eta_rec3 <- softmaxinv(p3, lambda = lambda_val, ref_position = 1, ref_value = 1)
+  expect_equal(eta_rec3, eta3, tolerance = 1e-10)
+})
+
+test_that("softmaxinv with default parameters", {
+  # Default reference position is length(p) and ref_value is 0
+  eta <- c(1, 2, 3)
+  p <- softmax(eta)
+
+  # With defaults, last position should be 0
+  eta_recovered <- softmaxinv(p)
+  expect_equal(eta_recovered[length(eta_recovered)], 0, tolerance = 1e-10)
+
+  # The differences should be preserved
+  eta_shifted <- eta - eta[length(eta)]
+  expect_equal(eta_recovered, eta_shifted, tolerance = 1e-10)
+})
+
+test_that("softmaxinv handles edge cases", {
+  # Length 1 probability vector
+  result <- softmaxinv(1)
+  expect_equal(result, numeric(0))
+
+  # Length 2 probability vector
+  p2 <- c(0.3, 0.7)
+  result2 <- softmaxinv(p2)
+  expect_length(result2, 2)
+  expect_equal(sum(softmax(result2) - p2), 0, tolerance = 1e-10)
+})
+
+test_that("softmaxinv validates inputs correctly", {
+  # ref_position must be a single value
+  expect_error(
+    softmaxinv(c(0.2, 0.3, 0.5), ref_position = c(1, 2)),
+    "single reference value"
+  )
+
+  # ref_position must be within valid range
+  expect_error(
+    softmaxinv(c(0.2, 0.3, 0.5), ref_position = 4),
+    "less or equal than the length"
+  )
+})
+
+test_that("softmax and softmaxinv work with example from documentation", {
+  # Example from the documentation
+  result <- softmax(5:7)
+  recovered <- softmaxinv(result, ref_position = 1, ref_value = 5)
+  expect_equal(recovered, 5:7, tolerance = 1e-10)
+})
