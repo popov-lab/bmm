@@ -28,15 +28,13 @@ Value of the softmax function or its inverse
 \code{softmaxinv} returns the value of the inverse-softmax function
 }
 \details{
-The softmax function is a bijective function that maps a real vector with length \code{m-1} to a probability vector
+The softmax function is a bijective function that maps a real vector with length \code{m} to a probability vector
 with length \code{m} with all non-zero probabilities.  The present functions define the softmax function and its inverse, both with a tuning
 parameter.
 
 The current functions define the softmax as:
 
 \deqn{\Large P(\eta_i) = \frac{e^{\lambda \eta_i}}{\sum_{j=1}^m e^{\lambda \eta_j}}}
-
-Code adapted from the \href{https://github.com/ben-oneill/utilities/}{utilities} package
 }
 \examples{
 softmax(5:7)

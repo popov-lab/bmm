@@ -3,7 +3,7 @@
 #' `softmax` returns the value of the softmax function
 #' `softmaxinv` returns the value of the inverse-softmax function
 #'
-#' The softmax function is a bijective function that maps a real vector with length `m-1` to a probability vector
+#' The softmax function is a bijective function that maps a real vector with length `m` to a probability vector
 #' with length `m` with all non-zero probabilities.  The present functions define the softmax function and its inverse, both with a tuning
 #' parameter.
 #'
@@ -20,15 +20,13 @@
 #' @return Value of the softmax function or its inverse
 #' @keywords transform
 #'
-#' @details Code adapted from the [utilities](https://github.com/ben-oneill/utilities/) package
-#'
 #' @export
 #' @examples
 #' softmax(5:7)
 #' softmaxinv(softmax(5:7), ref_position = 1, ref_value = 5)
 softmax <- function(eta, lambda = 1) {
   stopifnot(requireNamespace("matrixStats", quietly = TRUE))
-  denom <- matrixStats::logSumExp(c(lambda * eta))
+  denom <- matrixStats::logSumExp(lambda * eta)
   exp(c(lambda * eta) - denom)
 }
 
