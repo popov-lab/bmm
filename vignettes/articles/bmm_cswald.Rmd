@@ -1,0 +1,377 @@
+---
+title: "The Censored Shifted Wald Model (cswald)"
+output: bookdown::html_document2
+author:
+  - Gidon Frischkorn
+  - Ven Popov
+bibliography: REFERENCES.bib
+header-includes:
+  - \usepackage{amsmath}
+vignette: >
+  %\VignetteIndexEntry{The Censored Shifted Wald Model (cswald)}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+pkgdown:
+  as_is: true
+---
+<style type="text/css">
+div.main-container {
+max-width: 800px !important;
+}
+
+p {
+margin-top: 1.5em ;
+margin-bottom: 1.5em ;
+}
+.author{
+    display: none;
+}
+</style>
+
+```{r, include = FALSE}
+options(crayon.enabled = TRUE)
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>",
+  dev = "jpeg",
+  dpi = 100
+)
+fansi::set_knit_hooks(knitr::knit_hooks, which = c("output","message","error"))
+```
+
+# Introduction
+
+The Censored Shifted Wald (cswald) model is a measurement model for choice
+response time (RT) tasks, particularly suited for tasks with high accuracy
+(few errors). The model was introduced by @millerRelationCensoredShifted2018
+as a simplified alternative to the full Wiener diffusion model
+[@ratcliffDiffusionDecisionModel2008] that is easier to estimate while still
+capturing essential features of the decision-making process.
+
+The cswald model is ideal when:
+
+- You have RT data from a two-choice decision task
+- Accuracy is relatively high (error rates < 20%)
+- You want to separate different components of the decision process
+- You need a computationally efficient alternative to the full diffusion model
+
+# Theoretical Background
+
+## The Shifted Wald Distribution
+
+The Wald distribution (also known as the inverse Gaussian distribution)
+describes the first-passage time of a Wiener process (Brownian motion with
+drift) to a single absorbing boundary. In the context of decision-making,
+this models the time it takes for evidence to accumulate to a decision
+threshold.
+
+The shifted Wald distribution adds a non-decision time component to account
+for processes like stimulus encoding and motor response execution:
+
+$$
+RT = T_{decision} + T_{ndt}
+$$
+
+where $T_{decision}$ follows a Wald distribution and $T_{ndt}$ is the
+non-decision time.
+
+The probability density function of the shifted Wald is:
+
+$$
+f(t | v, a, \tau) = \frac{a}{\sqrt{2\pi (t-\tau)^3}}
+\exp\left(-\frac{(a - v(t-\tau))^2}{2(t-\tau)}\right)
+$$
+
+for $t > \tau$, where:
+
+- $v$ is the drift rate (rate of evidence accumulation)
+- $a$ is the boundary (decision threshold)
+- $\tau$ is the non-decision time
+
+## Censoring for Error Responses
+
+In tasks with high accuracy, most responses are correct. The "censored"
+aspect of the model refers to how error responses are handled. Instead of
+modeling errors as arising from a separate accumulation process toward the
+wrong boundary (as in the full diffusion model), errors are treated as
+**censored** observations — trials where the correct response had not yet
+been reached.
+
+This censoring approach assumes that:
+
+1. Correct responses follow the shifted Wald distribution
+2. Error responses represent trials where the accumulation process was
+   interrupted before reaching the correct boundary
+
+The likelihood for a correct response is the Wald density:
+
+$$
+L_{correct}(t) = f_{Wald}(t - \tau | v, a)
+$$
+
+The likelihood for an error response is the survivor function (1 - CDF):
+
+$$
+L_{error}(t) = S_{Wald}(t - \tau | v, a) = 1 - F_{Wald}(t - \tau | v, a)
+$$
+
+## Relationship to the Diffusion Model
+
+The cswald model can be seen as a simplification of the Wiener diffusion
+model that makes certain assumptions:
+
+1. **Single boundary**: Only the correct response boundary is explicitly
+   modeled
+2. **Unbiased starting point**: The starting point is assumed to be
+   equidistant from both boundaries
+3. **High accuracy**: The model works best when error rates are low
+
+For tasks with substantial error rates (> 20%), the competing risks version
+of the model (`version = "crisk"`) provides a more appropriate fit by
+modeling both boundaries explicitly.
+
+# Model Versions
+
+The `bmm` package implements two versions of the cswald model:
+
+## Simple Version (`version = "simple"`)
+
+The simple version treats errors as censored correct responses. It estimates:
+
+- **drift**: The drift rate (rate of evidence accumulation toward the
+  correct response)
+- **bound**: The boundary separation (distance from starting point to
+  correct boundary)
+- **ndt**: Non-decision time
+- **s**: Diffusion constant (usually fixed to 1 for scaling)
+
+This version is best suited for tasks with error rates below 20%.
+
+## Competing Risks Version (`version = "crisk"`)
+
+The competing risks version models both correct and error responses as
+arising from racing accumulators toward opposite boundaries. It estimates:
+
+- **drift**: The drift rate
+- **bound**: Total boundary separation
+- **ndt**: Non-decision time
+- **zr**: Relative starting point (proportion of boundary separation,
+  0.5 = unbiased)
+- **s**: Diffusion constant
+
+This version is better suited for tasks with substantial error rates.
+
+# Fitting the Model with `bmm`
+
+## Setup
+
+```{r setup, message=FALSE, warning=FALSE}
+library(bmm)
+library(ggplot2)
+```
+
+## Generating Simulated Data
+
+We'll simulate data from a diffusion process using `rcswald()`, which
+internally uses `rtdists::rdiffusion()` to generate theoretically consistent
+samples:
+
+```{r}
+# set seed for reproducibility
+set.seed(42)
+
+# simulate data for two conditions with different drift rates
+n_per_condition <- 500
+
+# Condition A: higher drift (faster, more accurate)
+dat_A <- rcswald(n = n_per_condition, drift = 3, bound = 1.5, ndt = 0.3)
+dat_A$condition <- "A"
+
+# Condition B: lower drift (slower, less accurate)
+dat_B <- rcswald(n = n_per_condition, drift = 1.5, bound = 1.5, ndt = 0.3)
+dat_B$condition <- "B"
+
+# combine data
+dat <- rbind(dat_A, dat_B)
+dat$condition <- factor(dat$condition)
+
+# check error rates
+aggregate(response ~ condition, data = dat, FUN = function(x) mean(x == 0))
+```
+
+Let's visualize the RT distributions:
+
+```{r fig.width=8, fig.height=4}
+ggplot(dat, aes(x = rt, fill = factor(response))) +
+  geom_histogram(binwidth = 0.05, position = "identity", alpha = 0.7) +
+  facet_wrap(~condition, labeller = labeller(
+    condition = c(A = "Condition A (drift = 3)", B = "Condition B (drift = 1.5)")
+  )) +
+  scale_fill_manual(values = c("0" = "red", "1" = "blue"),
+                    labels = c("0" = "Error", "1" = "Correct"),
+                    name = "Response") +
+  labs(x = "Response Time (s)", y = "Count",
+       title = "Simulated RT distributions") +
+  theme_classic()
+```
+
+## Specifying the Model
+
+First, specify the model using `cswald()`:
+
+```{r}
+model <- cswald(
+  rt = "rt",
+  response = "response",
+  version = "simple"
+)
+
+# view model information
+model
+```
+
+## Specifying the Formula
+
+We want to estimate how drift rate varies by condition while keeping the
+boundary and non-decision time constant:
+
+```{r}
+formula <- bmf(
+  drift ~ 0 + condition,
+  bound ~ 1,
+  ndt ~ 1
+)
+```
+
+## Fitting the Model
+
+```{r, message=FALSE, results='hide'}
+fit <- bmm(
+  formula = formula,
+  data = dat,
+  model = model,
+  cores = 4,
+  backend = "cmdstanr",
+  file = "assets/bmmfit_cswald_vignette.rds"
+)
+```
+
+## Inspecting Results
+
+```{r}
+summary(fit)
+```
+
+The model uses link functions for the parameters:
+
+- `drift` uses a log link, so estimated values are on the log scale
+- `bound` uses a log link
+- `ndt` uses a log link
+
+To get the parameters on the original scale, we exponentiate:
+
+```{r}
+# extract fixed effects
+fixef_est <- brms::fixef(fit)
+
+# transform to original scale
+cat("Estimated parameters:\n")
+cat("drift (Condition A):", exp(fixef_est["drift_conditionA", "Estimate"]), "\n")
+cat("drift (Condition B):", exp(fixef_est["drift_conditionB", "Estimate"]), "\n")
+cat("bound:", exp(fixef_est["bound_Intercept", "Estimate"]), "\n")
+cat("ndt:", exp(fixef_est["ndt_Intercept", "Estimate"]), "\n")
+```
+
+Compare with true values:
+
+```{r}
+cat("\nTrue parameters:\n")
+cat("drift (Condition A): 3\n")
+cat("drift (Condition B): 1.5\n")
+cat("bound: 1.5\n")
+cat("ndt: 0.3\n")
+```
+
+## Model Diagnostics
+
+Check posterior predictive distributions:
+
+```{r fig.width=8, fig.height=4, message=FALSE}
+pp_check(fit, type = "dens_overlay", ndraws = 50) +
+  labs(title = "Posterior Predictive Check")
+```
+
+# Parameter Interpretation
+
+## Drift Rate
+
+The drift rate ($v$) represents the speed of evidence accumulation. Higher
+drift rates lead to:
+
+- Faster correct responses
+- Fewer errors
+- More peaked RT distributions
+
+In cognitive terms, drift rate often reflects:
+
+- Task difficulty (easier tasks → higher drift)
+- Ability or skill
+- Attention or motivation
+
+## Boundary Separation
+
+The boundary ($a$) represents the amount of evidence required before making
+a decision. Higher boundaries lead to:
+
+- Slower but more accurate responses
+- More symmetric RT distributions for correct and error responses
+
+In cognitive terms, boundary separation often reflects:
+
+- Speed-accuracy tradeoff settings
+- Response caution
+- Task instructions (emphasize speed vs. accuracy)
+
+## Non-Decision Time
+
+The non-decision time ($\tau$) represents all processes not involved in the
+decision itself:
+
+- Stimulus encoding time
+- Motor preparation and execution time
+
+This parameter shifts the entire RT distribution without changing its shape.
+
+# When to Use Each Version
+
+## Use `version = "simple"` when:
+
+- Error rates are low (< 20%)
+- You want a computationally efficient model
+- The focus is on correct response times
+- Errors can reasonably be treated as censored observations
+
+## Use `version = "crisk"` when:
+
+- Error rates are substantial (> 20%)
+- You want to model both response types explicitly
+- Starting point bias might be present
+- You need estimates comparable to full diffusion model parameters
+
+# Comparison with the Wiener Diffusion Model
+
+The cswald model in `bmm` is related to but distinct from the full Wiener
+diffusion model available in `brms::wiener()`. Key differences:
+
+| Feature | cswald (simple) | cswald (crisk) | brms::wiener |
+|---------|-----------------|----------------|--------------|
+| Boundaries | Single | Both | Both |
+| Starting point | Fixed (unbiased) | Estimated | Estimated |
+| Best for | High accuracy | Moderate accuracy | Any accuracy |
+| Computation | Fast | Moderate | Slower |
+| Parameters | 3-4 | 4-5 | 4-5 |
+
+For tasks with low error rates, the cswald model provides equivalent
+inferences with faster computation.
+
+# References
