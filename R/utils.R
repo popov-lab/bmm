@@ -3,41 +3,46 @@
 #' `softmax` returns the value of the softmax function
 #' `softmaxinv` returns the value of the inverse-softmax function
 #'
-#' The softmax function is a bijective function that maps a real vector with length `m-1` to a probability vector
+#' The softmax function is a bijective function that maps a real vector with length `m` to a probability vector
 #' with length `m` with all non-zero probabilities.  The present functions define the softmax function and its inverse, both with a tuning
 #' parameter.
 #'
 #' The current functions define the softmax as:
 #'
-#' \deqn{\Large P(\eta_i) = \frac{e^{\lambda \eta_i}}{1+ \sum_{j=1}^m e^{\lambda \eta_j}}}
+#' \deqn{\Large P(\eta_i) = \frac{e^{\lambda \eta_i}}{\sum_{j=1}^m e^{\lambda \eta_j}}}
 #'
 #' @param eta A numeric vector input
 #' @param lambda Tuning parameter (a single positive value)
 #' @param p A probability vector (i.e., numeric vector of non-negative values that sum to one)
 #' @param eta A numeric vector input
+#' @param ref_position The reference position that should be used to calculate the inverse softmax function. The default is the last position.
+#' @param ref_value The value the reference position will be set to. The default is 0.
 #' @return Value of the softmax function or its inverse
 #' @keywords transform
-#'
-#' @details Code adapted from the [utilities](https://github.com/ben-oneill/utilities/) package
 #'
 #' @export
 #' @examples
 #' softmax(5:7)
-#' softmaxinv(softmax(5:7))
+#' softmaxinv(softmax(5:7), ref_position = 1, ref_value = 5)
 softmax <- function(eta, lambda = 1) {
   stopifnot(requireNamespace("matrixStats", quietly = TRUE))
-  denom <- matrixStats::logSumExp(c(lambda * eta, 0))
-  exp(c(lambda * eta, 0) - denom)
+  denom <- matrixStats::logSumExp(lambda * eta)
+  exp(c(lambda * eta) - denom)
 }
 
 #' @rdname softmax
 #' @export
-softmaxinv <- function(p, lambda = 1) {
+softmaxinv <- function(p, lambda = 1, ref_position = length(p), ref_value = 0) {
   len <- length(p)
   if (len <= 1) {
     return(numeric(0))
   }
-  (log(p) - log(p[len]))[1:(len - 1)] / lambda
+
+  stopif(length(ref_position) > 1, "Please provide a single reference value.")
+  stopif(ref_position > len, "The reference value must be less or equal than the length of the probability vector.")
+
+  weights = (log(p) - log(p[len])) / lambda
+  weights + (ref_value - weights[ref_position])
 }
 
 #' @title Configure local options during model fitting
@@ -120,27 +125,27 @@ combine_args <- function(args) {
 }
 
 ############################
-#' @description 
-#'  stop2, warning2, and message2 are wrappers to the builting functions stop, warning and message. 
+#' @description
+#'  stop2, warning2, and message2 are wrappers to the builting functions stop, warning and message.
 #'  They automatically suppress the call stack and allow you to use glue syntax for the message.
 #' @param ... arguments to pass to glue() - these will form the message to the user
 #' @param env.frame the frame in which variables passed to glue will be evaluated. Default is the environment
 #'  of the function that calls stop2, message2, warning2
 #' @examples
 #' name <- "John"
-#' 
+#'
 #' stop2("Hi {name}, this is an error")
-#' 
+#'
 #' warning2("Hi {name}, this is a long warning \\
 #'  that is split on multiple rows \\
 #'  but no new lines are added in the output message \\
 #'  because of the double slashes at the end of each row.")
-#' 
+#'
 #' message2("Hi {name}, this is a long message
 #'      that is split on multiple rows
 #'      and the printed message shows every new line
 #'      because there are not back slashes on any line.
-#' 
+#'
 #'      You don't have to worry about identation or adding quotes
 #'      or commas to any row. Makes typing long messages a breeze!")
 #' @noRd
@@ -164,7 +169,7 @@ message2 <- function(..., env.frame = -1) {
 }
 
 # stopif and warnif work like the builtin stopifnot except that
-# the stoping condition is a single boolean expression, 
+# the stoping condition is a single boolean expression,
 # and you can provide a custom message
 stopif <- function(condition, message) {
   if (condition) {
@@ -404,7 +409,7 @@ get_variables <- function(x, all_variables, regex = FALSE) {
   if (!regex) {
     return(x)
   }
-  
+
   variables <- all_variables[grep(x, all_variables)]
   stopif(
     length(variables) == 0,
@@ -709,7 +714,7 @@ try_read_bmmfit <- function(file, file_refit) {
   if (is_try_error(out)) {
     return(NULL)
   }
-  
+
   stopif(!is_bmmfit(out), "Object loaded via 'file' is not of class 'bmmfit'.")
   out$file <- file
   out

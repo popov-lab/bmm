@@ -167,3 +167,11 @@ test_that("non-numeric values error", {
   # If you rely on glue(), also ensure glue is installed; otherwise any error is fine.
   expect_error(link_transform(c("a","b"), "log"))
 })
+
+test_that("NULL link is treated as identity", {
+  x <- c(-2, -0.5, 0, 1.25, 3)
+  eta <- link_transform(x, NULL, inverse = FALSE)
+  back <- link_transform(eta, NULL, inverse = TRUE)
+  expect_identical(eta, x)
+  expect_identical(back, x)
+})
