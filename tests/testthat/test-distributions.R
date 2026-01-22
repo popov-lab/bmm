@@ -307,6 +307,7 @@ test_that("rezdm 3par returns plausible values", {
 })
 
 test_that("rezdm 4par returns plausible values", {
+  set.seed(123)
   res <- rezdm(
     n = 500, n_trials = 100, drift = 2, bound = 1.5, ndt = 0.3,
     zr = 0.5, version = "4par"

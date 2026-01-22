@@ -72,8 +72,8 @@
       task = "Choice Reaction Time tasks",
       name = "EZ-Diffusion Model",
       citation = glue(
-        "Wagenmakers, E.-J., Van Der Maas, H. L. J., & Grasman, R. P. P. P. (2007). An EZ-diffusion model for response time and accuracy. Psychonomic Bulletin & Review, 14(1), 3–22. https://doi.org/10/fk447c","\n",
-        "- Chávez De la Peña, A. F., & Vandekerckhove, J. (2025). An EZ Bayesian hierarchical drift diffusion model for response time and accuracy. Psychonomic Bulletin & Review. https://doi.org/10.3758/s13423-025-02729-y"
+        "Wagenmakers, E.-J., Van Der Maas, H. L. J., & Grasman, R. P. P. P. (2007). An EZ-diffusion model for response time and accuracy. Psychonomic Bulletin & Review, 14(1), 3-22. https://doi.org/10/fk447c","\n",
+        "- Ch\u00e1vez De la Pe\u00f1a, A. F., & Vandekerckhove, J. (2025). An EZ Bayesian hierarchical drift diffusion model for response time and accuracy. Psychonomic Bulletin & Review. https://doi.org/10.3758/s13423-025-02729-y"
       ),
       version = version,
       requirements = glue(
@@ -114,6 +114,7 @@
 #'   four parameter verison (version = "4par"), that allows to freely estimate the starting point.
 #' @param ... used internally for testing, ignore it
 #' @return An object of class `bmmodel`
+#' @keywords bmmodel
 #' @export
 #' @examples
 #' \dontrun{
@@ -323,7 +324,7 @@ posterior_predict_ezdm_3par <- function(i, prep, ...) {
   # validate dv argument
   valid_dvs <- c("mean_rt", "var_rt", "n_upper")
   if (!dv %in% valid_dvs) {
-    stop("dv must be one of: ", paste(valid_dvs, collapse = ", "))
+    stop2("dv must be one of: {paste(valid_dvs, collapse = ', ')}")
   }
 
   # extract posterior samples for distributional parameters
@@ -441,7 +442,7 @@ posterior_predict_ezdm_4par <- function(i, prep, ...) {
   valid_dvs <- c("mean_rt_upper", "mean_rt_lower",
                  "var_rt_upper", "var_rt_lower", "n_upper")
   if (!dv %in% valid_dvs) {
-    stop("dv must be one of: ", paste(valid_dvs, collapse = ", "))
+    stop2("dv must be one of: {paste(valid_dvs, collapse = ', ')}")
   }
 
   # extract posterior samples for distributional parameters
