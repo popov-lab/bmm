@@ -905,13 +905,57 @@ rezdm <- function(n, n_trials, drift, bound, ndt, zr = 0.5, s = 1,
   ll
 }
 
+# Internal: truncated normal sampling via rejection sampling
+# Samples from N(mean, sd) truncated to [lower, Inf)
+# @param n Number of samples
+# @param mean Mean of the normal distribution (scalar or vector of length n)
+# @param sd Standard deviation (scalar or vector of length n)
+# @param lower Lower truncation bound (scalar)
+# @param max_iter Maximum rejection sampling iterations (default 1000)
+# @return Numeric vector of n samples >= lower
+.rtruncnorm_lower <- function(n, mean, sd, lower, max_iter = 1000) {
+  samples <- stats::rnorm(n, mean = mean, sd = sd)
+  rejected <- samples < lower
+  iter <- 0
+
+  while (any(rejected) && iter < max_iter) {
+    n_rejected <- sum(rejected)
+    # Resample only rejected values, using corresponding mean/sd if vectorized
+    if (length(mean) == 1) {
+      samples[rejected] <- stats::rnorm(n_rejected, mean = mean, sd = sd)
+    } else {
+      samples[rejected] <- stats::rnorm(
+        n_rejected,
+        mean = mean[rejected],
+        sd = sd[rejected]
+      )
+    }
+    rejected <- samples < lower
+    iter <- iter + 1
+  }
+
+  # Fallback: clamp any remaining rejected samples (should be extremely rare)
+  if (any(rejected)) {
+    samples[rejected] <- lower
+  }
+
+  samples
+}
+
 # Internal: 3par random generation
 .rezdm_3par <- function(n, n_trials, drift, bound, ndt, s) {
   moments <- .ezdm_moments_3par(drift, bound, s)
 
   n_upper <- stats::rbinom(n, size = n_trials, prob = moments$pC)
   var_rt <- moments$VRT * stats::rchisq(n, df = n_trials - 1) / (n_trials - 1)
-  mean_rt <- stats::rnorm(n, mean = ndt + moments$MDT, sd = sqrt(var_rt / n_trials))
+
+  # Use truncated normal to ensure mean_rt >= ndt
+  mean_rt <- .rtruncnorm_lower(
+    n = n,
+    mean = ndt + moments$MDT,
+    sd = sqrt(var_rt / n_trials),
+    lower = ndt
+  )
 
   data.frame(
     mean_rt = mean_rt,
@@ -938,10 +982,12 @@ rezdm <- function(n, n_trials, drift, bound, ndt, zr = 0.5, s = 1,
     n_u <- n_upper[idx_upper]
     var_rt_upper[idx_upper] <- moments$vrt_upper *
       stats::rchisq(sum(idx_upper), df = n_u - 1) / (n_u - 1)
-    mean_rt_upper[idx_upper] <- stats::rnorm(
-      sum(idx_upper),
+    # Use truncated normal to ensure mean_rt_upper >= ndt
+    mean_rt_upper[idx_upper] <- .rtruncnorm_lower(
+      n = sum(idx_upper),
       mean = ndt + moments$mdt_upper,
-      sd = sqrt(var_rt_upper[idx_upper] / n_u)
+      sd = sqrt(var_rt_upper[idx_upper] / n_u),
+      lower = ndt
     )
   }
 
@@ -951,10 +997,12 @@ rezdm <- function(n, n_trials, drift, bound, ndt, zr = 0.5, s = 1,
     n_l <- n_lower[idx_lower]
     var_rt_lower[idx_lower] <- moments$vrt_lower *
       stats::rchisq(sum(idx_lower), df = n_l - 1) / (n_l - 1)
-    mean_rt_lower[idx_lower] <- stats::rnorm(
-      sum(idx_lower),
+    # Use truncated normal to ensure mean_rt_lower >= ndt
+    mean_rt_lower[idx_lower] <- .rtruncnorm_lower(
+      n = sum(idx_lower),
       mean = ndt + moments$mdt_lower,
-      sd = sqrt(var_rt_lower[idx_lower] / n_l)
+      sd = sqrt(var_rt_lower[idx_lower] / n_l),
+      lower = ndt
     )
   }
 
