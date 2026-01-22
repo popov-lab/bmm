@@ -307,24 +307,34 @@ configure_model.cswald_simple <- function(model, data, formula) {
 }
 
 posterior_predict_cswald_simple <- function(i, prep, ...) {
-  dots <- list(...)
 
+  # extract parameters from posterior draws
+
+  drift <- brms::get_dpar(prep, "drift", i = i)
+  bound <- brms::get_dpar(prep, "bound", i = i)
+  ndt <- brms::get_dpar(prep, "ndt", i = i)
+  s <- brms::get_dpar(prep, "s", i = i)
+
+  # Simple version estimates distance to upper bound only (single-boundary Wald).
+  # To generate data from the full DDM (via rcswald), convert to total boundary
+  # separation: a = 2 * bound, with unbiased starting point zr = 0.5
   out <- rcswald(
-    n = length(brms::get_dpar(prep,"drift",i = i)),
-    bound = brms::get_dpar(prep, "bound", i = i)*2,
-    drift = brms::get_dpar(prep, "drift", i),
-    ndt = brms::get_dpar(prep, "ndt", i = i),
-    s = brms::get_dpar(prep,"s", i = i)
+    n = length(drift),
+    drift = drift,
+    bound = bound * 2,
+    ndt = ndt,
+    zr = 0.5,
+    s = s
   )
 
-  if(!is.null(dots$negative_rt) && dots$negative_rt) {
-    # code lower bound responses as negative RTs
-    out <- out[["rt"]] * ifelse(out[["response"]] == 1, 1, -1)
+  # handle negative_rt option (consistent with brms::wiener)
+  dots <- list(...)
+  if (!is.null(dots$negative_rt) && dots$negative_rt) {
+    # encode lower bound responses as negative RTs
+    out$rt * ifelse(out$response == 1, 1, -1)
   } else {
-    out <- out[["rt"]]
+    out$rt
   }
-
-  out
 }
 
 log_lik_cswald_simple <- function(i, prep) {
@@ -384,23 +394,29 @@ log_lik_cswald_crisk <- function(i, prep) {
 }
 
 posterior_predict_cswald_crisk <- function(i, prep, ...) {
-  dots <- list(...)
+  # extract parameters from posterior draws
+  drift <- brms::get_dpar(prep, "drift", i = i)
+  bound <- brms::get_dpar(prep, "bound", i = i)
+  ndt <- brms::get_dpar(prep, "ndt", i = i)
+  zr <- brms::get_dpar(prep, "zr", i = i)
+  s <- brms::get_dpar(prep, "s", i = i)
 
+  # Crisk version estimates full boundary separation and relative starting point
   out <- rcswald(
-    n = length(brms::get_dpar(prep,"drift",i = i)),
-    bound = brms::get_dpar(prep, "bound", i = i),
-    drift = brms::get_dpar(prep, "drift", i),
-    ndt = brms::get_dpar(prep, "ndt", i = i),
-    zr = brms::get_dpar(prep,"zr",i = i),
-    s = brms::get_dpar(prep,"s", i = i)
+    n = length(drift),
+    drift = drift,
+    bound = bound,
+    ndt = ndt,
+    zr = zr,
+    s = s
   )
 
-  if(!is.null(dots$negative_rt) && dots$negative_rt) {
-    # code lower bound responses as negative RTs
-    out <- out[["rt"]] * ifelse(out[["response"]] == 1, 1, -1)
+  # handle negative_rt option (consistent with brms::wiener)
+  dots <- list(...)
+  if (!is.null(dots$negative_rt) && dots$negative_rt) {
+    # encode lower bound responses as negative RTs
+    out$rt * ifelse(out$response == 1, 1, -1)
   } else {
-    out <- out[["rt"]]
+    out$rt
   }
-
-  out
 }
