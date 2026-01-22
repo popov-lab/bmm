@@ -9,8 +9,8 @@ test_that("create_initfun returns function for sdm", {
   init_fun <- create_initfun(mod, dat, config_args$formula)
 
   # run tests
-  expect_equal(class(init_fun),"function")
-  expect_equal(class(unlist(init_fun())),"numeric")
+  expect_equal(class(init_fun), "function")
+  expect_equal(class(unlist(init_fun())), "numeric")
 })
 
 
@@ -27,8 +27,8 @@ test_that("create_initfun returns 1 for mixture2p models", {
   init_fun <- create_initfun(model_mix2p, dat, config_args_mix2p$formula)
 
   # run tests
-  expect_equal(class(init_fun),"numeric")
-  expect_equal(init_fun,1)
+  expect_equal(class(init_fun), "numeric")
+  expect_equal(init_fun, 1)
 })
 
 # =============================================================================
@@ -142,6 +142,25 @@ test_that("initfun handles interaction terms", {
   # Should handle interaction term correctly
   b_kappa <- inits[["b_kappa"]]
   expect_equal(length(b_kappa), 4)
+  expect_true(all(is.finite(b_kappa)))
+})
+
+test_that("initfun handles interaction terms with other terms", {
+  dat <- oberauer_lin_2017
+  dat$cond1 <- factor(rep(c("A", "B"), length.out = nrow(dat)))
+  dat$cond2 <- factor(rep(c("X", "Y"), length.out = nrow(dat)))
+  dat$cond3 <- factor(rep(c("S", "T"), length.out = nrow(dat)))
+
+  ff <- bmmformula(kappa ~ 0 + cond1:cond2 + cond1:cond3, c ~ 1)
+  mod <- sdm(resp_error = "dev_rad")
+  config_args <- configure_model(mod, data = dat, formula = ff)
+
+  init_fun <- create_initfun(mod, dat, config_args$formula)
+  inits <- init_fun()
+
+  # Should handle interaction term correctly
+  b_kappa <- inits[["b_kappa"]]
+  expect_equal(length(b_kappa), 6)
   expect_true(all(is.finite(b_kappa)))
 })
 
