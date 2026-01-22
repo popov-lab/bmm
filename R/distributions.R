@@ -641,27 +641,43 @@ rm3 <- function(n, size, pars, m3_model, act_funs = construct_m3_act_funs(m3_mod
   }
 
 
-#' @title Distribution functions for the censored shifted Wald mode (`cswald`)
+#' @title Distribution functions for the censored shifted Wald model (`cswald`)
 #'
 #' @name cswald_dist
 #'
 #' @description
 #'   These functions provide the density and random generation function for the
-#'   censored shifted Wald model: `cswald`
+#'   censored shifted Wald model: `cswald`. The random generation function
+#'   `rcswald()` generates samples from the Wiener diffusion model using
+#'   [rtdists::rdiffusion()], which is theoretically consistent since the
+#'   censored shifted Wald model is an approximation to the Wiener diffusion
+#'   model for tasks with high accuracy (few errors).
 #'
-#' @param rt A vector of response times in seconds `x` for which the likelihood should be evaluated
-#' @param response A vector of responses coded numerically: 0 = lower response, 1 = upper response
+#' @param rt A vector of response times in seconds for which the likelihood
+#'   should be evaluated
+#' @param response A vector of responses coded numerically: 0 = lower response,
+#'   1 = upper response
 #' @param n The number of random samples that should be generated
-#' @param drift The drift rate for which the likelihood should be evaluated
-#' @param bound The boundary separation for which the likelihood should be evaluated
-#' @param ndt The non-decision time for which the
-#' @param zr The relative starting point, only available with `version = "crisk"`
-#' @param s The diffusion constant - that is standard deviation of the noise in the evidence accumulation. Default is `s = 1`
-#' @param version A character string specifying the version of the `cswald` for which the
-#'   likelihood should be returned. Available versions are "simple" and "crisk", the default is "simple."
-#' @param log A single logical value indicating if log-likelihoods should be returned, the default is `TRUE`
+#' @param drift The drift rate
+#' @param bound The boundary separation
+#' @param ndt The non-decision time
+#' @param zr The relative starting point (proportion of boundary separation).
+#'   Default is `0.5` (unbiased). Values must be between 0 and 1.
+#' @param s The diffusion constant - the standard deviation of the noise in the
+#'   evidence accumulation process. Default is `s = 1`
+#' @param version A character string specifying the version of the `cswald` for
+#'   which the likelihood should be returned. Available versions are "simple"
+#'   and "crisk", the default is "simple."
+#' @param log A single logical value indicating if log-likelihoods should be
+#'   returned, the default is `TRUE`
 #'
-#' @keywords distributions
+#' @return `dcswald()` returns a numeric vector of (log-)likelihoods.
+#'   `rcswald()` returns a data.frame with columns `rt` (response times) and
+#'   `response` (1 = upper, 0 = lower).
+#'
+#' @seealso [rtdists::rdiffusion()] for the underlying random generation
+#'
+#' @keywords distribution
 #'
 #'
 #' @export
@@ -716,22 +732,24 @@ rcswald <- function(n, drift, bound, ndt, zr = 0.5, s = 1) {
   zr    <- rep(zr,    length.out = n)
   s     <- rep(s,     length.out = n)
 
-  # calucalte p_correct from parms
+  # convert relative starting point to absolute starting point
+  z_abs <- zr * bound
 
-  k_num <- -2 * drift * (zr * bound) / (s^2)
-  k_all <- -2 * drift * bound / (s^2)
-  p_correct <- -expm1(k_num)/-expm1(k_all)
-  response <- rbinom(n, size = 1, prob = p_correct)
+  # generate random samples from the Wiener diffusion model using rtdists
+  # parameter mapping: drift -> v, bound -> a, ndt -> t0, z_abs -> z, s -> s
+  out <- rtdists::rdiffusion(
+    n = n,
+    a = bound,
+    v = drift,
+    t0 = ndt,
+    z = z_abs,
+    s = s
+  )
 
-  # Draw latent decision times to each boundary independently (competing-risks approximation)
-  rt_decision <- numeric(n)
-  rt_decision[response == 1] <- .rwald(sum(response), drift = drift, bound = bound * (1-zr), s = s)
-  rt_decision[response == 0] <- .rwald(n - sum(response), drift = drift, bound = bound * zr, s = s)
-  rt <- ndt + rt_decision
-
+  # convert response coding from "upper"/"lower" to 1/0
   data.frame(
-    rt = rt,
-    response = response   # 1 = upper, 0 = lower
+    rt = out$rt,
+    response = ifelse(out$response == "upper", 1, 0)
   )
 }
 

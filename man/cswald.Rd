@@ -39,6 +39,14 @@ for Choice Response Times. Applied Psychological Measurement, 42(2), 116-135. ht
 }
 \item \strong{Version:} simple
 \item \strong{Requirements:}
+\itemize{
+\item Reaction times should be passed in seconds
+}
+}
+\itemize{
+\item The response variable should be passed numerically: 0 = lower response, 1 = upper response
+}
+\itemize{
 \item \strong{Parameters:}
 \itemize{
 \item \code{drift}: drift rate
