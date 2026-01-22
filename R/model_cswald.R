@@ -6,7 +6,7 @@
   simple = list(
     parameters = list(
       drift = "drift rate",
-      bound = "boundary separation",
+      bound = "boundary (distance from starting point to correct boundary)",
       ndt = "non-decision time",
       s = "diffusion constant"
     ),
@@ -36,7 +36,7 @@
   crisk = list(
     parameters = list(
       drift = "drift rate",
-      bound = "boundary separation",
+      bound = "boundary separation (total distance between boundaries)",
       ndt = "non-decision time",
       zr = "relative starting point",
       s = "diffusion constant"
@@ -136,10 +136,17 @@
 #'   \itemize{
 #'     \item `"simple"` (default): The standard censored shifted Wald model,
 #'       which treats error responses as censored correct responses. Best suited
-#'       for tasks with few errors (<20%).
+#'       for tasks with few errors (<20%). **Note:** The `bound` parameter in
+#'       the simple version represents the distance from the starting point to
+#'       the correct boundary, which is half the total boundary separation
+#'       in the diffusion model (assuming an unbiased starting point). To
+#'       convert to the full boundary separation (as in DDM or crisk), multiply
+#'       by 2.
 #'     \item `"crisk"`: The competing risks version, which models both response
 #'       types as arising from racing accumulators toward opposite boundaries.
-#'       Better suited for tasks with substantial error rates.
+#'       Better suited for tasks with substantial error rates. The `bound`
+#'       parameter represents the total boundary separation, consistent with
+#'       the diffusion model parameterization.
 #'   }
 #'   For more details, see Miller et al. (2017).
 #' @param ... Additional arguments passed internally (for testing purposes).

@@ -26,10 +26,17 @@ model to use. Options are:
 \itemize{
 \item \code{"simple"} (default): The standard censored shifted Wald model,
 which treats error responses as censored correct responses. Best suited
-for tasks with few errors (<20\%).
+for tasks with few errors (<20\%). \strong{Note:} The \code{bound} parameter in
+the simple version represents the distance from the starting point to
+the correct boundary, which is half the total boundary separation
+in the diffusion model (assuming an unbiased starting point). To
+convert to the full boundary separation (as in DDM or crisk), multiply
+by 2.
 \item \code{"crisk"}: The competing risks version, which models both response
 types as arising from racing accumulators toward opposite boundaries.
-Better suited for tasks with substantial error rates.
+Better suited for tasks with substantial error rates. The \code{bound}
+parameter represents the total boundary separation, consistent with
+the diffusion model parameterization.
 }
 For more details, see Miller et al. (2017).}
 
@@ -65,7 +72,7 @@ for Choice Response Times. Applied Psychological Measurement, 42(2), 116-135. ht
 \item \strong{Parameters:}
 \itemize{
 \item \code{drift}: drift rate
-\item \code{bound}: boundary separation
+\item \code{bound}: boundary (distance from starting point to correct boundary)
 \item \code{ndt}: non-decision time
 \item \code{s}: diffusion constant
 }

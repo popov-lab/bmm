@@ -141,26 +141,40 @@ The simple version treats errors as censored correct responses. It estimates:
 
 - **drift**: The drift rate (rate of evidence accumulation toward the
   correct response)
-- **bound**: The boundary separation (distance from starting point to
-  correct boundary)
+- **bound**: The distance from the starting point to the correct boundary
 - **ndt**: Non-decision time
 - **s**: Diffusion constant (usually fixed to 1 for scaling)
 
 This version is best suited for tasks with error rates below 20%.
+
+**Important note on boundary parameterization:** The `bound` parameter in the
+simple version represents only the distance from the (unbiased) starting point
+to the correct response boundary. This is **half** the total boundary
+separation in the standard diffusion model parameterization. To convert the
+simple version's `bound` estimate to the equivalent DDM or crisk boundary
+separation, multiply by 2:
+
+$$
+a_{DDM} = 2 \times \text{bound}_{simple}
+$$
 
 ## Competing Risks Version (`version = "crisk"`)
 
 The competing risks version models both correct and error responses as
 arising from racing accumulators toward opposite boundaries. It estimates:
 
-- **drift**: The drift rate
-- **bound**: Total boundary separation
+- **drift**: The drift rate (can be positive or negative; negative drift
+  indicates evidence accumulation toward the lower boundary)
+- **bound**: Total boundary separation (full distance between both boundaries,
+  consistent with DDM parameterization)
 - **ndt**: Non-decision time
 - **zr**: Relative starting point (proportion of boundary separation,
   0.5 = unbiased)
 - **s**: Diffusion constant
 
-This version is better suited for tasks with substantial error rates.
+This version is better suited for tasks with substantial error rates. The
+`bound` parameter is directly comparable to the boundary separation in the
+standard diffusion model.
 
 ## When to Use Each Version
 
@@ -187,12 +201,16 @@ diffusion model available in `brms::wiener()`. Key differences:
 |---------|-----------------|----------------|--------------|
 | Boundaries | Single | Both | Both |
 | Starting point | Fixed (unbiased) | Estimated | Estimated |
+| Bound param | Half separation | Full separation | Full separation |
+| Drift sign | Positive only | Positive/negative | Positive/negative |
 | Best for | High accuracy | Moderate accuracy | Any accuracy |
 | Computation | Fast | Moderate | Slower |
 | Parameters | 3-4 | 4-5 | 4-5 |
 
 For tasks with low error rates, the `cswald` model provides equivalent
-inferences with faster computation.
+inferences with faster computation. When comparing results across model
+versions, remember to multiply the simple version's `bound` by 2 to get the
+equivalent total boundary separation.
 
 # Fitting the Model with `bmm`
 
@@ -298,17 +316,20 @@ The model uses link functions for the parameters:
 - `bound` uses a log link
 - `ndt` uses a log link
 
-To get the parameters on the original scale, we exponentiate:
+To get the parameters on the original scale, we exponentiate. Note that for the
+simple version, we multiply `bound` by 2 to get the total boundary separation
+(since the simple version estimates the distance to one boundary only):
 
 ```{r}
 # extract fixed effects
 fixef_est <- brms::fixef(fit)
 
 # transform to original scale
+# Note: bound is multiplied by 2 to convert from half-separation to full DDM boundary
 cat("Estimated parameters:\n")
 cat("drift (Condition A):", exp(fixef_est["drift_conditionA", "Estimate"]), "\n")
 cat("drift (Condition B):", exp(fixef_est["drift_conditionB", "Estimate"]), "\n")
-cat("bound:", 2*exp(fixef_est["bound_Intercept", "Estimate"]), "\n")
+cat("bound (total separation):", 2*exp(fixef_est["bound_Intercept", "Estimate"]), "\n")
 cat("ndt:", exp(fixef_est["ndt_Intercept", "Estimate"]), "\n")
 ```
 
