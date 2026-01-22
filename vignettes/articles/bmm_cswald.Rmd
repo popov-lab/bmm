@@ -14,6 +14,7 @@ vignette: >
 pkgdown:
   as_is: true
 ---
+
 <style type="text/css">
 div.main-container {
 max-width: 800px !important;
@@ -161,6 +162,38 @@ arising from racing accumulators toward opposite boundaries. It estimates:
 
 This version is better suited for tasks with substantial error rates.
 
+## When to Use Each Version
+
+### Use `version = "simple"` when:
+
+- Error rates are low (< 20%)
+- You want a computationally efficient model
+- The focus is on correct response times
+- Errors can reasonably be treated as censored observations
+
+### Use `version = "crisk"` when:
+
+- Error rates are substantial (> 20%)
+- You want to model both response types explicitly
+- Starting point bias might be present
+- You need estimates comparable to full diffusion model parameters
+
+## Comparison with the Wiener Diffusion Model
+
+The `cswald` model in `bmm` is related to but distinct from the full Wiener
+diffusion model available in `brms::wiener()`. Key differences:
+
+| Feature | cswald (simple) | cswald (crisk) | brms::wiener |
+|---------|-----------------|----------------|--------------|
+| Boundaries | Single | Both | Both |
+| Starting point | Fixed (unbiased) | Estimated | Estimated |
+| Best for | High accuracy | Moderate accuracy | Any accuracy |
+| Computation | Fast | Moderate | Slower |
+| Parameters | 3-4 | 4-5 | 4-5 |
+
+For tasks with low error rates, the `cswald` model provides equivalent
+inferences with faster computation.
+
 # Fitting the Model with `bmm`
 
 ## Setup
@@ -225,9 +258,6 @@ model <- cswald(
   response = "response",
   version = "simple"
 )
-
-# view model information
-model
 ```
 
 ## Specifying the Formula
@@ -278,7 +308,7 @@ fixef_est <- brms::fixef(fit)
 cat("Estimated parameters:\n")
 cat("drift (Condition A):", exp(fixef_est["drift_conditionA", "Estimate"]), "\n")
 cat("drift (Condition B):", exp(fixef_est["drift_conditionB", "Estimate"]), "\n")
-cat("bound:", exp(fixef_est["bound_Intercept", "Estimate"]), "\n")
+cat("bound:", 2*exp(fixef_est["bound_Intercept", "Estimate"]), "\n")
 cat("ndt:", exp(fixef_est["ndt_Intercept", "Estimate"]), "\n")
 ```
 
@@ -297,81 +327,8 @@ cat("ndt: 0.3\n")
 Check posterior predictive distributions:
 
 ```{r fig.width=8, fig.height=4, message=FALSE}
-pp_check(fit, type = "dens_overlay", ndraws = 50) +
+brms::pp_check(fit, type = "dens_overlay", ndraws = 50) +
   labs(title = "Posterior Predictive Check")
 ```
-
-# Parameter Interpretation
-
-## Drift Rate
-
-The drift rate ($v$) represents the speed of evidence accumulation. Higher
-drift rates lead to:
-
-- Faster correct responses
-- Fewer errors
-- More peaked RT distributions
-
-In cognitive terms, drift rate often reflects:
-
-- Task difficulty (easier tasks → higher drift)
-- Ability or skill
-- Attention or motivation
-
-## Boundary Separation
-
-The boundary ($a$) represents the amount of evidence required before making
-a decision. Higher boundaries lead to:
-
-- Slower but more accurate responses
-- More symmetric RT distributions for correct and error responses
-
-In cognitive terms, boundary separation often reflects:
-
-- Speed-accuracy tradeoff settings
-- Response caution
-- Task instructions (emphasize speed vs. accuracy)
-
-## Non-Decision Time
-
-The non-decision time ($\tau$) represents all processes not involved in the
-decision itself:
-
-- Stimulus encoding time
-- Motor preparation and execution time
-
-This parameter shifts the entire RT distribution without changing its shape.
-
-# When to Use Each Version
-
-## Use `version = "simple"` when:
-
-- Error rates are low (< 20%)
-- You want a computationally efficient model
-- The focus is on correct response times
-- Errors can reasonably be treated as censored observations
-
-## Use `version = "crisk"` when:
-
-- Error rates are substantial (> 20%)
-- You want to model both response types explicitly
-- Starting point bias might be present
-- You need estimates comparable to full diffusion model parameters
-
-# Comparison with the Wiener Diffusion Model
-
-The cswald model in `bmm` is related to but distinct from the full Wiener
-diffusion model available in `brms::wiener()`. Key differences:
-
-| Feature | cswald (simple) | cswald (crisk) | brms::wiener |
-|---------|-----------------|----------------|--------------|
-| Boundaries | Single | Both | Both |
-| Starting point | Fixed (unbiased) | Estimated | Estimated |
-| Best for | High accuracy | Moderate accuracy | Any accuracy |
-| Computation | Fast | Moderate | Slower |
-| Parameters | 3-4 | 4-5 | 4-5 |
-
-For tasks with low error rates, the cswald model provides equivalent
-inferences with faster computation.
 
 # References

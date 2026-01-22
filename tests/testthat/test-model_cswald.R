@@ -330,3 +330,21 @@ test_that("cswald simple version with predictors runs with mock backend", {
     bmm(formula, dat, model, backend = "mock", mock = 1, rename = FALSE)
   )
 })
+
+test_that("cswald crisk version allows negative drift (more lower responses)", {
+  skip_on_cran()
+
+  # Generate data with negative drift (biased toward lower boundary)
+  dat <- rcswald(n = 100, drift = -1.5, bound = 1.5, ndt = 0.3, zr = 0.5)
+
+  # Most responses should be lower (0) with negative drift
+  expect_true(mean(dat$response == 0) > 0.5)
+
+  model <- cswald(rt = "rt", response = "response", version = "crisk")
+  formula <- bmf(drift ~ 1, bound ~ 1, ndt ~ 1, zr ~ 1)
+
+  # Model should run without error
+  expect_silent(
+    bmm(formula, dat, model, backend = "mock", mock = 1, rename = FALSE)
+  )
+})

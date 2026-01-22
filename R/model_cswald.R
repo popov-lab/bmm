@@ -53,7 +53,7 @@
       s = 0
     ),
     priors = list(
-      drift = list(main = "normal(1,1)", effects = "normal(0,0.3)"),
+      drift = list(main = "normal(0,1)", effects = "normal(0,0.5)"),
       bound = list(main = "normal(0,0.3)", effects = "normal(0,0.3)"),
       ndt = list(main = "normal(-2,0.3)", effects = "normal(0,0.3)"),
       zr = list(main = "normal(0,0.3)", effects = "normal(0,0.2)"),
@@ -61,7 +61,7 @@
     ),
     init_ranges = list(
       mu = c(0,1),
-      drift = c(1,2),
+      drift = c(-0.5, 0.5),
       bound = c(1.5,2),
       ndt = c(0.025, 0.05),
       zr = c(0.45, 0.55),
@@ -474,7 +474,7 @@ configure_model.cswald_crisk <- function(model, data, formula) {
       dpars = c("mu", "drift", "bound", "ndt", "zr", "s"),
       links = c("identity", link_drift, link_bound, link_ndt, link_zr, link_s),
       ub = c(NA, NA, NA, NA, 1, NA), # upper bounds for parameters
-      lb = c(NA, 0, 0, 0, 0, 0), # lower bounds for parameters
+      lb = c(NA, NA, 0, 0, 0, 0), # lower bounds (drift can be negative)
       type = 'real', # real for continous dv, int for discrete dv
       vars = 'dec[n]',
       loop = TRUE, # is the likelihood vectorized
