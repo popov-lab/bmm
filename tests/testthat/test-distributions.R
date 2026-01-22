@@ -229,3 +229,194 @@ test_that("rm3 works for a complexspan m3 model", {
   expect_equal(colnames(res), model$resp_vars$resp_cats)
   expect_true(median(res[, "dist_other"]) > median(res))
 })
+
+# -----------------------------------------------------------------------------
+# cswald distribution function tests
+# -----------------------------------------------------------------------------
+
+test_that("dcswald runs without errors and returns correct output", {
+  n <- 10
+  rt <- runif(n, 0.4, 1.5)
+  response <- sample(c(0, 1), n, replace = TRUE)
+
+  # simple version
+  res <- dcswald(rt, response, drift = 2, bound = 1.5, ndt = 0.3,
+                 version = "simple")
+  expect_length(res, n)
+  expect_type(res, "double")
+
+  # crisk version
+  res_crisk <- dcswald(rt, response, drift = 2, bound = 1.5, ndt = 0.3,
+                       zr = 0.5, version = "crisk")
+  expect_length(res_crisk, n)
+  expect_type(res_crisk, "double")
+
+  # test log = FALSE
+  res_exp <- dcswald(rt, response, drift = 2, bound = 1.5, ndt = 0.3,
+                     version = "simple", log = FALSE)
+  expect_true(all(res_exp >= 0))
+  expect_equal(res_exp, exp(res))
+})
+
+test_that("dcswald handles vectorized parameters", {
+  n <- 5
+  rt <- runif(n, 0.4, 1.5)
+  response <- sample(c(0, 1), n, replace = TRUE)
+
+  # vectorized drift
+  res <- dcswald(rt, response, drift = 1:n, bound = 1.5, ndt = 0.3,
+                 version = "simple")
+  expect_length(res, n)
+
+  # all parameters vectorized
+  res <- dcswald(rt, response, drift = 1:n, bound = seq(1, 2, length.out = n),
+                 ndt = seq(0.1, 0.3, length.out = n), version = "simple")
+  expect_length(res, n)
+})
+
+test_that("rcswald generates valid output", {
+  n <- 100
+  out <- rcswald(n, drift = 2, bound = 1.5, ndt = 0.3)
+
+  expect_s3_class(out, "data.frame")
+  expect_equal(nrow(out), n)
+  expect_true(all(c("rt", "response") %in% names(out)))
+  expect_true(all(out$rt > 0))
+  expect_true(all(out$response %in% c(0, 1)))
+})
+
+test_that("rcswald handles vectorized parameters", {
+  n <- 10
+  out <- rcswald(n, drift = runif(n, 1, 3), bound = runif(n, 1, 2),
+                 ndt = runif(n, 0.1, 0.3), zr = runif(n, 0.3, 0.7))
+  expect_equal(nrow(out), n)
+})
+
+test_that("pcswald returns probabilities between 0 and 1 for simple version", {
+  q <- seq(0.4, 2, length.out = 20)
+  p <- pcswald(q, response = 1, drift = 2, bound = 1.5, ndt = 0.3,
+               version = "simple")
+
+  expect_length(p, 20)
+  expect_true(all(p >= 0, na.rm = TRUE))
+  expect_true(all(p <= 1, na.rm = TRUE))
+  # CDF should be monotonically increasing
+  expect_true(all(diff(p) >= 0))
+})
+
+test_that("pcswald returns probabilities between 0 and 1 for crisk version", {
+  q <- seq(0.4, 2, length.out = 20)
+
+  # upper boundary
+  p_upper <- pcswald(q, response = 1, drift = 2, bound = 1.5, ndt = 0.3,
+                     version = "crisk")
+  expect_true(all(p_upper >= 0))
+  expect_true(all(p_upper <= 1))
+
+  # lower boundary
+  p_lower <- pcswald(q, response = 0, drift = 2, bound = 1.5, ndt = 0.3,
+                     version = "crisk")
+  expect_true(all(p_lower >= 0))
+  expect_true(all(p_lower <= 1))
+})
+
+test_that("pcswald warns for response=0 in simple version", {
+  expect_warning(
+    pcswald(1.0, response = 0, drift = 2, bound = 1.5, ndt = 0.3,
+            version = "simple"),
+    "CDF for response=0 is not well-defined"
+  )
+})
+
+test_that("pcswald handles log.p and lower.tail arguments", {
+  q <- 1.0
+  p <- pcswald(q, response = 1, drift = 2, bound = 1.5, ndt = 0.3)
+
+  # log.p = TRUE
+  p_log <- pcswald(q, response = 1, drift = 2, bound = 1.5, ndt = 0.3,
+                   log.p = TRUE)
+  expect_equal(p_log, log(p))
+
+  # lower.tail = FALSE
+  p_upper <- pcswald(q, response = 1, drift = 2, bound = 1.5, ndt = 0.3,
+                     lower.tail = FALSE)
+  expect_equal(p_upper, 1 - p)
+})
+
+test_that("qcswald returns valid quantiles for simple version", {
+  p <- c(0.1, 0.5, 0.9)
+  q <- qcswald(p, response = 1, drift = 2, bound = 1.5, ndt = 0.3,
+               version = "simple")
+
+  expect_length(q, 3)
+  expect_true(all(q > 0.3))  # all quantiles > ndt
+  expect_true(all(diff(q) > 0))  # monotonically increasing
+})
+
+test_that("qcswald returns valid quantiles for crisk version", {
+  p <- c(0.1, 0.5, 0.9)
+  q <- qcswald(p, response = 1, drift = 2, bound = 1.5, ndt = 0.3,
+               version = "crisk")
+
+  expect_length(q, 3)
+  expect_true(all(q > 0.3))  # all quantiles > ndt
+})
+
+test_that("qcswald warns for response=0 in simple version", {
+  expect_warning(
+    qcswald(0.5, response = 0, drift = 2, bound = 1.5, ndt = 0.3,
+            version = "simple"),
+    "Quantile for response=0 is not well-defined"
+  )
+})
+
+test_that("pcswald and qcswald are inverses (round-trip)", {
+  p_orig <- c(0.1, 0.3, 0.5, 0.7, 0.9)
+
+  # simple version
+  q <- qcswald(p_orig, response = 1, drift = 2, bound = 1.5, ndt = 0.3,
+               version = "simple")
+  p_back <- pcswald(q, response = 1, drift = 2, bound = 1.5, ndt = 0.3,
+                    version = "simple")
+  expect_equal(p_orig, p_back, tolerance = 1e-4)
+
+  # crisk version
+  q_crisk <- qcswald(p_orig, response = 1, drift = 2, bound = 1.5, ndt = 0.3,
+                     version = "crisk")
+  p_back_crisk <- pcswald(q_crisk, response = 1, drift = 2, bound = 1.5,
+                          ndt = 0.3, version = "crisk")
+  expect_equal(p_orig, p_back_crisk, tolerance = 1e-4)
+})
+
+test_that("cswald parameter validation works", {
+  # negative bound
+  expect_error(
+    dcswald(1, 1, drift = 2, bound = -1, ndt = 0.3),
+    "boundary"
+  )
+
+  # negative ndt
+  expect_error(
+    dcswald(1, 1, drift = 2, bound = 1.5, ndt = -0.1),
+    "non-decision time"
+  )
+
+  # zr out of range (note: actual error message has typo "startin point")
+  expect_error(
+    dcswald(1, 1, drift = 2, bound = 1.5, ndt = 0.3, zr = 1.5),
+    "startin"
+  )
+
+  # negative s
+  expect_error(
+    dcswald(1, 1, drift = 2, bound = 1.5, ndt = 0.3, s = -1),
+    "diffusion constant"
+  )
+})
+
+test_that("dcswald errors when rt < ndt", {
+  expect_error(
+    dcswald(rt = 0.2, response = 1, drift = 2, bound = 1.5, ndt = 0.3),
+    "smaller than the non-decision time"
+  )
+})
