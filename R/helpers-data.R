@@ -351,9 +351,17 @@ has_nonconsecutive_duplicates <- function(vec) {
 #'   contaminant proportions. Default is 0.5
 #' @param maxit Integer. Maximum number of EM iterations. Default is 100
 #' @param tol Numeric. Convergence tolerance for EM algorithm. Default is 1e-6
+#' @param adjust_accuracy Logical. If TRUE and method = "mixture", adjust
+#'   accuracy counts by removing estimated contaminant guesses using binomial
+#'   sampling. Default is FALSE
+#' @param guess_rate Numeric. Assumed accuracy rate for contaminant trials
+#'   (random guessing). Default is 0.5 (appropriate for 2AFC tasks)
+#' @param seed Integer. Random seed for reproducibility of accuracy adjustment.
+#'   If NULL (default), results will vary across runs
 #'
 #' @return A `data.frame` with summary statistics. For version = "3par":
 #'   grouping variables, mean_rt, var_rt, n_upper, n_trials, contaminant_prop.
+#'   When adjust_accuracy = TRUE, also includes n_upper_adj and n_trials_adj.
 #'   For version = "4par": grouping variables, mean_rt_upper, mean_rt_lower,
 #'   var_rt_upper, var_rt_lower, n_upper, n_trials, contaminant_prop_upper,
 #'   contaminant_prop_lower.
@@ -402,7 +410,10 @@ ezdm_summary_stats <- function(
   init_contaminant = 0.05,
   max_contaminant = 0.5,
   maxit = 100,
-  tol = 1e-6
+  tol = 1e-6,
+  adjust_accuracy = FALSE,
+  guess_rate = 0.5,
+  seed = NULL
 ) {
   # Input validation
   stopif(missing(data), "Argument 'data' is required")
@@ -489,6 +500,29 @@ ezdm_summary_stats <- function(
     init_contaminant >= max_contaminant,
     "init_contaminant must be less than max_contaminant"
   )
+  stopif(
+    !is.logical(adjust_accuracy),
+    "adjust_accuracy must be TRUE or FALSE"
+  )
+  stopif(
+    !is.numeric(guess_rate) || guess_rate < 0 || guess_rate > 1,
+    "guess_rate must be between 0 and 1"
+  )
+  stopif(
+    !is.null(seed) && (!is.numeric(seed) || length(seed) != 1),
+    "seed must be NULL or a single integer value"
+  )
+
+  # Warn if adjust_accuracy is TRUE but method is "simple"
+  warnif(
+    adjust_accuracy && method == "simple",
+    "adjust_accuracy has no effect with method='simple' (no contaminant estimate)"
+  )
+
+  # Set seed for reproducibility if provided
+  if (adjust_accuracy && !is.null(seed)) {
+    set.seed(seed)
+  }
 
   # Warnings for potential data issues
   warnif(
@@ -529,7 +563,9 @@ ezdm_summary_stats <- function(
       init_contaminant = init_contaminant,
       max_contaminant = max_contaminant,
       maxit = maxit,
-      tol = tol
+      tol = tol,
+      adjust_accuracy = adjust_accuracy,
+      guess_rate = guess_rate
     )
     result_df <- as.data.frame(result)
   } else {
@@ -555,7 +591,9 @@ ezdm_summary_stats <- function(
         init_contaminant = init_contaminant,
         max_contaminant = max_contaminant,
         maxit = maxit,
-        tol = tol
+        tol = tol,
+        adjust_accuracy = adjust_accuracy,
+        guess_rate = guess_rate
       )
 
       # Extract group values
@@ -643,7 +681,8 @@ ezdm_summary_stats <- function(
 # @return Named list with summary statistics
 .process_rt_group <- function(rt_data, response_data, version, distribution,
                               method, contaminant_bound, min_trials,
-                              init_contaminant, max_contaminant, maxit, tol) {
+                              init_contaminant, max_contaminant, maxit, tol,
+                              adjust_accuracy, guess_rate) {
   n_trials <- length(rt_data)
 
   # Convert response to logical indicator (TRUE = upper boundary)
@@ -708,6 +747,13 @@ ezdm_summary_stats <- function(
         n_trials = n_trials,
         contaminant_prop = fit$contaminant_prop
       )
+      if (adjust_accuracy) {
+        adj <- .adjust_accuracy_counts(
+          n_upper, n_trials, fit$contaminant_prop, guess_rate
+        )
+        result$n_upper_adj <- adj$n_upper_adj
+        result$n_trials_adj <- adj$n_trials_adj
+      }
       return(result)
     }
 
@@ -719,6 +765,13 @@ ezdm_summary_stats <- function(
       n_trials = n_trials,
       contaminant_prop = fit$contaminant_prop
     )
+    if (adjust_accuracy) {
+      adj <- .adjust_accuracy_counts(
+        n_upper, n_trials, fit$contaminant_prop, guess_rate
+      )
+      result$n_upper_adj <- adj$n_upper_adj
+      result$n_trials_adj <- adj$n_trials_adj
+    }
     return(result)
 
   } else {
@@ -754,7 +807,7 @@ ezdm_summary_stats <- function(
     if (n_upper >= min_trials) {
       fit_upper <- .fit_rt_mixture(
         rt_upper, distribution, resolved_bounds,
-        init_contaminant, maxit, tol
+        init_contaminant, max_contaminant, maxit, tol
       )
       if (!fit_upper$converged || is.null(fit_upper$params)) {
         warning2("EM for upper boundary did not converge. Using simple moments.",
@@ -775,7 +828,7 @@ ezdm_summary_stats <- function(
     if (n_lower >= min_trials) {
       fit_lower <- .fit_rt_mixture(
         rt_lower, distribution, resolved_bounds,
-        init_contaminant, maxit, tol
+        init_contaminant, max_contaminant, maxit, tol
       )
       if (!fit_lower$converged || is.null(fit_lower$params)) {
         warning2("EM for lower boundary did not converge. Using simple moments.",
@@ -802,6 +855,21 @@ ezdm_summary_stats <- function(
       contaminant_prop_upper = contam_upper,
       contaminant_prop_lower = contam_lower
     )
+
+    if (adjust_accuracy) {
+      # Use weighted average of contaminant proportions
+      contam_upper_safe <- ifelse(is.na(contam_upper), 0, contam_upper)
+      contam_lower_safe <- ifelse(is.na(contam_lower), 0, contam_lower)
+      if (n_upper + n_lower > 0) {
+        avg_contam <- (n_upper * contam_upper_safe +
+                         n_lower * contam_lower_safe) / (n_upper + n_lower)
+      } else {
+        avg_contam <- 0
+      }
+      adj <- .adjust_accuracy_counts(n_upper, n_trials, avg_contam, guess_rate)
+      result$n_upper_adj <- adj$n_upper_adj
+      result$n_trials_adj <- adj$n_trials_adj
+    }
 
     result
   }
@@ -1202,4 +1270,40 @@ ezdm_summary_stats <- function(
   }
 
   resolved
+}
+
+# Compute adjusted accuracy counts based on contaminant proportion
+# Uses binomial sampling to produce integer counts
+# @param n_upper Raw count of upper boundary responses
+# @param n_trials Total number of trials
+# @param contaminant_prop Estimated proportion of contaminants
+# @param guess_rate Assumed accuracy rate for contaminants (default 0.5)
+# @return List with n_upper_adj and n_trials_adj (integers)
+.adjust_accuracy_counts <- function(n_upper, n_trials, contaminant_prop,
+                                    guess_rate) {
+  if (is.na(contaminant_prop) || contaminant_prop <= 0) {
+    return(list(
+      n_upper_adj = as.integer(n_upper),
+      n_trials_adj = as.integer(n_trials)
+    ))
+  }
+
+  # Sample number of contaminant trials from binomial distribution
+  n_contam <- rbinom(1, size = n_trials, prob = contaminant_prop)
+
+  # Sample number of contaminant upper responses from binomial
+  # (contaminants that happened to be "correct" by chance)
+  n_contam_upper <- rbinom(1, size = n_contam, prob = guess_rate)
+
+  # Adjusted counts (integers)
+  n_trials_adj <- n_trials - n_contam
+  n_upper_adj <- n_upper - n_contam_upper
+
+  # Bound to valid range
+  n_upper_adj <- max(0L, min(n_upper_adj, n_trials_adj))
+
+  list(
+    n_upper_adj = as.integer(n_upper_adj),
+    n_trials_adj = as.integer(n_trials_adj)
+  )
 }
