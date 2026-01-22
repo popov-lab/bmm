@@ -88,3 +88,8 @@ articles:
     desc: Fitting models to categorical decision tasks (e.g. cued or free recall, n-AFC, etc)
     contents:
     - articles/bmm_m3
+
+  - title: Speeded decision making
+    desc: Fitting models to choice reaction time tasks
+    contents:
+    - articles/bmm_ezdm
