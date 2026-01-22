@@ -338,7 +338,25 @@ posterior_predict_cswald_simple <- function(i, prep, ...) {
 }
 
 log_lik_cswald_simple <- function(i, prep) {
+  # extract parameters from posterior draws
+  drift <- brms::get_dpar(prep, "drift", i = i)
+  bound <- brms::get_dpar(prep, "bound", i = i)
+  ndt <- brms::get_dpar(prep, "ndt", i = i)
+  s <- brms::get_dpar(prep, "s", i = i)
 
+  # get observed data for observation i
+  rt <- prep$data$Y[i]
+  response <- prep$data$dec[i]
+
+  # number of posterior draws
+  ndraws <- length(drift)
+
+  # replicate rt and response to match number of posterior draws
+  rt <- rep(rt, ndraws)
+  response <- rep(response, ndraws)
+
+  # compute log-likelihood for each posterior draw
+  dcswald(rt, response, drift, bound, ndt, s = s, version = "simple", log = TRUE)
 }
 
 #' @export
@@ -390,7 +408,26 @@ configure_model.cswald_crisk <- function(model, data, formula) {
 }
 
 log_lik_cswald_crisk <- function(i, prep) {
+  # extract parameters from posterior draws
+  drift <- brms::get_dpar(prep, "drift", i = i)
+  bound <- brms::get_dpar(prep, "bound", i = i)
+  ndt <- brms::get_dpar(prep, "ndt", i = i)
+  zr <- brms::get_dpar(prep, "zr", i = i)
+  s <- brms::get_dpar(prep, "s", i = i)
 
+  # get observed data for observation i
+  rt <- prep$data$Y[i]
+  response <- prep$data$dec[i]
+
+  # number of posterior draws
+  ndraws <- length(drift)
+
+  # replicate rt and response to match number of posterior draws
+  rt <- rep(rt, ndraws)
+  response <- rep(response, ndraws)
+
+  # compute log-likelihood for each posterior draw
+  dcswald(rt, response, drift, bound, ndt, zr = zr, s = s, version = "crisk", log = TRUE)
 }
 
 posterior_predict_cswald_crisk <- function(i, prep, ...) {
