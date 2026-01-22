@@ -7,18 +7,33 @@
 cswald(rt, response, links = NULL, version = "simple", ...)
 }
 \arguments{
-\item{rt}{A description of the response variable}
+\item{rt}{The name of the variable in the dataset containing the response
+times. Response times should be coded in seconds (not milliseconds).}
 
-\item{response}{A description of the response variable}
+\item{response}{The name of the variable in the dataset containing the
+response/decision. Responses should be coded as 0 (lower boundary) or
+1 (upper boundary). Alternatively, character values "lower" and "upper"
+or logical values (FALSE/TRUE) are accepted and will be converted
+automatically.}
 
-\item{links}{A list of links for the parameters.}
+\item{links}{A named list of link functions for the model parameters.
+Available parameters depend on the version: "simple" has \code{drift}, \code{bound},
+\code{ndt}, and \code{s}; "crisk" additionally has \code{zr}. Default links are "log" for
+most parameters and "logit" for \code{zr}.}
 
-\item{version}{A character string which version of the cswald model to use.
-The standard cswald model is referred to as "simple" version, and the competing risk
-version is referred to as "crisk". For more details on these model versions, please look
-into Miller et al. (2017) given as the reference in the \code{cswald} model object.}
+\item{version}{A character string specifying which version of the cswald
+model to use. Options are:
+\itemize{
+\item \code{"simple"} (default): The standard censored shifted Wald model,
+which treats error responses as censored correct responses. Best suited
+for tasks with few errors (<20\%).
+\item \code{"crisk"}: The competing risks version, which models both response
+types as arising from racing accumulators toward opposite boundaries.
+Better suited for tasks with substantial error rates.
+}
+For more details, see Miller et al. (2017).}
 
-\item{...}{used internally for testing, ignore it}
+\item{...}{Additional arguments passed internally (for testing purposes).}
 }
 \value{
 An object of class \code{bmmodel}
@@ -50,7 +65,7 @@ for Choice Response Times. Applied Psychological Measurement, 42(2), 116-135. ht
 \item \strong{Parameters:}
 \itemize{
 \item \code{drift}: drift rate
-\item \code{bound}: boundary seperation
+\item \code{bound}: boundary separation
 \item \code{ndt}: non-decision time
 \item \code{s}: diffusion constant
 }
@@ -88,7 +103,32 @@ for Choice Response Times. Applied Psychological Measurement, 42(2), 116-135. ht
 }
 }
 \examples{
-\dontrun{
-# put a full example here (see 'R/model_mixture3p.R' for an example)
+\dontshow{if (isTRUE(Sys.getenv("BMM_EXAMPLES"))) withAutoprint(\{ # examplesIf}
+# generate simulated data from the diffusion model
+dat <- rcswald(n = 500, drift = 2, bound = 1.5, ndt = 0.3, zr = 0.5, s = 1)
+
+# specify the model
+model <- cswald(rt = "rt", response = "response", version = "simple")
+
+# specify the formula
+formula <- bmf(
+  drift ~ 1,
+  bound ~ 1,
+  ndt ~ 1
+)
+
+# fit the model
+fit <- bmm(
+  formula = formula,
+  data = dat,
+  model = model,
+  cores = 4,
+  backend = "cmdstanr"
+)
+\dontshow{\}) # examplesIf}
 }
+\seealso{
+\code{\link[=dcswald]{dcswald()}} and \code{\link[=rcswald]{rcswald()}} for the density and random generation
+functions.
 }
+\keyword{bmmodel}

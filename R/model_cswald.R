@@ -6,7 +6,7 @@
   simple = list(
     parameters = list(
       drift = "drift rate",
-      bound = "boundary seperation",
+      bound = "boundary separation",
       ndt = "non-decision time",
       s = "diffusion constant"
     ),
@@ -36,7 +36,7 @@
   crisk = list(
     parameters = list(
       drift = "drift rate",
-      bound = "boundary seperation",
+      bound = "boundary separation",
       ndt = "non-decision time",
       zr = "relative starting point",
       s = "diffusion constant"
@@ -120,20 +120,56 @@
 #' @title `r .model_cswald()$name`
 #' @name cswald
 #' @details `r model_info(.model_cswald())`
-#' @param rt A description of the response variable
-#' @param response A description of the response variable
-#' @param links A list of links for the parameters.
-#' @param version A character string which version of the cswald model to use.
-#'   The standard cswald model is referred to as "simple" version, and the competing risk
-#'   version is referred to as "crisk". For more details on these model versions, please look
-#'   into Miller et al. (2017) given as the reference in the `cswald` model object.
-#' @param ... used internally for testing, ignore it
+#' @param rt The name of the variable in the dataset containing the response
+#'   times. Response times should be coded in seconds (not milliseconds).
+#' @param response The name of the variable in the dataset containing the
+#'   response/decision. Responses should be coded as 0 (lower boundary) or
+#'   1 (upper boundary). Alternatively, character values "lower" and "upper"
+#'   or logical values (FALSE/TRUE) are accepted and will be converted
+#'   automatically.
+#' @param links A named list of link functions for the model parameters.
+#'   Available parameters depend on the version: "simple" has `drift`, `bound`,
+#'   `ndt`, and `s`; "crisk" additionally has `zr`. Default links are "log" for
+#'   most parameters and "logit" for `zr`.
+#' @param version A character string specifying which version of the cswald
+#'   model to use. Options are:
+#'   \itemize{
+#'     \item `"simple"` (default): The standard censored shifted Wald model,
+#'       which treats error responses as censored correct responses. Best suited
+#'       for tasks with few errors (<20%).
+#'     \item `"crisk"`: The competing risks version, which models both response
+#'       types as arising from racing accumulators toward opposite boundaries.
+#'       Better suited for tasks with substantial error rates.
+#'   }
+#'   For more details, see Miller et al. (2017).
+#' @param ... Additional arguments passed internally (for testing purposes).
 #' @return An object of class `bmmodel`
 #' @export
-#' @examples
-#' \dontrun{
-#' # put a full example here (see 'R/model_mixture3p.R' for an example)
-#' }
+#' @keywords bmmodel
+#' @seealso [dcswald()] and [rcswald()] for the density and random generation
+#'   functions.
+#' @examplesIf isTRUE(Sys.getenv("BMM_EXAMPLES"))
+#' # generate simulated data from the diffusion model
+#' dat <- rcswald(n = 500, drift = 2, bound = 1.5, ndt = 0.3, zr = 0.5, s = 1)
+#'
+#' # specify the model
+#' model <- cswald(rt = "rt", response = "response", version = "simple")
+#'
+#' # specify the formula
+#' formula <- bmf(
+#'   drift ~ 1,
+#'   bound ~ 1,
+#'   ndt ~ 1
+#' )
+#'
+#' # fit the model
+#' fit <- bmm(
+#'   formula = formula,
+#'   data = dat,
+#'   model = model,
+#'   cores = 4,
+#'   backend = "cmdstanr"
+#' )
 cswald <- function(rt, response, links = NULL, version = "simple", ...) {
   call <- match.call()
   stop_missing_args()
