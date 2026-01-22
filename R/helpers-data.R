@@ -301,3 +301,291 @@ has_nonconsecutive_duplicates <- function(vec) {
   }
   !cond
 }
+
+############################################################################# !
+# EZDM SUMMARY STATISTICS                                                 ####
+############################################################################# !
+
+#' Compute Summary Statistics for EZ-Diffusion Model
+#'
+#' @description Computes summary statistics for the EZ-Diffusion Model
+#'   from raw trial-level RT data.
+#'
+#' @param data A `data.frame` containing trial-level data with RT and accuracy
+#'   columns
+#' @param rt Character. The name of the column containing reaction times (in
+#'   seconds)
+#' @param response Character. The name of the column containing response
+#'   indicators. Accepts multiple formats:
+#'   \itemize{
+#'     \item Numeric: 1 = upper/correct, 0 = lower/error
+#'     \item Logical: TRUE = upper/correct, FALSE = lower/error
+#'     \item Character/Factor: "upper"/"lower", "correct"/"error",
+#'       "acc"/"err", "hit"/"miss", "yes"/"no" (case-insensitive)
+#'   }
+#' @param ... Grouping variables (unquoted column names). Summary statistics
+#'   will be computed separately for each combination of these variables.
+#' @param version Character. Either "3par" (default) for pooled RTs or "4par"
+#'   for separate upper/lower boundary RTs
+#' @param min_trials Integer. Minimum number of trials required for fitting.
+#'   Groups with fewer trials will return NA. Default is 10
+#'
+#' @return A `data.frame` with summary statistics. For version = "3par":
+#'   grouping variables, mean_rt, var_rt, n_upper, n_trials.
+#'   For version = "4par": grouping variables, mean_rt_upper, mean_rt_lower,
+#'   var_rt_upper, var_rt_lower, n_upper, n_trials.
+#'
+#' @keywords transform
+#' @export
+#'
+#' @examples
+#' # Generate example data
+#' set.seed(123)
+#' test_data <- data.frame(
+#'   subject = rep(1:3, each = 100),
+#'   condition = rep(c("A", "B"), 150),
+#'   rt = rgamma(300, shape = 5, rate = 10) + 0.3,
+#'   correct = rbinom(300, 1, 0.8)
+#' )
+#'
+#' # Compute summary statistics grouped by subject
+#' result <- ezdm_summary_stats(test_data, rt = "rt", response = "correct",
+#'                              subject)
+#' print(result)
+#'
+#' # Group by multiple variables
+#' result_multi <- ezdm_summary_stats(test_data, rt = "rt",
+#'                                    response = "correct",
+#'                                    subject, condition)
+#'
+ezdm_summary_stats <- function(
+  data,
+  rt,
+  response,
+  ...,
+  version = "3par",
+  min_trials = 10
+) {
+  # Input validation
+  stopif(missing(data), "Argument 'data' is required")
+  stopif(missing(rt), "Argument 'rt' is required")
+  stopif(missing(response), "Argument 'response' is required")
+
+  data <- try(as.data.frame(data), silent = TRUE)
+  stopif(
+    is_try_error(data),
+    "Argument 'data' must be coercible to a data.frame"
+  )
+  stopif(
+    !isTRUE(nrow(data) > 0L),
+    "Argument 'data' does not contain observations"
+  )
+
+  stopif(not_in(rt, colnames(data)), "RT variable '{rt}' not found in data")
+  stopif(
+    not_in(response, colnames(data)),
+    "Response variable '{response}' not found in data"
+  )
+
+  stopif(
+    not_in(version, c("3par", "4par")),
+    "version must be '3par' or '4par'"
+  )
+  stopif(
+    !is.numeric(min_trials) || min_trials < 1,
+    "min_trials must be a positive integer"
+  )
+
+  # Warnings for potential data issues
+  warnif(
+    any(data[[rt]] > 10, na.rm = TRUE),
+    "Some RT values > 10. Ensure RTs are in seconds, not milliseconds."
+  )
+
+  # Filter out non-positive RTs with warning
+  non_positive <- sum(data[[rt]] <= 0, na.rm = TRUE)
+  warnif(
+    non_positive > 0,
+    "{non_positive} non-positive RT values will be excluded."
+  )
+  data <- data[data[[rt]] > 0 & !is.na(data[[rt]]), ]
+
+  # Process grouping variables
+  group_vars <- as.character(substitute(list(...)))[-1]
+
+  # Validate grouping variables exist
+  for (gv in group_vars) {
+    stopif(
+      not_in(gv, colnames(data)),
+      "Grouping variable '{gv}' not found in data"
+    )
+  }
+
+  # Process data by groups
+  if (length(group_vars) == 0) {
+    # No grouping - process all data
+    result <- .process_rt_group(
+      rt_data = data[[rt]],
+      response_data = data[[response]],
+      version = version,
+      min_trials = min_trials
+    )
+    result_df <- as.data.frame(result)
+  } else {
+    # Split by grouping variables
+    if (length(group_vars) == 1) {
+      split_factor <- data[[group_vars]]
+    } else {
+      split_factor <- interaction(data[group_vars], drop = TRUE)
+    }
+
+    split_data <- split(data, split_factor)
+
+    results_list <- lapply(names(split_data), function(grp_name) {
+      grp_data <- split_data[[grp_name]]
+      grp_result <- .process_rt_group(
+        rt_data = grp_data[[rt]],
+        response_data = grp_data[[response]],
+        version = version,
+        min_trials = min_trials
+      )
+
+      # Extract group values
+      grp_values <- unique(grp_data[group_vars])
+      cbind(grp_values[1, , drop = FALSE], as.data.frame(grp_result))
+    })
+
+    result_df <- do.call(rbind, results_list)
+    rownames(result_df) <- NULL
+  }
+
+  # Add attributes for diagnostics
+  attr(result_df, "version") <- version
+
+  result_df
+}
+
+# Simple aggregation (standard moments)
+# @param x Numeric vector
+# @return List with mean, var, and n
+.simple_aggregation <- function(x) {
+  list(
+    mean = mean(x, na.rm = TRUE),
+    var = var(x, na.rm = TRUE),
+    n = sum(!is.na(x))
+  )
+}
+
+# Convert response data to logical indicator for upper boundary
+# Handles: numeric (0/1), logical (TRUE/FALSE), character/factor
+# ("upper"/"lower", "correct"/"error", "acc"/"err", etc.)
+# @param response_data Vector of response values
+# @return Logical vector where TRUE = upper boundary response
+.convert_response_to_upper <- function(response_data) {
+  # Handle factors by converting to character
+  if (is.factor(response_data)) {
+    response_data <- as.character(response_data)
+  }
+
+  # Numeric or logical: treat 1/TRUE as upper
+  if (is.numeric(response_data) || is.logical(response_data)) {
+    return(as.logical(response_data))
+  }
+
+  # Character: match common patterns for upper boundary
+  if (is.character(response_data)) {
+    response_lower <- tolower(response_data)
+    # Define patterns for upper boundary responses
+    upper_patterns <- c("upper", "correct", "acc", "1", "true", "yes", "hit")
+    lower_patterns <- c("lower", "error", "err", "incorrect", "0", "false",
+                        "no", "miss", "fa")
+
+    is_upper <- response_lower %in% upper_patterns
+    is_lower <- response_lower %in% lower_patterns
+
+    # Check if all responses are recognized
+    unrecognized <- !is_upper & !is_lower & !is.na(response_data)
+    if (any(unrecognized)) {
+      unique_unrec <- unique(response_data[unrecognized])
+      stop2("Unrecognized response values: \\
+            {paste(unique_unrec, collapse = ', ')}. Expected values like \\
+            'upper'/'lower', 'correct'/'error', 1/0, or TRUE/FALSE.")
+    }
+
+    return(is_upper)
+  }
+
+  stop2("Response variable must be numeric, logical, character, or factor. \\
+        Got class: {class(response_data)[1]}")
+}
+
+# Process RT data for a single group
+# @param rt_data Numeric vector of RTs
+# @param response_data Vector of responses (various formats accepted)
+# @param version "3par" or "4par"
+# @param min_trials Minimum trials required
+# @return Named list with summary statistics
+.process_rt_group <- function(rt_data, response_data, version, min_trials) {
+  n_trials <- length(rt_data)
+
+  # Convert response to logical indicator (TRUE = upper boundary)
+  is_upper <- .convert_response_to_upper(response_data)
+  n_upper <- sum(is_upper, na.rm = TRUE)
+
+  # Check minimum trials
+  if (n_trials < min_trials) {
+    if (version == "3par") {
+      return(list(
+        mean_rt = NA_real_,
+        var_rt = NA_real_,
+        n_upper = n_upper,
+        n_trials = n_trials
+      ))
+    } else {
+      return(list(
+        mean_rt_upper = NA_real_,
+        mean_rt_lower = NA_real_,
+        var_rt_upper = NA_real_,
+        var_rt_lower = NA_real_,
+        n_upper = n_upper,
+        n_trials = n_trials
+      ))
+    }
+  }
+
+  if (version == "3par") {
+    # Pool all RTs
+    agg <- .simple_aggregation(rt_data)
+    result <- list(
+      mean_rt = agg$mean,
+      var_rt = agg$var,
+      n_upper = n_upper,
+      n_trials = n_trials
+    )
+    return(result)
+  } else {
+    # version == "4par": separate by response
+    rt_upper <- rt_data[is_upper]
+    rt_lower <- rt_data[!is_upper]
+    n_lower <- length(rt_lower)
+
+    agg_upper <- if (n_upper >= min_trials) {
+      .simple_aggregation(rt_upper)
+    } else {
+      list(mean = NA_real_, var = NA_real_)
+    }
+    agg_lower <- if (n_lower >= min_trials) {
+      .simple_aggregation(rt_lower)
+    } else {
+      list(mean = NA_real_, var = NA_real_)
+    }
+    return(list(
+      mean_rt_upper = agg_upper$mean,
+      mean_rt_lower = agg_lower$mean,
+      var_rt_upper = agg_upper$var,
+      var_rt_lower = agg_lower$var,
+      n_upper = n_upper,
+      n_trials = n_trials
+    ))
+  }
+}
