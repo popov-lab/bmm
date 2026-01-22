@@ -306,10 +306,11 @@ has_nonconsecutive_duplicates <- function(vec) {
 # EZDM SUMMARY STATISTICS                                                 ####
 ############################################################################# !
 
-#' Compute Summary Statistics for EZ-Diffusion Model
+#' Compute Robust Summary Statistics for EZ-Diffusion Model
 #'
-#' @description Computes summary statistics for the EZ-Diffusion Model
-#'   from raw trial-level RT data.
+#' @description Computes robust summary statistics for the EZ-Diffusion Model
+#'   by fitting mixture models to raw trial-level RT data, separating
+#'   contaminant responses from true responses.
 #'
 #' @param data A `data.frame` containing trial-level data with RT and accuracy
 #'   columns
@@ -327,13 +328,32 @@ has_nonconsecutive_duplicates <- function(vec) {
 #'   will be computed separately for each combination of these variables.
 #' @param version Character. Either "3par" (default) for pooled RTs or "4par"
 #'   for separate upper/lower boundary RTs
+#' @param distribution Character. The parametric distribution for the RT
+#'   component. One of "exgaussian" (default), "lognormal", or "invgaussian"
+#' @param method Character. Either "mixture" (default) for robust estimation
+#'   via mixture modeling or "simple" for standard moment calculation
+#' @param contaminant_bound Numeric vector of length 2 specifying the bounds
+#'   (in seconds) for the uniform contaminant distribution. Default is
+#'   c(0.1, 3.0)
 #' @param min_trials Integer. Minimum number of trials required for fitting.
 #'   Groups with fewer trials will return NA. Default is 10
+#' @param init_contaminant Numeric. Initial proportion of contaminants for EM
+#'   algorithm. Default is 0.05
+#' @param maxit Integer. Maximum number of EM iterations. Default is 100
+#' @param tol Numeric. Convergence tolerance for EM algorithm. Default is 1e-6
 #'
 #' @return A `data.frame` with summary statistics. For version = "3par":
-#'   grouping variables, mean_rt, var_rt, n_upper, n_trials.
+#'   grouping variables, mean_rt, var_rt, n_upper, n_trials, contaminant_prop.
 #'   For version = "4par": grouping variables, mean_rt_upper, mean_rt_lower,
-#'   var_rt_upper, var_rt_lower, n_upper, n_trials.
+#'   var_rt_upper, var_rt_lower, n_upper, n_trials, contaminant_prop_upper,
+#'   contaminant_prop_lower.
+#'
+#' @details RT outliers and contaminant responses (fast guesses, lapses of
+#'   attention) can distort the mean and variance estimates used as input to
+#'   the EZ-Diffusion equations. This function addresses this by fitting a
+#'   mixture model with two components: a uniform distribution for
+#'   contaminants and a parametric RT distribution for true responses.
+#'   Robust moments are then extracted from the fitted parametric component.
 #'
 #' @keywords transform
 #' @export
@@ -353,10 +373,11 @@ has_nonconsecutive_duplicates <- function(vec) {
 #'                              subject)
 #' print(result)
 #'
-#' # Group by multiple variables
+#' # Group by multiple variables using simple method
 #' result_multi <- ezdm_summary_stats(test_data, rt = "rt",
 #'                                    response = "correct",
-#'                                    subject, condition)
+#'                                    subject, condition,
+#'                                    method = "simple")
 #'
 ezdm_summary_stats <- function(
   data,
@@ -364,7 +385,13 @@ ezdm_summary_stats <- function(
   response,
   ...,
   version = "3par",
-  min_trials = 10
+  distribution = "exgaussian",
+  method = "mixture",
+  contaminant_bound = c(0.1, 3.0),
+  min_trials = 10,
+  init_contaminant = 0.05,
+  maxit = 100,
+  tol = 1e-6
 ) {
   # Input validation
   stopif(missing(data), "Argument 'data' is required")
@@ -392,8 +419,30 @@ ezdm_summary_stats <- function(
     "version must be '3par' or '4par'"
   )
   stopif(
+    not_in(distribution, c("exgaussian", "lognormal", "invgaussian")),
+    "distribution must be 'exgaussian', 'lognormal', or 'invgaussian'"
+  )
+  stopif(
+    not_in(method, c("mixture", "simple")),
+    "method must be 'mixture' or 'simple'"
+  )
+  stopif(
+    length(contaminant_bound) != 2,
+    "contaminant_bound must be a vector of length 2"
+  )
+  stopif(
+    !is.numeric(contaminant_bound) ||
+      contaminant_bound[1] >= contaminant_bound[2],
+    "contaminant_bound[1] must be less than contaminant_bound[2]"
+  )
+  stopif(
     !is.numeric(min_trials) || min_trials < 1,
     "min_trials must be a positive integer"
+  )
+  stopif(
+    !is.numeric(init_contaminant) || init_contaminant <= 0 ||
+      init_contaminant >= 1,
+    "init_contaminant must be between 0 and 1 (exclusive)"
   )
 
   # Warnings for potential data issues
@@ -428,7 +477,13 @@ ezdm_summary_stats <- function(
       rt_data = data[[rt]],
       response_data = data[[response]],
       version = version,
-      min_trials = min_trials
+      distribution = distribution,
+      method = method,
+      contaminant_bound = contaminant_bound,
+      min_trials = min_trials,
+      init_contaminant = init_contaminant,
+      maxit = maxit,
+      tol = tol
     )
     result_df <- as.data.frame(result)
   } else {
@@ -447,7 +502,13 @@ ezdm_summary_stats <- function(
         rt_data = grp_data[[rt]],
         response_data = grp_data[[response]],
         version = version,
-        min_trials = min_trials
+        distribution = distribution,
+        method = method,
+        contaminant_bound = contaminant_bound,
+        min_trials = min_trials,
+        init_contaminant = init_contaminant,
+        maxit = maxit,
+        tol = tol
       )
 
       # Extract group values
@@ -461,6 +522,8 @@ ezdm_summary_stats <- function(
 
   # Add attributes for diagnostics
   attr(result_df, "version") <- version
+  attr(result_df, "distribution") <- distribution
+  attr(result_df, "method") <- method
 
   result_df
 }
@@ -523,9 +586,17 @@ ezdm_summary_stats <- function(
 # @param rt_data Numeric vector of RTs
 # @param response_data Vector of responses (various formats accepted)
 # @param version "3par" or "4par"
+# @param distribution Distribution type
+# @param method "mixture" or "simple"
+# @param contaminant_bound Bounds for uniform distribution
 # @param min_trials Minimum trials required
+# @param init_contaminant Initial contaminant proportion
+# @param maxit Maximum EM iterations
+# @param tol Convergence tolerance
 # @return Named list with summary statistics
-.process_rt_group <- function(rt_data, response_data, version, min_trials) {
+.process_rt_group <- function(rt_data, response_data, version, distribution,
+                              method, contaminant_bound, min_trials,
+                              init_contaminant, maxit, tol) {
   n_trials <- length(rt_data)
 
   # Convert response to logical indicator (TRUE = upper boundary)
@@ -539,7 +610,8 @@ ezdm_summary_stats <- function(
         mean_rt = NA_real_,
         var_rt = NA_real_,
         n_upper = n_upper,
-        n_trials = n_trials
+        n_trials = n_trials,
+        contaminant_prop = NA_real_
       ))
     } else {
       return(list(
@@ -548,45 +620,140 @@ ezdm_summary_stats <- function(
         var_rt_upper = NA_real_,
         var_rt_lower = NA_real_,
         n_upper = n_upper,
-        n_trials = n_trials
+        n_trials = n_trials,
+        contaminant_prop_upper = NA_real_,
+        contaminant_prop_lower = NA_real_
       ))
     }
   }
 
   if (version == "3par") {
     # Pool all RTs
-    agg <- .simple_aggregation(rt_data)
+    if (method == "simple") {
+      agg <- .simple_aggregation(rt_data)
+      result <- list(
+        mean_rt = agg$mean,
+        var_rt = agg$var,
+        n_upper = n_upper,
+        n_trials = n_trials,
+        contaminant_prop = NA_real_
+      )
+      return(result)
+    }
+
+    # Mixture method
+    fit <- .fit_rt_mixture(
+      rt_data, distribution, contaminant_bound,
+      init_contaminant, maxit, tol
+    )
+
+    if (!fit$converged || is.null(fit$params)) {
+      # Fall back to simple moments with warning
+      warning2("EM did not converge. Using simple moments.", env.frame = -1)
+      agg <- .simple_aggregation(rt_data)
+      result <- list(
+        mean_rt = agg$mean,
+        var_rt = agg$var,
+        n_upper = n_upper,
+        n_trials = n_trials,
+        contaminant_prop = fit$contaminant_prop
+      )
+      return(result)
+    }
+
+    moments <- .dist_moments(fit$params, distribution)
     result <- list(
-      mean_rt = agg$mean,
-      var_rt = agg$var,
+      mean_rt = moments$mean,
+      var_rt = moments$var,
       n_upper = n_upper,
-      n_trials = n_trials
+      n_trials = n_trials,
+      contaminant_prop = fit$contaminant_prop
     )
     return(result)
+
   } else {
     # version == "4par": separate by response
     rt_upper <- rt_data[is_upper]
     rt_lower <- rt_data[!is_upper]
     n_lower <- length(rt_lower)
 
-    agg_upper <- if (n_upper >= min_trials) {
-      .simple_aggregation(rt_upper)
-    } else {
-      list(mean = NA_real_, var = NA_real_)
+    if (method == "simple") {
+      agg_upper <- if (n_upper >= min_trials) {
+        .simple_aggregation(rt_upper)
+      } else {
+        list(mean = NA_real_, var = NA_real_)
+      }
+      agg_lower <- if (n_lower >= min_trials) {
+        .simple_aggregation(rt_lower)
+      } else {
+        list(mean = NA_real_, var = NA_real_)
+      }
+      return(list(
+        mean_rt_upper = agg_upper$mean,
+        mean_rt_lower = agg_lower$mean,
+        var_rt_upper = agg_upper$var,
+        var_rt_lower = agg_lower$var,
+        n_upper = n_upper,
+        n_trials = n_trials,
+        contaminant_prop_upper = NA_real_,
+        contaminant_prop_lower = NA_real_
+      ))
     }
-    agg_lower <- if (n_lower >= min_trials) {
-      .simple_aggregation(rt_lower)
+
+    # Mixture method for upper boundary
+    if (n_upper >= min_trials) {
+      fit_upper <- .fit_rt_mixture(
+        rt_upper, distribution, contaminant_bound,
+        init_contaminant, maxit, tol
+      )
+      if (!fit_upper$converged || is.null(fit_upper$params)) {
+        warning2("EM for upper boundary did not converge. Using simple moments.",
+                 env.frame = -1)
+        agg_upper <- .simple_aggregation(rt_upper)
+        moments_upper <- list(mean = agg_upper$mean, var = agg_upper$var)
+        contam_upper <- fit_upper$contaminant_prop
+      } else {
+        moments_upper <- .dist_moments(fit_upper$params, distribution)
+        contam_upper <- fit_upper$contaminant_prop
+      }
     } else {
-      list(mean = NA_real_, var = NA_real_)
+      moments_upper <- list(mean = NA_real_, var = NA_real_)
+      contam_upper <- NA_real_
     }
-    return(list(
-      mean_rt_upper = agg_upper$mean,
-      mean_rt_lower = agg_lower$mean,
-      var_rt_upper = agg_upper$var,
-      var_rt_lower = agg_lower$var,
+
+    # Mixture method for lower boundary
+    if (n_lower >= min_trials) {
+      fit_lower <- .fit_rt_mixture(
+        rt_lower, distribution, contaminant_bound,
+        init_contaminant, maxit, tol
+      )
+      if (!fit_lower$converged || is.null(fit_lower$params)) {
+        warning2("EM for lower boundary did not converge. Using simple moments.",
+                 env.frame = -1)
+        agg_lower <- .simple_aggregation(rt_lower)
+        moments_lower <- list(mean = agg_lower$mean, var = agg_lower$var)
+        contam_lower <- fit_lower$contaminant_prop
+      } else {
+        moments_lower <- .dist_moments(fit_lower$params, distribution)
+        contam_lower <- fit_lower$contaminant_prop
+      }
+    } else {
+      moments_lower <- list(mean = NA_real_, var = NA_real_)
+      contam_lower <- NA_real_
+    }
+
+    result <- list(
+      mean_rt_upper = moments_upper$mean,
+      mean_rt_lower = moments_lower$mean,
+      var_rt_upper = moments_upper$var,
+      var_rt_lower = moments_lower$var,
       n_upper = n_upper,
-      n_trials = n_trials
-    ))
+      n_trials = n_trials,
+      contaminant_prop_upper = contam_upper,
+      contaminant_prop_lower = contam_lower
+    )
+
+    result
   }
 }
 
@@ -801,5 +968,110 @@ ezdm_summary_stats <- function(
       lower = c(1e-6, 1e-6),
       upper = c(Inf, Inf)
     )
+  )
+}
+
+# Fit RT mixture model using EM algorithm
+# @param x Numeric vector of RT values
+# @param distribution Character specifying the parametric distribution
+# @param contaminant_bound Numeric vector of length 2 for uniform bounds
+# @param init_contaminant Initial contaminant proportion
+# @param maxit Maximum EM iterations
+# @param tol Convergence tolerance
+# @return List with fitted params, contaminant proportion, convergence info
+.fit_rt_mixture <- function(x, distribution, contaminant_bound,
+                            init_contaminant, maxit, tol) {
+  n <- length(x)
+
+  # Filter to valid range for fitting
+  x_valid <- x[x >= contaminant_bound[1] & x <= contaminant_bound[2]]
+  n_valid <- length(x_valid)
+
+  if (n_valid < 5) {
+    return(list(
+      params = NULL,
+      contaminant_prop = NA,
+      converged = FALSE,
+      iterations = 0,
+      message = "Too few observations in valid range"
+    ))
+  }
+
+  # Initialize parameters
+  pi_c <- init_contaminant  # contaminant proportion
+  pi_rt <- 1 - pi_c         # RT distribution proportion
+  dist_params <- .init_dist_params(x_valid, distribution)
+
+  # Uniform density (constant for contaminant component)
+  uniform_dens <- 1 / (contaminant_bound[2] - contaminant_bound[1])
+
+  prev_loglik <- -Inf
+  converged <- FALSE
+
+  for (iter in seq_len(maxit)) {
+    # E-step: compute responsibilities
+    dens_rt <- switch(distribution,
+      exgaussian = .dexgauss(x_valid, dist_params$mu, dist_params$sigma,
+                            dist_params$tau, log = FALSE),
+      lognormal = dlnorm(x_valid, dist_params$mu, dist_params$sigma),
+      invgaussian = .dinvgauss(x_valid, dist_params$mu, dist_params$lambda,
+                               log = FALSE)
+    )
+
+    # Ensure numerical stability
+    dens_rt <- pmax(dens_rt, 1e-300)
+
+    # Posterior probabilities
+    numer_rt <- pi_rt * dens_rt
+    numer_c <- pi_c * uniform_dens
+    denom <- numer_rt + numer_c
+
+    # Responsibilities (prob of being from RT distribution)
+    gamma_rt <- numer_rt / denom
+    gamma_c <- 1 - gamma_rt
+
+    # Handle numerical issues (NA or NaN in responsibilities)
+    if (any(is.na(gamma_rt)) || any(is.nan(gamma_rt))) {
+      # Fall back to previous iteration's estimates
+      break
+    }
+
+    # Compute log-likelihood
+    loglik <- sum(log(denom))
+
+    # Handle numerical issues in log-likelihood
+    if (is.na(loglik) || is.nan(loglik) || is.infinite(loglik)) {
+      break
+    }
+
+    # Check convergence
+    if (abs(loglik - prev_loglik) < tol) {
+      converged <- TRUE
+      break
+    }
+    prev_loglik <- loglik
+
+    # M-step: update parameters
+    # Update mixing proportions
+    pi_rt <- mean(gamma_rt, na.rm = TRUE)
+    pi_c <- 1 - pi_rt
+
+    # Handle edge case where pi_c is NA
+    if (is.na(pi_c)) {
+      pi_c <- init_contaminant
+      pi_rt <- 1 - pi_c
+    }
+
+    # Update distribution parameters using weighted MLE
+    dist_params <- .fit_dist_params(x_valid, distribution, gamma_rt,
+                                    dist_params)
+  }
+
+  list(
+    params = dist_params,
+    contaminant_prop = pi_c,
+    converged = converged,
+    iterations = iter,
+    loglik = if (converged) loglik else NA
   )
 }
