@@ -4,6 +4,8 @@
 \alias{cswald_dist}
 \alias{dcswald}
 \alias{rcswald}
+\alias{pcswald}
+\alias{qcswald}
 \title{Distribution functions for the censored shifted Wald model (\code{cswald})}
 \usage{
 dcswald(
@@ -19,6 +21,32 @@ dcswald(
 )
 
 rcswald(n, drift, bound, ndt, zr = 0.5, s = 1)
+
+pcswald(
+  q,
+  response,
+  drift,
+  bound,
+  ndt,
+  zr = 0.5,
+  s = 1,
+  version = "simple",
+  lower.tail = TRUE,
+  log.p = FALSE
+)
+
+qcswald(
+  p,
+  response,
+  drift,
+  bound,
+  ndt,
+  zr = 0.5,
+  s = 1,
+  version = "simple",
+  lower.tail = TRUE,
+  log.p = FALSE
+)
 }
 \arguments{
 \item{rt}{A vector of response times in seconds for which the likelihood
@@ -47,21 +75,59 @@ and "crisk", the default is "simple."}
 returned, the default is \code{TRUE}}
 
 \item{n}{The number of random samples that should be generated}
+
+\item{q}{A vector of quantiles (response times) at which to evaluate the CDF}
+
+\item{lower.tail}{Logical; if \code{TRUE} (default), probabilities are P(RT <= q),
+otherwise P(RT > q)}
+
+\item{log.p}{Logical; if \code{TRUE}, probabilities are returned on the log scale.
+Default is \code{FALSE}}
+
+\item{p}{A vector of probabilities for which to compute quantiles}
 }
 \value{
-\code{dcswald()} returns a numeric vector of (log-)likelihoods.
-\code{rcswald()} returns a data.frame with columns \code{rt} (response times) and
+\itemize{
+\item \code{dcswald()} returns a numeric vector of (log-)likelihoods.
+\item \code{rcswald()} returns a data.frame with columns \code{rt} (response times) and
 \code{response} (1 = upper, 0 = lower).
+\item \code{pcswald()} returns a numeric vector of (log-)probabilities.
+\item \code{qcswald()} returns a numeric vector of quantiles (response times).
+}
 }
 \description{
-These functions provide the density and random generation function for the
-censored shifted Wald model: \code{cswald}. The random generation function
-\code{rcswald()} generates samples from the Wiener diffusion model using
-\code{\link[rtdists:Diffusion]{rtdists::rdiffusion()}}, which is theoretically consistent since the
-censored shifted Wald model is an approximation to the Wiener diffusion
-model for tasks with high accuracy (few errors).
+These functions provide the density, distribution, quantile, and random
+generation functions for the censored shifted Wald model: \code{cswald}.
+The random generation (\code{rcswald}) and distribution functions (\code{pcswald},
+\code{qcswald}) use \code{\link[rtdists:Diffusion]{rtdists::rdiffusion()}}, \code{\link[rtdists:Diffusion]{rtdists::pdiffusion()}}, and
+\code{\link[rtdists:Diffusion]{rtdists::qdiffusion()}} internally for the \code{"crisk"} version, which is
+theoretically consistent since the censored shifted Wald model is an
+approximation to the Wiener diffusion model for tasks with high accuracy
+(few errors).
+}
+\details{
+\strong{Cumulative Distribution Function (\code{pcswald})}
+
+For the \code{"simple"} version, the CDF is only defined for \code{response = 1}
+(correct responses), as errors are treated as censored observations. The
+CDF returns the probability that a correct response occurs by time \code{q}.
+For \code{response = 0}, \code{NA} is returned with a warning.
+
+For the \code{"crisk"} version (competing risks), the CDF computes the defective
+cumulative distribution P(RT <= q, response = r), which is the probability
+of responding with the specified response by time \code{q}. This uses
+
+\code{\link[rtdists:Diffusion]{rtdists::pdiffusion()}} internally for accurate computation.
+
+\strong{Quantile Function (\code{qcswald})}
+
+The quantile function returns the response time \code{q} such that
+P(RT <= q) = p. Similar to the CDF, for the \code{"simple"} version this is only
+defined for \code{response = 1}. For the \code{"crisk"} version, this uses
+\code{\link[rtdists:Diffusion]{rtdists::qdiffusion()}} internally.
 }
 \seealso{
-\code{\link[rtdists:Diffusion]{rtdists::rdiffusion()}} for the underlying random generation
+\code{\link[rtdists:Diffusion]{rtdists::rdiffusion()}}, \code{\link[rtdists:Diffusion]{rtdists::pdiffusion()}},
+\code{\link[rtdists:Diffusion]{rtdists::qdiffusion()}} for the underlying functions
 }
 \keyword{distribution}

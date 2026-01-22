@@ -646,12 +646,14 @@ rm3 <- function(n, size, pars, m3_model, act_funs = construct_m3_act_funs(m3_mod
 #' @name cswald_dist
 #'
 #' @description
-#'   These functions provide the density and random generation function for the
-#'   censored shifted Wald model: `cswald`. The random generation function
-#'   `rcswald()` generates samples from the Wiener diffusion model using
-#'   [rtdists::rdiffusion()], which is theoretically consistent since the
-#'   censored shifted Wald model is an approximation to the Wiener diffusion
-#'   model for tasks with high accuracy (few errors).
+#'   These functions provide the density, distribution, quantile, and random
+#'   generation functions for the censored shifted Wald model: `cswald`.
+#'   The random generation (`rcswald`) and distribution functions (`pcswald`,
+#'   `qcswald`) use [rtdists::rdiffusion()], [rtdists::pdiffusion()], and
+#'   [rtdists::qdiffusion()] internally for the `"crisk"` version, which is
+#'   theoretically consistent since the censored shifted Wald model is an
+#'   approximation to the Wiener diffusion model for tasks with high accuracy
+#'   (few errors).
 #'
 #' @param rt A vector of response times in seconds for which the likelihood
 #'   should be evaluated
@@ -671,11 +673,15 @@ rm3 <- function(n, size, pars, m3_model, act_funs = construct_m3_act_funs(m3_mod
 #' @param log A single logical value indicating if log-likelihoods should be
 #'   returned, the default is `TRUE`
 #'
-#' @return `dcswald()` returns a numeric vector of (log-)likelihoods.
-#'   `rcswald()` returns a data.frame with columns `rt` (response times) and
-#'   `response` (1 = upper, 0 = lower).
+#' @return
+#'   - `dcswald()` returns a numeric vector of (log-)likelihoods.
+#'   - `rcswald()` returns a data.frame with columns `rt` (response times) and
+#'     `response` (1 = upper, 0 = lower).
+#'   - `pcswald()` returns a numeric vector of (log-)probabilities.
+#'   - `qcswald()` returns a numeric vector of quantiles (response times).
 #'
-#' @seealso [rtdists::rdiffusion()] for the underlying random generation
+#' @seealso [rtdists::rdiffusion()], [rtdists::pdiffusion()],
+#'   [rtdists::qdiffusion()] for the underlying functions
 #'
 #' @keywords distribution
 #'
@@ -751,6 +757,203 @@ rcswald <- function(n, drift, bound, ndt, zr = 0.5, s = 1) {
     rt = out$rt,
     response = ifelse(out$response == "upper", 1, 0)
   )
+}
+
+#' @rdname cswald_dist
+#' @param q A vector of quantiles (response times) at which to evaluate the CDF
+#' @param lower.tail Logical; if `TRUE` (default), probabilities are P(RT <= q),
+#'   otherwise P(RT > q)
+#' @param log.p Logical; if `TRUE`, probabilities are returned on the log scale.
+#'   Default is `FALSE`
+#' @details
+#'   **Cumulative Distribution Function (`pcswald`)**
+#'
+#'   For the `"simple"` version, the CDF is only defined for `response = 1`
+#'   (correct responses), as errors are treated as censored observations. The
+#'   CDF returns the probability that a correct response occurs by time `q`.
+#'   For `response = 0`, `NA` is returned with a warning.
+#'
+#'   For the `"crisk"` version (competing risks), the CDF computes the defective
+#'   cumulative distribution P(RT <= q, response = r), which is the probability
+#'   of responding with the specified response by time `q`. This uses
+#'
+#'   [rtdists::pdiffusion()] internally for accurate computation.
+#'
+#'   **Quantile Function (`qcswald`)**
+#'
+#'   The quantile function returns the response time `q` such that
+#'   P(RT <= q) = p. Similar to the CDF, for the `"simple"` version this is only
+
+#'   defined for `response = 1`. For the `"crisk"` version, this uses
+#'   [rtdists::qdiffusion()] internally.
+#' @export
+pcswald <- function(q, response, drift, bound, ndt, zr = 0.5, s = 1,
+                    version = "simple", lower.tail = TRUE, log.p = FALSE) {
+  validate_cswald_parameters(drift, bound, ndt, zr, s)
+
+  n <- length(q)
+
+  # handle vector parameters - recycle to length of q
+
+  if (length(drift) == 1) drift <- rep(drift, length.out = n)
+  if (length(bound) == 1) bound <- rep(bound, length.out = n)
+  if (length(ndt) == 1) ndt <- rep(ndt, length.out = n)
+  if (length(zr) == 1) zr <- rep(zr, length.out = n)
+  if (length(s) == 1) s <- rep(s, length.out = n)
+  if (length(response) == 1) response <- rep(response, length.out = n)
+
+  # compute shifted response time
+  q_shifted <- q - ndt
+
+  # pre-allocate output
+
+  p <- numeric(n)
+
+  if (version == "simple") {
+    # For simple version: only upper boundary is absorbing
+    # CDF for response = 0 is not well-defined (censored observations)
+    if (any(response == 0)) {
+      warning("CDF for response=0 is not well-defined in the 'simple' version. ",
+              "The simple version treats errors as censored observations. ",
+              "Returning NA for these values.")
+    }
+
+    # for response = 1 with valid q_shifted, use the Wald CDF
+    idx1 <- response == 1 & q_shifted > 0
+    if (any(idx1)) {
+      p[idx1] <- .pwald(q_shifted[idx1], drift = drift[idx1],
+                        bound = bound[idx1], s = s[idx1],
+                        lower.tail = TRUE, log.p = FALSE)
+    }
+
+    # for q_shifted <= 0, probability is 0
+    p[q_shifted <= 0 & response == 1] <- 0
+
+    # for response = 0, return NA
+    p[response == 0] <- NA
+
+  } else if (version == "crisk") {
+    # For crisk version: use the full diffusion model defective CDF
+    # This computes P(RT <= q, response = r)
+
+    idx_valid <- q_shifted > 0
+    if (any(idx_valid)) {
+      # convert to rtdists parameters
+      z_abs <- zr[idx_valid] * bound[idx_valid]
+
+      p[idx_valid] <- rtdists::pdiffusion(
+        q[idx_valid],
+        response = ifelse(response[idx_valid] == 1, "upper", "lower"),
+        a = bound[idx_valid],
+        v = drift[idx_valid],
+        t0 = ndt[idx_valid],
+        z = z_abs,
+        s = s[idx_valid]
+      )
+    }
+
+    # for q_shifted <= 0, probability is 0
+    p[!idx_valid] <- 0
+
+  } else {
+    stop2("The version you specified is not valid. ",
+          "Please choose between version = \"simple\" or \"crisk\".")
+  }
+
+  if (!lower.tail) {
+    p <- 1 - p
+  }
+
+  if (log.p) {
+    p <- log(p)
+  }
+
+  p
+}
+
+#' @rdname cswald_dist
+#' @param p A vector of probabilities for which to compute quantiles
+#' @export
+qcswald <- function(p, response, drift, bound, ndt, zr = 0.5, s = 1,
+                    version = "simple", lower.tail = TRUE, log.p = FALSE) {
+  validate_cswald_parameters(drift, bound, ndt, zr, s)
+
+  # handle log.p
+  if (log.p) {
+    p <- exp(p)
+  }
+
+  # handle lower.tail
+  if (!lower.tail) {
+    p <- 1 - p
+  }
+
+  # validate probabilities
+  stopif(any(p < 0 | p > 1, na.rm = TRUE),
+         "Probabilities must be between 0 and 1.")
+
+  n <- length(p)
+
+  # handle vector parameters - recycle to length of p
+  if (length(drift) == 1) drift <- rep(drift, length.out = n)
+  if (length(bound) == 1) bound <- rep(bound, length.out = n)
+  if (length(ndt) == 1) ndt <- rep(ndt, length.out = n)
+  if (length(zr) == 1) zr <- rep(zr, length.out = n)
+  if (length(s) == 1) s <- rep(s, length.out = n)
+  if (length(response) == 1) response <- rep(response, length.out = n)
+
+  # pre-allocate output
+  q <- numeric(n)
+
+  if (version == "simple") {
+    # For simple version, quantile only makes sense for response = 1
+    if (any(response == 0)) {
+      warning("Quantile for response=0 is not well-defined in the 'simple' version. ",
+              "The simple version treats errors as censored observations. ",
+              "Returning NA for these values.")
+    }
+
+    # for response = 1, use numerical inversion of the Wald CDF
+    idx1 <- which(response == 1)
+    for (i in idx1) {
+      if (p[i] <= 0) {
+        q[i] <- ndt[i]
+      } else if (p[i] >= 1) {
+        q[i] <- Inf
+      } else {
+        # numerical root finding to invert CDF
+        q[i] <- stats::uniroot(
+          function(x) .pwald(x - ndt[i], drift[i], bound[i], s[i],
+                             lower.tail = TRUE, log.p = FALSE) - p[i],
+          interval = c(ndt[i] + 1e-10, ndt[i] + 100),
+          extendInt = "upX"
+        )$root
+      }
+    }
+
+    # for response = 0, return NA
+    q[response == 0] <- NA
+
+  } else if (version == "crisk") {
+    # For crisk version: use rtdists::qdiffusion
+    z_abs <- zr * bound
+
+    q <- rtdists::qdiffusion(
+      p,
+      response = ifelse(response == 1, "upper", "lower"),
+      a = bound,
+      v = drift,
+      t0 = ndt,
+      z = z_abs,
+      s = s
+    )
+
+  } else {
+    stop2("The version you specified is not valid. ",
+          "Please choose between version = \"simple\" or \"crisk\".")
+  }
+
+  q
 }
 
 validate_cswald_parameters <- function(drift, bound, ndt, zr, s) {
