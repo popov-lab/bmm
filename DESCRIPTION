@@ -51,8 +51,7 @@ Suggests:
     tidybayes,
     tidyr,
     usethis,
-    waldo,
-    gghalves
+    waldo
 Additional_repositories: https://stan-dev.r-universe.dev
 Config/testthat/edition: 3
 Config/Needs/website: rmarkdown

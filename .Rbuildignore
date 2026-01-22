@@ -20,3 +20,5 @@
 ^.dev$
 ^.Rprofile$
 ^CRAN-SUBMISSION$
+^AGENTS.md$
+^code-structure.md$

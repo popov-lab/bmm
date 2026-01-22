@@ -76,14 +76,12 @@ c_bessel2sqrtexp <- function(c, kappa) {
 #' Available options are: "identity", "log", "log1p", "logm1", "inverse", "sqrt", "logit", "probit", "tan_half", and "cloglog".
 #' @param inverse A Boolean value indicating if values should be transformed from the native to
 #' the parameter scale (FALSE), or from the parameter scale to the native scale (TRUE)
-link_transform <- function(values, link = "identity", inverse = FALSE) {
-  stopif(!is.numeric(values),
-         glue("The values to be transformed need to be numeric."))
-
-  if(is.null(link)) link = "identity"
-
+#'
+#' @noRd
+link_transform <- function(values, link, inverse = FALSE) {
+  stopifnot(is.numeric(values), is.character(link), length(link) == 1L, is.logical(inverse), length(inverse) == 1L)
   if(inverse) {
-    transformed_values <- switch(
+    switch(
       link,
       identity = values,
       log = exp(values),
@@ -99,7 +97,7 @@ link_transform <- function(values, link = "identity", inverse = FALSE) {
       stop("Link not recognized.")
     )
   } else {
-    transformed_values <- switch(
+    switch(
       link,
       identity = values,
       log = log(values),
@@ -115,6 +113,4 @@ link_transform <- function(values, link = "identity", inverse = FALSE) {
       stop("Link not recognized.")
     )
   }
-
-  return(transformed_values)
 }
