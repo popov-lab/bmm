@@ -346,6 +346,9 @@ has_nonconsecutive_duplicates <- function(vec) {
 #'   Groups with fewer trials will return NA. Default is 10
 #' @param init_contaminant Numeric. Initial proportion of contaminants for EM
 #'   algorithm. Default is 0.05
+#' @param max_contaminant Numeric. Maximum allowed contaminant proportion
+#'   (0 < max <= 1). Estimates are clipped to this value to prevent inflated
+#'   contaminant proportions. Default is 0.5
 #' @param maxit Integer. Maximum number of EM iterations. Default is 100
 #' @param tol Numeric. Convergence tolerance for EM algorithm. Default is 1e-6
 #'
@@ -397,6 +400,7 @@ ezdm_summary_stats <- function(
   contaminant_bound = c(0.1, 3.0),
   min_trials = 10,
   init_contaminant = 0.05,
+  max_contaminant = 0.5,
   maxit = 100,
   tol = 1e-6
 ) {
@@ -476,6 +480,15 @@ ezdm_summary_stats <- function(
       init_contaminant >= 1,
     "init_contaminant must be between 0 and 1 (exclusive)"
   )
+  stopif(
+    !is.numeric(max_contaminant) || max_contaminant <= 0 ||
+      max_contaminant > 1,
+    "max_contaminant must be between 0 (exclusive) and 1 (inclusive)"
+  )
+  stopif(
+    init_contaminant >= max_contaminant,
+    "init_contaminant must be less than max_contaminant"
+  )
 
   # Warnings for potential data issues
   warnif(
@@ -514,6 +527,7 @@ ezdm_summary_stats <- function(
       contaminant_bound = contaminant_bound,
       min_trials = min_trials,
       init_contaminant = init_contaminant,
+      max_contaminant = max_contaminant,
       maxit = maxit,
       tol = tol
     )
@@ -539,6 +553,7 @@ ezdm_summary_stats <- function(
         contaminant_bound = contaminant_bound,
         min_trials = min_trials,
         init_contaminant = init_contaminant,
+        max_contaminant = max_contaminant,
         maxit = maxit,
         tol = tol
       )
@@ -628,7 +643,7 @@ ezdm_summary_stats <- function(
 # @return Named list with summary statistics
 .process_rt_group <- function(rt_data, response_data, version, distribution,
                               method, contaminant_bound, min_trials,
-                              init_contaminant, maxit, tol) {
+                              init_contaminant, max_contaminant, maxit, tol) {
   n_trials <- length(rt_data)
 
   # Convert response to logical indicator (TRUE = upper boundary)
@@ -679,7 +694,7 @@ ezdm_summary_stats <- function(
     # Mixture method
     fit <- .fit_rt_mixture(
       rt_data, distribution, resolved_bounds,
-      init_contaminant, maxit, tol
+      init_contaminant, max_contaminant, maxit, tol
     )
 
     if (!fit$converged || is.null(fit$params)) {
@@ -1011,11 +1026,12 @@ ezdm_summary_stats <- function(
 # @param distribution Character specifying the parametric distribution
 # @param contaminant_bound Numeric vector of length 2 for uniform bounds
 # @param init_contaminant Initial contaminant proportion
+# @param max_contaminant Maximum allowed contaminant proportion (clipping)
 # @param maxit Maximum EM iterations
 # @param tol Convergence tolerance
 # @return List with fitted params, contaminant proportion, convergence info
 .fit_rt_mixture <- function(x, distribution, contaminant_bound,
-                            init_contaminant, maxit, tol) {
+                            init_contaminant, max_contaminant, maxit, tol) {
   n <- length(x)
 
   # Filter to valid range for fitting
@@ -1097,9 +1113,22 @@ ezdm_summary_stats <- function(
       pi_rt <- 1 - pi_c
     }
 
+    # Clip contaminant proportion to maximum allowed value
+    if (pi_c > max_contaminant) {
+      pi_c <- max_contaminant
+      pi_rt <- 1 - pi_c
+    }
+
     # Update distribution parameters using weighted MLE
     dist_params <- .fit_dist_params(x_valid, distribution, gamma_rt,
                                     dist_params)
+  }
+
+  # Warn if contaminant proportion hit the maximum bound
+  if (pi_c >= max_contaminant) {
+    warning2("Contaminant proportion was clipped to max_contaminant \\
+             ({max_contaminant}). This may indicate data quality issues.",
+             env.frame = -1)
   }
 
   list(
