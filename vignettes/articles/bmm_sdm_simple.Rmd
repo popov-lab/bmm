@@ -44,7 +44,7 @@ fansi::set_knit_hooks(knitr::knit_hooks, which = c("output","message","error"))
 The Signal Discrimination Model is a measurement model for continuous
 reproduction tasks in the visual working memory domain. The model was originally
 introduced by @Oberauer_2023. As other measurement models for continuous
-reproduction tasks, it's goal is to model the distribution of angular response
+reproduction tasks, its goal is to model the distribution of angular response
 errors.
 
 The model assumes that when a test probe appears, all possible responses on the
@@ -54,7 +54,7 @@ this is given by the following activation function:
 
 
 $$
-S(\theta) = c \cdot \frac{\exp(\kappa \cdot \cos(y-\mu))}{2\pi I_0(\kappa)}
+S(\theta) = c \cdot \frac{\exp(\kappa \cdot \cos(\theta-\mu))}{2\pi I_0(\kappa)}
 $$
 
 

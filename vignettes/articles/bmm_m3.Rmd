@@ -181,7 +181,7 @@ library(bmm)
 
 For this example, we will be using the data from the first experiment from @oberauerSimpleMeasurementModels2019. This data set is part of the `bmm` package as `oberauer_lewandowsky_2019_e1`
 
-```{r}
+```{r data_structure}
 data <- oberauer_lewandowsky_2019_e1
 head(data)
 ```
@@ -222,7 +222,7 @@ cat_label ~ activation_function
 
 If we wanted to implement the model proposed by @oberauerSimpleMeasurementModels2019 for this data set, we need to specified four activation formulas for the response categories `corr`, `other`, `dist`, and `npl`:
 
-```{r}
+```{r activation_formula}
 act_formulas <- bmf(
   corr ~ b + a + c,
   other ~ b + a,
@@ -235,7 +235,7 @@ How you label the parameters in the activation formula is up to you, except for 
 
 Based on the parameter labels that we used in these activation functions, we can then specify the linear formulas for each parameter:
 
-```{r}
+```{r parameter_formula}
 par_formulas <- bmf(
   c ~ 1 + cond + (1 + cond | ID),
   a ~ 1 + cond + (1 + cond | ID),
@@ -245,7 +245,7 @@ par_formulas <- bmf(
 
 Then, we can combine both formulas into one by adding them using the `+` operator. Alternatively you can include all formulas in one call to `bmmformula`:
 
-```{r}
+```{r formula_setup}
 full_formula <- act_formulas + par_formulas
 
 # pass all formulas in one call
@@ -271,7 +271,7 @@ The last thing we need to do before fitting the `m3` to the data is set up the `
 
 Thus, a basic set up of an `m3` object looks like this:
 
-```{r}
+```{r model_setup}
 my_model <- m3(resp_cats = c("corr","other","dist","npl"),
                num_options = c("n_corr","n_other","n_dist","n_npl"),
                choice_rule = "simple",
@@ -284,7 +284,7 @@ Based on the provided links for the model parameters, `bmm` will set `default_pr
 
 Setting up a `m3` object including these info looks like this:
 
-```{r}
+```{r default_priors}
 my_links <- list(
   c = "log", a = "log", d = "log"
 )
@@ -292,6 +292,7 @@ my_links <- list(
 my_model <- m3(resp_cats = c("corr","other","dist","npl"),
                num_options = c("n_corr","n_other","n_dist","n_npl"),
                choice_rule = "simple",
+               version = "custom",
                links = my_links)
 
 # print default priors determined based on link functions
@@ -302,23 +303,23 @@ default_prior(full_formula, data, my_model)
 
 After having set up the `data`, the `bmmformula`, and the `bmmodel`, we can pass all information to `bmm` to fit the model:
 
-```{r message=FALSE, warning=FALSE, echo=TRUE, results = 'hide'}
+```{r fit_m3, message=FALSE, warning=FALSE, echo=TRUE, results = 'hide'}
 m3_fit <- bmm(
   formula = full_formula,
   data = data,
   model = my_model,
   sample_prior = "yes",
   cores = 4,
-  init = 0,
-  warmup = 2000, iter = 2000 + 5000,
+  warmup = 1000, iter = 2000,
   backend = 'cmdstanr',
+  file = "assets/bmmfit_m3_vignette",
   refresh = 0
 )
 ```
 
 Running this model takes about 20 to 40 seconds (depending on the speed of your computer). Using the `bmmfit` object we can have a quick look at the summary of the fitted model:
 
-```{r, comment=NA}
+```{r print_summary, message=FALSE, comment=NA}
 summary(m3_fit)
 ```
 
@@ -326,7 +327,7 @@ First, we can have a look at the estimated regression coefficients. The first th
 
 The parameter estimates for `c`, `a`, and `d` are estimated using a `log` link function, so we have to transform these back to the native scale using the `exp` function:
 
-```{r}
+```{r native_scale}
 fixedFX <- brms::fixef(m3_fit)
 
 # print posterior means for the c parameter
@@ -341,9 +342,11 @@ exp(fixedFX[startsWith(rownames(fixedFX),"d_"),])
 
 These estimates differ from the estimates reported by @oberauerSimpleMeasurementModels2019, because we used a `log` link function, whereas in the original publication an `identity` link was used. This was done with adding truncation arguments to the priors, to ensure that all activations are positive. In principle, this is possible in `bmm`, too. However, such an estimation is less numerically stable and efficient. Therefore, we recommend using `log` links for activation parameters that should be positive.
 
+### Testing Hypothesis
+
 When comparing the differences between the different conditions, the results from `bmm` converge with those in @oberauerSimpleMeasurementModels2019. The goal of this first experiment was to show a selective influence of different conditions on the `c` and `a` parameter. This replicated using the `bmm` implementation of the proposed `m3`. To evaluate the posterior differences between the conditions, we can use the `hypothesis` function from `brms`:
 
-```{r}
+```{r hypothesis_test}
 post_diff <- c(
   c_newVoldR = "c_condoldreordered = 0",
   c_newVoldS = "c_condoldsame = 0",
@@ -360,5 +363,58 @@ hyp
 These hypothesis will compute the difference between the specified parameters. You can see that the `c` parameter in the condition `oldsame` differs from both the `new` and `oldreorderd` condition. In contrast the `a` parameter in the condition `oldreordered` differs from both the `new` and the `oldsame` condition. For these differences the 95% CI does not include zero as indicated by the `*` at the end of the line.
 
 As we included a statement to also sample the priors using the `sample_prior = TRUE` option from `brms` when running the `bmm`, the `Evid.Ratio` and `Post.Prob` column given us the Bayes Factor in favor of the specified hypothesis and the posterior probability for the hypothesis being true.
+
+### Assessing model fit
+
+For most models implemented in `bmm` you can easily assess model fit by visually inspecting posterior predictive plots provided by the `pp_check` function. Unfortunately this function is not yet implemented for multinomial distributional models, such as the `m3` model. 
+
+Nevertheless, there is a pretty simple way to assess model fit for the `m3` model by obtaining posterior predictions using the `tidybayes` package. Using the posterior predictive draws for the frequency of selecting each response category, we can compare the observed frequencies to the predicted frequencies. If the model fits the data well, the observed frequencies should be within the 95% credible interval of the predicted frequencies.
+
+```{r model_fit, message=FALSE}
+library(tidybayes)
+library(dplyr)
+library(ggplot2)
+
+pp_m3 <- m3_fit %>% 
+  # obtain expected predicted draws
+  tidybayes::epred_draws(
+    newdata = .$data
+  ) %>% ungroup() %>% 
+  # select only relevant variables
+  select(ID, cond, nTrials, .draw, .category, .epred) %>% 
+  # calculate the mean predicted values in each condition for each response category
+  # and each draw
+  summarise(.epred = mean(.epred/nTrials),
+            .by = c(cond, .category, .draw))
+
+# reshape data to match the format of the posterior predictives
+data$n_trials <- rowSums(data[,c("corr","other","dist","npl")], na.rm = T)
+data_pp <- data %>% 
+  select(ID, n_trials, cond, corr, other, dist, npl) %>% 
+  tidyr::pivot_longer(cols = c(corr, other, dist, npl), names_to = ".category", values_to = ".value") %>% 
+  mutate(.value = .value/n_trials)
+
+# some responses were not possible in some conditions, so we set them to zero
+data_pp[is.na(data_pp)] <- 0
+
+# relabel condition factor for better readability
+levels(pp_m3$cond) <- c("new", "old shuffled", "old same")
+levels(data_pp$cond) <- c("new", "old shuffled", "old same")
+
+# plot the posterior predictive draws against the observed data
+ggplot(data = pp_m3,
+       aes(condition, y = .epred, x = cond, fill = cond)) +
+  facet_wrap(~.category, scales = "free") +
+  geom_violin() +
+  stat_summary(data = data_pp, aes (y = .value),
+               fun.data = mean_se, size = 0.1) +
+  labs(y = "Response proportions",
+       x = "Condition",
+       fill = "Condition",
+       title = "Model Fit",
+       subtitle = "Posterior Predicitve vs. Observed Response Proportions")
+```
+
+The generated plot illustrates that the distribution of posterior predictive response distributions is in line with the observed response distributions. This indicates that the model fits the data well. For this particular model, this is unsurprising as it is saturated with respect to the number of parameters and the number of observations.
 
 # References

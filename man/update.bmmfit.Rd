@@ -39,7 +39,7 @@ your choice before creating the original bmmfit.
 For more information and examples, see \code{\link[brms:update.brmsfit]{brms::update.brmsfit()}}
 }
 \examples{
-\dontshow{if (isTRUE(Sys.getenv("BMM_EXAMPLES"))) (if (getRversion() >= "3.4") withAutoprint else force)(\{ # examplesIf}
+\dontshow{if (isTRUE(Sys.getenv("BMM_EXAMPLES"))) withAutoprint(\{ # examplesIf}
 # generate artificial data from the Signal Discrimination Model
 # generate artificial data from the Signal Discrimination Model
 dat <- data.frame(y = rsdm(2000))

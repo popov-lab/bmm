@@ -466,7 +466,7 @@ use_model_template <- function(model_name,
   user_facing_alias <- glue("
     # user facing alias
     # information in the title and details sections will be filled in
-    # automatically based on the information in the .model_<<model_name>>()$info\n 
+    # automatically based on the information in the .model_<<model_name>>()$info\n
     #\' @title `r .model_<<model_name>>()$name`
     #\' @name Model Name,
     #\' @details `r model_info(.model_<<model_name>>())`
@@ -474,7 +474,7 @@ use_model_template <- function(model_name,
     #\' @param required_arg1 A description of the required argument
     #\' @param required_arg2 A description of the required argument
     #\' @param links A list of links for the parameters.
-    #\' @param version A character label for the version of the model. Can be empty or NULL if there is only one version. 
+    #\' @param version A character label for the version of the model. Can be empty or NULL if there is only one version.
     #\' @param ... used internally for testing, ignore it
     #\' @return An object of class `bmmodel`
     #\' @export
@@ -511,7 +511,7 @@ use_model_template <- function(model_name,
        # retrieve required response arguments
        resp_var1 <- model$resp_vars$resp_var1
        resp_var2 <- model$resp_vars$resp_arg2\n
-       # set the base brmsformula based 
+       # set the base brmsformula based
        brms_formula <- brms::bf(paste0(resp_var1, \" | \", vreal(resp_var2), \" ~ 1\"))\n
        # return the brms_formula to add the remaining bmmformulas to it.
        brms_formula
@@ -690,4 +690,307 @@ add_bmm_version_to_stancode <- function(stancode) {
   )
   class(new_stancode) <- class(stancode)
   new_stancode
+}
+
+############################################################################# !
+# StanCode Helper FUNCTIONS                                              ####
+############################################################################# !
+
+# Return integer positions of all occurrences of a fixed pattern in x
+# simple wrapper around gregexpr that return a 0-length vector if no matches
+# instead of -1
+which_positions <- function(x, pat) {
+  m <- gregexpr(pat, x, fixed = TRUE)[[1]]
+  if (length(m) == 1L && m[1] == -1L) integer(0) else as.integer(m)
+}
+
+
+#' Find the matching closing brace for an opening brace position
+#'
+#' Given a string containing brace-like delimiters, return the index of the
+#' closing brace that matches the opening brace at \code{open_pos}, accounting
+#' for nested braces.
+#'
+#' The function operates on indices of all occurrences of \code{open_brace} and
+#' \code{close_brace} in \code{x} and uses a cumulative-sum depth counter to
+#' identify the first position at which nesting depth returns to zero.
+#'
+#' @param x A length-1 character string.
+#' @param open_pos A 1-based integer index into \code{x} indicating the position
+#'   of an opening brace character.
+#' @param open_brace A length-1 character string giving the opening delimiter
+#'   (default \code{"\{"}).
+#' @param close_brace A length-1 character string giving the closing delimiter
+#'   (default \code{"\}"}).
+#'
+#' @returns A single integer: the 1-based index of the matching closing brace in
+#'   \code{x}.
+#' @noRd
+#' @examples
+#' find_matching_brace("{}", 1L)
+#'
+#' x <- "{{}{}}"
+#' find_matching_brace(x, 1L) # outer brace -> 6
+#' find_matching_brace(x, 2L) # inner brace -> 3
+#' find_matching_brace(x, 4L) # inner brace -> 5
+#'
+#' y <- "abc{def{ghi}jkl}mno"
+#' find_matching_brace(y, 4L) # -> 16
+#' find_matching_brace(y, 8L) # -> 12
+find_matching_brace <- function(x, open_pos,
+                                open_brace = "{", close_brace = "}") {
+  stopifnot(is.character(x), length(x) == 1L)
+  n <- nchar(x)
+  stopifnot(length(open_pos) == 1L, open_pos >= 1L, open_pos <= n)
+  stopif(
+    substr(x, open_pos, open_pos) != open_brace,
+    "Character at open_pos {open_pos} is not open_brace."
+  )
+
+  opens <- which_positions(x, open_brace)
+  closes <- which_positions(x, close_brace)
+
+  # combine + sort
+  pos <- c(opens, closes)
+  stopif(!length(pos), "No braces found.")
+  delta <- c(rep.int(1L, length(opens)), rep.int(-1L, length(closes)))
+
+  delta <- delta[order(pos)]
+  pos <- pos[order(pos)]
+
+  # locate the opening brace occurrence in the brace stream
+  k0 <- match(as.integer(open_pos), pos)
+  stopif(is.na(k0), "open_pos was not found among opening brace indices (unexpected).")
+  stopif(delta[k0] != 1L, "open_pos does not correspond to an opening brace in the stream.")
+
+  # cumulative sum from that opening brace
+  cs <- cumsum(delta[k0:length(delta)])
+
+  # first return to 0 gives the matching close
+  j <- which(cs == 0L)[1]
+  stopif(is.na(j), "No matching closing brace found (unbalanced braces?).")
+
+  pos[k0 + j - 1L]
+}
+
+
+#' @title Extract code from different STAN program blocks
+#'
+#' @description
+#'   This function extracts the code from the different program blocks of a STAN
+#'   program. This can be used in combination with the `stancode` function to
+#'   access information about the STAN code generated by `brms` and `bmm`.
+#'
+#' @param stan_code The STAN code for which the elements should be extracted
+#' @param blocks A character vector specifying for which program blocks
+#'   the code should be extracted. The default extracks all standard blocks:
+#'   "functions", "data", "transformed data", "parameters", "transformed parameters",
+#'   "model", and "generated quantities"
+#'
+#' @return A named list with each element containing the code of one of the STAN
+#'   program blocks. If a block
+#'
+#' @keywords extract_info
+#'
+#' @examples
+#' # generate simple stan code from brms
+#' stan_code <- stancode(brms::bf(x ~ 1), data = data.frame(x = rnorm(100)))
+#'
+#' extracted_program_blocks <- extract_stan_blocks(stan_code)
+#'
+#' @export
+extract_stan_blocks <- function(stan_code, blocks = c("functions", "data", "transformed data", "parameters", "transformed parameters", "model", "generated quantities")) {
+  stopifnot(is.character(stan_code), length(stan_code) == 1L)
+  blocks <- match.arg(blocks, several.ok = TRUE)
+  out <- lapply(blocks, function(b) .extract_stan_block(stan_code, b))
+  names(out) <- blocks
+  out
+}
+
+.extract_stan_block <- function(stan_code, block,
+                                include_braces = FALSE,
+                                trim = TRUE) {
+  stopifnot(is.character(block), length(block) == 1L)
+
+  # Anchor to start-of-line (multiline mode), allow leading spaces/tabs.
+  # Match the exact block name, then optional whitespace, then '{'.
+  header_pat <- paste0("(?m)^[[:space:]]*", block, "[[:space:]]*\\{")
+  m <- regexpr(header_pat, stan_code, perl = TRUE)
+  if (m[1] == -1L) {
+    return(NULL)
+  }
+
+  open_pos <- m[1] + attr(m, "match.length") - 1L # points at '{'
+  close_pos <- find_matching_brace(stan_code, open_pos)
+
+  out <- if (include_braces) {
+    substr(stan_code, open_pos, close_pos)
+  } else {
+    substr(stan_code, open_pos + 1L, close_pos - 1L)
+  }
+
+  if (trim) out <- sub("^\\s+|\\s+$", "", out)
+  out
+}
+
+
+#' @title Extract dimension from parameters in STAN parameter block
+#'
+#' @description
+#'  This functions extracts the names, dimensions, and types from a compiled STAN
+#'  parameters blocks generated by bmm or brms. This function is used to specify
+#'  initial values for bmm models.
+#'
+#' @param parameters_block The parameters block extracted via `extract_stan_blocks`
+#'
+#' @return A list of all parameters, their types, and dimensions as as specified in
+#'   the STAN data generated by bmm and brms
+#'
+#' @keywords extract_info
+#'
+#' @examples
+#' # generate simple stan code from brms
+#' stan_code <- stancode(brms::bf(x ~ 1 + cond + (1 + cond | ID)),
+#'   data = data.frame(
+#'     x = rnorm(100),
+#'     ID = rep(1:50, each = 2),
+#'     cond = rep(1:2, times = 50)
+#'   )
+#' )
+#'
+#' extracted_program_blocks <- extract_stan_blocks(stan_code)
+#'
+#' par_dims <- extract_parameter_dimensions(extracted_program_blocks$parameters) #'
+#'
+#' @export
+extract_parameter_dimensions <- function(parameters_block) {
+  lines <- unlist(strsplit(parameters_block, "\n"))
+  lines <- trimws(lines)
+  lines <- gsub("//.*", "", lines)
+  lines <- lines[nzchar(lines)]
+
+  res <- lapply(lines, parse_parameters_line)
+  names(res) <- vapply(res, `[[`, character(1), "name")
+  res
+}
+
+parse_parameters_line <- function(x) {
+  # strip trailing comments and semicolon; normalize whitespace
+  x <- sub("//.*$", "", x)
+  x <- trimws(x)
+  x <- sub(";$", "", x)
+  if (!nzchar(x)) stop("Empty or comment-only line.", call. = FALSE)
+
+  # 1) optional leading array[...] prefix
+  array_dims <- character(0)
+  if (grepl("^array\\s*\\[", x, perl = TRUE)) {
+    m <- regexpr("^array\\s*\\[([^\\]]*)\\]\\s*", x, perl = TRUE)
+    if (m > 0) {
+      dims_str <- sub("^array\\s*\\[([^\\]]*)\\]\\s*.*$", "\\1", regmatches(x, m), perl = TRUE)
+      array_dims <- trimws(unlist(strsplit(dims_str, ",")))
+      array_dims <- array_dims[nzchar(array_dims)]
+      x <- sub("^array\\s*\\[[^\\]]*\\]\\s*", "", x, perl = TRUE)
+    }
+  }
+  is_array <- length(array_dims) > 0
+
+  # 2) detect base type
+  base_types <- c(
+    "cholesky_factor_corr", "cholesky_factor_cov",
+    "corr_matrix", "cov_matrix",
+    "row_vector", "unit_vector", "positive_ordered", "simplex", "ordered",
+    "vector", "matrix", "real", "int"
+  )
+  base_type <- NULL
+  for (bt in base_types) {
+    if (grepl(paste0("^", bt, "\\b"), x, perl = TRUE)) {
+      base_type <- bt
+      break
+    }
+  }
+  if (is.null(base_type)) stop("Unknown or unsupported base type in: ", x, call. = FALSE)
+
+  # consume the base type token
+  x_after_bt <- sub(paste0("^", base_type), "", x, perl = TRUE)
+
+  # 3) constraints <...>
+  bounds <- parse_bounds(x_after_bt)
+  if (!is.null(bounds)) {
+    x_after_bt <- sub("^\\s*<[^>]*>\\s*", "", x_after_bt, perl = TRUE)
+  }
+
+  # 4) base-type dims [ ... ] (needed for most non-scalars)
+  base_dims <- character(0)
+  if (grepl("^\\s*\\[", x_after_bt, perl = TRUE)) {
+    m <- regexpr("(?<=\\[)[^\\]]+(?=\\])", x_after_bt, perl = TRUE)
+    if (m[1] == -1) stop("Could not parse base dimensions.", call. = FALSE)
+    dims_str <- regmatches(x_after_bt, m)
+    base_dims <- trimws(strsplit(dims_str, ",", fixed = TRUE)[[1]])
+    base_dims <- base_dims[nzchar(base_dims)]
+    x_after_bt <- sub("^\\s*\\[[^\\]]*\\]\\s*", "", x_after_bt, perl = TRUE)
+  } else {
+    if (base_type %in% c(
+      "vector", "row_vector", "matrix",
+      "simplex", "unit_vector", "ordered", "positive_ordered",
+      "corr_matrix", "cov_matrix", "cholesky_factor_corr", "cholesky_factor_cov"
+    )) {
+      stop("Missing dimensions for type ", base_type, ".", call. = FALSE)
+    }
+  }
+
+  # 5) name
+  name <- trimws(x_after_bt)
+  if (!nzchar(name)) stop("Missing parameter name.", call. = FALSE)
+
+  # 6) normalize dims by base type
+  dims_by_type <- switch(base_type,
+    real                 = 1,
+    int                  = 1,
+    vector               = base_dims[1],
+    row_vector           = base_dims[1],
+    simplex              = base_dims[1],
+    unit_vector          = base_dims[1],
+    ordered              = base_dims[1],
+    positive_ordered     = base_dims[1],
+    matrix               = base_dims[1:2],
+    corr_matrix          = base_dims[1],
+    cov_matrix           = base_dims[1],
+    cholesky_factor_corr = base_dims[1],
+    cholesky_factor_cov  = base_dims[1],
+    character(0)
+  )
+  dims <- c(array_dims, dims_by_type)
+
+  # NEW: dual typing
+  types <- if (is_array) c("array", base_type) else base_type
+
+  list(
+    name    = name,
+    type    = base_type, # backward-compat: base type only
+    types   = types, # NEW: includes "array" when applicable
+    dims    = dims,
+    bounds  = bounds
+  )
+}
+
+# helper: parse <...> constraints into a named list
+parse_bounds <- function(s) {
+  if (!grepl("<[^>]*>", s, perl = TRUE)) {
+    return(NULL)
+  }
+  inside <- sub(".*?<([^>]*)>.*", "\\1", s, perl = TRUE)
+  parts <- trimws(unlist(strsplit(inside, ",")))
+  kvs <- lapply(parts, function(p) {
+    if (!grepl("=", p, fixed = TRUE)) {
+      return(NULL)
+    }
+    sp <- strsplit(p, "=", fixed = TRUE)[[1]]
+    setNames(list(trimws(sp[2])), trimws(sp[1]))
+  })
+  # merge into a single named list
+  kvs <- Filter(Negate(is.null), kvs)
+  if (!length(kvs)) {
+    return(list())
+  }
+  Reduce(function(a, b) c(a, b), kvs)
 }

@@ -53,6 +53,7 @@
                       choice_rule = "softmax", version = "custom", links = NULL,
                       default_priors = NULL, call = NULL, ...) {
   if(!is.null(num_options)) names(num_options) <- names(num_options) %||% paste0("n_opt_",resp_cats)
+  if(!is.character(choice_rule)) choice_rule <- as.character(choice_rule)
   out <- structure(
     list(
       resp_vars = nlist(resp_cats),
@@ -213,9 +214,13 @@ check_model.m3_custom <- function(model, data = NULL, formula = NULL) {
     model$parameters <- c(model$parameters, setNames(user_pars, user_pars))
   }
 
+  missing_links <- setdiff(names(model$parameters), names(model$links))
+  missing_links <- setdiff(missing_links, names(model$fixed_parameters))
   stopif(
-    length(model$links) < length(model$parameters) - 1,
-    "Please provide link functions for all model parameters to ensure proper identification of your model"
+    length(missing_links) > 0,
+    "Please provide link functions for all model parameters via the `link` argument of `m3()` \\
+     to ensure proper identification of your model.
+     The following parameters are missing link functions: {paste0(missing_links, ' ', collapse = '')}"
   )
 
   # add default priors if missing
@@ -277,7 +282,7 @@ check_data.m3 <- function(model, data, formula) {
     # n_opt_vect is the *number* of options for each response variable
     opt_vars <- names(n_opt_vect)
     stopif(
-      any(opt_vars %in% names(data)), 
+      any(opt_vars %in% names(data)),
       "One of the variables {paste0(opt_vars, collapse = ', ')} already exists in the data. Give explicit names to your num_options vector"
     )
     data[opt_vars] <- rep(n_opt_vect, each = nrow(data))
