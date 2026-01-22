@@ -53,7 +53,7 @@ softmaxinv returns the value of the inverse-softmax function"><meta name="robots
     <h2 id="ref-usage">Usage<a class="anchor" aria-label="anchor" href="#ref-usage"></a></h2>
     <div class="sourceCode"><pre class="sourceCode r"><code><span><span class="fu">softmax</span><span class="op">(</span><span class="va">eta</span>, lambda <span class="op">=</span> <span class="fl">1</span><span class="op">)</span></span>
 <span></span>
-<span><span class="fu">softmaxinv</span><span class="op">(</span><span class="va">p</span>, lambda <span class="op">=</span> <span class="fl">1</span><span class="op">)</span></span></code></pre></div>
+<span><span class="fu">softmaxinv</span><span class="op">(</span><span class="va">p</span>, lambda <span class="op">=</span> <span class="fl">1</span>, ref_position <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/length.html" class="external-link">length</a></span><span class="op">(</span><span class="va">p</span><span class="op">)</span>, ref_value <span class="op">=</span> <span class="fl">0</span><span class="op">)</span></span></code></pre></div>
     </div>
 
     <div class="section level2">
@@ -71,6 +71,14 @@ softmaxinv returns the value of the inverse-softmax function"><meta name="robots
 <dt id="arg-p">p<a class="anchor" aria-label="anchor" href="#arg-p"></a></dt>
 <dd><p>A probability vector (i.e., numeric vector of non-negative values that sum to one)</p></dd>
 
+
+<dt id="arg-ref-position">ref_position<a class="anchor" aria-label="anchor" href="#arg-ref-position"></a></dt>
+<dd><p>The reference position that should be used to calculate the inverse softmax function. The default is the last position.</p></dd>
+
+
+<dt id="arg-ref-value">ref_value<a class="anchor" aria-label="anchor" href="#arg-ref-value"></a></dt>
+<dd><p>The value the reference position will be set to. The default is 0.</p></dd>
+
 </dl></div>
     <div class="section level2">
     <h2 id="value">Value<a class="anchor" aria-label="anchor" href="#value"></a></h2>
@@ -78,19 +86,18 @@ softmaxinv returns the value of the inverse-softmax function"><meta name="robots
     </div>
     <div class="section level2">
     <h2 id="details">Details<a class="anchor" aria-label="anchor" href="#details"></a></h2>
-    <p>The softmax function is a bijective function that maps a real vector with length <code>m-1</code> to a probability vector
+    <p>The softmax function is a bijective function that maps a real vector with length <code>m</code> to a probability vector
 with length <code>m</code> with all non-zero probabilities.  The present functions define the softmax function and its inverse, both with a tuning
 parameter.</p>
 <p>The current functions define the softmax as:</p>
-<p>$$\Large P(\eta_i) = \frac{e^{\lambda \eta_i}}{1+ \sum_{j=1}^m e^{\lambda \eta_j}}$$</p>
-<p>Code adapted from the <a href="https://github.com/ben-oneill/utilities/" class="external-link">utilities</a> package</p>
+<p>$$\Large P(\eta_i) = \frac{e^{\lambda \eta_i}}{\sum_{j=1}^m e^{\lambda \eta_j}}$$</p>
     </div>
 
     <div class="section level2">
     <h2 id="ref-examples">Examples<a class="anchor" aria-label="anchor" href="#ref-examples"></a></h2>
     <div class="sourceCode"><pre class="sourceCode r"><code><span class="r-in"><span><span class="fu">softmax</span><span class="op">(</span><span class="fl">5</span><span class="op">:</span><span class="fl">7</span><span class="op">)</span></span></span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [1] 0.0899759918 0.2445801036 0.6648376511 0.0006062535</span>
-<span class="r-in"><span><span class="fu">softmaxinv</span><span class="op">(</span><span class="fu">softmax</span><span class="op">(</span><span class="fl">5</span><span class="op">:</span><span class="fl">7</span><span class="op">)</span><span class="op">)</span></span></span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> [1] 0.09003057 0.24472847 0.66524096</span>
+<span class="r-in"><span><span class="fu">softmaxinv</span><span class="op">(</span><span class="fu">softmax</span><span class="op">(</span><span class="fl">5</span><span class="op">:</span><span class="fl">7</span><span class="op">)</span>, ref_position <span class="op">=</span> <span class="fl">1</span>, ref_value <span class="op">=</span> <span class="fl">5</span><span class="op">)</span></span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> [1] 5 6 7</span>
 </code></pre></div>
     </div>

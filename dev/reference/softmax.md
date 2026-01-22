@@ -8,7 +8,7 @@ the value of the inverse-softmax function
 ``` r
 softmax(eta, lambda = 1)
 
-softmaxinv(p, lambda = 1)
+softmaxinv(p, lambda = 1, ref_position = length(p), ref_value = 0)
 ```
 
 ## Arguments
@@ -26,6 +26,15 @@ softmaxinv(p, lambda = 1)
   A probability vector (i.e., numeric vector of non-negative values that
   sum to one)
 
+- ref_position:
+
+  The reference position that should be used to calculate the inverse
+  softmax function. The default is the last position.
+
+- ref_value:
+
+  The value the reference position will be set to. The default is 0.
+
 ## Value
 
 Value of the softmax function or its inverse
@@ -33,23 +42,20 @@ Value of the softmax function or its inverse
 ## Details
 
 The softmax function is a bijective function that maps a real vector
-with length `m-1` to a probability vector with length `m` with all
+with length `m` to a probability vector with length `m` with all
 non-zero probabilities. The present functions define the softmax
 function and its inverse, both with a tuning parameter.
 
 The current functions define the softmax as:
 
-\$\$\Large P(\eta_i) = \frac{e^{\lambda \eta_i}}{1+ \sum\_{j=1}^m
+\$\$\Large P(\eta_i) = \frac{e^{\lambda \eta_i}}{\sum\_{j=1}^m
 e^{\lambda \eta_j}}\$\$
-
-Code adapted from the
-[utilities](https://github.com/ben-oneill/utilities/) package
 
 ## Examples
 
 ``` r
 softmax(5:7)
-#> [1] 0.0899759918 0.2445801036 0.6648376511 0.0006062535
-softmaxinv(softmax(5:7))
+#> [1] 0.09003057 0.24472847 0.66524096
+softmaxinv(softmax(5:7), ref_position = 1, ref_value = 5)
 #> [1] 5 6 7
 ```
