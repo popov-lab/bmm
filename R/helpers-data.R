@@ -332,9 +332,16 @@ has_nonconsecutive_duplicates <- function(vec) {
 #'   component. One of "exgaussian" (default), "lognormal", or "invgaussian"
 #' @param method Character. Either "mixture" (default) for robust estimation
 #'   via mixture modeling or "simple" for standard moment calculation
-#' @param contaminant_bound Numeric vector of length 2 specifying the bounds
-#'   (in seconds) for the uniform contaminant distribution. Default is
-#'   c(0.1, 3.0)
+#' @param contaminant_bound Vector of length 2 specifying the bounds (in
+#'   seconds) for the uniform contaminant distribution. Can be numeric values
+#'   or the special strings "min" and "max" to use data-driven bounds:
+#'   \itemize{
+#'     \item Numeric: Fixed bounds, e.g., c(0.1, 3.0) (default)
+#'     \item "min": Use the minimum RT in each group, minus a 50\% buffer
+#'     \item "max": Use the maximum RT in each group, plus a 50\% buffer
+#'   }
+#'   The buffer extends data-driven bounds to ensure conservative estimates.
+#'   Examples: c(0.1, 3.0), c("min", "max"), c(0.1, "max"), c("min", 3.0)
 #' @param min_trials Integer. Minimum number of trials required for fitting.
 #'   Groups with fewer trials will return NA. Default is 10
 #' @param init_contaminant Numeric. Initial proportion of contaminants for EM
@@ -430,11 +437,36 @@ ezdm_summary_stats <- function(
     length(contaminant_bound) != 2,
     "contaminant_bound must be a vector of length 2"
   )
+  # Validate each element is either numeric (or coercible) or "min"/"max"
+  valid_bound <- function(x) {
+    if (is.numeric(x)) return(TRUE)
+    if (is.character(x)) {
+      # Check if it's "min" or "max"
+      if (tolower(x) %in% c("min", "max")) return(TRUE)
+      # Check if it's a numeric string
+      num_val <- suppressWarnings(as.numeric(x))
+      if (!is.na(num_val)) return(TRUE)
+    }
+    FALSE
+  }
+
   stopif(
-    !is.numeric(contaminant_bound) ||
-      contaminant_bound[1] >= contaminant_bound[2],
-    "contaminant_bound[1] must be less than contaminant_bound[2]"
+    !valid_bound(contaminant_bound[1]) || !valid_bound(contaminant_bound[2]),
+    "contaminant_bound elements must be numeric or 'min'/'max'"
   )
+  # If both are numeric (or coercible), check order
+  is_numeric_val <- function(x) {
+    is.numeric(x) ||
+      (is.character(x) && !is.na(suppressWarnings(as.numeric(x))) &&
+         !(tolower(x) %in% c("min", "max")))
+  }
+  if (is_numeric_val(contaminant_bound[1]) &&
+        is_numeric_val(contaminant_bound[2])) {
+    stopif(
+      as.numeric(contaminant_bound[1]) >= as.numeric(contaminant_bound[2]),
+      "contaminant_bound[1] must be less than contaminant_bound[2]"
+    )
+  }
   stopif(
     !is.numeric(min_trials) || min_trials < 1,
     "min_trials must be a positive integer"
@@ -603,6 +635,9 @@ ezdm_summary_stats <- function(
   is_upper <- .convert_response_to_upper(response_data)
   n_upper <- sum(is_upper, na.rm = TRUE)
 
+  # Resolve contaminant bounds from data if "min" or "max" specified
+  resolved_bounds <- .resolve_contaminant_bounds(contaminant_bound, rt_data)
+
   # Check minimum trials
   if (n_trials < min_trials) {
     if (version == "3par") {
@@ -643,7 +678,7 @@ ezdm_summary_stats <- function(
 
     # Mixture method
     fit <- .fit_rt_mixture(
-      rt_data, distribution, contaminant_bound,
+      rt_data, distribution, resolved_bounds,
       init_contaminant, maxit, tol
     )
 
@@ -703,7 +738,7 @@ ezdm_summary_stats <- function(
     # Mixture method for upper boundary
     if (n_upper >= min_trials) {
       fit_upper <- .fit_rt_mixture(
-        rt_upper, distribution, contaminant_bound,
+        rt_upper, distribution, resolved_bounds,
         init_contaminant, maxit, tol
       )
       if (!fit_upper$converged || is.null(fit_upper$params)) {
@@ -724,7 +759,7 @@ ezdm_summary_stats <- function(
     # Mixture method for lower boundary
     if (n_lower >= min_trials) {
       fit_lower <- .fit_rt_mixture(
-        rt_lower, distribution, contaminant_bound,
+        rt_lower, distribution, resolved_bounds,
         init_contaminant, maxit, tol
       )
       if (!fit_lower$converged || is.null(fit_lower$params)) {
@@ -1074,4 +1109,68 @@ ezdm_summary_stats <- function(
     iterations = iter,
     loglik = if (converged) loglik else NA
   )
+}
+
+# Resolve contaminant bounds from data
+# @param contaminant_bound Vector of length 2 (numeric or "min"/"max")
+# @param rt_data Numeric vector of RT values
+# @param bound_buffer Proportion to extend data-driven bounds (default 0.5)
+# @return Numeric vector of length 2 with resolved bounds
+.resolve_contaminant_bounds <- function(contaminant_bound, rt_data,
+                                        bound_buffer = 0.5) {
+  resolved <- numeric(2)
+  data_min <- min(rt_data, na.rm = TRUE)
+  data_max <- max(rt_data, na.rm = TRUE)
+  data_range <- data_max - data_min
+
+  # Track whether each bound is data-driven
+  lower_is_data_driven <- FALSE
+  upper_is_data_driven <- FALSE
+
+  # Helper to resolve a single bound
+  resolve_single <- function(bound_val, is_lower) {
+    if (is.numeric(bound_val)) {
+      return(list(value = bound_val, data_driven = FALSE))
+    }
+    # Character value
+    if (tolower(bound_val) == "min") {
+      return(list(value = data_min, data_driven = TRUE))
+    } else if (tolower(bound_val) == "max") {
+      return(list(value = data_max, data_driven = TRUE))
+    } else {
+      # Try to convert as numeric string (e.g., "0.1" from c(0.1, "max"))
+      return(list(value = as.numeric(bound_val), data_driven = FALSE))
+    }
+  }
+
+  lower_result <- resolve_single(contaminant_bound[1], TRUE)
+  upper_result <- resolve_single(contaminant_bound[2], FALSE)
+
+  resolved[1] <- lower_result$value
+  resolved[2] <- upper_result$value
+  lower_is_data_driven <- lower_result$data_driven
+  upper_is_data_driven <- upper_result$data_driven
+
+  # Apply buffer to data-driven bounds to reduce uniform density
+  # This improves mixture identifiability by making uniform less competitive
+  # Use 50% of range or at least 100ms to ensure conservative estimation
+  if (lower_is_data_driven && bound_buffer > 0) {
+    buffer_amount <- max(bound_buffer * data_range, 0.1)  # At least 100ms
+    resolved[1] <- max(0.001, resolved[1] - buffer_amount)  # Keep positive
+  }
+  if (upper_is_data_driven && bound_buffer > 0) {
+    buffer_amount <- max(bound_buffer * data_range, 0.1)  # At least 100ms
+    resolved[2] <- resolved[2] + buffer_amount
+  }
+
+  # Ensure lower < upper (swap if necessary due to data-driven bounds)
+  if (resolved[1] >= resolved[2]) {
+    warning2("Resolved contaminant bounds are invalid (lower >= upper). \\
+             Using data range with buffer.", env.frame = -1)
+    buffer_amount <- max(bound_buffer * data_range, 0.1)
+    resolved[1] <- max(0.001, data_min - buffer_amount)
+    resolved[2] <- data_max + buffer_amount
+  }
+
+  resolved
 }
