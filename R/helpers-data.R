@@ -589,3 +589,217 @@ ezdm_summary_stats <- function(
     ))
   }
 }
+
+# Ex-Gaussian density function
+# @param x Numeric vector of values
+# @param mu Mean of the Gaussian component
+# @param sigma Standard deviation of the Gaussian component
+# @param tau Rate parameter of the exponential component
+# @param log Logical, return log density if TRUE
+.dexgauss <- function(x, mu, sigma, tau, log = FALSE) {
+  # Ensure positive parameters
+  if (sigma <= 0 || tau <= 0) {
+    return(rep(if (log) -Inf else 0, length(x)))
+  }
+
+  # Ex-Gaussian density: convolution of Gaussian and Exponential
+  # Using the standard formula with numerical stability
+  z <- (x - mu) / sigma - sigma / tau
+  log_dens <- -log(tau) + (sigma^2) / (2 * tau^2) - (x - mu) / tau +
+    pnorm(z, log.p = TRUE)
+
+  if (log) {
+    return(log_dens)
+  }
+  exp(log_dens)
+}
+
+# Inverse Gaussian (Wald) density function
+# @param x Numeric vector of values
+# @param mu Mean parameter
+# @param lambda Shape parameter
+# @param log Logical, return log density if TRUE
+.dinvgauss <- function(x, mu, lambda, log = FALSE) {
+  # Ensure positive parameters and values
+  if (mu <= 0 || lambda <= 0) {
+    return(rep(if (log) -Inf else 0, length(x)))
+  }
+
+  valid <- x > 0
+  log_dens <- rep(-Inf, length(x))
+
+  if (any(valid)) {
+    xv <- x[valid]
+    log_dens[valid] <- 0.5 * (log(lambda) - log(2 * pi) - 3 * log(xv)) -
+      (lambda * (xv - mu)^2) / (2 * mu^2 * xv)
+  }
+
+  if (log) {
+    return(log_dens)
+  }
+  exp(log_dens)
+}
+
+# Extract mean and variance from fitted distribution parameters
+# @param params Named list of distribution parameters
+# @param distribution Character specifying the distribution type
+# @return List with mean and var components
+.dist_moments <- function(params, distribution) {
+  switch(distribution,
+    exgaussian = {
+      mu <- params$mu
+      sigma <- params$sigma
+      tau <- params$tau
+      list(
+        mean = mu + tau,
+        var = sigma^2 + tau^2
+      )
+    },
+    lognormal = {
+      mu <- params$mu
+      sigma <- params$sigma
+      list(
+        mean = exp(mu + sigma^2 / 2),
+        var = exp(2 * mu + sigma^2) * (exp(sigma^2) - 1)
+      )
+    },
+    invgaussian = {
+      mu <- params$mu
+      lambda <- params$lambda
+      list(
+        mean = mu,
+        var = mu^3 / lambda
+      )
+    }
+  )
+}
+
+# Initialize distribution parameters using method of moments
+# @param x Numeric vector of RT values
+# @param distribution Character specifying the distribution type
+# @return Named list of initial parameter estimates
+.init_dist_params <- function(x, distribution) {
+  m <- mean(x)
+  v <- var(x)
+  s <- sd(x)
+
+  switch(distribution,
+    exgaussian = {
+      # Method of moments for ex-Gaussian
+      # Skewness = 2 * tau^3 / (sigma^2 + tau^2)^(3/2)
+      # Use simple heuristic: tau captures about 1/3 of the variance
+      tau <- max(s / 3, 0.01)
+      sigma <- max(sqrt(max(v - tau^2, 0.0001)), 0.01)
+      mu <- max(m - tau, 0.01)
+      list(mu = mu, sigma = sigma, tau = tau)
+    },
+    lognormal = {
+      # Method of moments for lognormal
+      sigma2 <- log(1 + v / m^2)
+      sigma <- sqrt(max(sigma2, 0.01))
+      mu <- log(m) - sigma2 / 2
+      list(mu = mu, sigma = sigma)
+    },
+    invgaussian = {
+      # Method of moments for inverse Gaussian
+      mu <- max(m, 0.01)
+      lambda <- max(mu^3 / v, 0.01)
+      list(mu = mu, lambda = lambda)
+    }
+  )
+}
+
+# Compute log-likelihood for a distribution
+# @param x Numeric vector of RT values
+# @param params Named list of distribution parameters
+# @param distribution Character specifying the distribution type
+# @param weights Optional numeric vector of observation weights
+# @return Log-likelihood value
+.dist_loglik <- function(x, params, distribution, weights = NULL) {
+  if (is.null(weights)) {
+    weights <- rep(1, length(x))
+  }
+
+  log_dens <- switch(distribution,
+    exgaussian = .dexgauss(x, params$mu, params$sigma, params$tau, log = TRUE),
+    lognormal = dlnorm(x, params$mu, params$sigma, log = TRUE),
+    invgaussian = .dinvgauss(x, params$mu, params$lambda, log = TRUE)
+  )
+
+  sum(weights * log_dens, na.rm = TRUE)
+}
+
+# Fit distribution parameters using weighted MLE
+# @param x Numeric vector of RT values
+# @param distribution Character specifying the distribution type
+# @param weights Numeric vector of observation weights
+# @param init_params Initial parameter estimates
+# @return Named list of fitted parameters
+.fit_dist_params <- function(x, distribution, weights, init_params) {
+  # Objective function (negative log-likelihood)
+  neg_loglik <- function(par) {
+    params <- .par_to_list(par, distribution)
+    -1 * .dist_loglik(x, params, distribution, weights)
+  }
+
+  # Convert initial params to vector
+  init_par <- .list_to_par(init_params, distribution)
+
+  # Set bounds based on distribution
+  bounds <- .get_param_bounds(distribution)
+
+  # Optimize
+  result <- tryCatch(
+    stats::optim(
+      par = init_par,
+      fn = neg_loglik,
+      method = "L-BFGS-B",
+      lower = bounds$lower,
+      upper = bounds$upper
+    ),
+    error = function(e) NULL
+  )
+
+  if (is.null(result) || result$convergence != 0) {
+    # Return initial params if optimization fails
+    return(init_params)
+  }
+
+  .par_to_list(result$par, distribution)
+}
+
+# Convert parameter vector to named list
+.par_to_list <- function(par, distribution) {
+  switch(distribution,
+    exgaussian = list(mu = par[1], sigma = par[2], tau = par[3]),
+    lognormal = list(mu = par[1], sigma = par[2]),
+    invgaussian = list(mu = par[1], lambda = par[2])
+  )
+}
+
+# Convert named list to parameter vector
+.list_to_par <- function(params, distribution) {
+  switch(distribution,
+    exgaussian = c(params$mu, params$sigma, params$tau),
+    lognormal = c(params$mu, params$sigma),
+    invgaussian = c(params$mu, params$lambda)
+  )
+}
+
+# Get parameter bounds for optimization
+.get_param_bounds <- function(distribution) {
+  switch(distribution,
+    exgaussian = list(
+      lower = c(-Inf, 1e-6, 1e-6),
+      upper = c(Inf, Inf, Inf)
+    ),
+    lognormal = list(
+      lower = c(-Inf, 1e-6),
+      upper = c(Inf, Inf)
+    ),
+    invgaussian = list(
+      lower = c(1e-6, 1e-6),
+      upper = c(Inf, Inf)
+    )
+  )
+}
