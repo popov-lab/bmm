@@ -96,7 +96,7 @@ link_transform <- function(values, link = "identity", inverse = FALSE) {
       tan_half = 2 * atan(values),
       loglog = exp(-exp(values)),
       cloglog = 1 - exp(-exp(values)),
-      stop("Link not recognized.")
+      stop2("Link not recognized.")
     )
   } else {
     transformed_values <- switch(
@@ -112,7 +112,7 @@ link_transform <- function(values, link = "identity", inverse = FALSE) {
       tan_half = tan(values / 2),
       loglog = log(-log(values)),
       cloglog = log(-log1p(-values)),
-      stop("Link not recognized.")
+      stop2("Link not recognized.")
     )
   }
 

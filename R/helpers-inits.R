@@ -187,7 +187,7 @@ count_term_levels <- function(data, vars,
         ux <- if (na.rm) unique(na.omit(x)) else unique(x)
         return(length(ux))
       } else { # "bins"
-        if (is.null(nbins) || nbins < 1) stop("Provide a positive 'nbins' for numeric_strategy='bins'.")
+        if (is.null(nbins) || nbins < 1) stop2("Provide a positive 'nbins' for numeric_strategy='bins'.")
         x2 <- if (na.rm) x[!is.na(x)] else x
         if (!length(x2)) return(0L)
         b <- cut(x2, breaks = nbins, include.lowest = TRUE, right = TRUE)

@@ -37,7 +37,7 @@ EZ-Diffusion Model
 \item \strong{Name:} EZ-Diffusion Model
 \item \strong{Citation:}
 \itemize{
-\item Wagenmakers, E.-J., Van Der Maas, H. L. J., & Grasman, R. P. P. P. (2007). An EZ-diffusion model for response time and accuracy. Psychonomic Bulletin & Review, 14(1), 3–22. https://doi.org/10/fk447c
+\item Wagenmakers, E.-J., Van Der Maas, H. L. J., & Grasman, R. P. P. P. (2007). An EZ-diffusion model for response time and accuracy. Psychonomic Bulletin & Review, 14(1), 3-22. https://doi.org/10/fk447c
 }
 }
 \itemize{
@@ -107,3 +107,4 @@ Provide aggregated statistics for each subject and condition that model paramete
 # put a full example here (see 'R/model_mixture3p.R' for an example)
 }
 }
+\keyword{bmmodel}
