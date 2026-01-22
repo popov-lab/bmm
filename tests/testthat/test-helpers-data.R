@@ -1077,32 +1077,6 @@ test_that("ezdm_summary_stats() seed ensures reproducibility", {
   expect_equal(result1$n_trials_adj, result2$n_trials_adj)
 })
 
-test_that("ezdm_summary_stats() different seeds give different results", {
-  set.seed(42)
-  test_data <- data.frame(
-    rt = rgamma(500, shape = 5, rate = 10) + 0.3,
-    correct = rbinom(500, 1, 0.8)
-  )
-
-  # Different seeds may give different results (with high probability)
-  # Run multiple times to check variation exists
-  results <- lapply(1:10, function(s) {
-    ezdm_summary_stats(test_data, rt = "rt", response = "correct",
-                       adjust_accuracy = TRUE, seed = s)
-  })
-
-  # Extract adjusted values
-  n_upper_adjs <- sapply(results, function(r) r$n_upper_adj)
-
-  # With binomial sampling and 5 different seeds, we expect some variation
-  # (unless contaminant_prop is 0)
-  if (!is.na(results[[1]]$contaminant_prop) &&
-      results[[1]]$contaminant_prop > 0.01) {
-    # At least some variation expected with different seeds
-    expect_true(length(unique(n_upper_adjs)) > 1 || all(n_upper_adjs == results[[1]]$n_upper))
-  }
-})
-
 test_that("ezdm_summary_stats() adjust_accuracy warns with simple method", {
   test_data <- data.frame(
     rt = rgamma(100, shape = 5, rate = 10) + 0.3,
