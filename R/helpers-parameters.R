@@ -79,6 +79,9 @@ c_bessel2sqrtexp <- function(c, kappa) {
 #'
 #' @noRd
 link_transform <- function(values, link, inverse = FALSE) {
+  # Handle NULL or missing link as identity (no transformation)
+  if (is.null(link)) link <- "identity"
+
   stopifnot(is.numeric(values), is.character(link), length(link) == 1L, is.logical(inverse), length(inverse) == 1L)
   if(inverse) {
     switch(
