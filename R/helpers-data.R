@@ -331,8 +331,16 @@ has_nonconsecutive_duplicates <- function(vec) {
 #'   for separate upper/lower boundary RTs
 #' @param distribution Character. The parametric distribution for the RT
 #'   component. One of "exgaussian" (default), "lognormal", or "invgaussian"
-#' @param method Character. Either "mixture" (default) for robust estimation
-#'   via mixture modeling or "simple" for standard moment calculation
+#' @param method Character. One of "mixture" (default) for robust estimation
+#'   via mixture modeling, "robust" for non-parametric robust estimation using
+#'   median and IQR/MAD-based variance, or "simple" for standard moment
+#'   calculation. The "robust" method is faster and requires no distributional
+#'   assumptions, but note that the EZ equations were derived for mean and
+#'   variance, so using median may introduce some bias for skewed distributions.
+#' @param robust_scale Character. Scale estimator for robust method. Either
+#'   "iqr" (default) for IQR-based variance estimation (variance = (IQR/1.349)^2)
+#'   or "mad" for MAD-based estimation (variance = MAD^2, where MAD is scaled
+#'   to be consistent with SD for normal data). Only used when method = "robust".
 #' @param contaminant_bound Vector of length 2 specifying the bounds (in
 #'   seconds) for the uniform contaminant distribution. Can be numeric values
 #'   or the special strings "min" and "max" to use data-driven bounds:
@@ -406,6 +414,7 @@ ezdm_summary_stats <- function(
   version = "3par",
   distribution = "exgaussian",
   method = "mixture",
+  robust_scale = "iqr",
   contaminant_bound = c(0.1, 3.0),
   min_trials = 10,
   init_contaminant = 0.05,
@@ -446,8 +455,12 @@ ezdm_summary_stats <- function(
     "distribution must be 'exgaussian', 'lognormal', or 'invgaussian'"
   )
   stopif(
-    not_in(method, c("mixture", "simple")),
-    "method must be 'mixture' or 'simple'"
+    not_in(method, c("mixture", "simple", "robust")),
+    "method must be 'mixture', 'simple', or 'robust'"
+  )
+  stopif(
+    not_in(robust_scale, c("iqr", "mad")),
+    "robust_scale must be 'iqr' or 'mad'"
   )
   stopif(
     length(contaminant_bound) != 2,
@@ -559,6 +572,7 @@ ezdm_summary_stats <- function(
       version = version,
       distribution = distribution,
       method = method,
+      robust_scale = robust_scale,
       contaminant_bound = contaminant_bound,
       min_trials = min_trials,
       init_contaminant = init_contaminant,
@@ -587,6 +601,7 @@ ezdm_summary_stats <- function(
         version = version,
         distribution = distribution,
         method = method,
+        robust_scale = robust_scale,
         contaminant_bound = contaminant_bound,
         min_trials = min_trials,
         init_contaminant = init_contaminant,
@@ -618,10 +633,41 @@ ezdm_summary_stats <- function(
 # @param x Numeric vector
 # @return List with mean, var, and n
 .simple_aggregation <- function(x) {
+
   list(
     mean = mean(x, na.rm = TRUE),
     var = var(x, na.rm = TRUE),
     n = sum(!is.na(x))
+  )
+}
+
+# Robust aggregation using median and IQR/MAD-based variance
+# @param x Numeric vector
+# @param scale_method Character, either "iqr" or "mad"
+# @return List with mean (median), var, and n
+.robust_aggregation <- function(x, scale_method = "iqr") {
+  x <- x[!is.na(x)]
+  med <- median(x)
+
+  if (scale_method == "iqr") {
+    # IQR-based variance estimation
+    # For normal distribution: sigma = IQR / (2 * qnorm(0.75)) ≈ IQR / 1.349
+    iqr_val <- IQR(x)
+    sd_est <- iqr_val / 1.349
+    var_est <- sd_est^2
+  } else if (scale_method == "mad") {
+    # MAD-based variance estimation
+    # mad() already scales by 1.4826 to be consistent with SD for normal data
+    mad_val <- mad(x)
+    var_est <- mad_val^2
+  } else {
+    stop("scale_method must be 'iqr' or 'mad'")
+  }
+
+  list(
+    mean = med,
+    var = var_est,
+    n = length(x)
   )
 }
 
@@ -681,9 +727,9 @@ ezdm_summary_stats <- function(
 # @param tol Convergence tolerance
 # @return Named list with summary statistics
 .process_rt_group <- function(rt_data, response_data, version, distribution,
-                              method, contaminant_bound, min_trials,
-                              init_contaminant, max_contaminant, maxit, tol,
-                              adjust_accuracy, guess_rate) {
+                              method, robust_scale, contaminant_bound,
+                              min_trials, init_contaminant, max_contaminant,
+                              maxit, tol, adjust_accuracy, guess_rate) {
   n_trials <- length(rt_data)
 
   # Convert response to logical indicator (TRUE = upper boundary)
@@ -721,6 +767,19 @@ ezdm_summary_stats <- function(
     # Pool all RTs
     if (method == "simple") {
       agg <- .simple_aggregation(rt_data)
+      result <- list(
+        mean_rt = agg$mean,
+        var_rt = agg$var,
+        n_upper = n_upper,
+        n_trials = n_trials,
+        contaminant_prop = NA_real_
+      )
+      return(result)
+    }
+
+    # Robust method (median + IQR/MAD-based variance)
+    if (method == "robust") {
+      agg <- .robust_aggregation(rt_data, scale_method = robust_scale)
       result <- list(
         mean_rt = agg$mean,
         var_rt = agg$var,
@@ -789,6 +848,30 @@ ezdm_summary_stats <- function(
       }
       agg_lower <- if (n_lower >= min_trials) {
         .simple_aggregation(rt_lower)
+      } else {
+        list(mean = NA_real_, var = NA_real_)
+      }
+      return(list(
+        mean_rt_upper = agg_upper$mean,
+        mean_rt_lower = agg_lower$mean,
+        var_rt_upper = agg_upper$var,
+        var_rt_lower = agg_lower$var,
+        n_upper = n_upper,
+        n_trials = n_trials,
+        contaminant_prop_upper = NA_real_,
+        contaminant_prop_lower = NA_real_
+      ))
+    }
+
+    # Robust method (median + IQR/MAD-based variance)
+    if (method == "robust") {
+      agg_upper <- if (n_upper >= min_trials) {
+        .robust_aggregation(rt_upper, scale_method = robust_scale)
+      } else {
+        list(mean = NA_real_, var = NA_real_)
+      }
+      agg_lower <- if (n_lower >= min_trials) {
+        .robust_aggregation(rt_lower, scale_method = robust_scale)
       } else {
         list(mean = NA_real_, var = NA_real_)
       }

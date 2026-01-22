@@ -12,6 +12,7 @@ ezdm_summary_stats(
   version = "3par",
   distribution = "exgaussian",
   method = "mixture",
+  robust_scale = "iqr",
   contaminant_bound = c(0.1, 3),
   min_trials = 10,
   init_contaminant = 0.05,
@@ -49,8 +50,17 @@ for separate upper/lower boundary RTs}
 \item{distribution}{Character. The parametric distribution for the RT
 component. One of "exgaussian" (default), "lognormal", or "invgaussian"}
 
-\item{method}{Character. Either "mixture" (default) for robust estimation
-via mixture modeling or "simple" for standard moment calculation}
+\item{method}{Character. One of "mixture" (default) for robust estimation
+via mixture modeling, "robust" for non-parametric robust estimation using
+median and IQR/MAD-based variance, or "simple" for standard moment
+calculation. The "robust" method is faster and requires no distributional
+assumptions, but note that the EZ equations were derived for mean and
+variance, so using median may introduce some bias for skewed distributions.}
+
+\item{robust_scale}{Character. Scale estimator for robust method. Either
+"iqr" (default) for IQR-based variance estimation (variance = (IQR/1.349)^2)
+or "mad" for MAD-based estimation (variance = MAD^2, where MAD is scaled
+to be consistent with SD for normal data). Only used when method = "robust".}
 
 \item{contaminant_bound}{Vector of length 2 specifying the bounds (in
 seconds) for the uniform contaminant distribution. Can be numeric values

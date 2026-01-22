@@ -433,8 +433,13 @@ test_that("ezdm_summary_stats() validates parameter options", {
   )
   expect_error(
     ezdm_summary_stats(test_data, rt = "rt", response = "correct",
-                       method = "robust"),
-    "method must be 'mixture' or 'simple'"
+                       method = "invalid"),
+    "method must be 'mixture', 'simple', or 'robust'"
+  )
+  expect_error(
+    ezdm_summary_stats(test_data, rt = "rt", response = "correct",
+                       method = "robust", robust_scale = "invalid"),
+    "robust_scale must be 'iqr' or 'mad'"
   )
 })
 
@@ -498,6 +503,62 @@ test_that("ezdm_summary_stats() simple method matches mean() and var()", {
   expect_equal(result$var_rt, var(test_data$rt), tolerance = 1e-10)
   expect_equal(result$n_trials, nrow(test_data))
   expect_equal(result$n_upper, sum(test_data$correct == 1))
+})
+
+test_that("ezdm_summary_stats() robust method uses median and IQR/MAD", {
+  set.seed(123)
+  test_data <- data.frame(
+    rt = rgamma(100, shape = 5, rate = 10) + 0.3,
+    correct = rbinom(100, 1, 0.8)
+  )
+
+  # Test IQR-based robust method
+  result_iqr <- ezdm_summary_stats(
+    test_data, rt = "rt", response = "correct",
+    method = "robust", robust_scale = "iqr"
+  )
+
+  expect_equal(result_iqr$mean_rt, median(test_data$rt), tolerance = 1e-10)
+  expected_var_iqr <- (IQR(test_data$rt) / 1.349)^2
+  expect_equal(result_iqr$var_rt, expected_var_iqr, tolerance = 1e-10)
+  expect_equal(result_iqr$n_trials, nrow(test_data))
+  expect_equal(result_iqr$n_upper, sum(test_data$correct == 1))
+  expect_true(is.na(result_iqr$contaminant_prop))
+
+  # Test MAD-based robust method
+  result_mad <- ezdm_summary_stats(
+    test_data, rt = "rt", response = "correct",
+    method = "robust", robust_scale = "mad"
+  )
+
+  expect_equal(result_mad$mean_rt, median(test_data$rt), tolerance = 1e-10)
+  expected_var_mad <- mad(test_data$rt)^2
+  expect_equal(result_mad$var_rt, expected_var_mad, tolerance = 1e-10)
+})
+
+test_that("ezdm_summary_stats() robust method is resistant to outliers", {
+  set.seed(123)
+  # Create data with outliers
+  clean_rt <- rnorm(90, mean = 0.5, sd = 0.1)
+  outliers <- c(0.05, 0.08, 2.5, 3.0, 3.5, 4.0, 5.0, 6.0, 7.0, 8.0)
+  test_data <- data.frame(
+    rt = c(clean_rt, outliers),
+    correct = c(rep(1, 80), rep(0, 20))
+  )
+
+  result_simple <- ezdm_summary_stats(
+    test_data, rt = "rt", response = "correct", method = "simple"
+  )
+  result_robust <- ezdm_summary_stats(
+    test_data, rt = "rt", response = "correct", method = "robust"
+  )
+
+  # Robust method should give mean_rt closer to true median of clean data
+  true_median_clean <- median(clean_rt)
+  expect_true(
+    abs(result_robust$mean_rt - true_median_clean) <
+      abs(result_simple$mean_rt - true_median_clean)
+  )
 })
 
 test_that("ezdm_summary_stats() handles multiple grouping variables", {
