@@ -162,10 +162,10 @@ check_data.cswald <- function(model, data, formula) {
   rt_var <- model$resp_vars$rt
   response_var <- model$resp_vars$response
 
-  # stop due to missing information
-  stopif(
+  # check that required variables are present
+ stopif(
     not_in(rt_var, colnames(data)),
-    "The response variable '{rt_var}' is not present in the data."
+    "The RT variable '{rt_var}' is not present in the data."
   )
 
   stopif(
@@ -173,63 +173,122 @@ check_data.cswald <- function(model, data, formula) {
     "The response variable '{response_var}' is not present in the data."
   )
 
+  # check for NA values
+  n_na_rt <- sum(is.na(data[, rt_var]))
+  n_na_resp <- sum(is.na(data[, response_var]))
+
+  stopif(
+    n_na_rt > 0,
+    "The RT variable '{rt_var}' contains {n_na_rt} NA values. \\
+    Please remove or impute missing values before fitting the model."
+  )
+
+  stopif(
+    n_na_resp > 0,
+    "The response variable '{response_var}' contains {n_na_resp} NA values. \\
+    Please remove or impute missing values before fitting the model."
+  )
+
   # checks for rt_var
-  if (typeof(data[, rt_var]) %in% c("double", "numerical")) {
+  if (typeof(data[, rt_var]) %in% c("double", "integer")) {
     stopif(
       any(data[, rt_var] < 0),
-      glue("Some reaction times are lower than zero, please check your data.")
+      "Some reaction times are lower than zero, please check your data."
     )
 
-    warnif(any(data[,rt_var] > 10),
-           glue::glue("Your data contains reaction times larger then 10.\n",
-                      "Either you have passed reaction times in milli-seconds, then please recode them to seconds and rerun the model.\n",
-                      "Or you have very long RTs in your data in which case you might want to consider outlier deletion."))
+    warnif(
+      any(data[, rt_var] > 10),
+      "Your data contains reaction times larger than 10 seconds.\n
+      Either you have passed reaction times in milliseconds, then please \\
+      recode them to seconds and rerun the model.\n
+      Or you have very long RTs in your data in which case you might want \\
+      to consider outlier filtering."
+    )
 
-    warnif(any(data[,rt_var] < .100),
-           glue::glue("Your data contains reaction times smaller the 0.100 seconds.\n",
-                      "It is likely that the model will not be able to sample with the current settings of the inital values.\n",
-                      "Either pass your own initial value function or consider filtering reaction times below 0.100 seconds"))
+    warnif(
+      any(data[, rt_var] < 0.100),
+      "Your data contains reaction times smaller than 0.100 seconds.\n
+      It is likely that the model will not be able to sample with the \\
+      current settings of the initial values.\n
+      Either pass your own initial value function or consider filtering \\
+      reaction times below 0.100 seconds."
+    )
   } else {
     stop(glue(
-      "The rt variable: ",
-      rt_var,
-      " needs to be of type double or numerical."
+      "The RT variable '{rt_var}' needs to be of type double or integer."
     ))
   }
 
   # checks for response_var
-  if (typeof(data[, response_var]) %in% c("integer", "double", "numerical")) {
-    stopif(any(!data[, response_var] %in% c(0, 1)), glue("Only values of zero"))
-  } else if (typeof(data[, response_var]) == "logical") {
+  resp_type <- typeof(data[, response_var])
+
+  # handle factor variables by converting to character first
+  if (is.factor(data[, response_var])) {
+    data[, response_var] <- as.character(data[, response_var])
+    resp_type <- "character"
+  }
+
+  if (resp_type %in% c("integer", "double")) {
+    stopif(
+      any(!data[, response_var] %in% c(0, 1)),
+      "The response variable '{response_var}' contains values other than 0 and 1.\n
+      Please pass responses coded as 0 (lower boundary) and 1 (upper boundary)."
+    )
+  } else if (resp_type == "logical") {
     warning(glue::glue(
-      "The response variable you provided is boolean, it will be internally transformed ",
+      "The response variable is boolean and will be internally transformed ",
       "to an integer variable with values 0 for FALSE and 1 for TRUE."
     ))
-    data[, response_var] <- ifelse(data[, response_var], 1, 0)
-  } else if (typeof(data[, response_var]) == "character") {
-    data[,response_var] <- tolower(data[,response_var])
-    stopif(any(!data[,response_var] %in% c("upper","lower")),
-           glue::glue("You have passed a character variable as response variable containing invalid responses.\n",
-                      "Please pass only upper or lower responses as response variables either coded numerically (0 = \"lower\" and 1 = \"upper\")\n",
-                      "or characters that match \"upper\" and \"lower\"."))
+    data[, response_var] <- as.integer(data[, response_var])
+  } else if (resp_type == "character") {
+    data[, response_var] <- tolower(data[, response_var])
+    stopif(
+      any(!data[, response_var] %in% c("upper", "lower")),
+      "The response variable '{response_var}' contains invalid character values.\n
+      Please pass only 'upper' or 'lower' as response values, or use \\
+      numeric coding (0 = lower, 1 = upper)."
+    )
     warning(glue::glue(
-      "The response variable you provided is a character variable, it will be internally transformed ",
-      "to an integer variable with values 0 for \"lower\" and 1 for \"upper\"."
+      "The response variable is a character variable and will be internally ",
+      "transformed to an integer variable with 0 for 'lower' and 1 for 'upper'."
     ))
-    data[,response_var] <- ifelse(data[,response_var] == "upper",1,0)
-  }else {
+    data[, response_var] <- ifelse(data[, response_var] == "upper", 1L, 0L)
+  } else {
     stop(glue(
-      "The response variable: ",
-      response_var,
-      " needs to be of type integer, numerical, or logical."
+      "The response variable '{response_var}' is of type '{resp_type}'.\n
+      Please provide responses as integer (0/1), logical, character \\
+      ('upper'/'lower'), or factor."
     ))
   }
 
-  stopif(any(!data[,response_var] %in% c(0,1)),
-         glue::glue("Invalid values in the response variable passed to ddm.\n",
-                    "Please pass either numeric or character variables that only contain 0 and 1 or  \"upper\" and \"lower\"."))
+  # final validation of response values
+  stopif(
+    any(!data[, response_var] %in% c(0, 1)),
+    "Invalid values in the response variable '{response_var}'.\n
+    After processing, responses must be coded as 0 (lower) or 1 (upper)."
+  )
 
-  data
+  # warn about high error rates for simple version (assumes few errors)
+  if ("cswald_simple" %in% class(model)) {
+    error_rate <- mean(data[, response_var] == 0)
+    warnif(
+      error_rate > 0.20,
+      "Your data has an error rate of {round(error_rate * 100, 1)}%.\n
+      The simple censored shifted Wald model assumes few errors. \\
+      Consider using version = 'crisk' (competing risks) for data with \\
+      substantial error rates."
+    )
+  }
+
+  # warn about small sample sizes
+  n_obs <- nrow(data)
+  warnif(
+    n_obs < 50,
+    "Your data contains only {n_obs} observations.\n
+    Parameter estimation may be unreliable with very small sample sizes."
+  )
+
+  NextMethod("check_data")
 }
 
 #############################################################################!
