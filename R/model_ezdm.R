@@ -110,7 +110,7 @@
 #' @param n_trials The variable coding the number of trials that was used to calculated the aggregated statistics.
 #' @param links A list of links for the parameters.
 #' @param version A character label for the version of the model. There is a three-parameter version
-#'   (version = "3par")of the `ezdm` that fixes the relativ starting point `zr` to 0.5, and a
+#'   (version = "3par") of the `ezdm` that fixes the relative starting point `zr` to 0.5, and a
 #'   four parameter version (version = "4par"), that allows to freely estimate the starting point.
 #' @param ... used internally for testing, ignore it
 #' @return An object of class `bmmodel`
