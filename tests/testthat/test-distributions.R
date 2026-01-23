@@ -417,6 +417,43 @@ test_that("dezdm handles edge case with near-zero drift", {
   expect_true(is.finite(ll))
 })
 
+test_that("dezdm 4par handles edge case with near-zero drift", {
+  # near-zero drift should not cause NaN in pC computation
+  # Test with different zr values to ensure pC -> zr as drift -> 0
+  
+  # Test with zr = 0.5 (symmetric starting point)
+  ll1 <- dezdm(
+    mean_rt = c(0.5, 0.5), var_rt = c(0.02, 0.02),
+    n_upper = 50, n_trials = 100,
+    drift = 1e-8, bound = 1.5, ndt = 0.3, zr = 0.5, version = "4par"
+  )
+  expect_true(is.finite(ll1))
+  
+  # Test with zr = 0.3 (bias toward lower boundary)
+  ll2 <- dezdm(
+    mean_rt = c(0.5, 0.5), var_rt = c(0.02, 0.02),
+    n_upper = 30, n_trials = 100,
+    drift = 1e-8, bound = 1.5, ndt = 0.3, zr = 0.3, version = "4par"
+  )
+  expect_true(is.finite(ll2))
+  
+  # Test with zr = 0.7 (bias toward upper boundary)
+  ll3 <- dezdm(
+    mean_rt = c(0.5, 0.5), var_rt = c(0.02, 0.02),
+    n_upper = 70, n_trials = 100,
+    drift = 1e-8, bound = 1.5, ndt = 0.3, zr = 0.7, version = "4par"
+  )
+  expect_true(is.finite(ll3))
+  
+  # Test with exactly zero drift
+  ll4 <- dezdm(
+    mean_rt = c(0.5, 0.5), var_rt = c(0.02, 0.02),
+    n_upper = 50, n_trials = 100,
+    drift = 0, bound = 1.5, ndt = 0.3, zr = 0.5, version = "4par"
+  )
+  expect_true(is.finite(ll4))
+})
+
 test_that("dezdm 4par handles edge cases with few responses at boundary", {
 
   # when n_upper = 1, only binomial contributes (no mean/var for upper)
