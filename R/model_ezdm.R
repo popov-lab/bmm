@@ -102,7 +102,7 @@
 # automatically based on the information in the .model_ezdm()$info
 
 #' @title `r .model_ezdm()$name`
-#' @name ezdm,
+#' @name ezdm
 #' @details `r model_info(.model_ezdm())`
 #' @param mean_rt The variable coding the mean reaction time in seconds in the data.
 #' @param var_rt The variable coding the variance of the reaction time in seconds in the data
