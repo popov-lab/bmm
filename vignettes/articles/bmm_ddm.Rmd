@@ -1,0 +1,749 @@
+---
+title: "The Diffusion Decision Model (ddm)"
+output: bookdown::html_document2
+author:
+  - Gidon Frischkorn
+  - Ven Popov
+bibliography: REFERENCES.bib
+header-includes:
+  - \usepackage{amsmath}
+vignette: >
+  %\VignetteIndexEntry{The Diffusion Decision Model (ddm)}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+pkgdown:
+  as_is: true
+---
+
+<style type="text/css">
+div.main-container {
+max-width: 800px !important;
+}
+
+p {
+margin-top: 1.5em ;
+margin-bottom: 1.5em ;
+}
+.author{
+    display: none;
+}
+</style>
+
+```{r, include = FALSE}
+options(crayon.enabled = TRUE)
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>",
+  dev = "jpeg",
+  dpi = 100
+)
+fansi::set_knit_hooks(knitr::knit_hooks, which = c("output","message","error"))
+```
+
+# Introduction
+
+The Diffusion Decision Model (DDM) is one of the most widely used cognitive
+models for analyzing response time (RT) and accuracy data in two-alternative
+forced-choice (2AFC) tasks. Originally developed by @ratcliffTheoryMemoryRetrieval1978,
+the DDM has become a cornerstone of cognitive psychology and neuroscience
+research on decision-making processes.
+
+The DDM is ideal when:
+
+- You have RT data from a two-choice decision task with both correct and error responses
+- You want to decompose decision-making into separate cognitive processes
+- You need to account for speed-accuracy tradeoffs
+- You want to model trial-to-trial variability in decision processes
+- You're interested in linking cognitive parameters to neural or behavioral measures
+
+The `bmm` package provides three versions of the DDM with increasing complexity:
+
+- **3-parameter version**: Simplest model with drift, boundary, and non-decision time
+- **4-parameter version**: Adds starting point bias
+- **7-parameter version**: Full model including trial-to-trial variability parameters
+
+# Theoretical Background
+
+## The Diffusion Process
+
+The DDM models decision-making as a noisy accumulation of evidence over time
+toward one of two decision boundaries. The evidence accumulation process is
+described by the Wiener diffusion process:
+
+$$
+dX(t) = v \cdot dt + s \cdot dW(t)
+$$
+
+where:
+
+- $X(t)$ is the accumulated evidence at time $t$
+- $v$ is the drift rate (average rate of evidence accumulation)
+- $s$ is the within-trial noise (standard deviation of the diffusion process, typically fixed at 0.1 or 1)
+- $dW(t)$ is a Wiener process (Brownian motion)
+
+The process starts at position $z \cdot a$ (where $z$ is the starting point
+parameter and $a$ is the boundary separation) and continues until it reaches
+one of two absorbing boundaries at 0 (lower/incorrect) or $a$ (upper/correct).
+
+## Model Parameters
+
+### Core Parameters (3-parameter version)
+
+1. **Drift rate ($v$)**: The average rate at which evidence accumulates toward
+   the correct boundary. Higher drift rates lead to faster and more accurate
+   decisions.
+   - Typical range: -5 to 5 (task-dependent)
+   - Interpretation: Quality of evidence, task difficulty, or attention
+
+2. **Boundary separation ($a$)**: The amount of evidence required before making
+   a decision. Larger boundaries lead to slower but more accurate responses.
+   - Typical range: 0.5 to 3
+   - Interpretation: Response caution, speed-accuracy tradeoff
+
+3. **Non-decision time ($t_0$ or ndt)**: Time for processes unrelated to the
+   decision (e.g., stimulus encoding, motor response).
+   - Typical range: 0.1 to 0.5 seconds
+   - Interpretation: Perceptual and motor latencies
+
+### Extended Parameters (4-parameter version)
+
+4. **Starting point bias ($z_r$)**: Relative starting point of evidence
+   accumulation (0 = lower boundary, 1 = upper boundary).
+   - Default: 0.5 (unbiased)
+   - Interpretation: A priori response bias
+
+### Variability Parameters (7-parameter version)
+
+5. **Drift rate variability ($s_v$ or sdrift)**: Between-trial variability in
+   drift rate.
+   - Typical range: 0 to 2
+   - Accounts for variable evidence quality across trials
+
+6. **Non-decision time variability ($s_{t_0}$ or sndt)**: Between-trial
+   variability in non-decision time.
+   - Typical range: 0 to 0.2
+   - Accounts for variable encoding/motor times
+
+7. **Starting point variability ($s_z$ or szr)**: Between-trial variability in
+   starting point.
+   - Typical range: 0 to 0.5
+   - Accounts for variable response bias across trials
+
+## Predictions
+
+The DDM predicts complete RT distributions for both correct and error
+responses, including:
+
+- Mean RT and accuracy
+- RT variability (standard deviation)
+- Shape of RT distributions (skewness, leading edge)
+- Speed-accuracy tradeoffs
+- Effects of experimental manipulations on different cognitive processes
+
+# Implementation in bmm
+
+## Computational Efficiency Considerations
+
+The DDM likelihood requires numerical solution of the Fokker-Planck equation,
+which can be computationally demanding. @henrichSevenparameterDiffusionModel2024
+provide detailed benchmarks of their Stan implementation (which `bmm` uses).
+
+**Important**: Runtime scales approximately linearly with the number of trials.
+The estimates below are based on typical experimental datasets with **1000-2000
+trials per participant** (across all conditions). Smaller datasets will be faster;
+larger datasets will take proportionally longer.
+
+**Runtime per iteration** (from Henrich et al., 2024):
+
+- **3-parameter version**: ~0.5-1 second per iteration
+- **4-parameter version**: ~0.8-1.5 seconds per iteration  
+- **7-parameter version**: ~2-4 seconds per iteration
+
+**Total runtime for typical analysis** with 4 chains × 2000 iterations (1000
+warmup, 1000 sampling) and ~1500 trials per participant:
+
+- **3-parameter**: ~20-40 minutes
+- **4-parameter**: ~30-60 minutes
+- **7-parameter**: ~2-3 hours
+
+For datasets with different sizes, scale these estimates proportionally:
+
+- **500 trials**: ~30% of the time above
+- **3000 trials**: ~200% of the time above
+- **10,000 trials**: ~650% of the time above
+
+### Effect of Model Complexity on Runtime
+
+**Critical consideration**: Runtime depends not just on the total number of trials,
+but also on the number of parameters being estimated. Hierarchical models with
+many subjects or experimental conditions can be substantially slower than
+single-subject models with the same total trial count.
+
+**Example comparison** (same total of 10,000 trials):
+
+- **1 subject, 10,000 trials**: Fast baseline
+- **10 subjects, 1,000 trials each**: ~2-3× slower (adds random effects per subject)
+- **50 subjects, 200 trials each**: ~5-10× slower (many random effects + correlation structure)
+- **50 subjects × 2 conditions, 100 trials each**: ~8-15× slower (adds condition effects + interactions)
+
+**Why hierarchical models are slower**:
+
+1. **More parameters**: Each subject adds random intercepts/slopes (e.g., 3-7
+   parameters per subject for random effects)
+2. **Correlation matrices**: Stan must sample correlation matrices for random
+   effects, which is computationally intensive
+3. **Increased model complexity**: More parameters means longer gradient
+   computations for each iteration
+4. **Convergence challenges**: Complex hierarchical structures may require more
+   warmup iterations
+
+**Practical implications**:
+
+- A single-subject model with 10,000 trials might take 1 hour
+- A 50-subject hierarchical model (2 conditions × 100 trials = 10,000 total trials)
+  might take 8-15 hours for the same DDM version
+- Adding experimental predictors (e.g., drift ~ condition1 * condition2) increases
+  runtime proportionally to the number of parameters
+
+**Strategies for large hierarchical models**:
+
+1. **Simplify random effects structure**: Start with random intercepts only
+   before adding random slopes
+2. **Consider non-centered parameterization**: May help with convergence (bmm
+   handles this automatically for some models)
+3. **Use more informative priors**: Helps constrain the posterior space and
+   speeds convergence
+4. **Parallel computing**: Use within-chain parallelization for large datasets
+   (requires cmdstanr backend with threading support)
+5. **Subset testing**: Fit to a subset of subjects first to verify model
+   specification and estimate total runtime
+
+**Recommendations for efficient model fitting**:
+
+1. Start with the 3-parameter version to test your model specification
+2. Use hierarchical priors to regularize parameter estimates
+3. Consider parallelizing chains across cores (included in runtime estimates above)
+4. For large datasets (>10,000 trials), consider within-chain parallelization or
+   reduce chains to 2 with more iterations
+5. Use informative priors when possible to speed convergence
+6. Test on a subset of data first (e.g., one participant) to verify model
+   specification before fitting the full dataset
+7. The 7-parameter version is most useful when you have:
+   - Large sample sizes per condition (>100 trials)
+   - Theoretical interest in variability parameters
+   - Evidence that simpler models don't capture the data well
+
+## Example Dataset: Ratcliff & Rouder (1998)
+
+The `rr98` dataset from the `rtdists` package provides a classic example of
+choice response time data. The dataset contains responses from a brightness
+discrimination task where participants judged whether pixel arrays were "high"
+or "low" brightness.
+
+```{r, eval=FALSE}
+library(bmm)
+library(ggplot2)
+library(dplyr)
+
+# Load the dataset from rtdists
+data(rr98, package = "rtdists")
+
+# Remove outliers as in the original analysis
+rr98 <- rr98[!rr98$outlier, ]
+
+# Examine structure
+str(rr98[, c("id", "rt", "response_num", "instruction", "strength")])
+
+# Check accuracy by condition
+rr98 %>%
+  mutate(correct = (response_num == 1 & strength <= 16) | 
+                   (response_num == 2 & strength > 16)) %>%
+  group_by(id, instruction) %>%
+  summarise(accuracy = mean(correct), .groups = "drop")
+```
+
+The dataset includes:
+
+- **rt**: Response time in seconds
+- **response_num**: Binary response (1 = "dark", 2 = "light")
+- **instruction**: Speed vs accuracy emphasis
+- **strength**: Task difficulty (0-32, brightness level)
+- **id**: Participant identifier
+
+This dataset is ideal for DDM analysis because:
+
+1. **Sufficient error trials**: Unlike tasks with near-ceiling accuracy
+2. **Multiple conditions**: Speed vs accuracy emphasis
+3. **Clear manipulation**: Brightness strength affects evidence quality
+4. **Rich structure**: Individual differences and trial-level variability
+
+## Preparing Data for DDM
+
+The DDM requires:
+
+1. A numeric RT variable (positive values)
+2. A binary response variable coded as 0/1 or "lower"/"upper"
+
+```{r, eval=FALSE}
+# Prepare data for DDM analysis
+# Focus on one participant and instruction condition for demonstration
+demo_data <- rr98 %>%
+  filter(id == 1, instruction == "accuracy") %>%
+  mutate(
+    # Recode response: 1 = "upper", 0 = "lower"
+    response = ifelse(response_num == 1, 0, 1)
+  ) %>%
+  select(rt, response, strength)
+
+# Check response coding
+table(demo_data$response)
+
+# Visualize RT distributions by response
+ggplot(demo_data, aes(x = rt, fill = factor(response))) +
+  geom_histogram(alpha = 0.6, bins = 30, position = "identity") +
+  labs(x = "Response Time (s)", y = "Count", fill = "Response") +
+  theme_minimal()
+```
+
+# Fitting DDM Models in bmm
+
+## 3-Parameter DDM
+
+The simplest DDM with drift, boundary, and non-decision time:
+
+```{r, eval=FALSE}
+# Define the model
+model_3par <- ddm(rt = "rt", 
+                  response = "response", 
+                  version = "3par")
+
+# Define the formula - let drift vary by strength
+formula_3par <- bmf(
+  drift ~ strength,
+  bound ~ 1,
+  ndt ~ 1
+)
+
+# Fit the model 
+# Note: demo_data has ~260 trials, so this will take ~5-10 minutes
+# For larger datasets (1500+ trials), expect 20-40 minutes
+fit_3par <- bmm(
+  formula = formula_3par,
+  data = demo_data,
+  model = model_3par,
+  backend = "cmdstanr",
+  cores = 4,
+  chains = 4,
+  iter = 2000,
+  warmup = 1000
+)
+
+# Examine convergence
+summary(fit_3par)
+
+# Check diagnostics
+plot(fit_3par)
+```
+
+**Interpreting the 3-parameter model**:
+
+- **drift**: Higher values indicate faster evidence accumulation (easier trials)
+- **bound**: Higher values indicate more cautious responding
+- **ndt**: Time spent on non-decision processes
+
+## 4-Parameter DDM with Starting Point Bias
+
+Adding starting point bias allows modeling a priori response preferences:
+
+```{r, eval=FALSE}
+# Define the 4-parameter model
+model_4par <- ddm(rt = "rt", 
+                  response = "response", 
+                  version = "4par")
+
+# Define the formula
+formula_4par <- bmf(
+  drift ~ strength,
+  bound ~ 1,
+  ndt ~ 1,
+  zr ~ 1  # starting point bias
+)
+
+# Fit the model
+# With ~260 trials: ~8-15 minutes
+# With 1500+ trials: ~30-60 minutes
+fit_4par <- bmm(
+  formula = formula_4par,
+  data = demo_data,
+  model = model_4par,
+  backend = "cmdstanr",
+  cores = 4
+)
+
+# Compare models
+loo_3par <- loo(fit_3par)
+loo_4par <- loo(fit_4par)
+loo_compare(loo_3par, loo_4par)
+```
+
+**When to use starting point bias**:
+
+- When you suspect a priori response preferences
+- When conditions systematically favor one response
+- When testing theoretical predictions about response bias
+
+## 7-Parameter DDM with Variability
+
+The full DDM includes between-trial variability in drift, non-decision time,
+and starting point:
+
+```{r, eval=FALSE}
+# Define the 7-parameter model
+model_7par <- ddm(rt = "rt", 
+                  response = "response", 
+                  version = "7par")
+
+# Define the formula
+formula_7par <- bmf(
+  drift ~ strength,
+  bound ~ 1,
+  ndt ~ 1,
+  zr ~ 1,
+  sdrift ~ 1,   # drift variability
+  sndt ~ 1,     # non-decision time variability
+  szr ~ 1       # starting point variability
+)
+
+# Fit the model
+# With ~260 trials: ~30-45 minutes
+# With 1500+ trials: ~2-3 hours
+fit_7par <- bmm(
+  formula = formula_7par,
+  data = demo_data,
+  model = model_7par,
+  backend = "cmdstanr",
+  cores = 4
+)
+```
+
+**When to use the 7-parameter version**:
+
+- Large datasets with sufficient statistical power
+- Theoretical interest in trial-to-trial variability
+- When simpler models show systematic misfit
+- When comparing to classic DDM literature (which often uses variability parameters)
+
+# Hierarchical DDM Models
+
+One of the key advantages of fitting DDMs in a Bayesian framework with `bmm`
+is the ability to easily specify hierarchical models that account for
+individual differences.
+
+## Multi-Subject Analysis
+
+```{r, eval=FALSE}
+# Use multiple subjects from rr98
+multi_subject_data <- rr98 %>%
+  filter(instruction == "accuracy") %>%
+  mutate(response = ifelse(response_num == 1, 0, 1)) %>%
+  select(id, rt, response, strength)
+
+# Hierarchical 3-parameter model
+model_hier <- ddm(rt = "rt", 
+                  response = "response", 
+                  version = "3par")
+
+# Formula with random effects
+formula_hier <- bmf(
+  drift ~ strength + (strength | id),  # random slopes for drift by strength
+  bound ~ 1 + (1 | id),                # random intercepts for boundary
+  ndt ~ 1 + (1 | id)                   # random intercepts for ndt
+)
+
+# Fit hierarchical model
+fit_hier <- bmm(
+  formula = formula_hier,
+  data = multi_subject_data,
+  model = model_hier,
+  backend = "cmdstanr",
+  cores = 4
+)
+
+# Extract individual-level parameters
+# This gives you person-specific drift, bound, and ndt estimates
+```
+
+**Benefits of hierarchical modeling**:
+
+1. **Partial pooling**: Borrows strength across subjects for better estimates
+2. **Individual differences**: Quantifies between-subject variability
+3. **Handles unbalanced data**: Works even with different trial counts per subject
+4. **Shrinkage**: Extreme individual estimates are pulled toward group mean
+
+## Condition Effects
+
+Test how experimental manipulations affect different cognitive processes:
+
+```{r, eval=FALSE}
+# Compare speed vs accuracy emphasis
+full_data <- rr98 %>%
+  mutate(response = ifelse(response_num == 1, 0, 1)) %>%
+  select(id, rt, response, instruction, strength)
+
+# Model with instruction effects
+formula_instruction <- bmf(
+  drift ~ strength + (strength | id),
+  bound ~ instruction + (instruction | id),  # boundary varies by instruction
+  ndt ~ 1 + (1 | id)
+)
+
+fit_instruction <- bmm(
+  formula = formula_instruction,
+  data = full_data,
+  model = model_hier,
+  backend = "cmdstanr",
+  cores = 4
+)
+```
+
+**Theoretical predictions**:
+
+- **Speed emphasis**: Lower boundary (faster, less accurate)
+- **Accuracy emphasis**: Higher boundary (slower, more accurate)
+- **Drift**: Should primarily reflect stimulus strength, not instruction
+
+# Model Comparison and Selection
+
+## Comparing DDM Versions
+
+Use information criteria to compare model fit:
+
+```{r, eval=FALSE}
+# Compute LOO for each model
+loo_3par <- loo(fit_3par)
+loo_4par <- loo(fit_4par)
+loo_7par <- loo(fit_7par)
+
+# Compare models
+loo_compare(loo_3par, loo_4par, loo_7par)
+
+# Check for influential observations
+plot(loo_7par)
+```
+
+**General findings** (from simulation studies):
+
+- 3-parameter model often sufficient when variability is low
+- 4-parameter model improves fit when response bias present
+- 7-parameter model necessary when trial-to-trial variability is substantial
+- Overfitting risks with 7-parameter model on small datasets (<100 trials)
+
+## Posterior Predictive Checks
+
+Assess model adequacy by comparing predictions to data:
+
+```{r, eval=FALSE}
+# Generate posterior predictions
+pp_3par <- posterior_predict(fit_3par)
+
+# Compare predicted vs observed RT distributions
+library(bayesplot)
+ppc_dens_overlay(demo_data$rt, pp_3par[1:50, ])
+
+# Quantile-probability plots (QP plots)
+# These are the gold standard for evaluating DDM fits
+# Shows predicted vs observed RT quantiles for correct/error responses
+```
+
+# Hypothesis Testing
+
+## Testing Parameter Differences
+
+Use Bayesian hypothesis testing to compare parameters across conditions:
+
+```{r, eval=FALSE}
+# Test if drift differs between conditions
+hypothesis(fit_instruction, "driftinstructionspeed < 0")
+
+# Test if boundary differs between conditions  
+hypothesis(fit_instruction, "boundinstructionspeed < boundinstructionaccuracy")
+
+# Joint hypothesis about multiple parameters
+hypothesis(fit_instruction, c(
+  "driftstrength > 0",
+  "boundinstructionaccuracy > boundinstructionspeed"
+))
+```
+
+## Bayes Factors
+
+Compare specific hypotheses using bridge sampling:
+
+```{r, eval=FALSE}
+# Fit constrained model (drift doesn't vary by strength)
+formula_null <- bmf(
+  drift ~ 1 + (1 | id),
+  bound ~ instruction + (instruction | id),
+  ndt ~ 1 + (1 | id)
+)
+
+fit_null <- bmm(
+  formula = formula_null,
+  data = full_data,
+  model = model_hier,
+  backend = "cmdstanr"
+)
+
+# Compute Bayes factor (requires bridgesampling package)
+# bf <- bayes_factor(fit_instruction, fit_null)
+```
+
+# Advanced Topics
+
+## Custom Priors
+
+Specify informative priors based on prior research or pilot data:
+
+```{r, eval=FALSE}
+# Define custom priors
+custom_priors <- c(
+  prior(normal(2, 1), nlpar = "drift", coef = "Intercept"),
+  prior(normal(1, 0.5), nlpar = "bound", coef = "Intercept"),
+  prior(normal(-1, 0.3), nlpar = "ndt", coef = "Intercept")  # on log scale
+)
+
+# Fit with custom priors
+fit_custom <- bmm(
+  formula = formula_3par,
+  data = demo_data,
+  model = model_3par,
+  prior = custom_priors,
+  backend = "cmdstanr"
+)
+```
+
+## Fixing Parameters
+
+Fix parameters to specific values for hypothesis testing:
+
+```{r, eval=FALSE}
+# Fix starting point to 0.5 (unbiased) while estimating others
+formula_fixed <- bmf(
+  drift ~ strength,
+  bound ~ 1,
+  ndt ~ 1,
+  zr = 0.5  # fixed parameter
+)
+
+fit_fixed <- bmm(
+  formula = formula_fixed,
+  data = demo_data,
+  model = model_4par,  # uses 4par model but fixes zr
+  backend = "cmdstanr"
+)
+```
+
+## Link Functions
+
+By default, `bmm` uses appropriate link functions:
+
+- **drift**: identity (can be positive or negative)
+- **bound**: log (must be positive)
+- **ndt**: log (must be positive)
+- **zr**: logit (must be between 0 and 1)
+- **sdrift, sndt**: log (must be positive)
+- **szr**: logit (must be between 0 and 1)
+
+You can customize links if needed:
+
+```{r, eval=FALSE}
+# Use log link for drift (forces positive values)
+model_custom_links <- ddm(
+  rt = "rt",
+  response = "response",
+  version = "3par",
+  links = list(drift = "log")
+)
+```
+
+# Comparison with Other Models
+
+## DDM vs Censored Shifted Wald (cswald)
+
+**DDM advantages**:
+
+- Models both correct and error responses
+- Accounts for response bias and variability
+- Richer theoretical interpretation
+- Standard in the field
+
+**cswald advantages**:
+
+- Much faster to fit (minutes vs hours)
+- Simpler interpretation with fewer parameters
+- Adequate for high-accuracy tasks
+- More stable with small samples
+
+**Recommendation**: Use cswald for initial exploration or when errors are rare
+(<10%); use DDM for complete analysis when computational resources allow.
+
+## DDM vs EZ-DDM (ezdm)
+
+The EZ-DDM provides closed-form parameter estimates from summary statistics
+(mean RT, accuracy, RT variance). It's extremely fast but:
+
+- Only provides point estimates (no uncertainty quantification)
+- Cannot model individual differences hierarchically
+- Cannot include covariates
+- Assumes specific parameter values (e.g., $z = 0.5$, $s_z = 0$)
+
+**Recommendation**: Use ezdm for quick initial estimates or when you need to
+process many datasets rapidly; use full DDM for formal inference.
+
+# Practical Guidelines
+
+## Sample Size Recommendations
+
+Based on simulation studies and practical experience:
+
+- **Minimum**: 50 trials per condition (for 3-parameter model)
+- **Adequate**: 100-200 trials per condition (for 4-parameter model)
+- **Recommended**: 200+ trials per condition (for 7-parameter model)
+- **Hierarchical models**: At least 5-10 subjects per group
+
+## Convergence Diagnostics
+
+Always check:
+
+1. **Rhat < 1.01** for all parameters (indicates chain convergence)
+2. **ESS > 400** (effective sample size, indicates sufficient sampling)
+3. **No divergent transitions** (indicates numerical issues)
+4. **Trace plots** look like "hairy caterpillars"
+5. **Posterior predictive checks** show good fit
+
+## Common Issues and Solutions
+
+**Problem**: Divergent transitions
+- **Solution**: Increase `adapt_delta` (e.g., 0.95 or 0.99)
+
+**Problem**: Slow mixing / low ESS
+- **Solution**: Increase iterations, use informative priors, check reparameterization
+
+**Problem**: Boundary estimates at extremes
+- **Solution**: Check data quality, consider more informative priors
+
+**Problem**: Non-decision time longer than minimum RT
+- **Solution**: Check for fast outliers, consider data trimming
+
+**Problem**: Starting point estimates at 0 or 1
+- **Solution**: May indicate model misspecification or insufficient data
+
+# References
+
+<div id="refs"></div>
+
+# Session Info
+
+```{r}
+sessionInfo()
+```

@@ -44,10 +44,8 @@ package:
   - [Available models](#available-models)
   - [Fitting models using `bmm`](#fitting-models-using-bmm)
   - [Exploring measurement models](#exploring-measurement-models)
-  - [The general structure of the `bmm`
-    package](#the-general-structure-of-the-bmm-package)
-  - [Contributing to the `bmm`
-    package](#contributing-to-the-bmm-package)
+  - [The general structure of the `bmm` package](#the-general-structure-of-the-bmm-package)
+  - [Contributing to the `bmm` package](#contributing-to-the-bmm-package)
 
 ## How to install bmm
 
@@ -143,12 +141,17 @@ of working memory research, such as:
 
 - The Multinomial / Memory Measurement Model
 
+**Evidence Accumulation Models (Response Time & Choice)**
+
+- Diffusion Decision Model (DDM) by Ratcliff (1978)
+- Censored Shifted Wald (cswald) by Miller & Ulrich (2018)
+
 However, the `bmm` package is setup to provide the foundation for the
 implementation of a broad range of cognitive measurement models. In
 fact, we are already working on implementing additional models, such as:
 
-- Signal-Detection Models
-- Evidence Accumulation Models
+- Additional Signal-Detection Models
+- EZ-DDM and related simplified evidence accumulation models
 
 If you have suggestions for models that should be added to the package
 or additional functionality that would improve the usability of the
