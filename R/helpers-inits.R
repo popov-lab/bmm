@@ -98,7 +98,7 @@ init_vector_param <- function(par, dim, init_range, link, bterms, data) {
     # ranges; the rest (if any) with small random values
     term_labels <- attr(terms(bterms$fe), "term.labels")
     variables <- strsplit(term_labels[1], ":")[[1]] # may be interaction terms (e.g., "var1:var2")
-    n_first <- count_term_levels(data, variables)$total_coeffs
+    n_first <- count_term_levels(data, variables)
 
     c(
       link_transform(runif(n_first, min = init_range[1], max = init_range[2]), link),
@@ -114,43 +114,18 @@ init_vector_param <- function(par, dim, init_range, link, bterms, data) {
 }
 
 
-# Count "levels" per term, with configurable handling for numeric columns.
-count_term_levels <- function(data, vars,
-                              numeric_strategy = c("one", "unique", "bins"),
-                              nbins = NULL,
-                              na.rm = TRUE) {
-  numeric_strategy <- match.arg(numeric_strategy)
+# Count levels for model formula terms - used for determining number of
+# coefficients when initializing models without intercepts
+count_term_levels <- function(data, vars) {
   term_sizes <- vapply(data[vars], function(x) {
-    # factors (including ordered): use declared levels
     if (is.factor(x)) {
-      return(nlevels(x))
+      nlevels(x)
+    } else {
+      # For continuous predictors, treat as single coefficient
+      1L
     }
-
-    # numeric/integer
-    if (is.numeric(x)) {
-      if (numeric_strategy == "one") {
-        return(1L) # treat continuous predictor as 1 level
-      } else if (numeric_strategy == "unique") {
-        ux <- if (na.rm) unique(na.omit(x)) else unique(x)
-        return(length(ux))
-      } else {
-        stopif(is.null(nbins) || nbins < 1, "Provide a positive 'nbins' for numeric_strategy='bins'.")
-        x2 <- if (na.rm) x[!is.na(x)] else x
-        if (!length(x2)) {
-          return(0L)
-        }
-        b <- cut(x2, breaks = nbins, include.lowest = TRUE, right = TRUE)
-        return(nlevels(b))
-      }
-    }
-
-    # fallback: distinct count
-    ux <- if (na.rm) unique(na.omit(x)) else unique(x)
-    length(ux)
   }, integer(1L))
-
-  list(
-    per_term = term_sizes,
-    total_coeffs = prod(term_sizes)
-  )
+  
+  # Return total number of coefficients (product for interactions)
+  prod(term_sizes)
 }
