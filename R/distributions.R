@@ -663,7 +663,7 @@ rm3 <- function(n, size, pars, m3_model, act_funs = construct_m3_act_funs(m3_mod
 #' @keywords distributions
 #'
 #' @export
-dddm <- function(rt, response,drift, bound, ndt, zr = 0.5, sdrift = 0, sndt = 0, szr = 0, log = TRUE) {
+dddm <- function(rt, response, drift, bound, ndt, zr = 0.5, sdrift = 0, sndt = 0, szr = 0, log = TRUE) {
 
   stopif(any(rt < 0),
          glue("Negative RTs are not allowed.\n",
@@ -681,8 +681,28 @@ dddm <- function(rt, response,drift, bound, ndt, zr = 0.5, sdrift = 0, sndt = 0,
   stopif(length(rt) != length(response),
          glue("Different number of rts and responses passed to dddm. Please pass vectors of equal length."))
 
-  out <- rtdists::ddiffusion(rt = rt, response = response,
-                             a = bound, v = drift, t0 = ndt, z = zr * bound, sz = szr, sv = sdrift, st0 = sndt)
+  # Recycle rt/response to match parameter length if needed
+  # This is needed for log_lik functions where we have one observation
+  # but multiple parameter samples from the posterior
+  max_len <- max(lengths(list(drift, bound, ndt, zr, sdrift, sndt, szr)))
+  
+  if (length(rt) == 1 && max_len > 1) {
+    rt <- rep(rt, max_len)
+    response <- rep(response, max_len)
+  }
+  
+  # Call ddiffusion with recycled vectors
+  out <- rtdists::ddiffusion(
+    rt = rt,
+    response = response,
+    a = bound,
+    v = drift,
+    t0 = ndt,
+    z = zr * bound,
+    sz = szr,
+    sv = sdrift,
+    st0 = sndt
+  )
 
   if(log) out <- log(out)
   out

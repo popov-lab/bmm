@@ -165,6 +165,7 @@
 #' @param version A character label for the version of the model. Can be empty or NULL if there is only one version.
 #' @param ... used internally for testing, ignore it
 #' @return An object of class `bmmodel`
+#' @keywords bmmodel
 #' @export
 #' @examples
 #' \dontrun{
@@ -343,24 +344,27 @@ configure_model.ddm <- function(model, data, formula) {
 }
 
 log_lik_ddm <- function(i, prep) {
-  out <- rtdists::ddiffusion(rt = prep$data$Y[i], response = ifelse(prep$data[["dec"]][i] == 1, "upper","lower"),
-                             a = brms::get_dpar(prep, "bound", i = i),
-                             v = brms::get_dpar(prep, "drift", i),
-                             t0 = brms::get_dpar(prep, "ndt", i = i),
-                             z = brms::get_dpar(prep, "zr", i = i) * brms::get_dpar(prep, "bound", i = i),
-                             sz = brms::get_dpar(prep, "szr", i = i),
-                             sv = brms::get_dpar(prep, "sdrift", i = i),
-                             st0 = brms::get_dpar(prep, "sndt", i = i))
-  log(out)
+  dddm(
+    rt = prep$data$Y[i],
+    response = prep$data[["dec"]][i],
+    drift = brms::get_dpar(prep, "drift", i = i),
+    bound = brms::get_dpar(prep, "bound", i = i),
+    ndt = brms::get_dpar(prep, "ndt", i = i),
+    zr = brms::get_dpar(prep, "zr", i = i),
+    szr = brms::get_dpar(prep, "szr", i = i),
+    sdrift = brms::get_dpar(prep, "sdrift", i = i),
+    sndt = brms::get_dpar(prep, "sndt", i = i),
+    log = TRUE
+  )
 }
 
 posterior_predict_ddm <- function(i, prep, ...) {
   dots <- list(...)
 
   out <- rddm(
-    n = length(brms::get_dpar(prep,"drift", i = i)),
+    n = length(brms::get_dpar(prep, "drift", i = i)),
+    drift = brms::get_dpar(prep, "drift", i = i),
     bound = brms::get_dpar(prep, "bound", i = i),
-    drift = brms::get_dpar(prep, "drift", i),
     ndt = brms::get_dpar(prep, "ndt", i = i),
     zr = brms::get_dpar(prep, "zr", i = i),
     szr = brms::get_dpar(prep, "szr", i = i),
