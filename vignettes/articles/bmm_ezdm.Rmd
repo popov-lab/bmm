@@ -799,7 +799,7 @@ draws %>%
 
 # Comparing conditions
 
-As `bmm` feeds seamlessly into `brms`, we can use Bayesian hypothesis testing via Savage-Dickey density rations to compare drift rates between conditions:
+As `bmm` feeds seamlessly into `brms`, we can use Bayesian hypothesis testing via Savage-Dickey density ratios to compare drift rates between conditions:
 
 ```{r}
 # Test if drift rate is higher in easy vs hard condition
