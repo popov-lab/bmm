@@ -46,7 +46,7 @@ fansi::set_knit_hooks(knitr::knit_hooks, which = c("output","message","error"))
 
 # Introduction to the model
 
-The diffusion model [@Ratcliff_1978] is a widely used model in speeded decision-making. It describes how participants accumulate noisy evidence over time until reaching one of two decision boundaries. Usually, the diffusion model is fit to trial-level reaction time distributions, which can be computationally intensive, especially for hierarchical Bayeisian estiamtion.
+The diffusion model [@Ratcliff_1978] is a widely used model in speeded decision-making. It describes how participants accumulate noisy evidence over time until reaching one of two decision boundaries. Usually, the diffusion model is fit to trial-level reaction time distributions, which can be computationally intensive, especially for hierarchical Bayesian estimation.
 
 The **EZ-Diffusion Model** [@Wagenmakers_2007] provides a simplified alternative building on closed-form equations that relate the parameters of the diffusion model to easily computed summary statistics: mean reaction time (MRT), reaction time variance (VRT), and accuracy (proportion correct, Pc). This makes it possible to calculate diffusion model parameters from aggregated data without fitting to individual trials.
 
@@ -424,7 +424,7 @@ summary_hybrid <- ezdm_summary_stats(
 )
 ```
 
-Fixed bounds based on task constraints (e.g., responses faster than 100ms are likely anticipations) provide more conservative estimates of contaminants. However, in the present of contaminants, data driven bounds are often more accurate with respect to detecting contaminants, especially in the presence of very long reaction times. In practice you can first filter the data and discard very short (< 0.1s) and very long (> 3 to 5s) and then proceed with data driven bounds for the mixture approach. This prevents the bounds from being influenced by extreme outliers.
+Fixed bounds based on task constraints (e.g., responses faster than 100ms are likely anticipations) provide more conservative estimates of contaminants. However, in the presence of contaminants, data driven bounds are often more accurate with respect to detecting contaminants, especially in the presence of very long reaction times. In practice you can first filter the data and discard very short (< 0.1s) and very long (> 3 to 5s) and then proceed with data driven bounds for the mixture approach. This prevents the bounds from being influenced by extreme outliers.
 
 ## Quality Control: Inspecting Contaminant Proportions
 
@@ -799,7 +799,7 @@ draws %>%
 
 # Comparing conditions
 
-As `bmm` feeds seamlessly into `brms`, we can use Bayesian hypothesis testing via Savage-Dickey density rations to compare drift rates between conditions:
+As `bmm` feeds seamlessly into `brms`, we can use Bayesian hypothesis testing via Savage-Dickey density ratios to compare drift rates between conditions:
 
 ```{r}
 # Test if drift rate is higher in easy vs hard condition
