@@ -288,18 +288,18 @@ The DDM requires:
 # Prepare data for DDM analysis
 # Focus on one participant and instruction condition for demonstration
 demo_data <- rr98 %>%
-  filter(id == 1, instruction == "accuracy") %>%
+  dplyr::filter(id == "jf", instruction == "accuracy") %>%
   mutate(
     # Recode response: 1 = "upper", 0 = "lower"
     response = ifelse(response_num == 1, 0, 1)
-  ) %>%
-  select(rt, response, strength)
+  )
 
 # Check response coding
 table(demo_data$response)
 
 # Visualize RT distributions by response
 ggplot(demo_data, aes(x = rt, fill = factor(response))) +
+  facet_wrap(~ source) +
   geom_histogram(alpha = 0.6, bins = 30, position = "identity") +
   labs(x = "Response Time (s)", y = "Count", fill = "Response") +
   theme_minimal()
@@ -319,7 +319,7 @@ model_3par <- ddm(rt = "rt",
 
 # Define the formula - let drift vary by strength
 formula_3par <- bmf(
-  drift ~ strength,
+  drift ~ 0 + source,
   bound ~ 1,
   ndt ~ 1
 )
@@ -363,7 +363,7 @@ model_4par <- ddm(rt = "rt",
 
 # Define the formula
 formula_4par <- bmf(
-  drift ~ strength,
+  drift ~ 0 + source,
   bound ~ 1,
   ndt ~ 1,
   zr ~ 1  # starting point bias
@@ -405,7 +405,7 @@ model_7par <- ddm(rt = "rt",
 
 # Define the formula
 formula_7par <- bmf(
-  drift ~ strength,
+  drift ~ 0 + source,
   bound ~ 1,
   ndt ~ 1,
   zr ~ 1,
