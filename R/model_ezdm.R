@@ -167,7 +167,7 @@
 #'
 #' # Extract population-level effects
 #' # True values: drift = 2, bound = 1.5, ndt = 0.3 (on log scale for drift/bound)
-#' exp(fixef(fit))
+#' exp(brms::fixef(fit))
 #' }
 ezdm <- function(mean_rt, var_rt, n_upper, n_trials, links = NULL, version = "3par", ...) {
   call <- match.call()
@@ -206,7 +206,7 @@ check_data.ezdm <- function(model, data, formula) {
   required_vars <- c(mean_rt, var_rt, n_upper, n_trials)
   missing_vars <- setdiff(required_vars, colnames(data))
   stopif(
-    length(missing_vars) > 0,
+    length(missing_vars),
     "The following required variables are missing from the data: {collapse_comma(missing_vars)}"
   )
 
