@@ -568,16 +568,16 @@ rimm <- function(n, mu = c(0, 2, -1.5), dist = c(0, 0.5, 2),
 #'
 #' @name m3dist
 #'
-#' @param x Integer vector of length `K` where K is the number of response categories 
+#' @param x Integer vector of length `K` where K is the number of response categories
 #'   and each value is the number of observed responses per category
 #' @param n Integer. Number of observations to generate data for
-#' @param size The total number of observations in all categories 
+#' @param size The total number of observations in all categories
 #' @param pars A named vector of parameters of the memory measurement model
 #' @param m3_model A `bmmodel` object specifying the m3 model that densities or
 #'   random samples should be generated for
 #' @param act_funs A `bmmformula` object specifying the activation functions for
-#'   the different response categories for the "custom" version of the M3. The 
-#'   default will attempt to construct the standard activation functions for the 
+#'   the different response categories for the "custom" version of the M3. The
+#'   default will attempt to construct the standard activation functions for the
 #'   "ss" and "cs" model version. For a custom m3 model you need to specify the
 #'   act_funs argument manually
 #' @param log Logical; if `TRUE` (default), values are returned on the log scale.
@@ -602,7 +602,7 @@ rimm <- function(n, mu = c(0, 2, -1.5), dist = c(0, 0.5, 2),
 #'  )
 #'  dm3(x = c(20, 10, 10), pars = c(a = 1, b = 1, c = 2), m3_model = model)
 #' @export
-dm3 <- function(x, pars, m3_model, act_funs = construct_m3_act_funs(m3_model, warnings = FALSE), 
+dm3 <- function(x, pars, m3_model, act_funs = construct_m3_act_funs(m3_model, warnings = FALSE),
                 log = TRUE, ...) {
   probs <- .compute_m3_probability_vector(pars, m3_model, act_funs, ...)
   dmultinom(x, prob = probs, log = log)
@@ -719,7 +719,7 @@ dezdm <- function(mean_rt, var_rt, n_upper, n_trials,
   stopif(isTRUE(any(bound <= 0)), "bound must be positive")
   stopif(isTRUE(any(ndt <= 0)), "ndt must be positive")
   stopif(isTRUE(any(s <= 0)), "s must be positive")
-  stopif(isTRUE(any(n_trials <= 0)), "n_trials must be positive")
+  stopif(isTRUE(any(n_trials <= 2)), "n_trials must be larger than 2")
   stopif(isTRUE(any(n_upper < 0)), "n_upper cannot be negative")
   stopif(isTRUE(any(n_upper > n_trials)), "n_upper cannot exceed n_trials")
 
@@ -767,6 +767,7 @@ rezdm <- function(n, n_trials, drift, bound, ndt, zr = 0.5, s = 1,
   stopif(isTRUE(any(ndt <= 0)), "ndt must be positive")
   stopif(isTRUE(any(s <= 0)), "s must be positive")
   stopif(length(n) > 1, "n must be a single integer")
+  stopif(n_trials <= 2, "n_trials must be larger than 2")
 
   if (version == "4par") {
     stopif(isTRUE(any(zr <= 0 | zr >= 1)), "zr must be between 0 and 1")

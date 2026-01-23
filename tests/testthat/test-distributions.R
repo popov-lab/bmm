@@ -352,6 +352,19 @@ test_that("dezdm validates parameters correctly", {
           drift = 2, bound = 1.5, ndt = 0.3),
     "n_upper cannot exceed n_trials"
   )
+  
+  # n_trials must be larger than 2
+  expect_error(
+    dezdm(mean_rt = 0.5, var_rt = 0.02, n_upper = 1, n_trials = 1,
+          drift = 2, bound = 1.5, ndt = 0.3),
+    "n_trials must be larger than 2"
+  )
+  
+  expect_error(
+    dezdm(mean_rt = 0.5, var_rt = 0.02, n_upper = 2, n_trials = 2,
+          drift = 2, bound = 1.5, ndt = 0.3),
+    "n_trials must be larger than 2"
+  )
 
   # version must be valid
   expect_error(
@@ -381,6 +394,17 @@ test_that("rezdm validates parameters correctly", {
   expect_error(
     rezdm(n = c(10, 20), n_trials = 100, drift = 2, bound = 1.5, ndt = 0.3),
     "n must be a single integer"
+  )
+  
+  # n_trials must be larger than 2
+  expect_error(
+    rezdm(n = 10, n_trials = 1, drift = 2, bound = 1.5, ndt = 0.3),
+    "n_trials must be larger than 2"
+  )
+  
+  expect_error(
+    rezdm(n = 10, n_trials = 2, drift = 2, bound = 1.5, ndt = 0.3),
+    "n_trials must be larger than 2"
   )
 })
 
