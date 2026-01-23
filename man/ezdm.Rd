@@ -101,10 +101,6 @@ Provide aggregated statistics for each subject and condition that model paramete
 }
 }
 }
-
-\strong{Note:} The drift parameter uses an identity link (not log) to allow
-estimation of negative drift rates for below-chance performance. A soft
-absolute value approximation ensures smooth gradients for MCMC sampling.
 }
 \examples{
 \dontrun{

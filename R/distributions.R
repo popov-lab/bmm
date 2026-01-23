@@ -1127,8 +1127,8 @@ rezdm <- function(n, n_trials, drift, bound, ndt, zr = 0.5, s = 1,
   # This provides smooth gradients without extreme curvature
   tau <- 0.01
   a <- sqrt(drift^2 + tau^2)
-  k_z <- (a * z) / s^2
-  k_x <- (a * x0) / s^2
+  kz <- (a * z) / s^2
+  kx <- (a * x0) / s^2
 
   # initialize outputs
   mdt_upper <- rep(NA_real_, n)
