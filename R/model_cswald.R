@@ -365,9 +365,7 @@ bmf2bf.cswald <- function(model, formula) {
 #' @export
 configure_model.cswald_simple <- function(model, data, formula) {
   # retrieve required arguments
-  rt_var <- model$other_vars$rt
   response_var <- model$other_vars$response
-  trials <- data[, response_var]
   links <- model$links
 
   # construct brms formula from the bmm formula
@@ -464,9 +462,7 @@ log_lik_cswald_simple <- function(i, prep) {
 #' @export
 configure_model.cswald_crisk <- function(model, data, formula) {
   # retrieve required arguments
-  rt_var <- model$other_vars$rt
   response_var <- model$other_vars$response
-  trials <- data[, response_var]
   links <- model$links
 
   # construct brms formula from the bmm formula
