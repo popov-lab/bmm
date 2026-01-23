@@ -205,6 +205,7 @@ The `bmm` package provides the `ezdm_summary_stats()` function to compute the re
 Research by @wagenmakers_EZDoesIt_2008 demonstrated that contaminant responses systematically bias EZ-DM parameter estimates. Even a small proportion (5-10%) of outlier RTs can substantially affect the moments used to compute drift rate, boundary, and non-decision time. To illustrate this, let's generate trial-level data with known parameters and introduce realistic contaminants:
 
 ```{r trial-level-simulation, message=FALSE}
+library(bmm)
 library(rtdists)
 library(dplyr)
 
@@ -225,12 +226,12 @@ trials_clean <- rdiffusion(
   z = 0.5 * true_bound  # Symmetric starting point
 )
 
-# Add contaminants (5% fast guesses uniformly distributed between 0.1-0.3s)
+# Add contaminants (5% fast guesses and lapses uniformly distributed between 0.1 and 3 seconds)
 n_contaminants <- round(n_trials * 0.05)
 contaminant_idx <- sample(n_trials, n_contaminants)
 
 trials_contaminated <- trials_clean
-trials_contaminated$rt[contaminant_idx] <- runif(n_contaminants, 0.1, 0.3)
+trials_contaminated$rt[contaminant_idx] <- runif(n_contaminants, 0.1, 3)
 trials_contaminated$response[contaminant_idx] <- sample(c("upper", "lower"), 
                                                          n_contaminants, 
                                                          replace = TRUE)
@@ -324,8 +325,8 @@ summary_mixture <- ezdm_summary_stats(
   response = "correct",
   .by = c("subject", "condition"),
   method = "mixture",              # Default: use mixture modeling
-  distribution = "exgaussian",     # RT distribution for true responses
-  contaminant_bound = c(0.1, 3.0), # Bounds for contaminant distribution
+  distribution = "lognormal",     # RT distribution for true responses
+  contaminant_bound = c("min", "max"), # Bounds for contaminant distribution
   version = "3par"
 )
 
@@ -340,21 +341,24 @@ Let's compare all three approaches:
 
 ```{r comparison}
 comparison <- data.frame(
-  Method = c("Simple", "Robust", "Mixture"),
+  Method = c("Simple", "Robust", "Mixture", "TRUE"),
   Mean_RT = c(
     summary_simple$mean_rt,
     summary_robust$mean_rt,
-    summary_mixture$mean_rt
+    summary_mixture$mean_rt,
+    mean(trials_clean$rt[trials_clean$response == "upper"])
   ),
   Var_RT = c(
     summary_simple$var_rt,
     summary_robust$var_rt,
-    summary_mixture$var_rt
+    summary_mixture$var_rt,
+    var(trials_clean$rt[trials_clean$response == "upper"])
   ),
   Contaminant = c(
     NA,
     NA,
-    summary_mixture$contaminant_prop
+    summary_mixture$contaminant_prop,
+    0.05
   )
 )
 
@@ -385,7 +389,7 @@ for (dist in c("exgaussian", "lognormal", "invgaussian")) {
     distribution = dist,
     version = "3par"
   )
-  cat(dist, ": Mean RT =", round(stats$mean_rt, 3), 
+  cat(dist, ": Mean RT =", round(stats$mean_rt, 3), ", Var RT =", round(stats$var_rt, 4),
       ", Contaminant prop =", round(stats$contaminant_prop, 3), "\n")
 }
 ```
@@ -420,7 +424,7 @@ summary_hybrid <- ezdm_summary_stats(
 )
 ```
 
-**Recommendation**: Use fixed bounds based on task constraints when possible (e.g., responses faster than 100ms are likely anticipations). This prevents the bounds from being influenced by extreme outliers.
+Fixed bounds based on task constraints (e.g., responses faster than 100ms are likely anticipations) provide more conservative estimates of contaminants. However, in the present of contaminants, data driven bounds are often more accurate with respect to detecting contaminants, especially in the presence of very long reaction times. In practice you can first filter the data and discard very short (< 0.1s) and very long (> 3 to 5s) and then proceed with data driven bounds for the mixture approach. This prevents the bounds from being influenced by extreme outliers.
 
 ## Quality Control: Inspecting Contaminant Proportions
 
@@ -502,7 +506,7 @@ When using the mixture method with sparse data, the algorithm may fail to conver
 
 ## Accuracy Adjustment for Better Estimates
 
-The `adjust_accuracy` parameter (default: `FALSE`) adjusts the accuracy counts (`n_upper`, `n_trials`) by removing estimated contaminants from both numerator and denominator:
+The `adjust_accuracy` parameter (default: `FALSE`) adjusts the accuracy counts (`n_upper`, `n_trials`) by removing estimated contaminants from both numerator and denominator. The accuracy adjustments assumes that contaminants are random guesses, which on average yield 50% accuracy. This adjustment can improve accuracy estimates when contaminants are substantial:
 
 ```{r accuracy-adjustment}
 # Without accuracy adjustment (default)
