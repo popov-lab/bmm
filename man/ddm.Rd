@@ -33,12 +33,12 @@ Diffusion Decision Model
 \itemize{
 \item 
 \itemize{
-\item Ratcliff, R. (1978). A theory of memory retrieval. Psychological Review, 85(2), 59–108. https://doi.org/10/fjwm2f
+\item Ratcliff, R. (1978). A theory of memory retrieval. Psychological Review, 85(2), 59-108. https://doi.org/10/fjwm2f
 }
 }
 }
 \itemize{
-\item Henrich, F., Hartmann, R., Pratz, V., Voss, A., & Klauer, K. C. (2024). The Seven-parameter Diffusion Model: An Implementation in Stan for Bayesian Analyses. Behavior Research Methods, 56(4), 3102–3116. https://doi.org/10.3758/s13428-023-02179-1
+\item Henrich, F., Hartmann, R., Pratz, V., Voss, A., & Klauer, K. C. (2024). The Seven-parameter Diffusion Model: An Implementation in Stan for Bayesian Analyses. Behavior Research Methods, 56(4), 3102-3116. https://doi.org/10.3758/s13428-023-02179-1
 }
 \itemize{
 \item \strong{Version:} 7par
@@ -90,18 +90,18 @@ Diffusion Decision Model
 }
 \item \code{sdrift}:
 \itemize{
-\item \code{main}: normal(0,0.5)
-\item \code{effects}: normal(0,0.5)
+\item \code{main}: normal(0,0.3)
+\item \code{effects}: normal(0,0.3)
 }
 \item \code{sndt}:
 \itemize{
-\item \code{main}: normal(0,0.5)
-\item \code{effects}: normal(0,0.5)
+\item \code{main}: normal(-2.5,0.3)
+\item \code{effects}: normal(0,0.3)
 }
 \item \code{szr}:
 \itemize{
-\item \code{main}: normal(0,0.5)
-\item \code{effects}: normal(0,0.5)
+\item \code{main}: normal(0,0.2)
+\item \code{effects}: normal(0,0.3)
 }
 }
 }
@@ -111,3 +111,4 @@ Diffusion Decision Model
 # put a full example here (see 'R/model_mixture3p.R' for an example)
 }
 }
+\keyword{bmmodel}

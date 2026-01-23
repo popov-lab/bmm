@@ -670,6 +670,9 @@ dddm <- function(rt, response, drift, bound, ndt, zr = 0.5, sdrift = 0, sndt = 0
               "Please check your rt variable and pass only positive RTs."))
 
   if(!is.character(response)){
+    # Validate numeric responses are 0 or 1 before converting
+    stopif(any(!response %in% c(0, 1)),
+           glue("Invalid numeric responses! Numeric responses must be 0 (lower) or 1 (upper)."))
     response <- ifelse(response == 1, "upper","lower")
   }
 
