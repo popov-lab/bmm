@@ -103,7 +103,56 @@ Provide aggregated statistics for each subject and condition that model paramete
 }
 \examples{
 \dontrun{
-# put a full example here (see 'R/model_mixture3p.R' for an example)
+# Minimal parameter recovery example with 3-parameter EZDM
+
+# Simulate data from known parameters
+set.seed(123)
+sim_data <- rezdm(
+  n = 10,
+  n_trials = 100,
+  drift = 2,
+  bound = 1.5,
+  ndt = 0.3,
+  version = "3par"
+)
+
+# Add subject ID
+sim_data$id <- 1:10
+
+# Specify model
+model <- ezdm(
+  mean_rt = "mean_rt",
+  var_rt = "var_rt", 
+  n_upper = "n_upper",
+  n_trials = "n_trials",
+  version = "3par"
+)
+
+# Specify formula with random effects
+formula <- bmf(
+  drift ~ 1 + (1 | id),
+  bound ~ 1 + (1 | id),
+  ndt ~ 1
+)
+
+# Fit model (using cmdstanr backend)
+fit <- bmm(
+  formula = formula,
+  data = sim_data,
+  model = model,
+  backend = "cmdstanr",
+  cores = 4,
+  chains = 4,
+  iter = 2000,
+  warmup = 1000
+)
+
+# Check parameter recovery
+summary(fit)
+
+# Extract population-level effects
+# True values: drift = 2, bound = 1.5, ndt = 0.3 (on log scale for drift/bound)
+fixef(fit)
 }
 }
 \keyword{bmmodel}
