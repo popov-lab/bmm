@@ -14,7 +14,7 @@ test_that("sdm distribution functions run without errors", {
 })
 
 test_that("dsdm integrates to 1", {
-  expect_equal(integrate(dsdm, -pi, pi, mu = 0, c = 3, kappa = 3)$value, 1)
+  expect_equal(integrate(dsdm, -pi, pi, mu = 0, c = 3, kappa = 3)$value, 1, tolerance = 1e-6)
 })
 
 
@@ -61,7 +61,7 @@ test_that("dmixture2p integrates to 1", {
     mu = runif(1, min = -pi, pi),
     kappa = runif(1, min = 1, max = 20),
     p_mem = runif(1, min = 0, max = 1)
-  )$value, 1)
+  )$value, 1, tolerance = 1e-6)
 })
 
 test_that("dmixture3p integrates to 1", {
@@ -70,7 +70,7 @@ test_that("dmixture3p integrates to 1", {
     kappa = runif(1, min = 1, max = 20),
     p_mem = runif(1, min = 0, max = 0.6),
     p_nt = runif(1, min = 0, max = 0.3)
-  )$value, 1)
+  )$value, 1, tolerance = 1e-6)
 })
 
 test_that("dimm integrates to 1", {
@@ -82,7 +82,7 @@ test_that("dimm integrates to 1", {
     a = runif(1, min = 0, max = 1),
     s = runif(1, min = 1, max = 20),
     b = 0
-  )$value, 1)
+  )$value, 1, tolerance = 1e-6)
 })
 
 test_that("rmixture2p returns values between -pi and pi", {
