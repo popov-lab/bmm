@@ -441,7 +441,7 @@ configure_model.ezdm_4par <- function(model, data, formula) {
       'ezdm_4par',
       dpars = c("mu","drift","bound","ndt","zr","s"),
       links = c("identity",link_drift,link_bound,link_ndt,link_zr,link_s),
-      lb = c(NA,0,0,0,0,0), # lower bounds for parameters
+      lb = c(NA,NA,0,0,0,0), # lower bounds for parameters
       ub = c(NA,NA,NA,NA,1,NA), # upper bounds for parameters
       type = 'real', # real for continous dv, int for discrete dv
       log_lik = log_lik_ezdm_4par,
