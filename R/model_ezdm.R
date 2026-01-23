@@ -104,6 +104,11 @@
 #' @title `r .model_ezdm()$name`
 #' @name ezdm
 #' @details `r model_info(.model_ezdm(version = "4par"))`
+#' 
+#' **Note:** The drift parameter uses an identity link (not log) to allow
+#' estimation of negative drift rates for below-chance performance. A soft
+#' absolute value approximation ensures smooth gradients for MCMC sampling.
+#' 
 #' @param mean_rt The variable or variables (for 4par version) coding the mean reaction time in seconds in the data.
 #' @param var_rt The variable or variables (for 4par version) coding the variance of the reaction time in seconds in the data
 #' @param n_upper The variable coding the number of responses that hit the upper response threshold (typically the number of correct responses) in the data.

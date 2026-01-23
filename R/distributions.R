@@ -660,7 +660,8 @@ rm3 <- function(n, size, pars, m3_model, act_funs = construct_m3_act_funs(m3_mod
 #'   columns for multiple observations.
 #' @param n_upper Number of responses to the upper boundary
 #' @param n_trials Total number of trials
-#' @param drift Drift rate (positive, evidence accumulation rate).
+#' @param drift Drift rate (evidence accumulation rate; can be positive or negative
+#'   for below-chance performance).
 #' @param bound Boundary separation (distance between decision thresholds).
 #' @param ndt Non-decision time (seconds).
 #' @param zr Relative starting point (0 to 1). Only used for version "4par".
