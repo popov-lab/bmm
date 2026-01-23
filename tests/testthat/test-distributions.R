@@ -283,8 +283,10 @@ test_that("rezdm 4par returns correct output structure", {
   expect_equal(nrow(res), 100)
   expect_equal(ncol(res), 6)
   expect_true(all(
-    c("mean_rt_upper", "mean_rt_lower", "var_rt_upper",
-      "var_rt_lower", "n_upper", "n_trials") %in% names(res)
+    c(
+      "mean_rt_upper", "mean_rt_lower", "var_rt_upper",
+      "var_rt_lower", "n_upper", "n_trials"
+    ) %in% names(res)
   ))
 })
 
@@ -334,57 +336,73 @@ test_that("rezdm 4par returns plausible values", {
 test_that("dezdm validates parameters correctly", {
   # bound must be positive
   expect_error(
-    dezdm(mean_rt = 0.5, var_rt = 0.02, n_upper = 80, n_trials = 100,
-          drift = 2, bound = -1, ndt = 0.3),
+    dezdm(
+      mean_rt = 0.5, var_rt = 0.02, n_upper = 80, n_trials = 100,
+      drift = 2, bound = -1, ndt = 0.3
+    ),
     "bound must be positive"
   )
 
   # ndt must be positive
   expect_error(
-    dezdm(mean_rt = 0.5, var_rt = 0.02, n_upper = 80, n_trials = 100,
-          drift = 2, bound = 1.5, ndt = -0.1),
+    dezdm(
+      mean_rt = 0.5, var_rt = 0.02, n_upper = 80, n_trials = 100,
+      drift = 2, bound = 1.5, ndt = -0.1
+    ),
     "ndt must be positive"
   )
 
   # n_upper cannot exceed n_trials
   expect_error(
-    dezdm(mean_rt = 0.5, var_rt = 0.02, n_upper = 150, n_trials = 100,
-          drift = 2, bound = 1.5, ndt = 0.3),
+    dezdm(
+      mean_rt = 0.5, var_rt = 0.02, n_upper = 150, n_trials = 100,
+      drift = 2, bound = 1.5, ndt = 0.3
+    ),
     "n_upper cannot exceed n_trials"
   )
-  
+
   # n_trials must be larger than 2
   expect_error(
-    dezdm(mean_rt = 0.5, var_rt = 0.02, n_upper = 1, n_trials = 1,
-          drift = 2, bound = 1.5, ndt = 0.3),
+    dezdm(
+      mean_rt = 0.5, var_rt = 0.02, n_upper = 1, n_trials = 1,
+      drift = 2, bound = 1.5, ndt = 0.3
+    ),
     "n_trials must be larger than 2"
   )
-  
+
   expect_error(
-    dezdm(mean_rt = 0.5, var_rt = 0.02, n_upper = 2, n_trials = 2,
-          drift = 2, bound = 1.5, ndt = 0.3),
+    dezdm(
+      mean_rt = 0.5, var_rt = 0.02, n_upper = 2, n_trials = 2,
+      drift = 2, bound = 1.5, ndt = 0.3
+    ),
     "n_trials must be larger than 2"
   )
 
   # version must be valid
   expect_error(
-    dezdm(mean_rt = 0.5, var_rt = 0.02, n_upper = 80, n_trials = 100,
-          drift = 2, bound = 1.5, ndt = 0.3, version = "5par"),
-    "version must be either"
+    dezdm(
+      mean_rt = 0.5, var_rt = 0.02, n_upper = 80, n_trials = 100,
+      drift = 2, bound = 1.5, ndt = 0.3, version = "5par"
+    ),
+    "should be one of"
   )
 
   # 4par requires length-2 vectors
   expect_error(
-    dezdm(mean_rt = 0.5, var_rt = 0.02, n_upper = 80, n_trials = 100,
-          drift = 2, bound = 1.5, ndt = 0.3, version = "4par"),
-    "mean_rt must be length 2"
+    dezdm(
+      mean_rt = 0.5, var_rt = 0.02, n_upper = 80, n_trials = 100,
+      drift = 2, bound = 1.5, ndt = 0.3, version = "4par"
+    ),
+    "must be length 2"
   )
 
   # zr must be between 0 and 1 for 4par
   expect_error(
-    dezdm(mean_rt = c(0.5, 0.6), var_rt = c(0.02, 0.03),
-          n_upper = 80, n_trials = 100,
-          drift = 2, bound = 1.5, ndt = 0.3, zr = 1.5, version = "4par"),
+    dezdm(
+      mean_rt = c(0.5, 0.6), var_rt = c(0.02, 0.03),
+      n_upper = 80, n_trials = 100,
+      drift = 2, bound = 1.5, ndt = 0.3, zr = 1.5, version = "4par"
+    ),
     "zr must be between 0 and 1"
   )
 })
@@ -395,13 +413,13 @@ test_that("rezdm validates parameters correctly", {
     rezdm(n = c(10, 20), n_trials = 100, drift = 2, bound = 1.5, ndt = 0.3),
     "n must be a single integer"
   )
-  
+
   # n_trials must be larger than 2
   expect_error(
     rezdm(n = 10, n_trials = 1, drift = 2, bound = 1.5, ndt = 0.3),
     "n_trials must be larger than 2"
   )
-  
+
   expect_error(
     rezdm(n = 10, n_trials = 2, drift = 2, bound = 1.5, ndt = 0.3),
     "n_trials must be larger than 2"
@@ -455,7 +473,6 @@ test_that("dezdm 4par handles edge case with near-zero drift", {
 })
 
 test_that("dezdm 4par handles edge cases with few responses at boundary", {
-
   # when n_upper = 1, only binomial contributes (no mean/var for upper)
   ll <- dezdm(
     mean_rt = c(NA, 0.55), var_rt = c(NA, 0.025),
@@ -497,10 +514,14 @@ test_that("generated data from rezdm has reasonable density under dezdm", {
 
 test_that("dezdm 3par is vectorized over observations", {
   # single observation values
-  ll1 <- dezdm(mean_rt = 0.5, var_rt = 0.02, n_upper = 80, n_trials = 100,
-               drift = 2, bound = 1.5, ndt = 0.3)
-  ll2 <- dezdm(mean_rt = 0.55, var_rt = 0.025, n_upper = 75, n_trials = 100,
-               drift = 2, bound = 1.5, ndt = 0.3)
+  ll1 <- dezdm(
+    mean_rt = 0.5, var_rt = 0.02, n_upper = 80, n_trials = 100,
+    drift = 2, bound = 1.5, ndt = 0.3
+  )
+  ll2 <- dezdm(
+    mean_rt = 0.55, var_rt = 0.025, n_upper = 75, n_trials = 100,
+    drift = 2, bound = 1.5, ndt = 0.3
+  )
 
   # vectorized call
   ll_vec <- dezdm(

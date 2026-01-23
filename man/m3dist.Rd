@@ -58,13 +58,13 @@ measurement model. Please note that these functions are currently not
 vectorized.
 }
 \examples{
-  model <- m3(
-   resp_cats = c("corr", "other", "npl"),
-   num_options = c(1, 4, 5),
-   choice_rule = "simple",
-   version = "ss"
- )
- dm3(x = c(20, 10, 10), pars = c(a = 1, b = 1, c = 2), m3_model = model)
+model <- m3(
+  resp_cats = c("corr", "other", "npl"),
+  num_options = c(1, 4, 5),
+  choice_rule = "simple",
+  version = "ss"
+)
+dm3(x = c(20, 10, 10), pars = c(a = 1, b = 1, c = 2), m3_model = model)
 }
 \references{
 Oberauer, K., & Lewandowsky, S. (2019). Simple measurement models

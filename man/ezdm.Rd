@@ -7,13 +7,13 @@
 ezdm(mean_rt, var_rt, n_upper, n_trials, links = NULL, version = "3par", ...)
 }
 \arguments{
-\item{mean_rt}{The variable or variables (for 4par version) coding the mean reaction time in seconds in the data.}
+\item{mean_rt}{The names of the variable or variables (for 4par version) coding the mean reaction time in seconds in the data.}
 
-\item{var_rt}{The variable or variables (for 4par version) coding the variance of the reaction time in seconds in the data}
+\item{var_rt}{The names of the variable or variables (for 4par version) coding the variance of the reaction time in seconds in the data}
 
-\item{n_upper}{The variable coding the number of responses that hit the upper response threshold (typically the number of correct responses) in the data.}
+\item{n_upper}{The name of the variable coding the number of responses that hit the upper response threshold (typically the number of correct responses) in the data.}
 
-\item{n_trials}{The variable coding the number of trials that was used to calculate the aggregated statistics.}
+\item{n_trials}{The name of the variable coding the number of trials that was used to calculated the aggregated statistics.}
 
 \item{links}{A list of links for the parameters.}
 
@@ -66,6 +66,7 @@ Provide aggregated statistics for each subject and condition that model paramete
 \item \strong{Fixed parameters:}
 \itemize{
 \item \code{s} = 0
+\item \code{mu} = 0
 }
 \item \strong{Default parameter links:}
 \itemize{
@@ -126,7 +127,7 @@ sim_data$id <- 1:10
 # Specify model
 model <- ezdm(
   mean_rt = "mean_rt",
-  var_rt = "var_rt", 
+  var_rt = "var_rt",
   n_upper = "n_upper",
   n_trials = "n_trials",
   version = "3par"
@@ -156,7 +157,7 @@ summary(fit)
 
 # Extract population-level effects
 # True values: drift = 2, bound = 1.5, ndt = 0.3 (on log scale for drift/bound)
-exp(fixef(fit))
+exp(brms::fixef(fit))
 }
 }
 \keyword{bmmodel}
