@@ -66,6 +66,8 @@ stan data, etc.
 
 Functions for specifying which model to fit
 
+- [`ezdm()`](https://venpopov.github.io/bmm/dev/reference/ezdm.md) :
+  EZ-Diffusion Model
 - [`imm()`](https://venpopov.github.io/bmm/dev/reference/imm.md)
   [`IMMfull()`](https://venpopov.github.io/bmm/dev/reference/imm.md)
   [`IMMbsc()`](https://venpopov.github.io/bmm/dev/reference/imm.md)
@@ -95,6 +97,9 @@ Functions for special distributions
   [`qsdm()`](https://venpopov.github.io/bmm/dev/reference/SDMdist.md)
   [`rsdm()`](https://venpopov.github.io/bmm/dev/reference/SDMdist.md) :
   Distribution functions for the Signal Discrimination Model (SDM)
+- [`dezdm()`](https://venpopov.github.io/bmm/dev/reference/ezdm_dist.md)
+  [`rezdm()`](https://venpopov.github.io/bmm/dev/reference/ezdm_dist.md)
+  : Distribution functions for the EZ-Diffusion Model (ezdm)
 - [`dm3()`](https://venpopov.github.io/bmm/dev/reference/m3dist.md)
   [`rm3()`](https://venpopov.github.io/bmm/dev/reference/m3dist.md) :
   Distribution functions for the Memory Measurement Model (M3)

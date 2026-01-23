@@ -139,6 +139,8 @@ many other useful information about the model. Use methods(class =
 
 The following models are supported:
 
+- ezdm(mean_rt, var_rt, n_upper, n_trials, links, version)
+
 - imm(resp_error, nt_features, nt_distances, set_size, regex, version)
 
 - m3(resp_cats, num_options, choice_rule, version)

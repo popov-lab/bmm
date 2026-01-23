@@ -2,6 +2,21 @@
 
 ## bmm (development version)
 
+## bmm 1.3.0
+
+#### New models
+
+- Add the **EZ-Diffusion Model** (`ezdm`) for speeded decision-making
+  tasks. The model estimates drift rate, boundary separation, and
+  non-decision time from aggregated summary statistics (mean RT,
+  variance of RT, accuracy) using the closed-form equations derived by
+  Wagenmakers et al. (2007). Supports both 3-parameter (symmetric
+  starting point) and 4-parameter (asymmetric starting point) versions
+  based on Srivastava et al. (2016). Implements Bayesian hierarchical
+  estimation following Chavez & Vandekerckhove (2025). See the
+  [article](https://venpopov.github.io/bmm/dev/articles/bmm_ezdm.html)
+  on the `bmm` website for details.
+
 ## bmm 1.2.0
 
 CRAN release: 2025-07-24

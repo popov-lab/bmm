@@ -17,6 +17,10 @@ Markdown code for printing the list of measurement models available in
 
 ``` r
 print_pretty_models_md()
+#> **Processing Speed, Decision Making**
+#> 
+#> * EZ-Diffusion Model 
+#> 
 #> **Visual working memory**
 #> 
 #> * Interference measurement model by Oberauer and Lin (2017). 
