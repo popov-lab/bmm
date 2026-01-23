@@ -46,7 +46,7 @@ fansi::set_knit_hooks(knitr::knit_hooks, which = c("output","message","error"))
 
 # Introduction to the model
 
-The diffusion model [@Ratcliff_1978] is a widely used model in speeded decision-making. It describes how participants accumulate noisy evidence over time until reaching one of two decision boundaries. Usually, the diffusion model is fit to trial-level reaction time distributions, which can be computationally intensive, especially for hierarchical Bayeisian estiamtion.
+The diffusion model [@Ratcliff_1978] is a widely used model in speeded decision-making. It describes how participants accumulate noisy evidence over time until reaching one of two decision boundaries. Usually, the diffusion model is fit to trial-level reaction time distributions, which can be computationally intensive, especially for hierarchical Bayesian estiamtion.
 
 The **EZ-Diffusion Model** [@Wagenmakers_2007] provides a simplified alternative building on closed-form equations that relate the parameters of the diffusion model to easily computed summary statistics: mean reaction time (MRT), reaction time variance (VRT), and accuracy (proportion correct, Pc). This makes it possible to calculate diffusion model parameters from aggregated data without fitting to individual trials.
 
