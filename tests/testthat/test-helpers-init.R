@@ -349,9 +349,8 @@ test_that("initfun handles numeric predictors", {
 test_that("initfun output matches standata dimensions", {
   # Use a model with predictors to ensure b_ parameters exist
   dat <- oberauer_lin_2017
-  dat$condition <- factor(rep(c("A", "B"), length.out = nrow(dat)))
   
-  ff <- bmmformula(kappa ~ 1 + condition, c ~ 1)
+  ff <- bmmformula(kappa ~ 1 + set_size, c ~ 1)
   mod <- sdm(resp_error = "dev_rad")
   config_args <- configure_model(mod, data = dat, formula = ff)
 
@@ -386,5 +385,42 @@ test_that("initfun output matches standata dimensions", {
         info = paste("Dimension mismatch for parameter:", nm)
       )
     }
+  }
+})
+
+test_that("initfun output matches standata dimensions for no-intercept models", {
+  # Use a model without intercept to test K_ dimension matching
+  dat <- oberauer_lin_2017
+  
+  ff <- bmmformula(kappa ~ 0 + set_size, c ~ 1)
+  mod <- sdm(resp_error = "dev_rad")
+  config_args <- configure_model(mod, data = dat, formula = ff)
+
+  init_fun <- create_initfun(mod, dat, config_args$formula)
+  inits <- init_fun()
+
+  standata <- brms::standata(config_args$formula, dat, config_args$formula$family)
+
+  # Verify that we have b_ parameters to test
+  b_names <- grep("^b_", names(inits), value = TRUE)
+  expect_true(length(b_names) > 0, info = "Should have at least one b_ parameter")
+
+  # For models without intercepts, kappa should NOT have an Intercept_kappa parameter
+  expect_false("Intercept_kappa" %in% names(inits), 
+               info = "No-intercept model should not have Intercept_kappa parameter")
+
+  # Verify dimensions match using K_ (not Kc_) for no-intercept models
+  for (nm in b_names) {
+    param <- sub("^b_", "", nm)
+    dim_name <- paste0("K_", param)
+    
+    expect_true(dim_name %in% names(standata), 
+                info = paste("K_ dimension should exist for no-intercept model:", dim_name))
+    
+    expect_equal(
+      length(inits[[nm]]), 
+      standata[[dim_name]],
+      info = paste("Dimension mismatch for no-intercept parameter:", nm)
+    )
   }
 })
