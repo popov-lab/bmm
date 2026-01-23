@@ -479,6 +479,9 @@ Functions to assist in developing new models
 - [`configure_prior()`](https://venpopov.github.io/bmm/dev/reference/configure_prior.md)
   : Generic S3 method for configuring the default prior for a bmmodel
 
+- [`create_initfun()`](https://venpopov.github.io/bmm/dev/reference/create_initfun.md)
+  : Generic S3 method for creating an initial values function
+
 - [`postprocess_brm()`](https://venpopov.github.io/bmm/dev/reference/postprocess_brm.md)
   : Generic S3 method for postprocessing the fitted brm model
 
