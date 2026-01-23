@@ -107,7 +107,7 @@
 #' @param mean_rt The variable or variables (for 4par version) coding the mean reaction time in seconds in the data.
 #' @param var_rt The variable or variables (for 4par version) coding the variance of the reaction time in seconds in the data
 #' @param n_upper The variable coding the number of responses that hit the upper response threshold (typically the number of correct responses) in the data.
-#' @param n_trials The variable coding the number of trials that was used to calculated the aggregated statistics.
+#' @param n_trials The variable coding the number of trials that was used to calculate the aggregated statistics.
 #' @param links A list of links for the parameters.
 #' @param version A character label for the version of the model. There is a three-parameter version
 #'   (version = "3par") of the `ezdm` that fixes the relative starting point `zr` to 0.5, and a
