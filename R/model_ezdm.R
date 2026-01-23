@@ -63,7 +63,7 @@
 )
 
 
-.model_ezdm <- function(mean_rt = NULL, var_rt = NULL, n_upper = NULL, n_trials = NULL, version = "4par", links = NULL, call = NULL, ...) {
+.model_ezdm <- function(mean_rt = NULL, var_rt = NULL, n_upper = NULL, n_trials = NULL, version = "3par", links = NULL, call = NULL, ...) {
   out <- structure(
     list(
       resp_vars = nlist(mean_rt, var_rt, n_upper),
@@ -103,9 +103,9 @@
 
 #' @title `r .model_ezdm()$name`
 #' @name ezdm
-#' @details `r model_info(.model_ezdm())`
-#' @param mean_rt The variable coding the mean reaction time in seconds in the data.
-#' @param var_rt The variable coding the variance of the reaction time in seconds in the data
+#' @details `r model_info(.model_ezdm(version = "4par"))`
+#' @param mean_rt The variable or variables (for 4par version) coding the mean reaction time in seconds in the data.
+#' @param var_rt The variable or variables (for 4par version) coding the variance of the reaction time in seconds in the data
 #' @param n_upper The variable coding the number of responses that hit the upper response threshold (typically the number of correct responses) in the data.
 #' @param n_trials The variable coding the number of trials that was used to calculated the aggregated statistics.
 #' @param links A list of links for the parameters.
@@ -145,12 +145,31 @@ check_data.ezdm <- function(model, data, formula) {
     "ezdm model requires mean_rt, var_rt, n_upper, and n_trials arguments"
   )
 
-  # for 4par model, mean_rt and var_rt can be vectors of length 2
-  mean_rt_vars <- if (length(mean_rt) > 1) mean_rt else mean_rt
-  var_rt_vars <- if (length(var_rt) > 1) var_rt else var_rt
+  # validate length of mean_rt and var_rt dependent on version
+  if(model$version == "3par") {
+    stopif(
+      length(mean_rt) != 1,
+      "For ezdm version '3par', mean_rt must be a single variable name."
+    )
+    stopif(
+      length(var_rt) != 1,
+      "For ezdm version '3par', var_rt must be a single variable name."
+    )
+  } else if(model$version == "4par") {
+    stopif(
+      length(mean_rt) != 2,
+      "For ezdm version '4par', mean_rt must be a vector of two variable names: c(mean_rt_upper, mean_rt_lower)."
+    )
+    stopif(
+      length(var_rt) != 2,
+      "For ezdm version '4par', var_rt must be a vector of two variable names: c(var_rt_upper, var_rt_lower)."
+    )
+  } else {
+    stop2("Unknown ezdm version: {model$version}. Supported versions are '3par' and '4par'.")
+  }
 
   # check that all required variables exist in data
-  required_vars <- c(mean_rt_vars, var_rt_vars, n_upper, n_trials)
+  required_vars <- c(mean_rt, var_rt, n_upper, n_trials)
   missing_vars <- setdiff(required_vars, colnames(data))
   stopif(
     length(missing_vars) > 0,
@@ -159,7 +178,7 @@ check_data.ezdm <- function(model, data, formula) {
 
   # check that mean RT values are plausible (warn if likely in milliseconds)
   # typical RTs in seconds are 0.2-3s; values > 10 suggest milliseconds
-  mean_rt_values <- unlist(data[mean_rt_vars])
+  mean_rt_values <- unlist(data[mean_rt])
   warnif(
     any(mean_rt_values > 10, na.rm = TRUE),
     "Some mean RT values are greater than 10. If your reaction times are in
@@ -174,7 +193,7 @@ check_data.ezdm <- function(model, data, formula) {
   )
 
   # check that variance values are positive
-  var_rt_values <- unlist(data[var_rt_vars])
+  var_rt_values <- unlist(data[var_rt])
   stopif(
     any(var_rt_values <= 0, na.rm = TRUE),
     "Variance of RT must be positive. Found non-positive values in the data."
@@ -183,8 +202,8 @@ check_data.ezdm <- function(model, data, formula) {
   # check that n_trials is a positive integer
   n_trials_values <- data[[n_trials]]
   stopif(
-    any(n_trials_values <= 0, na.rm = TRUE),
-    "Number of trials (n_trials) must be positive. Found non-positive values."
+    any(n_trials_values <= 2, na.rm = TRUE),
+    "Number of trials (n_trials) must larger than two."
   )
   warnif(
     any(n_trials_values != round(n_trials_values), na.rm = TRUE),
@@ -195,7 +214,7 @@ check_data.ezdm <- function(model, data, formula) {
   n_upper_values <- data[[n_upper]]
   stopif(
     any(n_upper_values < 0, na.rm = TRUE),
-    "Number of upper boundary responses (n_upper) cannot be negative."
+    "Number of upper boundary responses (n_upper) needs to be positive."
   )
   warnif(
     any(n_upper_values != round(n_upper_values), na.rm = TRUE),

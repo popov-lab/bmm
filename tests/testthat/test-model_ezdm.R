@@ -116,7 +116,7 @@ test_that("ezdm check_data validates var_rt variable", {
 test_that("ezdm check_data validates n_trials variable", {
   model <- ezdm("mean_rt", "var_rt", "n_upper", "n_trials", version = "3par")
   
-  # Negative or zero n_trials should error
+  # Zero n_trials should error
   invalid_data <- data.frame(
     mean_rt = c(0.5, 0.6),
     var_rt = c(0.02, 0.03),
@@ -125,18 +125,42 @@ test_that("ezdm check_data validates n_trials variable", {
   )
   expect_error(
     check_data(model, invalid_data, bmf(drift ~ 1, bound ~ 1, ndt ~ 1)),
-    "Number of trials .* must be positive"
+    "must larger than two"
+  )
+  
+  # n_trials = 1 should error (must be > 2)
+  invalid_data_1 <- data.frame(
+    mean_rt = c(0.5, 0.6),
+    var_rt = c(0.02, 0.03),
+    n_upper = c(1, 85),
+    n_trials = c(1, 100)
+  )
+  expect_error(
+    check_data(model, invalid_data_1, bmf(drift ~ 1, bound ~ 1, ndt ~ 1)),
+    "must larger than two"
+  )
+  
+  # n_trials = 2 should error (must be larger than 2)
+  invalid_data_2 <- data.frame(
+    mean_rt = c(0.5, 0.6),
+    var_rt = c(0.02, 0.03),
+    n_upper = c(1, 85),
+    n_trials = c(2, 100)
+  )
+  expect_error(
+    check_data(model, invalid_data_2, bmf(drift ~ 1, bound ~ 1, ndt ~ 1)),
+    "must larger than two"
   )
   
   # Non-integer n_trials should warn
-  invalid_data2 <- data.frame(
+  invalid_data_nonint <- data.frame(
     mean_rt = c(0.5, 0.6),
     var_rt = c(0.02, 0.03),
     n_upper = c(80, 85),
     n_trials = c(100.5, 100)
   )
   expect_warning(
-    check_data(model, invalid_data2, bmf(drift ~ 1, bound ~ 1, ndt ~ 1)),
+    check_data(model, invalid_data_nonint, bmf(drift ~ 1, bound ~ 1, ndt ~ 1)),
     "whole numbers"
   )
 })
@@ -153,7 +177,7 @@ test_that("ezdm check_data validates n_upper variable", {
   )
   expect_error(
     check_data(model, invalid_data, bmf(drift ~ 1, bound ~ 1, ndt ~ 1)),
-    "cannot be negative"
+    "needs to be positive"
   )
   
   # n_upper > n_trials should error
