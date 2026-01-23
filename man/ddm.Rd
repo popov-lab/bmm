@@ -56,7 +56,7 @@ Diffusion Decision Model
 \item \code{drift}: Drift rate = Average rate of evidence accumulation of the decision processes
 \item \code{bound}: Boundary separation = Distance between the decision boundaries that need to be reached
 \item \code{ndt}: Non-decision time = Additional time required beyond the evidence accumulation process
-\item \code{zr}: Relative startin point = Starting point between the decision thresholds relative to the upper bound.
+\item \code{zr}: Relative starting point = Starting point between the decision thresholds relative to the upper bound.
 \item \code{sdrift}: Trial-to-trial variability in the drift rate
 \item \code{sndt}: Trial-to-trial variability in the non-decision time
 \item \code{szr}: Trial-to-trial variability in the relative starting point

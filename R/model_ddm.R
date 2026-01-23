@@ -8,7 +8,7 @@
       drift = "Drift rate = Average rate of evidence accumulation of the decision processes",
       bound = "Boundary separation = Distance between the decision boundaries that need to be reached",
       ndt   = "Non-decision time = Additional time required beyond the evidence accumulation process",
-      zr     = "Relative startin point = Starting point between the decision thresholds relative to the upper bound.",
+      zr     = "Relative starting point = Starting point between the decision thresholds relative to the upper bound.",
       sdrift = "Trial-to-trial variability in the drift rate",
       sndt   = "Trial-to-trial variability in the non-decision time",
       szr    = "Trial-to-trial variability in the relative starting point"
@@ -41,7 +41,7 @@
       drift = "Drift rate = Average rate of evidence accumulation of the decision processes",
       bound = "Boundary separation = Distance between the decision boundaries that need to be reached",
       ndt   = "Non-decision time = Additional time required beyond the evidence accumulation process",
-      zr    = "Relative startin point = Starting point between the decision thresholds relative to the upper bound.",
+      zr    = "Relative starting point = Starting point between the decision thresholds relative to the upper bound.",
       sdrift = "Trial-to-trial variability in the drift rate",
       sndt   = "Trial-to-trial variability in the non-decision time",
       szr    = "Trial-to-trial variability in the relative starting point"
@@ -75,7 +75,7 @@
       drift  = "Drift rate = Average rate of evidence accumulation of the decision processes",
       bound  = "Boundary separation = Distance between the decision boundaries that need to be reached",
       ndt    = "Non-decision time = Additional time required beyond the evidence accumulation process",
-      zr     = "Relative startin point = Starting point between the decision thresholds relative to the upper bound.",
+      zr     = "Relative starting point = Starting point between the decision thresholds relative to the upper bound.",
       sdrift = "Trial-to-trial variability in the drift rate",
       sndt   = "Trial-to-trial variability in the non-decision time",
       szr    = "Trial-to-trial variability in the relative starting point"
