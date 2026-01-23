@@ -11,20 +11,20 @@
       s = "The diffusion constant, that is the standard deviation of the Gaussian noise during sampling"
     ),
     links = list(
-      drift = "log", bound = "log", ndt = "log", s = "log"
+      drift = "identity", bound = "log", ndt = "log", s = "log"
     ),
     fixed_parameters = list(
       s = 0
     ),
     priors = list(
-      drift = list(main = "normal(0,1)", effects = "normal(0,0.5)"),
+      drift = list(main = "cauchy(0,1)", effects = "normal(0,0.5)"),
       bound = list(main = "normal(0,0.5)", effects = "normal(0,0.5)"),
       ndt = list(main = "normal(-1.5,0.5)", effects = "normal(0,0.3)"),
       s = list(main = "normal(0,1)", effects = "normal(0,0.3)")
     ),
     init_ranges = list(
       mu = c(0,1),
-      drift = c(0.5,2),
+      drift = c(-1,1),
       bound = c(1,2),
       ndt = c(0.25, 0.5),
       s = c(0.99,1.01)
@@ -39,13 +39,13 @@
       s = "The diffusion constant, that is the standard deviation of the Gaussian noise during sampling"
     ),
     links = list(
-      drift = "log", bound = "log", ndt = "log", zr = "logit", s = "log"
+      drift = "identity", bound = "log", ndt = "log", zr = "logit", s = "log"
     ),
     fixed_parameters = list(
       s = 0
     ),
     priors = list(
-      drift = list(main = "normal(0,1)", effects = "normal(0,0.5)"),
+      drift = list(main = "cauchy(0,1)", effects = "normal(0,0.5)"),
       bound = list(main = "normal(0,0.5)", effects = "normal(0,0.5)"),
       ndt = list(main = "normal(-1.5,0.5)", effects = "normal(0,0.3)"),
       zr = list(main = "normal(0,0.5)", effects = "normal(0,0.3)"),
@@ -53,7 +53,7 @@
     ),
     init_ranges = list(
       mu = c(0,1),
-      drift = c(0.5,2),
+      drift = c(-1,1),
       bound = c(1,2),
       ndt = c(0.25, 0.5),
       zr = c(0.45, 0.55),

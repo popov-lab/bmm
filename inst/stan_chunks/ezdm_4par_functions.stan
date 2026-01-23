@@ -17,24 +17,44 @@ real coth_stable(real x) {
 
 // Specify likelihood for ezDM
 real ezdm_4par_lpdf(real mrt_upper, real mu, real drift, real bound, real ndt, real zr, real s, real mrt_lower, real vrt_upper, real vrt_lower, int hits, int trials) {
+  // Declare all variables at the top
+  int misses;
+  real s_sq;
+  real z;
+  real x0;
+  real k_z_signed;
+  real k_x_signed;
+  real exp_2kz;
+  real exp_neg2kz;
+  real exp_neg2kx;
+  real pC;
+  real a;
+  real k_z;
+  real k_x;
+  
   // compute misses
-  int misses = trials - hits;
+  misses = trials - hits;
 
   // Cache common calculations
-  real s_sq = square(s);
-  real z = bound / 2;           // boundary (half of bound separation)
-  real x0 = (zr * bound) - z;   // starting point relative to center
+  s_sq = square(s);
+  z = bound / 2;           // boundary (half of bound separation)
+  x0 = (zr * bound) - z;   // starting point relative to center
 
-  // get standardized boundary and start point
-  real a = drift;               // drift rate
-  real k_z = (a * z) / s_sq;
-  real k_x = (a * x0) / s_sq;
+  // Use signed drift for pC calculation
+  k_z_signed = (drift * z) / s_sq;
+  k_x_signed = (drift * x0) / s_sq;
 
   // Compute pC with cached exponentials for numerical stability
-  real exp_2kz = exp(2 * k_z);
-  real exp_neg2kz = 1.0 / exp_2kz;  // More stable than exp(-2*k_z)
-  real exp_neg2kx = exp(-2 * k_x);
-  real pC = 1 - ((exp_neg2kx - exp_neg2kz) / (exp_2kz - exp_neg2kz));
+  exp_2kz = exp(2 * k_z_signed);
+  exp_neg2kz = 1.0 / exp_2kz;  // More stable than exp(-2*k_z)
+  exp_neg2kx = exp(-2 * k_x_signed);
+  pC = 1 - ((exp_neg2kx - exp_neg2kz) / (exp_2kz - exp_neg2kz));
+  
+  // Use soft absolute value: sqrt(drift^2 + tau^2) with larger tau
+  // This provides smooth gradients without extreme curvature  
+  a = sqrt(drift * drift + 0.0001);  // tau = 0.01, tau^2 = 0.0001
+  k_z = (a * z) / s_sq;
+  k_x = (a * x0) / s_sq;
 
   // drift is small: use functions not relying on drift rate
   if (abs(drift) < 1e-6) {

@@ -716,7 +716,6 @@ dezdm <- function(mean_rt, var_rt, n_upper, n_trials,
   )
 
   # parameter validation
-  stopif(isTRUE(any(drift <= 0)), "drift must be positive")
   stopif(isTRUE(any(bound <= 0)), "bound must be positive")
   stopif(isTRUE(any(ndt <= 0)), "ndt must be positive")
   stopif(isTRUE(any(s <= 0)), "s must be positive")
@@ -764,7 +763,6 @@ rezdm <- function(n, n_trials, drift, bound, ndt, zr = 0.5, s = 1,
   )
 
   # parameter validation
-  stopif(isTRUE(any(drift <= 0)), "drift must be positive")
   stopif(isTRUE(any(bound <= 0)), "bound must be positive")
   stopif(isTRUE(any(ndt <= 0)), "ndt must be positive")
   stopif(isTRUE(any(s <= 0)), "s must be positive")
@@ -1044,12 +1042,19 @@ rezdm <- function(n, n_trials, drift, bound, ndt, zr = 0.5, s = 1,
   # non-zero drift formulas
   if (any(!zero_drift)) {
     idx <- !zero_drift
+    # Use signed drift for pC calculation
     y <- -(bound[idx] * drift[idx]) / s[idx]^2
     expy <- exp(y)
     pC[idx] <- 1 / (1 + expy)
-    MDT[idx] <- (bound[idx] / (2 * drift[idx])) * ((1 - expy) / (1 + expy))
-    VRT[idx] <- ((bound[idx] * s[idx]^2) / (2 * drift[idx]^3)) *
-      (2 * y * expy - exp(2 * y) + 1) / ((expy + 1)^2)
+    # Use soft absolute value: sqrt(drift^2 + tau^2) with tau = 0.01
+    # This avoids extreme curvature while maintaining smoothness
+    tau <- 0.01
+    drift_abs <- sqrt(drift[idx]^2 + tau^2)
+    y_abs <- -(bound[idx] * drift_abs) / s[idx]^2
+    expy_abs <- exp(y_abs)
+    MDT[idx] <- (bound[idx] / (2 * drift_abs)) * ((1 - expy_abs) / (1 + expy_abs))
+    VRT[idx] <- ((bound[idx] * s[idx]^2) / (2 * drift_abs^3)) *
+      (2 * y_abs * expy_abs - exp(2 * y_abs) + 1) / ((expy_abs + 1)^2)
   }
 
   list(pC = pC, MDT = MDT, VRT = VRT)
@@ -1071,15 +1076,22 @@ rezdm <- function(n, n_trials, drift, bound, ndt, zr = 0.5, s = 1,
   s <- rep_len(s, n)
 
   # compute intermediate values
-  a <- drift
   z <- bound / 2
   x0 <- (zr * bound) - z
 
+  # Use signed drift for pC calculation
+  k_z_signed <- (drift * z) / s^2
+  k_x_signed <- (drift * x0) / s^2
+  
+  # proportion correct (works for all cases)
+  pC <- 1 - (exp(-2 * k_x_signed) - exp(-2 * k_z_signed)) / (exp(2 * k_z_signed) - exp(-2 * k_z_signed))
+  
+  # Use soft absolute value: sqrt(drift^2 + tau^2) with tau = 0.01
+  # This provides smooth gradients without extreme curvature
+  tau <- 0.01
+  a <- sqrt(drift^2 + tau^2)
   k_z <- (a * z) / s^2
   k_x <- (a * x0) / s^2
-
-  # proportion correct (works for all cases)
-  pC <- 1 - (exp(-2 * k_x) - exp(-2 * k_z)) / (exp(2 * k_z) - exp(-2 * k_z))
 
   # initialize outputs
   mdt_upper <- rep(NA_real_, n)

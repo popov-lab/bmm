@@ -332,13 +332,6 @@ test_that("rezdm 4par returns plausible values", {
 })
 
 test_that("dezdm validates parameters correctly", {
-  # drift must be positive
-  expect_error(
-    dezdm(mean_rt = 0.5, var_rt = 0.02, n_upper = 80, n_trials = 100,
-          drift = -1, bound = 1.5, ndt = 0.3),
-    "drift must be positive"
-  )
-
   # bound must be positive
   expect_error(
     dezdm(mean_rt = 0.5, var_rt = 0.02, n_upper = 80, n_trials = 100,
@@ -384,12 +377,6 @@ test_that("dezdm validates parameters correctly", {
 })
 
 test_that("rezdm validates parameters correctly", {
-  # drift must be positive
-  expect_error(
-    rezdm(n = 10, n_trials = 100, drift = -1, bound = 1.5, ndt = 0.3),
-    "drift must be positive"
-  )
-
   # n must be single integer
   expect_error(
     rezdm(n = c(10, 20), n_trials = 100, drift = 2, bound = 1.5, ndt = 0.3),
