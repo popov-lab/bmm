@@ -13,7 +13,7 @@ ezdm(mean_rt, var_rt, n_upper, n_trials, links = NULL, version = "3par", ...)
 
 \item{n_upper}{The variable coding the number of responses that hit the upper response threshold (typically the number of correct responses) in the data.}
 
-\item{n_trials}{The variable coding the number of trials that was used to calculated the aggregated statistics.}
+\item{n_trials}{The variable coding the number of trials that was used to calculate the aggregated statistics.}
 
 \item{links}{A list of links for the parameters.}
 
