@@ -16,11 +16,20 @@ dezdm(
   ndt,
   zr = 0.5,
   s = 1,
-  version = "3par",
+  version = c("3par", "4par"),
   log = TRUE
 )
 
-rezdm(n, n_trials, drift, bound, ndt, zr = 0.5, s = 1, version = "3par")
+rezdm(
+  n,
+  n_trials,
+  drift,
+  bound,
+  ndt,
+  zr = 0.5,
+  s = 1,
+  version = c("3par", "4par")
+)
 }
 \arguments{
 \item{mean_rt}{Observed mean reaction time(s) in seconds. For version
@@ -66,23 +75,31 @@ upper boundary.
 }
 \examples{
 # 3-parameter version (single observation)
-dezdm(mean_rt = 0.5, var_rt = 0.02, n_upper = 80, n_trials = 100,
-      drift = 2, bound = 1.5, ndt = 0.3)
+dezdm(
+  mean_rt = 0.5, var_rt = 0.02, n_upper = 80, n_trials = 100,
+  drift = 2, bound = 1.5, ndt = 0.3
+)
 
 # 3-parameter version (vectorized)
-dezdm(mean_rt = c(0.5, 0.55), var_rt = c(0.02, 0.025),
-      n_upper = c(80, 75), n_trials = c(100, 100),
-      drift = 2, bound = 1.5, ndt = 0.3)
+dezdm(
+  mean_rt = c(0.5, 0.55), var_rt = c(0.02, 0.025),
+  n_upper = c(80, 75), n_trials = c(100, 100),
+  drift = 2, bound = 1.5, ndt = 0.3
+)
 
 # 4-parameter version (single observation)
-dezdm(mean_rt = c(0.45, 0.55), var_rt = c(0.018, 0.025),
-      n_upper = 80, n_trials = 100,
-      drift = 2, bound = 1.5, ndt = 0.3, zr = 0.55, version = "4par")
+dezdm(
+  mean_rt = c(0.45, 0.55), var_rt = c(0.018, 0.025),
+  n_upper = 80, n_trials = 100,
+  drift = 2, bound = 1.5, ndt = 0.3, zr = 0.55, version = "4par"
+)
 
 # generate random summary statistics
 rezdm(n = 100, n_trials = 100, drift = 2, bound = 1.5, ndt = 0.3)
-rezdm(n = 100, n_trials = 100, drift = 2, bound = 1.5, ndt = 0.3,
-      zr = 0.55, version = "4par")
+rezdm(
+  n = 100, n_trials = 100, drift = 2, bound = 1.5, ndt = 0.3,
+  zr = 0.55, version = "4par"
+)
 
 }
 \references{

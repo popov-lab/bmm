@@ -46,7 +46,7 @@ test_that("ezdm model accepts custom links", {
   custom_links <- list(drift = "identity")
   model <- ezdm("mean_rt", "var_rt", "n_upper", "n_trials", version = "3par", links = custom_links)
   expect_equal(model$links$drift, "identity")
-  expect_equal(model$links$bound, "log")  # unchanged
+  expect_equal(model$links$bound, "log") # unchanged
 })
 
 test_that("ezdm check_data validates mean_rt variable", {
@@ -323,11 +323,13 @@ test_that("ezdm with hierarchical structure works", {
   n_per_subject <- 5
 
   data_list <- lapply(1:n_subjects, function(i) {
-    d <- rezdm(n_per_subject, n_trials = 100,
-               drift = rnorm(1, 2, 0.3),
-               bound = 1.5,
-               ndt = 0.3,
-               version = "3par")
+    d <- rezdm(n_per_subject,
+      n_trials = 100,
+      drift = rnorm(1, 2, 0.3),
+      bound = 1.5,
+      ndt = 0.3,
+      version = "3par"
+    )
     d$id <- paste0("S", i)
     d
   })
