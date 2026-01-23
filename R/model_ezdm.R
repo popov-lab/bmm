@@ -344,24 +344,15 @@ log_lik_ezdm_3par <- function(i, prep) {
 posterior_predict_ezdm_3par <- function(i, prep, ..., dv = c("mean_rt", "var_rt", "n_upper")) {
   dv <- match.arg(dv)
 
-  # extract posterior samples for distributional parameters
-  drift <- brms::get_dpar(prep, "drift", i = i)
-  bound <- brms::get_dpar(prep, "bound", i = i)
-  ndt <- brms::get_dpar(prep, "ndt", i = i)
-  s <- brms::get_dpar(prep, "s", i = i)
-
-  # generate predictions for each posterior draw
-  sapply(seq_along(drift), function(j) {
-    rezdm(
-      n = 1,
-      n_trials = prep$data$trials[i],
-      drift = drift[j],
-      bound = bound[j],
-      ndt = ndt[j],
-      s = s[j],
-      version = "3par"
-    )[[dv]]
-  })
+  rezdm(
+    n = length(brms::get_dpar(prep, "drift", i = i)),
+    n_trials = prep$data$trials[i],
+    drift = brms::get_dpar(prep, "drift", i = i),
+    bound = brms::get_dpar(prep, "bound", i = i),
+    ndt = brms::get_dpar(prep, "ndt", i = i),
+    s = brms::get_dpar(prep, "s", i = i),
+    version = "3par"
+  )[[dv]]
 }
 
 #' @export
@@ -426,24 +417,14 @@ posterior_predict_ezdm_4par <- function(i, prep, ..., dv = c(
                                         )) {
   dv <- match.arg(dv)
 
-  # extract posterior samples for distributional parameters
-  drift <- brms::get_dpar(prep, "drift", i = i)
-  bound <- brms::get_dpar(prep, "bound", i = i)
-  ndt <- brms::get_dpar(prep, "ndt", i = i)
-  zr <- brms::get_dpar(prep, "zr", i = i)
-  s <- brms::get_dpar(prep, "s", i = i)
-
-  # generate predictions for each posterior draw
-  sapply(seq_along(drift), function(j) {
-    rezdm(
-      n = 1,
-      n_trials = prep$data$vint2[i],
-      drift = drift[j],
-      bound = bound[j],
-      ndt = ndt[j],
-      zr = zr[j],
-      s = s[j],
-      version = "4par"
-    )[[dv]]
-  })
+  rezdm(
+    n = length(brms::get_dpar(prep, "drift", i = i)),
+    n_trials = prep$data$vint2[i],
+    drift = brms::get_dpar(prep, "drift", i = i),
+    bound = brms::get_dpar(prep, "bound", i = i),
+    ndt = brms::get_dpar(prep, "ndt", i = i),
+    zr = brms::get_dpar(prep, "zr", i = i),
+    s = brms::get_dpar(prep, "s", i = i),
+    version = "4par"
+  )[[dv]]
 }
