@@ -262,48 +262,77 @@ This dataset is particularly well-suited for the cswald model because:
 For a complete analysis example using this dataset, see the `rtdists` package
 vignette: `vignette("reanalysis_rr98", package = "rtdists")`.
 
-## Generating Simulated Data
+## Generating Simulated Data with Hierarchical Structure
 
-Alternatively, we can simulate data from a diffusion process using
-`rcswald()`, which internally uses `rtdists::rdiffusion()` to generate
-theoretically consistent samples:
+We'll simulate data from multiple participants with individual differences in
+drift rates, demonstrating how to fit hierarchical models with `bmm`:
 
 ```{r}
 # set seed for reproducibility
 set.seed(42)
 
-# simulate data for two conditions with different drift rates
-n_per_condition <- 500
+# simulate data for 3 participants in two conditions
+n_subjects <- 5
+n_per_condition <- 200  # fewer trials per condition to keep file size manageable
 
-# Condition A: higher drift (faster, more accurate)
-dat_A <- rcswald(n = n_per_condition, drift = 3, bound = 1.5, ndt = 0.3)
-dat_A$condition <- "A"
+# Population-level parameters
+pop_drift_A <- 3.0      # mean drift for condition A
+pop_drift_B <- 1.8      # mean drift for condition B
+drift_sd <- 0.5         # between-subject SD in drift
+bound <- 1.5            # shared boundary
+ndt <- 0.3              # shared non-decision time
 
-# Condition B: lower drift (slower, less accurate)
-dat_B <- rcswald(n = n_per_condition, drift = 1.5, bound = 1.5, ndt = 0.3)
-dat_B$condition <- "B"
+# Generate subject-specific drift rates
+subject_drifts_A <- rnorm(n_subjects, pop_drift_A, drift_sd)
+subject_drifts_B <- rnorm(n_subjects, pop_drift_B, drift_sd)
 
-# combine data
-dat <- rbind(dat_A, dat_B)
+# Simulate data for each subject and condition
+dat_list <- list()
+for (i in 1:n_subjects) {
+  # Condition A
+  dat_A <- rcswald(n = n_per_condition, 
+                   drift = subject_drifts_A[i], 
+                   bound = bound, 
+                   ndt = ndt)
+  dat_A$id <- paste0("S", i)
+  dat_A$condition <- "A"
+  
+  # Condition B
+  dat_B <- rcswald(n = n_per_condition, 
+                   drift = subject_drifts_B[i], 
+                   bound = bound, 
+                   ndt = ndt)
+  dat_B$id <- paste0("S", i)
+  dat_B$condition <- "B"
+  
+  dat_list[[2*i-1]] <- dat_A
+  dat_list[[2*i]] <- dat_B
+}
+
+# Combine all data
+dat <- do.call(rbind, dat_list)
+dat$id <- factor(dat$id)
 dat$condition <- factor(dat$condition)
 
-# check error rates
-aggregate(response ~ condition, data = dat, FUN = function(x) mean(x == 0))
+# Check error rates by subject and condition
+error_rates <- aggregate(response ~ id + condition, data = dat, 
+                        FUN = function(x) mean(x == 0))
+print(error_rates)
 ```
 
-Let's visualize the RT distributions:
+Let's visualize the RT distributions by participant:
 
-```{r fig.width=8, fig.height=4}
+```{r fig.width=8, fig.height=6}
 ggplot(dat, aes(x = rt, fill = factor(response))) +
   geom_histogram(binwidth = 0.05, position = "identity", alpha = 0.7) +
-  facet_wrap(~condition, labeller = labeller(
-    condition = c(A = "Condition A (drift = 3)", B = "Condition B (drift = 1.5)")
+  facet_grid(id ~ condition, labeller = labeller(
+    condition = c(A = "Condition A", B = "Condition B")
   )) +
   scale_fill_manual(values = c("0" = "red", "1" = "blue"),
                     labels = c("0" = "Error", "1" = "Correct"),
                     name = "Response") +
   labs(x = "Response Time (s)", y = "Count",
-       title = "Simulated RT distributions") +
+       title = "RT distributions by participant and condition") +
   theme_classic()
 ```
 
@@ -319,20 +348,47 @@ model <- cswald(
 )
 ```
 
-## Specifying the Formula
+## Specifying the Hierarchical Formula
 
-We want to estimate how drift rate varies by condition while keeping the
-boundary and non-decision time constant:
+We want to estimate:
+
+1. **Population-level effects**: How drift rate varies by condition
+2. **Individual differences**: Random effects for drift rate by participant
+3. **Shared parameters**: Boundary and non-decision time constant across
+   participants
+
+The formula includes both fixed effects for condition and random effects
+(varying intercepts) for participants:
 
 ```{r}
 formula <- bmf(
-  drift ~ 0 + condition,
-  bound ~ 1,
-  ndt ~ 1
+  drift ~ 0 + condition + (0 + condition | id),  # fixed condition effects + random subject effects
+  bound ~ 1,                          # shared boundary
+  ndt ~ 1                             # shared non-decision time
 )
 ```
 
-## Fitting the Model
+The `(0 + condition | id)` term in the drift formula specifies random slopes
+for each condition by participant. This allows the model to estimate:
+
+- A population-level drift rate for each condition
+- Individual deviations from these population means for each condition
+- The variability (SD) and correlation of these individual differences across conditions
+
+This hierarchical structure provides several advantages:
+
+1. **Partial pooling**: Individual estimates are pulled toward the group mean,
+   providing more stable estimates for participants with less data
+2. **Uncertainty quantification**: The model quantifies both within- and
+   between-subject variability
+3. **Shrinkage**: Extreme individual estimates are regularized toward the group
+   mean
+
+## Fitting the Hierarchical Model
+
+Now we fit the model with hierarchical structure. The random effects allow
+each participant to have their own drift rate while estimating the
+population-level mean drift for each condition:
 
 ```{r, message=FALSE, results='hide'}
 fit <- bmm(
@@ -341,7 +397,11 @@ fit <- bmm(
   model = model,
   cores = 4,
   backend = "cmdstanr",
-  file = "assets/bmmfit_cswald_vignette.rds"
+  # Reduce iterations to keep file size manageable
+  iter = 1000,
+  warmup = 500,
+  control = list(adapt_delta = 0.9),
+  file = "assets/bmmfit_cswald_hierarchical_vignette.rds"
 )
 ```
 
@@ -351,37 +411,61 @@ fit <- bmm(
 summary(fit)
 ```
 
-The model uses link functions for the parameters:
+### Population-Level Effects
 
-- `drift` uses a log link, so estimated values are on the log scale
-- `bound` uses a log link
-- `ndt` uses a log link
-
-To get the parameters on the original scale, we exponentiate. Note that for the
-simple version, we multiply `bound` by 2 to get the total boundary separation
-(since the simple version estimates the distance to one boundary only):
+The model uses link functions for the parameters (log link for all parameters),
+so we need to exponentiate to get values on the original scale:
 
 ```{r}
-# extract fixed effects
+# Extract population-level (fixed) effects
 fixef_est <- brms::fixef(fit)
 
-# transform to original scale
-# Note: bound is multiplied by 2 to convert from half-separation to full DDM boundary
-cat("Estimated parameters:\n")
+# Transform to original scale
+cat("Population-level estimates:\n")
 cat("drift (Condition A):", exp(fixef_est["drift_conditionA", "Estimate"]), "\n")
 cat("drift (Condition B):", exp(fixef_est["drift_conditionB", "Estimate"]), "\n")
-cat("bound (total separation):", 2*exp(fixef_est["bound_Intercept", "Estimate"]), "\n")
+cat("bound (half-separation):", exp(fixef_est["bound_Intercept", "Estimate"]), "\n")
 cat("ndt:", exp(fixef_est["ndt_Intercept", "Estimate"]), "\n")
+
+cat("\nTrue population-level parameters:\n")
+cat("drift (Condition A):", pop_drift_A, "\n")
+cat("drift (Condition B):", pop_drift_B, "\n")
+cat("bound:", bound, "\n")
+cat("ndt:", ndt, "\n")
 ```
 
-Compare with true values:
+### Individual Differences
+
+The random effects capture individual differences in drift rate:
 
 ```{r}
-cat("\nTrue parameters:\n")
-cat("drift (Condition A): 3\n")
-cat("drift (Condition B): 1.5\n")
-cat("bound: 1.5\n")
-cat("ndt: 0.3\n")
+# Extract random effects (deviations from population mean on log scale)
+ranef_est <- brms::ranef(fit)
+
+# Get subject-specific drift estimates by adding random effects to fixed effects
+cat("\nSubject-specific drift estimates (Condition A):\n")
+for (i in 1:n_subjects) {
+  subj_id <- paste0("S", i)
+  # Add random effect to fixed effect, then exponentiate
+  drift_subj <- exp(fixef_est["drift_conditionA", "Estimate"] + 
+                    ranef_est$id[subj_id, "Estimate", "drift_conditionA"])
+  cat(subj_id, ": ", round(drift_subj, 2), 
+      " (true: ", round(subject_drifts_A[i], 2), ")\n", sep = "")
+}
+
+cat("\nSubject-specific drift estimates (Condition B):\n")
+for (i in 1:n_subjects) {
+  subj_id <- paste0("S", i)
+  drift_subj <- exp(fixef_est["drift_conditionB", "Estimate"] + 
+                    ranef_est$id[subj_id, "Estimate", "drift_conditionB"])
+  cat(subj_id, ": ", round(drift_subj, 2), 
+      " (true: ", round(subject_drifts_B[i], 2), ")\n", sep = "")
+}
+
+# Between-subject variability
+cat("\nEstimated SD of random effects (log scale, Cond A | Cond B):\n")
+cat("sd(drift):", brms::VarCorr(fit)$id$sd[,"Estimate"], "\n")
+cat("True SD (log scale):", drift_sd, "\n")
 ```
 
 ## Model Diagnostics
@@ -389,8 +473,49 @@ cat("ndt: 0.3\n")
 Check posterior predictive distributions:
 
 ```{r fig.width=8, fig.height=4, message=FALSE}
-brms::pp_check(fit, type = "dens_overlay", ndraws = 50) +
+brms::pp_check(fit, type = "dens_overlay", ndraws = 10) +
   labs(title = "Posterior Predictive Check")
 ```
+
+## Hypothesis Testing
+
+We can test whether drift rates differ between conditions using the
+`brms::hypothesis()` function. This tests the difference on the log scale:
+
+```{r}
+# Test if drift rate is higher in Condition A than B
+hyp_test <- brms::hypothesis(fit, "drift_conditionA > drift_conditionB")
+print(hyp_test)
+```
+
+The output shows:
+
+- **Estimate**: The posterior mean of the difference (on log scale)
+- **Est.Error**: The standard error of the difference
+- **CI**: The 95% credible interval for the difference
+- **Evid.Ratio**: The evidence ratio (posterior odds) in favor of the hypothesis
+- **Post.Prob**: The posterior probability that the hypothesis is true
+
+To express the difference on the original scale, we can compute the ratio of
+drift rates:
+
+```{r}
+# Extract posterior samples
+posterior <- brms::as_draws_df(fit)
+
+# Compute drift ratio (Condition A / Condition B) on original scale
+drift_ratio <- exp(posterior$b_drift_conditionA - posterior$b_drift_conditionB)
+
+cat("Drift rate ratio (A/B):\n")
+cat("  Median:", round(median(drift_ratio), 2), "\n")
+cat("  95% CI: [", round(quantile(drift_ratio, 0.025), 2), ", ",
+    round(quantile(drift_ratio, 0.975), 2), "]\n", sep = "")
+cat("  P(ratio > 1):", round(mean(drift_ratio > 1), 3), "\n")
+
+cat("\nTrue drift ratio:", round(pop_drift_A / pop_drift_B, 2), "\n")
+```
+
+This shows that the model successfully recovers the difference between
+conditions, with strong evidence that drift rates are higher in Condition A.
 
 # References
