@@ -3,41 +3,46 @@
 #' `softmax` returns the value of the softmax function
 #' `softmaxinv` returns the value of the inverse-softmax function
 #'
-#' The softmax function is a bijective function that maps a real vector with length `m-1` to a probability vector
+#' The softmax function is a bijective function that maps a real vector with length `m` to a probability vector
 #' with length `m` with all non-zero probabilities.  The present functions define the softmax function and its inverse, both with a tuning
 #' parameter.
 #'
 #' The current functions define the softmax as:
 #'
-#' \deqn{\Large P(\eta_i) = \frac{e^{\lambda \eta_i}}{1+ \sum_{j=1}^m e^{\lambda \eta_j}}}
+#' \deqn{\Large P(\eta_i) = \frac{e^{\lambda \eta_i}}{\sum_{j=1}^m e^{\lambda \eta_j}}}
 #'
 #' @param eta A numeric vector input
 #' @param lambda Tuning parameter (a single positive value)
 #' @param p A probability vector (i.e., numeric vector of non-negative values that sum to one)
 #' @param eta A numeric vector input
+#' @param ref_position The reference position that should be used to calculate the inverse softmax function. The default is the last position.
+#' @param ref_value The value the reference position will be set to. The default is 0.
 #' @return Value of the softmax function or its inverse
 #' @keywords transform
-#'
-#' @details Code adapted from the [utilities](https://github.com/ben-oneill/utilities/) package
 #'
 #' @export
 #' @examples
 #' softmax(5:7)
-#' softmaxinv(softmax(5:7))
+#' softmaxinv(softmax(5:7), ref_position = 1, ref_value = 5)
 softmax <- function(eta, lambda = 1) {
   stopifnot(requireNamespace("matrixStats", quietly = TRUE))
-  denom <- matrixStats::logSumExp(c(lambda * eta, 0))
-  exp(c(lambda * eta, 0) - denom)
+  denom <- matrixStats::logSumExp(lambda * eta)
+  exp(c(lambda * eta) - denom)
 }
 
 #' @rdname softmax
 #' @export
-softmaxinv <- function(p, lambda = 1) {
+softmaxinv <- function(p, lambda = 1, ref_position = length(p), ref_value = 0) {
   len <- length(p)
   if (len <= 1) {
     return(numeric(0))
   }
-  (log(p) - log(p[len]))[1:(len - 1)] / lambda
+
+  stopif(length(ref_position) > 1, "Please provide a single reference value.")
+  stopif(ref_position > len, "The reference value must be less or equal than the length of the probability vector.")
+
+  weights <- (log(p) - log(p[len])) / lambda
+  weights + (ref_value - weights[ref_position])
 }
 
 #' @title Configure local options during model fitting
@@ -347,12 +352,12 @@ order_data_query <- function(model, data, formula) {
           "Your data has been sorted by the following predictors: ",
           paste(predictors, collapse = ", "), "\n"
         )
-        data <- data[do.call(order, data[predictors]),]
+        data <- data[do.call(order, data[predictors]), ]
       }
     }
     message("\n\n", disable_msg)
   } else if (isTRUE(sort_data)) {
-    data <- data[do.call(order, data[predictors]),]
+    data <- data[do.call(order, data[predictors]), ]
     message(
       "\nYour data has been sorted by the following predictors: ",
       paste(predictors, collapse = ", "), "\n"
@@ -628,7 +633,7 @@ reset_env.brmsformula <- function(object, env = globalenv(), ...) {
 }
 
 #' @export
-reset_env.formula <- function(object, env =  globalenv(), ...) {
+reset_env.formula <- function(object, env = globalenv(), ...) {
   environment(object) <- env
   object
 }
