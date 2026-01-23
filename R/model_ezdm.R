@@ -167,7 +167,7 @@
 #' 
 #' # Extract population-level effects
 #' # True values: drift = 2, bound = 1.5, ndt = 0.3 (on log scale for drift/bound)
-#' fixef(fit)
+#' exp(fixef(fit))
 #' }
 ezdm <- function(mean_rt, var_rt, n_upper, n_trials, links = NULL, version = "3par", ...) {
   call <- match.call()
