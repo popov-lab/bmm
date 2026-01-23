@@ -13,9 +13,7 @@
     links = list(
       drift = "log", bound = "log", ndt = "log", s = "log"
     ),
-    fixed_parameters = list(
-      s = 0
-    ),
+    fixed_parameters = list(s = 0, mu = 0),
     priors = list(
       drift = list(main = "normal(0,1)", effects = "normal(0,0.5)"),
       bound = list(main = "normal(0,0.5)", effects = "normal(0,0.5)"),
@@ -41,9 +39,7 @@
     links = list(
       drift = "log", bound = "log", ndt = "log", zr = "logit", s = "log"
     ),
-    fixed_parameters = list(
-      s = 0
-    ),
+    fixed_parameters = list(s = 0, mu = 0),
     priors = list(
       drift = list(main = "normal(0,1)", effects = "normal(0,0.5)"),
       bound = list(main = "normal(0,0.5)", effects = "normal(0,0.5)"),
