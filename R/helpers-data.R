@@ -661,7 +661,7 @@ ezdm_summary_stats <- function(
     mad_val <- mad(x)
     var_est <- mad_val^2
   } else {
-    stop("scale_method must be 'iqr' or 'mad'")
+    stop2("scale_method must be 'iqr' or 'mad'")
   }
 
   list(
