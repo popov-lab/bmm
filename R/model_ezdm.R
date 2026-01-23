@@ -415,7 +415,6 @@ posterior_predict_ezdm_4par <- function(i, prep, ..., dv = c(
                                           "var_rt_upper", "var_rt_lower", "n_upper"
                                         )) {
   dv <- match.arg(dv)
-  browser()
   rezdm(
     n = length(brms::get_dpar(prep, "drift", i = i)),
     n_trials = prep$data$vint2[i],

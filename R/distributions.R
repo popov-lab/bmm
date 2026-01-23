@@ -1068,16 +1068,15 @@ rezdm <- function(n, n_trials, drift, bound, ndt, zr = 0.5, s = 1,
 
   # non-zero drift formulas
   if (any(!zero_drift)) {
-    idx <- !zero_drift
-    y <- -(bound[idx] * drift[idx]) / s[idx]^2
+    i <- !zero_drift
+    y <- -bound[i] * drift[i] / s[i]^2
     expy <- exp(y)
-    pC[idx] <- 1 / (1 + expy)
-    MDT[idx] <- (bound[idx] / (2 * drift[idx])) * ((1 - expy) / (1 + expy))
-    VRT[idx] <- ((bound[idx] * s[idx]^2) / (2 * drift[idx]^3)) *
-      (2 * y * expy - exp(2 * y) + 1) / ((expy + 1)^2)
+    pC[i] <- 1 / (1 + expy)
+    MDT[i] <- bound[i] / (2 * drift[i]) * (1 - expy) / (1 + expy)
+    VRT[i] <- bound[i] * s[i]^2 / (2 * drift[i]^3) * (2 * y * expy - exp(2 * y) + 1) / (expy + 1)^2
   }
 
-  list(pC = pC, MDT = MDT, VRT = VRT)
+  nlist(pC, MDT, VRT)
 }
 
 # Internal: compute 4par moments (Srivastava et al. formulas) - vectorized
@@ -1100,11 +1099,11 @@ rezdm <- function(n, n_trials, drift, bound, ndt, zr = 0.5, s = 1,
   z <- bound / 2
   x0 <- (zr * bound) - z
 
-  k_z <- (a * z) / s^2
-  k_x <- (a * x0) / s^2
+  kz <- a * z / s^2
+  kx <- a * x0 / s^2
 
   # proportion correct (works for all cases)
-  pC <- 1 - (exp(-2 * k_x) - exp(-2 * k_z)) / (exp(2 * k_z) - exp(-2 * k_z))
+  pC <- 1 - (exp(-2 * kx) - exp(-2 * kz)) / (exp(2 * kz) - exp(-2 * kz))
 
   # initialize outputs
   mdt_upper <- rep(NA_real_, n)
@@ -1117,40 +1116,37 @@ rezdm <- function(n, n_trials, drift, bound, ndt, zr = 0.5, s = 1,
 
   # zero-drift formulas
   if (any(zero_drift)) {
-    idx <- zero_drift
-    mdt_upper[idx] <- (4 * z[idx]^2 - (z[idx] + x0[idx])^2) / (3 * s[idx]^2)
-    mdt_lower[idx] <- (4 * z[idx]^2 - (z[idx] - x0[idx])^2) / (3 * s[idx]^2)
-    vrt_upper[idx] <- (32 * z[idx]^4 - 2 * (z[idx] + x0[idx])^4) / (45 * s[idx]^4)
-    vrt_lower[idx] <- (32 * z[idx]^4 - 2 * (z[idx] - x0[idx])^4) / (45 * s[idx]^4)
+    z_ <- z[zero_drift]
+    x0_ <- x0[zero_drift]
+    s_ <- s[zero_drift]
+
+    mdt_upper[zero_drift] <- (4 * z_^2 - (z_ + x0_)^2) / (3 * s_^2)
+    mdt_lower[zero_drift] <- (4 * z_^2 - (z_ - x0_)^2) / (3 * s_^2)
+    vrt_upper[zero_drift] <- (32 * z_^4 - 2 * (z_ + x0_)^4) / (45 * s_^4)
+    vrt_lower[zero_drift] <- (32 * z_^4 - 2 * (z_ - x0_)^4) / (45 * s_^4)
   }
 
   # non-zero drift formulas
   if (any(!zero_drift)) {
-    idx <- !zero_drift
-    mdt_upper[idx] <- (s[idx]^2 / a[idx]^2) *
-      (2 * k_z[idx] * coth(2 * k_z[idx]) -
-        (k_x[idx] + k_z[idx]) * coth(k_x[idx] + k_z[idx]))
-    mdt_lower[idx] <- (s[idx]^2 / a[idx]^2) *
-      (2 * k_z[idx] * coth(2 * k_z[idx]) -
-        (-k_x[idx] + k_z[idx]) * coth(-k_x[idx] + k_z[idx]))
+    a <- a[!zero_drift]
+    s <- s[!zero_drift]
+    kz <- kz[!zero_drift]
+    kx <- kx[!zero_drift]
 
-    vrt_upper[idx] <- (s[idx]^4 / a[idx]^4) *
-      (4 * k_z[idx]^2 * csch(2 * k_z[idx])^2 +
-        2 * k_z[idx] * coth(2 * k_z[idx]) -
-        (k_x[idx] + k_z[idx])^2 * csch(k_x[idx] + k_z[idx])^2 -
-        (k_x[idx] + k_z[idx]) * coth(k_x[idx] + k_z[idx]))
-    vrt_lower[idx] <- (s[idx]^4 / a[idx]^4) *
-      (4 * k_z[idx]^2 * csch(2 * k_z[idx])^2 +
-        2 * k_z[idx] * coth(2 * k_z[idx]) -
-        (-k_x[idx] + k_z[idx])^2 * csch(-k_x[idx] + k_z[idx])^2 -
-        (-k_x[idx] + k_z[idx]) * coth(-k_x[idx] + k_z[idx]))
+    mdt_upper[!zero_drift] <- (s / a)^2 * (2 * kz * coth(2 * kz) - (kx + kz) * coth(kx + kz))
+    mdt_lower[!zero_drift] <- (s / a)^2 * (2 * kz * coth(2 * kz) - (-kx + kz) * coth(-kx + kz))
+
+    vrt_upper[!zero_drift] <- (s / a)^4 *
+      (4 * kz^2 * csch(2 * kz)^2 +
+        2 * kz * coth(2 * kz) -
+        (kx + kz)^2 * csch(kx + kz)^2 -
+        (kx + kz) * coth(kx + kz))
+    vrt_lower[!zero_drift] <- (s / a)^4 *
+      (4 * kz^2 * csch(2 * kz)^2 +
+        2 * kz * coth(2 * kz) -
+        (-kx + kz)^2 * csch(-kx + kz)^2 -
+        (-kx + kz) * coth(-kx + kz))
   }
 
-  list(
-    pC = pC,
-    mdt_upper = mdt_upper,
-    mdt_lower = mdt_lower,
-    vrt_upper = vrt_upper,
-    vrt_lower = vrt_lower
-  )
+  nlist(pC, mdt_upper, mdt_lower, vrt_upper, vrt_lower)
 }
