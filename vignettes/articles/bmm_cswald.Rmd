@@ -221,11 +221,52 @@ library(bmm)
 library(ggplot2)
 ```
 
+## Example Dataset: Ratcliff & Rouder (1998)
+
+The `rr98` dataset from the `rtdists` package provides a classic example of
+choice response time data suitable for evidence accumulation models. The
+dataset contains responses from a brightness discrimination task where
+participants judged whether pixel arrays were "high" or "low" brightness.
+
+```{r}
+# Load the dataset from rtdists (already a dependency of bmm)
+data(rr98, package = "rtdists")
+
+# Remove outliers as in the original analysis
+rr98 <- rr98[!rr98$outlier, ]
+
+# Examine structure
+str(rr98[, c("id", "rt", "response_num", "instruction", "strength")])
+
+# Check error rates by condition
+with(rr98, tapply(response_num == 1, list(id, instruction), mean))
+```
+
+The dataset includes:
+
+- **rt**: Response time in seconds
+- **response_num**: Binary response (1 = "dark", 2 = "light")
+- **instruction**: Speed vs accuracy emphasis
+- **strength**: Task difficulty (0-32, brightness level)
+- **id**: Participant identifier
+
+This dataset is particularly well-suited for the cswald model because:
+
+1. **High accuracy**: Most conditions have error rates below 20%, ideal for the
+   simple version
+2. **Multiple conditions**: Allows testing how task manipulations affect model
+   parameters
+3. **Trial-level data**: Contains the RT and response for every trial
+4. **Classic reference**: Widely used in the evidence accumulation literature
+
+For a complete analysis example using this dataset, see the `rtdists` package
+vignette: `vignette("reanalysis_rr98", package = "rtdists")`.
+
 ## Generating Simulated Data
 
-We'll simulate data from a diffusion process using `rcswald()`, which
-internally uses `rtdists::rdiffusion()` to generate theoretically consistent
-samples:
+Alternatively, we can simulate data from a diffusion process using
+`rcswald()`, which internally uses `rtdists::rdiffusion()` to generate
+theoretically consistent samples:
 
 ```{r}
 # set seed for reproducibility
