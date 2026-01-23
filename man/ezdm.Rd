@@ -152,7 +152,7 @@ summary(fit)
 
 # Extract population-level effects
 # True values: drift = 2, bound = 1.5, ndt = 0.3 (on log scale for drift/bound)
-fixef(fit)
+exp(fixef(fit))
 }
 }
 \keyword{bmmodel}
