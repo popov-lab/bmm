@@ -803,7 +803,7 @@ As `bmm` feeds seamlessly into `brms`, we can use Bayesian hypothesis testing vi
 
 ```{r}
 # Test if drift rate is higher in easy vs hard condition
-brms::hypothesis(fit, "exp(drift_conditioneasy) > exp(drift_conditionhard)")
+brms::hypothesis(fit, "drift_conditioneasy > drift_conditionhard")
 ```
 
 # Adding random effects
