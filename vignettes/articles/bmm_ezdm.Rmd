@@ -424,7 +424,7 @@ summary_hybrid <- ezdm_summary_stats(
 )
 ```
 
-Fixed bounds based on task constraints (e.g., responses faster than 100ms are likely anticipations) provide more conservative estimates of contaminants. However, in the present of contaminants, data driven bounds are often more accurate with respect to detecting contaminants, especially in the presence of very long reaction times. In practice you can first filter the data and discard very short (< 0.1s) and very long (> 3 to 5s) and then proceed with data driven bounds for the mixture approach. This prevents the bounds from being influenced by extreme outliers.
+Fixed bounds based on task constraints (e.g., responses faster than 100ms are likely anticipations) provide more conservative estimates of contaminants. However, in the presence of contaminants, data driven bounds are often more accurate with respect to detecting contaminants, especially in the presence of very long reaction times. In practice you can first filter the data and discard very short (< 0.1s) and very long (> 3 to 5s) and then proceed with data driven bounds for the mixture approach. This prevents the bounds from being influenced by extreme outliers.
 
 ## Quality Control: Inspecting Contaminant Proportions
 
