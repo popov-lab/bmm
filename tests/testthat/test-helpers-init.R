@@ -347,8 +347,11 @@ test_that("initfun handles numeric predictors", {
 # =============================================================================
 
 test_that("initfun output matches standata dimensions", {
-  ff <- bmmformula(kappa ~ 1, c ~ 1)
+  # Use a model with predictors to ensure b_ parameters exist
   dat <- oberauer_lin_2017
+  dat$condition <- factor(rep(c("A", "B"), length.out = nrow(dat)))
+  
+  ff <- bmmformula(kappa ~ 1 + condition, c ~ 1)
   mod <- sdm(resp_error = "dev_rad")
   config_args <- configure_model(mod, data = dat, formula = ff)
 
@@ -357,14 +360,31 @@ test_that("initfun output matches standata dimensions", {
 
   standata <- brms::standata(config_args$formula, dat, config_args$formula$family)
 
-  # Verify dimensions match for vector parameters
-  for (nm in names(inits)) {
-    if (grepl("^b_", nm)) {
-      param <- sub("^b_", "", nm)
-      dim_name <- paste0("K_", param)
-      if (dim_name %in% names(standata)) {
-        expect_equal(length(inits[[nm]]), standata[[dim_name]])
-      }
+  # Verify that we have b_ parameters to test
+  b_names <- grep("^b_", names(inits), value = TRUE)
+  expect_true(length(b_names) > 0, info = "Should have at least one b_ parameter")
+
+  # Verify dimensions match for b_ (non-intercept) parameters
+  # Note: b_ parameters correspond to Kc_ (centered, excluding intercept) in standata
+  for (nm in b_names) {
+    param <- sub("^b_", "", nm)
+    # For models with intercepts, brms uses Kc_ for centered predictors
+    dim_name_c <- paste0("Kc_", param)
+    # For models without intercepts, brms uses K_
+    dim_name <- paste0("K_", param)
+    
+    if (dim_name_c %in% names(standata)) {
+      expect_equal(
+        length(inits[[nm]]), 
+        standata[[dim_name_c]],
+        info = paste("Dimension mismatch for parameter:", nm)
+      )
+    } else if (dim_name %in% names(standata)) {
+      expect_equal(
+        length(inits[[nm]]), 
+        standata[[dim_name]],
+        info = paste("Dimension mismatch for parameter:", nm)
+      )
     }
   }
 })
