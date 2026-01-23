@@ -120,12 +120,14 @@ count_term_levels <- function(data, vars) {
   term_sizes <- vapply(data[vars], function(x) {
     if (is.factor(x)) {
       nlevels(x)
-    } else {
+    } else if (is.numeric(x)) {
       # For continuous predictors, treat as single coefficient
       1L
+    } else {
+      length(unique(na.omit(x)))
     }
   }, integer(1L))
-  
+
   # Return total number of coefficients (product for interactions)
   prod(term_sizes)
 }
