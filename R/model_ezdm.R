@@ -321,7 +321,6 @@ configure_model.ezdm_3par <- function(model, data, formula) {
 
 
 log_lik_ezdm_3par <- function(i, prep) {
-  # compute log-likelihood using dezdm (vectorized over posterior samples)
   dezdm(
     mean_rt = prep$data$Y[i],
     var_rt = prep$data$vreal1[i],
@@ -416,7 +415,7 @@ posterior_predict_ezdm_4par <- function(i, prep, ..., dv = c(
                                           "var_rt_upper", "var_rt_lower", "n_upper"
                                         )) {
   dv <- match.arg(dv)
-
+  browser()
   rezdm(
     n = length(brms::get_dpar(prep, "drift", i = i)),
     n_trials = prep$data$vint2[i],
