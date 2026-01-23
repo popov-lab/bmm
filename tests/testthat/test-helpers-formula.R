@@ -40,6 +40,15 @@ test_that("+.bmmformula method works", {
   expect_error(base_f + formula(~ 1), "Formulas must have a left-hand-side variable")
 })
 
+test_that("bmmformula gives proper error for duplicate parameters", {
+  # Test duplicate formula error message includes proper comma separation
+  expect_error(bmf(m1 ~ 1, m1 ~ 2), "Duplicate formula for parameter\\(s\\) 'm1'")
+  expect_error(
+    bmf(m1 ~ 1, m2 ~ 1, m1 ~ 2, m2 ~ 2),
+    "Duplicate formula for parameter\\(s\\) 'm1', 'm2'"
+  )
+})
+
 describe("subsetting a bmmformula with [", {
   f <- bmf(y ~ exp(a) + b, a ~ 1 + (1 | id), b ~ 1, c = 3)
 

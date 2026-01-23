@@ -85,7 +85,8 @@ bmmformula <- function(...) {
   })
 
   stopif(any(vapply(par_names, length, integer(1)) == 0), "Formulas must have a left-hand-side variable")
-  stopif(any(duplicated(par_names)), "Duplicate formula for parameter(s) {par_names[duplicates]}")
+  duplicates <- par_names[duplicated(par_names)]
+  stopif(length(duplicates) > 0, "Duplicate formula for parameter(s) {collapse_comma(duplicates)}")
   new_bmmformula(setNames(out, par_names))
 }
 
