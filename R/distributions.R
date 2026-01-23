@@ -1084,10 +1084,21 @@ rezdm <- function(n, n_trials, drift, bound, ndt, zr = 0.5, s = 1,
   # Use signed drift for pC calculation
   k_z_signed <- (drift * z) / s^2
   k_x_signed <- (drift * x0) / s^2
-  
-  # proportion correct (works for all cases)
-  pC <- 1 - (exp(-2 * k_x_signed) - exp(-2 * k_z_signed)) / (exp(2 * k_z_signed) - exp(-2 * k_z_signed))
-  
+
+  # proportion correct
+  # Guard against drift -> 0, where the analytic limit is pC = zr
+  zero_drift <- abs(drift) < 1e-8
+  pC <- numeric(n)
+  if (any(!zero_drift)) {
+    kz_nz <- k_z_signed[!zero_drift]
+    kx_nz <- k_x_signed[!zero_drift]
+    denom <- exp(2 * kz_nz) - exp(-2 * kz_nz)
+    num <- exp(-2 * kx_nz) - exp(-2 * kz_nz)
+    pC[!zero_drift] <- 1 - num / denom
+  }
+  if (any(zero_drift)) {
+    pC[zero_drift] <- zr[zero_drift]
+  }
   # Use soft absolute value: sqrt(drift^2 + tau^2) with tau = 0.01
   # This provides smooth gradients without extreme curvature
   tau <- 0.01
