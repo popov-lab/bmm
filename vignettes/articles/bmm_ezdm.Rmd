@@ -137,7 +137,7 @@ With sufficient responses at both the upper and lower bound, this allows estimat
 
 ## Bayesian Estimation
 
-So far, studies using the EZ-Diffuison model have adopted step-wise analyses approaches. First, diffusion model parameters are calculated for summary statistics for each individual in each design cell. Second, the calculated parameters are submitted to statistical tests evaluating differences between experimental conditions. This approach has two downsides: 1) uncertainty in parameter estimation is not sufficiently propagated between analysis steps, and 2) all parameters of the diffusion model were allowed to vary over all design cells, bearing the risk of overfitting. To address these issues, @Chavez_Vandekerckhove_2025 introduced a Bayesian hierarchical approach to the EZ-diffusion model. This approach combines the derivation of summary statistics from diffusion model paramters with a probablistic model of the sampling distributions of the summary statistics. Specifically, this approach:
+So far, studies using the EZ-Diffusion model have adopted step-wise analyses approaches. First, diffusion model parameters are calculated for summary statistics for each individual in each design cell. Second, the calculated parameters are submitted to statistical tests evaluating differences between experimental conditions. This approach has two downsides: 1) uncertainty in parameter estimation is not sufficiently propagated between analysis steps, and 2) all parameters of the diffusion model were allowed to vary over all design cells, bearing the risk of over fitting. To address these issues, @Chavez_Vandekerckhove_2025 introduced a Bayesian hierarchical approach to the EZ-diffusion model. This approach combines the derivation of summary statistics from diffusion model parameters with a probabilistic model of the sampling distributions of the summary statistics. Specifically, this approach:
 
 1. Treats the summary statistics as **observed data** generated from a known sampling distribution
 2. Uses **likelihood-based inference** to estimate parameters with proper uncertainty quantification
@@ -160,9 +160,9 @@ Estimates three parameters with a fixed symmetric starting point ($z_r = 0.5$):
 
 | Parameter | Description | Link Function |
 |-----------|-------------|---------------|
-| `drift` | Drift rate ($v$) - rate of evidence accumulation | log |
-| `bound` | Boundary separation ($a$) - response caution | log |
-| `ndt` | Non-decision time ($T_{er}$) - encoding + motor time | log |
+| `drift`   | Drift rate ($v$) - rate of evidence accumulation | identity |
+| `bound`   | Boundary separation ($a$) - response caution | log |
+| `ndt`     | Non-decision time ($T_{er}$) - encoding + motor time | log |
 
 The diffusion constant `s` is fixed to 1 for identification.
 
@@ -172,7 +172,7 @@ Adds estimation of starting point bias:
 
 | Parameter | Description | Link Function |
 |-----------|-------------|---------------|
-| `drift` | Drift rate ($v$) | log |
+| `drift` | Drift rate ($v$) | identity |
 | `bound` | Boundary separation ($a$) | log |
 | `ndt` | Non-decision time ($T_{er}$) | log |
 | `zr` | Relative starting point (0-1 scale) | logit |
