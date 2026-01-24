@@ -375,6 +375,7 @@ test_that("rddm starting point bias affects response proportions", {
   # Bias toward lower boundary
   res_lower <- rddm(1000, drift = 0, bound = 1.5, ndt = 0.3, zr = 0.3)
   expect_gt(mean(res_lower$response == 0), 0.6)
+})
 
 # Tests for EZDM distribution functions ----------------------------------------
 
