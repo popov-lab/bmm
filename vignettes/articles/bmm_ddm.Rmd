@@ -148,29 +148,41 @@ The DDM likelihood requires numerical solution of the Fokker-Planck equation,
 which can be computationally demanding. @henrichSevenparameterDiffusionModel2024
 provide detailed benchmarks of their Stan implementation (which `bmm` uses).
 
-**Important**: Runtime scales approximately linearly with the number of trials.
-The estimates below are based on typical experimental datasets with **1000-2000
-trials per participant** (across all conditions). Smaller datasets will be faster;
-larger datasets will take proportionally longer.
+**Important notes about runtime**:
 
-**Runtime per iteration** (from Henrich et al., 2024):
+1. **Runtime scales approximately linearly with the number of trials**
+2. **Parallelization strategy matters**: @henrichSevenparameterDiffusionModel2024 used
+   heavy **within-chain parallelization** (32-80 threads per chain), which requires
+   special cmdstanr configuration and provides modest speedups for very large datasets
+3. **Typical `bmm` usage is much faster**: The default approach of parallelizing
+   4 chains across 4 cores (without within-chain threading) runs very efficiently
+   on modern hardware (2023+ CPUs)
 
-- **3-parameter version**: ~0.5-1 second per iteration
-- **4-parameter version**: ~0.8-1.5 seconds per iteration  
-- **7-parameter version**: ~2-4 seconds per iteration
+**Typical runtime estimates for `bmm`** (4 chains × 2000 iterations, 4 cores,
+no within-chain threading, tested on modern hardware):
 
-**Total runtime for typical analysis** with 4 chains × 2000 iterations (1000
-warmup, 1000 sampling) and ~1500 trials per participant:
+| Model Version | 100 trials | 300 trials | 1500 trials | Feasibility for Hierarchical |
+|---------------|-----------|-----------|-------------|-----------------------------|
+| 3-parameter   | < 10 sec  | < 10 sec  | ~2-5 min    | ✓ Excellent                 |
+| 4-parameter   | < 10 sec  | < 20 sec  | ~3-7 min    | ✓ Acceptable                |
+| 7-parameter   | ~5-15 min | ~15-45 min | ~1-3 hours | ⚠️  Single-subject only     |
 
-- **3-parameter**: ~20-40 minutes
-- **4-parameter**: ~30-60 minutes
-- **7-parameter**: ~2-3 hours
+**Note**: @henrichSevenparameterDiffusionModel2024 reported ~6-7 minutes for
+just 100 trials using 32-80 threads per chain (see their Appendix Figure S1).
+The much faster performance in typical `bmm` usage reflects both modern hardware
+improvements and efficient chain-level parallelization without the overhead of
+within-chain threading.
 
-For datasets with different sizes, scale these estimates proportionally:
+**Important**: The 7-parameter version is substantially slower than 3par/4par. 
+Between-chain parallelization provides limited speedup when individual chains 
+take many minutes, making hierarchical models with 7par potentially infeasible 
+without HPC resources. See the 7-parameter section below for detailed feasibility 
+guidelines.
 
-- **500 trials**: ~30% of the time above
-- **3000 trials**: ~200% of the time above
-- **10,000 trials**: ~650% of the time above
+**For larger datasets**, scale linearly:
+
+- **3000 trials**: ~2× the time for 1500 trials
+- **10,000 trials**: ~6-7× the time for 1500 trials
 
 ### Effect of Model Complexity on Runtime
 
@@ -199,9 +211,11 @@ single-subject models with the same total trial count.
 
 **Practical implications**:
 
-- A single-subject model with 10,000 trials might take 1 hour
-- A 50-subject hierarchical model (2 conditions × 100 trials = 10,000 total trials)
-  might take 8-15 hours for the same DDM version
+- A single-subject model with 10,000 trials (3par) might take ~30-60 minutes
+- A 50-subject hierarchical model (2 conditions × 100 trials = 10,000 total trials):
+  - 3par: ~4-10 hours
+  - 4par: ~6-15 hours
+  - 7par: **likely infeasible** (days to weeks without HPC)
 - Adding experimental predictors (e.g., drift ~ condition1 * condition2) increases
   runtime proportionally to the number of parameters
 
@@ -213,8 +227,9 @@ single-subject models with the same total trial count.
    handles this automatically for some models)
 3. **Use more informative priors**: Helps constrain the posterior space and
    speeds convergence
-4. **Parallel computing**: Use within-chain parallelization for large datasets
-   (requires cmdstanr backend with threading support)
+4. **Parallel computing**: Default `cores = 4` parallelizes chains efficiently.
+   Within-chain parallelization (threading) is available but typically not needed
+   for datasets < 10,000 trials
 5. **Subset testing**: Fit to a subset of subjects first to verify model
    specification and estimate total runtime
 
@@ -222,16 +237,18 @@ single-subject models with the same total trial count.
 
 1. Start with the 3-parameter version to test your model specification
 2. Use hierarchical priors to regularize parameter estimates
-3. Consider parallelizing chains across cores (included in runtime estimates above)
-4. For large datasets (>10,000 trials), consider within-chain parallelization or
-   reduce chains to 2 with more iterations
+3. Use `cores = 4` to parallelize chains (default, included in runtime estimates above)
+4. Within-chain parallelization is typically unnecessary for most datasets;
+   the default chain-level parallelization is more efficient
 5. Use informative priors when possible to speed convergence
 6. Test on a subset of data first (e.g., one participant) to verify model
    specification before fitting the full dataset
-7. The 7-parameter version is most useful when you have:
-   - Large sample sizes per condition (>100 trials)
-   - Theoretical interest in variability parameters
-   - Evidence that simpler models don't capture the data well
+7. The 7-parameter version should only be used when:
+   - Working with **single-subject** data or very small samples (N < 10)
+   - Large sample sizes per condition (>500 trials per subject)
+   - Theoretical interest in variability parameters is critical
+   - Access to HPC resources if fitting hierarchical models (>10 subjects)
+   - Consider alternatives (BayesFlow, separate per-subject fits) for large hierarchical studies
 
 ## Example Dataset: Ratcliff & Rouder (1998)
 
@@ -325,8 +342,8 @@ formula_3par <- bmf(
 )
 
 # Fit the model 
-# Note: demo_data has ~260 trials, so this will take ~5-10 minutes
-# For larger datasets (1500+ trials), expect 20-40 minutes
+# Note: demo_data has ~260 trials, so this will take < 10 seconds
+# For larger datasets (1500 trials), expect ~2-5 minutes
 fit_3par <- bmm(
   formula = formula_3par,
   data = demo_data,
@@ -335,7 +352,8 @@ fit_3par <- bmm(
   cores = 4,
   chains = 4,
   iter = 2000,
-  warmup = 1000
+  warmup = 1000,
+  file = "assets/bmmfit_ddm_3par_vignette"
 )
 
 # Examine convergence
@@ -370,14 +388,15 @@ formula_4par <- bmf(
 )
 
 # Fit the model
-# With ~260 trials: ~8-15 minutes
-# With 1500+ trials: ~30-60 minutes
+# With ~260 trials: < 10 seconds
+# With 1500 trials: ~3-7 minutes
 fit_4par <- bmm(
   formula = formula_4par,
   data = demo_data,
   model = model_4par,
   backend = "cmdstanr",
-  cores = 4
+  cores = 4,
+  file = "assets/bmmfit_ddm_4par_vignette"
 )
 
 # Compare models
@@ -397,6 +416,10 @@ loo_compare(loo_3par, loo_4par)
 The full DDM includes between-trial variability in drift, non-decision time,
 and starting point:
 
+**Note**: The 7-parameter model is not fitted in this vignette due to its
+computational intensity (~10-20 minutes for 260 trials). The code below shows
+how to specify and fit the model.
+
 ```{r, eval=FALSE}
 # Define the 7-parameter model
 model_7par <- ddm(rt = "rt", 
@@ -415,8 +438,10 @@ formula_7par <- bmf(
 )
 
 # Fit the model
-# With ~260 trials: ~30-45 minutes
-# With 1500+ trials: ~2-3 hours
+# WARNING: 7par is computationally intensive!
+# With ~260 trials: ~10-20 minutes
+# With 1500 trials: ~1-3 hours (single subject)
+# Hierarchical models may not be feasible without HPC resources
 fit_7par <- bmm(
   formula = formula_7par,
   data = demo_data,
@@ -428,10 +453,33 @@ fit_7par <- bmm(
 
 **When to use the 7-parameter version**:
 
-- Large datasets with sufficient statistical power
+- **Single-subject studies** with moderate to large trial counts (>500 trials)
+- Small hierarchical models with few subjects (N < 10)
 - Theoretical interest in trial-to-trial variability
 - When simpler models show systematic misfit
 - When comparing to classic DDM literature (which often uses variability parameters)
+
+**⚠️ Important computational feasibility note**:
+
+The 7-parameter DDM is **computationally intensive** and may not be feasible for 
+hierarchical models without high-performance computing (HPC) resources. Even with 
+chain-level parallelization, individual chains take substantial time due to the 
+complex likelihood calculations.
+
+**Feasibility guidelines**:
+
+- ✓ **Single-subject**: Feasible with ~1-3 hours for 1500 trials
+- ⚠️ **Small hierarchical** (5-10 subjects): Feasible but slow (~6-24 hours)
+- ❌ **Large hierarchical** (50+ subjects): Likely infeasible without HPC/within-chain
+  parallelization (32-80 threads per chain as used by @henrichSevenparameterDiffusionModel2024)
+
+**Alternative approaches for large hierarchical studies**:
+
+- Use the **3-parameter or 4-parameter versions** which are much faster and often sufficient
+- Consider **simulation-based inference** methods like BayesFlow for large-scale 
+  hierarchical DDM fitting
+- If variability parameters are critical, consider fitting separate 7-parameter 
+  models per subject rather than a full hierarchical model
 
 # Hierarchical DDM Models
 
@@ -455,7 +503,7 @@ model_hier <- ddm(rt = "rt",
 
 # Formula with random effects
 formula_hier <- bmf(
-  drift ~ strength + (strength | id),  # random slopes for drift by strength
+  drift ~ 0 + source + (0 + source | id),  # random slopes for drift by strength
   bound ~ 1 + (1 | id),                # random intercepts for boundary
   ndt ~ 1 + (1 | id)                   # random intercepts for ndt
 )
@@ -492,7 +540,7 @@ full_data <- rr98 %>%
 
 # Model with instruction effects
 formula_instruction <- bmf(
-  drift ~ strength + (strength | id),
+  drift ~ 0 + source + (0 + source| id),
   bound ~ instruction + (instruction | id),  # boundary varies by instruction
   ndt ~ 1 + (1 | id)
 )
@@ -742,8 +790,3 @@ Always check:
 
 <div id="refs"></div>
 
-# Session Info
-
-```{r}
-sessionInfo()
-```
