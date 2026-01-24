@@ -2,11 +2,10 @@
 
 ### New models
 * Add the Diffusion Decision Model (DDM, Ratcliff, 1978) for two-alternative forced-choice response time data with three versions: **3par** (drift, boundary, non-decision time), **4par** (adds starting point bias), and **7par** (adds trial-to-trial variability parameters). Implemented following the Stan code of Henrich et al. (2024). For details, see the [DDM article](https://venpopov.github.io/bmm/dev/articles/bmm_ddm.html) on the `bmm` website.
-* Add the Censored Shifted Wald model (**cswald**) for two-alternative forced-choice response time data in high-accuracy tasks. The model provides a computationally efficient alternative to the full DDM when error rates are low. For details, see the [cswald article](https://venpopov.github.io/bmm/dev/articles/bmm_cswald.html).
+* Add the **EZ-Diffusion Model** (`ezdm`) for speeded decision-making tasks. The model estimates drift rate, boundary separation, and non-decision time from aggregated summary statistics (mean RT, variance of RT, accuracy) using the closed-form equations derived by Wagenmakers et al. (2007). Supports both 3-parameter (symmetric starting point) and 4-parameter (asymmetric starting point) versions based on Srivastava et al. (2016). Implements Bayesian hierarchical estimation following Chavez & Vandekerckhove (2025). See the [article](https://venpopov.github.io/bmm/dev/articles/bmm_ezdm.html) on the `bmm` website for details.
 
 ### New features
 * New distribution functions **dddm()** and **rddm()** for the Diffusion Decision Model, with proper vectorization support for loo/waic computations.
-* Distribution functions now validate response codes more strictly to catch errors early.
 
 ### Bug fixes
 * Fix **log_lik_ddm()** and **posterior_predict_ddm()** to use wrapper functions consistently and extract parameters correctly.
@@ -18,6 +17,7 @@
 
 ### Dependencies
 * Add **rtdists** to Imports for DDM likelihood computation.
+
 
 # bmm 1.2.0
 
