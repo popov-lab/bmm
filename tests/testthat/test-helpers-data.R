@@ -144,13 +144,26 @@ test_that("check_var_set_size rejects invalid input", {
 
 test_that("check_data() returns a data.frame()", {
   mls <- lapply(supported_models(print_call = FALSE), get_model)
+  # test data includes variables for all model types:
+  # - y, x, z, w, l, s for circular/mixture models
+  # - mean_rt, var_rt, n_upper, n_trials for ezdm 3par
+  # - mean_rt_upper/lower, var_rt_upper/lower for ezdm 4par
+  test_data <- data.frame(
+    y = 1, x = 1, z = 2, w = 1, s = 2, l = 1,
+    mean_rt = 0.5, var_rt = 0.02, n_upper = 80, n_trials = 100,
+    mean_rt_upper = 0.45, mean_rt_lower = 0.55,
+    var_rt_upper = 0.018, var_rt_lower = 0.025,
+    rt = 0.6, response = 1
+  )
   for (ml in mls) {
     model <- ml(
       resp_error = "y", nt_features = "x", set_size = 2,
-      nt_distances = "z", resp_cats = c("w", "l"), num_options = c(1, 1), rt = "rt", response = "response"
+      nt_distances = "z", resp_cats = c("w", "l"), num_options = c(1, 1),
+      mean_rt = "mean_rt", var_rt = "var_rt", n_upper = "n_upper",
+      n_trials = "n_trials", rt = "rt", response = "response"
     )
     expect_s3_class(
-      check_data(model, data.frame(y = 1, x = 1, z = 2, w = 1, s = 2, l = 1, rt = 0.5, response = 1), bmf(kappa ~ 1)),
+      check_data(model, test_data, bmf(kappa ~ 1)),
       "data.frame"
     )
   }
