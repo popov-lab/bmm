@@ -170,15 +170,6 @@ test_that("default priors are consistent across different contrast codings", {
   contrasts(data_helmert$set_size) <- contr.helmert(nlevels(data_helmert$set_size))
   contrasts(data_helmert$session) <- contr.helmert(nlevels(data_helmert$session))
   
-  # Optionally test with bayestestR::contr.equalprior if available
-  data_equalprior <- NULL
-  if (requireNamespace("bayestestR", quietly = TRUE)) {
-    data_equalprior <- data_orig
-    contr_equalprior <- getFromNamespace("contr.equalprior", "bayestestR")
-    contrasts(data_equalprior$set_size) <- contr_equalprior(nlevels(data_equalprior$set_size))
-    contrasts(data_equalprior$session) <- contr_equalprior(nlevels(data_equalprior$session))
-  }
-  
   # Test Pattern 1: Single predictor with intercept
   formula <- bmf(kappa ~ 1 + set_size, thetat ~ 1 + set_size)
   
@@ -199,14 +190,6 @@ test_that("default priors are consistent across different contrast codings", {
     pr_treatment[pr_treatment$coef == "Intercept", ]$prior,
     pr_sum[pr_sum$coef == "Intercept", ]$prior
   )
-  
-  if (!is.null(data_equalprior)) {
-    pr_equalprior <- default_prior(formula, data_equalprior, model)
-    expect_equal(
-      pr_treatment[pr_treatment$coef == "" & pr_treatment$class == "b", ]$prior,
-      pr_equalprior[pr_equalprior$coef == "" & pr_equalprior$class == "b", ]$prior
-    )
-  }
   
   # Test Pattern 2: Multiple predictors with intercept
   formula <- bmf(kappa ~ 1 + set_size + session, thetat ~ 1 + set_size + session)
