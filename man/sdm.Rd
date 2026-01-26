@@ -60,6 +60,7 @@ and how to use it. * \strong{Domain:} Visual working memory
 \item \code{mu}:
 \itemize{
 \item \code{main}: student_t(1, 0, 1)
+\item \code{effects}: normal(0,1)
 }
 \item \code{kappa}:
 \itemize{

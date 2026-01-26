@@ -174,8 +174,9 @@ test_that("default priors are consistent across different contrast codings", {
   data_equalprior <- NULL
   if (requireNamespace("bayestestR", quietly = TRUE)) {
     data_equalprior <- data_orig
-    contrasts(data_equalprior$set_size) <- bayestestR::contr.equalprior(nlevels(data_equalprior$set_size))
-    contrasts(data_equalprior$session) <- bayestestR::contr.equalprior(nlevels(data_equalprior$session))
+    contr_equalprior <- getFromNamespace("contr.equalprior", "bayestestR")
+    contrasts(data_equalprior$set_size) <- contr_equalprior(nlevels(data_equalprior$set_size))
+    contrasts(data_equalprior$session) <- contr_equalprior(nlevels(data_equalprior$session))
   }
   
   # Test Pattern 1: Single predictor with intercept
