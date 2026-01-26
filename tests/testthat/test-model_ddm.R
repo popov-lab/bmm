@@ -131,6 +131,10 @@ test_that("ddm check_data handles missing values", {
 
 test_that("ddm works with mock backend - 3par version", {
   skip_on_cran()
+  skip_if_not(
+    requireNamespace("cmdstanr", quietly = TRUE),
+    "cmdstanr is required for DDM models"
+  )
   
   sim_data <- rddm(50, drift = 2, bound = 1.5, ndt = 0.3)
   model <- ddm("rt", "response", version = "3par")
@@ -141,6 +145,10 @@ test_that("ddm works with mock backend - 3par version", {
 
 test_that("ddm works with mock backend - 4par version", {
   skip_on_cran()
+  skip_if_not(
+    requireNamespace("cmdstanr", quietly = TRUE),
+    "cmdstanr is required for DDM models"
+  )
   
   sim_data <- rddm(50, drift = 2, bound = 1.5, ndt = 0.3, zr = 0.5)
   model <- ddm("rt", "response", version = "4par")
@@ -167,6 +175,10 @@ test_that("ddm works with mock backend - 7par version", {
 
 test_that("ddm formula conversion works correctly", {
   skip_on_cran()
+  skip_if_not(
+    requireNamespace("cmdstanr", quietly = TRUE),
+    "cmdstanr is required for DDM models"
+  )
   
   sim_data <- rddm(50, drift = 2, bound = 1.5, ndt = 0.3)
   model <- ddm("rt", "response", version = "3par")
@@ -180,6 +192,10 @@ test_that("ddm formula conversion works correctly", {
 
 test_that("ddm with condition effects works", {
   skip_on_cran()
+  skip_if_not(
+    requireNamespace("cmdstanr", quietly = TRUE),
+    "cmdstanr is required for DDM models"
+  )
   
   # Simulate data with condition effects
   n_per_cond <- 25
@@ -198,6 +214,10 @@ test_that("ddm with condition effects works", {
 
 test_that("ddm with hierarchical structure works", {
   skip_on_cran()
+  skip_if_not(
+    requireNamespace("cmdstanr", quietly = TRUE),
+    "cmdstanr is required for DDM models"
+  )
   
   # Simulate hierarchical data
   n_subjects <- 3
@@ -219,6 +239,10 @@ test_that("ddm with hierarchical structure works", {
 
 test_that("ddm allows missing parameters with message", {
   skip_on_cran()
+  skip_if_not(
+    requireNamespace("cmdstanr", quietly = TRUE),
+    "cmdstanr is required for DDM models"
+  )
   
   sim_data <- rddm(50, drift = 2, bound = 1.5, ndt = 0.3)
   model <- ddm("rt", "response", version = "3par")
@@ -233,6 +257,10 @@ test_that("ddm allows missing parameters with message", {
 
 test_that("ddm default priors are correctly set", {
   skip_on_cran()
+  skip_if_not(
+    requireNamespace("cmdstanr", quietly = TRUE),
+    "cmdstanr is required for DDM models"
+  )
   
   sim_data <- rddm(50, drift = 2, bound = 1.5, ndt = 0.3)
   model <- ddm("rt", "response", version = "3par")
@@ -249,6 +277,10 @@ test_that("ddm default priors are correctly set", {
 
 test_that("ddm stanvars are correctly added", {
   skip_on_cran()
+  skip_if_not(
+    requireNamespace("cmdstanr", quietly = TRUE),
+    "cmdstanr is required for DDM models"
+  )
   
   sim_data <- rddm(50, drift = 2, bound = 1.5, ndt = 0.3)
   model <- ddm("rt", "response", version = "3par")
