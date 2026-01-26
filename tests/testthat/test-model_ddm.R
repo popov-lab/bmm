@@ -1,18 +1,23 @@
 # Test DDM model specification and integration
 
 test_that("ddm model can be created with all versions", {
-  expect_silent(ddm("rt", "response", version = "3par"))
-  expect_silent(ddm("rt", "response", version = "4par"))
-  
-  # 7par version requires cmdstanr (uses new Wiener likelihood not in rstan)
+  # All DDM versions require cmdstanr (use Wiener likelihood not in rstan)
   skip_if_not(
     requireNamespace("cmdstanr", quietly = TRUE),
-    "cmdstanr is required for 7par DDM version"
+    "cmdstanr is required for DDM models"
   )
+  
+  expect_silent(ddm("rt", "response", version = "3par"))
+  expect_silent(ddm("rt", "response", version = "4par"))
   expect_silent(ddm("rt", "response", version = "7par"))
 })
 
 test_that("ddm model has correct class structure", {
+  skip_if_not(
+    requireNamespace("cmdstanr", quietly = TRUE),
+    "cmdstanr is required for DDM models"
+  )
+  
   model <- ddm("rt", "response", version = "3par")
   expect_s3_class(model, "bmmodel")
   expect_s3_class(model, "ddm")
@@ -20,6 +25,11 @@ test_that("ddm model has correct class structure", {
 })
 
 test_that("ddm model parameters are correctly defined for 3par version", {
+  skip_if_not(
+    requireNamespace("cmdstanr", quietly = TRUE),
+    "cmdstanr is required for DDM models"
+  )
+  
   model <- ddm("rt", "response", version = "3par")
   expect_true("drift" %in% names(model$parameters))
   expect_true("bound" %in% names(model$parameters))
@@ -31,6 +41,11 @@ test_that("ddm model parameters are correctly defined for 3par version", {
 })
 
 test_that("ddm model parameters are correctly defined for 4par version", {
+  skip_if_not(
+    requireNamespace("cmdstanr", quietly = TRUE),
+    "cmdstanr is required for DDM models"
+  )
+  
   model <- ddm("rt", "response", version = "4par")
   expect_true("zr" %in% names(model$parameters))
   expect_equal(model$fixed_parameters$sdrift, 0)
@@ -41,7 +56,7 @@ test_that("ddm model parameters are correctly defined for 4par version", {
 test_that("ddm model parameters are correctly defined for 7par version", {
   skip_if_not(
     requireNamespace("cmdstanr", quietly = TRUE),
-    "cmdstanr is required for 7par DDM version"
+    "cmdstanr is required for DDM models"
   )
   
   model <- ddm("rt", "response", version = "7par")
@@ -58,7 +73,7 @@ test_that("ddm model parameters are correctly defined for 7par version", {
 test_that("ddm model has correct link functions", {
   skip_if_not(
     requireNamespace("cmdstanr", quietly = TRUE),
-    "cmdstanr is required for 7par DDM version"
+    "cmdstanr is required for DDM models"
   )
   
   model <- ddm("rt", "response", version = "7par")
@@ -72,12 +87,22 @@ test_that("ddm model has correct link functions", {
 })
 
 test_that("ddm model accepts custom links", {
+  skip_if_not(
+    requireNamespace("cmdstanr", quietly = TRUE),
+    "cmdstanr is required for DDM models"
+  )
+  
   custom_links <- list(drift = "log")
   model <- ddm("rt", "response", version = "3par", links = custom_links)
   expect_equal(model$links$drift, "log")
 })
 
 test_that("ddm legacy version names work with deprecation warning", {
+  skip_if_not(
+    requireNamespace("cmdstanr", quietly = TRUE),
+    "cmdstanr is required for DDM models"
+  )
+  
   expect_warning(
     ddm("rt", "response", version = "three_par"),
     "outdated version label"
@@ -93,6 +118,11 @@ test_that("ddm legacy version names work with deprecation warning", {
 })
 
 test_that("ddm check_data validates rt variable", {
+  skip_if_not(
+    requireNamespace("cmdstanr", quietly = TRUE),
+    "cmdstanr is required for DDM models"
+  )
+  
   model <- ddm("rt", "response", version = "3par")
   
   # Valid data
@@ -108,6 +138,11 @@ test_that("ddm check_data validates rt variable", {
 })
 
 test_that("ddm check_data validates response variable", {
+  skip_if_not(
+    requireNamespace("cmdstanr", quietly = TRUE),
+    "cmdstanr is required for DDM models"
+  )
+  
   model <- ddm("rt", "response", version = "3par")
   
   # Invalid response codes
@@ -119,6 +154,11 @@ test_that("ddm check_data validates response variable", {
 })
 
 test_that("ddm check_data handles missing values", {
+  skip_if_not(
+    requireNamespace("cmdstanr", quietly = TRUE),
+    "cmdstanr is required for DDM models"
+  )
+  
   model <- ddm("rt", "response", version = "3par")
   
   # Missing values produce a warning and are removed, not an error
