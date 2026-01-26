@@ -6,38 +6,29 @@
 \alias{rm3}
 \title{Distribution functions for the Memory Measurement Model (M3)}
 \usage{
-dm3(
-  x,
-  pars,
-  m3_model,
-  act_funs = construct_m3_act_funs(m3_model, warnings = FALSE),
-  log = TRUE,
-  ...
-)
+dm3(x, pars, m3_model, act_funs = NULL, log = TRUE, ...)
 
-rm3(
-  n,
-  size,
-  pars,
-  m3_model,
-  act_funs = construct_m3_act_funs(m3_model, warnings = FALSE),
-  ...
-)
+rm3(n, size, pars, m3_model, act_funs = NULL, unpack = FALSE, ...)
 }
 \arguments{
 \item{x}{Integer vector of length \code{K} where K is the number of response categories
 and each value is the number of observed responses per category}
 
-\item{pars}{A named vector of parameters of the memory measurement model}
+\item{pars}{A named vector of parameters of the memory measurement model.
+Note: The fixed parameter \code{b} does not need to be provided - it will be
+automatically added from the model specification if missing.}
 
 \item{m3_model}{A \code{bmmodel} object specifying the m3 model that densities or
 random samples should be generated for}
 
 \item{act_funs}{A \code{bmmformula} object specifying the activation functions for
-the different response categories for the "custom" version of the M3. The
-default will attempt to construct the standard activation functions for the
-"ss" and "cs" model version. For a custom m3 model you need to specify the
-act_funs argument manually}
+the different response categories. This can be either:
+(1) Just the activation formulas (one for each response category), or
+(2) A full bmmformula including both activation formulas and other parameters.
+If a full formula is provided, only the formulas matching response categories
+will be extracted. The default will attempt to construct the standard
+activation functions for the "ss" and "cs" model version. For a custom m3
+model you need to specify the act_funs argument manually.}
 
 \item{log}{Logical; if \code{TRUE} (default), values are returned on the log scale.}
 
@@ -47,6 +38,11 @@ activation functions, but not parameters of the model}
 \item{n}{Integer. Number of observations to generate data for}
 
 \item{size}{The total number of observations in all categories}
+
+\item{unpack}{Logical; if \code{TRUE} and \code{n = 1}, returns a named vector instead of
+a matrix. This allows automatic unpacking of response categories into separate
+columns when used with \code{dplyr::reframe()}. Default is \code{FALSE} for backward
+compatibility.}
 }
 \value{
 \code{dm3} gives the density of the memory measurement model, and \code{rm3}
@@ -58,13 +54,46 @@ measurement model. Please note that these functions are currently not
 vectorized.
 }
 \examples{
+# Basic usage - b parameter is added automatically
 model <- m3(
   resp_cats = c("corr", "other", "npl"),
   num_options = c(1, 4, 5),
   choice_rule = "simple",
   version = "ss"
 )
-dm3(x = c(20, 10, 10), pars = c(a = 1, b = 1, c = 2), m3_model = model)
+
+# No need to provide b parameter
+dm3(x = c(20, 10, 10), pars = c(a = 1, c = 2), m3_model = model)
+rm3(n = 10, size = 100, pars = c(a = 1, c = 2), m3_model = model)
+
+# Can also use full formula (activation formulas are extracted automatically)
+full_formula <- bmf(
+  corr ~ b + a + c,
+  other ~ b + a, 
+  npl ~ b,
+  a ~ 1,
+  c ~ 1
+)
+rm3(n = 10, size = 100, pars = c(a = 1, c = 2), 
+    m3_model = model, act_funs = full_formula)
+    
+\dontrun{
+# Use with dplyr::reframe() for automatic unpacking into columns
+library(dplyr)
+library(tibble)
+param_grid <- expand.grid(a = c(0.5, 1, 1.5), c = c(1, 2, 3))
+
+simulated_data <- param_grid \%>\%
+  rowwise() \%>\%
+  reframe(
+    a = a,
+    c = c,
+    # unpack=TRUE returns named vector; wrap in as_tibble_row for auto-unpacking
+    as_tibble_row(rm3(n = 1, size = 100, pars = c(a = a, c = c), 
+                      m3_model = model, unpack = TRUE))
+  )
+# Result has columns: a, c, corr, other, npl
+}
 }
 \references{
 Oberauer, K., & Lewandowsky, S. (2019). Simple measurement models
