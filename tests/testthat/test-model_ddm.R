@@ -3,6 +3,12 @@
 test_that("ddm model can be created with all versions", {
   expect_silent(ddm("rt", "response", version = "3par"))
   expect_silent(ddm("rt", "response", version = "4par"))
+  
+  # 7par version requires cmdstanr (uses new Wiener likelihood not in rstan)
+  skip_if_not(
+    requireNamespace("cmdstanr", quietly = TRUE),
+    "cmdstanr is required for 7par DDM version"
+  )
   expect_silent(ddm("rt", "response", version = "7par"))
 })
 
@@ -33,6 +39,11 @@ test_that("ddm model parameters are correctly defined for 4par version", {
 })
 
 test_that("ddm model parameters are correctly defined for 7par version", {
+  skip_if_not(
+    requireNamespace("cmdstanr", quietly = TRUE),
+    "cmdstanr is required for 7par DDM version"
+  )
+  
   model <- ddm("rt", "response", version = "7par")
   expect_true("drift" %in% names(model$parameters))
   expect_true("bound" %in% names(model$parameters))
@@ -45,6 +56,11 @@ test_that("ddm model parameters are correctly defined for 7par version", {
 })
 
 test_that("ddm model has correct link functions", {
+  skip_if_not(
+    requireNamespace("cmdstanr", quietly = TRUE),
+    "cmdstanr is required for 7par DDM version"
+  )
+  
   model <- ddm("rt", "response", version = "7par")
   expect_equal(model$links$drift, "identity")
   expect_equal(model$links$bound, "log")
@@ -135,6 +151,10 @@ test_that("ddm works with mock backend - 4par version", {
 
 test_that("ddm works with mock backend - 7par version", {
   skip_on_cran()
+  skip_if_not(
+    requireNamespace("cmdstanr", quietly = TRUE),
+    "cmdstanr is required for 7par DDM version"
+  )
   
   sim_data <- rddm(50, drift = 2, bound = 1.5, ndt = 0.3, zr = 0.5,
                    sdrift = 0.3, sndt = 0.05, szr = 0.1)
