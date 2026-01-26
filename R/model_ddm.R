@@ -172,6 +172,11 @@
 #' # put a full example here (see 'R/model_mixture3p.R' for an example)
 #' }
 ddm <- function(rt, response, links = NULL, version = "4par", ...) {
+  stopif(
+    !requireNamespace("cmdstanr", quietly = TRUE),
+    'The "cmdstanr" package is required for this functionality'
+  )
+
   call <- match.call()
   stop_missing_args()
   .model_ddm(rt = rt, response = response,
