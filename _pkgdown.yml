@@ -92,5 +92,6 @@ articles:
   - title: Evidence accumulation models
     desc: Fitting evidence accumulation models to response time and choice data
     contents:
-    - articles/bmm_ddm
+    - articles/bmm_ezdm
     - articles/bmm_cswald
+    - articles/bmm_ddm

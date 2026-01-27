@@ -233,7 +233,7 @@ check_data.ezdm <- function(model, data, formula) {
   n_trials_values <- data[[n_trials]]
   stopif(
     any(n_trials_values <= 2, na.rm = TRUE),
-    "Number of trials (n_trials) must larger than two."
+    "Number of trials (n_trials) must be larger than two."
   )
   warnif(
     any(n_trials_values != round(n_trials_values), na.rm = TRUE),

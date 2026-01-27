@@ -6,6 +6,7 @@
 
 ### New features
 * New distribution functions **dddm()** and **rddm()** for the Diffusion Decision Model, with proper vectorization support for loo/waic computations.
+* New function **ezdm_summary_stats()** to compute summary statistics from trial-level RT data for the EZ-Diffusion Model.
 
 ### Bug fixes
 * Fix **log_lik_ddm()** and **posterior_predict_ddm()** to use wrapper functions consistently and extract parameters correctly.
@@ -17,6 +18,7 @@
 
 ### Dependencies
 * Add **rtdists** to Imports for DDM likelihood computation.
+
 
 
 # bmm 1.2.0
