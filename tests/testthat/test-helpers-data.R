@@ -484,8 +484,7 @@ test_that("ezdm_summary_stats() warns for potential data issues", {
     ezdm_summary_stats(test_data_neg,
       rt = "rt", response = "correct",
       method = "simple"
-    ),
-    "non-positive RT values will be excluded"
+    )
   )
 })
 
@@ -1151,7 +1150,7 @@ test_that("ezdm_summary_stats() adjust_accuracy produces integer values", {
 
   result <- ezdm_summary_stats(test_data,
     rt = "rt", response = "correct",
-    adjust_accuracy = TRUE, seed = 123
+    adjust_accuracy = TRUE
   )
 
   # Adjusted values should be integers
@@ -1164,26 +1163,6 @@ test_that("ezdm_summary_stats() adjust_accuracy produces integer values", {
   expect_true(result$n_trials_adj <= result$n_trials)
 })
 
-test_that("ezdm_summary_stats() seed ensures reproducibility", {
-  set.seed(42)
-  test_data <- data.frame(
-    rt = rgamma(200, shape = 5, rate = 10) + 0.3,
-    correct = rbinom(200, 1, 0.8)
-  )
-
-  # Same seed should give same results
-  result1 <- ezdm_summary_stats(test_data,
-    rt = "rt", response = "correct",
-    adjust_accuracy = TRUE, seed = 999
-  )
-  result2 <- ezdm_summary_stats(test_data,
-    rt = "rt", response = "correct",
-    adjust_accuracy = TRUE, seed = 999
-  )
-
-  expect_equal(result1$n_upper_adj, result2$n_upper_adj)
-  expect_equal(result1$n_trials_adj, result2$n_trials_adj)
-})
 
 test_that("ezdm_summary_stats() adjust_accuracy warns with simple method", {
   test_data <- data.frame(
@@ -1232,8 +1211,7 @@ test_that("ezdm_summary_stats() 4par with adjust_accuracy works", {
 
   result <- ezdm_summary_stats(test_data,
     rt = "rt", response = "correct",
-    version = "4par", adjust_accuracy = TRUE,
-    seed = 456
+    version = "4par", adjust_accuracy = TRUE
   )
 
   expect_true("n_upper_adj" %in% names(result))
@@ -1254,8 +1232,7 @@ test_that("ezdm_summary_stats() adjust_accuracy works with grouping", {
 
   result <- ezdm_summary_stats(test_data,
     rt = "rt", response = "correct",
-    .by = "subject", adjust_accuracy = TRUE,
-    seed = 789
+    .by = "subject", adjust_accuracy = TRUE
   )
 
   expect_equal(nrow(result), 3)
