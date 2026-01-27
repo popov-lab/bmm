@@ -125,7 +125,7 @@ test_that("ezdm check_data validates n_trials variable", {
   )
   expect_error(
     check_data(model, invalid_data, bmf(drift ~ 1, bound ~ 1, ndt ~ 1)),
-    "must larger than two"
+    "must be larger than two"
   )
 
   # n_trials = 1 should error (must be > 2)
@@ -137,7 +137,7 @@ test_that("ezdm check_data validates n_trials variable", {
   )
   expect_error(
     check_data(model, invalid_data_1, bmf(drift ~ 1, bound ~ 1, ndt ~ 1)),
-    "must larger than two"
+    "must be larger than two"
   )
 
   # n_trials = 2 should error (must be larger than 2)
@@ -149,7 +149,7 @@ test_that("ezdm check_data validates n_trials variable", {
   )
   expect_error(
     check_data(model, invalid_data_2, bmf(drift ~ 1, bound ~ 1, ndt ~ 1)),
-    "must larger than two"
+    "must be larger than two"
   )
 
   # Non-integer n_trials should warn
