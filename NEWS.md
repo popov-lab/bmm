@@ -11,6 +11,9 @@
 * New function **create_initfun()** creates initialization functions for models that benefit from or require initial values for MCMC sampling. Supports automatic parameter initialization based on model-specific ranges with proper link function transformations.
 * New utility function **link_transform()** applies link functions (log, logit, identity, etc.) to parameter values, with proper handling of NULL inputs.
 
+### New features
+* New function **ezdm_summary_stats()** to compute summary statistics from trial-level RT data for the EZ-Diffusion Model.
+
 # bmm 1.2.0
 
 ### New models
