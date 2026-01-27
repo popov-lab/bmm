@@ -572,15 +572,24 @@ rimm <- function(n, mu = c(0, 2, -1.5), dist = c(0, 0.5, 2),
 #'   and each value is the number of observed responses per category
 #' @param n Integer. Number of observations to generate data for
 #' @param size The total number of observations in all categories
-#' @param pars A named vector of parameters of the memory measurement model
+#' @param pars A named vector of parameters of the memory measurement model.
+#'   Note: The fixed parameter `b` does not need to be provided - it will be
+#'   automatically added from the model specification if missing.
 #' @param m3_model A `bmmodel` object specifying the m3 model that densities or
 #'   random samples should be generated for
 #' @param act_funs A `bmmformula` object specifying the activation functions for
-#'   the different response categories for the "custom" version of the M3. The
-#'   default will attempt to construct the standard activation functions for the
-#'   "ss" and "cs" model version. For a custom m3 model you need to specify the
-#'   act_funs argument manually
+#'   the different response categories. This can be either:
+#'   (1) Just the activation formulas (one for each response category), or
+#'   (2) A full bmmformula including both activation formulas and other parameters.
+#'   If a full formula is provided, only the formulas matching response categories
+#'   will be extracted. The default will attempt to construct the standard
+#'   activation functions for the "ss" and "cs" model version. For a custom m3
+#'   model you need to specify the act_funs argument manually.
 #' @param log Logical; if `TRUE` (default), values are returned on the log scale.
+#' @param unpack Logical; if `TRUE` and `n = 1`, returns a named vector instead of
+#'   a matrix. This allows automatic unpacking of response categories into separate
+#'   columns when used with `dplyr::reframe()`. Default is `FALSE` for backward
+#'   compatibility.
 #' @param ... can be used to pass additional variables that are used in the
 #'   activation functions, but not parameters of the model
 #'
@@ -594,15 +603,48 @@ rimm <- function(n, mu = c(0, 2, -1.5), dist = c(0, 0.5, 2),
 #'   gives the random generation function for the memory measurement model.
 #'
 #' @examples
+#' # Basic usage - b parameter is added automatically
 #' model <- m3(
 #'   resp_cats = c("corr", "other", "npl"),
 #'   num_options = c(1, 4, 5),
 #'   choice_rule = "simple",
 #'   version = "ss"
 #' )
-#' dm3(x = c(20, 10, 10), pars = c(a = 1, b = 1, c = 2), m3_model = model)
+#' 
+#' # No need to provide b parameter
+#' dm3(x = c(20, 10, 10), pars = c(a = 1, c = 2), m3_model = model)
+#' rm3(n = 10, size = 100, pars = c(a = 1, c = 2), m3_model = model)
+#' 
+#' # Can also use full formula (activation formulas are extracted automatically)
+#' full_formula <- bmf(
+#'   corr ~ b + a + c,
+#'   other ~ b + a, 
+#'   npl ~ b,
+#'   a ~ 1,
+#'   c ~ 1
+#' )
+#' rm3(n = 10, size = 100, pars = c(a = 1, c = 2), 
+#'     m3_model = model, act_funs = full_formula)
+#'     
+#' \dontrun{
+#' # Use with dplyr::reframe() for automatic unpacking into columns
+#' library(dplyr)
+#' library(tibble)
+#' param_grid <- expand.grid(a = c(0.5, 1, 1.5), c = c(1, 2, 3))
+#' 
+#' simulated_data <- param_grid %>%
+#'   rowwise() %>%
+#'   reframe(
+#'     a = a,
+#'     c = c,
+#'     # unpack=TRUE returns named vector; wrap in as_tibble_row for auto-unpacking
+#'     as_tibble_row(rm3(n = 1, size = 100, pars = c(a = a, c = c), 
+#'                       m3_model = model, unpack = TRUE))
+#'   )
+#' # Result has columns: a, c, corr, other, npl
+#' }
 #' @export
-dm3 <- function(x, pars, m3_model, act_funs = construct_m3_act_funs(m3_model, warnings = FALSE),
+dm3 <- function(x, pars, m3_model, act_funs = NULL,
                 log = TRUE, ...) {
   probs <- .compute_m3_probability_vector(pars, m3_model, act_funs, ...)
   dmultinom(x, prob = probs, log = log)
@@ -610,25 +652,66 @@ dm3 <- function(x, pars, m3_model, act_funs = construct_m3_act_funs(m3_model, wa
 
 #' @rdname m3dist
 #' @export
-rm3 <- function(n, size, pars, m3_model, act_funs = construct_m3_act_funs(m3_model, warnings = FALSE),
+rm3 <- function(n, size, pars, m3_model, act_funs = NULL, unpack = FALSE,
                 ...) {
   probs <- .compute_m3_probability_vector(pars, m3_model, act_funs, ...)
-  t(rmultinom(n, size = size, prob = probs))
+  result <- t(rmultinom(n, size = size, prob = probs))
+  
+  # If unpack=TRUE and n=1, return named vector for automatic unpacking
+  if (unpack && n == 1) {
+    result_vec <- as.vector(result[1, ])
+    names(result_vec) <- colnames(result)
+    return(result_vec)
+  }
+  
+  result
 }
 
 .compute_m3_probability_vector <-
-  function(pars, m3_model, act_funs = construct_m3_act_funs(m3_model, warnings = FALSE), ...) {
+  function(pars, m3_model, act_funs = NULL, ...) {
     pars <- c(pars, unlist(list(...)))
+    
+    # If act_funs is NULL, construct default activation functions
+    if (is.null(act_funs)) {
+      act_funs <- construct_m3_act_funs(m3_model, warnings = FALSE)
+    }
+    
+    # Extract activation functions if full formula is provided
+    if (inherits(act_funs, "bmmformula")) {
+      resp_cats <- m3_model$resp_vars$resp_cats
+      # Keep only formulas that match response categories
+      act_funs_filtered <- act_funs[names(act_funs) %in% resp_cats]
+      stopif(
+        length(act_funs_filtered) == 0,
+        "No activation formulas found in the provided formula. Expected formulas for: {collapse_comma(resp_cats)}"
+      )
+      act_funs <- act_funs_filtered
+    }
+    
     stopif(
       is_try_error(try(act_funs, silent = TRUE)),
       'No activation functions for version "custom" provided.
       Please pass activation functions for the different response categories
       using the "act_funs" argument.'
     )
+    
+    # Get required parameters from activation functions
+    required_pars <- rhs_vars(act_funs)
+    
+    # Add fixed b parameter if not provided
+    if ("b" %in% required_pars && !("b" %in% names(pars))) {
+      b_value <- m3_model$fixed_parameters$b
+      if (!is.null(b_value)) {
+        pars <- c(pars, b = b_value)
+      }
+    }
+    
     stopif(
-      !identical(sort(rhs_vars(act_funs)), sort(names(pars))),
+      !identical(sort(required_pars), sort(names(pars))),
       'The names or number of parameters used in the activation functions mismatch the names or number
-      of parameters ("pars") and additional arguments (i.e. ...) passed to the function.'
+      of parameters ("pars") and additional arguments (i.e. ...) passed to the function.
+      Required parameters: {collapse_comma(required_pars)}
+      Provided parameters: {collapse_comma(names(pars))}'
     )
 
     acts <- sapply(act_funs, function(pform) eval(pform[[length(pform)]], envir = as.list(pars)))
