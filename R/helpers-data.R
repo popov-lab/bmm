@@ -396,39 +396,43 @@ has_nonconsecutive_duplicates <- function(vec) {
 #' )
 #'
 #' # Compute summary statistics grouped by subject
-#' result <- ezdm_summary_stats(test_data, rt = "rt", response = "correct",
-#'                              .by = "subject")
+#' result <- ezdm_summary_stats(test_data,
+#'   rt = "rt", response = "correct",
+#'   .by = "subject"
+#' )
 #' print(result)
 #'
 #' # Group by multiple variables using simple method
-#' result_multi <- ezdm_summary_stats(test_data, rt = "rt",
-#'                                    response = "correct",
-#'                                    .by = c("subject", "condition"),
-#'                                    method = "simple")
+#' result_multi <- ezdm_summary_stats(test_data,
+#'   rt = "rt",
+#'   response = "correct",
+#'   .by = c("subject", "condition"),
+#'   method = "simple"
+#' )
 #'
 ezdm_summary_stats <- function(
-  data,
-  rt,
-  response,
-  .by = NULL,
-  version = "3par",
-  distribution = "exgaussian",
-  method = "mixture",
-  robust_scale = "iqr",
-  contaminant_bound = c(0.1, 3.0),
-  min_trials = 10,
-  init_contaminant = 0.05,
-  max_contaminant = 0.5,
-  maxit = 100,
-  tol = 1e-6,
-  adjust_accuracy = FALSE,
-  guess_rate = 0.5,
-  seed = NULL
-) {
-  # Input validation
-  stopif(missing(data), "Argument 'data' is required")
-  stopif(missing(rt), "Argument 'rt' is required")
-  stopif(missing(response), "Argument 'response' is required")
+    data,
+    rt,
+    response,
+    .by = NULL,
+    version = c("3par", "4par"),
+    distribution = c("exgaussian", "lognormal", "invgaussian"),
+    method = c("mixture", "simple", "robust"),
+    robust_scale = c("iqr", "mad"),
+    contaminant_bound = c(0.1, 3.0),
+    min_trials = 10,
+    init_contaminant = 0.05,
+    max_contaminant = 0.5,
+    maxit = 100,
+    tol = 1e-6,
+    adjust_accuracy = FALSE,
+    guess_rate = 0.5,
+    seed = NULL) {
+  stop_missing_args()
+  version <- match.arg(version)
+  distribution <- match.arg(distribution)
+  method <- match.arg(method)
+  robust_scale <- match.arg(robust_scale)
 
   data <- try(as.data.frame(data), silent = TRUE)
   stopif(
@@ -439,85 +443,44 @@ ezdm_summary_stats <- function(
     !isTRUE(nrow(data) > 0L),
     "Argument 'data' does not contain observations"
   )
-
   stopif(not_in(rt, colnames(data)), "RT variable '{rt}' not found in data")
   stopif(
     not_in(response, colnames(data)),
     "Response variable '{response}' not found in data"
   )
-
-  stopif(
-    not_in(version, c("3par", "4par")),
-    "version must be '3par' or '4par'"
-  )
-  stopif(
-    not_in(distribution, c("exgaussian", "lognormal", "invgaussian")),
-    "distribution must be 'exgaussian', 'lognormal', or 'invgaussian'"
-  )
-  stopif(
-    not_in(method, c("mixture", "simple", "robust")),
-    "method must be 'mixture', 'simple', or 'robust'"
-  )
-  stopif(
-    not_in(robust_scale, c("iqr", "mad")),
-    "robust_scale must be 'iqr' or 'mad'"
-  )
   stopif(
     length(contaminant_bound) != 2,
     "contaminant_bound must be a vector of length 2"
   )
-  # Validate each element is either numeric (or coercible) or "min"/"max"
-  valid_bound <- function(x) {
-    if (is.numeric(x)) return(TRUE)
-    if (is.character(x)) {
-      # Check if it's "min" or "max"
-      if (tolower(x) %in% c("min", "max")) return(TRUE)
-      # Check if it's a numeric string
-      num_val <- suppressWarnings(as.numeric(x))
-      if (!is.na(num_val)) return(TRUE)
-    }
-    FALSE
-  }
 
+  is_valid_bound <- function(x) {
+    tolower(x) %in% c("min", "max") | suppressWarnings(!is.na(as.numeric(x)))
+  }
   stopif(
-    !valid_bound(contaminant_bound[1]) || !valid_bound(contaminant_bound[2]),
+    any(!is_valid_bound(contaminant_bound)),
     "contaminant_bound elements must be numeric or 'min'/'max'"
   )
-  # If both are numeric (or coercible), check order
-  is_numeric_val <- function(x) {
-    is.numeric(x) ||
-      (is.character(x) && !is.na(suppressWarnings(as.numeric(x))) &&
-         !(tolower(x) %in% c("min", "max")))
-  }
-  if (is_numeric_val(contaminant_bound[1]) &&
-        is_numeric_val(contaminant_bound[2])) {
-    stopif(
-      as.numeric(contaminant_bound[1]) >= as.numeric(contaminant_bound[2]),
-      "contaminant_bound[1] must be less than contaminant_bound[2]"
-    )
-  }
+  stopif(
+    all(is.numeric(contaminant_bound)) && contaminant_bound[1] >= contaminant_bound[2],
+    "contaminant_bound[1] must be less than contaminant_bound[2]"
+  )
   stopif(
     !is.numeric(min_trials) || min_trials < 1,
     "min_trials must be a positive integer"
   )
   stopif(
-    !is.numeric(init_contaminant) || init_contaminant <= 0 ||
-      init_contaminant >= 1,
+    !is.numeric(init_contaminant) || init_contaminant <= 0 || init_contaminant >= 1,
     "init_contaminant must be between 0 and 1 (exclusive)"
   )
   stopif(
-    !is.numeric(max_contaminant) || max_contaminant <= 0 ||
-      max_contaminant > 1,
+    !is.numeric(max_contaminant) || max_contaminant <= 0 || max_contaminant > 1,
     "max_contaminant must be between 0 (exclusive) and 1 (inclusive)"
   )
   stopif(
     init_contaminant >= max_contaminant,
     "init_contaminant must be less than max_contaminant"
   )
-  stopif(
-    !is.logical(adjust_accuracy),
-    "adjust_accuracy must be TRUE or FALSE"
-  )
+  stopif(!is.logical(adjust_accuracy), "adjust_accuracy must be TRUE or FALSE")
   stopif(
     !is.numeric(guess_rate) || guess_rate < 0 || guess_rate > 1,
     "guess_rate must be between 0 and 1"
@@ -633,7 +596,6 @@ ezdm_summary_stats <- function(
 # @param x Numeric vector
 # @return List with mean, var, and n
 .simple_aggregation <- function(x) {
-
   list(
     mean = mean(x, na.rm = TRUE),
     var = var(x, na.rm = TRUE),
@@ -692,8 +654,10 @@ ezdm_summary_stats <- function(
     response_lower <- tolower(response_data)
     # Define patterns for upper boundary responses
     upper_patterns <- c("upper", "correct", "acc", "1", "true", "yes", "hit")
-    lower_patterns <- c("lower", "error", "err", "incorrect", "0", "false",
-                        "no", "miss", "fa")
+    lower_patterns <- c(
+      "lower", "error", "err", "incorrect", "0", "false",
+      "no", "miss", "fa"
+    )
 
     is_upper <- response_lower %in% upper_patterns
     is_lower <- response_lower %in% lower_patterns
@@ -833,7 +797,6 @@ ezdm_summary_stats <- function(
       result$n_trials_adj <- adj$n_trials_adj
     }
     return(result)
-
   } else {
     # version == "4par": separate by response
     rt_upper <- rt_data[is_upper]
@@ -895,7 +858,8 @@ ezdm_summary_stats <- function(
       )
       if (!fit_upper$converged || is.null(fit_upper$params)) {
         warning2("EM for upper boundary did not converge. Using simple moments.",
-                 env.frame = -1)
+          env.frame = -1
+        )
         agg_upper <- .simple_aggregation(rt_upper)
         moments_upper <- list(mean = agg_upper$mean, var = agg_upper$var)
         contam_upper <- fit_upper$contaminant_prop
@@ -916,7 +880,8 @@ ezdm_summary_stats <- function(
       )
       if (!fit_lower$converged || is.null(fit_lower$params)) {
         warning2("EM for lower boundary did not converge. Using simple moments.",
-                 env.frame = -1)
+          env.frame = -1
+        )
         agg_lower <- .simple_aggregation(rt_lower)
         moments_lower <- list(mean = agg_lower$mean, var = agg_lower$var)
         contam_lower <- fit_lower$contaminant_prop
@@ -946,7 +911,7 @@ ezdm_summary_stats <- function(
       contam_lower_safe <- ifelse(is.na(contam_lower), 0, contam_lower)
       if (n_upper + n_lower > 0) {
         avg_contam <- (n_upper * contam_upper_safe +
-                         n_lower * contam_lower_safe) / (n_upper + n_lower)
+          n_lower * contam_lower_safe) / (n_upper + n_lower)
       } else {
         avg_contam <- 0
       }
@@ -1201,8 +1166,8 @@ ezdm_summary_stats <- function(
   }
 
   # Initialize parameters
-  pi_c <- init_contaminant  # contaminant proportion
-  pi_rt <- 1 - pi_c         # RT distribution proportion
+  pi_c <- init_contaminant # contaminant proportion
+  pi_rt <- 1 - pi_c # RT distribution proportion
   dist_params <- .init_dist_params(x_valid, distribution)
 
   # Uniform density (constant for contaminant component)
@@ -1215,10 +1180,13 @@ ezdm_summary_stats <- function(
     # E-step: compute responsibilities
     dens_rt <- switch(distribution,
       exgaussian = .dexgauss(x_valid, dist_params$mu, dist_params$sigma,
-                            dist_params$tau, log = FALSE),
+        dist_params$tau,
+        log = FALSE
+      ),
       lognormal = dlnorm(x_valid, dist_params$mu, dist_params$sigma),
       invgaussian = .dinvgauss(x_valid, dist_params$mu, dist_params$lambda,
-                               log = FALSE)
+        log = FALSE
+      )
     )
 
     # Ensure numerical stability
@@ -1272,15 +1240,18 @@ ezdm_summary_stats <- function(
     }
 
     # Update distribution parameters using weighted MLE
-    dist_params <- .fit_dist_params(x_valid, distribution, gamma_rt,
-                                    dist_params)
+    dist_params <- .fit_dist_params(
+      x_valid, distribution, gamma_rt,
+      dist_params
+    )
   }
 
   # Warn if contaminant proportion hit the maximum bound
   if (pi_c >= max_contaminant) {
     warning2("Contaminant proportion was clipped to max_contaminant \\
              ({max_contaminant}). This may indicate data quality issues.",
-             env.frame = -1)
+      env.frame = -1
+    )
   }
 
   list(
@@ -1336,11 +1307,11 @@ ezdm_summary_stats <- function(
   # This improves mixture identifiability by making uniform less competitive
   # Use 50% of range or at least 100ms to ensure conservative estimation
   if (lower_is_data_driven && bound_buffer > 0) {
-    buffer_amount <- max(bound_buffer * data_range, 0.1)  # At least 100ms
-    resolved[1] <- max(0.001, resolved[1] - buffer_amount)  # Keep positive
+    buffer_amount <- max(bound_buffer * data_range, 0.1) # At least 100ms
+    resolved[1] <- max(0.001, resolved[1] - buffer_amount) # Keep positive
   }
   if (upper_is_data_driven && bound_buffer > 0) {
-    buffer_amount <- max(bound_buffer * data_range, 0.1)  # At least 100ms
+    buffer_amount <- max(bound_buffer * data_range, 0.1) # At least 100ms
     resolved[2] <- resolved[2] + buffer_amount
   }
 
