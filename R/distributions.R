@@ -1150,3 +1150,74 @@ rezdm <- function(n, n_trials, drift, bound, ndt, zr = 0.5, s = 1,
 
   nlist(pC, mdt_upper, mdt_lower, vrt_upper, vrt_lower)
 }
+
+
+# Ex-Gaussian density function
+# @param x Numeric vector of values
+# @param mu Mean of the Gaussian component
+# @param sigma Standard deviation of the Gaussian component
+# @param tau Rate parameter of the exponential component
+# @param log Logical, return log density if TRUE
+.dexgauss <- function(x, mu, sigma, tau, log = FALSE) {
+  # Ensure positive parameters
+  if (sigma <= 0 || tau <= 0) {
+    return(rep(if (log) -Inf else 0, length(x)))
+  }
+
+  # Ex-Gaussian density: convolution of Gaussian and Exponential
+  # Using the standard formula with numerical stability
+  z <- (x - mu) / sigma - sigma / tau
+  log_dens <- -log(tau) + (sigma^2) / (2 * tau^2) - (x - mu) / tau +
+    pnorm(z, log.p = TRUE)
+
+  if (log) {
+    return(log_dens)
+  }
+  exp(log_dens)
+}
+
+# Inverse Gaussian (Wald) density function
+# @param x Numeric vector of values
+# @param mu Mean parameter
+# @param lambda Shape parameter
+# @param log Logical, return log density if TRUE
+.dinvgauss <- function(x, mu, lambda, log = FALSE) {
+  # Ensure positive parameters and values
+  if (mu <= 0 || lambda <= 0) {
+    return(rep(if (log) -Inf else 0, length(x)))
+  }
+
+  valid <- x > 0
+  log_dens <- rep(-Inf, length(x))
+
+  if (any(valid)) {
+    xv <- x[valid]
+    log_dens[valid] <- 0.5 * (log(lambda) - log(2 * pi) - 3 * log(xv)) -
+      (lambda * (xv - mu)^2) / (2 * mu^2 * xv)
+  }
+
+  if (log) {
+    return(log_dens)
+  }
+  exp(log_dens)
+}
+
+# Compute log-likelihood for a distribution
+# @param x Numeric vector of RT values
+# @param params Named list of distribution parameters
+# @param distribution Character specifying the distribution type
+# @param weights Optional numeric vector of observation weights
+# @return Log-likelihood value
+.dist_loglik <- function(x, params, distribution, weights = NULL) {
+  if (is.null(weights)) {
+    weights <- rep(1, length(x))
+  }
+
+  log_dens <- switch(distribution,
+    exgaussian = .dexgauss(x, params$mu, params$sigma, params$tau, log = TRUE),
+    lognormal = dlnorm(x, params$mu, params$sigma, log = TRUE),
+    invgaussian = .dinvgauss(x, params$mu, params$lambda, log = TRUE)
+  )
+
+  sum(weights * log_dens, na.rm = TRUE)
+}
