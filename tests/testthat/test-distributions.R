@@ -562,6 +562,8 @@ test_that("pcswald and qcswald handle extreme parameters", {
   # Very small p should give RT close to ndt
   q_small <- qcswald(p = 0.01, response = 1, drift = 2, bound = 1.5, ndt = 0.3)
   expect_true(q_small > 0.3 && q_small < 0.5)
+})
+
 test_that("rm3 works without providing b parameter", {
   model <- m3(
     resp_cats = c("corr", "other", "npl"),
@@ -593,7 +595,7 @@ test_that("rm3 works with full bmmformula", {
     a ~ 1,
     c ~ 1
   )
-  res <- rm3(n = 10, size = 100, pars = c(a = 1, c = 2), 
+  res <- rm3(n = 10, size = 100, pars = c(a = 1, c = 2),
              m3_model = model, act_funs = full_formula)
   expect_type(res, "integer")
   expect_true("matrix" %in% class(res))
@@ -629,7 +631,7 @@ test_that("dm3 works with full bmmformula", {
     a ~ 1,
     c ~ 1
   )
-  dens <- dm3(x = c(20, 10, 10), pars = c(a = 1, c = 2), 
+  dens <- dm3(x = c(20, 10, 10), pars = c(a = 1, c = 2),
               m3_model = model, act_funs = full_formula)
   expect_type(dens, "double")
   expect_length(dens, 1)
@@ -648,7 +650,7 @@ test_that("rm3 errors when full formula has no activation functions", {
     c ~ 1
   )
   expect_error(
-    rm3(n = 10, size = 100, pars = c(a = 1, c = 2), 
+    rm3(n = 10, size = 100, pars = c(a = 1, c = 2),
         m3_model = model, act_funs = wrong_formula),
     "No activation formulas found"
   )
@@ -661,11 +663,11 @@ test_that("rm3 with unpack=TRUE returns named vector for n=1", {
     choice_rule = "simple",
     version = "ss"
   )
-  
+
   # Test unpack=TRUE
-  result <- rm3(n = 1, size = 100, pars = c(a = 1, c = 2), 
+  result <- rm3(n = 1, size = 100, pars = c(a = 1, c = 2),
                 m3_model = model, unpack = TRUE)
-  
+
   expect_type(result, "integer")
   expect_false("matrix" %in% class(result))
   expect_true("integer" %in% class(result))
@@ -680,11 +682,11 @@ test_that("rm3 with unpack=TRUE still returns matrix for n>1", {
     choice_rule = "simple",
     version = "ss"
   )
-  
+
   # unpack should be ignored when n > 1
-  result <- rm3(n = 5, size = 100, pars = c(a = 1, c = 2), 
+  result <- rm3(n = 5, size = 100, pars = c(a = 1, c = 2),
                 m3_model = model, unpack = TRUE)
-  
+
   expect_true("matrix" %in% class(result))
   expect_equal(dim(result), c(5, 3))
   expect_equal(colnames(result), c("corr", "other", "npl"))
