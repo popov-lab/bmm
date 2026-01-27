@@ -1194,7 +1194,7 @@ rezdm <- function(n, n_trials, drift, bound, ndt, zr = 0.5, s = 1,
 
   # proportion correct
   # Guard against drift -> 0, where the analytic limit is pC = zr
-  zero_drift <- abs(drift) < 1e-8
+  zero_drift <- abs(drift) < 1e-6
   pC <- numeric(n)
   if (any(!zero_drift)) {
     kz_nz <- k_z_signed[!zero_drift]
