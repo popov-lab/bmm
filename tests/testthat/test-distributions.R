@@ -126,7 +126,7 @@ test_that("dm3 requires custom act_funs to be specified", {
   )
   expect_error(
     dm3(x = c(10, 10, 10, 10), pars = c(a = 1, b = 1, c = 1, f = 1), m3_model = model),
-    "No activation functions"
+    "Activation functions can only be generated"
   )
 })
 
@@ -228,6 +228,134 @@ test_that("rm3 works for a complexspan m3 model", {
   expect_true(all(rowSums(res) == 100))
   expect_equal(colnames(res), model$resp_vars$resp_cats)
   expect_true(median(res[, "dist_other"]) > median(res))
+})
+
+test_that("rm3 works without providing b parameter", {
+  model <- m3(
+    resp_cats = c("corr", "other", "npl"),
+    num_options = c(1, 4, 5),
+    choice_rule = "simple",
+    version = "ss"
+  )
+  # b parameter should be added automatically
+  res <- rm3(n = 10, size = 100, pars = c(a = 1, c = 2), m3_model = model)
+  expect_type(res, "integer")
+  expect_true("matrix" %in% class(res))
+  expect_true(nrow(res) == 10 && ncol(res) == 3)
+  expect_true(all(rowSums(res) == 100))
+  expect_equal(colnames(res), model$resp_vars$resp_cats)
+})
+
+test_that("rm3 works with full bmmformula", {
+  model <- m3(
+    resp_cats = c("corr", "other", "npl"),
+    num_options = c(1, 4, 5),
+    choice_rule = "simple",
+    version = "ss"
+  )
+  # Full formula with both activation formulas and parameter formulas
+  full_formula <- bmf(
+    corr ~ b + a + c,
+    other ~ b + a,
+    npl ~ b,
+    a ~ 1,
+    c ~ 1
+  )
+  res <- rm3(n = 10, size = 100, pars = c(a = 1, c = 2), 
+             m3_model = model, act_funs = full_formula)
+  expect_type(res, "integer")
+  expect_true("matrix" %in% class(res))
+  expect_true(nrow(res) == 10 && ncol(res) == 3)
+  expect_true(all(rowSums(res) == 100))
+  expect_equal(colnames(res), model$resp_vars$resp_cats)
+})
+
+test_that("dm3 works without providing b parameter", {
+  model <- m3(
+    resp_cats = c("corr", "other", "npl"),
+    num_options = c(1, 4, 5),
+    choice_rule = "simple",
+    version = "ss"
+  )
+  # b parameter should be added automatically
+  dens <- dm3(x = c(20, 10, 10), pars = c(a = 1, c = 2), m3_model = model)
+  expect_type(dens, "double")
+  expect_length(dens, 1)
+})
+
+test_that("dm3 works with full bmmformula", {
+  model <- m3(
+    resp_cats = c("corr", "other", "npl"),
+    num_options = c(1, 4, 5),
+    choice_rule = "simple",
+    version = "ss"
+  )
+  full_formula <- bmf(
+    corr ~ b + a + c,
+    other ~ b + a,
+    npl ~ b,
+    a ~ 1,
+    c ~ 1
+  )
+  dens <- dm3(x = c(20, 10, 10), pars = c(a = 1, c = 2), 
+              m3_model = model, act_funs = full_formula)
+  expect_type(dens, "double")
+  expect_length(dens, 1)
+})
+
+test_that("rm3 errors when full formula has no activation functions", {
+  model <- m3(
+    resp_cats = c("corr", "other", "npl"),
+    num_options = c(1, 4, 5),
+    choice_rule = "simple",
+    version = "ss"
+  )
+  # Formula with only parameter formulas, no activation formulas
+  wrong_formula <- bmf(
+    a ~ 1,
+    c ~ 1
+  )
+  expect_error(
+    rm3(n = 10, size = 100, pars = c(a = 1, c = 2), 
+        m3_model = model, act_funs = wrong_formula),
+    "No activation formulas found"
+  )
+})
+
+test_that("rm3 with unpack=TRUE returns named vector for n=1", {
+  model <- m3(
+    resp_cats = c("corr", "other", "npl"),
+    num_options = c(1, 4, 5),
+    choice_rule = "simple",
+    version = "ss"
+  )
+  
+  # Test unpack=TRUE
+  result <- rm3(n = 1, size = 100, pars = c(a = 1, c = 2), 
+                m3_model = model, unpack = TRUE)
+  
+  expect_type(result, "integer")
+  expect_false("matrix" %in% class(result))
+  expect_true("integer" %in% class(result))
+  expect_equal(names(result), c("corr", "other", "npl"))
+  expect_equal(sum(result), 100)
+})
+
+test_that("rm3 with unpack=TRUE still returns matrix for n>1", {
+  model <- m3(
+    resp_cats = c("corr", "other", "npl"),
+    num_options = c(1, 4, 5),
+    choice_rule = "simple",
+    version = "ss"
+  )
+  
+  # unpack should be ignored when n > 1
+  result <- rm3(n = 5, size = 100, pars = c(a = 1, c = 2), 
+                m3_model = model, unpack = TRUE)
+  
+  expect_true("matrix" %in% class(result))
+  expect_equal(dim(result), c(5, 3))
+  expect_equal(colnames(result), c("corr", "other", "npl"))
 })
 
 
