@@ -1158,7 +1158,7 @@ rezdm <- function(n, n_trials, drift, bound, ndt, zr = 0.5, s = 1,
 # @param sigma Standard deviation of the Gaussian component
 # @param tau Rate parameter of the exponential component
 # @param log Logical, return log density if TRUE
-.dexgauss <- function(x, mu, sigma, tau, log = FALSE) {
+dexgauss <- function(x, mu, sigma, tau, log = FALSE) {
   # Ensure positive parameters
   if (sigma <= 0 || tau <= 0) {
     return(rep(if (log) -Inf else 0, length(x)))
@@ -1181,7 +1181,7 @@ rezdm <- function(n, n_trials, drift, bound, ndt, zr = 0.5, s = 1,
 # @param mu Mean parameter
 # @param lambda Shape parameter
 # @param log Logical, return log density if TRUE
-.dinvgauss <- function(x, mu, lambda, log = FALSE) {
+dinvgauss <- function(x, mu, lambda, log = FALSE) {
   # Ensure positive parameters and values
   if (mu <= 0 || lambda <= 0) {
     return(rep(if (log) -Inf else 0, length(x)))
@@ -1208,18 +1208,18 @@ rezdm <- function(n, n_trials, drift, bound, ndt, zr = 0.5, s = 1,
 # @param distribution Character specifying the distribution type
 # @param weights Optional numeric vector of observation weights
 # @return Log-likelihood value
-.dist_loglik <- function(x, params, distribution, weights = NULL) {
+neg_loglik <- function(x, params, distribution, weights = NULL) {
   if (is.null(weights)) {
     weights <- rep(1, length(x))
   }
 
   log_dens <- switch(distribution,
-    exgaussian = .dexgauss(x, params$mu, params$sigma, params$tau, log = TRUE),
-    lognormal = dlnorm(x, params$mu, params$sigma, log = TRUE),
-    invgaussian = .dinvgauss(x, params$mu, params$lambda, log = TRUE)
+    exgaussian = dexgauss(x, params["mu"], params["sigma"], params["tau"], log = TRUE),
+    lognormal = dlnorm(x, params["mu"], params["sigma"], log = TRUE),
+    invgaussian = dinvgauss(x, params["mu"], params["lambda"], log = TRUE)
   )
 
-  sum(weights * log_dens, na.rm = TRUE)
+  -sum(weights * log_dens, na.rm = TRUE)
 }
 
 
@@ -1231,16 +1231,16 @@ rezdm <- function(n, n_trials, drift, bound, ndt, zr = 0.5, s = 1,
   distribution <- match.arg(distribution)
   switch(distribution,
     exgaussian = list(
-      mean = x$mu + x$tau,
-      var = x$sigma^2 + x$tau^2
+      mean = x["mu"] + x["tau"],
+      var = x["sigma"]^2 + x["tau"]^2
     ),
     lognormal = list(
-      mean = exp(x$mu + x$sigma^2 / 2),
-      var = exp(2 * x$mu + x$sigma^2) * (exp(x$sigma^2) - 1)
+      mean = exp(x["mu"] + x["sigma"]^2 / 2),
+      var = exp(2 * x["mu"] + x["sigma"]^2) * (exp(x["sigma"]^2) - 1)
     ),
     invgaussian = list(
-      mean = x$mu,
-      var = x$mu^3 / x$lambda
+      mean = x["mu"],
+      var = x["mu"]^3 / x["lambda"]
     )
   )
 }
@@ -1262,20 +1262,20 @@ rezdm <- function(n, n_trials, drift, bound, ndt, zr = 0.5, s = 1,
       tau <- max(s / 3, 0.01)
       sigma <- max(sqrt(max(v - tau^2, 0.0001)), 0.01)
       mu <- max(m - tau, 0.01)
-      list(mu = mu, sigma = sigma, tau = tau)
+      c(mu = mu, sigma = sigma, tau = tau)
     },
     lognormal = {
       # Method of moments for lognormal
       sigma2 <- log(1 + v / m^2)
       sigma <- sqrt(max(sigma2, 0.01))
       mu <- log(m) - sigma2 / 2
-      list(mu = mu, sigma = sigma)
+      c(mu = mu, sigma = sigma)
     },
     invgaussian = {
       # Method of moments for inverse Gaussian
       mu <- max(m, 0.01)
       lambda <- max(mu^3 / v, 0.01)
-      list(mu = mu, lambda = lambda)
+      c(mu = mu, lambda = lambda)
     }
   )
 }
@@ -1287,23 +1287,11 @@ rezdm <- function(n, n_trials, drift, bound, ndt, zr = 0.5, s = 1,
 # @param init_params Initial parameter estimates
 # @return Named list of fitted parameters
 .fit_dist_params <- function(x, distribution, weights, init_params) {
-  # Objective function (negative log-likelihood)
-  neg_loglik <- function(par) {
-    params <- .par_to_list(par, distribution)
-    -1 * .dist_loglik(x, params, distribution, weights)
-  }
-
-  # Convert initial params to vector
-  init_par <- .list_to_par(init_params, distribution)
-
-  # Set bounds based on distribution
   bounds <- .get_param_bounds(distribution)
-
-  # Optimize
   result <- tryCatch(
     stats::optim(
-      par = init_par,
-      fn = neg_loglik,
+      par = init_params,
+      fn = \(par) neg_loglik(x, par, distribution, weights),
       method = "L-BFGS-B",
       lower = bounds$lower,
       upper = bounds$upper
@@ -1312,29 +1300,10 @@ rezdm <- function(n, n_trials, drift, bound, ndt, zr = 0.5, s = 1,
   )
 
   if (is.null(result) || result$convergence != 0) {
-    # Return initial params if optimization fails
     return(init_params)
   }
 
-  .par_to_list(result$par, distribution)
-}
-
-# Convert parameter vector to named list
-.par_to_list <- function(par, distribution) {
-  switch(distribution,
-    exgaussian = list(mu = par[1], sigma = par[2], tau = par[3]),
-    lognormal = list(mu = par[1], sigma = par[2]),
-    invgaussian = list(mu = par[1], lambda = par[2])
-  )
-}
-
-# Convert named list to parameter vector
-.list_to_par <- function(params, distribution) {
-  switch(distribution,
-    exgaussian = c(params$mu, params$sigma, params$tau),
-    lognormal = c(params$mu, params$sigma),
-    invgaussian = c(params$mu, params$lambda)
-  )
+  result$par
 }
 
 # Get parameter bounds for optimization
@@ -1396,12 +1365,12 @@ rezdm <- function(n, n_trials, drift, bound, ndt, zr = 0.5, s = 1,
   for (iter in seq_len(maxit)) {
     # E-step: compute responsibilities
     dens_rt <- switch(distribution,
-      exgaussian = .dexgauss(x_valid, dist_params$mu, dist_params$sigma,
-        dist_params$tau,
+      exgaussian = dexgauss(x_valid, dist_params["mu"], dist_params["sigma"],
+        dist_params["tau"],
         log = FALSE
       ),
-      lognormal = dlnorm(x_valid, dist_params$mu, dist_params$sigma),
-      invgaussian = .dinvgauss(x_valid, dist_params$mu, dist_params$lambda,
+      lognormal = dlnorm(x_valid, dist_params["mu"], dist_params["sigma"]),
+      invgaussian = dinvgauss(x_valid, dist_params["mu"], dist_params["lambda"],
         log = FALSE
       )
     )

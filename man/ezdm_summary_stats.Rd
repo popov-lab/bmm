@@ -9,10 +9,10 @@ ezdm_summary_stats(
   rt,
   response,
   .by = NULL,
-  version = "3par",
-  distribution = "exgaussian",
-  method = "mixture",
-  robust_scale = "iqr",
+  version = c("3par", "4par"),
+  distribution = c("exgaussian", "lognormal", "invgaussian"),
+  method = c("mixture", "simple", "robust"),
+  robust_scale = c("iqr", "mad"),
   contaminant_bound = c(0.1, 3),
   min_trials = 10,
   init_contaminant = 0.05,
@@ -20,8 +20,7 @@ ezdm_summary_stats(
   maxit = 100,
   tol = 1e-06,
   adjust_accuracy = FALSE,
-  guess_rate = 0.5,
-  seed = NULL
+  guess_rate = 0.5
 )
 }
 \arguments{
@@ -93,9 +92,6 @@ sampling. Default is FALSE}
 
 \item{guess_rate}{Numeric. Assumed accuracy rate for contaminant trials
 (random guessing). Default is 0.5 (appropriate for 2AFC tasks)}
-
-\item{seed}{Integer. Random seed for reproducibility of accuracy adjustment.
-If NULL (default), results will vary across runs}
 }
 \value{
 A \code{data.frame} with summary statistics. For version = "3par":
@@ -129,15 +125,19 @@ test_data <- data.frame(
 )
 
 # Compute summary statistics grouped by subject
-result <- ezdm_summary_stats(test_data, rt = "rt", response = "correct",
-                             .by = "subject")
+result <- ezdm_summary_stats(test_data,
+  rt = "rt", response = "correct",
+  .by = "subject"
+)
 print(result)
 
 # Group by multiple variables using simple method
-result_multi <- ezdm_summary_stats(test_data, rt = "rt",
-                                   response = "correct",
-                                   .by = c("subject", "condition"),
-                                   method = "simple")
+result_multi <- ezdm_summary_stats(test_data,
+  rt = "rt",
+  response = "correct",
+  .by = c("subject", "condition"),
+  method = "simple"
+)
 
 }
 \keyword{transform}
