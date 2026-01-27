@@ -581,8 +581,7 @@ ezdm_summary_stats <- function(
 .simple_aggregation <- function(x) {
   list(
     mean = mean(x, na.rm = TRUE),
-    var = var(x, na.rm = TRUE),
-    n = sum(!is.na(x))
+    var = var(x, na.rm = TRUE)
   )
 }
 
@@ -593,16 +592,13 @@ ezdm_summary_stats <- function(
 .robust_aggregation <- function(x, scale_method = "iqr") {
   x <- x[!is.na(x)]
 
-  var_est <- switch(scale_method,
-    iqr = (IQR(x) / 1.349)^2,
-    mad = mad(x)^2,
-    stop2("scale_method must be iqr or mad")
-  )
-
   list(
     mean = median(x),
-    var = var_est,
-    n = length(x)
+    var = switch(scale_method,
+      iqr = (IQR(x) / 1.349)^2,
+      mad = mad(x)^2,
+      stop2("scale_method must be iqr or mad")
+    )
   )
 }
 
@@ -670,45 +666,26 @@ ezdm_summary_stats <- function(
   resolved_bounds <- .resolve_contaminant_bounds(contaminant_bound, rt_data)
 
   # Helper to compute moments for a single RT vector
-  compute_moments <- function(rt_vec, n_obs, label = "") {
-    na_result <- list(mean = NA_real_, var = NA_real_, contaminant_prop = NA_real_)
-
+  compute_moments <- function(rt_vec, n_obs) {
     if (n_obs < min_trials) {
-      return(na_result)
-    }
+      list(mean = NA_real_, var = NA_real_, contaminant_prop = NA_real_)
+    } else if (method == "simple") {
+      c(.simple_aggregation(rt_vec), contaminant_prop = NA_real_)
+    } else if (method == "robust") {
+      c(.robust_aggregation(rt_vec, scale_method = robust_scale), contaminant_prop = NA_real_)
+    } else if (method == "mixture") {
+      fit <- .fit_rt_mixture(
+        rt_vec, distribution, resolved_bounds,
+        init_contaminant, max_contaminant, maxit, tol
+      )
 
-    if (method == "simple") {
-      agg <- .simple_aggregation(rt_vec)
-      return(list(mean = agg$mean, var = agg$var, contaminant_prop = NA_real_))
-    }
-
-    if (method == "robust") {
-      agg <- .robust_aggregation(rt_vec, scale_method = robust_scale)
-      return(list(mean = agg$mean, var = agg$var, contaminant_prop = NA_real_))
-    }
-
-    # Mixture method
-    fit <- .fit_rt_mixture(
-      rt_vec, distribution, resolved_bounds,
-      init_contaminant, max_contaminant, maxit, tol
-    )
-
-    if (!fit$converged || is.null(fit$params)) {
-      msg <- if (nzchar(label)) {
-        "EM for {label} did not converge. Using simple moments."
+      if (!fit$converged || is.null(fit$params)) {
+        warning2("EM did not converge. Using simple moments.", env.frame = -2)
+        c(.simple_aggregation(rt_vec), contaminant_prop = NA_real_)
       } else {
-        "EM did not converge. Using simple moments."
+        c(.dist_moments(fit$params, distribution), contaminant_prop = fit$contaminant_prop)
       }
-      warning2(msg, env.frame = -2)
-      agg <- .simple_aggregation(rt_vec)
-      return(list(
-        mean = agg$mean, var = agg$var,
-        contaminant_prop = fit$contaminant_prop
-      ))
     }
-
-    moments <- .dist_moments(fit$params, distribution)
-    list(mean = moments$mean, var = moments$var, contaminant_prop = fit$contaminant_prop)
   }
 
   if (version == "3par") {
@@ -725,8 +702,7 @@ ezdm_summary_stats <- function(
       adj <- .adjust_accuracy_counts(
         n_upper, n_trials, moments$contaminant_prop, guess_rate
       )
-      result$n_upper_adj <- adj$n_upper_adj
-      result$n_trials_adj <- adj$n_trials_adj
+      result <- c(result, adj)
     }
 
     return(result)
@@ -738,8 +714,8 @@ ezdm_summary_stats <- function(
   rt_lower <- rt_data[!is_upper]
   n_lower <- length(rt_lower)
 
-  moments_upper <- compute_moments(rt_upper, n_upper, "upper boundary")
-  moments_lower <- compute_moments(rt_lower, n_lower, "lower boundary")
+  moments_upper <- compute_moments(rt_upper, n_upper)
+  moments_lower <- compute_moments(rt_lower, n_lower)
 
   result <- list(
     mean_rt_upper = moments_upper$mean,
@@ -764,8 +740,7 @@ ezdm_summary_stats <- function(
       0
     }
     adj <- .adjust_accuracy_counts(n_upper, n_trials, avg_contam, guess_rate)
-    result$n_upper_adj <- adj$n_upper_adj
-    result$n_trials_adj <- adj$n_trials_adj
+    result <- c(result, adj)
   }
 
   result
@@ -822,36 +797,24 @@ ezdm_summary_stats <- function(
 }
 
 # Extract mean and variance from fitted distribution parameters
-# @param params Named list of distribution parameters
+# @param x Named list of distribution parameters
 # @param distribution Character specifying the distribution type
 # @return List with mean and var components
-.dist_moments <- function(params, distribution) {
+.dist_moments <- function(x, distribution = c("exgaussian", "lognormal", "invgaussian")) {
+  distribution <- match.arg(distribution)
   switch(distribution,
-    exgaussian = {
-      mu <- params$mu
-      sigma <- params$sigma
-      tau <- params$tau
-      list(
-        mean = mu + tau,
-        var = sigma^2 + tau^2
-      )
-    },
-    lognormal = {
-      mu <- params$mu
-      sigma <- params$sigma
-      list(
-        mean = exp(mu + sigma^2 / 2),
-        var = exp(2 * mu + sigma^2) * (exp(sigma^2) - 1)
-      )
-    },
-    invgaussian = {
-      mu <- params$mu
-      lambda <- params$lambda
-      list(
-        mean = mu,
-        var = mu^3 / lambda
-      )
-    }
+    exgaussian = list(
+      mean = x$mu + x$tau,
+      var = x$sigma^2 + x$tau^2
+    ),
+    lognormal = list(
+      mean = exp(x$mu + x$sigma^2 / 2),
+      var = exp(2 * x$mu + x$sigma^2) * (exp(x$sigma^2) - 1)
+    ),
+    invgaussian = list(
+      mean = x$mu,
+      var = x$mu^3 / x$lambda
+    )
   )
 }
 
