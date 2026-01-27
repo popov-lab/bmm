@@ -365,8 +365,6 @@ has_nonconsecutive_duplicates <- function(vec) {
 #'   sampling. Default is FALSE
 #' @param guess_rate Numeric. Assumed accuracy rate for contaminant trials
 #'   (random guessing). Default is 0.5 (appropriate for 2AFC tasks)
-#' @param seed Integer. Random seed for reproducibility of accuracy adjustment.
-#'   If NULL (default), results will vary across runs
 #'
 #' @return A `data.frame` with summary statistics. For version = "3par":
 #'   grouping variables, mean_rt, var_rt, n_upper, n_trials, contaminant_prop.
@@ -396,39 +394,42 @@ has_nonconsecutive_duplicates <- function(vec) {
 #' )
 #'
 #' # Compute summary statistics grouped by subject
-#' result <- ezdm_summary_stats(test_data, rt = "rt", response = "correct",
-#'                              .by = "subject")
+#' result <- ezdm_summary_stats(test_data,
+#'   rt = "rt", response = "correct",
+#'   .by = "subject"
+#' )
 #' print(result)
 #'
 #' # Group by multiple variables using simple method
-#' result_multi <- ezdm_summary_stats(test_data, rt = "rt",
-#'                                    response = "correct",
-#'                                    .by = c("subject", "condition"),
-#'                                    method = "simple")
+#' result_multi <- ezdm_summary_stats(test_data,
+#'   rt = "rt",
+#'   response = "correct",
+#'   .by = c("subject", "condition"),
+#'   method = "simple"
+#' )
 #'
 ezdm_summary_stats <- function(
-  data,
-  rt,
-  response,
-  .by = NULL,
-  version = "3par",
-  distribution = "exgaussian",
-  method = "mixture",
-  robust_scale = "iqr",
-  contaminant_bound = c(0.1, 3.0),
-  min_trials = 10,
-  init_contaminant = 0.05,
-  max_contaminant = 0.5,
-  maxit = 100,
-  tol = 1e-6,
-  adjust_accuracy = FALSE,
-  guess_rate = 0.5,
-  seed = NULL
-) {
-  # Input validation
-  stopif(missing(data), "Argument 'data' is required")
-  stopif(missing(rt), "Argument 'rt' is required")
-  stopif(missing(response), "Argument 'response' is required")
+    data,
+    rt,
+    response,
+    .by = NULL,
+    version = c("3par", "4par"),
+    distribution = c("exgaussian", "lognormal", "invgaussian"),
+    method = c("mixture", "simple", "robust"),
+    robust_scale = c("iqr", "mad"),
+    contaminant_bound = c(0.1, 3.0),
+    min_trials = 10,
+    init_contaminant = 0.05,
+    max_contaminant = 0.5,
+    maxit = 100,
+    tol = 1e-6,
+    adjust_accuracy = FALSE,
+    guess_rate = 0.5) {
+  stop_missing_args()
+  version <- match.arg(version)
+  distribution <- match.arg(distribution)
+  method <- match.arg(method)
+  robust_scale <- match.arg(robust_scale)
 
   data <- try(as.data.frame(data), silent = TRUE)
   stopif(
@@ -439,92 +440,47 @@ ezdm_summary_stats <- function(
     !isTRUE(nrow(data) > 0L),
     "Argument 'data' does not contain observations"
   )
-
   stopif(not_in(rt, colnames(data)), "RT variable '{rt}' not found in data")
   stopif(
     not_in(response, colnames(data)),
     "Response variable '{response}' not found in data"
   )
-
-  stopif(
-    not_in(version, c("3par", "4par")),
-    "version must be '3par' or '4par'"
-  )
-  stopif(
-    not_in(distribution, c("exgaussian", "lognormal", "invgaussian")),
-    "distribution must be 'exgaussian', 'lognormal', or 'invgaussian'"
-  )
-  stopif(
-    not_in(method, c("mixture", "simple", "robust")),
-    "method must be 'mixture', 'simple', or 'robust'"
-  )
-  stopif(
-    not_in(robust_scale, c("iqr", "mad")),
-    "robust_scale must be 'iqr' or 'mad'"
-  )
   stopif(
     length(contaminant_bound) != 2,
     "contaminant_bound must be a vector of length 2"
   )
-  # Validate each element is either numeric (or coercible) or "min"/"max"
-  valid_bound <- function(x) {
-    if (is.numeric(x)) return(TRUE)
-    if (is.character(x)) {
-      # Check if it's "min" or "max"
-      if (tolower(x) %in% c("min", "max")) return(TRUE)
-      # Check if it's a numeric string
-      num_val <- suppressWarnings(as.numeric(x))
-      if (!is.na(num_val)) return(TRUE)
-    }
-    FALSE
-  }
 
+  is_valid_bound <- function(x) {
+    tolower(x) %in% c("min", "max") | suppressWarnings(!is.na(as.numeric(x)))
+  }
   stopif(
-    !valid_bound(contaminant_bound[1]) || !valid_bound(contaminant_bound[2]),
+    any(!is_valid_bound(contaminant_bound)),
     "contaminant_bound elements must be numeric or 'min'/'max'"
   )
-  # If both are numeric (or coercible), check order
-  is_numeric_val <- function(x) {
-    is.numeric(x) ||
-      (is.character(x) && !is.na(suppressWarnings(as.numeric(x))) &&
-         !(tolower(x) %in% c("min", "max")))
-  }
-  if (is_numeric_val(contaminant_bound[1]) &&
-        is_numeric_val(contaminant_bound[2])) {
-    stopif(
-      as.numeric(contaminant_bound[1]) >= as.numeric(contaminant_bound[2]),
-      "contaminant_bound[1] must be less than contaminant_bound[2]"
-    )
-  }
+  stopif(
+    all(is.numeric(contaminant_bound)) && contaminant_bound[1] >= contaminant_bound[2],
+    "contaminant_bound[1] must be less than contaminant_bound[2]"
+  )
   stopif(
     !is.numeric(min_trials) || min_trials < 1,
     "min_trials must be a positive integer"
   )
   stopif(
-    !is.numeric(init_contaminant) || init_contaminant <= 0 ||
-      init_contaminant >= 1,
+    !is.numeric(init_contaminant) || init_contaminant <= 0 || init_contaminant >= 1,
     "init_contaminant must be between 0 and 1 (exclusive)"
   )
   stopif(
-    !is.numeric(max_contaminant) || max_contaminant <= 0 ||
-      max_contaminant > 1,
+    !is.numeric(max_contaminant) || max_contaminant <= 0 || max_contaminant > 1,
     "max_contaminant must be between 0 (exclusive) and 1 (inclusive)"
   )
   stopif(
     init_contaminant >= max_contaminant,
     "init_contaminant must be less than max_contaminant"
   )
-  stopif(
-    !is.logical(adjust_accuracy),
-    "adjust_accuracy must be TRUE or FALSE"
-  )
+  stopif(!is.logical(adjust_accuracy), "adjust_accuracy must be TRUE or FALSE")
   stopif(
     !is.numeric(guess_rate) || guess_rate < 0 || guess_rate > 1,
     "guess_rate must be between 0 and 1"
-  )
-  stopif(
-    !is.null(seed) && (!is.numeric(seed) || length(seed) != 1),
-    "seed must be NULL or a single integer value"
   )
 
   # Warn if adjust_accuracy is TRUE but method is "simple"
@@ -533,38 +489,28 @@ ezdm_summary_stats <- function(
     "adjust_accuracy has no effect with method='simple' (no contaminant estimate)"
   )
 
-  # Set seed for reproducibility if provided
-  if (adjust_accuracy && !is.null(seed)) {
-    set.seed(seed)
-  }
-
   # Warnings for potential data issues
   warnif(
-    any(data[[rt]] > 10, na.rm = TRUE),
+    any(data[[rt]] > 10),
     "Some RT values > 10. Ensure RTs are in seconds, not milliseconds."
   )
 
   # Filter out non-positive RTs with warning
-  non_positive <- sum(data[[rt]] <= 0, na.rm = TRUE)
   warnif(
-    non_positive > 0,
-    "{non_positive} non-positive RT values will be excluded."
+    any(data[[rt]] <= 0),
+    "Non-positive RT founds. These values will be excluded."
   )
   data <- data[data[[rt]] > 0 & !is.na(data[[rt]]), ]
 
-  # Process grouping variables
-  group_vars <- if (is.null(.by)) character(0) else .by
-
   # Validate grouping variables exist
-  for (gv in group_vars) {
+  for (gv in .by) {
     stopif(
       not_in(gv, colnames(data)),
       "Grouping variable '{gv}' not found in data"
     )
   }
 
-  # Process data by groups
-  if (length(group_vars) == 0) {
+  if (length(.by) == 0) {
     # No grouping - process all data
     result <- .process_rt_group(
       rt_data = data[[rt]],
@@ -585,10 +531,10 @@ ezdm_summary_stats <- function(
     result_df <- as.data.frame(result)
   } else {
     # Split by grouping variables
-    if (length(group_vars) == 1) {
-      split_factor <- data[[group_vars]]
+    if (length(.by) == 1) {
+      split_factor <- data[[.by]]
     } else {
-      split_factor <- interaction(data[group_vars], drop = TRUE)
+      split_factor <- interaction(data[.by], drop = TRUE)
     }
 
     split_data <- split(data, split_factor)
@@ -613,7 +559,7 @@ ezdm_summary_stats <- function(
       )
 
       # Extract group values
-      grp_values <- unique(grp_data[group_vars])
+      grp_values <- unique(grp_data[.by])
       cbind(grp_values[1, , drop = FALSE], as.data.frame(grp_result))
     })
 
@@ -633,11 +579,9 @@ ezdm_summary_stats <- function(
 # @param x Numeric vector
 # @return List with mean, var, and n
 .simple_aggregation <- function(x) {
-
   list(
     mean = mean(x, na.rm = TRUE),
-    var = var(x, na.rm = TRUE),
-    n = sum(!is.na(x))
+    var = var(x, na.rm = TRUE)
   )
 }
 
@@ -647,65 +591,48 @@ ezdm_summary_stats <- function(
 # @return List with mean (median), var, and n
 .robust_aggregation <- function(x, scale_method = "iqr") {
   x <- x[!is.na(x)]
-  med <- median(x)
-
-  if (scale_method == "iqr") {
-    # IQR-based variance estimation
-    # For normal distribution: sigma = IQR / (2 * qnorm(0.75)) ≈ IQR / 1.349
-    iqr_val <- IQR(x)
-    sd_est <- iqr_val / 1.349
-    var_est <- sd_est^2
-  } else if (scale_method == "mad") {
-    # MAD-based variance estimation
-    # mad() already scales by 1.4826 to be consistent with SD for normal data
-    mad_val <- mad(x)
-    var_est <- mad_val^2
-  } else {
-    stop2("scale_method must be 'iqr' or 'mad'")
-  }
 
   list(
-    mean = med,
-    var = var_est,
-    n = length(x)
+    mean = median(x),
+    var = switch(scale_method,
+      iqr = (IQR(x) / 1.349)^2,
+      mad = mad(x)^2,
+      stop2("scale_method must be iqr or mad")
+    )
   )
 }
 
 # Convert response data to logical indicator for upper boundary
 # Handles: numeric (0/1), logical (TRUE/FALSE), character/factor
 # ("upper"/"lower", "correct"/"error", "acc"/"err", etc.)
-# @param response_data Vector of response values
+# @param x Vector of response values
 # @return Logical vector where TRUE = upper boundary response
-.convert_response_to_upper <- function(response_data) {
-  # Handle factors by converting to character
-  if (is.factor(response_data)) {
-    response_data <- as.character(response_data)
-  }
-
+.convert_response_to_upper <- function(x) {
   # Numeric or logical: treat 1/TRUE as upper
-  if (is.numeric(response_data) || is.logical(response_data)) {
-    return(as.logical(response_data))
+  if (is.numeric(x) || is.logical(x)) {
+    return(as.logical(x))
   }
 
   # Character: match common patterns for upper boundary
-  if (is.character(response_data)) {
-    response_lower <- tolower(response_data)
-    # Define patterns for upper boundary responses
+  if (is.character(x) || is.factor(x)) {
+    x <- tolower(x)
     upper_patterns <- c("upper", "correct", "acc", "1", "true", "yes", "hit")
-    lower_patterns <- c("lower", "error", "err", "incorrect", "0", "false",
-                        "no", "miss", "fa")
+    lower_patterns <- c(
+      "lower", "error", "err", "incorrect", "0", "false",
+      "no", "miss", "fa"
+    )
 
-    is_upper <- response_lower %in% upper_patterns
-    is_lower <- response_lower %in% lower_patterns
+    is_upper <- x %in% upper_patterns
+    is_lower <- x %in% lower_patterns
 
     # Check if all responses are recognized
-    unrecognized <- !is_upper & !is_lower & !is.na(response_data)
-    if (any(unrecognized)) {
-      unique_unrec <- unique(response_data[unrecognized])
-      stop2("Unrecognized response values: \\
-            {paste(unique_unrec, collapse = ', ')}. Expected values like \\
-            'upper'/'lower', 'correct'/'error', 1/0, or TRUE/FALSE.")
-    }
+    unrecognized <- !is_upper & !is_lower & !is.na(x)
+    stopif(
+      any(unrecognized),
+      "Unrecognized response values: \\
+      {collapse_comma(unique(x[unrecognized]))}. Expected values like \\
+      'upper'/'lower', 'correct'/'error', 1/0, or TRUE/FALSE."
+    )
 
     return(is_upper)
   }
@@ -719,577 +646,104 @@ ezdm_summary_stats <- function(
 # @param response_data Vector of responses (various formats accepted)
 # @param version "3par" or "4par"
 # @param distribution Distribution type
-# @param method "mixture" or "simple"
+# @param method "mixture", "robust", or "simple"
 # @param contaminant_bound Bounds for uniform distribution
 # @param min_trials Minimum trials required
 # @param init_contaminant Initial contaminant proportion
+# @param max_contaminant Maximum allowed contaminant proportion
 # @param maxit Maximum EM iterations
 # @param tol Convergence tolerance
+# @param adjust_accuracy Whether to adjust accuracy counts
+# @param guess_rate Assumed accuracy rate for contaminants
 # @return Named list with summary statistics
 .process_rt_group <- function(rt_data, response_data, version, distribution,
                               method, robust_scale, contaminant_bound,
                               min_trials, init_contaminant, max_contaminant,
                               maxit, tol, adjust_accuracy, guess_rate) {
   n_trials <- length(rt_data)
-
-  # Convert response to logical indicator (TRUE = upper boundary)
   is_upper <- .convert_response_to_upper(response_data)
   n_upper <- sum(is_upper, na.rm = TRUE)
-
-  # Resolve contaminant bounds from data if "min" or "max" specified
   resolved_bounds <- .resolve_contaminant_bounds(contaminant_bound, rt_data)
 
-  # Check minimum trials
-  if (n_trials < min_trials) {
-    if (version == "3par") {
-      return(list(
-        mean_rt = NA_real_,
-        var_rt = NA_real_,
-        n_upper = n_upper,
-        n_trials = n_trials,
-        contaminant_prop = NA_real_
-      ))
-    } else {
-      return(list(
-        mean_rt_upper = NA_real_,
-        mean_rt_lower = NA_real_,
-        var_rt_upper = NA_real_,
-        var_rt_lower = NA_real_,
-        n_upper = n_upper,
-        n_trials = n_trials,
-        contaminant_prop_upper = NA_real_,
-        contaminant_prop_lower = NA_real_
-      ))
+  # Helper to compute moments for a single RT vector
+  compute_moments <- function(rt_vec, n_obs) {
+    if (n_obs < min_trials) {
+      list(mean = NA_real_, var = NA_real_, contaminant_prop = NA_real_)
+    } else if (method == "simple") {
+      c(.simple_aggregation(rt_vec), contaminant_prop = NA_real_)
+    } else if (method == "robust") {
+      c(.robust_aggregation(rt_vec, scale_method = robust_scale), contaminant_prop = NA_real_)
+    } else if (method == "mixture") {
+      fit <- .fit_rt_mixture(
+        rt_vec, distribution, resolved_bounds,
+        init_contaminant, max_contaminant, maxit, tol
+      )
+
+      if (!fit$converged || is.null(fit$params)) {
+        warning2("EM did not converge. Using simple moments.", env.frame = -2)
+        c(.simple_aggregation(rt_vec), contaminant_prop = NA_real_)
+      } else {
+        c(.dist_moments(fit$params, distribution), contaminant_prop = fit$contaminant_prop)
+      }
     }
   }
 
   if (version == "3par") {
-    # Pool all RTs
-    if (method == "simple") {
-      agg <- .simple_aggregation(rt_data)
-      result <- list(
-        mean_rt = agg$mean,
-        var_rt = agg$var,
-        n_upper = n_upper,
-        n_trials = n_trials,
-        contaminant_prop = NA_real_
-      )
-      return(result)
-    }
-
-    # Robust method (median + IQR/MAD-based variance)
-    if (method == "robust") {
-      agg <- .robust_aggregation(rt_data, scale_method = robust_scale)
-      result <- list(
-        mean_rt = agg$mean,
-        var_rt = agg$var,
-        n_upper = n_upper,
-        n_trials = n_trials,
-        contaminant_prop = NA_real_
-      )
-      return(result)
-    }
-
-    # Mixture method
-    fit <- .fit_rt_mixture(
-      rt_data, distribution, resolved_bounds,
-      init_contaminant, max_contaminant, maxit, tol
-    )
-
-    if (!fit$converged || is.null(fit$params)) {
-      # Fall back to simple moments with warning
-      warning2("EM did not converge. Using simple moments.", env.frame = -1)
-      agg <- .simple_aggregation(rt_data)
-      result <- list(
-        mean_rt = agg$mean,
-        var_rt = agg$var,
-        n_upper = n_upper,
-        n_trials = n_trials,
-        contaminant_prop = fit$contaminant_prop
-      )
-      if (adjust_accuracy) {
-        adj <- .adjust_accuracy_counts(
-          n_upper, n_trials, fit$contaminant_prop, guess_rate
-        )
-        result$n_upper_adj <- adj$n_upper_adj
-        result$n_trials_adj <- adj$n_trials_adj
-      }
-      return(result)
-    }
-
-    moments <- .dist_moments(fit$params, distribution)
+    moments <- compute_moments(rt_data, n_trials)
     result <- list(
       mean_rt = moments$mean,
       var_rt = moments$var,
       n_upper = n_upper,
       n_trials = n_trials,
-      contaminant_prop = fit$contaminant_prop
+      contaminant_prop = moments$contaminant_prop
     )
-    if (adjust_accuracy) {
+
+    if (adjust_accuracy && !is.na(moments$contaminant_prop)) {
       adj <- .adjust_accuracy_counts(
-        n_upper, n_trials, fit$contaminant_prop, guess_rate
+        n_upper, n_trials, moments$contaminant_prop, guess_rate
       )
-      result$n_upper_adj <- adj$n_upper_adj
-      result$n_trials_adj <- adj$n_trials_adj
+      result <- c(result, adj)
     }
+
     return(result)
+  }
 
-  } else {
-    # version == "4par": separate by response
-    rt_upper <- rt_data[is_upper]
-    rt_lower <- rt_data[!is_upper]
-    n_lower <- length(rt_lower)
+  # version == "4par": separate by response
 
-    if (method == "simple") {
-      agg_upper <- if (n_upper >= min_trials) {
-        .simple_aggregation(rt_upper)
-      } else {
-        list(mean = NA_real_, var = NA_real_)
-      }
-      agg_lower <- if (n_lower >= min_trials) {
-        .simple_aggregation(rt_lower)
-      } else {
-        list(mean = NA_real_, var = NA_real_)
-      }
-      return(list(
-        mean_rt_upper = agg_upper$mean,
-        mean_rt_lower = agg_lower$mean,
-        var_rt_upper = agg_upper$var,
-        var_rt_lower = agg_lower$var,
-        n_upper = n_upper,
-        n_trials = n_trials,
-        contaminant_prop_upper = NA_real_,
-        contaminant_prop_lower = NA_real_
-      ))
-    }
+  rt_upper <- rt_data[is_upper]
+  rt_lower <- rt_data[!is_upper]
+  n_lower <- length(rt_lower)
 
-    # Robust method (median + IQR/MAD-based variance)
-    if (method == "robust") {
-      agg_upper <- if (n_upper >= min_trials) {
-        .robust_aggregation(rt_upper, scale_method = robust_scale)
-      } else {
-        list(mean = NA_real_, var = NA_real_)
-      }
-      agg_lower <- if (n_lower >= min_trials) {
-        .robust_aggregation(rt_lower, scale_method = robust_scale)
-      } else {
-        list(mean = NA_real_, var = NA_real_)
-      }
-      return(list(
-        mean_rt_upper = agg_upper$mean,
-        mean_rt_lower = agg_lower$mean,
-        var_rt_upper = agg_upper$var,
-        var_rt_lower = agg_lower$var,
-        n_upper = n_upper,
-        n_trials = n_trials,
-        contaminant_prop_upper = NA_real_,
-        contaminant_prop_lower = NA_real_
-      ))
-    }
+  moments_upper <- compute_moments(rt_upper, n_upper)
+  moments_lower <- compute_moments(rt_lower, n_lower)
 
-    # Mixture method for upper boundary
-    if (n_upper >= min_trials) {
-      fit_upper <- .fit_rt_mixture(
-        rt_upper, distribution, resolved_bounds,
-        init_contaminant, max_contaminant, maxit, tol
-      )
-      if (!fit_upper$converged || is.null(fit_upper$params)) {
-        warning2("EM for upper boundary did not converge. Using simple moments.",
-                 env.frame = -1)
-        agg_upper <- .simple_aggregation(rt_upper)
-        moments_upper <- list(mean = agg_upper$mean, var = agg_upper$var)
-        contam_upper <- fit_upper$contaminant_prop
-      } else {
-        moments_upper <- .dist_moments(fit_upper$params, distribution)
-        contam_upper <- fit_upper$contaminant_prop
-      }
+  result <- list(
+    mean_rt_upper = moments_upper$mean,
+    mean_rt_lower = moments_lower$mean,
+    var_rt_upper = moments_upper$var,
+    var_rt_lower = moments_lower$var,
+    n_upper = n_upper,
+    n_trials = n_trials,
+    contaminant_prop_upper = moments_upper$contaminant_prop,
+    contaminant_prop_lower = moments_lower$contaminant_prop
+  )
+
+  if (adjust_accuracy) {
+    contam_upper <- moments_upper$contaminant_prop
+    contam_lower <- moments_lower$contaminant_prop
+    contam_upper_safe <- if (is.na(contam_upper)) 0 else contam_upper
+    contam_lower_safe <- if (is.na(contam_lower)) 0 else contam_lower
+    avg_contam <- if (n_upper + n_lower > 0) {
+      (n_upper * contam_upper_safe + n_lower * contam_lower_safe) /
+        (n_upper + n_lower)
     } else {
-      moments_upper <- list(mean = NA_real_, var = NA_real_)
-      contam_upper <- NA_real_
+      0
     }
-
-    # Mixture method for lower boundary
-    if (n_lower >= min_trials) {
-      fit_lower <- .fit_rt_mixture(
-        rt_lower, distribution, resolved_bounds,
-        init_contaminant, max_contaminant, maxit, tol
-      )
-      if (!fit_lower$converged || is.null(fit_lower$params)) {
-        warning2("EM for lower boundary did not converge. Using simple moments.",
-                 env.frame = -1)
-        agg_lower <- .simple_aggregation(rt_lower)
-        moments_lower <- list(mean = agg_lower$mean, var = agg_lower$var)
-        contam_lower <- fit_lower$contaminant_prop
-      } else {
-        moments_lower <- .dist_moments(fit_lower$params, distribution)
-        contam_lower <- fit_lower$contaminant_prop
-      }
-    } else {
-      moments_lower <- list(mean = NA_real_, var = NA_real_)
-      contam_lower <- NA_real_
-    }
-
-    result <- list(
-      mean_rt_upper = moments_upper$mean,
-      mean_rt_lower = moments_lower$mean,
-      var_rt_upper = moments_upper$var,
-      var_rt_lower = moments_lower$var,
-      n_upper = n_upper,
-      n_trials = n_trials,
-      contaminant_prop_upper = contam_upper,
-      contaminant_prop_lower = contam_lower
-    )
-
-    if (adjust_accuracy) {
-      # Use weighted average of contaminant proportions
-      contam_upper_safe <- ifelse(is.na(contam_upper), 0, contam_upper)
-      contam_lower_safe <- ifelse(is.na(contam_lower), 0, contam_lower)
-      if (n_upper + n_lower > 0) {
-        avg_contam <- (n_upper * contam_upper_safe +
-                         n_lower * contam_lower_safe) / (n_upper + n_lower)
-      } else {
-        avg_contam <- 0
-      }
-      adj <- .adjust_accuracy_counts(n_upper, n_trials, avg_contam, guess_rate)
-      result$n_upper_adj <- adj$n_upper_adj
-      result$n_trials_adj <- adj$n_trials_adj
-    }
-
-    result
-  }
-}
-
-# Ex-Gaussian density function
-# @param x Numeric vector of values
-# @param mu Mean of the Gaussian component
-# @param sigma Standard deviation of the Gaussian component
-# @param tau Rate parameter of the exponential component
-# @param log Logical, return log density if TRUE
-.dexgauss <- function(x, mu, sigma, tau, log = FALSE) {
-  # Ensure positive parameters
-  if (sigma <= 0 || tau <= 0) {
-    return(rep(if (log) -Inf else 0, length(x)))
+    adj <- .adjust_accuracy_counts(n_upper, n_trials, avg_contam, guess_rate)
+    result <- c(result, adj)
   }
 
-  # Ex-Gaussian density: convolution of Gaussian and Exponential
-  # Using the standard formula with numerical stability
-  z <- (x - mu) / sigma - sigma / tau
-  log_dens <- -log(tau) + (sigma^2) / (2 * tau^2) - (x - mu) / tau +
-    pnorm(z, log.p = TRUE)
-
-  if (log) {
-    return(log_dens)
-  }
-  exp(log_dens)
-}
-
-# Inverse Gaussian (Wald) density function
-# @param x Numeric vector of values
-# @param mu Mean parameter
-# @param lambda Shape parameter
-# @param log Logical, return log density if TRUE
-.dinvgauss <- function(x, mu, lambda, log = FALSE) {
-  # Ensure positive parameters and values
-  if (mu <= 0 || lambda <= 0) {
-    return(rep(if (log) -Inf else 0, length(x)))
-  }
-
-  valid <- x > 0
-  log_dens <- rep(-Inf, length(x))
-
-  if (any(valid)) {
-    xv <- x[valid]
-    log_dens[valid] <- 0.5 * (log(lambda) - log(2 * pi) - 3 * log(xv)) -
-      (lambda * (xv - mu)^2) / (2 * mu^2 * xv)
-  }
-
-  if (log) {
-    return(log_dens)
-  }
-  exp(log_dens)
-}
-
-# Extract mean and variance from fitted distribution parameters
-# @param params Named list of distribution parameters
-# @param distribution Character specifying the distribution type
-# @return List with mean and var components
-.dist_moments <- function(params, distribution) {
-  switch(distribution,
-    exgaussian = {
-      mu <- params$mu
-      sigma <- params$sigma
-      tau <- params$tau
-      list(
-        mean = mu + tau,
-        var = sigma^2 + tau^2
-      )
-    },
-    lognormal = {
-      mu <- params$mu
-      sigma <- params$sigma
-      list(
-        mean = exp(mu + sigma^2 / 2),
-        var = exp(2 * mu + sigma^2) * (exp(sigma^2) - 1)
-      )
-    },
-    invgaussian = {
-      mu <- params$mu
-      lambda <- params$lambda
-      list(
-        mean = mu,
-        var = mu^3 / lambda
-      )
-    }
-  )
-}
-
-# Initialize distribution parameters using method of moments
-# @param x Numeric vector of RT values
-# @param distribution Character specifying the distribution type
-# @return Named list of initial parameter estimates
-.init_dist_params <- function(x, distribution) {
-  m <- mean(x)
-  v <- var(x)
-  s <- sd(x)
-
-  switch(distribution,
-    exgaussian = {
-      # Method of moments for ex-Gaussian
-      # Skewness = 2 * tau^3 / (sigma^2 + tau^2)^(3/2)
-      # Use simple heuristic: tau captures about 1/3 of the variance
-      tau <- max(s / 3, 0.01)
-      sigma <- max(sqrt(max(v - tau^2, 0.0001)), 0.01)
-      mu <- max(m - tau, 0.01)
-      list(mu = mu, sigma = sigma, tau = tau)
-    },
-    lognormal = {
-      # Method of moments for lognormal
-      sigma2 <- log(1 + v / m^2)
-      sigma <- sqrt(max(sigma2, 0.01))
-      mu <- log(m) - sigma2 / 2
-      list(mu = mu, sigma = sigma)
-    },
-    invgaussian = {
-      # Method of moments for inverse Gaussian
-      mu <- max(m, 0.01)
-      lambda <- max(mu^3 / v, 0.01)
-      list(mu = mu, lambda = lambda)
-    }
-  )
-}
-
-# Compute log-likelihood for a distribution
-# @param x Numeric vector of RT values
-# @param params Named list of distribution parameters
-# @param distribution Character specifying the distribution type
-# @param weights Optional numeric vector of observation weights
-# @return Log-likelihood value
-.dist_loglik <- function(x, params, distribution, weights = NULL) {
-  if (is.null(weights)) {
-    weights <- rep(1, length(x))
-  }
-
-  log_dens <- switch(distribution,
-    exgaussian = .dexgauss(x, params$mu, params$sigma, params$tau, log = TRUE),
-    lognormal = dlnorm(x, params$mu, params$sigma, log = TRUE),
-    invgaussian = .dinvgauss(x, params$mu, params$lambda, log = TRUE)
-  )
-
-  sum(weights * log_dens, na.rm = TRUE)
-}
-
-# Fit distribution parameters using weighted MLE
-# @param x Numeric vector of RT values
-# @param distribution Character specifying the distribution type
-# @param weights Numeric vector of observation weights
-# @param init_params Initial parameter estimates
-# @return Named list of fitted parameters
-.fit_dist_params <- function(x, distribution, weights, init_params) {
-  # Objective function (negative log-likelihood)
-  neg_loglik <- function(par) {
-    params <- .par_to_list(par, distribution)
-    -1 * .dist_loglik(x, params, distribution, weights)
-  }
-
-  # Convert initial params to vector
-  init_par <- .list_to_par(init_params, distribution)
-
-  # Set bounds based on distribution
-  bounds <- .get_param_bounds(distribution)
-
-  # Optimize
-  result <- tryCatch(
-    stats::optim(
-      par = init_par,
-      fn = neg_loglik,
-      method = "L-BFGS-B",
-      lower = bounds$lower,
-      upper = bounds$upper
-    ),
-    error = function(e) NULL
-  )
-
-  if (is.null(result) || result$convergence != 0) {
-    # Return initial params if optimization fails
-    return(init_params)
-  }
-
-  .par_to_list(result$par, distribution)
-}
-
-# Convert parameter vector to named list
-.par_to_list <- function(par, distribution) {
-  switch(distribution,
-    exgaussian = list(mu = par[1], sigma = par[2], tau = par[3]),
-    lognormal = list(mu = par[1], sigma = par[2]),
-    invgaussian = list(mu = par[1], lambda = par[2])
-  )
-}
-
-# Convert named list to parameter vector
-.list_to_par <- function(params, distribution) {
-  switch(distribution,
-    exgaussian = c(params$mu, params$sigma, params$tau),
-    lognormal = c(params$mu, params$sigma),
-    invgaussian = c(params$mu, params$lambda)
-  )
-}
-
-# Get parameter bounds for optimization
-.get_param_bounds <- function(distribution) {
-  switch(distribution,
-    exgaussian = list(
-      lower = c(-Inf, 1e-6, 1e-6),
-      upper = c(Inf, Inf, Inf)
-    ),
-    lognormal = list(
-      lower = c(-Inf, 1e-6),
-      upper = c(Inf, Inf)
-    ),
-    invgaussian = list(
-      lower = c(1e-6, 1e-6),
-      upper = c(Inf, Inf)
-    )
-  )
-}
-
-# Fit RT mixture model using EM algorithm
-# @param x Numeric vector of RT values
-# @param distribution Character specifying the parametric distribution
-# @param contaminant_bound Numeric vector of length 2 for uniform bounds
-# @param init_contaminant Initial contaminant proportion
-# @param max_contaminant Maximum allowed contaminant proportion (clipping)
-# @param maxit Maximum EM iterations
-# @param tol Convergence tolerance
-# @return List with fitted params, contaminant proportion, convergence info
-.fit_rt_mixture <- function(x, distribution, contaminant_bound,
-                            init_contaminant, max_contaminant, maxit, tol) {
-  n <- length(x)
-
-  # Filter to valid range for fitting
-  x_valid <- x[x >= contaminant_bound[1] & x <= contaminant_bound[2]]
-  n_valid <- length(x_valid)
-
-  if (n_valid < 5) {
-    return(list(
-      params = NULL,
-      contaminant_prop = NA,
-      converged = FALSE,
-      iterations = 0,
-      message = "Too few observations in valid range"
-    ))
-  }
-
-  # Initialize parameters
-  pi_c <- init_contaminant  # contaminant proportion
-  pi_rt <- 1 - pi_c         # RT distribution proportion
-  dist_params <- .init_dist_params(x_valid, distribution)
-
-  # Uniform density (constant for contaminant component)
-  uniform_dens <- 1 / (contaminant_bound[2] - contaminant_bound[1])
-
-  prev_loglik <- -Inf
-  converged <- FALSE
-
-  for (iter in seq_len(maxit)) {
-    # E-step: compute responsibilities
-    dens_rt <- switch(distribution,
-      exgaussian = .dexgauss(x_valid, dist_params$mu, dist_params$sigma,
-                            dist_params$tau, log = FALSE),
-      lognormal = dlnorm(x_valid, dist_params$mu, dist_params$sigma),
-      invgaussian = .dinvgauss(x_valid, dist_params$mu, dist_params$lambda,
-                               log = FALSE)
-    )
-
-    # Ensure numerical stability
-    dens_rt <- pmax(dens_rt, 1e-300)
-
-    # Posterior probabilities
-    numer_rt <- pi_rt * dens_rt
-    numer_c <- pi_c * uniform_dens
-    denom <- numer_rt + numer_c
-
-    # Responsibilities (prob of being from RT distribution)
-    gamma_rt <- numer_rt / denom
-    gamma_c <- 1 - gamma_rt
-
-    # Handle numerical issues (NA or NaN in responsibilities)
-    if (any(is.na(gamma_rt)) || any(is.nan(gamma_rt))) {
-      # Fall back to previous iteration's estimates
-      break
-    }
-
-    # Compute log-likelihood
-    loglik <- sum(log(denom))
-
-    # Handle numerical issues in log-likelihood
-    if (is.na(loglik) || is.nan(loglik) || is.infinite(loglik)) {
-      break
-    }
-
-    # Check convergence
-    if (abs(loglik - prev_loglik) < tol) {
-      converged <- TRUE
-      break
-    }
-    prev_loglik <- loglik
-
-    # M-step: update parameters
-    # Update mixing proportions
-    pi_rt <- mean(gamma_rt, na.rm = TRUE)
-    pi_c <- 1 - pi_rt
-
-    # Handle edge case where pi_c is NA
-    if (is.na(pi_c)) {
-      pi_c <- init_contaminant
-      pi_rt <- 1 - pi_c
-    }
-
-    # Clip contaminant proportion to maximum allowed value
-    if (pi_c > max_contaminant) {
-      pi_c <- max_contaminant
-      pi_rt <- 1 - pi_c
-    }
-
-    # Update distribution parameters using weighted MLE
-    dist_params <- .fit_dist_params(x_valid, distribution, gamma_rt,
-                                    dist_params)
-  }
-
-  # Warn if contaminant proportion hit the maximum bound
-  if (pi_c >= max_contaminant) {
-    warning2("Contaminant proportion was clipped to max_contaminant \\
-             ({max_contaminant}). This may indicate data quality issues.",
-             env.frame = -1)
-  }
-
-  list(
-    params = dist_params,
-    contaminant_prop = pi_c,
-    converged = converged,
-    iterations = iter,
-    loglik = if (converged) loglik else NA
-  )
+  result
 }
 
 # Resolve contaminant bounds from data
@@ -1336,11 +790,11 @@ ezdm_summary_stats <- function(
   # This improves mixture identifiability by making uniform less competitive
   # Use 50% of range or at least 100ms to ensure conservative estimation
   if (lower_is_data_driven && bound_buffer > 0) {
-    buffer_amount <- max(bound_buffer * data_range, 0.1)  # At least 100ms
-    resolved[1] <- max(0.001, resolved[1] - buffer_amount)  # Keep positive
+    buffer_amount <- max(bound_buffer * data_range, 0.1) # At least 100ms
+    resolved[1] <- max(0.001, resolved[1] - buffer_amount) # Keep positive
   }
   if (upper_is_data_driven && bound_buffer > 0) {
-    buffer_amount <- max(bound_buffer * data_range, 0.1)  # At least 100ms
+    buffer_amount <- max(bound_buffer * data_range, 0.1) # At least 100ms
     resolved[2] <- resolved[2] + buffer_amount
   }
 

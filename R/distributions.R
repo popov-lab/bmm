@@ -1175,3 +1175,301 @@ rezdm <- function(n, n_trials, drift, bound, ndt, zr = 0.5, s = 1,
 
   nlist(pC, mdt_upper, mdt_lower, vrt_upper, vrt_lower)
 }
+
+
+# Ex-Gaussian density function
+# @param x Numeric vector of values
+# @param mu Mean of the Gaussian component
+# @param sigma Standard deviation of the Gaussian component
+# @param tau Rate parameter of the exponential component
+# @param log Logical, return log density if TRUE
+dexgauss <- function(x, mu, sigma, tau, log = FALSE) {
+  # Ensure positive parameters
+  if (sigma <= 0 || tau <= 0) {
+    return(rep(if (log) -Inf else 0, length(x)))
+  }
+
+  # Ex-Gaussian density: convolution of Gaussian and Exponential
+  # Using the standard formula with numerical stability
+  z <- (x - mu) / sigma - sigma / tau
+  log_dens <- -log(tau) + (sigma^2) / (2 * tau^2) - (x - mu) / tau +
+    pnorm(z, log.p = TRUE)
+
+  if (log) {
+    return(log_dens)
+  }
+  exp(log_dens)
+}
+
+# Inverse Gaussian (Wald) density function
+# @param x Numeric vector of values
+# @param mu Mean parameter
+# @param lambda Shape parameter
+# @param log Logical, return log density if TRUE
+dinvgauss <- function(x, mu, lambda, log = FALSE) {
+  # Ensure positive parameters and values
+  if (mu <= 0 || lambda <= 0) {
+    return(rep(if (log) -Inf else 0, length(x)))
+  }
+
+  valid <- x > 0
+  log_dens <- rep(-Inf, length(x))
+
+  if (any(valid)) {
+    xv <- x[valid]
+    log_dens[valid] <- 0.5 * (log(lambda) - log(2 * pi) - 3 * log(xv)) -
+      (lambda * (xv - mu)^2) / (2 * mu^2 * xv)
+  }
+
+  if (log) {
+    return(log_dens)
+  }
+  exp(log_dens)
+}
+
+# Compute log-likelihood for a distribution
+# @param x Numeric vector of RT values
+# @param params Named list of distribution parameters
+# @param distribution Character specifying the distribution type
+# @param weights Optional numeric vector of observation weights
+# @return Log-likelihood value
+neg_loglik <- function(x, params, distribution, weights = NULL) {
+  if (is.null(weights)) {
+    weights <- rep(1, length(x))
+  }
+
+  log_dens <- switch(distribution,
+    exgaussian = dexgauss(x, params["mu"], params["sigma"], params["tau"], log = TRUE),
+    lognormal = dlnorm(x, params["mu"], params["sigma"], log = TRUE),
+    invgaussian = dinvgauss(x, params["mu"], params["lambda"], log = TRUE)
+  )
+
+  -sum(weights * log_dens, na.rm = TRUE)
+}
+
+
+# Extract mean and variance from fitted distribution parameters
+# @param x Named list of distribution parameters
+# @param distribution Character specifying the distribution type
+# @return List with mean and var components
+.dist_moments <- function(x, distribution = c("exgaussian", "lognormal", "invgaussian")) {
+  distribution <- match.arg(distribution)
+  switch(distribution,
+    exgaussian = list(
+      mean = x["mu"] + x["tau"],
+      var = x["sigma"]^2 + x["tau"]^2
+    ),
+    lognormal = list(
+      mean = exp(x["mu"] + x["sigma"]^2 / 2),
+      var = exp(2 * x["mu"] + x["sigma"]^2) * (exp(x["sigma"]^2) - 1)
+    ),
+    invgaussian = list(
+      mean = x["mu"],
+      var = x["mu"]^3 / x["lambda"]
+    )
+  )
+}
+
+# Initialize distribution parameters using method of moments
+# @param x Numeric vector of RT values
+# @param distribution Character specifying the distribution type
+# @return Named list of initial parameter estimates
+.init_dist_params <- function(x, distribution) {
+  m <- mean(x)
+  v <- var(x)
+  s <- sd(x)
+
+  switch(distribution,
+    exgaussian = {
+      # Method of moments for ex-Gaussian
+      # Skewness = 2 * tau^3 / (sigma^2 + tau^2)^(3/2)
+      # Use simple heuristic: tau captures about 1/3 of the variance
+      tau <- max(s / 3, 0.01)
+      sigma <- max(sqrt(max(v - tau^2, 0.0001)), 0.01)
+      mu <- max(m - tau, 0.01)
+      c(mu = mu, sigma = sigma, tau = tau)
+    },
+    lognormal = {
+      # Method of moments for lognormal
+      sigma2 <- log(1 + v / m^2)
+      sigma <- sqrt(max(sigma2, 0.01))
+      mu <- log(m) - sigma2 / 2
+      c(mu = mu, sigma = sigma)
+    },
+    invgaussian = {
+      # Method of moments for inverse Gaussian
+      mu <- max(m, 0.01)
+      lambda <- max(mu^3 / v, 0.01)
+      c(mu = mu, lambda = lambda)
+    }
+  )
+}
+
+# Fit distribution parameters using weighted MLE
+# @param x Numeric vector of RT values
+# @param distribution Character specifying the distribution type
+# @param weights Numeric vector of observation weights
+# @param init_params Initial parameter estimates
+# @return Named list of fitted parameters
+.fit_dist_params <- function(x, distribution, weights, init_params) {
+  bounds <- .get_param_bounds(distribution)
+  result <- tryCatch(
+    stats::optim(
+      par = init_params,
+      fn = \(par) neg_loglik(x, par, distribution, weights),
+      method = "L-BFGS-B",
+      lower = bounds$lower,
+      upper = bounds$upper
+    ),
+    error = function(e) NULL
+  )
+
+  if (is.null(result) || result$convergence != 0) {
+    return(init_params)
+  }
+
+  result$par
+}
+
+# Get parameter bounds for optimization
+.get_param_bounds <- function(distribution) {
+  switch(distribution,
+    exgaussian = list(
+      lower = c(-Inf, 1e-6, 1e-6),
+      upper = c(Inf, Inf, Inf)
+    ),
+    lognormal = list(
+      lower = c(-Inf, 1e-6),
+      upper = c(Inf, Inf)
+    ),
+    invgaussian = list(
+      lower = c(1e-6, 1e-6),
+      upper = c(Inf, Inf)
+    )
+  )
+}
+
+# Fit RT mixture model using EM algorithm
+# @param x Numeric vector of RT values
+# @param distribution Character specifying the parametric distribution
+# @param contaminant_bound Numeric vector of length 2 for uniform bounds
+# @param init_contaminant Initial contaminant proportion
+# @param max_contaminant Maximum allowed contaminant proportion (clipping)
+# @param maxit Maximum EM iterations
+# @param tol Convergence tolerance
+# @return List with fitted params, contaminant proportion, convergence info
+.fit_rt_mixture <- function(x, distribution, contaminant_bound,
+                            init_contaminant, max_contaminant, maxit, tol) {
+  n <- length(x)
+
+  # Filter to valid range for fitting
+  x_valid <- x[x >= contaminant_bound[1] & x <= contaminant_bound[2]]
+  n_valid <- length(x_valid)
+
+  if (n_valid < 5) {
+    return(list(
+      params = NULL,
+      contaminant_prop = NA,
+      converged = FALSE,
+      iterations = 0,
+      message = "Too few observations in valid range"
+    ))
+  }
+
+  # Initialize parameters
+  pi_c <- init_contaminant # contaminant proportion
+  pi_rt <- 1 - pi_c # RT distribution proportion
+  dist_params <- .init_dist_params(x_valid, distribution)
+
+  # Uniform density (constant for contaminant component)
+  uniform_dens <- 1 / (contaminant_bound[2] - contaminant_bound[1])
+
+  prev_loglik <- -Inf
+  converged <- FALSE
+
+  for (iter in seq_len(maxit)) {
+    # E-step: compute responsibilities
+    dens_rt <- switch(distribution,
+      exgaussian = dexgauss(x_valid, dist_params["mu"], dist_params["sigma"],
+        dist_params["tau"],
+        log = FALSE
+      ),
+      lognormal = dlnorm(x_valid, dist_params["mu"], dist_params["sigma"]),
+      invgaussian = dinvgauss(x_valid, dist_params["mu"], dist_params["lambda"],
+        log = FALSE
+      )
+    )
+
+    # Ensure numerical stability
+    dens_rt <- pmax(dens_rt, 1e-300)
+
+    # Posterior probabilities
+    numer_rt <- pi_rt * dens_rt
+    numer_c <- pi_c * uniform_dens
+    denom <- numer_rt + numer_c
+
+    # Responsibilities (prob of being from RT distribution)
+    gamma_rt <- numer_rt / denom
+    gamma_c <- 1 - gamma_rt
+
+    # Handle numerical issues (NA or NaN in responsibilities)
+    if (any(is.na(gamma_rt)) || any(is.nan(gamma_rt))) {
+      # Fall back to previous iteration's estimates
+      break
+    }
+
+    # Compute log-likelihood
+    loglik <- sum(log(denom))
+
+    # Handle numerical issues in log-likelihood
+    if (is.na(loglik) || is.nan(loglik) || is.infinite(loglik)) {
+      break
+    }
+
+    # Check convergence
+    if (abs(loglik - prev_loglik) < tol) {
+      converged <- TRUE
+      break
+    }
+    prev_loglik <- loglik
+
+    # M-step: update parameters
+    # Update mixing proportions
+    pi_rt <- mean(gamma_rt, na.rm = TRUE)
+    pi_c <- 1 - pi_rt
+
+    # Handle edge case where pi_c is NA
+    if (is.na(pi_c)) {
+      pi_c <- init_contaminant
+      pi_rt <- 1 - pi_c
+    }
+
+    # Clip contaminant proportion to maximum allowed value
+    if (pi_c > max_contaminant) {
+      pi_c <- max_contaminant
+      pi_rt <- 1 - pi_c
+    }
+
+    # Update distribution parameters using weighted MLE
+    dist_params <- .fit_dist_params(
+      x_valid, distribution, gamma_rt,
+      dist_params
+    )
+  }
+
+  # Warn if contaminant proportion hit the maximum bound
+  if (pi_c >= max_contaminant) {
+    warning2("Contaminant proportion was clipped to max_contaminant \\
+             ({max_contaminant}). This may indicate data quality issues.",
+      env.frame = -1
+    )
+  }
+
+  list(
+    params = dist_params,
+    contaminant_prop = pi_c,
+    converged = converged,
+    iterations = iter,
+    loglik = if (converged) loglik else NA
+  )
+}
