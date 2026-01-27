@@ -365,8 +365,6 @@ has_nonconsecutive_duplicates <- function(vec) {
 #'   sampling. Default is FALSE
 #' @param guess_rate Numeric. Assumed accuracy rate for contaminant trials
 #'   (random guessing). Default is 0.5 (appropriate for 2AFC tasks)
-#' @param seed Integer. Random seed for reproducibility of accuracy adjustment.
-#'   If NULL (default), results will vary across runs
 #'
 #' @return A `data.frame` with summary statistics. For version = "3par":
 #'   grouping variables, mean_rt, var_rt, n_upper, n_trials, contaminant_prop.
@@ -426,8 +424,7 @@ ezdm_summary_stats <- function(
     maxit = 100,
     tol = 1e-6,
     adjust_accuracy = FALSE,
-    guess_rate = 0.5,
-    seed = NULL) {
+    guess_rate = 0.5) {
   stop_missing_args()
   version <- match.arg(version)
   distribution <- match.arg(distribution)
@@ -485,21 +482,12 @@ ezdm_summary_stats <- function(
     !is.numeric(guess_rate) || guess_rate < 0 || guess_rate > 1,
     "guess_rate must be between 0 and 1"
   )
-  stopif(
-    !is.null(seed) && (!is.numeric(seed) || length(seed) != 1),
-    "seed must be NULL or a single integer value"
-  )
 
   # Warn if adjust_accuracy is TRUE but method is "simple"
   warnif(
     adjust_accuracy && method == "simple",
     "adjust_accuracy has no effect with method='simple' (no contaminant estimate)"
   )
-
-  # Set seed for reproducibility if provided
-  if (adjust_accuracy && !is.null(seed)) {
-    set.seed(seed)
-  }
 
   # Warnings for potential data issues
   warnif(
