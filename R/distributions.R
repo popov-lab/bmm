@@ -738,15 +738,12 @@ rm3 <- function(n, size, pars, m3_model, act_funs = NULL, unpack = FALSE,
 #' @param bound Boundary separation of the ddm
 #' @param ndt Non-decision time of the ddm
 #' @param zr relative starting point of the ddm
-#' @param sdrift Trial-to-trial variability of the drift rate
-#' @param sndt Trial-to-trial variability of the non-decision time
-#' @param szr Trial-to-trial variability of the relative starting point
 #' @param log Logical, indicating if log-densities should be returned (default = TRUE)
 #'
 #' @keywords distributions
 #'
 #' @export
-dddm <- function(rt, response, drift, bound, ndt, zr = 0.5, sdrift = 0, sndt = 0, szr = 0, log = TRUE) {
+dddm <- function(rt, response, drift, bound, ndt, zr = 0.5, log = TRUE) {
 
   stopif(any(rt < 0),
          glue("Negative RTs are not allowed.\n",
@@ -770,7 +767,7 @@ dddm <- function(rt, response, drift, bound, ndt, zr = 0.5, sdrift = 0, sndt = 0
   # Recycle rt/response to match parameter length if needed
   # This is needed for log_lik functions where we have one observation
   # but multiple parameter samples from the posterior
-  max_len <- max(lengths(list(drift, bound, ndt, zr, sdrift, sndt, szr)))
+  max_len <- max(lengths(list(drift, bound, ndt, zr)))
   
   if (length(rt) == 1 && max_len > 1) {
     rt <- rep(rt, max_len)
@@ -784,10 +781,7 @@ dddm <- function(rt, response, drift, bound, ndt, zr = 0.5, sdrift = 0, sndt = 0
     a = bound,
     v = drift,
     t0 = ndt,
-    z = zr * bound,
-    sz = szr,
-    sv = sdrift,
-    st0 = sndt
+    z = zr * bound
   )
 
   if(log) out <- log(out)
@@ -796,8 +790,8 @@ dddm <- function(rt, response, drift, bound, ndt, zr = 0.5, sdrift = 0, sndt = 0
 
 #' @name ddm_dist
 #' @export
-rddm <- function(n, drift, bound, ndt, zr = 0.5, sdrift = 0, sndt = 0, szr = 0) {
-  max_len <- max(lengths(list(drift, bound, ndt, zr, sdrift, sndt, szr)))
+rddm <- function(n, drift, bound, ndt, zr = 0.5) {
+  max_len <- max(lengths(list(drift, bound, ndt, zr)))
 
   if (max_len > 1L) {
     if (!n %in% c(1, max_len)) {
@@ -806,7 +800,7 @@ rddm <- function(n, drift, bound, ndt, zr = 0.5, sdrift = 0, sndt = 0, szr = 0) 
     n <- max_len
   }
 
-  sim_data <- rtdists::rdiffusion(n = n, a = bound, v = drift, t0 = ndt, z = zr * bound, sz = szr, sv = sdrift, st0 = sndt)
+  sim_data <- rtdists::rdiffusion(n = n, a = bound, v = drift, t0 = ndt, z = zr * bound)
   sim_data$response <- ifelse(sim_data$response == "upper",1,0)
   sim_data
 }

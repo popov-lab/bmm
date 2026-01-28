@@ -8,17 +8,13 @@
       drift = "Drift rate = Average rate of evidence accumulation of the decision processes",
       bound = "Boundary separation = Distance between the decision boundaries that need to be reached",
       ndt   = "Non-decision time = Additional time required beyond the evidence accumulation process",
-      zr     = "Relative starting point = Starting point between the decision thresholds relative to the upper bound.",
-      sdrift = "Trial-to-trial variability in the drift rate",
-      sndt   = "Trial-to-trial variability in the non-decision time",
-      szr    = "Trial-to-trial variability in the relative starting point"
+      zr     = "Relative starting point = Starting point between the decision thresholds relative to the upper bound."
     ),
     links = list(
-      drift = "identity", bound = "log", ndt = "log", zr = "identity",
-      sdrift = "identity", sndt = "identity", szr = "identity"
+      drift = "identity", bound = "log", ndt = "log", zr = "identity"
     ),
     fixed_parameters = list(
-      zr = 0.5, sdrift = 0, sndt = 0, szr = 0
+      zr = 0.5
     ),
     priors = list(
       drift = list(main = "cauchy(0,1)", effects = "normal(0,0.5)"),
@@ -30,10 +26,7 @@
       drift  = c(-1,1),
       bound  = c(1,2),
       ndt    = c(0.02,0.05),
-      zr     = c(0.45,0.55),
-      sdrift = c(0.01,0.1),
-      sndt   = c(0.01,0.1),
-      szr    = c(0.01,0.1)
+      zr     = c(0.45,0.55)
     )
   ),
   "4par" = list(
@@ -41,17 +34,12 @@
       drift = "Drift rate = Average rate of evidence accumulation of the decision processes",
       bound = "Boundary separation = Distance between the decision boundaries that need to be reached",
       ndt   = "Non-decision time = Additional time required beyond the evidence accumulation process",
-      zr    = "Relative starting point = Starting point between the decision thresholds relative to the upper bound.",
-      sdrift = "Trial-to-trial variability in the drift rate",
-      sndt   = "Trial-to-trial variability in the non-decision time",
-      szr    = "Trial-to-trial variability in the relative starting point"
+      zr    = "Relative starting point = Starting point between the decision thresholds relative to the upper bound."
     ),
     links = list(
-      drift = "identity", bound = "log", ndt = "log", zr = "logit",
-      sdrift = "identity", sndt = "identity", szr = "identity"
+      drift = "identity", bound = "log", ndt = "log", zr = "logit"
     ),
     fixed_parameters = list(
-      sdrift = 0, sndt = 0, szr = 0
     ),
     priors = list(
       drift = list(main = "cauchy(0,1)", effects = "normal(0,0.5)"),
@@ -64,58 +52,19 @@
       drift  = c(-1,1),
       bound  = c(1,2),
       ndt    = c(0.02,0.05),
-      zr     = c(0.45,0.55),
-      sdrift = c(0.01,0.1),
-      sndt   = c(0.01,0.1),
-      szr    = c(0.01,0.1)
-    )
-  ),
-  "7par" = list(
-    parameters = list(
-      drift  = "Drift rate = Average rate of evidence accumulation of the decision processes",
-      bound  = "Boundary separation = Distance between the decision boundaries that need to be reached",
-      ndt    = "Non-decision time = Additional time required beyond the evidence accumulation process",
-      zr     = "Relative starting point = Starting point between the decision thresholds relative to the upper bound.",
-      sdrift = "Trial-to-trial variability in the drift rate",
-      sndt   = "Trial-to-trial variability in the non-decision time",
-      szr    = "Trial-to-trial variability in the relative starting point"
-    ),
-    links = list(
-      drift = "identity", bound = "log", ndt = "log", zr = "logit",
-      sdrift = "log", sndt = "log", szr = "logit"
-    ),
-    fixed_parameters = list(),
-    priors = list(
-      drift  = list(main = "cauchy(0,1)", effects = "normal(0,0.5)"),
-      bound  = list(main = "normal(0,0.5)", effects = "normal(0,0.5)"),
-      ndt    = list(main = "normal(-1.5,0.5)", effects = "normal(0,0.3)"),
-      zr     = list(main = "normal(0,0.5)", effects = "normal(0,0.3)"),
-      sdrift = list(main = "normal(0,0.3)", effects = "normal(0,0.3)"),
-      sndt   = list(main = "normal(-2.5,0.3)", effects = "normal(0,0.3)"),
-      szr    = list(main = "normal(0,0.2)", effects = "normal(0,0.3)")
-    ),
-    init_ranges = list(
-      mu    = c(0,1),
-      drift  = c(-1,1),
-      bound  = c(1,2),
-      ndt    = c(0.02,0.05),
-      zr     = c(0.45,0.55),
-      sdrift = c(0.1,1),
-      sndt   = c(0.01,0.1),
-      szr    = c(0.45,0.55)
+      zr     = c(0.45,0.55)
     )
   )
 )
 
-.model_ddm <- function(rt = NULL, response = NULL, links = NULL, version = "7par", call = NULL, ...) {
+.model_ddm <- function(rt = NULL, response = NULL, links = NULL, version = "4par", call = NULL, ...) {
   # accomodate legacy versions that were introduced in the ESCoP 2025 workshop
   if(grepl("_",version)) {
     legacy_version <- version
     version <- switch(
       version,
       three_par = "3par",
-      four_par = "4par",
-      seven_par = "7par"
+      four_par = "4par"
     )
     warning(glue::glue("You have passed an outdated version label: {legacy_version}\n",
                        "  We will internally convert the version to the corresponding current version label: {version}"))
@@ -313,14 +262,13 @@ configure_model.ddm <- function(model, data, formula) {
   formula <- bmf2bf(model, formula)
 
   # construct the family & add to formula object
-  ddm_family <- function(link_drift = "identity", link_bound = "log", link_ndt = "log", link_zr = "logit",
-                         link_sdrift = "log", link_sndt = "log", link_szr = "log") {
+  ddm_family <- function(link_drift = "identity", link_bound = "log", link_ndt = "log", link_zr = "logit") {
     brms::custom_family(
       'ddm',
-      dpars = c("mu","drift","bound","ndt","zr","sdrift","sndt","szr"),
-      links = c("identity",link_drift, link_bound, link_ndt, link_zr, link_sdrift, link_sndt, link_szr),
-      lb = c(NA,NA,0.1, 0,0,0 ,0 ,0),
-      ub = c(NA,NA,NA ,NA,1,NA,NA,NA),
+      dpars = c("mu","drift","bound","ndt","zr"),
+      links = c("identity",link_drift, link_bound, link_ndt, link_zr),
+      lb = c(NA,NA,0.1, 0,0),
+      ub = c(NA,NA,NA ,NA,1),
       type = 'real',
       vars = 'dec[n]',
       loop = TRUE,
@@ -332,10 +280,7 @@ configure_model.ddm <- function(model, data, formula) {
     link_drift = model$links$drift,
     link_bound = model$links$bound,
     link_ndt = model$links$ndt,
-    link_zr = model$links$zr,
-    link_sdrift = model$links$sdrift,
-    link_sndt = model$links$sndt,
-    link_szr = model$links$szr
+    link_zr = model$links$zr
   )
 
   # prepare initial stanvars to pass to brms, model formula and priors
@@ -356,9 +301,6 @@ log_lik_ddm <- function(i, prep) {
     bound = brms::get_dpar(prep, "bound", i = i),
     ndt = brms::get_dpar(prep, "ndt", i = i),
     zr = brms::get_dpar(prep, "zr", i = i),
-    szr = brms::get_dpar(prep, "szr", i = i),
-    sdrift = brms::get_dpar(prep, "sdrift", i = i),
-    sndt = brms::get_dpar(prep, "sndt", i = i),
     log = TRUE
   )
 }
@@ -371,10 +313,7 @@ posterior_predict_ddm <- function(i, prep, ...) {
     drift = brms::get_dpar(prep, "drift", i = i),
     bound = brms::get_dpar(prep, "bound", i = i),
     ndt = brms::get_dpar(prep, "ndt", i = i),
-    zr = brms::get_dpar(prep, "zr", i = i),
-    szr = brms::get_dpar(prep, "szr", i = i),
-    sdrift = brms::get_dpar(prep, "sdrift", i = i),
-    sndt = brms::get_dpar(prep, "sndt", i = i)
+    zr = brms::get_dpar(prep, "zr", i = i)
   )
 
   if(!is.null(dots$negative_rt) && dots$negative_rt) {

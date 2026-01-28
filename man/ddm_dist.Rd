@@ -6,20 +6,9 @@
 \alias{rddm}
 \title{Distribution function for the Diffusion Decision Model (\code{ddm})}
 \usage{
-dddm(
-  rt,
-  response,
-  drift,
-  bound,
-  ndt,
-  zr = 0.5,
-  sdrift = 0,
-  sndt = 0,
-  szr = 0,
-  log = TRUE
-)
+dddm(rt, response, drift, bound, ndt, zr = 0.5, log = TRUE)
 
-rddm(n, drift, bound, ndt, zr = 0.5, sdrift = 0, sndt = 0, szr = 0)
+rddm(n, drift, bound, ndt, zr = 0.5)
 }
 \arguments{
 \item{rt}{Vector of response times for which the density should be returned}
@@ -33,12 +22,6 @@ rddm(n, drift, bound, ndt, zr = 0.5, sdrift = 0, sndt = 0, szr = 0)
 \item{ndt}{Non-decision time of the ddm}
 
 \item{zr}{relative starting point of the ddm}
-
-\item{sdrift}{Trial-to-trial variability of the drift rate}
-
-\item{sndt}{Trial-to-trial variability of the non-decision time}
-
-\item{szr}{Trial-to-trial variability of the relative starting point}
 
 \item{log}{Logical, indicating if log-densities should be returned (default = TRUE)}
 

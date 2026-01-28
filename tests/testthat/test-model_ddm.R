@@ -9,7 +9,6 @@ test_that("ddm model can be created with all versions", {
   
   expect_silent(ddm("rt", "response", version = "3par"))
   expect_silent(ddm("rt", "response", version = "4par"))
-  expect_silent(ddm("rt", "response", version = "7par"))
 })
 
 test_that("ddm model has correct class structure", {
@@ -35,9 +34,6 @@ test_that("ddm model parameters are correctly defined for 3par version", {
   expect_true("bound" %in% names(model$parameters))
   expect_true("ndt" %in% names(model$parameters))
   expect_equal(model$fixed_parameters$zr, 0.5)
-  expect_equal(model$fixed_parameters$sdrift, 0)
-  expect_equal(model$fixed_parameters$sndt, 0)
-  expect_equal(model$fixed_parameters$szr, 0)
 })
 
 test_that("ddm model parameters are correctly defined for 4par version", {
@@ -47,26 +43,10 @@ test_that("ddm model parameters are correctly defined for 4par version", {
   )
   
   model <- ddm("rt", "response", version = "4par")
-  expect_true("zr" %in% names(model$parameters))
-  expect_equal(model$fixed_parameters$sdrift, 0)
-  expect_equal(model$fixed_parameters$sndt, 0)
-  expect_equal(model$fixed_parameters$szr, 0)
-})
-
-test_that("ddm model parameters are correctly defined for 7par version", {
-  skip_if_not(
-    requireNamespace("cmdstanr", quietly = TRUE),
-    "cmdstanr is required for DDM models"
-  )
-  
-  model <- ddm("rt", "response", version = "7par")
   expect_true("drift" %in% names(model$parameters))
   expect_true("bound" %in% names(model$parameters))
   expect_true("ndt" %in% names(model$parameters))
   expect_true("zr" %in% names(model$parameters))
-  expect_true("sdrift" %in% names(model$parameters))
-  expect_true("sndt" %in% names(model$parameters))
-  expect_true("szr" %in% names(model$parameters))
   expect_length(model$fixed_parameters, 0)
 })
 
@@ -76,14 +56,11 @@ test_that("ddm model has correct link functions", {
     "cmdstanr is required for DDM models"
   )
   
-  model <- ddm("rt", "response", version = "7par")
+  model <- ddm("rt", "response", version = "4par")
   expect_equal(model$links$drift, "identity")
   expect_equal(model$links$bound, "log")
   expect_equal(model$links$ndt, "log")
   expect_equal(model$links$zr, "logit")
-  expect_equal(model$links$sdrift, "log")
-  expect_equal(model$links$sndt, "log")
-  expect_equal(model$links$szr, "logit")
 })
 
 test_that("ddm model accepts custom links", {
@@ -109,10 +86,6 @@ test_that("ddm legacy version names work with deprecation warning", {
   )
   expect_warning(
     ddm("rt", "response", version = "four_par"),
-    "outdated version label"
-  )
-  expect_warning(
-    ddm("rt", "response", version = "seven_par"),
     "outdated version label"
   )
 })
@@ -193,22 +166,6 @@ test_that("ddm works with mock backend - 4par version", {
   sim_data <- rddm(50, drift = 2, bound = 1.5, ndt = 0.3, zr = 0.5)
   model <- ddm("rt", "response", version = "4par")
   formula <- bmf(drift ~ 1, bound ~ 1, ndt ~ 1, zr ~ 1)
-  
-  expect_silent(bmm(formula, sim_data, model, backend = "mock", mock = 1, rename = FALSE))
-})
-
-test_that("ddm works with mock backend - 7par version", {
-  skip_on_cran()
-  skip_if_not(
-    requireNamespace("cmdstanr", quietly = TRUE),
-    "cmdstanr is required for 7par DDM version"
-  )
-  
-  sim_data <- rddm(50, drift = 2, bound = 1.5, ndt = 0.3, zr = 0.5,
-                   sdrift = 0.3, sndt = 0.05, szr = 0.1)
-  model <- ddm("rt", "response", version = "7par")
-  formula <- bmf(drift ~ 1, bound ~ 1, ndt ~ 1, zr ~ 1, 
-                 sdrift ~ 1, sndt ~ 1, szr ~ 1)
   
   expect_silent(bmm(formula, sim_data, model, backend = "mock", mock = 1, rename = FALSE))
 })

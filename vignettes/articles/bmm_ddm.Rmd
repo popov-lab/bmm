@@ -44,7 +44,7 @@ fansi::set_knit_hooks(knitr::knit_hooks, which = c("output","message","error"))
 
 The Diffusion Decision Model (DDM) is one of the most widely used cognitive
 models for analyzing response time (RT) and accuracy data in two-alternative
-forced-choice (2AFC) tasks. Originally developed by @ratcliffTheoryMemoryRetrieval1978,
+forced-choice (2AFC) tasks. Originally developed by @Ratcliff_1978,
 the DDM has become a cornerstone of cognitive psychology and neuroscience
 research on decision-making processes.
 
@@ -56,11 +56,10 @@ The DDM is ideal when:
 - You want to model trial-to-trial variability in decision processes
 - You're interested in linking cognitive parameters to neural or behavioral measures
 
-The `bmm` package provides three versions of the DDM with increasing complexity:
+The `bmm` package provides two versions of the DDM with increasing complexity:
 
 - **3-parameter version**: Simplest model with drift, boundary, and non-decision time
 - **4-parameter version**: Adds starting point bias
-- **7-parameter version**: Full model including trial-to-trial variability parameters
 
 # Theoretical Background
 
@@ -112,22 +111,51 @@ one of two absorbing boundaries at 0 (lower/incorrect) or $a$ (upper/correct).
    - Default: 0.5 (unbiased)
    - Interpretation: A priori response bias
 
-### Variability Parameters (7-parameter version)
+### Variability Parameters (7-parameter DDM)
+
+The full DDM, as described by @ratcliffDiffusionDecisionModel2008 and
+implemented by @henrichSevenparameterDiffusionModel2024, includes three
+additional parameters that capture trial-to-trial variability in the core
+parameters:
 
 5. **Drift rate variability ($s_v$ or sdrift)**: Between-trial variability in
-   drift rate.
-   - Typical range: 0 to 2
-   - Accounts for variable evidence quality across trials
+   drift rate, accounting for fluctuations in evidence quality across trials
+   (typical range: 0 to 2).
 
 6. **Non-decision time variability ($s_{t_0}$ or sndt)**: Between-trial
-   variability in non-decision time.
-   - Typical range: 0 to 0.2
-   - Accounts for variable encoding/motor times
+   variability in non-decision time, accounting for variable encoding/motor
+   times (typical range: 0 to 0.2).
 
 7. **Starting point variability ($s_z$ or szr)**: Between-trial variability in
-   starting point.
-   - Typical range: 0 to 0.5
-   - Accounts for variable response bias across trials
+   starting point, accounting for variable response bias across trials (typical
+   range: 0 to 0.5).
+
+**Why the 7-parameter version is not implemented in `bmm`**:
+
+While these variability parameters are theoretically important and can improve
+model fit, @henrichSevenparameterDiffusionModel2024 demonstrated that the
+7-parameter likelihood has prohibitively long computation times, especially for
+hierarchical Bayesian estimation. Key limitations include:
+
+- **Single-subject feasibility only**: Even with 100-300 trials, model fitting
+  can take hours. With 1500+ trials typical for robust DDM estimation, runtimes
+  extend to many hours or days.
+
+- **Hierarchical models infeasible**: The most common use case in cognitive
+  research (multiple subjects, conditions, and trials) becomes computationally
+  intractable without high-performance computing resources. A typical
+  hierarchical study (20+ subjects, 2-3 conditions, 200+ trials per condition)
+  would require weeks of computation time.
+
+- **Limited practical benefit**: For most research questions, the 3- and
+  4-parameter versions provide excellent fits and interpretable parameters,
+  making the substantial computational cost of the 7-parameter version difficult
+  to justify.
+
+For researchers specifically interested in trial-to-trial variability
+parameters, we recommend considering simulation-based inference methods (e.g.,
+BayesFlow) or fitting separate single-subject models rather than hierarchical
+approaches.
 
 ## Predictions
 
@@ -144,111 +172,9 @@ responses, including:
 
 ## Computational Efficiency Considerations
 
-The DDM likelihood requires numerical solution of the Fokker-Planck equation,
-which can be computationally demanding. @henrichSevenparameterDiffusionModel2024
-provide detailed benchmarks of their Stan implementation (which `bmm` uses).
+The DDM likelihood requires numerical solution of the Fokker-Planck equation, which can be computationally demanding for large datasets. Runtime scales approximately linearly with the number of trials. For typical datasets (100-300 trials), both 3-parameter and 4-parameter models fit quickly (< 20 seconds on modern hardware with 4 chains × 2000 iterations). Larger datasets (1500+ trials) may take several minutes for single-subject models and several hours for hierarchical models with many subjects.
 
-**Important notes about runtime**:
-
-1. **Runtime scales approximately linearly with the number of trials**
-2. **Parallelization strategy matters**: @henrichSevenparameterDiffusionModel2024 used
-   heavy **within-chain parallelization** (32-80 threads per chain), which requires
-   special cmdstanr configuration and provides modest speedups for very large datasets
-3. **Typical `bmm` usage is much faster**: The default approach of parallelizing
-   4 chains across 4 cores (without within-chain threading) runs very efficiently
-   on modern hardware (2023+ CPUs)
-
-**Typical runtime estimates for `bmm`** (4 chains × 2000 iterations, 4 cores,
-no within-chain threading, tested on modern hardware):
-
-| Model Version | 100 trials | 300 trials | 1500 trials | Feasibility for Hierarchical |
-|---------------|-----------|-----------|-------------|-----------------------------|
-| 3-parameter   | < 10 sec  | < 10 sec  | ~2-5 min    | ✓ Excellent                 |
-| 4-parameter   | < 10 sec  | < 20 sec  | ~3-7 min    | ✓ Acceptable                |
-| 7-parameter   | ~5-15 min | ~15-45 min | ~1-3 hours | ⚠️  Single-subject only     |
-
-**Note**: @henrichSevenparameterDiffusionModel2024 reported ~6-7 minutes for
-just 100 trials using 32-80 threads per chain (see their Appendix Figure S1).
-The much faster performance in typical `bmm` usage reflects both modern hardware
-improvements and efficient chain-level parallelization without the overhead of
-within-chain threading.
-
-**Important**: The 7-parameter version is substantially slower than 3par/4par. 
-Between-chain parallelization provides limited speedup when individual chains 
-take many minutes, making hierarchical models with 7par potentially infeasible 
-without HPC resources. See the 7-parameter section below for detailed feasibility 
-guidelines.
-
-**For larger datasets**, scale linearly:
-
-- **3000 trials**: ~2× the time for 1500 trials
-- **10,000 trials**: ~6-7× the time for 1500 trials
-
-### Effect of Model Complexity on Runtime
-
-**Critical consideration**: Runtime depends not just on the total number of trials,
-but also on the number of parameters being estimated. Hierarchical models with
-many subjects or experimental conditions can be substantially slower than
-single-subject models with the same total trial count.
-
-**Example comparison** (same total of 10,000 trials):
-
-- **1 subject, 10,000 trials**: Fast baseline
-- **10 subjects, 1,000 trials each**: ~2-3× slower (adds random effects per subject)
-- **50 subjects, 200 trials each**: ~5-10× slower (many random effects + correlation structure)
-- **50 subjects × 2 conditions, 100 trials each**: ~8-15× slower (adds condition effects + interactions)
-
-**Why hierarchical models are slower**:
-
-1. **More parameters**: Each subject adds random intercepts/slopes (e.g., 3-7
-   parameters per subject for random effects)
-2. **Correlation matrices**: Stan must sample correlation matrices for random
-   effects, which is computationally intensive
-3. **Increased model complexity**: More parameters means longer gradient
-   computations for each iteration
-4. **Convergence challenges**: Complex hierarchical structures may require more
-   warmup iterations
-
-**Practical implications**:
-
-- A single-subject model with 10,000 trials (3par) might take ~30-60 minutes
-- A 50-subject hierarchical model (2 conditions × 100 trials = 10,000 total trials):
-  - 3par: ~4-10 hours
-  - 4par: ~6-15 hours
-  - 7par: **likely infeasible** (days to weeks without HPC)
-- Adding experimental predictors (e.g., drift ~ condition1 * condition2) increases
-  runtime proportionally to the number of parameters
-
-**Strategies for large hierarchical models**:
-
-1. **Simplify random effects structure**: Start with random intercepts only
-   before adding random slopes
-2. **Consider non-centered parameterization**: May help with convergence (bmm
-   handles this automatically for some models)
-3. **Use more informative priors**: Helps constrain the posterior space and
-   speeds convergence
-4. **Parallel computing**: Default `cores = 4` parallelizes chains efficiently.
-   Within-chain parallelization (threading) is available but typically not needed
-   for datasets < 10,000 trials
-5. **Subset testing**: Fit to a subset of subjects first to verify model
-   specification and estimate total runtime
-
-**Recommendations for efficient model fitting**:
-
-1. Start with the 3-parameter version to test your model specification
-2. Use hierarchical priors to regularize parameter estimates
-3. Use `cores = 4` to parallelize chains (default, included in runtime estimates above)
-4. Within-chain parallelization is typically unnecessary for most datasets;
-   the default chain-level parallelization is more efficient
-5. Use informative priors when possible to speed convergence
-6. Test on a subset of data first (e.g., one participant) to verify model
-   specification before fitting the full dataset
-7. The 7-parameter version should only be used when:
-   - Working with **single-subject** data or very small samples (N < 10)
-   - Large sample sizes per condition (>500 trials per subject)
-   - Theoretical interest in variability parameters is critical
-   - Access to HPC resources if fitting hierarchical models (>10 subjects)
-   - Consider alternatives (BayesFlow, separate per-subject fits) for large hierarchical studies
+**Practical recommendations**: Start with the 3-parameter version to test your model specification. Use the default `cores = 4` to parallelize chains efficiently. For hierarchical models, consider starting with random intercepts only before adding random slopes. Test on a subset of data first to verify model specification and estimate total runtime.
 
 ## Example Dataset: Ratcliff & Rouder (1998)
 
@@ -342,8 +268,6 @@ formula_3par <- bmf(
 )
 
 # Fit the model 
-# Note: demo_data has ~260 trials, so this will take < 10 seconds
-# For larger datasets (1500 trials), expect ~2-5 minutes
 fit_3par <- bmm(
   formula = formula_3par,
   data = demo_data,
@@ -388,8 +312,6 @@ formula_4par <- bmf(
 )
 
 # Fit the model
-# With ~260 trials: < 10 seconds
-# With 1500 trials: ~3-7 minutes
 fit_4par <- bmm(
   formula = formula_4par,
   data = demo_data,
@@ -410,76 +332,6 @@ loo_compare(loo_3par, loo_4par)
 - When you suspect a priori response preferences
 - When conditions systematically favor one response
 - When testing theoretical predictions about response bias
-
-## 7-Parameter DDM with Variability
-
-The full DDM includes between-trial variability in drift, non-decision time,
-and starting point:
-
-**Note**: The 7-parameter model is not fitted in this vignette due to its
-computational intensity (~10-20 minutes for 260 trials). The code below shows
-how to specify and fit the model.
-
-```{r, eval=FALSE}
-# Define the 7-parameter model
-model_7par <- ddm(rt = "rt", 
-                  response = "response", 
-                  version = "7par")
-
-# Define the formula
-formula_7par <- bmf(
-  drift ~ 0 + source,
-  bound ~ 1,
-  ndt ~ 1,
-  zr ~ 1,
-  sdrift ~ 1,   # drift variability
-  sndt ~ 1,     # non-decision time variability
-  szr ~ 1       # starting point variability
-)
-
-# Fit the model
-# WARNING: 7par is computationally intensive!
-# With ~260 trials: ~10-20 minutes
-# With 1500 trials: ~1-3 hours (single subject)
-# Hierarchical models may not be feasible without HPC resources
-fit_7par <- bmm(
-  formula = formula_7par,
-  data = demo_data,
-  model = model_7par,
-  backend = "cmdstanr",
-  cores = 4
-)
-```
-
-**When to use the 7-parameter version**:
-
-- **Single-subject studies** with moderate to large trial counts (>500 trials)
-- Small hierarchical models with few subjects (N < 10)
-- Theoretical interest in trial-to-trial variability
-- When simpler models show systematic misfit
-- When comparing to classic DDM literature (which often uses variability parameters)
-
-**⚠️ Important computational feasibility note**:
-
-The 7-parameter DDM is **computationally intensive** and may not be feasible for 
-hierarchical models without high-performance computing (HPC) resources. Even with 
-chain-level parallelization, individual chains take substantial time due to the 
-complex likelihood calculations.
-
-**Feasibility guidelines**:
-
-- ✓ **Single-subject**: Feasible with ~1-3 hours for 1500 trials
-- ⚠️ **Small hierarchical** (5-10 subjects): Feasible but slow (~6-24 hours)
-- ❌ **Large hierarchical** (50+ subjects): Likely infeasible without HPC/within-chain
-  parallelization (32-80 threads per chain as used by @henrichSevenparameterDiffusionModel2024)
-
-**Alternative approaches for large hierarchical studies**:
-
-- Use the **3-parameter or 4-parameter versions** which are much faster and often sufficient
-- Consider **simulation-based inference** methods like BayesFlow for large-scale 
-  hierarchical DDM fitting
-- If variability parameters are critical, consider fitting separate 7-parameter 
-  models per subject rather than a full hierarchical model
 
 # Hierarchical DDM Models
 
@@ -570,21 +422,19 @@ Use information criteria to compare model fit:
 # Compute LOO for each model
 loo_3par <- loo(fit_3par)
 loo_4par <- loo(fit_4par)
-loo_7par <- loo(fit_7par)
 
 # Compare models
-loo_compare(loo_3par, loo_4par, loo_7par)
+loo_compare(loo_3par, loo_4par)
 
 # Check for influential observations
-plot(loo_7par)
+plot(loo_4par)
 ```
 
 **General findings** (from simulation studies):
 
-- 3-parameter model often sufficient when variability is low
-- 4-parameter model improves fit when response bias present
-- 7-parameter model necessary when trial-to-trial variability is substantial
-- Overfitting risks with 7-parameter model on small datasets (<100 trials)
+- 3-parameter model often sufficient for most applications
+- 4-parameter model improves fit when response bias is present
+- Model selection should balance fit quality with interpretability
 
 ## Posterior Predictive Checks
 
@@ -756,7 +606,7 @@ Based on simulation studies and practical experience:
 
 - **Minimum**: 50 trials per condition (for 3-parameter model)
 - **Adequate**: 100-200 trials per condition (for 4-parameter model)
-- **Recommended**: 200+ trials per condition (for 7-parameter model)
+- **Recommended**: 200+ trials per condition for stable estimates
 - **Hierarchical models**: At least 5-10 subjects per group
 
 ## Convergence Diagnostics

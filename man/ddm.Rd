@@ -41,7 +41,7 @@ Diffusion Decision Model
 \item Henrich, F., Hartmann, R., Pratz, V., Voss, A., & Klauer, K. C. (2024). The Seven-parameter Diffusion Model: An Implementation in Stan for Bayesian Analyses. Behavior Research Methods, 56(4), 3102-3116. https://doi.org/10.3758/s13428-023-02179-1
 }
 \itemize{
-\item \strong{Version:} 7par
+\item \strong{Version:} 4par
 \item \strong{Requirements:}
 \itemize{
 \item The response time should be in seconds and represent the time between onset of the target stimulus until the response execution
@@ -57,14 +57,11 @@ Diffusion Decision Model
 \item \code{bound}: Boundary separation = Distance between the decision boundaries that need to be reached
 \item \code{ndt}: Non-decision time = Additional time required beyond the evidence accumulation process
 \item \code{zr}: Relative starting point = Starting point between the decision thresholds relative to the upper bound.
-\item \code{sdrift}: Trial-to-trial variability in the drift rate
-\item \code{sndt}: Trial-to-trial variability in the non-decision time
-\item \code{szr}: Trial-to-trial variability in the relative starting point
 }
 \item \strong{Fixed parameters:}
 \item \strong{Default parameter links:}
 \itemize{
-\item drift = identity; bound = log; ndt = log; zr = logit; sdrift = log; sndt = log; szr = logit
+\item drift = identity; bound = log; ndt = log; zr = logit
 }
 \item \strong{Default priors:}
 \itemize{
@@ -86,21 +83,6 @@ Diffusion Decision Model
 \item \code{zr}:
 \itemize{
 \item \code{main}: normal(0,0.5)
-\item \code{effects}: normal(0,0.3)
-}
-\item \code{sdrift}:
-\itemize{
-\item \code{main}: normal(0,0.3)
-\item \code{effects}: normal(0,0.3)
-}
-\item \code{sndt}:
-\itemize{
-\item \code{main}: normal(-2.5,0.3)
-\item \code{effects}: normal(0,0.3)
-}
-\item \code{szr}:
-\itemize{
-\item \code{main}: normal(0,0.2)
 \item \code{effects}: normal(0,0.3)
 }
 }

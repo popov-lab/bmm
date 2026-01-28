@@ -294,15 +294,6 @@ test_that("dddm vectorizes correctly with vector rt/response and vector paramete
   expect_false(any(is.na(res)))
 })
 
-test_that("dddm handles variability parameters", {
-  res_no_var <- dddm(0.5, 1, drift = 2, bound = 1.5, ndt = 0.3, 
-                     sdrift = 0, sndt = 0, szr = 0)
-  res_with_var <- dddm(0.5, 1, drift = 2, bound = 1.5, ndt = 0.3, 
-                       sdrift = 0.5, sndt = 0.05, szr = 0.1)
-  expect_type(res_with_var, "double")
-  expect_false(identical(res_no_var, res_with_var))
-})
-
 test_that("dddm rejects negative RTs", {
   expect_error(
     dddm(-0.5, 1, drift = 2, bound = 1.5, ndt = 0.3),
@@ -357,13 +348,6 @@ test_that("rddm samples from correct boundaries based on drift", {
 test_that("rddm respects non-decision time", {
   res <- rddm(100, drift = 2, bound = 1.5, ndt = 0.3)
   expect_true(all(res$rt >= 0.3))
-})
-
-test_that("rddm handles variability parameters", {
-  res <- rddm(10, drift = 2, bound = 1.5, ndt = 0.3,
-              sdrift = 0.5, sndt = 0.05, szr = 0.1)
-  expect_s3_class(res, "data.frame")
-  expect_equal(nrow(res), 10)
 })
 
 test_that("rddm starting point bias affects response proportions", {
