@@ -1008,22 +1008,18 @@ flag_contaminant_rts <- function(
     threshold = 0.5,
     what_return = c("data", "diagnostics", "all")) {
   
-  # Match arguments
   stop_missing_args()
   version <- match.arg(version)
   distribution <- match.arg(distribution)
   output <- match.arg(output)
   what_return <- match.arg(what_return)
 
-  # Validate data structure (reuse pattern from ezdm_summary_stats)
   data <- try(as.data.frame(data), silent = TRUE)
   stopif(is_try_error(data), "Argument 'data' must be coercible to a data.frame")
   stopif(!isTRUE(nrow(data) > 0L), "Argument 'data' does not contain observations")
 
-  # Validate column names
   stopif(not_in(rt, colnames(data)), "RT variable '{rt}' not found in data")
   
-  # Validate response for separate version
   if (version == "4par") {
     stopif(
       is.null(response),
@@ -1035,12 +1031,10 @@ flag_contaminant_rts <- function(
     )
   }
 
-  # Validate grouping variables
   for (gv in .by) {
     stopif(not_in(gv, colnames(data)), "Grouping variable '{gv}' not found in data")
   }
 
-  # Validate contaminant_bound
   stopif(length(contaminant_bound) != 2, "contaminant_bound must be a vector of length 2")
   is_valid_bound <- function(x) {
     tolower(x) %in% c("min", "max") | suppressWarnings(!is.na(as.numeric(x)))
@@ -1054,7 +1048,6 @@ flag_contaminant_rts <- function(
     "contaminant_bound[1] must be less than contaminant_bound[2]"
   )
 
-  # Validate numeric parameters
   stopif(
     !is.numeric(init_contaminant) || init_contaminant <= 0 || init_contaminant >= 1,
     "init_contaminant must be between 0 and 1 (exclusive)"
@@ -1072,20 +1065,15 @@ flag_contaminant_rts <- function(
     "threshold must be between 0 and 1"
   )
 
-  # Warnings for potential data issues
   warnif(any(data[[rt]] > 10), "Some RT values > 10. Ensure RTs are in seconds, not milliseconds.")
   warnif(any(data[[rt]] <= 0, na.rm = TRUE), "Non-positive RT found. These values will be excluded.")
 
-  # Filter out non-positive RTs
   valid_idx <- data[[rt]] > 0 & !is.na(data[[rt]])
   data <- data[valid_idx, , drop = FALSE]
   
-  # Check if any valid data remains after filtering
   stopif(nrow(data) == 0, "No valid RT data remaining after filtering.")
 
-  # Process by groups or single group
   if (length(.by) == 0) {
-    # No grouping - process all data
     result <- .flag_rt_group(
       data = data,
       rt = rt,
@@ -1101,7 +1089,6 @@ flag_contaminant_rts <- function(
       threshold = threshold
     )
   } else {
-    # Split by grouping variables
     if (length(.by) == 1) {
       split_factor <- data[[.by]]
     } else {
@@ -1127,7 +1114,6 @@ flag_contaminant_rts <- function(
         threshold = threshold
       )
       
-      # Add grouping variables to diagnostics
       grp_values <- unique(grp_data[.by])
       grp_result$diagnostics <- cbind(grp_values[1, , drop = FALSE], 
                                        grp_result$diagnostics,
@@ -1135,7 +1121,6 @@ flag_contaminant_rts <- function(
       grp_result
     })
 
-    # Combine results
     result <- list(
       data = do.call(rbind, lapply(results_list, `[[`, "data")),
       diagnostics = do.call(rbind, lapply(results_list, `[[`, "diagnostics"))
@@ -1144,7 +1129,6 @@ flag_contaminant_rts <- function(
     rownames(result$diagnostics) <- NULL
   }
 
-  # Return based on what_return
   if (what_return == "data") {
     return(result$data)
   } else if (what_return == "diagnostics") {
@@ -1175,17 +1159,14 @@ flag_contaminant_rts <- function(
   rt_data <- data[[rt]]
   n_trials <- length(rt_data)
   
-  # Resolve bounds
   resolved_bounds <- .resolve_contaminant_bounds(contaminant_bound, rt_data)
   
   if (version == "3par") {
-    # Fit single mixture to all RTs
     fit <- .fit_rt_mixture(
       rt_data, distribution, resolved_bounds,
       init_contaminant, max_contaminant, maxit, tol
     )
     
-    # Compute trial-level contamination metrics
     if (!fit$converged || is.null(fit$params)) {
       warning2("EM did not converge for group. Returning NA for contamination metrics.",
                env.frame = -1)
@@ -1200,7 +1181,6 @@ flag_contaminant_rts <- function(
       )
     }
     
-    # Build augmented data
     data_out <- data
     data_out$contam_prob <- contam_metrics$contam_prob
     if (output %in% c("likelihood_ratio", "flag")) {
@@ -1210,7 +1190,6 @@ flag_contaminant_rts <- function(
       data_out$contam_flag <- contam_metrics$contam_flag
     }
     
-    # Build diagnostics
     diagnostics <- data.frame(
       mixture_params = I(list(fit$params)),
       contaminant_prop = fit$contaminant_prop,
@@ -1224,7 +1203,6 @@ flag_contaminant_rts <- function(
     )
     
   } else {
-    # version == "4par"
     response_data <- data[[response]]
     is_upper <- .convert_response_to_upper(response_data)
     
@@ -1233,7 +1211,6 @@ flag_contaminant_rts <- function(
     n_upper <- length(rt_upper)
     n_lower <- length(rt_lower)
     
-    # Fit separate mixtures
     fit_upper <- .fit_rt_mixture(
       rt_upper, distribution, resolved_bounds,
       init_contaminant, max_contaminant, maxit, tol
@@ -1243,7 +1220,6 @@ flag_contaminant_rts <- function(
       init_contaminant, max_contaminant, maxit, tol
     )
     
-    # Compute metrics separately
     if (!fit_upper$converged || is.null(fit_upper$params)) {
       warning2("EM did not converge for upper boundary. Returning NA.",
                env.frame = -1)
@@ -1272,7 +1248,6 @@ flag_contaminant_rts <- function(
       )
     }
     
-    # Build augmented data with NAs for opposite boundary
     data_out <- data
     data_out$contam_prob_upper <- NA_real_
     data_out$contam_prob_lower <- NA_real_
@@ -1293,7 +1268,6 @@ flag_contaminant_rts <- function(
       data_out$contam_flag_lower[!is_upper] <- contam_metrics_lower$contam_flag
     }
     
-    # Build diagnostics
     diagnostics <- data.frame(
       mixture_params_upper = I(list(fit_upper$params)),
       mixture_params_lower = I(list(fit_lower$params)),
@@ -1330,10 +1304,8 @@ flag_contaminant_rts <- function(
   pi_c <- mixture_fit$contaminant_prop
   pi_rt <- 1 - pi_c
   
-  # Uniform density
   uniform_dens <- 1 / (contaminant_bound[2] - contaminant_bound[1])
   
-  # RT distribution density for each trial
   dens_rt <- switch(distribution,
     exgaussian = dexgauss(rt_vec, params["mu"], params["sigma"],
                           params["tau"], log = FALSE),
@@ -1342,10 +1314,8 @@ flag_contaminant_rts <- function(
                             log = FALSE)
   )
   
-  # Ensure numerical stability
   dens_rt <- pmax(dens_rt, 1e-300)
   
-  # Posterior probabilities (Bayes rule)
   numer_c <- pi_c * uniform_dens
   numer_rt <- pi_rt * dens_rt
   denom <- numer_c + numer_rt
