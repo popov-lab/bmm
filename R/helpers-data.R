@@ -603,8 +603,8 @@ ezdm_summary_stats <- function(
 }
 
 # Convert response data to logical indicator for upper boundary
-# Handles: numeric (0/1), logical (TRUE/FALSE), character/factor
-# ("upper"/"lower", "correct"/"error", "acc"/"err", etc.)
+# Handles: numeric (0 or 1), logical (TRUE or FALSE), character/factor
+# ("upper" or "lower", "correct" or "error", "acc" or "err", etc.)
 # @param x Vector of response values
 # @return Logical vector where TRUE = upper boundary response
 .convert_response_to_upper <- function(x) {
@@ -631,7 +631,7 @@ ezdm_summary_stats <- function(
       any(unrecognized),
       "Unrecognized response values: \\
       {collapse_comma(unique(x[unrecognized]))}. Expected values like \\
-      'upper'/'lower', 'correct'/'error', 1/0, or TRUE/FALSE."
+      'upper', 'lower', 'correct', 'error', 1, 0, TRUE, or FALSE."
     )
 
     return(is_upper)
@@ -843,5 +843,520 @@ ezdm_summary_stats <- function(
   list(
     n_upper_adj = as.integer(n_upper_adj),
     n_trials_adj = as.integer(n_trials_adj)
+  )
+}
+
+############################################################################# !
+# FLAG_CONTAMINANT_RTS                                                   ####
+############################################################################# !
+
+#' Flag contaminant reaction times using mixture modeling
+#'
+#' @description Identifies contaminant RTs (fast guesses, attention lapses) at
+#'   the trial level using mixture modeling. Unlike [ezdm_summary_stats()] which
+#'   computes aggregated statistics, this function returns per-trial
+#'   contamination probabilities or flags to enable filtering before model fitting.
+#'
+#'   The function fits a mixture of a uniform distribution (representing
+#'   contaminants) and an RT distribution (exgaussian, lognormal, or invgaussian)
+#'   using an EM algorithm. For each trial, it computes the posterior probability
+#'   of being a contaminant.
+#'
+#' @param data A `data.frame` containing trial-level RT data
+#' @param rt Character. Name of the RT column in `data` (in seconds)
+#' @param response Character or NULL. Name of the response column. Required when
+#'   `version = "separate"`. Can be numeric (0 or 1), logical, character, or factor.
+#'   See Details for accepted response formats.
+#' @param .by Character vector or NULL. Grouping variables for separate mixture
+#'   fits (e.g., `c("subject", "condition")`). Default NULL (single group).
+#' @param version Character. Either "aggregate" (default) for single contamination
+#'   estimate across all RTs, or "separate" for separate estimates by upper/lower
+#'   boundary. Requires `response` when "separate". Mirrors the version argument
+#'   in [ezdm_summary_stats()].
+#' @param distribution Character. RT distribution for the mixture model:
+#'   "exgaussian" (default), "lognormal", or "invgaussian".
+#' @param contaminant_bound Numeric vector of length 2. Bounds `[lower, upper]`
+#'   for the uniform contaminant distribution. Can be numeric values or
+#'   "min"/"max" for data-driven bounds. Default `c(0.1, 3.0)`.
+#' @param init_contaminant Numeric. Initial contaminant proportion for EM
+#'   algorithm. Must be in (0, 1). Default 0.05.
+#' @param max_contaminant Numeric. Maximum allowed contaminant proportion. Values
+#'   exceeding this are clipped with a warning. Must be in (0, 1]. Default 0.5.
+#' @param maxit Integer. Maximum EM iterations. Default 100.
+#' @param tol Numeric. Convergence tolerance for log-likelihood. Default 1e-6.
+#' @param output Character. Type of contamination metric to compute:
+#'   - "probability" (default): Posterior probability P(contaminant | RT)
+#'   - "likelihood_ratio": Ratio of contaminant to RT likelihood
+#'   - "flag": Binary indicator (TRUE if probability > threshold)
+#' @param threshold Numeric. Threshold for binary flagging when `output = "flag"`.
+#'   Must be in the interval 0 to 1. Default 0.5.
+#' @param what_return Character. Type of output to return:
+#'   - "data" (default): Returns data.frame with contamination columns only
+#'   - "diagnostics": Returns data.frame with mixture fit diagnostics only
+#'   - "all": Returns list with both `$data` and `$diagnostics`
+#'
+#' @details
+#'
+#' ## Response Formats
+#'
+#' The `response` variable (when provided) can be in several formats:
+#' - **Numeric/Logical**: 1 or TRUE = upper boundary, 0 or FALSE = lower boundary
+#' - **Character/Factor**: "upper", "lower", "correct", "error", "acc", "err",
+#'   "1", "0", "TRUE", "FALSE", "yes", "no", "hit", "miss", "fa"
+#'
+#' ## Mixture Model
+#'
+#' The function fits: `f(RT) = π_c * Uniform(a,b) + (1-π_c) * f_RT(RT|θ)`
+#'
+#' where π_c is the contaminant proportion, Uniform(a,b) is the contaminant
+#' distribution over `contaminant_bound`, and f_RT is the specified RT
+#' distribution with parameters θ.
+#'
+#' ## Version Behavior
+#'
+#' - **version = "3par"**: Fits single mixture to all RTs. Returns
+#'   `contam_prob`, `contam_lr`, `contam_flag` columns.
+#' - **version = "4par"**: Fits separate mixtures for upper/lower boundary
+#'   RTs. Returns `contam_prob_upper`/`_lower` columns. Upper trials have NA
+#'   for `_lower` metrics and vice versa.
+#'
+#' ## Small Groups
+#'
+#' Groups with fewer than 5 valid observations return NA for contamination
+#' metrics with a warning.
+#'
+#' @return Return type depends on `what_return`:
+#'
+#' **what_return = "data"**: Data.frame with original columns plus:
+#' - `contam_prob`: Contamination probability (version="3par")
+#' - `contam_lr`: Likelihood ratio (if output != "flag")
+#' - `contam_flag`: Binary contamination flag (if output != "probability")
+#' - For version="4par": `_upper` and `_lower` suffixed columns
+#'
+#' **what_return = "diagnostics"**: Data.frame with one row per group:
+#' - Grouping variables (if `.by` specified)
+#' - `mixture_params`: List-column with fitted distribution parameters
+#' - `contaminant_prop`: Estimated contamination proportion
+#' - `converged`: EM convergence status
+#' - `iterations`, `loglik`: Fit quality metrics
+#' - `n_trials`: Number of trials
+#' - For version="4par": `_upper` and `_lower` suffixed columns
+#'
+#' **what_return = "all"**: List with `$data` and `$diagnostics` components
+#'
+#' @seealso [ezdm_summary_stats()] for aggregated RT statistics with contamination
+#'   handling
+#'
+#' @export
+#'
+#' @examples
+#' \dontrun{
+#' # Simulate data with contaminants
+#' library(bmm)
+#' set.seed(123)
+#' n <- 200
+#' rt_clean <- rexgauss(150, mu = 0.5, sigma = 0.05, tau = 0.1)
+#' rt_contam <- runif(50, 0.1, 0.2)
+#'
+#' data <- data.frame(
+#'   rt = c(rt_clean, rt_contam),
+#'   subject = 1,
+#'   trial = 1:n
+#' )
+#'
+#' # Basic usage - flag contaminants
+#' result <- flag_contaminant_rts(data, rt = "rt")
+#' data_clean <- result[!result$contam_flag, ]
+#'
+#' # Get diagnostics to check mixture fit
+#' result_all <- flag_contaminant_rts(data, rt = "rt", what_return = "all")
+#' print(result_all$diagnostics)
+#'
+#' # With grouping
+#' data_multi <- rbind(
+#'   cbind(data, condition = "A"),
+#'   cbind(data, condition = "B")
+#' )
+#' result_grouped <- flag_contaminant_rts(
+#'   data_multi,
+#'   rt = "rt",
+#'   .by = c("subject", "condition")
+#' )
+#'
+#' # Separate by response boundary (for DDM)
+#' data$response <- sample(c(0, 1), n, replace = TRUE)
+#' result_sep <- flag_contaminant_rts(
+#'   data,
+#'   rt = "rt",
+#'   response = "response",
+#'   version = "4par"
+#' )
+#' }
+flag_contaminant_rts <- function(
+    data,
+    rt,
+    response = NULL,
+    .by = NULL,
+    version = c("3par", "4par"),
+    distribution = c("exgaussian", "lognormal", "invgaussian"),
+    contaminant_bound = c(0.1, 3.0),
+    init_contaminant = 0.05,
+    max_contaminant = 0.5,
+    maxit = 100,
+    tol = 1e-6,
+    output = c("probability", "likelihood_ratio", "flag"),
+    threshold = 0.5,
+    what_return = c("data", "diagnostics", "all")) {
+  
+  # Match arguments
+  stop_missing_args()
+  version <- match.arg(version)
+  distribution <- match.arg(distribution)
+  output <- match.arg(output)
+  what_return <- match.arg(what_return)
+
+  # Validate data structure (reuse pattern from ezdm_summary_stats)
+  data <- try(as.data.frame(data), silent = TRUE)
+  stopif(is_try_error(data), "Argument 'data' must be coercible to a data.frame")
+  stopif(!isTRUE(nrow(data) > 0L), "Argument 'data' does not contain observations")
+
+  # Validate column names
+  stopif(not_in(rt, colnames(data)), "RT variable '{rt}' not found in data")
+  
+  # Validate response for separate version
+  if (version == "4par") {
+    stopif(
+      is.null(response),
+      "Argument 'response' is required when version = '4par'"
+    )
+    stopif(
+      not_in(response, colnames(data)),
+      "Response variable '{response}' not found in data"
+    )
+  }
+
+  # Validate grouping variables
+  for (gv in .by) {
+    stopif(not_in(gv, colnames(data)), "Grouping variable '{gv}' not found in data")
+  }
+
+  # Validate contaminant_bound
+  stopif(length(contaminant_bound) != 2, "contaminant_bound must be a vector of length 2")
+  is_valid_bound <- function(x) {
+    tolower(x) %in% c("min", "max") | suppressWarnings(!is.na(as.numeric(x)))
+  }
+  stopif(
+    any(!is_valid_bound(contaminant_bound)),
+    "contaminant_bound elements must be numeric or 'min'/'max'"
+  )
+  stopif(
+    all(is.numeric(contaminant_bound)) && contaminant_bound[1] >= contaminant_bound[2],
+    "contaminant_bound[1] must be less than contaminant_bound[2]"
+  )
+
+  # Validate numeric parameters
+  stopif(
+    !is.numeric(init_contaminant) || init_contaminant <= 0 || init_contaminant >= 1,
+    "init_contaminant must be between 0 and 1 (exclusive)"
+  )
+  stopif(
+    !is.numeric(max_contaminant) || max_contaminant <= 0 || max_contaminant > 1,
+    "max_contaminant must be between 0 (exclusive) and 1 (inclusive)"
+  )
+  stopif(
+    init_contaminant >= max_contaminant,
+    "init_contaminant must be less than max_contaminant"
+  )
+  stopif(
+    !is.numeric(threshold) || threshold < 0 || threshold > 1,
+    "threshold must be between 0 and 1"
+  )
+
+  # Warnings for potential data issues
+  warnif(any(data[[rt]] > 10), "Some RT values > 10. Ensure RTs are in seconds, not milliseconds.")
+  warnif(any(data[[rt]] <= 0, na.rm = TRUE), "Non-positive RT found. These values will be excluded.")
+
+  # Filter out non-positive RTs
+  valid_idx <- data[[rt]] > 0 & !is.na(data[[rt]])
+  data <- data[valid_idx, , drop = FALSE]
+  
+  # Check if any valid data remains after filtering
+  stopif(nrow(data) == 0, "No valid RT data remaining after filtering.")
+
+  # Process by groups or single group
+  if (length(.by) == 0) {
+    # No grouping - process all data
+    result <- .flag_rt_group(
+      data = data,
+      rt = rt,
+      response = response,
+      version = version,
+      distribution = distribution,
+      contaminant_bound = contaminant_bound,
+      init_contaminant = init_contaminant,
+      max_contaminant = max_contaminant,
+      maxit = maxit,
+      tol = tol,
+      output = output,
+      threshold = threshold
+    )
+  } else {
+    # Split by grouping variables
+    if (length(.by) == 1) {
+      split_factor <- data[[.by]]
+    } else {
+      split_factor <- interaction(data[.by], drop = TRUE)
+    }
+
+    split_data <- split(data, split_factor)
+
+    results_list <- lapply(names(split_data), function(grp_name) {
+      grp_data <- split_data[[grp_name]]
+      grp_result <- .flag_rt_group(
+        data = grp_data,
+        rt = rt,
+        response = response,
+        version = version,
+        distribution = distribution,
+        contaminant_bound = contaminant_bound,
+        init_contaminant = init_contaminant,
+        max_contaminant = max_contaminant,
+        maxit = maxit,
+        tol = tol,
+        output = output,
+        threshold = threshold
+      )
+      
+      # Add grouping variables to diagnostics
+      grp_values <- unique(grp_data[.by])
+      grp_result$diagnostics <- cbind(grp_values[1, , drop = FALSE], 
+                                       grp_result$diagnostics,
+                                       row.names = NULL)
+      grp_result
+    })
+
+    # Combine results
+    result <- list(
+      data = do.call(rbind, lapply(results_list, `[[`, "data")),
+      diagnostics = do.call(rbind, lapply(results_list, `[[`, "diagnostics"))
+    )
+    rownames(result$data) <- NULL
+    rownames(result$diagnostics) <- NULL
+  }
+
+  # Return based on what_return
+  if (what_return == "data") {
+    return(result$data)
+  } else if (what_return == "diagnostics") {
+    return(result$diagnostics)
+  } else {
+    return(result)
+  }
+}
+
+# Helper function to process a single group
+# @param data Data.frame for a single group
+# @param rt Character. Name of RT column
+# @param response Character or NULL. Name of response column
+# @param version Character. "3par" or "4par"
+# @param distribution Character. RT distribution type
+# @param contaminant_bound Numeric(2). Bounds for uniform distribution
+# @param init_contaminant Numeric. Initial contaminant proportion
+# @param max_contaminant Numeric. Maximum contaminant proportion
+# @param maxit Integer. Maximum EM iterations
+# @param tol Numeric. Convergence tolerance
+# @param output Character. Output type
+# @param threshold Numeric. Threshold for flagging
+# @return List with $data (augmented data.frame) and $diagnostics (fit info)
+.flag_rt_group <- function(data, rt, response, version, distribution,
+                           contaminant_bound, init_contaminant, max_contaminant,
+                           maxit, tol, output, threshold) {
+  
+  rt_data <- data[[rt]]
+  n_trials <- length(rt_data)
+  
+  # Resolve bounds
+  resolved_bounds <- .resolve_contaminant_bounds(contaminant_bound, rt_data)
+  
+  if (version == "3par") {
+    # Fit single mixture to all RTs
+    fit <- .fit_rt_mixture(
+      rt_data, distribution, resolved_bounds,
+      init_contaminant, max_contaminant, maxit, tol
+    )
+    
+    # Compute trial-level contamination metrics
+    if (!fit$converged || is.null(fit$params)) {
+      warning2("EM did not converge for group. Returning NA for contamination metrics.",
+               env.frame = -1)
+      contam_metrics <- list(
+        contam_prob = rep(NA_real_, n_trials),
+        contam_lr = rep(NA_real_, n_trials),
+        contam_flag = rep(NA, n_trials)
+      )
+    } else {
+      contam_metrics <- .compute_trial_contam_metrics(
+        rt_data, fit, distribution, resolved_bounds, threshold
+      )
+    }
+    
+    # Build augmented data
+    data_out <- data
+    data_out$contam_prob <- contam_metrics$contam_prob
+    if (output %in% c("likelihood_ratio", "flag")) {
+      data_out$contam_lr <- contam_metrics$contam_lr
+    }
+    if (output %in% c("flag", "probability")) {
+      data_out$contam_flag <- contam_metrics$contam_flag
+    }
+    
+    # Build diagnostics
+    diagnostics <- data.frame(
+      mixture_params = I(list(fit$params)),
+      contaminant_prop = fit$contaminant_prop,
+      converged = fit$converged,
+      iterations = fit$iterations,
+      loglik = if (fit$converged) fit$loglik else NA_real_,
+      n_trials = n_trials,
+      distribution = distribution,
+      method = "mixture_em",
+      stringsAsFactors = FALSE
+    )
+    
+  } else {
+    # version == "4par"
+    response_data <- data[[response]]
+    is_upper <- .convert_response_to_upper(response_data)
+    
+    rt_upper <- rt_data[is_upper]
+    rt_lower <- rt_data[!is_upper]
+    n_upper <- length(rt_upper)
+    n_lower <- length(rt_lower)
+    
+    # Fit separate mixtures
+    fit_upper <- .fit_rt_mixture(
+      rt_upper, distribution, resolved_bounds,
+      init_contaminant, max_contaminant, maxit, tol
+    )
+    fit_lower <- .fit_rt_mixture(
+      rt_lower, distribution, resolved_bounds,
+      init_contaminant, max_contaminant, maxit, tol
+    )
+    
+    # Compute metrics separately
+    if (!fit_upper$converged || is.null(fit_upper$params)) {
+      warning2("EM did not converge for upper boundary. Returning NA.",
+               env.frame = -1)
+      contam_metrics_upper <- list(
+        contam_prob = rep(NA_real_, n_upper),
+        contam_lr = rep(NA_real_, n_upper),
+        contam_flag = rep(NA, n_upper)
+      )
+    } else {
+      contam_metrics_upper <- .compute_trial_contam_metrics(
+        rt_upper, fit_upper, distribution, resolved_bounds, threshold
+      )
+    }
+    
+    if (!fit_lower$converged || is.null(fit_lower$params)) {
+      warning2("EM did not converge for lower boundary. Returning NA.",
+               env.frame = -1)
+      contam_metrics_lower <- list(
+        contam_prob = rep(NA_real_, n_lower),
+        contam_lr = rep(NA_real_, n_lower),
+        contam_flag = rep(NA, n_lower)
+      )
+    } else {
+      contam_metrics_lower <- .compute_trial_contam_metrics(
+        rt_lower, fit_lower, distribution, resolved_bounds, threshold
+      )
+    }
+    
+    # Build augmented data with NAs for opposite boundary
+    data_out <- data
+    data_out$contam_prob_upper <- NA_real_
+    data_out$contam_prob_lower <- NA_real_
+    data_out$contam_prob_upper[is_upper] <- contam_metrics_upper$contam_prob
+    data_out$contam_prob_lower[!is_upper] <- contam_metrics_lower$contam_prob
+    
+    if (output %in% c("likelihood_ratio", "flag")) {
+      data_out$contam_lr_upper <- NA_real_
+      data_out$contam_lr_lower <- NA_real_
+      data_out$contam_lr_upper[is_upper] <- contam_metrics_upper$contam_lr
+      data_out$contam_lr_lower[!is_upper] <- contam_metrics_lower$contam_lr
+    }
+    
+    if (output %in% c("flag", "probability")) {
+      data_out$contam_flag_upper <- NA
+      data_out$contam_flag_lower <- NA
+      data_out$contam_flag_upper[is_upper] <- contam_metrics_upper$contam_flag
+      data_out$contam_flag_lower[!is_upper] <- contam_metrics_lower$contam_flag
+    }
+    
+    # Build diagnostics
+    diagnostics <- data.frame(
+      mixture_params_upper = I(list(fit_upper$params)),
+      mixture_params_lower = I(list(fit_lower$params)),
+      contaminant_prop_upper = fit_upper$contaminant_prop,
+      contaminant_prop_lower = fit_lower$contaminant_prop,
+      converged_upper = fit_upper$converged,
+      converged_lower = fit_lower$converged,
+      iterations_upper = fit_upper$iterations,
+      iterations_lower = fit_lower$iterations,
+      loglik_upper = if (fit_upper$converged) fit_upper$loglik else NA_real_,
+      loglik_lower = if (fit_lower$converged) fit_lower$loglik else NA_real_,
+      n_trials_upper = n_upper,
+      n_trials_lower = n_lower,
+      distribution = distribution,
+      method = "mixture_em",
+      stringsAsFactors = FALSE
+    )
+  }
+  
+  list(data = data_out, diagnostics = diagnostics)
+}
+
+# Compute trial-level contamination metrics from mixture fit
+# @param rt_vec Numeric vector of RTs
+# @param mixture_fit List returned from .fit_rt_mixture
+# @param distribution Character. Distribution type
+# @param contaminant_bound Numeric(2). Bounds for uniform
+# @param threshold Numeric. Threshold for binary flagging
+# @return List with contam_prob, contam_lr, contam_flag vectors
+.compute_trial_contam_metrics <- function(rt_vec, mixture_fit, distribution,
+                                          contaminant_bound, threshold) {
+  
+  params <- mixture_fit$params
+  pi_c <- mixture_fit$contaminant_prop
+  pi_rt <- 1 - pi_c
+  
+  # Uniform density
+  uniform_dens <- 1 / (contaminant_bound[2] - contaminant_bound[1])
+  
+  # RT distribution density for each trial
+  dens_rt <- switch(distribution,
+    exgaussian = dexgauss(rt_vec, params["mu"], params["sigma"],
+                          params["tau"], log = FALSE),
+    lognormal = dlnorm(rt_vec, params["mu"], params["sigma"]),
+    invgaussian = dinvgauss(rt_vec, params["mu"], params["lambda"],
+                            log = FALSE)
+  )
+  
+  # Ensure numerical stability
+  dens_rt <- pmax(dens_rt, 1e-300)
+  
+  # Posterior probabilities (Bayes rule)
+  numer_c <- pi_c * uniform_dens
+  numer_rt <- pi_rt * dens_rt
+  denom <- numer_c + numer_rt
+  
+  contam_prob <- numer_c / denom
+  contam_lr <- numer_c / numer_rt
+  contam_flag <- contam_prob > threshold
+  
+  list(
+    contam_prob = contam_prob,
+    contam_lr = contam_lr,
+    contam_flag = contam_flag
   )
 }

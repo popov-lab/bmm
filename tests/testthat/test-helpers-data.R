@@ -1248,3 +1248,450 @@ test_that("ezdm_summary_stats() adjust_accuracy works with grouping", {
     expect_true(result$n_upper_adj[i] <= result$n_trials_adj[i])
   }
 })
+
+############################################################################# !
+# FLAG_CONTAMINANT_RTS TESTS                                              ####
+############################################################################# !
+
+# Helper to create test data
+.create_test_rt_data <- function(n = 100, add_contaminants = TRUE, prop_contam = 0.1) {
+  set.seed(123)
+  if (add_contaminants) {
+    n_legit <- floor((1 - prop_contam) * n)
+    n_contam <- n - n_legit
+    rt <- c(rgamma(n_legit, shape = 3, rate = 5), runif(n_contam, 0.05, 0.15))
+  } else {
+    rt <- rgamma(n, shape = 3, rate = 5)
+  }
+  data.frame(
+    rt = rt,
+    response = sample(c(0, 1), n, replace = TRUE),
+    subject = rep(1:2, each = n / 2),
+    condition = rep(c("A", "B"), times = n / 2)
+  )
+}
+
+# Section 1: Return Structure Tests ------------------------------------------
+
+test_that("flag_contaminant_rts() returns correct structure with what_return='data'", {
+  data <- .create_test_rt_data(n = 100)
+  
+  result <- flag_contaminant_rts(data, rt = "rt", what_return = "data")
+  
+  expect_s3_class(result, "data.frame")
+  expect_equal(nrow(result), 100)
+  expect_true("contam_prob" %in% names(result))
+  expect_type(result$contam_prob, "double")
+})
+
+test_that("flag_contaminant_rts() returns correct structure with what_return='diagnostics'", {
+  data <- .create_test_rt_data(n = 100)
+  
+  result <- flag_contaminant_rts(data, rt = "rt", what_return = "diagnostics")
+  
+  expect_s3_class(result, "data.frame")
+  expect_equal(nrow(result), 1)
+  expect_true(all(c("mixture_params", "contaminant_prop", "converged") %in% names(result)))
+  expect_type(result$contaminant_prop, "double")
+  expect_type(result$converged, "logical")
+})
+
+test_that("flag_contaminant_rts() returns correct structure with what_return='all'", {
+  data <- .create_test_rt_data(n = 100)
+  
+  result <- flag_contaminant_rts(data, rt = "rt", what_return = "all")
+  
+  expect_type(result, "list")
+  expect_true(all(c("data", "diagnostics") %in% names(result)))
+  expect_s3_class(result$data, "data.frame")
+  expect_s3_class(result$diagnostics, "data.frame")
+  expect_equal(nrow(result$data), 100)
+  expect_equal(nrow(result$diagnostics), 1)
+})
+
+# Section 2: Argument Validation Tests ---------------------------------------
+
+test_that("flag_contaminant_rts() validates required arguments", {
+  data <- .create_test_rt_data()
+  
+  expect_error(
+    flag_contaminant_rts(rt = "rt"),
+    "required arguments are missing"
+  )
+  
+  expect_error(
+    flag_contaminant_rts(data = data),
+    "required arguments are missing"
+  )
+})
+
+test_that("flag_contaminant_rts() validates column names", {
+  data <- .create_test_rt_data()
+  
+  expect_error(
+    flag_contaminant_rts(data, rt = "nonexistent"),
+    "not found in data"
+  )
+  
+  expect_error(
+    flag_contaminant_rts(data, rt = "rt", response = "nonexistent", version = "4par"),
+    "not found in data"
+  )
+})
+
+test_that("flag_contaminant_rts() validates version parameter", {
+  data <- .create_test_rt_data()
+  
+  expect_error(
+    flag_contaminant_rts(data, rt = "rt", version = "invalid"),
+    "should be one of"
+  )
+})
+
+test_that("flag_contaminant_rts() requires response when version='4par'", {
+  data <- .create_test_rt_data()
+  
+  expect_error(
+    flag_contaminant_rts(data, rt = "rt", version = "4par"),
+    "Argument 'response' is required when version = '4par'"
+  )
+  
+  # Should work with response provided
+  expect_silent(
+    flag_contaminant_rts(data, rt = "rt", response = "response", version = "4par")
+  )
+})
+
+test_that("flag_contaminant_rts() validates output parameter", {
+  data <- .create_test_rt_data()
+  
+  expect_error(
+    flag_contaminant_rts(data, rt = "rt", output = "invalid"),
+    "should be one of"
+  )
+})
+
+test_that("flag_contaminant_rts() validates threshold parameter", {
+  data <- .create_test_rt_data()
+  
+  expect_error(
+    flag_contaminant_rts(data, rt = "rt", threshold = -0.1),
+    "threshold must be between 0 and 1"
+  )
+  
+  expect_error(
+    flag_contaminant_rts(data, rt = "rt", threshold = 1.5),
+    "threshold must be between 0 and 1"
+  )
+  
+  # Valid threshold should work
+  expect_silent(
+    flag_contaminant_rts(data, rt = "rt", threshold = 0.5)
+  )
+})
+
+test_that("flag_contaminant_rts() warns for RTs > 10", {
+  # Mix of large and normal RTs to ensure some data remains after filtering
+  data <- data.frame(rt = c(15, 20, 25, 0.5, 0.6, 0.7, 0.8, 0.9))
+  
+  expect_warning(
+    flag_contaminant_rts(data, rt = "rt"),
+    "Some RT values > 10"
+  )
+})
+
+test_that("flag_contaminant_rts() warns for non-positive RTs", {
+  # Mix of negative and positive RTs to ensure some data remains
+  data <- data.frame(rt = c(-0.1, -0.2, 0.3, 0.5, 0.6, 0.7, 0.8, 0.9))
+  
+  expect_warning(
+    flag_contaminant_rts(data, rt = "rt"),
+    "Non-positive RT found"
+  )
+})
+
+# Section 3: Version Behavior Tests -------------------------------------------
+
+test_that("flag_contaminant_rts() version='3par' creates correct columns", {
+  data <- .create_test_rt_data()
+  
+  result <- flag_contaminant_rts(data, rt = "rt", version = "3par")
+  
+  expect_true("contam_prob" %in% names(result))
+  expect_false(any(grepl("_upper|_lower", names(result))))
+})
+
+test_that("flag_contaminant_rts() version='4par' creates boundary-specific columns", {
+  data <- .create_test_rt_data()
+  
+  result <- flag_contaminant_rts(
+    data, rt = "rt", response = "response", version = "4par"
+  )
+  
+  expect_true("contam_prob_upper" %in% names(result))
+  expect_true("contam_prob_lower" %in% names(result))
+  expect_false("contam_prob" %in% names(result))
+})
+
+test_that("flag_contaminant_rts() version='4par' handles NAs correctly", {
+  data <- .create_test_rt_data()
+  
+  result <- flag_contaminant_rts(
+    data, rt = "rt", response = "response", version = "4par"
+  )
+  
+  # Upper trials (response=1) should have NA for _lower
+  upper_idx <- result$response == 1
+  expect_true(all(is.na(result$contam_prob_lower[upper_idx])))
+  expect_true(all(!is.na(result$contam_prob_upper[upper_idx])))
+  
+  # Lower trials (response=0) should have NA for _upper
+  lower_idx <- result$response == 0
+  expect_true(all(is.na(result$contam_prob_upper[lower_idx])))
+  expect_true(all(!is.na(result$contam_prob_lower[lower_idx])))
+})
+
+test_that("flag_contaminant_rts() version='4par' handles all-one-boundary edge case", {
+  data <- data.frame(
+    rt = rgamma(50, 3, 5),
+    response = rep(1, 50)  # All upper boundary
+  )
+  
+  # Should warn that EM didn't converge for lower boundary (0 trials)
+  expect_warning(
+    result <- flag_contaminant_rts(
+      data, rt = "rt", response = "response", version = "4par",
+      what_return = "diagnostics"
+    ),
+    "EM did not converge for lower boundary"
+  )
+  
+  expect_equal(result$n_trials_upper, 50)
+  expect_equal(result$n_trials_lower, 0)
+})
+
+# Section 4: Output Type Tests ------------------------------------------------
+
+test_that("flag_contaminant_rts() output='probability' produces correct columns", {
+  data <- .create_test_rt_data()
+  
+  result <- flag_contaminant_rts(data, rt = "rt", output = "probability")
+  
+  expect_true("contam_prob" %in% names(result))
+  expect_true("contam_flag" %in% names(result))
+  expect_false("contam_lr" %in% names(result))
+})
+
+test_that("flag_contaminant_rts() output='likelihood_ratio' produces correct columns", {
+  data <- .create_test_rt_data()
+  
+  result <- flag_contaminant_rts(data, rt = "rt", output = "likelihood_ratio")
+  
+  expect_true("contam_prob" %in% names(result))
+  expect_true("contam_lr" %in% names(result))
+  expect_false("contam_flag" %in% names(result))
+})
+
+test_that("flag_contaminant_rts() output='flag' uses threshold correctly", {
+  data <- .create_test_rt_data()
+  
+  result_05 <- flag_contaminant_rts(
+    data, rt = "rt", output = "flag", threshold = 0.5
+  )
+  result_09 <- flag_contaminant_rts(
+    data, rt = "rt", output = "flag", threshold = 0.9
+  )
+  
+  expect_true("contam_flag" %in% names(result_05))
+  expect_type(result_05$contam_flag, "logical")
+  
+  # Higher threshold should flag fewer trials
+  expect_true(sum(result_09$contam_flag, na.rm = TRUE) <= 
+              sum(result_05$contam_flag, na.rm = TRUE))
+})
+
+# Section 5: Grouping Tests ---------------------------------------------------
+
+test_that("flag_contaminant_rts() handles multiple grouping variables", {
+  data <- .create_test_rt_data(n = 200)
+  
+  result <- flag_contaminant_rts(
+    data, rt = "rt", .by = c("subject", "condition"),
+    what_return = "diagnostics"
+  )
+  
+  expect_true("subject" %in% names(result))
+  expect_true("condition" %in% names(result))
+  expect_equal(nrow(result), 4)  # 2 subjects × 2 conditions
+})
+
+test_that("flag_contaminant_rts() handles no grouping", {
+  data <- .create_test_rt_data()
+  
+  result <- flag_contaminant_rts(
+    data, rt = "rt", .by = NULL, what_return = "diagnostics"
+  )
+  
+  expect_equal(nrow(result), 1)
+})
+
+test_that("flag_contaminant_rts() handles small groups gracefully", {
+  data <- data.frame(
+    rt = c(0.5, 0.6, 0.7),  # Only 3 trials
+    group = "small"
+  )
+  
+  # Should not error, but may warn or return NA
+  result <- suppressWarnings(
+    flag_contaminant_rts(data, rt = "rt", .by = "group", what_return = "diagnostics")
+  )
+  
+  expect_s3_class(result, "data.frame")
+  expect_equal(nrow(result), 1)
+})
+
+# Section 6: Response Format Tests --------------------------------------------
+
+test_that("flag_contaminant_rts() handles various response formats", {
+  n <- 100
+  rt <- rgamma(n, 3, 5)
+  
+  # Numeric 0/1
+  data1 <- data.frame(rt = rt, response = sample(c(0, 1), n, replace = TRUE))
+  expect_silent(
+    flag_contaminant_rts(data1, rt = "rt", response = "response", version = "4par")
+  )
+  
+  # Logical
+  data2 <- data.frame(rt = rt, response = sample(c(TRUE, FALSE), n, replace = TRUE))
+  expect_silent(
+    flag_contaminant_rts(data2, rt = "rt", response = "response", version = "4par")
+  )
+  
+  # Character
+  data3 <- data.frame(rt = rt, response = sample(c("upper", "lower"), n, replace = TRUE))
+  expect_silent(
+    flag_contaminant_rts(data3, rt = "rt", response = "response", version = "4par")
+  )
+  
+  # Factor
+  data4 <- data.frame(rt = rt, response = factor(sample(c(0, 1), n, replace = TRUE)))
+  expect_silent(
+    flag_contaminant_rts(data4, rt = "rt", response = "response", version = "4par")
+  )
+})
+
+# Section 7: Distribution Tests -----------------------------------------------
+
+test_that("flag_contaminant_rts() works with different distributions", {
+  data <- .create_test_rt_data()
+  
+  # All three distributions should work
+  result_exg <- flag_contaminant_rts(
+    data, rt = "rt", distribution = "exgaussian", what_return = "diagnostics"
+  )
+  result_lnorm <- flag_contaminant_rts(
+    data, rt = "rt", distribution = "lognormal", what_return = "diagnostics"
+  )
+  result_invg <- flag_contaminant_rts(
+    data, rt = "rt", distribution = "invgaussian", what_return = "diagnostics"
+  )
+  
+  expect_equal(result_exg$distribution, "exgaussian")
+  expect_equal(result_lnorm$distribution, "lognormal")
+  expect_equal(result_invg$distribution, "invgaussian")
+  
+  expect_true(result_exg$converged)
+  expect_true(result_lnorm$converged)
+  expect_true(result_invg$converged)
+})
+
+# Section 8: Detection Quality Tests ------------------------------------------
+
+test_that("flag_contaminant_rts() detects simulated contaminants", {
+  set.seed(456)
+  n <- 200
+  n_contam <- 20
+  
+  # Create data with known contaminants (very fast RTs)
+  rt_legit <- rgamma(n - n_contam, shape = 3, rate = 5)
+  rt_contam <- runif(n_contam, 0.05, 0.1)
+  
+  data <- data.frame(
+    rt = c(rt_legit, rt_contam),
+    true_type = c(rep("legit", n - n_contam), rep("contam", n_contam))
+  )
+  
+  result <- flag_contaminant_rts(data, rt = "rt", threshold = 0.5)
+  
+  # Contaminants should have higher probabilities on average
+  mean_prob_contam <- mean(result$contam_prob[data$true_type == "contam"])
+  mean_prob_legit <- mean(result$contam_prob[data$true_type == "legit"])
+  
+  expect_true(mean_prob_contam > mean_prob_legit)
+})
+
+test_that("flag_contaminant_rts() contamination probabilities are in valid range", {
+  data <- .create_test_rt_data()
+  
+  result <- flag_contaminant_rts(data, rt = "rt")
+  
+  expect_true(all(result$contam_prob >= 0 & result$contam_prob <= 1, na.rm = TRUE))
+})
+
+test_that("flag_contaminant_rts() likelihood ratios are positive", {
+  data <- .create_test_rt_data()
+  
+  result <- flag_contaminant_rts(data, rt = "rt", output = "likelihood_ratio")
+  
+  expect_true(all(result$contam_lr > 0, na.rm = TRUE))
+})
+
+# Section 9: Diagnostics Content Tests ----------------------------------------
+
+test_that("flag_contaminant_rts() diagnostics contain mixture parameters", {
+  data <- .create_test_rt_data()
+  
+  result <- flag_contaminant_rts(data, rt = "rt", what_return = "diagnostics")
+  
+  expect_true("mixture_params" %in% names(result))
+  expect_type(result$mixture_params, "list")
+  
+  # For exgaussian, should have mu, sigma, tau parameters
+  params <- result$mixture_params[[1]]
+  expect_true(all(c("mu", "sigma", "tau") %in% names(params)))
+})
+
+test_that("flag_contaminant_rts() diagnostics report convergence correctly", {
+  data <- .create_test_rt_data()
+  
+  result <- flag_contaminant_rts(data, rt = "rt", what_return = "diagnostics")
+  
+  expect_true("converged" %in% names(result))
+  expect_type(result$converged, "logical")
+  expect_true("iterations" %in% names(result))
+  expect_type(result$iterations, "integer")
+  
+  if (result$converged) {
+    expect_true("loglik" %in% names(result))
+    expect_false(is.na(result$loglik))
+  }
+})
+
+test_that("flag_contaminant_rts() diagnostics track trial counts", {
+  data <- .create_test_rt_data(n = 150)
+  
+  result_3par <- flag_contaminant_rts(
+    data, rt = "rt", version = "3par", what_return = "diagnostics"
+  )
+  expect_equal(result_3par$n_trials, 150)
+  
+  result_4par <- flag_contaminant_rts(
+    data, rt = "rt", response = "response", version = "4par", 
+    what_return = "diagnostics"
+  )
+  expect_equal(
+    result_4par$n_trials_upper + result_4par$n_trials_lower, 
+    150
+  )
+})

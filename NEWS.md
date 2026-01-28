@@ -7,6 +7,7 @@
 
 ### New features
 * New function **ezdm_summary_stats()** to compute summary statistics from trial-level RT data for the EZ-Diffusion Model.
+* * New function **flag_contaminant_rts()** for trial-level contamination detection in RT data. Identifies fast guesses and attention lapses using mixture modeling (uniform + RT distribution). Supports both 3-parameter (pooled) and 4-parameter (boundary-specific) versions, analogous to `ezdm_summary_stats()`. Returns contamination probabilities, likelihood ratios, or binary flags for filtering trials before model fitting (#307).
 
 # bmm 1.2.0
 
