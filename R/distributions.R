@@ -1219,9 +1219,6 @@ rezdm <- function(n, n_trials, drift, bound, ndt, zr = 0.5, s = 1,
   vrt_upper <- rep(NA_real_, n)
   vrt_lower <- rep(NA_real_, n)
 
-  # identify near-zero drift cases
-  zero_drift <- abs(drift) < 1e-6
-
   # zero-drift formulas
   if (any(zero_drift)) {
     z_ <- z[zero_drift]
