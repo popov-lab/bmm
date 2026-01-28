@@ -93,3 +93,4 @@ articles:
     desc: Fitting models to choice reaction time tasks
     contents:
     - articles/bmm_ezdm
+    - articles/bmm_rt_contamination
