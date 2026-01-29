@@ -22,7 +22,6 @@
       ndt   = list(main = "normal(-1.5,0.5)", effects = "normal(0,0.3)")
     ),
     init_ranges = list(
-      mu    = c(0,1),
       drift  = c(-1,1),
       bound  = c(1,2),
       ndt    = c(0.02,0.05),
@@ -48,7 +47,6 @@
       zr    = list(main = "normal(0,0.5)", effects = "normal(0,0.3)")
     ),
     init_ranges = list(
-      mu    = c(0,1),
       drift  = c(-1,1),
       bound  = c(1,2),
       ndt    = c(0.02,0.05),
@@ -92,7 +90,7 @@
       fixed_parameters = .ddm_version_table[[version]][["fixed_parameters"]],
       default_priors = .ddm_version_table[[version]][["priors"]],
       init_ranges = .ddm_version_table[[version]][["init_ranges"]],
-      void_mu = FALSE
+      void_mu = TRUE
     ),
     class = c("bmmodel", "ddm"),
     call = call
