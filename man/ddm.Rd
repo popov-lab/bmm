@@ -5,7 +5,7 @@
 \alias{ddm}
 \title{Diffusion Decision Model}
 \usage{
-ddm(rt, response, links = NULL, version = "4par", ...)
+ddm(rt, response, links = NULL, version = NULL, ...)
 }
 \arguments{
 \item{rt}{Name of the reaction time variable coding reaction time in seconds in the data.}
@@ -14,7 +14,7 @@ ddm(rt, response, links = NULL, version = "4par", ...)
 
 \item{links}{A list of links for the parameters.}
 
-\item{version}{A character label for the version of the model. Can be empty or NULL if there is only one version.}
+\item{version}{Deprecated and ignored; kept for backward compatibility.}
 
 \item{...}{used internally for testing, ignore it}
 }
@@ -41,7 +41,6 @@ Diffusion Decision Model
 \item Henrich, F., Hartmann, R., Pratz, V., Voss, A., & Klauer, K. C. (2024). The Seven-parameter Diffusion Model: An Implementation in Stan for Bayesian Analyses. Behavior Research Methods, 56(4), 3102-3116. https://doi.org/10.3758/s13428-023-02179-1
 }
 \itemize{
-\item \strong{Version:} 4par
 \item \strong{Requirements:}
 \itemize{
 \item The response time should be in seconds and represent the time between onset of the target stimulus until the response execution
@@ -59,6 +58,9 @@ Diffusion Decision Model
 \item \code{zr}: Relative starting point = Starting point between the decision thresholds relative to the upper bound.
 }
 \item \strong{Fixed parameters:}
+\itemize{
+\item \code{zr} = 0
+}
 \item \strong{Default parameter links:}
 \itemize{
 \item drift = identity; bound = log; ndt = log; zr = logit
@@ -88,6 +90,12 @@ Diffusion Decision Model
 }
 }
 }
+\section{Default behavior}{
+
+By default, \code{zr} is fixed at 0. If you want to estimate \code{zr}, add a formula
+for \code{zr} in your \code{bmf()} call.
+}
+
 \examples{
 \dontrun{
 # put a full example here (see 'R/model_mixture3p.R' for an example)

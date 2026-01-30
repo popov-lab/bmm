@@ -1,14 +1,13 @@
 # Test DDM model specification and integration
 
-test_that("ddm model can be created with all versions", {
+test_that("ddm model can be created", {
   # All DDM versions require cmdstanr (use Wiener likelihood not in rstan)
   skip_if_not(
     requireNamespace("cmdstanr", quietly = TRUE),
     "cmdstanr is required for DDM models"
   )
-  
-  expect_silent(ddm("rt", "response", version = "3par"))
-  expect_silent(ddm("rt", "response", version = "4par"))
+
+  expect_silent(ddm("rt", "response"))
 })
 
 test_that("ddm model has correct class structure", {
@@ -16,38 +15,24 @@ test_that("ddm model has correct class structure", {
     requireNamespace("cmdstanr", quietly = TRUE),
     "cmdstanr is required for DDM models"
   )
-  
-  model <- ddm("rt", "response", version = "3par")
+
+  model <- ddm("rt", "response")
   expect_s3_class(model, "bmmodel")
   expect_s3_class(model, "ddm")
-  expect_s3_class(model, "ddm_3par")
 })
 
-test_that("ddm model parameters are correctly defined for 3par version", {
+test_that("ddm model parameters are correctly defined", {
   skip_if_not(
     requireNamespace("cmdstanr", quietly = TRUE),
     "cmdstanr is required for DDM models"
   )
-  
-  model <- ddm("rt", "response", version = "3par")
-  expect_true("drift" %in% names(model$parameters))
-  expect_true("bound" %in% names(model$parameters))
-  expect_true("ndt" %in% names(model$parameters))
-  expect_equal(model$fixed_parameters$zr, 0.5)
-})
 
-test_that("ddm model parameters are correctly defined for 4par version", {
-  skip_if_not(
-    requireNamespace("cmdstanr", quietly = TRUE),
-    "cmdstanr is required for DDM models"
-  )
-  
-  model <- ddm("rt", "response", version = "4par")
+  model <- ddm("rt", "response")
   expect_true("drift" %in% names(model$parameters))
   expect_true("bound" %in% names(model$parameters))
   expect_true("ndt" %in% names(model$parameters))
   expect_true("zr" %in% names(model$parameters))
-  expect_length(model$fixed_parameters, 0)
+  expect_equal(model$fixed_parameters$zr, 0)
 })
 
 test_that("ddm model has correct link functions", {
@@ -56,7 +41,7 @@ test_that("ddm model has correct link functions", {
     "cmdstanr is required for DDM models"
   )
   
-  model <- ddm("rt", "response", version = "4par")
+  model <- ddm("rt", "response")
   expect_equal(model$links$drift, "identity")
   expect_equal(model$links$bound, "log")
   expect_equal(model$links$ndt, "log")
@@ -70,24 +55,22 @@ test_that("ddm model accepts custom links", {
   )
   
   custom_links <- list(drift = "log")
-  model <- ddm("rt", "response", version = "3par", links = custom_links)
+  model <- ddm("rt", "response", links = custom_links)
   expect_equal(model$links$drift, "log")
 })
 
-test_that("ddm legacy version names work with deprecation warning", {
+test_that("ddm fixed parameters are updated by formula", {
   skip_if_not(
     requireNamespace("cmdstanr", quietly = TRUE),
     "cmdstanr is required for DDM models"
   )
-  
-  expect_warning(
-    ddm("rt", "response", version = "three_par"),
-    "outdated version label"
-  )
-  expect_warning(
-    ddm("rt", "response", version = "four_par"),
-    "outdated version label"
-  )
+
+  model <- ddm("rt", "response")
+  expect_equal(model$fixed_parameters$zr, 0)
+
+  formula_free_zr <- bmf(drift ~ 1, bound ~ 1, ndt ~ 1, zr ~ 1)
+  updated <- update_model_fixed_parameters(model, formula_free_zr)
+  expect_false("zr" %in% names(updated$fixed_parameters))
 })
 
 test_that("ddm check_data validates rt variable", {
@@ -96,7 +79,7 @@ test_that("ddm check_data validates rt variable", {
     "cmdstanr is required for DDM models"
   )
   
-  model <- ddm("rt", "response", version = "3par")
+  model <- ddm("rt", "response")
   
   # Valid data
   valid_data <- data.frame(rt = c(0.5, 0.6, 0.7), response = c(1, 1, 0))
@@ -116,7 +99,7 @@ test_that("ddm check_data validates response variable", {
     "cmdstanr is required for DDM models"
   )
   
-  model <- ddm("rt", "response", version = "3par")
+  model <- ddm("rt", "response")
   
   # Invalid response codes
   invalid_data <- data.frame(rt = c(0.5, 0.6), response = c(2, 3))
@@ -132,7 +115,7 @@ test_that("ddm check_data handles missing values", {
     "cmdstanr is required for DDM models"
   )
   
-  model <- ddm("rt", "response", version = "3par")
+  model <- ddm("rt", "response")
   
   # Missing values produce a warning and are removed, not an error
   data_with_na <- data.frame(rt = c(0.5, NA, 0.7), response = c(1, 1, 0))
@@ -142,31 +125,31 @@ test_that("ddm check_data handles missing values", {
   )
 })
 
-test_that("ddm works with mock backend - 3par version", {
+test_that("ddm works with mock backend - fixed zr", {
   skip_on_cran()
   skip_if_not(
     requireNamespace("cmdstanr", quietly = TRUE),
     "cmdstanr is required for DDM models"
   )
-  
+
   sim_data <- rddm(50, drift = 2, bound = 1.5, ndt = 0.3)
-  model <- ddm("rt", "response", version = "3par")
+  model <- ddm("rt", "response")
   formula <- bmf(drift ~ 1, bound ~ 1, ndt ~ 1)
-  
+
   expect_silent(bmm(formula, sim_data, model, backend = "mock", mock = 1, rename = FALSE))
 })
 
-test_that("ddm works with mock backend - 4par version", {
+test_that("ddm works with mock backend - free zr", {
   skip_on_cran()
   skip_if_not(
     requireNamespace("cmdstanr", quietly = TRUE),
     "cmdstanr is required for DDM models"
   )
-  
+
   sim_data <- rddm(50, drift = 2, bound = 1.5, ndt = 0.3, zr = 0.5)
-  model <- ddm("rt", "response", version = "4par")
+  model <- ddm("rt", "response")
   formula <- bmf(drift ~ 1, bound ~ 1, ndt ~ 1, zr ~ 1)
-  
+
   expect_silent(bmm(formula, sim_data, model, backend = "mock", mock = 1, rename = FALSE))
 })
 
@@ -178,7 +161,7 @@ test_that("ddm formula conversion works correctly", {
   )
   
   sim_data <- rddm(50, drift = 2, bound = 1.5, ndt = 0.3)
-  model <- ddm("rt", "response", version = "3par")
+  model <- ddm("rt", "response")
   formula <- bmf(drift ~ 1, bound ~ 1, ndt ~ 1)
   
   fit <- bmm(formula, sim_data, model, backend = "mock", mock = 1, rename = FALSE)
@@ -203,7 +186,7 @@ test_that("ddm with condition effects works", {
   sim_data <- rbind(data_a, data_b)
   sim_data$condition <- factor(sim_data$condition)
   
-  model <- ddm("rt", "response", version = "3par")
+  model <- ddm("rt", "response")
   formula <- bmf(drift ~ 0 + condition, bound ~ 1, ndt ~ 1)
   
   expect_silent(bmm(formula, sim_data, model, backend = "mock", mock = 1, rename = FALSE))
@@ -228,7 +211,7 @@ test_that("ddm with hierarchical structure works", {
   sim_data <- do.call(rbind, data_list)
   sim_data$id <- factor(sim_data$id)
   
-  model <- ddm("rt", "response", version = "3par")
+  model <- ddm("rt", "response")
   formula <- bmf(drift ~ 1 + (1 | id), bound ~ 1, ndt ~ 1)
   
   expect_silent(bmm(formula, sim_data, model, backend = "mock", mock = 1, rename = FALSE))
@@ -242,7 +225,7 @@ test_that("ddm allows missing parameters with message", {
   )
   
   sim_data <- rddm(50, drift = 2, bound = 1.5, ndt = 0.3)
-  model <- ddm("rt", "response", version = "3par")
+  model <- ddm("rt", "response")
   
   # Missing ndt parameter should work with message (not error)
   formula_incomplete <- bmf(drift ~ 1, bound ~ 1)
@@ -260,7 +243,7 @@ test_that("ddm default priors are correctly set", {
   )
   
   sim_data <- rddm(50, drift = 2, bound = 1.5, ndt = 0.3)
-  model <- ddm("rt", "response", version = "3par")
+  model <- ddm("rt", "response")
   formula <- bmf(drift ~ 1, bound ~ 1, ndt ~ 1)
   
   fit <- bmm(formula, sim_data, model, backend = "mock", mock = 1, rename = FALSE)
@@ -280,7 +263,7 @@ test_that("ddm stanvars are correctly added", {
   )
   
   sim_data <- rddm(50, drift = 2, bound = 1.5, ndt = 0.3)
-  model <- ddm("rt", "response", version = "3par")
+  model <- ddm("rt", "response")
   formula <- bmf(drift ~ 1, bound ~ 1, ndt ~ 1)
   
   fit <- bmm(formula, sim_data, model, backend = "mock", mock = 1, rename = FALSE)

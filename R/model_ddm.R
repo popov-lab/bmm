@@ -2,71 +2,35 @@
 # MODELS                                                                 ####
 #############################################################################!
 # see file 'R/model_mixture3p.R' for an example
-.ddm_version_table <- list(
-  "3par" = list(
-    parameters = list(
-      drift = "Drift rate = Average rate of evidence accumulation of the decision processes",
-      bound = "Boundary separation = Distance between the decision boundaries that need to be reached",
-      ndt   = "Non-decision time = Additional time required beyond the evidence accumulation process",
-      zr     = "Relative starting point = Starting point between the decision thresholds relative to the upper bound."
-    ),
-    links = list(
-      drift = "identity", bound = "log", ndt = "log", zr = "identity"
-    ),
-    fixed_parameters = list(
-      zr = 0.5
-    ),
-    priors = list(
-      drift = list(main = "cauchy(0,1)", effects = "normal(0,0.5)"),
-      bound = list(main = "normal(0,0.5)", effects = "normal(0,0.5)"),
-      ndt   = list(main = "normal(-1.5,0.5)", effects = "normal(0,0.3)")
-    ),
-    init_ranges = list(
-      drift  = c(-1,1),
-      bound  = c(1,2),
-      ndt    = c(0.02,0.05),
-      zr     = c(0.45,0.55)
-    )
+.ddm_defaults <- list(
+  parameters = list(
+    drift = "Drift rate = Average rate of evidence accumulation of the decision processes",
+    bound = "Boundary separation = Distance between the decision boundaries that need to be reached",
+    ndt   = "Non-decision time = Additional time required beyond the evidence accumulation process",
+    zr    = "Relative starting point = Starting point between the decision thresholds relative to the upper bound."
   ),
-  "4par" = list(
-    parameters = list(
-      drift = "Drift rate = Average rate of evidence accumulation of the decision processes",
-      bound = "Boundary separation = Distance between the decision boundaries that need to be reached",
-      ndt   = "Non-decision time = Additional time required beyond the evidence accumulation process",
-      zr    = "Relative starting point = Starting point between the decision thresholds relative to the upper bound."
-    ),
-    links = list(
-      drift = "identity", bound = "log", ndt = "log", zr = "logit"
-    ),
-    fixed_parameters = list(
-    ),
-    priors = list(
-      drift = list(main = "cauchy(0,1)", effects = "normal(0,0.5)"),
-      bound = list(main = "normal(0,0.5)", effects = "normal(0,0.5)"),
-      ndt   = list(main = "normal(-1.5,0.5)", effects = "normal(0,0.3)"),
-      zr    = list(main = "normal(0,0.5)", effects = "normal(0,0.3)")
-    ),
-    init_ranges = list(
-      drift  = c(-1,1),
-      bound  = c(1,2),
-      ndt    = c(0.02,0.05),
-      zr     = c(0.45,0.55)
-    )
+  links = list(
+    drift = "identity", bound = "log", ndt = "log", zr = "logit"
+  ),
+  fixed_parameters = list(
+    zr = 0
+  ),
+  priors = list(
+    drift = list(main = "cauchy(0,1)", effects = "normal(0,0.5)"),
+    bound = list(main = "normal(0,0.5)", effects = "normal(0,0.5)"),
+    ndt   = list(main = "normal(-1.5,0.5)", effects = "normal(0,0.3)"),
+    zr    = list(main = "normal(0,0.5)", effects = "normal(0,0.3)")
+  ),
+  init_ranges = list(
+    drift  = c(-1,1),
+    bound  = c(1,2),
+    ndt    = c(0.02,0.05),
+    zr     = c(0.45,0.55)
   )
 )
 
-.model_ddm <- function(rt = NULL, response = NULL, links = NULL, version = "4par", call = NULL, ...) {
-  # accomodate legacy versions that were introduced in the ESCoP 2025 workshop
-  if(grepl("_",version)) {
-    legacy_version <- version
-    version <- switch(
-      version,
-      three_par = "3par",
-      four_par = "4par"
-    )
-    warning(glue::glue("You have passed an outdated version label: {legacy_version}\n",
-                       "  We will internally convert the version to the corresponding current version label: {version}"))
-  }
+.model_ddm <- function(rt = NULL, response = NULL, links = NULL, version = NULL, call = NULL, ...) {
+  version <- ""
   out <- structure(
     list(
       resp_vars = nlist(rt, response),
@@ -85,17 +49,16 @@
           - The response should be coded numerically: \\
           0 = lower response, 1 = upper response"
       ),
-      parameters = .ddm_version_table[[version]][["parameters"]],
-      links = .ddm_version_table[[version]][["links"]],
-      fixed_parameters = .ddm_version_table[[version]][["fixed_parameters"]],
-      default_priors = .ddm_version_table[[version]][["priors"]],
-      init_ranges = .ddm_version_table[[version]][["init_ranges"]],
+      parameters = .ddm_defaults[["parameters"]],
+      links = .ddm_defaults[["links"]],
+      fixed_parameters = .ddm_defaults[["fixed_parameters"]],
+      default_priors = .ddm_defaults[["priors"]],
+      init_ranges = .ddm_defaults[["init_ranges"]],
       void_mu = TRUE
     ),
     class = c("bmmodel", "ddm"),
     call = call
   )
-  if(!is.null(version)) class(out) <- c(class(out), paste0("ddm_",version))
   out$links[names(links)] <- links
   out
 }
@@ -109,7 +72,10 @@
 #' @param rt Name of the reaction time variable coding reaction time in seconds in the data.
 #' @param response Name of the response variable coding the response numerically (0 = lower response / incorrect, 1 = upper response / correct)
 #' @param links A list of links for the parameters.
-#' @param version A character label for the version of the model. Can be empty or NULL if there is only one version.
+#' @param version Deprecated and ignored; kept for backward compatibility.
+#' @section Default behavior:
+#' By default, `zr` is fixed at 0. If you want to estimate `zr`, add a formula
+#' for `zr` in your `bmf()` call.
 #' @param ... used internally for testing, ignore it
 #' @return An object of class `bmmodel`
 #' @keywords bmmodel
@@ -118,7 +84,7 @@
 #' \dontrun{
 #' # put a full example here (see 'R/model_mixture3p.R' for an example)
 #' }
-ddm <- function(rt, response, links = NULL, version = "4par", ...) {
+ddm <- function(rt, response, links = NULL, version = NULL, ...) {
   stopif(
     !requireNamespace("cmdstanr", quietly = TRUE),
     'The "cmdstanr" package is required for this functionality'

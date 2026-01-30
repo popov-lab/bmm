@@ -3,7 +3,6 @@ title: "The Diffusion Decision Model (ddm)"
 output: bookdown::html_document2
 author:
   - Gidon Frischkorn
-  - Ven Popov
 bibliography: REFERENCES.bib
 header-includes:
   - \usepackage{amsmath}
@@ -56,10 +55,11 @@ The DDM is ideal when:
 - You want to model trial-to-trial variability in decision processes
 - You're interested in linking cognitive parameters to neural or behavioral measures
 
-The `bmm` package provides two versions of the DDM with increasing complexity:
-
-- **3-parameter version**: Simplest model with drift, boundary, and non-decision time
-- **4-parameter version**: Adds starting point bias
+The `bmm` package provides a single DDM specification with a default fixed
+starting point. If you include a formula for `zr` in your `bmf()` call, the
+starting point becomes a freely estimated parameter. Trial-to-Trial variability 
+parameters of the DDM are currently not supported, due to feasibility for
+Bayesian hierarchical estimation.
 
 # Theoretical Background
 
@@ -86,7 +86,7 @@ one of two absorbing boundaries at 0 (lower/incorrect) or $a$ (upper/correct).
 
 ## Model Parameters
 
-### Core Parameters (3-parameter version)
+### Core Parameters
 
 1. **Drift rate ($v$)**: The average rate at which evidence accumulates toward
    the correct boundary. Higher drift rates lead to faster and more accurate
@@ -104,17 +104,17 @@ one of two absorbing boundaries at 0 (lower/incorrect) or $a$ (upper/correct).
    - Typical range: 0.1 to 0.5 seconds
    - Interpretation: Perceptual and motor latencies
 
-### Extended Parameters (4-parameter version)
+### Starting Point Bias
 
 4. **Starting point bias ($z_r$)**: Relative starting point of evidence
-   accumulation (0 = lower boundary, 1 = upper boundary).
-   - Default: 0.5 (unbiased)
-   - Interpretation: A priori response bias
+  accumulation (0 = lower boundary, 1 = upper boundary).
+  - Default: fixed at 0 (which implies $z_r = 0.5$ on the response scale)
+  - Interpretation: A priori response bias
 
 ### Variability Parameters (7-parameter DDM)
 
 The full DDM, as described by @ratcliffDiffusionDecisionModel2008 and
-implemented by @henrichSevenparameterDiffusionModel2024, includes three
+implemented by @henrichSevenparameterDiffusionModel2024 in STAN, includes three
 additional parameters that capture trial-to-trial variability in the core
 parameters:
 
@@ -138,17 +138,17 @@ model fit, @henrichSevenparameterDiffusionModel2024 demonstrated that the
 hierarchical Bayesian estimation. Key limitations include:
 
 - **Single-subject feasibility only**: Even with 100-300 trials, model fitting
-  can take hours. With 1500+ trials typical for robust DDM estimation, runtimes
-  extend to many hours or days.
+  can up to 20 minutes when using within-chain parallelization. With 1500+ trials 
+  typical for robust DDM estimation, runtimes likely extend to hours or even days.
 
 - **Hierarchical models infeasible**: The most common use case in cognitive
   research (multiple subjects, conditions, and trials) becomes computationally
   intractable without high-performance computing resources. A typical
   hierarchical study (20+ subjects, 2-3 conditions, 200+ trials per condition)
-  would require weeks of computation time.
+  would likely require weeks of computation time.
 
-- **Limited practical benefit**: For most research questions, the 3- and
-  4-parameter versions provide excellent fits and interpretable parameters,
+- **Limited practical benefit**: For most research questions, fixed- and
+  free-starting-point models provide adequate fits and interpretable parameters,
   making the substantial computational cost of the 7-parameter version difficult
   to justify.
 
@@ -172,9 +172,9 @@ responses, including:
 
 ## Computational Efficiency Considerations
 
-The DDM likelihood requires numerical solution of the Fokker-Planck equation, which can be computationally demanding for large datasets. Runtime scales approximately linearly with the number of trials. For typical datasets (100-300 trials), both 3-parameter and 4-parameter models fit quickly (< 20 seconds on modern hardware with 4 chains × 2000 iterations). Larger datasets (1500+ trials) may take several minutes for single-subject models and several hours for hierarchical models with many subjects.
+The DDM likelihood requires numerical solution of the Fokker-Planck equation, which can be computationally demanding for large datasets. Runtime scales approximately linearly with the number of trials. For typical datasets (100-300 trials), models fit quickly (< 20 seconds on modern hardware with 4 chains × 2000 iterations). Larger datasets (1500+ trials) may take several minutes for single-subject models and several hours for hierarchical models with many subjects.
 
-**Practical recommendations**: Start with the 3-parameter version to test your model specification. Use the default `cores = 4` to parallelize chains efficiently. For hierarchical models, consider starting with random intercepts only before adding random slopes. Test on a subset of data first to verify model specification and estimate total runtime.
+**Practical recommendations**: Start with the default model (fixed `zr`) to test your model specification. Use the default `cores = 4` to parallelize chains efficiently. For hierarchical models, consider starting with random intercepts only before adding random slopes. Test on a subset of data first to verify model specification and estimate total runtime.
 
 ## Example Dataset: Ratcliff & Rouder (1998)
 
@@ -250,61 +250,59 @@ ggplot(demo_data, aes(x = rt, fill = factor(response))) +
 
 # Fitting DDM Models in bmm
 
-## 3-Parameter DDM
+## DDM with Fixed Starting Point (Default)
 
 The simplest DDM with drift, boundary, and non-decision time:
 
 ```{r, eval=FALSE}
 # Define the model
-model_3par <- ddm(rt = "rt", 
-                  response = "response", 
-                  version = "3par")
+model_fixed_zr <- ddm(rt = "rt", 
+                      response = "response")
 
 # Define the formula - let drift vary by strength
-formula_3par <- bmf(
+formula_fixed_zr <- bmf(
   drift ~ 0 + source,
   bound ~ 1,
   ndt ~ 1
 )
 
 # Fit the model 
-fit_3par <- bmm(
-  formula = formula_3par,
+fit_fixed_zr <- bmm(
+  formula = formula_fixed_zr,
   data = demo_data,
-  model = model_3par,
+  model = model_fixed_zr,
   backend = "cmdstanr",
   cores = 4,
   chains = 4,
   iter = 2000,
   warmup = 1000,
-  file = "assets/bmmfit_ddm_3par_vignette"
+  file = "assets/bmmfit_ddm_fixed_zr_vignette"
 )
 
 # Examine convergence
-summary(fit_3par)
+summary(fit_fixed_zr)
 
 # Check diagnostics
-plot(fit_3par)
+plot(fit_fixed_zr)
 ```
 
-**Interpreting the 3-parameter model**:
+**Interpreting the fixed-`zr` model**:
 
 - **drift**: Higher values indicate faster evidence accumulation (easier trials)
 - **bound**: Higher values indicate more cautious responding
 - **ndt**: Time spent on non-decision processes
 
-## 4-Parameter DDM with Starting Point Bias
+## DDM with Free Starting Point Bias
 
 Adding starting point bias allows modeling a priori response preferences:
 
 ```{r, eval=FALSE}
-# Define the 4-parameter model
-model_4par <- ddm(rt = "rt", 
-                  response = "response", 
-                  version = "4par")
+# Define the model with free `zr`
+model_free_zr <- ddm(rt = "rt", 
+                     response = "response")
 
 # Define the formula
-formula_4par <- bmf(
+formula_free_zr <- bmf(
   drift ~ 0 + source,
   bound ~ 1,
   ndt ~ 1,
@@ -312,19 +310,19 @@ formula_4par <- bmf(
 )
 
 # Fit the model
-fit_4par <- bmm(
-  formula = formula_4par,
+fit_free_zr <- bmm(
+  formula = formula_free_zr,
   data = demo_data,
-  model = model_4par,
+  model = model_free_zr,
   backend = "cmdstanr",
   cores = 4,
-  file = "assets/bmmfit_ddm_4par_vignette"
+  file = "assets/bmmfit_ddm_free_zr_vignette"
 )
 
 # Compare models
-loo_3par <- loo(fit_3par)
-loo_4par <- loo(fit_4par)
-loo_compare(loo_3par, loo_4par)
+loo_fixed_zr <- loo(fit_fixed_zr)
+loo_free_zr <- loo(fit_free_zr)
+loo_compare(loo_fixed_zr, loo_free_zr)
 ```
 
 **When to use starting point bias**:
@@ -348,10 +346,9 @@ multi_subject_data <- rr98 %>%
   mutate(response = ifelse(response_num == 1, 0, 1)) %>%
   select(id, rt, response, strength)
 
-# Hierarchical 3-parameter model
+# Hierarchical model
 model_hier <- ddm(rt = "rt", 
-                  response = "response", 
-                  version = "3par")
+                  response = "response")
 
 # Formula with random effects
 formula_hier <- bmf(
@@ -414,26 +411,26 @@ fit_instruction <- bmm(
 
 # Model Comparison and Selection
 
-## Comparing DDM Versions
+## Comparing Fixed vs Free `zr`
 
 Use information criteria to compare model fit:
 
 ```{r, eval=FALSE}
 # Compute LOO for each model
-loo_3par <- loo(fit_3par)
-loo_4par <- loo(fit_4par)
+loo_fixed_zr <- loo(fit_fixed_zr)
+loo_free_zr <- loo(fit_free_zr)
 
 # Compare models
-loo_compare(loo_3par, loo_4par)
+loo_compare(loo_fixed_zr, loo_free_zr)
 
 # Check for influential observations
-plot(loo_4par)
+plot(loo_free_zr)
 ```
 
 **General findings** (from simulation studies):
 
-- 3-parameter model often sufficient for most applications
-- 4-parameter model improves fit when response bias is present
+- Fixed-`zr` model often sufficient for most applications
+- Free-`zr` model improves fit when response bias is present
 - Model selection should balance fit quality with interpretability
 
 ## Posterior Predictive Checks
@@ -442,11 +439,11 @@ Assess model adequacy by comparing predictions to data:
 
 ```{r, eval=FALSE}
 # Generate posterior predictions
-pp_3par <- posterior_predict(fit_3par)
+pp_fixed_zr <- posterior_predict(fit_fixed_zr)
 
 # Compare predicted vs observed RT distributions
 library(bayesplot)
-ppc_dens_overlay(demo_data$rt, pp_3par[1:50, ])
+ppc_dens_overlay(demo_data$rt, pp_fixed_zr[1:50, ])
 
 # Quantile-probability plots (QP plots)
 # These are the gold standard for evaluating DDM fits
@@ -512,9 +509,9 @@ custom_priors <- c(
 
 # Fit with custom priors
 fit_custom <- bmm(
-  formula = formula_3par,
+  formula = formula_fixed_zr,
   data = demo_data,
-  model = model_3par,
+  model = model_fixed_zr,
   prior = custom_priors,
   backend = "cmdstanr"
 )
@@ -536,7 +533,7 @@ formula_fixed <- bmf(
 fit_fixed <- bmm(
   formula = formula_fixed,
   data = demo_data,
-  model = model_4par,  # uses 4par model but fixes zr
+  model = model_fixed_zr,
   backend = "cmdstanr"
 )
 ```
@@ -559,7 +556,6 @@ You can customize links if needed:
 model_custom_links <- ddm(
   rt = "rt",
   response = "response",
-  version = "3par",
   links = list(drift = "log")
 )
 ```
@@ -604,8 +600,8 @@ process many datasets rapidly; use full DDM for formal inference.
 
 Based on simulation studies and practical experience:
 
-- **Minimum**: 50 trials per condition (for 3-parameter model)
-- **Adequate**: 100-200 trials per condition (for 4-parameter model)
+- **Minimum**: 50 trials per condition (fixed `zr`)
+- **Adequate**: 100-200 trials per condition (free `zr`)
 - **Recommended**: 200+ trials per condition for stable estimates
 - **Hierarchical models**: At least 5-10 subjects per group
 
@@ -625,7 +621,7 @@ Always check:
 - **Solution**: Increase `adapt_delta` (e.g., 0.95 or 0.99)
 
 **Problem**: Slow mixing / low ESS
-- **Solution**: Increase iterations, use informative priors, check reparameterization
+- **Solution**: Increase iterations, use more informative priors, check reparameterization
 
 **Problem**: Boundary estimates at extremes
 - **Solution**: Check data quality, consider more informative priors
