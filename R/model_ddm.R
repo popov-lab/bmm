@@ -13,7 +13,8 @@
     drift = "identity", bound = "log", ndt = "log", zr = "logit"
   ),
   fixed_parameters = list(
-    zr = 0
+    zr = 0,
+    mu = 0
   ),
   priors = list(
     drift = list(main = "cauchy(0,1)", effects = "normal(0,0.5)"),
@@ -30,7 +31,6 @@
 )
 
 .model_ddm <- function(rt = NULL, response = NULL, links = NULL, version = NULL, call = NULL, ...) {
-  version <- ""
   out <- structure(
     list(
       resp_vars = nlist(rt, response),
