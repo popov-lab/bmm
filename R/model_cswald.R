@@ -17,6 +17,7 @@
       s = "log"
     ),
     fixed_parameters = list(
+      mu = 0,
       s = 0
     ),
     priors = list(
@@ -26,7 +27,6 @@
       s = list(main = "normal(0,0.3)", effects = "normal(0,0.2)")
     ),
     init_ranges = list(
-      mu = c(0,1),
       drift = c(1,2),
       bound = c(1.5,2),
       ndt = c(0.025, 0.05),
@@ -49,6 +49,7 @@
       s = "log"
     ),
     fixed_parameters = list(
+      mu = 0,
       zr = 0,
       s = 0
     ),
@@ -60,7 +61,6 @@
       s = list(main = "normal(0,0.5)", effects = "normal(0,0.2)")
     ),
     init_ranges = list(
-      mu = c(0,1),
       drift = c(-0.5, 0.5),
       bound = c(1.5,2),
       ndt = c(0.025, 0.05),
@@ -312,7 +312,7 @@ check_data.cswald <- function(model, data, formula) {
   )
 
   # warn about high error rates for simple version (assumes few errors)
-  if ("cswald_simple" %in% class(model)) {
+  if (model$version == "simple") {
     error_rate <- mean(data[, response_var] == 0)
     warnif(
       error_rate > 0.20,
@@ -322,14 +322,6 @@ check_data.cswald <- function(model, data, formula) {
       substantial error rates."
     )
   }
-
-  # warn about small sample sizes
-  n_obs <- nrow(data)
-  warnif(
-    n_obs < 50,
-    "Your data contains only {n_obs} observations.\n
-    Parameter estimation may be unreliable with very small sample sizes."
-  )
 
   NextMethod("check_data")
 }

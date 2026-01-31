@@ -215,17 +215,6 @@ test_that("check_data.cswald does not warn about error rate for crisk version", 
   expect_silent(check_data(model, dat, bmf(drift ~ 1)))
 })
 
-test_that("check_data.cswald warns about small sample size", {
-  # Use crisk version to avoid error rate warning
-  model <- cswald(rt = "rt", response = "response", version = "crisk")
-  dat <- data.frame(rt = runif(30, 0.4, 1.5), response = rep(c(0, 1), 15))
-
-  expect_warning(
-    check_data(model, dat, bmf(drift ~ 1)),
-    "only.*observations"
-  )
-})
-
 test_that("check_data.cswald returns a data.frame", {
   # Use crisk version to avoid error rate warning
   model <- cswald(rt = "rt", response = "response", version = "crisk")
