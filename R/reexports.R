@@ -13,3 +13,7 @@ NULL
 #' @importFrom brms restructure
 #' @export restructure
 NULL
+
+#' @importFrom brms conditional_effects
+#' @export conditional_effects
+NULL
