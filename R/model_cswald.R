@@ -1,6 +1,6 @@
-#############################################################################!
+############################################################################# !
 # MODELS                                                                 ####
-#############################################################################!
+############################################################################# !
 
 .cswald_version_table <- list(
   simple = list(
@@ -27,10 +27,10 @@
       s = list(main = "normal(0,0.3)", effects = "normal(0,0.2)")
     ),
     init_ranges = list(
-      drift = c(1,2),
-      bound = c(1.5,2),
+      drift = c(1, 2),
+      bound = c(1.5, 2),
       ndt = c(0.025, 0.05),
-      s = c(0.95,1.05)
+      s = c(0.95, 1.05)
     )
   ),
   crisk = list(
@@ -62,10 +62,10 @@
     ),
     init_ranges = list(
       drift = c(-0.5, 0.5),
-      bound = c(1.5,2),
+      bound = c(1.5, 2),
       ndt = c(0.025, 0.05),
       zr = c(0.45, 0.55),
-      s = c(0.95,1.05)
+      s = c(0.95, 1.05)
     )
   )
 )
@@ -77,8 +77,7 @@
     links = NULL,
     version = "simple",
     call = NULL,
-    ...
-) {
+    ...) {
   out <- structure(
     list(
       resp_vars = nlist(rt, response),
@@ -91,7 +90,7 @@
         for Choice Response Times. Applied Psychological Measurement, 42(2), 116-135. https://doi.org/10.1177/0146621617710465",
       version = version,
       requirements = glue(
-        "- Reaction times should be passed in seconds","\n",
+        "- Reaction times should be passed in seconds", "\n",
         "- The response variable should be passed numerically: 0 = lower response, 1 = upper response"
       ),
       parameters = .cswald_version_table[[version]][["parameters"]],
@@ -190,9 +189,9 @@ cswald <- function(rt, response, links = NULL, version = "simple", ...) {
   )
 }
 
-#############################################################################!
+############################################################################# !
 # CHECK_DATA S3 methods                                                  ####
-#############################################################################!
+############################################################################# !
 # A check_data.* function should be defined for each class of the model.
 # If a model shares methods with other models, the shared methods should be
 # defined in helpers-data.R. Put here only the methods that are specific to
@@ -206,7 +205,7 @@ check_data.cswald <- function(model, data, formula) {
   response_var <- model$resp_vars$response
 
   # check that required variables are present
- stopif(
+  stopif(
     not_in(rt_var, colnames(data)),
     "The RT variable '{rt_var}' is not present in the data."
   )
@@ -326,9 +325,9 @@ check_data.cswald <- function(model, data, formula) {
   NextMethod("check_data")
 }
 
-#############################################################################!
+############################################################################# !
 # Convert bmmformula to brmsformla methods                               ####
-#############################################################################!
+############################################################################# !
 # A bmf2bf.* function should be defined if the default method for constructing
 # the brmsformula from the bmmformula does not apply (e.g if aterms are required).
 # The shared method for all `bmmodels` is defined in bmmformula.R.
@@ -348,9 +347,9 @@ bmf2bf.cswald <- function(model, formula) {
   brms_formula
 }
 
-#############################################################################!
+############################################################################# !
 # CONFIGURE_MODEL S3 METHODS                                             ####
-#############################################################################!
+############################################################################# !
 # Each model should have a corresponding configure_model.* function. See
 # ?configure_model for more information.
 
@@ -364,15 +363,15 @@ configure_model.cswald_simple <- function(model, data, formula) {
   formula <- bmf2bf(model, formula)
 
   # construct the family & add to formula object
-  cswald_family <- function (link_drift, link_bound, link_ndt, link_s) {
+  cswald_family <- function(link_drift, link_bound, link_ndt, link_s) {
     brms::custom_family(
-      'cswald',
+      "cswald",
       dpars = c("mu", "drift", "bound", "ndt", "s"),
       links = c("identity", link_drift, link_bound, link_ndt, link_s),
       ub = c(NA, NA, NA, NA, NA), # upper bounds for parameters
       lb = c(NA, 0, 0, 0, 0), # lower bounds for parameters
-      type = 'real', # real for continous dv, int for discrete dv
-      vars = 'dec[n]',
+      type = "real", # real for continous dv, int for discrete dv
+      vars = "dec[n]",
       loop = TRUE, # is the likelihood vectorized
       log_lik = log_lik_cswald_simple,
       posterior_predict = posterior_predict_cswald_simple
@@ -387,19 +386,18 @@ configure_model.cswald_simple <- function(model, data, formula) {
   )
 
   # prepare initial stanvars to pass to brms, model formula and priors
-  sc_path <- system.file('stan_chunks', package = 'bmm')
+  sc_path <- system.file("stan_chunks", package = "bmm")
   stan_helpers <- read_lines2(paste0(sc_path, "/cswald_helper_functions.stan"))
-  stan_functions <- read_lines2(paste0(sc_path, '/cswald_simple_functions.stan'))
+  stan_functions <- read_lines2(paste0(sc_path, "/cswald_simple_functions.stan"))
 
-  stanvars <- brms::stanvar(scode = stan_helpers, block = 'functions') +
-    brms::stanvar(scode = stan_functions, block = 'functions')
+  stanvars <- brms::stanvar(scode = stan_helpers, block = "functions") +
+    brms::stanvar(scode = stan_functions, block = "functions")
 
   # return the list
   nlist(formula, data, stanvars)
 }
 
 posterior_predict_cswald_simple <- function(i, prep, ...) {
-
   # extract parameters from posterior draws
 
   drift <- brms::get_dpar(prep, "drift", i = i)
@@ -463,13 +461,13 @@ configure_model.cswald_crisk <- function(model, data, formula) {
   # construct the family & add to formula object
   cswald_crisk_family <- function(link_drift, link_bound, link_ndt, link_zr, link_s) {
     brms::custom_family(
-      'cswald_crisk',
+      "cswald_crisk",
       dpars = c("mu", "drift", "bound", "ndt", "zr", "s"),
       links = c("identity", link_drift, link_bound, link_ndt, link_zr, link_s),
       ub = c(NA, NA, NA, NA, 1, NA), # upper bounds for parameters
       lb = c(NA, NA, 0, 0, 0, 0), # lower bounds (drift can be negative)
-      type = 'real', # real for continous dv, int for discrete dv
-      vars = 'dec[n]',
+      type = "real", # real for continous dv, int for discrete dv
+      vars = "dec[n]",
       loop = TRUE, # is the likelihood vectorized
       log_lik = log_lik_cswald_crisk,
       posterior_predict = posterior_predict_cswald_crisk
@@ -484,12 +482,12 @@ configure_model.cswald_crisk <- function(model, data, formula) {
   )
 
   # prepare initial stanvars to pass to brms, model formula and priors
-  sc_path <- system.file('stan_chunks', package = 'bmm')
+  sc_path <- system.file("stan_chunks", package = "bmm")
   stan_helpers <- read_lines2(paste0(sc_path, "/cswald_helper_functions.stan"))
-  stan_functions <- read_lines2(paste0(sc_path, '/cswald_crisk_functions.stan'))
+  stan_functions <- read_lines2(paste0(sc_path, "/cswald_crisk_functions.stan"))
 
-  stanvars <- brms::stanvar(scode = stan_helpers, block = 'functions') +
-    brms::stanvar(scode = stan_functions, block = 'functions')
+  stanvars <- brms::stanvar(scode = stan_helpers, block = "functions") +
+    brms::stanvar(scode = stan_functions, block = "functions")
 
   # return the list
   nlist(formula, data, stanvars)
