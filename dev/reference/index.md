@@ -137,6 +137,9 @@ Utility functions for transforming data and parameters
 - [`construct_m3_act_funs()`](https://venpopov.github.io/bmm/dev/reference/construct_m3_act_funs.md)
   : Get Activation Functions for different M3 versions
 
+- [`ezdm_summary_stats()`](https://venpopov.github.io/bmm/dev/reference/ezdm_summary_stats.md)
+  : Compute Robust Summary Statistics for EZ-Diffusion Model
+
 - [`k2sd()`](https://venpopov.github.io/bmm/dev/reference/k2sd.md) :
   Transform kappa of the von Mises distribution to the circular standard
   deviation

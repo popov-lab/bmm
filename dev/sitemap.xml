@@ -4,6 +4,7 @@
 <url><loc>https://venpopov.github.io/bmm/dev/LICENSE.html</loc></url>
 <url><loc>https://venpopov.github.io/bmm/dev/articles/bmm_bmmformula.html</loc></url>
 <url><loc>https://venpopov.github.io/bmm/dev/articles/bmm_extract_info.html</loc></url>
+<url><loc>https://venpopov.github.io/bmm/dev/articles/bmm_ezdm.html</loc></url>
 <url><loc>https://venpopov.github.io/bmm/dev/articles/bmm_imm.html</loc></url>
 <url><loc>https://venpopov.github.io/bmm/dev/articles/bmm_m3.html</loc></url>
 <url><loc>https://venpopov.github.io/bmm/dev/articles/bmm_mixture_models.html</loc></url>
@@ -37,6 +38,7 @@
 <url><loc>https://venpopov.github.io/bmm/dev/reference/extract_stan_blocks.html</loc></url>
 <url><loc>https://venpopov.github.io/bmm/dev/reference/ezdm.html</loc></url>
 <url><loc>https://venpopov.github.io/bmm/dev/reference/ezdm_dist.html</loc></url>
+<url><loc>https://venpopov.github.io/bmm/dev/reference/ezdm_summary_stats.html</loc></url>
 <url><loc>https://venpopov.github.io/bmm/dev/reference/fit_info.html</loc></url>
 <url><loc>https://venpopov.github.io/bmm/dev/reference/imm.html</loc></url>
 <url><loc>https://venpopov.github.io/bmm/dev/reference/index.html</loc></url>

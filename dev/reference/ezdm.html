@@ -114,9 +114,9 @@ four parameter version (version = "4par"), that allows to freely estimate the st
 <li><p><strong>Fixed parameters:</strong></p><ul><li><p><code>s</code> = 0</p></li>
 <li><p><code>mu</code> = 0</p></li>
 </ul></li>
-<li><p><strong>Default parameter links:</strong></p><ul><li><p>drift = log; bound = log; ndt = log; zr = logit; s = log</p></li>
+<li><p><strong>Default parameter links:</strong></p><ul><li><p>drift = identity; bound = log; ndt = log; zr = logit; s = log</p></li>
 </ul></li>
-<li><p><strong>Default priors:</strong></p><ul><li><p><code>drift</code>:</p><ul><li><p><code>main</code>: normal(0,1)</p></li>
+<li><p><strong>Default priors:</strong></p><ul><li><p><code>drift</code>:</p><ul><li><p><code>main</code>: cauchy(0,1)</p></li>
 <li><p><code>effects</code>: normal(0,0.5)</p></li>
 </ul></li>
 <li><p><code>bound</code>:</p><ul><li><p><code>main</code>: normal(0,0.5)</p></li>

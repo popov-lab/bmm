@@ -29,3 +29,10 @@ n-AFC, etc)
 
 - [The Multinomial / Memory Measurement Model
   (M3)](https://venpopov.github.io/bmm/dev/articles/bmm_m3.md):
+
+### Speeded decision making
+
+Fitting models to choice reaction time tasks
+
+- [The EZ-Diffusion Model
+  (EZDM)](https://venpopov.github.io/bmm/dev/articles/bmm_ezdm.md):

@@ -119,13 +119,13 @@ An object of class `bmmodel`
 
 - **Default parameter links:**
 
-  - drift = log; bound = log; ndt = log; zr = logit; s = log
+  - drift = identity; bound = log; ndt = log; zr = logit; s = log
 
 - **Default priors:**
 
   - `drift`:
 
-    - `main`: normal(0,1)
+    - `main`: cauchy(0,1)
 
     - `effects`: normal(0,0.5)
 
