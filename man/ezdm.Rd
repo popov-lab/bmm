@@ -70,13 +70,13 @@ Provide aggregated statistics for each subject and condition that model paramete
 }
 \item \strong{Default parameter links:}
 \itemize{
-\item drift = log; bound = log; ndt = log; zr = logit; s = log
+\item drift = identity; bound = log; ndt = log; zr = logit; s = log
 }
 \item \strong{Default priors:}
 \itemize{
 \item \code{drift}:
 \itemize{
-\item \code{main}: normal(0,1)
+\item \code{main}: cauchy(0,1)
 \item \code{effects}: normal(0,0.5)
 }
 \item \code{bound}:

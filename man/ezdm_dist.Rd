@@ -46,7 +46,8 @@ columns for multiple observations.}
 
 \item{n_trials}{Total number of trials}
 
-\item{drift}{Drift rate (positive, evidence accumulation rate).}
+\item{drift}{Drift rate (evidence accumulation rate; can be positive or negative
+for below-chance performance).}
 
 \item{bound}{Boundary separation (distance between decision thresholds).}
 
