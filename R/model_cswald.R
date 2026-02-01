@@ -27,6 +27,7 @@
       s = list(main = "normal(0,0.3)", effects = "normal(0,0.2)")
     ),
     init_ranges = list(
+      mu = c(-0.5, 0.5),
       drift = c(1, 2),
       bound = c(1.5, 2),
       ndt = c(0.025, 0.05),
@@ -42,6 +43,7 @@
       s = "diffusion constant"
     ),
     links = list(
+      mu = c(-0.5, 0.5),
       drift = "identity",
       bound = "log",
       ndt = "log",
