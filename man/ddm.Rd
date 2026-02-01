@@ -60,6 +60,7 @@ Diffusion Decision Model
 \item \strong{Fixed parameters:}
 \itemize{
 \item \code{zr} = 0
+\item \code{mu} = 0
 }
 \item \strong{Default parameter links:}
 \itemize{
@@ -97,8 +98,48 @@ for \code{zr} in your \code{bmf()} call.
 }
 
 \examples{
-\dontrun{
-# put a full example here (see 'R/model_mixture3p.R' for an example)
-}
+\dontshow{if (isTRUE(Sys.getenv("BMM_EXAMPLES"))) withAutoprint(\{ # examplesIf}
+# Simulate data for one subject using rddm
+set.seed(123)
+n_trials <- 500
+
+# Simulate DDM data with fixed parameters
+sim_data <- rddm(
+  n = n_trials,
+  drift = 1.5,    # drift rate
+  bound = 1.2,    # boundary separation
+  ndt = 0.3,      # non-decision time
+  zr = 0.5        # relative starting point
+)
+
+# Prepare data frame
+dat <- data.frame(
+  rt = sim_data$rt,
+  response = sim_data$response
+)
+
+# Define formula (intercept-only model)
+ff <- bmmformula(
+  drift ~ 1,
+  bound ~ 1,
+  ndt ~ 1
+)
+
+# Specify the DDM model
+model <- ddm(rt = "rt", response = "response")
+
+# Fit the model
+fit <- bmm(
+  formula = ff,
+  data = dat,
+  model = model,
+  cores = 4,
+  iter = 1000,
+  backend = "cmdstanr"
+)
+
+# Check parameter recovery
+summary(fit)
+\dontshow{\}) # examplesIf}
 }
 \keyword{bmmodel}

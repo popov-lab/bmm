@@ -32,6 +32,9 @@
 )
 
 .model_ddm <- function(rt = NULL, response = NULL, links = NULL, version = NULL, call = NULL, ...) {
+  # version is deprecated but kept for backward compatibility
+  if (is.null(version)) version <- ""
+  
   out <- structure(
     list(
       resp_vars = nlist(rt, response),
@@ -81,10 +84,48 @@
 #' @return An object of class `bmmodel`
 #' @keywords bmmodel
 #' @export
-#' @examples
-#' \dontrun{
-#' # put a full example here (see 'R/model_mixture3p.R' for an example)
-#' }
+#' @examplesIf isTRUE(Sys.getenv("BMM_EXAMPLES"))
+#' # Simulate data for one subject using rddm
+#' set.seed(123)
+#' n_trials <- 500
+#' 
+#' # Simulate DDM data with fixed parameters
+#' sim_data <- rddm(
+#'   n = n_trials,
+#'   drift = 1.5,    # drift rate
+#'   bound = 1.2,    # boundary separation
+#'   ndt = 0.3,      # non-decision time
+#'   zr = 0.5        # relative starting point
+#' )
+#' 
+#' # Prepare data frame
+#' dat <- data.frame(
+#'   rt = sim_data$rt,
+#'   response = sim_data$response
+#' )
+#' 
+#' # Define formula (intercept-only model)
+#' ff <- bmmformula(
+#'   drift ~ 1,
+#'   bound ~ 1,
+#'   ndt ~ 1
+#' )
+#' 
+#' # Specify the DDM model
+#' model <- ddm(rt = "rt", response = "response")
+#' 
+#' # Fit the model
+#' fit <- bmm(
+#'   formula = ff,
+#'   data = dat,
+#'   model = model,
+#'   cores = 4,
+#'   iter = 1000,
+#'   backend = "cmdstanr"
+#' )
+#' 
+#' # Check parameter recovery
+#' summary(fit)
 ddm <- function(rt, response, links = NULL, version = NULL, ...) {
   stopif(
     !requireNamespace("cmdstanr", quietly = TRUE),
