@@ -23,9 +23,10 @@
     zr    = list(main = "normal(0,0.5)", effects = "normal(0,0.3)")
   ),
   init_ranges = list(
+    mu = c(-0.1,0.1),
     drift  = c(-1,1),
     bound  = c(1,2),
-    ndt    = c(0.02,0.05),
+    ndt    = c(0.01,0.05),
     zr     = c(0.45,0.55)
   )
 )
