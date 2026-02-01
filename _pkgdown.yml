@@ -58,6 +58,8 @@ reference:
     desc: "Utility functions for transforming data and parameters"
   - contents:
     - has_keyword("transform")
+    - flag_contaminant_rts
+    - validate_fast_guesses
   - title: "Datasets"
     desc: "Available datasets for fitting the models"
   - contents:

@@ -916,11 +916,11 @@ ezdm_summary_stats <- function(
 #'
 #' ## Mixture Model
 #'
-#' The function fits: `f(RT) = π_c * Uniform(a,b) + (1-π_c) * f_RT(RT|θ)`
+#' The function fits: `f(RT) = pi_c * Uniform(a,b) + (1-pi_c) * f_RT(RT|theta)`
 #'
-#' where π_c is the contaminant proportion, Uniform(a,b) is the contaminant
+#' where pi_c is the contaminant proportion, Uniform(a,b) is the contaminant
 #' distribution over `contaminant_bound`, and f_RT is the specified RT
-#' distribution with parameters θ.
+#' distribution with parameters theta.
 #'
 #' ## Probabilistic Flagging
 #'
@@ -967,6 +967,7 @@ ezdm_summary_stats <- function(
 #' @seealso [ezdm_summary_stats()] for aggregated RT statistics with contamination
 #'   handling
 #'
+#' @keywords transform
 #' @export
 #'
 #' @examples
@@ -975,8 +976,8 @@ ezdm_summary_stats <- function(
 #' library(bmm)
 #' set.seed(123)
 #' n <- 200
-#' rt_clean <- rexgauss(150, mu = 0.5, sigma = 0.05, tau = 0.1)
-#' rt_contam <- runif(50, 0.1, 0.2)
+#' rt_clean <- rgamma(150, shape = 5, rate = 10)  # Right-skewed RTs
+#' rt_contam <- runif(50, 0.1, 0.2)  # Fast guesses
 #'
 #' data <- data.frame(
 #'   rt = c(rt_clean, rt_contam),
@@ -1246,7 +1247,7 @@ flag_contaminant_rts <- function(
           "(guessing would be 0.50). ",
           "{cred_mass_pct}% HDI: ",
           "[{round(fast_guess_result$hdi_lower, 2)}, {round(fast_guess_result$hdi_upper, 2)}]. ",
-          "BF₀₁ = {round(fast_guess_result$bf_01, 2)} ({fast_guess_result$bf_evidence}). ",
+          "BF_01 = {round(fast_guess_result$bf_01, 2)} ({fast_guess_result$bf_evidence}). ",
           "This suggests flagged contaminants may not be fast guesses, or there is response bias.",
           env.frame = -1
         )
@@ -1440,15 +1441,15 @@ flag_contaminant_rts <- function(
 #'
 #' @details
 #' The function performs a Bayesian test using the Beta-Binomial conjugate
-#' prior-posterior relationship. With a Beta(α, β) prior and observing n_upper
+#' prior-posterior relationship. With a Beta(alpha, beta) prior and observing n_upper
 #' "upper" responses out of n_tested trials, the posterior is:
 #'
-#' Beta(α + n_upper, β + n_lower)
+#' Beta(alpha + n_upper, beta + n_lower)
 #'
 #' The Savage-Dickey Bayes Factor compares the posterior and prior densities
 #' at the null hypothesis value (default 0.5):
 #'
-#' BF₀₁ = posterior_density(guess_prob) / prior_density(guess_prob)
+#' BF_01 = posterior_density(guess_prob) / prior_density(guess_prob)
 #'
 #' Evidence categories follow Jeffreys (1961) scale:
 #' - BF > 10: Strong evidence for guessing
@@ -1466,6 +1467,7 @@ flag_contaminant_rts <- function(
 #'
 #' @seealso [flag_contaminant_rts()] for contamination detection with optional validation
 #'
+#' @keywords transform
 #' @export
 #'
 #' @examples

@@ -76,15 +76,15 @@ or against the guessing hypothesis.
 }
 \details{
 The function performs a Bayesian test using the Beta-Binomial conjugate
-prior-posterior relationship. With a Beta(α, β) prior and observing n_upper
+prior-posterior relationship. With a Beta(alpha, beta) prior and observing n_upper
 "upper" responses out of n_tested trials, the posterior is:
 
-Beta(α + n_upper, β + n_lower)
+Beta(alpha + n_upper, beta + n_lower)
 
 The Savage-Dickey Bayes Factor compares the posterior and prior densities
 at the null hypothesis value (default 0.5):
 
-BF₀₁ = posterior_density(guess_prob) / prior_density(guess_prob)
+BF_01 = posterior_density(guess_prob) / prior_density(guess_prob)
 
 Evidence categories follow Jeffreys (1961) scale:
 \itemize{
@@ -138,3 +138,4 @@ Jeffreys, H. (1961). Theory of Probability (3rd ed.). Oxford University Press.
 \seealso{
 \code{\link[=flag_contaminant_rts]{flag_contaminant_rts()}} for contamination detection with optional validation
 }
+\keyword{transform}
