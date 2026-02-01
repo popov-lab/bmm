@@ -17,7 +17,9 @@ flag_contaminant_rts(
   maxit = 100,
   tol = 1e-06,
   output = c("probability", "likelihood_ratio", "flag"),
-  threshold = 0.5,
+  seed = NULL,
+  validate_fast_guessing = FALSE,
+  ...,
   what_return = c("data", "diagnostics", "all")
 )
 }
@@ -59,11 +61,23 @@ exceeding this are clipped with a warning. Must be in (0, 1]. Default 0.5.}
 \itemize{
 \item "probability" (default): Posterior probability P(contaminant | RT)
 \item "likelihood_ratio": Ratio of contaminant to RT likelihood
-\item "flag": Binary indicator (TRUE if probability > threshold)
+\item "flag": Binary indicator based on probabilistic binomial sampling
 }}
 
-\item{threshold}{Numeric. Threshold for binary flagging when \code{output = "flag"}.
-Must be in the interval 0 to 1. Default 0.5.}
+\item{seed}{Integer or NULL. Random seed for reproducible probabilistic flagging.
+If NULL (default), flagging is not reproducible. Only relevant when
+\code{output = "flag"}. Set to an integer for reproducible results.}
+
+\item{validate_fast_guessing}{Logical. If TRUE and response data is provided,
+tests whether fast flagged contaminants show random guessing behavior (~50\%
+accuracy for 2AFC tasks). By default, tests trials with RT below the 25th
+percentile (controlled by \code{threshold_type = "quantile"} and \code{rt_threshold = 0.25}
+passed via \code{...}). A warning is issued if responses show evidence against
+random guessing. Default FALSE. See \code{\link[=validate_fast_guesses]{validate_fast_guesses()}} for all options.}
+
+\item{...}{Additional arguments passed to \code{\link[=validate_fast_guesses]{validate_fast_guesses()}} when
+\code{validate_fast_guessing = TRUE}. See \code{\link[=validate_fast_guesses]{validate_fast_guesses()}} documentation
+for supported arguments and their default values}
 
 \item{what_return}{Character. Type of output to return:
 \itemize{
@@ -125,6 +139,17 @@ The function fits: \code{f(RT) = π_c * Uniform(a,b) + (1-π_c) * f_RT(RT|θ)}
 where π_c is the contaminant proportion, Uniform(a,b) is the contaminant
 distribution over \code{contaminant_bound}, and f_RT is the specified RT
 distribution with parameters θ.
+}
+
+\subsection{Probabilistic Flagging}{
+
+When \code{output = "flag"}, contamination flags are generated probabilistically
+using binomial sampling based on each trial's contamination probability.
+This avoids the deterministic threshold issue where all long RTs above a
+fixed threshold would be flagged, even if they're part of the RT distribution.
+Each trial has a chance of being flagged proportional to its contamination
+probability, allowing for more nuanced detection. Use the \code{seed} argument
+for reproducible flagging.
 }
 
 \subsection{Version Behavior}{

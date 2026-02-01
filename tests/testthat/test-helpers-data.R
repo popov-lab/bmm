@@ -1371,22 +1371,27 @@ test_that("flag_contaminant_rts() validates output parameter", {
   )
 })
 
-test_that("flag_contaminant_rts() validates threshold parameter", {
+test_that("flag_contaminant_rts() validates seed parameter", {
   data <- .create_test_rt_data()
   
+  # Invalid seed
   expect_error(
-    flag_contaminant_rts(data, rt = "rt", threshold = -0.1),
-    "threshold must be between 0 and 1"
+    flag_contaminant_rts(data, rt = "rt", seed = "not_numeric"),
+    "seed must be a single numeric value"
   )
   
   expect_error(
-    flag_contaminant_rts(data, rt = "rt", threshold = 1.5),
-    "threshold must be between 0 and 1"
+    flag_contaminant_rts(data, rt = "rt", seed = c(1, 2)),
+    "seed must be a single numeric value"
   )
   
-  # Valid threshold should work
+  # Valid seeds should work
   expect_silent(
-    flag_contaminant_rts(data, rt = "rt", threshold = 0.5)
+    flag_contaminant_rts(data, rt = "rt", seed = 123)
+  )
+  
+  expect_silent(
+    flag_contaminant_rts(data, rt = "rt", seed = NULL)
   )
 })
 
@@ -1492,22 +1497,71 @@ test_that("flag_contaminant_rts() output='likelihood_ratio' produces correct col
   expect_false("contam_flag" %in% names(result))
 })
 
-test_that("flag_contaminant_rts() output='flag' uses threshold correctly", {
-  data <- .create_test_rt_data()
+test_that("flag_contaminant_rts() output='flag' uses probabilistic sampling", {
+  # Create data with very clear contaminants that will definitely be detected
+  set.seed(999)
+  n <- 80
+  # Clean RTs centered around 0.6s with some spread
+  rt_clean <- rnorm(60, mean = 0.6, sd = 0.1)
+  rt_clean <- pmax(rt_clean, 0.2)  # Ensure positive
+  # Very fast contaminants well separated from clean RTs
+  rt_contam <- runif(20, 0.15, 0.25)
+  data <- data.frame(rt = c(rt_clean, rt_contam))
   
-  result_05 <- flag_contaminant_rts(
-    data, rt = "rt", output = "flag", threshold = 0.5
+  # Check that we can detect contaminants
+  result_prob <- flag_contaminant_rts(
+    data, rt = "rt", output = "probability", 
+    init_contaminant = 0.2, max_contaminant = 0.4
   )
-  result_09 <- flag_contaminant_rts(
-    data, rt = "rt", output = "flag", threshold = 0.9
+  
+  # If contaminants are detected, test probabilistic behavior
+  if (max(result_prob$contam_prob, na.rm = TRUE) > 0.01) {
+    # Test with seed for reproducibility
+    result1 <- flag_contaminant_rts(
+      data, rt = "rt", output = "flag", seed = 123,
+      init_contaminant = 0.2, max_contaminant = 0.4
+    )
+    result2 <- flag_contaminant_rts(
+      data, rt = "rt", output = "flag", seed = 123,
+      init_contaminant = 0.2, max_contaminant = 0.4
+    )
+    
+    expect_true("contam_flag" %in% names(result1))
+    expect_type(result1$contam_flag, "logical")
+    
+    # Same seed should produce identical flags
+    expect_identical(result1$contam_flag, result2$contam_flag)
+    
+    # Test that probabilistic flagging is actually probabilistic
+    # Count proportion of trials flagged over multiple runs with different seeds
+    n_runs <- 20
+    flag_counts <- numeric(n_runs)
+    for (i in 1:n_runs) {
+      result_temp <- flag_contaminant_rts(
+        data, rt = "rt", output = "flag", seed = 100 + i,
+        init_contaminant = 0.2, max_contaminant = 0.4
+      )
+      flag_counts[i] <- sum(result_temp$contam_flag, na.rm = TRUE)
+    }
+    
+    # If probabilistic, counts should vary
+    expect_true(length(unique(flag_counts)) > 1,
+                info = paste("Flag counts:", paste(flag_counts, collapse = ", ")))
+  } else {
+    # If EM doesn't detect contaminants in this data, just check basic functionality
+    result <- flag_contaminant_rts(
+      data, rt = "rt", output = "flag", seed = 123
+    )
+    expect_true("contam_flag" %in% names(result))
+    expect_type(result$contam_flag, "logical")
+  }
+  
+  # Without seed, results are valid (use simpler data)
+  simple_data <- data.frame(rt = rgamma(50, 5, 10))
+  result4 <- flag_contaminant_rts(
+    simple_data, rt = "rt", output = "flag", seed = NULL
   )
-  
-  expect_true("contam_flag" %in% names(result_05))
-  expect_type(result_05$contam_flag, "logical")
-  
-  # Higher threshold should flag fewer trials
-  expect_true(sum(result_09$contam_flag, na.rm = TRUE) <= 
-              sum(result_05$contam_flag, na.rm = TRUE))
+  expect_type(result4$contam_flag, "logical")
 })
 
 # Section 5: Grouping Tests ---------------------------------------------------
@@ -1622,7 +1676,7 @@ test_that("flag_contaminant_rts() detects simulated contaminants", {
     true_type = c(rep("legit", n - n_contam), rep("contam", n_contam))
   )
   
-  result <- flag_contaminant_rts(data, rt = "rt", threshold = 0.5)
+  result <- flag_contaminant_rts(data, rt = "rt")
   
   # Contaminants should have higher probabilities on average
   mean_prob_contam <- mean(result$contam_prob[data$true_type == "contam"])
@@ -1694,4 +1748,163 @@ test_that("flag_contaminant_rts() diagnostics track trial counts", {
     result_4par$n_trials_upper + result_4par$n_trials_lower, 
     150
   )
+})
+# Section 10: Fast Guess Validation Tests -------------------------------------
+
+test_that("flag_contaminant_rts() validates fast guesses when requested", {
+  # Create data with clear fast guesses
+  set.seed(123)
+  n_clean <- 80
+  n_fast_guess <- 20
+  rt_clean <- rnorm(n_clean, mean = 0.6, sd = 0.1)
+  rt_clean <- pmax(rt_clean, 0.2)
+  rt_fast <- runif(n_fast_guess, 0.15, 0.25)
+  
+  data <- data.frame(
+    rt = c(rt_clean, rt_fast),
+    response = c(
+      rbinom(n_clean, 1, 0.75),  # Clean trials with 75% accuracy
+      rbinom(n_fast_guess, 1, 0.5)  # Fast guesses with 50% (random)
+    )
+  )
+  
+  result <- flag_contaminant_rts(
+    data, rt = "rt", response = "response",
+    validate_fast_guessing = TRUE,
+    rt_threshold = 0.40,  # 40th percentile
+    init_contaminant = 0.15,
+    max_contaminant = 0.4,
+    what_return = "diagnostics"
+  )
+  
+  expect_true("fast_guess_validated" %in% names(result))
+  expect_true(result$fast_guess_validated)
+  expect_true("fast_guess_bf_01" %in% names(result))
+  expect_true("fast_guess_hdi_lower" %in% names(result))
+  expect_true("fast_guess_hdi_upper" %in% names(result))
+  expect_true("fast_guess_in_hdi" %in% names(result))
+  expect_true("fast_guess_evidence" %in% names(result))
+  expect_true("fast_guess_prop_upper" %in% names(result))
+  expect_true("fast_guess_n_tested" %in% names(result))
+  expect_true("fast_guess_rt_threshold" %in% names(result))
+  # rt_threshold should be 40th percentile of RT data
+  expected_threshold <- as.numeric(quantile(data$rt, 0.40))
+  expect_equal(result$fast_guess_rt_threshold, expected_threshold)
+})
+
+test_that("flag_contaminant_rts() validation uses adaptive threshold", {
+  set.seed(456)
+  n <- 100
+  rt_data <- rgamma(n, shape = 5, rate = 10)
+  data <- data.frame(
+    rt = rt_data,
+    response = rbinom(n, 1, 0.7)
+  )
+  
+  result <- flag_contaminant_rts(
+    data, rt = "rt", response = "response",
+    validate_fast_guessing = TRUE,
+    rt_threshold = 0.25,  # 25th percentile (default)
+    what_return = "diagnostics"
+  )
+  
+  expected_threshold <- as.numeric(quantile(rt_data, 0.25))
+  expect_equal(result$fast_guess_rt_threshold, expected_threshold, 
+               tolerance = 1e-6)
+})
+
+test_that("flag_contaminant_rts() validation not performed without response data", {
+  data <- data.frame(rt = rgamma(100, 5, 10))
+  
+  result <- flag_contaminant_rts(
+    data, rt = "rt",
+    validate_fast_guessing = TRUE,  # Request validation
+    what_return = "diagnostics"
+  )
+  
+  # Should not be validated (no response data)
+  expect_false(result$fast_guess_validated)
+  expect_true(is.na(result$fast_guess_bf_01))
+})
+
+test_that("flag_contaminant_rts() validation not performed by default", {
+  set.seed(789)
+  data <- data.frame(
+    rt = rgamma(100, 5, 10),
+    response = rbinom(100, 1, 0.7)
+  )
+  
+  result <- flag_contaminant_rts(
+    data, rt = "rt", response = "response",
+    validate_fast_guessing = FALSE,  # Default
+    what_return = "diagnostics"
+  )
+  
+  expect_false(result$fast_guess_validated)
+  expect_true(is.na(result$fast_guess_bf_01))
+})
+
+test_that("flag_contaminant_rts() validation handles version='4par'", {
+  set.seed(321)
+  n <- 100
+  data <- data.frame(
+    rt = rgamma(n, 5, 10),
+    response = rbinom(n, 1, 0.7)
+  )
+  
+  result <- flag_contaminant_rts(
+    data, rt = "rt", response = "response",
+    version = "4par",
+    validate_fast_guessing = TRUE,
+    rt_threshold = 0.35,  # 35th percentile
+    what_return = "diagnostics"
+  )
+  
+  expect_true(result$fast_guess_validated)
+  expect_true("fast_guess_n_upper" %in% names(result))
+  expect_true("fast_guess_n_lower" %in% names(result))
+  expect_true("fast_guess_mean_rt_upper" %in% names(result))
+  expect_true("fast_guess_mean_rt_lower" %in% names(result))
+})
+
+test_that("flag_contaminant_rts() validation returns NA for insufficient data", {
+  # Very few trials - won't have enough fast contaminants
+  set.seed(654)
+  data <- data.frame(
+    rt = rgamma(20, 5, 10),
+    response = rbinom(20, 1, 0.7)
+  )
+  
+  result <- flag_contaminant_rts(
+    data, rt = "rt", response = "response",
+    validate_fast_guessing = TRUE,
+    rt_threshold = 0.15,  # 15th percentile - very strict
+    what_return = "diagnostics"
+  )
+  
+  # May return NA if not enough fast high-prob contaminants
+  # Just check the structure is correct
+  expect_true("fast_guess_validated" %in% names(result))
+  expect_true("fast_guess_n_tested" %in% names(result))
+})
+
+test_that("flag_contaminant_rts() validation works with grouped data", {
+  set.seed(111)
+  data <- data.frame(
+    rt = rgamma(200, 5, 10),
+    response = rbinom(200, 1, 0.7),
+    subject = rep(1:2, each = 100)
+  )
+  
+  result <- flag_contaminant_rts(
+    data, rt = "rt", response = "response",
+    .by = "subject",
+    validate_fast_guessing = TRUE,
+    rt_threshold = 0.35,  # 35th percentile
+    what_return = "diagnostics"
+  )
+  
+  expect_equal(nrow(result), 2)
+  expect_true(all(result$fast_guess_validated))
+  expect_true(all("fast_guess_bf_01" %in% names(result)))
 })

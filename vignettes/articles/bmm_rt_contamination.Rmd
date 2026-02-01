@@ -535,6 +535,135 @@ flag_contaminant_rts(
 )
 ```
 
+### Validating Fast Guess Assumptions
+
+A key assumption of contamination modeling is that very fast responses represent random guessing rather than informed decisions. The `validate_fast_guessing` parameter enables Bayesian testing of this assumption for 2-alternative forced choice (2AFC) tasks by checking whether fast flagged contaminants show ~50% accuracy.
+
+#### Basic Usage
+
+```{r validate-basic, eval = FALSE}
+# Enable validation when flagging contaminants
+flagged <- flag_contaminant_rts(
+  data = my_2afc_data,
+  rt = "rt",
+  response = "response",
+  validate_fast_guessing = TRUE,  # Enables Bayesian validation
+  what_return = "diagnostics"
+)
+
+# Check validation results
+flagged$fast_guess_validated  # TRUE if test was performed
+flagged$fast_guess_bf_01      # Bayes Factor for guessing hypothesis
+flagged$fast_guess_evidence   # Evidence category (e.g., "anecdotal_for_guessing")
+flagged$fast_guess_in_hdi     # Is 0.5 in 95% credible interval?
+```
+
+The validation performs a Beta-Binomial conjugate Bayesian analysis on trials that are both flagged as contaminants and fall below an RT threshold (default: 25th percentile). By default, the threshold is quantile-based (adaptive to the RT distribution), but you can also specify absolute RT thresholds.
+
+#### Customizing the Validation
+
+Control validation behavior by passing additional arguments via `...`:
+
+```{r validate-custom, eval = FALSE}
+# Example 1: Use 30th percentile as threshold (quantile mode)
+flagged <- flag_contaminant_rts(
+  data = my_data,
+  rt = "rt",
+  response = "response",
+  validate_fast_guessing = TRUE,
+  threshold_type = "quantile",  # Adaptive threshold (default)
+  rt_threshold = 0.30,          # 30th percentile
+  what_return = "diagnostics"
+)
+
+# Example 2: Use fixed 250ms threshold (absolute mode)
+flagged <- flag_contaminant_rts(
+  data = my_data,
+  rt = "rt",
+  response = "response",
+  validate_fast_guessing = TRUE,
+  threshold_type = "absolute",  # Fixed threshold
+  rt_threshold = 0.25,          # 250ms
+  what_return = "diagnostics"
+)
+
+# Example 3: Custom prior and credible interval
+flagged <- flag_contaminant_rts(
+  data = my_data,
+  rt = "rt",
+  response = "response",
+  validate_fast_guessing = TRUE,
+  rt_threshold = 0.25,
+  prior_alpha = 1,              # Beta prior parameters
+  prior_beta = 1,               # (default: uniform prior)
+  credible_mass = 0.90,         # 90% HDI instead of 95%
+  what_return = "diagnostics"
+)
+```
+
+#### Understanding the Output
+
+The diagnostics data frame includes several validation-related columns:
+
+- `fast_guess_validated`: Whether validation was performed (requires response data and sufficient fast trials)
+- `fast_guess_n_tested`: Number of fast flagged trials tested
+- `fast_guess_prop_upper`: Observed proportion of "upper" responses (should be ~0.5 for random guessing)
+- `fast_guess_bf_01`: Bayes Factor for H₀ (random guessing at 0.5) vs H₁ (non-random)
+- `fast_guess_evidence`: Evidence category on Jeffreys scale (e.g., "strong_for_guessing", "moderate_against_guessing")
+- `fast_guess_in_hdi`: Whether 0.5 falls within the 95% Highest Density Interval
+- `fast_guess_hdi_lower`, `fast_guess_hdi_upper`: HDI bounds for accuracy proportion
+- `fast_guess_rt_threshold`: Actual RT threshold used (in seconds)
+- `fast_guess_mean_rt_tested`: Mean RT of tested trials
+
+**Interpreting Bayes Factors** (Jeffreys, 1961):
+- BF > 10: Strong evidence for random guessing
+- BF > 3: Moderate evidence for random guessing
+- BF > 1: Anecdotal evidence for random guessing
+- BF < 1/3: Moderate evidence against random guessing (responses are biased)
+- BF < 1/10: Strong evidence against random guessing
+
+#### When to Use Validation
+
+Validation is most useful when:
+
+1. **2AFC tasks**: The test assumes equal probability of two responses under guessing
+2. **Fast response concerns**: You suspect very fast responses may not be random guesses
+3. **Quality control**: You want empirical evidence that flagged contaminants match guessing behavior
+4. **Comparing conditions**: You want to verify that contamination patterns are consistent across experimental manipulations
+
+**Note**: Validation will issue a warning if evidence against random guessing is moderate or strong, suggesting that flagged fast responses may reflect systematic biases rather than random guesses.
+
+#### Standalone Validation
+
+For more control, you can use the `validate_fast_guesses()` function directly:
+
+```{r standalone-validation, eval = FALSE}
+# First flag contaminants
+flagged <- flag_contaminant_rts(
+  data = my_data,
+  rt = "rt",
+  response = "response"
+)
+
+# Then validate separately with full control
+validation_result <- validate_fast_guesses(
+  contam_flag = flagged$contam_flag,
+  rt_data = flagged$rt,
+  response = flagged$response,
+  threshold_type = "quantile",
+  rt_threshold = 0.25,
+  prior_alpha = 1,
+  prior_beta = 1,
+  guess_prob = 0.5,
+  credible_mass = 0.95
+)
+
+# Examine detailed results
+print(validation_result)
+```
+
+This approach allows you to experiment with different thresholds and prior specifications without re-running the contamination detection.
+
 ---
 
 ## Decision Guide: Which Approach for Your Model?

@@ -887,9 +887,19 @@ ezdm_summary_stats <- function(
 #' @param output Character. Type of contamination metric to compute:
 #'   - "probability" (default): Posterior probability P(contaminant | RT)
 #'   - "likelihood_ratio": Ratio of contaminant to RT likelihood
-#'   - "flag": Binary indicator (TRUE if probability > threshold)
-#' @param threshold Numeric. Threshold for binary flagging when `output = "flag"`.
-#'   Must be in the interval 0 to 1. Default 0.5.
+#'   - "flag": Binary indicator based on probabilistic binomial sampling
+#' @param seed Integer or NULL. Random seed for reproducible probabilistic flagging.
+#'   If NULL (default), flagging is not reproducible. Only relevant when
+#'   `output = "flag"`. Set to an integer for reproducible results.
+#' @param validate_fast_guessing Logical. If TRUE and response data is provided,
+#'   tests whether fast flagged contaminants show random guessing behavior (~50%
+#'   accuracy for 2AFC tasks). By default, tests trials with RT below the 25th
+#'   percentile (controlled by `threshold_type = "quantile"` and `rt_threshold = 0.25`
+#'   passed via `...`). A warning is issued if responses show evidence against
+#'   random guessing. Default FALSE. See [validate_fast_guesses()] for all options.
+#' @param ... Additional arguments passed to [validate_fast_guesses()] when
+#'   `validate_fast_guessing = TRUE`. See [validate_fast_guesses()] documentation
+#'   for supported arguments and their default values
 #' @param what_return Character. Type of output to return:
 #'   - "data" (default): Returns data.frame with contamination columns only
 #'   - "diagnostics": Returns data.frame with mixture fit diagnostics only
@@ -911,6 +921,16 @@ ezdm_summary_stats <- function(
 #' where π_c is the contaminant proportion, Uniform(a,b) is the contaminant
 #' distribution over `contaminant_bound`, and f_RT is the specified RT
 #' distribution with parameters θ.
+#'
+#' ## Probabilistic Flagging
+#'
+#' When `output = "flag"`, contamination flags are generated probabilistically
+#' using binomial sampling based on each trial's contamination probability.
+#' This avoids the deterministic threshold issue where all long RTs above a
+#' fixed threshold would be flagged, even if they're part of the RT distribution.
+#' Each trial has a chance of being flagged proportional to its contamination
+#' probability, allowing for more nuanced detection. Use the `seed` argument
+#' for reproducible flagging.
 #'
 #' ## Version Behavior
 #'
@@ -1005,9 +1025,11 @@ flag_contaminant_rts <- function(
     maxit = 100,
     tol = 1e-6,
     output = c("probability", "likelihood_ratio", "flag"),
-    threshold = 0.5,
+    seed = NULL,
+    validate_fast_guessing = FALSE,
+    ...,
     what_return = c("data", "diagnostics", "all")) {
-  
+
   stop_missing_args()
   version <- match.arg(version)
   distribution <- match.arg(distribution)
@@ -1019,7 +1041,7 @@ flag_contaminant_rts <- function(
   stopif(!isTRUE(nrow(data) > 0L), "Argument 'data' does not contain observations")
 
   stopif(not_in(rt, colnames(data)), "RT variable '{rt}' not found in data")
-  
+
   if (version == "4par") {
     stopif(
       is.null(response),
@@ -1060,17 +1082,20 @@ flag_contaminant_rts <- function(
     init_contaminant >= max_contaminant,
     "init_contaminant must be less than max_contaminant"
   )
-  stopif(
-    !is.numeric(threshold) || threshold < 0 || threshold > 1,
-    "threshold must be between 0 and 1"
-  )
+
+  if (!is.null(seed)) {
+    stopif(
+      !is.numeric(seed) || length(seed) != 1,
+      "seed must be a single numeric value or NULL"
+    )
+  }
 
   warnif(any(data[[rt]] > 10), "Some RT values > 10. Ensure RTs are in seconds, not milliseconds.")
   warnif(any(data[[rt]] <= 0, na.rm = TRUE), "Non-positive RT found. These values will be excluded.")
 
   valid_idx <- data[[rt]] > 0 & !is.na(data[[rt]])
   data <- data[valid_idx, , drop = FALSE]
-  
+
   stopif(nrow(data) == 0, "No valid RT data remaining after filtering.")
 
   if (length(.by) == 0) {
@@ -1086,7 +1111,9 @@ flag_contaminant_rts <- function(
       maxit = maxit,
       tol = tol,
       output = output,
-      threshold = threshold
+      seed = seed,
+      validate_fast_guessing = validate_fast_guessing,
+      ...
     )
   } else {
     if (length(.by) == 1) {
@@ -1111,11 +1138,13 @@ flag_contaminant_rts <- function(
         maxit = maxit,
         tol = tol,
         output = output,
-        threshold = threshold
+        seed = seed,
+        validate_fast_guessing = validate_fast_guessing,
+        ...
       )
-      
+
       grp_values <- unique(grp_data[.by])
-      grp_result$diagnostics <- cbind(grp_values[1, , drop = FALSE], 
+      grp_result$diagnostics <- cbind(grp_values[1, , drop = FALSE],
                                        grp_result$diagnostics,
                                        row.names = NULL)
       grp_result
@@ -1150,23 +1179,26 @@ flag_contaminant_rts <- function(
 # @param maxit Integer. Maximum EM iterations
 # @param tol Numeric. Convergence tolerance
 # @param output Character. Output type
-# @param threshold Numeric. Threshold for flagging
+# @param seed Integer or NULL. Random seed for reproducible flagging
+# @param validate_fast_guessing Logical. Whether to validate fast guessing behavior
+# @param ... Additional arguments passed to validate_fast_guesses()
 # @return List with $data (augmented data.frame) and $diagnostics (fit info)
 .flag_rt_group <- function(data, rt, response, version, distribution,
                            contaminant_bound, init_contaminant, max_contaminant,
-                           maxit, tol, output, threshold) {
-  
+                           maxit, tol, output, seed, validate_fast_guessing,
+                           ...) {
+
   rt_data <- data[[rt]]
   n_trials <- length(rt_data)
-  
+
   resolved_bounds <- .resolve_contaminant_bounds(contaminant_bound, rt_data)
-  
+
   if (version == "3par") {
     fit <- .fit_rt_mixture(
       rt_data, distribution, resolved_bounds,
       init_contaminant, max_contaminant, maxit, tol
     )
-    
+
     if (!fit$converged || is.null(fit$params)) {
       warning2("EM did not converge for group. Returning NA for contamination metrics.",
                env.frame = -1)
@@ -1177,10 +1209,10 @@ flag_contaminant_rts <- function(
       )
     } else {
       contam_metrics <- .compute_trial_contam_metrics(
-        rt_data, fit, distribution, resolved_bounds, threshold
+        rt_data, fit, distribution, resolved_bounds, seed
       )
     }
-    
+
     data_out <- data
     data_out$contam_prob <- contam_metrics$contam_prob
     if (output %in% c("likelihood_ratio", "flag")) {
@@ -1189,7 +1221,38 @@ flag_contaminant_rts <- function(
     if (output %in% c("flag", "probability")) {
       data_out$contam_flag <- contam_metrics$contam_flag
     }
-    
+
+    # Perform fast guess validation if requested and response data available
+    # Validation tests the actual flagged trials (from probabilistic flagging)
+    fast_guess_result <- NULL
+    if (validate_fast_guessing && !is.null(response)) {
+      fast_guess_result <- validate_fast_guesses(
+        contam_flag = contam_metrics$contam_flag,  # Use actual flags
+        rt_data = rt_data,
+        response = data[[response]],
+        ...  # Pass additional arguments (rt_threshold, prior_alpha, prior_beta, etc.)
+      )
+
+      # Issue warning if evidence against guessing is moderate or strong
+      # Using Jeffreys scale: BF < 1/3 indicates moderate evidence against H0
+      if (!is.na(fast_guess_result$bf_01) &&
+          fast_guess_result$bf_01 < 1/3) {
+        # Use actual credible mass from result
+        cred_mass_pct <- round(fast_guess_result$credible_mass * 100)
+        warning2(
+          "Fast flagged contaminants (RT < {round(fast_guess_result$rt_threshold, 2)}s) show ",
+          "evidence against random guessing. ",
+          "Observed upper proportion: {round(fast_guess_result$prop_upper, 2)} ",
+          "(guessing would be 0.50). ",
+          "{cred_mass_pct}% HDI: ",
+          "[{round(fast_guess_result$hdi_lower, 2)}, {round(fast_guess_result$hdi_upper, 2)}]. ",
+          "BF₀₁ = {round(fast_guess_result$bf_01, 2)} ({fast_guess_result$bf_evidence}). ",
+          "This suggests flagged contaminants may not be fast guesses, or there is response bias.",
+          env.frame = -1
+        )
+      }
+    }
+
     diagnostics <- data.frame(
       mixture_params = I(list(fit$params)),
       contaminant_prop = fit$contaminant_prop,
@@ -1199,18 +1262,28 @@ flag_contaminant_rts <- function(
       n_trials = n_trials,
       distribution = distribution,
       method = "mixture_em",
+      fast_guess_validated = !is.null(fast_guess_result),
+      fast_guess_prop_upper = if (!is.null(fast_guess_result)) fast_guess_result$prop_upper else NA_real_,
+      fast_guess_hdi_lower = if (!is.null(fast_guess_result)) fast_guess_result$hdi_lower else NA_real_,
+      fast_guess_hdi_upper = if (!is.null(fast_guess_result)) fast_guess_result$hdi_upper else NA_real_,
+      fast_guess_bf_01 = if (!is.null(fast_guess_result)) fast_guess_result$bf_01 else NA_real_,
+      fast_guess_in_hdi = if (!is.null(fast_guess_result)) fast_guess_result$guess_in_hdi else NA,
+      fast_guess_evidence = if (!is.null(fast_guess_result)) fast_guess_result$bf_evidence else NA_character_,
+      fast_guess_n_tested = if (!is.null(fast_guess_result)) fast_guess_result$n_tested else NA_integer_,
+      fast_guess_rt_threshold = if (!is.null(fast_guess_result)) fast_guess_result$rt_threshold else NA_real_,
+      fast_guess_mean_rt = if (!is.null(fast_guess_result)) fast_guess_result$mean_rt_tested else NA_real_,
       stringsAsFactors = FALSE
     )
-    
+
   } else {
     response_data <- data[[response]]
     is_upper <- .convert_response_to_upper(response_data)
-    
+
     rt_upper <- rt_data[is_upper]
     rt_lower <- rt_data[!is_upper]
     n_upper <- length(rt_upper)
     n_lower <- length(rt_lower)
-    
+
     fit_upper <- .fit_rt_mixture(
       rt_upper, distribution, resolved_bounds,
       init_contaminant, max_contaminant, maxit, tol
@@ -1219,7 +1292,7 @@ flag_contaminant_rts <- function(
       rt_lower, distribution, resolved_bounds,
       init_contaminant, max_contaminant, maxit, tol
     )
-    
+
     if (!fit_upper$converged || is.null(fit_upper$params)) {
       warning2("EM did not converge for upper boundary. Returning NA.",
                env.frame = -1)
@@ -1230,10 +1303,10 @@ flag_contaminant_rts <- function(
       )
     } else {
       contam_metrics_upper <- .compute_trial_contam_metrics(
-        rt_upper, fit_upper, distribution, resolved_bounds, threshold
+        rt_upper, fit_upper, distribution, resolved_bounds, seed
       )
     }
-    
+
     if (!fit_lower$converged || is.null(fit_lower$params)) {
       warning2("EM did not converge for lower boundary. Returning NA.",
                env.frame = -1)
@@ -1244,30 +1317,53 @@ flag_contaminant_rts <- function(
       )
     } else {
       contam_metrics_lower <- .compute_trial_contam_metrics(
-        rt_lower, fit_lower, distribution, resolved_bounds, threshold
+        rt_lower, fit_lower, distribution, resolved_bounds, seed
       )
     }
-    
+
     data_out <- data
     data_out$contam_prob_upper <- NA_real_
     data_out$contam_prob_lower <- NA_real_
     data_out$contam_prob_upper[is_upper] <- contam_metrics_upper$contam_prob
     data_out$contam_prob_lower[!is_upper] <- contam_metrics_lower$contam_prob
-    
+
     if (output %in% c("likelihood_ratio", "flag")) {
       data_out$contam_lr_upper <- NA_real_
       data_out$contam_lr_lower <- NA_real_
       data_out$contam_lr_upper[is_upper] <- contam_metrics_upper$contam_lr
       data_out$contam_lr_lower[!is_upper] <- contam_metrics_lower$contam_lr
     }
-    
+
     if (output %in% c("flag", "probability")) {
       data_out$contam_flag_upper <- NA
       data_out$contam_flag_lower <- NA
       data_out$contam_flag_upper[is_upper] <- contam_metrics_upper$contam_flag
       data_out$contam_flag_lower[!is_upper] <- contam_metrics_lower$contam_flag
     }
-    
+
+    # Perform fast guess validation if requested
+    # For version='4par', test upper and lower separately
+    # Validation uses the actual flagged trials
+    fast_guess_upper <- NULL
+    fast_guess_lower <- NULL
+    if (validate_fast_guessing) {
+      # Test upper boundary flagged contaminants
+      fast_guess_upper <- validate_fast_guesses(
+        contam_flag = contam_metrics_upper$contam_flag,  # Use actual flags
+        rt_data = rt_upper,
+        response = rep(TRUE, n_upper),  # All are upper responses
+        ...  # Pass additional arguments
+      )
+
+      # Test lower boundary flagged contaminants
+      fast_guess_lower <- validate_fast_guesses(
+        contam_flag = contam_metrics_lower$contam_flag,  # Use actual flags
+        rt_data = rt_lower,
+        response = rep(FALSE, n_lower),  # All are lower responses
+        ...  # Pass additional arguments
+      )
+    }
+
     diagnostics <- data.frame(
       mixture_params_upper = I(list(fit_upper$params)),
       mixture_params_lower = I(list(fit_lower$params)),
@@ -1283,11 +1379,249 @@ flag_contaminant_rts <- function(
       n_trials_lower = n_lower,
       distribution = distribution,
       method = "mixture_em",
+      fast_guess_validated = !is.null(fast_guess_upper),
+      fast_guess_n_upper = if (!is.null(fast_guess_upper)) fast_guess_upper$n_tested else NA_integer_,
+      fast_guess_n_lower = if (!is.null(fast_guess_lower)) fast_guess_lower$n_tested else NA_integer_,
+      fast_guess_rt_threshold = if (!is.null(fast_guess_upper)) fast_guess_upper$rt_threshold else NA_real_,
+      fast_guess_mean_rt_upper = if (!is.null(fast_guess_upper)) fast_guess_upper$mean_rt_tested else NA_real_,
+      fast_guess_mean_rt_lower = if (!is.null(fast_guess_lower)) fast_guess_lower$mean_rt_tested else NA_real_,
       stringsAsFactors = FALSE
     )
   }
-  
+
   list(data = data_out, diagnostics = diagnostics)
+}
+
+
+
+#' Test if fast contaminants show random guessing behavior
+#'
+#' @description Uses Bayesian Beta-Binomial conjugate analysis to test whether
+#'   fast flagged contaminants show random guessing (~50% accuracy for 2AFC).
+#'   The test computes the posterior distribution for the proportion of "upper"
+#'   responses and uses a Savage-Dickey Bayes Factor to quantify evidence for
+#'   or against the guessing hypothesis.
+#'
+#' @param contam_flag Logical vector indicating which trials were flagged as
+#'   contaminants
+#' @param rt_data Numeric vector of reaction times (in seconds)
+#' @param response Response data in any format accepted by `.convert_response_to_upper()`
+#'   (numeric 0/1, logical, character, factor)
+#' @param threshold_type Character. How to interpret `rt_threshold`:
+#'   - `"quantile"` (default): Use rt_threshold as quantile (0-1)
+#'   - `"absolute"`: Use rt_threshold as absolute RT in seconds
+#' @param rt_threshold Numeric. Threshold for defining "fast" trials.
+#'   Interpretation depends on `threshold_type`:
+#'   - If `threshold_type = "quantile"` (default): Quantile of RT distribution
+#'     (e.g., 0.25 = 25th percentile). Default 0.25.
+#'   - If `threshold_type = "absolute"`: Absolute RT value in seconds
+#'     (e.g., 0.25 = 250ms).
+#' @param prior_alpha,prior_beta Numeric. Parameters for Beta prior distribution.
+#'   Default 1,1 gives uniform prior. Values > 1 express prior belief about
+#'   response proportions.
+#' @param guess_prob Numeric. Null hypothesis value for guessing probability.
+#'   Default 0.5 (equal probability of upper/lower responses).
+#' @param credible_mass Numeric. Probability mass for Highest Density Interval.
+#'   Default 0.95 for 95% HDI. Common alternatives: 0.90, 0.99.
+#'
+#' @return List with components:
+#'   - `method`: "bayesian"
+#'   - `prop_upper`: Observed proportion of upper responses
+#'   - `hdi_lower`, `hdi_upper`: 95% Highest Density Interval bounds
+#'   - `bf_01`: Bayes Factor for H0 (guessing) vs H1 (non-random)
+#'   - `guess_in_hdi`: Logical, whether `guess_prob` is in HDI
+#'   - `bf_evidence`: Character, evidence category on Jeffreys scale
+#'   - `posterior_alpha`, `posterior_beta`: Posterior Beta parameters
+#'   - `n_tested`: Number of fast flagged trials tested
+#'   - `rt_threshold`: Actual RT threshold value used (in seconds)
+#'   - `threshold_type`: Type of threshold used ("quantile" or "absolute")
+#'   - `credible_mass`: Credible mass used for HDI computation
+#'   - `mean_rt_tested`: Mean RT of tested trials
+#'
+#' @details
+#' The function performs a Bayesian test using the Beta-Binomial conjugate
+#' prior-posterior relationship. With a Beta(α, β) prior and observing n_upper
+#' "upper" responses out of n_tested trials, the posterior is:
+#'
+#' Beta(α + n_upper, β + n_lower)
+#'
+#' The Savage-Dickey Bayes Factor compares the posterior and prior densities
+#' at the null hypothesis value (default 0.5):
+#'
+#' BF₀₁ = posterior_density(guess_prob) / prior_density(guess_prob)
+#'
+#' Evidence categories follow Jeffreys (1961) scale:
+#' - BF > 10: Strong evidence for guessing
+#' - BF > 3: Moderate evidence for guessing
+#' - BF > 1: Anecdotal evidence for guessing
+#' - BF < 1/3: Moderate evidence against guessing
+#' - BF < 1/10: Strong evidence against guessing
+#'
+#' **Note**: This function is called internally by [flag_contaminant_rts()] when
+#' `validate_fast_guessing = TRUE`. It can also be used standalone for custom
+#' validation workflows.
+#'
+#' @references
+#' Jeffreys, H. (1961). Theory of Probability (3rd ed.). Oxford University Press.
+#'
+#' @seealso [flag_contaminant_rts()] for contamination detection with optional validation
+#'
+#' @export
+#'
+#' @examples
+#' \dontrun{
+#' # Simulate data with random guessing on fast trials
+#' set.seed(123)
+#' n <- 100
+#' rt <- c(runif(20, 0.15, 0.30), rgamma(80, 5, 10))
+#' response <- c(rbinom(20, 1, 0.5), rbinom(80, 1, 0.7))
+#' contam_flag <- rt < 0.35
+#'
+#' # Test using quantile threshold (default, adaptive)
+#' result1 <- validate_fast_guesses(
+#'   contam_flag = contam_flag,
+#'   rt_data = rt,
+#'   response = response,
+#'   threshold_type = "quantile",
+#'   rt_threshold = 0.30  # 30th percentile
+#' )
+#'
+#' # Test using absolute threshold (fixed RT)
+#' result2 <- validate_fast_guesses(
+#'   contam_flag = contam_flag,
+#'   rt_data = rt,
+#'   response = response,
+#'   threshold_type = "absolute",
+#'   rt_threshold = 0.30  # 300ms
+#' )
+#'
+#' print(result1$bf_01)          # Bayes Factor
+#' print(result1$bf_evidence)    # Evidence category
+#' print(result1$guess_in_hdi)   # Is 0.5 in 95% HDI?
+#' print(result1$threshold_type) # "quantile"
+#' }
+validate_fast_guesses <- function(contam_flag, rt_data, response,
+                                        threshold_type = c("quantile", "absolute"),
+                                        rt_threshold = 0.25,
+                                        prior_alpha = 1,
+                                        prior_beta = 1,
+                                        guess_prob = 0.5,
+                                        credible_mass = 0.95) {
+
+  threshold_type <- match.arg(threshold_type)
+  
+  # Input validation for maintainability
+  stopif(prior_alpha <= 0 || prior_beta <= 0,
+         "Beta prior parameters must be positive")
+  stopif(guess_prob <= 0 || guess_prob >= 1,
+         "guess_prob must be between 0 and 1 (exclusive)")
+  
+  # Validate rt_threshold based on threshold_type
+  if (threshold_type == "quantile") {
+    stopif(rt_threshold <= 0 || rt_threshold >= 1,
+           "rt_threshold must be a quantile between 0 and 1 (exclusive) when threshold_type='quantile'")
+  } else {
+    stopif(rt_threshold <= 0,
+           "rt_threshold must be positive when threshold_type='absolute'")
+  }
+
+  is_upper <- .convert_response_to_upper(response)
+  
+  # Compute actual RT threshold based on threshold_type
+  if (threshold_type == "quantile") {
+    rt_threshold_value <- stats::quantile(rt_data, rt_threshold, na.rm = TRUE)
+  } else {
+    rt_threshold_value <- rt_threshold
+  }
+
+  # Select fast flagged trials (vectorized)
+  fast_flagged_idx <- contam_flag & (rt_data < rt_threshold_value) &
+                      !is.na(contam_flag) & !is.na(rt_data)
+  n_tested <- sum(fast_flagged_idx)
+
+  # Posterior: Beta(alpha + n_upper, beta + n_lower)
+  # Note: HDI provides useful uncertainty information even with low trial numbers
+  n_upper <- sum(is_upper[fast_flagged_idx])
+  prop_upper <- n_upper / n_tested
+  posterior_alpha <- prior_alpha + n_upper
+  posterior_beta <- prior_beta + (n_tested - n_upper)
+
+  # HDI and Bayes Factor
+  hdi <- .compute_beta_hdi(posterior_alpha, posterior_beta,
+                           credible_mass = credible_mass)
+  bf_01 <- stats::dbeta(guess_prob, posterior_alpha, posterior_beta) /
+           stats::dbeta(guess_prob, prior_alpha, prior_beta)
+  guess_in_hdi <- guess_prob >= hdi$lower && guess_prob <= hdi$upper
+  bf_evidence <- .categorize_bf(bf_01)
+
+  method <- "bayesian"
+  hdi_lower <- hdi$lower
+  hdi_upper <- hdi$upper
+  mean_rt_tested <- mean(rt_data[fast_flagged_idx])
+
+  nlist(method, prop_upper, hdi_lower, hdi_upper, bf_01, guess_in_hdi,
+        bf_evidence, posterior_alpha, posterior_beta, n_tested,
+        rt_threshold = as.numeric(rt_threshold_value), threshold_type,
+        credible_mass, mean_rt_tested)
+}
+
+# Categorize Bayes Factor using Jeffreys scale
+# See: Jeffreys, H. (1961). Theory of Probability (3rd ed.). Oxford University Press.
+# Thresholds: BF > 10 (strong), > 3 (moderate), > 1 (anecdotal)
+# @param bf_01 Numeric. Bayes factor for H0 vs H1
+# @return Character. Evidence category on Jeffreys scale
+.categorize_bf <- function(bf_01) {
+  if (bf_01 > 10) return("strong_for_guessing")
+  if (bf_01 > 3) return("moderate_for_guessing")
+  if (bf_01 > 1) return("anecdotal_for_guessing")
+  if (bf_01 > 1/3) return("anecdotal_against_guessing")
+  if (bf_01 > 1/10) return("moderate_against_guessing")
+  "strong_against_guessing"
+}
+
+# Compute Highest Density Interval (HDI) for Beta distribution
+# Uses grid search to find narrowest interval containing credible_mass
+# For extreme parameters, falls back to equal-tailed credible interval
+# @param alpha,beta Numeric. Beta distribution parameters
+# @param credible_mass Numeric. Probability mass (default from constant)
+# @return List with lower and upper bounds
+.compute_beta_hdi <- function(alpha, beta,
+                              credible_mass = 0.95) {
+
+  # Input validation for numerical stability
+  stopif(alpha <= 0 || beta <= 0,
+         "Beta parameters alpha and beta must be positive")
+  stopif(credible_mass <= 0 || credible_mass >= 1,
+         "credible_mass must be between 0 and 1 (exclusive)")
+
+  # Use quantile-based interval for extreme or undefined cases
+  # Extreme: alpha or beta > 1000 (numerical precision issues)
+  # Undefined: both < 1 (U-shaped, HDI not meaningful)
+  if (alpha > 1000 ||
+      beta > 1000 ||
+      (alpha < 1 && beta < 1)) {
+    tail_prob <- (1 - credible_mass) / 2
+    return(nlist(
+      lower = stats::qbeta(tail_prob, alpha, beta),
+      upper = stats::qbeta(1 - tail_prob, alpha, beta)
+    ))
+  }
+
+  # Grid search: find shortest interval containing credible_mass
+  # Higher grid resolution = more accurate HDI but slower computation
+  # Grid size = 1000 balances accuracy vs speed
+  lower_percentiles <- seq(0, 1 - credible_mass,
+                          length.out = 1000)
+  upper_percentiles <- lower_percentiles + credible_mass
+
+  # Vectorized quantile computation (efficient)
+  lowers <- stats::qbeta(lower_percentiles, alpha, beta)
+  uppers <- stats::qbeta(upper_percentiles, alpha, beta)
+  widths <- uppers - lowers
+
+  # Return narrowest interval (HDI property)
+  min_idx <- which.min(widths)
+  nlist(lower = lowers[min_idx], upper = uppers[min_idx])
 }
 
 # Compute trial-level contamination metrics from mixture fit
@@ -1295,17 +1629,17 @@ flag_contaminant_rts <- function(
 # @param mixture_fit List returned from .fit_rt_mixture
 # @param distribution Character. Distribution type
 # @param contaminant_bound Numeric(2). Bounds for uniform
-# @param threshold Numeric. Threshold for binary flagging
+# @param seed Integer or NULL. Random seed for probabilistic flagging
 # @return List with contam_prob, contam_lr, contam_flag vectors
 .compute_trial_contam_metrics <- function(rt_vec, mixture_fit, distribution,
-                                          contaminant_bound, threshold) {
-  
+                                          contaminant_bound, seed) {
+
   params <- mixture_fit$params
   pi_c <- mixture_fit$contaminant_prop
   pi_rt <- 1 - pi_c
-  
+
   uniform_dens <- 1 / (contaminant_bound[2] - contaminant_bound[1])
-  
+
   dens_rt <- switch(distribution,
     exgaussian = dexgauss(rt_vec, params["mu"], params["sigma"],
                           params["tau"], log = FALSE),
@@ -1313,17 +1647,23 @@ flag_contaminant_rts <- function(
     invgaussian = dinvgauss(rt_vec, params["mu"], params["lambda"],
                             log = FALSE)
   )
-  
+
   dens_rt <- pmax(dens_rt, 1e-300)
-  
+
   numer_c <- pi_c * uniform_dens
   numer_rt <- pi_rt * dens_rt
   denom <- numer_c + numer_rt
-  
+
   contam_prob <- numer_c / denom
   contam_lr <- numer_c / numer_rt
-  contam_flag <- contam_prob > threshold
-  
+
+  # Probabilistic flagging using binomial sampling
+  # Each trial is flagged with probability equal to its contamination probability
+  if (!is.null(seed)) {
+    set.seed(seed)
+  }
+  contam_flag <- stats::rbinom(n = length(contam_prob), size = 1, prob = contam_prob) == 1
+
   list(
     contam_prob = contam_prob,
     contam_lr = contam_lr,
