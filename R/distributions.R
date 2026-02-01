@@ -1148,7 +1148,8 @@ recycle_cswald_params <- function(n, drift, bound, ndt, zr, s, response = NULL) 
 #'   columns for multiple observations.
 #' @param n_upper Number of responses to the upper boundary
 #' @param n_trials Total number of trials
-#' @param drift Drift rate (positive, evidence accumulation rate).
+#' @param drift Drift rate (evidence accumulation rate; can be positive or negative
+#'   for below-chance performance).
 #' @param bound Boundary separation (distance between decision thresholds).
 #' @param ndt Non-decision time (seconds).
 #' @param zr Relative starting point (0 to 1). Only used for version "4par".
@@ -1208,7 +1209,6 @@ dezdm <- function(mean_rt, var_rt, n_upper, n_trials,
   version <- match.arg(version)
 
   # parameter validation
-  stopif(isTRUE(any(drift <= 0)), "drift must be positive")
   stopif(isTRUE(any(bound <= 0)), "bound must be positive")
   stopif(isTRUE(any(ndt <= 0)), "ndt must be positive")
   stopif(isTRUE(any(s <= 0)), "s must be positive")
@@ -1251,7 +1251,6 @@ rezdm <- function(n, n_trials, drift, bound, ndt, zr = 0.5, s = 1,
   version <- match.arg(version)
 
   # parameter validation
-  stopif(isTRUE(any(drift <= 0)), "drift must be positive")
   stopif(isTRUE(any(bound <= 0)), "bound must be positive")
   stopif(isTRUE(any(ndt <= 0)), "ndt must be positive")
   stopif(isTRUE(any(s <= 0)), "s must be positive")
@@ -1557,11 +1556,19 @@ rezdm <- function(n, n_trials, drift, bound, ndt, zr = 0.5, s = 1,
   # non-zero drift formulas
   if (any(!zero_drift)) {
     i <- !zero_drift
-    y <- -bound[i] * drift[i] / s[i]^2
+    # Use signed drift for pC calculation
+    y <- -(bound[i] * drift[i]) / s[i]^2
     expy <- exp(y)
     pC[i] <- 1 / (1 + expy)
-    MDT[i] <- bound[i] / (2 * drift[i]) * (1 - expy) / (1 + expy)
-    VRT[i] <- bound[i] * s[i]^2 / (2 * drift[i]^3) * (2 * y * expy - exp(2 * y) + 1) / (expy + 1)^2
+    # Use soft absolute value: sqrt(drift^2 + tau^2) with tau = 0.01
+    # This avoids extreme curvature while maintaining smoothness
+    tau <- 0.01
+    drift_abs <- sqrt(drift[i]^2 + tau^2)
+    y_abs <- -(bound[i] * drift_abs) / s[i]^2
+    expy_abs <- exp(y_abs)
+    MDT[i] <- (bound[i] / (2 * drift_abs)) * ((1 - expy_abs) / (1 + expy_abs))
+    VRT[i] <- ((bound[i] * s[i]^2) / (2 * drift_abs^3)) *
+      (2 * y_abs * expy_abs - exp(2 * y_abs) + 1) / ((expy_abs + 1)^2)
   }
 
   nlist(pC, MDT, VRT)
@@ -1583,24 +1590,39 @@ rezdm <- function(n, n_trials, drift, bound, ndt, zr = 0.5, s = 1,
   s <- rep_len(s, n)
 
   # compute intermediate values
-  a <- drift
   z <- bound / 2
   x0 <- (zr * bound) - z
 
-  kz <- a * z / s^2
-  kx <- a * x0 / s^2
+  # Use signed drift for pC calculation
+  k_z_signed <- (drift * z) / s^2
+  k_x_signed <- (drift * x0) / s^2
 
-  # proportion correct (works for all cases)
-  pC <- 1 - (exp(-2 * kx) - exp(-2 * kz)) / (exp(2 * kz) - exp(-2 * kz))
+  # proportion correct
+  # Guard against drift -> 0, where the analytic limit is pC = zr
+  zero_drift <- abs(drift) < 1e-6
+  pC <- numeric(n)
+  if (any(!zero_drift)) {
+    kz_nz <- k_z_signed[!zero_drift]
+    kx_nz <- k_x_signed[!zero_drift]
+    denom <- exp(2 * kz_nz) - exp(-2 * kz_nz)
+    num <- exp(-2 * kx_nz) - exp(-2 * kz_nz)
+    pC[!zero_drift] <- 1 - num / denom
+  }
+  if (any(zero_drift)) {
+    pC[zero_drift] <- zr[zero_drift]
+  }
+  # Use soft absolute value: sqrt(drift^2 + tau^2) with tau = 0.01
+  # This provides smooth gradients without extreme curvature
+  tau <- 0.01
+  a <- sqrt(drift^2 + tau^2)
+  kz <- (a * z) / s^2
+  kx <- (a * x0) / s^2
 
   # initialize outputs
   mdt_upper <- rep(NA_real_, n)
   mdt_lower <- rep(NA_real_, n)
   vrt_upper <- rep(NA_real_, n)
   vrt_lower <- rep(NA_real_, n)
-
-  # identify near-zero drift cases
-  zero_drift <- abs(drift) < 1e-6
 
   # zero-drift formulas
   if (any(zero_drift)) {
