@@ -35,8 +35,8 @@
       links = list(
         mu1 = "tan_half",
         kappa = "log",
-        thetat = "identity",
-        thetant = "identity"
+        thetat = "softmax",
+        thetant = "softmax"
       ),
       fixed_parameters = list(mu1 = 0, mu2 = 0, kappa2 = -100),
       default_priors = list(
