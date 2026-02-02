@@ -117,12 +117,19 @@ conditional_effects.bmmfit <- function(x,
 
   scale <- match.arg(scale)
 
-  # Require explicit parameter specification
+  # If par is NULL, forward to brms method for default behavior (response variable)
   if (is.null(par)) {
-    model_pars <- names(x$bmm$model$parameters)
+    return(NextMethod())
+  }
+  
+  # m3 models with explicit par are not supported
+  model_class <- class(x$bmm$model)
+  if ("m3" %in% model_class) {
     stop2(
-      "Argument 'par' is required. Please specify which parameter to plot.\n",
-      "Available parameters: {paste(model_pars, collapse = ', ')}"
+      "conditional_effects() with 'par' argument is not currently supported for m3 models.\n\n",
+      "Alternative approaches:\n",
+      "- Use posterior_predict() or posterior_epred() for predictions\n",
+      "- Extract posterior samples directly for custom visualization"
     )
   }
 
@@ -305,11 +312,8 @@ conditional_effects.bmmfit <- function(x,
   # For mixture3p: thetat, thetant, thetaguess (fixed at 0)
   # softmax denominator = exp(thetat) + exp(thetant) + exp(0) = exp(thetat) + exp(thetant) + 1
   
-  # Process each effect in the conditional_effects list
-  for (i in seq_along(ce_thetat)) {
-    df_thetat <- ce_thetat[[i]]
-    df_thetant <- ce_thetant[[i]]
-    
+  # Process each effect in the conditional_effects list using vectorized lapply
+  result <- Map(function(df_thetat, df_thetant) {
     # Check that both have same structure
     if (nrow(df_thetat) != nrow(df_thetant)) {
       stop2("Mismatch in conditional_effects structure between thetat and thetant")
@@ -317,33 +321,25 @@ conditional_effects.bmmfit <- function(x,
     
     # Extract values on sampling scale
     thetat_est <- df_thetat$estimate__
-    thetat_lower <- if ("lower__" %in% names(df_thetat)) df_thetat$lower__ else NULL
-    thetat_upper <- if ("upper__" %in% names(df_thetat)) df_thetat$upper__ else NULL
+    thetat_lower <- df_thetat$lower__
+    thetat_upper <- df_thetat$upper__
     
     thetant_est <- df_thetant$estimate__
-    thetant_lower <- if ("lower__" %in% names(df_thetant)) df_thetant$lower__ else NULL
-    thetant_upper <- if ("upper__" %in% names(df_thetant)) df_thetant$upper__ else NULL
+    thetant_lower <- df_thetant$lower__
+    thetant_upper <- df_thetant$upper__
     
     # Compute softmax denominator (sum of exp for all components)
     denom_est <- exp(thetat_est) + exp(thetant_est) + 1  # 1 = exp(0) for thetaguess
-    denom_lower <- if (!is.null(thetat_lower) && !is.null(thetant_lower)) {
-      exp(thetat_lower) + exp(thetant_lower) + 1
-    } else NULL
-    denom_upper <- if (!is.null(thetat_upper) && !is.null(thetant_upper)) {
-      exp(thetat_upper) + exp(thetant_upper) + 1
-    } else NULL
+    denom_lower <- exp(thetat_lower) + exp(thetant_lower) + 1
+    denom_upper <- exp(thetat_upper) + exp(thetant_upper) + 1
     
     # Select which parameter to return based on 'par'
     if (par == "thetat") {
       # Probability of target response
       df_result <- df_thetat
       df_result$estimate__ <- exp(thetat_est) / denom_est
-      if (!is.null(thetat_lower)) {
-        df_result$lower__ <- exp(thetat_lower) / denom_lower
-      }
-      if (!is.null(thetat_upper)) {
-        df_result$upper__ <- exp(thetat_upper) / denom_upper
-      }
+      df_result$lower__ <- exp(thetat_lower) / denom_lower
+      df_result$upper__ <- exp(thetat_upper) / denom_upper
     } else if (par == "thetant") {
       # Probability of swapping to non-targets
       # Note: In mixture3p, thetant already includes log(1/(set_size-1))
@@ -351,144 +347,20 @@ conditional_effects.bmmfit <- function(x,
       # We just need to apply softmax
       df_result <- df_thetant
       df_result$estimate__ <- exp(thetant_est) / denom_est
-      if (!is.null(thetant_lower)) {
-        df_result$lower__ <- exp(thetant_lower) / denom_lower
-      }
-      if (!is.null(thetant_upper)) {
-        df_result$upper__ <- exp(thetant_upper) / denom_upper
-      }
+      df_result$lower__ <- exp(thetant_lower) / denom_lower
+      df_result$upper__ <- exp(thetant_upper) / denom_upper
     } else {
       stop2("Unknown parameter: {par}")
     }
     
-    ce_thetat[[i]] <- df_result
-  }
+    df_result
+  }, ce_thetat, ce_thetant)
   
-  return(ce_thetat)
-}
-
-
-#' Map nlpar to corresponding dpar for native scale display
-#'
-#' @description
-#' For mixture models, nlpars like thetat/thetant use multinomial logit and
-#' can't be transformed individually. However, brms creates corresponding dpars
-#' (theta1, theta2, etc.) that represent the mixture weights on probability scale.
-#' This function maps user-facing nlpars to their corresponding dpars and
-#' optionally provides a post-processing function.
-#'
-#' @param bmmfit A bmmfit object
-#' @param par Character string. Parameter name (nlpar)
-#'
-#' @return List with elements:
-#'   - dpar: Character string with dpar name
-#'   - postprocess: Optional function(ce_result, bmmfit) for post-processing
-#'   Returns NULL if no mapping available.
-#'
-#' @keywords internal
-#' @noRd
-.map_nlpar_to_dpar <- function(bmmfit, par) {
-  model <- bmmfit$bmm$model
-  model_class <- class(model)
+  # Restore class and attributes from original conditional_effects object
+  class(result) <- class(ce_thetat)
+  attributes(result) <- c(attributes(result), attributes(ce_thetat)[!names(attributes(ce_thetat)) %in% c("names", "class")])
   
-  # mixture3p: map to theta dpars
-  if ("mixture3p" %in% model_class) {
-    # theta1 = target responses (from thetat)
-    # theta2 = guessing responses (fixed at 0)
-    # theta3+ = non-target responses (from thetant)
-    if (par == "thetat") {
-      return(list(dpar = "theta1", postprocess = NULL))
-    } else if (par == "thetant") {
-      # theta3 represents probability of swapping to ONE specific lure
-      # Need to multiply by (set_size - 1) to get total swap probability
-      return(list(
-        dpar = "theta3",
-        postprocess = .postprocess_thetant_mixture3p
-      ))
-    }
-  }
-  
-  # Add more mappings here for other mixture models if needed
-  
-  return(NULL)
-}
-
-
-#' Post-process thetant for mixture3p models
-#'
-#' @description
-#' Multiplies theta3 (probability of swapping to one specific lure) by
-#' (set_size - 1) to get the total probability of swapping to any non-target.
-#'
-#' @param ce_result Conditional effects object from brms
-#' @param bmmfit A bmmfit object
-#'
-#' @return Modified conditional effects object
-#'
-#' @keywords internal
-#' @noRd
-.postprocess_thetant_mixture3p <- function(ce_result, bmmfit) {
-  set_size_var <- bmmfit$bmm$model$other_vars$set_size
-  
-  # Process each effect in the list
-  for (i in seq_along(ce_result)) {
-    df <- ce_result[[i]]
-    
-    # Determine set_size for each row
-    if (set_size_var %in% names(df)) {
-      # set_size varies in the data
-      ss_values <- df[[set_size_var]]
-    } else if (set_size_var %in% names(attr(df, "conditions"))) {
-      # set_size is in conditions (constant across this effect)
-      ss_values <- rep(attr(df, "conditions")[[set_size_var]], nrow(df))
-    } else {
-      # Try to get from cond__ or other attributes
-      # Fall back to extracting from bmmfit data
-      data <- bmmfit$data
-      if (set_size_var %in% names(data)) {
-        # Use the unique set_size values or mean if variable
-        ss_unique <- unique(data[[set_size_var]])
-        if (length(ss_unique) == 1) {
-          ss_values <- rep(ss_unique, nrow(df))
-        } else {
-          warning2(
-            "set_size varies in data but not specified in conditional_effects.\n",
-            "Using mean set_size for thetant scaling. Consider specifying set_size explicitly."
-          )
-          ss_values <- rep(mean(as.numeric(as.character(data[[set_size_var]])), na.rm = TRUE), nrow(df))
-        }
-      } else {
-        stop2(
-          "Cannot determine set_size for thetant post-processing.\n",
-          "Expected variable '{set_size_var}' not found in data or conditions."
-        )
-      }
-    }
-    
-    # Convert set_size to numeric if it's a factor
-    if (is.factor(ss_values)) {
-      ss_values <- as.numeric(as.character(ss_values))
-    } else if (!is.numeric(ss_values)) {
-      ss_values <- as.numeric(ss_values)
-    }
-    
-    # Multiply probability columns by (set_size - 1)
-    multiplier <- ss_values - 1
-    df$estimate__ <- df$estimate__ * multiplier
-    if ("lower__" %in% names(df)) {
-      df$lower__ <- df$lower__ * multiplier
-    }
-    if ("upper__" %in% names(df)) {
-      df$upper__ <- df$upper__ * multiplier
-    }
-    if ("se__" %in% names(df)) {
-      df$se__ <- df$se__ * multiplier
-    }
-    
-    ce_result[[i]] <- df
-  }
-  
-  return(ce_result)
+  result
 }
 
 
@@ -513,25 +385,14 @@ conditional_effects.bmmfit <- function(x,
     return(ce_object) # No transformation needed
   }
 
-  # Apply transformation to each data frame in the list
+  # Apply transformation to each data frame in the list using vectorized lapply
   # conditional_effects returns a list of data frames, one per effect
-  for (i in seq_along(ce_object)) {
-    df <- ce_object[[i]]
-
+  lapply(ce_object, function(df) {
     # Transform estimate and confidence intervals using link_transform()
     # brms stores these as estimate__, lower__, upper__
-    if ("estimate__" %in% names(df)) {
-      df$estimate__ <- link_transform(df$estimate__, link, inverse = inverse)
-    }
-    if ("lower__" %in% names(df)) {
-      df$lower__ <- link_transform(df$lower__, link, inverse = inverse)
-    }
-    if ("upper__" %in% names(df)) {
-      df$upper__ <- link_transform(df$upper__, link, inverse = inverse)
-    }
-
-    ce_object[[i]] <- df
-  }
-
-  return(ce_object)
+    df$estimate__ <- link_transform(df$estimate__, link, inverse = inverse)
+    df$lower__ <- link_transform(df$lower__, link, inverse = inverse)
+    df$upper__ <- link_transform(df$upper__, link, inverse = inverse)
+    df
+  })
 }
