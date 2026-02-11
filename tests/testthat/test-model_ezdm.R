@@ -35,7 +35,7 @@ test_that("ezdm model parameters are correctly defined for 4par version", {
 
 test_that("ezdm model has correct link functions", {
   model <- ezdm("mean_rt", "var_rt", "n_upper", "n_trials", version = "4par")
-  expect_equal(model$links$drift, "log")
+  expect_equal(model$links$drift, "identity")  # Changed to identity to allow negative drift
   expect_equal(model$links$bound, "log")
   expect_equal(model$links$ndt, "log")
   expect_equal(model$links$zr, "logit")
@@ -43,10 +43,10 @@ test_that("ezdm model has correct link functions", {
 })
 
 test_that("ezdm model accepts custom links", {
-  custom_links <- list(drift = "identity")
+  custom_links <- list(bound = "identity")  # Changed from drift since identity is now default
   model <- ezdm("mean_rt", "var_rt", "n_upper", "n_trials", version = "3par", links = custom_links)
-  expect_equal(model$links$drift, "identity")
-  expect_equal(model$links$bound, "log") # unchanged
+  expect_equal(model$links$drift, "identity")  # default
+  expect_equal(model$links$bound, "identity")  # custom
 })
 
 test_that("ezdm check_data validates mean_rt variable", {
@@ -125,7 +125,7 @@ test_that("ezdm check_data validates n_trials variable", {
   )
   expect_error(
     check_data(model, invalid_data, bmf(drift ~ 1, bound ~ 1, ndt ~ 1)),
-    "must larger than two"
+    "must be larger than two"
   )
 
   # n_trials = 1 should error (must be > 2)
@@ -137,7 +137,7 @@ test_that("ezdm check_data validates n_trials variable", {
   )
   expect_error(
     check_data(model, invalid_data_1, bmf(drift ~ 1, bound ~ 1, ndt ~ 1)),
-    "must larger than two"
+    "must be larger than two"
   )
 
   # n_trials = 2 should error (must be larger than 2)
@@ -149,7 +149,7 @@ test_that("ezdm check_data validates n_trials variable", {
   )
   expect_error(
     check_data(model, invalid_data_2, bmf(drift ~ 1, bound ~ 1, ndt ~ 1)),
-    "must larger than two"
+    "must be larger than two"
   )
 
   # Non-integer n_trials should warn

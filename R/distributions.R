@@ -572,15 +572,24 @@ rimm <- function(n, mu = c(0, 2, -1.5), dist = c(0, 0.5, 2),
 #'   and each value is the number of observed responses per category
 #' @param n Integer. Number of observations to generate data for
 #' @param size The total number of observations in all categories
-#' @param pars A named vector of parameters of the memory measurement model
+#' @param pars A named vector of parameters of the memory measurement model.
+#'   Note: The fixed parameter `b` does not need to be provided - it will be
+#'   automatically added from the model specification if missing.
 #' @param m3_model A `bmmodel` object specifying the m3 model that densities or
 #'   random samples should be generated for
 #' @param act_funs A `bmmformula` object specifying the activation functions for
-#'   the different response categories for the "custom" version of the M3. The
-#'   default will attempt to construct the standard activation functions for the
-#'   "ss" and "cs" model version. For a custom m3 model you need to specify the
-#'   act_funs argument manually
+#'   the different response categories. This can be either:
+#'   (1) Just the activation formulas (one for each response category), or
+#'   (2) A full bmmformula including both activation formulas and other parameters.
+#'   If a full formula is provided, only the formulas matching response categories
+#'   will be extracted. The default will attempt to construct the standard
+#'   activation functions for the "ss" and "cs" model version. For a custom m3
+#'   model you need to specify the act_funs argument manually.
 #' @param log Logical; if `TRUE` (default), values are returned on the log scale.
+#' @param unpack Logical; if `TRUE` and `n = 1`, returns a named vector instead of
+#'   a matrix. This allows automatic unpacking of response categories into separate
+#'   columns when used with `dplyr::reframe()`. Default is `FALSE` for backward
+#'   compatibility.
 #' @param ... can be used to pass additional variables that are used in the
 #'   activation functions, but not parameters of the model
 #'
@@ -594,15 +603,48 @@ rimm <- function(n, mu = c(0, 2, -1.5), dist = c(0, 0.5, 2),
 #'   gives the random generation function for the memory measurement model.
 #'
 #' @examples
+#' # Basic usage - b parameter is added automatically
 #' model <- m3(
 #'   resp_cats = c("corr", "other", "npl"),
 #'   num_options = c(1, 4, 5),
 #'   choice_rule = "simple",
 #'   version = "ss"
 #' )
-#' dm3(x = c(20, 10, 10), pars = c(a = 1, b = 1, c = 2), m3_model = model)
+#' 
+#' # No need to provide b parameter
+#' dm3(x = c(20, 10, 10), pars = c(a = 1, c = 2), m3_model = model)
+#' rm3(n = 10, size = 100, pars = c(a = 1, c = 2), m3_model = model)
+#' 
+#' # Can also use full formula (activation formulas are extracted automatically)
+#' full_formula <- bmf(
+#'   corr ~ b + a + c,
+#'   other ~ b + a, 
+#'   npl ~ b,
+#'   a ~ 1,
+#'   c ~ 1
+#' )
+#' rm3(n = 10, size = 100, pars = c(a = 1, c = 2), 
+#'     m3_model = model, act_funs = full_formula)
+#'     
+#' \dontrun{
+#' # Use with dplyr::reframe() for automatic unpacking into columns
+#' library(dplyr)
+#' library(tibble)
+#' param_grid <- expand.grid(a = c(0.5, 1, 1.5), c = c(1, 2, 3))
+#' 
+#' simulated_data <- param_grid %>%
+#'   rowwise() %>%
+#'   reframe(
+#'     a = a,
+#'     c = c,
+#'     # unpack=TRUE returns named vector; wrap in as_tibble_row for auto-unpacking
+#'     as_tibble_row(rm3(n = 1, size = 100, pars = c(a = a, c = c), 
+#'                       m3_model = model, unpack = TRUE))
+#'   )
+#' # Result has columns: a, c, corr, other, npl
+#' }
 #' @export
-dm3 <- function(x, pars, m3_model, act_funs = construct_m3_act_funs(m3_model, warnings = FALSE),
+dm3 <- function(x, pars, m3_model, act_funs = NULL,
                 log = TRUE, ...) {
   probs <- .compute_m3_probability_vector(pars, m3_model, act_funs, ...)
   dmultinom(x, prob = probs, log = log)
@@ -610,25 +652,66 @@ dm3 <- function(x, pars, m3_model, act_funs = construct_m3_act_funs(m3_model, wa
 
 #' @rdname m3dist
 #' @export
-rm3 <- function(n, size, pars, m3_model, act_funs = construct_m3_act_funs(m3_model, warnings = FALSE),
+rm3 <- function(n, size, pars, m3_model, act_funs = NULL, unpack = FALSE,
                 ...) {
   probs <- .compute_m3_probability_vector(pars, m3_model, act_funs, ...)
-  t(rmultinom(n, size = size, prob = probs))
+  result <- t(rmultinom(n, size = size, prob = probs))
+  
+  # If unpack=TRUE and n=1, return named vector for automatic unpacking
+  if (unpack && n == 1) {
+    result_vec <- as.vector(result[1, ])
+    names(result_vec) <- colnames(result)
+    return(result_vec)
+  }
+  
+  result
 }
 
 .compute_m3_probability_vector <-
-  function(pars, m3_model, act_funs = construct_m3_act_funs(m3_model, warnings = FALSE), ...) {
+  function(pars, m3_model, act_funs = NULL, ...) {
     pars <- c(pars, unlist(list(...)))
+    
+    # If act_funs is NULL, construct default activation functions
+    if (is.null(act_funs)) {
+      act_funs <- construct_m3_act_funs(m3_model, warnings = FALSE)
+    }
+    
+    # Extract activation functions if full formula is provided
+    if (inherits(act_funs, "bmmformula")) {
+      resp_cats <- m3_model$resp_vars$resp_cats
+      # Keep only formulas that match response categories
+      act_funs_filtered <- act_funs[names(act_funs) %in% resp_cats]
+      stopif(
+        length(act_funs_filtered) == 0,
+        "No activation formulas found in the provided formula. Expected formulas for: {collapse_comma(resp_cats)}"
+      )
+      act_funs <- act_funs_filtered
+    }
+    
     stopif(
       is_try_error(try(act_funs, silent = TRUE)),
       'No activation functions for version "custom" provided.
       Please pass activation functions for the different response categories
       using the "act_funs" argument.'
     )
+    
+    # Get required parameters from activation functions
+    required_pars <- rhs_vars(act_funs)
+    
+    # Add fixed b parameter if not provided
+    if ("b" %in% required_pars && !("b" %in% names(pars))) {
+      b_value <- m3_model$fixed_parameters$b
+      if (!is.null(b_value)) {
+        pars <- c(pars, b = b_value)
+      }
+    }
+    
     stopif(
-      !identical(sort(rhs_vars(act_funs)), sort(names(pars))),
+      !identical(sort(required_pars), sort(names(pars))),
       'The names or number of parameters used in the activation functions mismatch the names or number
-      of parameters ("pars") and additional arguments (i.e. ...) passed to the function.'
+      of parameters ("pars") and additional arguments (i.e. ...) passed to the function.
+      Required parameters: {collapse_comma(required_pars)}
+      Provided parameters: {collapse_comma(names(pars))}'
     )
 
     acts <- sapply(act_funs, function(pform) eval(pform[[length(pform)]], envir = as.list(pars)))
@@ -660,7 +743,8 @@ rm3 <- function(n, size, pars, m3_model, act_funs = construct_m3_act_funs(m3_mod
 #'   columns for multiple observations.
 #' @param n_upper Number of responses to the upper boundary
 #' @param n_trials Total number of trials
-#' @param drift Drift rate (positive, evidence accumulation rate).
+#' @param drift Drift rate (evidence accumulation rate; can be positive or negative
+#'   for below-chance performance).
 #' @param bound Boundary separation (distance between decision thresholds).
 #' @param ndt Non-decision time (seconds).
 #' @param zr Relative starting point (0 to 1). Only used for version "4par".
@@ -720,7 +804,6 @@ dezdm <- function(mean_rt, var_rt, n_upper, n_trials,
   version <- match.arg(version)
 
   # parameter validation
-  stopif(isTRUE(any(drift <= 0)), "drift must be positive")
   stopif(isTRUE(any(bound <= 0)), "bound must be positive")
   stopif(isTRUE(any(ndt <= 0)), "ndt must be positive")
   stopif(isTRUE(any(s <= 0)), "s must be positive")
@@ -763,7 +846,6 @@ rezdm <- function(n, n_trials, drift, bound, ndt, zr = 0.5, s = 1,
   version <- match.arg(version)
 
   # parameter validation
-  stopif(isTRUE(any(drift <= 0)), "drift must be positive")
   stopif(isTRUE(any(bound <= 0)), "bound must be positive")
   stopif(isTRUE(any(ndt <= 0)), "ndt must be positive")
   stopif(isTRUE(any(s <= 0)), "s must be positive")
@@ -1069,11 +1151,19 @@ rezdm <- function(n, n_trials, drift, bound, ndt, zr = 0.5, s = 1,
   # non-zero drift formulas
   if (any(!zero_drift)) {
     i <- !zero_drift
-    y <- -bound[i] * drift[i] / s[i]^2
+    # Use signed drift for pC calculation
+    y <- -(bound[i] * drift[i]) / s[i]^2
     expy <- exp(y)
     pC[i] <- 1 / (1 + expy)
-    MDT[i] <- bound[i] / (2 * drift[i]) * (1 - expy) / (1 + expy)
-    VRT[i] <- bound[i] * s[i]^2 / (2 * drift[i]^3) * (2 * y * expy - exp(2 * y) + 1) / (expy + 1)^2
+    # Use soft absolute value: sqrt(drift^2 + tau^2) with tau = 0.01
+    # This avoids extreme curvature while maintaining smoothness
+    tau <- 0.01
+    drift_abs <- sqrt(drift[i]^2 + tau^2)
+    y_abs <- -(bound[i] * drift_abs) / s[i]^2
+    expy_abs <- exp(y_abs)
+    MDT[i] <- (bound[i] / (2 * drift_abs)) * ((1 - expy_abs) / (1 + expy_abs))
+    VRT[i] <- ((bound[i] * s[i]^2) / (2 * drift_abs^3)) *
+      (2 * y_abs * expy_abs - exp(2 * y_abs) + 1) / ((expy_abs + 1)^2)
   }
 
   nlist(pC, MDT, VRT)
@@ -1095,24 +1185,39 @@ rezdm <- function(n, n_trials, drift, bound, ndt, zr = 0.5, s = 1,
   s <- rep_len(s, n)
 
   # compute intermediate values
-  a <- drift
   z <- bound / 2
   x0 <- (zr * bound) - z
 
-  kz <- a * z / s^2
-  kx <- a * x0 / s^2
+  # Use signed drift for pC calculation
+  k_z_signed <- (drift * z) / s^2
+  k_x_signed <- (drift * x0) / s^2
 
-  # proportion correct (works for all cases)
-  pC <- 1 - (exp(-2 * kx) - exp(-2 * kz)) / (exp(2 * kz) - exp(-2 * kz))
+  # proportion correct
+  # Guard against drift -> 0, where the analytic limit is pC = zr
+  zero_drift <- abs(drift) < 1e-6
+  pC <- numeric(n)
+  if (any(!zero_drift)) {
+    kz_nz <- k_z_signed[!zero_drift]
+    kx_nz <- k_x_signed[!zero_drift]
+    denom <- exp(2 * kz_nz) - exp(-2 * kz_nz)
+    num <- exp(-2 * kx_nz) - exp(-2 * kz_nz)
+    pC[!zero_drift] <- 1 - num / denom
+  }
+  if (any(zero_drift)) {
+    pC[zero_drift] <- zr[zero_drift]
+  }
+  # Use soft absolute value: sqrt(drift^2 + tau^2) with tau = 0.01
+  # This provides smooth gradients without extreme curvature
+  tau <- 0.01
+  a <- sqrt(drift^2 + tau^2)
+  kz <- (a * z) / s^2
+  kx <- (a * x0) / s^2
 
   # initialize outputs
   mdt_upper <- rep(NA_real_, n)
   mdt_lower <- rep(NA_real_, n)
   vrt_upper <- rep(NA_real_, n)
   vrt_lower <- rep(NA_real_, n)
-
-  # identify near-zero drift cases
-  zero_drift <- abs(drift) < 1e-6
 
   # zero-drift formulas
   if (any(zero_drift)) {
@@ -1149,4 +1254,302 @@ rezdm <- function(n, n_trials, drift, bound, ndt, zr = 0.5, s = 1,
   }
 
   nlist(pC, mdt_upper, mdt_lower, vrt_upper, vrt_lower)
+}
+
+
+# Ex-Gaussian density function
+# @param x Numeric vector of values
+# @param mu Mean of the Gaussian component
+# @param sigma Standard deviation of the Gaussian component
+# @param tau Rate parameter of the exponential component
+# @param log Logical, return log density if TRUE
+dexgauss <- function(x, mu, sigma, tau, log = FALSE) {
+  # Ensure positive parameters
+  if (sigma <= 0 || tau <= 0) {
+    return(rep(if (log) -Inf else 0, length(x)))
+  }
+
+  # Ex-Gaussian density: convolution of Gaussian and Exponential
+  # Using the standard formula with numerical stability
+  z <- (x - mu) / sigma - sigma / tau
+  log_dens <- -log(tau) + (sigma^2) / (2 * tau^2) - (x - mu) / tau +
+    pnorm(z, log.p = TRUE)
+
+  if (log) {
+    return(log_dens)
+  }
+  exp(log_dens)
+}
+
+# Inverse Gaussian (Wald) density function
+# @param x Numeric vector of values
+# @param mu Mean parameter
+# @param lambda Shape parameter
+# @param log Logical, return log density if TRUE
+dinvgauss <- function(x, mu, lambda, log = FALSE) {
+  # Ensure positive parameters and values
+  if (mu <= 0 || lambda <= 0) {
+    return(rep(if (log) -Inf else 0, length(x)))
+  }
+
+  valid <- x > 0
+  log_dens <- rep(-Inf, length(x))
+
+  if (any(valid)) {
+    xv <- x[valid]
+    log_dens[valid] <- 0.5 * (log(lambda) - log(2 * pi) - 3 * log(xv)) -
+      (lambda * (xv - mu)^2) / (2 * mu^2 * xv)
+  }
+
+  if (log) {
+    return(log_dens)
+  }
+  exp(log_dens)
+}
+
+# Compute log-likelihood for a distribution
+# @param x Numeric vector of RT values
+# @param params Named list of distribution parameters
+# @param distribution Character specifying the distribution type
+# @param weights Optional numeric vector of observation weights
+# @return Log-likelihood value
+neg_loglik <- function(x, params, distribution, weights = NULL) {
+  if (is.null(weights)) {
+    weights <- rep(1, length(x))
+  }
+
+  log_dens <- switch(distribution,
+    exgaussian = dexgauss(x, params["mu"], params["sigma"], params["tau"], log = TRUE),
+    lognormal = dlnorm(x, params["mu"], params["sigma"], log = TRUE),
+    invgaussian = dinvgauss(x, params["mu"], params["lambda"], log = TRUE)
+  )
+
+  -sum(weights * log_dens, na.rm = TRUE)
+}
+
+
+# Extract mean and variance from fitted distribution parameters
+# @param x Named list of distribution parameters
+# @param distribution Character specifying the distribution type
+# @return List with mean and var components
+.dist_moments <- function(x, distribution = c("exgaussian", "lognormal", "invgaussian")) {
+  distribution <- match.arg(distribution)
+  switch(distribution,
+    exgaussian = list(
+      mean = x["mu"] + x["tau"],
+      var = x["sigma"]^2 + x["tau"]^2
+    ),
+    lognormal = list(
+      mean = exp(x["mu"] + x["sigma"]^2 / 2),
+      var = exp(2 * x["mu"] + x["sigma"]^2) * (exp(x["sigma"]^2) - 1)
+    ),
+    invgaussian = list(
+      mean = x["mu"],
+      var = x["mu"]^3 / x["lambda"]
+    )
+  )
+}
+
+# Initialize distribution parameters using method of moments
+# @param x Numeric vector of RT values
+# @param distribution Character specifying the distribution type
+# @return Named list of initial parameter estimates
+.init_dist_params <- function(x, distribution) {
+  m <- mean(x)
+  v <- var(x)
+  s <- sd(x)
+
+  switch(distribution,
+    exgaussian = {
+      # Method of moments for ex-Gaussian
+      # Skewness = 2 * tau^3 / (sigma^2 + tau^2)^(3/2)
+      # Use simple heuristic: tau captures about 1/3 of the variance
+      tau <- max(s / 3, 0.01)
+      sigma <- max(sqrt(max(v - tau^2, 0.0001)), 0.01)
+      mu <- max(m - tau, 0.01)
+      c(mu = mu, sigma = sigma, tau = tau)
+    },
+    lognormal = {
+      # Method of moments for lognormal
+      sigma2 <- log(1 + v / m^2)
+      sigma <- sqrt(max(sigma2, 0.01))
+      mu <- log(m) - sigma2 / 2
+      c(mu = mu, sigma = sigma)
+    },
+    invgaussian = {
+      # Method of moments for inverse Gaussian
+      mu <- max(m, 0.01)
+      lambda <- max(mu^3 / v, 0.01)
+      c(mu = mu, lambda = lambda)
+    }
+  )
+}
+
+# Fit distribution parameters using weighted MLE
+# @param x Numeric vector of RT values
+# @param distribution Character specifying the distribution type
+# @param weights Numeric vector of observation weights
+# @param init_params Initial parameter estimates
+# @return Named list of fitted parameters
+.fit_dist_params <- function(x, distribution, weights, init_params) {
+  bounds <- .get_param_bounds(distribution)
+  result <- tryCatch(
+    stats::optim(
+      par = init_params,
+      fn = \(par) neg_loglik(x, par, distribution, weights),
+      method = "L-BFGS-B",
+      lower = bounds$lower,
+      upper = bounds$upper
+    ),
+    error = function(e) NULL
+  )
+
+  if (is.null(result) || result$convergence != 0) {
+    return(init_params)
+  }
+
+  result$par
+}
+
+# Get parameter bounds for optimization
+.get_param_bounds <- function(distribution) {
+  switch(distribution,
+    exgaussian = list(
+      lower = c(-Inf, 1e-6, 1e-6),
+      upper = c(Inf, Inf, Inf)
+    ),
+    lognormal = list(
+      lower = c(-Inf, 1e-6),
+      upper = c(Inf, Inf)
+    ),
+    invgaussian = list(
+      lower = c(1e-6, 1e-6),
+      upper = c(Inf, Inf)
+    )
+  )
+}
+
+# Fit RT mixture model using EM algorithm
+# @param x Numeric vector of RT values
+# @param distribution Character specifying the parametric distribution
+# @param contaminant_bound Numeric vector of length 2 for uniform bounds
+# @param init_contaminant Initial contaminant proportion
+# @param max_contaminant Maximum allowed contaminant proportion (clipping)
+# @param maxit Maximum EM iterations
+# @param tol Convergence tolerance
+# @return List with fitted params, contaminant proportion, convergence info
+.fit_rt_mixture <- function(x, distribution, contaminant_bound,
+                            init_contaminant, max_contaminant, maxit, tol) {
+  n <- length(x)
+
+  # Filter to valid range for fitting
+  x_valid <- x[x >= contaminant_bound[1] & x <= contaminant_bound[2]]
+  n_valid <- length(x_valid)
+
+  if (n_valid < 5) {
+    return(list(
+      params = NULL,
+      contaminant_prop = NA,
+      converged = FALSE,
+      iterations = 0,
+      message = "Too few observations in valid range"
+    ))
+  }
+
+  # Initialize parameters
+  pi_c <- init_contaminant # contaminant proportion
+  pi_rt <- 1 - pi_c # RT distribution proportion
+  dist_params <- .init_dist_params(x_valid, distribution)
+
+  # Uniform density (constant for contaminant component)
+  uniform_dens <- 1 / (contaminant_bound[2] - contaminant_bound[1])
+
+  prev_loglik <- -Inf
+  converged <- FALSE
+
+  for (iter in seq_len(maxit)) {
+    # E-step: compute responsibilities
+    dens_rt <- switch(distribution,
+      exgaussian = dexgauss(x_valid, dist_params["mu"], dist_params["sigma"],
+        dist_params["tau"],
+        log = FALSE
+      ),
+      lognormal = dlnorm(x_valid, dist_params["mu"], dist_params["sigma"]),
+      invgaussian = dinvgauss(x_valid, dist_params["mu"], dist_params["lambda"],
+        log = FALSE
+      )
+    )
+
+    # Ensure numerical stability
+    dens_rt <- pmax(dens_rt, 1e-300)
+
+    # Posterior probabilities
+    numer_rt <- pi_rt * dens_rt
+    numer_c <- pi_c * uniform_dens
+    denom <- numer_rt + numer_c
+
+    # Responsibilities (prob of being from RT distribution)
+    gamma_rt <- numer_rt / denom
+    gamma_c <- 1 - gamma_rt
+
+    # Handle numerical issues (NA or NaN in responsibilities)
+    if (any(is.na(gamma_rt)) || any(is.nan(gamma_rt))) {
+      # Fall back to previous iteration's estimates
+      break
+    }
+
+    # Compute log-likelihood
+    loglik <- sum(log(denom))
+
+    # Handle numerical issues in log-likelihood
+    if (is.na(loglik) || is.nan(loglik) || is.infinite(loglik)) {
+      break
+    }
+
+    # Check convergence
+    if (abs(loglik - prev_loglik) < tol) {
+      converged <- TRUE
+      break
+    }
+    prev_loglik <- loglik
+
+    # M-step: update parameters
+    # Update mixing proportions
+    pi_rt <- mean(gamma_rt, na.rm = TRUE)
+    pi_c <- 1 - pi_rt
+
+    # Handle edge case where pi_c is NA
+    if (is.na(pi_c)) {
+      pi_c <- init_contaminant
+      pi_rt <- 1 - pi_c
+    }
+
+    # Clip contaminant proportion to maximum allowed value
+    if (pi_c > max_contaminant) {
+      pi_c <- max_contaminant
+      pi_rt <- 1 - pi_c
+    }
+
+    # Update distribution parameters using weighted MLE
+    dist_params <- .fit_dist_params(
+      x_valid, distribution, gamma_rt,
+      dist_params
+    )
+  }
+
+  # Warn if contaminant proportion hit the maximum bound
+  if (pi_c >= max_contaminant) {
+    warning2("Contaminant proportion was clipped to max_contaminant \\
+             ({max_contaminant}). This may indicate data quality issues.",
+      env.frame = -1
+    )
+  }
+
+  list(
+    params = dist_params,
+    contaminant_prop = pi_c,
+    converged = converged,
+    iterations = iter,
+    loglik = if (converged) loglik else NA
+  )
 }

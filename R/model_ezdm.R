@@ -11,19 +11,19 @@
       s = "The diffusion constant, that is the standard deviation of the Gaussian noise during sampling"
     ),
     links = list(
-      drift = "log", bound = "log", ndt = "log", s = "log"
+      drift = "identity", bound = "log", ndt = "log", s = "log"
     ),
     fixed_parameters = list(s = 0, mu = 0),
     priors = list(
-      drift = list(main = "normal(0,1)", effects = "normal(0,0.5)"),
+      drift = list(main = "cauchy(0,1)", effects = "normal(0,0.5)"),
       bound = list(main = "normal(0,0.5)", effects = "normal(0,0.5)"),
       ndt = list(main = "normal(-1.5,0.5)", effects = "normal(0,0.3)"),
       s = list(main = "normal(0,1)", effects = "normal(0,0.3)")
     ),
     init_ranges = list(
-      mu = c(0, 1),
-      drift = c(0.5, 2),
-      bound = c(1, 2),
+      mu = c(0,1),
+      drift = c(-1,1),
+      bound = c(1,2),
       ndt = c(0.25, 0.5),
       s = c(0.99, 1.01)
     )
@@ -37,20 +37,20 @@
       s = "The diffusion constant, that is the standard deviation of the Gaussian noise during sampling"
     ),
     links = list(
-      drift = "log", bound = "log", ndt = "log", zr = "logit", s = "log"
+      drift = "identity", bound = "log", ndt = "log", zr = "logit", s = "log"
     ),
     fixed_parameters = list(s = 0, mu = 0),
     priors = list(
-      drift = list(main = "normal(0,1)", effects = "normal(0,0.5)"),
+      drift = list(main = "cauchy(0,1)", effects = "normal(0,0.5)"),
       bound = list(main = "normal(0,0.5)", effects = "normal(0,0.5)"),
       ndt = list(main = "normal(-1.5,0.5)", effects = "normal(0,0.3)"),
       zr = list(main = "normal(0,0.5)", effects = "normal(0,0.3)"),
       s = list(main = "normal(0,1)", effects = "normal(0,0.3)")
     ),
     init_ranges = list(
-      mu = c(0, 1),
-      drift = c(0.5, 2),
-      bound = c(1, 2),
+      mu = c(0,1),
+      drift = c(-1,1),
+      bound = c(1,2),
       ndt = c(0.25, 0.5),
       zr = c(0.45, 0.55),
       s = c(0.99, 1.01)
@@ -233,7 +233,7 @@ check_data.ezdm <- function(model, data, formula) {
   n_trials_values <- data[[n_trials]]
   stopif(
     any(n_trials_values <= 2, na.rm = TRUE),
-    "Number of trials (n_trials) must larger than two."
+    "Number of trials (n_trials) must be larger than two."
   )
   warnif(
     any(n_trials_values != round(n_trials_values), na.rm = TRUE),
@@ -301,7 +301,7 @@ configure_model.ezdm_3par <- function(model, data, formula) {
     "ezdm_3par",
     dpars = c("mu", "drift", "bound", "ndt", "s"),
     links = c("identity", links$drift, links$bound, links$ndt, links$s),
-    lb = c(NA, 0, 0, 0, 0),
+    lb = c(NA, NA, 0, 0, 0),
     ub = c(NA, NA, NA, NA, NA),
     type = "real",
     log_lik = log_lik_ezdm_3par,
@@ -365,7 +365,7 @@ configure_model.ezdm_4par <- function(model, data, formula) {
     "ezdm_4par",
     dpars = c("mu", "drift", "bound", "ndt", "zr", "s"),
     links = c("identity", links$drift, links$bound, links$ndt, links$zr, links$s),
-    lb = c(NA, 0, 0, 0, 0, 0), # lower bounds for parameters
+    lb = c(NA, NA, 0, 0, 0, 0), # lower bounds for parameters
     ub = c(NA, NA, NA, NA, 1, NA), # upper bounds for parameters
     type = "real", # real for continous dv, int for discrete dv
     log_lik = log_lik_ezdm_4par,

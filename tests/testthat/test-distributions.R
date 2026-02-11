@@ -126,7 +126,7 @@ test_that("dm3 requires custom act_funs to be specified", {
   )
   expect_error(
     dm3(x = c(10, 10, 10, 10), pars = c(a = 1, b = 1, c = 1, f = 1), m3_model = model),
-    "No activation functions"
+    "Activation functions can only be generated"
   )
 })
 
@@ -228,6 +228,134 @@ test_that("rm3 works for a complexspan m3 model", {
   expect_true(all(rowSums(res) == 100))
   expect_equal(colnames(res), model$resp_vars$resp_cats)
   expect_true(median(res[, "dist_other"]) > median(res))
+})
+
+test_that("rm3 works without providing b parameter", {
+  model <- m3(
+    resp_cats = c("corr", "other", "npl"),
+    num_options = c(1, 4, 5),
+    choice_rule = "simple",
+    version = "ss"
+  )
+  # b parameter should be added automatically
+  res <- rm3(n = 10, size = 100, pars = c(a = 1, c = 2), m3_model = model)
+  expect_type(res, "integer")
+  expect_true("matrix" %in% class(res))
+  expect_true(nrow(res) == 10 && ncol(res) == 3)
+  expect_true(all(rowSums(res) == 100))
+  expect_equal(colnames(res), model$resp_vars$resp_cats)
+})
+
+test_that("rm3 works with full bmmformula", {
+  model <- m3(
+    resp_cats = c("corr", "other", "npl"),
+    num_options = c(1, 4, 5),
+    choice_rule = "simple",
+    version = "ss"
+  )
+  # Full formula with both activation formulas and parameter formulas
+  full_formula <- bmf(
+    corr ~ b + a + c,
+    other ~ b + a,
+    npl ~ b,
+    a ~ 1,
+    c ~ 1
+  )
+  res <- rm3(n = 10, size = 100, pars = c(a = 1, c = 2), 
+             m3_model = model, act_funs = full_formula)
+  expect_type(res, "integer")
+  expect_true("matrix" %in% class(res))
+  expect_true(nrow(res) == 10 && ncol(res) == 3)
+  expect_true(all(rowSums(res) == 100))
+  expect_equal(colnames(res), model$resp_vars$resp_cats)
+})
+
+test_that("dm3 works without providing b parameter", {
+  model <- m3(
+    resp_cats = c("corr", "other", "npl"),
+    num_options = c(1, 4, 5),
+    choice_rule = "simple",
+    version = "ss"
+  )
+  # b parameter should be added automatically
+  dens <- dm3(x = c(20, 10, 10), pars = c(a = 1, c = 2), m3_model = model)
+  expect_type(dens, "double")
+  expect_length(dens, 1)
+})
+
+test_that("dm3 works with full bmmformula", {
+  model <- m3(
+    resp_cats = c("corr", "other", "npl"),
+    num_options = c(1, 4, 5),
+    choice_rule = "simple",
+    version = "ss"
+  )
+  full_formula <- bmf(
+    corr ~ b + a + c,
+    other ~ b + a,
+    npl ~ b,
+    a ~ 1,
+    c ~ 1
+  )
+  dens <- dm3(x = c(20, 10, 10), pars = c(a = 1, c = 2), 
+              m3_model = model, act_funs = full_formula)
+  expect_type(dens, "double")
+  expect_length(dens, 1)
+})
+
+test_that("rm3 errors when full formula has no activation functions", {
+  model <- m3(
+    resp_cats = c("corr", "other", "npl"),
+    num_options = c(1, 4, 5),
+    choice_rule = "simple",
+    version = "ss"
+  )
+  # Formula with only parameter formulas, no activation formulas
+  wrong_formula <- bmf(
+    a ~ 1,
+    c ~ 1
+  )
+  expect_error(
+    rm3(n = 10, size = 100, pars = c(a = 1, c = 2), 
+        m3_model = model, act_funs = wrong_formula),
+    "No activation formulas found"
+  )
+})
+
+test_that("rm3 with unpack=TRUE returns named vector for n=1", {
+  model <- m3(
+    resp_cats = c("corr", "other", "npl"),
+    num_options = c(1, 4, 5),
+    choice_rule = "simple",
+    version = "ss"
+  )
+  
+  # Test unpack=TRUE
+  result <- rm3(n = 1, size = 100, pars = c(a = 1, c = 2), 
+                m3_model = model, unpack = TRUE)
+  
+  expect_type(result, "integer")
+  expect_false("matrix" %in% class(result))
+  expect_true("integer" %in% class(result))
+  expect_equal(names(result), c("corr", "other", "npl"))
+  expect_equal(sum(result), 100)
+})
+
+test_that("rm3 with unpack=TRUE still returns matrix for n>1", {
+  model <- m3(
+    resp_cats = c("corr", "other", "npl"),
+    num_options = c(1, 4, 5),
+    choice_rule = "simple",
+    version = "ss"
+  )
+  
+  # unpack should be ignored when n > 1
+  result <- rm3(n = 5, size = 100, pars = c(a = 1, c = 2), 
+                m3_model = model, unpack = TRUE)
+  
+  expect_true("matrix" %in% class(result))
+  expect_equal(dim(result), c(5, 3))
+  expect_equal(colnames(result), c("corr", "other", "npl"))
 })
 
 
@@ -334,15 +462,6 @@ test_that("rezdm 4par returns plausible values", {
 })
 
 test_that("dezdm validates parameters correctly", {
-  # drift must be positive
-  expect_error(
-    dezdm(
-      mean_rt = 0.5, var_rt = 0.02, n_upper = 80, n_trials = 100,
-      drift = -1, bound = 1.5, ndt = 0.3
-    ),
-    "drift must be positive"
-  )
-
   # bound must be positive
   expect_error(
     dezdm(
@@ -417,12 +536,6 @@ test_that("dezdm validates parameters correctly", {
 })
 
 test_that("rezdm validates parameters correctly", {
-  # drift must be positive
-  expect_error(
-    rezdm(n = 10, n_trials = 100, drift = -1, bound = 1.5, ndt = 0.3),
-    "drift must be positive"
-  )
-
   # n must be single integer
   expect_error(
     rezdm(n = c(10, 20), n_trials = 100, drift = 2, bound = 1.5, ndt = 0.3),
@@ -448,6 +561,43 @@ test_that("dezdm handles edge case with near-zero drift", {
     drift = 1e-8, bound = 1.5, ndt = 0.3
   )
   expect_true(is.finite(ll))
+})
+
+test_that("dezdm 4par handles edge case with near-zero drift", {
+  # near-zero drift should not cause NaN in pC computation
+  # Test with different zr values to ensure pC -> zr as drift -> 0
+  
+  # Test with zr = 0.5 (symmetric starting point)
+  ll1 <- dezdm(
+    mean_rt = c(0.5, 0.5), var_rt = c(0.02, 0.02),
+    n_upper = 50, n_trials = 100,
+    drift = 1e-8, bound = 1.5, ndt = 0.3, zr = 0.5, version = "4par"
+  )
+  expect_true(is.finite(ll1))
+  
+  # Test with zr = 0.3 (bias toward lower boundary)
+  ll2 <- dezdm(
+    mean_rt = c(0.5, 0.5), var_rt = c(0.02, 0.02),
+    n_upper = 30, n_trials = 100,
+    drift = 1e-8, bound = 1.5, ndt = 0.3, zr = 0.3, version = "4par"
+  )
+  expect_true(is.finite(ll2))
+  
+  # Test with zr = 0.7 (bias toward upper boundary)
+  ll3 <- dezdm(
+    mean_rt = c(0.5, 0.5), var_rt = c(0.02, 0.02),
+    n_upper = 70, n_trials = 100,
+    drift = 1e-8, bound = 1.5, ndt = 0.3, zr = 0.7, version = "4par"
+  )
+  expect_true(is.finite(ll3))
+  
+  # Test with exactly zero drift
+  ll4 <- dezdm(
+    mean_rt = c(0.5, 0.5), var_rt = c(0.02, 0.02),
+    n_upper = 50, n_trials = 100,
+    drift = 0, bound = 1.5, ndt = 0.3, zr = 0.5, version = "4par"
+  )
+  expect_true(is.finite(ll4))
 })
 
 test_that("dezdm 4par handles edge cases with few responses at boundary", {
