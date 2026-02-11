@@ -146,6 +146,8 @@ conditional_effects.bmmfit <- function(x,
   if (par_info$multinomial && scale == "native") {
     softmax_result <- .compute_softmax_conditional_effects(x, par, ...)
     if (!is.null(softmax_result)) {
+      # Filter out internal variables before returning
+      softmax_result <- .filter_internal_effects(softmax_result, x)
       return(softmax_result)
     } else {
       # Fallback to warning if softmax computation not available
@@ -184,8 +186,87 @@ conditional_effects.bmmfit <- function(x,
       ce_result <- .apply_link_transform(ce_result, par_info$link, inverse = FALSE)
     }
   }
+  
+  # Filter out internal variables before returning
+  ce_result <- .filter_internal_effects(ce_result, x)
 
   return(ce_result)
+}
+
+
+#' Filter internal variables from conditional_effects results
+#'
+#' @description
+#' Removes conditional effects plots for internal model variables
+#' (like LureIdx, Idx_*, inv_ss, etc.) that are created during data
+#' preprocessing but are not part of the user's formula.
+#'
+#' @param ce_result A brms_conditional_effects object
+#' @param bmmfit A bmmfit object
+#'
+#' @return Filtered conditional_effects object with only user-specified predictors
+#'
+#' @keywords internal
+#' @noRd
+.filter_internal_effects <- function(ce_result, bmmfit) {
+  # Get user-specified variables from the data
+  # Internal variables typically match patterns like:
+  # - LureIdx* (mixture models)
+  # - Idx_* (m3 models)
+  # - inv_ss (mixture models)
+  # - Item*_Col_rad, Item*_Pos_rad (internal feature variables)
+  # - nt_features and nt_distances from model (mixture3p, imm, sdm models)
+  
+  internal_patterns <- c(
+    "^LureIdx",
+    "^Idx_",
+    "^inv_ss$",
+    "^Item[0-9]+_",
+    "^expS$"
+  )
+  
+  # Extract nt_features and nt_distances from model if available
+  model <- bmmfit$bmm$model
+  if (!is.null(model$other_vars$nt_features)) {
+    # Escape special regex characters and add to patterns
+    nt_features <- model$other_vars$nt_features
+    internal_patterns <- c(internal_patterns, paste0("^", gsub("([.|()\\^{}+$*?[]\\\\])", "\\\\\\1", nt_features), "$"))
+  }
+  if (!is.null(model$other_vars$nt_distances)) {
+    # Escape special regex characters and add to patterns
+    nt_distances <- model$other_vars$nt_distances
+    internal_patterns <- c(internal_patterns, paste0("^", gsub("([.|()\\^{}+$*?[]\\\\])", "\\\\\\1", nt_distances), "$"))
+  }
+  
+  # Get the names of effects in the conditional_effects list
+  effect_names <- names(ce_result)
+  
+  # Filter out effects that match internal patterns
+  keep_effects <- sapply(effect_names, function(name) {
+    # Extract the variable name from the effect name
+    # Effect names can be like "variable", "var1:var2", etc.
+    vars_in_effect <- strsplit(name, ":")[[1]]
+    
+    # Check if any variable matches internal patterns
+    any_internal <- any(sapply(vars_in_effect, function(var) {
+      any(sapply(internal_patterns, function(pattern) {
+        grepl(pattern, var)
+      }))
+    }))
+    
+    # Keep if not internal
+    !any_internal
+  })
+  
+  # Filter the list
+  if (any(keep_effects)) {
+    ce_result <- ce_result[keep_effects]
+    
+    # Restore class and attributes
+    class(ce_result) <- c("brms_conditional_effects", "list")
+  }
+  
+  ce_result
 }
 
 
@@ -387,7 +468,7 @@ conditional_effects.bmmfit <- function(x,
 
   # Apply transformation to each data frame in the list using vectorized lapply
   # conditional_effects returns a list of data frames, one per effect
-  lapply(ce_object, function(df) {
+  result <- lapply(ce_object, function(df) {
     # Transform estimate and confidence intervals using link_transform()
     # brms stores these as estimate__, lower__, upper__
     df$estimate__ <- link_transform(df$estimate__, link, inverse = inverse)
@@ -395,4 +476,10 @@ conditional_effects.bmmfit <- function(x,
     df$upper__ <- link_transform(df$upper__, link, inverse = inverse)
     df
   })
+  
+  # Restore class and attributes from original conditional_effects object
+  class(result) <- class(ce_object)
+  attributes(result) <- c(attributes(result), attributes(ce_object)[!names(attributes(ce_object)) %in% c("names", "class")])
+  
+  result
 }
