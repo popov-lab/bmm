@@ -1,5 +1,8 @@
 # bmm (development version)
 
+### New features
+* **EZDM now supports negative drift rates** to model below-chance performance. The drift parameter uses an identity link (previously log) and employs a soft absolute value approximation (sqrt(drift² + τ²) with τ = 0.01) to maintain smooth gradients for MCMC sampling while allowing bidirectional drift estimation.
+
 # bmm 1.3.0
 
 ### New models
