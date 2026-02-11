@@ -21,7 +21,7 @@ update(object, formula., newdata = NULL, recompile = NULL, ...)
 - formula.:
 
   A
-  [`bmmformula()`](https://venpopov.github.io/bmm/dev/reference/bmmformula.md).
+  [`bmmformula()`](https://venpopov.com/bmm/dev/reference/bmmformula.md).
   If missing, the original formula is used. Currently you have to
   specify a full `bmmformula`
 

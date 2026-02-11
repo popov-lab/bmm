@@ -6,12 +6,12 @@ The two-parameter mixture model (Zhang and Luck 2008) and the
 three-parameter mixture model (Bays, Catalao, and Husain 2009) are
 measurement models for continuous reproduction tasks in the visual
 working memory domain (for details on the task, see [the online
-article](https://venpopov.github.io/bmm/articles/bmm_vwm_crt.html). As
-other measurement models for continuous reproduction tasks, their goal
-is to model the distribution of angular response errors.
+article](https://venpopov.com/bmm/articles/bmm_vwm_crt.html). As other
+measurement models for continuous reproduction tasks, their goal is to
+model the distribution of angular response errors.
 
 The *two-parameter mixture model*
-([`?mixture2p`](https://venpopov.github.io/bmm/dev/reference/mixture2p.md))
+([`?mixture2p`](https://venpopov.com/bmm/dev/reference/mixture2p.md))
 distinguishes two memory states that lead to responses with a mixture of
 two different distributions of angular errors. The two states are:
 
@@ -44,7 +44,7 @@ of the von Mises distribution representing the target feature, and
 representing the precision of the target memory representation.
 
 The *three-parameter mixture model*
-([`?mixture3p`](https://venpopov.github.io/bmm/dev/reference/mixture3p.md))
+([`?mixture3p`](https://venpopov.com/bmm/dev/reference/mixture3p.md))
 adds a third state: confusing the cued object with another object shown
 during encoding and thus reporting the feature of the other object (long
 dashed green distribution in Figure [1.1](#fig:mixture-models)).
@@ -123,9 +123,8 @@ the data is in the correct format. The response variable should be in
 radians and represent the *angular error relative to the target*, and
 the non-target variables should be in radians and be *centered relative
 to the target*. You can find these requirements in the help topic for
-[`?mixture2p`](https://venpopov.github.io/bmm/dev/reference/mixture2p.md)
-and
-[`?mixture3p`](https://venpopov.github.io/bmm/dev/reference/mixture3p.md).
+[`?mixture2p`](https://venpopov.com/bmm/dev/reference/mixture2p.md) and
+[`?mixture3p`](https://venpopov.com/bmm/dev/reference/mixture3p.md).
 
 In this dataset, the response and non-target variables are already in
 radians, but they is not centered relative to the target. We can check
@@ -207,9 +206,9 @@ model <- mixture2p(resp_error = "error")
 ```
 
 Finally, we fit the model with the
-[`bmm()`](https://venpopov.github.io/bmm/dev/reference/bmm.md) function.
-The fit model function uses the `brms` package to fit the model, so you
-can pass to it any argument that you would pass to the `brm` function.
+[`bmm()`](https://venpopov.com/bmm/dev/reference/bmm.md) function. The
+fit model function uses the `brms` package to fit the model, so you can
+pass to it any argument that you would pass to the `brm` function.
 
 ``` r
 fit <- bmm(

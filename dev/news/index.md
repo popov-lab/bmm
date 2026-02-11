@@ -22,8 +22,8 @@
   starting point) and 4-parameter (asymmetric starting point) versions
   based on Srivastava et al. (2016). Implements Bayesian hierarchical
   estimation following Chavez & Vandekerckhove (2025). See the
-  [article](https://venpopov.github.io/bmm/dev/articles/bmm_ezdm.html)
-  on the `bmm` website for details.
+  [article](https://venpopov.com/bmm/dev/articles/bmm_ezdm.html) on the
+  `bmm` website for details.
 
 #### New features
 
@@ -41,10 +41,9 @@ CRAN release: 2025-07-24
   categorical decision tasks as new model class **m3** with three
   versions: simple span (**ss**), complex span (**cs**), and **custom**.
   For details, see the
-  [article](https://venpopov.github.io/bmm/dev/articles/bmm_m3.html) on
-  the `bmm` website
-  ([\#237](https://github.com/venpopov/bmm/issues/237)). Thanks to
-  [@GidonFrischkorn](https://github.com/GidonFrischkorn) and
+  [article](https://venpopov.com/bmm/dev/articles/bmm_m3.html) on the
+  `bmm` website ([\#237](https://github.com/venpopov/bmm/issues/237)).
+  Thanks to [@GidonFrischkorn](https://github.com/GidonFrischkorn) and
   [@chenyu-psy](https://github.com/chenyu-psy)
 
 #### New features
@@ -76,19 +75,18 @@ CRAN release: 2025-07-24
 #### Documentation
 
 - Add documentation to the [continuous reproduction
-  task](https://venpopov.github.io/bmm/articles/bmm_vwm_crt.html)
-  article for pre-processing half-circular stimulus spaces when using
-  `bmmodels` of the `circular` model class
+  task](https://venpopov.com/bmm/articles/bmm_vwm_crt.html) article for
+  pre-processing half-circular stimulus spaces when using `bmmodels` of
+  the `circular` model class
   ([\#229](https://github.com/venpopov/bmm/issues/229),
   [\#233](https://github.com/venpopov/bmm/issues/233)).
 - New online
-  [article](https://venpopov.github.io/bmm/dev/articles/bmm_m3.html) to
+  [article](https://venpopov.com/bmm/dev/articles/bmm_m3.html) to
   accompany the m3 model
 
 #### Other changes
 
-- vectorize
-  [`k2sd()`](https://venpopov.github.io/bmm/dev/reference/k2sd.md)
+- vectorize [`k2sd()`](https://venpopov.com/bmm/dev/reference/k2sd.md)
   function for improved performance
 - various internal refactorings
   ([\#246](https://github.com/venpopov/bmm/issues/246),
@@ -161,9 +159,9 @@ First version of the package on published on CRAN!
 #### Documentation
 
 - two new online articles that [introduce the **bmmformula**
-  syntax](https://venpopov.github.io/bmm/articles/bmm_bmmformula.html)
-  and explain [how to extract information from
-  **bmmodels**](https://venpopov.github.io/bmm/articles/bmm_extract_info.html)
+  syntax](https://venpopov.com/bmm/articles/bmm_bmmformula.html) and
+  explain [how to extract information from
+  **bmmodels**](https://venpopov.com/bmm/articles/bmm_extract_info.html)
   such as the generated Stan code and Stan data for each model
 
 #### Bug fixes
@@ -356,12 +354,12 @@ First version of the package on published on CRAN!
 #### Documentation
 
 - Website for the development version of the package is now available at
-  <https://venpopov.github.io/bmm/dev/>
+  <https://venpopov.com/bmm/dev/>
   ([\#18](https://github.com/venpopov/bmm/issues/18))
 - Add articles for each model to the website at
-  <https://venpopov.github.io/bmm/dev/articles/>
+  <https://venpopov.com/bmm/dev/articles/>
 - Add a detailed developer’s guide to the website at
-  <https://venpopov.github.io/bmm/dev/dev-notes>
+  <https://venpopov.com/bmm/dev/dev-notes>
   ([\#21](https://github.com/venpopov/bmm/issues/21))
 - Improve README with more detailed information about the package’s
   goals and its models

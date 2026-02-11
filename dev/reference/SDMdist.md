@@ -51,8 +51,8 @@ rsdm(n, mu = 0, c = 3, kappa = 3.5, parametrization = "sqrtexp")
 - parametrization:
 
   Character; either `"bessel"` or `"sqrtexp"` (default). See [the online
-  article](https://venpopov.github.io/bmm/articles/bmm_sdm_simple.html)
-  for details on the parameterization.
+  article](https://venpopov.com/bmm/articles/bmm_sdm_simple.html) for
+  details on the parameterization.
 
 - q:
 
@@ -91,14 +91,14 @@ the SDM distribution.
 **Parametrization**
 
 See [the online
-article](https://venpopov.github.io/bmm/articles/bmm_sdm_simple.html)
-for details on the parameterization. Oberauer (2023) introduced the SDM
-with the bessel parametrization. The sqrtexp parametrization is the
-default in the `bmm` package for numerical stability and efficiency. The
-two parametrizations are related by the functions
-[`c_bessel2sqrtexp()`](https://venpopov.github.io/bmm/dev/reference/c_parametrizations.md)
+article](https://venpopov.com/bmm/articles/bmm_sdm_simple.html) for
+details on the parameterization. Oberauer (2023) introduced the SDM with
+the bessel parametrization. The sqrtexp parametrization is the default
+in the `bmm` package for numerical stability and efficiency. The two
+parametrizations are related by the functions
+[`c_bessel2sqrtexp()`](https://venpopov.com/bmm/dev/reference/c_parametrizations.md)
 and
-[`c_sqrtexp2bessel()`](https://venpopov.github.io/bmm/dev/reference/c_parametrizations.md).
+[`c_sqrtexp2bessel()`](https://venpopov.com/bmm/dev/reference/c_parametrizations.md).
 
 **The cumulative distribution function**
 

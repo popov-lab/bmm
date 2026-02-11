@@ -166,7 +166,7 @@ ggplot(dat, aes(x=y, fill=cond)) +
 ### 3.2 Estimating the model with `bmm`
 
 To estimate the parameters of the SDM distribution, we can use the
-[`bmm()`](https://venpopov.github.io/bmm/dev/reference/bmm.md) function.
+[`bmm()`](https://venpopov.com/bmm/dev/reference/bmm.md) function.
 First, let’s specify the model formula. We want `c` and `kappa` to vary
 over conditions. The first two lines of the formula specify how the
 parameters vary over conditions. In this case, we want them to vary over
@@ -177,8 +177,8 @@ ff <- bmf(c ~ 0 + cond, kappa ~ 0 + cond)
 ```
 
 Then we specify the model, which in this case is just
-[`sdmSimple()`](https://venpopov.github.io/bmm/dev/reference/sdm.md),
-and we provide the name of the response error variable in the dataset:
+[`sdmSimple()`](https://venpopov.com/bmm/dev/reference/sdm.md), and we
+provide the name of the response error variable in the dataset:
 
 ``` r
 model <- sdm(resp_error = "y")

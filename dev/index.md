@@ -135,8 +135,8 @@ bmm::supported_models()
 ## Fitting models using `bmm`
 
 The core function of the `bmm` package is the
-[`bmm()`](https://venpopov.github.io/bmm/dev/reference/bmm.md) function.
-This function takes:
+[`bmm()`](https://venpopov.com/bmm/dev/reference/bmm.md) function. This
+function takes:
 
 1.  a *linear model formula* specifying how parameters of the model
     should vary as a function of experimental conditions
@@ -258,15 +258,14 @@ face challenges in writing their own STAN code to implement such models
 themselves can still use these models in almost any experimental design.
 
 Under the hood, the main
-[`bmm()`](https://venpopov.github.io/bmm/dev/reference/bmm.md) function
-will then call the appropriate functions for the specified model and
-will perform several steps:
+[`bmm()`](https://venpopov.com/bmm/dev/reference/bmm.md) function will
+then call the appropriate functions for the specified model and will
+perform several steps:
 
 1.  Configure the sampler (e.g., set up prallelization & additional
     settings)
 2.  Check the information passed to the
-    [`bmm()`](https://venpopov.github.io/bmm/dev/reference/bmm.md)
-    function:
+    [`bmm()`](https://venpopov.com/bmm/dev/reference/bmm.md) function:
     - if the model is installed and all required arguments were provided
     - if a valid formula was passed
     - if the data contains all necessary variables

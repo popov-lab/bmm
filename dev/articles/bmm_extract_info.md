@@ -11,13 +11,13 @@ important for you to understand what priors are used when you estimate a
 model, or when you report the results of a model fit.
 
 You can use the function
-[`default_prior()`](https://venpopov.github.io/bmm/dev/reference/default_prior.bmmformula.md)
+[`default_prior()`](https://venpopov.com/bmm/dev/reference/default_prior.bmmformula.md)
 from the `brms` package to extract the default priors for a model. The
 arguments to `default_prior` are the same as for the
-[`bmm()`](https://venpopov.github.io/bmm/dev/reference/bmm.md) function
-in `bmm`. For example, if you want to extract the default priors for the
+[`bmm()`](https://venpopov.com/bmm/dev/reference/bmm.md) function in
+`bmm`. For example, if you want to extract the default priors for the
 SDM model ([see the online article for more
-information](https://venpopov.github.io/bmm/articles/bmm_sdm_simple.html)),
+information](https://venpopov.com/bmm/articles/bmm_sdm_simple.html)),
 where you have a set_size categorical predictor of `c` and `kappa`, you
 can use the following code:
 
@@ -156,7 +156,7 @@ All of the above examples make an important point - priors are always
 specified on the scale at which the parameters are sampled. You can
 always check the documentation for a given model to see the links for
 the parameters (e.g.
-[`?sdm`](https://venpopov.github.io/bmm/dev/reference/sdm.md)).
+[`?sdm`](https://venpopov.com/bmm/dev/reference/sdm.md)).
 
 To overwrite the default priors and set your own, you can use the
 `set_prior` function from `brms`. For more information, see
@@ -170,7 +170,7 @@ and `brms`. `bmm` takes care of the code specific to the model, while
 everything else. If you want to get the Stan code that would be used for
 fitting a model, so that you can inspect it or modify it, you can use
 the
-[`stancode()`](https://venpopov.github.io/bmm/dev/reference/stancode.bmmformula.md)
+[`stancode()`](https://venpopov.com/bmm/dev/reference/stancode.bmmformula.md)
 function from `brms`:
 
 ``` r
@@ -328,7 +328,7 @@ stancode(bmf(c ~ 0 + set_size, kappa ~ 0 + set_size),
 
 Alternatively, if you already have a fitted model object, you can just
 call
-[`stancode()`](https://venpopov.github.io/bmm/dev/reference/stancode.bmmformula.md)
+[`stancode()`](https://venpopov.com/bmm/dev/reference/stancode.bmmformula.md)
 on that object, which will give you the same result:
 
 ``` r
@@ -342,7 +342,7 @@ stancode(fit)
 
 If you want to extract the data that would be used for fitting a model,
 you can use the
-[`standata()`](https://venpopov.github.io/bmm/dev/reference/standata.bmmformula.md)
+[`standata()`](https://venpopov.com/bmm/dev/reference/standata.bmmformula.md)
 function from `brms`. This function will return a list with the data
 that would be passed to Stan for fitting the model.
 

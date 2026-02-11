@@ -5,11 +5,10 @@
 bmm is an R package that translates domain-specific cognitive
 measurement models into brms/Stan syntax for Bayesian hierarchical
 modeling. Users specify models through S3 objects (e.g.,
-[`mixture3p()`](https://venpopov.github.io/bmm/dev/reference/mixture3p.md),
-[`imm()`](https://venpopov.github.io/bmm/dev/reference/imm.md),
-[`sdm()`](https://venpopov.github.io/bmm/dev/reference/sdm.md)) which
-are internally transformed into brms distributional families and Stan
-code.
+[`mixture3p()`](https://venpopov.com/bmm/dev/reference/mixture3p.md),
+[`imm()`](https://venpopov.com/bmm/dev/reference/imm.md),
+[`sdm()`](https://venpopov.com/bmm/dev/reference/sdm.md)) which are
+internally transformed into brms distributional families and Stan code.
 
 **Key Architecture**: Model specification → Formula construction → brms
 translation → Stan compilation
@@ -130,8 +129,8 @@ Each model class needs a `configure_model.*` S3 method in
 
 1.  **Preprocess data** (extract attributes from data checks)
 2.  **Build formula** using
-    [`bmf2bf()`](https://venpopov.github.io/bmm/dev/reference/bmf2bf.md)
-    to convert bmmformula → brmsformula
+    [`bmf2bf()`](https://venpopov.com/bmm/dev/reference/bmf2bf.md) to
+    convert bmmformula → brmsformula
 3.  **Define family** (often brms mixture distributions)
 4.  **Return** `nlist(formula, data, family, prior, stanvars)`
 

@@ -1,8 +1,8 @@
 # Generic S3 method for checking data based on model type
 
-Called by [`bmm()`](https://venpopov.github.io/bmm/dev/reference/bmm.md)
-to automatically perform checks on the data depending on the model type.
-It will call the appropriate check_data methods based on the list of
+Called by [`bmm()`](https://venpopov.com/bmm/dev/reference/bmm.md) to
+automatically perform checks on the data depending on the model type. It
+will call the appropriate check_data methods based on the list of
 classes defined in the .model\_\* functions. For models with several
 classes listed, it will call the functions in the order they are listed.
 Thus, any operations that are common to a group of models should be

@@ -16,7 +16,7 @@ Useful links:
 
 - <https://github.com/venpopov/bmm>
 
-- <https://venpopov.github.io/bmm/>
+- <https://venpopov.com/bmm/>
 
 - Report bugs at <https://github.com/venpopov/bmm/issues>
 

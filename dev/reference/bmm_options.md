@@ -23,17 +23,17 @@ bmm_options(
   logical. If TRUE, the data will be sorted by the predictors. If FALSE,
   the data will not be sorted, but sampling will be slower. If "check"
   (the default),
-  [`bmm()`](https://venpopov.github.io/bmm/dev/reference/bmm.md) will
-  check if the data is sorted, and ask you via a console prompt if it
-  should be sorted. **Default: "check"**
+  [`bmm()`](https://venpopov.com/bmm/dev/reference/bmm.md) will check if
+  the data is sorted, and ask you via a console prompt if it should be
+  sorted. **Default: "check"**
 
 - parallel:
 
   logical. If TRUE, chains will be run in parallel. If FALSE, chains
   will be run sequentially. You can also set these value for each model
   separately via the argument `parallel` in
-  [`bmm()`](https://venpopov.github.io/bmm/dev/reference/bmm.md).
-  **Default: FALSE**
+  [`bmm()`](https://venpopov.com/bmm/dev/reference/bmm.md). **Default:
+  FALSE**
 
 - default_priors:
 
@@ -75,7 +75,7 @@ current options. If arguments are provided, the function will change the
 options and return the old options invisibly. If you provide only some
 of the arguments, the other options will not be changed. The options are
 stored in the global options list and will be used by
-[`bmm()`](https://venpopov.github.io/bmm/dev/reference/bmm.md) and other
+[`bmm()`](https://venpopov.com/bmm/dev/reference/bmm.md) and other
 functions in the `bmm` package. Each of these options can also be set
 manually using the built-in
 [`options()`](https://rdrr.io/r/base/options.html) function, by setting

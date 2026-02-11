@@ -35,9 +35,9 @@ An object of class `bmmodel`
 ## Details
 
 see [the online
-article](https://venpopov.github.io/bmm/articles/bmm_sdm_simple.html)
-for a detailed description of the model and how to use it. \*
-**Domain:** Visual working memory
+article](https://venpopov.com/bmm/articles/bmm_sdm_simple.html) for a
+detailed description of the model and how to use it. \* **Domain:**
+Visual working memory
 
 - **Task:** Continuous reproduction
 

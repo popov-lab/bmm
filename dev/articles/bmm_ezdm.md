@@ -171,7 +171,7 @@ lower boundary (error) responses
 ## 4 Preparing data with `ezdm_summary_stats()`
 
 The `bmm` package provides the
-[`ezdm_summary_stats()`](https://venpopov.github.io/bmm/dev/reference/ezdm_summary_stats.md)
+[`ezdm_summary_stats()`](https://venpopov.com/bmm/dev/reference/ezdm_summary_stats.md)
 function to compute the required aggregated statistics from trial-level
 RT data in the correct format. This function addresses a critical
 challenge in applying the EZ-Diffusion Model: **RT contaminants** (fast
@@ -248,7 +248,7 @@ simple moments.
 ### 4.2 Three Methods for Computing Statistics
 
 The
-[`ezdm_summary_stats()`](https://venpopov.github.io/bmm/dev/reference/ezdm_summary_stats.md)
+[`ezdm_summary_stats()`](https://venpopov.com/bmm/dev/reference/ezdm_summary_stats.md)
 function provides three approaches to handle this challenge:
 
 #### 4.2.1 Simple Method (Standard Moments)
@@ -683,7 +683,7 @@ library(bmm)
 
 For illustration, we will generate simulated data with known parameters
 using the
-[`rezdm()`](https://venpopov.github.io/bmm/dev/reference/ezdm_dist.md)
+[`rezdm()`](https://venpopov.com/bmm/dev/reference/ezdm_dist.md)
 function. As for all other models, `bmm` provides a density and random
 generation function for all implemented models. In the case of the
 `ezdm` there is no single dependent variable for the density function,
@@ -747,9 +747,8 @@ head(sim_data)
 ### 5.2 Specifying the formula
 
 Next, we specify the model formula using
-[`bmmformula()`](https://venpopov.github.io/bmm/dev/reference/bmmformula.md)
-(or
-[`bmf()`](https://venpopov.github.io/bmm/dev/reference/bmmformula.md)).
+[`bmmformula()`](https://venpopov.com/bmm/dev/reference/bmmformula.md)
+(or [`bmf()`](https://venpopov.com/bmm/dev/reference/bmmformula.md)).
 For this example, we want to estimate separate drift rates for each
 condition while keeping boundary and non-decision time constant:
 
@@ -782,7 +781,7 @@ As for all other `bmmodel` this provides the necessary information for
 ### 5.4 Fitting the model
 
 Now we can fit the model using
-[`bmm()`](https://venpopov.github.io/bmm/dev/reference/bmm.md):
+[`bmm()`](https://venpopov.com/bmm/dev/reference/bmm.md):
 
 ``` r
 fit <- bmm(

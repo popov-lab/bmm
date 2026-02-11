@@ -31,7 +31,7 @@ contributor in the package documentation. These entail:
 We use Github to host all code, track issues and feature requests, as
 well as accept pull requests. Detailed info on the development process
 can be found in the `bmm` [Developer
-Notes](https://venpopov.github.io/bmm/dev/dev-notes/index.html)
+Notes](https://venpopov.com/bmm/dev/dev-notes/index.html)
 
 All changes and additions to code have to be submitted via pull
 requests. We consider all pull requests as propositions for changes to
@@ -60,8 +60,8 @@ entails:
 - avoid upper case labels in variable and function names
 
 The `bmm` [Developer
-Notes](https://venpopov.github.io/bmm/dev/dev-notes/index.html) provide
-an introduction into the file organization of the package. Please follow
+Notes](https://venpopov.com/bmm/dev/dev-notes/index.html) provide an
+introduction into the file organization of the package. Please follow
 the guidelines where to put functions associated with the different
 steps in fitting `bmmodels`. If you have questions or an unsure about
 where to add code, feel free to ask us. There is a dedicated

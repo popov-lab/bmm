@@ -56,28 +56,26 @@ continuous reproduction data:
 ##### The two-parameter mixture model (Zhang and Luck 2008)
 
 - see
-  [`?mixture2p`](https://venpopov.github.io/bmm/dev/reference/mixture2p.md)
+  [`?mixture2p`](https://venpopov.com/bmm/dev/reference/mixture2p.md)
   and [the mixture models
-  article](https://venpopov.github.io/bmm/articles/bmm_mixture_models.html)
+  article](https://venpopov.com/bmm/articles/bmm_mixture_models.html)
 
 ##### The three-parameter mixture model (Bays, Catalao, and Husain 2009)
 
 - see
-  [`?mixture3p`](https://venpopov.github.io/bmm/dev/reference/mixture3p.md)
+  [`?mixture3p`](https://venpopov.com/bmm/dev/reference/mixture3p.md)
   and [the mixture models
-  article](https://venpopov.github.io/bmm/articles/bmm_mixture_models.html)
+  article](https://venpopov.com/bmm/articles/bmm_mixture_models.html)
 
 ##### The Interference Measurement Model (Oberauer and Lin 2017)
 
-- see [`?imm`](https://venpopov.github.io/bmm/dev/reference/imm.md) and
-  [the IMM
-  article](https://venpopov.github.io/bmm/articles/bmm_imm.html)
+- see [`?imm`](https://venpopov.com/bmm/dev/reference/imm.md) and [the
+  IMM article](https://venpopov.com/bmm/articles/bmm_imm.html)
 
 ##### The Signal Discrimination Model (SDM) by (Oberauer 2023)
 
-- see [`?sdm`](https://venpopov.github.io/bmm/dev/reference/sdm.md) and
-  [the SDM
-  article](https://venpopov.github.io/bmm/articles/bmm_sdm_simple.html)
+- see [`?sdm`](https://venpopov.com/bmm/dev/reference/sdm.md) and [the
+  SDM article](https://venpopov.com/bmm/articles/bmm_sdm_simple.html)
 
 ## 4 Preparing data from half-circular stimulus spaces
 

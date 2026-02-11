@@ -3,10 +3,9 @@
 ## Main user entry point - `bmm()`
 
 The main function for fitting models is
-[`bmm()`](https://venpopov.github.io/bmm/dev/reference/bmm.md). This
-function is the main entry point for users to fit models. It is set-up
-to be independent of the specific models that are implemented in the
-package.
+[`bmm()`](https://venpopov.com/bmm/dev/reference/bmm.md). This function
+is the main entry point for users to fit models. It is set-up to be
+independent of the specific models that are implemented in the package.
 
 ``` r
 bmm <- function(formula, data, model,
@@ -57,21 +56,21 @@ It calls several subroutines, implemented as generic S3 methods, to:
 
 - `configure_options()` - to configure local options for fitting, such
   as parallel sampling,
-- [`check_model()`](https://venpopov.github.io/bmm/dev/reference/check_model.md) -
+- [`check_model()`](https://venpopov.com/bmm/dev/reference/check_model.md) -
   check if the model exists
-- [`check_formula()`](https://venpopov.github.io/bmm/dev/reference/check_formula.md) -
+- [`check_formula()`](https://venpopov.com/bmm/dev/reference/check_formula.md) -
   check if the formula is specified correctly and transform it to a
   brmsformula
-- [`check_data()`](https://venpopov.github.io/bmm/dev/reference/check_data.md) -
+- [`check_data()`](https://venpopov.com/bmm/dev/reference/check_data.md) -
   check whether the data contains all necessary information
-- [`configure_model()`](https://venpopov.github.io/bmm/dev/reference/configure_model.md) -
+- [`configure_model()`](https://venpopov.com/bmm/dev/reference/configure_model.md) -
   configures the model called for fitting
-- [`configure_prior()`](https://venpopov.github.io/bmm/dev/reference/configure_prior.md) -
+- [`configure_prior()`](https://venpopov.com/bmm/dev/reference/configure_prior.md) -
   sets the default priors for the model and combines them with the user
   prior
 - `call_brm()` - fit the model using the `brm()` function from the
   `brms` package
-- [`postprocess_brm()`](https://venpopov.github.io/bmm/dev/reference/postprocess_brm.md) -
+- [`postprocess_brm()`](https://venpopov.com/bmm/dev/reference/postprocess_brm.md) -
   to post-process the fitted model
 
 In addition, it also tests if the specified `bmmodel` has already been
@@ -148,9 +147,8 @@ my_new_model <- function(resp_var1, required_arg1, required_arg2,
 ```
 
 Then users can fit the model using the
-[`bmm()`](https://venpopov.github.io/bmm/dev/reference/bmm.md) function,
-and the model will be automatically recognized and handled by the
-package:
+[`bmm()`](https://venpopov.com/bmm/dev/reference/bmm.md) function, and
+the model will be automatically recognized and handled by the package:
 
 ``` r
 fit <- bmm(formula = my_bmmformula, 
@@ -164,7 +162,7 @@ The package uses S3 methods to handle different models. This means that
 the same function can behave differently depending on the class of the
 object it is called with. For example, the `configure_model(model)`
 function called by
-[`fit_model()`](https://venpopov.github.io/bmm/dev/reference/bmm.md), is
+[`fit_model()`](https://venpopov.com/bmm/dev/reference/bmm.md), is
 generally defined as:
 
 ``` r
@@ -175,13 +173,12 @@ configure_model <- function(model) {
 
 and it will call a function `configure_model.modelname()` that is
 specified for each model. The same is true for other functions, such as
-[`check_data()`](https://venpopov.github.io/bmm/dev/reference/check_data.md),
-[`postprocess_brm()`](https://venpopov.github.io/bmm/dev/reference/postprocess_brm.md),
+[`check_data()`](https://venpopov.com/bmm/dev/reference/check_data.md),
+[`postprocess_brm()`](https://venpopov.com/bmm/dev/reference/postprocess_brm.md),
 and
-[`check_formula()`](https://venpopov.github.io/bmm/dev/reference/check_formula.md).
+[`check_formula()`](https://venpopov.com/bmm/dev/reference/check_formula.md).
 This allows us to add new models without having to edit the main fitting
-function,
-[`bmm()`](https://venpopov.github.io/bmm/dev/reference/bmm.md).
+function, [`bmm()`](https://venpopov.com/bmm/dev/reference/bmm.md).
 
 ## File organization
 
@@ -190,10 +187,9 @@ The `bmm` package is organized into several files. The main files are:
 ### `R/bmm.R`
 
 It contains the main function for fitting models,
-[`bmm()`](https://venpopov.github.io/bmm/dev/reference/bmm.md). This
-function is the main entry point for users to fit models. It is set-up
-to be independent of the specific models that are implemented in the
-package.
+[`bmm()`](https://venpopov.com/bmm/dev/reference/bmm.md). This function
+is the main entry point for users to fit models. It is set-up to be
+independent of the specific models that are implemented in the package.
 
 To add new models, you do not have to edit this file. The functions
 above are generic S3 methods, and they will automatically recognize new
@@ -209,19 +205,19 @@ These files define the main generic S3 methods for checking data,
 post-processing the fitted model, configuring the model, checking the
 model formula, and combining priors. They contain the default methods
 for these functions, which are called by
-[`bmm()`](https://venpopov.github.io/bmm/dev/reference/bmm.md) if no
-specific method is defined for a model. If you want to add a new model,
-you will need to add specific methods for these functions for your
-model. *You do not need to edit these files to add a new model.*
+[`bmm()`](https://venpopov.com/bmm/dev/reference/bmm.md) if no specific
+method is defined for a model. If you want to add a new model, you will
+need to add specific methods for these functions for your model. *You do
+not need to edit these files to add a new model.*
 
 ### `R/bmmformula.R`
 
 This file contains the definition of the `bmmformula` class, which is
 used to represent the formula for the model. It contains the
-[`bmmformula()`](https://venpopov.github.io/bmm/dev/reference/bmmformula.md)
+[`bmmformula()`](https://venpopov.com/bmm/dev/reference/bmmformula.md)
 function and its alias
-[`bmf()`](https://venpopov.github.io/bmm/dev/reference/bmmformula.md),
-which is used to create a new formula object.
+[`bmf()`](https://venpopov.com/bmm/dev/reference/bmmformula.md), which
+is used to create a new formula object.
 
 In addition, it contains the definition of the `bmf2bf` S3 method that
 is used to convert a `bmmformula` object into a `brms_formula`\`object.

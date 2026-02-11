@@ -226,12 +226,10 @@ model <- imm(resp_error = "resp_error",
 
 By default the imm() function implements the full imm model. You can
 specify a reduced model by setting the version argument to “abc” or
-“bsc” (see
-[`?imm`](https://venpopov.github.io/bmm/dev/reference/imm.md)).
+“bsc” (see [`?imm`](https://venpopov.com/bmm/dev/reference/imm.md)).
 
 Finally, we can fit the model by passing all the relevant arguments to
-the [`bmm()`](https://venpopov.github.io/bmm/dev/reference/bmm.md)
-function:
+the [`bmm()`](https://venpopov.com/bmm/dev/reference/bmm.md) function:
 
 ``` r
 fit <- bmm(
@@ -302,9 +300,9 @@ scale reduction factor on split chains (at convergence, Rhat = 1).
 
 The first thing you might notice is that below the parts of the formula
 that was passed to the
-[`bmm()`](https://venpopov.github.io/bmm/dev/reference/bmm.md) function,
-`bmm` has added a lot of additional specifications to implement the IMM.
-This is nothing that you have to check. But if you are interested in
+[`bmm()`](https://venpopov.com/bmm/dev/reference/bmm.md) function, `bmm`
+has added a lot of additional specifications to implement the IMM. This
+is nothing that you have to check. But if you are interested in
 customizing and exploring different assumptions imposed by the IMM, you
 could start by taking this formula and adapting it accordingly.
 

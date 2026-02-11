@@ -33,8 +33,8 @@ bessel parametrization to the sqrtexp parametrization,
 bessel parametrization.
 
 See [the online
-article](https://venpopov.github.io/bmm/articles/bmm_sdm_simple.html)
-for details on the parameterization. The sqrtexp parametrization is the
+article](https://venpopov.com/bmm/articles/bmm_sdm_simple.html) for
+details on the parameterization. The sqrtexp parametrization is the
 default in the `bmm` package.
 
 ## Examples

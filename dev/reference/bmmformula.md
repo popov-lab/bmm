@@ -57,8 +57,8 @@ In `bmm`, the same formula would be written as:
                      bias ~ 1 + (1 | id))
 
 and the rt and response variables would be specified in the model
-argument of the
-[`bmm()`](https://venpopov.github.io/bmm/dev/reference/bmm.md) function.
+argument of the [`bmm()`](https://venpopov.com/bmm/dev/reference/bmm.md)
+function.
 
 Aside from that, the `bmm` formula syntax is the same as the `brms`
 formula syntax. For more information on the `brms` formula syntax, see
