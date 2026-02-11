@@ -47,7 +47,7 @@ ggplot2::theme_set(tidybayes::theme_tidybayes() + cowplot::panel_border())
 
 # Introduction to the models
 
-The two-parameter mixture model [@Zhang_Luck_2008] and the three-parameter mixture model [@Bays_Catalao_Husain_2009] are measurement models for continuous reproduction tasks in the visual working memory domain (for details on the task, see [the online article](https://venpopov.github.io/bmm/articles/bmm_vwm_crt.html). As other measurement models for continuous reproduction tasks, their goal is to model the distribution of angular response errors.
+The two-parameter mixture model [@Zhang_Luck_2008] and the three-parameter mixture model [@Bays_Catalao_Husain_2009] are measurement models for continuous reproduction tasks in the visual working memory domain (for details on the task, see [the online article](https://venpopov.com/bmm/articles/bmm_vwm_crt.html). As other measurement models for continuous reproduction tasks, their goal is to model the distribution of angular response errors.
 
 The *two-parameter mixture model* (`?mixture2p`) distinguishes two memory states that lead to responses with a mixture of two different distributions of angular errors. The two states are: 
 
