@@ -52,6 +52,7 @@ jobs:
             remotes
             waldo
             fansi
+            rtdists
             any::pkgdown
             local::.
 
