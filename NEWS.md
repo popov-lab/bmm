@@ -1,5 +1,28 @@
 # bmm (development version)
 
+### New models
+* Add **Signal Detection Theory (SDT)** models via the new `sdt()` function,
+  supporting five model versions across four noise distributions:
+  * **Versions**: Equal-variance SDT (`"evsdt"`), Unequal-variance SDT
+    (`variances = "unequal"`), Dual Process SDT (`"dpsdt"`, Yonelinas, 1994),
+    Meta-d' (`"metad"`, Maniscalco & Lau, 2012), and m-Alternative Forced
+    Choice (`"mafc"`, DeCarlo, 2012).
+  * **Noise distributions**: `"normal"` (Gaussian, reports d'), `"logistic"`,
+    `"gumbel_min"` (reports g', Meyer-Grant et al., 2025), and `"gumbel_max"`.
+    The `dprime` parameter always indexes sensitivity on the scale natural to
+    the chosen distribution; for `dist = "gumbel_min"` it estimates g' =
+    log(FA) - log(H), which is invariant under uniform expansion of the choice
+    set.
+  * **Threshold parameterizations** for confidence rating models:
+    `"equidistant"` (2 parameters, equal spacing in decision-variable space),
+    `"parsimonious"` (2 parameters, logit-spaced canonical positions, Selker
+    et al., 2019), and `"log_distance"` (K-2 parameters, fully flexible
+    ordered thresholds).
+  * **Distribution functions**: `rsdt()` and `dsdt()` for simulation and
+    density evaluation across all versions; `sdt_dprime()` and
+    `sdt_criterion()` for computing sensitivity and bias from hit/FA rates;
+    `combine_sdt_response()` for preparing confidence rating data.
+
 ### New features
 * **EZDM now supports negative drift rates** to model below-chance performance. The drift parameter uses an identity link (previously log) and employs a soft absolute value approximation (sqrt(drift² + τ²) with τ = 0.01) to maintain smooth gradients for MCMC sampling while allowing bidirectional drift estimation.
 

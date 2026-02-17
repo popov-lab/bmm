@@ -108,6 +108,7 @@ The following models are supported:
 \item mixture2p(resp_error)
 \item mixture3p(resp_error, nt_features, set_size, regex)
 \item sdm(resp_error, version)
+\item sdt(response, stimulus, n_trials, version, dist, variances, n_ratings, threshold_type, m, links)
 }
 
 Type  ?modelname  to get information about a specific model, e.g.  ?imm
