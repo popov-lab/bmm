@@ -23,7 +23,7 @@ URL: https://github.com/venpopov/bmm, https://venpopov.github.io/bmm/
 BugReports: https://github.com/venpopov/bmm/issues
 Depends: 
     R (>= 3.6.0)
-Imports: 
+Imports:
     brms (>= 2.21.0),
     crayon,
     fs,

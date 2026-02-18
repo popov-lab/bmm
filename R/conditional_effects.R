@@ -13,8 +13,8 @@
 #' @param x A bmmfit object (created by [bmm()])
 #' @param par Character string. Name of the model parameter to compute effects for.
 #'   This should be one of the parameter names from the original model specification
-#'   (see `names(x$bmm$model$parameters)`). If `NULL`, the function will error
-#'   and ask you to specify a parameter explicitly.
+#'   (see `names(x$bmm$model$parameters)`). If `NULL` (the default), conditional
+#'   effects are computed for all estimated (non-fixed) parameters.
 #' @param scale Character. Scale on which to show the parameter:
 #'   \describe{
 #'     \item{`"native"` (default)}{Show on natural scale using inverse link transformation.
@@ -117,20 +117,21 @@ conditional_effects.bmmfit <- function(x,
 
   scale <- match.arg(scale)
 
-  # If par is NULL, forward to brms method for default behavior (response variable)
+  # If par is NULL, compute conditional effects for all estimated parameters
   if (is.null(par)) {
-    return(NextMethod())
-  }
-  
-  # m3 models with explicit par are not supported
-  model_class <- class(x$bmm$model)
-  if ("m3" %in% model_class) {
-    stop2(
-      "conditional_effects() with 'par' argument is not currently supported for m3 models.\n\n",
-      "Alternative approaches:\n",
-      "- Use posterior_predict() or posterior_epred() for predictions\n",
-      "- Extract posterior samples directly for custom visualization"
-    )
+    model <- x$bmm$model
+    estimated_pars <- setdiff(names(model$parameters),
+                              names(model$fixed_parameters))
+    all_effects <- list()
+    for (p in estimated_pars) {
+      ce <- conditional_effects(x, par = p, scale = scale, ...)
+      if (length(ce) > 0) {
+        names(ce) <- paste0(p, ".", names(ce))
+        all_effects <- c(all_effects, ce)
+      }
+    }
+    class(all_effects) <- c("brms_conditional_effects", "list")
+    return(all_effects)
   }
 
   # Validate that par is a single character string
@@ -146,11 +147,9 @@ conditional_effects.bmmfit <- function(x,
   if (par_info$multinomial && scale == "native") {
     softmax_result <- .compute_softmax_conditional_effects(x, par, ...)
     if (!is.null(softmax_result)) {
-      # Filter out internal variables before returning
       softmax_result <- .filter_internal_effects(softmax_result, x)
       return(softmax_result)
     } else {
-      # Fallback to warning if softmax computation not available
       warning2(
         "Parameter '{par}' uses multinomial logit transformation.\n",
         "Native scale display not available for this model configuration.\n",
@@ -160,15 +159,15 @@ conditional_effects.bmmfit <- function(x,
     }
   }
 
-  # Route to brms::conditional_effects with appropriate arguments
-  # Use brms:::conditional_effects.brmsfit directly to avoid infinite recursion
-  # since x has class c("bmmfit", "brmsfit") and would dispatch back here
-  dots <- list(...)
-
-  if (par_info$type == "dpar") {
-    ce_result <- brms:::conditional_effects.brmsfit(x, dpar = par_info$brms_name, ...)
+  # For multinomial family models (m3), brms requires categorical = TRUE
+  # even when requesting a specific nlpar, which breaks the workflow.
+  # Bypass by computing conditional effects via posterior_linpred directly.
+  if ("m3" %in% class(x$bmm$model)) {
+    ce_result <- .compute_multinomial_conditional_effects(x, par, ...)
+  } else if (par_info$type == "dpar") {
+    ce_result <- .brms_conditional_effects(x, dpar = par_info$brms_name, ...)
   } else if (par_info$type == "nlpar") {
-    ce_result <- brms:::conditional_effects.brmsfit(x, nlpar = par_info$brms_name, ...)
+    ce_result <- .brms_conditional_effects(x, nlpar = par_info$brms_name, ...)
   } else {
     stop2("Internal error: parameter type must be 'dpar' or 'nlpar'")
   }
@@ -176,21 +175,38 @@ conditional_effects.bmmfit <- function(x,
   # Apply transformations based on parameter type and requested scale
   # - nlpars: brms returns on sampling scale, apply inverse link for native scale
   # - dpars: brms returns on native scale, apply forward link for sampling scale
-  
   if (par_info$link != "identity") {
     if (par_info$type == "nlpar" && scale == "native") {
-      # nlpar: sampling → native (apply inverse link)
       ce_result <- .apply_link_transform(ce_result, par_info$link, inverse = TRUE)
     } else if (par_info$type == "dpar" && scale %in% c("parameter", "sampling")) {
-      # dpar: native → sampling (apply forward link)
       ce_result <- .apply_link_transform(ce_result, par_info$link, inverse = FALSE)
     }
   }
-  
+
   # Filter out internal variables before returning
   ce_result <- .filter_internal_effects(ce_result, x)
 
   return(ce_result)
+}
+
+
+#' Call brms conditional_effects without infinite recursion
+#'
+#' @description
+#' Strips the `"bmmfit"` class so that S3 dispatch reaches
+#' `brms::conditional_effects.brmsfit()` instead of recursing back to
+#' `conditional_effects.bmmfit()`.
+#'
+#' @param x A bmmfit object
+#' @param ... Arguments forwarded to [brms::conditional_effects()]
+#'
+#' @return A `brms_conditional_effects` object
+#'
+#' @keywords internal
+#' @noRd
+.brms_conditional_effects <- function(x, ...) {
+  class(x) <- class(x)[class(x) != "bmmfit"]
+  conditional_effects(x, ...)
 }
 
 
@@ -360,6 +376,121 @@ conditional_effects.bmmfit <- function(x,
 }
 
 
+#' Build a prediction grid for conditional effects
+#'
+#' @description
+#' Constructs a prediction grid for computing conditional effects via
+#' [brms::posterior_linpred()]. For each effect variable, creates a data frame
+#' where that variable varies over its range (numeric) or levels (factor) while
+#' all other columns are held at reference values (mean for numeric, first level
+#' for factor).
+#'
+#' @param bmmfit A bmmfit object
+#' @param par Character string. Parameter name whose formula determines the
+#'   predictor variables.
+#' @param effects Character vector. Specific effect variables to include. If
+#'   `NULL`, all RHS variables from the parameter's formula are used.
+#' @param resolution Integer. Number of points for numeric predictors (default
+#'   100).
+#'
+#' @return A named list of data frames, one per effect variable. Empty list if
+#'   no effects are found.
+#'
+#' @keywords internal
+#' @noRd
+.ce_prediction_grid <- function(bmmfit, par, effects = NULL, resolution = 100) {
+  user_formula <- bmmfit$bmm$user_formula
+  par_formula <- user_formula[[par]]
+  if (is.null(par_formula)) return(list())
+
+  # Extract fixed-effect predictors only, excluding random-effects grouping
+  # variables (e.g. 'id' from (1|id) or (1||id)) by finding text between
+  # the last | and the closing ) in each bar term
+  rhs_str <- paste(deparse(stats::formula(par_formula)[[3]]), collapse = " ")
+  re_groups <- regmatches(
+    rhs_str, gregexpr("(?<=\\|)[^|)]+(?=\\))", rhs_str, perl = TRUE)
+  )[[1]]
+  re_groups <- trimws(unlist(strsplit(re_groups, "[:/+]")))
+  rhs_vars <- all.vars(stats::formula(par_formula)[-2])
+  rhs_vars <- setdiff(rhs_vars, c("0", "1", re_groups))
+
+  if (is.null(effects)) {
+    effect_vars <- rhs_vars
+  } else {
+    effect_vars <- unlist(strsplit(as.character(effects), ":"))
+    effect_vars <- intersect(effect_vars, rhs_vars)
+  }
+
+  if (length(effect_vars) == 0) return(list())
+
+  orig_data <- bmmfit$data
+  grids <- list()
+
+  for (var in effect_vars) {
+    col <- orig_data[[var]]
+    if (is.factor(col) || is.character(col)) {
+      varying <- sort(unique(col))
+    } else {
+      rng <- range(col, na.rm = TRUE)
+      varying <- seq(rng[1], rng[2], length.out = resolution)
+    }
+
+    newdata <- data.frame(x__ = varying)
+    names(newdata) <- var
+
+    for (v in setdiff(names(orig_data), var)) {
+      cv <- orig_data[[v]]
+      if (is.matrix(cv)) next
+      if (is.factor(cv)) {
+        newdata[[v]] <- factor(levels(cv)[1], levels = levels(cv))
+      } else if (is.character(cv)) {
+        newdata[[v]] <- cv[1]
+      } else if (is.integer(cv)) {
+        newdata[[v]] <- as.integer(round(stats::median(cv, na.rm = TRUE)))
+      } else if (is.numeric(cv)) {
+        newdata[[v]] <- mean(cv, na.rm = TRUE)
+      } else {
+        newdata[[v]] <- cv[1]
+      }
+    }
+
+    grids[[var]] <- newdata
+  }
+
+  grids
+}
+
+
+#' Summarize posterior draws into conditional-effect statistics
+#'
+#' @description
+#' Takes a draws matrix (n_draws x n_grid_points) and computes summary
+#' statistics suitable for `brms_conditional_effects` data frames.
+#'
+#' @param draws Matrix. Posterior draws (rows = draws, columns = grid points).
+#' @param prob Numeric. Probability mass for credible intervals (default 0.95).
+#' @param robust Logical. If `TRUE`, use median/MAD instead of mean/SD.
+#'
+#' @return A list with elements `estimate`, `lower`, `upper`, `se` — each a
+#'   numeric vector of length `ncol(draws)`.
+#'
+#' @keywords internal
+#' @noRd
+.ce_summarize_draws <- function(draws, prob = 0.95, robust = FALSE) {
+  probs <- c((1 - prob) / 2, 1 - (1 - prob) / 2)
+  if (robust) {
+    estimate <- apply(draws, 2, stats::median)
+    se <- apply(draws, 2, stats::mad)
+  } else {
+    estimate <- colMeans(draws)
+    se <- apply(draws, 2, stats::sd)
+  }
+  lower <- apply(draws, 2, stats::quantile, probs = probs[1])
+  upper <- apply(draws, 2, stats::quantile, probs = probs[2])
+  list(estimate = estimate, lower = lower, upper = upper, se = se)
+}
+
+
 #' Compute softmax transformation for multinomial parameters
 #'
 #' @description
@@ -378,69 +509,137 @@ conditional_effects.bmmfit <- function(x,
 .compute_softmax_conditional_effects <- function(bmmfit, par, ...) {
   model <- bmmfit$bmm$model
   model_class <- class(model)
-  
+
   # Currently only implemented for mixture3p
   if (!"mixture3p" %in% model_class) {
     return(NULL)
   }
-  
-  # Extract conditional effects for all theta parameters on sampling scale
-  # thetat and thetant are nlpars, thetaguess is fixed to 0
-  ce_thetat <- brms:::conditional_effects.brmsfit(bmmfit, nlpar = "thetat", ...)
-  ce_thetant <- brms:::conditional_effects.brmsfit(bmmfit, nlpar = "thetant", ...)
-  
-  # Apply softmax: prob_i = exp(theta_i) / sum(exp(theta_j))
-  # For mixture3p: thetat, thetant, thetaguess (fixed at 0)
-  # softmax denominator = exp(thetat) + exp(thetant) + exp(0) = exp(thetat) + exp(thetant) + 1
-  
-  # Process each effect in the conditional_effects list using vectorized lapply
-  result <- Map(function(df_thetat, df_thetant) {
-    # Check that both have same structure
-    if (nrow(df_thetat) != nrow(df_thetant)) {
-      stop2("Mismatch in conditional_effects structure between thetat and thetant")
-    }
-    
-    # Extract values on sampling scale
-    thetat_est <- df_thetat$estimate__
-    thetat_lower <- df_thetat$lower__
-    thetat_upper <- df_thetat$upper__
-    
-    thetant_est <- df_thetant$estimate__
-    thetant_lower <- df_thetant$lower__
-    thetant_upper <- df_thetant$upper__
-    
-    # Compute softmax denominator (sum of exp for all components)
-    denom_est <- exp(thetat_est) + exp(thetant_est) + 1  # 1 = exp(0) for thetaguess
-    denom_lower <- exp(thetat_lower) + exp(thetant_lower) + 1
-    denom_upper <- exp(thetat_upper) + exp(thetant_upper) + 1
-    
-    # Select which parameter to return based on 'par'
+
+  # Get conditional_effects for the requested par to obtain the grid
+  ce_par <- .brms_conditional_effects(bmmfit, nlpar = par, ...)
+
+  # Extract options from ... for posterior computation
+  dots <- list(...)
+  prob <- dots$prob %||% 0.95
+  robust <- dots$robust %||% FALSE
+  re_formula <- dots$re_formula %||% NA
+  ndraws <- dots$ndraws
+
+  # For each effect, compute softmax-transformed posterior draws
+  result <- lapply(ce_par, function(df) {
+    # Extract newdata grid (remove brms-internal *__ columns)
+    internal_cols <- grep("__$", names(df), value = TRUE)
+    newdata <- df[, !names(df) %in% internal_cols, drop = FALSE]
+
+    # Get posterior draws for both theta params on sampling scale
+    linpred_args <- list(
+      object = bmmfit,
+      newdata = newdata,
+      re_formula = re_formula,
+      allow_new_levels = TRUE
+    )
+    if (!is.null(ndraws)) linpred_args$ndraws <- ndraws
+
+    draws_t <- do.call(
+      brms::posterior_linpred,
+      c(linpred_args, list(nlpar = "thetat"))
+    )
+    draws_nt <- do.call(
+      brms::posterior_linpred,
+      c(linpred_args, list(nlpar = "thetant"))
+    )
+
+    # Apply softmax jointly per draw
+    # softmax denom = exp(thetat) + exp(thetant) + exp(0)
+    denom <- exp(draws_t) + exp(draws_nt) + 1
     if (par == "thetat") {
-      # Probability of target response
-      df_result <- df_thetat
-      df_result$estimate__ <- exp(thetat_est) / denom_est
-      df_result$lower__ <- exp(thetat_lower) / denom_lower
-      df_result$upper__ <- exp(thetat_upper) / denom_upper
-    } else if (par == "thetant") {
-      # Probability of swapping to non-targets
-      # Note: In mixture3p, thetant already includes log(1/(set_size-1))
-      # So exp(thetant) gives us the TOTAL swap probability directly
-      # We just need to apply softmax
-      df_result <- df_thetant
-      df_result$estimate__ <- exp(thetant_est) / denom_est
-      df_result$lower__ <- exp(thetant_lower) / denom_lower
-      df_result$upper__ <- exp(thetant_upper) / denom_upper
+      softmax_draws <- exp(draws_t) / denom
     } else {
-      stop2("Unknown parameter: {par}")
+      softmax_draws <- exp(draws_nt) / denom
     }
-    
-    df_result
-  }, ce_thetat, ce_thetant)
-  
-  # Restore class and attributes from original conditional_effects object
-  class(result) <- class(ce_thetat)
-  attributes(result) <- c(attributes(result), attributes(ce_thetat)[!names(attributes(ce_thetat)) %in% c("names", "class")])
-  
+
+    summ <- .ce_summarize_draws(softmax_draws, prob = prob, robust = robust)
+    df$estimate__ <- summ$estimate
+    df$lower__ <- summ$lower
+    df$upper__ <- summ$upper
+
+    df
+  })
+
+  names(result) <- names(ce_par)
+  class(result) <- class(ce_par)
+  result
+}
+
+
+#' Compute conditional effects for multinomial family models
+#'
+#' @description
+#' For models using `brms::multinomial()` family (e.g., m3), brms requires
+#' `categorical = TRUE` even when requesting a specific nlpar, which conflicts
+#' with nlpar-level computation. This helper bypasses that check by using
+#' `brms::posterior_linpred()` directly with a manually constructed prediction
+#' grid.
+#'
+#' @param bmmfit A bmmfit object
+#' @param par Character string. Parameter name (nlpar) to compute effects for
+#' @param ... Additional arguments (prob, robust, re_formula, ndraws, effects,
+#'   resolution)
+#'
+#' @return A `brms_conditional_effects` object with one element per effect
+#'
+#' @keywords internal
+#' @noRd
+.compute_multinomial_conditional_effects <- function(bmmfit, par, ...) {
+  dots <- list(...)
+  prob <- dots$prob %||% 0.95
+  robust <- dots$robust %||% FALSE
+  re_formula <- dots$re_formula %||% NA
+  ndraws <- dots$ndraws
+  resolution <- dots$resolution %||% 100
+  effects <- dots$effects
+
+  # Build prediction grids using shared helper
+  grids <- .ce_prediction_grid(bmmfit, par,
+                               effects = effects,
+                               resolution = resolution)
+  if (length(grids) == 0) {
+    return(structure(list(), class = c("brms_conditional_effects", "list")))
+  }
+
+  result <- list()
+
+  for (var in names(grids)) {
+    newdata <- grids[[var]]
+
+    # Get posterior draws for the nlpar
+    linpred_args <- list(
+      object = bmmfit,
+      newdata = newdata,
+      nlpar = par,
+      re_formula = re_formula,
+      allow_new_levels = TRUE
+    )
+    if (!is.null(ndraws)) linpred_args$ndraws <- ndraws
+
+    draws <- do.call(brms::posterior_linpred, linpred_args)
+
+    # Summarize draws using shared helper
+    summ <- .ce_summarize_draws(draws, prob = prob, robust = robust)
+    newdata$estimate__ <- summ$estimate
+    newdata$lower__ <- summ$lower
+    newdata$upper__ <- summ$upper
+    newdata$se__ <- summ$se
+    newdata$effect1__ <- newdata[[var]]
+    newdata$cond__ <- factor("1")
+
+    attr(newdata, "effects") <- var
+    attr(newdata, "response") <- par
+
+    result[[var]] <- newdata
+  }
+
+  class(result) <- c("brms_conditional_effects", "list")
   result
 }
 
@@ -477,9 +676,7 @@ conditional_effects.bmmfit <- function(x,
     df
   })
   
-  # Restore class and attributes from original conditional_effects object
+  names(result) <- names(ce_object)
   class(result) <- class(ce_object)
-  attributes(result) <- c(attributes(result), attributes(ce_object)[!names(attributes(ce_object)) %in% c("names", "class")])
-  
   result
 }

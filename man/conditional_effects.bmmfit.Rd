@@ -16,8 +16,8 @@
 
 \item{par}{Character string. Name of the model parameter to compute effects for.
 This should be one of the parameter names from the original model specification
-(see \code{names(x$bmm$model$parameters)}). If \code{NULL}, the function will error
-and ask you to specify a parameter explicitly.}
+(see \code{names(x$bmm$model$parameters)}). If \code{NULL} (the default), conditional
+effects are computed for all estimated (non-fixed) parameters.}
 
 \item{scale}{Character. Scale on which to show the parameter:
 \describe{
