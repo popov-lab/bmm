@@ -12,7 +12,8 @@
                        version = "evsdt", dist = "normal",
                        variances = "equal", n_ratings = NULL,
                        threshold_type = "equidistant",
-                       m = NULL, links = NULL, call = NULL, ...) {
+                       m = NULL, rank = NULL, log_scale = FALSE,
+                       links = NULL, call = NULL, ...) {
   # Map distribution to integer for Stan dispatch (from registry)
   dist_int <- .sdt_dist_id(dist)
 
@@ -23,6 +24,12 @@
   if (version == "mafc") {
     return(.build_sdt_mafc(response, n_trials, m, dist, dist_int,
                            links, call))
+  }
+
+  # Ranking model: no criterion, no stimulus (like m-AFC)
+  if (version == "ranking") {
+    return(.build_sdt_ranking(response, rank, m, dist, dist_int,
+                              variances, links, call))
   }
 
   # Build parameters and priors based on model type
@@ -46,7 +53,7 @@
         main = "normal(0, 1)", effects = "normal(0, 0.5)"
       )
       param_links$spacing <- "identity"
-    } else if (threshold_type == "log_distance") {
+    } else if (threshold_type %in% c("log_distance", "log_ratio")) {
       n_deltas <- n_ratings - 2L
       mid <- n_ratings %/% 2L
       for (i in seq_len(n_deltas)) {
@@ -54,7 +61,7 @@
         idx <- if (i < mid) i else i + 1L
         pname <- paste0("delta", idx)
         parameters[[pname]] <- glue(
-          "Log-distance threshold parameter for threshold {idx}"
+          "Threshold parameter for threshold {idx}"
         )
         default_priors[[pname]] <- list(
           main = "normal(0, 1)", effects = "normal(0, 0.5)"
@@ -138,7 +145,7 @@
     list(
       resp_vars = nlist(response),
       other_vars = nlist(stimulus, n_trials, dist, dist_int, variances,
-                         n_ratings, threshold_type),
+                         n_ratings, threshold_type, log_scale),
       domain = "Perception & Recognition Memory",
       task = "Signal/Noise or Old/New Recognition",
       name = "Signal Detection Theory (SDT)",
@@ -211,6 +218,66 @@
   out
 }
 
+# Internal: build ranking model object (no criterion, no stimulus)
+.build_sdt_ranking <- function(response, rank, m, dist, dist_int,
+                               variances, links, call) {
+  parameters <- list(
+    mu = glue("Internal parameter (fixed to 0)"),
+    dprime = glue("Sensitivity: ranking discrimination parameter")
+  )
+  default_priors <- list(
+    dprime = list(main = "normal(1, 1)", effects = "normal(0, 0.5)")
+  )
+  param_links <- list(mu = "identity", dprime = "identity")
+
+  # Unequal variance adds sdratio (Gaussian only)
+  if (variances == "unequal") {
+    parameters$sdratio <- glue(
+      "SD ratio: log ratio of signal to noise standard deviations ",
+      "(exp(sdratio) ensures positivity, 0 = equal variance)"
+    )
+    default_priors$sdratio <- list(
+      main = "normal(0, 0.5)", effects = "normal(0, 0.3)"
+    )
+    param_links$sdratio <- "identity"
+  }
+
+  requirements <- glue(
+    "Provide pre-aggregated ranking data in long format:", "\n\n",
+    "  - Response counts ({response}): number of times target received this rank", "\n",
+    "  - Rank position ({rank}): rank position (1 = most likely target, m = least)", "\n",
+    "  No stimulus column needed (all items include exactly one target)"
+  )
+
+  out <- structure(
+    list(
+      resp_vars = nlist(response),
+      other_vars = nlist(rank, dist, dist_int, m, variances,
+                         stimulus = NULL, n_trials = NULL,
+                         n_ratings = NULL, threshold_type = NULL),
+      domain = "Perception & Recognition Memory",
+      task = "Ranking Task",
+      name = "Signal Detection Theory (Ranking)",
+      citation = glue(
+        "Meyer-Grant, C. G., Kellen, D., Harding, S. M., & Singmann, H. ",
+        "(2025). Extreme-value signal detection theory for recognition memory. ",
+        "PsyArXiv preprint."
+      ),
+      version = "ranking",
+      requirements = requirements,
+      parameters = parameters,
+      links = param_links,
+      fixed_parameters = list(mu = 0),
+      default_priors = default_priors,
+      void_mu = FALSE
+    ),
+    class = c("bmmodel", "sdt", "sdt_ranking"),
+    call = call
+  )
+  out$links[names(links)] <- links
+  out
+}
+
 
 #' @title Signal Detection Theory Model
 #' @name sdt
@@ -236,6 +303,11 @@
 #'     \item "mafc": m-Alternative Forced Choice (DeCarlo, 2012). Models
 #'       accuracy in m-AFC tasks. Only `dprime` parameter (no criterion).
 #'       Requires `m` argument specifying number of alternatives.
+#'     \item "ranking": Ranking SDT (Meyer-Grant et al., 2025). Models rank
+#'       ordering of m items by perceived strength. Only `dprime` parameter
+#'       (no criterion). Requires `m` and `rank` arguments. Supports
+#'       `dist = "gumbel_min"` (closed form) and `dist = "normal"` with
+#'       optional `variances = "unequal"`.
 #'   }
 #' @param dist Character. The noise distribution to use:
 #'   \itemize{
@@ -275,10 +347,22 @@
 #'       observer with d'=0, all K rating categories are used equally often.
 #'     \item "log_distance": K-2 parameters (one per non-criterion threshold).
 #'       Each threshold distance is exp(delta), guaranteeing ordering.
+#'     \item "log_ratio": K-2 parameters (same as log_distance). Threshold
+#'       distances are parameterized as ratios relative to a reference spread.
+#'       When all delta parameters equal 0, thresholds are equally spaced
+#'       with unit spacing, making zero-centered priors encode symmetric
+#'       spacing. Based on Paulewicz & Blaut (2020).
 #'   }
 #'   Ignored for binary SDT.
-#' @param m Integer. Number of alternatives for m-AFC models. Required when
-#'   `version = "mafc"`. Must be >= 2.
+#' @param m Integer. Number of alternatives for m-AFC models, or number of
+#'   ranked items for ranking models. Required when `version = "mafc"` or
+#'   `version = "ranking"`. Must be >= 2.
+#' @param rank The name of the variable coding the rank position (1 = most
+#'   likely target, m = least likely). Required when `version = "ranking"`.
+#' @param log_scale Logical. If TRUE, use numerically stable log-scale CDF
+#'   expressions in rating model nlf formulas. Default FALSE. Only applies to
+#'   EV-SDT and UV-SDT rating models. Uses Stan's log_Phi, log1m_Phi, and
+#'   log_diff_exp for improved numerical stability with extreme parameters.
 #' @param links A named list of link functions for the parameters. The default
 #'   link for dprime is "identity" and for criterion is "identity". The dprime
 #'   link can be set to "log" to constrain sensitivity to positive values, which
@@ -424,12 +508,13 @@
 #' )
 #' }
 sdt <- function(response, stimulus = NULL, n_trials = NULL,
-                version = c("evsdt", "dpsdt", "metad", "mafc"),
+                version = c("evsdt", "dpsdt", "metad", "mafc", "ranking"),
                 dist = c("normal", "logistic", "gumbel_min", "gumbel_max"),
                 variances = c("equal", "unequal"),
                 n_ratings = NULL,
-                threshold_type = c("equidistant", "parsimonious", "log_distance"),
-                m = NULL, links = NULL, ...) {
+                threshold_type = c("equidistant", "parsimonious", "log_distance", "log_ratio"),
+                m = NULL, rank = NULL, log_scale = FALSE,
+                links = NULL, ...) {
   call <- match.call()
   stop_missing_args()
   version <- match.arg(version)
@@ -451,7 +536,23 @@ sdt <- function(response, stimulus = NULL, n_trials = NULL,
                       links = links, call = call, ...))
   }
 
-  # Non-mafc versions require stimulus
+  # Ranking model: no criterion, no stimulus
+  if (version == "ranking") {
+    stopif(is.null(m) || !is.numeric(m) || length(m) != 1 || m < 2,
+           "m must be a single integer >= 2 for ranking models")
+    m <- as.integer(m)
+    stopif(is.null(rank),
+           "rank is required for ranking models (column name with rank position)")
+    stopif(!dist %in% c("gumbel_min", "normal"),
+           "Ranking models only support dist = 'gumbel_min' or 'normal'")
+    stopif(variances == "unequal" && dist != "normal",
+           "Unequal-variance ranking requires dist = 'normal'")
+    return(.model_sdt(response = response, version = version,
+                      dist = dist, variances = variances, m = m,
+                      rank = rank, links = links, call = call, ...))
+  }
+
+  # Non-mafc/ranking versions require stimulus
   stopif(is.null(stimulus),
          "stimulus is required for version = '{version}'")
 
@@ -483,6 +584,7 @@ sdt <- function(response, stimulus = NULL, n_trials = NULL,
              n_trials = n_trials, version = version,
              dist = dist, variances = variances,
              n_ratings = n_ratings, threshold_type = threshold_type,
+             log_scale = log_scale,
              links = links, call = call, ...)
 }
 
@@ -493,6 +595,12 @@ sdt <- function(response, stimulus = NULL, n_trials = NULL,
 
 #' @export
 check_data.sdt <- function(model, data, formula) {
+  # Ranking has no stimulus column
+  if (model$version == "ranking") {
+    data <- .check_data_sdt_ranking(model, data)
+    return(NextMethod("check_data"))
+  }
+
   # m-AFC has no stimulus column
   if (model$version == "mafc") {
     data <- .check_data_sdt_mafc(model, data)
@@ -602,6 +710,36 @@ check_data.sdt <- function(model, data, formula) {
   data
 }
 
+# Internal: ranking-specific data checks
+.check_data_sdt_ranking <- function(model, data) {
+  resp_var <- model$resp_vars$response
+  rank_var <- model$other_vars$rank
+  m <- model$other_vars$m
+
+  # Validate response column exists and is non-negative
+  stopif(!resp_var %in% colnames(data),
+    "Response variable '{resp_var}' missing in the data")
+  resp_vals <- data[[resp_var]]
+  stopif(any(resp_vals < 0, na.rm = TRUE),
+    "Response variable '{resp_var}' must contain non-negative counts")
+  warnif(any(resp_vals != round(resp_vals), na.rm = TRUE),
+    "Response variable '{resp_var}' should contain integer counts")
+
+  # Validate rank column exists and has valid values
+  stopif(!rank_var %in% colnames(data),
+    "Rank variable '{rank_var}' missing in the data")
+  rank_vals <- data[[rank_var]]
+  stopif(any(rank_vals < 1 | rank_vals > m, na.rm = TRUE),
+    "Rank variable '{rank_var}' must contain integers from 1 to {m}")
+  warnif(any(rank_vals != round(rank_vals), na.rm = TRUE),
+    "Rank variable '{rank_var}' should contain integer values")
+
+  # Add columns for Stan dispatch via vint
+  data$rank_pos <- as.integer(data[[rank_var]])
+  data$max_rank <- m
+  data
+}
+
 
 ############################################################################# !
 # Convert bmmformula to brmsformula methods                              ####
@@ -609,6 +747,9 @@ check_data.sdt <- function(model, data, formula) {
 
 #' @export
 bmf2bf.sdt <- function(model, formula) {
+  if (model$version == "ranking") {
+    return(.bmf2bf_sdt_ranking(model))
+  }
   if (model$version == "mafc") {
     return(.bmf2bf_sdt_mafc(model))
   }
@@ -648,6 +789,15 @@ bmf2bf.sdt <- function(model, formula) {
   ))
 }
 
+# Internal: ranking SDT base formula (multinomial kernel on rank counts)
+.bmf2bf_sdt_ranking <- function(model) {
+  resp_var <- model$resp_vars$response
+
+  # Pass rank position and max rank via vint()
+  # No trials() — likelihood uses y * log(p) kernel
+  brms::bf(paste0(resp_var, " | vint(rank_pos, max_rank) ~ 1"))
+}
+
 # Internal: shared infrastructure for rating SDT formula construction
 # Extracts model properties and builds the base formula, CDF expression builder,
 # threshold expressions, and cumulative probability function.
@@ -675,22 +825,28 @@ bmf2bf.sdt <- function(model, formula) {
     .sdt_thresholds_equidistant(n_ratings, mid)
   } else if (threshold_type == "parsimonious") {
     .sdt_thresholds_parsimonious(n_ratings)
+  } else if (threshold_type == "log_ratio") {
+    .sdt_thresholds_log_ratio(n_ratings, mid)
   } else {
     .sdt_thresholds_log_distance(n_ratings, mid)
   }
 
+  # Build raw argument function: returns the pre-CDF argument string
+  # Used by log-scale NLF builder to wrap in log_CDF instead of CDF
+  raw_arg <- if (variances == "unequal") {
+    scale <- "(stimulus * exp(sdratio) + (1 - stimulus))"
+    function(k) paste0("(", theta_expr(k), " - ", shift_expr, ") / ", scale)
+  } else {
+    function(k) paste0(theta_expr(k), " - ", shift_expr)
+  }
+
   # Build cumulative probability function: F(theta[k] - shift)
   # UV-SDT: F((theta[k] - shift) / scale)
-  cum_prob <- if (variances == "unequal") {
-    scale <- "(stimulus * exp(sdratio) + (1 - stimulus))"
-    function(k) cdf_fn(paste0("(", theta_expr(k), " - ", shift_expr, ") / ", scale))
-  } else {
-    function(k) cdf_fn(paste0(theta_expr(k), " - ", shift_expr))
-  }
+  cum_prob <- function(k) cdf_fn(raw_arg(k))
 
   list(base_formula = base_formula, cum_prob = cum_prob, cdf_fn = cdf_fn,
        theta_expr = theta_expr, n_ratings = n_ratings, mid = mid,
-       resp_cols = resp_cols)
+       resp_cols = resp_cols, raw_arg = raw_arg, dist = dist)
 }
 
 # Internal: equidistant threshold expressions
@@ -752,6 +908,53 @@ bmf2bf.sdt <- function(model, formula) {
   }
 }
 
+# Internal: log-ratio threshold expressions (Paulewicz & Blaut, 2020)
+# theta[mid] = criterion
+# theta[mid+1] = criterion + exp(delta_{mid+1})              [reference spread]
+# theta[mid-1] = criterion - exp(delta_{mid-1}) * spread     [ratio x spread]
+# Outer upper: cumulative steps of exp(delta_k) * spread_above
+# Outer lower: cumulative steps of exp(delta_k) * spread_below
+# When all deltas = 0, thresholds are equally spaced with unit spacing.
+.sdt_thresholds_log_ratio <- function(n_ratings, mid) {
+  K1 <- n_ratings - 1L
+  theta_exprs <- character(K1)
+  theta_exprs[mid] <- "criterion"
+
+  # Reference spread above mid
+  spread_name <- paste0("delta", mid + 1L)
+  spread_above <- paste0("exp(", spread_name, ")")
+  theta_exprs[mid + 1L] <- paste0("criterion + ", spread_above)
+
+  # First step below: ratio x spread_above
+  if (mid > 1L) {
+    ratio_name <- paste0("delta", mid - 1L)
+    spread_below <- paste0("exp(", ratio_name, ") * ", spread_above)
+    theta_exprs[mid - 1L] <- paste0("criterion - ", spread_below)
+  }
+
+  # Outer upper thresholds
+  if (mid + 2L <= K1) {
+    for (k in (mid + 2L):K1) {
+      delta_name <- paste0("delta", k)
+      theta_exprs[k] <- paste0(
+        theta_exprs[k - 1L], " + exp(", delta_name, ") * ", spread_above
+      )
+    }
+  }
+
+  # Outer lower thresholds
+  if (mid > 1L && mid - 2L >= 1L) {
+    for (k in (mid - 2L):1L) {
+      delta_name <- paste0("delta", k)
+      theta_exprs[k] <- paste0(
+        theta_exprs[k + 1L], " - exp(", delta_name, ") * ", spread_below
+      )
+    }
+  }
+
+  function(k) theta_exprs[k]
+}
+
 # Internal: standard SDT nlf formulas (log of raw category probabilities)
 .sdt_build_nlf_standard <- function(parts) {
   nlf_formulas <- list()
@@ -763,6 +966,33 @@ bmf2bf.sdt <- function(model, formula) {
       expr <- paste0("log(1 - ", parts$cum_prob(parts$n_ratings - 1L), ")")
     } else {
       expr <- paste0("log(", parts$cum_prob(k), " - ", parts$cum_prob(k - 1L), ")")
+    }
+    nlf_formulas[[k]] <- glue_nlf("{dpar} ~ {expr}")
+  }
+  nlf_formulas
+}
+
+# Internal: log-scale SDT nlf formulas (numerically stable)
+# Uses log_CDF, log(1-CDF), and log_diff_exp for interior categories
+# Only for standard EV-SDT and UV-SDT rating models
+.sdt_build_nlf_logscale <- function(parts) {
+  log_cdf_fn <- .sdt_log_cdf_expr(parts$dist)
+  log1m_cdf_fn <- .sdt_log1m_cdf_expr(parts$dist)
+
+  nlf_formulas <- list()
+  for (k in seq_len(parts$n_ratings)) {
+    dpar <- paste0("mu", parts$resp_cols[k])
+    if (k == 1L) {
+      # First category: log(F(theta_1 - shift))
+      expr <- log_cdf_fn(parts$raw_arg(1))
+    } else if (k == parts$n_ratings) {
+      # Last category: log(1 - F(theta_{K-1} - shift))
+      expr <- log1m_cdf_fn(parts$raw_arg(parts$n_ratings - 1L))
+    } else {
+      # Interior category: log(F(a) - F(b)) = log_diff_exp(log_F(a), log_F(b))
+      log_upper <- log_cdf_fn(parts$raw_arg(k))
+      log_lower <- log_cdf_fn(parts$raw_arg(k - 1L))
+      expr <- paste0("log_diff_exp(", log_upper, ", ", log_lower, ")")
     }
     nlf_formulas[[k]] <- glue_nlf("{dpar} ~ {expr}")
   }
@@ -844,7 +1074,11 @@ bmf2bf.sdt <- function(model, formula) {
 # Internal: rating SDT formula (standard EV/UV-SDT)
 .bmf2bf_sdt_rating <- function(model) {
   parts <- .sdt_rating_formula_parts(model)
-  nlf_formulas <- .sdt_build_nlf_standard(parts)
+  nlf_formulas <- if (isTRUE(model$other_vars$log_scale)) {
+    .sdt_build_nlf_logscale(parts)
+  } else {
+    .sdt_build_nlf_standard(parts)
+  }
   Reduce(`+`, nlf_formulas, init = parts$base_formula)
 }
 
@@ -948,6 +1182,48 @@ configure_model.sdt_mafc <- function(model, data, formula) {
   nlist(formula, data, stanvars)
 }
 
+#' @export
+configure_model.sdt_ranking <- function(model, data, formula) {
+  formula <- bmf2bf(model, formula)
+
+  sc_path <- system.file("stan_chunks", package = "bmm")
+  stan_funs <- read_lines2(paste0(sc_path, "/sdt_ranking_funs.stan"))
+  stanvars <- brms::stanvar(scode = stan_funs, block = "functions")
+
+  if (model$other_vars$variances == "unequal") {
+    # Gaussian UV-SDT ranking: dprime + sdratio
+    formula$family <- brms::custom_family(
+      "sdt_ranking_uv",
+      dpars = c("mu", "dprime", "sdratio"),
+      links = c("identity", model$links$dprime, model$links$sdratio),
+      type = "int",
+      loop = TRUE,
+      log_lik = log_lik_sdt_ranking_uv,
+      posterior_predict = posterior_predict_sdt_ranking,
+      vars = c("vint1[n]", "vint2[n]")
+    )
+
+    # Add transformed data block for integrate_1d placeholders
+    tdata_code <- "  array[0] real x_r;\n  array[0] int x_i;"
+    stanvars <- stanvars +
+      brms::stanvar(scode = tdata_code, block = "tdata")
+  } else {
+    # Gumbel ranking: dprime only
+    formula$family <- brms::custom_family(
+      "sdt_ranking",
+      dpars = c("mu", "dprime"),
+      links = c("identity", model$links$dprime),
+      type = "int",
+      loop = TRUE,
+      log_lik = log_lik_sdt_ranking,
+      posterior_predict = posterior_predict_sdt_ranking,
+      vars = c("vint1[n]", "vint2[n]")
+    )
+  }
+
+  nlist(formula, data, stanvars)
+}
+
 
 ############################################################################# !
 # LOG_LIK & POSTERIOR_PREDICT (Binary SDT)                               ####
@@ -1038,6 +1314,92 @@ posterior_predict_sdt_mafc <- function(i, prep, ...) {
 
   pc <- vapply(dprime, .mafc_pc_r, numeric(1), m = m)
   rbinom(length(pc), n_trials, pc)
+}
+
+
+############################################################################# !
+# LOG_LIK & POSTERIOR_PREDICT (Ranking SDT)                              ####
+############################################################################# !
+
+# R-side computation of rank probability for Gumbel-min ranking
+# Mirrors the Stan sdt_ranking_lpmf kernel
+.ranking_prob_r <- function(dprime, rank_pos, m, dist = "gumbel_min",
+                            sdratio = 0) {
+  if (dist == "gumbel_min") {
+    g <- dprime
+    e_neg_g <- exp(-g)
+    log_p <- -g + lgamma(m) + lgamma(rank_pos - 1 + e_neg_g) -
+             lgamma(rank_pos) - lgamma(m + e_neg_g)
+    return(exp(log_p))
+  }
+  # Gaussian UV-SDT: numerical integration
+  sigma <- exp(sdratio)
+  integrand <- function(x) {
+    pnorm(x)^(m - rank_pos) * dnorm(x, dprime, sigma) *
+      (1 - pnorm(x))^(rank_pos - 1)
+  }
+  choose(m - 1, rank_pos - 1) * integrate(integrand, -Inf, Inf)$value
+}
+
+# R-side computation of all rank probabilities (vectorized over ranks 1..m)
+.ranking_all_probs_r <- function(dprime, m, dist = "gumbel_min",
+                                 sdratio = 0) {
+  probs <- vapply(seq_len(m), function(r) {
+    .ranking_prob_r(dprime, r, m, dist, sdratio)
+  }, numeric(1))
+  # Normalize to ensure exact sum-to-1 (numerical rounding)
+  probs / sum(probs)
+}
+
+log_lik_sdt_ranking <- function(i, prep) {
+  dprime <- brms::get_dpar(prep, "dprime", i = i)
+  rank_pos <- prep$data$vint1[i]
+  max_rank <- prep$data$vint2[i]
+  y <- prep$data$Y[i]
+
+  log_p <- vapply(dprime, function(d) {
+    p <- .ranking_prob_r(d, rank_pos, max_rank, dist = "gumbel_min")
+    log(p)
+  }, numeric(1))
+  y * log_p
+}
+
+log_lik_sdt_ranking_uv <- function(i, prep) {
+  dprime <- brms::get_dpar(prep, "dprime", i = i)
+  sdratio <- brms::get_dpar(prep, "sdratio", i = i)
+  rank_pos <- prep$data$vint1[i]
+  max_rank <- prep$data$vint2[i]
+  y <- prep$data$Y[i]
+
+  log_p <- mapply(function(d, s) {
+    p <- .ranking_prob_r(d, rank_pos, max_rank, dist = "normal", sdratio = s)
+    log(p)
+  }, dprime, sdratio)
+  y * log_p
+}
+
+posterior_predict_sdt_ranking <- function(i, prep, ...) {
+  dprime <- brms::get_dpar(prep, "dprime", i = i)
+  rank_pos <- prep$data$vint1[i]
+  max_rank <- prep$data$vint2[i]
+
+  # Determine dist and sdratio from model
+  has_sdratio <- "sdratio" %in% names(prep$dpars)
+  dist <- if (has_sdratio) "normal" else "gumbel_min"
+  sdratio <- if (has_sdratio) {
+    brms::get_dpar(prep, "sdratio", i = i)
+  } else {
+    rep(0, length(dprime))
+  }
+
+  # For each posterior draw, compute probability for this rank position
+  vapply(seq_along(dprime), function(s) {
+    probs <- .ranking_all_probs_r(dprime[s], max_rank, dist, sdratio[s])
+    # Return the count for this rank position from a single multinomial draw
+    # We don't know n_trials here, so return the probability
+    # (brms will handle this via posterior_epred for predictions)
+    probs[rank_pos]
+  }, numeric(1))
 }
 
 

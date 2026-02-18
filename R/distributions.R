@@ -1589,7 +1589,7 @@ neg_loglik <- function(x, params, distribution, weights = NULL) {
 #' @param version Character. SDT model version controlling the likelihood type.
 #'   Supported: "binary" (default), "rating" (confidence rating models),
 #'   "dpsdt" (dual process SDT with recollection), "metad" (meta-d'),
-#'   "mafc" (m-alternative forced choice).
+#'   "mafc" (m-alternative forced choice), "ranking" (rank ordering).
 #' @param log Logical. If `TRUE`, returns log-density. Default `FALSE`.
 #' @param counts Integer vector of length K. Response counts per category for
 #'   a single observation (used by `dsdt` with `version = "rating"`).
@@ -1603,12 +1603,13 @@ neg_loglik <- function(x, params, distribution, weights = NULL) {
 #'   `criterion + (k - mid) * exp(spacing)`. For `threshold_type =
 #'   "parsimonious"`: thresholds are `criterion + exp(spacing) * logit(k/K)`
 #'   (Selker et al., 2019). Used by `rsdt` with `version = "rating"`.
-#' @param deltas Numeric vector. Log-distance parameters for threshold
-#'   generation. Used by `rsdt` with `version = "rating"` and
-#'   `threshold_type = "log_distance"`.
+#' @param deltas Numeric vector. Log-distance or log-ratio parameters for
+#'   threshold generation. Used by `rsdt` with `version = "rating"` and
+#'   `threshold_type = "log_distance"` or `"log_ratio"`.
 #' @param threshold_type Character. Method for generating thresholds in
 #'   `rsdt` with `version = "rating"`: "equidistant" (default), "parsimonious"
-#'   (logit-spaced, Selker et al., 2019), or "log_distance".
+#'   (logit-spaced, Selker et al., 2019), "log_distance", or "log_ratio"
+#'   (ratio-scaled distances, Paulewicz & Blaut, 2020).
 #' @param hit_rate Numeric. Proportion of hits (P("old" | signal)).
 #' @param fa_rate Numeric. Proportion of false alarms (P("old" | noise)).
 #'
@@ -1677,8 +1678,11 @@ dsdt <- function(n_old = NULL, n_trials = NULL, stimulus = NULL, dprime,
     metad = .dsdt_metad(counts, stimulus, dprime, metad, thresholds,
                         sd_ratio = sd_ratio, dist = dist, log = log),
     mafc = .dsdt_mafc(n_correct, n_trials, dprime, m = m, log = log),
+    ranking = .dsdt_ranking(counts = counts, dprime = dprime, m = m,
+                            dist = dist, sd_ratio = sd_ratio, log = log),
     stop("Unknown SDT version: ", version,
-         ". Currently supported: 'binary', 'rating', 'dpsdt', 'metad', 'mafc'")
+         ". Currently supported: 'binary', 'rating', 'dpsdt', 'metad', ",
+         "'mafc', 'ranking'")
   )
 }
 
@@ -1719,7 +1723,7 @@ rsdt <- function(n_per_cell = 50, n_subjects = 1,
                  dist = c("normal", "logistic", "gumbel_min", "gumbel_max"),
                  version = "binary",
                  n_ratings = NULL, spacing = NULL, deltas = NULL,
-                 threshold_type = c("equidistant", "parsimonious", "log_distance")) {
+                 threshold_type = c("equidistant", "parsimonious", "log_distance", "log_ratio")) {
   dist <- match.arg(dist)
   threshold_type <- match.arg(threshold_type)
   switch(version,
@@ -1738,8 +1742,11 @@ rsdt <- function(n_per_cell = 50, n_subjects = 1,
                         n_ratings = n_ratings, spacing = spacing,
                         deltas = deltas, threshold_type = threshold_type),
     mafc = .rsdt_mafc(n_per_cell, n_subjects, dprime, m = m),
+    ranking = .rsdt_ranking(n_per_cell, n_subjects, dprime, m = m,
+                            dist = dist, sd_ratio = sd_ratio),
     stop("Unknown SDT version: ", version,
-         ". Currently supported: 'binary', 'rating', 'dpsdt', 'metad', 'mafc'")
+         ". Currently supported: 'binary', 'rating', 'dpsdt', 'metad', ",
+         "'mafc', 'ranking'")
   )
 }
 
@@ -1825,6 +1832,41 @@ rsdt <- function(n_per_cell = 50, n_subjects = 1,
       log(seq_len(K1) / (n_ratings - seq_len(K1)))        # logit(k/K)
     }
     thresholds <- criterion + exp(spacing) * canonical
+  } else if (threshold_type == "log_ratio") {
+    stopif(is.null(deltas), "deltas is required for log_ratio thresholds")
+    n_deltas <- n_ratings - 2L
+    stopif(length(deltas) != n_deltas,
+           "deltas must have length n_ratings - 2 = {n_deltas}")
+
+    thresholds <- numeric(K1)
+    thresholds[mid] <- criterion
+
+    # Index mapping: compact delta index from threshold index (skip mid)
+    didx <- function(k) if (k <= mid) k else k - 1L
+
+    # Reference spread above
+    spread_above <- exp(deltas[didx(mid + 1L)])
+    thresholds[mid + 1L] <- criterion + spread_above
+
+    # First step below: ratio x spread_above
+    if (mid > 1L) {
+      spread_below <- exp(deltas[didx(mid - 1L)]) * spread_above
+      thresholds[mid - 1L] <- criterion - spread_below
+    }
+
+    # Outer upper
+    if (mid + 2L <= K1) {
+      for (k in (mid + 2L):K1) {
+        thresholds[k] <- thresholds[k - 1L] + exp(deltas[didx(k)]) * spread_above
+      }
+    }
+
+    # Outer lower
+    if (mid > 1L && mid - 2L >= 1L) {
+      for (k in (mid - 2L):1L) {
+        thresholds[k] <- thresholds[k + 1L] - exp(deltas[didx(k)]) * spread_below
+      }
+    }
   } else {
     stopif(is.null(deltas), "deltas is required for log_distance thresholds")
     n_deltas <- n_ratings - 2L
@@ -2105,6 +2147,49 @@ rsdt <- function(n_per_cell = 50, n_subjects = 1,
 }
 
 
+# Internal: ranking density (multinomial kernel on rank counts)
+.dsdt_ranking <- function(counts, dprime, m = NULL,
+                          dist = "gumbel_min", sd_ratio = 1, log = FALSE) {
+  stopif(is.null(counts), "counts is required for ranking density")
+  stopif(is.null(m) || !is.numeric(m) || any(m < 2),
+         "m must be an integer >= 2")
+  stopif(length(counts) != m,
+         "counts must have length m (one count per rank position)")
+  stopif(any(counts < 0), "counts must be non-negative")
+
+  sdratio <- log(sd_ratio)
+  probs <- .ranking_all_probs_r(dprime, m, dist, sdratio)
+  # Multinomial kernel: sum(y_k * log(p_k))
+  log_val <- sum(counts * log(probs))
+  if (log) log_val else exp(log_val)
+}
+
+
+# Internal: ranking random generation (multinomial on rank counts)
+.rsdt_ranking <- function(n_per_cell, n_subjects, dprime, m = NULL,
+                          dist = "gumbel_min", sd_ratio = 1) {
+  stopif(is.null(m) || !is.numeric(m) || length(m) != 1 || m < 2,
+         "m must be a single integer >= 2")
+  m <- as.integer(m)
+  stopif(length(n_per_cell) != 1 || n_per_cell < 1,
+         "n_per_cell must be a single positive integer")
+  stopif(length(n_subjects) != 1 || n_subjects < 1,
+         "n_subjects must be a single positive integer")
+  stopif(length(dprime) != 1, "dprime must be a single value for ranking")
+
+  sdratio <- log(sd_ratio)
+  probs <- .ranking_all_probs_r(dprime, m, dist, sdratio)
+
+  # Generate counts per subject via multinomial
+  data_list <- lapply(seq_len(n_subjects), function(id) {
+    counts <- as.integer(stats::rmultinom(1, n_per_cell, probs))
+    data.frame(id = id, rank = seq_len(m), maxrank = m,
+               observed = counts)
+  })
+  do.call(rbind, data_list)
+}
+
+
 # Internal: compute SDT decision variable (eta)
 # Shared by density, random generation, and log_lik across versions
 # For EV-SDT (sd_ratio = 1): eta = dprime/2 * (2*stimulus - 1) - criterion
@@ -2174,25 +2259,33 @@ sdt_criterion <- function(hit_rate, fa_rate,
     id = 1L,
     cdf = pnorm,
     qf = qnorm,
-    stan_expr = function(x) paste0("Phi(", x, ")")
+    stan_expr = function(x) paste0("Phi(", x, ")"),
+    log_stan_expr = function(x) paste0("log_Phi(", x, ")"),
+    log1m_stan_expr = function(x) paste0("log1m_Phi(", x, ")")
   ),
   gumbel_min = list(
     id = 2L,
     cdf = function(x) exp(-exp(-x)),
     qf = function(p) -log(-log(p)),
-    stan_expr = function(x) paste0("exp(-exp(-(", x, ")))")
+    stan_expr = function(x) paste0("exp(-exp(-(", x, ")))"),
+    log_stan_expr = function(x) paste0("(-exp(-(", x, ")))"),
+    log1m_stan_expr = function(x) paste0("log1m_exp(-exp(-(", x, ")))")
   ),
   gumbel_max = list(
     id = 3L,
     cdf = function(x) 1 - exp(-exp(x)),
     qf = function(p) log(-log(1 - p)),
-    stan_expr = function(x) paste0("(1 - exp(-exp(", x, ")))")
+    stan_expr = function(x) paste0("(1 - exp(-exp(", x, ")))"),
+    log_stan_expr = function(x) paste0("log1m_exp(-exp(", x, "))"),
+    log1m_stan_expr = function(x) paste0("(-exp(", x, "))")
   ),
   logistic = list(
     id = 4L,
     cdf = plogis,
     qf = qlogis,
-    stan_expr = function(x) paste0("inv_logit(", x, ")")
+    stan_expr = function(x) paste0("inv_logit(", x, ")"),
+    log_stan_expr = function(x) paste0("(-log1p_exp(-(", x, ")))"),
+    log1m_stan_expr = function(x) paste0("(-(", x, ") - log1p_exp(-(", x, ")))")
   )
 )
 
@@ -2207,6 +2300,18 @@ sdt_criterion <- function(hit_rate, fa_rate,
 # Returns a function(x) that produces the Stan expression string
 .sdt_cdf_expr <- function(dist) {
   .SDT_DISTS[[dist]]$stan_expr
+}
+
+# Internal: Stan log-CDF expression builder for SDT distributions
+# Returns a function(x) that produces the Stan log_CDF expression string
+.sdt_log_cdf_expr <- function(dist) {
+  .SDT_DISTS[[dist]]$log_stan_expr
+}
+
+# Internal: Stan log complementary CDF expression builder
+# Returns a function(x) that produces log(1 - CDF(x)) expression string
+.sdt_log1m_cdf_expr <- function(dist) {
+  .SDT_DISTS[[dist]]$log1m_stan_expr
 }
 
 # Internal: map distribution name to Stan integer ID

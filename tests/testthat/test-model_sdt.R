@@ -731,6 +731,89 @@ test_that("sdt rating parsimonious K=6 produces valid stancode", {
   expect_true(nchar(code) > 0)
 })
 
+# --- log_ratio threshold tests ---
+
+test_that("sdt rating model stores log_ratio threshold_type", {
+  model <- sdt(c("r1", "r2", "r3", "r4"), "stimulus",
+               threshold_type = "log_ratio")
+  expect_equal(model$other_vars$threshold_type, "log_ratio")
+})
+
+test_that("sdt rating model has log_ratio threshold params", {
+  model <- sdt(c("r1", "r2", "r3", "r4"), "stimulus",
+               threshold_type = "log_ratio")
+  expect_true("delta1" %in% names(model$parameters))
+  expect_true("delta3" %in% names(model$parameters))
+  expect_true("criterion" %in% names(model$parameters))
+  expect_false("spacing" %in% names(model$parameters))
+  expect_false("delta2" %in% names(model$parameters))
+})
+
+test_that(".sdt_make_thresholds log_ratio computes ratio-scaled thresholds", {
+  # All deltas = 0 -> equally spaced with unit spacing
+  thr <- .sdt_make_thresholds(criterion = 0, n_ratings = 4,
+                              threshold_type = "log_ratio", deltas = c(0, 0))
+  expect_equal(thr, c(-1, 0, 1), tolerance = 1e-8)
+
+  # K=6, all zeros -> equally spaced
+  thr6 <- .sdt_make_thresholds(criterion = 0, n_ratings = 6,
+                               threshold_type = "log_ratio",
+                               deltas = c(0, 0, 0, 0))
+  expect_equal(thr6, c(-2, -1, 0, 1, 2), tolerance = 1e-8)
+
+  # Criterion shift
+  thr_shifted <- .sdt_make_thresholds(criterion = 1, n_ratings = 4,
+                                      threshold_type = "log_ratio",
+                                      deltas = c(0, 0))
+  expect_equal(thr_shifted, c(0, 1, 2), tolerance = 1e-8)
+
+  # Monotonicity with non-zero deltas
+  thr_asym <- .sdt_make_thresholds(criterion = 0, n_ratings = 6,
+                                   threshold_type = "log_ratio",
+                                   deltas = c(0.3, -0.2, 0.5, 0.1))
+  expect_true(all(diff(thr_asym) > 0))
+
+  # Asymmetric: delta_{mid-1} != 0 makes lower spread differ from upper
+  thr_k4 <- .sdt_make_thresholds(criterion = 0, n_ratings = 4,
+                                 threshold_type = "log_ratio",
+                                 deltas = c(log(2), 0))
+  # spread_above = exp(0) = 1, spread_below = exp(log(2)) * 1 = 2
+  expect_equal(thr_k4, c(-2, 0, 1), tolerance = 1e-8)
+})
+
+test_that("rsdt rating works with log_ratio thresholds", {
+  dat <- rsdt(n_per_cell = 50, n_subjects = 3, dprime = 1.5, criterion = 0,
+              n_ratings = 4, deltas = c(0, 0), version = "rating",
+              threshold_type = "log_ratio")
+  expect_equal(nrow(dat), 6)
+  expect_true(all(rowSums(dat[, paste0("r", 1:4)]) == 50))
+})
+
+test_that("sdt rating produces valid stancode with log_ratio thresholds", {
+  dat <- rsdt(n_per_cell = 50, n_subjects = 3, dprime = 1.5, criterion = 0,
+              n_ratings = 4, deltas = c(0, 0), version = "rating",
+              threshold_type = "log_ratio")
+  model <- sdt(c("r1", "r2", "r3", "r4"), "stimulus",
+               threshold_type = "log_ratio")
+  formula <- bmf(dprime ~ 1, criterion ~ 1, delta1 ~ 1, delta3 ~ 1)
+  code <- stancode(formula, data = dat, model = model)
+  expect_true(nchar(code) > 0)
+  expect_true(grepl("multinomial", code, ignore.case = TRUE))
+  # log_ratio multiplies delta expressions: exp(nlp_delta1) * exp(nlp_delta3)
+  expect_true(grepl("exp\\(nlp_delta", code))
+})
+
+test_that("sdt rating log_ratio K=6 produces valid stancode", {
+  dat <- rsdt(n_per_cell = 50, n_subjects = 3, dprime = 1.5, criterion = 0,
+              n_ratings = 6, deltas = c(0, 0, 0, 0), version = "rating",
+              threshold_type = "log_ratio")
+  model <- sdt(paste0("r", 1:6), "stimulus", threshold_type = "log_ratio")
+  formula <- bmf(dprime ~ 1, criterion ~ 1, delta1 ~ 1, delta2 ~ 1,
+                 delta4 ~ 1, delta5 ~ 1)
+  code <- stancode(formula, data = dat, model = model)
+  expect_true(nchar(code) > 0)
+})
+
 test_that("sdt rating handles K=6 equidistant", {
   dat <- rsdt(n_per_cell = 50, n_subjects = 2, dprime = 1.5, criterion = 0,
               n_ratings = 6, spacing = 0.3, version = "rating")
@@ -1659,4 +1742,316 @@ test_that("sdt mafc stancode works with random effects on dprime", {
   formula <- bmf(dprime ~ 1 + (1 | id))
   code <- stancode(formula, data = dat, model = model)
   expect_true(nchar(code) > 0)
+})
+
+
+############################################################################# !
+# RANKING MODEL TESTS                                                       ####
+############################################################################# !
+
+# --- Constructor Tests ---
+
+test_that("sdt ranking model can be created", {
+  model <- sdt("observed", version = "ranking", rank = "rank", m = 4)
+  expect_s3_class(model, "bmmodel")
+  expect_s3_class(model, "sdt")
+  expect_s3_class(model, "sdt_ranking")
+})
+
+test_that("sdt ranking has correct parameters (only dprime, no criterion)", {
+  model <- sdt("observed", version = "ranking", rank = "rank", m = 4)
+  expect_true("dprime" %in% names(model$parameters))
+  expect_true("mu" %in% names(model$parameters))
+  expect_false("criterion" %in% names(model$parameters))
+  expect_equal(model$fixed_parameters$mu, 0)
+})
+
+test_that("sdt ranking stores m and rank correctly", {
+  model <- sdt("observed", version = "ranking", rank = "rank", m = 4)
+  expect_equal(model$other_vars$m, 4L)
+  expect_equal(model$other_vars$rank, "rank")
+
+  model2 <- sdt("observed", version = "ranking", rank = "pos", m = 3)
+  expect_equal(model2$other_vars$m, 3L)
+  expect_equal(model2$other_vars$rank, "pos")
+})
+
+test_that("sdt ranking has correct links", {
+  model <- sdt("observed", version = "ranking", rank = "rank", m = 4)
+  expect_equal(model$links$mu, "identity")
+  expect_equal(model$links$dprime, "identity")
+})
+
+test_that("sdt ranking accepts custom links", {
+  model <- sdt("observed", version = "ranking", rank = "rank", m = 4,
+               links = list(dprime = "log"))
+  expect_equal(model$links$dprime, "log")
+})
+
+test_that("sdt ranking requires m >= 2", {
+  expect_error(sdt("observed", version = "ranking", rank = "rank", m = 1))
+  expect_error(sdt("observed", version = "ranking", rank = "rank", m = NULL))
+  expect_error(sdt("observed", version = "ranking", rank = "rank"))
+})
+
+test_that("sdt ranking requires rank", {
+  expect_error(sdt("observed", version = "ranking", m = 4))
+})
+
+test_that("sdt ranking only supports gumbel_min and normal", {
+  expect_silent(sdt("observed", version = "ranking", rank = "rank",
+                    m = 4, dist = "gumbel_min"))
+  expect_silent(sdt("observed", version = "ranking", rank = "rank",
+                    m = 4, dist = "normal"))
+  expect_error(sdt("observed", version = "ranking", rank = "rank",
+                   m = 4, dist = "logistic"))
+  expect_error(sdt("observed", version = "ranking", rank = "rank",
+                   m = 4, dist = "gumbel_max"))
+})
+
+test_that("sdt ranking UV-SDT requires dist = 'normal'", {
+  expect_error(sdt("observed", version = "ranking", rank = "rank",
+                   m = 4, dist = "gumbel_min", variances = "unequal"))
+})
+
+test_that("sdt ranking UV-SDT adds sdratio parameter", {
+  model <- sdt("observed", version = "ranking", rank = "rank",
+               m = 4, dist = "normal", variances = "unequal")
+  expect_true("sdratio" %in% names(model$parameters))
+})
+
+test_that("sdt ranking does not require stimulus", {
+  expect_silent(sdt("observed", version = "ranking", rank = "rank", m = 4))
+})
+
+# --- R-side Probability Tests ---
+
+test_that(".ranking_prob_r gives valid probabilities for Gumbel", {
+  p <- bmm:::.ranking_prob_r(1.5, 1L, 4L, dist = "gumbel_min")
+  expect_true(p > 0 && p < 1)
+})
+
+test_that(".ranking_all_probs_r sums to 1 for Gumbel", {
+  probs <- bmm:::.ranking_all_probs_r(1.5, 4L, dist = "gumbel_min")
+  expect_equal(sum(probs), 1.0, tolerance = 1e-10)
+})
+
+test_that(".ranking_all_probs_r at d'=0 gives uniform for Gumbel", {
+  probs <- bmm:::.ranking_all_probs_r(0, 4L, dist = "gumbel_min")
+  expect_equal(probs, rep(0.25, 4), tolerance = 1e-6)
+})
+
+test_that(".ranking_all_probs_r is monotone: rank 1 increases with dprime", {
+  p_low <- bmm:::.ranking_all_probs_r(0.5, 4L, dist = "gumbel_min")
+  p_high <- bmm:::.ranking_all_probs_r(2.0, 4L, dist = "gumbel_min")
+  expect_true(p_high[1] > p_low[1])
+})
+
+test_that(".ranking_all_probs_r works for m=3", {
+  probs <- bmm:::.ranking_all_probs_r(1.0, 3L, dist = "gumbel_min")
+  expect_length(probs, 3)
+  expect_equal(sum(probs), 1.0, tolerance = 1e-10)
+})
+
+test_that(".ranking_all_probs_r works for Gaussian UV-SDT", {
+  probs <- bmm:::.ranking_all_probs_r(1.5, 4L, dist = "normal", sdratio = 0)
+  expect_equal(sum(probs), 1.0, tolerance = 1e-6)
+  expect_true(probs[1] > probs[4])
+})
+
+# --- Distribution Function Tests ---
+
+test_that("rsdt generates valid ranking data", {
+  set.seed(42)
+  dat <- rsdt(n_per_cell = 100, n_subjects = 5, dprime = 1.5,
+              version = "ranking", m = 4)
+
+  expect_true("id" %in% colnames(dat))
+  expect_true("rank" %in% colnames(dat))
+  expect_true("maxrank" %in% colnames(dat))
+  expect_true("observed" %in% colnames(dat))
+  expect_equal(nrow(dat), 20)  # 5 subjects x 4 ranks
+  expect_true(all(dat$observed >= 0))
+  expect_true(all(dat$maxrank == 4))
+  expect_true(all(dat$rank %in% 1:4))
+})
+
+test_that("rsdt ranking validates inputs", {
+  expect_error(rsdt(version = "ranking", m = NULL))
+  expect_error(rsdt(version = "ranking", m = 1))
+})
+
+test_that("dsdt computes valid ranking densities", {
+  dens <- dsdt(counts = c(40, 30, 20, 10), dprime = 1.5, m = 4,
+               version = "ranking")
+  expect_true(dens > 0)
+
+  log_dens <- dsdt(counts = c(40, 30, 20, 10), dprime = 1.5, m = 4,
+                   version = "ranking", log = TRUE)
+  expect_equal(log(dens), log_dens, tolerance = 1e-10)
+})
+
+# --- Check Data Tests ---
+
+test_that("check_data validates ranking data correctly", {
+  model <- sdt("observed", version = "ranking", rank = "rank", m = 4)
+  dat <- rsdt(n_per_cell = 50, n_subjects = 3, dprime = 1.5,
+              version = "ranking", m = 4)
+  formula <- bmf(dprime ~ 1)
+
+  result <- check_data(model, dat, formula)
+  expect_true("rank_pos" %in% colnames(result))
+  expect_true("max_rank" %in% colnames(result))
+  expect_equal(unique(result$max_rank), 4L)
+})
+
+test_that("check_data errors on missing rank column for ranking", {
+  model <- sdt("observed", version = "ranking", rank = "rank", m = 4)
+  dat <- data.frame(id = 1:5, observed = 50, wrong_col = 1:5)
+  formula <- bmf(dprime ~ 1)
+  expect_error(check_data(model, dat, formula))
+})
+
+test_that("check_data errors on invalid rank values for ranking", {
+  model <- sdt("observed", version = "ranking", rank = "rank", m = 4)
+  dat <- data.frame(observed = c(10, 10, 10), rank = c(0, 2, 5))
+  formula <- bmf(dprime ~ 1)
+  expect_error(check_data(model, dat, formula))
+})
+
+# --- Formula Construction Tests ---
+
+test_that("bmf2bf.sdt produces correct formula for ranking", {
+  model <- sdt("observed", version = "ranking", rank = "rank", m = 4)
+  bf <- bmf2bf(model, bmf(dprime ~ 1))
+
+  expect_s3_class(bf, "brmsformula")
+  bf_str <- deparse(bf$formula, width.cutoff = 500)
+  expect_true(grepl("observed", bf_str))
+  expect_true(grepl("vint.*rank_pos.*max_rank", bf_str))
+  # No trials clause
+  expect_false(grepl("trials", bf_str))
+})
+
+# --- Stan Code Generation Tests ---
+
+test_that("sdt ranking produces valid stancode (Gumbel, m=4)", {
+  dat <- rsdt(n_per_cell = 50, n_subjects = 3, dprime = 1.5,
+              version = "ranking", m = 4)
+  model <- sdt("observed", version = "ranking", rank = "rank", m = 4)
+  formula <- bmf(dprime ~ 1)
+  code <- stancode(formula, data = dat, model = model)
+  expect_true(nchar(code) > 0)
+  expect_true(grepl("sdt_ranking_lpmf", code))
+  expect_true(grepl("lgamma", code))
+})
+
+test_that("sdt ranking produces valid stancode (Gumbel, m=3)", {
+  dat <- rsdt(n_per_cell = 50, n_subjects = 3, dprime = 1.5,
+              version = "ranking", m = 3)
+  model <- sdt("observed", version = "ranking", rank = "rank", m = 3)
+  formula <- bmf(dprime ~ 1)
+  code <- stancode(formula, data = dat, model = model)
+  expect_true(nchar(code) > 0)
+})
+
+test_that("sdt ranking stancode works with predictors on dprime", {
+  set.seed(42)
+  dat <- rsdt(n_per_cell = 50, n_subjects = 5, dprime = 1.5,
+              version = "ranking", m = 4)
+  dat$condition <- rep(c("A", "B"), length.out = nrow(dat))
+  model <- sdt("observed", version = "ranking", rank = "rank", m = 4)
+  formula <- bmf(dprime ~ condition)
+  code <- stancode(formula, data = dat, model = model)
+  expect_true(nchar(code) > 0)
+})
+
+test_that("sdt ranking stancode works with random effects on dprime", {
+  dat <- rsdt(n_per_cell = 50, n_subjects = 5, dprime = 1.5,
+              version = "ranking", m = 4)
+  model <- sdt("observed", version = "ranking", rank = "rank", m = 4)
+  formula <- bmf(dprime ~ 1 + (1 | id))
+  code <- stancode(formula, data = dat, model = model)
+  expect_true(nchar(code) > 0)
+})
+
+
+############################################################################# !
+# LOG-SCALE NUMERICS TESTS                                                  ####
+############################################################################# !
+
+test_that("sdt rating with log_scale=TRUE produces valid stancode (normal)", {
+  dat <- rsdt(n_per_cell = 100, n_subjects = 3, dprime = 1.5,
+              criterion = 0, n_ratings = 6, spacing = 0.5,
+              version = "rating")
+  model <- sdt(response = paste0("r", 1:6), stimulus = "stimulus",
+               dist = "normal", log_scale = TRUE)
+  formula <- bmf(dprime ~ 1, criterion ~ 1, spacing ~ 1)
+  code <- stancode(formula, data = dat, model = model)
+  expect_true(nchar(code) > 0)
+  expect_true(grepl("log_Phi", code))
+  expect_true(grepl("log1m_Phi", code))
+  expect_true(grepl("log_diff_exp", code))
+})
+
+test_that("sdt rating with log_scale=TRUE works for gumbel_min", {
+  dat <- rsdt(n_per_cell = 100, n_subjects = 3, dprime = 1.5,
+              criterion = 0, n_ratings = 6, spacing = 0.5,
+              version = "rating", dist = "gumbel_min")
+  model <- sdt(response = paste0("r", 1:6), stimulus = "stimulus",
+               dist = "gumbel_min", log_scale = TRUE)
+  formula <- bmf(dprime ~ 1, criterion ~ 1, spacing ~ 1)
+  code <- stancode(formula, data = dat, model = model)
+  expect_true(nchar(code) > 0)
+  expect_true(grepl("log_diff_exp", code))
+})
+
+test_that("sdt rating with log_scale=TRUE works for logistic", {
+  dat <- rsdt(n_per_cell = 100, n_subjects = 3, dprime = 1.5,
+              criterion = 0, n_ratings = 6, spacing = 0.5,
+              version = "rating", dist = "logistic")
+  model <- sdt(response = paste0("r", 1:6), stimulus = "stimulus",
+               dist = "logistic", log_scale = TRUE)
+  formula <- bmf(dprime ~ 1, criterion ~ 1, spacing ~ 1)
+  code <- stancode(formula, data = dat, model = model)
+  expect_true(nchar(code) > 0)
+  expect_true(grepl("log1p_exp", code))
+})
+
+test_that("sdt rating with log_scale=TRUE works for gumbel_max", {
+  dat <- rsdt(n_per_cell = 100, n_subjects = 3, dprime = 1.5,
+              criterion = 0, n_ratings = 6, spacing = 0.5,
+              version = "rating", dist = "gumbel_max")
+  model <- sdt(response = paste0("r", 1:6), stimulus = "stimulus",
+               dist = "gumbel_max", log_scale = TRUE)
+  formula <- bmf(dprime ~ 1, criterion ~ 1, spacing ~ 1)
+  code <- stancode(formula, data = dat, model = model)
+  expect_true(nchar(code) > 0)
+  expect_true(grepl("log_diff_exp", code))
+})
+
+test_that("sdt rating with log_scale=FALSE is unchanged (default)", {
+  dat <- rsdt(n_per_cell = 100, n_subjects = 3, dprime = 1.5,
+              criterion = 0, n_ratings = 6, spacing = 0.5,
+              version = "rating")
+  model <- sdt(response = paste0("r", 1:6), stimulus = "stimulus")
+  formula <- bmf(dprime ~ 1, criterion ~ 1, spacing ~ 1)
+  code <- stancode(formula, data = dat, model = model)
+  expect_true(nchar(code) > 0)
+  # Default (log_scale=FALSE) should use Phi, not log_Phi
+  expect_true(grepl("Phi\\(", code))
+  expect_false(grepl("log_Phi", code))
+})
+
+test_that("sdt UV-SDT rating with log_scale=TRUE produces valid stancode", {
+  dat <- rsdt(n_per_cell = 100, n_subjects = 3, dprime = 1.5,
+              criterion = 0, sd_ratio = 1.2, n_ratings = 6,
+              spacing = 0.5, version = "rating")
+  model <- sdt(response = paste0("r", 1:6), stimulus = "stimulus",
+               variances = "unequal", log_scale = TRUE)
+  formula <- bmf(dprime ~ 1, criterion ~ 1, spacing ~ 1, sdratio ~ 1)
+  code <- stancode(formula, data = dat, model = model)
+  expect_true(nchar(code) > 0)
+  expect_true(grepl("log_Phi", code))
+  expect_true(grepl("sdratio", code))
 })
