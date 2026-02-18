@@ -40,7 +40,7 @@ Common arguments include:
 }}
 }
 \value{
-A \code{brmsfit_conditional_effects} object (from brms), which can be:
+A \code{brms_conditional_effects} object (from brms), which can be:
 \itemize{
 \item Plotted directly using \code{\link[=plot]{plot()}}
 \item Converted to a data frame for custom plotting

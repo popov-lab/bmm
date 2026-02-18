@@ -34,7 +34,7 @@
 #'     \item `method`: Method for computing effects ("posterior_predict" or "posterior_epred")
 #'   }
 #'
-#' @return A `brmsfit_conditional_effects` object (from brms), which can be:
+#' @return A `brms_conditional_effects` object (from brms), which can be:
 #' \itemize{
 #'   \item Plotted directly using [plot()]
 #'   \item Converted to a data frame for custom plotting
@@ -323,7 +323,7 @@ conditional_effects.bmmfit <- function(x,
   link <- model$links[[par]] %||% "identity"
   
   # Check if this is a multinomial logit parameter
-  # These appear in mixture3p (thetat, thetant) and imm models
+  # These appear in mixture3p (thetat, thetant)
   # and cannot be meaningfully transformed in isolation
   multinomial <- .is_multinomial_param(par, model)
   
@@ -507,11 +507,8 @@ conditional_effects.bmmfit <- function(x,
 #' @keywords internal
 #' @noRd
 .compute_softmax_conditional_effects <- function(bmmfit, par, ...) {
-  model <- bmmfit$bmm$model
-  model_class <- class(model)
-
   # Currently only implemented for mixture3p
-  if (!"mixture3p" %in% model_class) {
+  if (!"mixture3p" %in% class(bmmfit$bmm$model)) {
     return(NULL)
   }
 
