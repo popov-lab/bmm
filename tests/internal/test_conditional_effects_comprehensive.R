@@ -347,6 +347,81 @@ tryCatch({
 })
 
 # ==============================================================================
+# 8. M3 MODEL (Multinomial Processing Tree)
+# ==============================================================================
+
+cat("\n\n")
+cat("******************************************************************************\n")
+cat("*                                M3 MODEL                                   *\n")
+cat("******************************************************************************\n")
+
+# Simulate m3 data with 2-level predictor
+set.seed(321)
+n_subj <- 20
+n_trials <- 50
+data_m3 <- expand.grid(
+  id = factor(1:n_subj),
+  trial = 1:n_trials
+)
+data_m3$cond <- factor(rep(c("A", "B"), each = n_trials, length.out = nrow(data_m3)))
+
+# Simulate response counts (3 categories: correct, other, guessing)
+set.seed(321)
+n_rows <- nrow(data_m3)
+probs <- matrix(c(0.6, 0.2, 0.2), nrow = n_rows, ncol = 3, byrow = TRUE)
+responses <- t(apply(probs, 1, function(p) rmultinom(1, size = 1, prob = p)))
+data_m3$corr <- responses[, 1]
+data_m3$other <- responses[, 2]
+data_m3$guess <- responses[, 3]
+
+# Aggregate to get counts per subject x condition
+data_m3_agg <- aggregate(
+  cbind(corr, other, guess) ~ id + cond,
+  data = data_m3,
+  FUN = sum
+)
+
+cat("\nFitting M3 model (ss version, softmax) with condition predictor...\n")
+
+tryCatch({
+  fit_m3 <- bmm(
+    formula = bmf(c ~ 0 + cond + (1 || id), a ~ 1 + (1 || id)),
+    data = data_m3_agg,
+    model = m3(
+      resp = c("corr", "other", "guess"),
+      version = "ss",
+      choice_rule = "softmax"
+    ),
+    backend = "cmdstanr",
+    chains = 2,
+    iter = 500,
+    silent = 2
+  )
+
+  # Test parameters
+  test_ce(fit_m3, par = "c", scale = "native", model_name = "M3 (ss, softmax)")
+  test_ce(fit_m3, par = "c", scale = "sampling", model_name = "M3 (ss, softmax)")
+  test_ce(fit_m3, par = "c", effects = "cond", model_name = "M3 (ss, softmax)")
+  test_ce(fit_m3, par = "a", scale = "native", model_name = "M3 (ss, softmax)")
+
+  # Test par = NULL (all estimated params)
+  cat("\n", strrep("=", 80), "\n", sep = "")
+  cat("Testing: M3 (ss, softmax) | par = NULL (all params)\n")
+  cat(strrep("=", 80), "\n")
+  tryCatch({
+    ce_all <- conditional_effects(fit_m3)
+    cat("OK conditional_effects(fit, par = NULL) succeeded\n")
+    cat("  Number of effects:", length(ce_all), "\n")
+    cat("  Effect names:", names(ce_all), "\n")
+  }, error = function(e) {
+    cat("ERROR:", conditionMessage(e), "\n")
+  })
+
+}, error = function(e) {
+  cat("M3 model failed to fit:", conditionMessage(e), "\n")
+})
+
+# ==============================================================================
 # SUMMARY
 # ==============================================================================
 
@@ -366,6 +441,5 @@ cat("- SDM: Tested with multiple kappa parameters\n")
 cat("- EZDM: Tested with 2-level condition predictor\n")
 cat("- CSWALD: Attempted (if available)\n")
 cat("- DDM: Attempted (if available)\n")
-cat("\nNote: m3 models are intentionally excluded as conditional_effects\n")
-cat("      is not supported for categorical multinomial models.\n")
+cat("- M3: Tested with multinomial conditional_effects path\n")
 cat("\n")
