@@ -1,0 +1,767 @@
+---
+title: "Signal Detection Theory (SDT) Models"
+output: bookdown::html_document2
+author:
+  - Gidon Frischkorn
+bibliography: REFERENCES.bib
+header-includes:
+  - \usepackage{amsmath}
+vignette: >
+  %\VignetteIndexEntry{Signal Detection Theory (SDT) Models}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+pkgdown:
+  as_is: true
+---
+
+<style type="text/css">
+div.main-container {
+max-width: 850px !important;
+}
+
+p {
+margin-top: 1.5em ;
+margin-bottom: 1.5em ;
+}
+.author{
+    display: none;
+}
+</style>
+
+```{r, include = FALSE}
+options(crayon.enabled = TRUE)
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>",
+  dev = "jpeg",
+  dpi = 100,
+  fig.asp = 0.8,
+  fig.width = 6,
+  out.width = "80%",
+  fig.align = "center"
+)
+fansi::set_knit_hooks(knitr::knit_hooks, which = c("output","message","error"))
+```
+
+# Introduction to Signal Detection Theory
+
+Signal Detection Theory [SDT; @Green_Swets_1966; @Macmillan_Creelman_2005] is a framework for measuring an observer's ability to discriminate between two types of events -- typically called *signal* and *noise* -- while separately accounting for their tendency to favor one response over the other. SDT has been widely applied in recognition memory, perceptual detection, medical diagnosis, and any domain where binary classification decisions are made under uncertainty.
+
+The core idea is simple: both signal and noise events produce evidence along a latent decision axis. The observer sets a *criterion* on this axis and responds "signal" whenever the evidence exceeds the criterion. Because the signal and noise distributions overlap, four outcomes are possible: hits (correctly detecting a signal), misses (failing to detect a signal), false alarms (incorrectly reporting a signal when none was present), and correct rejections (correctly identifying noise).
+
+```{r sdt-illustration, echo=FALSE, fig.cap="Signal Detection Theory: Two overlapping distributions represent evidence from noise (blue) and signal (red) trials. The vertical dashed line is the observer's criterion. The shaded areas correspond to the four possible outcomes.", out.width="75%"}
+x <- seq(-3, 5, length.out = 300)
+dprime <- 1.5
+crit <- dprime / 2  # unbiased criterion
+
+noise <- dnorm(x, mean = 0, sd = 1)
+signal <- dnorm(x, mean = dprime, sd = 1)
+
+par(mar = c(4, 0.5, 2, 0.5))
+plot(x, signal, type = "n", ylim = c(0, max(signal) * 1.15),
+     xlab = "Decision variable", ylab = "", yaxt = "n",
+     main = "Signal Detection Theory")
+
+# Shaded regions
+# False alarms: noise distribution above criterion
+x_fa <- x[x >= crit & x <= max(x)]
+polygon(c(min(x_fa), x_fa, max(x_fa)),
+        c(0, dnorm(x_fa, 0, 1), 0),
+        col = rgb(0.2, 0.4, 0.8, 0.25), border = NA)
+
+# Hits: signal distribution above criterion
+x_hit <- x[x >= crit & x <= max(x)]
+polygon(c(min(x_hit), x_hit, max(x_hit)),
+        c(0, dnorm(x_hit, dprime, 1), 0),
+        col = rgb(0.8, 0.2, 0.2, 0.25), border = NA)
+
+# Draw distributions
+lines(x, noise, col = "steelblue", lwd = 2.5)
+lines(x, signal, col = "firebrick", lwd = 2.5)
+
+# Criterion line
+abline(v = crit, lty = 2, lwd = 2, col = "gray30")
+text(crit + 0.15, max(signal) * 1.1, "criterion (c)", adj = 0, col = "gray30")
+
+# Labels
+text(-1.5, max(noise) * 0.85, "Noise", col = "steelblue", cex = 1.2, font = 2)
+text(dprime + 1.5, max(signal) * 0.85, "Signal", col = "firebrick", cex = 1.2, font = 2)
+
+# Annotate d'
+arrows(0, max(noise) * 0.55, dprime, max(noise) * 0.55,
+       code = 3, length = 0.1, lwd = 2, col = "darkorange")
+text(dprime / 2, max(noise) * 0.62, expression(italic("d'")),
+     col = "darkorange", cex = 1.3)
+
+# Legend
+legend("topright", legend = c("Hit", "False alarm"),
+       fill = c(rgb(0.8, 0.2, 0.2, 0.25), rgb(0.2, 0.4, 0.8, 0.25)),
+       border = NA, bty = "n", cex = 0.9)
+```
+
+SDT separates two psychologically distinct quantities:
+
+- **Sensitivity** ($d'$): the distance between the signal and noise distribution means, reflecting how well the observer can discriminate between the two event types. Higher $d'$ means better discrimination.
+- **Criterion** ($c$): the location of the decision boundary, reflecting the observer's response bias. A liberal criterion (low $c$) produces more "signal" responses, while a conservative criterion (high $c$) produces fewer.
+
+For Gaussian (normal) SDT, these are computed from the hit rate $H$ and false alarm rate $\text{FA}$ as:
+
+$$d' = \Phi^{-1}(H) - \Phi^{-1}(\text{FA})$$
+$$c = -\frac{\Phi^{-1}(H) + \Phi^{-1}(\text{FA})}{2}$$
+
+where $\Phi^{-1}$ is the inverse of the standard normal CDF. The advantage of SDT over simple accuracy measures is that $d'$ and $c$ are independent: an observer can change their criterion (e.g., become more liberal) without changing their sensitivity, and vice versa.
+
+# SDT parametrization in the `bmm` package
+
+The `bmm` package implements SDT models through the `sdt()` function, which creates a model object that can be passed to `bmm()` for hierarchical Bayesian estimation via `brms`. The key idea is that SDT parameters ($d'$, $c$, and any additional parameters) are estimated jointly within a hierarchical framework, allowing researchers to model effects of experimental conditions, include random effects for participants, and properly propagate uncertainty.
+
+## Key parameters
+
+| Parameter | Description | Default link |
+|-----------|-------------|-------------|
+| `dprime` | Sensitivity ($d'$) -- distance between signal and noise distributions | identity |
+| `criterion` | Response bias ($c$) -- location of decision boundary | identity |
+| `spacing` | Threshold spacing for confidence ratings (with equidistant or parsimonious thresholds) | identity |
+| `sdratio` | SD ratio for unequal-variance SDT (signal-to-noise SD ratio) | identity |
+
+For ranking models (`version = "ranking"`), only `dprime` is estimated -- there is no criterion or spacing parameter, since ranking data contains no decision boundary.
+
+## Data requirements
+
+SDT models in `bmm` require **pre-aggregated** data. For binary SDT, this means one row per subject per stimulus type, with columns for the count of "signal" responses and total trial count. For confidence rating models, each row contains response counts across $K$ rating categories. For ranking models, data is in **long format**: one row per subject per rank position, with columns for the rank (1 to $m$), the observed frequency count, and any grouping variables.
+
+The `brms` formula interface allows modeling any parameter as a function of experimental conditions with random effects. For example, `dprime ~ condition + (1 | id)` estimates condition effects on sensitivity with subject-level random intercepts.
+
+# Fitting a binary SDT model
+
+We start with a simple example: a binary SDT model where participants discriminate between old (signal) and new (noise) items in a recognition memory task, with two difficulty conditions.
+
+## Generating simulated data
+
+We use `rsdt()` to generate data with known parameter values, so we can verify that the model recovers them correctly.
+
+```{r sim-binary, message=FALSE}
+library(bmm)
+set.seed(42)
+
+# Simulate an "easy" condition (high sensitivity)
+dat_easy <- rsdt(n_per_cell = 100, n_subjects = 30,
+                 dprime = 2.0, criterion = 0.2)
+dat_easy$condition <- "easy"
+
+# Simulate a "hard" condition (low sensitivity)
+dat_hard <- rsdt(n_per_cell = 100, n_subjects = 30,
+                 dprime = 1.0, criterion = 0.2)
+dat_hard$condition <- "hard"
+
+dat_binary <- rbind(dat_easy, dat_hard)
+dat_binary$condition <- factor(dat_binary$condition, levels = c("easy", "hard"))
+head(dat_binary)
+```
+
+Each row contains one subject's data for one stimulus type: `stimulus` (0 = noise, 1 = signal), `n_old` (count of "old" responses), and `n_trials` (total trials). The `condition` column codes our experimental manipulation.
+
+## Specifying the model and formula
+
+We create the SDT model object and specify the formula. We allow sensitivity ($d'$) to vary by condition with subject-level random effects, while the criterion is constant across conditions with random intercepts.
+
+```{r model-binary}
+model_binary <- sdt(
+  response = "n_old",
+  stimulus = "stimulus",
+  n_trials = "n_trials"
+)
+
+formula_binary <- bmf(
+  dprime ~ 0 + condition + (0 + condition | id),
+  criterion ~ 1 + (1 | id)
+)
+```
+
+## Fitting the model
+
+```{r fit-binary-show, eval=FALSE}
+fit_binary <- bmm(
+  formula = formula_binary,
+  data = dat_binary,
+  model = model_binary,
+  cores = 4,
+  backend = "cmdstanr",
+  file = "assets/bmmfit_sdt_binary"
+)
+```
+
+```{r fit-binary-run, echo=FALSE, message=FALSE, warning=FALSE}
+fit_binary <- bmm(
+  formula = formula_binary,
+  data = dat_binary,
+  model = model_binary,
+  cores = 4,
+  iter = 2000,
+  backend = "cmdstanr",
+  file = "assets/bmmfit_sdt_binary"
+)
+```
+
+## Inspecting results
+
+```{r summary-binary, comment=NA}
+summary(fit_binary)
+```
+
+The fixed effects show the estimated sensitivity for each condition and the overall criterion. Since `dprime` uses an identity link, the estimates are directly interpretable:
+
+```{r fixef-binary}
+fixef_est <- brms::fixef(fit_binary)
+fixef_est
+```
+
+## Visualizing posterior distributions
+
+```{r plot-binary, message=FALSE, warning=FALSE, fig.width=7, fig.height=4, fig.cap="Posterior distributions of binary SDT parameters. Red diamonds show the true generating values."}
+library(tidybayes)
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+
+true_vals <- data.frame(
+  par = c("dprime_conditioneasy", "dprime_conditionhard", "criterion_Intercept"),
+  value = c(2.0, 1.0, 0.2)
+)
+
+tidybayes::tidy_draws(fit_binary) %>%
+  select(starts_with("b_")) %>%
+  pivot_longer(everything(), names_to = "par", values_to = "value") %>%
+  mutate(par = gsub("b_", "", par)) %>%
+  ggplot(aes(x = value, y = par)) +
+  stat_halfeye(normalize = "groups", fill = "steelblue", alpha = 0.7) +
+  geom_point(data = true_vals, aes(x = value, y = par),
+             color = "red", shape = 18, size = 4) +
+  labs(x = "Parameter value", y = "",
+       title = "Posterior distributions of binary SDT parameters",
+       subtitle = "Red diamonds indicate true generating values") +
+  theme_minimal()
+```
+
+## Hypothesis testing
+
+We can test whether sensitivity is higher in the easy than the hard condition:
+
+```{r hyp-binary}
+brms::hypothesis(fit_binary, "dprime_conditioneasy > dprime_conditionhard")
+```
+
+The evidence ratio strongly supports higher sensitivity in the easy condition, as expected from our simulation.
+
+# Confidence rating SDT
+
+## Why confidence ratings?
+
+In many experiments, observers do not simply respond "signal" or "noise" -- they also rate their confidence. For example, a 6-point scale might range from "definitely noise" (1) through "maybe noise" (2-3) and "maybe signal" (4-5) to "definitely signal" (6). This places $K-1$ thresholds on the decision axis, providing richer data for estimating the underlying distributions.
+
+```{r sdt-rating-illustration, echo=FALSE, fig.cap="Confidence rating SDT: Five thresholds divide the decision axis into six rating categories. The response counts across categories form a multinomial distribution.", out.width="75%"}
+x <- seq(-4, 5.5, length.out = 300)
+dprime <- 1.5
+noise <- dnorm(x, mean = 0, sd = 1)
+signal <- dnorm(x, mean = dprime, sd = 1)
+
+# Thresholds for K=6 (parsimonious-like spacing)
+thresholds <- c(-1.5, -0.5, 0.3, 1.0, 2.0)
+
+par(mar = c(4, 0.5, 2, 0.5))
+plot(x, signal, type = "n", ylim = c(0, max(signal) * 1.2),
+     xlab = "Decision variable", ylab = "", yaxt = "n",
+     main = "Confidence Rating SDT (K = 6)")
+
+# Draw distributions
+lines(x, noise, col = "steelblue", lwd = 2.5)
+lines(x, signal, col = "firebrick", lwd = 2.5)
+
+# Draw thresholds
+for (th in thresholds) {
+  abline(v = th, lty = 3, lwd = 1.5, col = "gray50")
+}
+
+# Label rating categories
+midpoints <- c(min(x), thresholds, max(x))
+for (i in seq_len(6)) {
+  mid <- (midpoints[i] + midpoints[i + 1]) / 2
+  label <- paste0("r", i)
+  text(mid, max(signal) * 1.12, label, col = "gray30", cex = 0.9, font = 2)
+}
+
+# Labels
+text(-2.5, max(noise) * 0.85, "Noise", col = "steelblue", cex = 1.1, font = 2)
+text(dprime + 2, max(signal) * 0.85, "Signal", col = "firebrick", cex = 1.1, font = 2)
+```
+
+Rating data provides substantially more information than binary responses. With $K$ rating categories, the full pattern of response counts constrains both the distribution shapes and their separation, enabling estimation of models that would not be identifiable from binary data alone (such as unequal-variance SDT).
+
+## Generating rating data
+
+We simulate data with $K = 6$ rating categories using the parsimonious threshold parameterization [@Selker_2019]:
+
+```{r sim-rating}
+set.seed(123)
+dat_rating <- rsdt(
+  n_per_cell = 200, n_subjects = 30,
+  dprime = 1.5, criterion = 0,
+  n_ratings = 6, spacing = 0.5,
+  version = "rating",
+  threshold_type = "parsimonious"
+)
+head(dat_rating)
+```
+
+Each row has one subject's response counts for one stimulus type across six categories (`r1` through `r6`), ordered from "definitely noise" to "definitely signal".
+
+## Preparing real-world data
+
+In practice, experimental data typically has trial-level rows with separate stimulus and confidence columns. The `combine_sdt_response()` helper converts this format into combined rating categories, which can then be aggregated into counts:
+
+```{r combine-example, eval=FALSE}
+# Suppose your data has columns: subject, stimulus (0/1), confidence (1-3)
+dat$category <- combine_sdt_response(dat$stimulus, dat$confidence, n_levels = 3)
+# Then aggregate: count responses per subject x stimulus x category cell
+```
+
+## Specifying and fitting the rating model
+
+```{r model-rating}
+model_rating <- sdt(
+  response = c("r1", "r2", "r3", "r4", "r5", "r6"),
+  stimulus = "stimulus",
+  threshold_type = "parsimonious"
+)
+
+formula_rating <- bmf(
+  dprime ~ 1 + (1 | id),
+  criterion ~ 1 + (1 | id),
+  spacing ~ 1
+)
+```
+
+```{r fit-rating-show, eval=FALSE}
+fit_rating <- bmm(
+  formula = formula_rating,
+  data = dat_rating,
+  model = model_rating,
+  cores = 4,
+  backend = "cmdstanr",
+  file = "assets/bmmfit_sdt_rating"
+)
+```
+
+```{r fit-rating-run, echo=FALSE, message=FALSE, warning=FALSE}
+fit_rating <- bmm(
+  formula = formula_rating,
+  data = dat_rating,
+  model = model_rating,
+  cores = 4,
+  iter = 2000,
+  backend = "cmdstanr",
+  file = "assets/bmmfit_sdt_rating"
+)
+```
+
+## Results and threshold parameterizations
+
+```{r summary-rating, comment=NA}
+summary(fit_rating)
+```
+
+```{r fixef-rating}
+brms::fixef(fit_rating)
+```
+
+### Threshold parameterizations
+
+The `threshold_type` argument controls how the $K-1$ thresholds are placed on the decision axis. The `bmm` package offers four options:
+
+- **`"equidistant"`** (default): Thresholds are equally spaced around the criterion. Two parameters: `criterion` (center) and `spacing` (distance between adjacent thresholds). The formula is $\theta_k = c + (k - \text{mid}) \cdot \exp(\text{spacing})$.
+
+- **`"parsimonious"`**: Thresholds follow logit-spaced canonical positions [@Selker_2019]. Same two parameters as equidistant, but the spacing follows $\theta_k = c + \exp(\text{spacing}) \cdot \text{logit}(k/K)$. This ensures that an unbiased observer with $d' = 0$ uses all $K$ rating categories equally often -- a theoretically appealing property.
+
+- **`"log_distance"`**: Each threshold distance is a free parameter, giving maximum flexibility at the cost of $K-2$ additional parameters. Useful when threshold patterns are expected to be highly irregular.
+
+- **`"log_ratio"`**: Same $K-2$ free parameters as `log_distance`, but parameterized as ratios relative to a reference spread [@Paulewicz_2020]. One parameter sets the distance from criterion to the next-upper threshold (the reference spread); all other parameters are log-ratios of their interval to this reference. When all delta parameters equal zero, thresholds are equally spaced with unit spacing -- so zero-centered priors encode a preference for symmetric, regular threshold placement.
+
+For most applications, the parsimonious parameterization is a good default: it is well-identified with only two parameters and produces theoretically principled threshold placement. When full flexibility is needed, `log_ratio` is preferred over `log_distance` because its priors are more interpretable.
+
+### Numerical stability for extreme parameters
+
+For models with very high sensitivity (large $d'$) or extreme threshold placement, category probabilities can become very small, leading to numerical underflow. The `log_scale = TRUE` option computes all CDF expressions on the log scale, using Stan primitives like `log_Phi`, `log1m_Phi`, and `log_diff_exp` that remain stable even for near-zero probabilities:
+
+```{r logscale-example, eval=FALSE}
+model_logscale <- sdt(
+  response = c("r1", "r2", "r3", "r4", "r5", "r6"),
+  stimulus = "stimulus",
+  log_scale = TRUE   # numerically stable log-CDF computation
+)
+```
+
+This is available for EV-SDT and UV-SDT rating models across all four noise distributions. For typical parameter ranges, the default probability-scale computation is sufficient.
+
+# Choosing the noise distribution
+
+## Beyond the Gaussian default
+
+SDT traditionally assumes Gaussian (normal) noise distributions -- not because of theoretical justification, but because of historical convention [@DeCarlo_1998]. @Meyer_Grant_2025 challenge this assumption by proposing that **extreme-value (Gumbel minimum) distributions** are theoretically motivated for recognition memory. Their argument is based on the idea that recognition decisions involve selecting the minimum activation across a set of memory features, which naturally gives rise to Gumbel distributions via extreme-value theory.
+
+This is not merely a technical detail -- it leads to a testable prediction. Under Gumbel-min SDT, the sensitivity index $g'$ is:
+
+$$g' = \log(\text{FA}) - \log(H)$$
+
+which is **invariant under uniform expansion of the choice set**. That is, adding equally familiar foil items to a recognition test should not change the estimated sensitivity. Gaussian SDT violates this invariance: $d'$ systematically changes when the choice set is expanded. This is a principled, testable difference between theories.
+
+The `bmm` package supports four noise distributions, allowing researchers to test these theoretical predictions directly:
+
+| Distribution | Argument | Sensitivity index | Theoretical basis |
+|-------------|----------|-------------------|-------------------|
+| Gaussian | `dist = "normal"` | $d' = \Phi^{-1}(H) - \Phi^{-1}(\text{FA})$ | Historical default |
+| Logistic | `dist = "logistic"` | Analogous logistic index | Heavier tails than Gaussian |
+| Gumbel minimum | `dist = "gumbel_min"` | $g' = \log(\text{FA}) - \log(H)$ | Event minima [@Meyer_Grant_2025] |
+| Gumbel maximum | `dist = "gumbel_max"` | Analogous Gumbel-max index | Event maxima processes |
+
+Note that the parameter is always called `dprime` in `bmm`, regardless of the distribution. For `dist = "gumbel_min"`, the `dprime` parameter estimates $g'$ rather than $d'$.
+
+## Comparing noise distributions
+
+To illustrate how researchers can compare noise distributions, we simulate data under a Gumbel-min model and then fit it with both the correct (Gumbel-min) and misspecified (Gaussian) distributions. This mirrors the kind of analysis recommended by @Meyer_Grant_2025 for testing distributional assumptions with empirical data.
+
+```{r sim-invariance}
+set.seed(2025)
+
+# Generate confidence rating data under Gumbel-min SDT
+dat_gumbel <- rsdt(
+  n_per_cell = 300, n_subjects = 30,
+  dprime = 1.5, criterion = 0,
+  n_ratings = 6, spacing = 0.5,
+  dist = "gumbel_min",
+  version = "rating",
+  threshold_type = "parsimonious"
+)
+```
+
+### Fitting the correct model (Gumbel-min)
+
+```{r model-gumbel}
+model_gumbel <- sdt(
+  response = c("r1", "r2", "r3", "r4", "r5", "r6"),
+  stimulus = "stimulus",
+  dist = "gumbel_min",
+  threshold_type = "parsimonious"
+)
+
+formula_inv <- bmf(
+  dprime ~ 1 + (1 | id),
+  criterion ~ 1 + (1 | id),
+  spacing ~ 1
+)
+```
+
+```{r fit-gumbel-show, eval=FALSE}
+fit_gumbel <- bmm(
+  formula = formula_inv,
+  data = dat_gumbel,
+  model = model_gumbel,
+  cores = 4,
+  backend = "cmdstanr",
+  file = "assets/bmmfit_sdt_gumbel"
+)
+```
+
+```{r fit-gumbel-run, echo=FALSE, message=FALSE, warning=FALSE}
+fit_gumbel <- bmm(
+  formula = formula_inv,
+  data = dat_gumbel,
+  model = model_gumbel,
+  cores = 4,
+  iter = 2000,
+  backend = "cmdstanr",
+  file = "assets/bmmfit_sdt_gumbel"
+)
+```
+
+### Fitting the misspecified model (Gaussian)
+
+We fit the same data with a Gaussian SDT model:
+
+```{r model-normal-misspec}
+model_normal <- sdt(
+  response = c("r1", "r2", "r3", "r4", "r5", "r6"),
+  stimulus = "stimulus",
+  dist = "normal",
+  threshold_type = "parsimonious"
+)
+```
+
+```{r fit-normal-show, eval=FALSE}
+fit_normal <- bmm(
+  formula = formula_inv,
+  data = dat_gumbel,
+  model = model_normal,
+  cores = 4,
+  backend = "cmdstanr",
+  file = "assets/bmmfit_sdt_normal_misspec"
+)
+```
+
+```{r fit-normal-run, echo=FALSE, message=FALSE, warning=FALSE}
+fit_normal <- bmm(
+  formula = formula_inv,
+  data = dat_gumbel,
+  model = model_normal,
+  cores = 4,
+  iter = 2000,
+  backend = "cmdstanr",
+  file = "assets/bmmfit_sdt_normal_misspec"
+)
+```
+
+### Comparing model fit with LOO-CV
+
+We use Leave-One-Out Cross-Validation [LOO-CV; via Pareto-smoothed importance sampling from the `loo` package] to compare the predictive performance of both models. LOO-CV estimates how well each model would predict new observations from the same data-generating process. The model with the higher expected log pointwise predictive density (ELPD) provides a better fit.
+
+```{r loo-compare, message=FALSE, warning=FALSE}
+loo_gumbel <- brms::loo(fit_gumbel)
+loo_normal <- brms::loo(fit_normal)
+loo::loo_compare(loo_gumbel, loo_normal)
+```
+
+Since the data were generated under a Gumbel-min model, the Gumbel-min SDT model should show better predictive performance. With real data, this same approach lets researchers empirically test which distributional assumption is more appropriate for their domain.
+
+### Comparing sensitivity estimates
+
+The two models also produce different sensitivity estimates, because $d'$ and $g'$ are on different scales:
+
+```{r compare-dprime}
+est_gumbel <- brms::fixef(fit_gumbel)["dprime_Intercept", ]
+est_normal <- brms::fixef(fit_normal)["dprime_Intercept", ]
+
+cat("Gumbel-min (g', true = 1.5):", round(est_gumbel["Estimate"], 3), "\n")
+cat("Gaussian   (d')            :", round(est_normal["Estimate"], 3), "\n")
+```
+
+The Gumbel-min model recovers the true generating value, while the Gaussian model produces a different sensitivity estimate because $d'$ and $g'$ measure sensitivity on different scales. Critically, if the data truly follow a Gumbel-min process, only $g'$ will remain invariant when the experimental design changes (e.g., when the number of foil items increases).
+
+### Computing sensitivity indices from summary statistics
+
+The `sdt_dprime()` function computes the appropriate sensitivity index for any supported distribution:
+
+```{r utility-fns}
+H <- 0.80
+FA <- 0.15
+
+cat("d' (Gaussian):  ", round(sdt_dprime(H, FA, dist = "normal"), 3), "\n")
+cat("g' (Gumbel-min):", round(sdt_dprime(H, FA, dist = "gumbel_min"), 3), "\n")
+```
+
+Both indices are valid measures of sensitivity, but they make different assumptions about the underlying distributions and have different invariance properties. The choice between them should be guided by theory and empirical model comparison, as demonstrated above.
+
+# Ranking SDT
+
+## The ranking paradigm
+
+In some experimental designs, participants do not make a binary or confidence-rated decision about a single item. Instead, they are presented with $m$ items simultaneously and asked to **rank them by perceived strength** -- for example, ordering four faces from "most likely old" to "least likely old." The rank assigned to the target item reveals how well the observer discriminates it from the foils, without requiring any explicit criterion placement.
+
+This paradigm is particularly useful because it eliminates response bias entirely: the observer must assign every rank exactly once, so there is no criterion to set. Under Gumbel-min SDT [@Meyer_Grant_2025], the probability of the target receiving rank $r$ among $m$ items has a closed form via gamma function ratios:
+
+$$P(\text{rank} = r \mid g', m) = \frac{e^{-g'} \cdot \Gamma(m) \cdot \Gamma(r - 1 + e^{-g'})}{\Gamma(r) \cdot \Gamma(m + e^{-g'})}$$
+
+When $g' = 0$ (no sensitivity), the target is equally likely to receive any rank. As $g'$ increases, the target is increasingly likely to receive rank 1 (correctly identified as strongest). Crucially, the sensitivity index $g'$ estimated from ranking data is on the same scale as $g'$ from binary or confidence rating data -- enabling direct comparison across paradigms.
+
+## Theoretical rank probabilities
+
+```{r ranking-probs-figure, echo=FALSE, fig.cap="Rank probabilities under Gumbel-min SDT for m = 4 items at three levels of sensitivity. At g' = 0 (no discrimination), all ranks are equally likely. As sensitivity increases, the target is more likely to receive rank 1.", fig.width=8, fig.height=3.5, out.width="90%"}
+# Compute rank probabilities using the gamma-function formula
+rank_prob <- function(g, m, r) {
+  exp(-g) * gamma(m) * gamma(r - 1 + exp(-g)) / (gamma(r) * gamma(m + exp(-g)))
+}
+
+g_vals <- c(0, 1, 2)
+m <- 4
+par(mfrow = c(1, 3), mar = c(4, 4, 3, 1))
+for (g in g_vals) {
+  probs <- sapply(1:m, function(r) rank_prob(g, m, r))
+  barplot(probs, names.arg = 1:m, ylim = c(0, 0.7),
+          col = "steelblue", border = "white",
+          xlab = "Rank position", ylab = "P(rank)",
+          main = bquote(italic("g'") == .(g)))
+  abline(h = 1/m, lty = 2, col = "gray50")
+}
+```
+
+## Generating ranking data
+
+We use `rsdt()` with `version = "ranking"` to simulate data from a Gumbel-min ranking model:
+
+```{r sim-ranking, message=FALSE}
+set.seed(2026)
+dat_ranking <- rsdt(
+  n_per_cell = 200, n_subjects = 30,
+  dprime = 1.5, m = 4,
+  version = "ranking",
+  dist = "gumbel_min"
+)
+head(dat_ranking)
+```
+
+The data is in long format: one row per subject per rank position. The `rank` column indicates the rank position (1 to $m$), `observed` is the count of times the target received that rank, and `maxrank` is the total number of items.
+
+## Specifying and fitting the model
+
+```{r model-ranking}
+model_ranking <- sdt(
+  response = "observed",
+  version = "ranking",
+  rank = "rank",
+  m = 4,
+  dist = "gumbel_min"
+)
+
+formula_ranking <- bmf(dprime ~ 1 + (1 | id))
+```
+
+Note that the formula contains only `dprime` -- there is no criterion, spacing, or stimulus parameter for ranking models.
+
+```{r fit-ranking-show, eval=FALSE}
+fit_ranking <- bmm(
+  formula = formula_ranking,
+  data = dat_ranking,
+  model = model_ranking,
+  cores = 4,
+  backend = "cmdstanr",
+  file = "assets/bmmfit_sdt_ranking"
+)
+```
+
+```{r fit-ranking-run, echo=FALSE, message=FALSE, warning=FALSE}
+fit_ranking <- bmm(
+  formula = formula_ranking,
+  data = dat_ranking,
+  model = model_ranking,
+  cores = 4,
+  iter = 2000,
+  backend = "cmdstanr",
+  file = "assets/bmmfit_sdt_ranking"
+)
+```
+
+## Inspecting results
+
+```{r summary-ranking, comment=NA}
+summary(fit_ranking)
+```
+
+The `dprime` intercept estimates the group-level sensitivity $g'$, which should recover the generating value of 1.5:
+
+```{r fixef-ranking}
+brms::fixef(fit_ranking)
+```
+
+## Gaussian UV-SDT ranking
+
+For researchers who prefer Gaussian noise distributions or wish to estimate unequal variances, the ranking model also supports `dist = "normal"` with `variances = "unequal"`. This adds a `sdratio` parameter and uses numerical integration in Stan:
+
+```{r ranking-uv-example, eval=FALSE}
+model_ranking_uv <- sdt(
+  response = "observed",
+  version = "ranking",
+  rank = "rank",
+  m = 4,
+  dist = "normal",
+  variances = "unequal"
+)
+
+formula_ranking_uv <- bmf(
+  dprime ~ 1 + (1 | id),
+  sdratio ~ 1
+)
+```
+
+This variant is slower to fit due to numerical integration but allows testing whether signal and noise distributions have different variances in a ranking design.
+
+# Further SDT models in `bmm`
+
+The `sdt()` function supports several additional model versions for addressing specific theoretical questions. These are available through the `version` and `variances` arguments. The ranking model is described in its own section above.
+
+## Unequal-variance SDT
+
+Standard SDT assumes equal variances for the signal and noise distributions. In practice, the signal distribution often has a larger variance -- for example, because studied items vary in encoding strength. Unequal-variance SDT adds an `sdratio` parameter that scales the signal distribution's standard deviation.
+
+```{r uvsdt-example, eval=FALSE}
+model_uv <- sdt(
+  response = c("r1", "r2", "r3", "r4", "r5", "r6"),
+  stimulus = "stimulus",
+  variances = "unequal"
+)
+
+formula_uv <- bmf(
+  dprime ~ 1 + (1 | id),
+  criterion ~ 1 + (1 | id),
+  spacing ~ 1,
+  sdratio ~ 1
+)
+```
+
+Note that unequal-variance SDT requires confidence rating data ($K > 2$) for the variance ratio to be identifiable.
+
+## Dual-Process SDT (DPSDT)
+
+@Yonelinas_1994 proposed that recognition memory involves two distinct processes: continuous *familiarity* (modeled by SDT) and threshold-based *recollection*. In DPSDT, the `Ro` parameter captures the probability that an old item triggers certain recollection, bypassing the familiarity-based decision.
+
+```{r dpsdt-example, eval=FALSE}
+model_dp <- sdt(
+  response = c("r1", "r2", "r3", "r4", "r5", "r6"),
+  stimulus = "stimulus",
+  version = "dpsdt"
+)
+
+formula_dp <- bmf(
+  dprime ~ 1 + (1 | id),
+  criterion ~ 1 + (1 | id),
+  spacing ~ 1,
+  Ro ~ 1 + (1 | id)
+)
+```
+
+Researchers can use DPSDT to test whether recognition in a particular paradigm is better explained by a dual-process account (with non-zero recollection) or a pure familiarity account (Ro near zero).
+
+## Meta-d'
+
+The meta-d' model [@Maniscalco_Lau_2012] dissociates *type-1 sensitivity* (task performance, measured by $d'$) from *type-2 sensitivity* (confidence calibration, measured by meta-$d'$). If an observer's confidence judgments perfectly track their discrimination ability, meta-$d' = d'$. The ratio meta-$d'/d'$ provides an index of metacognitive efficiency.
+
+```{r metad-example, eval=FALSE}
+model_meta <- sdt(
+  response = c("r1", "r2", "r3", "r4", "r5", "r6"),
+  stimulus = "stimulus",
+  version = "metad"
+)
+
+formula_meta <- bmf(
+  dprime ~ 1 + (1 | id),
+  metad ~ 1 + (1 | id),
+  criterion ~ 1 + (1 | id),
+  spacing ~ 1
+)
+```
+
+## m-Alternative Forced Choice (m-AFC)
+
+In m-AFC paradigms [@DeCarlo_2012], observers choose which of $m$ alternatives contains the signal. There is no criterion parameter -- performance depends only on sensitivity. This is useful when researchers want to measure sensitivity without the influence of response bias.
+
+```{r mafc-example, eval=FALSE}
+model_mafc <- sdt(
+  response = "n_correct",
+  n_trials = "n_trials",
+  version = "mafc",
+  m = 4
+)
+
+formula_mafc <- bmf(dprime ~ 1 + condition + (1 | id))
+```
+
+The m-AFC model uses a closed-form solution for $m = 2$ and Gauss-Hermite quadrature for $m \geq 3$.
+
+# References

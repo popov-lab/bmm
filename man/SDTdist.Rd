@@ -40,7 +40,7 @@ rsdt(
   n_ratings = NULL,
   spacing = NULL,
   deltas = NULL,
-  threshold_type = c("equidistant", "parsimonious", "log_distance")
+  threshold_type = c("equidistant", "parsimonious", "log_distance", "log_ratio")
 )
 
 sdt_dprime(
@@ -96,7 +96,7 @@ Must be between 0 and 1. Applies only to old/signal items.}
 \item{version}{Character. SDT model version controlling the likelihood type.
 Supported: "binary" (default), "rating" (confidence rating models),
 "dpsdt" (dual process SDT with recollection), "metad" (meta-d'),
-"mafc" (m-alternative forced choice).}
+"mafc" (m-alternative forced choice), "ranking" (rank ordering).}
 
 \item{log}{Logical. If \code{TRUE}, returns log-density. Default \code{FALSE}.}
 
@@ -112,13 +112,14 @@ threshold types. For \code{threshold_type = "equidistant"}: thresholds are
 \code{criterion + (k - mid) * exp(spacing)}. For \code{threshold_type = "parsimonious"}: thresholds are \code{criterion + exp(spacing) * logit(k/K)}
 (Selker et al., 2019). Used by \code{rsdt} with \code{version = "rating"}.}
 
-\item{deltas}{Numeric vector. Log-distance parameters for threshold
-generation. Used by \code{rsdt} with \code{version = "rating"} and
-\code{threshold_type = "log_distance"}.}
+\item{deltas}{Numeric vector. Log-distance or log-ratio parameters for
+threshold generation. Used by \code{rsdt} with \code{version = "rating"} and
+\code{threshold_type = "log_distance"} or \code{"log_ratio"}.}
 
 \item{threshold_type}{Character. Method for generating thresholds in
 \code{rsdt} with \code{version = "rating"}: "equidistant" (default), "parsimonious"
-(logit-spaced, Selker et al., 2019), or "log_distance".}
+(logit-spaced, Selker et al., 2019), "log_distance", or "log_ratio"
+(ratio-scaled distances, Paulewicz & Blaut, 2020).}
 
 \item{hit_rate}{Numeric. Proportion of hits (P("old" | signal)).}
 

@@ -7,6 +7,23 @@ real sdt_cumprob(real eta, int dist_type) {
   return inv_logit(eta);
 }
 
+// Log-CDF dispatch: log(F(eta))
+// Uses numerically stable Stan primitives for each distribution
+real sdt_log_cumprob(real eta, int dist_type) {
+  if (dist_type == 1) return log_Phi(eta);
+  if (dist_type == 2) return -exp(-eta);                 // gumbel_min
+  if (dist_type == 3) return log1m_exp(-exp(eta));       // gumbel_max
+  return -log1p_exp(-eta);                                // logistic
+}
+
+// Log complementary CDF: log(1 - F(eta))
+real sdt_log_one_minus_cumprob(real eta, int dist_type) {
+  if (dist_type == 1) return log1m_Phi(eta);
+  if (dist_type == 2) return log1m_exp(-exp(-eta));      // gumbel_min
+  if (dist_type == 3) return -exp(eta);                   // gumbel_max
+  return -eta - log1p_exp(-eta);                          // logistic
+}
+
 // Binary SDT likelihood with binomial on aggregated data
 // Parameters:
 //   y:         count of "old"/"signal" responses

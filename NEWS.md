@@ -16,8 +16,19 @@
   * **Threshold parameterizations** for confidence rating models:
     `"equidistant"` (2 parameters, equal spacing in decision-variable space),
     `"parsimonious"` (2 parameters, logit-spaced canonical positions, Selker
-    et al., 2019), and `"log_distance"` (K-2 parameters, fully flexible
-    ordered thresholds).
+    et al., 2019), `"log_distance"` (K-2 parameters, fully flexible
+    ordered thresholds), and `"log_ratio"` (K-2 parameters, ratio-scaled
+    distances with interpretable priors, Paulewicz & Blaut, 2020).
+  * **Ranking SDT** (`version = "ranking"`): Models where participants rank m
+    items by perceived strength (Meyer-Grant et al., 2025). Gumbel-min ranking
+    uses a closed-form likelihood via gamma function ratios; Gaussian UV-SDT
+    ranking uses numerical integration (`integrate_1d` in Stan). Only `dprime`
+    is estimated (no criterion), paralleling the m-AFC architecture.
+  * **Log-scale numerics** (`log_scale = TRUE`): Opt-in numerically stable
+    log-CDF computation for confidence rating models. Uses Stan primitives
+    (`log_Phi`, `log1m_Phi`, `log1m_exp`, `log_diff_exp`) to prevent underflow
+    for extreme parameter values. Available for EV-SDT and UV-SDT rating models
+    across all four noise distributions.
   * **Distribution functions**: `rsdt()` and `dsdt()` for simulation and
     density evaluation across all versions; `sdt_dprime()` and
     `sdt_criterion()` for computing sensitivity and bias from hit/FA rates;

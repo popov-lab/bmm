@@ -8,12 +8,14 @@ sdt(
   response,
   stimulus = NULL,
   n_trials = NULL,
-  version = c("evsdt", "dpsdt", "metad", "mafc"),
+  version = c("evsdt", "dpsdt", "metad", "mafc", "ranking"),
   dist = c("normal", "logistic", "gumbel_min", "gumbel_max"),
   variances = c("equal", "unequal"),
   n_ratings = NULL,
-  threshold_type = c("equidistant", "parsimonious", "log_distance"),
+  threshold_type = c("equidistant", "parsimonious", "log_distance", "log_ratio"),
   m = NULL,
+  rank = NULL,
+  log_scale = FALSE,
   links = NULL,
   ...
 )
@@ -43,6 +45,11 @@ metacognition is ideal. Requires confidence rating data.
 \item "mafc": m-Alternative Forced Choice (DeCarlo, 2012). Models
 accuracy in m-AFC tasks. Only \code{dprime} parameter (no criterion).
 Requires \code{m} argument specifying number of alternatives.
+\item "ranking": Ranking SDT (Meyer-Grant et al., 2025). Models rank
+ordering of m items by perceived strength. Only \code{dprime} parameter
+(no criterion). Requires \code{m} and \code{rank} arguments. Supports
+\code{dist = "gumbel_min"} (closed form) and \code{dist = "normal"} with
+optional \code{variances = "unequal"}.
 }}
 
 \item{dist}{Character. The noise distribution to use:
@@ -86,11 +93,25 @@ follow logit-spaced canonical positions (Selker et al., 2019):
 observer with d'=0, all K rating categories are used equally often.
 \item "log_distance": K-2 parameters (one per non-criterion threshold).
 Each threshold distance is exp(delta), guaranteeing ordering.
+\item "log_ratio": K-2 parameters (same as log_distance). Threshold
+distances are parameterized as ratios relative to a reference spread.
+When all delta parameters equal 0, thresholds are equally spaced
+with unit spacing, making zero-centered priors encode symmetric
+spacing. Based on Paulewicz & Blaut (2020).
 }
 Ignored for binary SDT.}
 
-\item{m}{Integer. Number of alternatives for m-AFC models. Required when
-\code{version = "mafc"}. Must be >= 2.}
+\item{m}{Integer. Number of alternatives for m-AFC models, or number of
+ranked items for ranking models. Required when \code{version = "mafc"} or
+\code{version = "ranking"}. Must be >= 2.}
+
+\item{rank}{The name of the variable coding the rank position (1 = most
+likely target, m = least likely). Required when \code{version = "ranking"}.}
+
+\item{log_scale}{Logical. If TRUE, use numerically stable log-scale CDF
+expressions in rating model nlf formulas. Default FALSE. Only applies to
+EV-SDT and UV-SDT rating models. Uses Stan's log_Phi, log1m_Phi, and
+log_diff_exp for improved numerical stability with extreme parameters.}
 
 \item{links}{A named list of link functions for the parameters. The default
 link for dprime is "identity" and for criterion is "identity". The dprime
