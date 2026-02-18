@@ -88,12 +88,12 @@ Use \code{scale = "sampling"} to see parameters on the scale used during MCMC sa
 \dontrun{
 # Fit a mixture model with set size effect on kappa
 fit <- bmm(
-  formula = bmf(kappa ~ set_size, thetat ~ 1),
+  formula = bmf(kappa ~ setsize, thetat ~ 1),
   data = zhang_luck_2008,
   model = mixture3p(
-    resp_error = "err_rad",
-    nt_features = paste0("nt_", 1:7, "_err_rad"),
-    set_size = "set_size"
+    resp_error = "response_error",
+    nt_features = paste0("col_lure", 1:5),
+    set_size = "setsize"
   )
 )
 
@@ -110,13 +110,13 @@ ce_thetat <- conditional_effects(fit, par = "thetat")
 plot(ce_thetat)
 
 # Specify which effects to plot
-ce_specific <- conditional_effects(fit, par = "kappa", effects = "set_size")
+ce_specific <- conditional_effects(fit, par = "kappa", effects = "setsize")
 
 # Combine with other brms options
 ce_detailed <- conditional_effects(
   fit,
   par = "kappa",
-  effects = "set_size",
+  effects = "setsize",
   spaghetti = TRUE,
   ndraws = 100
 )

@@ -75,12 +75,12 @@
 #' \dontrun{
 #' # Fit a mixture model with set size effect on kappa
 #' fit <- bmm(
-#'   formula = bmf(kappa ~ set_size, thetat ~ 1),
+#'   formula = bmf(kappa ~ setsize, thetat ~ 1),
 #'   data = zhang_luck_2008,
 #'   model = mixture3p(
-#'     resp_error = "err_rad",
-#'     nt_features = paste0("nt_", 1:7, "_err_rad"),
-#'     set_size = "set_size"
+#'     resp_error = "response_error",
+#'     nt_features = paste0("col_lure", 1:5),
+#'     set_size = "setsize"
 #'   )
 #' )
 #'
@@ -97,13 +97,13 @@
 #' plot(ce_thetat)
 #'
 #' # Specify which effects to plot
-#' ce_specific <- conditional_effects(fit, par = "kappa", effects = "set_size")
+#' ce_specific <- conditional_effects(fit, par = "kappa", effects = "setsize")
 #'
 #' # Combine with other brms options
 #' ce_detailed <- conditional_effects(
 #'   fit,
 #'   par = "kappa",
-#'   effects = "set_size",
+#'   effects = "setsize",
 #'   spaghetti = TRUE,
 #'   ndraws = 100
 #' )
@@ -376,6 +376,57 @@ conditional_effects.bmmfit <- function(x,
 }
 
 
+#' Extract grouping variable names from random effects in a formula
+#'
+#' @description
+#' Parses the RHS of a formula to identify random-effects grouping variables
+#' that should be excluded from conditional effects. Handles all brms grouping
+#' specifications:
+#' \itemize{
+#'   \item Bare names: `(1 | id)`, `(1 || id)`
+#'   \item Correlation IDs: `(1 |ID1| id)` — excludes both `ID1` and `id`
+#'   \item `gr()`: `(1 | gr(id, by = exp))` — extracts `id`, not `exp`
+#'   \item `mm()`: `(1 | mm(g1, g2))` — extracts all positional args
+#'   \item Crossed: `(1 | id:group)` — extracts both `id` and `group`
+#' }
+#'
+#' @param formula A formula object
+#'
+#' @return Character vector of grouping variable names to exclude
+#'
+#' @keywords internal
+#' @noRd
+.extract_re_grouping_vars <- function(formula) {
+  rhs_str <- paste(deparse(formula[[length(formula)]]), collapse = " ")
+
+  # Match text after each | that is not itself | or )
+  # This captures: bare grouping vars, correlation IDs, and gr()/mm() calls
+  bar_parts <- regmatches(
+    rhs_str, gregexpr("(?<=\\|)[^|)]+", rhs_str, perl = TRUE)
+  )[[1]]
+  bar_parts <- trimws(bar_parts)
+  bar_parts <- bar_parts[nchar(bar_parts) > 0]
+
+  if (length(bar_parts) == 0) return(character(0))
+
+  unlist(lapply(bar_parts, function(part) {
+    # gr(id, ...) — first argument is the grouping variable
+    if (grepl("^gr\\s*\\(", part)) {
+      inner <- sub("^gr\\s*\\(\\s*", "", part)
+      return(trimws(sub("[,)]+.*", "", inner)))
+    }
+    # mm(g1, g2, ...) — positional args (before named args) are grouping vars
+    if (grepl("^mm\\s*\\(", part)) {
+      inner <- sub("^mm\\s*\\(\\s*", "", part)
+      args <- trimws(strsplit(inner, ",")[[1]])
+      return(args[!grepl("=", args)])
+    }
+    # Bare variable name(s) or correlation ID — split on : only
+    trimws(strsplit(part, ":")[[1]])
+  }))
+}
+
+
 #' Build a prediction grid for conditional effects
 #'
 #' @description
@@ -404,14 +455,10 @@ conditional_effects.bmmfit <- function(x,
   if (is.null(par_formula)) return(list())
 
   # Extract fixed-effect predictors only, excluding random-effects grouping
-  # variables (e.g. 'id' from (1|id) or (1||id)) by finding text between
-  # the last | and the closing ) in each bar term
-  rhs_str <- paste(deparse(stats::formula(par_formula)[[3]]), collapse = " ")
-  re_groups <- regmatches(
-    rhs_str, gregexpr("(?<=\\|)[^|)]+(?=\\))", rhs_str, perl = TRUE)
-  )[[1]]
-  re_groups <- trimws(unlist(strsplit(re_groups, "[:/+]")))
-  rhs_vars <- all.vars(stats::formula(par_formula)[-2])
+  # variables and correlation IDs from all brms grouping patterns
+  f <- stats::formula(par_formula)
+  re_groups <- .extract_re_grouping_vars(f)
+  rhs_vars <- all.vars(f[-2])
   rhs_vars <- setdiff(rhs_vars, c("0", "1", re_groups))
 
   if (is.null(effects)) {
