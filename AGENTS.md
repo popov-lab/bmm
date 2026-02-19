@@ -48,6 +48,16 @@ These functions:
 - **Functional patterns**: Use functional programming where possible
 - **Explicit namespacing**: Always use `package::function()` (e.g., `brms::lf()`, `glue::glue()`)
 - Only use functions from packages in `DESCRIPTION` "Imports"
+- **Pure functions**: Always write functions that preserve the global state
+- NEVER use a `seed` argument and `set.seed` inside of functions
+
+```r
+# Bad - never do this
+myfun <- function(n, seed) {
+   set.seed(seed)
+   rnorm(n)
+}
+```
 
 ### String Formatting
 Use `glue::glue()` instead of `sprintf()`:
