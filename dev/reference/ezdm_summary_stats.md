@@ -172,9 +172,9 @@ result <- ezdm_summary_stats(test_data,
 )
 print(result)
 #>   subject   mean_rt     var_rt n_upper n_trials contaminant_prop
-#> 1       1 0.7752029 0.03617940      85      100     5.229547e-09
-#> 2       2 0.7722166 0.06168264      78      100     1.542531e-08
-#> 3       3 0.7906632 0.04787073      85      100     2.465862e-08
+#> 1       1 0.7752000 0.03617616      85      100     5.232355e-09
+#> 2       2 0.7722113 0.06167891      78      100     1.008148e-08
+#> 3       3 0.7906609 0.04786826      85      100     1.694455e-08
 
 # Group by multiple variables using simple method
 result_multi <- ezdm_summary_stats(test_data,

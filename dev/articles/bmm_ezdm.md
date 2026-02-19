@@ -612,9 +612,9 @@ summary_4par <- ezdm_summary_stats(
 
 summary_4par
 #>    mean_rt_upper mean_rt_lower var_rt_upper var_rt_lower n_upper n_trials
-#> mu     0.3959584            NA   0.01657201           NA     195      200
+#> mu      0.395538            NA   0.01647681           NA     195      200
 #>    contaminant_prop_upper contaminant_prop_lower
-#> mu           7.544663e-09                     NA
+#> mu           7.311399e-09                     NA
 ```
 
 Notice the output now includes: - `mean_rt_upper`, `var_rt_upper`:

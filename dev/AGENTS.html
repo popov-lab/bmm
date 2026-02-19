@@ -156,7 +156,7 @@
 <div class="section level2">
 <h2 id="testing-requirements">Testing Requirements<a class="anchor" aria-label="anchor" href="#testing-requirements"></a></h2>
 <p><strong>Always add/update tests</strong> for code changes - even if not explicitly requested.</p>
-<p>Test organization: - <code>tests/testthat/</code> - automated unit tests (run by CI) - <code>tests/internal/</code> - long-running manual tests</p>
+<p>Test organization: - <code>tests/testthat/</code> - automated unit tests (run by CI) - <code>tests/internal/</code> - long-running manual tests - <code>bmm-dev/feature_tests/</code> - exploratory/development scripts (synced via SWITCHdrive, not tracked by git) - <code>local/</code> - machine-specific scratch scripts (not tracked by git)</p>
 <p>Test patterns from codebase:</p>
 <div class="sourceCode" id="cb6"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu">test_that</span><span class="op">(</span><span class="st">"check_data() produces expected errors"</span>, <span class="op">{</span></span>
@@ -205,7 +205,15 @@ tests/internal/      # Manual long-running tests
 vignettes/articles/  # Long-form tutorials (Rmd)
 man/                 # AUTO-GENERATED - do not edit
 docs/                # AUTO-GENERATED pkgdown site - do not edit
-_pkgdown.yml         # pkgdown configuration and function organization</code></pre>
+_pkgdown.yml         # pkgdown configuration and function organization
+
+# Git-ignored development folders (not part of the package)
+bmm-dev/             # Developer-specific folder for exploratory/development scripts (git-ignored)
+local/               # Machine-local scratch files (not synced, not shared)</code></pre>
+</div>
+<div class="section level2">
+<h2 id="local-configuration">Local Configuration<a class="anchor" aria-label="anchor" href="#local-configuration"></a></h2>
+<p>If a <code>LOCAL-AGENTS.md</code> file exists in the repository root, read it for machine-specific configuration. This file is git-ignored, so each developer maintains their own copy.</p>
 </div>
 <div class="section level2">
 <h2 id="common-pitfalls">Common Pitfalls<a class="anchor" aria-label="anchor" href="#common-pitfalls"></a></h2>
@@ -221,6 +229,8 @@ _pkgdown.yml         # pkgdown configuration and function organization</code></p
 <strong>devtools::load_all()</strong> - never use <code><a href="https://github.com/venpopov/bmm" class="external-link">library(bmm)</a></code> during development</li>
 <li>
 <strong>Git branching</strong> - feature branches → PR to <code>develop</code> (never commit directly to <code>develop</code> or <code>master</code>)</li>
+<li>
+<strong>Local <code>.gitignore</code> changes</strong> - to ignore files locally without touching the tracked <code>.gitignore</code>, add patterns to <code>.git/info/exclude</code> instead (see <a href="https://venpopov.com/posts/2024/git-local-ignore/" class="external-link">venpopov.com/posts/2024/git-local-ignore</a>)</li>
 </ol></div>
 </div>
 

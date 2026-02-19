@@ -148,7 +148,10 @@ into brms-generated models via stanvars for custom families.
 requested.
 
 Test organization: - `tests/testthat/` - automated unit tests (run by
-CI) - `tests/internal/` - long-running manual tests
+CI) - `tests/internal/` - long-running manual tests -
+`bmm-dev/feature_tests/` - exploratory/development scripts (synced via
+SWITCHdrive, not tracked by git) - `local/` - machine-specific scratch
+scripts (not tracked by git)
 
 Test patterns from codebase:
 
@@ -205,6 +208,16 @@ bmf(kappa ~ set_size, c ~ 1, a = 0.5)  # 'a' fixed to 0.5
     docs/                # AUTO-GENERATED pkgdown site - do not edit
     _pkgdown.yml         # pkgdown configuration and function organization
 
+    # Git-ignored development folders (not part of the package)
+    bmm-dev/             # Developer-specific folder for exploratory/development scripts (git-ignored)
+    local/               # Machine-local scratch files (not synced, not shared)
+
+## Local Configuration
+
+If a `LOCAL-AGENTS.md` file exists in the repository root, read it for
+machine-specific configuration. This file is git-ignored, so each
+developer maintains their own copy.
+
 ## Common Pitfalls
 
 1.  **Never edit** `man/` or `docs/` directly - regenerated from
@@ -217,3 +230,7 @@ bmf(kappa ~ set_size, c ~ 1, a = 0.5)  # 'a' fixed to 0.5
     [`library(bmm)`](https://github.com/venpopov/bmm) during development
 6.  **Git branching** - feature branches → PR to `develop` (never commit
     directly to `develop` or `master`)
+7.  **Local `.gitignore` changes** - to ignore files locally without
+    touching the tracked `.gitignore`, add patterns to
+    `.git/info/exclude` instead (see
+    [venpopov.com/posts/2024/git-local-ignore](https://venpopov.com/posts/2024/git-local-ignore/))
