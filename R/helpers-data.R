@@ -627,7 +627,6 @@ ezdm_summary_stats <- function(
   n_upper <- sum(is_upper, na.rm = TRUE)
   resolved_bounds <- .resolve_contaminant_bounds(contaminant_bound, rt_data)
 
-  # Helper to compute moments for a single RT vector
   compute_moments <- function(rt_vec, n_obs) {
     if (n_obs < min_trials) {
       list(mean = NA_real_, var = NA_real_, contaminant_prop = NA_real_)
@@ -720,16 +719,10 @@ ezdm_summary_stats <- function(
   data_max <- max(rt_data, na.rm = TRUE)
   data_range <- data_max - data_min
 
-  # Track whether each bound is data-driven
-  lower_is_data_driven <- FALSE
-  upper_is_data_driven <- FALSE
-
-  # Helper to resolve a single bound
-  resolve_single <- function(bound_val, is_lower) {
+  resolve_single <- function(bound_val) {
     if (is.numeric(bound_val)) {
       return(list(value = bound_val, data_driven = FALSE))
     }
-    # Character value
     if (tolower(bound_val) == "min") {
       return(list(value = data_min, data_driven = TRUE))
     } else if (tolower(bound_val) == "max") {
@@ -740,27 +733,22 @@ ezdm_summary_stats <- function(
     }
   }
 
-  lower_result <- resolve_single(contaminant_bound[1], TRUE)
-  upper_result <- resolve_single(contaminant_bound[2], FALSE)
+  lower_result <- resolve_single(contaminant_bound[1])
+  upper_result <- resolve_single(contaminant_bound[2])
 
   resolved[1] <- lower_result$value
   resolved[2] <- upper_result$value
-  lower_is_data_driven <- lower_result$data_driven
-  upper_is_data_driven <- upper_result$data_driven
 
-  # Apply buffer to data-driven bounds to reduce uniform density
-  # This improves mixture identifiability by making uniform less competitive
-  # Use 50% of range or at least 100ms to ensure conservative estimation
-  if (lower_is_data_driven && bound_buffer > 0) {
-    buffer_amount <- max(bound_buffer * data_range, 0.1) # At least 100ms
-    resolved[1] <- max(0.001, resolved[1] - buffer_amount) # Keep positive
+  # Buffer data-driven bounds to improve mixture identifiability
+  if (lower_result$data_driven && bound_buffer > 0) {
+    buffer_amount <- max(bound_buffer * data_range, 0.1)
+    resolved[1] <- max(0.001, resolved[1] - buffer_amount)
   }
-  if (upper_is_data_driven && bound_buffer > 0) {
-    buffer_amount <- max(bound_buffer * data_range, 0.1) # At least 100ms
+  if (upper_result$data_driven && bound_buffer > 0) {
+    buffer_amount <- max(bound_buffer * data_range, 0.1)
     resolved[2] <- resolved[2] + buffer_amount
   }
 
-  # Ensure lower < upper (swap if necessary due to data-driven bounds)
   if (resolved[1] >= resolved[2]) {
     warning2("Resolved contaminant bounds are invalid (lower >= upper). \\
              Using data range with buffer.", env.frame = -1)
@@ -992,7 +980,6 @@ flag_contaminant_rts <- function(
   data <- data[!is.na(data[[rt]]), , drop = FALSE]
   warnif(any(data[[rt]] > 10), "Some RT values > 10. Ensure RTs are in seconds, not milliseconds.")
   stopif(any(data[[rt]] <= 0), "Non-positive RT values found in column '{rt}'.")
-
 
   flag_group <- function(grp_data) {
     .flag_rt_group(
@@ -1251,15 +1238,12 @@ validate_fast_guesses <- function(contam_flag, rt_data, response,
   fast_flagged_idx <- contam_flag & (rt_data < rt_threshold) & !is.na(contam_flag) & !is.na(rt_data)
   n_tested <- sum(fast_flagged_idx)
 
-  # Posterior: Beta(alpha + n_upper, beta + n_lower)
-  # Note: HDI provides useful uncertainty information even with low trial numbers
   is_upper <- .convert_response_to_upper(response)
   n_upper <- sum(is_upper[fast_flagged_idx])
   prop_upper <- n_upper / n_tested
   posterior_alpha <- prior_alpha + n_upper
   posterior_beta <- prior_beta + (n_tested - n_upper)
 
-  # HDI and Bayes Factor
   hdi <- .compute_beta_hdi(posterior_alpha, posterior_beta, credible_mass = credible_mass)
   bf_01 <- stats::dbeta(guess_prob, posterior_alpha, posterior_beta) /
     stats::dbeta(guess_prob, prior_alpha, prior_beta)
@@ -1304,11 +1288,7 @@ validate_fast_guesses <- function(contam_flag, rt_data, response,
 # @param credible_mass Numeric. Probability mass (default from constant)
 # @return List with lower and upper bounds
 .compute_beta_hdi <- function(alpha, beta, credible_mass = 0.95) {
-
-
-  # Use quantile-based interval for extreme or undefined cases
-  # Extreme: alpha or beta > 1000 (numerical precision issues)
-  # Undefined: both < 1 (U-shaped, HDI not meaningful)
+  # Fall back to equal-tailed interval for extreme (>1000) or U-shaped (both <1) cases
   if (alpha > 1000 || beta > 1000 || (alpha < 1 && beta < 1)) {
     tail_prob <- (1 - credible_mass) / 2
     return(list(
@@ -1317,7 +1297,6 @@ validate_fast_guesses <- function(contam_flag, rt_data, response,
     ))
   }
 
-  # Grid search: find shortest interval containing credible_mass
   lower_percentiles <- seq(0, 1 - credible_mass, length.out = 1000)
   upper_percentiles <- lower_percentiles + credible_mass
 
@@ -1329,7 +1308,6 @@ validate_fast_guesses <- function(contam_flag, rt_data, response,
   list(lower = lowers[min_idx], upper = uppers[min_idx])
 }
 
-# Compute trial-level contamination metrics from mixture fit
 # @param rt_vec Numeric vector of RTs
 # @param mixture_fit List returned from .fit_rt_mixture
 # @param distribution Character. Distribution type
