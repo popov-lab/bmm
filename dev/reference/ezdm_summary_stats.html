@@ -9,7 +9,7 @@
 by fitting mixture models to raw trial-level RT data, separating
 contaminant responses from true responses."><meta property="og:description" content="Computes robust summary statistics for the EZ-Diffusion Model
 by fitting mixture models to raw trial-level RT data, separating
-contaminant responses from true responses."><meta name="robots" content="noindex"></head><body>
+contaminant responses from true responses."><meta property="og:image" content="https://venpopov.com/bmm/logo.png"><meta name="robots" content="noindex"></head><body>
     <a href="#main" class="visually-hidden-focusable">Skip to contents</a>
 
 
@@ -40,8 +40,7 @@ contaminant responses from true responses."><meta name="robots" content="noindex
 </nav><div class="container template-reference-topic">
 <div class="row">
   <main id="main" class="col-md-9"><div class="page-header">
-
-      <h1>Compute Robust Summary Statistics for EZ-Diffusion Model</h1>
+      <img src="../logo.png" class="logo" alt=""><h1>Compute Robust Summary Statistics for EZ-Diffusion Model</h1>
       <small class="dont-index">Source: <a href="https://github.com/venpopov/bmm/blob/develop/R/helpers-data.R" class="external-link"><code>R/helpers-data.R</code></a></small>
       <div class="d-none name"><code>ezdm_summary_stats.Rd</code></div>
     </div>
@@ -211,9 +210,9 @@ Robust moments are then extracted from the fitted parametric component.</p>
 <span class="r-in"><span><span class="op">)</span></span></span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/base/print.html" class="external-link">print</a></span><span class="op">(</span><span class="va">result</span><span class="op">)</span></span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   subject   mean_rt     var_rt n_upper n_trials contaminant_prop</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 1       1 0.7752000 0.03617616      85      100     5.232355e-09</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 2       2 0.7722113 0.06167891      78      100     1.008148e-08</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 3       3 0.7906609 0.04786826      85      100     1.694455e-08</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 1       1 0.7752029 0.03617940      85      100     5.229547e-09</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 2       2 0.7722166 0.06168264      78      100     1.542531e-08</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 3       3 0.7906632 0.04787073      85      100     2.465862e-08</span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Group by multiple variables using simple method</span></span></span>
 <span class="r-in"><span><span class="va">result_multi</span> <span class="op">&lt;-</span> <span class="fu">ezdm_summary_stats</span><span class="op">(</span><span class="va">test_data</span>,</span></span>
