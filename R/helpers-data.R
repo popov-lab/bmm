@@ -533,7 +533,6 @@ ezdm_summary_stats <- function(
     rownames(result_df) <- NULL
   }
 
-  # Add attributes for diagnostics
   attr(result_df, "version") <- version
   attr(result_df, "distribution") <- distribution
   attr(result_df, "method") <- method
@@ -574,12 +573,10 @@ ezdm_summary_stats <- function(
 # @param x Vector of response values
 # @return Logical vector where TRUE = upper boundary response
 .convert_response_to_upper <- function(x) {
-  # Numeric or logical: treat 1/TRUE as upper
   if (is.numeric(x) || is.logical(x)) {
     return(as.logical(x))
   }
 
-  # Character: match common patterns for upper boundary
   if (is.character(x) || is.factor(x)) {
     x <- tolower(x)
     upper_patterns <- c("upper", "correct", "acc", "1", "true", "yes", "hit")
@@ -846,19 +843,6 @@ ezdm_summary_stats <- function(
 #'   exceeding this are clipped with a warning. Must be in (0, 1]. Default 0.5.
 #' @param maxit Integer. Maximum EM iterations. Default 100.
 #' @param tol Numeric. Convergence tolerance for log-likelihood. Default 1e-6.
-#' @param output Character. Type of contamination metric to compute:
-#'   - "probability" (default): Posterior probability P(contaminant | RT)
-#'   - "likelihood_ratio": Ratio of contaminant to RT likelihood
-#'   - "flag": Binary indicator based on probabilistic binomial sampling
-#' @param validate_fast_guessing Logical. If TRUE and response data is provided,
-#'   tests whether fast flagged contaminants show random guessing behavior (~50%
-#'   accuracy for 2AFC tasks). By default, tests trials with RT below the 25th
-#'   percentile (controlled by `threshold_type = "quantile"` and `rt_threshold = 0.25`
-#'   passed via `...`). A warning is issued if responses show evidence against
-#'   random guessing. Default FALSE. See [validate_fast_guesses()] for all options.
-#' @param ... Additional arguments passed to [validate_fast_guesses()] when
-#'   `validate_fast_guessing = TRUE`. See [validate_fast_guesses()] documentation
-#'   for supported arguments and their default values
 #' @param what_return Character. Type of output to return:
 #'   - "data" (default): Returns data.frame with contamination columns only
 #'   - "diagnostics": Returns data.frame with mixture fit diagnostics only
@@ -881,23 +865,13 @@ ezdm_summary_stats <- function(
 #' distribution over `contaminant_bound`, and f_RT is the specified RT
 #' distribution with parameters theta.
 #'
-#' ## Probabilistic Flagging
-#'
-#' When `output = "flag"`, contamination flags are generated probabilistically
-#' using binomial sampling based on each trial's contamination probability.
-#' This avoids the deterministic threshold issue where all long RTs above a
-#' fixed threshold would be flagged, even if they're part of the RT distribution.
-#' Each trial has a chance of being flagged proportional to its contamination
-#' probability, allowing for more nuanced detection. Use the `seed` argument
-#' for reproducible flagging.
-#'
 #' ## Version Behavior
 #'
 #' - **version = "3par"**: Fits single mixture to all RTs. Returns
-#'   `contam_prob`, `contam_lr`, `contam_flag` columns.
+#'   `contam_prob` column.
 #' - **version = "4par"**: Fits separate mixtures for upper/lower boundary
 #'   RTs. Returns `contam_prob_upper`/`_lower` columns. Upper trials have NA
-#'   for `_lower` metrics and vice versa.
+#'   for `_lower` column and vice versa.
 #'
 #' ## Small Groups
 #'
@@ -907,10 +881,8 @@ ezdm_summary_stats <- function(
 #' @return Return type depends on `what_return`:
 #'
 #' **what_return = "data"**: Data.frame with original columns plus:
-#' - `contam_prob`: Contamination probability (version="3par")
-#' - `contam_lr`: Likelihood ratio (if output != "flag")
-#' - `contam_flag`: Binary contamination flag (if output != "probability")
-#' - For version="4par": `_upper` and `_lower` suffixed columns
+#' - `contam_prob`: Posterior P(contaminant | RT) (version="3par")
+#' - For version="4par": `contam_prob_upper` and `contam_prob_lower` columns
 #'
 #' **what_return = "diagnostics"**: Data.frame with one row per group:
 #' - Grouping variables (if `.by` specified)
@@ -924,7 +896,8 @@ ezdm_summary_stats <- function(
 #' **what_return = "all"**: List with `$data` and `$diagnostics` components
 #'
 #' @seealso [ezdm_summary_stats()] for aggregated RT statistics with contamination
-#'   handling
+#'   handling, [validate_fast_guesses()] for testing whether flagged contaminants
+#'   show random guessing behavior
 #'
 #' @keywords transform
 #' @export
@@ -944,9 +917,14 @@ ezdm_summary_stats <- function(
 #'   trial = 1:n
 #' )
 #'
-#' # Basic usage - flag contaminants
+#' # Basic usage - get contamination probabilities
 #' result <- flag_contaminant_rts(data, rt = "rt")
-#' data_clean <- result[!result$contam_flag, ]
+#'
+#' # Hard threshold: flag trials with P(contaminant) > 0.5
+#' data_clean <- result[result$contam_prob <= 0.5, ]
+#'
+#' # Probabilistic flagging via binomial sampling
+#' result$flagged <- rbinom(nrow(result), 1, result$contam_prob) == 1
 #'
 #' # Get diagnostics to check mixture fit
 #' result_all <- flag_contaminant_rts(data, rt = "rt", what_return = "all")
@@ -984,14 +962,10 @@ flag_contaminant_rts <- function(
     max_contaminant = 0.5,
     maxit = 100,
     tol = 1e-6,
-    output = c("probability", "likelihood_ratio", "flag"),
-    validate_fast_guessing = FALSE,
-    ...,
     what_return = c("data", "diagnostics", "all")) {
   stop_missing_args()
   version <- match.arg(version)
   distribution <- match.arg(distribution)
-  output <- match.arg(output)
   what_return <- match.arg(what_return)
 
   data <- try(as.data.frame(data), silent = TRUE)
@@ -1031,10 +1005,7 @@ flag_contaminant_rts <- function(
       init_contaminant = init_contaminant,
       max_contaminant = max_contaminant,
       maxit = maxit,
-      tol = tol,
-      output = output,
-      validate_fast_guessing = validate_fast_guessing,
-      ...
+      tol = tol
     )
   }
 
@@ -1061,214 +1032,87 @@ flag_contaminant_rts <- function(
   )
 }
 
-# Helper function to process a single group
-# @param data Data.frame for a single group
-# @param rt Character. Name of RT column
-# @param response Character or NULL. Name of response column
-# @param version Character. "3par" or "4par"
-# @param distribution Character. RT distribution type
-# @param contaminant_bound Numeric(2). Bounds for uniform distribution
-# @param init_contaminant Numeric. Initial contaminant proportion
-# @param max_contaminant Numeric. Maximum contaminant proportion
-# @param maxit Integer. Maximum EM iterations
-# @param tol Numeric. Convergence tolerance
-# @param output Character. Output type
-# @param validate_fast_guessing Logical. Whether to validate fast guessing behavior
-# @param ... Additional arguments passed to validate_fast_guesses()
-# @return List with $data (augmented data.frame) and $diagnostics (fit info)
+# Fit mixture and compute contamination probabilities, with convergence fallback
+# @return List with $fit and $contam_prob
+.fit_and_compute_prob <- function(rt_vec, distribution, bounds,
+                                  init_contaminant, max_contaminant, maxit, tol,
+                                  warn_label = "group") {
+  fit <- .fit_rt_mixture(
+    rt_vec, distribution, bounds,
+    init_contaminant, max_contaminant, maxit, tol
+  )
+
+  if (!fit$converged || is.null(fit$params)) {
+    msg <- paste0("EM did not converge for ", warn_label, ". Returning NA.")
+    warning(msg, call. = FALSE)
+    contam_prob <- rep(NA_real_, length(rt_vec))
+  } else {
+    contam_prob <- .compute_contam_prob(rt_vec, fit, distribution, bounds)
+  }
+
+  list(fit = fit, contam_prob = contam_prob)
+}
+
+# Build a diagnostics row from a mixture fit
+.build_diagnostics <- function(fit, n_trials, distribution) {
+  data.frame(
+    mixture_params = I(list(fit$params)),
+    contaminant_prop = fit$contaminant_prop,
+    converged = fit$converged,
+    iterations = fit$iterations,
+    loglik = if (fit$converged) fit$loglik else NA_real_,
+    n_trials = n_trials,
+    distribution = distribution,
+    method = "mixture_em",
+    stringsAsFactors = FALSE
+  )
+}
+
 .flag_rt_group <- function(data, rt, response, version, distribution,
                            contaminant_bound, init_contaminant, max_contaminant,
-                           maxit, tol, output, validate_fast_guessing,
-                           ...) {
+                           maxit, tol) {
   rt_data <- data[[rt]]
-  n_trials <- length(rt_data)
-
   resolved_bounds <- .resolve_contaminant_bounds(contaminant_bound, rt_data)
 
   if (version == "3par") {
-    fit <- .fit_rt_mixture(
+    result <- .fit_and_compute_prob(
       rt_data, distribution, resolved_bounds,
       init_contaminant, max_contaminant, maxit, tol
     )
 
-    if (!fit$converged || is.null(fit$params)) {
-      warning2("EM did not converge for group. Returning NA for contamination metrics.",
-        env.frame = -1
-      )
-      contam_metrics <- list(
-        contam_prob = rep(NA_real_, n_trials),
-        contam_lr = rep(NA_real_, n_trials),
-        contam_flag = rep(NA, n_trials)
-      )
-    } else {
-      contam_metrics <- .compute_trial_contam_metrics(
-        rt_data, fit, distribution, resolved_bounds
-      )
-    }
-
     data_out <- data
-    data_out$contam_prob <- contam_metrics$contam_prob
-    if (output %in% c("likelihood_ratio", "flag")) {
-      data_out$contam_lr <- contam_metrics$contam_lr
-    }
-    if (output %in% c("flag", "probability")) {
-      data_out$contam_flag <- contam_metrics$contam_flag
-    }
-
-    # Perform fast guess validation if requested and response data available
-    fast_guess_result <- NULL
-    if (validate_fast_guessing && !is.null(response)) {
-      fast_guess_result <- validate_fast_guesses(
-        contam_flag = contam_metrics$contam_flag, 
-        rt_data = rt_data,
-        response = data[[response]],
-        ...
-      )
-
-      # Issue warning if evidence against guessing is moderate or strong
-      # Using Jeffreys scale: BF < 1/3 indicates moderate evidence against H0
-      if (!is.na(fast_guess_result$bf_01) && fast_guess_result$bf_01 < 1 / 3) {
-        cred_mass_pct <- round(fast_guess_result$credible_mass * 100)
-        warning2(
-          "Fast flagged contaminants (RT < {round(fast_guess_result$rt_threshold, 2)}s) show ",
-          "evidence against random guessing. ",
-          "Observed upper proportion: {round(fast_guess_result$prop_upper, 2)} ",
-          "(guessing would be 0.50). ",
-          "{cred_mass_pct}% HDI: ",
-          "[{round(fast_guess_result$hdi_lower, 2)}, {round(fast_guess_result$hdi_upper, 2)}]. ",
-          "BF_01 = {round(fast_guess_result$bf_01, 2)} ({fast_guess_result$bf_evidence}). ",
-          "This suggests flagged contaminants may not be fast guesses, or there is response bias."
-        )
-      }
-    }
-
-    diagnostics <- data.frame(
-      mixture_params = I(list(fit$params)),
-      contaminant_prop = fit$contaminant_prop,
-      converged = fit$converged,
-      iterations = fit$iterations,
-      loglik = if (fit$converged) fit$loglik else NA_real_,
-      n_trials = n_trials,
-      distribution = distribution,
-      method = "mixture_em",
-      fast_guess_validated = !is.null(fast_guess_result),
-      fast_guess_prop_upper = if (!is.null(fast_guess_result)) fast_guess_result$prop_upper else NA_real_,
-      fast_guess_hdi_lower = if (!is.null(fast_guess_result)) fast_guess_result$hdi_lower else NA_real_,
-      fast_guess_hdi_upper = if (!is.null(fast_guess_result)) fast_guess_result$hdi_upper else NA_real_,
-      fast_guess_bf_01 = if (!is.null(fast_guess_result)) fast_guess_result$bf_01 else NA_real_,
-      fast_guess_in_hdi = if (!is.null(fast_guess_result)) fast_guess_result$guess_in_hdi else NA,
-      fast_guess_evidence = if (!is.null(fast_guess_result)) fast_guess_result$bf_evidence else NA_character_,
-      fast_guess_n_tested = if (!is.null(fast_guess_result)) fast_guess_result$n_tested else NA_integer_,
-      fast_guess_rt_threshold = if (!is.null(fast_guess_result)) fast_guess_result$rt_threshold else NA_real_,
-      fast_guess_mean_rt = if (!is.null(fast_guess_result)) fast_guess_result$mean_rt_tested else NA_real_,
-      stringsAsFactors = FALSE
-    )
+    data_out$contam_prob <- result$contam_prob
+    diagnostics <- .build_diagnostics(result$fit, length(rt_data), distribution)
   } else {
-    response_data <- data[[response]]
-    is_upper <- .convert_response_to_upper(response_data)
-
+    is_upper <- .convert_response_to_upper(data[[response]])
     rt_upper <- rt_data[is_upper]
     rt_lower <- rt_data[!is_upper]
-    n_upper <- length(rt_upper)
-    n_lower <- length(rt_lower)
 
-    fit_upper <- .fit_rt_mixture(
+    res_upper <- .fit_and_compute_prob(
       rt_upper, distribution, resolved_bounds,
-      init_contaminant, max_contaminant, maxit, tol
+      init_contaminant, max_contaminant, maxit, tol,
+      warn_label = "upper boundary"
     )
-    fit_lower <- .fit_rt_mixture(
+    res_lower <- .fit_and_compute_prob(
       rt_lower, distribution, resolved_bounds,
-      init_contaminant, max_contaminant, maxit, tol
+      init_contaminant, max_contaminant, maxit, tol,
+      warn_label = "lower boundary"
     )
-
-    if (!fit_upper$converged || is.null(fit_upper$params)) {
-      warning2("EM did not converge for upper boundary. Returning NA.")
-      contam_metrics_upper <- list(
-        contam_prob = rep(NA_real_, n_upper),
-        contam_lr = rep(NA_real_, n_upper),
-        contam_flag = rep(NA, n_upper)
-      )
-    } else {
-      contam_metrics_upper <- .compute_trial_contam_metrics(
-        rt_upper, fit_upper, distribution, resolved_bounds
-      )
-    }
-
-    if (!fit_lower$converged || is.null(fit_lower$params)) {
-      warning2("EM did not converge for lower boundary. Returning NA.")
-      contam_metrics_lower <- list(
-        contam_prob = rep(NA_real_, n_lower),
-        contam_lr = rep(NA_real_, n_lower),
-        contam_flag = rep(NA, n_lower)
-      )
-    } else {
-      contam_metrics_lower <- .compute_trial_contam_metrics(
-        rt_lower, fit_lower, distribution, resolved_bounds
-      )
-    }
 
     data_out <- data
     data_out$contam_prob_upper <- NA_real_
     data_out$contam_prob_lower <- NA_real_
-    data_out$contam_prob_upper[is_upper] <- contam_metrics_upper$contam_prob
-    data_out$contam_prob_lower[!is_upper] <- contam_metrics_lower$contam_prob
+    data_out$contam_prob_upper[is_upper] <- res_upper$contam_prob
+    data_out$contam_prob_lower[!is_upper] <- res_lower$contam_prob
 
-    if (output %in% c("likelihood_ratio", "flag")) {
-      data_out$contam_lr_upper <- NA_real_
-      data_out$contam_lr_lower <- NA_real_
-      data_out$contam_lr_upper[is_upper] <- contam_metrics_upper$contam_lr
-      data_out$contam_lr_lower[!is_upper] <- contam_metrics_lower$contam_lr
-    }
-
-    if (output %in% c("flag", "probability")) {
-      data_out$contam_flag_upper <- NA
-      data_out$contam_flag_lower <- NA
-      data_out$contam_flag_upper[is_upper] <- contam_metrics_upper$contam_flag
-      data_out$contam_flag_lower[!is_upper] <- contam_metrics_lower$contam_flag
-    }
-
-    fast_guess_upper <- NULL
-    fast_guess_lower <- NULL
-
-    if (validate_fast_guessing) {
-      fast_guess_upper <- validate_fast_guesses(
-        contam_flag = contam_metrics_upper$contam_flag, 
-        rt_data = rt_upper,
-        response = rep(TRUE, n_upper), 
-        ... 
-      )
-
-      fast_guess_lower <- validate_fast_guesses(
-        contam_flag = contam_metrics_lower$contam_flag, 
-        rt_data = rt_lower,
-        response = rep(FALSE, n_lower), 
-        ... 
-      )
-    }
-
-    diagnostics <- data.frame(
-      mixture_params_upper = I(list(fit_upper$params)),
-      mixture_params_lower = I(list(fit_lower$params)),
-      contaminant_prop_upper = fit_upper$contaminant_prop,
-      contaminant_prop_lower = fit_lower$contaminant_prop,
-      converged_upper = fit_upper$converged,
-      converged_lower = fit_lower$converged,
-      iterations_upper = fit_upper$iterations,
-      iterations_lower = fit_lower$iterations,
-      loglik_upper = if (fit_upper$converged) fit_upper$loglik else NA_real_,
-      loglik_lower = if (fit_lower$converged) fit_lower$loglik else NA_real_,
-      n_trials_upper = n_upper,
-      n_trials_lower = n_lower,
-      distribution = distribution,
-      method = "mixture_em",
-      fast_guess_validated = !is.null(fast_guess_upper),
-      fast_guess_n_upper = if (!is.null(fast_guess_upper)) fast_guess_upper$n_tested else NA_integer_,
-      fast_guess_n_lower = if (!is.null(fast_guess_lower)) fast_guess_lower$n_tested else NA_integer_,
-      fast_guess_rt_threshold = if (!is.null(fast_guess_upper)) fast_guess_upper$rt_threshold else NA_real_,
-      fast_guess_mean_rt_upper = if (!is.null(fast_guess_upper)) fast_guess_upper$mean_rt_tested else NA_real_,
-      fast_guess_mean_rt_lower = if (!is.null(fast_guess_lower)) fast_guess_lower$mean_rt_tested else NA_real_,
-      stringsAsFactors = FALSE
-    )
+    diag_upper <- .build_diagnostics(res_upper$fit, length(rt_upper), distribution)
+    diag_lower <- .build_diagnostics(res_lower$fit, length(rt_lower), distribution)
+    shared <- c("distribution", "method")
+    names(diag_upper)[!names(diag_upper) %in% shared] <-
+      paste0(names(diag_upper)[!names(diag_upper) %in% shared], "_upper")
+    names(diag_lower)[!names(diag_lower) %in% shared] <-
+      paste0(names(diag_lower)[!names(diag_lower) %in% shared], "_lower")
+    diagnostics <- cbind(diag_upper, diag_lower[!names(diag_lower) %in% shared])
   }
 
   list(data = data_out, diagnostics = diagnostics)
@@ -1337,14 +1181,13 @@ flag_contaminant_rts <- function(
 #' - BF < 1/3: Moderate evidence against guessing
 #' - BF < 1/10: Strong evidence against guessing
 #'
-#' **Note**: This function is called internally by [flag_contaminant_rts()] when
-#' `validate_fast_guessing = TRUE`. It can also be used standalone for custom
-#' validation workflows.
+#' **Note**: This function can be used as a standalone validation step after
+#' obtaining contamination probabilities from [flag_contaminant_rts()].
 #'
 #' @references
 #' Jeffreys, H. (1961). Theory of Probability (3rd ed.). Oxford University Press.
 #'
-#' @seealso [flag_contaminant_rts()] for contamination detection with optional validation
+#' @seealso [flag_contaminant_rts()] for obtaining contamination probabilities
 #'
 #' @keywords transform
 #' @export
@@ -1491,8 +1334,8 @@ validate_fast_guesses <- function(contam_flag, rt_data, response,
 # @param mixture_fit List returned from .fit_rt_mixture
 # @param distribution Character. Distribution type
 # @param contaminant_bound Numeric(2). Bounds for uniform
-# @return List with contam_prob, contam_lr, contam_flag vectors
-.compute_trial_contam_metrics <- function(rt_vec, mixture_fit, distribution, contaminant_bound) {
+# @return Numeric vector of contamination probabilities
+.compute_contam_prob <- function(rt_vec, mixture_fit, distribution, contaminant_bound) {
   par <- mixture_fit$params
   pi_c <- mixture_fit$contaminant_prop
   pi_rt <- 1 - pi_c
@@ -1508,15 +1351,7 @@ validate_fast_guesses <- function(contam_flag, rt_data, response,
   dens_rt <- pmax(dens_rt, 1e-300)
 
   numer_c <- pi_c * uniform_dens
-  numer_rt <- pi_rt * dens_rt
-  denom <- numer_c + numer_rt
+  denom <- numer_c + pi_rt * dens_rt
 
-  contam_prob <- numer_c / denom
-  contam_lr <- numer_c / numer_rt
-
-  # Probabilistic flagging using binomial sampling
-  # Each trial is flagged with probability equal to its contamination probability
-  contam_flag <- stats::rbinom(n = length(contam_prob), size = 1, prob = contam_prob) == 1
-
-  nlist(contam_prob, contam_lr, contam_flag)
+  numer_c / denom
 }

@@ -318,11 +318,11 @@ Unlike EZDM, the Drift Diffusion Model (DDM) and Circular Shifted Wald (csWald) 
 - **Model robustness**: DDM/csWald are somewhat robust to contamination, so filtering is optional
 - **Computational benefit**: Filtering reduces data size, speeding up Stan sampling
 
-Use `flag_contaminant_rts()` to get per-trial contamination metrics, then decide how to handle flagged trials.
+Use `flag_contaminant_rts()` to get per-trial contamination probabilities, then decide how to handle flagged trials.
 
 ### Basic Usage of `flag_contaminant_rts()`
 
-The function returns trial-level contamination metrics:
+The function returns trial-level contamination probabilities:
 
 ```{r flag-basic-example}
 # Use the rr98 data subset
@@ -337,9 +337,8 @@ flagged <- flag_contaminant_rts(
 # Examine output
 head(flagged)
 
-# New columns added:
-# - contam_flag: Binary flag (0/1) for likely contaminant
-# - contam_prob: Posterior probability trial is a contaminant
+# New column added:
+# - contam_prob: Posterior probability P(contaminant | RT) for each trial
 ```
 
 The what_return parameter determines what information the function provides. Setting it to "data" returns the original data frame augmented with contamination columns, allowing immediate use of the flagged data in subsequent analyses. The "diagnostics" option returns only the fit diagnostics including convergence status and parameter estimates, useful for checking model performance across groups without retaining the full dataset. The "all" option returns a list containing both components, providing complete information about both the trial-level classifications and the quality of the mixture model fits.
@@ -375,7 +374,7 @@ flagged_3par <- flag_contaminant_rts(
 
 # Check columns
 names(flagged_3par)[grepl("contam", names(flagged_3par))]
-# [1] "contam_flag" "contam_prob"
+# [1] "contam_prob"
 
 # version = "4par": Separate probabilities for upper/lower responses
 # NOTE: Requires response parameter
@@ -388,8 +387,7 @@ flagged_4par <- flag_contaminant_rts(
 
 # Check columns
 names(flagged_4par)[grepl("contam", names(flagged_4par))]
-# [1] "contam_flag_upper" "contam_flag_lower"
-# [3] "contam_prob_upper" "contam_prob_lower"
+# [1] "contam_prob_upper" "contam_prob_lower"
 ```
 
 An important detail when using the 4-parameter version is that contamination probabilities for the boundary not chosen on each trial are set to NA. For instance, when response equals "upper", the contam_prob_lower value will be NA for that trial, and vice versa. This design reflects the fact that the mixture model estimates separate contamination distributions for each boundary, making it inappropriate to assign contamination probabilities from one boundary's distribution to trials that terminated at the other boundary.
@@ -482,25 +480,44 @@ fit <- bmm(
 )
 ```
 
-### Choosing a Threshold
+### Using Contamination Probabilities
 
-The contam_prob values returned by the mixture model represent posterior probabilities that each trial originated from the contaminant distribution rather than the cognitive process. Several strategies exist for translating these probabilities into filtering decisions. The most straightforward approach uses a fixed threshold, typically 0.5, which removes trials where the posterior probability favors the contaminant explanation over the cognitive explanation. This threshold has an intuitive interpretation: we remove trials that are more likely to be contaminants than genuine responses.
+The `contam_prob` values returned by the mixture model represent posterior probabilities that each trial originated from the contaminant distribution rather than the cognitive process. The function deliberately returns only these probabilities, leaving the decision about how to use them to the researcher. Two common approaches are hard-threshold flagging and probabilistic flagging.
 
-Alternatively, a percentile-based approach removes a predetermined proportion of trials regardless of their absolute contamination probabilities. For example, removing the top 5% most suspicious trials adapts to the degree of contamination present in the data without requiring an absolute probability cutoff. A third strategy relies on visual inspection of the relationship between response time and contamination probability, looking for natural separation points in the data that distinguish clean trials from contaminants. This approach is particularly useful when there is clear bimodality in the contamination probability distribution.
+#### Hard Threshold
 
-A reasonable starting point is the 0.5 threshold, representing the point where posterior evidence favors contamination over genuine responding. Researchers can then adjust this threshold based on diagnostic plots and downstream model fit quality, raising it if too few trials are being removed or lowering it if the filtering appears too aggressive.
+The most straightforward approach uses a fixed threshold, typically 0.5, which removes trials where the posterior probability favors the contaminant explanation over the cognitive explanation. This threshold has an intuitive interpretation: we remove trials that are more likely to be contaminants than genuine responses.
 
 ```r
-# Example: Fixed threshold at 0.5
-clean_data <- flagged_data %>% 
-  filter(contam_prob < 0.5)
+# Hard threshold: flag trials with P(contaminant) > 0.5
+flagged_data$is_contaminant <- flagged_data$contam_prob > 0.5
+clean_data <- flagged_data[!flagged_data$is_contaminant, ]
+```
 
-# Example: Percentile-based removal
+#### Probabilistic Flagging
+
+An alternative approach uses binomial sampling based on each trial's contamination probability. Each trial is flagged with probability equal to its `contam_prob`, avoiding the deterministic threshold issue where all trials above a cutoff are removed. This allows for more nuanced detection where borderline trials have only a chance of being flagged.
+
+```r
+# Probabilistic flagging via binomial sampling
+set.seed(123)  # for reproducibility
+flagged_data$is_contaminant <- rbinom(
+  nrow(flagged_data), 1, flagged_data$contam_prob
+) == 1
+clean_data <- flagged_data[!flagged_data$is_contaminant, ]
+```
+
+#### Other Strategies
+
+A percentile-based approach removes a predetermined proportion of trials regardless of their absolute contamination probabilities. Visual inspection of the relationship between response time and contamination probability can also reveal natural separation points.
+
+```r
+# Percentile-based removal
 threshold <- quantile(flagged_data$contam_prob, 0.95)
-clean_data <- flagged_data %>% 
+clean_data <- flagged_data %>%
   filter(contam_prob < threshold)
 
-# Example: Visual inspection
+# Visual inspection
 ggplot(flagged_data, aes(x = rt, y = contam_prob)) +
   geom_point(alpha = 0.3) +
   geom_hline(yintercept = 0.5, linetype = "dashed", color = "red")
@@ -537,85 +554,55 @@ flag_contaminant_rts(
 
 ### Validating Fast Guess Assumptions
 
-A key assumption of contamination modeling is that very fast responses represent random guessing rather than informed decisions. The `validate_fast_guessing` parameter enables Bayesian testing of this assumption for 2-alternative forced choice (2AFC) tasks by checking whether fast flagged contaminants show ~50% accuracy.
+A key assumption of contamination modeling is that very fast responses represent random guessing rather than informed decisions. The standalone `validate_fast_guesses()` function provides Bayesian testing of this assumption for 2-alternative forced choice (2AFC) tasks by checking whether fast flagged contaminants show ~50% accuracy.
 
-#### Basic Usage
+#### Usage
 
-```{r validate-basic, eval = FALSE}
-# Enable validation when flagging contaminants
+After obtaining contamination probabilities from `flag_contaminant_rts()`, you can validate whether fast contaminants show random guessing behavior:
+
+```{r validate-fast-guesses, eval = FALSE}
+# Step 1: Get contamination probabilities
 flagged <- flag_contaminant_rts(
   data = my_2afc_data,
   rt = "rt",
-  response = "response",
-  validate_fast_guessing = TRUE,  # Enables Bayesian validation
-  what_return = "diagnostics"
+  response = "response"
 )
 
-# Check validation results
-flagged$fast_guess_validated  # TRUE if test was performed
-flagged$fast_guess_bf_01      # Bayes Factor for guessing hypothesis
-flagged$fast_guess_evidence   # Evidence category (e.g., "anecdotal_for_guessing")
-flagged$fast_guess_in_hdi     # Is 0.5 in 95% credible interval?
+# Step 2: Create a flag using a hard threshold
+flagged$is_contaminant <- flagged$contam_prob > 0.5
+
+# Step 3: Validate fast guesses separately
+validation <- validate_fast_guesses(
+  contam_flag = flagged$is_contaminant,
+  rt_data = flagged$rt,
+  response = flagged$response,
+  threshold_type = "quantile",  # or "absolute"
+  rt_threshold = 0.25           # 25th percentile (or absolute RT in seconds)
+)
+
+# Examine results
+validation$bf_01        # Bayes Factor for guessing hypothesis
+validation$bf_evidence  # Evidence category (e.g., "anecdotal_for_guessing")
+validation$guess_in_hdi # Is 0.5 in 95% credible interval?
+validation$prop_upper   # Observed proportion of upper responses
 ```
 
-The validation performs a Beta-Binomial conjugate Bayesian analysis on trials that are both flagged as contaminants and fall below an RT threshold (default: 25th percentile). By default, the threshold is quantile-based (adaptive to the RT distribution), but you can also specify absolute RT thresholds.
-
-#### Customizing the Validation
-
-Control validation behavior by passing additional arguments via `...`:
-
-```{r validate-custom, eval = FALSE}
-# Example 1: Use 30th percentile as threshold (quantile mode)
-flagged <- flag_contaminant_rts(
-  data = my_data,
-  rt = "rt",
-  response = "response",
-  validate_fast_guessing = TRUE,
-  threshold_type = "quantile",  # Adaptive threshold (default)
-  rt_threshold = 0.30,          # 30th percentile
-  what_return = "diagnostics"
-)
-
-# Example 2: Use fixed 250ms threshold (absolute mode)
-flagged <- flag_contaminant_rts(
-  data = my_data,
-  rt = "rt",
-  response = "response",
-  validate_fast_guessing = TRUE,
-  threshold_type = "absolute",  # Fixed threshold
-  rt_threshold = 0.25,          # 250ms
-  what_return = "diagnostics"
-)
-
-# Example 3: Custom prior and credible interval
-flagged <- flag_contaminant_rts(
-  data = my_data,
-  rt = "rt",
-  response = "response",
-  validate_fast_guessing = TRUE,
-  rt_threshold = 0.25,
-  prior_alpha = 1,              # Beta prior parameters
-  prior_beta = 1,               # (default: uniform prior)
-  credible_mass = 0.90,         # 90% HDI instead of 95%
-  what_return = "diagnostics"
-)
-```
+The validation performs a Beta-Binomial conjugate Bayesian analysis on trials that are both flagged as contaminants and fall below an RT threshold. By default, the threshold is quantile-based (adaptive to the RT distribution), but you can also specify absolute RT thresholds.
 
 #### Understanding the Output
 
-The diagnostics data frame includes several validation-related columns:
+The function returns a list with:
 
-- `fast_guess_validated`: Whether validation was performed (requires response data and sufficient fast trials)
-- `fast_guess_n_tested`: Number of fast flagged trials tested
-- `fast_guess_prop_upper`: Observed proportion of "upper" responses (should be ~0.5 for random guessing)
-- `fast_guess_bf_01`: Bayes Factor for H₀ (random guessing at 0.5) vs H₁ (non-random)
-- `fast_guess_evidence`: Evidence category on Jeffreys scale (e.g., "strong_for_guessing", "moderate_against_guessing")
-- `fast_guess_in_hdi`: Whether 0.5 falls within the 95% Highest Density Interval
-- `fast_guess_hdi_lower`, `fast_guess_hdi_upper`: HDI bounds for accuracy proportion
-- `fast_guess_rt_threshold`: Actual RT threshold used (in seconds)
-- `fast_guess_mean_rt_tested`: Mean RT of tested trials
+- `prop_upper`: Observed proportion of "upper" responses (should be ~0.5 for random guessing)
+- `bf_01`: Bayes Factor for H0 (random guessing at 0.5) vs H1 (non-random)
+- `bf_evidence`: Evidence category on Jeffreys scale
+- `guess_in_hdi`: Whether 0.5 falls within the Highest Density Interval
+- `hdi_lower`, `hdi_upper`: HDI bounds
+- `n_tested`: Number of fast flagged trials tested
+- `rt_threshold`: Actual RT threshold used (in seconds)
 
 **Interpreting Bayes Factors** (Jeffreys, 1961):
+
 - BF > 10: Strong evidence for random guessing
 - BF > 3: Moderate evidence for random guessing
 - BF > 1: Anecdotal evidence for random guessing
@@ -624,45 +611,7 @@ The diagnostics data frame includes several validation-related columns:
 
 #### When to Use Validation
 
-Validation is most useful when:
-
-1. **2AFC tasks**: The test assumes equal probability of two responses under guessing
-2. **Fast response concerns**: You suspect very fast responses may not be random guesses
-3. **Quality control**: You want empirical evidence that flagged contaminants match guessing behavior
-4. **Comparing conditions**: You want to verify that contamination patterns are consistent across experimental manipulations
-
-**Note**: Validation will issue a warning if evidence against random guessing is moderate or strong, suggesting that flagged fast responses may reflect systematic biases rather than random guesses.
-
-#### Standalone Validation
-
-For more control, you can use the `validate_fast_guesses()` function directly:
-
-```{r standalone-validation, eval = FALSE}
-# First flag contaminants
-flagged <- flag_contaminant_rts(
-  data = my_data,
-  rt = "rt",
-  response = "response"
-)
-
-# Then validate separately with full control
-validation_result <- validate_fast_guesses(
-  contam_flag = flagged$contam_flag,
-  rt_data = flagged$rt,
-  response = flagged$response,
-  threshold_type = "quantile",
-  rt_threshold = 0.25,
-  prior_alpha = 1,
-  prior_beta = 1,
-  guess_prob = 0.5,
-  credible_mass = 0.95
-)
-
-# Examine detailed results
-print(validation_result)
-```
-
-This approach allows you to experiment with different thresholds and prior specifications without re-running the contamination detection.
+Validation is most useful for 2AFC tasks where you suspect very fast responses may not be random guesses, or when you want empirical evidence that flagged contaminants match guessing behavior.
 
 ---
 

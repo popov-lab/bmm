@@ -22,7 +22,7 @@ the latest \pkg{bmm} version. This function is called
 internally when applying post-processing methods.
 }
 \examples{
-\dontshow{if (file.exists("bmmfit_old.rds")) (if (getRversion() >= "3.4") withAutoprint else force)(\{ # examplesIf}
+\dontshow{if (file.exists("bmmfit_old.rds")) withAutoprint(\{ # examplesIf}
 # Load an old bmmfit object
 old_fit <- readRDS("bmmfit_old.rds")
 new_fit <- restructure(old_fit)

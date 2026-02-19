@@ -95,9 +95,8 @@ Evidence categories follow Jeffreys (1961) scale:
 \item BF < 1/10: Strong evidence against guessing
 }
 
-\strong{Note}: This function is called internally by \code{\link[=flag_contaminant_rts]{flag_contaminant_rts()}} when
-\code{validate_fast_guessing = TRUE}. It can also be used standalone for custom
-validation workflows.
+\strong{Note}: This function can be used as a standalone validation step after
+obtaining contamination probabilities from \code{\link[=flag_contaminant_rts]{flag_contaminant_rts()}}.
 }
 \examples{
 \dontrun{
@@ -114,7 +113,7 @@ result1 <- validate_fast_guesses(
   rt_data = rt,
   response = response,
   threshold_type = "quantile",
-  rt_threshold = 0.30  # 30th percentile
+  rt_threshold = 0.30 # 30th percentile
 )
 
 # Test using absolute threshold (fixed RT)
@@ -123,12 +122,12 @@ result2 <- validate_fast_guesses(
   rt_data = rt,
   response = response,
   threshold_type = "absolute",
-  rt_threshold = 0.30  # 300ms
+  rt_threshold = 0.30 # 300ms
 )
 
-print(result1$bf_01)          # Bayes Factor
-print(result1$bf_evidence)    # Evidence category
-print(result1$guess_in_hdi)   # Is 0.5 in 95\% HDI?
+print(result1$bf_01) # Bayes Factor
+print(result1$bf_evidence) # Evidence category
+print(result1$guess_in_hdi) # Is 0.5 in 95\% HDI?
 print(result1$threshold_type) # "quantile"
 }
 }
@@ -136,6 +135,6 @@ print(result1$threshold_type) # "quantile"
 Jeffreys, H. (1961). Theory of Probability (3rd ed.). Oxford University Press.
 }
 \seealso{
-\code{\link[=flag_contaminant_rts]{flag_contaminant_rts()}} for contamination detection with optional validation
+\code{\link[=flag_contaminant_rts]{flag_contaminant_rts()}} for obtaining contamination probabilities
 }
 \keyword{transform}
