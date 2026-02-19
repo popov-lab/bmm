@@ -1,6 +1,6 @@
 # Comprehensive Conditional Effects Testing Script
 # Tests conditional_effects.bmmfit() for all supported models
-# Excludes m3 models (not supported due to categorical structure)
+# M3 models use a custom posterior_linpred path (see .compute_multinomial_conditional_effects)
 
 library(bmm)
 library(dplyr)
