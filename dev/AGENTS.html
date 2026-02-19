@@ -95,6 +95,12 @@
 <li>
 <strong>Pure functions</strong>: Always write functions that preserve the global state</li>
 <li>NEVER use a <code>seed</code> argument and <code>set.seed</code> inside of functions</li>
+<li>
+<strong>Self-documenting code</strong>: Write clear, descriptive names for functions and variables; refactor unclear code rather than adding explanatory comments</li>
+<li>
+<strong>Single-responsibility functions</strong>: Extract complex logic into well-named helper functions</li>
+<li>
+<strong>Early returns</strong>: Use early returns to simplify conditional flow and reduce nesting</li>
 </ul><div class="sourceCode" id="cb3"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="co"># Bad - never do this</span></span>
 <span><span class="va">myfun</span> <span class="op">&lt;-</span> <span class="kw">function</span><span class="op">(</span><span class="va">n</span>, <span class="va">seed</span><span class="op">)</span> <span class="op">{</span></span>
