@@ -75,7 +75,7 @@ and how to use it. * \strong{Domain:} Visual working memory
 }
 }
 \examples{
-\dontshow{if (isTRUE(Sys.getenv("BMM_EXAMPLES"))) withAutoprint(\{ # examplesIf}
+\dontshow{if (isTRUE(Sys.getenv("BMM_EXAMPLES"))) (if (getRversion() >= "3.4") withAutoprint else force)(\{ # examplesIf}
 # simulate data from the model
 dat <- data.frame(y = rsdm(n = 1000, c = 4, kappa = 3))
 

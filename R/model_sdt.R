@@ -312,8 +312,8 @@
 #' @param dist Character. The noise distribution to use:
 #'   \itemize{
 #'     \item "normal" (default): Gaussian SDT. The sensitivity parameter
-#'       `dprime` equals d' = Phi^{-1}(H) - Phi^{-1}(FA), where Phi is the
-#'       standard normal CDF.
+#'       `dprime` equals \eqn{d' = \Phi^{-1}(H) - \Phi^{-1}(FA)}, where Phi is
+#'       the standard normal CDF.
 #'     \item "logistic": Logistic SDT.
 #'     \item "gumbel_min": Extreme-value (Gumbel minimum) SDT, theoretically
 #'       motivated by recognition memory as event minima (Meyer-Grant et al.,
@@ -328,7 +328,7 @@
 #'   distributions:
 #'   \itemize{
 #'     \item "equal" (default): Equal-variance SDT
-#'     \item "unequal": Unequal-variance SDT, adds an `sd_ratio` parameter.
+#'     \item "unequal": Unequal-variance SDT, adds an `sdratio` parameter.
 #'       Requires confidence rating data (`n_ratings` > 2) for identification.
 #'   }
 #' @param n_ratings Integer. Number of response categories for confidence
@@ -359,10 +359,10 @@
 #'   `version = "ranking"`. Must be >= 2.
 #' @param rank The name of the variable coding the rank position (1 = most
 #'   likely target, m = least likely). Required when `version = "ranking"`.
-#' @param log_scale Logical. If TRUE, use numerically stable log-scale CDF
-#'   expressions in rating model nlf formulas. Default FALSE. Only applies to
-#'   EV-SDT and UV-SDT rating models. Uses Stan's log_Phi, log1m_Phi, and
-#'   log_diff_exp for improved numerical stability with extreme parameters.
+#' @param log_scale Logical. Whether to use numerically stable log-scale CDF
+#'   computation in the Stan code for confidence rating models (default
+#'   `FALSE`). Set to `TRUE` if you encounter numerical issues with extreme
+#'   parameter values. Only applies to EV-SDT and UV-SDT rating models.
 #' @param links A named list of link functions for the parameters. The default
 #'   link for dprime is "identity" and for criterion is "identity". The dprime
 #'   link can be set to "log" to constrain sensitivity to positive values, which
@@ -452,7 +452,7 @@
 #'
 #' # --- Unequal-Variance Rating SDT ---
 #' dat_uv <- rsdt(n_per_cell = 200, n_subjects = 20,
-#'                dprime = 1.5, criterion = 0, sd_ratio = 1.3,
+#'                dprime = 1.5, criterion = 0, sdratio = 1.3,
 #'                n_ratings = 4, spacing = 0.5, version = "rating")
 #'
 #' model_uv <- sdt(

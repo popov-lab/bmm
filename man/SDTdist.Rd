@@ -16,7 +16,7 @@ dsdt(
   criterion = NULL,
   thresholds = NULL,
   counts = NULL,
-  sd_ratio = 1,
+  sdratio = 1,
   Ro = NULL,
   metad = NULL,
   n_correct = NULL,
@@ -31,7 +31,7 @@ rsdt(
   n_subjects = 1,
   dprime = 1.5,
   criterion = 0,
-  sd_ratio = 1,
+  sdratio = 1,
   Ro = NULL,
   metad = NULL,
   m = NULL,
@@ -63,7 +63,7 @@ sdt_criterion(
 \item{stimulus}{Integer vector (0/1). Stimulus type: 0 = noise, 1 = signal.}
 
 \item{dprime}{Numeric. Sensitivity (discriminability). For \code{dist = "normal"},
-this equals d' = Phi^{-1}(H) - Phi^{-1}(FA). For \code{dist = "gumbel_min"},
+this equals \eqn{d' = \Phi^{-1}(H) - \Phi^{-1}(FA)}. For \code{dist = "gumbel_min"},
 this equals g' = log(FA) - log(H) (Meyer-Grant et al., 2025). On the
 identity scale regardless of the link function used in model fitting.}
 
@@ -76,7 +76,7 @@ SDT decision space.}
 a single observation (used by \code{dsdt} with \code{version = "rating"}).
 Categories ordered: 1 = "definitely noise" to K = "definitely signal".}
 
-\item{sd_ratio}{Numeric. Ratio of signal to noise standard deviations
+\item{sdratio}{Numeric. Ratio of signal to noise standard deviations
 (default 1, i.e. equal variance). Values > 1 mean the signal distribution
 has larger variance.}
 
@@ -139,7 +139,7 @@ binary version, columns are: \code{id}, \code{stimulus} (0/1), \code{n_trials}, 
 and \code{nTrials}.
 
 \code{sdt_dprime} returns the sensitivity index appropriate for the
-chosen distribution: d' = Phi^{-1}(H) - Phi^{-1}(FA) for \code{dist = "normal"}; g' = log(FA) - log(H) for \code{dist = "gumbel_min"} (Meyer-Grant
+chosen distribution: \eqn{d' = \Phi^{-1}(H) - \Phi^{-1}(FA)} for \code{dist = "normal"}; g' = log(FA) - log(H) for \code{dist = "gumbel_min"} (Meyer-Grant
 et al., 2025); analogous quantile-difference measures for other
 distributions.
 
@@ -163,7 +163,7 @@ dsdt(n_old = c(30, 80), n_trials = c(100, 100), stimulus = c(0, 1),
 
 # With unequal variance
 dsdt(n_old = 80, n_trials = 100, stimulus = 1,
-     dprime = 1.5, criterion = 0.2, sd_ratio = 1.2)
+     dprime = 1.5, criterion = 0.2, sdratio = 1.2)
 
 # Rating SDT density (K=4, single observation)
 dsdt(counts = c(5, 15, 25, 55), stimulus = 1,
@@ -184,7 +184,7 @@ dat_logistic <- rsdt(n_per_cell = 100, n_subjects = 10,
 
 # Generate data with unequal variance
 dat_uv <- rsdt(n_per_cell = 100, n_subjects = 10,
-               dprime = 1.5, criterion = 0, sd_ratio = 1.3)
+               dprime = 1.5, criterion = 0, sdratio = 1.3)
 
 # Generate rating data (K=4, equidistant thresholds)
 dat_rating <- rsdt(n_per_cell = 100, n_subjects = 10,

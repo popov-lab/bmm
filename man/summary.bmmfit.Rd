@@ -49,7 +49,7 @@ You can turn off the color output by setting the option
 options(bmm.color_summary = FALSE) or bmm_options(color_summary = FALSE)
 }
 \examples{
-\dontshow{if (isTRUE(Sys.getenv("BMM_EXAMPLES"))) withAutoprint(\{ # examplesIf}
+\dontshow{if (isTRUE(Sys.getenv("BMM_EXAMPLES"))) (if (getRversion() >= "3.4") withAutoprint else force)(\{ # examplesIf}
 # generate artificial data from the Signal Discrimination Model
 dat <- data.frame(y = rsdm(2000))
 

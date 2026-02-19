@@ -130,7 +130,7 @@ Type \code{help(package=bmm)} for a full list of available help topics.
 }
 
 \examples{
-\dontshow{if (isTRUE(Sys.getenv("BMM_EXAMPLES"))) withAutoprint(\{ # examplesIf}
+\dontshow{if (isTRUE(Sys.getenv("BMM_EXAMPLES"))) (if (getRversion() >= "3.4") withAutoprint else force)(\{ # examplesIf}
 # generate artificial data from the Signal Discrimination Model
 dat <- data.frame(y = rsdm(2000))
 

@@ -251,25 +251,25 @@ test_that("dsdt validates input", {
                     dprime = 1, criterion = 0), "0.*1")
 })
 
-test_that("dsdt with sd_ratio produces different densities than EV-SDT", {
+test_that("dsdt with sdratio produces different densities than EV-SDT", {
   d_ev <- dsdt(n_old = 80, n_trials = 100, stimulus = 1,
-               dprime = 1.5, criterion = 0, sd_ratio = 1)
+               dprime = 1.5, criterion = 0, sdratio = 1)
   d_uv <- dsdt(n_old = 80, n_trials = 100, stimulus = 1,
-               dprime = 1.5, criterion = 0, sd_ratio = 1.3)
+               dprime = 1.5, criterion = 0, sdratio = 1.3)
   expect_false(d_ev == d_uv)
 })
 
-test_that("dsdt with sd_ratio = 1 matches equal-variance result", {
+test_that("dsdt with sdratio = 1 matches equal-variance result", {
   d1 <- dsdt(n_old = 70, n_trials = 100, stimulus = 0,
-             dprime = 1.5, criterion = 0.2, sd_ratio = 1)
-  # For noise trials, sd_ratio should not matter in the formula
+             dprime = 1.5, criterion = 0.2, sdratio = 1)
+  # For noise trials, sdratio should not matter in the formula
   # eta = -dprime/2 - criterion for both EV and UV noise
   d2 <- dsdt(n_old = 70, n_trials = 100, stimulus = 0,
-             dprime = 1.5, criterion = 0.2, sd_ratio = 1.5)
-  # Noise trials ARE affected by sd_ratio in UV-SDT only through
+             dprime = 1.5, criterion = 0.2, sdratio = 1.5)
+  # Noise trials ARE affected by sdratio in UV-SDT only through
   # changed hit rates, but for a single observation density they differ
   # because UV only changes signal side. Let's verify noise side is unchanged:
-  # For noise: eta = -dprime/2 - criterion regardless of sd_ratio
+  # For noise: eta = -dprime/2 - criterion regardless of sdratio
   # So noise density should be same
   expect_equal(d1, d2)
 })
@@ -640,13 +640,13 @@ test_that("dsdt rating works for all distributions", {
   }
 })
 
-test_that("dsdt rating with sd_ratio != 1 changes density", {
+test_that("dsdt rating with sdratio != 1 changes density", {
   d_ev <- dsdt(counts = c(10, 20, 30, 40), stimulus = 1,
                dprime = 1.5, thresholds = c(-0.5, 0, 0.5),
-               version = "rating", sd_ratio = 1)
+               version = "rating", sdratio = 1)
   d_uv <- dsdt(counts = c(10, 20, 30, 40), stimulus = 1,
                dprime = 1.5, thresholds = c(-0.5, 0, 0.5),
-               version = "rating", sd_ratio = 1.3)
+               version = "rating", sdratio = 1.3)
   expect_false(d_ev == d_uv)
 })
 
@@ -860,7 +860,7 @@ test_that("sdt UV-SDT requires ratings", {
 
 test_that("sdt UV-SDT produces valid stancode", {
   dat <- rsdt(n_per_cell = 50, n_subjects = 3, dprime = 1.5, criterion = 0,
-              sd_ratio = 1.3, n_ratings = 4, spacing = 0.5, version = "rating")
+              sdratio = 1.3, n_ratings = 4, spacing = 0.5, version = "rating")
   model <- sdt(c("r1", "r2", "r3", "r4"), "stimulus", variances = "unequal")
   formula <- bmf(dprime ~ 1, criterion ~ 1, spacing ~ 1, sdratio ~ 1)
   code <- stancode(formula, data = dat, model = model)
@@ -872,7 +872,7 @@ test_that("sdt UV-SDT produces valid stancode", {
 
 test_that("sdt UV-SDT with log_distance thresholds produces valid stancode", {
   dat <- rsdt(n_per_cell = 50, n_subjects = 3, dprime = 1.5, criterion = 0,
-              sd_ratio = 1.3, n_ratings = 4, deltas = c(0.5, 0.5),
+              sdratio = 1.3, n_ratings = 4, deltas = c(0.5, 0.5),
               version = "rating", threshold_type = "log_distance")
   model <- sdt(c("r1", "r2", "r3", "r4"), "stimulus",
                variances = "unequal", threshold_type = "log_distance")
@@ -885,7 +885,7 @@ test_that("sdt UV-SDT with log_distance thresholds produces valid stancode", {
 
 test_that("sdt UV-SDT with K=6 produces valid stancode", {
   dat <- rsdt(n_per_cell = 50, n_subjects = 2, dprime = 1.5, criterion = 0,
-              sd_ratio = 1.3, n_ratings = 6, spacing = 0.3, version = "rating")
+              sdratio = 1.3, n_ratings = 6, spacing = 0.3, version = "rating")
   model <- sdt(c("r1", "r2", "r3", "r4", "r5", "r6"), "stimulus",
                variances = "unequal")
   formula <- bmf(dprime ~ 1, criterion ~ 1, spacing ~ 1, sdratio ~ 1)
@@ -911,24 +911,24 @@ test_that(".sdt_eta is vectorized over all arguments", {
   expect_equal(eta[1], -1.0/2 - 0.2)
   expect_equal(eta[2], 2.0/2 - 0.2)
 
-  # Vector sd_ratio (UV-SDT)
-  eta <- bmm:::.sdt_eta(1.5, 0.2, c(0, 1), sd_ratio = c(1.0, 1.3))
+  # Vector sdratio (UV-SDT)
+  eta <- bmm:::.sdt_eta(1.5, 0.2, c(0, 1), sdratio = c(1.0, 1.3))
   expect_length(eta, 2)
-  expect_equal(eta[1], -1.5/2 - 0.2)  # noise: sd_ratio ignored
+  expect_equal(eta[1], -1.5/2 - 0.2)  # noise: sdratio ignored
   expect_equal(eta[2], (1.5/2 - 0.2) / 1.3)  # signal: scaled
 })
 
 test_that(".sdt_eta EV and UV give same results for noise trials", {
-  eta_ev <- bmm:::.sdt_eta(1.5, 0.2, 0, sd_ratio = 1)
-  eta_uv <- bmm:::.sdt_eta(1.5, 0.2, 0, sd_ratio = 1.5)
+  eta_ev <- bmm:::.sdt_eta(1.5, 0.2, 0, sdratio = 1)
+  eta_uv <- bmm:::.sdt_eta(1.5, 0.2, 0, sdratio = 1.5)
   expect_equal(eta_ev, eta_uv)
 })
 
-test_that("dsdt is vectorized over sd_ratio", {
-  # Should not error with vector sd_ratio
+test_that("dsdt is vectorized over sdratio", {
+  # Should not error with vector sdratio
   d <- dsdt(n_old = c(30, 80), n_trials = c(100, 100),
             stimulus = c(0, 1), dprime = 1.5, criterion = 0.2,
-            sd_ratio = c(1.0, 1.3))
+            sdratio = c(1.0, 1.3))
   expect_length(d, 2)
   expect_true(all(d > 0))
 })
@@ -950,12 +950,12 @@ test_that("rsdt rating rejects vector criterion", {
   )
 })
 
-test_that("rsdt rating rejects vector sd_ratio", {
+test_that("rsdt rating rejects vector sdratio", {
   expect_error(
     rsdt(n_per_cell = 50, n_subjects = 2, dprime = 1.5,
-         criterion = 0, sd_ratio = c(1.0, 1.3),
+         criterion = 0, sdratio = c(1.0, 1.3),
          n_ratings = 4, spacing = 0.5, version = "rating"),
-    "sd_ratio must be a single value"
+    "sdratio must be a single value"
   )
 })
 
@@ -1131,14 +1131,14 @@ test_that("DPSDT category probs sum to 1", {
 
   # Old items
   probs_old <- bmm:::.sdt_dpsdt_category_probs(
-    thresholds, shift = 0.75, sd_ratio = 1, stimulus = 1,
+    thresholds, shift = 0.75, sdratio = 1, stimulus = 1,
     dist = "normal", Ro = 0.3
   )
   expect_equal(sum(probs_old), 1, tolerance = 1e-10)
 
   # New items
   probs_new <- bmm:::.sdt_dpsdt_category_probs(
-    thresholds, shift = -0.75, sd_ratio = 1, stimulus = 0,
+    thresholds, shift = -0.75, sdratio = 1, stimulus = 0,
     dist = "normal", Ro = 0.3
   )
   expect_equal(sum(probs_new), 1, tolerance = 1e-10)
@@ -1149,10 +1149,10 @@ test_that("DPSDT Ro increases p[K] for old items", {
   shift <- 0.75
 
   probs_no_r <- bmm:::.sdt_category_probs(
-    thresholds, shift, sd_ratio = 1, stimulus = 1, dist = "normal"
+    thresholds, shift, sdratio = 1, stimulus = 1, dist = "normal"
   )
   probs_hi_r <- bmm:::.sdt_dpsdt_category_probs(
-    thresholds, shift, sd_ratio = 1, stimulus = 1, dist = "normal", Ro = 0.5
+    thresholds, shift, sdratio = 1, stimulus = 1, dist = "normal", Ro = 0.5
   )
 
   # Highest "old" category should increase
@@ -1170,10 +1170,10 @@ test_that("DPSDT Ro does not affect new items", {
   shift <- -0.75
 
   probs_std <- bmm:::.sdt_category_probs(
-    thresholds, shift, sd_ratio = 1, stimulus = 0, dist = "normal"
+    thresholds, shift, sdratio = 1, stimulus = 0, dist = "normal"
   )
   probs_dpsdt <- bmm:::.sdt_dpsdt_category_probs(
-    thresholds, shift, sd_ratio = 1, stimulus = 0, dist = "normal", Ro = 0.5
+    thresholds, shift, sdratio = 1, stimulus = 0, dist = "normal", Ro = 0.5
   )
 
   expect_equal(probs_dpsdt, probs_std, tolerance = 1e-10)
@@ -1184,7 +1184,7 @@ test_that("DPSDT with Ro=1 puts all old items in highest category", {
   shift <- 0.5
 
   probs <- bmm:::.sdt_dpsdt_category_probs(
-    thresholds, shift, sd_ratio = 1, stimulus = 1, dist = "normal", Ro = 1.0
+    thresholds, shift, sdratio = 1, stimulus = 1, dist = "normal", Ro = 1.0
   )
 
   K <- length(probs)
@@ -1244,7 +1244,7 @@ test_that("sdt DPSDT produces valid stancode with predictors", {
 
 test_that("sdt DPSDT + UV-SDT produces valid stancode", {
   dat <- rsdt(n_per_cell = 50, n_subjects = 3, dprime = 1.0, criterion = 0,
-              Ro = 0.3, sd_ratio = 1.2, n_ratings = 4, spacing = 0.5,
+              Ro = 0.3, sdratio = 1.2, n_ratings = 4, spacing = 0.5,
               version = "dpsdt")
   model <- sdt(c("r1", "r2", "r3", "r4"), "stimulus",
                version = "dpsdt", variances = "unequal")
@@ -1378,13 +1378,13 @@ test_that("meta-d' category probs sum to 1", {
 
   probs_old <- bmm:::.sdt_metad_category_probs(
     thresholds, dprime = 1.5, metad = 1.0, stimulus = 1,
-    sd_ratio = 1, dist = "normal"
+    sdratio = 1, dist = "normal"
   )
   expect_equal(sum(probs_old), 1, tolerance = 1e-10)
 
   probs_new <- bmm:::.sdt_metad_category_probs(
     thresholds, dprime = 1.5, metad = 1.0, stimulus = 0,
-    sd_ratio = 1, dist = "normal"
+    sdratio = 1, dist = "normal"
   )
   expect_equal(sum(probs_new), 1, tolerance = 1e-10)
 })
@@ -1394,10 +1394,10 @@ test_that("meta-d' with metad=dprime gives same probs as standard SDT", {
 
   probs_metad <- bmm:::.sdt_metad_category_probs(
     thresholds, dprime = 1.5, metad = 1.5, stimulus = 1,
-    sd_ratio = 1, dist = "normal"
+    sdratio = 1, dist = "normal"
   )
   probs_std <- bmm:::.sdt_category_probs(
-    thresholds, shift = 1.5 / 2, sd_ratio = 1, stimulus = 1, dist = "normal"
+    thresholds, shift = 1.5 / 2, sdratio = 1, stimulus = 1, dist = "normal"
   )
   expect_equal(probs_metad, probs_std, tolerance = 1e-10)
 })
@@ -1407,11 +1407,11 @@ test_that("meta-d' lower than dprime shifts confidence toward criterion", {
 
   probs_ideal <- bmm:::.sdt_metad_category_probs(
     thresholds, dprime = 2.0, metad = 2.0, stimulus = 1,
-    sd_ratio = 1, dist = "normal"
+    sdratio = 1, dist = "normal"
   )
   probs_poor <- bmm:::.sdt_metad_category_probs(
     thresholds, dprime = 2.0, metad = 0.5, stimulus = 1,
-    sd_ratio = 1, dist = "normal"
+    sdratio = 1, dist = "normal"
   )
 
   # With lower meta-d', confidence resolution is worse
@@ -1427,7 +1427,7 @@ test_that("meta-d' works with all 4 distributions", {
   for (d in c("normal", "logistic", "gumbel_min", "gumbel_max")) {
     probs <- bmm:::.sdt_metad_category_probs(
       thresholds, dprime = 1.5, metad = 1.0, stimulus = 1,
-      sd_ratio = 1, dist = d
+      sdratio = 1, dist = d
     )
     expect_equal(sum(probs), 1, tolerance = 1e-10)
     expect_true(all(probs > 0))
@@ -2045,7 +2045,7 @@ test_that("sdt rating with log_scale=FALSE is unchanged (default)", {
 
 test_that("sdt UV-SDT rating with log_scale=TRUE produces valid stancode", {
   dat <- rsdt(n_per_cell = 100, n_subjects = 3, dprime = 1.5,
-              criterion = 0, sd_ratio = 1.2, n_ratings = 6,
+              criterion = 0, sdratio = 1.2, n_ratings = 6,
               spacing = 0.5, version = "rating")
   model <- sdt(response = paste0("r", 1:6), stimulus = "stimulus",
                variances = "unequal", log_scale = TRUE)
