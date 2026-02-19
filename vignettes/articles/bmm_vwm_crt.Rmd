@@ -51,19 +51,19 @@ The `bmm` package implements several measurement models for analyzing continuous
 
 #### The two-parameter mixture model [@Zhang_Luck_2008] {.unnumbered}
 
-  - see `?mixture2p` and [the mixture models article](https://venpopov.github.io/bmm/articles/bmm_mixture_models.html)
+  - see `?mixture2p` and [the mixture models article](https://venpopov.com/bmm/articles/bmm_mixture_models.html)
 
 #### The three-parameter mixture model [@Bays_Catalao_Husain_2009] {.unnumbered}
 
-  - see `?mixture3p` and [the mixture models article](https://venpopov.github.io/bmm/articles/bmm_mixture_models.html)
+  - see `?mixture3p` and [the mixture models article](https://venpopov.com/bmm/articles/bmm_mixture_models.html)
  
 #### The Interference Measurement Model [@Oberauer_Lin_2017]  {.unnumbered}
 
-  - see `?imm` and [the IMM article](https://venpopov.github.io/bmm/articles/bmm_imm.html)
+  - see `?imm` and [the IMM article](https://venpopov.com/bmm/articles/bmm_imm.html)
  
 #### The Signal Discrimination Model (SDM) by [@Oberauer_2023]  {.unnumbered}
 
-  - see `?sdm` and [the SDM article](https://venpopov.github.io/bmm/articles/bmm_sdm_simple.html)
+  - see `?sdm` and [the SDM article](https://venpopov.com/bmm/articles/bmm_sdm_simple.html)
 
 # Preparing data from half-circular stimulus spaces
 

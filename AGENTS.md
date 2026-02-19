@@ -48,6 +48,19 @@ These functions:
 - **Functional patterns**: Use functional programming where possible
 - **Explicit namespacing**: Always use `package::function()` (e.g., `brms::lf()`, `glue::glue()`)
 - Only use functions from packages in `DESCRIPTION` "Imports"
+- **Pure functions**: Always write functions that preserve the global state
+- NEVER use a `seed` argument and `set.seed` inside of functions
+- **Self-documenting code**: Write clear, descriptive names for functions and variables; refactor unclear code rather than adding explanatory comments
+- **Single-responsibility functions**: Extract complex logic into well-named helper functions
+- **Early returns**: Use early returns to simplify conditional flow and reduce nesting
+
+```r
+# Bad - never do this
+myfun <- function(n, seed) {
+   set.seed(seed)
+   rnorm(n)
+}
+```
 
 ### String Formatting
 Use `glue::glue()` instead of `sprintf()`:
@@ -58,6 +71,15 @@ message2("Processing {nrow(data)} rows with set_size={ss}")
 # Bad
 sprintf("Processing %d rows with set_size=%d", nrow(data), ss)
 ```
+
+Use the internal function `collapse_comma()` to create a comma separated string from a character vector
+```r
+message2("The following variables are missing from the data: {collapse_comma(missing_vars)}")
+
+# Bad
+message2("The following variables are missing from the data: {paste(missing_vars, collapse = ', ')}")
+```
+
 
 ### Documentation Requirements
 Exported functions must:
@@ -119,6 +141,8 @@ Stan code snippets go in `inst/stan_chunks/*.stan` - these are injected into brm
 Test organization:
 - `tests/testthat/` - automated unit tests (run by CI)
 - `tests/internal/` - long-running manual tests
+- `bmm-dev/feature_tests/` - exploratory/development scripts (synced via SWITCHdrive, not tracked by git)
+- `local/` - machine-specific scratch scripts (not tracked by git)
 
 Test patterns from codebase:
 ```r
@@ -161,7 +185,7 @@ R/                    # All package code
   helpers-*.R        # Shared utilities organized by function
   distributions.R    # Custom distribution functions
   utils.R            # stop2/warning2/message2, stopif/warnif
-  
+
 inst/stan_chunks/    # Stan code snippets for models
 data/                # Package datasets (.rda files)
 tests/testthat/      # Unit tests (test-*.R pattern)
@@ -170,7 +194,16 @@ vignettes/articles/  # Long-form tutorials (Rmd)
 man/                 # AUTO-GENERATED - do not edit
 docs/                # AUTO-GENERATED pkgdown site - do not edit
 _pkgdown.yml         # pkgdown configuration and function organization
+
+# Git-ignored development folders (not part of the package)
+bmm-dev/             # Developer-specific folder for exploratory/development scripts (git-ignored)
+local/               # Machine-local scratch files (not synced, not shared)
 ```
+
+## Local Configuration
+
+If a `LOCAL-AGENTS.md` file exists in the repository root, read it for machine-specific
+configuration. This file is git-ignored, so each developer maintains their own copy.
 
 ## Common Pitfalls
 
@@ -180,3 +213,4 @@ _pkgdown.yml         # pkgdown configuration and function organization
 4. **Implicit returns** - avoid explicit `return()` statements
 5. **devtools::load_all()** - never use `library(bmm)` during development
 6. **Git branching** - feature branches → PR to `develop` (never commit directly to `develop` or `master`)
+7. **Local `.gitignore` changes** - to ignore files locally without touching the tracked `.gitignore`, add patterns to `.git/info/exclude` instead (see [venpopov.com/posts/2024/git-local-ignore](https://venpopov.com/posts/2024/git-local-ignore/))
