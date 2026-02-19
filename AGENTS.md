@@ -174,17 +174,14 @@ docs/                # AUTO-GENERATED pkgdown site - do not edit
 _pkgdown.yml         # pkgdown configuration and function organization
 
 # Git-ignored development folders (not part of the package)
-bmm-dev/             # Symlink → SWITCHdrive/Software/bmm-dev (shared across machines)
-  development_planning/  # Feature planning docs, design decisions
-  feature_tests/         # Exploratory scripts for new features
-  model_tests/           # Model validation and parameter recovery scripts
-  simulations/           # Simulation studies
-  debugging/             # Debugging scripts
-  benchmarks/            # Performance benchmarks
-  demos/                 # Demo scripts
-  results/               # Saved outputs from test runs
+bmm-dev/             # Developer-specific folder for exploratory/development scripts (git-ignored)
 local/               # Machine-local scratch files (not synced, not shared)
 ```
+
+## Local Configuration
+
+If a `LOCAL-AGENTS.md` file exists in the repository root, read it for machine-specific
+configuration. This file is git-ignored, so each developer maintains their own copy.
 
 ## Common Pitfalls
 
@@ -194,4 +191,4 @@ local/               # Machine-local scratch files (not synced, not shared)
 4. **Implicit returns** - avoid explicit `return()` statements
 5. **devtools::load_all()** - never use `library(bmm)` during development
 6. **Git branching** - feature branches → PR to `develop` (never commit directly to `develop` or `master`)
-7. **Local `.gitignore` changes** - to ignore files locally without touching the tracked `.gitignore`, add patterns to `.git/info/exclude` or `.github/info/exclude` instead
+7. **Local `.gitignore` changes** - to ignore files locally without touching the tracked `.gitignore`, add patterns to `.git/info/exclude` instead (see [venpopov.com/posts/2024/git-local-ignore](https://venpopov.com/posts/2024/git-local-ignore/))
