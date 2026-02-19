@@ -53,7 +53,7 @@ rejection_sampling <- function(n, f, max_f, proposal_fun, ...) {
 #' @param kappa Vector of precision values
 #' @param log Logical; if `TRUE`, values are returned on the log scale.
 #' @param parametrization Character; either `"bessel"` or `"sqrtexp"`
-#'   (default). See [the online article](https://venpopov.github.io/bmm/articles/bmm_sdm_simple.html) for details on the
+#'   (default). See [the online article](https://venpopov.com/bmm/articles/bmm_sdm_simple.html) for details on the
 #'   parameterization.
 #' @param log.p Logical; if `TRUE`, probabilities are returned on the log
 #'   scale.
@@ -73,7 +73,7 @@ rejection_sampling <- function(n, f, max_f, proposal_fun, ...) {
 #'
 #' @details **Parametrization**
 #'
-#' See [the online article](https://venpopov.github.io/bmm/articles/bmm_sdm_simple.html) for details on the parameterization.
+#' See [the online article](https://venpopov.com/bmm/articles/bmm_sdm_simple.html) for details on the parameterization.
 #' Oberauer (2023) introduced the SDM with the bessel parametrization. The
 #' sqrtexp parametrization is the default in the `bmm` package for
 #' numerical stability and efficiency. The two parametrizations are related by

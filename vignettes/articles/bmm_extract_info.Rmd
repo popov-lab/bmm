@@ -51,7 +51,7 @@ used when you estimate a model, or when you report the results of a model fit.
 You can use the function `default_prior()` from the `brms` package to extract
 the default priors for a model. The arguments to `default_prior` are the same as
 for the `bmm()` function in `bmm`. For example, if you want to extract the
-default priors for the SDM model ([see the online article for more information](https://venpopov.github.io/bmm/articles/bmm_sdm_simple.html)), where you have
+default priors for the SDM model ([see the online article for more information](https://venpopov.com/bmm/articles/bmm_sdm_simple.html)), where you have
 a set_size categorical predictor of `c` and `kappa`, you can use the following
 code:
 

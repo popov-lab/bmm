@@ -166,7 +166,7 @@ A complete call to fit a model using `bmm` could look like this. For this exampl
 we are using the `oberauer_lin_2017` data that is provided with the package and we 
 will show how to fit the Interference Measurement Model to this data. 
 If you want a detailed description of this model and and in depth explanation of the parameters 
-estimated in the model, please have a look at [the IMM article](https://venpopov.github.io/bmm/articles/bmm_imm.html).
+estimated in the model, please have a look at [the IMM article](https://venpopov.com/bmm/articles/bmm_imm.html).
 
 ``` r
 library(bmm)
@@ -198,8 +198,8 @@ brms::pp_check(fit)
 
 You can have a look at examples for how to fit all currently implemented models
 by reading the vignettes for each model [here for the released version of the
-package](https://venpopov.github.io/bmm/articles/index.html) or [here for the
-development version](https://venpopov.github.io/bmm/dev/articles/index.html).
+package](https://venpopov.com/bmm/articles/index.html) or [here for the
+development version](https://venpopov.com/bmm/dev/articles/index.html).
 
 ## Exploring measurement models
 
@@ -280,7 +280,7 @@ knitr::include_graphics("man/figures/README-fitModel_process.png")
 ## Contributing to the `bmm` package
 
 Should be interested in contributing a model to the `bmm` package, you should
-first look into the [Developer Notes](https://venpopov.github.io/bmm/dev/dev-notes/index.html) 
+first look into the [Developer Notes](https://venpopov.com/bmm/dev/dev-notes/index.html) 
 as well as the [Contributor Guidelines](https://github.com/venpopov/bmm/blob/develop/.github/CONTRIBUTING.md). 
 These give a more in depth description of the package architecture, the steps necessary to
 add your own model to the package, and how contributions will be acknowledged.
