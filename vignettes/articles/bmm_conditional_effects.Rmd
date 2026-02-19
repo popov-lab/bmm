@@ -1,0 +1,164 @@
+---
+title: "Visualizing conditional effects of model parameters"
+output: bookdown::html_document2
+author:
+  - Gidon Frischkorn
+  - Ven Popov
+bibliography: REFERENCES.bib
+header-includes:
+  - \usepackage{amsmath}
+vignette: >
+  %\VignetteIndexEntry{Visualizing conditional effects of model parameters}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+pkgdown:
+  as_is: true
+---
+<style type="text/css">
+div.main-container {
+max-width: 800px !important;
+}
+
+p {
+margin-top: 1.5em ;
+margin-bottom: 1.5em ;
+}
+.author{
+    display: none;
+}
+</style>
+
+```{r, include = FALSE}
+options(crayon.enabled = TRUE, width = 800)
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>",
+  dev = "jpeg",
+  dpi = 100
+)
+fansi::set_knit_hooks(knitr::knit_hooks, which = c("output","message","error"))
+```
+
+# Overview
+
+After fitting a model with `bmm()`, you often want to visualize how predictors
+affect model parameters. If you are familiar with `brms`, you may know the
+`conditional_effects()` function for this purpose. However, calling
+`brms::conditional_effects()` directly on a `bmmfit` object requires you to know
+which brms arguments to use for each parameter, and returns results on the
+sampling scale without link-function back-transformation.
+
+The `conditional_effects()` method for `bmmfit` objects makes this easier:
+
+- **Specify parameters by name**: Just pass `par = "kappa"` or `par = "c"` and
+  the method takes care of the rest.
+- **Choose your scale**: View results on the natural parameter scale
+  (`scale = "native"`, the default) or on the MCMC sampling scale
+  (`scale = "sampling"`).
+- **Mixture proportions as probabilities**: For `mixture3p` models, the softmax
+  transformation is applied jointly so that mixing proportions (`thetat`,
+  `thetant`) are displayed as proper probabilities that sum to 1.
+
+# Basic usage
+
+We illustrate the function using the SDM model fitted to the
+`oberauer_lin_2017` data set. First, we fit a model where the memory strength
+parameter `c` varies by `set_size`, while the precision parameter `kappa` is
+estimated as an intercept only:
+
+```{r fit-sdm, eval = FALSE}
+library(bmm)
+
+fit_sdm <- bmm(
+  formula = bmf(c ~ 0 + set_size, kappa ~ 1),
+  data = oberauer_lin_2017,
+  model = sdm(resp_error = "dev_rad")
+)
+```
+
+To compute and plot the conditional effect of `set_size` on `c`:
+
+```{r ce-basic, eval = FALSE}
+ce_c <- conditional_effects(fit_sdm, par = "c")
+plot(ce_c)
+```
+
+By default, the results are shown on the **native scale**. Since `c` uses a log
+link, this means the exponentiated values (always positive). To see the results
+on the **sampling scale** (log scale) instead:
+
+```{r ce-sampling, eval = FALSE}
+ce_c_log <- conditional_effects(fit_sdm, par = "c", scale = "sampling")
+plot(ce_c_log)
+```
+
+# Viewing all estimated parameters at once
+
+If you omit the `par` argument, effects are computed for all estimated
+parameters. Fixed parameters (like `mu` in the SDM) are excluded automatically:
+
+```{r ce-all, eval = FALSE}
+ce_all <- conditional_effects(fit_sdm)
+plot(ce_all)
+```
+
+The resulting effect names are prefixed with the parameter name (e.g.,
+`"c.set_size"`, `"kappa.1"`) so you can distinguish them.
+
+# Mixture proportions in mixture3p
+
+For `mixture3p` models, the mixing proportions `thetat` (target) and `thetant`
+(non-target) are estimated on an unconstrained scale internally. When you use
+`scale = "native"` (the default), the softmax transformation is applied jointly,
+and you see proper probabilities between 0 and 1:
+
+```{r ce-softmax, eval = FALSE}
+fit_mix3p <- bmm(
+  formula = bmf(kappa ~ 0 + setsize, thetat ~ 0 + setsize),
+  data = zhang_luck_2008,
+  model = mixture3p(
+    resp_error = "response_error",
+    nt_features = paste0("col_lure", 1:5),
+    set_size = "setsize"
+  )
+)
+
+# P(target response) on probability scale
+ce_thetat <- conditional_effects(fit_mix3p, par = "thetat")
+plot(ce_thetat)
+
+# Precision on native (exponentiated) scale
+ce_kappa <- conditional_effects(fit_mix3p, par = "kappa")
+plot(ce_kappa)
+```
+
+# Passing additional arguments
+
+All extra arguments are forwarded to `brms::conditional_effects()`. Some useful
+options:
+
+```{r ce-advanced, eval = FALSE}
+# Select a specific predictor to plot
+ce_specific <- conditional_effects(fit_sdm, par = "c", effects = "set_size")
+
+# Adjust credible interval width
+ce_narrow <- conditional_effects(fit_sdm, par = "c", prob = 0.80)
+
+# Add spaghetti lines showing individual posterior draws
+ce_spag <- conditional_effects(fit_sdm, par = "c", spaghetti = TRUE, ndraws = 50)
+plot(ce_spag)
+```
+
+See `?brms::conditional_effects` for the full list of available options.
+
+# Quick reference
+
+| What you want | How to do it |
+|:--------------|:-------------|
+| Single parameter | `conditional_effects(fit, par = "kappa")` |
+| All parameters | `conditional_effects(fit)` |
+| Native scale (default) | `scale = "native"` |
+| Sampling scale | `scale = "sampling"` |
+| Specific predictor | `effects = "set_size"` |
+| Narrower CI | `prob = 0.80` |
+| Spaghetti plot | `spaghetti = TRUE, ndraws = 50` |
