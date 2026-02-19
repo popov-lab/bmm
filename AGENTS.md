@@ -211,4 +211,3 @@ configuration. This file is git-ignored, so each developer maintains their own c
 5. **devtools::load_all()** - never use `library(bmm)` during development
 6. **Git branching** - feature branches → PR to `develop` (never commit directly to `develop` or `master`)
 7. **Local `.gitignore` changes** - to ignore files locally without touching the tracked `.gitignore`, add patterns to `.git/info/exclude` instead (see [venpopov.com/posts/2024/git-local-ignore](https://venpopov.com/posts/2024/git-local-ignore/))
-8. **Never call `set.seed()` inside package functions** - this alters global RNG state and breaks reproducibility of user scripts. Leave seed control entirely to the user.
