@@ -56,7 +56,7 @@
 
 #' @title `r .model_sdm()$name`
 #' @name sdm
-#' @details see [the online article](https://venpopov.github.io/bmm/articles/bmm_sdm_simple.html) for a detailed description of the model
+#' @details see [the online article](https://venpopov.com/bmm/articles/bmm_sdm_simple.html) for a detailed description of the model
 #'   and how to use it. `r model_info(.model_sdm())`
 #' @param resp_error The name of the variable in the dataset containing the
 #'   response error. The response error should code the response relative to the

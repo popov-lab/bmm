@@ -27,7 +27,7 @@ from the bessel parametrization to the sqrtexp parametrization,
 \code{c_sqrtexp2bessel} converts from the sqrtexp parametrization to the
 bessel parametrization.
 
-See \href{https://venpopov.github.io/bmm/articles/bmm_sdm_simple.html}{the online article} for details on the
+See \href{https://venpopov.com/bmm/articles/bmm_sdm_simple.html}{the online article} for details on the
 parameterization. The sqrtexp parametrization is the default in the
 \code{bmm} package.
 }
