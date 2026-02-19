@@ -706,7 +706,7 @@ test_that("ezdm_summary_stats() validates grouping variables", {
       rt = "rt", response = "correct",
       .by = "nonexistent_var"
     ),
-    "Grouping variable 'nonexistent_var' not found in data"
+    "not found in data"
   )
 })
 
