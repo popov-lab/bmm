@@ -6,7 +6,7 @@
 # bmm 1.3.0
 
 ### New models
-* Add the **EZ-Diffusion Model** (`ezdm`) for speeded decision-making tasks. The model estimates drift rate, boundary separation, and non-decision time from aggregated summary statistics (mean RT, variance of RT, accuracy) using the closed-form equations derived by Wagenmakers et al. (2007). Supports both 3-parameter (symmetric starting point) and 4-parameter (asymmetric starting point) versions based on Srivastava et al. (2016). Implements Bayesian hierarchical estimation following Chavez & Vandekerckhove (2025). See the [article](https://venpopov.github.io/bmm/dev/articles/bmm_ezdm.html) on the `bmm` website for details.
+* Add the **EZ-Diffusion Model** (`ezdm`) for speeded decision-making tasks. The model estimates drift rate, boundary separation, and non-decision time from aggregated summary statistics (mean RT, variance of RT, accuracy) using the closed-form equations derived by Wagenmakers et al. (2007). Supports both 3-parameter (symmetric starting point) and 4-parameter (asymmetric starting point) versions based on Srivastava et al. (2016). Implements Bayesian hierarchical estimation following Chavez & Vandekerckhove (2025). See the [article](https://venpopov.com/bmm/dev/articles/bmm_ezdm.html) on the `bmm` website for details.
 
 ### New features
 * New function **ezdm_summary_stats()** to compute summary statistics from trial-level RT data for the EZ-Diffusion Model.
@@ -14,7 +14,7 @@
 # bmm 1.2.0
 
 ### New models
-* Add the Memory Measurement Model (Oberauer & Lewandowsky, 2019) and its generalization as the Multinomial Measurement Model for categorical decision tasks as new model class **m3** with three versions: simple span (**ss**), complex span (**cs**), and **custom**. For details, see the [article](https://venpopov.github.io/bmm/dev/articles/bmm_m3.html) on the `bmm` website (#237). Thanks to @GidonFrischkorn and @chenyu-psy
+* Add the Memory Measurement Model (Oberauer & Lewandowsky, 2019) and its generalization as the Multinomial Measurement Model for categorical decision tasks as new model class **m3** with three versions: simple span (**ss**), complex span (**cs**), and **custom**. For details, see the [article](https://venpopov.com/bmm/dev/articles/bmm_m3.html) on the `bmm` website (#237). Thanks to @GidonFrischkorn and @chenyu-psy
 
 ### New features
 * Updates to the `bmf2bf` S3 methods for more flexible translation of `bmmformulas` into `brmsformulas` (#227).
@@ -29,8 +29,8 @@
 * Improve error messages when attempting to construct bmmformulas without a left-hand-side variable
 
 ### Documentation
-* Add documentation to the [continuous reproduction task](https://venpopov.github.io/bmm/articles/bmm_vwm_crt.html) article for pre-processing half-circular stimulus spaces when using `bmmodels` of the `circular` model class (#229, #233).
-* New online [article](https://venpopov.github.io/bmm/dev/articles/bmm_m3.html) to accompany the m3 model
+* Add documentation to the [continuous reproduction task](https://venpopov.com/bmm/articles/bmm_vwm_crt.html) article for pre-processing half-circular stimulus spaces when using `bmmodels` of the `circular` model class (#229, #233).
+* New online [article](https://venpopov.com/bmm/dev/articles/bmm_m3.html) to accompany the m3 model
 
 ### Other changes
 * vectorize `k2sd()` function for improved performance
@@ -72,7 +72,7 @@ First version of the package on published on CRAN!
 * various updates to the documentation and data sets
 
 ### Documentation
-* two new online articles that [introduce the **bmmformula** syntax](https://venpopov.github.io/bmm/articles/bmm_bmmformula.html) and explain [how to extract information from **bmmodels**](https://venpopov.github.io/bmm/articles/bmm_extract_info.html) such as the generated Stan code and Stan data for each model
+* two new online articles that [introduce the **bmmformula** syntax](https://venpopov.com/bmm/articles/bmm_bmmformula.html) and explain [how to extract information from **bmmodels**](https://venpopov.com/bmm/articles/bmm_extract_info.html) such as the generated Stan code and Stan data for each model
 
 ### Bug fixes
 * fix a bug preventing the **sort_data** check from being executed (#72)
@@ -158,9 +158,9 @@ to zero for scaling and as of now cannot be predicted by independent variables b
 
 ### Documentation
 
-* Website for the development version of the package is now available at https://venpopov.github.io/bmm/dev/ (#18)
-* Add articles for each model to the website at https://venpopov.github.io/bmm/dev/articles/
-* Add a detailed developer's guide to the website at https://venpopov.github.io/bmm/dev/dev-notes (#21)
+* Website for the development version of the package is now available at https://venpopov.com/bmm/dev/ (#18)
+* Add articles for each model to the website at https://venpopov.com/bmm/dev/articles/
+* Add a detailed developer's guide to the website at https://venpopov.com/bmm/dev/dev-notes (#21)
 * Improve README with more detailed information about the package's goals and its models (#21)
 
 ### Other changes
