@@ -1,4 +1,4 @@
-url: https://venpopov.github.io/bmm/
+url: https://venpopov.com/bmm/
 template:
   bootstrap: 5
   math-rendering: mathjax
@@ -21,10 +21,10 @@ navbar:
         href: news/index.html
      develop:
         text: Develop
-        href: https://venpopov.github.io/bmm/dev-notes/index.html
+        href: https://venpopov.com/bmm/dev-notes/index.html
      parameter_recovery:
         text: Parameter recovery
-        href: https://venpopov.github.io/bmm/parameter-recovery/index.html
+        href: https://venpopov.com/bmm/parameter-recovery/index.html
 
 
 

@@ -1,14 +1,28 @@
+# R development artifacts
 .Rproj.user
 .Rhistory
-.Rdata
+.RData
 .Rprofile
 .httr-oauth
+
+# macOS
 .DS_Store
-local/
-bmm-dev
-docs
-inst/doc
+
+# R CMD check / build artifacts
+*.Rcheck/
+*.tar.gz
 /doc/
 /Meta/
+inst/doc
+
+# pkgdown site
+/docs/
+
+# Local / private directories
+.claude/
+local/
+bmm-dev
+
+# Internal test artifacts
 /tests/internal/cmdstanr_output/
 /tests/internal/*cache*
