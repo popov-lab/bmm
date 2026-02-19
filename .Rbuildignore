@@ -4,6 +4,7 @@
 ^README\.Rmd$
 ^cran-comments\.md$
 ^local$
+^bmm-dev$
 ^.github$
 ^\.github$
 ^_pkgdown\.yml$

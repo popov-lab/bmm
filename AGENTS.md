@@ -170,6 +170,15 @@ vignettes/articles/  # Long-form tutorials (Rmd)
 man/                 # AUTO-GENERATED - do not edit
 docs/                # AUTO-GENERATED pkgdown site - do not edit
 _pkgdown.yml         # pkgdown configuration and function organization
+
+bmm-dev/             # Shared dev sandbox (symlink → SwitchDrive, git-ignored)
+  development_planning/  # Implementation plans and roadmaps
+  feature_tests/         # Manual feature/bug tests
+  model_tests/           # Full model workflow tests
+  simulations/           # Parameter recovery studies
+  benchmarks/            # Performance benchmarks
+  results/               # Simulation outputs (.rds)
+local/                # Truly local files, not synced (git-ignored)
 ```
 
 ## Common Pitfalls

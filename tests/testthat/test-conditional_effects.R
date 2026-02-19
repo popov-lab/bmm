@@ -369,12 +369,12 @@ test_that(".get_parameter_info returns correct info for SDM params", {
   fit <- readRDS(test_path("assets/bmmfit_example1.rds"))
 
   info_c <- bmm:::.get_parameter_info(fit, "c")
-  expect_equal(info_c$type, "nlpar")
+  expect_equal(info_c$type, "dpar")
   expect_equal(info_c$link, "log")
   expect_false(info_c$multinomial)
 
   info_kappa <- bmm:::.get_parameter_info(fit, "kappa")
-  expect_equal(info_kappa$type, "nlpar")
+  expect_equal(info_kappa$type, "dpar")
   expect_equal(info_kappa$link, "log")
   expect_false(info_kappa$multinomial)
 })
