@@ -22,7 +22,6 @@ inst/doc
 .claude/
 local/
 bmm-dev
-LOCAL-AGENTS.md
 
 # Internal test artifacts
 /tests/internal/cmdstanr_output/

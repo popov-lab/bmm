@@ -181,8 +181,7 @@ local/               # Machine-local scratch files (not synced, not shared)
 ## Local Configuration
 
 If a `LOCAL-AGENTS.md` file exists in the repository root, read it for machine-specific
-configuration (e.g. local directory layout, symlinks, paths). This file is git-ignored, so
-each developer maintains their own copy.
+configuration. This file is git-ignored, so each developer maintains their own copy.
 
 ## Common Pitfalls
 
