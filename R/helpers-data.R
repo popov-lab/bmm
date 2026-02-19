@@ -503,12 +503,11 @@ ezdm_summary_stats <- function(
   data <- data[data[[rt]] > 0 & !is.na(data[[rt]]), ]
 
   # Validate grouping variables exist
-  for (gv in .by) {
-    stopif(
-      not_in(gv, colnames(data)),
-      "Grouping variable '{gv}' not found in data"
-    )
-  }
+  missing_by <- setdiff(.by, colnames(data))
+  stopif(
+    length(missing_by) > 0,
+    "Grouping variable(s) not found in data: {paste(missing_by, collapse = ', ')}"
+  )
 
   if (length(.by) == 0) {
     # No grouping - process all data
@@ -1043,20 +1042,20 @@ flag_contaminant_rts <- function(
 
   stopif(not_in(rt, colnames(data)), "RT variable '{rt}' not found in data")
 
-  if (version == "4par") {
-    stopif(
-      is.null(response),
-      "Argument 'response' is required when version = '4par'"
-    )
-    stopif(
-      not_in(response, colnames(data)),
-      "Response variable '{response}' not found in data"
-    )
-  }
+  stopif(
+    version == "4par" && is.null(response),
+    "Argument 'response' is required when version = '4par'"
+  )
+  stopif(
+    version == "4par" && not_in(response, colnames(data)),
+    "Response variable '{response}' not found in data"
+  )
 
-  for (gv in .by) {
-    stopif(not_in(gv, colnames(data)), "Grouping variable '{gv}' not found in data")
-  }
+  missing_by <- setdiff(.by, colnames(data))
+  stopif(
+    length(missing_by) > 0,
+    "Grouping variable(s) not found in data: {collapse_comma(missing_by)}"
+  )
 
   stopif(length(contaminant_bound) != 2, "contaminant_bound must be a vector of length 2")
   is_valid_bound <- function(x) {
