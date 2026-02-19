@@ -68,6 +68,7 @@
 #'
 #' @seealso [brms::conditional_effects()] for the underlying brms function
 #'
+#' @aliases conditional_effects
 #' @method conditional_effects bmmfit
 #' @export
 #'

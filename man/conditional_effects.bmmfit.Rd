@@ -2,6 +2,7 @@
 % Please edit documentation in R/conditional_effects.R
 \name{conditional_effects.bmmfit}
 \alias{conditional_effects.bmmfit}
+\alias{conditional_effects}
 \title{Conditional Effects for BMM Models}
 \usage{
 \method{conditional_effects}{bmmfit}(
