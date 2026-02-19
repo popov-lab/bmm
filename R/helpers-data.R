@@ -591,7 +591,6 @@ ezdm_summary_stats <- function(
     is_upper <- x %in% upper_patterns
     is_lower <- x %in% lower_patterns
 
-    # Check if all responses are recognized
     unrecognized <- !is_upper & !is_lower & !is.na(x)
     stopif(
       any(unrecognized),
@@ -799,11 +798,8 @@ ezdm_summary_stats <- function(
   # (contaminants that happened to be "correct" by chance)
   n_contam_upper <- rbinom(1, size = n_contam, prob = guess_rate)
 
-  # Adjusted counts (integers)
   n_trials_adj <- n_trials - n_contam
   n_upper_adj <- n_upper - n_contam_upper
-
-  # Bound to valid range
   n_upper_adj <- max(0L, min(n_upper_adj, n_trials_adj))
 
   list(
@@ -1120,7 +1116,6 @@ flag_contaminant_rts <- function(
     }
 
     # Perform fast guess validation if requested and response data available
-    # Validation tests the actual flagged trials (from probabilistic flagging)
     fast_guess_result <- NULL
     if (validate_fast_guessing && !is.null(response)) {
       fast_guess_result <- validate_fast_guesses(
@@ -1187,9 +1182,7 @@ flag_contaminant_rts <- function(
     )
 
     if (!fit_upper$converged || is.null(fit_upper$params)) {
-      warning2("EM did not converge for upper boundary. Returning NA.",
-        env.frame = -1
-      )
+      warning2("EM did not converge for upper boundary. Returning NA.")
       contam_metrics_upper <- list(
         contam_prob = rep(NA_real_, n_upper),
         contam_lr = rep(NA_real_, n_upper),
@@ -1202,9 +1195,7 @@ flag_contaminant_rts <- function(
     }
 
     if (!fit_lower$converged || is.null(fit_lower$params)) {
-      warning2("EM did not converge for lower boundary. Returning NA.",
-        env.frame = -1
-      )
+      warning2("EM did not converge for lower boundary. Returning NA.")
       contam_metrics_lower <- list(
         contam_prob = rep(NA_real_, n_lower),
         contam_lr = rep(NA_real_, n_lower),
@@ -1410,8 +1401,6 @@ validate_fast_guesses <- function(contam_flag, rt_data, response,
     "rt_threshold must be positive when threshold_type='absolute'"
   )
 
-  is_upper <- .convert_response_to_upper(response)
-
   if (threshold_type == "quantile") {
     rt_threshold <- stats::quantile(rt_data, rt_threshold, na.rm = TRUE)
   } 
@@ -1421,6 +1410,7 @@ validate_fast_guesses <- function(contam_flag, rt_data, response,
 
   # Posterior: Beta(alpha + n_upper, beta + n_lower)
   # Note: HDI provides useful uncertainty information even with low trial numbers
+  is_upper <- .convert_response_to_upper(response)
   n_upper <- sum(is_upper[fast_flagged_idx])
   prop_upper <- n_upper / n_tested
   posterior_alpha <- prior_alpha + n_upper
