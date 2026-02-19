@@ -48,6 +48,16 @@ These functions:
 - **Functional patterns**: Use functional programming where possible
 - **Explicit namespacing**: Always use `package::function()` (e.g., `brms::lf()`, `glue::glue()`)
 - Only use functions from packages in `DESCRIPTION` "Imports"
+- **Pure functions**: Always write functions that preserve the global state
+- NEVER use a `seed` argument and `set.seed` inside of functions
+
+```r
+# Bad - never do this
+myfun <- function(n, seed) {
+   set.seed(seed)
+   rnorm(n)
+}
+```
 
 ### String Formatting
 Use `glue::glue()` instead of `sprintf()`:
@@ -58,6 +68,15 @@ message2("Processing {nrow(data)} rows with set_size={ss}")
 # Bad
 sprintf("Processing %d rows with set_size=%d", nrow(data), ss)
 ```
+
+Use the internal function `collapse_comma()` to create a comma separated string from a character vector
+```r
+message2("The following variables are missing from the data: {collapse_comma(missing_vars)}")
+
+# Bad
+message2("The following variables are missing from the data: {paste(missing_vars, collapse = ', ')}")
+```
+
 
 ### Documentation Requirements
 Exported functions must:
