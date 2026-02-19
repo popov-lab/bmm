@@ -64,6 +64,17 @@ messages - Support glue syntax without explicit `glue()` calls - Accept
   [`brms::lf()`](https://paulbuerkner.com/brms/reference/brmsformula-helpers.html),
   [`glue::glue()`](https://glue.tidyverse.org/reference/glue.html))
 - Only use functions from packages in `DESCRIPTION` “Imports”
+- **Pure functions**: Always write functions that preserve the global
+  state
+- NEVER use a `seed` argument and `set.seed` inside of functions
+
+``` r
+# Bad - never do this
+myfun <- function(n, seed) {
+   set.seed(seed)
+   rnorm(n)
+}
+```
 
 ### String Formatting
 
