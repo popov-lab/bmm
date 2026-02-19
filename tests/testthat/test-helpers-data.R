@@ -474,17 +474,20 @@ test_that("ezdm_summary_stats() warns for potential data issues", {
     "Some RT values > 10. Ensure RTs are in seconds"
   )
 
-  # Non-positive RT values
+})
+
+test_that("ezdm_summary_stats() errors for non-positive RT values", {
   test_data_neg <- data.frame(
     rt = c(-0.1, 0, rgamma(98, shape = 5, rate = 10) + 0.3),
     correct = rbinom(100, 1, 0.8)
   )
 
-  expect_warning(
+  expect_error(
     ezdm_summary_stats(test_data_neg,
       rt = "rt", response = "correct",
       method = "simple"
-    )
+    ),
+    "Non-positive RT values found"
   )
 })
 
