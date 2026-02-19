@@ -50,6 +50,9 @@ These functions:
 - Only use functions from packages in `DESCRIPTION` "Imports"
 - **Pure functions**: Always write functions that preserve the global state
 - NEVER use a `seed` argument and `set.seed` inside of functions
+- **Self-documenting code**: Write clear, descriptive names for functions and variables; refactor unclear code rather than adding explanatory comments
+- **Single-responsibility functions**: Extract complex logic into well-named helper functions
+- **Early returns**: Use early returns to simplify conditional flow and reduce nesting
 
 ```r
 # Bad - never do this
