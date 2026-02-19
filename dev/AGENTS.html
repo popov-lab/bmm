@@ -102,6 +102,12 @@
 <span></span>
 <span><span class="co"># Bad</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/sprintf.html" class="external-link">sprintf</a></span><span class="op">(</span><span class="st">"Processing %d rows with set_size=%d"</span>, <span class="fu"><a href="https://rdrr.io/r/base/nrow.html" class="external-link">nrow</a></span><span class="op">(</span><span class="va">data</span><span class="op">)</span>, <span class="va">ss</span><span class="op">)</span></span></code></pre></div>
+<p>Use the internal function <code>collapse_comma()</code> to create a comma separated string from a character vector</p>
+<div class="sourceCode" id="cb4"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="fu">message2</span><span class="op">(</span><span class="st">"The following variables are missing from the data: {collapse_comma(missing_vars)}"</span><span class="op">)</span></span>
+<span></span>
+<span><span class="co"># Bad</span></span>
+<span><span class="fu">message2</span><span class="op">(</span><span class="st">"The following variables are missing from the data: {paste(missing_vars, collapse = ', ')}"</span><span class="op">)</span></span></code></pre></div>
 </div>
 <div class="section level3">
 <h3 id="documentation-requirements">Documentation Requirements<a class="anchor" aria-label="anchor" href="#documentation-requirements"></a></h3>
@@ -114,7 +120,7 @@
 <h3 id="model-structure-s3-system">Model Structure (S3 System)<a class="anchor" aria-label="anchor" href="#model-structure-s3-system"></a></h3>
 <p>Models are S3 objects created by internal <code>.model_*()</code> functions with user-facing aliases:</p>
 <p><strong>Internal function</strong> (<code>R/model_mixture3p.R</code>):</p>
-<div class="sourceCode" id="cb4"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb5"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">.model_mixture3p</span> <span class="op">&lt;-</span> <span class="kw">function</span><span class="op">(</span><span class="va">resp_error</span>, <span class="va">nt_features</span>, <span class="va">set_size</span>, <span class="va">...</span><span class="op">)</span> <span class="op">{</span></span>
 <span>  <span class="fu"><a href="https://rdrr.io/r/base/structure.html" class="external-link">structure</a></span><span class="op">(</span></span>
 <span>    <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span></span>
@@ -129,7 +135,7 @@
 <span>  <span class="op">)</span></span>
 <span><span class="op">}</span></span></code></pre></div>
 <p><strong>User-facing alias</strong>:</p>
-<div class="sourceCode" id="cb5"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb6"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="co">#' @keywords bmmodel</span></span>
 <span><span class="co">#' @export</span></span>
 <span><span class="va">mixture3p</span> <span class="op">&lt;-</span> <span class="kw">function</span><span class="op">(</span><span class="va">...</span><span class="op">)</span> <span class="op">{</span> <span class="fu">.model_mixture3p</span><span class="op">(</span><span class="va">...</span><span class="op">)</span> <span class="op">}</span></span></code></pre></div>
@@ -158,7 +164,7 @@
 <p><strong>Always add/update tests</strong> for code changes - even if not explicitly requested.</p>
 <p>Test organization: - <code>tests/testthat/</code> - automated unit tests (run by CI) - <code>tests/internal/</code> - long-running manual tests - <code>bmm-dev/feature_tests/</code> - exploratory/development scripts (synced via SWITCHdrive, not tracked by git) - <code>local/</code> - machine-specific scratch scripts (not tracked by git)</p>
 <p>Test patterns from codebase:</p>
-<div class="sourceCode" id="cb6"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb7"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu">test_that</span><span class="op">(</span><span class="st">"check_data() produces expected errors"</span>, <span class="op">{</span></span>
 <span>  <span class="fu">expect_error</span><span class="op">(</span></span>
 <span>    <span class="fu"><a href="reference/check_data.html">check_data</a></span><span class="op">(</span><span class="va">model</span>, <span class="va">data</span>, <span class="va">formula</span><span class="op">)</span>,</span>
@@ -173,7 +179,7 @@
 <div class="section level3">
 <h3 id="bmmformula-vs-brmsformula">bmmformula vs brmsformula<a class="anchor" aria-label="anchor" href="#bmmformula-vs-brmsformula"></a></h3>
 <p>bmm uses explicit parameter prediction (NOT implicit mu):</p>
-<div class="sourceCode" id="cb7"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb8"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="co"># brms: response on LHS implies mu parameter</span></span>
 <span><span class="fu">brmsformula</span><span class="op">(</span><span class="va">rt</span> <span class="op">|</span> <span class="fu">dec</span><span class="op">(</span><span class="va">response</span><span class="op">)</span> <span class="op">~</span> <span class="va">condition</span><span class="op">)</span></span>
 <span></span>
@@ -184,7 +190,7 @@
 <div class="section level3">
 <h3 id="fixed-parameters">Fixed Parameters<a class="anchor" aria-label="anchor" href="#fixed-parameters"></a></h3>
 <p>Set parameters to constants using assignment syntax:</p>
-<div class="sourceCode" id="cb8"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb9"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="reference/bmmformula.html">bmf</a></span><span class="op">(</span><span class="va">kappa</span> <span class="op">~</span> <span class="va">set_size</span>, <span class="va">c</span> <span class="op">~</span> <span class="fl">1</span>, a <span class="op">=</span> <span class="fl">0.5</span><span class="op">)</span>  <span class="co"># 'a' fixed to 0.5</span></span></code></pre></div>
 </div>
 </div>
