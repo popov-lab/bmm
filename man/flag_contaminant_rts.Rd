@@ -17,7 +17,6 @@ flag_contaminant_rts(
   maxit = 100,
   tol = 1e-06,
   output = c("probability", "likelihood_ratio", "flag"),
-  seed = NULL,
   validate_fast_guessing = FALSE,
   ...,
   what_return = c("data", "diagnostics", "all")
@@ -63,10 +62,6 @@ exceeding this are clipped with a warning. Must be in (0, 1]. Default 0.5.}
 \item "likelihood_ratio": Ratio of contaminant to RT likelihood
 \item "flag": Binary indicator based on probabilistic binomial sampling
 }}
-
-\item{seed}{Integer or NULL. Random seed for reproducible probabilistic flagging.
-If NULL (default), flagging is not reproducible. Only relevant when
-\code{output = "flag"}. Set to an integer for reproducible results.}
 
 \item{validate_fast_guessing}{Logical. If TRUE and response data is provided,
 tests whether fast flagged contaminants show random guessing behavior (~50\%

@@ -306,6 +306,61 @@ has_nonconsecutive_duplicates <- function(vec) {
 # EZDM SUMMARY STATISTICS                                                 ####
 ############################################################################# !
 
+# Validate contaminant_bound argument (shared by ezdm_summary_stats and flag_contaminant_rts)
+# @param contaminant_bound Vector of length 2 (numeric or "min"/"max")
+.validate_contaminant_bounds <- function(contaminant_bound) {
+  stopif(length(contaminant_bound) != 2, "contaminant_bound must be a vector of length 2")
+  is_valid_bound <- function(x) {
+    tolower(x) %in% c("min", "max") | suppressWarnings(!is.na(as.numeric(x)))
+  }
+  stopif(
+    any(!is_valid_bound(contaminant_bound)),
+    "contaminant_bound elements must be numeric or 'min'/'max'"
+  )
+  stopif(
+    all(is.numeric(contaminant_bound)) && contaminant_bound[1] >= contaminant_bound[2],
+    "contaminant_bound[1] must be less than contaminant_bound[2]"
+  )
+  invisible(NULL)
+}
+
+# Validate init_contaminant and max_contaminant arguments (shared helper)
+# @param init_contaminant Numeric. Initial proportion of contaminants
+# @param max_contaminant Numeric. Maximum allowed contaminant proportion
+.validate_contaminant_params <- function(init_contaminant, max_contaminant) {
+  stopif(
+    !is.numeric(init_contaminant) || init_contaminant <= 0 || init_contaminant >= 1,
+    "init_contaminant must be between 0 and 1 (exclusive)"
+  )
+  stopif(
+    !is.numeric(max_contaminant) || max_contaminant <= 0 || max_contaminant > 1,
+    "max_contaminant must be between 0 (exclusive) and 1 (inclusive)"
+  )
+  stopif(
+    init_contaminant >= max_contaminant,
+    "init_contaminant must be less than max_contaminant"
+  )
+  invisible(NULL)
+}
+
+# Apply a function to each group defined by .by variables (shared helper)
+# @param data Data.frame
+# @param .by Character vector of grouping variable names
+# @param fn Function taking a group data.frame, returning any value
+# @param ... Additional arguments passed to fn
+# @return List of lists, each with $group_values (1-row data.frame) and $result
+.apply_by_groups <- function(data, .by, fn, ...) {
+  split_factor <- if (length(.by) == 1) data[[.by]] else interaction(data[.by], drop = TRUE)
+  split_data <- split(data, split_factor)
+  lapply(names(split_data), function(grp_name) {
+    grp_data <- split_data[[grp_name]]
+    list(
+      group_values = unique(grp_data[.by])[1L, , drop = FALSE],
+      result = fn(grp_data, ...)
+    )
+  })
+}
+
 #' Compute Robust Summary Statistics for EZ-Diffusion Model
 #'
 #' @description Computes robust summary statistics for the EZ-Diffusion Model
@@ -445,38 +500,12 @@ ezdm_summary_stats <- function(
     not_in(response, colnames(data)),
     "Response variable '{response}' not found in data"
   )
-  stopif(
-    length(contaminant_bound) != 2,
-    "contaminant_bound must be a vector of length 2"
-  )
-
-  is_valid_bound <- function(x) {
-    tolower(x) %in% c("min", "max") | suppressWarnings(!is.na(as.numeric(x)))
-  }
-  stopif(
-    any(!is_valid_bound(contaminant_bound)),
-    "contaminant_bound elements must be numeric or 'min'/'max'"
-  )
-  stopif(
-    all(is.numeric(contaminant_bound)) && contaminant_bound[1] >= contaminant_bound[2],
-    "contaminant_bound[1] must be less than contaminant_bound[2]"
-  )
+  .validate_contaminant_bounds(contaminant_bound)
   stopif(
     !is.numeric(min_trials) || min_trials < 1,
     "min_trials must be a positive integer"
   )
-  stopif(
-    !is.numeric(init_contaminant) || init_contaminant <= 0 || init_contaminant >= 1,
-    "init_contaminant must be between 0 and 1 (exclusive)"
-  )
-  stopif(
-    !is.numeric(max_contaminant) || max_contaminant <= 0 || max_contaminant > 1,
-    "max_contaminant must be between 0 (exclusive) and 1 (inclusive)"
-  )
-  stopif(
-    init_contaminant >= max_contaminant,
-    "init_contaminant must be less than max_contaminant"
-  )
+  .validate_contaminant_params(init_contaminant, max_contaminant)
   stopif(!is.logical(adjust_accuracy), "adjust_accuracy must be TRUE or FALSE")
   stopif(
     !is.numeric(guess_rate) || guess_rate < 0 || guess_rate > 1,
@@ -509,11 +538,10 @@ ezdm_summary_stats <- function(
     "Grouping variable(s) not found in data: {paste(missing_by, collapse = ', ')}"
   )
 
-  if (length(.by) == 0) {
-    # No grouping - process all data
-    result <- .process_rt_group(
-      rt_data = data[[rt]],
-      response_data = data[[response]],
+  process_group <- function(grp_data) {
+    .process_rt_group(
+      rt_data = grp_data[[rt]],
+      response_data = grp_data[[response]],
       version = version,
       distribution = distribution,
       method = method,
@@ -527,41 +555,15 @@ ezdm_summary_stats <- function(
       adjust_accuracy = adjust_accuracy,
       guess_rate = guess_rate
     )
-    result_df <- as.data.frame(result)
+  }
+
+  if (length(.by) == 0) {
+    result_df <- as.data.frame(process_group(data))
   } else {
-    # Split by grouping variables
-    if (length(.by) == 1) {
-      split_factor <- data[[.by]]
-    } else {
-      split_factor <- interaction(data[.by], drop = TRUE)
-    }
-
-    split_data <- split(data, split_factor)
-
-    results_list <- lapply(names(split_data), function(grp_name) {
-      grp_data <- split_data[[grp_name]]
-      grp_result <- .process_rt_group(
-        rt_data = grp_data[[rt]],
-        response_data = grp_data[[response]],
-        version = version,
-        distribution = distribution,
-        method = method,
-        robust_scale = robust_scale,
-        contaminant_bound = contaminant_bound,
-        min_trials = min_trials,
-        init_contaminant = init_contaminant,
-        max_contaminant = max_contaminant,
-        maxit = maxit,
-        tol = tol,
-        adjust_accuracy = adjust_accuracy,
-        guess_rate = guess_rate
-      )
-
-      # Extract group values
-      grp_values <- unique(grp_data[.by])
-      cbind(grp_values[1, , drop = FALSE], as.data.frame(grp_result))
+    groups <- .apply_by_groups(data, .by, process_group)
+    results_list <- lapply(groups, function(g) {
+      cbind(g$group_values, as.data.frame(g$result))
     })
-
     result_df <- do.call(rbind, results_list)
     rownames(result_df) <- NULL
   }
@@ -887,9 +889,6 @@ ezdm_summary_stats <- function(
 #'   - "probability" (default): Posterior probability P(contaminant | RT)
 #'   - "likelihood_ratio": Ratio of contaminant to RT likelihood
 #'   - "flag": Binary indicator based on probabilistic binomial sampling
-#' @param seed Integer or NULL. Random seed for reproducible probabilistic flagging.
-#'   If NULL (default), flagging is not reproducible. Only relevant when
-#'   `output = "flag"`. Set to an integer for reproducible results.
 #' @param validate_fast_guessing Logical. If TRUE and response data is provided,
 #'   tests whether fast flagged contaminants show random guessing behavior (~50%
 #'   accuracy for 2AFC tasks). By default, tests trials with RT below the 25th
@@ -1025,7 +1024,6 @@ flag_contaminant_rts <- function(
     maxit = 100,
     tol = 1e-6,
     output = c("probability", "likelihood_ratio", "flag"),
-    seed = NULL,
     validate_fast_guessing = FALSE,
     ...,
     what_return = c("data", "diagnostics", "all")) {
@@ -1057,50 +1055,19 @@ flag_contaminant_rts <- function(
     "Grouping variable(s) not found in data: {collapse_comma(missing_by)}"
   )
 
-  stopif(length(contaminant_bound) != 2, "contaminant_bound must be a vector of length 2")
-  is_valid_bound <- function(x) {
-    tolower(x) %in% c("min", "max") | suppressWarnings(!is.na(as.numeric(x)))
-  }
-  stopif(
-    any(!is_valid_bound(contaminant_bound)),
-    "contaminant_bound elements must be numeric or 'min'/'max'"
-  )
-  stopif(
-    all(is.numeric(contaminant_bound)) && contaminant_bound[1] >= contaminant_bound[2],
-    "contaminant_bound[1] must be less than contaminant_bound[2]"
-  )
-
-  stopif(
-    !is.numeric(init_contaminant) || init_contaminant <= 0 || init_contaminant >= 1,
-    "init_contaminant must be between 0 and 1 (exclusive)"
-  )
-  stopif(
-    !is.numeric(max_contaminant) || max_contaminant <= 0 || max_contaminant > 1,
-    "max_contaminant must be between 0 (exclusive) and 1 (inclusive)"
-  )
-  stopif(
-    init_contaminant >= max_contaminant,
-    "init_contaminant must be less than max_contaminant"
-  )
-
-  if (!is.null(seed)) {
-    stopif(
-      !is.numeric(seed) || length(seed) != 1,
-      "seed must be a single numeric value or NULL"
-    )
-  }
+  .validate_contaminant_bounds(contaminant_bound)
+  .validate_contaminant_params(init_contaminant, max_contaminant)
 
   warnif(any(data[[rt]] > 10), "Some RT values > 10. Ensure RTs are in seconds, not milliseconds.")
-  warnif(any(data[[rt]] <= 0, na.rm = TRUE), "Non-positive RT found. These values will be excluded.")
+  stopif(
+    any(data[[rt]] <= 0, na.rm = TRUE),
+    "Non-positive RT values found in column '{rt}'. Please remove or correct these before proceeding."
+  )
+  data <- data[!is.na(data[[rt]]), , drop = FALSE]
 
-  valid_idx <- data[[rt]] > 0 & !is.na(data[[rt]])
-  data <- data[valid_idx, , drop = FALSE]
-
-  stopif(nrow(data) == 0, "No valid RT data remaining after filtering.")
-
-  if (length(.by) == 0) {
-    result <- .flag_rt_group(
-      data = data,
+  flag_group <- function(grp_data) {
+    .flag_rt_group(
+      data = grp_data,
       rt = rt,
       response = response,
       version = version,
@@ -1111,45 +1078,19 @@ flag_contaminant_rts <- function(
       maxit = maxit,
       tol = tol,
       output = output,
-      seed = seed,
       validate_fast_guessing = validate_fast_guessing,
       ...
     )
+  }
+
+  if (length(.by) == 0) {
+    result <- flag_group(data)
   } else {
-    if (length(.by) == 1) {
-      split_factor <- data[[.by]]
-    } else {
-      split_factor <- interaction(data[.by], drop = TRUE)
-    }
-
-    split_data <- split(data, split_factor)
-
-    results_list <- lapply(names(split_data), function(grp_name) {
-      grp_data <- split_data[[grp_name]]
-      grp_result <- .flag_rt_group(
-        data = grp_data,
-        rt = rt,
-        response = response,
-        version = version,
-        distribution = distribution,
-        contaminant_bound = contaminant_bound,
-        init_contaminant = init_contaminant,
-        max_contaminant = max_contaminant,
-        maxit = maxit,
-        tol = tol,
-        output = output,
-        seed = seed,
-        validate_fast_guessing = validate_fast_guessing,
-        ...
-      )
-
-      grp_values <- unique(grp_data[.by])
-      grp_result$diagnostics <- cbind(grp_values[1, , drop = FALSE],
-                                       grp_result$diagnostics,
-                                       row.names = NULL)
-      grp_result
+    groups <- .apply_by_groups(data, .by, flag_group)
+    results_list <- lapply(groups, function(g) {
+      g$result$diagnostics <- cbind(g$group_values, g$result$diagnostics, row.names = NULL)
+      g$result
     })
-
     result <- list(
       data = do.call(rbind, lapply(results_list, `[[`, "data")),
       diagnostics = do.call(rbind, lapply(results_list, `[[`, "diagnostics"))
@@ -1179,13 +1120,12 @@ flag_contaminant_rts <- function(
 # @param maxit Integer. Maximum EM iterations
 # @param tol Numeric. Convergence tolerance
 # @param output Character. Output type
-# @param seed Integer or NULL. Random seed for reproducible flagging
 # @param validate_fast_guessing Logical. Whether to validate fast guessing behavior
 # @param ... Additional arguments passed to validate_fast_guesses()
 # @return List with $data (augmented data.frame) and $diagnostics (fit info)
 .flag_rt_group <- function(data, rt, response, version, distribution,
                            contaminant_bound, init_contaminant, max_contaminant,
-                           maxit, tol, output, seed, validate_fast_guessing,
+                           maxit, tol, output, validate_fast_guessing,
                            ...) {
 
   rt_data <- data[[rt]]
@@ -1209,7 +1149,7 @@ flag_contaminant_rts <- function(
       )
     } else {
       contam_metrics <- .compute_trial_contam_metrics(
-        rt_data, fit, distribution, resolved_bounds, seed
+        rt_data, fit, distribution, resolved_bounds
       )
     }
 
@@ -1303,7 +1243,7 @@ flag_contaminant_rts <- function(
       )
     } else {
       contam_metrics_upper <- .compute_trial_contam_metrics(
-        rt_upper, fit_upper, distribution, resolved_bounds, seed
+        rt_upper, fit_upper, distribution, resolved_bounds
       )
     }
 
@@ -1317,7 +1257,7 @@ flag_contaminant_rts <- function(
       )
     } else {
       contam_metrics_lower <- .compute_trial_contam_metrics(
-        rt_lower, fit_lower, distribution, resolved_bounds, seed
+        rt_lower, fit_lower, distribution, resolved_bounds
       )
     }
 
@@ -1630,10 +1570,9 @@ validate_fast_guesses <- function(contam_flag, rt_data, response,
 # @param mixture_fit List returned from .fit_rt_mixture
 # @param distribution Character. Distribution type
 # @param contaminant_bound Numeric(2). Bounds for uniform
-# @param seed Integer or NULL. Random seed for probabilistic flagging
 # @return List with contam_prob, contam_lr, contam_flag vectors
 .compute_trial_contam_metrics <- function(rt_vec, mixture_fit, distribution,
-                                          contaminant_bound, seed) {
+                                          contaminant_bound) {
 
   params <- mixture_fit$params
   pi_c <- mixture_fit$contaminant_prop
@@ -1660,9 +1599,6 @@ validate_fast_guesses <- function(contam_flag, rt_data, response,
 
   # Probabilistic flagging using binomial sampling
   # Each trial is flagged with probability equal to its contamination probability
-  if (!is.null(seed)) {
-    set.seed(seed)
-  }
   contam_flag <- stats::rbinom(n = length(contam_prob), size = 1, prob = contam_prob) == 1
 
   list(

@@ -1371,30 +1371,6 @@ test_that("flag_contaminant_rts() validates output parameter", {
   )
 })
 
-test_that("flag_contaminant_rts() validates seed parameter", {
-  data <- .create_test_rt_data()
-  
-  # Invalid seed
-  expect_error(
-    flag_contaminant_rts(data, rt = "rt", seed = "not_numeric"),
-    "seed must be a single numeric value"
-  )
-  
-  expect_error(
-    flag_contaminant_rts(data, rt = "rt", seed = c(1, 2)),
-    "seed must be a single numeric value"
-  )
-  
-  # Valid seeds should work
-  expect_silent(
-    flag_contaminant_rts(data, rt = "rt", seed = 123)
-  )
-  
-  expect_silent(
-    flag_contaminant_rts(data, rt = "rt", seed = NULL)
-  )
-})
-
 test_that("flag_contaminant_rts() warns for RTs > 10", {
   # Mix of large and normal RTs to ensure some data remains after filtering
   data <- data.frame(rt = c(15, 20, 25, 0.5, 0.6, 0.7, 0.8, 0.9))
@@ -1405,13 +1381,12 @@ test_that("flag_contaminant_rts() warns for RTs > 10", {
   )
 })
 
-test_that("flag_contaminant_rts() warns for non-positive RTs", {
-  # Mix of negative and positive RTs to ensure some data remains
+test_that("flag_contaminant_rts() errors for non-positive RTs", {
   data <- data.frame(rt = c(-0.1, -0.2, 0.3, 0.5, 0.6, 0.7, 0.8, 0.9))
-  
-  expect_warning(
+
+  expect_error(
     flag_contaminant_rts(data, rt = "rt"),
-    "Non-positive RT found"
+    "Non-positive RT values found"
   )
 })
 
@@ -1507,61 +1482,47 @@ test_that("flag_contaminant_rts() output='flag' uses probabilistic sampling", {
   # Very fast contaminants well separated from clean RTs
   rt_contam <- runif(20, 0.15, 0.25)
   data <- data.frame(rt = c(rt_clean, rt_contam))
-  
+
   # Check that we can detect contaminants
   result_prob <- flag_contaminant_rts(
-    data, rt = "rt", output = "probability", 
+    data, rt = "rt", output = "probability",
     init_contaminant = 0.2, max_contaminant = 0.4
   )
-  
+
   # If contaminants are detected, test probabilistic behavior
   if (max(result_prob$contam_prob, na.rm = TRUE) > 0.01) {
-    # Test with seed for reproducibility
     result1 <- flag_contaminant_rts(
-      data, rt = "rt", output = "flag", seed = 123,
+      data, rt = "rt", output = "flag",
       init_contaminant = 0.2, max_contaminant = 0.4
     )
-    result2 <- flag_contaminant_rts(
-      data, rt = "rt", output = "flag", seed = 123,
-      init_contaminant = 0.2, max_contaminant = 0.4
-    )
-    
+
     expect_true("contam_flag" %in% names(result1))
     expect_type(result1$contam_flag, "logical")
-    
-    # Same seed should produce identical flags
-    expect_identical(result1$contam_flag, result2$contam_flag)
-    
-    # Test that probabilistic flagging is actually probabilistic
-    # Count proportion of trials flagged over multiple runs with different seeds
+
+    # Test that probabilistic flagging varies across runs
     n_runs <- 20
-    flag_counts <- numeric(n_runs)
-    for (i in 1:n_runs) {
+    flag_counts <- vapply(seq_len(n_runs), function(i) {
       result_temp <- flag_contaminant_rts(
-        data, rt = "rt", output = "flag", seed = 100 + i,
+        data, rt = "rt", output = "flag",
         init_contaminant = 0.2, max_contaminant = 0.4
       )
-      flag_counts[i] <- sum(result_temp$contam_flag, na.rm = TRUE)
-    }
-    
-    # If probabilistic, counts should vary
+      sum(result_temp$contam_flag, na.rm = TRUE)
+    }, integer(1L))
+
+    # If probabilistic, counts should vary across runs
     expect_true(length(unique(flag_counts)) > 1,
                 info = paste("Flag counts:", paste(flag_counts, collapse = ", ")))
   } else {
     # If EM doesn't detect contaminants in this data, just check basic functionality
-    result <- flag_contaminant_rts(
-      data, rt = "rt", output = "flag", seed = 123
-    )
+    result <- flag_contaminant_rts(data, rt = "rt", output = "flag")
     expect_true("contam_flag" %in% names(result))
     expect_type(result$contam_flag, "logical")
   }
-  
-  # Without seed, results are valid (use simpler data)
+
+  # Results are always valid
   simple_data <- data.frame(rt = rgamma(50, 5, 10))
-  result4 <- flag_contaminant_rts(
-    simple_data, rt = "rt", output = "flag", seed = NULL
-  )
-  expect_type(result4$contam_flag, "logical")
+  result2 <- flag_contaminant_rts(simple_data, rt = "rt", output = "flag")
+  expect_type(result2$contam_flag, "logical")
 })
 
 # Section 5: Grouping Tests ---------------------------------------------------

@@ -158,7 +158,7 @@ decision task.
 }
 }
 \examples{
-\dontshow{if (isTRUE(Sys.getenv("BMM_EXAMPLES"))) withAutoprint(\{ # examplesIf}
+\dontshow{if (isTRUE(Sys.getenv("BMM_EXAMPLES"))) (if (getRversion() >= "3.4") withAutoprint else force)(\{ # examplesIf}
 data <- oberauer_lewandowsky_2019_e1
 
 # initiate the model object
