@@ -59,6 +59,15 @@ message2("Processing {nrow(data)} rows with set_size={ss}")
 sprintf("Processing %d rows with set_size=%d", nrow(data), ss)
 ```
 
+Use the internal function `collapse_comma()` to create a comma separated string from a character vector
+```r
+message2("The following variables are missing from the data: {collapse_comma(missing_vars)}")
+
+# Bad
+message2("The following variables are missing from the data: {paste(missing_vars, collapse = ', ')}")
+```
+
+
 ### Documentation Requirements
 Exported functions must:
 1. Have complete roxygen documentation
