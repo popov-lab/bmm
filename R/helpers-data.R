@@ -1099,13 +1099,11 @@ flag_contaminant_rts <- function(
     rownames(result$diagnostics) <- NULL
   }
 
-  if (what_return == "data") {
-    return(result$data)
-  } else if (what_return == "diagnostics") {
-    return(result$diagnostics)
-  } else {
-    return(result)
-  }
+  switch(what_return,
+    data = result$data,
+    diagnostics = result$diagnostics,
+    result
+  )
 }
 
 # Helper function to process a single group
