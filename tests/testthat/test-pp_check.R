@@ -16,7 +16,6 @@ test_that("pp_check() aggregates over all predictors by default", {
   skip_if_not_installed("ggplot2")
   fit <- load_m3_fit()
   p <- pp_check(fit, ndraws = 5)
-  # Default: no faceting, single panel aggregating all observations
   expect_s3_class(p$facet, "FacetNull")
 })
 
@@ -72,7 +71,6 @@ test_that("pp_check() uses bayesplot theme_default", {
   skip_if_not_installed("ggplot2")
   fit <- load_m3_fit()
   p <- pp_check(fit, ndraws = 5)
-  # bayesplot::theme_default() produces a complete theme with serif font
   expect_equal(p$theme$text$family, "serif")
 })
 

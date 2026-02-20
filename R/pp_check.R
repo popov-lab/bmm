@@ -45,7 +45,6 @@ pp_check.bmmfit <- function(object, type = "dens_overlay", ndraws = NULL, ...) {
 }
 
 
-# Auto-append _grouped to type if a grouped variant exists in bayesplot
 .auto_grouped_type <- function(type) {
   if (endsWith(type, "_grouped")) return(type)
   grouped <- paste0(type, "_grouped")
@@ -94,7 +93,6 @@ pp_check.bmmfit <- function(object, type = "dens_overlay", ndraws = NULL, ...) {
 
   y_mat <- object$data$Y
   cat_names <- colnames(y_mat) %||% resp_cols
-  n_cats <- length(cat_names)
 
   cond_cols <- .validate_group_arg(group, object)
   intercept_only <- length(cond_cols) == 0L
@@ -108,8 +106,6 @@ pp_check.bmmfit <- function(object, type = "dens_overlay", ndraws = NULL, ...) {
 }
 
 
-# By default aggregate over all predictors (no faceting).
-# When group is specified, facet by that predictor.
 .validate_group_arg <- function(group, fit) {
   if (is.null(group)) return(character(0))
 
@@ -127,7 +123,6 @@ pp_check.bmmfit <- function(object, type = "dens_overlay", ndraws = NULL, ...) {
 }
 
 
-# Build grouping structure: data frame of groups and unique combinations
 .build_grouping <- function(data, cond_cols) {
   if (length(cond_cols) == 0L) {
     return(list(
@@ -143,7 +138,6 @@ pp_check.bmmfit <- function(object, type = "dens_overlay", ndraws = NULL, ...) {
 }
 
 
-# Pool observed and predicted counts per group, normalize to proportions
 .aggregate_pp_data <- function(y_mat, yrep, cat_names, grouping,
                                probs, intercept_only) {
   unique_grps <- grouping$unique_grps
@@ -202,7 +196,6 @@ pp_check.bmmfit <- function(object, type = "dens_overlay", ndraws = NULL, ...) {
 }
 
 
-# Construct the ggplot object (ppc_bars style from bayesplot)
 .build_pp_plot <- function(plot_df, cond_cols, intercept_only, yrep, probs) {
   p <- ggplot2::ggplot(plot_df, ggplot2::aes(x = .data[["category"]])) +
     ggplot2::geom_col(
