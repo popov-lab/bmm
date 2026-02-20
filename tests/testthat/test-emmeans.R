@@ -69,6 +69,14 @@ test_that(".bmmfit_resolve_par passes through when both are NULL", {
   expect_null(result$nlpar)
 })
 
+test_that(".bmmfit_resolve_par errors on invalid dpar name", {
+  mock <- load_mock_mixture2p()
+  expect_error(
+    .bmmfit_resolve_par(mock, dpar = "not_a_par", nlpar = NULL),
+    "not found in model"
+  )
+})
+
 
 # Tier 2: Fixture-based integration tests (SDM fixture — has posterior samples)
 

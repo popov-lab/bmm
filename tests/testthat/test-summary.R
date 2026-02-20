@@ -1,6 +1,6 @@
 test_that("summary has reasonable outputs", {
   skip_if_not(interactive())
-  fit <- readRDS(test_path("assets/bmmfit_example1.rds"))
+  fit <- readRDS(system.file("extdata", "bmmfit_example1.rds", package = "bmm"))
   summary1 <- suppressWarnings(summary(fit))
   expect_true(is.data.frame(summary1$fixed))
   expect_equal(

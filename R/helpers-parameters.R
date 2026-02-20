@@ -160,6 +160,7 @@ link_transform <- function(values, link, inverse = FALSE) {
   } else if (!is.null(bterms$nlpars) && par %in% names(bterms$nlpars)) {
     type <- "nlpar"
   } else {
+    # parameters not in bterms (e.g. fixed or auxiliary params) default to nlpar
     type <- "nlpar"
   }
 
