@@ -175,3 +175,43 @@ test_that("NULL link is treated as identity", {
   expect_identical(eta, x)
   expect_identical(back, x)
 })
+
+
+# ===========================================================================
+# .is_multinomial_param()
+# ===========================================================================
+
+test_that(".is_multinomial_param detects mixture3p softmax params", {
+  mock_model <- structure(list(), class = c("mixture3p", "bmmodel"))
+  expect_true(bmm:::.is_multinomial_param("thetat", mock_model))
+  expect_true(bmm:::.is_multinomial_param("thetant", mock_model))
+  expect_false(bmm:::.is_multinomial_param("kappa", mock_model))
+})
+
+test_that(".is_multinomial_param returns FALSE for non-mixture3p models", {
+  mock_model <- structure(list(), class = c("mixture2p", "bmmodel"))
+  expect_false(bmm:::.is_multinomial_param("thetat", mock_model))
+
+  mock_sdm <- structure(list(), class = c("sdm", "bmmodel"))
+  expect_false(bmm:::.is_multinomial_param("kappa", mock_sdm))
+})
+
+# ===========================================================================
+# .get_parameter_info()
+# ===========================================================================
+
+test_that(".get_parameter_info returns correct info for SDM params", {
+  skip_on_cran()
+  skip_if_not(interactive())
+  fit <- readRDS(system.file("extdata", "bmmfit_example1.rds", package = "bmm"))
+
+  info_c <- bmm:::.get_parameter_info(fit, "c")
+  expect_equal(info_c$type, "dpar")
+  expect_equal(info_c$link, "log")
+  expect_false(info_c$multinomial)
+
+  info_kappa <- bmm:::.get_parameter_info(fit, "kappa")
+  expect_equal(info_kappa$type, "dpar")
+  expect_equal(info_kappa$link, "log")
+  expect_false(info_kappa$multinomial)
+})

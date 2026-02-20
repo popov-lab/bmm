@@ -121,26 +121,6 @@ test_that(".ce_summarize_draws prob argument controls CI width", {
 
 
 # ===========================================================================
-# Tier 1: Unit tests — .is_multinomial_param()
-# ===========================================================================
-
-test_that(".is_multinomial_param detects mixture3p softmax params", {
-  mock_model <- structure(list(), class = c("mixture3p", "bmmodel"))
-  expect_true(bmm:::.is_multinomial_param("thetat", mock_model))
-  expect_true(bmm:::.is_multinomial_param("thetant", mock_model))
-  expect_false(bmm:::.is_multinomial_param("kappa", mock_model))
-})
-
-test_that(".is_multinomial_param returns FALSE for non-mixture3p models", {
-  mock_model <- structure(list(), class = c("mixture2p", "bmmodel"))
-  expect_false(bmm:::.is_multinomial_param("thetat", mock_model))
-
-  mock_sdm <- structure(list(), class = c("sdm", "bmmodel"))
-  expect_false(bmm:::.is_multinomial_param("kappa", mock_sdm))
-})
-
-
-# ===========================================================================
 # Tier 1: Unit tests — .apply_link_transform()
 # ===========================================================================
 
@@ -276,7 +256,7 @@ test_that(".filter_internal_effects keeps all user vars", {
 test_that("conditional_effects returns correct class for par = 'c'", {
   skip_on_cran()
   skip_if_not(interactive())
-  fit <- readRDS(test_path("assets/bmmfit_example1.rds"))
+  fit <- readRDS(system.file("extdata", "bmmfit_example1.rds", package = "bmm"))
 
   ce <- conditional_effects(fit, par = "c")
   expect_s3_class(ce, "brms_conditional_effects")
@@ -286,7 +266,7 @@ test_that("conditional_effects returns correct class for par = 'c'", {
 test_that("conditional_effects works for intercept-only par = 'kappa'", {
   skip_on_cran()
   skip_if_not(interactive())
-  fit <- readRDS(test_path("assets/bmmfit_example1.rds"))
+  fit <- readRDS(system.file("extdata", "bmmfit_example1.rds", package = "bmm"))
 
   ce <- conditional_effects(fit, par = "kappa")
   expect_s3_class(ce, "brms_conditional_effects")
@@ -295,7 +275,7 @@ test_that("conditional_effects works for intercept-only par = 'kappa'", {
 test_that("conditional_effects with par = NULL returns all estimated params", {
   skip_on_cran()
   skip_if_not(interactive())
-  fit <- readRDS(test_path("assets/bmmfit_example1.rds"))
+  fit <- readRDS(system.file("extdata", "bmmfit_example1.rds", package = "bmm"))
 
   ce <- conditional_effects(fit)
   expect_s3_class(ce, "brms_conditional_effects")
@@ -309,7 +289,7 @@ test_that("conditional_effects with par = NULL returns all estimated params", {
 test_that("conditional_effects errors for invalid par name", {
   skip_on_cran()
   skip_if_not(interactive())
-  fit <- readRDS(test_path("assets/bmmfit_example1.rds"))
+  fit <- readRDS(system.file("extdata", "bmmfit_example1.rds", package = "bmm"))
 
   expect_error(
     conditional_effects(fit, par = "nonexistent"),
@@ -320,7 +300,7 @@ test_that("conditional_effects errors for invalid par name", {
 test_that("conditional_effects errors for non-character par", {
   skip_on_cran()
   skip_if_not(interactive())
-  fit <- readRDS(test_path("assets/bmmfit_example1.rds"))
+  fit <- readRDS(system.file("extdata", "bmmfit_example1.rds", package = "bmm"))
 
   expect_error(
     conditional_effects(fit, par = 42),
@@ -331,7 +311,7 @@ test_that("conditional_effects errors for non-character par", {
 test_that("scale = 'native' gives positive values for log-linked par", {
   skip_on_cran()
   skip_if_not(interactive())
-  fit <- readRDS(test_path("assets/bmmfit_example1.rds"))
+  fit <- readRDS(system.file("extdata", "bmmfit_example1.rds", package = "bmm"))
 
   ce <- conditional_effects(fit, par = "c", scale = "native")
   # c has log link, so native scale = exp(sampling) → all positive
@@ -342,7 +322,7 @@ test_that("scale = 'native' gives positive values for log-linked par", {
 test_that("scale = 'sampling' can give negative values for log-linked par", {
   skip_on_cran()
   skip_if_not(interactive())
-  fit <- readRDS(test_path("assets/bmmfit_example1.rds"))
+  fit <- readRDS(system.file("extdata", "bmmfit_example1.rds", package = "bmm"))
 
   ce <- conditional_effects(fit, par = "c", scale = "sampling")
   # On log scale, values can be any real number
@@ -356,33 +336,17 @@ test_that("scale = 'sampling' can give negative values for log-linked par", {
 test_that("scale = 'parameter' is treated same as 'sampling'", {
   skip_on_cran()
   skip_if_not(interactive())
-  fit <- readRDS(test_path("assets/bmmfit_example1.rds"))
+  fit <- readRDS(system.file("extdata", "bmmfit_example1.rds", package = "bmm"))
 
   ce_param <- conditional_effects(fit, par = "c", scale = "parameter")
   ce_sampling <- conditional_effects(fit, par = "c", scale = "sampling")
   expect_equal(ce_param[[1]]$estimate__, ce_sampling[[1]]$estimate__)
 })
 
-test_that(".get_parameter_info returns correct info for SDM params", {
-  skip_on_cran()
-  skip_if_not(interactive())
-  fit <- readRDS(test_path("assets/bmmfit_example1.rds"))
-
-  info_c <- bmm:::.get_parameter_info(fit, "c")
-  expect_equal(info_c$type, "dpar")
-  expect_equal(info_c$link, "log")
-  expect_false(info_c$multinomial)
-
-  info_kappa <- bmm:::.get_parameter_info(fit, "kappa")
-  expect_equal(info_kappa$type, "dpar")
-  expect_equal(info_kappa$link, "log")
-  expect_false(info_kappa$multinomial)
-})
-
 test_that("effects argument limits output to specified effect", {
   skip_on_cran()
   skip_if_not(interactive())
-  fit <- readRDS(test_path("assets/bmmfit_example1.rds"))
+  fit <- readRDS(system.file("extdata", "bmmfit_example1.rds", package = "bmm"))
 
   ce <- conditional_effects(fit, par = "c", effects = "set_size")
   expect_length(ce, 1)
@@ -392,7 +356,7 @@ test_that("effects argument limits output to specified effect", {
 test_that("plotting conditional_effects works", {
   skip_on_cran()
   skip_if_not(interactive())
-  fit <- readRDS(test_path("assets/bmmfit_example1.rds"))
+  fit <- readRDS(system.file("extdata", "bmmfit_example1.rds", package = "bmm"))
 
   ce <- conditional_effects(fit, par = "c")
   p <- plot(ce, plot = FALSE)

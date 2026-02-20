@@ -117,3 +117,74 @@ link_transform <- function(values, link, inverse = FALSE) {
     )
   }
 }
+
+
+#' Get parameter classification info for a bmmfit parameter
+#'
+#' @description
+#' Determines whether a named model parameter is a distributional (`dpar`) or
+#' non-linear (`nlpar`) parameter in the underlying brms model, retrieves its
+#' link function, and checks for multinomial logit (softmax) transformation.
+#'
+#' @param bmmfit A bmmfit object
+#' @param par Character string. Parameter name (e.g., `"kappa"`, `"c"`)
+#'
+#' @return A list with elements:
+#'   \describe{
+#'     \item{`type`}{Character: `"dpar"` or `"nlpar"`}
+#'     \item{`model_name`}{Character: the parameter name as specified in the bmmodel}
+#'     \item{`brms_name`}{Character: the parameter name as used in brms}
+#'     \item{`link`}{Character: the link function (e.g., `"log"`, `"identity"`)}
+#'     \item{`multinomial`}{Logical: whether the parameter uses multinomial logit}
+#'   }
+#'
+#' @keywords internal
+#' @noRd
+.get_parameter_info <- function(bmmfit, par) {
+  model <- bmmfit$bmm$model
+  model_pars <- names(model$parameters)
+  bterms <- brms::brmsterms(bmmfit$formula)
+
+  if (!par %in% model_pars) {
+    stop2(
+      "Parameter '{par}' not found in model.\n",
+      "Available parameters: {paste(model_pars, collapse = ', ')}"
+    )
+  }
+
+  link <- model$links[[par]] %||% "identity"
+  multinomial <- .is_multinomial_param(par, model)
+
+  if (!is.null(bterms$dpars) && par %in% names(bterms$dpars)) {
+    type <- "dpar"
+  } else if (!is.null(bterms$nlpars) && par %in% names(bterms$nlpars)) {
+    type <- "nlpar"
+  } else {
+    type <- "nlpar"
+  }
+
+  list(
+    type = type,
+    model_name = par,
+    brms_name = par,
+    link = link,
+    multinomial = multinomial
+  )
+}
+
+
+#' Check if parameter uses multinomial logit transformation
+#'
+#' @param par Character string. Parameter name
+#' @param model A bmmodel object
+#' @return Logical. TRUE if parameter uses multinomial logit
+#'
+#' @keywords internal
+#' @noRd
+.is_multinomial_param <- function(par, model) {
+  model_class <- class(model)
+  if ("mixture3p" %in% model_class && par %in% c("thetat", "thetant")) {
+    return(TRUE)
+  }
+  FALSE
+}
