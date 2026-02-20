@@ -124,7 +124,7 @@ link_transform <- function(values, link, inverse = FALSE) {
 #' @description
 #' Determines whether a named model parameter is a distributional (`dpar`) or
 #' non-linear (`nlpar`) parameter in the underlying brms model, retrieves its
-#' link function, and checks for multinomial logit (softmax) transformation.
+#' link function, and checks for softmax transformation.
 #'
 #' @param bmmfit A bmmfit object
 #' @param par Character string. Parameter name (e.g., `"kappa"`, `"c"`)
@@ -135,7 +135,7 @@ link_transform <- function(values, link, inverse = FALSE) {
 #'     \item{`model_name`}{Character: the parameter name as specified in the bmmodel}
 #'     \item{`brms_name`}{Character: the parameter name as used in brms}
 #'     \item{`link`}{Character: the link function (e.g., `"log"`, `"identity"`)}
-#'     \item{`multinomial`}{Logical: whether the parameter uses multinomial logit}
+#'     \item{`softmax`}{Logical: whether the parameter uses softmax transformation}
 #'   }
 #'
 #' @keywords internal
@@ -153,7 +153,7 @@ link_transform <- function(values, link, inverse = FALSE) {
   }
 
   link <- model$links[[par]] %||% "identity"
-  multinomial <- .is_multinomial_param(par, model)
+  softmax <- .is_softmax_param(par, model)
 
   if (!is.null(bterms$dpars) && par %in% names(bterms$dpars)) {
     type <- "dpar"
@@ -168,20 +168,20 @@ link_transform <- function(values, link, inverse = FALSE) {
     model_name = par,
     brms_name = par,
     link = link,
-    multinomial = multinomial
+    softmax = softmax
   )
 }
 
 
-#' Check if parameter uses multinomial logit transformation
+#' Check if parameter uses softmax transformation
 #'
 #' @param par Character string. Parameter name
 #' @param model A bmmodel object
-#' @return Logical. TRUE if parameter uses multinomial logit
+#' @return Logical. TRUE if parameter uses softmax transformation
 #'
 #' @keywords internal
 #' @noRd
-.is_multinomial_param <- function(par, model) {
+.is_softmax_param <- function(par, model) {
   model_class <- class(model)
   if ("mixture3p" %in% model_class && par %in% c("thetat", "thetant")) {
     return(TRUE)
