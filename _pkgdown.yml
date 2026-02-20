@@ -75,7 +75,8 @@ articles:
     contents:
      - articles/bmm_bmmformula
      - articles/bmm_extract_info
- 
+     - articles/bmm_postestimation
+
   - title: Continuous reproduction tasks
     desc: Fitting models to continuous reproduction tasks
     contents:

@@ -1,0 +1,476 @@
+---
+title: "Interpreting Model Results"
+output: bookdown::html_document2
+author:
+  - Gidon Frischkorn
+  - Ven Popov
+bibliography: REFERENCES.bib
+header-includes:
+  - \usepackage{amsmath}
+vignette: >
+  %\VignetteIndexEntry{Interpreting Model Results}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+pkgdown:
+  as_is: true
+---
+<style type="text/css">
+div.main-container {
+max-width: 800px !important;
+}
+
+p {
+margin-top: 1.5em ;
+margin-bottom: 1.5em ;
+}
+.author{
+    display: none;
+}
+</style>
+
+```{r, include = FALSE}
+options(crayon.enabled = TRUE, width = 800)
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>",
+  dev = "jpeg",
+  dpi = 100
+)
+fansi::set_knit_hooks(knitr::knit_hooks, which = c("output","message","error"))
+```
+
+# Overview
+
+You have fitted a measurement model with `bmm()`. Now what? This article walks
+through the steps that usually follow: checking that the model actually fits the
+data, looking at what the parameter estimates tell you, and formally testing
+whether your experimental manipulation had an effect.
+
+We cover five topics:
+
+1. Posterior predictive checks with `pp_check()`.
+2. Visualizing predictor effects with `conditional_effects()`.
+3. Testing specific hypotheses with `brms::hypothesis()` and
+   `emmeans::emmeans()`.
+4. Comparing different predictor structures for the same model via LOO
+   cross-validation.
+5. Comparing different measurement models on the same data.
+
+Since `bmm` builds on `brms`, most post-estimation techniques you already know
+from `brms` work on `bmmfit` objects without modification.
+
+
+# Setup {#setup}
+
+We use the `oberauer_lin_2017` data set, which contains continuous reproduction
+responses from 19 participants at set sizes 1 through 8 [@Oberauer_Lin_2017].
+We fit three models to this data:
+
+- A **full SDM** [@Oberauer_2023] where memory strength `c` varies by set size.
+- A **restricted SDM** where `c` is a single intercept (no set-size effect).
+- A **two-component mixture model** [@Zhang_Luck_2008] for cross-model
+  comparison.
+
+```{r load-packages, message = FALSE}
+library(bmm)
+```
+
+## Fitting the models
+
+The full SDM lets `c` vary across set sizes, while `kappa` (precision) is
+estimated as a single intercept. We pass `sample_prior = TRUE` so that
+Savage-Dickey Bayes factors are available for `brms::hypothesis()` later, and
+`save_pars = brms::save_pars(all = TRUE)` so that bridge sampling works for
+`brms::bayes_factor()`.
+
+```{r fit-sdm-full}
+fit_sdm <- bmm(
+  formula = bmf(c ~ 0 + set_size, kappa ~ 1),
+  data = oberauer_lin_2017,
+  model = sdm(resp_error = "dev_rad"),
+  cores = 4,
+  backend = "cmdstanr",
+  sample_prior = TRUE,
+  save_pars = brms::save_pars(all = TRUE),
+  file = "assets/bmmfit_postestimation_sdm"
+)
+```
+
+The restricted SDM estimates `c` as a single intercept, ignoring set size:
+
+```{r fit-sdm-null}
+fit_sdm_null <- bmm(
+  formula = bmf(c ~ 1, kappa ~ 1),
+  data = oberauer_lin_2017,
+  model = sdm(resp_error = "dev_rad"),
+  cores = 4,
+  backend = "cmdstanr",
+  sample_prior = TRUE,
+  save_pars = brms::save_pars(all = TRUE),
+  file = "assets/bmmfit_postestimation_sdm_null"
+)
+```
+
+The mixture model decomposes responses into a von Mises target component and a
+uniform guessing component:
+
+```{r fit-mix2p}
+fit_mix2p <- bmm(
+  formula = bmf(thetat ~ 0 + set_size, kappa ~ 1),
+  data = oberauer_lin_2017,
+  model = mixture2p(resp_error = "dev_rad"),
+  cores = 4,
+  backend = "cmdstanr",
+  save_pars = brms::save_pars(all = TRUE),
+  file = "assets/bmmfit_postestimation_mix2p"
+)
+```
+
+
+# Posterior predictive checks {#pp-check}
+
+Before diving into parameter estimates, you should check that the model actually
+describes the data reasonably well. Posterior predictive checks do this by
+simulating data from the fitted model and comparing it to what was observed.
+
+## Basic density overlay
+
+The default `pp_check()` overlays the observed data density (dark line) on
+densities from posterior predictive draws (light lines). If the two look
+similar, the model is doing a reasonable job:
+
+```{r pp-check-sdm, fig.width = 7, fig.height = 4}
+pp_check(fit_sdm, ndraws = 100)
+```
+
+## Comparing models visually
+
+Running `pp_check()` on both the full and restricted SDM gives you a quick sense
+of whether dropping the set-size predictor matters. If the restricted model
+produces visibly worse predictions (e.g., a wider or less peaked density), that
+is already informative:
+
+```{r pp-check-null, fig.width = 7, fig.height = 4}
+pp_check(fit_sdm_null, ndraws = 100)
+```
+
+## Grouped checks
+
+You can also split the check by an experimental variable to see whether the
+model captures condition-level differences:
+
+```{r pp-check-grouped, fig.width = 7, fig.height = 4}
+pp_check(fit_sdm, ndraws = 100, group = "set_size",
+         type = "dens_overlay")
+```
+
+If certain conditions (say, the highest set sizes) are poorly captured, that
+points to misspecification for those conditions specifically.
+
+
+# Visualizing conditional effects {#conditional-effects}
+
+With the model checked, the next thing you probably want is a plot of how your
+predictors affect each parameter.
+
+## Why not just use `brms::conditional_effects()`?
+
+You can, but it is a bit awkward. Calling `brms::conditional_effects()` on a
+`bmmfit` requires you to figure out whether each parameter is a `dpar` or
+`nlpar` in brms terms, and the results come back on the sampling scale without
+back-transformation.
+
+The `bmm` method wraps this so you do not have to worry about those details:
+
+- Pass `par = "kappa"` or `par = "c"` and the method figures out the rest.
+- Results are shown on the native parameter scale by default (e.g., exponentiated
+  for log-linked parameters). Use `scale = "sampling"` if you want the raw
+  sampling scale.
+- For `mixture3p` models, the softmax transformation is applied jointly so that
+  `thetat` and `thetant` are displayed as probabilities that sum to 1.
+
+## Single parameter
+
+To plot the conditional effect of `set_size` on memory strength `c`:
+
+```{r ce-basic, fig.width = 7, fig.height = 4}
+ce_c <- conditional_effects(fit_sdm, par = "c")
+plot(ce_c)
+```
+
+Since `c` uses a log link, the native scale shows exponentiated values (always
+positive). If you want the log scale instead:
+
+```{r ce-sampling, fig.width = 7, fig.height = 4}
+ce_c_log <- conditional_effects(fit_sdm, par = "c", scale = "sampling")
+plot(ce_c_log)
+```
+
+## All parameters at once
+
+Omitting `par` computes effects for every estimated parameter. Fixed parameters
+(like `mu` in the SDM) are excluded automatically:
+
+```{r ce-all, fig.width = 7, fig.height = 4}
+ce_all <- conditional_effects(fit_sdm)
+plot(ce_all)
+```
+
+Effect names are prefixed with the parameter (`"c.set_size"`, `"kappa.1"`) so
+you can tell them apart.
+
+## Credible intervals and spaghetti lines
+
+Extra arguments are forwarded to `brms::conditional_effects()`. For instance, to
+narrow the credible interval and overlay individual posterior draws:
+
+```{r ce-advanced, fig.width = 7, fig.height = 4}
+ce_spag <- conditional_effects(fit_sdm, par = "c",
+                               prob = 0.80,
+                               spaghetti = TRUE,
+                               ndraws = 50)
+plot(ce_spag)
+```
+
+See `?brms::conditional_effects` for all available options.
+
+## Mixture models
+
+For `mixture2p`, `thetat` is the mixture weight for target responses. On the
+native scale the logit link is inverted, so you see probabilities directly:
+
+```{r ce-mix2p, fig.width = 7, fig.height = 4}
+ce_thetat <- conditional_effects(fit_mix2p, par = "thetat")
+plot(ce_thetat)
+```
+
+For `mixture3p`, both `thetat` and `thetant` go through a joint softmax, so the
+displayed probabilities sum to 1.
+
+
+# Testing hypotheses on model parameters {#hypothesis-testing}
+
+## `brms::hypothesis()` {#brms-hypothesis}
+
+`brms::hypothesis()` lets you test directed hypotheses about model parameters.
+You write hypotheses as character strings using the parameter names from the
+model summary.
+
+To see what those names are:
+
+```{r summary}
+summary(fit_sdm)
+```
+
+The fixed effects for `c` are called `c_set_size1` through `c_set_size8`.
+Because `c` uses a log link, these are on the log scale. To test whether memory
+strength at set size 1 exceeds that at set size 4:
+
+```{r hypothesis-directed}
+brms::hypothesis(fit_sdm, "c_set_size1 > c_set_size4")
+```
+
+The output includes the posterior probability for the hypothesis, an evidence
+ratio (Bayes factor), and a 95% credible interval for the difference. Because we
+passed `sample_prior = TRUE` when fitting, the evidence ratio is a Savage-Dickey
+density ratio [@Wagenmakers_2010].
+
+You can test several hypotheses at once. Here we check whether `c` decreases
+monotonically across selected set sizes:
+
+```{r hypothesis-multiple}
+hypotheses <- c(
+  "c_set_size1 > c_set_size2",
+  "c_set_size2 > c_set_size4",
+  "c_set_size4 > c_set_size8"
+)
+brms::hypothesis(fit_sdm, hypotheses)
+```
+
+### Native scale
+
+Keep in mind that `brms::hypothesis()` operates on the sampling scale. For `c`
+that means log scale. If you want to compare on the original scale, wrap the
+expressions in the inverse link:
+
+```{r hypothesis-native}
+brms::hypothesis(fit_sdm, "exp(c_set_size1) - exp(c_set_size4) > 0")
+```
+
+
+## `emmeans` for estimated marginal means {#emmeans}
+
+The `emmeans` package [@Lenth_2024] is a standard R tool for post-hoc
+comparisons. `bmm` provides S3 methods so that `emmeans()` works directly on
+`bmmfit` objects.
+
+The main advantage over `brms::hypothesis()` is that you refer to parameters by
+their model name (`"c"`, `"kappa"`) rather than having to know whether brms
+treats them as `dpar` or `nlpar` internally.
+
+### Marginal means for `c`
+
+```{r emmeans-c, message = FALSE}
+library(emmeans)
+
+em_c <- emmeans(fit_sdm, ~ set_size, dpar = "c")
+em_c
+```
+
+These are on the sampling scale (log scale for `c`).
+
+### Pairwise comparisons
+
+```{r emmeans-pairs}
+pairs(em_c)
+```
+
+Each row is the posterior difference between two set-size levels. Where the 95%
+CI excludes zero, there is evidence for a difference.
+
+### Back-transformation
+
+To get estimates on the natural scale, use `regrid()`:
+
+```{r emmeans-regrid}
+em_c_native <- regrid(em_c, transform = "log")
+em_c_native
+```
+
+Pairwise comparisons after `regrid()` are on the natural scale:
+
+```{r emmeans-pairs-native}
+pairs(em_c_native)
+```
+
+### Custom contrasts
+
+`emmeans` also supports custom contrasts. For instance, a polynomial contrast to
+test for a linear trend:
+
+```{r emmeans-contrasts}
+contrast(em_c, method = "poly")
+```
+
+
+# Comparing predictor structures {#model-comparison}
+
+Does adding the set-size predictor actually help? There are two ways to answer
+this: LOO cross-validation, which asks which model predicts better out of
+sample, and Bayes factors, which quantify relative evidence given the data and
+priors.
+
+## LOO-CV comparison
+
+`brms::loo()` computes the expected log pointwise predictive density (ELPD).
+`loo_compare()` ranks the models:
+
+```{r loo-compare}
+loo_sdm <- brms::loo(fit_sdm)
+loo_sdm_null <- brms::loo(fit_sdm_null)
+loo_compare(loo_sdm, loo_sdm_null)
+```
+
+The model with the higher ELPD (closer to zero) fits better out of sample. The
+`elpd_diff` column is the difference relative to the best model, with a standard
+error. A difference larger than about 4 standard errors is strong evidence.
+
+Also check the Pareto $k$ diagnostics: observations with $k > 0.7$ have
+unreliable LOO estimates and may need closer inspection.
+
+```{r loo-diagnostics, fig.width = 7, fig.height = 4}
+plot(loo_sdm, label_points = TRUE)
+```
+
+## Bayes factor comparison
+
+`brms::bayes_factor()` computes the Bayes factor between two models via bridge
+sampling. This requires that all Stan parameters are saved, which is why we
+passed `save_pars = brms::save_pars(all = TRUE)` when fitting:
+
+```{r bf-predictor}
+brms::bayes_factor(fit_sdm, fit_sdm_null)
+```
+
+The Bayes factor tells you how much the data favor one model over the other,
+given their respective priors. A $BF > 10$ is usually considered strong evidence
+for the numerator model; $BF < 1/10$ favors the denominator.
+
+Note that Bayes factors and LOO-CV answer slightly different questions. LOO-CV
+is about predictive performance: which model will generalize better to new data?
+Bayes factors weigh relative evidence for the two models given the priors. The
+two will usually agree, but they can diverge when priors are very diffuse or
+when the models differ mainly in how they handle extreme observations.
+
+
+# Comparing different measurement models {#cross-model}
+
+Sometimes the question is not which predictors to include but which measurement
+model to use. Here we compare the SDM against the two-component mixture model,
+both fit to the same data.
+
+## LOO-CV across models
+
+Both models are fit to the same response variable (`dev_rad`) and the same
+observations, so their ELPD estimates are directly comparable:
+
+```{r loo-cross-model}
+loo_mix2p <- brms::loo(fit_mix2p)
+loo_compare(loo_sdm, loo_mix2p)
+```
+
+## Bayes factor across models
+
+The same `brms::bayes_factor()` call works for comparing different measurement
+models:
+
+```{r bf-cross-model}
+brms::bayes_factor(fit_sdm, fit_mix2p)
+```
+
+Since both models were fit with `save_pars = brms::save_pars(all = TRUE)`,
+bridge sampling can estimate the marginal likelihood for each. The resulting
+Bayes factor tells you how much the data favor the SDM over the mixture model
+(or vice versa), given their respective priors.
+
+## Things to watch out for
+
+A few caveats when comparing across models:
+
+- Both models must use the same response variable. You cannot compare a
+  continuous-response model against a categorical one this way.
+- LOO-CV compares on the log-likelihood scale. Different families or link
+  functions are fine as long as the response is the same.
+- LOO-CV penalizes overfitting, so a more complex model is not automatically
+  favored.
+- Bayes factors depend on the priors. With very diffuse priors, the more complex
+  model is penalized more heavily (the Lindley paradox). Make sure the priors on
+  both models are reasonable before interpreting the Bayes factor.
+
+@Oberauer_2023 discusses model comparison for visual working memory models in
+more detail.
+
+
+# Summary {#summary}
+
+| Goal | Method | Function |
+|:-----|:-------|:---------|
+| Check model adequacy | Posterior predictive check | `pp_check()` |
+| Visualize predictor effects | Conditional effects | `conditional_effects()` |
+| Test a specific hypothesis | Savage-Dickey density ratio | `brms::hypothesis()` |
+| Compare conditions (all pairwise) | Estimated marginal means | `emmeans::emmeans()` + `pairs()` |
+| Compare predictor structures | LOO cross-validation | `brms::loo()` + `loo_compare()` |
+| Compare predictor structures | Bayes factor | `brms::bayes_factor()` |
+| Compare measurement models | LOO cross-validation | `brms::loo()` + `loo_compare()` |
+| Compare measurement models | Bayes factor | `brms::bayes_factor()` |
+
+In practice, these steps tend to go in order:
+
+1. Run `pp_check()` to make sure the model fits.
+2. Plot `conditional_effects()` to see what the estimates look like.
+3. Test hypotheses with `brms::hypothesis()` or `emmeans()`.
+4. If you are comparing models, use `brms::loo()`, `loo_compare()`, or
+   `brms::bayes_factor()`.
+
+
+# References
