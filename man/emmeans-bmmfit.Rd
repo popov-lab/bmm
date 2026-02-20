@@ -57,5 +57,5 @@ confint(em)
 
 }
 \seealso{
-\code{\link[emmeans:emmeans]{emmeans::emmeans()}}, \code{\link[=conditional_effects.bmmfit]{conditional_effects.bmmfit()}}
+\code{\link[emmeans:emmeans]{emmeans::emmeans()}}
 }

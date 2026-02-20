@@ -31,7 +31,7 @@
 #' @return See [emmeans::recover_data()] and [emmeans::emm_basis()] for return
 #'   values.
 #'
-#' @seealso [emmeans::emmeans()], [conditional_effects.bmmfit()]
+#' @seealso [emmeans::emmeans()]
 #'
 #' @examples
 #' \dontrun{
