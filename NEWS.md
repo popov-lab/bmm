@@ -1,7 +1,7 @@
 # bmm (development version)
 
 ### New features
-* New S3 method **conditional_effects()** for `bmmfit` objects. Provides an intuitive interface for visualizing predictor effects on model parameters, with automatic routing between distributional and non-linear parameters, inverse link transformations to show parameters on their natural scale (`scale = "native"`), softmax handling for mixture3p multinomial parameters, and filtering of internal model variables (#203).
+* New S3 method **conditional_effects()** for `bmmfit` objects. Provides an intuitive interface for visualizing predictor effects on model parameters, with automatic routing between distributional and non-linear parameters, inverse link transformations to show parameters on their natural scale (`scale = "native"`), softmax handling for mixture3p weight parameters, and filtering of internal model variables (#203).
 * **EZDM now supports negative drift rates** to model below-chance performance. The drift parameter uses an identity link (previously log) and employs a soft absolute value approximation (sqrt(drift² + τ²) with τ = 0.01) to maintain smooth gradients for MCMC sampling while allowing bidirectional drift estimation.
 
 # bmm 1.3.0
