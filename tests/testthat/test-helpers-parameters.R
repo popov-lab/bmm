@@ -178,22 +178,22 @@ test_that("NULL link is treated as identity", {
 
 
 # ===========================================================================
-# .is_multinomial_param()
+# .is_softmax_param()
 # ===========================================================================
 
-test_that(".is_multinomial_param detects mixture3p softmax params", {
+test_that(".is_softmax_param detects mixture3p softmax params", {
   mock_model <- structure(list(), class = c("mixture3p", "bmmodel"))
-  expect_true(bmm:::.is_multinomial_param("thetat", mock_model))
-  expect_true(bmm:::.is_multinomial_param("thetant", mock_model))
-  expect_false(bmm:::.is_multinomial_param("kappa", mock_model))
+  expect_true(bmm:::.is_softmax_param("thetat", mock_model))
+  expect_true(bmm:::.is_softmax_param("thetant", mock_model))
+  expect_false(bmm:::.is_softmax_param("kappa", mock_model))
 })
 
-test_that(".is_multinomial_param returns FALSE for non-mixture3p models", {
+test_that(".is_softmax_param returns FALSE for non-mixture3p models", {
   mock_model <- structure(list(), class = c("mixture2p", "bmmodel"))
-  expect_false(bmm:::.is_multinomial_param("thetat", mock_model))
+  expect_false(bmm:::.is_softmax_param("thetat", mock_model))
 
   mock_sdm <- structure(list(), class = c("sdm", "bmmodel"))
-  expect_false(bmm:::.is_multinomial_param("kappa", mock_sdm))
+  expect_false(bmm:::.is_softmax_param("kappa", mock_sdm))
 })
 
 # ===========================================================================
@@ -208,10 +208,10 @@ test_that(".get_parameter_info returns correct info for SDM params", {
   info_c <- bmm:::.get_parameter_info(fit, "c")
   expect_equal(info_c$type, "dpar")
   expect_equal(info_c$link, "log")
-  expect_false(info_c$multinomial)
+  expect_false(info_c$softmax)
 
   info_kappa <- bmm:::.get_parameter_info(fit, "kappa")
   expect_equal(info_kappa$type, "dpar")
   expect_equal(info_kappa$link, "log")
-  expect_false(info_kappa$multinomial)
+  expect_false(info_kappa$softmax)
 })

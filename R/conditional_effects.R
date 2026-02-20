@@ -144,15 +144,15 @@ conditional_effects.bmmfit <- function(x,
   # Get parameter information from model
   par_info <- .get_parameter_info(x, par)
 
-  # For mixture models with multinomial logit, compute softmax manually
-  if (par_info$multinomial && scale == "native") {
+  # For mixture models with softmax link, compute softmax manually
+  if (par_info$softmax && scale == "native") {
     softmax_result <- .compute_softmax_conditional_effects(x, par, ...)
     if (!is.null(softmax_result)) {
       softmax_result <- .filter_internal_effects(softmax_result, x)
       return(softmax_result)
     } else {
       warning2(
-        "Parameter '{par}' uses multinomial logit transformation.\n",
+        "Parameter '{par}' uses softmax transformation.\n",
         "Native scale display not available for this model configuration.\n",
         "Showing on sampling scale instead."
       )
