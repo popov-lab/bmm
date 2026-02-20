@@ -21,7 +21,9 @@ multinomial models; otherwise passed to \code{\link[brms:pp_check.brmsfit]{brms:
 \item{...}{For non-multinomial models: additional arguments forwarded to
 \code{\link[brms:pp_check.brmsfit]{brms::pp_check()}}. For multinomial models: \code{probs} (numeric vector of
 length 2, default \code{c(0.025, 0.975)}) to control the credible interval, and
-\code{group} (single character string) to facet by a predictor variable.}
+\code{group} (single character string) to facet by a predictor variable.
+Both model types accept \code{re_formula} (e.g., \code{re_formula = NA} to
+predict at the population level, excluding random effects).}
 }
 \value{
 For multinomial models, a \code{ggplot2} object. For other models, the
