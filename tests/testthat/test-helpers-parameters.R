@@ -114,9 +114,8 @@ test_that("tan_half round-trip on a safe interval (-pi, pi)", {
 
 test_that("cloglog round-trip for probabilities in (0,1)", {
   p <- seq(0.1,0.9,by = 0.1)
-  eta <- link_transform(p, "cloglog", inverse = FALSE)    # should be log(-log(1 - p))
-  back <- link_transform(eta, "cloglog", inverse = TRUE)  # should be 1 - exp(-exp(eta))
-  # This expectation is correct; it will fail with current implementation.
+  eta <- link_transform(p, "cloglog", inverse = FALSE)
+  back <- link_transform(eta, "cloglog", inverse = TRUE)
   expect_equal(back, p, tolerance = 1e-9)
 })
 
@@ -164,7 +163,6 @@ test_that("unknown link errors clearly", {
 })
 
 test_that("non-numeric values error", {
-  # If you rely on glue(), also ensure glue is installed; otherwise any error is fine.
   expect_error(link_transform(c("a","b"), "log"))
 })
 

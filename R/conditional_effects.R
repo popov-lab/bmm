@@ -113,12 +113,10 @@ conditional_effects.bmmfit <- function(x,
                                        par = NULL,
                                        scale = c("native", "parameter", "sampling"),
                                        ...) {
-  # Validate inputs
   stopif(!inherits(x, "bmmfit"), "x must be a bmmfit object")
 
   scale <- match.arg(scale)
 
-  # If par is NULL, compute conditional effects for all estimated parameters
   if (is.null(par)) {
     model <- x$bmm$model
     estimated_pars <- setdiff(names(model$parameters),
@@ -135,21 +133,17 @@ conditional_effects.bmmfit <- function(x,
     return(all_effects)
   }
 
-  # Validate that par is a single character string
   stopif(
     !is.character(par) || length(par) != 1,
     "Argument 'par' must be a single character string"
   )
 
-  # Get parameter information from model
   par_info <- .get_parameter_info(x, par)
 
-  # For mixture models with softmax link, compute softmax manually
   if (par_info$softmax && scale == "native") {
     softmax_result <- .compute_softmax_conditional_effects(x, par, ...)
     if (!is.null(softmax_result)) {
-      softmax_result <- .filter_internal_effects(softmax_result, x)
-      return(softmax_result)
+      return(.filter_internal_effects(softmax_result, x))
     } else {
       warning2(
         "Parameter '{par}' uses softmax transformation.\n",
@@ -160,9 +154,8 @@ conditional_effects.bmmfit <- function(x,
     }
   }
 
-  # For multinomial family models (m3), brms requires categorical = TRUE
-  # even when requesting a specific nlpar, which breaks the workflow.
-  # Bypass by computing conditional effects via posterior_linpred directly.
+  # m3 models require categorical = TRUE in brms, which breaks nlpar-level
+  # computation — bypass via posterior_linpred directly
   if ("m3" %in% class(x$bmm$model)) {
     ce_result <- .compute_multinomial_conditional_effects(x, par, ...)
   } else if (par_info$type == "dpar") {
@@ -173,9 +166,7 @@ conditional_effects.bmmfit <- function(x,
     stop2("Internal error: parameter type must be 'dpar' or 'nlpar'")
   }
 
-  # Apply transformations based on parameter type and requested scale
-  # - nlpars: brms returns on sampling scale, apply inverse link for native scale
-  # - dpars: brms returns on native scale, apply forward link for sampling scale
+  # nlpars: brms returns on sampling scale; dpars: on native scale
   if (par_info$link != "identity") {
     if (par_info$type == "nlpar" && scale == "native") {
       ce_result <- .apply_link_transform(ce_result, par_info$link, inverse = TRUE)
@@ -184,10 +175,7 @@ conditional_effects.bmmfit <- function(x,
     }
   }
 
-  # Filter out internal variables before returning
-  ce_result <- .filter_internal_effects(ce_result, x)
-
-  return(ce_result)
+  .filter_internal_effects(ce_result, x)
 }
 
 
@@ -226,14 +214,6 @@ conditional_effects.bmmfit <- function(x,
 #' @keywords internal
 #' @noRd
 .filter_internal_effects <- function(ce_result, bmmfit) {
-  # Get user-specified variables from the data
-  # Internal variables typically match patterns like:
-  # - LureIdx* (mixture models)
-  # - Idx_* (m3 models)
-  # - inv_ss (mixture models)
-  # - Item*_Col_rad, Item*_Pos_rad (internal feature variables)
-  # - nt_features and nt_distances from model (mixture3p, imm, sdm models)
-  
   internal_patterns <- c(
     "^LureIdx",
     "^Idx_",
@@ -242,47 +222,28 @@ conditional_effects.bmmfit <- function(x,
     "^expS$"
   )
   
-  # Extract nt_features and nt_distances from model if available
   model <- bmmfit$bmm$model
   if (!is.null(model$other_vars$nt_features)) {
-    # Escape special regex characters and add to patterns
     nt_features <- model$other_vars$nt_features
     internal_patterns <- c(internal_patterns, paste0("^", gsub("([.|()\\^{}+$*?[]\\\\])", "\\\\\\1", nt_features), "$"))
   }
   if (!is.null(model$other_vars$nt_distances)) {
-    # Escape special regex characters and add to patterns
     nt_distances <- model$other_vars$nt_distances
     internal_patterns <- c(internal_patterns, paste0("^", gsub("([.|()\\^{}+$*?[]\\\\])", "\\\\\\1", nt_distances), "$"))
   }
   
-  # Get the names of effects in the conditional_effects list
   effect_names <- names(ce_result)
-  
-  # Filter out effects that match internal patterns
-  keep_effects <- sapply(effect_names, function(name) {
-    # Extract the variable name from the effect name
-    # Effect names can be like "variable", "var1:var2", etc.
-    vars_in_effect <- strsplit(name, ":")[[1]]
-    
-    # Check if any variable matches internal patterns
-    any_internal <- any(sapply(vars_in_effect, function(var) {
-      any(sapply(internal_patterns, function(pattern) {
-        grepl(pattern, var)
-      }))
-    }))
-    
-    # Keep if not internal
-    !any_internal
-  })
-  
-  # Filter the list
+  combined_pattern <- paste(internal_patterns, collapse = "|")
+  keep_effects <- !vapply(effect_names, function(name) {
+    vars <- strsplit(name, ":")[[1]]
+    any(grepl(combined_pattern, vars))
+  }, logical(1))
+
   if (any(keep_effects)) {
     ce_result <- ce_result[keep_effects]
-    
-    # Restore class and attributes
     class(ce_result) <- c("brms_conditional_effects", "list")
   }
-  
+
   ce_result
 }
 
@@ -365,8 +326,6 @@ conditional_effects.bmmfit <- function(x,
   par_formula <- user_formula[[par]]
   if (is.null(par_formula)) return(list())
 
-  # Extract fixed-effect predictors only, excluding random-effects grouping
-  # variables and correlation IDs from all brms grouping patterns
   f <- stats::formula(par_formula)
   re_groups <- .extract_re_grouping_vars(f)
   rhs_vars <- all.vars(f[-2])
@@ -465,28 +424,22 @@ conditional_effects.bmmfit <- function(x,
 #' @keywords internal
 #' @noRd
 .compute_softmax_conditional_effects <- function(bmmfit, par, ...) {
-  # Currently only implemented for mixture3p
   if (!"mixture3p" %in% class(bmmfit$bmm$model)) {
     return(NULL)
   }
 
-  # Get conditional_effects for the requested par to obtain the grid
   ce_par <- .brms_conditional_effects(bmmfit, nlpar = par, ...)
 
-  # Extract options from ... for posterior computation
   dots <- list(...)
   prob <- dots$prob %||% 0.95
   robust <- dots$robust %||% FALSE
   re_formula <- dots$re_formula %||% NA
   ndraws <- dots$ndraws
 
-  # For each effect, compute softmax-transformed posterior draws
   result <- lapply(ce_par, function(df) {
-    # Extract newdata grid (remove brms-internal *__ columns)
     internal_cols <- grep("__$", names(df), value = TRUE)
     newdata <- df[, !names(df) %in% internal_cols, drop = FALSE]
 
-    # Get posterior draws for both theta params on sampling scale
     linpred_args <- list(
       object = bmmfit,
       newdata = newdata,
@@ -504,8 +457,7 @@ conditional_effects.bmmfit <- function(x,
       c(linpred_args, list(nlpar = "thetant"))
     )
 
-    # Apply softmax jointly per draw
-    # softmax denom = exp(thetat) + exp(thetant) + exp(0)
+    # softmax: exp(x_i) / (exp(thetat) + exp(thetant) + exp(0))
     denom <- exp(draws_t) + exp(draws_nt) + 1
     if (par == "thetat") {
       softmax_draws <- exp(draws_t) / denom
@@ -554,7 +506,6 @@ conditional_effects.bmmfit <- function(x,
   resolution <- dots$resolution %||% 100
   effects <- dots$effects
 
-  # Build prediction grids using shared helper
   grids <- .ce_prediction_grid(bmmfit, par,
                                effects = effects,
                                resolution = resolution)
@@ -567,7 +518,6 @@ conditional_effects.bmmfit <- function(x,
   for (var in names(grids)) {
     newdata <- grids[[var]]
 
-    # Get posterior draws for the nlpar
     linpred_args <- list(
       object = bmmfit,
       newdata = newdata,
@@ -579,7 +529,6 @@ conditional_effects.bmmfit <- function(x,
 
     draws <- do.call(brms::posterior_linpred, linpred_args)
 
-    # Summarize draws using shared helper
     summ <- .ce_summarize_draws(draws, prob = prob, robust = robust)
     newdata$estimate__ <- summ$estimate
     newdata$lower__ <- summ$lower
@@ -616,15 +565,9 @@ conditional_effects.bmmfit <- function(x,
 #' @keywords internal
 #' @noRd
 .apply_link_transform <- function(ce_object, link, inverse = TRUE) {
-  if (link == "identity") {
-    return(ce_object) # No transformation needed
-  }
+  if (link == "identity") return(ce_object)
 
-  # Apply transformation to each data frame in the list using vectorized lapply
-  # conditional_effects returns a list of data frames, one per effect
   result <- lapply(ce_object, function(df) {
-    # Transform estimate and confidence intervals using link_transform()
-    # brms stores these as estimate__, lower__, upper__
     df$estimate__ <- link_transform(df$estimate__, link, inverse = inverse)
     df$lower__ <- link_transform(df$lower__, link, inverse = inverse)
     df$upper__ <- link_transform(df$upper__, link, inverse = inverse)
