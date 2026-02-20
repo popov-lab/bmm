@@ -32,6 +32,7 @@ Imports:
     matrixStats,
     methods,
     parallel,
+    rlang,
     stats,
     withr
 Suggests: 
