@@ -24,7 +24,7 @@ effects are computed for all estimated (non-fixed) parameters.}
 \describe{
 \item{\code{"native"} (default)}{Show on natural scale using inverse link transformation.
 For example, \code{kappa} with log link shown on exp scale, \code{thetat} with
-identity link shown on probability scale (between 0 and 1).}
+logit (mixture2p) or softmax (mixture3p) link shown on the probability scale.}
 \item{\code{"parameter"} or \code{"sampling"}}{Show on the sampling scale (as used during MCMC).
 For example, \code{kappa} with log link shown on log scale.}
 }}

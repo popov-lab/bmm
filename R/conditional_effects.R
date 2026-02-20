@@ -19,7 +19,7 @@
 #'   \describe{
 #'     \item{`"native"` (default)}{Show on natural scale using inverse link transformation.
 #'       For example, `kappa` with log link shown on exp scale, `thetat` with
-#'       identity link shown on probability scale (between 0 and 1).}
+#'       logit (mixture2p) or softmax (mixture3p) link shown on the probability scale.}
 #'     \item{`"parameter"` or `"sampling"`}{Show on the sampling scale (as used during MCMC).
 #'       For example, `kappa` with log link shown on log scale.}
 #'   }
@@ -114,6 +114,7 @@ conditional_effects.bmmfit <- function(x,
                                        scale = c("native", "parameter", "sampling"),
                                        ...) {
   stopif(!inherits(x, "bmmfit"), "x must be a bmmfit object")
+  x <- restructure(x)
 
   scale <- match.arg(scale)
 
@@ -225,11 +226,13 @@ conditional_effects.bmmfit <- function(x,
   model <- bmmfit$bmm$model
   if (!is.null(model$other_vars$nt_features)) {
     nt_features <- model$other_vars$nt_features
-    internal_patterns <- c(internal_patterns, paste0("^", gsub("([.|()\\^{}+$*?[]\\\\])", "\\\\\\1", nt_features), "$"))
+    escaped <- gsub("([][(){}^$*+?.|\\\\])", "\\\\\\1", nt_features)
+    internal_patterns <- c(internal_patterns, paste0("^", escaped, "$"))
   }
   if (!is.null(model$other_vars$nt_distances)) {
     nt_distances <- model$other_vars$nt_distances
-    internal_patterns <- c(internal_patterns, paste0("^", gsub("([.|()\\^{}+$*?[]\\\\])", "\\\\\\1", nt_distances), "$"))
+    escaped <- gsub("([][(){}^$*+?.|\\\\])", "\\\\\\1", nt_distances)
+    internal_patterns <- c(internal_patterns, paste0("^", escaped, "$"))
   }
   
   effect_names <- names(ce_result)
@@ -457,18 +460,23 @@ conditional_effects.bmmfit <- function(x,
       c(linpred_args, list(nlpar = "thetant"))
     )
 
-    # softmax: exp(x_i) / (exp(thetat) + exp(thetant) + exp(0))
-    denom <- exp(draws_t) + exp(draws_nt) + 1
+    # numerically stable softmax: subtract max before exponentiating
+    shift <- pmax(draws_t, draws_nt, 0)
+    exp_t <- exp(draws_t - shift)
+    exp_nt <- exp(draws_nt - shift)
+    exp_0 <- exp(-shift)
+    denom <- exp_t + exp_nt + exp_0
     if (par == "thetat") {
-      softmax_draws <- exp(draws_t) / denom
+      softmax_draws <- exp_t / denom
     } else {
-      softmax_draws <- exp(draws_nt) / denom
+      softmax_draws <- exp_nt / denom
     }
 
     summ <- .ce_summarize_draws(softmax_draws, prob = prob, robust = robust)
     df$estimate__ <- summ$estimate
     df$lower__ <- summ$lower
     df$upper__ <- summ$upper
+    df$se__ <- summ$se
 
     df
   })

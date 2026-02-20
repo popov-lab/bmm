@@ -1,6 +1,6 @@
 # Tests for conditional_effects.bmmfit() and its internal helpers
 # Tier 1: Unit tests (always run, no fitted model)
-# Tier 2: Fixture-based integration tests (skip if not interactive)
+# Tier 2: Fixture-based integration tests (skip on CRAN)
 # Tier 3: Model-fitting integration tests (skip on CRAN)
 
 library(testthat)
