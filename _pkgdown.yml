@@ -42,6 +42,7 @@ reference:
     - "bmmformula"
     - "update.bmmfit"
     - "summary.bmmfit"
+    - "conditional_effects.bmmfit"
   - title: "Extract model information"
     desc: "Utility functions for extracting default priors, generate stan code, stan data, etc."
   - contents:
@@ -75,6 +76,7 @@ articles:
     contents:
      - articles/bmm_bmmformula
      - articles/bmm_extract_info
+     - articles/bmm_conditional_effects
  
   - title: Continuous reproduction tasks
     desc: Fitting models to continuous reproduction tasks

@@ -47,7 +47,7 @@ Two-parameter mixture model by Zhang and Luck (2008).
 }
 \item \strong{Default parameter links:}
 \itemize{
-\item mu1 = tan_half; kappa = log; thetat = identity
+\item mu1 = tan_half; kappa = log; thetat = logit
 }
 \item \strong{Default priors:}
 \itemize{
