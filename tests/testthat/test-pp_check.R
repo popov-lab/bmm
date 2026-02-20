@@ -1,7 +1,7 @@
 # Tests for pp_check.bmmfit() — multinomial model support
 
 load_m3_fit <- function() {
-  readRDS(test_path("../../vignettes/articles/assets/bmmfit_m3_vignette.rds"))
+  readRDS(test_path("assets/bmmfit_m3_ppcheck.rds"))
 }
 
 test_that("pp_check() returns ggplot for m3 model", {
