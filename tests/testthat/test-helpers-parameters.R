@@ -202,7 +202,6 @@ test_that(".is_softmax_param returns FALSE for non-mixture3p models", {
 
 test_that(".get_parameter_info returns correct info for SDM params", {
   skip_on_cran()
-  skip_if_not(interactive())
   fit <- readRDS(system.file("extdata", "bmmfit_example1.rds", package = "bmm"))
 
   info_c <- bmm:::.get_parameter_info(fit, "c")

@@ -255,7 +255,6 @@ test_that(".filter_internal_effects keeps all user vars", {
 
 test_that("conditional_effects returns correct class for par = 'c'", {
   skip_on_cran()
-  skip_if_not(interactive())
   fit <- readRDS(system.file("extdata", "bmmfit_example1.rds", package = "bmm"))
 
   ce <- conditional_effects(fit, par = "c")
@@ -265,7 +264,6 @@ test_that("conditional_effects returns correct class for par = 'c'", {
 
 test_that("conditional_effects works for intercept-only par = 'kappa'", {
   skip_on_cran()
-  skip_if_not(interactive())
   fit <- readRDS(system.file("extdata", "bmmfit_example1.rds", package = "bmm"))
 
   ce <- conditional_effects(fit, par = "kappa")
@@ -274,7 +272,6 @@ test_that("conditional_effects works for intercept-only par = 'kappa'", {
 
 test_that("conditional_effects with par = NULL returns all estimated params", {
   skip_on_cran()
-  skip_if_not(interactive())
   fit <- readRDS(system.file("extdata", "bmmfit_example1.rds", package = "bmm"))
 
   ce <- conditional_effects(fit)
@@ -288,7 +285,6 @@ test_that("conditional_effects with par = NULL returns all estimated params", {
 
 test_that("conditional_effects errors for invalid par name", {
   skip_on_cran()
-  skip_if_not(interactive())
   fit <- readRDS(system.file("extdata", "bmmfit_example1.rds", package = "bmm"))
 
   expect_error(
@@ -299,7 +295,6 @@ test_that("conditional_effects errors for invalid par name", {
 
 test_that("conditional_effects errors for non-character par", {
   skip_on_cran()
-  skip_if_not(interactive())
   fit <- readRDS(system.file("extdata", "bmmfit_example1.rds", package = "bmm"))
 
   expect_error(
@@ -310,7 +305,6 @@ test_that("conditional_effects errors for non-character par", {
 
 test_that("scale = 'native' gives positive values for log-linked par", {
   skip_on_cran()
-  skip_if_not(interactive())
   fit <- readRDS(system.file("extdata", "bmmfit_example1.rds", package = "bmm"))
 
   ce <- conditional_effects(fit, par = "c", scale = "native")
@@ -321,7 +315,6 @@ test_that("scale = 'native' gives positive values for log-linked par", {
 
 test_that("scale = 'sampling' can give negative values for log-linked par", {
   skip_on_cran()
-  skip_if_not(interactive())
   fit <- readRDS(system.file("extdata", "bmmfit_example1.rds", package = "bmm"))
 
   ce <- conditional_effects(fit, par = "c", scale = "sampling")
@@ -335,7 +328,6 @@ test_that("scale = 'sampling' can give negative values for log-linked par", {
 
 test_that("scale = 'parameter' is treated same as 'sampling'", {
   skip_on_cran()
-  skip_if_not(interactive())
   fit <- readRDS(system.file("extdata", "bmmfit_example1.rds", package = "bmm"))
 
   ce_param <- conditional_effects(fit, par = "c", scale = "parameter")
@@ -345,7 +337,6 @@ test_that("scale = 'parameter' is treated same as 'sampling'", {
 
 test_that("effects argument limits output to specified effect", {
   skip_on_cran()
-  skip_if_not(interactive())
   fit <- readRDS(system.file("extdata", "bmmfit_example1.rds", package = "bmm"))
 
   ce <- conditional_effects(fit, par = "c", effects = "set_size")
@@ -355,7 +346,6 @@ test_that("effects argument limits output to specified effect", {
 
 test_that("plotting conditional_effects works", {
   skip_on_cran()
-  skip_if_not(interactive())
   fit <- readRDS(system.file("extdata", "bmmfit_example1.rds", package = "bmm"))
 
   ce <- conditional_effects(fit, par = "c")

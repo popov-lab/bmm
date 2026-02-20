@@ -1,8 +1,8 @@
 save_pars <- brms::save_pars
 
 test_that("update.bmmfit works", {
-  skip_if_not(interactive())
-  fit1 <- restructure(readRDS(test_path("assets/bmmfit_example1.rds")))
+  skip_on_cran()
+  fit1 <- restructure(readRDS(system.file("extdata", "bmmfit_example1.rds", package = "bmm")))
   data <- fit1$data
 
   # formula is replaced
