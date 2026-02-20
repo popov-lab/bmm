@@ -372,7 +372,7 @@ You can assess model fit by visually inspecting posterior predictive plots using
 pp_check(m3_fit, ndraws = 100)
 ```
 
-The plot shows observed response proportions (black points and dashed line) against the posterior predictive mean (blue line) and 95% credible interval (blue ribbon) for each response category, faceted by experimental condition. If the model fits the data well, the observed proportions should fall within the credible band.
+The plot shows observed response proportions as bars and the posterior predictive median with 95% credible interval as point-ranges for each response category. If the model fits the data well, the observed bars should align with the predicted point-ranges.
 
 For this particular model, a good fit is unsurprising as it is saturated with respect to the number of parameters and the number of observations.
 
