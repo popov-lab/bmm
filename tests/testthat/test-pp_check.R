@@ -1,7 +1,11 @@
 # Tests for pp_check.bmmfit() — multinomial model support
 
 load_m3_fit <- function() {
-  readRDS(test_path("assets/bmmfit_m3_ppcheck.rds"))
+  readRDS(system.file("extdata", "bmmfit_m3_ppcheck.rds", package = "bmm"))
+}
+
+load_sdm_fit <- function() {
+  readRDS(system.file("extdata", "bmmfit_example1.rds", package = "bmm"))
 }
 
 test_that("pp_check() returns ggplot for m3 model", {
@@ -85,7 +89,7 @@ test_that("pp_check() uses response category names on x-axis", {
 
 test_that("pp_check() delegates to brms for non-multinomial bmmfit", {
   skip_if_not_installed("ggplot2")
-  fit <- readRDS(test_path("assets/bmmfit_example1.rds"))
+  fit <- load_sdm_fit()
   p <- pp_check(fit, ndraws = 5)
   expect_s3_class(p, "ggplot")
 })
@@ -101,7 +105,7 @@ test_that("pp_check() accepts re_formula for multinomial model", {
 
 test_that("pp_check() auto-selects grouped type when group is provided", {
   skip_if_not_installed("ggplot2")
-  fit <- readRDS(test_path("assets/bmmfit_example1.rds"))
+  fit <- load_sdm_fit()
   # bayesplot warns "group unrecognized" for custom families — upstream issue
   p <- suppressWarnings(pp_check(fit, group = "set_size", ndraws = 5))
   expect_s3_class(p, "ggplot")
@@ -109,7 +113,7 @@ test_that("pp_check() auto-selects grouped type when group is provided", {
 
 test_that("pp_check() auto-converts explicit type to grouped variant", {
   skip_if_not_installed("ggplot2")
-  fit <- readRDS(test_path("assets/bmmfit_example1.rds"))
+  fit <- load_sdm_fit()
   p <- pp_check(fit, type = "stat", group = "set_size", ndraws = 5)
   expect_s3_class(p, "ggplot")
 })
