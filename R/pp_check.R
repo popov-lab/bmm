@@ -23,24 +23,29 @@
 #'   proportion profile regardless of the value supplied.
 #' @param ndraws Integer. Number of posterior draws. Defaults to `100` for
 #'   multinomial models; otherwise passed to [brms::pp_check()].
-#' @param ... For non-multinomial models: additional arguments forwarded to
-#'   [brms::pp_check()]. For multinomial models: `probs` (numeric vector of
-#'   length 2, default `c(0.025, 0.975)`) to control the credible interval, and
-#'   `group` (single character string) to facet by a predictor variable.
-#'   Both model types accept `re_formula` (e.g., `re_formula = NA` to
-#'   predict at the population level, excluding random effects).
+#' @param group Character. Optional grouping variable for faceting. For
+#'   non-multinomial models, passed to [brms::pp_check()]; when specified, the
+#'   grouped variant of `type` (e.g., `"dens_overlay_grouped"`) is auto-selected
+#'   if available. For multinomial models, facets by the named predictor.
+#' @param ... Additional arguments forwarded to [brms::pp_check()] (non-multinomial)
+#'   or to [brms::posterior_predict()] (multinomial). For multinomial models,
+#'   `probs` (numeric vector of length 2, default `c(0.025, 0.975)`) controls the
+#'   credible interval. Both model types accept `re_formula` (e.g.,
+#'   `re_formula = NA` to predict at the population level, excluding random
+#'   effects).
 #' @return For multinomial models, a `ggplot2` object. For other models, the
 #'   result of [brms::pp_check()].
 #' @seealso [brms::pp_check()]
 #' @importFrom brms pp_check
 #' @importFrom rlang .data
 #' @export
-pp_check.bmmfit <- function(object, type = "dens_overlay", ndraws = NULL, ...) {
+pp_check.bmmfit <- function(object, type = "dens_overlay", ndraws = NULL,
+                            group = NULL, ...) {
   if (identical(family(object)$family, "multinomial")) {
-    return(.pp_check_multinomial(object, type = type, ndraws = ndraws, ...))
+    return(.pp_check_multinomial(object, type = type, ndraws = ndraws,
+                                 group = group, ...))
   }
-  dots <- list(...)
-  if (!is.null(dots$group)) {
+  if (!is.null(group)) {
     type <- .auto_grouped_type(type)
   }
   NextMethod()

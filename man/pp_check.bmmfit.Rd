@@ -4,7 +4,7 @@
 \alias{pp_check.bmmfit}
 \title{Posterior predictive check for bmmfit objects}
 \usage{
-\method{pp_check}{bmmfit}(object, type = "dens_overlay", ndraws = NULL, ...)
+\method{pp_check}{bmmfit}(object, type = "dens_overlay", ndraws = NULL, group = NULL, ...)
 }
 \arguments{
 \item{object}{A \code{bmmfit} object returned by \code{\link[=bmm]{bmm()}}.}
@@ -18,12 +18,17 @@ proportion profile regardless of the value supplied.}
 \item{ndraws}{Integer. Number of posterior draws. Defaults to \code{100} for
 multinomial models; otherwise passed to \code{\link[brms:pp_check.brmsfit]{brms::pp_check()}}.}
 
-\item{...}{For non-multinomial models: additional arguments forwarded to
-\code{\link[brms:pp_check.brmsfit]{brms::pp_check()}}. For multinomial models: \code{probs} (numeric vector of
-length 2, default \code{c(0.025, 0.975)}) to control the credible interval, and
-\code{group} (single character string) to facet by a predictor variable.
-Both model types accept \code{re_formula} (e.g., \code{re_formula = NA} to
-predict at the population level, excluding random effects).}
+\item{group}{Character. Optional grouping variable for faceting. For
+non-multinomial models, passed to \code{\link[brms:pp_check.brmsfit]{brms::pp_check()}}; when specified, the
+grouped variant of \code{type} (e.g., \code{"dens_overlay_grouped"}) is auto-selected
+if available. For multinomial models, facets by the named predictor.}
+
+\item{...}{Additional arguments forwarded to \code{\link[brms:pp_check.brmsfit]{brms::pp_check()}} (non-multinomial)
+or to \code{\link[brms:posterior_predict.brmsfit]{brms::posterior_predict()}} (multinomial). For multinomial models,
+\code{probs} (numeric vector of length 2, default \code{c(0.025, 0.975)}) controls the
+credible interval. Both model types accept \code{re_formula} (e.g.,
+\code{re_formula = NA} to predict at the population level, excluding random
+effects).}
 }
 \value{
 For multinomial models, a \code{ggplot2} object. For other models, the
