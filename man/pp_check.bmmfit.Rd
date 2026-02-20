@@ -4,13 +4,15 @@
 \alias{pp_check.bmmfit}
 \title{Posterior predictive check for bmmfit objects}
 \usage{
-\method{pp_check}{bmmfit}(object, type = NULL, ndraws = NULL, ...)
+\method{pp_check}{bmmfit}(object, type = "dens_overlay", ndraws = NULL, ...)
 }
 \arguments{
 \item{object}{A \code{bmmfit} object returned by \code{\link[=bmm]{bmm()}}.}
 
-\item{type}{Character. Type of pp_check. For non-multinomial models, passed
-to \code{\link[brms:pp_check.brmsfit]{brms::pp_check()}}. Multinomial models currently produce a response
+\item{type}{Character. Type of pp_check (default \code{"dens_overlay"}). For
+non-multinomial models, passed to \code{\link[brms:pp_check.brmsfit]{brms::pp_check()}}. When \code{group} is
+specified, the grouped variant (e.g., \code{"dens_overlay_grouped"}) is
+auto-selected if available. Multinomial models produce a response
 proportion profile regardless of the value supplied.}
 
 \item{ndraws}{Integer. Number of posterior draws. Defaults to \code{100} for
@@ -19,7 +21,7 @@ multinomial models; otherwise passed to \code{\link[brms:pp_check.brmsfit]{brms:
 \item{...}{For non-multinomial models: additional arguments forwarded to
 \code{\link[brms:pp_check.brmsfit]{brms::pp_check()}}. For multinomial models: \code{probs} (numeric vector of
 length 2, default \code{c(0.025, 0.975)}) to control the credible interval, and
-\code{group} (single character string) to add an extra faceting dimension.}
+\code{group} (single character string) to facet by a predictor variable.}
 }
 \value{
 For multinomial models, a \code{ggplot2} object. For other models, the
@@ -32,10 +34,10 @@ model), brms's \code{pp_check} is unavailable; this method dispatches to a
 model-specific visualisation instead.
 }
 \details{
-For \strong{multinomial models}, the plot shows the observed proportion of
-responses in each category (black points and dashed line) against the
-posterior predictive mean and credible band (blue), faceted by experimental
-conditions.
+For \strong{multinomial models}, the plot mirrors the bayesplot \code{ppc_bars} style:
+observed proportions are shown as bars and posterior predictive medians with
+credible intervals are shown as point-ranges, using the bayesplot default
+colour scheme and theme.
 }
 \seealso{
 \code{\link[brms:pp_check.brmsfit]{brms::pp_check()}}

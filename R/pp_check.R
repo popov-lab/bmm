@@ -10,32 +10,50 @@
 #' model), brms's `pp_check` is unavailable; this method dispatches to a
 #' model-specific visualisation instead.
 #'
-#' For **multinomial models**, the plot shows the observed proportion of
-#' responses in each category (black points and dashed line) against the
-#' posterior predictive mean and credible band (blue), faceted by experimental
-#' conditions.
+#' For **multinomial models**, the plot mirrors the bayesplot `ppc_bars` style:
+#' observed proportions are shown as bars and posterior predictive medians with
+#' credible intervals are shown as point-ranges, using the bayesplot default
+#' colour scheme and theme.
 #'
 #' @param object A `bmmfit` object returned by [bmm()].
-#' @param type Character. Type of pp_check. For non-multinomial models, passed
-#'   to [brms::pp_check()]. Multinomial models currently produce a response
+#' @param type Character. Type of pp_check (default `"dens_overlay"`). For
+#'   non-multinomial models, passed to [brms::pp_check()]. When `group` is
+#'   specified, the grouped variant (e.g., `"dens_overlay_grouped"`) is
+#'   auto-selected if available. Multinomial models produce a response
 #'   proportion profile regardless of the value supplied.
 #' @param ndraws Integer. Number of posterior draws. Defaults to `100` for
 #'   multinomial models; otherwise passed to [brms::pp_check()].
 #' @param ... For non-multinomial models: additional arguments forwarded to
 #'   [brms::pp_check()]. For multinomial models: `probs` (numeric vector of
 #'   length 2, default `c(0.025, 0.975)`) to control the credible interval, and
-#'   `group` (single character string) to add an extra faceting dimension.
+#'   `group` (single character string) to facet by a predictor variable.
 #' @return For multinomial models, a `ggplot2` object. For other models, the
 #'   result of [brms::pp_check()].
 #' @seealso [brms::pp_check()]
 #' @importFrom brms pp_check
 #' @importFrom rlang .data
 #' @export
-pp_check.bmmfit <- function(object, type = NULL, ndraws = NULL, ...) {
+pp_check.bmmfit <- function(object, type = "dens_overlay", ndraws = NULL, ...) {
   if (identical(family(object)$family, "multinomial")) {
     return(.pp_check_multinomial(object, type = type, ndraws = ndraws, ...))
   }
+  dots <- list(...)
+  if (!is.null(dots$group)) {
+    type <- .auto_grouped_type(type)
+  }
   NextMethod()
+}
+
+
+# Auto-append _grouped to type if a grouped variant exists in bayesplot
+.auto_grouped_type <- function(type) {
+  if (endsWith(type, "_grouped")) return(type)
+  grouped <- paste0(type, "_grouped")
+  ppc_fn <- paste0("ppc_", grouped)
+  if (exists(ppc_fn, where = asNamespace("bayesplot"), mode = "function")) {
+    return(grouped)
+  }
+  type
 }
 
 
@@ -51,7 +69,7 @@ pp_check.bmmfit <- function(object, type = NULL, ndraws = NULL, ...) {
     stop2("ggplot2 is required for pp_check of multinomial models.")
   }
 
-  if (!is.null(type)) {
+  if (!is.null(type) && type != "dens_overlay") {
     warning2("Argument 'type' is ignored for multinomial pp_check. ",
              "A response-proportion plot is always produced.")
   }
@@ -78,9 +96,7 @@ pp_check.bmmfit <- function(object, type = NULL, ndraws = NULL, ...) {
   cat_names <- colnames(y_mat) %||% resp_cols
   n_cats <- length(cat_names)
 
-  cond_cols <- .resolve_pp_conditions(object)
-  cond_cols <- .validate_group_arg(group, object$data, cond_cols)
-
+  cond_cols <- .validate_group_arg(group, object)
   intercept_only <- length(cond_cols) == 0L
   grouping <- .build_grouping(object$data, cond_cols)
 
@@ -92,21 +108,22 @@ pp_check.bmmfit <- function(object, type = NULL, ndraws = NULL, ...) {
 }
 
 
-# Validate and incorporate the group argument into condition columns
-.validate_group_arg <- function(group, data, cond_cols) {
-  if (is.null(group)) return(cond_cols)
+# By default aggregate over all predictors (no faceting).
+# When group is specified, facet by that predictor.
+.validate_group_arg <- function(group, fit) {
+  if (is.null(group)) return(character(0))
 
   if (!is.character(group) || length(group) != 1L) {
     stop2("'group' must be a single character string naming a column.")
   }
-  if (!group %in% names(data)) {
-    warning2("Ignoring 'group': column '{group}' not found in model data.")
-    return(cond_cols)
+
+  valid_cols <- .resolve_pp_conditions(fit)
+  if (!group %in% valid_cols) {
+    warning2("Ignoring 'group': column '{group}' is not a predictor ",
+             "variable in the model data.")
+    return(character(0))
   }
-  if (!group %in% cond_cols) {
-    cond_cols <- c(cond_cols, group)
-  }
-  cond_cols
+  group
 }
 
 
@@ -149,32 +166,31 @@ pp_check.bmmfit <- function(object, type = NULL, ndraws = NULL, ...) {
     total_cnt <- colSums(y_mat[idx, , drop = FALSE])
     obs_props <- total_cnt / sum(total_cnt)
 
-    grp_row <- if (intercept_only) {
-      data.frame(stringsAsFactors = FALSE)
-    } else {
-      unique_grps[rep(g, n_cats), , drop = FALSE]
-    }
-
-    obs_list[[g]] <- cbind(
-      grp_row,
-      data.frame(category = factor(cat_names, levels = cat_names),
-                 proportion = as.numeric(obs_props),
-                 stringsAsFactors = FALSE)
+    obs_row <- data.frame(
+      category = factor(cat_names, levels = cat_names),
+      proportion = as.numeric(obs_props),
+      stringsAsFactors = FALSE
     )
 
     yrep_pool <- apply(yrep[, idx, , drop = FALSE], c(1L, 3L), sum)
     yrep_props <- yrep_pool / rowSums(yrep_pool)
 
-    pred_list[[g]] <- cbind(
-      grp_row,
-      data.frame(
-        category   = factor(cat_names, levels = cat_names),
-        pred_mean  = colMeans(yrep_props),
-        pred_lower = apply(yrep_props, 2L, stats::quantile, probs = probs[1L]),
-        pred_upper = apply(yrep_props, 2L, stats::quantile, probs = probs[2L]),
-        stringsAsFactors = FALSE
-      )
+    pred_row <- data.frame(
+      category    = factor(cat_names, levels = cat_names),
+      pred_median = apply(yrep_props, 2L, stats::median),
+      pred_lower  = apply(yrep_props, 2L, stats::quantile, probs = probs[1L]),
+      pred_upper  = apply(yrep_props, 2L, stats::quantile, probs = probs[2L]),
+      stringsAsFactors = FALSE
     )
+
+    if (!intercept_only) {
+      grp_row <- unique_grps[rep(g, n_cats), , drop = FALSE]
+      obs_row <- cbind(grp_row, obs_row)
+      pred_row <- cbind(grp_row, pred_row)
+    }
+
+    obs_list[[g]] <- obs_row
+    pred_list[[g]] <- pred_row
   }
 
   obs_df <- do.call(rbind, obs_list)
@@ -186,25 +202,20 @@ pp_check.bmmfit <- function(object, type = NULL, ndraws = NULL, ...) {
 }
 
 
-# Construct the ggplot object
+# Construct the ggplot object (ppc_bars style from bayesplot)
 .build_pp_plot <- function(plot_df, cond_cols, intercept_only, yrep, probs) {
   p <- ggplot2::ggplot(plot_df, ggplot2::aes(x = .data[["category"]])) +
-    ggplot2::geom_ribbon(
-      ggplot2::aes(ymin = .data[["pred_lower"]], ymax = .data[["pred_upper"]],
-                   group = 1L),
-      alpha = 0.30, fill = "#4393c3"
-    ) +
-    ggplot2::geom_line(
-      ggplot2::aes(y = .data[["pred_mean"]], group = 1L),
-      colour = "#4393c3", linewidth = 0.8
-    ) +
-    ggplot2::geom_point(
+    ggplot2::geom_col(
       ggplot2::aes(y = .data[["proportion"]]),
-      colour = "black", size = 2
+      fill = "#d1e1ec", colour = "#b3cde0", width = 0.9
     ) +
-    ggplot2::geom_line(
-      ggplot2::aes(y = .data[["proportion"]], group = 1L),
-      colour = "black", linewidth = 0.5, linetype = "dashed"
+    ggplot2::geom_pointrange(
+      ggplot2::aes(
+        y    = .data[["pred_median"]],
+        ymin = .data[["pred_lower"]],
+        ymax = .data[["pred_upper"]]
+      ),
+      colour = "#03396c", size = 0.5, fatten = 2.5, linewidth = 1
     )
 
   if (!intercept_only) {
@@ -222,11 +233,11 @@ pp_check.bmmfit <- function(object, type = NULL, ndraws = NULL, ...) {
     ggplot2::labs(
       x = "Response category", y = "Proportion",
       subtitle = paste0(
-        "Posterior predictive check (", n_actual_draws, " draws; band: ",
-        pct_lo, "\u2013", pct_hi, "% CrI; points: observed)"
+        "Posterior predictive check (", n_actual_draws, " draws; ",
+        pct_lo, "\u2013", pct_hi, "% CrI)"
       )
     ) +
-    ggplot2::theme_minimal()
+    bayesplot::theme_default()
 }
 
 
