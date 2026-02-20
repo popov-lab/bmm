@@ -27,6 +27,8 @@
 #'   [brms::pp_check()]. For multinomial models: `probs` (numeric vector of
 #'   length 2, default `c(0.025, 0.975)`) to control the credible interval, and
 #'   `group` (single character string) to facet by a predictor variable.
+#'   Both model types accept `re_formula` (e.g., `re_formula = NA` to
+#'   predict at the population level, excluding random effects).
 #' @return For multinomial models, a `ggplot2` object. For other models, the
 #'   result of [brms::pp_check()].
 #' @seealso [brms::pp_check()]

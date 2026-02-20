@@ -90,6 +90,13 @@ test_that("pp_check() delegates to brms for non-multinomial bmmfit", {
   expect_s3_class(p, "ggplot")
 })
 
+test_that("pp_check() accepts re_formula for multinomial model", {
+  skip_if_not_installed("ggplot2")
+  fit <- load_m3_fit()
+  p <- pp_check(fit, ndraws = 5, re_formula = NA)
+  expect_s3_class(p, "ggplot")
+})
+
 # Auto-grouped type selection for non-multinomial models
 
 test_that("pp_check() auto-selects grouped type when group is provided", {
