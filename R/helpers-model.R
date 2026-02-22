@@ -179,6 +179,23 @@ update_model_fixed_parameters <- function(model, formula) {
   model
 }
 
+#' @export
+print.bmmodel <- function(x, ...) {
+  cat(construct_model_call(x), "\n")
+  par_names <- names(x$parameters)
+  cat("Parameters:", paste(par_names, collapse = ", "), "\n")
+  if (length(x$fixed_parameters) > 0) {
+    fixed_str <- paste(
+      names(x$fixed_parameters), "=", x$fixed_parameters,
+      collapse = ", "
+    )
+    cat("Fixed:     ", fixed_str, "\n")
+  }
+  cat("Use parameters() for more details.\n")
+  invisible(x)
+}
+
+
 ############################################################################# !
 # HELPER FUNCTIONS                                                       ####
 ############################################################################# !
