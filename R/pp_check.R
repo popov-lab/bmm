@@ -42,24 +42,29 @@
 pp_check.bmmfit <- function(object, type = "dens_overlay", ndraws = NULL,
                             group = NULL, ...) {
   if (identical(family(object)$family, "multinomial")) {
-    return(.pp_check_multinomial(object, type = type, ndraws = ndraws,
-                                 group = group, ...))
+    .pp_check_multinomial(object, type = type, ndraws = ndraws,
+                          group = group, ...)
+  } else {
+    if (!is.null(group)) {
+      type <- .auto_grouped_type(type)
+    }
+    NextMethod()
   }
-  if (!is.null(group)) {
-    type <- .auto_grouped_type(type)
-  }
-  NextMethod()
 }
 
 
 .auto_grouped_type <- function(type) {
-  if (endsWith(type, "_grouped")) return(type)
-  grouped <- paste0(type, "_grouped")
-  ppc_fn <- paste0("ppc_", grouped)
-  if (exists(ppc_fn, where = asNamespace("bayesplot"), mode = "function")) {
-    return(grouped)
+  if (endsWith(type, "_grouped")) {
+    type
+  } else {
+    grouped <- paste0(type, "_grouped")
+    ppc_fn <- paste0("ppc_", grouped)
+    if (exists(ppc_fn, where = asNamespace("bayesplot"), mode = "function")) {
+      grouped
+    } else {
+      type
+    }
   }
-  type
 }
 
 
@@ -114,34 +119,38 @@ pp_check.bmmfit <- function(object, type = "dens_overlay", ndraws = NULL,
 
 
 .validate_group_arg <- function(group, fit) {
-  if (is.null(group)) return(character(0))
-
-  if (!is.character(group) || length(group) != 1L) {
-    stop2("'group' must be a single character string naming a column.")
+  if (is.null(group)) {
+    character(0)
+  } else {
+    stopif(
+      !is.character(group) || length(group) != 1L,
+      "'group' must be a single character string naming a column."
+    )
+    valid_cols <- .resolve_pp_conditions(fit)
+    if (group %in% valid_cols) {
+      group
+    } else {
+      warning2("Ignoring 'group': column '{group}' is not a predictor ",
+               "variable in the model data.")
+      character(0)
+    }
   }
-
-  valid_cols <- .resolve_pp_conditions(fit)
-  if (!group %in% valid_cols) {
-    warning2("Ignoring 'group': column '{group}' is not a predictor ",
-             "variable in the model data.")
-    return(character(0))
-  }
-  group
 }
 
 
 .build_grouping <- function(data, cond_cols) {
   if (length(cond_cols) == 0L) {
-    return(list(
+    list(
       group_df = NULL,
       unique_grps = data.frame(.placeholder = 1L),
       cond_cols = character(0)
-    ))
+    )
+  } else {
+    group_df <- data[, cond_cols, drop = FALSE]
+    unique_grps <- unique(group_df)
+    rownames(unique_grps) <- NULL
+    list(group_df = group_df, unique_grps = unique_grps, cond_cols = cond_cols)
   }
-  group_df <- data[, cond_cols, drop = FALSE]
-  unique_grps <- unique(group_df)
-  rownames(unique_grps) <- NULL
-  list(group_df = group_df, unique_grps = unique_grps, cond_cols = cond_cols)
 }
 
 
@@ -253,7 +262,6 @@ pp_check.bmmfit <- function(object, type = "dens_overlay", ndraws = NULL,
   is_matrix <- vapply(pred_cols, function(col) is.matrix(data[[col]]), logical(1))
   pred_cols <- pred_cols[!is_matrix]
 
-  # Drop m3 infrastructure columns (Idx_*, n_*)
   pred_cols <- pred_cols[!grepl("^(Idx_|n_)", pred_cols)]
 
   pred_cols
