@@ -306,7 +306,6 @@ has_nonconsecutive_duplicates <- function(vec) {
 # EZDM SUMMARY STATISTICS                                                 ####
 ############################################################################# !
 
-# Validate contaminant_bound argument (shared by ezdm_summary_stats and flag_contaminant_rts)
 # @param contaminant_bound Vector of length 2 (numeric or "min"/"max")
 .validate_contaminant_bounds <- function(contaminant_bound) {
   stopif(length(contaminant_bound) != 2, "contaminant_bound must be a vector of length 2")
@@ -321,10 +320,8 @@ has_nonconsecutive_duplicates <- function(vec) {
     all(is.numeric(contaminant_bound)) && contaminant_bound[1] >= contaminant_bound[2],
     "contaminant_bound[1] must be less than contaminant_bound[2]"
   )
-  invisible(NULL)
 }
 
-# Validate init_contaminant and max_contaminant arguments (shared helper)
 # @param init_contaminant Numeric. Initial proportion of contaminants
 # @param max_contaminant Numeric. Maximum allowed contaminant proportion
 .validate_contaminant_params <- function(init_contaminant, max_contaminant) {
@@ -340,7 +337,6 @@ has_nonconsecutive_duplicates <- function(vec) {
     init_contaminant >= max_contaminant,
     "init_contaminant must be less than max_contaminant"
   )
-  invisible(NULL)
 }
 
 # Apply a function to each group defined by .by variables (shared helper)
@@ -1030,8 +1026,7 @@ flag_contaminant_rts <- function(
   )
 
   if (!fit$converged || is.null(fit$params)) {
-    msg <- paste0("EM did not converge for ", warn_label, ". Returning NA.")
-    warning(msg, call. = FALSE)
+    warning2("EM did not converge for {warn_label}. Returning NA.")
     contam_prob <- rep(NA_real_, length(rt_vec))
   } else {
     contam_prob <- .compute_contam_prob(rt_vec, fit, distribution, bounds)
@@ -1263,22 +1258,12 @@ validate_fast_guesses <- function(contam_flag, rt_data, response,
 # @param bf_01 Numeric. Bayes factor for H0 vs H1
 # @return Character. Evidence category on Jeffreys scale
 .categorize_bf <- function(bf_01) {
-  if (bf_01 > 10) {
-    return("strong_for_guessing")
-  }
-  if (bf_01 > 3) {
-    return("moderate_for_guessing")
-  }
-  if (bf_01 > 1) {
-    return("anecdotal_for_guessing")
-  }
-  if (bf_01 > 1 / 3) {
-    return("anecdotal_against_guessing")
-  }
-  if (bf_01 > 1 / 10) {
-    return("moderate_against_guessing")
-  }
-  "strong_against_guessing"
+  if (bf_01 > 10) "strong_for_guessing"
+  else if (bf_01 > 3) "moderate_for_guessing"
+  else if (bf_01 > 1) "anecdotal_for_guessing"
+  else if (bf_01 > 1 / 3) "anecdotal_against_guessing"
+  else if (bf_01 > 1 / 10) "moderate_against_guessing"
+  else "strong_against_guessing"
 }
 
 # Compute Highest Density Interval (HDI) for Beta distribution
@@ -1291,21 +1276,21 @@ validate_fast_guesses <- function(contam_flag, rt_data, response,
   # Fall back to equal-tailed interval for extreme (>1000) or U-shaped (both <1) cases
   if (alpha > 1000 || beta > 1000 || (alpha < 1 && beta < 1)) {
     tail_prob <- (1 - credible_mass) / 2
-    return(list(
+    list(
       lower = stats::qbeta(tail_prob, alpha, beta),
       upper = stats::qbeta(1 - tail_prob, alpha, beta)
-    ))
+    )
+  } else {
+    lower_percentiles <- seq(0, 1 - credible_mass, length.out = 1000)
+    upper_percentiles <- lower_percentiles + credible_mass
+
+    lowers <- stats::qbeta(lower_percentiles, alpha, beta)
+    uppers <- stats::qbeta(upper_percentiles, alpha, beta)
+    widths <- uppers - lowers
+
+    min_idx <- which.min(widths)
+    list(lower = lowers[min_idx], upper = uppers[min_idx])
   }
-
-  lower_percentiles <- seq(0, 1 - credible_mass, length.out = 1000)
-  upper_percentiles <- lower_percentiles + credible_mass
-
-  lowers <- stats::qbeta(lower_percentiles, alpha, beta)
-  uppers <- stats::qbeta(upper_percentiles, alpha, beta)
-  widths <- uppers - lowers
-
-  min_idx <- which.min(widths)
-  list(lower = lowers[min_idx], upper = uppers[min_idx])
 }
 
 # @param rt_vec Numeric vector of RTs
