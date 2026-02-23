@@ -119,50 +119,64 @@ conditional_effects.bmmfit <- function(x,
   scale <- match.arg(scale)
 
   if (is.null(par)) {
-    model <- x$bmm$model
-    estimated_pars <- setdiff(names(model$parameters),
-                              names(model$fixed_parameters))
-    all_effects <- list()
-    for (p in estimated_pars) {
-      ce <- conditional_effects(x, par = p, scale = scale, ...)
-      if (length(ce) > 0) {
-        names(ce) <- paste0(p, ".", names(ce))
-        all_effects <- c(all_effects, ce)
-      }
-    }
-    class(all_effects) <- c("brms_conditional_effects", "list")
-    return(all_effects)
+    .ce_all_parameters(x, scale, ...)
+  } else {
+    stopif(
+      !is.character(par) || length(par) != 1,
+      "Argument 'par' must be a single character string"
+    )
+    .ce_single_parameter(x, par, scale, ...)
   }
+}
 
-  stopif(
-    !is.character(par) || length(par) != 1,
-    "Argument 'par' must be a single character string"
-  )
 
+.ce_all_parameters <- function(x, scale, ...) {
+  model <- x$bmm$model
+  estimated_pars <- setdiff(names(model$parameters),
+                            names(model$fixed_parameters))
+  all_effects <- list()
+  for (p in estimated_pars) {
+    ce <- conditional_effects(x, par = p, scale = scale, ...)
+    if (length(ce) > 0) {
+      names(ce) <- paste0(p, ".", names(ce))
+      all_effects <- c(all_effects, ce)
+    }
+  }
+  class(all_effects) <- c("brms_conditional_effects", "list")
+  all_effects
+}
+
+
+.ce_single_parameter <- function(x, par, scale, ...) {
   par_info <- .get_parameter_info(x, par)
 
   if (par_info$softmax && scale == "native") {
     softmax_result <- .compute_softmax_conditional_effects(x, par, ...)
     if (!is.null(softmax_result)) {
-      return(.filter_internal_effects(softmax_result, x))
+      .filter_internal_effects(softmax_result, x)
     } else {
       warning2(
         "Parameter '{par}' uses softmax transformation.\n",
         "Native scale display not available for this model configuration.\n",
         "Showing on sampling scale instead."
       )
-      scale <- "sampling"
+      .ce_compute_and_transform(x, par, par_info, "sampling", ...)
     }
+  } else {
+    .ce_compute_and_transform(x, par, par_info, scale, ...)
   }
+}
 
+
+.ce_compute_and_transform <- function(x, par, par_info, scale, ...) {
   # m3 models require categorical = TRUE in brms, which breaks nlpar-level
   # computation — bypass via posterior_linpred directly
-  if ("m3" %in% class(x$bmm$model)) {
-    ce_result <- .compute_multinomial_conditional_effects(x, par, ...)
+  ce_result <- if ("m3" %in% class(x$bmm$model)) {
+    .compute_multinomial_conditional_effects(x, par, ...)
   } else if (par_info$type == "dpar") {
-    ce_result <- .brms_conditional_effects(x, dpar = par_info$brms_name, ...)
+    .brms_conditional_effects(x, dpar = par_info$brms_name, ...)
   } else if (par_info$type == "nlpar") {
-    ce_result <- .brms_conditional_effects(x, nlpar = par_info$brms_name, ...)
+    .brms_conditional_effects(x, nlpar = par_info$brms_name, ...)
   } else {
     stop2("Internal error: parameter type must be 'dpar' or 'nlpar'")
   }
@@ -282,23 +296,25 @@ conditional_effects.bmmfit <- function(x,
   bar_parts <- trimws(bar_parts)
   bar_parts <- bar_parts[nchar(bar_parts) > 0]
 
-  if (length(bar_parts) == 0) return(character(0))
-
-  unlist(lapply(bar_parts, function(part) {
-    # gr(id, ...) — first argument is the grouping variable
-    if (grepl("^gr\\s*\\(", part)) {
-      inner <- sub("^gr\\s*\\(\\s*", "", part)
-      return(trimws(sub("[,)]+.*", "", inner)))
-    }
-    # mm(g1, g2, ...) — positional args (before named args) are grouping vars
-    if (grepl("^mm\\s*\\(", part)) {
-      inner <- sub("^mm\\s*\\(\\s*", "", part)
-      args <- trimws(strsplit(inner, ",")[[1]])
-      return(args[!grepl("=", args)])
-    }
-    # Bare variable name(s) or correlation ID — split on : only
-    trimws(strsplit(part, ":")[[1]])
-  }))
+  if (length(bar_parts) == 0) {
+    character(0)
+  } else {
+    unlist(lapply(bar_parts, function(part) {
+      if (grepl("^gr\\s*\\(", part)) {
+        # gr(id, ...) — first argument is the grouping variable
+        inner <- sub("^gr\\s*\\(\\s*", "", part)
+        trimws(sub("[,)]+.*", "", inner))
+      } else if (grepl("^mm\\s*\\(", part)) {
+        # mm(g1, g2, ...) — positional args (before named args) are grouping vars
+        inner <- sub("^mm\\s*\\(\\s*", "", part)
+        args <- trimws(strsplit(inner, ",")[[1]])
+        args[!grepl("=", args)]
+      } else {
+        # Bare variable name(s) or correlation ID — split on : only
+        trimws(strsplit(part, ":")[[1]])
+      }
+    }))
+  }
 }
 
 
@@ -327,23 +343,35 @@ conditional_effects.bmmfit <- function(x,
 .ce_prediction_grid <- function(bmmfit, par, effects = NULL, resolution = 100) {
   user_formula <- bmmfit$bmm$user_formula
   par_formula <- user_formula[[par]]
-  if (is.null(par_formula)) return(list())
+  if (is.null(par_formula)) {
+    list()
+  } else {
+    .ce_build_grids(bmmfit, par_formula, effects, resolution)
+  }
+}
 
+
+.ce_build_grids <- function(bmmfit, par_formula, effects, resolution) {
   f <- stats::formula(par_formula)
   re_groups <- .extract_re_grouping_vars(f)
   rhs_vars <- all.vars(f[-2])
   rhs_vars <- setdiff(rhs_vars, c("0", "1", re_groups))
 
-  if (is.null(effects)) {
-    effect_vars <- rhs_vars
+  effect_vars <- if (is.null(effects)) {
+    rhs_vars
   } else {
-    effect_vars <- unlist(strsplit(as.character(effects), ":"))
-    effect_vars <- intersect(effect_vars, rhs_vars)
+    intersect(unlist(strsplit(as.character(effects), ":")), rhs_vars)
   }
 
-  if (length(effect_vars) == 0) return(list())
+  if (length(effect_vars) == 0) {
+    list()
+  } else {
+    .ce_build_grids_for_vars(bmmfit$data, effect_vars, resolution)
+  }
+}
 
-  orig_data <- bmmfit$data
+
+.ce_build_grids_for_vars <- function(orig_data, effect_vars, resolution) {
   grids <- list()
 
   for (var in effect_vars) {
@@ -428,9 +456,14 @@ conditional_effects.bmmfit <- function(x,
 #' @noRd
 .compute_softmax_conditional_effects <- function(bmmfit, par, ...) {
   if (!"mixture3p" %in% class(bmmfit$bmm$model)) {
-    return(NULL)
+    NULL
+  } else {
+    .compute_softmax_ce_inner(bmmfit, par, ...)
   }
+}
 
+
+.compute_softmax_ce_inner <- function(bmmfit, par, ...) {
   ce_par <- .brms_conditional_effects(bmmfit, nlpar = par, ...)
 
   dots <- list(...)
@@ -518,9 +551,16 @@ conditional_effects.bmmfit <- function(x,
                                effects = effects,
                                resolution = resolution)
   if (length(grids) == 0) {
-    return(structure(list(), class = c("brms_conditional_effects", "list")))
+    structure(list(), class = c("brms_conditional_effects", "list"))
+  } else {
+    .compute_multinomial_ce_grids(bmmfit, par, grids, prob, robust,
+                                  re_formula, ndraws)
   }
+}
 
+
+.compute_multinomial_ce_grids <- function(bmmfit, par, grids, prob, robust,
+                                           re_formula, ndraws) {
   result <- list()
 
   for (var in names(grids)) {
@@ -573,8 +613,15 @@ conditional_effects.bmmfit <- function(x,
 #' @keywords internal
 #' @noRd
 .apply_link_transform <- function(ce_object, link, inverse = TRUE) {
-  if (link == "identity") return(ce_object)
+  if (link == "identity") {
+    ce_object
+  } else {
+    .apply_link_transform_inner(ce_object, link, inverse)
+  }
+}
 
+
+.apply_link_transform_inner <- function(ce_object, link, inverse) {
   result <- lapply(ce_object, function(df) {
     df$estimate__ <- link_transform(df$estimate__, link, inverse = inverse)
     df$lower__ <- link_transform(df$lower__, link, inverse = inverse)

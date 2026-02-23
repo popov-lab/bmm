@@ -182,9 +182,5 @@ link_transform <- function(values, link, inverse = FALSE) {
 #' @keywords internal
 #' @noRd
 .is_softmax_param <- function(par, model) {
-  model_class <- class(model)
-  if ("mixture3p" %in% model_class && par %in% c("thetat", "thetant")) {
-    return(TRUE)
-  }
-  FALSE
+  "mixture3p" %in% class(model) && par %in% c("thetat", "thetant")
 }
