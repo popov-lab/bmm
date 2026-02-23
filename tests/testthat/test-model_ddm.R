@@ -105,7 +105,7 @@ test_that("ddm check_data validates response variable", {
   invalid_data <- data.frame(rt = c(0.5, 0.6), response = c(2, 3))
   expect_error(
     check_data(model, invalid_data, bmf(drift ~ 1, bound ~ 1, ndt ~ 1)),
-    "only contain values of zero and one"
+    "only contain values of 0 and 1"
   )
 })
 

@@ -1,7 +1,7 @@
 #############################################################################!
 # MODELS                                                                 ####
 #############################################################################!
-# see file 'R/model_mixture3p.R' for an example
+
 .ddm_defaults <- list(
   parameters = list(
     drift = "Drift rate = Average rate of evidence accumulation of the decision processes",
@@ -141,22 +141,15 @@ ddm <- function(rt, response, links = NULL, version = NULL, ...) {
 #############################################################################!
 # CHECK_DATA S3 methods                                                  ####
 #############################################################################!
-# A check_data.* function should be defined for each class of the model.
-# If a model shares methods with other models, the shared methods should be
-# defined in helpers-data.R. Put here only the methods that are specific to
-# the model. See ?check_data for details.
-# (YOU CAN DELETE THIS SECTION IF YOU DO NOT REQUIRE ADDITIONAL DATA CHECKS)
 
 #' @export
 check_data.ddm <- function(model, data, formula) {
-  # retrieve required response arguments
   rt_var <- model$resp_vars$rt
   response_var <- model$resp_vars$response
 
-  # stop due to missing information
   stopif(
     not_in(rt_var, colnames(data)),
-    "The response variable '{rt_var}' is not present in the data."
+    "The RT variable '{rt_var}' is not present in the data."
   )
 
   stopif(
@@ -164,124 +157,120 @@ check_data.ddm <- function(model, data, formula) {
     "The response variable '{response_var}' is not present in the data."
   )
 
-  if(any(is.na(data[, rt_var]))){
-    data <- data[!is.na(data[, rt_var]),]
-    warning(glue::glue("Some values in {rt_var} were NA. These were removed from the analysis."))
+  if (any(is.na(data[, rt_var]))) {
+    data <- data[!is.na(data[, rt_var]), ]
+    warning2("Some values in {rt_var} were NA. These were removed from the analysis.")
   }
 
-  if(any(is.na(data[, response_var]))){
-    data <- data[!is.na(data[, response_var]),]
-    warning(glue::glue("Some values in {response_var} were NA. These were removed from the analysis."))
+  if (any(is.na(data[, response_var]))) {
+    data <- data[!is.na(data[, response_var]), ]
+    warning2("Some values in {response_var} were NA. These were removed from the analysis.")
   }
 
-  # checks for rt_var
   if (typeof(data[, rt_var]) %in% c("double", "numerical")) {
     stopif(
       any(data[, rt_var] < 0, na.rm = TRUE),
-      glue("Some reaction times are lower than zero, please check your data.")
+      "Some reaction times are lower than zero, please check your data."
     )
 
-    warnif(any(data[,rt_var] > 10, na.rm = TRUE),
-           glue::glue("Your data contains reaction times larger then 10.\n",
-                      "Either you have passed reaction times in milli-seconds, then please recode them to seconds and rerun the model.\n",
-                      "Or you have very long RTs in your data in which case you might want to consider outlier deletion."))
+    warnif(
+      any(data[, rt_var] > 10, na.rm = TRUE),
+      "Your data contains reaction times larger than 10 seconds.\n
+      Either you have passed reaction times in milliseconds, then please \\
+      recode them to seconds and rerun the model.\n
+      Or you have very long RTs in your data in which case you might want \\
+      to consider outlier filtering."
+    )
 
-    warnif(any(data[,rt_var] < .100, na.rm = TRUE),
-           glue::glue("Your data contains reaction times smaller the 0.100 seconds.\n",
-                      "It is likely that the model will not be able to sample with the current settings of the inital values.\n",
-                      "Either pass your own initial value function or consider filtering reaction times below 0.100 seconds"))
+    warnif(
+      any(data[, rt_var] < 0.100, na.rm = TRUE),
+      "Your data contains reaction times smaller than 0.100 seconds.\n
+      It is likely that the model will not be able to sample with the \\
+      current settings of the initial values.\n
+      Either pass your own initial value function or consider filtering \\
+      reaction times below 0.100 seconds."
+    )
   } else {
-    stop(glue(
-      "The rt variable: ",
-      rt_var,
-      " needs to be of type double or numerical."
-    ))
+    stop2("The RT variable '{rt_var}' needs to be of type double or integer.")
   }
 
-  # checks for response_var
-  if (typeof(data[, response_var]) %in% c("integer", "double", "numerical")) {
-    stopif(any(!data[, response_var] %in% c(0, 1), na.rm = TRUE),
-           glue("The response variable {response_var} should only contain values of zero and one."))
-  } else if (typeof(data[, response_var]) == "logical") {
-    warning(glue::glue(
-      "The response variable you provided is boolean, it will be internally transformed ",
+  resp_type <- typeof(data[, response_var])
+
+  if (resp_type %in% c("integer", "double", "numerical")) {
+    stopif(
+      any(!data[, response_var] %in% c(0, 1), na.rm = TRUE),
+      "The response variable '{response_var}' should only contain values of 0 and 1."
+    )
+  } else if (resp_type == "logical") {
+    warning2(
+      "The response variable is boolean and will be internally transformed ",
       "to an integer variable with values 0 for FALSE and 1 for TRUE."
-    ))
+    )
     data[, response_var] <- ifelse(data[, response_var], 1, 0)
-  } else if (typeof(data[, response_var]) == "character") {
-    data[,response_var] <- tolower(data[,response_var])
-    stopif(any(!data[,response_var] %in% c("upper","lower")),
-           glue::glue("You have passed a character variable as response variable containing invalid responses.\n",
-                      "Please pass only upper or lower responses as response variables either coded numerically (0 = \"lower\" and 1 = \"upper\")\n",
-                      "or characters that match \"upper\" and \"lower\"."))
-    warning(glue::glue(
-      "The response variable you provided is a character variable, it will be internally transformed ",
-      "to an integer variable with values 0 for \"lower\" and 1 for \"upper\"."
-    ))
-    data[,response_var] <- ifelse(data[,response_var] == "upper",1,0)
-  }else {
-    stop(glue(
-      "The response variable: ",
-      response_var,
-      " needs to be of type integer, numerical, or logical."
-    ))
+  } else if (resp_type == "character") {
+    data[, response_var] <- tolower(data[, response_var])
+    stopif(
+      any(!data[, response_var] %in% c("upper", "lower")),
+      "The response variable '{response_var}' contains invalid character values.\n
+      Please pass only 'upper' or 'lower' as response values, or use \\
+      numeric coding (0 = lower, 1 = upper)."
+    )
+    warning2(
+      "The response variable is a character variable and will be internally ",
+      "transformed to an integer variable with 0 for 'lower' and 1 for 'upper'."
+    )
+    data[, response_var] <- ifelse(data[, response_var] == "upper", 1, 0)
+  } else {
+    stop2(
+      "The response variable '{response_var}' is of type '{resp_type}'.\n
+      Please provide responses as integer (0/1), logical, or character \\
+      ('upper'/'lower')."
+    )
   }
 
-  stopif(any(!data[,response_var] %in% c(0,1)),
-         glue::glue("Invalid values in the response variable passed to ddm.\n",
-                    "Please pass either numeric or character variables that only contain 0 and 1 or  \"upper\" and \"lower\"."))
+  stopif(
+    any(!data[, response_var] %in% c(0, 1)),
+    "Invalid values in the response variable '{response_var}'.\n
+    After processing, responses must be coded as 0 (lower) or 1 (upper)."
+  )
 
-  data
+  NextMethod("check_data")
 }
 
 #############################################################################!
 # Convert bmmformula to brmsformla methods                               ####
 #############################################################################!
-# A bmf2bf.* function should be defined if the default method for constructing
-# the brmsformula from the bmmformula does not apply (e.g if aterms are required).
-# The shared method for all `bmmodels` is defined in bmmformula.R.
-# See ?bmf2bf for details.
-# (YOU CAN DELETE THIS SECTION IF YOUR MODEL USES A STANDARD FORMULA WITH 1 RESPONSE VARIABLE)
 
 #' @export
 bmf2bf.ddm <- function(model, formula) {
-  # retrieve required response arguments
   rt <- model$resp_vars$rt
   response <- model$resp_vars$response
-
-  # set the base brmsformula based
-  brms_formula <- brms::bf(paste0(rt, " | dec(", response, ") ~ 1"))
-
-  # return the brms_formula to add the remaining bmmformulas to it.
-  brms_formula
+  brms::bf(paste0(rt, " | dec(", response, ") ~ 1"))
 }
 
 #############################################################################!
 # CONFIGURE_MODEL S3 METHODS                                             ####
 #############################################################################!
-# Each model should have a corresponding configure_model.* function. See
-# ?configure_model for more information.
 
 #' @export
 configure_model.ddm <- function(model, data, formula) {
-  # construct brms formula from the bmm formula
   formula <- bmf2bf(model, formula)
 
-  # construct the family & add to formula object
-  ddm_family <- function(link_drift = "identity", link_bound = "log", link_ndt = "log", link_zr = "logit") {
+  ddm_family <- function(link_drift, link_bound, link_ndt, link_zr) {
     brms::custom_family(
-      'ddm',
-      dpars = c("mu","drift","bound","ndt","zr"),
-      links = c("identity",link_drift, link_bound, link_ndt, link_zr),
-      lb = c(NA,NA,0.1, 0,0),
-      ub = c(NA,NA,NA ,NA,1),
-      type = 'real',
-      vars = 'dec[n]',
+      "ddm",
+      dpars = c("mu", "drift", "bound", "ndt", "zr"),
+      links = c("identity", link_drift, link_bound, link_ndt, link_zr),
+      lb = c(NA, NA, 0.1, 0, 0),
+      ub = c(NA, NA, NA, NA, 1),
+      type = "real",
+      vars = "dec[n]",
       loop = TRUE,
       log_lik = log_lik_ddm,
       posterior_predict = posterior_predict_ddm
     )
   }
+
   formula$family <- ddm_family(
     link_drift = model$links$drift,
     link_bound = model$links$bound,
@@ -289,13 +278,10 @@ configure_model.ddm <- function(model, data, formula) {
     link_zr = model$links$zr
   )
 
-  # prepare initial stanvars to pass to brms, model formula and priors
-  sc_path <- system.file('stan_chunks', package='bmm')
-  stan_functions <- read_lines2(paste0(sc_path, '/ddm_functions.stan'))
+  sc_path <- system.file("stan_chunks", package = "bmm")
+  stan_functions <- read_lines2(paste0(sc_path, "/ddm_functions.stan"))
+  stanvars <- brms::stanvar(scode = stan_functions, block = "functions")
 
-  stanvars <- brms::stanvar(scode = stan_functions, block = 'functions')
-
-  # return the list
   nlist(formula, data, stanvars)
 }
 
@@ -312,8 +298,6 @@ log_lik_ddm <- function(i, prep) {
 }
 
 posterior_predict_ddm <- function(i, prep, ...) {
-  dots <- list(...)
-
   out <- rddm(
     n = length(brms::get_dpar(prep, "drift", i = i)),
     drift = brms::get_dpar(prep, "drift", i = i),
@@ -322,12 +306,10 @@ posterior_predict_ddm <- function(i, prep, ...) {
     zr = brms::get_dpar(prep, "zr", i = i)
   )
 
-  if(!is.null(dots$negative_rt) && dots$negative_rt) {
-    # code lower bound responses as negative RTs
-    out <- out[["rt"]] * ifelse(out[["response"]] == 1, 1, -1)
+  dots <- list(...)
+  if (!is.null(dots$negative_rt) && dots$negative_rt) {
+    out[["rt"]] * ifelse(out[["response"]] == 1, 1, -1)
   } else {
-    out <- out[["rt"]]
+    out[["rt"]]
   }
-
-  out
 }

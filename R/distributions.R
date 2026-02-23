@@ -744,37 +744,40 @@ rm3 <- function(n, size, pars, m3_model, act_funs = NULL, unpack = FALSE,
 #'
 #' @export
 dddm <- function(rt, response, drift, bound, ndt, zr = 0.5, log = TRUE) {
+  stopif(
+    any(rt < 0),
+    "Negative RTs are not allowed. Please check your rt variable."
+  )
 
-  stopif(any(rt < 0),
-         glue("Negative RTs are not allowed.\n",
-              "Please check your rt variable and pass only positive RTs."))
-
-  if(!is.character(response)){
-    # Validate numeric responses are 0 or 1 before converting
-    stopif(any(!response %in% c(0, 1)),
-           glue("Invalid numeric responses! Numeric responses must be 0 (lower) or 1 (upper)."))
-    response <- ifelse(response == 1, "upper","lower")
+  if (!is.character(response)) {
+    stopif(
+      any(!response %in% c(0, 1)),
+      "Invalid numeric responses. Numeric responses must be 0 (lower) or 1 (upper)."
+    )
+    response <- ifelse(response == 1, "upper", "lower")
   }
 
-  stopif(any(!response %in% c("upper","lower")),
-         glue("Invalid responses passed! Either pass a numeric vector with 0 as a lower bound response,",
-              "and 1 as upper bound response, or a character vector with \"upper\" and \"lower\" for the respecitve,",
-              "responses given."))
+  stopif(
+    any(!response %in% c("upper", "lower")),
+    "Invalid responses. Pass a numeric vector with 0/1, or a character \\
+    vector with 'upper' and 'lower'."
+  )
 
-  stopif(length(rt) != length(response),
-         glue("Different number of rts and responses passed to dddm. Please pass vectors of equal length."))
+  stopif(
+    length(rt) != length(response),
+    "Different number of RTs and responses passed to dddm. \\
+    Please pass vectors of equal length."
+  )
 
-  # Recycle rt/response to match parameter length if needed
-  # This is needed for log_lik functions where we have one observation
-  # but multiple parameter samples from the posterior
+  # recycle rt/response to match parameter length for log_lik (one observation,
+  # multiple posterior draws)
   max_len <- max(lengths(list(drift, bound, ndt, zr)))
-  
+
   if (length(rt) == 1 && max_len > 1) {
     rt <- rep(rt, max_len)
     response <- rep(response, max_len)
   }
-  
-  # Call ddiffusion with recycled vectors
+
   out <- rtdists::ddiffusion(
     rt = rt,
     response = response,
@@ -784,8 +787,7 @@ dddm <- function(rt, response, drift, bound, ndt, zr = 0.5, log = TRUE) {
     z = zr * bound
   )
 
-  if(log) out <- log(out)
-  out
+  if (log) log(out) else out
 }
 
 #' @name ddm_dist

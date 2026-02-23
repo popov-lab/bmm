@@ -308,14 +308,14 @@ test_that("dddm rejects invalid response codes", {
   )
   expect_error(
     dddm(0.5, "invalid", drift = 2, bound = 1.5, ndt = 0.3),
-    "Invalid responses passed"
+    "Invalid responses"
   )
 })
 
 test_that("dddm rejects mismatched rt and response lengths", {
   expect_error(
     dddm(c(0.5, 0.6), 1, drift = 2, bound = 1.5, ndt = 0.3),
-    "Different number of rts and responses"
+    "Different number of RTs and responses"
   )
 })
 
