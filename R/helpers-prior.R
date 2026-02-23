@@ -243,11 +243,10 @@ construct_default_priors_list <- function(par, bterms, default_priors, data) {
 
   priors <- list()
 
-  # priors on intercept; unfortunately too convoluted to use the create_prior function
+  # brms Intercept class requires special handling outside .build_prior
   if (has_intercept(terms)) {
     intercept_prior <- .build_prior(prior_desc$main, "Intercept", par = par, bterms = bterms)
     priors <- c(priors, list(intercept_prior))
-    # Set class-level effects prior for non-intercept terms
     if (has_effects_prior && (fixed_effects_count > 0 || interactions_count > 0)) {
       fixed_effects_prior <- .build_prior(prior_desc$effects, "b", par = par, bterms = bterms)
       priors <- c(priors, list(fixed_effects_prior))
@@ -255,35 +254,30 @@ construct_default_priors_list <- function(par, bterms, default_priors, data) {
     return(priors)
   }
 
-  # priors when intercept is supressed and all levels are explicit
+  # suppressed intercept with single predictor or interaction-only: one class prior suffices
   if ((fixed_effects_count == 1 && interactions_count == 0) || interaction_only) {
     levels_only_prior <- .build_prior(prior_desc[[1]], "b", par = par, bterms = bterms)
     priors <- c(priors, list(levels_only_prior))
     return(priors)
   }
 
-  # Multiple predictors and/or interactions with no intercept
-  # Set class-level effects prior for non-first predictor terms
   if (has_effects_prior) {
     fixed_effects_prior <- .build_prior(prior_desc$effects, "b", par = par, bterms = bterms)
     priors <- c(priors, list(fixed_effects_prior))
   }
 
-  # edge case: with multiple predictors and no intercept, set the main prior on
-  # the levels of the first predictor
+  # without intercept, brms expands all factor levels as coefficients, so the
+  # first predictor needs explicit main priors on each level
   all_predictors <- rhs_vars(terms)
   for (i in seq_along(all_predictors)) {
     predictor <- all_predictors[i]
 
-    # Only handle factor predictors with levels
     if (!is.factor(data[[predictor]])) {
       predictor_coefs <- predictor
     } else {
       predictor_coefs <- paste0(predictor, levels(data[[predictor]]))
     }
 
-
-    # First predictor gets main prior, others get effects prior
     prior_to_use <- if (i == 1) prior_desc$main else prior_desc$effects
 
     for (coef in predictor_coefs) {
