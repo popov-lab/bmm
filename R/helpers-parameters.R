@@ -168,7 +168,7 @@ parameters.bmmodel <- function(x, formula = NULL, ...) {
 
   pars <- names(model$parameters)
   if (length(pars) == 0) {
-    message("This model has no parameters defined.")
+    message2("This model has no parameters defined.")
     return(invisible(data.frame()))
   }
 

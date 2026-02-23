@@ -93,11 +93,10 @@ test_that("parameters() for m3 custom with formula discovers params", {
   expect_null(attr(p, "m3_note"))
 })
 
-test_that("parameters() returns usable data.frame", {
+test_that("parameters() identifies free parameters for sdm", {
   m <- sdm(resp_error = "y")
   p <- parameters(m)
 
-  # Can subset like a normal data frame
   free_pars <- p[!p$fixed, ]
   expect_equal(nrow(free_pars), 2)
   expect_true(all(c("c", "kappa") %in% free_pars$parameter))
