@@ -65,9 +65,6 @@ emm_basis.bmmfit <- function(object, trms, xlev, grid, ...,
 }
 
 
-# Internal: if the user passes dpar = "X" but X is an nlpar in this model,
-# silently route to nlpar. Uses .get_parameter_info() which calls
-# brms::brmsterms() for reliable classification.
 .bmmfit_resolve_par <- function(object, dpar, nlpar) {
   if (!is.null(dpar) && is.null(nlpar) && !is.null(object$bmm$model)) {
     par_info <- .get_parameter_info(object, dpar)
