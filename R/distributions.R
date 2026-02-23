@@ -803,10 +803,7 @@ dcswald <- function(rt, response, drift, bound, ndt, zr = 0.5, s = 1,
 
   log_ll[response == 1] <- ll1[response == 1]
 
-  if (!log) {
-    return(exp(log_ll))
-  }
-  log_ll
+  if (log) log_ll else exp(log_ll)
 }
 
 #' @rdname cswald_dist
@@ -814,11 +811,8 @@ dcswald <- function(rt, response, drift, bound, ndt, zr = 0.5, s = 1,
 rcswald <- function(n, drift, bound, ndt, zr = 0.5, s = 1) {
   validate_cswald_parameters(drift, bound, ndt, zr, s)
 
-  # convert relative starting point to absolute starting point
   z_abs <- zr * bound
 
-  # generate random samples from the Wiener diffusion model using rtdists
-  # parameter mapping: drift -> v, bound -> a, ndt -> t0, z_abs -> z, s -> s
   out <- rtdists::rdiffusion(
     n = n,
     a = bound,
@@ -828,7 +822,6 @@ rcswald <- function(n, drift, bound, ndt, zr = 0.5, s = 1) {
     s = s
   )
 
-  # convert response coding from "upper"/"lower" to 1/0
   data.frame(
     rt = out$rt,
     response = ifelse(out$response == "upper", 1, 0)
@@ -1023,11 +1016,9 @@ validate_cswald_parameters <- function(drift, bound, ndt, zr, s) {
 
 
 .dwald <- function(rt, drift, bound, s, log = TRUE) {
-  term1 <- bound / (s * sqrt(2 * pi * rt^3))
-  term2 <- exp(-(bound - drift * rt)^2 / (2 * s^2 * rt))
-  if (log) {
-    return(log(term1) + log(term2))
-  }
+  log_d <- log(bound) - 0.5 * log(2 * pi * rt^3) - log(s) -
+    (bound - drift * rt)^2 / (2 * s^2 * rt)
+  if (log) log_d else exp(log_d)
 }
 
 .pwald <- function(rt, drift, bound, s, lower.tail = TRUE, log.p = TRUE) {
@@ -1035,37 +1026,30 @@ validate_cswald_parameters <- function(drift, bound, ndt, zr, s) {
   z2 <- -(drift * rt + bound) / (s * sqrt(rt))
   logE <- (2 * drift * bound) / (s^2)
 
-  # log-CDF via log-sum-exp
   a1 <- pnorm(z1, log.p = TRUE)
   a2 <- logE + pnorm(z2, log.p = TRUE)
   matrix_a <- cbind(a1, a2)
   log_p <- apply(matrix_a, 1, matrixStats::logSumExp)
 
   if (!lower.tail) log_p <- log(1 - exp(log_p))
-
-  if (!log.p) {
-    return(exp(log_p))
-  }
-  log_p
+  if (log.p) log_p else exp(log_p)
 }
 
 .rwald <- function(n, drift, bound, s = 1) {
-  # recycle to length n
   v <- rep(drift, length.out = n)
   a <- rep(bound, length.out = n)
   s <- rep(s, length.out = n)
 
-  stopifnot(all(a > 0), all(s > 0))
+  stopif(!all(a > 0), "All boundary values must be positive.")
+  stopif(!all(s > 0), "All diffusion constant values must be positive.")
 
-  # choose effective drift component per trial
   eps <- 1e-12
   v_eff <- pmax(v, eps)
 
-  # Transform DDM parms to mu / lambda parametrization
+  # Michael-Schucany-Haas (1976) inverse-Gaussian parametrization
   mu <- a / v_eff
   lambda <- (a / s)^2
 
-  # Michael–Schucany–Haas (1976) IG sampler
   z <- rnorm(n)
   y <- z * z
   x <- mu + (mu^2 * y) / (2 * lambda) - (mu / (2 * lambda)) * sqrt(4 * mu * lambda * y + (mu^2) * (y^2))

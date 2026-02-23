@@ -43,7 +43,6 @@
       s = "diffusion constant"
     ),
     links = list(
-      mu = c(-0.5, 0.5),
       drift = "identity",
       bound = "log",
       ndt = "log",
@@ -63,6 +62,7 @@
       s = list(main = "normal(0,0.5)", effects = "normal(0,0.2)")
     ),
     init_ranges = list(
+      mu = c(-0.5, 0.5),
       drift = c(-0.5, 0.5),
       bound = c(1.5, 2),
       ndt = c(0.025, 0.05),
@@ -105,10 +105,6 @@
     class = c("bmmodel", "cswald", paste0("cswald_", version)),
     call = call
   )
-
-  if (!is.null(version)) {
-    class(out) <- c(class(out))
-  }
 
   out$links[names(links)] <- links
   out
@@ -194,19 +190,12 @@ cswald <- function(rt, response, links = NULL, version = "simple", ...) {
 ############################################################################# !
 # CHECK_DATA S3 methods                                                  ####
 ############################################################################# !
-# A check_data.* function should be defined for each class of the model.
-# If a model shares methods with other models, the shared methods should be
-# defined in helpers-data.R. Put here only the methods that are specific to
-# the model. See ?check_data for details.
-# (YOU CAN DELETE THIS SECTION IF YOU DO NOT REQUIRE ADDITIONAL DATA CHECKS)
 
 #' @export
 check_data.cswald <- function(model, data, formula) {
-  # retrieve required arguments
   rt_var <- model$resp_vars$rt
   response_var <- model$resp_vars$response
 
-  # check that required variables are present
   stopif(
     not_in(rt_var, colnames(data)),
     "The RT variable '{rt_var}' is not present in the data."
@@ -217,7 +206,6 @@ check_data.cswald <- function(model, data, formula) {
     "The response variable '{response_var}' is not present in the data."
   )
 
-  # check for NA values
   n_na_rt <- sum(is.na(data[, rt_var]))
   n_na_resp <- sum(is.na(data[, response_var]))
 
@@ -233,7 +221,6 @@ check_data.cswald <- function(model, data, formula) {
     Please remove or impute missing values before fitting the model."
   )
 
-  # checks for rt_var
   if (typeof(data[, rt_var]) %in% c("double", "integer")) {
     stopif(
       any(data[, rt_var] < 0),
@@ -258,15 +245,11 @@ check_data.cswald <- function(model, data, formula) {
       reaction times below 0.100 seconds."
     )
   } else {
-    stop(glue(
-      "The RT variable '{rt_var}' needs to be of type double or integer."
-    ))
+    stop2("The RT variable '{rt_var}' needs to be of type double or integer.")
   }
 
-  # checks for response_var
   resp_type <- typeof(data[, response_var])
 
-  # handle factor variables by converting to character first
   if (is.factor(data[, response_var])) {
     data[, response_var] <- as.character(data[, response_var])
     resp_type <- "character"
@@ -279,10 +262,10 @@ check_data.cswald <- function(model, data, formula) {
       Please pass responses coded as 0 (lower boundary) and 1 (upper boundary)."
     )
   } else if (resp_type == "logical") {
-    warning(glue::glue(
+    warning2(
       "The response variable is boolean and will be internally transformed ",
       "to an integer variable with values 0 for FALSE and 1 for TRUE."
-    ))
+    )
     data[, response_var] <- as.integer(data[, response_var])
   } else if (resp_type == "character") {
     data[, response_var] <- tolower(data[, response_var])
@@ -292,27 +275,25 @@ check_data.cswald <- function(model, data, formula) {
       Please pass only 'upper' or 'lower' as response values, or use \\
       numeric coding (0 = lower, 1 = upper)."
     )
-    warning(glue::glue(
+    warning2(
       "The response variable is a character variable and will be internally ",
       "transformed to an integer variable with 0 for 'lower' and 1 for 'upper'."
-    ))
+    )
     data[, response_var] <- ifelse(data[, response_var] == "upper", 1L, 0L)
   } else {
-    stop(glue(
+    stop2(
       "The response variable '{response_var}' is of type '{resp_type}'.\n
       Please provide responses as integer (0/1), logical, character \\
       ('upper'/'lower'), or factor."
-    ))
+    )
   }
 
-  # final validation of response values
   stopif(
     any(!data[, response_var] %in% c(0, 1)),
     "Invalid values in the response variable '{response_var}'.\n
     After processing, responses must be coded as 0 (lower) or 1 (upper)."
   )
 
-  # warn about high error rates for simple version (assumes few errors)
   if (model$version == "simple") {
     error_rate <- mean(data[, response_var] == 0)
     warnif(
@@ -330,51 +311,33 @@ check_data.cswald <- function(model, data, formula) {
 ############################################################################# !
 # Convert bmmformula to brmsformla methods                               ####
 ############################################################################# !
-# A bmf2bf.* function should be defined if the default method for constructing
-# the brmsformula from the bmmformula does not apply (e.g if aterms are required).
-# The shared method for all `bmmodels` is defined in bmmformula.R.
-# See ?bmf2bf for details.
-# (YOU CAN DELETE THIS SECTION IF YOUR MODEL USES A STANDARD FORMULA WITH 1 RESPONSE VARIABLE)
 
 #' @export
 bmf2bf.cswald <- function(model, formula) {
-  # retrieve required response arguments
   rt_var <- model$resp_vars$rt
   response_var <- model$resp_vars$response
-
-  # set the base brmsformula based
-  brms_formula <- brms::bf(glue(rt_var, " | dec(", response_var, ") ~ 1"))
-
-  # return the brms_formula to add the remaining bmmformulas to it.
-  brms_formula
+  brms::bf(glue(rt_var, " | dec(", response_var, ") ~ 1"))
 }
 
 ############################################################################# !
 # CONFIGURE_MODEL S3 METHODS                                             ####
 ############################################################################# !
-# Each model should have a corresponding configure_model.* function. See
-# ?configure_model for more information.
 
 #' @export
 configure_model.cswald_simple <- function(model, data, formula) {
-  # retrieve required arguments
-  response_var <- model$other_vars$response
   links <- model$links
-
-  # construct brms formula from the bmm formula
   formula <- bmf2bf(model, formula)
 
-  # construct the family & add to formula object
   cswald_family <- function(link_drift, link_bound, link_ndt, link_s) {
     brms::custom_family(
       "cswald",
       dpars = c("mu", "drift", "bound", "ndt", "s"),
       links = c("identity", link_drift, link_bound, link_ndt, link_s),
-      ub = c(NA, NA, NA, NA, NA), # upper bounds for parameters
-      lb = c(NA, 0, 0, 0, 0), # lower bounds for parameters
-      type = "real", # real for continous dv, int for discrete dv
+      ub = c(NA, NA, NA, NA, NA),
+      lb = c(NA, 0, 0, 0, 0),
+      type = "real",
       vars = "dec[n]",
-      loop = TRUE, # is the likelihood vectorized
+      loop = TRUE,
       log_lik = log_lik_cswald_simple,
       posterior_predict = posterior_predict_cswald_simple
     )
@@ -387,7 +350,6 @@ configure_model.cswald_simple <- function(model, data, formula) {
     link_s = links$s
   )
 
-  # prepare initial stanvars to pass to brms, model formula and priors
   sc_path <- system.file("stan_chunks", package = "bmm")
   stan_helpers <- read_lines2(paste0(sc_path, "/cswald_helper_functions.stan"))
   stan_functions <- read_lines2(paste0(sc_path, "/cswald_simple_functions.stan"))
@@ -395,13 +357,10 @@ configure_model.cswald_simple <- function(model, data, formula) {
   stanvars <- brms::stanvar(scode = stan_helpers, block = "functions") +
     brms::stanvar(scode = stan_functions, block = "functions")
 
-  # return the list
   nlist(formula, data, stanvars)
 }
 
 posterior_predict_cswald_simple <- function(i, prep, ...) {
-  # extract parameters from posterior draws
-
   drift <- brms::get_dpar(prep, "drift", i = i)
   bound <- brms::get_dpar(prep, "bound", i = i)
   ndt <- brms::get_dpar(prep, "ndt", i = i)
@@ -419,10 +378,8 @@ posterior_predict_cswald_simple <- function(i, prep, ...) {
     s = s
   )
 
-  # handle negative_rt option (consistent with brms::wiener)
   dots <- list(...)
   if (!is.null(dots$negative_rt) && dots$negative_rt) {
-    # encode lower bound responses as negative RTs
     out$rt * ifelse(out$response == 1, 1, -1)
   } else {
     out$rt
@@ -430,47 +387,32 @@ posterior_predict_cswald_simple <- function(i, prep, ...) {
 }
 
 log_lik_cswald_simple <- function(i, prep) {
-  # extract parameters from posterior draws
   drift <- brms::get_dpar(prep, "drift", i = i)
   bound <- brms::get_dpar(prep, "bound", i = i)
   ndt <- brms::get_dpar(prep, "ndt", i = i)
   s <- brms::get_dpar(prep, "s", i = i)
 
-  # get observed data for observation i
-  rt <- prep$data$Y[i]
-  response <- prep$data$dec[i]
+  rt <- rep(prep$data$Y[i], length(drift))
+  response <- rep(prep$data$dec[i], length(drift))
 
-  # number of posterior draws
-  ndraws <- length(drift)
-
-  # replicate rt and response to match number of posterior draws
-  rt <- rep(rt, ndraws)
-  response <- rep(response, ndraws)
-
-  # compute log-likelihood for each posterior draw
   dcswald(rt, response, drift, bound, ndt, s = s, version = "simple", log = TRUE)
 }
 
 #' @export
 configure_model.cswald_crisk <- function(model, data, formula) {
-  # retrieve required arguments
-  response_var <- model$other_vars$response
   links <- model$links
-
-  # construct brms formula from the bmm formula
   formula <- bmf2bf(model, formula)
 
-  # construct the family & add to formula object
   cswald_crisk_family <- function(link_drift, link_bound, link_ndt, link_zr, link_s) {
     brms::custom_family(
       "cswald_crisk",
       dpars = c("mu", "drift", "bound", "ndt", "zr", "s"),
       links = c("identity", link_drift, link_bound, link_ndt, link_zr, link_s),
-      ub = c(NA, NA, NA, NA, 1, NA), # upper bounds for parameters
-      lb = c(NA, NA, 0, 0, 0, 0), # lower bounds (drift can be negative)
-      type = "real", # real for continous dv, int for discrete dv
+      ub = c(NA, NA, NA, NA, 1, NA),
+      lb = c(NA, NA, 0, 0, 0, 0),
+      type = "real",
       vars = "dec[n]",
-      loop = TRUE, # is the likelihood vectorized
+      loop = TRUE,
       log_lik = log_lik_cswald_crisk,
       posterior_predict = posterior_predict_cswald_crisk
     )
@@ -483,7 +425,6 @@ configure_model.cswald_crisk <- function(model, data, formula) {
     link_s = links$s
   )
 
-  # prepare initial stanvars to pass to brms, model formula and priors
   sc_path <- system.file("stan_chunks", package = "bmm")
   stan_helpers <- read_lines2(paste0(sc_path, "/cswald_helper_functions.stan"))
   stan_functions <- read_lines2(paste0(sc_path, "/cswald_crisk_functions.stan"))
@@ -491,42 +432,29 @@ configure_model.cswald_crisk <- function(model, data, formula) {
   stanvars <- brms::stanvar(scode = stan_helpers, block = "functions") +
     brms::stanvar(scode = stan_functions, block = "functions")
 
-  # return the list
   nlist(formula, data, stanvars)
 }
 
 log_lik_cswald_crisk <- function(i, prep) {
-  # extract parameters from posterior draws
   drift <- brms::get_dpar(prep, "drift", i = i)
   bound <- brms::get_dpar(prep, "bound", i = i)
   ndt <- brms::get_dpar(prep, "ndt", i = i)
   zr <- brms::get_dpar(prep, "zr", i = i)
   s <- brms::get_dpar(prep, "s", i = i)
 
-  # get observed data for observation i
-  rt <- prep$data$Y[i]
-  response <- prep$data$dec[i]
+  rt <- rep(prep$data$Y[i], length(drift))
+  response <- rep(prep$data$dec[i], length(drift))
 
-  # number of posterior draws
-  ndraws <- length(drift)
-
-  # replicate rt and response to match number of posterior draws
-  rt <- rep(rt, ndraws)
-  response <- rep(response, ndraws)
-
-  # compute log-likelihood for each posterior draw
   dcswald(rt, response, drift, bound, ndt, zr = zr, s = s, version = "crisk", log = TRUE)
 }
 
 posterior_predict_cswald_crisk <- function(i, prep, ...) {
-  # extract parameters from posterior draws
   drift <- brms::get_dpar(prep, "drift", i = i)
   bound <- brms::get_dpar(prep, "bound", i = i)
   ndt <- brms::get_dpar(prep, "ndt", i = i)
   zr <- brms::get_dpar(prep, "zr", i = i)
   s <- brms::get_dpar(prep, "s", i = i)
 
-  # Crisk version estimates full boundary separation and relative starting point
   out <- rcswald(
     n = length(drift),
     drift = drift,
@@ -536,10 +464,8 @@ posterior_predict_cswald_crisk <- function(i, prep, ...) {
     s = s
   )
 
-  # handle negative_rt option (consistent with brms::wiener)
   dots <- list(...)
   if (!is.null(dots$negative_rt) && dots$negative_rt) {
-    # encode lower bound responses as negative RTs
     out$rt * ifelse(out$response == 1, 1, -1)
   } else {
     out$rt
