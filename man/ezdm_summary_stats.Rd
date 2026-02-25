@@ -5,10 +5,8 @@
 \title{Compute Robust Summary Statistics for EZ-Diffusion Model}
 \usage{
 ezdm_summary_stats(
-  data,
   rt,
   response,
-  .by = NULL,
   version = c("3par", "4par"),
   distribution = c("exgaussian", "lognormal", "invgaussian"),
   method = c("mixture", "simple", "robust"),
@@ -18,20 +16,13 @@ ezdm_summary_stats(
   init_contaminant = 0.05,
   max_contaminant = 0.5,
   maxit = 100,
-  tol = 1e-06,
-  adjust_accuracy = FALSE,
-  guess_rate = 0.5
+  tol = 1e-06
 )
 }
 \arguments{
-\item{data}{A \code{data.frame} containing trial-level data with RT and accuracy
-columns}
+\item{rt}{Numeric vector of reaction times in seconds.}
 
-\item{rt}{Character. The name of the column containing reaction times (in
-seconds)}
-
-\item{response}{Character. The name of the column containing response
-indicators. Accepts multiple formats:
+\item{response}{Vector of response indicators. Accepts multiple formats:
 \itemize{
 \item Numeric: 1 = upper/correct, 0 = lower/error
 \item Logical: TRUE = upper/correct, FALSE = lower/error
@@ -39,12 +30,8 @@ indicators. Accepts multiple formats:
 "acc"/"err", "hit"/"miss", "yes"/"no" (case-insensitive)
 }}
 
-\item{.by}{A character vector of column names to group by before computing
-summary statistics (e.g., \code{.by = c("subject", "condition")}). If NULL
-(default), computes statistics across all data without grouping.}
-
 \item{version}{Character. Either "3par" (default) for pooled RTs or "4par"
-for separate upper/lower boundary RTs}
+for separate upper/lower boundary RTs. Controls the output columns.}
 
 \item{distribution}{Character. The parametric distribution for the RT
 component. One of "exgaussian" (default), "lognormal", or "invgaussian"}
@@ -73,7 +60,7 @@ The buffer extends data-driven bounds to ensure conservative estimates.
 Examples: c(0.1, 3.0), c("min", "max"), c(0.1, "max"), c("min", 3.0)}
 
 \item{min_trials}{Integer. Minimum number of trials required for fitting.
-Groups with fewer trials will return NA. Default is 10}
+Returns NA if fewer trials are available. Default is 10}
 
 \item{init_contaminant}{Numeric. Initial proportion of contaminants for EM
 algorithm. Default is 0.05}
@@ -85,21 +72,12 @@ contaminant proportions. Default is 0.5}
 \item{maxit}{Integer. Maximum number of EM iterations. Default is 100}
 
 \item{tol}{Numeric. Convergence tolerance for EM algorithm. Default is 1e-6}
-
-\item{adjust_accuracy}{Logical. If TRUE and method = "mixture", adjust
-accuracy counts by removing estimated contaminant guesses using binomial
-sampling. Default is FALSE}
-
-\item{guess_rate}{Numeric. Assumed accuracy rate for contaminant trials
-(random guessing). Default is 0.5 (appropriate for 2AFC tasks)}
 }
 \value{
-A \code{data.frame} with summary statistics. For version = "3par":
-grouping variables, mean_rt, var_rt, n_upper, n_trials, contaminant_prop.
-When adjust_accuracy = TRUE, also includes n_upper_adj and n_trials_adj.
-For version = "4par": grouping variables, mean_rt_upper, mean_rt_lower,
-var_rt_upper, var_rt_lower, n_upper, n_trials, contaminant_prop_upper,
-contaminant_prop_lower.
+A 1-row \code{data.frame}. For version = "3par": \code{mean_rt}, \code{var_rt},
+\code{n_upper}, \code{n_trials}, \code{contaminant_prop}. For version = "4par":
+\code{mean_rt_upper}, \code{mean_rt_lower}, \code{var_rt_upper}, \code{var_rt_lower},
+\code{n_upper}, \code{n_trials}, \code{contaminant_prop_upper}, \code{contaminant_prop_lower}.
 }
 \description{
 Computes robust summary statistics for the EZ-Diffusion Model
@@ -113,31 +91,34 @@ the EZ-Diffusion equations. This function addresses this by fitting a
 mixture model with two components: a uniform distribution for
 contaminants and a parametric RT distribution for true responses.
 Robust moments are then extracted from the fitted parametric component.
+
+This function is designed to work with \code{\link[dplyr:group_by]{dplyr::group_by()}} and
+\code{\link[dplyr:reframe]{dplyr::reframe()}} for grouped operations. Use \code{\link[=adjust_ezdm_accuracy]{adjust_ezdm_accuracy()}}
+as a separate step if you need to adjust accuracy counts for
+contamination.
 }
 \examples{
 # Generate example data
 set.seed(123)
-test_data <- data.frame(
-  subject = rep(1:3, each = 100),
-  condition = rep(c("A", "B"), 150),
-  rt = rgamma(300, shape = 5, rate = 10) + 0.3,
-  correct = rbinom(300, 1, 0.8)
-)
+rt <- rgamma(100, shape = 5, rate = 10) + 0.3
+response <- rbinom(100, 1, 0.8)
 
-# Compute summary statistics grouped by subject
-result <- ezdm_summary_stats(test_data,
-  rt = "rt", response = "correct",
-  .by = "subject"
-)
-print(result)
+# 3par summary stats
+ezdm_summary_stats(rt, response)
 
-# Group by multiple variables using simple method
-result_multi <- ezdm_summary_stats(test_data,
-  rt = "rt",
-  response = "correct",
-  .by = c("subject", "condition"),
-  method = "simple"
-)
+# With dplyr for grouped operations
+# library(dplyr)
+# mydata |>
+#   group_by(subject) |>
+#   reframe(ezdm_summary_stats(rt, response))
 
+# 4par version with separate upper/lower moments
+ezdm_summary_stats(rt, response, version = "4par")
+
+}
+\seealso{
+\code{\link[=adjust_ezdm_accuracy]{adjust_ezdm_accuracy()}} for adjusting accuracy counts,
+\code{\link[=flag_contaminant_rts]{flag_contaminant_rts()}} for trial-level contamination probabilities,
+\code{\link[=ezdm]{ezdm()}} for fitting the EZ-Diffusion Model
 }
 \keyword{transform}

@@ -5,36 +5,17 @@
 \title{Flag contaminant reaction times using mixture modeling}
 \usage{
 flag_contaminant_rts(
-  data,
   rt,
-  response = NULL,
-  .by = NULL,
-  version = c("3par", "4par"),
   distribution = c("exgaussian", "lognormal", "invgaussian"),
   contaminant_bound = c(0.1, 3),
   init_contaminant = 0.05,
   max_contaminant = 0.5,
   maxit = 100,
-  tol = 1e-06,
-  what_return = c("data", "diagnostics", "all")
+  tol = 1e-06
 )
 }
 \arguments{
-\item{data}{A \code{data.frame} containing trial-level RT data}
-
-\item{rt}{Character. Name of the RT column in \code{data} (in seconds)}
-
-\item{response}{Character or NULL. Name of the response column. Required when
-\code{version = "separate"}. Can be numeric (0 or 1), logical, character, or factor.
-See Details for accepted response formats.}
-
-\item{.by}{Character vector or NULL. Grouping variables for separate mixture
-fits (e.g., \code{c("subject", "condition")}). Default NULL (single group).}
-
-\item{version}{Character. Either "aggregate" (default) for single contamination
-estimate across all RTs, or "separate" for separate estimates by upper/lower
-boundary. Requires \code{response} when "separate". Mirrors the version argument
-in \code{\link[=ezdm_summary_stats]{ezdm_summary_stats()}}.}
+\item{rt}{Numeric vector. Reaction times in seconds. Must be positive.}
 
 \item{distribution}{Character. RT distribution for the mixture model:
 "exgaussian" (default), "lognormal", or "invgaussian".}
@@ -52,58 +33,24 @@ exceeding this are clipped with a warning. Must be in (0, 1]. Default 0.5.}
 \item{maxit}{Integer. Maximum EM iterations. Default 100.}
 
 \item{tol}{Numeric. Convergence tolerance for log-likelihood. Default 1e-6.}
-
-\item{what_return}{Character. Type of output to return:
-\itemize{
-\item "data" (default): Returns data.frame with contamination columns only
-\item "diagnostics": Returns data.frame with mixture fit diagnostics only
-\item "all": Returns list with both \verb{$data} and \verb{$diagnostics}
-}}
 }
 \value{
-Return type depends on \code{what_return}:
-
-\strong{what_return = "data"}: Data.frame with original columns plus:
-\itemize{
-\item \code{contam_prob}: Posterior P(contaminant | RT) (version="3par")
-\item For version="4par": \code{contam_prob_upper} and \code{contam_prob_lower} columns
-}
-
-\strong{what_return = "diagnostics"}: Data.frame with one row per group:
-\itemize{
-\item Grouping variables (if \code{.by} specified)
-\item \code{mixture_params}: List-column with fitted distribution parameters
-\item \code{contaminant_prop}: Estimated contamination proportion
-\item \code{converged}: EM convergence status
-\item \code{iterations}, \code{loglik}: Fit quality metrics
-\item \code{n_trials}: Number of trials
-\item For version="4par": \verb{_upper} and \verb{_lower} suffixed columns
-}
-
-\strong{what_return = "all"}: List with \verb{$data} and \verb{$diagnostics} components
+Numeric vector of posterior contamination probabilities P(contaminant
+| RT), with a \code{"diagnostics"} attribute containing a one-row data.frame
+with columns: \code{mixture_params} (list), \code{contaminant_prop}, \code{converged},
+\code{iterations}, \code{loglik}, \code{n_trials}, \code{distribution}, \code{method}.
 }
 \description{
 Identifies contaminant RTs (fast guesses, attention lapses) at
-the trial level using mixture modeling. Unlike \code{\link[=ezdm_summary_stats]{ezdm_summary_stats()}} which
-computes aggregated statistics, this function returns per-trial
-contamination probabilities or flags to enable filtering before model fitting.
+the trial level using mixture modeling. For each trial, it computes the
+posterior probability of being a contaminant given a mixture of a uniform
+distribution (contaminants) and an RT distribution.
 
-The function fits a mixture of a uniform distribution (representing
-contaminants) and an RT distribution (exgaussian, lognormal, or invgaussian)
-using an EM algorithm. For each trial, it computes the posterior probability
-of being a contaminant.
+The function takes a numeric vector of RTs and returns a numeric vector of
+contamination probabilities, making it compatible with \code{dplyr::mutate()} and
+\code{dplyr::group_by()} workflows.
 }
 \details{
-\subsection{Response Formats}{
-
-The \code{response} variable (when provided) can be in several formats:
-\itemize{
-\item \strong{Numeric/Logical}: 1 or TRUE = upper boundary, 0 or FALSE = lower boundary
-\item \strong{Character/Factor}: "upper", "lower", "correct", "error", "acc", "err",
-"1", "0", "TRUE", "FALSE", "yes", "no", "hit", "miss", "fa"
-}
-}
-
 \subsection{Mixture Model}{
 
 The function fits: \code{f(RT) = pi_c * Uniform(a,b) + (1-pi_c) * f_RT(RT|theta)}
@@ -113,20 +60,17 @@ distribution over \code{contaminant_bound}, and f_RT is the specified RT
 distribution with parameters theta.
 }
 
-\subsection{Version Behavior}{
-\itemize{
-\item \strong{version = "3par"}: Fits single mixture to all RTs. Returns
-\code{contam_prob} column.
-\item \strong{version = "4par"}: Fits separate mixtures for upper/lower boundary
-RTs. Returns \code{contam_prob_upper}/\verb{_lower} columns. Upper trials have NA
-for \verb{_lower} column and vice versa.
-}
+\subsection{Grouping}{
+
+To fit separate mixtures by condition or response boundary, use
+\code{dplyr::group_by()} before calling this function inside \code{dplyr::mutate()}.
 }
 
-\subsection{Small Groups}{
+\subsection{Diagnostics}{
 
-Groups with fewer than 5 valid observations return NA for contamination
-metrics with a warning.
+Mixture fit diagnostics (parameters, convergence, log-likelihood) are
+attached as the \code{"diagnostics"} attribute of the returned vector.
+Access them with \code{attr(result, "diagnostics")}.
 }
 }
 \examples{
@@ -134,48 +78,31 @@ metrics with a warning.
 # Simulate data with contaminants
 library(bmm)
 set.seed(123)
-n <- 200
-rt_clean <- rgamma(150, shape = 5, rate = 10) # Right-skewed RTs
-rt_contam <- runif(50, 0.1, 0.2) # Fast guesses
+rt_clean <- rgamma(150, shape = 5, rate = 10)
+rt_contam <- runif(50, 0.1, 0.2)
 
 data <- data.frame(
   rt = c(rt_clean, rt_contam),
   subject = 1,
-  trial = 1:n
+  response = sample(c("upper", "lower"), 200, replace = TRUE)
 )
 
-# Basic usage - get contamination probabilities
-result <- flag_contaminant_rts(data, rt = "rt")
+# Basic usage with mutate
+library(dplyr)
+data <- data |>
+  mutate(contam_prob = flag_contaminant_rts(rt))
 
-# Hard threshold: flag trials with P(contaminant) > 0.5
-data_clean <- result[result$contam_prob <= 0.5, ]
+# Hard threshold: remove trials with P(contaminant) > 0.5
+data_clean <- data |> filter(contam_prob <= 0.5)
 
-# Probabilistic flagging via binomial sampling
-result$flagged <- rbinom(nrow(result), 1, result$contam_prob) == 1
+# Separate fits by response boundary
+data <- data |>
+  group_by(subject, response) |>
+  mutate(contam_prob = flag_contaminant_rts(rt))
 
-# Get diagnostics to check mixture fit
-result_all <- flag_contaminant_rts(data, rt = "rt", what_return = "all")
-print(result_all$diagnostics)
-
-# With grouping
-data_multi <- rbind(
-  cbind(data, condition = "A"),
-  cbind(data, condition = "B")
-)
-result_grouped <- flag_contaminant_rts(
-  data_multi,
-  rt = "rt",
-  .by = c("subject", "condition")
-)
-
-# Separate by response boundary (for DDM)
-data$response <- sample(c(0, 1), n, replace = TRUE)
-result_sep <- flag_contaminant_rts(
-  data,
-  rt = "rt",
-  response = "response",
-  version = "4par"
-)
+# Access diagnostics
+probs <- flag_contaminant_rts(data$rt)
+attr(probs, "diagnostics")
 }
 }
 \seealso{

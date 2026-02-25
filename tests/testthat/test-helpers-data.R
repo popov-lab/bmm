@@ -337,253 +337,155 @@ test_that("is_data_ordered works when there are non-linear predictors", {
 # ezdm_summary_stats TESTS                                                ####
 ############################################################################# !
 
-test_that("ezdm_summary_stats() returns correct structure for 3par version", {
+test_that("ezdm_summary_stats() returns 1-row data.frame for 3par version", {
   set.seed(123)
-  test_data <- data.frame(
-    subject = rep(1:3, each = 50),
-    rt = rgamma(150, shape = 5, rate = 10) + 0.3,
-    correct = rbinom(150, 1, 0.8)
-  )
+  rt <- rgamma(100, shape = 5, rate = 10) + 0.3
+  response <- rbinom(100, 1, 0.8)
 
-  result <- ezdm_summary_stats(test_data,
-    rt = "rt", response = "correct",
-    .by = "subject", method = "simple"
-  )
+  result <- ezdm_summary_stats(rt, response, method = "simple")
 
   expect_s3_class(result, "data.frame")
-  expect_equal(nrow(result), 3)
+  expect_equal(nrow(result), 1)
   expect_true(all(c(
-    "subject", "mean_rt", "var_rt", "n_upper",
+    "mean_rt", "var_rt", "n_upper",
     "n_trials", "contaminant_prop"
   ) %in% names(result)))
-
-  # Check types
   expect_type(result$mean_rt, "double")
   expect_type(result$var_rt, "double")
-  expect_type(result$n_upper, "integer")
-  expect_type(result$n_trials, "integer")
 })
 
-test_that("ezdm_summary_stats() returns correct structure for 4par version", {
+test_that("ezdm_summary_stats() returns 1-row data.frame for 4par version", {
   set.seed(123)
-  test_data <- data.frame(
-    subject = rep(1:2, each = 100),
-    rt = rgamma(200, shape = 5, rate = 10) + 0.3,
-    correct = rbinom(200, 1, 0.7)
-  )
+  rt <- rgamma(200, shape = 5, rate = 10) + 0.3
+  response <- rbinom(200, 1, 0.7)
 
-  result <- ezdm_summary_stats(test_data,
-    rt = "rt", response = "correct",
-    .by = "subject", version = "4par", method = "simple"
-  )
+  result <- ezdm_summary_stats(rt, response, version = "4par", method = "simple")
 
   expect_s3_class(result, "data.frame")
-  expect_equal(nrow(result), 2)
+  expect_equal(nrow(result), 1)
   expect_true(all(c(
-    "subject", "mean_rt_upper", "mean_rt_lower",
+    "mean_rt_upper", "mean_rt_lower",
     "var_rt_upper", "var_rt_lower", "n_upper", "n_trials",
     "contaminant_prop_upper", "contaminant_prop_lower"
-  )
-  %in% names(result)))
+  ) %in% names(result)))
 })
 
 test_that("ezdm_summary_stats() validates required arguments", {
-  test_data <- data.frame(
-    rt = rgamma(100, shape = 5, rate = 10) + 0.3,
-    correct = rbinom(100, 1, 0.8)
-  )
-
   expect_error(
-    ezdm_summary_stats(rt = "rt", response = "correct"),
+    ezdm_summary_stats(response = rbinom(10, 1, 0.5)),
     "required arguments are missing"
   )
   expect_error(
-    ezdm_summary_stats(test_data, response = "correct"),
-    "required arguments are missing"
-  )
-  expect_error(
-    ezdm_summary_stats(test_data, rt = "rt"),
+    ezdm_summary_stats(rt = rgamma(10, 5, 10)),
     "required arguments are missing"
   )
 })
 
-test_that("ezdm_summary_stats() validates column names", {
-  test_data <- data.frame(
-    rt = rgamma(100, shape = 5, rate = 10) + 0.3,
-    correct = rbinom(100, 1, 0.8)
+test_that("ezdm_summary_stats() validates rt is numeric", {
+  expect_error(
+    ezdm_summary_stats(rt = "not_numeric", response = c(1, 0)),
+    "must be a numeric vector"
   )
+  expect_error(
+    ezdm_summary_stats(rt = numeric(0), response = numeric(0)),
+    "has length 0"
+  )
+})
 
+test_that("ezdm_summary_stats() validates rt and response have same length", {
   expect_error(
-    ezdm_summary_stats(test_data, rt = "reaction_time", response = "correct"),
-    "RT variable 'reaction_time' not found in data"
-  )
-  expect_error(
-    ezdm_summary_stats(test_data, rt = "rt", response = "accuracy"),
-    "Response variable 'accuracy' not found in data"
+    ezdm_summary_stats(rt = c(0.5, 0.6), response = c(1, 0, 1)),
+    "must have the same length"
   )
 })
 
 test_that("ezdm_summary_stats() validates parameter options", {
-  test_data <- data.frame(
-    rt = rgamma(100, shape = 5, rate = 10) + 0.3,
-    correct = rbinom(100, 1, 0.8)
-  )
+  rt <- rgamma(100, shape = 5, rate = 10) + 0.3
+  response <- rbinom(100, 1, 0.8)
 
+  expect_error(ezdm_summary_stats(rt, response, version = "5par"), "should be one of")
+  expect_error(ezdm_summary_stats(rt, response, distribution = "normal"), "should be one of")
+  expect_error(ezdm_summary_stats(rt, response, method = "invalid"), "should be one of")
   expect_error(
-    ezdm_summary_stats(test_data,
-      rt = "rt", response = "correct",
-      version = "5par"
-    ),
-    "should be one of"
-  )
-  expect_error(
-    ezdm_summary_stats(test_data,
-      rt = "rt", response = "correct",
-      distribution = "normal"
-    ),
-    "should be one of"
-  )
-  expect_error(
-    ezdm_summary_stats(test_data,
-      rt = "rt", response = "correct",
-      method = "invalid"
-    ),
-    "should be one of"
-  )
-  expect_error(
-    ezdm_summary_stats(test_data,
-      rt = "rt", response = "correct",
-      method = "robust", robust_scale = "invalid"
-    ),
+    ezdm_summary_stats(rt, response, method = "robust", robust_scale = "invalid"),
     "should be one of"
   )
 })
 
 test_that("ezdm_summary_stats() warns for potential data issues", {
-  # RT values > 10 (likely in milliseconds)
-  test_data_ms <- data.frame(
-    rt = rgamma(100, shape = 5, rate = 10) * 1000, # milliseconds
-    correct = rbinom(100, 1, 0.8)
-  )
+  rt_ms <- rgamma(100, shape = 5, rate = 10) * 1000
+  response <- rbinom(100, 1, 0.8)
 
   expect_warning(
-    ezdm_summary_stats(test_data_ms,
-      rt = "rt", response = "correct",
-      method = "simple"
-    ),
+    ezdm_summary_stats(rt_ms, response, method = "simple"),
     "Some RT values > 10. Ensure RTs are in seconds"
   )
-
 })
 
 test_that("ezdm_summary_stats() errors for non-positive RT values", {
-  test_data_neg <- data.frame(
-    rt = c(-0.1, 0, rgamma(98, shape = 5, rate = 10) + 0.3),
-    correct = rbinom(100, 1, 0.8)
-  )
+  rt <- c(-0.1, 0, rgamma(98, shape = 5, rate = 10) + 0.3)
+  response <- rbinom(100, 1, 0.8)
 
   expect_error(
-    ezdm_summary_stats(test_data_neg,
-      rt = "rt", response = "correct",
-      method = "simple"
-    ),
+    ezdm_summary_stats(rt, response, method = "simple"),
     "Non-positive RT values found"
   )
 })
 
 test_that("ezdm_summary_stats() handles too few trials", {
-  # Create data with one subject having very few trials
   set.seed(123)
-  test_data <- data.frame(
-    subject = c(rep(1, 50), rep(2, 5)), # Subject 2 has only 5 trials
-    rt = rgamma(55, shape = 5, rate = 10) + 0.3,
-    correct = rbinom(55, 1, 0.8)
-  )
+  rt <- rgamma(5, shape = 5, rate = 10) + 0.3
+  response <- rbinom(5, 1, 0.8)
 
-  result <- ezdm_summary_stats(test_data,
-    rt = "rt", response = "correct",
-    .by = "subject", method = "simple", min_trials = 10
-  )
+  result <- ezdm_summary_stats(rt, response, method = "simple", min_trials = 10)
 
-  # Subject 2 should have NA for mean_rt and var_rt
-  expect_true(is.na(result$mean_rt[result$subject == 2]))
-  expect_true(is.na(result$var_rt[result$subject == 2]))
-
-  # But n_trials should still be reported
-  expect_equal(result$n_trials[result$subject == 2], 5)
+  expect_true(is.na(result$mean_rt))
+  expect_true(is.na(result$var_rt))
+  expect_equal(result$n_trials, 5)
 })
 
 test_that("ezdm_summary_stats() simple method matches mean() and var()", {
   set.seed(123)
-  test_data <- data.frame(
-    rt = rgamma(100, shape = 5, rate = 10) + 0.3,
-    correct = rbinom(100, 1, 0.8)
-  )
+  rt <- rgamma(100, shape = 5, rate = 10) + 0.3
+  response <- rbinom(100, 1, 0.8)
 
-  result <- ezdm_summary_stats(test_data,
-    rt = "rt", response = "correct",
-    method = "simple"
-  )
+  result <- ezdm_summary_stats(rt, response, method = "simple")
 
-  expect_equal(result$mean_rt, mean(test_data$rt), tolerance = 1e-10)
-  expect_equal(result$var_rt, var(test_data$rt), tolerance = 1e-10)
-  expect_equal(result$n_trials, nrow(test_data))
-  expect_equal(result$n_upper, sum(test_data$correct == 1))
+  expect_equal(result$mean_rt, mean(rt), tolerance = 1e-10)
+  expect_equal(result$var_rt, var(rt), tolerance = 1e-10)
+  expect_equal(result$n_trials, 100L)
+  expect_equal(result$n_upper, sum(response == 1))
 })
 
 test_that("ezdm_summary_stats() robust method uses median and IQR/MAD", {
   set.seed(123)
-  test_data <- data.frame(
-    rt = rgamma(100, shape = 5, rate = 10) + 0.3,
-    correct = rbinom(100, 1, 0.8)
-  )
+  rt <- rgamma(100, shape = 5, rate = 10) + 0.3
+  response <- rbinom(100, 1, 0.8)
 
-  # Test IQR-based robust method
-  result_iqr <- ezdm_summary_stats(
-    test_data,
-    rt = "rt", response = "correct",
+  result_iqr <- ezdm_summary_stats(rt, response,
     method = "robust", robust_scale = "iqr"
   )
-
-  expect_equal(result_iqr$mean_rt, median(test_data$rt), tolerance = 1e-10)
-  expected_var_iqr <- (IQR(test_data$rt) / 1.349)^2
-  expect_equal(result_iqr$var_rt, expected_var_iqr, tolerance = 1e-10)
-  expect_equal(result_iqr$n_trials, nrow(test_data))
-  expect_equal(result_iqr$n_upper, sum(test_data$correct == 1))
+  expect_equal(result_iqr$mean_rt, median(rt), tolerance = 1e-10)
+  expect_equal(result_iqr$var_rt, (IQR(rt) / 1.349)^2, tolerance = 1e-10)
   expect_true(is.na(result_iqr$contaminant_prop))
 
-  # Test MAD-based robust method
-  result_mad <- ezdm_summary_stats(
-    test_data,
-    rt = "rt", response = "correct",
+  result_mad <- ezdm_summary_stats(rt, response,
     method = "robust", robust_scale = "mad"
   )
-
-  expect_equal(result_mad$mean_rt, median(test_data$rt), tolerance = 1e-10)
-  expected_var_mad <- mad(test_data$rt)^2
-  expect_equal(result_mad$var_rt, expected_var_mad, tolerance = 1e-10)
+  expect_equal(result_mad$mean_rt, median(rt), tolerance = 1e-10)
+  expect_equal(result_mad$var_rt, mad(rt)^2, tolerance = 1e-10)
 })
 
 test_that("ezdm_summary_stats() robust method is resistant to outliers", {
   set.seed(123)
-  # Create data with outliers
   clean_rt <- rnorm(90, mean = 0.5, sd = 0.1)
   outliers <- c(0.05, 0.08, 2.5, 3.0, 3.5, 4.0, 5.0, 6.0, 7.0, 8.0)
-  test_data <- data.frame(
-    rt = c(clean_rt, outliers),
-    correct = c(rep(1, 80), rep(0, 20))
-  )
+  rt <- c(clean_rt, outliers)
+  response <- c(rep(1, 80), rep(0, 20))
 
-  result_simple <- ezdm_summary_stats(
-    test_data,
-    rt = "rt", response = "correct", method = "simple"
-  )
-  result_robust <- ezdm_summary_stats(
-    test_data,
-    rt = "rt", response = "correct", method = "robust"
-  )
+  result_simple <- ezdm_summary_stats(rt, response, method = "simple")
+  result_robust <- ezdm_summary_stats(rt, response, method = "robust")
 
-  # Robust method should give mean_rt closer to true median of clean data
   true_median_clean <- median(clean_rt)
   expect_true(
     abs(result_robust$mean_rt - true_median_clean) <
@@ -591,51 +493,13 @@ test_that("ezdm_summary_stats() robust method is resistant to outliers", {
   )
 })
 
-test_that("ezdm_summary_stats() handles multiple grouping variables", {
-  set.seed(123)
-  test_data <- data.frame(
-    subject = rep(1:2, each = 100),
-    condition = rep(rep(c("A", "B"), each = 50), 2),
-    rt = rgamma(200, shape = 5, rate = 10) + 0.3,
-    correct = rbinom(200, 1, 0.8)
-  )
-
-  result <- ezdm_summary_stats(test_data,
-    rt = "rt", response = "correct",
-    .by = c("subject", "condition"), method = "simple"
-  )
-
-  expect_equal(nrow(result), 4) # 2 subjects x 2 conditions
-  expect_true(all(c("subject", "condition") %in% names(result)))
-})
-
-test_that("ezdm_summary_stats() handles no grouping variables", {
-  set.seed(123)
-  test_data <- data.frame(
-    rt = rgamma(100, shape = 5, rate = 10) + 0.3,
-    correct = rbinom(100, 1, 0.8)
-  )
-
-  result <- ezdm_summary_stats(test_data,
-    rt = "rt", response = "correct",
-    method = "simple"
-  )
-
-  expect_equal(nrow(result), 1)
-  expect_false("subject" %in% names(result))
-})
-
 test_that("ezdm_summary_stats() mixture method works with different distributions", {
   set.seed(123)
-  test_data <- data.frame(
-    rt = rgamma(200, shape = 5, rate = 10) + 0.3,
-    correct = rbinom(200, 1, 0.8)
-  )
+  rt <- rgamma(200, shape = 5, rate = 10) + 0.3
+  response <- rbinom(200, 1, 0.8)
 
-  # Test each distribution
   for (dist in c("exgaussian", "lognormal", "invgaussian")) {
-    result <- ezdm_summary_stats(test_data,
-      rt = "rt", response = "correct",
+    result <- ezdm_summary_stats(rt, response,
       distribution = dist, method = "mixture"
     )
     expect_s3_class(result, "data.frame")
@@ -647,56 +511,235 @@ test_that("ezdm_summary_stats() mixture method works with different distribution
 
 test_that("ezdm_summary_stats() 4par handles all correct or all errors", {
   set.seed(123)
-  # All correct responses
-  test_data_all_correct <- data.frame(
-    rt = rgamma(100, shape = 5, rate = 10) + 0.3,
-    correct = rep(1, 100)
-  )
+  rt <- rgamma(100, shape = 5, rate = 10) + 0.3
 
-  result <- ezdm_summary_stats(test_data_all_correct,
-    rt = "rt",
-    response = "correct", version = "4par",
-    method = "simple", min_trials = 10
+  result <- ezdm_summary_stats(rt, rep(1, 100),
+    version = "4par", method = "simple", min_trials = 10
   )
-
   expect_false(is.na(result$mean_rt_upper))
-  expect_true(is.na(result$mean_rt_lower)) # No error trials
+  expect_true(is.na(result$mean_rt_lower))
 
-  # All error responses
-  test_data_all_errors <- data.frame(
-    rt = rgamma(100, shape = 5, rate = 10) + 0.3,
-    correct = rep(0, 100)
+  result2 <- ezdm_summary_stats(rt, rep(0, 100),
+    version = "4par", method = "simple", min_trials = 10
   )
-
-  result2 <- ezdm_summary_stats(test_data_all_errors,
-    rt = "rt",
-    response = "correct", version = "4par",
-    method = "simple", min_trials = 10
-  )
-
-  expect_true(is.na(result2$mean_rt_upper)) # No correct trials
+  expect_true(is.na(result2$mean_rt_upper))
   expect_false(is.na(result2$mean_rt_lower))
 })
 
-test_that("ezdm_summary_stats() attributes are correctly set", {
-  set.seed(123)
-  test_data <- data.frame(
-    rt = rgamma(100, shape = 5, rate = 10) + 0.3,
-    correct = rbinom(100, 1, 0.8)
-  )
+test_that("ezdm_summary_stats() validates contaminant_bound", {
+  rt <- rgamma(100, shape = 5, rate = 10) + 0.3
+  response <- rbinom(100, 1, 0.8)
 
-  result <- ezdm_summary_stats(test_data,
-    rt = "rt", response = "correct",
-    version = "4par", distribution = "lognormal",
-    method = "simple"
+  expect_error(
+    ezdm_summary_stats(rt, response, contaminant_bound = c(3.0, 0.1)),
+    "contaminant_bound\\[1\\] must be less than"
   )
-
-  expect_equal(attr(result, "version"), "4par")
-  expect_equal(attr(result, "distribution"), "lognormal")
-  expect_equal(attr(result, "method"), "simple")
+  expect_error(
+    ezdm_summary_stats(rt, response, contaminant_bound = c(0.1)),
+    "contaminant_bound must be a vector of length 2"
+  )
+  expect_error(
+    ezdm_summary_stats(rt, response, contaminant_bound = c("invalid", 3.0)),
+    "contaminant_bound elements must be numeric or"
+  )
 })
 
-test_that("ezdm_summary_stats() validates grouping variables", {
+test_that("ezdm_summary_stats() accepts 'min' and 'max' for contaminant_bound", {
+  set.seed(123)
+  rt <- rgamma(100, shape = 5, rate = 10) + 0.3
+  response <- rbinom(100, 1, 0.8)
+
+  expect_no_error(result <- ezdm_summary_stats(rt, response,
+    contaminant_bound = c("min", "max")
+  ))
+  expect_true(is.data.frame(result))
+
+  expect_no_error(ezdm_summary_stats(rt, response,
+    contaminant_bound = c(0.1, "max")
+  ))
+  expect_no_error(ezdm_summary_stats(rt, response,
+    contaminant_bound = c("min", 3.0)
+  ))
+  expect_no_error(ezdm_summary_stats(rt, response,
+    contaminant_bound = c("MIN", "MAX")
+  ))
+})
+
+test_that("ezdm_summary_stats() validates init_contaminant", {
+  rt <- rgamma(100, shape = 5, rate = 10) + 0.3
+  response <- rbinom(100, 1, 0.8)
+
+  expect_error(
+    ezdm_summary_stats(rt, response, init_contaminant = 0),
+    "init_contaminant must be between 0 and 1"
+  )
+  expect_error(
+    ezdm_summary_stats(rt, response, init_contaminant = 1),
+    "init_contaminant must be between 0 and 1"
+  )
+})
+
+test_that("ezdm_summary_stats() validates max_contaminant", {
+  rt <- rgamma(100, shape = 5, rate = 10) + 0.3
+  response <- rbinom(100, 1, 0.8)
+
+  expect_error(ezdm_summary_stats(rt, response, max_contaminant = 0),
+    "max_contaminant must be between 0")
+  expect_error(ezdm_summary_stats(rt, response, max_contaminant = 1.5),
+    "max_contaminant must be between 0")
+  expect_error(ezdm_summary_stats(rt, response, max_contaminant = -0.1),
+    "max_contaminant must be between 0")
+  expect_no_error(ezdm_summary_stats(rt, response,
+    max_contaminant = 1, method = "simple"
+  ))
+})
+
+test_that("ezdm_summary_stats() validates init < max contaminant", {
+  rt <- rgamma(100, shape = 5, rate = 10) + 0.3
+  response <- rbinom(100, 1, 0.8)
+
+  expect_error(
+    ezdm_summary_stats(rt, response, init_contaminant = 0.3, max_contaminant = 0.2),
+    "init_contaminant must be less than max_contaminant"
+  )
+  expect_error(
+    ezdm_summary_stats(rt, response, init_contaminant = 0.5, max_contaminant = 0.5),
+    "init_contaminant must be less than max_contaminant"
+  )
+})
+
+test_that("ezdm_summary_stats() clips contaminant proportion to max", {
+  set.seed(42)
+  true_rt <- rgamma(50, shape = 5, rate = 10) + 0.3
+  contam_rt <- runif(50, 0.1, 3.0)
+  rt <- c(true_rt, contam_rt)
+  response <- rbinom(100, 1, 0.8)
+
+  result <- suppressWarnings(
+    ezdm_summary_stats(rt, response, max_contaminant = 0.3)
+  )
+  expect_true(result$contaminant_prop <= 0.3)
+
+  result_strict <- suppressWarnings(
+    ezdm_summary_stats(rt, response, max_contaminant = 0.1)
+  )
+  expect_true(result_strict$contaminant_prop <= 0.1)
+})
+
+test_that("ezdm_summary_stats() warns when contaminant proportion is clipped", {
+  set.seed(42)
+  true_rt <- rgamma(50, shape = 5, rate = 10) + 0.3
+  contam_rt <- runif(50, 0.1, 3.0)
+  rt <- c(true_rt, contam_rt)
+  response <- rbinom(100, 1, 0.8)
+
+  expect_warning(
+    ezdm_summary_stats(rt, response, max_contaminant = 0.1),
+    "clipped to max_contaminant"
+  )
+})
+
+test_that("ezdm_summary_stats() max_contaminant works with 4par version", {
+  set.seed(42)
+  n_per_group <- 60
+  rt <- c(
+    rgamma(n_per_group, shape = 5, rate = 10) + 0.3,
+    runif(20, 0.1, 3.0),
+    rgamma(n_per_group, shape = 5, rate = 10) + 0.3,
+    runif(20, 0.1, 3.0)
+  )
+  response <- c(rep(1, n_per_group + 20), rep(0, n_per_group + 20))
+
+  result <- suppressWarnings(
+    ezdm_summary_stats(rt, response, version = "4par", max_contaminant = 0.2)
+  )
+
+  expect_true(is.na(result$contaminant_prop_upper) ||
+    result$contaminant_prop_upper <= 0.2)
+  expect_true(is.na(result$contaminant_prop_lower) ||
+    result$contaminant_prop_lower <= 0.2)
+})
+
+test_that("ezdm_summary_stats() handles character responses", {
+  set.seed(123)
+  rt <- rgamma(100, shape = 5, rate = 10) + 0.3
+  response <- sample(c("upper", "lower"), 100, replace = TRUE, prob = c(0.8, 0.2))
+
+  result <- ezdm_summary_stats(rt, response, method = "simple")
+
+  expect_equal(result$n_upper, sum(response == "upper"))
+  expect_equal(result$n_trials, 100L)
+})
+
+test_that("ezdm_summary_stats() handles factor responses", {
+  set.seed(123)
+  rt <- rgamma(100, shape = 5, rate = 10) + 0.3
+  response <- factor(sample(c("upper", "lower"), 100, replace = TRUE, prob = c(0.8, 0.2)))
+
+  result <- ezdm_summary_stats(rt, response, method = "simple")
+  expect_equal(result$n_upper, sum(response == "upper"))
+})
+
+test_that("ezdm_summary_stats() handles correct/error and logical responses", {
+  set.seed(123)
+  rt <- rgamma(100, shape = 5, rate = 10) + 0.3
+
+  response_ce <- sample(c("correct", "error"), 100, replace = TRUE, prob = c(0.8, 0.2))
+  result_ce <- ezdm_summary_stats(rt, response_ce, method = "simple")
+  expect_equal(result_ce$n_upper, sum(response_ce == "correct"))
+
+  response_lgl <- sample(c(TRUE, FALSE), 100, replace = TRUE, prob = c(0.8, 0.2))
+  result_lgl <- ezdm_summary_stats(rt, response_lgl, method = "simple")
+  expect_equal(result_lgl$n_upper, sum(response_lgl))
+})
+
+test_that("ezdm_summary_stats() handles case-insensitive responses", {
+  set.seed(123)
+  rt <- rgamma(100, shape = 5, rate = 10) + 0.3
+  response <- sample(c("UPPER", "Lower", "UpPeR", "LOWER"), 100, replace = TRUE)
+
+  result <- ezdm_summary_stats(rt, response, method = "simple")
+  expect_equal(result$n_upper, sum(tolower(response) == "upper"))
+})
+
+test_that("ezdm_summary_stats() errors on unrecognized response values", {
+  rt <- rgamma(100, shape = 5, rate = 10) + 0.3
+  response <- sample(c("fast", "slow"), 100, replace = TRUE)
+
+  expect_error(
+    ezdm_summary_stats(rt, response),
+    "Unrecognized response values"
+  )
+})
+
+test_that("ezdm_summary_stats() 4par version works with character responses", {
+  set.seed(123)
+  rt <- rgamma(200, shape = 5, rate = 10) + 0.3
+  response <- sample(c("upper", "lower"), 200, replace = TRUE, prob = c(0.7, 0.3))
+
+  result <- ezdm_summary_stats(rt, response, version = "4par", method = "simple")
+
+  expect_true(all(c(
+    "mean_rt_upper", "mean_rt_lower", "var_rt_upper", "var_rt_lower"
+  ) %in% names(result)))
+  expect_equal(result$n_upper, sum(response == "upper"))
+  expect_false(is.na(result$mean_rt_upper))
+  expect_false(is.na(result$mean_rt_lower))
+})
+
+test_that("ezdm_summary_stats() handles NAs in rt", {
+  set.seed(123)
+  rt <- c(rgamma(90, shape = 5, rate = 10) + 0.3, rep(NA, 10))
+  response <- rbinom(100, 1, 0.8)
+
+  result <- ezdm_summary_stats(rt, response, method = "simple")
+
+  expect_equal(result$n_trials, 90L)
+  expect_equal(result$mean_rt, mean(rt, na.rm = TRUE), tolerance = 1e-10)
+})
+
+test_that("ezdm_summary_stats() works with dplyr::reframe()", {
+  skip_if_not_installed("dplyr")
   set.seed(123)
   test_data <- data.frame(
     subject = rep(1:3, each = 50),
@@ -704,932 +747,249 @@ test_that("ezdm_summary_stats() validates grouping variables", {
     correct = rbinom(150, 1, 0.8)
   )
 
-  expect_error(
-    ezdm_summary_stats(test_data,
-      rt = "rt", response = "correct",
-      .by = "nonexistent_var"
-    ),
-    "not found in data"
-  )
-})
-
-test_that("ezdm_summary_stats() validates contaminant_bound", {
-  test_data <- data.frame(
-    rt = rgamma(100, shape = 5, rate = 10) + 0.3,
-    correct = rbinom(100, 1, 0.8)
-  )
-
-  expect_error(
-    ezdm_summary_stats(test_data,
-      rt = "rt", response = "correct",
-      contaminant_bound = c(3.0, 0.1)
-    ),
-    "contaminant_bound\\[1\\] must be less than"
-  )
-
-  expect_error(
-    ezdm_summary_stats(test_data,
-      rt = "rt", response = "correct",
-      contaminant_bound = c(0.1)
-    ),
-    "contaminant_bound must be a vector of length 2"
-  )
-
-  # Invalid element type
-  expect_error(
-    ezdm_summary_stats(test_data,
-      rt = "rt", response = "correct",
-      contaminant_bound = c("invalid", 3.0)
-    ),
-    "contaminant_bound elements must be numeric or"
-  )
-})
-
-test_that("ezdm_summary_stats() accepts 'min' and 'max' for contaminant_bound", {
-  set.seed(123)
-  test_data <- data.frame(
-    rt = rgamma(100, shape = 5, rate = 10) + 0.3,
-    correct = rbinom(100, 1, 0.8)
-  )
-
-  # c("min", "max") should work
-
-  expect_no_error(
-    result <- ezdm_summary_stats(test_data,
-      rt = "rt", response = "correct",
-      contaminant_bound = c("min", "max")
-    )
-  )
-  expect_true(is.data.frame(result))
-  expect_true("mean_rt" %in% names(result))
-
-  # c(0.1, "max") should work (mixed)
-  expect_no_error(
-    result2 <- ezdm_summary_stats(test_data,
-      rt = "rt", response = "correct",
-      contaminant_bound = c(0.1, "max")
-    )
-  )
-  expect_true(is.data.frame(result2))
-
-  # c("min", 3.0) should work (mixed)
-  expect_no_error(
-    result3 <- ezdm_summary_stats(test_data,
-      rt = "rt", response = "correct",
-      contaminant_bound = c("min", 3.0)
-    )
-  )
-  expect_true(is.data.frame(result3))
-
-  # Case insensitive
-  expect_no_error(
-    result4 <- ezdm_summary_stats(test_data,
-      rt = "rt", response = "correct",
-      contaminant_bound = c("MIN", "MAX")
-    )
-  )
-  expect_true(is.data.frame(result4))
-})
-
-test_that("ezdm_summary_stats() data-driven bounds use actual data range", {
-  set.seed(456)
-  # Create data with known min/max
-  test_data <- data.frame(
-    rt = c(0.2, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0, 1.5, 2.0, 2.5),
-    correct = c(1, 1, 1, 1, 1, 1, 1, 0, 0, 0)
-  )
-  # Min RT = 0.2, Max RT = 2.5
-
-  # Using c("min", "max") should capture all data in bounds
-  result <- ezdm_summary_stats(test_data,
-    rt = "rt", response = "correct",
-    contaminant_bound = c("min", "max"),
-    method = "simple"
-  )
-
-  # Should have all 10 trials
-  expect_equal(result$n_trials, 10)
-})
-
-test_that("ezdm_summary_stats() data-driven bounds work per group", {
-  set.seed(789)
-  # Create data with different RT ranges for different subjects
-  test_data <- data.frame(
-    subject = rep(1:2, each = 50),
-    rt = c(
-      runif(50, 0.3, 1.0), # Subject 1: range 0.3-1.0
-      runif(50, 0.5, 2.0) # Subject 2: range 0.5-2.0
-    ),
-    correct = rbinom(100, 1, 0.8)
-  )
-
-  # Using "min"/"max" should adapt to each group's range
-  result <- ezdm_summary_stats(test_data,
-    rt = "rt", response = "correct",
-    .by = "subject", contaminant_bound = c("min", "max"),
-    method = "simple"
-  )
-
-  expect_equal(nrow(result), 2)
-  expect_equal(result$n_trials, c(50, 50))
-})
-
-test_that("ezdm_summary_stats() validates init_contaminant", {
-  test_data <- data.frame(
-    rt = rgamma(100, shape = 5, rate = 10) + 0.3,
-    correct = rbinom(100, 1, 0.8)
-  )
-
-  expect_error(
-    ezdm_summary_stats(test_data,
-      rt = "rt", response = "correct",
-      init_contaminant = 0
-    ),
-    "init_contaminant must be between 0 and 1"
-  )
-
-  expect_error(
-    ezdm_summary_stats(test_data,
-      rt = "rt", response = "correct",
-      init_contaminant = 1
-    ),
-    "init_contaminant must be between 0 and 1"
-  )
-})
-
-test_that("ezdm_summary_stats() validates max_contaminant", {
-  test_data <- data.frame(
-    rt = rgamma(100, shape = 5, rate = 10) + 0.3,
-    correct = rbinom(100, 1, 0.8)
-  )
-
-  expect_error(
-    ezdm_summary_stats(test_data,
-      rt = "rt", response = "correct",
-      max_contaminant = 0
-    ),
-    "max_contaminant must be between 0"
-  )
-
-  expect_error(
-    ezdm_summary_stats(test_data,
-      rt = "rt", response = "correct",
-      max_contaminant = 1.5
-    ),
-    "max_contaminant must be between 0"
-  )
-
-  expect_error(
-    ezdm_summary_stats(test_data,
-      rt = "rt", response = "correct",
-      max_contaminant = -0.1
-    ),
-    "max_contaminant must be between 0"
-  )
-
-  # max_contaminant = 1 should be valid (no upper bound enforcement)
-  expect_no_error(
-    ezdm_summary_stats(test_data,
-      rt = "rt", response = "correct",
-      max_contaminant = 1, method = "simple"
-    )
-  )
-})
-
-test_that("ezdm_summary_stats() validates init < max contaminant", {
-  test_data <- data.frame(
-    rt = rgamma(100, shape = 5, rate = 10) + 0.3,
-    correct = rbinom(100, 1, 0.8)
-  )
-
-  expect_error(
-    ezdm_summary_stats(test_data,
-      rt = "rt", response = "correct",
-      init_contaminant = 0.3, max_contaminant = 0.2
-    ),
-    "init_contaminant must be less than max_contaminant"
-  )
-
-  expect_error(
-    ezdm_summary_stats(test_data,
-      rt = "rt", response = "correct",
-      init_contaminant = 0.5, max_contaminant = 0.5
-    ),
-    "init_contaminant must be less than max_contaminant"
-  )
-})
-
-test_that("ezdm_summary_stats() clips contaminant proportion to max", {
-  set.seed(42)
-  # Generate data with many contaminants (uniform RTs)
-  n_true <- 50
-  n_contam <- 50
-  true_rt <- rgamma(n_true, shape = 5, rate = 10) + 0.3
-  contam_rt <- runif(n_contam, 0.1, 3.0)
-  test_data <- data.frame(
-    rt = c(true_rt, contam_rt),
-    correct = rbinom(100, 1, 0.8)
-  )
-
-  # With default max_contaminant = 0.5, high contamination should be clipped
-  result <- suppressWarnings(
-    ezdm_summary_stats(test_data,
-      rt = "rt", response = "correct",
-      max_contaminant = 0.3
-    )
-  )
-  expect_true(result$contaminant_prop <= 0.3)
-
-  # With max_contaminant = 0.1, should be clipped even more
-  result_strict <- suppressWarnings(
-    ezdm_summary_stats(test_data,
-      rt = "rt", response = "correct",
-      max_contaminant = 0.1
-    )
-  )
-  expect_true(result_strict$contaminant_prop <= 0.1)
-})
-
-test_that("ezdm_summary_stats() warns when contaminant proportion is clipped", {
-  set.seed(42)
-  # Generate data with many contaminants
-  n_true <- 50
-  n_contam <- 50
-  true_rt <- rgamma(n_true, shape = 5, rate = 10) + 0.3
-  contam_rt <- runif(n_contam, 0.1, 3.0)
-  test_data <- data.frame(
-    rt = c(true_rt, contam_rt),
-    correct = rbinom(100, 1, 0.8)
-  )
-
-  # Should warn when clipping occurs
-  expect_warning(
-    ezdm_summary_stats(test_data,
-      rt = "rt", response = "correct",
-      max_contaminant = 0.1
-    ),
-    "clipped to max_contaminant"
-  )
-})
-
-test_that("ezdm_summary_stats() max_contaminant works with 4par version", {
-  set.seed(42)
-  # Generate data with contaminants for both boundary types
-  n_per_group <- 60
-  true_rt_upper <- rgamma(n_per_group, shape = 5, rate = 10) + 0.3
-  true_rt_lower <- rgamma(n_per_group, shape = 5, rate = 10) + 0.3
-  contam_upper <- runif(20, 0.1, 3.0)
-  contam_lower <- runif(20, 0.1, 3.0)
-
-  test_data <- data.frame(
-    rt = c(true_rt_upper, contam_upper, true_rt_lower, contam_lower),
-    correct = c(rep(1, n_per_group + 20), rep(0, n_per_group + 20))
-  )
-
-  result <- suppressWarnings(
-    ezdm_summary_stats(test_data,
-      rt = "rt", response = "correct",
-      version = "4par", max_contaminant = 0.2
-    )
-  )
-
-  # Both contaminant proportions should be clipped
-  expect_true(is.na(result$contaminant_prop_upper) ||
-    result$contaminant_prop_upper <= 0.2)
-  expect_true(is.na(result$contaminant_prop_lower) ||
-    result$contaminant_prop_lower <= 0.2)
-})
-
-test_that("ezdm_summary_stats() handles character 'upper'/'lower' responses", {
-  set.seed(123)
-  test_data <- data.frame(
-    rt = rgamma(100, shape = 5, rate = 10) + 0.3,
-    response = sample(c("upper", "lower"), 100, replace = TRUE, prob = c(0.8, 0.2))
-  )
-
-  result <- ezdm_summary_stats(test_data,
-    rt = "rt", response = "response",
-    method = "simple"
-  )
-
-  expect_equal(result$n_upper, sum(test_data$response == "upper"))
-  expect_equal(result$n_trials, nrow(test_data))
-  expect_true(is.numeric(result$mean_rt))
-})
-
-test_that("ezdm_summary_stats() handles factor 'upper'/'lower' responses", {
-  set.seed(123)
-  test_data <- data.frame(
-    rt = rgamma(100, shape = 5, rate = 10) + 0.3,
-    response = factor(sample(c("upper", "lower"), 100, replace = TRUE, prob = c(0.8, 0.2)))
-  )
-
-  result <- ezdm_summary_stats(test_data,
-    rt = "rt", response = "response",
-    method = "simple"
-  )
-
-  expect_equal(result$n_upper, sum(test_data$response == "upper"))
-  expect_equal(result$n_trials, nrow(test_data))
-})
-
-test_that("ezdm_summary_stats() handles character 'correct'/'error' responses", {
-  set.seed(123)
-  test_data <- data.frame(
-    rt = rgamma(100, shape = 5, rate = 10) + 0.3,
-    response = sample(c("correct", "error"), 100, replace = TRUE, prob = c(0.8, 0.2))
-  )
-
-  result <- ezdm_summary_stats(test_data,
-    rt = "rt", response = "response",
-    method = "simple"
-  )
-
-  expect_equal(result$n_upper, sum(test_data$response == "correct"))
-  expect_equal(result$n_trials, nrow(test_data))
-})
-
-test_that("ezdm_summary_stats() handles logical TRUE/FALSE responses", {
-  set.seed(123)
-  test_data <- data.frame(
-    rt = rgamma(100, shape = 5, rate = 10) + 0.3,
-    response = sample(c(TRUE, FALSE), 100, replace = TRUE, prob = c(0.8, 0.2))
-  )
-
-  result <- ezdm_summary_stats(test_data,
-    rt = "rt", response = "response",
-    method = "simple"
-  )
-
-  expect_equal(result$n_upper, sum(test_data$response))
-  expect_equal(result$n_trials, nrow(test_data))
-})
-
-test_that("ezdm_summary_stats() handles case-insensitive responses", {
-  set.seed(123)
-  test_data <- data.frame(
-    rt = rgamma(100, shape = 5, rate = 10) + 0.3,
-    response = sample(c("UPPER", "Lower", "UpPeR", "LOWER"), 100, replace = TRUE)
-  )
-
-  result <- ezdm_summary_stats(test_data,
-    rt = "rt", response = "response",
-    method = "simple"
-  )
-
-  expect_equal(result$n_upper, sum(tolower(test_data$response) == "upper"))
-  expect_equal(result$n_trials, nrow(test_data))
-})
-
-test_that("ezdm_summary_stats() errors on unrecognized response values", {
-  test_data <- data.frame(
-    rt = rgamma(100, shape = 5, rate = 10) + 0.3,
-    response = sample(c("fast", "slow"), 100, replace = TRUE)
-  )
-
-  expect_error(
-    ezdm_summary_stats(test_data, rt = "rt", response = "response"),
-    "Unrecognized response values"
-  )
-})
-
-test_that("ezdm_summary_stats() 4par version works with character responses", {
-  set.seed(123)
-  test_data <- data.frame(
-    rt = rgamma(200, shape = 5, rate = 10) + 0.3,
-    response = sample(c("upper", "lower"), 200, replace = TRUE, prob = c(0.7, 0.3))
-  )
-
-  result <- ezdm_summary_stats(test_data,
-    rt = "rt", response = "response",
-    version = "4par", method = "simple"
-  )
-
-  expect_true(all(c(
-    "mean_rt_upper", "mean_rt_lower", "var_rt_upper",
-    "var_rt_lower"
-  ) %in% names(result)))
-  expect_equal(result$n_upper, sum(test_data$response == "upper"))
-  expect_false(is.na(result$mean_rt_upper))
-  expect_false(is.na(result$mean_rt_lower))
-})
-
-############################################################################# !
-# ezdm_summary_stats ACCURACY ADJUSTMENT TESTS                            ####
-############################################################################# !
-
-test_that("ezdm_summary_stats() adjust_accuracy adds columns when TRUE", {
-  set.seed(123)
-  test_data <- data.frame(
-    rt = rgamma(200, shape = 5, rate = 10) + 0.3,
-    correct = rbinom(200, 1, 0.8)
-  )
-
-  # Without adjustment
-  result_no_adj <- ezdm_summary_stats(test_data,
-    rt = "rt", response = "correct",
-    adjust_accuracy = FALSE
-  )
-  expect_false("n_upper_adj" %in% names(result_no_adj))
-  expect_false("n_trials_adj" %in% names(result_no_adj))
-
-  # With adjustment
-  result_adj <- ezdm_summary_stats(test_data,
-    rt = "rt", response = "correct",
-    adjust_accuracy = TRUE
-  )
-  expect_true("n_upper_adj" %in% names(result_adj))
-  expect_true("n_trials_adj" %in% names(result_adj))
-})
-
-test_that("ezdm_summary_stats() adjust_accuracy produces integer values", {
-  set.seed(42)
-  # Create data with known properties
-  n <- 200
-  test_data <- data.frame(
-    rt = rgamma(n, shape = 5, rate = 10) + 0.3,
-    correct = rbinom(n, 1, 0.8)
-  )
-
-  result <- ezdm_summary_stats(test_data,
-    rt = "rt", response = "correct",
-    adjust_accuracy = TRUE
-  )
-
-  # Adjusted values should be integers
-  expect_type(result$n_upper_adj, "integer")
-  expect_type(result$n_trials_adj, "integer")
-
-  # Adjusted values should be bounded
-  expect_true(result$n_upper_adj >= 0)
-  expect_true(result$n_upper_adj <= result$n_trials_adj)
-  expect_true(result$n_trials_adj <= result$n_trials)
-})
-
-
-test_that("ezdm_summary_stats() adjust_accuracy warns with simple method", {
-  test_data <- data.frame(
-    rt = rgamma(100, shape = 5, rate = 10) + 0.3,
-    correct = rbinom(100, 1, 0.8)
-  )
-
-  expect_warning(
-    ezdm_summary_stats(test_data,
-      rt = "rt", response = "correct",
-      method = "simple", adjust_accuracy = TRUE
-    ),
-    "adjust_accuracy has no effect"
-  )
-})
-
-test_that("ezdm_summary_stats() adjust_accuracy validates guess_rate", {
-  test_data <- data.frame(
-    rt = rgamma(100, shape = 5, rate = 10) + 0.3,
-    correct = rbinom(100, 1, 0.8)
-  )
-
-  expect_error(
-    ezdm_summary_stats(test_data,
-      rt = "rt", response = "correct",
-      guess_rate = -0.1
-    ),
-    "guess_rate must be between 0 and 1"
-  )
-
-  expect_error(
-    ezdm_summary_stats(test_data,
-      rt = "rt", response = "correct",
-      guess_rate = 1.5
-    ),
-    "guess_rate must be between 0 and 1"
-  )
-})
-
-test_that("ezdm_summary_stats() 4par with adjust_accuracy works", {
-  set.seed(123)
-  test_data <- data.frame(
-    rt = rgamma(300, shape = 5, rate = 10) + 0.3,
-    correct = rbinom(300, 1, 0.75)
-  )
-
-  result <- ezdm_summary_stats(test_data,
-    rt = "rt", response = "correct",
-    version = "4par", adjust_accuracy = TRUE
-  )
-
-  expect_true("n_upper_adj" %in% names(result))
-  expect_true("n_trials_adj" %in% names(result))
-  expect_type(result$n_upper_adj, "integer")
-  expect_type(result$n_trials_adj, "integer")
-  expect_true(result$n_upper_adj >= 0)
-  expect_true(result$n_upper_adj <= result$n_trials_adj)
-})
-
-test_that("ezdm_summary_stats() adjust_accuracy works with grouping", {
-  set.seed(123)
-  test_data <- data.frame(
-    subject = rep(1:3, each = 100),
-    rt = rgamma(300, shape = 5, rate = 10) + 0.3,
-    correct = rbinom(300, 1, 0.8)
-  )
-
-  result <- ezdm_summary_stats(test_data,
-    rt = "rt", response = "correct",
-    .by = "subject", adjust_accuracy = TRUE
-  )
+  result <- dplyr::group_by(test_data, subject) |>
+    dplyr::reframe(ezdm_summary_stats(rt, correct, method = "simple"))
 
   expect_equal(nrow(result), 3)
-  expect_true(all(c("n_upper_adj", "n_trials_adj") %in% names(result)))
+  expect_true(all(c("subject", "mean_rt", "var_rt", "n_upper", "n_trials") %in%
+    names(result)))
+})
 
-  # Check types are integers
+############################################################################# !
+# adjust_ezdm_accuracy TESTS                                              ####
+############################################################################# !
+
+test_that("adjust_ezdm_accuracy() returns 1-row data.frame", {
+  set.seed(42)
+  result <- adjust_ezdm_accuracy(80, 100, 0.1)
+
+  expect_s3_class(result, "data.frame")
+  expect_equal(nrow(result), 1)
+  expect_true(all(c("n_upper_adj", "n_trials_adj") %in% names(result)))
+})
+
+test_that("adjust_ezdm_accuracy() returns integer values", {
+  set.seed(42)
+  result <- adjust_ezdm_accuracy(80, 100, 0.1)
+
   expect_type(result$n_upper_adj, "integer")
   expect_type(result$n_trials_adj, "integer")
+  expect_true(result$n_upper_adj >= 0)
+  expect_true(result$n_upper_adj <= result$n_trials_adj)
+  expect_true(result$n_trials_adj <= 100)
+})
 
-  # Check each group has valid adjusted values
-  for (i in 1:3) {
-    expect_true(result$n_upper_adj[i] >= 0)
-    expect_true(result$n_upper_adj[i] <= result$n_trials_adj[i])
-  }
+test_that("adjust_ezdm_accuracy() handles NA contaminant_prop", {
+  result <- adjust_ezdm_accuracy(80, 100, NA)
+
+  expect_equal(result$n_upper_adj, 80L)
+  expect_equal(result$n_trials_adj, 100L)
+})
+
+test_that("adjust_ezdm_accuracy() handles zero contaminant_prop", {
+  result <- adjust_ezdm_accuracy(80, 100, 0)
+
+  expect_equal(result$n_upper_adj, 80L)
+  expect_equal(result$n_trials_adj, 100L)
+})
+
+test_that("adjust_ezdm_accuracy() validates inputs", {
+  expect_error(adjust_ezdm_accuracy("a", 100, 0.1), "n_upper must be numeric")
+  expect_error(adjust_ezdm_accuracy(80, "b", 0.1), "n_trials must be numeric")
+  expect_error(adjust_ezdm_accuracy(80, 100, 0.1, guess_rate = -0.1),
+    "guess_rate must be between 0 and 1")
+  expect_error(adjust_ezdm_accuracy(80, 100, 0.1, guess_rate = 1.5),
+    "guess_rate must be between 0 and 1")
 })
 
 ############################################################################# !
 # FLAG_CONTAMINANT_RTS TESTS                                              ####
 ############################################################################# !
 
-# Helper to create test data
-.create_test_rt_data <- function(n = 100, add_contaminants = TRUE, prop_contam = 0.1) {
+# Helper to create test RT vector with known contaminants
+.create_test_rt_vec <- function(n = 100, add_contaminants = TRUE, prop_contam = 0.1) {
   set.seed(123)
   if (add_contaminants) {
     n_legit <- floor((1 - prop_contam) * n)
     n_contam <- n - n_legit
-    rt <- c(rgamma(n_legit, shape = 3, rate = 5), runif(n_contam, 0.05, 0.15))
+    c(rgamma(n_legit, shape = 3, rate = 5), runif(n_contam, 0.05, 0.15))
   } else {
-    rt <- rgamma(n, shape = 3, rate = 5)
+    rgamma(n, shape = 3, rate = 5)
   }
-  data.frame(
-    rt = rt,
-    response = sample(c(0, 1), n, replace = TRUE),
-    subject = rep(1:2, each = n / 2),
-    condition = rep(c("A", "B"), times = n / 2)
-  )
 }
 
 # Section 1: Return Structure Tests ------------------------------------------
 
-test_that("flag_contaminant_rts() returns correct structure with what_return='data'", {
-  data <- .create_test_rt_data(n = 100)
-  
-  result <- flag_contaminant_rts(data, rt = "rt", what_return = "data")
-  
-  expect_s3_class(result, "data.frame")
-  expect_equal(nrow(result), 100)
-  expect_true("contam_prob" %in% names(result))
-  expect_type(result$contam_prob, "double")
+test_that("flag_contaminant_rts() returns numeric vector", {
+  rt <- .create_test_rt_vec(n = 100)
+
+  result <- flag_contaminant_rts(rt)
+
+  expect_type(result, "double")
+  expect_equal(length(result), 100)
 })
 
-test_that("flag_contaminant_rts() returns correct structure with what_return='diagnostics'", {
-  data <- .create_test_rt_data(n = 100)
-  
-  result <- flag_contaminant_rts(data, rt = "rt", what_return = "diagnostics")
-  
-  expect_s3_class(result, "data.frame")
-  expect_equal(nrow(result), 1)
-  expect_true(all(c("mixture_params", "contaminant_prop", "converged") %in% names(result)))
-  expect_type(result$contaminant_prop, "double")
-  expect_type(result$converged, "logical")
-})
+test_that("flag_contaminant_rts() attaches diagnostics attribute", {
+  rt <- .create_test_rt_vec(n = 100)
 
-test_that("flag_contaminant_rts() returns correct structure with what_return='all'", {
-  data <- .create_test_rt_data(n = 100)
-  
-  result <- flag_contaminant_rts(data, rt = "rt", what_return = "all")
-  
-  expect_type(result, "list")
-  expect_true(all(c("data", "diagnostics") %in% names(result)))
-  expect_s3_class(result$data, "data.frame")
-  expect_s3_class(result$diagnostics, "data.frame")
-  expect_equal(nrow(result$data), 100)
-  expect_equal(nrow(result$diagnostics), 1)
+  result <- flag_contaminant_rts(rt)
+  diag <- attr(result, "diagnostics")
+
+  expect_s3_class(diag, "data.frame")
+  expect_equal(nrow(diag), 1)
+  expect_true(all(
+    c("mixture_params", "contaminant_prop", "converged") %in% names(diag)
+  ))
+  expect_type(diag$contaminant_prop, "double")
+  expect_type(diag$converged, "logical")
 })
 
 # Section 2: Argument Validation Tests ---------------------------------------
 
-test_that("flag_contaminant_rts() validates required arguments", {
-  data <- .create_test_rt_data()
-  
+test_that("flag_contaminant_rts() validates rt is numeric", {
   expect_error(
-    flag_contaminant_rts(rt = "rt"),
-    "required arguments are missing"
-  )
-  
-  expect_error(
-    flag_contaminant_rts(data = data),
-    "required arguments are missing"
+    flag_contaminant_rts(rt = "not_numeric"),
+    "must be a numeric vector"
   )
 })
 
-test_that("flag_contaminant_rts() validates column names", {
-  data <- .create_test_rt_data()
-  
+test_that("flag_contaminant_rts() validates rt is non-empty", {
   expect_error(
-    flag_contaminant_rts(data, rt = "nonexistent"),
-    "not found in data"
-  )
-  
-  expect_error(
-    flag_contaminant_rts(data, rt = "rt", response = "nonexistent", version = "4par"),
-    "not found in data"
-  )
-})
-
-test_that("flag_contaminant_rts() validates version parameter", {
-  data <- .create_test_rt_data()
-  
-  expect_error(
-    flag_contaminant_rts(data, rt = "rt", version = "invalid"),
-    "should be one of"
-  )
-})
-
-test_that("flag_contaminant_rts() requires response when version='4par'", {
-  data <- .create_test_rt_data()
-  
-  expect_error(
-    flag_contaminant_rts(data, rt = "rt", version = "4par"),
-    "Argument 'response' is required when version = '4par'"
-  )
-  
-  # Should work with response provided
-  expect_silent(
-    flag_contaminant_rts(data, rt = "rt", response = "response", version = "4par")
+    flag_contaminant_rts(rt = numeric(0)),
+    "has length 0"
   )
 })
 
 test_that("flag_contaminant_rts() warns for RTs > 10", {
-  # Mix of large and normal RTs to ensure some data remains after filtering
-  data <- data.frame(rt = c(15, 20, 25, 0.5, 0.6, 0.7, 0.8, 0.9))
-  
+  rt <- c(15, 20, 25, 0.5, 0.6, 0.7, 0.8, 0.9)
+
   expect_warning(
-    flag_contaminant_rts(data, rt = "rt"),
+    flag_contaminant_rts(rt),
     "Some RT values > 10"
   )
 })
 
 test_that("flag_contaminant_rts() errors for non-positive RTs", {
-  data <- data.frame(rt = c(-0.1, -0.2, 0.3, 0.5, 0.6, 0.7, 0.8, 0.9))
+  rt <- c(-0.1, -0.2, 0.3, 0.5, 0.6, 0.7, 0.8, 0.9)
 
   expect_error(
-    flag_contaminant_rts(data, rt = "rt"),
+    flag_contaminant_rts(rt),
     "Non-positive RT values found"
   )
 })
 
-# Section 3: Version Behavior Tests -------------------------------------------
+# Section 3: NA Handling Tests ------------------------------------------------
 
-test_that("flag_contaminant_rts() version='3par' creates correct columns", {
-  data <- .create_test_rt_data()
-  
-  result <- flag_contaminant_rts(data, rt = "rt", version = "3par")
-  
-  expect_true("contam_prob" %in% names(result))
-  expect_false(any(grepl("_upper|_lower", names(result))))
+test_that("flag_contaminant_rts() preserves NAs in output", {
+  rt <- c(0.3, 0.4, NA, 0.5, 0.6, NA, 0.7, 0.8, 0.9, 1.0,
+          0.35, 0.45, 0.55, 0.65, 0.75, 0.85, 0.95, 1.1, 1.2, 1.3)
+
+  result <- flag_contaminant_rts(rt)
+
+  expect_equal(length(result), length(rt))
+  expect_true(is.na(result[3]))
+  expect_true(is.na(result[6]))
+  expect_true(all(!is.na(result[!is.na(rt)])))
 })
 
-test_that("flag_contaminant_rts() version='4par' creates boundary-specific columns", {
-  data <- .create_test_rt_data()
-  
-  result <- flag_contaminant_rts(
-    data, rt = "rt", response = "response", version = "4par"
-  )
-  
-  expect_true("contam_prob_upper" %in% names(result))
-  expect_true("contam_prob_lower" %in% names(result))
-  expect_false("contam_prob" %in% names(result))
-})
-
-test_that("flag_contaminant_rts() version='4par' handles NAs correctly", {
-  data <- .create_test_rt_data()
-  
-  result <- flag_contaminant_rts(
-    data, rt = "rt", response = "response", version = "4par"
-  )
-  
-  # Upper trials (response=1) should have NA for _lower
-  upper_idx <- result$response == 1
-  expect_true(all(is.na(result$contam_prob_lower[upper_idx])))
-  expect_true(all(!is.na(result$contam_prob_upper[upper_idx])))
-  
-  # Lower trials (response=0) should have NA for _upper
-  lower_idx <- result$response == 0
-  expect_true(all(is.na(result$contam_prob_upper[lower_idx])))
-  expect_true(all(!is.na(result$contam_prob_lower[lower_idx])))
-})
-
-test_that("flag_contaminant_rts() version='4par' handles all-one-boundary edge case", {
-  data <- data.frame(
-    rt = rgamma(50, 3, 5),
-    response = rep(1, 50)  # All upper boundary
-  )
-  
-  # Should warn that EM didn't converge for lower boundary (0 trials)
-  expect_warning(
-    result <- flag_contaminant_rts(
-      data, rt = "rt", response = "response", version = "4par",
-      what_return = "diagnostics"
-    ),
-    "EM did not converge for lower boundary"
-  )
-  
-  expect_equal(result$n_trials_upper, 50)
-  expect_equal(result$n_trials_lower, 0)
-})
-
-# Section 4: Output Column Tests ----------------------------------------------
-
-test_that("flag_contaminant_rts() returns only contam_prob column", {
-  data <- .create_test_rt_data()
-
-  result <- flag_contaminant_rts(data, rt = "rt")
-
-  expect_true("contam_prob" %in% names(result))
-  expect_false("contam_lr" %in% names(result))
-  expect_false("contam_flag" %in% names(result))
-})
-
-# Section 5: Grouping Tests ---------------------------------------------------
-
-test_that("flag_contaminant_rts() handles multiple grouping variables", {
-  data <- .create_test_rt_data(n = 200)
-  
-  result <- flag_contaminant_rts(
-    data, rt = "rt", .by = c("subject", "condition"),
-    what_return = "diagnostics"
-  )
-  
-  expect_true("subject" %in% names(result))
-  expect_true("condition" %in% names(result))
-  expect_equal(nrow(result), 4)  # 2 subjects × 2 conditions
-})
-
-test_that("flag_contaminant_rts() handles no grouping", {
-  data <- .create_test_rt_data()
-  
-  result <- flag_contaminant_rts(
-    data, rt = "rt", .by = NULL, what_return = "diagnostics"
-  )
-  
-  expect_equal(nrow(result), 1)
-})
-
-test_that("flag_contaminant_rts() handles small groups gracefully", {
-  data <- data.frame(
-    rt = c(0.5, 0.6, 0.7),  # Only 3 trials
-    group = "small"
-  )
-  
-  # Should not error, but may warn or return NA
-  result <- suppressWarnings(
-    flag_contaminant_rts(data, rt = "rt", .by = "group", what_return = "diagnostics")
-  )
-  
-  expect_s3_class(result, "data.frame")
-  expect_equal(nrow(result), 1)
-})
-
-# Section 6: Response Format Tests --------------------------------------------
-
-test_that("flag_contaminant_rts() handles various response formats", {
-  n <- 100
-  rt <- rgamma(n, 3, 5)
-  
-  # Numeric 0/1
-  data1 <- data.frame(rt = rt, response = sample(c(0, 1), n, replace = TRUE))
-  expect_silent(
-    flag_contaminant_rts(data1, rt = "rt", response = "response", version = "4par")
-  )
-  
-  # Logical
-  data2 <- data.frame(rt = rt, response = sample(c(TRUE, FALSE), n, replace = TRUE))
-  expect_silent(
-    flag_contaminant_rts(data2, rt = "rt", response = "response", version = "4par")
-  )
-  
-  # Character
-  data3 <- data.frame(rt = rt, response = sample(c("upper", "lower"), n, replace = TRUE))
-  expect_silent(
-    flag_contaminant_rts(data3, rt = "rt", response = "response", version = "4par")
-  )
-  
-  # Factor
-  data4 <- data.frame(rt = rt, response = factor(sample(c(0, 1), n, replace = TRUE)))
-  expect_silent(
-    flag_contaminant_rts(data4, rt = "rt", response = "response", version = "4par")
-  )
-})
-
-# Section 7: Distribution Tests -----------------------------------------------
+# Section 4: Distribution Tests -----------------------------------------------
 
 test_that("flag_contaminant_rts() works with different distributions", {
-  data <- .create_test_rt_data()
-  
-  # All three distributions should work
-  result_exg <- flag_contaminant_rts(
-    data, rt = "rt", distribution = "exgaussian", what_return = "diagnostics"
-  )
-  result_lnorm <- flag_contaminant_rts(
-    data, rt = "rt", distribution = "lognormal", what_return = "diagnostics"
-  )
-  result_invg <- flag_contaminant_rts(
-    data, rt = "rt", distribution = "invgaussian", what_return = "diagnostics"
-  )
-  
-  expect_equal(result_exg$distribution, "exgaussian")
-  expect_equal(result_lnorm$distribution, "lognormal")
-  expect_equal(result_invg$distribution, "invgaussian")
-  
-  expect_true(result_exg$converged)
-  expect_true(result_lnorm$converged)
-  expect_true(result_invg$converged)
+  rt <- .create_test_rt_vec()
+
+  result_exg <- flag_contaminant_rts(rt, distribution = "exgaussian")
+  result_lnorm <- flag_contaminant_rts(rt, distribution = "lognormal")
+  result_invg <- flag_contaminant_rts(rt, distribution = "invgaussian")
+
+  diag_exg <- attr(result_exg, "diagnostics")
+  diag_lnorm <- attr(result_lnorm, "diagnostics")
+  diag_invg <- attr(result_invg, "diagnostics")
+
+  expect_equal(diag_exg$distribution, "exgaussian")
+  expect_equal(diag_lnorm$distribution, "lognormal")
+  expect_equal(diag_invg$distribution, "invgaussian")
+
+  expect_true(diag_exg$converged)
+  expect_true(diag_lnorm$converged)
+  expect_true(diag_invg$converged)
 })
 
-# Section 8: Detection Quality Tests ------------------------------------------
+# Section 5: Detection Quality Tests ------------------------------------------
 
 test_that("flag_contaminant_rts() detects simulated contaminants", {
   set.seed(456)
   n <- 200
   n_contam <- 20
-  
-  # Create data with known contaminants (very fast RTs)
+
   rt_legit <- rgamma(n - n_contam, shape = 3, rate = 5)
   rt_contam <- runif(n_contam, 0.05, 0.1)
-  
-  data <- data.frame(
-    rt = c(rt_legit, rt_contam),
-    true_type = c(rep("legit", n - n_contam), rep("contam", n_contam))
-  )
-  
-  result <- flag_contaminant_rts(data, rt = "rt")
-  
-  # Contaminants should have higher probabilities on average
-  mean_prob_contam <- mean(result$contam_prob[data$true_type == "contam"])
-  mean_prob_legit <- mean(result$contam_prob[data$true_type == "legit"])
-  
+  rt <- c(rt_legit, rt_contam)
+  is_contam <- c(rep(FALSE, n - n_contam), rep(TRUE, n_contam))
+
+  result <- flag_contaminant_rts(rt)
+
+  mean_prob_contam <- mean(result[is_contam])
+  mean_prob_legit <- mean(result[!is_contam])
+
   expect_true(mean_prob_contam > mean_prob_legit)
 })
 
 test_that("flag_contaminant_rts() contamination probabilities are in valid range", {
-  data <- .create_test_rt_data()
-  
-  result <- flag_contaminant_rts(data, rt = "rt")
-  
-  expect_true(all(result$contam_prob >= 0 & result$contam_prob <= 1, na.rm = TRUE))
+  rt <- .create_test_rt_vec()
+
+  result <- flag_contaminant_rts(rt)
+
+  expect_true(all(result >= 0 & result <= 1, na.rm = TRUE))
 })
 
-# Section 9: Diagnostics Content Tests ----------------------------------------
+# Section 6: Diagnostics Content Tests ----------------------------------------
 
 test_that("flag_contaminant_rts() diagnostics contain mixture parameters", {
-  data <- .create_test_rt_data()
-  
-  result <- flag_contaminant_rts(data, rt = "rt", what_return = "diagnostics")
-  
-  expect_true("mixture_params" %in% names(result))
-  expect_type(result$mixture_params, "list")
-  
-  # For exgaussian, should have mu, sigma, tau parameters
-  params <- result$mixture_params[[1]]
+  rt <- .create_test_rt_vec()
+
+  result <- flag_contaminant_rts(rt)
+  diag <- attr(result, "diagnostics")
+
+  expect_true("mixture_params" %in% names(diag))
+  expect_type(diag$mixture_params, "list")
+
+  params <- diag$mixture_params[[1]]
   expect_true(all(c("mu", "sigma", "tau") %in% names(params)))
 })
 
 test_that("flag_contaminant_rts() diagnostics report convergence correctly", {
-  data <- .create_test_rt_data()
-  
-  result <- flag_contaminant_rts(data, rt = "rt", what_return = "diagnostics")
-  
-  expect_true("converged" %in% names(result))
-  expect_type(result$converged, "logical")
-  expect_true("iterations" %in% names(result))
-  expect_type(result$iterations, "integer")
-  
-  if (result$converged) {
-    expect_true("loglik" %in% names(result))
-    expect_false(is.na(result$loglik))
+  rt <- .create_test_rt_vec()
+
+  result <- flag_contaminant_rts(rt)
+  diag <- attr(result, "diagnostics")
+
+  expect_true("converged" %in% names(diag))
+  expect_type(diag$converged, "logical")
+  expect_true("iterations" %in% names(diag))
+  expect_type(diag$iterations, "integer")
+
+  if (diag$converged) {
+    expect_true("loglik" %in% names(diag))
+    expect_false(is.na(diag$loglik))
   }
 })
 
 test_that("flag_contaminant_rts() diagnostics track trial counts", {
-  data <- .create_test_rt_data(n = 150)
-  
-  result_3par <- flag_contaminant_rts(
-    data, rt = "rt", version = "3par", what_return = "diagnostics"
-  )
-  expect_equal(result_3par$n_trials, 150)
-  
-  result_4par <- flag_contaminant_rts(
-    data, rt = "rt", response = "response", version = "4par", 
-    what_return = "diagnostics"
-  )
-  expect_equal(
-    result_4par$n_trials_upper + result_4par$n_trials_lower, 
-    150
-  )
+  rt <- .create_test_rt_vec(n = 150)
+
+  result <- flag_contaminant_rts(rt)
+  diag <- attr(result, "diagnostics")
+
+  expect_equal(diag$n_trials, 150)
+})
+
+# Section 7: Small Input Tests ------------------------------------------------
+
+test_that("flag_contaminant_rts() handles small inputs gracefully", {
+  rt <- c(0.5, 0.6, 0.7)
+
+  result <- suppressWarnings(flag_contaminant_rts(rt))
+
+  expect_type(result, "double")
+  expect_equal(length(result), 3)
 })

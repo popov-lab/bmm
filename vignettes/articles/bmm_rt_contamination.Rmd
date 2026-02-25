@@ -7,7 +7,7 @@ bibliography: REFERENCES.bib
 header-includes:
   - \usepackage{amsmath}
 vignette: >
-  %\VignetteIndexEntry{The Memory Measurement Model (M3)}
+  %\VignetteIndexEntry{Handling RT Contamination in Evidence Accumulation Models}
   %\VignetteEngine{knitr::rmarkdown}
   %\VignetteEncoding{UTF-8}
 pkgdown:
@@ -92,13 +92,12 @@ Because EZDM uses closed-form equations rather than trial-level fitting:
 The function provides three methods for computing summary statistics:
 
 ```r
-ezdm_summary_stats(
-  data = my_data,
-  rt = "rt",
-  response = "response",
-  .by = c("subject", "condition"),
-  method = "mixture"  # "simple", "robust", or "mixture"
-)
+my_data |>
+  group_by(subject, condition) |>
+  reframe(ezdm_summary_stats(
+    rt, response,
+    method = "mixture"  # "simple", "robust", or "mixture"
+  ))
 ```
 
 **Method comparison:**
@@ -140,27 +139,20 @@ Now compare the three methods:
 ```{r compare-methods}
 # Simple method (biased by contaminants)
 stats_simple <- ezdm_summary_stats(
-  data = rr98_subset,
-  rt = "rt",
-  response = "response",
+  rr98_subset$rt, rr98_subset$response,
   method = "simple"
 )
 
 # Robust method (median-based)
 stats_robust <- ezdm_summary_stats(
-  data = rr98_subset,
-  rt = "rt",
-  response = "response",
+  rr98_subset$rt, rr98_subset$response,
   method = "robust"
 )
 
 # Mixture method (EM algorithm)
 stats_mixture <- ezdm_summary_stats(
-  data = rr98_subset,
-  rt = "rt",
-  response = "response",
+  rr98_subset$rt, rr98_subset$response,
   method = "mixture",
-  version = "3par",
   distribution = "exgaussian",
   contaminant_bound = c("min", "max")
 )
@@ -186,18 +178,14 @@ The `version` parameter controls whether contamination is modeled separately for
 ```{r version-comparison}
 # version = "3par": Single contamination proportion for all RTs
 stats_3par <- ezdm_summary_stats(
-  data = rr98_subset,
-  rt = "rt",
-  response = "response",
+  rr98_subset$rt, rr98_subset$response,
   method = "mixture",
   version = "3par"
 )
 
 # version = "4par": Separate contamination for upper/lower responses
 stats_4par <- ezdm_summary_stats(
-  data = rr98_subset,
-  rt = "rt",
-  response = "response",
+  rr98_subset$rt, rr98_subset$response,
   method = "mixture",
   version = "4par"
 )
@@ -263,36 +251,35 @@ Complete workflow from raw data to EZDM model:
 
 ```{r ezdm-workflow, eval = FALSE}
 # Step 1: Aggregate data with contamination handling
-ezdm_data <- ezdm_summary_stats(
-  data = raw_trial_data,
-  rt = "rt",
-  response = "response",
-  .by = c("subject", "condition"),
-  method = "mixture",
-  version = "4par",
-  distribution = "exgaussian",
-  contaminant_bound = c("min", "max")
-)
+ezdm_data <- raw_trial_data |>
+  group_by(subject, condition) |>
+  reframe(ezdm_summary_stats(
+    rt, response,
+    method = "mixture",
+    distribution = "exgaussian",
+    contaminant_bound = c("min", "max")
+  ))
 
 # Step 2: Inspect contamination estimates
-ezdm_data %>%
-  select(subject, condition, contam_prop_upper, contam_prop_lower) %>%
+ezdm_data |>
+  select(subject, condition, contaminant_prop) |>
   print()
 
 # Step 3: Visualize contamination by condition
-ezdm_data %>%
-  pivot_longer(cols = c(contam_prop_upper, contam_prop_lower),
-               names_to = "boundary", values_to = "contam_prop") %>%
-  ggplot(aes(x = condition, y = contam_prop, fill = boundary)) +
+ezdm_data |>
+  ggplot(aes(x = condition, y = contaminant_prop)) +
   geom_boxplot() +
   labs(title = "Contamination Proportions by Condition",
        y = "Contamination Proportion")
 
 # Step 4: Fit EZDM model with cleaned statistics
 fit <- bmm(
-  formula = bmf(drift ~ condition, bs ~ 1, ndt ~ 1),
+  formula = bmf(drift ~ condition, bound ~ 1, ndt ~ 1),
   data = ezdm_data,
-  model = ezdm(),
+  model = ezdm(
+    mean_rt = "mean_rt", var_rt = "var_rt",
+    n_upper = "n_upper", n_trials = "n_trials"
+  ),
   prior = prior(normal(0, 1), class = "b", dpar = "drift"),
   chains = 4,
   cores = 4,
@@ -322,79 +309,32 @@ Use `flag_contaminant_rts()` to get per-trial contamination probabilities, then 
 
 ### Basic Usage of `flag_contaminant_rts()`
 
-The function returns trial-level contamination probabilities:
+The function takes a numeric vector of RTs and returns a numeric vector of contamination probabilities. This makes it compatible with `dplyr::mutate()` and `dplyr::group_by()` workflows:
 
 ```{r flag-basic-example}
 # Use the rr98 data subset
-flagged <- flag_contaminant_rts(
-  data = rr98_subset,
-  rt = "rt",
-  response = "response",
-  version = "3par",
-  what_return = "data"
-)
+flagged <- rr98_subset %>%
+  mutate(contam_prob = flag_contaminant_rts(rt))
 
 # Examine output
 head(flagged)
 
-# New column added:
-# - contam_prob: Posterior probability P(contaminant | RT) for each trial
+# contam_prob: Posterior probability P(contaminant | RT) for each trial
 ```
 
-The what_return parameter determines what information the function provides. Setting it to "data" returns the original data frame augmented with contamination columns, allowing immediate use of the flagged data in subsequent analyses. The "diagnostics" option returns only the fit diagnostics including convergence status and parameter estimates, useful for checking model performance across groups without retaining the full dataset. The "all" option returns a list containing both components, providing complete information about both the trial-level classifications and the quality of the mixture model fits.
+Mixture fit diagnostics (convergence status, parameter estimates, log-likelihood) are attached as an attribute of the returned vector. Access them with `attr()`:
 
-```{r what-return-example}
-# Get both data and diagnostics
-flagged_all <- flag_contaminant_rts(
-  data = rr98_subset,
-  rt = "rt",
-  response = "response",
-  version = "3par",
-  what_return = "all"
-)
+```{r diagnostics-example}
+# Get contamination probabilities
+probs <- flag_contaminant_rts(rr98_subset$rt)
 
-# Trial-level data
-head(flagged_all$data)
-
-# Fit diagnostics
-print(flagged_all$diagnostics)
+# Access diagnostics
+attr(probs, "diagnostics")
 ```
 
-### Version: 3-Parameter vs 4-Parameter
+### Grouping
 
-Like `ezdm_summary_stats()`, you can model contamination separately by response:
-
-```{r flag-version}
-# version = "3par": Single contamination probability for all trials
-flagged_3par <- flag_contaminant_rts(
-  data = rr98_subset,
-  rt = "rt",
-  version = "3par"
-)
-
-# Check columns
-names(flagged_3par)[grepl("contam", names(flagged_3par))]
-# [1] "contam_prob"
-
-# version = "4par": Separate probabilities for upper/lower responses
-# NOTE: Requires response parameter
-flagged_4par <- flag_contaminant_rts(
-  data = rr98_subset,
-  rt = "rt",
-  response = "response",
-  version = "4par"
-)
-
-# Check columns
-names(flagged_4par)[grepl("contam", names(flagged_4par))]
-# [1] "contam_prob_upper" "contam_prob_lower"
-```
-
-An important detail when using the 4-parameter version is that contamination probabilities for the boundary not chosen on each trial are set to NA. For instance, when response equals "upper", the contam_prob_lower value will be NA for that trial, and vice versa. This design reflects the fact that the mixture model estimates separate contamination distributions for each boundary, making it inappropriate to assign contamination probabilities from one boundary's distribution to trials that terminated at the other boundary.
-
-### Grouping Variables
-
-Use `.by` to fit separate mixture models for each group:
+To fit separate mixture models for different subsets (e.g., by subject or response boundary), use `dplyr::group_by()` before calling `flag_contaminant_rts()` inside `mutate()`:
 
 ```{r grouping-example}
 # Use multiple subjects from rr98 with instruction as grouping variable
@@ -402,18 +342,23 @@ rr98_grouped <- rr98 %>%
   filter(id %in% c("jf", "kr")) %>%
   mutate(response = ifelse(response == "dark", "upper", "lower"))
 
-# Flag with grouping by subject and instruction
-flagged_grouped <- flag_contaminant_rts(
-  data = rr98_grouped,
-  rt = "rt",
-  response = "response",
-  .by = c("id", "instruction"),
-  version = "3par",
-  what_return = "all"
-)
+# Fit separate mixtures by subject and instruction
+flagged_grouped <- rr98_grouped %>%
+  group_by(id, instruction) %>%
+  mutate(contam_prob = flag_contaminant_rts(rt))
 
-# Diagnostics preserve grouping variables
-print(flagged_grouped$diagnostics)
+head(flagged_grouped)
+```
+
+To fit separate mixtures by response boundary (analogous to the "4par" approach in `ezdm_summary_stats()`), simply group by the response variable:
+
+```{r grouping-by-response}
+# Separate fits by response boundary
+flagged_by_resp <- rr98_subset %>%
+  group_by(response) %>%
+  mutate(contam_prob = flag_contaminant_rts(rt))
+
+head(flagged_by_resp)
 ```
 
 Grouping by meaningful experimental factors such as subject, condition, or block allows the mixture model parameters to vary appropriately across different contexts where RT distributions may differ systematically. Failing to group when groups have genuinely different RT distributions can lead to poor fits, while over-grouping into cells with insufficient trials (fewer than 50-100 per group) can produce unstable parameter estimates or convergence failures.
@@ -424,56 +369,39 @@ Complete workflow from flagging to model fitting:
 
 ```{r filtering-workflow, eval = FALSE}
 # Step 1: Flag contaminated trials
-flagged_data <- flag_contaminant_rts(
-  data = raw_data,
-  rt = "rt",
-  response = "response",
-  .by = c("subject", "condition"),
-  version = "4par",
-  what_return = "all",
-  distribution = "exgaussian",
-  contaminant_bound = c("min", "max")
-)
+flagged_data <- raw_data %>%
+  group_by(subject, condition, response) %>%
+  mutate(
+    contam_prob = flag_contaminant_rts(
+      rt,
+      distribution = "exgaussian",
+      contaminant_bound = c("min", "max")
+    )
+  ) %>%
+  ungroup()
 
-# Step 2: Examine diagnostics
-# Check convergence
-all(flagged_data$diagnostics$converged)
-
-# Contamination proportions by group
-ggplot(flagged_data$diagnostics, 
-       aes(x = condition, y = contaminant_prop_upper)) +
-  geom_boxplot() +
-  facet_wrap(~subject) +
-  labs(title = "Contamination Rates by Subject and Condition",
-       y = "Contamination Proportion (Upper)")
-
-# Step 3: Visualize trial-level probabilities
-ggplot(flagged_data$data, aes(x = contam_prob_upper)) +
+# Step 2: Visualize trial-level probabilities
+ggplot(flagged_data, aes(x = contam_prob)) +
   geom_histogram(bins = 50, fill = "steelblue") +
   geom_vline(xintercept = 0.5, linetype = "dashed", color = "red") +
   labs(title = "Distribution of Contamination Probabilities",
        subtitle = "Red line: typical threshold (0.5)",
        x = "P(Contaminated)", y = "Count")
 
-# Step 4: Apply filtering threshold
-threshold <- 0.5
-
-clean_data <- flagged_data$data %>%
-  filter(
-    (response == "upper" & (is.na(contam_prob_upper) | contam_prob_upper < threshold)) |
-    (response == "lower" & (is.na(contam_prob_lower) | contam_prob_lower < threshold))
-  )
+# Step 3: Apply filtering threshold
+clean_data <- flagged_data %>%
+  filter(contam_prob < 0.5)
 
 cat("Original trials:", nrow(raw_data), "\n")
 cat("After filtering:", nrow(clean_data), "\n")
-cat("Removed:", nrow(raw_data) - nrow(clean_data), 
+cat("Removed:", nrow(raw_data) - nrow(clean_data),
     sprintf("(%.1f%%)\n", 100 * (1 - nrow(clean_data)/nrow(raw_data))))
 
-# Step 5: Fit DDM/csWald with clean data
+# Step 4: Fit DDM/csWald with clean data
 fit <- bmm(
-  formula = bmf(drift ~ condition, bs ~ 1, ndt ~ 1),
+  formula = bmf(drift ~ condition, bound ~ 1, ndt ~ 1),
   data = clean_data,
-  model = ddm(),
+  model = ddm(resp1 = "rt", resp2 = "response"),
   chains = 4,
   cores = 4,
   backend = "cmdstanr"
@@ -490,8 +418,9 @@ The most straightforward approach uses a fixed threshold, typically 0.5, which r
 
 ```r
 # Hard threshold: flag trials with P(contaminant) > 0.5
-flagged_data$is_contaminant <- flagged_data$contam_prob > 0.5
-clean_data <- flagged_data[!flagged_data$is_contaminant, ]
+my_data <- my_data %>%
+  mutate(contam_prob = flag_contaminant_rts(rt))
+clean_data <- my_data %>% filter(contam_prob <= 0.5)
 ```
 
 #### Probabilistic Flagging
@@ -501,10 +430,12 @@ An alternative approach uses binomial sampling based on each trial's contaminati
 ```r
 # Probabilistic flagging via binomial sampling
 set.seed(123)  # for reproducibility
-flagged_data$is_contaminant <- rbinom(
-  nrow(flagged_data), 1, flagged_data$contam_prob
-) == 1
-clean_data <- flagged_data[!flagged_data$is_contaminant, ]
+my_data <- my_data %>%
+  mutate(
+    contam_prob = flag_contaminant_rts(rt),
+    is_contaminant = rbinom(n(), 1, contam_prob) == 1
+  )
+clean_data <- my_data %>% filter(!is_contaminant)
 ```
 
 #### Other Strategies
@@ -513,12 +444,13 @@ A percentile-based approach removes a predetermined proportion of trials regardl
 
 ```r
 # Percentile-based removal
-threshold <- quantile(flagged_data$contam_prob, 0.95)
-clean_data <- flagged_data %>%
-  filter(contam_prob < threshold)
+my_data <- my_data %>%
+  mutate(contam_prob = flag_contaminant_rts(rt))
+threshold <- quantile(my_data$contam_prob, 0.95)
+clean_data <- my_data %>% filter(contam_prob < threshold)
 
 # Visual inspection
-ggplot(flagged_data, aes(x = rt, y = contam_prob)) +
+ggplot(my_data, aes(x = rt, y = contam_prob)) +
   geom_point(alpha = 0.3) +
   geom_hline(yintercept = 0.5, linetype = "dashed", color = "red")
 ```
@@ -528,28 +460,19 @@ ggplot(flagged_data, aes(x = rt, y = contam_prob)) +
 All customization options available in `ezdm_summary_stats()` apply equally to `flag_contaminant_rts()`, including distribution selection, contamination bound specification, and EM algorithm tuning parameters. These options allow researchers to tailor the contamination detection procedure to the specific characteristics of their experimental paradigm.
 
 ```{r advanced-options, eval = FALSE}
-flag_contaminant_rts(
-  data = ...,
-  rt = "rt",
-  response = "response",
-  
-  # Distribution for cognitive process
-  distribution = "exgaussian",  # or "lognormal", "invgaussian"
-  
-  # Contamination bounds (data-driven using observed min/max)
-  contaminant_bound = c("min", "max"),
-  
-  # EM algorithm parameters
-  init_contaminant = 0.05,
-  max_contaminant = 0.3,
-  maxit = 100,
-  epsilon = 1e-3,
-  
-  # Grouping and version
-  .by = c("subject", "condition"),
-  version = "4par",
-  what_return = "all"
-)
+my_data %>%
+  group_by(subject, condition, response) %>%
+  mutate(
+    contam_prob = flag_contaminant_rts(
+      rt,
+      distribution = "exgaussian",          # or "lognormal", "invgaussian"
+      contaminant_bound = c("min", "max"),   # data-driven bounds
+      init_contaminant = 0.05,
+      max_contaminant = 0.3,
+      maxit = 100,
+      tol = 1e-3
+    )
+  )
 ```
 
 ### Validating Fast Guess Assumptions
@@ -562,20 +485,17 @@ After obtaining contamination probabilities from `flag_contaminant_rts()`, you c
 
 ```{r validate-fast-guesses, eval = FALSE}
 # Step 1: Get contamination probabilities
-flagged <- flag_contaminant_rts(
-  data = my_2afc_data,
-  rt = "rt",
-  response = "response"
-)
+my_2afc_data <- my_2afc_data %>%
+  mutate(contam_prob = flag_contaminant_rts(rt))
 
 # Step 2: Create a flag using a hard threshold
-flagged$is_contaminant <- flagged$contam_prob > 0.5
+my_2afc_data$is_contaminant <- my_2afc_data$contam_prob > 0.5
 
 # Step 3: Validate fast guesses separately
 validation <- validate_fast_guesses(
-  contam_flag = flagged$is_contaminant,
-  rt_data = flagged$rt,
-  response = flagged$response,
+  contam_flag = my_2afc_data$is_contaminant,
+  rt_data = my_2afc_data$rt,
+  response = my_2afc_data$response,
   threshold_type = "quantile",  # or "absolute"
   rt_threshold = 0.25           # 25th percentile (or absolute RT in seconds)
 )
@@ -709,16 +629,15 @@ The speed condition shows lower mean RT, higher variability, and more extreme mi
 **Step 1: Aggregate with contamination handling**
 
 ```{r ezdm-workflow-aggregate}
-ezdm_data <- ezdm_summary_stats(
-  data = case_study_data,
-  rt = "rt",
-  response = "response",
-  .by = c("id", "instruction"),
-  method = "mixture",
-  version = "4par",
-  distribution = "exgaussian",
-  contaminant_bound = c("min", "max")
-)
+ezdm_data <- case_study_data |>
+  group_by(id, instruction) |>
+  reframe(ezdm_summary_stats(
+    rt, response,
+    method = "mixture",
+    version = "4par",
+    distribution = "exgaussian",
+    contaminant_bound = c("min", "max")
+  ))
 
 # Examine contamination estimates
 ezdm_data %>%
@@ -762,24 +681,18 @@ ezdm_data %>%
 ```{r ezdm-compare-stats}
 # Compare mixture-cleaned vs simple method
 # Note: Using 3par version for direct comparison of mean_rt and var_rt
-ezdm_simple <- ezdm_summary_stats(
-  data = case_study_data,
-  rt = "rt",
-  response = "response",
-  .by = c("id", "instruction"),
-  method = "simple"
-)
+ezdm_simple <- case_study_data |>
+  group_by(id, instruction) |>
+  reframe(ezdm_summary_stats(rt, response, method = "simple"))
 
-ezdm_mixture_3par <- ezdm_summary_stats(
-  data = case_study_data,
-  rt = "rt",
-  response = "response",
-  .by = c("id", "instruction"),
-  method = "mixture",
-  version = "3par",
-  distribution = "exgaussian",
-  contaminant_bound = c("min", "max")
-)
+ezdm_mixture_3par <- case_study_data |>
+  group_by(id, instruction) |>
+  reframe(ezdm_summary_stats(
+    rt, response,
+    method = "mixture",
+    distribution = "exgaussian",
+    contaminant_bound = c("min", "max")
+  ))
 
 comparison <- bind_rows(
   ezdm_simple %>% mutate(method = "simple (biased)"),
@@ -803,48 +716,34 @@ The mixture method provides contamination-robust estimates of mean RT and varian
 **Step 1: Flag contaminated trials**
 
 ```{r ddm-flag-trials}
-flagged_data <- flag_contaminant_rts(
-  data = case_study_data,
-  rt = "rt",
-  response = "response",
-  .by = c("id", "instruction"),
-  version = "4par",
-  what_return = "all",
-  distribution = "exgaussian",
-  contaminant_bound = c("min", "max")
-)
+flagged_data <- case_study_data %>%
+  group_by(id, instruction, response) %>%
+  mutate(
+    contam_prob = flag_contaminant_rts(
+      rt,
+      distribution = "exgaussian",
+      contaminant_bound = c("min", "max")
+    )
+  ) %>%
+  ungroup()
 
-# Check convergence
-table(flagged_data$diagnostics$converged)
-
-# Examine diagnostics by instruction condition
-flagged_summary <- flagged_data$diagnostics %>%
-  group_by(instruction) %>%
-  summarize(
-    mean_contam_upper = mean(contaminant_prop_upper, na.rm = TRUE),
-    sd_contam_upper = sd(contaminant_prop_upper, na.rm = TRUE),
-    mean_contam_lower = mean(contaminant_prop_lower, na.rm = TRUE),
-    sd_contam_lower = sd(contaminant_prop_lower, na.rm = TRUE)
-  )
-
-print(flagged_summary)
+head(flagged_data)
 ```
 
 **Step 2: Visualize trial-level probabilities**
 
 ```{r ddm-viz-probabilities}
 # Distribution of contamination probabilities
-ggplot(flagged_data$data, aes(x = contam_prob_upper, fill = instruction)) +
+ggplot(flagged_data, aes(x = contam_prob, fill = instruction)) +
   geom_histogram(bins = 50, alpha = 0.6, position = "identity") +
   geom_vline(xintercept = 0.5, linetype = "dashed", color = "red") +
   scale_fill_manual(values = c("speed" = "coral", "accuracy" = "steelblue")) +
   labs(title = "Distribution of Trial-Level Contamination Probabilities",
-       subtitle = "Red line: 0.5 threshold; accuracy condition has more high-probability contaminants",
+       subtitle = "Red line: 0.5 threshold",
        x = "P(Contaminated)", y = "Count")
 
 # RT vs contamination probability
-ggplot(flagged_data$data %>% filter(!is.na(contam_prob_upper)), 
-       aes(x = rt, y = contam_prob_upper, color = instruction)) +
+ggplot(flagged_data, aes(x = rt, y = contam_prob, color = instruction)) +
   geom_point(alpha = 0.1) +
   geom_hline(yintercept = 0.5, linetype = "dashed", color = "red") +
   scale_color_manual(values = c("speed" = "coral", "accuracy" = "steelblue")) +
@@ -859,11 +758,8 @@ ggplot(flagged_data$data %>% filter(!is.na(contam_prob_upper)),
 ```{r ddm-filter}
 threshold <- 0.5
 
-clean_data <- flagged_data$data %>%
-  filter(
-    (response == "upper" & (is.na(contam_prob_upper) | contam_prob_upper < threshold)) |
-    (response == "lower" & (is.na(contam_prob_lower) | contam_prob_lower < threshold))
-  )
+clean_data <- flagged_data %>%
+  filter(contam_prob < threshold)
 
 # Summary of filtering
 filter_summary <- case_study_data %>%
@@ -984,19 +880,18 @@ A reasonable workflow begins with the ex-Gaussian default, switching to alternat
 data <- read.csv("my_rt_data.csv")
 
 # 2. Aggregate with contamination handling (required)
-ezdm_data <- ezdm_summary_stats(
-  data = data,
-  rt = "rt",
-  response = "response",
-  .by = c("subject", "condition"),
-  method = "mixture"
-)
+ezdm_data <- data |>
+  group_by(subject, condition) |>
+  reframe(ezdm_summary_stats(rt, response, method = "mixture"))
 
 # 3. Fit EZDM model
 fit <- bmm(
-  formula = bmf(drift ~ condition, bs ~ 1, ndt ~ 1),
+  formula = bmf(drift ~ condition, bound ~ 1, ndt ~ 1),
   data = ezdm_data,
-  model = ezdm()
+  model = ezdm(
+    mean_rt = "mean_rt", var_rt = "var_rt",
+    n_upper = "n_upper", n_trials = "n_trials"
+  )
 )
 
 # 4. Analyze results
@@ -1009,37 +904,23 @@ summary(fit)
 data <- read.csv("my_rt_data.csv")
 
 # 2. Optional: Flag and filter contamination
-flagged <- flag_contaminant_rts(
-  data = data,
-  rt = "rt",
-  response = "response",
-  .by = c("subject", "condition")
-)
+data <- data %>%
+  group_by(subject, condition) %>%
+  mutate(contam_prob = flag_contaminant_rts(rt)) %>%
+  ungroup()
 
-clean_data <- flagged %>% filter(contam_prob < 0.5)
+clean_data <- data %>% filter(contam_prob < 0.5)
 
 # 3. Fit trial-level model
 fit <- bmm(
-  formula = bmf(drift ~ condition, bs ~ 1, ndt ~ 1),
-  data = clean_data,  # or use original 'data' if skipping filtering
-  model = ddm()
+  formula = bmf(drift ~ condition, bound ~ 1, ndt ~ 1),
+  data = clean_data,
+  model = ddm(resp1 = "rt", resp2 = "response")
 )
 
 # 4. Analyze results
 summary(fit)
 ```
-
-### Cross-References
-
-**Model-specific vignettes:**
-- [EZ Diffusion Model](bmm_ezdm.html) - Full EZDM workflow and examples
-- [Drift Diffusion Model](bmm_ddm.html) - DDM specification and fitting
-- [Circular Shifted Wald](bmm_cswald.html) - csWald for circular responses
-
-**Related topics:**
-- [Getting Started with bmm](bmm.html) - Package overview
-- [Formula Specification](bmm_formula.html) - Building bmmformula objects
-- [Model Comparison](bmm_model_comparison.html) - Comparing model fits
 
 ---
 
@@ -1053,14 +934,3 @@ When applying these methods in practice, researchers should begin by visualizing
 
 ## References
 
-Ratcliff, R., & Rouder, J. N. (1998). Modeling response times for two-choice decisions. *Psychological Science*, 9(5), 347–356.
-
-Ratcliff, R., & Tuerlinckx, F. (2002). Estimating parameters of the diffusion model: Approaches to dealing with contaminant reaction times and parameter variability. *Psychonomic Bulletin & Review*, 9(3), 438–481.
-
-Wagenmakers, E.-J., van der Maas, H. L. J., & Grasman, R. P. P. P. (2007). An EZ-diffusion model for response time and accuracy. *Psychonomic Bulletin & Review*, 14(1), 3–22.
-
-Wagenmakers, E.-J., van der Maas, H. L. J., Dolan, C. V., & Grasman, R. P. P. P. (2008). EZ does it! Extensions of the EZ-diffusion model. *Psychonomic Bulletin & Review*, 15(6), 1229–1235.
-
-Ratcliff, R., & McKoon, G. (2008). The diffusion decision model: Theory and data for two-choice decision tasks. *Neural Computation*, 20(4), 873–922.
-
-Smith, P. L. (2016). Diffusion theory of decision making in continuous report. *Psychological Review*, 123(4), 425–451.
