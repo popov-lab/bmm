@@ -101,7 +101,7 @@ stats_robust <- ezdm_summary_stats(
 )
 stats_mixture <- ezdm_summary_stats(
   rr98_subset$rt, rr98_subset$response,
-  method = "mixture", contaminant_bound = c("min", "max")
+  method = "mixture"
 )
 
 bind_rows(
@@ -296,7 +296,6 @@ ezdm_data <- case_study_data |>
   reframe(ezdm_summary_stats(
     rt, response,
     method = "mixture", version = "4par",
-    contaminant_bound = c("min", "max")
   ))
 
 ezdm_data |>
@@ -312,7 +311,6 @@ ezdm_mixture <- case_study_data |>
   group_by(id, instruction) |>
   reframe(ezdm_summary_stats(
     rt, response, method = "mixture",
-    contaminant_bound = c("min", "max")
   ))
 
 bind_rows(
@@ -364,9 +362,11 @@ Both workflows pick up on contamination differences between instruction conditio
 
 ## Practical guidance
 
+Before applying these functions, filter out implausible RTs that clearly cannot reflect any cognitive process. For example, RTs below 100ms are too fast for a voluntary motor response, and in many experiments RTs exceeding 10s in a speeded task likely reflect disengagement rather than slow accumulation. Removing these extreme values before mixture modeling ensures the algorithm focuses on distinguishing genuine slow responses from moderate contaminants, rather than being distorted by impossible values.
+
 Group by factors that affect the RT distribution (subject, condition), but keep at least 50 to 100 trials per group so the mixture model has enough data to work with.
 
-For contaminant bounds, 100--150ms is a sensible lower bound (faster than any real decision). The upper bound depends on your task; `c("min", "max")` adapts to the data and works well as a default.
+The default data-driven bounds (`c("min", "max")`) adapt the uniform component to the observed RT range and work well in most cases. If you need fixed bounds for cross-study comparability, specify them explicitly (e.g., `contaminant_bound = c(0.1, 3.0)`). RTs outside the contaminant bounds receive a contamination probability of zero, so ensure that implausible RTs are filtered beforehand.
 
 The ex-Gaussian distribution is a safe starting point. Try log-normal if you have heavy tails, or inverse Gaussian if you want a closer match to the Wiener process. See `?ezdm_summary_stats` for details.
 

@@ -366,11 +366,11 @@ has_nonconsecutive_duplicates <- function(vec) {
 #'   to be consistent with SD for normal data). Only used when method = "robust".
 #' @param contaminant_bound Vector of length 2 specifying the bounds (in
 #'   seconds) for the uniform contaminant distribution. Can be numeric values
-#'   or the special strings "min" and "max" to use data-driven bounds:
+#'   or the special strings "min" and "max" to use data-driven bounds (default):
 #'   \itemize{
-#'     \item Numeric: Fixed bounds, e.g., c(0.1, 3.0) (default)
 #'     \item "min": Use the minimum RT in each group, minus a 50\% buffer
 #'     \item "max": Use the maximum RT in each group, plus a 50\% buffer
+#'     \item Numeric: Fixed bounds, e.g., c(0.1, 3.0)
 #'   }
 #'   The buffer extends data-driven bounds to ensure conservative estimates.
 #'   Examples: c(0.1, 3.0), c("min", "max"), c(0.1, "max"), c("min", 3.0)
@@ -433,7 +433,7 @@ ezdm_summary_stats <- function(
     distribution = c("exgaussian", "lognormal", "invgaussian"),
     method = c("mixture", "simple", "robust"),
     robust_scale = c("iqr", "mad"),
-    contaminant_bound = c(0.1, 3.0),
+    contaminant_bound = c("min", "max"),
     min_trials = 10,
     init_contaminant = 0.05,
     max_contaminant = 0.5,
@@ -694,9 +694,9 @@ adjust_ezdm_accuracy <- function(n_upper, n_trials, contaminant_prop,
 #' @param rt Numeric vector. Reaction times in seconds. Must be positive.
 #' @param distribution Character. RT distribution for the mixture model:
 #'   "exgaussian" (default), "lognormal", or "invgaussian".
-#' @param contaminant_bound Numeric vector of length 2. Bounds `[lower, upper]`
+#' @param contaminant_bound Vector of length 2. Bounds `[lower, upper]`
 #'   for the uniform contaminant distribution. Can be numeric values or
-#'   "min"/"max" for data-driven bounds. Default `c(0.1, 3.0)`.
+#'   "min"/"max" for data-driven bounds. Default `c("min", "max")`.
 #' @param init_contaminant Numeric. Initial contaminant proportion for EM
 #'   algorithm. Must be in (0, 1). Default 0.05.
 #' @param max_contaminant Numeric. Maximum allowed contaminant proportion. Values
@@ -771,7 +771,7 @@ adjust_ezdm_accuracy <- function(n_upper, n_trials, contaminant_prop,
 flag_contaminant_rts <- function(
     rt,
     distribution = c("exgaussian", "lognormal", "invgaussian"),
-    contaminant_bound = c(0.1, 3.0),
+    contaminant_bound = c("min", "max"),
     init_contaminant = 0.05,
     max_contaminant = 0.5,
     maxit = 100,
@@ -800,7 +800,8 @@ flag_contaminant_rts <- function(
   } else {
     par <- fit$params
     pi_c <- fit$contaminant_prop
-    uniform_dens <- 1 / (resolved_bounds[2] - resolved_bounds[1])
+    in_bounds <- rt_clean >= resolved_bounds[1] & rt_clean <= resolved_bounds[2]
+    uniform_dens <- ifelse(in_bounds, 1 / (resolved_bounds[2] - resolved_bounds[1]), 0)
     dens_rt <- switch(distribution,
       exgaussian = dexgauss(rt_clean, par["mu"], par["sigma"], par["tau"]),
       lognormal = dlnorm(rt_clean, par["mu"], par["sigma"]),
