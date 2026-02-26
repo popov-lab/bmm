@@ -477,8 +477,8 @@ test_that("ezdm_summary_stats() robust method uses median and IQR/MAD", {
 })
 
 test_that("ezdm_summary_stats() robust method is resistant to outliers", {
-  set.seed(123)
-  clean_rt <- rnorm(90, mean = 0.5, sd = 0.1)
+  # Fixed data: 90 values tightly around 0.5 + 10 extreme outliers
+  clean_rt <- seq(0.4, 0.6, length.out = 90)
   outliers <- c(0.05, 0.08, 2.5, 3.0, 3.5, 4.0, 5.0, 6.0, 7.0, 8.0)
   rt <- c(clean_rt, outliers)
   response <- c(rep(1, 80), rep(0, 20))
@@ -609,11 +609,10 @@ test_that("ezdm_summary_stats() validates init < max contaminant", {
 })
 
 test_that("ezdm_summary_stats() clips contaminant proportion to max", {
-  set.seed(42)
-  true_rt <- rgamma(50, shape = 5, rate = 10) + 0.3
-  contam_rt <- runif(50, 0.1, 3.0)
-  rt <- c(true_rt, contam_rt)
-  response <- rbinom(100, 1, 0.8)
+  # Fixed data: 50 legitimate RTs tightly clustered + 50 uniform contaminants
+  # ensures the EM finds a large contaminant proportion that must be clipped
+  rt <- c(rep(0.5, 25), rep(0.6, 25), seq(0.1, 5.0, length.out = 50))
+  response <- rep(c(1, 0), 50)
 
   result <- suppressWarnings(
     ezdm_summary_stats(rt, response, max_contaminant = 0.3)
@@ -627,11 +626,9 @@ test_that("ezdm_summary_stats() clips contaminant proportion to max", {
 })
 
 test_that("ezdm_summary_stats() warns when contaminant proportion is clipped", {
-  set.seed(42)
-  true_rt <- rgamma(60, shape = 5, rate = 10) + 0.3
-  contam_rt <- runif(40, 0.1, 5.0)
-  rt <- c(true_rt, contam_rt)
-  response <- rbinom(100, 1, 0.8)
+  # Fixed data: tight cluster + spread-out values forces clipping at 0.1
+  rt <- c(rep(0.5, 25), rep(0.6, 25), seq(0.1, 5.0, length.out = 50))
+  response <- rep(c(1, 0), 50)
 
   expect_warning(
     ezdm_summary_stats(rt, response, max_contaminant = 0.1),
@@ -640,15 +637,12 @@ test_that("ezdm_summary_stats() warns when contaminant proportion is clipped", {
 })
 
 test_that("ezdm_summary_stats() max_contaminant works with 4par version", {
-  set.seed(42)
-  n_per_group <- 60
+  # Fixed data: tight clusters + spread-out contaminants per response group
   rt <- c(
-    rgamma(n_per_group, shape = 5, rate = 10) + 0.3,
-    runif(20, 0.1, 3.0),
-    rgamma(n_per_group, shape = 5, rate = 10) + 0.3,
-    runif(20, 0.1, 3.0)
+    rep(0.5, 30), rep(0.6, 30), seq(0.1, 5.0, length.out = 20),
+    rep(0.5, 30), rep(0.6, 30), seq(0.1, 5.0, length.out = 20)
   )
-  response <- c(rep(1, n_per_group + 20), rep(0, n_per_group + 20))
+  response <- c(rep(1, 80), rep(0, 80))
 
   result <- suppressWarnings(
     ezdm_summary_stats(rt, response, version = "4par", max_contaminant = 0.2)
@@ -806,15 +800,14 @@ test_that("adjust_ezdm_accuracy() validates inputs", {
 # FLAG_CONTAMINANT_RTS TESTS                                              ####
 ############################################################################# !
 
-# Helper to create test RT vector with known contaminants
+# Helper to create test RT vector with known contaminants (deterministic)
 .create_test_rt_vec <- function(n = 100, add_contaminants = TRUE, prop_contam = 0.1) {
-  set.seed(123)
   if (add_contaminants) {
     n_legit <- floor((1 - prop_contam) * n)
     n_contam <- n - n_legit
-    c(rgamma(n_legit, shape = 3, rate = 5), runif(n_contam, 0.05, 0.15))
+    c(seq(0.3, 1.5, length.out = n_legit), seq(0.05, 0.15, length.out = n_contam))
   } else {
-    rgamma(n, shape = 3, rate = 5)
+    seq(0.2, 1.5, length.out = n)
   }
 }
 
@@ -941,14 +934,13 @@ test_that("flag_contaminant_rts() works with different distributions", {
 # Section 5: Detection Quality Tests ------------------------------------------
 
 test_that("flag_contaminant_rts() detects simulated contaminants", {
-  set.seed(456)
-  n <- 200
-  n_contam <- 40
-
-  rt_legit <- rgamma(n - n_contam, shape = 5, rate = 5) + 0.3
-  rt_contam <- runif(n_contam, 5, 10)
+  # Fixed data: tight legitimate cluster around 0.5-1.0, contaminants at 5-10
+  # The separation is large enough that the mixture model must assign higher
+  # contamination probability to the extreme values
+  rt_legit <- seq(0.4, 1.2, length.out = 80)
+  rt_contam <- seq(5, 10, length.out = 20)
   rt <- c(rt_legit, rt_contam)
-  is_contam <- c(rep(FALSE, n - n_contam), rep(TRUE, n_contam))
+  is_contam <- c(rep(FALSE, 80), rep(TRUE, 20))
 
   result <- flag_contaminant_rts(rt)
 

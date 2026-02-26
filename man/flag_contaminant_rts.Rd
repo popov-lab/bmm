@@ -7,7 +7,7 @@
 flag_contaminant_rts(
   rt,
   distribution = c("exgaussian", "lognormal", "invgaussian"),
-  contaminant_bound = c(0.1, 3),
+  contaminant_bound = c("min", "max"),
   init_contaminant = 0.05,
   max_contaminant = 0.5,
   maxit = 100,
@@ -20,9 +20,9 @@ flag_contaminant_rts(
 \item{distribution}{Character. RT distribution for the mixture model:
 "exgaussian" (default), "lognormal", or "invgaussian".}
 
-\item{contaminant_bound}{Numeric vector of length 2. Bounds \verb{[lower, upper]}
+\item{contaminant_bound}{Vector of length 2. Bounds \verb{[lower, upper]}
 for the uniform contaminant distribution. Can be numeric values or
-"min"/"max" for data-driven bounds. Default \code{c(0.1, 3.0)}.}
+"min"/"max" for data-driven bounds. Default \code{c("min", "max")}.}
 
 \item{init_contaminant}{Numeric. Initial contaminant proportion for EM
 algorithm. Must be in (0, 1). Default 0.05.}
