@@ -11,6 +11,8 @@
 
 ### New features
 * New function **ezdm_summary_stats()** to compute summary statistics from trial-level RT data for the EZ-Diffusion Model.
+* New function **flag_contaminant_rts()** for trial-level contamination detection in RT data. Identifies fast guesses and attention lapses using mixture modeling (uniform + RT distribution). Supports both 3-parameter (pooled) and 4-parameter (boundary-specific) versions, analogous to `ezdm_summary_stats()`. Returns contamination probabilities, likelihood ratios, or binary flags for filtering trials before model fitting. Includes Bayesian validation of fast guess assumptions for 2AFC tasks via `validate_fast_guessing` parameter (#307).
+* New function **validate_fast_guesses()** for standalone Bayesian validation of fast guess assumptions using Beta-Binomial conjugate analysis with Savage-Dickey Bayes Factors. Supports both quantile-based (adaptive) and absolute (fixed) RT thresholds.
 
 # bmm 1.2.0
 

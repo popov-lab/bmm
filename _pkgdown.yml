@@ -58,6 +58,8 @@ reference:
     desc: "Utility functions for transforming data and parameters"
   - contents:
     - has_keyword("transform")
+    - flag_contaminant_rts
+    - validate_fast_guesses
   - title: "Datasets"
     desc: "Available datasets for fitting the models"
   - contents:
@@ -93,3 +95,4 @@ articles:
     desc: Fitting models to choice reaction time tasks
     contents:
     - articles/bmm_ezdm
+    - articles/bmm_rt_contamination
