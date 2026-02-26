@@ -306,29 +306,52 @@ has_nonconsecutive_duplicates <- function(vec) {
 # EZDM SUMMARY STATISTICS                                                 ####
 ############################################################################# !
 
+.validate_contaminant_bounds <- function(contaminant_bound) {
+  stopif(length(contaminant_bound) != 2, "contaminant_bound must be a vector of length 2")
+  is_valid_bound <- function(x) {
+    tolower(x) %in% c("min", "max") | suppressWarnings(!is.na(as.numeric(x)))
+  }
+  stopif(
+    any(!is_valid_bound(contaminant_bound)),
+    "contaminant_bound elements must be numeric or 'min'/'max'"
+  )
+  stopif(
+    all(is.numeric(contaminant_bound)) && contaminant_bound[1] >= contaminant_bound[2],
+    "contaminant_bound[1] must be less than contaminant_bound[2]"
+  )
+}
+
+.validate_contaminant_params <- function(init_contaminant, max_contaminant) {
+  stopif(
+    !is.numeric(init_contaminant) || init_contaminant <= 0 || init_contaminant >= 1,
+    "init_contaminant must be between 0 and 1 (exclusive)"
+  )
+  stopif(
+    !is.numeric(max_contaminant) || max_contaminant <= 0 || max_contaminant > 1,
+    "max_contaminant must be between 0 (exclusive) and 1 (inclusive)"
+  )
+  stopif(
+    init_contaminant >= max_contaminant,
+    "init_contaminant must be less than max_contaminant"
+  )
+}
+
 #' Compute Robust Summary Statistics for EZ-Diffusion Model
 #'
 #' @description Computes robust summary statistics for the EZ-Diffusion Model
 #'   by fitting mixture models to raw trial-level RT data, separating
 #'   contaminant responses from true responses.
 #'
-#' @param data A `data.frame` containing trial-level data with RT and accuracy
-#'   columns
-#' @param rt Character. The name of the column containing reaction times (in
-#'   seconds)
-#' @param response Character. The name of the column containing response
-#'   indicators. Accepts multiple formats:
+#' @param rt Numeric vector of reaction times in seconds.
+#' @param response Vector of response indicators. Accepts multiple formats:
 #'   \itemize{
 #'     \item Numeric: 1 = upper/correct, 0 = lower/error
 #'     \item Logical: TRUE = upper/correct, FALSE = lower/error
 #'     \item Character/Factor: "upper"/"lower", "correct"/"error",
 #'       "acc"/"err", "hit"/"miss", "yes"/"no" (case-insensitive)
 #'   }
-#' @param .by A character vector of column names to group by before computing
-#'   summary statistics (e.g., `.by = c("subject", "condition")`). If NULL
-#'   (default), computes statistics across all data without grouping.
 #' @param version Character. Either "3par" (default) for pooled RTs or "4par"
-#'   for separate upper/lower boundary RTs
+#'   for separate upper/lower boundary RTs. Controls the output columns.
 #' @param distribution Character. The parametric distribution for the RT
 #'   component. One of "exgaussian" (default), "lognormal", or "invgaussian"
 #' @param method Character. One of "mixture" (default) for robust estimation
@@ -343,16 +366,16 @@ has_nonconsecutive_duplicates <- function(vec) {
 #'   to be consistent with SD for normal data). Only used when method = "robust".
 #' @param contaminant_bound Vector of length 2 specifying the bounds (in
 #'   seconds) for the uniform contaminant distribution. Can be numeric values
-#'   or the special strings "min" and "max" to use data-driven bounds:
+#'   or the special strings "min" and "max" to use data-driven bounds (default):
 #'   \itemize{
-#'     \item Numeric: Fixed bounds, e.g., c(0.1, 3.0) (default)
 #'     \item "min": Use the minimum RT in each group, minus a 50\% buffer
 #'     \item "max": Use the maximum RT in each group, plus a 50\% buffer
+#'     \item Numeric: Fixed bounds, e.g., c(0.1, 3.0)
 #'   }
 #'   The buffer extends data-driven bounds to ensure conservative estimates.
 #'   Examples: c(0.1, 3.0), c("min", "max"), c(0.1, "max"), c("min", 3.0)
 #' @param min_trials Integer. Minimum number of trials required for fitting.
-#'   Groups with fewer trials will return NA. Default is 10
+#'   Returns NA if fewer trials are available. Default is 10
 #' @param init_contaminant Numeric. Initial proportion of contaminants for EM
 #'   algorithm. Default is 0.05
 #' @param max_contaminant Numeric. Maximum allowed contaminant proportion
@@ -360,18 +383,11 @@ has_nonconsecutive_duplicates <- function(vec) {
 #'   contaminant proportions. Default is 0.5
 #' @param maxit Integer. Maximum number of EM iterations. Default is 100
 #' @param tol Numeric. Convergence tolerance for EM algorithm. Default is 1e-6
-#' @param adjust_accuracy Logical. If TRUE and method = "mixture", adjust
-#'   accuracy counts by removing estimated contaminant guesses using binomial
-#'   sampling. Default is FALSE
-#' @param guess_rate Numeric. Assumed accuracy rate for contaminant trials
-#'   (random guessing). Default is 0.5 (appropriate for 2AFC tasks)
 #'
-#' @return A `data.frame` with summary statistics. For version = "3par":
-#'   grouping variables, mean_rt, var_rt, n_upper, n_trials, contaminant_prop.
-#'   When adjust_accuracy = TRUE, also includes n_upper_adj and n_trials_adj.
-#'   For version = "4par": grouping variables, mean_rt_upper, mean_rt_lower,
-#'   var_rt_upper, var_rt_lower, n_upper, n_trials, contaminant_prop_upper,
-#'   contaminant_prop_lower.
+#' @return A 1-row `data.frame`. For version = "3par": `mean_rt`, `var_rt`,
+#'   `n_upper`, `n_trials`, `contaminant_prop`. For version = "4par":
+#'   `mean_rt_upper`, `mean_rt_lower`, `var_rt_upper`, `var_rt_lower`,
+#'   `n_upper`, `n_trials`, `contaminant_prop_upper`, `contaminant_prop_lower`.
 #'
 #' @details RT outliers and contaminant responses (fast guesses, lapses of
 #'   attention) can distort the mean and variance estimates used as input to
@@ -380,204 +396,123 @@ has_nonconsecutive_duplicates <- function(vec) {
 #'   contaminants and a parametric RT distribution for true responses.
 #'   Robust moments are then extracted from the fitted parametric component.
 #'
+#'   This function is designed to work with [dplyr::group_by()] and
+#'   [dplyr::reframe()] for grouped operations. Use [adjust_ezdm_accuracy()]
+#'   as a separate step if you need to adjust accuracy counts for
+#'   contamination.
+#'
+#' @seealso [adjust_ezdm_accuracy()] for adjusting accuracy counts,
+#'   [flag_contaminant_rts()] for trial-level contamination probabilities,
+#'   [ezdm()] for fitting the EZ-Diffusion Model
+#'
 #' @keywords transform
 #' @export
 #'
 #' @examples
 #' # Generate example data
 #' set.seed(123)
-#' test_data <- data.frame(
-#'   subject = rep(1:3, each = 100),
-#'   condition = rep(c("A", "B"), 150),
-#'   rt = rgamma(300, shape = 5, rate = 10) + 0.3,
-#'   correct = rbinom(300, 1, 0.8)
-#' )
+#' rt <- rgamma(100, shape = 5, rate = 10) + 0.3
+#' response <- rbinom(100, 1, 0.8)
 #'
-#' # Compute summary statistics grouped by subject
-#' result <- ezdm_summary_stats(test_data,
-#'   rt = "rt", response = "correct",
-#'   .by = "subject"
-#' )
-#' print(result)
+#' # 3par summary stats
+#' ezdm_summary_stats(rt, response)
 #'
-#' # Group by multiple variables using simple method
-#' result_multi <- ezdm_summary_stats(test_data,
-#'   rt = "rt",
-#'   response = "correct",
-#'   .by = c("subject", "condition"),
-#'   method = "simple"
-#' )
+#' # With dplyr for grouped operations
+#' # library(dplyr)
+#' # mydata |>
+#' #   group_by(subject) |>
+#' #   reframe(ezdm_summary_stats(rt, response))
+#'
+#' # 4par version with separate upper/lower moments
+#' ezdm_summary_stats(rt, response, version = "4par")
 #'
 ezdm_summary_stats <- function(
-    data,
     rt,
     response,
-    .by = NULL,
     version = c("3par", "4par"),
     distribution = c("exgaussian", "lognormal", "invgaussian"),
     method = c("mixture", "simple", "robust"),
     robust_scale = c("iqr", "mad"),
-    contaminant_bound = c(0.1, 3.0),
+    contaminant_bound = c("min", "max"),
     min_trials = 10,
     init_contaminant = 0.05,
     max_contaminant = 0.5,
     maxit = 100,
-    tol = 1e-6,
-    adjust_accuracy = FALSE,
-    guess_rate = 0.5) {
+    tol = 1e-6) {
   stop_missing_args()
   version <- match.arg(version)
   distribution <- match.arg(distribution)
   method <- match.arg(method)
   robust_scale <- match.arg(robust_scale)
 
-  data <- try(as.data.frame(data), silent = TRUE)
-  stopif(
-    is_try_error(data),
-    "Argument 'data' must be coercible to a data.frame"
-  )
-  stopif(
-    !isTRUE(nrow(data) > 0L),
-    "Argument 'data' does not contain observations"
-  )
-  stopif(not_in(rt, colnames(data)), "RT variable '{rt}' not found in data")
-  stopif(
-    not_in(response, colnames(data)),
-    "Response variable '{response}' not found in data"
-  )
-  stopif(
-    length(contaminant_bound) != 2,
-    "contaminant_bound must be a vector of length 2"
-  )
+  stopif(!is.numeric(rt), "Argument 'rt' must be a numeric vector")
+  stopif(length(rt) == 0L, "Argument 'rt' has length 0")
+  stopif(length(response) != length(rt), "Arguments 'rt' and 'response' must have the same length")
+  .validate_contaminant_bounds(contaminant_bound)
+  stopif(!is.numeric(min_trials) || min_trials < 1, "min_trials must be a positive integer")
+  .validate_contaminant_params(init_contaminant, max_contaminant)
 
-  is_valid_bound <- function(x) {
-    tolower(x) %in% c("min", "max") | suppressWarnings(!is.na(as.numeric(x)))
-  }
-  stopif(
-    any(!is_valid_bound(contaminant_bound)),
-    "contaminant_bound elements must be numeric or 'min'/'max'"
-  )
-  stopif(
-    all(is.numeric(contaminant_bound)) && contaminant_bound[1] >= contaminant_bound[2],
-    "contaminant_bound[1] must be less than contaminant_bound[2]"
-  )
-  stopif(
-    !is.numeric(min_trials) || min_trials < 1,
-    "min_trials must be a positive integer"
-  )
-  stopif(
-    !is.numeric(init_contaminant) || init_contaminant <= 0 || init_contaminant >= 1,
-    "init_contaminant must be between 0 and 1 (exclusive)"
-  )
-  stopif(
-    !is.numeric(max_contaminant) || max_contaminant <= 0 || max_contaminant > 1,
-    "max_contaminant must be between 0 (exclusive) and 1 (inclusive)"
-  )
-  stopif(
-    init_contaminant >= max_contaminant,
-    "init_contaminant must be less than max_contaminant"
-  )
-  stopif(!is.logical(adjust_accuracy), "adjust_accuracy must be TRUE or FALSE")
-  stopif(
-    !is.numeric(guess_rate) || guess_rate < 0 || guess_rate > 1,
-    "guess_rate must be between 0 and 1"
-  )
+  complete <- !is.na(rt)
+  rt <- rt[complete]
+  response <- response[complete]
+  warnif(any(rt > 10), "Some RT values > 10. Ensure RTs are in seconds, not milliseconds.")
+  stopif(any(rt <= 0), "Non-positive RT values found.")
 
-  # Warn if adjust_accuracy is TRUE but method is "simple"
-  warnif(
-    adjust_accuracy && method == "simple",
-    "adjust_accuracy has no effect with method='simple' (no contaminant estimate)"
-  )
+  is_upper <- .convert_response_to_upper(response)
+  n_upper <- sum(is_upper, na.rm = TRUE)
+  n_trials <- length(rt)
+  resolved_bounds <- .resolve_contaminant_bounds(contaminant_bound, rt)
 
-  # Warnings for potential data issues
-  warnif(
-    any(data[[rt]] > 10),
-    "Some RT values > 10. Ensure RTs are in seconds, not milliseconds."
-  )
-
-  # Filter out non-positive RTs with warning
-  warnif(
-    any(data[[rt]] <= 0),
-    "Non-positive RT founds. These values will be excluded."
-  )
-  data <- data[data[[rt]] > 0 & !is.na(data[[rt]]), ]
-
-  # Validate grouping variables exist
-  for (gv in .by) {
-    stopif(
-      not_in(gv, colnames(data)),
-      "Grouping variable '{gv}' not found in data"
-    )
-  }
-
-  if (length(.by) == 0) {
-    # No grouping - process all data
-    result <- .process_rt_group(
-      rt_data = data[[rt]],
-      response_data = data[[response]],
-      version = version,
-      distribution = distribution,
-      method = method,
-      robust_scale = robust_scale,
-      contaminant_bound = contaminant_bound,
-      min_trials = min_trials,
-      init_contaminant = init_contaminant,
-      max_contaminant = max_contaminant,
-      maxit = maxit,
-      tol = tol,
-      adjust_accuracy = adjust_accuracy,
-      guess_rate = guess_rate
-    )
-    result_df <- as.data.frame(result)
-  } else {
-    # Split by grouping variables
-    if (length(.by) == 1) {
-      split_factor <- data[[.by]]
+  compute_moments <- function(rt_vec, n_obs) {
+    if (n_obs < min_trials) {
+      list(mean = NA_real_, var = NA_real_, contaminant_prop = NA_real_)
+    } else if (method == "simple") {
+      c(.simple_aggregation(rt_vec), contaminant_prop = NA_real_)
+    } else if (method == "robust") {
+      c(.robust_aggregation(rt_vec, scale_method = robust_scale),
+        contaminant_prop = NA_real_)
     } else {
-      split_factor <- interaction(data[.by], drop = TRUE)
-    }
-
-    split_data <- split(data, split_factor)
-
-    results_list <- lapply(names(split_data), function(grp_name) {
-      grp_data <- split_data[[grp_name]]
-      grp_result <- .process_rt_group(
-        rt_data = grp_data[[rt]],
-        response_data = grp_data[[response]],
-        version = version,
-        distribution = distribution,
-        method = method,
-        robust_scale = robust_scale,
-        contaminant_bound = contaminant_bound,
-        min_trials = min_trials,
-        init_contaminant = init_contaminant,
-        max_contaminant = max_contaminant,
-        maxit = maxit,
-        tol = tol,
-        adjust_accuracy = adjust_accuracy,
-        guess_rate = guess_rate
+      fit <- .fit_rt_mixture(
+        rt_vec, distribution, resolved_bounds,
+        init_contaminant, max_contaminant, maxit, tol
       )
-
-      # Extract group values
-      grp_values <- unique(grp_data[.by])
-      cbind(grp_values[1, , drop = FALSE], as.data.frame(grp_result))
-    })
-
-    result_df <- do.call(rbind, results_list)
-    rownames(result_df) <- NULL
+      if (!fit$converged || is.null(fit$params)) {
+        warning2("EM did not converge. Using simple moments.")
+        c(.simple_aggregation(rt_vec), contaminant_prop = NA_real_)
+      } else {
+        c(.dist_moments(fit$params, distribution),
+          contaminant_prop = fit$contaminant_prop)
+      }
+    }
   }
 
-  # Add attributes for diagnostics
-  attr(result_df, "version") <- version
-  attr(result_df, "distribution") <- distribution
-  attr(result_df, "method") <- method
-
-  result_df
+  if (version == "3par") {
+    moments <- compute_moments(rt, n_trials)
+    data.frame(
+      mean_rt = moments$mean,
+      var_rt = moments$var,
+      n_upper = n_upper,
+      n_trials = n_trials,
+      contaminant_prop = moments$contaminant_prop
+    )
+  } else {
+    rt_upper <- rt[is_upper]
+    rt_lower <- rt[!is_upper]
+    moments_upper <- compute_moments(rt_upper, length(rt_upper))
+    moments_lower <- compute_moments(rt_lower, length(rt_lower))
+    data.frame(
+      mean_rt_upper = moments_upper$mean,
+      mean_rt_lower = moments_lower$mean,
+      var_rt_upper = moments_upper$var,
+      var_rt_lower = moments_lower$var,
+      n_upper = n_upper,
+      n_trials = n_trials,
+      contaminant_prop_upper = moments_upper$contaminant_prop,
+      contaminant_prop_lower = moments_lower$contaminant_prop
+    )
+  }
 }
 
-# Simple aggregation (standard moments)
-# @param x Numeric vector
-# @return List with mean, var, and n
 .simple_aggregation <- function(x) {
   list(
     mean = mean(x, na.rm = TRUE),
@@ -585,10 +520,6 @@ ezdm_summary_stats <- function(
   )
 }
 
-# Robust aggregation using median and IQR/MAD-based variance
-# @param x Numeric vector
-# @param scale_method Character, either "iqr" or "mad"
-# @return List with mean (median), var, and n
 .robust_aggregation <- function(x, scale_method = "iqr") {
   x <- x[!is.na(x)]
 
@@ -602,18 +533,11 @@ ezdm_summary_stats <- function(
   )
 }
 
-# Convert response data to logical indicator for upper boundary
-# Handles: numeric (0/1), logical (TRUE/FALSE), character/factor
-# ("upper"/"lower", "correct"/"error", "acc"/"err", etc.)
-# @param x Vector of response values
-# @return Logical vector where TRUE = upper boundary response
 .convert_response_to_upper <- function(x) {
-  # Numeric or logical: treat 1/TRUE as upper
   if (is.numeric(x) || is.logical(x)) {
     return(as.logical(x))
   }
 
-  # Character: match common patterns for upper boundary
   if (is.character(x) || is.factor(x)) {
     x <- tolower(x)
     upper_patterns <- c("upper", "correct", "acc", "1", "true", "yes", "hit")
@@ -625,180 +549,48 @@ ezdm_summary_stats <- function(
     is_upper <- x %in% upper_patterns
     is_lower <- x %in% lower_patterns
 
-    # Check if all responses are recognized
     unrecognized <- !is_upper & !is_lower & !is.na(x)
     stopif(
       any(unrecognized),
       "Unrecognized response values: \\
       {collapse_comma(unique(x[unrecognized]))}. Expected values like \\
-      'upper'/'lower', 'correct'/'error', 1/0, or TRUE/FALSE."
+      'upper', 'lower', 'correct', 'error', 1, 0, TRUE, or FALSE."
     )
 
     return(is_upper)
   }
 
   stop2("Response variable must be numeric, logical, character, or factor. \\
-        Got class: {class(response_data)[1]}")
+        Got class: {class(x)[1]}")
 }
 
-# Process RT data for a single group
-# @param rt_data Numeric vector of RTs
-# @param response_data Vector of responses (various formats accepted)
-# @param version "3par" or "4par"
-# @param distribution Distribution type
-# @param method "mixture", "robust", or "simple"
-# @param contaminant_bound Bounds for uniform distribution
-# @param min_trials Minimum trials required
-# @param init_contaminant Initial contaminant proportion
-# @param max_contaminant Maximum allowed contaminant proportion
-# @param maxit Maximum EM iterations
-# @param tol Convergence tolerance
-# @param adjust_accuracy Whether to adjust accuracy counts
-# @param guess_rate Assumed accuracy rate for contaminants
-# @return Named list with summary statistics
-.process_rt_group <- function(rt_data, response_data, version, distribution,
-                              method, robust_scale, contaminant_bound,
-                              min_trials, init_contaminant, max_contaminant,
-                              maxit, tol, adjust_accuracy, guess_rate) {
-  n_trials <- length(rt_data)
-  is_upper <- .convert_response_to_upper(response_data)
-  n_upper <- sum(is_upper, na.rm = TRUE)
-  resolved_bounds <- .resolve_contaminant_bounds(contaminant_bound, rt_data)
-
-  # Helper to compute moments for a single RT vector
-  compute_moments <- function(rt_vec, n_obs) {
-    if (n_obs < min_trials) {
-      list(mean = NA_real_, var = NA_real_, contaminant_prop = NA_real_)
-    } else if (method == "simple") {
-      c(.simple_aggregation(rt_vec), contaminant_prop = NA_real_)
-    } else if (method == "robust") {
-      c(.robust_aggregation(rt_vec, scale_method = robust_scale), contaminant_prop = NA_real_)
-    } else if (method == "mixture") {
-      fit <- .fit_rt_mixture(
-        rt_vec, distribution, resolved_bounds,
-        init_contaminant, max_contaminant, maxit, tol
-      )
-
-      if (!fit$converged || is.null(fit$params)) {
-        warning2("EM did not converge. Using simple moments.", env.frame = -2)
-        c(.simple_aggregation(rt_vec), contaminant_prop = NA_real_)
-      } else {
-        c(.dist_moments(fit$params, distribution), contaminant_prop = fit$contaminant_prop)
-      }
-    }
-  }
-
-  if (version == "3par") {
-    moments <- compute_moments(rt_data, n_trials)
-    result <- list(
-      mean_rt = moments$mean,
-      var_rt = moments$var,
-      n_upper = n_upper,
-      n_trials = n_trials,
-      contaminant_prop = moments$contaminant_prop
-    )
-
-    if (adjust_accuracy && !is.na(moments$contaminant_prop)) {
-      adj <- .adjust_accuracy_counts(
-        n_upper, n_trials, moments$contaminant_prop, guess_rate
-      )
-      result <- c(result, adj)
-    }
-
-    return(result)
-  }
-
-  # version == "4par": separate by response
-
-  rt_upper <- rt_data[is_upper]
-  rt_lower <- rt_data[!is_upper]
-  n_lower <- length(rt_lower)
-
-  moments_upper <- compute_moments(rt_upper, n_upper)
-  moments_lower <- compute_moments(rt_lower, n_lower)
-
-  result <- list(
-    mean_rt_upper = moments_upper$mean,
-    mean_rt_lower = moments_lower$mean,
-    var_rt_upper = moments_upper$var,
-    var_rt_lower = moments_lower$var,
-    n_upper = n_upper,
-    n_trials = n_trials,
-    contaminant_prop_upper = moments_upper$contaminant_prop,
-    contaminant_prop_lower = moments_lower$contaminant_prop
-  )
-
-  if (adjust_accuracy) {
-    contam_upper <- moments_upper$contaminant_prop
-    contam_lower <- moments_lower$contaminant_prop
-    contam_upper_safe <- if (is.na(contam_upper)) 0 else contam_upper
-    contam_lower_safe <- if (is.na(contam_lower)) 0 else contam_lower
-    avg_contam <- if (n_upper + n_lower > 0) {
-      (n_upper * contam_upper_safe + n_lower * contam_lower_safe) /
-        (n_upper + n_lower)
-    } else {
-      0
-    }
-    adj <- .adjust_accuracy_counts(n_upper, n_trials, avg_contam, guess_rate)
-    result <- c(result, adj)
-  }
-
-  result
-}
-
-# Resolve contaminant bounds from data
-# @param contaminant_bound Vector of length 2 (numeric or "min"/"max")
-# @param rt_data Numeric vector of RT values
-# @param bound_buffer Proportion to extend data-driven bounds (default 0.5)
-# @return Numeric vector of length 2 with resolved bounds
 .resolve_contaminant_bounds <- function(contaminant_bound, rt_data,
                                         bound_buffer = 0.5) {
-  resolved <- numeric(2)
   data_min <- min(rt_data, na.rm = TRUE)
   data_max <- max(rt_data, na.rm = TRUE)
   data_range <- data_max - data_min
 
-  # Track whether each bound is data-driven
-  lower_is_data_driven <- FALSE
-  upper_is_data_driven <- FALSE
-
-  # Helper to resolve a single bound
-  resolve_single <- function(bound_val, is_lower) {
-    if (is.numeric(bound_val)) {
-      return(list(value = bound_val, data_driven = FALSE))
-    }
-    # Character value
-    if (tolower(bound_val) == "min") {
-      return(list(value = data_min, data_driven = TRUE))
-    } else if (tolower(bound_val) == "max") {
-      return(list(value = data_max, data_driven = TRUE))
-    } else {
-      # Try to convert as numeric string (e.g., "0.1" from c(0.1, "max"))
-      return(list(value = as.numeric(bound_val), data_driven = FALSE))
-    }
+  resolve_single <- function(bound_val) {
+    if (is.numeric(bound_val)) return(bound_val)
+    val <- tolower(bound_val)
+    if (val == "min") return(data_min)
+    if (val == "max") return(data_max)
+    # numeric string (e.g., "0.1" from c(0.1, "max"))
+    as.numeric(bound_val)
   }
 
-  lower_result <- resolve_single(contaminant_bound[1], TRUE)
-  upper_result <- resolve_single(contaminant_bound[2], FALSE)
+  resolved <- vapply(contaminant_bound, resolve_single, numeric(1))
+  lower_is_data <- tolower(contaminant_bound[1]) %in% c("min", "max")
+  upper_is_data <- tolower(contaminant_bound[2]) %in% c("min", "max")
 
-  resolved[1] <- lower_result$value
-  resolved[2] <- upper_result$value
-  lower_is_data_driven <- lower_result$data_driven
-  upper_is_data_driven <- upper_result$data_driven
-
-  # Apply buffer to data-driven bounds to reduce uniform density
-  # This improves mixture identifiability by making uniform less competitive
-  # Use 50% of range or at least 100ms to ensure conservative estimation
-  if (lower_is_data_driven && bound_buffer > 0) {
-    buffer_amount <- max(bound_buffer * data_range, 0.1) # At least 100ms
-    resolved[1] <- max(0.001, resolved[1] - buffer_amount) # Keep positive
+  # Buffer data-driven bounds to improve mixture identifiability
+  if (lower_is_data && bound_buffer > 0) {
+    resolved[1] <- max(0.001, resolved[1] - max(bound_buffer * data_range, 0.1))
   }
-  if (upper_is_data_driven && bound_buffer > 0) {
-    buffer_amount <- max(bound_buffer * data_range, 0.1) # At least 100ms
-    resolved[2] <- resolved[2] + buffer_amount
+  if (upper_is_data && bound_buffer > 0) {
+    resolved[2] <- resolved[2] + max(bound_buffer * data_range, 0.1)
   }
 
-  # Ensure lower < upper (swap if necessary due to data-driven bounds)
   if (resolved[1] >= resolved[2]) {
     warning2("Resolved contaminant bounds are invalid (lower >= upper). \\
              Using data range with buffer.", env.frame = -1)
@@ -807,16 +599,19 @@ ezdm_summary_stats <- function(
     resolved[2] <- data_max + buffer_amount
   }
 
-  resolved
+  warnif(resolved[1] > data_min,
+    "Lower contaminant bound ({round(resolved[1], 3)}) is greater than the \\
+     minimum observed RT ({round(data_min, 3)}). Observations below the \\
+     bound cannot be classified as contaminants.")
+
+  warnif(resolved[2] < data_max,
+    "Upper contaminant bound ({round(resolved[2], 3)}) is less than the \\
+     maximum observed RT ({round(data_max, 3)}). Observations above the \\
+     bound cannot be classified as contaminants.")
+
+  unname(resolved)
 }
 
-# Compute adjusted accuracy counts based on contaminant proportion
-# Uses binomial sampling to produce integer counts
-# @param n_upper Raw count of upper boundary responses
-# @param n_trials Total number of trials
-# @param contaminant_prop Estimated proportion of contaminants
-# @param guess_rate Assumed accuracy rate for contaminants (default 0.5)
-# @return List with n_upper_adj and n_trials_adj (integers)
 .adjust_accuracy_counts <- function(n_upper, n_trials, contaminant_prop,
                                     guess_rate) {
   if (is.na(contaminant_prop) || contaminant_prop <= 0) {
@@ -826,22 +621,402 @@ ezdm_summary_stats <- function(
     ))
   }
 
-  # Sample number of contaminant trials from binomial distribution
   n_contam <- rbinom(1, size = n_trials, prob = contaminant_prop)
-
-  # Sample number of contaminant upper responses from binomial
-  # (contaminants that happened to be "correct" by chance)
+  # contaminants that happened to be "correct" by chance
   n_contam_upper <- rbinom(1, size = n_contam, prob = guess_rate)
 
-  # Adjusted counts (integers)
   n_trials_adj <- n_trials - n_contam
   n_upper_adj <- n_upper - n_contam_upper
-
-  # Bound to valid range
   n_upper_adj <- max(0L, min(n_upper_adj, n_trials_adj))
 
   list(
     n_upper_adj = as.integer(n_upper_adj),
     n_trials_adj = as.integer(n_trials_adj)
   )
+}
+
+#' Adjust Accuracy Counts for Contamination
+#'
+#' @description Adjusts accuracy counts (`n_upper`, `n_trials`) by removing
+#'   estimated contaminant trials using binomial sampling. Contaminant trials
+#'   are assumed to produce correct responses at a fixed guess rate (e.g., 0.5
+#'   for 2AFC tasks).
+#'
+#' @param n_upper Numeric. Count of upper boundary (correct) responses.
+#' @param n_trials Numeric. Total number of trials.
+#' @param contaminant_prop Numeric. Estimated proportion of contaminant trials
+#'   (e.g., from the `contaminant_prop` column of [ezdm_summary_stats()]).
+#' @param guess_rate Numeric. Assumed accuracy rate for contaminant trials
+#'   (random guessing). Default is 0.5 (appropriate for 2AFC tasks).
+#'
+#' @return A 1-row `data.frame` with columns `n_upper_adj` and `n_trials_adj`
+#'   (integers). When `contaminant_prop` is `NA` or <= 0, returns the original
+#'   counts unchanged.
+#'
+#' @details Uses binomial sampling to estimate the number of contaminant trials
+#'   and contaminant correct responses, then subtracts these from the raw
+#'   counts. Because of the stochastic sampling, results will vary across
+#'   calls unless a seed is set by the user.
+#'
+#' @seealso [ezdm_summary_stats()] for computing the summary statistics and
+#'   contamination proportions
+#'
+#' @keywords transform
+#' @export
+#'
+#' @examples
+#' # Adjust accuracy for estimated 10% contamination
+#' set.seed(42)
+#' adjust_ezdm_accuracy(n_upper = 80, n_trials = 100, contaminant_prop = 0.1)
+#'
+#' # In a pipeline with ezdm_summary_stats
+#' # library(dplyr)
+#' # mydata |>
+#' #   group_by(subject) |>
+#' #   reframe(ezdm_summary_stats(rt, response)) |>
+#' #   mutate(adjust_ezdm_accuracy(n_upper, n_trials, contaminant_prop))
+#'
+adjust_ezdm_accuracy <- function(n_upper, n_trials, contaminant_prop,
+                                 guess_rate = 0.5) {
+  stopif(!is.numeric(n_upper), "n_upper must be numeric")
+  stopif(!is.numeric(n_trials), "n_trials must be numeric")
+  stopif(!is.numeric(guess_rate) || guess_rate < 0 || guess_rate > 1,
+         "guess_rate must be between 0 and 1")
+  as.data.frame(.adjust_accuracy_counts(n_upper, n_trials, contaminant_prop,
+                                        guess_rate))
+}
+
+############################################################################# !
+# FLAG_CONTAMINANT_RTS                                                   ####
+############################################################################# !
+
+#' Flag contaminant reaction times using mixture modeling
+#'
+#' @description Identifies contaminant RTs (fast guesses, attention lapses) at
+#'   the trial level using mixture modeling. For each trial, it computes the
+#'   posterior probability of being a contaminant given a mixture of a uniform
+#'   distribution (contaminants) and an RT distribution.
+#'
+#'   The function takes a numeric vector of RTs and returns a numeric vector of
+#'   contamination probabilities, making it compatible with `dplyr::mutate()` and
+#'   `dplyr::group_by()` workflows.
+#'
+#' @param rt Numeric vector. Reaction times in seconds. Must be positive.
+#' @param distribution Character. RT distribution for the mixture model:
+#'   "exgaussian" (default), "lognormal", or "invgaussian".
+#' @param contaminant_bound Vector of length 2. Bounds `[lower, upper]`
+#'   for the uniform contaminant distribution. Can be numeric values or
+#'   "min"/"max" for data-driven bounds. Default `c("min", "max")`.
+#' @param init_contaminant Numeric. Initial contaminant proportion for EM
+#'   algorithm. Must be in (0, 1). Default 0.05.
+#' @param max_contaminant Numeric. Maximum allowed contaminant proportion. Values
+#'   exceeding this are clipped with a warning. Must be in (0, 1]. Default 0.5.
+#' @param maxit Integer. Maximum EM iterations. Default 100.
+#' @param tol Numeric. Convergence tolerance for log-likelihood. Default 1e-6.
+#'
+#' @details
+#'
+#' ## Mixture Model
+#'
+#' The function fits: `f(RT) = pi_c * Uniform(a,b) + (1-pi_c) * f_RT(RT|theta)`
+#'
+#' where pi_c is the contaminant proportion, Uniform(a,b) is the contaminant
+#' distribution over `contaminant_bound`, and f_RT is the specified RT
+#' distribution with parameters theta.
+#'
+#' ## Grouping
+#'
+#' To fit separate mixtures by condition or response boundary, use
+#' `dplyr::group_by()` before calling this function inside `dplyr::mutate()`.
+#'
+#' ## Diagnostics
+#'
+#' Mixture fit diagnostics (parameters, convergence, log-likelihood) are
+#' attached as the `"diagnostics"` attribute of the returned vector.
+#' Access them with `attr(result, "diagnostics")`.
+#'
+#' @return Numeric vector of posterior contamination probabilities P(contaminant
+#'   | RT), with a `"diagnostics"` attribute containing a one-row data.frame
+#'   with columns: `mixture_params` (list), `contaminant_prop`, `converged`,
+#'   `iterations`, `loglik`, `n_trials`, `distribution`, `method`.
+#'
+#' @seealso [ezdm_summary_stats()] for aggregated RT statistics with contamination
+#'   handling, [validate_fast_guesses()] for testing whether flagged contaminants
+#'   show random guessing behavior
+#'
+#' @keywords transform
+#' @export
+#'
+#' @examples
+#' \dontrun{
+#' # Simulate data with contaminants
+#' library(bmm)
+#' set.seed(123)
+#' rt_clean <- rgamma(150, shape = 5, rate = 10)
+#' rt_contam <- runif(50, 0.1, 0.2)
+#'
+#' data <- data.frame(
+#'   rt = c(rt_clean, rt_contam),
+#'   subject = 1,
+#'   response = sample(c("upper", "lower"), 200, replace = TRUE)
+#' )
+#'
+#' # Basic usage with mutate
+#' library(dplyr)
+#' data <- data |>
+#'   mutate(contam_prob = flag_contaminant_rts(rt))
+#'
+#' # Hard threshold: remove trials with P(contaminant) > 0.5
+#' data_clean <- data |> filter(contam_prob <= 0.5)
+#'
+#' # Separate fits by response boundary
+#' data <- data |>
+#'   group_by(subject, response) |>
+#'   mutate(contam_prob = flag_contaminant_rts(rt))
+#'
+#' # Access diagnostics
+#' probs <- flag_contaminant_rts(data$rt)
+#' attr(probs, "diagnostics")
+#' }
+flag_contaminant_rts <- function(
+    rt,
+    distribution = c("exgaussian", "lognormal", "invgaussian"),
+    contaminant_bound = c("min", "max"),
+    init_contaminant = 0.05,
+    max_contaminant = 0.5,
+    maxit = 100,
+    tol = 1e-6) {
+  distribution <- match.arg(distribution)
+  stopif(!is.numeric(rt), "Argument 'rt' must be a numeric vector")
+  stopif(length(rt) == 0L, "Argument 'rt' has length 0")
+
+  .validate_contaminant_bounds(contaminant_bound)
+  .validate_contaminant_params(init_contaminant, max_contaminant)
+
+  rt_clean <- rt[!is.na(rt)]
+  warnif(any(rt_clean > 10), "Some RT values > 10. Ensure RTs are in seconds, not milliseconds.")
+  stopif(any(rt_clean <= 0), "Non-positive RT values found.")
+
+  resolved_bounds <- .resolve_contaminant_bounds(contaminant_bound, rt_clean)
+
+  fit <- .fit_rt_mixture(
+    rt_clean, distribution, resolved_bounds,
+    init_contaminant, max_contaminant, maxit, tol
+  )
+
+  if (!fit$converged || is.null(fit$params)) {
+    warning2("EM did not converge. Returning NA.")
+    contam_prob_clean <- rep(NA_real_, length(rt_clean))
+  } else {
+    par <- fit$params
+    pi_c <- fit$contaminant_prop
+    in_bounds <- rt_clean >= resolved_bounds[1] & rt_clean <= resolved_bounds[2]
+    uniform_dens <- ifelse(in_bounds, 1 / (resolved_bounds[2] - resolved_bounds[1]), 0)
+    dens_rt <- switch(distribution,
+      exgaussian = dexgauss(rt_clean, par["mu"], par["sigma"], par["tau"]),
+      lognormal = dlnorm(rt_clean, par["mu"], par["sigma"]),
+      invgaussian = dinvgauss(rt_clean, par["mu"], par["lambda"])
+    )
+    numer_c <- pi_c * uniform_dens
+    contam_prob_clean <- numer_c / (numer_c + (1 - pi_c) * pmax(dens_rt, 1e-300))
+  }
+
+  result <- rep(NA_real_, length(rt))
+  result[!is.na(rt)] <- contam_prob_clean
+
+  attr(result, "diagnostics") <- data.frame(
+    mixture_params = I(list(fit$params)),
+    contaminant_prop = fit$contaminant_prop,
+    converged = fit$converged,
+    iterations = fit$iterations,
+    loglik = if (fit$converged) fit$loglik else NA_real_,
+    n_trials = length(rt_clean),
+    distribution = distribution,
+    method = "mixture_em",
+    stringsAsFactors = FALSE
+  )
+  result
+}
+
+#' Test if fast contaminants show random guessing behavior
+#'
+#' @description Uses Bayesian Beta-Binomial conjugate analysis to test whether
+#'   fast flagged contaminants show random guessing (~50% accuracy for 2AFC).
+#'   The test computes the posterior distribution for the proportion of "upper"
+#'   responses and uses a Savage-Dickey Bayes Factor to quantify evidence for
+#'   or against the guessing hypothesis.
+#'
+#' @param contam_flag Logical vector indicating which trials were flagged as
+#'   contaminants
+#' @param rt_data Numeric vector of reaction times (in seconds)
+#' @param response Response data in any format accepted by `.convert_response_to_upper()`
+#'   (numeric 0/1, logical, character, factor)
+#' @param threshold_type Character. How to interpret `rt_threshold`:
+#'   - `"quantile"` (default): Use rt_threshold as quantile (0-1)
+#'   - `"absolute"`: Use rt_threshold as absolute RT in seconds
+#' @param rt_threshold Numeric. Threshold for defining "fast" trials.
+#'   Interpretation depends on `threshold_type`:
+#'   - If `threshold_type = "quantile"` (default): Quantile of RT distribution
+#'     (e.g., 0.25 = 25th percentile). Default 0.25.
+#'   - If `threshold_type = "absolute"`: Absolute RT value in seconds
+#'     (e.g., 0.25 = 250ms).
+#' @param prior_alpha,prior_beta Numeric. Parameters for Beta prior distribution.
+#'   Default 1,1 gives uniform prior. Values > 1 express prior belief about
+#'   response proportions.
+#' @param guess_prob Numeric. Null hypothesis value for guessing probability.
+#'   Default 0.5 (equal probability of upper/lower responses).
+#' @param credible_mass Numeric. Probability mass for Highest Density Interval.
+#'   Default 0.95 for 95% HDI. Common alternatives: 0.90, 0.99.
+#'
+#' @return List with components:
+#'   - `method`: "bayesian"
+#'   - `prop_upper`: Observed proportion of upper responses
+#'   - `hdi_lower`, `hdi_upper`: 95% Highest Density Interval bounds
+#'   - `bf_01`: Bayes Factor for H0 (guessing) vs H1 (non-random)
+#'   - `guess_in_hdi`: Logical, whether `guess_prob` is in HDI
+#'   - `bf_evidence`: Character, evidence category on Jeffreys scale
+#'   - `posterior_alpha`, `posterior_beta`: Posterior Beta parameters
+#'   - `n_tested`: Number of fast flagged trials tested
+#'   - `rt_threshold`: Actual RT threshold value used (in seconds)
+#'   - `threshold_type`: Type of threshold used ("quantile" or "absolute")
+#'   - `credible_mass`: Credible mass used for HDI computation
+#'   - `mean_rt_tested`: Mean RT of tested trials
+#'
+#' @details
+#' The function performs a Bayesian test using the Beta-Binomial conjugate
+#' prior-posterior relationship. With a Beta(alpha, beta) prior and observing n_upper
+#' "upper" responses out of n_tested trials, the posterior is:
+#'
+#' Beta(alpha + n_upper, beta + n_lower)
+#'
+#' The Savage-Dickey Bayes Factor compares the posterior and prior densities
+#' at the null hypothesis value (default 0.5):
+#'
+#' BF_01 = posterior_density(guess_prob) / prior_density(guess_prob)
+#'
+#' Evidence categories follow Jeffreys (1961) scale:
+#' - BF > 10: Strong evidence for guessing
+#' - BF > 3: Moderate evidence for guessing
+#' - BF > 1: Anecdotal evidence for guessing
+#' - BF < 1/3: Moderate evidence against guessing
+#' - BF < 1/10: Strong evidence against guessing
+#'
+#' **Note**: This function can be used as a standalone validation step after
+#' obtaining contamination probabilities from [flag_contaminant_rts()].
+#'
+#' @references
+#' Jeffreys, H. (1961). Theory of Probability (3rd ed.). Oxford University Press.
+#'
+#' @seealso [flag_contaminant_rts()] for obtaining contamination probabilities
+#'
+#' @keywords transform
+#' @export
+#'
+#' @examples
+#' \dontrun{
+#' # Simulate data with random guessing on fast trials
+#' set.seed(123)
+#' n <- 100
+#' rt <- c(runif(20, 0.15, 0.30), rgamma(80, 5, 10))
+#' response <- c(rbinom(20, 1, 0.5), rbinom(80, 1, 0.7))
+#' contam_flag <- rt < 0.35
+#'
+#' # Test using quantile threshold (default, adaptive)
+#' result1 <- validate_fast_guesses(
+#'   contam_flag = contam_flag,
+#'   rt_data = rt,
+#'   response = response,
+#'   threshold_type = "quantile",
+#'   rt_threshold = 0.30 # 30th percentile
+#' )
+#'
+#' # Test using absolute threshold (fixed RT)
+#' result2 <- validate_fast_guesses(
+#'   contam_flag = contam_flag,
+#'   rt_data = rt,
+#'   response = response,
+#'   threshold_type = "absolute",
+#'   rt_threshold = 0.30 # 300ms
+#' )
+#'
+#' print(result1$bf_01) # Bayes Factor
+#' print(result1$bf_evidence) # Evidence category
+#' print(result1$guess_in_hdi) # Is 0.5 in 95% HDI?
+#' print(result1$threshold_type) # "quantile"
+#' }
+validate_fast_guesses <- function(contam_flag, rt_data, response,
+                                  threshold_type = c("quantile", "absolute"),
+                                  rt_threshold = 0.25,
+                                  prior_alpha = 1,
+                                  prior_beta = 1,
+                                  guess_prob = 0.5,
+                                  credible_mass = 0.95) {
+  threshold_type <- match.arg(threshold_type)
+  stopif(prior_alpha <= 0 || prior_beta <= 0, "Beta prior parameters must be positive")
+  stopif(guess_prob <= 0 || guess_prob >= 1, "guess_prob must be between 0 and 1 (exclusive)")
+
+  stopif(
+    threshold_type == "quantile" && (rt_threshold <= 0 || rt_threshold >= 1),
+    "rt_threshold must be a quantile between 0 and 1 (exclusive) when threshold_type='quantile'"
+  )
+  stopif(
+    threshold_type == "absolute" && rt_threshold <= 0,
+    "rt_threshold must be positive when threshold_type='absolute'"
+  )
+
+  if (threshold_type == "quantile") {
+    rt_threshold <- stats::quantile(rt_data, rt_threshold, na.rm = TRUE)
+  } 
+
+  fast_flagged_idx <- contam_flag & (rt_data < rt_threshold) & !is.na(contam_flag) & !is.na(rt_data)
+  n_tested <- sum(fast_flagged_idx)
+
+  is_upper <- .convert_response_to_upper(response)
+  n_upper <- sum(is_upper[fast_flagged_idx])
+  prop_upper <- n_upper / n_tested
+  posterior_alpha <- prior_alpha + n_upper
+  posterior_beta <- prior_beta + (n_tested - n_upper)
+
+  hdi <- .compute_beta_hdi(posterior_alpha, posterior_beta, credible_mass = credible_mass)
+  bf_01 <- stats::dbeta(guess_prob, posterior_alpha, posterior_beta) /
+    stats::dbeta(guess_prob, prior_alpha, prior_beta)
+  guess_in_hdi <- guess_prob >= hdi$lower && guess_prob <= hdi$upper
+
+  nlist(
+    method = "bayesian", prop_upper, hdi_lower = hdi$lower, hdi_upper = hdi$upper, bf_01, guess_in_hdi,
+    bf_evidence = .categorize_bf(bf_01), posterior_alpha, posterior_beta, n_tested,
+    rt_threshold = as.numeric(rt_threshold), threshold_type,
+    credible_mass, mean_rt_tested = mean(rt_data[fast_flagged_idx])
+  )
+}
+
+# Jeffreys (1961) scale: BF > 10 (strong), > 3 (moderate), > 1 (anecdotal)
+.categorize_bf <- function(bf_01) {
+  if (bf_01 > 10) "strong_for_guessing"
+  else if (bf_01 > 3) "moderate_for_guessing"
+  else if (bf_01 > 1) "anecdotal_for_guessing"
+  else if (bf_01 > 1 / 3) "anecdotal_against_guessing"
+  else if (bf_01 > 1 / 10) "moderate_against_guessing"
+  else "strong_against_guessing"
+}
+
+.compute_beta_hdi <- function(alpha, beta, credible_mass = 0.95) {
+  # Fall back to equal-tailed interval for extreme (>1000) or U-shaped (both <1) cases
+  if (alpha > 1000 || beta > 1000 || (alpha < 1 && beta < 1)) {
+    tail_prob <- (1 - credible_mass) / 2
+    list(
+      lower = stats::qbeta(tail_prob, alpha, beta),
+      upper = stats::qbeta(1 - tail_prob, alpha, beta)
+    )
+  } else {
+    lower_percentiles <- seq(0, 1 - credible_mass, length.out = 1000)
+    upper_percentiles <- lower_percentiles + credible_mass
+
+    lowers <- stats::qbeta(lower_percentiles, alpha, beta)
+    uppers <- stats::qbeta(upper_percentiles, alpha, beta)
+    widths <- uppers - lowers
+
+    min_idx <- which.min(widths)
+    list(lower = lowers[min_idx], upper = uppers[min_idx])
+  }
 }
