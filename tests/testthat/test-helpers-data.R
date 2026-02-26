@@ -628,8 +628,8 @@ test_that("ezdm_summary_stats() clips contaminant proportion to max", {
 
 test_that("ezdm_summary_stats() warns when contaminant proportion is clipped", {
   set.seed(42)
-  true_rt <- rgamma(50, shape = 5, rate = 10) + 0.3
-  contam_rt <- runif(50, 0.1, 3.0)
+  true_rt <- rgamma(60, shape = 5, rate = 10) + 0.3
+  contam_rt <- runif(40, 0.1, 5.0)
   rt <- c(true_rt, contam_rt)
   response <- rbinom(100, 1, 0.8)
 
@@ -864,8 +864,32 @@ test_that("flag_contaminant_rts() warns for RTs > 10", {
   rt <- c(15, 20, 25, 0.5, 0.6, 0.7, 0.8, 0.9)
 
   expect_warning(
-    flag_contaminant_rts(rt),
-    "Some RT values > 10"
+    expect_warning(
+      flag_contaminant_rts(rt),
+      "Some RT values > 10"
+    ),
+    "clipped to max_contaminant"
+  )
+})
+
+test_that("flag_contaminant_rts() warns when lower bound > min RT", {
+  rt <- c(0.1, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0)
+
+  expect_warning(
+    flag_contaminant_rts(rt, contaminant_bound = c(0.3, "max")),
+    "Lower contaminant bound.*greater than the minimum observed RT"
+  )
+})
+
+test_that("flag_contaminant_rts() warns when upper bound < max RT", {
+  rt <- c(0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0, 1.5, 2.0)
+
+  expect_warning(
+    expect_warning(
+      flag_contaminant_rts(rt, contaminant_bound = c("min", 1.0)),
+      "Upper contaminant bound.*less than the maximum observed RT"
+    ),
+    "EM did not converge"
   )
 })
 
@@ -919,10 +943,10 @@ test_that("flag_contaminant_rts() works with different distributions", {
 test_that("flag_contaminant_rts() detects simulated contaminants", {
   set.seed(456)
   n <- 200
-  n_contam <- 20
+  n_contam <- 40
 
-  rt_legit <- rgamma(n - n_contam, shape = 3, rate = 5)
-  rt_contam <- runif(n_contam, 0.05, 0.1)
+  rt_legit <- rgamma(n - n_contam, shape = 5, rate = 5) + 0.3
+  rt_contam <- runif(n_contam, 5, 10)
   rt <- c(rt_legit, rt_contam)
   is_contam <- c(rep(FALSE, n - n_contam), rep(TRUE, n_contam))
 

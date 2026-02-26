@@ -599,6 +599,16 @@ ezdm_summary_stats <- function(
     resolved[2] <- data_max + buffer_amount
   }
 
+  warnif(resolved[1] > data_min,
+    "Lower contaminant bound ({round(resolved[1], 3)}) is greater than the \\
+     minimum observed RT ({round(data_min, 3)}). Observations below the \\
+     bound cannot be classified as contaminants.")
+
+  warnif(resolved[2] < data_max,
+    "Upper contaminant bound ({round(resolved[2], 3)}) is less than the \\
+     maximum observed RT ({round(data_max, 3)}). Observations above the \\
+     bound cannot be classified as contaminants.")
+
   unname(resolved)
 }
 
