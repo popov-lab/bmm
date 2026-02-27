@@ -8,6 +8,7 @@
 <url><loc>https://venpopov.com/bmm/dev/articles/bmm_imm.html</loc></url>
 <url><loc>https://venpopov.com/bmm/dev/articles/bmm_m3.html</loc></url>
 <url><loc>https://venpopov.com/bmm/dev/articles/bmm_mixture_models.html</loc></url>
+<url><loc>https://venpopov.com/bmm/dev/articles/bmm_rt_contamination.html</loc></url>
 <url><loc>https://venpopov.com/bmm/dev/articles/bmm_sdm_simple.html</loc></url>
 <url><loc>https://venpopov.com/bmm/dev/articles/bmm_vwm_crt.html</loc></url>
 <url><loc>https://venpopov.com/bmm/dev/articles/index.html</loc></url>
@@ -17,6 +18,7 @@
 <url><loc>https://venpopov.com/bmm/dev/news/index.html</loc></url>
 <url><loc>https://venpopov.com/bmm/dev/reference/IMMdist.html</loc></url>
 <url><loc>https://venpopov.com/bmm/dev/reference/SDMdist.html</loc></url>
+<url><loc>https://venpopov.com/bmm/dev/reference/adjust_ezdm_accuracy.html</loc></url>
 <url><loc>https://venpopov.com/bmm/dev/reference/apply_links.html</loc></url>
 <url><loc>https://venpopov.com/bmm/dev/reference/bmf2bf.html</loc></url>
 <url><loc>https://venpopov.com/bmm/dev/reference/bmm-package.html</loc></url>
@@ -40,6 +42,7 @@
 <url><loc>https://venpopov.com/bmm/dev/reference/ezdm_dist.html</loc></url>
 <url><loc>https://venpopov.com/bmm/dev/reference/ezdm_summary_stats.html</loc></url>
 <url><loc>https://venpopov.com/bmm/dev/reference/fit_info.html</loc></url>
+<url><loc>https://venpopov.com/bmm/dev/reference/flag_contaminant_rts.html</loc></url>
 <url><loc>https://venpopov.com/bmm/dev/reference/imm.html</loc></url>
 <url><loc>https://venpopov.com/bmm/dev/reference/index.html</loc></url>
 <url><loc>https://venpopov.com/bmm/dev/reference/k2sd.html</loc></url>
@@ -64,6 +67,7 @@
 <url><loc>https://venpopov.com/bmm/dev/reference/supported_models.html</loc></url>
 <url><loc>https://venpopov.com/bmm/dev/reference/update.bmmfit.html</loc></url>
 <url><loc>https://venpopov.com/bmm/dev/reference/use_model_template.html</loc></url>
+<url><loc>https://venpopov.com/bmm/dev/reference/validate_fast_guesses.html</loc></url>
 <url><loc>https://venpopov.com/bmm/dev/reference/wrap.html</loc></url>
 <url><loc>https://venpopov.com/bmm/dev/reference/zhang_luck_2008.html</loc></url>
 </urlset>

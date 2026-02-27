@@ -272,12 +272,42 @@ T_{er} = MRT - \frac{a}{2v} \cdot \frac{1 - e^{-\frac{va}{s^2}}}{1 + e^{-\frac{v
 <h2 id="preparing-data-with-ezdm_summary_stats">
 <span class="header-section-number">4</span> Preparing data with <code>ezdm_summary_stats()</code><a class="anchor" aria-label="anchor" href="#preparing-data-with-ezdm_summary_stats"></a>
 </h2>
-<p>The <code>bmm</code> package provides the <code><a href="../reference/ezdm_summary_stats.html">ezdm_summary_stats()</a></code> function to compute the required aggregated statistics from trial-level RT data in the correct format. This function addresses a critical challenge in applying the EZ-Diffusion Model: <strong>RT contaminants</strong> (fast guesses, lapses, attentional failures) can severely distort mean and variance estimates, leading to biased parameter estimates <span class="citation">(Wagenmakers et al. 2008)</span>.</p>
+<p>The <code>bmm</code> package provides the <code><a href="../reference/ezdm_summary_stats.html">ezdm_summary_stats()</a></code> function to compute the required aggregated statistics from trial-level RT data in the correct format. RT contaminants (fast guesses, lapses, attentional failures) can severely distort mean and variance estimates, leading to biased parameter estimates <span class="citation">(Wagenmakers et al. 2008)</span>. The function offers three methods to address this:</p>
+<table class="table">
+<colgroup>
+<col width="25%">
+<col width="41%">
+<col width="32%">
+</colgroup>
+<thead><tr class="header">
+<th>Method</th>
+<th>Description</th>
+<th>Use when</th>
+</tr></thead>
+<tbody>
+<tr class="odd">
+<td><code>"simple"</code></td>
+<td>Standard mean/variance</td>
+<td>Data is pre-cleaned</td>
+</tr>
+<tr class="even">
+<td><code>"robust"</code></td>
+<td>Median + IQR/MAD-based variance</td>
+<td>Moderate contamination</td>
+</tr>
+<tr class="odd">
+<td><code>"mixture"</code></td>
+<td>EM mixture modeling (default)</td>
+<td>General use; provides contamination estimates</td>
+</tr>
+</tbody>
+</table>
+<p>For detailed coverage of RT contamination handling, including mixture model theory, distribution options, contaminant bounds, and diagnostics, see <code>vignette("bmm_rt_contamination")</code>.</p>
 <div class="section level3" number="4.1">
-<h3 id="why-robust-estimation-matters">
-<span class="header-section-number">4.1</span> Why Robust Estimation Matters<a class="anchor" aria-label="anchor" href="#why-robust-estimation-matters"></a>
+<h3 id="example-with-simulated-data">
+<span class="header-section-number">4.1</span> Example with Simulated Data<a class="anchor" aria-label="anchor" href="#example-with-simulated-data"></a>
 </h3>
-<p>Research by <span class="citation">Wagenmakers et al. (2008)</span> demonstrated that contaminant responses systematically bias EZ-DM parameter estimates. Even a small proportion (5-10%) of outlier RTs can substantially affect the moments used to compute drift rate, boundary, and non-decision time. To illustrate this, let’s generate trial-level data with known parameters and introduce realistic contaminants:</p>
+<p>To illustrate the impact of contamination, we generate trial-level data with known parameters and introduce 5% contaminant trials:</p>
 <div class="sourceCode" id="cb1"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://github.com/venpopov/bmm" class="external-link">bmm</a></span><span class="op">)</span></span>
 <span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://github.com/rtdists/rtdists/" class="external-link">rtdists</a></span><span class="op">)</span></span>
@@ -295,131 +325,45 @@ T_{er} = MRT - \frac{a}{2v} \cdot \frac{1 - e^{-\frac{va}{s^2}}}{1 + e^{-\frac{v
 <span><span class="va">trials_clean</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/pkg/rtdists/man/Diffusion.html" class="external-link">rdiffusion</a></span><span class="op">(</span></span>
 <span>  n <span class="op">=</span> <span class="va">n_trials</span>,</span>
 <span>  a <span class="op">=</span> <span class="va">true_bound</span>,</span>
-<span>  v <span class="op">=</span> <span class="va">true_drift</span>, </span>
+<span>  v <span class="op">=</span> <span class="va">true_drift</span>,</span>
 <span>  t0 <span class="op">=</span> <span class="va">true_ndt</span>,</span>
-<span>  z <span class="op">=</span> <span class="fl">0.5</span> <span class="op">*</span> <span class="va">true_bound</span>  <span class="co"># Symmetric starting point</span></span>
+<span>  z <span class="op">=</span> <span class="fl">0.5</span> <span class="op">*</span> <span class="va">true_bound</span></span>
 <span><span class="op">)</span></span>
 <span></span>
-<span><span class="co"># Add contaminants (5% fast guesses and lapses uniformly distributed between 0.1 and 3 seconds)</span></span>
+<span><span class="co"># Add contaminants (5% fast guesses and lapses)</span></span>
 <span><span class="va">n_contaminants</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/Round.html" class="external-link">round</a></span><span class="op">(</span><span class="va">n_trials</span> <span class="op">*</span> <span class="fl">0.05</span><span class="op">)</span></span>
 <span><span class="va">contaminant_idx</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/sample.html" class="external-link">sample</a></span><span class="op">(</span><span class="va">n_trials</span>, <span class="va">n_contaminants</span><span class="op">)</span></span>
 <span></span>
 <span><span class="va">trials_contaminated</span> <span class="op">&lt;-</span> <span class="va">trials_clean</span></span>
 <span><span class="va">trials_contaminated</span><span class="op">$</span><span class="va">rt</span><span class="op">[</span><span class="va">contaminant_idx</span><span class="op">]</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/stats/Uniform.html" class="external-link">runif</a></span><span class="op">(</span><span class="va">n_contaminants</span>, <span class="fl">0.1</span>, <span class="fl">3</span><span class="op">)</span></span>
-<span><span class="va">trials_contaminated</span><span class="op">$</span><span class="va">response</span><span class="op">[</span><span class="va">contaminant_idx</span><span class="op">]</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/sample.html" class="external-link">sample</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"upper"</span>, <span class="st">"lower"</span><span class="op">)</span>, </span>
-<span>                                                         <span class="va">n_contaminants</span>, </span>
+<span><span class="va">trials_contaminated</span><span class="op">$</span><span class="va">response</span><span class="op">[</span><span class="va">contaminant_idx</span><span class="op">]</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/sample.html" class="external-link">sample</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"upper"</span>, <span class="st">"lower"</span><span class="op">)</span>,</span>
+<span>                                                         <span class="va">n_contaminants</span>,</span>
 <span>                                                         replace <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span>
 <span></span>
-<span><span class="co"># Convert to format expected by ezdm_summary_stats</span></span>
-<span><span class="va">trials_contaminated</span> <span class="op">&lt;-</span> <span class="va">trials_contaminated</span> <span class="op"><a href="https://magrittr.tidyverse.org/reference/pipe.html" class="external-link">%&gt;%</a></span></span>
+<span><span class="va">trials_contaminated</span> <span class="op">&lt;-</span> <span class="va">trials_contaminated</span> <span class="op">|&gt;</span></span>
 <span>  <span class="fu"><a href="https://dplyr.tidyverse.org/reference/mutate.html" class="external-link">mutate</a></span><span class="op">(</span></span>
 <span>    correct <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/numeric.html" class="external-link">as.numeric</a></span><span class="op">(</span><span class="va">response</span> <span class="op">==</span> <span class="st">"upper"</span><span class="op">)</span>,</span>
 <span>    subject <span class="op">=</span> <span class="fl">1</span>,</span>
 <span>    condition <span class="op">=</span> <span class="st">"standard"</span></span>
-<span>  <span class="op">)</span></span>
-<span></span>
-<span><span class="co"># Compare moments</span></span>
-<span><span class="fu"><a href="https://rdrr.io/r/base/cat.html" class="external-link">cat</a></span><span class="op">(</span><span class="st">"Clean data:       Mean RT ="</span>, </span>
-<span>    <span class="fu"><a href="https://rdrr.io/r/base/Round.html" class="external-link">round</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/mean.html" class="external-link">mean</a></span><span class="op">(</span><span class="va">trials_clean</span><span class="op">$</span><span class="va">rt</span><span class="op">[</span><span class="va">trials_clean</span><span class="op">$</span><span class="va">response</span> <span class="op">==</span> <span class="st">"upper"</span><span class="op">]</span><span class="op">)</span>, <span class="fl">3</span><span class="op">)</span>,</span>
-<span>    <span class="st">", Var RT ="</span>, </span>
-<span>    <span class="fu"><a href="https://rdrr.io/r/base/Round.html" class="external-link">round</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/stats/cor.html" class="external-link">var</a></span><span class="op">(</span><span class="va">trials_clean</span><span class="op">$</span><span class="va">rt</span><span class="op">[</span><span class="va">trials_clean</span><span class="op">$</span><span class="va">response</span> <span class="op">==</span> <span class="st">"upper"</span><span class="op">]</span><span class="op">)</span>, <span class="fl">4</span><span class="op">)</span>, <span class="st">"\n"</span><span class="op">)</span></span>
-<span><span class="co">#&gt; Clean data:       Mean RT = 0.476 , Var RT = 0.0205</span></span>
-<span><span class="fu"><a href="https://rdrr.io/r/base/cat.html" class="external-link">cat</a></span><span class="op">(</span><span class="st">"Contaminated data: Mean RT ="</span>, </span>
-<span>    <span class="fu"><a href="https://rdrr.io/r/base/Round.html" class="external-link">round</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/mean.html" class="external-link">mean</a></span><span class="op">(</span><span class="va">trials_contaminated</span><span class="op">$</span><span class="va">rt</span><span class="op">[</span><span class="va">trials_contaminated</span><span class="op">$</span><span class="va">correct</span> <span class="op">==</span> <span class="fl">1</span><span class="op">]</span><span class="op">)</span>, <span class="fl">3</span><span class="op">)</span>,</span>
-<span>    <span class="st">", Var RT ="</span>, </span>
-<span>    <span class="fu"><a href="https://rdrr.io/r/base/Round.html" class="external-link">round</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/stats/cor.html" class="external-link">var</a></span><span class="op">(</span><span class="va">trials_contaminated</span><span class="op">$</span><span class="va">rt</span><span class="op">[</span><span class="va">trials_contaminated</span><span class="op">$</span><span class="va">correct</span> <span class="op">==</span> <span class="fl">1</span><span class="op">]</span><span class="op">)</span>, <span class="fl">4</span><span class="op">)</span>, <span class="st">"\n"</span><span class="op">)</span></span>
-<span><span class="co">#&gt; Contaminated data: Mean RT = 0.514 , Var RT = 0.0756</span></span></code></pre></div>
-<p>The contaminants substantially reduce both the mean and variance of correct RTs, which would lead to biased parameter estimates if we used simple moments.</p>
-</div>
-<div class="section level3" number="4.2">
-<h3 id="three-methods-for-computing-statistics">
-<span class="header-section-number">4.2</span> Three Methods for Computing Statistics<a class="anchor" aria-label="anchor" href="#three-methods-for-computing-statistics"></a>
-</h3>
-<p>The <code><a href="../reference/ezdm_summary_stats.html">ezdm_summary_stats()</a></code> function provides three approaches to handle this challenge:</p>
-<div class="section level4" number="4.2.1">
-<h4 id="simple-method-standard-moments">
-<span class="header-section-number">4.2.1</span> Simple Method (Standard Moments)<a class="anchor" aria-label="anchor" href="#simple-method-standard-moments"></a>
-</h4>
-<p>The <code>"simple"</code> method computes standard sample mean and variance without any outlier detection. This is the fastest approach but vulnerable to contamination:</p>
+<span>  <span class="op">)</span></span></code></pre></div>
+<p>We can now compare the three methods. The function takes <code>rt</code> and <code>response</code> as vectors. For grouped operations, use <code><a href="https://dplyr.tidyverse.org/reference/group_by.html" class="external-link">dplyr::group_by()</a></code> with <code><a href="https://dplyr.tidyverse.org/reference/reframe.html" class="external-link">reframe()</a></code>:</p>
 <div class="sourceCode" id="cb2"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="co"># Basic usage: compute statistics with simple method</span></span>
-<span><span class="va">summary_simple</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/ezdm_summary_stats.html">ezdm_summary_stats</a></span><span class="op">(</span></span>
-<span>  data <span class="op">=</span> <span class="va">trials_contaminated</span>,</span>
-<span>  rt <span class="op">=</span> <span class="st">"rt"</span>,</span>
-<span>  response <span class="op">=</span> <span class="st">"correct"</span>,</span>
-<span>  .by <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"subject"</span>, <span class="st">"condition"</span><span class="op">)</span>,</span>
-<span>  method <span class="op">=</span> <span class="st">"simple"</span>,  <span class="co"># No outlier handling</span></span>
-<span>  version <span class="op">=</span> <span class="st">"3par"</span></span>
+<code class="sourceCode R"><span><span class="va">summary_simple</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/ezdm_summary_stats.html">ezdm_summary_stats</a></span><span class="op">(</span></span>
+<span>  <span class="va">trials_contaminated</span><span class="op">$</span><span class="va">rt</span>, <span class="va">trials_contaminated</span><span class="op">$</span><span class="va">correct</span>,</span>
+<span>  method <span class="op">=</span> <span class="st">"simple"</span>, version <span class="op">=</span> <span class="st">"3par"</span></span>
 <span><span class="op">)</span></span>
 <span></span>
-<span><span class="va">summary_simple</span></span>
-<span><span class="co">#&gt;   subject condition   mean_rt    var_rt n_upper n_trials contaminant_prop</span></span>
-<span><span class="co">#&gt; 1       1  standard 0.5409176 0.1060586     186      200               NA</span></span></code></pre></div>
-<p>Use this method when:
-- Data quality is high with minimal outliers
-- Preprocessing has already removed contaminants
-- Speed is critical for exploratory analysis</p>
-</div>
-<div class="section level4" number="4.2.2">
-<h4 id="robust-method-non-parametric">
-<span class="header-section-number">4.2.2</span> Robust Method (Non-parametric)<a class="anchor" aria-label="anchor" href="#robust-method-non-parametric"></a>
-</h4>
-<p>The <code>"robust"</code> method uses non-parametric statistics resistant to outliers. It computes the <strong>median</strong> for location and uses either the <strong>interquartile range (IQR)</strong> or <strong>median absolute deviation (MAD)</strong> for scale, converting these to equivalent moments:</p>
-<div class="sourceCode" id="cb3"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="co"># Robust estimation using median + IQR</span></span>
 <span><span class="va">summary_robust</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/ezdm_summary_stats.html">ezdm_summary_stats</a></span><span class="op">(</span></span>
-<span>  data <span class="op">=</span> <span class="va">trials_contaminated</span>,</span>
-<span>  rt <span class="op">=</span> <span class="st">"rt"</span>,</span>
-<span>  response <span class="op">=</span> <span class="st">"correct"</span>,</span>
-<span>  .by <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"subject"</span>, <span class="st">"condition"</span><span class="op">)</span>,</span>
-<span>  method <span class="op">=</span> <span class="st">"robust"</span>,</span>
-<span>  robust_scale <span class="op">=</span> <span class="st">"iqr"</span>,  <span class="co"># or "mad"</span></span>
-<span>  version <span class="op">=</span> <span class="st">"3par"</span></span>
+<span>  <span class="va">trials_contaminated</span><span class="op">$</span><span class="va">rt</span>, <span class="va">trials_contaminated</span><span class="op">$</span><span class="va">correct</span>,</span>
+<span>  method <span class="op">=</span> <span class="st">"robust"</span>, version <span class="op">=</span> <span class="st">"3par"</span></span>
 <span><span class="op">)</span></span>
 <span></span>
-<span><span class="va">summary_robust</span></span>
-<span><span class="co">#&gt;   subject condition   mean_rt     var_rt n_upper n_trials contaminant_prop</span></span>
-<span><span class="co">#&gt; 1       1  standard 0.4568634 0.02440439     186      200               NA</span></span></code></pre></div>
-<p>This method is faster than mixture modeling but makes stronger assumptions about the RT distribution shape. Use it when:
-- Moderate contamination is expected
-- Computational efficiency is important
-- The RT distribution is reasonably symmetric</p>
-</div>
-<div class="section level4" number="4.2.3">
-<h4 id="mixture-method-default-most-robust">
-<span class="header-section-number">4.2.3</span> Mixture Method (Default, Most Robust)<a class="anchor" aria-label="anchor" href="#mixture-method-default-most-robust"></a>
-</h4>
-<p>The <code>"mixture"</code> method (default) uses an <strong>EM algorithm</strong> to fit a two-component mixture model:</p>
-<ol style="list-style-type: decimal">
-<li>A parametric distribution (ex-Gaussian, log-normal, or inverse Gaussian) for true responses</li>
-<li>A uniform distribution for contaminants</li>
-</ol>
-<p>This approach explicitly models contaminants and provides estimates of their proportion:</p>
-<div class="sourceCode" id="cb4"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="co"># Robust estimation with mixture model (default)</span></span>
 <span><span class="va">summary_mixture</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/ezdm_summary_stats.html">ezdm_summary_stats</a></span><span class="op">(</span></span>
-<span>  data <span class="op">=</span> <span class="va">trials_contaminated</span>,</span>
-<span>  rt <span class="op">=</span> <span class="st">"rt"</span>,</span>
-<span>  response <span class="op">=</span> <span class="st">"correct"</span>,</span>
-<span>  .by <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"subject"</span>, <span class="st">"condition"</span><span class="op">)</span>,</span>
-<span>  method <span class="op">=</span> <span class="st">"mixture"</span>,              <span class="co"># Default: use mixture modeling</span></span>
-<span>  distribution <span class="op">=</span> <span class="st">"lognormal"</span>,     <span class="co"># RT distribution for true responses</span></span>
-<span>  contaminant_bound <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"min"</span>, <span class="st">"max"</span><span class="op">)</span>, <span class="co"># Bounds for contaminant distribution</span></span>
-<span>  version <span class="op">=</span> <span class="st">"3par"</span></span>
+<span>  <span class="va">trials_contaminated</span><span class="op">$</span><span class="va">rt</span>, <span class="va">trials_contaminated</span><span class="op">$</span><span class="va">correct</span>,</span>
+<span>  method <span class="op">=</span> <span class="st">"mixture"</span>, version <span class="op">=</span> <span class="st">"3par"</span></span>
 <span><span class="op">)</span></span>
 <span></span>
-<span><span class="va">summary_mixture</span></span>
-<span><span class="co">#&gt;   subject condition   mean_rt     var_rt n_upper n_trials contaminant_prop</span></span>
-<span><span class="co">#&gt; 1       1  standard 0.4833737 0.02104083     186      200       0.05073744</span></span></code></pre></div>
-<p>Notice the <code>contaminant_prop</code> column showing the estimated proportion of contaminants. This method provides the most accurate estimates when contaminants are present.</p>
-</div>
-<div class="section level4" number="4.2.4">
-<h4 id="comparison-of-methods">
-<span class="header-section-number">4.2.4</span> Comparison of Methods<a class="anchor" aria-label="anchor" href="#comparison-of-methods"></a>
-</h4>
-<p>Let’s compare all three approaches:</p>
-<div class="sourceCode" id="cb5"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="va">comparison</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/data.frame.html" class="external-link">data.frame</a></span><span class="op">(</span></span>
+<span><span class="va">comparison</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/data.frame.html" class="external-link">data.frame</a></span><span class="op">(</span></span>
 <span>  Method <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"Simple"</span>, <span class="st">"Robust"</span>, <span class="st">"Mixture"</span>, <span class="st">"TRUE"</span><span class="op">)</span>,</span>
 <span>  Mean_RT <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span></span>
 <span>    <span class="va">summary_simple</span><span class="op">$</span><span class="va">mean_rt</span>,</span>
@@ -433,219 +377,58 @@ T_{er} = MRT - \frac{a}{2v} \cdot \frac{1 - e^{-\frac{va}{s^2}}}{1 + e^{-\frac{v
 <span>    <span class="va">summary_mixture</span><span class="op">$</span><span class="va">var_rt</span>,</span>
 <span>    <span class="fu"><a href="https://rdrr.io/r/stats/cor.html" class="external-link">var</a></span><span class="op">(</span><span class="va">trials_clean</span><span class="op">$</span><span class="va">rt</span><span class="op">[</span><span class="va">trials_clean</span><span class="op">$</span><span class="va">response</span> <span class="op">==</span> <span class="st">"upper"</span><span class="op">]</span><span class="op">)</span></span>
 <span>  <span class="op">)</span>,</span>
-<span>  Contaminant <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span></span>
-<span>    <span class="cn">NA</span>,</span>
-<span>    <span class="cn">NA</span>,</span>
-<span>    <span class="va">summary_mixture</span><span class="op">$</span><span class="va">contaminant_prop</span>,</span>
-<span>    <span class="fl">0.05</span></span>
-<span>  <span class="op">)</span></span>
+<span>  Contaminant <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="cn">NA</span>, <span class="cn">NA</span>, <span class="va">summary_mixture</span><span class="op">$</span><span class="va">contaminant_prop</span>, <span class="fl">0.05</span><span class="op">)</span></span>
 <span><span class="op">)</span></span>
 <span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/print.html" class="external-link">print</a></span><span class="op">(</span><span class="va">comparison</span><span class="op">)</span></span>
 <span><span class="co">#&gt;    Method   Mean_RT     Var_RT Contaminant</span></span>
 <span><span class="co">#&gt; 1  Simple 0.5409176 0.10605857          NA</span></span>
 <span><span class="co">#&gt; 2  Robust 0.4568634 0.02440439          NA</span></span>
-<span><span class="co">#&gt; 3 Mixture 0.4833737 0.02104083  0.05073744</span></span>
+<span><span class="co">#&gt; 3 Mixture 0.4962307 0.03633472  0.03539257</span></span>
 <span><span class="co">#&gt; 4    TRUE 0.4755037 0.02050638  0.05000000</span></span></code></pre></div>
-<p>The mixture method successfully identifies contaminants and provides more accurate moment estimates.</p>
+<p>The mixture method identifies contaminants and provides more accurate moment estimates.</p>
 </div>
-</div>
-<div class="section level3" number="4.3">
-<h3 id="handling-contaminants-with-mixture-modeling">
-<span class="header-section-number">4.3</span> Handling Contaminants with Mixture Modeling<a class="anchor" aria-label="anchor" href="#handling-contaminants-with-mixture-modeling"></a>
+<div class="section level3" number="4.2">
+<h3 id="accuracy-adjustment">
+<span class="header-section-number">4.2</span> Accuracy Adjustment<a class="anchor" aria-label="anchor" href="#accuracy-adjustment"></a>
 </h3>
-<p>When using <code>method = "mixture"</code>, you have several options to customize the estimation:</p>
-<div class="section level4" number="4.3.1">
-<h4 id="choosing-an-rt-distribution">
-<span class="header-section-number">4.3.1</span> Choosing an RT Distribution<a class="anchor" aria-label="anchor" href="#choosing-an-rt-distribution"></a>
-</h4>
-<p>The <code>distribution</code> parameter specifies the assumed distribution for true (non-contaminant) responses:</p>
-<ul>
-<li>
-<code>"exgaussian"</code> (default): Ex-Gaussian distribution, commonly used for RTs</li>
-<li>
-<code>"lognormal"</code>: Log-normal distribution, ensures positive RTs</li>
-<li>
-<code>"invgaussian"</code>: Inverse Gaussian, theoretically motivated for diffusion processes</li>
-</ul>
-<div class="sourceCode" id="cb6"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="co"># Compare different distributions</span></span>
-<span><span class="kw">for</span> <span class="op">(</span><span class="va">dist</span> <span class="kw">in</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"exgaussian"</span>, <span class="st">"lognormal"</span>, <span class="st">"invgaussian"</span><span class="op">)</span><span class="op">)</span> <span class="op">{</span></span>
-<span>  <span class="va">stats</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/ezdm_summary_stats.html">ezdm_summary_stats</a></span><span class="op">(</span></span>
-<span>    data <span class="op">=</span> <span class="va">trials_contaminated</span>,</span>
-<span>    rt <span class="op">=</span> <span class="st">"rt"</span>, response <span class="op">=</span> <span class="st">"correct"</span>,</span>
-<span>    method <span class="op">=</span> <span class="st">"mixture"</span>,</span>
-<span>    distribution <span class="op">=</span> <span class="va">dist</span>,</span>
-<span>    version <span class="op">=</span> <span class="st">"3par"</span></span>
-<span>  <span class="op">)</span></span>
-<span>  <span class="fu"><a href="https://rdrr.io/r/base/cat.html" class="external-link">cat</a></span><span class="op">(</span><span class="va">dist</span>, <span class="st">": Mean RT ="</span>, <span class="fu"><a href="https://rdrr.io/r/base/Round.html" class="external-link">round</a></span><span class="op">(</span><span class="va">stats</span><span class="op">$</span><span class="va">mean_rt</span>, <span class="fl">3</span><span class="op">)</span>, <span class="st">", Var RT ="</span>, <span class="fu"><a href="https://rdrr.io/r/base/Round.html" class="external-link">round</a></span><span class="op">(</span><span class="va">stats</span><span class="op">$</span><span class="va">var_rt</span>, <span class="fl">4</span><span class="op">)</span>,</span>
-<span>      <span class="st">", Contaminant prop ="</span>, <span class="fu"><a href="https://rdrr.io/r/base/Round.html" class="external-link">round</a></span><span class="op">(</span><span class="va">stats</span><span class="op">$</span><span class="va">contaminant_prop</span>, <span class="fl">3</span><span class="op">)</span>, <span class="st">"\n"</span><span class="op">)</span></span>
-<span><span class="op">}</span></span></code></pre></div>
-</div>
-<div class="section level4" number="4.3.2">
-<h4 id="specifying-contaminant-bounds">
-<span class="header-section-number">4.3.2</span> Specifying Contaminant Bounds<a class="anchor" aria-label="anchor" href="#specifying-contaminant-bounds"></a>
-</h4>
-<p>The <code>contaminant_bound</code> parameter defines the range for the uniform contaminant distribution:</p>
-<div class="sourceCode" id="cb7"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="co"># Fixed bounds (e.g., based on task constraints)</span></span>
-<span><span class="va">summary_fixed</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/ezdm_summary_stats.html">ezdm_summary_stats</a></span><span class="op">(</span></span>
-<span>  data <span class="op">=</span> <span class="va">trials_contaminated</span>,</span>
-<span>  rt <span class="op">=</span> <span class="st">"rt"</span>, response <span class="op">=</span> <span class="st">"correct"</span>,</span>
-<span>  contaminant_bound <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">0.1</span>, <span class="fl">3.0</span><span class="op">)</span>,  <span class="co"># RTs between 0.1-3.0s may be contaminants</span></span>
-<span>  version <span class="op">=</span> <span class="st">"3par"</span></span>
+<p>When using the mixture method, the <code><a href="../reference/adjust_ezdm_accuracy.html">adjust_ezdm_accuracy()</a></code> function can adjust accuracy counts by removing estimated contaminants. This assumes contaminants are random guesses (50% accuracy by default) and is applied as a separate step after computing summary statistics:</p>
+<div class="sourceCode" id="cb3"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">summary_no_adjust</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/ezdm_summary_stats.html">ezdm_summary_stats</a></span><span class="op">(</span></span>
+<span>  <span class="va">trials_contaminated</span><span class="op">$</span><span class="va">rt</span>, <span class="va">trials_contaminated</span><span class="op">$</span><span class="va">correct</span>, version <span class="op">=</span> <span class="st">"3par"</span></span>
 <span><span class="op">)</span></span>
 <span></span>
-<span><span class="co"># Data-driven bounds (use observed min/max)</span></span>
-<span><span class="va">summary_datadriven</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/ezdm_summary_stats.html">ezdm_summary_stats</a></span><span class="op">(</span></span>
-<span>  data <span class="op">=</span> <span class="va">trials_contaminated</span>,</span>
-<span>  rt <span class="op">=</span> <span class="st">"rt"</span>, response <span class="op">=</span> <span class="st">"correct"</span>,</span>
-<span>  contaminant_bound <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"min"</span>, <span class="st">"max"</span><span class="op">)</span>,</span>
-<span>  version <span class="op">=</span> <span class="st">"3par"</span></span>
-<span><span class="op">)</span></span>
-<span></span>
-<span><span class="co"># Hybrid approach (fixed lower, data-driven upper)</span></span>
-<span><span class="va">summary_hybrid</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/ezdm_summary_stats.html">ezdm_summary_stats</a></span><span class="op">(</span></span>
-<span>  data <span class="op">=</span> <span class="va">trials_contaminated</span>,</span>
-<span>  rt <span class="op">=</span> <span class="st">"rt"</span>, response <span class="op">=</span> <span class="st">"correct"</span>,</span>
-<span>  contaminant_bound <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">0.1</span>, <span class="st">"max"</span><span class="op">)</span>,</span>
-<span>  version <span class="op">=</span> <span class="st">"3par"</span></span>
-<span><span class="op">)</span></span></code></pre></div>
-<p>Fixed bounds based on task constraints (e.g., responses faster than 100ms are likely anticipations) provide more conservative estimates of contaminants. However, in the presence of contaminants, data driven bounds are often more accurate with respect to detecting contaminants, especially in the presence of very long reaction times. In practice you can first filter the data and discard very short (&lt; 0.1s) and very long (&gt; 3 to 5s) and then proceed with data driven bounds for the mixture approach. This prevents the bounds from being influenced by extreme outliers.</p>
-</div>
-</div>
-<div class="section level3" number="4.4">
-<h3 id="quality-control-inspecting-contaminant-proportions">
-<span class="header-section-number">4.4</span> Quality Control: Inspecting Contaminant Proportions<a class="anchor" aria-label="anchor" href="#quality-control-inspecting-contaminant-proportions"></a>
-</h3>
-<p>When using the mixture method, always inspect the estimated contaminant proportions across subjects/conditions:</p>
-<div class="sourceCode" id="cb8"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://ggplot2.tidyverse.org" class="external-link">ggplot2</a></span><span class="op">)</span></span>
-<span></span>
-<span><span class="co"># Generate data for multiple subjects</span></span>
-<span><span class="va">trial_data_multi</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/data.frame.html" class="external-link">data.frame</a></span><span class="op">(</span><span class="op">)</span></span>
-<span><span class="kw">for</span> <span class="op">(</span><span class="va">subj</span> <span class="kw">in</span> <span class="fl">1</span><span class="op">:</span><span class="fl">20</span><span class="op">)</span> <span class="op">{</span></span>
-<span>  <span class="va">trials</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/pkg/rtdists/man/Diffusion.html" class="external-link">rdiffusion</a></span><span class="op">(</span>n <span class="op">=</span> <span class="fl">150</span>, a <span class="op">=</span> <span class="fl">1.2</span>, v <span class="op">=</span> <span class="fl">2.0</span>, t0 <span class="op">=</span> <span class="fl">0.25</span>, z <span class="op">=</span> <span class="fl">0.6</span><span class="op">)</span></span>
-<span>  </span>
-<span>  <span class="co"># Add varying levels of contamination across subjects (0-15%)</span></span>
-<span>  <span class="va">n_contam</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/Round.html" class="external-link">round</a></span><span class="op">(</span><span class="fl">150</span> <span class="op">*</span> <span class="fu"><a href="https://rdrr.io/r/stats/Uniform.html" class="external-link">runif</a></span><span class="op">(</span><span class="fl">1</span>, <span class="fl">0</span>, <span class="fl">0.15</span><span class="op">)</span><span class="op">)</span></span>
-<span>  <span class="kw">if</span> <span class="op">(</span><span class="va">n_contam</span> <span class="op">&gt;</span> <span class="fl">0</span><span class="op">)</span> <span class="op">{</span></span>
-<span>    <span class="va">contam_idx</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/sample.html" class="external-link">sample</a></span><span class="op">(</span><span class="fl">150</span>, <span class="va">n_contam</span><span class="op">)</span></span>
-<span>    <span class="va">trials</span><span class="op">$</span><span class="va">rt</span><span class="op">[</span><span class="va">contam_idx</span><span class="op">]</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/stats/Uniform.html" class="external-link">runif</a></span><span class="op">(</span><span class="va">n_contam</span>, <span class="fl">0.1</span>, <span class="fl">0.3</span><span class="op">)</span></span>
-<span>    <span class="va">trials</span><span class="op">$</span><span class="va">response</span><span class="op">[</span><span class="va">contam_idx</span><span class="op">]</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/sample.html" class="external-link">sample</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"upper"</span>, <span class="st">"lower"</span><span class="op">)</span>, <span class="va">n_contam</span>, replace <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span>
-<span>  <span class="op">}</span></span>
-<span>  </span>
-<span>  <span class="va">trials</span><span class="op">$</span><span class="va">subject</span> <span class="op">&lt;-</span> <span class="va">subj</span></span>
-<span>  <span class="va">trials</span><span class="op">$</span><span class="va">correct</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/numeric.html" class="external-link">as.numeric</a></span><span class="op">(</span><span class="va">trials</span><span class="op">$</span><span class="va">response</span> <span class="op">==</span> <span class="st">"upper"</span><span class="op">)</span></span>
-<span>  <span class="va">trial_data_multi</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/cbind.html" class="external-link">rbind</a></span><span class="op">(</span><span class="va">trial_data_multi</span>, <span class="va">trials</span><span class="op">)</span></span>
-<span><span class="op">}</span></span>
-<span></span>
-<span><span class="co"># Compute summary statistics</span></span>
-<span><span class="va">summary_stats</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/ezdm_summary_stats.html">ezdm_summary_stats</a></span><span class="op">(</span></span>
-<span>  data <span class="op">=</span> <span class="va">trial_data_multi</span>,</span>
-<span>  rt <span class="op">=</span> <span class="st">"rt"</span>, response <span class="op">=</span> <span class="st">"correct"</span>,</span>
-<span>  .by <span class="op">=</span> <span class="st">"subject"</span>,</span>
-<span>  version <span class="op">=</span> <span class="st">"3par"</span></span>
-<span><span class="op">)</span></span>
-<span></span>
-<span><span class="co"># Visualize contaminant proportions</span></span>
-<span><span class="fu"><a href="https://ggplot2.tidyverse.org/reference/ggplot.html" class="external-link">ggplot</a></span><span class="op">(</span><span class="va">summary_stats</span>, <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/aes.html" class="external-link">aes</a></span><span class="op">(</span>x <span class="op">=</span> <span class="va">contaminant_prop</span><span class="op">)</span><span class="op">)</span> <span class="op">+</span></span>
-<span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/geom_histogram.html" class="external-link">geom_histogram</a></span><span class="op">(</span>binwidth <span class="op">=</span> <span class="fl">0.02</span>, fill <span class="op">=</span> <span class="st">"steelblue"</span>, alpha <span class="op">=</span> <span class="fl">0.7</span><span class="op">)</span> <span class="op">+</span></span>
-<span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/geom_abline.html" class="external-link">geom_vline</a></span><span class="op">(</span>xintercept <span class="op">=</span> <span class="fl">0.10</span>, linetype <span class="op">=</span> <span class="st">"dashed"</span>, color <span class="op">=</span> <span class="st">"red"</span><span class="op">)</span> <span class="op">+</span></span>
-<span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/labs.html" class="external-link">labs</a></span><span class="op">(</span></span>
-<span>    title <span class="op">=</span> <span class="st">"Distribution of Estimated Contaminant Proportions"</span>,</span>
-<span>    x <span class="op">=</span> <span class="st">"Contaminant Proportion"</span>,</span>
-<span>    y <span class="op">=</span> <span class="st">"Number of Subjects"</span>,</span>
-<span>    caption <span class="op">=</span> <span class="st">"Red line indicates 10% threshold"</span></span>
-<span>  <span class="op">)</span> <span class="op">+</span></span>
-<span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/ggtheme.html" class="external-link">theme_minimal</a></span><span class="op">(</span><span class="op">)</span></span></code></pre></div>
-<p>Subjects with unusually high contaminant proportions (&gt;15-20%) may require additional data cleaning or exclusion.</p>
-</div>
-<div class="section level3" number="4.5">
-<h3 id="minimum-trial-requirements">
-<span class="header-section-number">4.5</span> Minimum Trial Requirements<a class="anchor" aria-label="anchor" href="#minimum-trial-requirements"></a>
-</h3>
-<p>The accuracy of summary statistics depends critically on sample size. The <code>min_trials</code> parameter (default: 10) sets the minimum number of trials required in each cell:</p>
-<div class="sourceCode" id="cb9"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="co"># Simulate sparse data (some subjects with few correct responses)</span></span>
-<span><span class="va">sparse_data</span> <span class="op">&lt;-</span> <span class="va">trials_contaminated</span><span class="op">[</span><span class="fu"><a href="https://rdrr.io/r/base/sample.html" class="external-link">sample</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/nrow.html" class="external-link">nrow</a></span><span class="op">(</span><span class="va">trials_contaminated</span><span class="op">)</span>, <span class="fl">30</span><span class="op">)</span>, <span class="op">]</span></span>
-<span><span class="va">sparse_data</span><span class="op">$</span><span class="va">subject</span> <span class="op">&lt;-</span> <span class="fl">1</span></span>
-<span></span>
-<span><span class="co"># Function enforces minimum trials</span></span>
-<span><span class="va">summary_sparse</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/ezdm_summary_stats.html">ezdm_summary_stats</a></span><span class="op">(</span></span>
-<span>  data <span class="op">=</span> <span class="va">sparse_data</span>,</span>
-<span>  rt <span class="op">=</span> <span class="st">"rt"</span>, response <span class="op">=</span> <span class="st">"correct"</span>,</span>
-<span>  min_trials <span class="op">=</span> <span class="fl">10</span>,  <span class="co"># Require at least 10 trials</span></span>
-<span>  version <span class="op">=</span> <span class="st">"3par"</span></span>
-<span><span class="op">)</span></span>
-<span></span>
-<span><span class="fu"><a href="https://rdrr.io/r/base/cat.html" class="external-link">cat</a></span><span class="op">(</span><span class="st">"Number of rows returned:"</span>, <span class="fu"><a href="https://rdrr.io/r/base/nrow.html" class="external-link">nrow</a></span><span class="op">(</span><span class="va">summary_sparse</span><span class="op">)</span>, <span class="st">"\n"</span><span class="op">)</span></span>
-<span><span class="co">#&gt; Number of rows returned: 1</span></span>
-<span><span class="fu"><a href="https://rdrr.io/r/base/cat.html" class="external-link">cat</a></span><span class="op">(</span><span class="st">"Number of trials:"</span>, <span class="va">sparse_data</span> <span class="op"><a href="https://magrittr.tidyverse.org/reference/pipe.html" class="external-link">%&gt;%</a></span> <span class="fu"><a href="https://dplyr.tidyverse.org/reference/filter.html" class="external-link">filter</a></span><span class="op">(</span><span class="va">correct</span> <span class="op">==</span> <span class="fl">1</span><span class="op">)</span> <span class="op"><a href="https://magrittr.tidyverse.org/reference/pipe.html" class="external-link">%&gt;%</a></span> <span class="fu"><a href="https://rdrr.io/r/base/nrow.html" class="external-link">nrow</a></span><span class="op">(</span><span class="op">)</span>, <span class="st">"\n"</span><span class="op">)</span></span>
-<span><span class="co">#&gt; Number of trials: 28</span></span></code></pre></div>
-<p><strong>Guidelines for minimum trials</strong>:</p>
-<ul>
-<li>
-<strong>3-parameter model</strong>: At least 30-50 correct responses per cell for stable moment estimates</li>
-<li>
-<strong>4-parameter model</strong>: At least 20-30 responses per boundary (upper and lower)</li>
-<li>
-<strong>Mixture method</strong>: Requires more trials than simple method (50-100+ recommended)</li>
-<li>
-<strong>Hierarchical models</strong>: Can handle smaller cell sizes by borrowing strength across subjects</li>
-</ul>
-<p>When using the mixture method with sparse data, the algorithm may fail to converge or produce unreliable contaminant estimates. Consider using <code>method = "robust"</code> for cells with fewer trials.</p>
-</div>
-<div class="section level3" number="4.6">
-<h3 id="accuracy-adjustment-for-better-estimates">
-<span class="header-section-number">4.6</span> Accuracy Adjustment for Better Estimates<a class="anchor" aria-label="anchor" href="#accuracy-adjustment-for-better-estimates"></a>
-</h3>
-<p>The <code>adjust_accuracy</code> parameter (default: <code>FALSE</code>) adjusts the accuracy counts (<code>n_upper</code>, <code>n_trials</code>) by removing estimated contaminants from both numerator and denominator. The accuracy adjustments assumes that contaminants are random guesses, which on average yield 50% accuracy. This adjustment can improve accuracy estimates when contaminants are substantial:</p>
-<div class="sourceCode" id="cb10"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="co"># Without accuracy adjustment (default)</span></span>
-<span><span class="va">summary_no_adjust</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/ezdm_summary_stats.html">ezdm_summary_stats</a></span><span class="op">(</span></span>
-<span>  data <span class="op">=</span> <span class="va">trials_contaminated</span>,</span>
-<span>  rt <span class="op">=</span> <span class="st">"rt"</span>, response <span class="op">=</span> <span class="st">"correct"</span>,</span>
-<span>  adjust_accuracy <span class="op">=</span> <span class="cn">FALSE</span>,</span>
-<span>  version <span class="op">=</span> <span class="st">"3par"</span></span>
-<span><span class="op">)</span></span>
-<span></span>
-<span><span class="co"># With accuracy adjustment</span></span>
 <span><span class="va">summary_adjust</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/ezdm_summary_stats.html">ezdm_summary_stats</a></span><span class="op">(</span></span>
-<span>  data <span class="op">=</span> <span class="va">trials_contaminated</span>,</span>
-<span>  rt <span class="op">=</span> <span class="st">"rt"</span>, response <span class="op">=</span> <span class="st">"correct"</span>,</span>
-<span>  adjust_accuracy <span class="op">=</span> <span class="cn">TRUE</span>,</span>
-<span>  version <span class="op">=</span> <span class="st">"3par"</span></span>
-<span><span class="op">)</span></span>
+<span>  <span class="va">trials_contaminated</span><span class="op">$</span><span class="va">rt</span>, <span class="va">trials_contaminated</span><span class="op">$</span><span class="va">correct</span>, version <span class="op">=</span> <span class="st">"3par"</span></span>
+<span><span class="op">)</span> <span class="op">|&gt;</span></span>
+<span>  <span class="fu"><a href="https://dplyr.tidyverse.org/reference/mutate.html" class="external-link">mutate</a></span><span class="op">(</span><span class="fu"><a href="../reference/adjust_ezdm_accuracy.html">adjust_ezdm_accuracy</a></span><span class="op">(</span><span class="va">n_upper</span>, <span class="va">n_trials</span>, <span class="va">contaminant_prop</span><span class="op">)</span><span class="op">)</span></span>
 <span></span>
-<span><span class="co"># Compare accuracy estimates</span></span>
-<span><span class="fu"><a href="https://rdrr.io/r/base/cat.html" class="external-link">cat</a></span><span class="op">(</span><span class="st">"Unadjusted accuracy:"</span>, </span>
+<span><span class="fu"><a href="https://rdrr.io/r/base/cat.html" class="external-link">cat</a></span><span class="op">(</span><span class="st">"Unadjusted accuracy:"</span>,</span>
 <span>    <span class="fu"><a href="https://rdrr.io/r/base/Round.html" class="external-link">round</a></span><span class="op">(</span><span class="va">summary_no_adjust</span><span class="op">$</span><span class="va">n_upper</span> <span class="op">/</span> <span class="va">summary_no_adjust</span><span class="op">$</span><span class="va">n_trials</span>, <span class="fl">3</span><span class="op">)</span>, <span class="st">"\n"</span><span class="op">)</span></span>
 <span><span class="co">#&gt; Unadjusted accuracy: 0.93</span></span>
-<span><span class="fu"><a href="https://rdrr.io/r/base/cat.html" class="external-link">cat</a></span><span class="op">(</span><span class="st">"Adjusted accuracy:"</span>, </span>
-<span>    <span class="fu"><a href="https://rdrr.io/r/base/Round.html" class="external-link">round</a></span><span class="op">(</span><span class="va">summary_adjust</span><span class="op">$</span><span class="va">n_upper</span> <span class="op">/</span> <span class="va">summary_adjust</span><span class="op">$</span><span class="va">n_trials</span>, <span class="fl">3</span><span class="op">)</span>, <span class="st">"\n"</span><span class="op">)</span></span>
-<span><span class="co">#&gt; Adjusted accuracy: 0.93</span></span>
-<span><span class="fu"><a href="https://rdrr.io/r/base/cat.html" class="external-link">cat</a></span><span class="op">(</span><span class="st">"True accuracy (no contaminants):"</span>, </span>
+<span><span class="fu"><a href="https://rdrr.io/r/base/cat.html" class="external-link">cat</a></span><span class="op">(</span><span class="st">"Adjusted accuracy:"</span>,</span>
+<span>    <span class="fu"><a href="https://rdrr.io/r/base/Round.html" class="external-link">round</a></span><span class="op">(</span><span class="va">summary_adjust</span><span class="op">$</span><span class="va">n_upper_adj</span> <span class="op">/</span> <span class="va">summary_adjust</span><span class="op">$</span><span class="va">n_trials_adj</span>, <span class="fl">3</span><span class="op">)</span>, <span class="st">"\n"</span><span class="op">)</span></span>
+<span><span class="co">#&gt; Adjusted accuracy: 0.948</span></span>
+<span><span class="fu"><a href="https://rdrr.io/r/base/cat.html" class="external-link">cat</a></span><span class="op">(</span><span class="st">"True accuracy (no contaminants):"</span>,</span>
 <span>    <span class="fu"><a href="https://rdrr.io/r/base/Round.html" class="external-link">round</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/mean.html" class="external-link">mean</a></span><span class="op">(</span><span class="va">trials_clean</span><span class="op">$</span><span class="va">response</span> <span class="op">==</span> <span class="st">"upper"</span><span class="op">)</span>, <span class="fl">3</span><span class="op">)</span>, <span class="st">"\n"</span><span class="op">)</span></span>
 <span><span class="co">#&gt; True accuracy (no contaminants): 0.945</span></span></code></pre></div>
-<p>Use accuracy adjustment when contaminants are substantial and you want the accuracy metric to reflect true performance (excluding guesses).</p>
 </div>
-<div class="section level3" number="4.7">
+<div class="section level3" number="4.3">
 <h3 id="working-with-the-4-parameter-version">
-<span class="header-section-number">4.7</span> Working with the 4-Parameter Version<a class="anchor" aria-label="anchor" href="#working-with-the-4-parameter-version"></a>
+<span class="header-section-number">4.3</span> Working with the 4-Parameter Version<a class="anchor" aria-label="anchor" href="#working-with-the-4-parameter-version"></a>
 </h3>
 <p>The 4-parameter version estimates starting point bias (<code>zr</code>) and requires separate statistics for upper and lower boundary responses:</p>
-<div class="sourceCode" id="cb11"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb4"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="co"># Generate data with response bias (zr = 0.6, favoring upper boundary)</span></span>
 <span><span class="va">trials_biased</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/pkg/rtdists/man/Diffusion.html" class="external-link">rdiffusion</a></span><span class="op">(</span></span>
 <span>  n <span class="op">=</span> <span class="fl">200</span>,</span>
 <span>  a <span class="op">=</span> <span class="fl">1.2</span>,</span>
 <span>  v <span class="op">=</span> <span class="fl">2.0</span>,</span>
 <span>  t0 <span class="op">=</span> <span class="fl">0.25</span>,</span>
-<span>  z <span class="op">=</span> <span class="fl">0.7</span> <span class="op">*</span> <span class="fl">1.2</span>  <span class="co"># Starting point closer to upper boundary</span></span>
+<span>  z <span class="op">=</span> <span class="fl">0.7</span> <span class="op">*</span> <span class="fl">1.2</span></span>
 <span><span class="op">)</span></span>
 <span></span>
-<span><span class="va">trials_biased</span> <span class="op">&lt;-</span> <span class="va">trials_biased</span> <span class="op"><a href="https://magrittr.tidyverse.org/reference/pipe.html" class="external-link">%&gt;%</a></span></span>
+<span><span class="va">trials_biased</span> <span class="op">&lt;-</span> <span class="va">trials_biased</span> <span class="op">|&gt;</span></span>
 <span>  <span class="fu"><a href="https://dplyr.tidyverse.org/reference/mutate.html" class="external-link">mutate</a></span><span class="op">(</span></span>
 <span>    correct <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/numeric.html" class="external-link">as.numeric</a></span><span class="op">(</span><span class="va">response</span> <span class="op">==</span> <span class="st">"upper"</span><span class="op">)</span>,</span>
 <span>    subject <span class="op">=</span> <span class="fl">1</span></span>
@@ -653,48 +436,42 @@ T_{er} = MRT - \frac{a}{2v} \cdot \frac{1 - e^{-\frac{va}{s^2}}}{1 + e^{-\frac{v
 <span></span>
 <span><span class="co"># Compute summary statistics for 4-parameter model</span></span>
 <span><span class="va">summary_4par</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/ezdm_summary_stats.html">ezdm_summary_stats</a></span><span class="op">(</span></span>
-<span>  data <span class="op">=</span> <span class="va">trials_biased</span>,</span>
-<span>  rt <span class="op">=</span> <span class="st">"rt"</span>,</span>
-<span>  response <span class="op">=</span> <span class="st">"correct"</span>,</span>
-<span>  version <span class="op">=</span> <span class="st">"4par"</span>  <span class="co"># Request separate upper/lower statistics</span></span>
+<span>  <span class="va">trials_biased</span><span class="op">$</span><span class="va">rt</span>, <span class="va">trials_biased</span><span class="op">$</span><span class="va">correct</span>, version <span class="op">=</span> <span class="st">"4par"</span></span>
 <span><span class="op">)</span></span>
 <span></span>
 <span><span class="va">summary_4par</span></span>
 <span><span class="co">#&gt;    mean_rt_upper mean_rt_lower var_rt_upper var_rt_lower n_upper n_trials</span></span>
-<span><span class="co">#&gt; mu      0.395538            NA   0.01647681           NA     195      200</span></span>
+<span><span class="co">#&gt; mu     0.3943676            NA   0.01611958           NA     195      200</span></span>
 <span><span class="co">#&gt;    contaminant_prop_upper contaminant_prop_lower</span></span>
-<span><span class="co">#&gt; mu           7.311399e-09                     NA</span></span></code></pre></div>
+<span><span class="co">#&gt; mu             0.01217136                     NA</span></span></code></pre></div>
 <p>Notice the output now includes:
 - <code>mean_rt_upper</code>, <code>var_rt_upper</code>: Statistics for upper boundary responses
 - <code>mean_rt_lower</code>, <code>var_rt_lower</code>: Statistics for lower boundary responses</p>
 <p>This format is required for fitting the 4-parameter EZ-DM model.</p>
 </div>
-<div class="section level3" number="4.8">
+<div class="section level3" number="4.4">
 <h3 id="complete-workflow-from-trial-level-to-model-fitting">
-<span class="header-section-number">4.8</span> Complete Workflow: From Trial-Level to Model Fitting<a class="anchor" aria-label="anchor" href="#complete-workflow-from-trial-level-to-model-fitting"></a>
+<span class="header-section-number">4.4</span> Complete Workflow: From Trial-Level to Model Fitting<a class="anchor" aria-label="anchor" href="#complete-workflow-from-trial-level-to-model-fitting"></a>
 </h3>
 <p>Here’s the complete pipeline from trial-level data to parameter estimation:</p>
-<div class="sourceCode" id="cb12"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb5"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="co"># Step 1: Generate or load trial-level data</span></span>
 <span><span class="va">trial_data</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/pkg/rtdists/man/Diffusion.html" class="external-link">rdiffusion</a></span><span class="op">(</span></span>
 <span>  n <span class="op">=</span> <span class="fl">100</span> <span class="op">*</span> <span class="fl">20</span>,  <span class="co"># 20 subjects, 100 trials each</span></span>
 <span>  a <span class="op">=</span> <span class="fl">1.5</span>, v <span class="op">=</span> <span class="fl">2.5</span>, t0 <span class="op">=</span> <span class="fl">0.3</span>, z <span class="op">=</span> <span class="fl">0.75</span></span>
-<span><span class="op">)</span> <span class="op"><a href="https://magrittr.tidyverse.org/reference/pipe.html" class="external-link">%&gt;%</a></span></span>
+<span><span class="op">)</span> <span class="op">|&gt;</span></span>
 <span>  <span class="fu"><a href="https://dplyr.tidyverse.org/reference/mutate.html" class="external-link">mutate</a></span><span class="op">(</span></span>
 <span>    subject <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/rep.html" class="external-link">rep</a></span><span class="op">(</span><span class="fl">1</span><span class="op">:</span><span class="fl">20</span>, each <span class="op">=</span> <span class="fl">100</span><span class="op">)</span>,</span>
 <span>    correct <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/numeric.html" class="external-link">as.numeric</a></span><span class="op">(</span><span class="va">response</span> <span class="op">==</span> <span class="st">"upper"</span><span class="op">)</span></span>
 <span>  <span class="op">)</span></span>
 <span></span>
 <span><span class="co"># Step 2: Compute summary statistics with robust estimation</span></span>
-<span><span class="va">summary_data</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/ezdm_summary_stats.html">ezdm_summary_stats</a></span><span class="op">(</span></span>
-<span>  data <span class="op">=</span> <span class="va">trial_data</span>,</span>
-<span>  rt <span class="op">=</span> <span class="st">"rt"</span>,</span>
-<span>  response <span class="op">=</span> <span class="st">"correct"</span>,</span>
-<span>  .by <span class="op">=</span> <span class="st">"subject"</span>,</span>
-<span>  method <span class="op">=</span> <span class="st">"mixture"</span>,</span>
-<span>  distribution <span class="op">=</span> <span class="st">"exgaussian"</span>,</span>
-<span>  version <span class="op">=</span> <span class="st">"3par"</span></span>
-<span><span class="op">)</span></span>
+<span><span class="va">summary_data</span> <span class="op">&lt;-</span> <span class="va">trial_data</span> <span class="op">|&gt;</span></span>
+<span>  <span class="fu"><a href="https://dplyr.tidyverse.org/reference/group_by.html" class="external-link">group_by</a></span><span class="op">(</span><span class="va">subject</span><span class="op">)</span> <span class="op">|&gt;</span></span>
+<span>  <span class="fu"><a href="https://dplyr.tidyverse.org/reference/reframe.html" class="external-link">reframe</a></span><span class="op">(</span><span class="fu"><a href="../reference/ezdm_summary_stats.html">ezdm_summary_stats</a></span><span class="op">(</span></span>
+<span>    <span class="va">rt</span>, <span class="va">correct</span>,</span>
+<span>    method <span class="op">=</span> <span class="st">"mixture"</span>, distribution <span class="op">=</span> <span class="st">"exgaussian"</span>, version <span class="op">=</span> <span class="st">"3par"</span></span>
+<span>  <span class="op">)</span><span class="op">)</span></span>
 <span></span>
 <span><span class="co"># Step 3: Inspect contaminant proportions (quality control)</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/summary.html" class="external-link">summary</a></span><span class="op">(</span><span class="va">summary_data</span><span class="op">$</span><span class="va">contaminant_prop</span><span class="op">)</span></span>
@@ -720,14 +497,14 @@ T_{er} = MRT - \frac{a}{2v} \cdot \frac{1 - e^{-\frac{va}{s^2}}}{1 + e^{-\frac{v
 <span class="header-section-number">5</span> Fitting the model with <code>bmm</code><a class="anchor" aria-label="anchor" href="#fitting-the-model-with-bmm"></a>
 </h2>
 <p>We start by loading the <code>bmm</code> package:</p>
-<div class="sourceCode" id="cb13"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb6"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://github.com/venpopov/bmm" class="external-link">bmm</a></span><span class="op">)</span></span></code></pre></div>
 <div class="section level3" number="5.1">
 <h3 id="generating-simulated-data">
 <span class="header-section-number">5.1</span> Generating simulated data<a class="anchor" aria-label="anchor" href="#generating-simulated-data"></a>
 </h3>
 <p>For illustration, we will generate simulated data with known parameters using the <code><a href="../reference/ezdm_dist.html">rezdm()</a></code> function. As for all other models, <code>bmm</code> provides a density and random generation function for all implemented models. In the case of the <code>ezdm</code> there is no single dependent variable for the density function, which makes efficient illustration challenging. However, the <code>rezdm</code> function allows for evaluating parameter recovery simulations and predicitions based on the <code>ezdm</code>.</p>
-<div class="sourceCode" id="cb14"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb7"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/base/Random.html" class="external-link">set.seed</a></span><span class="op">(</span><span class="fl">123</span><span class="op">)</span></span>
 <span></span>
 <span><span class="co"># Define true parameters for two conditions</span></span>
@@ -784,7 +561,7 @@ T_{er} = MRT - \frac{a}{2v} \cdot \frac{1 - e^{-\frac{va}{s^2}}}{1 + e^{-\frac{v
 <span class="header-section-number">5.2</span> Specifying the formula<a class="anchor" aria-label="anchor" href="#specifying-the-formula"></a>
 </h3>
 <p>Next, we specify the model formula using <code><a href="../reference/bmmformula.html">bmmformula()</a></code> (or <code><a href="../reference/bmmformula.html">bmf()</a></code>). For this example, we want to estimate separate drift rates for each condition while keeping boundary and non-decision time constant:</p>
-<div class="sourceCode" id="cb15"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb8"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">model_formula</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/bmmformula.html">bmf</a></span><span class="op">(</span></span>
 <span>  <span class="va">drift</span> <span class="op">~</span> <span class="fl">0</span> <span class="op">+</span> <span class="va">condition</span>,</span>
 <span>  <span class="va">bound</span> <span class="op">~</span> <span class="fl">1</span>,</span>
@@ -796,7 +573,7 @@ T_{er} = MRT - \frac{a}{2v} \cdot \frac{1 - e^{-\frac{va}{s^2}}}{1 + e^{-\frac{v
 <span class="header-section-number">5.3</span> Specifying the model<a class="anchor" aria-label="anchor" href="#specifying-the-model"></a>
 </h3>
 <p>Next, we specify the <code>bmmodel</code>object for the EZDM model by calling <code>ezdm</code> and passing the respective variable names from our dataset:</p>
-<div class="sourceCode" id="cb16"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb9"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">model</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/ezdm.html">ezdm</a></span><span class="op">(</span></span>
 <span>  mean_rt <span class="op">=</span> <span class="st">"mean_rt"</span>,</span>
 <span>  var_rt <span class="op">=</span> <span class="st">"var_rt"</span>,</span>
@@ -811,7 +588,7 @@ T_{er} = MRT - \frac{a}{2v} \cdot \frac{1 - e^{-\frac{va}{s^2}}}{1 + e^{-\frac{v
 <span class="header-section-number">5.4</span> Fitting the model<a class="anchor" aria-label="anchor" href="#fitting-the-model"></a>
 </h3>
 <p>Now we can fit the model using <code><a href="../reference/bmm.html">bmm()</a></code>:</p>
-<div class="sourceCode" id="cb17"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb10"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">fit</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/bmm.html">bmm</a></span><span class="op">(</span></span>
 <span>  formula <span class="op">=</span> <span class="va">model_formula</span>,</span>
 <span>  data <span class="op">=</span> <span class="va">sim_data</span>,</span>
@@ -826,8 +603,8 @@ T_{er} = MRT - \frac{a}{2v} \cdot \frac{1 - e^{-\frac{va}{s^2}}}{1 + e^{-\frac{v
 <span class="header-section-number">5.5</span> Inspecting results<a class="anchor" aria-label="anchor" href="#inspecting-results"></a>
 </h3>
 <p>First, check the model summary:</p>
-<div class="sourceCode" id="cb18"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb18-1"><a href="#cb18-1" tabindex="-1"></a><span class="fu">summary</span>(fit)</span>
-<span id="cb18-2"><a href="#cb18-2" tabindex="-1"></a>Loading required namespace<span class="sc">:</span> rstan</span></code></pre></div>
+<div class="sourceCode" id="cb11"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb11-1"><a href="#cb11-1" tabindex="-1"></a><span class="fu">summary</span>(fit)</span>
+<span id="cb11-2"><a href="#cb11-2" tabindex="-1"></a>Loading required namespace<span class="sc">:</span> rstan</span></code></pre></div>
 <pre class="fansi fansi-output"><code><span style="color: #AF5FFF;">  Model: </span><span style="color: #FF875F;">ezdm</span>(mean_rt = "mean_rt",
               var_rt = "var_rt",
               n_upper = "n_upper",
@@ -858,7 +635,7 @@ and Tail_ESS are effective sample size measures, and Rhat is the potential
 scale reduction factor on split chains (at convergence, Rhat = 1).
 </code></pre>
 <p>To provide stable sampling all parameters use log link functions, so we need to exponentiate to get estimates on the natural scale:</p>
-<div class="sourceCode" id="cb19"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb12"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="co"># Extract fixed effects</span></span>
 <span><span class="va">fixef_est</span> <span class="op">&lt;-</span> <span class="fu">brms</span><span class="fu">::</span><span class="fu"><a href="https://rdrr.io/pkg/nlme/man/fixed.effects.html" class="external-link">fixef</a></span><span class="op">(</span><span class="va">fit</span><span class="op">)</span></span>
 <span></span>
@@ -872,7 +649,7 @@ scale reduction factor on split chains (at convergence, Rhat = 1).
 <span><span class="fu"><a href="https://rdrr.io/r/base/cat.html" class="external-link">cat</a></span><span class="op">(</span><span class="st">"Non-decision time:"</span>, <span class="fu"><a href="https://rdrr.io/r/base/Log.html" class="external-link">exp</a></span><span class="op">(</span><span class="va">fixef_est</span><span class="op">[</span><span class="st">"ndt_Intercept"</span>, <span class="st">"Estimate"</span><span class="op">]</span><span class="op">)</span>, <span class="st">"\n"</span><span class="op">)</span></span>
 <span><span class="co">#&gt; Non-decision time: 0.2827719</span></span></code></pre></div>
 <p>As you can see, these match the generating values well:</p>
-<div class="sourceCode" id="cb20"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb13"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/base/print.html" class="external-link">print</a></span><span class="op">(</span><span class="va">true_params</span><span class="op">)</span></span>
 <span><span class="co">#&gt;   condition drift bound ndt</span></span>
 <span><span class="co">#&gt; 1      easy   3.0   1.5 0.3</span></span>
@@ -882,7 +659,7 @@ scale reduction factor on split chains (at convergence, Rhat = 1).
 <h3 id="visualizing-posterior-distributions">
 <span class="header-section-number">5.6</span> Visualizing posterior distributions<a class="anchor" aria-label="anchor" href="#visualizing-posterior-distributions"></a>
 </h3>
-<div class="sourceCode" id="cb21"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb14"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://mjskay.github.io/tidybayes/" class="external-link">tidybayes</a></span><span class="op">)</span></span>
 <span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://dplyr.tidyverse.org" class="external-link">dplyr</a></span><span class="op">)</span></span>
 <span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://tidyr.tidyverse.org" class="external-link">tidyr</a></span><span class="op">)</span></span>
@@ -923,7 +700,7 @@ scale reduction factor on split chains (at convergence, Rhat = 1).
 <span class="header-section-number">6</span> Comparing conditions<a class="anchor" aria-label="anchor" href="#comparing-conditions"></a>
 </h2>
 <p>As <code>bmm</code> feeds seamlessly into <code>brms</code>, we can use Bayesian hypothesis testing via Savage-Dickey density ratios to compare drift rates between conditions:</p>
-<div class="sourceCode" id="cb22"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb15"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="co"># Test if drift rate is higher in easy vs hard condition</span></span>
 <span><span class="fu">brms</span><span class="fu">::</span><span class="fu"><a href="https://paulbuerkner.com/brms/reference/hypothesis.brmsfit.html" class="external-link">hypothesis</a></span><span class="op">(</span><span class="va">fit</span>, <span class="st">"exp(drift_conditioneasy) &gt; exp(drift_conditionhard)"</span><span class="op">)</span></span>
 <span><span class="co">#&gt; Hypothesis Tests for class b:</span></span>
@@ -942,7 +719,7 @@ scale reduction factor on split chains (at convergence, Rhat = 1).
 <span class="header-section-number">7</span> Adding random effects<a class="anchor" aria-label="anchor" href="#adding-random-effects"></a>
 </h2>
 <p>For hierarchical models with random effects across subjects:</p>
-<div class="sourceCode" id="cb23"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb16"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="co"># Formula with random effects</span></span>
 <span><span class="va">model_formula_re</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/bmmformula.html">bmf</a></span><span class="op">(</span></span>
 <span>  <span class="va">drift</span> <span class="op">~</span> <span class="fl">0</span> <span class="op">+</span> <span class="va">condition</span> <span class="op">+</span> <span class="op">(</span><span class="fl">0</span> <span class="op">+</span> <span class="va">condition</span> <span class="op">|</span> <span class="va">subject</span><span class="op">)</span>,</span>

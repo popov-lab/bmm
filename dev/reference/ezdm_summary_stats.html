@@ -54,22 +54,18 @@ contaminant responses from true responses.</p>
     <div class="section level2">
     <h2 id="ref-usage">Usage<a class="anchor" aria-label="anchor" href="#ref-usage"></a></h2>
     <div class="sourceCode"><pre class="sourceCode r"><code><span><span class="fu">ezdm_summary_stats</span><span class="op">(</span></span>
-<span>  <span class="va">data</span>,</span>
 <span>  <span class="va">rt</span>,</span>
 <span>  <span class="va">response</span>,</span>
-<span>  .by <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  version <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"3par"</span>, <span class="st">"4par"</span><span class="op">)</span>,</span>
 <span>  distribution <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"exgaussian"</span>, <span class="st">"lognormal"</span>, <span class="st">"invgaussian"</span><span class="op">)</span>,</span>
 <span>  method <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"mixture"</span>, <span class="st">"simple"</span>, <span class="st">"robust"</span><span class="op">)</span>,</span>
 <span>  robust_scale <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"iqr"</span>, <span class="st">"mad"</span><span class="op">)</span>,</span>
-<span>  contaminant_bound <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">0.1</span>, <span class="fl">3</span><span class="op">)</span>,</span>
+<span>  contaminant_bound <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"min"</span>, <span class="st">"max"</span><span class="op">)</span>,</span>
 <span>  min_trials <span class="op">=</span> <span class="fl">10</span>,</span>
 <span>  init_contaminant <span class="op">=</span> <span class="fl">0.05</span>,</span>
 <span>  max_contaminant <span class="op">=</span> <span class="fl">0.5</span>,</span>
 <span>  maxit <span class="op">=</span> <span class="fl">100</span>,</span>
-<span>  tol <span class="op">=</span> <span class="fl">1e-06</span>,</span>
-<span>  adjust_accuracy <span class="op">=</span> <span class="cn">FALSE</span>,</span>
-<span>  guess_rate <span class="op">=</span> <span class="fl">0.5</span></span>
+<span>  tol <span class="op">=</span> <span class="fl">1e-06</span></span>
 <span><span class="op">)</span></span></code></pre></div>
     </div>
 
@@ -77,34 +73,21 @@ contaminant responses from true responses.</p>
     <h2 id="arguments">Arguments<a class="anchor" aria-label="anchor" href="#arguments"></a></h2>
 
 
-<dl><dt id="arg-data">data<a class="anchor" aria-label="anchor" href="#arg-data"></a></dt>
-<dd><p>A <code>data.frame</code> containing trial-level data with RT and accuracy
-columns</p></dd>
-
-
-<dt id="arg-rt">rt<a class="anchor" aria-label="anchor" href="#arg-rt"></a></dt>
-<dd><p>Character. The name of the column containing reaction times (in
-seconds)</p></dd>
+<dl><dt id="arg-rt">rt<a class="anchor" aria-label="anchor" href="#arg-rt"></a></dt>
+<dd><p>Numeric vector of reaction times in seconds.</p></dd>
 
 
 <dt id="arg-response">response<a class="anchor" aria-label="anchor" href="#arg-response"></a></dt>
-<dd><p>Character. The name of the column containing response
-indicators. Accepts multiple formats:</p><ul><li><p>Numeric: 1 = upper/correct, 0 = lower/error</p></li>
+<dd><p>Vector of response indicators. Accepts multiple formats:</p><ul><li><p>Numeric: 1 = upper/correct, 0 = lower/error</p></li>
 <li><p>Logical: TRUE = upper/correct, FALSE = lower/error</p></li>
 <li><p>Character/Factor: "upper"/"lower", "correct"/"error",
 "acc"/"err", "hit"/"miss", "yes"/"no" (case-insensitive)</p></li>
 </ul></dd>
 
 
-<dt id="arg--by">.by<a class="anchor" aria-label="anchor" href="#arg--by"></a></dt>
-<dd><p>A character vector of column names to group by before computing
-summary statistics (e.g., <code>.by = c("subject", "condition")</code>). If NULL
-(default), computes statistics across all data without grouping.</p></dd>
-
-
 <dt id="arg-version">version<a class="anchor" aria-label="anchor" href="#arg-version"></a></dt>
 <dd><p>Character. Either "3par" (default) for pooled RTs or "4par"
-for separate upper/lower boundary RTs</p></dd>
+for separate upper/lower boundary RTs. Controls the output columns.</p></dd>
 
 
 <dt id="arg-distribution">distribution<a class="anchor" aria-label="anchor" href="#arg-distribution"></a></dt>
@@ -131,16 +114,16 @@ to be consistent with SD for normal data). Only used when method = "robust".</p>
 <dt id="arg-contaminant-bound">contaminant_bound<a class="anchor" aria-label="anchor" href="#arg-contaminant-bound"></a></dt>
 <dd><p>Vector of length 2 specifying the bounds (in
 seconds) for the uniform contaminant distribution. Can be numeric values
-or the special strings "min" and "max" to use data-driven bounds:</p><ul><li><p>Numeric: Fixed bounds, e.g., c(0.1, 3.0) (default)</p></li>
-<li><p>"min": Use the minimum RT in each group, minus a 50\<!-- % buffer --></p></li>
+or the special strings "min" and "max" to use data-driven bounds (default):</p><ul><li><p>"min": Use the minimum RT in each group, minus a 50\<!-- % buffer --></p></li>
 <li><p>"max": Use the maximum RT in each group, plus a 50\<!-- % buffer --></p></li>
+<li><p>Numeric: Fixed bounds, e.g., c(0.1, 3.0)</p></li>
 </ul><p>The buffer extends data-driven bounds to ensure conservative estimates.
 Examples: c(0.1, 3.0), c("min", "max"), c(0.1, "max"), c("min", 3.0)</p></dd>
 
 
 <dt id="arg-min-trials">min_trials<a class="anchor" aria-label="anchor" href="#arg-min-trials"></a></dt>
 <dd><p>Integer. Minimum number of trials required for fitting.
-Groups with fewer trials will return NA. Default is 10</p></dd>
+Returns NA if fewer trials are available. Default is 10</p></dd>
 
 
 <dt id="arg-init-contaminant">init_contaminant<a class="anchor" aria-label="anchor" href="#arg-init-contaminant"></a></dt>
@@ -161,26 +144,13 @@ contaminant proportions. Default is 0.5</p></dd>
 <dt id="arg-tol">tol<a class="anchor" aria-label="anchor" href="#arg-tol"></a></dt>
 <dd><p>Numeric. Convergence tolerance for EM algorithm. Default is 1e-6</p></dd>
 
-
-<dt id="arg-adjust-accuracy">adjust_accuracy<a class="anchor" aria-label="anchor" href="#arg-adjust-accuracy"></a></dt>
-<dd><p>Logical. If TRUE and method = "mixture", adjust
-accuracy counts by removing estimated contaminant guesses using binomial
-sampling. Default is FALSE</p></dd>
-
-
-<dt id="arg-guess-rate">guess_rate<a class="anchor" aria-label="anchor" href="#arg-guess-rate"></a></dt>
-<dd><p>Numeric. Assumed accuracy rate for contaminant trials
-(random guessing). Default is 0.5 (appropriate for 2AFC tasks)</p></dd>
-
 </dl></div>
     <div class="section level2">
     <h2 id="value">Value<a class="anchor" aria-label="anchor" href="#value"></a></h2>
-    <p>A <code>data.frame</code> with summary statistics. For version = "3par":
-grouping variables, mean_rt, var_rt, n_upper, n_trials, contaminant_prop.
-When adjust_accuracy = TRUE, also includes n_upper_adj and n_trials_adj.
-For version = "4par": grouping variables, mean_rt_upper, mean_rt_lower,
-var_rt_upper, var_rt_lower, n_upper, n_trials, contaminant_prop_upper,
-contaminant_prop_lower.</p>
+    <p>A 1-row <code>data.frame</code>. For version = "3par": <code>mean_rt</code>, <code>var_rt</code>,
+<code>n_upper</code>, <code>n_trials</code>, <code>contaminant_prop</code>. For version = "4par":
+<code>mean_rt_upper</code>, <code>mean_rt_lower</code>, <code>var_rt_upper</code>, <code>var_rt_lower</code>,
+<code>n_upper</code>, <code>n_trials</code>, <code>contaminant_prop_upper</code>, <code>contaminant_prop_lower</code>.</p>
     </div>
     <div class="section level2">
     <h2 id="details">Details<a class="anchor" aria-label="anchor" href="#details"></a></h2>
@@ -190,37 +160,42 @@ the EZ-Diffusion equations. This function addresses this by fitting a
 mixture model with two components: a uniform distribution for
 contaminants and a parametric RT distribution for true responses.
 Robust moments are then extracted from the fitted parametric component.</p>
+<p>This function is designed to work with <code><a href="https://dplyr.tidyverse.org/reference/group_by.html" class="external-link">dplyr::group_by()</a></code> and
+<code><a href="https://dplyr.tidyverse.org/reference/reframe.html" class="external-link">dplyr::reframe()</a></code> for grouped operations. Use <code><a href="adjust_ezdm_accuracy.html">adjust_ezdm_accuracy()</a></code>
+as a separate step if you need to adjust accuracy counts for
+contamination.</p>
+    </div>
+    <div class="section level2">
+    <h2 id="see-also">See also<a class="anchor" aria-label="anchor" href="#see-also"></a></h2>
+    <div class="dont-index"><p><code><a href="adjust_ezdm_accuracy.html">adjust_ezdm_accuracy()</a></code> for adjusting accuracy counts,
+<code><a href="flag_contaminant_rts.html">flag_contaminant_rts()</a></code> for trial-level contamination probabilities,
+<code><a href="ezdm.html">ezdm()</a></code> for fitting the EZ-Diffusion Model</p></div>
     </div>
 
     <div class="section level2">
     <h2 id="ref-examples">Examples<a class="anchor" aria-label="anchor" href="#ref-examples"></a></h2>
     <div class="sourceCode"><pre class="sourceCode r"><code><span class="r-in"><span><span class="co"># Generate example data</span></span></span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/base/Random.html" class="external-link">set.seed</a></span><span class="op">(</span><span class="fl">123</span><span class="op">)</span></span></span>
-<span class="r-in"><span><span class="va">test_data</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/data.frame.html" class="external-link">data.frame</a></span><span class="op">(</span></span></span>
-<span class="r-in"><span>  subject <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/rep.html" class="external-link">rep</a></span><span class="op">(</span><span class="fl">1</span><span class="op">:</span><span class="fl">3</span>, each <span class="op">=</span> <span class="fl">100</span><span class="op">)</span>,</span></span>
-<span class="r-in"><span>  condition <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/rep.html" class="external-link">rep</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"A"</span>, <span class="st">"B"</span><span class="op">)</span>, <span class="fl">150</span><span class="op">)</span>,</span></span>
-<span class="r-in"><span>  rt <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/stats/GammaDist.html" class="external-link">rgamma</a></span><span class="op">(</span><span class="fl">300</span>, shape <span class="op">=</span> <span class="fl">5</span>, rate <span class="op">=</span> <span class="fl">10</span><span class="op">)</span> <span class="op">+</span> <span class="fl">0.3</span>,</span></span>
-<span class="r-in"><span>  correct <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/stats/Binomial.html" class="external-link">rbinom</a></span><span class="op">(</span><span class="fl">300</span>, <span class="fl">1</span>, <span class="fl">0.8</span><span class="op">)</span></span></span>
-<span class="r-in"><span><span class="op">)</span></span></span>
+<span class="r-in"><span><span class="va">rt</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/stats/GammaDist.html" class="external-link">rgamma</a></span><span class="op">(</span><span class="fl">100</span>, shape <span class="op">=</span> <span class="fl">5</span>, rate <span class="op">=</span> <span class="fl">10</span><span class="op">)</span> <span class="op">+</span> <span class="fl">0.3</span></span></span>
+<span class="r-in"><span><span class="va">response</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/stats/Binomial.html" class="external-link">rbinom</a></span><span class="op">(</span><span class="fl">100</span>, <span class="fl">1</span>, <span class="fl">0.8</span><span class="op">)</span></span></span>
 <span class="r-in"><span></span></span>
-<span class="r-in"><span><span class="co"># Compute summary statistics grouped by subject</span></span></span>
-<span class="r-in"><span><span class="va">result</span> <span class="op">&lt;-</span> <span class="fu">ezdm_summary_stats</span><span class="op">(</span><span class="va">test_data</span>,</span></span>
-<span class="r-in"><span>  rt <span class="op">=</span> <span class="st">"rt"</span>, response <span class="op">=</span> <span class="st">"correct"</span>,</span></span>
-<span class="r-in"><span>  .by <span class="op">=</span> <span class="st">"subject"</span></span></span>
-<span class="r-in"><span><span class="op">)</span></span></span>
-<span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/base/print.html" class="external-link">print</a></span><span class="op">(</span><span class="va">result</span><span class="op">)</span></span></span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   subject   mean_rt     var_rt n_upper n_trials contaminant_prop</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 1       1 0.7752000 0.03617616      85      100     5.232355e-09</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 2       2 0.7722113 0.06167891      78      100     1.008148e-08</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 3       3 0.7906609 0.04786826      85      100     1.694455e-08</span>
+<span class="r-in"><span><span class="co"># 3par summary stats</span></span></span>
+<span class="r-in"><span><span class="fu">ezdm_summary_stats</span><span class="op">(</span><span class="va">rt</span>, <span class="va">response</span><span class="op">)</span></span></span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>      mean_rt     var_rt n_upper n_trials contaminant_prop</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> mu 0.7751987 0.03617632      82      100      4.68105e-08</span>
 <span class="r-in"><span></span></span>
-<span class="r-in"><span><span class="co"># Group by multiple variables using simple method</span></span></span>
-<span class="r-in"><span><span class="va">result_multi</span> <span class="op">&lt;-</span> <span class="fu">ezdm_summary_stats</span><span class="op">(</span><span class="va">test_data</span>,</span></span>
-<span class="r-in"><span>  rt <span class="op">=</span> <span class="st">"rt"</span>,</span></span>
-<span class="r-in"><span>  response <span class="op">=</span> <span class="st">"correct"</span>,</span></span>
-<span class="r-in"><span>  .by <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"subject"</span>, <span class="st">"condition"</span><span class="op">)</span>,</span></span>
-<span class="r-in"><span>  method <span class="op">=</span> <span class="st">"simple"</span></span></span>
-<span class="r-in"><span><span class="op">)</span></span></span>
+<span class="r-in"><span><span class="co"># With dplyr for grouped operations</span></span></span>
+<span class="r-in"><span><span class="co"># library(dplyr)</span></span></span>
+<span class="r-in"><span><span class="co"># mydata |&gt;</span></span></span>
+<span class="r-in"><span><span class="co">#   group_by(subject) |&gt;</span></span></span>
+<span class="r-in"><span><span class="co">#   reframe(ezdm_summary_stats(rt, response))</span></span></span>
+<span class="r-in"><span></span></span>
+<span class="r-in"><span><span class="co"># 4par version with separate upper/lower moments</span></span></span>
+<span class="r-in"><span><span class="fu">ezdm_summary_stats</span><span class="op">(</span><span class="va">rt</span>, <span class="va">response</span>, version <span class="op">=</span> <span class="st">"4par"</span><span class="op">)</span></span></span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>    mean_rt_upper mean_rt_lower var_rt_upper var_rt_lower n_upper n_trials</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> mu     0.7751185     0.7756404   0.04176804   0.01614607      82      100</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>    contaminant_prop_upper contaminant_prop_lower</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> mu           5.349368e-08           5.258552e-08</span>
 <span class="r-in"><span></span></span>
 </code></pre></div>
     </div>

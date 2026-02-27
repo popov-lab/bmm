@@ -8,41 +8,30 @@ responses from true responses.
 
 ``` r
 ezdm_summary_stats(
-  data,
   rt,
   response,
-  .by = NULL,
   version = c("3par", "4par"),
   distribution = c("exgaussian", "lognormal", "invgaussian"),
   method = c("mixture", "simple", "robust"),
   robust_scale = c("iqr", "mad"),
-  contaminant_bound = c(0.1, 3),
+  contaminant_bound = c("min", "max"),
   min_trials = 10,
   init_contaminant = 0.05,
   max_contaminant = 0.5,
   maxit = 100,
-  tol = 1e-06,
-  adjust_accuracy = FALSE,
-  guess_rate = 0.5
+  tol = 1e-06
 )
 ```
 
 ## Arguments
 
-- data:
-
-  A `data.frame` containing trial-level data with RT and accuracy
-  columns
-
 - rt:
 
-  Character. The name of the column containing reaction times (in
-  seconds)
+  Numeric vector of reaction times in seconds.
 
 - response:
 
-  Character. The name of the column containing response indicators.
-  Accepts multiple formats:
+  Vector of response indicators. Accepts multiple formats:
 
   - Numeric: 1 = upper/correct, 0 = lower/error
 
@@ -51,16 +40,10 @@ ezdm_summary_stats(
   - Character/Factor: "upper"/"lower", "correct"/"error", "acc"/"err",
     "hit"/"miss", "yes"/"no" (case-insensitive)
 
-- .by:
-
-  A character vector of column names to group by before computing
-  summary statistics (e.g., `.by = c("subject", "condition")`). If NULL
-  (default), computes statistics across all data without grouping.
-
 - version:
 
   Character. Either "3par" (default) for pooled RTs or "4par" for
-  separate upper/lower boundary RTs
+  separate upper/lower boundary RTs. Controls the output columns.
 
 - distribution:
 
@@ -88,13 +71,13 @@ ezdm_summary_stats(
 
   Vector of length 2 specifying the bounds (in seconds) for the uniform
   contaminant distribution. Can be numeric values or the special strings
-  "min" and "max" to use data-driven bounds:
-
-  - Numeric: Fixed bounds, e.g., c(0.1, 3.0) (default)
+  "min" and "max" to use data-driven bounds (default):
 
   - "min": Use the minimum RT in each group, minus a 50\\
 
   - "max": Use the maximum RT in each group, plus a 50\\
+
+  - Numeric: Fixed bounds, e.g., c(0.1, 3.0)
 
   The buffer extends data-driven bounds to ensure conservative
   estimates. Examples: c(0.1, 3.0), c("min", "max"), c(0.1, "max"),
@@ -102,8 +85,8 @@ ezdm_summary_stats(
 
 - min_trials:
 
-  Integer. Minimum number of trials required for fitting. Groups with
-  fewer trials will return NA. Default is 10
+  Integer. Minimum number of trials required for fitting. Returns NA if
+  fewer trials are available. Default is 10
 
 - init_contaminant:
 
@@ -124,25 +107,13 @@ ezdm_summary_stats(
 
   Numeric. Convergence tolerance for EM algorithm. Default is 1e-6
 
-- adjust_accuracy:
-
-  Logical. If TRUE and method = "mixture", adjust accuracy counts by
-  removing estimated contaminant guesses using binomial sampling.
-  Default is FALSE
-
-- guess_rate:
-
-  Numeric. Assumed accuracy rate for contaminant trials (random
-  guessing). Default is 0.5 (appropriate for 2AFC tasks)
-
 ## Value
 
-A `data.frame` with summary statistics. For version = "3par": grouping
-variables, mean_rt, var_rt, n_upper, n_trials, contaminant_prop. When
-adjust_accuracy = TRUE, also includes n_upper_adj and n_trials_adj. For
-version = "4par": grouping variables, mean_rt_upper, mean_rt_lower,
-var_rt_upper, var_rt_lower, n_upper, n_trials, contaminant_prop_upper,
-contaminant_prop_lower.
+A 1-row `data.frame`. For version = "3par": `mean_rt`, `var_rt`,
+`n_upper`, `n_trials`, `contaminant_prop`. For version = "4par":
+`mean_rt_upper`, `mean_rt_lower`, `var_rt_upper`, `var_rt_lower`,
+`n_upper`, `n_trials`, `contaminant_prop_upper`,
+`contaminant_prop_lower`.
 
 ## Details
 
@@ -153,34 +124,47 @@ mixture model with two components: a uniform distribution for
 contaminants and a parametric RT distribution for true responses. Robust
 moments are then extracted from the fitted parametric component.
 
+This function is designed to work with
+[`dplyr::group_by()`](https://dplyr.tidyverse.org/reference/group_by.html)
+and
+[`dplyr::reframe()`](https://dplyr.tidyverse.org/reference/reframe.html)
+for grouped operations. Use
+[`adjust_ezdm_accuracy()`](https://venpopov.com/bmm/dev/reference/adjust_ezdm_accuracy.md)
+as a separate step if you need to adjust accuracy counts for
+contamination.
+
+## See also
+
+[`adjust_ezdm_accuracy()`](https://venpopov.com/bmm/dev/reference/adjust_ezdm_accuracy.md)
+for adjusting accuracy counts,
+[`flag_contaminant_rts()`](https://venpopov.com/bmm/dev/reference/flag_contaminant_rts.md)
+for trial-level contamination probabilities,
+[`ezdm()`](https://venpopov.com/bmm/dev/reference/ezdm.md) for fitting
+the EZ-Diffusion Model
+
 ## Examples
 
 ``` r
 # Generate example data
 set.seed(123)
-test_data <- data.frame(
-  subject = rep(1:3, each = 100),
-  condition = rep(c("A", "B"), 150),
-  rt = rgamma(300, shape = 5, rate = 10) + 0.3,
-  correct = rbinom(300, 1, 0.8)
-)
+rt <- rgamma(100, shape = 5, rate = 10) + 0.3
+response <- rbinom(100, 1, 0.8)
 
-# Compute summary statistics grouped by subject
-result <- ezdm_summary_stats(test_data,
-  rt = "rt", response = "correct",
-  .by = "subject"
-)
-print(result)
-#>   subject   mean_rt     var_rt n_upper n_trials contaminant_prop
-#> 1       1 0.7752000 0.03617616      85      100     5.232355e-09
-#> 2       2 0.7722113 0.06167891      78      100     1.008148e-08
-#> 3       3 0.7906609 0.04786826      85      100     1.694455e-08
+# 3par summary stats
+ezdm_summary_stats(rt, response)
+#>      mean_rt     var_rt n_upper n_trials contaminant_prop
+#> mu 0.7751987 0.03617632      82      100      4.68105e-08
 
-# Group by multiple variables using simple method
-result_multi <- ezdm_summary_stats(test_data,
-  rt = "rt",
-  response = "correct",
-  .by = c("subject", "condition"),
-  method = "simple"
-)
+# With dplyr for grouped operations
+# library(dplyr)
+# mydata |>
+#   group_by(subject) |>
+#   reframe(ezdm_summary_stats(rt, response))
+
+# 4par version with separate upper/lower moments
+ezdm_summary_stats(rt, response, version = "4par")
+#>    mean_rt_upper mean_rt_lower var_rt_upper var_rt_lower n_upper n_trials
+#> mu     0.7751185     0.7756404   0.04176804   0.01614607      82      100
+#>    contaminant_prop_upper contaminant_prop_lower
+#> mu           5.349368e-08           5.258552e-08
 ```

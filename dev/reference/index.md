@@ -121,6 +121,9 @@ Functions for special distributions
 
 Utility functions for transforming data and parameters
 
+- [`adjust_ezdm_accuracy()`](https://venpopov.com/bmm/dev/reference/adjust_ezdm_accuracy.md)
+  : Adjust Accuracy Counts for Contamination
+
 - [`c_sqrtexp2bessel()`](https://venpopov.com/bmm/dev/reference/c_parametrizations.md)
   [`c_bessel2sqrtexp()`](https://venpopov.com/bmm/dev/reference/c_parametrizations.md)
   : Convert between parametrizations of the c parameter of the SDM
@@ -139,6 +142,9 @@ Utility functions for transforming data and parameters
 - [`ezdm_summary_stats()`](https://venpopov.com/bmm/dev/reference/ezdm_summary_stats.md)
   : Compute Robust Summary Statistics for EZ-Diffusion Model
 
+- [`flag_contaminant_rts()`](https://venpopov.com/bmm/dev/reference/flag_contaminant_rts.md)
+  : Flag contaminant reaction times using mixture modeling
+
 - [`k2sd()`](https://venpopov.com/bmm/dev/reference/k2sd.md) : Transform
   kappa of the von Mises distribution to the circular standard deviation
 
@@ -150,6 +156,9 @@ Utility functions for transforming data and parameters
 - [`softmax()`](https://venpopov.com/bmm/dev/reference/softmax.md)
   [`softmaxinv()`](https://venpopov.com/bmm/dev/reference/softmax.md) :
   Softmax function and its inverse
+
+- [`validate_fast_guesses()`](https://venpopov.com/bmm/dev/reference/validate_fast_guesses.md)
+  : Test if fast contaminants show random guessing behavior
 
 - [`wrap()`](https://venpopov.com/bmm/dev/reference/wrap.md) : Wrap
   angles that extend beyond (-pi;pi)
