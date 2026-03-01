@@ -4,7 +4,17 @@
 \alias{mixture3p}
 \title{Three-parameter mixture model by Bays et al (2009).}
 \usage{
-mixture3p(resp_error, nt_features, set_size, regex = FALSE, task = "de", ...)
+mixture3p(
+  resp_error = NULL,
+  nt_features = NULL,
+  set_size = NULL,
+  response = NULL,
+  probe = NULL,
+  target = NULL,
+  regex = FALSE,
+  task = "de",
+  ...
+)
 }
 \arguments{
 \item{resp_error}{The name of the variable in the dataset containing
@@ -21,6 +31,15 @@ dataset.}
 \item{set_size}{Name of the column containing the set size variable (if
 set_size varies) or a numeric value for the set_size, if the set_size is
 fixed.}
+
+\item{response}{The name of the variable in the dataset containing the binary
+response (0 = "same", 1 = "change"). Required when \code{task = "cd"}.}
+
+\item{probe}{The name of the variable containing the probe color in radians.
+Required when \code{task = "cd"}.}
+
+\item{target}{The name of the variable containing the target color in
+radians. Required when \code{task = "cd"}.}
 
 \item{regex}{Logical. If TRUE, the \code{nt_features} argument is interpreted as
 a regular expression to match the non-target feature columns in the dataset.}

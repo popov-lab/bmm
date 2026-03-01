@@ -540,6 +540,103 @@ rmixture3p <- function(n, mu = c(0, 2, -1.5), kappa = 5, p_mem = 0.6, p_nt = 0.2
   )
 }
 
+#' @title Distribution functions for the mixture3p change detection model
+#'
+#' @name mixture3p_cd_dist
+#'
+#' @description Density and random generation for the three-parameter mixture
+#'   model applied to the change detection task.
+#'
+#' @param response Binary vector (0 = "same", 1 = "change")
+#' @param n Number of observations to generate
+#' @param probe Probe value in radians (centered relative to target)
+#' @param nt_features Numeric vector of non-target feature values (radians,
+#'   centered relative to target)
+#' @param lure_idx Integer vector indicating active non-targets (1) or
+#'   inactive (0)
+#' @param kappa Concentration parameter of the von Mises distribution
+#' @param thetat Target mixture weight (logit scale)
+#' @param thetant Non-target mixture weight (logit scale)
+#' @param beta Decision criterion. Default 0.
+#' @param log Logical; if `TRUE`, return log probability.
+#'
+#' @keywords distribution
+#' @export
+dmixture3p_cd <- function(response, probe, nt_features, lure_idx,
+                           kappa = 5, thetat = 0.6, thetant = 0.3,
+                           beta = 0, log = FALSE) {
+  n_quad <- 101
+  x_grid <- seq(-pi, pi, length.out = n_quad)
+  dx <- x_grid[2] - x_grid[1]
+  log_uniform <- -log(2 * pi)
+
+  thetat_prob <- stats::plogis(thetat)
+  thetant_prob <- stats::plogis(thetant)
+  p_guess <- max(1 - thetat_prob - thetant_prob, 1e-10)
+  n_active <- sum(lure_idx)
+  inv_ss <- if (n_active > 0) 1 / n_active else 1
+
+  p_change <- 0
+  for (j in seq_along(x_grid)) {
+    x <- x_grid[j]
+
+    log_p_ret <- .log_mix(thetat_prob,
+      brms::dvon_mises(x, mu = 0, kappa = kappa, log = TRUE),
+      log(p_guess) + log_uniform
+    )
+    log_p_same_part <- .log_mix(thetat_prob,
+      brms::dvon_mises(x, mu = probe, kappa = kappa, log = TRUE),
+      log(p_guess) + log_uniform
+    )
+
+    for (k in seq_along(nt_features)) {
+      if (lure_idx[k] == 1) {
+        log_nt <- log(thetant_prob * inv_ss) +
+          brms::dvon_mises(x, mu = nt_features[k], kappa = kappa, log = TRUE)
+        log_p_ret <- matrixStats::logSumExp(c(log_p_ret, log_nt))
+        log_nt_same <- log(thetant_prob * inv_ss) +
+          brms::dvon_mises(x, mu = nt_features[k] + probe, kappa = kappa, log = TRUE)
+        log_p_same_part <- matrixStats::logSumExp(c(log_p_same_part, log_nt_same))
+      }
+    }
+
+    log_p_same <- log_p_same_part + log_uniform
+    log_p_change_hyp <- log_p_ret + log_uniform
+    llr <- log_p_change_hyp - log_p_same
+
+    if (llr > beta) {
+      p_change <- p_change + exp(log_p_ret) * dx
+    }
+  }
+
+  p_change <- max(min(p_change, 1 - 1e-10), 1e-10)
+  loglik <- if (response == 1) log(p_change) else log(1 - p_change)
+  if (log) loglik else exp(loglik)
+}
+
+#' @rdname mixture3p_cd_dist
+#' @export
+rmixture3p_cd <- function(n, probe, nt_features, lure_idx,
+                           kappa = 5, thetat = 0.6, thetant = 0.3,
+                           beta = 0) {
+  n_quad <- 101
+  x_grid <- seq(-pi, pi, length.out = n_quad)
+  dx <- x_grid[2] - x_grid[1]
+
+  probe <- rep_len(probe, n)
+  kappa <- rep_len(kappa, n)
+  thetat <- rep_len(thetat, n)
+  thetant <- rep_len(thetant, n)
+  beta <- rep_len(beta, n)
+
+  p_change <- vapply(seq_len(n), function(i) {
+    dmixture3p_cd(1, probe[i], nt_features, lure_idx,
+                  kappa[i], thetat[i], thetant[i], beta[i])
+  }, numeric(1))
+
+  stats::rbinom(n, size = 1, prob = p_change)
+}
+
 #' @title Distribution functions for the Interference Measurement Model (IMM)
 #'
 #' @description Density, distribution, and random generation functions for the
