@@ -8,10 +8,13 @@
 \title{Interference measurement model by Oberauer and Lin (2017).}
 \usage{
 imm(
-  resp_error,
-  nt_features,
-  nt_distances,
-  set_size,
+  resp_error = NULL,
+  nt_features = NULL,
+  nt_distances = NULL,
+  set_size = NULL,
+  response = NULL,
+  probe = NULL,
+  target = NULL,
   regex = FALSE,
   version = "full",
   task = "de",
@@ -44,6 +47,15 @@ dataset. Only necessary for the \code{bsc} and \code{full} versions.}
 \item{set_size}{Name of the column containing the set size variable (if
 set_size varies) or a numeric value for the set_size, if the set_size is
 fixed.}
+
+\item{response}{The name of the variable in the dataset containing the binary
+response (0 = "same", 1 = "change"). Required when \code{task = "cd"}.}
+
+\item{probe}{The name of the variable containing the probe color in radians.
+Required when \code{task = "cd"}.}
+
+\item{target}{The name of the variable containing the target color in
+radians. Required when \code{task = "cd"}.}
 
 \item{regex}{Logical. If TRUE, the \code{nt_features} and \code{nt_distances} arguments
 are interpreted as a regular expression to match the non-target feature

@@ -5,7 +5,15 @@
 \alias{sdmSimple}
 \title{Signal Discrimination Model (SDM) by Oberauer (2023)}
 \usage{
-sdm(resp_error, version = "simple", task = "de", ...)
+sdm(
+  resp_error = NULL,
+  response = NULL,
+  probe = NULL,
+  target = NULL,
+  version = "simple",
+  task = "de",
+  ...
+)
 
 sdmSimple(resp_error, version = "simple", task = "de", ...)
 }
@@ -14,6 +22,15 @@ sdmSimple(resp_error, version = "simple", task = "de", ...)
 response error. The response error should code the response relative to the
 to-be-recalled target in radians. You can transform the response error in
 degrees to radians using the \code{deg2rad} function.}
+
+\item{response}{The name of the variable in the dataset containing the binary
+response (0 = "same", 1 = "change"). Required when \code{task = "cd"}.}
+
+\item{probe}{The name of the variable containing the probe color in radians.
+Required when \code{task = "cd"}.}
+
+\item{target}{The name of the variable containing the target color in
+radians. Required when \code{task = "cd"}.}
 
 \item{version}{Character. The version of the model to use. Currently only
 "simple" is supported.}

@@ -103,11 +103,11 @@ backend interface to Stan.
 The following models are supported:
 \itemize{
 \item ezdm(mean_rt, var_rt, n_upper, n_trials, links, version)
-\item imm(resp_error, nt_features, nt_distances, set_size, regex, version, task)
+\item imm(resp_error, nt_features, nt_distances, set_size, response, probe, target, regex, version, task)
 \item m3(resp_cats, num_options, choice_rule, version)
 \item mixture2p(resp_error, response, probe, target, task)
 \item mixture3p(resp_error, nt_features, set_size, response, probe, target, regex, task)
-\item sdm(resp_error, version, task)
+\item sdm(resp_error, response, probe, target, version, task)
 }
 
 Type  ?modelname  to get information about a specific model, e.g.  ?imm

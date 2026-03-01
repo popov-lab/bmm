@@ -218,6 +218,72 @@ rsdm <- function(n, mu = 0, c = 3, kappa = 3.5, parametrization = "sqrtexp") {
   )
 }
 
+#' @title Distribution functions for the SDM change detection model
+#'
+#' @description Density and random generation for the signal discrimination
+#'   model applied to change detection tasks, based on Lin & Oberauer (2022).
+#'
+#' @name sdm_cd_dist
+#'
+#' @param response Binary response (0 = "same", 1 = "change")
+#' @param n Number of observations to generate
+#' @param probe Probe position (centered, in radians)
+#' @param c Memory strength parameter of the SDM distribution
+#' @param kappa Precision parameter of the SDM distribution
+#' @param beta Decision criterion. Default 0.
+#' @param log Logical; if `TRUE`, return log probability.
+#'
+#' @keywords distribution
+#'
+#' @references Lin, H.Y., & Oberauer, K. (2022). An interference model for
+#'   visual working memory: Applications to the change detection task.
+#'   Cognitive Psychology, 133, 101463.
+#'
+#' @return `dsdm_cd` gives the likelihood, `rsdm_cd` gives random binary
+#'   responses.
+#'
+#' @export
+dsdm_cd <- function(response, probe, c = 4, kappa = 3, beta = 0,
+                     log = FALSE) {
+  stopif(isTRUE(any(kappa < 0)), "kappa must be non-negative")
+  stopif(isTRUE(any(c < 0)), "c must be non-negative")
+
+  n_quad <- 101
+  x_grid <- seq(-pi, pi, length.out = n_quad)
+  dx <- x_grid[2] - x_grid[1]
+  log_uniform <- -log(2 * pi)
+
+  p_change <- 0
+  for (j in seq_along(x_grid)) {
+    x <- x_grid[j]
+    log_p_ret <- dsdm(x, mu = 0, c = c, kappa = kappa, log = TRUE)
+    log_p_same <- dsdm(x, mu = probe, c = c, kappa = kappa, log = TRUE)
+    llr <- (log_p_ret + log_uniform) - (log_p_same + log_uniform)
+    if (llr > beta) {
+      p_change <- p_change + exp(log_p_ret) * dx
+    }
+  }
+
+  p_change <- max(min(p_change, 1 - 1e-10), 1e-10)
+  loglik <- if (response == 1) log(p_change) else log(1 - p_change)
+  if (log) loglik else exp(loglik)
+}
+
+#' @rdname sdm_cd_dist
+#' @export
+rsdm_cd <- function(n, probe, c = 4, kappa = 3, beta = 0) {
+  probe <- rep_len(probe, n)
+  c <- rep_len(c, n)
+  kappa <- rep_len(kappa, n)
+  beta <- rep_len(beta, n)
+
+  p_change <- vapply(seq_len(n), function(i) {
+    dsdm_cd(1, probe[i], c = c[i], kappa = kappa[i], beta = beta[i])
+  }, numeric(1))
+
+  stats::rbinom(n, size = 1, prob = p_change)
+}
+
 # helper functions for calculating the density of the SDM distribution
 .dsdm_numer_bessel <- function(x, mu, c, kappa, log = FALSE) {
   be <- besselI(kappa, nu = 0, expon.scaled = TRUE)
