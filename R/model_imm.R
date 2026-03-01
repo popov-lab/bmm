@@ -8,117 +8,84 @@
                        task = "de", links = NULL, call = NULL, ...) {
   domain_class <- if (task == "cd") "change_detection" else "circular"
 
+  out <- structure(
+    list(
+      resp_vars = if (task == "cd") nlist(response, probe, target) else nlist(resp_error),
+      other_vars = nlist(nt_features, nt_distances, set_size),
+      domain = "Visual working memory",
+      task = if (task == "cd") "Change detection" else "Continuous reproduction",
+      name = "Interference measurement model by Oberauer and Lin (2017).",
+      version = version,
+      citation = glue(
+        "Oberauer, K., & Lin, H.Y. (2017). An interference model \\
+          of visual working memory. Psychological Review, 124(1), 21-59"
+      ),
+      parameters = list(
+        kappa = "Concentration parameter of the von Mises distribution",
+        a = "General activation of memory items",
+        c = "Context activation",
+        s = "Spatial similarity gradient"
+      ),
+      links = list(kappa = "log", a = "log", c = "log", s = "log"),
+      default_priors = list(
+        kappa = list(main = "normal(2, 1)", effects = "normal(0, 1)"),
+        a = list(main = "normal(0, 1)", effects = "normal(0, 1)"),
+        c = list(main = "normal(0, 1)", effects = "normal(0, 1)"),
+        s = list(main = "normal(0, 1)", effects = "normal(0, 1)")
+      ),
+      fixed_parameters = list(),
+      void_mu = task == "cd"
+    ),
+    regex = regex,
+    regex_vars = c("nt_features", "nt_distances"),
+    class = c("bmmodel", domain_class, "non_targets", "imm",
+              paste0("imm_", version), paste0("imm_", version, "_", task)),
+    call = call
+  )
+
   if (task == "cd") {
-    out <- structure(
-      list(
-        resp_vars = nlist(response, probe, target),
-        other_vars = nlist(nt_features, nt_distances, set_size),
-        domain = "Visual working memory",
-        task = "Change detection",
-        name = "Interference measurement model by Oberauer and Lin (2017).",
-        version = version,
-        citation = glue(
-          "Oberauer, K., & Lin, H.Y. (2017). An interference model \\
-            of visual working memory. Psychological Review, 124(1), 21-59; \\
-            Lin, H.Y., & Oberauer, K. (2022). An interference model for visual \\
-            working memory: Applications to the change detection task. \\
-            Cognitive Psychology, 133, 101463."
-        ),
-        requirements = glue(
-          "- response: Binary (0='same', 1='change')
-            - probe: Probe color in radians
-            - target: Target color in radians
-            - Non-target features should be in radians and centered relative to the target
-            - Non-target distances should be positive"
-        ),
-        parameters = list(
-          kappa = "Concentration parameter of the von Mises distribution",
-          a = "General activation of memory items",
-          c = "Context activation",
-          s = "Spatial similarity gradient",
-          beta = glue(
-            "Decision criterion (log prior odds). \\
-            Fixed to 0 by default for unbiased decision."
-          )
-        ),
-        links = list(
-          kappa = "log",
-          a = "log",
-          c = "log",
-          s = "log",
-          beta = "identity"
-        ),
-        fixed_parameters = list(beta = 0),
-        default_priors = list(
-          kappa = list(main = "normal(2, 1)", effects = "normal(0, 1)"),
-          a = list(main = "normal(0, 1)", effects = "normal(0, 1)"),
-          c = list(main = "normal(0, 1)", effects = "normal(0, 1)"),
-          s = list(main = "normal(0, 1)", effects = "normal(0, 1)"),
-          beta = list(main = "normal(0, 0.5)")
-        ),
-        void_mu = TRUE
-      ),
-      regex = regex,
-      regex_vars = c("nt_features", "nt_distances"),
-      class = c("bmmodel", domain_class, "non_targets", "imm",
-                paste0("imm_", version), paste0("imm_", version, "_", task)),
-      call = call
+    out$citation <- glue(
+      "{out$citation}; \\
+      Lin, H.Y., & Oberauer, K. (2022). An interference model for visual \\
+      working memory: Applications to the change detection task. \\
+      Cognitive Psychology, 133, 101463."
     )
+    out$requirements <- glue(
+      "- response: Binary (0='same', 1='change')
+        - probe: Probe color in radians
+        - target: Target color in radians
+        - Non-target features should be in radians and centered relative to the target
+        - Non-target distances should be positive"
+    )
+    out$parameters$beta <- glue(
+      "Decision criterion (log prior odds). \\
+      Fixed to 0 by default for unbiased decision."
+    )
+    out$links$beta <- "identity"
+    out$fixed_parameters$beta <- 0
+    out$default_priors$beta <- list(main = "normal(0, 0.5)")
   } else {
-    out <- structure(
-      list(
-        resp_vars = nlist(resp_error),
-        other_vars = nlist(nt_features, nt_distances, set_size),
-        domain = "Visual working memory",
-        task = "Continuous reproduction",
-        name = "Interference measurement model by Oberauer and Lin (2017).",
-        version = version,
-        citation = glue(
-          "Oberauer, K., & Lin, H.Y. (2017). An interference model \\
-            of visual working memory. Psychological Review, 124(1), 21-59"
-        ),
-        requirements = glue(
-          "- The response vairable should be in radians and \\
-            represent the angular error relative to the target
-            - The non-target features should be in radians and be \\
-            centered relative to the target"
-        ),
-        parameters = list(
-          mu1 = glue(
-            "Location parameter of the von Mises distribution for memory \\
-              responses (in radians). Fixed internally to 0 by default."
-          ),
-          kappa = "Concentration parameter of the von Mises distribution",
-          a = "General activation of memory items",
-          c = "Context activation",
-          s = "Spatial similarity gradient"
-        ),
-        links = list(
-          mu1 = "tan_half",
-          kappa = "log",
-          a = "log",
-          c = "log",
-          s = "log"
-        ),
-        fixed_parameters = list(mu1 = 0, mu2 = 0, kappa2 = -100),
-        default_priors = list(
-          mu1 = list(main = "student_t(1, 0, 1)"),
-          kappa = list(main = "normal(2, 1)", effects = "normal(0, 1)"),
-          a = list(main = "normal(0, 1)", effects = "normal(0, 1)"),
-          c = list(main = "normal(0, 1)", effects = "normal(0, 1)"),
-          s = list(main = "normal(0, 1)", effects = "normal(0, 1)")
-        ),
-        void_mu = FALSE
-      ),
-      regex = regex,
-      regex_vars = c("nt_features", "nt_distances"),
-      class = c("bmmodel", domain_class, "non_targets", "imm",
-                paste0("imm_", version), paste0("imm_", version, "_", task)),
-      call = call
+    out$requirements <- glue(
+      "- The response vairable should be in radians and \\
+        represent the angular error relative to the target
+        - The non-target features should be in radians and be \\
+        centered relative to the target"
+    )
+    out$parameters <- c(
+      list(mu1 = glue(
+        "Location parameter of the von Mises distribution for memory \\
+          responses (in radians). Fixed internally to 0 by default."
+      )),
+      out$parameters
+    )
+    out$links <- c(list(mu1 = "tan_half"), out$links)
+    out$fixed_parameters <- list(mu1 = 0, mu2 = 0, kappa2 = -100)
+    out$default_priors <- c(
+      list(mu1 = list(main = "student_t(1, 0, 1)")),
+      out$default_priors
     )
   }
 
-  # version-specific parameter removal (applies to both DE and CD)
   if (version == "abc") {
     out$parameters$s <- NULL
     out$links$s <- NULL
@@ -504,34 +471,24 @@ bmf2bf.imm_full_cd <- function(model, formula = bmmformula()) {
     real dx = 2 * pi() / (n_quad - 1);
     real p_change = 0;
     real log_uniform = -log(2 * pi());
-
-    // background activation (b = 0, so exp(b) = 1)
     real w_bg = 1.0;
-    // target activation
     real w_target = exp(c_par) + exp(a);
 
     for (i in 1:n_quad) {{
       real x = -pi() + (i - 1) * dx;
       real total_weight = w_target + w_bg;
 
-      // Start with target retrieval density (unnormalized)
       real log_p_retrieve = log(w_target) + von_mises_lpdf(x | 0, kappa);
-
-      // Same hypothesis: retrieval density centered at probe
       real log_p_x_given_same = log(w_target) + von_mises_lpdf(x | probe, kappa);
 
-      // Add non-target components
       {nt_loop}
 
-      // Add background uniform component
       log_p_retrieve = log_sum_exp(log_p_retrieve, log(w_bg) + log_uniform);
       log_p_x_given_same = log_sum_exp(log_p_x_given_same, log(w_bg) + log_uniform);
 
-      // Normalize by total weight
       log_p_retrieve -= log(total_weight);
       log_p_x_given_same -= log(total_weight);
 
-      // LLR: compare change vs same hypothesis
       real log_p_same = log_p_x_given_same + log_uniform;
       real log_p_change_hyp = log_p_retrieve + log_uniform;
       real llr = log_p_change_hyp - log_p_same;
@@ -556,15 +513,11 @@ log_lik_imm_full_cd <- function(i, prep) {
   beta <- brms::get_dpar(prep, "beta", i = i)
   probe <- prep$data$vreal1[i]
   y <- prep$data$Y[i]
+  nt_data <- .extract_cd_nt_data(i, prep, has_distances = TRUE)
 
-  n_nt <- (sum(grepl("^vreal[0-9]+$", names(prep$data))) - 1) / 2
-  nt_features <- vapply(seq_len(n_nt), function(j) prep$data[[paste0("vreal", j + 1)]][i], numeric(1))
-  nt_distances <- vapply(seq_len(n_nt), function(j) prep$data[[paste0("vreal", n_nt + j + 1)]][i], numeric(1))
-  lure_idx <- vapply(seq_len(n_nt), function(j) prep$data[[paste0("vint", j)]][i], numeric(1))
-
-  dimm_cd(y, probe, nt_features = nt_features, nt_distances = nt_distances,
-          lure_idx = lure_idx, kappa = kappa, c = c_par, a = a, s = s,
-          beta = beta, log = TRUE)
+  dimm_cd(y, probe, nt_features = nt_data$nt_features,
+          nt_distances = nt_data$nt_distances, lure_idx = nt_data$lure_idx,
+          kappa = kappa, c = c_par, a = a, s = s, beta = beta, log = TRUE)
 }
 
 posterior_predict_imm_full_cd <- function(i, prep, ...) {
@@ -574,14 +527,10 @@ posterior_predict_imm_full_cd <- function(i, prep, ...) {
   s <- brms::get_dpar(prep, "s", i = i)
   beta <- brms::get_dpar(prep, "beta", i = i)
   probe <- prep$data$vreal1[i]
+  nt_data <- .extract_cd_nt_data(i, prep, has_distances = TRUE)
 
-  n_nt <- (sum(grepl("^vreal[0-9]+$", names(prep$data))) - 1) / 2
-  nt_features <- vapply(seq_len(n_nt), function(j) prep$data[[paste0("vreal", j + 1)]][i], numeric(1))
-  nt_distances <- vapply(seq_len(n_nt), function(j) prep$data[[paste0("vreal", n_nt + j + 1)]][i], numeric(1))
-  lure_idx <- vapply(seq_len(n_nt), function(j) prep$data[[paste0("vint", j)]][i], numeric(1))
-
-  rimm_cd(length(kappa), probe, nt_features = nt_features,
-          nt_distances = nt_distances, lure_idx = lure_idx,
+  rimm_cd(length(kappa), probe, nt_features = nt_data$nt_features,
+          nt_distances = nt_data$nt_distances, lure_idx = nt_data$lure_idx,
           kappa = kappa, c = c_par, a = a, s = s, beta = beta)
 }
 

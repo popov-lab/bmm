@@ -7,98 +7,73 @@
                        task = "de", call = NULL, ...) {
   domain_class <- if (task == "cd") "change_detection" else "circular"
 
+  out <- structure(
+    list(
+      resp_vars = if (task == "cd") nlist(response, probe, target) else nlist(resp_error),
+      other_vars = nlist(),
+      domain = "Visual working memory",
+      task = if (task == "cd") "Change detection" else "Continuous reproduction",
+      name = "Signal Discrimination Model (SDM) by Oberauer (2023)",
+      version = version,
+      citation = glue(
+        "Oberauer, K. (2023). Measurement models for visual working memory - \\
+        A factorial model comparison. Psychological Review, 130(3), 841-852"
+      ),
+      parameters = list(
+        c = "Memory strength parameter of the SDM distribution",
+        kappa = "Precision parameter of the SDM distribution"
+      ),
+      links = list(c = "log", kappa = "log"),
+      default_priors = list(
+        kappa = list(main = "student_t(5, 1.75, 0.75)", effects = "normal(0, 1)"),
+        c = list(main = "student_t(5, 2, 0.75)", effects = "normal(0, 1)")
+      ),
+      fixed_parameters = list(),
+      void_mu = task == "cd"
+    ),
+    class = c("bmmodel", domain_class, "sdm", paste0("sdm_", version),
+              paste0("sdm_", version, "_", task)),
+    call = call
+  )
+
   if (task == "cd") {
-    out <- structure(
-      list(
-        resp_vars = nlist(response, probe, target),
-        other_vars = nlist(),
-        domain = "Visual working memory",
-        task = "Change detection",
-        name = "Signal Discrimination Model (SDM) by Oberauer (2023)",
-        citation = glue(
-          "Oberauer, K. (2023). Measurement models for visual working memory - \\
-          A factorial model comparison. Psychological Review, 130(3), 841-852; \\
-          Lin, H.Y., & Oberauer, K. (2022). An interference model for visual \\
-          working memory: Applications to the change detection task. \\
-          Cognitive Psychology, 133, 101463."
-        ),
-        version = version,
-        requirements = glue(
-          "- response: Binary (0='same', 1='change')
-          - probe: Probe color in radians
-          - target: Target color in radians"
-        ),
-        parameters = list(
-          c = "Memory strength parameter of the SDM distribution",
-          kappa = "Precision parameter of the SDM distribution",
-          beta = glue(
-            "Decision criterion (log prior odds). \\
-            Fixed to 0 by default for unbiased decision."
-          )
-        ),
-        links = list(
-          c = "log",
-          kappa = "log",
-          beta = "identity"
-        ),
-        fixed_parameters = list(beta = 0),
-        default_priors = list(
-          kappa = list(main = "student_t(5, 1.75, 0.75)", effects = "normal(0, 1)"),
-          c = list(main = "student_t(5, 2, 0.75)", effects = "normal(0, 1)"),
-          beta = list(main = "normal(0, 0.5)")
-        ),
-        void_mu = TRUE
-      ),
-      class = c("bmmodel", domain_class, "sdm", paste0("sdm_", version),
-                paste0("sdm_", version, "_", task)),
-      call = call
+    out$citation <- glue(
+      "{out$citation}; \\
+      Lin, H.Y., & Oberauer, K. (2022). An interference model for visual \\
+      working memory: Applications to the change detection task. \\
+      Cognitive Psychology, 133, 101463."
     )
+    out$requirements <- glue(
+      "- response: Binary (0='same', 1='change')
+      - probe: Probe color in radians
+      - target: Target color in radians"
+    )
+    out$parameters$beta <- glue(
+      "Decision criterion (log prior odds). \\
+      Fixed to 0 by default for unbiased decision."
+    )
+    out$links$beta <- "identity"
+    out$fixed_parameters$beta <- 0
+    out$default_priors$beta <- list(main = "normal(0, 0.5)")
   } else {
-    out <- structure(
-      list(
-        resp_vars = nlist(resp_error),
-        other_vars = nlist(),
-        domain = "Visual working memory",
-        task = "Continuous reproduction",
-        name = "Signal Discrimination Model (SDM) by Oberauer (2023)",
-        citation = glue(
-          "Oberauer, K. (2023). Measurement models for visual working memory - \\
-          A factorial model comparison. Psychological Review, 130(3), 841-852"
-        ),
-        version = version,
-        requirements = glue(
-          "- The response variable should be in radians and represent the angular \\
-          error relative to the target"
-        ),
-        parameters = list(
-          mu = glue("Location parameter of the SDM distribution (in radians; \\
-                    by default fixed internally to 0)"),
-          c = "Memory strength parameter of the SDM distribution",
-          kappa = "Precision parameter of the SDM distribution"
-        ),
-        links = list(
-          mu = "tan_half",
-          c = "log",
-          kappa = "log"
-        ),
-        fixed_parameters = list(mu = 0),
-        default_priors = list(
-          mu = list(main = "student_t(1, 0, 1)"),
-          kappa = list(main = "student_t(5, 1.75, 0.75)", effects = "normal(0, 1)"),
-          c = list(main = "student_t(5, 2, 0.75)", effects = "normal(0, 1)")
-        ),
-        init_ranges = list(
-          mu = c(-0.5,0.5),
-          kappa = c(2.5,3.5),
-          c = c(4,6)
-        ),
-        void_mu = FALSE
-      ),
-      class = c("bmmodel", domain_class, "sdm", paste0("sdm_", version),
-                paste0("sdm_", version, "_", task)),
-      call = call
+    out$requirements <- glue(
+      "- The response variable should be in radians and represent the angular \\
+      error relative to the target"
     )
+    out$parameters <- c(
+      list(mu = glue("Location parameter of the SDM distribution (in radians; \\
+                      by default fixed internally to 0)")),
+      out$parameters
+    )
+    out$links <- c(list(mu = "tan_half"), out$links)
+    out$fixed_parameters <- list(mu = 0)
+    out$default_priors <- c(
+      list(mu = list(main = "student_t(1, 0, 1)")),
+      out$default_priors
+    )
+    out$init_ranges <- list(mu = c(-0.5, 0.5), kappa = c(2.5, 3.5), c = c(4, 6))
   }
+
   out$links[names(links)] <- links
   out
 }

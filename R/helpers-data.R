@@ -111,6 +111,18 @@ check_data.change_detection <- function(model, data, formula) {
   NextMethod("check_data")
 }
 
+.extract_cd_nt_data <- function(i, prep, has_distances = FALSE) {
+  n_vreal <- sum(grepl("^vreal[0-9]+$", names(prep$data)))
+  n_nt <- if (has_distances) (n_vreal - 1) / 2 else n_vreal - 1
+  nt_features <- vapply(seq_len(n_nt), function(j) prep$data[[paste0("vreal", j + 1)]][i], numeric(1))
+  lure_idx <- vapply(seq_len(n_nt), function(j) prep$data[[paste0("vint", j)]][i], numeric(1))
+  out <- nlist(nt_features, lure_idx)
+  if (has_distances) {
+    out$nt_distances <- vapply(seq_len(n_nt), function(j) prep$data[[paste0("vreal", n_nt + j + 1)]][i], numeric(1))
+  }
+  out
+}
+
 #' @export
 check_data.non_targets <- function(model, data, formula) {
   nt_features <- model$other_vars$nt_features

@@ -7,93 +7,73 @@
                              links = NULL, call = NULL, ...) {
   domain_class <- if (task == "cd") "change_detection" else "circular"
 
+  out <- structure(
+    list(
+      resp_vars = if (task == "cd") nlist(response, probe, target) else nlist(resp_error),
+      other_vars = nlist(),
+      domain = "Visual working memory",
+      task = if (task == "cd") "Change detection" else "Continuous reproduction",
+      name = "Two-parameter mixture model by Zhang and Luck (2008).",
+      version = "NA",
+      citation = glue(
+        "Zhang, W., & Luck, S. J. (2008). Discrete fixed-resolution \\
+        representations in visual working memory. Nature, 453(7192), 233-235"
+      ),
+      parameters = list(
+        kappa = "Concentration parameter of the von Mises distribution",
+        thetat = "Mixture weight for target responses"
+      ),
+      links = list(kappa = "log", thetat = "identity"),
+      default_priors = list(
+        kappa = list(main = "normal(2, 1)", effects = "normal(0, 1)"),
+        thetat = list(main = "logistic(0, 1)")
+      ),
+      fixed_parameters = list(),
+      void_mu = task == "cd"
+    ),
+    class = c("bmmodel", domain_class, "mixture2p", paste0("mixture2p_", task)),
+    call = call
+  )
+
   if (task == "cd") {
-    out <- structure(
-      list(
-        resp_vars = nlist(response, probe, target),
-        other_vars = nlist(),
-        domain = "Visual working memory",
-        task = "Change detection",
-        name = "Two-parameter mixture model by Zhang and Luck (2008).",
-        version = "NA",
-        citation = glue(
-          "Zhang, W., & Luck, S. J. (2008). Discrete fixed-resolution \\
-          representations in visual working memory. Nature, 453(7192), 233-235; \\
-          Lin, H.Y., & Oberauer, K. (2022). An interference model for visual \\
-          working memory: Applications to the change detection task. \\
-          Cognitive Psychology, 133, 101463."
-        ),
-        requirements = glue(
-          "- response: Binary (0='same', 1='change')
-          - probe: Probe color in radians
-          - target: Target color in radians"
-        ),
-        parameters = list(
-          kappa = "Concentration parameter of the von Mises distribution",
-          thetat = "Mixture weight for target responses",
-          beta = glue(
-            "Decision criterion (log prior odds). \\
-            Fixed to 0 by default for unbiased decision."
-          )
-        ),
-        links = list(
-          kappa = "log",
-          thetat = "identity",
-          beta = "identity"
-        ),
-        fixed_parameters = list(beta = 0),
-        default_priors = list(
-          kappa = list(main = "normal(2, 1)", effects = "normal(0, 1)"),
-          thetat = list(main = "logistic(0, 1)"),
-          beta = list(main = "normal(0, 0.5)")
-        ),
-        void_mu = TRUE
-      ),
-      class = c("bmmodel", domain_class, "mixture2p", "mixture2p_cd"),
-      call = call
+    out$citation <- glue(
+      "{out$citation}; \\
+      Lin, H.Y., & Oberauer, K. (2022). An interference model for visual \\
+      working memory: Applications to the change detection task. \\
+      Cognitive Psychology, 133, 101463."
     )
+    out$requirements <- glue(
+      "- response: Binary (0='same', 1='change')
+      - probe: Probe color in radians
+      - target: Target color in radians"
+    )
+    out$parameters$beta <- glue(
+      "Decision criterion (log prior odds). \\
+      Fixed to 0 by default for unbiased decision."
+    )
+    out$links$beta <- "identity"
+    out$fixed_parameters$beta <- 0
+    out$default_priors$beta <- list(main = "normal(0, 0.5)")
   } else {
-    out <- structure(
-      list(
-        resp_vars = nlist(resp_error),
-        other_vars = nlist(),
-        domain = "Visual working memory",
-        task = "Continuous reproduction",
-        name = "Two-parameter mixture model by Zhang and Luck (2008).",
-        version = "NA",
-        citation = glue(
-          "Zhang, W., & Luck, S. J. (2008). Discrete fixed-resolution \\
-          representations in visual working memory. Nature, 453(7192), 233-235"
-        ),
-        requirements = glue(
-          "- The response vairable should be in radians and \\
-          represent the angular error relative to the target"
-        ),
-        parameters = list(
-          mu1 = glue(
-            "Location parameter of the von Mises distribution for memory responses \\
-            (in radians). Fixed internally to 0 by default."
-          ),
-          kappa = "Concentration parameter of the von Mises distribution",
-          thetat = "Mixture weight for target responses"
-        ),
-        links = list(
-          mu1 = "tan_half",
-          kappa = "log",
-          thetat = "identity"
-        ),
-        fixed_parameters = list(mu1 = 0, mu2 = 0, kappa2 = -100),
-        default_priors = list(
-          mu1 = list(main = "student_t(1, 0, 1)"),
-          kappa = list(main = "normal(2, 1)", effects = "normal(0, 1)"),
-          thetat = list(main = "logistic(0, 1)")
-        ),
-        void_mu = FALSE
-      ),
-      class = c("bmmodel", domain_class, "mixture2p", "mixture2p_de"),
-      call = call
+    out$requirements <- glue(
+      "- The response vairable should be in radians and \\
+      represent the angular error relative to the target"
+    )
+    out$parameters <- c(
+      list(mu1 = glue(
+        "Location parameter of the von Mises distribution for memory responses \\
+        (in radians). Fixed internally to 0 by default."
+      )),
+      out$parameters
+    )
+    out$links <- c(list(mu1 = "tan_half"), out$links)
+    out$fixed_parameters <- list(mu1 = 0, mu2 = 0, kappa2 = -100)
+    out$default_priors <- c(
+      list(mu1 = list(main = "student_t(1, 0, 1)")),
+      out$default_priors
     )
   }
+
   out$links[names(links)] <- links
   out
 }
@@ -175,9 +155,6 @@ configure_model.mixture2p_de <- function(model, data, formula) {
 
 #' @export
 configure_model.mixture2p_cd <- function(model, data, formula) {
-  resp_name <- model$resp_vars$response
-  probe_var <- attr(data, "probe_var")
-
   mixture2p_cd <- brms::custom_family(
     name = "mixture2p_cd",
     dpars = c("mu", "kappa", "thetat", "beta"),

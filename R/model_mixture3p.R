@@ -9,110 +9,82 @@
                              call = NULL, ...) {
   domain_class <- if (task == "cd") "change_detection" else "circular"
 
+  out <- structure(
+    list(
+      resp_vars = if (task == "cd") nlist(response, probe, target) else nlist(resp_error),
+      other_vars = nlist(nt_features, set_size),
+      domain = "Visual working memory",
+      task = if (task == "cd") "Change detection" else "Continuous reproduction",
+      name = "Three-parameter mixture model by Bays et al (2009).",
+      version = "NA",
+      citation = glue(
+        "Bays, P. M., Catalao, R. F. G., & Husain, M. (2009). \\
+        The precision of visual working memory is set by allocation \\
+        of a shared resource. Journal of Vision, 9(10), 1-11"
+      ),
+      parameters = list(
+        kappa = "Concentration parameter of the von Mises distribution",
+        thetat = "Mixture weight for target responses",
+        thetant = "Mixture weight for non-target responses"
+      ),
+      links = list(kappa = "log", thetat = "identity", thetant = "identity"),
+      default_priors = list(
+        kappa = list(main = "normal(2, 1)", effects = "normal(0, 1)"),
+        thetat = list(main = "logistic(0, 1)"),
+        thetant = list(main = "logistic(0, 1)")
+      ),
+      fixed_parameters = list(),
+      void_mu = task == "cd"
+    ),
+    regex = regex,
+    regex_vars = c("nt_features"),
+    class = c("bmmodel", domain_class, "non_targets", "mixture3p",
+              paste0("mixture3p_", task)),
+    call = call
+  )
+
   if (task == "cd") {
-    out <- structure(
-      list(
-        resp_vars = nlist(response, probe, target),
-        other_vars = nlist(nt_features, set_size),
-        domain = "Visual working memory",
-        task = "Change detection",
-        name = "Three-parameter mixture model by Bays et al (2009).",
-        version = "NA",
-        citation = glue(
-          "Bays, P. M., Catalao, R. F. G., & Husain, M. (2009). \\
-          The precision of visual working memory is set by allocation \\
-          of a shared resource. Journal of Vision, 9(10), 1-11; \\
-          Lin, H.Y., & Oberauer, K. (2022). An interference model for visual \\
-          working memory: Applications to the change detection task. \\
-          Cognitive Psychology, 133, 101463."
-        ),
-        requirements = glue(
-          "- response: Binary (0='same', 1='change')
-          - probe: Probe color in radians
-          - target: Target color in radians
-          - Non-target features should be in radians and centered relative to the target"
-        ),
-        parameters = list(
-          kappa = "Concentration parameter of the von Mises distribution",
-          thetat = "Mixture weight for target responses",
-          thetant = "Mixture weight for non-target responses",
-          beta = glue(
-            "Decision criterion (log prior odds). \\
-            Fixed to 0 by default for unbiased decision."
-          )
-        ),
-        links = list(
-          kappa = "log",
-          thetat = "identity",
-          thetant = "identity",
-          beta = "identity"
-        ),
-        fixed_parameters = list(beta = 0),
-        default_priors = list(
-          kappa = list(main = "normal(2, 1)", effects = "normal(0, 1)"),
-          thetat = list(main = "logistic(0, 1)"),
-          thetant = list(main = "logistic(0, 1)"),
-          beta = list(main = "normal(0, 0.5)")
-        ),
-        void_mu = TRUE
-      ),
-      regex = regex,
-      regex_vars = c("nt_features"),
-      class = c("bmmodel", domain_class, "non_targets", "mixture3p",
-                "mixture3p_cd"),
-      call = call
+    out$citation <- glue(
+      "{out$citation}; \\
+      Lin, H.Y., & Oberauer, K. (2022). An interference model for visual \\
+      working memory: Applications to the change detection task. \\
+      Cognitive Psychology, 133, 101463."
     )
+    out$requirements <- glue(
+      "- response: Binary (0='same', 1='change')
+      - probe: Probe color in radians
+      - target: Target color in radians
+      - Non-target features should be in radians and centered relative to the target"
+    )
+    out$parameters$beta <- glue(
+      "Decision criterion (log prior odds). \\
+      Fixed to 0 by default for unbiased decision."
+    )
+    out$links$beta <- "identity"
+    out$fixed_parameters$beta <- 0
+    out$default_priors$beta <- list(main = "normal(0, 0.5)")
   } else {
-    out <- structure(
-      list(
-        resp_vars = nlist(resp_error),
-        other_vars = nlist(nt_features, set_size),
-        domain = "Visual working memory",
-        task = "Continuous reproduction",
-        name = "Three-parameter mixture model by Bays et al (2009).",
-        version = "NA",
-        citation = glue(
-          "Bays, P. M., Catalao, R. F. G., & Husain, M. (2009). \\
-          The precision of visual working memory is set by allocation \\
-          of a shared resource. Journal of Vision, 9(10), 1-11"
-        ),
-        requirements = glue(
-          "- The response vairable should be in radians and \\
-          represent the angular error relative to the target
-          - The non-target features should be in radians and be \\
-          centered relative to the target"
-        ),
-        parameters = list(
-          mu1 = glue(
-            "Location parameter of the von Mises distribution for memory responses \\
-            (in radians). Fixed internally to 0 by default."
-          ),
-          kappa = "Concentration parameter of the von Mises distribution",
-          thetat = "Mixture weight for target responses",
-          thetant = "Mixture weight for non-target responses"
-        ),
-        links = list(
-          mu1 = "tan_half",
-          kappa = "log",
-          thetat = "identity",
-          thetant = "identity"
-        ),
-        fixed_parameters = list(mu1 = 0, mu2 = 0, kappa2 = -100),
-        default_priors = list(
-          mu1 = list(main = "student_t(1, 0, 1)"),
-          kappa = list(main = "normal(2, 1)", effects = "normal(0, 1)"),
-          thetat = list(main = "logistic(0, 1)"),
-          thetant = list(main = "logistic(0, 1)")
-        ),
-        void_mu = FALSE
-      ),
-      regex = regex,
-      regex_vars = c("nt_features"),
-      class = c("bmmodel", domain_class, "non_targets", "mixture3p",
-                "mixture3p_de"),
-      call = call
+    out$requirements <- glue(
+      "- The response vairable should be in radians and \\
+      represent the angular error relative to the target
+      - The non-target features should be in radians and be \\
+      centered relative to the target"
+    )
+    out$parameters <- c(
+      list(mu1 = glue(
+        "Location parameter of the von Mises distribution for memory responses \\
+        (in radians). Fixed internally to 0 by default."
+      )),
+      out$parameters
+    )
+    out$links <- c(list(mu1 = "tan_half"), out$links)
+    out$fixed_parameters <- list(mu1 = 0, mu2 = 0, kappa2 = -100)
+    out$default_priors <- c(
+      list(mu1 = list(main = "student_t(1, 0, 1)")),
+      out$default_priors
     )
   }
+
   out$links[names(links)] <- links
   out
 }
@@ -350,19 +322,16 @@ bmf2bf.mixture3p_cd <- function(model, formula = bmmformula()) {
     for (i in 1:n_quad) {{
       real x = -pi() + (i - 1) * dx;
 
-      // Retrieval density: target + non-targets + uniform
       real log_p_retrieve = log_sum_exp(
         log(thetat_prob) + von_mises_lpdf(x | 0, kappa),
         log(p_guess) + log_uniform
       );
 
-      // Same hypothesis: retrieval dist centered at probe
       real log_p_x_given_same = log_sum_exp(
         log(thetat_prob) + von_mises_lpdf(x | probe, kappa),
         log(p_guess) + log_uniform
       );
 
-      // Add non-target components
       {nt_loop}
 
       real log_p_same = log_p_x_given_same + log_uniform;
@@ -388,14 +357,11 @@ log_lik_mixture3p_cd <- function(i, prep) {
   beta <- brms::get_dpar(prep, "beta", i = i)
   probe <- prep$data$vreal1[i]
   y <- prep$data$Y[i]
+  nt_data <- .extract_cd_nt_data(i, prep)
 
-  n_nt <- sum(grepl("^vreal[0-9]+$", names(prep$data))) - 1
-  nt_features <- vapply(seq_len(n_nt), function(j) prep$data[[paste0("vreal", j + 1)]][i], numeric(1))
-  lure_idx <- vapply(seq_len(n_nt), function(j) prep$data[[paste0("vint", j)]][i], numeric(1))
-
-  dmixture3p_cd(y, probe, nt_features = nt_features, lure_idx = lure_idx,
-                kappa = kappa, thetat = thetat, thetant = thetant,
-                beta = beta, log = TRUE)
+  dmixture3p_cd(y, probe, nt_features = nt_data$nt_features,
+                lure_idx = nt_data$lure_idx, kappa = kappa, thetat = thetat,
+                thetant = thetant, beta = beta, log = TRUE)
 }
 
 posterior_predict_mixture3p_cd <- function(i, prep, ...) {
@@ -404,42 +370,29 @@ posterior_predict_mixture3p_cd <- function(i, prep, ...) {
   thetant <- brms::get_dpar(prep, "thetant", i = i)
   beta <- brms::get_dpar(prep, "beta", i = i)
   probe <- prep$data$vreal1[i]
+  nt_data <- .extract_cd_nt_data(i, prep)
 
-  n_nt <- sum(grepl("^vreal[0-9]+$", names(prep$data))) - 1
-  nt_features <- vapply(seq_len(n_nt), function(j) prep$data[[paste0("vreal", j + 1)]][i], numeric(1))
-  lure_idx <- vapply(seq_len(n_nt), function(j) prep$data[[paste0("vint", j)]][i], numeric(1))
-
-  rmixture3p_cd(length(kappa), probe, nt_features = nt_features,
-                lure_idx = lure_idx, kappa = kappa, thetat = thetat,
+  rmixture3p_cd(length(kappa), probe, nt_features = nt_data$nt_features,
+                lure_idx = nt_data$lure_idx, kappa = kappa, thetat = thetat,
                 thetant = thetant, beta = beta)
+}
+
+.configure_prior_mixture3p <- function(model, data, formula) {
+  prior <- brms::empty_prior()
+  set_size_var <- model$other_vars$set_size
+  set_size_is_factor_with_level1 <- any(data$ss_numeric == 1) && !is.numeric(data[[set_size_var]])
+  if (!set_size_is_factor_with_level1) return(prior)
+  prior +
+    constrain_set_size1_fixef(formula, "thetant", set_size_var, "constant(-100)") +
+    constrain_set_size1_ranef(formula, "thetant", set_size_var, "constant(1e-8)")
 }
 
 #' @export
 configure_prior.mixture3p_cd <- function(model, data, formula, user_prior, ...) {
-  prior <- brms::empty_prior()
-  set_size_var <- model$other_vars$set_size
-  set_size_is_factor_with_level1 <- any(data$ss_numeric == 1) && !is.numeric(data[[set_size_var]])
-  if (!set_size_is_factor_with_level1) {
-    return(prior)
-  }
-
-  prior +
-    constrain_set_size1_fixef(formula, "thetant", set_size_var, "constant(-100)") +
-    constrain_set_size1_ranef(formula, "thetant", set_size_var, "constant(1e-8)")
+  .configure_prior_mixture3p(model, data, formula)
 }
 
 #' @export
 configure_prior.mixture3p_de <- function(model, data, formula, user_prior, ...) {
-  prior <- brms::empty_prior()
-  set_size_var <- model$other_vars$set_size
-
-  # Models with non-target errors need constant priors on set-size 1 factors
-  set_size_is_factor_with_level1 <- any(data$ss_numeric == 1) && !is.numeric(data[[set_size_var]])
-  if (!set_size_is_factor_with_level1) {
-    return(prior)
-  }
-
-  prior +
-    constrain_set_size1_fixef(formula, "thetant", set_size_var, "constant(-100)") +
-    constrain_set_size1_ranef(formula, "thetant", set_size_var, "constant(1e-8)")
+  .configure_prior_mixture3p(model, data, formula)
 }
