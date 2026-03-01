@@ -763,6 +763,110 @@ rimm <- function(n, mu = c(0, 2, -1.5), dist = c(0, 0.5, 2),
   )
 }
 
+#' @title Distribution functions for the IMM change detection model
+#'
+#' @description Density and random generation for the interference measurement
+#'   model applied to change detection tasks, based on Lin & Oberauer (2022).
+#'
+#' @name imm_cd_dist
+#'
+#' @param response Binary response (0 = "same", 1 = "change")
+#' @param n Number of observations to generate
+#' @param probe Probe position (centered, in radians)
+#' @param nt_features Numeric vector of non-target feature values (radians)
+#' @param nt_distances Numeric vector of distances of non-targets to target
+#' @param lure_idx Integer vector indicating active non-targets (1) or
+#'   inactive (0)
+#' @param kappa Concentration parameter of the von Mises distribution
+#' @param c Context activation parameter (log scale)
+#' @param a General activation parameter (log scale)
+#' @param s Spatial similarity gradient (log scale)
+#' @param beta Decision criterion. Default 0.
+#' @param log Logical; if `TRUE`, return log probability.
+#'
+#' @keywords distribution
+#'
+#' @references Lin, H.Y., & Oberauer, K. (2022). An interference model for
+#'   visual working memory: Applications to the change detection task.
+#'   Cognitive Psychology, 133, 101463.
+#'
+#' @return `dimm_cd` gives the likelihood, `rimm_cd` gives random binary
+#'   responses.
+#'
+#' @export
+dimm_cd <- function(response, probe, nt_features, nt_distances, lure_idx,
+                     kappa = 5, c = 2, a = 0.5, s = 2, beta = 0,
+                     log = FALSE) {
+  n_quad <- 101
+  x_grid <- seq(-pi, pi, length.out = n_quad)
+  dx <- x_grid[2] - x_grid[1]
+  log_uniform <- -log(2 * pi)
+
+  w_bg <- 1.0
+  w_target <- exp(c) + exp(a)
+
+  p_change <- 0
+  for (j in seq_along(x_grid)) {
+    x <- x_grid[j]
+    total_weight <- w_target + w_bg
+
+    log_p_ret <- log(w_target) +
+      brms::dvon_mises(x, mu = 0, kappa = kappa, log = TRUE)
+    log_p_same_part <- log(w_target) +
+      brms::dvon_mises(x, mu = probe, kappa = kappa, log = TRUE)
+
+    for (k in seq_along(nt_features)) {
+      if (lure_idx[k] == 1) {
+        w_nt <- exp(c - exp(s) * nt_distances[k]) + exp(a)
+        total_weight <- total_weight + w_nt
+        log_nt <- log(w_nt) +
+          brms::dvon_mises(x, mu = nt_features[k], kappa = kappa, log = TRUE)
+        log_p_ret <- matrixStats::logSumExp(c(log_p_ret, log_nt))
+        log_nt_same <- log(w_nt) +
+          brms::dvon_mises(x, mu = nt_features[k] + probe, kappa = kappa, log = TRUE)
+        log_p_same_part <- matrixStats::logSumExp(c(log_p_same_part, log_nt_same))
+      }
+    }
+
+    log_p_ret <- log_p_ret + log_uniform - log(total_weight)
+    log_p_same_part <- log_p_same_part + log_uniform - log(total_weight)
+
+    log_p_ret <- matrixStats::logSumExp(c(log_p_ret,
+      log(w_bg) - log(total_weight) + 2 * log_uniform))
+    log_p_same_part <- matrixStats::logSumExp(c(log_p_same_part,
+      log(w_bg) - log(total_weight) + 2 * log_uniform))
+
+    llr <- log_p_ret - log_p_same_part
+    if (llr > beta) {
+      p_change <- p_change + exp(log_p_ret - log_uniform) * dx
+    }
+  }
+
+  p_change <- max(min(p_change, 1 - 1e-10), 1e-10)
+  loglik <- if (response == 1) log(p_change) else log(1 - p_change)
+  if (log) loglik else exp(loglik)
+}
+
+#' @rdname imm_cd_dist
+#' @export
+rimm_cd <- function(n, probe, nt_features, nt_distances, lure_idx,
+                     kappa = 5, c = 2, a = 0.5, s = 2, beta = 0) {
+  probe <- rep_len(probe, n)
+  kappa <- rep_len(kappa, n)
+  c <- rep_len(c, n)
+  a <- rep_len(a, n)
+  s <- rep_len(s, n)
+  beta <- rep_len(beta, n)
+
+  p_change <- vapply(seq_len(n), function(i) {
+    dimm_cd(1, probe[i], nt_features, lure_idx = lure_idx,
+            nt_distances = nt_distances, kappa = kappa[i],
+            c = c[i], a = a[i], s = s[i], beta = beta[i])
+  }, numeric(1))
+
+  stats::rbinom(n, size = 1, prob = p_change)
+}
+
 #' @title Distribution functions for the Memory Measurement Model (M3)
 #'
 #' @description Density and random generation functions for the memory
