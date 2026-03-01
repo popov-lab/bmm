@@ -3,7 +3,8 @@
 ############################################################################# !
 
 .model_mixture3p <- function(resp_error = NULL, nt_features = NULL, set_size = NULL,
-                             regex = FALSE, links = NULL, call = NULL, ...) {
+                             regex = FALSE, task = "de", links = NULL,
+                             call = NULL, ...) {
   out <- structure(
     list(
       resp_vars = nlist(resp_error),
@@ -50,7 +51,8 @@
     # attributes
     regex = regex,
     regex_vars = c("nt_features"),
-    class = c("bmmodel", "circular", "non_targets", "mixture3p"),
+    class = c("bmmodel", "circular", "non_targets", "mixture3p",
+              paste0("mixture3p_", task)),
     call = call
   )
   out$links[names(links)] <- links
@@ -75,6 +77,8 @@
 #'   fixed.
 #' @param regex Logical. If TRUE, the `nt_features` argument is interpreted as
 #'  a regular expression to match the non-target feature columns in the dataset.
+#' @param task Character. The experimental task: `"de"` for delayed estimation
+#'   (continuous reproduction) or `"cd"` for change detection. Default is `"de"`.
 #' @param ... used internally for testing, ignore it
 #' @return An object of class `bmmodel`
 #' @keywords bmmodel
@@ -121,7 +125,8 @@
 #'   iter = 500,
 #'   backend = "cmdstanr"
 #' )
-mixture3p <- function(resp_error, nt_features, set_size, regex = FALSE, ...) {
+mixture3p <- function(resp_error, nt_features, set_size, regex = FALSE,
+                      task = "de", ...) {
   call <- match.call()
   dots <- list(...)
   if ("setsize" %in% names(dots)) {
@@ -131,7 +136,7 @@ mixture3p <- function(resp_error, nt_features, set_size, regex = FALSE, ...) {
   stop_missing_args()
   .model_mixture3p(
     resp_error = resp_error, nt_features = nt_features,
-    set_size = set_size, regex = regex, call = call, ...
+    set_size = set_size, regex = regex, task = task, call = call, ...
   )
 }
 
@@ -142,7 +147,7 @@ mixture3p <- function(resp_error, nt_features, set_size, regex = FALSE, ...) {
 # ?configure_model for more information.
 
 #' @export
-configure_model.mixture3p <- function(model, data, formula) {
+configure_model.mixture3p_de <- function(model, data, formula) {
   # retrieve arguments from the data check
   max_set_size <- attr(data, "max_set_size")
   lure_idx <- attr(data, "lure_idx_vars")
@@ -182,7 +187,7 @@ configure_model.mixture3p <- function(model, data, formula) {
 }
 
 #' @export
-configure_prior.mixture3p <- function(model, data, formula, user_prior, ...) {
+configure_prior.mixture3p_de <- function(model, data, formula, user_prior, ...) {
   prior <- brms::empty_prior()
   set_size_var <- model$other_vars$set_size
 

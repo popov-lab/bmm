@@ -2,7 +2,8 @@
 # MODELS                                                                 ####
 ############################################################################# !
 
-.model_sdm <- function(resp_error = NULL, links = NULL, version = "simple", call = NULL, ...) {
+.model_sdm <- function(resp_error = NULL, links = NULL, version = "simple",
+                       task = "de", call = NULL, ...) {
   out <- structure(
     list(
       resp_vars = nlist(resp_error),
@@ -43,7 +44,8 @@
       ),
       void_mu = FALSE
     ),
-    class = c("bmmodel", "circular", "sdm", paste0("sdm_", version)),
+    class = c("bmmodel", "circular", "sdm", paste0("sdm_", version),
+              paste0("sdm_", version, "_", task)),
     call = call
   )
   out$links[names(links)] <- links
@@ -64,6 +66,8 @@
 #'   degrees to radians using the `deg2rad` function.
 #' @param version Character. The version of the model to use. Currently only
 #'   "simple" is supported.
+#' @param task Character. The experimental task: `"de"` for delayed estimation
+#'   (continuous reproduction) or `"cd"` for change detection. Default is `"de"`.
 #' @param ... used internally for testing, ignore it
 #' @return An object of class `bmmodel`
 #' @export
@@ -86,20 +90,22 @@
 #'   cores = 4,
 #'   backend = "cmdstanr"
 #' )
-sdm <- function(resp_error, version = "simple", ...) {
+sdm <- function(resp_error, version = "simple", task = "de", ...) {
   call <- match.call()
   stop_missing_args()
-  .model_sdm(resp_error = resp_error, version = version, call = call, ...)
+  .model_sdm(resp_error = resp_error, version = version, task = task,
+             call = call, ...)
 }
 
 #' @rdname sdm
 #' @keywords deprecated
 #' @export
-sdmSimple <- function(resp_error, version = "simple", ...) {
+sdmSimple <- function(resp_error, version = "simple", task = "de", ...) {
   warning2("The function `sdmSimple()` is deprecated. Please use `sdm()` instead.")
   call <- match.call()
   stop_missing_args()
-  .model_sdm(resp_error = resp_error, version = version, call = call, ...)
+  .model_sdm(resp_error = resp_error, version = version, task = task,
+             call = call, ...)
 }
 
 ############################################################################# !
@@ -120,7 +126,7 @@ check_data.sdm <- function(model, data, formula) {
 # ?configure_model for more information.
 
 #' @export
-configure_model.sdm <- function(model, data, formula) {
+configure_model.sdm_simple_de <- function(model, data, formula) {
   # note - c has a log link, but I've coded it manually for computational efficiency
   sdm_simple <- brms::custom_family(
     name = "sdm_simple",
@@ -158,7 +164,7 @@ configure_model.sdm <- function(model, data, formula) {
 ############################################################################# !
 
 #' @export
-postprocess_brm.sdm <- function(model, fit, ...) {
+postprocess_brm.sdm_simple_de <- function(model, fit, ...) {
   # manually set link_c to "log" since I coded it manually
   fit$family$link_c <- "log"
   fit$formula$family$link_c <- "log"
@@ -166,7 +172,7 @@ postprocess_brm.sdm <- function(model, fit, ...) {
 }
 
 #' @export
-revert_postprocess_brm.sdm <- function(model, fit, ...) {
+revert_postprocess_brm.sdm_simple_de <- function(model, fit, ...) {
   fit$family$link_c <- "identity"
   fit$formula$family$link_c <- "identity"
   fit

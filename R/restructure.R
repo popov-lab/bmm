@@ -63,8 +63,7 @@ restructure.bmmfit <- function(x, ...) {
 
   if (restr_version < "0.4.5") {
     prev_model <- x$bmm$model
-    prev_model_name <- class(prev_model)[length(class(prev_model))]
-    new_model <- get_model(prev_model_name)
+    new_model <- get_model(class(prev_model))
     new_model <- brms::do_call(new_model, c(prev_model$resp_vars, prev_model$other_vars))
     x$bmm$model <- check_model(new_model, x$data, x$bmm$user_formula)
   }
@@ -116,8 +115,7 @@ add_links.bmmfit <- function(x) {
 
 #' @export
 add_links.bmmodel <- function(x) {
-  model_name <- class(x)[length(class(x))]
-  new_model <- get_model(model_name)()
+  new_model <- get_model(class(x))()
   x$links <- new_model$links
   x
 }

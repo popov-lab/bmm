@@ -70,6 +70,48 @@ check_data.circular <- function(model, data, formula) {
 }
 
 #' @export
+check_data.change_detection <- function(model, data, formula) {
+  resp_name <- model$resp_vars$response
+  probe_name <- model$resp_vars$probe
+  target_name <- model$resp_vars$target
+
+  stopif(
+    not_in(resp_name, colnames(data)),
+    "The response variable '{resp_name}' is not present in the data."
+  )
+  stopif(
+    not_in(probe_name, colnames(data)),
+    "The probe variable '{probe_name}' is not present in the data."
+  )
+  stopif(
+    not_in(target_name, colnames(data)),
+    "The target variable '{target_name}' is not present in the data."
+  )
+
+  resp_vals <- data[[resp_name]]
+  stopif(
+    !all(resp_vals %in% c(0L, 1L, 0, 1)),
+    "The response variable '{resp_name}' must be binary (0 or 1)."
+  )
+
+  warnif(
+    max(abs(data[[probe_name]]), na.rm = TRUE) > 2 * pi,
+    "It appears your probe variable is in degrees.
+    The model requires probe values to be in radians."
+  )
+  warnif(
+    max(abs(data[[target_name]]), na.rm = TRUE) > 2 * pi,
+    "It appears your target variable is in degrees.
+    The model requires target values to be in radians."
+  )
+
+  data$probe_centered <- wrap(data[[probe_name]] - data[[target_name]])
+  attr(data, "probe_var") <- "probe_centered"
+
+  NextMethod("check_data")
+}
+
+#' @export
 check_data.non_targets <- function(model, data, formula) {
   nt_features <- model$other_vars$nt_features
   warnif(

@@ -5,9 +5,9 @@
 \alias{sdmSimple}
 \title{Signal Discrimination Model (SDM) by Oberauer (2023)}
 \usage{
-sdm(resp_error, version = "simple", ...)
+sdm(resp_error, version = "simple", task = "de", ...)
 
-sdmSimple(resp_error, version = "simple", ...)
+sdmSimple(resp_error, version = "simple", task = "de", ...)
 }
 \arguments{
 \item{resp_error}{The name of the variable in the dataset containing the
@@ -17,6 +17,9 @@ degrees to radians using the \code{deg2rad} function.}
 
 \item{version}{Character. The version of the model to use. Currently only
 "simple" is supported.}
+
+\item{task}{Character. The experimental task: \code{"de"} for delayed estimation
+(continuous reproduction) or \code{"cd"} for change detection. Default is \code{"de"}.}
 
 \item{...}{used internally for testing, ignore it}
 }

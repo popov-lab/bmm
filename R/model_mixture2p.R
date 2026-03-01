@@ -2,7 +2,8 @@
 # MODELS                                                                 ####
 ############################################################################# !
 
-.model_mixture2p <- function(resp_error = NULL, links = NULL, call = NULL, ...) {
+.model_mixture2p <- function(resp_error = NULL, task = "de",
+                             links = NULL, call = NULL, ...) {
   out <- structure(
     list(
       resp_vars = nlist(resp_error),
@@ -40,7 +41,7 @@
       ),
       void_mu = FALSE
     ),
-    class = c("bmmodel", "circular", "mixture2p"),
+    class = c("bmmodel", "circular", "mixture2p", paste0("mixture2p_", task)),
     call = call
   )
   out$links[names(links)] <- links
@@ -55,6 +56,8 @@
 #'   the response error. The response Error should code the response relative to
 #'   the to-be-recalled target in radians. You can transform the response error
 #'   in degrees to radian using the `deg2rad` function.
+#' @param task Character. The experimental task: `"de"` for delayed estimation
+#'   (continuous reproduction) or `"cd"` for change detection. Default is `"de"`.
 #' @param ... used internally for testing, ignore it
 #' @return An object of class `bmmodel`
 #' @keywords bmmodel
@@ -77,10 +80,10 @@
 #'   backend = "cmdstanr"
 #' )
 #' @export
-mixture2p <- function(resp_error, ...) {
+mixture2p <- function(resp_error, task = "de", ...) {
   call <- match.call()
   stop_missing_args()
-  .model_mixture2p(resp_error = resp_error, call = call, ...)
+  .model_mixture2p(resp_error = resp_error, task = task, call = call, ...)
 }
 
 ############################################################################# !
@@ -90,7 +93,7 @@ mixture2p <- function(resp_error, ...) {
 # ?configure_model for more information.
 
 #' @export
-configure_model.mixture2p <- function(model, data, formula) {
+configure_model.mixture2p_de <- function(model, data, formula) {
   # construct the brmsformula
   formula <- bmf2bf(model, formula) +
     brms::lf(kappa2 ~ 1, mu2 ~ 1) +

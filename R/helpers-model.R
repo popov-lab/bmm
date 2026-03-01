@@ -308,13 +308,21 @@ model_info.bmmodel <- function(model, components = "all") {
 
 
 
-#' @param model A string with the name of the model supplied by the user
+#' @param model A string or character vector. If a single string, looks up
+#'   `.model_{model}` directly. If a character vector (e.g., from `class(x)`),
+#'   walks the vector backwards until a matching `.model_*` constructor is found.
 #' @return A function of type .model_*
 #' @details the returned object is a function. To get the model object, call the
 #'   returned function, e.g. `get_model("mixture2p")()`
 #' @noRd
 get_model <- function(model) {
-  get(paste0(".model_", model), mode = "function")
+  for (cls in rev(model)) {
+    fn_name <- paste0(".model_", cls)
+    if (exists(fn_name, mode = "function")) {
+      return(get(fn_name, mode = "function"))
+    }
+  }
+  stop2("Could not find constructor for model: ", collapse_comma(model))
 }
 
 # same as get_model2, but with the new model structure for the user facing alias

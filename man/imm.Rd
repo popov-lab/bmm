@@ -14,6 +14,7 @@ imm(
   set_size,
   regex = FALSE,
   version = "full",
+  task = "de",
   ...
 )
 
@@ -50,6 +51,9 @@ columns in the dataset.}
 
 \item{version}{Character. The version of the IMM model to use. Can be one of
 \code{full}, \code{bsc}, or \code{abc}. The default is \code{full}.}
+
+\item{task}{Character. The experimental task: \code{"de"} for delayed estimation
+(continuous reproduction) or \code{"cd"} for change detection. Default is \code{"de"}.}
 
 \item{...}{used internally for testing, ignore it}
 }

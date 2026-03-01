@@ -4,7 +4,7 @@
 \alias{mixture3p}
 \title{Three-parameter mixture model by Bays et al (2009).}
 \usage{
-mixture3p(resp_error, nt_features, set_size, regex = FALSE, ...)
+mixture3p(resp_error, nt_features, set_size, regex = FALSE, task = "de", ...)
 }
 \arguments{
 \item{resp_error}{The name of the variable in the dataset containing
@@ -24,6 +24,9 @@ fixed.}
 
 \item{regex}{Logical. If TRUE, the \code{nt_features} argument is interpreted as
 a regular expression to match the non-target feature columns in the dataset.}
+
+\item{task}{Character. The experimental task: \code{"de"} for delayed estimation
+(continuous reproduction) or \code{"cd"} for change detection. Default is \code{"de"}.}
 
 \item{...}{used internally for testing, ignore it}
 }

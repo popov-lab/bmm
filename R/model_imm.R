@@ -3,8 +3,8 @@
 ############################################################################# !
 
 .model_imm <- function(resp_error = NULL, nt_features = NULL, nt_distances = NULL,
-                       set_size = NULL, regex = FALSE, version = "full", links = NULL,
-                       call = NULL, ...) {
+                       set_size = NULL, regex = FALSE, version = "full",
+                       task = "de", links = NULL, call = NULL, ...) {
   out <- structure(
     list(
       resp_vars = nlist(resp_error),
@@ -53,7 +53,8 @@
     # attributes
     regex = regex,
     regex_vars = c("nt_features", "nt_distances"),
-    class = c("bmmodel", "circular", "non_targets", "imm", paste0("imm_", version)),
+    class = c("bmmodel", "circular", "non_targets", "imm", paste0("imm_", version),
+              paste0("imm_", version, "_", task)),
     call = call
   )
 
@@ -116,6 +117,8 @@
 #'   columns in the dataset.
 #' @param version Character. The version of the IMM model to use. Can be one of
 #'  `full`, `bsc`, or `abc`. The default is `full`.
+#' @param task Character. The experimental task: `"de"` for delayed estimation
+#'   (continuous reproduction) or `"cd"` for change detection. Default is `"de"`.
 #' @param ... used internally for testing, ignore it
 #' @return An object of class `bmmodel`
 #' @keywords bmmodel
@@ -184,7 +187,8 @@
 #'   backend = "cmdstanr"
 #' )
 #' @export
-imm <- function(resp_error, nt_features, nt_distances, set_size, regex = FALSE, version = "full", ...) {
+imm <- function(resp_error, nt_features, nt_distances, set_size, regex = FALSE,
+                version = "full", task = "de", ...) {
   call <- match.call()
   dots <- list(...)
   if ("setsize" %in% names(dots)) {
@@ -197,7 +201,7 @@ imm <- function(resp_error, nt_features, nt_distances, set_size, regex = FALSE, 
   .model_imm(
     resp_error = resp_error, nt_features = nt_features,
     nt_distances = nt_distances, set_size = set_size, regex = regex,
-    version = version, call = call, ...
+    version = version, task = task, call = call, ...
   )
 }
 
@@ -279,7 +283,7 @@ check_data.imm_full <- function(model, data, formula) {
 }
 
 #' @export
-configure_model.imm_abc <- function(model, data, formula) {
+configure_model.imm_abc_de <- function(model, data, formula) {
   # retrieve arguments from the data check
   max_set_size <- attr(data, "max_set_size")
   lure_idx <- attr(data, "lure_idx_vars")
@@ -296,7 +300,7 @@ configure_model.imm_abc <- function(model, data, formula) {
 }
 
 #' @export
-configure_model.imm_bsc <- function(model, data, formula) {
+configure_model.imm_bsc_de <- function(model, data, formula) {
   # retrieve arguments from the data check
   max_set_size <- attr(data, "max_set_size")
   lure_idx <- attr(data, "lure_idx_vars")
@@ -315,7 +319,7 @@ configure_model.imm_bsc <- function(model, data, formula) {
 }
 
 #' @export
-configure_model.imm_full <- function(model, data, formula) {
+configure_model.imm_full_de <- function(model, data, formula) {
   # retrieve arguments from the data check
   max_set_size <- attr(data, "max_set_size")
   lure_idx <- attr(data, "lure_idx_vars")
@@ -338,17 +342,17 @@ configure_model.imm_full <- function(model, data, formula) {
 ############################################################################# !
 
 #' @export
-configure_prior.imm_abc <- function(model, data, formula, user_prior, ...) {
+configure_prior.imm_abc_de <- function(model, data, formula, user_prior, ...) {
   .configure_prior_imm(model, data, formula, nlpars = "a")
 }
 
 #' @export
-configure_prior.imm_bsc <- function(model, data, formula, user_prior, ...) {
+configure_prior.imm_bsc_de <- function(model, data, formula, user_prior, ...) {
   .configure_prior_imm(model, data, formula, nlpars = "s")
 }
 
 #' @export
-configure_prior.imm_full <- function(model, data, formula, user_prior, ...) {
+configure_prior.imm_full_de <- function(model, data, formula, user_prior, ...) {
   .configure_prior_imm(model, data, formula, nlpars = c("a", "s"))
 }
 
