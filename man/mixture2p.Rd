@@ -4,13 +4,30 @@
 \alias{mixture2p}
 \title{Two-parameter mixture model by Zhang and Luck (2008).}
 \usage{
-mixture2p(resp_error, task = "de", ...)
+mixture2p(
+  resp_error = NULL,
+  response = NULL,
+  probe = NULL,
+  target = NULL,
+  task = "de",
+  ...
+)
 }
 \arguments{
 \item{resp_error}{The name of the variable in the provided dataset containing
 the response error. The response Error should code the response relative to
 the to-be-recalled target in radians. You can transform the response error
-in degrees to radian using the \code{deg2rad} function.}
+in degrees to radian using the \code{deg2rad} function. Required when
+\code{task = "de"}.}
+
+\item{response}{The name of the variable in the dataset containing the binary
+response (0 = "same", 1 = "change"). Required when \code{task = "cd"}.}
+
+\item{probe}{The name of the variable containing the probe color in radians.
+Required when \code{task = "cd"}.}
+
+\item{target}{The name of the variable containing the target color in
+radians. Required when \code{task = "cd"}.}
 
 \item{task}{Character. The experimental task: \code{"de"} for delayed estimation
 (continuous reproduction) or \code{"cd"} for change detection. Default is \code{"de"}.}

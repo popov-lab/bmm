@@ -330,6 +330,112 @@ rmixture2p <- function(n, mu = 0, kappa = 5, p_mem = 0.6) {
   )
 }
 
+#' @title Distribution functions for the mixture2p change detection model
+#'
+#' @name mixture2p_cd_dist
+#'
+#' @description Density and random generation for the two-parameter mixture
+#'   model applied to the change detection task, based on Lin & Oberauer (2022).
+#'
+#' @param response Binary vector (0 = "same", 1 = "change")
+#' @param n Number of observations to generate
+#' @param probe Probe value in radians (centered relative to target)
+#' @param kappa Concentration parameter of the von Mises distribution
+#' @param thetat Probability of target memory retrieval
+#' @param beta Decision criterion (log prior odds). Default 0 for unbiased.
+#' @param log Logical; if `TRUE`, values are returned on the log scale.
+#'
+#' @keywords distribution
+#'
+#' @references Lin, H.Y., & Oberauer, K. (2022). An interference model for
+#'   visual working memory: Applications to the change detection task.
+#'   Cognitive Psychology, 133, 101463.
+#'
+#' @return `dmixture2p_cd` gives the likelihood of the binary response,
+#'   `rmixture2p_cd` gives random binary responses.
+#'
+#' @export
+dmixture2p_cd <- function(response, probe, kappa = 5, thetat = 0.6,
+                           beta = 0, log = FALSE) {
+  stopif(isTRUE(any(kappa < 0)), "kappa must be non-negative")
+  stopif(isTRUE(any(thetat < 0 | thetat > 1)), "thetat must be in [0,1]")
+
+  n_quad <- 101
+  x_grid <- seq(-pi, pi, length.out = n_quad)
+  dx <- x_grid[2] - x_grid[1]
+
+  kappa <- rep_len(kappa, length(response))
+  thetat <- rep_len(thetat, length(response))
+  beta <- rep_len(beta, length(response))
+  probe <- rep_len(probe, length(response))
+
+  loglik <- numeric(length(response))
+  for (i in seq_along(response)) {
+    p_change <- .mixture2p_cd_p_change(probe[i], kappa[i], thetat[i],
+                                        beta[i], x_grid, dx)
+    loglik[i] <- if (response[i] == 1) log(p_change) else log(1 - p_change)
+  }
+
+  if (log) loglik else exp(loglik)
+}
+
+#' @rdname mixture2p_cd_dist
+#' @export
+rmixture2p_cd <- function(n, probe, kappa = 5, thetat = 0.6, beta = 0) {
+  stopif(isTRUE(any(kappa < 0)), "kappa must be non-negative")
+  stopif(isTRUE(any(thetat < 0 | thetat > 1)), "thetat must be in [0,1]")
+
+  kappa <- rep_len(kappa, n)
+  thetat <- rep_len(thetat, n)
+  beta <- rep_len(beta, n)
+  probe <- rep_len(probe, n)
+
+  n_quad <- 101
+  x_grid <- seq(-pi, pi, length.out = n_quad)
+  dx <- x_grid[2] - x_grid[1]
+
+  p_change <- vapply(seq_len(n), function(i) {
+    .mixture2p_cd_p_change(probe[i], kappa[i], thetat[i], beta[i],
+                            x_grid, dx)
+  }, numeric(1))
+
+  stats::rbinom(n, size = 1, prob = p_change)
+}
+
+.mixture2p_cd_p_change <- function(probe, kappa, thetat, beta,
+                                    x_grid, dx) {
+  log_uniform <- -log(2 * pi)
+  p_change <- 0
+
+  for (j in seq_along(x_grid)) {
+    x <- x_grid[j]
+
+    log_p_retrieve <- .log_mix(thetat,
+      brms::dvon_mises(x, mu = 0, kappa = kappa, log = TRUE),
+      log_uniform
+    )
+    p_retrieve <- exp(log_p_retrieve)
+
+    log_p_x_given_same <- .log_mix(thetat,
+      brms::dvon_mises(x, mu = probe, kappa = kappa, log = TRUE),
+      log_uniform
+    )
+    log_p_same <- log_p_x_given_same + log_uniform
+    log_p_change_hyp <- log_p_retrieve + log_uniform
+    llr <- log_p_change_hyp - log_p_same
+
+    if (llr > beta) {
+      p_change <- p_change + p_retrieve * dx
+    }
+  }
+
+  max(min(p_change, 1 - 1e-10), 1e-10)
+}
+
+.log_mix <- function(weight, log_p1, log_p2) {
+  matrixStats::logSumExp(c(log(weight) + log_p1, log(1 - weight) + log_p2))
+}
+
 #' @title Distribution functions for the three-parameter mixture model (mixture3p)
 #'
 #' @description Density, distribution, and random generation functions for the
