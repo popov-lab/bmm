@@ -35,11 +35,12 @@ Imports:
     rlang,
     stats,
     withr
-Suggests: 
+Suggests:
     bookdown,
     cmdstanr (>= 0.7.0),
     cowplot,
     dplyr,
+    emmeans (>= 1.8.0),
     fansi,
     ggplot2,
     ggthemes,
