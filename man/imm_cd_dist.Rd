@@ -17,6 +17,7 @@ dimm_cd(
   a = 0.5,
   s = 2,
   beta = 0,
+  mu = 0,
   log = FALSE
 )
 
@@ -30,7 +31,8 @@ rimm_cd(
   c = 2,
   a = 0.5,
   s = 2,
-  beta = 0
+  beta = 0,
+  mu = 0
 )
 }
 \arguments{

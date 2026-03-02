@@ -48,6 +48,19 @@
       - probe: Probe color in radians
       - target: Target color in radians"
     )
+    out$parameters <- c(
+      list(mu = glue(
+        "Location parameter (bias) of the retrieval distribution \\
+        (in radians). Fixed to 0 by default."
+      )),
+      out$parameters
+    )
+    out$links <- c(list(mu = "tan_half"), out$links)
+    out$fixed_parameters$mu <- 0
+    out$default_priors <- c(
+      list(mu = list(main = "student_t(1, 0, 1)")),
+      out$default_priors
+    )
     out$parameters$beta <- glue(
       "Decision criterion (log prior odds). \\
       Fixed to 0 by default for unbiased decision."
@@ -205,7 +218,7 @@ configure_model.sdm_simple_cd <- function(model, data, formula) {
   sdm_simple_cd <- brms::custom_family(
     name = "sdm_simple_cd",
     dpars = c("mu", "c", "kappa", "beta"),
-    links = c("identity", "log", "log", "identity"),
+    links = c("tan_half", "log", "log", "identity"),
     lb = c(NA, NA, 0, NA),
     ub = c(NA, NA, NA, NA),
     type = "int",
@@ -238,20 +251,24 @@ bmf2bf.sdm_simple_cd <- function(model, formula = bmmformula()) {
 }
 
 log_lik_sdm_simple_cd <- function(i, prep) {
+  mu <- brms::get_dpar(prep, "mu", i = i)
   c_par <- brms::get_dpar(prep, "c", i = i)
   kappa <- brms::get_dpar(prep, "kappa", i = i)
   beta <- brms::get_dpar(prep, "beta", i = i)
   probe <- prep$data$vreal1[i]
   y <- prep$data$Y[i]
-  dsdm_cd(y, probe, c = c_par, kappa = kappa, beta = beta, log = TRUE)
+  dsdm_cd(y, probe, c = c_par, kappa = kappa, beta = beta, mu = mu,
+          log = TRUE)
 }
 
 posterior_predict_sdm_simple_cd <- function(i, prep, ...) {
+  mu <- brms::get_dpar(prep, "mu", i = i)
   c_par <- brms::get_dpar(prep, "c", i = i)
   kappa <- brms::get_dpar(prep, "kappa", i = i)
   beta <- brms::get_dpar(prep, "beta", i = i)
   probe <- prep$data$vreal1[i]
-  rsdm_cd(length(c_par), probe, c = c_par, kappa = kappa, beta = beta)
+  rsdm_cd(length(c_par), probe, c = c_par, kappa = kappa, beta = beta,
+          mu = mu)
 }
 
 ############################################################################# !

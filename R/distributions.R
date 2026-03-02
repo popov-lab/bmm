@@ -244,7 +244,7 @@ rsdm <- function(n, mu = 0, c = 3, kappa = 3.5, parametrization = "sqrtexp") {
 #'
 #' @export
 dsdm_cd <- function(response, probe, c = 4, kappa = 3, beta = 0,
-                     log = FALSE) {
+                     mu = 0, log = FALSE) {
   stopif(isTRUE(any(kappa < 0)), "kappa must be non-negative")
   stopif(isTRUE(any(c < 0)), "c must be non-negative")
 
@@ -256,12 +256,11 @@ dsdm_cd <- function(response, probe, c = 4, kappa = 3, beta = 0,
   p_change <- 0
   for (j in seq_along(x_grid)) {
     x <- x_grid[j]
-    log_p_ret <- dsdm(x, mu = 0, c = c, kappa = kappa, log = TRUE)
-    log_p_same <- dsdm(x, mu = probe, c = c, kappa = kappa, log = TRUE)
-    llr <- (log_p_ret + log_uniform) - (log_p_same + log_uniform)
-    if (llr > beta) {
-      p_change <- p_change + exp(log_p_ret) * dx
-    }
+    log_p_ret <- dsdm(x, mu = mu, c = c, kappa = kappa, log = TRUE)
+    log_p_same <- dsdm(x, mu = probe + mu, c = c, kappa = kappa, log = TRUE)
+    llr <- log_p_ret - log_p_same
+    w <- stats::plogis(5 * (llr - beta))
+    p_change <- p_change + w * exp(log_p_ret) * dx
   }
 
   p_change <- max(min(p_change, 1 - 1e-10), 1e-10)
@@ -271,14 +270,17 @@ dsdm_cd <- function(response, probe, c = 4, kappa = 3, beta = 0,
 
 #' @rdname sdm_cd_dist
 #' @export
-rsdm_cd <- function(n, probe, c = 4, kappa = 3, beta = 0) {
+rsdm_cd <- function(n, probe, c = 4, kappa = 3, beta = 0, mu = 0) {
   probe <- rep_len(probe, n)
   c <- rep_len(c, n)
   kappa <- rep_len(kappa, n)
   beta <- rep_len(beta, n)
 
+  mu <- rep_len(mu, n)
+
   p_change <- vapply(seq_len(n), function(i) {
-    dsdm_cd(1, probe[i], c = c[i], kappa = kappa[i], beta = beta[i])
+    dsdm_cd(1, probe[i], c = c[i], kappa = kappa[i], beta = beta[i],
+            mu = mu[i])
   }, numeric(1))
 
   stats::rbinom(n, size = 1, prob = p_change)
@@ -407,7 +409,7 @@ rmixture2p <- function(n, mu = 0, kappa = 5, p_mem = 0.6) {
 #' @param n Number of observations to generate
 #' @param probe Probe value in radians (centered relative to target)
 #' @param kappa Concentration parameter of the von Mises distribution
-#' @param thetat Probability of target memory retrieval
+#' @param thetat Target mixture weight (logit scale)
 #' @param beta Decision criterion (log prior odds). Default 0 for unbiased.
 #' @param log Logical; if `TRUE`, values are returned on the log scale.
 #'
@@ -422,23 +424,24 @@ rmixture2p <- function(n, mu = 0, kappa = 5, p_mem = 0.6) {
 #'
 #' @export
 dmixture2p_cd <- function(response, probe, kappa = 5, thetat = 0.6,
-                           beta = 0, log = FALSE) {
+                           beta = 0, mu = 0, log = FALSE) {
   stopif(isTRUE(any(kappa < 0)), "kappa must be non-negative")
-  stopif(isTRUE(any(thetat < 0 | thetat > 1)), "thetat must be in [0,1]")
 
   n_quad <- 101
   x_grid <- seq(-pi, pi, length.out = n_quad)
   dx <- x_grid[2] - x_grid[1]
 
+  thetat <- stats::plogis(thetat)
   kappa <- rep_len(kappa, length(response))
   thetat <- rep_len(thetat, length(response))
   beta <- rep_len(beta, length(response))
+  mu <- rep_len(mu, length(response))
   probe <- rep_len(probe, length(response))
 
   loglik <- numeric(length(response))
   for (i in seq_along(response)) {
     p_change <- .mixture2p_cd_p_change(probe[i], kappa[i], thetat[i],
-                                        beta[i], x_grid, dx)
+                                        beta[i], mu[i], x_grid, dx)
     loglik[i] <- if (response[i] == 1) log(p_change) else log(1 - p_change)
   }
 
@@ -447,13 +450,15 @@ dmixture2p_cd <- function(response, probe, kappa = 5, thetat = 0.6,
 
 #' @rdname mixture2p_cd_dist
 #' @export
-rmixture2p_cd <- function(n, probe, kappa = 5, thetat = 0.6, beta = 0) {
+rmixture2p_cd <- function(n, probe, kappa = 5, thetat = 0.6, beta = 0,
+                           mu = 0) {
   stopif(isTRUE(any(kappa < 0)), "kappa must be non-negative")
-  stopif(isTRUE(any(thetat < 0 | thetat > 1)), "thetat must be in [0,1]")
 
+  thetat <- stats::plogis(thetat)
   kappa <- rep_len(kappa, n)
   thetat <- rep_len(thetat, n)
   beta <- rep_len(beta, n)
+  mu <- rep_len(mu, n)
   probe <- rep_len(probe, n)
 
   n_quad <- 101
@@ -462,14 +467,14 @@ rmixture2p_cd <- function(n, probe, kappa = 5, thetat = 0.6, beta = 0) {
 
   p_change <- vapply(seq_len(n), function(i) {
     .mixture2p_cd_p_change(probe[i], kappa[i], thetat[i], beta[i],
-                            x_grid, dx)
+                            mu[i], x_grid, dx)
   }, numeric(1))
 
   stats::rbinom(n, size = 1, prob = p_change)
 }
 
 .mixture2p_cd_p_change <- function(probe, kappa, thetat, beta,
-                                    x_grid, dx) {
+                                    mu, x_grid, dx) {
   log_uniform <- -log(2 * pi)
   p_change <- 0
 
@@ -477,22 +482,18 @@ rmixture2p_cd <- function(n, probe, kappa = 5, thetat = 0.6, beta = 0) {
     x <- x_grid[j]
 
     log_p_retrieve <- .log_mix(thetat,
-      brms::dvon_mises(x, mu = 0, kappa = kappa, log = TRUE),
+      brms::dvon_mises(x, mu = mu, kappa = kappa, log = TRUE),
       log_uniform
     )
     p_retrieve <- exp(log_p_retrieve)
 
     log_p_x_given_same <- .log_mix(thetat,
-      brms::dvon_mises(x, mu = probe, kappa = kappa, log = TRUE),
+      brms::dvon_mises(x, mu = probe + mu, kappa = kappa, log = TRUE),
       log_uniform
     )
-    log_p_same <- log_p_x_given_same + log_uniform
-    log_p_change_hyp <- log_p_retrieve + log_uniform
-    llr <- log_p_change_hyp - log_p_same
-
-    if (llr > beta) {
-      p_change <- p_change + p_retrieve * dx
-    }
+    llr <- log_p_retrieve - log_p_x_given_same
+    w <- stats::plogis(5 * (llr - beta))
+    p_change <- p_change + w * p_retrieve * dx
   }
 
   max(min(p_change, 1 - 1e-10), 1e-10)
@@ -630,7 +631,7 @@ rmixture3p <- function(n, mu = c(0, 2, -1.5), kappa = 5, p_mem = 0.6, p_nt = 0.2
 #' @export
 dmixture3p_cd <- function(response, probe, nt_features, lure_idx,
                            kappa = 5, thetat = 0.6, thetant = 0.3,
-                           beta = 0, log = FALSE) {
+                           beta = 0, mu = 0, log = FALSE) {
   n_quad <- 101
   x_grid <- seq(-pi, pi, length.out = n_quad)
   dx <- x_grid[2] - x_grid[1]
@@ -647,11 +648,11 @@ dmixture3p_cd <- function(response, probe, nt_features, lure_idx,
     x <- x_grid[j]
 
     log_p_ret <- .log_mix(thetat_prob,
-      brms::dvon_mises(x, mu = 0, kappa = kappa, log = TRUE),
+      brms::dvon_mises(x, mu = mu, kappa = kappa, log = TRUE),
       log(p_guess) + log_uniform
     )
     log_p_same_part <- .log_mix(thetat_prob,
-      brms::dvon_mises(x, mu = probe, kappa = kappa, log = TRUE),
+      brms::dvon_mises(x, mu = probe + mu, kappa = kappa, log = TRUE),
       log(p_guess) + log_uniform
     )
 
@@ -666,13 +667,9 @@ dmixture3p_cd <- function(response, probe, nt_features, lure_idx,
       }
     }
 
-    log_p_same <- log_p_same_part + log_uniform
-    log_p_change_hyp <- log_p_ret + log_uniform
-    llr <- log_p_change_hyp - log_p_same
-
-    if (llr > beta) {
-      p_change <- p_change + exp(log_p_ret) * dx
-    }
+    llr <- log_p_ret - log_p_same_part
+    w <- stats::plogis(5 * (llr - beta))
+    p_change <- p_change + w * exp(log_p_ret) * dx
   }
 
   p_change <- max(min(p_change, 1 - 1e-10), 1e-10)
@@ -684,7 +681,7 @@ dmixture3p_cd <- function(response, probe, nt_features, lure_idx,
 #' @export
 rmixture3p_cd <- function(n, probe, nt_features, lure_idx,
                            kappa = 5, thetat = 0.6, thetant = 0.3,
-                           beta = 0) {
+                           beta = 0, mu = 0) {
   n_quad <- 101
   x_grid <- seq(-pi, pi, length.out = n_quad)
   dx <- x_grid[2] - x_grid[1]
@@ -695,9 +692,11 @@ rmixture3p_cd <- function(n, probe, nt_features, lure_idx,
   thetant <- rep_len(thetant, n)
   beta <- rep_len(beta, n)
 
+  mu <- rep_len(mu, n)
+
   p_change <- vapply(seq_len(n), function(i) {
     dmixture3p_cd(1, probe[i], nt_features, lure_idx,
-                  kappa[i], thetat[i], thetant[i], beta[i])
+                  kappa[i], thetat[i], thetant[i], beta[i], mu[i])
   }, numeric(1))
 
   stats::rbinom(n, size = 1, prob = p_change)
@@ -862,7 +861,7 @@ rimm <- function(n, mu = c(0, 2, -1.5), dist = c(0, 0.5, 2),
 #' @export
 dimm_cd <- function(response, probe, nt_features, nt_distances, lure_idx,
                      kappa = 5, c = 2, a = 0.5, s = 2, beta = 0,
-                     log = FALSE) {
+                     mu = 0, log = FALSE) {
   n_quad <- 101
   x_grid <- seq(-pi, pi, length.out = n_quad)
   dx <- x_grid[2] - x_grid[1]
@@ -877,9 +876,9 @@ dimm_cd <- function(response, probe, nt_features, nt_distances, lure_idx,
     total_weight <- w_target + w_bg
 
     log_p_ret <- log(w_target) +
-      brms::dvon_mises(x, mu = 0, kappa = kappa, log = TRUE)
+      brms::dvon_mises(x, mu = mu, kappa = kappa, log = TRUE)
     log_p_same_part <- log(w_target) +
-      brms::dvon_mises(x, mu = probe, kappa = kappa, log = TRUE)
+      brms::dvon_mises(x, mu = probe + mu, kappa = kappa, log = TRUE)
 
     for (k in seq_along(nt_features)) {
       if (lure_idx[k] == 1) {
@@ -903,9 +902,8 @@ dimm_cd <- function(response, probe, nt_features, nt_distances, lure_idx,
       log(w_bg) - log(total_weight) + 2 * log_uniform))
 
     llr <- log_p_ret - log_p_same_part
-    if (llr > beta) {
-      p_change <- p_change + exp(log_p_ret - log_uniform) * dx
-    }
+    w <- stats::plogis(5 * (llr - beta))
+    p_change <- p_change + w * exp(log_p_ret - log_uniform) * dx
   }
 
   p_change <- max(min(p_change, 1 - 1e-10), 1e-10)
@@ -916,7 +914,8 @@ dimm_cd <- function(response, probe, nt_features, nt_distances, lure_idx,
 #' @rdname imm_cd_dist
 #' @export
 rimm_cd <- function(n, probe, nt_features, nt_distances, lure_idx,
-                     kappa = 5, c = 2, a = 0.5, s = 2, beta = 0) {
+                     kappa = 5, c = 2, a = 0.5, s = 2, beta = 0,
+                     mu = 0) {
   probe <- rep_len(probe, n)
   kappa <- rep_len(kappa, n)
   c <- rep_len(c, n)
@@ -924,10 +923,13 @@ rimm_cd <- function(n, probe, nt_features, nt_distances, lure_idx,
   s <- rep_len(s, n)
   beta <- rep_len(beta, n)
 
+  mu <- rep_len(mu, n)
+
   p_change <- vapply(seq_len(n), function(i) {
     dimm_cd(1, probe[i], nt_features, lure_idx = lure_idx,
             nt_distances = nt_distances, kappa = kappa[i],
-            c = c[i], a = a[i], s = s[i], beta = beta[i])
+            c = c[i], a = a[i], s = s[i], beta = beta[i],
+            mu = mu[i])
   }, numeric(1))
 
   stats::rbinom(n, size = 1, prob = p_change)

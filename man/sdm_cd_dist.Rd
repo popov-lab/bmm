@@ -6,9 +6,9 @@
 \alias{rsdm_cd}
 \title{Distribution functions for the SDM change detection model}
 \usage{
-dsdm_cd(response, probe, c = 4, kappa = 3, beta = 0, log = FALSE)
+dsdm_cd(response, probe, c = 4, kappa = 3, beta = 0, mu = 0, log = FALSE)
 
-rsdm_cd(n, probe, c = 4, kappa = 3, beta = 0)
+rsdm_cd(n, probe, c = 4, kappa = 3, beta = 0, mu = 0)
 }
 \arguments{
 \item{response}{Binary response (0 = "same", 1 = "change")}

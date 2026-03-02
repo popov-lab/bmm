@@ -56,6 +56,19 @@
       - target: Target color in radians
       - Non-target features should be in radians and centered relative to the target"
     )
+    out$parameters <- c(
+      list(mu = glue(
+        "Location parameter (bias) of the retrieval distribution \\
+        (in radians). Fixed to 0 by default."
+      )),
+      out$parameters
+    )
+    out$links <- c(list(mu = "tan_half"), out$links)
+    out$fixed_parameters$mu <- 0
+    out$default_priors <- c(
+      list(mu = list(main = "student_t(1, 0, 1)")),
+      out$default_priors
+    )
     out$parameters$beta <- glue(
       "Decision criterion (log prior odds). \\
       Fixed to 0 by default for unbiased decision."
@@ -245,7 +258,7 @@ configure_model.mixture3p_cd <- function(model, data, formula) {
   mixture3p_cd <- brms::custom_family(
     name = "mixture3p_cd",
     dpars = c("mu", "kappa", "thetat", "thetant", "beta"),
-    links = c("identity", "log", "identity", "identity", "identity"),
+    links = c("tan_half", "log", "identity", "identity", "identity"),
     lb = c(NA, 0, NA, NA, NA),
     ub = c(NA, NA, NA, NA, NA),
     type = "int",
@@ -310,6 +323,7 @@ bmf2bf.mixture3p_cd <- function(model, formula = bmmformula()) {
     real thetant_prob = inv_logit(thetant);
     real p_guess = fmax(1 - thetat_prob - thetant_prob, 1e-10);
     real log_uniform = -log(2 * pi());
+    real sharpness = 5;
     int n_active = 0;
     real inv_ss;
 
@@ -323,24 +337,21 @@ bmf2bf.mixture3p_cd <- function(model, formula = bmmformula()) {
       real x = -pi() + (i - 1) * dx;
 
       real log_p_retrieve = log_sum_exp(
-        log(thetat_prob) + von_mises_lpdf(x | 0, kappa),
+        log(thetat_prob) + von_mises_lpdf(x | mu, kappa),
         log(p_guess) + log_uniform
       );
 
       real log_p_x_given_same = log_sum_exp(
-        log(thetat_prob) + von_mises_lpdf(x | probe, kappa),
+        log(thetat_prob) + von_mises_lpdf(x | probe + mu, kappa),
         log(p_guess) + log_uniform
       );
 
       {nt_loop}
 
-      real log_p_same = log_p_x_given_same + log_uniform;
-      real log_p_change_hyp = log_p_retrieve + log_uniform;
-      real llr = log_p_change_hyp - log_p_same;
+      real llr = log_p_retrieve - log_p_x_given_same;
+      real w = inv_logit(sharpness * (llr - beta));
 
-      if (llr > beta) {{
-        p_change += exp(log_p_retrieve) * dx;
-      }}
+      p_change += w * exp(log_p_retrieve) * dx;
     }}
 
     p_change = fmin(fmax(p_change, 1e-10), 1 - 1e-10);
@@ -351,6 +362,7 @@ bmf2bf.mixture3p_cd <- function(model, formula = bmmformula()) {
 }
 
 log_lik_mixture3p_cd <- function(i, prep) {
+  mu <- brms::get_dpar(prep, "mu", i = i)
   kappa <- brms::get_dpar(prep, "kappa", i = i)
   thetat <- brms::get_dpar(prep, "thetat", i = i)
   thetant <- brms::get_dpar(prep, "thetant", i = i)
@@ -361,10 +373,11 @@ log_lik_mixture3p_cd <- function(i, prep) {
 
   dmixture3p_cd(y, probe, nt_features = nt_data$nt_features,
                 lure_idx = nt_data$lure_idx, kappa = kappa, thetat = thetat,
-                thetant = thetant, beta = beta, log = TRUE)
+                thetant = thetant, beta = beta, mu = mu, log = TRUE)
 }
 
 posterior_predict_mixture3p_cd <- function(i, prep, ...) {
+  mu <- brms::get_dpar(prep, "mu", i = i)
   kappa <- brms::get_dpar(prep, "kappa", i = i)
   thetat <- brms::get_dpar(prep, "thetat", i = i)
   thetant <- brms::get_dpar(prep, "thetant", i = i)
@@ -374,7 +387,7 @@ posterior_predict_mixture3p_cd <- function(i, prep, ...) {
 
   rmixture3p_cd(length(kappa), probe, nt_features = nt_data$nt_features,
                 lure_idx = nt_data$lure_idx, kappa = kappa, thetat = thetat,
-                thetant = thetant, beta = beta)
+                thetant = thetant, beta = beta, mu = mu)
 }
 
 .configure_prior_mixture3p <- function(model, data, formula) {

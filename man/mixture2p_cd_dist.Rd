@@ -6,9 +6,17 @@
 \alias{rmixture2p_cd}
 \title{Distribution functions for the mixture2p change detection model}
 \usage{
-dmixture2p_cd(response, probe, kappa = 5, thetat = 0.6, beta = 0, log = FALSE)
+dmixture2p_cd(
+  response,
+  probe,
+  kappa = 5,
+  thetat = 0.6,
+  beta = 0,
+  mu = 0,
+  log = FALSE
+)
 
-rmixture2p_cd(n, probe, kappa = 5, thetat = 0.6, beta = 0)
+rmixture2p_cd(n, probe, kappa = 5, thetat = 0.6, beta = 0, mu = 0)
 }
 \arguments{
 \item{response}{Binary vector (0 = "same", 1 = "change")}
@@ -17,7 +25,7 @@ rmixture2p_cd(n, probe, kappa = 5, thetat = 0.6, beta = 0)
 
 \item{kappa}{Concentration parameter of the von Mises distribution}
 
-\item{thetat}{Probability of target memory retrieval}
+\item{thetat}{Target mixture weight (logit scale)}
 
 \item{beta}{Decision criterion (log prior odds). Default 0 for unbiased.}
 

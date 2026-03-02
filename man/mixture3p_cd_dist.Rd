@@ -15,6 +15,7 @@ dmixture3p_cd(
   thetat = 0.6,
   thetant = 0.3,
   beta = 0,
+  mu = 0,
   log = FALSE
 )
 
@@ -26,7 +27,8 @@ rmixture3p_cd(
   kappa = 5,
   thetat = 0.6,
   thetant = 0.3,
-  beta = 0
+  beta = 0,
+  mu = 0
 )
 }
 \arguments{

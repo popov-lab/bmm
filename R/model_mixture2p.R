@@ -47,6 +47,19 @@
       - probe: Probe color in radians
       - target: Target color in radians"
     )
+    out$parameters <- c(
+      list(mu = glue(
+        "Location parameter (bias) of the retrieval distribution \\
+        (in radians). Fixed to 0 by default."
+      )),
+      out$parameters
+    )
+    out$links <- c(list(mu = "tan_half"), out$links)
+    out$fixed_parameters$mu <- 0
+    out$default_priors <- c(
+      list(mu = list(main = "student_t(1, 0, 1)")),
+      out$default_priors
+    )
     out$parameters$beta <- glue(
       "Decision criterion (log prior odds). \\
       Fixed to 0 by default for unbiased decision."
@@ -158,7 +171,7 @@ configure_model.mixture2p_cd <- function(model, data, formula) {
   mixture2p_cd <- brms::custom_family(
     name = "mixture2p_cd",
     dpars = c("mu", "kappa", "thetat", "beta"),
-    links = c("identity", "log", "identity", "identity"),
+    links = c("tan_half", "log", "identity", "identity"),
     lb = c(NA, 0, NA, NA),
     ub = c(NA, NA, NA, NA),
     type = "int",
@@ -192,20 +205,22 @@ bmf2bf.mixture2p_cd <- function(model, formula = bmmformula()) {
 }
 
 log_lik_mixture2p_cd <- function(i, prep) {
+  mu <- brms::get_dpar(prep, "mu", i = i)
   kappa <- brms::get_dpar(prep, "kappa", i = i)
   thetat <- brms::get_dpar(prep, "thetat", i = i)
   beta <- brms::get_dpar(prep, "beta", i = i)
   probe <- prep$data$vreal1[i]
   y <- prep$data$Y[i]
   dmixture2p_cd(y, probe, kappa = kappa, thetat = thetat, beta = beta,
-                log = TRUE)
+                mu = mu, log = TRUE)
 }
 
 posterior_predict_mixture2p_cd <- function(i, prep, ...) {
+  mu <- brms::get_dpar(prep, "mu", i = i)
   kappa <- brms::get_dpar(prep, "kappa", i = i)
   thetat <- brms::get_dpar(prep, "thetat", i = i)
   beta <- brms::get_dpar(prep, "beta", i = i)
   probe <- prep$data$vreal1[i]
   rmixture2p_cd(length(kappa), probe, kappa = kappa, thetat = thetat,
-                beta = beta)
+                beta = beta, mu = mu)
 }

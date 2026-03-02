@@ -19,23 +19,20 @@
     int n_quad = 101;
     real dx = 2 * pi() / (n_quad - 1);
     real p_change = 0;
-    real log_uniform = -log(2 * pi());
+    real sharpness = 5;
     int n_norm = 101;
     real norm_dx = 2 * pi() / (n_norm - 1);
 
     for (i in 1:n_quad) {
       real x = -pi() + (i - 1) * dx;
 
-      real log_p_retrieve = sdm_log_density(x, 0, c_par, kappa, n_norm, norm_dx);
-      real log_p_x_given_same = sdm_log_density(x, probe, c_par, kappa, n_norm, norm_dx);
+      real log_p_retrieve = sdm_log_density(x, mu, c_par, kappa, n_norm, norm_dx);
+      real log_p_x_given_same = sdm_log_density(x, probe + mu, c_par, kappa, n_norm, norm_dx);
 
-      real log_p_same = log_p_x_given_same + log_uniform;
-      real log_p_change_hyp = log_p_retrieve + log_uniform;
-      real llr = log_p_change_hyp - log_p_same;
+      real llr = log_p_retrieve - log_p_x_given_same;
+      real w = inv_logit(sharpness * (llr - beta));
 
-      if (llr > beta) {
-        p_change += exp(log_p_retrieve) * dx;
-      }
+      p_change += w * exp(log_p_retrieve) * dx;
     }
 
     p_change = fmin(fmax(p_change, 1e-10), 1 - 1e-10);

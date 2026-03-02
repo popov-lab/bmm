@@ -51,21 +51,21 @@ test_that("check_data.change_detection rejects invalid response", {
 })
 
 test_that("dmixture2p_cd returns valid probabilities", {
-  probs <- dmixture2p_cd(c(0, 1), probe = 0, kappa = 5, thetat = 0.8)
+  probs <- dmixture2p_cd(c(0, 1), probe = 0, kappa = 5, thetat = qlogis(0.8))
   expect_length(probs, 2)
   expect_true(all(probs >= 0 & probs <= 1))
   expect_equal(sum(probs), 1, tolerance = 1e-4)
 })
 
 test_that("dmixture2p_cd: same probe has lower P(change)", {
-  p_change_same <- dmixture2p_cd(1, probe = 0, kappa = 5, thetat = 0.8)
-  p_change_diff <- dmixture2p_cd(1, probe = pi, kappa = 5, thetat = 0.8)
+  p_change_same <- dmixture2p_cd(1, probe = 0, kappa = 5, thetat = qlogis(0.8))
+  p_change_diff <- dmixture2p_cd(1, probe = pi, kappa = 5, thetat = qlogis(0.8))
   expect_lt(p_change_same, p_change_diff)
 })
 
 test_that("rmixture2p_cd returns binary values", {
   set.seed(42)
-  r <- rmixture2p_cd(100, probe = 1.0, kappa = 5, thetat = 0.8)
+  r <- rmixture2p_cd(100, probe = 1.0, kappa = 5, thetat = qlogis(0.8))
   expect_true(all(r %in% c(0, 1)))
 })
 
