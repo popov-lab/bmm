@@ -12,8 +12,8 @@ dmixture3p_cd(
   nt_features,
   lure_idx,
   kappa = 5,
-  thetat = 0.6,
-  thetant = 0.3,
+  thetat = log(6),
+  thetant = log(3),
   beta = 0,
   mu = 0,
   log = FALSE
@@ -25,8 +25,8 @@ rmixture3p_cd(
   nt_features,
   lure_idx,
   kappa = 5,
-  thetat = 0.6,
-  thetant = 0.3,
+  thetat = log(6),
+  thetant = log(3),
   beta = 0,
   mu = 0
 )
@@ -44,9 +44,12 @@ inactive (0)}
 
 \item{kappa}{Concentration parameter of the von Mises distribution}
 
-\item{thetat}{Target mixture weight (logit scale)}
+\item{thetat}{Target log-weight for softmax normalization (guessing is the
+reference category with log-weight 0). A value of \code{log(6)} together with
+\code{thetant = log(3)} gives P(target)=0.6, P(non-target)=0.3, P(guess)=0.1.}
 
-\item{thetant}{Non-target mixture weight (logit scale)}
+\item{thetant}{Non-target log-weight for softmax normalization (same scale
+as \code{thetat}).}
 
 \item{beta}{Decision criterion. Default 0.}
 

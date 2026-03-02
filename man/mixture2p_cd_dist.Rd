@@ -25,7 +25,7 @@ rmixture2p_cd(n, probe, kappa = 5, thetat = 0.6, beta = 0, mu = 0)
 
 \item{kappa}{Concentration parameter of the von Mises distribution}
 
-\item{thetat}{Target mixture weight (logit scale)}
+\item{thetat}{Probability of target memory retrieval (between 0 and 1)}
 
 \item{beta}{Decision criterion (log prior odds). Default 0 for unbiased.}
 

@@ -305,9 +305,9 @@ bmf2bf.mixture3p_cd <- function(model, formula = bmmformula()) {
   nt_loop <- paste(vapply(seq_len(n_nt), function(i) {
     glue("
       if (lure{i} == 1) {{
-        real log_nt{i} = log(thetant_prob * inv_ss) + von_mises_lpdf(x | nt{i}, kappa);
+        real log_nt{i} = log_thetant - log(n_active) + von_mises_lpdf(x | nt{i}, kappa);
         log_p_retrieve = log_sum_exp(log_p_retrieve, log_nt{i});
-        real log_nt{i}_same = log(thetant_prob * inv_ss) + von_mises_lpdf(x | nt{i} + probe, kappa);
+        real log_nt{i}_same = log_thetant - log(n_active) + von_mises_lpdf(x | nt{i} + probe, kappa);
         log_p_x_given_same = log_sum_exp(log_p_x_given_same, log_nt{i}_same);
       }}")
   }, character(1)), collapse = "\n")
@@ -319,31 +319,32 @@ bmf2bf.mixture3p_cd <- function(model, formula = bmmformula()) {
     int n_quad = 101;
     real dx = 2 * pi() / (n_quad - 1);
     real p_change = 0;
-    real thetat_prob = inv_logit(thetat);
-    real thetant_prob = inv_logit(thetant);
-    real p_guess = fmax(1 - thetat_prob - thetant_prob, 1e-10);
     real log_uniform = -log(2 * pi());
     real sharpness = 5;
-    int n_active = 0;
-    real inv_ss;
 
+    // softmax normalization with guessing as reference (log-weight = 0)
+    real log_Z = log_sum_exp(log_sum_exp(thetat, thetant), 0);
+    real log_thetat = thetat - log_Z;
+    real log_thetant = thetant - log_Z;
+    real log_pguess = -log_Z;
+
+    int n_active = 0;
     for (j in 1:{n_nt}) {{
       array[{n_nt}] int lures = {{{paste0('lure', seq_len(n_nt), collapse = ', ')}}};
       n_active += lures[j];
     }}
-    inv_ss = n_active > 0 ? inv(n_active) : 1.0;
 
     for (i in 1:n_quad) {{
       real x = -pi() + (i - 1) * dx;
 
       real log_p_retrieve = log_sum_exp(
-        log(thetat_prob) + von_mises_lpdf(x | mu, kappa),
-        log(p_guess) + log_uniform
+        log_thetat + von_mises_lpdf(x | mu, kappa),
+        log_pguess + log_uniform
       );
 
       real log_p_x_given_same = log_sum_exp(
-        log(thetat_prob) + von_mises_lpdf(x | probe + mu, kappa),
-        log(p_guess) + log_uniform
+        log_thetat + von_mises_lpdf(x | probe + mu, kappa),
+        log_pguess + log_uniform
       );
 
       {nt_loop}

@@ -23,7 +23,7 @@
         kappa = "Concentration parameter of the von Mises distribution",
         thetat = "Mixture weight for target responses"
       ),
-      links = list(kappa = "log", thetat = "identity"),
+      links = list(kappa = "log", thetat = if (task == "cd") "logit" else "identity"),
       default_priors = list(
         kappa = list(main = "normal(2, 1)", effects = "normal(0, 1)"),
         thetat = list(main = "logistic(0, 1)")
@@ -171,9 +171,9 @@ configure_model.mixture2p_cd <- function(model, data, formula) {
   mixture2p_cd <- brms::custom_family(
     name = "mixture2p_cd",
     dpars = c("mu", "kappa", "thetat", "beta"),
-    links = c("tan_half", "log", "identity", "identity"),
-    lb = c(NA, 0, NA, NA),
-    ub = c(NA, NA, NA, NA),
+    links = c("tan_half", "log", "logit", "identity"),
+    lb = c(NA, 0, 0, NA),
+    ub = c(NA, NA, 1, NA),
     type = "int",
     loop = TRUE,
     vars = "vreal1[n]",

@@ -30,8 +30,8 @@ test_that("mixture3p CD validates required arguments", {
 
 test_that("dmixture3p_cd returns valid probabilities", {
   p <- dmixture3p_cd(1, probe = 0, nt_features = c(1, -1),
-                     lure_idx = c(1, 1), kappa = 5, thetat = 0.6,
-                     thetant = 0.3)
+                     lure_idx = c(1, 1), kappa = 5, thetat = log(6),
+                     thetant = log(3))
   expect_true(p >= 0 && p <= 1)
 })
 

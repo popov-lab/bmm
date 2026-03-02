@@ -16,17 +16,16 @@
     real p_change = 0;
     real log_uniform = -log(2 * pi());
     real sharpness = 5;
-    real thetat_prob = inv_logit(thetat);
 
     for (i in 1:n_quad) {
       real x = -pi() + (i - 1) * dx;
 
-      real log_p_retrieve = log_mix(thetat_prob,
+      real log_p_retrieve = log_mix(thetat,
                                      von_mises_lpdf(x | mu, kappa),
                                      log_uniform);
       real p_retrieve = exp(log_p_retrieve);
 
-      real log_p_x_given_same = log_mix(thetat_prob,
+      real log_p_x_given_same = log_mix(thetat,
                                          von_mises_lpdf(x | probe + mu, kappa),
                                          log_uniform);
       real llr = log_p_retrieve - log_p_x_given_same;
