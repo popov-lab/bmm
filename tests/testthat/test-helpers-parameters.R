@@ -200,7 +200,9 @@ test_that(".is_softmax_param returns FALSE for non-mixture3p models", {
 
 test_that(".get_parameter_info returns correct info for SDM params", {
   skip_on_cran()
-  fit <- readRDS(system.file("extdata", "bmmfit_example1.rds", package = "bmm"))
+  path <- test_path("assets/bmmfit_example1.rds")
+  skip_if_not(file.exists(path), "SDM fixture not available (excluded by .Rbuildignore)")
+  fit <- readRDS(path)
 
   info_c <- bmm:::.get_parameter_info(fit, "c")
   expect_equal(info_c$type, "dpar")

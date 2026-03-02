@@ -5,6 +5,12 @@
 
 library(testthat)
 
+load_sdm_fit <- function() {
+  path <- test_path("assets/bmmfit_example1.rds")
+  skip_if_not(file.exists(path), "SDM fixture not available (excluded by .Rbuildignore)")
+  readRDS(path)
+}
+
 # ===========================================================================
 # Tier 1: Unit tests — .extract_re_grouping_vars()
 # ===========================================================================
@@ -255,7 +261,7 @@ test_that(".filter_internal_effects keeps all user vars", {
 
 test_that("conditional_effects returns correct class for par = 'c'", {
   skip_on_cran()
-  fit <- readRDS(system.file("extdata", "bmmfit_example1.rds", package = "bmm"))
+  fit <- load_sdm_fit()
 
   ce <- conditional_effects(fit, par = "c")
   expect_s3_class(ce, "brms_conditional_effects")
@@ -264,7 +270,7 @@ test_that("conditional_effects returns correct class for par = 'c'", {
 
 test_that("conditional_effects works for intercept-only par = 'kappa'", {
   skip_on_cran()
-  fit <- readRDS(system.file("extdata", "bmmfit_example1.rds", package = "bmm"))
+  fit <- load_sdm_fit()
 
   ce <- conditional_effects(fit, par = "kappa")
   expect_s3_class(ce, "brms_conditional_effects")
@@ -272,7 +278,7 @@ test_that("conditional_effects works for intercept-only par = 'kappa'", {
 
 test_that("conditional_effects with par = NULL returns all estimated params", {
   skip_on_cran()
-  fit <- readRDS(system.file("extdata", "bmmfit_example1.rds", package = "bmm"))
+  fit <- load_sdm_fit()
 
   ce <- conditional_effects(fit)
   expect_s3_class(ce, "brms_conditional_effects")
@@ -285,7 +291,7 @@ test_that("conditional_effects with par = NULL returns all estimated params", {
 
 test_that("conditional_effects errors for invalid par name", {
   skip_on_cran()
-  fit <- readRDS(system.file("extdata", "bmmfit_example1.rds", package = "bmm"))
+  fit <- load_sdm_fit()
 
   expect_error(
     conditional_effects(fit, par = "nonexistent"),
@@ -295,7 +301,7 @@ test_that("conditional_effects errors for invalid par name", {
 
 test_that("conditional_effects errors for non-character par", {
   skip_on_cran()
-  fit <- readRDS(system.file("extdata", "bmmfit_example1.rds", package = "bmm"))
+  fit <- load_sdm_fit()
 
   expect_error(
     conditional_effects(fit, par = 42),
@@ -305,7 +311,7 @@ test_that("conditional_effects errors for non-character par", {
 
 test_that("scale = 'native' gives positive values for log-linked par", {
   skip_on_cran()
-  fit <- readRDS(system.file("extdata", "bmmfit_example1.rds", package = "bmm"))
+  fit <- load_sdm_fit()
 
   ce <- conditional_effects(fit, par = "c", scale = "native")
   # c has log link, so native scale = exp(sampling) → all positive
@@ -315,7 +321,7 @@ test_that("scale = 'native' gives positive values for log-linked par", {
 
 test_that("scale = 'sampling' can give negative values for log-linked par", {
   skip_on_cran()
-  fit <- readRDS(system.file("extdata", "bmmfit_example1.rds", package = "bmm"))
+  fit <- load_sdm_fit()
 
   ce <- conditional_effects(fit, par = "c", scale = "sampling")
   # On log scale, values can be any real number
@@ -328,7 +334,7 @@ test_that("scale = 'sampling' can give negative values for log-linked par", {
 
 test_that("scale = 'parameter' is treated same as 'sampling'", {
   skip_on_cran()
-  fit <- readRDS(system.file("extdata", "bmmfit_example1.rds", package = "bmm"))
+  fit <- load_sdm_fit()
 
   ce_param <- conditional_effects(fit, par = "c", scale = "parameter")
   ce_sampling <- conditional_effects(fit, par = "c", scale = "sampling")
@@ -337,7 +343,7 @@ test_that("scale = 'parameter' is treated same as 'sampling'", {
 
 test_that("effects argument limits output to specified effect", {
   skip_on_cran()
-  fit <- readRDS(system.file("extdata", "bmmfit_example1.rds", package = "bmm"))
+  fit <- load_sdm_fit()
 
   ce <- conditional_effects(fit, par = "c", effects = "set_size")
   expect_length(ce, 1)
@@ -346,7 +352,7 @@ test_that("effects argument limits output to specified effect", {
 
 test_that("plotting conditional_effects works", {
   skip_on_cran()
-  fit <- readRDS(system.file("extdata", "bmmfit_example1.rds", package = "bmm"))
+  fit <- load_sdm_fit()
 
   ce <- conditional_effects(fit, par = "c")
   p <- plot(ce, plot = FALSE)
