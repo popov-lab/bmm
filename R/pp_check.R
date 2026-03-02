@@ -42,7 +42,7 @@
 pp_check.bmmfit <- function(object, type = "dens_overlay", ndraws = NULL,
                             group = NULL, ...) {
   if (identical(family(object)$family, "multinomial")) {
-    .pp_check_multinomial(object, type = type, ndraws = ndraws,
+    .pp_check_multinomial(object, type = type, ndraws = ndraws %||% 100L,
                           group = group, ...)
   } else {
     if (!is.null(group)) {
@@ -68,40 +68,18 @@ pp_check.bmmfit <- function(object, type = "dens_overlay", ndraws = NULL,
 }
 
 
-.pp_check_multinomial <- function(object, type = NULL, ndraws = NULL,
+.pp_check_multinomial <- function(object, type = NULL, ndraws = 100L,
                                   probs = c(0.025, 0.975),
-                                  group = NULL,
-                                  # brms pp_check args — intercepted, not forwarded
-                                  x = NULL, prefix = c("ppc", "ppd"),
-                                  draw_ids = NULL,
-                                  nsamples = NULL, subset = NULL,
-                                  ...) {
-  if (!requireNamespace("ggplot2", quietly = TRUE)) {
-    stop2("ggplot2 is required for pp_check of multinomial models.")
-  }
-
+                                  group = NULL, draw_ids = NULL, ...) {
   if (!is.null(type) && type != "dens_overlay") {
     warning2("Argument 'type' is ignored for multinomial pp_check. ",
              "A response-proportion plot is always produced.")
   }
 
-  if (!is.null(nsamples)) {
-    warning2("'nsamples' is deprecated; use 'ndraws' instead.")
-    if (is.null(draw_ids)) ndraws <- nsamples
-  }
-
-  if (is.null(ndraws)) ndraws <- 100L
-
-  predict_args <- if (!is.null(draw_ids)) {
-    list(draw_ids = draw_ids)
-  } else {
-    list(ndraws = ndraws)
-  }
-
   model <- object$bmm$model
   resp_cols <- unlist(model$resp_vars)
-  yrep <- do.call(brms::posterior_predict,
-                  c(list(object), predict_args, list(...)))
+  yrep <- brms::posterior_predict(object, draw_ids = draw_ids,
+                                  ndraws = ndraws, ...)
 
   y_mat <- object$data$Y
   cat_names <- colnames(y_mat) %||% resp_cols

@@ -251,6 +251,8 @@ print.bmm_parameters <- function(x, max_desc_width = 50, ...) {
   }
 
   invisible(x)
+}
+
 #' Get parameter classification info for a bmmfit parameter
 #'
 #' @description
