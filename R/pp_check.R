@@ -36,6 +36,7 @@
 #' @return For multinomial models, a `ggplot2` object. For other models, the
 #'   result of [brms::pp_check()].
 #' @seealso [brms::pp_check()]
+#' @aliases pp_check
 #' @importFrom brms pp_check
 #' @importFrom rlang .data
 #' @export

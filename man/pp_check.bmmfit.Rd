@@ -2,6 +2,7 @@
 % Please edit documentation in R/pp_check.R
 \name{pp_check.bmmfit}
 \alias{pp_check.bmmfit}
+\alias{pp_check}
 \title{Posterior predictive check for bmmfit objects}
 \usage{
 \method{pp_check}{bmmfit}(object, type = "dens_overlay", ndraws = NULL, group = NULL, ...)
