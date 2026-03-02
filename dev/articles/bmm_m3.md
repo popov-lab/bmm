@@ -647,31 +647,43 @@ hypothesis being true.
 
 #### 3.4.2 Assessing model fit
 
-For most models implemented in `bmm` you can easily assess model fit by
-visually inspecting posterior predictive plots provided by the
-`pp_check` function. Unfortunately this function is not yet implemented
-for multinomial distributional models, such as the `m3` model.
+You can assess model fit by visually inspecting posterior predictive
+plots using the `pp_check` function. For multinomial models like the
+`m3`, `bmm` provides a custom `pp_check` method that compares observed
+and predicted response proportions across experimental conditions.
 
-Nevertheless, there is a pretty simple way to assess model fit for the
-`m3` model by obtaining posterior predictions using the `tidybayes`
-package. Using the posterior predictive draws for the frequency of
-selecting each response category, we can compare the observed
-frequencies to the predicted frequencies. If the model fits the data
-well, the observed frequencies should be within the 95% credible
-interval of the predicted frequencies.
+``` r
+pp_check(m3_fit, ndraws = 100)
+```
+
+![](bmm_m3_files/figure-html/model_fit-1.jpeg)
+
+The plot shows observed response proportions as bars and the posterior
+predictive median with 95% credible interval as point-ranges for each
+response category. If the model fits the data well, the observed bars
+should align with the predicted point-ranges.
+
+For this particular model, a good fit is unsurprising as it is saturated
+with respect to the number of parameters and the number of observations.
+
+#### 3.4.3 Advanced: custom visualization
+
+For more control over the visualization, you can obtain posterior
+predictions directly using the `tidybayes` package and build a custom
+plot.
 
 ``` r
 library(tidybayes)
 library(dplyr)
 library(ggplot2)
 
-pp_m3 <- m3_fit %>% 
+pp_m3 <- m3_fit %>%
   # obtain expected predicted draws
   tidybayes::epred_draws(
     newdata = .$data
-  ) %>% ungroup() %>% 
+  ) %>% ungroup() %>%
   # select only relevant variables
-  select(ID, cond, nTrials, .draw, .category, .epred) %>% 
+  select(ID, cond, nTrials, .draw, .category, .epred) %>%
   # calculate the mean predicted values in each condition for each response category
   # and each draw
   summarise(.epred = mean(.epred/nTrials),
@@ -679,9 +691,9 @@ pp_m3 <- m3_fit %>%
 
 # reshape data to match the format of the posterior predictives
 data$n_trials <- rowSums(data[,c("corr","other","dist","npl")], na.rm = T)
-data_pp <- data %>% 
-  select(ID, n_trials, cond, corr, other, dist, npl) %>% 
-  tidyr::pivot_longer(cols = c(corr, other, dist, npl), names_to = ".category", values_to = ".value") %>% 
+data_pp <- data %>%
+  select(ID, n_trials, cond, corr, other, dist, npl) %>%
+  tidyr::pivot_longer(cols = c(corr, other, dist, npl), names_to = ".category", values_to = ".value") %>%
   mutate(.value = .value/n_trials)
 
 # some responses were not possible in some conditions, so we set them to zero
@@ -702,16 +714,10 @@ ggplot(data = pp_m3,
        x = "Condition",
        fill = "Condition",
        title = "Model Fit",
-       subtitle = "Posterior Predicitve vs. Observed Response Proportions")
+       subtitle = "Posterior Predictive vs. Observed Response Proportions")
 ```
 
-![](bmm_m3_files/figure-html/model_fit-1.jpeg)
-
-The generated plot illustrates that the distribution of posterior
-predictive response distributions is in line with the observed response
-distributions. This indicates that the model fits the data well. For
-this particular model, this is unsurprising as it is saturated with
-respect to the number of parameters and the number of observations.
+![](bmm_m3_files/figure-html/model_fit_custom-1.jpeg)
 
 ## References
 

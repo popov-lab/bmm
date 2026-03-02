@@ -36,6 +36,7 @@
 <url><loc>https://venpopov.com/bmm/dev/reference/construct_m3_act_funs.html</loc></url>
 <url><loc>https://venpopov.com/bmm/dev/reference/create_initfun.html</loc></url>
 <url><loc>https://venpopov.com/bmm/dev/reference/default_prior.bmmformula.html</loc></url>
+<url><loc>https://venpopov.com/bmm/dev/reference/emmeans-bmmfit.html</loc></url>
 <url><loc>https://venpopov.com/bmm/dev/reference/extract_parameter_dimensions.html</loc></url>
 <url><loc>https://venpopov.com/bmm/dev/reference/extract_stan_blocks.html</loc></url>
 <url><loc>https://venpopov.com/bmm/dev/reference/ezdm.html</loc></url>
@@ -54,7 +55,9 @@
 <url><loc>https://venpopov.com/bmm/dev/reference/mixture3p_dist.html</loc></url>
 <url><loc>https://venpopov.com/bmm/dev/reference/oberauer_lewandowsky_2019_e1.html</loc></url>
 <url><loc>https://venpopov.com/bmm/dev/reference/oberauer_lin_2017.html</loc></url>
+<url><loc>https://venpopov.com/bmm/dev/reference/parameters.html</loc></url>
 <url><loc>https://venpopov.com/bmm/dev/reference/postprocess_brm.html</loc></url>
+<url><loc>https://venpopov.com/bmm/dev/reference/pp_check.bmmfit.html</loc></url>
 <url><loc>https://venpopov.com/bmm/dev/reference/print_pretty_models_md.html</loc></url>
 <url><loc>https://venpopov.com/bmm/dev/reference/rejection_sampling.html</loc></url>
 <url><loc>https://venpopov.com/bmm/dev/reference/restructure.bmmfit.html</loc></url>

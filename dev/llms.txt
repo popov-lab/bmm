@@ -327,6 +327,13 @@ Main functions for model fitting
 
   Create a summary of a fitted model represented by a `bmmfit` object
 
+- [`recover_data(`*`<bmmfit>`*`)`](https://venpopov.com/bmm/dev/reference/emmeans-bmmfit.md)
+  [`emm_basis(`*`<bmmfit>`*`)`](https://venpopov.com/bmm/dev/reference/emmeans-bmmfit.md)
+  : emmeans support for bmmfit objects
+
+- [`pp_check(`*`<bmmfit>`*`)`](https://venpopov.com/bmm/dev/reference/pp_check.bmmfit.md)
+  : Posterior predictive check for bmmfit objects
+
 ## Extract model information
 
 Utility functions for extracting default priors, generate stan code,
@@ -351,6 +358,9 @@ stan data, etc.
   :
 
   Stan data for `bmm` models
+
+- [`parameters()`](https://venpopov.com/bmm/dev/reference/parameters.md)
+  : Get parameter information for a bmm model
 
 ## Specifying models
 
