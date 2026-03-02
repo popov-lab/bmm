@@ -339,7 +339,7 @@ order_data_query <- function(model, data, formula) {
         }
         message2("To sort your data, use the following code:\n\n")
         message(crayon::green("library(dplyr)"))
-        message(crayon::green(data_name, "_sorted <- ", data_name, " %>% arrange(",
+        message(crayon::green(data_name, "_sorted <- ", data_name, " |> arrange(",
           paste(predictors, collapse = ", "),
           ")\n\n",
           sep = ""
