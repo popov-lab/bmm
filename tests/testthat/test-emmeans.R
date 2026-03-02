@@ -10,7 +10,7 @@ load_mock_m3 <- function() {
 }
 
 load_sdm_fit <- function() {
-  readRDS(system.file("extdata", "bmmfit_example1.rds", package = "bmm"))
+  readRDS(test_path("assets/bmmfit_example1.rds"))
 }
 
 test_that(".bmmfit_resolve_par routes dpar to nlpar for mixture2p", {
