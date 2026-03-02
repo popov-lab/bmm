@@ -2,11 +2,15 @@
 # These test the parameter routing logic without requiring posterior samples
 
 load_mock_mixture2p <- function() {
-  readRDS(system.file("extdata", "mock_bmmfit_mixture2p.rds", package = "bmm"))
+  path <- test_path("assets/mock_bmmfit_mixture2p.rds")
+  skip_if_not(file.exists(path), "fixture not available (excluded by .Rbuildignore)")
+  readRDS(path)
 }
 
 load_mock_m3 <- function() {
-  readRDS(system.file("extdata", "mock_bmmfit_m3.rds", package = "bmm"))
+  path <- test_path("assets/mock_bmmfit_m3.rds")
+  skip_if_not(file.exists(path), "fixture not available (excluded by .Rbuildignore)")
+  readRDS(path)
 }
 
 load_sdm_fit <- function() {
