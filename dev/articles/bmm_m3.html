@@ -514,7 +514,7 @@ scale reduction factor on split chains (at convergence, Rhat = 1).
 </h4>
 <p>You can assess model fit by visually inspecting posterior predictive plots using the <code>pp_check</code> function. For multinomial models like the <code>m3</code>, <code>bmm</code> provides a custom <code>pp_check</code> method that compares observed and predicted response proportions across experimental conditions.</p>
 <div class="sourceCode" id="cb14"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="fu">pp_check</span><span class="op">(</span><span class="va">m3_fit</span>, ndraws <span class="op">=</span> <span class="fl">100</span><span class="op">)</span></span></code></pre></div>
+<code class="sourceCode R"><span><span class="fu"><a href="../reference/pp_check.bmmfit.html">pp_check</a></span><span class="op">(</span><span class="va">m3_fit</span>, ndraws <span class="op">=</span> <span class="fl">100</span><span class="op">)</span></span></code></pre></div>
 <p><img src="bmm_m3_files/figure-html/model_fit-1.jpeg" alt="" width="80%" style="display: block; margin: auto;"></p>
 <p>The plot shows observed response proportions as bars and the posterior predictive median with 95% credible interval as point-ranges for each response category. If the model fits the data well, the observed bars should align with the predicted point-ranges.</p>
 <p>For this particular model, a good fit is unsurprising as it is saturated with respect to the number of parameters and the number of observations.</p>

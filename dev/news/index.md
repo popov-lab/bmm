@@ -19,7 +19,9 @@
   the `ppc_bars` style from `bayesplot`. The method supports faceting by
   experimental conditions via `group`, configurable credible intervals
   via `probs`, and population-level predictions via `re_formula = NA`.
-  For non-multinomial models, `pp_check()` delegates to
+  For non-multinomial models,
+  [`pp_check()`](https://venpopov.com/bmm/dev/reference/pp_check.bmmfit.md)
+  delegates to
   [`brms::pp_check()`](https://mc-stan.org/bayesplot/reference/pp_check.html)
   and auto-selects the grouped plot variant when `group` is specified.
 
