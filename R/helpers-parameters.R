@@ -251,4 +251,69 @@ print.bmm_parameters <- function(x, max_desc_width = 50, ...) {
   }
 
   invisible(x)
+#' Get parameter classification info for a bmmfit parameter
+#'
+#' @description
+#' Determines whether a named model parameter is a distributional (`dpar`) or
+#' non-linear (`nlpar`) parameter in the underlying brms model, retrieves its
+#' link function, and checks for softmax transformation.
+#'
+#' @param bmmfit A bmmfit object
+#' @param par Character string. Parameter name (e.g., `"kappa"`, `"c"`)
+#'
+#' @return A list with elements:
+#'   \describe{
+#'     \item{`type`}{Character: `"dpar"` or `"nlpar"`}
+#'     \item{`model_name`}{Character: the parameter name as specified in the bmmodel}
+#'     \item{`brms_name`}{Character: the parameter name as used in brms}
+#'     \item{`link`}{Character: the link function (e.g., `"log"`, `"identity"`)}
+#'     \item{`softmax`}{Logical: whether the parameter uses softmax transformation}
+#'   }
+#'
+#' @keywords internal
+#' @noRd
+.get_parameter_info <- function(bmmfit, par) {
+  model <- bmmfit$bmm$model
+  model_pars <- names(model$parameters)
+  bterms <- brms::brmsterms(bmmfit$formula)
+
+  if (!par %in% model_pars) {
+    stop2(
+      "Parameter '{par}' not found in model.\n",
+      "Available parameters: {paste(model_pars, collapse = ', ')}"
+    )
+  }
+
+  link <- model$links[[par]] %||% "identity"
+  softmax <- .is_softmax_param(par, model)
+
+  if (!is.null(bterms$dpars) && par %in% names(bterms$dpars)) {
+    type <- "dpar"
+  } else if (!is.null(bterms$nlpars) && par %in% names(bterms$nlpars)) {
+    type <- "nlpar"
+  } else {
+    # parameters not in bterms (e.g. fixed or auxiliary params) default to nlpar
+    type <- "nlpar"
+  }
+
+  list(
+    type = type,
+    model_name = par,
+    brms_name = par,
+    link = link,
+    softmax = softmax
+  )
+}
+
+
+#' Check if parameter uses softmax transformation
+#'
+#' @param par Character string. Parameter name
+#' @param model A bmmodel object
+#' @return Logical. TRUE if parameter uses softmax transformation
+#'
+#' @keywords internal
+#' @noRd
+.is_softmax_param <- function(par, model) {
+  "mixture3p" %in% class(model) && par %in% c("thetat", "thetant")
 }
