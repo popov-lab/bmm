@@ -78,12 +78,6 @@ jobs:
           cmdstanr::install_cmdstan(cores = parallel::detectCores())
         shell: Rscript {0}
 
-      - name: Check _pkgdown.yml reference coverage
-        if: matrix.config.os == 'ubuntu-latest'
-        run: |
-          testthat::test_file("tests/testthat/test-pkgdown.R", reporter = "progress", stop_on_failure = TRUE)
-        shell: Rscript {0}
-
       - uses: r-lib/actions/check-r-package@v2
         with:
           build_args: 'c("--no-manual", "--no-build-vignettes")'
