@@ -194,14 +194,8 @@ configure_model.mixture2p_cd <- function(model, data, formula) {
 #' @export
 bmf2bf.mixture2p_cd <- function(model, formula = bmmformula()) {
   resp_name <- model$resp_vars$response
-  probe_var <- "probe_centered"
-  brms_formula <- brms::bf(
-    glue("{resp_name} | vreal({probe_var}) ~ 1")
-  )
-  components <- lapply(formula, function(x) {
-    if (is_nl(x)) brms::nlf(x) else brms::lf(x)
-  })
-  Reduce(`+`, components, init = brms_formula)
+  mu_rhs <- .extract_mu_rhs(formula)
+  brms::bf(glue("{resp_name} | vreal(probe_centered) ~ {mu_rhs}"))
 }
 
 log_lik_mixture2p_cd <- function(i, prep) {

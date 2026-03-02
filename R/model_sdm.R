@@ -222,15 +222,18 @@ configure_model.sdm_simple_cd <- function(model, data, formula) {
     lb = c(NA, NA, 0, NA),
     ub = c(NA, NA, NA, NA),
     type = "int",
-    loop = TRUE,
-    vars = "vreal1[n]",
+    loop = FALSE,
     log_lik = log_lik_sdm_simple_cd,
     posterior_predict = posterior_predict_sdm_simple_cd
   )
 
   sc_path <- system.file("stan_chunks", package = "bmm")
   stan_funs <- read_lines2(paste0(sc_path, "/sdm_simple_cd_funs.stan"))
-  stanvars <- brms::stanvar(scode = stan_funs, block = "functions")
+  stan_tdata <- read_lines2(paste0(sc_path, "/sdm_simple_cd_tdata.stan"))
+  stan_llik <- read_lines2(paste0(sc_path, "/sdm_simple_cd_likelihood.stan"))
+  stanvars <- brms::stanvar(scode = stan_funs, block = "functions") +
+    brms::stanvar(scode = stan_tdata, block = "tdata") +
+    brms::stanvar(scode = stan_llik, block = "likelihood", position = "end")
 
   formula <- bmf2bf(model, formula)
   formula$family <- sdm_simple_cd
@@ -241,13 +244,8 @@ configure_model.sdm_simple_cd <- function(model, data, formula) {
 #' @export
 bmf2bf.sdm_simple_cd <- function(model, formula = bmmformula()) {
   resp_name <- model$resp_vars$response
-  brms_formula <- brms::bf(
-    glue("{resp_name} | vreal(probe_centered) ~ 1")
-  )
-  components <- lapply(formula, function(x) {
-    if (is_nl(x)) brms::nlf(x) else brms::lf(x)
-  })
-  Reduce(`+`, components, init = brms_formula)
+  mu_rhs <- .extract_mu_rhs(formula)
+  brms::bf(glue("{resp_name} | vreal(probe_centered) ~ {mu_rhs}"))
 }
 
 log_lik_sdm_simple_cd <- function(i, prep) {

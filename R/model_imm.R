@@ -450,13 +450,8 @@ bmf2bf.imm_full_cd <- function(model, formula = bmmformula()) {
   vreal_args <- paste(c("probe_centered", nt_features, nt_distances), collapse = ", ")
   vint_args <- paste(lure_idx, collapse = ", ")
 
-  brms_formula <- brms::bf(
-    glue("{resp_name} | vreal({vreal_args}) + vint({vint_args}) ~ 1")
-  )
-  components <- lapply(formula, function(x) {
-    if (is_nl(x)) brms::nlf(x) else brms::lf(x)
-  })
-  Reduce(`+`, components, init = brms_formula)
+  mu_rhs <- .extract_mu_rhs(formula)
+  brms::bf(glue("{resp_name} | vreal({vreal_args}) + vint({vint_args}) ~ {mu_rhs}"))
 }
 
 .generate_imm_full_cd_stan <- function(n_nt) {
@@ -469,9 +464,9 @@ bmf2bf.imm_full_cd <- function(model, formula = bmmformula()) {
       if (lure{i} == 1) {{
         real w_nt{i} = exp(c_par - exp(s) * dist{i}) + exp(a);
         total_weight += w_nt{i};
-        real log_nt{i} = log(w_nt{i}) + von_mises_lpdf(x | nt{i}, kappa);
+        real log_nt{i} = log(w_nt{i}) + kappa * cos(x - nt{i}) - log_vm_norm;
         log_p_retrieve = log_sum_exp(log_p_retrieve, log_nt{i});
-        real log_nt{i}_same = log(w_nt{i}) + von_mises_lpdf(x | nt{i} + probe, kappa);
+        real log_nt{i}_same = log(w_nt{i}) + kappa * cos(x - nt{i} - probe) - log_vm_norm;
         log_p_x_given_same = log_sum_exp(log_p_x_given_same, log_nt{i}_same);
       }}")
   }, character(1)), collapse = "\n")
@@ -488,12 +483,15 @@ bmf2bf.imm_full_cd <- function(model, formula = bmmformula()) {
     real w_bg = 1.0;
     real w_target = exp(c_par) + exp(a);
 
+    // precompute von Mises normalization -- depends only on kappa
+    real log_vm_norm = log(2 * pi()) + log_modified_bessel_first_kind(0, kappa);
+
     for (i in 1:n_quad) {{
       real x = -pi() + (i - 1) * dx;
       real total_weight = w_target + w_bg;
 
-      real log_p_retrieve = log(w_target) + von_mises_lpdf(x | mu, kappa);
-      real log_p_x_given_same = log(w_target) + von_mises_lpdf(x | probe + mu, kappa);
+      real log_p_retrieve = log(w_target) + kappa * cos(x - mu) - log_vm_norm;
+      real log_p_x_given_same = log(w_target) + kappa * cos(x - probe - mu) - log_vm_norm;
 
       {nt_loop}
 

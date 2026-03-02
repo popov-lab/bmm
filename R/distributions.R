@@ -248,20 +248,18 @@ dsdm_cd <- function(response, probe, c = 4, kappa = 3, beta = 0,
   stopif(isTRUE(any(kappa < 0)), "kappa must be non-negative")
   stopif(isTRUE(any(c < 0)), "c must be non-negative")
 
-  n_quad <- 101
+  n_quad <- 51
   x_grid <- seq(-pi, pi, length.out = n_quad)
-  dx <- x_grid[2] - x_grid[1]
-  log_uniform <- -log(2 * pi)
 
-  p_change <- 0
-  for (j in seq_along(x_grid)) {
-    x <- x_grid[j]
-    log_p_ret <- dsdm(x, mu = mu, c = c, kappa = kappa, log = TRUE)
-    log_p_same <- dsdm(x, mu = probe + mu, c = c, kappa = kappa, log = TRUE)
-    llr <- log_p_ret - log_p_same
-    w <- stats::plogis(5 * (llr - beta))
-    p_change <- p_change + w * exp(log_p_ret) * dx
-  }
+  ln_ret <- .dsdm_numer_sqrtexp(x_grid, mu = mu, c, kappa, log = TRUE)
+  ln_same <- .dsdm_numer_sqrtexp(x_grid, mu = probe + mu, c, kappa, log = TRUE)
+
+  exp_ln_ret <- exp(ln_ret)
+  norm_sum <- sum(exp_ln_ret)
+
+  llr <- ln_ret - ln_same
+  w <- stats::plogis(5 * (llr - beta))
+  p_change <- sum(w * exp_ln_ret) / norm_sum
 
   p_change <- max(min(p_change, 1 - 1e-10), 1e-10)
   loglik <- if (response == 1) log(p_change) else log(1 - p_change)
@@ -476,24 +474,22 @@ rmixture2p_cd <- function(n, probe, kappa = 5, thetat = 0.6, beta = 0,
 .mixture2p_cd_p_change <- function(probe, kappa, thetat, beta,
                                     mu, x_grid, dx) {
   log_uniform <- -log(2 * pi)
+  # precompute von Mises normalization -- depends only on kappa
+  log_vm_norm <- log(2 * pi) + log(besselI(kappa, nu = 0, expon.scaled = TRUE)) + kappa
   p_change <- 0
 
   for (j in seq_along(x_grid)) {
     x <- x_grid[j]
 
-    log_p_retrieve <- .log_mix(thetat,
-      brms::dvon_mises(x, mu = mu, kappa = kappa, log = TRUE),
-      log_uniform
-    )
-    p_retrieve <- exp(log_p_retrieve)
+    vm_ret <- kappa * cos(x - mu) - log_vm_norm
+    vm_same <- kappa * cos(x - probe - mu) - log_vm_norm
 
-    log_p_x_given_same <- .log_mix(thetat,
-      brms::dvon_mises(x, mu = probe + mu, kappa = kappa, log = TRUE),
-      log_uniform
-    )
+    log_p_retrieve <- .log_mix(thetat, vm_ret, log_uniform)
+
+    log_p_x_given_same <- .log_mix(thetat, vm_same, log_uniform)
     llr <- log_p_retrieve - log_p_x_given_same
     w <- stats::plogis(5 * (llr - beta))
-    p_change <- p_change + w * p_retrieve * dx
+    p_change <- p_change + w * exp(log_p_retrieve) * dx
   }
 
   max(min(p_change, 1 - 1e-10), 1e-10)
@@ -646,28 +642,34 @@ dmixture3p_cd <- function(response, probe, nt_features, lure_idx,
   log_thetant <- thetant - log_Z
   log_pguess <- -log_Z
 
+  # precompute von Mises normalization -- depends only on kappa
+  log_vm_norm <- log(2 * pi) + log(besselI(kappa, nu = 0, expon.scaled = TRUE)) + kappa
+
   n_active <- sum(lure_idx)
 
   p_change <- 0
   for (j in seq_along(x_grid)) {
     x <- x_grid[j]
 
+    vm_ret <- kappa * cos(x - mu) - log_vm_norm
+    vm_same <- kappa * cos(x - probe - mu) - log_vm_norm
+
     log_p_ret <- matrixStats::logSumExp(c(
-      log_thetat + brms::dvon_mises(x, mu = mu, kappa = kappa, log = TRUE),
+      log_thetat + vm_ret,
       log_pguess + log_uniform
     ))
     log_p_same_part <- matrixStats::logSumExp(c(
-      log_thetat + brms::dvon_mises(x, mu = probe + mu, kappa = kappa, log = TRUE),
+      log_thetat + vm_same,
       log_pguess + log_uniform
     ))
 
     for (k in seq_along(nt_features)) {
       if (lure_idx[k] == 1) {
         log_nt <- log_thetant - log(n_active) +
-          brms::dvon_mises(x, mu = nt_features[k], kappa = kappa, log = TRUE)
+          kappa * cos(x - nt_features[k]) - log_vm_norm
         log_p_ret <- matrixStats::logSumExp(c(log_p_ret, log_nt))
         log_nt_same <- log_thetant - log(n_active) +
-          brms::dvon_mises(x, mu = nt_features[k] + probe, kappa = kappa, log = TRUE)
+          kappa * cos(x - nt_features[k] - probe) - log_vm_norm
         log_p_same_part <- matrixStats::logSumExp(c(log_p_same_part, log_nt_same))
       }
     }
@@ -875,25 +877,28 @@ dimm_cd <- function(response, probe, nt_features, nt_distances, lure_idx,
   w_bg <- 1.0
   w_target <- exp(c) + exp(a)
 
+  # precompute von Mises normalization -- depends only on kappa
+  log_vm_norm <- log(2 * pi) + log(besselI(kappa, nu = 0, expon.scaled = TRUE)) + kappa
+
   p_change <- 0
   for (j in seq_along(x_grid)) {
     x <- x_grid[j]
     total_weight <- w_target + w_bg
 
     log_p_ret <- log(w_target) +
-      brms::dvon_mises(x, mu = mu, kappa = kappa, log = TRUE)
+      kappa * cos(x - mu) - log_vm_norm
     log_p_same_part <- log(w_target) +
-      brms::dvon_mises(x, mu = probe + mu, kappa = kappa, log = TRUE)
+      kappa * cos(x - probe - mu) - log_vm_norm
 
     for (k in seq_along(nt_features)) {
       if (lure_idx[k] == 1) {
         w_nt <- exp(c - exp(s) * nt_distances[k]) + exp(a)
         total_weight <- total_weight + w_nt
         log_nt <- log(w_nt) +
-          brms::dvon_mises(x, mu = nt_features[k], kappa = kappa, log = TRUE)
+          kappa * cos(x - nt_features[k]) - log_vm_norm
         log_p_ret <- matrixStats::logSumExp(c(log_p_ret, log_nt))
         log_nt_same <- log(w_nt) +
-          brms::dvon_mises(x, mu = nt_features[k] + probe, kappa = kappa, log = TRUE)
+          kappa * cos(x - nt_features[k] - probe) - log_vm_norm
         log_p_same_part <- matrixStats::logSumExp(c(log_p_same_part, log_nt_same))
       }
     }

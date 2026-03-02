@@ -1,40 +1,42 @@
   #include 'fun_tan_half.stan'
 
-  real sdm_log_numer(real x, real mu, real c_par, real kappa) {
-    return c_par * exp(kappa * (cos(x - mu) - 1)) * sqrt(kappa) * inv(sqrt2()) * inv_sqrt(pi());
+  // dummy _lpmf — brms requires this but actual likelihood is in the likelihood block
+  real sdm_simple_cd_lpmf(array[] int y, vector mu, vector c_par,
+                           vector kappa, vector beta) {
+    return 0;
   }
 
-  real sdm_log_density(real x, real mu, real c_par, real kappa, int n_norm, real norm_dx) {
-    real log_numer = sdm_log_numer(x, mu, c_par, kappa);
+  // compute log-normalization constant via quadrature (cached in likelihood block)
+  real sdm_cd_log_Z(real c_par, real kappa, vector grid) {
+    int n_quad = size(grid);
+    real base = c_par * sqrt(kappa) * inv(sqrt2()) * inv_sqrt(pi());
     real norm_sum = 0;
-    for (j in 1:n_norm) {
-      real t = -pi() + (j - 1) * norm_dx;
-      norm_sum += exp(sdm_log_numer(t, mu, c_par, kappa));
+    for (j in 1:n_quad) {
+      norm_sum += exp(base * exp(kappa * (cos(grid[j]) - 1)));
     }
-    real log_denom = log(norm_sum * norm_dx);
-    return log_numer - log_denom;
+    return log(norm_sum);
   }
 
-  real sdm_simple_cd_lpmf(int y, real mu, real c_par, real kappa, real beta, real probe) {
-    int n_quad = 101;
-    real dx = 2 * pi() / (n_quad - 1);
-    real p_change = 0;
+  // compute log P(y | params) for a single observation, given cached log_Z
+  real sdm_cd_log_prob(int y, real mu, real c_par, real kappa, real beta,
+                       real probe, real log_Z, vector grid) {
+    int n_quad = size(grid);
+    real base = c_par * sqrt(kappa) * inv(sqrt2()) * inv_sqrt(pi());
     real sharpness = 5;
-    int n_norm = 101;
-    real norm_dx = 2 * pi() / (n_norm - 1);
+    real weighted_sum = 0;
 
     for (i in 1:n_quad) {
-      real x = -pi() + (i - 1) * dx;
+      real x = grid[i];
+      real ln_ret = base * exp(kappa * (cos(x - mu) - 1));
+      real ln_same = base * exp(kappa * (cos(x - probe - mu) - 1));
 
-      real log_p_retrieve = sdm_log_density(x, mu, c_par, kappa, n_norm, norm_dx);
-      real log_p_x_given_same = sdm_log_density(x, probe + mu, c_par, kappa, n_norm, norm_dx);
-
-      real llr = log_p_retrieve - log_p_x_given_same;
+      real exp_ln_ret = exp(ln_ret);
+      real llr = ln_ret - ln_same;
       real w = inv_logit(sharpness * (llr - beta));
-
-      p_change += w * exp(log_p_retrieve) * dx;
+      weighted_sum += w * exp_ln_ret;
     }
 
+    real p_change = weighted_sum / exp(log_Z);
     p_change = fmin(fmax(p_change, 1e-10), 1 - 1e-10);
     if (y == 1) return log(p_change);
     return log1m(p_change);

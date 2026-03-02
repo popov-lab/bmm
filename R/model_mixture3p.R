@@ -289,13 +289,8 @@ bmf2bf.mixture3p_cd <- function(model, formula = bmmformula()) {
   vreal_args <- paste(c("probe_centered", nt_features), collapse = ", ")
   vint_args <- paste(lure_idx, collapse = ", ")
 
-  brms_formula <- brms::bf(
-    glue("{resp_name} | vreal({vreal_args}) + vint({vint_args}) ~ 1")
-  )
-  components <- lapply(formula, function(x) {
-    if (is_nl(x)) brms::nlf(x) else brms::lf(x)
-  })
-  Reduce(`+`, components, init = brms_formula)
+  mu_rhs <- .extract_mu_rhs(formula)
+  brms::bf(glue("{resp_name} | vreal({vreal_args}) + vint({vint_args}) ~ {mu_rhs}"))
 }
 
 .generate_mixture3p_cd_stan <- function(n_nt) {
@@ -305,9 +300,9 @@ bmf2bf.mixture3p_cd <- function(model, formula = bmmformula()) {
   nt_loop <- paste(vapply(seq_len(n_nt), function(i) {
     glue("
       if (lure{i} == 1) {{
-        real log_nt{i} = log_thetant - log(n_active) + von_mises_lpdf(x | nt{i}, kappa);
+        real log_nt{i} = log_thetant - log(n_active) + kappa * cos(x - nt{i}) - log_vm_norm;
         log_p_retrieve = log_sum_exp(log_p_retrieve, log_nt{i});
-        real log_nt{i}_same = log_thetant - log(n_active) + von_mises_lpdf(x | nt{i} + probe, kappa);
+        real log_nt{i}_same = log_thetant - log(n_active) + kappa * cos(x - nt{i} - probe) - log_vm_norm;
         log_p_x_given_same = log_sum_exp(log_p_x_given_same, log_nt{i}_same);
       }}")
   }, character(1)), collapse = "\n")
@@ -328,6 +323,9 @@ bmf2bf.mixture3p_cd <- function(model, formula = bmmformula()) {
     real log_thetant = thetant - log_Z;
     real log_pguess = -log_Z;
 
+    // precompute von Mises normalization -- depends only on kappa
+    real log_vm_norm = log(2 * pi()) + log_modified_bessel_first_kind(0, kappa);
+
     int n_active = 0;
     for (j in 1:{n_nt}) {{
       array[{n_nt}] int lures = {{{paste0('lure', seq_len(n_nt), collapse = ', ')}}};
@@ -337,13 +335,16 @@ bmf2bf.mixture3p_cd <- function(model, formula = bmmformula()) {
     for (i in 1:n_quad) {{
       real x = -pi() + (i - 1) * dx;
 
+      real vm_ret = kappa * cos(x - mu) - log_vm_norm;
+      real vm_same = kappa * cos(x - probe - mu) - log_vm_norm;
+
       real log_p_retrieve = log_sum_exp(
-        log_thetat + von_mises_lpdf(x | mu, kappa),
+        log_thetat + vm_ret,
         log_pguess + log_uniform
       );
 
       real log_p_x_given_same = log_sum_exp(
-        log_thetat + von_mises_lpdf(x | probe + mu, kappa),
+        log_thetat + vm_same,
         log_pguess + log_uniform
       );
 

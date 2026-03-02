@@ -207,7 +207,13 @@ bmf2bf <- function(model, formula) {
 # We do it this way because most models require just one response variable
 #' @export
 bmf2bf.bmmodel <- function(model, formula = bmmformula()) {
-  brms_formula <- NextMethod("bmf2bf") %||% brms::bf(glue("{model$resp_vars[[1]]} ~ 1"))
+  brms_formula <- NextMethod("bmf2bf")
+  if (is.null(brms_formula)) {
+    mu_rhs <- .extract_mu_rhs(formula)
+    brms_formula <- brms::bf(glue("{model$resp_vars[[1]]} ~ {mu_rhs}"))
+  }
+  # mu is already in the base formula — don't add it again as a component
+  formula <- formula[names(formula) != "mu"]
   components <- lapply(formula, function(x) if (is_nl(x)) brms::nlf(x) else brms::lf(x))
   Reduce(`+`, components, init = brms_formula)
 }
@@ -215,6 +221,11 @@ bmf2bf.bmmodel <- function(model, formula = bmmformula()) {
 #' @export
 bmf2bf.default <- function(model, formula) {
   NULL
+}
+
+# extract the RHS of the mu formula as a string for the base brms formula
+.extract_mu_rhs <- function(formula) {
+  if ("mu" %in% names(formula)) deparse(formula[["mu"]][[3]]) else "1"
 }
 
 add_missing_parameters <- function(model, formula = bmmformula()) {

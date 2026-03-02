@@ -17,21 +17,22 @@
     real log_uniform = -log(2 * pi());
     real sharpness = 5;
 
+    // precompute von Mises normalization -- depends only on kappa
+    real log_vm_norm = log(2 * pi()) + log_modified_bessel_first_kind(0, kappa);
+
     for (i in 1:n_quad) {
       real x = -pi() + (i - 1) * dx;
 
-      real log_p_retrieve = log_mix(thetat,
-                                     von_mises_lpdf(x | mu, kappa),
-                                     log_uniform);
-      real p_retrieve = exp(log_p_retrieve);
+      real vm_ret = kappa * cos(x - mu) - log_vm_norm;
+      real vm_same = kappa * cos(x - probe - mu) - log_vm_norm;
 
-      real log_p_x_given_same = log_mix(thetat,
-                                         von_mises_lpdf(x | probe + mu, kappa),
-                                         log_uniform);
+      real log_p_retrieve = log_mix(thetat, vm_ret, log_uniform);
+
+      real log_p_x_given_same = log_mix(thetat, vm_same, log_uniform);
       real llr = log_p_retrieve - log_p_x_given_same;
       real w = inv_logit(sharpness * (llr - beta));
 
-      p_change += w * p_retrieve * dx;
+      p_change += w * exp(log_p_retrieve) * dx;
     }
 
     p_change = fmin(fmax(p_change, 1e-10), 1 - 1e-10);
