@@ -128,7 +128,7 @@ dsdm <- function(x, mu = 0, c = 3, kappa = 3.5, log = FALSE,
   .dsdm_numer <- switch(parametrization,
     bessel = .dsdm_numer_bessel,
     sqrtexp = .dsdm_numer_sqrtexp,
-    stop("Parametrization must be one of 'bessel' or 'sqrtexp'")
+    stop2("Parametrization must be one of 'bessel' or 'sqrtexp'")
   )
 
   lnumerator <- .dsdm_numer(x, mu, c, kappa, log = TRUE)
@@ -207,7 +207,7 @@ rsdm <- function(n, mu = 0, c = 3, kappa = 3.5, parametrization = "sqrtexp") {
   .dsdm_numer <- switch(parametrization,
     bessel = .dsdm_numer_bessel,
     sqrtexp = .dsdm_numer_sqrtexp,
-    stop("Parametrization must be one of 'bessel' or 'sqrtexp'")
+    stop2("Parametrization must be one of 'bessel' or 'sqrtexp'")
   )
 
   rejection_sampling(
