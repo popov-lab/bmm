@@ -1,11 +1,15 @@
 # Tests for pp_check.bmmfit() — multinomial model support
 
 load_m3_fit <- function() {
-  readRDS(test_path("assets/bmmfit_m3_ppcheck.rds"))
+  path <- test_path("assets/bmmfit_m3_ppcheck.rds")
+  skip_if_not(file.exists(path), "M3 fixture not available (excluded by .Rbuildignore)")
+  readRDS(path)
 }
 
 load_sdm_fit <- function() {
-  readRDS(test_path("assets/bmmfit_example1.rds"))
+  path <- test_path("assets/bmmfit_example1.rds")
+  skip_if_not(file.exists(path), "SDM fixture not available (excluded by .Rbuildignore)")
+  readRDS(path)
 }
 
 test_that("pp_check() returns ggplot for m3 model", {
