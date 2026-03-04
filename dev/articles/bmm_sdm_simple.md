@@ -274,9 +274,9 @@ draws <- tidybayes::tidy_draws(fit)
 draws <- select(draws, b_c_condA:b_kappa_condC)
 
 # plot posterior with original parameters overlayed as diamonds
-as.data.frame(draws) %>% 
-  gather(par, value) %>% 
-  mutate(value = exp(value)) %>% 
+as.data.frame(draws) |> 
+  gather(par, value) |> 
+  mutate(value = exp(value)) |> 
   ggplot(aes(value, par)) +
   tidybayes::stat_halfeyeh(normalize = "groups") +
   geom_point(data = data.frame(par = c('b_c_condA', 'b_c_condB', 'b_c_condC',

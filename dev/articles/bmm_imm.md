@@ -372,12 +372,12 @@ library(ggplot2)
 
 # extract the posterior draws
 draws <- tidybayes::tidy_draws(fit)
-draws <- select(draws, starts_with("b_")) %>% select(-(1:3)) %>% 
+draws <- select(draws, starts_with("b_")) |> select(-(1:3)) |> 
   mutate_at(vars(starts_with("b_")),exp)
 
 # plot posterior with original parameters overlayed as diamonds
-as.data.frame(draws) %>% 
-  gather(par, value) %>% 
+as.data.frame(draws) |> 
+  gather(par, value) |> 
   ggplot(aes(value, par)) +
   tidybayes::stat_halfeyeh(normalize = "groups") +
   geom_point(data = data.frame(par = colnames(draws),

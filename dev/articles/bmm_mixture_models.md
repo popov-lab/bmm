@@ -151,7 +151,7 @@ distribution is now centered on 0.
 
 ``` r
 library(dplyr)
-dat_preprocessed <- dat %>%
+dat_preprocessed <- dat |>
   mutate(error = wrap(response - target),
          non_target_1 = wrap(non_target_1 - target),
          non_target_2 = wrap(non_target_2 - target),
@@ -352,17 +352,17 @@ draws_theta <- exp(draws_theta)/(exp(draws_theta) + 1)
 draws_kappa <- exp(draws_kappa)
 
 # plot posterior
-as.data.frame(draws_theta) %>% 
-  gather(par, value) %>%
-  mutate(par = gsub("b_thetat_set_size", "", par)) %>%
+as.data.frame(draws_theta) |> 
+  gather(par, value) |>
+  mutate(par = gsub("b_thetat_set_size", "", par)) |>
   ggplot(aes(par, value)) +
   tidybayes::stat_halfeyeh(normalize = "groups", orientation = "vertical") +
   labs(y = "Probability of memory response", x = "Set size", parse = TRUE)
 
-as.data.frame(draws_kappa) %>% 
-  gather(par, value) %>%
-  mutate(value = k2sd(value)) %>% 
-  mutate(par = gsub("b_kappa_set_size", "", par)) %>%
+as.data.frame(draws_kappa) |> 
+  gather(par, value) |>
+  mutate(value = k2sd(value)) |> 
+  mutate(par = gsub("b_kappa_set_size", "", par)) |>
   ggplot(aes(par,value)) +
   tidybayes::stat_halfeyeh(normalize = "groups", orientation = "vertical") +
   labs(y = "Memory imprecision (SD)", x = "Set size", parse = TRUE)

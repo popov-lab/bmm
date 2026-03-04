@@ -594,8 +594,8 @@ library(tidyr)
 library(ggplot2)
 
 # Extract posterior draws
-draws <- tidybayes::tidy_draws(fit) %>%
-  select(starts_with("b_")) %>%
+draws <- tidybayes::tidy_draws(fit) |>
+  select(starts_with("b_")) |>
   mutate(across(everything(), exp))
 
 # Rename for plotting
@@ -608,9 +608,9 @@ true_vals <- data.frame(
 )
 
 # Plot
-draws %>%
-  pivot_longer(everything(), names_to = "par", values_to = "value") %>%
-  filter(par != "Intercept") %>%
+draws |>
+  pivot_longer(everything(), names_to = "par", values_to = "value") |>
+  filter(par != "Intercept") |>
   ggplot(aes(x = value, y = par)) +
   stat_halfeye(normalize = "groups", fill = "steelblue", alpha = 0.7) +
   geom_point(data = true_vals, aes(x = value, y = par),
