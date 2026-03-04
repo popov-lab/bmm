@@ -45,7 +45,6 @@ Suggests:
     ggplot2,
     ggthemes,
     knitr,
-    magrittr,
     mixtur,
     remotes,
     rmarkdown,
