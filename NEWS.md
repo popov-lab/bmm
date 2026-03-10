@@ -1,7 +1,9 @@
 # bmm (development version)
 
 ### New features
+* New S3 methods for **emmeans** support on `bmmfit` objects. Users can now call `emmeans(fit, ~ condition, dpar = "kappa")` for any bmmodel (#323).
 * **EZDM now supports negative drift rates** to model below-chance performance. The drift parameter uses an identity link (previously log) and employs a soft absolute value approximation (sqrt(drift² + τ²) with τ = 0.01) to maintain smooth gradients for MCMC sampling while allowing bidirectional drift estimation.
+* New **pp_check()** method for multinomial models (e.g., `m3`). Since `brms::pp_check()` does not support the multinomial family, `bmm` now provides a custom method that compares observed and predicted response proportions in the `ppc_bars` style from `bayesplot`. The method supports faceting by experimental conditions via `group`, configurable credible intervals via `probs`, and population-level predictions via `re_formula = NA`. For non-multinomial models, `pp_check()` delegates to `brms::pp_check()` and auto-selects the grouped plot variant when `group` is specified.
 
 # bmm 1.3.0
 
@@ -17,6 +19,8 @@
 
 ### New features
 * New function **ezdm_summary_stats()** to compute summary statistics from trial-level RT data for the EZ-Diffusion Model.
+* New function **flag_contaminant_rts()** for trial-level contamination detection in RT data. Identifies fast guesses and attention lapses using mixture modeling (uniform + RT distribution). Supports both 3-parameter (pooled) and 4-parameter (boundary-specific) versions, analogous to `ezdm_summary_stats()`. Returns contamination probabilities, likelihood ratios, or binary flags for filtering trials before model fitting. Includes Bayesian validation of fast guess assumptions for 2AFC tasks via `validate_fast_guessing` parameter (#307).
+* New function **validate_fast_guesses()** for standalone Bayesian validation of fast guess assumptions using Beta-Binomial conjugate analysis with Savage-Dickey Bayes Factors. Supports both quantile-based (adaptive) and absolute (fixed) RT thresholds.
 
 # bmm 1.2.0
 

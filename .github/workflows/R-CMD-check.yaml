@@ -71,6 +71,7 @@ jobs:
             remotes
             waldo
             fansi
+            yaml
 
       - name: Build Cmdstan
         run: |

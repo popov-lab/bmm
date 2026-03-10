@@ -332,19 +332,19 @@ order_data_query <- function(model, data, formula) {
         title = "Do you want to stop and sort your data? (y/n): "
       )
       if (var == 1) {
-        message("Please sort your data by all predictors and then re-run the model.")
+        message2("Please sort your data by all predictors and then re-run the model.")
         data_name <- attr(data, "data_name")
         if (is.null(data_name)) {
           data_name <- deparse(substitute(data))
         }
-        message("To sort your data, use the following code:\n\n")
+        message2("To sort your data, use the following code:\n\n")
         message(crayon::green("library(dplyr)"))
-        message(crayon::green(data_name, "_sorted <- ", data_name, " %>% arrange(",
+        message(crayon::green(data_name, "_sorted <- ", data_name, " |> arrange(",
           paste(predictors, collapse = ", "),
           ")\n\n",
           sep = ""
         ))
-        message("Then re-run the model with the newly sorted data.\n\n", disable_msg)
+        message2("Then re-run the model with the newly sorted data.\n\n{disable_msg}")
         stop_quietly()
       } else if (var == 2) {
         message(
@@ -354,7 +354,7 @@ order_data_query <- function(model, data, formula) {
         data <- data[do.call(order, data[predictors]), ]
       }
     }
-    message("\n\n", disable_msg)
+    message2("\n\n{disable_msg}")
   } else if (isTRUE(sort_data)) {
     data <- data[do.call(order, data[predictors]), ]
     message(
