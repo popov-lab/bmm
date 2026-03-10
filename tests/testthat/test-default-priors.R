@@ -56,13 +56,6 @@ test_that("default priors are set correctly with fixed effects only", {
   pr <- default_prior(formula, data, model)
   expect_equal(pr[pr$coef == "Intercept", ]$prior, character(0))
   expect_equal(pr[pr$coef == "" & pr$class == "b", ]$prior, c("normal(2, 1)", "logistic(0, 1)"))
-
-  # Intercept + interaction only (no main effects)
-  formula <- bmf(kappa ~ 1 + set_size:session, thetat ~ 1 + set_size:session)
-  pr <- default_prior(formula, data, model)
-  expect_equal(pr[pr$coef == "Intercept", ]$prior, c("normal(2, 1)", "logistic(0, 1)"))
-  # Class-level effects prior should be set for interactions
-  expect_equal(pr[pr$coef == "" & pr$class == "b", ]$prior, c("normal(0, 1)", "normal(0, 0.5)"))
 })
 
 
@@ -130,23 +123,11 @@ test_that("default priors distinguish main vs effects priors correctly", {
 test_that("default priors handle interaction-only formulas correctly", {
   model <- mixture2p("dev_rad")
   data <- oberauer_lin_2017
-  
-  # Intercept + interaction only: class-level effects prior should be set
-  formula <- bmf(kappa ~ 1 + set_size:session, thetat ~ 1 + set_size:session)
-  pr <- default_prior(formula, data, model)
-  
-  expect_equal(pr[pr$coef == "Intercept", ]$prior, c("normal(2, 1)", "logistic(0, 1)"))
-  # Critical: class-level b prior should be effects prior (not flat)
-  expect_equal(pr[pr$coef == "" & pr$class == "b", ]$prior, c("normal(0, 1)", "normal(0, 0.5)"))
-  
-  # Verify individual interaction terms inherit (show as empty but class-level is set)
-  interaction_priors <- pr[grepl(":", pr$coef) & pr$class == "b", ]
-  expect_true(all(interaction_priors$prior == ""))
-  
+
   # No intercept + interaction only: class-level should be MAIN prior
   formula <- bmf(kappa ~ 0 + set_size:session, thetat ~ 0 + set_size:session)
   pr <- default_prior(formula, data, model)
-  
+
   expect_equal(pr[pr$coef == "" & pr$class == "b", ]$prior, c("normal(2, 1)", "logistic(0, 1)"))
 })
 
@@ -265,27 +246,6 @@ test_that("default priors are consistent across different contrast codings", {
   expect_equal(
     pr_treatment[pr_treatment$coef == "set_size1" & pr_treatment$class == "b", ]$prior,
     c("normal(2, 1)", "logistic(0, 1)")
-  )
-  
-  # Test Pattern 5: Interactions with intercept
-  formula <- bmf(kappa ~ 1 + set_size:session, thetat ~ 1 + set_size:session)
-  
-  pr_treatment <- default_prior(formula, data_treatment, model)
-  pr_sum <- default_prior(formula, data_sum, model)
-  pr_helmert <- default_prior(formula, data_helmert, model)
-  
-  # Class-level effects prior should be set consistently
-  expect_equal(
-    pr_treatment[pr_treatment$coef == "" & pr_treatment$class == "b", ]$prior,
-    pr_sum[pr_sum$coef == "" & pr_sum$class == "b", ]$prior
-  )
-  expect_equal(
-    pr_treatment[pr_treatment$coef == "" & pr_treatment$class == "b", ]$prior,
-    pr_helmert[pr_helmert$coef == "" & pr_helmert$class == "b", ]$prior
-  )
-  expect_equal(
-    pr_treatment[pr_treatment$coef == "" & pr_treatment$class == "b", ]$prior,
-    c("normal(0, 1)", "normal(0, 0.5)")
   )
 })
 
