@@ -198,11 +198,19 @@ For the **4-parameter version**, you need separate statistics for upper and lowe
 
 # Preparing data with `ezdm_summary_stats()`
 
-The `bmm` package provides the `ezdm_summary_stats()` function to compute the required aggregated statistics from trial-level RT data in the correct format. This function addresses a critical challenge in applying the EZ-Diffusion Model: **RT contaminants** (fast guesses, lapses, attentional failures) can severely distort mean and variance estimates, leading to biased parameter estimates [@wagenmakers_EZDoesIt_2008].
+The `bmm` package provides the `ezdm_summary_stats()` function to compute the required aggregated statistics from trial-level RT data in the correct format. RT contaminants (fast guesses, lapses, attentional failures) can severely distort mean and variance estimates, leading to biased parameter estimates [@wagenmakers_EZDoesIt_2008]. The function offers three methods to address this:
 
-## Why Robust Estimation Matters
+| Method | Description | Use when |
+|--------|-------------|----------|
+| `"simple"` | Standard mean/variance | Data is pre-cleaned |
+| `"robust"` | Median + IQR/MAD-based variance | Moderate contamination |
+| `"mixture"` | EM mixture modeling (default) | General use; provides contamination estimates |
 
-Research by @wagenmakers_EZDoesIt_2008 demonstrated that contaminant responses systematically bias EZ-DM parameter estimates. Even a small proportion (5-10%) of outlier RTs can substantially affect the moments used to compute drift rate, boundary, and non-decision time. To illustrate this, let's generate trial-level data with known parameters and introduce realistic contaminants:
+For detailed coverage of RT contamination handling, including mixture model theory, distribution options, contaminant bounds, and diagnostics, see `vignette("bmm_rt_contamination")`.
+
+## Example with Simulated Data
+
+To illustrate the impact of contamination, we generate trial-level data with known parameters and introduce 5% contaminant trials:
 
 ```{r trial-level-simulation, message=FALSE}
 library(bmm)
@@ -221,125 +229,47 @@ true_ndt <- 0.25
 trials_clean <- rdiffusion(
   n = n_trials,
   a = true_bound,
-  v = true_drift, 
+  v = true_drift,
   t0 = true_ndt,
-  z = 0.5 * true_bound  # Symmetric starting point
+  z = 0.5 * true_bound
 )
 
-# Add contaminants (5% fast guesses and lapses uniformly distributed between 0.1 and 3 seconds)
+# Add contaminants (5% fast guesses and lapses)
 n_contaminants <- round(n_trials * 0.05)
 contaminant_idx <- sample(n_trials, n_contaminants)
 
 trials_contaminated <- trials_clean
 trials_contaminated$rt[contaminant_idx] <- runif(n_contaminants, 0.1, 3)
-trials_contaminated$response[contaminant_idx] <- sample(c("upper", "lower"), 
-                                                         n_contaminants, 
+trials_contaminated$response[contaminant_idx] <- sample(c("upper", "lower"),
+                                                         n_contaminants,
                                                          replace = TRUE)
 
-# Convert to format expected by ezdm_summary_stats
-trials_contaminated <- trials_contaminated %>%
+trials_contaminated <- trials_contaminated |>
   mutate(
     correct = as.numeric(response == "upper"),
     subject = 1,
     condition = "standard"
   )
-
-# Compare moments
-cat("Clean data:       Mean RT =", 
-    round(mean(trials_clean$rt[trials_clean$response == "upper"]), 3),
-    ", Var RT =", 
-    round(var(trials_clean$rt[trials_clean$response == "upper"]), 4), "\n")
-cat("Contaminated data: Mean RT =", 
-    round(mean(trials_contaminated$rt[trials_contaminated$correct == 1]), 3),
-    ", Var RT =", 
-    round(var(trials_contaminated$rt[trials_contaminated$correct == 1]), 4), "\n")
 ```
 
-The contaminants substantially reduce both the mean and variance of correct RTs, which would lead to biased parameter estimates if we used simple moments.
+We can now compare the three methods. The function takes `rt` and `response` as vectors. For grouped operations, use `dplyr::group_by()` with `reframe()`:
 
-## Three Methods for Computing Statistics
-
-The `ezdm_summary_stats()` function provides three approaches to handle this challenge:
-
-### Simple Method (Standard Moments)
-
-The `"simple"` method computes standard sample mean and variance without any outlier detection. This is the fastest approach but vulnerable to contamination:
-
-```{r simple-method}
-# Basic usage: compute statistics with simple method
+```{r method-comparison}
 summary_simple <- ezdm_summary_stats(
-  data = trials_contaminated,
-  rt = "rt",
-  response = "correct",
-  .by = c("subject", "condition"),
-  method = "simple",  # No outlier handling
-  version = "3par"
+  trials_contaminated$rt, trials_contaminated$correct,
+  method = "simple", version = "3par"
 )
 
-summary_simple
-```
-
-Use this method when:
-- Data quality is high with minimal outliers
-- Preprocessing has already removed contaminants
-- Speed is critical for exploratory analysis
-
-### Robust Method (Non-parametric)
-
-The `"robust"` method uses non-parametric statistics resistant to outliers. It computes the **median** for location and uses either the **interquartile range (IQR)** or **median absolute deviation (MAD)** for scale, converting these to equivalent moments:
-
-```{r robust-method}
-# Robust estimation using median + IQR
 summary_robust <- ezdm_summary_stats(
-  data = trials_contaminated,
-  rt = "rt",
-  response = "correct",
-  .by = c("subject", "condition"),
-  method = "robust",
-  robust_scale = "iqr",  # or "mad"
-  version = "3par"
+  trials_contaminated$rt, trials_contaminated$correct,
+  method = "robust", version = "3par"
 )
 
-summary_robust
-```
-
-This method is faster than mixture modeling but makes stronger assumptions about the RT distribution shape. Use it when:
-- Moderate contamination is expected
-- Computational efficiency is important
-- The RT distribution is reasonably symmetric
-
-### Mixture Method (Default, Most Robust)
-
-The `"mixture"` method (default) uses an **EM algorithm** to fit a two-component mixture model:
-
-1. A parametric distribution (ex-Gaussian, log-normal, or inverse Gaussian) for true responses
-2. A uniform distribution for contaminants
-
-This approach explicitly models contaminants and provides estimates of their proportion:
-
-```{r mixture-method}
-# Robust estimation with mixture model (default)
 summary_mixture <- ezdm_summary_stats(
-  data = trials_contaminated,
-  rt = "rt",
-  response = "correct",
-  .by = c("subject", "condition"),
-  method = "mixture",              # Default: use mixture modeling
-  distribution = "lognormal",     # RT distribution for true responses
-  contaminant_bound = c("min", "max"), # Bounds for contaminant distribution
-  version = "3par"
+  trials_contaminated$rt, trials_contaminated$correct,
+  method = "mixture", version = "3par"
 )
 
-summary_mixture
-```
-
-Notice the `contaminant_prop` column showing the estimated proportion of contaminants. This method provides the most accurate estimates when contaminants are present.
-
-### Comparison of Methods
-
-Let's compare all three approaches:
-
-```{r comparison}
 comparison <- data.frame(
   Method = c("Simple", "Robust", "Mixture", "TRUE"),
   Mean_RT = c(
@@ -354,187 +284,35 @@ comparison <- data.frame(
     summary_mixture$var_rt,
     var(trials_clean$rt[trials_clean$response == "upper"])
   ),
-  Contaminant = c(
-    NA,
-    NA,
-    summary_mixture$contaminant_prop,
-    0.05
-  )
+  Contaminant = c(NA, NA, summary_mixture$contaminant_prop, 0.05)
 )
 
 print(comparison)
 ```
 
-The mixture method successfully identifies contaminants and provides more accurate moment estimates.
+The mixture method identifies contaminants and provides more accurate moment estimates.
 
-## Handling Contaminants with Mixture Modeling
+## Accuracy Adjustment
 
-When using `method = "mixture"`, you have several options to customize the estimation:
-
-### Choosing an RT Distribution
-
-The `distribution` parameter specifies the assumed distribution for true (non-contaminant) responses:
-
-- `"exgaussian"` (default): Ex-Gaussian distribution, commonly used for RTs
-- `"lognormal"`: Log-normal distribution, ensures positive RTs
-- `"invgaussian"`: Inverse Gaussian, theoretically motivated for diffusion processes
-
-```{r distributions, eval=FALSE}
-# Compare different distributions
-for (dist in c("exgaussian", "lognormal", "invgaussian")) {
-  stats <- ezdm_summary_stats(
-    data = trials_contaminated,
-    rt = "rt", response = "correct",
-    method = "mixture",
-    distribution = dist,
-    version = "3par"
-  )
-  cat(dist, ": Mean RT =", round(stats$mean_rt, 3), ", Var RT =", round(stats$var_rt, 4),
-      ", Contaminant prop =", round(stats$contaminant_prop, 3), "\n")
-}
-```
-
-### Specifying Contaminant Bounds
-
-The `contaminant_bound` parameter defines the range for the uniform contaminant distribution:
-
-```{r bounds}
-# Fixed bounds (e.g., based on task constraints)
-summary_fixed <- ezdm_summary_stats(
-  data = trials_contaminated,
-  rt = "rt", response = "correct",
-  contaminant_bound = c(0.1, 3.0),  # RTs between 0.1-3.0s may be contaminants
-  version = "3par"
-)
-
-# Data-driven bounds (use observed min/max)
-summary_datadriven <- ezdm_summary_stats(
-  data = trials_contaminated,
-  rt = "rt", response = "correct",
-  contaminant_bound = c("min", "max"),
-  version = "3par"
-)
-
-# Hybrid approach (fixed lower, data-driven upper)
-summary_hybrid <- ezdm_summary_stats(
-  data = trials_contaminated,
-  rt = "rt", response = "correct",
-  contaminant_bound = c(0.1, "max"),
-  version = "3par"
-)
-```
-
-Fixed bounds based on task constraints (e.g., responses faster than 100ms are likely anticipations) provide more conservative estimates of contaminants. However, in the presence of contaminants, data driven bounds are often more accurate with respect to detecting contaminants, especially in the presence of very long reaction times. In practice you can first filter the data and discard very short (< 0.1s) and very long (> 3 to 5s) and then proceed with data driven bounds for the mixture approach. This prevents the bounds from being influenced by extreme outliers.
-
-## Quality Control: Inspecting Contaminant Proportions
-
-When using the mixture method, always inspect the estimated contaminant proportions across subjects/conditions:
-
-```{r contaminant-diagnostics, eval=FALSE, fig.width=6, fig.height=4}
-library(ggplot2)
-
-# Generate data for multiple subjects
-trial_data_multi <- data.frame()
-for (subj in 1:20) {
-  trials <- rdiffusion(n = 150, a = 1.2, v = 2.0, t0 = 0.25, z = 0.6)
-  
-  # Add varying levels of contamination across subjects (0-15%)
-  n_contam <- round(150 * runif(1, 0, 0.15))
-  if (n_contam > 0) {
-    contam_idx <- sample(150, n_contam)
-    trials$rt[contam_idx] <- runif(n_contam, 0.1, 0.3)
-    trials$response[contam_idx] <- sample(c("upper", "lower"), n_contam, replace = TRUE)
-  }
-  
-  trials$subject <- subj
-  trials$correct <- as.numeric(trials$response == "upper")
-  trial_data_multi <- rbind(trial_data_multi, trials)
-}
-
-# Compute summary statistics
-summary_stats <- ezdm_summary_stats(
-  data = trial_data_multi,
-  rt = "rt", response = "correct",
-  .by = "subject",
-  version = "3par"
-)
-
-# Visualize contaminant proportions
-ggplot(summary_stats, aes(x = contaminant_prop)) +
-  geom_histogram(binwidth = 0.02, fill = "steelblue", alpha = 0.7) +
-  geom_vline(xintercept = 0.10, linetype = "dashed", color = "red") +
-  labs(
-    title = "Distribution of Estimated Contaminant Proportions",
-    x = "Contaminant Proportion",
-    y = "Number of Subjects",
-    caption = "Red line indicates 10% threshold"
-  ) +
-  theme_minimal()
-```
-
-Subjects with unusually high contaminant proportions (>15-20%) may require additional data cleaning or exclusion.
-
-## Minimum Trial Requirements
-
-The accuracy of summary statistics depends critically on sample size. The `min_trials` parameter (default: 10) sets the minimum number of trials required in each cell:
-
-```{r min-trials}
-# Simulate sparse data (some subjects with few correct responses)
-sparse_data <- trials_contaminated[sample(nrow(trials_contaminated), 30), ]
-sparse_data$subject <- 1
-
-# Function enforces minimum trials
-summary_sparse <- ezdm_summary_stats(
-  data = sparse_data,
-  rt = "rt", response = "correct",
-  min_trials = 10,  # Require at least 10 trials
-  version = "3par"
-)
-
-cat("Number of rows returned:", nrow(summary_sparse), "\n")
-cat("Number of trials:", sparse_data %>% filter(correct == 1) %>% nrow(), "\n")
-```
-
-**Guidelines for minimum trials**:
-
-- **3-parameter model**: At least 30-50 correct responses per cell for stable moment estimates
-- **4-parameter model**: At least 20-30 responses per boundary (upper and lower)
-- **Mixture method**: Requires more trials than simple method (50-100+ recommended)
-- **Hierarchical models**: Can handle smaller cell sizes by borrowing strength across subjects
-
-When using the mixture method with sparse data, the algorithm may fail to converge or produce unreliable contaminant estimates. Consider using `method = "robust"` for cells with fewer trials.
-
-## Accuracy Adjustment for Better Estimates
-
-The `adjust_accuracy` parameter (default: `FALSE`) adjusts the accuracy counts (`n_upper`, `n_trials`) by removing estimated contaminants from both numerator and denominator. The accuracy adjustments assumes that contaminants are random guesses, which on average yield 50% accuracy. This adjustment can improve accuracy estimates when contaminants are substantial:
+When using the mixture method, the `adjust_ezdm_accuracy()` function can adjust accuracy counts by removing estimated contaminants. This assumes contaminants are random guesses (50% accuracy by default) and is applied as a separate step after computing summary statistics:
 
 ```{r accuracy-adjustment}
-# Without accuracy adjustment (default)
 summary_no_adjust <- ezdm_summary_stats(
-  data = trials_contaminated,
-  rt = "rt", response = "correct",
-  adjust_accuracy = FALSE,
-  version = "3par"
+  trials_contaminated$rt, trials_contaminated$correct, version = "3par"
 )
 
-# With accuracy adjustment
 summary_adjust <- ezdm_summary_stats(
-  data = trials_contaminated,
-  rt = "rt", response = "correct",
-  adjust_accuracy = TRUE,
-  version = "3par"
-)
+  trials_contaminated$rt, trials_contaminated$correct, version = "3par"
+) |>
+  mutate(adjust_ezdm_accuracy(n_upper, n_trials, contaminant_prop))
 
-# Compare accuracy estimates
-cat("Unadjusted accuracy:", 
+cat("Unadjusted accuracy:",
     round(summary_no_adjust$n_upper / summary_no_adjust$n_trials, 3), "\n")
-cat("Adjusted accuracy:", 
-    round(summary_adjust$n_upper / summary_adjust$n_trials, 3), "\n")
-cat("True accuracy (no contaminants):", 
+cat("Adjusted accuracy:",
+    round(summary_adjust$n_upper_adj / summary_adjust$n_trials_adj, 3), "\n")
+cat("True accuracy (no contaminants):",
     round(mean(trials_clean$response == "upper"), 3), "\n")
 ```
-
-Use accuracy adjustment when contaminants are substantial and you want the accuracy metric to reflect true performance (excluding guesses).
 
 ## Working with the 4-Parameter Version
 
@@ -547,10 +325,10 @@ trials_biased <- rdiffusion(
   a = 1.2,
   v = 2.0,
   t0 = 0.25,
-  z = 0.7 * 1.2  # Starting point closer to upper boundary
+  z = 0.7 * 1.2
 )
 
-trials_biased <- trials_biased %>%
+trials_biased <- trials_biased |>
   mutate(
     correct = as.numeric(response == "upper"),
     subject = 1
@@ -558,10 +336,7 @@ trials_biased <- trials_biased %>%
 
 # Compute summary statistics for 4-parameter model
 summary_4par <- ezdm_summary_stats(
-  data = trials_biased,
-  rt = "rt",
-  response = "correct",
-  version = "4par"  # Request separate upper/lower statistics
+  trials_biased$rt, trials_biased$correct, version = "4par"
 )
 
 summary_4par
@@ -582,22 +357,19 @@ Here's the complete pipeline from trial-level data to parameter estimation:
 trial_data <- rdiffusion(
   n = 100 * 20,  # 20 subjects, 100 trials each
   a = 1.5, v = 2.5, t0 = 0.3, z = 0.75
-) %>%
+) |>
   mutate(
     subject = rep(1:20, each = 100),
     correct = as.numeric(response == "upper")
   )
 
 # Step 2: Compute summary statistics with robust estimation
-summary_data <- ezdm_summary_stats(
-  data = trial_data,
-  rt = "rt",
-  response = "correct",
-  .by = "subject",
-  method = "mixture",
-  distribution = "exgaussian",
-  version = "3par"
-)
+summary_data <- trial_data |>
+  group_by(subject) |>
+  reframe(ezdm_summary_stats(
+    rt, correct,
+    method = "mixture", distribution = "exgaussian", version = "3par"
+  ))
 
 # Step 3: Inspect contaminant proportions (quality control)
 summary(summary_data$contaminant_prop)
@@ -769,8 +541,8 @@ library(tidyr)
 library(ggplot2)
 
 # Extract posterior draws
-draws <- tidybayes::tidy_draws(fit) %>%
-  select(starts_with("b_")) %>%
+draws <- tidybayes::tidy_draws(fit) |>
+  select(starts_with("b_")) |>
   mutate(across(everything(), exp))
 
 # Rename for plotting
@@ -783,9 +555,9 @@ true_vals <- data.frame(
 )
 
 # Plot
-draws %>%
-  pivot_longer(everything(), names_to = "par", values_to = "value") %>%
-  filter(par != "Intercept") %>%
+draws |>
+  pivot_longer(everything(), names_to = "par", values_to = "value") |>
+  filter(par != "Intercept") |>
   ggplot(aes(x = value, y = par)) +
   stat_halfeye(normalize = "groups", fill = "steelblue", alpha = 0.7) +
   geom_point(data = true_vals, aes(x = value, y = par),

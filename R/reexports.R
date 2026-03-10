@@ -13,3 +13,8 @@ NULL
 #' @importFrom brms restructure
 #' @export restructure
 NULL
+
+#' @importFrom brms pp_check
+#' @export pp_check
+NULL
+

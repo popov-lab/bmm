@@ -20,11 +20,11 @@ install_and_load_bmm_version <- function(version) {
 ref_data <- function() {
   withr::local_package('dplyr')
   dat <- oberauer_lin_2017
-  dat <- dat %>%
+  dat <- dat |>
     mutate(ID = as.factor(ID),
-           SetSize = as.factor(SetSize)) %>%
+           SetSize = as.factor(SetSize)) |>
     filter(ID %in% c(1,2,3,4,5,6,7,8,9,10),
-           SetSize %in% c(1,2,3,4)) %>%
+           SetSize %in% c(1,2,3,4)) |>
     arrange(ID, SetSize)
   dat
 }

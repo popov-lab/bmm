@@ -42,10 +42,13 @@ reference:
     - "bmmformula"
     - "update.bmmfit"
     - "summary.bmmfit"
+    - "emmeans-bmmfit"
+    - "pp_check.bmmfit"
   - title: "Extract model information"
     desc: "Utility functions for extracting default priors, generate stan code, stan data, etc."
   - contents:
     - has_keyword("extract_info")
+    - "parameters"
   - title: "Specifying models"
     desc: "Functions for specifying which model to fit"
   - contents:

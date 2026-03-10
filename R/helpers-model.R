@@ -179,6 +179,23 @@ update_model_fixed_parameters <- function(model, formula) {
   model
 }
 
+#' @export
+print.bmmodel <- function(x, ...) {
+  cat(construct_model_call(x), "\n")
+  par_names <- names(x$parameters)
+  cat("Parameters:", paste(par_names, collapse = ", "), "\n")
+  if (length(x$fixed_parameters) > 0) {
+    fixed_str <- paste(
+      names(x$fixed_parameters), "=", x$fixed_parameters,
+      collapse = ", "
+    )
+    cat("Fixed:     ", fixed_str, "\n")
+  }
+  cat("Use parameters() for more details.\n")
+  invisible(x)
+}
+
+
 ############################################################################# !
 # HELPER FUNCTIONS                                                       ####
 ############################################################################# !
@@ -382,10 +399,10 @@ use_model_template <- function(model_name,
 
   # check if model exists
   if (model_name %in% supported_models(print_call = FALSE)) {
-    stop(paste0("Model ", model_name, " already exists"))
+    stop2("Model {model_name} already exists")
   }
   if (file.exists(paste0("R/", file_name))) {
-    stop(paste0("File ", file_name, " already exists"))
+    stop2("File {file_name} already exists")
   }
 
   model_header <- glue(
@@ -878,7 +895,7 @@ parse_parameters_line <- function(x) {
   x <- sub("//.*$", "", x)
   x <- trimws(x)
   x <- sub(";$", "", x)
-  if (!nzchar(x)) stop("Empty or comment-only line.", call. = FALSE)
+  if (!nzchar(x)) stop2("Empty or comment-only line.")
 
   # 1) optional leading array[...] prefix
   array_dims <- character(0)
@@ -907,7 +924,7 @@ parse_parameters_line <- function(x) {
       break
     }
   }
-  if (is.null(base_type)) stop("Unknown or unsupported base type in: ", x, call. = FALSE)
+  if (is.null(base_type)) stop2("Unknown or unsupported base type in: {x}")
 
   # consume the base type token
   x_after_bt <- sub(paste0("^", base_type), "", x, perl = TRUE)
@@ -922,7 +939,7 @@ parse_parameters_line <- function(x) {
   base_dims <- character(0)
   if (grepl("^\\s*\\[", x_after_bt, perl = TRUE)) {
     m <- regexpr("(?<=\\[)[^\\]]+(?=\\])", x_after_bt, perl = TRUE)
-    if (m[1] == -1) stop("Could not parse base dimensions.", call. = FALSE)
+    if (m[1] == -1) stop2("Could not parse base dimensions.")
     dims_str <- regmatches(x_after_bt, m)
     base_dims <- trimws(strsplit(dims_str, ",", fixed = TRUE)[[1]])
     base_dims <- base_dims[nzchar(base_dims)]
@@ -933,13 +950,13 @@ parse_parameters_line <- function(x) {
       "simplex", "unit_vector", "ordered", "positive_ordered",
       "corr_matrix", "cov_matrix", "cholesky_factor_corr", "cholesky_factor_cov"
     )) {
-      stop("Missing dimensions for type ", base_type, ".", call. = FALSE)
+      stop2("Missing dimensions for type {base_type}.")
     }
   }
 
   # 5) name
   name <- trimws(x_after_bt)
-  if (!nzchar(name)) stop("Missing parameter name.", call. = FALSE)
+  if (!nzchar(name)) stop2("Missing parameter name.")
 
   # 6) normalize dims by base type
   dims_by_type <- switch(base_type,

@@ -166,7 +166,7 @@ fit_model <- function(formula, data, model,
                       silent = getOption("bmm.silent", 1),
                       backend = getOption("brms.backend", NULL),
                       ...) {
-  message("You are using the deprecated `fit_model()` function. Please use `bmm()` instead.")
+  warning2("The function `fit_model()` is deprecated. Please use `bmm()` instead.")
   bmm(
     formula = formula, data = data, model = model, prior = prior,
     sort_data = sort_data, silent = silent, backend = backend, ...
