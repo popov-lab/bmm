@@ -266,11 +266,13 @@ construct_default_priors_list <- function(par, bterms, default_priors, data) {
     priors <- c(priors, list(fixed_effects_prior))
   }
 
-  # without intercept, brms expands all factor levels as coefficients, so the
-  # first predictor needs explicit main priors on each level
-  all_predictors <- rhs_vars(terms)
-  for (i in seq_along(all_predictors)) {
-    predictor <- all_predictors[i]
+  # without intercept, brms expands all factor levels as coefficients, so
+  # main effect predictors need explicit priors on each level. Variables that
+  # only appear in interactions (e.g., set_size in 0 + group + group:set_size)
+  # have no standalone coefficients and are covered by the class-level prior
+  main_effects <- attr(terms, "term.labels")[attr(terms, "order") == 1]
+  for (i in seq_along(main_effects)) {
+    predictor <- main_effects[i]
 
     if (!is.factor(data[[predictor]])) {
       predictor_coefs <- predictor
