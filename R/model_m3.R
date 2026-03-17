@@ -15,12 +15,16 @@
     ),
     priors = list(
       simple = list(
-        a = list(main = "normal(1,0.5)", effects = "normal(0,0.5)"),
-        c = list(main = "normal(1.5,0.5)", effects = "normal(0,0.5)")
+        a = list(main = "normal(1,0.5)", effects = "normal(0,0.5)",
+                 sd_main = "exponential(2)", sd_effects = "exponential(2)"),
+        c = list(main = "normal(1.5,0.5)", effects = "normal(0,0.5)",
+                 sd_main = "exponential(2)", sd_effects = "exponential(2)")
       ),
       softmax = list(
-        a = list(main = "normal(2,1)", effects = "normal(0,0.5)"),
-        c = list(main = "normal(3,1)", effects = "normal(0,2)")
+        a = list(main = "normal(2,1)", effects = "normal(0,0.5)",
+                 sd_main = "exponential(1)", sd_effects = "exponential(2)"),
+        c = list(main = "normal(3,1)", effects = "normal(0,2)",
+                 sd_main = "exponential(1)", sd_effects = "exponential(1)")
       )
     )
   ),
@@ -36,14 +40,20 @@
     ),
     priors = list(
       simple = list(
-        a = list(main = "normal(1,0.5)", effects = "normal(0,.5)"),
-        c = list(main = "normal(1.5,0.5)", effects = "normal(0,.5)"),
-        f = list(main = "logistic(0,1)", effects = "normal(0,1)")
+        a = list(main = "normal(1,0.5)", effects = "normal(0,.5)",
+                 sd_main = "exponential(2)", sd_effects = "exponential(2)"),
+        c = list(main = "normal(1.5,0.5)", effects = "normal(0,.5)",
+                 sd_main = "exponential(2)", sd_effects = "exponential(2)"),
+        f = list(main = "logistic(0,1)", effects = "normal(0,1)",
+                 sd_main = "exponential(1)", sd_effects = "exponential(1)")
       ),
       softmax = list(
-        a = list(main = "normal(3,1)", effects = "normal(0,0.5)"),
-        c = list(main = "normal(3,1)", effects = "normal(0,2)"),
-        f = list(main = "logistic(0,1)", effects = "normal(0,1)")
+        a = list(main = "normal(3,1)", effects = "normal(0,0.5)",
+                 sd_main = "exponential(1)", sd_effects = "exponential(2)"),
+        c = list(main = "normal(3,1)", effects = "normal(0,2)",
+                 sd_main = "exponential(1)", sd_effects = "exponential(1)"),
+        f = list(main = "logistic(0,1)", effects = "normal(0,1)",
+                 sd_main = "exponential(1)", sd_effects = "exponential(1)")
       )
     )
   )

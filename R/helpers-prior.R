@@ -294,9 +294,10 @@ construct_default_priors_list <- function(par, bterms, default_priors, data) {
 }
 
 # Extract random effects terms from a parameter's brmsterms entry.
-# nlpars nest RE under $dpars$mu$re; dpars have $re directly.
+# Returns a data.frame with RE info, or NULL if no random effects.
 .extract_re_terms <- function(par_terms) {
-  par_terms$dpars$mu$re %||% par_terms$re
+  re <- par_terms$dpars$mu$re %||% par_terms$re
+  if (is.data.frame(re) && NROW(re) > 0) re else NULL
 }
 
 # Build default SD priors for random effects of a single parameter.

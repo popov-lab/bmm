@@ -33,8 +33,10 @@
       fixed_parameters = list(mu = 0),
       default_priors = list(
         mu = list(main = "student_t(1, 0, 1)"),
-        kappa = list(main = "student_t(5, 1.75, 0.75)", effects = "normal(0, 1)"),
-        c = list(main = "student_t(5, 2, 0.75)", effects = "normal(0, 1)")
+        kappa = list(main = "student_t(5, 1.75, 0.75)", effects = "normal(0, 1)",
+                     sd_main = "exponential(1)", sd_effects = "exponential(1)"),
+        c = list(main = "student_t(5, 2, 0.75)", effects = "normal(0, 1)",
+                 sd_main = "exponential(1)", sd_effects = "exponential(1)")
       ),
       init_ranges = list(
         mu = c(-0.5,0.5),
