@@ -263,7 +263,6 @@ construct_default_priors_list <- function(par, bterms, default_priors, data) {
     }
   }
 
-  # priors on random effects SDs
   c(priors, .construct_sd_priors(par, bterms, prior_desc))
 }
 
@@ -282,35 +281,15 @@ construct_default_priors_list <- function(par, bterms, default_priors, data) {
   do.call(brms::prior_, args)
 }
 
-# Helper to create a class="sd" prior with correct nlpar/dpar routing
-.build_sd_prior <- function(prior_desc, par, bterms, coef = "", group = "") {
-  args <- list(prior = prior_desc, class = "sd", coef = coef, group = group)
-  if (par %in% names(bterms$nlpars)) {
-    args$nlpar <- par
-  } else {
-    args$dpar <- par
-  }
-  do.call(brms::prior_, args)
-}
-
-# Extract random effects terms from a parameter's brmsterms entry.
-# Returns a data.frame with RE info, or NULL if no random effects.
-.extract_re_terms <- function(par_terms) {
-  re <- par_terms$dpars$mu$re %||% par_terms$re
-  if (is.data.frame(re) && NROW(re) > 0) re else NULL
-}
-
-# Build default SD priors for random effects of a single parameter.
-# sd_effects is set as a blanket prior (no coef, no group — covers all RE SDs).
-# sd_main targets the intercept SD for each group that has a random intercept.
 .construct_sd_priors <- function(par, bterms, prior_desc) {
-  re <- .extract_re_terms(bterms$allpars[[par]])
-  if (is.null(re)) return(list())
+  par_terms <- bterms$allpars[[par]]
+  re <- par_terms$dpars$mu$re %||% par_terms$re
+  if (!is.data.frame(re) || NROW(re) == 0) return(list())
 
   priors <- list()
 
   if (!is.null(prior_desc$sd_effects)) {
-    priors <- c(priors, list(.build_sd_prior(prior_desc$sd_effects, par, bterms)))
+    priors <- c(priors, list(.build_prior(prior_desc$sd_effects, "sd", par, bterms)))
   }
 
   if (!is.null(prior_desc$sd_main)) {
@@ -318,8 +297,8 @@ construct_default_priors_list <- function(par, bterms, default_priors, data) {
       has_int <- attr(stats::terms(re$form[[i]]), "intercept") == 1
       if (has_int) {
         priors <- c(priors, list(
-          .build_sd_prior(prior_desc$sd_main, par, bterms,
-                          coef = "Intercept", group = re$group[[i]])
+          .build_prior(prior_desc$sd_main, "sd", par, bterms,
+                       coef = "Intercept", group = re$group[[i]])
         ))
       }
     }
