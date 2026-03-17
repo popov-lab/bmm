@@ -198,6 +198,138 @@ test_that("default priors work when there are no fixed parameters", {
   expect_s3_class(pr, "brmsprior")
 })
 
+test_that("SD priors are set for random intercept only", {
+  data <- oberauer_lin_2017
+  model <- mixture2p("dev_rad")
+
+  formula <- bmf(kappa ~ 1 + (1 | ID), thetat ~ 1 + (1 | ID))
+  pr <- default_prior(formula, data, model)
+  sd_pr <- pr[pr$class == "sd" & pr$prior != "", ]
+
+  # sd_main on intercept for kappa and thetat
+  int_sd <- sd_pr[sd_pr$coef == "Intercept", ]
+  expect_true(all(int_sd$prior == "exponential(1)"))
+  expect_setequal(int_sd$nlpar, c("kappa", "thetat"))
+
+  # sd_effects as blanket for kappa and thetat
+  blanket_sd <- sd_pr[sd_pr$coef == "", ]
+  expect_true(all(blanket_sd$prior == "exponential(1)"))
+  expect_setequal(blanket_sd$nlpar, c("kappa", "thetat"))
+})
+
+
+test_that("SD priors are set for random intercept + slope", {
+  data <- oberauer_lin_2017
+  model <- mixture2p("dev_rad")
+
+  formula <- bmf(kappa ~ set_size + (set_size | ID), thetat ~ 1 + (1 | ID))
+  pr <- default_prior(formula, data, model)
+  sd_pr <- pr[pr$class == "sd" & pr$prior != "", ]
+
+  # kappa: sd_main on Intercept, sd_effects as blanket
+  kappa_sd <- sd_pr[sd_pr$nlpar == "kappa", ]
+  expect_true("Intercept" %in% kappa_sd$coef)
+  expect_true("" %in% kappa_sd$coef)
+  expect_true(all(kappa_sd$prior == "exponential(1)"))
+
+  # thetat: also has both
+  thetat_sd <- sd_pr[sd_pr$nlpar == "thetat", ]
+  expect_true(all(thetat_sd$prior == "exponential(1)"))
+})
+
+
+test_that("SD priors are set for random slope only (no intercept)", {
+  data <- oberauer_lin_2017
+  model <- mixture2p("dev_rad")
+
+  formula <- bmf(kappa ~ set_size + (0 + set_size | ID), thetat ~ 1)
+  pr <- default_prior(formula, data, model)
+  sd_pr <- pr[pr$class == "sd" & pr$prior != "", ]
+
+  # sd_effects blanket present for kappa
+  blanket <- sd_pr[sd_pr$nlpar == "kappa" & sd_pr$coef == "", ]
+  expect_equal(nrow(blanket), 1)
+  expect_equal(blanket$prior, "exponential(1)")
+
+  # no sd_main on Intercept (suppressed in RE)
+  int_sd <- sd_pr[sd_pr$nlpar == "kappa" & sd_pr$coef == "Intercept", ]
+  expect_equal(nrow(int_sd), 0)
+})
+
+
+test_that("no SD priors without random effects", {
+  data <- oberauer_lin_2017
+  model <- mixture2p("dev_rad")
+
+  formula <- bmf(kappa ~ 1, thetat ~ 1)
+  pr <- default_prior(formula, data, model)
+
+  expect_false(any(pr$class == "sd"))
+})
+
+
+test_that("SD priors work with SDM model (dpars)", {
+  data <- oberauer_lin_2017
+  model <- sdm("dev_rad")
+
+  formula <- bmf(c ~ 1 + (1 | ID), kappa ~ 1 + (1 | ID))
+  pr <- default_prior(formula, data, model)
+  sd_pr <- pr[pr$class == "sd" & pr$prior != "", ]
+
+  expect_true(all(sd_pr$prior == "exponential(1)"))
+  expect_setequal(sd_pr$dpar, c("c", "kappa"))
+})
+
+
+test_that("user-specified SD priors override defaults", {
+  data <- oberauer_lin_2017
+  model <- mixture2p("dev_rad")
+
+  formula <- bmf(kappa ~ 1 + (1 | ID), thetat ~ 1)
+  user_prior <- brms::prior_("normal(0, 0.5)", class = "sd", nlpar = "kappa")
+  pr <- default_prior(formula, data, model, prior = user_prior)
+  sd_pr <- pr[pr$class == "sd" & pr$prior != "" & pr$nlpar == "kappa", ]
+
+  expect_true("normal(0, 0.5)" %in% sd_pr$prior)
+})
+
+
+test_that("SD priors use parameter-specific rates for ezdm", {
+  sim_data <- data.frame(
+    mean_rt = rnorm(20, 0.5, 0.1), var_rt = runif(20, 0.01, 0.05),
+    n_upper = sample(30:70, 20, TRUE), n_trials = rep(100, 20),
+    id = rep(1:10, 2), cond = rep(c("A", "B"), each = 10)
+  )
+  model <- ezdm("mean_rt", "var_rt", "n_upper", "n_trials", version = "3par")
+
+  formula <- bmf(
+    drift ~ 1 + (1 | id),
+    bound ~ 1 + (1 | id),
+    ndt ~ 1 + (1 | id)
+  )
+  pr <- default_prior(formula, sim_data, model)
+  sd_pr <- pr[pr$class == "sd" & pr$prior != "", ]
+
+  # drift: sd_main=exp(1) on Intercept, sd_effects=exp(2) as blanket
+  drift_int <- sd_pr[sd_pr$dpar == "drift" & sd_pr$coef == "Intercept", "prior"]
+  drift_blanket <- sd_pr[sd_pr$dpar == "drift" & sd_pr$coef == "", "prior"]
+  expect_equal(drift_int, "exponential(1)")
+  expect_equal(drift_blanket, "exponential(2)")
+
+  # bound: both exp(2)
+  bound_int <- sd_pr[sd_pr$dpar == "bound" & sd_pr$coef == "Intercept", "prior"]
+  bound_blanket <- sd_pr[sd_pr$dpar == "bound" & sd_pr$coef == "", "prior"]
+  expect_equal(bound_int, "exponential(2)")
+  expect_equal(bound_blanket, "exponential(2)")
+
+  # ndt: sd_main=exp(2) on Intercept, sd_effects=exp(3) as blanket
+  ndt_int <- sd_pr[sd_pr$dpar == "ndt" & sd_pr$coef == "Intercept", "prior"]
+  ndt_blanket <- sd_pr[sd_pr$dpar == "ndt" & sd_pr$coef == "", "prior"]
+  expect_equal(ndt_int, "exponential(2)")
+  expect_equal(ndt_blanket, "exponential(3)")
+})
+
+
 test_that("default priors work when there are non-linear transformations of default parameters", {
   withr::local_options(bmm.silent = 2)
   expect_warning(
