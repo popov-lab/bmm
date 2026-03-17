@@ -232,9 +232,7 @@ test_that("SD priors are set for random intercept + slope", {
   expect_true("" %in% kappa_sd$coef)
   expect_true(all(kappa_sd$prior == "exponential(1)"))
 
-  # thetat: also has both
-  thetat_sd <- sd_pr[sd_pr$nlpar == "thetat", ]
-  expect_true(all(thetat_sd$prior == "exponential(1)"))
+  expect_true(all(sd_pr[sd_pr$nlpar == "thetat", "prior"] == "exponential(1)"))
 })
 
 
@@ -251,9 +249,7 @@ test_that("SD priors are set for random slope only (no intercept)", {
   expect_equal(nrow(blanket), 1)
   expect_equal(blanket$prior, "exponential(1)")
 
-  # no sd_main on Intercept (suppressed in RE)
-  int_sd <- sd_pr[sd_pr$nlpar == "kappa" & sd_pr$coef == "Intercept", ]
-  expect_equal(nrow(int_sd), 0)
+  expect_equal(nrow(sd_pr[sd_pr$nlpar == "kappa" & sd_pr$coef == "Intercept", ]), 0)
 })
 
 
@@ -310,23 +306,14 @@ test_that("SD priors use parameter-specific rates for ezdm", {
   pr <- default_prior(formula, sim_data, model)
   sd_pr <- pr[pr$class == "sd" & pr$prior != "", ]
 
-  # drift: sd_main=exp(1) on Intercept, sd_effects=exp(2) as blanket
-  drift_int <- sd_pr[sd_pr$dpar == "drift" & sd_pr$coef == "Intercept", "prior"]
-  drift_blanket <- sd_pr[sd_pr$dpar == "drift" & sd_pr$coef == "", "prior"]
-  expect_equal(drift_int, "exponential(1)")
-  expect_equal(drift_blanket, "exponential(2)")
+  expect_equal(sd_pr[sd_pr$dpar == "drift" & sd_pr$coef == "Intercept", "prior"], "exponential(1)")
+  expect_equal(sd_pr[sd_pr$dpar == "drift" & sd_pr$coef == "", "prior"], "exponential(2)")
 
-  # bound: both exp(2)
-  bound_int <- sd_pr[sd_pr$dpar == "bound" & sd_pr$coef == "Intercept", "prior"]
-  bound_blanket <- sd_pr[sd_pr$dpar == "bound" & sd_pr$coef == "", "prior"]
-  expect_equal(bound_int, "exponential(2)")
-  expect_equal(bound_blanket, "exponential(2)")
+  expect_equal(sd_pr[sd_pr$dpar == "bound" & sd_pr$coef == "Intercept", "prior"], "exponential(2)")
+  expect_equal(sd_pr[sd_pr$dpar == "bound" & sd_pr$coef == "", "prior"], "exponential(2)")
 
-  # ndt: sd_main=exp(2) on Intercept, sd_effects=exp(3) as blanket
-  ndt_int <- sd_pr[sd_pr$dpar == "ndt" & sd_pr$coef == "Intercept", "prior"]
-  ndt_blanket <- sd_pr[sd_pr$dpar == "ndt" & sd_pr$coef == "", "prior"]
-  expect_equal(ndt_int, "exponential(2)")
-  expect_equal(ndt_blanket, "exponential(3)")
+  expect_equal(sd_pr[sd_pr$dpar == "ndt" & sd_pr$coef == "Intercept", "prior"], "exponential(2)")
+  expect_equal(sd_pr[sd_pr$dpar == "ndt" & sd_pr$coef == "", "prior"], "exponential(3)")
 })
 
 

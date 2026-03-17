@@ -294,8 +294,7 @@ construct_default_priors_list <- function(par, bterms, default_priors, data) {
 
   if (!is.null(prior_desc$sd_main)) {
     for (i in seq_len(NROW(re))) {
-      has_int <- attr(stats::terms(re$form[[i]]), "intercept") == 1
-      if (has_int) {
+      if (attr(stats::terms(re$form[[i]]), "intercept") == 1) {
         priors <- c(priors, list(
           .build_prior(prior_desc$sd_main, "sd", par, bterms,
                        coef = "Intercept", group = re$group[[i]])
