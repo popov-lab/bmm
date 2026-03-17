@@ -301,11 +301,11 @@ construct_default_priors_list <- function(par, bterms, default_priors, data) {
 }
 
 # Build default SD priors for random effects of a single parameter.
-# sd_effects is set as a blanket prior (covers all RE SDs).
-# sd_main overrides the blanket for the intercept SD specifically.
+# sd_effects is set as a blanket prior (no coef, no group — covers all RE SDs).
+# sd_main targets the intercept SD for each group that has a random intercept.
 .construct_sd_priors <- function(par, bterms, prior_desc) {
   re <- .extract_re_terms(bterms$allpars[[par]])
-  if (is.null(re) || NROW(re) == 0) return(list())
+  if (is.null(re)) return(list())
 
   priors <- list()
 
@@ -314,15 +314,14 @@ construct_default_priors_list <- function(par, bterms, default_priors, data) {
   }
 
   if (!is.null(prior_desc$sd_main)) {
-    has_intercept <- any(vapply(
-      re$form,
-      function(f) attr(stats::terms(f), "intercept") == 1,
-      logical(1)
-    ))
-    if (has_intercept) {
-      priors <- c(priors, list(
-        .build_sd_prior(prior_desc$sd_main, par, bterms, coef = "Intercept")
-      ))
+    for (i in seq_len(NROW(re))) {
+      has_int <- attr(stats::terms(re$form[[i]]), "intercept") == 1
+      if (has_int) {
+        priors <- c(priors, list(
+          .build_sd_prior(prior_desc$sd_main, par, bterms,
+                          coef = "Intercept", group = re$group[[i]])
+        ))
+      }
     }
   }
 
