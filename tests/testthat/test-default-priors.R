@@ -253,6 +253,25 @@ test_that("SD priors are set for random slope only (no intercept)", {
 })
 
 
+test_that("SD priors are set for crossed random effects", {
+  data <- oberauer_lin_2017
+  model <- mixture2p("dev_rad")
+
+  formula <- bmf(kappa ~ 1 + (1 | ID) + (1 | session), thetat ~ 1 + (1 | ID))
+  pr <- default_prior(formula, data, model)
+  sd_pr <- pr[pr$class == "sd" & pr$prior != "", ]
+
+  kappa_int <- sd_pr[sd_pr$nlpar == "kappa" & sd_pr$coef == "Intercept", ]
+  expect_equal(nrow(kappa_int), 2)
+  expect_setequal(kappa_int$group, c("ID", "session"))
+  expect_true(all(kappa_int$prior == "exponential(1)"))
+
+  thetat_int <- sd_pr[sd_pr$nlpar == "thetat" & sd_pr$coef == "Intercept", ]
+  expect_equal(nrow(thetat_int), 1)
+  expect_equal(thetat_int$group, "ID")
+})
+
+
 test_that("no SD priors without random effects", {
   data <- oberauer_lin_2017
   model <- mixture2p("dev_rad")
