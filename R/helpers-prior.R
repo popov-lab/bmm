@@ -249,28 +249,22 @@ construct_default_priors_list <- function(par, bterms, default_priors, data) {
     priors <- c(priors, list(fixed_effects_prior))
   }
 
-  # priors on intercept; unfortunately too convoluted to use the create_prior function
   if (has_intercept(terms)) {
     intercept_prior <- .build_prior(prior_desc$main, "Intercept", par = par, bterms = bterms)
     priors <- c(priors, list(intercept_prior))
-    return(priors)
-  }
-
-  # priors when intercept is supressed and all levels are explicit
-  if ((fixed_effects_count == 1 && interactions_count == 0) || interaction_only) {
+  } else if ((fixed_effects_count == 1 && interactions_count == 0) || interaction_only) {
     levels_only_prior <- .build_prior(prior_desc[[1]], "b", par = par, bterms = bterms)
     priors <- c(priors, list(levels_only_prior))
-    return(priors)
+  } else if (fixed_effects_count > 0) {
+    first_predictor_coefs <- paste0(rhs_vars(terms)[1], levels(data[[rhs_vars(terms)[1]]]))
+    for (coef in first_predictor_coefs) {
+      first_predictor_prior <- .build_prior(prior_desc[[1]], "b", par, coef = coef, bterms = bterms)
+      priors <- c(priors, list(first_predictor_prior))
+    }
   }
 
-  # edge case: with multiple predictors and no intercept, set the main prior on
-  # the levels of the first predictor
-  first_predictor_coefs <- paste0(rhs_vars(terms)[1], levels(data[[rhs_vars(terms)[1]]]))
-  for (coef in first_predictor_coefs) {
-    first_predictor_prior <- .build_prior(prior_desc[[1]], "b", par, coef = coef, bterms = bterms)
-    priors <- c(priors, list(first_predictor_prior))
-  }
-  priors
+  # priors on random effects SDs
+  c(priors, .construct_sd_priors(par, bterms, prior_desc))
 }
 
 # Helper function to create a prior object conditional on parameter type
@@ -286,6 +280,52 @@ construct_default_priors_list <- function(par, bterms, default_priors, data) {
     args$dpar <- par
   }
   do.call(brms::prior_, args)
+}
+
+# Helper to create a class="sd" prior with correct nlpar/dpar routing
+.build_sd_prior <- function(prior_desc, par, bterms, coef = "", group = "") {
+  args <- list(prior = prior_desc, class = "sd", coef = coef, group = group)
+  if (par %in% names(bterms$nlpars)) {
+    args$nlpar <- par
+  } else {
+    args$dpar <- par
+  }
+  do.call(brms::prior_, args)
+}
+
+# Extract random effects terms from a parameter's brmsterms entry.
+# nlpars nest RE under $dpars$mu$re; dpars have $re directly.
+.extract_re_terms <- function(par_terms) {
+  par_terms$dpars$mu$re %||% par_terms$re
+}
+
+# Build default SD priors for random effects of a single parameter.
+# sd_effects is set as a blanket prior (covers all RE SDs).
+# sd_main overrides the blanket for the intercept SD specifically.
+.construct_sd_priors <- function(par, bterms, prior_desc) {
+  re <- .extract_re_terms(bterms$allpars[[par]])
+  if (is.null(re) || NROW(re) == 0) return(list())
+
+  priors <- list()
+
+  if (!is.null(prior_desc$sd_effects)) {
+    priors <- c(priors, list(.build_sd_prior(prior_desc$sd_effects, par, bterms)))
+  }
+
+  if (!is.null(prior_desc$sd_main)) {
+    has_intercept <- any(vapply(
+      re$form,
+      function(f) attr(stats::terms(f), "intercept") == 1,
+      logical(1)
+    ))
+    if (has_intercept) {
+      priors <- c(priors, list(
+        .build_sd_prior(prior_desc$sd_main, par, bterms, coef = "Intercept")
+      ))
+    }
+  }
+
+  priors
 }
 
 # internal function to combine two priors (e.g. the default prior with the user
