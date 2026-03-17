@@ -44,13 +44,13 @@
       default_priors = list(
         mu1 = list(main = "student_t(1, 0, 1)"),
         kappa = list(main = "normal(2, 1)", effects = "normal(0, 1)",
-                     sd_main = "exponential(1)", sd_effects = "exponential(1)"),
+                     sd = "exponential(1)"),
         a = list(main = "normal(0, 1)", effects = "normal(0, 1)",
-                 sd_main = "exponential(1)", sd_effects = "exponential(1)"),
+                 sd = "exponential(1)"),
         c = list(main = "normal(0, 1)", effects = "normal(0, 1)",
-                 sd_main = "exponential(1)", sd_effects = "exponential(1)"),
+                 sd = "exponential(1)"),
         s = list(main = "normal(0, 1)", effects = "normal(0, 1)",
-                 sd_main = "exponential(1)", sd_effects = "exponential(1)")
+                 sd = "exponential(1)")
       ),
       void_mu = FALSE
     ),

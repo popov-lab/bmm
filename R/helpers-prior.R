@@ -284,26 +284,8 @@ construct_default_priors_list <- function(par, bterms, default_priors, data) {
 .construct_sd_priors <- function(par, bterms, prior_desc) {
   par_terms <- bterms$allpars[[par]]
   re <- par_terms$dpars$mu$re %||% par_terms$re
-  if (!is.data.frame(re) || NROW(re) == 0) return(list())
-
-  priors <- list()
-
-  if (!is.null(prior_desc$sd_effects)) {
-    priors <- c(priors, list(.build_prior(prior_desc$sd_effects, "sd", par, bterms)))
-  }
-
-  if (!is.null(prior_desc$sd_main)) {
-    for (i in seq_len(NROW(re))) {
-      if (attr(stats::terms(re$form[[i]]), "intercept") == 1) {
-        priors <- c(priors, list(
-          .build_prior(prior_desc$sd_main, "sd", par, bterms,
-                       coef = "Intercept", group = re$group[[i]])
-        ))
-      }
-    }
-  }
-
-  priors
+  if (!is.data.frame(re) || NROW(re) == 0 || is.null(prior_desc$sd)) return(list())
+  list(.build_prior(prior_desc$sd, "sd", par, bterms))
 }
 
 # internal function to combine two priors (e.g. the default prior with the user

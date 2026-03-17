@@ -206,15 +206,9 @@ test_that("SD priors are set for random intercept only", {
   pr <- default_prior(formula, data, model)
   sd_pr <- pr[pr$class == "sd" & pr$prior != "", ]
 
-  # sd_main on intercept for kappa and thetat
-  int_sd <- sd_pr[sd_pr$coef == "Intercept", ]
-  expect_true(all(int_sd$prior == "exponential(1)"))
-  expect_setequal(int_sd$nlpar, c("kappa", "thetat"))
-
-  # sd_effects as blanket for kappa and thetat
-  blanket_sd <- sd_pr[sd_pr$coef == "", ]
-  expect_true(all(blanket_sd$prior == "exponential(1)"))
-  expect_setequal(blanket_sd$nlpar, c("kappa", "thetat"))
+  expect_true(all(sd_pr$prior == "exponential(1)"))
+  expect_setequal(sd_pr$nlpar, c("kappa", "thetat"))
+  expect_true(all(sd_pr$coef == ""))
 })
 
 
@@ -226,13 +220,9 @@ test_that("SD priors are set for random intercept + slope", {
   pr <- default_prior(formula, data, model)
   sd_pr <- pr[pr$class == "sd" & pr$prior != "", ]
 
-  # kappa: sd_main on Intercept, sd_effects as blanket
-  kappa_sd <- sd_pr[sd_pr$nlpar == "kappa", ]
-  expect_true("Intercept" %in% kappa_sd$coef)
-  expect_true("" %in% kappa_sd$coef)
-  expect_true(all(kappa_sd$prior == "exponential(1)"))
-
-  expect_true(all(sd_pr[sd_pr$nlpar == "thetat", "prior"] == "exponential(1)"))
+  expect_true(all(sd_pr$prior == "exponential(1)"))
+  expect_setequal(sd_pr$nlpar, c("kappa", "thetat"))
+  expect_true(all(sd_pr$coef == ""))
 })
 
 
@@ -261,14 +251,11 @@ test_that("SD priors are set for crossed random effects", {
   pr <- default_prior(formula, data, model)
   sd_pr <- pr[pr$class == "sd" & pr$prior != "", ]
 
-  kappa_int <- sd_pr[sd_pr$nlpar == "kappa" & sd_pr$coef == "Intercept", ]
-  expect_equal(nrow(kappa_int), 2)
-  expect_setequal(kappa_int$group, c("ID", "session"))
-  expect_true(all(kappa_int$prior == "exponential(1)"))
-
-  thetat_int <- sd_pr[sd_pr$nlpar == "thetat" & sd_pr$coef == "Intercept", ]
-  expect_equal(nrow(thetat_int), 1)
-  expect_equal(thetat_int$group, "ID")
+  # one blanket row per parameter regardless of number of grouping factors
+  expect_equal(nrow(sd_pr), 2)
+  expect_true(all(sd_pr$prior == "exponential(1)"))
+  expect_true(all(sd_pr$coef == ""))
+  expect_true(all(sd_pr$group == ""))
 })
 
 
@@ -325,14 +312,9 @@ test_that("SD priors use parameter-specific rates for ezdm", {
   pr <- default_prior(formula, sim_data, model)
   sd_pr <- pr[pr$class == "sd" & pr$prior != "", ]
 
-  expect_equal(sd_pr[sd_pr$dpar == "drift" & sd_pr$coef == "Intercept", "prior"], "exponential(1)")
-  expect_equal(sd_pr[sd_pr$dpar == "drift" & sd_pr$coef == "", "prior"], "exponential(2)")
-
-  expect_equal(sd_pr[sd_pr$dpar == "bound" & sd_pr$coef == "Intercept", "prior"], "exponential(2)")
-  expect_equal(sd_pr[sd_pr$dpar == "bound" & sd_pr$coef == "", "prior"], "exponential(2)")
-
-  expect_equal(sd_pr[sd_pr$dpar == "ndt" & sd_pr$coef == "Intercept", "prior"], "exponential(2)")
-  expect_equal(sd_pr[sd_pr$dpar == "ndt" & sd_pr$coef == "", "prior"], "exponential(3)")
+  expect_equal(sd_pr[sd_pr$dpar == "drift", "prior"], "exponential(1)")
+  expect_equal(sd_pr[sd_pr$dpar == "bound", "prior"], "exponential(2)")
+  expect_equal(sd_pr[sd_pr$dpar == "ndt", "prior"], "exponential(2)")
 })
 
 
