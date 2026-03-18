@@ -243,23 +243,18 @@ construct_default_priors_list <- function(par, bterms, default_priors, data) {
 
   priors <- list()
 
-  # priors on fixed effects
   if (has_effects_prior && fixed_effects_count > 0) {
-    fixed_effects_prior <- .build_prior(prior_desc$effects, "b", par = par, bterms = bterms)
-    priors <- c(priors, list(fixed_effects_prior))
+    priors <- c(priors, list(.build_prior(prior_desc$effects, "b", par = par, bterms = bterms)))
   }
 
   if (has_intercept(terms)) {
-    intercept_prior <- .build_prior(prior_desc$main, "Intercept", par = par, bterms = bterms)
-    priors <- c(priors, list(intercept_prior))
+    priors <- c(priors, list(.build_prior(prior_desc$main, "Intercept", par = par, bterms = bterms)))
   } else if ((fixed_effects_count == 1 && interactions_count == 0) || interaction_only) {
-    levels_only_prior <- .build_prior(prior_desc[[1]], "b", par = par, bterms = bterms)
-    priors <- c(priors, list(levels_only_prior))
+    priors <- c(priors, list(.build_prior(prior_desc[[1]], "b", par = par, bterms = bterms)))
   } else if (fixed_effects_count > 0) {
     first_predictor_coefs <- paste0(rhs_vars(terms)[1], levels(data[[rhs_vars(terms)[1]]]))
     for (coef in first_predictor_coefs) {
-      first_predictor_prior <- .build_prior(prior_desc[[1]], "b", par, coef = coef, bterms = bterms)
-      priors <- c(priors, list(first_predictor_prior))
+      priors <- c(priors, list(.build_prior(prior_desc[[1]], "b", par, coef = coef, bterms = bterms)))
     }
   }
 

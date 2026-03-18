@@ -234,7 +234,6 @@ test_that("SD priors are set for random slope only (no intercept)", {
   pr <- default_prior(formula, data, model)
   sd_pr <- pr[pr$class == "sd" & pr$prior != "", ]
 
-  # sd_effects blanket present for kappa
   blanket <- sd_pr[sd_pr$nlpar == "kappa" & sd_pr$coef == "", ]
   expect_equal(nrow(blanket), 1)
   expect_equal(blanket$prior, "exponential(1)")
@@ -251,7 +250,6 @@ test_that("SD priors are set for crossed random effects", {
   pr <- default_prior(formula, data, model)
   sd_pr <- pr[pr$class == "sd" & pr$prior != "", ]
 
-  # one blanket row per parameter regardless of number of grouping factors
   expect_equal(nrow(sd_pr), 2)
   expect_true(all(sd_pr$prior == "exponential(1)"))
   expect_true(all(sd_pr$coef == ""))
@@ -288,8 +286,7 @@ test_that("user-specified SD priors override defaults", {
   model <- mixture2p("dev_rad")
 
   formula <- bmf(kappa ~ 1 + (1 | ID), thetat ~ 1)
-  user_prior <- brms::prior_("normal(0, 0.5)", class = "sd", nlpar = "kappa")
-  pr <- default_prior(formula, data, model, prior = user_prior)
+  pr <- default_prior(formula, data, model, prior = brms::prior_("normal(0, 0.5)", class = "sd", nlpar = "kappa"))
   sd_pr <- pr[pr$class == "sd" & pr$prior != "" & pr$nlpar == "kappa", ]
 
   expect_true("normal(0, 0.5)" %in% sd_pr$prior)
