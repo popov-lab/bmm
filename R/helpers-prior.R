@@ -242,23 +242,50 @@ construct_default_priors_list <- function(par, bterms, default_priors, data) {
   interaction_only <- fixed_effects_count == 0 && interactions_count > 0
 
   priors <- list()
-
-  if (has_effects_prior && fixed_effects_count > 0) {
-    priors <- c(priors, list(.build_prior(prior_desc$effects, "b", par = par, bterms = bterms)))
-  }
+  sd_priors <- .construct_sd_priors(par, bterms, prior_desc)
 
   if (has_intercept(terms)) {
-    priors <- c(priors, list(.build_prior(prior_desc$main, "Intercept", par = par, bterms = bterms)))
-  } else if ((fixed_effects_count == 1 && interactions_count == 0) || interaction_only) {
-    priors <- c(priors, list(.build_prior(prior_desc[[1]], "b", par = par, bterms = bterms)))
-  } else if (fixed_effects_count > 0) {
-    first_predictor_coefs <- paste0(rhs_vars(terms)[1], levels(data[[rhs_vars(terms)[1]]]))
-    for (coef in first_predictor_coefs) {
-      priors <- c(priors, list(.build_prior(prior_desc[[1]], "b", par, coef = coef, bterms = bterms)))
+    intercept_prior <- .build_prior(prior_desc$main, "Intercept", par = par, bterms = bterms)
+    priors <- c(priors, list(intercept_prior))
+    if (has_effects_prior && (fixed_effects_count > 0 || interactions_count > 0)) {
+      fixed_effects_prior <- .build_prior(prior_desc$effects, "b", par = par, bterms = bterms)
+      priors <- c(priors, list(fixed_effects_prior))
     }
+    return(c(priors, sd_priors))
   }
 
-  c(priors, .construct_sd_priors(par, bterms, prior_desc))
+  if ((fixed_effects_count == 1 && interactions_count == 0) || interaction_only) {
+    levels_only_prior <- .build_prior(prior_desc[[1]], "b", par = par, bterms = bterms)
+    priors <- c(priors, list(levels_only_prior))
+    return(c(priors, sd_priors))
+  }
+
+  if (has_effects_prior) {
+    fixed_effects_prior <- .build_prior(prior_desc$effects, "b", par = par, bterms = bterms)
+    priors <- c(priors, list(fixed_effects_prior))
+  }
+
+  main_effects <- attr(terms, "term.labels")[attr(terms, "order") == 1]
+  for (i in seq_along(main_effects)) {
+    predictor <- main_effects[i]
+
+    if (!is.factor(data[[predictor]])) {
+      predictor_coefs <- predictor
+    } else {
+      predictor_coefs <- paste0(predictor, levels(data[[predictor]]))
+    }
+
+    prior_to_use <- if (i == 1) prior_desc$main else prior_desc$effects
+
+    for (coef in predictor_coefs) {
+      if (is.null(prior_to_use)) {
+        next
+      }
+      coef_prior <- .build_prior(prior_to_use, "b", par, coef = coef, bterms = bterms)
+      priors <- c(priors, list(coef_prior))
+    }
+  }
+  c(priors, sd_priors)
 }
 
 # Helper function to create a prior object conditional on parameter type
@@ -317,11 +344,11 @@ summarise_default_prior <- function(prior_list) {
 constrain_set_size1_fixef <- function(formula, nlpars, set_size_var, prior_value) {
   nl_pforms <- formula$pforms[nlpars]
   has_setsize <- vapply(nl_pforms, function(x) set_size_var %in% rhs_vars(x), logical(1))
-  
+
   if (!any(has_setsize)) {
     return(NULL)
   }
-    
+
   brms::prior_(prior_value,
     class = "b",
     coef = paste0(set_size_var, 1),
@@ -337,14 +364,14 @@ constrain_set_size1_ranef <- function(formula, nlpars, set_size_var, prior_value
       data.frame(nlpar = nlp, group = re$group, form = I(re$form), stringsAsFactors = FALSE)
     }
   })
-  
+
   re_terms_df <- do.call(rbind, re_terms_list)
   if (is.null(re_terms_df)) {
     return(NULL)
   }
-  
+
   has_setsize <- vapply(re_terms_df$form, function(x) set_size_var %in% rhs_vars(x), logical(1))
-  
+
   if (!any(has_setsize)) {
     return(NULL)
   }

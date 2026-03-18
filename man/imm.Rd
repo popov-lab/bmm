@@ -105,26 +105,31 @@ Please use \code{imm(version = 'full')}, \code{imm(version = 'bsc')}, or \code{i
 \item \code{mu1}:
 \itemize{
 \item \code{main}: student_t(1, 0, 1)
+\item \code{effects}: normal(0,1)
 }
 \item \code{kappa}:
 \itemize{
 \item \code{main}: normal(2, 1)
 \item \code{effects}: normal(0, 1)
+\item \code{sd}: exponential(1)
 }
 \item \code{a}:
 \itemize{
 \item \code{main}: normal(0, 1)
 \item \code{effects}: normal(0, 1)
+\item \code{sd}: exponential(1)
 }
 \item \code{c}:
 \itemize{
 \item \code{main}: normal(0, 1)
 \item \code{effects}: normal(0, 1)
+\item \code{sd}: exponential(1)
 }
 \item \code{s}:
 \itemize{
 \item \code{main}: normal(0, 1)
 \item \code{effects}: normal(0, 1)
+\item \code{sd}: exponential(1)
 }
 }
 }
@@ -163,21 +168,25 @@ Please use \code{imm(version = 'full')}, \code{imm(version = 'bsc')}, or \code{i
 \item \code{mu1}:
 \itemize{
 \item \code{main}: student_t(1, 0, 1)
+\item \code{effects}: normal(0,1)
 }
 \item \code{kappa}:
 \itemize{
 \item \code{main}: normal(2, 1)
 \item \code{effects}: normal(0, 1)
+\item \code{sd}: exponential(1)
 }
 \item \code{c}:
 \itemize{
 \item \code{main}: normal(0, 1)
 \item \code{effects}: normal(0, 1)
+\item \code{sd}: exponential(1)
 }
 \item \code{s}:
 \itemize{
 \item \code{main}: normal(0, 1)
 \item \code{effects}: normal(0, 1)
+\item \code{sd}: exponential(1)
 }
 }
 }
@@ -216,21 +225,25 @@ Please use \code{imm(version = 'full')}, \code{imm(version = 'bsc')}, or \code{i
 \item \code{mu1}:
 \itemize{
 \item \code{main}: student_t(1, 0, 1)
+\item \code{effects}: normal(0,1)
 }
 \item \code{kappa}:
 \itemize{
 \item \code{main}: normal(2, 1)
 \item \code{effects}: normal(0, 1)
+\item \code{sd}: exponential(1)
 }
 \item \code{a}:
 \itemize{
 \item \code{main}: normal(0, 1)
 \item \code{effects}: normal(0, 1)
+\item \code{sd}: exponential(1)
 }
 \item \code{c}:
 \itemize{
 \item \code{main}: normal(0, 1)
 \item \code{effects}: normal(0, 1)
+\item \code{sd}: exponential(1)
 }
 }
 }

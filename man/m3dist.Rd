@@ -83,8 +83,8 @@ library(dplyr)
 library(tibble)
 param_grid <- expand.grid(a = c(0.5, 1, 1.5), c = c(1, 2, 3))
 
-simulated_data <- param_grid \%>\%
-  rowwise() \%>\%
+simulated_data <- param_grid |>
+  rowwise() |>
   reframe(
     a = a,
     c = c,

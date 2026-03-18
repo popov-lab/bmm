@@ -77,11 +77,13 @@ decision task.
 \itemize{
 \item \code{main}: normal(2,1)
 \item \code{effects}: normal(0,0.5)
+\item \code{sd}: exponential(1)
 }
 \item \code{c}:
 \itemize{
 \item \code{main}: normal(3,1)
 \item \code{effects}: normal(0,2)
+\item \code{sd}: exponential(1)
 }
 }
 }
@@ -117,16 +119,19 @@ decision task.
 \itemize{
 \item \code{main}: normal(3,1)
 \item \code{effects}: normal(0,0.5)
+\item \code{sd}: exponential(1)
 }
 \item \code{c}:
 \itemize{
 \item \code{main}: normal(3,1)
 \item \code{effects}: normal(0,2)
+\item \code{sd}: exponential(1)
 }
 \item \code{f}:
 \itemize{
 \item \code{main}: logistic(0,1)
 \item \code{effects}: normal(0,1)
+\item \code{sd}: exponential(1)
 }
 }
 }
