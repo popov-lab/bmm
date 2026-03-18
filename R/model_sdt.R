@@ -130,6 +130,21 @@
     )
   }
 
+  # Binary SDT: include mu=c(0,0) so the brms Intercept parameter (mu linear
+  # predictor) gets a valid range → matches ezdm pattern. Rating/DPSDT/meta-d'
+  # use nlf() (nlpar) formulas and need the Y-matrix from configure_model for
+  # standata(); returning NULL (no initfun) avoids both issues cleanly.
+  init_ranges <- if (!is_rating) {
+    list(
+      mu        = c(0, 0),
+      dprime    = c(0.5, 1.5),
+      criterion = c(-0.5, 0.5),
+      sdratio   = c(-0.3, 0.3)
+    )
+  } else {
+    NULL
+  }
+
   out <- structure(
     list(
       resp_vars = nlist(response),
@@ -148,6 +163,7 @@
       links = param_links,
       fixed_parameters = if (!is_rating) list(mu = 0) else list(),
       default_priors = default_priors,
+      init_ranges = init_ranges,
       void_mu = is_rating
     ),
     class = model_class,
@@ -198,6 +214,7 @@
       links = param_links,
       fixed_parameters = list(mu = 0),
       default_priors = default_priors,
+      init_ranges = list(mu = c(0, 0), dprime = c(0.5, 1.5)),
       void_mu = FALSE
     ),
     class = c("bmmodel", "sdt", "sdt_mafc"),
@@ -258,6 +275,7 @@
       links = param_links,
       fixed_parameters = list(mu = 0),
       default_priors = default_priors,
+      init_ranges = list(mu = c(0, 0), dprime = c(0.5, 1.5), sdratio = c(-0.3, 0.3)),
       void_mu = FALSE
     ),
     class = c("bmmodel", "sdt", "sdt_ranking"),

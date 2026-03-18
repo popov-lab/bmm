@@ -1989,8 +1989,8 @@ test_that("sdt rating with log_scale=TRUE produces valid stancode (normal)", {
   formula <- bmf(dprime ~ 1, criterion ~ 1, spacing ~ 1)
   code <- stancode(formula, data = dat, model = model)
   expect_true(nchar(code) > 0)
-  expect_true(grepl("log_Phi", code))
-  expect_true(grepl("log1m_Phi", code))
+  expect_true(grepl("std_normal_lcdf", code))
+  expect_true(grepl("std_normal_lccdf", code))
   expect_true(grepl("log_diff_exp", code))
 })
 
@@ -2052,6 +2052,57 @@ test_that("sdt UV-SDT rating with log_scale=TRUE produces valid stancode", {
   formula <- bmf(dprime ~ 1, criterion ~ 1, spacing ~ 1, sdratio ~ 1)
   code <- stancode(formula, data = dat, model = model)
   expect_true(nchar(code) > 0)
-  expect_true(grepl("log_Phi", code))
+  expect_true(grepl("std_normal_lcdf", code))
   expect_true(grepl("sdratio", code))
 })
+
+
+############################################################################# !
+# INIT RANGES TESTS                                                       ####
+############################################################################# !
+
+test_that("sdt binary model has init_ranges with mu, dprime, criterion", {
+  model <- sdt("n_old", "stimulus", "n_trials")
+  expect_false(is.null(model$init_ranges))
+  expect_true(all(c("mu", "dprime", "criterion") %in% names(model$init_ranges)))
+  expect_equal(model$init_ranges$mu, c(0, 0))
+  expect_equal(model$init_ranges$dprime, c(0.5, 1.5))
+  expect_equal(model$init_ranges$criterion, c(-0.5, 0.5))
+})
+
+test_that("sdt rating model has NULL init_ranges (nlpar/Y-matrix incompatibility)", {
+  model <- sdt(paste0("r", 1:6), "stimulus", threshold_type = "equidistant")
+  expect_null(model$init_ranges)
+})
+
+test_that("sdt UV-SDT rating model has NULL init_ranges", {
+  model <- sdt(paste0("r", 1:6), "stimulus", variances = "unequal")
+  expect_null(model$init_ranges)
+})
+
+test_that("sdt DPSDT model has NULL init_ranges", {
+  model <- sdt(paste0("r", 1:6), "stimulus", version = "dpsdt")
+  expect_null(model$init_ranges)
+})
+
+test_that("sdt m-AFC model has init_ranges with mu and dprime", {
+  model <- sdt("n_correct", n_trials = "n_trials", version = "mafc", m = 4)
+  expect_false(is.null(model$init_ranges))
+  expect_true(all(c("mu", "dprime") %in% names(model$init_ranges)))
+  expect_equal(model$init_ranges$dprime, c(0.5, 1.5))
+})
+
+test_that("sdt ranking model has init_ranges with mu and dprime", {
+  model <- sdt("observed", version = "ranking", rank = "rank", m = 4)
+  expect_false(is.null(model$init_ranges))
+  expect_true(all(c("mu", "dprime") %in% names(model$init_ranges)))
+  expect_equal(model$init_ranges$dprime, c(0.5, 1.5))
+})
+
+test_that("sdt UV ranking model has sdratio in init_ranges", {
+  model <- sdt("observed", version = "ranking", rank = "rank", m = 4,
+               variances = "unequal")
+  expect_true("sdratio" %in% names(model$init_ranges))
+  expect_equal(model$init_ranges$sdratio, c(-0.3, 0.3))
+})
+

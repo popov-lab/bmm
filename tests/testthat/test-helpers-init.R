@@ -418,9 +418,57 @@ test_that("initfun output matches standata dimensions for no-intercept models", 
                 info = paste("K_ dimension should exist for no-intercept model:", dim_name))
     
     expect_equal(
-      length(inits[[nm]]), 
+      length(inits[[nm]]),
       standata[[dim_name]],
       info = paste("Dimension mismatch for no-intercept parameter:", nm)
     )
   }
+})
+
+
+# =============================================================================
+# SDT MODELS
+# =============================================================================
+
+test_that("create_initfun returns function for binary SDT", {
+  dat <- data.frame(n_old = c(80L, 20L), stimulus = c(1L, 0L), n_trials = c(100L, 100L))
+  mod <- sdt("n_old", "stimulus", "n_trials")
+  ff  <- bmf(dprime ~ 1, criterion ~ 1)
+  dat_cd      <- check_data(mod, dat, ff)
+  config_args <- configure_model(mod, dat_cd, ff)
+
+  init_fun <- create_initfun(mod, config_args$data, config_args$formula)
+  expect_equal(class(init_fun), "function")
+
+  inits <- init_fun()
+  expect_type(inits, "list")
+  expect_true(all(sapply(inits, is.finite)))
+})
+
+test_that("binary SDT initfun keeps dprime in (0.5, 1.5)", {
+  dat <- data.frame(n_old = c(80L, 20L), stimulus = c(1L, 0L), n_trials = c(100L, 100L))
+  mod <- sdt("n_old", "stimulus", "n_trials")
+  ff  <- bmf(dprime ~ 1, criterion ~ 1)
+  dat_cd      <- check_data(mod, dat, ff)
+  config_args <- configure_model(mod, dat_cd, ff)
+  init_fun    <- create_initfun(mod, config_args$data, config_args$formula)
+
+  dprime_vals <- replicate(30, {
+    inits <- init_fun()
+    inits[[grep("dprime", names(inits), value = TRUE)[1]]]
+  })
+  expect_true(all(dprime_vals >= 0.5 & dprime_vals <= 1.5))
+})
+
+test_that("rating SDT create_initfun returns 1 (no custom init)", {
+  dat <- data.frame(
+    r1 = c(5L, 20L), r2 = c(10L, 15L), r3 = c(15L, 10L),
+    r4 = c(20L, 5L),  r5 = c(25L, 5L),  r6 = c(25L, 5L),
+    stimulus = c(1L, 0L)
+  )
+  mod <- sdt(c("r1","r2","r3","r4","r5","r6"), "stimulus",
+             threshold_type = "equidistant")
+  ff  <- bmf(dprime ~ 1, criterion ~ 1, spacing ~ 1)
+  dat_cd <- check_data(mod, dat, ff)
+  expect_equal(create_initfun(mod, dat_cd, ff), 1)
 })
