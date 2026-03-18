@@ -126,13 +126,9 @@ roc_sdt <- function(fit, conditions = NULL, n_points = 100,
   newdata <- fit$data[rep(1L, n_rows), , drop = FALSE]
   rownames(newdata) <- NULL
 
-  # Override with user-supplied condition values
   if (ncol(conditions) > 0L) {
-    for (col in names(conditions)) {
-      if (col %in% names(newdata)) {
-        newdata[[col]] <- conditions[[col]]
-      }
-    }
+    cols <- intersect(names(conditions), names(newdata))
+    newdata[cols] <- conditions[cols]
   }
 
   if (is_rating) {
@@ -210,7 +206,6 @@ roc_sdt <- function(fit, conditions = NULL, n_points = 100,
   crit_mat    <- .sdt_linpred(fit, "criterion", conditions, is_rating = TRUE, ...)
   n_draws     <- nrow(dprime_mat)
 
-  # Threshold parameters
   if (threshold_type %in% c("equidistant", "parsimonious")) {
     spacing_mat <- .sdt_linpred(fit, "spacing", conditions, is_rating = TRUE, ...)
     delta_mats  <- NULL
@@ -401,7 +396,6 @@ auc_sdt <- function(fit, conditions = NULL, probs = c(0.025, 0.975), ...) {
   is_rating <- .is_sdt_rating(model)
   conditions <- .sdt_resolve_conditions(fit, conditions)
 
-  # Analytical path: normal or gumbel_min EV-SDT, binary response
   use_analytical <- !is_rating && variances == "equal" &&
                     version == "evsdt" &&
                     dist %in% c("normal", "gumbel_min")

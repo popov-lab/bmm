@@ -14,25 +14,19 @@
                        threshold_type = "equidistant",
                        m = NULL, rank = NULL, log_scale = FALSE,
                        links = NULL, call = NULL, ...) {
-  # Map distribution to integer for Stan dispatch (from registry)
   dist_int <- .sdt_dist_id(dist)
-
-  # Determine if this is a rating model
   is_rating <- !is.null(n_ratings) && n_ratings > 2
 
-  # m-AFC has a simpler parameter structure
   if (version == "mafc") {
     return(.build_sdt_mafc(response, n_trials, m, dist, dist_int,
                            links, call))
   }
 
-  # Ranking model: no criterion, no stimulus (like m-AFC)
   if (version == "ranking") {
     return(.build_sdt_ranking(response, rank, m, dist, dist_int,
                               variances, links, call))
   }
 
-  # Build parameters and priors based on model type
   parameters <- list(
     dprime = glue("Sensitivity: distance between signal and noise distributions"),
     criterion = glue("Response bias: location of decision boundary")
@@ -71,7 +65,7 @@
     }
   }
 
-  # Unequal variance adds sdratio parameter (requires ratings for identification)
+  # UV-SDT requires ratings for identification
   if (variances == "unequal") {
     parameters$sdratio <- glue(
       "SD ratio: ratio of signal to noise standard deviations ",
@@ -83,7 +77,6 @@
     param_links$sdratio <- "identity"
   }
 
-  # DPSDT adds Ro (recollection) parameter
   if (version == "dpsdt") {
     parameters$Ro <- glue(
       "Recollection: probability of threshold-based recollection ",
@@ -95,7 +88,6 @@
     param_links$Ro <- "identity"
   }
 
-  # Meta-d' adds metad (metacognitive sensitivity) parameter
   if (version == "metad") {
     parameters$metad <- glue(
       "Metacognitive sensitivity: type-2 d' controlling confidence ",
@@ -107,7 +99,6 @@
     param_links$metad <- "identity"
   }
 
-  # Binary models need mu as internal fixed parameter
   if (!is_rating) {
     parameters <- c(
       list(mu = glue("Internal parameter (fixed to 0)")),
@@ -116,14 +107,12 @@
     param_links <- c(list(mu = "identity"), param_links)
   }
 
-  # Determine class
   if (is_rating) {
     model_class <- c("bmmodel", "sdt", paste0("sdt_", version, "_rating"))
   } else {
     model_class <- c("bmmodel", "sdt", paste0("sdt_", version))
   }
 
-  # Build requirements text
   if (is_rating) {
     requirements <- glue(
       "Provide pre-aggregated data with the following columns:", "\n\n",
@@ -522,7 +511,6 @@ sdt <- function(response, stimulus = NULL, n_trials = NULL,
   variances <- match.arg(variances)
   threshold_type <- match.arg(threshold_type)
 
-  # m-AFC has different requirements
   if (version == "mafc") {
     stopif(is.null(m) || !is.numeric(m) || length(m) != 1 || m < 2,
            "m must be a single integer >= 2 for m-AFC models")
@@ -536,7 +524,6 @@ sdt <- function(response, stimulus = NULL, n_trials = NULL,
                       links = links, call = call, ...))
   }
 
-  # Ranking model: no criterion, no stimulus
   if (version == "ranking") {
     stopif(is.null(m) || !is.numeric(m) || length(m) != 1 || m < 2,
            "m must be a single integer >= 2 for ranking models")
@@ -552,11 +539,9 @@ sdt <- function(response, stimulus = NULL, n_trials = NULL,
                       rank = rank, links = links, call = call, ...))
   }
 
-  # Non-mafc/ranking versions require stimulus
   stopif(is.null(stimulus),
          "stimulus is required for version = '{version}'")
 
-  # Infer n_ratings from response vector length
   if (length(response) > 1) {
     if (is.null(n_ratings)) {
       n_ratings <- length(response)
@@ -595,13 +580,11 @@ sdt <- function(response, stimulus = NULL, n_trials = NULL,
 
 #' @export
 check_data.sdt <- function(model, data, formula) {
-  # Ranking has no stimulus column
   if (model$version == "ranking") {
     data <- .check_data_sdt_ranking(model, data)
     return(NextMethod("check_data"))
   }
 
-  # m-AFC has no stimulus column
   if (model$version == "mafc") {
     data <- .check_data_sdt_mafc(model, data)
     return(NextMethod("check_data"))
@@ -609,13 +592,11 @@ check_data.sdt <- function(model, data, formula) {
 
   stim_var <- model$other_vars$stimulus
 
-  # Validate stimulus column exists
   stopif(
     !stim_var %in% colnames(data),
     "Stimulus variable '{stim_var}' missing in the data"
   )
 
-  # Validate stimulus is 0/1
   stim_vals <- unique(data[[stim_var]])
   stopif(
     !all(stim_vals %in% c(0, 1)),
@@ -660,11 +641,9 @@ check_data.sdt <- function(model, data, formula) {
 
   .validate_sdt_counts(data, resp_var, n_trials_var)
 
-  # Binary-specific: warn on non-integer trial counts
   warnif(any(data[[n_trials_var]] != round(data[[n_trials_var]]), na.rm = TRUE),
     "Variable '{n_trials_var}' should contain integer counts")
 
-  # Add dist_type column for Stan dispatch
   data$dist_type <- model$other_vars$dist_int
   data
 }
@@ -673,12 +652,10 @@ check_data.sdt <- function(model, data, formula) {
 .check_data_sdt_rating <- function(model, data) {
   resp_cols <- model$resp_vars$response
 
-  # Validate all response columns exist
   missing <- setdiff(resp_cols, colnames(data))
   stopif(length(missing) > 0,
     "Response columns {collapse_comma(missing)} missing in the data")
 
-  # Validate all response columns are non-negative
   for (col in resp_cols) {
     vals <- data[[col]]
     stopif(any(vals < 0, na.rm = TRUE),
@@ -687,7 +664,6 @@ check_data.sdt <- function(model, data, formula) {
       "Response column '{col}' should contain integer counts")
   }
 
-  # Create response matrix Y and compute nTrials
   Y <- as.matrix(data[resp_cols])
   data$nTrials <- rowSums(Y)
   data$Y <- Y
@@ -705,7 +681,6 @@ check_data.sdt <- function(model, data, formula) {
 
   .validate_sdt_counts(data, resp_var, n_trials_var)
 
-  # Add m as data column for Stan dispatch via vint
   data$m_afc <- model$other_vars$m
   data
 }
@@ -716,7 +691,6 @@ check_data.sdt <- function(model, data, formula) {
   rank_var <- model$other_vars$rank
   m <- model$other_vars$m
 
-  # Validate response column exists and is non-negative
   stopif(!resp_var %in% colnames(data),
     "Response variable '{resp_var}' missing in the data")
   resp_vals <- data[[resp_var]]
@@ -725,7 +699,6 @@ check_data.sdt <- function(model, data, formula) {
   warnif(any(resp_vals != round(resp_vals), na.rm = TRUE),
     "Response variable '{resp_var}' should contain integer counts")
 
-  # Validate rank column exists and has valid values
   stopif(!rank_var %in% colnames(data),
     "Rank variable '{rank_var}' missing in the data")
   rank_vals <- data[[rank_var]]
@@ -734,7 +707,6 @@ check_data.sdt <- function(model, data, formula) {
   warnif(any(rank_vals != round(rank_vals), na.rm = TRUE),
     "Rank variable '{rank_var}' should contain integer values")
 
-  # Add columns for Stan dispatch via vint
   data$rank_pos <- as.integer(data[[rank_var]])
   data$max_rank <- m
   data
@@ -782,7 +754,6 @@ bmf2bf.sdt <- function(model, formula) {
   resp_var <- model$resp_vars$response
   n_trials_var <- model$other_vars$n_trials
 
-  # Pass m via vint()
   brms::bf(paste0(
     resp_var, " | vint(m_afc) + trials(",
     n_trials_var, ") ~ 1"
@@ -793,7 +764,6 @@ bmf2bf.sdt <- function(model, formula) {
 .bmf2bf_sdt_ranking <- function(model) {
   resp_var <- model$resp_vars$response
 
-  # Pass rank position and max rank via vint()
   # No trials() — likelihood uses y * log(p) kernel
   brms::bf(paste0(resp_var, " | vint(rank_pos, max_rank) ~ 1"))
 }
@@ -1106,10 +1076,8 @@ bmf2bf.sdt <- function(model, formula) {
 
 #' @export
 configure_model.sdt_evsdt <- function(model, data, formula) {
-  # construct brms formula from the bmm formula
   formula <- bmf2bf(model, formula)
 
-  # construct the family & add to formula object
   formula$family <- brms::custom_family(
     "sdt_binary",
     dpars = c("mu", "dprime", "criterion"),
@@ -1121,12 +1089,10 @@ configure_model.sdt_evsdt <- function(model, data, formula) {
     vars = c("vint1[n]", "vint2[n]", "trials[n]")
   )
 
-  # prepare initial stanvars to pass to brms
   sc_path <- system.file("stan_chunks", package = "bmm")
   stan_funs <- read_lines2(paste0(sc_path, "/sdt_binary_funs.stan"))
   stanvars <- brms::stanvar(scode = stan_funs, block = "functions")
 
-  # return the list
   nlist(formula, data, stanvars)
 }
 
@@ -1159,10 +1125,8 @@ configure_model.sdt_metad_rating <- function(model, data, formula) {
 
 #' @export
 configure_model.sdt_mafc <- function(model, data, formula) {
-  # construct brms formula
   formula <- bmf2bf(model, formula)
 
-  # Define custom family: only dprime (+ mu as internal)
   formula$family <- brms::custom_family(
     "sdt_mafc",
     dpars = c("mu", "dprime"),
@@ -1174,7 +1138,6 @@ configure_model.sdt_mafc <- function(model, data, formula) {
     vars = c("vint1[n]", "trials[n]")
   )
 
-  # Load Stan functions
   sc_path <- system.file("stan_chunks", package = "bmm")
   stan_funs <- read_lines2(paste0(sc_path, "/sdt_mafc_funs.stan"))
   stanvars <- brms::stanvar(scode = stan_funs, block = "functions")

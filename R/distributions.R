@@ -1760,9 +1760,6 @@ rsdt <- function(n_per_cell = 50, n_subjects = 1,
   stopif(any(!stimulus %in% c(0L, 1L)),
          "stimulus must be 0 (noise) or 1 (signal)")
 
-  # Compute SDT decision variable
-  # For equal variance (sdratio = 1): eta = dprime/2 * (2*s - 1) - criterion
-  # For unequal variance: signal distribution scaled by sdratio
   eta <- .sdt_eta(dprime, criterion, stimulus, sdratio)
   p <- .sdt_cdf(eta, dist)
   stats::dbinom(n_old, n_trials, p, log = log)
@@ -1810,7 +1807,7 @@ rsdt <- function(n_per_cell = 50, n_subjects = 1,
   # Category probabilities from cumulative differences: P(k) = F(k) - F(k-1)
   probs <- diff(c(0, cum_p, 1))
 
-  # Ensure valid probabilities (clamp near-zero values)
+  # Avoid log(0) from numerical underflow
   probs <- pmax(probs, .Machine$double.eps)
   probs / sum(probs)
 }
@@ -1916,7 +1913,6 @@ rsdt <- function(n_per_cell = 50, n_subjects = 1,
 }
 
 
-# Internal: rating SDT random generation (multinomial sampling)
 # Internal: shared rating SDT random generation
 # All rating rsdt variants share: validation, threshold generation,
 # data frame construction, multinomial sampling loop, and column assembly.
@@ -2121,7 +2117,6 @@ rsdt <- function(n_per_cell = 50, n_subjects = 1,
   stopif(any(n_correct < 0), "n_correct must be non-negative")
   stopif(any(n_correct > n_trials), "n_correct must not exceed n_trials")
 
-  # Vectorize: compute P(correct) for each dprime value
   pc <- vapply(dprime, .mafc_pc_r, numeric(1), m = as.integer(m[1]))
   stats::dbinom(n_correct, n_trials, pc, log = log)
 }
@@ -2157,9 +2152,7 @@ rsdt <- function(n_per_cell = 50, n_subjects = 1,
          "counts must have length m (one count per rank position)")
   stopif(any(counts < 0), "counts must be non-negative")
 
-  sdratio <- log(sdratio)
-  probs <- .ranking_all_probs_r(dprime, m, dist, sdratio)
-  # Multinomial kernel: sum(y_k * log(p_k))
+  probs <- .ranking_all_probs_r(dprime, m, dist, log(sdratio))
   log_val <- sum(counts * log(probs))
   if (log) log_val else exp(log_val)
 }
@@ -2177,10 +2170,8 @@ rsdt <- function(n_per_cell = 50, n_subjects = 1,
          "n_subjects must be a single positive integer")
   stopif(length(dprime) != 1, "dprime must be a single value for ranking")
 
-  sdratio <- log(sdratio)
-  probs <- .ranking_all_probs_r(dprime, m, dist, sdratio)
+  probs <- .ranking_all_probs_r(dprime, m, dist, log(sdratio))
 
-  # Generate counts per subject via multinomial
   data_list <- lapply(seq_len(n_subjects), function(id) {
     counts <- as.integer(stats::rmultinom(1, n_per_cell, probs))
     data.frame(id = id, rank = seq_len(m), maxrank = m,
