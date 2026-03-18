@@ -1163,7 +1163,7 @@ configure_model.sdt_ranking <- function(model, data, formula) {
       loop = TRUE,
       log_lik = log_lik_sdt_ranking_uv,
       posterior_predict = posterior_predict_sdt_ranking,
-      vars = c("vint1[n]", "vint2[n]")
+      vars = c("vint1[n]", "vint2[n]", "x_r", "x_i")
     )
 
     # Add transformed data block for integrate_1d placeholders

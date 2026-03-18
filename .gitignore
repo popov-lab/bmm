@@ -26,3 +26,5 @@ bmm-dev
 # Internal test artifacts
 /tests/internal/cmdstanr_output/
 /tests/internal/*cache*
+
+.positai

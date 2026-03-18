@@ -2251,8 +2251,8 @@ sdt_criterion <- function(hit_rate, fa_rate,
     cdf = pnorm,
     qf = qnorm,
     stan_expr = function(x) paste0("Phi(", x, ")"),
-    log_stan_expr = function(x) paste0("log_Phi(", x, ")"),
-    log1m_stan_expr = function(x) paste0("log1m_Phi(", x, ")")
+    log_stan_expr = function(x) paste0("std_normal_lcdf(", x, ")"),
+    log1m_stan_expr = function(x) paste0("std_normal_lccdf(", x, ")")
   ),
   gumbel_min = list(
     id = 2L,
