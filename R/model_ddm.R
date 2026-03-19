@@ -31,10 +31,7 @@
   )
 )
 
-.model_ddm <- function(rt = NULL, response = NULL, links = NULL, version = NULL, call = NULL, ...) {
-  # version is deprecated but kept for backward compatibility
-  if (is.null(version)) version <- ""
-  
+.model_ddm <- function(rt = NULL, response = NULL, links = NULL, call = NULL, ...) {
   out <- structure(
     list(
       resp_vars = nlist(rt, response),
@@ -46,7 +43,6 @@
         "- Ratcliff, R. (1978). A theory of memory retrieval. Psychological Review, 85(2), 59-108. https://doi.org/10/fjwm2f","\n",
         "- Henrich, F., Hartmann, R., Pratz, V., Voss, A., & Klauer, K. C. (2024). The Seven-parameter Diffusion Model: An Implementation in Stan for Bayesian Analyses. Behavior Research Methods, 56(4), 3102-3116. https://doi.org/10.3758/s13428-023-02179-1"
       ),
-      version = version,
       requirements = glue(
         "- The response time should be in seconds and \\
           represent the time between onset of the target stimulus until the response execution
@@ -76,7 +72,6 @@
 #' @param rt Name of the reaction time variable coding reaction time in seconds in the data.
 #' @param response Name of the response variable coding the response numerically (0 = lower response / incorrect, 1 = upper response / correct)
 #' @param links A list of links for the parameters.
-#' @param version Deprecated and ignored; kept for backward compatibility.
 #' @section Default behavior:
 #' By default, `zr` is fixed at 0. If you want to estimate `zr`, add a formula
 #' for `zr` in your `bmf()` call.
@@ -126,7 +121,7 @@
 #' 
 #' # Check parameter recovery
 #' summary(fit)
-ddm <- function(rt, response, links = NULL, version = NULL, ...) {
+ddm <- function(rt, response, links = NULL, ...) {
   stopif(
     !requireNamespace("cmdstanr", quietly = TRUE),
     'The "cmdstanr" package is required for this functionality'
@@ -135,7 +130,7 @@ ddm <- function(rt, response, links = NULL, version = NULL, ...) {
   call <- match.call()
   stop_missing_args()
   .model_ddm(rt = rt, response = response,
-             links = links, version = version, call = call, ...)
+             links = links, call = call, ...)
 }
 
 #############################################################################!
