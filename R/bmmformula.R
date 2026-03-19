@@ -222,7 +222,10 @@ add_missing_parameters <- function(model, formula = bmmformula()) {
   model_pars <- names(model$parameters)
   fixed_pars <- names(model$fixed_parameters)
 
-  estimable_formula_pars <- setdiff(formula_pars, fixed_pars)
+  # User-provided formulas override fixed parameters (e.g., sdratio ~ 1
+  # overrides fixed_parameters = list(sdratio = 0) to enable UV-SDT)
+  active_fixed <- setdiff(fixed_pars, formula_pars)
+  estimable_formula_pars <- setdiff(formula_pars, active_fixed)
   missing_pars <- setdiff(model_pars, estimable_formula_pars)
 
   for (mpar in missing_pars) {

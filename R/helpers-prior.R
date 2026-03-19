@@ -150,14 +150,27 @@ fixed_pars_priors <- function(model, formula, additional_pars = list()) {
     return(brms::empty_prior())
   }
 
+  # Skip fixed parameters the user has overridden in the formula
+  # (e.g., sdratio ~ 1 overrides fixed_parameters = list(sdratio = 0))
+  bterms <- brms::brmsterms(formula)
+  user_pars <- c(names(bterms$dpars), names(bterms$nlpars))
+  overridden <- intersect(names(fix_pars), user_pars)
+  # A parameter is truly overridden only if the user's formula is not constant
+  overridden <- Filter(function(p) {
+    !isTRUE(attr(formula$pforms[[p]]$formula, "constant"))
+  }, overridden)
+  fix_pars <- fix_pars[!names(fix_pars) %in% overridden]
+  if (length(fix_pars) == 0) {
+    return(brms::empty_prior())
+  }
+
   # construct parameter names and prior values
-  par_list <- c(model$fixed_parameters, additional_pars)
+  par_list <- c(fix_pars, additional_pars)
   pars <- names(par_list)
   values <- unlist(par_list)
   priors <- glue("constant({values})")
 
-  # determine type of parameters
-  bterms <- brms::brmsterms(formula)
+  # determine type of parameters (reuse bterms from above)
   dpars <- names(bterms$dpars)
   nlpars <- names(bterms$nlpars)
 

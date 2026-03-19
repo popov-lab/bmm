@@ -432,7 +432,7 @@ test_that("initfun output matches standata dimensions for no-intercept models", 
 
 test_that("create_initfun returns function for binary SDT", {
   dat <- data.frame(n_old = c(80L, 20L), stimulus = c(1L, 0L), n_trials = c(100L, 100L))
-  mod <- sdt("n_old", "stimulus", "n_trials")
+  mod <- sdt_binary("n_old", "stimulus", "n_trials")
   ff  <- bmf(dprime ~ 1, criterion ~ 1)
   dat_cd      <- check_data(mod, dat, ff)
   config_args <- configure_model(mod, dat_cd, ff)
@@ -447,7 +447,7 @@ test_that("create_initfun returns function for binary SDT", {
 
 test_that("binary SDT initfun keeps dprime in (0.5, 1.5)", {
   dat <- data.frame(n_old = c(80L, 20L), stimulus = c(1L, 0L), n_trials = c(100L, 100L))
-  mod <- sdt("n_old", "stimulus", "n_trials")
+  mod <- sdt_binary("n_old", "stimulus", "n_trials")
   ff  <- bmf(dprime ~ 1, criterion ~ 1)
   dat_cd      <- check_data(mod, dat, ff)
   config_args <- configure_model(mod, dat_cd, ff)
@@ -466,8 +466,8 @@ test_that("rating SDT create_initfun returns 1 (no custom init)", {
     r4 = c(20L, 5L),  r5 = c(25L, 5L),  r6 = c(25L, 5L),
     stimulus = c(1L, 0L)
   )
-  mod <- sdt(c("r1","r2","r3","r4","r5","r6"), "stimulus",
-             threshold_type = "equidistant")
+  mod <- sdt_rating(c("r1","r2","r3","r4","r5","r6"), "stimulus",
+                    threshold_type = "equidistant")
   ff  <- bmf(dprime ~ 1, criterion ~ 1, spacing ~ 1)
   dat_cd <- check_data(mod, dat, ff)
   expect_equal(create_initfun(mod, dat_cd, ff), 1)

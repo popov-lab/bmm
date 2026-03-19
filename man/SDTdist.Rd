@@ -2,47 +2,10 @@
 % Please edit documentation in R/distributions.R
 \name{SDTdist}
 \alias{SDTdist}
-\alias{dsdt}
-\alias{rsdt}
 \alias{sdt_dprime}
 \alias{sdt_criterion}
-\title{Distribution functions for Signal Detection Theory (SDT)}
+\title{Utility functions for Signal Detection Theory}
 \usage{
-dsdt(
-  n_old = NULL,
-  n_trials = NULL,
-  stimulus = NULL,
-  dprime,
-  criterion = NULL,
-  thresholds = NULL,
-  counts = NULL,
-  sdratio = 1,
-  Ro = NULL,
-  metad = NULL,
-  n_correct = NULL,
-  m = NULL,
-  dist = c("normal", "logistic", "gumbel_min", "gumbel_max"),
-  version = "binary",
-  log = FALSE
-)
-
-rsdt(
-  n_per_cell = 50,
-  n_subjects = 1,
-  dprime = 1.5,
-  criterion = 0,
-  sdratio = 1,
-  Ro = NULL,
-  metad = NULL,
-  m = NULL,
-  dist = c("normal", "logistic", "gumbel_min", "gumbel_max"),
-  version = "binary",
-  n_ratings = NULL,
-  spacing = NULL,
-  deltas = NULL,
-  threshold_type = c("equidistant", "parsimonious", "log_distance", "log_ratio")
-)
-
 sdt_dprime(
   hit_rate,
   fa_rate,
@@ -56,88 +19,14 @@ sdt_criterion(
 )
 }
 \arguments{
-\item{n_old}{Integer vector. Number of "old" responses per row.}
-
-\item{n_trials}{Integer vector. Number of trials per row.}
-
-\item{stimulus}{Integer vector (0/1). Stimulus type: 0 = noise, 1 = signal.}
-
-\item{dprime}{Numeric. Sensitivity (discriminability). For \code{dist = "normal"},
-this equals \eqn{d' = \Phi^{-1}(H) - \Phi^{-1}(FA)}. For \code{dist = "gumbel_min"},
-this equals g' = log(FA) - log(H) (Meyer-Grant et al., 2025). On the
-identity scale regardless of the link function used in model fitting.}
-
-\item{criterion}{Numeric. True criterion (response bias) value.}
-
-\item{thresholds}{Numeric vector of length K-1. Decision thresholds in the
-SDT decision space.}
-
-\item{counts}{Integer vector of length K. Response counts per category for
-a single observation (used by \code{dsdt} with \code{version = "rating"}).
-Categories ordered: 1 = "definitely noise" to K = "definitely signal".}
-
-\item{sdratio}{Numeric. Ratio of signal to noise standard deviations
-(default 1, i.e. equal variance). Values > 1 mean the signal distribution
-has larger variance.}
-
-\item{Ro}{Numeric. Recollection probability for DPSDT (version = "dpsdt").
-Must be between 0 and 1. Applies only to old/signal items.}
-
-\item{metad}{Numeric. Metacognitive sensitivity for meta-d'
-(version = "metad"). If metad = dprime, metacognition is ideal.}
-
-\item{n_correct}{Integer vector. Number of correct responses (for m-AFC).}
-
-\item{m}{Integer. Number of alternatives in m-AFC task. Must be >= 2.}
-
-\item{dist}{Character. Noise distribution: "normal" (default), "logistic",
-"gumbel_min", or "gumbel_max".}
-
-\item{version}{Character. SDT model version controlling the likelihood type.
-Supported: "binary" (default), "rating" (confidence rating models),
-"dpsdt" (dual process SDT with recollection), "metad" (meta-d'),
-"mafc" (m-alternative forced choice), "ranking" (rank ordering).}
-
-\item{log}{Logical. If \code{TRUE}, returns log-density. Default \code{FALSE}.}
-
-\item{n_per_cell}{Integer. Number of trials per stimulus type per subject.}
-
-\item{n_subjects}{Integer. Number of subjects.}
-
-\item{n_ratings}{Integer. Number of response categories for rating data
-(used by \code{rsdt} with \code{version = "rating"}).}
-
-\item{spacing}{Numeric. Global threshold spacing parameter for 2-parameter
-threshold types. For \code{threshold_type = "equidistant"}: thresholds are
-\code{criterion + (k - mid) * exp(spacing)}. For \code{threshold_type = "parsimonious"}: thresholds are \code{criterion + exp(spacing) * logit(k/K)}
-(Selker et al., 2019). Used by \code{rsdt} with \code{version = "rating"}.}
-
-\item{deltas}{Numeric vector. Log-distance or log-ratio parameters for
-threshold generation. Used by \code{rsdt} with \code{version = "rating"} and
-\code{threshold_type = "log_distance"} or \code{"log_ratio"}.}
-
-\item{threshold_type}{Character. Method for generating thresholds in
-\code{rsdt} with \code{version = "rating"}: "equidistant" (default), "parsimonious"
-(logit-spaced, Selker et al., 2019), "log_distance", or "log_ratio"
-(ratio-scaled distances, Paulewicz & Blaut, 2020).}
-
 \item{hit_rate}{Numeric. Proportion of hits (P("old" | signal)).}
 
 \item{fa_rate}{Numeric. Proportion of false alarms (P("old" | noise)).}
+
+\item{dist}{Character. Noise distribution: "normal" (default), "logistic",
+"gumbel_min", or "gumbel_max".}
 }
 \value{
-\code{dsdt} returns the (log-)density of the observed data under the
-SDT model. For the binary version, this is the binomial probability of
-observing \code{n_old} "old" responses out of \code{n_trials}, given the SDT
-parameters. For the rating version, this is the multinomial probability
-of the response counts given K-1 thresholds.
-
-\code{rsdt} returns a data frame in pre-aggregated format. For the
-binary version, columns are: \code{id}, \code{stimulus} (0/1), \code{n_trials}, and
-\code{n_old} (count of "old" responses). For the rating version, columns are:
-\code{id}, \code{stimulus} (0/1), one column per rating category (\code{r1}, ..., \code{rK}),
-and \code{nTrials}.
-
 \code{sdt_dprime} returns the sensitivity index appropriate for the
 chosen distribution: \eqn{d' = \Phi^{-1}(H) - \Phi^{-1}(FA)} for \code{dist = "normal"}; g' = log(FA) - log(H) for \code{dist = "gumbel_min"} (Meyer-Grant
 et al., 2025); analogous quantile-difference measures for other
@@ -146,54 +35,10 @@ distributions.
 \code{sdt_criterion} returns the criterion (response bias) value.
 }
 \description{
-Density, random generation, and utility functions for Signal
-Detection Theory models with different noise distribution families and
-model versions. The wrapper functions \code{dsdt} and \code{rsdt} dispatch to
-version-specific helpers based on the \code{version} argument, allowing
-extensibility for binary, rating, and unequal-variance models.
+Compute sensitivity (d') and criterion from hit and false
+alarm rates for different SDT distribution families.
 }
 \examples{
-# Compute log-density of binary SDT data
-dsdt(n_old = 80, n_trials = 100, stimulus = 1,
-     dprime = 1.5, criterion = 0.2)
-
-# Vectorized over observations
-dsdt(n_old = c(30, 80), n_trials = c(100, 100), stimulus = c(0, 1),
-     dprime = 1.5, criterion = 0.2, log = TRUE)
-
-# With unequal variance
-dsdt(n_old = 80, n_trials = 100, stimulus = 1,
-     dprime = 1.5, criterion = 0.2, sdratio = 1.2)
-
-# Rating SDT density (K=4, single observation)
-dsdt(counts = c(5, 15, 25, 55), stimulus = 1,
-     dprime = 1.5, thresholds = c(-0.5, 0.0, 0.5),
-     version = "rating")
-
-# m-AFC density (4-AFC)
-dsdt(n_correct = 80, n_trials = 100, dprime = 1.5, m = 4,
-     version = "mafc")
-# Generate data from a Gaussian SDT model
-dat <- rsdt(n_per_cell = 100, n_subjects = 20, dprime = 1.5, criterion = 0.2)
-head(dat)
-
-# Generate data from a Logistic SDT model
-dat_logistic <- rsdt(n_per_cell = 100, n_subjects = 10,
-                     dprime = 1.5, criterion = 0,
-                     dist = "logistic")
-
-# Generate data with unequal variance
-dat_uv <- rsdt(n_per_cell = 100, n_subjects = 10,
-               dprime = 1.5, criterion = 0, sdratio = 1.3)
-
-# Generate rating data (K=4, equidistant thresholds)
-dat_rating <- rsdt(n_per_cell = 100, n_subjects = 10,
-                   dprime = 1.5, criterion = 0, n_ratings = 4,
-                   spacing = 0.5, version = "rating")
-
-# Generate m-AFC data (4-AFC)
-dat_mafc <- rsdt(n_per_cell = 200, n_subjects = 20,
-                 dprime = 1.5, version = "mafc", m = 4)
 # Compute d' from hit and false alarm rates (Gaussian SDT)
 sdt_dprime(hit_rate = 0.8, fa_rate = 0.2, dist = "normal")
 
@@ -206,15 +51,5 @@ sdt_criterion(hit_rate = 0.8, fa_rate = 0.2, dist = "normal")
 \references{
 Green, D. M., & Swets, J. A. (1966). \emph{Signal detection theory and
 psychophysics}. Wiley.
-
-Selker, R., van den Bergh, D., Criss, A. H., & Wagenmakers, E.-J. (2019).
-Parsimonious estimation of signal detection models from confidence ratings.
-\emph{Behavior Research Methods}, \emph{51}(5), 1953--1967.
-\doi{10.3758/s13428-019-01231-3}
-
-Meyer-Grant, C. G., Kellen, D., Harding, S. M., & Singmann, H. (2025).
-\emph{Extreme-value signal detection theory for recognition memory: The
-parametric road not taken}. PsyArXiv preprint.
-\doi{10.31234/osf.io/qhrfj}
 }
 \keyword{distribution}

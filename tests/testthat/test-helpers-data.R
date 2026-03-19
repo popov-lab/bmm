@@ -148,13 +148,23 @@ test_that("check_data() returns a data.frame()", {
   # - y, x, z, w, l, s for circular/mixture models
   # - mean_rt, var_rt, n_upper, n_trials for ezdm 3par
   # - mean_rt_upper/lower, var_rt_upper/lower for ezdm 4par
-  # - n_old, stimulus for sdt
+  # - n_old, stimulus for sdt_binary
+  # - r1..r4 for sdt_rating/sdt_dp/sdt_metad
+  # - n_correct for sdt_mafc
+  # - observed, rank_col for sdt_ranking
+  # - i1_c1..i2_c4 for sdai (2 sources x 4 confidence)
+  sdai_cols <- c("i1_c1", "i1_c2", "i1_c3", "i1_c4",
+                 "i2_c1", "i2_c2", "i2_c3", "i2_c4")
   test_data <- data.frame(
     y = 1, x = 1, z = 2, w = 1, s = 2, l = 1,
     mean_rt = 0.5, var_rt = 0.02, n_upper = 80, n_trials = 100,
     mean_rt_upper = 0.45, mean_rt_lower = 0.55,
     var_rt_upper = 0.018, var_rt_lower = 0.025,
-    n_old = 40, stimulus = 1L
+    n_old = 40, stimulus = 1L,
+    r1 = 10, r2 = 20, r3 = 30, r4 = 40,
+    n_correct = 75, observed = 25, rank_col = 1L,
+    i1_c1 = 10, i1_c2 = 20, i1_c3 = 15, i1_c4 = 5,
+    i2_c1 = 8, i2_c2 = 18, i2_c3 = 22, i2_c4 = 12
   )
   for (ml in mls) {
     model <- ml(
@@ -162,7 +172,9 @@ test_that("check_data() returns a data.frame()", {
       nt_distances = "z", resp_cats = c("w", "l"), num_options = c(1, 1),
       mean_rt = "mean_rt", var_rt = "var_rt", n_upper = "n_upper",
       n_trials = "n_trials",
-      response = "n_old", stimulus = "stimulus"
+      response = "n_old", stimulus = "stimulus",
+      resp = sdai_cols,
+      rank = "rank_col", m = 4L, n_ratings = 4L
     )
     expect_s3_class(
       check_data(model, test_data, bmf(kappa ~ 1)),

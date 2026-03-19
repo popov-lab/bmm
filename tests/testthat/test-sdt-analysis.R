@@ -28,12 +28,12 @@ test_that("roc_sdt() errors on non-SDT bmmfit", {
 test_that("roc_sdt() errors for m-AFC and ranking models", {
   fit <- load_sdt_fit("bmmfit_sdt_binary")
 
-  fake_mafc    <- fit
-  fake_mafc$bmm$model$version <- "mafc"
+  fake_mafc <- fit
+  class(fake_mafc$bmm$model) <- c("bmmodel", "sdt", "sdt_mafc")
   expect_error(roc_sdt(fake_mafc), "not defined")
 
   fake_ranking <- fit
-  fake_ranking$bmm$model$version <- "ranking"
+  class(fake_ranking$bmm$model) <- c("bmmodel", "sdt", "sdt_ranking")
   expect_error(roc_sdt(fake_ranking), "not defined")
 })
 
@@ -41,7 +41,7 @@ test_that("auc_sdt() errors for m-AFC and ranking models", {
   fit <- load_sdt_fit("bmmfit_sdt_binary")
 
   fake_mafc <- fit
-  fake_mafc$bmm$model$version <- "mafc"
+  class(fake_mafc$bmm$model) <- c("bmmodel", "sdt", "sdt_mafc")
   expect_error(auc_sdt(fake_mafc), "not defined")
 })
 
@@ -346,4 +346,54 @@ test_that("pp_check.bmmfit() delegates to brms for binary SDT model", {
   fit <- load_sdt_fit("bmmfit_sdt_binary")
   p <- pp_check(fit, ndraws = 5)
   expect_s3_class(p, "ggplot")
+})
+
+
+############################################################################# !
+# OBSERVED ROC                                                           ####
+############################################################################# !
+
+test_that("roc_observed() errors on non-bmmfit input", {
+  expect_error(roc_observed(list()), "bmmfit object")
+})
+
+test_that("roc_observed() errors on non-SDT bmmfit", {
+  fit <- load_sdt_fit("bmmfit_sdt_binary")
+  fake_fit <- fit
+  class(fake_fit$bmm$model) <- c("bmmodel", "sdm")
+  expect_error(roc_observed(fake_fit), "only available for SDT")
+})
+
+test_that("roc_observed() errors on binary SDT model", {
+  fit <- load_sdt_fit("bmmfit_sdt_binary")
+  expect_error(roc_observed(fit), "rating SDT model")
+})
+
+test_that("roc_observed() returns bmm_sdt_roc_observed for rating fit", {
+  fit <- load_sdt_fit("bmmfit_sdt_rating")
+  obs <- roc_observed(fit)
+  expect_s3_class(obs, "bmm_sdt_roc_observed")
+  expect_s3_class(obs, "data.frame")
+})
+
+test_that("roc_observed() has FA and Hit columns in [0, 1]", {
+  fit <- load_sdt_fit("bmmfit_sdt_rating")
+  obs <- roc_observed(fit)
+  expect_true(all(c("FA", "Hit") %in% names(obs)))
+  expect_true(all(obs$FA  >= 0 & obs$FA  <= 1))
+  expect_true(all(obs$Hit >= 0 & obs$Hit <= 1))
+})
+
+test_that("roc_observed() includes endpoints (0,0) and (1,1)", {
+  fit <- load_sdt_fit("bmmfit_sdt_rating")
+  obs <- roc_observed(fit)
+  expect_true(any(abs(obs$FA) < 1e-8 & abs(obs$Hit) < 1e-8))
+  expect_true(any(abs(obs$FA - 1) < 1e-8 & abs(obs$Hit - 1) < 1e-8))
+})
+
+test_that("roc_observed() produces K+1 rows (K-1 thresholds + 2 endpoints)", {
+  fit <- load_sdt_fit("bmmfit_sdt_rating")
+  K <- length(unlist(fit$bmm$model$resp_vars))
+  obs <- roc_observed(fit)
+  expect_equal(nrow(obs), K + 1L)
 })

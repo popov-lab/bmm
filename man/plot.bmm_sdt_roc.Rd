@@ -4,7 +4,15 @@
 \alias{plot.bmm_sdt_roc}
 \title{Plot model-implied ROC curve}
 \usage{
-\method{plot}{bmm_sdt_roc}(x, condition_col = NULL, add_diagonal = TRUE, ribbon_alpha = 0.25, ...)
+\method{plot}{bmm_sdt_roc}(
+  x,
+  condition_col = NULL,
+  add_diagonal = TRUE,
+  ribbon_alpha = 0.25,
+  probs = c(0.025, 0.975),
+  point_size = 2.5,
+  ...
+)
 }
 \arguments{
 \item{x}{A \code{"bmm_sdt_roc"} object from \code{\link[=roc_sdt]{roc_sdt()}}.}
@@ -15,8 +23,15 @@ for colour/faceting. If \code{NULL} (default), auto-detected from the object.}
 \item{add_diagonal}{Logical. Whether to draw the chance-level diagonal
 (default \code{TRUE}).}
 
-\item{ribbon_alpha}{Numeric. Transparency of the credible-band ribbon
-(default \code{0.25}).}
+\item{ribbon_alpha}{Numeric. Transparency of the credible-band ribbon for
+binary models (default \code{0.25}).}
+
+\item{probs}{Numeric vector of length 2. Lower and upper quantiles for
+credible intervals shown as error bars (rating) or ribbon (binary).
+Default \code{c(0.025, 0.975)}.}
+
+\item{point_size}{Numeric. Size of threshold-position points for rating
+models (default \code{2.5}).}
 
 \item{...}{Ignored.}
 }
@@ -24,7 +39,14 @@ for colour/faceting. If \code{NULL} (default), auto-detected from the object.}
 A \code{ggplot2} object.
 }
 \description{
-Plot model-implied ROC curve
+For \strong{rating SDT models}, shows the posterior mean hit vs. false-alarm rate
+at each confidence threshold as points with crosshair error bars (uncertainty
+in both the x/FA and y/Hit directions), connected by a line through the
+posterior mean points.
+}
+\details{
+For \strong{binary SDT models}, shows the smooth analytical ROC as a credible-band
+ribbon around the posterior mean curve.
 }
 \seealso{
 \code{\link[=roc_sdt]{roc_sdt()}}, \code{\link[=auc_sdt]{auc_sdt()}}

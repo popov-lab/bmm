@@ -52,14 +52,16 @@ roc_sdt <- function(fit, conditions = NULL, n_points = 100,
          "fit must be a bmmfit object returned by bmm()")
   model <- fit$bmm$model
   stopif(!inherits(model, "sdt"),
-         "roc_sdt() is only available for SDT models fit with sdt()")
+         "roc_sdt() is only available for SDT models (sdt_binary, sdt_rating, sdt_dp, sdt_metad)")
 
-  version <- model$version
-  stopif(version %in% c("mafc", "ranking"),
-         glue("ROC curves are not defined for version = '{version}'. ",
-              "These models have no response criterion."))
+  stopif(inherits(model, "sdt_mafc") || model$version %in% c("mafc"),
+         "ROC curves are not defined for this model type. It has no response criterion.")
+  stopif(inherits(model, "sdt_ranking") || model$version %in% c("ranking"),
+         "ROC curves are not defined for this model type. It has no response criterion.")
 
-  is_rating <- .is_sdt_rating(model)
+  is_rating <- inherits(model, "sdt_rating") || inherits(model, "sdt_dp") ||
+               inherits(model, "sdt_metad") ||
+               grepl("_rating$", tail(class(model), 1))
   conditions <- .sdt_resolve_conditions(fit, conditions)
 
   roc_data <- if (is_rating) {
@@ -74,11 +76,21 @@ roc_sdt <- function(fit, conditions = NULL, n_points = 100,
     roc_data,
     class      = c("bmm_sdt_roc", "data.frame"),
     summary    = summary_df,
-    model_version = version,
+    model_class = class(model),
     dist       = model$other_vars$dist,
     is_rating  = is_rating,
     conditions = conditions
   )
+}
+
+
+# Internal: check if a model has sdratio as an estimated (not fixed) parameter
+# Handles both new models (fixed_parameters) and old models (variances)
+.sdt_has_estimated_sdratio <- function(model) {
+  if ("sdratio" %in% names(model$parameters)) {
+    if (!"sdratio" %in% names(model$fixed_parameters)) return(TRUE)
+  }
+  identical(model$other_vars$variances, "unequal")
 }
 
 
@@ -143,22 +155,22 @@ roc_sdt <- function(fit, conditions = NULL, n_points = 100,
 
 # Internal: smooth analytical ROC for binary EV- and UV-SDT
 .roc_sdt_binary <- function(fit, model, conditions, n_points, ...) {
-  dist      <- model$other_vars$dist
-  variances <- model$other_vars$variances
+  dist <- model$other_vars$dist
+  has_sdratio <- .sdt_has_estimated_sdratio(model)
 
   cdf  <- .SDT_DISTS[[dist]]$cdf
   qf   <- .SDT_DISTS[[dist]]$qf
 
   fa_grid  <- seq(0.001, 0.999, length.out = n_points)
-  qf_vals  <- qf(fa_grid)              # quantile values at each FA point
-  fa_full  <- c(0, fa_grid, 1)         # add trivial endpoints
+  qf_vals  <- qf(fa_grid)
+  fa_full  <- c(0, fa_grid, 1)
   n_fa     <- length(fa_full)
 
   n_cond      <- max(1L, nrow(conditions))
   dprime_mat  <- .sdt_linpred(fit, "dprime", conditions, is_rating = FALSE, ...)
   n_draws     <- nrow(dprime_mat)
 
-  sdratio_mat <- if (variances == "unequal") {
+  sdratio_mat <- if (has_sdratio) {
     exp(.sdt_linpred(fit, "sdratio", conditions, is_rating = FALSE, ...))
   } else {
     matrix(1, nrow = n_draws, ncol = n_cond)
@@ -196,10 +208,11 @@ roc_sdt <- function(fit, conditions = NULL, n_points = 100,
 # Internal: empirical (K+1-point) ROC for rating SDT models
 .roc_sdt_rating <- function(fit, model, conditions, ...) {
   dist           <- model$other_vars$dist
-  variances      <- model$other_vars$variances
-  version        <- model$version
   threshold_type <- model$other_vars$threshold_type
   n_ratings      <- model$other_vars$n_ratings
+  has_sdratio    <- .sdt_has_estimated_sdratio(model)
+  is_dp          <- inherits(model, "sdt_dp") || model$version %in% c("dpsdt")
+  is_metad       <- inherits(model, "sdt_metad") || model$version %in% c("metad")
 
   n_cond      <- max(1L, nrow(conditions))
   dprime_mat  <- .sdt_linpred(fit, "dprime",    conditions, is_rating = TRUE, ...)
@@ -218,15 +231,19 @@ roc_sdt <- function(fit, conditions = NULL, n_points = 100,
     spacing_mat <- NULL
   }
 
-  sdratio_mat <- if (variances == "unequal") {
+  sdratio_mat <- if (has_sdratio) {
     exp(.sdt_linpred(fit, "sdratio", conditions, is_rating = TRUE, ...))
   } else NULL
 
-  Ro_mat <- if (version == "dpsdt") {
+  Ro_mat <- if (is_dp) {
     plogis(.sdt_linpred(fit, "Ro", conditions, is_rating = TRUE, ...))
   } else NULL
 
-  metad_mat <- if (version == "metad") {
+  Rn_mat <- if (is_dp) {
+    plogis(.sdt_linpred(fit, "Rn", conditions, is_rating = TRUE, ...))
+  } else NULL
+
+  metad_mat <- if (is_metad) {
     .sdt_linpred(fit, "metad", conditions, is_rating = TRUE, ...)
   } else NULL
 
@@ -252,23 +269,25 @@ roc_sdt <- function(fit, conditions = NULL, n_points = 100,
                                            deltas = deltas_d)
       }
 
-      # Category probability function, dispatched by model version
-      cat_probs_fn <- switch(
-        version,
-        evsdt = function(stim) {
-          shift <- dp / 2 * (2 * stim - 1)
-          .sdt_category_probs(thresholds, shift, sr, stim, dist)
-        },
-        dpsdt = function(stim) {
+      # Category probability function, dispatched by model class
+      cat_probs_fn <- if (is_dp) {
+        function(stim) {
           shift  <- dp / 2 * (2 * stim - 1)
           Ro_val <- Ro_mat[d_i, c_i]
-          .sdt_dpsdt_category_probs(thresholds, shift, sr, stim, dist, Ro_val)
-        },
-        metad = function(stim) {
+          Rn_val <- Rn_mat[d_i, c_i]
+          .sdt_dpsdt_category_probs(thresholds, shift, sr, stim, dist, Ro_val, Rn_val)
+        }
+      } else if (is_metad) {
+        function(stim) {
           metad_val <- metad_mat[d_i, c_i]
           .sdt_metad_category_probs(thresholds, dp, metad_val, stim, sr, dist)
         }
-      )
+      } else {
+        function(stim) {
+          shift <- dp / 2 * (2 * stim - 1)
+          .sdt_category_probs(thresholds, shift, sr, stim, dist)
+        }
+      }
 
       pn <- cat_probs_fn(0L)  # noise: length-K vector
       ps <- cat_probs_fn(1L)  # signal: length-K vector
@@ -326,14 +345,15 @@ roc_sdt <- function(fit, conditions = NULL, n_points = 100,
 
 #' @export
 print.bmm_sdt_roc <- function(x, ...) {
-  version  <- attr(x, "model_version")
+  model_class <- attr(x, "model_class")
+  model_name  <- if (!is.null(model_class)) tail(model_class, 1L) else "sdt"
   dist     <- attr(x, "dist")
   is_rating <- attr(x, "is_rating")
   n_draws  <- length(unique(x$.draw))
   n_cond   <- nrow(attr(x, "conditions"))
   cond_cols <- setdiff(names(x), c("FA", "Hit", ".draw"))
 
-  cat("SDT ROC curve (", version, ", dist = ", dist, ")\n", sep = "")
+  cat("SDT ROC curve (", model_name, ", dist = ", dist, ")\n", sep = "")
   cat("  ", n_draws, " posterior draws",
       if (n_cond > 1L) paste0(" x ", n_cond, " conditions") else "",
       "\n", sep = "")
@@ -346,6 +366,101 @@ print.bmm_sdt_roc <- function(x, ...) {
   }
   cat("Use plot() to visualise, or attr(x, 'summary') for summaries.\n")
   invisible(x)
+}
+
+
+############################################################################# !
+# OBSERVED ROC                                                           ####
+############################################################################# !
+
+#' Observed ROC points from a fitted rating SDT model
+#'
+#' Computes empirical (observed) ROC points from the response count data used
+#' to fit a rating SDT model.  Counts are pooled across all observations
+#' within each stimulus type (and optional condition grouping) to produce
+#' cumulative hit and false-alarm rates at each confidence threshold.
+#'
+#' @param fit A `bmmfit` object returned by [bmm()] from a rating SDT model.
+#' @param conditions Optional character vector of column names from the
+#'   original data to condition on (e.g., `"dataset"`).  If `NULL` (default),
+#'   all observations are pooled into a single ROC.
+#'
+#' @return A data frame of class `"bmm_sdt_roc_observed"` with columns `FA`,
+#'   `Hit`, and any condition columns.  Rows include the K-1 interior
+#'   threshold points plus the (0, 0) and (1, 1) endpoints.
+#'
+#' @seealso [roc_sdt()], [plot.bmm_sdt_roc()]
+#' @export
+roc_observed <- function(fit, conditions = NULL) {
+  stopif(!inherits(fit, "bmmfit"),
+         "fit must be a bmmfit object returned by bmm()")
+  model <- fit$bmm$model
+  stopif(!inherits(model, "sdt"),
+         "roc_observed() is only available for SDT models (sdt_rating, sdt_dp, sdt_metad)")
+  is_rating <- inherits(model, "sdt_rating") || inherits(model, "sdt_dp") ||
+               inherits(model, "sdt_metad") ||
+               grepl("_rating$", tail(class(model), 1))
+  stopif(!is_rating,
+         "roc_observed() requires a rating SDT model (sdt_rating, sdt_dp, or sdt_metad)")
+
+  resp_cols <- unlist(model$resp_vars)
+  stim_var  <- model$other_vars$stimulus
+  n_ratings <- model$other_vars$n_ratings
+  y_mat     <- as.matrix(fit$data[, resp_cols])
+
+  if (is.null(conditions)) {
+    group_cols <- stim_var
+  } else {
+    group_cols <- c(stim_var, conditions)
+  }
+
+  group_df    <- fit$data[, group_cols, drop = FALSE]
+  cond_cols   <- setdiff(group_cols, stim_var)
+  cond_levels <- if (length(cond_cols) > 0L) {
+    unique(fit$data[, cond_cols, drop = FALSE])
+  } else {
+    data.frame(.row = 1L)[1L, -1L, drop = FALSE]
+  }
+  n_cond <- max(1L, nrow(cond_levels))
+
+  result <- vector("list", n_cond)
+  for (c_i in seq_len(n_cond)) {
+    if (ncol(cond_levels) > 0L) {
+      mask <- Reduce("&", lapply(cond_cols, function(col) {
+        group_df[[col]] == cond_levels[[col]][c_i]
+      }))
+    } else {
+      mask <- rep(TRUE, nrow(group_df))
+    }
+
+    stim_col <- group_df[[stim_var]]
+    noise_idx  <- which(mask & stim_col == 0)
+    signal_idx <- which(mask & stim_col == 1)
+
+    noise_counts  <- colSums(y_mat[noise_idx, , drop = FALSE])
+    signal_counts <- colSums(y_mat[signal_idx, , drop = FALSE])
+
+    pn <- noise_counts / sum(noise_counts)
+    ps <- signal_counts / sum(signal_counts)
+
+    K <- ncol(y_mat)
+    fa_pts <- c(1, 1 - cumsum(pn)[seq_len(K - 1L)], 0)
+    hi_pts <- c(1, 1 - cumsum(ps)[seq_len(K - 1L)], 0)
+
+    roc_df <- data.frame(FA = fa_pts, Hit = hi_pts)
+    if (ncol(cond_levels) > 0L) {
+      roc_df <- cbind(roc_df,
+                      cond_levels[rep(c_i, nrow(roc_df)), , drop = FALSE],
+                      row.names = NULL)
+    }
+    result[[c_i]] <- roc_df
+  }
+
+  structure(
+    do.call(rbind, result),
+    class = c("bmm_sdt_roc_observed", "data.frame"),
+    n_ratings = n_ratings
+  )
 }
 
 
@@ -385,19 +500,21 @@ auc_sdt <- function(fit, conditions = NULL, probs = c(0.025, 0.975), ...) {
          "fit must be a bmmfit object returned by bmm()")
   model <- fit$bmm$model
   stopif(!inherits(model, "sdt"),
-         "auc_sdt() is only available for SDT models fit with sdt()")
+         "auc_sdt() is only available for SDT models (sdt_binary, sdt_rating, sdt_dp, sdt_metad)")
 
-  version   <- model$version
-  stopif(version %in% c("mafc", "ranking"),
-         glue("AUC is not defined for version = '{version}'."))
+  stopif(inherits(model, "sdt_mafc") || model$version %in% c("mafc"),
+         "AUC is not defined for this model type.")
+  stopif(inherits(model, "sdt_ranking") || model$version %in% c("ranking"),
+         "AUC is not defined for this model type.")
 
   dist      <- model$other_vars$dist
-  variances <- model$other_vars$variances
-  is_rating <- .is_sdt_rating(model)
+  is_rating <- inherits(model, "sdt_rating") || inherits(model, "sdt_dp") ||
+               inherits(model, "sdt_metad") ||
+               grepl("_rating$", tail(class(model), 1))
+  has_sdratio <- .sdt_has_estimated_sdratio(model)
   conditions <- .sdt_resolve_conditions(fit, conditions)
 
-  use_analytical <- !is_rating && variances == "equal" &&
-                    version == "evsdt" &&
+  use_analytical <- !is_rating && !has_sdratio &&
                     dist %in% c("normal", "gumbel_min")
 
   if (use_analytical) {
@@ -457,11 +574,11 @@ auc_sdt <- function(fit, conditions = NULL, probs = c(0.025, 0.975), ...) {
 
   structure(
     auc_data,
-    class         = c("bmm_sdt_auc", "data.frame"),
-    summary       = summary_df,
-    model_version = version,
-    dist          = dist,
-    conditions    = conditions
+    class       = c("bmm_sdt_auc", "data.frame"),
+    summary     = summary_df,
+    model_class = class(model),
+    dist        = dist,
+    conditions  = conditions
   )
 }
 
@@ -501,11 +618,12 @@ auc_sdt <- function(fit, conditions = NULL, probs = c(0.025, 0.975), ...) {
 
 #' @export
 print.bmm_sdt_auc <- function(x, ...) {
-  version <- attr(x, "model_version")
+  model_class <- attr(x, "model_class")
+  model_name  <- if (!is.null(model_class)) tail(model_class, 1L) else "sdt"
   dist    <- attr(x, "dist")
   summ    <- attr(x, "summary")
 
-  cat("SDT AUC (", version, ", dist = ", dist, ")\n", sep = "")
+  cat("SDT AUC (", model_name, ", dist = ", dist, ")\n", sep = "")
   print(summ, digits = 3, row.names = FALSE)
   invisible(x)
 }

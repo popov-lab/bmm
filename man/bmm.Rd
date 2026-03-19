@@ -107,8 +107,14 @@ The following models are supported:
 \item m3(resp_cats, num_options, choice_rule, version)
 \item mixture2p(resp_error)
 \item mixture3p(resp_error, nt_features, set_size, regex)
+\item sdai(resp, n_sources, n_confidence, dist)
 \item sdm(resp_error, version)
-\item sdt(response, stimulus, n_trials, version, dist, variances, n_ratings, threshold_type, m, rank, log_scale, links)
+\item sdt_binary(response, stimulus, n_trials, dist, links)
+\item sdt_dp(response, stimulus, n_ratings, dist, threshold_type, links)
+\item sdt_mafc(response, n_trials, m, dist, links)
+\item sdt_metad(response, stimulus, n_ratings, dist, threshold_type, links)
+\item sdt_ranking(response, rank, m, dist, links)
+\item sdt_rating(response, stimulus, n_ratings, dist, threshold_type, log_scale, links)
 }
 
 Type  ?modelname  to get information about a specific model, e.g.  ?imm
@@ -130,7 +136,7 @@ Type \code{help(package=bmm)} for a full list of available help topics.
 }
 
 \examples{
-\dontshow{if (isTRUE(Sys.getenv("BMM_EXAMPLES"))) (if (getRversion() >= "3.4") withAutoprint else force)(\{ # examplesIf}
+\dontshow{if (isTRUE(Sys.getenv("BMM_EXAMPLES"))) withAutoprint(\{ # examplesIf}
 # generate artificial data from the Signal Discrimination Model
 dat <- data.frame(y = rsdm(2000))
 

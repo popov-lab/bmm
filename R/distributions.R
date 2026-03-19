@@ -1555,206 +1555,68 @@ neg_loglik <- function(x, params, distribution, weights = NULL) {
 }
 
 
-#' @title Distribution functions for Signal Detection Theory (SDT)
+#' @title Utility functions for Signal Detection Theory
 #'
-#' @description Density, random generation, and utility functions for Signal
-#'   Detection Theory models with different noise distribution families and
-#'   model versions. The wrapper functions `dsdt` and `rsdt` dispatch to
-#'   version-specific helpers based on the `version` argument, allowing
-#'   extensibility for binary, rating, and unequal-variance models.
+#' @description Compute sensitivity (d') and criterion from hit and false
+#'   alarm rates for different SDT distribution families.
 #'
 #' @name SDTdist
 #'
-#' @param n_old Integer vector. Number of "old" responses per row.
-#' @param n_trials Integer vector. Number of trials per row.
-#' @param stimulus Integer vector (0/1). Stimulus type: 0 = noise, 1 = signal.
-#' @param n_per_cell Integer. Number of trials per stimulus type per subject.
-#' @param n_subjects Integer. Number of subjects.
-#' @param dprime Numeric. Sensitivity (discriminability). For `dist = "normal"`,
-#'   this equals \eqn{d' = \Phi^{-1}(H) - \Phi^{-1}(FA)}. For `dist = "gumbel_min"`,
-#'   this equals g' = log(FA) - log(H) (Meyer-Grant et al., 2025). On the
-#'   identity scale regardless of the link function used in model fitting.
-#' @param criterion Numeric. True criterion (response bias) value.
-#' @param sdratio Numeric. Ratio of signal to noise standard deviations
-#'   (default 1, i.e. equal variance). Values > 1 mean the signal distribution
-#'   has larger variance.
-#' @param dist Character. Noise distribution: "normal" (default), "logistic",
-#'   "gumbel_min", or "gumbel_max".
-#' @param Ro Numeric. Recollection probability for DPSDT (version = "dpsdt").
-#'   Must be between 0 and 1. Applies only to old/signal items.
-#' @param metad Numeric. Metacognitive sensitivity for meta-d'
-#'   (version = "metad"). If metad = dprime, metacognition is ideal.
-#' @param n_correct Integer vector. Number of correct responses (for m-AFC).
-#' @param m Integer. Number of alternatives in m-AFC task. Must be >= 2.
-#' @param version Character. SDT model version controlling the likelihood type.
-#'   Supported: "binary" (default), "rating" (confidence rating models),
-#'   "dpsdt" (dual process SDT with recollection), "metad" (meta-d'),
-#'   "mafc" (m-alternative forced choice), "ranking" (rank ordering).
-#' @param log Logical. If `TRUE`, returns log-density. Default `FALSE`.
-#' @param counts Integer vector of length K. Response counts per category for
-#'   a single observation (used by `dsdt` with `version = "rating"`).
-#'   Categories ordered: 1 = "definitely noise" to K = "definitely signal".
-#' @param thresholds Numeric vector of length K-1. Decision thresholds in the
-#'   SDT decision space.
-#' @param n_ratings Integer. Number of response categories for rating data
-#'   (used by `rsdt` with `version = "rating"`).
-#' @param spacing Numeric. Global threshold spacing parameter for 2-parameter
-#'   threshold types. For `threshold_type = "equidistant"`: thresholds are
-#'   `criterion + (k - mid) * exp(spacing)`. For `threshold_type =
-#'   "parsimonious"`: thresholds are `criterion + exp(spacing) * logit(k/K)`
-#'   (Selker et al., 2019). Used by `rsdt` with `version = "rating"`.
-#' @param deltas Numeric vector. Log-distance or log-ratio parameters for
-#'   threshold generation. Used by `rsdt` with `version = "rating"` and
-#'   `threshold_type = "log_distance"` or `"log_ratio"`.
-#' @param threshold_type Character. Method for generating thresholds in
-#'   `rsdt` with `version = "rating"`: "equidistant" (default), "parsimonious"
-#'   (logit-spaced, Selker et al., 2019), "log_distance", or "log_ratio"
-#'   (ratio-scaled distances, Paulewicz & Blaut, 2020).
 #' @param hit_rate Numeric. Proportion of hits (P("old" | signal)).
 #' @param fa_rate Numeric. Proportion of false alarms (P("old" | noise)).
+#' @param dist Character. Noise distribution: "normal" (default), "logistic",
+#'   "gumbel_min", or "gumbel_max".
 #'
 #' @references
 #' Green, D. M., & Swets, J. A. (1966). \emph{Signal detection theory and
 #'   psychophysics}. Wiley.
 #'
-#' Selker, R., van den Bergh, D., Criss, A. H., & Wagenmakers, E.-J. (2019).
-#'   Parsimonious estimation of signal detection models from confidence ratings.
-#'   \emph{Behavior Research Methods}, \emph{51}(5), 1953--1967.
-#'   \doi{10.3758/s13428-019-01231-3}
-#'
-#' Meyer-Grant, C. G., Kellen, D., Harding, S. M., & Singmann, H. (2025).
-#'   \emph{Extreme-value signal detection theory for recognition memory: The
-#'   parametric road not taken}. PsyArXiv preprint.
-#'   \doi{10.31234/osf.io/qhrfj}
-#'
 #' @keywords distribution
 NULL
 
 
-#' @rdname SDTdist
-#' @return `dsdt` returns the (log-)density of the observed data under the
-#'   SDT model. For the binary version, this is the binomial probability of
-#'   observing `n_old` "old" responses out of `n_trials`, given the SDT
-#'   parameters. For the rating version, this is the multinomial probability
-#'   of the response counts given K-1 thresholds.
+#' @title Distribution functions for Binary SDT
+#'
+#' @description Density and random generation for binary signal detection
+#'   theory models. The response is the number of "old"/"signal" responses
+#'   out of a fixed number of trials (binomial likelihood).
+#'
+#' @name sdt_binary_dist
+#'
+#' @param n_old Integer vector. Number of "old"/"signal" responses.
+#' @param n_trials Integer vector. Total number of trials per cell.
+#' @param stimulus Integer vector (0/1). Stimulus type: 0 = noise, 1 = signal.
+#' @param dprime Numeric. Sensitivity parameter.
+#' @param criterion Numeric. Response bias (decision boundary location).
+#' @param sdratio Numeric. Ratio of signal to noise standard deviations
+#'   (default 1, i.e., equal variance).
+#' @param dist Character. Noise distribution: "normal" (default), "logistic",
+#'   "gumbel_min", or "gumbel_max".
+#' @param log Logical. If `TRUE`, returns log-density (default `FALSE`).
+#' @param n_per_cell Integer. Number of trials per stimulus type per subject.
+#' @param n_subjects Integer. Number of subjects.
+#'
+#' @return `dsdt_binary` returns the (log-)density (binomial probability).
+#'   `rsdt_binary` returns a data frame with columns `id`, `stimulus`, `n_trials`,
+#'   and `n_old`.
+#'
+#' @references
+#' Green, D. M., & Swets, J. A. (1966). \emph{Signal detection theory and
+#'   psychophysics}. Wiley.
+#'
+#' @keywords distribution
 #' @export
 #' @examples
-#' # Compute log-density of binary SDT data
-#' dsdt(n_old = 80, n_trials = 100, stimulus = 1,
-#'      dprime = 1.5, criterion = 0.2)
+#' # Density of binary SDT data
+#' dsdt_binary(n_old = 80, n_trials = 100, stimulus = 1,
+#'             dprime = 1.5, criterion = 0.2)
 #'
 #' # Vectorized over observations
-#' dsdt(n_old = c(30, 80), n_trials = c(100, 100), stimulus = c(0, 1),
-#'      dprime = 1.5, criterion = 0.2, log = TRUE)
-#'
-#' # With unequal variance
-#' dsdt(n_old = 80, n_trials = 100, stimulus = 1,
-#'      dprime = 1.5, criterion = 0.2, sdratio = 1.2)
-#'
-#' # Rating SDT density (K=4, single observation)
-#' dsdt(counts = c(5, 15, 25, 55), stimulus = 1,
-#'      dprime = 1.5, thresholds = c(-0.5, 0.0, 0.5),
-#'      version = "rating")
-#'
-#' # m-AFC density (4-AFC)
-#' dsdt(n_correct = 80, n_trials = 100, dprime = 1.5, m = 4,
-#'      version = "mafc")
-dsdt <- function(n_old = NULL, n_trials = NULL, stimulus = NULL, dprime,
-                 criterion = NULL, thresholds = NULL, counts = NULL,
-                 sdratio = 1, Ro = NULL, metad = NULL,
-                 n_correct = NULL, m = NULL,
-                 dist = c("normal", "logistic", "gumbel_min", "gumbel_max"),
-                 version = "binary",
-                 log = FALSE) {
-  dist <- match.arg(dist)
-  switch(version,
-    binary = .dsdt_binary(n_old, n_trials, stimulus, dprime, criterion,
-                          sdratio = sdratio, dist = dist, log = log),
-    rating = .dsdt_rating(counts, stimulus, dprime, thresholds,
-                          sdratio = sdratio, dist = dist, log = log),
-    dpsdt = .dsdt_dpsdt(counts, stimulus, dprime, thresholds,
-                        Ro = Ro, sdratio = sdratio, dist = dist,
-                        log = log),
-    metad = .dsdt_metad(counts, stimulus, dprime, metad, thresholds,
-                        sdratio = sdratio, dist = dist, log = log),
-    mafc = .dsdt_mafc(n_correct, n_trials, dprime, m = m, log = log),
-    ranking = .dsdt_ranking(counts = counts, dprime = dprime, m = m,
-                            dist = dist, sdratio = sdratio, log = log),
-    stop("Unknown SDT version: ", version,
-         ". Currently supported: 'binary', 'rating', 'dpsdt', 'metad', ",
-         "'mafc', 'ranking'")
-  )
-}
-
-
-#' @rdname SDTdist
-#' @return `rsdt` returns a data frame in pre-aggregated format. For the
-#'   binary version, columns are: `id`, `stimulus` (0/1), `n_trials`, and
-#'   `n_old` (count of "old" responses). For the rating version, columns are:
-#'   `id`, `stimulus` (0/1), one column per rating category (`r1`, ..., `rK`),
-#'   and `nTrials`.
-#' @export
-#' @examples
-#' # Generate data from a Gaussian SDT model
-#' dat <- rsdt(n_per_cell = 100, n_subjects = 20, dprime = 1.5, criterion = 0.2)
-#' head(dat)
-#'
-#' # Generate data from a Logistic SDT model
-#' dat_logistic <- rsdt(n_per_cell = 100, n_subjects = 10,
-#'                      dprime = 1.5, criterion = 0,
-#'                      dist = "logistic")
-#'
-#' # Generate data with unequal variance
-#' dat_uv <- rsdt(n_per_cell = 100, n_subjects = 10,
-#'                dprime = 1.5, criterion = 0, sdratio = 1.3)
-#'
-#' # Generate rating data (K=4, equidistant thresholds)
-#' dat_rating <- rsdt(n_per_cell = 100, n_subjects = 10,
-#'                    dprime = 1.5, criterion = 0, n_ratings = 4,
-#'                    spacing = 0.5, version = "rating")
-#'
-#' # Generate m-AFC data (4-AFC)
-#' dat_mafc <- rsdt(n_per_cell = 200, n_subjects = 20,
-#'                  dprime = 1.5, version = "mafc", m = 4)
-rsdt <- function(n_per_cell = 50, n_subjects = 1,
-                 dprime = 1.5, criterion = 0,
-                 sdratio = 1, Ro = NULL, metad = NULL,
-                 m = NULL,
-                 dist = c("normal", "logistic", "gumbel_min", "gumbel_max"),
-                 version = "binary",
-                 n_ratings = NULL, spacing = NULL, deltas = NULL,
-                 threshold_type = c("equidistant", "parsimonious", "log_distance", "log_ratio")) {
-  dist <- match.arg(dist)
-  threshold_type <- match.arg(threshold_type)
-  switch(version,
-    binary = .rsdt_binary(n_per_cell, n_subjects, dprime, criterion,
-                          sdratio = sdratio, dist = dist),
-    rating = .rsdt_rating(n_per_cell, n_subjects, dprime, criterion,
-                          sdratio = sdratio, dist = dist,
-                          n_ratings = n_ratings, spacing = spacing,
-                          deltas = deltas, threshold_type = threshold_type),
-    dpsdt = .rsdt_dpsdt(n_per_cell, n_subjects, dprime, criterion,
-                        Ro = Ro, sdratio = sdratio, dist = dist,
-                        n_ratings = n_ratings, spacing = spacing,
-                        deltas = deltas, threshold_type = threshold_type),
-    metad = .rsdt_metad(n_per_cell, n_subjects, dprime, criterion,
-                        metad = metad, sdratio = sdratio, dist = dist,
-                        n_ratings = n_ratings, spacing = spacing,
-                        deltas = deltas, threshold_type = threshold_type),
-    mafc = .rsdt_mafc(n_per_cell, n_subjects, dprime, m = m),
-    ranking = .rsdt_ranking(n_per_cell, n_subjects, dprime, m = m,
-                            dist = dist, sdratio = sdratio),
-    stop("Unknown SDT version: ", version,
-         ". Currently supported: 'binary', 'rating', 'dpsdt', 'metad', ",
-         "'mafc', 'ranking'")
-  )
-}
-
-
-# Internal: binary SDT density (binomial likelihood)
-# Handles both equal-variance (sdratio = 1) and unequal-variance models
-.dsdt_binary <- function(n_old, n_trials, stimulus, dprime, criterion,
-                         sdratio = 1, dist = "normal", log = FALSE) {
+#' dsdt_binary(n_old = c(30, 80), n_trials = c(100, 100),
+#'             stimulus = c(0, 1), dprime = 1.5, criterion = 0.2,
+#'             log = TRUE)
+dsdt_binary <- function(n_old, n_trials, stimulus, dprime, criterion,
+                        sdratio = 1, dist = "normal", log = FALSE) {
   stopif(any(n_old < 0), "n_old must be non-negative")
   stopif(any(n_trials < 1), "n_trials must be positive")
   stopif(any(!stimulus %in% c(0L, 1L)),
@@ -1766,9 +1628,15 @@ rsdt <- function(n_per_cell = 50, n_subjects = 1,
 }
 
 
-# Internal: binary SDT random generation (binomial sampling)
-.rsdt_binary <- function(n_per_cell, n_subjects, dprime, criterion,
-                         sdratio = 1, dist = "normal") {
+#' @rdname sdt_binary_dist
+#' @export
+#' @examples
+#' # Generate binary SDT data
+#' dat <- rsdt_binary(n_per_cell = 100, n_subjects = 20,
+#'                    dprime = 1.5, criterion = 0.2)
+#' head(dat)
+rsdt_binary <- function(n_per_cell, n_subjects, dprime, criterion,
+                        sdratio = 1, dist = "normal") {
   stopif(length(n_per_cell) != 1 || n_per_cell < 1,
          "n_per_cell must be a single positive integer")
   stopif(length(n_subjects) != 1 || n_subjects < 1,
@@ -1893,9 +1761,57 @@ rsdt <- function(n_per_cell = 50, n_subjects = 1,
 }
 
 
-# Internal: rating SDT density (multinomial likelihood)
-.dsdt_rating <- function(counts, stimulus, dprime, thresholds,
-                         sdratio = 1, dist = "normal", log = FALSE) {
+#' @title Distribution functions for Confidence Rating SDT
+#'
+#' @description Density and random generation for confidence rating signal
+#'   detection theory models. The response is a vector of counts across K
+#'   ordered rating categories (multinomial likelihood).
+#'
+#' @name sdt_rating_dist
+#'
+#' @param counts Integer vector of length K. Response counts per rating
+#'   category for a single observation, ordered from "definitely noise" (1) to
+#'   "definitely signal" (K).
+#' @param stimulus Integer (0 or 1). Stimulus type: 0 = noise, 1 = signal.
+#' @param dprime Numeric. Sensitivity parameter.
+#' @param thresholds Numeric vector of length K-1. Ordered decision thresholds.
+#' @param sdratio Numeric. Ratio of signal to noise standard deviations
+#'   (default 1, i.e., equal variance).
+#' @param dist Character. Noise distribution: "normal" (default), "logistic",
+#'   "gumbel_min", or "gumbel_max".
+#' @param log Logical. If `TRUE`, returns log-density (default `FALSE`).
+#' @param n_per_cell Integer. Number of trials per stimulus type per subject.
+#' @param n_subjects Integer. Number of subjects.
+#' @param criterion Numeric. Central decision threshold (response bias).
+#' @param n_ratings Integer. Number of response categories (must be >= 3).
+#' @param spacing Numeric. Threshold spacing parameter for "equidistant" and
+#'   "parsimonious" threshold types.
+#' @param deltas Numeric vector. Parameters for "log_distance" or "log_ratio"
+#'   threshold types.
+#' @param threshold_type Character. Threshold parameterization: "parsimonious"
+#'   (default), "equidistant", "log_distance", or "log_ratio".
+#'
+#' @return `dsdt_rating` returns the (log-)density (multinomial probability).
+#'   `rsdt_rating` returns a data frame with columns `id`, `stimulus`,
+#'   `r1`, ..., `rK`, and `nTrials`.
+#'
+#' @references
+#' Green, D. M., & Swets, J. A. (1966). \emph{Signal detection theory and
+#'   psychophysics}. Wiley.
+#'
+#' Selker, R., van den Bergh, D., Criss, A. H., & Wagenmakers, E.-J. (2019).
+#'   Parsimonious estimation of signal detection models from confidence ratings.
+#'   \emph{Behavior Research Methods}, \emph{51}(5), 1953--1967.
+#'   \doi{10.3758/s13428-019-01231-3}
+#'
+#' @keywords distribution
+#' @export
+#' @examples
+#' # Density for a single observation (K=4)
+#' dsdt_rating(counts = c(5, 15, 25, 55), stimulus = 1,
+#'             dprime = 1.5, thresholds = c(-0.5, 0.0, 0.5))
+dsdt_rating <- function(counts, stimulus, dprime, thresholds,
+                        sdratio = 1, dist = "normal", log = FALSE) {
   stopif(is.null(counts), "counts is required for rating SDT density")
   stopif(is.null(thresholds), "thresholds is required for rating SDT density")
   stopif(any(counts < 0), "counts must be non-negative")
@@ -1946,10 +1862,18 @@ rsdt <- function(n_per_cell = 50, n_subjects = 1,
   data
 }
 
-.rsdt_rating <- function(n_per_cell, n_subjects, dprime, criterion,
-                         sdratio = 1, dist = "normal",
-                         n_ratings = NULL, spacing = NULL, deltas = NULL,
-                         threshold_type = "equidistant") {
+#' @rdname sdt_rating_dist
+#' @export
+#' @examples
+#' # Generate rating data (K=4, parsimonious thresholds)
+#' dat <- rsdt_rating(n_per_cell = 100, n_subjects = 10,
+#'                    dprime = 1.5, criterion = 0,
+#'                    n_ratings = 4, spacing = 0.5)
+#' head(dat)
+rsdt_rating <- function(n_per_cell, n_subjects, dprime, criterion,
+                        sdratio = 1, dist = "normal",
+                        n_ratings = NULL, spacing = NULL, deltas = NULL,
+                        threshold_type = "parsimonious") {
   stopif(length(sdratio) != 1, "sdratio must be a single value for rating SDT")
   .rsdt_rating_common(n_per_cell, n_subjects, dprime, criterion,
     n_ratings, spacing, deltas, threshold_type,
@@ -1964,15 +1888,18 @@ rsdt <- function(n_per_cell = 50, n_subjects = 1,
 # Internal: compute DPSDT category probabilities for a single observation
 # Modifies standard SDT probabilities with recollection mixture:
 #   For old items: p[k] = (1-Ro)*sdt_prob[k], p[K] += Ro
-#   For new items: standard SDT probabilities (unmodified)
+#   For new items: p[k] = (1-Rn)*sdt_prob[k], p[1] += Rn
 .sdt_dpsdt_category_probs <- function(thresholds, shift, sdratio, stimulus,
-                                      dist, Ro) {
+                                      dist, Ro, Rn = 0) {
   probs <- .sdt_category_probs(thresholds, shift, sdratio, stimulus, dist)
+  K <- length(probs)
 
   if (stimulus == 1) {
-    K <- length(probs)
     probs <- (1 - Ro) * probs
     probs[K] <- probs[K] + Ro
+  } else {
+    probs <- (1 - Rn) * probs
+    probs[1] <- probs[1] + Rn
   }
 
   probs <- pmax(probs, .Machine$double.eps)
@@ -1980,15 +1907,65 @@ rsdt <- function(n_per_cell = 50, n_subjects = 1,
 }
 
 
-# Internal: DPSDT density (multinomial likelihood with recollection mixture)
-.dsdt_dpsdt <- function(counts, stimulus, dprime, thresholds,
-                        Ro = NULL, sdratio = 1, dist = "normal",
-                        log = FALSE) {
+#' @title Distribution functions for Dual Process SDT (DPSDT)
+#'
+#' @description Density and random generation for dual process signal detection
+#'   theory (Yonelinas, 1994). Extends rating SDT with recollection parameters
+#'   `Ro` (old items) and `Rn` (new items) that add probability mass to the
+#'   extreme confidence categories.
+#'
+#' @name sdt_dp_dist
+#'
+#' @param counts Integer vector of length K. Response counts per rating
+#'   category for a single observation.
+#' @param stimulus Integer (0 or 1). Stimulus type: 0 = noise, 1 = signal.
+#' @param dprime Numeric. Sensitivity (familiarity) parameter.
+#' @param thresholds Numeric vector of length K-1. Ordered decision thresholds.
+#' @param Ro Numeric. Recollection probability for old items (0 to 1). Adds
+#'   mass to the highest confidence "old" category.
+#' @param Rn Numeric. Recollection probability for new items (0 to 1). Adds
+#'   mass to the highest confidence "new" category.
+#' @param sdratio Numeric. Ratio of signal to noise standard deviations
+#'   (default 1).
+#' @param dist Character. Noise distribution: "normal" (default), "logistic",
+#'   "gumbel_min", or "gumbel_max".
+#' @param log Logical. If `TRUE`, returns log-density (default `FALSE`).
+#' @param n_per_cell Integer. Number of trials per stimulus type per subject.
+#' @param n_subjects Integer. Number of subjects.
+#' @param criterion Numeric. Central decision threshold.
+#' @param n_ratings Integer. Number of response categories (must be >= 3).
+#' @param spacing Numeric. Threshold spacing parameter.
+#' @param deltas Numeric vector. Parameters for "log_distance" or "log_ratio"
+#'   threshold types.
+#' @param threshold_type Character. Threshold parameterization: "parsimonious"
+#'   (default), "equidistant", "log_distance", or "log_ratio".
+#'
+#' @return `dsdt_dp` returns the (log-)density. `rsdt_dp` returns a data frame
+#'   with columns `id`, `stimulus`, `r1`, ..., `rK`, and `nTrials`.
+#'
+#' @references
+#' Yonelinas, A. P. (1994). Receiver-operating characteristics in recognition
+#'   memory: Evidence for a dual-process model. \emph{Journal of Experimental
+#'   Psychology: Learning, Memory, and Cognition}, \emph{20}(6), 1341--1354.
+#'   \doi{10.1037/0278-7393.20.6.1341}
+#'
+#' @keywords distribution
+#' @export
+#' @examples
+#' # DPSDT density (K=4)
+#' dsdt_dp(counts = c(5, 15, 25, 55), stimulus = 1,
+#'         dprime = 1.0, thresholds = c(-0.5, 0.0, 0.5),
+#'         Ro = 0.3, Rn = 0.1)
+dsdt_dp <- function(counts, stimulus, dprime, thresholds,
+                    Ro = NULL, Rn = NULL, sdratio = 1, dist = "normal",
+                    log = FALSE) {
   stopif(is.null(counts), "counts is required for DPSDT density")
   stopif(is.null(thresholds), "thresholds is required for DPSDT density")
   stopif(is.null(Ro), "Ro (recollection probability) is required for DPSDT")
+  stopif(is.null(Rn), "Rn (recollection probability) is required for DPSDT")
   stopif(any(counts < 0), "counts must be non-negative")
   stopif(Ro < 0 || Ro > 1, "Ro must be between 0 and 1")
+  stopif(Rn < 0 || Rn > 1, "Rn must be between 0 and 1")
 
   K <- length(counts)
   stopif(length(thresholds) != K - 1,
@@ -1998,25 +1975,35 @@ rsdt <- function(n_per_cell = 50, n_subjects = 1,
 
   shift <- dprime / 2 * (2 * stimulus - 1)
   probs <- .sdt_dpsdt_category_probs(thresholds, shift, sdratio, stimulus,
-                                     dist, Ro)
+                                     dist, Ro, Rn)
 
   stats::dmultinom(counts, prob = probs, log = log)
 }
 
 
-# Internal: DPSDT random generation (multinomial sampling with recollection)
-.rsdt_dpsdt <- function(n_per_cell, n_subjects, dprime, criterion,
-                        Ro = NULL, sdratio = 1, dist = "normal",
-                        n_ratings = NULL, spacing = NULL, deltas = NULL,
-                        threshold_type = "equidistant") {
+#' @rdname sdt_dp_dist
+#' @export
+#' @examples
+#' # Generate DPSDT data
+#' dat <- rsdt_dp(n_per_cell = 100, n_subjects = 10,
+#'                dprime = 1.0, criterion = 0,
+#'                Ro = 0.3, Rn = 0.1,
+#'                n_ratings = 4, spacing = 0.5)
+rsdt_dp <- function(n_per_cell, n_subjects, dprime, criterion,
+                    Ro = NULL, Rn = NULL, sdratio = 1, dist = "normal",
+                    n_ratings = NULL, spacing = NULL, deltas = NULL,
+                    threshold_type = "parsimonious") {
   stopif(is.null(Ro), "Ro (recollection probability) is required for DPSDT")
+  stopif(is.null(Rn), "Rn (recollection probability) is required for DPSDT")
   stopif(Ro < 0 || Ro > 1, "Ro must be between 0 and 1")
+  stopif(Rn < 0 || Rn > 1, "Rn must be between 0 and 1")
 
   .rsdt_rating_common(n_per_cell, n_subjects, dprime, criterion,
     n_ratings, spacing, deltas, threshold_type,
     prob_fn = function(thresholds, stimulus) {
       shift <- dprime / 2 * (2 * stimulus - 1)
-      .sdt_dpsdt_category_probs(thresholds, shift, sdratio, stimulus, dist, Ro)
+      .sdt_dpsdt_category_probs(thresholds, shift, sdratio, stimulus, dist,
+                                Ro, Rn)
     }
   )
 }
@@ -2069,9 +2056,55 @@ rsdt <- function(n_per_cell = 50, n_subjects = 1,
 }
 
 
-# Internal: meta-d' density (multinomial likelihood with normalization)
-.dsdt_metad <- function(counts, stimulus, dprime, metad, thresholds,
-                        sdratio = 1, dist = "normal", log = FALSE) {
+#' @title Distribution functions for Meta-d' SDT
+#'
+#' @description Density and random generation for the meta-d' model
+#'   (Maniscalco & Lau, 2012). Uses metacognitive sensitivity (`metad`) for
+#'   confidence threshold placement, normalized so that total "old"/"new"
+#'   response rates match what type-1 d' predicts.
+#'
+#' @name sdt_metad_dist
+#'
+#' @param counts Integer vector of length K. Response counts per rating
+#'   category for a single observation.
+#' @param stimulus Integer (0 or 1). Stimulus type: 0 = noise, 1 = signal.
+#' @param dprime Numeric. Type-1 sensitivity parameter.
+#' @param metad Numeric. Metacognitive sensitivity. If `metad = dprime`,
+#'   metacognition is ideal.
+#' @param thresholds Numeric vector of length K-1. Ordered decision thresholds.
+#' @param sdratio Numeric. Ratio of signal to noise standard deviations
+#'   (default 1).
+#' @param dist Character. Noise distribution: "normal" (default), "logistic",
+#'   "gumbel_min", or "gumbel_max".
+#' @param log Logical. If `TRUE`, returns log-density (default `FALSE`).
+#' @param n_per_cell Integer. Number of trials per stimulus type per subject.
+#' @param n_subjects Integer. Number of subjects.
+#' @param criterion Numeric. Central decision threshold.
+#' @param n_ratings Integer. Number of response categories (must be >= 3).
+#' @param spacing Numeric. Threshold spacing parameter.
+#' @param deltas Numeric vector. Parameters for "log_distance" or "log_ratio"
+#'   threshold types.
+#' @param threshold_type Character. Threshold parameterization: "parsimonious"
+#'   (default), "equidistant", "log_distance", or "log_ratio".
+#'
+#' @return `dsdt_metad` returns the (log-)density. `rsdt_metad` returns a data
+#'   frame with columns `id`, `stimulus`, `r1`, ..., `rK`, and `nTrials`.
+#'
+#' @references
+#' Maniscalco, B., & Lau, H. (2012). A signal detection theoretic approach
+#'   for estimating metacognitive sensitivity from confidence ratings.
+#'   \emph{Consciousness and Cognition}, \emph{21}(1), 422--430.
+#'   \doi{10.1016/j.concog.2011.09.021}
+#'
+#' @keywords distribution
+#' @export
+#' @examples
+#' # Meta-d' density (K=4)
+#' dsdt_metad(counts = c(5, 15, 25, 55), stimulus = 1,
+#'            dprime = 1.5, metad = 1.2,
+#'            thresholds = c(-0.5, 0.0, 0.5))
+dsdt_metad <- function(counts, stimulus, dprime, metad, thresholds,
+                       sdratio = 1, dist = "normal", log = FALSE) {
   stopif(is.null(counts), "counts is required for meta-d' density")
   stopif(is.null(thresholds), "thresholds is required for meta-d' density")
   stopif(is.null(metad), "metad (metacognitive sensitivity) is required")
@@ -2090,11 +2123,17 @@ rsdt <- function(n_per_cell = 50, n_subjects = 1,
 }
 
 
-# Internal: meta-d' random generation (multinomial with normalization)
-.rsdt_metad <- function(n_per_cell, n_subjects, dprime, criterion,
-                        metad = NULL, sdratio = 1, dist = "normal",
-                        n_ratings = NULL, spacing = NULL, deltas = NULL,
-                        threshold_type = "equidistant") {
+#' @rdname sdt_metad_dist
+#' @export
+#' @examples
+#' # Generate meta-d' data
+#' dat <- rsdt_metad(n_per_cell = 100, n_subjects = 10,
+#'                   dprime = 1.5, criterion = 0, metad = 1.2,
+#'                   n_ratings = 4, spacing = 0.5)
+rsdt_metad <- function(n_per_cell, n_subjects, dprime, criterion,
+                       metad = NULL, sdratio = 1, dist = "normal",
+                       n_ratings = NULL, spacing = NULL, deltas = NULL,
+                       threshold_type = "parsimonious") {
   stopif(is.null(metad), "metad (metacognitive sensitivity) is required")
   stopif(length(metad) != 1, "metad must be a single value for meta-d'")
 
@@ -2108,8 +2147,41 @@ rsdt <- function(n_per_cell = 50, n_subjects = 1,
 }
 
 
-# Internal: m-AFC density (binomial likelihood on accuracy)
-.dsdt_mafc <- function(n_correct, n_trials, dprime, m = NULL, log = FALSE) {
+#' @title Distribution functions for m-AFC SDT
+#'
+#' @description Density and random generation for m-alternative forced choice
+#'   signal detection theory (DeCarlo, 2012). Models accuracy in tasks where
+#'   one of m alternatives contains the signal. Only the `dprime` parameter
+#'   is estimated (no criterion).
+#'
+#' @name sdt_mafc_dist
+#'
+#' @param n_correct Integer vector. Number of correct responses.
+#' @param n_trials Integer vector. Total number of trials.
+#' @param dprime Numeric. Sensitivity parameter.
+#' @param m Integer. Number of alternatives. Must be >= 2. For 2-AFC, uses
+#'   the closed-form solution `Phi(dprime / sqrt(2))`. For m >= 3, uses
+#'   Gauss-Hermite quadrature.
+#' @param log Logical. If `TRUE`, returns log-density (default `FALSE`).
+#' @param n_per_cell Integer. Number of trials per subject.
+#' @param n_subjects Integer. Number of subjects.
+#'
+#' @return `dsdt_mafc` returns the (log-)density (binomial probability).
+#'   `rsdt_mafc` returns a data frame with columns `id`, `n_trials`, and
+#'   `n_correct`.
+#'
+#' @references
+#' DeCarlo, L. T. (2012). On a signal detection approach to m-alternative
+#'   forced choice with bias, with maximum likelihood and Bayesian approaches
+#'   to estimation. \emph{Journal of Mathematical and Statistical Psychology},
+#'   \emph{11}(1), 257--282.
+#'
+#' @keywords distribution
+#' @export
+#' @examples
+#' # 4-AFC density
+#' dsdt_mafc(n_correct = 80, n_trials = 100, dprime = 1.5, m = 4)
+dsdt_mafc <- function(n_correct, n_trials, dprime, m = NULL, log = FALSE) {
   stopif(is.null(n_correct), "n_correct is required for m-AFC density")
   stopif(is.null(n_trials), "n_trials is required for m-AFC density")
   stopif(is.null(m) || !is.numeric(m) || any(m < 2),
@@ -2122,8 +2194,13 @@ rsdt <- function(n_per_cell = 50, n_subjects = 1,
 }
 
 
-# Internal: m-AFC random generation (binomial on accuracy)
-.rsdt_mafc <- function(n_per_cell, n_subjects, dprime, m = NULL) {
+#' @rdname sdt_mafc_dist
+#' @export
+#' @examples
+#' # Generate 4-AFC data
+#' dat <- rsdt_mafc(n_per_cell = 200, n_subjects = 20, dprime = 1.5, m = 4)
+#' head(dat)
+rsdt_mafc <- function(n_per_cell, n_subjects, dprime, m = NULL) {
   stopif(is.null(m) || !is.numeric(m) || length(m) != 1 || m < 2,
          "m must be a single integer >= 2")
   m <- as.integer(m)
@@ -2142,9 +2219,44 @@ rsdt <- function(n_per_cell = 50, n_subjects = 1,
 }
 
 
-# Internal: ranking density (multinomial kernel on rank counts)
-.dsdt_ranking <- function(counts, dprime, m = NULL,
-                          dist = "gumbel_min", sdratio = 1, log = FALSE) {
+#' @title Distribution functions for Ranking SDT
+#'
+#' @description Density and random generation for ranking signal detection
+#'   theory (Meyer-Grant et al., 2025). Models rank ordering of m items by
+#'   perceived strength. Only `dprime` is estimated (no criterion or stimulus
+#'   column). Supports Gumbel-min (closed form) and Gaussian UV-SDT
+#'   (numerical integration).
+#'
+#' @name sdt_ranking_dist
+#'
+#' @param counts Integer vector of length m. Counts of how often the target
+#'   received each rank (1 = most likely target, m = least likely).
+#' @param dprime Numeric. Ranking discrimination parameter.
+#' @param m Integer. Number of ranked items. Must be >= 2.
+#' @param dist Character. Distribution: "gumbel_min" (default, closed form)
+#'   or "normal" (Gaussian UV-SDT, numerical integration).
+#' @param sdratio Numeric. Ratio of signal to noise standard deviations
+#'   (default 1). Only used when `dist = "normal"`.
+#' @param log Logical. If `TRUE`, returns log-density (default `FALSE`).
+#' @param n_per_cell Integer. Number of ranking trials per subject.
+#' @param n_subjects Integer. Number of subjects.
+#'
+#' @return `dsdt_ranking` returns the (log-)density. `rsdt_ranking` returns a
+#'   data frame with columns `id`, `rank`, `maxrank`, and `observed`.
+#'
+#' @references
+#' Meyer-Grant, C. G., Kellen, D., Harding, S. M., & Singmann, H. (2025).
+#'   \emph{Extreme-value signal detection theory for recognition memory: The
+#'   parametric road not taken}. PsyArXiv preprint.
+#'   \doi{10.31234/osf.io/qhrfj}
+#'
+#' @keywords distribution
+#' @export
+#' @examples
+#' # Gumbel-min ranking density
+#' dsdt_ranking(counts = c(40, 30, 20, 10), dprime = 1.0, m = 4)
+dsdt_ranking <- function(counts, dprime, m = NULL,
+                         dist = "gumbel_min", sdratio = 1, log = FALSE) {
   stopif(is.null(counts), "counts is required for ranking density")
   stopif(is.null(m) || !is.numeric(m) || any(m < 2),
          "m must be an integer >= 2")
@@ -2158,9 +2270,15 @@ rsdt <- function(n_per_cell = 50, n_subjects = 1,
 }
 
 
-# Internal: ranking random generation (multinomial on rank counts)
-.rsdt_ranking <- function(n_per_cell, n_subjects, dprime, m = NULL,
-                          dist = "gumbel_min", sdratio = 1) {
+#' @rdname sdt_ranking_dist
+#' @export
+#' @examples
+#' # Generate ranking data (m=4, Gumbel-min)
+#' dat <- rsdt_ranking(n_per_cell = 100, n_subjects = 10,
+#'                     dprime = 1.0, m = 4)
+#' head(dat)
+rsdt_ranking <- function(n_per_cell, n_subjects, dprime, m = NULL,
+                         dist = "gumbel_min", sdratio = 1) {
   stopif(is.null(m) || !is.numeric(m) || length(m) != 1 || m < 2,
          "m must be a single integer >= 2")
   m <- as.integer(m)
@@ -2242,6 +2360,168 @@ sdt_criterion <- function(hit_rate, fa_rate,
 }
 
 
+############################################################################# !
+# SDAI DISTRIBUTION FUNCTIONS                                             ####
+############################################################################# !
+
+#' @title Distribution functions for the SDAI model
+#'
+#' @description Density and random generation for the Source-Dependent
+#'   Asymmetric Information (SDAI) model (Meyer-Grant et al., 2025).
+#'   Supports both Gumbel-min and Gaussian noise distributions.
+#'
+#' @name sdai_dist
+#'
+#' @param tabs_counts Integer vector. Response counts for the table
+#'   (discrimination) process (length = `n_confidence`).
+#' @param tpres_counts Integer vector. Response counts for the test-present
+#'   (source confusion) process (length = `(n_sources - 1) * n_confidence`).
+#' @param dprime Numeric. Source discrimination parameter.
+#' @param criterion Numeric. Central decision threshold.
+#' @param margins_l Numeric vector. Left (below-criterion) margin parameters
+#'   on the original scale (not log). Length = `n_confidence - 2`.
+#'   Use `NULL` for 2-confidence models (no margins).
+#' @param margins_h Numeric vector. Right (above-criterion) margin parameters.
+#'   Same length as `margins_l`.
+#' @param sdratio Numeric. SD ratio for Gaussian models (default 1, i.e.,
+#'   equal variance). Ignored for Gumbel models.
+#' @param dist Character. Noise distribution: "gumbel_min" (default) or
+#'   "normal".
+#' @param log Logical. If `TRUE`, returns log-density (default `FALSE`).
+#' @param n_per_cell Integer. Number of trials per cell.
+#' @param n_subjects Integer. Number of subjects.
+#' @param n_sources Integer. Number of source categories (default 2).
+#' @param n_confidence Integer. Number of confidence levels (default 4).
+#'
+#' @return `dsdai` returns the (log-)density (product of two multinomial
+#'   likelihoods for tabs and tpres processes). `rsdai` returns a data frame
+#'   with columns `id` and one column per response category
+#'   (`i{source}_c{confidence}`).
+#'
+#' @references
+#' Meyer-Grant, C. G., Kellen, D., & Klauer, K. C. (2025). A
+#'   Gumbel-distribution model of recognition memory.
+#'
+#' @keywords distribution
+#' @export
+#' @examples
+#' # Gumbel SDAI density (2 sources x 4 confidence)
+#' dsdai(tabs_counts = c(10, 20, 30, 40),
+#'       tpres_counts = c(15, 25, 35, 25, 20, 30, 30, 20),
+#'       dprime = 1.0, criterion = 0,
+#'       margins_l = c(0.5, 0.3), margins_h = c(0.5, 0.3))
+dsdai <- function(tabs_counts, tpres_counts, dprime, criterion,
+                  margins_l = NULL, margins_h = NULL,
+                  sdratio = 1, dist = "gumbel_min", log = FALSE) {
+  dist <- match.arg(dist, c("gumbel_min", "normal"))
+  stopif(any(tabs_counts < 0), "tabs_counts must be non-negative")
+  stopif(any(tpres_counts < 0), "tpres_counts must be non-negative")
+
+  n_confidence <- length(tabs_counts)
+  n_margins <- n_confidence - 2L
+
+  thresholds <- .sdai_thresholds(
+    criterion,
+    if (n_margins > 0) matrix(margins_l, nrow = 1) else NULL,
+    if (n_margins > 0) matrix(margins_h, nrow = 1) else NULL
+  )
+
+  dp_mat <- matrix(dprime, nrow = 1)
+
+  if (dist == "gumbel_min") {
+    p_tabs <- .sdai_tabs_probs_gumbel(thresholds)
+    p_tpres <- .sdai_tpres_probs_gumbel(thresholds, dp_mat)
+  } else {
+    sr_mat <- matrix(sdratio, nrow = 1)
+    p_tabs <- .sdai_tabs_probs_gaussian(thresholds)
+    p_tpres <- .sdai_tpres_probs_gaussian(thresholds, dp_mat, sr_mat)
+  }
+
+  # p_tpres may have more columns than tpres_counts (both source directions);
+  # use only the first length(tpres_counts) probabilities
+  n_tpres <- length(tpres_counts)
+  p_tpres_use <- p_tpres[1, seq_len(n_tpres)]
+  p_tpres_use <- p_tpres_use / sum(p_tpres_use)
+
+  ll_tabs <- stats::dmultinom(tabs_counts, prob = p_tabs[1, ], log = TRUE)
+  ll_tpres <- stats::dmultinom(tpres_counts, prob = p_tpres_use, log = TRUE)
+
+  if (log) ll_tabs + ll_tpres else exp(ll_tabs + ll_tpres)
+}
+
+
+#' @rdname sdai_dist
+#' @export
+#' @examples
+#' # Generate SDAI data
+#' dat <- rsdai(n_per_cell = 100, n_subjects = 5, dprime = 1.0,
+#'              criterion = 0, margins_l = c(0.5, 0.3),
+#'              margins_h = c(0.5, 0.3))
+#' head(dat)
+rsdai <- function(n_per_cell = 50, n_subjects = 1, dprime = 1.0,
+                  criterion = 0, margins_l = NULL, margins_h = NULL,
+                  sdratio = 1, dist = "gumbel_min",
+                  n_sources = 2, n_confidence = 4) {
+  dist <- match.arg(dist, c("gumbel_min", "normal"))
+  stopif(n_per_cell < 1, "n_per_cell must be a positive integer")
+  stopif(n_subjects < 1, "n_subjects must be a positive integer")
+  stopif(n_sources < 2, "n_sources must be at least 2")
+  stopif(n_confidence < 2, "n_confidence must be at least 2")
+
+  n_margins <- n_confidence - 2L
+  if (n_margins > 0 && is.null(margins_l)) {
+    margins_l <- rep(0.5, n_margins)
+  }
+  if (n_margins > 0 && is.null(margins_h)) {
+    margins_h <- rep(0.5, n_margins)
+  }
+
+  thresholds <- .sdai_thresholds(
+    criterion,
+    if (n_margins > 0) matrix(margins_l, nrow = 1) else NULL,
+    if (n_margins > 0) matrix(margins_h, nrow = 1) else NULL
+  )
+
+  dp_mat <- matrix(dprime, nrow = 1)
+
+  if (dist == "gumbel_min") {
+    p_tabs <- .sdai_tabs_probs_gumbel(thresholds)[1, ]
+    p_tpres <- .sdai_tpres_probs_gumbel(thresholds, dp_mat)[1, ]
+  } else {
+    sr_mat <- matrix(sdratio, nrow = 1)
+    p_tabs <- .sdai_tabs_probs_gaussian(thresholds)[1, ]
+    p_tpres <- .sdai_tpres_probs_gaussian(thresholds, dp_mat, sr_mat)[1, ]
+  }
+
+  n_tabs <- n_confidence
+  n_tpres <- (n_sources - 1) * n_confidence
+  n_total <- n_sources * n_confidence
+
+  resp_names <- character(n_total)
+  for (s in seq_len(n_sources)) {
+    for (cc in seq_len(n_confidence)) {
+      resp_names[(s - 1) * n_confidence + cc] <- paste0("i", s, "_c", cc)
+    }
+  }
+
+  # p_tpres may have more columns than n_tpres (both directions);
+  # use only the first n_tpres probabilities for data generation
+  p_tpres_gen <- p_tpres[seq_len(n_tpres)]
+  p_tpres_gen <- p_tpres_gen / sum(p_tpres_gen)
+
+  data_list <- lapply(seq_len(n_subjects), function(id) {
+    tabs <- as.integer(stats::rmultinom(1, n_per_cell, p_tabs))
+    tpres <- as.integer(stats::rmultinom(1, n_per_cell, p_tpres_gen))
+    row <- c(tabs, tpres)
+    df <- as.data.frame(t(row))
+    names(df) <- resp_names
+    df$id <- id
+    df
+  })
+  do.call(rbind, data_list)
+}
+
+
 # SDT distribution registry: single source of truth for all CDF/quantile logic
 # Each entry: id (Stan integer), cdf (R CDF), qf (R quantile function),
 # stan_expr (function returning Stan CDF expression string)
@@ -2287,25 +2567,5 @@ sdt_criterion <- function(hit_rate, fa_rate,
   .SDT_DISTS[[dist]]$cdf(eta)
 }
 
-# Internal: Stan CDF expression builder for SDT distributions
-# Returns a function(x) that produces the Stan expression string
-.sdt_cdf_expr <- function(dist) {
-  .SDT_DISTS[[dist]]$stan_expr
-}
-
-# Internal: Stan log-CDF expression builder for SDT distributions
-# Returns a function(x) that produces the Stan log_CDF expression string
-.sdt_log_cdf_expr <- function(dist) {
-  .SDT_DISTS[[dist]]$log_stan_expr
-}
-
-# Internal: Stan log complementary CDF expression builder
-# Returns a function(x) that produces log(1 - CDF(x)) expression string
-.sdt_log1m_cdf_expr <- function(dist) {
-  .SDT_DISTS[[dist]]$log1m_stan_expr
-}
-
-# Internal: map distribution name to Stan integer ID
-.sdt_dist_id <- function(dist) {
-  .SDT_DISTS[[dist]]$id
-}
+# NOTE: .sdt_cdf_expr(), .sdt_log_cdf_expr(), .sdt_log1m_cdf_expr(),
+# and .sdt_dist_id() have moved to R/helpers-sdt.R
