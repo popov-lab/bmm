@@ -44,7 +44,7 @@
         "(exp(spacing) ensures positive spacing)"
       )
       default_priors$spacing <- list(
-        main = "normal(0, 1)", effects = "normal(0, 0.5)"
+        main = "normal(0, 0.5)", effects = "normal(0, 0.3)"
       )
       param_links$spacing <- "identity"
     } else if (threshold_type %in% c("log_distance", "log_ratio")) {
