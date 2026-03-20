@@ -439,10 +439,9 @@ test_that("cswald parameter validation works", {
     "non-decision time"
   )
 
-  # zr out of range (note: actual error message has typo "startin point")
   expect_error(
     dcswald(1, 1, drift = 2, bound = 1.5, ndt = 0.3, zr = 1.5),
-    "startin"
+    "starting point"
   )
 
   # negative s

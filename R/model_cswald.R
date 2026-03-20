@@ -110,10 +110,6 @@
   out
 }
 
-# user facing alias
-# information in the title and details sections will be filled in
-# automatically based on the information in the .model_cswald()$info
-
 #' @title `r .model_cswald()$name`
 #' @name cswald
 #' @details `r model_info(.model_cswald())`
@@ -288,12 +284,6 @@ check_data.cswald <- function(model, data, formula) {
     )
   }
 
-  stopif(
-    any(!data[, response_var] %in% c(0, 1)),
-    "Invalid values in the response variable '{response_var}'.\n
-    After processing, responses must be coded as 0 (lower) or 1 (upper)."
-  )
-
   if (model$version == "simple") {
     error_rate <- mean(data[, response_var] == 0)
     warnif(
@@ -366,10 +356,8 @@ posterior_predict_cswald_simple <- function(i, prep, ...) {
   ndt <- brms::get_dpar(prep, "ndt", i = i)
   s <- brms::get_dpar(prep, "s", i = i)
 
-  # Simple version estimates distance to upper bound only (single-boundary Wald).
-  # To generate data from the full DDM (via rcswald), convert to total boundary
-  # separation: a = 2 * bound, with unbiased starting point zr = 0.5
-  out <- rcswald(
+  # convert single-boundary bound to total separation for the full DDM generator
+  out <- .rcswald(
     n = length(drift),
     drift = drift,
     bound = bound * 2,
@@ -395,7 +383,7 @@ log_lik_cswald_simple <- function(i, prep) {
   rt <- rep(prep$data$Y[i], length(drift))
   response <- rep(prep$data$dec[i], length(drift))
 
-  dcswald(rt, response, drift, bound, ndt, s = s, version = "simple", log = TRUE)
+  .dcswald(rt, response, drift, bound, ndt, zr = 0.5, s = s, version = "simple", log = TRUE)
 }
 
 #' @export
@@ -445,7 +433,7 @@ log_lik_cswald_crisk <- function(i, prep) {
   rt <- rep(prep$data$Y[i], length(drift))
   response <- rep(prep$data$dec[i], length(drift))
 
-  dcswald(rt, response, drift, bound, ndt, zr = zr, s = s, version = "crisk", log = TRUE)
+  .dcswald(rt, response, drift, bound, ndt, zr = zr, s = s, version = "crisk", log = TRUE)
 }
 
 posterior_predict_cswald_crisk <- function(i, prep, ...) {
@@ -455,7 +443,7 @@ posterior_predict_cswald_crisk <- function(i, prep, ...) {
   zr <- brms::get_dpar(prep, "zr", i = i)
   s <- brms::get_dpar(prep, "s", i = i)
 
-  out <- rcswald(
+  out <- .rcswald(
     n = length(drift),
     drift = drift,
     bound = bound,

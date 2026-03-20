@@ -781,24 +781,32 @@ dcswald <- function(rt, response, drift, bound, ndt, zr = 0.5, s = 1,
                     version = "simple", log = TRUE) {
   validate_cswald_parameters(drift, bound, ndt, zr, s)
 
-  rt_shifted <- rt - ndt
   stopif(
-    any(rt_shifted <= 0),
+    any(rt - ndt <= 0),
     "Some reaction times are smaller than the non-decision time. \\
     You need to specify a non-decision time 'ndt' smaller than \\
     the shortest reaction time."
   )
 
+  stopif(
+    !version %in% c("simple", "crisk"),
+    "The version you specified is not valid. Please choose between version = \"simple\" or \"crisk\"."
+  )
+
+  .dcswald(rt, response, drift, bound, ndt, zr, s, version, log)
+}
+
+.dcswald <- function(rt, response, drift, bound, ndt, zr, s, version, log) {
+  rt_shifted <- rt - ndt
+
   if (version == "simple") {
     log_ll <- .pwald(rt_shifted, drift = drift, bound = bound, s = s, lower.tail = FALSE, log.p = TRUE)
     ll1 <- .dwald(rt_shifted, drift = drift, bound = bound, s = s, log = TRUE)
-  } else if (version == "crisk") {
+  } else {
     log_ll <- .dwald(rt_shifted, drift = -drift, bound = bound * zr, s = s, log = TRUE) +
       .pwald(rt_shifted, drift = drift, bound = bound - bound * zr, s = s, lower.tail = FALSE, log.p = TRUE)
     ll1 <- .dwald(rt_shifted, drift = drift, bound = bound - bound * zr, s = s, log = TRUE) +
       .pwald(rt_shifted, drift = -drift, bound = bound * zr, s = s, lower.tail = FALSE, log.p = TRUE)
-  } else {
-    stop2("The version you specified is not valid. Please choose between version = \"simple\" or \"crisk\".")
   }
 
   log_ll[response == 1] <- ll1[response == 1]
@@ -810,15 +818,16 @@ dcswald <- function(rt, response, drift, bound, ndt, zr = 0.5, s = 1,
 #' @export
 rcswald <- function(n, drift, bound, ndt, zr = 0.5, s = 1) {
   validate_cswald_parameters(drift, bound, ndt, zr, s)
+  .rcswald(n, drift, bound, ndt, zr, s)
+}
 
-  z_abs <- zr * bound
-
+.rcswald <- function(n, drift, bound, ndt, zr, s) {
   out <- rtdists::rdiffusion(
     n = n,
     a = bound,
     v = drift,
     t0 = ndt,
-    z = z_abs,
+    z = zr * bound,
     s = s
   )
 
@@ -863,8 +872,6 @@ pcswald <- function(q, response, drift, bound, ndt, zr = 0.5, s = 1,
   p <- numeric(length(q))
 
   if (version == "simple") {
-    # For simple version: only upper boundary is absorbing
-    # CDF for response = 0 is not well-defined (censored observations)
     warnif(
       any(response == 0),
       "CDF for response=0 is not well-defined in the 'simple' version. \\
@@ -872,7 +879,6 @@ pcswald <- function(q, response, drift, bound, ndt, zr = 0.5, s = 1,
         Returning NA for these values."
     )
 
-    # for response = 1 with valid q_shifted, use the Wald CDF
     idx1 <- response == 1 & q_shifted > 0
     if (any(idx1)) {
       p[idx1] <- .pwald(q_shifted,
@@ -884,9 +890,6 @@ pcswald <- function(q, response, drift, bound, ndt, zr = 0.5, s = 1,
 
     p[response == 0] <- NA
   } else if (version == "crisk") {
-    # For crisk version: use the full diffusion model defective CDF
-    # This computes P(RT <= q, response = r)
-
     idx_valid <- q_shifted > 0
     if (any(idx_valid)) {
       p[idx_valid] <- rtdists::pdiffusion(
@@ -959,10 +962,8 @@ qcswald <- function(p, response, drift, bound, ndt, zr = 0.5, s = 1,
     expected_rt <- bound / max(abs(drift), 0.01)
     upper_bound <- ndt + max(10, 20 * expected_rt)
 
-    # for response = 1, use numerical inversion of the Wald CDF
     idx1 <- which(response == 1)
     for (i in idx1) {
-      # numerical root finding to invert CDF
       q[i] <- stats::uniroot(
         function(x) {
           .pwald(x - ndt[i], drift[i], bound[i], s[i],
@@ -1035,28 +1036,6 @@ validate_cswald_parameters <- function(drift, bound, ndt, zr, s) {
   if (log.p) log_p else exp(log_p)
 }
 
-.rwald <- function(n, drift, bound, s = 1) {
-  v <- rep(drift, length.out = n)
-  a <- rep(bound, length.out = n)
-  s <- rep(s, length.out = n)
-
-  stopif(!all(a > 0), "All boundary values must be positive.")
-  stopif(!all(s > 0), "All diffusion constant values must be positive.")
-
-  eps <- 1e-12
-  v_eff <- pmax(v, eps)
-
-  # Michael-Schucany-Haas (1976) inverse-Gaussian parametrization
-  mu <- a / v_eff
-  lambda <- (a / s)^2
-
-  z <- rnorm(n)
-  y <- z * z
-  x <- mu + (mu^2 * y) / (2 * lambda) - (mu / (2 * lambda)) * sqrt(4 * mu * lambda * y + (mu^2) * (y^2))
-  u <- runif(n)
-
-  ifelse(u <= mu / (mu + x), x, (mu^2) / x)
-}
 
 #' @title Distribution functions for the EZ-Diffusion Model (ezdm)
 #'
@@ -1137,7 +1116,6 @@ dezdm <- function(mean_rt, var_rt, n_upper, n_trials,
                   version = c("3par", "4par"), log = TRUE) {
   version <- match.arg(version)
 
-  # parameter validation
   stopif(isTRUE(any(bound <= 0)), "bound must be positive")
   stopif(isTRUE(any(ndt <= 0)), "ndt must be positive")
   stopif(isTRUE(any(s <= 0)), "s must be positive")
@@ -1179,7 +1157,6 @@ rezdm <- function(n, n_trials, drift, bound, ndt, zr = 0.5, s = 1,
                   version = c("3par", "4par")) {
   version <- match.arg(version)
 
-  # parameter validation
   stopif(isTRUE(any(bound <= 0)), "bound must be positive")
   stopif(isTRUE(any(ndt <= 0)), "ndt must be positive")
   stopif(isTRUE(any(s <= 0)), "s must be positive")
