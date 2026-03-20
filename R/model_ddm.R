@@ -39,6 +39,7 @@
       domain = "Decision Making / Processing Speed",
       task = "Two-Alternative Force Choice RT",
       name = "Diffusion Decision Model",
+      version = "NA",
       citation = glue(
         "- Ratcliff, R. (1978). A theory of memory retrieval. Psychological Review, 85(2), 59-108. https://doi.org/10/fjwm2f","\n",
         "- Henrich, F., Hartmann, R., Pratz, V., Voss, A., & Klauer, K. C. (2024). The Seven-parameter Diffusion Model: An Implementation in Stan for Bayesian Analyses. Behavior Research Methods, 56(4), 3102-3116. https://doi.org/10.3758/s13428-023-02179-1"

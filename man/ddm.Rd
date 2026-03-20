@@ -5,7 +5,7 @@
 \alias{ddm}
 \title{Diffusion Decision Model}
 \usage{
-ddm(rt, response, links = NULL, version = NULL, ...)
+ddm(rt, response, links = NULL, ...)
 }
 \arguments{
 \item{rt}{Name of the reaction time variable coding reaction time in seconds in the data.}
@@ -13,8 +13,6 @@ ddm(rt, response, links = NULL, version = NULL, ...)
 \item{response}{Name of the response variable coding the response numerically (0 = lower response / incorrect, 1 = upper response / correct)}
 
 \item{links}{A list of links for the parameters.}
-
-\item{version}{Deprecated and ignored; kept for backward compatibility.}
 
 \item{...}{used internally for testing, ignore it}
 }
