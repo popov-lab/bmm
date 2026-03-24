@@ -2299,6 +2299,249 @@ rsdt_ranking <- function(n_per_cell, n_subjects, dprime, m = NULL,
 }
 
 
+# ==========================================================================
+# CDP (Continuous Dual-Process) SDT distribution functions
+# ==========================================================================
+
+# Internal: PDF for SDT distributions (mirrors .sdt_cdf for the CDF)
+.sdt_pdf <- function(eta, dist) {
+  if (dist == "normal") return(stats::dnorm(eta))
+  if (dist == "gumbel_min") {
+    z <- exp(-eta)
+    return(z * exp(-z))
+  }
+  if (dist == "gumbel_max") {
+    z <- exp(eta)
+    return(z * exp(-z))
+  }
+  # logistic
+  stats::dlogis(eta)
+}
+
+# Internal: compute CDP category probabilities for a single observation
+# Computes probabilities via numerical integration over the recollection
+# dimension R. Categories are: new (n_conf), [guess (n_conf)], know (n_conf),
+# remember (n_conf).
+#
+# thresholds: numeric vector of (2*n_conf - 1) ordered confidence thresholds
+# dprimef: familiarity sensitivity (mu_F for targets)
+# dprimer: recollection sensitivity (mu_R for targets)
+# sigmar: log SD ratio for recollection targets (exp(sigmar) = sigma_R)
+# rcrit: remember criterion on R axis
+# kcrit: know criterion on F axis (NULL or -Inf for 2-way model)
+# stimulus: 0 (lure) or 1 (target)
+# n_conf: number of confidence levels per side
+# dist: distribution name ("normal", "logistic", "gumbel_min", "gumbel_max")
+.sdt_cdp_category_probs <- function(thresholds, dprimef, dprimer, sigmar,
+                                    rcrit, kcrit, stimulus, n_conf,
+                                    dist = "normal") {
+  mu_F <- if (stimulus == 1) dprimef else 0
+  mu_R <- if (stimulus == 1) dprimer else 0
+  sd_R <- if (stimulus == 1) exp(sigmar) else 1
+
+  K_full <- 2 * n_conf
+  has_guess <- !is.null(kcrit) && is.finite(kcrit)
+  n_cat_types <- if (has_guess) 4L else 3L
+  n_cats <- n_cat_types * n_conf
+  probs <- numeric(n_cats)
+
+  cdf_fn <- .SDT_DISTS[[dist]]$cdf
+
+  # Build the integrand for a given category
+  make_integrand <- function(c_lo, c_hi, f_lo, f_hi) {
+    function(R) {
+      phi_R <- .sdt_pdf((R - mu_R) / sd_R, dist) / sd_R
+      F_lower <- pmax(c_lo - R, f_lo) - mu_F
+      F_upper <- pmin(c_hi - R, f_hi) - mu_F
+      ifelse(F_upper <= F_lower, 0, phi_R * (cdf_fn(F_upper) - cdf_fn(F_lower)))
+    }
+  }
+
+  for (cat_idx in seq_len(n_cats)) {
+    if (has_guess) {
+      cat_type <- ((cat_idx - 1L) %/% n_conf) + 1L
+      cat_conf <- ((cat_idx - 1L) %% n_conf) + 1L
+    } else {
+      cat_type <- ((cat_idx - 1L) %/% n_conf) + 1L
+      cat_conf <- ((cat_idx - 1L) %% n_conf) + 1L
+      # Remap: 1=new, 2=know, 3=remember → 1=new, 3=know, 4=remember
+      if (cat_type == 2L) cat_type <- 3L
+      else if (cat_type == 3L) cat_type <- 4L
+    }
+
+    # Map to global confidence position
+    global_k <- if (cat_type == 1L) cat_conf else (n_conf + cat_conf)
+
+    c_lo <- if (global_k == 1L) -Inf else thresholds[global_k - 1L]
+    c_hi <- if (global_k == K_full) Inf else thresholds[global_k]
+
+    # R and F bounds by category type
+    if (cat_type == 1L) {
+      R_lo <- -Inf; R_hi <- Inf; f_lo <- -Inf; f_hi <- Inf
+    } else if (cat_type == 4L) {
+      R_lo <- rcrit; R_hi <- Inf; f_lo <- -Inf; f_hi <- Inf
+    } else if (cat_type == 3L) {
+      R_lo <- -Inf; R_hi <- rcrit
+      f_lo <- if (has_guess) kcrit else -Inf
+      f_hi <- Inf
+    } else {
+      R_lo <- -Inf; R_hi <- rcrit
+      f_lo <- -Inf; f_hi <- if (has_guess) kcrit else Inf
+    }
+
+    integrand <- make_integrand(c_lo, c_hi, f_lo, f_hi)
+    result <- tryCatch(
+      stats::integrate(integrand, R_lo, R_hi,
+                       rel.tol = 1e-8, abs.tol = 1e-12)$value,
+      error = function(e) .Machine$double.eps
+    )
+    probs[cat_idx] <- result
+  }
+
+  probs <- pmax(probs, .Machine$double.eps)
+  probs / sum(probs)
+}
+
+
+#' @title Distribution functions for Continuous Dual-Process SDT (CDP)
+#'
+#' @description Density and random generation for the continuous dual-process
+#'   signal detection theory model (Wixted & Mickes, 2010). The model assumes
+#'   two independent continuous dimensions — Familiarity (F) and Recollection
+#'   (R). Old/new confidence ratings are based on the aggregated signal F + R.
+#'   Remember/Know judgments are based on R exceeding a criterion. Optionally,
+#'   a Know/Guess split uses F exceeding a second criterion.
+#'
+#'   When only confidence rating data is available (no R/K split), the CDP model
+#'   reduces to UV-SDT on the aggregated F + R axis. Use [sdt_rating()] for
+#'   that case.
+#'
+#' @name sdt_cdp_dist
+#'
+#' @param counts Integer vector of response counts. For 2-way R/K: length
+#'   3 * n_conf (new, know, remember blocks). For 3-way R/K/G: length
+#'   4 * n_conf (new, guess, know, remember blocks).
+#' @param stimulus Integer. 0 (noise/new) or 1 (signal/old).
+#' @param dprimef Numeric. Familiarity sensitivity (target mean on F axis).
+#' @param dprimer Numeric. Recollection sensitivity (target mean on R axis).
+#' @param thresholds Numeric vector of K-1 ordered confidence thresholds on the
+#'   aggregated F+R axis, where K = 2 * n_conf.
+#' @param rcrit Numeric. Remember criterion on the recollection axis.
+#' @param kcrit Numeric or NULL. Know criterion on the familiarity axis.
+#'   NULL or -Inf for 2-way R/K model (default). Finite value enables 3-way
+#'   R/K/G model.
+#' @param sigmar Numeric. Log SD ratio for recollection target distribution.
+#'   0 = equal variance (default).
+#' @param dist Character. The noise distribution: "normal" (default),
+#'   "logistic", "gumbel_min", or "gumbel_max".
+#' @param log Logical. If TRUE, returns log-density (default FALSE).
+#' @param n_per_cell Integer. Number of trials per stimulus condition per
+#'   subject.
+#' @param n_subjects Integer. Number of subjects.
+#' @param criterion Numeric. Central confidence criterion for threshold
+#'   generation.
+#' @param spacing Numeric. Threshold spacing parameter.
+#' @param n_ratings Integer. Total number of confidence levels (must be even).
+#' @param threshold_type Character. "parsimonious" (default) or "equidistant".
+#'
+#' @return `dsdt_cdp` returns the (log-)density (multinomial probability).
+#'   `rsdt_cdp` returns a data frame in wide format with columns: `id`,
+#'   `stimulus`, response count columns, and `nTrials`.
+#'
+#' @references
+#' Wixted, J. T., & Mickes, L. (2010). A continuous dual-process model of
+#'   remember/know judgments. \emph{Psychological Review}, \emph{117}(4),
+#'   1025--1054. \doi{10.1037/a0020874}
+#'
+#' @keywords distribution
+#' @export
+#' @examples
+#' # CDP density (2-way R/K, 6-point scale)
+#' dsdt_cdp(
+#'   counts = c(50, 30, 20, 10, 15, 25, 5, 20, 75),
+#'   stimulus = 1, dprimef = 0.8, dprimer = 1.0,
+#'   thresholds = c(-1.5, -0.5, 0.0, 0.5, 1.5),
+#'   rcrit = 0.5
+#' )
+dsdt_cdp <- function(counts, stimulus, dprimef, dprimer, thresholds,
+                     rcrit, kcrit = NULL, sigmar = 0, dist = "normal",
+                     log = FALSE) {
+  stopif(is.null(counts), "counts is required for CDP density")
+  stopif(is.null(thresholds), "thresholds is required for CDP density")
+  stopif(any(counts < 0), "counts must be non-negative")
+  stopif(length(stimulus) != 1 || !stimulus %in% c(0L, 1L),
+         "stimulus must be a single value: 0 (noise) or 1 (signal)")
+
+  K_full <- length(thresholds) + 1L
+  n_conf <- K_full %/% 2L
+  has_guess <- !is.null(kcrit) && is.finite(kcrit)
+  expected_len <- if (has_guess) 4L * n_conf else 3L * n_conf
+  stopif(length(counts) != expected_len,
+         "counts must have length {expected_len} ({if (has_guess) '4' else '3'} x {n_conf})")
+
+  probs <- .sdt_cdp_category_probs(thresholds, dprimef, dprimer, sigmar,
+                                   rcrit, kcrit, stimulus, n_conf, dist)
+  stats::dmultinom(counts, prob = probs, log = log)
+}
+
+
+#' @rdname sdt_cdp_dist
+#' @export
+#' @examples
+#' # Generate CDP data (2-way R/K)
+#' dat <- rsdt_cdp(n_per_cell = 100, n_subjects = 10,
+#'                 dprimef = 0.8, dprimer = 1.0,
+#'                 criterion = 0, spacing = 0.5,
+#'                 rcrit = 0.5, n_ratings = 6)
+rsdt_cdp <- function(n_per_cell, n_subjects, dprimef, dprimer,
+                     criterion, spacing, rcrit, kcrit = NULL,
+                     sigmar = 0, dist = "normal",
+                     n_ratings = NULL,
+                     threshold_type = "parsimonious") {
+  stopif(is.null(n_ratings) || n_ratings < 4 || n_ratings %% 2 != 0,
+         "n_ratings must be an even integer >= 4")
+  stopif(length(n_per_cell) != 1 || n_per_cell < 1,
+         "n_per_cell must be a single positive integer")
+  stopif(length(n_subjects) != 1 || n_subjects < 1,
+         "n_subjects must be a single positive integer")
+
+  n_conf <- n_ratings %/% 2L
+  thresholds <- .sdt_make_thresholds(criterion, n_ratings, threshold_type,
+                                     spacing)
+  has_guess <- !is.null(kcrit) && is.finite(kcrit)
+
+  # Build column names
+  new_names <- paste0("n", seq_len(n_conf))
+  if (has_guess) {
+    guess_names <- paste0("g", seq(n_conf + 1L, n_ratings))
+  }
+  know_names <- paste0("k", seq(n_conf + 1L, n_ratings))
+  rem_names <- paste0("r", seq(n_conf + 1L, n_ratings))
+
+  if (has_guess) {
+    resp_names <- c(new_names, guess_names, know_names, rem_names)
+  } else {
+    resp_names <- c(new_names, know_names, rem_names)
+  }
+
+  data <- expand.grid(id = seq_len(n_subjects), stimulus = c(0L, 1L))
+  n_cats <- length(resp_names)
+  counts_mat <- matrix(0L, nrow = nrow(data), ncol = n_cats)
+
+  for (i in seq_len(nrow(data))) {
+    probs <- .sdt_cdp_category_probs(thresholds, dprimef, dprimer, sigmar,
+                                     rcrit, kcrit, data$stimulus[i], n_conf,
+                                     dist)
+    counts_mat[i, ] <- stats::rmultinom(1, n_per_cell, probs)
+  }
+
+  colnames(counts_mat) <- resp_names
+  data <- cbind(data, as.data.frame(counts_mat))
+  data$nTrials <- as.integer(n_per_cell)
+  data
+}
+
+
 # Internal: compute SDT decision variable (eta)
 # Shared by density, random generation, and log_lik across versions
 # For EV-SDT (sdratio = 1): eta = dprime/2 * (2*stimulus - 1) - criterion
