@@ -2320,82 +2320,108 @@ rsdt_ranking <- function(n_per_cell, n_subjects, dprime, m = NULL,
 
 # Internal: compute CDP category probabilities for a single observation
 # Computes probabilities via numerical integration over the recollection
-# dimension R. Categories are: new (n_conf), [guess (n_conf)], know (n_conf),
-# remember (n_conf).
+# dimension R. Supports asymmetric confidence scales where the number of
+# "new" levels (n_new) may differ from the number of "old" levels (n_old).
 #
-# thresholds: numeric vector of (2*n_conf - 1) ordered confidence thresholds
-# dprimef: familiarity sensitivity (mu_F for targets)
-# dprimer: recollection sensitivity (mu_R for targets)
-# sigmar: log SD ratio for recollection targets (exp(sigmar) = sigma_R)
+# Categories: new (n_new), [guess (n_old)], know (n_old), remember (n_old)
+#
+# thresholds: numeric vector of (n_new + n_old - 1) ordered thresholds
+# dprimef, dprimer, sigmar: sensitivity and recollection SD parameters
 # rcrit: remember criterion on R axis
 # kcrit: know criterion on F axis (NULL or -Inf for 2-way model)
 # stimulus: 0 (lure) or 1 (target)
-# n_conf: number of confidence levels per side
-# dist: distribution name ("normal", "logistic", "gumbel_min", "gumbel_max")
+# n_new: number of "new" confidence levels
+# n_old: number of "old" confidence levels (with R/K split)
+# dist: distribution name
+#
+# For backward compatibility, if n_old is missing, assumes symmetric:
+# n_new = n_old = n_conf (first positional arg after stimulus)
 .sdt_cdp_category_probs <- function(thresholds, dprimef, dprimer, sigmar,
-                                    rcrit, kcrit, stimulus, n_conf,
+                                    rcrit, kcrit, stimulus, n_new, n_old = NULL,
                                     dist = "normal") {
+  # Backward compatibility: if n_old is NULL, assume symmetric
+
+  if (is.null(n_old)) {
+    n_old <- n_new
+  }
+
   mu_F <- if (stimulus == 1) dprimef else 0
   mu_R <- if (stimulus == 1) dprimer else 0
   sd_R <- if (stimulus == 1) exp(sigmar) else 1
 
-  K_full <- 2 * n_conf
+  K_full <- n_new + n_old
   has_guess <- !is.null(kcrit) && is.finite(kcrit)
-  n_cat_types <- if (has_guess) 4L else 3L
-  n_cats <- n_cat_types * n_conf
+  n_old_types <- if (has_guess) 3L else 2L
+  n_cats <- n_new + n_old_types * n_old
   probs <- numeric(n_cats)
 
   cdf_fn <- .SDT_DISTS[[dist]]$cdf
 
-  # Build the integrand for a given category
   make_integrand <- function(c_lo, c_hi, f_lo, f_hi) {
     function(R) {
       phi_R <- .sdt_pdf((R - mu_R) / sd_R, dist) / sd_R
       F_lower <- pmax(c_lo - R, f_lo) - mu_F
       F_upper <- pmin(c_hi - R, f_hi) - mu_F
-      ifelse(F_upper <= F_lower, 0, phi_R * (cdf_fn(F_upper) - cdf_fn(F_lower)))
+      ifelse(F_upper <= F_lower, 0,
+             phi_R * (cdf_fn(F_upper) - cdf_fn(F_lower)))
     }
   }
 
-  for (cat_idx in seq_len(n_cats)) {
-    if (has_guess) {
-      cat_type <- ((cat_idx - 1L) %/% n_conf) + 1L
-      cat_conf <- ((cat_idx - 1L) %% n_conf) + 1L
+  # Process categories sequentially:
+  # Block 1: new categories (indices 1..n_new, type=1)
+  # Block 2: [guess categories] (indices n_new+1..n_new+n_old, type=2)
+  # Block 3: know categories (type=3)
+  # Block 4: remember categories (type=4)
+  cat_idx <- 0L
+  for (block in seq_len(1L + n_old_types)) {
+    if (block == 1L) {
+      block_size <- n_new
+      cat_type <- 1L
+    } else if (has_guess && block == 2L) {
+      block_size <- n_old
+      cat_type <- 2L
+    } else if (has_guess && block == 3L) {
+      block_size <- n_old
+      cat_type <- 3L
+    } else if (has_guess && block == 4L) {
+      block_size <- n_old
+      cat_type <- 4L
+    } else if (!has_guess && block == 2L) {
+      block_size <- n_old
+      cat_type <- 3L
     } else {
-      cat_type <- ((cat_idx - 1L) %/% n_conf) + 1L
-      cat_conf <- ((cat_idx - 1L) %% n_conf) + 1L
-      # Remap: 1=new, 2=know, 3=remember → 1=new, 3=know, 4=remember
-      if (cat_type == 2L) cat_type <- 3L
-      else if (cat_type == 3L) cat_type <- 4L
+      block_size <- n_old
+      cat_type <- 4L
     }
 
-    # Map to global confidence position
-    global_k <- if (cat_type == 1L) cat_conf else (n_conf + cat_conf)
+    for (j in seq_len(block_size)) {
+      cat_idx <- cat_idx + 1L
 
-    c_lo <- if (global_k == 1L) -Inf else thresholds[global_k - 1L]
-    c_hi <- if (global_k == K_full) Inf else thresholds[global_k]
+      global_k <- if (cat_type == 1L) j else (n_new + j)
 
-    # R and F bounds by category type
-    if (cat_type == 1L) {
-      R_lo <- -Inf; R_hi <- Inf; f_lo <- -Inf; f_hi <- Inf
-    } else if (cat_type == 4L) {
-      R_lo <- rcrit; R_hi <- Inf; f_lo <- -Inf; f_hi <- Inf
-    } else if (cat_type == 3L) {
-      R_lo <- -Inf; R_hi <- rcrit
-      f_lo <- if (has_guess) kcrit else -Inf
-      f_hi <- Inf
-    } else {
-      R_lo <- -Inf; R_hi <- rcrit
-      f_lo <- -Inf; f_hi <- if (has_guess) kcrit else Inf
+      c_lo <- if (global_k == 1L) -Inf else thresholds[global_k - 1L]
+      c_hi <- if (global_k == K_full) Inf else thresholds[global_k]
+
+      if (cat_type == 1L) {
+        R_lo <- -Inf; R_hi <- Inf; f_lo <- -Inf; f_hi <- Inf
+      } else if (cat_type == 4L) {
+        R_lo <- rcrit; R_hi <- Inf; f_lo <- -Inf; f_hi <- Inf
+      } else if (cat_type == 3L) {
+        R_lo <- -Inf; R_hi <- rcrit
+        f_lo <- if (has_guess) kcrit else -Inf
+        f_hi <- Inf
+      } else {
+        R_lo <- -Inf; R_hi <- rcrit
+        f_lo <- -Inf; f_hi <- if (has_guess) kcrit else Inf
+      }
+
+      integrand <- make_integrand(c_lo, c_hi, f_lo, f_hi)
+      probs[cat_idx] <- tryCatch(
+        stats::integrate(integrand, R_lo, R_hi,
+                         rel.tol = 1e-8, abs.tol = 1e-12)$value,
+        error = function(e) .Machine$double.eps
+      )
     }
-
-    integrand <- make_integrand(c_lo, c_hi, f_lo, f_hi)
-    result <- tryCatch(
-      stats::integrate(integrand, R_lo, R_hi,
-                       rel.tol = 1e-8, abs.tol = 1e-12)$value,
-      error = function(e) .Machine$double.eps
-    )
-    probs[cat_idx] <- result
   }
 
   probs <- pmax(probs, .Machine$double.eps)
@@ -2419,8 +2445,11 @@ rsdt_ranking <- function(n_per_cell, n_subjects, dprime, m = NULL,
 #' @name sdt_cdp_dist
 #'
 #' @param counts Integer vector of response counts. For 2-way R/K: length
-#'   3 * n_conf (new, know, remember blocks). For 3-way R/K/G: length
-#'   4 * n_conf (new, guess, know, remember blocks).
+#'   n_new + 2 * n_old (new, know, remember blocks). For 3-way R/K/G: length
+#'   n_new + 3 * n_old (new, guess, know, remember blocks).
+#' @param n_new Integer. Number of "new" confidence levels.
+#' @param n_old Integer. Number of "old" confidence levels (with R/K split).
+#'   Defaults to n_new for symmetric scales.
 #' @param stimulus Integer. 0 (noise/new) or 1 (signal/old).
 #' @param dprimef Numeric. Familiarity sensitivity (target mean on F axis).
 #' @param dprimer Numeric. Recollection sensitivity (target mean on R axis).
@@ -2465,22 +2494,28 @@ rsdt_ranking <- function(n_per_cell, n_subjects, dprime, m = NULL,
 #' )
 dsdt_cdp <- function(counts, stimulus, dprimef, dprimer, thresholds,
                      rcrit, kcrit = NULL, sigmar = 0, dist = "normal",
-                     log = FALSE) {
+                     n_new = NULL, n_old = NULL, log = FALSE) {
   stopif(is.null(counts), "counts is required for CDP density")
   stopif(is.null(thresholds), "thresholds is required for CDP density")
   stopif(any(counts < 0), "counts must be non-negative")
   stopif(length(stimulus) != 1 || !stimulus %in% c(0L, 1L),
-         "stimulus must be a single value: 0 (noise) or 1 (signal)")
+         "stimulus must be 0 (noise) or 1 (signal)")
 
   K_full <- length(thresholds) + 1L
-  n_conf <- K_full %/% 2L
+  if (is.null(n_new) || is.null(n_old)) {
+    n_new <- K_full %/% 2L
+    n_old <- K_full - n_new
+  }
   has_guess <- !is.null(kcrit) && is.finite(kcrit)
-  expected_len <- if (has_guess) 4L * n_conf else 3L * n_conf
+  n_old_types <- if (has_guess) 3L else 2L
+  expected_len <- n_new + n_old_types * n_old
   stopif(length(counts) != expected_len,
-         "counts must have length {expected_len} ({if (has_guess) '4' else '3'} x {n_conf})")
+         "counts must have length {expected_len}")
 
-  probs <- .sdt_cdp_category_probs(thresholds, dprimef, dprimer, sigmar,
-                                   rcrit, kcrit, stimulus, n_conf, dist)
+  probs <- .sdt_cdp_category_probs(
+    thresholds, dprimef, dprimer, sigmar,
+    rcrit, kcrit, stimulus, n_new, n_old, dist
+  )
   stats::dmultinom(counts, prob = probs, log = log)
 }
 
@@ -2496,42 +2531,53 @@ dsdt_cdp <- function(counts, stimulus, dprimef, dprimer, thresholds,
 rsdt_cdp <- function(n_per_cell, n_subjects, dprimef, dprimer,
                      criterion, spacing, rcrit, kcrit = NULL,
                      sigmar = 0, dist = "normal",
-                     n_ratings = NULL,
+                     n_ratings = NULL, n_new = NULL, n_old = NULL,
                      threshold_type = "parsimonious") {
-  stopif(is.null(n_ratings) || n_ratings < 4 || n_ratings %% 2 != 0,
-         "n_ratings must be an even integer >= 4")
+  stopif(is.null(n_ratings) || n_ratings < 3,
+         "n_ratings must be >= 3")
   stopif(length(n_per_cell) != 1 || n_per_cell < 1,
          "n_per_cell must be a single positive integer")
   stopif(length(n_subjects) != 1 || n_subjects < 1,
          "n_subjects must be a single positive integer")
 
-  n_conf <- n_ratings %/% 2L
-  thresholds <- .sdt_make_thresholds(criterion, n_ratings, threshold_type,
-                                     spacing)
+  if (is.null(n_new) || is.null(n_old)) {
+    n_new <- n_ratings %/% 2L
+    n_old <- n_ratings - n_new
+  }
+  stopif(n_new + n_old != n_ratings,
+         "n_new + n_old must equal n_ratings")
+
+  thresholds <- .sdt_make_thresholds(
+    criterion, n_ratings, threshold_type, spacing
+  )
   has_guess <- !is.null(kcrit) && is.finite(kcrit)
 
-  # Build column names
-  new_names <- paste0("n", seq_len(n_conf))
+  new_names <- paste0("n", seq_len(n_new))
+  old_start <- n_new + 1L
   if (has_guess) {
-    guess_names <- paste0("g", seq(n_conf + 1L, n_ratings))
+    guess_names <- paste0("g", seq(old_start, n_ratings))
   }
-  know_names <- paste0("k", seq(n_conf + 1L, n_ratings))
-  rem_names <- paste0("r", seq(n_conf + 1L, n_ratings))
+  know_names <- paste0("k", seq(old_start, n_ratings))
+  rem_names <- paste0("r", seq(old_start, n_ratings))
 
-  if (has_guess) {
-    resp_names <- c(new_names, guess_names, know_names, rem_names)
+  resp_names <- if (has_guess) {
+    c(new_names, guess_names, know_names, rem_names)
   } else {
-    resp_names <- c(new_names, know_names, rem_names)
+    c(new_names, know_names, rem_names)
   }
 
-  data <- expand.grid(id = seq_len(n_subjects), stimulus = c(0L, 1L))
+  data <- expand.grid(
+    id = seq_len(n_subjects), stimulus = c(0L, 1L)
+  )
   n_cats <- length(resp_names)
   counts_mat <- matrix(0L, nrow = nrow(data), ncol = n_cats)
 
   for (i in seq_len(nrow(data))) {
-    probs <- .sdt_cdp_category_probs(thresholds, dprimef, dprimer, sigmar,
-                                     rcrit, kcrit, data$stimulus[i], n_conf,
-                                     dist)
+    probs <- .sdt_cdp_category_probs(
+      thresholds, dprimef, dprimer, sigmar,
+      rcrit, kcrit, data$stimulus[i],
+      n_new, n_old, dist
+    )
     counts_mat[i, ] <- stats::rmultinom(1, n_per_cell, probs)
   }
 

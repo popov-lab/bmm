@@ -9,31 +9,45 @@
                            threshold_type = "parsimonious",
                            links = NULL, call = NULL, ...) {
   dist_int <- .sdt_dist_id(dist)
-  n_conf <- length(new_response)
+  n_new <- length(new_response)
+  n_old <- length(old_know)
   has_guess <- !is.null(old_guess)
 
   if (is.null(n_ratings)) {
-    n_ratings <- 2L * n_conf
+    n_ratings <- n_new + n_old
   }
 
   thresh_type_int <- if (threshold_type == "parsimonious") 1L else 2L
 
   parameters <- list(
-    dprimef = glue("Familiarity sensitivity: target mean on familiarity axis"),
-    dprimer = glue("Recollection sensitivity: target mean on recollection axis"),
-    criterion = glue("Response bias: central confidence criterion on F+R axis"),
-    spacing = glue(
-      "Threshold spacing: controls distance between adjacent confidence ",
-      "thresholds (exp(spacing) ensures positive spacing)"
+    dprimef = glue(
+      "Familiarity sensitivity: target mean on familiarity axis"
     ),
-    rcrit = glue("Remember criterion: threshold on recollection axis")
+    dprimer = glue(
+      "Recollection sensitivity: target mean on recollection axis"
+    ),
+    criterion = glue(
+      "Response bias: central confidence criterion on F+R axis"
+    ),
+    spacing = glue(
+      "Threshold spacing: controls distance between adjacent ",
+      "confidence thresholds (exp(spacing) ensures positive spacing)"
+    ),
+    rcrit = glue(
+      "Remember criterion: threshold on recollection axis"
+    )
   )
   default_priors <- list(
-    dprimef = list(main = "normal(1, 1)", effects = "normal(0, 0.5)"),
-    dprimer = list(main = "normal(1, 1)", effects = "normal(0, 0.5)"),
-    criterion = list(main = "normal(0, 1.5)", effects = "normal(0, 0.5)"),
-    spacing = list(main = "normal(0, 0.5)", effects = "normal(0, 0.3)"),
-    rcrit = list(main = "normal(0, 1)", effects = "normal(0, 0.5)")
+    dprimef = list(main = "normal(1, 1)",
+                   effects = "normal(0, 0.5)"),
+    dprimer = list(main = "normal(1, 1)",
+                   effects = "normal(0, 0.5)"),
+    criterion = list(main = "normal(0, 1.5)",
+                     effects = "normal(0, 0.5)"),
+    spacing = list(main = "normal(0, 0.5)",
+                   effects = "normal(0, 0.3)"),
+    rcrit = list(main = "normal(0, 1)",
+                 effects = "normal(0, 0.5)")
   )
   param_links <- list(
     dprimef = "identity", dprimer = "identity",
@@ -41,8 +55,6 @@
     rcrit = "identity"
   )
 
-  # sigmar as overridable fixed parameter (default = equal variance)
-  # When not estimated, it's passed as stanvar data (not as a dpar)
   parameters$sigmar <- glue(
     "SD ratio: log ratio of recollection target to noise SD ",
     "(exp(sigmar) ensures positivity, 0 = equal variance)"
@@ -67,32 +79,34 @@
   }
 
   requirements <- glue(
-    "Provide pre-aggregated data with the following columns:", "\n\n",
-    "  - 'New' response counts: {n_conf} columns for confidence levels ",
-    "1 to {n_conf}", "\n",
-    "  - 'Old-Know' counts: {n_conf} columns for confidence levels ",
-    "{n_conf + 1} to {n_ratings}", "\n",
-    "  - 'Old-Remember' counts: {n_conf} columns for confidence levels ",
-    "{n_conf + 1} to {n_ratings}", "\n",
+    "Provide pre-aggregated data with the following columns:",
+    "\n\n",
+    "  - 'New' response counts: {n_new} columns", "\n",
+    "  - 'Old-Know' counts: {n_old} columns", "\n",
+    "  - 'Old-Remember' counts: {n_old} columns", "\n",
     if (has_guess) {
-      glue("  - 'Old-Guess' counts: {n_conf} columns for confidence levels ",
-           "{n_conf + 1} to {n_ratings}", "\n")
-    } else "",
+      glue("  - 'Old-Guess' counts: {n_old} columns", "\n")
+    } else {
+      ""
+    },
     "  - Stimulus type (stimulus): 0 = noise, 1 = signal"
   )
 
   out <- structure(
     list(
-      resp_vars = nlist(new_response, old_know, old_remember, old_guess),
-      other_vars = nlist(stimulus, dist, dist_int, n_ratings, n_conf,
-                         threshold_type, thresh_type_int, has_guess),
+      resp_vars = nlist(new_response, old_know,
+                        old_remember, old_guess),
+      other_vars = nlist(stimulus, dist, dist_int,
+                         n_ratings, n_new, n_old,
+                         threshold_type, thresh_type_int,
+                         has_guess),
       domain = "Recognition Memory",
       task = "Old/New Recognition with Remember/Know Judgments",
       name = "Continuous Dual-Process Signal Detection Theory (CDP)",
       citation = glue(
-        "Wixted, J. T., & Mickes, L. (2010). A continuous dual-process ",
-        "model of remember/know judgments. Psychological Review, 117(4), ",
-        "1025-1054."
+        "Wixted, J. T., & Mickes, L. (2010). ",
+        "A continuous dual-process model of remember/know ",
+        "judgments. Psychological Review, 117(4), 1025-1054."
       ),
       version = "cdp",
       requirements = requirements,
@@ -131,6 +145,10 @@
 #' confidence ratings are based on the aggregated signal F + R. Remember/Know
 #' judgments are based on R exceeding a criterion on the recollection axis.
 #'
+#' The number of "new" and "old" confidence levels need not be equal. For
+#' example, a 6-point scale with 1 "new" level and 5 "old" levels (each with
+#' R/K split) is supported — as used in Rotello et al. (2005).
+#'
 #' Optionally, a Know/Guess split uses F exceeding a second criterion on the
 #' familiarity axis. To enable the 3-way R/K/G model, provide `old_guess`
 #' columns and add `kcrit ~ 1` to the formula.
@@ -144,18 +162,18 @@
 #'
 #' @param new_response A character vector of column names containing response
 #'   counts for "new" confidence levels, ordered from "definitely new" to
-#'   "guess new".
+#'   "guess new". Can have a different length than `old_know`/`old_remember`.
 #' @param old_know A character vector of column names containing "old-know"
 #'   response counts, ordered from "guess old" to "definitely old".
 #' @param old_remember A character vector of column names containing
 #'   "old-remember" response counts, same ordering as `old_know`.
 #' @param old_guess Optional character vector of column names for "old-guess"
 #'   response counts. If provided, enables the 3-way R/K/G model with the
-#'   `kcrit` parameter.
+#'   `kcrit` parameter. Must have the same length as `old_know`.
 #' @param stimulus The name of the variable coding the stimulus type.
 #'   Must be coded as 0 (noise/new) and 1 (signal/old).
 #' @param n_ratings Integer. Total number of confidence levels. Defaults to
-#'   `2 * length(new_response)`. Must be even and >= 4.
+#'   `length(new_response) + length(old_know)`. Must be >= 3.
 #' @param dist Character. The noise distribution to use:
 #'   \itemize{
 #'     \item "normal" (default): Gaussian SDT
@@ -176,11 +194,7 @@
 #' @export
 #' @examples
 #' \dontrun{
-#' dat <- rsdt_cdp(n_per_cell = 200, n_subjects = 20,
-#'                 dprimef = 0.8, dprimer = 1.0,
-#'                 criterion = 0, spacing = 0.5,
-#'                 rcrit = 0.5, n_ratings = 6)
-#'
+#' # Symmetric 6-point scale (3 new + 3 old)
 #' model <- sdt_cdp(
 #'   new_response = c("n1", "n2", "n3"),
 #'   old_know = c("k4", "k5", "k6"),
@@ -188,13 +202,12 @@
 #'   stimulus = "stimulus"
 #' )
 #'
-#' fit <- bmm(
-#'   formula = bmf(dprimef ~ 1, dprimer ~ 1, criterion ~ 1,
-#'                 spacing ~ 1, rcrit ~ 1),
-#'   data = dat,
-#'   model = model,
-#'   cores = 4,
-#'   backend = "cmdstanr"
+#' # Asymmetric scale (1 new + 5 old, as in Rotello et al. 2005)
+#' model <- sdt_cdp(
+#'   new_response = c("new"),
+#'   old_know = c("k2", "k3", "k4", "k5", "k6"),
+#'   old_remember = c("r2", "r3", "r4", "r5", "r6"),
+#'   stimulus = "stimulus"
 #' )
 #' }
 sdt_cdp <- function(new_response, old_know, old_remember,
@@ -202,37 +215,45 @@ sdt_cdp <- function(new_response, old_know, old_remember,
                     n_ratings = NULL,
                     dist = c("normal", "logistic",
                              "gumbel_min", "gumbel_max"),
-                    threshold_type = c("parsimonious", "equidistant"),
+                    threshold_type = c("parsimonious",
+                                       "equidistant"),
                     links = NULL, ...) {
   call <- match.call()
   stop_missing_args()
   dist <- match.arg(dist)
   threshold_type <- match.arg(threshold_type)
 
-  n_conf <- length(new_response)
-  stopif(n_conf < 2,
-         "CDP requires at least 2 confidence levels per side (n_conf >= 2)")
-  stopif(length(old_know) != n_conf,
-         "old_know must have the same length as new_response ({n_conf})")
-  stopif(length(old_remember) != n_conf,
-         "old_remember must have the same length as new_response ({n_conf})")
+  n_new <- length(new_response)
+  n_old <- length(old_know)
+  stopif(n_new < 1,
+         "CDP requires at least 1 new confidence level")
+  stopif(n_old < 1,
+         "CDP requires at least 1 old confidence level")
+  stopif(n_new + n_old < 3,
+         "CDP requires at least 3 total confidence levels")
+  stopif(length(old_remember) != n_old,
+         "old_remember must have the same length as old_know ({n_old})")
   if (!is.null(old_guess)) {
-    stopif(length(old_guess) != n_conf,
-           "old_guess must have the same length as new_response ({n_conf})")
+    stopif(length(old_guess) != n_old,
+           "old_guess must have the same length as old_know ({n_old})")
   }
 
   if (is.null(n_ratings)) {
-    n_ratings <- 2L * n_conf
+    n_ratings <- n_new + n_old
   }
-  stopif(n_ratings != 2L * n_conf,
-         "n_ratings ({n_ratings}) must equal 2 * length(new_response) ({2L * n_conf})")
+  stopif(
+    n_ratings != n_new + n_old,
+    "n_ratings ({n_ratings}) must equal length(new_response) + length(old_know) ({n_new + n_old})"
+  )
 
-  .model_sdt_cdp(new_response = new_response, old_know = old_know,
-                  old_remember = old_remember, old_guess = old_guess,
-                  stimulus = stimulus, dist = dist,
-                  n_ratings = n_ratings,
-                  threshold_type = threshold_type,
-                  links = links, call = call, ...)
+  .model_sdt_cdp(
+    new_response = new_response, old_know = old_know,
+    old_remember = old_remember, old_guess = old_guess,
+    stimulus = stimulus, dist = dist,
+    n_ratings = n_ratings,
+    threshold_type = threshold_type,
+    links = links, call = call, ...
+  )
 }
 
 
@@ -246,15 +267,18 @@ check_data.sdt_cdp <- function(model, data, formula) {
   stopif(!stim_var %in% colnames(data),
          "Stimulus variable '{stim_var}' missing in the data")
   stim_vals <- unique(data[[stim_var]])
-  stopif(!all(stim_vals %in% c(0, 1)),
-         "Stimulus variable '{stim_var}' must be coded as 0 (noise) and 1 (signal)")
+  stopif(
+    !all(stim_vals %in% c(0, 1)),
+    "Stimulus variable '{stim_var}' must be coded as 0 and 1"
+  )
 
   new_cols <- model$resp_vars$new_response
   know_cols <- model$resp_vars$old_know
   rem_cols <- model$resp_vars$old_remember
   guess_cols <- model$resp_vars$old_guess
   has_guess <- model$other_vars$has_guess
-  n_conf <- model$other_vars$n_conf
+  n_new <- model$other_vars$n_new
+  n_old <- model$other_vars$n_old
 
   all_resp_cols <- if (has_guess) {
     c(new_cols, guess_cols, know_cols, rem_cols)
@@ -262,51 +286,51 @@ check_data.sdt_cdp <- function(model, data, formula) {
     c(new_cols, know_cols, rem_cols)
   }
 
-  # Validate all response columns exist and contain valid counts
   for (col in all_resp_cols) {
     stopif(!col %in% colnames(data),
            "Response column '{col}' missing in the data")
     vals <- data[[col]]
     stopif(any(vals < 0, na.rm = TRUE),
-           "Response column '{col}' must contain non-negative counts")
+           "Response column '{col}' must be non-negative")
     warnif(any(vals != round(vals), na.rm = TRUE),
-           "Response column '{col}' should contain integer counts")
+           "Response column '{col}' should be integer counts")
   }
 
-  # Compute total trials per row
   n_total <- rowSums(data[all_resp_cols])
-
-  # Identify non-response columns (preserve grouping variables)
   other_cols <- setdiff(names(data), all_resp_cols)
 
-  # Reshape wide → long: one row per (original_row × category)
   n_cats <- length(all_resp_cols)
   orig_nrow <- nrow(data)
 
-  # Repeat each original row n_cats times
-  long_data <- data[rep(seq_len(orig_nrow), each = n_cats), other_cols,
-                    drop = FALSE]
+  long_data <- data[rep(seq_len(orig_nrow), each = n_cats),
+                    other_cols, drop = FALSE]
   rownames(long_data) <- NULL
 
-  # Build category metadata
-  # Ordering: new (type=1), [guess (type=2)], know (type=3), remember (type=4)
+  # Build category metadata with asymmetric block sizes
+  # Ordering: new (type=1, n_new items),
+  #           [guess (type=2, n_old items)],
+  #           know (type=3, n_old items),
+  #           remember (type=4, n_old items)
   if (has_guess) {
-    cat_types <- rep(c(1L, 2L, 3L, 4L), each = n_conf)
+    cat_types <- c(rep(1L, n_new), rep(2L, n_old),
+                   rep(3L, n_old), rep(4L, n_old))
+    cat_confs <- c(seq_len(n_new), rep(seq_len(n_old), 3L))
   } else {
-    cat_types <- rep(c(1L, 3L, 4L), each = n_conf)
+    cat_types <- c(rep(1L, n_new), rep(3L, n_old),
+                   rep(4L, n_old))
+    cat_confs <- c(seq_len(n_new), rep(seq_len(n_old), 2L))
   }
-  cat_confs <- rep(seq_len(n_conf), if (has_guess) 4L else 3L)
 
   long_data$cat_type <- rep(cat_types, orig_nrow)
   long_data$cat_conf <- rep(cat_confs, orig_nrow)
   long_data$stim_val <- as.integer(long_data[[stim_var]])
-  long_data$n_conf <- model$other_vars$n_conf
+  long_data$n_new <- n_new
+  long_data$n_old <- n_old
   long_data$has_guess <- as.integer(has_guess)
   long_data$dist_type <- model$other_vars$dist_int
   long_data$thresh_type <- model$other_vars$thresh_type_int
   long_data$n_total <- rep(n_total, each = n_cats)
 
-  # Extract count for each category
   counts <- as.matrix(data[all_resp_cols])
   long_data$count <- as.vector(t(counts))
 
@@ -322,8 +346,8 @@ check_data.sdt_cdp <- function(model, data, formula) {
 #' @export
 bmf2bf.sdt_cdp <- function(model, formula) {
   brms::bf(paste0(
-    "count | vint(cat_type, cat_conf, stim_val, n_conf, ",
-    "has_guess, dist_type, thresh_type) ~ 1"
+    "count | vint(cat_type, cat_conf, stim_val, n_new, ",
+    "n_old, has_guess, dist_type, thresh_type) ~ 1"
   ))
 }
 
@@ -337,48 +361,42 @@ configure_model.sdt_cdp <- function(model, data, formula) {
   sigmar_estimated <- !is.null(formula[["sigmar"]]) &&
     !is_constant(formula[["sigmar"]])
   kcrit_estimated <- model$other_vars$has_guess &&
-    !is.null(formula[["kcrit"]]) && !is_constant(formula[["kcrit"]])
+    !is.null(formula[["kcrit"]]) &&
+    !is_constant(formula[["kcrit"]])
 
   formula <- bmf2bf(model, formula)
 
   sc_path <- system.file("stan_chunks", package = "bmm")
-  # Load both the CDF dispatcher and CDP-specific functions
-  stan_binary <- read_lines2(paste0(sc_path, "/sdt_binary_funs.stan"))
-  stan_cdp <- read_lines2(paste0(sc_path, "/sdt_cdp_funs.stan"))
+  stan_binary <- read_lines2(
+    paste0(sc_path, "/sdt_binary_funs.stan")
+  )
+  stan_cdp <- read_lines2(
+    paste0(sc_path, "/sdt_cdp_funs.stan")
+  )
   stanvars <- brms::stanvar(
     scode = paste(stan_binary, stan_cdp, sep = "\n"),
     block = "functions"
   )
 
-  # kcrit passed as stanvar data (fixed or estimated via formula)
-  kcrit_val <- if (model$other_vars$has_guess) {
-    model$fixed_parameters$kcrit
-  } else {
-    -100
-  }
-
-  # Always include sigmar as a dpar (fixed via constant prior when not
-  # estimated). Use sdt_cdp_uv Stan family when sigmar is free.
-  dpars <- c("mu", "dprimef", "dprimer", "criterion", "spacing",
-             "rcrit", "sigmar")
-  links <- c("identity", model$links$dprimef, model$links$dprimer,
-             model$links$criterion, model$links$spacing,
-             model$links$rcrit, model$links$sigmar)
+  dpars <- c("mu", "dprimef", "dprimer", "criterion",
+             "spacing", "rcrit", "sigmar")
+  links <- c("identity", model$links$dprimef,
+             model$links$dprimer, model$links$criterion,
+             model$links$spacing, model$links$rcrit,
+             model$links$sigmar)
 
   if (kcrit_estimated) {
     dpars <- c(dpars, "kcrit")
     links <- c(links, model$links$kcrit)
-    kcrit_val <- 0  # placeholder, will be estimated
   } else if (model$other_vars$has_guess) {
     dpars <- c(dpars, "kcrit")
     links <- c(links, model$links$kcrit)
   }
 
-  # Use sdt_cdp_uv3 when kcrit is a dpar, sdt_cdp_uv otherwise
   has_guess <- model$other_vars$has_guess
   family_name <- if (has_guess) "sdt_cdp_uv3" else "sdt_cdp_uv"
 
-  vint_vars <- paste0("vint", 1:7, "[n]")
+  vint_vars <- paste0("vint", 1:8, "[n]")
 
   formula$family <- brms::custom_family(
     family_name,
@@ -388,10 +406,15 @@ configure_model.sdt_cdp <- function(model, data, formula) {
     loop = TRUE,
     log_lik = log_lik_sdt_cdp_uv,
     posterior_predict = posterior_predict_sdt_cdp,
-    vars = c(vint_vars, "x_r", "x_i")
+    vars = c(vint_vars, "x_r", "cdp_dist_type")
   )
 
-  tdata_code <- "  array[0] real x_r;\n  array[0] int x_i;"
+  # cdp_dist_type as data array[1] int for integrate_1d's x_i
+  dist_int <- model$other_vars$dist_int
+  tdata_code <- paste0(
+    "  array[0] real x_r;\n",
+    "  array[1] int cdp_dist_type = {", dist_int, "};"
+  )
   stanvars <- stanvars +
     brms::stanvar(scode = tdata_code, block = "tdata")
 
@@ -404,33 +427,46 @@ configure_model.sdt_cdp <- function(model, data, formula) {
 ############################################################################# !
 
 # R-side: compute log-probability for a single CDP observation
-.cdp_log_prob_r <- function(dprimef, dprimer, sigmar, criterion, spacing,
-                            rcrit, kcrit, cat_type, cat_conf, stim,
-                            n_conf, dist, thresh_type) {
-  n_ratings <- 2L * n_conf
-  threshold_type_str <- if (thresh_type == 1L) "parsimonious" else "equidistant"
-  thresholds <- .sdt_make_thresholds(criterion, n_ratings,
-                                     threshold_type_str, spacing)
+.cdp_log_prob_r <- function(dprimef, dprimer, sigmar,
+                            criterion, spacing, rcrit, kcrit,
+                            cat_type, cat_conf, stim,
+                            n_new, n_old, dist, thresh_type) {
+  n_ratings <- n_new + n_old
+  threshold_type_str <- if (thresh_type == 1L) {
+    "parsimonious"
+  } else {
+    "equidistant"
+  }
+  thresholds <- .sdt_make_thresholds(
+    criterion, n_ratings, threshold_type_str, spacing
+  )
 
   has_guess_val <- !is.null(kcrit) && is.finite(kcrit)
-  probs <- .sdt_cdp_category_probs(thresholds, dprimef, dprimer, sigmar,
-                                   rcrit, kcrit, stim, n_conf,
-                                   .sdt_dist_names[dist])
+  probs <- .sdt_cdp_category_probs(
+    thresholds, dprimef, dprimer, sigmar,
+    rcrit, kcrit, stim, n_new, n_old,
+    .sdt_dist_names[dist]
+  )
 
   # Map (cat_type, cat_conf) to index in probs
-  if (has_guess_val) {
-    # 4 blocks: new(1), guess(2), know(3), remember(4)
-    idx <- (cat_type - 1L) * n_conf + cat_conf
+  # Probs layout: new(n_new), [guess(n_old)], know(n_old),
+  #               remember(n_old)
+  if (cat_type == 1L) {
+    idx <- cat_conf
+  } else if (has_guess_val) {
+    block <- cat_type - 1L  # 2→1, 3→2, 4→3
+    idx <- n_new + (block - 1L) * n_old + cat_conf
   } else {
-    # 3 blocks: new(1), know(3→2), remember(4→3)
-    block <- if (cat_type == 1L) 1L else if (cat_type == 3L) 2L else 3L
-    idx <- (block - 1L) * n_conf + cat_conf
+    block <- if (cat_type == 3L) 1L else 2L
+    idx <- n_new + (block - 1L) * n_old + cat_conf
   }
   log(max(probs[idx], .Machine$double.eps))
 }
 
 # Reverse map from dist_int to dist name
-.sdt_dist_names <- c("normal", "gumbel_min", "gumbel_max", "logistic")
+.sdt_dist_names <- c(
+  "normal", "gumbel_min", "gumbel_max", "logistic"
+)
 
 log_lik_sdt_cdp_uv <- function(i, prep) {
   dprimef <- brms::get_dpar(prep, "dprimef", i = i)
@@ -443,10 +479,11 @@ log_lik_sdt_cdp_uv <- function(i, prep) {
   cat_type <- prep$data$vint1[i]
   cat_conf <- prep$data$vint2[i]
   stim <- prep$data$vint3[i]
-  n_conf <- prep$data$vint4[i]
-  has_guess <- prep$data$vint5[i]
-  dist_type <- prep$data$vint6[i]
-  thresh_type <- prep$data$vint7[i]
+  n_new <- prep$data$vint4[i]
+  n_old <- prep$data$vint5[i]
+  has_guess <- prep$data$vint6[i]
+  dist_type <- prep$data$vint7[i]
+  thresh_type <- prep$data$vint8[i]
   y <- prep$data$Y[i]
 
   has_kcrit <- "kcrit" %in% names(prep$dpars)
@@ -458,11 +495,15 @@ log_lik_sdt_cdp_uv <- function(i, prep) {
     rep(NULL, length(dprimef))
   }
 
-  log_p <- mapply(function(df, dr, sr, cr, sp, rc, kc) {
-    .cdp_log_prob_r(df, dr, sr, cr, sp, rc, kc,
-                    cat_type, cat_conf, stim, n_conf,
-                    dist_type, thresh_type)
-  }, dprimef, dprimer, sigmar, criterion, spacing, rcrit, kcrit_vec)
+  log_p <- mapply(
+    function(df, dr, sr, cr, sp, rc, kc) {
+      .cdp_log_prob_r(df, dr, sr, cr, sp, rc, kc,
+                      cat_type, cat_conf, stim,
+                      n_new, n_old, dist_type, thresh_type)
+    },
+    dprimef, dprimer, sigmar,
+    criterion, spacing, rcrit, kcrit_vec
+  )
 
   y * log_p
 }
@@ -477,10 +518,11 @@ posterior_predict_sdt_cdp <- function(i, prep, ...) {
   cat_type <- prep$data$vint1[i]
   cat_conf <- prep$data$vint2[i]
   stim <- prep$data$vint3[i]
-  n_conf <- prep$data$vint4[i]
-  has_guess <- prep$data$vint5[i]
-  dist_type <- prep$data$vint6[i]
-  thresh_type <- prep$data$vint7[i]
+  n_new <- prep$data$vint4[i]
+  n_old <- prep$data$vint5[i]
+  has_guess <- prep$data$vint6[i]
+  dist_type <- prep$data$vint7[i]
+  thresh_type <- prep$data$vint8[i]
 
   has_sigmar <- "sigmar" %in% names(prep$dpars)
   sigmar_vec <- if (has_sigmar) {
@@ -498,20 +540,29 @@ posterior_predict_sdt_cdp <- function(i, prep, ...) {
     rep(NULL, length(dprimef))
   }
 
-  mapply(function(df, dr, sr, cr, sp, rc, kc) {
-    n_ratings <- 2L * n_conf
-    threshold_type_str <- if (thresh_type == 1L) "parsimonious" else "equidistant"
-    thresholds <- .sdt_make_thresholds(cr, n_ratings, threshold_type_str, sp)
-    dist_name <- .sdt_dist_names[dist_type]
-    probs <- .sdt_cdp_category_probs(thresholds, df, dr, sr, rc, kc,
-                                     stim, n_conf, dist_name)
-    has_guess_val <- !is.null(kc) && is.finite(kc)
-    if (has_guess_val) {
-      idx <- (cat_type - 1L) * n_conf + cat_conf
-    } else {
-      block <- if (cat_type == 1L) 1L else if (cat_type == 3L) 2L else 3L
-      idx <- (block - 1L) * n_conf + cat_conf
-    }
-    probs[idx]
-  }, dprimef, dprimer, sigmar_vec, criterion, spacing, rcrit, kcrit_vec)
+  mapply(
+    function(df, dr, sr, cr, sp, rc, kc) {
+      n_ratings <- n_new + n_old
+      ttype <- if (thresh_type == 1L) "parsimonious" else "equidistant"
+      thresholds <- .sdt_make_thresholds(cr, n_ratings, ttype, sp)
+      dist_name <- .sdt_dist_names[dist_type]
+      probs <- .sdt_cdp_category_probs(
+        thresholds, df, dr, sr, rc, kc,
+        stim, n_new, n_old, dist_name
+      )
+      has_guess_val <- !is.null(kc) && is.finite(kc)
+      if (cat_type == 1L) {
+        idx <- cat_conf
+      } else if (has_guess_val) {
+        block <- cat_type - 1L
+        idx <- n_new + (block - 1L) * n_old + cat_conf
+      } else {
+        block <- if (cat_type == 3L) 1L else 2L
+        idx <- n_new + (block - 1L) * n_old + cat_conf
+      }
+      probs[idx]
+    },
+    dprimef, dprimer, sigmar_vec,
+    criterion, spacing, rcrit, kcrit_vec
+  )
 }
