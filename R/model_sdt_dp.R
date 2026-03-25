@@ -47,14 +47,14 @@
 
   parameters$Ro <- glue(
     "Recollection: probability of threshold-based recollection ",
-    "for old items (inv_logit(Ro) maps to [0,1])"
+    "for old items (inv_logit(Ro) maps to \\[0,1\\])"
   )
   default_priors$Ro <- list(main = "normal(0, 1)", effects = "normal(0, 0.5)")
   param_links$Ro <- "identity"
 
   parameters$Rn <- glue(
     "Recollection: probability of threshold-based recollection ",
-    "for new items (inv_logit(Rn) maps to [0,1])"
+    "for new items (inv_logit(Rn) maps to \\[0,1\\])"
   )
   default_priors$Rn <- list(main = "normal(0, 1)", effects = "normal(0, 0.5)")
   param_links$Rn <- "identity"

@@ -110,6 +110,7 @@ The following models are supported:
 \item sdai(resp, n_sources, n_confidence, dist)
 \item sdm(resp_error, version)
 \item sdt_binary(response, stimulus, n_trials, dist, links)
+\item sdt_cdp(new_response, old_know, old_remember, old_guess, stimulus, n_ratings, dist, threshold_type, links)
 \item sdt_dp(response, stimulus, n_ratings, dist, threshold_type, links)
 \item sdt_mafc(response, n_trials, m, dist, links)
 \item sdt_metad(response, stimulus, n_ratings, dist, threshold_type, links)

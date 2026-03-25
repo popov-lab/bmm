@@ -406,17 +406,8 @@ configure_model.sdt_cdp <- function(model, data, formula) {
     loop = TRUE,
     log_lik = log_lik_sdt_cdp_uv,
     posterior_predict = posterior_predict_sdt_cdp,
-    vars = c(vint_vars, "x_r", "cdp_dist_type")
+    vars = vint_vars
   )
-
-  # cdp_dist_type as data array[1] int for integrate_1d's x_i
-  dist_int <- model$other_vars$dist_int
-  tdata_code <- paste0(
-    "  array[0] real x_r;\n",
-    "  array[1] int cdp_dist_type = {", dist_int, "};"
-  )
-  stanvars <- stanvars +
-    brms::stanvar(scode = tdata_code, block = "tdata")
 
   nlist(formula, data, stanvars)
 }

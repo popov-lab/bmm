@@ -62,8 +62,8 @@ Dual Process Signal Detection Theory Model
 \item \code{dprime}: Sensitivity: distance between signal and noise distributions
 \item \code{criterion}: Response bias: location of decision boundary
 \item \code{spacing}: Threshold spacing: controls distance between adjacent thresholds (exp(spacing) ensures positive spacing)
-\item \code{Ro}: Recollection: probability of threshold-based recollection for old items (inv_logit(Ro) maps to \link{0,1})
-\item \code{Rn}: Recollection: probability of threshold-based recollection for new items (inv_logit(Rn) maps to \link{0,1})
+\item \code{Ro}: Recollection: probability of threshold-based recollection for old items (inv_logit(Ro) maps to [0,1])
+\item \code{Rn}: Recollection: probability of threshold-based recollection for new items (inv_logit(Rn) maps to [0,1])
 \item \code{sdratio}: SD ratio: log ratio of signal to noise standard deviations (exp(sdratio) ensures positivity, 0 = equal variance)
 }
 \item \strong{Fixed parameters:}
