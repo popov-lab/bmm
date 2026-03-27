@@ -778,19 +778,15 @@ rm3 <- function(n, size, pars, m3_model, act_funs = NULL, unpack = FALSE,
 #' hist(dat$rt)
 #' @export
 dcswald <- function(rt, response, drift, bound, ndt, zr = 0.5, s = 1,
-                    version = "simple", log = TRUE) {
+                    version = c("simple", "crisk"), log = TRUE) {
   validate_cswald_parameters(drift, bound, ndt, zr, s)
+  version <- match.arg(version)
 
   stopif(
     any(rt - ndt <= 0),
     "Some reaction times are smaller than the non-decision time. \\
     You need to specify a non-decision time 'ndt' smaller than \\
     the shortest reaction time."
-  )
-
-  stopif(
-    !version %in% c("simple", "crisk"),
-    "The version you specified is not valid. Please choose between version = \"simple\" or \"crisk\"."
   )
 
   .dcswald(rt, response, drift, bound, ndt, zr, s, version, log)
@@ -822,19 +818,8 @@ rcswald <- function(n, drift, bound, ndt, zr = 0.5, s = 1) {
 }
 
 .rcswald <- function(n, drift, bound, ndt, zr, s) {
-  out <- rtdists::rdiffusion(
-    n = n,
-    a = bound,
-    v = drift,
-    t0 = ndt,
-    z = zr * bound,
-    s = s
-  )
-
-  data.frame(
-    rt = out$rt,
-    response = ifelse(out$response == "upper", 1, 0)
-  )
+  out <- rtdists::rdiffusion(n = n, a = bound, v = drift, t0 = ndt, z = zr * bound, s = s)
+  data.frame(rt = out$rt, response = as.numeric(out$response == "upper"))
 }
 
 #' @rdname cswald_dist
@@ -935,10 +920,7 @@ qcswald <- function(p, response, drift, bound, ndt, zr = 0.5, s = 1,
     p <- 1 - p
   }
 
-  stopif(
-    any(p < 0 | p > 1, na.rm = TRUE),
-    "Probabilities must be between 0 and 1."
-  )
+  stopif(any(p < 0 | p > 1, na.rm = TRUE), "Probabilities must be between 0 and 1.")
   n <- length(p)
   ndt <- rep(ndt, length.out = n)
   drift <- rep(drift, length.out = n)
