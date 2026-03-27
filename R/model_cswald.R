@@ -83,7 +83,7 @@
   out <- structure(
     list(
       resp_vars = nlist(rt, response),
-      other_vars = nlist(),
+      other_vars = list(),
       domain = "Processing Speed, Decision Making",
       task = "Choice Reaction Time tasks (with few errors)",
       name = "Censored-Shifted Wald Model",
@@ -170,9 +170,10 @@
 #'   cores = 4,
 #'   backend = "cmdstanr"
 #' )
-cswald <- function(rt, response, links = NULL, version = "simple", ...) {
+cswald <- function(rt, response, links = NULL, version = c("simple", "crisk"), ...) {
   call <- match.call()
   stop_missing_args()
+  version <- match.arg(version)
   .model_cswald(
     rt = rt,
     response = response,
