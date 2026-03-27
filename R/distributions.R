@@ -744,7 +744,7 @@ rm3 <- function(n, size, pars, m3_model, act_funs = NULL, unpack = FALSE,
 #' @param zr relative starting point of the ddm
 #' @param log Logical, indicating if log-densities should be returned (default = TRUE)
 #'
-#' @keywords distributions
+#' @keywords distribution
 #'
 #' @export
 dddm <- function(rt, response, drift, bound, ndt, zr = 0.5, log = TRUE) {

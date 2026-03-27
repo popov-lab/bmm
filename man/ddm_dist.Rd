@@ -30,4 +30,4 @@ rddm(n, drift, bound, ndt, zr = 0.5)
 \description{
 Density and random generation function for the Diffusion Decision Model.
 }
-\keyword{distributions}
+\keyword{distribution}
