@@ -1,0 +1,521 @@
+---
+title: "The Censored Shifted Wald Model (cswald)"
+output: bookdown::html_document2
+author:
+  - Gidon Frischkorn
+  - Ven Popov
+bibliography: REFERENCES.bib
+header-includes:
+  - \usepackage{amsmath}
+vignette: >
+  %\VignetteIndexEntry{The Censored Shifted Wald Model (cswald)}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+pkgdown:
+  as_is: true
+---
+
+<style type="text/css">
+div.main-container {
+max-width: 800px !important;
+}
+
+p {
+margin-top: 1.5em ;
+margin-bottom: 1.5em ;
+}
+.author{
+    display: none;
+}
+</style>
+
+```{r, include = FALSE}
+options(crayon.enabled = TRUE)
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>",
+  dev = "jpeg",
+  dpi = 100
+)
+fansi::set_knit_hooks(knitr::knit_hooks, which = c("output","message","error"))
+```
+
+# Introduction
+
+The Censored Shifted Wald (cswald) model is a measurement model for choice
+response time (RT) tasks, particularly suited for tasks with high accuracy
+(few errors). The model was introduced by @millerRelationCensoredShifted2018
+as a simplified alternative to the full Wiener diffusion model
+[@ratcliffDiffusionDecisionModel2008] that is easier to estimate while still
+capturing essential features of the decision-making process.
+
+The cswald model is ideal when:
+
+- You have RT data from a two-choice decision task
+- Accuracy is relatively high (error rates < 20%)
+- You want to separate different components of the decision process
+- You need a computationally efficient alternative to the full diffusion model
+
+# Theoretical Background
+
+## The Shifted Wald Distribution
+
+The Wald distribution (also known as the inverse Gaussian distribution)
+describes the first-passage time of a Wiener process (Brownian motion with
+drift) to a single absorbing boundary. In the context of decision-making,
+this models the time it takes for evidence to accumulate to a decision
+threshold.
+
+The shifted Wald distribution adds a non-decision time component to account
+for processes like stimulus encoding and motor response execution:
+
+$$
+RT = T_{decision} + T_{ndt}
+$$
+
+where $T_{decision}$ follows a Wald distribution and $T_{ndt}$ is the
+non-decision time.
+
+The probability density function of the shifted Wald is:
+
+$$
+f(t | v, a, \tau) = \frac{a}{\sqrt{2\pi (t-\tau)^3}}
+\exp\left(-\frac{(a - v(t-\tau))^2}{2(t-\tau)}\right)
+$$
+
+for $t > \tau$, where:
+
+- $v$ is the drift rate (rate of evidence accumulation)
+- $a$ is the boundary (decision threshold)
+- $\tau$ is the non-decision time
+
+## Censoring for Error Responses
+
+In tasks with high accuracy, most responses are correct. The "censored"
+aspect of the model refers to how error responses are handled. Instead of
+modeling errors as arising from a separate accumulation process toward the
+wrong boundary (as in the full diffusion model), errors are treated as
+**censored** observations — trials where the correct response had not yet
+been reached.
+
+This censoring approach assumes that:
+
+1. Correct responses follow the shifted Wald distribution
+2. Error responses represent trials where the accumulation process was
+   interrupted before reaching the correct boundary
+
+The likelihood for a correct response is the Wald density:
+
+$$
+L_{correct}(t) = f_{Wald}(t - \tau | v, a)
+$$
+
+The likelihood for an error response is the survivor function (1 - CDF):
+
+$$
+L_{error}(t) = S_{Wald}(t - \tau | v, a) = 1 - F_{Wald}(t - \tau | v, a)
+$$
+
+## Relationship to the Diffusion Model
+
+The cswald model can be seen as a simplification of the Wiener diffusion
+model that makes certain assumptions:
+
+1. **Single boundary**: Only the correct response boundary is explicitly
+   modeled
+2. **Unbiased starting point**: The starting point is assumed to be
+   equidistant from both boundaries
+3. **High accuracy**: The model works best when error rates are low
+
+For tasks with substantial error rates (> 20%), the competing risks version
+of the model (`version = "crisk"`) provides a more appropriate fit by
+modeling both boundaries explicitly.
+
+# Model Versions
+
+The `bmm` package implements two versions of the cswald model:
+
+## Simple Version (`version = "simple"`)
+
+The simple version treats errors as censored correct responses. It estimates:
+
+- **drift**: The drift rate (rate of evidence accumulation toward the
+  correct response)
+- **bound**: The distance from the starting point to the correct boundary
+- **ndt**: Non-decision time
+- **s**: Diffusion constant (usually fixed to 1 for scaling)
+
+This version is best suited for tasks with error rates below 20%.
+
+**Important note on boundary parameterization:** The `bound` parameter in the
+simple version represents only the distance from the (unbiased) starting point
+to the correct response boundary. This is **half** the total boundary
+separation in the standard diffusion model parameterization. To convert the
+simple version's `bound` estimate to the equivalent DDM or crisk boundary
+separation, multiply by 2:
+
+$$
+a_{DDM} = 2 \times \text{bound}_{simple}
+$$
+
+## Competing Risks Version (`version = "crisk"`)
+
+The competing risks version models both correct and error responses as
+arising from racing accumulators toward opposite boundaries. It estimates:
+
+- **drift**: The drift rate (can be positive or negative; negative drift
+  indicates evidence accumulation toward the lower boundary)
+- **bound**: Total boundary separation (full distance between both boundaries,
+  consistent with DDM parameterization)
+- **ndt**: Non-decision time
+- **zr**: Relative starting point (proportion of boundary separation,
+  0.5 = unbiased)
+- **s**: Diffusion constant
+
+This version is better suited for tasks with substantial error rates. The
+`bound` parameter is directly comparable to the boundary separation in the
+standard diffusion model.
+
+## When to Use Each Version
+
+### Use `version = "simple"` when:
+
+- Error rates are low (< 20%)
+- You want a computationally efficient model
+- The focus is on correct response times
+- Errors can reasonably be treated as censored observations
+
+### Use `version = "crisk"` when:
+
+- Error rates are substantial (> 20%)
+- You want to model both response types explicitly
+- Starting point bias might be present
+- You need estimates comparable to full diffusion model parameters
+
+## Comparison with the Wiener Diffusion Model
+
+The `cswald` model in `bmm` is related to but distinct from the full Wiener
+diffusion model available in `brms::wiener()`. Key differences:
+
+| Feature | cswald (simple) | cswald (crisk) | brms::wiener |
+|---------|-----------------|----------------|--------------|
+| Boundaries | Single | Both | Both |
+| Starting point | Fixed (unbiased) | Estimated | Estimated |
+| Bound param | Half separation | Full separation | Full separation |
+| Drift sign | Positive only | Positive/negative | Positive/negative |
+| Best for | High accuracy | Moderate accuracy | Any accuracy |
+| Computation | Fast | Moderate | Slower |
+| Parameters | 3-4 | 4-5 | 4-5 |
+
+For tasks with low error rates, the `cswald` model provides equivalent
+inferences with faster computation. When comparing results across model
+versions, remember to multiply the simple version's `bound` by 2 to get the
+equivalent total boundary separation.
+
+# Fitting the Model with `bmm`
+
+## Setup
+
+```{r setup, message=FALSE, warning=FALSE}
+library(bmm)
+library(ggplot2)
+```
+
+## Example Dataset: Ratcliff & Rouder (1998)
+
+The `rr98` dataset from the `rtdists` package provides a classic example of
+choice response time data suitable for evidence accumulation models. The
+dataset contains responses from a brightness discrimination task where
+participants judged whether pixel arrays were "high" or "low" brightness.
+
+```{r}
+# Load the dataset from rtdists (already a dependency of bmm)
+data(rr98, package = "rtdists")
+
+# Remove outliers as in the original analysis
+rr98 <- rr98[!rr98$outlier, ]
+
+# Examine structure
+str(rr98[, c("id", "rt", "response_num", "instruction", "strength")])
+
+# Check error rates by condition
+with(rr98, tapply(response_num == 1, list(id, instruction), mean))
+```
+
+The dataset includes:
+
+- **rt**: Response time in seconds
+- **response_num**: Binary response (1 = "dark", 2 = "light")
+- **instruction**: Speed vs accuracy emphasis
+- **strength**: Task difficulty (0-32, brightness level)
+- **id**: Participant identifier
+
+This dataset is particularly well-suited for the cswald model because:
+
+1. **High accuracy**: Most conditions have error rates below 20%, ideal for the
+   simple version
+2. **Multiple conditions**: Allows testing how task manipulations affect model
+   parameters
+3. **Trial-level data**: Contains the RT and response for every trial
+4. **Classic reference**: Widely used in the evidence accumulation literature
+
+For a complete analysis example using this dataset, see the `rtdists` package
+vignette: `vignette("reanalysis_rr98", package = "rtdists")`.
+
+## Generating Simulated Data with Hierarchical Structure
+
+We'll simulate data from multiple participants with individual differences in
+drift rates, demonstrating how to fit hierarchical models with `bmm`:
+
+```{r}
+# set seed for reproducibility
+set.seed(42)
+
+# simulate data for 3 participants in two conditions
+n_subjects <- 5
+n_per_condition <- 200  # fewer trials per condition to keep file size manageable
+
+# Population-level parameters
+pop_drift_A <- 3.0      # mean drift for condition A
+pop_drift_B <- 1.8      # mean drift for condition B
+drift_sd <- 0.5         # between-subject SD in drift
+bound <- 1.5            # shared boundary
+ndt <- 0.3              # shared non-decision time
+
+# Generate subject-specific drift rates
+subject_drifts_A <- rnorm(n_subjects, pop_drift_A, drift_sd)
+subject_drifts_B <- rnorm(n_subjects, pop_drift_B, drift_sd)
+
+# Simulate data for each subject and condition
+dat_list <- list()
+for (i in 1:n_subjects) {
+  # Condition A
+  dat_A <- rcswald(n = n_per_condition, 
+                   drift = subject_drifts_A[i], 
+                   bound = bound, 
+                   ndt = ndt)
+  dat_A$id <- paste0("S", i)
+  dat_A$condition <- "A"
+  
+  # Condition B
+  dat_B <- rcswald(n = n_per_condition, 
+                   drift = subject_drifts_B[i], 
+                   bound = bound, 
+                   ndt = ndt)
+  dat_B$id <- paste0("S", i)
+  dat_B$condition <- "B"
+  
+  dat_list[[2*i-1]] <- dat_A
+  dat_list[[2*i]] <- dat_B
+}
+
+# Combine all data
+dat <- do.call(rbind, dat_list)
+dat$id <- factor(dat$id)
+dat$condition <- factor(dat$condition)
+
+# Check error rates by subject and condition
+error_rates <- aggregate(response ~ id + condition, data = dat, 
+                        FUN = function(x) mean(x == 0))
+print(error_rates)
+```
+
+Let's visualize the RT distributions by participant:
+
+```{r fig.width=8, fig.height=6}
+ggplot(dat, aes(x = rt, fill = factor(response))) +
+  geom_histogram(binwidth = 0.05, position = "identity", alpha = 0.7) +
+  facet_grid(id ~ condition, labeller = labeller(
+    condition = c(A = "Condition A", B = "Condition B")
+  )) +
+  scale_fill_manual(values = c("0" = "red", "1" = "blue"),
+                    labels = c("0" = "Error", "1" = "Correct"),
+                    name = "Response") +
+  labs(x = "Response Time (s)", y = "Count",
+       title = "RT distributions by participant and condition") +
+  theme_classic()
+```
+
+## Specifying the Model
+
+First, specify the model using `cswald()`:
+
+```{r}
+model <- cswald(
+  rt = "rt",
+  response = "response",
+  version = "simple"
+)
+```
+
+## Specifying the Hierarchical Formula
+
+We want to estimate:
+
+1. **Population-level effects**: How drift rate varies by condition
+2. **Individual differences**: Random effects for drift rate by participant
+3. **Shared parameters**: Boundary and non-decision time constant across
+   participants
+
+The formula includes both fixed effects for condition and random effects
+(varying intercepts) for participants:
+
+```{r}
+formula <- bmf(
+  drift ~ 0 + condition + (0 + condition | id),  # fixed condition effects + random subject effects
+  bound ~ 1,                          # shared boundary
+  ndt ~ 1                             # shared non-decision time
+)
+```
+
+The `(0 + condition | id)` term in the drift formula specifies random slopes
+for each condition by participant. This allows the model to estimate:
+
+- A population-level drift rate for each condition
+- Individual deviations from these population means for each condition
+- The variability (SD) and correlation of these individual differences across conditions
+
+This hierarchical structure provides several advantages:
+
+1. **Partial pooling**: Individual estimates are pulled toward the group mean,
+   providing more stable estimates for participants with less data
+2. **Uncertainty quantification**: The model quantifies both within- and
+   between-subject variability
+3. **Shrinkage**: Extreme individual estimates are regularized toward the group
+   mean
+
+## Fitting the Hierarchical Model
+
+Now we fit the model with hierarchical structure. The random effects allow
+each participant to have their own drift rate while estimating the
+population-level mean drift for each condition:
+
+```{r, message=FALSE, results='hide'}
+fit <- bmm(
+  formula = formula,
+  data = dat,
+  model = model,
+  cores = 4,
+  backend = "cmdstanr",
+  # Reduce iterations to keep file size manageable
+  iter = 1000,
+  warmup = 500,
+  control = list(adapt_delta = 0.9),
+  file = "assets/bmmfit_cswald_hierarchical_vignette.rds"
+)
+```
+
+## Inspecting Results
+
+```{r}
+summary(fit)
+```
+
+### Population-Level Effects
+
+The model uses link functions for the parameters (log link for all parameters),
+so we need to exponentiate to get values on the original scale:
+
+```{r}
+# Extract population-level (fixed) effects
+fixef_est <- brms::fixef(fit)
+
+# Transform to original scale
+cat("Population-level estimates:\n")
+cat("drift (Condition A):", exp(fixef_est["drift_conditionA", "Estimate"]), "\n")
+cat("drift (Condition B):", exp(fixef_est["drift_conditionB", "Estimate"]), "\n")
+cat("bound (half-separation):", exp(fixef_est["bound_Intercept", "Estimate"]), "\n")
+cat("ndt:", exp(fixef_est["ndt_Intercept", "Estimate"]), "\n")
+
+cat("\nTrue population-level parameters:\n")
+cat("drift (Condition A):", pop_drift_A, "\n")
+cat("drift (Condition B):", pop_drift_B, "\n")
+cat("bound:", bound, "\n")
+cat("ndt:", ndt, "\n")
+```
+
+### Individual Differences
+
+The random effects capture individual differences in drift rate:
+
+```{r}
+# Extract random effects (deviations from population mean on log scale)
+ranef_est <- brms::ranef(fit)
+
+# Get subject-specific drift estimates by adding random effects to fixed effects
+cat("\nSubject-specific drift estimates (Condition A):\n")
+for (i in 1:n_subjects) {
+  subj_id <- paste0("S", i)
+  # Add random effect to fixed effect, then exponentiate
+  drift_subj <- exp(fixef_est["drift_conditionA", "Estimate"] + 
+                    ranef_est$id[subj_id, "Estimate", "drift_conditionA"])
+  cat(subj_id, ": ", round(drift_subj, 2), 
+      " (true: ", round(subject_drifts_A[i], 2), ")\n", sep = "")
+}
+
+cat("\nSubject-specific drift estimates (Condition B):\n")
+for (i in 1:n_subjects) {
+  subj_id <- paste0("S", i)
+  drift_subj <- exp(fixef_est["drift_conditionB", "Estimate"] + 
+                    ranef_est$id[subj_id, "Estimate", "drift_conditionB"])
+  cat(subj_id, ": ", round(drift_subj, 2), 
+      " (true: ", round(subject_drifts_B[i], 2), ")\n", sep = "")
+}
+
+# Between-subject variability
+cat("\nEstimated SD of random effects (log scale, Cond A | Cond B):\n")
+cat("sd(drift):", brms::VarCorr(fit)$id$sd[,"Estimate"], "\n")
+cat("True SD (log scale):", drift_sd, "\n")
+```
+
+## Model Diagnostics
+
+Check posterior predictive distributions:
+
+```{r fig.width=8, fig.height=4, message=FALSE}
+brms::pp_check(fit, type = "dens_overlay", ndraws = 10) +
+  labs(title = "Posterior Predictive Check")
+```
+
+## Hypothesis Testing
+
+We can test whether drift rates differ between conditions using the
+`brms::hypothesis()` function. This tests the difference on the log scale:
+
+```{r}
+# Test if drift rate is higher in Condition A than B
+hyp_test <- brms::hypothesis(fit, "drift_conditionA > drift_conditionB")
+print(hyp_test)
+```
+
+The output shows:
+
+- **Estimate**: The posterior mean of the difference (on log scale)
+- **Est.Error**: The standard error of the difference
+- **CI**: The 95% credible interval for the difference
+- **Evid.Ratio**: The evidence ratio (posterior odds) in favor of the hypothesis
+- **Post.Prob**: The posterior probability that the hypothesis is true
+
+To express the difference on the original scale, we can compute the ratio of
+drift rates:
+
+```{r}
+# Extract posterior samples
+posterior <- brms::as_draws_df(fit)
+
+# Compute drift ratio (Condition A / Condition B) on original scale
+drift_ratio <- exp(posterior$b_drift_conditionA - posterior$b_drift_conditionB)
+
+cat("Drift rate ratio (A/B):\n")
+cat("  Median:", round(median(drift_ratio), 2), "\n")
+cat("  95% CI: [", round(quantile(drift_ratio, 0.025), 2), ", ",
+    round(quantile(drift_ratio, 0.975), 2), "]\n", sep = "")
+cat("  P(ratio > 1):", round(mean(drift_ratio > 1), 3), "\n")
+
+cat("\nTrue drift ratio:", round(pop_drift_A / pop_drift_B, 2), "\n")
+```
+
+This shows that the model successfully recovers the difference between
+conditions, with strong evidence that drift rates are higher in Condition A.
+
+# References
