@@ -94,53 +94,57 @@ dm3(x = c(20, 10, 10), pars = c(a = 1, c = 2), m3_model = model)
 #> [1] -14.88885
 rm3(n = 10, size = 100, pars = c(a = 1, c = 2), m3_model = model)
 #>       corr other npl
-#>  [1,]   36    58   6
-#>  [2,]   41    55   4
-#>  [3,]   38    58   4
-#>  [4,]   44    51   5
-#>  [5,]   28    60  12
-#>  [6,]   35    59   6
-#>  [7,]   39    58   3
-#>  [8,]   36    61   3
-#>  [9,]   36    56   8
-#> [10,]   33    61   6
+#>  [1,]   38    61   1
+#>  [2,]   41    56   3
+#>  [3,]   34    57   9
+#>  [4,]   40    53   7
+#>  [5,]   36    58   6
+#>  [6,]   41    55   4
+#>  [7,]   38    58   4
+#>  [8,]   44    51   5
+#>  [9,]   28    60  12
+#> [10,]   35    59   6
 
 # Can also use full formula (activation formulas are extracted automatically)
 full_formula <- bmf(
   corr ~ b + a + c,
-  other ~ b + a, 
+  other ~ b + a,
   npl ~ b,
   a ~ 1,
   c ~ 1
 )
-rm3(n = 10, size = 100, pars = c(a = 1, c = 2), 
-    m3_model = model, act_funs = full_formula)
+rm3(
+  n = 10, size = 100, pars = c(a = 1, c = 2),
+  m3_model = model, act_funs = full_formula
+)
 #>       corr other npl
-#>  [1,]   34    61   5
-#>  [2,]   42    55   3
-#>  [3,]   35    57   8
-#>  [4,]   33    59   8
-#>  [5,]   48    49   3
-#>  [6,]   37    56   7
-#>  [7,]   39    56   5
-#>  [8,]   30    64   6
-#>  [9,]   49    48   3
-#> [10,]   49    43   8
-    
+#>  [1,]   39    58   3
+#>  [2,]   36    61   3
+#>  [3,]   36    56   8
+#>  [4,]   33    61   6
+#>  [5,]   34    61   5
+#>  [6,]   42    55   3
+#>  [7,]   35    57   8
+#>  [8,]   33    59   8
+#>  [9,]   48    49   3
+#> [10,]   37    56   7
+
 if (FALSE) { # \dontrun{
 # Use with dplyr::reframe() for automatic unpacking into columns
 library(dplyr)
 library(tibble)
 param_grid <- expand.grid(a = c(0.5, 1, 1.5), c = c(1, 2, 3))
 
-simulated_data <- param_grid %>%
-  rowwise() %>%
+simulated_data <- param_grid |>
+  rowwise() |>
   reframe(
     a = a,
     c = c,
     # unpack=TRUE returns named vector; wrap in as_tibble_row for auto-unpacking
-    as_tibble_row(rm3(n = 1, size = 100, pars = c(a = a, c = c), 
-                      m3_model = model, unpack = TRUE))
+    as_tibble_row(rm3(
+      n = 1, size = 100, pars = c(a = a, c = c),
+      m3_model = model, unpack = TRUE
+    ))
   )
 # Result has columns: a, c, corr, other, npl
 } # }

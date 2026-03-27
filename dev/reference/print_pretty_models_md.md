@@ -19,6 +19,7 @@ Markdown code for printing the list of measurement models available in
 print_pretty_models_md()
 #> **Processing Speed, Decision Making**
 #> 
+#> * Censored-Shifted Wald Model 
 #> * EZ-Diffusion Model 
 #> 
 #> **Visual working memory**

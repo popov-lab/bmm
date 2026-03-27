@@ -75,6 +75,8 @@ stan data, etc.
 
 Functions for specifying which model to fit
 
+- [`cswald()`](https://venpopov.com/bmm/dev/reference/cswald.md) :
+  Censored-Shifted Wald Model
 - [`ezdm()`](https://venpopov.com/bmm/dev/reference/ezdm.md) :
   EZ-Diffusion Model
 - [`imm()`](https://venpopov.com/bmm/dev/reference/imm.md)
@@ -101,29 +103,42 @@ Functions for special distributions
   [`qimm()`](https://venpopov.com/bmm/dev/reference/IMMdist.md)
   [`rimm()`](https://venpopov.com/bmm/dev/reference/IMMdist.md) :
   Distribution functions for the Interference Measurement Model (IMM)
+
 - [`dsdm()`](https://venpopov.com/bmm/dev/reference/SDMdist.md)
   [`psdm()`](https://venpopov.com/bmm/dev/reference/SDMdist.md)
   [`qsdm()`](https://venpopov.com/bmm/dev/reference/SDMdist.md)
   [`rsdm()`](https://venpopov.com/bmm/dev/reference/SDMdist.md) :
   Distribution functions for the Signal Discrimination Model (SDM)
+
+- [`dcswald()`](https://venpopov.com/bmm/dev/reference/cswald_dist.md)
+  [`rcswald()`](https://venpopov.com/bmm/dev/reference/cswald_dist.md)
+  [`pcswald()`](https://venpopov.com/bmm/dev/reference/cswald_dist.md)
+  [`qcswald()`](https://venpopov.com/bmm/dev/reference/cswald_dist.md) :
+
+  Distribution functions for the censored shifted Wald model (`cswald`)
+
 - [`dezdm()`](https://venpopov.com/bmm/dev/reference/ezdm_dist.md)
   [`rezdm()`](https://venpopov.com/bmm/dev/reference/ezdm_dist.md) :
   Distribution functions for the EZ-Diffusion Model (ezdm)
+
 - [`dm3()`](https://venpopov.com/bmm/dev/reference/m3dist.md)
   [`rm3()`](https://venpopov.com/bmm/dev/reference/m3dist.md) :
   Distribution functions for the Memory Measurement Model (M3)
+
 - [`dmixture2p()`](https://venpopov.com/bmm/dev/reference/mixture2p_dist.md)
   [`pmixture2p()`](https://venpopov.com/bmm/dev/reference/mixture2p_dist.md)
   [`qmixture2p()`](https://venpopov.com/bmm/dev/reference/mixture2p_dist.md)
   [`rmixture2p()`](https://venpopov.com/bmm/dev/reference/mixture2p_dist.md)
   : Distribution functions for the two-parameter mixture model
   (mixture2p)
+
 - [`dmixture3p()`](https://venpopov.com/bmm/dev/reference/mixture3p_dist.md)
   [`pmixture3p()`](https://venpopov.com/bmm/dev/reference/mixture3p_dist.md)
   [`qmixture3p()`](https://venpopov.com/bmm/dev/reference/mixture3p_dist.md)
   [`rmixture3p()`](https://venpopov.com/bmm/dev/reference/mixture3p_dist.md)
   : Distribution functions for the three-parameter mixture model
   (mixture3p)
+
 - [`rejection_sampling()`](https://venpopov.com/bmm/dev/reference/rejection_sampling.md)
   : Rejection Sampling
 

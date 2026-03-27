@@ -36,5 +36,7 @@ Fitting models to choice reaction time tasks
 
 - [The EZ-Diffusion Model
   (EZDM)](https://venpopov.com/bmm/dev/articles/bmm_ezdm.md):
+- [The Censored Shifted Wald Model
+  (cswald)](https://venpopov.com/bmm/dev/articles/bmm_cswald.md):
 - [Handling RT Contamination in Evidence Accumulation
   Models](https://venpopov.com/bmm/dev/articles/bmm_rt_contamination.md):

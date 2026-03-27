@@ -37,8 +37,30 @@
   starting point) and 4-parameter (asymmetric starting point) versions
   based on Srivastava et al. (2016). Implements Bayesian hierarchical
   estimation following Chavez & Vandekerckhove (2025). See the
-  [article](https://venpopov.com/bmm/dev/articles/bmm_ezdm.html) on the
-  `bmm` website for details.
+  [article](https://venpopov.github.io/bmm/dev/articles/bmm_ezdm.html)
+  on the `bmm` website for details.
+- Add the **Censored Shifted Wald Model** (`cswald`) for choice reaction
+  time tasks with two response boundaries. The model estimates drift
+  rate, boundary separation, and non-decision time from trial-level RT
+  and response data. Implements two versions: **simple** (treats errors
+  as censored correct responses, appropriate for high-accuracy tasks)
+  and **crisk** (competing risks version with separate accumulators for
+  each response, suitable for balanced accuracy). See the
+  [article](https://venpopov.github.io/bmm/dev/articles/bmm_cswald.html)
+  on the `bmm` website for details. Thanks to
+  [@GidonFrischkorn](https://github.com/GidonFrischkorn)
+
+#### New features
+
+- New function **ezdm_summary_stats()** to compute summary statistics
+  from trial-level RT data for the EZ-Diffusion Model.
+- New function **create_initfun()** creates initialization functions for
+  models that benefit from or require initial values for MCMC sampling.
+  Supports automatic parameter initialization based on model-specific
+  ranges with proper link function transformations.
+- New utility function **link_transform()** applies link functions (log,
+  logit, identity, etc.) to parameter values, with proper handling of
+  NULL inputs.
 
 #### New features
 
