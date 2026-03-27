@@ -148,12 +148,15 @@ test_that("check_data() returns a data.frame()", {
   # - y, x, z, w, l, s for circular/mixture models
   # - mean_rt, var_rt, n_upper, n_trials for ezdm 3par
   # - mean_rt_upper/lower, var_rt_upper/lower for ezdm 4par
+  # Use 50 rows to avoid small sample size warnings from cswald
   test_data <- data.frame(
-    y = 1, x = 1, z = 2, w = 1, s = 2, l = 1,
-    mean_rt = 0.5, var_rt = 0.02, n_upper = 80, n_trials = 100,
-    mean_rt_upper = 0.45, mean_rt_lower = 0.55,
-    var_rt_upper = 0.018, var_rt_lower = 0.025,
-    rt = 0.6, response = 1
+    y = rep(1, 50), x = rep(1, 50), z = rep(2, 50), w = rep(1, 50), 
+    s = rep(2, 50), l = rep(1, 50),
+    mean_rt = rep(0.5, 50), var_rt = rep(0.02, 50), 
+    n_upper = rep(80, 50), n_trials = rep(100, 50),
+    mean_rt_upper = rep(0.45, 50), mean_rt_lower = rep(0.55, 50),
+    var_rt_upper = rep(0.018, 50), var_rt_lower = rep(0.025, 50),
+    rt = rep(0.6, 50), response = rep(1, 50)
   )
   for (ml in mls) {
     model <- ml(

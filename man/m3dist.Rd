@@ -69,14 +69,16 @@ rm3(n = 10, size = 100, pars = c(a = 1, c = 2), m3_model = model)
 # Can also use full formula (activation formulas are extracted automatically)
 full_formula <- bmf(
   corr ~ b + a + c,
-  other ~ b + a, 
+  other ~ b + a,
   npl ~ b,
   a ~ 1,
   c ~ 1
 )
-rm3(n = 10, size = 100, pars = c(a = 1, c = 2), 
-    m3_model = model, act_funs = full_formula)
-    
+rm3(
+  n = 10, size = 100, pars = c(a = 1, c = 2),
+  m3_model = model, act_funs = full_formula
+)
+
 \dontrun{
 # Use with dplyr::reframe() for automatic unpacking into columns
 library(dplyr)
@@ -89,8 +91,10 @@ simulated_data <- param_grid |>
     a = a,
     c = c,
     # unpack=TRUE returns named vector; wrap in as_tibble_row for auto-unpacking
-    as_tibble_row(rm3(n = 1, size = 100, pars = c(a = a, c = c), 
-                      m3_model = model, unpack = TRUE))
+    as_tibble_row(rm3(
+      n = 1, size = 100, pars = c(a = a, c = c),
+      m3_model = model, unpack = TRUE
+    ))
   )
 # Result has columns: a, c, corr, other, npl
 }
