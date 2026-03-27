@@ -16,7 +16,7 @@ dcswald(
   ndt,
   zr = 0.5,
   s = 1,
-  version = "simple",
+  version = c("simple", "crisk"),
   log = TRUE
 )
 
@@ -125,6 +125,11 @@ The quantile function returns the response time \code{q} such that
 P(RT <= q) = p. Similar to the CDF, for the \code{"simple"} version this is only
 defined for \code{response = 1}. For the \code{"crisk"} version, this uses
 \code{\link[rtdists:Diffusion]{rtdists::qdiffusion()}} internally.
+}
+\examples{
+dat <- rcswald(n = 1000, drift = 2, bound = 1, ndt = 0.3)
+head(dat)
+hist(dat$rt)
 }
 \seealso{
 \code{\link[rtdists:Diffusion]{rtdists::rdiffusion()}}, \code{\link[rtdists:Diffusion]{rtdists::pdiffusion()}},

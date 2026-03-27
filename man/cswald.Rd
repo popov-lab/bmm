@@ -4,7 +4,7 @@
 \alias{cswald}
 \title{Censored-Shifted Wald Model}
 \usage{
-cswald(rt, response, links = NULL, version = "simple", ...)
+cswald(rt, response, links = NULL, version = c("simple", "crisk"), ...)
 }
 \arguments{
 \item{rt}{The name of the variable in the dataset containing the response
@@ -78,6 +78,7 @@ for Choice Response Times. Applied Psychological Measurement, 42(2), 116-135. ht
 }
 \item \strong{Fixed parameters:}
 \itemize{
+\item \code{mu} = 0
 \item \code{s} = 0
 }
 \item \strong{Default parameter links:}
