@@ -31,7 +31,7 @@ EZ-Diffusion Model
 }
 \details{
 \itemize{
-\item \strong{Domain:} Processing Speed, Decision Making
+\item \strong{Domain:} Decision Making / Response times
 \item \strong{Task:} Choice Reaction Time tasks
 \item \strong{Name:} EZ-Diffusion Model
 \item \strong{Citation:}

@@ -230,6 +230,499 @@ test_that("rm3 works for a complexspan m3 model", {
   expect_true(median(res[, "dist_other"]) > median(res))
 })
 
+# DDM distribution tests ----
+test_that("dddm runs without errors with scalar inputs", {
+  res <- dddm(0.5, 1, drift = 2, bound = 1.5, ndt = 0.3)
+  expect_type(res, "double")
+  expect_length(res, 1)
+  expect_false(is.na(res))
+  expect_false(is.infinite(res))
+})
+
+test_that("dddm handles numeric response codes correctly", {
+  res_upper <- dddm(0.5, 1, drift = 2, bound = 1.5, ndt = 0.3)
+  res_lower <- dddm(0.5, 0, drift = 2, bound = 1.5, ndt = 0.3)
+  expect_type(res_upper, "double")
+  expect_type(res_lower, "double")
+  expect_false(identical(res_upper, res_lower))
+})
+
+test_that("dddm handles character response codes correctly", {
+  res_numeric <- dddm(0.5, 1, drift = 2, bound = 1.5, ndt = 0.3)
+  res_char <- dddm(0.5, "upper", drift = 2, bound = 1.5, ndt = 0.3)
+  expect_equal(res_numeric, res_char)
+})
+
+test_that("dddm log parameter works correctly", {
+  res <- dddm(0.5, 1, drift = 2, bound = 1.5, ndt = 0.3, log = FALSE)
+  res_log <- dddm(0.5, 1, drift = 2, bound = 1.5, ndt = 0.3, log = TRUE)
+  expect_equal(log(res), res_log)
+})
+
+test_that("dddm vectorizes correctly with scalar rt/response and vector parameters", {
+  # This is the log_lik case: single observation, multiple posterior samples
+  rt_single <- 0.5
+  resp_single <- 1
+  drift_vec <- rnorm(10, 2, 0.3)
+  bound_vec <- rep(1.5, 10)
+  ndt_vec <- rep(0.3, 10)
+  
+  res <- dddm(rt_single, resp_single, drift_vec, bound_vec, ndt_vec)
+  expect_length(res, 10)
+  expect_false(any(is.na(res)))
+  expect_false(any(is.infinite(res)))
+})
+
+test_that("dddm vectorizes correctly with vector rt/response and scalar parameters", {
+  rt_vec <- c(0.4, 0.5, 0.6)
+  resp_vec <- c(1, 1, 0)
+  drift_scalar <- 2.0
+  
+  res <- dddm(rt_vec, resp_vec, drift_scalar, bound = 1.5, ndt = 0.3)
+  expect_length(res, 3)
+  expect_false(any(is.na(res)))
+})
+
+test_that("dddm vectorizes correctly with vector rt/response and vector parameters", {
+  n <- 5
+  rt_vec <- runif(n, 0.3, 0.8)
+  resp_vec <- sample(0:1, n, replace = TRUE)
+  drift_vec <- rnorm(n, 2, 0.3)
+  
+  res <- dddm(rt_vec, resp_vec, drift_vec, bound = 1.5, ndt = 0.3)
+  expect_length(res, n)
+  expect_false(any(is.na(res)))
+})
+
+test_that("dddm rejects negative RTs", {
+  expect_error(
+    dddm(-0.5, 1, drift = 2, bound = 1.5, ndt = 0.3),
+    "Negative RTs are not allowed"
+  )
+})
+
+test_that("dddm rejects invalid response codes", {
+  expect_error(
+    dddm(0.5, 2, drift = 2, bound = 1.5, ndt = 0.3),
+    "Invalid numeric responses"
+  )
+  expect_error(
+    dddm(0.5, "invalid", drift = 2, bound = 1.5, ndt = 0.3),
+    "Invalid responses"
+  )
+})
+
+test_that("dddm rejects mismatched rt and response lengths", {
+  expect_error(
+    dddm(c(0.5, 0.6), 1, drift = 2, bound = 1.5, ndt = 0.3),
+    "Different number of RTs and responses"
+  )
+})
+
+test_that("rddm returns data frame with correct structure", {
+  res <- rddm(10, drift = 2, bound = 1.5, ndt = 0.3)
+  expect_s3_class(res, "data.frame")
+  expect_equal(nrow(res), 10)
+  expect_true(all(c("rt", "response") %in% names(res)))
+  expect_true(all(res$rt > 0))
+  expect_true(all(res$response %in% c(0, 1)))
+})
+
+test_that("rddm handles vector parameters correctly", {
+  n <- 5
+  drift_vec <- rnorm(n, 2, 0.3)
+  res <- rddm(n, drift = drift_vec, bound = 1.5, ndt = 0.3)
+  expect_equal(nrow(res), n)
+})
+
+test_that("rddm samples from correct boundaries based on drift", {
+  # Positive drift should favor upper boundary (response = 1)
+  res_pos <- rddm(1000, drift = 3, bound = 1.5, ndt = 0.3)
+  expect_gt(mean(res_pos$response == 1), 0.8)
+  
+  # Negative drift should favor lower boundary (response = 0)
+  res_neg <- rddm(1000, drift = -3, bound = 1.5, ndt = 0.3)
+  expect_gt(mean(res_neg$response == 0), 0.8)
+})
+
+test_that("rddm respects non-decision time", {
+  res <- rddm(100, drift = 2, bound = 1.5, ndt = 0.3)
+  expect_true(all(res$rt >= 0.3))
+})
+
+test_that("rddm starting point bias affects response proportions", {
+  # Bias toward upper boundary
+  res_upper <- rddm(1000, drift = 0, bound = 1.5, ndt = 0.3, zr = 0.7)
+  expect_gt(mean(res_upper$response == 1), 0.6)
+  
+  # Bias toward lower boundary
+  res_lower <- rddm(1000, drift = 0, bound = 1.5, ndt = 0.3, zr = 0.3)
+  expect_gt(mean(res_lower$response == 0), 0.6)
+})
+
+# -----------------------------------------------------------------------------
+# cswald distribution function tests
+# -----------------------------------------------------------------------------
+
+test_that("dcswald runs without errors and returns correct output", {
+  n <- 10
+  rt <- runif(n, 0.4, 1.5)
+  response <- sample(c(0, 1), n, replace = TRUE)
+
+  # simple version
+  res <- dcswald(rt, response,
+    drift = 2, bound = 1.5, ndt = 0.3,
+    version = "simple"
+  )
+  expect_length(res, n)
+  expect_type(res, "double")
+
+  # crisk version
+  res_crisk <- dcswald(rt, response,
+    drift = 2, bound = 1.5, ndt = 0.3,
+    zr = 0.5, version = "crisk"
+  )
+  expect_length(res_crisk, n)
+  expect_type(res_crisk, "double")
+
+  # test log = FALSE
+  res_exp <- dcswald(rt, response,
+    drift = 2, bound = 1.5, ndt = 0.3,
+    version = "simple", log = FALSE
+  )
+  expect_true(all(res_exp >= 0))
+  expect_equal(res_exp, exp(res))
+})
+
+test_that("dcswald handles vectorized parameters", {
+  n <- 5
+  rt <- runif(n, 0.4, 1.5)
+  response <- sample(c(0, 1), n, replace = TRUE)
+
+  # vectorized drift
+  res <- dcswald(rt, response,
+    drift = 1:n, bound = 1.5, ndt = 0.3,
+    version = "simple"
+  )
+  expect_length(res, n)
+
+  # all parameters vectorized
+  res <- dcswald(rt, response,
+    drift = 1:n, bound = seq(1, 2, length.out = n),
+    ndt = seq(0.1, 0.3, length.out = n), version = "simple"
+  )
+  expect_length(res, n)
+})
+
+test_that("rcswald generates valid output", {
+  n <- 100
+  out <- rcswald(n, drift = 2, bound = 1.5, ndt = 0.3)
+
+  expect_s3_class(out, "data.frame")
+  expect_equal(nrow(out), n)
+  expect_true(all(c("rt", "response") %in% names(out)))
+  expect_true(all(out$rt > 0))
+  expect_true(all(out$response %in% c(0, 1)))
+})
+
+test_that("rcswald handles vectorized parameters", {
+  n <- 10
+  out <- rcswald(n,
+    drift = runif(n, 1, 3), bound = runif(n, 1, 2),
+    ndt = runif(n, 0.1, 0.3), zr = runif(n, 0.3, 0.7)
+  )
+  expect_equal(nrow(out), n)
+})
+
+test_that("pcswald returns probabilities between 0 and 1 for simple version", {
+  q <- seq(0.4, 2, length.out = 20)
+  p <- pcswald(q,
+    response = 1, drift = 2, bound = 1.5, ndt = 0.3,
+    version = "simple"
+  )
+
+  expect_length(p, 20)
+  expect_true(all(p >= 0, na.rm = TRUE))
+  expect_true(all(p <= 1, na.rm = TRUE))
+  # CDF should be monotonically increasing
+  expect_true(all(diff(p) >= 0))
+})
+
+test_that("pcswald returns probabilities between 0 and 1 for crisk version", {
+  q <- seq(0.4, 2, length.out = 20)
+
+  # upper boundary
+  p_upper <- pcswald(q,
+    response = 1, drift = 2, bound = 1.5, ndt = 0.3,
+    version = "crisk"
+  )
+  expect_true(all(p_upper >= 0))
+  expect_true(all(p_upper <= 1))
+
+  # lower boundary
+  p_lower <- pcswald(q,
+    response = 0, drift = 2, bound = 1.5, ndt = 0.3,
+    version = "crisk"
+  )
+  expect_true(all(p_lower >= 0))
+  expect_true(all(p_lower <= 1))
+})
+
+test_that("pcswald warns for response=0 in simple version", {
+  expect_warning(
+    pcswald(1.0,
+      response = 0, drift = 2, bound = 1.5, ndt = 0.3,
+      version = "simple"
+    ),
+    "CDF for response=0 is not well-defined"
+  )
+})
+
+test_that("pcswald handles log.p and lower.tail arguments", {
+  q <- 1.0
+  p <- pcswald(q, response = 1, drift = 2, bound = 1.5, ndt = 0.3)
+
+  # log.p = TRUE
+  p_log <- pcswald(q,
+    response = 1, drift = 2, bound = 1.5, ndt = 0.3,
+    log.p = TRUE
+  )
+  expect_equal(p_log, log(p))
+
+  # lower.tail = FALSE
+  p_upper <- pcswald(q,
+    response = 1, drift = 2, bound = 1.5, ndt = 0.3,
+    lower.tail = FALSE
+  )
+  expect_equal(p_upper, 1 - p)
+})
+
+test_that("qcswald returns valid quantiles for simple version", {
+  p <- c(0.1, 0.5, 0.9)
+  q <- qcswald(p,
+    response = 1, drift = 2, bound = 1.5, ndt = 0.3,
+    version = "simple"
+  )
+
+  expect_length(q, 3)
+  expect_true(all(q > 0.3)) # all quantiles > ndt
+  expect_true(all(diff(q) > 0)) # monotonically increasing
+})
+
+test_that("qcswald returns valid quantiles for crisk version", {
+  p <- c(0.1, 0.5, 0.9)
+  q <- qcswald(p,
+    response = 1, drift = 2, bound = 1.5, ndt = 0.3,
+    version = "crisk"
+  )
+
+  expect_length(q, 3)
+  expect_true(all(q > 0.3)) # all quantiles > ndt
+})
+
+test_that("qcswald warns for response=0 in simple version", {
+  expect_warning(
+    qcswald(0.5,
+      response = 0, drift = 2, bound = 1.5, ndt = 0.3,
+      version = "simple"
+    ),
+    "Quantile for response=0 is not well-defined"
+  )
+})
+
+test_that("pcswald and qcswald are inverses (round-trip)", {
+  p_orig <- c(0.1, 0.3, 0.5, 0.7, 0.9)
+
+  # simple version
+  q <- qcswald(p_orig,
+    response = 1, drift = 2, bound = 1.5, ndt = 0.3,
+    version = "simple"
+  )
+  p_back <- pcswald(q,
+    response = 1, drift = 2, bound = 1.5, ndt = 0.3,
+    version = "simple"
+  )
+  expect_equal(p_orig, p_back, tolerance = 1e-4)
+
+  # crisk version
+  q_crisk <- qcswald(p_orig,
+    response = 1, drift = 2, bound = 1.5, ndt = 0.3,
+    version = "crisk"
+  )
+  p_back_crisk <- pcswald(q_crisk,
+    response = 1, drift = 2, bound = 1.5,
+    ndt = 0.3, version = "crisk"
+  )
+  expect_equal(p_orig, p_back_crisk, tolerance = 1e-4)
+})
+
+test_that("cswald parameter validation works", {
+  # negative bound
+  expect_error(
+    dcswald(1, 1, drift = 2, bound = -1, ndt = 0.3),
+    "boundary"
+  )
+
+  # negative ndt
+  expect_error(
+    dcswald(1, 1, drift = 2, bound = 1.5, ndt = -0.1),
+    "non-decision time"
+  )
+
+  expect_error(
+    dcswald(1, 1, drift = 2, bound = 1.5, ndt = 0.3, zr = 1.5),
+    "starting point"
+  )
+
+  # negative s
+  expect_error(
+    dcswald(1, 1, drift = 2, bound = 1.5, ndt = 0.3, s = -1),
+    "diffusion constant"
+  )
+})
+
+test_that("dcswald errors when rt < ndt", {
+  expect_error(
+    dcswald(rt = 0.2, response = 1, drift = 2, bound = 1.5, ndt = 0.3),
+    "smaller than the non-decision time"
+  )
+})
+
+test_that("cswald simple and crisk give similar results for correct responses", {
+  # For high drift and unbiased starting point (zr=0.5), the simple version
+
+  # should give similar densities to crisk for correct responses (response=1)
+  rt <- seq(0.4, 1.5, by = 0.1)
+  drift <- 3
+  bound_simple <- 1.5 # simple version: distance to correct boundary
+  bound_crisk <- 3.0 # crisk version: total boundary separation (2x simple)
+
+  # Get densities for correct responses
+  dens_simple <- dcswald(rt,
+    response = 1, drift = drift, bound = bound_simple,
+    ndt = 0.2, version = "simple", log = FALSE
+  )
+  dens_crisk <- dcswald(rt,
+    response = 1, drift = drift, bound = bound_crisk,
+    ndt = 0.2, zr = 0.5, version = "crisk", log = FALSE
+  )
+
+  # Densities should be correlated (similar shape) though not identical
+  # because crisk accounts for competing accumulator
+  cor_value <- cor(dens_simple, dens_crisk)
+  expect_true(cor_value > 0.95)
+})
+
+test_that("qcswald adaptive bounds work for slow drift", {
+  # With very slow drift, RTs can be very long
+  # The adaptive bounds should handle this
+  q <- qcswald(p = 0.5, response = 1, drift = 0.1, bound = 2, ndt = 0.3)
+  expect_true(is.finite(q))
+  expect_true(q > 0.3) # greater than ndt
+
+  # Verify round-trip
+  p_back <- pcswald(q, response = 1, drift = 0.1, bound = 2, ndt = 0.3)
+  expect_equal(p_back, 0.5, tolerance = 0.01)
+})
+test_that("dcswald handles extreme drift values", {
+  # Very high drift - fast accurate responses
+  expect_no_error(
+    dcswald(rt = 0.5, response = 1, drift = 10, bound = 1.5, ndt = 0.2)
+  )
+
+  # Very low drift - slow responses
+  expect_no_error(
+    dcswald(rt = 2.0, response = 1, drift = 0.1, bound = 1.5, ndt = 0.2)
+  )
+
+  # Negative drift for crisk version
+  expect_no_error(
+    dcswald(
+      rt = 0.8, response = 0, drift = -2, bound = 1.5, ndt = 0.2,
+      zr = 0.5, version = "crisk"
+    )
+  )
+})
+
+test_that("dcswald handles extreme bound values", {
+  # Very small bound - fast responses
+  expect_no_error(
+    dcswald(rt = 0.3, response = 1, drift = 2, bound = 0.5, ndt = 0.1)
+  )
+
+  # Very large bound - slow responses
+  expect_no_error(
+    dcswald(rt = 5.0, response = 1, drift = 2, bound = 5, ndt = 0.2)
+  )
+})
+
+test_that("dcswald handles boundary zr values for crisk version", {
+  # zr near lower boundary
+  expect_no_error(
+    dcswald(
+      rt = 0.8, response = 1, drift = 2, bound = 1.5, ndt = 0.2,
+      zr = 0.01, version = "crisk"
+    )
+  )
+
+  # zr near upper boundary
+  expect_no_error(
+    dcswald(
+      rt = 0.8, response = 1, drift = 2, bound = 1.5, ndt = 0.2,
+      zr = 0.99, version = "crisk"
+    )
+  )
+
+  # zr exactly at boundaries should error
+  expect_error(
+    dcswald(
+      rt = 0.8, response = 1, drift = 2, bound = 1.5, ndt = 0.2,
+      zr = 0, version = "crisk"
+    ),
+    "between 0 and 1"
+  )
+
+  expect_error(
+    dcswald(
+      rt = 0.8, response = 1, drift = 2, bound = 1.5, ndt = 0.2,
+      zr = 1, version = "crisk"
+    ),
+    "between 0 and 1"
+  )
+})
+
+test_that("rcswald generates valid data with extreme parameters", {
+  # High drift - should produce mostly correct responses
+  dat_high <- rcswald(n = 100, drift = 5, bound = 1.5, ndt = 0.2)
+  expect_true(mean(dat_high$response == 1) > 0.9)
+  expect_true(all(dat_high$rt > 0.2)) # all RTs > ndt
+
+  # Low drift - should produce more errors
+  dat_low <- rcswald(n = 100, drift = 0.5, bound = 1.5, ndt = 0.2)
+  expect_true(mean(dat_low$response == 0) > 0.1) # some errors
+
+  # Extreme zr values
+  dat_biased_upper <- rcswald(n = 100, drift = 1, bound = 2, ndt = 0.2, zr = 0.9)
+  expect_true(mean(dat_biased_upper$response == 1) > 0.7) # biased toward upper
+
+  dat_biased_lower <- rcswald(n = 100, drift = 1, bound = 2, ndt = 0.2, zr = 0.1)
+  expect_true(mean(dat_biased_lower$response == 0) > 0.3) # biased toward lower
+})
+
+test_that("pcswald and qcswald handle extreme parameters", {
+  # pcswald with high drift should give CDF close to 1 quickly
+  p_high <- pcswald(q = 1.0, response = 1, drift = 5, bound = 1, ndt = 0.2)
+  expect_true(p_high > 0.99)
+
+  # qcswald should return valid quantiles for correct responses
+  q_50 <- qcswald(p = 0.5, response = 1, drift = 2, bound = 1.5, ndt = 0.3)
+  expect_true(q_50 > 0.3) # greater than ndt
+
+  # Very small p should give RT close to ndt
+  q_small <- qcswald(p = 0.01, response = 1, drift = 2, bound = 1.5, ndt = 0.3)
+  expect_true(q_small > 0.3 && q_small < 0.5)
+})
+
 test_that("rm3 works without providing b parameter", {
   model <- m3(
     resp_cats = c("corr", "other", "npl"),
@@ -261,8 +754,10 @@ test_that("rm3 works with full bmmformula", {
     a ~ 1,
     c ~ 1
   )
-  res <- rm3(n = 10, size = 100, pars = c(a = 1, c = 2), 
-             m3_model = model, act_funs = full_formula)
+  res <- rm3(
+    n = 10, size = 100, pars = c(a = 1, c = 2),
+    m3_model = model, act_funs = full_formula
+  )
   expect_type(res, "integer")
   expect_true("matrix" %in% class(res))
   expect_true(nrow(res) == 10 && ncol(res) == 3)
@@ -297,8 +792,10 @@ test_that("dm3 works with full bmmformula", {
     a ~ 1,
     c ~ 1
   )
-  dens <- dm3(x = c(20, 10, 10), pars = c(a = 1, c = 2), 
-              m3_model = model, act_funs = full_formula)
+  dens <- dm3(
+    x = c(20, 10, 10), pars = c(a = 1, c = 2),
+    m3_model = model, act_funs = full_formula
+  )
   expect_type(dens, "double")
   expect_length(dens, 1)
 })
@@ -316,8 +813,10 @@ test_that("rm3 errors when full formula has no activation functions", {
     c ~ 1
   )
   expect_error(
-    rm3(n = 10, size = 100, pars = c(a = 1, c = 2), 
-        m3_model = model, act_funs = wrong_formula),
+    rm3(
+      n = 10, size = 100, pars = c(a = 1, c = 2),
+      m3_model = model, act_funs = wrong_formula
+    ),
     "No activation formulas found"
   )
 })
@@ -329,11 +828,13 @@ test_that("rm3 with unpack=TRUE returns named vector for n=1", {
     choice_rule = "simple",
     version = "ss"
   )
-  
+
   # Test unpack=TRUE
-  result <- rm3(n = 1, size = 100, pars = c(a = 1, c = 2), 
-                m3_model = model, unpack = TRUE)
-  
+  result <- rm3(
+    n = 1, size = 100, pars = c(a = 1, c = 2),
+    m3_model = model, unpack = TRUE
+  )
+
   expect_type(result, "integer")
   expect_false("matrix" %in% class(result))
   expect_true("integer" %in% class(result))
@@ -348,11 +849,13 @@ test_that("rm3 with unpack=TRUE still returns matrix for n>1", {
     choice_rule = "simple",
     version = "ss"
   )
-  
+
   # unpack should be ignored when n > 1
-  result <- rm3(n = 5, size = 100, pars = c(a = 1, c = 2), 
-                m3_model = model, unpack = TRUE)
-  
+  result <- rm3(
+    n = 5, size = 100, pars = c(a = 1, c = 2),
+    m3_model = model, unpack = TRUE
+  )
+
   expect_true("matrix" %in% class(result))
   expect_equal(dim(result), c(5, 3))
   expect_equal(colnames(result), c("corr", "other", "npl"))
@@ -566,7 +1069,7 @@ test_that("dezdm handles edge case with near-zero drift", {
 test_that("dezdm 4par handles edge case with near-zero drift", {
   # near-zero drift should not cause NaN in pC computation
   # Test with different zr values to ensure pC -> zr as drift -> 0
-  
+
   # Test with zr = 0.5 (symmetric starting point)
   ll1 <- dezdm(
     mean_rt = c(0.5, 0.5), var_rt = c(0.02, 0.02),
@@ -574,7 +1077,7 @@ test_that("dezdm 4par handles edge case with near-zero drift", {
     drift = 1e-8, bound = 1.5, ndt = 0.3, zr = 0.5, version = "4par"
   )
   expect_true(is.finite(ll1))
-  
+
   # Test with zr = 0.3 (bias toward lower boundary)
   ll2 <- dezdm(
     mean_rt = c(0.5, 0.5), var_rt = c(0.02, 0.02),
@@ -582,7 +1085,7 @@ test_that("dezdm 4par handles edge case with near-zero drift", {
     drift = 1e-8, bound = 1.5, ndt = 0.3, zr = 0.3, version = "4par"
   )
   expect_true(is.finite(ll2))
-  
+
   # Test with zr = 0.7 (bias toward upper boundary)
   ll3 <- dezdm(
     mean_rt = c(0.5, 0.5), var_rt = c(0.02, 0.02),
@@ -590,7 +1093,7 @@ test_that("dezdm 4par handles edge case with near-zero drift", {
     drift = 1e-8, bound = 1.5, ndt = 0.3, zr = 0.7, version = "4par"
   )
   expect_true(is.finite(ll3))
-  
+
   # Test with exactly zero drift
   ll4 <- dezdm(
     mean_rt = c(0.5, 0.5), var_rt = c(0.02, 0.02),
