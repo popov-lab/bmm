@@ -23,7 +23,7 @@ Diffusion Decision Model
 }
 \details{
 \itemize{
-\item \strong{Domain:} Decision Making / Processing Speed
+\item \strong{Domain:} Decision Making / Response times
 \item \strong{Task:} Two-Alternative Force Choice RT
 \item \strong{Name:} Diffusion Decision Model
 \item \strong{Citation:}

@@ -36,7 +36,7 @@
     list(
       resp_vars = nlist(rt, response),
       other_vars = nlist(),
-      domain = "Decision Making / Processing Speed",
+      domain = "Decision Making / Response times",
       task = "Two-Alternative Force Choice RT",
       name = "Diffusion Decision Model",
       version = "NA",

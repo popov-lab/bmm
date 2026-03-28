@@ -64,7 +64,7 @@
     list(
       resp_vars = nlist(mean_rt, var_rt, n_upper),
       other_vars = nlist(n_trials),
-      domain = "Processing Speed, Decision Making",
+      domain = "Decision Making / Response times",
       task = "Choice Reaction Time tasks",
       name = "EZ-Diffusion Model",
       citation = glue(
