@@ -113,9 +113,7 @@ conditional_effects.bmmfit <- function(x,
                                        par = NULL,
                                        scale = c("native", "sampling"),
                                        ...) {
-  stopif(!inherits(x, "bmmfit"), "x must be a bmmfit object")
   x <- restructure(x)
-
   scale <- match.arg(scale)
 
   if (is.null(par)) {
