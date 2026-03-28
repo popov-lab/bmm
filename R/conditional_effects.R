@@ -76,7 +76,7 @@
 #' \dontrun{
 #' # Fit a mixture model with set size effect on kappa
 #' fit <- bmm(
-#'   formula = bmf(kappa ~ setsize, thetat ~ 1),
+#'   formula = bmf(kappa ~ 0 + setsize, thetat ~ 1),
 #'   data = zhang_luck_2008,
 #'   model = mixture3p(
 #'     resp_error = "response_error",
