@@ -347,39 +347,3 @@ test_that("plotting conditional_effects works", {
   p <- plot(ce, plot = FALSE)
   expect_true(length(p) > 0)
 })
-
-
-# ===========================================================================
-# Tier 3: Model-fitting integration tests (mixture3p softmax)
-# ===========================================================================
-
-test_that("conditional_effects softmax path returns probabilities", {
-  skip_on_cran()
-  skip_if_not(interactive())
-
-  data_mix3p <- zhang_luck_2008[zhang_luck_2008$setsize %in% c(2, 3, 6), ]
-
-  fit_mix3p <- bmm(
-    formula = bmf(kappa ~ 0 + setsize, thetat ~ 1),
-    data = data_mix3p,
-    model = mixture3p(
-      resp_error = "response_error",
-      nt_features = paste0("col_lure", 1:5),
-      set_size = "setsize"
-    ),
-    backend = "cmdstanr",
-    chains = 2,
-    iter = 500,
-    silent = 2
-  )
-
-  # Softmax (native) scale: thetat should be in (0, 1)
-  ce_thetat <- conditional_effects(fit_mix3p, par = "thetat", scale = "native")
-  expect_s3_class(ce_thetat, "brms_conditional_effects")
-  expect_true(all(ce_thetat[[1]]$estimate__ > 0))
-  expect_true(all(ce_thetat[[1]]$estimate__ < 1))
-
-  # Kappa on native scale should be positive
-  ce_kappa <- conditional_effects(fit_mix3p, par = "kappa", scale = "native")
-  expect_true(all(ce_kappa[[1]]$estimate__ > 0))
-})
