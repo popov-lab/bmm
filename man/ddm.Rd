@@ -28,7 +28,7 @@ Diffusion Decision Model
 \item \strong{Name:} Diffusion Decision Model
 \item \strong{Citation:}
 \itemize{
-\item Ratcliff, R. (1978). A theory of memory retrieval. Psychological Review, 85(2), 59-108. https://doi.org/10/fjwm2f; Henrich, F., Hartmann, R., Pratz, V., Voss, A., & Klauer, K. C. (2024). The Seven-parameter Diffusion Model: An Implementation in Stan for Bayesian Analyses. Behavior Research Methods, 56(4), 3102-3116. https://doi.org/10.3758/s13428-023-02179-1
+\item Ratcliff, R. (1978). A theory of memory retrieval. Psychological Review, 85(2), 59-108. https://doi.org/10/fjwm2f;
 }
 \item \strong{Requirements:}
 \itemize{
