@@ -28,6 +28,7 @@ supported_models()
 #> The following models are supported:
 #> 
 #> -  cswald(rt, response, links, version) 
+#> -  ddm(rt, response, links) 
 #> -  ezdm(mean_rt, var_rt, n_upper, n_trials, links, version) 
 #> -  imm(resp_error, nt_features, nt_distances, set_size, regex, version) 
 #> -  m3(resp_cats, num_options, choice_rule, version) 

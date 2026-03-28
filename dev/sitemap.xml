@@ -4,6 +4,7 @@
 <url><loc>https://venpopov.com/bmm/dev/LICENSE.html</loc></url>
 <url><loc>https://venpopov.com/bmm/dev/articles/bmm_bmmformula.html</loc></url>
 <url><loc>https://venpopov.com/bmm/dev/articles/bmm_cswald.html</loc></url>
+<url><loc>https://venpopov.com/bmm/dev/articles/bmm_ddm.html</loc></url>
 <url><loc>https://venpopov.com/bmm/dev/articles/bmm_extract_info.html</loc></url>
 <url><loc>https://venpopov.com/bmm/dev/articles/bmm_ezdm.html</loc></url>
 <url><loc>https://venpopov.com/bmm/dev/articles/bmm_imm.html</loc></url>
@@ -38,6 +39,9 @@
 <url><loc>https://venpopov.com/bmm/dev/reference/create_initfun.html</loc></url>
 <url><loc>https://venpopov.com/bmm/dev/reference/cswald.html</loc></url>
 <url><loc>https://venpopov.com/bmm/dev/reference/cswald_dist.html</loc></url>
+<url><loc>https://venpopov.com/bmm/dev/reference/data_color_judgement_task.html</loc></url>
+<url><loc>https://venpopov.com/bmm/dev/reference/ddm.html</loc></url>
+<url><loc>https://venpopov.com/bmm/dev/reference/ddm_dist.html</loc></url>
 <url><loc>https://venpopov.com/bmm/dev/reference/default_prior.bmmformula.html</loc></url>
 <url><loc>https://venpopov.com/bmm/dev/reference/emmeans-bmmfit.html</loc></url>
 <url><loc>https://venpopov.com/bmm/dev/reference/extract_parameter_dimensions.html</loc></url>

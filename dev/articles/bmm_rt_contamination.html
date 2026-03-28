@@ -201,7 +201,7 @@ f(RT) = (1 - \pi) \cdot f_{\text{cognitive}}(RT) + \pi \cdot f_{\text{uniform}}(
 <span><span class="co">#&gt;       method   mean_rt     var_rt  accuracy contaminant_prop</span></span>
 <span><span class="co">#&gt; ...1  simple 0.8231905 0.39684254 0.4752726               NA</span></span>
 <span><span class="co">#&gt; ...2  robust 0.6440000 0.05804206 0.4752726               NA</span></span>
-<span><span class="co">#&gt; mu   mixture 0.7500167 0.11366858 0.4752726       0.02797528</span></span></code></pre></div>
+<span><span class="co">#&gt; mu   mixture 0.7500098 0.11366415 0.4752726       0.02797548</span></span></code></pre></div>
 <p>The mixture method also returns a contamination proportion estimate. The robust method is faster and makes no distributional assumptions, but does not quantify contamination.</p>
 </div>
 <div class="section level3" number="0.2.3">
@@ -269,18 +269,18 @@ f(RT) = (1 - \pi) \cdot f_{\text{cognitive}}(RT) + \pi \cdot f_{\text{uniform}}(
 <span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/utils/head.html" class="external-link">head</a></span><span class="op">(</span><span class="va">flagged</span><span class="op">)</span></span>
 <span><span class="co">#&gt;      rt response strength correct contam_prob</span></span>
-<span><span class="co">#&gt; 1 0.801    upper        8    TRUE 0.002307907</span></span>
-<span><span class="co">#&gt; 2 0.680    upper        7    TRUE 0.001599956</span></span>
-<span><span class="co">#&gt; 3 0.694    lower       19    TRUE 0.001669001</span></span>
-<span><span class="co">#&gt; 4 0.582    lower       21   FALSE 0.001215208</span></span>
-<span><span class="co">#&gt; 5 0.925    upper       19   FALSE 0.003359717</span></span>
-<span><span class="co">#&gt; 6 0.605    upper       10    TRUE 0.001286845</span></span></code></pre></div>
+<span><span class="co">#&gt; 1 0.801    upper        8    TRUE 0.002307926</span></span>
+<span><span class="co">#&gt; 2 0.680    upper        7    TRUE 0.001599957</span></span>
+<span><span class="co">#&gt; 3 0.694    lower       19    TRUE 0.001669003</span></span>
+<span><span class="co">#&gt; 4 0.582    lower       21   FALSE 0.001215204</span></span>
+<span><span class="co">#&gt; 5 0.925    upper       19   FALSE 0.003359771</span></span>
+<span><span class="co">#&gt; 6 0.605    upper       10    TRUE 0.001286841</span></span></code></pre></div>
 <p>Diagnostics (convergence, parameters, log-likelihood) are available via <code>attr(result, "diagnostics")</code>:</p>
 <div class="sourceCode" id="cb8"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">probs</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/flag_contaminant_rts.html">flag_contaminant_rts</a></span><span class="op">(</span><span class="va">rr98_subset</span><span class="op">$</span><span class="va">rt</span><span class="op">)</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/attr.html" class="external-link">attr</a></span><span class="op">(</span><span class="va">probs</span>, <span class="st">"diagnostics"</span><span class="op">)</span></span>
 <span><span class="co">#&gt;   mixture_params contaminant_prop converged iterations    loglik n_trials</span></span>
-<span><span class="co">#&gt; 1   0.420729....       0.02797528      TRUE         12 -926.5735     3943</span></span>
+<span><span class="co">#&gt; 1   0.420729....       0.02797548      TRUE         13 -926.5735     3943</span></span>
 <span><span class="co">#&gt;   distribution     method</span></span>
 <span><span class="co">#&gt; 1   exgaussian mixture_em</span></span></code></pre></div>
 </div>
@@ -346,7 +346,7 @@ f(RT) = (1 - \pi) \cdot f_{\text{cognitive}}(RT) + \pi \cdot f_{\text{uniform}}(
 <span><span class="va">fit</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/bmm.html">bmm</a></span><span class="op">(</span></span>
 <span>  formula <span class="op">=</span> <span class="fu"><a href="../reference/bmmformula.html">bmf</a></span><span class="op">(</span><span class="va">drift</span> <span class="op">~</span> <span class="va">condition</span>, <span class="va">bound</span> <span class="op">~</span> <span class="fl">1</span>, <span class="va">ndt</span> <span class="op">~</span> <span class="fl">1</span><span class="op">)</span>,</span>
 <span>  data <span class="op">=</span> <span class="va">clean_data</span>,</span>
-<span>  model <span class="op">=</span> <span class="fu">ddm</span><span class="op">(</span>resp1 <span class="op">=</span> <span class="st">"rt"</span>, resp2 <span class="op">=</span> <span class="st">"response"</span><span class="op">)</span></span>
+<span>  model <span class="op">=</span> <span class="fu"><a href="../reference/ddm.html">ddm</a></span><span class="op">(</span>resp1 <span class="op">=</span> <span class="st">"rt"</span>, resp2 <span class="op">=</span> <span class="st">"response"</span><span class="op">)</span></span>
 <span><span class="op">)</span></span></code></pre></div>
 </div>
 <div class="section level3" number="0.3.5">
@@ -418,7 +418,7 @@ f(RT) = (1 - \pi) \cdot f_{\text{cognitive}}(RT) + \pi \cdot f_{\text{uniform}}(
 <span><span class="co">#&gt; <span style="color: #BCBCBC;">1</span> jf    speed                      0.001<span style="text-decoration: underline;">61</span>                0.001<span style="text-decoration: underline;">45</span></span></span>
 <span><span class="co">#&gt; <span style="color: #BCBCBC;">2</span> jf    accuracy                   0.031<span style="text-decoration: underline;">6</span>                 0.024<span style="text-decoration: underline;">0</span> </span></span>
 <span><span class="co">#&gt; <span style="color: #BCBCBC;">3</span> kr    speed                      0.002<span style="text-decoration: underline;">41</span>                0.003<span style="text-decoration: underline;">62</span></span></span>
-<span><span class="co">#&gt; <span style="color: #BCBCBC;">4</span> kr    accuracy                   0.014<span style="text-decoration: underline;">7</span>                 0.028<span style="text-decoration: underline;">4</span> </span></span>
+<span><span class="co">#&gt; <span style="color: #BCBCBC;">4</span> kr    accuracy                   0.014<span style="text-decoration: underline;">7</span>                 0.028<span style="text-decoration: underline;">5</span> </span></span>
 <span><span class="co">#&gt; <span style="color: #BCBCBC;">5</span> nh    speed                      0.002<span style="text-decoration: underline;">57</span>                0.001<span style="text-decoration: underline;">55</span></span></span>
 <span><span class="co">#&gt; <span style="color: #BCBCBC;">6</span> nh    accuracy                   0.039<span style="text-decoration: underline;">6</span>                 0.050<span style="text-decoration: underline;">6</span></span></span></code></pre></div>
 <div class="sourceCode" id="cb17"><pre class="downlit sourceCode r">

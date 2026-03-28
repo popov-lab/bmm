@@ -126,7 +126,13 @@
 <div class="section level2">
 <h2 id="available-models">Available models<a class="anchor" aria-label="anchor" href="#available-models"></a>
 </h2>
-<p>Currently the <code>bmm</code> package implements mainly models used in the domain of working memory research, such as:</p>
+<p>Currently the <code>bmm</code> package implements models used in the domain of working memory research and evidence accumulation models, such as:</p>
+<p><strong>Decision Making / Response times</strong></p>
+<ul>
+<li>Censored-Shifted Wald Model</li>
+<li>Diffusion Decision Model</li>
+<li>EZ-Diffusion Model</li>
+</ul>
 <p><strong>Visual working memory</strong></p>
 <ul>
 <li>Interference measurement model by Oberauer and Lin (2017).</li>
@@ -141,7 +147,7 @@
 <p>However, the <code>bmm</code> package is setup to provide the foundation for the implementation of a broad range of cognitive measurement models. In fact, we are already working on implementing additional models, such as:</p>
 <ul>
 <li>Signal-Detection Models</li>
-<li>Evidence Accumulation Models</li>
+<li>further evidence accumulation models, such as the LBA</li>
 </ul>
 <p>If you have suggestions for models that should be added to the package or additional functionality that would improve the usability of the pacakge, feel free to create an <a href="https://github.com/venpopov/bmm/issues" class="external-link">issue</a>. Ideally this should describe the model, point towards literature that gives details on the model, and if possible link to code that has already implemented the model.</p>
 <p>Given the dynamic nature the <code>bmm</code> package is currently in, you can always view the latest list of supported models by running:</p>
@@ -149,6 +155,9 @@
 <code class="sourceCode R"><span><span class="fu">bmm</span><span class="fu">::</span><span class="fu"><a href="reference/supported_models.html">supported_models</a></span><span class="op">(</span><span class="op">)</span></span>
 <span><span class="co">#&gt; The following models are supported:</span></span>
 <span><span class="co">#&gt; </span></span>
+<span><span class="co">#&gt; -  cswald(rt, response, links, version) </span></span>
+<span><span class="co">#&gt; -  ddm(rt, response, links) </span></span>
+<span><span class="co">#&gt; -  ezdm(mean_rt, var_rt, n_upper, n_trials, links, version) </span></span>
 <span><span class="co">#&gt; -  imm(resp_error, nt_features, nt_distances, set_size, regex, version) </span></span>
 <span><span class="co">#&gt; -  m3(resp_cats, num_options, choice_rule, version) </span></span>
 <span><span class="co">#&gt; -  mixture2p(resp_error) </span></span>
@@ -171,7 +180,7 @@
 <p>You can get more detailed information on the models implemented in <code>bmm</code> by invoking the documentation of each model typing <code>?bmmodel</code> into your console. For example, calling the information on Interference Measurement Model <code>imm</code> would look like this:</p>
 <div class="sourceCode" id="cb5"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="op">?</span><span class="va">imm</span></span></code></pre></div>
-<p>A complete call to fit a model using <code>bmm</code> could look like this. For this example, we are using the <code>oberauer_lin_2017</code> data that is provided with the package and we will show how to fit the Interference Measurement Model to this data. If you want a detailed description of this model and and in depth explanation of the parameters estimated in the model, please have a look at <a href="https://venpopov.github.io/bmm/articles/bmm_imm.html" class="external-link">the IMM article</a>.</p>
+<p>A complete call to fit a model using <code>bmm</code> could look like this. For this example, we are using the <code>oberauer_lin_2017</code> data that is provided with the package and we will show how to fit the Interference Measurement Model to this data. If you want a detailed description of this model and and in depth explanation of the parameters estimated in the model, please have a look at <a href="https://venpopov.com/bmm/articles/bmm_imm.html">the IMM article</a>.</p>
 <div class="sourceCode" id="cb6"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://github.com/venpopov/bmm" class="external-link">bmm</a></span><span class="op">)</span></span>
 <span></span>
@@ -193,7 +202,7 @@
 <span></span>
 <span><span class="co"># plot posterior predicitive plot</span></span>
 <span><span class="fu">brms</span><span class="fu">::</span><span class="fu"><a href="https://mc-stan.org/bayesplot/reference/pp_check.html" class="external-link">pp_check</a></span><span class="op">(</span><span class="va">fit</span><span class="op">)</span></span></code></pre></div>
-<p>You can have a look at examples for how to fit all currently implemented models by reading the vignettes for each model <a href="https://venpopov.github.io/bmm/articles/index.html" class="external-link">here for the released version of the package</a> or <a href="https://venpopov.github.io/bmm/dev/articles/index.html" class="external-link">here for the development version</a>.</p>
+<p>You can have a look at examples for how to fit all currently implemented models by reading the vignettes for each model <a href="https://venpopov.com/bmm/articles/index.html">here for the released version of the package</a> or <a href="https://venpopov.com/bmm/dev/articles/index.html">here for the development version</a>.</p>
 </div>
 <div class="section level2">
 <h2 id="exploring-measurement-models">Exploring measurement models<a class="anchor" aria-label="anchor" href="#exploring-measurement-models"></a>
@@ -220,13 +229,13 @@
 <span>  <span class="op">)</span>,</span>
 <span>  from <span class="op">=</span> <span class="op">-</span><span class="va">pi</span>, to <span class="op">=</span> <span class="va">pi</span>, add <span class="op">=</span> <span class="cn">TRUE</span></span>
 <span><span class="op">)</span></span></code></pre></div>
-<p><img src="reference/figures/README-unnamed-chunk-4-1.png" width="400"></p>
+<p><img src="reference/figures/README-unnamed-chunk-4-1.png" alt="" width="400"></p>
 </div>
 <div class="section level2">
 <h2 id="the-general-structure-of-the-bmm-package">The general structure of the <code>bmm</code> package<a class="anchor" aria-label="anchor" href="#the-general-structure-of-the-bmm-package"></a>
 </h2>
 <p>The main building block of the <code>bmm</code> package is that cognitive measurement models can often be specified as distributional models for which the distributional parameters of the generalized linear mixed model are a function of cognitive measurement model parameters. These functions that translate the cognitive measurement model parameters into distributional parameters is what we implement in the <code>bmm</code> package.</p>
-<p><img src="reference/figures/README-bmmLogic.png" width="600" style="display: block; margin: auto;"></p>
+<p><img src="reference/figures/README-bmmLogic.png" alt="" width="600" style="display: block; margin: auto;"></p>
 <p>As these function can become complicated and their implementation changes with differences in experimental designs, the <code>bmm</code> package provides general translation functions that ease the use of the cognitive measurement models for end users. This way researchers that face challenges in writing their own STAN code to implement such models themselves can still use these models in almost any experimental design.</p>
 <p>Under the hood, the main <code><a href="reference/bmm.html">bmm()</a></code> function will then call the appropriate functions for the specified model and will perform several steps:</p>
 <ol style="list-style-type: decimal">
@@ -243,12 +252,12 @@
 <li>Post-processing the output and passing it to the user</li>
 </ol>
 <p>This process is illustrated in the Figure below:</p>
-<p><img src="reference/figures/README-fitModel_process.png" width="600" style="display: block; margin: auto;"></p>
+<p><img src="reference/figures/README-fitModel_process.png" alt="" width="600" style="display: block; margin: auto;"></p>
 </div>
 <div class="section level2">
 <h2 id="contributing-to-the-bmm-package">Contributing to the <code>bmm</code> package<a class="anchor" aria-label="anchor" href="#contributing-to-the-bmm-package"></a>
 </h2>
-<p>Should be interested in contributing a model to the <code>bmm</code> package, you should first look into the <a href="https://venpopov.github.io/bmm/dev/dev-notes/index.html" class="external-link">Developer Notes</a> as well as the <a href="https://github.com/venpopov/bmm/blob/develop/.github/CONTRIBUTING.md" class="external-link">Contributor Guidelines</a>. These give a more in depth description of the package architecture, the steps necessary to add your own model to the package, and how contributions will be acknowledged.</p>
+<p>Should be interested in contributing a model to the <code>bmm</code> package, you should first look into the <a href="https://venpopov.com/bmm/dev/dev-notes/index.html">Developer Notes</a> as well as the <a href="https://github.com/venpopov/bmm/blob/develop/.github/CONTRIBUTING.md" class="external-link">Contributor Guidelines</a>. These give a more in depth description of the package architecture, the steps necessary to add your own model to the package, and how contributions will be acknowledged.</p>
 </div>
 </div>
   </main><aside class="col-md-3"><div class="links">

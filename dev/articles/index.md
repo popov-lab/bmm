@@ -30,13 +30,15 @@ n-AFC, etc)
 - [The Multinomial / Memory Measurement Model
   (M3)](https://venpopov.com/bmm/dev/articles/bmm_m3.md):
 
-### Speeded decision making
+### Evidence accumulation models
 
-Fitting models to choice reaction time tasks
+Fitting evidence accumulation models to response time and choice data
 
 - [The EZ-Diffusion Model
   (EZDM)](https://venpopov.com/bmm/dev/articles/bmm_ezdm.md):
 - [The Censored Shifted Wald Model
   (cswald)](https://venpopov.com/bmm/dev/articles/bmm_cswald.md):
+- [The Diffusion Decision Model
+  (ddm)](https://venpopov.com/bmm/dev/articles/bmm_ddm.md):
 - [Handling RT Contamination in Evidence Accumulation
   Models](https://venpopov.com/bmm/dev/articles/bmm_rt_contamination.md):

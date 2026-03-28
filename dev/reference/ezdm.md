@@ -52,7 +52,7 @@ An object of class `bmmodel`
 
 ## Details
 
-- **Domain:** Processing Speed, Decision Making
+- **Domain:** Decision Making / Response times
 
 - **Task:** Choice Reaction Time tasks
 

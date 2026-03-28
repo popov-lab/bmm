@@ -87,8 +87,14 @@ remotes::install_github("venpopov/bmm@v0.0.1")
 
 ## Available models
 
-Currently the `bmm` package implements mainly models used in the domain
-of working memory research, such as:
+Currently the `bmm` package implements models used in the domain of
+working memory research and evidence accumulation models, such as:
+
+**Decision Making / Response times**
+
+- Censored-Shifted Wald Model
+- Diffusion Decision Model
+- EZ-Diffusion Model
 
 **Visual working memory**
 
@@ -106,7 +112,7 @@ implementation of a broad range of cognitive measurement models. In
 fact, we are already working on implementing additional models, such as:
 
 - Signal-Detection Models
-- Evidence Accumulation Models
+- further evidence accumulation models, such as the LBA
 
 If you have suggestions for models that should be added to the package
 or additional functionality that would improve the usability of the
@@ -123,6 +129,9 @@ always view the latest list of supported models by running:
 bmm::supported_models()
 #> The following models are supported:
 #> 
+#> -  cswald(rt, response, links, version) 
+#> -  ddm(rt, response, links) 
+#> -  ezdm(mean_rt, var_rt, n_upper, n_trials, links, version) 
 #> -  imm(resp_error, nt_features, nt_distances, set_size, regex, version) 
 #> -  m3(resp_cats, num_options, choice_rule, version) 
 #> -  mixture2p(resp_error) 
@@ -160,7 +169,7 @@ with the package and we will show how to fit the Interference
 Measurement Model to this data. If you want a detailed description of
 this model and and in depth explanation of the parameters estimated in
 the model, please have a look at [the IMM
-article](https://venpopov.github.io/bmm/articles/bmm_imm.html).
+article](https://venpopov.com/bmm/articles/bmm_imm.html).
 
 ``` r
 library(bmm)
@@ -192,10 +201,9 @@ brms::pp_check(fit)
 
 You can have a look at examples for how to fit all currently implemented
 models by reading the vignettes for each model [here for the released
-version of the
-package](https://venpopov.github.io/bmm/articles/index.html) or [here
-for the development
-version](https://venpopov.github.io/bmm/dev/articles/index.html).
+version of the package](https://venpopov.com/bmm/articles/index.html) or
+[here for the development
+version](https://venpopov.com/bmm/dev/articles/index.html).
 
 ## Exploring measurement models
 
@@ -282,8 +290,8 @@ This process is illustrated in the Figure below:
 
 Should be interested in contributing a model to the `bmm` package, you
 should first look into the [Developer
-Notes](https://venpopov.github.io/bmm/dev/dev-notes/index.html) as well
-as the [Contributor
+Notes](https://venpopov.com/bmm/dev/dev-notes/index.html) as well as the
+[Contributor
 Guidelines](https://github.com/venpopov/bmm/blob/develop/.github/CONTRIBUTING.md).
 These give a more in depth description of the package architecture, the
 steps necessary to add your own model to the package, and how

@@ -77,6 +77,8 @@ Functions for specifying which model to fit
 
 - [`cswald()`](https://venpopov.com/bmm/dev/reference/cswald.md) :
   Censored-Shifted Wald Model
+- [`ddm()`](https://venpopov.com/bmm/dev/reference/ddm.md) : Diffusion
+  Decision Model
 - [`ezdm()`](https://venpopov.com/bmm/dev/reference/ezdm.md) :
   EZ-Diffusion Model
 - [`imm()`](https://venpopov.com/bmm/dev/reference/imm.md)
@@ -116,6 +118,11 @@ Functions for special distributions
   [`qcswald()`](https://venpopov.com/bmm/dev/reference/cswald_dist.md) :
 
   Distribution functions for the censored shifted Wald model (`cswald`)
+
+- [`dddm()`](https://venpopov.com/bmm/dev/reference/ddm_dist.md)
+  [`rddm()`](https://venpopov.com/bmm/dev/reference/ddm_dist.md) :
+
+  Distribution function for the Diffusion Decision Model (`ddm`)
 
 - [`dezdm()`](https://venpopov.com/bmm/dev/reference/ezdm_dist.md)
   [`rezdm()`](https://venpopov.com/bmm/dev/reference/ezdm_dist.md) :
@@ -192,6 +199,8 @@ Utility functions for transforming data and parameters
 
 Available datasets for fitting the models
 
+- [`data_color_judgement_task`](https://venpopov.com/bmm/dev/reference/data_color_judgement_task.md)
+  : Example Data from a Color Judgement Task
 - [`oberauer_lewandowsky_2019_e1`](https://venpopov.com/bmm/dev/reference/oberauer_lewandowsky_2019_e1.md)
   : Data from Experiment 1 reported by Oberauer & Lewandowsky (2019)
 - [`oberauer_lin_2017`](https://venpopov.com/bmm/dev/reference/oberauer_lin_2017.md)
