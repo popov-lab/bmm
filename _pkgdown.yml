@@ -93,10 +93,11 @@ articles:
     desc: Fitting models to categorical decision tasks (e.g. cued or free recall, n-AFC, etc)
     contents:
     - articles/bmm_m3
-    
-  - title: Speeded decision making
-    desc: Fitting models to choice reaction time tasks
+
+  - title: Evidence accumulation models
+    desc: Fitting evidence accumulation models to response time and choice data
     contents:
     - articles/bmm_ezdm
     - articles/bmm_cswald
+    - articles/bmm_ddm
     - articles/bmm_rt_contamination

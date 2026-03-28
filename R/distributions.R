@@ -728,6 +728,89 @@ rm3 <- function(n, size, pars, m3_model, act_funs = NULL, unpack = FALSE,
   }
 
 
+#' @title Distribution function for the Diffusion Decision Model (`ddm`)
+#'
+#' @description
+#'   Density and random generation function for the Diffusion Decision Model.
+#'
+#' @name ddm_dist
+#'
+#' @param rt Vector of response times for which the density should be returned
+#' @param response Vector of responses for which the density should be returned
+#' @param n Number of random samples to generate
+#' @param drift Drift rates of the ddm
+#' @param bound Boundary separation of the ddm
+#' @param ndt Non-decision time of the ddm
+#' @param zr relative starting point of the ddm
+#' @param log Logical, indicating if log-densities should be returned (default = TRUE)
+#'
+#' @keywords distribution
+#'
+#' @export
+dddm <- function(rt, response, drift, bound, ndt, zr = 0.5, log = TRUE) {
+  stopif(
+    any(rt < 0),
+    "Negative RTs are not allowed. Please check your rt variable."
+  )
+
+  if (!is.character(response)) {
+    stopif(
+      any(!response %in% c(0, 1)),
+      "Invalid numeric responses. Numeric responses must be 0 (lower) or 1 (upper)."
+    )
+    response <- ifelse(response == 1, "upper", "lower")
+  }
+
+  stopif(
+    any(!response %in% c("upper", "lower")),
+    "Invalid responses. Pass a numeric vector with 0/1, or a character \\
+    vector with 'upper' and 'lower'."
+  )
+
+  stopif(
+    length(rt) != length(response),
+    "Different number of RTs and responses passed to dddm. \\
+    Please pass vectors of equal length."
+  )
+
+  # recycle rt/response to match parameter length for log_lik (one observation,
+  # multiple posterior draws)
+  max_len <- max(lengths(list(drift, bound, ndt, zr)))
+
+  if (length(rt) == 1 && max_len > 1) {
+    rt <- rep(rt, max_len)
+    response <- rep(response, max_len)
+  }
+
+  out <- rtdists::ddiffusion(
+    rt = rt,
+    response = response,
+    a = bound,
+    v = drift,
+    t0 = ndt,
+    z = zr * bound
+  )
+
+  if (log) log(out) else out
+}
+
+#' @name ddm_dist
+#' @export
+rddm <- function(n, drift, bound, ndt, zr = 0.5) {
+  max_len <- max(lengths(list(drift, bound, ndt, zr)))
+
+  if (max_len > 1L) {
+    if (!n %in% c(1, max_len)) {
+      stop2("Can only sample exactly once for each condition.")
+    }
+    n <- max_len
+  }
+
+  sim_data <- rtdists::rdiffusion(n = n, a = bound, v = drift, t0 = ndt, z = zr * bound)
+  sim_data$response <- ifelse(sim_data$response == "upper",1,0)
+  sim_data
+}
+
 #' @title Distribution functions for the censored shifted Wald model (`cswald`)
 #'
 #' @name cswald_dist
