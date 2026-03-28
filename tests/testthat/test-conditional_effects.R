@@ -3,8 +3,6 @@
 # Tier 2: Fixture-based integration tests (skip on CRAN)
 # Tier 3: Model-fitting integration tests (skip on CRAN)
 
-library(testthat)
-
 load_sdm_fit <- function() {
   path <- test_path("assets/bmmfit_example1.rds")
   skip_if_not(file.exists(path), "SDM fixture not available (excluded by .Rbuildignore)")
