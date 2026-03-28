@@ -230,6 +230,136 @@ test_that("rm3 works for a complexspan m3 model", {
   expect_true(median(res[, "dist_other"]) > median(res))
 })
 
+# DDM distribution tests ----
+test_that("dddm runs without errors with scalar inputs", {
+  res <- dddm(0.5, 1, drift = 2, bound = 1.5, ndt = 0.3)
+  expect_type(res, "double")
+  expect_length(res, 1)
+  expect_false(is.na(res))
+  expect_false(is.infinite(res))
+})
+
+test_that("dddm handles numeric response codes correctly", {
+  res_upper <- dddm(0.5, 1, drift = 2, bound = 1.5, ndt = 0.3)
+  res_lower <- dddm(0.5, 0, drift = 2, bound = 1.5, ndt = 0.3)
+  expect_type(res_upper, "double")
+  expect_type(res_lower, "double")
+  expect_false(identical(res_upper, res_lower))
+})
+
+test_that("dddm handles character response codes correctly", {
+  res_numeric <- dddm(0.5, 1, drift = 2, bound = 1.5, ndt = 0.3)
+  res_char <- dddm(0.5, "upper", drift = 2, bound = 1.5, ndt = 0.3)
+  expect_equal(res_numeric, res_char)
+})
+
+test_that("dddm log parameter works correctly", {
+  res <- dddm(0.5, 1, drift = 2, bound = 1.5, ndt = 0.3, log = FALSE)
+  res_log <- dddm(0.5, 1, drift = 2, bound = 1.5, ndt = 0.3, log = TRUE)
+  expect_equal(log(res), res_log)
+})
+
+test_that("dddm vectorizes correctly with scalar rt/response and vector parameters", {
+  # This is the log_lik case: single observation, multiple posterior samples
+  rt_single <- 0.5
+  resp_single <- 1
+  drift_vec <- rnorm(10, 2, 0.3)
+  bound_vec <- rep(1.5, 10)
+  ndt_vec <- rep(0.3, 10)
+  
+  res <- dddm(rt_single, resp_single, drift_vec, bound_vec, ndt_vec)
+  expect_length(res, 10)
+  expect_false(any(is.na(res)))
+  expect_false(any(is.infinite(res)))
+})
+
+test_that("dddm vectorizes correctly with vector rt/response and scalar parameters", {
+  rt_vec <- c(0.4, 0.5, 0.6)
+  resp_vec <- c(1, 1, 0)
+  drift_scalar <- 2.0
+  
+  res <- dddm(rt_vec, resp_vec, drift_scalar, bound = 1.5, ndt = 0.3)
+  expect_length(res, 3)
+  expect_false(any(is.na(res)))
+})
+
+test_that("dddm vectorizes correctly with vector rt/response and vector parameters", {
+  n <- 5
+  rt_vec <- runif(n, 0.3, 0.8)
+  resp_vec <- sample(0:1, n, replace = TRUE)
+  drift_vec <- rnorm(n, 2, 0.3)
+  
+  res <- dddm(rt_vec, resp_vec, drift_vec, bound = 1.5, ndt = 0.3)
+  expect_length(res, n)
+  expect_false(any(is.na(res)))
+})
+
+test_that("dddm rejects negative RTs", {
+  expect_error(
+    dddm(-0.5, 1, drift = 2, bound = 1.5, ndt = 0.3),
+    "Negative RTs are not allowed"
+  )
+})
+
+test_that("dddm rejects invalid response codes", {
+  expect_error(
+    dddm(0.5, 2, drift = 2, bound = 1.5, ndt = 0.3),
+    "Invalid numeric responses"
+  )
+  expect_error(
+    dddm(0.5, "invalid", drift = 2, bound = 1.5, ndt = 0.3),
+    "Invalid responses"
+  )
+})
+
+test_that("dddm rejects mismatched rt and response lengths", {
+  expect_error(
+    dddm(c(0.5, 0.6), 1, drift = 2, bound = 1.5, ndt = 0.3),
+    "Different number of RTs and responses"
+  )
+})
+
+test_that("rddm returns data frame with correct structure", {
+  res <- rddm(10, drift = 2, bound = 1.5, ndt = 0.3)
+  expect_s3_class(res, "data.frame")
+  expect_equal(nrow(res), 10)
+  expect_true(all(c("rt", "response") %in% names(res)))
+  expect_true(all(res$rt > 0))
+  expect_true(all(res$response %in% c(0, 1)))
+})
+
+test_that("rddm handles vector parameters correctly", {
+  n <- 5
+  drift_vec <- rnorm(n, 2, 0.3)
+  res <- rddm(n, drift = drift_vec, bound = 1.5, ndt = 0.3)
+  expect_equal(nrow(res), n)
+})
+
+test_that("rddm samples from correct boundaries based on drift", {
+  # Positive drift should favor upper boundary (response = 1)
+  res_pos <- rddm(1000, drift = 3, bound = 1.5, ndt = 0.3)
+  expect_gt(mean(res_pos$response == 1), 0.8)
+  
+  # Negative drift should favor lower boundary (response = 0)
+  res_neg <- rddm(1000, drift = -3, bound = 1.5, ndt = 0.3)
+  expect_gt(mean(res_neg$response == 0), 0.8)
+})
+
+test_that("rddm respects non-decision time", {
+  res <- rddm(100, drift = 2, bound = 1.5, ndt = 0.3)
+  expect_true(all(res$rt >= 0.3))
+})
+
+test_that("rddm starting point bias affects response proportions", {
+  # Bias toward upper boundary
+  res_upper <- rddm(1000, drift = 0, bound = 1.5, ndt = 0.3, zr = 0.7)
+  expect_gt(mean(res_upper$response == 1), 0.6)
+  
+  # Bias toward lower boundary
+  res_lower <- rddm(1000, drift = 0, bound = 1.5, ndt = 0.3, zr = 0.3)
+  expect_gt(mean(res_lower$response == 0), 0.6)
+})
+
 # -----------------------------------------------------------------------------
 # cswald distribution function tests
 # -----------------------------------------------------------------------------

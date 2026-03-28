@@ -50,7 +50,7 @@ Censored-Shifted Wald Model
 }
 \details{
 \itemize{
-\item \strong{Domain:} Processing Speed, Decision Making
+\item \strong{Domain:} Decision Making / Response times
 \item \strong{Task:} Choice Reaction Time tasks (with few errors)
 \item \strong{Name:} Censored-Shifted Wald Model
 \item \strong{Citation:}
