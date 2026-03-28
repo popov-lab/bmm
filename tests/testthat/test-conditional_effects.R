@@ -15,34 +15,34 @@ load_sdm_fit <- function() {
 
 test_that(".extract_re_grouping_vars extracts single-bar grouping var", {
   f <- y ~ x + (1 | id)
-  expect_equal(bmm:::.extract_re_grouping_vars(f), "id")
+  expect_equal(.extract_re_grouping_vars(f), "id")
 })
 
 test_that(".extract_re_grouping_vars extracts double-bar grouping var", {
   f <- y ~ x + (1 || id)
-  expect_equal(bmm:::.extract_re_grouping_vars(f), "id")
+  expect_equal(.extract_re_grouping_vars(f), "id")
 })
 
 test_that(".extract_re_grouping_vars extracts correlation-ID and grouping var", {
   f <- y ~ x + (1 |ID1| id)
-  result <- bmm:::.extract_re_grouping_vars(f)
+  result <- .extract_re_grouping_vars(f)
   expect_true("id" %in% result)
   expect_true("ID1" %in% result)
 })
 
 test_that(".extract_re_grouping_vars extracts gr() grouping var", {
   f <- y ~ x + (1 | gr(id, by = exp))
-  expect_equal(bmm:::.extract_re_grouping_vars(f), "id")
+  expect_equal(.extract_re_grouping_vars(f), "id")
 })
 
 test_that(".extract_re_grouping_vars extracts gr() with cor arg", {
   f <- y ~ x + (1 | gr(id, cor = FALSE))
-  expect_equal(bmm:::.extract_re_grouping_vars(f), "id")
+  expect_equal(.extract_re_grouping_vars(f), "id")
 })
 
 test_that(".extract_re_grouping_vars extracts mm() grouping vars", {
   f <- y ~ x + (1 | mm(g1, g2))
-  result <- bmm:::.extract_re_grouping_vars(f)
+  result <- .extract_re_grouping_vars(f)
   expect_true("g1" %in% result)
   expect_true("g2" %in% result)
   expect_length(result, 2)
@@ -50,26 +50,26 @@ test_that(".extract_re_grouping_vars extracts mm() grouping vars", {
 
 test_that(".extract_re_grouping_vars extracts crossed grouping vars", {
   f <- y ~ x + (1 | id:group)
-  result <- bmm:::.extract_re_grouping_vars(f)
+  result <- .extract_re_grouping_vars(f)
   expect_true("id" %in% result)
   expect_true("group" %in% result)
 })
 
 test_that(".extract_re_grouping_vars handles multiple RE terms", {
   f <- y ~ x + (1 | id) + (1 | group)
-  result <- bmm:::.extract_re_grouping_vars(f)
+  result <- .extract_re_grouping_vars(f)
   expect_true("id" %in% result)
   expect_true("group" %in% result)
 })
 
 test_that(".extract_re_grouping_vars returns empty for no RE", {
   f <- y ~ x
-  expect_equal(bmm:::.extract_re_grouping_vars(f), character(0))
+  expect_equal(.extract_re_grouping_vars(f), character(0))
 })
 
 test_that(".extract_re_grouping_vars returns empty for intercept only", {
   f <- y ~ 1
-  expect_equal(bmm:::.extract_re_grouping_vars(f), character(0))
+  expect_equal(.extract_re_grouping_vars(f), character(0))
 })
 
 
@@ -80,7 +80,7 @@ test_that(".extract_re_grouping_vars returns empty for intercept only", {
 test_that(".ce_summarize_draws computes mean/SD summary", {
   set.seed(42)
   draws <- matrix(rnorm(1000 * 3), nrow = 1000, ncol = 3)
-  result <- bmm:::.ce_summarize_draws(draws)
+  result <- .ce_summarize_draws(draws)
 
   expect_named(result, c("estimate", "lower", "upper", "se"))
   expect_length(result$estimate, 3)
@@ -97,7 +97,7 @@ test_that(".ce_summarize_draws computes mean/SD summary", {
 test_that(".ce_summarize_draws uses median/MAD when robust = TRUE", {
   set.seed(42)
   draws <- matrix(rnorm(1000 * 2), nrow = 1000, ncol = 2)
-  result <- bmm:::.ce_summarize_draws(draws, robust = TRUE)
+  result <- .ce_summarize_draws(draws, robust = TRUE)
 
   expect_equal(result$estimate, apply(draws, 2, median), tolerance = 1e-10)
   expect_equal(result$se, apply(draws, 2, mad), tolerance = 1e-10)
@@ -105,7 +105,7 @@ test_that(".ce_summarize_draws uses median/MAD when robust = TRUE", {
 
 test_that(".ce_summarize_draws handles single-row draws", {
   draws <- matrix(c(1, 2, 3), nrow = 1, ncol = 3)
-  result <- bmm:::.ce_summarize_draws(draws)
+  result <- .ce_summarize_draws(draws)
 
   expect_equal(result$estimate, c(1, 2, 3))
   expect_length(result$lower, 3)
@@ -116,8 +116,8 @@ test_that(".ce_summarize_draws prob argument controls CI width", {
   set.seed(42)
   draws <- matrix(rnorm(5000 * 2), nrow = 5000, ncol = 2)
 
-  wide <- bmm:::.ce_summarize_draws(draws, prob = 0.95)
-  narrow <- bmm:::.ce_summarize_draws(draws, prob = 0.50)
+  wide <- .ce_summarize_draws(draws, prob = 0.95)
+  narrow <- .ce_summarize_draws(draws, prob = 0.50)
 
   # Wider prob → wider interval
   expect_true(all(wide$upper - wide$lower > narrow$upper - narrow$lower))
@@ -148,7 +148,7 @@ test_that(".apply_link_transform is no-op for identity link", {
   ce <- mock_ce(
     eff1 = mock_ce_df(c(1, 2, 3), c(0.5, 1.5, 2.5), c(1.5, 2.5, 3.5))
   )
-  result <- bmm:::.apply_link_transform(ce, "identity", inverse = TRUE)
+  result <- .apply_link_transform(ce, "identity", inverse = TRUE)
   expect_equal(result[[1]]$estimate__, c(1, 2, 3))
   expect_equal(result[[1]]$lower__, c(0.5, 1.5, 2.5))
   expect_equal(result[[1]]$upper__, c(1.5, 2.5, 3.5))
@@ -158,7 +158,7 @@ test_that(".apply_link_transform applies inverse log (exp)", {
   ce <- mock_ce(
     eff1 = mock_ce_df(c(0, 1, 2), c(-0.5, 0.5, 1.5), c(0.5, 1.5, 2.5))
   )
-  result <- bmm:::.apply_link_transform(ce, "log", inverse = TRUE)
+  result <- .apply_link_transform(ce, "log", inverse = TRUE)
   expect_equal(result[[1]]$estimate__, exp(c(0, 1, 2)), tolerance = 1e-10)
   expect_equal(result[[1]]$lower__, exp(c(-0.5, 0.5, 1.5)), tolerance = 1e-10)
   expect_equal(result[[1]]$upper__, exp(c(0.5, 1.5, 2.5)), tolerance = 1e-10)
@@ -168,7 +168,7 @@ test_that(".apply_link_transform applies forward log", {
   ce <- mock_ce(
     eff1 = mock_ce_df(c(1, 2, 3), c(0.5, 1.5, 2.5), c(1.5, 2.5, 3.5))
   )
-  result <- bmm:::.apply_link_transform(ce, "log", inverse = FALSE)
+  result <- .apply_link_transform(ce, "log", inverse = FALSE)
   expect_equal(result[[1]]$estimate__, log(c(1, 2, 3)), tolerance = 1e-10)
   expect_equal(result[[1]]$lower__, log(c(0.5, 1.5, 2.5)), tolerance = 1e-10)
   expect_equal(result[[1]]$upper__, log(c(1.5, 2.5, 3.5)), tolerance = 1e-10)
@@ -178,7 +178,7 @@ test_that(".apply_link_transform applies inverse logit (plogis)", {
   ce <- mock_ce(
     eff1 = mock_ce_df(c(-1, 0, 1), c(-2, -1, 0), c(0, 1, 2))
   )
-  result <- bmm:::.apply_link_transform(ce, "logit", inverse = TRUE)
+  result <- .apply_link_transform(ce, "logit", inverse = TRUE)
   expect_equal(result[[1]]$estimate__, plogis(c(-1, 0, 1)), tolerance = 1e-10)
   expect_equal(result[[1]]$lower__, plogis(c(-2, -1, 0)), tolerance = 1e-10)
 })
@@ -188,7 +188,7 @@ test_that(".apply_link_transform preserves class and names", {
     set_size = mock_ce_df(c(1, 2), c(0.5, 1.5), c(1.5, 2.5)),
     condition = mock_ce_df(c(3, 4), c(2.5, 3.5), c(3.5, 4.5))
   )
-  result <- bmm:::.apply_link_transform(ce, "log", inverse = TRUE)
+  result <- .apply_link_transform(ce, "log", inverse = TRUE)
   expect_s3_class(result, "brms_conditional_effects")
   expect_named(result, c("set_size", "condition"))
 })
@@ -198,7 +198,7 @@ test_that(".apply_link_transform transforms all elements in list", {
     eff1 = mock_ce_df(c(0, 1), c(-0.5, 0.5), c(0.5, 1.5)),
     eff2 = mock_ce_df(c(2, 3), c(1.5, 2.5), c(2.5, 3.5))
   )
-  result <- bmm:::.apply_link_transform(ce, "log", inverse = TRUE)
+  result <- .apply_link_transform(ce, "log", inverse = TRUE)
   expect_equal(result[[1]]$estimate__, exp(c(0, 1)), tolerance = 1e-10)
   expect_equal(result[[2]]$estimate__, exp(c(2, 3)), tolerance = 1e-10)
 })
@@ -228,7 +228,7 @@ test_that(".filter_internal_effects removes internal variables", {
     expS = mock_ce_df(1:3, 0:2, 2:4)
   )
 
-  result <- bmm:::.filter_internal_effects(ce, mock_bmmfit)
+  result <- .filter_internal_effects(ce, mock_bmmfit)
   expect_named(result, "set_size")
   expect_s3_class(result, "brms_conditional_effects")
 })
@@ -248,7 +248,7 @@ test_that(".filter_internal_effects keeps all user vars", {
     condition = mock_ce_df(1:3, 0:2, 2:4)
   )
 
-  result <- bmm:::.filter_internal_effects(ce, mock_bmmfit)
+  result <- .filter_internal_effects(ce, mock_bmmfit)
   expect_named(result, c("set_size", "condition"))
 })
 
