@@ -242,7 +242,7 @@ table(demo_data$response)
 
 # Visualize RT distributions by response
 ggplot(demo_data, aes(x = rt, fill = factor(response))) +
-  facet_wrap(~ source) +
+  facet_wrap(~ strength) +
   geom_histogram(alpha = 0.6, bins = 30, position = "identity") +
   labs(x = "Response Time (s)", y = "Count", fill = "Response") +
   theme_minimal()
@@ -261,7 +261,7 @@ model_fixed_zr <- ddm(rt = "rt",
 
 # Define the formula - let drift vary by strength
 formula_fixed_zr <- bmf(
-  drift ~ 0 + source,
+  drift ~ 0 + strength,
   bound ~ 1,
   ndt ~ 1
 )
@@ -303,7 +303,7 @@ model_free_zr <- ddm(rt = "rt",
 
 # Define the formula
 formula_free_zr <- bmf(
-  drift ~ 0 + source,
+  drift ~ 0 + strength,
   bound ~ 1,
   ndt ~ 1,
   zr ~ 1  # starting point bias
@@ -352,9 +352,9 @@ model_hier <- ddm(rt = "rt",
 
 # Formula with random effects
 formula_hier <- bmf(
-  drift ~ 0 + source + (0 + source | id),  # random slopes for drift by strength
-  bound ~ 1 + (1 | id),                # random intercepts for boundary
-  ndt ~ 1 + (1 | id)                   # random intercepts for ndt
+  drift ~ 0 + strength + (0 + strength | id),
+  bound ~ 1 + (1 | id),
+  ndt ~ 1 + (1 | id)
 )
 
 # Fit hierarchical model
@@ -389,8 +389,8 @@ full_data <- rr98 %>%
 
 # Model with instruction effects
 formula_instruction <- bmf(
-  drift ~ 0 + source + (0 + source| id),
-  bound ~ instruction + (instruction | id),  # boundary varies by instruction
+  drift ~ 0 + strength + (0 + strength | id),
+  bound ~ instruction + (instruction | id),
   ndt ~ 1 + (1 | id)
 )
 

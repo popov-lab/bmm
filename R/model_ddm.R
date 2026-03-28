@@ -41,8 +41,7 @@
       name = "Diffusion Decision Model",
       version = "NA",
       citation = glue(
-        "- Ratcliff, R. (1978). A theory of memory retrieval. Psychological Review, 85(2), 59-108. https://doi.org/10/fjwm2f","\n",
-        "- Henrich, F., Hartmann, R., Pratz, V., Voss, A., & Klauer, K. C. (2024). The Seven-parameter Diffusion Model: An Implementation in Stan for Bayesian Analyses. Behavior Research Methods, 56(4), 3102-3116. https://doi.org/10.3758/s13428-023-02179-1"
+        "Ratcliff, R. (1978). A theory of memory retrieval. Psychological Review, 85(2), 59-108. https://doi.org/10/fjwm2f;"
       ),
       requirements = glue(
         "- The response time should be in seconds and \\
@@ -68,7 +67,7 @@
 # automatically based on the information in the .model_ddm()$info
 
 #' @title `r .model_ddm()$name`
-#' @name ddm,
+#' @name ddm
 #' @details `r model_info(.model_ddm())`
 #' @param rt Name of the reaction time variable coding reaction time in seconds in the data.
 #' @param response Name of the response variable coding the response numerically (0 = lower response / incorrect, 1 = upper response / correct)
@@ -163,7 +162,7 @@ check_data.ddm <- function(model, data, formula) {
     warning2("Some values in {response_var} were NA. These were removed from the analysis.")
   }
 
-  if (typeof(data[, rt_var]) %in% c("double", "numerical")) {
+  if (typeof(data[, rt_var]) %in% c("double", "integer")) {
     stopif(
       any(data[, rt_var] < 0, na.rm = TRUE),
       "Some reaction times are lower than zero, please check your data."
