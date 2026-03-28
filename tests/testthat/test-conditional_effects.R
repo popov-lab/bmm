@@ -330,15 +330,6 @@ test_that("scale = 'sampling' can give negative values for log-linked par", {
   )
 })
 
-test_that("scale = 'parameter' is treated same as 'sampling'", {
-  skip_on_cran()
-  fit <- load_sdm_fit()
-
-  ce_param <- conditional_effects(fit, par = "c", scale = "parameter")
-  ce_sampling <- conditional_effects(fit, par = "c", scale = "sampling")
-  expect_equal(ce_param[[1]]$estimate__, ce_sampling[[1]]$estimate__)
-})
-
 test_that("effects argument limits output to specified effect", {
   skip_on_cran()
   fit <- load_sdm_fit()

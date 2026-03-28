@@ -20,7 +20,7 @@
 #'     \item{`"native"` (default)}{Show on natural scale using inverse link transformation.
 #'       For example, `kappa` with log link shown on exp scale, `thetat` with
 #'       logit (mixture2p) or softmax (mixture3p) link shown on the probability scale.}
-#'     \item{`"parameter"` or `"sampling"`}{Show on the sampling scale (as used during MCMC).
+#'     \item{`"sampling"`}{Show on the sampling scale (as used during MCMC).
 #'       For example, `kappa` with log link shown on log scale.}
 #'   }
 #' @param ... Additional arguments passed to [brms::conditional_effects()].
@@ -111,7 +111,7 @@
 #' }
 conditional_effects.bmmfit <- function(x,
                                        par = NULL,
-                                       scale = c("native", "parameter", "sampling"),
+                                       scale = c("native", "sampling"),
                                        ...) {
   stopif(!inherits(x, "bmmfit"), "x must be a bmmfit object")
   x <- restructure(x)
@@ -185,7 +185,7 @@ conditional_effects.bmmfit <- function(x,
   if (par_info$link != "identity") {
     if (par_info$type == "nlpar" && scale == "native") {
       ce_result <- .apply_link_transform(ce_result, par_info$link, inverse = TRUE)
-    } else if (par_info$type == "dpar" && scale %in% c("parameter", "sampling")) {
+    } else if (par_info$type == "dpar" && scale == "sampling") {
       ce_result <- .apply_link_transform(ce_result, par_info$link, inverse = FALSE)
     }
   }
