@@ -134,13 +134,13 @@ conditional_effects.bmmfit <- function(x,
                             names(model$fixed_parameters))
   all_effects <- list()
   for (p in estimated_pars) {
-    ce <- conditional_effects(x, par = p, scale = scale, ...)
+    ce <- .ce_single_parameter(x, par = p, scale = scale, ...)
     if (length(ce) > 0) {
       names(ce) <- paste0(p, ".", names(ce))
       all_effects <- c(all_effects, ce)
     }
   }
-  class(all_effects) <- c("brms_conditional_effects", "list")
+  class(all_effects) <- c("brms_conditional_effects")
   all_effects
 }
 
@@ -256,7 +256,7 @@ conditional_effects.bmmfit <- function(x,
 
   if (any(keep_effects)) {
     ce_result <- ce_result[keep_effects]
-    class(ce_result) <- c("brms_conditional_effects", "list")
+    class(ce_result) <- c("brms_conditional_effects")
   }
 
   ce_result
