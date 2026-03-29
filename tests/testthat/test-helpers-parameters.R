@@ -1,5 +1,3 @@
-library(testthat)
-
 test_that("k2sd works", {
   # Test format
   kappa <- runif(10)
@@ -114,9 +112,8 @@ test_that("tan_half round-trip on a safe interval (-pi, pi)", {
 
 test_that("cloglog round-trip for probabilities in (0,1)", {
   p <- seq(0.1,0.9,by = 0.1)
-  eta <- link_transform(p, "cloglog", inverse = FALSE)    # should be log(-log(1 - p))
-  back <- link_transform(eta, "cloglog", inverse = TRUE)  # should be 1 - exp(-exp(eta))
-  # This expectation is correct; it will fail with current implementation.
+  eta <- link_transform(p, "cloglog", inverse = FALSE)
+  back <- link_transform(eta, "cloglog", inverse = TRUE)
   expect_equal(back, p, tolerance = 1e-9)
 })
 
@@ -164,7 +161,6 @@ test_that("unknown link errors clearly", {
 })
 
 test_that("non-numeric values error", {
-  # If you rely on glue(), also ensure glue is installed; otherwise any error is fine.
   expect_error(link_transform(c("a","b"), "log"))
 })
 
@@ -174,4 +170,45 @@ test_that("NULL link is treated as identity", {
   back <- link_transform(eta, NULL, inverse = TRUE)
   expect_identical(eta, x)
   expect_identical(back, x)
+})
+
+
+# ===========================================================================
+# .is_softmax_param()
+# ===========================================================================
+
+test_that(".is_softmax_param detects mixture3p softmax params", {
+  mock_model <- structure(list(), class = c("mixture3p", "bmmodel"))
+  expect_true(.is_softmax_param("thetat", mock_model))
+  expect_true(.is_softmax_param("thetant", mock_model))
+  expect_false(.is_softmax_param("kappa", mock_model))
+})
+
+test_that(".is_softmax_param returns FALSE for non-mixture3p models", {
+  mock_model <- structure(list(), class = c("mixture2p", "bmmodel"))
+  expect_false(.is_softmax_param("thetat", mock_model))
+
+  mock_sdm <- structure(list(), class = c("sdm", "bmmodel"))
+  expect_false(.is_softmax_param("kappa", mock_sdm))
+})
+
+# ===========================================================================
+# .get_parameter_info()
+# ===========================================================================
+
+test_that(".get_parameter_info returns correct info for SDM params", {
+  skip_on_cran()
+  path <- test_path("assets/bmmfit_example1.rds")
+  skip_if_not(file.exists(path), "SDM fixture not available (excluded by .Rbuildignore)")
+  fit <- readRDS(path)
+
+  info_c <- .get_parameter_info(fit, "c")
+  expect_equal(info_c$type, "dpar")
+  expect_equal(info_c$link, "log")
+  expect_false(info_c$softmax)
+
+  info_kappa <- .get_parameter_info(fit, "kappa")
+  expect_equal(info_kappa$type, "dpar")
+  expect_equal(info_kappa$link, "log")
+  expect_false(info_kappa$softmax)
 })

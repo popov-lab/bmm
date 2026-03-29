@@ -118,7 +118,6 @@ link_transform <- function(values, link, inverse = FALSE) {
   }
 }
 
-
 #' Get parameter information for a bmm model
 #'
 #' @description Returns a data frame with information about the model

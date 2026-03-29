@@ -1,8 +1,10 @@
 save_pars <- brms::save_pars
 
 test_that("update.bmmfit works", {
-  skip_if_not(interactive())
-  fit1 <- restructure(readRDS(test_path("assets/bmmfit_example1.rds")))
+  skip_on_cran()
+  path <- test_path("assets/bmmfit_example1.rds")
+  skip_if_not(file.exists(path), "SDM fixture not available (excluded by .Rbuildignore)")
+  fit1 <- restructure(readRDS(path))
   data <- fit1$data
 
   # formula is replaced

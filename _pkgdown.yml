@@ -42,6 +42,7 @@ reference:
     - "bmmformula"
     - "update.bmmfit"
     - "summary.bmmfit"
+    - "conditional_effects.bmmfit"
     - "emmeans-bmmfit"
     - "pp_check.bmmfit"
   - title: "Extract model information"
@@ -80,7 +81,6 @@ articles:
     contents:
      - articles/bmm_bmmformula
      - articles/bmm_extract_info
- 
   - title: Continuous reproduction tasks
     desc: Fitting models to continuous reproduction tasks
     contents:
