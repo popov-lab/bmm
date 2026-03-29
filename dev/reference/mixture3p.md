@@ -91,7 +91,7 @@ An object of class `bmmodel`
 
 - **Default parameter links:**
 
-  - mu1 = tan_half; kappa = log; thetat = identity; thetant = identity
+  - mu1 = tan_half; kappa = log; thetat = softmax; thetant = softmax
 
 - **Default priors:**
 

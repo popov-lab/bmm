@@ -335,6 +335,9 @@ Main functions for model fitting
 
   Create a summary of a fitted model represented by a `bmmfit` object
 
+- [`conditional_effects(`*`<bmmfit>`*`)`](https://venpopov.com/bmm/dev/reference/conditional_effects.bmmfit.md)
+  : Conditional Effects for BMM Models
+
 - [`recover_data(`*`<bmmfit>`*`)`](https://venpopov.com/bmm/dev/reference/emmeans-bmmfit.md)
   [`emm_basis(`*`<bmmfit>`*`)`](https://venpopov.com/bmm/dev/reference/emmeans-bmmfit.md)
   : emmeans support for bmmfit objects

@@ -4,6 +4,13 @@
 
 #### New features
 
+- New S3 method **conditional_effects()** for `bmmfit` objects. Provides
+  an intuitive interface for visualizing predictor effects on model
+  parameters, with automatic routing between distributional and
+  non-linear parameters, inverse link transformations to show parameters
+  on their natural scale (`scale = "native"`), softmax handling for
+  mixture3p weight parameters, and filtering of internal model variables
+  ([\#203](https://github.com/venpopov/bmm/issues/203)).
 - New S3 methods for **emmeans** support on `bmmfit` objects. Users can
   now call `emmeans(fit, ~ condition, dpar = "kappa")` for any bmmodel
   ([\#323](https://github.com/venpopov/bmm/issues/323)).

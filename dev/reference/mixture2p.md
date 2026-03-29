@@ -62,7 +62,7 @@ An object of class `bmmodel`
 
 - **Default parameter links:**
 
-  - mu1 = tan_half; kappa = log; thetat = identity
+  - mu1 = tan_half; kappa = log; thetat = logit
 
 - **Default priors:**
 
