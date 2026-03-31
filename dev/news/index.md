@@ -34,6 +34,8 @@
 
 ## bmm 1.3.0
 
+CRAN release: 2026-03-30
+
 #### New models
 
 - Add the **EZ-Diffusion Model** (`ezdm`) for speeded decision-making

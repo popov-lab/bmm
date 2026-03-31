@@ -153,7 +153,7 @@ response <- rbinom(100, 1, 0.8)
 # 3par summary stats
 ezdm_summary_stats(rt, response)
 #>      mean_rt     var_rt n_upper n_trials contaminant_prop
-#> mu 0.7751987 0.03617631      82      100      4.68105e-08
+#> mu 0.7751987 0.03617632      82      100      4.68105e-08
 
 # With dplyr for grouped operations
 # library(dplyr)
@@ -164,7 +164,7 @@ ezdm_summary_stats(rt, response)
 # 4par version with separate upper/lower moments
 ezdm_summary_stats(rt, response, version = "4par")
 #>    mean_rt_upper mean_rt_lower var_rt_upper var_rt_lower n_upper n_trials
-#> mu     0.7751185     0.7755708   0.04176804   0.01614341      82      100
+#> mu     0.7751185     0.7756404   0.04176804   0.01614607      82      100
 #>    contaminant_prop_upper contaminant_prop_lower
-#> mu           5.349368e-08           1.992978e-08
+#> mu           5.349368e-08           5.258552e-08
 ```
