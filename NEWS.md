@@ -1,3 +1,11 @@
+# bmm 1.3.1
+
+### Bug fixes
+* Fix `swald_lccdf()` returning incorrect log-survival probability when response time equals non-decision time in the **cswald** model. Previously returned `-Inf` instead of `0` (log of survival = 1) (#348).
+
+### Other changes
+* The **ddm** model supports both `cmdstanr` and `rstan` backends. Previously, `cmdstanr` was required.
+
 # bmm 1.3.0
 
 ### New models
