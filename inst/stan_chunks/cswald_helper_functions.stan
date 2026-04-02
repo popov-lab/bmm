@@ -26,7 +26,7 @@ real swald_lpdf(real rt, real drift, real bound, real ndt, real sigma) {
 real swald_lccdf(real rt, real drift, real bound, real ndt, real sigma) {
   // compute shifted response time
   real t_shifted = rt - ndt;
-  if (t_shifted <= 0) return negative_infinity();
+  if (t_shifted <= 0) return 0;  // process hasn't started, survival = 1
 
   // pre-compute common terms
   real sqrt_t = sqrt(t_shifted);
