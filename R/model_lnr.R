@@ -209,7 +209,6 @@ check_model.lnr_custom <- function(model, data = NULL, formula = NULL) {
       "Custom version requires at least one accumulator parameter in the formula."
     )
 
-    # validate category names are valid Stan identifiers
     bad_names <- intersect(tolower(cat_pars), .stan_reserved)
     stopif(
       length(bad_names) > 0,
@@ -217,7 +216,6 @@ check_model.lnr_custom <- function(model, data = NULL, formula = NULL) {
       Please rename the affected response categories."
     )
 
-    # add category parameters to model
     for (p in cat_pars) {
       model$parameters[[p]] <- paste0("meanlog for '", p, "' accumulator")
       if (is.null(model$links[[p]])) model$links[[p]] <- "identity"
@@ -241,7 +239,11 @@ check_model.lnr_custom <- function(model, data = NULL, formula = NULL) {
 # CHECK_DATA S3 methods                                                  ####
 ############################################################################# !
 
-.check_rt <- function(data, rt_var) {
+#' @export
+check_data.lnr <- function(model, data, formula) {
+  rt_var <- model$resp_vars$rt
+  response_var <- model$resp_vars$response
+
   stopif(
     not_in(rt_var, colnames(data)),
     "The RT variable '{rt_var}' is not present in the data."
@@ -278,15 +280,6 @@ check_model.lnr_custom <- function(model, data = NULL, formula = NULL) {
   } else {
     stop2("The RT variable '{rt_var}' needs to be of type double or integer.")
   }
-  invisible(NULL)
-}
-
-#' @export
-check_data.lnr <- function(model, data, formula) {
-  rt_var <- model$resp_vars$rt
-  response_var <- model$resp_vars$response
-
-  .check_rt(data, rt_var)
 
   stopif(
     not_in(response_var, colnames(data)),
@@ -308,7 +301,6 @@ check_data.lnr_simple <- function(model, data, formula) {
   response_var <- model$resp_vars$response
   n_alt <- model$other_vars$n_alternatives
 
-  # convert factor/character responses to integer
   if (is.factor(data[, response_var])) {
     data[, response_var] <- as.integer(as.character(data[, response_var]))
   } else if (is.character(data[, response_var])) {
@@ -328,11 +320,7 @@ check_data.lnr_simple <- function(model, data, formula) {
   )
   data[, response_var] <- as.integer(data[, response_var])
 
-  # simple version: 2 categories (correct=1, error=2..K)
-  # map to category index: response=1 → cat 1, response>1 → cat 2
   data$.lnr_cat <- ifelse(data[, response_var] == 1L, 1L, 2L)
-
-  # per-category counts: correct=1, error=K-1
   data$.lnr_n1 <- 1L
   data$.lnr_n2 <- n_alt - 1L
 
@@ -346,7 +334,6 @@ check_data.lnr_custom <- function(model, data, formula) {
   num_alt <- model$other_vars$num_alternatives
   n_cats <- length(cat_names)
 
-  # convert factor to character
   if (is.factor(data[, response_var])) {
     data[, response_var] <- as.character(data[, response_var])
   }
@@ -357,7 +344,6 @@ check_data.lnr_custom <- function(model, data, formula) {
     contain character labels matching the formula category names."
   )
 
-  # validate response levels match formula categories
   data_levels <- unique(data[, response_var])
   missing_in_formula <- setdiff(data_levels, cat_names)
   missing_in_data <- setdiff(cat_names, data_levels)
@@ -372,13 +358,9 @@ check_data.lnr_custom <- function(model, data, formula) {
     in the data."
   )
 
-  # map character → integer using formula LHS ordering
-  cat_map <- setNames(seq_along(cat_names), cat_names)
-  data$.lnr_cat <- cat_map[data[, response_var]]
+  data$.lnr_cat <- setNames(seq_along(cat_names), cat_names)[data[, response_var]]
 
-  # handle num_alternatives (following M3's num_options pattern)
   if (is.null(num_alt)) {
-    # default: 1 accumulator per category
     for (i in seq_along(cat_names)) {
       data[[paste0(".lnr_n", i)]] <- 1L
     }
@@ -397,8 +379,7 @@ check_data.lnr_custom <- function(model, data, formula) {
       "num_alternatives must have names matching formula categories: \\
       {collapse_comma(cat_names)}"
     )
-    col_names <- colnames(data)
-    missing_cols <- setdiff(num_alt, col_names)
+    missing_cols <- setdiff(num_alt, colnames(data))
     stopif(
       length(missing_cols) > 0,
       "num_alternatives columns {collapse_comma(missing_cols)} not found \\
@@ -521,7 +502,7 @@ configure_model.lnr_custom <- function(model, data, formula) {
   )
   lb_vec <- c(NA, rep(NA, n_cats), 0, 0)
 
-  # vars: vint1 = response, vint2..vintK+1 = per-category counts
+  # brms vint() order must match Stan function signature
   vars_vec <- paste0("vint", seq_len(n_cats + 1), "[n]")
 
   formula$family <- brms::custom_family(
@@ -557,26 +538,22 @@ configure_model.lnr_custom <- function(model, data, formula) {
   t <- rt - ndt
   t[t <= 0] <- NA
 
-  # per-category counts
   n_cat <- vapply(
     seq_len(n_cats),
     function(j) prep$data[[paste0("vint", j + 1)]][i],
     integer(1)
   )
 
-  # PDF of the winning accumulator's category
   m_win <- brms::get_dpar(prep, cat_names[response], i = i)
   log_lik <- log(n_cat[response]) +
     stats::dlnorm(t, meanlog = m_win, sdlog = s, log = TRUE)
 
-  # survivors within winning category
   if (n_cat[response] > 1) {
     log_lik <- log_lik + (n_cat[response] - 1) *
       stats::plnorm(t, meanlog = m_win, sdlog = s,
                     lower.tail = FALSE, log.p = TRUE)
   }
 
-  # survivors in losing categories
   for (j in seq_len(n_cats)) {
     if (j == response) next
     m_j <- brms::get_dpar(prep, cat_names[j], i = i)
@@ -594,7 +571,6 @@ configure_model.lnr_custom <- function(model, data, formula) {
   s <- brms::get_dpar(prep, "s", i = i)
   n_draws <- length(ndt)
 
-  # per-category counts
   n_cat <- vapply(
     seq_len(n_cats),
     function(j) prep$data[[paste0("vint", j + 1)]][i],
@@ -604,7 +580,6 @@ configure_model.lnr_custom <- function(model, data, formula) {
 
   rt <- numeric(n_draws)
   for (d in seq_len(n_draws)) {
-    # build meanlog and sdlog for all individual accumulators
     m_vec <- unlist(lapply(seq_len(n_cats), function(j) {
       rep(brms::get_dpar(prep, cat_names[j], i = i)[d], n_cat[j])
     }))

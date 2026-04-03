@@ -159,7 +159,6 @@ test_that("check_data.lnr_simple creates category mapping columns", {
   expect_true(".lnr_n2" %in% names(result))
   expect_true(all(result$.lnr_n1 == 1L))
   expect_true(all(result$.lnr_n2 == 3L))
-  # response=1 maps to cat 1, response>1 maps to cat 2
   expect_true(all(result$.lnr_cat[result$response == 1] == 1L))
   expect_true(all(result$.lnr_cat[result$response > 1] == 2L))
 })

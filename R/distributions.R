@@ -1165,11 +1165,9 @@ dlnr <- function(rt, response, m, s, ndt, log = FALSE) {
   if (length(s) == 1) s <- rep(s, K)
   t <- rt - ndt
 
-  # PDF of the winning accumulator
   log_lik <- stats::dlnorm(t, meanlog = m[response], sdlog = s[response],
                            log = TRUE)
 
-  # survivor functions of losing accumulators
   for (j in seq_len(K)) {
     is_loser <- (j != response)
     if (!any(is_loser)) next
@@ -1205,9 +1203,7 @@ plnr <- function(q, response, m, s, ndt, lower.tail = TRUE, log.p = FALSE) {
   if (length(s) == 1) s <- rep(s, K)
   t <- q - ndt
 
-  # P(response r wins AND finishes by time t) requires integration;
-  # use a simulation-based approximation for now
-  # For the marginal CDF of the minimum: P(min(T) <= t) = 1 - prod(1 - F_j(t))
+  # no closed form for response-specific CDF; marginal CDF has one
   if (missing(response)) {
     log_surv <- numeric(length(t))
     for (j in seq_len(K)) {
@@ -1236,7 +1232,6 @@ qlnr <- function(p, m, s, ndt, lower.tail = TRUE, log.p = FALSE) {
   vapply(p, function(pi) {
     if (pi <= 0) return(ndt)
     if (pi >= 1) return(Inf)
-    # marginal CDF: P(min(T) <= t) = 1 - prod(1 - F_j(t))
     cdf_fn <- function(q) {
       t <- q - ndt
       if (t <= 0) return(-pi)
@@ -1244,7 +1239,6 @@ qlnr <- function(p, m, s, ndt, lower.tail = TRUE, log.p = FALSE) {
                                      lower.tail = FALSE, log.p = TRUE))
       (1 - exp(log_surv)) - pi
     }
-    # upper search bound: use a generous multiple of the slowest accumulator
     upper <- ndt + stats::qlnorm(0.999, meanlog = max(m), sdlog = max(s))
     stats::uniroot(cdf_fn, interval = c(ndt + 1e-10, upper),
                    tol = 1e-8)$root
