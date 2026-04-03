@@ -1102,6 +1102,161 @@ validate_cswald_parameters <- function(drift, bound, ndt, zr, s) {
 }
 
 
+############################################################################# !
+# Log-Normal Race (LNR) distributions                                    ####
+############################################################################# !
+
+#' @title Distribution functions for the Log-Normal Race Model (LNR)
+#'
+#' @description Density, random generation, and cumulative distribution
+#'   functions for the Log-Normal Race Model. The LNR (Rouder et al., 2015) is
+#'   a K-accumulator race model where each accumulator's finishing time follows
+#'   a lognormal distribution. The first accumulator to finish determines both
+#'   the response and the response time.
+#'
+#' @name lnr_dist
+#'
+#' @param rt Numeric vector of response times in seconds.
+#' @param response Integer vector of responses (1:K, where K is the number of
+#'   alternatives).
+#' @param m Numeric vector of meanlog parameters (one per accumulator).
+#' @param s Numeric vector of sdlog parameters (one per accumulator, or a
+#'   single value shared across all accumulators).
+#' @param ndt Non-decision time in seconds.
+#' @param n Number of samples to generate.
+#' @param log Logical; if `TRUE`, values are returned on the log scale.
+#' @param q Numeric vector of quantiles (response times).
+#' @param lower.tail Logical; if `TRUE` (default), probabilities are P(X <= x).
+#' @param log.p Logical; if `TRUE`, probabilities are given as log(p).
+#'
+#' @param p Numeric vector of probabilities.
+#'
+#' @return
+#'   - `dlnr()` returns a numeric vector of (log-)densities.
+#'   - `rlnr()` returns a data.frame with columns `rt` and `response`.
+#'   - `plnr()` returns a numeric vector of (log-)probabilities.
+#'   - `qlnr()` returns a numeric vector of quantiles (response times).
+#'
+#' @references
+#' Rouder, J. N., Province, J. M., Morey, R. D., Gomez, P., & Heathcote, A.
+#'   (2015). The Lognormal Race: A Cognitive-Process Model of Choice and Latency
+#'   with Desirable Psychometric Properties. Psychometrika, 80(2), 491-513.
+#'
+#' @keywords distribution
+#'
+#' @examples
+#' dat <- rlnr(n = 1000, m = c(-1, 0), s = c(1, 1), ndt = 0.2)
+#' head(dat)
+#' hist(dat$rt)
+#' @export
+dlnr <- function(rt, response, m, s, ndt, log = FALSE) {
+  validate_lnr_parameters(s, ndt)
+  stopif(
+    any(rt - ndt <= 0),
+    "Some reaction times are smaller than the non-decision time. \\
+    You need to specify a non-decision time 'ndt' smaller than \\
+    the shortest reaction time."
+  )
+  .dlnr(rt, response, m, s, ndt, log)
+}
+
+.dlnr <- function(rt, response, m, s, ndt, log) {
+  K <- length(m)
+  if (length(s) == 1) s <- rep(s, K)
+  t <- rt - ndt
+
+  # PDF of the winning accumulator
+  log_lik <- stats::dlnorm(t, meanlog = m[response], sdlog = s[response],
+                           log = TRUE)
+
+  # survivor functions of losing accumulators
+  for (j in seq_len(K)) {
+    is_loser <- (j != response)
+    if (!any(is_loser)) next
+    log_lik[is_loser] <- log_lik[is_loser] +
+      stats::plnorm(t[is_loser], meanlog = m[j], sdlog = s[j],
+                    lower.tail = FALSE, log.p = TRUE)
+  }
+
+  if (log) log_lik else exp(log_lik)
+}
+
+#' @rdname lnr_dist
+#' @export
+rlnr <- function(n, m, s, ndt) {
+  validate_lnr_parameters(s, ndt)
+  .rlnr(n, m, s, ndt)
+}
+
+.rlnr <- function(n, m, s, ndt) {
+  K <- length(m)
+  if (length(s) == 1) s <- rep(s, K)
+  ft <- matrix(stats::rlnorm(n * K, meanlog = rep(m, each = n),
+                              sdlog = rep(s, each = n)), nrow = n, ncol = K)
+  winner <- apply(ft, 1, which.min)
+  data.frame(rt = apply(ft, 1, min) + ndt, response = winner)
+}
+
+#' @rdname lnr_dist
+#' @export
+plnr <- function(q, response, m, s, ndt, lower.tail = TRUE, log.p = FALSE) {
+  validate_lnr_parameters(s, ndt)
+  K <- length(m)
+  if (length(s) == 1) s <- rep(s, K)
+  t <- q - ndt
+
+  # P(response r wins AND finishes by time t) requires integration;
+  # use a simulation-based approximation for now
+  # For the marginal CDF of the minimum: P(min(T) <= t) = 1 - prod(1 - F_j(t))
+  if (missing(response)) {
+    log_surv <- numeric(length(t))
+    for (j in seq_len(K)) {
+      log_surv <- log_surv + stats::plnorm(t, meanlog = m[j], sdlog = s[j],
+                                            lower.tail = FALSE, log.p = TRUE)
+    }
+    log_p <- log(1 - exp(log_surv))
+  } else {
+    stop2("Response-specific CDF for the LNR is not yet implemented. \\
+           Omit the 'response' argument to get the marginal RT CDF.")
+  }
+
+  if (!lower.tail) log_p <- log(1 - exp(log_p))
+  if (log.p) log_p else exp(log_p)
+}
+
+#' @rdname lnr_dist
+#' @export
+qlnr <- function(p, m, s, ndt, lower.tail = TRUE, log.p = FALSE) {
+  validate_lnr_parameters(s, ndt)
+  K <- length(m)
+  if (length(s) == 1) s <- rep(s, K)
+  if (log.p) p <- exp(p)
+  if (!lower.tail) p <- 1 - p
+
+  vapply(p, function(pi) {
+    if (pi <= 0) return(ndt)
+    if (pi >= 1) return(Inf)
+    # marginal CDF: P(min(T) <= t) = 1 - prod(1 - F_j(t))
+    cdf_fn <- function(q) {
+      t <- q - ndt
+      if (t <= 0) return(-pi)
+      log_surv <- sum(stats::plnorm(t, meanlog = m, sdlog = s,
+                                     lower.tail = FALSE, log.p = TRUE))
+      (1 - exp(log_surv)) - pi
+    }
+    # upper search bound: use a generous multiple of the slowest accumulator
+    upper <- ndt + stats::qlnorm(0.999, meanlog = max(m), sdlog = max(s))
+    stats::uniroot(cdf_fn, interval = c(ndt + 1e-10, upper),
+                   tol = 1e-8)$root
+  }, numeric(1))
+}
+
+validate_lnr_parameters <- function(s, ndt) {
+  stopif(any(s <= 0), "s (sdlog) must be positive.")
+  stopif(any(ndt < 0), "ndt (non-decision time) must be non-negative.")
+}
+
+
 #' @title Distribution functions for the EZ-Diffusion Model (ezdm)
 #'
 #' @description Density and random generation functions for the EZ-Diffusion

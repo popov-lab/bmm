@@ -1,5 +1,8 @@
 # bmm (development version)
 
+### New models
+* Add the **Log-Normal Race Model** (`lnr`) for multi-alternative choice reaction time tasks (Rouder et al., 2015). The LNR is a K-accumulator race model where finishing times follow lognormal distributions. Implements two versions: **simple** (correct vs. error accumulators, integer-coded responses) and **custom** (per-category meanlog parameters with character-labeled responses, analogous to the M3 `custom` version). The custom version supports per-category `num_alternatives` for tasks where response categories have different numbers of racing accumulators. Uses dynamically generated Stan code with built-in lognormal functions --- no custom Stan math required. See the [article](https://venpopov.github.io/bmm/dev/articles/bmm_lnr.html) on the `bmm` website for details. Thanks to @GidonFrischkorn (#352)
+
 ### New features
 * New S3 method **conditional_effects()** for `bmmfit` objects. Provides an intuitive interface for visualizing predictor effects on model parameters, with automatic routing between distributional and non-linear parameters, inverse link transformations to show parameters on their natural scale (`scale = "native"`), softmax handling for mixture3p weight parameters, and filtering of internal model variables (#203).
 * New S3 methods for **emmeans** support on `bmmfit` objects. Users can now call `emmeans(fit, ~ condition, dpar = "kappa")` for any bmmodel (#323).

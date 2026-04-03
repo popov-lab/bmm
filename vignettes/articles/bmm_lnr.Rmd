@@ -1,0 +1,251 @@
+---
+title: "The Log-Normal Race Model (LNR)"
+output: bookdown::html_document2
+author:
+  - Gidon Frischkorn
+bibliography: REFERENCES.bib
+header-includes:
+  - \usepackage{amsmath}
+vignette: >
+  %\VignetteIndexEntry{The Log-Normal Race Model (LNR)}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+pkgdown:
+  as_is: true
+---
+
+<style type="text/css">
+div.main-container {
+max-width: 800px !important;
+}
+
+p {
+margin-top: 1.5em ;
+margin-bottom: 1.5em ;
+}
+.author{
+    display: none;
+}
+</style>
+
+```{r, include = FALSE}
+options(crayon.enabled = TRUE)
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>",
+  dev = "jpeg",
+  dpi = 100,
+  fig.asp = 0.8,
+  fig.width = 6,
+  out.width = "80%",
+  fig.align = "center"
+)
+fansi::set_knit_hooks(knitr::knit_hooks, which = c("output","message","error"))
+```
+
+# Introduction to the model
+
+The Log-Normal Race model [LNR; @rouderLognormalRaceCognitiveProcess2015] is
+a race model for choice response time data. Each response option has its own
+accumulator, and these accumulators race to completion. The first accumulator
+to finish determines both the chosen response and the observed response time.
+
+The LNR works with two or more response alternatives and has fewer parameters
+than the Linear Ballistic Accumulator or the Diffusion Decision Model. This
+makes it a good starting point for decomposing RT distributions, especially in
+multi-alternative tasks.
+
+## Model specification
+
+Each response alternative $k$ has an accumulator whose finishing time $T_k$
+follows a lognormal distribution:
+
+$$
+T_k \sim \text{Lognormal}(\mu_k, \sigma)
+$$
+
+where $\mu_k$ is the meanlog parameter (lower values produce faster finishing
+times) and $\sigma$ is the sdlog parameter controlling variability. The
+observed response and response time are:
+
+$$
+\text{Response} = \arg\min_k T_k, \quad RT = \min_k T_k + \tau
+$$
+
+where $\tau$ is the non-decision time for stimulus encoding and motor
+execution. Since the lognormal distribution is positively skewed and defined
+on the positive reals, it fits the shape of empirical RT distributions well.
+
+# Parametrization in the `bmm` package
+
+The `bmm` package provides two versions of the LNR.
+
+## Simple version (`version = "simple"`)
+
+The simple version uses two meanlog parameters: one for correct responses
+and one shared across all error responses.
+
+| Parameter | Description | Link function |
+|-----------|-------------|---------------|
+| `correct` | Meanlog for the correct accumulator | identity |
+| `error`   | Meanlog for all error accumulators | identity |
+| `ndt`     | Non-decision time | log |
+| `s`       | Sdlog, shared across accumulators (fixed to 1) | log |
+
+Responses must be integer-coded: 1 for correct, 2 through K for errors. The
+total number of alternatives is specified via `n_alternatives`. Use this
+version for standard accuracy-based designs where the distinction between
+correct and error processing is the primary interest.
+
+## Custom version (`version = "custom"`)
+
+The custom version assigns a separate meanlog parameter to each response
+category. Category names are defined in the formula and matched to character
+labels in the response column of the data:
+
+| Parameter | Description | Link function |
+|-----------|-------------|---------------|
+| one per category | Meanlog for that category's accumulator(s) | identity |
+| `ndt`     | Non-decision time | log |
+| `s`       | Sdlog, shared across accumulators (fixed to 1) | log |
+
+The custom version also supports per-category `num_alternatives` for tasks
+where categories contain different numbers of items (e.g., 1 target, 3
+similar lures, 5 unrelated distractors). This works analogously to the
+`num_options` argument in the M3 model.
+
+## Identifiability
+
+Like other race and diffusion models, the LNR needs a scale constraint. By
+default, `s` (sdlog) is fixed to 1. You can unfix it if you constrain another
+parameter instead, but the default is appropriate for most applications.
+
+# Data requirements
+
+## Simple version
+
+The data must contain:
+
+- An RT column with response times in **seconds**
+- A response column with integer values: 1 = correct, 2:K = errors
+
+```{r}
+library(bmm)
+
+set.seed(42)
+dat_simple <- rlnr(n = 500, m = c(-1, 0), s = c(1, 1), ndt = 0.2)
+str(dat_simple)
+```
+
+## Custom version
+
+The data must contain:
+
+- An RT column with response times in **seconds**
+- A response column with **character labels** matching the formula parameters
+
+```{r}
+set.seed(42)
+sim <- rlnr(n = 500, m = c(-1.5, -0.5, 0.5), s = 1, ndt = 0.15)
+dat_custom <- data.frame(
+  rt = sim$rt,
+  resp = c("recall", "similar", "other")[sim$response]
+)
+str(dat_custom)
+table(dat_custom$resp)
+```
+
+# Fitting the model
+
+## Simple version: two-choice task
+
+```{r, eval=FALSE}
+model <- lnr(rt = "rt", response = "response", n_alternatives = 2)
+
+formula <- bmf(
+  correct ~ 1,
+  error ~ 1,
+  ndt ~ 1
+)
+
+fit <- bmm(formula, dat_simple, model,
+           cores = 4, backend = "cmdstanr")
+```
+
+For a four-choice task, set `n_alternatives = 4`. Responses 2 through 4 all
+share the `error` parameter:
+
+```{r, eval=FALSE}
+model_k4 <- lnr(rt = "rt", response = "response", n_alternatives = 4)
+fit_k4 <- bmm(bmf(correct ~ 1, error ~ 1, ndt ~ 1),
+               dat_k4, model_k4,
+               cores = 4, backend = "cmdstanr")
+```
+
+## Custom version: named categories
+
+```{r, eval=FALSE}
+model_custom <- lnr(rt = "rt", response = "resp", version = "custom")
+
+formula_custom <- bmf(
+  recall ~ 1,
+  similar ~ 1,
+  other ~ 1,
+  ndt ~ 1
+)
+
+fit_custom <- bmm(formula_custom, dat_custom, model_custom,
+                   cores = 4, backend = "cmdstanr")
+```
+
+## Per-category accumulator counts
+
+When categories have different numbers of racing accumulators, pass a named
+integer vector to `num_alternatives`:
+
+```{r, eval=FALSE}
+model_numalt <- lnr(
+  rt = "rt", response = "resp", version = "custom",
+  num_alternatives = c(recall = 1, similar = 3, other = 5)
+)
+```
+
+If the number of items per category varies across trials, pass column names
+instead of integers (e.g.,
+`c(recall = "n_recall", similar = "n_similar", other = "n_other")`).
+
+## Hierarchical models
+
+Both versions support random effects. For hierarchical models, we recommend
+setting `adapt_delta = 0.95` or higher, because divergent transitions can
+occur when the non-decision time parameter gets close to the fastest observed
+RT.
+
+```{r, eval=FALSE}
+model_hier <- lnr(rt = "rt", response = "response", n_alternatives = 2)
+
+formula_hier <- bmf(
+  correct ~ 1 + condition + (1 + condition | id),
+  error ~ 1 + (1 | id),
+  ndt ~ 1 + (1 | id)
+)
+
+fit_hier <- bmm(formula_hier, dat_hier, model_hier,
+                cores = 4, backend = "cmdstanr",
+                control = list(adapt_delta = 0.95))
+```
+
+# Default priors
+
+| Parameter | Prior | Scale |
+|-----------|-------|-------|
+| `correct` | `normal(-1, 0.5)` | identity (meanlog) |
+| `error` | `normal(0, 0.5)` | identity (meanlog) |
+| `ndt` | `normal(-2, 0.3)` | log (~0.14s on the natural scale) |
+| `s` | `normal(0, 0.3)` | log (~1.0 on the natural scale) |
+
+For the custom version, category parameters default to `normal(0, 0.5)` on
+the identity scale. These priors are weakly informative and appropriate for
+RT data in seconds. Check them with `default_prior()` and adjust as needed.
+
+# References
