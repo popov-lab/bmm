@@ -70,10 +70,6 @@ create_initfun.bmmodel <- function(model, data, formula) {
 }
 
 
-# Match a Stan parameter name to the corresponding model parameter.
-# Uses word-boundary regex to avoid substring collisions (e.g., parameter "s"
-# must not match inside "Intercept_sim"). When multiple model parameters match,
-# the longest (most specific) name wins (e.g., "mu1" over "mu").
 match_stan_to_model_par <- function(spar, model_pars) {
   parameter <- model_pars[unlist(lapply(
     paste0("(^|_)", model_pars, "(_|$)"), grepl, x = spar
