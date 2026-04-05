@@ -418,9 +418,52 @@ test_that("initfun output matches standata dimensions for no-intercept models", 
                 info = paste("K_ dimension should exist for no-intercept model:", dim_name))
     
     expect_equal(
-      length(inits[[nm]]), 
+      length(inits[[nm]]),
       standata[[dim_name]],
       info = paste("Dimension mismatch for no-intercept parameter:", nm)
     )
   }
+})
+
+
+# -----------------------------------------------------------------------------
+# match_stan_to_model_par tests (substring collision scenarios)
+# -----------------------------------------------------------------------------
+
+test_that("match_stan_to_model_par handles exact matches", {
+  model_pars <- c("kappa", "c", "mu")
+  expect_equal(match_stan_to_model_par("Intercept_kappa", model_pars), "kappa")
+  expect_equal(match_stan_to_model_par("Intercept_c", model_pars), "c")
+  expect_equal(match_stan_to_model_par("Intercept", model_pars), "mu")
+})
+
+test_that("match_stan_to_model_par avoids substring collisions", {
+  model_pars <- c("s", "sim", "ndt", "bound")
+  expect_equal(match_stan_to_model_par("Intercept_sim", model_pars), "sim")
+  expect_equal(match_stan_to_model_par("Intercept_s", model_pars), "s")
+  expect_equal(match_stan_to_model_par("b_sim", model_pars), "sim")
+  expect_equal(match_stan_to_model_par("sd_1", model_pars), "sd")
+})
+
+test_that("match_stan_to_model_par avoids single-letter collisions", {
+  model_pars <- c("c", "correct", "a", "activation")
+  expect_equal(match_stan_to_model_par("Intercept_correct", model_pars), "correct")
+  expect_equal(match_stan_to_model_par("Intercept_c", model_pars), "c")
+  expect_equal(match_stan_to_model_par("Intercept_activation", model_pars), "activation")
+  expect_equal(match_stan_to_model_par("Intercept_a", model_pars), "a")
+})
+
+test_that("match_stan_to_model_par prefers longest match for prefix params", {
+  model_pars <- c("mu", "mu1", "mu2", "kappa", "kappa2")
+  expect_equal(match_stan_to_model_par("Intercept_mu1", model_pars), "mu1")
+  expect_equal(match_stan_to_model_par("Intercept_mu2", model_pars), "mu2")
+  expect_equal(match_stan_to_model_par("Intercept_kappa2", model_pars), "kappa2")
+  expect_equal(match_stan_to_model_par("Intercept_kappa", model_pars), "kappa")
+})
+
+test_that("match_stan_to_model_par falls back for structural params", {
+  model_pars <- c("kappa", "c")
+  expect_equal(match_stan_to_model_par("sd_1", model_pars), "sd")
+  expect_equal(match_stan_to_model_par("z_1", model_pars), "z")
+  expect_equal(match_stan_to_model_par("cor_1", model_pars), "cor")
 })
