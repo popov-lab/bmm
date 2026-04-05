@@ -47,7 +47,10 @@ create_initfun.bmmodel <- function(model, data, formula) {
       # parse stan parameter names; if it contains a model parameter return that,
       # otherwise get the type of parameter, e.g. for  covariance matrices and z-values
       # for random effects over groups
-      parameter <- model_pars[unlist(lapply(paste0("_", model_pars), grepl, x = spar))]
+      parameter <- model_pars[unlist(lapply(paste0("_", model_pars, "(_|$)"), grepl, x = spar))]
+      if (length(parameter) > 1) {
+        parameter <- parameter[which.max(nchar(parameter))]
+      }
       if (length(parameter) == 0) {
         parameter <- strsplit(spar, "_")[[1]][1]
       }

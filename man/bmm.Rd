@@ -109,6 +109,7 @@ The following models are supported:
 \item m3(resp_cats, num_options, choice_rule, version)
 \item mixture2p(resp_error)
 \item mixture3p(resp_error, nt_features, set_size, regex)
+\item rdm(rt, response, n_alternatives, version, num_alternatives, links)
 \item sdm(resp_error, version)
 }
 
