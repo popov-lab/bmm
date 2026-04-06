@@ -1,0 +1,375 @@
+# =============================================================================
+# Tests for lba model (model-specific tests)
+# Distribution function tests are in test-distributions.R
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# Model construction tests
+# -----------------------------------------------------------------------------
+
+test_that("lba() creates simple model with correct structure", {
+  model <- lba(rt = "rt", response = "response", n_alternatives = 2)
+
+  expect_s3_class(model, "bmmodel")
+  expect_s3_class(model, "lba")
+  expect_s3_class(model, "lba_simple")
+  expect_equal(model$resp_vars$rt, "rt")
+  expect_equal(model$resp_vars$response, "response")
+  expect_equal(model$other_vars$n_alternatives, 2L)
+  expect_equal(model$version, "simple")
+  expect_equal(model$distribution, "normal")
+})
+
+test_that("lba simple version has correct parameters", {
+  model <- lba(rt = "rt", response = "response", n_alternatives = 4)
+
+  expect_true(all(c("driftc", "drifte", "B", "A", "ndt", "s") %in%
+                    names(model$parameters)))
+  expect_equal(model$other_vars$n_alternatives, 4L)
+})
+
+test_that("lba gamma distribution uses consistent drift parameter names", {
+  model <- lba(rt = "rt", response = "response", n_alternatives = 2,
+               distribution = "gamma")
+
+  expect_true(all(c("driftc", "drifte", "B", "A", "ndt", "s") %in%
+                    names(model$parameters)))
+  expect_equal(model$distribution, "gamma")
+  expect_equal(model$links$driftc, "log")
+})
+
+test_that("lba accepts custom links", {
+  model <- lba(rt = "rt", response = "response", n_alternatives = 2,
+               links = list(driftc = "log"))
+  expect_equal(model$links$driftc, "log")
+  expect_equal(model$links$drifte, "identity")
+})
+
+test_that("lba errors on invalid n_alternatives", {
+  expect_error(lba(rt = "rt", response = "response", n_alternatives = 1))
+  expect_error(lba(rt = "rt", response = "response", n_alternatives = 2.5))
+})
+
+test_that("lba errors on missing required arguments", {
+  expect_error(lba(response = "response", n_alternatives = 2))
+  expect_error(lba(rt = "rt", n_alternatives = 2))
+})
+
+test_that("lba() creates custom model with correct structure", {
+  model <- lba(rt = "rt", response = "resp", version = "custom")
+
+  expect_s3_class(model, "lba_custom")
+  expect_equal(model$version, "custom")
+  expect_null(model$other_vars$n_alternatives)
+})
+
+test_that("lba custom accepts num_alternatives", {
+  model <- lba(rt = "rt", response = "resp", version = "custom",
+               num_alternatives = c(correct = 1, lure = 3))
+  expect_equal(model$other_vars$num_alternatives, c(correct = 1, lure = 3))
+})
+
+
+# -----------------------------------------------------------------------------
+# Data validation tests — simple version
+# -----------------------------------------------------------------------------
+
+test_that("check_data.lba errors on missing RT variable", {
+  dat <- data.frame(response = 1:10)
+  model <- lba(rt = "rt", response = "response", n_alternatives = 2)
+  expect_error(check_data(model, dat, bmf(driftc ~ 1)))
+})
+
+test_that("check_data.lba errors on NA RT values", {
+  dat <- data.frame(rt = c(0.5, NA, 0.6), response = c(1L, 2L, 1L))
+  model <- lba(rt = "rt", response = "response", n_alternatives = 2)
+  expect_error(check_data(model, dat, bmf(driftc ~ 1)))
+})
+
+test_that("check_data.lba errors on negative RT", {
+  dat <- data.frame(rt = c(0.5, -0.1, 0.6), response = c(1L, 2L, 1L))
+  model <- lba(rt = "rt", response = "response", n_alternatives = 2)
+  expect_error(check_data(model, dat, bmf(driftc ~ 1)))
+})
+
+test_that("check_data.lba warns on RT > 10s", {
+  dat <- data.frame(rt = c(0.5, 15, 0.6), response = c(1L, 2L, 1L))
+  model <- lba(rt = "rt", response = "response", n_alternatives = 2)
+  expect_warning(check_data(model, dat, bmf(driftc ~ 1)))
+})
+
+test_that("check_data.lba_simple errors on out-of-range response", {
+  dat <- data.frame(rt = c(0.5, 0.6, 0.7), response = c(1L, 3L, 1L))
+  model <- lba(rt = "rt", response = "response", n_alternatives = 2)
+  expect_error(check_data(model, dat, bmf(driftc ~ 1)))
+})
+
+test_that("check_data.lba_simple converts factor responses", {
+  dat <- data.frame(rt = c(0.5, 0.6, 0.7), response = factor(c(1, 2, 1)))
+  model <- lba(rt = "rt", response = "response", n_alternatives = 2)
+  dat2 <- check_data(model, dat, bmf(driftc ~ 1))
+  expect_true(is.integer(dat2$response))
+})
+
+test_that("check_data.lba_simple creates category columns", {
+  dat <- data.frame(rt = c(0.5, 0.6, 0.7, 0.8),
+                    response = c(1L, 2L, 3L, 1L))
+  model <- lba(rt = "rt", response = "response", n_alternatives = 3)
+  dat2 <- check_data(model, dat, bmf(driftc ~ 1))
+
+  expect_true(".lba_cat" %in% names(dat2))
+  expect_true(".lba_n1" %in% names(dat2))
+  expect_true(".lba_n2" %in% names(dat2))
+  expect_equal(dat2$.lba_cat[1], 1L)
+  expect_equal(dat2$.lba_cat[2], 2L)
+  expect_equal(dat2$.lba_n1[1], 1L)
+  expect_equal(dat2$.lba_n2[1], 2L)
+})
+
+
+# -----------------------------------------------------------------------------
+# Data validation tests — custom version
+# -----------------------------------------------------------------------------
+
+test_that("check_data.lba_custom maps character responses", {
+  dat <- data.frame(rt = c(0.5, 0.6, 0.7),
+                    response = c("correct", "wrong", "correct"))
+  model <- lba(rt = "rt", response = "response", version = "custom")
+  model$other_vars$resp_cats <- c("correct", "wrong")
+  dat2 <- check_data(model, dat, bmf(correct ~ 1))
+  expect_equal(dat2$.lba_cat[1], 1L)
+  expect_equal(dat2$.lba_cat[2], 2L)
+})
+
+test_that("check_data.lba_custom errors on missing formula category", {
+  dat <- data.frame(rt = c(0.5, 0.6), response = c("correct", "unknown"))
+  model <- lba(rt = "rt", response = "response", version = "custom")
+  model$other_vars$resp_cats <- c("correct", "wrong")
+  expect_error(check_data(model, dat, bmf(correct ~ 1)))
+})
+
+
+# -----------------------------------------------------------------------------
+# check_model tests — custom version
+# -----------------------------------------------------------------------------
+
+test_that("check_model.lba_custom discovers category params from formula", {
+  model <- lba(rt = "rt", response = "response", version = "custom")
+  formula <- bmf(fast ~ 1, slow ~ 1, B ~ 1, A ~ 1, ndt ~ 1)
+  model <- check_model(model, data = NULL, formula = formula)
+
+  expect_equal(model$other_vars$resp_cats, c("fast", "slow"))
+  expect_true("fast" %in% names(model$parameters))
+  expect_true("slow" %in% names(model$parameters))
+})
+
+test_that("check_model.lba_custom errors on Stan reserved words", {
+  model <- lba(rt = "rt", response = "response", version = "custom")
+  formula <- bmf(void ~ 1, B ~ 1, A ~ 1, ndt ~ 1)
+  expect_error(check_model(model, data = NULL, formula = formula))
+})
+
+
+# -----------------------------------------------------------------------------
+# Formula conversion tests
+# -----------------------------------------------------------------------------
+
+test_that("bmf2bf.lba_simple creates correct formula", {
+  model <- lba(rt = "rt", response = "response", n_alternatives = 2)
+  bf <- bmf2bf(model, bmf(driftc ~ 1))
+  expect_true(grepl("vint\\(.lba_cat, .lba_n1, .lba_n2\\)", deparse(bf$formula)))
+})
+
+test_that("bmf2bf.lba_custom creates correct formula", {
+  model <- lba(rt = "rt", response = "response", version = "custom")
+  model$other_vars$resp_cats <- c("a", "b", "c")
+  bf <- bmf2bf(model, bmf(a ~ 1))
+  expect_true(grepl("vint\\(.lba_cat, .lba_n1, .lba_n2, .lba_n3\\)",
+                    deparse(bf$formula)))
+})
+
+
+# -----------------------------------------------------------------------------
+# Stan code generation tests
+# -----------------------------------------------------------------------------
+
+test_that("Stan code for normal LBA contains expected elements", {
+  code <- bmm:::.lba_stan_code("lba_normal_simple", c("driftc", "drifte"), "normal")
+  code <- gsub("\\bK\\b", "2", code)
+  expect_true(grepl("Phi", code))
+  expect_true(grepl("std_normal_lpdf", code))
+  expect_true(grepl("b = A \\+ B", code))
+})
+
+test_that("Stan code for gamma LBA contains expected elements", {
+  code <- bmm:::.lba_stan_code("lba_gamma_simple", c("driftc", "drifte"), "gamma")
+  code <- gsub("\\bK\\b", "2", code)
+  expect_true(grepl("gamma_cdf", code))
+  expect_true(grepl("gamma_lpdf", code))
+})
+
+test_that("Stan code for lognormal LBA contains expected elements", {
+  code <- bmm:::.lba_stan_code("lba_lognormal_simple", c("driftc", "drifte"), "lognormal")
+  code <- gsub("\\bK\\b", "2", code)
+  expect_true(grepl("lognormal_cdf", code))
+})
+
+test_that("Stan code for frechet LBA contains expected elements", {
+  code <- bmm:::.lba_stan_code("lba_frechet_simple", c("driftc", "drifte"), "frechet")
+  code <- gsub("\\bK\\b", "2", code)
+  expect_true(grepl("n_quad", code))
+})
+
+
+# -----------------------------------------------------------------------------
+# Mock integration tests
+# -----------------------------------------------------------------------------
+
+test_that("lba normal simple version runs with mock backend (2-choice)", {
+  dat <- rlba(n = 100, drift = c(3, 1.5), B = 0.5, A = 0.5, ndt = 0.2)
+  model <- lba(rt = "rt", response = "response", n_alternatives = 2)
+  formula <- bmf(driftc ~ 1, drifte ~ 1, B ~ 1, A ~ 1, ndt ~ 1)
+  expect_silent(
+    bmm(formula, dat, model, backend = "mock", mock_fit = 1, rename = FALSE)
+  )
+})
+
+test_that("lba normal simple version runs with mock backend (4-choice)", {
+  dat <- rlba(n = 100, drift = c(3, 1.5, 1, 0.8), B = 0.5, A = 0.5, ndt = 0.2)
+  model <- lba(rt = "rt", response = "response", n_alternatives = 4)
+  formula <- bmf(driftc ~ 1, drifte ~ 1, B ~ 1, A ~ 1, ndt ~ 1)
+  expect_silent(
+    bmm(formula, dat, model, backend = "mock", mock_fit = 1, rename = FALSE)
+  )
+})
+
+test_that("lba gamma simple version runs with mock backend", {
+  dat <- rlba(n = 100, drift = c(2, 3), B = 0.5, A = 0.5, ndt = 0.2,
+              distribution = "gamma")
+  model <- lba(rt = "rt", response = "response", n_alternatives = 2,
+               distribution = "gamma")
+  formula <- bmf(driftc ~ 1, drifte ~ 1, B ~ 1, A ~ 1, ndt ~ 1)
+  expect_silent(
+    bmm(formula, dat, model, backend = "mock", mock_fit = 1, rename = FALSE)
+  )
+})
+
+test_that("lba lognormal simple version runs with mock backend", {
+  dat <- rlba(n = 100, drift = c(0.5, 0.3), B = 0.5, A = 0.5, ndt = 0.2,
+              distribution = "lognormal")
+  model <- lba(rt = "rt", response = "response", n_alternatives = 2,
+               distribution = "lognormal")
+  formula <- bmf(driftc ~ 1, drifte ~ 1, B ~ 1, A ~ 1, ndt ~ 1)
+  expect_silent(
+    bmm(formula, dat, model, backend = "mock", mock_fit = 1, rename = FALSE)
+  )
+})
+
+test_that("lba frechet simple version runs with mock backend", {
+  dat <- rlba(n = 100, drift = c(2, 3), B = 0.5, A = 0.5, ndt = 0.2,
+              distribution = "frechet")
+  model <- lba(rt = "rt", response = "response", n_alternatives = 2,
+               distribution = "frechet")
+  formula <- bmf(driftc ~ 1, drifte ~ 1, B ~ 1, A ~ 1, ndt ~ 1)
+  expect_silent(
+    bmm(formula, dat, model, backend = "mock", mock_fit = 1, rename = FALSE)
+  )
+})
+
+test_that("lba custom version runs with mock backend", {
+  dat <- rlba(n = 100, drift = c(3, 1.5), B = 0.5, A = 0.5, ndt = 0.2)
+  dat$response <- ifelse(dat$response == 1, "correct", "wrong")
+  model <- lba(rt = "rt", response = "response", version = "custom")
+  formula <- bmf(correct ~ 1, wrong ~ 1, B ~ 1, A ~ 1, ndt ~ 1)
+  expect_silent(
+    bmm(formula, dat, model, backend = "mock", mock_fit = 1, rename = FALSE)
+  )
+})
+
+test_that("lba simple with predictor runs with mock backend", {
+  dat <- rlba(n = 200, drift = c(3, 1.5), B = 0.5, A = 0.5, ndt = 0.2)
+  dat$cond <- rep(c("a", "b"), each = 100)
+  model <- lba(rt = "rt", response = "response", n_alternatives = 2)
+  formula <- bmf(driftc ~ cond, drifte ~ 1, B ~ 1, A ~ 1, ndt ~ 1)
+  expect_silent(
+    bmm(formula, dat, model, backend = "mock", mock_fit = 1, rename = FALSE)
+  )
+})
+
+
+# -----------------------------------------------------------------------------
+# Distribution function tests
+# -----------------------------------------------------------------------------
+
+test_that("dlba returns positive densities for valid inputs", {
+  d <- dlba(c(0.5, 0.6), c(1, 2), drift = c(3, 1.5),
+            B = 0.5, A = 0.5, ndt = 0.2)
+  expect_true(all(d > 0))
+})
+
+test_that("rlba returns valid data.frame", {
+  dat <- rlba(100, drift = c(3, 1.5), B = 0.5, A = 0.5, ndt = 0.2)
+  expect_s3_class(dat, "data.frame")
+  expect_true(all(c("rt", "response") %in% names(dat)))
+  expect_true(all(dat$rt > 0.2))
+  expect_true(all(dat$response %in% 1:2))
+})
+
+test_that("plba is monotonically increasing", {
+  rts <- seq(0.3, 1, by = 0.1)
+  p <- plba(rts, drift = c(3, 1.5), B = 0.5, A = 0.5, ndt = 0.2)
+  expect_true(all(diff(p) >= 0))
+})
+
+test_that("dlba matches rtdists for normal distribution", {
+  skip_if_not_installed("rtdists")
+  set.seed(42)
+  ref <- rtdists::rLBA(5, A = 0.5, b = 1, t0 = 0.3,
+                       mean_v = c(3, 1.5), sd_v = c(1, 1),
+                       distribution = "norm")
+  bmm_d <- dlba(ref$rt, ref$response, drift = c(3, 1.5),
+                B = 0.5, A = 0.5, ndt = 0.3, distribution = "normal")
+  rtd_d <- rtdists::dLBA(ref$rt, ref$response, A = 0.5, b = 1, t0 = 0.3,
+                         mean_v = c(3, 1.5), sd_v = c(1, 1),
+                         distribution = "norm", silent = TRUE,
+                         args.dist = list(posdrift = FALSE))
+  expect_equal(bmm_d, rtd_d, tolerance = 1e-10)
+})
+
+test_that("dlba matches rtdists for gamma distribution", {
+  skip_if_not_installed("rtdists")
+  set.seed(42)
+  ref <- rtdists::rLBA(5, A = 0.5, b = 1, t0 = 0.3,
+                       shape_v = c(2, 3), rate_v = c(1, 1),
+                       distribution = "gamma")
+  bmm_d <- dlba(ref$rt, ref$response, drift = c(2, 3),
+                B = 0.5, A = 0.5, ndt = 0.3, s = 1,
+                distribution = "gamma")
+  rtd_d <- rtdists::dLBA(ref$rt, ref$response, A = 0.5, b = 1, t0 = 0.3,
+                         shape_v = c(2, 3), rate_v = c(1, 1),
+                         distribution = "gamma", silent = TRUE)
+  expect_equal(bmm_d, rtd_d, tolerance = 1e-10)
+})
+
+test_that("dlba matches rtdists for lognormal distribution", {
+  skip_if_not_installed("rtdists")
+  set.seed(42)
+  ref <- rtdists::rLBA(5, A = 0.5, b = 1, t0 = 0.3,
+                       meanlog_v = c(0.5, 0.3), sdlog_v = c(1, 1),
+                       distribution = "lnorm")
+  bmm_d <- dlba(ref$rt, ref$response, drift = c(0.5, 0.3),
+                B = 0.5, A = 0.5, ndt = 0.3, s = 1,
+                distribution = "lognormal")
+  rtd_d <- rtdists::dLBA(ref$rt, ref$response, A = 0.5, b = 1, t0 = 0.3,
+                         meanlog_v = c(0.5, 0.3), sdlog_v = c(1, 1),
+                         distribution = "lnorm", silent = TRUE)
+  expect_equal(bmm_d, rtd_d, tolerance = 1e-10)
+})
+
+test_that("validate_lba_parameters catches invalid inputs", {
+  expect_error(dlba(0.5, 1, drift = c(3, 1.5), B = -1, A = 0.5, ndt = 0.2))
+  expect_error(dlba(0.5, 1, drift = c(3, 1.5), B = 0.5, A = -1, ndt = 0.2))
+  expect_error(dlba(0.5, 1, drift = c(3, 1.5), B = 0.5, A = 0.5, ndt = -1))
+  expect_error(dlba(0.5, 1, drift = c(3, 1.5), B = 0.5, A = 0.5, ndt = 0.2,
+                    s = 0))
+})

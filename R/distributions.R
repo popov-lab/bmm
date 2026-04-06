@@ -1929,3 +1929,364 @@ neg_loglik <- function(x, params, distribution, weights = NULL) {
     loglik = if (converged) loglik else NA
   )
 }
+
+
+############################################################################# !
+# LBA Distribution Functions                                             ####
+############################################################################# !
+
+#' @title LBA Distribution
+#' @name lba_dist
+#'
+#' @description Density, distribution function, quantile function, and random
+#'   generation for the Linear Ballistic Accumulator (LBA) model with multiple
+#'   drift rate distributions.
+#'
+#' @param rt Numeric vector of response times in seconds.
+#' @param n Integer. Number of samples to generate.
+#' @param response Integer vector indicating the winning accumulator
+#'   (1, 2, ..., K).
+#' @param drift Numeric vector of drift rate parameters (one per accumulator).
+#'   Interpretation depends on `distribution`: mean drift for `"normal"`, shape
+#'   for `"gamma"` and `"frechet"`, meanlog for `"lognormal"`.
+#' @param B Numeric. Threshold gap (> 0). The effective threshold is
+#'   `b = A + B`, guaranteeing `b > A`.
+#' @param A Numeric. Maximum starting point for the uniform starting point
+#'   distribution on `[0, A]`. Must be >= 0.
+#' @param ndt Numeric. Non-decision time in seconds (>= 0).
+#' @param s Numeric. Scale parameter (> 0, default = 1). Interpretation depends
+#'   on `distribution`: drift SD for `"normal"`, rate for `"gamma"`, scale for
+#'   `"frechet"`, sdlog for `"lognormal"`. Typically fixed to 1 for
+#'   identifiability.
+#' @param distribution Character. The drift rate distribution. One of
+#'   `"normal"` (default), `"gamma"`, `"frechet"`, or `"lognormal"`.
+#' @param log Logical. If `TRUE`, return log-densities. Default `FALSE`.
+#' @param q Numeric vector of quantiles (response times).
+#' @param p Numeric vector of probabilities.
+#' @param lower.tail Logical. If `TRUE` (default), probabilities are
+#'   `P(RT <= q)`.
+#' @param log.p Logical. If `TRUE`, probabilities are on the log scale.
+#'
+#' @return
+#'   - `dlba()` returns a numeric vector of (log-)densities.
+#'   - `rlba()` returns a data.frame with columns `rt` and `response`.
+#'   - `plba()` returns a numeric vector of (log-)probabilities.
+#'   - `qlba()` returns a numeric vector of quantiles (response times).
+#'
+#' @references Brown, S. D., & Heathcote, A. (2008). The simplest complete
+#'   model of choice response time: Linear ballistic accumulation. *Cognitive
+#'   Psychology*, 57(3), 153-178.
+#'
+#' @examples
+#' dat <- rlba(n = 1000, drift = c(3, 1.5), B = 0.5, A = 0.5, ndt = 0.3)
+#' head(dat)
+#' dlba(dat$rt[1:5], dat$response[1:5], drift = c(3, 1.5),
+#'      B = 0.5, A = 0.5, ndt = 0.3)
+#'
+#' @export
+dlba <- function(rt, response, drift, B, A, ndt, s = 1,
+                 distribution = c("normal", "gamma", "frechet", "lognormal"),
+                 log = FALSE) {
+  distribution <- match.arg(distribution)
+  validate_lba_parameters(drift, B, A, ndt, s, distribution)
+  .dlba(rt, response, drift, B, A, ndt, s, distribution, log)
+}
+
+#' @rdname lba_dist
+#' @export
+rlba <- function(n, drift, B, A, ndt, s = 1,
+                 distribution = c("normal", "gamma", "frechet", "lognormal")) {
+  distribution <- match.arg(distribution)
+  validate_lba_parameters(drift, B, A, ndt, s, distribution)
+  .rlba(n, drift, B, A, ndt, s, distribution)
+}
+
+#' @rdname lba_dist
+#' @export
+plba <- function(q, drift, B, A, ndt, s = 1,
+                 distribution = c("normal", "gamma", "frechet", "lognormal"),
+                 lower.tail = TRUE, log.p = FALSE) {
+  distribution <- match.arg(distribution)
+  validate_lba_parameters(drift, B, A, ndt, s, distribution)
+  K <- length(drift)
+  t <- q - ndt
+  b <- A + B
+
+  p_total <- numeric(length(q))
+  for (i in seq_along(q)) {
+    if (t[i] <= 0) {
+      p_total[i] <- 0
+      next
+    }
+    survs <- vapply(seq_len(K), function(j) {
+      1 - .plba_single(t[i], drift[j], b, A, s, distribution)
+    }, numeric(1))
+    p_total[i] <- 1 - prod(survs)
+  }
+
+  if (!lower.tail) p_total <- 1 - p_total
+  if (log.p) p_total <- log(p_total)
+  p_total
+}
+
+#' @rdname lba_dist
+#' @export
+qlba <- function(p, drift, B, A, ndt, s = 1,
+                 distribution = c("normal", "gamma", "frechet", "lognormal"),
+                 lower.tail = TRUE, log.p = FALSE) {
+  distribution <- match.arg(distribution)
+  validate_lba_parameters(drift, B, A, ndt, s, distribution)
+
+  if (log.p) p <- exp(p)
+  if (!lower.tail) p <- 1 - p
+
+  vapply(p, function(pi) {
+    stats::uniroot(
+      function(q) {
+        plba(q, drift = drift, B = B, A = A, ndt = ndt, s = s,
+             distribution = distribution) - pi
+      },
+      interval = c(ndt + 1e-6, ndt + 20),
+      extendInt = "upX",
+      tol = 1e-8
+    )$root
+  }, numeric(1))
+}
+
+
+.dlba <- function(rt, response, drift, B, A, ndt, s, distribution, log) {
+  K <- length(drift)
+  b <- A + B
+
+  out <- vapply(seq_along(rt), function(i) {
+    t <- rt[i] - ndt
+    if (t <= 0) return(-Inf)
+
+    resp <- response[i]
+    log_pdf <- .dlba_single(t, drift[resp], b, A, s, distribution, log = TRUE)
+    if (!is.finite(log_pdf)) return(-Inf)
+
+    log_lik <- log_pdf
+    for (j in seq_len(K)) {
+      if (j == resp) next
+      cdf_j <- .plba_single(t, drift[j], b, A, s, distribution)
+      surv_j <- 1 - cdf_j
+      if (surv_j <= 0) return(-Inf)
+      log_lik <- log_lik + log(surv_j)
+    }
+    log_lik
+  }, numeric(1))
+
+  if (log) out else exp(out)
+}
+
+.rlba <- function(n, drift, B, A, ndt, s, distribution) {
+  K <- length(drift)
+  b <- A + B
+
+  ft <- matrix(NA_real_, nrow = n, ncol = K)
+  for (j in seq_len(K)) {
+    sp <- stats::runif(n, min = 0, max = A)
+    d <- switch(distribution,
+      normal = stats::rnorm(n, mean = drift[j], sd = s),
+      gamma = stats::rgamma(n, shape = drift[j], rate = s),
+      frechet = .rfrechet(n, shape = drift[j], scale = s),
+      lognormal = stats::rlnorm(n, meanlog = drift[j], sdlog = s)
+    )
+    ft[, j] <- ifelse(d > 0, (b - sp) / d, Inf)
+  }
+
+  winner <- apply(ft, 1, which.min)
+  data.frame(
+    rt = apply(ft, 1, min) + ndt,
+    response = winner
+  )
+}
+
+
+.dlba_single <- function(t, v, b, A, s, distribution, log = FALSE) {
+  pdf_val <- switch(distribution,
+    normal = .dlba_normal_single(t, v, b, A, s),
+    gamma = .dlba_gamma_single(t, v, b, A, s),
+    frechet = .dlba_frechet_single(t, v, b, A, s),
+    lognormal = .dlba_lognormal_single(t, v, b, A, s)
+  )
+  pdf_val <- pmax(pdf_val, 0)
+  if (log) log(pdf_val) else pdf_val
+}
+
+.plba_single <- function(t, v, b, A, s, distribution) {
+  cdf_val <- switch(distribution,
+    normal = .plba_normal_single(t, v, b, A, s),
+    gamma = .plba_gamma_single(t, v, b, A, s),
+    frechet = .plba_frechet_single(t, v, b, A, s),
+    lognormal = .plba_lognormal_single(t, v, b, A, s)
+  )
+  pmin(pmax(cdf_val, 0), 1)
+}
+
+
+# --- General LBA single-accumulator formulas ---
+#
+# The LBA finishing time T = (b - k) / d, where k ~ Uniform(0, A) and
+# d ~ F_drift(params). The general CDF and PDF are:
+#
+#   CDF(t) = 1 + (1/A) * [t*M(t) - b*F(b/t) + (b-A)*F((b-A)/t)]
+#   PDF(t) = M(t) / A
+#
+# where M(t) = integral from (b-A)/t to b/t of u * f_drift(u) du
+#            = E[d * I((b-A)/t < d < b/t)]
+#
+# For A ~ 0:  CDF(t) = 1 - F(b/t),  PDF(t) = (b/t^2) * f(b/t)
+
+
+.dlba_normal_single <- function(t, v, b, A, s) {
+  if (A < 1e-10) {
+    (b / (t^2 * s)) * stats::dnorm((b / t - v) / s)
+  } else {
+    z1 <- (b - A - t * v) / (t * s)
+    z2 <- (b - t * v) / (t * s)
+    (1 / A) * (
+      -v * stats::pnorm(z1) + s * stats::dnorm(z1) +
+       v * stats::pnorm(z2) - s * stats::dnorm(z2)
+    )
+  }
+}
+
+.plba_normal_single <- function(t, v, b, A, s) {
+  if (A < 1e-10) {
+    stats::pnorm((v * t - b) / (s * t))
+  } else {
+    z1 <- (b - A - t * v) / (t * s)
+    z2 <- (b - t * v) / (t * s)
+    1 + (1 / A) * (
+      (b - A - t * v) * stats::pnorm(z1) + t * s * stats::dnorm(z1) -
+      (b - t * v) * stats::pnorm(z2) - t * s * stats::dnorm(z2)
+    )
+  }
+}
+
+
+.dlba_gamma_single <- function(t, shape, b, A, rate) {
+  if (A < 1e-10) {
+    (b / t^2) * stats::dgamma(b / t, shape = shape, rate = rate)
+  } else {
+    upper <- b / t
+    lower <- (b - A) / t
+    (shape / (rate * A)) * (
+      stats::pgamma(upper, shape = shape + 1, rate = rate) -
+      stats::pgamma(lower, shape = shape + 1, rate = rate)
+    )
+  }
+}
+
+.plba_gamma_single <- function(t, shape, b, A, rate) {
+  if (A < 1e-10) {
+    stats::pgamma(b / t, shape = shape, rate = rate, lower.tail = FALSE)
+  } else {
+    upper <- b / t
+    lower <- (b - A) / t
+    M_t <- (shape / rate) * (
+      stats::pgamma(upper, shape = shape + 1, rate = rate) -
+      stats::pgamma(lower, shape = shape + 1, rate = rate)
+    )
+    1 + (1 / A) * (
+      t * M_t -
+      b * stats::pgamma(upper, shape = shape, rate = rate) +
+      (b - A) * stats::pgamma(lower, shape = shape, rate = rate)
+    )
+  }
+}
+
+
+.rfrechet <- function(n, shape, scale) {
+  scale * (-log(stats::runif(n)))^(-1 / shape)
+}
+
+.dfrechet <- function(x, shape, scale) {
+  z <- x / scale
+  (shape / scale) * z^(-(1 + shape)) * exp(-z^(-shape))
+}
+
+.pfrechet <- function(x, shape, scale) {
+  exp(-(x / scale)^(-shape))
+}
+
+.dlba_frechet_single <- function(t, shape, b, A, scale) {
+  if (A < 1e-10) {
+    (b / t^2) * .dfrechet(b / t, shape, scale)
+  } else {
+    lower <- (b - A) / t
+    upper <- b / t
+    M_t <- stats::integrate(
+      function(u) u * .dfrechet(u, shape, scale),
+      lower = lower, upper = upper
+    )$value
+    M_t / A
+  }
+}
+
+.plba_frechet_single <- function(t, shape, b, A, scale) {
+  if (A < 1e-10) {
+    1 - .pfrechet(b / t, shape, scale)
+  } else {
+    lower <- (b - A) / t
+    upper <- b / t
+    M_t <- stats::integrate(
+      function(u) u * .dfrechet(u, shape, scale),
+      lower = lower, upper = upper
+    )$value
+    1 + (1 / A) * (
+      t * M_t -
+      b * .pfrechet(upper, shape, scale) +
+      (b - A) * .pfrechet(lower, shape, scale)
+    )
+  }
+}
+
+
+.dlba_lognormal_single <- function(t, meanlog, b, A, sdlog) {
+  if (A < 1e-10) {
+    (b / t^2) * stats::dlnorm(b / t, meanlog = meanlog, sdlog = sdlog)
+  } else {
+    upper <- b / t
+    lower <- (b - A) / t
+    mu_s2 <- exp(meanlog + sdlog^2 / 2)
+    M_t <- mu_s2 * (
+      stats::pnorm((log(upper) - meanlog - sdlog^2) / sdlog) -
+      stats::pnorm((log(lower) - meanlog - sdlog^2) / sdlog)
+    )
+    M_t / A
+  }
+}
+
+.plba_lognormal_single <- function(t, meanlog, b, A, sdlog) {
+  if (A < 1e-10) {
+    stats::plnorm(b / t, meanlog = meanlog, sdlog = sdlog, lower.tail = FALSE)
+  } else {
+    upper <- b / t
+    lower <- (b - A) / t
+    mu_s2 <- exp(meanlog + sdlog^2 / 2)
+    M_t <- mu_s2 * (
+      stats::pnorm((log(upper) - meanlog - sdlog^2) / sdlog) -
+      stats::pnorm((log(lower) - meanlog - sdlog^2) / sdlog)
+    )
+    1 + (1 / A) * (
+      t * M_t -
+      b * stats::plnorm(upper, meanlog = meanlog, sdlog = sdlog) +
+      (b - A) * stats::plnorm(lower, meanlog = meanlog, sdlog = sdlog)
+    )
+  }
+}
+
+
+validate_lba_parameters <- function(drift, B, A, ndt, s, distribution) {
+  stopif(any(B <= 0), "B (threshold gap) must be positive.")
+  stopif(any(A < 0), "A (starting point variability) must be non-negative.")
+  stopif(any(ndt < 0), "ndt (non-decision time) must be non-negative.")
+  stopif(any(s <= 0), "s (scale parameter) must be positive.")
+  if (distribution %in% c("gamma", "frechet", "lognormal")) {
+    stopif(any(drift <= 0),
+           "drift must be positive for distribution '{distribution}'.")
+  }
+}
