@@ -23,7 +23,7 @@ test_that("lba() creates simple model with correct structure", {
 test_that("lba simple version has correct parameters", {
   model <- lba(rt = "rt", response = "response", n_alternatives = 4)
 
-  expect_true(all(c("driftc", "drifte", "B", "A", "ndt", "s") %in%
+  expect_true(all(c("driftc", "drifte", "bound", "sp", "ndt", "s") %in%
                     names(model$parameters)))
   expect_equal(model$other_vars$n_alternatives, 4L)
 })
@@ -32,10 +32,16 @@ test_that("lba gamma distribution uses consistent drift parameter names", {
   model <- lba(rt = "rt", response = "response", n_alternatives = 2,
                distribution = "gamma")
 
-  expect_true(all(c("driftc", "drifte", "B", "A", "ndt", "s") %in%
+  expect_true(all(c("driftc", "drifte", "bound", "sp", "ndt", "s") %in%
                     names(model$parameters)))
   expect_equal(model$distribution, "gamma")
   expect_equal(model$links$driftc, "log")
+})
+
+test_that("lba has correct link functions for bound and sp", {
+  model <- lba(rt = "rt", response = "response", n_alternatives = 2)
+  expect_equal(model$links$bound, "log")
+  expect_equal(model$links$sp, "logit")
 })
 
 test_that("lba accepts custom links", {
@@ -155,7 +161,7 @@ test_that("check_data.lba_custom errors on missing formula category", {
 
 test_that("check_model.lba_custom discovers category params from formula", {
   model <- lba(rt = "rt", response = "response", version = "custom")
-  formula <- bmf(fast ~ 1, slow ~ 1, B ~ 1, A ~ 1, ndt ~ 1)
+  formula <- bmf(fast ~ 1, slow ~ 1, bound ~ 1, sp ~ 1, ndt ~ 1)
   model <- check_model(model, data = NULL, formula = formula)
 
   expect_equal(model$other_vars$resp_cats, c("fast", "slow"))
@@ -165,7 +171,7 @@ test_that("check_model.lba_custom discovers category params from formula", {
 
 test_that("check_model.lba_custom errors on Stan reserved words", {
   model <- lba(rt = "rt", response = "response", version = "custom")
-  formula <- bmf(void ~ 1, B ~ 1, A ~ 1, ndt ~ 1)
+  formula <- bmf(void ~ 1, bound ~ 1, sp ~ 1, ndt ~ 1)
   expect_error(check_model(model, data = NULL, formula = formula))
 })
 
@@ -198,7 +204,8 @@ test_that("Stan code for normal LBA contains expected elements", {
   expect_true(grepl("lba_normal_single_lpdf", code))
   expect_true(grepl("lba_normal_single_lccdf", code))
   expect_true(grepl("inv_logit", code))
-  expect_true(grepl("b = A \\+ B", code))
+  expect_true(grepl("real b = bound", code))
+  expect_true(grepl("real A = sp \\* bound", code))
 })
 
 test_that("Stan code for gamma LBA contains expected elements", {
@@ -228,7 +235,7 @@ test_that("Stan code for frechet LBA contains expected elements", {
 test_that("lba normal simple version runs with mock backend (2-choice)", {
   dat <- rlba(n = 100, drift = c(3, 1.5), B = 0.5, A = 0.5, ndt = 0.2)
   model <- lba(rt = "rt", response = "response", n_alternatives = 2)
-  formula <- bmf(driftc ~ 1, drifte ~ 1, B ~ 1, A ~ 1, ndt ~ 1)
+  formula <- bmf(driftc ~ 1, drifte ~ 1, bound ~ 1, sp ~ 1, ndt ~ 1)
   expect_silent(
     bmm(formula, dat, model, backend = "mock", mock_fit = 1, rename = FALSE)
   )
@@ -237,7 +244,7 @@ test_that("lba normal simple version runs with mock backend (2-choice)", {
 test_that("lba normal simple version runs with mock backend (4-choice)", {
   dat <- rlba(n = 100, drift = c(3, 1.5, 1, 0.8), B = 0.5, A = 0.5, ndt = 0.2)
   model <- lba(rt = "rt", response = "response", n_alternatives = 4)
-  formula <- bmf(driftc ~ 1, drifte ~ 1, B ~ 1, A ~ 1, ndt ~ 1)
+  formula <- bmf(driftc ~ 1, drifte ~ 1, bound ~ 1, sp ~ 1, ndt ~ 1)
   expect_silent(
     bmm(formula, dat, model, backend = "mock", mock_fit = 1, rename = FALSE)
   )
@@ -248,7 +255,7 @@ test_that("lba gamma simple version runs with mock backend", {
               distribution = "gamma")
   model <- lba(rt = "rt", response = "response", n_alternatives = 2,
                distribution = "gamma")
-  formula <- bmf(driftc ~ 1, drifte ~ 1, B ~ 1, A ~ 1, ndt ~ 1)
+  formula <- bmf(driftc ~ 1, drifte ~ 1, bound ~ 1, sp ~ 1, ndt ~ 1)
   expect_silent(
     bmm(formula, dat, model, backend = "mock", mock_fit = 1, rename = FALSE)
   )
@@ -259,7 +266,7 @@ test_that("lba lognormal simple version runs with mock backend", {
               distribution = "lognormal")
   model <- lba(rt = "rt", response = "response", n_alternatives = 2,
                distribution = "lognormal")
-  formula <- bmf(driftc ~ 1, drifte ~ 1, B ~ 1, A ~ 1, ndt ~ 1)
+  formula <- bmf(driftc ~ 1, drifte ~ 1, bound ~ 1, sp ~ 1, ndt ~ 1)
   expect_silent(
     bmm(formula, dat, model, backend = "mock", mock_fit = 1, rename = FALSE)
   )
@@ -270,7 +277,7 @@ test_that("lba frechet simple version runs with mock backend", {
               distribution = "frechet")
   model <- lba(rt = "rt", response = "response", n_alternatives = 2,
                distribution = "frechet")
-  formula <- bmf(driftc ~ 1, drifte ~ 1, B ~ 1, A ~ 1, ndt ~ 1)
+  formula <- bmf(driftc ~ 1, drifte ~ 1, bound ~ 1, sp ~ 1, ndt ~ 1)
   expect_silent(
     bmm(formula, dat, model, backend = "mock", mock_fit = 1, rename = FALSE)
   )
@@ -280,7 +287,7 @@ test_that("lba custom version runs with mock backend", {
   dat <- rlba(n = 100, drift = c(3, 1.5), B = 0.5, A = 0.5, ndt = 0.2)
   dat$response <- ifelse(dat$response == 1, "correct", "wrong")
   model <- lba(rt = "rt", response = "response", version = "custom")
-  formula <- bmf(correct ~ 1, wrong ~ 1, B ~ 1, A ~ 1, ndt ~ 1)
+  formula <- bmf(correct ~ 1, wrong ~ 1, bound ~ 1, sp ~ 1, ndt ~ 1)
   expect_silent(
     bmm(formula, dat, model, backend = "mock", mock_fit = 1, rename = FALSE)
   )
@@ -290,15 +297,17 @@ test_that("lba simple with predictor runs with mock backend", {
   dat <- rlba(n = 200, drift = c(3, 1.5), B = 0.5, A = 0.5, ndt = 0.2)
   dat$cond <- rep(c("a", "b"), each = 100)
   model <- lba(rt = "rt", response = "response", n_alternatives = 2)
-  formula <- bmf(driftc ~ cond, drifte ~ 1, B ~ 1, A ~ 1, ndt ~ 1)
-  expect_silent(
-    bmm(formula, dat, model, backend = "mock", mock_fit = 1, rename = FALSE)
+  formula <- bmf(driftc ~ cond, drifte ~ 1, bound ~ 1, sp ~ 1, ndt ~ 1)
+  expect_no_error(
+    suppressWarnings(
+      bmm(formula, dat, model, backend = "mock", mock_fit = 1, rename = FALSE)
+    )
   )
 })
 
 
 # -----------------------------------------------------------------------------
-# Distribution function tests
+# Distribution function tests (dlba/rlba/plba keep B+A interface)
 # -----------------------------------------------------------------------------
 
 test_that("dlba returns positive densities for valid inputs", {

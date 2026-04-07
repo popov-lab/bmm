@@ -42,26 +42,26 @@
 )
 
 .lba_shared_priors <- list(
-  B = list(main = "normal(-0.5, 0.5)", effects = "normal(0, 0.3)"),
-  A = list(main = "normal(-1, 0.5)", effects = "normal(0, 0.3)"),
+  bound = list(main = "normal(0, 0.5)", effects = "normal(0, 0.3)"),
+  sp = list(main = "normal(-1, 1)", effects = "normal(0, 0.5)"),
   ndt = list(main = "normal(-2, 0.3)", effects = "normal(0, 0.3)"),
   s = list(main = "normal(0, 0.3)", effects = "normal(0, 0.2)")
 )
 
 .lba_shared_inits <- list(
-  mu = c(-0.5, 0.5), B = c(0.3, 0.8), A = c(0.2, 0.5),
+  mu = c(-0.5, 0.5), bound = c(0.5, 1.5), sp = c(0.15, 0.45),
   ndt = c(0.025, 0.05), s = c(0.8, 1.2)
 )
 
 .build_lba_version <- function(dist) {
   spec <- .lba_dist_specs[[dist]]
   shared_params <- list(
-    B = "threshold gap (b = A + B)",
-    A = "maximum starting point (uniform on 0 to A)",
+    bound = "decision threshold",
+    sp = "starting point proportion (A/bound, on logit scale)",
     ndt = "non-decision time",
     s = spec$s_desc
   )
-  shared_links <- list(B = "log", A = "log", ndt = "log", s = "log")
+  shared_links <- list(bound = "log", sp = "logit", ndt = "log", s = "log")
 
   simple_params <- c(
     list(
@@ -215,7 +215,7 @@
 #' # simple version with 2 alternatives
 #' dat <- rlba(n = 500, drift = c(3, 1.5), B = 0.5, A = 0.5, ndt = 0.2)
 #' model <- lba(rt = "rt", response = "response", n_alternatives = 2)
-#' formula <- bmf(driftc ~ 1, drifte ~ 1, B ~ 1, A ~ 1, ndt ~ 1)
+#' formula <- bmf(driftc ~ 1, drifte ~ 1, bound ~ 1, sp ~ 1, ndt ~ 1)
 #' fit <- bmm(formula, dat, model, cores = 4, backend = "cmdstanr")
 lba <- function(rt, response, n_alternatives = NULL,
                 version = c("simple", "custom"),
@@ -251,7 +251,7 @@ lba <- function(rt, response, n_alternatives = NULL,
 #' @export
 check_model.lba_custom <- function(model, data = NULL, formula = NULL) {
   if (!is.null(formula)) {
-    cat_pars <- setdiff(names(formula), c("B", "A", "ndt", "s"))
+    cat_pars <- setdiff(names(formula), c("bound", "sp", "ndt", "s"))
 
     stopif(
       length(cat_pars) == 0,
@@ -477,8 +477,9 @@ bmf2bf.lba_custom <- function(model, formula) {
 
   main_fn <- glue(
     "real {family_name}_lpdf(real rt, real mu, {cat_args}, ",
-    "real B, real A, real ndt, real s, int response, {n_args}) {{\n",
-    "  real b = A + B;\n",
+    "real bound, real sp, real ndt, real s, int response, {n_args}) {{\n",
+    "  real b = bound;\n",
+    "  real A = sp * bound;\n",
     "  real t = rt - ndt;\n",
     "  if (t <= 0) return negative_infinity();\n",
     "  {drift_array}\n",
@@ -506,15 +507,15 @@ configure_model.lba_simple <- function(model, data, formula) {
   dist <- model$distribution
   cat_names <- setdiff(
     names(.lba_version_table[[dist]][["simple"]]$parameters),
-    c("B", "A", "ndt", "s")
+    c("bound", "sp", "ndt", "s")
   )
   formula <- bmf2bf(model, formula)
 
-  dpars <- c("mu", cat_names, "B", "A", "ndt", "s")
+  dpars <- c("mu", cat_names, "bound", "sp", "ndt", "s")
   link_vec <- c(
     "identity",
     vapply(cat_names, function(p) links[[p]], character(1)),
-    links$B, links$A, links$ndt,
+    links$bound, links$sp, links$ndt,
     if (is.null(links$s)) "log" else links$s
   )
 
@@ -547,11 +548,11 @@ configure_model.lba_custom <- function(model, data, formula) {
   n_cats <- length(cat_names)
   formula <- bmf2bf(model, formula)
 
-  dpars <- c("mu", cat_names, "B", "A", "ndt", "s")
+  dpars <- c("mu", cat_names, "bound", "sp", "ndt", "s")
   link_vec <- c(
     "identity",
     vapply(cat_names, function(p) links[[p]], character(1)),
-    links$B, links$A, links$ndt,
+    links$bound, links$sp, links$ndt,
     if (is.null(links$s)) "log" else links$s
   )
 
@@ -581,17 +582,17 @@ configure_model.lba_custom <- function(model, data, formula) {
 .lba_log_lik <- function(i, prep, cat_names, n_cats) {
   rt <- prep$data$Y[i]
   response <- prep$data$vint1[i]
-  B <- brms::get_dpar(prep, "B", i = i)
-  A <- brms::get_dpar(prep, "A", i = i)
+  bound <- brms::get_dpar(prep, "bound", i = i)
+  sp <- brms::get_dpar(prep, "sp", i = i)
   ndt <- brms::get_dpar(prep, "ndt", i = i)
   s <- brms::get_dpar(prep, "s", i = i)
 
-  # Determine distribution from family name
   dist <- .lba_dist_from_family(prep$family$name)
 
   t <- rt - ndt
   t[t <= 0] <- NA
-  b <- A + B
+  b <- bound
+  A <- sp * bound
 
   n_cat <- vapply(
     seq_len(n_cats),
@@ -622,8 +623,8 @@ configure_model.lba_custom <- function(model, data, formula) {
 }
 
 .lba_posterior_predict <- function(i, prep, cat_names, n_cats, ...) {
-  B <- brms::get_dpar(prep, "B", i = i)
-  A <- brms::get_dpar(prep, "A", i = i)
+  bound <- brms::get_dpar(prep, "bound", i = i)
+  sp <- brms::get_dpar(prep, "sp", i = i)
   ndt <- brms::get_dpar(prep, "ndt", i = i)
   s <- brms::get_dpar(prep, "s", i = i)
   dist <- .lba_dist_from_family(prep$family$name)
@@ -638,20 +639,21 @@ configure_model.lba_custom <- function(model, data, formula) {
 
   rt <- numeric(n_draws)
   for (d in seq_len(n_draws)) {
-    b <- A[d] + B[d]
+    b <- bound[d]
+    A <- sp[d] * bound[d]
     ft <- numeric(total_acc)
     idx <- 1
     for (j in seq_len(n_cats)) {
       drift_j <- brms::get_dpar(prep, cat_names[j], i = i)[d]
       for (k in seq_len(n_cat[j])) {
-        sp <- stats::runif(1, 0, A[d])
+        start <- stats::runif(1, 0, A)
         dv <- switch(dist,
           normal = stats::rnorm(1, drift_j, s[d]),
           gamma = stats::rgamma(1, shape = drift_j, rate = s[d]),
           frechet = .rfrechet(1, shape = drift_j, scale = s[d]),
           lognormal = stats::rlnorm(1, meanlog = drift_j, sdlog = s[d])
         )
-        ft[idx] <- if (dv > 0) (b - sp) / dv else Inf
+        ft[idx] <- if (dv > 0) (b - start) / dv else Inf
         idx <- idx + 1
       }
     }
@@ -668,8 +670,8 @@ configure_model.lba_custom <- function(model, data, formula) {
 
   epred <- matrix(NA_real_, nrow = n_draws, ncol = n_obs)
   for (i in seq_len(n_obs)) {
-    B <- brms::get_dpar(prep, "B", i = i)
-    A <- brms::get_dpar(prep, "A", i = i)
+    bound <- brms::get_dpar(prep, "bound", i = i)
+    sp_val <- brms::get_dpar(prep, "sp", i = i)
     ndt <- brms::get_dpar(prep, "ndt", i = i)
     s <- brms::get_dpar(prep, "s", i = i)
 
@@ -681,7 +683,8 @@ configure_model.lba_custom <- function(model, data, formula) {
     total_acc <- sum(n_cat)
 
     for (d in seq_len(n_draws)) {
-      b <- A[d] + B[d]
+      b <- bound[d]
+      A <- sp_val[d] * bound[d]
       min_rts <- numeric(n_sim)
       for (sim in seq_len(n_sim)) {
         ft <- numeric(total_acc)
@@ -689,14 +692,14 @@ configure_model.lba_custom <- function(model, data, formula) {
         for (j in seq_len(n_cats)) {
           drift_j <- brms::get_dpar(prep, cat_names[j], i = i)[d]
           for (k in seq_len(n_cat[j])) {
-            sp <- stats::runif(1, 0, A[d])
+            start <- stats::runif(1, 0, A)
             dv <- switch(dist,
               normal = stats::rnorm(1, drift_j, s[d]),
               gamma = stats::rgamma(1, shape = drift_j, rate = s[d]),
               frechet = .rfrechet(1, shape = drift_j, scale = s[d]),
               lognormal = stats::rlnorm(1, meanlog = drift_j, sdlog = s[d])
             )
-            ft[idx] <- if (dv > 0) (b - sp) / dv else Inf
+            ft[idx] <- if (dv > 0) (b - start) / dv else Inf
             idx <- idx + 1
           }
         }
@@ -713,40 +716,40 @@ configure_model.lba_custom <- function(model, data, formula) {
 }
 
 log_lik_lba_simple <- function(i, prep) {
-  cat_names <- setdiff(prep$family$dpars, c("mu", "B", "A", "ndt", "s"))
+  cat_names <- setdiff(prep$family$dpars, c("mu", "bound", "sp", "ndt", "s"))
   .lba_log_lik(i, prep, cat_names = cat_names, n_cats = length(cat_names))
 }
 
 posterior_predict_lba_simple <- function(i, prep, ...) {
-  cat_names <- setdiff(prep$family$dpars, c("mu", "B", "A", "ndt", "s"))
+  cat_names <- setdiff(prep$family$dpars, c("mu", "bound", "sp", "ndt", "s"))
   .lba_posterior_predict(i, prep, cat_names = cat_names,
                          n_cats = length(cat_names), ...)
 }
 
 log_lik_lba_custom <- function(i, prep) {
   cat_names <- setdiff(
-    prep$family$dpars, c("mu", "B", "A", "ndt", "s")
+    prep$family$dpars, c("mu", "bound", "sp", "ndt", "s")
   )
   .lba_log_lik(i, prep, cat_names = cat_names, n_cats = length(cat_names))
 }
 
 posterior_predict_lba_custom <- function(i, prep, ...) {
   cat_names <- setdiff(
-    prep$family$dpars, c("mu", "B", "A", "ndt", "s")
+    prep$family$dpars, c("mu", "bound", "sp", "ndt", "s")
   )
   .lba_posterior_predict(i, prep, cat_names = cat_names,
                          n_cats = length(cat_names), ...)
 }
 
 posterior_epred_lba_simple <- function(prep, ...) {
-  cat_names <- setdiff(prep$family$dpars, c("mu", "B", "A", "ndt", "s"))
+  cat_names <- setdiff(prep$family$dpars, c("mu", "bound", "sp", "ndt", "s"))
   .lba_posterior_epred(prep, cat_names = cat_names,
                        n_cats = length(cat_names), ...)
 }
 
 posterior_epred_lba_custom <- function(prep, ...) {
   cat_names <- setdiff(
-    prep$family$dpars, c("mu", "B", "A", "ndt", "s")
+    prep$family$dpars, c("mu", "bound", "sp", "ndt", "s")
   )
   .lba_posterior_epred(prep, cat_names = cat_names,
                        n_cats = length(cat_names), ...)
