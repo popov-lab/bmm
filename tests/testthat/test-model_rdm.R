@@ -22,12 +22,12 @@ test_that("rdm() creates simple model with correct structure", {
 test_that("rdm simple version has correct parameters", {
   model <- rdm(rt = "rt", response = "response", n_alternatives = 4)
 
-  expect_true(all(c("driftc", "drifte", "bound", "ndt", "s", "A") %in%
+  expect_true(all(c("driftc", "drifte", "bound", "ndt", "s", "sp") %in%
                     names(model$parameters)))
   expect_equal(model$other_vars$n_alternatives, 4L)
 })
 
-test_that("rdm simple version has all log links", {
+test_that("rdm simple version has correct links", {
   model <- rdm(rt = "rt", response = "response", n_alternatives = 2)
 
   expect_equal(model$links$driftc, "log")
@@ -35,7 +35,7 @@ test_that("rdm simple version has all log links", {
   expect_equal(model$links$bound, "log")
   expect_equal(model$links$ndt, "log")
   expect_equal(model$links$s, "log")
-  expect_equal(model$links$A, "log")
+  expect_equal(model$links$sp, "logit")
 })
 
 test_that("rdm has correct fixed parameters", {
@@ -43,7 +43,7 @@ test_that("rdm has correct fixed parameters", {
 
   expect_equal(model$fixed_parameters$mu, 0)
   expect_equal(model$fixed_parameters$s, 0)
-  expect_equal(model$fixed_parameters$A, -100)
+  expect_equal(model$fixed_parameters$sp, -100)
 })
 
 test_that("rdm accepts custom links", {
@@ -263,35 +263,36 @@ test_that("bmf2bf.rdm_custom creates correct brms formula", {
 # Stan code generation tests
 # -----------------------------------------------------------------------------
 
-test_that(".rdm_stan_code generates valid Stan for A=0 (2 categories)", {
-  code <- .rdm_stan_code("rdm_simple", c("driftc", "drifte"), has_A = FALSE)
+test_that(".rdm_stan_code generates valid Stan for sp=0 (2 categories)", {
+  code <- .rdm_stan_code("rdm_simple", c("driftc", "drifte"), has_sp = FALSE)
   expect_true(grepl("rdm_simple_lpdf", code))
   expect_true(grepl("swald_lpdf", code))
   expect_true(grepl("swald_lccdf", code))
   expect_false(grepl("Phi\\(", code))
 })
 
-test_that(".rdm_stan_code generates valid Stan for A>0 (2 categories)", {
-  code <- .rdm_stan_code("rdm_simple", c("driftc", "drifte"), has_A = TRUE)
+test_that(".rdm_stan_code generates valid Stan for sp>0 (2 categories)", {
+  code <- .rdm_stan_code("rdm_simple", c("driftc", "drifte"), has_sp = TRUE)
   expect_true(grepl("rdm_simple_lpdf", code))
   expect_true(grepl("Phi\\(", code))
   expect_true(grepl("std_normal_lpdf", code))
-  expect_true(grepl("b = A \\+ bound", code))
+  expect_true(grepl("real b = bound", code))
+  expect_true(grepl("real A = sp \\* bound", code))
   expect_false(grepl("swald_lpdf", code))
 })
 
 test_that(".rdm_stan_code generates valid Stan for 4 categories", {
   cats <- c("cat1", "cat2", "cat3", "cat4")
-  code <- .rdm_stan_code("rdm_custom", cats, has_A = FALSE)
+  code <- .rdm_stan_code("rdm_custom", cats, has_sp = FALSE)
   expect_true(grepl("rdm_custom_lpdf", code))
   expect_true(grepl("array\\[4\\]", code))
   expect_true(grepl("real cat1", code))
   expect_true(grepl("real cat4", code))
 })
 
-test_that(".rdm_stan_code generates A>0 Stan for custom version", {
+test_that(".rdm_stan_code generates sp>0 Stan for custom version", {
   cats <- c("target", "lure", "npl")
-  code <- .rdm_stan_code("rdm_custom", cats, has_A = TRUE)
+  code <- .rdm_stan_code("rdm_custom", cats, has_sp = TRUE)
   expect_true(grepl("rdm_custom_lpdf", code))
   expect_true(grepl("array\\[3\\]", code))
   expect_true(grepl("Phi\\(", code))
@@ -313,7 +314,7 @@ test_that("configure_model.rdm_simple returns correct components", {
   expect_true("data" %in% names(config))
   expect_true("stanvars" %in% names(config))
   expect_equal(config$formula$family$name, "rdm_simple")
-  expect_true(all(c("mu", "driftc", "drifte", "bound", "ndt", "s", "A") %in%
+  expect_true(all(c("mu", "driftc", "drifte", "bound", "ndt", "s", "sp") %in%
                     config$formula$family$dpars))
 })
 
@@ -392,12 +393,45 @@ test_that("rdm custom version runs with predictor", {
   )
 })
 
-test_that("rdm simple with A estimated runs with mock backend", {
+test_that("rdm simple with sp estimated runs with mock backend", {
   skip_on_cran()
-  dat <- rrdm(n = 200, drift = c(3, 1.5), bound = 1, ndt = 0.2, A = 0.3)
+  dat <- rrdm(n = 200, drift = c(3, 1.5), bound = 1, ndt = 0.2, sp = 0.3)
   model <- rdm(rt = "rt", response = "response", n_alternatives = 2)
-  f <- bmf(driftc ~ 1, drifte ~ 1, bound ~ 1, ndt ~ 1, A ~ 1)
+  f <- bmf(driftc ~ 1, drifte ~ 1, bound ~ 1, ndt ~ 1, sp ~ 1)
   expect_no_error(
     bmm(f, dat, model, backend = "mock", mock_fit = 1, rename = FALSE)
   )
+})
+
+# -----------------------------------------------------------------------------
+# Distribution function tests
+# -----------------------------------------------------------------------------
+
+test_that("drdm returns positive densities for valid inputs", {
+  d <- drdm(c(0.5, 0.6), c(1, 2), drift = c(3, 1.5),
+            bound = 1, ndt = 0.2)
+  expect_true(all(d > 0))
+})
+
+test_that("rrdm returns valid data.frame", {
+  dat <- rrdm(100, drift = c(3, 1.5), bound = 1, ndt = 0.2)
+  expect_s3_class(dat, "data.frame")
+  expect_true(all(c("rt", "response") %in% names(dat)))
+  expect_true(all(dat$rt > 0.2))
+  expect_true(all(dat$response %in% 1:2))
+})
+
+test_that("rrdm with sp > 0 returns valid data", {
+  dat <- rrdm(100, drift = c(3, 1.5), bound = 1, ndt = 0.2, sp = 0.3)
+  expect_true(all(dat$rt > 0.2))
+})
+
+test_that("validate_rdm_parameters catches invalid inputs", {
+  expect_error(drdm(0.5, 1, drift = c(3, 1.5), bound = -1, ndt = 0.2))
+  expect_error(drdm(0.5, 1, drift = c(-1, 1.5), bound = 1, ndt = 0.2))
+  expect_error(drdm(0.5, 1, drift = c(3, 1.5), bound = 1, ndt = 0.2,
+                    sp = -0.1))
+  expect_error(drdm(0.5, 1, drift = c(3, 1.5), bound = 1, ndt = 0.2,
+                    sp = 1.0))
+  expect_error(drdm(0.5, 1, drift = c(3, 1.5), bound = 1, ndt = -1))
 })

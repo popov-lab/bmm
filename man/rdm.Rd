@@ -35,8 +35,8 @@ use. Options are:
 \item \code{"simple"} (default): Two drift parameters — \code{driftc} for the
 correct accumulator (response = 1) and \code{drifte} for all error
 accumulators. The diffusion constant \code{s} is shared and fixed by
-default (s = 1). Starting point variability \code{A} is fixed to ~0 by
-default; add \code{A ~ 1} to the formula to estimate it.
+default (s = 1). Starting point proportion \code{sp} is fixed to ~0 by
+default; add \code{sp ~ 1} to the formula to estimate it.
 \item \code{"custom"}: Per-category drift parameters. Response categories
 are defined by the formula LHS names (e.g., \verb{correct ~ 1, other ~ 1, npl ~ 1}). The response column must contain character labels matching
 these names. Supports per-category \code{num_alternatives}.
@@ -52,8 +52,7 @@ defaults to 1 accumulator per category.}
 
 \item{links}{A named list of link functions for the model parameters.
 For \code{"simple"}: parameters are \code{driftc}, \code{drifte}, \code{bound}, \code{ndt}, \code{s},
-and \code{A}. Default links are "log" for all parameters. For \code{"custom"}:
-category parameters also default to "log".}
+and \code{sp}. Default links are "log" for all except \code{sp} which uses "logit".}
 
 \item{...}{Additional arguments passed internally (for testing purposes).}
 }
@@ -90,20 +89,20 @@ Bulletin & Review, 27, 911-936. https://doi.org/10.3758/s13423-020-01719-6
 \itemize{
 \item \code{driftc}: drift rate for correct accumulator
 \item \code{drifte}: drift rate for error accumulators
-\item \code{bound}: boundary (gap from max starting point to threshold)
+\item \code{bound}: decision threshold
 \item \code{ndt}: non-decision time
 \item \code{s}: diffusion constant
-\item \code{A}: maximum starting point (uniform on 0 to A)
+\item \code{sp}: starting point proportion (A/bound, on logit scale)
 }
 \item \strong{Fixed parameters:}
 \itemize{
 \item \code{mu} = 0
 \item \code{s} = 0
-\item \code{A} = -100
+\item \code{sp} = -100
 }
 \item \strong{Default parameter links:}
 \itemize{
-\item driftc = log; drifte = log; bound = log; ndt = log; s = log; A = log
+\item driftc = log; drifte = log; bound = log; ndt = log; s = log; sp = logit
 }
 \item \strong{Default priors:}
 \itemize{
@@ -119,7 +118,7 @@ Bulletin & Review, 27, 911-936. https://doi.org/10.3758/s13423-020-01719-6
 }
 \item \code{bound}:
 \itemize{
-\item \code{main}: normal(0, 0.3)
+\item \code{main}: normal(0, 0.5)
 \item \code{effects}: normal(0, 0.3)
 }
 \item \code{ndt}:
@@ -132,10 +131,10 @@ Bulletin & Review, 27, 911-936. https://doi.org/10.3758/s13423-020-01719-6
 \item \code{main}: normal(0, 0.3)
 \item \code{effects}: normal(0, 0.2)
 }
-\item \code{A}:
+\item \code{sp}:
 \itemize{
-\item \code{main}: normal(-1, 0.5)
-\item \code{effects}: normal(0, 0.3)
+\item \code{main}: normal(-1, 1)
+\item \code{effects}: normal(0, 0.5)
 }
 }
 }
@@ -149,7 +148,7 @@ formula <- bmf(driftc ~ 1, drifte ~ 1, bound ~ 1, ndt ~ 1)
 fit <- bmm(formula, dat, model, cores = 4, backend = "cmdstanr")
 
 # with starting point variability
-formula2 <- bmf(driftc ~ 1, drifte ~ 1, bound ~ 1, ndt ~ 1, A ~ 1)
+formula2 <- bmf(driftc ~ 1, drifte ~ 1, bound ~ 1, ndt ~ 1, sp ~ 1)
 fit2 <- bmm(formula2, dat, model, cores = 4, backend = "cmdstanr")
 \dontshow{\}) # examplesIf}
 }

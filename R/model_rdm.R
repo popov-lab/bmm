@@ -7,10 +7,10 @@
     parameters = list(
       driftc = "drift rate for correct accumulator",
       drifte = "drift rate for error accumulators",
-      bound = "boundary (gap from max starting point to threshold)",
+      bound = "decision threshold",
       ndt = "non-decision time",
       s = "diffusion constant",
-      A = "maximum starting point (uniform on 0 to A)"
+      sp = "starting point proportion (A/bound, on logit scale)"
     ),
     links = list(
       driftc = "log",
@@ -18,61 +18,61 @@
       bound = "log",
       ndt = "log",
       s = "log",
-      A = "log"
+      sp = "logit"
     ),
     fixed_parameters = list(
       mu = 0,
       s = 0,
-      A = -100
+      sp = -100
     ),
     priors = list(
       driftc = list(main = "normal(1, 0.5)", effects = "normal(0, 0.3)"),
       drifte = list(main = "normal(0.5, 0.5)", effects = "normal(0, 0.3)"),
-      bound = list(main = "normal(0, 0.3)", effects = "normal(0, 0.3)"),
+      bound = list(main = "normal(0, 0.5)", effects = "normal(0, 0.3)"),
       ndt = list(main = "normal(-2, 0.3)", effects = "normal(0, 0.3)"),
       s = list(main = "normal(0, 0.3)", effects = "normal(0, 0.2)"),
-      A = list(main = "normal(-1, 0.5)", effects = "normal(0, 0.3)")
+      sp = list(main = "normal(-1, 1)", effects = "normal(0, 0.5)")
     ),
     init_ranges = list(
       mu = c(-0.5, 0.5),
       driftc = c(2, 4),
       drifte = c(1, 2.5),
-      bound = c(0.8, 1.2),
+      bound = c(0.8, 1.5),
       ndt = c(0.025, 0.05),
       s = c(0.8, 1.2),
-      A = c(0.2, 0.5)
+      sp = c(0.15, 0.45)
     )
   ),
   custom = list(
     parameters = list(
-      bound = "boundary (gap from max starting point to threshold)",
+      bound = "decision threshold",
       ndt = "non-decision time",
       s = "diffusion constant",
-      A = "maximum starting point (uniform on 0 to A)"
+      sp = "starting point proportion (A/bound, on logit scale)"
     ),
     links = list(
       bound = "log",
       ndt = "log",
       s = "log",
-      A = "log"
+      sp = "logit"
     ),
     fixed_parameters = list(
       mu = 0,
       s = 0,
-      A = -100
+      sp = -100
     ),
     priors = list(
-      bound = list(main = "normal(0, 0.3)", effects = "normal(0, 0.3)"),
+      bound = list(main = "normal(0, 0.5)", effects = "normal(0, 0.3)"),
       ndt = list(main = "normal(-2, 0.3)", effects = "normal(0, 0.3)"),
       s = list(main = "normal(0, 0.3)", effects = "normal(0, 0.2)"),
-      A = list(main = "normal(-1, 0.5)", effects = "normal(0, 0.3)")
+      sp = list(main = "normal(-1, 1)", effects = "normal(0, 0.5)")
     ),
     init_ranges = list(
       mu = c(-0.5, 0.5),
-      bound = c(0.8, 1.2),
+      bound = c(0.8, 1.5),
       ndt = c(0.025, 0.05),
       s = c(0.8, 1.2),
-      A = c(0.2, 0.5)
+      sp = c(0.15, 0.45)
     )
   )
 )
@@ -155,8 +155,8 @@
 #'     \item `"simple"` (default): Two drift parameters — `driftc` for the
 #'       correct accumulator (response = 1) and `drifte` for all error
 #'       accumulators. The diffusion constant `s` is shared and fixed by
-#'       default (s = 1). Starting point variability `A` is fixed to ~0 by
-#'       default; add `A ~ 1` to the formula to estimate it.
+#'       default (s = 1). Starting point proportion `sp` is fixed to ~0 by
+#'       default; add `sp ~ 1` to the formula to estimate it.
 #'     \item `"custom"`: Per-category drift parameters. Response categories
 #'       are defined by the formula LHS names (e.g., `correct ~ 1, other ~ 1,
 #'       npl ~ 1`). The response column must contain character labels matching
@@ -164,8 +164,7 @@
 #'   }
 #' @param links A named list of link functions for the model parameters.
 #'   For `"simple"`: parameters are `driftc`, `drifte`, `bound`, `ndt`, `s`,
-#'   and `A`. Default links are "log" for all parameters. For `"custom"`:
-#'   category parameters also default to "log".
+#'   and `sp`. Default links are "log" for all except `sp` which uses "logit".
 #' @param ... Additional arguments passed internally (for testing purposes).
 #' @return An object of class `bmmodel`
 #' @export
@@ -180,7 +179,7 @@
 #' fit <- bmm(formula, dat, model, cores = 4, backend = "cmdstanr")
 #'
 #' # with starting point variability
-#' formula2 <- bmf(driftc ~ 1, drifte ~ 1, bound ~ 1, ndt ~ 1, A ~ 1)
+#' formula2 <- bmf(driftc ~ 1, drifte ~ 1, bound ~ 1, ndt ~ 1, sp ~ 1)
 #' fit2 <- bmm(formula2, dat, model, cores = 4, backend = "cmdstanr")
 rdm <- function(rt, response, n_alternatives = NULL,
                 version = c("simple", "custom"),
@@ -217,7 +216,7 @@ rdm <- function(rt, response, n_alternatives = NULL,
 #' @export
 check_model.rdm_custom <- function(model, data = NULL, formula = NULL) {
   if (!is.null(formula)) {
-    reserved_pars <- c("bound", "ndt", "s", "A")
+    reserved_pars <- c("bound", "ndt", "s", "sp")
     formula_pars <- names(formula)
     cat_pars <- setdiff(formula_pars, reserved_pars)
 
@@ -434,7 +433,7 @@ bmf2bf.rdm_custom <- function(model, formula) {
 # Stan code generation                                                   ####
 ############################################################################# !
 
-.rdm_stan_code <- function(family_name, cat_names, has_A) {
+.rdm_stan_code <- function(family_name, cat_names, has_sp) {
   n_cats <- length(cat_names)
   cat_args <- paste(paste0("real ", cat_names), collapse = ", ")
   n_args <- paste(paste0("int n", seq_len(n_cats)), collapse = ", ")
@@ -447,10 +446,10 @@ bmf2bf.rdm_custom <- function(model, formula) {
     paste(paste0("n", seq_len(n_cats)), collapse = ", "), "};"
   )
 
-  if (!has_A) {
+  if (!has_sp) {
     glue(
       "real {family_name}_lpdf(real rt, real mu, {cat_args}, ",
-      "real bound, real ndt, real s, real A, int response, {n_args}) {{\n",
+      "real bound, real ndt, real s, real sp, int response, {n_args}) {{\n",
       "  real t = rt - ndt;\n",
       "  if (t <= 0) return negative_infinity();\n",
       "  {drift_array}\n",
@@ -473,8 +472,9 @@ bmf2bf.rdm_custom <- function(model, formula) {
   } else {
     glue(
       "real {family_name}_lpdf(real rt, real mu, {cat_args}, ",
-      "real bound, real ndt, real s, real A, int response, {n_args}) {{\n",
-      "  real b = A + bound;\n",
+      "real bound, real ndt, real s, real sp, int response, {n_args}) {{\n",
+      "  real b = bound;\n",
+      "  real A = sp * bound;\n",
       "  real t = rt - ndt;\n",
       "  if (t <= 0) return negative_infinity();\n",
       "  {drift_array}\n",
@@ -528,14 +528,15 @@ bmf2bf.rdm_custom <- function(model, formula) {
 #' @export
 configure_model.rdm_simple <- function(model, data, formula) {
   cat_names <- c("driftc", "drifte")
-  has_A <- !("A" %in% names(model$fixed_parameters))
+  has_sp <- !("sp" %in% names(model$fixed_parameters))
   formula <- bmf2bf(model, formula)
 
   formula$family <- brms::custom_family(
     "rdm_simple",
-    dpars = c("mu", cat_names, "bound", "ndt", "s", "A"),
+    dpars = c("mu", cat_names, "bound", "ndt", "s", "sp"),
     links = c("identity", model$links$driftc, model$links$drifte,
-              model$links$bound, model$links$ndt, model$links$s, model$links$A),
+              model$links$bound, model$links$ndt, model$links$s,
+              model$links$sp),
     ub = rep(NA, 7),
     lb = rep(NA, 7),
     type = "real",
@@ -553,7 +554,7 @@ configure_model.rdm_simple <- function(model, data, formula) {
     )),
     block = "functions"
   ) + brms::stanvar(
-    scode = .rdm_stan_code("rdm_simple", cat_names, has_A),
+    scode = .rdm_stan_code("rdm_simple", cat_names, has_sp),
     block = "functions"
   )
 
@@ -564,17 +565,17 @@ configure_model.rdm_simple <- function(model, data, formula) {
 configure_model.rdm_custom <- function(model, data, formula) {
   cat_names <- model$other_vars$resp_cats
   n_cats <- length(cat_names)
-  has_A <- !("A" %in% names(model$fixed_parameters))
+  has_sp <- !("sp" %in% names(model$fixed_parameters))
   formula <- bmf2bf(model, formula)
 
   n_dpars <- n_cats + 5
   formula$family <- brms::custom_family(
     "rdm_custom",
-    dpars = c("mu", cat_names, "bound", "ndt", "s", "A"),
+    dpars = c("mu", cat_names, "bound", "ndt", "s", "sp"),
     links = c(
       "identity",
       vapply(cat_names, function(p) model$links[[p]], character(1)),
-      model$links$bound, model$links$ndt, model$links$s, model$links$A
+      model$links$bound, model$links$ndt, model$links$s, model$links$sp
     ),
     ub = rep(NA, n_dpars),
     lb = rep(NA, n_dpars),
@@ -593,7 +594,7 @@ configure_model.rdm_custom <- function(model, data, formula) {
     )),
     block = "functions"
   ) + brms::stanvar(
-    scode = .rdm_stan_code("rdm_custom", cat_names, has_A),
+    scode = .rdm_stan_code("rdm_custom", cat_names, has_sp),
     block = "functions"
   )
 
@@ -610,11 +611,12 @@ configure_model.rdm_custom <- function(model, data, formula) {
   bound <- brms::get_dpar(prep, "bound", i = i)
   ndt <- brms::get_dpar(prep, "ndt", i = i)
   s <- brms::get_dpar(prep, "s", i = i)
-  A <- brms::get_dpar(prep, "A", i = i)
+  sp_val <- brms::get_dpar(prep, "sp", i = i)
 
   t <- rt - ndt
   t[t <= 0] <- NA
-  b <- A + bound
+  b <- bound
+  A <- sp_val * bound
 
   n_cat <- vapply(
     seq_len(n_cats),
@@ -670,7 +672,7 @@ configure_model.rdm_custom <- function(model, data, formula) {
   bound <- brms::get_dpar(prep, "bound", i = i)
   ndt <- brms::get_dpar(prep, "ndt", i = i)
   s <- brms::get_dpar(prep, "s", i = i)
-  A <- brms::get_dpar(prep, "A", i = i)
+  sp_val <- brms::get_dpar(prep, "sp", i = i)
   n_draws <- length(ndt)
 
   n_cat <- vapply(
@@ -682,16 +684,18 @@ configure_model.rdm_custom <- function(model, data, formula) {
 
   rt <- numeric(n_draws)
   for (d in seq_len(n_draws)) {
-    b <- A[d] + bound[d]
+    b <- bound[d]
+    A <- sp_val[d] * bound[d]
     drift_vec <- unlist(lapply(seq_len(n_cats), function(j) {
       rep(brms::get_dpar(prep, cat_names[j], i = i)[d], n_cat[j])
     }))
 
-    if (A[d] < 1e-10) {
+    if (A < 1e-10) {
       ft <- .rwald_ig(total_acc, drift = drift_vec, bound = b, s = s[d])
     } else {
-      sp <- stats::runif(total_acc, min = 0, max = A[d])
-      ft <- .rwald_ig(total_acc, drift = drift_vec, bound = b - sp, s = s[d])
+      start <- stats::runif(total_acc, min = 0, max = A)
+      ft <- .rwald_ig(total_acc, drift = drift_vec, bound = b - start,
+                      s = s[d])
     }
     rt[d] <- min(ft) + ndt[d]
   }
@@ -708,7 +712,7 @@ configure_model.rdm_custom <- function(model, data, formula) {
     bound <- brms::get_dpar(prep, "bound", i = i)
     ndt <- brms::get_dpar(prep, "ndt", i = i)
     s <- brms::get_dpar(prep, "s", i = i)
-    A <- brms::get_dpar(prep, "A", i = i)
+    sp_val <- brms::get_dpar(prep, "sp", i = i)
 
     n_cat <- vapply(
       seq_len(n_cats),
@@ -718,23 +722,24 @@ configure_model.rdm_custom <- function(model, data, formula) {
     total_acc <- sum(n_cat)
 
     for (d in seq_len(n_draws)) {
-      b <- A[d] + bound[d]
+      b <- bound[d]
+      A <- sp_val[d] * bound[d]
       drift_vec <- unlist(lapply(seq_len(n_cats), function(j) {
         rep(brms::get_dpar(prep, cat_names[j], i = i)[d], n_cat[j])
       }))
 
-      if (A[d] < 1e-10) {
+      if (A < 1e-10) {
         ft <- matrix(
           .rwald_ig(total_acc * n_sim, drift = drift_vec, bound = b, s = s[d]),
           nrow = n_sim, ncol = total_acc, byrow = TRUE
         )
       } else {
-        sp <- matrix(stats::runif(total_acc * n_sim, min = 0, max = A[d]),
-                     nrow = n_sim, ncol = total_acc)
+        start <- matrix(stats::runif(total_acc * n_sim, min = 0, max = A),
+                        nrow = n_sim, ncol = total_acc)
         ft <- matrix(NA_real_, nrow = n_sim, ncol = total_acc)
         for (k in seq_len(total_acc)) {
           ft[, k] <- .rwald_ig(n_sim, drift = drift_vec[k],
-                               bound = b - sp[, k], s = s[d])
+                               bound = b - start[, k], s = s[d])
         }
       }
       epred[d, i] <- mean(apply(ft, 1, min)) + ndt[d]
@@ -759,14 +764,14 @@ posterior_epred_rdm_simple <- function(prep, ...) {
 
 log_lik_rdm_custom <- function(i, prep) {
   cat_names <- setdiff(
-    prep$family$dpars, c("mu", "bound", "ndt", "s", "A")
+    prep$family$dpars, c("mu", "bound", "ndt", "s", "sp")
   )
   .rdm_log_lik(i, prep, cat_names = cat_names, n_cats = length(cat_names))
 }
 
 posterior_predict_rdm_custom <- function(i, prep, ...) {
   cat_names <- setdiff(
-    prep$family$dpars, c("mu", "bound", "ndt", "s", "A")
+    prep$family$dpars, c("mu", "bound", "ndt", "s", "sp")
   )
   .rdm_posterior_predict(i, prep, cat_names = cat_names,
                          n_cats = length(cat_names), ...)
@@ -774,7 +779,7 @@ posterior_predict_rdm_custom <- function(i, prep, ...) {
 
 posterior_epred_rdm_custom <- function(prep, ...) {
   cat_names <- setdiff(
-    prep$family$dpars, c("mu", "bound", "ndt", "s", "A")
+    prep$family$dpars, c("mu", "bound", "ndt", "s", "sp")
   )
   .rdm_posterior_epred(prep, cat_names = cat_names,
                        n_cats = length(cat_names), ...)

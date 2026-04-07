@@ -1951,12 +1951,13 @@ neg_loglik <- function(x, params, distribution, weights = NULL) {
 #' @param n Number of observations to generate.
 #' @param response Integer vector indicating which accumulator won (1-indexed).
 #' @param drift Numeric vector of drift rates for each accumulator (all > 0).
-#' @param bound Boundary parameter (> 0). When `A = 0`, this is the threshold.
-#'   When `A > 0`, the effective threshold is `A + bound`.
+#' @param bound Decision threshold (> 0). The total boundary for accumulation.
 #' @param ndt Non-decision time in seconds (>= 0).
 #' @param s Diffusion constant (> 0), default = 1.
-#' @param A Maximum starting point for uniform variability on `[0, A]` (>= 0).
-#'   Default = 0 (no starting point variability).
+#' @param sp Starting point proportion (0 to 1). The maximum starting point A
+#'   is computed as `A = sp * bound`, so starting evidence is uniformly
+#'   distributed on `[0, sp * bound]`. Default = 0 (no starting point
+#'   variability).
 #' @param log Logical; if `TRUE`, values are returned on the log scale.
 #' @param lower.tail Logical; if `TRUE` (default), probabilities are P(X <= x).
 #' @param log.p Logical; if `TRUE`, probabilities are given as log(p).
@@ -1981,23 +1982,25 @@ neg_loglik <- function(x, params, distribution, weights = NULL) {
 #' hist(dat$rt)
 #'
 #' # with starting point variability
-#' dat2 <- rrdm(n = 1000, drift = c(3, 1.5), bound = 1, ndt = 0.2, A = 0.3)
+#' dat2 <- rrdm(n = 1000, drift = c(3, 1.5), bound = 1, ndt = 0.2, sp = 0.3)
 #' @export
-drdm <- function(rt, response, drift, bound, ndt, s = 1, A = 0, log = FALSE) {
-  validate_rdm_parameters(drift, bound, ndt, s, A)
+drdm <- function(rt, response, drift, bound, ndt, s = 1, sp = 0,
+                 log = FALSE) {
+  validate_rdm_parameters(drift, bound, ndt, s, sp)
   stopif(
     any(rt - ndt <= 0),
     "Some reaction times are smaller than the non-decision time. \\
     You need to specify a non-decision time 'ndt' smaller than \\
     the shortest reaction time."
   )
-  .drdm(rt, response, drift, bound, ndt, s, A, log)
+  b <- bound
+  A <- sp * bound
+  .drdm(rt, response, drift, b, A, ndt, s, log)
 }
 
-.drdm <- function(rt, response, drift, bound, ndt, s, A, log) {
+.drdm <- function(rt, response, drift, b, A, ndt, s, log) {
   K <- length(drift)
   t <- rt - ndt
-  b <- A + bound
 
   if (A < 1e-10) {
     log_lik <- .dwald(t, drift = drift[response], bound = b, s = s, log = TRUE)
@@ -2025,14 +2028,15 @@ drdm <- function(rt, response, drift, bound, ndt, s = 1, A = 0, log = FALSE) {
 
 #' @rdname rdm_dist
 #' @export
-rrdm <- function(n, drift, bound, ndt, s = 1, A = 0) {
-  validate_rdm_parameters(drift, bound, ndt, s, A)
-  .rrdm(n, drift, bound, ndt, s, A)
+rrdm <- function(n, drift, bound, ndt, s = 1, sp = 0) {
+  validate_rdm_parameters(drift, bound, ndt, s, sp)
+  b <- bound
+  A <- sp * bound
+  .rrdm(n, drift, b, A, ndt, s)
 }
 
-.rrdm <- function(n, drift, bound, ndt, s, A) {
+.rrdm <- function(n, drift, b, A, ndt, s) {
   K <- length(drift)
-  b <- A + bound
 
   if (A < 1e-10) {
     ft <- matrix(
@@ -2041,10 +2045,10 @@ rrdm <- function(n, drift, bound, ndt, s = 1, A = 0) {
       nrow = n, ncol = K
     )
   } else {
-    sp <- matrix(stats::runif(n * K, min = 0, max = A), nrow = n, ncol = K)
+    start <- matrix(stats::runif(n * K, min = 0, max = A), nrow = n, ncol = K)
     ft <- matrix(NA_real_, nrow = n, ncol = K)
     for (j in seq_len(K)) {
-      ft[, j] <- .rwald_ig(n, drift = drift[j], bound = b - sp[, j], s = s)
+      ft[, j] <- .rwald_ig(n, drift = drift[j], bound = b - start[, j], s = s)
     }
   }
 
@@ -2054,12 +2058,13 @@ rrdm <- function(n, drift, bound, ndt, s = 1, A = 0) {
 
 #' @rdname rdm_dist
 #' @export
-prdm <- function(q, drift, bound, ndt, s = 1, A = 0,
+prdm <- function(q, drift, bound, ndt, s = 1, sp = 0,
                  lower.tail = TRUE, log.p = FALSE) {
-  validate_rdm_parameters(drift, bound, ndt, s, A)
+  validate_rdm_parameters(drift, bound, ndt, s, sp)
   K <- length(drift)
   t <- q - ndt
-  b <- A + bound
+  b <- bound
+  A <- sp * bound
 
   log_surv <- numeric(length(t))
   if (A < 1e-10) {
@@ -2083,32 +2088,33 @@ prdm <- function(q, drift, bound, ndt, s = 1, A = 0,
 
 #' @rdname rdm_dist
 #' @export
-qrdm <- function(p, drift, bound, ndt, s = 1, A = 0,
+qrdm <- function(p, drift, bound, ndt, s = 1, sp = 0,
                  lower.tail = TRUE, log.p = FALSE) {
-  validate_rdm_parameters(drift, bound, ndt, s, A)
+  validate_rdm_parameters(drift, bound, ndt, s, sp)
   if (log.p) p <- exp(p)
   if (!lower.tail) p <- 1 - p
 
+  b <- bound
+  A <- sp * bound
   vapply(p, function(pi) {
     if (pi <= 0) return(ndt)
     if (pi >= 1) return(Inf)
     cdf_fn <- function(q) {
-      prdm(q, drift = drift, bound = bound, ndt = ndt, s = s, A = A) - pi
+      prdm(q, drift = drift, bound = bound, ndt = ndt, s = s, sp = sp) - pi
     }
-    # use Wald mean as rough upper bound estimate
-    b <- A + bound
     upper <- ndt + max(b / drift) * 5
     stats::uniroot(cdf_fn, interval = c(ndt + 1e-10, upper),
                    tol = 1e-8)$root
   }, numeric(1))
 }
 
-validate_rdm_parameters <- function(drift, bound, ndt, s, A) {
+validate_rdm_parameters <- function(drift, bound, ndt, s, sp) {
   stopif(any(drift <= 0), "drift rates must be positive.")
-  stopif(any(bound <= 0), "bound must be positive.")
+  stopif(any(bound <= 0), "bound (decision threshold) must be positive.")
   stopif(any(ndt < 0), "ndt (non-decision time) must be non-negative.")
   stopif(any(s <= 0), "s (diffusion constant) must be positive.")
-  stopif(any(A < 0), "A (starting point variability) must be non-negative.")
+  stopif(any(sp < 0) || any(sp >= 1),
+         "sp (starting point proportion) must be in [0, 1).")
 }
 
 
