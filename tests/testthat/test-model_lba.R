@@ -195,28 +195,28 @@ test_that("bmf2bf.lba_custom creates correct formula", {
 
 test_that("Stan code for normal LBA contains expected elements", {
   code <- bmm:::.lba_stan_code("lba_normal_simple", c("driftc", "drifte"), "normal")
-  code <- gsub("\\bK\\b", "2", code)
-  expect_true(grepl("Phi", code))
-  expect_true(grepl("std_normal_lpdf", code))
+  expect_true(grepl("lba_normal_single_lpdf", code))
+  expect_true(grepl("lba_normal_single_lccdf", code))
+  expect_true(grepl("inv_logit", code))
   expect_true(grepl("b = A \\+ B", code))
 })
 
 test_that("Stan code for gamma LBA contains expected elements", {
   code <- bmm:::.lba_stan_code("lba_gamma_simple", c("driftc", "drifte"), "gamma")
-  code <- gsub("\\bK\\b", "2", code)
+  expect_true(grepl("lba_gamma_single_lpdf", code))
   expect_true(grepl("gamma_cdf", code))
   expect_true(grepl("gamma_lpdf", code))
 })
 
 test_that("Stan code for lognormal LBA contains expected elements", {
   code <- bmm:::.lba_stan_code("lba_lognormal_simple", c("driftc", "drifte"), "lognormal")
-  code <- gsub("\\bK\\b", "2", code)
-  expect_true(grepl("lognormal_cdf", code))
+  expect_true(grepl("lba_lognormal_single_lpdf", code))
+  expect_true(grepl("inv_logit", code))
 })
 
 test_that("Stan code for frechet LBA contains expected elements", {
   code <- bmm:::.lba_stan_code("lba_frechet_simple", c("driftc", "drifte"), "frechet")
-  code <- gsub("\\bK\\b", "2", code)
+  expect_true(grepl("lba_frechet_single_lpdf", code))
   expect_true(grepl("n_quad", code))
 })
 

@@ -468,14 +468,14 @@ bmf2bf.lba_custom <- function(model, formula) {
     paste(paste0("n", seq_len(n_cats)), collapse = ", "), "};"
   )
 
-  stan_body <- switch(distribution,
-    normal = .lba_stan_body_normal(n_cats),
-    gamma = .lba_stan_body_gamma(n_cats),
-    frechet = .lba_stan_body_frechet(n_cats),
-    lognormal = .lba_stan_body_lognormal(n_cats)
+  sc_path <- system.file("stan_chunks", package = "bmm")
+  helpers <- read_lines2(
+    file.path(sc_path, paste0("lba_", distribution, "_functions.stan"))
   )
 
-  glue(
+  prefix <- paste0("lba_", distribution)
+
+  main_fn <- glue(
     "real {family_name}_lpdf(real rt, real mu, {cat_args}, ",
     "real B, real A, real ndt, real s, int response, {n_args}) {{\n",
     "  real b = A + B;\n",
@@ -483,205 +483,21 @@ bmf2bf.lba_custom <- function(model, formula) {
     "  if (t <= 0) return negative_infinity();\n",
     "  {drift_array}\n",
     "  {n_array}\n",
-    "{stan_body}\n",
+    "  real log_lik = log(n[response])\n",
+    "               + {prefix}_single_lpdf(t | drift[response], b, A, s);\n",
+    "  for (j in 1:{n_cats}) {{\n",
+    "    real log_ccdf = {prefix}_single_lccdf(t | drift[j], b, A, s);\n",
+    "    if (j == response) {{\n",
+    "      if (n[j] > 1) log_lik += (n[j] - 1) * log_ccdf;\n",
+    "    }} else {{\n",
+    "      log_lik += n[j] * log_ccdf;\n",
+    "    }}\n",
+    "  }}\n",
+    "  return log_lik;\n",
     "}}"
   )
-}
 
-.lba_stan_body_normal <- function(n_cats) {
-  "
-  // Brown & Heathcote (2008) normal drift LBA
-  real log_lik;
-  real hi = b / t;
-  real lo = (b - A) / t;
-  if (A < 1e-6) {
-    log_lik = log(n[response]) + log(b) - 2 * log(t)
-              + normal_lpdf(hi | drift[response], s);
-    for (j in 1:K) {
-      real log_ccdf = normal_lccdf(hi | drift[j], s);
-      if (j == response) {
-        if (n[j] > 1) log_lik += (n[j] - 1) * log_ccdf;
-      } else {
-        log_lik += n[j] * log_ccdf;
-      }
-    }
-  } else {
-    real z_lo = (lo - drift[response]) / s;
-    real z_hi = (hi - drift[response]) / s;
-    real M_win = -drift[response] * Phi(z_lo) + s * exp(std_normal_lpdf(z_lo | ))
-                 + drift[response] * Phi(z_hi) - s * exp(std_normal_lpdf(z_hi | ));
-    real pdf_val = M_win / A;
-    if (pdf_val <= 0) return negative_infinity();
-    log_lik = log(n[response]) + log(pdf_val);
-    for (j in 1:K) {
-      real zl = (lo - drift[j]) / s;
-      real zh = (hi - drift[j]) / s;
-      real M_j = -drift[j] * Phi(zl) + s * exp(std_normal_lpdf(zl | ))
-                 + drift[j] * Phi(zh) - s * exp(std_normal_lpdf(zh | ));
-      real cdf_j = 1 + (1.0 / A) * (
-        t * M_j - b * normal_cdf(hi | drift[j], s)
-        + (b - A) * normal_cdf(lo | drift[j], s));
-      real surv = 1 - cdf_j;
-      if (surv < 1e-10) surv = 1e-10;
-      if (surv > 1) surv = 1.0;
-      if (j == response) {
-        if (n[j] > 1) log_lik += (n[j] - 1) * log(surv);
-      } else {
-        log_lik += n[j] * log(surv);
-      }
-    }
-  }
-  return log_lik;"
-}
-
-.lba_stan_body_gamma <- function(n_cats) {
-  "
-  real log_lik;
-  if (A < 1e-6) {
-    log_lik = log(n[response]) + log(b) - 2 * log(t)
-              + gamma_lpdf(b / t | drift[response], s);
-    for (j in 1:K) {
-      real log_ccdf = gamma_lccdf(b / t | drift[j], s);
-      if (j == response) {
-        if (n[j] > 1) log_lik += (n[j] - 1) * log_ccdf;
-      } else {
-        log_lik += n[j] * log_ccdf;
-      }
-    }
-  } else {
-    real hi = b / t;
-    real lo = (b - A) / t;
-    real pdf_val = (drift[response] / (s * A)) * (
-      gamma_cdf(hi | drift[response] + 1, s) -
-      gamma_cdf(lo | drift[response] + 1, s));
-    if (pdf_val <= 0) return negative_infinity();
-    log_lik = log(n[response]) + log(pdf_val);
-    for (j in 1:K) {
-      real M_j = (drift[j] / s) * (
-        gamma_cdf(hi | drift[j] + 1, s) -
-        gamma_cdf(lo | drift[j] + 1, s));
-      real cdf_j = 1 + (1.0 / A) * (
-        t * M_j - b * gamma_cdf(hi | drift[j], s) +
-        (b - A) * gamma_cdf(lo | drift[j], s));
-      real surv = 1 - cdf_j;
-      if (surv < 1e-10) surv = 1e-10;
-      if (surv > 1) surv = 1.0;
-      if (j == response) {
-        if (n[j] > 1) log_lik += (n[j] - 1) * log(surv);
-      } else {
-        log_lik += n[j] * log(surv);
-      }
-    }
-  }
-  return log_lik;"
-}
-
-.lba_stan_body_frechet <- function(n_cats) {
-  "
-  real log_lik;
-  if (A < 1e-6) {
-    real x = b / t;
-    real z = x / s;
-    log_lik = log(n[response]) + log(b) - 2 * log(t)
-              + log(drift[response]) - log(s)
-              - (1 + drift[response]) * log(z) - pow(z, -drift[response]);
-    for (j in 1:K) {
-      real xj = b / t;
-      real zj = xj / s;
-      real log_ccdf = -exp(-pow(zj, -drift[j]));
-      log_ccdf = log1m_exp(log_ccdf);
-      if (j == response) {
-        if (n[j] > 1) log_lik += (n[j] - 1) * log_ccdf;
-      } else {
-        log_lik += n[j] * log_ccdf;
-      }
-    }
-  } else {
-    real hi = b / t;
-    real lo = (b - A) / t;
-    real M_win = 0;
-    int n_quad = 20;
-    real h = (hi - lo) / n_quad;
-    for (q in 0:n_quad) {
-      real u = lo + q * h;
-      real z = u / s;
-      real f_u = (drift[response] / s) * pow(z, -(1 + drift[response])) * exp(-pow(z, -drift[response]));
-      real w = (q == 0 || q == n_quad) ? 0.5 : 1.0;
-      M_win += w * u * f_u;
-    }
-    M_win *= h;
-    real pdf_val = M_win / A;
-    if (pdf_val <= 0) return negative_infinity();
-    log_lik = log(n[response]) + log(pdf_val);
-    for (j in 1:K) {
-      real M_j = 0;
-      for (q in 0:n_quad) {
-        real u = lo + q * h;
-        real z = u / s;
-        real f_u = (drift[j] / s) * pow(z, -(1 + drift[j])) * exp(-pow(z, -drift[j]));
-        real w = (q == 0 || q == n_quad) ? 0.5 : 1.0;
-        M_j += w * u * f_u;
-      }
-      M_j *= h;
-      real cdf_hi = exp(-pow(hi / s, -drift[j]));
-      real cdf_lo = exp(-pow(lo / s, -drift[j]));
-      real cdf_j = 1 + (1.0 / A) * (
-        t * M_j - b * cdf_hi + (b - A) * cdf_lo);
-      real surv = 1 - cdf_j;
-      if (surv < 1e-10) surv = 1e-10;
-      if (surv > 1) surv = 1.0;
-      if (j == response) {
-        if (n[j] > 1) log_lik += (n[j] - 1) * log(surv);
-      } else {
-        log_lik += n[j] * log(surv);
-      }
-    }
-  }
-  return log_lik;"
-}
-
-.lba_stan_body_lognormal <- function(n_cats) {
-  "
-  real log_lik;
-  if (A < 1e-6) {
-    log_lik = log(n[response]) + log(b) - 2 * log(t)
-              + lognormal_lpdf(b / t | drift[response], s);
-    for (j in 1:K) {
-      real log_ccdf = lognormal_lccdf(b / t | drift[j], s);
-      if (j == response) {
-        if (n[j] > 1) log_lik += (n[j] - 1) * log_ccdf;
-      } else {
-        log_lik += n[j] * log_ccdf;
-      }
-    }
-  } else {
-    real hi = b / t;
-    real lo = (b - A) / t;
-    real mu_s2 = exp(drift[response] + square(s) / 2);
-    real pdf_val = (mu_s2 / A) * (
-      Phi((log(hi) - drift[response] - square(s)) / s) -
-      Phi((log(lo) - drift[response] - square(s)) / s));
-    if (pdf_val <= 0) return negative_infinity();
-    log_lik = log(n[response]) + log(pdf_val);
-    for (j in 1:K) {
-      real mu_s2_j = exp(drift[j] + square(s) / 2);
-      real M_j = mu_s2_j * (
-        Phi((log(hi) - drift[j] - square(s)) / s) -
-        Phi((log(lo) - drift[j] - square(s)) / s));
-      real cdf_j = 1 + (1.0 / A) * (
-        t * M_j - b * lognormal_cdf(hi | drift[j], s) +
-        (b - A) * lognormal_cdf(lo | drift[j], s));
-      real surv = 1 - cdf_j;
-      if (surv < 1e-10) surv = 1e-10;
-      if (surv > 1) surv = 1.0;
-      if (j == response) {
-        if (n[j] > 1) log_lik += (n[j] - 1) * log(surv);
-      } else {
-        log_lik += n[j] * log(surv);
-      }
-    }
-  }
-  return log_lik;"
+  paste0(helpers, "\n", main_fn)
 }
 
 #' @export
@@ -718,7 +534,6 @@ configure_model.lba_simple <- function(model, data, formula) {
   )
 
   stan_code <- .lba_stan_code(family_name, cat_names, dist)
-  stan_code <- gsub("\\bK\\b", length(cat_names), stan_code)
   stanvars <- brms::stanvar(scode = stan_code, block = "functions")
 
   nlist(formula, data, stanvars)
@@ -758,7 +573,6 @@ configure_model.lba_custom <- function(model, data, formula) {
   )
 
   stan_code <- .lba_stan_code(family_name, cat_names, dist)
-  stan_code <- gsub("\\bK\\b", n_cats, stan_code)
   stanvars <- brms::stanvar(scode = stan_code, block = "functions")
 
   nlist(formula, data, stanvars)
