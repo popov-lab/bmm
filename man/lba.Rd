@@ -102,8 +102,8 @@ Psychology, 57(3), 153-178. https://doi.org/10.1016/j.cogpsych.2007.12.002
 \itemize{
 \item \code{driftc}: mean drift rate for correct accumulator
 \item \code{drifte}: mean drift rate for error accumulators
-\item \code{B}: threshold gap (b = A + B)
-\item \code{A}: maximum starting point (uniform on 0 to A)
+\item \code{bound}: decision threshold
+\item \code{sp}: starting point proportion (A/bound, on logit scale)
 \item \code{ndt}: non-decision time
 \item \code{s}: drift rate SD (fixed to 1 by default)
 }
@@ -114,7 +114,7 @@ Psychology, 57(3), 153-178. https://doi.org/10.1016/j.cogpsych.2007.12.002
 }
 \item \strong{Default parameter links:}
 \itemize{
-\item driftc = identity; drifte = identity; B = log; A = log; ndt = log; s = log
+\item driftc = identity; drifte = identity; bound = log; sp = logit; ndt = log; s = log
 }
 \item \strong{Default priors:}
 \itemize{
@@ -128,15 +128,15 @@ Psychology, 57(3), 153-178. https://doi.org/10.1016/j.cogpsych.2007.12.002
 \item \code{main}: normal(1, 1)
 \item \code{effects}: normal(0, 0.5)
 }
-\item \code{B}:
+\item \code{bound}:
 \itemize{
-\item \code{main}: normal(-0.5, 0.5)
+\item \code{main}: normal(0, 0.5)
 \item \code{effects}: normal(0, 0.3)
 }
-\item \code{A}:
+\item \code{sp}:
 \itemize{
-\item \code{main}: normal(-1, 0.5)
-\item \code{effects}: normal(0, 0.3)
+\item \code{main}: normal(-1, 1)
+\item \code{effects}: normal(0, 0.5)
 }
 \item \code{ndt}:
 \itemize{
@@ -156,7 +156,7 @@ Psychology, 57(3), 153-178. https://doi.org/10.1016/j.cogpsych.2007.12.002
 # simple version with 2 alternatives
 dat <- rlba(n = 500, drift = c(3, 1.5), B = 0.5, A = 0.5, ndt = 0.2)
 model <- lba(rt = "rt", response = "response", n_alternatives = 2)
-formula <- bmf(driftc ~ 1, drifte ~ 1, B ~ 1, A ~ 1, ndt ~ 1)
+formula <- bmf(driftc ~ 1, drifte ~ 1, bound ~ 1, sp ~ 1, ndt ~ 1)
 fit <- bmm(formula, dat, model, cores = 4, backend = "cmdstanr")
 \dontshow{\}) # examplesIf}
 }
