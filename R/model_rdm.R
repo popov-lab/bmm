@@ -7,18 +7,18 @@
     parameters = list(
       driftc = "drift rate for correct accumulator",
       drifte = "drift rate for error accumulators",
-      bound = "decision threshold",
+      gap = "threshold gap (b = gap + sp)",
       ndt = "non-decision time",
       s = "diffusion constant",
-      sp = "starting point proportion (A/bound, on logit scale)"
+      sp = "maximum starting point (uniform on 0 to sp)"
     ),
     links = list(
       driftc = "log",
       drifte = "log",
-      bound = "log",
+      gap = "log",
       ndt = "log",
       s = "log",
-      sp = "logit"
+      sp = "log"
     ),
     fixed_parameters = list(
       mu = 0,
@@ -28,33 +28,33 @@
     priors = list(
       driftc = list(main = "normal(1, 0.5)", effects = "normal(0, 0.3)"),
       drifte = list(main = "normal(0.5, 0.5)", effects = "normal(0, 0.3)"),
-      bound = list(main = "normal(0, 0.5)", effects = "normal(0, 0.3)"),
+      gap = list(main = "normal(0, 0.3)", effects = "normal(0, 0.3)"),
       ndt = list(main = "normal(-2, 0.3)", effects = "normal(0, 0.3)"),
       s = list(main = "normal(0, 0.3)", effects = "normal(0, 0.2)"),
-      sp = list(main = "normal(-1, 1)", effects = "normal(0, 0.5)")
+      sp = list(main = "normal(-1, 0.5)", effects = "normal(0, 0.3)")
     ),
     init_ranges = list(
       mu = c(-0.5, 0.5),
       driftc = c(2, 4),
       drifte = c(1, 2.5),
-      bound = c(0.8, 1.5),
+      gap = c(0.8, 1.2),
       ndt = c(0.025, 0.05),
       s = c(0.8, 1.2),
-      sp = c(0.15, 0.45)
+      sp = c(0.2, 0.5)
     )
   ),
   custom = list(
     parameters = list(
-      bound = "decision threshold",
+      gap = "threshold gap (b = gap + sp)",
       ndt = "non-decision time",
       s = "diffusion constant",
-      sp = "starting point proportion (A/bound, on logit scale)"
+      sp = "maximum starting point (uniform on 0 to sp)"
     ),
     links = list(
-      bound = "log",
+      gap = "log",
       ndt = "log",
       s = "log",
-      sp = "logit"
+      sp = "log"
     ),
     fixed_parameters = list(
       mu = 0,
@@ -62,17 +62,17 @@
       sp = -100
     ),
     priors = list(
-      bound = list(main = "normal(0, 0.5)", effects = "normal(0, 0.3)"),
+      gap = list(main = "normal(0, 0.3)", effects = "normal(0, 0.3)"),
       ndt = list(main = "normal(-2, 0.3)", effects = "normal(0, 0.3)"),
       s = list(main = "normal(0, 0.3)", effects = "normal(0, 0.2)"),
-      sp = list(main = "normal(-1, 1)", effects = "normal(0, 0.5)")
+      sp = list(main = "normal(-1, 0.5)", effects = "normal(0, 0.3)")
     ),
     init_ranges = list(
       mu = c(-0.5, 0.5),
-      bound = c(0.8, 1.5),
+      gap = c(0.8, 1.2),
       ndt = c(0.025, 0.05),
       s = c(0.8, 1.2),
-      sp = c(0.15, 0.45)
+      sp = c(0.2, 0.5)
     )
   )
 )
@@ -155,7 +155,7 @@
 #'     \item `"simple"` (default): Two drift parameters — `driftc` for the
 #'       correct accumulator (response = 1) and `drifte` for all error
 #'       accumulators. The diffusion constant `s` is shared and fixed by
-#'       default (s = 1). Starting point proportion `sp` is fixed to ~0 by
+#'       default (s = 1). Starting point `sp` is fixed to ~0 by
 #'       default; add `sp ~ 1` to the formula to estimate it.
 #'     \item `"custom"`: Per-category drift parameters. Response categories
 #'       are defined by the formula LHS names (e.g., `correct ~ 1, other ~ 1,
@@ -163,8 +163,8 @@
 #'       these names. Supports per-category `num_alternatives`.
 #'   }
 #' @param links A named list of link functions for the model parameters.
-#'   For `"simple"`: parameters are `driftc`, `drifte`, `bound`, `ndt`, `s`,
-#'   and `sp`. Default links are "log" for all except `sp` which uses "logit".
+#'   For `"simple"`: parameters are `driftc`, `drifte`, `gap`, `ndt`, `s`,
+#'   and `sp`. Default links are "log" for all parameters.
 #' @param ... Additional arguments passed internally (for testing purposes).
 #' @return An object of class `bmmodel`
 #' @export
@@ -173,13 +173,13 @@
 #'   functions.
 #' @examplesIf isTRUE(Sys.getenv("BMM_EXAMPLES"))
 #' # simple version with 2 alternatives
-#' dat <- rrdm(n = 500, drift = c(3, 1.5), bound = 1, ndt = 0.2)
+#' dat <- rrdm(n = 500, drift = c(3, 1.5), gap = 1, sp = 0, ndt = 0.2)
 #' model <- rdm(rt = "rt", response = "response", n_alternatives = 2)
-#' formula <- bmf(driftc ~ 1, drifte ~ 1, bound ~ 1, ndt ~ 1)
+#' formula <- bmf(driftc ~ 1, drifte ~ 1, gap ~ 1, ndt ~ 1)
 #' fit <- bmm(formula, dat, model, cores = 4, backend = "cmdstanr")
 #'
 #' # with starting point variability
-#' formula2 <- bmf(driftc ~ 1, drifte ~ 1, bound ~ 1, ndt ~ 1, sp ~ 1)
+#' formula2 <- bmf(driftc ~ 1, drifte ~ 1, gap ~ 1, ndt ~ 1, sp ~ 1)
 #' fit2 <- bmm(formula2, dat, model, cores = 4, backend = "cmdstanr")
 rdm <- function(rt, response, n_alternatives = NULL,
                 version = c("simple", "custom"),
@@ -216,7 +216,7 @@ rdm <- function(rt, response, n_alternatives = NULL,
 #' @export
 check_model.rdm_custom <- function(model, data = NULL, formula = NULL) {
   if (!is.null(formula)) {
-    reserved_pars <- c("bound", "ndt", "s", "sp")
+    reserved_pars <- c("gap", "ndt", "s", "sp")
     formula_pars <- names(formula)
     cat_pars <- setdiff(formula_pars, reserved_pars)
 
@@ -449,21 +449,22 @@ bmf2bf.rdm_custom <- function(model, formula) {
   if (!has_sp) {
     glue(
       "real {family_name}_lpdf(real rt, real mu, {cat_args}, ",
-      "real bound, real ndt, real s, real sp, int response, {n_args}) {{\n",
+      "real gap, real ndt, real s, real sp, int response, {n_args}) {{\n",
+      "  real b = gap + sp;\n",
       "  real t = rt - ndt;\n",
       "  if (t <= 0) return negative_infinity();\n",
       "  {drift_array}\n",
       "  {n_array}\n",
       "  real log_lik = log(n[response]) + ",
-      "swald_lpdf(rt | drift[response], bound, ndt, s);\n",
+      "swald_lpdf(rt | drift[response], b, ndt, s);\n",
       "  for (j in 1:{n_cats}) {{\n",
       "    if (j == response) {{\n",
       "      if (n[j] > 1)\n",
       "        log_lik += (n[j] - 1) * ",
-      "swald_lccdf(rt | drift[j], bound, ndt, s);\n",
+      "swald_lccdf(rt | drift[j], b, ndt, s);\n",
       "    }} else {{\n",
       "      log_lik += n[j] * ",
-      "swald_lccdf(rt | drift[j], bound, ndt, s);\n",
+      "swald_lccdf(rt | drift[j], b, ndt, s);\n",
       "    }}\n",
       "  }}\n",
       "  return log_lik;\n",
@@ -472,9 +473,9 @@ bmf2bf.rdm_custom <- function(model, formula) {
   } else {
     glue(
       "real {family_name}_lpdf(real rt, real mu, {cat_args}, ",
-      "real bound, real ndt, real s, real sp, int response, {n_args}) {{\n",
-      "  real b = bound;\n",
-      "  real A = sp * bound;\n",
+      "real gap, real ndt, real s, real sp, int response, {n_args}) {{\n",
+      "  real b = gap + sp;\n",
+      "  real A = sp;\n",
       "  real t = rt - ndt;\n",
       "  if (t <= 0) return negative_infinity();\n",
       "  {drift_array}\n",
@@ -533,9 +534,9 @@ configure_model.rdm_simple <- function(model, data, formula) {
 
   formula$family <- brms::custom_family(
     "rdm_simple",
-    dpars = c("mu", cat_names, "bound", "ndt", "s", "sp"),
+    dpars = c("mu", cat_names, "gap", "ndt", "s", "sp"),
     links = c("identity", model$links$driftc, model$links$drifte,
-              model$links$bound, model$links$ndt, model$links$s,
+              model$links$gap, model$links$ndt, model$links$s,
               model$links$sp),
     ub = rep(NA, 7),
     lb = rep(NA, 7),
@@ -571,11 +572,11 @@ configure_model.rdm_custom <- function(model, data, formula) {
   n_dpars <- n_cats + 5
   formula$family <- brms::custom_family(
     "rdm_custom",
-    dpars = c("mu", cat_names, "bound", "ndt", "s", "sp"),
+    dpars = c("mu", cat_names, "gap", "ndt", "s", "sp"),
     links = c(
       "identity",
       vapply(cat_names, function(p) model$links[[p]], character(1)),
-      model$links$bound, model$links$ndt, model$links$s, model$links$sp
+      model$links$gap, model$links$ndt, model$links$s, model$links$sp
     ),
     ub = rep(NA, n_dpars),
     lb = rep(NA, n_dpars),
@@ -608,15 +609,15 @@ configure_model.rdm_custom <- function(model, data, formula) {
 .rdm_log_lik <- function(i, prep, cat_names, n_cats) {
   rt <- prep$data$Y[i]
   response <- prep$data$vint1[i]
-  bound <- brms::get_dpar(prep, "bound", i = i)
+  gap <- brms::get_dpar(prep, "gap", i = i)
   ndt <- brms::get_dpar(prep, "ndt", i = i)
   s <- brms::get_dpar(prep, "s", i = i)
   sp_val <- brms::get_dpar(prep, "sp", i = i)
 
   t <- rt - ndt
   t[t <= 0] <- NA
-  b <- bound
-  A <- sp_val * bound
+  b <- gap + sp_val
+  A <- sp_val
 
   n_cat <- vapply(
     seq_len(n_cats),
@@ -669,7 +670,7 @@ configure_model.rdm_custom <- function(model, data, formula) {
 }
 
 .rdm_posterior_predict <- function(i, prep, cat_names, n_cats, ...) {
-  bound <- brms::get_dpar(prep, "bound", i = i)
+  gap <- brms::get_dpar(prep, "gap", i = i)
   ndt <- brms::get_dpar(prep, "ndt", i = i)
   s <- brms::get_dpar(prep, "s", i = i)
   sp_val <- brms::get_dpar(prep, "sp", i = i)
@@ -684,8 +685,8 @@ configure_model.rdm_custom <- function(model, data, formula) {
 
   rt <- numeric(n_draws)
   for (d in seq_len(n_draws)) {
-    b <- bound[d]
-    A <- sp_val[d] * bound[d]
+    b <- gap[d] + sp_val[d]
+    A <- sp_val[d]
     drift_vec <- unlist(lapply(seq_len(n_cats), function(j) {
       rep(brms::get_dpar(prep, cat_names[j], i = i)[d], n_cat[j])
     }))
@@ -709,7 +710,7 @@ configure_model.rdm_custom <- function(model, data, formula) {
 
   epred <- matrix(NA_real_, nrow = n_draws, ncol = n_obs)
   for (i in seq_len(n_obs)) {
-    bound <- brms::get_dpar(prep, "bound", i = i)
+    gap <- brms::get_dpar(prep, "gap", i = i)
     ndt <- brms::get_dpar(prep, "ndt", i = i)
     s <- brms::get_dpar(prep, "s", i = i)
     sp_val <- brms::get_dpar(prep, "sp", i = i)
@@ -722,8 +723,8 @@ configure_model.rdm_custom <- function(model, data, formula) {
     total_acc <- sum(n_cat)
 
     for (d in seq_len(n_draws)) {
-      b <- bound[d]
-      A <- sp_val[d] * bound[d]
+      b <- gap[d] + sp_val[d]
+      A <- sp_val[d]
       drift_vec <- unlist(lapply(seq_len(n_cats), function(j) {
         rep(brms::get_dpar(prep, cat_names[j], i = i)[d], n_cat[j])
       }))
@@ -764,14 +765,14 @@ posterior_epred_rdm_simple <- function(prep, ...) {
 
 log_lik_rdm_custom <- function(i, prep) {
   cat_names <- setdiff(
-    prep$family$dpars, c("mu", "bound", "ndt", "s", "sp")
+    prep$family$dpars, c("mu", "gap", "ndt", "s", "sp")
   )
   .rdm_log_lik(i, prep, cat_names = cat_names, n_cats = length(cat_names))
 }
 
 posterior_predict_rdm_custom <- function(i, prep, ...) {
   cat_names <- setdiff(
-    prep$family$dpars, c("mu", "bound", "ndt", "s", "sp")
+    prep$family$dpars, c("mu", "gap", "ndt", "s", "sp")
   )
   .rdm_posterior_predict(i, prep, cat_names = cat_names,
                          n_cats = length(cat_names), ...)
@@ -779,7 +780,7 @@ posterior_predict_rdm_custom <- function(i, prep, ...) {
 
 posterior_epred_rdm_custom <- function(prep, ...) {
   cat_names <- setdiff(
-    prep$family$dpars, c("mu", "bound", "ndt", "s", "sp")
+    prep$family$dpars, c("mu", "gap", "ndt", "s", "sp")
   )
   .rdm_posterior_epred(prep, cat_names = cat_names,
                        n_cats = length(cat_names), ...)

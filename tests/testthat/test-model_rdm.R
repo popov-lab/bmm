@@ -22,7 +22,7 @@ test_that("rdm() creates simple model with correct structure", {
 test_that("rdm simple version has correct parameters", {
   model <- rdm(rt = "rt", response = "response", n_alternatives = 4)
 
-  expect_true(all(c("driftc", "drifte", "bound", "ndt", "s", "sp") %in%
+  expect_true(all(c("driftc", "drifte", "gap", "ndt", "s", "sp") %in%
                     names(model$parameters)))
   expect_equal(model$other_vars$n_alternatives, 4L)
 })
@@ -32,10 +32,10 @@ test_that("rdm simple version has correct links", {
 
   expect_equal(model$links$driftc, "log")
   expect_equal(model$links$drifte, "log")
-  expect_equal(model$links$bound, "log")
+  expect_equal(model$links$gap, "log")
   expect_equal(model$links$ndt, "log")
   expect_equal(model$links$s, "log")
-  expect_equal(model$links$sp, "logit")
+  expect_equal(model$links$sp, "log")
 })
 
 test_that("rdm has correct fixed parameters", {
@@ -276,8 +276,8 @@ test_that(".rdm_stan_code generates valid Stan for sp>0 (2 categories)", {
   expect_true(grepl("rdm_simple_lpdf", code))
   expect_true(grepl("Phi\\(", code))
   expect_true(grepl("std_normal_lpdf", code))
-  expect_true(grepl("real b = bound", code))
-  expect_true(grepl("real A = sp \\* bound", code))
+  expect_true(grepl("real b = gap \\+ sp", code))
+  expect_true(grepl("real A = sp", code))
   expect_false(grepl("swald_lpdf", code))
 })
 
@@ -305,7 +305,7 @@ test_that(".rdm_stan_code generates sp>0 Stan for custom version", {
 test_that("configure_model.rdm_simple returns correct components", {
   model <- rdm(rt = "rt", response = "response", n_alternatives = 2)
   dat <- data.frame(rt = c(0.5, 0.6), response = c(1, 2))
-  f <- bmf(driftc ~ 1, drifte ~ 1, bound ~ 1, ndt ~ 1)
+  f <- bmf(driftc ~ 1, drifte ~ 1, gap ~ 1, ndt ~ 1)
   model <- check_model(model, data = dat, formula = f)
   dat <- check_data(model, dat, f)
   config <- configure_model(model, dat, f)
@@ -314,14 +314,14 @@ test_that("configure_model.rdm_simple returns correct components", {
   expect_true("data" %in% names(config))
   expect_true("stanvars" %in% names(config))
   expect_equal(config$formula$family$name, "rdm_simple")
-  expect_true(all(c("mu", "driftc", "drifte", "bound", "ndt", "s", "sp") %in%
+  expect_true(all(c("mu", "driftc", "drifte", "gap", "ndt", "s", "sp") %in%
                     config$formula$family$dpars))
 })
 
 test_that("configure_model.rdm_simple loads cswald_helper_functions", {
   model <- rdm(rt = "rt", response = "response", n_alternatives = 2)
   dat <- data.frame(rt = c(0.5, 0.6), response = c(1, 2))
-  f <- bmf(driftc ~ 1, drifte ~ 1, bound ~ 1, ndt ~ 1)
+  f <- bmf(driftc ~ 1, drifte ~ 1, gap ~ 1, ndt ~ 1)
   model <- check_model(model, data = dat, formula = f)
   dat <- check_data(model, dat, f)
   config <- configure_model(model, dat, f)
@@ -339,9 +339,9 @@ test_that("configure_model.rdm_simple loads cswald_helper_functions", {
 
 test_that("rdm simple version runs with mock backend (2-choice)", {
   skip_on_cran()
-  dat <- rrdm(n = 200, drift = c(3, 1.5), bound = 1, ndt = 0.2)
+  dat <- rrdm(n = 200, drift = c(3, 1.5), gap = 1, ndt = 0.2)
   model <- rdm(rt = "rt", response = "response", n_alternatives = 2)
-  f <- bmf(driftc ~ 1, drifte ~ 1, bound ~ 1, ndt ~ 1)
+  f <- bmf(driftc ~ 1, drifte ~ 1, gap ~ 1, ndt ~ 1)
   expect_no_error(
     bmm(f, dat, model, backend = "mock", mock_fit = 1, rename = FALSE)
   )
@@ -349,9 +349,9 @@ test_that("rdm simple version runs with mock backend (2-choice)", {
 
 test_that("rdm simple version runs with mock backend (4-choice)", {
   skip_on_cran()
-  dat <- rrdm(n = 200, drift = c(3, 1.5, 1.5, 1.5), bound = 1, ndt = 0.2)
+  dat <- rrdm(n = 200, drift = c(3, 1.5, 1.5, 1.5), gap = 1, ndt = 0.2)
   model <- rdm(rt = "rt", response = "response", n_alternatives = 4)
-  f <- bmf(driftc ~ 1, drifte ~ 1, bound ~ 1, ndt ~ 1)
+  f <- bmf(driftc ~ 1, drifte ~ 1, gap ~ 1, ndt ~ 1)
   expect_no_error(
     bmm(f, dat, model, backend = "mock", mock_fit = 1, rename = FALSE)
   )
@@ -359,10 +359,10 @@ test_that("rdm simple version runs with mock backend (4-choice)", {
 
 test_that("rdm simple version runs with predictor", {
   skip_on_cran()
-  dat <- rrdm(n = 200, drift = c(3, 1.5), bound = 1, ndt = 0.2)
+  dat <- rrdm(n = 200, drift = c(3, 1.5), gap = 1, ndt = 0.2)
   dat$cond <- rep(c("A", "B"), 100)
   model <- rdm(rt = "rt", response = "response", n_alternatives = 2)
-  f <- bmf(driftc ~ 1 + cond, drifte ~ 1, bound ~ 1, ndt ~ 1)
+  f <- bmf(driftc ~ 1 + cond, drifte ~ 1, gap ~ 1, ndt ~ 1)
   expect_no_error(
     bmm(f, dat, model, backend = "mock", mock_fit = 1, rename = FALSE)
   )
@@ -370,12 +370,12 @@ test_that("rdm simple version runs with predictor", {
 
 test_that("rdm custom version runs with mock backend", {
   skip_on_cran()
-  dat <- rrdm(n = 200, drift = c(3, 1.5, 1), bound = 1, ndt = 0.2)
+  dat <- rrdm(n = 200, drift = c(3, 1.5, 1), gap = 1, ndt = 0.2)
   cats <- c("corr", "err", "npl")
   dat$resp <- cats[dat$response]
   model <- rdm(rt = "rt", response = "resp", version = "custom",
                num_alternatives = c(corr = 1, err = 1, npl = 1))
-  f <- bmf(corr ~ 1, err ~ 1, npl ~ 1, bound ~ 1, ndt ~ 1)
+  f <- bmf(corr ~ 1, err ~ 1, npl ~ 1, gap ~ 1, ndt ~ 1)
   expect_no_error(
     bmm(f, dat, model, backend = "mock", mock_fit = 1, rename = FALSE)
   )
@@ -383,11 +383,11 @@ test_that("rdm custom version runs with mock backend", {
 
 test_that("rdm custom version runs with predictor", {
   skip_on_cran()
-  dat <- rrdm(n = 200, drift = c(3, 1.5), bound = 1, ndt = 0.2)
+  dat <- rrdm(n = 200, drift = c(3, 1.5), gap = 1, ndt = 0.2)
   dat$resp <- ifelse(dat$response == 1, "corr", "err")
   dat$cond <- rep(c("A", "B"), 100)
   model <- rdm(rt = "rt", response = "resp", version = "custom")
-  f <- bmf(corr ~ 1 + cond, err ~ 1, bound ~ 1, ndt ~ 1)
+  f <- bmf(corr ~ 1 + cond, err ~ 1, gap ~ 1, ndt ~ 1)
   expect_no_error(
     bmm(f, dat, model, backend = "mock", mock_fit = 1, rename = FALSE)
   )
@@ -395,9 +395,9 @@ test_that("rdm custom version runs with predictor", {
 
 test_that("rdm simple with sp estimated runs with mock backend", {
   skip_on_cran()
-  dat <- rrdm(n = 200, drift = c(3, 1.5), bound = 1, ndt = 0.2, sp = 0.3)
+  dat <- rrdm(n = 200, drift = c(3, 1.5), gap = 0.7, sp = 0.3, ndt = 0.2)
   model <- rdm(rt = "rt", response = "response", n_alternatives = 2)
-  f <- bmf(driftc ~ 1, drifte ~ 1, bound ~ 1, ndt ~ 1, sp ~ 1)
+  f <- bmf(driftc ~ 1, drifte ~ 1, gap ~ 1, ndt ~ 1, sp ~ 1)
   expect_no_error(
     bmm(f, dat, model, backend = "mock", mock_fit = 1, rename = FALSE)
   )
@@ -409,12 +409,12 @@ test_that("rdm simple with sp estimated runs with mock backend", {
 
 test_that("drdm returns positive densities for valid inputs", {
   d <- drdm(c(0.5, 0.6), c(1, 2), drift = c(3, 1.5),
-            bound = 1, ndt = 0.2)
+            gap = 1, ndt = 0.2)
   expect_true(all(d > 0))
 })
 
 test_that("rrdm returns valid data.frame", {
-  dat <- rrdm(100, drift = c(3, 1.5), bound = 1, ndt = 0.2)
+  dat <- rrdm(100, drift = c(3, 1.5), gap = 1, ndt = 0.2)
   expect_s3_class(dat, "data.frame")
   expect_true(all(c("rt", "response") %in% names(dat)))
   expect_true(all(dat$rt > 0.2))
@@ -422,16 +422,14 @@ test_that("rrdm returns valid data.frame", {
 })
 
 test_that("rrdm with sp > 0 returns valid data", {
-  dat <- rrdm(100, drift = c(3, 1.5), bound = 1, ndt = 0.2, sp = 0.3)
+  dat <- rrdm(100, drift = c(3, 1.5), gap = 0.7, sp = 0.3, ndt = 0.2)
   expect_true(all(dat$rt > 0.2))
 })
 
 test_that("validate_rdm_parameters catches invalid inputs", {
-  expect_error(drdm(0.5, 1, drift = c(3, 1.5), bound = -1, ndt = 0.2))
-  expect_error(drdm(0.5, 1, drift = c(-1, 1.5), bound = 1, ndt = 0.2))
-  expect_error(drdm(0.5, 1, drift = c(3, 1.5), bound = 1, ndt = 0.2,
+  expect_error(drdm(0.5, 1, drift = c(3, 1.5), gap = -1, ndt = 0.2))
+  expect_error(drdm(0.5, 1, drift = c(-1, 1.5), gap = 1, ndt = 0.2))
+  expect_error(drdm(0.5, 1, drift = c(3, 1.5), gap = 1, ndt = 0.2,
                     sp = -0.1))
-  expect_error(drdm(0.5, 1, drift = c(3, 1.5), bound = 1, ndt = 0.2,
-                    sp = 1.0))
-  expect_error(drdm(0.5, 1, drift = c(3, 1.5), bound = 1, ndt = -1))
+  expect_error(drdm(0.5, 1, drift = c(3, 1.5), gap = 1, ndt = -1))
 })
