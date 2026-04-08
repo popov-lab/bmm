@@ -1949,13 +1949,12 @@ neg_loglik <- function(x, params, distribution, weights = NULL) {
 #' @param drift Numeric vector of drift rate parameters (one per accumulator).
 #'   Interpretation depends on `distribution`: mean drift for `"normal"`, shape
 #'   for `"gamma"` and `"frechet"`, meanlog for `"lognormal"`.
-#' @param bound Numeric. Decision threshold (> 0). The total threshold for
-#'   the accumulation process.
-#' @param sp Numeric. Starting point proportion (0 to 1). The maximum starting
-#'   point A is computed as `A = sp * bound`, so that starting evidence is
-#'   uniformly distributed on `[0, sp * bound]`. Values near 0 mean minimal
-#'   starting point variability; values near 1 mean the starting point can be
-#'   close to the threshold.
+#' @param gap Numeric. Threshold gap (> 0). The distance between the maximum
+#'   starting point and the decision threshold. The total threshold is computed
+#'   as `b = gap + sp`, ensuring `b > sp` structurally.
+#' @param sp Numeric. Maximum starting point (>= 0). Starting evidence is
+#'   uniformly distributed on `[0, sp]`. When `sp = 0`, there is no starting
+#'   point variability.
 #' @param ndt Numeric. Non-decision time in seconds (>= 0).
 #' @param s Numeric. Scale parameter (> 0, default = 1). Interpretation depends
 #'   on `distribution`: drift SD for `"normal"`, rate for `"gamma"`, scale for
@@ -1981,44 +1980,44 @@ neg_loglik <- function(x, params, distribution, weights = NULL) {
 #'   Psychology*, 57(3), 153-178.
 #'
 #' @examples
-#' dat <- rlba(n = 1000, drift = c(3, 1.5), bound = 1, sp = 0.3, ndt = 0.3)
+#' dat <- rlba(n = 1000, drift = c(3, 1.5), gap = 0.5, sp = 0.3, ndt = 0.3)
 #' head(dat)
 #' dlba(dat$rt[1:5], dat$response[1:5], drift = c(3, 1.5),
-#'      bound = 1, sp = 0.3, ndt = 0.3)
+#'      gap = 0.5, sp = 0.3, ndt = 0.3)
 #'
 #' @export
-dlba <- function(rt, response, drift, bound, sp, ndt, s = 1,
+dlba <- function(rt, response, drift, gap, sp, ndt, s = 1,
                  distribution = c("normal", "gamma", "frechet", "lognormal"),
                  log = FALSE) {
   distribution <- match.arg(distribution)
-  validate_lba_parameters(drift, bound, sp, ndt, s, distribution)
-  b <- bound
-  A <- sp * bound
+  validate_lba_parameters(drift, gap, sp, ndt, s, distribution)
+  b <- gap + sp
+  A <- sp
   .dlba(rt, response, drift, b, A, ndt, s, distribution, log)
 }
 
 #' @rdname lba_dist
 #' @export
-rlba <- function(n, drift, bound, sp, ndt, s = 1,
+rlba <- function(n, drift, gap, sp, ndt, s = 1,
                  distribution = c("normal", "gamma", "frechet", "lognormal")) {
   distribution <- match.arg(distribution)
-  validate_lba_parameters(drift, bound, sp, ndt, s, distribution)
-  b <- bound
-  A <- sp * bound
+  validate_lba_parameters(drift, gap, sp, ndt, s, distribution)
+  b <- gap + sp
+  A <- sp
   .rlba(n, drift, b, A, ndt, s, distribution)
 }
 
 #' @rdname lba_dist
 #' @export
-plba <- function(q, drift, bound, sp, ndt, s = 1,
+plba <- function(q, drift, gap, sp, ndt, s = 1,
                  distribution = c("normal", "gamma", "frechet", "lognormal"),
                  lower.tail = TRUE, log.p = FALSE) {
   distribution <- match.arg(distribution)
-  validate_lba_parameters(drift, bound, sp, ndt, s, distribution)
+  validate_lba_parameters(drift, gap, sp, ndt, s, distribution)
   K <- length(drift)
   t <- q - ndt
-  b <- bound
-  A <- sp * bound
+  b <- gap + sp
+  A <- sp
 
   p_total <- numeric(length(q))
   for (i in seq_along(q)) {
@@ -2039,11 +2038,11 @@ plba <- function(q, drift, bound, sp, ndt, s = 1,
 
 #' @rdname lba_dist
 #' @export
-qlba <- function(p, drift, bound, sp, ndt, s = 1,
+qlba <- function(p, drift, gap, sp, ndt, s = 1,
                  distribution = c("normal", "gamma", "frechet", "lognormal"),
                  lower.tail = TRUE, log.p = FALSE) {
   distribution <- match.arg(distribution)
-  validate_lba_parameters(drift, bound, sp, ndt, s, distribution)
+  validate_lba_parameters(drift, gap, sp, ndt, s, distribution)
 
   if (log.p) p <- exp(p)
   if (!lower.tail) p <- 1 - p
@@ -2051,7 +2050,7 @@ qlba <- function(p, drift, bound, sp, ndt, s = 1,
   vapply(p, function(pi) {
     stats::uniroot(
       function(q) {
-        plba(q, drift = drift, bound = bound, sp = sp, ndt = ndt, s = s,
+        plba(q, drift = drift, gap = gap, sp = sp, ndt = ndt, s = s,
              distribution = distribution) - pi
       },
       interval = c(ndt + 1e-6, ndt + 20),
@@ -2286,10 +2285,9 @@ qlba <- function(p, drift, bound, sp, ndt, s = 1,
 }
 
 
-validate_lba_parameters <- function(drift, bound, sp, ndt, s, distribution) {
-  stopif(any(bound <= 0), "bound (decision threshold) must be positive.")
-  stopif(any(sp < 0) || any(sp >= 1),
-         "sp (starting point proportion) must be in [0, 1).")
+validate_lba_parameters <- function(drift, gap, sp, ndt, s, distribution) {
+  stopif(any(gap <= 0), "gap (threshold gap) must be positive.")
+  stopif(any(sp < 0), "sp (maximum starting point) must be non-negative.")
   stopif(any(ndt < 0), "ndt (non-decision time) must be non-negative.")
   stopif(any(s <= 0), "s (scale parameter) must be positive.")
   if (distribution %in% c("gamma", "frechet", "lognormal")) {

@@ -23,7 +23,7 @@ test_that("lba() creates simple model with correct structure", {
 test_that("lba simple version has correct parameters", {
   model <- lba(rt = "rt", response = "response", n_alternatives = 4)
 
-  expect_true(all(c("driftc", "drifte", "bound", "sp", "ndt", "s") %in%
+  expect_true(all(c("driftc", "drifte", "gap", "sp", "ndt", "s") %in%
                     names(model$parameters)))
   expect_equal(model$other_vars$n_alternatives, 4L)
 })
@@ -32,16 +32,16 @@ test_that("lba gamma distribution uses consistent drift parameter names", {
   model <- lba(rt = "rt", response = "response", n_alternatives = 2,
                distribution = "gamma")
 
-  expect_true(all(c("driftc", "drifte", "bound", "sp", "ndt", "s") %in%
+  expect_true(all(c("driftc", "drifte", "gap", "sp", "ndt", "s") %in%
                     names(model$parameters)))
   expect_equal(model$distribution, "gamma")
   expect_equal(model$links$driftc, "log")
 })
 
-test_that("lba has correct link functions for bound and sp", {
+test_that("lba has correct link functions for gap and sp", {
   model <- lba(rt = "rt", response = "response", n_alternatives = 2)
-  expect_equal(model$links$bound, "log")
-  expect_equal(model$links$sp, "logit")
+  expect_equal(model$links$gap, "log")
+  expect_equal(model$links$sp, "log")
 })
 
 test_that("lba accepts custom links", {
@@ -161,7 +161,7 @@ test_that("check_data.lba_custom errors on missing formula category", {
 
 test_that("check_model.lba_custom discovers category params from formula", {
   model <- lba(rt = "rt", response = "response", version = "custom")
-  formula <- bmf(fast ~ 1, slow ~ 1, bound ~ 1, sp ~ 1, ndt ~ 1)
+  formula <- bmf(fast ~ 1, slow ~ 1, gap ~ 1, sp ~ 1, ndt ~ 1)
   model <- check_model(model, data = NULL, formula = formula)
 
   expect_equal(model$other_vars$resp_cats, c("fast", "slow"))
@@ -171,7 +171,7 @@ test_that("check_model.lba_custom discovers category params from formula", {
 
 test_that("check_model.lba_custom errors on Stan reserved words", {
   model <- lba(rt = "rt", response = "response", version = "custom")
-  formula <- bmf(void ~ 1, bound ~ 1, sp ~ 1, ndt ~ 1)
+  formula <- bmf(void ~ 1, gap ~ 1, sp ~ 1, ndt ~ 1)
   expect_error(check_model(model, data = NULL, formula = formula))
 })
 
@@ -203,9 +203,8 @@ test_that("Stan code for normal LBA contains expected elements", {
   code <- bmm:::.lba_stan_code("lba_normal_simple", c("driftc", "drifte"), "normal")
   expect_true(grepl("lba_normal_single_lpdf", code))
   expect_true(grepl("lba_normal_single_lccdf", code))
-  expect_true(grepl("inv_logit", code))
-  expect_true(grepl("real b = bound", code))
-  expect_true(grepl("real A = sp \\* bound", code))
+  expect_true(grepl("real b = gap \\+ sp", code))
+  expect_true(grepl("real A = sp", code))
 })
 
 test_that("Stan code for gamma LBA contains expected elements", {
@@ -218,7 +217,6 @@ test_that("Stan code for gamma LBA contains expected elements", {
 test_that("Stan code for lognormal LBA contains expected elements", {
   code <- bmm:::.lba_stan_code("lba_lognormal_simple", c("driftc", "drifte"), "lognormal")
   expect_true(grepl("lba_lognormal_single_lpdf", code))
-  expect_true(grepl("inv_logit", code))
 })
 
 test_that("Stan code for frechet LBA contains expected elements", {
@@ -233,71 +231,71 @@ test_that("Stan code for frechet LBA contains expected elements", {
 # -----------------------------------------------------------------------------
 
 test_that("lba normal simple version runs with mock backend (2-choice)", {
-  dat <- rlba(n = 100, drift = c(3, 1.5), bound = 1, sp = 0.5, ndt = 0.2)
+  dat <- rlba(n = 100, drift = c(3, 1.5), gap = 0.5, sp = 0.5, ndt = 0.2)
   model <- lba(rt = "rt", response = "response", n_alternatives = 2)
-  formula <- bmf(driftc ~ 1, drifte ~ 1, bound ~ 1, sp ~ 1, ndt ~ 1)
+  formula <- bmf(driftc ~ 1, drifte ~ 1, gap ~ 1, sp ~ 1, ndt ~ 1)
   expect_silent(
     bmm(formula, dat, model, backend = "mock", mock_fit = 1, rename = FALSE)
   )
 })
 
 test_that("lba normal simple version runs with mock backend (4-choice)", {
-  dat <- rlba(n = 100, drift = c(3, 1.5, 1, 0.8), bound = 1, sp = 0.5, ndt = 0.2)
+  dat <- rlba(n = 100, drift = c(3, 1.5, 1, 0.8), gap = 0.5, sp = 0.5, ndt = 0.2)
   model <- lba(rt = "rt", response = "response", n_alternatives = 4)
-  formula <- bmf(driftc ~ 1, drifte ~ 1, bound ~ 1, sp ~ 1, ndt ~ 1)
+  formula <- bmf(driftc ~ 1, drifte ~ 1, gap ~ 1, sp ~ 1, ndt ~ 1)
   expect_silent(
     bmm(formula, dat, model, backend = "mock", mock_fit = 1, rename = FALSE)
   )
 })
 
 test_that("lba gamma simple version runs with mock backend", {
-  dat <- rlba(n = 100, drift = c(2, 3), bound = 1, sp = 0.5, ndt = 0.2,
+  dat <- rlba(n = 100, drift = c(2, 3), gap = 0.5, sp = 0.5, ndt = 0.2,
               distribution = "gamma")
   model <- lba(rt = "rt", response = "response", n_alternatives = 2,
                distribution = "gamma")
-  formula <- bmf(driftc ~ 1, drifte ~ 1, bound ~ 1, sp ~ 1, ndt ~ 1)
+  formula <- bmf(driftc ~ 1, drifte ~ 1, gap ~ 1, sp ~ 1, ndt ~ 1)
   expect_silent(
     bmm(formula, dat, model, backend = "mock", mock_fit = 1, rename = FALSE)
   )
 })
 
 test_that("lba lognormal simple version runs with mock backend", {
-  dat <- rlba(n = 100, drift = c(0.5, 0.3), bound = 1, sp = 0.5, ndt = 0.2,
+  dat <- rlba(n = 100, drift = c(0.5, 0.3), gap = 0.5, sp = 0.5, ndt = 0.2,
               distribution = "lognormal")
   model <- lba(rt = "rt", response = "response", n_alternatives = 2,
                distribution = "lognormal")
-  formula <- bmf(driftc ~ 1, drifte ~ 1, bound ~ 1, sp ~ 1, ndt ~ 1)
+  formula <- bmf(driftc ~ 1, drifte ~ 1, gap ~ 1, sp ~ 1, ndt ~ 1)
   expect_silent(
     bmm(formula, dat, model, backend = "mock", mock_fit = 1, rename = FALSE)
   )
 })
 
 test_that("lba frechet simple version runs with mock backend", {
-  dat <- rlba(n = 100, drift = c(2, 3), bound = 1, sp = 0.5, ndt = 0.2,
+  dat <- rlba(n = 100, drift = c(2, 3), gap = 0.5, sp = 0.5, ndt = 0.2,
               distribution = "frechet")
   model <- lba(rt = "rt", response = "response", n_alternatives = 2,
                distribution = "frechet")
-  formula <- bmf(driftc ~ 1, drifte ~ 1, bound ~ 1, sp ~ 1, ndt ~ 1)
+  formula <- bmf(driftc ~ 1, drifte ~ 1, gap ~ 1, sp ~ 1, ndt ~ 1)
   expect_silent(
     bmm(formula, dat, model, backend = "mock", mock_fit = 1, rename = FALSE)
   )
 })
 
 test_that("lba custom version runs with mock backend", {
-  dat <- rlba(n = 100, drift = c(3, 1.5), bound = 1, sp = 0.5, ndt = 0.2)
+  dat <- rlba(n = 100, drift = c(3, 1.5), gap = 0.5, sp = 0.5, ndt = 0.2)
   dat$response <- ifelse(dat$response == 1, "correct", "wrong")
   model <- lba(rt = "rt", response = "response", version = "custom")
-  formula <- bmf(correct ~ 1, wrong ~ 1, bound ~ 1, sp ~ 1, ndt ~ 1)
+  formula <- bmf(correct ~ 1, wrong ~ 1, gap ~ 1, sp ~ 1, ndt ~ 1)
   expect_silent(
     bmm(formula, dat, model, backend = "mock", mock_fit = 1, rename = FALSE)
   )
 })
 
 test_that("lba simple with predictor runs with mock backend", {
-  dat <- rlba(n = 200, drift = c(3, 1.5), bound = 1, sp = 0.5, ndt = 0.2)
+  dat <- rlba(n = 200, drift = c(3, 1.5), gap = 0.5, sp = 0.5, ndt = 0.2)
   dat$cond <- rep(c("a", "b"), each = 100)
   model <- lba(rt = "rt", response = "response", n_alternatives = 2)
-  formula <- bmf(driftc ~ cond, drifte ~ 1, bound ~ 1, sp ~ 1, ndt ~ 1)
+  formula <- bmf(driftc ~ cond, drifte ~ 1, gap ~ 1, sp ~ 1, ndt ~ 1)
   expect_no_error(
     suppressWarnings(
       bmm(formula, dat, model, backend = "mock", mock_fit = 1, rename = FALSE)
@@ -307,17 +305,17 @@ test_that("lba simple with predictor runs with mock backend", {
 
 
 # -----------------------------------------------------------------------------
-# Distribution function tests (dlba/rlba/plba use bound+sp interface)
+# Distribution function tests (dlba/rlba/plba use gap+sp interface)
 # -----------------------------------------------------------------------------
 
 test_that("dlba returns positive densities for valid inputs", {
   d <- dlba(c(0.5, 0.6), c(1, 2), drift = c(3, 1.5),
-            bound = 1, sp = 0.5, ndt = 0.2)
+            gap = 0.5, sp = 0.5, ndt = 0.2)
   expect_true(all(d > 0))
 })
 
 test_that("rlba returns valid data.frame", {
-  dat <- rlba(100, drift = c(3, 1.5), bound = 1, sp = 0.5, ndt = 0.2)
+  dat <- rlba(100, drift = c(3, 1.5), gap = 0.5, sp = 0.5, ndt = 0.2)
   expect_s3_class(dat, "data.frame")
   expect_true(all(c("rt", "response") %in% names(dat)))
   expect_true(all(dat$rt > 0.2))
@@ -326,19 +324,19 @@ test_that("rlba returns valid data.frame", {
 
 test_that("plba is monotonically increasing", {
   rts <- seq(0.3, 1, by = 0.1)
-  p <- plba(rts, drift = c(3, 1.5), bound = 1, sp = 0.5, ndt = 0.2)
+  p <- plba(rts, drift = c(3, 1.5), gap = 0.5, sp = 0.5, ndt = 0.2)
   expect_true(all(diff(p) >= 0))
 })
 
 test_that("dlba matches rtdists for normal distribution", {
   skip_if_not_installed("rtdists")
   set.seed(42)
-  # rtdists: A = 0.5, b = 1 -> bound = 1, sp = A/b = 0.5
+  # rtdists: A = 0.5, b = 1 -> sp = A = 0.5, gap = b - A = 0.5
   ref <- rtdists::rLBA(5, A = 0.5, b = 1, t0 = 0.3,
                        mean_v = c(3, 1.5), sd_v = c(1, 1),
                        distribution = "norm")
   bmm_d <- dlba(ref$rt, ref$response, drift = c(3, 1.5),
-                bound = 1, sp = 0.5, ndt = 0.3, distribution = "normal")
+                gap = 0.5, sp = 0.5, ndt = 0.3, distribution = "normal")
   rtd_d <- rtdists::dLBA(ref$rt, ref$response, A = 0.5, b = 1, t0 = 0.3,
                          mean_v = c(3, 1.5), sd_v = c(1, 1),
                          distribution = "norm", silent = TRUE,
@@ -353,7 +351,7 @@ test_that("dlba matches rtdists for gamma distribution", {
                        shape_v = c(2, 3), rate_v = c(1, 1),
                        distribution = "gamma")
   bmm_d <- dlba(ref$rt, ref$response, drift = c(2, 3),
-                bound = 1, sp = 0.5, ndt = 0.3, s = 1,
+                gap = 0.5, sp = 0.5, ndt = 0.3, s = 1,
                 distribution = "gamma")
   rtd_d <- rtdists::dLBA(ref$rt, ref$response, A = 0.5, b = 1, t0 = 0.3,
                          shape_v = c(2, 3), rate_v = c(1, 1),
@@ -368,7 +366,7 @@ test_that("dlba matches rtdists for lognormal distribution", {
                        meanlog_v = c(0.5, 0.3), sdlog_v = c(1, 1),
                        distribution = "lnorm")
   bmm_d <- dlba(ref$rt, ref$response, drift = c(0.5, 0.3),
-                bound = 1, sp = 0.5, ndt = 0.3, s = 1,
+                gap = 0.5, sp = 0.5, ndt = 0.3, s = 1,
                 distribution = "lognormal")
   rtd_d <- rtdists::dLBA(ref$rt, ref$response, A = 0.5, b = 1, t0 = 0.3,
                          meanlog_v = c(0.5, 0.3), sdlog_v = c(1, 1),
@@ -377,14 +375,12 @@ test_that("dlba matches rtdists for lognormal distribution", {
 })
 
 test_that("validate_lba_parameters catches invalid inputs", {
-  expect_error(dlba(0.5, 1, drift = c(3, 1.5), bound = -1, sp = 0.3,
+  expect_error(dlba(0.5, 1, drift = c(3, 1.5), gap = -1, sp = 0.3,
                     ndt = 0.2))
-  expect_error(dlba(0.5, 1, drift = c(3, 1.5), bound = 1, sp = -0.1,
+  expect_error(dlba(0.5, 1, drift = c(3, 1.5), gap = 0.5, sp = -0.1,
                     ndt = 0.2))
-  expect_error(dlba(0.5, 1, drift = c(3, 1.5), bound = 1, sp = 1.0,
-                    ndt = 0.2))
-  expect_error(dlba(0.5, 1, drift = c(3, 1.5), bound = 1, sp = 0.3,
+  expect_error(dlba(0.5, 1, drift = c(3, 1.5), gap = 0.5, sp = 0.3,
                     ndt = -1))
-  expect_error(dlba(0.5, 1, drift = c(3, 1.5), bound = 1, sp = 0.3,
+  expect_error(dlba(0.5, 1, drift = c(3, 1.5), gap = 0.5, sp = 0.3,
                     ndt = 0.2, s = 0))
 })
