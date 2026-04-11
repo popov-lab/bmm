@@ -551,6 +551,25 @@ bmf2bf.rdm_custom <- function(model, formula) {
 
 .rdm_stan_code <- function(family_name, cat_names, has_sp) {
   n_cats <- length(cat_names)
+  use_start_var <- if (has_sp) 1 else 0
+
+  if (identical(family_name, "rdm_simple")) {
+    return(glue(
+      "real {family_name}_lpdf(vector rt, vector mu, vector driftc, vector drifte, ",
+      "vector gap, vector ndt, vector s, vector sp, array[] int response, ",
+      "array[] int n1, array[] int n2) {{\n",
+      "  int N = rows(rt);\n",
+      "  real log_lik = 0;\n",
+      "  for (i in 1:N) {{\n",
+      "    log_lik += rdm_simple_log_lik_one(\n",
+      "      rt[i], driftc[i], drifte[i], gap[i], ndt[i], s[i], sp[i], ",
+      "response[i], n1[i], n2[i], {use_start_var});\n",
+      "  }}\n",
+      "  return log_lik;\n",
+      "}}"
+    ))
+  }
+
   cat_args <- paste(paste0("vector ", cat_names), collapse = ", ")
   n_args <- paste(paste0("array[] int n", seq_len(n_cats)), collapse = ", ")
   drift_array <- paste0(
@@ -561,7 +580,6 @@ bmf2bf.rdm_custom <- function(model, formula) {
     "      array[", n_cats, "] int n_i = {",
     paste(paste0("n", seq_len(n_cats), "[i]"), collapse = ", "), "};\n"
   )
-  use_start_var <- if (has_sp) 1 else 0
 
   glue(
     "real {family_name}_lpdf(vector rt, vector mu, {cat_args}, ",

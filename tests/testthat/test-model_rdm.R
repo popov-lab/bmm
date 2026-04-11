@@ -285,7 +285,7 @@ test_that(".rdm_stan_code generates valid Stan for sp=0 (2 categories)", {
   code <- .rdm_stan_code("rdm_simple", c("driftc", "drifte"), has_sp = FALSE)
   expect_true(grepl("rdm_simple_lpdf", code))
   expect_true(grepl("vector driftc", code))
-  expect_true(grepl("rdm_log_lik_one", code))
+  expect_true(grepl("rdm_simple_log_lik_one", code))
   expect_true(grepl("0\\)", code))
 })
 
@@ -293,7 +293,7 @@ test_that(".rdm_stan_code generates valid Stan for sp>0 (2 categories)", {
   code <- .rdm_stan_code("rdm_simple", c("driftc", "drifte"), has_sp = TRUE)
   expect_true(grepl("rdm_simple_lpdf", code))
   expect_true(grepl("vector driftc", code))
-  expect_true(grepl("rdm_log_lik_one", code))
+  expect_true(grepl("rdm_simple_log_lik_one", code))
   expect_true(grepl("1\\)", code))
 })
 
@@ -350,6 +350,7 @@ test_that("configure_model.rdm_simple loads RDM helper functions", {
   )
   expect_true(grepl("swald_lpdf", stanvar_code))
   expect_true(grepl("rdm_log_lik_one", stanvar_code))
+  expect_true(grepl("rdm_simple_log_lik_one", stanvar_code))
 })
 
 test_that("configure_model.rdm_simple rewrites ndt through internal ndtraw", {
