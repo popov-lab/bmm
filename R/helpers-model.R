@@ -125,11 +125,20 @@ check_model.default <- function(model, data = NULL, formula = NULL) {
   model
 }
 
+# internal terminal method for validated bmmodel subclasses
+check_model.validated_bmmodel <- function(model, data = NULL, formula = NULL) {
+  model
+}
+
 #' @export
 check_model.bmmodel <- function(model, data = NULL, formula = NULL) {
+  original_class <- class(model)
   model <- replace_regex_variables(model, data)
   model <- update_model_fixed_parameters(model, formula)
-  NextMethod("check_model")
+  class(model) <- c(original_class[original_class != "bmmodel"], "validated_bmmodel")
+  model <- check_model(model, data = data, formula = formula)
+  class(model) <- original_class
+  model
 }
 
 # check if the user has provided a regular expression for any model variables and
@@ -1010,4 +1019,3 @@ parse_bounds <- function(s) {
   }
   Reduce(function(a, b) c(a, b), kvs)
 }
-

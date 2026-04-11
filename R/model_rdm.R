@@ -16,7 +16,7 @@
       driftc = "log",
       drifte = "log",
       gap = "log",
-      ndt = "log",
+      ndt = "identity",
       s = "log",
       sp = "log"
     ),
@@ -52,7 +52,7 @@
     ),
     links = list(
       gap = "log",
-      ndt = "log",
+      ndt = "identity",
       s = "log",
       sp = "log"
     ),
@@ -83,6 +83,9 @@
   "exp", "lower", "upper", "in", "functions", "generated", "transformed",
   "parameters"
 )
+
+.rdm_ndt_internal <- "ndtraw"
+.rdm_ndt_buffer <- 1e-4
 
 
 .model_rdm <- function(
@@ -164,7 +167,9 @@
 #'   }
 #' @param links A named list of link functions for the model parameters.
 #'   For `"simple"`: parameters are `driftc`, `drifte`, `gap`, `ndt`, `s`,
-#'   and `sp`. Default links are "log" for all parameters.
+#'   and `sp`. Positive-valued parameters use a "log" link; `ndt` is
+#'   internally bounded through a support-preserving transformation and does
+#'   not support custom links.
 #' @param ... Additional arguments passed internally (for testing purposes).
 #' @return An object of class `bmmodel`
 #' @export
@@ -212,6 +217,28 @@ rdm <- function(rt, response, n_alternatives = NULL,
 ############################################################################# !
 # CHECK_MODEL S3 methods                                                 ####
 ############################################################################# !
+
+#' @export
+check_model.rdm <- function(model, data = NULL, formula = NULL) {
+  positive_pars <- setdiff(names(model$links), c("mu", "ndt"))
+  bad_positive <- positive_pars[vapply(
+    positive_pars,
+    function(par) !identical(model$links[[par]], "log"),
+    logical(1)
+  )]
+
+  stopif(
+    length(bad_positive) > 0,
+    "RDM parameters {collapse_comma(bad_positive)} only support the 'log' link."
+  )
+  stopif(
+    !identical(model$links$ndt, "identity"),
+    "The RDM ndt parameter is internally bounded via ndt = ndt_max * inv_logit({.rdm_ndt_internal}). \\
+    Custom ndt links are not supported."
+  )
+
+  NextMethod("check_model")
+}
 
 #' @export
 check_model.rdm_custom <- function(model, data = NULL, formula = NULL) {
@@ -308,6 +335,14 @@ check_data.rdm <- function(model, data, formula) {
     "The response variable '{response_var}' contains {n_na_resp} NA values. \\
     Please remove or impute missing values before fitting the model."
   )
+
+  ndt_max <- min(data[, rt_var]) - .rdm_ndt_buffer
+  stopif(
+    ndt_max <= 0,
+    "The smallest reaction time must be larger than {.rdm_ndt_buffer} seconds \\
+    to construct a valid ndt upper bound."
+  )
+  attr(data, "rdm_ndt_max") <- ndt_max
 
   NextMethod("check_data")
 }
@@ -429,97 +464,119 @@ bmf2bf.rdm_custom <- function(model, formula) {
   brms::bf(glue("{rt_var} | vint({vint_args}) ~ 1"))
 }
 
+.rdm_rename_formula_lhs <- function(formula, lhs) {
+  out <- formula
+  out[[2]] <- as.name(lhs)
+  out
+}
+
+.rdm_formula_component <- function(formula) {
+  if (is_nl(formula)) brms::nlf(formula) else brms::lf(formula)
+}
+
+.rdm_ndt_ratio <- function(ndt, ndt_max, strict = FALSE) {
+  ratio <- ndt / ndt_max
+  if (strict) {
+    stopif(
+      any(ratio <= 0) || any(ratio >= 1),
+      "ndt must be strictly between 0 and the fitted upper bound ({signif(ndt_max, 6)} seconds)."
+    )
+  }
+  pmin(pmax(ratio, 1e-6), 1 - 1e-6)
+}
+
+.rdm_ndt_to_raw <- function(ndt, ndt_max, strict = FALSE) {
+  stats::qlogis(.rdm_ndt_ratio(ndt, ndt_max, strict = strict))
+}
+
+.rdm_ndt_default_prior <- function(ndt_max) {
+  center <- .rdm_ndt_to_raw(exp(-2), ndt_max)
+  list(
+    main = glue("normal({signif(center, 8)}, 0.3)"),
+    effects = "normal(0, 0.3)"
+  )
+}
+
+.rdm_rewrite_user_prior <- function(prior) {
+  if (is.null(prior) || nrow(prior) == 0) {
+    return(prior)
+  }
+
+  idx_dpar <- prior$dpar == "ndt"
+  idx_nlpar <- prior$nlpar == "ndt"
+
+  if (any(idx_dpar)) {
+    intercept_idx <- idx_dpar & prior$class == "Intercept"
+    prior$dpar[idx_dpar] <- ""
+    prior$nlpar[idx_dpar] <- .rdm_ndt_internal
+    prior$class[intercept_idx] <- "b"
+    prior$coef[intercept_idx] <- "Intercept"
+  }
+  if (any(idx_nlpar)) {
+    prior$nlpar[idx_nlpar] <- .rdm_ndt_internal
+  }
+
+  prior
+}
+
+.rdm_internal_model <- function(model, ndt_max) {
+  model_internal <- model
+  model_internal$parameters[[.rdm_ndt_internal]] <- model_internal$parameters$ndt
+  model_internal$parameters$ndt <- NULL
+  model_internal$links[[.rdm_ndt_internal]] <- "identity"
+  model_internal$links$ndt <- NULL
+  model_internal$init_ranges[[.rdm_ndt_internal]] <- .rdm_ndt_to_raw(
+    model_internal$init_ranges$ndt,
+    ndt_max
+  )
+  model_internal$init_ranges$ndt <- NULL
+  model_internal
+}
+
+.rdm_build_formula <- function(response_formula, formula, ndt_max) {
+  ndt_formula <- .rdm_rename_formula_lhs(formula$ndt, .rdm_ndt_internal)
+  ndt_max_txt <- sprintf("%.17g", ndt_max)
+  ndt_nlf <- brms::nlf(
+    stats::as.formula(glue("ndt ~ {ndt_max_txt} * inv_logit({.rdm_ndt_internal})"))
+  )
+  other_pars <- setdiff(names(formula), "ndt")
+  components <- lapply(formula[other_pars], .rdm_formula_component)
+  components <- c(components, list(.rdm_formula_component(ndt_formula), ndt_nlf))
+  Reduce(`+`, components, init = response_formula)
+}
+
 ############################################################################# !
 # Stan code generation                                                   ####
 ############################################################################# !
 
 .rdm_stan_code <- function(family_name, cat_names, has_sp) {
   n_cats <- length(cat_names)
-  cat_args <- paste(paste0("real ", cat_names), collapse = ", ")
-  n_args <- paste(paste0("int n", seq_len(n_cats)), collapse = ", ")
+  cat_args <- paste(paste0("vector ", cat_names), collapse = ", ")
+  n_args <- paste(paste0("array[] int n", seq_len(n_cats)), collapse = ", ")
   drift_array <- paste0(
-    "array[", n_cats, "] real drift = {",
-    paste(cat_names, collapse = ", "), "};"
+    "      array[", n_cats, "] real drift_i = {",
+    paste0(cat_names, "[i]", collapse = ", "), "};\n"
   )
   n_array <- paste0(
-    "array[", n_cats, "] int n = {",
-    paste(paste0("n", seq_len(n_cats)), collapse = ", "), "};"
+    "      array[", n_cats, "] int n_i = {",
+    paste(paste0("n", seq_len(n_cats), "[i]"), collapse = ", "), "};\n"
   )
+  use_start_var <- if (has_sp) 1 else 0
 
-  if (!has_sp) {
-    glue(
-      "real {family_name}_lpdf(real rt, real mu, {cat_args}, ",
-      "real gap, real ndt, real s, real sp, int response, {n_args}) {{\n",
-      "  real b = gap + sp;\n",
-      "  real t = rt - ndt;\n",
-      "  if (t <= 0) return negative_infinity();\n",
-      "  {drift_array}\n",
-      "  {n_array}\n",
-      "  real log_lik = log(n[response]) + ",
-      "swald_lpdf(rt | drift[response], b, ndt, s);\n",
-      "  for (j in 1:{n_cats}) {{\n",
-      "    if (j == response) {{\n",
-      "      if (n[j] > 1)\n",
-      "        log_lik += (n[j] - 1) * ",
-      "swald_lccdf(rt | drift[j], b, ndt, s);\n",
-      "    }} else {{\n",
-      "      log_lik += n[j] * ",
-      "swald_lccdf(rt | drift[j], b, ndt, s);\n",
-      "    }}\n",
-      "  }}\n",
-      "  return log_lik;\n",
-      "}}"
-    )
-  } else {
-    glue(
-      "real {family_name}_lpdf(real rt, real mu, {cat_args}, ",
-      "real gap, real ndt, real s, real sp, int response, {n_args}) {{\n",
-      "  real b = gap + sp;\n",
-      "  real A = sp;\n",
-      "  real t = rt - ndt;\n",
-      "  if (t <= 0) return negative_infinity();\n",
-      "  {drift_array}\n",
-      "  {n_array}\n",
-      "  real s_sqrt_t = s * sqrt(t);\n",
-      "  // Winner PDF (Tillman et al. 2020, Eq. 5)\n",
-      "  real v_win = drift[response];\n",
-      "  real alpha_w = (b - A - t * v_win) / s_sqrt_t;\n",
-      "  real beta_w = (b - t * v_win) / s_sqrt_t;\n",
-      "  real pdf_val = (1.0 / A) * (\n",
-      "    -v_win * Phi(alpha_w) + (s / sqrt(t)) * exp(std_normal_lpdf(alpha_w)) +\n",
-      "     v_win * Phi(beta_w)  - (s / sqrt(t)) * exp(std_normal_lpdf(beta_w))\n",
-      "  );\n",
-      "  if (pdf_val <= 0) return negative_infinity();\n",
-      "  real log_lik = log(n[response]) + log(pdf_val);\n",
-      "  // Loser survivor functions (1 - CDF from Appendix A)\n",
-      "  for (j in 1:{n_cats}) {{\n",
-      "    real v_j = drift[j];\n",
-      "    real alpha1 = (v_j * t - b) / s_sqrt_t;\n",
-      "    real alpha2 = (v_j * t - (b - A)) / s_sqrt_t;\n",
-      "    real beta1 = -(v_j * t + b) / s_sqrt_t;\n",
-      "    real beta2 = -(v_j * t + (b - A)) / s_sqrt_t;\n",
-      "    real cdf_val = (1.0 / (2 * v_j * A)) * (Phi(alpha2) - Phi(alpha1))\n",
-      "      + (s * sqrt(t) / A) * (\n",
-      "          alpha2 * Phi(alpha2) - alpha1 * Phi(alpha1)\n",
-      "          + exp(std_normal_lpdf(alpha2)) - exp(std_normal_lpdf(alpha1))\n",
-      "        )\n",
-      "      - (1.0 / (2 * v_j * A)) * (\n",
-      "          exp(2 * v_j * (b - A) / square(s)) * Phi(beta2)\n",
-      "          - exp(2 * v_j * b / square(s)) * Phi(beta1)\n",
-      "        );\n",
-      "    if (cdf_val < 0) cdf_val = 0;\n",
-      "    if (cdf_val > 1) cdf_val = 1;\n",
-      "    real log_surv = log1m(cdf_val);\n",
-      "    if (j == response) {{\n",
-      "      if (n[j] > 1) log_lik += (n[j] - 1) * log_surv;\n",
-      "    }} else {{\n",
-      "      log_lik += n[j] * log_surv;\n",
-      "    }}\n",
-      "  }}\n",
-      "  return log_lik;\n",
-      "}}"
-    )
-  }
+  glue(
+    "real {family_name}_lpdf(vector rt, vector mu, {cat_args}, ",
+    "vector gap, vector ndt, vector s, vector sp, array[] int response, {n_args}) {{\n",
+    "  int N = rows(rt);\n",
+    "  real log_lik = 0;\n",
+    "  for (i in 1:N) {{\n",
+    "{drift_array}",
+    "{n_array}",
+    "    log_lik += rdm_log_lik_one(\n",
+    "      rt[i], drift_i, gap[i], ndt[i], s[i], sp[i], response[i], n_i, {use_start_var});\n",
+    "  }}\n",
+    "  return log_lik;\n",
+    "}}"
+  )
 }
 
 ############################################################################# !
@@ -530,28 +587,36 @@ bmf2bf.rdm_custom <- function(model, formula) {
 configure_model.rdm_simple <- function(model, data, formula) {
   cat_names <- c("driftc", "drifte")
   has_sp <- !("sp" %in% names(model$fixed_parameters))
-  formula <- bmf2bf(model, formula)
+  ndt_max <- attr(data, "rdm_ndt_max")
+  formula <- .rdm_build_formula(bmf2bf(model, formula), formula, ndt_max)
 
   formula$family <- brms::custom_family(
     "rdm_simple",
     dpars = c("mu", cat_names, "gap", "ndt", "s", "sp"),
     links = c("identity", model$links$driftc, model$links$drifte,
-              model$links$gap, model$links$ndt, model$links$s,
+              model$links$gap, "identity", model$links$s,
               model$links$sp),
     ub = rep(NA, 7),
     lb = rep(NA, 7),
     type = "real",
-    vars = c("vint1[n]", "vint2[n]", "vint3[n]"),
-    loop = TRUE,
+    vars = c("vint1", "vint2", "vint3"),
+    loop = FALSE,
     log_lik = log_lik_rdm_simple,
     posterior_predict = posterior_predict_rdm_simple,
     posterior_epred = posterior_epred_rdm_simple
   )
+  formula$family$rdm_has_sp <- has_sp
 
   stanvars <- brms::stanvar(
     scode = read_lines2(paste0(
       system.file("stan_chunks", package = "bmm"),
       "/cswald_helper_functions.stan"
+    )),
+    block = "functions"
+  ) + brms::stanvar(
+    scode = read_lines2(paste0(
+      system.file("stan_chunks", package = "bmm"),
+      "/rdm_functions.stan"
     )),
     block = "functions"
   ) + brms::stanvar(
@@ -567,7 +632,8 @@ configure_model.rdm_custom <- function(model, data, formula) {
   cat_names <- model$other_vars$resp_cats
   n_cats <- length(cat_names)
   has_sp <- !("sp" %in% names(model$fixed_parameters))
-  formula <- bmf2bf(model, formula)
+  ndt_max <- attr(data, "rdm_ndt_max")
+  formula <- .rdm_build_formula(bmf2bf(model, formula), formula, ndt_max)
 
   n_dpars <- n_cats + 5
   formula$family <- brms::custom_family(
@@ -576,17 +642,18 @@ configure_model.rdm_custom <- function(model, data, formula) {
     links = c(
       "identity",
       vapply(cat_names, function(p) model$links[[p]], character(1)),
-      model$links$gap, model$links$ndt, model$links$s, model$links$sp
+      model$links$gap, "identity", model$links$s, model$links$sp
     ),
     ub = rep(NA, n_dpars),
     lb = rep(NA, n_dpars),
     type = "real",
-    vars = paste0("vint", seq_len(n_cats + 1), "[n]"),
-    loop = TRUE,
+    vars = paste0("vint", seq_len(n_cats + 1)),
+    loop = FALSE,
     log_lik = log_lik_rdm_custom,
     posterior_predict = posterior_predict_rdm_custom,
     posterior_epred = posterior_epred_rdm_custom
   )
+  formula$family$rdm_has_sp <- has_sp
 
   stanvars <- brms::stanvar(
     scode = read_lines2(paste0(
@@ -595,11 +662,74 @@ configure_model.rdm_custom <- function(model, data, formula) {
     )),
     block = "functions"
   ) + brms::stanvar(
+    scode = read_lines2(paste0(
+      system.file("stan_chunks", package = "bmm"),
+      "/rdm_functions.stan"
+    )),
+    block = "functions"
+  ) + brms::stanvar(
     scode = .rdm_stan_code("rdm_custom", cat_names, has_sp),
     block = "functions"
   )
 
   nlist(formula, data, stanvars)
+}
+
+#' @export
+configure_prior.rdm <- function(model, data, formula, user_prior = NULL, ...) {
+  ndt_max <- attr(data, "rdm_ndt_max")
+  model_internal <- model
+  model_internal$default_priors$ndt <- NULL
+  model_internal$fixed_parameters$ndt <- NULL
+
+  prior <- fixed_pars_priors(model_internal, formula)
+  default_prior <- set_default_prior(model_internal, data, formula)
+  prior <- combine_prior(default_prior, prior)
+
+  if (isTRUE(getOption("bmm.default_priors", TRUE)) &&
+      !"ndt" %in% names(model$fixed_parameters)) {
+    bterms <- brms::brmsterms(formula, family = formula$family)
+    ndtraw_prior <- list()
+    ndtraw_prior[[.rdm_ndt_internal]] <- .rdm_ndt_default_prior(ndt_max)
+    prior <- combine_prior(
+      prior,
+      Reduce(
+        combine_prior,
+        construct_default_priors_list(
+          .rdm_ndt_internal, bterms, ndtraw_prior, data
+        ),
+        init = brms::empty_prior()
+      )
+    )
+  }
+
+  if ("ndt" %in% names(model$fixed_parameters)) {
+    prior <- combine_prior(
+      prior,
+      brms::prior_(
+        glue(
+          "constant({signif(.rdm_ndt_to_raw(model$fixed_parameters$ndt, ndt_max, strict = TRUE), 8)})"
+        ),
+        class = "b",
+        coef = "Intercept",
+        nlpar = .rdm_ndt_internal
+      )
+    )
+  }
+
+  user_prior <- .rdm_rewrite_user_prior(user_prior)
+  prior <- combine_prior(prior, user_prior)
+  additional_prior <- NextMethod("configure_prior")
+  combine_prior(prior, additional_prior)
+}
+
+#' @export
+create_initfun.rdm <- function(model, data, formula) {
+  create_initfun.bmmodel(
+    .rdm_internal_model(model, attr(data, "rdm_ndt_max")),
+    data,
+    formula
+  )
 }
 
 ############################################################################# !
@@ -613,11 +743,12 @@ configure_model.rdm_custom <- function(model, data, formula) {
   ndt <- brms::get_dpar(prep, "ndt", i = i)
   s <- brms::get_dpar(prep, "s", i = i)
   sp_val <- brms::get_dpar(prep, "sp", i = i)
+  has_sp <- isTRUE(prep$family$rdm_has_sp)
 
   t <- rt - ndt
   t[t <= 0] <- NA
-  b <- gap + sp_val
-  A <- sp_val
+  b <- if (has_sp) gap + sp_val else gap
+  A <- if (has_sp) sp_val else 0
 
   n_cat <- vapply(
     seq_len(n_cats),
@@ -627,9 +758,7 @@ configure_model.rdm_custom <- function(model, data, formula) {
 
   drift_win <- brms::get_dpar(prep, cat_names[response], i = i)
 
-  use_full <- any(A >= 1e-10)
-
-  if (!use_full) {
+  if (!has_sp) {
     log_lik <- log(n_cat[response]) +
       .dwald(t, drift = drift_win, bound = b, s = s, log = TRUE)
 
@@ -675,6 +804,7 @@ configure_model.rdm_custom <- function(model, data, formula) {
   s <- brms::get_dpar(prep, "s", i = i)
   sp_val <- brms::get_dpar(prep, "sp", i = i)
   n_draws <- length(ndt)
+  has_sp <- isTRUE(prep$family$rdm_has_sp)
 
   n_cat <- vapply(
     seq_len(n_cats),
@@ -685,13 +815,13 @@ configure_model.rdm_custom <- function(model, data, formula) {
 
   rt <- numeric(n_draws)
   for (d in seq_len(n_draws)) {
-    b <- gap[d] + sp_val[d]
-    A <- sp_val[d]
+    b <- if (has_sp) gap[d] + sp_val[d] else gap[d]
+    A <- if (has_sp) sp_val[d] else 0
     drift_vec <- unlist(lapply(seq_len(n_cats), function(j) {
       rep(brms::get_dpar(prep, cat_names[j], i = i)[d], n_cat[j])
     }))
 
-    if (A < 1e-10) {
+    if (!has_sp) {
       ft <- .rwald_ig(total_acc, drift = drift_vec, bound = b, s = s[d])
     } else {
       start <- stats::runif(total_acc, min = 0, max = A)
@@ -707,6 +837,7 @@ configure_model.rdm_custom <- function(model, data, formula) {
   n_obs <- prep$nobs
   n_draws <- prep$ndraws
   n_sim <- 100
+  has_sp <- isTRUE(prep$family$rdm_has_sp)
 
   epred <- matrix(NA_real_, nrow = n_draws, ncol = n_obs)
   for (i in seq_len(n_obs)) {
@@ -723,13 +854,13 @@ configure_model.rdm_custom <- function(model, data, formula) {
     total_acc <- sum(n_cat)
 
     for (d in seq_len(n_draws)) {
-      b <- gap[d] + sp_val[d]
-      A <- sp_val[d]
+      b <- if (has_sp) gap[d] + sp_val[d] else gap[d]
+      A <- if (has_sp) sp_val[d] else 0
       drift_vec <- unlist(lapply(seq_len(n_cats), function(j) {
         rep(brms::get_dpar(prep, cat_names[j], i = i)[d], n_cat[j])
       }))
 
-      if (A < 1e-10) {
+      if (!has_sp) {
         ft <- matrix(
           .rwald_ig(total_acc * n_sim, drift = drift_vec, bound = b, s = s[d]),
           nrow = n_sim, ncol = total_acc, byrow = TRUE

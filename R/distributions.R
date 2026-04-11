@@ -1087,6 +1087,56 @@ validate_cswald_parameters <- function(drift, bound, ndt, zr, s) {
   if (log) log_d else exp(log_d)
 }
 
+.logsumexp2 <- function(a, b) {
+  m <- pmax(a, b)
+  m + log(exp(a - m) + exp(b - m))
+}
+
+.logdiffexp <- function(a, b) {
+  out <- rep(-Inf, length(a))
+  ok <- is.finite(a) & (a > b)
+  out[ok] <- a[ok] + log1p(-exp(b[ok] - a[ok]))
+  out
+}
+
+.log_normal_cdf_diff <- function(lower, upper) {
+  out <- rep(-Inf, length(lower))
+  valid <- upper > lower
+  if (!any(valid)) {
+    return(out)
+  }
+
+  lower_v <- lower[valid]
+  upper_v <- upper[valid]
+  lower_pos <- lower_v >= 0
+  upper_neg <- upper_v <= 0
+  mixed <- !(lower_pos | upper_neg)
+  valid_idx <- which(valid)
+
+  if (any(lower_pos)) {
+    idx <- valid_idx[lower_pos]
+    out[idx] <- .logdiffexp(
+      stats::pnorm(lower_v[lower_pos], lower.tail = FALSE, log.p = TRUE),
+      stats::pnorm(upper_v[lower_pos], lower.tail = FALSE, log.p = TRUE)
+    )
+  }
+  if (any(upper_neg)) {
+    idx <- valid_idx[upper_neg]
+    out[idx] <- .logdiffexp(
+      stats::pnorm(upper_v[upper_neg], log.p = TRUE),
+      stats::pnorm(lower_v[upper_neg], log.p = TRUE)
+    )
+  }
+  if (any(mixed)) {
+    idx <- valid_idx[mixed]
+    out[idx] <- log(
+      stats::pnorm(upper_v[mixed]) - stats::pnorm(lower_v[mixed])
+    )
+  }
+
+  out
+}
+
 .pwald <- function(rt, drift, bound, s, lower.tail = TRUE, log.p = TRUE) {
   z1 <- (drift * rt - bound) / (s * sqrt(rt))
   z2 <- -(drift * rt + bound) / (s * sqrt(rt))
@@ -2002,7 +2052,7 @@ drdm <- function(rt, response, drift, gap, ndt, s = 1, sp = 0,
   K <- length(drift)
   t <- rt - ndt
 
-  if (A < 1e-10) {
+  if (A == 0) {
     log_lik <- .dwald(t, drift = drift[response], bound = b, s = s, log = TRUE)
     for (j in seq_len(K)) {
       is_loser <- (j != response)
@@ -2038,7 +2088,7 @@ rrdm <- function(n, drift, gap, ndt, s = 1, sp = 0) {
 .rrdm <- function(n, drift, b, A, ndt, s) {
   K <- length(drift)
 
-  if (A < 1e-10) {
+  if (A == 0) {
     ft <- matrix(
       .rwald_ig(n * K, drift = rep(drift, each = n),
                 bound = b, s = s),
@@ -2067,7 +2117,7 @@ prdm <- function(q, drift, gap, ndt, s = 1, sp = 0,
   A <- sp
 
   log_surv <- numeric(length(t))
-  if (A < 1e-10) {
+  if (A == 0) {
     for (j in seq_len(K)) {
       log_surv <- log_surv +
         .pwald(t, drift = drift[j], bound = b, s = s,
@@ -2130,31 +2180,23 @@ validate_rdm_parameters <- function(drift, gap, ndt, s, sp) {
 }
 
 
-# Tillman et al. (2020), Eq. 5
-.dwald_full <- function(t, drift, bound, A, s, log = TRUE) {
+.rdm_full_pdf_raw <- function(t, drift, bound, A, s) {
   s_sqrt_t <- s * sqrt(t)
   alpha <- (bound - A - t * drift) / s_sqrt_t
   beta <- (bound - t * drift) / s_sqrt_t
 
-  pdf_val <- (1 / A) * (
+  (1 / A) * (
     -drift * stats::pnorm(alpha) +
       (s / sqrt(t)) * stats::dnorm(alpha) +
       drift * stats::pnorm(beta) -
       (s / sqrt(t)) * stats::dnorm(beta)
   )
-
-  pdf_val[pdf_val < 0] <- 0
-  if (log) log(pdf_val) else pdf_val
 }
 
-
-# Tillman et al. (2020), Appendix A
-.pwald_full <- function(t, drift, bound, A, s, lower.tail = TRUE,
-                        log.p = TRUE) {
+.rdm_full_cdf_raw <- function(t, drift, bound, A, s) {
   s2 <- s^2
   sqrt_t <- sqrt(t)
   bA <- bound - A
-
   alpha1 <- (drift * t - bound) / (s * sqrt_t)
   alpha2 <- (drift * t - bA) / (s * sqrt_t)
   beta1 <- -(drift * t + bound) / (s * sqrt_t)
@@ -2188,12 +2230,79 @@ validate_rdm_parameters <- function(drift, gap, ndt, s, sp) {
            stats::dnorm(a2_0) - stats::dnorm(a1_0))
   }
 
-  cdf_val <- pmin(pmax(cdf_val, 0), 1)
+  cdf_val
+}
 
-  if (!lower.tail) {
-    log_p <- log(1 - cdf_val)
+.rdm_full_surv_antiderivative <- function(u, t, drift, s) {
+  q <- s^2 / (2 * drift)
+  s_sqrt_t <- s * sqrt(t)
+  drift_t <- drift * t
+  y <- (u - drift_t) / s_sqrt_t
+  z <- -(drift_t + u) / s_sqrt_t
+
+  (u - drift_t - q) * stats::pnorm(y) +
+    s_sqrt_t * stats::dnorm(y) -
+    q * exp(2 * drift * u / (s^2)) * stats::pnorm(z)
+}
+
+.rdm_full_surv_raw <- function(t, drift, bound, A, s) {
+  (
+    .rdm_full_surv_antiderivative(bound, t, drift, s) -
+      .rdm_full_surv_antiderivative(bound - A, t, drift, s)
+  ) / A
+}
+
+# Tillman et al. (2020), Eq. 5
+.dwald_full <- function(t, drift, bound, A, s, log = TRUE) {
+  s_sqrt_t <- s * sqrt(t)
+  alpha <- (bound - A - t * drift) / s_sqrt_t
+  beta <- (bound - t * drift) / s_sqrt_t
+
+  use_tail <- alpha > 0
+  log_pdf <- rep(NA_real_, length(t))
+
+  if (any(use_tail)) {
+    idx <- use_tail
+    log_term1 <- log(drift) + .log_normal_cdf_diff(alpha[idx], beta[idx])
+    log_term2 <- log(s / sqrt(t[idx])) + .logdiffexp(
+      stats::dnorm(alpha[idx], log = TRUE),
+      stats::dnorm(beta[idx], log = TRUE)
+    )
+    log_pdf[idx] <- .logsumexp2(log_term1, log_term2) - log(A)
+  }
+
+  if (any(!use_tail)) {
+    idx <- !use_tail
+    pdf_val <- .rdm_full_pdf_raw(t[idx], drift, bound, A, s)
+    log_pdf[idx] <- log(pdf_val)
+  }
+
+  if (log) log_pdf else exp(log_pdf)
+}
+
+
+# Tillman et al. (2020), Appendix A
+.pwald_full <- function(t, drift, bound, A, s, lower.tail = TRUE,
+                        log.p = TRUE) {
+  cdf_val <- .rdm_full_cdf_raw(t, drift, bound, A, s)
+  surv_val <- .rdm_full_surv_raw(t, drift, bound, A, s)
+
+  if (lower.tail) {
+    log_p <- rep(-Inf, length(t))
+    use_cdf <- cdf_val > 0 & cdf_val <= 1 &
+      (cdf_val >= 0.5 | surv_val <= 0 | surv_val >= 1)
+    use_surv <- !use_cdf & surv_val >= 0 & surv_val < 1
+    log_p[use_cdf] <- log(cdf_val[use_cdf])
+    log_p[use_surv] <- log1p(-surv_val[use_surv])
   } else {
-    log_p <- log(cdf_val)
+    log_p <- rep(0, length(t))
+    use_surv <- surv_val > 0 & surv_val < 1 &
+      (surv_val >= 0.5 | cdf_val <= 0 | cdf_val >= 1)
+    use_cdf <- !use_surv & cdf_val >= 0 & cdf_val < 1
+    bad <- !use_surv & !use_cdf
+    log_p[bad & !(cdf_val <= 0 & surv_val >= 1)] <- -Inf
+    log_p[use_surv] <- log(surv_val[use_surv])
+    log_p[use_cdf] <- log1p(-cdf_val[use_cdf])
   }
 
   if (log.p) log_p else exp(log_p)

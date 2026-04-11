@@ -33,7 +33,7 @@ test_that("rdm simple version has correct links", {
   expect_equal(model$links$driftc, "log")
   expect_equal(model$links$drifte, "log")
   expect_equal(model$links$gap, "log")
-  expect_equal(model$links$ndt, "log")
+  expect_equal(model$links$ndt, "identity")
   expect_equal(model$links$s, "log")
   expect_equal(model$links$sp, "log")
 })
@@ -46,11 +46,28 @@ test_that("rdm has correct fixed parameters", {
   expect_equal(model$fixed_parameters$sp, -100)
 })
 
-test_that("rdm accepts custom links", {
-  model <- rdm(rt = "rt", response = "response", n_alternatives = 2,
-               links = list(driftc = "identity"))
-  expect_equal(model$links$driftc, "identity")
-  expect_equal(model$links$drifte, "log")
+test_that("rdm rejects unsupported custom links during model checks", {
+  model_bad_drift <- rdm(
+    rt = "rt",
+    response = "response",
+    n_alternatives = 2,
+    links = list(driftc = "identity")
+  )
+  expect_error(
+    check_model(model_bad_drift, formula = bmf(driftc ~ 1)),
+    "only support the 'log' link"
+  )
+
+  model_bad_ndt <- rdm(
+    rt = "rt",
+    response = "response",
+    n_alternatives = 2,
+    links = list(ndt = "log")
+  )
+  expect_error(
+    check_model(model_bad_ndt, formula = bmf(driftc ~ 1)),
+    "internally bounded"
+  )
 })
 
 test_that("rdm errors on invalid n_alternatives", {
@@ -154,6 +171,7 @@ test_that("check_data.rdm returns a data.frame", {
   dat <- data.frame(rt = c(0.5, 0.6), response = c(1, 2))
   result <- check_data(model, dat, bmf(driftc ~ 1))
   expect_s3_class(result, "data.frame")
+  expect_equal(attr(result, "rdm_ndt_max"), min(dat$rt) - 1e-4)
 })
 
 # -----------------------------------------------------------------------------
@@ -266,19 +284,17 @@ test_that("bmf2bf.rdm_custom creates correct brms formula", {
 test_that(".rdm_stan_code generates valid Stan for sp=0 (2 categories)", {
   code <- .rdm_stan_code("rdm_simple", c("driftc", "drifte"), has_sp = FALSE)
   expect_true(grepl("rdm_simple_lpdf", code))
-  expect_true(grepl("swald_lpdf", code))
-  expect_true(grepl("swald_lccdf", code))
-  expect_false(grepl("Phi\\(", code))
+  expect_true(grepl("vector driftc", code))
+  expect_true(grepl("rdm_log_lik_one", code))
+  expect_true(grepl("0\\)", code))
 })
 
 test_that(".rdm_stan_code generates valid Stan for sp>0 (2 categories)", {
   code <- .rdm_stan_code("rdm_simple", c("driftc", "drifte"), has_sp = TRUE)
   expect_true(grepl("rdm_simple_lpdf", code))
-  expect_true(grepl("Phi\\(", code))
-  expect_true(grepl("std_normal_lpdf", code))
-  expect_true(grepl("real b = gap \\+ sp", code))
-  expect_true(grepl("real A = sp", code))
-  expect_false(grepl("swald_lpdf", code))
+  expect_true(grepl("vector driftc", code))
+  expect_true(grepl("rdm_log_lik_one", code))
+  expect_true(grepl("1\\)", code))
 })
 
 test_that(".rdm_stan_code generates valid Stan for 4 categories", {
@@ -286,8 +302,8 @@ test_that(".rdm_stan_code generates valid Stan for 4 categories", {
   code <- .rdm_stan_code("rdm_custom", cats, has_sp = FALSE)
   expect_true(grepl("rdm_custom_lpdf", code))
   expect_true(grepl("array\\[4\\]", code))
-  expect_true(grepl("real cat1", code))
-  expect_true(grepl("real cat4", code))
+  expect_true(grepl("vector cat1", code))
+  expect_true(grepl("vector cat4", code))
 })
 
 test_that(".rdm_stan_code generates sp>0 Stan for custom version", {
@@ -295,7 +311,7 @@ test_that(".rdm_stan_code generates sp>0 Stan for custom version", {
   code <- .rdm_stan_code("rdm_custom", cats, has_sp = TRUE)
   expect_true(grepl("rdm_custom_lpdf", code))
   expect_true(grepl("array\\[3\\]", code))
-  expect_true(grepl("Phi\\(", code))
+  expect_true(grepl("rdm_log_lik_one", code))
 })
 
 # -----------------------------------------------------------------------------
@@ -316,9 +332,11 @@ test_that("configure_model.rdm_simple returns correct components", {
   expect_equal(config$formula$family$name, "rdm_simple")
   expect_true(all(c("mu", "driftc", "drifte", "gap", "ndt", "s", "sp") %in%
                     config$formula$family$dpars))
+  expect_false(config$formula$family$loop)
+  expect_false(is.null(attr(config$data, "rdm_ndt_max")))
 })
 
-test_that("configure_model.rdm_simple loads cswald_helper_functions", {
+test_that("configure_model.rdm_simple loads RDM helper functions", {
   model <- rdm(rt = "rt", response = "response", n_alternatives = 2)
   dat <- data.frame(rt = c(0.5, 0.6), response = c(1, 2))
   f <- bmf(driftc ~ 1, drifte ~ 1, gap ~ 1, ndt ~ 1)
@@ -331,6 +349,37 @@ test_that("configure_model.rdm_simple loads cswald_helper_functions", {
     collapse = "\n"
   )
   expect_true(grepl("swald_lpdf", stanvar_code))
+  expect_true(grepl("rdm_log_lik_one", stanvar_code))
+})
+
+test_that("configure_model.rdm_simple rewrites ndt through internal ndtraw", {
+  model <- rdm(rt = "rt", response = "response", n_alternatives = 2)
+  dat <- data.frame(rt = c(0.5, 0.6), response = c(1, 2), cond = c(0, 1))
+  f <- bmf(driftc ~ cond, drifte ~ 1, gap ~ 1, ndt ~ cond)
+  model <- check_model(model, data = dat, formula = f)
+  dat <- check_data(model, dat, f)
+  config <- configure_model(model, dat, f)
+  stan_code <- brms::stancode(config$formula, data = config$data, family = config$formula$family)
+
+  expect_true(grepl("ndtraw", stan_code))
+  expect_true(grepl("inv_logit\\(nlp_ndtraw", stan_code))
+  expect_true(grepl("X_ndtraw", stan_code))
+  expect_true(grepl("X_driftc", stan_code))
+})
+
+test_that("stancode for rdm includes user predictors for drift parameters", {
+  dat <- data.frame(
+    rt = c(0.5, 0.6),
+    response = c(1, 2),
+    cond = factor(c("A", "B"))
+  )
+  model <- rdm(rt = "rt", response = "response", n_alternatives = 2)
+  f <- bmf(driftc ~ cond, drifte ~ 1, gap ~ 1, ndt ~ 1)
+  code <- suppressWarnings(stancode(f, dat, model))
+
+  expect_true(grepl("X_driftc", code))
+  expect_true(grepl("Xc_driftc \\* b_driftc", code))
+  expect_true(grepl("rdm_simple_lpdf\\(Y", code))
 })
 
 # -----------------------------------------------------------------------------
@@ -411,6 +460,41 @@ test_that("drdm returns positive densities for valid inputs", {
   d <- drdm(c(0.5, 0.6), c(1, 2), drift = c(3, 1.5),
             gap = 1, ndt = 0.2)
   expect_true(all(d > 0))
+})
+
+test_that("drdm remains finite close to ndt when sp > 0", {
+  ll <- drdm(
+    rt = c(0.201, 0.202, 0.205, 0.210),
+    response = rep(1, 4),
+    drift = c(3, 1.5, 1),
+    gap = 1,
+    ndt = 0.2,
+    sp = 0.05,
+    log = TRUE
+  )
+  expect_true(all(is.finite(ll)))
+})
+
+test_that("drdm with positive sp approaches the sp=0 likelihood as sp -> 0", {
+  ll_sp0 <- drdm(
+    rt = 0.6,
+    response = 1,
+    drift = c(3, 1.5, 1),
+    gap = 1,
+    ndt = 0.2,
+    sp = 0,
+    log = TRUE
+  )
+  ll_sp_eps <- drdm(
+    rt = 0.6,
+    response = 1,
+    drift = c(3, 1.5, 1),
+    gap = 1,
+    ndt = 0.2,
+    sp = 1e-8,
+    log = TRUE
+  )
+  expect_equal(ll_sp_eps, ll_sp0, tolerance = 1e-5)
 })
 
 test_that("rrdm returns valid data.frame", {

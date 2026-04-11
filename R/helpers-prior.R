@@ -157,7 +157,7 @@ fixed_pars_priors <- function(model, formula, additional_pars = list()) {
   priors <- glue("constant({values})")
 
   # determine type of parameters
-  bterms <- brms::brmsterms(formula)
+  bterms <- brms::brmsterms(formula, family = formula$family)
   dpars <- names(bterms$dpars)
   nlpars <- names(bterms$nlpars)
 
@@ -189,7 +189,7 @@ set_default_prior <- function(model, data, formula) {
   }
 
   default_priors <- validate_default_priors(model, formula)
-  bterms <- brms::brmsterms(formula)
+  bterms <- brms::brmsterms(formula, family = formula$family)
   pars <- intersect(lhs_vars(bterms), names(default_priors))
 
   priors <- lapply(pars, function(par) {

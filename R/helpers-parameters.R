@@ -276,7 +276,7 @@ print.bmm_parameters <- function(x, max_desc_width = 50, ...) {
 .get_parameter_info <- function(bmmfit, par) {
   model <- bmmfit$bmm$model
   model_pars <- names(model$parameters)
-  bterms <- brms::brmsterms(bmmfit$formula)
+  bterms <- brms::brmsterms(bmmfit$formula, family = bmmfit$formula$family)
 
   if (!par %in% model_pars) {
     stop2(

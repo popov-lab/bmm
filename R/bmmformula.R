@@ -322,7 +322,7 @@ lhs_vars.bmmformula <- function(object, ...) {
 
 #' @export
 lhs_vars.brmsformula <- function(object, ...) {
-  lhs_vars(brms::brmsterms(object), ...)
+  lhs_vars(brms::brmsterms(object, family = object$family), ...)
 }
 
 #' @export

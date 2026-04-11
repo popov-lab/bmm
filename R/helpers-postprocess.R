@@ -49,7 +49,7 @@ postprocess_brm.default <- function(model, fit, ...) {
 }
 
 get_mu_pars <- function(object) {
-  bterms <- brms::brmsterms(object$formula)
+  bterms <- brms::brmsterms(object$formula, family = object$formula$family)
   dpars <- bterms$dpars
   if ("mu" %in% names(dpars)) {
     X <- get_model_matrix(dpars$mu$fe, object$data)

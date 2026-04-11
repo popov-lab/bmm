@@ -37,7 +37,7 @@ create_initfun.bmmodel <- function(model, data, formula) {
     force(formula)
     force(data)
 
-    bterms <- brms::brmsterms(formula)
+    bterms <- brms::brmsterms(formula, family = formula$family)
     model_pars <- names(model$parameters)
     init_ranges <- model$init_ranges
     links <- model$links
