@@ -425,6 +425,47 @@ test_that("initfun output matches standata dimensions for no-intercept models", 
   }
 })
 
+test_that("initfun handles LBA simple models", {
+  dat <- rlba(n = 120, drift = c(3, 1.5), gap = 0.5, sp = 0.5, ndt = 0.2)
+  mod <- lba(rt = "rt", response = "response", n_alternatives = 2)
+  ff <- bmf(driftc ~ 1, drifte ~ 1, gap ~ 1, sp ~ 1, ndt ~ 1)
+  mod <- check_model(mod, data = dat, formula = ff)
+  dat <- check_data(mod, dat, ff)
+  ff <- check_formula(mod, dat, ff)
+  config_args <- configure_model(mod, data = dat, formula = ff)
+
+  init_fun <- create_initfun(mod, dat, config_args$formula)
+  inits <- init_fun()
+
+  expect_type(inits, "list")
+  expect_true(all(vapply(inits, function(x) all(is.finite(x)), logical(1))))
+  expect_true(all(c(
+    "Intercept_driftc", "Intercept_drifte", "Intercept_gap",
+    "Intercept_sp", "Intercept_ndt"
+  ) %in% names(inits)))
+})
+
+test_that("initfun handles LBA custom models with predictors", {
+  dat <- rlba(n = 160, drift = c(3, 1.5), gap = 0.5, sp = 0.5, ndt = 0.2)
+  dat$response <- ifelse(dat$response == 1, "correct", "wrong")
+  dat$condition <- factor(rep(c("A", "B"), length.out = nrow(dat)))
+
+  mod <- lba(rt = "rt", response = "response", version = "custom")
+  ff <- bmf(correct ~ condition, wrong ~ 1, gap ~ 1, sp ~ 1, ndt ~ 1)
+  mod <- check_model(mod, data = dat, formula = ff)
+  dat <- check_data(mod, dat, ff)
+  ff <- check_formula(mod, dat, ff)
+  config_args <- configure_model(mod, data = dat, formula = ff)
+
+  init_fun <- create_initfun(mod, dat, config_args$formula)
+  inits <- init_fun()
+
+  expect_type(inits, "list")
+  expect_true(all(vapply(inits, function(x) all(is.finite(x)), logical(1))))
+  expect_true(any(grepl("^b_", names(inits))))
+  expect_true("Intercept_correct" %in% names(inits))
+})
+
 
 # -----------------------------------------------------------------------------
 # match_stan_to_model_par tests (substring collision scenarios)

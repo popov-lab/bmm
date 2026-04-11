@@ -466,6 +466,119 @@ fit_rows <- fit_rows[(fixef(fit$IMMabc)[,2]-0.000001) > 0]
 round(fixef(fit$IMMabc)[fit_rows,] - fixef(ref_fits$IMMabc)[fit_rows,],3)
 ```
 
+## Benchmark: lba
+
+```{r lba_benchmark_helpers}
+count_divergences <- function(fit) {
+  np <- brms::nuts_params(fit)
+  sum(np$Parameter == "divergent__" & np$Value == 1)
+}
+
+run_lba_benchmark <- function(data, model, formula) {
+  elapsed <- system.time(
+    fit <- bmm(formula, data, model,
+               cores = 2,
+               chains = 2,
+               iter = 500,
+               refresh = 0,
+               silent = 2,
+               backend = "cmdstanr",
+               seed = seed)
+  )[["elapsed"]]
+
+  fixed <- summary(fit)$fixed
+  list(
+    fit = fit,
+    metrics = data.frame(
+      elapsed_sec = elapsed,
+      max_rhat = max(fixed[, "Rhat"], na.rm = TRUE),
+      min_bulk_ess = min(fixed[, "Bulk_ESS"], na.rm = TRUE),
+      min_tail_ess = min(fixed[, "Tail_ESS"], na.rm = TRUE),
+      divergences = count_divergences(fit)
+    )
+  )
+}
+```
+
+```{r lba_benchmark_fits}
+set.seed(seed)
+
+lba_normal_data <- rlba(
+  n = 500,
+  drift = c(3, 1.5),
+  gap = 0.5,
+  sp = 0.5,
+  ndt = 0.2
+)
+lba_gamma_data <- rlba(
+  n = 500,
+  drift = c(2.5, 1.3),
+  gap = 0.5,
+  sp = 0.5,
+  ndt = 0.2,
+  distribution = "gamma"
+)
+lba_lognormal_data <- rlba(
+  n = 500,
+  drift = c(0.5, 0.1),
+  gap = 0.5,
+  sp = 0.5,
+  ndt = 0.2,
+  distribution = "lognormal"
+)
+lba_frechet_data <- rlba(
+  n = 500,
+  drift = c(2.5, 1.5),
+  gap = 0.5,
+  sp = 0.5,
+  ndt = 0.2,
+  distribution = "frechet"
+)
+lba_custom_data <- lba_normal_data
+lba_custom_data$response <- ifelse(lba_custom_data$response == 1, "correct", "wrong")
+
+lba_bench <- list(
+  normal = run_lba_benchmark(
+    lba_normal_data,
+    lba(rt = "rt", response = "response", n_alternatives = 2),
+    bmf(driftc ~ 1, drifte ~ 1, gap ~ 1, sp ~ 1, ndt ~ 1)
+  ),
+  gamma = run_lba_benchmark(
+    lba_gamma_data,
+    lba(rt = "rt", response = "response", n_alternatives = 2,
+        distribution = "gamma"),
+    bmf(driftc ~ 1, drifte ~ 1, gap ~ 1, sp ~ 1, ndt ~ 1)
+  ),
+  lognormal = run_lba_benchmark(
+    lba_lognormal_data,
+    lba(rt = "rt", response = "response", n_alternatives = 2,
+        distribution = "lognormal"),
+    bmf(driftc ~ 1, drifte ~ 1, gap ~ 1, sp ~ 1, ndt ~ 1)
+  ),
+  frechet = run_lba_benchmark(
+    lba_frechet_data,
+    lba(rt = "rt", response = "response", n_alternatives = 2,
+        distribution = "frechet"),
+    bmf(driftc ~ 1, drifte ~ 1, gap ~ 1, sp ~ 1, ndt ~ 1)
+  ),
+  custom = run_lba_benchmark(
+    lba_custom_data,
+    lba(rt = "rt", response = "response", version = "custom"),
+    bmf(correct ~ 1, wrong ~ 1, gap ~ 1, sp ~ 1, ndt ~ 1)
+  )
+)
+```
+
+```{r lba_benchmark_metrics}
+dplyr::bind_rows(lapply(names(lba_bench), function(name) {
+  cbind(model = name, lba_bench[[name]]$metrics)
+}))
+```
+
+```{r lba_benchmark_summaries}
+lapply(lba_bench, function(x) summary(x$fit)$fixed)
+```
+
 
 save fit objects
 

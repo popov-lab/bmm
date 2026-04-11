@@ -457,18 +457,19 @@ bmf2bf.lba_custom <- function(model, formula) {
 
 .lba_stan_code <- function(family_name, cat_names, distribution) {
   n_cats <- length(cat_names)
-  cat_args <- paste(paste0("real ", cat_names), collapse = ", ")
-  n_args <- paste(paste0("int n", seq_len(n_cats)), collapse = ", ")
-  drift_array <- paste0(
-    "array[", n_cats, "] real drift = {",
-    paste(cat_names, collapse = ", "), "};"
+  cat_args <- paste(paste0("vector ", cat_names), collapse = ", ")
+  n_args <- paste(paste0("array[] int n", seq_len(n_cats)), collapse = ", ")
+  drift_assignments <- paste(
+    paste0("drift[", seq_len(n_cats), "] = ", cat_names, "[i];"),
+    collapse = "\n    "
   )
-  n_array <- paste0(
-    "array[", n_cats, "] int n = {",
-    paste(paste0("n", seq_len(n_cats)), collapse = ", "), "};"
+  n_assignments <- paste(
+    paste0("n[", seq_len(n_cats), "] = n", seq_len(n_cats), "[i];"),
+    collapse = "\n    "
   )
 
   sc_path <- system.file("stan_chunks", package = "bmm")
+  shared_helpers <- read_lines2(file.path(sc_path, "lba_shared_functions.stan"))
   helpers <- read_lines2(
     file.path(sc_path, paste0("lba_", distribution, "_functions.stan"))
   )
@@ -476,29 +477,35 @@ bmf2bf.lba_custom <- function(model, formula) {
   prefix <- paste0("lba_", distribution)
 
   main_fn <- glue(
-    "real {family_name}_lpdf(real rt, real mu, {cat_args}, ",
-    "real gap, real sp, real ndt, real s, int response, {n_args}) {{\n",
-    "  real b = gap + sp;\n",
-    "  real A = sp;\n",
-    "  real t = rt - ndt;\n",
-    "  if (t <= 0) return negative_infinity();\n",
-    "  {drift_array}\n",
-    "  {n_array}\n",
-    "  real log_lik = log(n[response])\n",
-    "               + {prefix}_single_lpdf(t | drift[response], b, A, s);\n",
-    "  for (j in 1:{n_cats}) {{\n",
-    "    real log_ccdf = {prefix}_single_lccdf(t | drift[j], b, A, s);\n",
-    "    if (j == response) {{\n",
-    "      if (n[j] > 1) log_lik += (n[j] - 1) * log_ccdf;\n",
-    "    }} else {{\n",
-    "      log_lik += n[j] * log_ccdf;\n",
+    "real {family_name}_lpdf(vector rt, vector mu, {cat_args}, ",
+    "vector gap, vector sp, vector ndt, vector s, array[] int response, ",
+    "{n_args}) {{\n",
+    "  int N = num_elements(rt);\n",
+    "  real log_lik = 0;\n",
+    "  for (i in 1:N) {{\n",
+    "    real b = gap[i] + sp[i];\n",
+    "    real A = sp[i];\n",
+    "    real t = rt[i] - ndt[i];\n",
+    "    array[{n_cats}] real drift;\n",
+    "    array[{n_cats}] int n;\n",
+    "    array[{n_cats}] real log_surv;\n",
+    "    if (t <= 0) return negative_infinity();\n",
+    "    {drift_assignments}\n",
+    "    {n_assignments}\n",
+    "    for (j in 1:{n_cats}) {{\n",
+    "      log_surv[j] = {prefix}_single_lccdf(t | drift[j], b, A, s[i]);\n",
     "    }}\n",
+    "    log_lik += lba_race_loglik(\n",
+    "      response[i], n,\n",
+    "      {prefix}_single_lpdf(t | drift[response[i]], b, A, s[i]),\n",
+    "      log_surv\n",
+    "    );\n",
     "  }}\n",
     "  return log_lik;\n",
     "}}"
   )
 
-  paste0(helpers, "\n", main_fn)
+  paste0(shared_helpers, "\n", helpers, "\n", main_fn)
 }
 
 #' @export
@@ -527,8 +534,8 @@ configure_model.lba_simple <- function(model, data, formula) {
     ub = rep(NA, length(dpars)),
     lb = rep(NA, length(dpars)),
     type = "real",
-    vars = c("vint1[n]", "vint2[n]", "vint3[n]"),
-    loop = TRUE,
+    vars = c("vint1", "vint2", "vint3"),
+    loop = FALSE,
     log_lik = log_lik_lba_simple,
     posterior_predict = posterior_predict_lba_simple,
     posterior_epred = posterior_epred_lba_simple
@@ -556,7 +563,7 @@ configure_model.lba_custom <- function(model, data, formula) {
     if (is.null(links$s)) "log" else links$s
   )
 
-  vars_vec <- paste0("vint", seq_len(n_cats + 1), "[n]")
+  vars_vec <- paste0("vint", seq_len(n_cats + 1))
   family_name <- paste0("lba_", dist, "_custom")
 
   formula$family <- brms::custom_family(
@@ -567,7 +574,7 @@ configure_model.lba_custom <- function(model, data, formula) {
     lb = rep(NA, length(dpars)),
     type = "real",
     vars = vars_vec,
-    loop = TRUE,
+    loop = FALSE,
     log_lik = log_lik_lba_custom,
     posterior_predict = posterior_predict_lba_custom,
     posterior_epred = posterior_epred_lba_custom

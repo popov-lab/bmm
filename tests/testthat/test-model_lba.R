@@ -203,26 +203,73 @@ test_that("Stan code for normal LBA contains expected elements", {
   code <- bmm:::.lba_stan_code("lba_normal_simple", c("driftc", "drifte"), "normal")
   expect_true(grepl("lba_normal_single_lpdf", code))
   expect_true(grepl("lba_normal_single_lccdf", code))
-  expect_true(grepl("real b = gap \\+ sp", code))
-  expect_true(grepl("real A = sp", code))
+  expect_true(grepl("lba_race_loglik", code))
+  expect_true(grepl("std_normal_lcdf", code))
+  expect_false(grepl("Phi_approx", code))
+  expect_false(grepl("fmax\\(", code))
+  expect_false(grepl("fmin\\(", code))
 })
 
 test_that("Stan code for gamma LBA contains expected elements", {
   code <- bmm:::.lba_stan_code("lba_gamma_simple", c("driftc", "drifte"), "gamma")
+  dat <- rlba(10, drift = c(2, 3), gap = 0.5, sp = 0.5, ndt = 0.2,
+              distribution = "gamma")
+  config <- configure_model(
+    lba(rt = "rt", response = "response", n_alternatives = 2,
+        distribution = "gamma"),
+    dat,
+    bmf(driftc ~ 1, drifte ~ 1, gap ~ 1, sp ~ 1, ndt ~ 1)
+  )
   expect_true(grepl("lba_gamma_single_lpdf", code))
-  expect_true(grepl("gamma_cdf", code))
-  expect_true(grepl("gamma_lpdf", code))
+  expect_true(grepl("gamma_lcdf", code))
+  expect_false(config$formula$family$loop)
 })
 
 test_that("Stan code for lognormal LBA contains expected elements", {
   code <- bmm:::.lba_stan_code("lba_lognormal_simple", c("driftc", "drifte"), "lognormal")
   expect_true(grepl("lba_lognormal_single_lpdf", code))
+  expect_true(grepl("std_normal_lcdf", code))
+  expect_false(grepl("Phi_approx", code))
+  expect_false(grepl("fmax\\(", code))
+  expect_false(grepl("fmin\\(", code))
 })
 
 test_that("Stan code for frechet LBA contains expected elements", {
   code <- bmm:::.lba_stan_code("lba_frechet_simple", c("driftc", "drifte"), "frechet")
   expect_true(grepl("lba_frechet_single_lpdf", code))
-  expect_true(grepl("n_quad", code))
+  expect_true(grepl("array\\[16\\] real nodes", code))
+  expect_true(grepl("log_sum_exp", code))
+})
+
+test_that("LBA generated Stan code uses vectorized custom likelihoods", {
+  dat <- rlba(n = 20, drift = c(3, 1.5), gap = 0.5, sp = 0.5, ndt = 0.2)
+  simple_model <- lba(rt = "rt", response = "response", n_alternatives = 2)
+  simple_formula <- bmf(driftc ~ 1, drifte ~ 1, gap ~ 1, sp ~ 1, ndt ~ 1)
+  simple_code <- stancode(simple_formula, data = dat, model = simple_model,
+                          backend = "cmdstanr")
+
+  expect_true(grepl(
+    "target \\+= lba_normal_simple_lpdf\\(Y \\| mu, driftc, drifte, gap, sp, ndt, s, vint1, vint2, vint3\\);",
+    simple_code
+  ))
+  expect_false(grepl(
+    "for \\(n in 1:N\\) \\{\\s+target \\+= lba_normal_simple_lpdf",
+    simple_code,
+    perl = TRUE
+  ))
+
+  dat$response <- ifelse(dat$response == 1, "correct", "wrong")
+  custom_model <- lba(rt = "rt", response = "response", version = "custom")
+  custom_formula <- bmf(correct ~ 1, wrong ~ 1, gap ~ 1, sp ~ 1, ndt ~ 1)
+  custom_code <- stancode(custom_formula, data = dat, model = custom_model,
+                          backend = "cmdstanr")
+
+  expect_true(grepl("target \\+= lba_normal_custom_lpdf\\(Y \\|", custom_code))
+  expect_false(grepl(
+    "for \\(n in 1:N\\) \\{\\s+target \\+= lba_normal_custom_lpdf",
+    custom_code,
+    perl = TRUE
+  ))
 })
 
 

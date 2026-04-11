@@ -1,37 +1,33 @@
 // Single-accumulator log-PDF for LBA with normal drift
-// Uses Phi_approx (inv_logit approximation) for speed
-// c = 1.702 gives max |Phi_approx(x) - Phi(x)| < 0.00014
+// Exact formulas follow the R reference implementation in distributions.R
 real lba_normal_single_lpdf(real t, real v, real b, real A, real s) {
-  real c = 1.702;
-  if (A < 1e-6) {
-    return log(b) - 2 * log(t) + normal_lpdf(b / t | v, s);
-  }
   real hi = b / t;
   real lo = (b - A) / t;
-  real cz_hi = c * (hi - v) / s;
-  real cz_lo = c * (lo - v) / s;
-  real Phi_hi = inv_logit(cz_hi);
-  real Phi_lo = inv_logit(cz_lo);
-  real M = v * (Phi_hi - Phi_lo)
-         + s * c * (Phi_lo * (1 - Phi_lo) - Phi_hi * (1 - Phi_hi));
-  return log(fmax(M, 1e-10)) - log(A);
+  real z_hi = (hi - v) / s;
+  real z_lo = (lo - v) / s;
+  real log_F_hi = std_normal_lcdf(z_hi | );
+  real log_F_lo = std_normal_lcdf(z_lo | );
+  real Phi_hi = exp(log_F_hi);
+  real Phi_lo = exp(log_F_lo);
+  real phi_hi = exp(std_normal_lpdf(z_hi | ));
+  real phi_lo = exp(std_normal_lpdf(z_lo | ));
+  real M = v * (Phi_hi - Phi_lo) + s * (phi_lo - phi_hi);
+  return lba_log_positive(M) - log(A);
 }
 
 // Single-accumulator log-survival for LBA with normal drift
-// Survival is clamped to [1e-10, 1] using fmin/fmax for gradient-safe bounds
 real lba_normal_single_lccdf(real t, real v, real b, real A, real s) {
-  real c = 1.702;
-  if (A < 1e-6) {
-    return log1m_inv_logit(c * (b / t - v) / s);
-  }
   real hi = b / t;
   real lo = (b - A) / t;
-  real cz_hi = c * (hi - v) / s;
-  real cz_lo = c * (lo - v) / s;
-  real Phi_hi = inv_logit(cz_hi);
-  real Phi_lo = inv_logit(cz_lo);
-  real M = v * (Phi_hi - Phi_lo)
-         + s * c * (Phi_lo * (1 - Phi_lo) - Phi_hi * (1 - Phi_hi));
-  real surv = (b * Phi_hi - (b - A) * Phi_lo - t * M) / A;
-  return fmin(log(fmax(surv, 1e-10)), 0.0);
+  real z_hi = (hi - v) / s;
+  real z_lo = (lo - v) / s;
+  real log_F_hi = std_normal_lcdf(z_hi | );
+  real log_F_lo = std_normal_lcdf(z_lo | );
+  real Phi_hi = exp(log_F_hi);
+  real Phi_lo = exp(log_F_lo);
+  real phi_hi = exp(std_normal_lpdf(z_hi | ));
+  real phi_lo = exp(std_normal_lpdf(z_lo | ));
+  real M = v * (Phi_hi - Phi_lo) + s * (phi_lo - phi_hi);
+  real surv_num = (b * Phi_hi) - ((b - A) * Phi_lo) - (t * M);
+  return lba_log_positive(surv_num) - log(A);
 }

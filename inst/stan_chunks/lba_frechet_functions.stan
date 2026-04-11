@@ -1,49 +1,52 @@
-// Single-accumulator log-PDF for LBA with Frechet drift
-// Uses 20-point trapezoidal quadrature for M integral when A >= 1e-6
-real lba_frechet_single_lpdf(real t, real v, real b, real A, real s) {
-  if (A < 1e-6) {
-    real z = b / (t * s);
-    return log(b) - 2 * log(t) + log(v) - log(s)
-           - (1 + v) * log(z) - pow(z, -v);
-  }
-  real hi = b / t;
+real lba_frechet_log_F(real x, real v, real s) {
+  return -pow(x / s, -v);
+}
+
+real lba_frechet_log_M(real t, real v, real b, real A, real s) {
+  array[16] real nodes = {
+    -0.9894009349916499, -0.9445750230732326, -0.8656312023878318,
+    -0.7554044083550030, -0.6178762444026438, -0.4580167776572274,
+    -0.2816035507792589, -0.0950125098376374,  0.0950125098376374,
+     0.2816035507792589,  0.4580167776572274,  0.6178762444026438,
+     0.7554044083550030,  0.8656312023878318,  0.9445750230732326,
+     0.9894009349916499
+  };
+  array[16] real weights = {
+    0.0271524594117541, 0.0622535239386479, 0.0951585116824928,
+    0.1246289712555339, 0.1495959888165767, 0.1691565193950025,
+    0.1826034150449236, 0.1894506104550685, 0.1894506104550685,
+    0.1826034150449236, 0.1691565193950025, 0.1495959888165767,
+    0.1246289712555339, 0.0951585116824928, 0.0622535239386479,
+    0.0271524594117541
+  };
   real lo = (b - A) / t;
-  int n_quad = 20;
-  real h = (hi - lo) / n_quad;
-  real M = 0;
-  for (q in 0:n_quad) {
-    real u = lo + q * h;
+  real hi = b / t;
+  real mid = 0.5 * (hi + lo);
+  real half_range = 0.5 * (hi - lo);
+  array[16] real log_terms;
+  for (j in 1:16) {
+    real u = mid + half_range * nodes[j];
     real log_z = log(u / s);
-    real f_u = (v / s) * exp(-(1 + v) * log_z - exp(-v * log_z));
-    real w = (q == 0 || q == n_quad) ? 0.5 : 1.0;
-    M += w * u * f_u;
+    real log_integrand = log(v) - (v * log_z) - exp(-v * log_z);
+    log_terms[j] = log(weights[j]) + log_integrand;
   }
-  M *= h;
-  return log(fmax(M, 1e-10)) - log(A);
+  return log(half_range) + log_sum_exp(log_terms);
+}
+
+// Single-accumulator log-PDF for LBA with Frechet drift
+real lba_frechet_single_lpdf(real t, real v, real b, real A, real s) {
+  return lba_frechet_log_M(t, v, b, A, s) - log(A);
 }
 
 // Single-accumulator log-survival for LBA with Frechet drift
-// Survival is clamped to [1e-10, 1] using fmin/fmax for gradient-safe bounds
 real lba_frechet_single_lccdf(real t, real v, real b, real A, real s) {
-  if (A < 1e-6) {
-    real log_F = -pow(b / (t * s), -v);
-    return log1m_exp(log_F);
-  }
+  real log_M = lba_frechet_log_M(t, v, b, A, s);
   real hi = b / t;
   real lo = (b - A) / t;
-  int n_quad = 20;
-  real h = (hi - lo) / n_quad;
-  real M = 0;
-  for (q in 0:n_quad) {
-    real u = lo + q * h;
-    real log_z = log(u / s);
-    real f_u = (v / s) * exp(-(1 + v) * log_z - exp(-v * log_z));
-    real w = (q == 0 || q == n_quad) ? 0.5 : 1.0;
-    M += w * u * f_u;
-  }
-  M *= h;
-  real F_hi = exp(-pow(hi / s, -v));
-  real F_lo = exp(-pow(lo / s, -v));
-  real surv = (b * F_hi - (b - A) * F_lo - t * M) / A;
-  return fmin(log(fmax(surv, 1e-10)), 0.0);
+  real log_u = log_diff_exp(
+    log(b) + lba_frechet_log_F(hi, v, s),
+    log(b - A) + lba_frechet_log_F(lo, v, s)
+  );
+  real surv_num = exp(log_u) - t * exp(log_M);
+  return lba_log_positive(surv_num) - log(A);
 }
