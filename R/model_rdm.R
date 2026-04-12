@@ -16,7 +16,7 @@
       driftc = "log",
       drifte = "log",
       gap = "log",
-      ndt = "identity",
+      ndt = "log",
       s = "log",
       sp = "log"
     ),
@@ -38,7 +38,7 @@
       driftc = c(2, 4),
       drifte = c(1, 2.5),
       gap = c(0.8, 1.2),
-      ndt = c(0.025, 0.05),
+      ndt = c(0.01, 0.05),
       s = c(0.8, 1.2),
       sp = c(0.2, 0.5)
     )
@@ -52,7 +52,7 @@
     ),
     links = list(
       gap = "log",
-      ndt = "identity",
+      ndt = "log",
       s = "log",
       sp = "log"
     ),
@@ -70,7 +70,7 @@
     init_ranges = list(
       mu = c(-0.5, 0.5),
       gap = c(0.8, 1.2),
-      ndt = c(0.025, 0.05),
+      ndt = c(0.01, 0.05),
       s = c(0.8, 1.2),
       sp = c(0.2, 0.5)
     )
@@ -83,10 +83,6 @@
   "exp", "lower", "upper", "in", "functions", "generated", "transformed",
   "parameters"
 )
-
-.rdm_ndt_internal <- "ndtraw"
-.rdm_ndt_buffer <- 1e-4
-
 
 .model_rdm <- function(
     rt = NULL,
@@ -167,9 +163,8 @@
 #'   }
 #' @param links A named list of link functions for the model parameters.
 #'   For `"simple"`: parameters are `driftc`, `drifte`, `gap`, `ndt`, `s`,
-#'   and `sp`. Positive-valued parameters use a "log" link; `ndt` is
-#'   internally bounded through a support-preserving transformation and does
-#'   not support custom links.
+#'   and `sp`. All positive-valued parameters, including `ndt`, use a "log"
+#'   link and only support that link.
 #' @param ... Additional arguments passed internally (for testing purposes).
 #' @return An object of class `bmmodel`
 #' @export
@@ -220,7 +215,7 @@ rdm <- function(rt, response, n_alternatives = NULL,
 
 #' @export
 check_model.rdm <- function(model, data = NULL, formula = NULL) {
-  positive_pars <- setdiff(names(model$links), c("mu", "ndt"))
+  positive_pars <- setdiff(names(model$links), "mu")
   bad_positive <- positive_pars[vapply(
     positive_pars,
     function(par) !identical(model$links[[par]], "log"),
@@ -230,11 +225,6 @@ check_model.rdm <- function(model, data = NULL, formula = NULL) {
   stopif(
     length(bad_positive) > 0,
     "RDM parameters {collapse_comma(bad_positive)} only support the 'log' link."
-  )
-  stopif(
-    !identical(model$links$ndt, "identity"),
-    "The RDM ndt parameter is internally bounded via ndt = ndt_max * inv_logit({.rdm_ndt_internal}). \\
-    Custom ndt links are not supported."
   )
 
   NextMethod("check_model")
@@ -335,14 +325,6 @@ check_data.rdm <- function(model, data, formula) {
     "The response variable '{response_var}' contains {n_na_resp} NA values. \\
     Please remove or impute missing values before fitting the model."
   )
-
-  ndt_max <- min(data[, rt_var]) - .rdm_ndt_buffer
-  stopif(
-    ndt_max <= 0,
-    "The smallest reaction time must be larger than {.rdm_ndt_buffer} seconds \\
-    to construct a valid ndt upper bound."
-  )
-  attr(data, "rdm_ndt_max") <- ndt_max
 
   NextMethod("check_data")
 }
@@ -464,87 +446,6 @@ bmf2bf.rdm_custom <- function(model, formula) {
   brms::bf(glue("{rt_var} | vint({vint_args}) ~ 1"))
 }
 
-.rdm_rename_formula_lhs <- function(formula, lhs) {
-  out <- formula
-  out[[2]] <- as.name(lhs)
-  out
-}
-
-.rdm_formula_component <- function(formula) {
-  if (is_nl(formula)) brms::nlf(formula) else brms::lf(formula)
-}
-
-.rdm_ndt_ratio <- function(ndt, ndt_max, strict = FALSE) {
-  ratio <- ndt / ndt_max
-  if (strict) {
-    stopif(
-      any(ratio <= 0) || any(ratio >= 1),
-      "ndt must be strictly between 0 and the fitted upper bound ({signif(ndt_max, 6)} seconds)."
-    )
-  }
-  pmin(pmax(ratio, 1e-6), 1 - 1e-6)
-}
-
-.rdm_ndt_to_raw <- function(ndt, ndt_max, strict = FALSE) {
-  stats::qlogis(.rdm_ndt_ratio(ndt, ndt_max, strict = strict))
-}
-
-.rdm_ndt_default_prior <- function(ndt_max) {
-  center <- .rdm_ndt_to_raw(exp(-2), ndt_max)
-  list(
-    main = glue("normal({signif(center, 8)}, 0.3)"),
-    effects = "normal(0, 0.3)"
-  )
-}
-
-.rdm_rewrite_user_prior <- function(prior) {
-  if (is.null(prior) || nrow(prior) == 0) {
-    return(prior)
-  }
-
-  idx_dpar <- prior$dpar == "ndt"
-  idx_nlpar <- prior$nlpar == "ndt"
-
-  if (any(idx_dpar)) {
-    intercept_idx <- idx_dpar & prior$class == "Intercept"
-    prior$dpar[idx_dpar] <- ""
-    prior$nlpar[idx_dpar] <- .rdm_ndt_internal
-    prior$class[intercept_idx] <- "b"
-    prior$coef[intercept_idx] <- "Intercept"
-  }
-  if (any(idx_nlpar)) {
-    prior$nlpar[idx_nlpar] <- .rdm_ndt_internal
-  }
-
-  prior
-}
-
-.rdm_internal_model <- function(model, ndt_max) {
-  model_internal <- model
-  model_internal$parameters[[.rdm_ndt_internal]] <- model_internal$parameters$ndt
-  model_internal$parameters$ndt <- NULL
-  model_internal$links[[.rdm_ndt_internal]] <- "identity"
-  model_internal$links$ndt <- NULL
-  model_internal$init_ranges[[.rdm_ndt_internal]] <- .rdm_ndt_to_raw(
-    model_internal$init_ranges$ndt,
-    ndt_max
-  )
-  model_internal$init_ranges$ndt <- NULL
-  model_internal
-}
-
-.rdm_build_formula <- function(response_formula, formula, ndt_max) {
-  ndt_formula <- .rdm_rename_formula_lhs(formula$ndt, .rdm_ndt_internal)
-  ndt_max_txt <- sprintf("%.17g", ndt_max)
-  ndt_nlf <- brms::nlf(
-    stats::as.formula(glue("ndt ~ {ndt_max_txt} * inv_logit({.rdm_ndt_internal})"))
-  )
-  other_pars <- setdiff(names(formula), "ndt")
-  components <- lapply(formula[other_pars], .rdm_formula_component)
-  components <- c(components, list(.rdm_formula_component(ndt_formula), ndt_nlf))
-  Reduce(`+`, components, init = response_formula)
-}
-
 ############################################################################# !
 # Stan code generation                                                   ####
 ############################################################################# !
@@ -605,17 +506,16 @@ bmf2bf.rdm_custom <- function(model, formula) {
 configure_model.rdm_simple <- function(model, data, formula) {
   cat_names <- c("driftc", "drifte")
   has_sp <- !("sp" %in% names(model$fixed_parameters))
-  ndt_max <- attr(data, "rdm_ndt_max")
-  formula <- .rdm_build_formula(bmf2bf(model, formula), formula, ndt_max)
+  formula <- bmf2bf(model, formula)
 
   formula$family <- brms::custom_family(
     "rdm_simple",
     dpars = c("mu", cat_names, "gap", "ndt", "s", "sp"),
     links = c("identity", model$links$driftc, model$links$drifte,
-              model$links$gap, "identity", model$links$s,
+              model$links$gap, model$links$ndt, model$links$s,
               model$links$sp),
     ub = rep(NA, 7),
-    lb = rep(NA, 7),
+    lb = c(NA, 0, 0, 0, 0, 0, 0),
     type = "real",
     vars = c("vint1", "vint2", "vint3"),
     loop = FALSE,
@@ -650,8 +550,7 @@ configure_model.rdm_custom <- function(model, data, formula) {
   cat_names <- model$other_vars$resp_cats
   n_cats <- length(cat_names)
   has_sp <- !("sp" %in% names(model$fixed_parameters))
-  ndt_max <- attr(data, "rdm_ndt_max")
-  formula <- .rdm_build_formula(bmf2bf(model, formula), formula, ndt_max)
+  formula <- bmf2bf(model, formula)
 
   n_dpars <- n_cats + 5
   formula$family <- brms::custom_family(
@@ -660,10 +559,10 @@ configure_model.rdm_custom <- function(model, data, formula) {
     links = c(
       "identity",
       vapply(cat_names, function(p) model$links[[p]], character(1)),
-      model$links$gap, "identity", model$links$s, model$links$sp
+      model$links$gap, model$links$ndt, model$links$s, model$links$sp
     ),
     ub = rep(NA, n_dpars),
-    lb = rep(NA, n_dpars),
+    lb = c(NA, rep(0, n_cats), 0, 0, 0, 0),
     type = "real",
     vars = paste0("vint", seq_len(n_cats + 1)),
     loop = FALSE,
@@ -695,59 +594,7 @@ configure_model.rdm_custom <- function(model, data, formula) {
 
 #' @export
 configure_prior.rdm <- function(model, data, formula, user_prior = NULL, ...) {
-  ndt_max <- attr(data, "rdm_ndt_max")
-  model_internal <- model
-  model_internal$default_priors$ndt <- NULL
-  model_internal$fixed_parameters$ndt <- NULL
-
-  prior <- fixed_pars_priors(model_internal, formula)
-  default_prior <- set_default_prior(model_internal, data, formula)
-  prior <- combine_prior(default_prior, prior)
-
-  if (isTRUE(getOption("bmm.default_priors", TRUE)) &&
-      !"ndt" %in% names(model$fixed_parameters)) {
-    bterms <- brms::brmsterms(formula, family = formula$family)
-    ndtraw_prior <- list()
-    ndtraw_prior[[.rdm_ndt_internal]] <- .rdm_ndt_default_prior(ndt_max)
-    prior <- combine_prior(
-      prior,
-      Reduce(
-        combine_prior,
-        construct_default_priors_list(
-          .rdm_ndt_internal, bterms, ndtraw_prior, data
-        ),
-        init = brms::empty_prior()
-      )
-    )
-  }
-
-  if ("ndt" %in% names(model$fixed_parameters)) {
-    prior <- combine_prior(
-      prior,
-      brms::prior_(
-        glue(
-          "constant({signif(.rdm_ndt_to_raw(model$fixed_parameters$ndt, ndt_max, strict = TRUE), 8)})"
-        ),
-        class = "b",
-        coef = "Intercept",
-        nlpar = .rdm_ndt_internal
-      )
-    )
-  }
-
-  user_prior <- .rdm_rewrite_user_prior(user_prior)
-  prior <- combine_prior(prior, user_prior)
-  additional_prior <- NextMethod("configure_prior")
-  combine_prior(prior, additional_prior)
-}
-
-#' @export
-create_initfun.rdm <- function(model, data, formula) {
-  create_initfun.bmmodel(
-    .rdm_internal_model(model, attr(data, "rdm_ndt_max")),
-    data,
-    formula
-  )
+  NULL
 }
 
 ############################################################################# !

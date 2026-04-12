@@ -2037,39 +2037,72 @@ neg_loglik <- function(x, params, distribution, weights = NULL) {
 drdm <- function(rt, response, drift, gap, ndt, s = 1, sp = 0,
                  log = FALSE) {
   validate_rdm_parameters(drift, gap, ndt, s, sp)
-  stopif(
-    any(rt - ndt <= 0),
-    "Some reaction times are smaller than the non-decision time. \\
-    You need to specify a non-decision time 'ndt' smaller than \\
-    the shortest reaction time."
-  )
+
+  n <- max(length(rt), length(response), length(gap), length(ndt), length(s), length(sp))
+  rt <- rep_len(rt, n)
+  response <- rep_len(response, n)
+  gap <- rep_len(gap, n)
+  ndt <- rep_len(ndt, n)
+  s <- rep_len(s, n)
+  sp <- rep_len(sp, n)
+
   b <- gap + sp
   A <- sp
-  .drdm(rt, response, drift, b, A, ndt, s, log)
+  invalid <- rt - ndt <= 0
+
+  if (!any(invalid)) {
+    return(.drdm(rt, response, drift, b, A, ndt, s, log))
+  }
+
+  out <- rep(if (log) -Inf else 0, n)
+  valid <- !invalid
+  if (any(valid)) {
+    out[valid] <- .drdm(rt[valid], response[valid], drift, b[valid], A[valid],
+                        ndt[valid], s[valid], log)
+  }
+  out
 }
 
 .drdm <- function(rt, response, drift, b, A, ndt, s, log) {
   K <- length(drift)
   t <- rt - ndt
 
-  if (A == 0) {
+  if (all(A == 0)) {
     log_lik <- .dwald(t, drift = drift[response], bound = b, s = s, log = TRUE)
     for (j in seq_len(K)) {
       is_loser <- (j != response)
       if (!any(is_loser)) next
       log_lik[is_loser] <- log_lik[is_loser] +
-        .pwald(t[is_loser], drift = drift[j], bound = b, s = s,
+        .pwald(t[is_loser], drift = drift[j], bound = b[is_loser],
+               s = s[is_loser],
                lower.tail = FALSE, log.p = TRUE)
     }
-  } else {
+  } else if (all(A > 0)) {
     log_lik <- .dwald_full(t, drift = drift[response], bound = b, A = A,
                            s = s, log = TRUE)
     for (j in seq_len(K)) {
       is_loser <- (j != response)
       if (!any(is_loser)) next
       log_lik[is_loser] <- log_lik[is_loser] +
-        .pwald_full(t[is_loser], drift = drift[j], bound = b, A = A, s = s,
-                    lower.tail = FALSE, log.p = TRUE)
+        .pwald_full(t[is_loser], drift = drift[j], bound = b[is_loser],
+                    A = A[is_loser], s = s[is_loser], lower.tail = FALSE,
+                    log.p = TRUE)
+    }
+  } else {
+    zero_idx <- A == 0
+    log_lik <- numeric(length(t))
+
+    if (any(zero_idx)) {
+      log_lik[zero_idx] <- .drdm(
+        rt[zero_idx], response[zero_idx], drift,
+        b[zero_idx], A = 0, ndt[zero_idx], s[zero_idx], log = TRUE
+      )
+    }
+    if (any(!zero_idx)) {
+      log_lik[!zero_idx] <- .drdm(
+        rt[!zero_idx], response[!zero_idx], drift,
+        b[!zero_idx], A[!zero_idx], ndt[!zero_idx], s[!zero_idx], log = TRUE
+      )
     }
   }
 
@@ -2285,24 +2318,37 @@ validate_rdm_parameters <- function(drift, gap, ndt, s, sp) {
 .pwald_full <- function(t, drift, bound, A, s, lower.tail = TRUE,
                         log.p = TRUE) {
   cdf_val <- .rdm_full_cdf_raw(t, drift, bound, A, s)
-  surv_val <- .rdm_full_surv_raw(t, drift, bound, A, s)
 
   if (lower.tail) {
     log_p <- rep(-Inf, length(t))
-    use_cdf <- cdf_val > 0 & cdf_val <= 1 &
-      (cdf_val >= 0.5 | surv_val <= 0 | surv_val >= 1)
-    use_surv <- !use_cdf & surv_val >= 0 & surv_val < 1
+    use_cdf <- cdf_val > 0 & cdf_val < 1 & cdf_val >= 0.5
     log_p[use_cdf] <- log(cdf_val[use_cdf])
-    log_p[use_surv] <- log1p(-surv_val[use_surv])
+
+    need_surv <- !use_cdf
+    if (any(need_surv)) {
+      idx <- which(need_surv)
+      surv_val <- .rdm_full_surv_raw(t[idx], drift, bound, A, s)
+      use_surv <- surv_val >= 0 & surv_val < 1
+      log_p[idx[use_surv]] <- log1p(-surv_val[use_surv])
+      use_fallback <- !use_surv & cdf_val[idx] > 0 & cdf_val[idx] < 1
+      log_p[idx[use_fallback]] <- log(cdf_val[idx[use_fallback]])
+      log_p[idx[!use_surv & cdf_val[idx] >= 1]] <- 0
+    }
   } else {
     log_p <- rep(0, length(t))
-    use_surv <- surv_val > 0 & surv_val < 1 &
-      (surv_val >= 0.5 | cdf_val <= 0 | cdf_val >= 1)
-    use_cdf <- !use_surv & cdf_val >= 0 & cdf_val < 1
-    bad <- !use_surv & !use_cdf
-    log_p[bad & !(cdf_val <= 0 & surv_val >= 1)] <- -Inf
-    log_p[use_surv] <- log(surv_val[use_surv])
+    use_cdf <- cdf_val > 0 & cdf_val < 0.5
     log_p[use_cdf] <- log1p(-cdf_val[use_cdf])
+
+    need_surv <- !use_cdf & cdf_val > 0
+    if (any(need_surv)) {
+      idx <- which(need_surv)
+      surv_val <- .rdm_full_surv_raw(t[idx], drift, bound, A, s)
+      use_surv <- surv_val > 0 & surv_val < 1
+      log_p[idx[use_surv]] <- log(surv_val[use_surv])
+      use_fallback <- !use_surv & cdf_val[idx] >= 0 & cdf_val[idx] < 1
+      log_p[idx[use_fallback]] <- log1p(-cdf_val[idx[use_fallback]])
+      log_p[idx[!use_surv & cdf_val[idx] >= 1]] <- -Inf
+    }
   }
 
   if (log.p) log_p else exp(log_p)

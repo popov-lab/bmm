@@ -33,7 +33,7 @@ test_that("rdm simple version has correct links", {
   expect_equal(model$links$driftc, "log")
   expect_equal(model$links$drifte, "log")
   expect_equal(model$links$gap, "log")
-  expect_equal(model$links$ndt, "identity")
+  expect_equal(model$links$ndt, "log")
   expect_equal(model$links$s, "log")
   expect_equal(model$links$sp, "log")
 })
@@ -62,11 +62,11 @@ test_that("rdm rejects unsupported custom links during model checks", {
     rt = "rt",
     response = "response",
     n_alternatives = 2,
-    links = list(ndt = "log")
+    links = list(ndt = "identity")
   )
   expect_error(
     check_model(model_bad_ndt, formula = bmf(driftc ~ 1)),
-    "internally bounded"
+    "only support the 'log' link"
   )
 })
 
@@ -171,7 +171,6 @@ test_that("check_data.rdm returns a data.frame", {
   dat <- data.frame(rt = c(0.5, 0.6), response = c(1, 2))
   result <- check_data(model, dat, bmf(driftc ~ 1))
   expect_s3_class(result, "data.frame")
-  expect_equal(attr(result, "rdm_ndt_max"), min(dat$rt) - 1e-4)
 })
 
 # -----------------------------------------------------------------------------
@@ -333,7 +332,9 @@ test_that("configure_model.rdm_simple returns correct components", {
   expect_true(all(c("mu", "driftc", "drifte", "gap", "ndt", "s", "sp") %in%
                     config$formula$family$dpars))
   expect_false(config$formula$family$loop)
-  expect_false(is.null(attr(config$data, "rdm_ndt_max")))
+  expect_true(grepl("exp\\(ndt\\)", brms::stancode(
+    config$formula, data = config$data, family = config$formula$family
+  )))
 })
 
 test_that("configure_model.rdm_simple loads RDM helper functions", {
@@ -353,7 +354,7 @@ test_that("configure_model.rdm_simple loads RDM helper functions", {
   expect_true(grepl("rdm_simple_log_lik_one", stanvar_code))
 })
 
-test_that("configure_model.rdm_simple rewrites ndt through internal ndtraw", {
+test_that("configure_model.rdm_simple keeps ndt as a regular log-linked parameter", {
   model <- rdm(rt = "rt", response = "response", n_alternatives = 2)
   dat <- data.frame(rt = c(0.5, 0.6), response = c(1, 2), cond = c(0, 1))
   f <- bmf(driftc ~ cond, drifte ~ 1, gap ~ 1, ndt ~ cond)
@@ -362,10 +363,64 @@ test_that("configure_model.rdm_simple rewrites ndt through internal ndtraw", {
   config <- configure_model(model, dat, f)
   stan_code <- brms::stancode(config$formula, data = config$data, family = config$formula$family)
 
-  expect_true(grepl("ndtraw", stan_code))
-  expect_true(grepl("inv_logit\\(nlp_ndtraw", stan_code))
-  expect_true(grepl("X_ndtraw", stan_code))
+  expect_false(grepl("ndtraw", stan_code))
+  expect_false(grepl("inv_logit\\(nlp_ndtraw", stan_code))
+  expect_true(grepl("X_ndt", stan_code))
   expect_true(grepl("X_driftc", stan_code))
+})
+
+test_that("create_initfun for rdm keeps intercept ndt draws in 10 to 50 ms", {
+  model <- rdm(rt = "rt", response = "response", n_alternatives = 2)
+  dat <- data.frame(rt = c(0.45, 0.62), response = c(1, 2))
+  f <- bmf(driftc ~ 1, drifte ~ 1, gap ~ 1, ndt ~ 1)
+  model <- check_model(model, data = dat, formula = f)
+  dat <- check_data(model, dat, f)
+  config <- configure_model(model, dat, f)
+
+  init_fun <- create_initfun(model, dat, config$formula)
+  vals <- replicate(100, exp(init_fun()[["Intercept_ndt"]]))
+
+  expect_true(all(vals >= 0.01 & vals <= 0.05))
+})
+
+test_that("create_initfun for rdm keeps no-intercept ndt draws in 10 to 50 ms", {
+  model <- rdm(rt = "rt", response = "response", n_alternatives = 2)
+  dat <- data.frame(
+    rt = c(0.45, 0.62, 0.58, 0.71),
+    response = c(1, 2, 1, 2),
+    cond = factor(c("A", "B", "A", "B"))
+  )
+  f <- bmf(driftc ~ 1, drifte ~ 1, gap ~ 1, ndt ~ 0 + cond)
+  model <- check_model(model, data = dat, formula = f)
+  dat <- check_data(model, dat, f)
+  config <- configure_model(model, dat, f)
+
+  init_fun <- create_initfun(model, dat, config$formula)
+  vals <- exp(init_fun()[["b_ndt"]])
+
+  expect_true(all(vals >= 0.01 & vals <= 0.05))
+})
+
+test_that("create_initfun for rdm ndt draws do not depend on observed RT range", {
+  model <- rdm(rt = "rt", response = "response", n_alternatives = 2)
+  dat_small_rt <- data.frame(rt = c(0.18, 0.23), response = c(1, 2))
+  dat_large_rt <- data.frame(rt = c(0.75, 0.92), response = c(1, 2))
+  f <- bmf(driftc ~ 1, drifte ~ 1, gap ~ 1, ndt ~ 1)
+
+  model_small <- check_model(model, data = dat_small_rt, formula = f)
+  data_small <- check_data(model_small, dat_small_rt, f)
+  config_small <- configure_model(model_small, data_small, f)
+  init_small <- create_initfun(model_small, data_small, config_small$formula)
+
+  model_large <- check_model(model, data = dat_large_rt, formula = f)
+  data_large <- check_data(model_large, dat_large_rt, f)
+  config_large <- configure_model(model_large, data_large, f)
+  init_large <- create_initfun(model_large, data_large, config_large$formula)
+
+  ndt_small <- withr::with_seed(123, exp(init_small()[["Intercept_ndt"]]))
+  ndt_large <- withr::with_seed(123, exp(init_large()[["Intercept_ndt"]]))
+
+  expect_equal(ndt_small, ndt_large)
 })
 
 test_that("stancode for rdm includes user predictors for drift parameters", {
@@ -474,6 +529,19 @@ test_that("drdm remains finite close to ndt when sp > 0", {
     log = TRUE
   )
   expect_true(all(is.finite(ll)))
+})
+
+test_that("drdm returns -Inf when rt is at or below ndt", {
+  ll <- drdm(
+    rt = c(0.2, 0.199),
+    response = c(1, 1),
+    drift = c(3, 1.5),
+    gap = 1,
+    ndt = 0.2,
+    log = TRUE
+  )
+
+  expect_equal(ll, c(-Inf, -Inf))
 })
 
 test_that("drdm with positive sp approaches the sp=0 likelihood as sp -> 0", {

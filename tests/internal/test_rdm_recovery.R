@@ -6,7 +6,7 @@ if (!dir.exists(cmdstan_dir)) {
 }
 options(cmdstanr_write_stan_file_dir = normalizePath(cmdstan_dir))
 
-rdm_recovery_summary <- function(fit, truth, ndt_max) {
+rdm_recovery_summary <- function(fit, truth) {
   draws <- as.data.frame(fit)
 
   transformed <- lapply(names(truth), function(par) {
@@ -15,7 +15,7 @@ rdm_recovery_summary <- function(fit, truth, ndt_max) {
       driftc = "b_driftc_Intercept",
       drifte = "b_drifte_Intercept",
       gap = "b_gap_Intercept",
-      ndt = "b_ndtraw_Intercept",
+      ndt = "b_ndt_Intercept",
       s = "b_s_Intercept",
       sp = "b_sp_Intercept",
       corr = "b_corr_Intercept",
@@ -29,7 +29,7 @@ rdm_recovery_summary <- function(fit, truth, ndt_max) {
       x <- exp(x)
     }
     if (par == "ndt") {
-      x <- ndt_max * stats::plogis(x)
+      x <- exp(x)
     }
     x
   })
@@ -73,8 +73,7 @@ fit_rdm_recovery_case <- function(name, data, formula, model, truth,
     silent = 2
   )
 
-  ndt_max <- min(data[[model$resp_vars$rt]]) - 1e-4
-  out <- rdm_recovery_summary(fit, truth, ndt_max)
+  out <- rdm_recovery_summary(fit, truth)
   print(out)
   cat("Coverage rate:", mean(out$covered), "\n")
 

@@ -93,21 +93,27 @@ real rdm_full_surv_raw(real t, real drift, real bound, real A, real s) {
 }
 
 real rdm_log_full_surv(real t, real drift, real bound, real A, real s) {
-  real surv = rdm_full_surv_raw(t, drift, bound, A, s);
   real cdf = rdm_full_cdf_raw(t, drift, bound, A, s);
 
-  if (surv > 0 && surv < 1 &&
-      (surv > 0.5 || cdf <= 0 || cdf >= 1)) {
-    return log(surv);
-  }
   if (cdf > 0 && cdf < 1) {
-    return log1m(cdf);
-  }
-  if (surv > 0 && surv < 1) {
-    return log(surv);
+    if (cdf < 0.5) {
+      return log1m(cdf);
+    }
+    {
+      real surv = rdm_full_surv_raw(t, drift, bound, A, s);
+      if (surv > 0 && surv < 1) {
+        return log(surv);
+      }
+    }
   }
   if (cdf <= 0) {
     return 0;
+  }
+  {
+    real surv = rdm_full_surv_raw(t, drift, bound, A, s);
+    if (surv > 0 && surv < 1) {
+      return log(surv);
+    }
   }
   return negative_infinity();
 }

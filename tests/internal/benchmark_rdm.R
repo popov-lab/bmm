@@ -7,8 +7,14 @@ if (!dir.exists(cmdstan_dir)) {
 options(cmdstanr_write_stan_file_dir = normalizePath(cmdstan_dir))
 
 rdm_benchmark_metrics <- function(fit, elapsed_sec) {
-  smry <- summary(fit, backend = "brms")
-  fixed <- smry$fixed
+  draws <- posterior::as_draws_matrix(fit)
+  draw_names <- colnames(draws)
+  is_sampler <- grepl("__$", draw_names)
+  is_constant <- apply(draws, 2, function(x) stats::sd(x) == 0)
+  keep <- !is_sampler & !is_constant
+
+  bulk_ess <- posterior::ess_bulk(draws[, keep, drop = FALSE])
+  tail_ess <- posterior::ess_tail(draws[, keep, drop = FALSE])
   nuts <- tryCatch(brms::nuts_params(fit), error = function(e) NULL)
 
   divergences <- NA_integer_
@@ -22,16 +28,24 @@ rdm_benchmark_metrics <- function(fit, elapsed_sec) {
   }
 
   data.frame(
-    parameter = rownames(fixed),
-    estimate = fixed[, "Estimate"],
-    bulk_ess = fixed[, "Bulk_ESS"],
-    tail_ess = fixed[, "Tail_ESS"],
-    ess_per_sec = fixed[, "Bulk_ESS"] / elapsed_sec,
+    parameter = names(bulk_ess),
+    bulk_ess = unname(bulk_ess),
+    tail_ess = unname(tail_ess),
+    ess_per_sec = unname(bulk_ess) / elapsed_sec,
     elapsed_sec = elapsed_sec,
     divergences = divergences,
     max_treedepth = max_treedepth,
     row.names = NULL
   )
+}
+
+simulate_rdm_custom <- function(n, drift, counts, gap, ndt, s = 1, sp = 0) {
+  resp_names <- names(counts)
+  full_drift <- unlist(Map(rep, drift, counts), use.names = FALSE)
+  raw <- rrdm(n = n, drift = full_drift, gap = gap, ndt = ndt, s = s, sp = sp)
+  idx <- rep(seq_along(counts), counts)
+  raw$response <- resp_names[idx[raw$response]]
+  raw
 }
 
 run_rdm_benchmark <- function(name, data, formula, model,
@@ -84,6 +98,16 @@ simple_free_data <- rrdm(
   sp = 0.04
 )
 
+custom_free_data <- simulate_rdm_custom(
+  n = 500,
+  drift = c(corr = 2.8, lure = 1.9, npl = 1.2),
+  counts = c(corr = 1, lure = 2, npl = 2),
+  gap = 1.05,
+  ndt = 0.24,
+  s = 0.95,
+  sp = 0.03
+)
+
 benchmark_cases <- list(
   simple_fixed = list(
     data = simple_fixed_data,
@@ -94,6 +118,16 @@ benchmark_cases <- list(
     data = simple_free_data,
     formula = bmf(driftc ~ 1, drifte ~ 1, gap ~ 1, ndt ~ 1, s ~ 1, sp ~ 1),
     model = rdm(rt = "rt", response = "response", n_alternatives = 4)
+  ),
+  custom_free_sp = list(
+    data = custom_free_data,
+    formula = bmf(corr ~ 1, lure ~ 1, npl ~ 1, gap ~ 1, ndt ~ 1, s ~ 1, sp ~ 1),
+    model = rdm(
+      rt = "rt",
+      response = "response",
+      version = "custom",
+      num_alternatives = c(corr = 1, lure = 2, npl = 2)
+    )
   )
 )
 

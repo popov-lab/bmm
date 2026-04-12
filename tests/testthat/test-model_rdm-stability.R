@@ -259,13 +259,12 @@
    expect_true(all(is.finite(vals)))
  })
 
- test_that("RDM log likelihood remains finite under small parameter perturbations", {
-   ndt_max <- 0.45
+test_that("RDM log likelihood remains finite under small parameter perturbations", {
    base <- c(
      driftc = log(3.2),
      drifte = log(1.4),
      gap = log(0.95),
-     ndt_raw = stats::qlogis(0.19 / ndt_max),
+     ndt = log(0.19),
      s = log(0.9),
      sp = log(0.03)
    )
@@ -278,7 +277,7 @@
        drift = exp(theta[c("driftc", "drifte")]),
        n = c(1L, 3L),
        gap = exp(theta[["gap"]]),
-       ndt = ndt_max * stats::plogis(theta[["ndt_raw"]]),
+       ndt = exp(theta[["ndt"]]),
        s = exp(theta[["s"]]),
        sp = exp(theta[["sp"]])
      )
