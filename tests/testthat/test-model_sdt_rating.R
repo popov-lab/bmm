@@ -108,9 +108,12 @@ test_that("sdt_rating check_data validates response columns", {
     stimulus = c(0L, 1L)
   )
   result <- check_data(model, valid_data, formula)
-  expect_true("Y" %in% colnames(result))
-  expect_true("nTrials" %in% colnames(result))
-  expect_equal(result$nTrials, c(50, 100))
+  expect_equal(nrow(result), nrow(valid_data) * 4)
+  expect_true(all(c("count", "category", "stim_val", "obs_id",
+                    "n_trials_total", "dist_type", "thresh_type") %in%
+                    colnames(result)))
+  totals <- stats::aggregate(count ~ obs_id, result, sum)
+  expect_equal(totals$count, c(50, 100))
 })
 
 test_that("sdt_rating check_data rejects missing response columns", {
@@ -292,7 +295,8 @@ test_that("sdt_rating produces valid stancode with equidistant thresholds", {
   formula <- bmf(dprime ~ 1, criterion ~ 1, spacing ~ 1)
   code <- stancode(formula, data = dat, model = model)
   expect_true(nchar(code) > 0)
-  expect_true(grepl("multinomial", code, ignore.case = TRUE))
+  expect_true(grepl("sdt_rating_lpmf", code, fixed = TRUE))
+  expect_true(grepl("sdt_thresholds_equidistant_rating", code, fixed = TRUE))
 })
 
 test_that("sdt_rating produces valid stancode with log_distance thresholds", {
@@ -304,7 +308,8 @@ test_that("sdt_rating produces valid stancode with log_distance thresholds", {
   formula <- bmf(dprime ~ 1, criterion ~ 1, delta1 ~ 1, delta3 ~ 1)
   code <- stancode(formula, data = dat, model = model)
   expect_true(nchar(code) > 0)
-  expect_true(grepl("multinomial", code, ignore.case = TRUE))
+  expect_true(grepl("delta1par", code, fixed = TRUE))
+  expect_true(grepl("delta3par", code, fixed = TRUE))
 })
 
 test_that("sdt_rating produces valid stancode with parsimonious thresholds", {
@@ -316,8 +321,7 @@ test_that("sdt_rating produces valid stancode with parsimonious thresholds", {
   formula <- bmf(dprime ~ 1, criterion ~ 1, spacing ~ 1)
   code <- stancode(formula, data = dat, model = model)
   expect_true(nchar(code) > 0)
-  expect_true(grepl("multinomial", code, ignore.case = TRUE))
-  expect_true(grepl("1.0986122887", code))
+  expect_true(grepl("sdt_thresholds_parsimonious_rating", code, fixed = TRUE))
 })
 
 test_that("sdt_rating parsimonious K=6 produces valid stancode", {
@@ -340,8 +344,8 @@ test_that("sdt_rating produces valid stancode with log_ratio thresholds", {
   formula <- bmf(dprime ~ 1, criterion ~ 1, delta1 ~ 1, delta3 ~ 1)
   code <- stancode(formula, data = dat, model = model)
   expect_true(nchar(code) > 0)
-  expect_true(grepl("multinomial", code, ignore.case = TRUE))
-  expect_true(grepl("exp\\(nlp_delta", code))
+  expect_true(grepl("sdt_thresholds_log_ratio_rating", code, fixed = TRUE))
+  expect_true(grepl("delta1par", code, fixed = TRUE))
 })
 
 test_that("sdt_rating log_ratio K=6 produces valid stancode", {
@@ -386,7 +390,7 @@ test_that("sdt_rating with sdratio ~ 1 produces valid stancode", {
   formula <- bmf(dprime ~ 1, criterion ~ 1, spacing ~ 1, sdratio ~ 1)
   code <- stancode(formula, data = dat, model = model)
   expect_true(nchar(code) > 0)
-  expect_true(grepl("multinomial", code, ignore.case = TRUE))
+  expect_true(grepl("sdt_rating_lpmf", code, fixed = TRUE))
   expect_true(grepl("sdratio", code))
 })
 
@@ -420,22 +424,27 @@ test_that("sdt_rating UV-SDT with K=6 produces valid stancode", {
 test_that("sdt_rating with log_scale=TRUE produces valid stancode (normal)", {
   dat <- rsdt_rating(n_per_cell = 100, n_subjects = 3, dprime = 1.5,
                      criterion = 0, n_ratings = 6, spacing = 0.5)
-  model <- sdt_rating(response = paste0("r", 1:6), stimulus = "stimulus",
-                      dist = "normal", log_scale = TRUE)
+  expect_warning(
+    model <- sdt_rating(response = paste0("r", 1:6), stimulus = "stimulus",
+                        dist = "normal", log_scale = TRUE),
+    "deprecated and ignored"
+  )
   formula <- bmf(dprime ~ 1, criterion ~ 1, spacing ~ 1)
   code <- stancode(formula, data = dat, model = model)
   expect_true(nchar(code) > 0)
-  expect_true(grepl("std_normal_lcdf", code))
-  expect_true(grepl("std_normal_lccdf", code))
-  expect_true(grepl("log_diff_exp", code))
+  expect_true(grepl("sdt_log_cumprob", code, fixed = TRUE))
+  expect_true(grepl("log_diff_exp", code, fixed = TRUE))
 })
 
 test_that("sdt_rating with log_scale=TRUE works for gumbel_min", {
   dat <- rsdt_rating(n_per_cell = 100, n_subjects = 3, dprime = 1.5,
                      criterion = 0, n_ratings = 6, spacing = 0.5,
                      dist = "gumbel_min")
-  model <- sdt_rating(response = paste0("r", 1:6), stimulus = "stimulus",
-                      dist = "gumbel_min", log_scale = TRUE)
+  expect_warning(
+    model <- sdt_rating(response = paste0("r", 1:6), stimulus = "stimulus",
+                        dist = "gumbel_min", log_scale = TRUE),
+    "deprecated and ignored"
+  )
   formula <- bmf(dprime ~ 1, criterion ~ 1, spacing ~ 1)
   code <- stancode(formula, data = dat, model = model)
   expect_true(nchar(code) > 0)
@@ -446,20 +455,26 @@ test_that("sdt_rating with log_scale=TRUE works for logistic", {
   dat <- rsdt_rating(n_per_cell = 100, n_subjects = 3, dprime = 1.5,
                      criterion = 0, n_ratings = 6, spacing = 0.5,
                      dist = "logistic")
-  model <- sdt_rating(response = paste0("r", 1:6), stimulus = "stimulus",
-                      dist = "logistic", log_scale = TRUE)
+  expect_warning(
+    model <- sdt_rating(response = paste0("r", 1:6), stimulus = "stimulus",
+                        dist = "logistic", log_scale = TRUE),
+    "deprecated and ignored"
+  )
   formula <- bmf(dprime ~ 1, criterion ~ 1, spacing ~ 1)
   code <- stancode(formula, data = dat, model = model)
   expect_true(nchar(code) > 0)
-  expect_true(grepl("log1p_exp", code))
+  expect_true(grepl("sdt_log_one_minus_cumprob", code, fixed = TRUE))
 })
 
 test_that("sdt_rating with log_scale=TRUE works for gumbel_max", {
   dat <- rsdt_rating(n_per_cell = 100, n_subjects = 3, dprime = 1.5,
                      criterion = 0, n_ratings = 6, spacing = 0.5,
                      dist = "gumbel_max")
-  model <- sdt_rating(response = paste0("r", 1:6), stimulus = "stimulus",
-                      dist = "gumbel_max", log_scale = TRUE)
+  expect_warning(
+    model <- sdt_rating(response = paste0("r", 1:6), stimulus = "stimulus",
+                        dist = "gumbel_max", log_scale = TRUE),
+    "deprecated and ignored"
+  )
   formula <- bmf(dprime ~ 1, criterion ~ 1, spacing ~ 1)
   code <- stancode(formula, data = dat, model = model)
   expect_true(nchar(code) > 0)
@@ -473,19 +488,21 @@ test_that("sdt_rating with log_scale=FALSE is unchanged (default)", {
   formula <- bmf(dprime ~ 1, criterion ~ 1, spacing ~ 1)
   code <- stancode(formula, data = dat, model = model)
   expect_true(nchar(code) > 0)
-  expect_true(grepl("Phi\\(", code))
-  expect_false(grepl("log_Phi", code))
+  expect_true(grepl("sdt_log_cumprob", code, fixed = TRUE))
 })
 
 test_that("sdt_rating UV-SDT with log_scale=TRUE produces valid stancode", {
   dat <- rsdt_rating(n_per_cell = 100, n_subjects = 3, dprime = 1.5,
                      criterion = 0, sdratio = 1.2, n_ratings = 6,
                      spacing = 0.5)
-  model <- sdt_rating(response = paste0("r", 1:6), stimulus = "stimulus",
-                      log_scale = TRUE)
+  expect_warning(
+    model <- sdt_rating(response = paste0("r", 1:6), stimulus = "stimulus",
+                        log_scale = TRUE),
+    "deprecated and ignored"
+  )
   formula <- bmf(dprime ~ 1, criterion ~ 1, spacing ~ 1, sdratio ~ 1)
   code <- stancode(formula, data = dat, model = model)
   expect_true(nchar(code) > 0)
-  expect_true(grepl("std_normal_lcdf", code))
+  expect_true(grepl("sdt_log_cumprob", code, fixed = TRUE))
   expect_true(grepl("sdratio", code))
 })

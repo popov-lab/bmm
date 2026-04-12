@@ -1655,6 +1655,112 @@ rsdt_binary <- function(n_per_cell, n_subjects, dprime, criterion,
   data
 }
 
+.rsdt_dispatch <- function(version) {
+  switch(version,
+    binary = rsdt_binary,
+    rating = rsdt_rating,
+    dp = rsdt_dp,
+    metad = rsdt_metad,
+    cdp = rsdt_cdp,
+    ranking = rsdt_ranking,
+    mafc = rsdt_mafc
+  )
+}
+
+.dsdt_dispatch <- function(version) {
+  switch(version,
+    binary = dsdt_binary,
+    rating = dsdt_rating,
+    dp = dsdt_dp,
+    metad = dsdt_metad,
+    cdp = dsdt_cdp,
+    ranking = dsdt_ranking,
+    mafc = dsdt_mafc
+  )
+}
+
+.infer_rsdt_version <- function(args) {
+  if (any(c("dprimef", "dprimer") %in% names(args))) {
+    return("cdp")
+  }
+  if (any(c("Ro", "Rn") %in% names(args))) {
+    return("dp")
+  }
+  if ("metad" %in% names(args)) {
+    return("metad")
+  }
+  if ("m" %in% names(args)) {
+    stop2(
+      "Could not infer whether `m` refers to an m-AFC or ranking SDT ",
+      "generator. Set `version = 'mafc'` or `version = 'ranking'`."
+    )
+  }
+  if (any(c("n_ratings", "spacing", "deltas", "threshold_type") %in% names(args))) {
+    return("rating")
+  }
+  "binary"
+}
+
+.infer_dsdt_version <- function(args) {
+  if (any(c("dprimef", "dprimer") %in% names(args))) {
+    return("cdp")
+  }
+  if (any(c("Ro", "Rn") %in% names(args))) {
+    return("dp")
+  }
+  if ("metad" %in% names(args)) {
+    return("metad")
+  }
+  if ("n_correct" %in% names(args)) {
+    return("mafc")
+  }
+  if ("m" %in% names(args) && "counts" %in% names(args)) {
+    return("ranking")
+  }
+  if (all(c("counts", "thresholds") %in% names(args))) {
+    return("rating")
+  }
+  "binary"
+}
+
+#' @title Unified SDT Data Generator
+#' @description Convenience wrapper around the specialized `rsdt_*()`
+#'   generators.
+#' @param ... Arguments forwarded to the selected generator.
+#' @param version Character. SDT generator to use. If omitted, `rsdt()`
+#'   infers the version when possible and otherwise defaults to binary SDT.
+#' @return A data frame containing simulated SDT data.
+#' @keywords distribution
+#' @export
+rsdt <- function(..., version = NULL) {
+  args <- list(...)
+  version <- if (is.null(version)) {
+    .infer_rsdt_version(args)
+  } else {
+    .match_sdt_version(version, allow_auto = FALSE)
+  }
+  do.call(.rsdt_dispatch(version), args)
+}
+
+#' @title Unified SDT Density Wrapper
+#' @description Convenience wrapper around the specialized `dsdt_*()`
+#'   density functions.
+#' @param ... Arguments forwarded to the selected density function.
+#' @param version Character. SDT density to use. If omitted, `dsdt()`
+#'   infers the version when possible and otherwise defaults to binary SDT.
+#' @return Numeric vector of densities or log-densities.
+#' @keywords distribution
+#' @export
+dsdt <- function(..., version = NULL) {
+  args <- list(...)
+  version <- if (is.null(version)) {
+    .infer_dsdt_version(args)
+  } else {
+    .match_sdt_version(version, allow_auto = FALSE)
+  }
+  do.call(.dsdt_dispatch(version), args)
+}
+
 
 # Internal: compute category probabilities for SDT rating model
 # Returns a vector of K probabilities for a single observation
@@ -1697,6 +1803,42 @@ rsdt_binary <- function(n_per_cell, n_subjects, dprime, criterion,
       log(seq_len(K1) / (n_ratings - seq_len(K1)))        # logit(k/K)
     }
     thresholds <- criterion + exp(spacing) * canonical
+  } else if (threshold_type == "softmax") {
+    stopif(is.null(spacing), "spacing is required for softmax thresholds")
+    n_deltas <- max(0L, n_ratings - 3L)
+    if (n_deltas > 0L) {
+      stopif(is.null(deltas), "deltas is required for softmax thresholds")
+      stopif(length(deltas) != n_deltas,
+             "deltas must have length n_ratings - 3 = {n_deltas}")
+    } else {
+      deltas <- numeric(0)
+    }
+
+    n_intervals <- n_ratings - 2L
+    logits <- c(deltas, 0)
+    intervals <- exp(logits - matrixStats::logSumExp(logits))
+    intervals <- intervals * n_intervals * exp(spacing)
+
+    thresholds <- numeric(K1)
+    thresholds[mid] <- criterion
+
+    if (mid < K1) {
+      thresholds[mid + 1L] <- criterion + intervals[mid]
+      if (mid + 2L <= K1) {
+        for (k in (mid + 2L):K1) {
+          thresholds[k] <- thresholds[k - 1L] + intervals[k - 1L]
+        }
+      }
+    }
+
+    if (mid > 1L) {
+      thresholds[mid - 1L] <- criterion - intervals[mid - 1L]
+      if (mid - 2L >= 1L) {
+        for (k in (mid - 2L):1L) {
+          thresholds[k] <- thresholds[k + 1L] - intervals[k]
+        }
+      }
+    }
   } else if (threshold_type == "log_ratio") {
     stopif(is.null(deltas), "deltas is required for log_ratio thresholds")
     n_deltas <- n_ratings - 2L
@@ -2318,6 +2460,92 @@ rsdt_ranking <- function(n_per_cell, n_subjects, dprime, m = NULL,
   stats::dlogis(eta)
 }
 
+.cdp_gl20_nodes <- c(
+  -9.9312859918509492e-01, -9.6397192727791379e-01,
+  -9.1223442825132591e-01, -8.3911697182221882e-01,
+  -7.4633190646015087e-01, -6.3605368072651512e-01,
+  -5.1086700195082709e-01, -3.7370608871541956e-01,
+  -2.2778585114164508e-01, -7.6526521133497324e-02,
+   7.6526521133497338e-02,  2.2778585114164508e-01,
+   3.7370608871541956e-01,  5.1086700195082709e-01,
+   6.3605368072651512e-01,  7.4633190646015087e-01,
+   8.3911697182221882e-01,  9.1223442825132591e-01,
+   9.6397192727791379e-01,  9.9312859918509492e-01
+)
+
+.cdp_gl20_weights <- c(
+  1.7614007139152118e-02, 4.0601429800386941e-02,
+  6.2672048334109064e-02, 8.3276741576704749e-02,
+  1.0193011981724044e-01, 1.1819453196151842e-01,
+  1.3168863844917664e-01, 1.4209610931838205e-01,
+  1.4917298647260360e-01, 1.5275338713072585e-01,
+  1.5275338713072585e-01, 1.4917298647260360e-01,
+  1.4209610931838205e-01, 1.3168863844917664e-01,
+  1.1819453196151842e-01, 1.0193011981724044e-01,
+  8.3276741576704749e-02, 6.2672048334109064e-02,
+  4.0601429800386941e-02, 1.7614007139152118e-02
+)
+
+.cdp_interval_mass_f_r <- function(R, c_lo, c_hi, f_lo, f_hi, mu_F, dist) {
+  lower <- pmax(c_lo - R, f_lo) - mu_F
+  upper <- pmin(c_hi - R, f_hi) - mu_F
+  out <- numeric(length(R))
+
+  inside <- upper > lower
+  if (!any(inside)) {
+    return(out)
+  }
+
+  li <- lower[inside]
+  ui <- upper[inside]
+  vals <- numeric(length(li))
+
+  both_inf <- is.infinite(li) & li < 0 & is.infinite(ui) & ui > 0
+  vals[both_inf] <- 1
+
+  only_lower_inf <- is.infinite(li) & li < 0 & !both_inf
+  vals[only_lower_inf] <- .sdt_cdf(ui[only_lower_inf], dist)
+
+  only_upper_inf <- is.infinite(ui) & ui > 0 & !both_inf
+  vals[only_upper_inf] <- 1 - .sdt_cdf(li[only_upper_inf], dist)
+
+  finite <- !(both_inf | only_lower_inf | only_upper_inf)
+  vals[finite] <- .sdt_cdf(ui[finite], dist) - .sdt_cdf(li[finite], dist)
+
+  out[inside] <- vals
+  out
+}
+
+.cdp_prob_quad_r <- function(mu_F, mu_R, sd_R, c_lo, c_hi,
+                             f_lo, f_hi, r_lo, r_hi, dist) {
+  t <- 0.5 * (.cdp_gl20_nodes + 1)
+
+  if (is.finite(r_lo) && is.finite(r_hi)) {
+    R <- r_lo + (r_hi - r_lo) * t
+    jacobian <- rep(r_hi - r_lo, length(t))
+  } else if (!is.finite(r_lo) && is.finite(r_hi)) {
+    y <- t / (1 - t)
+    R <- r_hi - y
+    jacobian <- 1 / (1 - t)^2
+  } else if (is.finite(r_lo) && !is.finite(r_hi)) {
+    y <- t / (1 - t)
+    R <- r_lo + y
+    jacobian <- 1 / (1 - t)^2
+  } else {
+    angle <- pi * (t - 0.5)
+    R <- mu_R + sd_R * tan(angle)
+    jacobian <- sd_R * pi / cos(angle)^2
+  }
+
+  integrand <- .sdt_pdf((R - mu_R) / sd_R, dist) / sd_R
+  integrand <- integrand * .cdp_interval_mass_f_r(
+    R, c_lo, c_hi, f_lo, f_hi, mu_F, dist
+  )
+
+  pmax(0.5 * sum(.cdp_gl20_weights * jacobian * integrand),
+       .Machine$double.eps)
+}
+
 # Internal: compute CDP category probabilities for a single observation
 # Computes probabilities via numerical integration over the recollection
 # dimension R. Supports asymmetric confidence scales where the number of
@@ -2354,18 +2582,6 @@ rsdt_ranking <- function(n_per_cell, n_subjects, dprime, m = NULL,
   n_old_types <- if (has_guess) 3L else 2L
   n_cats <- n_new + n_old_types * n_old
   probs <- numeric(n_cats)
-
-  cdf_fn <- .SDT_DISTS[[dist]]$cdf
-
-  make_integrand <- function(c_lo, c_hi, f_lo, f_hi) {
-    function(R) {
-      phi_R <- .sdt_pdf((R - mu_R) / sd_R, dist) / sd_R
-      F_lower <- pmax(c_lo - R, f_lo) - mu_F
-      F_upper <- pmin(c_hi - R, f_hi) - mu_F
-      ifelse(F_upper <= F_lower, 0,
-             phi_R * (cdf_fn(F_upper) - cdf_fn(F_lower)))
-    }
-  }
 
   # Process categories sequentially:
   # Block 1: new categories (indices 1..n_new, type=1)
@@ -2415,10 +2631,14 @@ rsdt_ranking <- function(n_per_cell, n_subjects, dprime, m = NULL,
         f_lo <- -Inf; f_hi <- if (has_guess) kcrit else Inf
       }
 
-      integrand <- make_integrand(c_lo, c_hi, f_lo, f_hi)
       probs[cat_idx] <- tryCatch(
-        stats::integrate(integrand, R_lo, R_hi,
-                         rel.tol = 1e-8, abs.tol = 1e-12)$value,
+        .cdp_prob_quad_r(
+          mu_F, mu_R, sd_R,
+          c_lo, c_hi,
+          f_lo, f_hi,
+          R_lo, R_hi,
+          dist
+        ),
         error = function(e) .Machine$double.eps
       )
     }

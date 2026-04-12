@@ -317,13 +317,22 @@ Each row has one subject's response counts for one stimulus type across six cate
 
 ## Preparing real-world data
 
-In practice, experimental data typically has trial-level rows with separate stimulus and confidence columns. The `combine_sdt_response()` helper converts this format into combined rating categories, which can then be aggregated into counts:
+In practice, experimental data often starts in trial-level format with separate stimulus, response, and confidence columns. The `prepare_sdt_data()` helper converts that format into the wide count tables expected by the rating-family SDT models:
 
 ```{r combine-example, eval=FALSE}
-# Suppose your data has columns: subject, stimulus (0/1), confidence (1-3)
-dat$category <- combine_sdt_response(dat$stimulus, dat$confidence, n_levels = 3)
-# Then aggregate: count responses per subject x stimulus x category cell
+# Trial-level data with columns: id, stimulus (0/1), response (0/1), confidence (1-3)
+dat_rating <- prepare_sdt_data(
+  dat,
+  stimulus = "stimulus",
+  response = "response",
+  confidence = "confidence",
+  id_cols = "id",
+  outcome = "rating",
+  n_ratings = 6
+)
 ```
+
+If your data already stores combined rating categories, `prepare_sdt_data()` can aggregate those directly, and `combine_sdt_response()` remains available as a lower-level helper when you want to create the combined categories yourself.
 
 ## Specifying and fitting the rating model
 
@@ -376,7 +385,7 @@ brms::fixef(fit_rating)
 
 ### Threshold parameterizations
 
-The `threshold_type` argument controls how the $K-1$ thresholds are placed on the decision axis. The `bmm` package offers four options:
+The `threshold_type` argument controls how the $K-1$ thresholds are placed on the decision axis. The `bmm` package offers five options:
 
 - **`"equidistant"`** (default): Thresholds are equally spaced around the criterion. Two parameters: `criterion` (center) and `spacing` (distance between adjacent thresholds). The formula is $\theta_k = c + (k - \text{mid}) \cdot \exp(\text{spacing})$.
 
@@ -386,21 +395,13 @@ The `threshold_type` argument controls how the $K-1$ thresholds are placed on th
 
 - **`"log_ratio"`**: Same $K-2$ free parameters as `log_distance`, but parameterized as ratios relative to a reference spread [@Paulewicz_2020]. One parameter sets the distance from criterion to the next-upper threshold (the reference spread); all other parameters are log-ratios of their interval to this reference. When all delta parameters equal zero, thresholds are equally spaced with unit spacing -- so zero-centered priors encode a preference for symmetric, regular threshold placement.
 
-For most applications, the parsimonious parameterization is a good default: it is well-identified with only two parameters and produces theoretically principled threshold placement. When full flexibility is needed, `log_ratio` is preferred over `log_distance` because its priors are more interpretable.
+- **`"softmax"`**: Uses one shared `spacing` parameter to control the average interval size plus $K-3$ delta parameters that are softmax-transformed into positive interval allocations. This keeps thresholds ordered while allowing more flexible asymmetry than the two-parameter options.
+
+For most applications, the parsimonious parameterization is a good default: it is well-identified with only two parameters and produces theoretically principled threshold placement. When full flexibility is needed, `log_ratio` and `softmax` provide smoother prior control than raw `log_distance`.
 
 ### Numerical stability for extreme parameters
 
-For models with very high sensitivity (large $d'$) or extreme threshold placement, category probabilities can become very small, leading to numerical underflow. The `log_scale = TRUE` option computes all CDF expressions on the log scale, using Stan primitives like `log_Phi`, `log1m_Phi`, and `log_diff_exp` that remain stable even for near-zero probabilities:
-
-```{r logscale-example, eval=FALSE}
-model_logscale <- sdt(
-  response = c("r1", "r2", "r3", "r4", "r5", "r6"),
-  stimulus = "stimulus",
-  log_scale = TRUE   # numerically stable log-CDF computation
-)
-```
-
-This is available for EV-SDT and UV-SDT rating models across all four noise distributions. For typical parameter ranges, the default probability-scale computation is sufficient.
+The rating-family SDT models now compute category log-probabilities on a stable log scale internally, so no extra tuning argument is needed for extreme $d'$ values or very tight threshold spacing. The historical `log_scale` argument is still accepted for compatibility, but it is deprecated and ignored.
 
 # Choosing the noise distribution
 
@@ -684,7 +685,7 @@ This variant is slower to fit due to numerical integration but allows testing wh
 
 # Further SDT models in `bmm`
 
-The `sdt()` function supports several additional model versions for addressing specific theoretical questions. These are available through the `version` and `variances` arguments. The ranking model is described in its own section above.
+The `sdt()` function supports several additional model versions for addressing specific theoretical questions. These are selected through the `version` argument. The ranking model is described in its own section above.
 
 ## Unequal-variance SDT
 
@@ -693,8 +694,7 @@ Standard SDT assumes equal variances for the signal and noise distributions. In 
 ```{r uvsdt-example, eval=FALSE}
 model_uv <- sdt(
   response = c("r1", "r2", "r3", "r4", "r5", "r6"),
-  stimulus = "stimulus",
-  variances = "unequal"
+  stimulus = "stimulus"
 )
 
 formula_uv <- bmf(

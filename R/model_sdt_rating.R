@@ -8,6 +8,7 @@
                               log_scale = FALSE,
                               links = NULL, call = NULL, ...) {
   dist_int <- .sdt_dist_id(dist)
+  thresh_type_int <- .sdt_threshold_type_id(threshold_type)
 
   if (is.null(n_ratings) && length(response) > 1) {
     n_ratings <- length(response)
@@ -23,33 +24,15 @@
   )
   param_links <- list(dprime = "identity", criterion = "identity")
 
-  if (threshold_type %in% c("equidistant", "parsimonious")) {
-    parameters$spacing <- glue(
-      "Threshold spacing: controls distance between adjacent thresholds ",
-      "(exp(spacing) ensures positive spacing)"
-    )
-    default_priors$spacing <- list(
-      main = "normal(0, 0.5)", effects = "normal(0, 0.3)"
-    )
-    param_links$spacing <- "identity"
-  } else if (threshold_type %in% c("log_distance", "log_ratio")) {
-    n_deltas <- n_ratings - 2L
-    mid <- n_ratings %/% 2L
-    for (i in seq_len(n_deltas)) {
-      idx <- if (i < mid) i else i + 1L
-      pname <- paste0("delta", idx)
-      parameters[[pname]] <- glue("Threshold parameter for threshold {idx}")
-      default_priors[[pname]] <- list(
-        main = "normal(0, 1)", effects = "normal(0, 0.5)"
-      )
-      param_links[[pname]] <- "identity"
-    }
-  }
+  threshold_parts <- .sdt_threshold_parameter_parts(n_ratings, threshold_type)
+  parameters <- c(parameters, threshold_parts$parameters)
+  default_priors <- c(default_priors, threshold_parts$default_priors)
+  param_links <- c(param_links, threshold_parts$param_links)
 
   # sdratio as overridable fixed parameter (default = equal variance)
   parameters$sdratio <- glue(
-    "SD ratio: log ratio of signal to noise standard deviations ",
-    "(exp(sdratio) ensures positivity, 0 = equal variance)"
+    "Log SD ratio: log ratio of signal to noise standard deviations ",
+    "(exp(sdratio) is the natural SD ratio, 0 = equal variance)"
   )
   default_priors$sdratio <- list(
     main = "normal(0, 0.5)", effects = "normal(0, 0.3)"
@@ -68,7 +51,7 @@
     list(
       resp_vars = nlist(response),
       other_vars = nlist(stimulus, dist, dist_int, n_ratings,
-                         threshold_type, log_scale),
+                         threshold_type, thresh_type_int, log_scale),
       domain = "Perception & Recognition Memory",
       task = "Signal/Noise or Old/New Recognition",
       name = "Signal Detection Theory (Confidence Rating)",
@@ -124,10 +107,12 @@
 #'       exp(delta), guaranteeing ordering.
 #'     \item "log_ratio": K-2 parameters. Threshold distances as ratios
 #'       (Paulewicz & Blaut, 2020).
+#'     \item "softmax": K-2 parameters. A shared spacing parameter controls
+#'       the average interval size, while softmax-transformed delta parameters
+#'       allocate interval widths smoothly across the scale.
 #'   }
-#' @param log_scale Logical. Whether to use numerically stable log-scale CDF
-#'   computation (default FALSE). Set to TRUE if you encounter numerical
-#'   issues with extreme parameter values.
+#' @param log_scale Logical. Deprecated and ignored. Confidence-rating SDT
+#'   likelihoods now use stable log-scale computations internally.
 #' @param links A named list of link functions for the parameters.
 #' @param ... used internally for testing, ignore it
 #' @return An object of class `bmmodel`
@@ -179,7 +164,8 @@ sdt_rating <- function(response, stimulus,
                        n_ratings = NULL,
                        dist = c("normal", "logistic", "gumbel_min", "gumbel_max"),
                        threshold_type = c("parsimonious", "equidistant",
-                                          "log_distance", "log_ratio"),
+                                          "log_distance", "log_ratio",
+                                          "softmax"),
                        log_scale = FALSE,
                        links = NULL, ...) {
   call <- match.call()
@@ -198,6 +184,12 @@ sdt_rating <- function(response, stimulus,
     stopif(n_ratings != length(response),
            "n_ratings ({n_ratings}) must match the number of response columns ({length(response)})")
   }
+  warnif(isTRUE(log_scale),
+    paste0(
+      "`log_scale` is deprecated and ignored; rating SDT likelihoods now use ",
+      "stable log-scale computations internally."
+    )
+  )
 
   .model_sdt_rating(response = response, stimulus = stimulus,
                     dist = dist, n_ratings = n_ratings,
@@ -221,6 +213,7 @@ check_data.sdt_rating <- function(model, data, formula) {
          "Stimulus variable '{stim_var}' must be coded as 0 (noise) and 1 (signal)")
 
   data <- .check_data_sdt_rating(model, data)
+  data <- .sdt_rating_long_data(model, data)
 
   NextMethod("check_data")
 }
@@ -232,13 +225,7 @@ check_data.sdt_rating <- function(model, data, formula) {
 
 #' @export
 bmf2bf.sdt_rating <- function(model, formula) {
-  parts <- .sdt_rating_formula_parts(model)
-  nlf_formulas <- if (isTRUE(model$other_vars$log_scale)) {
-    .sdt_build_nlf_logscale(parts)
-  } else {
-    .sdt_build_nlf_standard(parts)
-  }
-  Reduce(`+`, nlf_formulas, init = parts$base_formula)
+  .sdt_rating_base_formula()
 }
 
 
@@ -248,5 +235,23 @@ bmf2bf.sdt_rating <- function(model, formula) {
 
 #' @export
 configure_model.sdt_rating <- function(model, data, formula) {
-  .configure_sdt_rating(model, data, formula)
+  formula <- .sdt_remap_formula_dpars(formula, model)
+  formula <- bmf2bf(model, formula)
+  formula$family <- .sdt_rating_custom_family(
+    model,
+    family_name = "sdt_rating",
+    log_lik = log_lik_sdt_rating,
+    posterior_predict = posterior_predict_sdt_rating
+  )
+  stanvars <- .sdt_rating_stanvars(model, "sdt_rating", "sdt_rating_row_lpmf")
+
+  nlist(formula, data, stanvars)
+}
+
+log_lik_sdt_rating <- function(i, prep) {
+  .sdt_loglik_rating_common(i, prep, variant = "rating")
+}
+
+posterior_predict_sdt_rating <- function(i, prep, ...) {
+  .sdt_posterior_predict_rating_common(i, prep, variant = "rating")
 }

@@ -130,8 +130,9 @@ plot.bmm_sdt_roc <- function(x, condition_col = NULL, add_diagonal = TRUE,
 
     p <- p +
       ggplot2::geom_line(data = curve_data, aes_line, linewidth = 0.7) +
-      ggplot2::geom_errorbarh(data = threshold_summ, aes_errh,
-                              height = 0, linewidth = 0.5) +
+      ggplot2::geom_errorbar(data = threshold_summ, aes_errh,
+                             width = 0, linewidth = 0.5,
+                             orientation = "y") +
       ggplot2::geom_errorbar(data = threshold_summ, aes_errv,
                              width = 0, linewidth = 0.5) +
       ggplot2::geom_point(data = threshold_summ, aes_point, size = point_size)

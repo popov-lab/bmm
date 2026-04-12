@@ -329,7 +329,7 @@ test_that("sdt_dp produces valid stancode with equidistant thresholds", {
   formula <- bmf(dprime ~ 1, criterion ~ 1, spacing ~ 1, Ro ~ 1, Rn ~ 1)
   code <- stancode(formula, data = dat, model = model)
   expect_true(nchar(code) > 0)
-  expect_true(grepl("multinomial", code, ignore.case = TRUE))
+  expect_true(grepl("sdt_dp_lpmf", code, fixed = TRUE))
   expect_true(grepl("inv_logit", code))
   expect_true(grepl("Ro", code))
   expect_true(grepl("Rn", code))

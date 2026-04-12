@@ -143,7 +143,7 @@ bmf2bf.sdt_mafc <- function(model, formula) {
 
   brms::bf(paste0(
     resp_var, " | vint(m_afc) + trials(",
-    n_trials_var, ") ~ 1"
+    n_trials_var, ") ~ 0"
   ))
 }
 
@@ -210,7 +210,8 @@ configure_model.sdt_mafc <- function(model, data, formula) {
     2.4820623623151936e-10, 1.2578006724379269e-13
   )
 
-  sum(gh_weights * pnorm(gh_nodes + dprime)^(m - 1))
+  log_terms <- log(gh_weights) + (m - 1) * pnorm(gh_nodes + dprime, log.p = TRUE)
+  exp(matrixStats::logSumExp(log_terms))
 }
 
 log_lik_sdt_mafc <- function(i, prep) {

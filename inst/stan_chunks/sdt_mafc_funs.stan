@@ -38,11 +38,12 @@ real mafc_pc(real dprime, int m) {
     2.4820623623151936e-10, 1.2578006724379269e-13
   });
 
-  real result = 0;
+  vector[N_QUAD] log_terms;
   for (i in 1:N_QUAD) {
-    result += gh_weights[i] * Phi(gh_nodes[i] + dprime) ^ (m - 1);
+    log_terms[i] = log(gh_weights[i]) +
+      (m - 1) * std_normal_lcdf(gh_nodes[i] + dprime);
   }
-  return result;
+  return exp(log_sum_exp(log_terms));
 }
 
 real sdt_mafc_lpmf(int y, real mu, real dprime, int m, int trials) {

@@ -129,20 +129,96 @@ real cdp_prob_gaussian(real mu_F, real mu_R, real sd_R,
   return fmax(p_know, 1e-20);
 }
 
+real cdp_interval_mass_f(real R, real c_lo, real c_hi,
+                         real f_lo, real f_hi,
+                         real mu_F, int dist_type) {
+  real f_lower_bound = fmax(c_lo - R, f_lo) - mu_F;
+  real f_upper_bound = fmin(c_hi - R, f_hi) - mu_F;
+
+  if (f_upper_bound <= f_lower_bound) return 0;
+  if (f_lower_bound == negative_infinity() &&
+      f_upper_bound == positive_infinity()) return 1;
+  if (f_lower_bound == negative_infinity()) {
+    return sdt_cumprob(f_upper_bound, dist_type);
+  }
+  if (f_upper_bound == positive_infinity()) {
+    return 1 - sdt_cumprob(f_lower_bound, dist_type);
+  }
+  return sdt_cumprob(f_upper_bound, dist_type) -
+    sdt_cumprob(f_lower_bound, dist_type);
+}
+
+real cdp_prob_quad(real mu_F, real mu_R, real sd_R,
+                   real c_lo, real c_hi,
+                   real f_lo, real f_hi,
+                   real r_lo, real r_hi,
+                   int dist_type) {
+  int N_GL = 20;
+  vector[N_GL] gl_nodes = to_vector({
+    -9.9312859918509492e-01, -9.6397192727791379e-01,
+    -9.1223442825132591e-01, -8.3911697182221882e-01,
+    -7.4633190646015087e-01, -6.3605368072651512e-01,
+    -5.1086700195082709e-01, -3.7370608871541956e-01,
+    -2.2778585114164508e-01, -7.6526521133497324e-02,
+     7.6526521133497338e-02,  2.2778585114164508e-01,
+     3.7370608871541956e-01,  5.1086700195082709e-01,
+     6.3605368072651512e-01,  7.4633190646015087e-01,
+     8.3911697182221882e-01,  9.1223442825132591e-01,
+     9.6397192727791379e-01,  9.9312859918509492e-01
+  });
+  vector[N_GL] gl_weights = to_vector({
+    1.7614007139152118e-02, 4.0601429800386941e-02,
+    6.2672048334109064e-02, 8.3276741576704749e-02,
+    1.0193011981724044e-01, 1.1819453196151842e-01,
+    1.3168863844917664e-01, 1.4209610931838205e-01,
+    1.4917298647260360e-01, 1.5275338713072585e-01,
+    1.5275338713072585e-01, 1.4917298647260360e-01,
+    1.4209610931838205e-01, 1.3168863844917664e-01,
+    1.1819453196151842e-01, 1.0193011981724044e-01,
+    8.3276741576704749e-02, 6.2672048334109064e-02,
+    4.0601429800386941e-02, 1.7614007139152118e-02
+  });
+
+  real result = 0;
+  for (i in 1:N_GL) {
+    real x = gl_nodes[i];
+    real w = gl_weights[i];
+    real t = 0.5 * (x + 1);
+    real R;
+    real jacobian;
+
+    if (!is_inf(r_lo) && !is_inf(r_hi)) {
+      R = r_lo + (r_hi - r_lo) * t;
+      jacobian = r_hi - r_lo;
+    } else if (is_inf(r_lo) && !is_inf(r_hi)) {
+      real y = t / (1 - t);
+      R = r_hi - y;
+      jacobian = 1 / square(1 - t);
+    } else if (!is_inf(r_lo) && is_inf(r_hi)) {
+      real y = t / (1 - t);
+      R = r_lo + y;
+      jacobian = 1 / square(1 - t);
+    } else {
+      real angle = pi() * (t - 0.5);
+      R = mu_R + sd_R * tan(angle);
+      jacobian = sd_R * pi() / square(cos(angle));
+    }
+
+    result += w * jacobian *
+      sdt_pdf((R - mu_R) / sd_R, dist_type) / sd_R *
+      cdp_interval_mass_f(R, c_lo, c_hi, f_lo, f_hi, mu_F, dist_type);
+  }
+
+  return fmax(0.5 * result, 1e-20);
+}
+
 // CDP category probability for Gaussian 3-way (R/K/G) model
 // Guess: R < rcrit AND F < kcrit
 // Know:  R < rcrit AND F >= kcrit
 // Remember: R >= rcrit
 //
-// For guess/know, the F constraint introduces a third dimension.
-// We decompose using conditional probability:
-//   P(know, bin k) = P(M in bin k, R < rcrit) - P(M in bin k, R < rcrit, F < kcrit)
-//   P(guess, bin k) = P(M in bin k, R < rcrit, F < kcrit)
-//
-// P(M in bin, R < rcrit, F < kcrit) requires a trivariate constraint:
-//   c_lo < F + R < c_hi, R < rcrit, F < kcrit
-// We approximate this with GH quadrature over R (only for know/guess split)
-// using a sigmoid gate at rcrit for smoothness.
+// The Gaussian 2-way path remains analytical; only the extra F < kcrit
+// split is handled with fixed quadrature over the exact integration bounds.
 real cdp_prob_gaussian_3way(real mu_F, real mu_R, real sd_R,
                             real c_lo, real c_hi,
                             real rcrit, real kcrit,
@@ -167,109 +243,37 @@ real cdp_prob_gaussian_3way(real mu_F, real mu_R, real sd_R,
   // remember: R >= rcrit (no F constraint)
   if (cat_type == 4) return fmax(p_bin - p_know_total, 1e-20);
 
-  // For guess/know split: need P(M in bin, R < rcrit, F < kcrit)
-  // Use 20-point GH quadrature over R with sigmoid gate at rcrit
-  int N_GH = 20;
-  vector[N_GH] gh_nodes = to_vector({
-    -7.6190485416797546e+00, -6.5105901570136488e+00,
-    -5.5787388058932059e+00, -4.7345813340460463e+00,
-    -3.9439673506573110e+00, -3.1890148165533843e+00,
-    -2.4586636111723603e+00, -1.7452473208141255e+00,
-    -1.0429453488027509e+00, -3.4696415708135458e-01,
-     3.4696415708135830e-01,  1.0429453488027574e+00,
-     1.7452473208141317e+00,  2.4586636111723683e+00,
-     3.1890148165533900e+00,  3.9439673506573163e+00,
-     4.7345813340460552e+00,  5.5787388058932033e+00,
-     6.5105901570136551e+00,  7.6190485416797591e+00
-  });
-  vector[N_GH] gh_weights = to_vector({
-    1.2578006724378954e-13, 2.4820623623151972e-10,
-    6.1274902599825256e-08, 4.4021210902309806e-06,
-    1.2882627996193093e-04, 1.8301031310804826e-03,
-    1.3997837447100857e-02, 6.1506372063977507e-02,
-    1.6173933398399959e-01, 2.6079306344955683e-01,
-    2.6079306344955305e-01, 1.6173933398399776e-01,
-    6.1506372063977438e-02, 1.3997837447101162e-02,
-    1.8301031310805052e-03, 1.2882627996193072e-04,
-    4.4021210902309052e-06, 6.1274902599829068e-08,
-    2.4820623623151936e-10, 1.2578006724379269e-13
-  });
-
-  // P(M in bin, R < rcrit, F < kcrit) via GH over R with sigmoid gate
-  real p_guess = 0;
-  for (i in 1:N_GH) {
-    real z = gh_nodes[i];
-    real gate = inv_logit(200 * (b - z));  // R < rcrit gate
-    if (gate < 1e-10) continue;
-
-    real R = mu_R + sd_R * z;
-    real F_upper = fmin(c_hi - R, kcrit) - mu_F;
-    real F_lower = c_lo - R - mu_F;
-    if (F_upper <= F_lower) continue;
-
-    p_guess += gh_weights[i] * gate * (Phi(F_upper) - Phi(F_lower));
-  }
-  p_guess = fmax(p_guess, 1e-20);
+  real p_guess = cdp_prob_quad(
+    mu_F, mu_R, sd_R,
+    c_lo, c_hi,
+    negative_infinity(), kcrit,
+    negative_infinity(), rcrit,
+    1
+  );
 
   if (cat_type == 2) return p_guess;
   // know = total_know - guess
   return fmax(p_know_total - p_guess, 1e-20);
 }
 
-// Non-Gaussian fallback: GH quadrature with sigmoid gating
+// Non-Gaussian fallback: fixed quadrature over the exact integration bounds
 real cdp_prob_nongaussian(real mu_F, real mu_R, real sd_R,
                           real c_lo, real c_hi,
                           real f_lo, real f_hi,
                           real z_lo, real z_hi,
                           int dist_type) {
-  int N_QUAD = 20;
-  vector[N_QUAD] nodes = to_vector({
-    -7.6190485416797546e+00, -6.5105901570136488e+00,
-    -5.5787388058932059e+00, -4.7345813340460463e+00,
-    -3.9439673506573110e+00, -3.1890148165533843e+00,
-    -2.4586636111723603e+00, -1.7452473208141255e+00,
-    -1.0429453488027509e+00, -3.4696415708135458e-01,
-     3.4696415708135830e-01,  1.0429453488027574e+00,
-     1.7452473208141317e+00,  2.4586636111723683e+00,
-     3.1890148165533900e+00,  3.9439673506573163e+00,
-     4.7345813340460552e+00,  5.5787388058932033e+00,
-     6.5105901570136551e+00,  7.6190485416797591e+00
-  });
-  vector[N_QUAD] weights = to_vector({
-    1.2578006724378954e-13, 2.4820623623151972e-10,
-    6.1274902599825256e-08, 4.4021210902309806e-06,
-    1.2882627996193093e-04, 1.8301031310804826e-03,
-    1.3997837447100857e-02, 6.1506372063977507e-02,
-    1.6173933398399959e-01, 2.6079306344955683e-01,
-    2.6079306344955305e-01, 1.6173933398399776e-01,
-    6.1506372063977438e-02, 1.3997837447101162e-02,
-    1.8301031310805052e-03, 1.2882627996193072e-04,
-    4.4021210902309052e-06, 6.1274902599829068e-08,
-    2.4820623623151936e-10, 1.2578006724379269e-13
-  });
+  real r_lo = z_lo == negative_infinity()
+              ? negative_infinity() : mu_R + sd_R * z_lo;
+  real r_hi = z_hi == positive_infinity()
+              ? positive_infinity() : mu_R + sd_R * z_hi;
 
-  real result = 0;
-  for (i in 1:N_QUAD) {
-    real z = nodes[i];
-    real gate = 1.0;
-    if (z_lo != negative_infinity())
-      gate *= inv_logit(100 * (z - z_lo));
-    if (z_hi != positive_infinity())
-      gate *= inv_logit(100 * (z_hi - z));
-    if (gate < 1e-10) continue;
-
-    real R = mu_R + sd_R * z;
-    real F_lower = fmax(c_lo - R, f_lo) - mu_F;
-    real F_upper = fmin(c_hi - R, f_hi) - mu_F;
-    if (F_upper <= F_lower) continue;
-
-    real w = weights[i] * gate;
-    w *= sdt_pdf(z, dist_type) / sdt_pdf(z, 1);
-
-    result += w * (sdt_cumprob(F_upper, dist_type)
-                   - sdt_cumprob(F_lower, dist_type));
-  }
-  return fmax(result, 1e-20);
+  return cdp_prob_quad(
+    mu_F, mu_R, sd_R,
+    c_lo, c_hi,
+    f_lo, f_hi,
+    r_lo, r_hi,
+    dist_type
+  );
 }
 
 // CDP UV likelihood (2-way R/K model, sigmar as dpar)

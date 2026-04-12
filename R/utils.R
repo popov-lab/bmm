@@ -376,7 +376,15 @@ order_data_query <- function(model, data, formula) {
 # missing from the call
 missing_args <- function(which = -1) {
   parent_objects <- as.list(sys.frame(which))
-  parent_args <- names(as.list(args(as.character(sys.call(which)[[1]]))))
+  call_head <- sys.call(which)[[1]]
+  parent_fun <- if (is.function(call_head)) {
+    call_head
+  } else if (is.symbol(call_head) || is.character(call_head)) {
+    get(as.character(call_head), mode = "function", envir = sys.frame(which))
+  } else {
+    sys.function(which)
+  }
+  parent_args <- names(formals(parent_fun))
   parent_args <- parent_args[!parent_args %in% c("...", "")]
   symbols <- names(parent_objects)[sapply(parent_objects, is.symbol)]
   missing <- symbols[symbols %in% parent_args]
@@ -387,7 +395,7 @@ missing_args <- function(which = -1) {
 # required arguments are missing
 stop_missing_args <- function() {
   missing <- missing_args(-2)
-  fun <- as.character(sys.call(-1)[[1]])
+  fun <- deparse(sys.call(-1)[[1]])[1]
   stopif(
     length(missing) > 0,
     "The following required arguments are missing in {fun}(): \\

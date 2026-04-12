@@ -170,7 +170,7 @@ test_that("sdt_metad produces valid stancode with equidistant thresholds", {
   formula <- bmf(dprime ~ 1, metad ~ 1, criterion ~ 1, spacing ~ 1)
   code <- stancode(formula, data = dat, model = model)
   expect_true(nchar(code) > 0)
-  expect_true(grepl("multinomial", code, ignore.case = TRUE))
+  expect_true(grepl("sdt_metad_lpmf", code, fixed = TRUE))
   expect_true(grepl("metad", code))
 })
 

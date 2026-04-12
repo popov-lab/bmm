@@ -9,7 +9,8 @@ sdt_metad(
   stimulus,
   n_ratings = NULL,
   dist = c("normal", "logistic", "gumbel_min", "gumbel_max"),
-  threshold_type = c("parsimonious", "equidistant", "log_distance", "log_ratio"),
+  threshold_type = c("parsimonious", "equidistant", "log_distance", "log_ratio",
+    "softmax"),
   links = NULL,
   ...
 )

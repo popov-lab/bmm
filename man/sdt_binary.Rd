@@ -63,17 +63,17 @@ Provide pre-aggregated data with the following columns:
 \itemize{
 \item \strong{Parameters:}
 \itemize{
-\item \code{mu}: Internal parameter (fixed to 0)
 \item \code{dprime}: Sensitivity: distance between signal and noise distributions
 \item \code{criterion}: Response bias: location of decision boundary
+\item \code{sdratio}: Log SD ratio: log ratio of signal to noise standard deviations (exp(sdratio) is the natural SD ratio, 0 = equal variance)
 }
 \item \strong{Fixed parameters:}
 \itemize{
-\item \code{mu} = 0
+\item \code{sdratio} = 0
 }
 \item \strong{Default parameter links:}
 \itemize{
-\item mu = identity; dprime = identity; criterion = identity
+\item dprime = identity; criterion = identity; sdratio = identity
 }
 \item \strong{Default priors:}
 \itemize{
@@ -86,6 +86,11 @@ Provide pre-aggregated data with the following columns:
 \itemize{
 \item \code{main}: normal(0, 1.5)
 \item \code{effects}: normal(0, 0.5)
+}
+\item \code{sdratio}:
+\itemize{
+\item \code{main}: normal(0, 0.5)
+\item \code{effects}: normal(0, 0.3)
 }
 }
 }
@@ -103,6 +108,15 @@ model <- sdt_binary(
 
 fit <- bmm(
   formula = bmf(dprime ~ 1, criterion ~ 1),
+  data = dat,
+  model = model,
+  cores = 4,
+  backend = "cmdstanr"
+)
+
+# Unequal-variance binary SDT
+fit_uv <- bmm(
+  formula = bmf(dprime ~ 1, criterion ~ 1, sdratio ~ 1),
   data = dat,
   model = model,
   cores = 4,

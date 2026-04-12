@@ -31,10 +31,20 @@
 #' @importFrom brms pp_check
 #' @export
 pp_check.bmmfit <- function(object, type = NULL, ndraws = NULL, ...) {
-  # brms blocks pp_check for multinomial families (multi-column response).
-  # Dispatch to bmm-specific handler; all other families delegate to brms.
-  if (identical(family(object)$family, "multinomial")) {
-    return(.pp_check_bmm(object, type = type, ndraws = ndraws, ...))
+  model <- object$bmm$model
+  is_rating_family <- inherits(model, "sdt") &&
+    !inherits(model, "sdt_cdp") &&
+    !inherits(model, "sdt_mafc") &&
+    !inherits(model, "sdt_ranking") &&
+    !is.null(model$other_vars$n_ratings)
+
+  if (is_rating_family) {
+    if (!is.null(type)) {
+      warning2("Argument 'type' is ignored for rating SDT pp_check. ",
+               "A response-proportion plot is always produced.")
+    }
+    if (is.null(ndraws)) ndraws <- 100L
+    return(.pp_check_sdt_rating(object, ndraws = ndraws, ...))
   }
   NextMethod()
 }
@@ -90,15 +100,15 @@ pp_check.bmmfit <- function(object, type = NULL, ndraws = NULL, ...) {
   predict_args <- if (!is.null(draw_ids)) list(draw_ids = draw_ids) else list(ndraws = ndraws)
 
   model     <- fit$bmm$model
-  resp_cols <- unlist(model$resp_vars)
   stim_var  <- model$other_vars$stimulus
   n_ratings <- model$other_vars$n_ratings
+  long_data <- fit$data
+  has_long_counts <- all(c("count", "category") %in% names(long_data))
 
-  # Posterior predictions: array [ndraws x nobs x K]
+  # Posterior predictions: long-format custom families return a matrix of
+  # category probabilities, while older wide-format rating fits return the
+  # brms multinomial array [draw x obs x category].
   yrep <- do.call(brms::posterior_predict, c(list(fit), predict_args, list(...)))
-
-  # Observed response counts: [nobs x K]
-  y_mat <- as.matrix(fit$data[, resp_cols])
 
   # Condition columns (stimulus and grouping vars are already excluded)
   conditions  <- .sdt_resolve_conditions(fit, NULL)
@@ -134,8 +144,14 @@ pp_check.bmmfit <- function(object, type = NULL, ndraws = NULL, ...) {
     }))
     idx <- which(match_mask)
 
-    # Observed: pool counts across observations in group, then normalise
-    total_cnt <- colSums(y_mat[idx, , drop = FALSE])
+    if (has_long_counts) {
+      total_cnt <- vapply(seq_len(n_ratings), function(cat_idx) {
+        sum(long_data$count[idx][long_data$category[idx] == cat_idx])
+      }, numeric(1))
+    } else {
+      resp_cols <- unlist(model$resp_vars)
+      total_cnt <- colSums(as.matrix(long_data[idx, resp_cols, drop = FALSE]))
+    }
     obs_props <- total_cnt / sum(total_cnt)
 
     obs_list[[g]] <- cbind(
@@ -144,11 +160,24 @@ pp_check.bmmfit <- function(object, type = NULL, ndraws = NULL, ...) {
                  stringsAsFactors = FALSE)
     )
 
-    # Predicted: yrep[draw, obs_in_group, cat] -> [ndraws x K] proportions
-    yrep_sub   <- yrep[, idx, , drop = FALSE]
-    yrep_pool  <- apply(yrep_sub, c(1L, 3L), sum)         # [ndraws x K]
-    yrep_n     <- rowSums(yrep_pool)
-    yrep_props <- yrep_pool / yrep_n                       # [ndraws x K]
+    if (has_long_counts) {
+      yrep_sub <- yrep[, idx, drop = FALSE]
+      weight_mat <- matrix(
+        long_data$n_trials_total[idx],
+        nrow = nrow(yrep_sub),
+        ncol = length(idx),
+        byrow = TRUE
+      )
+      yrep_weighted <- yrep_sub * weight_mat
+      yrep_pool <- vapply(seq_len(n_ratings), function(cat_idx) {
+        rowSums(yrep_weighted[, long_data$category[idx] == cat_idx, drop = FALSE])
+      }, numeric(nrow(yrep_weighted)))
+    } else {
+      yrep_sub <- yrep[, idx, , drop = FALSE]
+      yrep_pool <- apply(yrep_sub, c(1L, 3L), sum)
+    }
+    yrep_n <- rowSums(yrep_pool)
+    yrep_props <- yrep_pool / yrep_n
 
     pred_list[[g]] <- cbind(
       unique_grps[rep(g, n_ratings), , drop = FALSE],

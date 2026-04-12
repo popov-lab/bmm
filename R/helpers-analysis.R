@@ -110,6 +110,10 @@ roc_sdt <- function(fit, conditions = NULL, n_points = 100,
     model$other_vars$stimulus,
     model$other_vars$n_trials,
     "nTrials", "dist_type",
+    "count", "category", "stim_val", "n_ratings",
+    "thresh_type", "obs_id", "n_trials_total",
+    "cat_type", "cat_conf", "n_new", "n_old",
+    "has_guess", "n_total",
     names(brms::ranef(fit))   # random-effect grouping variables
   ))
 
@@ -144,10 +148,10 @@ roc_sdt <- function(fit, conditions = NULL, n_points = 100,
   }
 
   if (is_rating) {
-    brms::posterior_linpred(fit, nlpar = param, newdata = newdata,
+    brms::posterior_linpred(fit, nlpar = .sdt_brms_dpar_name(param), newdata = newdata,
                             re_formula = NA, allow_new_levels = TRUE, ...)
   } else {
-    brms::posterior_linpred(fit, dpar = param, newdata = newdata,
+    brms::posterior_linpred(fit, dpar = .sdt_brms_dpar_name(param), newdata = newdata,
                             re_formula = NA, allow_new_levels = TRUE, ...)
   }
 }
@@ -406,7 +410,8 @@ roc_observed <- function(fit, conditions = NULL) {
   resp_cols <- unlist(model$resp_vars)
   stim_var  <- model$other_vars$stimulus
   n_ratings <- model$other_vars$n_ratings
-  y_mat     <- as.matrix(fit$data[, resp_cols])
+  long_data <- fit$data
+  has_long_counts <- all(c("count", "category") %in% names(long_data))
 
   if (is.null(conditions)) {
     group_cols <- stim_var
@@ -437,15 +442,24 @@ roc_observed <- function(fit, conditions = NULL) {
     noise_idx  <- which(mask & stim_col == 0)
     signal_idx <- which(mask & stim_col == 1)
 
-    noise_counts  <- colSums(y_mat[noise_idx, , drop = FALSE])
-    signal_counts <- colSums(y_mat[signal_idx, , drop = FALSE])
+    if (has_long_counts) {
+      noise_counts <- vapply(seq_len(n_ratings), function(cat_idx) {
+        sum(long_data$count[noise_idx][long_data$category[noise_idx] == cat_idx])
+      }, numeric(1))
+      signal_counts <- vapply(seq_len(n_ratings), function(cat_idx) {
+        sum(long_data$count[signal_idx][long_data$category[signal_idx] == cat_idx])
+      }, numeric(1))
+    } else {
+      y_mat <- as.matrix(long_data[, resp_cols, drop = FALSE])
+      noise_counts <- colSums(y_mat[noise_idx, , drop = FALSE])
+      signal_counts <- colSums(y_mat[signal_idx, , drop = FALSE])
+    }
 
     pn <- noise_counts / sum(noise_counts)
     ps <- signal_counts / sum(signal_counts)
 
-    K <- ncol(y_mat)
-    fa_pts <- c(1, 1 - cumsum(pn)[seq_len(K - 1L)], 0)
-    hi_pts <- c(1, 1 - cumsum(ps)[seq_len(K - 1L)], 0)
+    fa_pts <- c(1, 1 - cumsum(pn)[seq_len(n_ratings - 1L)], 0)
+    hi_pts <- c(1, 1 - cumsum(ps)[seq_len(n_ratings - 1L)], 0)
 
     roc_df <- data.frame(FA = fa_pts, Hit = hi_pts)
     if (ncol(cond_levels) > 0L) {
@@ -627,4 +641,3 @@ print.bmm_sdt_auc <- function(x, ...) {
   print(summ, digits = 3, row.names = FALSE)
   invisible(x)
 }
-

@@ -20,26 +20,9 @@ real sdt_ranking_lpmf(int y, real mu, real dprime,
   return y * log_p;
 }
 
-// Gaussian UV-SDT ranking: numerical integration via integrate_1d
-// Parameters:
-//   x:     integration variable
-//   xc:    complement (unused, required by Stan)
-//   theta: {dprime, sigma} where sigma = exp(sdratio)
-//   x_r:   empty real array (required by integrate_1d)
-//   x_i:   {rank_pos, max_rank}
-real ranking_integrand(real x, real xc,
-                       array[] real theta,
-                       array[] real x_r, array[] int x_i) {
-  real d = theta[1];
-  real sigma = theta[2];
-  int r = x_i[1];
-  int m = x_i[2];
-  return pow(Phi(x), m - r)
-         * exp(normal_lpdf(x | d, sigma))
-         * pow(1 - Phi(x), r - 1);
-}
-
-// Gaussian UV-SDT ranking likelihood
+// Gaussian UV-SDT ranking: fixed Gauss-Hermite quadrature over the target
+// distribution. This replaces the slower adaptive integrate_1d path while
+// retaining smooth gradients.
 // Parameters:
 //   y:        count of times target received this rank
 //   mu:       internal parameter (fixed to 0, required by brms)
@@ -47,16 +30,45 @@ real ranking_integrand(real x, real xc,
 //   sdratio:  log ratio of signal to noise SD (exp(sdratio) = sigma_s/sigma_n)
 //   rank_pos: rank position (1..m)
 //   max_rank: total number of ranked items (m)
-//   x_r:      empty real array (required by integrate_1d)
-//   x_i:      empty int array (required by integrate_1d)
 real sdt_ranking_uv_lpmf(int y, real mu, real dprime, real sdratio,
-                          int rank_pos, int max_rank,
-                          data array[] real x_r, data array[] int x_i) {
+                         int rank_pos, int max_rank) {
   if (y == 0) return 0;
   real sigma = exp(sdratio);
-  real p = choose(max_rank - 1, rank_pos - 1)
-           * integrate_1d(ranking_integrand,
-                          negative_infinity(), positive_infinity(),
-                          {dprime, sigma}, x_r, {rank_pos, max_rank});
-  return y * log(p);
+  int N_GH = 20;
+  vector[N_GH] gh_nodes = to_vector({
+    -7.6190485416797546e+00, -6.5105901570136488e+00,
+    -5.5787388058932059e+00, -4.7345813340460463e+00,
+    -3.9439673506573110e+00, -3.1890148165533843e+00,
+    -2.4586636111723603e+00, -1.7452473208141255e+00,
+    -1.0429453488027509e+00, -3.4696415708135458e-01,
+     3.4696415708135830e-01,  1.0429453488027574e+00,
+     1.7452473208141317e+00,  2.4586636111723683e+00,
+     3.1890148165533900e+00,  3.9439673506573163e+00,
+     4.7345813340460552e+00,  5.5787388058932033e+00,
+     6.5105901570136551e+00,  7.6190485416797591e+00
+  });
+  vector[N_GH] gh_weights = to_vector({
+    1.2578006724378954e-13, 2.4820623623151972e-10,
+    6.1274902599825256e-08, 4.4021210902309806e-06,
+    1.2882627996193093e-04, 1.8301031310804826e-03,
+    1.3997837447100857e-02, 6.1506372063977507e-02,
+    1.6173933398399959e-01, 2.6079306344955683e-01,
+    2.6079306344955305e-01, 1.6173933398399776e-01,
+    6.1506372063977438e-02, 1.3997837447101162e-02,
+    1.8301031310805052e-03, 1.2882627996193072e-04,
+    4.4021210902309052e-06, 6.1274902599829068e-08,
+    2.4820623623151936e-10, 1.2578006724379269e-13
+  });
+  vector[N_GH] log_terms;
+  real log_choose = log(choose(max_rank - 1, rank_pos - 1));
+
+  for (i in 1:N_GH) {
+    real eta = dprime + sigma * gh_nodes[i];
+    log_terms[i] = log(gh_weights[i])
+      + (max_rank - rank_pos) * std_normal_lcdf(eta)
+      + (rank_pos - 1) * std_normal_lccdf(eta);
+  }
+
+  real log_p = log_choose + log_sum_exp(log_terms);
+  return y * log_p;
 }

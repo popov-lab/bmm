@@ -71,6 +71,22 @@ test_that("combine_sdt_response handles K=4 (2 confidence levels)", {
   expect_equal(result, c(1, 2, 3, 4))
 })
 
+test_that("combine_sdt_response can use observed response or accuracy", {
+  stim <- c(0, 0, 1, 1)
+  conf <- c(2, 1, 1, 2)
+  resp <- c(0, 1, 0, 1)
+  acc <- c(1, 0, 0, 1)
+
+  expect_equal(
+    combine_sdt_response(stim, conf, n_levels = 2, response = resp),
+    c(1, 3, 2, 4)
+  )
+  expect_equal(
+    combine_sdt_response(stim, conf, n_levels = 2, accuracy = acc),
+    c(1, 3, 2, 4)
+  )
+})
+
 
 ############################################################################# !
 # THRESHOLD CONSTRUCTION TESTS                                            ####
@@ -115,6 +131,17 @@ test_that(".sdt_make_thresholds log_ratio computes ratio-scaled thresholds", {
                                  threshold_type = "log_ratio",
                                  deltas = c(log(2), 0))
   expect_equal(thr_k4, c(-2, 0, 1), tolerance = 1e-8)
+})
+
+test_that(".sdt_make_thresholds softmax produces ordered thresholds", {
+  thr <- .sdt_make_thresholds(
+    criterion = 0, n_ratings = 6,
+    threshold_type = "softmax",
+    spacing = 0, deltas = c(0.3, -0.2, 0.1)
+  )
+  expect_length(thr, 5)
+  expect_true(all(diff(thr) > 0))
+  expect_equal(thr[3], 0, tolerance = 1e-8)
 })
 
 

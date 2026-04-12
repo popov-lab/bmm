@@ -8,15 +8,20 @@
   dist_int <- .sdt_dist_id(dist)
 
   parameters <- list(
-    mu = glue("Internal parameter (fixed to 0)"),
     dprime = glue("Sensitivity: distance between signal and noise distributions"),
-    criterion = glue("Response bias: location of decision boundary")
+    criterion = glue("Response bias: location of decision boundary"),
+    sdratio = glue(
+      "Log SD ratio: log ratio of signal to noise standard deviations ",
+      "(exp(sdratio) is the natural SD ratio, 0 = equal variance)"
+    )
   )
   default_priors <- list(
     dprime = list(main = "normal(1, 1)", effects = "normal(0, 0.5)"),
-    criterion = list(main = "normal(0, 1.5)", effects = "normal(0, 0.5)")
+    criterion = list(main = "normal(0, 1.5)", effects = "normal(0, 0.5)"),
+    sdratio = list(main = "normal(0, 0.5)", effects = "normal(0, 0.3)")
   )
-  param_links <- list(mu = "identity", dprime = "identity", criterion = "identity")
+  param_links <- list(dprime = "identity", criterion = "identity",
+                      sdratio = "identity")
 
   requirements <- glue(
     "Provide pre-aggregated data with the following columns:", "\n\n",
@@ -40,12 +45,12 @@
       requirements = requirements,
       parameters = parameters,
       links = param_links,
-      fixed_parameters = list(mu = 0),
+      fixed_parameters = list(sdratio = 0),
       default_priors = default_priors,
       init_ranges = list(
-        mu        = c(0, 0),
         dprime    = c(0.5, 1.5),
-        criterion = c(-0.5, 0.5)
+        criterion = c(-0.5, 0.5),
+        sdratio   = c(-0.3, 0.3)
       ),
       void_mu = FALSE
     ),
@@ -98,6 +103,15 @@
 #'
 #' fit <- bmm(
 #'   formula = bmf(dprime ~ 1, criterion ~ 1),
+#'   data = dat,
+#'   model = model,
+#'   cores = 4,
+#'   backend = "cmdstanr"
+#' )
+#'
+#' # Unequal-variance binary SDT
+#' fit_uv <- bmm(
+#'   formula = bmf(dprime ~ 1, criterion ~ 1, sdratio ~ 1),
 #'   data = dat,
 #'   model = model,
 #'   cores = 4,
@@ -156,7 +170,7 @@ bmf2bf.sdt_binary <- function(model, formula) {
 
   brms::bf(paste0(
     resp_var, " | vint(", stim_var, ", dist_type) + trials(",
-    n_trials_var, ") ~ 1"
+    n_trials_var, ") ~ 0"
   ))
 }
 
@@ -171,8 +185,9 @@ configure_model.sdt_binary <- function(model, data, formula) {
 
   formula$family <- brms::custom_family(
     "sdt_binary",
-    dpars = c("mu", "dprime", "criterion"),
-    links = c("identity", model$links$dprime, model$links$criterion),
+    dpars = c("mu", "dprime", "criterion", "sdratio"),
+    links = c("identity", model$links$dprime, model$links$criterion,
+              model$links$sdratio),
     type = "int",
     loop = TRUE,
     log_lik = log_lik_sdt_binary,
@@ -195,12 +210,13 @@ configure_model.sdt_binary <- function(model, data, formula) {
 log_lik_sdt_binary <- function(i, prep) {
   dprime <- brms::get_dpar(prep, "dprime", i = i)
   criterion <- brms::get_dpar(prep, "criterion", i = i)
+  sdratio <- exp(brms::get_dpar(prep, "sdratio", i = i))
   stimulus <- prep$data$vint1[i]
   dist <- .sdt_dist_names[prep$data$vint2[i]]
   n_trials <- prep$data$trials[i]
   y <- prep$data$Y[i]
 
-  eta <- .sdt_eta(dprime, criterion, stimulus)
+  eta <- .sdt_eta(dprime, criterion, stimulus, sdratio)
   p <- .sdt_cdf(eta, dist)
   dbinom(y, n_trials, p, log = TRUE)
 }
@@ -208,11 +224,12 @@ log_lik_sdt_binary <- function(i, prep) {
 posterior_predict_sdt_binary <- function(i, prep, ...) {
   dprime <- brms::get_dpar(prep, "dprime", i = i)
   criterion <- brms::get_dpar(prep, "criterion", i = i)
+  sdratio <- exp(brms::get_dpar(prep, "sdratio", i = i))
   stimulus <- prep$data$vint1[i]
   dist <- .sdt_dist_names[prep$data$vint2[i]]
   n_trials <- prep$data$trials[i]
 
-  eta <- .sdt_eta(dprime, criterion, stimulus)
+  eta <- .sdt_eta(dprime, criterion, stimulus, sdratio)
   p <- .sdt_cdf(eta, dist)
   rbinom(length(p), n_trials, p)
 }

@@ -7,6 +7,7 @@
                              threshold_type = "parsimonious",
                              links = NULL, call = NULL, ...) {
   dist_int <- .sdt_dist_id(dist)
+  thresh_type_int <- .sdt_threshold_type_id(threshold_type)
 
   if (is.null(n_ratings) && length(response) > 1) {
     n_ratings <- length(response)
@@ -22,28 +23,10 @@
   )
   param_links <- list(dprime = "identity", criterion = "identity")
 
-  if (threshold_type %in% c("equidistant", "parsimonious")) {
-    parameters$spacing <- glue(
-      "Threshold spacing: controls distance between adjacent thresholds ",
-      "(exp(spacing) ensures positive spacing)"
-    )
-    default_priors$spacing <- list(
-      main = "normal(0, 0.5)", effects = "normal(0, 0.3)"
-    )
-    param_links$spacing <- "identity"
-  } else if (threshold_type %in% c("log_distance", "log_ratio")) {
-    n_deltas <- n_ratings - 2L
-    mid <- n_ratings %/% 2L
-    for (i in seq_len(n_deltas)) {
-      idx <- if (i < mid) i else i + 1L
-      pname <- paste0("delta", idx)
-      parameters[[pname]] <- glue("Threshold parameter for threshold {idx}")
-      default_priors[[pname]] <- list(
-        main = "normal(0, 1)", effects = "normal(0, 0.5)"
-      )
-      param_links[[pname]] <- "identity"
-    }
-  }
+  threshold_parts <- .sdt_threshold_parameter_parts(n_ratings, threshold_type)
+  parameters <- c(parameters, threshold_parts$parameters)
+  default_priors <- c(default_priors, threshold_parts$default_priors)
+  param_links <- c(param_links, threshold_parts$param_links)
 
   parameters$metad <- glue(
     "Metacognitive sensitivity: type-2 d' controlling confidence ",
@@ -76,7 +59,7 @@
     list(
       resp_vars = nlist(response),
       other_vars = nlist(stimulus, dist, dist_int, n_ratings,
-                         threshold_type),
+                         threshold_type, thresh_type_int),
       domain = "Perception & Recognition Memory",
       task = "Signal/Noise or Old/New Recognition",
       name = "Meta-d' Signal Detection Theory Model",
@@ -160,7 +143,8 @@ sdt_metad <- function(response, stimulus,
                       n_ratings = NULL,
                       dist = c("normal", "logistic", "gumbel_min", "gumbel_max"),
                       threshold_type = c("parsimonious", "equidistant",
-                                         "log_distance", "log_ratio"),
+                                         "log_distance", "log_ratio",
+                                         "softmax"),
                       links = NULL, ...) {
   call <- match.call()
   stop_missing_args()
@@ -200,6 +184,7 @@ check_data.sdt_metad <- function(model, data, formula) {
          "Stimulus variable '{stim_var}' must be coded as 0 (noise) and 1 (signal)")
 
   data <- .check_data_sdt_rating(model, data)
+  data <- .sdt_rating_long_data(model, data)
 
   NextMethod("check_data")
 }
@@ -211,12 +196,7 @@ check_data.sdt_metad <- function(model, data, formula) {
 
 #' @export
 bmf2bf.sdt_metad <- function(model, formula) {
-  parts_metad <- .sdt_rating_formula_parts(
-    model, shift_expr = "metad / 2 * (2 * stimulus - 1)"
-  )
-  parts_dprime <- .sdt_rating_formula_parts(model)
-  nlf_formulas <- .sdt_build_nlf_metad(parts_metad, parts_dprime)
-  Reduce(`+`, nlf_formulas, init = parts_metad$base_formula)
+  .sdt_rating_base_formula()
 }
 
 
@@ -226,5 +206,23 @@ bmf2bf.sdt_metad <- function(model, formula) {
 
 #' @export
 configure_model.sdt_metad <- function(model, data, formula) {
-  .configure_sdt_rating(model, data, formula)
+  formula <- .sdt_remap_formula_dpars(formula, model)
+  formula <- bmf2bf(model, formula)
+  formula$family <- .sdt_rating_custom_family(
+    model,
+    family_name = "sdt_metad",
+    log_lik = log_lik_sdt_metad,
+    posterior_predict = posterior_predict_sdt_metad
+  )
+  stanvars <- .sdt_rating_stanvars(model, "sdt_metad", "sdt_metad_row_lpmf")
+
+  nlist(formula, data, stanvars)
+}
+
+log_lik_sdt_metad <- function(i, prep) {
+  .sdt_loglik_rating_common(i, prep, variant = "metad")
+}
+
+posterior_predict_sdt_metad <- function(i, prep, ...) {
+  .sdt_posterior_predict_rating_common(i, prep, variant = "metad")
 }

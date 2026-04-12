@@ -9,7 +9,8 @@ sdt_rating(
   stimulus,
   n_ratings = NULL,
   dist = c("normal", "logistic", "gumbel_min", "gumbel_max"),
-  threshold_type = c("parsimonious", "equidistant", "log_distance", "log_ratio"),
+  threshold_type = c("parsimonious", "equidistant", "log_distance", "log_ratio",
+    "softmax"),
   log_scale = FALSE,
   links = NULL,
   ...
@@ -45,11 +46,13 @@ are equally spaced around criterion.
 exp(delta), guaranteeing ordering.
 \item "log_ratio": K-2 parameters. Threshold distances as ratios
 (Paulewicz & Blaut, 2020).
+\item "softmax": K-2 parameters. A shared spacing parameter controls
+the average interval size, while softmax-transformed delta parameters
+allocate interval widths smoothly across the scale.
 }}
 
-\item{log_scale}{Logical. Whether to use numerically stable log-scale CDF
-computation (default FALSE). Set to TRUE if you encounter numerical
-issues with extreme parameter values.}
+\item{log_scale}{Logical. Deprecated and ignored. Confidence-rating SDT
+likelihoods now use stable log-scale computations internally.}
 
 \item{links}{A named list of link functions for the parameters.}
 
@@ -77,7 +80,7 @@ Confidence Rating Signal Detection Theory Model
 \item \code{dprime}: Sensitivity: distance between signal and noise distributions
 \item \code{criterion}: Response bias: location of decision boundary
 \item \code{spacing}: Threshold spacing: controls distance between adjacent thresholds (exp(spacing) ensures positive spacing)
-\item \code{sdratio}: SD ratio: log ratio of signal to noise standard deviations (exp(sdratio) ensures positivity, 0 = equal variance)
+\item \code{sdratio}: Log SD ratio: log ratio of signal to noise standard deviations (exp(sdratio) is the natural SD ratio, 0 = equal variance)
 }
 \item \strong{Fixed parameters:}
 \itemize{

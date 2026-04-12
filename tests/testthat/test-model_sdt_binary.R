@@ -24,17 +24,17 @@ test_that("sdt_binary model has correct class structure", {
 
 test_that("sdt_binary model parameters are correctly defined", {
   model <- sdt_binary("n_old", "stimulus", "n_trials")
-  expect_true("mu" %in% names(model$parameters))
   expect_true("dprime" %in% names(model$parameters))
   expect_true("criterion" %in% names(model$parameters))
-  expect_equal(model$fixed_parameters$mu, 0)
+  expect_true("sdratio" %in% names(model$parameters))
+  expect_equal(model$fixed_parameters$sdratio, 0)
 })
 
 test_that("sdt_binary model has correct default link functions", {
   model <- sdt_binary("n_old", "stimulus", "n_trials")
-  expect_equal(model$links$mu, "identity")
   expect_equal(model$links$dprime, "identity")
   expect_equal(model$links$criterion, "identity")
+  expect_equal(model$links$sdratio, "identity")
 })
 
 test_that("sdt_binary model accepts custom links", {
@@ -66,13 +66,13 @@ test_that("sdt_binary requires n_trials argument", {
   expect_error(sdt_binary("n_old", "stimulus"))
 })
 
-test_that("sdt_binary model has init_ranges with mu, dprime, criterion", {
+test_that("sdt_binary model has init_ranges for estimated SDT parameters", {
   model <- sdt_binary("n_old", "stimulus", "n_trials")
   expect_false(is.null(model$init_ranges))
-  expect_true(all(c("mu", "dprime", "criterion") %in% names(model$init_ranges)))
-  expect_equal(model$init_ranges$mu, c(0, 0))
+  expect_true(all(c("dprime", "criterion", "sdratio") %in% names(model$init_ranges)))
   expect_equal(model$init_ranges$dprime, c(0.5, 1.5))
   expect_equal(model$init_ranges$criterion, c(-0.5, 0.5))
+  expect_equal(model$init_ranges$sdratio, c(-0.3, 0.3))
 })
 
 

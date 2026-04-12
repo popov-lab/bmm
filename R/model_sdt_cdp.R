@@ -347,7 +347,7 @@ check_data.sdt_cdp <- function(model, data, formula) {
 bmf2bf.sdt_cdp <- function(model, formula) {
   brms::bf(paste0(
     "count | vint(cat_type, cat_conf, stim_val, n_new, ",
-    "n_old, has_guess, dist_type, thresh_type) ~ 1"
+    "n_old, has_guess, dist_type, thresh_type) ~ 0"
   ))
 }
 
@@ -358,8 +358,6 @@ bmf2bf.sdt_cdp <- function(model, formula) {
 
 #' @export
 configure_model.sdt_cdp <- function(model, data, formula) {
-  sigmar_estimated <- !is.null(formula[["sigmar"]]) &&
-    !is_constant(formula[["sigmar"]])
   kcrit_estimated <- model$other_vars$has_guess &&
     !is.null(formula[["kcrit"]]) &&
     !is_constant(formula[["kcrit"]])

@@ -234,6 +234,277 @@ rad2deg <- function(rad) {
   rad * 180 / pi
 }
 
+.pull_sdt_column <- function(data, var, arg_name) {
+  stopif(is.null(var), "Argument `{arg_name}` must not be NULL")
+  stopif(length(var) != 1 || !is.character(var),
+    "Argument `{arg_name}` must be a single column name"
+  )
+  stopif(!var %in% names(data),
+    "Column '{var}' supplied to `{arg_name}` is missing in the data"
+  )
+  data[[var]]
+}
+
+.as_binary01 <- function(x, arg_name) {
+  if (is.factor(x)) {
+    x <- as.character(x)
+  }
+  stopif(any(!x %in% c(0, 1), na.rm = TRUE),
+    "`{arg_name}` must be coded as 0 and 1"
+  )
+  as.integer(x)
+}
+
+.map_binary_levels <- function(x, arg_name, levels = c(0, 1)) {
+  if (is.factor(x)) {
+    x <- as.character(x)
+  }
+  stopif(length(levels) != 2,
+    "`levels` for `{arg_name}` must have length 2"
+  )
+  if (all(x %in% c(0, 1), na.rm = TRUE)) {
+    return(as.integer(x))
+  }
+
+  out <- ifelse(x == levels[1], 0L, ifelse(x == levels[2], 1L, NA_integer_))
+  stopif(any(is.na(out)),
+    "`{arg_name}` must be coded as 0/1 or using `response_levels = c({levels[1]}, {levels[2]})`"
+  )
+  out
+}
+
+.prepare_binary_response <- function(data, stimulus, response = NULL,
+                                     accuracy = NULL,
+                                     response_levels = c(0, 1)) {
+  stopif(!is.null(response) && !is.null(accuracy),
+    "Provide only one of `response` or `accuracy`"
+  )
+
+  if (!is.null(response)) {
+    resp <- .pull_sdt_column(data, response, "response")
+    return(.map_binary_levels(resp, "response", response_levels))
+  }
+
+  stopif(is.null(accuracy),
+    "Provide `response` or `accuracy` to prepare SDT data"
+  )
+  acc <- .as_binary01(.pull_sdt_column(data, accuracy, "accuracy"), "accuracy")
+  ifelse(acc == 1L, stimulus, 1L - stimulus)
+}
+
+.sdt_group_rows <- function(data, group_cols) {
+  if (length(group_cols) == 0L) {
+    group_id <- factor(rep("all", nrow(data)), levels = "all")
+    group_data <- data.frame()
+  } else {
+    group_id <- interaction(data[group_cols], drop = TRUE, lex.order = TRUE)
+    first_rows <- match(levels(group_id), group_id)
+    group_data <- data[first_rows, group_cols, drop = FALSE]
+    rownames(group_data) <- NULL
+  }
+
+  nlist(group_id, group_data)
+}
+
+#' Combine stimulus type and confidence into SDT response categories
+#'
+#' Creates a combined response variable from separate stimulus and confidence
+#' columns, suitable for use with SDT rating models. The combined response
+#' maps "noise" trials to categories 1..K/2 (from highest to lowest confidence)
+#' and "signal" trials to categories K/2+1..K (from lowest to highest).
+#'
+#' @param stimulus Integer vector (0/1). Stimulus type: 0 = noise, 1 = signal.
+#' @param confidence Integer vector. Confidence rating (1 = lowest confidence,
+#'   n_levels = highest confidence).
+#' @param n_levels Integer. Number of confidence levels per response side.
+#' @param response Optional integer vector (0/1) indicating the observed
+#'   response side: 0 = "new"/"noise", 1 = "old"/"signal". If omitted, the
+#'   historical behaviour is used and categories are derived from `stimulus`.
+#' @param accuracy Optional integer vector (0/1) indicating whether the
+#'   observed response was correct. If supplied, `response` is derived from
+#'   `stimulus` and `accuracy`.
+#'
+#' @return Integer vector of combined response categories (1 to 2*n_levels).
+#' @export
+#' @examples
+#' # 3 confidence levels per stimulus type -> K=6 combined categories
+#' stim <- c(0, 0, 0, 1, 1, 1)
+#' conf <- c(3, 2, 1, 1, 2, 3)
+#' combine_sdt_response(stim, conf, n_levels = 3)
+#' # Returns: 1, 2, 3, 4, 5, 6
+combine_sdt_response <- function(stimulus, confidence, n_levels,
+                                 response = NULL, accuracy = NULL) {
+  stopif(any(!stimulus %in% c(0, 1)),
+    "stimulus must be 0 (noise) or 1 (signal)"
+  )
+  stopif(any(confidence < 1 | confidence > n_levels),
+    "confidence must be between 1 and {n_levels}"
+  )
+  stopif(!is.null(response) && !is.null(accuracy),
+    "Provide only one of `response` or `accuracy`"
+  )
+
+  if (!is.null(response)) {
+    stopif(any(!response %in% c(0, 1)),
+      "response must be 0 (new/noise) or 1 (old/signal)"
+    )
+  }
+
+  if (!is.null(accuracy)) {
+    stopif(any(!accuracy %in% c(0, 1)),
+      "accuracy must be coded as 0 and 1"
+    )
+    response <- ifelse(accuracy == 1L, stimulus, 1L - stimulus)
+  }
+
+  if (is.null(response)) {
+    response <- stimulus
+  }
+
+  ifelse(response == 0,
+    n_levels - confidence + 1L,
+    n_levels + confidence
+  )
+}
+
+#' @title Prepare Trial-Level Data for SDT Models
+#' @description Aggregates trial-level SDT data into the wide count formats
+#'   expected by [sdt_binary()] and the rating-family SDT models.
+#' @param data A data frame in trial-level format.
+#' @param stimulus Column name coding the stimulus type. Must be coded as
+#'   0 (noise/new) and 1 (signal/old).
+#' @param response Optional column name. For binary outcomes, this should code
+#'   the observed old/new response. For rating outcomes with no `confidence`
+#'   column, it should contain the combined rating category (1 to `n_ratings`).
+#' @param confidence Optional column name with confidence ratings. When
+#'   supplied, combined SDT rating categories are created via
+#'   [combine_sdt_response()].
+#' @param accuracy Optional column name with correctness coded as 0/1. This can
+#'   be used instead of `response`; the observed response side is then derived
+#'   from `stimulus` and `accuracy`.
+#' @param id_cols Optional character vector of grouping columns (for example
+#'   subject or condition identifiers). The output is aggregated over
+#'   `id_cols` and `stimulus`.
+#' @param outcome Character. Either `"rating"` (default) or `"binary"`.
+#' @param n_ratings Optional integer. For rating outcomes, the total number of
+#'   response categories. If omitted, it is inferred from the data.
+#' @param response_levels Optional length-2 vector defining the coding of the
+#'   observed response variable when `response` is binary but not coded as 0/1.
+#' @return A data frame in the count format required by the corresponding SDT
+#'   model family.
+#' @keywords transform
+#' @export
+prepare_sdt_data <- function(data, stimulus, response = NULL, confidence = NULL,
+                             accuracy = NULL, id_cols = NULL,
+                             outcome = c("rating", "binary"),
+                             n_ratings = NULL,
+                             response_levels = c(0, 1)) {
+  data <- as.data.frame(data)
+  outcome <- match.arg(outcome)
+  stopif(any(!id_cols %in% names(data)),
+    "Grouping columns {collapse_comma(setdiff(id_cols, names(data)))} are missing in the data"
+  )
+
+  stim <- .as_binary01(.pull_sdt_column(data, stimulus, "stimulus"), "stimulus")
+  data[[stimulus]] <- stim
+  group_cols <- unique(c(id_cols, stimulus))
+  grouping <- .sdt_group_rows(data, group_cols)
+  group_rows <- split(seq_len(nrow(data)), grouping$group_id)
+
+  if (outcome == "binary") {
+    response_side <- .prepare_binary_response(
+      data, stimulus = stim, response = response,
+      accuracy = accuracy, response_levels = response_levels
+    )
+
+    out <- grouping$group_data
+    out$n_old <- vapply(group_rows, function(idx) {
+      sum(response_side[idx], na.rm = TRUE)
+    }, numeric(1))
+    out$n_trials <- vapply(group_rows, length, integer(1))
+    out$n_old <- as.integer(out$n_old)
+    rownames(out) <- NULL
+    return(out)
+  }
+
+  if (!is.null(response) && !is.null(accuracy)) {
+    stop2("Provide only one of `response` or `accuracy` for rating outcomes.")
+  }
+
+  category <- if (!is.null(confidence)) {
+    conf <- .pull_sdt_column(data, confidence, "confidence")
+    if (is.factor(conf)) {
+      conf <- as.integer(as.character(conf))
+    }
+    stopif(any(conf != round(conf), na.rm = TRUE),
+      "`confidence` must contain integer values"
+    )
+
+    if (is.null(n_ratings)) {
+      n_ratings <- 2L * max(conf, na.rm = TRUE)
+    }
+    stopif(n_ratings %% 2 != 0,
+      "`n_ratings` must be even when `confidence` is supplied"
+    )
+
+    response_side <- if (!is.null(response)) {
+      .map_binary_levels(
+        .pull_sdt_column(data, response, "response"),
+        "response", response_levels
+      )
+    } else {
+      NULL
+    }
+
+    combine_sdt_response(
+      stimulus = stim,
+      confidence = conf,
+      n_levels = n_ratings / 2L,
+      response = response_side,
+      accuracy = if (!is.null(accuracy)) {
+        .as_binary01(.pull_sdt_column(data, accuracy, "accuracy"), "accuracy")
+      } else {
+        NULL
+      }
+    )
+  } else {
+    stopif(is.null(response),
+      "For rating outcomes, provide either `confidence` or a combined-category `response`"
+    )
+    category <- .pull_sdt_column(data, response, "response")
+    if (is.factor(category)) {
+      category <- as.integer(as.character(category))
+    }
+    stopif(any(category != round(category), na.rm = TRUE),
+      "Combined rating categories must be integers"
+    )
+    if (is.null(n_ratings)) {
+      n_ratings <- max(category, na.rm = TRUE)
+    }
+    as.integer(category)
+  }
+
+  stopif(any(category < 1 | category > n_ratings, na.rm = TRUE),
+    "Rating categories must be between 1 and {n_ratings}"
+  )
+
+  count_list <- lapply(group_rows, function(idx) {
+    as.integer(tabulate(category[idx], nbins = n_ratings))
+  })
+  count_mat <- matrix(
+    unlist(count_list, use.names = FALSE),
+    ncol = n_ratings,
+    byrow = TRUE
+  )
+
+  out <- grouping$group_data
+  count_df <- as.data.frame(count_mat)
+  names(count_df) <- paste0("r", seq_len(n_ratings))
+  out <- cbind(out, count_df, nTrials = as.integer(rowSums(count_mat)))
+  rownames(out) <- NULL
+  out
+}
+
 #' @title Stan data for `bmm` models
 #' @description Given the `model`, the `data` and the `formula` for the model,
 #'   this function will return the combined stan data generated by `bmm` and
