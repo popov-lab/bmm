@@ -4,6 +4,7 @@
 ^README\.Rmd$
 ^cran-comments\.md$
 ^local$
+^bmm-dev$
 ^.github$
 ^\.github$
 ^_pkgdown\.yml$
@@ -22,3 +23,4 @@
 ^CRAN-SUBMISSION$
 ^AGENTS.md$
 ^code-structure.md$
+^\.lintr$

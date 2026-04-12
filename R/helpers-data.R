@@ -555,8 +555,9 @@ ezdm_summary_stats <- function(
         init_contaminant, max_contaminant, maxit, tol
       )
       if (!fit$converged || is.null(fit$params)) {
-        warning2("EM did not converge. Using simple moments.")
-        c(.simple_aggregation(rt_vec), contaminant_prop = NA_real_)
+        warning2("EM did not converge. Using robust moments.")
+        c(.robust_aggregation(rt_vec, scale_method = robust_scale),
+          contaminant_prop = NA_real_)
       } else {
         c(.dist_moments(fit$params, distribution),
           contaminant_prop = fit$contaminant_prop)

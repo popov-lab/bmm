@@ -1,12 +1,22 @@
 # bmm (development version)
 
 ### New features
+* New S3 method **conditional_effects()** for `bmmfit` objects. Provides an intuitive interface for visualizing predictor effects on model parameters, with automatic routing between distributional and non-linear parameters, inverse link transformations to show parameters on their natural scale (`scale = "native"`), softmax handling for mixture3p weight parameters, and filtering of internal model variables (#203).
+* New S3 methods for **emmeans** support on `bmmfit` objects. Users can now call `emmeans(fit, ~ condition, dpar = "kappa")` for any bmmodel (#323).
 * **EZDM now supports negative drift rates** to model below-chance performance. The drift parameter uses an identity link (previously log) and employs a soft absolute value approximation (sqrt(drift² + τ²) with τ = 0.01) to maintain smooth gradients for MCMC sampling while allowing bidirectional drift estimation.
+* New **pp_check()** method for multinomial models (e.g., `m3`). Since `brms::pp_check()` does not support the multinomial family, `bmm` now provides a custom method that compares observed and predicted response proportions in the `ppc_bars` style from `bayesplot`. The method supports faceting by experimental conditions via `group`, configurable credible intervals via `probs`, and population-level predictions via `re_formula = NA`. For non-multinomial models, `pp_check()` delegates to `brms::pp_check()` and auto-selects the grouped plot variant when `group` is specified.
 
 # bmm 1.3.0
 
 ### New models
-* Add the **EZ-Diffusion Model** (`ezdm`) for speeded decision-making tasks. The model estimates drift rate, boundary separation, and non-decision time from aggregated summary statistics (mean RT, variance of RT, accuracy) using the closed-form equations derived by Wagenmakers et al. (2007). Supports both 3-parameter (symmetric starting point) and 4-parameter (asymmetric starting point) versions based on Srivastava et al. (2016). Implements Bayesian hierarchical estimation following Chavez & Vandekerckhove (2025). See the [article](https://venpopov.com/bmm/dev/articles/bmm_ezdm.html) on the `bmm` website for details.
+* Add the **EZ-Diffusion Model** (`ezdm`) for speeded decision-making tasks. The model estimates drift rate, boundary separation, and non-decision time from aggregated summary statistics (mean RT, variance of RT, accuracy) using the closed-form equations derived by Wagenmakers et al. (2007). Supports both 3-parameter (symmetric starting point) and 4-parameter (asymmetric starting point) versions based on Srivastava et al. (2016). Implements Bayesian hierarchical estimation following Chavez & Vandekerckhove (2025). See the [article](https://venpopov.github.io/bmm/dev/articles/bmm_ezdm.html) on the `bmm` website for details.
+* Add the **Censored Shifted Wald Model** (`cswald`) for choice reaction time tasks with two response boundaries. The model estimates drift rate, boundary separation, and non-decision time from trial-level RT and response data. Implements two versions: **simple** (treats errors as censored correct responses, appropriate for high-accuracy tasks) and **crisk** (competing risks version with separate accumulators for each response, suitable for balanced accuracy). See the [article](https://venpopov.github.io/bmm/dev/articles/bmm_cswald.html) on the `bmm` website for details. Thanks to @GidonFrischkorn
+
+### New features
+* New function **ezdm_summary_stats()** to compute summary statistics from trial-level RT data for the EZ-Diffusion Model.
+* New function **create_initfun()** creates initialization functions for models that benefit from or require initial values for MCMC sampling. Supports automatic parameter initialization based on model-specific ranges with proper link function transformations.
+* New utility function **link_transform()** applies link functions (log, logit, identity, etc.) to parameter values, with proper handling of NULL inputs.
+
 
 ### New features
 * New function **ezdm_summary_stats()** to compute summary statistics from trial-level RT data for the EZ-Diffusion Model.

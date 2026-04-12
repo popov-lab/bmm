@@ -645,16 +645,16 @@ priors.
 
 ``` r
 compare_priors <- function(formula,dat,model) {
-  p1 <- withr::with_options(list('bmm.default_priors'=FALSE), get_model_prior(formula, dat, model)) %>% 
-    brms:::prepare_print_prior() %>% 
-    rename(priorBRMS=prior) %>% 
+  p1 <- withr::with_options(list('bmm.default_priors'=FALSE), get_model_prior(formula, dat, model)) |> 
+    brms:::prepare_print_prior() |> 
+    rename(priorBRMS=prior) |> 
     select(priorBRMS,class,coef,group,resp,dpar,nlpar)
-  p2 <- withr::with_options(list('bmm.default_priors'=TRUE), get_model_prior(formula, dat, model)) %>% 
-    brms:::prepare_print_prior() %>% 
-    rename(priorBMM=prior) %>% 
+  p2 <- withr::with_options(list('bmm.default_priors'=TRUE), get_model_prior(formula, dat, model)) |> 
+    brms:::prepare_print_prior() |> 
+    rename(priorBMM=prior) |> 
     select(priorBMM,class,coef,group,resp,dpar,nlpar)
-  p <- left_join(p1,p2, by=c('class','coef','group','resp','dpar','nlpar')) %>%
-    select(priorBRMS,priorBMM,class,coef,group,resp,dpar,nlpar) %>% 
+  p <- left_join(p1,p2, by=c('class','coef','group','resp','dpar','nlpar')) |>
+    select(priorBRMS,priorBMM,class,coef,group,resp,dpar,nlpar) |> 
     arrange(nlpar, dpar, class, priorBMM, coef)
   p
 }

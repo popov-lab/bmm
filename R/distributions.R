@@ -128,7 +128,7 @@ dsdm <- function(x, mu = 0, c = 3, kappa = 3.5, log = FALSE,
   .dsdm_numer <- switch(parametrization,
     bessel = .dsdm_numer_bessel,
     sqrtexp = .dsdm_numer_sqrtexp,
-    stop("Parametrization must be one of 'bessel' or 'sqrtexp'")
+    stop2("Parametrization must be one of 'bessel' or 'sqrtexp'")
   )
 
   lnumerator <- .dsdm_numer(x, mu, c, kappa, log = TRUE)
@@ -207,7 +207,7 @@ rsdm <- function(n, mu = 0, c = 3, kappa = 3.5, parametrization = "sqrtexp") {
   .dsdm_numer <- switch(parametrization,
     bessel = .dsdm_numer_bessel,
     sqrtexp = .dsdm_numer_sqrtexp,
-    stop("Parametrization must be one of 'bessel' or 'sqrtexp'")
+    stop2("Parametrization must be one of 'bessel' or 'sqrtexp'")
   )
 
   rejection_sampling(
@@ -1030,36 +1030,40 @@ rimm_cd <- function(n, probe, nt_features, nt_distances, lure_idx = NULL,
 #'   choice_rule = "simple",
 #'   version = "ss"
 #' )
-#' 
+#'
 #' # No need to provide b parameter
 #' dm3(x = c(20, 10, 10), pars = c(a = 1, c = 2), m3_model = model)
 #' rm3(n = 10, size = 100, pars = c(a = 1, c = 2), m3_model = model)
-#' 
+#'
 #' # Can also use full formula (activation formulas are extracted automatically)
 #' full_formula <- bmf(
 #'   corr ~ b + a + c,
-#'   other ~ b + a, 
+#'   other ~ b + a,
 #'   npl ~ b,
 #'   a ~ 1,
 #'   c ~ 1
 #' )
-#' rm3(n = 10, size = 100, pars = c(a = 1, c = 2), 
-#'     m3_model = model, act_funs = full_formula)
-#'     
+#' rm3(
+#'   n = 10, size = 100, pars = c(a = 1, c = 2),
+#'   m3_model = model, act_funs = full_formula
+#' )
+#'
 #' \dontrun{
 #' # Use with dplyr::reframe() for automatic unpacking into columns
 #' library(dplyr)
 #' library(tibble)
 #' param_grid <- expand.grid(a = c(0.5, 1, 1.5), c = c(1, 2, 3))
 #' 
-#' simulated_data <- param_grid %>%
-#'   rowwise() %>%
+#' simulated_data <- param_grid |>
+#'   rowwise() |>
 #'   reframe(
 #'     a = a,
 #'     c = c,
 #'     # unpack=TRUE returns named vector; wrap in as_tibble_row for auto-unpacking
-#'     as_tibble_row(rm3(n = 1, size = 100, pars = c(a = a, c = c), 
-#'                       m3_model = model, unpack = TRUE))
+#'     as_tibble_row(rm3(
+#'       n = 1, size = 100, pars = c(a = a, c = c),
+#'       m3_model = model, unpack = TRUE
+#'     ))
 #'   )
 #' # Result has columns: a, c, corr, other, npl
 #' }
@@ -1076,26 +1080,26 @@ rm3 <- function(n, size, pars, m3_model, act_funs = NULL, unpack = FALSE,
                 ...) {
   probs <- .compute_m3_probability_vector(pars, m3_model, act_funs, ...)
   result <- t(rmultinom(n, size = size, prob = probs))
-  
+
   # If unpack=TRUE and n=1, return named vector for automatic unpacking
   if (unpack && n == 1) {
     result_vec <- as.vector(result[1, ])
     names(result_vec) <- colnames(result)
     return(result_vec)
   }
-  
+
   result
 }
 
 .compute_m3_probability_vector <-
   function(pars, m3_model, act_funs = NULL, ...) {
     pars <- c(pars, unlist(list(...)))
-    
+
     # If act_funs is NULL, construct default activation functions
     if (is.null(act_funs)) {
       act_funs <- construct_m3_act_funs(m3_model, warnings = FALSE)
     }
-    
+
     # Extract activation functions if full formula is provided
     if (inherits(act_funs, "bmmformula")) {
       resp_cats <- m3_model$resp_vars$resp_cats
@@ -1107,17 +1111,17 @@ rm3 <- function(n, size, pars, m3_model, act_funs = NULL, unpack = FALSE,
       )
       act_funs <- act_funs_filtered
     }
-    
+
     stopif(
       is_try_error(try(act_funs, silent = TRUE)),
       'No activation functions for version "custom" provided.
       Please pass activation functions for the different response categories
       using the "act_funs" argument.'
     )
-    
+
     # Get required parameters from activation functions
     required_pars <- rhs_vars(act_funs)
-    
+
     # Add fixed b parameter if not provided
     if ("b" %in% required_pars && !("b" %in% names(pars))) {
       b_value <- m3_model$fixed_parameters$b
@@ -1125,7 +1129,7 @@ rm3 <- function(n, size, pars, m3_model, act_funs = NULL, unpack = FALSE,
         pars <- c(pars, b = b_value)
       }
     }
-    
+
     stopif(
       !identical(sort(required_pars), sort(names(pars))),
       'The names or number of parameters used in the activation functions mismatch the names or number
@@ -1142,6 +1146,380 @@ rm3 <- function(n, size, pars, m3_model, act_funs = NULL, unpack = FALSE,
     acts <- acts * num_options
     acts / sum(acts)
   }
+
+
+#' @title Distribution function for the Diffusion Decision Model (`ddm`)
+#'
+#' @description
+#'   Density and random generation function for the Diffusion Decision Model.
+#'
+#' @name ddm_dist
+#'
+#' @param rt Vector of response times for which the density should be returned
+#' @param response Vector of responses for which the density should be returned
+#' @param n Number of random samples to generate
+#' @param drift Drift rates of the ddm
+#' @param bound Boundary separation of the ddm
+#' @param ndt Non-decision time of the ddm
+#' @param zr relative starting point of the ddm
+#' @param log Logical, indicating if log-densities should be returned (default = TRUE)
+#'
+#' @keywords distribution
+#'
+#' @export
+dddm <- function(rt, response, drift, bound, ndt, zr = 0.5, log = TRUE) {
+  stopif(
+    any(rt < 0),
+    "Negative RTs are not allowed. Please check your rt variable."
+  )
+
+  if (!is.character(response)) {
+    stopif(
+      any(!response %in% c(0, 1)),
+      "Invalid numeric responses. Numeric responses must be 0 (lower) or 1 (upper)."
+    )
+    response <- ifelse(response == 1, "upper", "lower")
+  }
+
+  stopif(
+    any(!response %in% c("upper", "lower")),
+    "Invalid responses. Pass a numeric vector with 0/1, or a character \\
+    vector with 'upper' and 'lower'."
+  )
+
+  stopif(
+    length(rt) != length(response),
+    "Different number of RTs and responses passed to dddm. \\
+    Please pass vectors of equal length."
+  )
+
+  # recycle rt/response to match parameter length for log_lik (one observation,
+  # multiple posterior draws)
+  max_len <- max(lengths(list(drift, bound, ndt, zr)))
+
+  if (length(rt) == 1 && max_len > 1) {
+    rt <- rep(rt, max_len)
+    response <- rep(response, max_len)
+  }
+
+  out <- rtdists::ddiffusion(
+    rt = rt,
+    response = response,
+    a = bound,
+    v = drift,
+    t0 = ndt,
+    z = zr * bound
+  )
+
+  if (log) log(out) else out
+}
+
+#' @name ddm_dist
+#' @export
+rddm <- function(n, drift, bound, ndt, zr = 0.5) {
+  max_len <- max(lengths(list(drift, bound, ndt, zr)))
+
+  if (max_len > 1L) {
+    if (!n %in% c(1, max_len)) {
+      stop2("Can only sample exactly once for each condition.")
+    }
+    n <- max_len
+  }
+
+  sim_data <- rtdists::rdiffusion(n = n, a = bound, v = drift, t0 = ndt, z = zr * bound)
+  sim_data$response <- ifelse(sim_data$response == "upper",1,0)
+  sim_data
+}
+
+#' @title Distribution functions for the censored shifted Wald model (`cswald`)
+#'
+#' @name cswald_dist
+#'
+#' @description
+#'   These functions provide the density, distribution, quantile, and random
+#'   generation functions for the censored shifted Wald model: `cswald`.
+#'   The random generation (`rcswald`) and distribution functions (`pcswald`,
+#'   `qcswald`) use [rtdists::rdiffusion()], [rtdists::pdiffusion()], and
+#'   [rtdists::qdiffusion()] internally for the `"crisk"` version, which is
+#'   theoretically consistent since the censored shifted Wald model is an
+#'   approximation to the Wiener diffusion model for tasks with high accuracy
+#'   (few errors).
+#'
+#' @param rt A vector of response times in seconds for which the likelihood
+#'   should be evaluated
+#' @param response A vector of responses coded numerically: 0 = lower response,
+#'   1 = upper response
+#' @param n The number of random samples that should be generated
+#' @param drift The drift rate
+#' @param bound The boundary separation
+#' @param ndt The non-decision time
+#' @param zr The relative starting point (proportion of boundary separation).
+#'   Default is `0.5` (unbiased). Values must be between 0 and 1.
+#' @param s The diffusion constant - the standard deviation of the noise in the
+#'   evidence accumulation process. Default is `s = 1`
+#' @param version A character string specifying the version of the `cswald` for
+#'   which the likelihood should be returned. Available versions are "simple"
+#'   and "crisk", the default is "simple."
+#' @param log A single logical value indicating if log-likelihoods should be
+#'   returned, the default is `TRUE`
+#'
+#' @return
+#'   - `dcswald()` returns a numeric vector of (log-)likelihoods.
+#'   - `rcswald()` returns a data.frame with columns `rt` (response times) and
+#'     `response` (1 = upper, 0 = lower).
+#'   - `pcswald()` returns a numeric vector of (log-)probabilities.
+#'   - `qcswald()` returns a numeric vector of quantiles (response times).
+#'
+#' @seealso [rtdists::rdiffusion()], [rtdists::pdiffusion()],
+#'   [rtdists::qdiffusion()] for the underlying functions
+#'
+#' @keywords distribution
+#'
+#' @examples
+#' dat <- rcswald(n = 1000, drift = 2, bound = 1, ndt = 0.3)
+#' head(dat)
+#' hist(dat$rt)
+#' @export
+dcswald <- function(rt, response, drift, bound, ndt, zr = 0.5, s = 1,
+                    version = c("simple", "crisk"), log = TRUE) {
+  validate_cswald_parameters(drift, bound, ndt, zr, s)
+  version <- match.arg(version)
+
+  stopif(
+    any(rt - ndt <= 0),
+    "Some reaction times are smaller than the non-decision time. \\
+    You need to specify a non-decision time 'ndt' smaller than \\
+    the shortest reaction time."
+  )
+
+  .dcswald(rt, response, drift, bound, ndt, zr, s, version, log)
+}
+
+.dcswald <- function(rt, response, drift, bound, ndt, zr, s, version, log) {
+  rt_shifted <- rt - ndt
+
+  if (version == "simple") {
+    log_ll <- .pwald(rt_shifted, drift = drift, bound = bound, s = s, lower.tail = FALSE, log.p = TRUE)
+    ll1 <- .dwald(rt_shifted, drift = drift, bound = bound, s = s, log = TRUE)
+  } else {
+    log_ll <- .dwald(rt_shifted, drift = -drift, bound = bound * zr, s = s, log = TRUE) +
+      .pwald(rt_shifted, drift = drift, bound = bound - bound * zr, s = s, lower.tail = FALSE, log.p = TRUE)
+    ll1 <- .dwald(rt_shifted, drift = drift, bound = bound - bound * zr, s = s, log = TRUE) +
+      .pwald(rt_shifted, drift = -drift, bound = bound * zr, s = s, lower.tail = FALSE, log.p = TRUE)
+  }
+
+  log_ll[response == 1] <- ll1[response == 1]
+
+  if (log) log_ll else exp(log_ll)
+}
+
+#' @rdname cswald_dist
+#' @export
+rcswald <- function(n, drift, bound, ndt, zr = 0.5, s = 1) {
+  validate_cswald_parameters(drift, bound, ndt, zr, s)
+  .rcswald(n, drift, bound, ndt, zr, s)
+}
+
+.rcswald <- function(n, drift, bound, ndt, zr, s) {
+  out <- rtdists::rdiffusion(n = n, a = bound, v = drift, t0 = ndt, z = zr * bound, s = s)
+  data.frame(rt = out$rt, response = as.numeric(out$response == "upper"))
+}
+
+#' @rdname cswald_dist
+#' @param q A vector of quantiles (response times) at which to evaluate the CDF
+#' @param lower.tail Logical; if `TRUE` (default), probabilities are P(RT <= q),
+#'   otherwise P(RT > q)
+#' @param log.p Logical; if `TRUE`, probabilities are returned on the log scale.
+#'   Default is `FALSE`
+#' @details
+#'   **Cumulative Distribution Function (`pcswald`)**
+#'
+#'   For the `"simple"` version, the CDF is only defined for `response = 1`
+#'   (correct responses), as errors are treated as censored observations. The
+#'   CDF returns the probability that a correct response occurs by time `q`.
+#'   For `response = 0`, `NA` is returned with a warning.
+#'
+#'   For the `"crisk"` version (competing risks), the CDF computes the defective
+#'   cumulative distribution P(RT <= q, response = r), which is the probability
+#'   of responding with the specified response by time `q`. This uses
+#'
+#'   [rtdists::pdiffusion()] internally for accurate computation.
+#'
+#'   **Quantile Function (`qcswald`)**
+#'
+#'   The quantile function returns the response time `q` such that
+#'   P(RT <= q) = p. Similar to the CDF, for the `"simple"` version this is only
+
+#'   defined for `response = 1`. For the `"crisk"` version, this uses
+#'   [rtdists::qdiffusion()] internally.
+#' @export
+pcswald <- function(q, response, drift, bound, ndt, zr = 0.5, s = 1,
+                    version = "simple", lower.tail = TRUE, log.p = FALSE) {
+  validate_cswald_parameters(drift, bound, ndt, zr, s)
+  q_shifted <- q - ndt
+  p <- numeric(length(q))
+
+  if (version == "simple") {
+    warnif(
+      any(response == 0),
+      "CDF for response=0 is not well-defined in the 'simple' version. \\
+        The simple version treats errors as censored observations. \\
+        Returning NA for these values."
+    )
+
+    idx1 <- response == 1 & q_shifted > 0
+    if (any(idx1)) {
+      p[idx1] <- .pwald(q_shifted,
+        drift = drift,
+        bound = bound, s = s,
+        lower.tail = TRUE, log.p = FALSE
+      )[idx1]
+    }
+
+    p[response == 0] <- NA
+  } else if (version == "crisk") {
+    idx_valid <- q_shifted > 0
+    if (any(idx_valid)) {
+      p[idx_valid] <- rtdists::pdiffusion(
+        q,
+        response = ifelse(response == 1, "upper", "lower"),
+        a = bound,
+        v = drift,
+        t0 = ndt,
+        z = zr * bound,
+        s = s
+      )[idx_valid]
+    }
+  } else {
+    stop2(
+      "The version you specified is not valid. ",
+      "Please choose between version = \"simple\" or \"crisk\"."
+    )
+  }
+
+  if (!lower.tail) {
+    p <- 1 - p
+  }
+
+  if (log.p) {
+    p <- log(p)
+  }
+
+  p
+}
+
+#' @rdname cswald_dist
+#' @param p A vector of probabilities for which to compute quantiles
+#' @export
+qcswald <- function(p, response, drift, bound, ndt, zr = 0.5, s = 1,
+                    version = "simple", lower.tail = TRUE, log.p = FALSE) {
+  validate_cswald_parameters(drift, bound, ndt, zr, s)
+
+  if (log.p) {
+    p <- exp(p)
+  }
+
+  if (!lower.tail) {
+    p <- 1 - p
+  }
+
+  stopif(any(p < 0 | p > 1, na.rm = TRUE), "Probabilities must be between 0 and 1.")
+  n <- length(p)
+  ndt <- rep(ndt, length.out = n)
+  drift <- rep(drift, length.out = n)
+  bound <- rep(bound, length.out = n)
+  s <- rep(s, length.out = n)
+  response <- rep(response, length.out = n)
+  q <- ndt # default
+
+
+  if (version == "simple") {
+    warnif(
+      any(response == 0),
+      "Quantile for response=0 is not well-defined in the 'simple' version. \\
+      The simple version treats errors as censored observations. \\
+      Returning NA for these values."
+    )
+
+    q[p >= 1] <- Inf
+    # adaptive upper bound based on expected RT (mean of Wald ~ bound/drift)
+    # use 20x the expected RT as upper bound, with minimum of 10 seconds
+    expected_rt <- bound / max(abs(drift), 0.01)
+    upper_bound <- ndt + max(10, 20 * expected_rt)
+
+    idx1 <- which(response == 1)
+    for (i in idx1) {
+      q[i] <- stats::uniroot(
+        function(x) {
+          .pwald(x - ndt[i], drift[i], bound[i], s[i],
+            lower.tail = TRUE, log.p = FALSE
+          ) - p[i]
+        },
+        interval = c(ndt[i] + 1e-10, upper_bound[i]),
+        extendInt = "upX"
+      )$root
+    }
+
+    q[response == 0] <- NA
+  } else if (version == "crisk") {
+    q <- rtdists::qdiffusion(
+      p,
+      response = ifelse(response == 1, "upper", "lower"),
+      a = bound,
+      v = drift,
+      t0 = ndt,
+      z = zr * bound,
+      s = s
+    )
+  } else {
+    stop2(
+      "The version you specified is not valid. ",
+      "Please choose between version = \"simple\" or \"crisk\"."
+    )
+  }
+
+  q
+}
+
+validate_cswald_parameters <- function(drift, bound, ndt, zr, s) {
+  stopif(
+    any(bound <= 0),
+    "Values for the boundary separation 'bound' must be positive."
+  )
+  stopif(
+    any(ndt <= 0),
+    "Values for the non-decision time 'ndt' must be positive."
+  )
+  stopif(
+    any(zr <= 0) || any(zr >= 1),
+    "Values for the relative starting point 'zr' must be between 0 and 1"
+  )
+  stopif(
+    any(s <= 0),
+    "Values for diffusion constant 's' must be positive."
+  )
+}
+
+
+.dwald <- function(rt, drift, bound, s, log = TRUE) {
+  log_d <- log(bound) - 0.5 * log(2 * pi * rt^3) - log(s) -
+    (bound - drift * rt)^2 / (2 * s^2 * rt)
+  if (log) log_d else exp(log_d)
+}
+
+.pwald <- function(rt, drift, bound, s, lower.tail = TRUE, log.p = TRUE) {
+  z1 <- (drift * rt - bound) / (s * sqrt(rt))
+  z2 <- -(drift * rt + bound) / (s * sqrt(rt))
+  logE <- (2 * drift * bound) / (s^2)
+
+  a1 <- pnorm(z1, log.p = TRUE)
+  a2 <- logE + pnorm(z2, log.p = TRUE)
+  matrix_a <- cbind(a1, a2)
+  log_p <- apply(matrix_a, 1, matrixStats::logSumExp)
+
+  if (!lower.tail) log_p <- log(1 - exp(log_p))
+  if (log.p) log_p else exp(log_p)
+}
 
 
 #' @title Distribution functions for the EZ-Diffusion Model (ezdm)
@@ -1223,7 +1601,6 @@ dezdm <- function(mean_rt, var_rt, n_upper, n_trials,
                   version = c("3par", "4par"), log = TRUE) {
   version <- match.arg(version)
 
-  # parameter validation
   stopif(isTRUE(any(bound <= 0)), "bound must be positive")
   stopif(isTRUE(any(ndt <= 0)), "ndt must be positive")
   stopif(isTRUE(any(s <= 0)), "s must be positive")
@@ -1265,7 +1642,6 @@ rezdm <- function(n, n_trials, drift, bound, ndt, zr = 0.5, s = 1,
                   version = c("3par", "4par")) {
   version <- match.arg(version)
 
-  # parameter validation
   stopif(isTRUE(any(bound <= 0)), "bound must be positive")
   stopif(isTRUE(any(ndt <= 0)), "ndt must be positive")
   stopif(isTRUE(any(s <= 0)), "s must be positive")

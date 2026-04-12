@@ -99,7 +99,7 @@ Three-parameter mixture model by Bays et al (2009).
 }
 \item \strong{Default parameter links:}
 \itemize{
-\item mu1 = tan_half; kappa = log; thetat = identity; thetant = identity
+\item mu1 = tan_half; kappa = log; thetat = softmax; thetant = softmax
 }
 \item \strong{Default priors:}
 \itemize{
