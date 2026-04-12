@@ -1,6 +1,5 @@
 test_that("sdm simple CD constructor works", {
-  m <- sdm(response = "resp", probe = "probe", target = "target",
-           task = "cd")
+  m <- sdm_cd(response = "resp", probe = "probe", target = "target")
   expect_s3_class(m, "bmmodel")
   expect_s3_class(m, "change_detection")
   expect_s3_class(m, "sdm")
@@ -12,6 +11,15 @@ test_that("sdm simple CD constructor works", {
   expect_equal(m$fixed_parameters$beta, 0)
 })
 
+test_that("sdm(task = 'cd') still works", {
+  expect_warning(
+    m <- sdm(response = "resp", probe = "probe", target = "target",
+             task = "cd"),
+    "deprecated"
+  )
+  expect_s3_class(m, "sdm_simple_cd")
+})
+
 test_that("sdm DE constructor still works", {
   m <- sdm(resp_error = "y")
   expect_s3_class(m, "circular")
@@ -20,9 +28,9 @@ test_that("sdm DE constructor still works", {
 })
 
 test_that("sdm CD validates required arguments", {
-  expect_error(sdm(task = "cd"), "response")
-  expect_error(sdm(response = "r", task = "cd"), "probe")
-  expect_error(sdm(response = "r", probe = "p", task = "cd"), "target")
+  expect_error(sdm_cd(probe = "p", target = "t"), "response")
+  expect_error(sdm_cd(response = "r", target = "t"), "probe")
+  expect_error(sdm_cd(response = "r", probe = "p"), "target")
 })
 
 test_that("SDM normalization is approximately translation-invariant in mu", {
@@ -46,6 +54,12 @@ test_that("SDM normalization is approximately translation-invariant in mu", {
 test_that("dsdm_cd returns valid probabilities", {
   p <- dsdm_cd(1, probe = 0, c = 4, kappa = 3)
   expect_true(p >= 0 && p <= 1)
+})
+
+test_that("dsdm_cd is vectorized over observations", {
+  vals <- dsdm_cd(c(0, 1), probe = c(0, pi / 2), c = c(4, 5), kappa = c(3, 4))
+  expect_length(vals, 2)
+  expect_true(all(vals >= 0 & vals <= 1))
 })
 
 test_that("dsdm_cd: same probe has lower P(change)", {
@@ -89,6 +103,11 @@ test_that("dsdm_cd with 51 points matches high-resolution reference", {
   }
 })
 
+test_that("dsdm_cd remains finite for extreme but legal parameters", {
+  val <- dsdm_cd(1, probe = 0, c = 128, kappa = 400, log = TRUE)
+  expect_true(is.finite(val))
+})
+
 test_that("sdm simple CD pipeline runs with mock backend", {
   dat <- data.frame(
     resp = c(rep(0, 50), rep(1, 50)),
@@ -96,8 +115,7 @@ test_that("sdm simple CD pipeline runs with mock backend", {
     target = runif(100, -pi, pi)
   )
 
-  m <- sdm(response = "resp", probe = "probe", target = "target",
-           task = "cd")
+  m <- sdm_cd(response = "resp", probe = "probe", target = "target")
   f <- bmf(c ~ 1, kappa ~ 1)
 
   mock_fit <- bmm(f, dat, m, backend = "mock", mock_fit = 1, rename = FALSE)

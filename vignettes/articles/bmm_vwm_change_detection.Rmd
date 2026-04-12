@@ -1,0 +1,166 @@
+---
+title: "Visual working memory change detection"
+output: bookdown::html_document2
+author:
+  - Ven Popov
+  - Gidon Frischkorn
+bibliography: REFERENCES.bib
+header-includes:
+  - \usepackage{amsmath}
+vignette: >
+  %\VignetteIndexEntry{Visual working memory change detection}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+pkgdown:
+  as_is: true
+---
+<style type="text/css">
+div.main-container {
+max-width: 800px !important;
+}
+
+p {
+margin-top: 1.5em ;
+margin-bottom: 1.5em ;
+}
+.author{
+    display: none;
+}
+</style>
+
+```{r, include = FALSE}
+options(crayon.enabled = TRUE, width = 800)
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>",
+  dev = "jpeg",
+  dpi = 100
+)
+fansi::set_knit_hooks(knitr::knit_hooks, which = c("output", "message", "error"))
+```
+
+# Overview
+
+`bmm` provides four model constructors for visual working memory change
+detection:
+
+- `sdm_cd()` for the signal discrimination model
+- `mixture2p_cd()` for the two-parameter mixture model
+- `mixture3p_cd()` for the three-parameter mixture model with non-targets
+- `imm_cd()` for the full interference measurement model
+
+These constructors replace the older `task = "cd"` entry points. The legacy
+calls are still accepted during the transition, but they now issue a
+deprecation warning.
+
+# Choosing a model
+
+Use `sdm_cd()` when you want the leanest model for binary same/change judgments.
+It is usually the fastest place to start and gives interpretable estimates of
+memory strength (`c`) and precision (`kappa`).
+
+Use `mixture2p_cd()` when you want a discrete-memory account with a target
+memory probability and a guessing component.
+
+Use `mixture3p_cd()` when non-target intrusions are theoretically important.
+The distribution helpers accept interpretable probability inputs
+`p_target` and `p_nontarget`, while the fitted model continues to estimate the
+corresponding mixture-weight parameters through the `bmm` formula interface.
+
+Use `imm_cd()` when interference from non-target features and distances is a
+core scientific question. It is the richest and typically the slowest of the
+four models.
+
+# Required data
+
+All change-detection models expect:
+
+- a binary response coded `0 = same`, `1 = change`
+- a `probe` feature in radians
+- a `target` feature in radians
+
+`mixture3p_cd()` and `imm_cd()` additionally require non-target features that
+are centered relative to the target. `imm_cd()` also requires positive
+non-target distances.
+
+# Model specification
+
+The examples below show the constructor surface for each model family.
+
+```{r eval = FALSE}
+library(bmm)
+
+sdm_model <- sdm_cd(
+  response = "resp",
+  probe = "probe",
+  target = "target"
+)
+
+mix2_model <- mixture2p_cd(
+  response = "resp",
+  probe = "probe",
+  target = "target"
+)
+
+mix3_model <- mixture3p_cd(
+  response = "resp",
+  probe = "probe",
+  target = "target",
+  nt_features = c("nt1", "nt2"),
+  set_size = "set_size"
+)
+
+imm_model <- imm_cd(
+  response = "resp",
+  probe = "probe",
+  target = "target",
+  nt_features = c("nt1", "nt2"),
+  nt_distances = c("d1", "d2"),
+  set_size = "set_size"
+)
+```
+
+For likelihood inspection or simulation, the public distribution helpers are
+vectorized over observations and accept matrix-like non-target inputs:
+
+```{r}
+library(bmm)
+
+dmixture3p_cd(
+  response = c(0, 1),
+  probe = c(0, pi / 2),
+  nt_features = matrix(c(1, -1, 0.5, -0.5), nrow = 2, byrow = TRUE),
+  lure_idx = matrix(c(1, 1, 1, 0), nrow = 2, byrow = TRUE),
+  kappa = c(5, 6),
+  p_target = c(0.6, 0.7),
+  p_nontarget = c(0.25, 0.15)
+)
+```
+
+# Diagnostics and runtime
+
+Short pilot fits are a good idea before committing to long hierarchical runs.
+`cd_fit_diagnostics()` extracts the core NUTS diagnostics for a fitted
+change-detection model:
+
+```{r eval = FALSE}
+fit <- bmm(
+  formula = bmf(c ~ 1, kappa ~ 1),
+  data = dat,
+  model = sdm_cd(response = "resp", probe = "probe", target = "target"),
+  backend = "rstan"
+)
+
+cd_fit_diagnostics(fit)
+```
+
+For side-by-side runtime checks across all four models, use the internal
+benchmark script in `tests/internal/benchmark_vwm_cd_models.R`.
+
+# Practical guidance
+
+Start with a short run, inspect divergences and effective sample sizes, and
+only then scale up the number of chains and iterations. In most applications,
+`sdm_cd()` or `mixture2p_cd()` are sensible baselines, while `mixture3p_cd()`
+and `imm_cd()` should be reserved for cases where non-target structure is
+substantively important.

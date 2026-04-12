@@ -10,13 +10,24 @@ dmixture2p_cd(
   response,
   probe,
   kappa = 5,
-  thetat = 0.6,
+  thetat = NULL,
+  p_target = NULL,
   beta = 0,
   mu = 0,
-  log = FALSE
+  log = FALSE,
+  n_quad = 101
 )
 
-rmixture2p_cd(n, probe, kappa = 5, thetat = 0.6, beta = 0, mu = 0)
+rmixture2p_cd(
+  n,
+  probe,
+  kappa = 5,
+  thetat = NULL,
+  p_target = NULL,
+  beta = 0,
+  mu = 0,
+  n_quad = 101
+)
 }
 \arguments{
 \item{response}{Binary vector (0 = "same", 1 = "change")}

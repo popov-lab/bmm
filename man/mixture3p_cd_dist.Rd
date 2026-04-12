@@ -10,25 +10,31 @@ dmixture3p_cd(
   response,
   probe,
   nt_features,
-  lure_idx,
+  lure_idx = NULL,
   kappa = 5,
-  thetat = log(6),
-  thetant = log(3),
+  p_target = NULL,
+  p_nontarget = NULL,
+  thetat = NULL,
+  thetant = NULL,
   beta = 0,
   mu = 0,
-  log = FALSE
+  log = FALSE,
+  n_quad = 101
 )
 
 rmixture3p_cd(
   n,
   probe,
   nt_features,
-  lure_idx,
+  lure_idx = NULL,
   kappa = 5,
-  thetat = log(6),
-  thetant = log(3),
+  p_target = NULL,
+  p_nontarget = NULL,
+  thetat = NULL,
+  thetant = NULL,
   beta = 0,
-  mu = 0
+  mu = 0,
+  n_quad = 101
 )
 }
 \arguments{
@@ -44,12 +50,14 @@ inactive (0)}
 
 \item{kappa}{Concentration parameter of the von Mises distribution}
 
-\item{thetat}{Target log-weight for softmax normalization (guessing is the
-reference category with log-weight 0). A value of \code{log(6)} together with
-\code{thetant = log(3)} gives P(target)=0.6, P(non-target)=0.3, P(guess)=0.1.}
+\item{p_target}{Probability of retrieving the target item from memory.}
 
-\item{thetant}{Non-target log-weight for softmax normalization (same scale
-as \code{thetat}).}
+\item{p_nontarget}{Probability mass assigned to non-target retrieval.}
+
+\item{thetat}{Deprecated legacy target log-weight argument. If supplied
+together with \code{thetant}, it is converted to \code{p_target}.}
+
+\item{thetant}{Deprecated legacy non-target log-weight argument.}
 
 \item{beta}{Decision criterion. Default 0.}
 

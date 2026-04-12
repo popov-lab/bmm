@@ -142,6 +142,7 @@ sdm <- function(resp_error = NULL, response = NULL, probe = NULL,
   if (task == "de") {
     stopif(is.null(resp_error), "Argument 'resp_error' is required for task = 'de'.")
   } else {
+    warning2("`sdm(task = \"cd\")` is deprecated. Please use `sdm_cd()` instead.")
     stopif(is.null(response), "Argument 'response' is required for task = 'cd'.")
     stopif(is.null(probe), "Argument 'probe' is required for task = 'cd'.")
     stopif(is.null(target), "Argument 'target' is required for task = 'cd'.")
@@ -162,14 +163,31 @@ sdmSimple <- function(resp_error, version = "simple", task = "de", ...) {
              call = call, ...)
 }
 
+#' @rdname sdm
+#' @export
+sdm_cd <- function(response, probe, target, version = "simple", ...) {
+  call <- match.call()
+  stop_missing_args()
+  .model_sdm(
+    response = response,
+    probe = probe,
+    target = target,
+    version = version,
+    task = "cd",
+    call = call,
+    ...
+  )
+}
+
 ############################################################################# !
 # CHECK_DATA S3 METHODS                                                  ####
 ############################################################################# !
 
 #' @export
 check_data.sdm <- function(model, data, formula) {
-  # data sorted by predictors is necessary for speedy computation of normalizing constant
-  data <- order_data_query(model, data, formula)
+  if (!inherits(model, "change_detection")) {
+    data <- order_data_query(model, data, formula)
+  }
   NextMethod("check_data")
 }
 

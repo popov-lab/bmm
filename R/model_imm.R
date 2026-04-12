@@ -254,6 +254,7 @@ imm <- function(resp_error = NULL, nt_features = NULL, nt_distances = NULL,
       nt_distances <- NULL
     }
   } else {
+    warning2("`imm(task = \"cd\")` is deprecated. Please use `imm_cd()` instead.")
     stopif(is.null(response), "Argument 'response' is required for task = 'cd'.")
     stopif(is.null(probe), "Argument 'probe' is required for task = 'cd'.")
     stopif(is.null(target), "Argument 'target' is required for task = 'cd'.")
@@ -271,6 +272,28 @@ imm <- function(resp_error = NULL, nt_features = NULL, nt_distances = NULL,
     nt_distances = nt_distances, set_size = set_size,
     response = response, probe = probe, target = target,
     regex = regex, version = version, task = task, call = call, ...
+  )
+}
+
+#' @rdname imm
+#' @export
+imm_cd <- function(response, probe, target, nt_features, nt_distances, set_size,
+                   regex = FALSE, version = "full", ...) {
+  call <- match.call()
+  stop_missing_args()
+  stopif(version != "full", "Only version = 'full' is currently supported by `imm_cd()`.")
+  .model_imm(
+    nt_features = nt_features,
+    nt_distances = nt_distances,
+    set_size = set_size,
+    response = response,
+    probe = probe,
+    target = target,
+    regex = regex,
+    version = version,
+    task = "cd",
+    call = call,
+    ...
   )
 }
 
@@ -311,6 +334,8 @@ check_data.imm_full <- function(model, data, formula) {
     any(data[, nt_distances] < 0),
     "All non-target distances to the target need to be postive."
   )
+
+  attr(data, "cd_nt_distances_matrix") <- data.matrix(data[, nt_distances, drop = FALSE])
 
   data
 }
@@ -408,12 +433,6 @@ configure_model.imm_full_de <- function(model, data, formula) {
 
 #' @export
 configure_model.imm_full_cd <- function(model, data, formula) {
-  max_set_size <- attr(data, "max_set_size")
-  lure_idx <- attr(data, "lure_idx_vars")
-  nt_features <- model$other_vars$nt_features
-  nt_distances <- model$other_vars$nt_distances
-  n_nt <- max_set_size - 1
-
   imm_full_cd <- brms::custom_family(
     name = "imm_full_cd",
     dpars = c("mu", "kappa", "c", "a", "s", "beta"),
@@ -421,17 +440,22 @@ configure_model.imm_full_cd <- function(model, data, formula) {
     lb = c(NA, 0, NA, NA, NA, NA),
     ub = c(NA, NA, NA, NA, NA, NA),
     type = "int",
-    loop = TRUE,
-    vars = c("vreal1[n]",
-             paste0("vreal", 2:(n_nt + 1), "[n]"),
-             paste0("vreal", (n_nt + 2):(2 * n_nt + 1), "[n]"),
-             paste0("vint", 1:n_nt, "[n]")),
+    loop = FALSE,
     log_lik = log_lik_imm_full_cd,
     posterior_predict = posterior_predict_imm_full_cd
   )
 
-  stan_funs <- .generate_imm_full_cd_stan(n_nt)
-  stanvars <- brms::stanvar(scode = stan_funs, block = "functions")
+  sc_path <- system.file("stan_chunks", package = "bmm")
+  stan_funs <- .generate_imm_full_cd_stan()
+  stan_tdata <- read_lines2(paste0(sc_path, "/imm_full_cd_tdata.stan"))
+  stan_likelihood <- read_lines2(paste0(sc_path, "/imm_full_cd_likelihood.stan"))
+  stanvars <- brms::stanvar(x = data$probe_centered, name = "probe_cd") +
+    brms::stanvar(x = attr(data, "cd_nt_features_matrix"), name = "cd_nt_features") +
+    brms::stanvar(x = attr(data, "cd_nt_distances_matrix"), name = "cd_nt_distances") +
+    brms::stanvar(x = attr(data, "cd_lure_idx_matrix"), name = "cd_lure_idx") +
+    brms::stanvar(scode = stan_funs, block = "functions") +
+    brms::stanvar(scode = stan_tdata, block = "tdata") +
+    brms::stanvar(scode = stan_likelihood, block = "likelihood", position = "end")
 
   formula <- bmf2bf(model, formula)
   formula$family <- imm_full_cd
@@ -442,76 +466,84 @@ configure_model.imm_full_cd <- function(model, data, formula) {
 #' @export
 bmf2bf.imm_full_cd <- function(model, formula = bmmformula()) {
   resp_name <- model$resp_vars$response
-  nt_features <- model$other_vars$nt_features
-  nt_distances <- model$other_vars$nt_distances
-  lure_idx <- attr(model, "lure_idx_computed") %||%
-    paste0("LureIdx", seq_along(nt_features))
-
-  vreal_args <- paste(c("probe_centered", nt_features, nt_distances), collapse = ", ")
-  vint_args <- paste(lure_idx, collapse = ", ")
-
   mu_rhs <- .extract_mu_rhs(formula)
-  brms::bf(glue("{resp_name} | vreal({vreal_args}) + vint({vint_args}) ~ {mu_rhs}"))
+  brms::bf(glue("{resp_name} ~ {mu_rhs}"))
 }
 
-.generate_imm_full_cd_stan <- function(n_nt) {
-  nt_args <- paste0("real nt", seq_len(n_nt), collapse = ", ")
-  dist_args <- paste0("real dist", seq_len(n_nt), collapse = ", ")
-  lure_args <- paste0("int lure", seq_len(n_nt), collapse = ", ")
+.generate_imm_full_cd_stan <- function() {
+  "
+  real imm_full_cd_lpmf(array[] int y, vector mu, vector kappa, vector c_par,
+                        vector a, vector s, vector beta) {
+    return 0;
+  }
 
-  nt_loop <- paste(vapply(seq_len(n_nt), function(i) {
-    glue("
-      if (lure{i} == 1) {{
-        real w_nt{i} = exp(c_par - exp(s) * dist{i}) + exp(a);
-        total_weight += w_nt{i};
-        real log_nt{i} = log(w_nt{i}) + kappa * cos(x - nt{i}) - log_vm_norm;
-        log_p_retrieve = log_sum_exp(log_p_retrieve, log_nt{i});
-        real log_nt{i}_same = log(w_nt{i}) + kappa * cos(x - nt{i} - probe) - log_vm_norm;
-        log_p_x_given_same = log_sum_exp(log_p_x_given_same, log_nt{i}_same);
-      }}")
-  }, character(1)), collapse = "\n")
-
-  glue("
-  #include 'fun_tan_half.stan'
-
-  real imm_full_cd_lpmf(int y, real mu, real kappa, real c_par, real a, real s, real beta, real probe, {nt_args}, {dist_args}, {lure_args}) {{
-    int n_quad = 101;
-    real dx = 2 * pi() / (n_quad - 1);
-    real p_change = 0;
+  real imm_full_cd_log_prob(int y, real probe, real mu, real kappa, real c_par,
+                            real a, real s, real beta, row_vector nt_features,
+                            row_vector nt_distances, row_vector lure_idx,
+                            vector grid, real dx) {
+    int n_quad = size(grid);
+    int n_nt = cols(nt_features);
+    int n_active = 0;
     real log_uniform = -log(2 * pi());
-    real sharpness = 5;
-    real w_bg = 1.0;
-    real w_target = exp(c_par) + exp(a);
-
-    // precompute von Mises normalization -- depends only on kappa
     real log_vm_norm = log(2 * pi()) + log_modified_bessel_first_kind(0, kappa);
+    real log_w_bg = 0;
+    real log_w_target = log_sum_exp(c_par, a);
+    vector[n_quad] log_p_ret;
+    vector[n_quad] log_p_same;
+    vector[n_nt] log_w_nt;
+    vector[n_quad] log_integrand;
+    real log_total_weight;
+    real log_p_change;
 
-    for (i in 1:n_quad) {{
-      real x = -pi() + (i - 1) * dx;
-      real total_weight = w_target + w_bg;
+    for (k in 1:n_nt) {
+      if (lure_idx[k] > 0.5) {
+        n_active += 1;
+        log_w_nt[k] = log_sum_exp(c_par - exp(s) * nt_distances[k], a);
+      } else {
+        log_w_nt[k] = negative_infinity();
+      }
+    }
 
-      real log_p_retrieve = log(w_target) + kappa * cos(x - mu) - log_vm_norm;
-      real log_p_x_given_same = log(w_target) + kappa * cos(x - probe - mu) - log_vm_norm;
+    log_total_weight = log_sum_exp(log_w_bg, log_w_target);
+    if (n_active > 0) {
+      for (k in 1:n_nt) {
+        if (lure_idx[k] > 0.5) {
+          log_total_weight = log_sum_exp(log_total_weight, log_w_nt[k]);
+        }
+      }
+    }
 
-      {nt_loop}
+    for (j in 1:n_quad) {
+      real x = grid[j];
+      real vm_ret = kappa * cos(x - mu) - log_vm_norm;
+      real vm_same = kappa * cos(x - probe - mu) - log_vm_norm;
 
-      log_p_retrieve = log_sum_exp(log_p_retrieve, log(w_bg) + log_uniform);
-      log_p_x_given_same = log_sum_exp(log_p_x_given_same, log(w_bg) + log_uniform);
+      log_p_ret[j] = log_sum_exp(log_w_target + vm_ret, log_w_bg + log_uniform);
+      log_p_same[j] = log_sum_exp(log_w_target + vm_same, log_w_bg + log_uniform);
 
-      log_p_retrieve -= log(total_weight);
-      log_p_x_given_same -= log(total_weight);
+      if (n_active > 0) {
+        for (k in 1:n_nt) {
+          if (lure_idx[k] > 0.5) {
+            real log_nt = log_w_nt[k] + kappa * cos(x - nt_features[k]) - log_vm_norm;
+            real log_nt_same = log_w_nt[k] + kappa * cos(x - nt_features[k] - probe) - log_vm_norm;
+            log_p_ret[j] = log_sum_exp(log_p_ret[j], log_nt);
+            log_p_same[j] = log_sum_exp(log_p_same[j], log_nt_same);
+          }
+        }
+      }
 
-      real llr = log_p_retrieve - log_p_x_given_same;
-      real w = inv_logit(sharpness * (llr - beta));
+      log_p_ret[j] -= log_total_weight;
+      log_p_same[j] -= log_total_weight;
+      log_integrand[j] = log_inv_logit(5 * (log_p_ret[j] - log_p_same[j] - beta)) +
+        log_p_ret[j];
+    }
 
-      p_change += w * exp(log_p_retrieve) * dx;
-    }}
-
-    p_change = fmin(fmax(p_change, 1e-10), 1 - 1e-10);
-    if (y == 1) return log(p_change);
-    return log1m(p_change);
-  }}
-  ")
+    log_p_change = log_sum_exp(log_integrand) + log(dx);
+    log_p_change = fmin(fmax(log_p_change, log(1e-10)), log1m(1e-10));
+    if (y == 1) return log_p_change;
+    return log1m_exp(log_p_change);
+  }
+  "
 }
 
 log_lik_imm_full_cd <- function(i, prep) {
@@ -521,7 +553,7 @@ log_lik_imm_full_cd <- function(i, prep) {
   a <- brms::get_dpar(prep, "a", i = i)
   s <- brms::get_dpar(prep, "s", i = i)
   beta <- brms::get_dpar(prep, "beta", i = i)
-  probe <- prep$data$vreal1[i]
+  probe <- .extract_cd_probe(i, prep)
   y <- prep$data$Y[i]
   nt_data <- .extract_cd_nt_data(i, prep, has_distances = TRUE)
 
@@ -538,7 +570,7 @@ posterior_predict_imm_full_cd <- function(i, prep, ...) {
   a <- brms::get_dpar(prep, "a", i = i)
   s <- brms::get_dpar(prep, "s", i = i)
   beta <- brms::get_dpar(prep, "beta", i = i)
-  probe <- prep$data$vreal1[i]
+  probe <- .extract_cd_probe(i, prep)
   nt_data <- .extract_cd_nt_data(i, prep, has_distances = TRUE)
 
   rimm_cd(length(kappa), probe, nt_features = nt_data$nt_features,

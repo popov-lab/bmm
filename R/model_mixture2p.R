@@ -137,6 +137,7 @@ mixture2p <- function(resp_error = NULL, response = NULL, probe = NULL,
   if (task == "de") {
     stopif(is.null(resp_error), "Argument 'resp_error' is required for task = 'de'.")
   } else {
+    warning2("`mixture2p(task = \"cd\")` is deprecated. Please use `mixture2p_cd()` instead.")
     stopif(is.null(response), "Argument 'response' is required for task = 'cd'.")
     stopif(is.null(probe), "Argument 'probe' is required for task = 'cd'.")
     stopif(is.null(target), "Argument 'target' is required for task = 'cd'.")
@@ -144,6 +145,21 @@ mixture2p <- function(resp_error = NULL, response = NULL, probe = NULL,
   .model_mixture2p(resp_error = resp_error, response = response,
                     probe = probe, target = target, task = task,
                     call = call, ...)
+}
+
+#' @rdname mixture2p
+#' @export
+mixture2p_cd <- function(response, probe, target, ...) {
+  call <- match.call()
+  stop_missing_args()
+  .model_mixture2p(
+    response = response,
+    probe = probe,
+    target = target,
+    task = "cd",
+    call = call,
+    ...
+  )
 }
 
 ############################################################################# !
@@ -175,15 +191,19 @@ configure_model.mixture2p_cd <- function(model, data, formula) {
     lb = c(NA, 0, 0, NA),
     ub = c(NA, NA, 1, NA),
     type = "int",
-    loop = TRUE,
-    vars = "vreal1[n]",
+    loop = FALSE,
     log_lik = log_lik_mixture2p_cd,
     posterior_predict = posterior_predict_mixture2p_cd
   )
 
   sc_path <- system.file("stan_chunks", package = "bmm")
   stan_funs <- read_lines2(paste0(sc_path, "/mixture2p_cd_funs.stan"))
-  stanvars <- brms::stanvar(scode = stan_funs, block = "functions")
+  stan_tdata <- read_lines2(paste0(sc_path, "/mixture2p_cd_tdata.stan"))
+  stan_likelihood <- read_lines2(paste0(sc_path, "/mixture2p_cd_likelihood.stan"))
+  stanvars <- brms::stanvar(x = data$probe_centered, name = "probe_cd") +
+    brms::stanvar(scode = stan_funs, block = "functions") +
+    brms::stanvar(scode = stan_tdata, block = "tdata") +
+    brms::stanvar(scode = stan_likelihood, block = "likelihood", position = "end")
 
   formula <- bmf2bf(model, formula)
   formula$family <- mixture2p_cd
@@ -195,7 +215,7 @@ configure_model.mixture2p_cd <- function(model, data, formula) {
 bmf2bf.mixture2p_cd <- function(model, formula = bmmformula()) {
   resp_name <- model$resp_vars$response
   mu_rhs <- .extract_mu_rhs(formula)
-  brms::bf(glue("{resp_name} | vreal(probe_centered) ~ {mu_rhs}"))
+  brms::bf(glue("{resp_name} ~ {mu_rhs}"))
 }
 
 log_lik_mixture2p_cd <- function(i, prep) {
@@ -203,7 +223,7 @@ log_lik_mixture2p_cd <- function(i, prep) {
   kappa <- brms::get_dpar(prep, "kappa", i = i)
   thetat <- brms::get_dpar(prep, "thetat", i = i)
   beta <- brms::get_dpar(prep, "beta", i = i)
-  probe <- prep$data$vreal1[i]
+  probe <- .extract_cd_probe(i, prep)
   y <- prep$data$Y[i]
   dmixture2p_cd(y, probe, kappa = kappa, thetat = thetat, beta = beta,
                 mu = mu, log = TRUE)
@@ -214,7 +234,7 @@ posterior_predict_mixture2p_cd <- function(i, prep, ...) {
   kappa <- brms::get_dpar(prep, "kappa", i = i)
   thetat <- brms::get_dpar(prep, "thetat", i = i)
   beta <- brms::get_dpar(prep, "beta", i = i)
-  probe <- prep$data$vreal1[i]
+  probe <- .extract_cd_probe(i, prep)
   rmixture2p_cd(length(kappa), probe, kappa = kappa, thetat = thetat,
                 beta = beta, mu = mu)
 }

@@ -2,6 +2,7 @@
 % Please edit documentation in R/model_mixture3p.R
 \name{mixture3p}
 \alias{mixture3p}
+\alias{mixture3p_cd}
 \title{Three-parameter mixture model by Bays et al (2009).}
 \usage{
 mixture3p(
@@ -13,6 +14,16 @@ mixture3p(
   target = NULL,
   regex = FALSE,
   task = "de",
+  ...
+)
+
+mixture3p_cd(
+  response,
+  probe,
+  target,
+  nt_features,
+  set_size,
+  regex = FALSE,
   ...
 )
 }

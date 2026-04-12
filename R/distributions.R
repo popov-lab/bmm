@@ -244,44 +244,53 @@ rsdm <- function(n, mu = 0, c = 3, kappa = 3.5, parametrization = "sqrtexp") {
 #'
 #' @export
 dsdm_cd <- function(response, probe, c = 4, kappa = 3, beta = 0,
-                     mu = 0, log = FALSE) {
+                     mu = 0, log = FALSE, n_quad = 51) {
   stopif(isTRUE(any(kappa < 0)), "kappa must be non-negative")
   stopif(isTRUE(any(c < 0)), "c must be non-negative")
 
-  n_quad <- 51
-  x_grid <- seq(-pi, pi, length.out = n_quad)
+  obs <- .recycle_cd_args(response = response, probe = probe, c = c,
+                          kappa = kappa, beta = beta, mu = mu)
+  stopif(
+    !all(obs$response %in% c(0, 1)),
+    "response must be binary (0 or 1)."
+  )
 
-  ln_ret <- .dsdm_numer_sqrtexp(x_grid, mu = mu, c, kappa, log = TRUE)
-  ln_same <- .dsdm_numer_sqrtexp(x_grid, mu = probe + mu, c, kappa, log = TRUE)
+  quad <- .cd_quadrature(n_quad)
+  loglik <- vapply(seq_len(obs$n), function(i) {
+    .sdm_cd_loglik(
+      obs$response[i], obs$probe[i], obs$c[i], obs$kappa[i],
+      obs$beta[i], obs$mu[i], quad
+    )
+  }, numeric(1))
 
-  exp_ln_ret <- exp(ln_ret)
-  norm_sum <- sum(exp_ln_ret)
-
-  llr <- ln_ret - ln_same
-  w <- stats::plogis(5 * (llr - beta))
-  p_change <- sum(w * exp_ln_ret) / norm_sum
-
-  p_change <- max(min(p_change, 1 - 1e-10), 1e-10)
-  loglik <- if (response == 1) log(p_change) else log(1 - p_change)
   if (log) loglik else exp(loglik)
 }
 
 #' @rdname sdm_cd_dist
 #' @export
-rsdm_cd <- function(n, probe, c = 4, kappa = 3, beta = 0, mu = 0) {
-  probe <- rep_len(probe, n)
-  c <- rep_len(c, n)
-  kappa <- rep_len(kappa, n)
-  beta <- rep_len(beta, n)
-
-  mu <- rep_len(mu, n)
-
-  p_change <- vapply(seq_len(n), function(i) {
-    dsdm_cd(1, probe[i], c = c[i], kappa = kappa[i], beta = beta[i],
-            mu = mu[i])
-  }, numeric(1))
-
+rsdm_cd <- function(n, probe, c = 4, kappa = 3, beta = 0, mu = 0, n_quad = 51) {
+  p_change <- dsdm_cd(
+    response = rep(1, n), probe = probe, c = c, kappa = kappa,
+    beta = beta, mu = mu, n_quad = n_quad
+  )
   stats::rbinom(n, size = 1, prob = p_change)
+}
+
+.sdm_cd_loglik <- function(response, probe, c, kappa, beta, mu, quad) {
+  eta_ret <- .dsdm_numer_sqrtexp(quad$x_grid, mu = mu, c = c, kappa = kappa, log = TRUE)
+  eta_same <- .dsdm_numer_sqrtexp(
+    quad$x_grid, mu = probe + mu, c = c, kappa = kappa, log = TRUE
+  )
+
+  log_p_change <- matrixStats::logSumExp(
+    stats::plogis(.cd_sharpness * (eta_ret - eta_same - beta), log.p = TRUE) + eta_ret
+  ) - matrixStats::logSumExp(eta_ret)
+
+  log_p_change <- max(min(log_p_change, log1p(-1e-10)), log(1e-10))
+  if (response == 1) {
+    return(log_p_change)
+  }
+  .log1mexp(log_p_change)
 }
 
 # helper functions for calculating the density of the SDM distribution
@@ -421,78 +430,68 @@ rmixture2p <- function(n, mu = 0, kappa = 5, p_mem = 0.6) {
 #'   `rmixture2p_cd` gives random binary responses.
 #'
 #' @export
-dmixture2p_cd <- function(response, probe, kappa = 5, thetat = 0.6,
-                           beta = 0, mu = 0, log = FALSE) {
+dmixture2p_cd <- function(response, probe, kappa = 5, thetat = NULL,
+                           p_target = NULL, beta = 0, mu = 0,
+                           log = FALSE, n_quad = 101) {
   stopif(isTRUE(any(kappa < 0)), "kappa must be non-negative")
-  stopif(isTRUE(any(thetat < 0 | thetat > 1)), "thetat must be in [0,1]")
 
-  n_quad <- 101
-  x_grid <- seq(-pi, pi, length.out = n_quad)
-  dx <- x_grid[2] - x_grid[1]
+  p_target <- .resolve_mixture2p_cd_p_target(p_target = p_target, thetat = thetat)
+  obs <- .recycle_cd_args(
+    response = response, probe = probe, kappa = kappa,
+    p_target = p_target, beta = beta, mu = mu
+  )
+  stopif(
+    !all(obs$response %in% c(0, 1)),
+    "response must be binary (0 or 1)."
+  )
 
-  kappa <- rep_len(kappa, length(response))
-  thetat <- rep_len(thetat, length(response))
-  beta <- rep_len(beta, length(response))
-  mu <- rep_len(mu, length(response))
-  probe <- rep_len(probe, length(response))
-
-  loglik <- numeric(length(response))
-  for (i in seq_along(response)) {
-    p_change <- .mixture2p_cd_p_change(probe[i], kappa[i], thetat[i],
-                                        beta[i], mu[i], x_grid, dx)
-    loglik[i] <- if (response[i] == 1) log(p_change) else log(1 - p_change)
-  }
+  quad <- .cd_quadrature(n_quad)
+  loglik <- vapply(seq_len(obs$n), function(i) {
+    .mixture2p_cd_loglik(
+      obs$response[i], obs$probe[i], obs$kappa[i], obs$p_target[i],
+      obs$beta[i], obs$mu[i], quad
+    )
+  }, numeric(1))
 
   if (log) loglik else exp(loglik)
 }
 
 #' @rdname mixture2p_cd_dist
 #' @export
-rmixture2p_cd <- function(n, probe, kappa = 5, thetat = 0.6, beta = 0,
-                           mu = 0) {
-  stopif(isTRUE(any(kappa < 0)), "kappa must be non-negative")
-  stopif(isTRUE(any(thetat < 0 | thetat > 1)), "thetat must be in [0,1]")
-
-  kappa <- rep_len(kappa, n)
-  thetat <- rep_len(thetat, n)
-  beta <- rep_len(beta, n)
-  mu <- rep_len(mu, n)
-  probe <- rep_len(probe, n)
-
-  n_quad <- 101
-  x_grid <- seq(-pi, pi, length.out = n_quad)
-  dx <- x_grid[2] - x_grid[1]
-
-  p_change <- vapply(seq_len(n), function(i) {
-    .mixture2p_cd_p_change(probe[i], kappa[i], thetat[i], beta[i],
-                            mu[i], x_grid, dx)
-  }, numeric(1))
-
+ rmixture2p_cd <- function(n, probe, kappa = 5, thetat = NULL, p_target = NULL,
+                           beta = 0, mu = 0, n_quad = 101) {
+  p_change <- dmixture2p_cd(
+    response = rep(1, n), probe = probe, kappa = kappa, thetat = thetat,
+    p_target = p_target, beta = beta, mu = mu, n_quad = n_quad
+  )
   stats::rbinom(n, size = 1, prob = p_change)
 }
 
-.mixture2p_cd_p_change <- function(probe, kappa, thetat, beta,
-                                    mu, x_grid, dx) {
+.mixture2p_cd_loglik <- function(response, probe, kappa, p_target, beta, mu, quad) {
   log_uniform <- -log(2 * pi)
-  # precompute von Mises normalization -- depends only on kappa
-  log_vm_norm <- log(2 * pi) + log(besselI(kappa, nu = 0, expon.scaled = TRUE)) + kappa
-  p_change <- 0
+  log_vm_norm <- .vm_log_norm(kappa)
+  vm_ret <- kappa * cos(quad$x_grid - mu) - log_vm_norm
+  vm_same <- kappa * cos(quad$x_grid - probe - mu) - log_vm_norm
 
-  for (j in seq_along(x_grid)) {
-    x <- x_grid[j]
+  log_p_ret <- matrixStats::rowLogSumExps(cbind(
+    .safe_log(p_target) + vm_ret,
+    .safe_log(1 - p_target) + log_uniform
+  ))
+  log_p_same <- matrixStats::rowLogSumExps(cbind(
+    .safe_log(p_target) + vm_same,
+    .safe_log(1 - p_target) + log_uniform
+  ))
 
-    vm_ret <- kappa * cos(x - mu) - log_vm_norm
-    vm_same <- kappa * cos(x - probe - mu) - log_vm_norm
+  log_p_change <- matrixStats::logSumExp(
+    stats::plogis(.cd_sharpness * (log_p_ret - log_p_same - beta), log.p = TRUE) +
+      log_p_ret
+  ) + log(quad$dx)
+  log_p_change <- max(min(log_p_change, log1p(-1e-10)), log(1e-10))
 
-    log_p_retrieve <- .log_mix(thetat, vm_ret, log_uniform)
-
-    log_p_x_given_same <- .log_mix(thetat, vm_same, log_uniform)
-    llr <- log_p_retrieve - log_p_x_given_same
-    w <- stats::plogis(5 * (llr - beta))
-    p_change <- p_change + w * exp(log_p_retrieve) * dx
+  if (response == 1) {
+    return(log_p_change)
   }
-
-  max(min(p_change, 1 - 1e-10), 1e-10)
+  .log1mexp(log_p_change)
 }
 
 .log_mix <- function(weight, log_p1, log_p2) {
@@ -618,94 +617,108 @@ rmixture3p <- function(n, mu = c(0, 2, -1.5), kappa = 5, p_mem = 0.6, p_nt = 0.2
 #' @param lure_idx Integer vector indicating active non-targets (1) or
 #'   inactive (0)
 #' @param kappa Concentration parameter of the von Mises distribution
-#' @param thetat Target log-weight for softmax normalization (guessing is the
-#'   reference category with log-weight 0). A value of `log(6)` together with
-#'   `thetant = log(3)` gives P(target)=0.6, P(non-target)=0.3, P(guess)=0.1.
-#' @param thetant Non-target log-weight for softmax normalization (same scale
-#'   as `thetat`).
+#' @param p_target Probability of retrieving the target item from memory.
+#' @param p_nontarget Probability mass assigned to non-target retrieval.
+#' @param thetat Deprecated legacy target log-weight argument. If supplied
+#'   together with `thetant`, it is converted to `p_target`.
+#' @param thetant Deprecated legacy non-target log-weight argument.
 #' @param beta Decision criterion. Default 0.
 #' @param log Logical; if `TRUE`, return log probability.
 #'
 #' @keywords distribution
 #' @export
-dmixture3p_cd <- function(response, probe, nt_features, lure_idx,
-                           kappa = 5, thetat = log(6), thetant = log(3),
-                           beta = 0, mu = 0, log = FALSE) {
-  n_quad <- 101
-  x_grid <- seq(-pi, pi, length.out = n_quad)
-  dx <- x_grid[2] - x_grid[1]
+dmixture3p_cd <- function(response, probe, nt_features, lure_idx = NULL,
+                           kappa = 5, p_target = NULL, p_nontarget = NULL,
+                           thetat = NULL, thetant = NULL, beta = 0,
+                           mu = 0, log = FALSE, n_quad = 101) {
+  probs <- .resolve_mixture3p_cd_probs(
+    p_target = p_target, p_nontarget = p_nontarget,
+    thetat = thetat, thetant = thetant
+  )
+  obs <- .recycle_cd_args(
+    response = response, probe = probe, kappa = kappa, beta = beta,
+    mu = mu, p_target = probs$p_target, p_nontarget = probs$p_nontarget
+  )
+  stopif(
+    !all(obs$response %in% c(0, 1)),
+    "response must be binary (0 or 1)."
+  )
+
+  nt_data <- .prepare_cd_nt_inputs(nt_features, lure_idx = lure_idx, n = obs$n)
+  quad <- .cd_quadrature(n_quad)
+  loglik <- vapply(seq_len(obs$n), function(i) {
+    .mixture3p_cd_loglik(
+      obs$response[i], obs$probe[i], nt_data$nt_features[i, ],
+      nt_data$lure_idx[i, ], obs$kappa[i], obs$p_target[i],
+      obs$p_nontarget[i], obs$beta[i], obs$mu[i], quad
+    )
+  }, numeric(1))
+
+  if (log) loglik else exp(loglik)
+}
+
+.mixture3p_cd_loglik <- function(response, probe, nt_features, lure_idx,
+                                 kappa, p_target, p_nontarget, beta, mu, quad) {
   log_uniform <- -log(2 * pi)
+  log_vm_norm <- .vm_log_norm(kappa)
+  active_idx <- which(lure_idx > 0)
+  n_active <- length(active_idx)
+  p_nontarget_eff <- if (n_active == 0) 0 else p_nontarget
+  log_pguess <- .safe_log(1 - p_target - p_nontarget_eff)
 
-  # softmax normalization with guessing as reference (log-weight = 0)
-  log_Z <- matrixStats::logSumExp(c(thetat, thetant, 0))
-  log_thetat <- thetat - log_Z
-  log_thetant <- thetant - log_Z
-  log_pguess <- -log_Z
+  vm_ret <- kappa * cos(quad$x_grid - mu) - log_vm_norm
+  vm_same <- kappa * cos(quad$x_grid - probe - mu) - log_vm_norm
+  log_p_ret <- matrixStats::rowLogSumExps(cbind(
+    .safe_log(p_target) + vm_ret,
+    log_pguess + log_uniform
+  ))
+  log_p_same <- matrixStats::rowLogSumExps(cbind(
+    .safe_log(p_target) + vm_same,
+    log_pguess + log_uniform
+  ))
 
-  # precompute von Mises normalization -- depends only on kappa
-  log_vm_norm <- log(2 * pi) + log(besselI(kappa, nu = 0, expon.scaled = TRUE)) + kappa
+  if (n_active > 0) {
+    log_nt_weight <- .safe_log(p_nontarget_eff) - log(n_active)
+    nt_ret <- vapply(active_idx, function(k) {
+      log_nt_weight + kappa * cos(quad$x_grid - nt_features[k]) - log_vm_norm
+    }, numeric(length(quad$x_grid)))
+    nt_same <- vapply(active_idx, function(k) {
+      log_nt_weight + kappa * cos(quad$x_grid - nt_features[k] - probe) - log_vm_norm
+    }, numeric(length(quad$x_grid)))
 
-  n_active <- sum(lure_idx)
-
-  p_change <- 0
-  for (j in seq_along(x_grid)) {
-    x <- x_grid[j]
-
-    vm_ret <- kappa * cos(x - mu) - log_vm_norm
-    vm_same <- kappa * cos(x - probe - mu) - log_vm_norm
-
-    log_p_ret <- matrixStats::logSumExp(c(
-      log_thetat + vm_ret,
-      log_pguess + log_uniform
-    ))
-    log_p_same_part <- matrixStats::logSumExp(c(
-      log_thetat + vm_same,
-      log_pguess + log_uniform
-    ))
-
-    for (k in seq_along(nt_features)) {
-      if (lure_idx[k] == 1) {
-        log_nt <- log_thetant - log(n_active) +
-          kappa * cos(x - nt_features[k]) - log_vm_norm
-        log_p_ret <- matrixStats::logSumExp(c(log_p_ret, log_nt))
-        log_nt_same <- log_thetant - log(n_active) +
-          kappa * cos(x - nt_features[k] - probe) - log_vm_norm
-        log_p_same_part <- matrixStats::logSumExp(c(log_p_same_part, log_nt_same))
-      }
+    if (is.null(dim(nt_ret))) {
+      nt_ret <- matrix(nt_ret, ncol = 1)
+      nt_same <- matrix(nt_same, ncol = 1)
     }
 
-    llr <- log_p_ret - log_p_same_part
-    w <- stats::plogis(5 * (llr - beta))
-    p_change <- p_change + w * exp(log_p_ret) * dx
+    log_p_ret <- matrixStats::rowLogSumExps(cbind(log_p_ret, nt_ret))
+    log_p_same <- matrixStats::rowLogSumExps(cbind(log_p_same, nt_same))
   }
 
-  p_change <- max(min(p_change, 1 - 1e-10), 1e-10)
-  loglik <- if (response == 1) log(p_change) else log(1 - p_change)
-  if (log) loglik else exp(loglik)
+  log_p_change <- matrixStats::logSumExp(
+    stats::plogis(.cd_sharpness * (log_p_ret - log_p_same - beta), log.p = TRUE) +
+      log_p_ret
+  ) + log(quad$dx)
+  log_p_change <- max(min(log_p_change, log1p(-1e-10)), log(1e-10))
+
+  if (response == 1) {
+    return(log_p_change)
+  }
+  .log1mexp(log_p_change)
 }
 
 #' @rdname mixture3p_cd_dist
 #' @export
-rmixture3p_cd <- function(n, probe, nt_features, lure_idx,
-                           kappa = 5, thetat = log(6), thetant = log(3),
-                           beta = 0, mu = 0) {
-  n_quad <- 101
-  x_grid <- seq(-pi, pi, length.out = n_quad)
-  dx <- x_grid[2] - x_grid[1]
-
-  probe <- rep_len(probe, n)
-  kappa <- rep_len(kappa, n)
-  thetat <- rep_len(thetat, n)
-  thetant <- rep_len(thetant, n)
-  beta <- rep_len(beta, n)
-
-  mu <- rep_len(mu, n)
-
-  p_change <- vapply(seq_len(n), function(i) {
-    dmixture3p_cd(1, probe[i], nt_features, lure_idx,
-                  kappa[i], thetat[i], thetant[i], beta[i], mu[i])
-  }, numeric(1))
-
+rmixture3p_cd <- function(n, probe, nt_features, lure_idx = NULL,
+                           kappa = 5, p_target = NULL, p_nontarget = NULL,
+                           thetat = NULL, thetant = NULL, beta = 0,
+                           mu = 0, n_quad = 101) {
+  p_change <- dmixture3p_cd(
+    response = rep(1, n), probe = probe, nt_features = nt_features,
+    lure_idx = lure_idx, kappa = kappa, p_target = p_target,
+    p_nontarget = p_nontarget, thetat = thetat, thetant = thetant,
+    beta = beta, mu = mu, n_quad = n_quad
+  )
   stats::rbinom(n, size = 1, prob = p_change)
 }
 
@@ -866,82 +879,104 @@ rimm <- function(n, mu = c(0, 2, -1.5), dist = c(0, 0.5, 2),
 #'   responses.
 #'
 #' @export
-dimm_cd <- function(response, probe, nt_features, nt_distances, lure_idx,
+dimm_cd <- function(response, probe, nt_features, nt_distances, lure_idx = NULL,
                      kappa = 5, c = 2, a = 0.5, s = 2, beta = 0,
-                     mu = 0, log = FALSE) {
-  n_quad <- 101
-  x_grid <- seq(-pi, pi, length.out = n_quad)
-  dx <- x_grid[2] - x_grid[1]
+                     mu = 0, log = FALSE, n_quad = 101) {
+  stopif(isTRUE(any(kappa < 0)), "kappa must be non-negative")
+  stopif(isTRUE(any(c < 0)), "c must be non-negative")
+  stopif(isTRUE(any(a < 0)), "a must be non-negative")
+  stopif(isTRUE(any(s < 0)), "s must be non-negative")
+
+  obs <- .recycle_cd_args(
+    response = response, probe = probe, kappa = kappa, c = c,
+    a = a, s = s, beta = beta, mu = mu
+  )
+  stopif(
+    !all(obs$response %in% c(0, 1)),
+    "response must be binary (0 or 1)."
+  )
+
+  nt_data <- .prepare_cd_nt_inputs(
+    nt_features, lure_idx = lure_idx, nt_distances = nt_distances, n = obs$n
+  )
+  quad <- .cd_quadrature(n_quad)
+  loglik <- vapply(seq_len(obs$n), function(i) {
+    .imm_cd_loglik(
+      obs$response[i], obs$probe[i], nt_data$nt_features[i, ],
+      nt_data$nt_distances[i, ], nt_data$lure_idx[i, ], obs$kappa[i],
+      obs$c[i], obs$a[i], obs$s[i], obs$beta[i], obs$mu[i], quad
+    )
+  }, numeric(1))
+
+  if (log) loglik else exp(loglik)
+}
+
+.imm_cd_loglik <- function(response, probe, nt_features, nt_distances, lure_idx,
+                           kappa, c, a, s, beta, mu, quad) {
   log_uniform <- -log(2 * pi)
-
-  w_bg <- 1.0
-  w_target <- exp(c) + exp(a)
-
-  # precompute von Mises normalization -- depends only on kappa
-  log_vm_norm <- log(2 * pi) + log(besselI(kappa, nu = 0, expon.scaled = TRUE)) + kappa
-
-  p_change <- 0
-  for (j in seq_along(x_grid)) {
-    x <- x_grid[j]
-    total_weight <- w_target + w_bg
-
-    log_p_ret <- log(w_target) +
-      kappa * cos(x - mu) - log_vm_norm
-    log_p_same_part <- log(w_target) +
-      kappa * cos(x - probe - mu) - log_vm_norm
-
-    for (k in seq_along(nt_features)) {
-      if (lure_idx[k] == 1) {
-        w_nt <- exp(c - exp(s) * nt_distances[k]) + exp(a)
-        total_weight <- total_weight + w_nt
-        log_nt <- log(w_nt) +
-          kappa * cos(x - nt_features[k]) - log_vm_norm
-        log_p_ret <- matrixStats::logSumExp(c(log_p_ret, log_nt))
-        log_nt_same <- log(w_nt) +
-          kappa * cos(x - nt_features[k] - probe) - log_vm_norm
-        log_p_same_part <- matrixStats::logSumExp(c(log_p_same_part, log_nt_same))
-      }
-    }
-
-    log_p_ret <- log_p_ret + log_uniform - log(total_weight)
-    log_p_same_part <- log_p_same_part + log_uniform - log(total_weight)
-
-    log_p_ret <- matrixStats::logSumExp(c(log_p_ret,
-      log(w_bg) - log(total_weight) + 2 * log_uniform))
-    log_p_same_part <- matrixStats::logSumExp(c(log_p_same_part,
-      log(w_bg) - log(total_weight) + 2 * log_uniform))
-
-    llr <- log_p_ret - log_p_same_part
-    w <- stats::plogis(5 * (llr - beta))
-    p_change <- p_change + w * exp(log_p_ret - log_uniform) * dx
+  log_vm_norm <- .vm_log_norm(kappa)
+  log_w_bg <- 0
+  log_w_target <- matrixStats::logSumExp(c(c, a))
+  active_idx <- which(lure_idx > 0)
+  log_w_nt <- if (length(active_idx) == 0) {
+    numeric(0)
+  } else {
+    vapply(active_idx, function(k) {
+      matrixStats::logSumExp(c(c - exp(s) * nt_distances[k], a))
+    }, numeric(1))
   }
 
-  p_change <- max(min(p_change, 1 - 1e-10), 1e-10)
-  loglik <- if (response == 1) log(p_change) else log(1 - p_change)
-  if (log) loglik else exp(loglik)
+  log_total_weight <- matrixStats::logSumExp(c(log_w_bg, log_w_target, log_w_nt))
+  vm_ret <- kappa * cos(quad$x_grid - mu) - log_vm_norm
+  vm_same <- kappa * cos(quad$x_grid - probe - mu) - log_vm_norm
+  log_p_ret <- matrixStats::rowLogSumExps(cbind(
+    log_w_target + vm_ret,
+    log_w_bg + log_uniform
+  )) - log_total_weight
+  log_p_same <- matrixStats::rowLogSumExps(cbind(
+    log_w_target + vm_same,
+    log_w_bg + log_uniform
+  )) - log_total_weight
+
+  if (length(active_idx) > 0) {
+    nt_ret <- vapply(seq_along(active_idx), function(j) {
+      log_w_nt[j] + kappa * cos(quad$x_grid - nt_features[active_idx[j]]) - log_vm_norm
+    }, numeric(length(quad$x_grid)))
+    nt_same <- vapply(seq_along(active_idx), function(j) {
+      log_w_nt[j] + kappa * cos(quad$x_grid - nt_features[active_idx[j]] - probe) - log_vm_norm
+    }, numeric(length(quad$x_grid)))
+
+    if (is.null(dim(nt_ret))) {
+      nt_ret <- matrix(nt_ret, ncol = 1)
+      nt_same <- matrix(nt_same, ncol = 1)
+    }
+
+    log_p_ret <- matrixStats::rowLogSumExps(cbind(log_p_ret + log_total_weight, nt_ret)) - log_total_weight
+    log_p_same <- matrixStats::rowLogSumExps(cbind(log_p_same + log_total_weight, nt_same)) - log_total_weight
+  }
+
+  log_p_change <- matrixStats::logSumExp(
+    stats::plogis(.cd_sharpness * (log_p_ret - log_p_same - beta), log.p = TRUE) +
+      log_p_ret
+  ) + log(quad$dx)
+  log_p_change <- max(min(log_p_change, log1p(-1e-10)), log(1e-10))
+
+  if (response == 1) {
+    return(log_p_change)
+  }
+  .log1mexp(log_p_change)
 }
 
 #' @rdname imm_cd_dist
 #' @export
-rimm_cd <- function(n, probe, nt_features, nt_distances, lure_idx,
+rimm_cd <- function(n, probe, nt_features, nt_distances, lure_idx = NULL,
                      kappa = 5, c = 2, a = 0.5, s = 2, beta = 0,
-                     mu = 0) {
-  probe <- rep_len(probe, n)
-  kappa <- rep_len(kappa, n)
-  c <- rep_len(c, n)
-  a <- rep_len(a, n)
-  s <- rep_len(s, n)
-  beta <- rep_len(beta, n)
-
-  mu <- rep_len(mu, n)
-
-  p_change <- vapply(seq_len(n), function(i) {
-    dimm_cd(1, probe[i], nt_features, lure_idx = lure_idx,
-            nt_distances = nt_distances, kappa = kappa[i],
-            c = c[i], a = a[i], s = s[i], beta = beta[i],
-            mu = mu[i])
-  }, numeric(1))
-
+                     mu = 0, n_quad = 101) {
+  p_change <- dimm_cd(
+    response = rep(1, n), probe = probe, nt_features = nt_features,
+    nt_distances = nt_distances, lure_idx = lure_idx, kappa = kappa,
+    c = c, a = a, s = s, beta = beta, mu = mu, n_quad = n_quad
+  )
   stats::rbinom(n, size = 1, prob = p_change)
 }
 

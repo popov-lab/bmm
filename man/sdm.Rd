@@ -3,6 +3,7 @@
 \name{sdm}
 \alias{sdm}
 \alias{sdmSimple}
+\alias{sdm_cd}
 \title{Signal Discrimination Model (SDM) by Oberauer (2023)}
 \usage{
 sdm(
@@ -16,6 +17,8 @@ sdm(
 )
 
 sdmSimple(resp_error, version = "simple", task = "de", ...)
+
+sdm_cd(response, probe, target, version = "simple", ...)
 }
 \arguments{
 \item{resp_error}{The name of the variable in the dataset containing the

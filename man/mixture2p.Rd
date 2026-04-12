@@ -2,6 +2,7 @@
 % Please edit documentation in R/model_mixture2p.R
 \name{mixture2p}
 \alias{mixture2p}
+\alias{mixture2p_cd}
 \title{Two-parameter mixture model by Zhang and Luck (2008).}
 \usage{
 mixture2p(
@@ -12,6 +13,8 @@ mixture2p(
   task = "de",
   ...
 )
+
+mixture2p_cd(response, probe, target, ...)
 }
 \arguments{
 \item{resp_error}{The name of the variable in the provided dataset containing

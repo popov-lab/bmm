@@ -11,14 +11,15 @@ dimm_cd(
   probe,
   nt_features,
   nt_distances,
-  lure_idx,
+  lure_idx = NULL,
   kappa = 5,
   c = 2,
   a = 0.5,
   s = 2,
   beta = 0,
   mu = 0,
-  log = FALSE
+  log = FALSE,
+  n_quad = 101
 )
 
 rimm_cd(
@@ -26,13 +27,14 @@ rimm_cd(
   probe,
   nt_features,
   nt_distances,
-  lure_idx,
+  lure_idx = NULL,
   kappa = 5,
   c = 2,
   a = 0.5,
   s = 2,
   beta = 0,
-  mu = 0
+  mu = 0,
+  n_quad = 101
 )
 }
 \arguments{

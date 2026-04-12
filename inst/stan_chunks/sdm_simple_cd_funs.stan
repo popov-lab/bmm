@@ -1,5 +1,3 @@
-  #include 'fun_tan_half.stan'
-
   // dummy _lpmf — brms requires this but actual likelihood is in the likelihood block
   real sdm_simple_cd_lpmf(array[] int y, vector mu, vector c_par,
                            vector kappa, vector beta) {
@@ -10,11 +8,11 @@
   real sdm_cd_log_Z(real c_par, real kappa, vector grid) {
     int n_quad = size(grid);
     real base = c_par * sqrt(kappa) * inv(sqrt2()) * inv_sqrt(pi());
-    real norm_sum = 0;
+    vector[n_quad] eta;
     for (j in 1:n_quad) {
-      norm_sum += exp(base * exp(kappa * (cos(grid[j]) - 1)));
+      eta[j] = base * exp(kappa * (cos(grid[j]) - 1));
     }
-    return log(norm_sum);
+    return log_sum_exp(eta);
   }
 
   // compute log P(y | params) for a single observation, given cached log_Z
@@ -22,22 +20,19 @@
                        real probe, real log_Z, vector grid) {
     int n_quad = size(grid);
     real base = c_par * sqrt(kappa) * inv(sqrt2()) * inv_sqrt(pi());
-    real sharpness = 5;
-    real weighted_sum = 0;
+    vector[n_quad] log_integrand;
 
     for (i in 1:n_quad) {
       real x = grid[i];
-      real ln_ret = base * exp(kappa * (cos(x - mu) - 1));
-      real ln_same = base * exp(kappa * (cos(x - probe - mu) - 1));
-
-      real exp_ln_ret = exp(ln_ret);
-      real llr = ln_ret - ln_same;
-      real w = inv_logit(sharpness * (llr - beta));
-      weighted_sum += w * exp_ln_ret;
+      real eta_ret = base * exp(kappa * (cos(x - mu) - 1));
+      real eta_same = base * exp(kappa * (cos(x - probe - mu) - 1));
+      log_integrand[i] = log_inv_logit(5 * (eta_ret - eta_same - beta)) + eta_ret;
     }
 
-    real p_change = weighted_sum / exp(log_Z);
-    p_change = fmin(fmax(p_change, 1e-10), 1 - 1e-10);
-    if (y == 1) return log(p_change);
-    return log1m(p_change);
+    {
+      real log_p_change = log_sum_exp(log_integrand) - log_Z;
+      log_p_change = fmin(fmax(log_p_change, log(1e-10)), log1m(1e-10));
+      if (y == 1) return log_p_change;
+      return log1m_exp(log_p_change);
+    }
   }

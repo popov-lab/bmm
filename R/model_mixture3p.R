@@ -189,6 +189,7 @@ mixture3p <- function(resp_error = NULL, nt_features = NULL, set_size = NULL,
     stopif(is.null(nt_features), "Argument 'nt_features' is required.")
     stopif(is.null(set_size), "Argument 'set_size' is required.")
   } else {
+    warning2("`mixture3p(task = \"cd\")` is deprecated. Please use `mixture3p_cd()` instead.")
     stopif(is.null(response), "Argument 'response' is required for task = 'cd'.")
     stopif(is.null(probe), "Argument 'probe' is required for task = 'cd'.")
     stopif(is.null(target), "Argument 'target' is required for task = 'cd'.")
@@ -199,6 +200,25 @@ mixture3p <- function(resp_error = NULL, nt_features = NULL, set_size = NULL,
     resp_error = resp_error, nt_features = nt_features,
     set_size = set_size, response = response, probe = probe,
     target = target, regex = regex, task = task, call = call, ...
+  )
+}
+
+#' @rdname mixture3p
+#' @export
+mixture3p_cd <- function(response, probe, target, nt_features, set_size,
+                         regex = FALSE, ...) {
+  call <- match.call()
+  stop_missing_args()
+  .model_mixture3p(
+    nt_features = nt_features,
+    set_size = set_size,
+    response = response,
+    probe = probe,
+    target = target,
+    regex = regex,
+    task = "cd",
+    call = call,
+    ...
   )
 }
 
@@ -250,11 +270,6 @@ configure_model.mixture3p_de <- function(model, data, formula) {
 
 #' @export
 configure_model.mixture3p_cd <- function(model, data, formula) {
-  max_set_size <- attr(data, "max_set_size")
-  lure_idx <- attr(data, "lure_idx_vars")
-  nt_features <- model$other_vars$nt_features
-  n_nt <- max_set_size - 1
-
   mixture3p_cd <- brms::custom_family(
     name = "mixture3p_cd",
     dpars = c("mu", "kappa", "thetat", "thetant", "beta"),
@@ -262,16 +277,21 @@ configure_model.mixture3p_cd <- function(model, data, formula) {
     lb = c(NA, 0, NA, NA, NA),
     ub = c(NA, NA, NA, NA, NA),
     type = "int",
-    loop = TRUE,
-    vars = c("vreal1[n]",
-             paste0("vreal", 2:(n_nt + 1), "[n]"),
-             paste0("vint", 1:n_nt, "[n]")),
+    loop = FALSE,
     log_lik = log_lik_mixture3p_cd,
     posterior_predict = posterior_predict_mixture3p_cd
   )
 
-  stan_funs <- .generate_mixture3p_cd_stan(n_nt)
-  stanvars <- brms::stanvar(scode = stan_funs, block = "functions")
+  sc_path <- system.file("stan_chunks", package = "bmm")
+  stan_funs <- .generate_mixture3p_cd_stan()
+  stan_tdata <- read_lines2(paste0(sc_path, "/mixture3p_cd_tdata.stan"))
+  stan_likelihood <- read_lines2(paste0(sc_path, "/mixture3p_cd_likelihood.stan"))
+  stanvars <- brms::stanvar(x = data$probe_centered, name = "probe_cd") +
+    brms::stanvar(x = attr(data, "cd_nt_features_matrix"), name = "cd_nt_features") +
+    brms::stanvar(x = attr(data, "cd_lure_idx_matrix"), name = "cd_lure_idx") +
+    brms::stanvar(scode = stan_funs, block = "functions") +
+    brms::stanvar(scode = stan_tdata, block = "tdata") +
+    brms::stanvar(scode = stan_likelihood, block = "likelihood", position = "end")
 
   formula <- bmf2bf(model, formula)
   formula$family <- mixture3p_cd
@@ -282,85 +302,80 @@ configure_model.mixture3p_cd <- function(model, data, formula) {
 #' @export
 bmf2bf.mixture3p_cd <- function(model, formula = bmmformula()) {
   resp_name <- model$resp_vars$response
-  nt_features <- model$other_vars$nt_features
-  lure_idx <- attr(model, "lure_idx_computed") %||%
-    paste0("LureIdx", seq_along(nt_features))
-
-  vreal_args <- paste(c("probe_centered", nt_features), collapse = ", ")
-  vint_args <- paste(lure_idx, collapse = ", ")
-
   mu_rhs <- .extract_mu_rhs(formula)
-  brms::bf(glue("{resp_name} | vreal({vreal_args}) + vint({vint_args}) ~ {mu_rhs}"))
+  brms::bf(glue("{resp_name} ~ {mu_rhs}"))
 }
 
-.generate_mixture3p_cd_stan <- function(n_nt) {
-  nt_args <- paste0("real nt", seq_len(n_nt), collapse = ", ")
-  lure_args <- paste0("int lure", seq_len(n_nt), collapse = ", ")
+.generate_mixture3p_cd_stan <- function() {
+  "
+  real mixture3p_cd_lpmf(array[] int y, vector mu, vector kappa,
+                         vector thetat, vector thetant, vector beta) {
+    return 0;
+  }
 
-  nt_loop <- paste(vapply(seq_len(n_nt), function(i) {
-    glue("
-      if (lure{i} == 1) {{
-        real log_nt{i} = log_thetant - log(n_active) + kappa * cos(x - nt{i}) - log_vm_norm;
-        log_p_retrieve = log_sum_exp(log_p_retrieve, log_nt{i});
-        real log_nt{i}_same = log_thetant - log(n_active) + kappa * cos(x - nt{i} - probe) - log_vm_norm;
-        log_p_x_given_same = log_sum_exp(log_p_x_given_same, log_nt{i}_same);
-      }}")
-  }, character(1)), collapse = "\n")
-
-  glue("
-  #include 'fun_tan_half.stan'
-
-  real mixture3p_cd_lpmf(int y, real mu, real kappa, real thetat, real thetant, real beta, real probe, {nt_args}, {lure_args}) {{
-    int n_quad = 101;
-    real dx = 2 * pi() / (n_quad - 1);
-    real p_change = 0;
-    real log_uniform = -log(2 * pi());
-    real sharpness = 5;
-
-    // softmax normalization with guessing as reference (log-weight = 0)
-    real log_Z = log_sum_exp(log_sum_exp(thetat, thetant), 0);
-    real log_thetat = thetat - log_Z;
-    real log_thetant = thetant - log_Z;
-    real log_pguess = -log_Z;
-
-    // precompute von Mises normalization -- depends only on kappa
-    real log_vm_norm = log(2 * pi()) + log_modified_bessel_first_kind(0, kappa);
-
+  real mixture3p_cd_log_prob(int y, real probe, real mu, real kappa,
+                             real thetat, real thetant, real beta,
+                             row_vector nt_features, row_vector lure_idx,
+                             vector grid, real dx) {
+    int n_quad = size(grid);
+    int n_nt = cols(nt_features);
     int n_active = 0;
-    for (j in 1:{n_nt}) {{
-      array[{n_nt}] int lures = {{{paste0('lure', seq_len(n_nt), collapse = ', ')}}};
-      n_active += lures[j];
-    }}
+    real log_uniform = -log(2 * pi());
+    real log_vm_norm = log(2 * pi()) + log_modified_bessel_first_kind(0, kappa);
+    real log_thetat;
+    real log_thetant;
+    real log_pguess;
+    vector[n_quad] log_p_ret;
+    vector[n_quad] log_p_same;
+    vector[n_quad] log_integrand;
+    real log_p_change;
 
-    for (i in 1:n_quad) {{
-      real x = -pi() + (i - 1) * dx;
+    for (k in 1:n_nt) {
+      if (lure_idx[k] > 0.5) {
+        n_active += 1;
+      }
+    }
 
+    {
+      real log_Z = log_sum_exp(log_sum_exp(thetat, thetant), 0);
+      log_thetat = thetat - log_Z;
+      log_thetant = thetant - log_Z;
+      log_pguess = -log_Z;
+    }
+
+    for (j in 1:n_quad) {
+      real x = grid[j];
       real vm_ret = kappa * cos(x - mu) - log_vm_norm;
       real vm_same = kappa * cos(x - probe - mu) - log_vm_norm;
 
-      real log_p_retrieve = log_sum_exp(
-        log_thetat + vm_ret,
-        log_pguess + log_uniform
-      );
+      log_p_ret[j] = log_sum_exp(log_thetat + vm_ret, log_pguess + log_uniform);
+      log_p_same[j] = log_sum_exp(log_thetat + vm_same, log_pguess + log_uniform);
 
-      real log_p_x_given_same = log_sum_exp(
-        log_thetat + vm_same,
-        log_pguess + log_uniform
-      );
+      if (n_active > 0) {
+        for (k in 1:n_nt) {
+          if (lure_idx[k] > 0.5) {
+            real log_nt = log_thetant - log(n_active) +
+              kappa * cos(x - nt_features[k]) - log_vm_norm;
+            real log_nt_same = log_thetant - log(n_active) +
+              kappa * cos(x - nt_features[k] - probe) - log_vm_norm;
+            log_p_ret[j] = log_sum_exp(log_p_ret[j], log_nt);
+            log_p_same[j] = log_sum_exp(log_p_same[j], log_nt_same);
+          }
+        }
+      }
+    }
 
-      {nt_loop}
+    for (j in 1:n_quad) {
+      log_integrand[j] = log_inv_logit(5 * (log_p_ret[j] - log_p_same[j] - beta)) +
+        log_p_ret[j];
+    }
 
-      real llr = log_p_retrieve - log_p_x_given_same;
-      real w = inv_logit(sharpness * (llr - beta));
-
-      p_change += w * exp(log_p_retrieve) * dx;
-    }}
-
-    p_change = fmin(fmax(p_change, 1e-10), 1 - 1e-10);
-    if (y == 1) return log(p_change);
-    return log1m(p_change);
-  }}
-  ")
+    log_p_change = log_sum_exp(log_integrand) + log(dx);
+    log_p_change = fmin(fmax(log_p_change, log(1e-10)), log1m(1e-10));
+    if (y == 1) return log_p_change;
+    return log1m_exp(log_p_change);
+  }
+  "
 }
 
 log_lik_mixture3p_cd <- function(i, prep) {
@@ -369,7 +384,7 @@ log_lik_mixture3p_cd <- function(i, prep) {
   thetat <- brms::get_dpar(prep, "thetat", i = i)
   thetant <- brms::get_dpar(prep, "thetant", i = i)
   beta <- brms::get_dpar(prep, "beta", i = i)
-  probe <- prep$data$vreal1[i]
+  probe <- .extract_cd_probe(i, prep)
   y <- prep$data$Y[i]
   nt_data <- .extract_cd_nt_data(i, prep)
 
@@ -384,7 +399,7 @@ posterior_predict_mixture3p_cd <- function(i, prep, ...) {
   thetat <- brms::get_dpar(prep, "thetat", i = i)
   thetant <- brms::get_dpar(prep, "thetant", i = i)
   beta <- brms::get_dpar(prep, "beta", i = i)
-  probe <- prep$data$vreal1[i]
+  probe <- .extract_cd_probe(i, prep)
   nt_data <- .extract_cd_nt_data(i, prep)
 
   rmixture3p_cd(length(kappa), probe, nt_features = nt_data$nt_features,

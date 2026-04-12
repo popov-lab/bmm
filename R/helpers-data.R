@@ -71,6 +71,8 @@ check_data.circular <- function(model, data, formula) {
 
 #' @export
 check_data.change_detection <- function(model, data, formula) {
+  data <- order_data_query(model, data, formula)
+
   resp_name <- model$resp_vars$response
   probe_name <- model$resp_vars$probe
   target_name <- model$resp_vars$target
@@ -112,6 +114,17 @@ check_data.change_detection <- function(model, data, formula) {
 }
 
 .extract_cd_nt_data <- function(i, prep, has_distances = FALSE) {
+  if ("cd_nt_features" %in% names(prep$data)) {
+    out <- nlist(
+      nt_features = prep$data$cd_nt_features[i, ],
+      lure_idx = prep$data$cd_lure_idx[i, ]
+    )
+    if (has_distances) {
+      out$nt_distances <- prep$data$cd_nt_distances[i, ]
+    }
+    return(out)
+  }
+
   n_vreal <- sum(grepl("^vreal[0-9]+$", names(prep$data)))
   n_nt <- if (has_distances) (n_vreal - 1) / 2 else n_vreal - 1
   nt_features <- vapply(seq_len(n_nt), function(j) prep$data[[paste0("vreal", j + 1)]][i], numeric(1))
@@ -121,6 +134,14 @@ check_data.change_detection <- function(model, data, formula) {
     out$nt_distances <- vapply(seq_len(n_nt), function(j) prep$data[[paste0("vreal", n_nt + j + 1)]][i], numeric(1))
   }
   out
+}
+
+.extract_cd_probe <- function(i, prep) {
+  if ("probe_cd" %in% names(prep$data)) {
+    prep$data$probe_cd[i]
+  } else {
+    prep$data$vreal1[i]
+  }
 }
 
 #' @export
@@ -152,6 +173,9 @@ check_data.non_targets <- function(model, data, formula) {
   data$inv_ss <- 1 / (ss_numeric - 1)
   data$inv_ss <- ifelse(is.infinite(data$inv_ss), 1, data$inv_ss)
   data[, nt_features][is.na(data[, nt_features])] <- 0
+
+  attr(data, "cd_nt_features_matrix") <- data.matrix(data[, nt_features, drop = FALSE])
+  attr(data, "cd_lure_idx_matrix") <- data.matrix(data[, lure_idx_vars, drop = FALSE])
 
   # save some variables for later use
   attr(data, "max_set_size") <- max_set_size

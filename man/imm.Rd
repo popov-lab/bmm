@@ -2,6 +2,7 @@
 % Please edit documentation in R/model_imm.R
 \name{imm}
 \alias{imm}
+\alias{imm_cd}
 \alias{IMMfull}
 \alias{IMMbsc}
 \alias{IMMabc}
@@ -18,6 +19,18 @@ imm(
   regex = FALSE,
   version = "full",
   task = "de",
+  ...
+)
+
+imm_cd(
+  response,
+  probe,
+  target,
+  nt_features,
+  nt_distances,
+  set_size,
+  regex = FALSE,
+  version = "full",
   ...
 )
 
