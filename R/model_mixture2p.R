@@ -24,11 +24,9 @@
         thetat = "Mixture weight for target responses"
       ),
       links = list(
-        mu1 = "tan_half",
         kappa = "log",
         thetat = "logit"
       ),
-      fixed_parameters = list(mu1 = 0, mu2 = 0, kappa2 = -100),
       default_priors = list(
         kappa = list(main = "normal(2, 1)", effects = "normal(0, 1)"),
         thetat = list(main = "logistic(0, 1)")

@@ -27,6 +27,7 @@ test_that("mixture3p DE constructor still works", {
   expect_s3_class(m, "circular")
   expect_s3_class(m, "mixture3p_de")
   expect_false(inherits(m, "change_detection"))
+  expect_equal(m$links$mu1, "tan_half")
 })
 
 test_that("mixture3p CD validates required arguments", {
