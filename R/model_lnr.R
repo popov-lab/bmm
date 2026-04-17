@@ -216,6 +216,14 @@ check_model.lnr_custom <- function(model, data = NULL, formula = NULL) {
       Please rename the affected response categories."
     )
 
+    bad_dpar_names <- cat_pars[grepl("[0-9]$", cat_pars)]
+    stopif(
+      length(bad_dpar_names) > 0,
+      "Category names cannot end in a number because brms uses them as \\
+      distributional parameters: {collapse_comma(bad_dpar_names)}. \\
+      Please rename the affected response categories."
+    )
+
     for (p in cat_pars) {
       model$parameters[[p]] <- paste0("meanlog for '", p, "' accumulator")
       if (is.null(model$links[[p]])) model$links[[p]] <- "identity"

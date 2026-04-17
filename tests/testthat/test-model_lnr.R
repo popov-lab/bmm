@@ -288,6 +288,16 @@ test_that("check_model.lnr_custom errors on Stan reserved words", {
   )
 })
 
+test_that("check_model.lnr_custom errors on category names ending in numbers", {
+  model <- lnr(rt = "rt", response = "resp", version = "custom")
+  formula <- bmf(correct ~ 1, error1 ~ 1, ndt ~ 1)
+
+  expect_error(
+    check_model(model, formula = formula),
+    "cannot end in a number"
+  )
+})
+
 # -----------------------------------------------------------------------------
 # Formula conversion tests
 # -----------------------------------------------------------------------------
