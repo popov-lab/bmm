@@ -117,6 +117,58 @@ test_that("rimm returns values between -pi and pi", {
   expect_true(all(res >= -pi) && all(res <= pi))
 })
 
+test_that("dlnr validates inputs and log scale output", {
+  rt <- c(0.5, 0.8)
+  response <- c(1, 2)
+  m <- c(-1, 0)
+  s <- 1
+  ndt <- 0.2
+
+  dens <- dlnr(rt, response, m = m, s = s, ndt = ndt)
+  log_dens <- dlnr(rt, response, m = m, s = s, ndt = ndt, log = TRUE)
+
+  expect_equal(dens, exp(log_dens))
+  expect_error(
+    dlnr(rt, c(1, 3), m = m, s = s, ndt = ndt),
+    "response must contain integers"
+  )
+  expect_error(
+    dlnr(rt, response, m = m, s = 0, ndt = ndt),
+    "finite and positive"
+  )
+  expect_error(
+    dlnr(rt, response, m = m, s = s, ndt = -0.1),
+    "finite and non-negative"
+  )
+})
+
+test_that("rlnr returns valid response times and responses", {
+  set.seed(123)
+  res <- rlnr(200, m = c(-1, 0, 0.5), s = 1, ndt = 0.2)
+
+  expect_s3_class(res, "data.frame")
+  expect_equal(names(res), c("rt", "response"))
+  expect_true(all(res$rt > 0.2))
+  expect_true(all(res$response %in% 1:3))
+})
+
+test_that("plnr and qlnr are internally consistent", {
+  m <- c(-1, 0)
+  s <- 1
+  ndt <- 0.2
+  p <- c(0.1, 0.5, 0.9, 0.99)
+
+  q <- qlnr(p, m = m, s = s, ndt = ndt)
+
+  expect_equal(plnr(q, m = m, s = s, ndt = ndt), p, tolerance = 1e-6)
+  expect_true(all(diff(plnr(seq(0.21, 3, length.out = 20),
+                             m = m, s = s, ndt = ndt)) >= 0))
+  expect_error(
+    plnr(q, response = 1, m = m, s = s, ndt = ndt),
+    "not yet implemented"
+  )
+})
+
 test_that("dm3 requires custom act_funs to be specified", {
   model <- m3(
     resp_cats = c("corr", "other", "dist", "npl"),

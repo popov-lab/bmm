@@ -112,7 +112,11 @@ labels in the response column of the data:
 The custom version also supports per-category `num_alternatives` for tasks
 where categories contain different numbers of items (e.g., 1 target, 3
 similar lures, 5 unrelated distractors). This works analogously to the
-`num_options` argument in the M3 model.
+`num_options` argument in the M3 model. Category names should not use
+reserved internal parameter names such as `mu`, `ndt`, or `s`, should not be
+Stan reserved words, and should not end in numbers. When supplied directly,
+`num_alternatives` must contain positive integers; when supplied via columns,
+those columns must contain positive integers on every trial.
 
 ## Identifiability
 
@@ -216,10 +220,17 @@ instead of integers (e.g.,
 
 ## Hierarchical models
 
-Both versions support random effects. For hierarchical models, we recommend
-setting `adapt_delta = 0.95` or higher, because divergent transitions can
-occur when the non-decision time parameter gets close to the fastest observed
-RT.
+Both versions can be specified with random effects, but hierarchical LNR fits
+are currently more fragile than intercept-only fits in our internal recovery
+checks. In particular, divergent transitions can occur when the non-decision
+time parameter gets close to the fastest observed RT. Treat convergence
+diagnostics as a hard requirement before interpreting hierarchical fits.
+
+For hierarchical models, start with a simple random-effects structure and use
+stricter sampler settings such as `adapt_delta = 0.99`. If divergences,
+problematic Rhat values, or weak effective sample sizes persist, simplify the
+model or reconsider whether the hierarchical LNR is appropriate for the
+current analysis.
 
 ```{r, eval=FALSE}
 model_hier <- lnr(rt = "rt", response = "response", n_alternatives = 2)
@@ -232,7 +243,7 @@ formula_hier <- bmf(
 
 fit_hier <- bmm(formula_hier, dat_hier, model_hier,
                 cores = 4, backend = "cmdstanr",
-                control = list(adapt_delta = 0.95))
+                control = list(adapt_delta = 0.99))
 ```
 
 # Default priors

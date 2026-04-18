@@ -58,6 +58,18 @@ test_that("lnr custom accepts num_alternatives", {
   expect_equal(model$other_vars$num_alternatives, c(target = 1, lure = 3))
 })
 
+test_that("lnr errors on version-specific alternative arguments", {
+  expect_error(
+    lnr(rt = "rt", response = "response", n_alternatives = 2,
+        num_alternatives = c(correct = 1, error = 1)),
+    "only supported for version 'custom'"
+  )
+  expect_error(
+    lnr(rt = "rt", response = "resp", version = "custom", n_alternatives = 2),
+    "only supported for version 'simple'"
+  )
+})
+
 # -----------------------------------------------------------------------------
 # Data validation tests (check_data — simple version)
 # -----------------------------------------------------------------------------
@@ -236,6 +248,80 @@ test_that("check_data.lnr_custom handles num_alternatives (column names)", {
   expect_equal(result$.lnr_n2, dat$n_lure)
 })
 
+test_that("check_data.lnr_custom requires exact num_alternatives names", {
+  model <- lnr(rt = "rt", response = "resp", version = "custom",
+               num_alternatives = c(target = 1, extra = 3))
+  model$other_vars$resp_cats <- c("target", "lure")
+  dat <- data.frame(
+    rt = runif(100, 0.4, 1.5),
+    resp = rep(c("target", "lure"), 50)
+  )
+
+  expect_error(
+    check_data(model, dat, bmf(target ~ 1, lure ~ 1, ndt ~ 1)),
+    "exactly the formula categories"
+  )
+})
+
+test_that("check_data.lnr_custom errors on invalid num_alternatives counts", {
+  model <- lnr(rt = "rt", response = "resp", version = "custom",
+               num_alternatives = c(target = 1, lure = 0))
+  model$other_vars$resp_cats <- c("target", "lure")
+  dat <- data.frame(
+    rt = runif(100, 0.4, 1.5),
+    resp = rep(c("target", "lure"), 50)
+  )
+
+  expect_error(
+    check_data(model, dat, bmf(target ~ 1, lure ~ 1, ndt ~ 1)),
+    "positive integers"
+  )
+
+  model$other_vars$num_alternatives <- c(target = 1, lure = Inf)
+  expect_error(
+    check_data(model, dat, bmf(target ~ 1, lure ~ 1, ndt ~ 1)),
+    "positive integers"
+  )
+})
+
+test_that("check_data.lnr_custom validates num_alternatives columns", {
+  model <- lnr(rt = "rt", response = "resp", version = "custom",
+               num_alternatives = c(target = "n_tgt", lure = "n_lure"))
+  model$other_vars$resp_cats <- c("target", "lure")
+  dat <- data.frame(
+    rt = runif(100, 0.4, 1.5),
+    resp = rep(c("target", "lure"), 50),
+    n_tgt = 1L,
+    n_lure = c(rep(3L, 99), NA_integer_)
+  )
+
+  expect_error(
+    check_data(model, dat, bmf(target ~ 1, lure ~ 1, ndt ~ 1)),
+    "contains NA values"
+  )
+
+  dat$n_lure <- c(rep(3, 99), 2.5)
+  expect_error(
+    check_data(model, dat, bmf(target ~ 1, lure ~ 1, ndt ~ 1)),
+    "integers >= 1"
+  )
+})
+
+test_that("check_data.lnr_custom errors on unsupported num_alternatives types", {
+  model <- lnr(rt = "rt", response = "resp", version = "custom",
+               num_alternatives = list(target = 1, lure = 3))
+  model$other_vars$resp_cats <- c("target", "lure")
+  dat <- data.frame(
+    rt = runif(100, 0.4, 1.5),
+    resp = rep(c("target", "lure"), 50)
+  )
+
+  expect_error(
+    check_data(model, dat, bmf(target ~ 1, lure ~ 1, ndt ~ 1)),
+    "must be NULL, a named numeric vector"
+  )
+})
+
 test_that("check_data.lnr_custom errors on mismatched response levels", {
   model <- lnr(rt = "rt", response = "resp", version = "custom")
   model$other_vars$resp_cats <- c("target", "lure")
@@ -258,6 +344,20 @@ test_that("check_data.lnr_custom errors on non-character responses", {
   expect_error(
     check_data(model, dat, bmf(target ~ 1, lure ~ 1, ndt ~ 1)),
     "character labels"
+  )
+})
+
+test_that("check_data.lnr_custom errors on reserved internal response levels", {
+  model <- lnr(rt = "rt", response = "resp", version = "custom")
+  model$other_vars$resp_cats <- c("target", "lure")
+  dat <- data.frame(
+    rt = runif(10, 0.4, 1.5),
+    resp = rep(c("target", "ndt"), 5)
+  )
+
+  expect_error(
+    check_data(model, dat, bmf(target ~ 1, lure ~ 1, ndt ~ 1)),
+    "reserved internal parameter names"
   )
 })
 
@@ -285,6 +385,16 @@ test_that("check_model.lnr_custom errors on Stan reserved words", {
   expect_error(
     check_model(model, formula = formula),
     "Stan reserved words"
+  )
+})
+
+test_that("check_model.lnr_custom errors on reserved internal parameter names", {
+  model <- lnr(rt = "rt", response = "resp", version = "custom")
+  formula <- bmf(mu ~ 1, ndt ~ 1)
+
+  expect_error(
+    check_model(model, formula = formula),
+    "reserved internal parameter names"
   )
 })
 
@@ -376,6 +486,58 @@ test_that("configure_model.lnr_simple returns correct components", {
   expect_equal(config$formula$family$name, "lnr_simple")
   expect_true("correct" %in% config$formula$family$dpars)
   expect_true("error" %in% config$formula$family$dpars)
+})
+
+test_that("configure_model.lnr_custom returns correct components", {
+  skip_on_cran()
+
+  model <- lnr(rt = "rt", response = "resp", version = "custom",
+               num_alternatives = c(fast = 1, slow = 3))
+  dat <- data.frame(
+    rt = runif(100, 0.4, 1.5),
+    resp = rep(c("fast", "slow"), 50)
+  )
+  formula <- bmf(fast ~ 1, slow ~ 1, ndt ~ 1)
+
+  model <- check_model(model, formula = formula)
+  dat <- check_data(model, dat, formula)
+  config <- configure_model(model, dat, formula)
+
+  expect_true(all(c("formula", "data", "stanvars") %in% names(config)))
+  expect_s3_class(config$formula, "brmsformula")
+  expect_s3_class(config$formula$family, "customfamily")
+  expect_equal(config$formula$family$name, "lnr_custom")
+  expect_equal(config$formula$family$dpars, c("mu", "fast", "slow", "ndt", "s"))
+})
+
+test_that("log_lik_lnr_simple matches dlnr for a 2-choice observation", {
+  prep <- structure(
+    list(
+      data = list(
+        Y = c(0.8, 0.9),
+        vint1 = c(1L, 2L),
+        vint2 = c(1L, 1L),
+        vint3 = c(1L, 1L)
+      ),
+      dpars = list(
+        correct = matrix(c(-1, -1), nrow = 1),
+        error = matrix(c(0, 0), nrow = 1),
+        ndt = matrix(c(0.2, 0.2), nrow = 1),
+        s = matrix(c(1, 1), nrow = 1)
+      ),
+      family = list(dpars = c("mu", "correct", "error", "ndt", "s"))
+    ),
+    class = "brmsprep"
+  )
+
+  expect_equal(
+    log_lik_lnr_simple(1, prep),
+    dlnr(0.8, 1, m = c(-1, 0), s = 1, ndt = 0.2, log = TRUE)
+  )
+  expect_equal(
+    log_lik_lnr_simple(2, prep),
+    dlnr(0.9, 2, m = c(-1, 0), s = 1, ndt = 0.2, log = TRUE)
+  )
 })
 
 # -----------------------------------------------------------------------------

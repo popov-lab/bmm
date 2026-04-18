@@ -23,7 +23,9 @@ response/choice. For the \code{"simple"} version, responses should be
 integer-coded: 1 = correct response, 2 through K = error responses.
 Factor and character-digit responses are accepted and converted
 automatically. For the \code{"custom"} version, responses should be character
-or factor labels matching the accumulator names in the formula.}
+or factor labels matching the accumulator names in the formula. Category
+names must not use reserved internal parameter names such as \code{"mu"},
+\code{"ndt"}, or \code{"s"}.}
 
 \item{n_alternatives}{An integer specifying the total number of response
 alternatives (K >= 2). Required for \code{version = "simple"}. Not used for
@@ -39,16 +41,17 @@ accumulators. The sdlog parameter \code{s} is shared and fixed by default
 of correct vs. error processing.
 \item \code{"custom"}: Per-category meanlog parameters. Response categories
 are defined by the formula LHS names (e.g., \verb{correct ~ 1, other ~ 1, npl ~ 1}). The response column must contain character labels matching
-these names. Supports per-category \code{num_alternatives}.
+these names. Category names must not be \code{"mu"}, \code{"ndt"}, \code{"s"},
+Stan reserved words, or names ending in a number. Supports
+per-category \code{num_alternatives}.
 }}
 
 \item{num_alternatives}{For \code{version = "custom"} only. A named vector
 specifying the number of racing accumulators per response category.
-Can be a named integer vector for constant counts (e.g.,
-\code{c(correct = 1, other = 3, npl = 5)}) or a named character vector
-of column names for trial-varying counts (e.g.,
-\code{c(correct = "n_corr", other = "n_other", npl = "n_npl")}). If omitted,
-defaults to 1 accumulator per category.}
+Can be a named integer vector of positive counts for constant numbers of
+accumulators (e.g., \code{c(correct = 1, other = 3, npl = 5)}) or a named
+character vector of column names whose values are positive integers for
+trial-varying counts (e.g., \code{c(correct = "n_corr", other = "n_other", npl = "n_npl")}). If omitted, defaults to 1 accumulator per category.}
 
 \item{links}{A named list of link functions for the model parameters.
 For \code{"simple"}: parameters are \code{correct}, \code{error}, \code{ndt}, and \code{s}.

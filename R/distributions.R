@@ -1152,6 +1152,15 @@ validate_cswald_parameters <- function(drift, bound, ndt, zr, s) {
 dlnr <- function(rt, response, m, s, ndt, log = FALSE) {
   validate_lnr_parameters(s, ndt)
   stopif(
+    !is.numeric(response) || anyNA(response),
+    "response must contain integers in 1:{length(m)}."
+  )
+  stopif(
+    any(response < 1) || any(response > length(m)) ||
+      any(response != round(response)),
+    "response must contain integers in 1:{length(m)}."
+  )
+  stopif(
     any(rt - ndt <= 0),
     "Some reaction times are smaller than the non-decision time. \\
     You need to specify a non-decision time 'ndt' smaller than \\
@@ -1210,13 +1219,13 @@ plnr <- function(q, response, m, s, ndt, lower.tail = TRUE, log.p = FALSE) {
       log_surv <- log_surv + stats::plnorm(t, meanlog = m[j], sdlog = s[j],
                                             lower.tail = FALSE, log.p = TRUE)
     }
-    log_p <- log(1 - exp(log_surv))
+    log_p <- log1p(-exp(log_surv))
   } else {
     stop2("Response-specific CDF for the LNR is not yet implemented. \\
            Omit the 'response' argument to get the marginal RT CDF.")
   }
 
-  if (!lower.tail) log_p <- log(1 - exp(log_p))
+  if (!lower.tail) log_p <- log1p(-exp(log_p))
   if (log.p) log_p else exp(log_p)
 }
 
@@ -1240,14 +1249,23 @@ qlnr <- function(p, m, s, ndt, lower.tail = TRUE, log.p = FALSE) {
       (1 - exp(log_surv)) - pi
     }
     upper <- ndt + stats::qlnorm(0.999, meanlog = max(m), sdlog = max(s))
+    while (cdf_fn(upper) < 0) {
+      upper <- ndt + 2 * (upper - ndt)
+    }
     stats::uniroot(cdf_fn, interval = c(ndt + 1e-10, upper),
                    tol = 1e-8)$root
   }, numeric(1))
 }
 
 validate_lnr_parameters <- function(s, ndt) {
-  stopif(any(s <= 0), "s (sdlog) must be positive.")
-  stopif(any(ndt < 0), "ndt (non-decision time) must be non-negative.")
+  stopif(
+    any(!is.finite(s)) || any(s <= 0),
+    "s (sdlog) must be finite and positive."
+  )
+  stopif(
+    any(!is.finite(ndt)) || any(ndt < 0),
+    "ndt (non-decision time) must be finite and non-negative."
+  )
 }
 
 

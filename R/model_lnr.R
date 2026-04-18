@@ -67,6 +67,8 @@
   "parameters"
 )
 
+.lnr_reserved_dpars <- c("mu", "ndt", "s")
+
 
 .model_lnr <- function(
     rt = NULL,
@@ -120,17 +122,19 @@
 #'   integer-coded: 1 = correct response, 2 through K = error responses.
 #'   Factor and character-digit responses are accepted and converted
 #'   automatically. For the `"custom"` version, responses should be character
-#'   or factor labels matching the accumulator names in the formula.
+#'   or factor labels matching the accumulator names in the formula. Category
+#'   names must not use reserved internal parameter names such as `"mu"`,
+#'   `"ndt"`, or `"s"`.
 #' @param n_alternatives An integer specifying the total number of response
 #'   alternatives (K >= 2). Required for `version = "simple"`. Not used for
 #'   `version = "custom"` (inferred from the formula).
 #' @param num_alternatives For `version = "custom"` only. A named vector
 #'   specifying the number of racing accumulators per response category.
-#'   Can be a named integer vector for constant counts (e.g.,
-#'   `c(correct = 1, other = 3, npl = 5)`) or a named character vector
-#'   of column names for trial-varying counts (e.g.,
-#'   `c(correct = "n_corr", other = "n_other", npl = "n_npl")`). If omitted,
-#'   defaults to 1 accumulator per category.
+#'   Can be a named integer vector of positive counts for constant numbers of
+#'   accumulators (e.g., `c(correct = 1, other = 3, npl = 5)`) or a named
+#'   character vector of column names whose values are positive integers for
+#'   trial-varying counts (e.g., `c(correct = "n_corr", other = "n_other",
+#'   npl = "n_npl")`). If omitted, defaults to 1 accumulator per category.
 #' @param version A character string specifying which version of the LNR model
 #'   to use. Options are:
 #'   \itemize{
@@ -142,7 +146,9 @@
 #'     \item `"custom"`: Per-category meanlog parameters. Response categories
 #'       are defined by the formula LHS names (e.g., `correct ~ 1, other ~ 1,
 #'       npl ~ 1`). The response column must contain character labels matching
-#'       these names. Supports per-category `num_alternatives`.
+#'       these names. Category names must not be `"mu"`, `"ndt"`, `"s"`,
+#'       Stan reserved words, or names ending in a number. Supports
+#'       per-category `num_alternatives`.
 #'   }
 #' @param links A named list of link functions for the model parameters.
 #'   For `"simple"`: parameters are `correct`, `error`, `ndt`, and `s`.
@@ -173,12 +179,20 @@ lnr <- function(rt, response, n_alternatives = NULL,
   version <- match.arg(version)
   if (version == "simple") {
     stopif(
+      !is.null(num_alternatives),
+      "num_alternatives is only supported for version 'custom'."
+    )
+    stopif(
       is.null(n_alternatives) || !is.numeric(n_alternatives) ||
         n_alternatives < 2 || n_alternatives != round(n_alternatives),
       "n_alternatives must be an integer >= 2 for version 'simple'."
     )
     n_alternatives <- as.integer(n_alternatives)
   } else {
+    stopif(
+      !is.null(n_alternatives),
+      "n_alternatives is only supported for version 'simple'. Use num_alternatives for version 'custom'."
+    )
     n_alternatives <- NULL
   }
   .model_lnr(
@@ -207,6 +221,12 @@ check_model.lnr_custom <- function(model, data = NULL, formula = NULL) {
     stopif(
       length(cat_pars) == 0,
       "Custom version requires at least one accumulator parameter in the formula."
+    )
+
+    bad_internal_names <- cat_pars[tolower(cat_pars) %in% .lnr_reserved_dpars]
+    stopif(
+      length(bad_internal_names) > 0,
+      "Category names cannot use reserved internal parameter names: {collapse_comma(bad_internal_names)}."
     )
 
     bad_names <- intersect(tolower(cat_pars), .stan_reserved)
@@ -340,7 +360,6 @@ check_data.lnr_custom <- function(model, data, formula) {
   response_var <- model$resp_vars$response
   cat_names <- model$other_vars$resp_cats
   num_alt <- model$other_vars$num_alternatives
-  n_cats <- length(cat_names)
 
   if (is.factor(data[, response_var])) {
     data[, response_var] <- as.character(data[, response_var])
@@ -353,6 +372,11 @@ check_data.lnr_custom <- function(model, data, formula) {
   )
 
   data_levels <- unique(data[, response_var])
+  bad_levels <- data_levels[tolower(data_levels) %in% .lnr_reserved_dpars]
+  stopif(
+    length(bad_levels) > 0,
+    "Response levels cannot use reserved internal parameter names: {collapse_comma(bad_levels)}."
+  )
   missing_in_formula <- setdiff(data_levels, cat_names)
   missing_in_data <- setdiff(cat_names, data_levels)
   stopif(
@@ -374,17 +398,41 @@ check_data.lnr_custom <- function(model, data, formula) {
     }
   } else if (is.numeric(num_alt)) {
     stopif(
-      !all(cat_names %in% names(num_alt)),
-      "num_alternatives must have names matching formula categories: \\
+      is.null(names(num_alt)) || any(names(num_alt) == "") ||
+        anyDuplicated(names(num_alt)) > 0,
+      "num_alternatives must be a uniquely named vector with one entry for each formula category: \\
       {collapse_comma(cat_names)}"
+    )
+    missing_cats <- setdiff(cat_names, names(num_alt))
+    extra_cats <- setdiff(names(num_alt), cat_names)
+    stopif(
+      length(missing_cats) > 0 || length(extra_cats) > 0,
+      "num_alternatives must have exactly the formula categories: \\
+      {collapse_comma(cat_names)}"
+    )
+    invalid_num_alt <- num_alt[
+      !is.finite(num_alt) | num_alt < 1 | num_alt != round(num_alt)
+    ]
+    stopif(
+      length(invalid_num_alt) > 0,
+      "num_alternatives must contain positive integers for each formula category. Invalid value(s): \\
+      {collapse_comma(glue::glue('{names(invalid_num_alt)} = {invalid_num_alt}'))}"
     )
     for (i in seq_along(cat_names)) {
       data[[paste0(".lnr_n", i)]] <- as.integer(num_alt[cat_names[i]])
     }
   } else if (is.character(num_alt)) {
     stopif(
-      !all(cat_names %in% names(num_alt)),
-      "num_alternatives must have names matching formula categories: \\
+      is.null(names(num_alt)) || any(names(num_alt) == "") ||
+        anyDuplicated(names(num_alt)) > 0,
+      "num_alternatives must be a uniquely named vector with one entry for each formula category: \\
+      {collapse_comma(cat_names)}"
+    )
+    missing_cats <- setdiff(cat_names, names(num_alt))
+    extra_cats <- setdiff(names(num_alt), cat_names)
+    stopif(
+      length(missing_cats) > 0 || length(extra_cats) > 0,
+      "num_alternatives must have exactly the formula categories: \\
       {collapse_comma(cat_names)}"
     )
     missing_cols <- setdiff(num_alt, colnames(data))
@@ -394,11 +442,33 @@ check_data.lnr_custom <- function(model, data, formula) {
       in the data."
     )
     for (i in seq_along(cat_names)) {
-      data[[paste0(".lnr_n", i)]] <- as.integer(data[, num_alt[cat_names[i]]])
+      col_name <- num_alt[cat_names[i]]
+      col_vals <- data[, col_name]
+      stopif(
+        !is.numeric(col_vals),
+        "num_alternatives column '{col_name}' must be numeric."
+      )
+      stopif(
+        anyNA(col_vals),
+        "num_alternatives column '{col_name}' contains NA values."
+      )
+      stopif(
+        any(!is.finite(col_vals)),
+        "num_alternatives column '{col_name}' contains non-finite values."
+      )
+      stopif(
+        any(col_vals < 1 | col_vals != round(col_vals)),
+        "num_alternatives column '{col_name}' must contain integers >= 1."
+      )
+      data[[paste0(".lnr_n", i)]] <- as.integer(col_vals)
     }
+  } else {
+    stop2(
+      "num_alternatives must be NULL, a named numeric vector of positive integers, \\
+      or a named character vector of column names."
+    )
   }
 
-  model$other_vars$n_alternatives <- n_cats
   NextMethod("check_data")
 }
 
