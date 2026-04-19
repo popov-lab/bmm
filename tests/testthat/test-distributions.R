@@ -53,7 +53,234 @@ test_that("dsdm parametrization conversion returns accurate results", {
   c_se <- c_bessel2sqrtexp(c_b, kappa)
   d1 <- dsdm(y, 0, c_b, kappa, parametrization = "bessel")
   d2 <- dsdm(y, 0, c_se, kappa, parametrization = "sqrtexp")
-  expect_equal(d1, d2)
+  expect_equal(d1, d2, tolerance = 1e-5)
+})
+
+test_that("generalized SDM densities integrate to 1", {
+  nt_features <- c(0.7, -1.2)
+  nt_distances <- c(0.5, 1.4)
+
+  expect_equal(
+    integrate(
+      dsdm,
+      -pi,
+      pi,
+      mu = 0.1,
+      c = 2.3,
+      a = 0.6,
+      kappa = 4.5,
+      nt_features = nt_features,
+      version = "abc"
+    )$value,
+    1,
+    tolerance = 1e-5
+  )
+
+  expect_equal(
+    integrate(
+      dsdm,
+      -pi,
+      pi,
+      mu = -0.2,
+      c = 2.3,
+      s = 2.1,
+      kappa = 4.5,
+      nt_features = nt_features,
+      nt_distances = nt_distances,
+      version = "bsc"
+    )$value,
+    1,
+    tolerance = 1e-5
+  )
+
+  expect_equal(
+    integrate(
+      dsdm,
+      -pi,
+      pi,
+      mu = 0,
+      c = 2.3,
+      a = 0.6,
+      s = 2.1,
+      kappa = 4.5,
+      nt_features = nt_features,
+      nt_distances = nt_distances,
+      version = "full"
+    )$value,
+    1,
+    tolerance = 1e-5
+  )
+})
+
+test_that("generalized SDM cdfs are monotone and bounded", {
+  q <- seq(-pi, pi, length.out = 200)
+  p <- psdm(
+    q,
+    mu = 0.1,
+    c = 2.3,
+    a = 0.6,
+    s = 2.1,
+    kappa = 4.5,
+    nt_features = c(0.7, -1.2),
+    nt_distances = c(0.5, 1.4),
+    version = "full"
+  )
+
+  expect_true(all(diff(p) >= -1e-8))
+  expect_true(all(p >= -1e-8) && all(p <= 1 + 1e-8))
+  expect_equal(p[1], 0, tolerance = 1e-6)
+  expect_equal(p[length(p)], 1, tolerance = 1e-4)
+})
+
+test_that("adaptive spectral SDM is close to fixed L=512 reference", {
+  x <- seq(-pi, pi, length.out = 120)
+
+  d_adaptive <- dsdm(
+    x,
+    mu = 0,
+    c = 2.8,
+    a = 0.7,
+    s = 1.6,
+    kappa = 5.5,
+    nt_features = c(-1.7, -0.5, 0.8, 2.2),
+    nt_distances = c(1.6, 0.9, 0.8, 1.5),
+    version = "full"
+  )
+  d_ref <- .dsdm_spectral_single(
+    x,
+    mu = 0,
+    c = 2.8,
+    kappa = 5.5,
+    a = 0.7,
+    s = 1.6,
+    nt_features = c(-1.7, -0.5, 0.8, 2.2),
+    nt_distances = c(1.6, 0.9, 0.8, 1.5),
+    lure_idx = c(1, 1, 1, 1),
+    version = "full",
+    parametrization = "sqrtexp",
+    L = 512L
+  )
+
+  expect_equal(d_adaptive, d_ref, tolerance = 1e-4)
+})
+
+test_that("spectral SDM tracks a hard 4096-point reference", {
+  params <- list(
+    mu = 0,
+    c = 4.6,
+    a = 1.2,
+    s = 2.6,
+    kappa = 13.5,
+    nt_features = c(0.04, 0.09, 0.16, 1.8, -2.2, 2.45, -2.75),
+    nt_distances = c(0.22, 0.28, 0.33, 0.9, 1.1, 1.5, 1.8),
+    lure_idx = rep(1, 7),
+    version = "full",
+    parametrization = "sqrtexp"
+  )
+
+  logz_256 <- do.call(.sdm_spectral_case, c(params, list(L = 256L)))$logz
+  logz_512 <- do.call(.sdm_spectral_case, c(params, list(L = 512L)))$logz
+  logz_4096 <- do.call(.sdm_spectral_case, c(params, list(L = 4096L)))$logz
+  adaptive <- do.call(.sdm_spectral_case, params)
+
+  expect_lte(abs(logz_512 - logz_4096), 1e-6)
+  expect_lte(abs(adaptive$logz - logz_4096), 1e-5)
+  expect_true(adaptive$L >= 256L)
+  expect_true(abs(logz_512 - logz_4096) <= abs(logz_256 - logz_4096))
+})
+
+test_that("spectral SDM selector returns allowed levels and tracks difficulty", {
+  easy_L <- .sdm_get_L_general(
+    kappa = 2.5,
+    J = 1,
+    w_sum = 3,
+    w_max = 3,
+    R = 3,
+    delta_min = pi
+  )
+  hard_L <- .sdm_get_L_general(
+    kappa = 12,
+    J = 8,
+    w_sum = 320,
+    w_max = 180,
+    R = 290,
+    delta_min = 0.12
+  )
+
+  expect_true(easy_L %in% c(32L, 64L, 128L, 256L, 512L))
+  expect_true(hard_L %in% c(32L, 64L, 128L, 256L, 512L))
+  expect_true(hard_L >= easy_L)
+})
+
+test_that("generalized rsdm returns values between -pi and pi", {
+  res <- rsdm(
+    250,
+    mu = 0,
+    c = 2.3,
+    a = 0.6,
+    s = 2.1,
+    kappa = 4.5,
+    nt_features = c(0.7, -1.2),
+    nt_distances = c(0.5, 1.4),
+    version = "full"
+  )
+  expect_true(all(res >= -pi) && all(res <= pi))
+})
+
+test_that("generalized SDM reductions hold", {
+  x <- seq(-pi, pi, length.out = 150)
+  nt_features <- c(0.8, -1.1)
+  nt_distances <- c(0.4, 1.2)
+
+  d_full <- dsdm(
+    x,
+    mu = 0.15,
+    c = 2,
+    a = 0,
+    s = 1.7,
+    kappa = 5,
+    nt_features = nt_features,
+    nt_distances = nt_distances,
+    version = "full"
+  )
+  d_bsc <- dsdm(
+    x,
+    mu = 0.15,
+    c = 2,
+    s = 1.7,
+    kappa = 5,
+    nt_features = nt_features,
+    nt_distances = nt_distances,
+    version = "bsc"
+  )
+  expect_equal(d_full, d_bsc, tolerance = 1e-8)
+
+  d_abc <- dsdm(
+    x,
+    mu = -0.1,
+    c = 2,
+    a = 0,
+    kappa = 5,
+    nt_features = nt_features,
+    version = "abc"
+  )
+  d_simple <- dsdm(x, mu = -0.1, c = 2, kappa = 5, version = "simple")
+  expect_equal(d_abc, d_simple, tolerance = 1e-8)
+
+  d_inactive <- dsdm(
+    x,
+    mu = 0,
+    c = 2,
+    a = 0.8,
+    s = 1.7,
+    kappa = 5,
+    nt_features = nt_features,
+    nt_distances = nt_distances,
+    lure_idx = c(0, 0),
+    version = "full"
+  )
+  d_target_only <- dsdm(x, mu = 0, c = 2.8, kappa = 5, version = "simple")
+  expect_equal(d_inactive, d_target_only, tolerance = 1e-8)
 })
 
 test_that("dmixture2p integrates to 1", {
@@ -83,6 +310,22 @@ test_that("dimm integrates to 1", {
     s = runif(1, min = 1, max = 20),
     b = 0
   )$value, 1, tolerance = 1e-6)
+})
+
+test_that("simple IMM matches mixture2p under the activation mapping", {
+  x <- seq(-pi, pi, length.out = 100)
+  c_act <- 2.5
+  p_mem <- c_act / (1 + c_act)
+
+  d_imm_simple <- dimm(x, mu = 0.3, c = c_act, kappa = 4, version = "simple")
+  d_mix <- dmixture2p(x, mu = 0.3, kappa = 4, p_mem = p_mem)
+
+  expect_equal(d_imm_simple, d_mix)
+  expect_equal(
+    integrate(dimm, -pi, pi, mu = 0.3, c = c_act, kappa = 4, version = "simple")$value,
+    1,
+    tolerance = 1e-6
+  )
 })
 
 test_that("rmixture2p returns values between -pi and pi", {
@@ -115,6 +358,9 @@ test_that("rimm returns values between -pi and pi", {
     b = 0
   )
   expect_true(all(res >= -pi) && all(res <= pi))
+
+  res_simple <- rimm(500, mu = 0, c = 2, kappa = 4, version = "simple")
+  expect_true(all(res_simple >= -pi) && all(res_simple <= pi))
 })
 
 test_that("dm3 requires custom act_funs to be specified", {

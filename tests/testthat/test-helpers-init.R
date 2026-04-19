@@ -424,3 +424,37 @@ test_that("initfun output matches standata dimensions for no-intercept models", 
     )
   }
 })
+
+test_that("initfun handles generalized SDM full without producing NaNs", {
+  dat <- oberauer_lin_2017
+
+  ff <- bmf(
+    kappa ~ 0 + set_size + (0 + set_size || ID),
+    c ~ 0 + set_size + (0 + set_size || ID),
+    a ~ 0 + set_size + (0 + set_size || ID),
+    s ~ 0 + set_size + (0 + set_size || ID)
+  )
+  mod <- sdm(
+    resp_error = "dev_rad",
+    nt_features = paste0("col_nt", 1:7),
+    nt_distances = paste0("dist_nt", 1:7),
+    set_size = "set_size",
+    version = "full"
+  )
+  checked_data <- check_data(mod, dat, ff)
+  config_args <- configure_model(mod, checked_data, ff)
+  prior <- configure_prior(mod, checked_data, config_args$formula, brms::empty_prior())
+
+  init_fun <- create_initfun(
+    mod, checked_data, config_args$formula,
+    prior = prior,
+    stanvars = config_args$stanvars
+  )
+  inits <- init_fun()
+
+  expect_true(all(is.finite(unlist(inits))))
+  expect_true(all(paste0("par_b_a_", 2:8) %in% names(inits)))
+  expect_true(all(paste0("par_b_s_", 2:8) %in% names(inits)))
+  expect_true(all(paste0("par_sd_3_", 2:8) %in% names(inits)))
+  expect_true(all(paste0("par_sd_4_", 2:8) %in% names(inits)))
+})

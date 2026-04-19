@@ -8,22 +8,65 @@
 \alias{rsdm}
 \title{Distribution functions for the Signal Discrimination Model (SDM)}
 \usage{
-dsdm(x, mu = 0, c = 3, kappa = 3.5, log = FALSE, parametrization = "sqrtexp")
+dsdm(
+  x,
+  mu = 0,
+  c = 3,
+  kappa = 3.5,
+  a = 0,
+  s = 1,
+  nt_features = NULL,
+  nt_distances = NULL,
+  lure_idx = NULL,
+  version = "simple",
+  log = FALSE,
+  parametrization = "sqrtexp"
+)
 
 psdm(
   q,
   mu = 0,
   c = 3,
   kappa = 3.5,
+  a = 0,
+  s = 1,
+  nt_features = NULL,
+  nt_distances = NULL,
+  lure_idx = NULL,
   lower.tail = TRUE,
   log.p = FALSE,
   lower.bound = -pi,
+  version = "simple",
   parametrization = "sqrtexp"
 )
 
-qsdm(p, mu = 0, c = 3, kappa = 3.5, parametrization = "sqrtexp")
+qsdm(
+  p,
+  mu = 0,
+  c = 3,
+  kappa = 3.5,
+  a = 0,
+  s = 1,
+  nt_features = NULL,
+  nt_distances = NULL,
+  lure_idx = NULL,
+  version = "simple",
+  parametrization = "sqrtexp"
+)
 
-rsdm(n, mu = 0, c = 3, kappa = 3.5, parametrization = "sqrtexp")
+rsdm(
+  n,
+  mu = 0,
+  c = 3,
+  kappa = 3.5,
+  a = 0,
+  s = 1,
+  nt_features = NULL,
+  nt_distances = NULL,
+  lure_idx = NULL,
+  version = "simple",
+  parametrization = "sqrtexp"
+)
 }
 \arguments{
 \item{x}{Vector of quantiles}
@@ -33,6 +76,24 @@ rsdm(n, mu = 0, c = 3, kappa = 3.5, parametrization = "sqrtexp")
 \item{c}{Vector of memory strength values}
 
 \item{kappa}{Vector of precision values}
+
+\item{a}{Vector of cue-independent activation values for the generalized SDM
+variants.}
+
+\item{s}{Vector of spatial similarity gradients for the generalized SDM
+variants.}
+
+\item{nt_features}{Numeric vector, matrix, or list of non-target feature
+values centered relative to the target.}
+
+\item{nt_distances}{Numeric vector, matrix, or list of non-target distances to
+the cued target.}
+
+\item{lure_idx}{Optional numeric vector, matrix, or list of 0/1 indicators
+specifying which non-target slots are active. If \code{NULL}, all supplied
+non-targets are treated as active.}
+
+\item{version}{Character. One of \code{"simple"}, \code{"abc"}, \code{"bsc"}, or \code{"full"}.}
 
 \item{log}{Logical; if \code{TRUE}, values are returned on the log scale.}
 
@@ -63,9 +124,7 @@ calculating the density of the SDM distribution.
 }
 \description{
 Density, distribution function, and random generation for the
-Signal Discrimination Model (SDM) Distribution with location \code{mu},
-memory strength \code{c}, and precision \code{kappa}. Currently only a
-single activation source is supported.
+Signal Discrimination Model (SDM) distribution.
 }
 \details{
 \strong{Parametrization}

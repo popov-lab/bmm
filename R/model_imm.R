@@ -5,10 +5,32 @@
 .model_imm <- function(resp_error = NULL, nt_features = NULL, nt_distances = NULL,
                        set_size = NULL, regex = FALSE, version = "full", links = NULL,
                        call = NULL, ...) {
+  version <- match.arg(version, c("simple", "full", "bsc", "abc"))
+  simple_version <- version == "simple"
+  regex_vars <- if (simple_version) character(0) else c("nt_features", "nt_distances")
+  classes <- if (simple_version) {
+    c("bmmodel", "circular", "imm", paste0("imm_", version))
+  } else {
+    c("bmmodel", "circular", "non_targets", "imm", paste0("imm_", version))
+  }
+  requirements <- if (simple_version) {
+    glue(
+      "- The response vairable should be in radians and \\
+        represent the angular error relative to the target"
+    )
+  } else {
+    glue(
+      "- The response vairable should be in radians and \\
+        represent the angular error relative to the target
+        - The non-target features should be in radians and be \\
+        centered relative to the target"
+    )
+  }
+
   out <- structure(
     list(
       resp_vars = nlist(resp_error),
-      other_vars = nlist(nt_features, nt_distances, set_size),
+      other_vars = if (simple_version) nlist() else nlist(nt_features, nt_distances, set_size),
       domain = "Visual working memory",
       task = "Continuous reproduction",
       name = "Interference measurement model by Oberauer and Lin (2017).",
@@ -17,12 +39,7 @@
         "Oberauer, K., & Lin, H.Y. (2017). An interference model \\
           of visual working memory. Psychological Review, 124(1), 21-59"
       ),
-      requirements = glue(
-        "- The response vairable should be in radians and \\
-          represent the angular error relative to the target
-          - The non-target features should be in radians and be \\
-          centered relative to the target"
-      ),
+      requirements = requirements,
       parameters = list(
         mu1 = glue(
           "Location parameter of the von Mises distribution for memory \\
@@ -51,14 +68,23 @@
       void_mu = FALSE
     ),
     # attributes
-    regex = regex,
-    regex_vars = c("nt_features", "nt_distances"),
-    class = c("bmmodel", "circular", "non_targets", "imm", paste0("imm_", version)),
+    regex = regex && !simple_version,
+    regex_vars = regex_vars,
+    class = classes,
     call = call
   )
 
   # add version specific information
-  if (version == "abc") {
+  if (simple_version) {
+    out$parameters$a <- NULL
+    out$parameters$c <- "Cue-dependent target activation relative to a fixed background"
+    out$parameters$s <- NULL
+    out$default_priors$a <- NULL
+    out$default_priors$c <- list(main = "logistic(0, 1)")
+    out$default_priors$s <- NULL
+    out$links$a <- NULL
+    out$links$s <- NULL
+  } else if (version == "abc") {
     out$parameters$s <- NULL
     out$links$s <- NULL
     out$default_priors$s <- NULL
@@ -76,12 +102,16 @@
 # user facing alias
 
 #' @title `r .model_imm()$name`
-#' @description Three versions of the `r .model_imm()$name` - the full, bsc, and abc.
+#' @description Four versions of the `r .model_imm()$name` - the simple, full,
+#'   bsc, and abc.
 #' `IMMfull()`, `IMMbsc()`, and `IMMabc()` are deprecated and will be removed in the future.
-#' Please use `imm(version = 'full')`, `imm(version = 'bsc')`, or `imm(version = 'abc')` instead.
+#' Please use `imm(version = 'simple')`, `imm(version = 'full')`,
+#' `imm(version = 'bsc')`, or `imm(version = 'abc')` instead.
 #'
 #' @name imm
 #' @details `r model_info(.model_imm(), components =c('domain', 'task', 'name', 'citation'))`
+#' #### Version: `simple`
+#' `r model_info(.model_imm(version = "simple"), components = c('requirements', 'parameters', 'fixed_parameters', 'links', 'prior'))`
 #' #### Version: `full`
 #' `r model_info(.model_imm(version = "full"), components = c('requirements', 'parameters', 'fixed_parameters', 'links', 'prior'))`
 #' #### Version: `bsc`
@@ -115,7 +145,7 @@
 #'   are interpreted as a regular expression to match the non-target feature
 #'   columns in the dataset.
 #' @param version Character. The version of the IMM model to use. Can be one of
-#'  `full`, `bsc`, or `abc`. The default is `full`.
+#'  `"simple"`, `"full"`, `"bsc"`, or `"abc"`. The default is `"full"`.
 #' @param ... used internally for testing, ignore it
 #' @return An object of class `bmmodel`
 #' @keywords bmmodel
@@ -184,15 +214,37 @@
 #'   backend = "cmdstanr"
 #' )
 #' @export
-imm <- function(resp_error, nt_features, nt_distances, set_size, regex = FALSE, version = "full", ...) {
+imm <- function(resp_error, nt_features = NULL, nt_distances = NULL, set_size = NULL,
+                regex = FALSE, version = "full", ...) {
   call <- match.call()
   dots <- list(...)
+  version <- match.arg(version, c("simple", "full", "bsc", "abc"))
+
   if ("setsize" %in% names(dots)) {
     set_size <- dots$setsize
     warning2("The argument 'setsize' is deprecated. Please use 'set_size' instead.")
   }
-  if (version == "abc") nt_distances <- NULL
-  stop_missing_args()
+
+  missing_args <- c()
+  if (missing(resp_error)) missing_args <- c(missing_args, "resp_error")
+  if (version != "simple" && missing(nt_features)) missing_args <- c(missing_args, "nt_features")
+  if (version %in% c("full", "bsc") && missing(nt_distances)) {
+    missing_args <- c(missing_args, "nt_distances")
+  }
+  if (version != "simple" && missing(set_size)) missing_args <- c(missing_args, "set_size")
+  stopif(
+    length(missing_args) > 0,
+    "The following required arguments are missing in imm(): \\
+    {paste(missing_args, collapse = ', ')}"
+  )
+
+  if (version == "simple") {
+    nt_features <- NULL
+    nt_distances <- NULL
+    set_size <- NULL
+  } else if (version == "abc") {
+    nt_distances <- NULL
+  }
 
   .model_imm(
     resp_error = resp_error, nt_features = nt_features,
@@ -276,6 +328,18 @@ check_data.imm_full <- function(model, data, formula) {
     nmix = c(1, max_set_size),
     order = "none"
   )
+}
+
+#' @export
+configure_model.imm_simple <- function(model, data, formula) {
+  formula <- bmf2bf(model, formula) +
+    brms::lf(kappa2 ~ 1, mu2 ~ 1) +
+    brms::nlf(kappa1 ~ kappa) +
+    brms::nlf(theta1 ~ c)
+
+  formula$family <- brms::mixture("von_mises", "von_mises", order = "none")
+
+  nlist(formula, data)
 }
 
 #' @export

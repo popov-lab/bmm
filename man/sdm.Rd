@@ -5,7 +5,15 @@
 \alias{sdmSimple}
 \title{Signal Discrimination Model (SDM) by Oberauer (2023)}
 \usage{
-sdm(resp_error, version = "simple", ...)
+sdm(
+  resp_error,
+  nt_features = NULL,
+  nt_distances = NULL,
+  set_size = NULL,
+  regex = FALSE,
+  version = "simple",
+  ...
+)
 
 sdmSimple(resp_error, version = "simple", ...)
 }
@@ -15,8 +23,25 @@ response error. The response error should code the response relative to the
 to-be-recalled target in radians. You can transform the response error in
 degrees to radians using the \code{deg2rad} function.}
 
-\item{version}{Character. The version of the model to use. Currently only
-"simple" is supported.}
+\item{nt_features}{A character vector with the names of the non-target
+variables. The non-target variables should be in radians and centered
+relative to the target. Only required for the \code{abc}, \code{bsc}, and \code{full}
+versions.}
+
+\item{nt_distances}{A character vector with the names of the columns
+containing the distances of non-target items to the cued target. Only
+required for the \code{bsc} and \code{full} versions.}
+
+\item{set_size}{Name of the column containing the set size variable (if
+set_size varies) or a numeric value for the set_size, if the set_size is
+fixed. Only required for the \code{abc}, \code{bsc}, and \code{full} versions.}
+
+\item{regex}{Logical. If TRUE, the \code{nt_features} and \code{nt_distances}
+arguments are interpreted as regular expressions to match columns in the
+dataset.}
+
+\item{version}{Character. The version of the model to use. One of
+\code{"simple"}, \code{"abc"}, \code{"bsc"}, or \code{"full"}.}
 
 \item{...}{used internally for testing, ignore it}
 }
@@ -44,7 +69,7 @@ and how to use it. * \strong{Domain:} Visual working memory
 \item \strong{Parameters:}
 \itemize{
 \item \code{mu}: Location parameter of the SDM distribution (in radians; by default fixed internally to 0)
-\item \code{c}: Memory strength parameter of the SDM distribution
+\item \code{c}: Cue-dependent activation of the target representation
 \item \code{kappa}: Precision parameter of the SDM distribution
 }
 \item \strong{Fixed parameters:}
@@ -76,7 +101,7 @@ and how to use it. * \strong{Domain:} Visual working memory
 }
 \examples{
 \dontshow{if (isTRUE(Sys.getenv("BMM_EXAMPLES"))) withAutoprint(\{ # examplesIf}
-# simulate data from the model
+# simulate data from the simple SDM
 dat <- data.frame(y = rsdm(n = 1000, c = 4, kappa = 3))
 
 # specify formula

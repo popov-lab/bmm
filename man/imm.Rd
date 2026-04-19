@@ -9,9 +9,9 @@
 \usage{
 imm(
   resp_error,
-  nt_features,
-  nt_distances,
-  set_size,
+  nt_features = NULL,
+  nt_distances = NULL,
+  set_size = NULL,
   regex = FALSE,
   version = "full",
   ...
@@ -49,7 +49,7 @@ are interpreted as a regular expression to match the non-target feature
 columns in the dataset.}
 
 \item{version}{Character. The version of the IMM model to use. Can be one of
-\code{full}, \code{bsc}, or \code{abc}. The default is \code{full}.}
+\code{"simple"}, \code{"full"}, \code{"bsc"}, or \code{"abc"}. The default is \code{"full"}.}
 
 \item{...}{used internally for testing, ignore it}
 }
@@ -57,9 +57,11 @@ columns in the dataset.}
 An object of class \code{bmmodel}
 }
 \description{
-Three versions of the Interference measurement model by Oberauer and Lin (2017). - the full, bsc, and abc.
+Four versions of the Interference measurement model by Oberauer and Lin (2017). - the simple, full,
+bsc, and abc.
 \code{IMMfull()}, \code{IMMbsc()}, and \code{IMMabc()} are deprecated and will be removed in the future.
-Please use \code{imm(version = 'full')}, \code{imm(version = 'bsc')}, or \code{imm(version = 'abc')} instead.
+Please use \code{imm(version = 'simple')}, \code{imm(version = 'full')},
+\code{imm(version = 'bsc')}, or \code{imm(version = 'abc')} instead.
 }
 \details{
 \itemize{
@@ -71,6 +73,47 @@ Please use \code{imm(version = 'full')}, \code{imm(version = 'bsc')}, or \code{i
 \item Oberauer, K., & Lin, H.Y. (2017). An interference model of visual working memory. Psychological Review, 124(1), 21-59
 }
 }
+\subsection{Version: \code{simple}}{
+\itemize{
+\item \strong{Requirements:}
+\itemize{
+\item The response vairable should be in radians and represent the angular error relative to the target
+}
+\item \strong{Parameters:}
+\itemize{
+\item \code{mu1}: Location parameter of the von Mises distribution for memory responses (in radians). Fixed internally to 0 by default.
+\item \code{kappa}: Concentration parameter of the von Mises distribution
+\item \code{c}: Cue-dependent target activation relative to a fixed background
+}
+\item \strong{Fixed parameters:}
+\itemize{
+\item \code{mu1} = 0
+\item \code{mu2} = 0
+\item \code{kappa2} = -100
+}
+\item \strong{Default parameter links:}
+\itemize{
+\item mu1 = tan_half; kappa = log; c = log
+}
+\item \strong{Default priors:}
+\itemize{
+\item \code{mu1}:
+\itemize{
+\item \code{main}: student_t(1, 0, 1)
+}
+\item \code{kappa}:
+\itemize{
+\item \code{main}: normal(2, 1)
+\item \code{effects}: normal(0, 1)
+}
+\item \code{c}:
+\itemize{
+\item \code{main}: logistic(0, 1)
+}
+}
+}
+}
+
 \subsection{Version: \code{full}}{
 \itemize{
 \item \strong{Requirements:}

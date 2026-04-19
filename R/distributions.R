@@ -38,9 +38,7 @@ rejection_sampling <- function(n, f, max_f, proposal_fun, ...) {
 #' @title Distribution functions for the Signal Discrimination Model (SDM)
 #'
 #' @description Density, distribution function, and random generation for the
-#'   Signal Discrimination Model (SDM) Distribution with location `mu`,
-#'   memory strength `c`, and precision `kappa`. Currently only a
-#'   single activation source is supported.
+#'   Signal Discrimination Model (SDM) distribution.
 #'
 #' @name SDMdist
 #'
@@ -51,6 +49,18 @@ rejection_sampling <- function(n, f, max_f, proposal_fun, ...) {
 #' @param mu Vector of location values in radians
 #' @param c Vector of memory strength values
 #' @param kappa Vector of precision values
+#' @param a Vector of cue-independent activation values for the generalized SDM
+#'   variants.
+#' @param s Vector of spatial similarity gradients for the generalized SDM
+#'   variants.
+#' @param nt_features Numeric vector, matrix, or list of non-target feature
+#'   values centered relative to the target.
+#' @param nt_distances Numeric vector, matrix, or list of non-target distances to
+#'   the cued target.
+#' @param lure_idx Optional numeric vector, matrix, or list of 0/1 indicators
+#'   specifying which non-target slots are active. If `NULL`, all supplied
+#'   non-targets are treated as active.
+#' @param version Character. One of `"simple"`, `"abc"`, `"bsc"`, or `"full"`.
 #' @param log Logical; if `TRUE`, values are returned on the log scale.
 #' @param parametrization Character; either `"bessel"` or `"sqrtexp"`
 #'   (default). See [the online article](https://venpopov.com/bmm/articles/bmm_sdm_simple.html) for details on the
@@ -120,101 +130,248 @@ rejection_sampling <- function(n, f, max_f, proposal_fun, ...) {
 #' d <- dsdm(x, mu = 0, c = 3.1, kappa = 5)
 #' hist(r, breaks = 60, freq = FALSE)
 #' lines(x, d, type = "l", col = "red")
-dsdm <- function(x, mu = 0, c = 3, kappa = 3.5, log = FALSE,
-                 parametrization = "sqrtexp") {
+dsdm <- function(x, mu = 0, c = 3, kappa = 3.5, a = 0, s = 1,
+                 nt_features = NULL, nt_distances = NULL, lure_idx = NULL,
+                 version = "simple", log = FALSE, parametrization = "sqrtexp") {
+  version <- match.arg(version, c("simple", "full", "bsc", "abc"))
   stopif(isTRUE(any(kappa < 0)), "kappa must be non-negative")
   stopif(isTRUE(any(c < 0)), "c must be non-negative")
-
-  .dsdm_numer <- switch(parametrization,
-    bessel = .dsdm_numer_bessel,
-    sqrtexp = .dsdm_numer_sqrtexp,
-    stop2("Parametrization must be one of 'bessel' or 'sqrtexp'")
+  if (version %in% c("abc", "full")) {
+    stopif(isTRUE(any(a < 0)), "a must be non-negative")
+  }
+  if (version %in% c("bsc", "full")) {
+    stopif(isTRUE(any(s < 0)), "s must be non-negative")
+  }
+  params <- .sdm_prepare_cases(
+    x = x,
+    mu = mu,
+    c = c,
+    kappa = kappa,
+    a = a,
+    s = s,
+    nt_features = nt_features,
+    nt_distances = nt_distances,
+    lure_idx = lure_idx,
+    version = version
   )
 
-  lnumerator <- .dsdm_numer(x, mu, c, kappa, log = TRUE)
-
-  denom <- if (any(length(mu) > 1, length(c) > 1, length(kappa) > 1)) {
-    .dsdm_integrate_numer_v(.dsdm_numer, mu, c, kappa, lower = mu, upper = mu + pi)
-  } else {
-    .dsdm_integrate_numer(.dsdm_numer, mu, c, kappa, lower = mu, upper = mu + pi)
-  }
-
-  denom <- 2 * denom
-
-  if (!log) {
-    return(exp(lnumerator) / denom)
-  }
-  lnumerator - log(denom)
-}
-
-#' @rdname SDMdist
-#' @export
-psdm <- function(q, mu = 0, c = 3, kappa = 3.5, lower.tail = TRUE, log.p = FALSE,
-                 lower.bound = -pi, parametrization = "sqrtexp") {
-  # parts adapted from brms::pvon_mises
-  stopif(isTRUE(any(kappa < 0)), "kappa must be non-negative")
-  stopif(isTRUE(any(c < 0)), "c must be non-negative")
-
-  pi <- base::pi
-  pi2 <- 2 * pi
-  q <- (q + pi) %% pi2
-  mu <- (mu + pi) %% pi2
-  lower.bound <- (lower.bound + pi) %% pi2
-
-  .dsdm_integrate <- function(mu, c, kappa, lower, upper, parametrization) {
-    stats::integrate(dsdm,
-      lower = lower, upper = upper, mu, c, kappa,
+  if (params$n_cases == 1L) {
+    return(.dsdm_spectral_single(
+      x = x,
+      mu = params$mu[1],
+      c = params$c[1],
+      kappa = params$kappa[1],
+      a = params$a[1],
+      s = params$s[1],
+      nt_features = params$nt_features[[1]],
+      nt_distances = params$nt_distances[[1]],
+      lure_idx = params$lure_idx[[1]],
+      version = version,
+      log = log,
       parametrization = parametrization
-    )$value
+    ))
   }
 
-  .dsdm_integrate_v <- Vectorize(.dsdm_integrate)
+  out <- mapply(
+    FUN = function(xi, mui, ci, kappai, ai, si, ntfi, ntdi, lurei) {
+      .dsdm_spectral_single(
+        x = xi,
+        mu = mui,
+        c = ci,
+        kappa = kappai,
+        a = ai,
+        s = si,
+        nt_features = ntfi,
+        nt_distances = ntdi,
+        lure_idx = lurei,
+        version = version,
+        log = log,
+        parametrization = parametrization
+      )
+    },
+    xi = params$x,
+    mui = params$mu,
+    ci = params$c,
+    kappai = params$kappa,
+    ai = params$a,
+    si = params$s,
+    ntfi = params$nt_features,
+    ntdi = params$nt_distances,
+    lurei = params$lure_idx,
+    SIMPLIFY = TRUE,
+    USE.NAMES = FALSE
+  )
 
-  if (any(length(q) > 1, length(mu) > 1, length(c) > 1, length(kappa) > 1)) {
-    out <- .dsdm_integrate_v(mu, c, kappa,
-      lower = lower.bound, upper = q,
-      parametrization = parametrization
-    )
-  } else {
-    out <- .dsdm_integrate(mu, c, kappa,
-      lower = lower.bound, upper = q,
-      parametrization = parametrization
-    )
-  }
-
-  if (!lower.tail) {
-    out <- 1 - out
-  }
-  if (log.p) {
-    out <- log(out)
-  }
   out
 }
 
 #' @rdname SDMdist
 #' @export
-qsdm <- function(p, mu = 0, c = 3, kappa = 3.5, parametrization = "sqrtexp") {
+psdm <- function(q, mu = 0, c = 3, kappa = 3.5, a = 0, s = 1,
+                 nt_features = NULL, nt_distances = NULL, lure_idx = NULL,
+                 lower.tail = TRUE, log.p = FALSE, lower.bound = -pi,
+                 version = "simple", parametrization = "sqrtexp") {
+  version <- match.arg(version, c("simple", "full", "bsc", "abc"))
+  stopif(isTRUE(any(kappa < 0)), "kappa must be non-negative")
+  stopif(isTRUE(any(c < 0)), "c must be non-negative")
+  if (version %in% c("abc", "full")) {
+    stopif(isTRUE(any(a < 0)), "a must be non-negative")
+  }
+  if (version %in% c("bsc", "full")) {
+    stopif(isTRUE(any(s < 0)), "s must be non-negative")
+  }
+
+  params <- .sdm_prepare_cases(
+    x = q,
+    mu = mu,
+    c = c,
+    kappa = kappa,
+    a = a,
+    s = s,
+    nt_features = nt_features,
+    nt_distances = nt_distances,
+    lure_idx = lure_idx,
+    version = version
+  )
+
+  q_vals <- if (params$n_cases == 1L) q else params$x
+  lower_vals <- .sdm_recycle_param(
+    lower.bound,
+    if (params$n_cases == 1L) length(q_vals) else params$n_cases,
+    "lower.bound"
+  )
+
+  if (params$n_cases == 1L) {
+    return(vapply(
+      seq_along(q_vals),
+      function(i) .psdm_spectral_single(
+        q = q_vals[i],
+        mu = params$mu[1],
+        c = params$c[1],
+        kappa = params$kappa[1],
+        a = params$a[1],
+        s = params$s[1],
+        nt_features = params$nt_features[[1]],
+        nt_distances = params$nt_distances[[1]],
+        lure_idx = params$lure_idx[[1]],
+        lower.tail = lower.tail,
+        log.p = log.p,
+        lower.bound = lower_vals[i],
+        version = version,
+        parametrization = parametrization
+      ),
+      numeric(1)
+    ))
+  }
+
+  mapply(
+    function(qi, loweri, mui, ci, kappai, ai, si, ntfi, ntdi, lurei) {
+      .psdm_spectral_single(
+        q = qi,
+        mu = mui,
+        c = ci,
+        kappa = kappai,
+        a = ai,
+        s = si,
+        nt_features = ntfi,
+        nt_distances = ntdi,
+        lure_idx = lurei,
+        lower.tail = lower.tail,
+        log.p = log.p,
+        lower.bound = loweri,
+        version = version,
+        parametrization = parametrization
+      )
+    },
+    qi = q_vals,
+    loweri = lower_vals,
+    mui = params$mu,
+    ci = params$c,
+    kappai = params$kappa,
+    ai = params$a,
+    si = params$s,
+    ntfi = params$nt_features,
+    ntdi = params$nt_distances,
+    lurei = params$lure_idx,
+    SIMPLIFY = TRUE,
+    USE.NAMES = FALSE
+  )
+}
+
+#' @rdname SDMdist
+#' @export
+qsdm <- function(p, mu = 0, c = 3, kappa = 3.5, a = 0, s = 1,
+                 nt_features = NULL, nt_distances = NULL, lure_idx = NULL,
+                 version = "simple", parametrization = "sqrtexp") {
   .NotYetImplemented()
 }
 
 #' @rdname SDMdist
 #' @export
-rsdm <- function(n, mu = 0, c = 3, kappa = 3.5, parametrization = "sqrtexp") {
+rsdm <- function(n, mu = 0, c = 3, kappa = 3.5, a = 0, s = 1,
+                 nt_features = NULL, nt_distances = NULL, lure_idx = NULL,
+                 version = "simple", parametrization = "sqrtexp") {
+  version <- match.arg(version, c("simple", "full", "bsc", "abc"))
   stopif(isTRUE(any(kappa < 0)), "kappa must be non-negative")
   stopif(isTRUE(any(c < 0)), "c must be non-negative")
   stopif(length(n) > 1, "n must be a single integer")
+  if (version %in% c("abc", "full")) {
+    stopif(isTRUE(any(a < 0)), "a must be non-negative")
+  }
+  if (version %in% c("bsc", "full")) {
+    stopif(isTRUE(any(s < 0)), "s must be non-negative")
+  }
 
-  .dsdm_numer <- switch(parametrization,
-    bessel = .dsdm_numer_bessel,
-    sqrtexp = .dsdm_numer_sqrtexp,
-    stop2("Parametrization must be one of 'bessel' or 'sqrtexp'")
+  params <- .sdm_prepare_cases(
+    x = 0,
+    mu = mu,
+    c = c,
+    kappa = kappa,
+    a = a,
+    s = s,
+    nt_features = nt_features,
+    nt_distances = nt_distances,
+    lure_idx = lure_idx,
+    version = version
   )
 
-  rejection_sampling(
+  if (params$n_cases > 1L) {
+    stopif(
+      !n %in% c(1, params$n_cases),
+      "Can only sample exactly once for each condition."
+    )
+
+    return(vapply(
+      seq_len(params$n_cases),
+      function(i) .rsdm_spectral_single(
+        n = 1,
+        mu = params$mu[i],
+        c = params$c[i],
+        kappa = params$kappa[i],
+        a = params$a[i],
+        s = params$s[i],
+        nt_features = params$nt_features[[i]],
+        nt_distances = params$nt_distances[[i]],
+        lure_idx = params$lure_idx[[i]],
+        version = version,
+        parametrization = parametrization
+      ),
+      numeric(1)
+    ))
+  }
+
+  .rsdm_spectral_single(
     n = n,
-    f = function(x) .dsdm_numer(x, mu, c, kappa),
-    max_f = .dsdm_numer(0, 0, c, kappa),
-    proposal_fun = function(n) stats::runif(n, -pi, pi)
+    mu = params$mu[1],
+    c = params$c[1],
+    kappa = params$kappa[1],
+    a = params$a[1],
+    s = params$s[1],
+    nt_features = params$nt_features[[1]],
+    nt_distances = params$nt_distances[[1]],
+    lure_idx = params$lure_idx[[1]],
+    version = version,
+    parametrization = parametrization
   )
 }
 
@@ -243,6 +400,464 @@ rsdm <- function(n, mu = 0, c = 3, kappa = 3.5, parametrization = "sqrtexp") {
 .dsdm_integrate_numer_v <- Vectorize(.dsdm_integrate_numer,
   vectorize.args = c("mu", "c", "kappa", "lower", "upper")
 )
+
+.sdm_input_length <- function(x) {
+  if (is.null(x)) {
+    return(0L)
+  }
+  if (is.matrix(x) || is.data.frame(x)) {
+    return(nrow(as.matrix(x)))
+  }
+  if (is.list(x)) {
+    return(length(x))
+  }
+  1L
+}
+
+.sdm_recycle_param <- function(x, n, name) {
+  if (length(x) == 1L) {
+    return(rep(x, n))
+  }
+  stopif(length(x) != n, "Argument '{name}' must have length 1 or {n}")
+  x
+}
+
+.sdm_recycle_vectors <- function(x, n, name, default = numeric(0)) {
+  if (is.null(x)) {
+    return(rep(list(default), n))
+  }
+  if (is.matrix(x) || is.data.frame(x)) {
+    mat <- as.matrix(x)
+    if (nrow(mat) == 1L && n > 1L) {
+      mat <- mat[rep(1L, n), , drop = FALSE]
+    }
+    stopif(nrow(mat) != n, "Argument '{name}' must have 1 or {n} rows")
+    return(lapply(seq_len(n), function(i) as.numeric(mat[i, , drop = TRUE])))
+  }
+  if (is.list(x)) {
+    if (length(x) == 1L && n > 1L) {
+      x <- rep(x, n)
+    }
+    stopif(length(x) != n, "Argument '{name}' must have length 1 or {n}")
+    return(lapply(x, as.numeric))
+  }
+  rep(list(as.numeric(x)), n)
+}
+
+.sdm_prepare_cases <- function(x, mu, c, kappa, a, s, nt_features, nt_distances,
+                               lure_idx, version) {
+  version <- match.arg(version, c("simple", "full", "bsc", "abc"))
+  uses_a <- version %in% c("full", "abc")
+  uses_s <- version %in% c("full", "bsc")
+  param_lengths <- c(
+    length(mu),
+    length(c),
+    length(kappa),
+    if (uses_a) length(a) else 1L,
+    if (uses_s) length(s) else 1L,
+    .sdm_input_length(nt_features),
+    .sdm_input_length(nt_distances),
+    .sdm_input_length(lure_idx),
+    1L
+  )
+  n_cases <- max(param_lengths)
+
+  if (version != "simple") {
+    stopif(is.null(nt_features), "nt_features must be provided for version '{version}'")
+    if (uses_s) {
+      stopif(is.null(nt_distances), "nt_distances must be provided for version '{version}'")
+    }
+  }
+
+  if (n_cases > 1L) {
+    x <- .sdm_recycle_param(x, n_cases, "x")
+  }
+
+  out <- list(
+    x = x,
+    mu = .sdm_recycle_param(mu, n_cases, "mu"),
+    c = .sdm_recycle_param(c, n_cases, "c"),
+    kappa = .sdm_recycle_param(kappa, n_cases, "kappa"),
+    a = .sdm_recycle_param(if (uses_a) a else 0, n_cases, "a"),
+    s = .sdm_recycle_param(if (uses_s) s else 1, n_cases, "s"),
+    nt_features = .sdm_recycle_vectors(nt_features, n_cases, "nt_features"),
+    nt_distances = .sdm_recycle_vectors(
+      if (uses_s) nt_distances else NULL,
+      n_cases,
+      "nt_distances"
+    ),
+    lure_idx = .sdm_recycle_vectors(lure_idx, n_cases, "lure_idx"),
+    n_cases = n_cases
+  )
+
+  for (i in seq_len(n_cases)) {
+    n_lures <- length(out$nt_features[[i]])
+    if (length(out$lure_idx[[i]]) == 0L) {
+      out$lure_idx[[i]] <- rep(1, n_lures)
+    }
+    stopif(
+      length(out$lure_idx[[i]]) != n_lures,
+      "lure_idx must have the same length as nt_features"
+    )
+    if (uses_s) {
+      stopif(
+        length(out$nt_distances[[i]]) != n_lures,
+        "nt_distances must have the same length as nt_features"
+      )
+      stopif(
+        any(out$nt_distances[[i]] < 0),
+        "nt_distances must be non-negative"
+      )
+    }
+  }
+
+  out
+}
+
+.sdm_spectral_levels <- c(32L, 64L, 128L, 256L, 512L)
+
+.sdm_spectral_grid <- local({
+  cache <- new.env(parent = emptyenv())
+
+  function(L = 512L) {
+    key <- as.character(L)
+    if (!exists(key, envir = cache, inherits = FALSE)) {
+      step <- 2 * pi / L
+      theta <- -pi + step * (seq_len(L) - 1)
+      assign(
+        key,
+        list(theta = theta, step = step, cos = cos(theta), sin = sin(theta)),
+        envir = cache
+      )
+    }
+    get(key, envir = cache, inherits = FALSE)
+  }
+})
+
+.sdm_kernel <- function(x, mu, kappa, parametrization) {
+  switch(parametrization,
+    bessel = {
+      be <- besselI(kappa, nu = 0, expon.scaled = TRUE)
+      exp(kappa * (cos(x - mu) - 1)) / (2 * pi * be)
+    },
+    sqrtexp = exp(kappa * (cos(x - mu) - 1)) * sqrt(kappa) / sqrt(2 * pi),
+    stop2("Parametrization must be one of 'bessel' or 'sqrtexp'")
+  )
+}
+
+.sdm_item_spec <- function(mu, c, a, s, nt_features, nt_distances, lure_idx, version) {
+  active_idx <- which(lure_idx > 0.5)
+  rel_angles <- 0
+  weights <- switch(version,
+    simple = c,
+    abc = c + a,
+    bsc = c,
+    full = c + a
+  )
+
+  if (length(active_idx) > 0L) {
+    rel_angles <- c(rel_angles, nt_features[active_idx])
+    lure_weights <- switch(version,
+      abc = rep(a, length(active_idx)),
+      bsc = c * exp(-s * nt_distances[active_idx]),
+      full = a + c * exp(-s * nt_distances[active_idx]),
+      numeric(0)
+    )
+    weights <- c(weights, lure_weights)
+  }
+
+  list(
+    item_mu = wrap(mu + rel_angles),
+    rel_angles = rel_angles,
+    weights = weights
+  )
+}
+
+.sdm_activation_from_items <- function(x, item_mu, weights, kappa, parametrization) {
+  out <- numeric(length(x))
+
+  for (i in seq_along(weights)) {
+    out <- out + weights[i] * .sdm_kernel(x, item_mu[i], kappa, parametrization)
+  }
+
+  out
+}
+
+.sdm_circular_distance <- function(x) {
+  y <- abs(x)
+  pmin(y, 2 * pi - y)
+}
+
+.sdm_trial_diagnostics <- function(weights, rel_angles, kappa) {
+  cx <- sum(weights * cos(rel_angles))
+  sx <- sum(weights * sin(rel_angles))
+  R <- sqrt(cx^2 + sx^2)
+  J <- length(weights)
+  delta_min <- if (J < 2) {
+    pi
+  } else {
+    min(
+      vapply(
+        utils::combn(rel_angles, 2, simplify = FALSE),
+        function(z) .sdm_circular_distance(z[1] - z[2]),
+        numeric(1)
+      )
+    )
+  }
+
+  list(
+    J = J,
+    w_sum = sum(weights),
+    w_max = max(weights),
+    R = R,
+    delta_min = max(delta_min, 1e-3),
+    kappa = kappa
+  )
+}
+
+.sdm_get_L_general <- function(kappa, J, w_sum, w_max, R, delta_min) {
+  rho <- R / max(w_sum, 1e-12)
+  logA <- log1p(sqrt(kappa / (2 * pi)) * w_sum)
+  closeness <- -log(max(delta_min, 1e-3))
+  score <- 2.6520 +
+    0.9349 * log(kappa) +
+    0.1815 * logA +
+    0.4803 * log1p(w_max) +
+    0.2386 * rho +
+    0.02224 * closeness -
+    0.06635 * log(J)
+
+  L <- if (score < 5.5) {
+    32L
+  } else if (score < 6.5) {
+    64L
+  } else if (score < 7.5) {
+    128L
+  } else if (score < 8.5) {
+    256L
+  } else {
+    512L
+  }
+
+  bump_L <- function(x) {
+    idx <- match(x, .sdm_spectral_levels)
+    .sdm_spectral_levels[pmin(idx + 1L, length(.sdm_spectral_levels))]
+  }
+
+  if (
+    kappa > 10 ||
+    logA > 5 ||
+    (delta_min < 0.25 && rho > 0.8)
+  ) {
+    L <- bump_L(L)
+  }
+
+  if (
+    kappa > 13 ||
+    (delta_min < 0.15 && logA > 4.2) ||
+    (w_max > 150 && rho > 0.75)
+  ) {
+    L <- 512L
+  }
+
+  L
+}
+
+.sdm_spectral_case <- function(mu, c, kappa, a, s, nt_features, nt_distances,
+                               lure_idx, version, parametrization, L = NULL) {
+  spec <- .sdm_item_spec(
+    mu = mu,
+    c = c,
+    a = a,
+    s = s,
+    nt_features = nt_features,
+    nt_distances = nt_distances,
+    lure_idx = lure_idx,
+    version = version
+  )
+  diag <- .sdm_trial_diagnostics(spec$weights, spec$rel_angles, kappa)
+  if (is.null(L)) {
+    L <- .sdm_get_L_general(
+      kappa = diag$kappa,
+      J = diag$J,
+      w_sum = diag$w_sum,
+      w_max = diag$w_max,
+      R = diag$R,
+      delta_min = diag$delta_min
+    )
+  }
+  grid <- .sdm_spectral_grid(L)
+  act_grid <- .sdm_activation_from_items(
+    x = grid$theta,
+    item_mu = spec$item_mu,
+    weights = spec$weights,
+    kappa = kappa,
+    parametrization = parametrization
+  )
+  logz <- matrixStats::logSumExp(act_grid) + log(grid$step)
+
+  list(
+    item_mu = spec$item_mu,
+    rel_angles = spec$rel_angles,
+    weights = spec$weights,
+    grid = grid,
+    L = L,
+    act_grid = act_grid,
+    logz = logz,
+    diagnostics = diag
+  )
+}
+
+.sdm_periodic_interp <- function(angle, values, step) {
+  L <- length(values)
+  t <- ((wrap(angle) + pi) %% (2 * pi)) / step
+  idx0 <- floor(t)
+  frac <- t - idx0
+  idx1 <- (idx0 %% L) + 1L
+  idx2 <- (idx1 %% L) + 1L
+
+  (1 - frac) * values[idx1] + frac * values[idx2]
+}
+
+.sdm_shifted_density_path <- function(density, step, lower.bound) {
+  theta <- -pi + step * (seq_along(density) - 1)
+  shifted <- (theta - lower.bound) %% (2 * pi)
+  ord <- order(shifted)
+  x <- shifted[ord]
+  y <- density[ord]
+  y0 <- .sdm_periodic_interp(lower.bound, density, step)
+
+  if (x[1] > sqrt(.Machine$double.eps)) {
+    x <- c(0, x)
+    y <- c(y0, y)
+  } else {
+    x[1] <- 0
+    y[1] <- y0
+  }
+
+  x <- c(x, 2 * pi)
+  y <- c(y, y0)
+  cdf <- c(0, cumsum(diff(x) * (head(y, -1) + tail(y, -1)) / 2))
+  total <- cdf[length(cdf)]
+
+  list(
+    x = x,
+    density = y,
+    cdf = cdf / total,
+    total = total
+  )
+}
+
+.dsdm_spectral_single <- function(x, mu, c, kappa, a, s, nt_features,
+                                  nt_distances, lure_idx, version,
+                                  log = FALSE, parametrization = "sqrtexp",
+                                  L = NULL) {
+  case <- .sdm_spectral_case(
+    mu = mu,
+    c = c,
+    kappa = kappa,
+    a = a,
+    s = s,
+    nt_features = nt_features,
+    nt_distances = nt_distances,
+    lure_idx = lure_idx,
+    version = version,
+    parametrization = parametrization,
+    L = L
+  )
+  activation_x <- .sdm_activation_from_items(
+    x = x,
+    item_mu = case$item_mu,
+    weights = case$weights,
+    kappa = kappa,
+    parametrization = parametrization
+  )
+  log_density <- activation_x - case$logz
+
+  if (log) {
+    return(log_density)
+  }
+  exp(log_density)
+}
+
+.psdm_spectral_single <- function(q, mu, c, kappa, a, s, nt_features,
+                                  nt_distances, lure_idx, lower.tail = TRUE,
+                                  log.p = FALSE, lower.bound = -pi,
+                                  version, parametrization = "sqrtexp",
+                                  L = NULL) {
+  case <- .sdm_spectral_case(
+    mu = mu,
+    c = c,
+    kappa = kappa,
+    a = a,
+    s = s,
+    nt_features = nt_features,
+    nt_distances = nt_distances,
+    lure_idx = lure_idx,
+    version = version,
+    parametrization = parametrization,
+    L = L
+  )
+  density <- exp(case$act_grid - case$logz)
+  density_path <- .sdm_shifted_density_path(
+    density = density,
+    step = case$grid$step,
+    lower.bound = lower.bound
+  )
+  q_shift <- pmin(pmax(q - lower.bound, 0), 2 * pi)
+  out <- stats::approx(
+    x = density_path$x,
+    y = density_path$cdf,
+    xout = q_shift,
+    method = "linear",
+    ties = "ordered",
+    rule = 2
+  )$y
+
+  if (!lower.tail) {
+    out <- 1 - out
+  }
+  if (log.p) {
+    out <- log(out)
+  }
+
+  out
+}
+
+.rsdm_spectral_single <- function(n, mu, c, kappa, a, s, nt_features,
+                                  nt_distances, lure_idx, version,
+                                  parametrization = "sqrtexp", L = NULL) {
+  case <- .sdm_spectral_case(
+    mu = mu,
+    c = c,
+    kappa = kappa,
+    a = a,
+    s = s,
+    nt_features = nt_features,
+    nt_distances = nt_distances,
+    lure_idx = lure_idx,
+    version = version,
+    parametrization = parametrization,
+    L = L
+  )
+  density <- exp(case$act_grid - case$logz)
+  density_path <- .sdm_shifted_density_path(
+    density = density,
+    step = case$grid$step,
+    lower.bound = -pi
+  )
+  u <- stats::runif(n)
+  shifted <- stats::approx(
+    x = density_path$cdf,
+    y = density_path$x,
+    xout = u,
+    method = "linear",
+    ties = "ordered",
+    rule = 2
+  )$y
+
+  wrap(-pi + shifted)
+}
 
 
 #' @title Distribution functions for the two-parameter mixture model (mixture2p)
@@ -455,6 +1070,7 @@ rmixture3p <- function(n, mu = c(0, 2, -1.5), kappa = 5, p_mem = 0.6, p_nt = 0.2
 #' @param a Vector of strengths for cue-independent activation
 #' @param s Vector of generalization gradients
 #' @param b Vector of baseline activation
+#' @param version Character. One of `"simple"`, `"abc"`, `"bsc"`, or `"full"`.
 #' @param log Logical; if `TRUE`, values are returned on the log scale.
 #'
 #' @keywords distribution
@@ -486,18 +1102,36 @@ rmixture3p <- function(n, mu = c(0, 2, -1.5), kappa = 5, p_mem = 0.6, p_nt = 0.2
 #' lines(x, d, type = "l", col = "red")
 #'
 dimm <- function(x, mu = c(0, 2, -1.5), dist = c(0, 0.5, 2),
-                 c = 5, a = 2, b = 1, s = 2, kappa = 5, log = FALSE) {
+                 c = 5, a = 2, b = 1, s = 2, kappa = 5,
+                 version = "full", log = FALSE) {
+  version <- match.arg(version, c("simple", "full", "bsc", "abc"))
   stopif(isTRUE(any(kappa < 0)), "kappa must be non-negative")
+  stopif(isTRUE(any(c < 0)), "c must be non-negative")
+
+  if (version == "simple") {
+    stopif(length(mu) != 1, "The simple IMM requires a single target location.")
+    p_mem <- c / (1 + c)
+    return(dmixture2p(x = x, mu = mu, kappa = kappa, p_mem = p_mem, log = log))
+  }
+
   len_mu <- length(mu)
-  stopif(
-    len_mu != length(dist),
-    "The number of items does not match the distances provided from the cued location."
-  )
-  stopif(isTRUE(any(s < 0)), "s must be non-negative")
-  stopif(isTRUE(any(dist < 0)), "all distances have to be positive.")
+  if (version %in% c("full", "bsc")) {
+    stopif(
+      len_mu != length(dist),
+      "The number of items does not match the distances provided from the cued location."
+    )
+    stopif(isTRUE(any(s < 0)), "s must be non-negative")
+    stopif(isTRUE(any(dist < 0)), "all distances have to be positive.")
+  } else {
+    dist <- rep(0, len_mu)
+  }
 
   # compute activation for all items
-  weights <- rep(c, len_mu) * exp(-s * dist) + rep(a, len_mu)
+  weights <- switch(version,
+    abc = c(c + a, rep(a, len_mu - 1)),
+    bsc = c * exp(-s * dist),
+    full = rep(c, len_mu) * exp(-s * dist) + rep(a, len_mu)
+  )
 
   # add activation of background noise
   weights <- c(weights, b)
@@ -526,35 +1160,48 @@ dimm <- function(x, mu = c(0, 2, -1.5), dist = c(0, 0.5, 2),
 #' @rdname IMMdist
 #' @export
 pimm <- function(q, mu = c(0, 2, -1.5), dist = c(0, 0.5, 2),
-                 c = 1, a = 0.2, b = 0, s = 2, kappa = 5) {
+                 c = 1, a = 0.2, b = 0, s = 2, kappa = 5,
+                 version = "full") {
   .NotYetImplemented()
 }
 
 #' @rdname IMMdist
 #' @export
 qimm <- function(p, mu = c(0, 2, -1.5), dist = c(0, 0.5, 2),
-                 c = 1, a = 0.2, b = 0, s = 2, kappa = 5) {
+                 c = 1, a = 0.2, b = 0, s = 2, kappa = 5,
+                 version = "full") {
   .NotYetImplemented()
 }
 
 #' @rdname IMMdist
 #' @export
 rimm <- function(n, mu = c(0, 2, -1.5), dist = c(0, 0.5, 2),
-                 c = 1, a = 0.2, b = 1, s = 2, kappa = 5) {
+                 c = 1, a = 0.2, b = 1, s = 2, kappa = 5,
+                 version = "full") {
+  version <- match.arg(version, c("simple", "full", "bsc", "abc"))
   stopif(isTRUE(any(kappa < 0)), "kappa must be non-negative")
-  stopif(isTRUE(any(s < 0)), "s must be non-negative")
-  stopif(isTRUE(any(dist < 0)), "all distances have to be positive.")
-  stopif(
-    length(mu) != length(dist),
-    "The number of items does not match the distances provided from the cued location."
-  )
+  stopif(isTRUE(any(c < 0)), "c must be non-negative")
+
+  if (version == "simple") {
+    p_mem <- c / (1 + c)
+    return(rmixture2p(n = n, mu = mu, kappa = kappa, p_mem = p_mem))
+  }
+
+  if (version %in% c("full", "bsc")) {
+    stopif(isTRUE(any(s < 0)), "s must be non-negative")
+    stopif(isTRUE(any(dist < 0)), "all distances have to be positive.")
+    stopif(
+      length(mu) != length(dist),
+      "The number of items does not match the distances provided from the cued location."
+    )
+  }
 
   xm <- seq(-pi, pi, length.out = 361)
-  max_y <- max(dimm(xm, mu, dist, c, a, b, s, kappa))
+  max_y <- max(dimm(xm, mu, dist, c, a, b, s, kappa, version = version))
 
   rejection_sampling(
     n = n,
-    f = function(x) dimm(x, mu, dist, c, a, b, s, kappa),
+    f = function(x) dimm(x, mu, dist, c, a, b, s, kappa, version = version),
     max_f = max_y,
     proposal_fun = function(n) stats::runif(n, -pi, pi)
   )

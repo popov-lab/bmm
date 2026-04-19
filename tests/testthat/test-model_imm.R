@@ -1,5 +1,60 @@
 dat <- oberauer_lin_2017
 
+test_that("imm_simple works without non-target inputs", {
+  skip_on_cran()
+  formula <- bmf(kappa ~ 1, c ~ 1)
+  model <- imm(resp_error = "dev_rad", version = "simple")
+  expect_silent(bmm(formula, dat, model, backend = "mock", mock = 1, rename = FALSE))
+})
+
+test_that("IMM non-target preprocessing applies only to non-simple versions", {
+  simple_checked <- check_data(
+    imm(resp_error = "dev_rad", version = "simple"),
+    dat[1:8, ],
+    bmf(kappa ~ 1, c ~ 1)
+  )
+  expect_false("ss_numeric" %in% names(simple_checked))
+  expect_false(any(grepl("^LureIdx", names(simple_checked))))
+
+  full_checked <- check_data(
+    imm(
+      resp_error = "dev_rad",
+      nt_features = paste0("col_nt", 1:7),
+      nt_distances = paste0("dist_nt", 1:7),
+      set_size = "set_size",
+      version = "full"
+    ),
+    dat[1:8, ],
+    bmf(kappa ~ 1, c ~ 1, a ~ 1, s ~ 1)
+  )
+  expect_true("ss_numeric" %in% names(full_checked))
+  expect_true(any(grepl("^LureIdx", names(full_checked))))
+})
+
+test_that("IMM non-simple versions support regex expansion", {
+  explicit <- imm(
+    resp_error = "dev_rad",
+    nt_features = paste0("col_nt", 1:7),
+    nt_distances = paste0("dist_nt", 1:7),
+    set_size = "set_size",
+    version = "full"
+  )
+  regex_model <- imm(
+    resp_error = "dev_rad",
+    nt_features = "col_nt",
+    nt_distances = "dist_nt",
+    set_size = "set_size",
+    regex = TRUE,
+    version = "full"
+  )
+
+  checked_explicit <- check_model(explicit, dat)
+  checked_regex <- check_model(regex_model, dat)
+  attributes(checked_explicit) <- NULL
+  attributes(checked_regex) <- NULL
+  expect_equal(checked_explicit, checked_regex)
+})
+
 test_that("imm works when set_size is not predicted and there is set_size 1", {
   skip_on_cran()
   formula <- bmf(kappa ~ 1, a ~ 1, c ~ 1, s ~ 1)

@@ -138,7 +138,11 @@ bmm <- function(formula, data, model,
   prior <- configure_prior(model, data, config_args$formula, prior)
 
   # configure initial values if necessary
-  config_args$init <- create_initfun(model, data, config_args$formula)
+  config_args$init <- create_initfun(
+    model, data, config_args$formula,
+    prior = prior,
+    stanvars = config_args$stanvars
+  )
 
   # estimate the model
   fit_args <- combine_args(nlist(config_args, opts, dots, prior))
