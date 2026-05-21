@@ -655,12 +655,16 @@ configure_model.lba_custom <- function(model, data, formula) {
       for (k in seq_len(n_cat[j])) {
         start <- stats::runif(1, 0, A)
         dv <- switch(dist,
-          normal = stats::rnorm(1, drift_j, s[d]),
+          normal = {
+            v_draw <- stats::rnorm(1, drift_j, s[d])
+            while (v_draw <= 0) v_draw <- stats::rnorm(1, drift_j, s[d])
+            v_draw
+          },
           gamma = stats::rgamma(1, shape = drift_j, rate = s[d]),
           frechet = .rfrechet(1, shape = drift_j, scale = s[d]),
           lognormal = stats::rlnorm(1, meanlog = drift_j, sdlog = s[d])
         )
-        ft[idx] <- if (dv > 0) (b - start) / dv else Inf
+        ft[idx] <- (b - start) / dv
         idx <- idx + 1
       }
     }

@@ -386,8 +386,7 @@ test_that("dlba matches rtdists for normal distribution", {
                 gap = 0.5, sp = 0.5, ndt = 0.3, distribution = "normal")
   rtd_d <- rtdists::dLBA(ref$rt, ref$response, A = 0.5, b = 1, t0 = 0.3,
                          mean_v = c(3, 1.5), sd_v = c(1, 1),
-                         distribution = "norm", silent = TRUE,
-                         args.dist = list(posdrift = FALSE))
+                         distribution = "norm", silent = TRUE)
   expect_equal(bmm_d, rtd_d, tolerance = 1e-10)
 })
 

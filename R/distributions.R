@@ -2093,12 +2093,20 @@ qlba <- function(p, drift, gap, sp, ndt, s = 1,
   for (j in seq_len(K)) {
     sp <- stats::runif(n, min = 0, max = A)
     d <- switch(distribution,
-      normal = stats::rnorm(n, mean = drift[j], sd = s),
+      normal = {
+        d_raw <- stats::rnorm(n, mean = drift[j], sd = s)
+        neg <- which(d_raw <= 0)
+        while (length(neg) > 0) {
+          d_raw[neg] <- stats::rnorm(length(neg), mean = drift[j], sd = s)
+          neg <- neg[d_raw[neg] <= 0]
+        }
+        d_raw
+      },
       gamma = stats::rgamma(n, shape = drift[j], rate = s),
       frechet = .rfrechet(n, shape = drift[j], scale = s),
       lognormal = stats::rlnorm(n, meanlog = drift[j], sdlog = s)
     )
-    ft[, j] <- ifelse(d > 0, (b - sp) / d, Inf)
+    ft[, j] <- (b - sp) / d
   }
 
   winner <- apply(ft, 1, which.min)
@@ -2146,12 +2154,13 @@ qlba <- function(p, drift, gap, sp, ndt, s = 1,
 
 
 .dlba_normal_single <- function(t, v, b, A, s) {
+  denom <- stats::pnorm(v / s)
   if (A < 1e-10) {
-    (b / (t^2 * s)) * stats::dnorm((b / t - v) / s)
+    (b / (t^2 * s)) * stats::dnorm((b / t - v) / s) / denom
   } else {
     z1 <- (b - A - t * v) / (t * s)
     z2 <- (b - t * v) / (t * s)
-    (1 / A) * (
+    (1 / (A * denom)) * (
       -v * stats::pnorm(z1) + s * stats::dnorm(z1) +
        v * stats::pnorm(z2) - s * stats::dnorm(z2)
     )
@@ -2159,15 +2168,16 @@ qlba <- function(p, drift, gap, sp, ndt, s = 1,
 }
 
 .plba_normal_single <- function(t, v, b, A, s) {
+  denom <- stats::pnorm(v / s)
   if (A < 1e-10) {
-    stats::pnorm((v * t - b) / (s * t))
+    stats::pnorm((v * t - b) / (s * t)) / denom
   } else {
     z1 <- (b - A - t * v) / (t * s)
     z2 <- (b - t * v) / (t * s)
-    1 + (1 / A) * (
+    (1 + (1 / A) * (
       (b - A - t * v) * stats::pnorm(z1) + t * s * stats::dnorm(z1) -
       (b - t * v) * stats::pnorm(z2) - t * s * stats::dnorm(z2)
-    )
+    )) / denom
   }
 }
 

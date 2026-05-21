@@ -29,7 +29,8 @@
   phi_hi <- stats::dnorm(z_hi)
   phi_lo <- stats::dnorm(z_lo)
   M <- v * (Phi_hi - Phi_lo) + s * (phi_lo - phi_hi)
-  .stan_lba_log_positive(M) - log(A)
+  log_denom <- stats::pnorm(v / s, log.p = TRUE)
+  .stan_lba_log_positive(M) - log(A) - log_denom
 }
 
 .stan_lba_normal_single_lccdf <- function(t, v, b, A, s) {
@@ -43,7 +44,9 @@
   phi_lo <- stats::dnorm(z_lo)
   M <- v * (Phi_hi - Phi_lo) + s * (phi_lo - phi_hi)
   surv_num <- (b * Phi_hi) - ((b - A) * Phi_lo) - (t * M)
-  .stan_lba_log_positive(surv_num) - log(A)
+  log_denom <- stats::pnorm(v / s, log.p = TRUE)
+  corrected_surv_num <- surv_num - A * stats::pnorm(-v / s)
+  .stan_lba_log_positive(corrected_surv_num) - log(A) - log_denom
 }
 
 .stan_lba_gamma_single_lpdf <- function(t, v, b, A, s) {
