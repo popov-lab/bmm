@@ -249,6 +249,22 @@ check_model.rdm_custom <- function(model, data = NULL, formula = NULL) {
       Please rename the affected response categories."
     )
 
+    bad_dpar_names <- cat_pars[grepl("[0-9]$", cat_pars)]
+    stopif(
+      length(bad_dpar_names) > 0,
+      "Category names cannot end in a number because brms uses them as \\
+      distributional parameters: {collapse_comma(bad_dpar_names)}. \\
+      Please rename the affected response categories."
+    )
+
+    bad_underscore_names <- cat_pars[grepl("_", cat_pars, fixed = TRUE)]
+    stopif(
+      length(bad_underscore_names) > 0,
+      "Category names cannot contain underscores because brms rejects them as \\
+      distributional parameters: {collapse_comma(bad_underscore_names)}. \\
+      Please rename the affected response categories."
+    )
+
     for (p in cat_pars) {
       model$parameters[[p]] <- paste0("drift rate for '", p, "' accumulator")
       if (is.null(model$links[[p]])) model$links[[p]] <- "log"

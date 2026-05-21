@@ -252,6 +252,18 @@ test_that("check_model.rdm_custom errors on Stan reserved words", {
   expect_error(check_model(model, formula = f), "Stan reserved words")
 })
 
+test_that("check_model.rdm_custom errors on category names ending in numbers", {
+  model <- rdm(rt = "rt", response = "resp", version = "custom")
+  f <- bmf(correct ~ 1, error1 ~ 1, gap ~ 1, ndt ~ 1)
+  expect_error(check_model(model, data = NULL, formula = f), "cannot end in a number")
+})
+
+test_that("check_model.rdm_custom errors on category names containing underscores", {
+  model <- rdm(rt = "rt", response = "resp", version = "custom")
+  f <- bmf(correct ~ 1, error_a ~ 1, gap ~ 1, ndt ~ 1)
+  expect_error(check_model(model, data = NULL, formula = f), "cannot contain underscores")
+})
+
 # -----------------------------------------------------------------------------
 # Formula conversion tests
 # -----------------------------------------------------------------------------
