@@ -175,6 +175,26 @@ test_that("check_model.lba_custom errors on Stan reserved words", {
   expect_error(check_model(model, data = NULL, formula = formula))
 })
 
+test_that("check_model.lba_custom errors on category names ending in numbers", {
+  model <- lba(rt = "rt", response = "response", version = "custom")
+  formula <- bmf(correct ~ 1, error1 ~ 1, gap ~ 1, sp ~ 1, ndt ~ 1)
+
+  expect_error(
+    check_model(model, data = NULL, formula = formula),
+    "cannot end in a number"
+  )
+})
+
+test_that("check_model.lba_custom errors on category names containing underscores", {
+  model <- lba(rt = "rt", response = "response", version = "custom")
+  formula <- bmf(correct ~ 1, error_a ~ 1, gap ~ 1, sp ~ 1, ndt ~ 1)
+
+  expect_error(
+    check_model(model, data = NULL, formula = formula),
+    "cannot contain underscores"
+  )
+})
+
 
 # -----------------------------------------------------------------------------
 # Formula conversion tests
