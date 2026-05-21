@@ -408,6 +408,16 @@ test_that("check_model.lnr_custom errors on category names ending in numbers", {
   )
 })
 
+test_that("check_model.lnr_custom errors on category names containing underscores", {
+  model <- lnr(rt = "rt", response = "resp", version = "custom")
+  formula <- bmf(correct ~ 1, error_a ~ 1, ndt ~ 1)
+
+  expect_error(
+    check_model(model, formula = formula),
+    "cannot contain underscores"
+  )
+})
+
 # -----------------------------------------------------------------------------
 # Formula conversion tests
 # -----------------------------------------------------------------------------

@@ -244,6 +244,14 @@ check_model.lnr_custom <- function(model, data = NULL, formula = NULL) {
       Please rename the affected response categories."
     )
 
+    bad_underscore_names <- cat_pars[grepl("_", cat_pars, fixed = TRUE)]
+    stopif(
+      length(bad_underscore_names) > 0,
+      "Category names cannot contain underscores because brms rejects them as \\
+      distributional parameters: {collapse_comma(bad_underscore_names)}. \\
+      Please rename the affected response categories."
+    )
+
     for (p in cat_pars) {
       model$parameters[[p]] <- paste0("meanlog for '", p, "' accumulator")
       if (is.null(model$links[[p]])) model$links[[p]] <- "identity"
