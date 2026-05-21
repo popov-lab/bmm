@@ -16,9 +16,7 @@ real lba_normal_single_lpdf(real t, real v, real b, real A, real s) {
   return lba_log_positive(M) - log(A) - log_denom;
 }
 
-// Single-accumulator log-survival for LBA with normal drift
-// Implements posdrift (truncated normal): S_corrected = 1 - F_standard/Phi(v/s)
-//   = (surv_num/A - Phi(-v/s)) / Phi(v/s)
+// Single-accumulator log-survival for LBA with normal drift (posdrift: corrected_surv_num = surv_num - A*Phi(-v/s))
 real lba_normal_single_lccdf(real t, real v, real b, real A, real s) {
   real hi = b / t;
   real lo = (b - A) / t;
