@@ -764,4 +764,34 @@ formula_mafc <- bmf(dprime ~ 1 + condition + (1 | id))
 
 The m-AFC model uses a closed-form solution for $m = 2$ and Gauss-Hermite quadrature for $m \geq 3$.
 
+### Parameter recovery
+
+A systematic parameter recovery simulation was conducted across 20 conditions defined by 4 trial counts (25, 50, 100, 200 trials per subject) and 5 numbers of alternatives ($m$ = 2, 3, 4, 6, 8), with 50 subjects and 100 replications per condition. Data were generated independently from the bmm likelihood using Gauss-Hermite quadrature in R (not the Stan code), and both the closed-form ($m = 2$) and quadrature ($m \geq 3$) paths were exercised.
+
+Recovery of $d'$ was excellent across all conditions. Bias was negligible throughout (|bias| < 0.02), RMSE decreased with trial count as expected, 95% CI coverage was close to nominal, and the concordance correlation coefficient (CCC) exceeded 0.99 in all cells.
+
+| nTrials | Median bias | Median RMSE | Median coverage | Median CCC |
+|--------:|------------:|------------:|----------------:|-----------:|
+| 25      | 0.004       | 0.079       | 0.96            | 0.992      |
+| 50      | −0.005      | 0.062       | 0.95            | 0.994      |
+| 100     | −0.002      | 0.054       | 0.96            | 0.995      |
+| 200     | −0.001      | 0.051       | 0.97            | 0.996      |
+
+Recovery was comparable between the closed-form ($m = 2$) and quadrature ($m \geq 3$) paths, confirming that both implementations are correct. RMSE decreased as $m$ increased (from ~0.060 at $m = 2$ to ~0.050 at $m = 8$), reflecting the additional information carried by each trial when there are more alternatives.
+
+### Sampling note for high-information designs
+
+In conditions with many trials per subject (≥ 200) and large $m$ (≥ 3), a non-trivial fraction of replications (up to ~27% for $m$ = 6–8 at 200 trials) showed $\hat{R} > 1.01$ for the population-level $d'$ intercept, accompanied by low bulk ESS (~400–700). This is a sampling-efficiency issue, not a model misspecification: bias and CI coverage remained accurate in these same conditions.
+
+The root cause is a funnel geometry that arises in hierarchical models when subject-level posteriors become very tight (many trials → precise individual estimates → narrow population-level likelihood). The Gauss-Hermite quadrature log-likelihood also produces less smooth gradients than the closed-form $m = 2$ path, which further slows HMC mixing.
+
+If you encounter $\hat{R} > 1.01$ warnings when fitting `sdt_mafc()` with many trials or large $m$, the recommended remedies are:
+
+```{r mafc-sampling-note, eval=FALSE}
+# increase iterations and tighten step-size adaptation
+bmm(formula_mafc, data, model_mafc,
+    iter = 4000, warmup = 2000,
+    control = list(adapt_delta = 0.99))
+```
+
 # References
