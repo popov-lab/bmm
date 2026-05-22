@@ -273,18 +273,19 @@ check_data.sdt <- function(model, data, formula) {
     )
   }
 
+  # Stan 2.33+ requires `|` between first arg and the rest for _lpmf functions
   helper_args <- switch(
     family_name,
     sdt_rating = paste(
-      "y, category, stimulus, n_ratings, dist_type, thresh_type,",
+      "y | category, stimulus, n_ratings, dist_type, thresh_type,",
       "dprime, criterion,", spacing_value, ", sdratio, deltas"
     ),
     sdt_dp = paste(
-      "y, category, stimulus, n_ratings, dist_type, thresh_type,",
+      "y | category, stimulus, n_ratings, dist_type, thresh_type,",
       "dprime, criterion,", spacing_value, ", Ro, Rn, sdratio, deltas"
     ),
     sdt_metad = paste(
-      "y, category, stimulus, n_ratings, dist_type, thresh_type,",
+      "y | category, stimulus, n_ratings, dist_type, thresh_type,",
       "dprime, criterion,", spacing_value, ", metad, sdratio, deltas"
     ),
     stop2("Unsupported SDT family wrapper: '{family_name}'")
