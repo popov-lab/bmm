@@ -185,26 +185,26 @@ real cdp_prob_quad(real mu_F, real mu_R, real sd_R,
     real w = gl_weights[i];
     real t = 0.5 * (x + 1);
     real R;
-    real jacobian;
+    real jac_weight;
 
     if (!is_inf(r_lo) && !is_inf(r_hi)) {
       R = r_lo + (r_hi - r_lo) * t;
-      jacobian = r_hi - r_lo;
+      jac_weight = r_hi - r_lo;
     } else if (is_inf(r_lo) && !is_inf(r_hi)) {
       real y = t / (1 - t);
       R = r_hi - y;
-      jacobian = 1 / square(1 - t);
+      jac_weight = 1 / square(1 - t);
     } else if (!is_inf(r_lo) && is_inf(r_hi)) {
       real y = t / (1 - t);
       R = r_lo + y;
-      jacobian = 1 / square(1 - t);
+      jac_weight = 1 / square(1 - t);
     } else {
       real angle = pi() * (t - 0.5);
       R = mu_R + sd_R * tan(angle);
-      jacobian = sd_R * pi() / square(cos(angle));
+      jac_weight = sd_R * pi() / square(cos(angle));
     }
 
-    result += w * jacobian *
+    result += w * jac_weight *
       sdt_pdf((R - mu_R) / sd_R, dist_type) / sd_R *
       cdp_interval_mass_f(R, c_lo, c_hi, f_lo, f_hi, mu_F, dist_type);
   }
