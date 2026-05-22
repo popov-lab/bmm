@@ -185,8 +185,7 @@ bmf2bf.sdt_ranking <- function(model, formula) {
 
 #' @export
 configure_model.sdt_ranking <- function(model, data, formula) {
-  # Check if sdratio is being estimated BEFORE converting to brmsformula
-  # (user overrode the fixed default by providing sdratio in the formula)
+  # bmf2bf() discards bmmformula structure, so check sdratio override before it runs
   sdratio_estimated <- !is.null(formula[["sdratio"]]) &&
     !is_constant(formula[["sdratio"]])
 
@@ -237,39 +236,40 @@ configure_model.sdt_ranking <- function(model, data, formula) {
     e_neg_g <- exp(-g)
     log_p <- -g + lgamma(m) + lgamma(rank_pos - 1 + e_neg_g) -
              lgamma(rank_pos) - lgamma(m + e_neg_g)
-    return(exp(log_p))
+    exp(log_p)
+  } else {
+    # Gaussian UV-SDT: fixed Gauss-Hermite quadrature over the target distribution
+    sigma <- exp(sdratio)
+    gh_nodes <- c(
+      -7.6190485416797546e+00, -6.5105901570136488e+00,
+      -5.5787388058932059e+00, -4.7345813340460463e+00,
+      -3.9439673506573110e+00, -3.1890148165533843e+00,
+      -2.4586636111723603e+00, -1.7452473208141255e+00,
+      -1.0429453488027509e+00, -3.4696415708135458e-01,
+       3.4696415708135830e-01,  1.0429453488027574e+00,
+       1.7452473208141317e+00,  2.4586636111723683e+00,
+       3.1890148165533900e+00,  3.9439673506573163e+00,
+       4.7345813340460552e+00,  5.5787388058932033e+00,
+       6.5105901570136551e+00,  7.6190485416797591e+00
+    )
+    gh_weights <- c(
+      1.2578006724378954e-13, 2.4820623623151972e-10,
+      6.1274902599825256e-08, 4.4021210902309806e-06,
+      1.2882627996193093e-04, 1.8301031310804826e-03,
+      1.3997837447100857e-02, 6.1506372063977507e-02,
+      1.6173933398399959e-01, 2.6079306344955683e-01,
+      2.6079306344955305e-01, 1.6173933398399776e-01,
+      6.1506372063977438e-02, 1.3997837447101162e-02,
+      1.8301031310805052e-03, 1.2882627996193072e-04,
+      4.4021210902309052e-06, 6.1274902599829068e-08,
+      2.4820623623151936e-10, 1.2578006724379269e-13
+    )
+    eta <- dprime + sigma * gh_nodes
+    log_terms <- log(gh_weights) +
+      (m - rank_pos) * pnorm(eta, log.p = TRUE) +
+      (rank_pos - 1) * pnorm(eta, lower.tail = FALSE, log.p = TRUE)
+    exp(lchoose(m - 1, rank_pos - 1) + matrixStats::logSumExp(log_terms))
   }
-  # Gaussian UV-SDT: fixed Gauss-Hermite quadrature over the target distribution
-  sigma <- exp(sdratio)
-  gh_nodes <- c(
-    -7.6190485416797546e+00, -6.5105901570136488e+00,
-    -5.5787388058932059e+00, -4.7345813340460463e+00,
-    -3.9439673506573110e+00, -3.1890148165533843e+00,
-    -2.4586636111723603e+00, -1.7452473208141255e+00,
-    -1.0429453488027509e+00, -3.4696415708135458e-01,
-     3.4696415708135830e-01,  1.0429453488027574e+00,
-     1.7452473208141317e+00,  2.4586636111723683e+00,
-     3.1890148165533900e+00,  3.9439673506573163e+00,
-     4.7345813340460552e+00,  5.5787388058932033e+00,
-     6.5105901570136551e+00,  7.6190485416797591e+00
-  )
-  gh_weights <- c(
-    1.2578006724378954e-13, 2.4820623623151972e-10,
-    6.1274902599825256e-08, 4.4021210902309806e-06,
-    1.2882627996193093e-04, 1.8301031310804826e-03,
-    1.3997837447100857e-02, 6.1506372063977507e-02,
-    1.6173933398399959e-01, 2.6079306344955683e-01,
-    2.6079306344955305e-01, 1.6173933398399776e-01,
-    6.1506372063977438e-02, 1.3997837447101162e-02,
-    1.8301031310805052e-03, 1.2882627996193072e-04,
-    4.4021210902309052e-06, 6.1274902599829068e-08,
-    2.4820623623151936e-10, 1.2578006724379269e-13
-  )
-  eta <- dprime + sigma * gh_nodes
-  log_terms <- log(gh_weights) +
-    (m - rank_pos) * pnorm(eta, log.p = TRUE) +
-    (rank_pos - 1) * pnorm(eta, lower.tail = FALSE, log.p = TRUE)
-  exp(lchoose(m - 1, rank_pos - 1) + matrixStats::logSumExp(log_terms))
 }
 
 # R-side computation of all rank probabilities (vectorized over ranks 1..m)

@@ -67,7 +67,7 @@ plot.bmm_sdt_roc <- function(x, condition_col = NULL, add_diagonal = TRUE,
                               ribbon_alpha = 0.25, probs = c(0.025, 0.975),
                               point_size = 2.5, ...) {
   if (!requireNamespace("ggplot2", quietly = TRUE)) {
-    stop("ggplot2 is required for plot.bmm_sdt_roc(). Please install it.")
+    stop2("ggplot2 is required for plot.bmm_sdt_roc(). Please install it.")
   }
 
   is_rating <- isTRUE(attr(x, "is_rating"))
@@ -183,7 +183,7 @@ plot.bmm_sdt_roc <- function(x, condition_col = NULL, add_diagonal = TRUE,
 #' @export
 plot.bmm_sdt_auc <- function(x, condition_col = NULL, ...) {
   if (!requireNamespace("ggplot2", quietly = TRUE)) {
-    stop("ggplot2 is required for plot.bmm_sdt_auc(). Please install it.")
+    stop2("ggplot2 is required for plot.bmm_sdt_auc(). Please install it.")
   }
 
   cond_cols <- setdiff(names(x), c("AUC", ".draw"))

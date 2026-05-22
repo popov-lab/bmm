@@ -44,28 +44,10 @@ pp_check.bmmfit <- function(object, type = NULL, ndraws = NULL, ...) {
                "A response-proportion plot is always produced.")
     }
     if (is.null(ndraws)) ndraws <- 100L
-    return(.pp_check_sdt_rating(object, ndraws = ndraws, ...))
+    .pp_check_sdt_rating(object, ndraws = ndraws, ...)
+  } else {
+    NextMethod()
   }
-  NextMethod()
-}
-
-
-# Internal: dispatcher for bmm models that brms cannot pp_check directly.
-# Add a new branch here when a new multi-column model type is introduced.
-.pp_check_bmm <- function(object, type = NULL, ndraws = NULL, ...) {
-  model <- object$bmm$model
-
-  # Rating SDT (evsdt_rating, dpsdt_rating, metad_rating)
-  if (!is.null(model$other_vars$n_ratings)) {
-    if (!is.null(type)) {
-      warning2("Argument 'type' is ignored for rating SDT pp_check. ",
-               "A response-proportion plot is always produced.")
-    }
-    if (is.null(ndraws)) ndraws <- 100L
-    return(.pp_check_sdt_rating(object, ndraws = ndraws, ...))
-  }
-
-  stop("'pp_check' is not implemented for this bmm model type.")
 }
 
 
@@ -86,8 +68,8 @@ pp_check.bmmfit <- function(object, type = NULL, ndraws = NULL, ...) {
                                  nsamples = NULL, subset = NULL,
                                  ...) {
   if (!requireNamespace("ggplot2", quietly = TRUE)) {
-    stop("ggplot2 is required for pp_check of rating SDT models. ",
-         "Please install it.")
+    stop2("ggplot2 is required for pp_check of rating SDT models. ",
+          "Please install it.")
   }
 
   # nsamples is a deprecated brms alias for ndraws

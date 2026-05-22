@@ -18,25 +18,21 @@ check_data.sdt <- function(model, data, formula) {
 # DISTRIBUTION ID & NAME MAPPING                                          ####
 ############################################################################# !
 
-# Map distribution name to Stan integer ID
 .sdt_dist_id <- function(dist) {
   .SDT_DISTS[[dist]]$id
 }
 
-# Map dist_type integer (from Stan vint) back to distribution name
+# ordered by id so vint2[i] in log_lik/posterior_predict indexes the right name
 .sdt_dist_names <- names(.SDT_DISTS)[order(vapply(.SDT_DISTS, `[[`, 0L, "id"))]
 
-# Stan CDF expression builder — returns function(x) producing Stan expression
 .sdt_cdf_expr <- function(dist) {
   .SDT_DISTS[[dist]]$stan_expr
 }
 
-# Stan log-CDF expression builder
 .sdt_log_cdf_expr <- function(dist) {
   .SDT_DISTS[[dist]]$log_stan_expr
 }
 
-# Stan log complementary CDF expression builder: log(1 - CDF(x))
 .sdt_log1m_cdf_expr <- function(dist) {
   .SDT_DISTS[[dist]]$log1m_stan_expr
 }
@@ -46,8 +42,6 @@ check_data.sdt <- function(model, data, formula) {
 # DATA VALIDATION HELPERS                                                 ####
 ############################################################################# !
 
-# Shared validation for count + trial columns
-# Checks existence, non-negativity, integerishness, and count <= trials
 .validate_sdt_counts <- function(data, resp_var, n_trials_var) {
   required <- c(resp_var, n_trials_var)
   missing <- setdiff(required, colnames(data))
@@ -68,7 +62,6 @@ check_data.sdt <- function(model, data, formula) {
     "Response counts in '{resp_var}' must not exceed '{n_trials_var}'")
 }
 
-# Rating-specific data checks (shared by sdt_rating, sdt_dp, sdt_metad)
 .check_data_sdt_rating <- function(model, data) {
   resp_cols <- model$resp_vars$response
 
@@ -93,7 +86,6 @@ check_data.sdt <- function(model, data, formula) {
   data
 }
 
-# Check if model is a rating model (used by old sdt() code path)
 .is_sdt_rating <- function(model) {
   n_ratings <- model$other_vars$n_ratings
   !is.null(n_ratings) && n_ratings > 2
@@ -175,10 +167,7 @@ check_data.sdt <- function(model, data, formula) {
 }
 
 .sdt_brms_dpar_name <- function(name) {
-  if (grepl("^delta[0-9]+$", name)) {
-    return(paste0(name, "par"))
-  }
-  name
+  if (grepl("^delta[0-9]+$", name)) paste0(name, "par") else name
 }
 
 .sdt_brms_dpar_map <- function(model) {
@@ -298,7 +287,7 @@ check_data.sdt <- function(model, data, formula) {
       "y, category, stimulus, n_ratings, dist_type, thresh_type,",
       "dprime, criterion,", spacing_value, ", metad, sdratio, deltas"
     ),
-    stop("Unsupported SDT family wrapper: ", family_name)
+    stop2("Unsupported SDT family wrapper: '{family_name}'")
   )
 
   paste0(
@@ -474,11 +463,13 @@ check_data.sdt <- function(model, data, formula) {
 .sdt_thresholds_equidistant <- function(n_ratings, mid) {
   function(k) {
     offset <- k - mid
-    if (offset == 0L) return("criterion")
-    if (offset > 0L) {
-      return(paste0("criterion + ", offset, " * exp(spacing)"))
+    if (offset == 0L) {
+      "criterion"
+    } else if (offset > 0L) {
+      paste0("criterion + ", offset, " * exp(spacing)")
+    } else {
+      paste0("criterion - ", abs(offset), " * exp(spacing)")
     }
-    paste0("criterion - ", abs(offset), " * exp(spacing)")
   }
 }
 
@@ -513,8 +504,9 @@ check_data.sdt <- function(model, data, formula) {
   canonical <- log(seq_len(K1) / (K - seq_len(K1)))
   function(k) {
     gk <- canonical[k]
-    if (gk == 0) return("criterion")
-    if (gk > 0) {
+    if (gk == 0) {
+      "criterion"
+    } else if (gk > 0) {
       sprintf("criterion + exp(spacing) * %.10f", gk)
     } else {
       sprintf("criterion - exp(spacing) * %.10f", abs(gk))

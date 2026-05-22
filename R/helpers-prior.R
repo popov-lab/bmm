@@ -155,7 +155,6 @@ fixed_pars_priors <- function(model, formula, additional_pars = list()) {
   bterms <- brms::brmsterms(formula)
   user_pars <- c(names(bterms$dpars), names(bterms$nlpars))
   overridden <- intersect(names(fix_pars), user_pars)
-  # A parameter is truly overridden only if the user's formula is not constant
   overridden <- Filter(function(p) {
     !isTRUE(attr(formula$pforms[[p]]$formula, "constant"))
   }, overridden)

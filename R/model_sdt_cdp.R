@@ -358,10 +358,6 @@ bmf2bf.sdt_cdp <- function(model, formula) {
 
 #' @export
 configure_model.sdt_cdp <- function(model, data, formula) {
-  kcrit_estimated <- model$other_vars$has_guess &&
-    !is.null(formula[["kcrit"]]) &&
-    !is_constant(formula[["kcrit"]])
-
   formula <- bmf2bf(model, formula)
 
   sc_path <- system.file("stan_chunks", package = "bmm")
@@ -383,28 +379,22 @@ configure_model.sdt_cdp <- function(model, data, formula) {
              model$links$spacing, model$links$rcrit,
              model$links$sigmar)
 
-  if (kcrit_estimated) {
-    dpars <- c(dpars, "kcrit")
-    links <- c(links, model$links$kcrit)
-  } else if (model$other_vars$has_guess) {
+  # kcrit is always a dpar when has_guess=TRUE: Stan needs it whether the user
+  # estimates it freely or it is fixed at the default via configure_prior()
+  if (model$other_vars$has_guess) {
     dpars <- c(dpars, "kcrit")
     links <- c(links, model$links$kcrit)
   }
 
-  has_guess <- model$other_vars$has_guess
-  family_name <- if (has_guess) "sdt_cdp_uv3" else "sdt_cdp_uv"
-
-  vint_vars <- paste0("vint", 1:8, "[n]")
-
   formula$family <- brms::custom_family(
-    family_name,
+    if (model$other_vars$has_guess) "sdt_cdp_uv3" else "sdt_cdp_uv",
     dpars = dpars,
     links = links,
     type = "int",
     loop = TRUE,
     log_lik = log_lik_sdt_cdp_uv,
     posterior_predict = posterior_predict_sdt_cdp,
-    vars = vint_vars
+    vars = paste0("vint", 1:8, "[n]")
   )
 
   nlist(formula, data, stanvars)
@@ -430,16 +420,14 @@ configure_model.sdt_cdp <- function(model, data, formula) {
     criterion, n_ratings, threshold_type_str, spacing
   )
 
-  has_guess_val <- !is.null(kcrit) && is.finite(kcrit)
+  has_guess_val <- !is.null(kcrit) && !is.na(kcrit) && is.finite(kcrit)
   probs <- .sdt_cdp_category_probs(
     thresholds, dprimef, dprimer, sigmar,
     rcrit, kcrit, stim, n_new, n_old,
     .sdt_dist_names[dist]
   )
 
-  # Map (cat_type, cat_conf) to index in probs
-  # Probs layout: new(n_new), [guess(n_old)], know(n_old),
-  #               remember(n_old)
+  # Probs layout: new(n_new), [guess(n_old)], know(n_old), remember(n_old)
   if (cat_type == 1L) {
     idx <- cat_conf
   } else if (has_guess_val) {
@@ -452,10 +440,6 @@ configure_model.sdt_cdp <- function(model, data, formula) {
   log(max(probs[idx], .Machine$double.eps))
 }
 
-# Reverse map from dist_int to dist name
-.sdt_dist_names <- c(
-  "normal", "gumbel_min", "gumbel_max", "logistic"
-)
 
 log_lik_sdt_cdp_uv <- function(i, prep) {
   dprimef <- brms::get_dpar(prep, "dprimef", i = i)
@@ -481,7 +465,7 @@ log_lik_sdt_cdp_uv <- function(i, prep) {
   } else if (has_guess == 1L) {
     rep(-100, length(dprimef))
   } else {
-    rep(NULL, length(dprimef))
+    rep(NA_real_, length(dprimef))
   }
 
   log_p <- mapply(
@@ -526,7 +510,7 @@ posterior_predict_sdt_cdp <- function(i, prep, ...) {
   } else if (has_guess == 1L) {
     rep(-100, length(dprimef))
   } else {
-    rep(NULL, length(dprimef))
+    rep(NA_real_, length(dprimef))
   }
 
   mapply(
@@ -539,7 +523,7 @@ posterior_predict_sdt_cdp <- function(i, prep, ...) {
         thresholds, df, dr, sr, rc, kc,
         stim, n_new, n_old, dist_name
       )
-      has_guess_val <- !is.null(kc) && is.finite(kc)
+      has_guess_val <- !is.null(kc) && !is.na(kc) && is.finite(kc)
       if (cat_type == 1L) {
         idx <- cat_conf
       } else if (has_guess_val) {
