@@ -156,7 +156,7 @@ fixed_pars_priors <- function(model, formula, additional_pars = list()) {
   user_pars <- c(names(bterms$dpars), names(bterms$nlpars))
   overridden <- intersect(names(fix_pars), user_pars)
   overridden <- Filter(function(p) {
-    !isTRUE(attr(formula$pforms[[p]]$formula, "constant"))
+    !isTRUE(attr(formula$pforms[[p]], "constant"))
   }, overridden)
   fix_pars <- fix_pars[!names(fix_pars) %in% overridden]
   if (length(fix_pars) == 0) {

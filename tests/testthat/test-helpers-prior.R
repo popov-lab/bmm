@@ -46,6 +46,28 @@ test_that("in combine prior, prior2 overwrites only shared components with prior
   expect_equal(dplyr::filter(prior, dpar == "kappa"), dplyr::filter(prior2, dpar == "kappa"))
 })
 
+test_that("fixed_pars_priors applies constant(0) to auto-added fixed parameters", {
+  # Regression: pforms[[p]] is a formula object, not a list, so the constant
+  # attribute must be read from attr(pform, "constant"), not attr(pform$formula, ...)
+  m <- sdt_binary(response = "n_old", stimulus = "stimulus", n_trials = "n_trials")
+  f <- bmf(dprime ~ 1, criterion ~ 1)
+  dat <- data.frame(id = "1", stimulus = c(1L, 0L), n_old = c(8L, 2L), n_trials = 10L)
+  f_checked <- suppressMessages(check_formula(m, dat, f))
+  config    <- configure_model(m, dat, f_checked)
+  prior     <- fixed_pars_priors(m, config$formula)
+  expect_true(any(grepl("constant\\(0\\)", prior$prior) & prior$dpar == "sdratio"))
+})
+
+test_that("fixed_pars_priors does not apply constant when user overrides sdratio", {
+  m <- sdt_binary(response = "n_old", stimulus = "stimulus", n_trials = "n_trials")
+  f <- bmf(dprime ~ 1, criterion ~ 1, sdratio ~ 1)
+  dat <- data.frame(id = "1", stimulus = c(1L, 0L), n_old = c(8L, 2L), n_trials = 10L)
+  f_checked <- suppressMessages(check_formula(m, dat, f))
+  config    <- configure_model(m, dat, f_checked)
+  prior     <- fixed_pars_priors(m, config$formula)
+  expect_false(any(grepl("constant", prior$prior) & prior$dpar == "sdratio"))
+})
+
 test_that("no check for sort_data with default_priors function", {
   withr::local_options("bmm.sort_data" = "check")
   res <- capture_messages(default_prior(
