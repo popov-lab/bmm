@@ -195,7 +195,7 @@ configure_model.sdt_ranking <- function(model, data, formula) {
   stan_funs <- read_lines2(paste0(sc_path, "/sdt_ranking_funs.stan"))
   stanvars <- brms::stanvar(scode = stan_funs, block = "functions")
 
-  if (model$other_vars$dist == "normal" && sdratio_estimated) {
+  if (model$other_vars$dist == "normal") {
     formula$family <- brms::custom_family(
       "sdt_ranking_uv",
       dpars = c("mu", "dprime", "sdratio"),
