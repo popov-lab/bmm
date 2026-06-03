@@ -195,7 +195,7 @@ configure_model.sdt_ranking <- function(model, data, formula) {
   stan_funs <- read_lines2(paste0(sc_path, "/sdt_ranking_funs.stan"))
   stanvars <- brms::stanvar(scode = stan_funs, block = "functions")
 
-  if (model$other_vars$dist == "normal") {
+  if (model$other_vars$dist == "normal" && sdratio_estimated) {
     formula$family <- brms::custom_family(
       "sdt_ranking_uv",
       dpars = c("mu", "dprime", "sdratio"),
@@ -203,6 +203,17 @@ configure_model.sdt_ranking <- function(model, data, formula) {
       type = "int",
       loop = TRUE,
       log_lik = log_lik_sdt_ranking_uv,
+      posterior_predict = posterior_predict_sdt_ranking,
+      vars = c("vint1[n]", "vint2[n]")
+    )
+  } else if (model$other_vars$dist == "normal") {
+    formula$family <- brms::custom_family(
+      "sdt_ranking_ev",
+      dpars = c("mu", "dprime"),
+      links = c("identity", model$links$dprime),
+      type = "int",
+      loop = TRUE,
+      log_lik = log_lik_sdt_ranking_ev,
       posterior_predict = posterior_predict_sdt_ranking,
       vars = c("vint1[n]", "vint2[n]")
     )
@@ -295,11 +306,11 @@ log_lik_sdt_ranking <- function(i, prep) {
 }
 
 log_lik_sdt_ranking_uv <- function(i, prep) {
-  dprime <- brms::get_dpar(prep, "dprime", i = i)
-  sdratio <- brms::get_dpar(prep, "sdratio", i = i)
+  dprime   <- brms::get_dpar(prep, "dprime",   i = i)
+  sdratio  <- brms::get_dpar(prep, "sdratio",  i = i)
   rank_pos <- prep$data$vint1[i]
   max_rank <- prep$data$vint2[i]
-  y <- prep$data$Y[i]
+  y        <- prep$data$Y[i]
 
   log_p <- mapply(function(d, s) {
     p <- .ranking_prob_r(d, rank_pos, max_rank, dist = "normal", sdratio = s)
@@ -308,17 +319,34 @@ log_lik_sdt_ranking_uv <- function(i, prep) {
   y * log_p
 }
 
+log_lik_sdt_ranking_ev <- function(i, prep) {
+  dprime   <- brms::get_dpar(prep, "dprime", i = i)
+  rank_pos <- prep$data$vint1[i]
+  max_rank <- prep$data$vint2[i]
+  y        <- prep$data$Y[i]
+
+  log_p <- vapply(dprime, function(d) {
+    p <- .ranking_prob_r(d, rank_pos, max_rank, dist = "normal", sdratio = 0)
+    log(p)
+  }, numeric(1))
+  y * log_p
+}
+
 posterior_predict_sdt_ranking <- function(i, prep, ...) {
-  dprime <- brms::get_dpar(prep, "dprime", i = i)
+  dprime   <- brms::get_dpar(prep, "dprime", i = i)
   rank_pos <- prep$data$vint1[i]
   max_rank <- prep$data$vint2[i]
 
-  has_sdratio <- "sdratio" %in% names(prep$dpars)
-  dist <- if (has_sdratio) "normal" else "gumbel_min"
-  sdratio <- if (has_sdratio) {
-    brms::get_dpar(prep, "sdratio", i = i)
+  family_name <- prep$family$name
+  if ("sdratio" %in% names(prep$dpars)) {
+    dist    <- "normal"
+    sdratio <- brms::get_dpar(prep, "sdratio", i = i)
+  } else if (family_name == "sdt_ranking_ev") {
+    dist    <- "normal"
+    sdratio <- rep(0, length(dprime))
   } else {
-    rep(0, length(dprime))
+    dist    <- "gumbel_min"
+    sdratio <- rep(0, length(dprime))
   }
 
   vapply(seq_along(dprime), function(s) {

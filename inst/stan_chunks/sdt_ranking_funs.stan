@@ -72,3 +72,11 @@ real sdt_ranking_uv_lpmf(int y, real mu, real dprime, real sdratio,
   real log_p = log_choose + log_sum_exp(log_terms);
   return y * log_p;
 }
+
+// Equal-variance normal ranking: delegates to UV with sdratio = 0 (sigma = 1).
+// Separate family avoids passing sdratio as a brms constant dpar, which
+// causes degenerate HMC geometry.
+real sdt_ranking_ev_lpmf(int y, real mu, real dprime,
+                         int rank_pos, int max_rank) {
+  return sdt_ranking_uv_lpmf(y | mu, dprime, 0.0, rank_pos, max_rank);
+}
