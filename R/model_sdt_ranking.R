@@ -207,6 +207,10 @@ configure_model.sdt_ranking <- function(model, data, formula) {
       vars = c("vint1[n]", "vint2[n]")
     )
   } else if (model$other_vars$dist == "normal") {
+    # sdratio is a fixed_parameter, so bmf2bf() adds it as a constant formula
+    # component inside pforms. Strip it here: sdt_ranking_ev has no sdratio
+    # dpar and brm() would reject a formula component not in the family dpars.
+    formula$pforms[["sdratio"]] <- NULL
     formula$family <- brms::custom_family(
       "sdt_ranking_ev",
       dpars = c("mu", "dprime"),

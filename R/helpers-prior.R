@@ -152,9 +152,14 @@ fixed_pars_priors <- function(model, formula, additional_pars = list()) {
 
   # Skip fixed parameters the user has overridden in the formula
   # (e.g., sdratio ~ 1 overrides fixed_parameters = list(sdratio = 0))
+  # Also skip fixed parameters that configure_model stripped from the formula
+  # (e.g., sdratio removed for sdt_ranking_ev family).
   bterms <- brms::brmsterms(formula)
-  user_pars <- c(names(bterms$dpars), names(bterms$nlpars))
-  overridden <- intersect(names(fix_pars), user_pars)
+  active_pars <- c(names(bterms$dpars), names(bterms$nlpars))
+  fix_pars <- fix_pars[names(fix_pars) %in% active_pars]
+  if (length(fix_pars) == 0) return(brms::empty_prior())
+
+  overridden <- intersect(names(fix_pars), active_pars)
   overridden <- Filter(function(p) {
     !isTRUE(attr(formula$pforms[[p]], "constant"))
   }, overridden)
