@@ -1,6 +1,6 @@
 Package: bmm
 Title: Easy and Accessible Bayesian Measurement Models Using 'brms'
-Version: 1.3.0
+Version: 1.3.1
 Authors@R: c(
     person("Vencislav", "Popov", , "vencislav.popov@gmail.com", role = c("aut", "cre", "cph"),
            comment = c(ORCID = "0000-0002-8073-4199")),
