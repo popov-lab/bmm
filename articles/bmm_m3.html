@@ -13,8 +13,8 @@
     }
   };
 </script><script src="../deps/jquery-3.6.0/jquery-3.6.0.min.js"></script><meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
-<link href="../deps/bootstrap-5.3.1/bootstrap.min.css" rel="stylesheet">
-<script src="../deps/bootstrap-5.3.1/bootstrap.bundle.min.js"></script><link href="../deps/font-awesome-6.5.2/css/all.min.css" rel="stylesheet">
+<link href="../deps/bootstrap-5.3.8/bootstrap.min.css" rel="stylesheet">
+<script src="../deps/bootstrap-5.3.8/bootstrap.bundle.min.js"></script><link href="../deps/font-awesome-6.5.2/css/all.min.css" rel="stylesheet">
 <link href="../deps/font-awesome-6.5.2/css/v4-shims.min.css" rel="stylesheet">
 <script src="../deps/headroom-0.11.0/headroom.min.js"></script><script src="../deps/headroom-0.11.0/jQuery.headroom.min.js"></script><script src="../deps/bootstrap-toc-1.0.1/bootstrap-toc.min.js"></script><script src="../deps/clipboard.js-2.0.11/clipboard.min.js"></script><script src="../deps/search-1.0.0/autocomplete.jquery.min.js"></script><script src="../deps/search-1.0.0/fuse.min.js"></script><script src="../deps/search-1.0.0/mark.min.js"></script><!-- pkgdown --><script src="../pkgdown.js"></script><meta property="og:title" content="The Multinomial / Memory Measurement Model (M3)">
 </head>
@@ -26,7 +26,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">bmm</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="Released version">1.2.0</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="Released version">1.3.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -38,8 +38,8 @@
 <li class="nav-item"><a class="nav-link" href="../reference/index.html">Functions</a></li>
 <li class="active nav-item"><a class="nav-link" href="../articles/index.html">Articles</a></li>
 <li class="nav-item"><a class="nav-link" href="../news/index.html">Changelog</a></li>
-<li class="nav-item"><a class="nav-link" href="https://venpopov.github.io/bmm/dev-notes/index.html">Develop</a></li>
-<li class="nav-item"><a class="nav-link" href="https://venpopov.github.io/bmm/parameter-recovery/index.html">Parameter recovery</a></li>
+<li class="nav-item"><a class="nav-link" href="https://venpopov.com/bmm/dev-notes/index.html">Develop</a></li>
+<li class="nav-item"><a class="nav-link" href="https://venpopov.com/bmm/parameter-recovery/index.html">Parameter recovery</a></li>
       </ul>
 <ul class="navbar-nav">
 <li class="nav-item"><form class="form-inline" role="search">
@@ -56,14 +56,13 @@
 
 <div class="row">
   <main id="main" class="col-md-9"><div class="page-header">
-
-      <h1>The Multinomial / Memory Measurement Model (M3)</h1>
+      <img src="../logo.png" class="logo" alt=""><h1>The Multinomial / Memory Measurement Model (M3)</h1>
                         <h4 data-toc-skip class="author">Gidon Frischkorn</h4>
                         <h4 data-toc-skip class="author">Chenyu Li</h4>
                         <h4 data-toc-skip class="author">Isabel Courage</h4>
             
       
-      <small class="dont-index">Source: <a href="https://github.com/venpopov/bmm/blob/v1.2.0/vignettes/articles/bmm_m3.Rmd" class="external-link"><code>vignettes/articles/bmm_m3.Rmd</code></a></small>
+      <small class="dont-index">Source: <a href="https://github.com/venpopov/bmm/blob/develop/vignettes/articles/bmm_m3.Rmd" class="external-link"><code>vignettes/articles/bmm_m3.Rmd</code></a></small>
       <div class="d-none name"><code>bmm_m3.Rmd</code></div>
     </div>
 
@@ -349,32 +348,32 @@ npi &amp; = b
 <span><span class="co">#&gt;          normal(1, 1)     b        Intercept                     c &lt;NA&gt; &lt;NA&gt;</span></span>
 <span><span class="co">#&gt;          normal(1, 1)     b        Intercept                     d &lt;NA&gt; &lt;NA&gt;</span></span>
 <span><span class="co">#&gt;         constant(0.1)     b        Intercept                     b &lt;NA&gt; &lt;NA&gt;</span></span>
-<span><span class="co">#&gt;        source</span></span>
-<span><span class="co">#&gt;  (vectorized)</span></span>
-<span><span class="co">#&gt;  (vectorized)</span></span>
-<span><span class="co">#&gt;       default</span></span>
-<span><span class="co">#&gt;  (vectorized)</span></span>
-<span><span class="co">#&gt;  (vectorized)</span></span>
-<span><span class="co">#&gt;  (vectorized)</span></span>
-<span><span class="co">#&gt;  (vectorized)</span></span>
-<span><span class="co">#&gt;       default</span></span>
-<span><span class="co">#&gt;  (vectorized)</span></span>
-<span><span class="co">#&gt;  (vectorized)</span></span>
-<span><span class="co">#&gt;       default</span></span>
-<span><span class="co">#&gt;  (vectorized)</span></span>
-<span><span class="co">#&gt;  (vectorized)</span></span>
-<span><span class="co">#&gt;  (vectorized)</span></span>
-<span><span class="co">#&gt;  (vectorized)</span></span>
-<span><span class="co">#&gt;       default</span></span>
-<span><span class="co">#&gt;       default</span></span>
-<span><span class="co">#&gt;  (vectorized)</span></span>
-<span><span class="co">#&gt;  (vectorized)</span></span>
-<span><span class="co">#&gt;          user</span></span>
-<span><span class="co">#&gt;          user</span></span>
-<span><span class="co">#&gt;          user</span></span>
-<span><span class="co">#&gt;          user</span></span>
-<span><span class="co">#&gt;          user</span></span>
-<span><span class="co">#&gt;          user</span></span></code></pre></div>
+<span><span class="co">#&gt;  tag       source</span></span>
+<span><span class="co">#&gt;      (vectorized)</span></span>
+<span><span class="co">#&gt;      (vectorized)</span></span>
+<span><span class="co">#&gt;           default</span></span>
+<span><span class="co">#&gt;      (vectorized)</span></span>
+<span><span class="co">#&gt;      (vectorized)</span></span>
+<span><span class="co">#&gt;      (vectorized)</span></span>
+<span><span class="co">#&gt;      (vectorized)</span></span>
+<span><span class="co">#&gt;           default</span></span>
+<span><span class="co">#&gt;      (vectorized)</span></span>
+<span><span class="co">#&gt;      (vectorized)</span></span>
+<span><span class="co">#&gt;           default</span></span>
+<span><span class="co">#&gt;      (vectorized)</span></span>
+<span><span class="co">#&gt;      (vectorized)</span></span>
+<span><span class="co">#&gt;      (vectorized)</span></span>
+<span><span class="co">#&gt;      (vectorized)</span></span>
+<span><span class="co">#&gt;           default</span></span>
+<span><span class="co">#&gt;           default</span></span>
+<span><span class="co">#&gt;      (vectorized)</span></span>
+<span><span class="co">#&gt;      (vectorized)</span></span>
+<span><span class="co">#&gt;              user</span></span>
+<span><span class="co">#&gt;              user</span></span>
+<span><span class="co">#&gt;              user</span></span>
+<span><span class="co">#&gt;              user</span></span>
+<span><span class="co">#&gt;              user</span></span>
+<span><span class="co">#&gt;              user</span></span></code></pre></div>
 </div>
 <div class="section level3" number="3.4">
 <h3 id="running-bmm-to-estimate-parameters">
@@ -512,20 +511,30 @@ scale reduction factor on split chains (at convergence, Rhat = 1).
 <h4 id="assessing-model-fit">
 <span class="header-section-number">3.4.2</span> Assessing model fit<a class="anchor" aria-label="anchor" href="#assessing-model-fit"></a>
 </h4>
-<p>For most models implemented in <code>bmm</code> you can easily assess model fit by visually inspecting posterior predictive plots provided by the <code>pp_check</code> function. Unfortunately this function is not yet implemented for multinomial distributional models, such as the <code>m3</code> model.</p>
-<p>Nevertheless, there is a pretty simple way to assess model fit for the <code>m3</code> model by obtaining posterior predictions using the <code>tidybayes</code> package. Using the posterior predictive draws for the frequency of selecting each response category, we can compare the observed frequencies to the predicted frequencies. If the model fits the data well, the observed frequencies should be within the 95% credible interval of the predicted frequencies.</p>
+<p>You can assess model fit by visually inspecting posterior predictive plots using the <code>pp_check</code> function. For multinomial models like the <code>m3</code>, <code>bmm</code> provides a custom <code>pp_check</code> method that compares observed and predicted response proportions across experimental conditions.</p>
 <div class="sourceCode" id="cb14"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="fu"><a href="../reference/pp_check.bmmfit.html">pp_check</a></span><span class="op">(</span><span class="va">m3_fit</span>, ndraws <span class="op">=</span> <span class="fl">100</span><span class="op">)</span></span></code></pre></div>
+<p><img src="bmm_m3_files/figure-html/model_fit-1.jpeg" alt="" width="80%" style="display: block; margin: auto;"></p>
+<p>The plot shows observed response proportions as bars and the posterior predictive median with 95% credible interval as point-ranges for each response category. If the model fits the data well, the observed bars should align with the predicted point-ranges.</p>
+<p>For this particular model, a good fit is unsurprising as it is saturated with respect to the number of parameters and the number of observations.</p>
+</div>
+<div class="section level4" number="3.4.3">
+<h4 id="advanced-custom-visualization">
+<span class="header-section-number">3.4.3</span> Advanced: custom visualization<a class="anchor" aria-label="anchor" href="#advanced-custom-visualization"></a>
+</h4>
+<p>For more control over the visualization, you can obtain posterior predictions directly using the <code>tidybayes</code> package and build a custom plot.</p>
+<div class="sourceCode" id="cb15"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://mjskay.github.io/tidybayes/" class="external-link">tidybayes</a></span><span class="op">)</span></span>
 <span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://dplyr.tidyverse.org" class="external-link">dplyr</a></span><span class="op">)</span></span>
 <span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://ggplot2.tidyverse.org" class="external-link">ggplot2</a></span><span class="op">)</span></span>
 <span></span>
-<span><span class="va">pp_m3</span> <span class="op">&lt;-</span> <span class="va">m3_fit</span> <span class="op"><a href="https://magrittr.tidyverse.org/reference/pipe.html" class="external-link">%&gt;%</a></span> </span>
+<span><span class="va">pp_m3</span> <span class="op">&lt;-</span> <span class="va">m3_fit</span> <span class="op">|&gt;</span></span>
 <span>  <span class="co"># obtain expected predicted draws</span></span>
 <span>  <span class="fu">tidybayes</span><span class="fu">::</span><span class="fu"><a href="https://mjskay.github.io/tidybayes/reference/add_predicted_draws.html" class="external-link">epred_draws</a></span><span class="op">(</span></span>
-<span>    newdata <span class="op">=</span> <span class="va">.</span><span class="op">$</span><span class="va">data</span></span>
-<span>  <span class="op">)</span> <span class="op"><a href="https://magrittr.tidyverse.org/reference/pipe.html" class="external-link">%&gt;%</a></span> <span class="fu"><a href="https://dplyr.tidyverse.org/reference/group_by.html" class="external-link">ungroup</a></span><span class="op">(</span><span class="op">)</span> <span class="op"><a href="https://magrittr.tidyverse.org/reference/pipe.html" class="external-link">%&gt;%</a></span> </span>
+<span>    newdata <span class="op">=</span> <span class="va">m3_fit</span><span class="op">$</span><span class="va">data</span></span>
+<span>  <span class="op">)</span> <span class="op">|&gt;</span> <span class="fu"><a href="https://dplyr.tidyverse.org/reference/group_by.html" class="external-link">ungroup</a></span><span class="op">(</span><span class="op">)</span> <span class="op">|&gt;</span></span>
 <span>  <span class="co"># select only relevant variables</span></span>
-<span>  <span class="fu"><a href="https://dplyr.tidyverse.org/reference/select.html" class="external-link">select</a></span><span class="op">(</span><span class="va">ID</span>, <span class="va">cond</span>, <span class="va">nTrials</span>, <span class="va">.draw</span>, <span class="va">.category</span>, <span class="va">.epred</span><span class="op">)</span> <span class="op"><a href="https://magrittr.tidyverse.org/reference/pipe.html" class="external-link">%&gt;%</a></span> </span>
+<span>  <span class="fu"><a href="https://dplyr.tidyverse.org/reference/select.html" class="external-link">select</a></span><span class="op">(</span><span class="va">ID</span>, <span class="va">cond</span>, <span class="va">nTrials</span>, <span class="va">.draw</span>, <span class="va">.category</span>, <span class="va">.epred</span><span class="op">)</span> <span class="op">|&gt;</span></span>
 <span>  <span class="co"># calculate the mean predicted values in each condition for each response category</span></span>
 <span>  <span class="co"># and each draw</span></span>
 <span>  <span class="fu"><a href="https://dplyr.tidyverse.org/reference/summarise.html" class="external-link">summarise</a></span><span class="op">(</span>.epred <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/mean.html" class="external-link">mean</a></span><span class="op">(</span><span class="va">.epred</span><span class="op">/</span><span class="va">nTrials</span><span class="op">)</span>,</span>
@@ -533,9 +542,9 @@ scale reduction factor on split chains (at convergence, Rhat = 1).
 <span></span>
 <span><span class="co"># reshape data to match the format of the posterior predictives</span></span>
 <span><span class="va">data</span><span class="op">$</span><span class="va">n_trials</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/colSums.html" class="external-link">rowSums</a></span><span class="op">(</span><span class="va">data</span><span class="op">[</span>,<span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"corr"</span>,<span class="st">"other"</span>,<span class="st">"dist"</span>,<span class="st">"npl"</span><span class="op">)</span><span class="op">]</span>, na.rm <span class="op">=</span> <span class="cn">T</span><span class="op">)</span></span>
-<span><span class="va">data_pp</span> <span class="op">&lt;-</span> <span class="va">data</span> <span class="op"><a href="https://magrittr.tidyverse.org/reference/pipe.html" class="external-link">%&gt;%</a></span> </span>
-<span>  <span class="fu"><a href="https://dplyr.tidyverse.org/reference/select.html" class="external-link">select</a></span><span class="op">(</span><span class="va">ID</span>, <span class="va">n_trials</span>, <span class="va">cond</span>, <span class="va">corr</span>, <span class="va">other</span>, <span class="va">dist</span>, <span class="va">npl</span><span class="op">)</span> <span class="op"><a href="https://magrittr.tidyverse.org/reference/pipe.html" class="external-link">%&gt;%</a></span> </span>
-<span>  <span class="fu">tidyr</span><span class="fu">::</span><span class="fu"><a href="https://tidyr.tidyverse.org/reference/pivot_longer.html" class="external-link">pivot_longer</a></span><span class="op">(</span>cols <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="va">corr</span>, <span class="va">other</span>, <span class="va">dist</span>, <span class="va">npl</span><span class="op">)</span>, names_to <span class="op">=</span> <span class="st">".category"</span>, values_to <span class="op">=</span> <span class="st">".value"</span><span class="op">)</span> <span class="op"><a href="https://magrittr.tidyverse.org/reference/pipe.html" class="external-link">%&gt;%</a></span> </span>
+<span><span class="va">data_pp</span> <span class="op">&lt;-</span> <span class="va">data</span> <span class="op">|&gt;</span></span>
+<span>  <span class="fu"><a href="https://dplyr.tidyverse.org/reference/select.html" class="external-link">select</a></span><span class="op">(</span><span class="va">ID</span>, <span class="va">n_trials</span>, <span class="va">cond</span>, <span class="va">corr</span>, <span class="va">other</span>, <span class="va">dist</span>, <span class="va">npl</span><span class="op">)</span> <span class="op">|&gt;</span></span>
+<span>  <span class="fu">tidyr</span><span class="fu">::</span><span class="fu"><a href="https://tidyr.tidyverse.org/reference/pivot_longer.html" class="external-link">pivot_longer</a></span><span class="op">(</span>cols <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="va">corr</span>, <span class="va">other</span>, <span class="va">dist</span>, <span class="va">npl</span><span class="op">)</span>, names_to <span class="op">=</span> <span class="st">".category"</span>, values_to <span class="op">=</span> <span class="st">".value"</span><span class="op">)</span> <span class="op">|&gt;</span></span>
 <span>  <span class="fu"><a href="https://dplyr.tidyverse.org/reference/mutate.html" class="external-link">mutate</a></span><span class="op">(</span>.value <span class="op">=</span> <span class="va">.value</span><span class="op">/</span><span class="va">n_trials</span><span class="op">)</span></span>
 <span></span>
 <span><span class="co"># some responses were not possible in some conditions, so we set them to zero</span></span>
@@ -547,27 +556,24 @@ scale reduction factor on split chains (at convergence, Rhat = 1).
 <span></span>
 <span><span class="co"># plot the posterior predictive draws against the observed data</span></span>
 <span><span class="fu"><a href="https://ggplot2.tidyverse.org/reference/ggplot.html" class="external-link">ggplot</a></span><span class="op">(</span>data <span class="op">=</span> <span class="va">pp_m3</span>,</span>
-<span>       <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/aes.html" class="external-link">aes</a></span><span class="op">(</span>y <span class="op">=</span> <span class="va">.epred</span>, x <span class="op">=</span> <span class="va">cond</span>, fill <span class="op">=</span> <span class="va">cond</span><span class="op">)</span><span class="op">)</span> <span class="op">+</span></span>
-<span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/facet_grid.html" class="external-link">facet_grid</a></span><span class="op">(</span><span class="va">.category</span> <span class="op">~</span> <span class="va">cond</span>, scales <span class="op">=</span> <span class="st">"free"</span><span class="op">)</span> <span class="op">+</span></span>
-<span>  <span class="fu">gghalves</span><span class="fu">::</span><span class="fu"><a href="https://rdrr.io/pkg/gghalves/man/geom_half_violin.html" class="external-link">geom_half_violin</a></span><span class="op">(</span></span>
-<span>    side <span class="op">=</span> <span class="st">"r"</span>, nudge <span class="op">=</span> <span class="fl">0.1</span>, trim <span class="op">=</span> <span class="cn">TRUE</span></span>
-<span>  <span class="op">)</span> <span class="op">+</span></span>
+<span>       <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/aes.html" class="external-link">aes</a></span><span class="op">(</span><span class="va">condition</span>, y <span class="op">=</span> <span class="va">.epred</span>, x <span class="op">=</span> <span class="va">cond</span>, fill <span class="op">=</span> <span class="va">cond</span><span class="op">)</span><span class="op">)</span> <span class="op">+</span></span>
+<span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/facet_wrap.html" class="external-link">facet_wrap</a></span><span class="op">(</span><span class="op">~</span><span class="va">.category</span>, scales <span class="op">=</span> <span class="st">"free"</span><span class="op">)</span> <span class="op">+</span></span>
+<span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/geom_violin.html" class="external-link">geom_violin</a></span><span class="op">(</span><span class="op">)</span> <span class="op">+</span></span>
 <span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/stat_summary.html" class="external-link">stat_summary</a></span><span class="op">(</span>data <span class="op">=</span> <span class="va">data_pp</span>, <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/aes.html" class="external-link">aes</a></span> <span class="op">(</span>y <span class="op">=</span> <span class="va">.value</span><span class="op">)</span>,</span>
-<span>               fun.data <span class="op">=</span> <span class="va">mean_se</span><span class="op">)</span> <span class="op">+</span></span>
+<span>               fun.data <span class="op">=</span> <span class="va">mean_se</span>, size <span class="op">=</span> <span class="fl">0.1</span><span class="op">)</span> <span class="op">+</span></span>
 <span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/labs.html" class="external-link">labs</a></span><span class="op">(</span>y <span class="op">=</span> <span class="st">"Response proportions"</span>,</span>
 <span>       x <span class="op">=</span> <span class="st">"Condition"</span>,</span>
 <span>       fill <span class="op">=</span> <span class="st">"Condition"</span>,</span>
 <span>       title <span class="op">=</span> <span class="st">"Model Fit"</span>,</span>
-<span>       subtitle <span class="op">=</span> <span class="st">"Posterior Predicitve vs. Observed Response Proportions"</span><span class="op">)</span></span></code></pre></div>
-<p><img src="bmm_m3_files/figure-html/model_fit-1.jpeg" width="80%" style="display: block; margin: auto;"></p>
-<p>The generated plot illustrates that the distribution of posterior predictive response distributions is in line with the observed response distributions. This indicates that the model fits the data well. For this particular model, this is unsurprising as it is saturated with respect to the number of parameters and the number of observations.</p>
+<span>       subtitle <span class="op">=</span> <span class="st">"Posterior Predictive vs. Observed Response Proportions"</span><span class="op">)</span></span></code></pre></div>
+<p><img src="bmm_m3_files/figure-html/model_fit_custom-1.jpeg" alt="" width="80%" style="display: block; margin: auto;"></p>
 </div>
 </div>
 </div>
 <div class="section level2">
 <h2 id="references">References<a class="anchor" aria-label="anchor" href="#references"></a>
 </h2>
-<div id="refs" class="references csl-bib-body hanging-indent" entry-spacing="0">
+<div id="refs" class="references csl-bib-body hanging-indent">
 <div id="ref-oberauerSimpleMeasurementModels2019" class="csl-entry">
 Oberauer, Klaus, and Stephan Lewandowsky. 2019. <span>“Simple Measurement Models for Complex Working-Memory Tasks.”</span> <em>Psychological Review</em> 126 (6): 880–932. <a href="https://doi.org/10.1037/rev0000159" class="external-link">https://doi.org/10.1037/rev0000159</a>.
 </div>
@@ -585,7 +591,7 @@ Oberauer, Klaus, and Stephan Lewandowsky. 2019. <span>“Simple Measurement Mode
 </div>
 
 <div class="pkgdown-footer-right">
-  <p>Site built with <a href="https://pkgdown.r-lib.org/" class="external-link">pkgdown</a> 2.1.3.</p>
+  <p>Site built with <a href="https://pkgdown.r-lib.org/" class="external-link">pkgdown</a> 2.2.0.</p>
 </div>
 
     </footer>

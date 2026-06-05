@@ -5,9 +5,9 @@
       fontURL: "https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/output/chtml/fonts/woff-v2"
     }
   };
-</script><script src="../deps/jquery-3.6.0/jquery-3.6.0.min.js"></script><meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no"><link href="../deps/bootstrap-5.3.1/bootstrap.min.css" rel="stylesheet"><script src="../deps/bootstrap-5.3.1/bootstrap.bundle.min.js"></script><link href="../deps/font-awesome-6.5.2/css/all.min.css" rel="stylesheet"><link href="../deps/font-awesome-6.5.2/css/v4-shims.min.css" rel="stylesheet"><script src="../deps/headroom-0.11.0/headroom.min.js"></script><script src="../deps/headroom-0.11.0/jQuery.headroom.min.js"></script><script src="../deps/bootstrap-toc-1.0.1/bootstrap-toc.min.js"></script><script src="../deps/clipboard.js-2.0.11/clipboard.min.js"></script><script src="../deps/search-1.0.0/autocomplete.jquery.min.js"></script><script src="../deps/search-1.0.0/fuse.min.js"></script><script src="../deps/search-1.0.0/mark.min.js"></script><!-- pkgdown --><script src="../pkgdown.js"></script><meta property="og:title" content="Softmax function and its inverse — softmax"><meta name="description" content="softmax returns the value of the softmax function
+</script><script src="../deps/jquery-3.6.0/jquery-3.6.0.min.js"></script><meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no"><link href="../deps/bootstrap-5.3.8/bootstrap.min.css" rel="stylesheet"><script src="../deps/bootstrap-5.3.8/bootstrap.bundle.min.js"></script><link href="../deps/font-awesome-6.5.2/css/all.min.css" rel="stylesheet"><link href="../deps/font-awesome-6.5.2/css/v4-shims.min.css" rel="stylesheet"><script src="../deps/headroom-0.11.0/headroom.min.js"></script><script src="../deps/headroom-0.11.0/jQuery.headroom.min.js"></script><script src="../deps/bootstrap-toc-1.0.1/bootstrap-toc.min.js"></script><script src="../deps/clipboard.js-2.0.11/clipboard.min.js"></script><script src="../deps/search-1.0.0/autocomplete.jquery.min.js"></script><script src="../deps/search-1.0.0/fuse.min.js"></script><script src="../deps/search-1.0.0/mark.min.js"></script><!-- pkgdown --><script src="../pkgdown.js"></script><meta property="og:title" content="Softmax function and its inverse — softmax"><meta name="description" content="softmax returns the value of the softmax function
 softmaxinv returns the value of the inverse-softmax function"><meta property="og:description" content="softmax returns the value of the softmax function
-softmaxinv returns the value of the inverse-softmax function"></head><body>
+softmaxinv returns the value of the inverse-softmax function"><meta property="og:image" content="https://venpopov.com/bmm/logo.png"></head><body>
     <a href="#main" class="visually-hidden-focusable">Skip to contents</a>
 
 
@@ -15,7 +15,7 @@ softmaxinv returns the value of the inverse-softmax function"></head><body>
 
     <a class="navbar-brand me-2" href="../index.html">bmm</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="Released version">1.2.0</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="Released version">1.3.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -26,8 +26,8 @@ softmaxinv returns the value of the inverse-softmax function"></head><body>
       <ul class="navbar-nav me-auto"><li class="active nav-item"><a class="nav-link" href="../reference/index.html">Functions</a></li>
 <li class="nav-item"><a class="nav-link" href="../articles/index.html">Articles</a></li>
 <li class="nav-item"><a class="nav-link" href="../news/index.html">Changelog</a></li>
-<li class="nav-item"><a class="nav-link" href="https://venpopov.github.io/bmm/dev-notes/index.html">Develop</a></li>
-<li class="nav-item"><a class="nav-link" href="https://venpopov.github.io/bmm/parameter-recovery/index.html">Parameter recovery</a></li>
+<li class="nav-item"><a class="nav-link" href="https://venpopov.com/bmm/dev-notes/index.html">Develop</a></li>
+<li class="nav-item"><a class="nav-link" href="https://venpopov.com/bmm/parameter-recovery/index.html">Parameter recovery</a></li>
       </ul><ul class="navbar-nav"><li class="nav-item"><form class="form-inline" role="search">
  <input class="form-control" type="search" name="search-input" id="search-input" autocomplete="off" aria-label="Search site" placeholder="Search for" data-search-index="../search.json"></form></li>
 <li class="nav-item"><a class="external-link nav-link" href="https://github.com/venpopov/bmm/" aria-label="GitHub"><span class="fa fab fa-github fa-lg"></span></a></li>
@@ -38,9 +38,8 @@ softmaxinv returns the value of the inverse-softmax function"></head><body>
 </nav><div class="container template-reference-topic">
 <div class="row">
   <main id="main" class="col-md-9"><div class="page-header">
-
-      <h1>Softmax function and its inverse</h1>
-      <small class="dont-index">Source: <a href="https://github.com/venpopov/bmm/blob/v1.2.0/R/utils.R" class="external-link"><code>R/utils.R</code></a></small>
+      <img src="../logo.png" class="logo" alt=""><h1>Softmax function and its inverse</h1>
+      <small class="dont-index">Source: <a href="https://github.com/venpopov/bmm/blob/develop/R/utils.R" class="external-link"><code>R/utils.R</code></a></small>
       <div class="d-none name"><code>softmax.Rd</code></div>
     </div>
 
@@ -53,7 +52,7 @@ softmaxinv returns the value of the inverse-softmax function"></head><body>
     <h2 id="ref-usage">Usage<a class="anchor" aria-label="anchor" href="#ref-usage"></a></h2>
     <div class="sourceCode"><pre class="sourceCode r"><code><span><span class="fu">softmax</span><span class="op">(</span><span class="va">eta</span>, lambda <span class="op">=</span> <span class="fl">1</span><span class="op">)</span></span>
 <span></span>
-<span><span class="fu">softmaxinv</span><span class="op">(</span><span class="va">p</span>, lambda <span class="op">=</span> <span class="fl">1</span><span class="op">)</span></span></code></pre></div>
+<span><span class="fu">softmaxinv</span><span class="op">(</span><span class="va">p</span>, lambda <span class="op">=</span> <span class="fl">1</span>, ref_position <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/length.html" class="external-link">length</a></span><span class="op">(</span><span class="va">p</span><span class="op">)</span>, ref_value <span class="op">=</span> <span class="fl">0</span><span class="op">)</span></span></code></pre></div>
     </div>
 
     <div class="section level2">
@@ -71,6 +70,14 @@ softmaxinv returns the value of the inverse-softmax function"></head><body>
 <dt id="arg-p">p<a class="anchor" aria-label="anchor" href="#arg-p"></a></dt>
 <dd><p>A probability vector (i.e., numeric vector of non-negative values that sum to one)</p></dd>
 
+
+<dt id="arg-ref-position">ref_position<a class="anchor" aria-label="anchor" href="#arg-ref-position"></a></dt>
+<dd><p>The reference position that should be used to calculate the inverse softmax function. The default is the last position.</p></dd>
+
+
+<dt id="arg-ref-value">ref_value<a class="anchor" aria-label="anchor" href="#arg-ref-value"></a></dt>
+<dd><p>The value the reference position will be set to. The default is 0.</p></dd>
+
 </dl></div>
     <div class="section level2">
     <h2 id="value">Value<a class="anchor" aria-label="anchor" href="#value"></a></h2>
@@ -78,19 +85,18 @@ softmaxinv returns the value of the inverse-softmax function"></head><body>
     </div>
     <div class="section level2">
     <h2 id="details">Details<a class="anchor" aria-label="anchor" href="#details"></a></h2>
-    <p>The softmax function is a bijective function that maps a real vector with length <code>m-1</code> to a probability vector
+    <p>The softmax function is a bijective function that maps a real vector with length <code>m</code> to a probability vector
 with length <code>m</code> with all non-zero probabilities.  The present functions define the softmax function and its inverse, both with a tuning
 parameter.</p>
 <p>The current functions define the softmax as:</p>
-<p>$$\Large P(\eta_i) = \frac{e^{\lambda \eta_i}}{1+ \sum_{j=1}^m e^{\lambda \eta_j}}$$</p>
-<p>Code adapted from the <a href="https://github.com/ben-oneill/utilities/" class="external-link">utilities</a> package</p>
+<p>$$\Large P(\eta_i) = \frac{e^{\lambda \eta_i}}{\sum_{j=1}^m e^{\lambda \eta_j}}$$</p>
     </div>
 
     <div class="section level2">
     <h2 id="ref-examples">Examples<a class="anchor" aria-label="anchor" href="#ref-examples"></a></h2>
     <div class="sourceCode"><pre class="sourceCode r"><code><span class="r-in"><span><span class="fu">softmax</span><span class="op">(</span><span class="fl">5</span><span class="op">:</span><span class="fl">7</span><span class="op">)</span></span></span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [1] 0.0899759918 0.2445801036 0.6648376511 0.0006062535</span>
-<span class="r-in"><span><span class="fu">softmaxinv</span><span class="op">(</span><span class="fu">softmax</span><span class="op">(</span><span class="fl">5</span><span class="op">:</span><span class="fl">7</span><span class="op">)</span><span class="op">)</span></span></span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> [1] 0.09003057 0.24472847 0.66524096</span>
+<span class="r-in"><span><span class="fu">softmaxinv</span><span class="op">(</span><span class="fu">softmax</span><span class="op">(</span><span class="fl">5</span><span class="op">:</span><span class="fl">7</span><span class="op">)</span>, ref_position <span class="op">=</span> <span class="fl">1</span>, ref_value <span class="op">=</span> <span class="fl">5</span><span class="op">)</span></span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> [1] 5 6 7</span>
 </code></pre></div>
     </div>
@@ -103,7 +109,7 @@ parameter.</p>
 </div>
 
 <div class="pkgdown-footer-right">
-  <p>Site built with <a href="https://pkgdown.r-lib.org/" class="external-link">pkgdown</a> 2.1.3.</p>
+  <p>Site built with <a href="https://pkgdown.r-lib.org/" class="external-link">pkgdown</a> 2.2.0.</p>
 </div>
 
     </footer></div>

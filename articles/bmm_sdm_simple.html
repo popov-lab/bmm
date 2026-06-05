@@ -13,8 +13,8 @@
     }
   };
 </script><script src="../deps/jquery-3.6.0/jquery-3.6.0.min.js"></script><meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
-<link href="../deps/bootstrap-5.3.1/bootstrap.min.css" rel="stylesheet">
-<script src="../deps/bootstrap-5.3.1/bootstrap.bundle.min.js"></script><link href="../deps/font-awesome-6.5.2/css/all.min.css" rel="stylesheet">
+<link href="../deps/bootstrap-5.3.8/bootstrap.min.css" rel="stylesheet">
+<script src="../deps/bootstrap-5.3.8/bootstrap.bundle.min.js"></script><link href="../deps/font-awesome-6.5.2/css/all.min.css" rel="stylesheet">
 <link href="../deps/font-awesome-6.5.2/css/v4-shims.min.css" rel="stylesheet">
 <script src="../deps/headroom-0.11.0/headroom.min.js"></script><script src="../deps/headroom-0.11.0/jQuery.headroom.min.js"></script><script src="../deps/bootstrap-toc-1.0.1/bootstrap-toc.min.js"></script><script src="../deps/clipboard.js-2.0.11/clipboard.min.js"></script><script src="../deps/search-1.0.0/autocomplete.jquery.min.js"></script><script src="../deps/search-1.0.0/fuse.min.js"></script><script src="../deps/search-1.0.0/mark.min.js"></script><!-- pkgdown --><script src="../pkgdown.js"></script><meta property="og:title" content="The Signal Discrimination Model (SDM)">
 </head>
@@ -26,7 +26,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">bmm</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="Released version">1.2.0</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="Released version">1.3.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -38,8 +38,8 @@
 <li class="nav-item"><a class="nav-link" href="../reference/index.html">Functions</a></li>
 <li class="active nav-item"><a class="nav-link" href="../articles/index.html">Articles</a></li>
 <li class="nav-item"><a class="nav-link" href="../news/index.html">Changelog</a></li>
-<li class="nav-item"><a class="nav-link" href="https://venpopov.github.io/bmm/dev-notes/index.html">Develop</a></li>
-<li class="nav-item"><a class="nav-link" href="https://venpopov.github.io/bmm/parameter-recovery/index.html">Parameter recovery</a></li>
+<li class="nav-item"><a class="nav-link" href="https://venpopov.com/bmm/dev-notes/index.html">Develop</a></li>
+<li class="nav-item"><a class="nav-link" href="https://venpopov.com/bmm/parameter-recovery/index.html">Parameter recovery</a></li>
       </ul>
 <ul class="navbar-nav">
 <li class="nav-item"><form class="form-inline" role="search">
@@ -56,13 +56,12 @@
 
 <div class="row">
   <main id="main" class="col-md-9"><div class="page-header">
-
-      <h1>The Signal Discrimination Model (SDM)</h1>
+      <img src="../logo.png" class="logo" alt=""><h1>The Signal Discrimination Model (SDM)</h1>
                         <h4 data-toc-skip class="author">Ven Popov</h4>
                         <h4 data-toc-skip class="author">Gidon Frischkorn</h4>
             
       
-      <small class="dont-index">Source: <a href="https://github.com/venpopov/bmm/blob/v1.2.0/vignettes/articles/bmm_sdm_simple.Rmd" class="external-link"><code>vignettes/articles/bmm_sdm_simple.Rmd</code></a></small>
+      <small class="dont-index">Source: <a href="https://github.com/venpopov/bmm/blob/develop/vignettes/articles/bmm_sdm_simple.Rmd" class="external-link"><code>vignettes/articles/bmm_sdm_simple.Rmd</code></a></small>
       <div class="d-none name"><code>bmm_sdm_simple.Rmd</code></div>
     </div>
 
@@ -139,7 +138,7 @@ e^{c \ \sqrt{\frac{k}{2\pi}} e^{k \ (cos(\theta-\mu)-1)}}
 }{Z}}
 \]</span></p>
 <p>This parametrization is derived from the known approximation of the modified
-bessel function for large <span class="math inline">\(k\)</span> (<span class="citation">Abramowitz, Stegun, and Romer (1988)</span>):</p>
+bessel function for large <span class="math inline">\(k\)</span> (<span class="citation">Abramowitz et al. (1988)</span>):</p>
 <p><span class="math display">\[
 I_0(\kappa) \sim ~ \frac{e^{\kappa}}{\sqrt{2\pi \kappa}}, \ \ \ \ \kappa \rightarrow \infty
 \]</span></p>
@@ -226,7 +225,7 @@ overlaying the predicted density generated with <code>dsdm</code>:</p>
 <span>       y <span class="op">=</span> <span class="st">"Density"</span><span class="op">)</span> <span class="op">+</span></span>
 <span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/geom_text.html" class="external-link">geom_text</a></span><span class="op">(</span>data<span class="op">=</span><span class="va">par_labels</span>, <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/aes.html" class="external-link">aes</a></span><span class="op">(</span>x <span class="op">=</span> <span class="op">-</span><span class="va">pi</span>, y <span class="op">=</span> <span class="fl">0.5</span>, label <span class="op">=</span> <span class="va">label</span><span class="op">)</span>, </span>
 <span>            hjust <span class="op">=</span> <span class="fl">0</span>, vjust <span class="op">=</span> <span class="fl">0</span>, size <span class="op">=</span> <span class="fl">3</span><span class="op">)</span></span></code></pre></div>
-<p><img src="bmm_sdm_simple_files/figure-html/unnamed-chunk-3-1.jpeg" width="800"></p>
+<p><img src="bmm_sdm_simple_files/figure-html/unnamed-chunk-3-1.jpeg" alt="" width="800"></p>
 </div>
 <div class="section level3" number="3.2">
 <h3 id="estimating-the-model-with-bmm">
@@ -316,9 +315,9 @@ the estimated posterior distributions of the parameters:</p>
 <span><span class="va">draws</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://dplyr.tidyverse.org/reference/select.html" class="external-link">select</a></span><span class="op">(</span><span class="va">draws</span>, <span class="va">b_c_condA</span><span class="op">:</span><span class="va">b_kappa_condC</span><span class="op">)</span></span>
 <span></span>
 <span><span class="co"># plot posterior with original parameters overlayed as diamonds</span></span>
-<span><span class="fu"><a href="https://rdrr.io/r/base/as.data.frame.html" class="external-link">as.data.frame</a></span><span class="op">(</span><span class="va">draws</span><span class="op">)</span> <span class="op"><a href="https://magrittr.tidyverse.org/reference/pipe.html" class="external-link">%&gt;%</a></span> </span>
-<span>  <span class="fu"><a href="https://tidyr.tidyverse.org/reference/gather.html" class="external-link">gather</a></span><span class="op">(</span><span class="va">par</span>, <span class="va">value</span><span class="op">)</span> <span class="op"><a href="https://magrittr.tidyverse.org/reference/pipe.html" class="external-link">%&gt;%</a></span> </span>
-<span>  <span class="fu"><a href="https://dplyr.tidyverse.org/reference/mutate.html" class="external-link">mutate</a></span><span class="op">(</span>value <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/Log.html" class="external-link">exp</a></span><span class="op">(</span><span class="va">value</span><span class="op">)</span><span class="op">)</span> <span class="op"><a href="https://magrittr.tidyverse.org/reference/pipe.html" class="external-link">%&gt;%</a></span> </span>
+<span><span class="fu"><a href="https://rdrr.io/r/base/as.data.frame.html" class="external-link">as.data.frame</a></span><span class="op">(</span><span class="va">draws</span><span class="op">)</span> <span class="op">|&gt;</span> </span>
+<span>  <span class="fu"><a href="https://tidyr.tidyverse.org/reference/gather.html" class="external-link">gather</a></span><span class="op">(</span><span class="va">par</span>, <span class="va">value</span><span class="op">)</span> <span class="op">|&gt;</span> </span>
+<span>  <span class="fu"><a href="https://dplyr.tidyverse.org/reference/mutate.html" class="external-link">mutate</a></span><span class="op">(</span>value <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/Log.html" class="external-link">exp</a></span><span class="op">(</span><span class="va">value</span><span class="op">)</span><span class="op">)</span> <span class="op">|&gt;</span> </span>
 <span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/ggplot.html" class="external-link">ggplot</a></span><span class="op">(</span><span class="fu"><a href="https://ggplot2.tidyverse.org/reference/aes.html" class="external-link">aes</a></span><span class="op">(</span><span class="va">value</span>, <span class="va">par</span><span class="op">)</span><span class="op">)</span> <span class="op">+</span></span>
 <span>  <span class="fu">tidybayes</span><span class="fu">::</span><span class="fu"><a href="https://mjskay.github.io/tidybayes/reference/tidybayes-deprecated.html" class="external-link">stat_halfeyeh</a></span><span class="op">(</span>normalize <span class="op">=</span> <span class="st">"groups"</span><span class="op">)</span> <span class="op">+</span></span>
 <span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/geom_point.html" class="external-link">geom_point</a></span><span class="op">(</span>data <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/data.frame.html" class="external-link">data.frame</a></span><span class="op">(</span>par <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">'b_c_condA'</span>, <span class="st">'b_c_condB'</span>, <span class="st">'b_c_condC'</span>,</span>
@@ -327,7 +326,7 @@ the estimated posterior distributions of the parameters:</p>
 <span>             <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/aes.html" class="external-link">aes</a></span><span class="op">(</span><span class="va">value</span>, <span class="va">par</span><span class="op">)</span>, color <span class="op">=</span> <span class="st">"red"</span>,</span>
 <span>             shape <span class="op">=</span> <span class="st">"diamond"</span>, size <span class="op">=</span> <span class="fl">2.5</span><span class="op">)</span> <span class="op">+</span></span>
 <span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/scale_continuous.html" class="external-link">scale_x_continuous</a></span><span class="op">(</span>lim <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">0</span>, <span class="fl">20</span><span class="op">)</span><span class="op">)</span></span></code></pre></div>
-<p><img src="bmm_sdm_simple_files/figure-html/unnamed-chunk-10-1.jpeg" width="500"></p>
+<p><img src="bmm_sdm_simple_files/figure-html/unnamed-chunk-10-1.jpeg" alt="" width="500"></p>
 <p>The true parameters all lie within the 50% credible intervals, which is a good
 sign that the model is able to recover the true parameters from the data.</p>
 <p>As a final step, we can plot our data again, adding another line overlay with
@@ -372,7 +371,7 @@ the density predicted by the estimated parameters:</p>
 <span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/geom_text.html" class="external-link">geom_text</a></span><span class="op">(</span>data <span class="op">=</span> <span class="va">par_labels</span>, <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/aes.html" class="external-link">aes</a></span><span class="op">(</span>x <span class="op">=</span> <span class="op">-</span><span class="va">pi</span>, y <span class="op">=</span> <span class="fl">0.9</span>, label <span class="op">=</span> <span class="va">label</span><span class="op">)</span>, </span>
 <span>            hjust <span class="op">=</span> <span class="fl">0</span>, vjust <span class="op">=</span> <span class="fl">0</span>, size <span class="op">=</span> <span class="fl">3</span><span class="op">)</span> <span class="op">+</span></span>
 <span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/scale_continuous.html" class="external-link">scale_y_continuous</a></span><span class="op">(</span>limits <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">0</span>, <span class="fl">1</span><span class="op">)</span><span class="op">)</span></span></code></pre></div>
-<p><img src="bmm_sdm_simple_files/figure-html/unnamed-chunk-11-1.jpeg" width="800"></p>
+<p><img src="bmm_sdm_simple_files/figure-html/unnamed-chunk-11-1.jpeg" alt="" width="800"></p>
 <p>The histograms represent the data, the black lines represent the predicted
 density from the true parameters, and the red lines represent the predicted
 density from the estimated parameters. We can see that the estimated parameters
@@ -382,12 +381,12 @@ are able to capture the main features of the data.</p>
 <div class="section level2">
 <h2 id="references">References<a class="anchor" aria-label="anchor" href="#references"></a>
 </h2>
-<div id="refs" class="references csl-bib-body hanging-indent" entry-spacing="0">
+<div id="refs" class="references csl-bib-body hanging-indent">
 <div id="ref-abramowitz1988handbook" class="csl-entry">
-Abramowitz, Milton, Irene A Stegun, and Robert H Romer. 1988. <span>“Handbook of Mathematical Functions with Formulas, Graphs, and Mathematical Tables.”</span> American Association of Physics Teachers.
+Abramowitz, Milton, Irene A Stegun, and Robert H Romer. 1988. <em>Handbook of Mathematical Functions with Formulas, Graphs, and Mathematical Tables</em>. American Association of Physics Teachers.
 </div>
 <div id="ref-Oberauer_2023" class="csl-entry">
-Oberauer, Klaus. 2023. <span>“Measurement Models for Visual Working Memory—a Factorial Model Comparison.”</span> <em>Psychological Review</em> 130 (3): 841–52. <a href="https://doi.org/10.1037/rev0000328" class="external-link">https://doi.org/10.1037/rev0000328</a>.
+Oberauer, Klaus. 2023. <span>“Measurement Models for Visual Working Memory—a Factorial Model Comparison.”</span> <em>Psychological Review</em> (US) 130 (3): 841–52. <a href="https://doi.org/10.1037/rev0000328" class="external-link">https://doi.org/10.1037/rev0000328</a>.
 </div>
 </div>
 </div>
@@ -402,7 +401,7 @@ Oberauer, Klaus. 2023. <span>“Measurement Models for Visual Working Memory—a
 </div>
 
 <div class="pkgdown-footer-right">
-  <p>Site built with <a href="https://pkgdown.r-lib.org/" class="external-link">pkgdown</a> 2.1.3.</p>
+  <p>Site built with <a href="https://pkgdown.r-lib.org/" class="external-link">pkgdown</a> 2.2.0.</p>
 </div>
 
     </footer>

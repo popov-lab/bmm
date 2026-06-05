@@ -13,8 +13,8 @@
     }
   };
 </script><script src="../deps/jquery-3.6.0/jquery-3.6.0.min.js"></script><meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
-<link href="../deps/bootstrap-5.3.1/bootstrap.min.css" rel="stylesheet">
-<script src="../deps/bootstrap-5.3.1/bootstrap.bundle.min.js"></script><link href="../deps/font-awesome-6.5.2/css/all.min.css" rel="stylesheet">
+<link href="../deps/bootstrap-5.3.8/bootstrap.min.css" rel="stylesheet">
+<script src="../deps/bootstrap-5.3.8/bootstrap.bundle.min.js"></script><link href="../deps/font-awesome-6.5.2/css/all.min.css" rel="stylesheet">
 <link href="../deps/font-awesome-6.5.2/css/v4-shims.min.css" rel="stylesheet">
 <script src="../deps/headroom-0.11.0/headroom.min.js"></script><script src="../deps/headroom-0.11.0/jQuery.headroom.min.js"></script><script src="../deps/bootstrap-toc-1.0.1/bootstrap-toc.min.js"></script><script src="../deps/clipboard.js-2.0.11/clipboard.min.js"></script><script src="../deps/search-1.0.0/autocomplete.jquery.min.js"></script><script src="../deps/search-1.0.0/fuse.min.js"></script><script src="../deps/search-1.0.0/mark.min.js"></script><!-- pkgdown --><script src="../pkgdown.js"></script><meta property="og:title" content="Extracting default priors, the generated Stan code and Stan data">
 </head>
@@ -26,7 +26,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">bmm</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="Released version">1.2.0</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="Released version">1.3.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -38,8 +38,8 @@
 <li class="nav-item"><a class="nav-link" href="../reference/index.html">Functions</a></li>
 <li class="active nav-item"><a class="nav-link" href="../articles/index.html">Articles</a></li>
 <li class="nav-item"><a class="nav-link" href="../news/index.html">Changelog</a></li>
-<li class="nav-item"><a class="nav-link" href="https://venpopov.github.io/bmm/dev-notes/index.html">Develop</a></li>
-<li class="nav-item"><a class="nav-link" href="https://venpopov.github.io/bmm/parameter-recovery/index.html">Parameter recovery</a></li>
+<li class="nav-item"><a class="nav-link" href="https://venpopov.com/bmm/dev-notes/index.html">Develop</a></li>
+<li class="nav-item"><a class="nav-link" href="https://venpopov.com/bmm/parameter-recovery/index.html">Parameter recovery</a></li>
       </ul>
 <ul class="navbar-nav">
 <li class="nav-item"><form class="form-inline" role="search">
@@ -56,13 +56,12 @@
 
 <div class="row">
   <main id="main" class="col-md-9"><div class="page-header">
-
-      <h1>Extracting default priors, the generated Stan code and Stan data</h1>
+      <img src="../logo.png" class="logo" alt=""><h1>Extracting default priors, the generated Stan code and Stan data</h1>
                         <h4 data-toc-skip class="author">Ven Popov</h4>
                         <h4 data-toc-skip class="author">Gidon Frischkorn</h4>
             
       
-      <small class="dont-index">Source: <a href="https://github.com/venpopov/bmm/blob/v1.2.0/vignettes/articles/bmm_extract_info.Rmd" class="external-link"><code>vignettes/articles/bmm_extract_info.Rmd</code></a></small>
+      <small class="dont-index">Source: <a href="https://github.com/venpopov/bmm/blob/develop/vignettes/articles/bmm_extract_info.Rmd" class="external-link"><code>vignettes/articles/bmm_extract_info.Rmd</code></a></small>
       <div class="d-none name"><code>bmm_extract_info.Rmd</code></div>
     </div>
 
@@ -94,7 +93,7 @@ used when you estimate a model, or when you report the results of a model fit.</
 <p>You can use the function <code><a href="../reference/default_prior.bmmformula.html">default_prior()</a></code> from the <code>brms</code> package to extract
 the default priors for a model. The arguments to <code>default_prior</code> are the same as
 for the <code><a href="../reference/bmm.html">bmm()</a></code> function in <code>bmm</code>. For example, if you want to extract the
-default priors for the SDM model (<a href="https://venpopov.github.io/bmm/articles/bmm_sdm_simple.html">see the online article for more information</a>), where you have
+default priors for the SDM model (<a href="https://venpopov.com/bmm/articles/bmm_sdm_simple.html">see the online article for more information</a>), where you have
 a set_size categorical predictor of <code>c</code> and <code>kappa</code>, you can use the following
 code:</p>
 <div class="sourceCode" id="cb1"><pre class="downlit sourceCode r">
@@ -103,26 +102,26 @@ code:</p>
 <span><span class="fu"><a href="../reference/default_prior.bmmformula.html">default_prior</a></span><span class="op">(</span><span class="fu"><a href="../reference/bmmformula.html">bmf</a></span><span class="op">(</span><span class="va">c</span> <span class="op">~</span> <span class="fl">0</span> <span class="op">+</span> <span class="va">set_size</span>, <span class="va">kappa</span> <span class="op">~</span> <span class="fl">0</span> <span class="op">+</span> <span class="va">set_size</span><span class="op">)</span>, </span>
 <span>              data <span class="op">=</span> <span class="va">oberauer_lin_2017</span>,</span>
 <span>              model <span class="op">=</span> <span class="fu"><a href="../reference/sdm.html">sdm</a></span><span class="op">(</span>resp_error <span class="op">=</span> <span class="st">'dev_rad'</span><span class="op">)</span><span class="op">)</span></span>
-<span><span class="co">#&gt;                     prior     class      coef group resp  dpar nlpar   lb   ub       source</span></span>
-<span><span class="co">#&gt;     student_t(5, 2, 0.75)         b set_size1                c       &lt;NA&gt; &lt;NA&gt; (vectorized)</span></span>
-<span><span class="co">#&gt;     student_t(5, 2, 0.75)         b set_size2                c       &lt;NA&gt; &lt;NA&gt; (vectorized)</span></span>
-<span><span class="co">#&gt;     student_t(5, 2, 0.75)         b set_size3                c       &lt;NA&gt; &lt;NA&gt; (vectorized)</span></span>
-<span><span class="co">#&gt;     student_t(5, 2, 0.75)         b set_size4                c       &lt;NA&gt; &lt;NA&gt; (vectorized)</span></span>
-<span><span class="co">#&gt;     student_t(5, 2, 0.75)         b set_size5                c       &lt;NA&gt; &lt;NA&gt; (vectorized)</span></span>
-<span><span class="co">#&gt;     student_t(5, 2, 0.75)         b set_size6                c       &lt;NA&gt; &lt;NA&gt; (vectorized)</span></span>
-<span><span class="co">#&gt;     student_t(5, 2, 0.75)         b set_size7                c       &lt;NA&gt; &lt;NA&gt; (vectorized)</span></span>
-<span><span class="co">#&gt;     student_t(5, 2, 0.75)         b set_size8                c       &lt;NA&gt; &lt;NA&gt; (vectorized)</span></span>
-<span><span class="co">#&gt;  student_t(5, 1.75, 0.75)         b set_size1            kappa       &lt;NA&gt; &lt;NA&gt; (vectorized)</span></span>
-<span><span class="co">#&gt;  student_t(5, 1.75, 0.75)         b set_size2            kappa       &lt;NA&gt; &lt;NA&gt; (vectorized)</span></span>
-<span><span class="co">#&gt;  student_t(5, 1.75, 0.75)         b set_size3            kappa       &lt;NA&gt; &lt;NA&gt; (vectorized)</span></span>
-<span><span class="co">#&gt;  student_t(5, 1.75, 0.75)         b set_size4            kappa       &lt;NA&gt; &lt;NA&gt; (vectorized)</span></span>
-<span><span class="co">#&gt;  student_t(5, 1.75, 0.75)         b set_size5            kappa       &lt;NA&gt; &lt;NA&gt; (vectorized)</span></span>
-<span><span class="co">#&gt;  student_t(5, 1.75, 0.75)         b set_size6            kappa       &lt;NA&gt; &lt;NA&gt; (vectorized)</span></span>
-<span><span class="co">#&gt;  student_t(5, 1.75, 0.75)         b set_size7            kappa       &lt;NA&gt; &lt;NA&gt; (vectorized)</span></span>
-<span><span class="co">#&gt;  student_t(5, 1.75, 0.75)         b set_size8            kappa       &lt;NA&gt; &lt;NA&gt; (vectorized)</span></span>
-<span><span class="co">#&gt;     student_t(5, 2, 0.75)         b                          c       &lt;NA&gt; &lt;NA&gt;         user</span></span>
-<span><span class="co">#&gt;  student_t(5, 1.75, 0.75)         b                      kappa       &lt;NA&gt; &lt;NA&gt;         user</span></span>
-<span><span class="co">#&gt;               constant(0) Intercept                                  &lt;NA&gt; &lt;NA&gt;         user</span></span></code></pre></div>
+<span><span class="co">#&gt;                     prior     class      coef group resp  dpar nlpar   lb   ub tag       source</span></span>
+<span><span class="co">#&gt;     student_t(5, 2, 0.75)         b set_size1                c       &lt;NA&gt; &lt;NA&gt;     (vectorized)</span></span>
+<span><span class="co">#&gt;     student_t(5, 2, 0.75)         b set_size2                c       &lt;NA&gt; &lt;NA&gt;     (vectorized)</span></span>
+<span><span class="co">#&gt;     student_t(5, 2, 0.75)         b set_size3                c       &lt;NA&gt; &lt;NA&gt;     (vectorized)</span></span>
+<span><span class="co">#&gt;     student_t(5, 2, 0.75)         b set_size4                c       &lt;NA&gt; &lt;NA&gt;     (vectorized)</span></span>
+<span><span class="co">#&gt;     student_t(5, 2, 0.75)         b set_size5                c       &lt;NA&gt; &lt;NA&gt;     (vectorized)</span></span>
+<span><span class="co">#&gt;     student_t(5, 2, 0.75)         b set_size6                c       &lt;NA&gt; &lt;NA&gt;     (vectorized)</span></span>
+<span><span class="co">#&gt;     student_t(5, 2, 0.75)         b set_size7                c       &lt;NA&gt; &lt;NA&gt;     (vectorized)</span></span>
+<span><span class="co">#&gt;     student_t(5, 2, 0.75)         b set_size8                c       &lt;NA&gt; &lt;NA&gt;     (vectorized)</span></span>
+<span><span class="co">#&gt;  student_t(5, 1.75, 0.75)         b set_size1            kappa       &lt;NA&gt; &lt;NA&gt;     (vectorized)</span></span>
+<span><span class="co">#&gt;  student_t(5, 1.75, 0.75)         b set_size2            kappa       &lt;NA&gt; &lt;NA&gt;     (vectorized)</span></span>
+<span><span class="co">#&gt;  student_t(5, 1.75, 0.75)         b set_size3            kappa       &lt;NA&gt; &lt;NA&gt;     (vectorized)</span></span>
+<span><span class="co">#&gt;  student_t(5, 1.75, 0.75)         b set_size4            kappa       &lt;NA&gt; &lt;NA&gt;     (vectorized)</span></span>
+<span><span class="co">#&gt;  student_t(5, 1.75, 0.75)         b set_size5            kappa       &lt;NA&gt; &lt;NA&gt;     (vectorized)</span></span>
+<span><span class="co">#&gt;  student_t(5, 1.75, 0.75)         b set_size6            kappa       &lt;NA&gt; &lt;NA&gt;     (vectorized)</span></span>
+<span><span class="co">#&gt;  student_t(5, 1.75, 0.75)         b set_size7            kappa       &lt;NA&gt; &lt;NA&gt;     (vectorized)</span></span>
+<span><span class="co">#&gt;  student_t(5, 1.75, 0.75)         b set_size8            kappa       &lt;NA&gt; &lt;NA&gt;     (vectorized)</span></span>
+<span><span class="co">#&gt;     student_t(5, 2, 0.75)         b                          c       &lt;NA&gt; &lt;NA&gt;             user</span></span>
+<span><span class="co">#&gt;  student_t(5, 1.75, 0.75)         b                      kappa       &lt;NA&gt; &lt;NA&gt;             user</span></span>
+<span><span class="co">#&gt;               constant(0) Intercept                                  &lt;NA&gt; &lt;NA&gt;             user</span></span></code></pre></div>
 <p>In this case we used a formula of the type <code>~ 0 + factor</code>, which means that the
 intercept is suppressed, and a separate parameter is estimated for each level of
 the set_size factor variable. For the SDM model, both <code>kappa</code> and <code>c</code> have to be
@@ -137,7 +136,7 @@ with 80% of the prior mass between 0.9 and 3.10:</p>
 <span><span class="va">y</span> <span class="op">&lt;-</span> <span class="fu">brms</span><span class="fu">::</span><span class="fu"><a href="https://paulbuerkner.com/brms/reference/StudentT.html" class="external-link">dstudent_t</a></span><span class="op">(</span><span class="va">log_c</span>, df <span class="op">=</span> <span class="fl">5</span>, mu <span class="op">=</span> <span class="fl">2</span>, sigma <span class="op">=</span> <span class="fl">0.75</span><span class="op">)</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">log_c</span>, <span class="va">y</span>, type <span class="op">=</span> <span class="st">'l'</span>, xlab <span class="op">=</span> <span class="st">'log(c)'</span>, ylab <span class="op">=</span> <span class="st">'Density'</span>, </span>
 <span>     main <span class="op">=</span> <span class="st">'Prior distribution for log(c)'</span><span class="op">)</span></span></code></pre></div>
-<p><img src="bmm_extract_info_files/figure-html/unnamed-chunk-3-1.jpeg" width="450"></p>
+<p><img src="bmm_extract_info_files/figure-html/unnamed-chunk-3-1.jpeg" alt="" width="450"></p>
 <p>This corresponds to the following log-T prior over the native scale of <code>c</code>, with
 a median of ~7.4, and 80% of the prior mass between 2.44 and 22.35:</p>
 <div class="sourceCode" id="cb3"><pre class="downlit sourceCode r">
@@ -145,7 +144,7 @@ a median of ~7.4, and 80% of the prior mass between 2.44 and 22.35:</p>
 <span><span class="va">y</span> <span class="op">&lt;-</span> <span class="fu">brms</span><span class="fu">::</span><span class="fu"><a href="https://paulbuerkner.com/brms/reference/StudentT.html" class="external-link">dstudent_t</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/Log.html" class="external-link">log</a></span><span class="op">(</span><span class="va">c</span><span class="op">)</span>, df <span class="op">=</span> <span class="fl">5</span>, mu <span class="op">=</span> <span class="fl">2</span>, sigma <span class="op">=</span> <span class="fl">0.75</span><span class="op">)</span> <span class="op">/</span> <span class="va">c</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">c</span>, <span class="va">y</span>, type <span class="op">=</span> <span class="st">'l'</span>, xlab <span class="op">=</span> <span class="st">'c'</span>, ylab <span class="op">=</span> <span class="st">'Density'</span>, </span>
 <span>     main <span class="op">=</span> <span class="st">'Prior distribution for c'</span><span class="op">)</span></span></code></pre></div>
-<p><img src="bmm_extract_info_files/figure-html/unnamed-chunk-4-1.jpeg" width="450"></p>
+<p><img src="bmm_extract_info_files/figure-html/unnamed-chunk-4-1.jpeg" alt="" width="450"></p>
 <p>The default prior for <code>kappa</code> is similar, with a lower mean, a student-t
 distribution with 5 degrees of freedom, a mean of 1.75, and a standard deviation
 of 0.75, which corresponds to a median of 3.5 on the native scale.</p>
@@ -156,26 +155,26 @@ the intercept would have a default prior of normal(0, 1):</p>
 <code class="sourceCode R"><span><span class="fu"><a href="../reference/default_prior.bmmformula.html">default_prior</a></span><span class="op">(</span><span class="fu"><a href="../reference/bmmformula.html">bmf</a></span><span class="op">(</span><span class="va">c</span> <span class="op">~</span> <span class="fl">1</span> <span class="op">+</span> <span class="va">set_size</span>, <span class="va">kappa</span> <span class="op">~</span> <span class="fl">1</span> <span class="op">+</span> <span class="va">set_size</span><span class="op">)</span>, </span>
 <span>              data <span class="op">=</span> <span class="va">oberauer_lin_2017</span>,</span>
 <span>              model <span class="op">=</span> <span class="fu"><a href="../reference/sdm.html">sdm</a></span><span class="op">(</span>resp_error <span class="op">=</span> <span class="st">'dev_rad'</span><span class="op">)</span><span class="op">)</span></span>
-<span><span class="co">#&gt;                     prior     class      coef group resp  dpar nlpar   lb   ub       source</span></span>
-<span><span class="co">#&gt;              normal(0, 1)         b set_size2                c       &lt;NA&gt; &lt;NA&gt; (vectorized)</span></span>
-<span><span class="co">#&gt;              normal(0, 1)         b set_size3                c       &lt;NA&gt; &lt;NA&gt; (vectorized)</span></span>
-<span><span class="co">#&gt;              normal(0, 1)         b set_size4                c       &lt;NA&gt; &lt;NA&gt; (vectorized)</span></span>
-<span><span class="co">#&gt;              normal(0, 1)         b set_size5                c       &lt;NA&gt; &lt;NA&gt; (vectorized)</span></span>
-<span><span class="co">#&gt;              normal(0, 1)         b set_size6                c       &lt;NA&gt; &lt;NA&gt; (vectorized)</span></span>
-<span><span class="co">#&gt;              normal(0, 1)         b set_size7                c       &lt;NA&gt; &lt;NA&gt; (vectorized)</span></span>
-<span><span class="co">#&gt;              normal(0, 1)         b set_size8                c       &lt;NA&gt; &lt;NA&gt; (vectorized)</span></span>
-<span><span class="co">#&gt;              normal(0, 1)         b set_size2            kappa       &lt;NA&gt; &lt;NA&gt; (vectorized)</span></span>
-<span><span class="co">#&gt;              normal(0, 1)         b set_size3            kappa       &lt;NA&gt; &lt;NA&gt; (vectorized)</span></span>
-<span><span class="co">#&gt;              normal(0, 1)         b set_size4            kappa       &lt;NA&gt; &lt;NA&gt; (vectorized)</span></span>
-<span><span class="co">#&gt;              normal(0, 1)         b set_size5            kappa       &lt;NA&gt; &lt;NA&gt; (vectorized)</span></span>
-<span><span class="co">#&gt;              normal(0, 1)         b set_size6            kappa       &lt;NA&gt; &lt;NA&gt; (vectorized)</span></span>
-<span><span class="co">#&gt;              normal(0, 1)         b set_size7            kappa       &lt;NA&gt; &lt;NA&gt; (vectorized)</span></span>
-<span><span class="co">#&gt;              normal(0, 1)         b set_size8            kappa       &lt;NA&gt; &lt;NA&gt; (vectorized)</span></span>
-<span><span class="co">#&gt;              normal(0, 1)         b                          c       &lt;NA&gt; &lt;NA&gt;         user</span></span>
-<span><span class="co">#&gt;     student_t(5, 2, 0.75) Intercept                          c       &lt;NA&gt; &lt;NA&gt;         user</span></span>
-<span><span class="co">#&gt;              normal(0, 1)         b                      kappa       &lt;NA&gt; &lt;NA&gt;         user</span></span>
-<span><span class="co">#&gt;  student_t(5, 1.75, 0.75) Intercept                      kappa       &lt;NA&gt; &lt;NA&gt;         user</span></span>
-<span><span class="co">#&gt;               constant(0) Intercept                                  &lt;NA&gt; &lt;NA&gt;         user</span></span></code></pre></div>
+<span><span class="co">#&gt;                     prior     class      coef group resp  dpar nlpar   lb   ub tag       source</span></span>
+<span><span class="co">#&gt;              normal(0, 1)         b set_size2                c       &lt;NA&gt; &lt;NA&gt;     (vectorized)</span></span>
+<span><span class="co">#&gt;              normal(0, 1)         b set_size3                c       &lt;NA&gt; &lt;NA&gt;     (vectorized)</span></span>
+<span><span class="co">#&gt;              normal(0, 1)         b set_size4                c       &lt;NA&gt; &lt;NA&gt;     (vectorized)</span></span>
+<span><span class="co">#&gt;              normal(0, 1)         b set_size5                c       &lt;NA&gt; &lt;NA&gt;     (vectorized)</span></span>
+<span><span class="co">#&gt;              normal(0, 1)         b set_size6                c       &lt;NA&gt; &lt;NA&gt;     (vectorized)</span></span>
+<span><span class="co">#&gt;              normal(0, 1)         b set_size7                c       &lt;NA&gt; &lt;NA&gt;     (vectorized)</span></span>
+<span><span class="co">#&gt;              normal(0, 1)         b set_size8                c       &lt;NA&gt; &lt;NA&gt;     (vectorized)</span></span>
+<span><span class="co">#&gt;              normal(0, 1)         b set_size2            kappa       &lt;NA&gt; &lt;NA&gt;     (vectorized)</span></span>
+<span><span class="co">#&gt;              normal(0, 1)         b set_size3            kappa       &lt;NA&gt; &lt;NA&gt;     (vectorized)</span></span>
+<span><span class="co">#&gt;              normal(0, 1)         b set_size4            kappa       &lt;NA&gt; &lt;NA&gt;     (vectorized)</span></span>
+<span><span class="co">#&gt;              normal(0, 1)         b set_size5            kappa       &lt;NA&gt; &lt;NA&gt;     (vectorized)</span></span>
+<span><span class="co">#&gt;              normal(0, 1)         b set_size6            kappa       &lt;NA&gt; &lt;NA&gt;     (vectorized)</span></span>
+<span><span class="co">#&gt;              normal(0, 1)         b set_size7            kappa       &lt;NA&gt; &lt;NA&gt;     (vectorized)</span></span>
+<span><span class="co">#&gt;              normal(0, 1)         b set_size8            kappa       &lt;NA&gt; &lt;NA&gt;     (vectorized)</span></span>
+<span><span class="co">#&gt;              normal(0, 1)         b                          c       &lt;NA&gt; &lt;NA&gt;             user</span></span>
+<span><span class="co">#&gt;     student_t(5, 2, 0.75) Intercept                          c       &lt;NA&gt; &lt;NA&gt;             user</span></span>
+<span><span class="co">#&gt;              normal(0, 1)         b                      kappa       &lt;NA&gt; &lt;NA&gt;             user</span></span>
+<span><span class="co">#&gt;  student_t(5, 1.75, 0.75) Intercept                      kappa       &lt;NA&gt; &lt;NA&gt;             user</span></span>
+<span><span class="co">#&gt;               constant(0) Intercept                                  &lt;NA&gt; &lt;NA&gt;             user</span></span></code></pre></div>
 <p>You can also see that in both cases, the last line is “constant(0)” on the
 Intercept of the <code>mu</code> parameter, which is fixed to 0 by default in the model,
 and is not estimated. You might wonder why it doesn’t say <code>mu</code> in the <code>dpar</code>
@@ -186,18 +185,18 @@ parameter in all models, so it hides it in the output. If you wanted to estimate
 <code class="sourceCode R"><span><span class="fu"><a href="../reference/default_prior.bmmformula.html">default_prior</a></span><span class="op">(</span><span class="fu"><a href="../reference/bmmformula.html">bmf</a></span><span class="op">(</span><span class="va">mu</span> <span class="op">~</span> <span class="fl">1</span> <span class="op">+</span> <span class="va">set_size</span>, <span class="va">c</span> <span class="op">~</span> <span class="fl">1</span>, <span class="va">kappa</span> <span class="op">~</span> <span class="fl">1</span><span class="op">)</span>,</span>
 <span>              data <span class="op">=</span> <span class="va">oberauer_lin_2017</span>,</span>
 <span>              model <span class="op">=</span> <span class="fu"><a href="../reference/sdm.html">sdm</a></span><span class="op">(</span>resp_error <span class="op">=</span> <span class="st">'dev_rad'</span><span class="op">)</span><span class="op">)</span></span>
-<span><span class="co">#&gt;                     prior     class      coef group resp  dpar nlpar   lb   ub       source</span></span>
-<span><span class="co">#&gt;                    (flat)         b                                                 default</span></span>
-<span><span class="co">#&gt;                    (flat)         b set_size2                                  (vectorized)</span></span>
-<span><span class="co">#&gt;                    (flat)         b set_size3                                  (vectorized)</span></span>
-<span><span class="co">#&gt;                    (flat)         b set_size4                                  (vectorized)</span></span>
-<span><span class="co">#&gt;                    (flat)         b set_size5                                  (vectorized)</span></span>
-<span><span class="co">#&gt;                    (flat)         b set_size6                                  (vectorized)</span></span>
-<span><span class="co">#&gt;                    (flat)         b set_size7                                  (vectorized)</span></span>
-<span><span class="co">#&gt;                    (flat)         b set_size8                                  (vectorized)</span></span>
-<span><span class="co">#&gt;        student_t(1, 0, 1) Intercept                                  &lt;NA&gt; &lt;NA&gt;         user</span></span>
-<span><span class="co">#&gt;     student_t(5, 2, 0.75) Intercept                          c       &lt;NA&gt; &lt;NA&gt;         user</span></span>
-<span><span class="co">#&gt;  student_t(5, 1.75, 0.75) Intercept                      kappa       &lt;NA&gt; &lt;NA&gt;         user</span></span></code></pre></div>
+<span><span class="co">#&gt;                     prior     class      coef group resp  dpar nlpar   lb   ub tag       source</span></span>
+<span><span class="co">#&gt;                    (flat)         b                                                     default</span></span>
+<span><span class="co">#&gt;                    (flat)         b set_size2                                      (vectorized)</span></span>
+<span><span class="co">#&gt;                    (flat)         b set_size3                                      (vectorized)</span></span>
+<span><span class="co">#&gt;                    (flat)         b set_size4                                      (vectorized)</span></span>
+<span><span class="co">#&gt;                    (flat)         b set_size5                                      (vectorized)</span></span>
+<span><span class="co">#&gt;                    (flat)         b set_size6                                      (vectorized)</span></span>
+<span><span class="co">#&gt;                    (flat)         b set_size7                                      (vectorized)</span></span>
+<span><span class="co">#&gt;                    (flat)         b set_size8                                      (vectorized)</span></span>
+<span><span class="co">#&gt;        student_t(1, 0, 1) Intercept                                  &lt;NA&gt; &lt;NA&gt;             user</span></span>
+<span><span class="co">#&gt;     student_t(5, 2, 0.75) Intercept                          c       &lt;NA&gt; &lt;NA&gt;             user</span></span>
+<span><span class="co">#&gt;  student_t(5, 1.75, 0.75) Intercept                      kappa       &lt;NA&gt; &lt;NA&gt;             user</span></span></code></pre></div>
 <p>The <code>mu</code> parameter uses a <code>tan_half</code> link function, which means that the
 <code>student_t(1, 0, 1)</code> prior results in a uniform prior over the native scale of
 <code>mu</code> from -pi to pi. You will also notice above that for the regression
@@ -225,7 +224,7 @@ can inspect it or modify it, you can use the <code><a href="../reference/stancod
 <code class="sourceCode R"><span><span class="fu"><a href="../reference/stancode.bmmformula.html">stancode</a></span><span class="op">(</span><span class="fu"><a href="../reference/bmmformula.html">bmf</a></span><span class="op">(</span><span class="va">c</span> <span class="op">~</span> <span class="fl">0</span> <span class="op">+</span> <span class="va">set_size</span>, <span class="va">kappa</span> <span class="op">~</span> <span class="fl">0</span> <span class="op">+</span> <span class="va">set_size</span><span class="op">)</span>, </span>
 <span>         data <span class="op">=</span> <span class="va">oberauer_lin_2017</span>,</span>
 <span>         model <span class="op">=</span> <span class="fu"><a href="../reference/sdm.html">sdm</a></span><span class="op">(</span>resp_error <span class="op">=</span> <span class="st">'dev_rad'</span><span class="op">)</span><span class="op">)</span></span></code></pre></div>
-<pre><code>// generated with brms 2.22.0 and bmm 1.2.0
+<pre><code>// generated with brms 2.23.0 and bmm 1.3.0
 functions {
   /* compute the tan_half link
    * Args:
@@ -333,7 +332,8 @@ parameters {
 }
 transformed parameters {
   real Intercept;  // temporary intercept for centered predictors
-  real lprior = 0;  // prior contributions to the log posterior
+  // prior contributions to the log posterior
+  real lprior = 0;
   Intercept = 0;
   lprior += student_t_lpdf(b_c | 5, 2, 0.75);
   lprior += student_t_lpdf(b_kappa | 5, 1.75, 0.75);
@@ -436,7 +436,7 @@ the data that would be passed to Stan for fitting the model.</p>
 </div>
 
 <div class="pkgdown-footer-right">
-  <p>Site built with <a href="https://pkgdown.r-lib.org/" class="external-link">pkgdown</a> 2.1.3.</p>
+  <p>Site built with <a href="https://pkgdown.r-lib.org/" class="external-link">pkgdown</a> 2.2.0.</p>
 </div>
 
     </footer>

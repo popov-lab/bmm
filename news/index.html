@@ -5,7 +5,7 @@
       fontURL: "https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/output/chtml/fonts/woff-v2"
     }
   };
-</script><script src="../deps/jquery-3.6.0/jquery-3.6.0.min.js"></script><meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no"><link href="../deps/bootstrap-5.3.1/bootstrap.min.css" rel="stylesheet"><script src="../deps/bootstrap-5.3.1/bootstrap.bundle.min.js"></script><link href="../deps/font-awesome-6.5.2/css/all.min.css" rel="stylesheet"><link href="../deps/font-awesome-6.5.2/css/v4-shims.min.css" rel="stylesheet"><script src="../deps/headroom-0.11.0/headroom.min.js"></script><script src="../deps/headroom-0.11.0/jQuery.headroom.min.js"></script><script src="../deps/bootstrap-toc-1.0.1/bootstrap-toc.min.js"></script><script src="../deps/clipboard.js-2.0.11/clipboard.min.js"></script><script src="../deps/search-1.0.0/autocomplete.jquery.min.js"></script><script src="../deps/search-1.0.0/fuse.min.js"></script><script src="../deps/search-1.0.0/mark.min.js"></script><!-- pkgdown --><script src="../pkgdown.js"></script><meta property="og:title" content="Changelog"></head><body>
+</script><script src="../deps/jquery-3.6.0/jquery-3.6.0.min.js"></script><meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no"><link href="../deps/bootstrap-5.3.8/bootstrap.min.css" rel="stylesheet"><script src="../deps/bootstrap-5.3.8/bootstrap.bundle.min.js"></script><link href="../deps/font-awesome-6.5.2/css/all.min.css" rel="stylesheet"><link href="../deps/font-awesome-6.5.2/css/v4-shims.min.css" rel="stylesheet"><script src="../deps/headroom-0.11.0/headroom.min.js"></script><script src="../deps/headroom-0.11.0/jQuery.headroom.min.js"></script><script src="../deps/bootstrap-toc-1.0.1/bootstrap-toc.min.js"></script><script src="../deps/clipboard.js-2.0.11/clipboard.min.js"></script><script src="../deps/search-1.0.0/autocomplete.jquery.min.js"></script><script src="../deps/search-1.0.0/fuse.min.js"></script><script src="../deps/search-1.0.0/mark.min.js"></script><!-- pkgdown --><script src="../pkgdown.js"></script><meta property="og:title" content="Changelog"><meta property="og:image" content="https://venpopov.com/bmm/logo.png"></head><body>
     <a href="#main" class="visually-hidden-focusable">Skip to contents</a>
 
 
@@ -13,7 +13,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">bmm</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="Released version">1.2.0</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="Released version">1.3.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -24,8 +24,8 @@
       <ul class="navbar-nav me-auto"><li class="nav-item"><a class="nav-link" href="../reference/index.html">Functions</a></li>
 <li class="nav-item"><a class="nav-link" href="../articles/index.html">Articles</a></li>
 <li class="active nav-item"><a class="nav-link" href="../news/index.html">Changelog</a></li>
-<li class="nav-item"><a class="nav-link" href="https://venpopov.github.io/bmm/dev-notes/index.html">Develop</a></li>
-<li class="nav-item"><a class="nav-link" href="https://venpopov.github.io/bmm/parameter-recovery/index.html">Parameter recovery</a></li>
+<li class="nav-item"><a class="nav-link" href="https://venpopov.com/bmm/dev-notes/index.html">Develop</a></li>
+<li class="nav-item"><a class="nav-link" href="https://venpopov.com/bmm/parameter-recovery/index.html">Parameter recovery</a></li>
       </ul><ul class="navbar-nav"><li class="nav-item"><form class="form-inline" role="search">
  <input class="form-control" type="search" name="search-input" id="search-input" autocomplete="off" aria-label="Search site" placeholder="Search for" data-search-index="../search.json"></form></li>
 <li class="nav-item"><a class="external-link nav-link" href="https://github.com/venpopov/bmm/" aria-label="GitHub"><span class="fa fab fa-github fa-lg"></span></a></li>
@@ -36,22 +36,63 @@
 </nav><div class="container template-news">
 <div class="row">
   <main id="main" class="col-md-9"><div class="page-header">
-
-      <h1>Changelog</h1>
-      <small>Source: <a href="https://github.com/venpopov/bmm/blob/v1.2.0/NEWS.md" class="external-link"><code>NEWS.md</code></a></small>
+      <img src="../logo.png" class="logo" alt=""><h1>Changelog</h1>
+      <small>Source: <a href="https://github.com/venpopov/bmm/blob/develop/NEWS.md" class="external-link"><code>NEWS.md</code></a></small>
     </div>
 
     <div class="section level2">
-<h2 class="pkg-version" data-toc-text="1.2.0" id="bmm-120">bmm 1.2.0<a class="anchor" aria-label="anchor" href="#bmm-120"></a></h2><p class="text-muted">CRAN release: 2025-07-24</p>
-</div>
-    <div class="section level2">
-<h2 class="pkg-version" data-toc-text="1.2" id="bmm-12">bmm 1.2<a class="anchor" aria-label="anchor" href="#bmm-12"></a></h2>
+<h2 class="pkg-version" data-toc-text="1.3.1" id="bmm-131">bmm 1.3.1<a class="anchor" aria-label="anchor" href="#bmm-131"></a></h2>
 <div class="section level4">
-<h4 id="new-models-1-2">New models<a class="anchor" aria-label="anchor" href="#new-models-1-2"></a></h4>
-<ul><li>Add the Memory Measurement Model (Oberauer &amp; Lewandowsky, 2019) and its generalization as the Multinomial Measurement Model for categorical decision tasks as new model class <strong>m3</strong> with three versions: simple span (<strong>ss</strong>), complex span (<strong>cs</strong>), and <strong>custom</strong>. For details, see the <a href="https://venpopov.github.io/bmm/dev/articles/bmm_m3.html">article</a> on the <code>bmm</code> website (<a href="https://github.com/venpopov/bmm/issues/237" class="external-link">#237</a>). Thanks to <a href="https://github.com/GidonFrischkorn" class="external-link">@GidonFrischkorn</a> and <a href="https://github.com/chenyu-psy" class="external-link">@chenyu-psy</a></li>
+<h4 id="bug-fixes-1-3-1">Bug fixes<a class="anchor" aria-label="anchor" href="#bug-fixes-1-3-1"></a></h4>
+<ul><li>Fix <code>swald_lccdf()</code> returning incorrect log-survival probability when response time equals non-decision time in the <strong>cswald</strong> model. Previously returned <code>-Inf</code> instead of <code>0</code> (log of survival = 1) (<a href="https://github.com/venpopov/bmm/issues/348" class="external-link">#348</a>).</li>
 </ul></div>
 <div class="section level4">
-<h4 id="new-features-1-2">New features<a class="anchor" aria-label="anchor" href="#new-features-1-2"></a></h4>
+<h4 id="other-changes-1-3-1">Other changes<a class="anchor" aria-label="anchor" href="#other-changes-1-3-1"></a></h4>
+<ul><li>The <strong>ddm</strong> model supports both <code>cmdstanr</code> and <code>rstan</code> backends. Previously, <code>cmdstanr</code> was required.</li>
+</ul></div>
+</div>
+    <div class="section level2">
+<h2 class="pkg-version" data-toc-text="1.3.0" id="bmm-130">bmm 1.3.0<a class="anchor" aria-label="anchor" href="#bmm-130"></a></h2><p class="text-muted">CRAN release: 2026-03-30</p>
+<div class="section level4">
+<h4 id="new-models-1-3-0">New models<a class="anchor" aria-label="anchor" href="#new-models-1-3-0"></a></h4>
+<ul><li>Add the <strong>Diffusion Decision Model</strong> (<code>ddm</code>) for speeded decision-making tasks with trial-level RT and response data. The model estimates drift rate, boundary separation, non-decision time, and (optionally) relative starting point. Includes distribution functions <code><a href="../reference/ddm_dist.html">dddm()</a></code> and <code><a href="../reference/ddm_dist.html">rddm()</a></code> (<a href="https://github.com/venpopov/bmm/issues/280" class="external-link">#280</a>).</li>
+<li>Add the <strong>EZ-Diffusion Model</strong> (<code>ezdm</code>) for speeded decision-making tasks. The model estimates drift rate, boundary separation, and non-decision time from aggregated summary statistics (mean RT, variance of RT, accuracy) using the closed-form equations derived by Wagenmakers et al. (2007). Supports both 3-parameter (symmetric starting point) and 4-parameter (asymmetric starting point) versions based on Srivastava et al. (2016). Implements Bayesian hierarchical estimation following Chavez &amp; Vandekerckhove (2025). Includes distribution functions <code><a href="../reference/ezdm_dist.html">dezdm()</a></code> and <code><a href="../reference/ezdm_dist.html">rezdm()</a></code> (<a href="https://github.com/venpopov/bmm/issues/281" class="external-link">#281</a>).</li>
+<li>Add the <strong>Censored Shifted Wald Model</strong> (<code>cswald</code>) for choice reaction time tasks with two response boundaries. The model estimates drift rate, boundary separation, and non-decision time from trial-level RT and response data. Implements two versions: <strong>simple</strong> (treats errors as censored correct responses, appropriate for high-accuracy tasks) and <strong>crisk</strong> (competing risks version with separate accumulators for each response, suitable for balanced accuracy). Includes distribution functions <code><a href="../reference/cswald_dist.html">dcswald()</a></code>, <code><a href="../reference/cswald_dist.html">pcswald()</a></code>, <code><a href="../reference/cswald_dist.html">qcswald()</a></code>, and <code><a href="../reference/cswald_dist.html">rcswald()</a></code>. Thanks to <a href="https://github.com/GidonFrischkorn" class="external-link">@GidonFrischkorn</a></li>
+</ul></div>
+<div class="section level4">
+<h4 id="new-features-1-3-0">New features<a class="anchor" aria-label="anchor" href="#new-features-1-3-0"></a></h4>
+<ul><li>New S3 method <strong>conditional_effects()</strong> for <code>bmmfit</code> objects. Provides an intuitive interface for visualizing predictor effects on model parameters, with automatic routing between distributional and non-linear parameters, inverse link transformations to show parameters on their natural scale (<code>scale = "native"</code>), softmax handling for mixture3p weight parameters, and filtering of internal model variables (<a href="https://github.com/venpopov/bmm/issues/203" class="external-link">#203</a>).</li>
+<li>New S3 methods for <strong>emmeans</strong> support on <code>bmmfit</code> objects. Users can now call <code>emmeans(fit, ~ condition, dpar = "kappa")</code> for any bmmodel (<a href="https://github.com/venpopov/bmm/issues/323" class="external-link">#323</a>).</li>
+<li>New <strong>pp_check()</strong> method for multinomial models (e.g., <code>m3</code>). Since <code><a href="https://mc-stan.org/bayesplot/reference/pp_check.html" class="external-link">brms::pp_check()</a></code> does not support the multinomial family, <code>bmm</code> now provides a custom method that compares observed and predicted response proportions in the <code>ppc_bars</code> style from <code>bayesplot</code>. The method supports faceting by experimental conditions via <code>group</code>, configurable credible intervals via <code>probs</code>, and population-level predictions via <code>re_formula = NA</code>. For non-multinomial models, <code><a href="../reference/pp_check.bmmfit.html">pp_check()</a></code> delegates to <code><a href="https://mc-stan.org/bayesplot/reference/pp_check.html" class="external-link">brms::pp_check()</a></code> and auto-selects the grouped plot variant when <code>group</code> is specified (<a href="https://github.com/venpopov/bmm/issues/324" class="external-link">#324</a>).</li>
+<li>New function <strong>parameters()</strong> lists all parameters of a <code>bmmodel</code> or <code>bmmfit</code> object with descriptions, link functions, and fixed values (<a href="https://github.com/venpopov/bmm/issues/329" class="external-link">#329</a>).</li>
+<li>New function <strong>extract_stan_blocks()</strong> extracts individual program blocks (functions, data, parameters, etc.) from compiled Stan code (<a href="https://github.com/venpopov/bmm/issues/286" class="external-link">#286</a>).</li>
+<li>New function <strong>extract_parameter_dimensions()</strong> extracts parameter names, dimensions, and types from a Stan parameters block.</li>
+<li>New functions <strong>ezdm_summary_stats()</strong> and <strong>adjust_ezdm_accuracy()</strong> to compute and pre-process summary statistics from trial-level RT data for the EZ-Diffusion Model (<a href="https://github.com/venpopov/bmm/issues/291" class="external-link">#291</a>).</li>
+<li>New functions <strong>flag_contaminant_rts()</strong> and <strong>validate_fast_guesses()</strong> for trial-level contamination detection in RT data. Identifies fast guesses and attention lapses using mixture modeling and provides Bayesian validation of fast guess assumptions (<a href="https://github.com/venpopov/bmm/issues/307" class="external-link">#307</a>).</li>
+<li>New function <strong>create_initfun()</strong> creates initialization functions for models that benefit from or require initial values for MCMC sampling (<a href="https://github.com/venpopov/bmm/issues/285" class="external-link">#285</a>).</li>
+</ul></div>
+<div class="section level4">
+<h4 id="documentation-1-3-0">Documentation<a class="anchor" aria-label="anchor" href="#documentation-1-3-0"></a></h4>
+<ul><li>New online <a href="https://venpopov.com/bmm/dev/articles/bmm_ddm.html">article</a> to accompany the <strong>ddm</strong> model</li>
+<li>New online <a href="https://venpopov.com/bmm/dev/articles/bmm_ezdm.html">article</a> to accompany the <strong>ezdm</strong> model</li>
+<li>New online <a href="https://venpopov.com/bmm/dev/articles/bmm_cswald.html">article</a> to accompany the <strong>cswald</strong> model</li>
+<li>New online <a href="https://venpopov.com/bmm/dev/articles/bmm_rt_contamination.html">article</a> on pre-processing and contamination detection for reaction time data</li>
+</ul></div>
+<div class="section level4">
+<h4 id="other-changes-1-3-0">Other changes<a class="anchor" aria-label="anchor" href="#other-changes-1-3-0"></a></h4>
+<ul><li>Improved <strong>rm3()</strong> random generation function for the M3 model (<a href="https://github.com/venpopov/bmm/issues/279" class="external-link">#279</a>).</li>
+<li>Removed magrittr dependency; replaced <code>%&gt;%</code> with the native pipe <code>|&gt;</code> (<a href="https://github.com/venpopov/bmm/issues/341" class="external-link">#341</a>).</li>
+<li>Minimum R version is now 4.1.0.</li>
+</ul></div>
+</div>
+    <div class="section level2">
+<h2 class="pkg-version" data-toc-text="1.2.0" id="bmm-120">bmm 1.2.0<a class="anchor" aria-label="anchor" href="#bmm-120"></a></h2><p class="text-muted">CRAN release: 2025-07-24</p>
+<div class="section level4">
+<h4 id="new-models-1-2-0">New models<a class="anchor" aria-label="anchor" href="#new-models-1-2-0"></a></h4>
+<ul><li>Add the Memory Measurement Model (Oberauer &amp; Lewandowsky, 2019) and its generalization as the Multinomial Measurement Model for categorical decision tasks as new model class <strong>m3</strong> with three versions: simple span (<strong>ss</strong>), complex span (<strong>cs</strong>), and <strong>custom</strong>. For details, see the <a href="https://venpopov.com/bmm/articles/bmm_m3.html">article</a> on the <code>bmm</code> website (<a href="https://github.com/venpopov/bmm/issues/237" class="external-link">#237</a>). Thanks to <a href="https://github.com/GidonFrischkorn" class="external-link">@GidonFrischkorn</a> and <a href="https://github.com/chenyu-psy" class="external-link">@chenyu-psy</a></li>
+</ul></div>
+<div class="section level4">
+<h4 id="new-features-1-2-0">New features<a class="anchor" aria-label="anchor" href="#new-features-1-2-0"></a></h4>
 <ul><li>Updates to the <code>bmf2bf</code> S3 methods for more flexible translation of <code>bmmformulas</code> into <code>brmsformulas</code> (<a href="https://github.com/venpopov/bmm/issues/227" class="external-link">#227</a>).</li>
 <li>New function <strong>apply_links</strong> adds link functions to all non-linear formulas in a <strong>bmmformula</strong> object.</li>
 <li>New example data set <strong>oberauer_lewandowsky_2019_e1</strong> for exploring the <strong>m3</strong> model.</li>
@@ -60,18 +101,18 @@
 </li>
 </ul></div>
 <div class="section level4">
-<h4 id="bug-fixes-1-2">Bug fixes<a class="anchor" aria-label="anchor" href="#bug-fixes-1-2"></a></h4>
+<h4 id="bug-fixes-1-2-0">Bug fixes<a class="anchor" aria-label="anchor" href="#bug-fixes-1-2-0"></a></h4>
 <ul><li>Fix conflict in setting default priors when model parameters were transformed in a non-linear formula (<a href="https://github.com/venpopov/bmm/issues/232" class="external-link">#232</a>).</li>
 <li>Allow a NULL formula (<code>formula(NULL)</code>) to be added to a bmmformula for consistentcy with brms (<a href="https://github.com/venpopov/bmm/issues/264" class="external-link">#264</a>)</li>
 <li>Improve error messages when attempting to construct bmmformulas without a left-hand-side variable</li>
 </ul></div>
 <div class="section level4">
-<h4 id="documentation-1-2">Documentation<a class="anchor" aria-label="anchor" href="#documentation-1-2"></a></h4>
-<ul><li>Add documentation to the <a href="https://venpopov.github.io/bmm/articles/bmm_vwm_crt.html">continuous reproduction task</a> article for pre-processing half-circular stimulus spaces when using <code>bmmodels</code> of the <code>circular</code> model class (<a href="https://github.com/venpopov/bmm/issues/229" class="external-link">#229</a>, <a href="https://github.com/venpopov/bmm/issues/233" class="external-link">#233</a>).</li>
-<li>New online <a href="https://venpopov.github.io/bmm/dev/articles/bmm_m3.html">article</a> to accompany the m3 model</li>
+<h4 id="documentation-1-2-0">Documentation<a class="anchor" aria-label="anchor" href="#documentation-1-2-0"></a></h4>
+<ul><li>Add documentation to the <a href="https://venpopov.com/bmm/articles/bmm_vwm_crt.html">continuous reproduction task</a> article for pre-processing half-circular stimulus spaces when using <code>bmmodels</code> of the <code>circular</code> model class (<a href="https://github.com/venpopov/bmm/issues/229" class="external-link">#229</a>, <a href="https://github.com/venpopov/bmm/issues/233" class="external-link">#233</a>).</li>
+<li>New online <a href="https://venpopov.com/bmm/articles/bmm_m3.html">article</a> to accompany the m3 model</li>
 </ul></div>
 <div class="section level4">
-<h4 id="other-changes-1-2">Other changes<a class="anchor" aria-label="anchor" href="#other-changes-1-2"></a></h4>
+<h4 id="other-changes-1-2-0">Other changes<a class="anchor" aria-label="anchor" href="#other-changes-1-2-0"></a></h4>
 <ul><li>vectorize <code><a href="../reference/k2sd.html">k2sd()</a></code> function for improved performance</li>
 <li>various internal refactorings (<a href="https://github.com/venpopov/bmm/issues/246" class="external-link">#246</a>, <a href="https://github.com/venpopov/bmm/issues/242" class="external-link">#242</a>)</li>
 <li>dplyr, magrittr and tidyr dependencies are now optional (<a href="https://github.com/venpopov/bmm/issues/240" class="external-link">#240</a>)</li>
@@ -120,7 +161,7 @@
 </ul></div>
 <div class="section level4">
 <h4 id="documentation-0-5-0">Documentation<a class="anchor" aria-label="anchor" href="#documentation-0-5-0"></a></h4>
-<ul><li>two new online articles that <a href="https://venpopov.github.io/bmm/articles/bmm_bmmformula.html">introduce the <strong>bmmformula</strong> syntax</a> and explain <a href="https://venpopov.github.io/bmm/articles/bmm_extract_info.html">how to extract information from <strong>bmmodels</strong></a> such as the generated Stan code and Stan data for each model</li>
+<ul><li>two new online articles that <a href="https://venpopov.com/bmm/articles/bmm_bmmformula.html">introduce the <strong>bmmformula</strong> syntax</a> and explain <a href="https://venpopov.com/bmm/articles/bmm_extract_info.html">how to extract information from <strong>bmmodels</strong></a> such as the generated Stan code and Stan data for each model</li>
 </ul></div>
 <div class="section level4">
 <h4 id="bug-fixes-0-5-0">Bug fixes<a class="anchor" aria-label="anchor" href="#bug-fixes-0-5-0"></a></h4>
@@ -222,10 +263,10 @@
 </ul></div>
 <div class="section level4">
 <h4 id="documentation-0-2-0">Documentation<a class="anchor" aria-label="anchor" href="#documentation-0-2-0"></a></h4>
-<ul><li>Website for the development version of the package is now available at <a href="https://venpopov.github.io/bmm/dev/" class="uri">https://venpopov.github.io/bmm/dev/</a> (<a href="https://github.com/venpopov/bmm/issues/18" class="external-link">#18</a>)</li>
-<li>Add articles for each model to the website at <a href="https://venpopov.github.io/bmm/dev/articles/" class="uri">https://venpopov.github.io/bmm/dev/articles/</a>
+<ul><li>Website for the development version of the package is now available at <a href="https://venpopov.com/bmm/dev/" class="uri">https://venpopov.com/bmm/dev/</a> (<a href="https://github.com/venpopov/bmm/issues/18" class="external-link">#18</a>)</li>
+<li>Add articles for each model to the website at <a href="https://venpopov.com/bmm/dev/articles/" class="uri">https://venpopov.com/bmm/dev/articles/</a>
 </li>
-<li>Add a detailed developer’s guide to the website at <a href="https://venpopov.github.io/bmm/dev/dev-notes" class="uri">https://venpopov.github.io/bmm/dev/dev-notes</a> (<a href="https://github.com/venpopov/bmm/issues/21" class="external-link">#21</a>)</li>
+<li>Add a detailed developer’s guide to the website at <a href="https://venpopov.com/bmm/dev/dev-notes" class="uri">https://venpopov.com/bmm/dev/dev-notes</a> (<a href="https://github.com/venpopov/bmm/issues/21" class="external-link">#21</a>)</li>
 <li>Improve README with more detailed information about the package’s goals and its models (<a href="https://github.com/venpopov/bmm/issues/21" class="external-link">#21</a>)</li>
 </ul></div>
 <div class="section level4">
@@ -283,7 +324,7 @@
 </div>
 
 <div class="pkgdown-footer-right">
-  <p>Site built with <a href="https://pkgdown.r-lib.org/" class="external-link">pkgdown</a> 2.1.3.</p>
+  <p>Site built with <a href="https://pkgdown.r-lib.org/" class="external-link">pkgdown</a> 2.2.0.</p>
 </div>
 
     </footer></div>
