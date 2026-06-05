@@ -69,7 +69,7 @@ scode1 <- stancode(bmf(c ~ 1, kappa ~ 1),
   model = sdm(resp_error = "dev_rad")
 )
 cat(scode1)
-#> // generated with brms 2.23.0 and bmm 1.3.0
+#> // generated with brms 2.23.0 and bmm 1.3.1
 #> functions {
 #>   /* compute the tan_half link
 #>    * Args:
