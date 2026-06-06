@@ -64,9 +64,17 @@ real sdt_ranking_uv_lpmf(int y, real mu, real dprime, real sdratio,
 
   for (i in 1:N_GH) {
     real eta = dprime + sigma * gh_nodes[i];
+    // Two guards are needed:
+    // 1. Only evaluate each CDF when its coefficient is non-zero — avoids
+    //    0 * (-Inf) = NaN at boundary rank positions (rank_pos = 1 or max_rank).
+    // 2. Clamp the log-CDF to -700 — avoids exp(-Inf) * d/dx lccdf = 0 * Inf = NaN
+    //    in Stan's autodiff when extreme GH nodes push eta far into the tail.
+    //    exp(-700) ≈ 1e-304 ≈ 0, so the clamp has no effect on the log-sum-exp value.
+    real lcdf  = (max_rank > rank_pos) ? fmax(std_normal_lcdf(eta),  -700.0) : 0.0;
+    real lccdf = (rank_pos > 1)        ? fmax(std_normal_lccdf(eta), -700.0) : 0.0;
     log_terms[i] = log(gh_weights[i])
-      + (max_rank - rank_pos) * std_normal_lcdf(eta)
-      + (rank_pos - 1) * std_normal_lccdf(eta);
+      + (max_rank - rank_pos) * lcdf
+      + (rank_pos - 1) * lccdf;
   }
 
   real log_p = log_choose + log_sum_exp(log_terms);
