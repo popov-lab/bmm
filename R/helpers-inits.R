@@ -79,10 +79,10 @@ create_initfun.bmmodel <- function(model, data, formula) {
 
 # Helper functions for initializing different parameter types ----------------
 init_real_param <- function(par, init_range, link) {
-  if (grepl("Intercept", par)) {
-    link_transform(runif(1, min = init_range[1], max = init_range[2]), link)
-  } else if (grepl("sd_", par)) {
+  if (grepl("sd_", par)) {
     runif(1, min = 0.05, max = 0.1)
+  } else if (!is.null(init_range)) {
+    link_transform(runif(1, min = init_range[1], max = init_range[2]), link)
   } else {
     stop2("Initial values for reals are only specified for Intercepts and sd-parameters")
   }

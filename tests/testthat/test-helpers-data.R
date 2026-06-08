@@ -164,7 +164,10 @@ test_that("check_data() returns a data.frame()", {
     r1 = 10, r2 = 20, r3 = 30, r4 = 40,
     n_correct = 75, observed = 25, rank_col = 1L,
     i1_c1 = 10, i1_c2 = 20, i1_c3 = 15, i1_c4 = 5,
-    i2_c1 = 8, i2_c2 = 18, i2_c3 = 22, i2_c4 = 12
+    i2_c1 = 8, i2_c2 = 18, i2_c3 = 22, i2_c4 = 12,
+    cdp_n1 = 10, cdp_n2 = 15,
+    cdp_k1 = 20, cdp_k2 = 25,
+    cdp_r1 = 12, cdp_r2 = 18
   )
   for (ml in mls) {
     model <- ml(
@@ -173,6 +176,9 @@ test_that("check_data() returns a data.frame()", {
       mean_rt = "mean_rt", var_rt = "var_rt", n_upper = "n_upper",
       n_trials = "n_trials",
       response = "n_old", stimulus = "stimulus",
+      new_response = c("cdp_n1", "cdp_n2"),
+      old_know = c("cdp_k1", "cdp_k2"),
+      old_remember = c("cdp_r1", "cdp_r2"),
       resp = sdai_cols,
       rank = "rank_col", m = 4L, n_ratings = 4L
     )
