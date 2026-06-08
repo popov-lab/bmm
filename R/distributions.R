@@ -3075,6 +3075,3 @@ rsdai <- function(n_per_cell = 50, n_subjects = 1, dprime = 1.0,
 .sdt_cdf <- function(eta, dist) {
   .SDT_DISTS[[dist]]$cdf(eta)
 }
-
-# NOTE: .sdt_cdf_expr(), .sdt_log_cdf_expr(), .sdt_log1m_cdf_expr(),
-# and .sdt_dist_id() have moved to R/helpers-sdt.R

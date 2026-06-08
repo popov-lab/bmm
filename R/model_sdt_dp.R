@@ -210,6 +210,18 @@ bmf2bf.sdt_dp <- function(model, formula) {
 # CONFIGURE_MODEL S3 METHODS                                             ####
 ############################################################################# !
 
+.sdt_dp_stanvars <- function(model) {
+  sc_path <- system.file("stan_chunks", package = "bmm")
+  stan_binary  <- read_lines2(file.path(sc_path, "sdt_binary_funs.stan"))
+  stan_rating  <- read_lines2(file.path(sc_path, "sdt_rating_funs.stan"))
+  stan_dp      <- read_lines2(file.path(sc_path, "sdt_dp_funs.stan"))
+  stan_wrapper <- .sdt_rating_stan_wrapper(model, "sdt_dp", "sdt_dp_row_lpmf")
+  brms::stanvar(
+    scode = paste(stan_binary, stan_rating, stan_dp, stan_wrapper, sep = "\n"),
+    block = "functions"
+  )
+}
+
 #' @export
 configure_model.sdt_dp <- function(model, data, formula) {
   formula <- .sdt_remap_formula_dpars(formula, model)
@@ -220,7 +232,7 @@ configure_model.sdt_dp <- function(model, data, formula) {
     log_lik = log_lik_sdt_dp,
     posterior_predict = posterior_predict_sdt_dp
   )
-  stanvars <- .sdt_rating_stanvars(model, "sdt_dp", "sdt_dp_row_lpmf")
+  stanvars <- .sdt_dp_stanvars(model)
 
   nlist(formula, data, stanvars)
 }
