@@ -23,7 +23,7 @@ endpoints (0,0) and (1,1)).}
 \item{probs}{Numeric vector of length 2. Lower and upper quantiles for the
 credible band (default \code{c(0.025, 0.975)} for a 95\% CI).}
 
-\item{...}{Additional arguments passed to \code{\link[brms:posterior_linpred.brmsfit]{brms::posterior_linpred()}}.}
+\item{...}{Additional arguments passed to \code{\link[brms:posterior_linpred]{brms::posterior_linpred()}}.}
 }
 \value{
 A data frame of class \code{"bmm_sdt_roc"} with columns \code{FA}, \code{Hit},

@@ -14,7 +14,7 @@ auc_sdt(fit, conditions = NULL, probs = c(0.025, 0.975), ...)
 \item{probs}{Numeric vector of length 2. Quantiles for the credible interval
 (default \code{c(0.025, 0.975)}).}
 
-\item{...}{Additional arguments passed to \code{\link[brms:posterior_linpred.brmsfit]{brms::posterior_linpred()}} (for
+\item{...}{Additional arguments passed to \code{\link[brms:posterior_linpred]{brms::posterior_linpred()}} (for
 analytical cases) or \code{\link[=roc_sdt]{roc_sdt()}} (for numerical cases).}
 }
 \value{

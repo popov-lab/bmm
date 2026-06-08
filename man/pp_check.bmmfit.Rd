@@ -10,24 +10,24 @@
 \item{object}{A \code{bmmfit} object returned by \code{\link[=bmm]{bmm()}}.}
 
 \item{type}{Character. Type of pp_check. For non-rating models, passed to
-\code{\link[brms:pp_check.brmsfit]{brms::pp_check()}}. Rating SDT models currently produce a response
+\code{\link[brms:pp_check]{brms::pp_check()}}. Rating SDT models currently produce a response
 proportion profile regardless of the value supplied.}
 
 \item{ndraws}{Integer. Number of posterior draws. Defaults to \code{100} for
-rating SDT models; otherwise passed to \code{\link[brms:pp_check.brmsfit]{brms::pp_check()}}.}
+rating SDT models; otherwise passed to \code{\link[brms:pp_check]{brms::pp_check()}}.}
 
 \item{...}{For non-rating models: additional arguments forwarded to
-\code{\link[brms:pp_check.brmsfit]{brms::pp_check()}}. For rating SDT models: arguments forwarded to
-\code{\link[brms:posterior_predict.brmsfit]{brms::posterior_predict()}}, plus \code{probs} (numeric vector of length 2,
+\code{\link[brms:pp_check]{brms::pp_check()}}. For rating SDT models: arguments forwarded to
+\code{\link[brms:posterior_predict]{brms::posterior_predict()}}, plus \code{probs} (numeric vector of length 2,
 default \code{c(0.025, 0.975)}) to control the credible interval.}
 }
 \value{
 For rating SDT models, a \code{ggplot2} object. For other models, the
-result of \code{\link[brms:pp_check.brmsfit]{brms::pp_check()}}.
+result of \code{\link[brms:pp_check]{brms::pp_check()}}.
 }
 \description{
 For models where brms provides \code{pp_check} support, this method delegates to
-\code{\link[brms:pp_check.brmsfit]{brms::pp_check()}}. For models with multi-column responses (e.g., confidence
+\code{\link[brms:pp_check]{brms::pp_check()}}. For models with multi-column responses (e.g., confidence
 rating SDT), brms's \code{pp_check} is unavailable; this method dispatches to a
 model-specific visualisation instead.
 }
@@ -38,5 +38,5 @@ posterior predictive mean and credible band (blue), faceted by stimulus type
 and any experimental conditions.
 }
 \seealso{
-\code{\link[=roc_sdt]{roc_sdt()}}, \code{\link[=auc_sdt]{auc_sdt()}}, \code{\link[brms:pp_check.brmsfit]{brms::pp_check()}}
+\code{\link[=roc_sdt]{roc_sdt()}}, \code{\link[=auc_sdt]{auc_sdt()}}, \code{\link[brms:pp_check]{brms::pp_check()}}
 }
