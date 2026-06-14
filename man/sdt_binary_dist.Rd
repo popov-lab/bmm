@@ -55,9 +55,9 @@ rsdt_binary(
 and \code{n_old}.
 }
 \description{
-Density and random generation for binary signal detection
-theory models. The response is the number of "old"/"signal" responses
-out of a fixed number of trials (binomial likelihood).
+Density and random generation for the binary signal detection
+theory model, where the response is the number of "old"/"signal" responses
+out of a fixed number of trials (a binomial likelihood).
 }
 \examples{
 # Density of binary SDT data

@@ -11,8 +11,8 @@
     dprime = "Sensitivity: distance between signal and noise distributions",
     criterion = "Response bias: location of decision boundary",
     sdratio = paste0(
-      "Log SD ratio: log ratio of signal to noise standard deviations ",
-      "(exp(sdratio) is the natural SD ratio, 0 = equal variance)"
+      "Log SD ratio: the log of the signal-to-noise standard deviation ratio, ",
+      "so exp(sdratio) is the ratio itself and 0 means equal variance"
     )
   )
   default_priors <- list(
@@ -65,13 +65,14 @@
 #' @title Binary Signal Detection Theory Model
 #' @name sdt_binary
 #' @details `r model_info(.model_sdt_binary())`
-#' @param response A single string naming the column with "old"/"signal"
-#'   response counts.
-#' @param stimulus The name of the variable coding the stimulus type.
-#'   Must be coded as 0 (noise/new) and 1 (signal/old).
-#' @param n_trials The name of the variable containing the total number of
-#'   trials per cell.
-#' @param dist Character. The noise distribution to use:
+#' @param response The name of the variable in the dataset containing the
+#'   count of "old"/"signal" responses for each cell.
+#' @param stimulus The name of the variable in the dataset coding the stimulus
+#'   type. Stimuli should be coded as 0 (noise/new) and 1 (signal/old).
+#' @param n_trials The name of the variable in the dataset containing the
+#'   total number of trials for each cell.
+#' @param dist The noise distribution assumed for the latent evidence variable.
+#'   One of:
 #'   \itemize{
 #'     \item "normal" (default): Gaussian SDT
 #'     \item "logistic": Logistic SDT

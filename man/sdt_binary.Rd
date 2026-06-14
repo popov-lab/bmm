@@ -14,16 +14,17 @@ sdt_binary(
 )
 }
 \arguments{
-\item{response}{A single string naming the column with "old"/"signal"
-response counts.}
+\item{response}{The name of the variable in the dataset containing the
+count of "old"/"signal" responses for each cell.}
 
-\item{stimulus}{The name of the variable coding the stimulus type.
-Must be coded as 0 (noise/new) and 1 (signal/old).}
+\item{stimulus}{The name of the variable in the dataset coding the stimulus
+type. Stimuli should be coded as 0 (noise/new) and 1 (signal/old).}
 
-\item{n_trials}{The name of the variable containing the total number of
-trials per cell.}
+\item{n_trials}{The name of the variable in the dataset containing the
+total number of trials for each cell.}
 
-\item{dist}{Character. The noise distribution to use:
+\item{dist}{The noise distribution assumed for the latent evidence variable.
+One of:
 \itemize{
 \item "normal" (default): Gaussian SDT
 \item "logistic": Logistic SDT
@@ -65,7 +66,7 @@ Provide pre-aggregated data with the following columns:
 \itemize{
 \item \code{dprime}: Sensitivity: distance between signal and noise distributions
 \item \code{criterion}: Response bias: location of decision boundary
-\item \code{sdratio}: Log SD ratio: log ratio of signal to noise standard deviations (exp(sdratio) is the natural SD ratio, 0 = equal variance)
+\item \code{sdratio}: Log SD ratio: the log of the signal-to-noise standard deviation ratio, so exp(sdratio) is the ratio itself and 0 means equal variance
 }
 \item \strong{Fixed parameters:}
 \itemize{

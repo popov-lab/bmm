@@ -2068,9 +2068,9 @@ sdt_criterion <- function(hit_rate, fa_rate,
 
 #' @title Distribution functions for Binary SDT
 #'
-#' @description Density and random generation for binary signal detection
-#'   theory models. The response is the number of "old"/"signal" responses
-#'   out of a fixed number of trials (binomial likelihood).
+#' @description Density and random generation for the binary signal detection
+#'   theory model, where the response is the number of "old"/"signal" responses
+#'   out of a fixed number of trials (a binomial likelihood).
 #'
 #' @name sdt_binary_dist
 #'
