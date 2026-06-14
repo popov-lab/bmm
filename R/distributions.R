@@ -1929,3 +1929,219 @@ neg_loglik <- function(x, params, distribution, weights = NULL) {
     loglik = if (converged) loglik else NA
   )
 }
+
+
+############################################################################# !
+# SIGNAL DETECTION THEORY (SDT) — SHARED NUMERICS                        ####
+############################################################################# !
+
+# SDT distribution registry: single source of truth for all CDF/quantile logic
+# Each entry: id (Stan integer), cdf (R CDF), qf (R quantile function),
+# stan_expr (function returning Stan CDF expression string)
+.SDT_DISTS <- list(
+  normal = list(
+    id = 1L,
+    cdf = pnorm,
+    qf = qnorm,
+    stan_expr = function(x) paste0("Phi(", x, ")"),
+    log_stan_expr = function(x) paste0("std_normal_lcdf(", x, ")"),
+    log1m_stan_expr = function(x) paste0("std_normal_lccdf(", x, ")")
+  ),
+  gumbel_min = list(
+    id = 2L,
+    cdf = function(x) exp(-exp(-x)),
+    qf = function(p) -log(-log(p)),
+    stan_expr = function(x) paste0("exp(-exp(-(", x, ")))"),
+    log_stan_expr = function(x) paste0("(-exp(-(", x, ")))"),
+    log1m_stan_expr = function(x) paste0("log1m_exp(-exp(-(", x, ")))")
+  ),
+  gumbel_max = list(
+    id = 3L,
+    cdf = function(x) 1 - exp(-exp(x)),
+    qf = function(p) log(-log(1 - p)),
+    stan_expr = function(x) paste0("(1 - exp(-exp(", x, ")))"),
+    log_stan_expr = function(x) paste0("log1m_exp(-exp(", x, "))"),
+    log1m_stan_expr = function(x) paste0("(-exp(", x, "))")
+  ),
+  logistic = list(
+    id = 4L,
+    cdf = plogis,
+    qf = qlogis,
+    stan_expr = function(x) paste0("inv_logit(", x, ")"),
+    log_stan_expr = function(x) paste0("(-log1p_exp(-(", x, ")))"),
+    log1m_stan_expr = function(x) paste0("(-(", x, ") - log1p_exp(-(", x, ")))")
+  )
+)
+
+# Internal CDF helper for SDT distributions
+# Maps string distribution name to CDF computation
+# Vectorized over eta
+.sdt_cdf <- function(eta, dist) {
+  .SDT_DISTS[[dist]]$cdf(eta)
+}
+
+
+# Internal: compute SDT decision variable (eta)
+# Shared by density, random generation, and log_lik across versions
+# For EV-SDT (sdratio = 1): eta = dprime/2 * (2*stimulus - 1) - criterion
+# For UV-SDT (sdratio != 1): noise eta unchanged, signal eta scaled
+# All arguments are vectorized (recycled to common length)
+.sdt_eta <- function(dprime, criterion, stimulus, sdratio = 1) {
+  shift <- dprime / 2 * (2 * stimulus - 1)
+  scale <- ifelse(stimulus == 1, sdratio, 1)
+  (shift - criterion) / scale
+}
+
+
+# Internal: validate hit_rate and fa_rate are in (0, 1)
+.validate_sdt_rates <- function(hit_rate, fa_rate) {
+  stopif(any(hit_rate <= 0 | hit_rate >= 1),
+         "hit_rate must be between 0 and 1 (exclusive)")
+  stopif(any(fa_rate <= 0 | fa_rate >= 1),
+         "fa_rate must be between 0 and 1 (exclusive)")
+}
+
+
+#' @title Utility functions for Signal Detection Theory
+#'
+#' @description Compute sensitivity (d') and criterion from hit and false
+#'   alarm rates for different SDT distribution families.
+#'
+#' @name SDTdist
+#'
+#' @param hit_rate Numeric. Proportion of hits (P("old" | signal)).
+#' @param fa_rate Numeric. Proportion of false alarms (P("old" | noise)).
+#' @param dist Character. Noise distribution: "normal" (default), "logistic",
+#'   "gumbel_min", or "gumbel_max".
+#'
+#' @references
+#' Green, D. M., & Swets, J. A. (1966). \emph{Signal detection theory and
+#'   psychophysics}. Wiley.
+#'
+#' @keywords distribution
+NULL
+
+
+#' @rdname SDTdist
+#' @return `sdt_dprime` returns the sensitivity index appropriate for the
+#'   chosen distribution: \eqn{d' = \Phi^{-1}(H) - \Phi^{-1}(FA)} for `dist =
+#'   "normal"`; g' = log(FA) - log(H) for `dist = "gumbel_min"` (Meyer-Grant
+#'   et al., 2025); analogous quantile-difference measures for other
+#'   distributions.
+#' @export
+#' @examples
+#' # Compute d' from hit and false alarm rates (Gaussian SDT)
+#' sdt_dprime(hit_rate = 0.8, fa_rate = 0.2, dist = "normal")
+#'
+#' # Compute g' from hit and false alarm rates (Gumbel-min SDT)
+#' # g' = log(FA) - log(H), invariant under uniform choice-set expansion
+#' sdt_dprime(hit_rate = 0.8, fa_rate = 0.2, dist = "gumbel_min")
+sdt_dprime <- function(hit_rate, fa_rate,
+                       dist = c("normal", "logistic",
+                                "gumbel_min", "gumbel_max")) {
+  dist <- match.arg(dist)
+  .validate_sdt_rates(hit_rate, fa_rate)
+  qf <- .SDT_DISTS[[dist]]$qf
+  qf(hit_rate) - qf(fa_rate)
+}
+
+
+#' @rdname SDTdist
+#' @return `sdt_criterion` returns the criterion (response bias) value.
+#' @export
+#' @examples
+#' # Compute criterion from hit and false alarm rates
+#' sdt_criterion(hit_rate = 0.8, fa_rate = 0.2, dist = "normal")
+sdt_criterion <- function(hit_rate, fa_rate,
+                          dist = c("normal", "logistic",
+                                   "gumbel_min", "gumbel_max")) {
+  dist <- match.arg(dist)
+  .validate_sdt_rates(hit_rate, fa_rate)
+  qf <- .SDT_DISTS[[dist]]$qf
+  -(qf(hit_rate) + qf(fa_rate)) / 2
+}
+
+
+############################################################################# !
+# BINARY SDT DISTRIBUTION FUNCTIONS                                       ####
+############################################################################# !
+
+#' @title Distribution functions for Binary SDT
+#'
+#' @description Density and random generation for binary signal detection
+#'   theory models. The response is the number of "old"/"signal" responses
+#'   out of a fixed number of trials (binomial likelihood).
+#'
+#' @name sdt_binary_dist
+#'
+#' @param n_old Integer vector. Number of "old"/"signal" responses.
+#' @param n_trials Integer vector. Total number of trials per cell.
+#' @param stimulus Integer vector (0/1). Stimulus type: 0 = noise, 1 = signal.
+#' @param dprime Numeric. Sensitivity parameter.
+#' @param criterion Numeric. Response bias (decision boundary location).
+#' @param sdratio Numeric. Ratio of signal to noise standard deviations
+#'   (default 1, i.e., equal variance).
+#' @param dist Character. Noise distribution: "normal" (default), "logistic",
+#'   "gumbel_min", or "gumbel_max".
+#' @param log Logical. If `TRUE`, returns log-density (default `FALSE`).
+#' @param n_per_cell Integer. Number of trials per stimulus type per subject.
+#' @param n_subjects Integer. Number of subjects.
+#'
+#' @return `dsdt_binary` returns the (log-)density (binomial probability).
+#'   `rsdt_binary` returns a data frame with columns `id`, `stimulus`, `n_trials`,
+#'   and `n_old`.
+#'
+#' @references
+#' Green, D. M., & Swets, J. A. (1966). \emph{Signal detection theory and
+#'   psychophysics}. Wiley.
+#'
+#' @keywords distribution
+#' @export
+#' @examples
+#' # Density of binary SDT data
+#' dsdt_binary(n_old = 80, n_trials = 100, stimulus = 1,
+#'             dprime = 1.5, criterion = 0.2)
+#'
+#' # Vectorized over observations
+#' dsdt_binary(n_old = c(30, 80), n_trials = c(100, 100),
+#'             stimulus = c(0, 1), dprime = 1.5, criterion = 0.2,
+#'             log = TRUE)
+dsdt_binary <- function(n_old, n_trials, stimulus, dprime, criterion,
+                        sdratio = 1, dist = "normal", log = FALSE) {
+  stopif(any(n_old < 0), "n_old must be non-negative")
+  stopif(any(n_trials < 1), "n_trials must be positive")
+  stopif(any(!stimulus %in% c(0L, 1L)),
+         "stimulus must be 0 (noise) or 1 (signal)")
+
+  eta <- .sdt_eta(dprime, criterion, stimulus, sdratio)
+  p <- .sdt_cdf(eta, dist)
+  stats::dbinom(n_old, n_trials, p, log = log)
+}
+
+
+#' @rdname sdt_binary_dist
+#' @export
+#' @examples
+#' # Generate binary SDT data
+#' dat <- rsdt_binary(n_per_cell = 100, n_subjects = 20,
+#'                    dprime = 1.5, criterion = 0.2)
+#' head(dat)
+rsdt_binary <- function(n_per_cell, n_subjects, dprime, criterion,
+                        sdratio = 1, dist = "normal") {
+  stopif(length(n_per_cell) != 1 || n_per_cell < 1,
+         "n_per_cell must be a single positive integer")
+  stopif(length(n_subjects) != 1 || n_subjects < 1,
+         "n_subjects must be a single positive integer")
+
+  data <- expand.grid(
+    id = seq_len(n_subjects),
+    stimulus = c(0L, 1L)
+  )
+  data$n_trials <- as.integer(n_per_cell)
+
+  eta <- .sdt_eta(dprime, criterion, data$stimulus, sdratio)
+  p <- .sdt_cdf(eta, dist)
+
+  data$n_old <- stats::rbinom(nrow(data), data$n_trials, p)
+  data
+}
