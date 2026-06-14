@@ -3,6 +3,9 @@
 ### New models
 * Add **Binary Signal Detection Theory** (`sdt_binary`) for yes/no detection and recognition tasks with aggregated hit and false-alarm counts. The model estimates sensitivity (`dprime`) and response bias (`criterion`) under a binomial likelihood, with a selectable noise distribution (`"normal"`, `"logistic"`, `"gumbel_min"`, or `"gumbel_max"`) and optional unequal-variance scaling via an `sdratio` parameter. Includes the distribution functions `dsdt_binary()` and `rsdt_binary()`, plus `sdt_dprime()` and `sdt_criterion()` to recover sensitivity and bias from observed hit and false-alarm rates. Thanks to @GidonFrischkorn
 
+### New datasets
+* Add **`broeder_schuetz_2009_e3`**, binary old/new recognition data from Broeder & Schuetz (2009, Exp. 3). The five base-rate conditions shift the decision criterion while sensitivity stays fixed, so the dataset demonstrates how `sdt_binary` estimates the unequal-variance ratio (`sdratio`) — which is only identifiable when the criterion varies across conditions.
+
 # bmm 1.3.1
 
 ### Bug fixes
