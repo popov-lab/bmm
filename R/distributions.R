@@ -2145,3 +2145,84 @@ rsdt_binary <- function(n_per_cell, n_subjects, dprime, criterion,
   data$n_old <- stats::rbinom(nrow(data), data$n_trials, p)
   data
 }
+
+
+#' @title Distribution functions for m-AFC SDT
+#'
+#' @description Density and random generation for m-alternative forced choice
+#'   signal detection theory (DeCarlo, 2012). Models accuracy in tasks where
+#'   one of `m` alternatives contains the signal. Only the `dprime` parameter
+#'   is estimated (no criterion). All arguments are recycled to the length of
+#'   the longest one, so passing vectors of `dprime`, `m`, or `n_trials`
+#'   generates (or evaluates) one observation per element.
+#'
+#' @name sdt_mafc_dist
+#'
+#' @param n_correct Integer vector. Number of correct responses.
+#' @param n_trials Integer vector. Total number of trials per observation.
+#' @param dprime Numeric vector. Sensitivity parameter(s).
+#' @param m Integer vector. Number of alternatives per observation. Must be
+#'   >= 2.
+#' @param dist The noise distribution: one of "normal" (default), "logistic",
+#'   "gumbel_min", or "gumbel_max".
+#' @param log Logical. If `TRUE`, returns log-density (default `FALSE`).
+#'
+#' @return `dsdt_mafc` returns the (log-)density (binomial probability).
+#'   `rsdt_mafc` returns a data frame with one row per observation and columns
+#'   `id`, `n_trials`, and `n_correct`.
+#'
+#' @references
+#' DeCarlo, L. T. (2012). On a signal detection approach to m-alternative
+#'   forced choice with bias, with maximum likelihood and Bayesian approaches
+#'   to estimation. \emph{Journal of Mathematical and Statistical Psychology},
+#'   \emph{11}(1), 257--282.
+#'
+#' @keywords distribution
+#' @export
+#' @examples
+#' # 4-AFC density
+#' dsdt_mafc(n_correct = 80, n_trials = 100, dprime = 1.5, m = 4)
+dsdt_mafc <- function(n_correct, n_trials, dprime, m,
+                      dist = "normal", log = FALSE) {
+  stopif(!dist %in% names(.SDT_DISTS),
+         "dist must be one of {collapse_comma(names(.SDT_DISTS))}")
+  stopif(any(m < 2), "m must be an integer >= 2")
+
+  n <- max(lengths(list(n_correct, n_trials, dprime, m)))
+  n_correct <- rep_len(n_correct, n)
+  n_trials <- rep_len(n_trials, n)
+  dprime <- rep_len(dprime, n)
+  m <- rep_len(as.integer(m), n)
+
+  stopif(any(n_correct < 0), "n_correct must be non-negative")
+  stopif(any(n_correct > n_trials), "n_correct must not exceed n_trials")
+
+  pc <- vapply(seq_len(n), function(i) .mafc_pc_r(dprime[i], m[i], dist), numeric(1))
+  stats::dbinom(n_correct, n_trials, pc, log = log)
+}
+
+
+#' @rdname sdt_mafc_dist
+#' @export
+#' @examples
+#' # Generate 4-AFC data for 20 subjects with varying sensitivity
+#' dat <- rsdt_mafc(dprime = rnorm(20, 1.5, 0.4), m = 4, n_trials = 200)
+#' head(dat)
+rsdt_mafc <- function(dprime, m, n_trials, dist = "normal") {
+  stopif(!dist %in% names(.SDT_DISTS),
+         "dist must be one of {collapse_comma(names(.SDT_DISTS))}")
+  stopif(any(m < 2), "m must be an integer >= 2")
+  stopif(any(n_trials < 1), "n_trials must be a positive integer")
+
+  n <- max(lengths(list(dprime, m, n_trials)))
+  dprime <- rep_len(dprime, n)
+  m <- rep_len(as.integer(m), n)
+  n_trials <- rep_len(as.integer(n_trials), n)
+
+  pc <- vapply(seq_len(n), function(i) .mafc_pc_r(dprime[i], m[i], dist), numeric(1))
+  data.frame(
+    id = seq_len(n),
+    n_trials = n_trials,
+    n_correct = stats::rbinom(n, n_trials, pc)
+  )
+}

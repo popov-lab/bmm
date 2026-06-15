@@ -111,6 +111,7 @@ The following models are supported:
 \item mixture3p(resp_error, nt_features, set_size, regex)
 \item sdm(resp_error, version)
 \item sdt_binary(response, stimulus, n_trials, dist, links)
+\item sdt_mafc(response, n_trials, m, dist, links)
 }
 
 Type  ?modelname  to get information about a specific model, e.g.  ?imm
