@@ -17,7 +17,8 @@ rsdt_mafc(dprime, m, n_trials, dist = "normal")
 
 \item{dprime}{Numeric vector. Sensitivity parameter(s).}
 
-\item{m}{Integer vector. Number of alternatives per observation. Must be= 2.}
+\item{m}{Integer vector. Number of alternatives per observation. Must be
+at least 2.}
 
 \item{dist}{The noise distribution: one of "normal" (default), "logistic",
 "gumbel_min", or "gumbel_max".}

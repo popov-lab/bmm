@@ -2162,7 +2162,7 @@ rsdt_binary <- function(n_per_cell, n_subjects, dprime, criterion,
 #' @param n_trials Integer vector. Total number of trials per observation.
 #' @param dprime Numeric vector. Sensitivity parameter(s).
 #' @param m Integer vector. Number of alternatives per observation. Must be
-#'   >= 2.
+#'   at least 2.
 #' @param dist The noise distribution: one of "normal" (default), "logistic",
 #'   "gumbel_min", or "gumbel_max".
 #' @param log Logical. If `TRUE`, returns log-density (default `FALSE`).
