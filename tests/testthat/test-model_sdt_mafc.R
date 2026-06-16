@@ -50,6 +50,14 @@ test_that("sdt_mafc model stores m and distribution info correctly", {
   expect_equal(model2$other_vars$dist_int, 4L)
 })
 
+test_that("sdt_mafc accepts m as a constant or a column name", {
+  m_const <- sdt_mafc("n_correct", "n_trials", m = 4)
+  expect_equal(m_const$other_vars$m, 4L)
+
+  m_col <- sdt_mafc("n_correct", "n_trials", m = "set_size")
+  expect_identical(m_col$other_vars$m, "set_size")
+})
+
 test_that("sdt_mafc model has default priors and init_ranges", {
   model <- sdt_mafc("n_correct", "n_trials", m = 4)
   expect_true("dprime" %in% names(model$default_priors))
@@ -80,6 +88,24 @@ test_that("sdt_mafc check_data adds m_afc and dist_type columns", {
   expect_true(all(c("m_afc", "dist_type") %in% colnames(result)))
   expect_equal(unique(result$m_afc), 4L)
   expect_equal(unique(result$dist_type), 4L)
+})
+
+test_that("sdt_mafc check_data resolves per-row set size from a data column", {
+  model <- sdt_mafc("n_correct", "n_trials", m = "set_size")
+  dat <- data.frame(
+    set_size = c(2L, 4L, 6L),
+    n_correct = c(70, 55, 40),
+    n_trials = c(100, 100, 100)
+  )
+
+  result <- check_data(model, dat, bmf(dprime ~ 1))
+  expect_equal(result$m_afc, c(2L, 4L, 6L))
+})
+
+test_that("sdt_mafc check_data errors when the set-size column is missing", {
+  model <- sdt_mafc("n_correct", "n_trials", m = "set_size")
+  dat <- data.frame(n_correct = c(70, 65), n_trials = c(100, 100))
+  expect_error(check_data(model, dat, bmf(dprime ~ 1)), "Set-size column")
 })
 
 test_that("sdt_mafc check_data validates response counts", {
@@ -250,6 +276,18 @@ test_that("sdt_mafc integrates with the bmm pipeline via mock backend", {
       bmm(bmf(dprime ~ 1), dat, model, backend = "mock", mock_fit = 1, rename = FALSE)
     )
   }
+})
+
+test_that("sdt_mafc fits mixed set sizes through the pipeline (mock)", {
+  dat <- rbind(
+    transform(rsdt_mafc(dprime = rep(1.2, 8), m = 2, n_trials = 100), set_size = 2L),
+    transform(rsdt_mafc(dprime = rep(1.2, 8), m = 4, n_trials = 100), set_size = 4L),
+    transform(rsdt_mafc(dprime = rep(1.2, 8), m = 6, n_trials = 100), set_size = 6L)
+  )
+  model <- sdt_mafc("n_correct", "n_trials", m = "set_size")
+  expect_silent(
+    bmm(bmf(dprime ~ 1), dat, model, backend = "mock", mock_fit = 1, rename = FALSE)
+  )
 })
 
 test_that("sdt_mafc default_prior returns a valid prior object", {
