@@ -7,6 +7,7 @@
 
 ### New datasets
 * Add **`broeder_schuetz_2009_e3`**, binary old/new recognition data from Broeder & Schuetz (2009, Exp. 3). The five base-rate conditions shift the decision criterion while sensitivity stays fixed, so the dataset demonstrates how `sdt_binary` estimates the unequal-variance ratio (`sdratio`) — which is only identifiable when the criterion varies across conditions.
+* Add **`meyer_grant_jakob_2025`**, ranking-recognition data from Meyer-Grant & Jakob (2025): 60 subjects ranking 3, 4, or 5 face images by perceived oldness, aggregated to target rank-frequency counts per subject and set size. Because the set size varies across trials, the dataset demonstrates fitting `sdt_ranking` jointly across set sizes by passing the set-size column to `m`.
 
 # bmm 1.3.1
 

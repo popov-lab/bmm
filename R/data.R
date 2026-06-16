@@ -144,3 +144,45 @@
 #' )
 #' }
 "broeder_schuetz_2009_e3"
+
+
+#' Ranking recognition data from Meyer-Grant & Jakob (2025)
+#'
+#' Ranking signal-detection data from 60 subjects. On each trial, participants
+#' saw 3, 4, or 5 face images---one a studied target---and ranked them by
+#' perceived oldness; the rank assigned to the target is recorded. The set size
+#' varies across trials, so the data are aggregated to target rank-frequency
+#' counts per subject and set size. Fitting all set sizes jointly relies on the
+#' per-row set-size feature of [sdt_ranking()]: pass the set-size column to `m`.
+#'
+#' @format ## `meyer_grant_jakob_2025`
+#' A data frame with 720 rows (60 subjects x set sizes 3, 4, 5, one row per
+#' rank) and 4 columns:
+#' \describe{
+#'   \item{id}{Factor uniquely identifying each subject}
+#'   \item{set_size}{Integer number of ranked items on the trial (3, 4, or 5)}
+#'   \item{rank}{Integer rank assigned to the target (1 = most likely target,
+#'   `set_size` = least), one row per rank position}
+#'   \item{count}{Integer number of trials in which the target received this
+#'   rank; counts sum to 56 within each subject x set size cell}
+#' }
+#' @keywords dataset
+#' @source Meyer-Grant, C. G., & Jakob, M. (2025). Ranking tasks in recognition
+#'   memory: A direct test of the two-high-threshold contrast model.
+#'   \emph{Journal of Experimental Psychology: General}. Advance online
+#'   publication. Data on OSF: \url{https://osf.io/gtzu7/} (CC-BY 4.0).
+#' @examples
+#' \dontrun{
+#' # Ranking SDT with set size varying per row: pass the set-size column to `m`
+#' # so trials with 3, 4, and 5 alternatives are fit jointly.
+#' model <- sdt_ranking(
+#'   response = "count", rank = "rank", m = "set_size"
+#' )
+#' fit <- bmm(
+#'   formula = bmf(dprime ~ 1 + (1 | id)),
+#'   data = meyer_grant_jakob_2025,
+#'   model = model,
+#'   backend = "cmdstanr"
+#' )
+#' }
+"meyer_grant_jakob_2025"
