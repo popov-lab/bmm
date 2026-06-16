@@ -2226,3 +2226,83 @@ rsdt_mafc <- function(dprime, m, n_trials, dist = "normal") {
     n_correct = stats::rbinom(n, n_trials, pc)
   )
 }
+
+
+#' @title Distribution functions for Ranking SDT
+#'
+#' @description Density and random generation for ranking signal detection
+#'   theory (Meyer-Grant et al., 2025). Models rank ordering of m items by
+#'   perceived strength. Only `dprime` is estimated (no criterion or stimulus
+#'   column). Supports Gumbel-min (closed form) and Gaussian UV-SDT
+#'   (numerical integration).
+#'
+#' @name sdt_ranking_dist
+#'
+#' @param counts Integer vector of length m. Counts of how often the target
+#'   received each rank (1 = most likely target, m = least likely).
+#' @param dprime Numeric. Ranking discrimination parameter.
+#' @param m Integer. Number of ranked items. Must be >= 2.
+#' @param dist Character. Distribution: "gumbel_min" (default, closed form)
+#'   or "normal" (Gaussian UV-SDT, numerical integration).
+#' @param sdratio Numeric. Ratio of signal to noise standard deviations
+#'   (default 1). Only used when `dist = "normal"`.
+#' @param log Logical. If `TRUE`, returns log-density (default `FALSE`).
+#' @param n_per_cell Integer. Number of ranking trials per subject.
+#' @param n_subjects Integer. Number of subjects.
+#'
+#' @return `dsdt_ranking` returns the (log-)density. `rsdt_ranking` returns a
+#'   data frame with columns `id`, `rank`, `maxrank`, and `observed`.
+#'
+#' @references
+#' Meyer-Grant, C. G., Kellen, D., Harding, S. M., & Singmann, H. (2025).
+#'   \emph{Extreme-value signal detection theory for recognition memory: The
+#'   parametric road not taken}. PsyArXiv preprint.
+#'   \doi{10.31234/osf.io/qhrfj}
+#'
+#' @keywords distribution
+#' @export
+#' @examples
+#' # Gumbel-min ranking density
+#' dsdt_ranking(counts = c(40, 30, 20, 10), dprime = 1.0, m = 4)
+dsdt_ranking <- function(counts, dprime, m = NULL,
+                         dist = "gumbel_min", sdratio = 1, log = FALSE) {
+  stopif(is.null(counts), "counts is required for ranking density")
+  stopif(is.null(m) || !is.numeric(m) || any(m < 2),
+         "m must be an integer >= 2")
+  stopif(length(counts) != m,
+         "counts must have length m (one count per rank position)")
+  stopif(any(counts < 0), "counts must be non-negative")
+
+  probs <- .ranking_all_probs_r(dprime, m, dist, log(sdratio))
+  log_val <- sum(counts * log(probs))
+  if (log) log_val else exp(log_val)
+}
+
+
+#' @rdname sdt_ranking_dist
+#' @export
+#' @examples
+#' # Generate ranking data (m=4, Gumbel-min)
+#' dat <- rsdt_ranking(n_per_cell = 100, n_subjects = 10,
+#'                     dprime = 1.0, m = 4)
+#' head(dat)
+rsdt_ranking <- function(n_per_cell, n_subjects, dprime, m = NULL,
+                         dist = "gumbel_min", sdratio = 1) {
+  stopif(is.null(m) || !is.numeric(m) || length(m) != 1 || m < 2,
+         "m must be a single integer >= 2")
+  m <- as.integer(m)
+  stopif(length(n_per_cell) != 1 || n_per_cell < 1,
+         "n_per_cell must be a single positive integer")
+  stopif(length(n_subjects) != 1 || n_subjects < 1,
+         "n_subjects must be a single positive integer")
+  stopif(length(dprime) != 1, "dprime must be a single value for ranking")
+
+  probs <- .ranking_all_probs_r(dprime, m, dist, log(sdratio))
+
+  data_list <- lapply(seq_len(n_subjects), function(id) {
+    counts <- as.integer(stats::rmultinom(1, n_per_cell, probs))
+    data.frame(id = id, rank = seq_len(m), maxrank = m,
+               observed = counts)
+  })
+  do.call(rbind, data_list)
+}

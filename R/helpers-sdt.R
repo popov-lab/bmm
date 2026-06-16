@@ -39,3 +39,17 @@
   stopif(any(resp_vals > trial_vals, na.rm = TRUE),
     "Response counts in '{resp_var}' must not exceed '{n_trials_var}'")
 }
+
+# Accept the set size either as a constant or as a column name, so models can
+# fit trials with different set sizes jointly. Returns one set size per row.
+.sdt_resolve_set_size <- function(m, data) {
+  if (is.character(m)) {
+    stopif(!m %in% colnames(data),
+      "Set-size column '{m}' missing in the data")
+    out <- as.integer(data[[m]])
+  } else {
+    out <- rep.int(as.integer(m), nrow(data))
+  }
+  stopif(any(out < 2, na.rm = TRUE), "Set size must be an integer >= 2")
+  out
+}

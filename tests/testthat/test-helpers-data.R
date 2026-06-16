@@ -149,6 +149,7 @@ test_that("check_data() returns a data.frame()", {
   # - mean_rt, var_rt, n_upper, n_trials for ezdm 3par
   # - mean_rt_upper/lower, var_rt_upper/lower for ezdm 4par
   # - stimulus (0/1) for sdt_binary (response counts come from `response`)
+  # - rank (1/2) for sdt_ranking (rank frequency counts come from `response`)
   # Use 50 rows to avoid small sample size warnings from cswald
   test_data <- data.frame(
     y = rep(1, 50), x = rep(1, 50), z = rep(2, 50), w = rep(1, 50),
@@ -158,7 +159,7 @@ test_that("check_data() returns a data.frame()", {
     mean_rt_upper = rep(0.45, 50), mean_rt_lower = rep(0.55, 50),
     var_rt_upper = rep(0.018, 50), var_rt_lower = rep(0.025, 50),
     rt = rep(0.6, 50), response = rep(1, 50),
-    stimulus = rep(c(0L, 1L), 25)
+    stimulus = rep(c(0L, 1L), 25), rank = rep(c(1L, 2L), 25)
   )
   for (ml in mls) {
     model <- ml(
@@ -166,7 +167,7 @@ test_that("check_data() returns a data.frame()", {
       nt_distances = "z", resp_cats = c("w", "l"), num_options = c(1, 1),
       mean_rt = "mean_rt", var_rt = "var_rt", n_upper = "n_upper",
       n_trials = "n_trials", rt = "rt", response = "response",
-      stimulus = "stimulus"
+      stimulus = "stimulus", rank = "rank", m = 2
     )
     expect_s3_class(
       check_data(model, test_data, bmf(kappa ~ 1)),
