@@ -20,7 +20,10 @@ responses.}
 \item{n_trials}{The name of the variable containing the total number of
 trials per cell.}
 
-\item{m}{Integer. Number of alternatives (must be >= 2).}
+\item{m}{Either a single integer >= 2 giving the number of alternatives
+(constant across all rows), or a single string naming a data column that
+gives the number of alternatives per row. A column lets trials with
+different set sizes be fit jointly.}
 
 \item{dist}{The noise distribution assumed for the latent evidence variable.
 One of:

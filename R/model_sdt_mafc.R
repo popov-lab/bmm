@@ -70,7 +70,10 @@
 #'   responses.
 #' @param n_trials The name of the variable containing the total number of
 #'   trials per cell.
-#' @param m Integer. Number of alternatives (must be >= 2).
+#' @param m Either a single integer >= 2 giving the number of alternatives
+#'   (constant across all rows), or a single string naming a data column that
+#'   gives the number of alternatives per row. A column lets trials with
+#'   different set sizes be fit jointly.
 #' @param dist The noise distribution assumed for the latent evidence variable.
 #'   One of:
 #'   \itemize{
@@ -117,9 +120,10 @@ sdt_mafc <- function(response, n_trials, m,
   stop_missing_args()
   dist <- match.arg(dist)
 
-  stopif(!is.numeric(m) || length(m) != 1 || m < 2,
-         "m must be a single integer >= 2 for m-AFC models")
-  m <- as.integer(m)
+  stopif(!((is.numeric(m) && length(m) == 1 && m >= 2) ||
+           (is.character(m) && length(m) == 1)),
+         "m must be a single integer >= 2, or the name of a set-size column in the data")
+  if (is.numeric(m)) m <- as.integer(m)
 
   .model_sdt_mafc(response = response, n_trials = n_trials,
                   m = m, dist = dist,
@@ -138,7 +142,7 @@ check_data.sdt_mafc <- function(model, data, formula) {
 
   .validate_sdt_counts(data, resp_var, n_trials_var)
 
-  data$m_afc <- model$other_vars$m
+  data$m_afc <- .sdt_resolve_set_size(model$other_vars$m, data)
   data$dist_type <- model$other_vars$dist_int
 
   NextMethod("check_data")
