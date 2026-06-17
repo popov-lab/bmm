@@ -467,3 +467,34 @@ test_that("match_stan_to_model_par falls back for structural params", {
   expect_equal(match_stan_to_model_par("z_1", model_pars), "z")
   expect_equal(match_stan_to_model_par("cor_1", model_pars), "cor")
 })
+
+
+# -----------------------------------------------------------------------------
+# nlpar parameter resolution (#362)
+# -----------------------------------------------------------------------------
+
+test_that("init terms resolve via nlpars for non-linear models (#362)", {
+  # native-multinomial / non-linear models (e.g. sdt_rating) carry their
+  # parameters in bterms$nlpars rather than bterms$dpars; an intercept-only
+  # nlpar is represented as a `b_` vector and so routes through init_vector_param
+  bterms <- brms::brmsterms(brms::bf(y ~ eta, eta ~ 1, nl = TRUE))
+  expect_null(bterms$dpars[["eta"]])
+  expect_false(is.null(bterms$nlpars[["eta"]]))
+
+  par_terms <- bterms$dpars[["eta"]] %||% bterms$nlpars[["eta"]]
+  expect_identical(par_terms, bterms$nlpars[["eta"]])
+
+  dat <- data.frame(y = rnorm(10))
+  inits <- init_vector_param(
+    "b_eta", dim = 1, init_range = c(0, 1), link = "identity",
+    bterms = par_terms, data = dat
+  )
+  expect_length(inits, 1)
+  expect_true(all(is.finite(inits)))
+
+  # the pre-fix dpars-only lookup yields NULL and errors in has_intercept()
+  expect_error(init_vector_param(
+    "b_eta", dim = 1, init_range = c(0, 1), link = "identity",
+    bterms = bterms$dpars[["eta"]], data = dat
+  ))
+})

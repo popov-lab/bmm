@@ -52,10 +52,13 @@ create_initfun.bmmodel <- function(model, data, formula) {
       range <- init_ranges[[parameter]]
       link <- links[[parameter]]
 
+      # non-linear model parameters live in nlpars, custom-family ones in dpars
+      par_terms <- bterms$dpars[[parameter]] %||% bterms$nlpars[[parameter]]
+
       # Handle different parameter types
       inits[[spar]] <- switch(type,
         real = init_real_param(spar, range, link),
-        vector = init_vector_param(spar, dim, range, link, bterms$dpars[[parameter]], data),
+        vector = init_vector_param(spar, dim, range, link, par_terms, data),
         matrix = matrix(runif(prod(dim), min = -.5, max = .5), nrow = dim[1]),
         cholesky_factor_corr = ,
         cholesky_factor_cov = ,

@@ -6,6 +6,10 @@
 * **EZDM now supports negative drift rates** to model below-chance performance. The drift parameter uses an identity link (previously log) and employs a soft absolute value approximation (sqrt(drift² + τ²) with τ = 0.01) to maintain smooth gradients for MCMC sampling while allowing bidirectional drift estimation.
 * New **pp_check()** method for multinomial models (e.g., `m3`). Since `brms::pp_check()` does not support the multinomial family, `bmm` now provides a custom method that compares observed and predicted response proportions in the `ppc_bars` style from `bayesplot`. The method supports faceting by experimental conditions via `group`, configurable credible intervals via `probs`, and population-level predictions via `re_formula = NA`. For non-multinomial models, `pp_check()` delegates to `brms::pp_check()` and auto-selects the grouped plot variant when `group` is specified.
 
+### Bug fixes
+* `create_initfun()` now matches Stan parameters to model parameters with a word-boundary regex (`(^|_)param(_|$)`) instead of a substring match, preventing collisions in models with short parameter names (e.g. `s`, `c`, `a`) that are substrings of longer ones (`sim`, `correct`, `activation`); the longest (most specific) match is selected when several apply (#354, #355).
+* `create_initfun()` now resolves initialization terms from `nlpars` when a model parameter is not a distributional parameter, so models built as non-linear brms formulas (e.g. native-multinomial models whose parameters live in `bterms$nlpars`) no longer error with `no applicable method for 'has_intercept' applied to an object of class "NULL"` (#362).
+
 # bmm 1.3.0
 
 ### New models
