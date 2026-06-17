@@ -2226,3 +2226,143 @@ rsdt_mafc <- function(dprime, m, n_trials, dist = "normal") {
     n_correct = stats::rbinom(n, n_trials, pc)
   )
 }
+
+
+# Rank probability P(target rank = rank_pos | set size m). Mirrors the Stan
+# sdt_ranking_logp / sdt_ranking_uv_logp kernels; shared by the density,
+# generator, and the sdt_ranking_logmu R companion.
+.ranking_prob_r <- function(dprime, rank_pos, m, dist = "gumbel_min",
+                            sdratio = 0) {
+  if (dist == "gumbel_min") {
+    g <- dprime
+    e_neg_g <- exp(-g)
+    log_p <- -g + lgamma(m) + lgamma(rank_pos - 1 + e_neg_g) -
+             lgamma(rank_pos) - lgamma(m + e_neg_g)
+    exp(log_p)
+  } else {
+    sigma <- exp(sdratio)
+    gh_nodes <- c(
+      -7.6190485416797546e+00, -6.5105901570136488e+00,
+      -5.5787388058932059e+00, -4.7345813340460463e+00,
+      -3.9439673506573110e+00, -3.1890148165533843e+00,
+      -2.4586636111723603e+00, -1.7452473208141255e+00,
+      -1.0429453488027509e+00, -3.4696415708135458e-01,
+       3.4696415708135830e-01,  1.0429453488027574e+00,
+       1.7452473208141317e+00,  2.4586636111723683e+00,
+       3.1890148165533900e+00,  3.9439673506573163e+00,
+       4.7345813340460552e+00,  5.5787388058932033e+00,
+       6.5105901570136551e+00,  7.6190485416797591e+00
+    )
+    gh_weights <- c(
+      1.2578006724378954e-13, 2.4820623623151972e-10,
+      6.1274902599825256e-08, 4.4021210902309806e-06,
+      1.2882627996193093e-04, 1.8301031310804826e-03,
+      1.3997837447100857e-02, 6.1506372063977507e-02,
+      1.6173933398399959e-01, 2.6079306344955683e-01,
+      2.6079306344955305e-01, 1.6173933398399776e-01,
+      6.1506372063977438e-02, 1.3997837447101162e-02,
+      1.8301031310805052e-03, 1.2882627996193072e-04,
+      4.4021210902309052e-06, 6.1274902599829068e-08,
+      2.4820623623151936e-10, 1.2578006724379269e-13
+    )
+    eta <- dprime + sigma * gh_nodes
+    log_terms <- log(gh_weights) +
+      (m - rank_pos) * pnorm(eta, log.p = TRUE) +
+      (rank_pos - 1) * pnorm(eta, lower.tail = FALSE, log.p = TRUE)
+    exp(lchoose(m - 1, rank_pos - 1) + matrixStats::logSumExp(log_terms))
+  }
+}
+
+# All rank probabilities (ranks 1..m), normalized.
+.ranking_all_probs_r <- function(dprime, m, dist = "gumbel_min",
+                                 sdratio = 0) {
+  probs <- vapply(seq_len(m), function(r) {
+    .ranking_prob_r(dprime, r, m, dist, sdratio)
+  }, numeric(1))
+  probs / sum(probs)
+}
+
+
+#' @title Distribution functions for Ranking SDT
+#'
+#' @description Density and random generation for ranking signal detection
+#'   theory (Meyer-Grant et al., 2025). Models rank ordering of m items by
+#'   perceived strength. Only `dprime` is estimated (no criterion or stimulus
+#'   column). Supports Gumbel-min (closed form) and Gaussian UV-SDT
+#'   (numerical integration).
+#'
+#' @name sdt_ranking_dist
+#'
+#' @param counts Integer vector of length m. Counts of how often the target
+#'   received each rank (1 = most likely target, m = least likely).
+#' @param dprime Numeric. Ranking discrimination parameter.
+#' @param m Integer. Number of ranked items. Must be >= 2.
+#' @param dist Character. Distribution: "gumbel_min" (default, closed form)
+#'   or "normal" (Gaussian UV-SDT, numerical integration).
+#' @param sdratio Numeric. Ratio of signal to noise standard deviations
+#'   (default 1). Only used when `dist = "normal"`.
+#' @param log Logical. If `TRUE`, returns log-density (default `FALSE`).
+#' @param n_per_cell Integer. Number of ranking trials per subject.
+#' @param n_subjects Integer. Number of subjects.
+#'
+#' @return `dsdt_ranking` returns the (log-)density. `rsdt_ranking` returns a
+#'   data frame in the wide format [sdt_ranking()] expects: columns `id`,
+#'   `set_size`, and one rank-count column per rank position (`rank1`, `rank2`,
+#'   ...).
+#'
+#' @references
+#' Meyer-Grant, C. G., Kellen, D., Harding, S. M., & Singmann, H. (2025).
+#'   \emph{Extreme-value signal detection theory for recognition memory: The
+#'   parametric road not taken}. PsyArXiv preprint.
+#'   \doi{10.31234/osf.io/qhrfj}
+#'
+#' @keywords distribution
+#' @export
+#' @examples
+#' # Gumbel-min ranking density
+#' dsdt_ranking(counts = c(40, 30, 20, 10), dprime = 1.0, m = 4)
+dsdt_ranking <- function(counts, dprime, m = NULL,
+                         dist = "gumbel_min", sdratio = 1, log = FALSE) {
+  stopif(is.null(counts), "counts is required for ranking density")
+  stopif(is.null(m) || !is.numeric(m) || any(m < 2),
+         "m must be an integer >= 2")
+  stopif(length(counts) != m,
+         "counts must have length m (one count per rank position)")
+  stopif(any(counts < 0), "counts must be non-negative")
+
+  probs <- .ranking_all_probs_r(dprime, m, dist, log(sdratio))
+  log_val <- sum(counts * log(probs))
+  if (log) log_val else exp(log_val)
+}
+
+
+#' @rdname sdt_ranking_dist
+#' @export
+#' @examples
+#' # Generate ranking data (m=4, Gumbel-min)
+#' dat <- rsdt_ranking(n_per_cell = 100, n_subjects = 10,
+#'                     dprime = 1.0, m = 4)
+#' head(dat)
+rsdt_ranking <- function(n_per_cell, n_subjects, dprime, m = NULL,
+                         dist = "gumbel_min", sdratio = 1) {
+  stopif(is.null(m) || !is.numeric(m) || length(m) != 1 || m < 2,
+         "m must be a single integer >= 2")
+  m <- as.integer(m)
+  stopif(length(n_per_cell) != 1 || n_per_cell < 1,
+         "n_per_cell must be a single positive integer")
+  stopif(length(n_subjects) != 1 || n_subjects < 1,
+         "n_subjects must be a single positive integer")
+  stopif(length(dprime) != 1, "dprime must be a single value for ranking")
+
+  probs <- .ranking_all_probs_r(dprime, m, dist, log(sdratio))
+
+  rank_cols <- paste0("rank", seq_len(m))
+  data_list <- lapply(seq_len(n_subjects), function(id) {
+    counts <- as.integer(stats::rmultinom(1, n_per_cell, probs))
+    cbind(
+      data.frame(id = id, set_size = m),
+      stats::setNames(as.data.frame(as.list(counts)), rank_cols)
+    )
+  })
+  do.call(rbind, data_list)
+}

@@ -112,6 +112,7 @@ The following models are supported:
 \item sdm(resp_error, version)
 \item sdt_binary(response, stimulus, n_trials, dist, links)
 \item sdt_mafc(response, n_trials, m, dist, links)
+\item sdt_ranking(response, m, dist, links)
 }
 
 Type  ?modelname  to get information about a specific model, e.g.  ?imm
