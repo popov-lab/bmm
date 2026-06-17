@@ -46,7 +46,9 @@ or "normal" (Gaussian UV-SDT, numerical integration).}
 }
 \value{
 \code{dsdt_ranking} returns the (log-)density. \code{rsdt_ranking} returns a
-data frame with columns \code{id}, \code{rank}, \code{maxrank}, and \code{observed}.
+data frame in the wide format \code{\link[=sdt_ranking]{sdt_ranking()}} expects: columns \code{id},
+\code{set_size}, and one rank-count column per rank position (\code{rank1}, \code{rank2},
+...).
 }
 \description{
 Density and random generation for ranking signal detection

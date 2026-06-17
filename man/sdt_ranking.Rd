@@ -4,21 +4,13 @@
 \alias{sdt_ranking}
 \title{Ranking Signal Detection Theory Model}
 \usage{
-sdt_ranking(
-  response,
-  rank,
-  m,
-  dist = c("gumbel_min", "normal"),
-  links = NULL,
-  ...
-)
+sdt_ranking(response, m, dist = c("gumbel_min", "normal"), links = NULL, ...)
 }
 \arguments{
-\item{response}{A single string naming the column with rank frequency
-counts.}
-
-\item{rank}{The name of the variable coding the rank position (1 = most
-likely target, m = least likely).}
+\item{response}{A character vector of column names with the target rank-count
+columns, ordered from rank 1 (most likely target) to rank \code{m} (least).
+With a constant \code{m}, supply exactly \code{m} columns; with a varying set size,
+supply \code{max(m)} columns.}
 
 \item{m}{Either a single integer >= 2 giving the number of ranked items
 (constant across all rows), or a single string naming a data column that
@@ -52,18 +44,23 @@ Ranking Signal Detection Theory Model
 }
 \item \strong{Version:} ranking
 \item \strong{Requirements:}
+
+Provide pre-aggregated ranking counts in wide format:
+}
+\itemize{
+\item Rank-count columns (response): one column per rank position, each giving the number of trials in which the target received that rank (column 1 = most likely target, column m = least)
+\item Set size (m): a constant or a column giving the number of ranked items per row; rows with fewer ranks leave the surplus columns at 0
+No stimulus column needed (all trials include exactly one target)
+}
+\itemize{
 \item \strong{Parameters:}
 \itemize{
-\item \code{mu}: Internal parameter (fixed to 0)
 \item \code{dprime}: Sensitivity: ranking discrimination parameter
 }
 \item \strong{Fixed parameters:}
-\itemize{
-\item \code{mu} = 0
-}
 \item \strong{Default parameter links:}
 \itemize{
-\item mu = identity; dprime = identity
+\item dprime = identity
 }
 \item \strong{Default priors:}
 \itemize{
@@ -75,15 +72,23 @@ Ranking Signal Detection Theory Model
 }
 }
 
-Models rank ordering of m items by perceived strength. Only \code{dprime}
-is estimated (no criterion). Supports \code{dist = "gumbel_min"} (closed-form
-via lgamma ratios) and \code{dist = "normal"} (numerical integration).
+Models the rank ordering of \code{m} items by perceived strength. Only \code{dprime}
+is estimated (no criterion). Supports \code{dist = "gumbel_min"} (closed-form via
+lgamma ratios) and \code{dist = "normal"} (Gauss-Hermite quadrature).
 
-For Gaussian ranking (\code{dist = "normal"}), sdratio is fixed to 0 by
-default. Add \code{sdratio ~ 1} to the formula for unequal-variance ranking.
+The model uses the native brms multinomial family: each rank position is a
+multinomial category whose logit is set to \verb{log p(rank)}, so \code{softmax}
+recovers the rank distribution exactly. This means \code{log_lik},
+\code{posterior_predict}, \code{posterior_epred}, and \code{pp_check} come from brms as
+proper joint multinomial draws.
+
+For Gaussian ranking (\code{dist = "normal"}), \code{sdratio} is fixed to 0 by default.
+Add \code{sdratio ~ 1} to the formula for unequal-variance ranking.
 
 The set size \code{m} may be a constant or the name of a data column. Supply a
-column to fit trials with different set sizes in a single model.
+column to fit trials with different set sizes in a single model: the response
+has \code{max(m)} columns, and rows with a smaller set size switch off the surplus
+rank categories (the multinomial then renormalizes over the valid ranks).
 }
 \examples{
 \dontrun{
@@ -91,8 +96,7 @@ dat <- rsdt_ranking(n_per_cell = 200, n_subjects = 20,
                     dprime = 1.5, m = 4)
 
 model <- sdt_ranking(
-  response = "observed",
-  rank = "rank",
+  response = c("rank1", "rank2", "rank3", "rank4"),
   m = 4
 )
 
@@ -102,6 +106,12 @@ fit <- bmm(
   model = model,
   cores = 4,
   backend = "cmdstanr"
+)
+
+# Mixed set sizes in one model: response has max(m) columns, m is a column
+model_mixed <- sdt_ranking(
+  response = c("rank1", "rank2", "rank3", "rank4", "rank5"),
+  m = "set_size"
 )
 }
 }

@@ -7,15 +7,13 @@
 \format{
 \subsection{\code{meyer_grant_jakob_2025}}{
 
-A data frame with 720 rows (60 subjects x set sizes 3, 4, 5, one row per
-rank) and 4 columns:
+A data frame with 180 rows (60 subjects x set sizes 3, 4, 5) and 7 columns:
 \describe{
 \item{id}{Factor uniquely identifying each subject}
 \item{set_size}{Integer number of ranked items on the trial (3, 4, or 5)}
-\item{rank}{Integer rank assigned to the target (1 = most likely target,
-\code{set_size} = least), one row per rank position}
-\item{count}{Integer number of trials in which the target received this
-rank; counts sum to 56 within each subject x set size cell}
+\item{rank1, rank2, rank3, rank4, rank5}{Integer number of trials in which
+the target received that rank (rank1 = most likely target). Columns beyond
+\code{set_size} are structural zeros. The counts sum to 56 within each row.}
 }
 }
 }
@@ -33,7 +31,9 @@ Ranking signal-detection data from 60 subjects. On each trial, participants
 saw 3, 4, or 5 face images---one a studied target---and ranked them by
 perceived oldness; the rank assigned to the target is recorded. The set size
 varies across trials, so the data are aggregated to target rank-frequency
-counts per subject and set size. Fitting all set sizes jointly relies on the
+counts per subject and set size, in the wide format \code{\link[=sdt_ranking]{sdt_ranking()}} consumes:
+one count column per rank position, with structural zeros where the rank
+exceeds the trial's set size. Fitting all set sizes jointly relies on the
 per-row set-size feature of \code{\link[=sdt_ranking]{sdt_ranking()}}: pass the set-size column to \code{m}.
 }
 \examples{
@@ -41,7 +41,7 @@ per-row set-size feature of \code{\link[=sdt_ranking]{sdt_ranking()}}: pass the 
 # Ranking SDT with set size varying per row: pass the set-size column to `m`
 # so trials with 3, 4, and 5 alternatives are fit jointly.
 model <- sdt_ranking(
-  response = "count", rank = "rank", m = "set_size"
+  response = c("rank1", "rank2", "rank3", "rank4", "rank5"), m = "set_size"
 )
 fit <- bmm(
   formula = bmf(dprime ~ 1 + (1 | id)),

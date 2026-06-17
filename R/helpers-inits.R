@@ -59,10 +59,14 @@ create_initfun.bmmodel <- function(model, data, formula) {
       range <- init_ranges[[parameter]]
       link <- links[[parameter]]
 
+      # Native-multinomial / non-linear models (e.g. sdt_rating, sdt_ranking)
+      # carry their parameters as nlpars, not dpars.
+      par_terms <- bterms$dpars[[parameter]] %||% bterms$nlpars[[parameter]]
+
       # Handle different parameter types
       inits[[spar]] <- switch(type,
         real = init_real_param(spar, range, link),
-        vector = init_vector_param(spar, dim, range, link, bterms$dpars[[parameter]], data),
+        vector = init_vector_param(spar, dim, range, link, par_terms, data),
         matrix = matrix(runif(prod(dim), min = -.5, max = .5), nrow = dim[1]),
         cholesky_factor_corr = ,
         cholesky_factor_cov = ,

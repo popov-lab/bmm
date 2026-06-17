@@ -2,46 +2,51 @@
 # MODELS                                                                 ####
 ############################################################################# !
 
-.model_sdt_ranking <- function(response = NULL, rank = NULL, m = NULL,
+.model_sdt_ranking <- function(response = NULL, m = NULL,
                                dist = "gumbel_min",
                                links = NULL, call = NULL, ...) {
   dist_int <- .sdt_dist_id(dist)
 
   parameters <- list(
-    mu = glue("Internal parameter (fixed to 0)"),
     dprime = glue("Sensitivity: ranking discrimination parameter")
   )
   default_priors <- list(
     dprime = list(main = "normal(1, 1)", effects = "normal(0, 0.5)")
   )
-  param_links <- list(mu = "identity", dprime = "identity")
+  param_links <- list(dprime = "identity")
+  fixed_pars <- list()
+  init_ranges <- list(dprime = c(0.5, 1.5))
 
-  fixed_pars <- list(mu = 0)
-
-  # Gaussian ranking supports sdratio as overridable fixed parameter
+  # Gaussian ranking carries sdratio as an overridable fixed parameter (fixed to
+  # 0 = equal variance, sampled when the user adds sdratio ~ ...), mirroring the
+  # rating and binary SDT models.
   if (dist == "normal") {
     parameters$sdratio <- glue(
-      "SD ratio: log ratio of signal to noise standard deviations ",
-      "(exp(sdratio) ensures positivity, 0 = equal variance)"
+      "Log SD ratio: log ratio of signal to noise standard deviations ",
+      "(exp(sdratio) is the ratio, 0 = equal variance)"
     )
     default_priors$sdratio <- list(
       main = "normal(0, 0.5)", effects = "normal(0, 0.3)"
     )
     param_links$sdratio <- "identity"
     fixed_pars$sdratio <- 0
+    init_ranges$sdratio <- c(-0.3, 0.3)
   }
 
   requirements <- glue(
-    "Provide pre-aggregated ranking data in long format:", "\n\n",
-    "  - Response counts ({response}): number of times target received this rank", "\n",
-    "  - Rank position ({rank}): rank position (1 = most likely target, m = least)", "\n",
-    "  No stimulus column needed (all items include exactly one target)"
+    "Provide pre-aggregated ranking counts in wide format:", "\n\n",
+    "  - Rank-count columns (response): one column per rank position, each ",
+    "giving the number of trials in which the target received that rank ",
+    "(column 1 = most likely target, column m = least)", "\n",
+    "  - Set size (m): a constant or a column giving the number of ranked ",
+    "items per row; rows with fewer ranks leave the surplus columns at 0", "\n",
+    "  No stimulus column needed (all trials include exactly one target)"
   )
 
   out <- structure(
     list(
       resp_vars = nlist(response),
-      other_vars = nlist(rank, dist, dist_int, m),
+      other_vars = nlist(m, dist, dist_int),
       domain = "Perception & Recognition Memory",
       task = "Ranking Task",
       name = "Signal Detection Theory (Ranking)",
@@ -57,8 +62,7 @@
       links = param_links,
       fixed_parameters = fixed_pars,
       default_priors = default_priors,
-      init_ranges = list(mu = c(0, 0), dprime = c(0.5, 1.5),
-                         sdratio = c(-0.3, 0.3)),
+      init_ranges = init_ranges,
       void_mu = FALSE
     ),
     class = c("bmmodel", "sdt", "sdt_ranking"),
@@ -73,19 +77,27 @@
 #' @name sdt_ranking
 #' @details `r model_info(.model_sdt_ranking())`
 #'
-#' Models rank ordering of m items by perceived strength. Only `dprime`
-#' is estimated (no criterion). Supports `dist = "gumbel_min"` (closed-form
-#' via lgamma ratios) and `dist = "normal"` (numerical integration).
+#' Models the rank ordering of `m` items by perceived strength. Only `dprime`
+#' is estimated (no criterion). Supports `dist = "gumbel_min"` (closed-form via
+#' lgamma ratios) and `dist = "normal"` (Gauss-Hermite quadrature).
 #'
-#' For Gaussian ranking (`dist = "normal"`), sdratio is fixed to 0 by
-#' default. Add `sdratio ~ 1` to the formula for unequal-variance ranking.
+#' The model uses the native brms multinomial family: each rank position is a
+#' multinomial category whose logit is set to `log p(rank)`, so `softmax`
+#' recovers the rank distribution exactly. This means `log_lik`,
+#' `posterior_predict`, `posterior_epred`, and `pp_check` come from brms as
+#' proper joint multinomial draws.
+#'
+#' For Gaussian ranking (`dist = "normal"`), `sdratio` is fixed to 0 by default.
+#' Add `sdratio ~ 1` to the formula for unequal-variance ranking.
 #'
 #' The set size `m` may be a constant or the name of a data column. Supply a
-#' column to fit trials with different set sizes in a single model.
-#' @param response A single string naming the column with rank frequency
-#'   counts.
-#' @param rank The name of the variable coding the rank position (1 = most
-#'   likely target, m = least likely).
+#' column to fit trials with different set sizes in a single model: the response
+#' has `max(m)` columns, and rows with a smaller set size switch off the surplus
+#' rank categories (the multinomial then renormalizes over the valid ranks).
+#' @param response A character vector of column names with the target rank-count
+#'   columns, ordered from rank 1 (most likely target) to rank `m` (least).
+#'   With a constant `m`, supply exactly `m` columns; with a varying set size,
+#'   supply `max(m)` columns.
 #' @param m Either a single integer >= 2 giving the number of ranked items
 #'   (constant across all rows), or a single string naming a data column that
 #'   gives the number of ranked items per row.
@@ -111,8 +123,7 @@
 #'                     dprime = 1.5, m = 4)
 #'
 #' model <- sdt_ranking(
-#'   response = "observed",
-#'   rank = "rank",
+#'   response = c("rank1", "rank2", "rank3", "rank4"),
 #'   m = 4
 #' )
 #'
@@ -123,8 +134,14 @@
 #'   cores = 4,
 #'   backend = "cmdstanr"
 #' )
+#'
+#' # Mixed set sizes in one model: response has max(m) columns, m is a column
+#' model_mixed <- sdt_ranking(
+#'   response = c("rank1", "rank2", "rank3", "rank4", "rank5"),
+#'   m = "set_size"
+#' )
 #' }
-sdt_ranking <- function(response, rank, m,
+sdt_ranking <- function(response, m,
                         dist = c("gumbel_min", "normal"),
                         links = NULL, ...) {
   call <- match.call()
@@ -136,8 +153,12 @@ sdt_ranking <- function(response, rank, m,
          "m must be a single integer >= 2, or the name of a set-size column in the data")
   if (is.numeric(m)) m <- as.integer(m)
 
-  .model_sdt_ranking(response = response, rank = rank,
-                     m = m, dist = dist,
+  stopif(length(response) < 2,
+         "response must name at least 2 rank-count columns")
+  stopif(is.numeric(m) && length(response) != m,
+         "With a constant m ({m}), response must name exactly m columns ({length(response)} supplied)")
+
+  .model_sdt_ranking(response = response, m = m, dist = dist,
                      links = links, call = call, ...)
 }
 
@@ -148,41 +169,81 @@ sdt_ranking <- function(response, rank, m,
 
 #' @export
 check_data.sdt_ranking <- function(model, data, formula) {
-  resp_var <- model$resp_vars$response
-  rank_var <- model$other_vars$rank
+  resp_cols <- model$resp_vars$response
+  missing <- setdiff(resp_cols, colnames(data))
+  stopif(length(missing) > 0,
+         "Response columns {collapse_comma(missing)} missing in the data")
 
-  stopif(!resp_var %in% colnames(data),
-         "Response variable '{resp_var}' missing in the data")
-  resp_vals <- data[[resp_var]]
-  stopif(any(resp_vals < 0, na.rm = TRUE),
-         "Response variable '{resp_var}' must contain non-negative counts")
-  warnif(any(resp_vals != round(resp_vals), na.rm = TRUE),
-         "Response variable '{resp_var}' should contain integer counts")
+  for (col in resp_cols) {
+    vals <- data[[col]]
+    stopif(any(vals < 0, na.rm = TRUE),
+           "Response column '{col}' must contain non-negative counts")
+    warnif(any(vals != round(vals), na.rm = TRUE),
+           "Response column '{col}' should contain integer counts")
+  }
 
-  stopif(!rank_var %in% colnames(data),
-         "Rank variable '{rank_var}' missing in the data")
   max_rank <- .sdt_resolve_set_size(model$other_vars$m, data)
-  rank_vals <- as.integer(data[[rank_var]])
-  stopif(any(rank_vals < 1 | rank_vals > max_rank, na.rm = TRUE),
-         "Rank variable '{rank_var}' must be between 1 and the set size in every row")
-  warnif(any(data[[rank_var]] != round(data[[rank_var]]), na.rm = TRUE),
-         "Rank variable '{rank_var}' should contain integer values")
+  n_ranks <- length(resp_cols)
+  stopif(any(max_rank > n_ranks, na.rm = TRUE),
+         "Set size must not exceed the number of rank columns ({n_ranks})")
 
-  data$rank_pos <- rank_vals
-  data$max_rank <- max_rank
+  Y <- as.matrix(data[resp_cols])
+  Y[is.na(Y)] <- 0
+  stopif(any(rowSums(Y) <= 0, na.rm = TRUE),
+         "Row sums of response columns must be positive (no empty rows)")
+
+  # Counts in rank columns beyond a row's set size must be structural zeros: a
+  # nonzero count there means the set size is mislabelled for that row.
+  surplus <- col(Y) > max_rank
+  stopif(any(Y[surplus] != 0),
+         "Rank columns beyond the row's set size (m) must be 0")
+
+  data <- data[!colnames(data) %in% resp_cols]
+  data$Y <- Y
+  data$nTrials <- rowSums(Y)
+  data$max_rank <- as.numeric(max_rank)
 
   NextMethod("check_data")
 }
 
 
 ############################################################################# !
-# Convert bmmformula to brmsformula methods                              ####
+# MULTINOMIAL FORMULA & FAMILY CONSTRUCTION                              ####
 ############################################################################# !
+
+# sdt_ranking uses brms' native multinomial family: each rank position's logit
+# is set to log(p(rank)) so softmax recovers the ranking probabilities. The
+# ranking math is computed by the static Stan function sdt_ranking_logmu for
+# fitting and by the exported R companion sdt_ranking_logmu() for
+# posterior_predict/epred (brms evaluates the non-linear formula in R for
+# prediction). log_lik and posterior_predict therefore come from brms — proper
+# joint multinomial draws — while both noise distributions stay supported.
+
+# max_rank (per-row set size) travels as a covariate; sdratio is the parameter
+# for the normal distribution and the literal 0 for gumbel_min; dist_int selects
+# the distribution in both the Stan function and the R companion.
+.sdt_ranking_logmu_args <- function(model) {
+  has_sdratio <- "sdratio" %in% names(model$parameters)
+  c("max_rank", "dprime",
+    if (has_sdratio) "sdratio" else "0",
+    model$other_vars$dist_int)
+}
 
 #' @export
 bmf2bf.sdt_ranking <- function(model, formula) {
-  resp_var <- model$resp_vars$response
-  brms::bf(paste0(resp_var, " | vint(rank_pos, max_rank) ~ 0"))
+  resp_cats <- model$resp_vars$response
+  args <- paste(.sdt_ranking_logmu_args(model), collapse = ", ")
+
+  bform <- brms::bf(
+    glue("Y | trials(nTrials) ~ sdt_ranking_logmu(1, {args})"),
+    nl = TRUE
+  )
+  for (k in seq_along(resp_cats)[-1]) {
+    bform <- bform + brms::nlf(stats::as.formula(
+      glue("mu{resp_cats[k]} ~ sdt_ranking_logmu({k}, {args})")
+    ))
+  }
+  bform
 }
 
 
@@ -192,142 +253,52 @@ bmf2bf.sdt_ranking <- function(model, formula) {
 
 #' @export
 configure_model.sdt_ranking <- function(model, data, formula) {
+  resp_cats <- model$resp_vars$response
+
   formula <- bmf2bf(model, formula)
+  formula$family <- brms::multinomial(refcat = NA)
+  formula$family$cats <- resp_cats
+  formula$family$dpars <- paste0("mu", resp_cats)
 
   sc_path <- system.file("stan_chunks", package = "bmm")
   stan_funs <- read_lines2(paste0(sc_path, "/sdt_ranking_funs.stan"))
   stanvars <- brms::stanvar(scode = stan_funs, block = "functions")
 
-  # Gaussian ranking always carries sdratio as a dpar (fixed to 0 for the
-  # equal-variance default, sampled when predicted), mirroring sdt_binary.
-  if (model$other_vars$dist == "normal") {
-    formula$family <- brms::custom_family(
-      "sdt_ranking_uv",
-      dpars = c("mu", "dprime", "sdratio"),
-      links = c("identity", model$links$dprime, model$links$sdratio),
-      type = "int",
-      loop = TRUE,
-      log_lik = log_lik_sdt_ranking_uv,
-      posterior_predict = posterior_predict_sdt_ranking,
-      vars = c("vint1[n]", "vint2[n]")
-    )
-  } else {
-    formula$family <- brms::custom_family(
-      "sdt_ranking",
-      dpars = c("mu", "dprime"),
-      links = c("identity", model$links$dprime),
-      type = "int",
-      loop = TRUE,
-      log_lik = log_lik_sdt_ranking,
-      posterior_predict = posterior_predict_sdt_ranking,
-      vars = c("vint1[n]", "vint2[n]")
-    )
-  }
-
   nlist(formula, data, stanvars)
 }
 
 
-############################################################################# !
-# LOG_LIK & POSTERIOR_PREDICT                                            ####
-############################################################################# !
+#' @title Ranking SDT rank log-probability (multinomial logit)
+#' @description R companion to the Stan `sdt_ranking_logmu` function. It returns
+#'   `log(p(rank))` for rank position `cat`, which the [sdt_ranking()]
+#'   multinomial formula uses as the category logit (so `softmax` recovers the
+#'   ranking probabilities). `brms` evaluates the non-linear formula in R for
+#'   `posterior_predict()` and `posterior_epred()`, so this function must be on
+#'   the search path; it is exported for that reason and is not called directly.
+#' @param cat Integer rank position index.
+#' @param max_rank Set size (number of ranked items) for the observation; ranks
+#'   above it return the finite `-100` sentinel so the category switches off.
+#' @param dprime Sensitivity (draws-by-observation matrix supplied by brms).
+#' @param sdratio Log SD ratio; `0` for the gumbel_min distribution.
+#' @param dist Integer noise-distribution id (2 = gumbel_min, 1 = normal).
+#' @return `log(p(cat))`, matching the shape of `dprime`.
+#' @keywords internal
+#' @export
+sdt_ranking_logmu <- function(cat, max_rank, dprime, sdratio = 0, dist = 2L) {
+  dist_name <- .sdt_dist_names[dist]
 
-# R-side computation of rank probability
-# Mirrors the Stan sdt_ranking_lpmf kernel
-.ranking_prob_r <- function(dprime, rank_pos, m, dist = "gumbel_min",
-                            sdratio = 0) {
-  if (dist == "gumbel_min") {
-    g <- dprime
-    e_neg_g <- exp(-g)
-    log_p <- -g + lgamma(m) + lgamma(rank_pos - 1 + e_neg_g) -
-             lgamma(rank_pos) - lgamma(m + e_neg_g)
-    exp(log_p)
-  } else {
-    # Gaussian UV-SDT: fixed Gauss-Hermite quadrature over the target distribution
-    sigma <- exp(sdratio)
-    gh_nodes <- c(
-      -7.6190485416797546e+00, -6.5105901570136488e+00,
-      -5.5787388058932059e+00, -4.7345813340460463e+00,
-      -3.9439673506573110e+00, -3.1890148165533843e+00,
-      -2.4586636111723603e+00, -1.7452473208141255e+00,
-      -1.0429453488027509e+00, -3.4696415708135458e-01,
-       3.4696415708135830e-01,  1.0429453488027574e+00,
-       1.7452473208141317e+00,  2.4586636111723683e+00,
-       3.1890148165533900e+00,  3.9439673506573163e+00,
-       4.7345813340460552e+00,  5.5787388058932033e+00,
-       6.5105901570136551e+00,  7.6190485416797591e+00
-    )
-    gh_weights <- c(
-      1.2578006724378954e-13, 2.4820623623151972e-10,
-      6.1274902599825256e-08, 4.4021210902309806e-06,
-      1.2882627996193093e-04, 1.8301031310804826e-03,
-      1.3997837447100857e-02, 6.1506372063977507e-02,
-      1.6173933398399959e-01, 2.6079306344955683e-01,
-      2.6079306344955305e-01, 1.6173933398399776e-01,
-      6.1506372063977438e-02, 1.3997837447101162e-02,
-      1.8301031310805052e-03, 1.2882627996193072e-04,
-      4.4021210902309052e-06, 6.1274902599829068e-08,
-      2.4820623623151936e-10, 1.2578006724379269e-13
-    )
-    eta <- dprime + sigma * gh_nodes
-    log_terms <- log(gh_weights) +
-      (m - rank_pos) * pnorm(eta, log.p = TRUE) +
-      (rank_pos - 1) * pnorm(eta, lower.tail = FALSE, log.p = TRUE)
-    exp(lchoose(m - 1, rank_pos - 1) + matrixStats::logSumExp(log_terms))
-  }
-}
+  shape <- dim(dprime)
+  dprime <- as.vector(dprime)
+  n <- length(dprime)
+  max_rank <- rep_len(as.vector(max_rank), n)
+  sdratio <- rep_len(as.vector(sdratio), n)
 
-# R-side computation of all rank probabilities (vectorized over ranks 1..m)
-.ranking_all_probs_r <- function(dprime, m, dist = "gumbel_min",
-                                 sdratio = 0) {
-  probs <- vapply(seq_len(m), function(r) {
-    .ranking_prob_r(dprime, r, m, dist, sdratio)
+  out <- vapply(seq_len(n), function(j) {
+    m_j <- max_rank[j]
+    if (cat > m_j) return(-100)
+    log(.ranking_all_probs_r(dprime[j], m_j, dist_name, sdratio[j])[cat])
   }, numeric(1))
-  probs / sum(probs)
-}
 
-log_lik_sdt_ranking <- function(i, prep) {
-  dprime <- brms::get_dpar(prep, "dprime", i = i)
-  rank_pos <- prep$data$vint1[i]
-  max_rank <- prep$data$vint2[i]
-  y <- prep$data$Y[i]
-
-  log_p <- vapply(dprime, function(d) {
-    p <- .ranking_prob_r(d, rank_pos, max_rank, dist = "gumbel_min")
-    log(p)
-  }, numeric(1))
-  y * log_p
-}
-
-log_lik_sdt_ranking_uv <- function(i, prep) {
-  dprime   <- brms::get_dpar(prep, "dprime",   i = i)
-  sdratio  <- brms::get_dpar(prep, "sdratio",  i = i)
-  rank_pos <- prep$data$vint1[i]
-  max_rank <- prep$data$vint2[i]
-  y        <- prep$data$Y[i]
-
-  log_p <- mapply(function(d, s) {
-    p <- .ranking_prob_r(d, rank_pos, max_rank, dist = "normal", sdratio = s)
-    log(p)
-  }, dprime, sdratio)
-  y * log_p
-}
-
-posterior_predict_sdt_ranking <- function(i, prep, ...) {
-  dprime   <- brms::get_dpar(prep, "dprime", i = i)
-  rank_pos <- prep$data$vint1[i]
-  max_rank <- prep$data$vint2[i]
-
-  if ("sdratio" %in% names(prep$dpars)) {
-    dist    <- "normal"
-    sdratio <- brms::get_dpar(prep, "sdratio", i = i)
-  } else {
-    dist    <- "gumbel_min"
-    sdratio <- rep(0, length(dprime))
-  }
-
-  vapply(seq_along(dprime), function(s) {
-    probs <- .ranking_all_probs_r(dprime[s], max_rank, dist, sdratio[s])
-    probs[rank_pos]
-  }, numeric(1))
+  if (!is.null(shape)) dim(out) <- shape
+  out
 }

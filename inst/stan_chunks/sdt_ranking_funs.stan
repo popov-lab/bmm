@@ -1,38 +1,28 @@
-// Ranking SDT likelihood functions
-// Implements ranking model where participants rank m items by perceived strength.
-// The likelihood uses y * log(p) (multinomial kernel, constant absorbed).
+// Ranking SDT category log-probabilities for the native multinomial family.
+// Each rank position is one multinomial category; sdt_ranking_logmu returns
+// log p(rank) so brms' softmax recovers the rank distribution. Ranks beyond a
+// row's set size (cat > max_rank) are switched off with a finite -100 logit,
+// the same idiom the mixture models use for absent set-size components. The set
+// size max_rank arrives as a real covariate (brms passes data covariates into
+// non-linear formulas as reals), so the gamma terms use lgamma rather than the
+// integer-only choose().
 
-// Gumbel-min ranking: closed-form via gamma function ratios
-// Meyer-Grant et al. (2025), based on extreme-value ordering statistics.
-// Parameters:
-//   y:        count of times target received this rank
-//   mu:       internal parameter (fixed to 0, required by brms)
-//   dprime:   sensitivity parameter (g' in Gumbel parameterization)
-//   rank_pos: rank position (1 = most likely target, m = least)
-//   max_rank: total number of ranked items (m)
-real sdt_ranking_lpmf(int y, real mu, real dprime,
-                      int rank_pos, int max_rank) {
-  if (y == 0) return 0;
+// Gumbel-min ranking: closed form via gamma-function ratios.
+// Meyer-Grant et al. (2025), based on extreme-value (min) order statistics.
+//   cat:      rank position (1 = most likely target, max_rank = least)
+//   max_rank: number of ranked items (m) on this row
+//   dprime:   sensitivity (g' in the Gumbel parameterization)
+real sdt_ranking_logp(int cat, real max_rank, real dprime) {
   real g = dprime;
   real e_neg_g = exp(-g);
-  real log_p = -g + lgamma(max_rank) + lgamma(rank_pos - 1 + e_neg_g)
-               - lgamma(rank_pos) - lgamma(max_rank + e_neg_g);
-  return y * log_p;
+  return -g + lgamma(max_rank) + lgamma(cat - 1 + e_neg_g)
+         - lgamma(cat) - lgamma(max_rank + e_neg_g);
 }
 
-// Gaussian UV-SDT ranking: fixed Gauss-Hermite quadrature over the target
-// distribution. This replaces the slower adaptive integrate_1d path while
-// retaining smooth gradients.
-// Parameters:
-//   y:        count of times target received this rank
-//   mu:       internal parameter (fixed to 0, required by brms)
-//   dprime:   sensitivity (d')
-//   sdratio:  log ratio of signal to noise SD (exp(sdratio) = sigma_s/sigma_n)
-//   rank_pos: rank position (1..m)
-//   max_rank: total number of ranked items (m)
-real sdt_ranking_uv_lpmf(int y, real mu, real dprime, real sdratio,
-                         int rank_pos, int max_rank) {
-  if (y == 0) return 0;
+// Gaussian UV-SDT ranking: 20-point Gauss-Hermite quadrature over the target
+// distribution. Retains smooth gradients without adaptive integration.
+//   sdratio: log ratio of signal to noise SD (exp(sdratio) = sigma_s / sigma_n)
+real sdt_ranking_uv_logp(int cat, real max_rank, real dprime, real sdratio) {
   real sigma = exp(sdratio);
   int N_GH = 20;
   vector[N_GH] gh_nodes = to_vector({
@@ -59,19 +49,28 @@ real sdt_ranking_uv_lpmf(int y, real mu, real dprime, real sdratio,
     4.4021210902309052e-06, 6.1274902599829068e-08,
     2.4820623623151936e-10, 1.2578006724379269e-13
   });
-  real log_choose = log(choose(max_rank - 1, rank_pos - 1));
+  real log_choose = lgamma(max_rank) - lgamma(cat) - lgamma(max_rank - cat + 1);
   real p = 0;
 
   for (i in 1:N_GH) {
     real eta = dprime + sigma * gh_nodes[i];
     // Probability-space formulation: avoids log-CDF underflow (→ -Inf) and the
-    // 0 * Inf = NaN that arises in Stan's autodiff when multiplying a zero
-    // coefficient by a -Inf log-CDF. Boundary guards use 1.0 so pow(1, 0) = 1.
-    real cdf  = (max_rank > rank_pos) ? Phi(eta)          : 1.0;
-    real ccdf = (rank_pos > 1)        ? (1.0 - Phi(eta))  : 1.0;
-    p += gh_weights[i] * pow(cdf, max_rank - rank_pos)
-                       * pow(ccdf, rank_pos - 1);
+    // 0 * Inf = NaN that arises when multiplying a zero coefficient by a -Inf
+    // log-CDF. Boundary guards use 1.0 so pow(1, 0) = 1.
+    real cdf  = (max_rank > cat) ? Phi(eta)         : 1.0;
+    real ccdf = (cat > 1)        ? (1.0 - Phi(eta)) : 1.0;
+    p += gh_weights[i] * pow(cdf, max_rank - cat) * pow(ccdf, cat - 1);
   }
 
-  return y * (log_choose + log(p));
+  return log_choose + log(p);
+}
+
+// Multinomial-logit value for rank category `cat`. Returns the finite -100
+// sentinel when the rank exceeds this row's set size; otherwise dispatches on
+// the noise distribution (id 2 = gumbel_min, id 1 = normal; see .SDT_DISTS).
+real sdt_ranking_logmu(int cat, real max_rank, real dprime, real sdratio,
+                       int dist_type) {
+  if (cat > max_rank) return -100;
+  if (dist_type == 2) return sdt_ranking_logp(cat, max_rank, dprime);
+  return sdt_ranking_uv_logp(cat, max_rank, dprime, sdratio);
 }
