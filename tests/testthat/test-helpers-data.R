@@ -143,7 +143,11 @@ test_that("check_var_set_size rejects invalid input", {
 })
 
 test_that("check_data() returns a data.frame()", {
-  mls <- lapply(supported_models(print_call = FALSE), get_model)
+  # sdt_rating needs one response column per rating category plus n_ratings, so
+  # it cannot be exercised with the shared single `response` column used here; it
+  # is covered with proper count data in test-model_sdt_rating.R.
+  model_names <- setdiff(supported_models(print_call = FALSE), "sdt_rating")
+  mls <- lapply(model_names, get_model)
   # test data includes variables for all model types:
   # - y, x, z, w, l, s for circular/mixture models
   # - mean_rt, var_rt, n_upper, n_trials for ezdm 3par
