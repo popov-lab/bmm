@@ -115,8 +115,8 @@ remotes::install_github("venpopov/bmm@v0.0.1")
 
 ## Available models
 
-Currently the `bmm` package implements mainly models used in the domain of
-working memory research, such as:
+Currently the `bmm` package implements models used in the domain of
+working memory research and evidence accumulation models, such as:
 
 ```{r, results="asis", echo=FALSE}
 bmm::print_pretty_models_md()
@@ -127,7 +127,7 @@ implementation of a broad range of cognitive measurement models. In fact, we are
 already working on implementing additional models, such as:
 
 - Signal-Detection Models
-- Evidence Accumulation Models
+- further evidence accumulation models, such as the LBA
 
 If you have suggestions for models that should be added to the package or additional functionality
 that would improve the usability of the pacakge, feel free to create an [issue](https://github.com/venpopov/bmm/issues). 

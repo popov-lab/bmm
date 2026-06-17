@@ -14,7 +14,10 @@ NULL
 #' @export restructure
 NULL
 
+#' @importFrom brms conditional_effects
+#' @export conditional_effects
+NULL
+
 #' @importFrom brms pp_check
 #' @export pp_check
 NULL
-

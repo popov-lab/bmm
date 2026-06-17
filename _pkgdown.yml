@@ -42,6 +42,7 @@ reference:
     - "bmmformula"
     - "update.bmmfit"
     - "summary.bmmfit"
+    - "conditional_effects.bmmfit"
     - "emmeans-bmmfit"
     - "pp_check.bmmfit"
   - title: "Extract model information"
@@ -80,7 +81,6 @@ articles:
     contents:
      - articles/bmm_bmmformula
      - articles/bmm_extract_info
- 
   - title: Continuous reproduction tasks
     desc: Fitting models to continuous reproduction tasks
     contents:
@@ -94,8 +94,10 @@ articles:
     contents:
     - articles/bmm_m3
 
-  - title: Speeded decision making
-    desc: Fitting models to choice reaction time tasks
+  - title: Evidence accumulation models
+    desc: Fitting evidence accumulation models to response time and choice data
     contents:
     - articles/bmm_ezdm
+    - articles/bmm_cswald
+    - articles/bmm_ddm
     - articles/bmm_rt_contamination

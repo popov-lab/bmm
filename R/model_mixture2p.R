@@ -30,7 +30,7 @@
       links = list(
         mu1 = "tan_half",
         kappa = "log",
-        thetat = "identity"
+        thetat = "logit"
       ),
       fixed_parameters = list(mu1 = 0, mu2 = 0, kappa2 = -100),
       default_priors = list(
