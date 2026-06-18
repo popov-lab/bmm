@@ -1982,7 +1982,11 @@ neg_loglik <- function(x, params, distribution, weights = NULL) {
 # signal distribution by sdratio. Arguments are recycled to a common length.
 .sdt_eta <- function(dprime, criterion, stimulus, sdratio = 1) {
   shift <- dprime / 2 * (2 * stimulus - 1)
-  scale <- ifelse(stimulus == 1, sdratio, 1)
+  # sdratio^(stimulus == 1) scales the signal by sdratio and the noise by 1,
+  # broadcasting whether stimulus is a per-observation vector (likelihood) or a
+  # scalar with sdratio a vector of draws (ROC points) -- unlike ifelse(), whose
+  # result length follows the scalar condition and would drop all but sdratio[1].
+  scale <- sdratio^(stimulus == 1)
   (shift - criterion) / scale
 }
 
