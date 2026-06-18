@@ -265,6 +265,64 @@ test_that("dsdt_binary is vectorized over sdratio", {
 
 
 ############################################################################# !
+# LOG_LIK & POSTERIOR_PREDICT                                            ####
+############################################################################# !
+
+# brmsprep stand-in: get_dpar() returns the supplied per-draw vectors (sdratio
+# on the log link, as brms passes it). dprime/criterion are held constant so the
+# only across-draw variation comes from sdratio -- isolating the unequal-variance
+# signal scaling that the .sdt_eta() collapse bug got wrong.
+uv_prep <- function(ndraws = 50L) {
+  draws <- list(
+    dprime    = rep(1.2, ndraws),
+    criterion = rep(0.0, ndraws),
+    sdratio   = log(seq(1.1, 1.9, length.out = ndraws))
+  )
+  prep <- list(data = list(
+    vint1  = c(0L, 1L),      # stimulus: noise, signal
+    vint2  = c(1L, 1L),      # dist_type: normal
+    trials = c(100L, 100L),
+    Y      = c(30L, 70L)
+  ))
+  list(prep = prep, draws = draws)
+}
+
+test_that("log_lik_sdt_binary scales the signal per draw under UV-SDT", {
+  mk <- uv_prep()
+  local_mocked_bindings(
+    get_dpar = function(prep, dpar, i = NULL, ...) mk$draws[[dpar]],
+    .package = "brms"
+  )
+  # signal row (stimulus = 1): p = Phi((dprime/2 - criterion) / exp(sdratio))
+  p_expected <- pnorm((1.2 / 2 - 0) / exp(mk$draws$sdratio))
+  expect_equal(log_lik_sdt_binary(2L, mk$prep),
+               dbinom(70L, 100L, p_expected, log = TRUE))
+  # the collapse bug divided every draw by exp(sdratio[1]), giving a constant p
+  expect_gt(length(unique(round(log_lik_sdt_binary(2L, mk$prep), 8))), 1L)
+  # noise row (stimulus = 0) is scale-free and must ignore sdratio entirely
+  expect_equal(log_lik_sdt_binary(1L, mk$prep),
+               rep(dbinom(30L, 100L, pnorm(-1.2 / 2), log = TRUE),
+                   length(mk$draws$dprime)))
+})
+
+test_that("posterior_predict_sdt_binary feeds per-draw signal probabilities", {
+  mk <- uv_prep()
+  captured <- NULL
+  local_mocked_bindings(
+    get_dpar = function(prep, dpar, i = NULL, ...) mk$draws[[dpar]],
+    .package = "brms"
+  )
+  local_mocked_bindings(
+    rbinom = function(n, size, prob) { captured <<- prob; rep(0L, n) },
+    .package = "stats"
+  )
+  out <- posterior_predict_sdt_binary(2L, mk$prep)
+  expect_length(out, length(mk$draws$dprime))
+  expect_equal(captured, pnorm((1.2 / 2) / exp(mk$draws$sdratio)))
+})
+
+
+############################################################################# !
 # FORMULA AND CONFIGURE_MODEL TESTS                                      ####
 ############################################################################# !
 
