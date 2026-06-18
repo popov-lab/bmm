@@ -116,6 +116,26 @@ test_that("sdt_rating supplies init_ranges for every estimated parameter", {
   }
 })
 
+test_that(".sdt_make_thresholds mid matches the Stan builders for odd and even K", {
+  # Regression: the R companion's middle-threshold index must equal the Stan
+  # builders' ((K-1) %/% 2 + 1) so prediction reproduces the likelihood. The two
+  # diverged for odd K (R used K %/% 2), shifting equidistant/anchored thresholds.
+  for (K in 4:7) {
+    mid <- (K - 1L) %/% 2L + 1L
+    for (tt in c("log_distance", "log_ratio", "softmax")) {
+      nd <- if (tt == "softmax") max(0L, K - 3L) else K - 2L
+      deltas <- if (nd > 0) seq(0.1, 0.3, length.out = nd) else NULL
+      thr <- .sdt_make_thresholds(0.3, K, tt, spacing = 0.2, deltas = deltas)
+      expect_equal(thr[mid], 0.3, info = paste(tt, "K =", K))    # criterion sits at mid
+      expect_false(is.unsorted(thr), info = paste(tt, "K =", K))
+    }
+  }
+  # equidistant closed form criterion + (k - mid) * exp(spacing); odd K was the bug
+  expect_equal(.sdt_make_thresholds(0, 5L, "equidistant", spacing = 0), c(-2, -1, 0, 1))
+  expect_equal(.sdt_make_thresholds(0, 7L, "equidistant", spacing = 0), c(-3, -2, -1, 0, 1, 2))
+  expect_equal(.sdt_make_thresholds(0, 6L, "equidistant", spacing = 0), c(-2, -1, 0, 1, 2))
+})
+
 ############################################################################# !
 # CHECK_DATA TESTS                                                       ####
 ############################################################################# !

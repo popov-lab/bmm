@@ -16,7 +16,7 @@ vector sdt_thresholds_parsimonious_rating(real criterion, real spacing,
 vector sdt_thresholds_equidistant_rating(real criterion, real spacing,
                                          int K_full) {
   int n_thresh = K_full - 1;
-  int mid = (K_full - 1) / 2 + 1;
+  int mid = (K_full - 1) %/% 2 + 1;
   vector[n_thresh] thresholds;
   for (k in 1:n_thresh) {
     thresholds[k] = criterion + (k - mid) * exp(spacing);
@@ -28,7 +28,7 @@ vector sdt_thresholds_log_distance_rating(real criterion,
                                           array[] real deltas,
                                           int K_full) {
   int n_thresh = K_full - 1;
-  int mid = (K_full - 1) / 2 + 1;
+  int mid = (K_full - 1) %/% 2 + 1;
   vector[n_thresh] thresholds;
   thresholds[mid] = criterion;
 
@@ -54,7 +54,7 @@ vector sdt_thresholds_log_ratio_rating(real criterion,
                                        array[] real deltas,
                                        int K_full) {
   int n_thresh = K_full - 1;
-  int mid = (K_full - 1) / 2 + 1;
+  int mid = (K_full - 1) %/% 2 + 1;
   vector[n_thresh] thresholds;
   thresholds[mid] = criterion;
 
@@ -93,7 +93,7 @@ vector sdt_thresholds_softmax_rating(real criterion, real spacing,
                                      array[] real deltas,
                                      int K_full) {
   int n_thresh = K_full - 1;
-  int mid = (K_full - 1) / 2 + 1;
+  int mid = (K_full - 1) %/% 2 + 1;
   int n_intervals = K_full - 2;
   vector[n_thresh] thresholds;
 

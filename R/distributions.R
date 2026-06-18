@@ -2163,7 +2163,9 @@ rsdt_binary <- function(n_per_cell, n_subjects, dprime, criterion,
 .sdt_make_thresholds <- function(criterion, n_ratings, threshold_type,
                                  spacing = NULL, deltas = NULL) {
   K1 <- n_ratings - 1L
-  mid <- n_ratings %/% 2L
+  # Must match the Stan builders in sdt_rating_funs.stan ((K_full - 1) %/% 2 + 1)
+  # so R-side prediction reproduces the likelihood for odd K; identical for even K.
+  mid <- (n_ratings - 1L) %/% 2L + 1L
 
   if (threshold_type %in% c("equidistant", "parsimonious")) {
     stopif(is.null(spacing), "spacing is required for {threshold_type} thresholds")
