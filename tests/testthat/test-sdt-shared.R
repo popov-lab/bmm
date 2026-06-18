@@ -24,6 +24,24 @@ test_that(".sdt_cdf is vectorized over eta", {
 
 
 ############################################################################# !
+# PDF HELPER TESTS                                                       ####
+############################################################################# !
+
+test_that(".SDT_DISTS pdf is the derivative of its cdf and integrates to 1", {
+  x <- seq(-4, 4, by = 0.1)
+  h <- 1e-5
+  for (dist in names(bmm:::.SDT_DISTS)) {
+    cdf <- bmm:::.SDT_DISTS[[dist]]$cdf
+    pdf <- bmm:::.SDT_DISTS[[dist]]$pdf
+    fd  <- (cdf(x + h) - cdf(x - h)) / (2 * h)
+    expect_equal(pdf(x), fd, tolerance = 1e-5, info = dist)
+    expect_equal(integrate(pdf, -Inf, Inf)$value, 1, tolerance = 1e-6,
+                 info = dist)
+  }
+})
+
+
+############################################################################# !
 # DPRIME AND CRITERION TESTS                                              ####
 ############################################################################# !
 

@@ -1937,12 +1937,14 @@ neg_loglik <- function(x, params, distribution, weights = NULL) {
 
 # SDT distribution registry: single source of truth for all CDF/quantile logic
 # Each entry: id (Stan integer), cdf (R CDF), qf (R quantile function),
-# stan_expr (function returning Stan CDF expression string)
+# pdf (R density, derivative of cdf), stan_expr (function returning Stan CDF
+# expression string)
 .SDT_DISTS <- list(
   normal = list(
     id = 1L,
     cdf = pnorm,
     qf = qnorm,
+    pdf = dnorm,
     stan_expr = function(x) paste0("Phi(", x, ")"),
     log_stan_expr = function(x) paste0("std_normal_lcdf(", x, ")"),
     log1m_stan_expr = function(x) paste0("std_normal_lccdf(", x, ")")
@@ -1951,6 +1953,7 @@ neg_loglik <- function(x, params, distribution, weights = NULL) {
     id = 2L,
     cdf = function(x) exp(-exp(-x)),
     qf = function(p) -log(-log(p)),
+    pdf = function(x) exp(-x - exp(-x)),
     stan_expr = function(x) paste0("exp(-exp(-(", x, ")))"),
     log_stan_expr = function(x) paste0("(-exp(-(", x, ")))"),
     log1m_stan_expr = function(x) paste0("log1m_exp(-exp(-(", x, ")))")
@@ -1959,6 +1962,7 @@ neg_loglik <- function(x, params, distribution, weights = NULL) {
     id = 3L,
     cdf = function(x) 1 - exp(-exp(x)),
     qf = function(p) log(-log(1 - p)),
+    pdf = function(x) exp(x - exp(x)),
     stan_expr = function(x) paste0("(1 - exp(-exp(", x, ")))"),
     log_stan_expr = function(x) paste0("log1m_exp(-exp(", x, "))"),
     log1m_stan_expr = function(x) paste0("(-exp(", x, "))")
@@ -1967,6 +1971,7 @@ neg_loglik <- function(x, params, distribution, weights = NULL) {
     id = 4L,
     cdf = plogis,
     qf = qlogis,
+    pdf = dlogis,
     stan_expr = function(x) paste0("inv_logit(", x, ")"),
     log_stan_expr = function(x) paste0("(-log1p_exp(-(", x, ")))"),
     log1m_stan_expr = function(x) paste0("(-(", x, ") - log1p_exp(-(", x, ")))")

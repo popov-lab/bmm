@@ -146,3 +146,26 @@ test_that(".resolve_pp_conditions() excludes infrastructure columns", {
   expect_false(any(grepl("^Idx_", conds)))
   expect_false(any(grepl("^n_", conds)))
 })
+
+
+# SDT-rating default grouping (.pp_check_resolve_group is the load-bearing seam)
+
+test_that(".pp_check_resolve_group() defaults to stimulus for sdt_rating", {
+  fit <- fake_multinomial_fit(c("sdt", "sdt_rating"))
+  expect_equal(.pp_check_resolve_group(fit, NULL), "stimulus")
+})
+
+test_that(".pp_check_resolve_group() treats NA as the pool-everything opt-out", {
+  fit <- fake_multinomial_fit(c("sdt", "sdt_rating"))
+  expect_null(.pp_check_resolve_group(fit, NA))
+})
+
+test_that(".pp_check_resolve_group() honours an explicit group for sdt_rating", {
+  fit <- fake_multinomial_fit(c("sdt", "sdt_rating"))
+  expect_equal(.pp_check_resolve_group(fit, "condition"), "condition")
+})
+
+test_that(".pp_check_resolve_group() leaves non-rating multinomial ungrouped", {
+  fit <- fake_multinomial_fit("m3")
+  expect_null(.pp_check_resolve_group(fit, NULL))
+})

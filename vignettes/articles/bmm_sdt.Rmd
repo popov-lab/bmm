@@ -1,0 +1,599 @@
+---
+title: "Signal Detection Theory models"
+output: bookdown::html_document2
+author:
+  - Gidon Frischkorn
+  - Ven Popov
+bibliography: REFERENCES.bib
+header-includes:
+  - \usepackage{amsmath}
+vignette: >
+  %\VignetteIndexEntry{Signal Detection Theory models}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+pkgdown:
+  as_is: true
+---
+<style type="text/css">
+div.main-container {
+max-width: 800px !important;
+}
+
+p {
+margin-top: 1.5em ;
+margin-bottom: 1.5em ;
+}
+.author{
+    display: none;
+}
+</style>
+
+```{r, include = FALSE}
+options(crayon.enabled = TRUE)
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>",
+  message = FALSE,
+  dev = "jpeg",
+  dpi = 100,
+  fig.width = 5,
+  fig.asp = 0.8,
+  out.width = "80%",
+  fig.align = "center"
+)
+fansi::set_knit_hooks(knitr::knit_hooks, which = c("output", "message", "error"))
+```
+
+```{r setup, message = FALSE}
+library(bmm)
+library(ggplot2)
+```
+
+# Signal detection theory in bmm
+
+Signal detection theory (SDT) separates an observer's *sensitivity* — how well
+two classes of stimuli (signal vs. noise, old vs. new) can be told apart — from
+their *response bias* — where they place the decision criterion
+[@Green_Swets_1966; @DeCarlo_1998]. `bmm` ships four SDT measurement models, one
+per response format. Each is a self-contained model with its own data
+requirements; they are not modes of a single function.
+
+| Constructor | Response format | Key parameters | ROC defined? |
+|-------------|-----------------|----------------|--------------|
+| `sdt_binary()` | counts of "signal"/"old" responses | `dprime`, `criterion`, `sdratio` | yes |
+| `sdt_rating()` | counts per confidence-rating category | `dprime`, `criterion`, threshold params, `sdratio` | yes |
+| `sdt_mafc()` | counts of correct m-AFC responses | `dprime` | no |
+| `sdt_ranking()` | counts per rank position | `dprime`, `sdratio` | no |
+
+All four assume a latent evidence variable whose noise distribution is selected
+with the `dist` argument: `"normal"` (Gaussian SDT), `"logistic"`,
+`"gumbel_min"` (extreme-value SDT), or `"gumbel_max"`.
+
+Two of the models — `sdt_binary()` and `sdt_rating()` — have an explicit
+response criterion, so a **receiver operating characteristic (ROC)** curve and
+its **area under the curve (AUC)** are defined. The m-AFC and ranking models
+have no criterion: accuracy already integrates over the decision rule, so
+`roc_sdt()` and `auc_sdt()` deliberately error for them. Posterior predictive
+checks via `pp_check()` are available for all four.
+
+This article walks through fitting each model and then through the
+post-processing toolkit: `roc_sdt()`, `roc_observed()`, `auc_sdt()`,
+`latent_sdt()`, the `plot()` methods (including the z-transformed ROC via
+`scale = "z"`), and `pp_check()`.
+
+# SDT in brief
+
+All SDT models share one idea. On each trial the observer obtains a noisy sample
+of *evidence* from a latent variable $X$. Noise items and signal items generate
+evidence from two distributions that overlap; the observer cannot see which
+distribution a sample came from, only its value. For the Gaussian (`"normal"`)
+model the two distributions are
+
+$$
+X \mid \text{noise} \sim \mathrm{Normal}(0,\, 1),
+\qquad
+X \mid \text{signal} \sim \mathrm{Normal}(d',\, s^2),
+$$
+
+where **sensitivity** $d'$ is the mean separation expressed in units of the noise
+standard deviation, and $s$ is the signal-to-noise SD ratio (the `sdratio`
+parameter, fixed to $s = 1$ unless estimated). In a binary task the observer
+responds "signal" whenever the evidence exceeds a **criterion** $k$. The two
+response probabilities are then tail areas of the two distributions:
+
+$$
+\text{FA} = P(X > k \mid \text{noise}) = 1 - \Phi(k),
+\qquad
+\text{Hit} = P(X > k \mid \text{signal}) = 1 - \Phi\!\left(\tfrac{k - d'}{s}\right).
+$$
+
+```{r sdt-distributions, echo = FALSE, fig.cap = "Latent evidence model. Noise and signal distributions overlap; responses above the criterion are labelled as signal. The shaded right tails are the false-alarm rate (noise) and the hit rate (signal); their separation is the sensitivity d-prime."}
+crit <- 0.75
+dpr  <- 1.5
+x    <- seq(-3.5, 5.5, length.out = 600)
+dens <- rbind(
+  data.frame(x = x, density = dnorm(x, 0, 1),   dist = "Noise"),
+  data.frame(x = x, density = dnorm(x, dpr, 1), dist = "Signal")
+)
+ggplot(dens, aes(x, density, color = dist, fill = dist)) +
+  geom_area(data = subset(dens, x > crit), alpha = 0.3,
+            position = "identity", color = NA) +
+  geom_line(linewidth = 0.8) +
+  geom_vline(xintercept = crit, linetype = "dashed") +
+  annotate("segment", x = 0, xend = dpr, y = 0.43, yend = 0.43,
+           arrow = arrow(ends = "both", length = unit(0.12, "cm"))) +
+  annotate("text", x = dpr / 2 - 0.2, y = 0.465, label = "italic(d)*minute",
+           parse = TRUE) +
+  annotate("text", x = crit + 0.15, y = 0.55, label = "criterion (k)",
+           hjust = 0) +
+  scale_color_brewer(palette = "Set1") +
+  scale_fill_brewer(palette = "Set1") +
+  scale_y_continuous(expand = expansion(mult = c(0, 0.1))) +
+  coord_cartesian(ylim = c(0, 0.56)) +
+  labs(x = "Latent evidence", y = "Density", color = NULL, fill = NULL) +
+  theme_classic() +
+  theme(legend.position = "top")
+```
+
+Sweeping the criterion from strict to lenient traces every (false-alarm, hit)
+pair the observer could produce — the **receiver operating characteristic
+(ROC)**. When the two distributions have equal variance ($s = 1$) the ROC is
+symmetric about the minor diagonal; when the signal distribution is wider
+($s > 1$, as is typical for recognition memory) the ROC becomes asymmetric. This
+is why a single (hit, false-alarm) point cannot identify $s$: separating $d'$
+from $s$ requires *several* operating points along the curve.
+
+```{r sdt-roc-geometry, echo = FALSE, fig.cap = "ROC geometry. Equal-variance models give a symmetric curve; unequal variance (wider signal distribution) bends it asymmetrically. The dashed line is chance (d' = 0)."}
+far <- seq(1e-4, 1 - 1e-4, length.out = 400)
+roc <- function(far, d, s) 1 - pnorm((qnorm(1 - far) - d) / s)
+curves <- rbind(
+  data.frame(FA = far, Hit = roc(far, 1.5, 1.0), Model = "Equal variance (s = 1)"),
+  data.frame(FA = far, Hit = roc(far, 1.5, 1.6), Model = "Unequal variance (s = 1.6)")
+)
+ggplot(curves, aes(FA, Hit, color = Model)) +
+  geom_abline(linetype = "dashed", color = "grey60") +
+  geom_line(linewidth = 1) +
+  coord_equal(xlim = c(0, 1), ylim = c(0, 1)) +
+  scale_color_brewer(palette = "Dark2") +
+  labs(x = "False-alarm rate", y = "Hit rate", color = NULL) +
+  theme_classic() +
+  theme(legend.position = "top")
+```
+
+The four response formats below reuse this latent model and differ only in the
+decision rule mapped onto it. The `dist` argument selects the shape of the latent
+distributions: `"normal"` is the textbook Gaussian model; `"logistic"` is the
+numerically convenient logistic analogue; `"gumbel_min"` is the extreme-value
+(EVSDT) model that often fits recognition data well and yields a logistic ROC;
+`"gumbel_max"` is its mirror image. Gaussian is the safe default unless theory or
+prior fits motivate an extreme-value form.
+
+# Binary SDT
+
+In a binary old/new recognition task each cell of the design contributes a count
+of "old" responses out of a number of trials, separately for old (`signal`) and
+new (`noise`) items. The latent decision variable places "old" responses above a
+criterion; sensitivity `dprime` is the distance between the signal and noise
+distributions and `criterion` is the location of the boundary.
+
+## A single condition: equal-variance SDT
+
+We simulate one condition with `rsdt_binary()` and fit an equal-variance model.
+
+```{r}
+set.seed(123)
+dat <- rsdt_binary(n_per_cell = 100, n_subjects = 30,
+                   dprime = 1.5, criterion = 0.2)
+
+model <- sdt_binary(response = "n_old", stimulus = "stimulus",
+                    n_trials = "n_trials")
+
+fit_ev <- bmm(
+  formula = bmf(dprime ~ 1 + (1 | id), criterion ~ 1 + (1 | id)),
+  data = dat,
+  model = model,
+  backend = "cmdstanr",
+  cores = 4,
+  refresh = 0,
+  silent = 2,
+  file = "assets/bmmfit_sdt_binary_ev_vignette"
+)
+summary(fit_ev)
+```
+
+The population estimates recover the simulated `dprime = 1.5` and
+`criterion = 0.2`.
+
+By default `sdratio` is fixed to 0, i.e. the signal and noise distributions have
+equal variance (`exp(0) = 1`). With a single (hit, false-alarm) pair per subject
+the signal/noise variance ratio is not identified, so leaving it fixed is the
+right default.
+
+## Multiple criteria: identifying the unequal-variance ratio
+
+When the criterion is shifted across conditions — for example by a base-rate or
+payoff manipulation — while sensitivity is held constant, the several
+(false-alarm, hit) points trace out a *curve* rather than a single point. That
+curvature is what identifies the unequal-variance ratio `sdratio` — the
+signal-to-noise SD ratio $s$, whose reciprocal is the slope of the zROC
+[@DeCarlo_1998]. The bundled `broeder_schuetz_2009_e3` data
+[@Broeder_Schuetz_2009] has exactly this structure: 40 subjects tested under five
+base-rate conditions (`br1` conservative … `br5` liberal).
+
+```{r}
+model <- sdt_binary(response = "n_old", stimulus = "stimulus",
+                    n_trials = "n_trials")
+
+fit_uv <- bmm(
+  formula = bmf(
+    dprime    ~ 1 + (1 | id),
+    criterion ~ 0 + condition + (1 | id),
+    sdratio   ~ 1
+  ),
+  data = broeder_schuetz_2009_e3,
+  model = model,
+  backend = "cmdstanr",
+  cores = 4,
+  refresh = 0,
+  silent = 2,
+  file = "assets/bmmfit_sdt_binary_uv_vignette"
+)
+summary(fit_uv)
+```
+
+Here `dprime` and `sdratio` are shared across conditions while `criterion` varies
+by `condition` — the five criteria are five operating points on a single ROC.
+`sdratio` is estimated on the log scale, so exponentiate it for the SD ratio on
+the natural scale:
+
+```{r}
+exp(brms::fixef(fit_uv)["sdratio_Intercept", c("Estimate", "Q2.5", "Q97.5")])
+```
+
+A value above 1 means the signal distribution is wider than the noise
+distribution, the classic recognition-memory pattern.
+
+## ROC and AUC
+
+`roc_sdt()` returns the model-implied ROC from the posterior. For a binary fit it
+traces the smooth analytical curve from the posterior of `dprime` (and `sdratio`
+when estimated). When it detects a predictor that varies the criterion only — as
+`condition` does above — it additionally returns the model-implied operating
+points (one per criterion level) in a `points` attribute. `roc_observed()` gives
+the empirical operating points straight from the response counts, and the
+`plot()` method overlays everything.
+
+```{r}
+roc <- roc_sdt(fit_uv)
+obs <- roc_observed(fit_uv)
+
+plot(roc, observed = obs)
+```
+
+The smooth ribbon is the posterior ROC, the filled points with crosshairs are the
+model-implied operating points per base-rate condition, and the open circles are
+the observed points. A curvilinear ROC that is asymmetric about the minor
+diagonal is the signature of unequal variance (`sdratio > 1`).
+
+`auc_sdt()` returns the posterior area under the curve. For *equal-variance*
+Gaussian and Gumbel-min fits it uses the closed forms $\Phi(d'/\sqrt{2})$ and
+$\mathrm{logistic}(g')$ respectively; every other case — unequal variance, the
+logistic distribution, and all rating fits — is integrated numerically. The
+returned AUC is always the area under the full curve (one value per curve, not
+the area spanned by the discrete points).
+
+```{r}
+auc <- auc_sdt(fit_uv)
+plot(auc)
+attr(auc, "summary")
+```
+
+## z-ROC and latent distributions
+
+Passing `scale = "z"` to the ROC `plot()` method reads the rates on the noise
+distribution's quantile axis ($z = \Phi^{-1}(\text{rate})$ for the Gaussian
+model). On this axis the model ROC is a straight line whose slope is
+$1/\exp(\mathtt{sdratio})$ and whose intercept is $d'/\exp(\mathtt{sdratio})$, so
+a slope below 1 is the visual signature of unequal variance and observed points
+that bow away from a straight line flag misfit. (The $(0,0)$ and $(1,1)$
+endpoints map to infinity and are dropped.)
+
+```{r}
+plot(roc, observed = obs, scale = "z")
+```
+
+`latent_sdt()` reconstructs the latent decision-variable distributions
+themselves: the noise and signal evidence densities, separated by `dprime` and
+scaled by `exp(sdratio)`, with the criterion drawn as a dashed line carrying a
+credible band on its location. This is the picture the criterion and `dprime`
+estimates describe.
+
+```{r}
+plot(latent_sdt(fit_uv))
+```
+
+## Posterior predictive checks
+
+`sdt_binary()` uses a custom binomial family, so `pp_check()` delegates to
+`brms`. The "old"-response counts span a wide range whose ceiling differs across
+cells (the base-rate conditions have different numbers of trials), so the bar
+view is cluttered and hard to read. An overlaid empirical CDF split by stimulus
+type is a cleaner check that the model reproduces the response distributions for
+signal and noise items — and the ROC plot above already checks the operating
+points directly:
+
+```{r}
+pp_check(fit_uv, type = "ecdf_overlay", group = "stimulus", ndraws = 100)
+```
+
+# Rating SDT
+
+In a confidence-rating task each item is judged on an ordered scale (e.g. 1 =
+"sure new" … 6 = "sure old"). The data are counts per rating category, one column
+per category. Internally `bmm` fits this with `brms`' native multinomial family;
+the K-1 confidence criteria are parameterized by a `threshold_type`
+[@Selker_2019; @Paulewicz_Blaut_2020].
+
+We use a real recognition ROC dataset. The `roc6` object in the
+[MPTinR](https://cran.r-project.org/package=MPTinR) package collects 12 published
+old/new recognition experiments as per-subject counts of old and new items across
+a 6-point confidence scale. Here we take @Pratte_2010 (97 subjects, 240 trials per
+stimulus class — narrow posteriors, clear effects) and reshape it to the format
+`sdt_rating()` expects: one row per (subject × stimulus), with categories
+`r1` = "sure new" … `r6` = "sure old".
+
+```{r}
+stopifnot(requireNamespace("MPTinR", quietly = TRUE))
+data("roc6", package = "MPTinR")
+pratte <- roc6[roc6$exp == "Pratte_2010", ]
+
+rating_data <- rbind(
+  data.frame(id = pratte$id, stimulus = 1L,
+             r1 = pratte$OLD_3new, r2 = pratte$OLD_2new, r3 = pratte$OLD_1new,
+             r4 = pratte$OLD_1old, r5 = pratte$OLD_2old, r6 = pratte$OLD_3old),
+  data.frame(id = pratte$id, stimulus = 0L,
+             r1 = pratte$NEW_3new, r2 = pratte$NEW_2new, r3 = pratte$NEW_1new,
+             r4 = pratte$NEW_1old, r5 = pratte$NEW_2old, r6 = pratte$NEW_3old)
+)
+
+model <- sdt_rating(response = paste0("r", 1:6), stimulus = "stimulus")
+
+# Recognition ROCs are classically asymmetric, so estimate unequal variance
+fit_rating <- bmm(
+  formula = bmf(dprime ~ 1 + (1 | id), criterion ~ 1 + (1 | id),
+                spacing ~ 1, sdratio ~ 1),
+  data = rating_data,
+  model = model,
+  backend = "cmdstanr",
+  cores = 4,
+  refresh = 0,
+  silent = 2,
+  chains = 4,
+  iter = 2000,
+  file = "assets/bmmfit_sdt_rating_vignette"
+)
+summary(fit_rating)
+```
+
+## Threshold parameterizations
+
+A rating model is binary SDT with several criteria at once: for a $K$-point scale
+the $K-1$ thresholds carve the latent evidence axis into $K$ ordered response
+bins. The probability of each rating is the area of the corresponding bin under
+the signal or noise distribution.
+
+```{r sdt-rating-thresholds, echo = FALSE, fig.cap = "A 6-point rating scale places K-1 = 5 thresholds on the evidence axis, splitting it into six ordered confidence bins. threshold_type governs how these thresholds are spaced."}
+thr   <- c(-1.5, -0.6, 0.1, 0.9, 1.9)
+dpr   <- 1.4
+edges <- c(-3.2, thr, 3.2)
+mids  <- (head(edges, -1) + tail(edges, -1)) / 2
+x     <- seq(-3.5, 5.5, length.out = 600)
+dens <- rbind(
+  data.frame(x = x, density = dnorm(x, 0, 1),   dist = "Noise"),
+  data.frame(x = x, density = dnorm(x, dpr, 1), dist = "Signal")
+)
+ggplot(dens, aes(x, density, color = dist)) +
+  geom_line(linewidth = 0.8) +
+  geom_vline(xintercept = thr, linetype = "dashed", color = "grey50") +
+  annotate("text", x = mids, y = 0.45, label = paste0("r", 1:6), size = 3) +
+  scale_color_brewer(palette = "Set1") +
+  labs(x = "Latent evidence", y = "Density", color = NULL) +
+  theme_classic() +
+  theme(legend.position = "top")
+```
+
+The `threshold_type` argument controls how those $K-1$ criteria are placed and
+therefore how many parameters they cost:
+
+- `"parsimonious"` (default) and `"equidistant"`: two parameters
+  (`criterion` + `spacing`) — the thresholds are evenly spaced around the
+  criterion, differing only in their canonical anchor positions [@Selker_2019].
+- `"log_distance"` and `"log_ratio"`: K-2 `delta` parameters that allow uneven
+  spacing while guaranteeing the thresholds stay ordered [@Paulewicz_Blaut_2020].
+- `"softmax"`: a shared `spacing` plus K-3 allocation `delta` parameters.
+
+Add `sdratio ~ 1` to the formula to estimate unequal variance.
+
+## ROC, AUC, and observed ROC
+
+For a rating model the K-1 thresholds define K-1 ROC points per posterior draw.
+`roc_sdt()` returns those points with their posterior uncertainty; `plot()` shows
+the mean operating points with crosshair credible intervals and a connecting
+curve; `roc_observed()` gives the empirical points from the pooled counts.
+
+```{r}
+roc <- roc_sdt(fit_rating)
+plot(roc, observed = roc_observed(fit_rating))
+
+attr(auc_sdt(fit_rating), "summary")
+```
+
+## Posterior predictive checks
+
+Because the rating model uses a multinomial family, `pp_check()` produces a
+response-proportion profile (observed bars vs. posterior-predictive
+point-ranges). For SDT the signal and noise rating distributions should be
+checked separately, so `pp_check()` **defaults to faceting by `stimulus`**:
+
+```{r}
+pp_check(fit_rating, ndraws = 100)
+```
+
+Pass `group = NA` to pool both stimulus types into a single profile, or
+`group = "<predictor>"` to facet by another design variable.
+
+The predicted point-ranges track the observed bars closely at the extreme
+categories but **deviate systematically for the interior categories** (r3–r5):
+the misses are smooth and one-sided rather than random scatter. That pattern is
+the fingerprint of *threshold misfit*. The default `"parsimonious"`
+parameterization buys its economy (two threshold parameters) by fixing the K-1
+criteria at regularly spaced canonical positions, and when the true confidence
+thresholds are unevenly spaced — as they usually are in recognition data — those
+two parameters cannot reproduce the full rating profile.
+
+## Improving fit with flexible thresholds
+
+The `"log_ratio"` parameterization frees the spacing with K-2 `delta` parameters
+(for a 6-point scale: `delta1`, `delta2`, `delta4`, `delta5`; `delta3` is the
+reference midpoint), so the thresholds can sit wherever the data require. Refit
+with it and re-run the same check:
+
+```{r}
+model_lr <- sdt_rating(response = paste0("r", 1:6), stimulus = "stimulus",
+                       threshold_type = "log_ratio")
+
+fit_rating_lr <- bmm(
+  formula = bmf(dprime ~ 1 + (1 | id), criterion ~ 1 + (1 | id),
+                delta1 ~ 1, delta2 ~ 1, delta4 ~ 1, delta5 ~ 1,
+                sdratio ~ 1),
+  data = rating_data,
+  model = model_lr,
+  backend = "cmdstanr",
+  cores = 4,
+  chains = 4,
+  iter = 2000,
+  refresh = 0,
+  silent = 2,
+  file = "assets/bmmfit_sdt_rating_logratio_vignette"
+)
+
+pp_check(fit_rating_lr, ndraws = 100)
+```
+
+The interior categories are now captured: the flexible thresholds absorb the
+systematic deviation that the parsimonious model could not. The improvement is
+not free — it costs four threshold parameters (the `delta`s) instead of two — so
+it should be weighed against the gain in fit.
+
+For these models the posterior predictive check is the most practical guide to
+that trade-off: a parameterization that leaves systematic, one-sided deviations
+is too rigid, while one whose predicted point-ranges sit on the observed bars (as
+here) is adequate. A *formal* predictive comparison is tempting, but the usual
+`loo()` is **not** appropriate here: each observation is an aggregated count over
+many trials, so leaving one out removes a large, highly influential chunk of data
+and the PSIS-LOO approximation becomes unreliable — it flags most observations
+with a high Pareto-$k$, and (because that reflects heavy-tailed importance weights
+rather than Monte Carlo noise) more posterior draws will not fix it. The
+principled alternative for aggregated data is k-fold cross-validation via
+`brms::kfold()`, which refits on held-out folds and avoids importance sampling
+altogether. `"log_distance"` behaves like `"log_ratio"`, and `"softmax"` offers an
+intermediate option with a shared spacing plus fewer free deltas.
+
+# m-AFC SDT
+
+In an m-alternative forced-choice task the observer picks the target among `m`
+alternatives; the data are counts of correct responses. There is no criterion and
+no stimulus column — accuracy alone identifies `dprime` [@DeCarlo_2012]. A correct
+response occurs when the target's evidence exceeds that of all $m-1$ distractors,
+so `dprime` is referenced to the maximum of the $m-1$ noise samples and stays on
+the same scale as binary $d'$: for $m = 2$ this is the closed form
+$\Phi(d'/\sqrt{2})$, and for $m \geq 3$ `bmm` evaluates the accuracy by
+quadrature. The set size `m` may be a constant or a data column (for mixed set
+sizes).
+
+```{r}
+# rsdt_mafc() is vectorised over its arguments and returns a data frame with
+# id, n_trials and n_correct; varying dprime by subject gives hierarchical data.
+set.seed(123)
+dat <- rsdt_mafc(dprime = rnorm(30, mean = 1.5, sd = 0.3), m = 4, n_trials = 100)
+
+model <- sdt_mafc(response = "n_correct", n_trials = "n_trials", m = 4)
+
+fit_mafc <- bmm(
+  formula = bmf(dprime ~ 1 + (1 | id)),
+  data = dat,
+  model = model,
+  backend = "cmdstanr",
+  cores = 4,
+  refresh = 0,
+  silent = 2,
+  file = "assets/bmmfit_sdt_mafc_vignette"
+)
+summary(fit_mafc)
+```
+
+ROC curves are undefined here (`roc_sdt(fit_mafc)` errors). Each subject
+contributes one correct-response count, so a bar per count value is sparse and
+noisy; an overlaid empirical CDF of the correct-response counts is a compact
+check that the model captures the spread of accuracy across subjects:
+
+```{r}
+pp_check(fit_mafc, type = "ecdf_overlay", ndraws = 100)
+```
+
+# Ranking SDT
+
+In a ranking task the observer orders `m` items by evidence and the data are
+counts per rank position assigned to the target [@MeyerGrant_2025]. As with
+m-AFC there is no criterion: the rank assigned to the target is an *order
+statistic* of the latent evidence, so the probability of each rank follows from
+the evidence distribution directly. With `dist = "gumbel_min"` these rank
+probabilities have a closed form (the extreme-value assumption that makes ranking
+analytically tractable); `dist = "normal"` is also available and evaluated by
+quadrature — prefer `gumbel_min` for speed and the standard Thurstonian ranking
+model, `normal` when you want Gaussian evidence comparable to the other SDT
+models. The model uses the native multinomial family with one category per rank
+position, and `m` may again be a constant or a column for mixed set sizes. The
+bundled `meyer_grant_jakob_2025` data [@MeyerGrant_Jakob_2025] illustrate the
+wide format.
+
+```{r}
+model <- sdt_ranking(
+  response = c("rank1", "rank2", "rank3", "rank4", "rank5"),
+  m = "set_size",
+  dist = "gumbel_min"
+)
+
+fit_rank <- bmm(
+  formula = bmf(dprime ~ 1 + (1 | id)),
+  data = meyer_grant_jakob_2025,
+  model = model,
+  backend = "cmdstanr",
+  cores = 4,
+  refresh = 0,
+  silent = 2,
+  file = "assets/bmmfit_sdt_ranking_vignette"
+)
+summary(fit_rank)
+```
+
+ROC/AUC are undefined; `pp_check()` shows the rank-position profile. With mixed
+set sizes, facet by the set-size column so each panel has a homogeneous
+denominator:
+
+```{r}
+pp_check(fit_rank, group = "set_size", ndraws = 100)
+```
+
+# Post-processing reference
+
+| Function | Models | Returns |
+|----------|--------|---------|
+| `roc_sdt()` | binary, rating | model-implied ROC draws (+ operating points for multi-criteria binary) |
+| `roc_observed()` | binary, rating | empirical ROC points from the data |
+| `auc_sdt()` | binary, rating | posterior AUC |
+| `latent_sdt()` | binary, rating | noise/signal latent densities + criterion/threshold locations |
+| `plot()` | `bmm_sdt_roc` (incl. `scale = "z"`), `bmm_sdt_auc`, `bmm_sdt_latent` | `ggplot2` ROC / z-ROC / AUC / latent-distribution figures |
+| `pp_check()` | all four | posterior predictive check |
+
+# References

@@ -47,6 +47,7 @@ Suggests:
     ggthemes,
     knitr,
     mixtur,
+    MPTinR,
     remotes,
     rmarkdown,
     stringr,

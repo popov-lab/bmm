@@ -45,6 +45,16 @@ reference:
     - "conditional_effects.bmmfit"
     - "emmeans-bmmfit"
     - "pp_check.bmmfit"
+  - title: "Model evaluation & post-processing"
+    desc: "ROC/AUC, z-ROC, and latent-distribution analysis for signal detection models"
+  - contents:
+    - "roc_sdt"
+    - "roc_observed"
+    - "auc_sdt"
+    - "latent_sdt"
+    - "plot.bmm_sdt_roc"
+    - "plot.bmm_sdt_auc"
+    - "plot.bmm_sdt_latent"
   - title: "Extract model information"
     desc: "Utility functions for extracting default priors, generate stan code, stan data, etc."
   - contents:
@@ -93,6 +103,11 @@ articles:
     desc: Fitting models to categorical decision tasks (e.g. cued or free recall, n-AFC, etc)
     contents:
     - articles/bmm_m3
+
+  - title: Signal detection & recognition
+    desc: Fitting signal detection models and analysing ROC/AUC
+    contents:
+    - articles/bmm_sdt
 
   - title: Evidence accumulation models
     desc: Fitting evidence accumulation models to response time and choice data
