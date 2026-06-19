@@ -467,11 +467,99 @@ comparing estimates against toolboxes that use the relative anchor.
 pp_check(fit_md, ndraws = 100)
 ```
 
+# Continuous dual-process SDT
+
+The dual-process model above treats recollection as a *threshold* process: an
+old item is either recollected — landing in the most-confident category — or it
+is not. The **continuous dual-process** (CDP) model [@Wixted_Mickes_2010] keeps
+the dual-process intuition but makes recollection *continuous*. Every item
+carries a familiarity signal $F$ and a recollection signal $R$, and the old/new
+confidence rating is driven by their sum, the aggregate memory strength
+$S = F + R$. What makes it a *dual*-process model is that the **Remember/Know
+judgment is read off $R$ directly**: an "old" response is called *Remember* when
+recollection clears a criterion $r$ on the $R$ axis, and *Know* otherwise.
+
+This needs a richer response than the rating versions above — not just a
+confidence rating, but a Remember/Know judgment on every "old" response — so bmm
+provides it as a dedicated model, `sdt_cdp()`, rather than a `version` of
+`sdt_rating()`. For a target, $F \sim \mathrm{Normal}(\mu_F, 1)$ and
+$R \sim \mathrm{Normal}(\mu_R, \sigma_R)$ (lures fix both means to 0 and
+$\sigma_R$ to 1); `dprimef` and `dprimer` are the two sensitivities and `sigmar`
+is $\log \sigma_R$. Old/new confidence partitions the strength axis $S$ with
+ordered thresholds, exactly as in the rating model, while the Remember/Know split
+is the probability that $R$ exceeds `rcrit` *within* each confidence bin — a
+region of the two-dimensional $(F, R)$ plane that bmm computes exactly with the
+bivariate-normal CDF.
+
+## Worked example: Remember/Know in recognition memory
+
+We fit the model to the group Remember/Know ROC data of @Rotello_2005 (neutral
+condition): a 6-point scale where rating 1 is a confident "new" response and
+ratings 2--6 are "old" responses, each accompanied by a Remember or Know
+judgment. The data go in **tidy long** form — a `judgment` column
+(`"new"`/`"remember"`/`"know"`), a `confidence` rating on the unified old/new
+scale, a `stimulus` column, and a `count` column:
+
+```{r}
+mk <- function(stim, n, k, r) rbind(
+  data.frame(stimulus = stim, judgment = "new",      confidence = 1L,  count = n),
+  data.frame(stimulus = stim, judgment = "know",     confidence = 2:6, count = k),
+  data.frame(stimulus = stim, judgment = "remember", confidence = 2:6, count = r)
+)
+rotello <- rbind(
+  mk(1L, 290, c(122, 106, 101, 92, 59), c(26, 38, 61, 109, 433)),  # targets (old)
+  mk(0L, 745, c(199, 124, 84, 45, 13),  c(46, 29, 47, 51, 55))     # lures (new)
+)
+rotello$id <- 1L
+head(rotello)
+```
+
+The scale is asymmetric — one "new" level and five "old" levels — which
+`sdt_cdp()` infers directly from the data (the numbers of "new" and "old"
+confidence levels need not match). We free `sigmar` so recollection can add
+variance to the old-item strength distribution (the canonical Wixted--Mickes
+result) and keep the familiarity--recollection correlation `rho` at its default
+of zero, the classic independent-process model:
+
+```{r}
+model_cdp <- sdt_cdp(judgment = "judgment", confidence = "confidence",
+                     count = "count", stimulus = "stimulus")
+
+fit_cdp <- bmm(
+  formula = bmf(dprimef ~ 1, dprimer ~ 1, criterion ~ 1, spacing ~ 1,
+                rcrit ~ 1, sigmar ~ 1),
+  data = rotello, model = model_cdp,
+  backend = "cmdstanr", cores = 4, chains = 4, iter = 2000,
+  refresh = 0, silent = 2,
+  file = "assets/bmmfit_sdt_cdp_vignette"
+)
+summary(fit_cdp)
+```
+
+Recollection (`dprimer` ≈ 0.81) and familiarity (`dprimef` ≈ 0.77) contribute
+comparable sensitivities, the Remember criterion sits well into the recollection
+distribution (`rcrit` ≈ 0.92), and `exp(sigmar)` ≈ 1.47 puts the recollection SD
+half again above one — the model's account of the recognition-ROC asymmetry as
+*added recollection variance* rather than a uniformly wider strength
+distribution. Despite using the two-parameter `parsimonious` thresholds rather
+than five free criteria, these estimates reproduce the maximum-likelihood values
+@Wixted_Mickes_2010 report for exactly these data (their Table 3:
+$\mu_F = 0.78$, $\mu_R = 0.81$, $\sigma_R = 1.48$, $r = 0.92$).
+
+Two further options extend the model, each opt-in. The
+familiarity--recollection correlation is freed with `rho ~ 1` (and can itself be
+predicted, e.g. `rho ~ condition`); it is bounded to $(-1, 1)$ internally and is
+a *within-item* correlation, distinct from a between-subject correlation of
+random effects (which you would write as `(1 |p| id)`). And when the task also
+collects an explicit *Guess* response, adding a `"guess"` judgment level to the
+data switches on the three-way Remember/Know/Guess model, with a familiarity
+criterion `kcrit` separating Know from Guess.
+
 # Choosing and comparing the models
 
-All three models share the same response interface and the same familiarity
-core, so the choice is about which *additional question* the data are meant to
-answer:
+The first three models share the same confidence-rating response interface and
+the same familiarity core, so the choice is about which *additional question* the
+data are meant to answer:
 
 - Reach for **`version = "dpsdt"`** when the question is about *recollection* —
   whether a threshold retrieval process contributes beyond graded familiarity,
@@ -481,6 +569,9 @@ answer:
 - Stay with **`version = "standard"`** when a single strength process suffices;
   both extensions reduce to it when their extra parameter is switched off
   (`Ro`, `Rn` → 0; `logmratio` = 0, i.e. meta-d′ = `dprime`).
+- Reach for **`sdt_cdp()`** when the data carry explicit *Remember/Know*
+  judgments: it models that richer response directly — recollection as a
+  continuous second axis — rather than collapsing it to a confidence rating.
 
 Because each extension nests the standard model, the most direct evidence is the
 **posterior of the extra parameter**: is `Ro` credibly greater than zero, is
