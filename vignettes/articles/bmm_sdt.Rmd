@@ -73,13 +73,15 @@ Two of the models — `sdt_binary()` and `sdt_rating()` — have an explicit
 response criterion, so a **receiver operating characteristic (ROC)** curve and
 its **area under the curve (AUC)** are defined. The m-AFC and ranking models
 have no criterion: accuracy already integrates over the decision rule, so
-`roc_sdt()` and `auc_sdt()` deliberately error for them. Posterior predictive
-checks via `pp_check()` are available for all four.
+`roc_sdt()` and `auc_sdt()` deliberately error for them. The latent
+decision-variable distributions (`latent_sdt()`) and posterior predictive checks
+(`pp_check()`) are available for all four — for the criterion-free models the
+latent plot simply shows the noise and signal densities without a boundary line.
 
 This article walks through fitting each model and then through the
 post-processing toolkit: `roc_sdt()`, `roc_observed()`, `auc_sdt()`,
-`latent_sdt()`, the `plot()` methods (including the z-transformed ROC via
-`scale = "z"`), and `pp_check()`.
+`latent_sdt()`, the `plot()` methods (including the quantile-transformed ROC via
+`scale = "quantile"`), and `pp_check()`.
 
 # SDT in brief
 
@@ -161,12 +163,260 @@ ggplot(curves, aes(FA, Hit, color = Model)) +
 ```
 
 The four response formats below reuse this latent model and differ only in the
-decision rule mapped onto it. The `dist` argument selects the shape of the latent
-distributions: `"normal"` is the textbook Gaussian model; `"logistic"` is the
-numerically convenient logistic analogue; `"gumbel_min"` is the extreme-value
-(EVSDT) model that often fits recognition data well and yields a logistic ROC;
-`"gumbel_max"` is its mirror image. Gaussian is the safe default unless theory or
-prior fits motivate an extreme-value form.
+decision rule mapped onto it. The `dist` argument selects the *shape* of the
+latent distributions; Gaussian is the safe default, but it is not the only
+option. The next section explains the alternatives and when a non-Gaussian shape
+is worth choosing.
+
+# Noise distributions
+
+The Gaussian model above is a *choice*, not a law. SDT needs only two overlapping
+evidence distributions and a criterion; their shape is a modelling assumption.
+And because the model never observes the latent samples — only the two response
+probabilities — the shape of the noise distribution is exactly what fixes the
+shape of the ROC. `bmm` exposes that choice through the `dist` argument, shared by
+all four constructors: `"normal"`, `"logistic"`, `"gumbel_min"`, and
+`"gumbel_max"`.
+
+## Why the shape matters
+
+Although the Gaussian model is by far the most common, signal detection theory is
+not committed to it. The framework needs only two overlapping evidence
+distributions and a criterion; the *shape* of those distributions is a separate,
+substantive assumption. The Gaussian became the default for historical and
+mathematical reasons — Fechner's and Thurstone's psychophysics, and the pull of
+the central limit theorem — and @Green_Swets_1966 adopted it on frankly pragmatic
+grounds (tractable mathematics) while conceding that other distributions would
+serve just as well [@MeyerGrant_2025].
+
+The choice is not cosmetic, because the shape of the distribution controls the
+shape of the ROC. Empirical recognition ROCs are almost always *asymmetric*: read
+off the z-axes, the operating points fall on a straight line with a slope below 1
+(typically around 0.8), so the curve is pulled toward the upper-left rather than
+being symmetric about the minor diagonal [@DeCarlo_1998]. A model has to
+manufacture that asymmetry somehow, and there are two routes.
+
+The first keeps the Gaussian distribution and spends a parameter on it: let the
+signal distribution be *wider* than the noise distribution ($s > 1$, the `sdratio`
+parameter). This is the unequal-variance Gaussian model fitted in the Binary SDT
+section below, and its zROC slope is exactly $1/s$.
+
+The second changes the *distribution* instead of adding a parameter. If the latent
+evidence follows an extreme-value (Gumbel) distribution rather than a Gaussian, the
+ROC comes out asymmetric *intrinsically* — with equal variance and one fewer
+parameter. This is the extreme-value signal detection (EVSDT) model
+[@MeyerGrant_2025], and it is why `sdt_ranking()` defaults to `"gumbel_min"`.
+
+These two routes are easy to conflate, but ROC asymmetry and the variance ratio are
+in fact *logically independent*: a skewed equal-variance distribution can produce an
+asymmetric ROC, and unequal variances can produce a symmetric one
+[@MeyerGrant_2025]. Nor are the routes equally clean. The unequal-variance Gaussian
+buys the asymmetry at a conceptual cost: the extra variance it posits implies that
+some study events *lower* an item's familiarity, its likelihood ratio is
+non-monotonic (so it can predict below-chance hit rates at extreme criteria), and
+the simple $d'$ must give way to $d_a$, which no longer guarantees that a larger
+value means a uniformly higher ROC [@MeyerGrant_2025]. The extreme-value route
+sidesteps all three.
+
+## Where the distributions come from
+
+The deeper reason to care about the noise distribution is that it encodes an
+assumption about *how* an observer turns many noisy sensory or memory signals into a
+single decision variable. Two aggregation rules lead to two limiting shapes. If the
+evidence for an item is the *sum* or *average* of many small contributions, the
+central limit theorem drives the decision variable toward a Gaussian. If instead it
+is the *most extreme* contribution — the single strongest match, or the most glaring
+mismatch — the extreme-value theorem drives it toward a Gumbel distribution, in the
+same way and for the same mathematical reasons [@MeyerGrant_2025; @Robinson_2023].
+Pooling gives the bell curve; a max (or min) rule gives the skew.
+
+This is more than an analogy. A signal-detection model with extreme-value noise and
+a maximum decision rule is *formally equivalent* to the softmax (normalized
+exponential) choice rule — that is, to Luce's choice axiom [@Yellott_1977;
+@Robinson_2023]. Choosing the noise distribution is therefore also choosing a theory
+of choice, and the link is visible in `bmm`: the m-AFC and ranking models decide by
+comparing the maximum (or the rank order) of evidence across the `m` alternatives, so
+an extreme-value distribution is their natural home — `sdt_ranking()` defaults to
+`"gumbel_min"` for exactly this reason.
+
+Whether human evidence is better described as pooled or as maximised is an empirical
+question, and the answer can depend on the task. In recognition memory the
+extreme-value model is principled and parsimonious, and can be grounded in a
+behavioural invariance axiom rather than in distributional convenience
+[@MeyerGrant_2025]. In visual working memory, by contrast, the Gaussian (pooling)
+account reproduces a *stable* sensitivity across changes in the number of
+alternatives, whereas the softmax (max-rule) account does not — favouring pooling in
+that domain [@Robinson_2023]. `bmm` keeps the distribution switchable precisely
+because this is a question to be answered, not assumed.
+
+Statistically, the choice of distribution is the choice of a *link function*.
+Written as a generalized linear model, SDT pairs the probit link with the Gaussian
+model, the logit link with the logistic, and complementary-log-log links with the
+extreme-value models [@DeCarlo_1998] — the same correspondence `bmm` exposes through
+`dist`.
+
+## The four options
+
+| `dist` | Latent shape | Equal-variance ROC | Typical motivation |
+|--------|--------------|--------------------|--------------------|
+| `"normal"` | symmetric (Gaussian) | symmetric, slope 1 | textbook default; pooling rule; comparability with the SDT literature |
+| `"logistic"` | symmetric, heavier tails | very nearly symmetric | logit-link convenience; ≈ normal in criterion tasks |
+| `"gumbel_min"` | skewed | asymmetric, slope < 1 | extreme-value / EVSDT; max-rule decisions |
+| `"gumbel_max"` | mirror of `"gumbel_min"` | asymmetric, slope > 1 | completeness; opposite asymmetry, disfavoured for recognition |
+
+Only two of these are live theoretical choices. `"normal"` and `"gumbel_min"` are
+the SDT instantiations of the two aggregation rules above — pooling and the max
+rule — and they are the *only* distributions `sdt_ranking()` offers, the model where
+the choice bites hardest. The other two are best read as completeness options.
+`"logistic"` is so close to `"normal"` once both are rescaled that the two are
+nearly indistinguishable in the criterion-based models (its honest role is the logit
+link for users coming from logistic regression, not a separate theory of evidence).
+`"gumbel_max"` is the extreme-value family pointed the other way: it predicts the
+*opposite* (slope > 1) asymmetry that recognition data rarely show, and the choice
+rule it entails has been found empirically inadequate [@MeyerGrant_2025;
+@Robinson_2023]. It is kept for the rare opposite-asymmetry case and for
+non-recognition tasks, not as a co-equal recognition model.
+
+## How the distribution shapes the ROC
+
+Under the extreme-value model the signal and noise distributions are *skewed*
+rather than symmetric (Figure \@ref(fig:noise-dist-latent)). Sweeping a criterion
+across that skewed pair traces an asymmetric ROC — the same bend that unequal
+variance produces, but built into the distribution.
+
+```{r noise-dist-latent, echo = FALSE, fig.cap = "Latent evidence under the extreme-value (gumbel_min) model. Unlike the symmetric Gaussian distributions in the previous figure, both distributions are skewed (a long left tail). Sweeping the criterion over this skewed pair is what makes the ROC asymmetric, with no unequal-variance parameter."}
+gamma <- -digamma(1)            # Euler-Mascheroni constant; centres the densities
+d     <- 1.6
+crit  <- 1.2
+fY    <- function(y) exp(-y - exp(-y))   # standard gumbel_min density (.SDT_DISTS)
+u     <- seq(-4, 5, length.out = 600)
+dens  <- rbind(
+  data.frame(x = u, density = fY(gamma - u),     dist = "Noise"),
+  data.frame(x = u, density = fY(d + gamma - u), dist = "Signal")
+)
+ggplot(dens, aes(x, density, color = dist, fill = dist)) +
+  geom_area(data = subset(dens, x > crit), alpha = 0.3,
+            position = "identity", color = NA) +
+  geom_line(linewidth = 0.8) +
+  geom_vline(xintercept = crit, linetype = "dashed") +
+  annotate("segment", x = gamma, xend = d + gamma, y = 0.42, yend = 0.42,
+           arrow = arrow(ends = "both", length = unit(0.12, "cm"))) +
+  annotate("text", x = gamma + d / 2, y = 0.455, label = "italic(d)*minute",
+           parse = TRUE) +
+  annotate("text", x = crit + 0.15, y = 0.49, label = "criterion (k)",
+           hjust = 0) +
+  scale_color_brewer(palette = "Set1") +
+  scale_fill_brewer(palette = "Set1") +
+  scale_y_continuous(expand = expansion(mult = c(0, 0.1))) +
+  coord_cartesian(ylim = c(0, 0.5)) +
+  labs(x = "Latent evidence", y = "Density", color = NULL, fill = NULL) +
+  theme_classic() +
+  theme(legend.position = "top")
+```
+
+The consequence for the ROC is direct. An equal-variance Gaussian gives a
+symmetric curve; an equal-variance `gumbel_min` gives an asymmetric one that lands
+almost on top of an unequal-variance Gaussian (Figure
+\@ref(fig:noise-dist-roc)). The same asymmetry, bought with the distribution
+rather than with an extra parameter.
+
+```{r noise-dist-roc, echo = FALSE, fig.cap = "Model-implied ROCs at d' = 1.6. The equal-variance Gaussian curve is symmetric; the equal-variance gumbel_min curve is asymmetric and nearly coincides with an unequal-variance Gaussian (s = 1.45). Hit(FA) = F((d' + F^-1(FA)) / s), matching bmm's roc_sdt()."}
+far <- seq(0.001, 0.999, length.out = 400)
+Fn  <- pnorm;                  Qn <- qnorm
+Fg  <- function(x) exp(-exp(-x)); Qg <- function(p) -log(-log(p))
+hit <- function(far, d, s, F, Q) F((d + Q(far)) / s)
+curves <- rbind(
+  data.frame(FA = far, Hit = hit(far, 1.6, 1.00, Fn, Qn), Model = "Normal, equal variance"),
+  data.frame(FA = far, Hit = hit(far, 1.6, 1.00, Fg, Qg), Model = "Gumbel-min, equal variance"),
+  data.frame(FA = far, Hit = hit(far, 1.6, 1.45, Fn, Qn), Model = "Normal, s = 1.45")
+)
+ggplot(curves, aes(FA, Hit, color = Model, linetype = Model)) +
+  geom_abline(linetype = "dashed", color = "grey60") +
+  geom_line(linewidth = 1) +
+  coord_equal(xlim = c(0, 1), ylim = c(0, 1)) +
+  scale_color_manual(values = c("Normal, equal variance" = "#1b9e77",
+                                "Gumbel-min, equal variance" = "#d95f02",
+                                "Normal, s = 1.45" = "#7570b3")) +
+  scale_linetype_manual(values = c("Normal, equal variance" = "solid",
+                                   "Gumbel-min, equal variance" = "solid",
+                                   "Normal, s = 1.45" = "22")) +
+  labs(x = "False-alarm rate", y = "Hit rate", color = NULL, linetype = NULL) +
+  theme_classic() +
+  theme(legend.position = "top", legend.direction = "vertical")
+```
+
+## Worked example: extreme value vs Gaussian
+
+The cleanest test holds everything fixed *except* the distribution. We fit the
+base-rate recognition data introduced in the next section
+(`broeder_schuetz_2009_e3`) twice, with the same equal-variance formula, changing
+only `dist`. Neither model estimates `sdratio`, so they have an identical number
+of parameters — any difference in ROC shape is the distribution's doing.
+
+```{r}
+ev_formula <- bmf(dprime ~ 1 + (1 | id), criterion ~ 0 + condition + (1 | id))
+
+fit_normal <- bmm(
+  formula = ev_formula,
+  data    = broeder_schuetz_2009_e3,
+  model   = sdt_binary(response = "n_old", stimulus = "stimulus",
+                       n_trials = "n_trials", dist = "normal"),
+  backend = "cmdstanr", cores = 4, refresh = 0, silent = 2,
+  file = "assets/bmmfit_sdt_noise_normal_vignette"
+)
+
+fit_gumbel <- bmm(
+  formula = ev_formula,
+  data    = broeder_schuetz_2009_e3,
+  model   = sdt_binary(response = "n_old", stimulus = "stimulus",
+                       n_trials = "n_trials", dist = "gumbel_min"),
+  backend = "cmdstanr", cores = 4, refresh = 0, silent = 2,
+  file = "assets/bmmfit_sdt_noise_gumbel_vignette"
+)
+```
+
+The post-processing helpers (`roc_sdt()`, `roc_observed()`, `auc_sdt()`, detailed
+in the Binary SDT section) overlay each model-implied ROC on the observed operating
+points.
+
+```{r noise-roc-fit, fig.show = "hold", out.width = "49%", fig.cap = "Equal-variance fits to the base-rate recognition data. Left: Gaussian noise forces a symmetric ROC that misses the operating points. Right: gumbel_min reproduces the asymmetric curve through the same points, with no sdratio parameter."}
+plot(roc_sdt(fit_normal), observed = roc_observed(fit_normal))
+plot(roc_sdt(fit_gumbel), observed = roc_observed(fit_gumbel))
+```
+
+The equal-variance Gaussian is locked to a symmetric curve and systematically
+misses the operating points; the equal-variance `gumbel_min` bends to follow them.
+Its implied zROC slope (~0.65) is close to the unequal-variance Gaussian slope of
+0.69 estimated for these data in the Binary SDT section — the extreme-value model
+reaches the same place that the Gaussian reaches only by widening the signal
+distribution. The two AUCs are similar (overall sensitivity is recovered either
+way); the distribution shows up in the *shape* of the curve, not its area.
+
+```{r}
+attr(auc_sdt(fit_normal), "summary")
+attr(auc_sdt(fit_gumbel), "summary")
+```
+
+## Choosing a noise distribution in practice
+
+`"normal"` is the safe default and keeps results comparable with the bulk of the
+SDT literature. Reach for `"gumbel_min"` when the ROC is asymmetric or when theory
+motivates a max-rule process; it is the natural choice for ranking and forced-choice
+tasks, and an equal-variance extreme-value model is often a more parsimonious
+account of recognition asymmetry than an unequal-variance Gaussian. `"logistic"` is
+mostly a numerical convenience, and `"gumbel_max"` covers the rare opposite
+asymmetry. As always, let the data arbitrate: compare candidates with the
+observed-versus-model ROC overlap and AUC shown above, with `pp_check()`, or with
+`loo()` for a formal information criterion.
+
+One caution on that comparison: the Gaussian model is the more *flexible* of the
+two — flexible enough to mimic extreme-value data closely, to the point that in
+simulations it wins on a clear majority of datasets that an extreme-value model
+actually generated [@MeyerGrant_2025]. A better Gaussian fit is therefore weak
+evidence on its own. The distributions are best told apart not by raw fit but by
+parsimony, by whether their parameters stay invariant when the design changes (for
+example across set sizes or numbers of alternatives) [@Robinson_2023], and by
+whether the implied decision process is plausible for the task at hand.
 
 # Binary SDT
 
@@ -288,25 +538,33 @@ plot(auc)
 attr(auc, "summary")
 ```
 
-## z-ROC and latent distributions
+## Quantile-transformed ROC and latent distributions
 
-Passing `scale = "z"` to the ROC `plot()` method reads the rates on the noise
-distribution's quantile axis ($z = \Phi^{-1}(\text{rate})$ for the Gaussian
-model). On this axis the model ROC is a straight line whose slope is
+Passing `scale = "quantile"` to the ROC `plot()` method reads the rates on the
+noise distribution's quantile axis — the inverse CDF of the fitted noise
+distribution applied to each rate ($\Phi^{-1}(\text{rate})$ for the Gaussian
+model). The axis label names the transform: `z` for the normal (the classic
+z-ROC, and `scale = "z"` is accepted as an alias), `logit` for the logistic, and
+`loglog`/`cloglog` for the Gumbel distributions. On this axis the symmetric
+(normal/logistic) model ROC is a straight line whose slope is
 $1/\exp(\mathtt{sdratio})$ and whose intercept is $d'/\exp(\mathtt{sdratio})$, so
 a slope below 1 is the visual signature of unequal variance and observed points
-that bow away from a straight line flag misfit. (The $(0,0)$ and $(1,1)$
-endpoints map to infinity and are dropped.)
+that bow away from a straight line flag misfit. (The Gumbel ROC is curved on this
+axis; its natural linearising transform is the log-log power-ROC. The $(0,0)$ and
+$(1,1)$ endpoints map to infinity and are dropped.)
 
 ```{r}
-plot(roc, observed = obs, scale = "z")
+plot(roc, observed = obs, scale = "quantile")
 ```
 
 `latent_sdt()` reconstructs the latent decision-variable distributions
 themselves: the noise and signal evidence densities, separated by `dprime` and
 scaled by `exp(sdratio)`, with the criterion drawn as a dashed line carrying a
 credible band on its location. This is the picture the criterion and `dprime`
-estimates describe.
+estimates describe. Here the criterion varies across the base-rate conditions but
+`dprime`/`sdratio` do not, so the densities are identical across conditions:
+`latent_sdt()` collapses them into one panel and overlays the several criteria,
+colour-coded by condition (pass `collapse = FALSE` for one panel per condition).
 
 ```{r}
 plot(latent_sdt(fit_uv))
@@ -417,9 +675,12 @@ Add `sdratio ~ 1` to the formula to estimate unequal variance.
 ## ROC, AUC, and observed ROC
 
 For a rating model the K-1 thresholds define K-1 ROC points per posterior draw.
-`roc_sdt()` returns those points with their posterior uncertainty; `plot()` shows
-the mean operating points with crosshair credible intervals and a connecting
-curve; `roc_observed()` gives the empirical points from the pooled counts.
+`roc_sdt()` returns those points together with the smooth model-implied ROC curve
+traced from the posterior of `dprime` (and `sdratio`); `plot()` shows that curve
+as a credible-band ribbon with the K-1 thresholds overlaid as colour-coded
+operating points (`c1`..`c(K-1)`) carrying crosshair credible intervals — the same
+display as the binary ROC. `roc_observed()` gives the empirical points from the
+pooled counts. The quantile axis (`scale = "quantile"`) works here too.
 
 ```{r}
 roc <- roc_sdt(fit_rating)
@@ -532,10 +793,22 @@ fit_mafc <- bmm(
 summary(fit_mafc)
 ```
 
-ROC curves are undefined here (`roc_sdt(fit_mafc)` errors). Each subject
-contributes one correct-response count, so a bar per count value is sparse and
-noisy; an overlaid empirical CDF of the correct-response counts is a compact
-check that the model captures the spread of accuracy across subjects:
+ROC curves are undefined here (`roc_sdt(fit_mafc)` errors), but `latent_sdt()`
+still works: it shows the noise and signal evidence densities the estimated `d'`
+implies (the noise density stands for each of the $m-1$ distractors), now without
+a criterion line because the decision is a max rule over the alternatives.
+Setting `show_competitors = TRUE` overlays the density of the *maximum* of the
+$m-1$ distractor samples — the effective competitor the target must beat — which
+shifts rightward as $m$ grows and shows directly why accuracy falls with set
+size.
+
+```{r}
+plot(latent_sdt(fit_mafc, show_competitors = TRUE))
+```
+
+Each subject contributes one correct-response count, so a bar per count value is
+sparse and noisy; an overlaid empirical CDF of the correct-response counts is a
+compact check that the model captures the spread of accuracy across subjects:
 
 ```{r}
 pp_check(fit_mafc, type = "ecdf_overlay", ndraws = 100)
@@ -589,11 +862,11 @@ pp_check(fit_rank, group = "set_size", ndraws = 100)
 
 | Function | Models | Returns |
 |----------|--------|---------|
-| `roc_sdt()` | binary, rating | model-implied ROC draws (+ operating points for multi-criteria binary) |
+| `roc_sdt()` | binary, rating | model-implied smooth ROC curve + operating points (criterion levels for multi-criteria binary; confidence thresholds for rating) |
 | `roc_observed()` | binary, rating | empirical ROC points from the data |
 | `auc_sdt()` | binary, rating | posterior AUC |
-| `latent_sdt()` | binary, rating | noise/signal latent densities + criterion/threshold locations |
-| `plot()` | `bmm_sdt_roc` (incl. `scale = "z"`), `bmm_sdt_auc`, `bmm_sdt_latent` | `ggplot2` ROC / z-ROC / AUC / latent-distribution figures |
+| `latent_sdt()` | all four | noise/signal latent densities + criterion/threshold locations (no boundary for m-AFC/ranking) |
+| `plot()` | `bmm_sdt_roc` (incl. `scale = "quantile"`), `bmm_sdt_auc`, `bmm_sdt_latent` | `ggplot2` ROC / quantile-ROC / AUC / latent-distribution figures |
 | `pp_check()` | all four | posterior predictive check |
 
 # References

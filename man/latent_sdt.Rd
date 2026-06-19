@@ -4,7 +4,15 @@
 \alias{latent_sdt}
 \title{Model-implied latent decision-variable distributions}
 \usage{
-latent_sdt(fit, conditions = NULL, n_grid = 200, probs = c(0.025, 0.975), ...)
+latent_sdt(
+  fit,
+  conditions = NULL,
+  n_grid = 200,
+  probs = c(0.025, 0.975),
+  collapse = NULL,
+  show_competitors = FALSE,
+  ...
+)
 }
 \arguments{
 \item{fit}{A \code{bmmfit} object returned by \code{\link[=bmm]{bmm()}} from an SDT model.}
@@ -21,14 +29,28 @@ each density is evaluated (default 200).}
 credible band on the criterion/threshold locations (default
 \code{c(0.025, 0.975)}).}
 
+\item{collapse}{Control of which predictor dimensions are collapsed into one
+panel. \code{NULL} (default) auto-detects: predictors of the criterion/thresholds
+only (and the set size) are collapsed; predictors of \code{dprime}/\code{sdratio} are
+faceted. Pass a character vector of column names to force those columns to
+collapse, or \code{FALSE} to facet every dimension (one panel per combination).}
+
+\item{show_competitors}{Logical (default \code{FALSE}). For \code{sdt_mafc}/\code{sdt_ranking}
+only, additionally overlay the density of the maximum of the \code{m - 1}
+distractor samples (one curve per set size) -- the "effective competitor"
+the target must beat -- which shifts rightward as \code{m} grows and visualises
+why accuracy falls with set size. Ignored for \code{sdt_binary}/\code{sdt_rating}.}
+
 \item{...}{Additional arguments passed to \code{\link[brms:posterior_linpred.brmsfit]{brms::posterior_linpred()}}.}
 }
 \value{
 A data frame of class \code{"bmm_sdt_latent"} with columns \code{x} (the
 evidence axis), \code{density}, \code{distribution} (\code{"noise"} or \code{"signal"}), and any
-condition columns. A \code{lines} attribute holds the decision-boundary
-positions (columns \code{position}, \code{lower}, \code{upper}, \code{marker}, plus condition
-columns).
+faceting (density) condition columns. A \code{lines} attribute holds the
+decision-boundary positions (columns \code{position}, \code{lower}, \code{upper}, \code{marker},
+\code{level}, plus condition columns), or \code{NULL} for the criterion-free
+\code{sdt_mafc}/\code{sdt_ranking} models. When \code{show_competitors = TRUE}, a
+\code{competitors} attribute holds the max-of-distractors densities.
 }
 \description{
 Computes the noise and signal latent decision-variable densities implied by a
@@ -48,8 +70,21 @@ distributions the densities and boundaries are faithful but that area
 identity does not hold (the model applies the CDF to a signed distance, not
 to a survivor probability).
 
-Like ROC curves, latent distributions require a response criterion and are
-not defined for \code{\link[=sdt_mafc]{sdt_mafc()}} or \code{\link[=sdt_ranking]{sdt_ranking()}}.
+Available for all four SDT models. \code{\link[=sdt_binary]{sdt_binary()}} draws the criterion and
+\code{\link[=sdt_rating]{sdt_rating()}} the K-1 confidence thresholds as boundary lines. \code{\link[=sdt_mafc]{sdt_mafc()}}
+and \code{\link[=sdt_ranking]{sdt_ranking()}} have no response criterion -- the decision is a max/rank
+rule over the \code{m} alternatives -- so only the densities are drawn (no boundary
+lines); there the noise density represents each of the \code{m - 1} distractor
+alternatives and the signal density the target.
+
+Because the densities depend only on \code{dprime}/\code{sdratio}, predictors that vary
+the criterion/thresholds \emph{only} (e.g. a base-rate manipulation, as in
+\link{broeder_schuetz_2009_e3}) leave the densities unchanged: by default they are
+collapsed into a single panel with their several boundaries overlaid and
+colour-coded, rather than shown as repeated identical panels. Predictors that
+vary \code{dprime}/\code{sdratio} produce distinct density panels (faceted). For
+\code{sdt_mafc}/\code{sdt_ranking} the set size is likewise collapsed unless it predicts
+\code{dprime}. Use \code{collapse} to override the auto-detection.
 }
 \seealso{
 \code{\link[=roc_sdt]{roc_sdt()}}, \code{\link[=plot.bmm_sdt_latent]{plot.bmm_sdt_latent()}}

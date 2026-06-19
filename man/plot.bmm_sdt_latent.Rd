@@ -22,10 +22,13 @@ A \code{ggplot2} object.
 }
 \description{
 Draws the model-implied noise and signal evidence densities on the latent
-decision axis, with the response criterion (binary) or the K-1 confidence
-thresholds (rating) as dashed vertical lines, each carrying a shaded credible
-band on its location. Distributions are distinguished by colour/fill;
-conditions are faceted.
+decision axis. For \code{\link[=sdt_binary]{sdt_binary()}}/\code{\link[=sdt_rating]{sdt_rating()}} the response criterion or the
+K-1 confidence thresholds are added as dashed vertical lines with a shaded
+credible band; when several boundaries are shown together (e.g. base-rate
+criteria or the rating thresholds) they are colour-coded. \code{\link[=sdt_mafc]{sdt_mafc()}} and
+\code{\link[=sdt_ranking]{sdt_ranking()}} have no boundary; with \code{show_competitors = TRUE} in
+\code{\link[=latent_sdt]{latent_sdt()}} the max-of-distractors densities are overlaid as dashed lines,
+one per set size. Distinct \code{dprime}/\code{sdratio} conditions are faceted.
 }
 \seealso{
 \code{\link[=latent_sdt]{latent_sdt()}}, \code{\link[=roc_sdt]{roc_sdt()}}

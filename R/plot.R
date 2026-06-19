@@ -6,7 +6,8 @@
 utils::globalVariables(c(
   ".data", "FA", "Hit", "FA_mean", "FA_lower", "FA_upper",
   "Hit_mean", "Hit_lower", "Hit_upper", "AUC", "AUC_mean",
-  "density", "distribution", "position", "lower", "upper"
+  "density", "distribution", "position", "lower", "upper",
+  "level", "set_size"
 ))
 
 
@@ -14,63 +15,28 @@ utils::globalVariables(c(
 # ROC                                                                     ####
 ############################################################################# !
 
-# Per-threshold posterior summary for rating ROC plots. The rating roc_sdt()
-# emits rows per (draw x condition) in the order (1,1), thresholds 1..K-1,
-# (0,0), so the within-group position indexes the threshold; the two endpoints
-# (first and last position) are dropped.
-.roc_threshold_summary <- function(x, cond_cols, probs) {
-  key <- if (length(cond_cols) > 0L) {
-    do.call(paste, c(x[c(".draw", cond_cols)], sep = "\r"))
-  } else {
-    as.character(x$.draw)
-  }
-  x$.k <- stats::ave(seq_len(nrow(x)), key, FUN = seq_along)
-  x$.n <- stats::ave(seq_len(nrow(x)), key, FUN = length)
-  interior <- x[x$.k > 1L & x$.k < x$.n, , drop = FALSE]
-
-  grp_cols <- c(".k", cond_cols)
-  groups <- unique(interior[, grp_cols, drop = FALSE])
-  rows <- vector("list", nrow(groups))
-  for (i in seq_len(nrow(groups))) {
-    mask <- rep(TRUE, nrow(interior))
-    for (col in grp_cols) mask <- mask & (interior[[col]] == groups[i, col])
-    fa <- interior$FA[mask]
-    hit <- interior$Hit[mask]
-    rows[[i]] <- data.frame(
-      FA_mean   = mean(fa),
-      FA_lower  = unname(stats::quantile(fa, probs[1L])),
-      FA_upper  = unname(stats::quantile(fa, probs[2L])),
-      Hit_mean  = mean(hit),
-      Hit_lower = unname(stats::quantile(hit, probs[1L])),
-      Hit_upper = unname(stats::quantile(hit, probs[2L])),
-      groups[i, cond_cols, drop = FALSE],
-      row.names = NULL, check.names = FALSE
-    )
-  }
-  do.call(rbind, rows)
-}
-
-
 #' Plot a model-implied SDT ROC curve
 #'
-#' For **rating** models, shows the posterior-mean hit vs. false-alarm rate at
-#' each confidence threshold as points with crosshair error bars (uncertainty in
-#' both directions), connected through the (0,0) and (1,1) endpoints. For
-#' **binary** models, shows the smooth analytical ROC as a credible-band ribbon;
-#' for binary multi-criteria fits the model-implied operating points are overlaid
-#' with crosshair error bars. Pass `observed` to overlay empirical points from
+#' Shows the smooth model-implied ROC as a credible-band ribbon, with the
+#' model-implied operating points overlaid as colour-coded markers with
+#' crosshair error bars (uncertainty in both directions). For **binary**
+#' multi-criteria fits the points are the several criterion levels; for
+#' **rating** models they are the K-1 confidence thresholds (labelled
+#' `c1`..`c(K-1)`). Pass `observed` to overlay empirical points from
 #' [roc_observed()].
 #'
-#' With `scale = "z"` the rates are read on the distribution's quantile
-#' (probit-style) axis: `z = qf(rate)`, where `qf` is the inverse CDF of the
-#' fitted noise distribution. On this axis the binary model ROC is a straight
-#' line with slope `1 / exp(sdratio)` and intercept `dprime / exp(sdratio)`, so
-#' a slope below 1 is the unequal-variance signature (signal SD > noise SD), and
-#' departures of the observed points from a straight line diagnose
-#' misfit. This linearity holds for the symmetric distributions (`"normal"`,
-#' `"logistic"`); for the Gumbel distributions the z-ROC is curved (their
-#' natural linearising transform is the log-log power-ROC). The (0,0) and (1,1)
-#' endpoints map to infinity and are dropped on the z scale.
+#' With `scale = "quantile"` (or its alias `scale = "z"`) the rates are read on
+#' the distribution's quantile axis: `qf(rate)`, where `qf` is the inverse CDF of
+#' the fitted noise distribution, and the axis label names that transform
+#' (`z` for normal, `logit` for logistic, `loglog`/`cloglog` for the Gumbel
+#' distributions). On this axis the binary model ROC is a straight line with
+#' slope `1 / exp(sdratio)` and intercept `dprime / exp(sdratio)`, so a slope
+#' below 1 is the unequal-variance signature (signal SD > noise SD), and
+#' departures of the observed points from a straight line diagnose misfit. This
+#' linearity holds for the symmetric distributions (`"normal"`, `"logistic"`);
+#' for the Gumbel distributions the transformed ROC is curved (their natural
+#' linearising transform is the log-log power-ROC). The (0,0) and (1,1)
+#' endpoints map to infinity and are dropped on the transformed scale.
 #'
 #' @param x A `"bmm_sdt_roc"` object from [roc_sdt()].
 #' @param observed Optional `"bmm_sdt_roc_observed"` object from [roc_observed()]
@@ -79,9 +45,10 @@ utils::globalVariables(c(
 #'   If `NULL` (default), auto-detected.
 #' @param add_diagonal Logical. Draw the chance-level diagonal (default `TRUE`).
 #' @param scale Either `"probability"` (default) for the usual hit vs. false-
-#'   alarm-rate axes, or `"z"` for the z-transformed (quantile) axes.
-#' @param ribbon_alpha Numeric. Transparency of the binary credible band
-#'   (default `0.25`).
+#'   alarm-rate axes, or `"quantile"` (alias `"z"`) for the quantile-transformed
+#'   axes (the inverse CDF of the fitted noise distribution).
+#' @param ribbon_alpha Numeric. Transparency of the credible band (default
+#'   `0.25`).
 #' @param point_size Numeric. Size of operating-point markers (default `2.5`).
 #' @param ... Ignored.
 #' @return A `ggplot2` object.
@@ -89,15 +56,13 @@ utils::globalVariables(c(
 #' @export
 plot.bmm_sdt_roc <- function(x, observed = NULL, condition_col = NULL,
                              add_diagonal = TRUE,
-                             scale = c("probability", "z"),
+                             scale = c("probability", "quantile", "z"),
                              ribbon_alpha = 0.25, point_size = 2.5, ...) {
   stopif(!requireNamespace("ggplot2", quietly = TRUE),
          "ggplot2 is required for plot.bmm_sdt_roc(). Please install it.")
   scale <- match.arg(scale)
-  qf    <- if (scale == "z") .SDT_DISTS[[attr(x, "dist")]]$qf
+  qf    <- if (scale != "probability") .SDT_DISTS[[attr(x, "dist")]]$qf
 
-  is_rating <- isTRUE(attr(x, "is_rating"))
-  probs     <- attr(x, "probs") %||% c(0.025, 0.975)
   cond_cols <- setdiff(names(x), c("FA", "Hit", ".draw"))
   colour_col <- .roc_colour_col(condition_col, cond_cols)
 
@@ -107,11 +72,7 @@ plot.bmm_sdt_roc <- function(x, observed = NULL, condition_col = NULL,
                                   linetype = "dashed", colour = "grey50")
   }
 
-  p <- if (is_rating) {
-    .plot_roc_rating(p, x, cond_cols, colour_col, probs, point_size, qf)
-  } else {
-    .plot_roc_binary(p, x, colour_col, ribbon_alpha, point_size, qf)
-  }
+  p <- .plot_roc_curve(p, x, colour_col, ribbon_alpha, point_size, qf)
 
   if (!is.null(observed)) {
     obs <- .roc_observed_xy(observed)
@@ -141,7 +102,9 @@ plot.bmm_sdt_roc <- function(x, observed = NULL, condition_col = NULL,
     ggplot2::labs(x = "False alarm rate", y = "Hit rate",
                   colour = colour_col, fill = colour_col)
   } else {
-    ggplot2::labs(x = "z(False alarm rate)", y = "z(Hit rate)",
+    zl <- .SDT_DISTS[[attr(x, "dist")]]$qf_label
+    ggplot2::labs(x = paste0(zl, "(False alarm rate)"),
+                  y = paste0(zl, "(Hit rate)"),
                   colour = colour_col, fill = colour_col)
   }
   p + coords + labs + ggplot2::theme_minimal()
@@ -163,71 +126,17 @@ plot.bmm_sdt_roc <- function(x, observed = NULL, condition_col = NULL,
 }
 
 
-.plot_roc_rating <- function(p, x, cond_cols, colour_col, probs, point_size,
-                             qf = NULL) {
-  summ <- .roc_threshold_summary(x, cond_cols, probs)
-  if (!is.null(qf)) {
-    summ[c("FA_mean", "FA_lower", "FA_upper",
-           "Hit_mean", "Hit_lower", "Hit_upper")] <-
-      lapply(summ[c("FA_mean", "FA_lower", "FA_upper",
-                    "Hit_mean", "Hit_lower", "Hit_upper")], qf)
-  }
-
-  if (!is.null(qf)) {
-    # Endpoints (0,0)/(1,1) are +/-Inf on the z scale: connect interior points.
-    curve <- if (length(cond_cols) > 0L) {
-      summ[do.call(order, summ[c(cond_cols, "FA_mean")]),
-           c("FA_mean", "Hit_mean", cond_cols)]
-    } else {
-      summ[order(summ$FA_mean), c("FA_mean", "Hit_mean")]
-    }
-  } else if (length(cond_cols) > 0L) {
-    conds <- unique(summ[, cond_cols, drop = FALSE])
-    endpoints <- cbind(
-      data.frame(FA_mean = rep(c(0, 1), each = nrow(conds)),
-                 Hit_mean = rep(c(0, 1), each = nrow(conds))),
-      rbind(conds, conds), row.names = NULL
-    )
-    curve <- rbind(summ[, c("FA_mean", "Hit_mean", cond_cols)], endpoints)
-    curve <- curve[do.call(order, curve[c(cond_cols, "FA_mean")]), ]
-  } else {
-    curve <- rbind(summ[, c("FA_mean", "Hit_mean")],
-                   data.frame(FA_mean = c(0, 1), Hit_mean = c(0, 1)))
-    curve <- curve[order(curve$FA_mean), ]
-  }
-
-  aes_pt <- if (!is.null(colour_col)) {
-    ggplot2::aes(x = FA_mean, y = Hit_mean, colour = .data[[colour_col]])
-  } else {
-    ggplot2::aes(x = FA_mean, y = Hit_mean)
-  }
-  aes_line <- aes_pt
-  aes_h <- if (!is.null(colour_col)) {
-    ggplot2::aes(y = Hit_mean, xmin = FA_lower, xmax = FA_upper,
-                 colour = .data[[colour_col]])
-  } else {
-    ggplot2::aes(y = Hit_mean, xmin = FA_lower, xmax = FA_upper)
-  }
-  aes_v <- if (!is.null(colour_col)) {
-    ggplot2::aes(x = FA_mean, ymin = Hit_lower, ymax = Hit_upper,
-                 colour = .data[[colour_col]])
-  } else {
-    ggplot2::aes(x = FA_mean, ymin = Hit_lower, ymax = Hit_upper)
-  }
-
-  p +
-    ggplot2::geom_line(data = curve, aes_line, linewidth = 0.7) +
-    ggplot2::geom_errorbar(data = summ, aes_h, width = 0, linewidth = 0.5,
-                           orientation = "y") +
-    ggplot2::geom_errorbar(data = summ, aes_v, width = 0, linewidth = 0.5) +
-    ggplot2::geom_point(data = summ, aes_pt, size = point_size)
-}
-
-
-.plot_roc_binary <- function(p, x, colour_col, ribbon_alpha, point_size,
-                             qf = NULL) {
-  summ   <- attr(x, "summary")
-  points <- attr(x, "points")
+# Unified ROC drawing for binary and rating fits: both carry a `summary` (smooth
+# implied curve) and `points` (operating points) attribute. The curve is drawn
+# as a ribbon + line; the points get crosshair error bars and are coloured by
+# `threshold` (rating: c1..cK-1) or, for binary, the single criterion-level
+# column. Operating points fall on the curve because both are derived from the
+# same probability map in roc_sdt().
+.plot_roc_curve <- function(p, x, colour_col, ribbon_alpha, point_size,
+                            qf = NULL) {
+  summ      <- attr(x, "summary")
+  points    <- attr(x, "points")
+  cond_cols <- setdiff(names(x), c("FA", "Hit", ".draw"))
 
   if (!is.null(qf)) {
     summ <- summ[summ$FA > 0 & summ$FA < 1, , drop = FALSE]
@@ -261,7 +170,11 @@ plot.bmm_sdt_roc <- function(x, observed = NULL, condition_col = NULL,
   if (!is.null(points)) {
     pt_cols <- setdiff(names(points), c("FA_mean", "FA_lower", "FA_upper",
                                         "Hit_mean", "Hit_lower", "Hit_upper"))
-    pt_colour <- if (length(pt_cols) == 1L) pt_cols
+    pt_colour <- if ("threshold" %in% pt_cols) {
+      "threshold"
+    } else if (length(setdiff(pt_cols, cond_cols)) == 1L) {
+      setdiff(pt_cols, cond_cols)
+    }
     aes_pt <- if (!is.null(pt_colour)) {
       ggplot2::aes(x = FA_mean, y = Hit_mean, colour = .data[[pt_colour]])
     } else {
@@ -288,10 +201,13 @@ plot.bmm_sdt_roc <- function(x, observed = NULL, condition_col = NULL,
 #' Plot the latent decision-variable distributions of an SDT model
 #'
 #' Draws the model-implied noise and signal evidence densities on the latent
-#' decision axis, with the response criterion (binary) or the K-1 confidence
-#' thresholds (rating) as dashed vertical lines, each carrying a shaded credible
-#' band on its location. Distributions are distinguished by colour/fill;
-#' conditions are faceted.
+#' decision axis. For [sdt_binary()]/[sdt_rating()] the response criterion or the
+#' K-1 confidence thresholds are added as dashed vertical lines with a shaded
+#' credible band; when several boundaries are shown together (e.g. base-rate
+#' criteria or the rating thresholds) they are colour-coded. [sdt_mafc()] and
+#' [sdt_ranking()] have no boundary; with `show_competitors = TRUE` in
+#' [latent_sdt()] the max-of-distractors densities are overlaid as dashed lines,
+#' one per set size. Distinct `dprime`/`sdratio` conditions are faceted.
 #'
 #' @param x A `"bmm_sdt_latent"` object from [latent_sdt()].
 #' @param condition_col Optional character. Condition column(s) for faceting. If
@@ -308,21 +224,61 @@ plot.bmm_sdt_latent <- function(x, condition_col = NULL, line_alpha = 0.9, ...) 
 
   cond_cols <- setdiff(names(x), c("x", "density", "distribution"))
   lines     <- attr(x, "lines")
+  comp      <- attr(x, "competitors")
+  n_levels  <- if (!is.null(lines)) length(unique(lines$level)) else 0L
+  n_comp    <- if (!is.null(comp)) length(unique(comp$set_size)) else 0L
+  # When several boundaries/competitors are colour-coded the colour scale is
+  # spent on them, so distributions are shown by fill with a neutral outline;
+  # otherwise the densities keep their coloured outline.
+  colour_key <- n_levels > 1L || n_comp > 1L
 
-  p <- ggplot2::ggplot(x, ggplot2::aes(x = .data[["x"]], y = density)) +
-    ggplot2::geom_rect(
+  p <- ggplot2::ggplot(x, ggplot2::aes(x = .data[["x"]], y = density))
+
+  if (!is.null(lines) && nrow(lines) > 0L) {
+    p <- p + ggplot2::geom_rect(
       data = lines, inherit.aes = FALSE,
       ggplot2::aes(xmin = lower, xmax = upper, ymin = -Inf, ymax = Inf),
       fill = "grey70", alpha = 0.3
-    ) +
-    ggplot2::geom_vline(
-      data = lines, inherit.aes = FALSE,
-      ggplot2::aes(xintercept = position), linetype = "dashed",
-      colour = "grey30", alpha = line_alpha
-    ) +
-    ggplot2::geom_area(ggplot2::aes(fill = distribution),
-                       position = "identity", alpha = 0.3) +
+    )
+    p <- p + if (colour_key) {
+      ggplot2::geom_vline(
+        data = lines, inherit.aes = FALSE,
+        ggplot2::aes(xintercept = position, colour = level),
+        linetype = "dashed", alpha = line_alpha
+      )
+    } else {
+      ggplot2::geom_vline(
+        data = lines, inherit.aes = FALSE,
+        ggplot2::aes(xintercept = position),
+        linetype = "dashed", alpha = line_alpha, colour = "grey30"
+      )
+    }
+  }
+
+  p <- p + ggplot2::geom_area(ggplot2::aes(fill = distribution),
+                              position = "identity", alpha = 0.3)
+  p <- p + if (colour_key) {
+    ggplot2::geom_line(ggplot2::aes(group = distribution),
+                       linewidth = 0.7, colour = "grey25")
+  } else {
     ggplot2::geom_line(ggplot2::aes(colour = distribution), linewidth = 0.7)
+  }
+
+  if (!is.null(comp) && nrow(comp) > 0L) {
+    p <- p + if (colour_key) {
+      ggplot2::geom_line(
+        data = comp, inherit.aes = FALSE,
+        ggplot2::aes(x = .data[["x"]], y = density, colour = set_size),
+        linetype = "dashed", linewidth = 0.6
+      )
+    } else {
+      ggplot2::geom_line(
+        data = comp, inherit.aes = FALSE,
+        ggplot2::aes(x = .data[["x"]], y = density),
+        linetype = "dashed", linewidth = 0.6, colour = "grey40"
+      )
+    }
+  }
 
   if (length(cond_cols) > 0L) {
     facet <- condition_col %||% cond_cols
@@ -331,9 +287,16 @@ plot.bmm_sdt_latent <- function(x, condition_col = NULL, line_alpha = 0.9, ...) 
     )
   }
 
+  colour_lab <- if (n_comp > 1L) {
+    "Set size (m)"
+  } else if (colour_key) {
+    if (isTRUE(attr(x, "is_rating"))) "Threshold" else "Criterion"
+  } else {
+    "Distribution"
+  }
   p +
     ggplot2::labs(x = "Decision variable", y = "Density",
-                  fill = "Distribution", colour = "Distribution") +
+                  fill = "Distribution", colour = colour_lab) +
     ggplot2::theme_minimal()
 }
 

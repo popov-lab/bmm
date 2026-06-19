@@ -9,7 +9,7 @@
   observed = NULL,
   condition_col = NULL,
   add_diagonal = TRUE,
-  scale = c("probability", "z"),
+  scale = c("probability", "quantile", "z"),
   ribbon_alpha = 0.25,
   point_size = 2.5,
   ...
@@ -27,10 +27,11 @@ If \code{NULL} (default), auto-detected.}
 \item{add_diagonal}{Logical. Draw the chance-level diagonal (default \code{TRUE}).}
 
 \item{scale}{Either \code{"probability"} (default) for the usual hit vs. false-
-alarm-rate axes, or \code{"z"} for the z-transformed (quantile) axes.}
+alarm-rate axes, or \code{"quantile"} (alias \code{"z"}) for the quantile-transformed
+axes (the inverse CDF of the fitted noise distribution).}
 
-\item{ribbon_alpha}{Numeric. Transparency of the binary credible band
-(default \code{0.25}).}
+\item{ribbon_alpha}{Numeric. Transparency of the credible band (default
+\code{0.25}).}
 
 \item{point_size}{Numeric. Size of operating-point markers (default \code{2.5}).}
 
@@ -40,25 +41,27 @@ alarm-rate axes, or \code{"z"} for the z-transformed (quantile) axes.}
 A \code{ggplot2} object.
 }
 \description{
-For \strong{rating} models, shows the posterior-mean hit vs. false-alarm rate at
-each confidence threshold as points with crosshair error bars (uncertainty in
-both directions), connected through the (0,0) and (1,1) endpoints. For
-\strong{binary} models, shows the smooth analytical ROC as a credible-band ribbon;
-for binary multi-criteria fits the model-implied operating points are overlaid
-with crosshair error bars. Pass \code{observed} to overlay empirical points from
+Shows the smooth model-implied ROC as a credible-band ribbon, with the
+model-implied operating points overlaid as colour-coded markers with
+crosshair error bars (uncertainty in both directions). For \strong{binary}
+multi-criteria fits the points are the several criterion levels; for
+\strong{rating} models they are the K-1 confidence thresholds (labelled
+\code{c1}..\code{c(K-1)}). Pass \code{observed} to overlay empirical points from
 \code{\link[=roc_observed]{roc_observed()}}.
 }
 \details{
-With \code{scale = "z"} the rates are read on the distribution's quantile
-(probit-style) axis: \code{z = qf(rate)}, where \code{qf} is the inverse CDF of the
-fitted noise distribution. On this axis the binary model ROC is a straight
-line with slope \code{1 / exp(sdratio)} and intercept \code{dprime / exp(sdratio)}, so
-a slope below 1 is the unequal-variance signature (signal SD > noise SD), and
-departures of the observed points from a straight line diagnose
-misfit. This linearity holds for the symmetric distributions (\code{"normal"},
-\code{"logistic"}); for the Gumbel distributions the z-ROC is curved (their
-natural linearising transform is the log-log power-ROC). The (0,0) and (1,1)
-endpoints map to infinity and are dropped on the z scale.
+With \code{scale = "quantile"} (or its alias \code{scale = "z"}) the rates are read on
+the distribution's quantile axis: \code{qf(rate)}, where \code{qf} is the inverse CDF of
+the fitted noise distribution, and the axis label names that transform
+(\code{z} for normal, \code{logit} for logistic, \code{loglog}/\code{cloglog} for the Gumbel
+distributions). On this axis the binary model ROC is a straight line with
+slope \code{1 / exp(sdratio)} and intercept \code{dprime / exp(sdratio)}, so a slope
+below 1 is the unequal-variance signature (signal SD > noise SD), and
+departures of the observed points from a straight line diagnose misfit. This
+linearity holds for the symmetric distributions (\code{"normal"}, \code{"logistic"});
+for the Gumbel distributions the transformed ROC is curved (their natural
+linearising transform is the log-log power-ROC). The (0,0) and (1,1)
+endpoints map to infinity and are dropped on the transformed scale.
 }
 \seealso{
 \code{\link[=roc_sdt]{roc_sdt()}}, \code{\link[=roc_observed]{roc_observed()}}, \code{\link[=auc_sdt]{auc_sdt()}}

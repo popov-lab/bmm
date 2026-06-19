@@ -54,6 +54,23 @@ fake_rating_fit <- function(uv = FALSE, threshold_type = "parsimonious",
             class = c("bmmfit", "brmsfit"))
 }
 
+fake_mafc_fit <- function(dist = "normal", m = 4L) {
+  model <- sdt_mafc(response = "n_correct", n_trials = "n_trials", m = m, dist = dist)
+  data <- data.frame(n_correct = 80L, n_trials = 100L, dist_type = 1L)
+  uf <- bmf(dprime ~ 1)
+  structure(list(data = data, bmm = list(model = model, user_formula = uf)),
+            class = c("bmmfit", "brmsfit"))
+}
+
+fake_ranking_fit <- function(dist = "gumbel_min", m = 3L) {
+  resp <- paste0("rank", seq_len(m))
+  model <- sdt_ranking(response = resp, m = m, dist = dist)
+  data <- data.frame(rank1 = 10L, rank2 = 6L, rank3 = 4L, nTrials = 20L)
+  uf <- bmf(dprime ~ 1)
+  structure(list(data = data, bmm = list(model = model, user_formula = uf)),
+            class = c("bmmfit", "brmsfit"))
+}
+
 # Minimal multinomial bmmfit for pp_check dispatch tests: family() returns
 # "multinomial" and the model class drives the rating default-group logic.
 fake_multinomial_fit <- function(model_class, stimulus = "stimulus") {

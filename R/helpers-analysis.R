@@ -25,17 +25,21 @@
 #' level) as a `points` attribute.
 #'
 #' For **rating** models the K-1 confidence thresholds define K-1 empirical ROC
-#' points per posterior draw.
+#' points per posterior draw (returned as the data frame). The smooth
+#' model-implied curve is traced over a virtual cut from the posterior of
+#' `dprime` (and `sdratio`) and attached as the `summary` attribute, with the K-1
+#' thresholds attached as the `points` attribute (labelled `c1`..`c(K-1)`) so
+#' they fall on the curve.
 #'
 #' @param fit A `bmmfit` object returned by [bmm()] from an SDT model.
 #' @param conditions Optional data frame of predictor values for which to
 #'   compute the ROC curve. Column names must match predictor variables used in
 #'   the formula. If `NULL` (default), unique predictor combinations are derived
 #'   from the data.
-#' @param n_points Integer. Number of equally-spaced points on the smooth ROC
-#'   curve for binary models (default 100). Ignored for rating models, which
-#'   return K+1 points (K-1 threshold points plus the (0,0) and (1,1)
-#'   endpoints).
+#' @param n_points Integer. Number of equally-spaced points on the smooth
+#'   model-implied ROC curve (default 100); used for both binary and rating
+#'   models. The rating data frame itself still holds K+1 points per draw (K-1
+#'   threshold points plus the (0,0) and (1,1) endpoints).
 #' @param probs Numeric vector of length 2. Lower and upper quantiles for the
 #'   credible band (default `c(0.025, 0.975)`).
 #' @param criterion_points Optional. Control of the binary multi-criteria
@@ -48,9 +52,10 @@
 #'
 #' @return A data frame of class `"bmm_sdt_roc"` with columns `FA`, `Hit`,
 #'   `.draw`, and any condition columns. The object carries a `summary`
-#'   attribute (`FA`, `Hit_mean`, `Hit_lower`, `Hit_upper`) and, for binary
-#'   multi-criteria fits, a `points` attribute with the model-implied operating
-#'   points.
+#'   attribute (`FA`, `Hit_mean`, `Hit_lower`, `Hit_upper`) with the smooth
+#'   model-implied curve, and a `points` attribute with the model-implied
+#'   operating points: one per criterion level for binary multi-criteria fits,
+#'   or the K-1 confidence thresholds (labelled `c1`..`c(K-1)`) for rating fits.
 #'
 #' @seealso [auc_sdt()], [roc_observed()], [plot.bmm_sdt_roc()]
 #' @export
@@ -70,9 +75,11 @@ roc_sdt <- function(fit, conditions = NULL, n_points = 100,
   conditions <- .sdt_resolve_conditions(fit, conditions)
 
   if (is_rating) {
-    roc_data    <- .roc_sdt_rating(fit, model, conditions, ...)
-    points      <- NULL
-    roc_summary <- .roc_sdt_summary(roc_data, probs)
+    rating      <- .roc_sdt_rating(fit, model, conditions, n_points,
+                                   probs = probs, ...)
+    roc_data    <- rating$curve
+    points      <- rating$points
+    roc_summary <- rating$summary
   } else {
     binary      <- .roc_sdt_binary(fit, model, conditions, n_points,
                                    criterion_points = criterion_points,
@@ -172,6 +179,45 @@ roc_sdt <- function(fit, conditions = NULL, n_points = 100,
 }
 
 
+# Classify the predictor columns present in `conditions` for latent_sdt(). The
+# latent densities depend only on dprime/sdratio, so `density` dims (predictors
+# of either) get distinct density panels (faceted), while `boundary` dims
+# (predictors of the criterion/threshold parameters only) leave the densities
+# unchanged and are collapsed into one panel with the boundaries overlaid.
+# Columns predicting neither (e.g. a set-size column for mafc/ranking) are
+# dropped. `collapse = FALSE` facets every dimension; `collapse = <cols>` forces
+# the named columns to collapse instead of facet.
+.sdt_latent_dims <- function(fit, conditions, collapse = NULL) {
+  all_vars <- names(conditions)
+  if (length(all_vars) == 0L) {
+    return(list(density = character(0), boundary = character(0)))
+  }
+  if (isFALSE(collapse)) {
+    return(list(density = all_vars, boundary = character(0)))
+  }
+
+  uf    <- fit$bmm$user_formula
+  preds <- if (inherits(uf, "bmmformula")) rhs_vars(uf, collapse = FALSE) else list()
+  re_vars <- tryCatch(names(brms::ranef(fit)), error = function(e) character(0))
+  strip <- function(v) setdiff(v %||% character(0), re_vars)
+
+  density_par   <- intersect(c("dprime", "sdratio"), names(preds))
+  density_vars  <- unique(unlist(lapply(preds[density_par], strip)))
+  boundary_vars <- setdiff(
+    unique(unlist(lapply(preds[setdiff(names(preds), density_par)], strip))),
+    density_vars
+  )
+
+  if (is.character(collapse)) {
+    forced <- intersect(collapse, all_vars)
+    return(list(density  = setdiff(all_vars, forced),
+                boundary = intersect(forced, boundary_vars)))
+  }
+  list(density  = intersect(all_vars, density_vars),
+       boundary = intersect(all_vars, boundary_vars))
+}
+
+
 # Whether sdratio is an estimated (not fixed) parameter. The model object is
 # authoritative once update_model_fixed_parameters() has dropped sdratio from
 # fixed_parameters for a `sdratio ~ ...` formula; the brms::variables() check is
@@ -202,6 +248,57 @@ roc_sdt <- function(fit, conditions = NULL, n_points = 100,
     brms::posterior_linpred(fit, dpar = param, newdata = newdata,
                             re_formula = NA, allow_new_levels = TRUE, ...)
   }
+}
+
+
+# The K-1 rating thresholds are not posterior parameters: they are rebuilt per
+# draw from the criterion plus the parameterization parameters (spacing and/or
+# delta*), whose mapping to ordered thresholds differs by threshold_type. Keeping
+# that reconstruction here lets latent_sdt() and sdt_thresholds() share it.
+# Returns one n_draws x (K-1) matrix per row of `conditions`.
+.sdt_rating_thresholds <- function(fit, model, conditions, ...) {
+  n_ratings      <- model$other_vars$n_ratings
+  threshold_type <- model$other_vars$threshold_type
+  crit    <- .sdt_linpred(fit, "criterion", conditions, TRUE, ...)
+  spacing <- if ("spacing" %in% names(model$parameters)) {
+    .sdt_linpred(fit, "spacing", conditions, TRUE, ...)
+  }
+  delta_names <- grep("^delta", names(model$parameters), value = TRUE)
+  deltas <- if (length(delta_names)) {
+    stats::setNames(lapply(delta_names, function(nm) {
+      .sdt_linpred(fit, nm, conditions, TRUE, ...)
+    }), delta_names)
+  }
+
+  lapply(seq_len(ncol(crit)), function(l_i) {
+    t(vapply(seq_len(nrow(crit)), function(d_i) {
+      sp       <- if (!is.null(spacing)) spacing[d_i, l_i]
+      deltas_d <- if (!is.null(deltas)) {
+        vapply(deltas, function(m) m[d_i, l_i], numeric(1))
+      }
+      .sdt_make_thresholds(crit[d_i, l_i], n_ratings, threshold_type,
+                           spacing = sp, deltas = deltas_d)
+    }, numeric(n_ratings - 1L)))
+  })
+}
+
+
+# Posterior-mean ROC + quantile band at each swept-cut node, with the (0,0) and
+# (1,1) endpoints appended and any condition columns recycled in. Shared by the
+# binary and rating smooth implied curves so a model's K-1 thresholds (rating) or
+# criterion operating points (binary) fall on the displayed curve.
+.roc_summary_from_mats <- function(fa_mat, hit_mat, probs, cond_row = NULL) {
+  summ <- data.frame(
+    FA        = c(0, colMeans(fa_mat), 1),
+    Hit_mean  = c(0, colMeans(hit_mat), 1),
+    Hit_lower = c(0, unname(apply(hit_mat, 2L, stats::quantile, probs[1L])), 1),
+    Hit_upper = c(0, unname(apply(hit_mat, 2L, stats::quantile, probs[2L])), 1)
+  )
+  if (!is.null(cond_row) && ncol(cond_row) > 0L) {
+    summ <- cbind(summ, cond_row[rep(1L, nrow(summ)), , drop = FALSE],
+                  row.names = NULL)
+  }
+  summ
 }
 
 
@@ -238,6 +335,7 @@ roc_sdt <- function(fit, conditions = NULL, n_points = 100,
   for (c_i in seq_len(n_curve)) {
     dp <- dprime_mat[, c_i]
     sr <- sdratio_mat[, c_i]
+    cond_row <- if (curve_has_cols) curve_cond[c_i, , drop = FALSE]
     # Anchor the criterion grid to the mean dprime so FA is ~evenly spaced; the
     # noise scale is 1, so FA = cdf(-dprime/2 - criterion) inverts to this.
     c_grid  <- -mean(dp) / 2 - qf(fa_grid)
@@ -252,19 +350,11 @@ roc_sdt <- function(fit, conditions = NULL, n_points = 100,
       Hit   = as.vector(t(hit_full)),
       .draw = rep(seq_len(n_draws), each = n_fa)
     )
-    summ <- data.frame(
-      FA        = c(0, colMeans(fa_mat), 1),
-      Hit_mean  = c(0, colMeans(hit_mat), 1),
-      Hit_lower = c(0, unname(apply(hit_mat, 2L, stats::quantile, probs[1L])), 1),
-      Hit_upper = c(0, unname(apply(hit_mat, 2L, stats::quantile, probs[2L])), 1)
-    )
-    if (curve_has_cols) {
-      cond_row <- curve_cond[c_i, , drop = FALSE]
-      df   <- cbind(df,   cond_row[rep(1L, nrow(df)), , drop = FALSE],   row.names = NULL)
-      summ <- cbind(summ, cond_row[rep(1L, nrow(summ)), , drop = FALSE], row.names = NULL)
+    if (!is.null(cond_row)) {
+      df <- cbind(df, cond_row[rep(1L, nrow(df)), , drop = FALSE], row.names = NULL)
     }
     curve_list[[c_i]]   <- df
-    summary_list[[c_i]] <- summ
+    summary_list[[c_i]] <- .roc_summary_from_mats(fa_mat, hit_mat, probs, cond_row)
   }
 
   points <- if (length(dims$points) > 0L) {
@@ -313,12 +403,24 @@ roc_sdt <- function(fit, conditions = NULL, n_points = 100,
 }
 
 
-# Empirical (K+1-point) ROC for rating SDT models, one set of points per draw.
-.roc_sdt_rating <- function(fit, model, conditions, ...) {
+# ROC for rating SDT models. Returns three pieces (like .roc_sdt_binary): the
+# discrete K+1-point ROC per draw (`curve`, also used by the numerical AUC), the
+# smooth model-implied curve swept over a virtual cut (`summary`), and the K-1
+# threshold operating points with a credible band (`points`, labelled c1..cK-1).
+# The smooth curve uses the rating model's own probability map -- FA = 1 - cdf(t
+# + dprime/2), Hit = 1 - cdf((t - dprime/2) / sdratio) -- the continuous envelope
+# of the discrete points, so the thresholds fall on it for every distribution
+# (the binary curve's criterion sign convention would mismatch for the
+# asymmetric Gumbel distributions).
+.roc_sdt_rating <- function(fit, model, conditions, n_points,
+                            probs = c(0.025, 0.975), ...) {
   dist           <- model$other_vars$dist
   threshold_type <- model$other_vars$threshold_type
   n_ratings      <- model$other_vars$n_ratings
   has_sdratio    <- .sdt_has_estimated_sdratio(model, fit)
+  cdf            <- .SDT_DISTS[[dist]]$cdf
+  qf             <- .SDT_DISTS[[dist]]$qf
+  K1             <- n_ratings - 1L
 
   n_cond     <- max(1L, nrow(conditions))
   dprime_mat <- .sdt_linpred(fit, "dprime",    conditions, is_rating = TRUE, ...)
@@ -340,9 +442,15 @@ roc_sdt <- function(fit, conditions = NULL, n_points = 100,
     exp(.sdt_linpred(fit, "sdratio", conditions, is_rating = TRUE, ...))
   }
 
+  fa_grid       <- seq(0.001, 0.999, length.out = n_points)
+  thr_levels    <- paste0("c", seq_len(K1))
   cond_has_cols <- ncol(conditions) > 0L
-  result <- vector("list", n_cond)
+  curve_list   <- vector("list", n_cond)
+  summary_list <- vector("list", n_cond)
+  points_list  <- vector("list", n_cond)
   for (c_i in seq_len(n_cond)) {
+    fa_pts  <- matrix(NA_real_, nrow = n_draws, ncol = K1)
+    hit_pts <- matrix(NA_real_, nrow = n_draws, ncol = K1)
     roc_rows <- vector("list", n_draws)
     for (d_i in seq_len(n_draws)) {
       dp   <- dprime_mat[d_i, c_i]
@@ -358,45 +466,47 @@ roc_sdt <- function(fit, conditions = NULL, n_points = 100,
       pn <- .sdt_category_probs(thresholds, dp, 1,  0L, dist)
       ps <- .sdt_category_probs(thresholds, dp, sr, 1L, dist)
 
+      fa_pts[d_i, ]  <- 1 - cumsum(pn)[seq_len(K1)]
+      hit_pts[d_i, ] <- 1 - cumsum(ps)[seq_len(K1)]
       roc_rows[[d_i]] <- data.frame(
-        FA    = c(1, 1 - cumsum(pn)[seq_len(n_ratings - 1L)], 0),
-        Hit   = c(1, 1 - cumsum(ps)[seq_len(n_ratings - 1L)], 0),
+        FA    = c(1, fa_pts[d_i, ], 0),
+        Hit   = c(1, hit_pts[d_i, ], 0),
         .draw = d_i
       )
     }
-    cond_df <- do.call(rbind, roc_rows)
-    if (cond_has_cols) {
-      cond_df <- cbind(cond_df, conditions[rep(c_i, nrow(cond_df)), , drop = FALSE],
-                       row.names = NULL)
-    }
-    result[[c_i]] <- cond_df
-  }
-  do.call(rbind, result)
-}
 
+    cond_row <- if (cond_has_cols) conditions[c_i, , drop = FALSE]
+    cond_df  <- do.call(rbind, roc_rows)
 
-# Summarise ROC draws to a mean + quantile band at each (FA, condition).
-.roc_sdt_summary <- function(roc_data, probs) {
-  cond_cols <- setdiff(names(roc_data), c("FA", "Hit", ".draw"))
-  roc_data$.fa_r <- round(roc_data$FA, 8L)
-  group_cols <- c(".fa_r", cond_cols)
-  groups <- unique(roc_data[, group_cols, drop = FALSE])
+    dp_vec  <- dprime_mat[, c_i]
+    sr_vec  <- if (!is.null(sdratio_mat)) sdratio_mat[, c_i] else rep(1, n_draws)
+    t_grid  <- qf(1 - fa_grid) - mean(dp_vec) / 2
+    fa_mat  <- 1 - cdf(outer(dp_vec / 2, t_grid, "+"))
+    hit_mat <- 1 - cdf(sweep(outer(-dp_vec / 2, t_grid, "+"), 1L, sr_vec, "/"))
 
-  rows <- vector("list", nrow(groups))
-  for (i in seq_len(nrow(groups))) {
-    mask <- rep(TRUE, nrow(roc_data))
-    for (col in group_cols) mask <- mask & (roc_data[[col]] == groups[i, col])
-    hit <- roc_data$Hit[mask]
-    rows[[i]] <- data.frame(
-      FA        = roc_data$FA[mask][1L],
-      Hit_mean  = mean(hit),
-      Hit_lower = unname(stats::quantile(hit, probs[1L])),
-      Hit_upper = unname(stats::quantile(hit, probs[2L])),
-      groups[i, cond_cols, drop = FALSE],
-      row.names = NULL, check.names = FALSE
+    pts <- data.frame(
+      threshold = factor(thr_levels, levels = thr_levels),
+      FA_mean   = colMeans(fa_pts),
+      FA_lower  = unname(apply(fa_pts, 2L, stats::quantile, probs[1L])),
+      FA_upper  = unname(apply(fa_pts, 2L, stats::quantile, probs[2L])),
+      Hit_mean  = colMeans(hit_pts),
+      Hit_lower = unname(apply(hit_pts, 2L, stats::quantile, probs[1L])),
+      Hit_upper = unname(apply(hit_pts, 2L, stats::quantile, probs[2L]))
     )
+    if (!is.null(cond_row)) {
+      cond_df <- cbind(cond_df, cond_row[rep(1L, nrow(cond_df)), , drop = FALSE],
+                       row.names = NULL)
+      pts <- cbind(pts, cond_row[rep(1L, nrow(pts)), , drop = FALSE],
+                   row.names = NULL)
+    }
+    curve_list[[c_i]]   <- cond_df
+    summary_list[[c_i]] <- .roc_summary_from_mats(fa_mat, hit_mat, probs, cond_row)
+    points_list[[c_i]]  <- pts
   }
-  do.call(rbind, rows)
+
+  list(curve   = do.call(rbind, curve_list),
+       summary = do.call(rbind, summary_list),
+       points  = do.call(rbind, points_list))
 }
 
 
@@ -412,6 +522,8 @@ print.bmm_sdt_roc <- function(x, ...) {
   if (isTRUE(attr(x, "is_rating"))) {
     cat("  Rating model: ", nrow(x) / (n_draws * n_cond) - 1L,
         " ROC points per draw\n", sep = "")
+    cat("  ", nrow(attr(x, "points")) / n_cond, " threshold operating points",
+        " (see attr(x, 'points'))\n", sep = "")
   } else {
     cat("  Smooth curve: ", nrow(x) / (n_draws * n_cond),
         " FA points per draw\n", sep = "")
@@ -566,8 +678,21 @@ roc_observed <- function(fit, conditions = NULL) {
 #' identity does not hold (the model applies the CDF to a signed distance, not
 #' to a survivor probability).
 #'
-#' Like ROC curves, latent distributions require a response criterion and are
-#' not defined for [sdt_mafc()] or [sdt_ranking()].
+#' Available for all four SDT models. [sdt_binary()] draws the criterion and
+#' [sdt_rating()] the K-1 confidence thresholds as boundary lines. [sdt_mafc()]
+#' and [sdt_ranking()] have no response criterion -- the decision is a max/rank
+#' rule over the `m` alternatives -- so only the densities are drawn (no boundary
+#' lines); there the noise density represents each of the `m - 1` distractor
+#' alternatives and the signal density the target.
+#'
+#' Because the densities depend only on `dprime`/`sdratio`, predictors that vary
+#' the criterion/thresholds *only* (e.g. a base-rate manipulation, as in
+#' [broeder_schuetz_2009_e3]) leave the densities unchanged: by default they are
+#' collapsed into a single panel with their several boundaries overlaid and
+#' colour-coded, rather than shown as repeated identical panels. Predictors that
+#' vary `dprime`/`sdratio` produce distinct density panels (faceted). For
+#' `sdt_mafc`/`sdt_ranking` the set size is likewise collapsed unless it predicts
+#' `dprime`. Use `collapse` to override the auto-detection.
 #'
 #' @inheritParams roc_sdt
 #' @param n_grid Integer. Number of points on the evidence-axis grid at which
@@ -575,82 +700,128 @@ roc_observed <- function(fit, conditions = NULL) {
 #' @param probs Numeric vector of length 2. Lower and upper quantiles for the
 #'   credible band on the criterion/threshold locations (default
 #'   `c(0.025, 0.975)`).
+#' @param collapse Control of which predictor dimensions are collapsed into one
+#'   panel. `NULL` (default) auto-detects: predictors of the criterion/thresholds
+#'   only (and the set size) are collapsed; predictors of `dprime`/`sdratio` are
+#'   faceted. Pass a character vector of column names to force those columns to
+#'   collapse, or `FALSE` to facet every dimension (one panel per combination).
+#' @param show_competitors Logical (default `FALSE`). For `sdt_mafc`/`sdt_ranking`
+#'   only, additionally overlay the density of the maximum of the `m - 1`
+#'   distractor samples (one curve per set size) -- the "effective competitor"
+#'   the target must beat -- which shifts rightward as `m` grows and visualises
+#'   why accuracy falls with set size. Ignored for `sdt_binary`/`sdt_rating`.
 #'
 #' @return A data frame of class `"bmm_sdt_latent"` with columns `x` (the
 #'   evidence axis), `density`, `distribution` (`"noise"` or `"signal"`), and any
-#'   condition columns. A `lines` attribute holds the decision-boundary
-#'   positions (columns `position`, `lower`, `upper`, `marker`, plus condition
-#'   columns).
+#'   faceting (density) condition columns. A `lines` attribute holds the
+#'   decision-boundary positions (columns `position`, `lower`, `upper`, `marker`,
+#'   `level`, plus condition columns), or `NULL` for the criterion-free
+#'   `sdt_mafc`/`sdt_ranking` models. When `show_competitors = TRUE`, a
+#'   `competitors` attribute holds the max-of-distractors densities.
 #'
 #' @seealso [roc_sdt()], [plot.bmm_sdt_latent()]
 #' @export
 latent_sdt <- function(fit, conditions = NULL, n_grid = 200,
-                       probs = c(0.025, 0.975), ...) {
+                       probs = c(0.025, 0.975), collapse = NULL,
+                       show_competitors = FALSE, ...) {
   stopif(!inherits(fit, "bmmfit"),
          "fit must be a bmmfit object returned by bmm()")
   model <- fit$bmm$model
   stopif(!inherits(model, "sdt"),
-         "latent_sdt() is only available for SDT models (sdt_binary, sdt_rating)")
-  stopif(inherits(model, "sdt_mafc"),
-         "Latent distributions are not defined for the m-AFC SDT model: it has no response criterion.")
-  stopif(inherits(model, "sdt_ranking"),
-         "Latent distributions are not defined for the ranking SDT model: it has no response criterion.")
+         "latent_sdt() is only available for SDT models")
 
-  dist        <- model$other_vars$dist
-  pdf         <- .SDT_DISTS[[dist]]$pdf
-  is_rating   <- inherits(model, "sdt_rating")
-  has_sdratio <- .sdt_has_estimated_sdratio(model, fit)
-  conditions  <- .sdt_resolve_conditions(fit, conditions)
-  n_cond      <- max(1L, nrow(conditions))
+  dist          <- model$other_vars$dist
+  pdf           <- .SDT_DISTS[[dist]]$pdf
+  cdf           <- .SDT_DISTS[[dist]]$cdf
+  is_rating     <- inherits(model, "sdt_rating")
+  # dprime/sdratio are nlpars for the multinomial models (rating, ranking) and
+  # dpars for the custom-family models (binary, mafc); criterion exists only for
+  # the models with an explicit response boundary (binary, rating).
+  use_nlpar     <- is_rating || inherits(model, "sdt_ranking")
+  has_criterion <- "criterion" %in% names(model$parameters)
+  has_sdratio   <- .sdt_has_estimated_sdratio(model, fit)
+  competitors   <- isTRUE(show_competitors) &&
+    inherits(model, c("sdt_mafc", "sdt_ranking"))
 
-  dprime_mat  <- .sdt_linpred(fit, "dprime",    conditions, is_rating, ...)
-  crit_mat    <- .sdt_linpred(fit, "criterion", conditions, is_rating, ...)
-  sdratio_mat <- if (has_sdratio) {
-    exp(.sdt_linpred(fit, "sdratio", conditions, is_rating, ...))
+  conditions <- .sdt_resolve_conditions(fit, conditions)
+  dims       <- .sdt_latent_dims(fit, conditions, collapse)
+  panel_cond <- .sdt_unique_subset(conditions, dims$density)
+  line_cond  <- .sdt_unique_subset(conditions, c(dims$density, dims$boundary))
+  n_panel    <- max(1L, nrow(panel_cond))
+
+  dprime_panel  <- .sdt_linpred(fit, "dprime", panel_cond, use_nlpar, ...)
+  sdratio_panel <- if (has_sdratio) {
+    exp(.sdt_linpred(fit, "sdratio", panel_cond, use_nlpar, ...))
   }
 
-  if (is_rating) {
-    n_ratings      <- model$other_vars$n_ratings
-    threshold_type <- model$other_vars$threshold_type
-    spacing_mat    <- if ("spacing" %in% names(model$parameters)) {
-      .sdt_linpred(fit, "spacing", conditions, is_rating, ...)
+  # Boundary positions are evaluated over the density x boundary combinations so
+  # that each density panel can carry all its criteria/thresholds.
+  if (has_criterion) {
+    crit_line <- .sdt_linpred(fit, "criterion", line_cond, use_nlpar, ...)
+    thr_list  <- if (is_rating) {
+      .sdt_rating_thresholds(fit, model, line_cond, ...)
     }
-    delta_names <- grep("^delta", names(model$parameters), value = TRUE)
-    delta_mats  <- if (length(delta_names)) {
-      stats::setNames(lapply(delta_names, function(nm) {
-        .sdt_linpred(fit, nm, conditions, is_rating, ...)
-      }), delta_names)
+    lines_all <- vector("list", nrow(line_cond))
+    for (l_i in seq_len(nrow(line_cond))) {
+      lines_all[[l_i]] <- if (is_rating) {
+        thr_draws <- thr_list[[l_i]]
+        data.frame(
+          position = colMeans(thr_draws),
+          lower    = unname(apply(thr_draws, 2L, stats::quantile, probs[1L])),
+          upper    = unname(apply(thr_draws, 2L, stats::quantile, probs[2L])),
+          marker   = paste0("t", seq_len(ncol(thr_draws)))
+        )
+      } else {
+        crit_draws <- crit_line[, l_i]
+        data.frame(
+          position = mean(crit_draws),
+          lower    = unname(stats::quantile(crit_draws, probs[1L])),
+          upper    = unname(stats::quantile(crit_draws, probs[2L])),
+          marker   = "criterion"
+        )
+      }
+      if (ncol(line_cond) > 0L) {
+        lines_all[[l_i]] <- cbind(
+          lines_all[[l_i]], line_cond[rep(l_i, nrow(lines_all[[l_i]])), , drop = FALSE],
+          row.names = NULL
+        )
+      }
     }
-  }
-
-  cond_has_cols <- ncol(conditions) > 0L
-  dens_list  <- vector("list", n_cond)
-  lines_list <- vector("list", n_cond)
-  for (c_i in seq_len(n_cond)) {
-    dp <- mean(dprime_mat[, c_i])
-    s  <- if (!is.null(sdratio_mat)) mean(sdratio_mat[, c_i]) else 1
-
-    if (is_rating) {
-      thr_draws <- t(vapply(seq_len(nrow(crit_mat)), function(d_i) {
-        sp       <- if (!is.null(spacing_mat)) spacing_mat[d_i, c_i] else NULL
-        deltas_d <- if (!is.null(delta_mats)) {
-          vapply(delta_mats, function(m) m[d_i, c_i], numeric(1))
-        }
-        .sdt_make_thresholds(crit_mat[d_i, c_i], n_ratings, threshold_type,
-                             spacing = sp, deltas = deltas_d)
-      }, numeric(n_ratings - 1L)))
-      positions <- colMeans(thr_draws)
-      lower     <- unname(apply(thr_draws, 2L, stats::quantile, probs[1L]))
-      upper     <- unname(apply(thr_draws, 2L, stats::quantile, probs[2L]))
-      marker    <- paste0("t", seq_len(n_ratings - 1L))
+    lines_all <- do.call(rbind, lines_all)
+    # Colour key: the boundary-dim value(s) when the criterion varies across a
+    # predictor (e.g. base-rate conditions), else the marker so a rating model's
+    # K-1 thresholds stay distinguishable.
+    lines_all$level <- if (length(dims$boundary) > 0L) {
+      factor(do.call(paste, c(lines_all[dims$boundary], sep = " / ")))
     } else {
-      crit_draws <- crit_mat[, c_i]
-      positions  <- mean(crit_draws)
-      lower      <- unname(stats::quantile(crit_draws, probs[1L]))
-      upper      <- unname(stats::quantile(crit_draws, probs[2L]))
-      marker     <- "criterion"
+      factor(lines_all$marker, levels = unique(lines_all$marker))
+    }
+  }
+
+  m_col     <- if (competitors && is.character(model$other_vars$m)) model$other_vars$m
+  set_sizes <- if (competitors) .sdt_competitor_sizes(model, fit$data)
+
+  dens_list  <- vector("list", n_panel)
+  lines_list <- vector("list", n_panel)
+  comp_list  <- vector("list", n_panel)
+  for (p_i in seq_len(n_panel)) {
+    dp <- mean(dprime_panel[, p_i])
+    s  <- if (!is.null(sdratio_panel)) mean(sdratio_panel[, p_i]) else 1
+    panel_row <- panel_cond[p_i, , drop = FALSE]
+
+    # Each density panel carries only the boundaries sharing its density-dim
+    # values, so restrict the pooled boundary frame to this panel's combination.
+    lines <- if (has_criterion) {
+      dcols <- intersect(dims$density, names(lines_all))
+      if (length(dcols) == 0L) {
+        lines_all
+      } else {
+        keep <- Reduce(`&`, lapply(dcols, function(col) lines_all[[col]] == panel_row[[col]]))
+        lines_all[keep, , drop = FALSE]
+      }
     }
 
+    positions <- if (!is.null(lines)) lines$position else numeric(0)
     pad <- 4 * max(1, s)
     x   <- seq(min(-dp / 2, positions) - pad, max(dp / 2, positions) + pad,
                length.out = n_grid)
@@ -659,45 +830,175 @@ latent_sdt <- function(fit, conditions = NULL, n_grid = 200,
       density      = c(pdf(x + dp / 2), pdf((x - dp / 2) / s) / s),
       distribution = rep(c("noise", "signal"), each = n_grid)
     )
-    lines <- data.frame(position = positions, lower = lower, upper = upper,
-                        marker = marker)
-    if (cond_has_cols) {
-      cond_row <- conditions[c_i, , drop = FALSE]
-      dens  <- cbind(dens,  cond_row[rep(1L, nrow(dens)),  , drop = FALSE], row.names = NULL)
-      lines <- cbind(lines, cond_row[rep(1L, nrow(lines)), , drop = FALSE], row.names = NULL)
+
+    comp <- if (competitors) {
+      ms <- if (!is.null(m_col) && m_col %in% dims$density) {
+        as.integer(panel_cond[p_i, m_col])
+      } else {
+        set_sizes
+      }
+      do.call(rbind, lapply(ms, function(mv) {
+        data.frame(
+          x        = x,
+          density  = (mv - 1) * cdf(x + dp / 2)^(mv - 2) * pdf(x + dp / 2),
+          set_size = factor(mv, levels = set_sizes)
+        )
+      }))
     }
-    dens_list[[c_i]]  <- dens
-    lines_list[[c_i]] <- lines
+
+    if (ncol(panel_cond) > 0L) {
+      dens <- cbind(dens, panel_row[rep(1L, nrow(dens)), , drop = FALSE], row.names = NULL)
+      if (!is.null(comp)) {
+        comp <- cbind(comp, panel_row[rep(1L, nrow(comp)), , drop = FALSE], row.names = NULL)
+      }
+    }
+    dens_list[[p_i]]  <- dens
+    lines_list[[p_i]] <- lines
+    comp_list[[p_i]]  <- comp
   }
 
   structure(
     do.call(rbind, dens_list),
-    class       = c("bmm_sdt_latent", "data.frame"),
-    lines       = do.call(rbind, lines_list),
-    probs       = probs,
-    model_class = class(model),
-    dist        = dist,
-    is_rating   = is_rating,
-    conditions  = conditions
+    class        = c("bmm_sdt_latent", "data.frame"),
+    lines        = do.call(rbind, lines_list),
+    competitors  = if (competitors) do.call(rbind, comp_list),
+    probs        = probs,
+    model_class  = class(model),
+    dist         = dist,
+    is_rating    = is_rating,
+    conditions   = panel_cond
   )
+}
+
+
+# Distinct set sizes for the competitor overlay. brms keeps only the derived
+# per-row set-size column (m_afc / max_rank) in fit$data, not the user's original
+# m column, so read that; fall back to a constant m for un-fitted/mock objects.
+.sdt_competitor_sizes <- function(model, data) {
+  col <- if (inherits(model, "sdt_ranking")) "max_rank" else "m_afc"
+  m   <- model$other_vars$m
+  if (!is.null(data[[col]])) {
+    sort(unique(as.integer(data[[col]])))
+  } else if (is.numeric(m)) {
+    as.integer(m)
+  } else if (m %in% names(data)) {
+    sort(unique(as.integer(data[[m]])))
+  } else {
+    integer(0)
+  }
 }
 
 
 #' @export
 print.bmm_sdt_latent <- function(x, ...) {
   model_name <- utils::tail(attr(x, "model_class"), 1L) %||% "sdt"
-  n_cond     <- max(1L, nrow(attr(x, "conditions")))
-  n_grid     <- nrow(x) / (2L * n_cond)
-  n_lines    <- nrow(attr(x, "lines")) / n_cond
+  n_panel    <- max(1L, nrow(attr(x, "conditions")))
+  n_grid     <- nrow(x) / (2L * n_panel)
+  lines      <- attr(x, "lines")
 
   cat("SDT latent distributions (", model_name, ", dist = ", attr(x, "dist"),
       ")\n", sep = "")
   cat("  noise + signal densities on ", n_grid, "-point grids",
-      if (n_cond > 1L) paste0(" x ", n_cond, " conditions") else "", "\n",
+      if (n_panel > 1L) paste0(" x ", n_panel, " panels") else "", "\n",
       sep = "")
-  cat("  ", n_lines, if (isTRUE(attr(x, "is_rating"))) " thresholds" else " criterion",
-      " per condition\n", sep = "")
+  if (is.null(lines)) {
+    cat("  no response boundary (max/rank decision rule)\n")
+  } else {
+    cat("  ", nrow(lines) / n_panel,
+        if (isTRUE(attr(x, "is_rating"))) " thresholds" else " criteria",
+        " per panel\n", sep = "")
+  }
+  if (!is.null(attr(x, "competitors"))) {
+    cat("  max-of-distractors densities overlaid\n")
+  }
   cat("Use plot() to visualise, or attr(x, 'lines') for boundary locations.\n")
+  invisible(x)
+}
+
+
+############################################################################# !
+# THRESHOLDS                                                             ####
+############################################################################# !
+
+#' Latent decision thresholds from a fitted rating SDT model
+#'
+#' Extracts the \eqn{K-1} latent decision thresholds of a rating signal
+#' detection model fit with [bmm()]. Thresholds are not posterior parameters:
+#' they are reconstructed per draw from the `criterion` and the parameterization
+#' parameters (`spacing` and/or `delta*`), whose mapping to ordered thresholds
+#' depends on the model's `threshold_type`. This function returns those draws on
+#' the latent decision-variable scale together with a posterior summary, so
+#' threshold estimates are accessible without knowing the parameterization.
+#'
+#' @inheritParams roc_sdt
+#' @param probs Numeric vector of length 2. Lower and upper quantiles for the
+#'   credible interval (default `c(0.025, 0.975)`).
+#'
+#' @return A data frame of class `"bmm_sdt_thresholds"` with columns `marker`
+#'   (threshold label `t1`, `t2`, ...), `position` (latent location), `.draw`,
+#'   and any condition columns. The object carries a `summary` attribute
+#'   (`marker`, `position` posterior mean, `lower`, `upper`, plus condition
+#'   columns). The `position`/`lower`/`upper` naming matches the `lines`
+#'   attribute of [latent_sdt()], which visualises the same quantities.
+#'
+#' @seealso [latent_sdt()], [roc_sdt()]
+#' @export
+sdt_thresholds <- function(fit, conditions = NULL, probs = c(0.025, 0.975), ...) {
+  stopif(!inherits(fit, "bmmfit"),
+         "fit must be a bmmfit object returned by bmm()")
+  model <- fit$bmm$model
+  stopif(!inherits(model, "sdt_rating"),
+         "sdt_thresholds() is only available for rating SDT models (sdt_rating)")
+
+  conditions <- .sdt_resolve_conditions(fit, conditions)
+  cond_rows  <- .sdt_unique_subset(conditions, names(conditions))
+  thr_list   <- .sdt_rating_thresholds(fit, model, cond_rows, ...)
+  markers    <- paste0("t", seq_len(model$other_vars$n_ratings - 1L))
+
+  draws_list   <- vector("list", length(thr_list))
+  summary_list <- vector("list", length(thr_list))
+  for (l_i in seq_along(thr_list)) {
+    thr_draws <- thr_list[[l_i]]
+    draws <- data.frame(
+      marker   = rep(markers, each = nrow(thr_draws)),
+      position = as.vector(thr_draws),
+      .draw    = rep(seq_len(nrow(thr_draws)), times = ncol(thr_draws))
+    )
+    summ <- data.frame(
+      marker   = markers,
+      position = colMeans(thr_draws),
+      lower    = unname(apply(thr_draws, 2L, stats::quantile, probs[1L])),
+      upper    = unname(apply(thr_draws, 2L, stats::quantile, probs[2L]))
+    )
+    if (ncol(cond_rows) > 0L) {
+      crow <- cond_rows[l_i, , drop = FALSE]
+      draws <- cbind(draws, crow[rep(1L, nrow(draws)), , drop = FALSE],
+                     row.names = NULL)
+      summ  <- cbind(summ, crow[rep(1L, nrow(summ)), , drop = FALSE],
+                     row.names = NULL)
+    }
+    draws_list[[l_i]]   <- draws
+    summary_list[[l_i]] <- summ
+  }
+
+  structure(
+    do.call(rbind, draws_list),
+    class       = c("bmm_sdt_thresholds", "data.frame"),
+    summary     = do.call(rbind, summary_list),
+    probs       = probs,
+    model_class = class(model),
+    dist        = model$other_vars$dist,
+    conditions  = cond_rows
+  )
+}
+
+
+#' @export
+print.bmm_sdt_thresholds <- function(x, ...) {
+  model_name <- utils::tail(attr(x, "model_class"), 1L) %||% "sdt"
+  cat("SDT decision thresholds (", model_name, ", dist = ", attr(x, "dist"),
+      ")\n", sep = "")
+  print(attr(x, "summary"), digits = 3, row.names = FALSE)
   invisible(x)
 }
 

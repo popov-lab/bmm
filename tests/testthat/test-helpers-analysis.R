@@ -233,6 +233,63 @@ test_that("roc_sdt() rating returns K+1 points per draw with endpoints", {
   expect_true(any(abs(d1$FA) < 1e-8 & abs(d1$Hit) < 1e-8))
 })
 
+test_that("roc_sdt() rating attaches a smooth implied curve + threshold points", {
+  fit <- fake_rating_fit()
+  local_mocked_bindings(
+    posterior_linpred = mock_linpred_factory(list(dprime = 1.5, criterion = 0, spacing = 0)),
+    ranef = function(...) list(),
+    variables = function(...) character(0),
+    .package = "brms"
+  )
+  roc  <- roc_sdt(fit, n_points = 50)
+  summ <- attr(roc, "summary")
+  pts  <- attr(roc, "points")
+
+  expect_true(all(c("FA", "Hit_mean", "Hit_lower", "Hit_upper") %in% names(summ)))
+  expect_equal(nrow(summ), 50L + 2L)
+  expect_equal(summ$FA[1L], 0)
+  expect_equal(utils::tail(summ$FA, 1L), 1)
+  expect_false(is.unsorted(summ$FA))
+  expect_true(all(summ$Hit_mean >= 0 & summ$Hit_mean <= 1))
+
+  expect_equal(nrow(pts), 5L)
+  expect_s3_class(pts$threshold, "factor")
+  expect_equal(levels(pts$threshold), paste0("c", 1:5))
+  expect_true(all(c("FA_mean", "FA_lower", "FA_upper",
+                    "Hit_mean", "Hit_lower", "Hit_upper") %in% names(pts)))
+})
+
+test_that("roc_sdt() rating threshold points fall on the smooth curve", {
+  for (dist in c("normal", "logistic", "gumbel_min")) {
+    fit <- fake_rating_fit(uv = TRUE)
+    fit$bmm$model$other_vars$dist <- dist
+    z      <- stats::qnorm(stats::ppoints(n_draws_mock))
+    spread <- list(dprime = 0.15, criterion = 0.10, spacing = 0.05, sdratio = 0.10)
+    base   <- list(dprime = 1.4, criterion = 0.1, spacing = 0, sdratio = log(1.2))
+    local_mocked_bindings(
+      posterior_linpred = function(object, dpar = NULL, nlpar = NULL,
+                                   newdata = NULL, ...) {
+        par <- if (!is.null(dpar)) dpar else nlpar
+        n_cond <- if (is.null(newdata)) 1L else nrow(newdata)
+        matrix(rep(rep_len(base[[par]], n_cond), each = n_draws_mock) +
+                 spread[[par]] * z, nrow = n_draws_mock)
+      },
+      ranef = function(...) list(),
+      variables = function(...) c("bsp_sdratio"),
+      .package = "brms"
+    )
+    roc  <- roc_sdt(fit, n_points = 200)
+    summ <- attr(roc, "summary")
+    pts  <- attr(roc, "points")
+    hit_on_curve <- stats::approx(summ$FA, summ$Hit_mean, xout = pts$FA_mean)$y
+    # Tolerance covers the small posterior-mean-point vs posterior-mean-curve
+    # (Jensen) gap, larger for the curved Gumbel ROC. A wrong sign convention
+    # would put the Gumbel points off the curve by >0.1, which this still
+    # catches; exact placement is checked above with constant draws.
+    expect_lt(max(abs(pts$Hit_mean - hit_on_curve)), 0.02)
+  }
+})
+
 
 ############################################################################# !
 # AUC                                                                    ####
@@ -291,14 +348,26 @@ test_that("roc_observed() binary gives one operating point per criterion", {
 # LATENT DECISION VARIABLE                                               ####
 ############################################################################# !
 
-test_that("latent_sdt() errors for criterion-free models", {
-  fake <- function(cls) {
-    structure(list(bmm = list(model = structure(list(),
-              class = c("bmmodel", "sdt", cls)))), class = c("bmmfit", "brmsfit"))
-  }
+test_that("latent_sdt() errors for non-bmmfit input", {
   expect_error(latent_sdt(list()), "bmmfit")
-  expect_error(latent_sdt(fake("sdt_mafc")), "not defined")
-  expect_error(latent_sdt(fake("sdt_ranking")), "not defined")
+})
+
+test_that("latent_sdt() draws densities without boundary lines (mafc, ranking)", {
+  for (maker in list(fake_mafc_fit, fake_ranking_fit)) {
+    fit <- maker()
+    local_mocked_bindings(
+      posterior_linpred = mock_linpred_factory(list(dprime = 1.4)),
+      ranef = function(...) list(),
+      variables = function(...) character(0),
+      .package = "brms"
+    )
+    lat <- latent_sdt(fit, n_grid = 120L)
+    expect_s3_class(lat, "bmm_sdt_latent")
+    expect_setequal(unique(lat$distribution), c("noise", "signal"))
+    expect_equal(nrow(lat), 2L * 120L)
+    expect_true(all(lat$density >= 0))
+    expect_null(attr(lat, "lines"))            # no criterion -> no boundary lines
+  }
 })
 
 test_that("latent_sdt() binary returns noise/signal densities + criterion line", {
@@ -348,6 +417,51 @@ test_that("latent_sdt() rating returns ordered threshold lines per condition", {
   expect_equal(nrow(ln), 5L)
   expect_equal(ln$marker, paste0("t", 1:5))
   expect_true(all(diff(ln$position) > 0))
+  expect_equal(as.character(ln$level), paste0("t", 1:5))   # colour key = threshold
+})
+
+test_that("latent_sdt() collapses criterion-only dimensions into one panel", {
+  fit <- fake_binary_fit(uv = TRUE, multi = TRUE)   # criterion ~ 0 + condition
+  local_mocked_bindings(
+    posterior_linpred = mock_linpred_factory(list(
+      dprime = 1.2, criterion = c(-0.8, -0.3, 0, 0.3, 0.8), sdratio = log(1.3))),
+    ranef = function(...) list(id = array(0, dim = c(1, 1, 1))),
+    variables = function(...) "bsp_sdratio",
+    .package = "brms"
+  )
+  lat <- latent_sdt(fit, n_grid = 60L)
+  # one density panel, five criterion lines colour-coded by condition
+  expect_equal(nrow(attr(lat, "conditions")), 1L)
+  expect_equal(nrow(lat), 2L * 60L)
+  ln <- attr(lat, "lines")
+  expect_equal(nrow(ln), 5L)
+  expect_setequal(as.character(ln$level), paste0("br", 1:5))
+
+  # collapse = FALSE restores one panel per criterion level
+  lat2 <- latent_sdt(fit, n_grid = 60L, collapse = FALSE)
+  expect_equal(nrow(attr(lat2, "conditions")), 5L)
+})
+
+test_that("latent_sdt() show_competitors overlays max-of-distractors per set size", {
+  fit <- fake_ranking_fit()                          # constant m = 3
+  local_mocked_bindings(
+    posterior_linpred = mock_linpred_factory(list(dprime = 1.4)),
+    ranef = function(...) list(),
+    variables = function(...) character(0),
+    .package = "brms"
+  )
+  lat <- latent_sdt(fit, n_grid = 80L, show_competitors = TRUE)
+  comp <- attr(lat, "competitors")
+  expect_false(is.null(comp))
+  expect_setequal(levels(comp$set_size), "3")
+  expect_true(all(comp$density >= 0))
+  # competitor density integrates to ~1 (it is a proper order-statistic density)
+  cd <- comp[order(comp$x), ]
+  area <- sum(diff(cd$x) * (utils::head(cd$density, -1L) + utils::tail(cd$density, -1L)) / 2)
+  expect_equal(area, 1, tolerance = 0.02)
+
+  # off by default and ignored for binary
+  expect_null(attr(latent_sdt(fit, n_grid = 40L), "competitors"))
 })
 
 test_that("latent_sdt() UV widens the signal distribution by exp(sdratio)", {
@@ -368,20 +482,75 @@ test_that("latent_sdt() UV widens the signal distribution by exp(sdratio)", {
 
 
 ############################################################################# !
-# SUMMARIES & PRINT                                                      ####
+# THRESHOLDS                                                             ####
 ############################################################################# !
 
-test_that(".roc_sdt_summary collapses draws to a quantile band per FA", {
-  df <- data.frame(
-    FA    = rep(c(0, 0.5, 1), 4L),
-    Hit   = c(0, 0.40, 1, 0, 0.60, 1, 0, 0.50, 1, 0, 0.55, 1),
-    .draw = rep(1:4, each = 3L)
+test_that("sdt_thresholds() returns per-draw samples + a K-1 summary", {
+  fit <- fake_rating_fit(n_ratings = 6L)
+  local_mocked_bindings(
+    posterior_linpred = mock_linpred_factory(list(dprime = 1.5, criterion = 0, spacing = 0)),
+    ranef = function(...) list(),
+    variables = function(...) character(0),
+    .package = "brms"
   )
-  s <- .roc_sdt_summary(df, c(0.025, 0.975))
-  expect_equal(nrow(s), 3L)
-  expect_true(all(c("FA", "Hit_mean", "Hit_lower", "Hit_upper") %in% names(s)))
-  expect_true(all(s$Hit_lower <= s$Hit_mean & s$Hit_mean <= s$Hit_upper))
+  thr <- sdt_thresholds(fit)
+  expect_s3_class(thr, "bmm_sdt_thresholds")
+  expect_true(all(c("marker", "position", ".draw") %in% names(thr)))
+  expect_equal(length(unique(thr$.draw)), n_draws_mock)
+  expect_setequal(unique(thr$marker), paste0("t", 1:5))
+  expect_equal(nrow(thr), n_draws_mock * 5L)
+
+  s <- attr(thr, "summary")
+  expect_equal(nrow(s), 5L)
+  expect_true(all(c("marker", "position", "lower", "upper") %in% names(s)))
+
+  d1 <- thr[thr$.draw == 1L, ]
+  d1 <- d1[order(match(d1$marker, paste0("t", 1:5))), ]
+  expect_true(all(diff(d1$position) > 0))                # ordered within a draw
+
+  expect_output(print(thr), "SDT decision thresholds")
 })
+
+test_that("sdt_thresholds() errors for fits without rating thresholds", {
+  expect_error(sdt_thresholds(list()), "bmmfit")
+  expect_error(sdt_thresholds(fake_binary_fit()), "rating")
+  expect_error(sdt_thresholds(fake_mafc_fit()), "rating")
+  expect_error(sdt_thresholds(fake_ranking_fit()), "rating")
+})
+
+test_that("sdt_thresholds() summary matches latent_sdt() lines across parameterizations", {
+  specs <- list(
+    list(tt = "equidistant",  K = 6L),   # spacing-based, even K
+    list(tt = "softmax",      K = 5L),   # spacing + deltas, odd K
+    list(tt = "log_ratio",    K = 6L),   # delta-based, even K
+    list(tt = "log_distance", K = 5L)    # delta-based, odd K
+  )
+  for (s in specs) {
+    fit  <- fake_rating_fit(threshold_type = s$tt, n_ratings = s$K)
+    pars <- names(fit$bmm$model$parameters)
+    draws <- list(dprime = 1.5, criterion = 0.2)
+    if ("spacing" %in% pars) draws$spacing <- 0
+    for (d in grep("^delta", pars, value = TRUE)) draws[[d]] <- 0
+
+    local_mocked_bindings(
+      posterior_linpred = mock_linpred_factory(draws),
+      ranef = function(...) list(),
+      variables = function(...) character(0),
+      .package = "brms"
+    )
+    summ  <- attr(sdt_thresholds(fit), "summary")
+    lines <- attr(latent_sdt(fit, n_grid = 20L), "lines")
+    info  <- paste(s$tt, s$K)
+    expect_equal(nrow(summ), s$K - 1L, info = info)
+    expect_equal(summ$position, lines$position, info = info)
+    expect_true(all(diff(summ$position) > 0), info = info)
+  }
+})
+
+
+############################################################################# !
+# SUMMARIES & PRINT                                                      ####
+############################################################################# !
 
 test_that(".auc_sdt_summary reports the posterior mean and band", {
   df <- data.frame(AUC = c(0.70, 0.75, 0.80, 0.72), .draw = 1:4)

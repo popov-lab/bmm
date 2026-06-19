@@ -21,10 +21,10 @@ compute the ROC curve. Column names must match predictor variables used in
 the formula. If \code{NULL} (default), unique predictor combinations are derived
 from the data.}
 
-\item{n_points}{Integer. Number of equally-spaced points on the smooth ROC
-curve for binary models (default 100). Ignored for rating models, which
-return K+1 points (K-1 threshold points plus the (0,0) and (1,1)
-endpoints).}
+\item{n_points}{Integer. Number of equally-spaced points on the smooth
+model-implied ROC curve (default 100); used for both binary and rating
+models. The rating data frame itself still holds K+1 points per draw (K-1
+threshold points plus the (0,0) and (1,1) endpoints).}
 
 \item{probs}{Numeric vector of length 2. Lower and upper quantiles for the
 credible band (default \code{c(0.025, 0.975)}).}
@@ -41,9 +41,10 @@ combination). Ignored for rating models.}
 \value{
 A data frame of class \code{"bmm_sdt_roc"} with columns \code{FA}, \code{Hit},
 \code{.draw}, and any condition columns. The object carries a \code{summary}
-attribute (\code{FA}, \code{Hit_mean}, \code{Hit_lower}, \code{Hit_upper}) and, for binary
-multi-criteria fits, a \code{points} attribute with the model-implied operating
-points.
+attribute (\code{FA}, \code{Hit_mean}, \code{Hit_lower}, \code{Hit_upper}) with the smooth
+model-implied curve, and a \code{points} attribute with the model-implied
+operating points: one per criterion level for binary multi-criteria fits,
+or the K-1 confidence thresholds (labelled \code{c1}..\code{c(K-1)}) for rating fits.
 }
 \description{
 Computes the receiver operating characteristic (ROC) curve implied by the
@@ -62,7 +63,11 @@ one smooth curve and attaches the model-implied points (one per criterion
 level) as a \code{points} attribute.
 
 For \strong{rating} models the K-1 confidence thresholds define K-1 empirical ROC
-points per posterior draw.
+points per posterior draw (returned as the data frame). The smooth
+model-implied curve is traced over a virtual cut from the posterior of
+\code{dprime} (and \code{sdratio}) and attached as the \code{summary} attribute, with the K-1
+thresholds attached as the \code{points} attribute (labelled \code{c1}..\code{c(K-1)}) so
+they fall on the curve.
 }
 \seealso{
 \code{\link[=auc_sdt]{auc_sdt()}}, \code{\link[=roc_observed]{roc_observed()}}, \code{\link[=plot.bmm_sdt_roc]{plot.bmm_sdt_roc()}}
