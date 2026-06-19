@@ -1,0 +1,497 @@
+---
+title: "Dual-process and meta-d′ signal detection models"
+output: bookdown::html_document2
+author:
+  - Gidon Frischkorn
+  - Ven Popov
+bibliography: REFERENCES.bib
+header-includes:
+  - \usepackage{amsmath}
+vignette: >
+  %\VignetteIndexEntry{Dual-process and meta-d′ signal detection models}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+pkgdown:
+  as_is: true
+---
+<style type="text/css">
+div.main-container {
+max-width: 800px !important;
+}
+
+p {
+margin-top: 1.5em ;
+margin-bottom: 1.5em ;
+}
+.author{
+    display: none;
+}
+</style>
+
+```{r, include = FALSE}
+options(crayon.enabled = TRUE)
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>",
+  message = FALSE,
+  dev = "jpeg",
+  dpi = 100,
+  fig.width = 5,
+  fig.asp = 0.8,
+  out.width = "80%",
+  fig.align = "center"
+)
+fansi::set_knit_hooks(knitr::knit_hooks, which = c("output", "message", "error"))
+```
+
+```{r setup, message = FALSE}
+library(bmm)
+library(ggplot2)
+```
+
+# Beyond familiarity: two process models
+
+The [confidence-rating SDT model](bmm_sdt.html) treats recognition as a single
+continuous process: an item generates a sample of memory *strength* (or
+*familiarity*), and the observer maps that one number onto an ordered confidence
+scale. A persistent finding in recognition memory is that the resulting ROC is
+**asymmetric** — on z-transformed axes its slope is below one. The core SDT
+article reads that asymmetry as *unequal variance*: the old-item distribution is
+simply wider than the new-item distribution.
+
+Unequal variance is not the only explanation. Two influential models keep the
+familiarity process but add a **second process** that also leaves its mark on the
+ROC:
+
+- **Dual-process SDT** [@Yonelinas_1994] adds a *recollection* process: besides
+  graded familiarity, an item can be consciously recollected, which supports a
+  confident, all-or-none response. Recollection is the textbook account of the
+  recognition ROC's shape.
+- **Meta-d′** [@Maniscalco_Lau_2012] adds a *metacognitive* read-out: it asks how
+  well an observer's confidence tracks whether their decision was actually
+  correct, separately from how well they discriminate old from new.
+
+Both are *versions of the same rating model* — they consume identical data
+(counts per confidence category, with a 0/1 `stimulus` column) and reduce to the
+standard model when their extra parameter is switched off. They are selected with
+the `version` argument of `sdt_rating()`:
+
+| `version` | extra parameter(s) | captures | reduces to standard when |
+|-----------|--------------------|----------|--------------------------|
+| `"standard"` (default) | — | familiarity / strength only | always |
+| `"dpsdt"` | `Ro`, `Rn` | recollection of old / new items | `Ro`, `Rn` → 0 |
+| `"metad"` | `logmratio` | metacognitive efficiency (log M-ratio) | `logmratio` = 0 |
+
+This article assumes the [core SDT article](bmm_sdt.html): the standard rating
+model, confidence thresholds, and the `roc_sdt()` / `latent_sdt()` / `pp_check()`
+toolkit. We focus here on what the second process adds.
+
+# Dual-process SDT
+
+## The model
+
+Dual-process theory holds that a recognition decision can draw on two separable
+sources [@Yonelinas_1994; @Wixted_Mickes_2010]. *Familiarity* is a graded
+signal-detection process: old and new items generate overlapping Gaussian
+evidence, exactly as in the standard model. *Recollection* is a high-threshold
+process: with some probability the observer retrieves specific details that
+settle the decision with high confidence, and otherwise recollection fails and
+they fall back on familiarity.
+
+`bmm` parameterizes recollection with two probabilities, both on the logit
+scale:
+
+- `Ro` — *recall-to-accept*: the probability $\mathrm{logit}^{-1}(\texttt{Ro})$
+  that an **old** item is recollected as old, producing the most-confident "old"
+  rating.
+- `Rn` — *recall-to-reject*: the probability $\mathrm{logit}^{-1}(\texttt{Rn})$
+  that a **new** item is recollected as new (its absence from the studied set is
+  recollected), producing the most-confident "new" rating.
+
+Classic recognition models keep only recall-to-accept; the symmetric
+recall-to-reject term is motivated by change-detection and working-memory
+paradigms, where recollecting that an item was *not* studied is itself
+diagnostic [@Yonelinas_2023]. The probability of each confidence category is then
+a mixture: a recollection component that piles mass on the extreme category, and
+a $(1 - R)$-weighted familiarity component spread across the scale by the
+thresholds.
+
+```{r dpsdt-densities, echo = FALSE, fig.cap = "Dual-process model. Old and new items generate equal-variance familiarity evidence (curves); on a fraction Ro of old trials recollection succeeds and the item is reported with maximal 'old' confidence (right spike), and on a fraction Rn of new trials recall-to-reject yields maximal 'new' confidence (left spike). The recollection mass sits on top of the familiarity process, not on the evidence axis."}
+dpr <- 1.2
+x   <- seq(-3.5, 4.8, length.out = 600)
+dens <- rbind(
+  data.frame(x = x, density = dnorm(x, -dpr / 2, 1), dist = "Noise (new)"),
+  data.frame(x = x, density = dnorm(x,  dpr / 2, 1), dist = "Signal (old)")
+)
+ggplot(dens, aes(x, density, color = dist, fill = dist)) +
+  geom_line(linewidth = 0.8) +
+  annotate("segment", x = 3.6, xend = 3.6, y = 0, yend = 0.30,
+           color = "#377EB8", linewidth = 1.1,
+           arrow = arrow(length = unit(0.12, "cm"))) +
+  annotate("text", x = 3.6, y = 0.34, label = "italic(R[o])", parse = TRUE,
+           color = "#377EB8") +
+  annotate("segment", x = -2.7, xend = -2.7, y = 0, yend = 0.18,
+           color = "#E41A1C", linewidth = 1.1,
+           arrow = arrow(length = unit(0.12, "cm"))) +
+  annotate("text", x = -2.7, y = 0.22, label = "italic(R[n])", parse = TRUE,
+           color = "#E41A1C") +
+  scale_color_brewer(palette = "Set1") +
+  scale_fill_brewer(palette = "Set1") +
+  scale_y_continuous(expand = expansion(mult = c(0, 0.1))) +
+  labs(x = "Latent familiarity", y = "Density", color = NULL, fill = NULL) +
+  theme_classic() +
+  theme(legend.position = "top")
+```
+
+Because recollection adds mass at the *high-confidence* ends, its fingerprint is
+a **curved** z-transformed ROC: a pure unequal-variance Gaussian produces a
+*straight* zROC (slope $1/s$), whereas a recollection component bows it
+[@Yonelinas_1994]. We return to this contrast below.
+
+`Ro` and `Rn` are **fixed off by default** (a constant near $-\infty$ on the
+logit scale, so recollection probability $\approx 0$ and the model is exactly the
+standard rating model). You switch recollection on by adding it to the formula —
+`Ro ~ 1` for the one-sided model (recollection of old items only) or
+`Ro ~ 1, Rn ~ 1` for the two-sided model.
+
+## Worked example: recognition memory
+
+We use the same @Pratte_2010 recognition data as the core article (from the
+`roc6` collection in the [MPTinR](https://cran.r-project.org/package=MPTinR)
+package): 97 subjects judging old and new items on a 6-point confidence scale.
+
+```{r}
+stopifnot(requireNamespace("MPTinR", quietly = TRUE))
+data("roc6", package = "MPTinR")
+pratte <- roc6[roc6$exp == "Pratte_2010", ]
+
+rating_data <- rbind(
+  data.frame(id = pratte$id, stimulus = 1L,
+             r1 = pratte$OLD_3new, r2 = pratte$OLD_2new, r3 = pratte$OLD_1new,
+             r4 = pratte$OLD_1old, r5 = pratte$OLD_2old, r6 = pratte$OLD_3old),
+  data.frame(id = pratte$id, stimulus = 0L,
+             r1 = pratte$NEW_3new, r2 = pratte$NEW_2new, r3 = pratte$NEW_1new,
+             r4 = pratte$NEW_1old, r5 = pratte$NEW_2old, r6 = pratte$NEW_3old)
+)
+```
+
+The dual-process model attributes the ROC asymmetry to recollection, so we keep
+the familiarity process *equal-variance* (we do not estimate `sdratio`) and free
+both recollection terms:
+
+```{r}
+model_dp <- sdt_rating(response = paste0("r", 1:6), stimulus = "stimulus",
+                       version = "dpsdt")
+
+fit_dp <- bmm(
+  formula = bmf(dprime ~ 1 + (1 | id), criterion ~ 1 + (1 | id),
+                spacing ~ 1, Ro ~ 1, Rn ~ 1),
+  data = rating_data,
+  model = model_dp,
+  backend = "cmdstanr",
+  cores = 4,
+  chains = 4,
+  iter = 2000,
+  refresh = 0,
+  silent = 2,
+  file = "assets/bmmfit_sdt_dpsdt_vignette"
+)
+summary(fit_dp)
+```
+
+The recollection terms are reported on the logit scale. `latent_sdt()` converts
+them to probabilities and prints them alongside the familiarity distributions:
+
+```{r}
+latent_dp <- latent_sdt(fit_dp)
+attr(latent_dp, "extra")
+```
+
+Recollection of old items (`Ro`) is credibly positive — it contributes to
+high-confidence "old" responses over and above familiarity, the dual-process
+signature. Recall-to-reject (`Rn`), by contrast, is estimated at essentially
+zero. That is exactly what we should expect for standard old/new recognition:
+recollecting that an item was *not* studied has little to work with here. Freeing
+`Rn` does no harm — the two-sided fit simply recovers the classic one-sided model
+— and it becomes diagnostic only in paradigms where the absence of an item is
+itself recollectable, such as change detection and visual working memory
+[@Yonelinas_2023].
+
+## Two accounts of the same asymmetry
+
+The core article fit these same data with an *unequal-variance* Gaussian
+(`sdratio ~ 1`, no recollection). Both models reproduce the asymmetric
+recognition ROC, but they tell different stories: unequal variance says the
+old-item *strength distribution* is wider, while dual-process says a separate
+*recollection process* adds high-confidence hits. We fit the unequal-variance
+model here too, for a direct comparison:
+
+```{r}
+model_uv <- sdt_rating(response = paste0("r", 1:6), stimulus = "stimulus")
+
+fit_uv <- bmm(
+  formula = bmf(dprime ~ 1 + (1 | id), criterion ~ 1 + (1 | id),
+                spacing ~ 1, sdratio ~ 1),
+  data = rating_data,
+  model = model_uv,
+  backend = "cmdstanr",
+  cores = 4,
+  chains = 4,
+  iter = 2000,
+  refresh = 0,
+  silent = 2,
+  file = "assets/bmmfit_sdt_dp_uv_vignette"
+)
+```
+
+On probability axes both ROCs bend through the operating points. The
+**z-transformed** ROC (`scale = "z"`) is the diagnostic that separates them: the
+unequal-variance Gaussian is a straight line, whereas the dual-process curve is
+bowed by the recollection mass.
+
+```{r dpsdt-zroc, fig.show = "hold", out.width = "49%", fig.cap = "The same recognition asymmetry, two accounts, on z-transformed ROC axes. Left: unequal-variance Gaussian — a straight zROC with slope below one. Right: dual-process — recollection bows the zROC. Points are the observed operating points."}
+plot(roc_sdt(fit_uv), observed = roc_observed(fit_uv), scale = "z") +
+  ggplot2::ggtitle("Unequal-variance Gaussian")
+plot(roc_sdt(fit_dp), observed = roc_observed(fit_dp), scale = "z") +
+  ggplot2::ggtitle("Dual-process (recollection)")
+```
+
+In practice the two are hard to separate from a single ROC: recognition zROCs
+are only gently curved, and an unequal-variance Gaussian mimics the dual-process
+shape closely (the same flexibility caveat that applies to the extreme-value vs
+Gaussian comparison in the core article; @MeyerGrant_2025). The choice is best
+driven by theory and by whether parameters stay invariant across conditions —
+for instance whether recollection, but not familiarity, responds to a
+manipulation [@Yonelinas_2023] — rather than by ROC fit alone. The continuous
+dual-process model [@Wixted_Mickes_2010] and finite-mixture SDT [@DeCarlo_2002]
+are further variations on the same theme of a second component shaping the ROC.
+
+## Posterior predictive checks
+
+As for the standard rating model, `pp_check()` compares the observed
+rating-category proportions against the posterior predictive distribution,
+faceted by `stimulus`:
+
+```{r}
+pp_check(fit_dp, ndraws = 100)
+```
+
+If recollection is doing real work, the dual-process model should track the
+high-confidence categories (r1 and r6) more closely than an equal-variance
+familiarity-only model, whose single strength axis cannot put enough mass at the
+extremes.
+
+# Meta-d′
+
+## The model
+
+A confidence-rating task answers two different questions at once. *Type-1*: how
+well does the observer tell old from new? That is ordinary sensitivity,
+`dprime`. *Type-2*: how well does the observer's **confidence** track whether
+each decision was actually correct? That is *metacognitive* sensitivity, and it
+need not match type-1 sensitivity — an observer can discriminate well yet place
+confidence poorly, or vice versa [@Fleming_Lau_2014].
+
+Meta-d′ [@Maniscalco_Lau_2012] expresses type-2 sensitivity in the same units as
+type-1 `dprime`. It is the sensitivity that a metacognitively *ideal*
+signal-detection observer would need in order to produce the observed confidence
+data, **holding the type-1 decision fixed** — that is, the old/new response rates
+are constrained to match what `dprime` already implies, so meta-d′ is identified
+purely from the *spread of confidence* within each response. The natural summary
+is the
+
+$$
+\text{M-ratio} = \frac{\text{meta-}d'}{\texttt{dprime}},
+$$
+
+the **metacognitive efficiency**: a value of 1 means confidence is as
+informative as the decision (ideal), below 1 means confidence carries less
+information than the decision used (the common case), and above 1 means
+confidence draws on information the decision did not.
+
+Rather than estimating meta-d′ directly, `bmm` estimates the **log M-ratio**,
+`logmratio` $= \log(\text{meta-}d'/d')$, and recovers meta-d′ as
+`exp(logmratio) * dprime`. This is the parameterization used by the HMeta-d
+toolbox [@Fleming_2017]: the M-ratio is the quantity researchers actually report,
+so making it the estimated parameter places the prior, hierarchical
+between-subject SD, and any group contrasts directly on metacognitive efficiency.
+It also keeps meta-d′ positive and regularizes it toward `dprime`, and it anchors
+the ideal point — perfect metacognition, meta-d′ = `dprime` — at `logmratio = 0`,
+which recovers the standard rating model. Add `logmratio` to the formula to
+estimate it; extract the M-ratio posterior with `mratio()`.
+
+```{r metad-resolution, echo = FALSE, fig.cap = "Metacognitive efficiency. Both panels have the same type-1 sensitivity (old/new discrimination) and the same old/new criterion (solid line). When metacognition is efficient (left, M-ratio = 1) the confidence thresholds (dashed) are well spread, so confidence separates likely-correct from likely-incorrect responses. When it is inefficient (right, M-ratio < 1) the thresholds bunch toward the criterion: confidence varies little and is weakly diagnostic of accuracy."}
+make_panel <- function(metad, label) {
+  dpr <- 1.6
+  x   <- seq(-3.5, 5, length.out = 500)
+  thr <- c(-1.4, -0.6, 0.6, 1.4) * (metad / dpr)  # type-2 criteria scale with metad
+  d <- rbind(
+    data.frame(x = x, density = dnorm(x, -dpr / 2, 1), dist = "Noise (new)",
+               panel = label),
+    data.frame(x = x, density = dnorm(x,  dpr / 2, 1), dist = "Signal (old)",
+               panel = label)
+  )
+  list(dens = d, thr = data.frame(thr = thr, panel = label))
+}
+p1 <- make_panel(1.6, "Efficient (M-ratio = 1)")
+p2 <- make_panel(0.8, "Inefficient (M-ratio = 0.5)")
+dens <- rbind(p1$dens, p2$dens)
+thr  <- rbind(p1$thr, p2$thr)
+ggplot(dens, aes(x, density, color = dist)) +
+  geom_line(linewidth = 0.8) +
+  geom_vline(data = thr, aes(xintercept = thr), linetype = "dashed",
+             color = "grey55") +
+  geom_vline(xintercept = 0, linewidth = 0.7, color = "grey20") +
+  facet_wrap(~ panel) +
+  scale_color_brewer(palette = "Set1") +
+  labs(x = "Latent evidence", y = "Density", color = NULL) +
+  theme_classic() +
+  theme(legend.position = "top")
+```
+
+## Worked example: metacognitive efficiency in recognition memory
+
+We reuse the recognition ROC data from the [core SDT article](bmm_sdt.html): the
+`roc6` object in the [MPTinR](https://cran.r-project.org/package=MPTinR) package,
+which collects published old/new recognition experiments as per-subject counts of
+old and new items on a 6-point confidence scale. We take @Pratte_2010 (97
+subjects, 240 trials per stimulus class) and reshape it to the format
+`sdt_rating()` expects — one row per (subject × stimulus), with categories `r1` =
+"sure new" … `r6` = "sure old". In a confidence-rating task this scale is exactly
+the *joint* type-1/type-2 response: the side of the scale is the old/new decision
+and the distance from the middle is confidence, so the same counts identify both
+type-1 sensitivity and metacognitive efficiency.
+
+```{r}
+stopifnot(requireNamespace("MPTinR", quietly = TRUE))
+data("roc6", package = "MPTinR")
+pratte <- roc6[roc6$exp == "Pratte_2010", ]
+
+metad_data <- rbind(
+  data.frame(id = pratte$id, stimulus = 1L,
+             r1 = pratte$OLD_3new, r2 = pratte$OLD_2new, r3 = pratte$OLD_1new,
+             r4 = pratte$OLD_1old, r5 = pratte$OLD_2old, r6 = pratte$OLD_3old),
+  data.frame(id = pratte$id, stimulus = 0L,
+             r1 = pratte$NEW_3new, r2 = pratte$NEW_2new, r3 = pratte$NEW_1new,
+             r4 = pratte$NEW_1old, r5 = pratte$NEW_2old, r6 = pratte$NEW_3old)
+)
+
+model_md <- sdt_rating(response = paste0("r", 1:6), stimulus = "stimulus",
+                       version = "metad")
+
+fit_md <- bmm(
+  formula = bmf(dprime ~ 1 + (1 | id), criterion ~ 1 + (1 | id),
+                spacing ~ 1, logmratio ~ 1 + (1 | id)),
+  data = metad_data,
+  model = model_md,
+  backend = "cmdstanr",
+  cores = 4,
+  chains = 4,
+  iter = 2000,
+  refresh = 0,
+  silent = 2,
+  file = "assets/bmmfit_sdt_metad_pratte_vignette"
+)
+summary(fit_md)
+```
+
+The M-ratio is the headline quantity, so `bmm` provides it directly: `mratio()`
+reconstructs meta-d′ $= \exp(\texttt{logmratio}) \times \texttt{dprime}$ from the
+fit and returns a posterior summary of both the M-ratio and meta-d′ (with the
+full per-draw posteriors kept in the `draws` attribute for plotting or contrasts).
+
+```{r}
+mratio(fit_md)
+```
+
+The population M-ratio sits a little below 1, the typical finding for recognition
+memory: confidence tracks accuracy well but not perfectly, carrying slightly less
+information than the old/new decision itself. The `(1 | id)` term on `logmratio`
+lets metacognitive efficiency vary across subjects, so this single fit also gives
+a posterior for *individual differences* in metacognition — the question that
+motivates most meta-d′ analyses.
+
+Two practical notes. First, recognition ROCs are classically asymmetric, which is
+usually modelled as unequal variance; adding `sdratio ~ 1` to the formula fits
+**unequal-variance meta-d′**, separating a genuine variance asymmetry from a
+metacognitive one. Second, the model recovers known M-ratios from simulated data —
+see `local/sdt_rating_metad_recovery.R` in the package source, which fits
+under- and over-confident observers generated by an independent code path.
+
+## Interpreting meta-d′
+
+Meta-d′ is most useful when the substantive question is about *metacognition* —
+whether confidence is well-calibrated to performance — rather than about
+discrimination itself. Expressing type-2 sensitivity on the `dprime` scale makes
+the M-ratio comparable across tasks and observers with different type-1
+performance, which is why it has become the standard index of metacognitive
+efficiency [@Fleming_Lau_2014; @Fleming_2017].
+
+Two cautions carry over from the rest of SDT. First, like all the rating models
+here, meta-d′ is fit to *aggregated counts*, so the type-2 estimate is only as
+informative as the number of trials per confidence category. Second, meta-d′
+inherits the standard model's assumptions about how confidence criteria are
+placed; systematic `pp_check()` deviations flag when those assumptions strain.
+
+### Confidence-threshold parameterization
+
+In the canonical meta-d′ model the type-2 confidence criteria are *free*: their
+spacing is exactly what makes the metacognitive fit informative. In `bmm` those
+criteria are the rating thresholds, so the `threshold_type` you choose
+([core SDT article](bmm_sdt.html)) governs how freely they can move. The
+delta-based parameterizations (`"log_distance"`, `"log_ratio"`) leave each
+threshold distance free and stay closest to the textbook meta-d′ estimator. The
+two-parameter `"parsimonious"` (default) and `"equidistant"` types instead tie
+the thresholds to a single spacing parameter: this regularizes the fit and is
+often desirable with few trials per category, but it constrains the type-2 ROC
+and can mask genuine asymmetries in how confidence is used for "old" versus "new"
+responses. If the metacognitive question hinges on that asymmetry, prefer a
+delta-based `threshold_type`.
+
+### How the type-1 criterion anchors confidence
+
+Meta-d′ models must fix the type-2 confidence scale relative to the type-1
+criterion. `bmm` uses the **absolute** convention — the confidence criteria are
+anchored at the same boundary as the old/new decision (meta-$c = c$), as in the
+HMeta-d toolbox [@Fleming_2017]. The literature also describes a **relative**
+convention that scales the anchor with metacognitive efficiency
+(meta-$c = M \cdot c$) [@Maniscalco_Lau_2012; @Maniscalco_Lau_2014]; `bmm` does
+not currently expose that toggle. The two rarely diverge materially when the
+criterion sits near the centre of the rating scale, but with a strongly biased
+criterion the choice can shift meta-d′, so it is worth keeping in mind when
+comparing estimates against toolboxes that use the relative anchor.
+
+## Posterior predictive checks
+
+```{r}
+pp_check(fit_md, ndraws = 100)
+```
+
+# Choosing and comparing the models
+
+All three models share the same response interface and the same familiarity
+core, so the choice is about which *additional question* the data are meant to
+answer:
+
+- Reach for **`version = "dpsdt"`** when the question is about *recollection* —
+  whether a threshold retrieval process contributes beyond graded familiarity,
+  as in recognition-memory and change-detection paradigms.
+- Reach for **`version = "metad"`** when the question is about *metacognition* —
+  whether confidence is efficiently calibrated to accuracy.
+- Stay with **`version = "standard"`** when a single strength process suffices;
+  both extensions reduce to it when their extra parameter is switched off
+  (`Ro`, `Rn` → 0; `logmratio` = 0, i.e. meta-d′ = `dprime`).
+
+Because each extension nests the standard model, the most direct evidence is the
+**posterior of the extra parameter**: is `Ro` credibly greater than zero, is
+`logmratio` credibly different from zero (M-ratio different from 1)? That,
+together with `pp_check()` and the
+ROC/zROC fit, is the practical guide. A *formal* predictive comparison via
+`loo()` is **not** appropriate for these aggregated-count models — leaving out one
+multinomial observation removes a large, influential block of data and the
+PSIS-LOO approximation becomes unreliable. The principled alternative is k-fold
+cross-validation with `brms::kfold()`, which refits on held-out folds. As always,
+let theory and parameter invariance across designs — not ROC fit alone — arbitrate
+between accounts that can mimic one another [@MeyerGrant_2025; @Robinson_2023].
+
+# References

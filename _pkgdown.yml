@@ -53,6 +53,7 @@ reference:
     - "auc_sdt"
     - "latent_sdt"
     - "sdt_thresholds"
+    - "mratio"
     - "plot.bmm_sdt_roc"
     - "plot.bmm_sdt_auc"
     - "plot.bmm_sdt_latent"
@@ -109,6 +110,7 @@ articles:
     desc: Fitting signal detection models and analysing ROC/AUC
     contents:
     - articles/bmm_sdt
+    - articles/bmm_sdt_dualprocess_metad
 
   - title: Evidence accumulation models
     desc: Fitting evidence accumulation models to response time and choice data

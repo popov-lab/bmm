@@ -2170,6 +2170,54 @@ rsdt_binary <- function(n_per_cell, n_subjects, dprime, criterion,
 }
 
 
+# Dual-process category probabilities (Yonelinas, 1994): recollection adds mass
+# to the most-confident category -- old items recollected as old (Ro) load the
+# top category, new items recall-rejected (Rn) load the bottom one -- on top of
+# the familiarity SDT probabilities. Ro/Rn are probabilities here; the model
+# passes inv_logit(linear) and fixes them near 0 to recover standard SDT.
+.sdt_dpsdt_category_probs <- function(thresholds, dprime, sdratio, stimulus,
+                                      dist, Ro, Rn) {
+  probs <- .sdt_category_probs(thresholds, dprime, sdratio, stimulus, dist)
+  K <- length(probs)
+  if (stimulus == 1) {
+    probs <- (1 - Ro) * probs
+    probs[K] <- probs[K] + Ro
+  } else {
+    probs <- (1 - Rn) * probs
+    probs[1] <- probs[1] + Rn
+  }
+  probs <- pmax(probs, .Machine$double.eps)
+  probs / sum(probs)
+}
+
+
+# Meta-d' category probabilities (Maniscalco & Lau, 2012): confidence thresholds
+# are read off the metacognitive sensitivity metad, then each side of the central
+# criterion is rescaled so the summed "old"/"new" mass still matches what the
+# type-1 dprime implies. mid uses the Stan central-threshold index so the R-side
+# prediction reproduces the likelihood for odd K.
+.sdt_metad_category_probs <- function(thresholds, dprime, metad, stimulus,
+                                      sdratio, dist) {
+  K <- length(thresholds) + 1L
+  mid <- (K - 1L) %/% 2L + 1L
+  d_shift <- dprime / 2 * (2 * stimulus - 1)
+  metad_shift <- metad / 2 * (2 * stimulus - 1)
+  scale <- if (sdratio != 1 && stimulus == 1) sdratio else 1
+
+  cum_p_metad <- .sdt_cdf((thresholds - metad_shift) / scale, dist)
+  raw_probs <- diff(c(0, cum_p_metad, 1))
+
+  crit <- thresholds[mid]
+  cdf_d <- .sdt_cdf((crit - d_shift) / scale, dist)
+  cdf_metad <- .sdt_cdf((crit - metad_shift) / scale, dist)
+  norm <- ifelse(seq_len(K) <= mid,
+                 cdf_d / cdf_metad, (1 - cdf_d) / (1 - cdf_metad))
+
+  probs <- pmax(raw_probs * norm, .Machine$double.eps)
+  probs / sum(probs)
+}
+
+
 # Build K-1 ordered thresholds from criterion plus a parameterization-specific
 # canonical spread. parsimonious/equidistant use exp(spacing) steps; the log_*
 # and softmax types place thresholds from positive distance/ratio deltas so the
@@ -2383,6 +2431,192 @@ rsdt_rating <- function(n_per_cell, n_subjects, dprime, criterion,
   for (i in seq_len(nrow(data))) {
     probs <- .sdt_category_probs(thresholds, dprime, sdratio,
                                  data$stimulus[i], dist)
+    counts_mat[i, ] <- stats::rmultinom(1, n_per_cell, probs)
+  }
+
+  colnames(counts_mat) <- paste0("r", seq_len(n_ratings))
+  data <- cbind(data, as.data.frame(counts_mat))
+  data$nTrials <- as.integer(n_per_cell)
+  data
+}
+
+
+#' @title Distribution functions for dual-process SDT (DPSDT)
+#'
+#' @description Density and random generation for the dual-process signal
+#'   detection model (Yonelinas, 1994). Extends rating SDT with recollection
+#'   probabilities `Ro` (old items recollected as old) and `Rn` (new items
+#'   recall-rejected) that add mass to the most-confident rating category. These
+#'   are the simulation counterparts of the `dpsdt` version of [sdt_rating()];
+#'   here `Ro`/`Rn` are supplied directly as probabilities in `[0, 1]`.
+#'
+#' @name sdt_dpsdt_dist
+#'
+#' @inheritParams sdt_rating_dist
+#' @param Ro Numeric in `[0, 1]`. Recollection probability for old (signal)
+#'   items.
+#' @param Rn Numeric in `[0, 1]`. Recollection (recall-to-reject) probability
+#'   for new (noise) items.
+#'
+#' @return `dsdt_dpsdt` returns the (log-)density (multinomial probability).
+#'   `rsdt_dpsdt` returns a data frame with columns `id`, `stimulus`,
+#'   `r1`, ..., `rK`, and `nTrials`.
+#'
+#' @references
+#' Yonelinas, A. P. (1994). Receiver-operating characteristics in recognition
+#'   memory: Evidence for a dual-process model. \emph{Journal of Experimental
+#'   Psychology: Learning, Memory, and Cognition}, \emph{20}(6), 1341--1354.
+#'   \doi{10.1037/0278-7393.20.6.1341}
+#'
+#' @keywords distribution
+#' @export
+#' @examples
+#' # Density for a single observation (K=4) with recollection of old items
+#' dsdt_dpsdt(counts = c(2, 8, 20, 70), stimulus = 1,
+#'            dprime = 1.5, thresholds = c(-0.5, 0.0, 0.5), Ro = 0.3, Rn = 0)
+dsdt_dpsdt <- function(counts, stimulus, dprime, thresholds, Ro, Rn,
+                       sdratio = 1, dist = "normal", log = FALSE) {
+  stopif(!dist %in% names(.SDT_DISTS),
+         "dist must be one of {collapse_comma(names(.SDT_DISTS))}")
+  stopif(is.null(counts), "counts is required for DPSDT density")
+  stopif(is.null(thresholds), "thresholds is required for DPSDT density")
+  stopif(any(counts < 0), "counts must be non-negative")
+  stopif(Ro < 0 || Ro > 1, "Ro must be a probability in [0, 1]")
+  stopif(Rn < 0 || Rn > 1, "Rn must be a probability in [0, 1]")
+
+  K <- length(counts)
+  stopif(length(thresholds) != K - 1,
+         "thresholds must have length K - 1 = {K - 1}")
+  stopif(length(stimulus) != 1 || !stimulus %in% c(0L, 1L),
+         "stimulus must be a single value: 0 (noise) or 1 (signal)")
+
+  probs <- .sdt_dpsdt_category_probs(thresholds, dprime, sdratio, stimulus,
+                                     dist, Ro, Rn)
+
+  stats::dmultinom(counts, prob = probs, log = log)
+}
+
+
+#' @rdname sdt_dpsdt_dist
+#' @export
+#' @examples
+#' # Generate DPSDT rating data (K=4)
+#' dat <- rsdt_dpsdt(n_per_cell = 100, n_subjects = 10, dprime = 1.5,
+#'                   criterion = 0, Ro = 0.3, Rn = 0.1, n_ratings = 4,
+#'                   spacing = 0.5)
+#' head(dat)
+rsdt_dpsdt <- function(n_per_cell, n_subjects, dprime, criterion, Ro, Rn,
+                       sdratio = 1, dist = "normal",
+                       n_ratings = NULL, spacing = NULL, deltas = NULL,
+                       threshold_type = "parsimonious") {
+  stopif(!dist %in% names(.SDT_DISTS),
+         "dist must be one of {collapse_comma(names(.SDT_DISTS))}")
+  stopif(length(sdratio) != 1, "sdratio must be a single value for rating SDT")
+  stopif(is.null(n_ratings) || n_ratings < 3,
+         "n_ratings must be >= 3 for rating SDT")
+  stopif(length(dprime) != 1, "dprime must be a single value")
+  stopif(length(criterion) != 1, "criterion must be a single value")
+  stopif(Ro < 0 || Ro > 1, "Ro must be a probability in [0, 1]")
+  stopif(Rn < 0 || Rn > 1, "Rn must be a probability in [0, 1]")
+
+  thresholds <- .sdt_make_thresholds(criterion, n_ratings, threshold_type,
+                                     spacing, deltas)
+  data <- expand.grid(id = seq_len(n_subjects), stimulus = c(0L, 1L))
+
+  counts_mat <- matrix(0L, nrow = nrow(data), ncol = n_ratings)
+  for (i in seq_len(nrow(data))) {
+    probs <- .sdt_dpsdt_category_probs(thresholds, dprime, sdratio,
+                                       data$stimulus[i], dist, Ro, Rn)
+    counts_mat[i, ] <- stats::rmultinom(1, n_per_cell, probs)
+  }
+
+  colnames(counts_mat) <- paste0("r", seq_len(n_ratings))
+  data <- cbind(data, as.data.frame(counts_mat))
+  data$nTrials <- as.integer(n_per_cell)
+  data
+}
+
+
+#' @title Distribution functions for meta-d' SDT
+#'
+#' @description Density and random generation for the meta-d' model
+#'   (Maniscalco & Lau, 2012). Confidence thresholds are placed using the
+#'   metacognitive sensitivity `metad`, then rescaled so the total "old"/"new"
+#'   response rates match what type-1 `dprime` predicts. These are the simulation
+#'   counterparts of the `metad` version of [sdt_rating()].
+#'
+#' @name sdt_metad_dist
+#'
+#' @inheritParams sdt_rating_dist
+#' @param metad Numeric. Metacognitive sensitivity (type-2 d'). `metad = dprime`
+#'   corresponds to ideal metacognition (recovers rating SDT).
+#'
+#' @return `dsdt_metad` returns the (log-)density (multinomial probability).
+#'   `rsdt_metad` returns a data frame with columns `id`, `stimulus`,
+#'   `r1`, ..., `rK`, and `nTrials`.
+#'
+#' @references
+#' Maniscalco, B., & Lau, H. (2012). A signal detection theoretic approach for
+#'   estimating metacognitive sensitivity from confidence ratings.
+#'   \emph{Consciousness and Cognition}, \emph{21}(1), 422--430.
+#'   \doi{10.1016/j.concog.2011.09.021}
+#'
+#' @keywords distribution
+#' @export
+#' @examples
+#' # Density for a single observation (K=4) with imperfect metacognition
+#' dsdt_metad(counts = c(5, 15, 25, 55), stimulus = 1,
+#'            dprime = 1.5, thresholds = c(-0.5, 0.0, 0.5), metad = 1.0)
+dsdt_metad <- function(counts, stimulus, dprime, thresholds, metad,
+                       sdratio = 1, dist = "normal", log = FALSE) {
+  stopif(!dist %in% names(.SDT_DISTS),
+         "dist must be one of {collapse_comma(names(.SDT_DISTS))}")
+  stopif(is.null(counts), "counts is required for meta-d' density")
+  stopif(is.null(thresholds), "thresholds is required for meta-d' density")
+  stopif(any(counts < 0), "counts must be non-negative")
+  stopif(length(metad) != 1, "metad must be a single value")
+
+  K <- length(counts)
+  stopif(length(thresholds) != K - 1,
+         "thresholds must have length K - 1 = {K - 1}")
+  stopif(length(stimulus) != 1 || !stimulus %in% c(0L, 1L),
+         "stimulus must be a single value: 0 (noise) or 1 (signal)")
+
+  probs <- .sdt_metad_category_probs(thresholds, dprime, metad, stimulus,
+                                     sdratio, dist)
+
+  stats::dmultinom(counts, prob = probs, log = log)
+}
+
+
+#' @rdname sdt_metad_dist
+#' @export
+#' @examples
+#' # Generate meta-d' rating data (K=4)
+#' dat <- rsdt_metad(n_per_cell = 100, n_subjects = 10, dprime = 1.5,
+#'                   criterion = 0, metad = 1.0, n_ratings = 4, spacing = 0.5)
+#' head(dat)
+rsdt_metad <- function(n_per_cell, n_subjects, dprime, criterion, metad,
+                       sdratio = 1, dist = "normal",
+                       n_ratings = NULL, spacing = NULL, deltas = NULL,
+                       threshold_type = "parsimonious") {
+  stopif(!dist %in% names(.SDT_DISTS),
+         "dist must be one of {collapse_comma(names(.SDT_DISTS))}")
+  stopif(length(sdratio) != 1, "sdratio must be a single value for rating SDT")
+  stopif(is.null(n_ratings) || n_ratings < 3,
+         "n_ratings must be >= 3 for rating SDT")
+  stopif(length(dprime) != 1, "dprime must be a single value")
+  stopif(length(criterion) != 1, "criterion must be a single value")
+  stopif(length(metad) != 1, "metad must be a single value")
+
+  thresholds <- .sdt_make_thresholds(criterion, n_ratings, threshold_type,
+                                     spacing, deltas)
+  data <- expand.grid(id = seq_len(n_subjects), stimulus = c(0L, 1L))
+
+  counts_mat <- matrix(0L, nrow = nrow(data), ncol = n_ratings)
+  for (i in seq_len(nrow(data))) {
+    probs <- .sdt_metad_category_probs(thresholds, dprime, metad,
+                                       data$stimulus[i], sdratio, dist)
     counts_mat[i, ] <- stats::rmultinom(1, n_per_cell, probs)
   }
 
