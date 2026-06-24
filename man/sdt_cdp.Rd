@@ -10,7 +10,9 @@ sdt_cdp(
   stimulus,
   count = NULL,
   dist = "normal",
-  threshold_type = c("parsimonious", "equidistant"),
+  threshold_type = c("parsimonious", "equidistant", "log_distance"),
+  n_new = NULL,
+  n_old = NULL,
   links = NULL,
   ...
 )
@@ -34,7 +36,16 @@ internally.}
 (the CDP model is inherently Gaussian).}
 
 \item{threshold_type}{Character. Threshold parameterization on the strength
-axis: \code{"parsimonious"} (default) or \code{"equidistant"}.}
+axis: \code{"parsimonious"} (default) and \code{"equidistant"} use a single \code{spacing}
+parameter; \code{"log_distance"} (Meyer-Grant et al., 2025) estimates the
+\code{n_new + n_old - 2} distances between adjacent thresholds freely, each as a
+\code{deltaN} parameter on the log scale (the distance leading into threshold
+\code{N} from the old/new boundary). \code{"log_distance"} requires \code{n_new}/\code{n_old}.}
+
+\item{n_new, n_old}{Integer numbers of "new" and "old" confidence levels.
+Required for \code{threshold_type = "log_distance"} (the per-distance parameters
+are fixed at construction); for \code{"parsimonious"}/\code{"equidistant"} they are
+ignored and detected from the data.}
 
 \item{links}{A named list of link functions for the parameters.}
 
@@ -72,7 +83,7 @@ Provide tidy long data with the following columns:
 \item \code{dprimef}: Familiarity sensitivity: target mean on the familiarity axis
 \item \code{dprimer}: Recollection sensitivity: target mean on the recollection axis
 \item \code{criterion}: Response bias: old/new boundary on the strength (F+R) axis
-\item \code{spacing}: Threshold spacing: distance between adjacent confidence thresholds (exp(spacing) ensures positive spacing)
+\item \code{spacing}: Threshold spacing: controls distance between adjacent thresholds (exp(spacing) ensures positive spacing)
 \item \code{rcrit}: Remember criterion: threshold on the recollection axis
 \item \code{sigmar}: Log SD of the recollection target distribution, so exp(sigmar) is the SD and 0 means SD = 1
 \item \code{rho}: Familiarity-recollection correlation on an unconstrained scale; tanh(rho) is the correlation and 0 means independent processes

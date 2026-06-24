@@ -37,7 +37,8 @@ rsdt_cdp(
   n_ratings = NULL,
   n_new = NULL,
   n_old = NULL,
-  threshold_type = "parsimonious"
+  threshold_type = "parsimonious",
+  deltas = NULL
 )
 }
 \arguments{
@@ -79,7 +80,11 @@ correlation. 0 (default) = independent processes (classic CDP).}
 
 \item{n_ratings}{Integer total number of confidence levels (\code{n_new + n_old}).}
 
-\item{threshold_type}{\code{"parsimonious"} (default) or \code{"equidistant"}.}
+\item{threshold_type}{\code{"parsimonious"} (default), \code{"equidistant"}, or
+\code{"log_distance"} (free cumulative log-distances; requires \code{deltas}).}
+
+\item{deltas}{Numeric vector of \code{n_new + n_old - 2} log-distances for
+\code{threshold_type = "log_distance"}; ignored otherwise.}
 }
 \value{
 \code{dsdt_cdp} returns the (log-)multinomial density. \code{rsdt_cdp} returns a

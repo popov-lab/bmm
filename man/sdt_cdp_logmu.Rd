@@ -29,17 +29,19 @@ guess/know/remember blocks).}
 \item{n_new, n_old}{Integer numbers of "new" and "old" confidence levels.}
 
 \item{thresh}{Integer threshold-parameterization id (1 parsimonious,
-2 equidistant).}
+2 equidistant, 3 log_distance).}
 
 \item{has_guess}{Integer flag (1 if the Know/Guess split is active).}
 
 \item{dprimef, dprimer, criterion, spacing, rcrit, sigmar, rho, kcrit}{Model
 parameters (draws-by-observation matrices supplied by brms). \code{kcrit} is
-ignored when \code{has_guess} is 0.}
+ignored when \code{has_guess} is 0. \code{spacing} is the fixed literal 0 for
+log_distance, which uses the per-distance deltas in \code{...} instead.}
 
 \item{stimulus}{Stimulus covariate (0 = new/lure, 1 = old/target).}
 
-\item{...}{Unused; absorbs any extra arguments.}
+\item{...}{For \code{log_distance}, the per-distance threshold parameters
+(\code{delta1}, ...) supplied by brms in contiguous order; otherwise unused.}
 }
 \value{
 \code{log(p_cat)}, matching the shape of \code{dprimef}.

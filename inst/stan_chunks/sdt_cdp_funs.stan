@@ -91,8 +91,9 @@ real cdp_guess_mass(real mu_F, real mu_R, real sd_R, real corr,
 // boundary (between bin n_new and bin n_new + 1) sits at `criterion`, with
 // n_new - 1 thresholds below and n_old - 1 above. Reduces to the symmetric
 // centred construction when n_new == n_old. thresh_type: 1 = parsimonious
-// (Selker et al., 2019), 2 = equidistant.
-vector cdp_make_thresholds(real criterion, real spacing,
+// (Selker et al., 2019), 2 = equidistant, 3 = log_distance (free cumulative
+// log-distances; `deltas` has length K_full - 2, anchor index n_new carries none).
+vector cdp_make_thresholds(real criterion, real spacing, array[] real deltas,
                            int n_new, int n_old, int thresh_type) {
   int K_full = n_new + n_old;
   int n_thresh = K_full - 1;
@@ -100,6 +101,14 @@ vector cdp_make_thresholds(real criterion, real spacing,
   real s = exp(spacing);
   if (thresh_type == 2) {
     for (k in 1:n_thresh) thr[k] = criterion + (k - n_new) * s;
+  } else if (thresh_type == 3) {
+    thr[n_new] = criterion;
+    for (k in (n_new + 1):n_thresh)
+      thr[k] = thr[k - 1] + exp(deltas[k - 1]);
+    for (k in 1:(n_new - 1)) {
+      int kk = n_new - k;            // Stan counts up: descend n_new-1 .. 1
+      thr[kk] = thr[kk + 1] - exp(deltas[kk]);
+    }
   } else {
     real anchor = log(n_new * 1.0 / (K_full - n_new));
     for (k in 1:n_thresh)
@@ -163,15 +172,7 @@ real cdp_category_prob(int cat, vector thresholds,
   return fmax(p_know_total - p_guess, 1e-20);
 }
 
-// Category logit for the native multinomial: log(p_cat). Thresholds are built
-// once per call from criterion + spacing. kcrit is ignored when has_guess == 0
-// (the caller passes a sentinel). dist is normal-only and so not threaded here.
-real sdt_cdp_logmu(int cat, int n_new, int n_old, int thresh_type,
-                   int has_guess, real dprimef, real dprimer, real criterion,
-                   real spacing, real rcrit, real sigmar, real rho,
-                   real kcrit, real stimulus) {
-  vector[n_new + n_old - 1] thr =
-    cdp_make_thresholds(criterion, spacing, n_new, n_old, thresh_type);
-  return log(cdp_category_prob(cat, thr, dprimef, dprimer, sigmar, rho,
-                               rcrit, kcrit, stimulus, n_new, n_old, has_guess));
-}
+// The category logit `sdt_cdp_logmu` is code-generated per model by
+// .sdt_cdp_logmu_stan() (R/model_sdt_cdp.R) so the per-distance log_distance
+// deltas can be passed with a fixed arity, mirroring sdt_rating. It calls the
+// helpers above (cdp_make_thresholds + cdp_category_prob).

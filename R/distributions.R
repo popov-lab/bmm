@@ -2899,14 +2899,32 @@ rsdt_ranking <- function(n_per_cell, n_subjects, dprime, m = NULL,
 # boundary (between bin n_new and n_new + 1) sits at `criterion`. Mirrors the
 # Stan cdp_make_thresholds; reduces to symmetric centring when n_new == n_old.
 .cdp_make_thresholds <- function(criterion, spacing, n_new, n_old,
-                                 threshold_type = "parsimonious") {
+                                 threshold_type = "parsimonious",
+                                 deltas = NULL) {
   K_full <- n_new + n_old
-  k <- seq_len(K_full - 1L)
+  K1 <- K_full - 1L
+  k <- seq_len(K1)
   s <- exp(spacing)
   if (threshold_type == "equidistant") {
     criterion + (k - n_new) * s
-  } else {
+  } else if (threshold_type == "parsimonious") {
     criterion + s * (log(k / (K_full - k)) - log(n_new / (K_full - n_new)))
+  } else {
+    # log_distance: free cumulative log-distances, anchored at the old/new
+    # boundary thr[n_new] = criterion. The anchor index carries no delta, so
+    # slot j maps to threshold k via didx (skip n_new).
+    stopif(length(deltas) != K_full - 2L,
+           "deltas must have length n_new + n_old - 2 = {K_full - 2L}")
+    didx <- function(j) if (j < n_new) j else j - 1L
+    thr <- numeric(K1)
+    thr[n_new] <- criterion
+    if (n_new < K1) {
+      for (j in (n_new + 1L):K1) thr[j] <- thr[j - 1L] + exp(deltas[didx(j)])
+    }
+    if (n_new > 1L) {
+      for (j in (n_new - 1L):1L) thr[j] <- thr[j + 1L] - exp(deltas[didx(j)])
+    }
+    thr
   }
 }
 
@@ -3009,7 +3027,10 @@ rsdt_ranking <- function(n_per_cell, n_subjects, dprime, m = NULL,
 #' @param criterion Central old/new criterion for threshold generation.
 #' @param spacing Threshold spacing parameter.
 #' @param n_ratings Integer total number of confidence levels (`n_new + n_old`).
-#' @param threshold_type `"parsimonious"` (default) or `"equidistant"`.
+#' @param threshold_type `"parsimonious"` (default), `"equidistant"`, or
+#'   `"log_distance"` (free cumulative log-distances; requires `deltas`).
+#' @param deltas Numeric vector of `n_new + n_old - 2` log-distances for
+#'   `threshold_type = "log_distance"`; ignored otherwise.
 #' @return `dsdt_cdp` returns the (log-)multinomial density. `rsdt_cdp` returns a
 #'   tidy long data frame (`id`, `stimulus`, `judgment`, `confidence`, `count`)
 #'   ready to pass to [sdt_cdp()].
@@ -3065,7 +3086,7 @@ rsdt_cdp <- function(n_per_cell, n_subjects, dprimef, dprimer,
                      criterion, spacing, rcrit, kcrit = NULL,
                      sigmar = 0, rho = 0, dist = "normal",
                      n_ratings = NULL, n_new = NULL, n_old = NULL,
-                     threshold_type = "parsimonious") {
+                     threshold_type = "parsimonious", deltas = NULL) {
   if (is.null(n_new) || is.null(n_old)) {
     stopif(is.null(n_ratings) || n_ratings < 3, "n_ratings must be >= 3")
     n_new <- n_ratings %/% 2L
@@ -3076,7 +3097,7 @@ rsdt_cdp <- function(n_per_cell, n_subjects, dprimef, dprimer,
          "n_per_cell must be a single positive integer")
 
   thresholds <- .cdp_make_thresholds(criterion, spacing, n_new, n_old,
-                                     threshold_type)
+                                     threshold_type, deltas)
   has_guess <- !is.null(kcrit) && is.finite(kcrit)
 
   # Category metadata in canonical order, with confidence on the unified
