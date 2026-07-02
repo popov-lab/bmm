@@ -1936,40 +1936,25 @@ neg_loglik <- function(x, params, distribution, weights = NULL) {
 ############################################################################# !
 
 # SDT distribution registry: single source of truth for all CDF/quantile logic
-# Each entry: id (Stan integer), cdf (R CDF), qf (R quantile function),
-# stan_expr (function returning Stan CDF expression string)
-.SDT_DISTS <- list(
+# Each entry: cdf (R CDF), qf (R quantile function). The list position defines
+# the integer dist_type code passed to Stan -- reordering entries changes the
+# R <-> Stan contract (see inst/stan_chunks/sdt_dist_funs.stan)
+.sdt_dists <- list(
   normal = list(
-    id = 1L,
     cdf = pnorm,
-    qf = qnorm,
-    stan_expr = function(x) paste0("Phi(", x, ")"),
-    log_stan_expr = function(x) paste0("std_normal_lcdf(", x, ")"),
-    log1m_stan_expr = function(x) paste0("std_normal_lccdf(", x, ")")
+    qf = qnorm
   ),
   gumbel_min = list(
-    id = 2L,
     cdf = function(x) exp(-exp(-x)),
-    qf = function(p) -log(-log(p)),
-    stan_expr = function(x) paste0("exp(-exp(-(", x, ")))"),
-    log_stan_expr = function(x) paste0("(-exp(-(", x, ")))"),
-    log1m_stan_expr = function(x) paste0("log1m_exp(-exp(-(", x, ")))")
+    qf = function(p) -log(-log(p))
   ),
   gumbel_max = list(
-    id = 3L,
     cdf = function(x) 1 - exp(-exp(x)),
-    qf = function(p) log(-log(1 - p)),
-    stan_expr = function(x) paste0("(1 - exp(-exp(", x, ")))"),
-    log_stan_expr = function(x) paste0("log1m_exp(-exp(", x, "))"),
-    log1m_stan_expr = function(x) paste0("(-exp(", x, "))")
+    qf = function(p) log(-log(1 - p))
   ),
   logistic = list(
-    id = 4L,
     cdf = plogis,
-    qf = qlogis,
-    stan_expr = function(x) paste0("inv_logit(", x, ")"),
-    log_stan_expr = function(x) paste0("(-log1p_exp(-(", x, ")))"),
-    log1m_stan_expr = function(x) paste0("(-(", x, ") - log1p_exp(-(", x, ")))")
+    qf = qlogis
   )
 )
 
@@ -1977,7 +1962,7 @@ neg_loglik <- function(x, params, distribution, weights = NULL) {
 # Maps string distribution name to CDF computation
 # Vectorized over eta
 .sdt_cdf <- function(eta, dist) {
-  .SDT_DISTS[[dist]]$cdf(eta)
+  .sdt_dists[[dist]]$cdf(eta)
 }
 
 
@@ -2045,7 +2030,7 @@ sdt_dprime <- function(hit_rate, fa_rate,
                                 "gumbel_min", "gumbel_max")) {
   dist <- match.arg(dist)
   .validate_sdt_rates(hit_rate, fa_rate)
-  qf <- .SDT_DISTS[[dist]]$qf
+  qf <- .sdt_dists[[dist]]$qf
   qf(hit_rate) - qf(fa_rate)
 }
 
@@ -2061,7 +2046,7 @@ sdt_criterion <- function(hit_rate, fa_rate,
                                    "gumbel_min", "gumbel_max")) {
   dist <- match.arg(dist)
   .validate_sdt_rates(hit_rate, fa_rate)
-  qf <- .SDT_DISTS[[dist]]$qf
+  qf <- .sdt_dists[[dist]]$qf
   -(qf(hit_rate) + qf(fa_rate)) / 2
 }
 
@@ -2088,12 +2073,12 @@ sdt_criterion <- function(hit_rate, fa_rate,
 #' @param dist Character. Noise distribution: "normal" (default), "logistic",
 #'   "gumbel_min", or "gumbel_max".
 #' @param log Logical. If `TRUE`, returns log-density (default `FALSE`).
-#' @param n_per_cell Integer. Number of trials per stimulus type per subject.
-#' @param n_subjects Integer. Number of subjects.
+#' @param n Integer. Number of observations to generate. `n_trials`,
+#'   `stimulus`, and the model parameters are recycled to this length.
 #'
 #' @return `dsdt_binary` returns the (log-)density (binomial probability).
-#'   `rsdt_binary` returns a data frame with columns `id`, `stimulus`, `n_trials`,
-#'   and `n_old`.
+#'   `rsdt_binary` returns an integer vector with the number of "old"/"signal"
+#'   responses per observation.
 #'
 #' @references
 #' Green, D. M., & Swets, J. A. (1966). \emph{Signal detection theory and
@@ -2126,26 +2111,20 @@ dsdt_binary <- function(n_old, n_trials, stimulus, dprime, criterion,
 #' @rdname sdt_binary_dist
 #' @export
 #' @examples
-#' # Generate binary SDT data
-#' dat <- rsdt_binary(n_per_cell = 100, n_subjects = 20,
-#'                    dprime = 1.5, criterion = 0.2)
+#' # Generate binary SDT data for a design
+#' dat <- expand.grid(id = 1:20, stimulus = c(0L, 1L))
+#' dat$n_trials <- 100L
+#' dat$n_old <- rsdt_binary(nrow(dat), dat$n_trials, dat$stimulus,
+#'                          dprime = 1.5, criterion = 0.2)
 #' head(dat)
-rsdt_binary <- function(n_per_cell, n_subjects, dprime, criterion,
+rsdt_binary <- function(n, n_trials, stimulus, dprime, criterion,
                         sdratio = 1, dist = "normal") {
-  stopif(length(n_per_cell) != 1 || n_per_cell < 1,
-         "n_per_cell must be a single positive integer")
-  stopif(length(n_subjects) != 1 || n_subjects < 1,
-         "n_subjects must be a single positive integer")
+  stopif(length(n) != 1 || n < 1, "n must be a single positive integer")
+  stopif(any(n_trials < 1), "n_trials must be positive")
+  stopif(any(!stimulus %in% c(0L, 1L)),
+         "stimulus must be 0 (noise) or 1 (signal)")
 
-  data <- expand.grid(
-    id = seq_len(n_subjects),
-    stimulus = c(0L, 1L)
-  )
-  data$n_trials <- as.integer(n_per_cell)
-
-  eta <- .sdt_eta(dprime, criterion, data$stimulus, sdratio)
+  eta <- .sdt_eta(dprime, criterion, stimulus, sdratio)
   p <- .sdt_cdf(eta, dist)
-
-  data$n_old <- stats::rbinom(nrow(data), data$n_trials, p)
-  data
+  stats::rbinom(n, n_trials, p)
 }
