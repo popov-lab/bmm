@@ -313,8 +313,8 @@ roc_sdt <- function(fit, conditions = NULL, n_points = 100,
                             probs = c(0.025, 0.975), ...) {
   dist        <- model$other_vars$dist
   has_sdratio <- .sdt_has_estimated_sdratio(model, fit)
-  cdf         <- .SDT_DISTS[[dist]]$cdf
-  qf          <- .SDT_DISTS[[dist]]$qf
+  cdf         <- .sdt_dists[[dist]]$cdf
+  qf          <- .sdt_dists[[dist]]$qf
 
   dims       <- .sdt_resolve_point_dims(fit, conditions, criterion_points)
   curve_cond <- .sdt_unique_subset(conditions, dims$curves)
@@ -418,8 +418,8 @@ roc_sdt <- function(fit, conditions = NULL, n_points = 100,
   threshold_type <- model$other_vars$threshold_type
   n_ratings      <- model$other_vars$n_ratings
   has_sdratio    <- .sdt_has_estimated_sdratio(model, fit)
-  cdf            <- .SDT_DISTS[[dist]]$cdf
-  qf             <- .SDT_DISTS[[dist]]$qf
+  cdf            <- .sdt_dists[[dist]]$cdf
+  qf             <- .sdt_dists[[dist]]$qf
   K1             <- n_ratings - 1L
 
   n_cond     <- max(1L, nrow(conditions))
@@ -731,8 +731,8 @@ latent_sdt <- function(fit, conditions = NULL, n_grid = 200,
          "latent_sdt() is only available for SDT models")
 
   dist          <- model$other_vars$dist
-  pdf           <- .SDT_DISTS[[dist]]$pdf
-  cdf           <- .SDT_DISTS[[dist]]$cdf
+  pdf           <- .sdt_dists[[dist]]$pdf
+  cdf           <- .sdt_dists[[dist]]$cdf
   is_rating     <- inherits(model, "sdt_rating")
   # dprime/sdratio are nlpars for the multinomial models (rating, ranking) and
   # dpars for the custom-family models (binary, mafc); criterion exists only for

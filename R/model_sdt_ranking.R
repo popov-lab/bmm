@@ -5,10 +5,8 @@
 .model_sdt_ranking <- function(response = NULL, m = NULL,
                                dist = "gumbel_min",
                                links = NULL, call = NULL, ...) {
-  dist_int <- .sdt_dist_id(dist)
-
   parameters <- list(
-    dprime = glue("Sensitivity: ranking discrimination parameter")
+    dprime = "Sensitivity: ranking discrimination parameter"
   )
   default_priors <- list(
     dprime = list(main = "normal(1, 1)", effects = "normal(0, 0.5)")
@@ -21,7 +19,7 @@
   # 0 = equal variance, sampled when the user adds sdratio ~ ...), mirroring the
   # rating and binary SDT models.
   if (dist == "normal") {
-    parameters$sdratio <- glue(
+    parameters$sdratio <- paste0(
       "Log SD ratio: log ratio of signal to noise standard deviations ",
       "(exp(sdratio) is the ratio, 0 = equal variance)"
     )
@@ -46,7 +44,7 @@
   out <- structure(
     list(
       resp_vars = nlist(response),
-      other_vars = nlist(m, dist, dist_int),
+      other_vars = nlist(m, dist),
       domain = "Perception & Recognition Memory",
       task = "Ranking Task",
       name = "Signal Detection Theory (Ranking)",
@@ -119,8 +117,8 @@
 #' @export
 #' @examples
 #' \dontrun{
-#' dat <- rsdt_ranking(n_per_cell = 200, n_subjects = 20,
-#'                     dprime = 1.5, m = 4)
+#' dat <- data.frame(id = 1:20)
+#' dat <- cbind(dat, rsdt_ranking(20, 200, m = 4, dprime = 1.5))
 #'
 #' model <- sdt_ranking(
 #'   response = c("rank1", "rank2", "rank3", "rank4"),
@@ -219,20 +217,17 @@ check_data.sdt_ranking <- function(model, data, formula) {
 # prediction). log_lik and posterior_predict therefore come from brms — proper
 # joint multinomial draws — while both noise distributions stay supported.
 
-# max_rank (per-row set size) travels as a covariate; sdratio is the parameter
-# for the normal distribution and the literal 0 for gumbel_min; dist_int selects
-# the distribution in both the Stan function and the R companion.
-.sdt_ranking_logmu_args <- function(model) {
-  has_sdratio <- "sdratio" %in% names(model$parameters)
-  c("max_rank", "dprime",
-    if (has_sdratio) "sdratio" else "0",
-    model$other_vars$dist_int)
-}
-
 #' @export
 bmf2bf.sdt_ranking <- function(model, formula) {
   resp_cats <- model$resp_vars$response
-  args <- paste(.sdt_ranking_logmu_args(model), collapse = ", ")
+
+  # max_rank (per-row set size) travels as a covariate; sdratio is the
+  # parameter for the normal distribution and the literal 0 for gumbel_min;
+  # the distribution id selects the kernel in both the Stan function and the
+  # R companion.
+  sdratio_arg <- if ("sdratio" %in% names(model$parameters)) "sdratio" else "0"
+  args <- paste("max_rank", "dprime", sdratio_arg,
+                .sdt_dist_id(model$other_vars$dist), sep = ", ")
 
   bform <- brms::bf(
     glue("Y | trials(nTrials) ~ sdt_ranking_logmu(1, {args})"),
@@ -293,11 +288,15 @@ sdt_ranking_logmu <- function(cat, max_rank, dprime, sdratio = 0, dist = 2L) {
   max_rank <- rep_len(as.vector(max_rank), n)
   sdratio <- rep_len(as.vector(sdratio), n)
 
-  out <- vapply(seq_len(n), function(j) {
-    m_j <- max_rank[j]
-    if (cat > m_j) return(-100)
-    log(.ranking_all_probs_r(dprime[j], m_j, dist_name, sdratio[j])[cat])
-  }, numeric(1))
+  # grouping by the (few) unique set sizes vectorizes the quadrature over all
+  # draws-by-observations elements sharing a set size
+  out <- rep(-100, n)
+  for (m_j in unique(max_rank[max_rank >= cat])) {
+    idx <- which(max_rank == m_j)
+    probs <- rbind(.ranking_all_probs_r(dprime[idx], m_j, dist_name,
+                                        sdratio[idx]))
+    out[idx] <- log(probs[, cat])
+  }
 
   if (!is.null(shape)) dim(out) <- shape
   out
