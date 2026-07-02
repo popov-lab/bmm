@@ -37,7 +37,9 @@
     param_links$spacing <- "identity"
   } else if (threshold_type %in% c("log_distance", "log_ratio")) {
     n_deltas <- n_ratings - 2L
-    mid <- n_ratings %/% 2L
+    # skip the same middle threshold as the builders ((K - 1) %/% 2 + 1), so
+    # the delta labels name the threshold they control for odd K
+    mid <- (n_ratings - 1L) %/% 2L + 1L
     for (i in seq_len(n_deltas)) {
       idx <- if (i < mid) i else i + 1L
       pname <- paste0("delta", idx)

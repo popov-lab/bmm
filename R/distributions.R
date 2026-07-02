@@ -1982,7 +1982,11 @@ neg_loglik <- function(x, params, distribution, weights = NULL) {
 # signal distribution by sdratio. Arguments are recycled to a common length.
 .sdt_eta <- function(dprime, criterion, stimulus, sdratio = 1) {
   shift <- dprime / 2 * (2 * stimulus - 1)
-  scale <- ifelse(stimulus == 1, sdratio, 1)
+  # sdratio^(stimulus == 1) scales the signal by sdratio and the noise by 1,
+  # broadcasting whether stimulus is a per-observation vector (likelihood) or a
+  # scalar with sdratio a vector of draws (ROC points) -- unlike ifelse(), whose
+  # result length follows the scalar condition and would drop all but sdratio[1].
+  scale <- sdratio^(stimulus == 1)
   (shift - criterion) / scale
 }
 
@@ -2163,7 +2167,9 @@ rsdt_binary <- function(n_per_cell, n_subjects, dprime, criterion,
 .sdt_make_thresholds <- function(criterion, n_ratings, threshold_type,
                                  spacing = NULL, deltas = NULL) {
   K1 <- n_ratings - 1L
-  mid <- n_ratings %/% 2L
+  # Must match the Stan builders in sdt_rating_funs.stan ((K_full - 1) %/% 2 + 1)
+  # so R-side prediction reproduces the likelihood for odd K; identical for even K.
+  mid <- (n_ratings - 1L) %/% 2L + 1L
 
   if (threshold_type %in% c("equidistant", "parsimonious")) {
     stopif(is.null(spacing), "spacing is required for {threshold_type} thresholds")
