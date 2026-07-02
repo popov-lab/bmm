@@ -83,6 +83,15 @@ selected with \code{version}:
 }
 \item \strong{Version:} standard
 \item \strong{Requirements:}
+
+Provide pre-aggregated data with the following columns:
+}
+\itemize{
+\item Response counts: one column per rating category (K columns)
+\item Stimulus type (stimulus): 0 = noise, 1 = signal
+Categories should be ordered: 1 = 'definitely noise' to K = 'definitely signal'
+}
+\itemize{
 \item \strong{Parameters:}
 \itemize{
 \item \code{dprime}: Sensitivity: distance between signal and noise distributions
@@ -275,9 +284,9 @@ to the formula.
 \examples{
 \dontrun{
 # EV-SDT rating model
-dat <- rsdt_rating(n_per_cell = 200, n_subjects = 20,
-                   dprime = 1.5, criterion = 0, n_ratings = 4,
-                   spacing = 0.5)
+dat <- expand.grid(id = 1:20, stimulus = c(0L, 1L))
+dat <- cbind(dat, rsdt_rating(nrow(dat), 200, dat$stimulus,
+                              dprime = 1.5, thresholds = c(-0.5, 0, 0.5)))
 
 model <- sdt_rating(
   response = c("r1", "r2", "r3", "r4"),

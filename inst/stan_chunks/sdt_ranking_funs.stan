@@ -67,7 +67,7 @@ real sdt_ranking_uv_logp(int cat, real max_rank, real dprime, real sdratio) {
 
 // Multinomial-logit value for rank category `cat`. Returns the finite -100
 // sentinel when the rank exceeds this row's set size; otherwise dispatches on
-// the noise distribution (id 2 = gumbel_min, id 1 = normal; see .SDT_DISTS).
+// the noise distribution (id 2 = gumbel_min, id 1 = normal; see .sdt_dists).
 real sdt_ranking_logmu(int cat, real max_rank, real dprime, real sdratio,
                        int dist_type) {
   if (cat > max_rank) return -100;

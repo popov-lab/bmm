@@ -2,20 +2,18 @@
 # CONFIDENCE-THRESHOLD PARAMETERIZATIONS                                  ####
 ############################################################################# !
 
-.sdt_threshold_type_ids <- c(
-  parsimonious = 1L,
-  equidistant = 2L,
-  log_distance = 3L,
-  log_ratio = 4L,
-  softmax = 5L
-)
+# Threshold-parameterization registry: the position defines the integer
+# thresh_type code passed to Stan -- reordering entries changes the R <-> Stan
+# contract (see sdt_make_thresholds_rating in sdt_rating_funs.stan)
+.sdt_threshold_types <- c("parsimonious", "equidistant", "log_distance",
+                          "log_ratio", "softmax")
 
 .sdt_threshold_type_id <- function(threshold_type) {
-  .sdt_threshold_type_ids[[threshold_type]]
+  match(threshold_type, .sdt_threshold_types)
 }
 
 .sdt_threshold_type_name <- function(thresh_type) {
-  names(.sdt_threshold_type_ids)[match(thresh_type, .sdt_threshold_type_ids)]
+  .sdt_threshold_types[thresh_type]
 }
 
 # Parameter spec for one threshold parameterization. parsimonious/equidistant
@@ -27,7 +25,7 @@
   param_links <- list()
 
   if (threshold_type %in% c("equidistant", "parsimonious")) {
-    parameters$spacing <- glue(
+    parameters$spacing <- paste0(
       "Threshold spacing: controls distance between adjacent thresholds ",
       "(exp(spacing) ensures positive spacing)"
     )
@@ -37,7 +35,9 @@
     param_links$spacing <- "identity"
   } else if (threshold_type %in% c("log_distance", "log_ratio")) {
     n_deltas <- n_ratings - 2L
-    mid <- n_ratings %/% 2L
+    # skip the same middle threshold as the builders ((K - 1) %/% 2 + 1), so
+    # the delta labels name the threshold they control for odd K
+    mid <- (n_ratings - 1L) %/% 2L + 1L
     for (i in seq_len(n_deltas)) {
       idx <- if (i < mid) i else i + 1L
       pname <- paste0("delta", idx)
@@ -48,7 +48,7 @@
       param_links[[pname]] <- "identity"
     }
   } else if (threshold_type == "softmax") {
-    parameters$spacing <- glue(
+    parameters$spacing <- paste0(
       "Average log spacing across threshold intervals ",
       "(exp(spacing) is the mean interval size)"
     )
@@ -153,16 +153,13 @@
                               threshold_type = "parsimonious",
                               version = "standard",
                               links = NULL, call = NULL, ...) {
-  dist_int <- .sdt_dist_id(dist)
-  thresh_type_int <- .sdt_threshold_type_id(threshold_type)
-
   if (is.null(n_ratings) && length(response) > 1) {
     n_ratings <- length(response)
   }
 
   parameters <- list(
-    dprime = glue("Sensitivity: distance between signal and noise distributions"),
-    criterion = glue("Response bias: location of decision boundary")
+    dprime = "Sensitivity: distance between signal and noise distributions",
+    criterion = "Response bias: location of decision boundary"
   )
   default_priors <- list(
     dprime = list(main = "normal(1, 1)", effects = "normal(0, 0.5)"),
@@ -175,7 +172,7 @@
   default_priors <- c(default_priors, threshold_parts$default_priors)
   param_links <- c(param_links, threshold_parts$param_links)
 
-  parameters$sdratio <- glue(
+  parameters$sdratio <- paste0(
     "Log SD ratio: the log of the signal-to-noise standard deviation ratio, ",
     "so exp(sdratio) is the ratio itself and 0 means equal variance"
   )
@@ -209,17 +206,16 @@
 
   requirements <- glue(
     "Provide pre-aggregated data with the following columns:", "\n\n",
-    "  - Response counts: one column per rating category ({n_ratings} columns)", "\n",
+    "  - Response counts: one column per rating category (K columns)", "\n",
     "  - Stimulus type (stimulus): 0 = noise, 1 = signal", "\n",
     "  Categories should be ordered: 1 = 'definitely noise' to ",
-    "{n_ratings} = 'definitely signal'"
+    "K = 'definitely signal'"
   )
 
   out <- structure(
     list(
       resp_vars = nlist(response),
-      other_vars = nlist(stimulus, dist, dist_int, n_ratings,
-                         threshold_type, thresh_type_int, version,
+      other_vars = nlist(stimulus, dist, n_ratings, threshold_type,
                          logmu_fun, logmu_cat_call, extra_params, stan_chunk),
       domain = "Perception & Recognition Memory",
       task = "Signal/Noise or Old/New Recognition",
@@ -354,9 +350,9 @@
 #' @examples
 #' \dontrun{
 #' # EV-SDT rating model
-#' dat <- rsdt_rating(n_per_cell = 200, n_subjects = 20,
-#'                    dprime = 1.5, criterion = 0, n_ratings = 4,
-#'                    spacing = 0.5)
+#' dat <- expand.grid(id = 1:20, stimulus = c(0L, 1L))
+#' dat <- cbind(dat, rsdt_rating(nrow(dat), 200, dat$stimulus,
+#'                               dprime = 1.5, thresholds = c(-0.5, 0, 0.5)))
 #'
 #' model <- sdt_rating(
 #'   response = c("r1", "r2", "r3", "r4"),
@@ -412,6 +408,9 @@ sdt_rating <- function(response, stimulus,
 
   stopif(is.null(n_ratings) || n_ratings <= 2,
          "Rating models require n_ratings > 2 (or pass a response vector with > 2 columns)")
+
+  stopif(threshold_type == "log_ratio" && n_ratings < 4,
+         "log_ratio thresholds require n_ratings >= 4 (the anchor ratio needs an interval above the criterion)")
 
   if (length(response) > 1) {
     stopif(n_ratings != length(response),
@@ -481,8 +480,9 @@ check_data.sdt_rating <- function(model, data, formula) {
 # (threshold types without spacing ignore it).
 .sdt_rating_logmu_args <- function(model) {
   has_spacing <- "spacing" %in% names(model$parameters)
-  c(model$other_vars$n_ratings, model$other_vars$dist_int,
-    model$other_vars$thresh_type_int, "dprime", "criterion",
+  c(model$other_vars$n_ratings, .sdt_dist_id(model$other_vars$dist),
+    .sdt_threshold_type_id(model$other_vars$threshold_type),
+    "dprime", "criterion",
     if (has_spacing) "spacing" else "0", "sdratio",
     model$other_vars$extra_params,
     model$other_vars$stimulus, .sdt_threshold_delta_names(model))
@@ -584,7 +584,7 @@ configure_model.sdt_rating <- function(model, data, formula) {
 #'   the search path; it is exported for that reason and is not called directly.
 #' @param cat Integer rating category index.
 #' @param K Integer number of rating categories.
-#' @param dist Integer noise-distribution id (see the `.SDT_DISTS` table).
+#' @param dist Integer noise-distribution id (see the `.sdt_dists` registry).
 #' @param thresh Integer threshold-parameterization id.
 #' @param dprime,criterion,spacing,sdratio Model parameters (draws-by-observation
 #'   matrices supplied by brms). `spacing` is `0` for threshold types without it.
@@ -605,18 +605,18 @@ sdt_rating_logmu <- function(cat, K, dist, thresh, dprime, criterion, spacing,
   shape <- dim(dprime)
   dprime <- as.vector(dprime)
   n <- length(dprime)
-  criterion <- as.vector(criterion)
+  criterion <- rep_len(as.vector(criterion), n)
   spacing <- rep_len(as.vector(spacing), n)
-  sdratio <- as.vector(sdratio)
+  sdratio <- rep_len(as.vector(sdratio), n)
   stimulus <- rep_len(as.vector(stimulus), n)
-  deltas <- lapply(list(...), as.vector)
+  deltas <- if (...length() > 0L) {
+    do.call(cbind, lapply(list(...), function(d) rep_len(as.vector(d), n)))
+  }
 
-  out <- vapply(seq_len(n), function(j) {
-    deltas_j <- if (length(deltas)) vapply(deltas, `[`, numeric(1), j) else NULL
-    thr <- .sdt_make_thresholds(criterion[j], K, thresh_name, spacing[j], deltas_j)
-    ratio <- if (stimulus[j] > 0.5) exp(sdratio[j]) else 1
-    log(.sdt_category_probs(thr, dprime[j], ratio, stimulus[j], dist_name)[cat])
-  }, numeric(1))
+  thr <- .sdt_make_thresholds(criterion, K, thresh_name, spacing, deltas)
+  probs <- rbind(.sdt_category_probs(rbind(thr), dprime, exp(sdratio),
+                                     stimulus, dist_name))
+  out <- log(probs[, cat])
 
   if (!is.null(shape)) dim(out) <- shape
   out

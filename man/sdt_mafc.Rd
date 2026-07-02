@@ -56,18 +56,23 @@ DeCarlo, L. T. (2012). On a signal detection approach to m-alternative forced ch
 }
 \item \strong{Version:} mafc
 \item \strong{Requirements:}
+
+Provide pre-aggregated accuracy data with the following columns:
+}
+\itemize{
+\item Response counts (n_correct): number of correct responses
+\item Number of trials (n_trials): total trials per cell
+No stimulus column needed (each trial has exactly one signal alternative)
+}
+\itemize{
 \item \strong{Parameters:}
 \itemize{
-\item \code{mu}: Internal parameter (fixed to 0)
 \item \code{dprime}: Sensitivity: distance between signal and noise distributions
 }
 \item \strong{Fixed parameters:}
-\itemize{
-\item \code{mu} = 0
-}
 \item \strong{Default parameter links:}
 \itemize{
-\item mu = identity; dprime = identity
+\item dprime = identity
 }
 \item \strong{Default priors:}
 \itemize{
@@ -90,7 +95,9 @@ ratio for \code{gumbel_max}, Gauss-Hermite quadrature for \code{normal}
 }
 \examples{
 \dontrun{
-dat <- rsdt_mafc(dprime = rnorm(20, 1.5, 0.4), m = 4, n_trials = 200)
+dat <- data.frame(id = 1:20, n_trials = 200L)
+dat$n_correct <- rsdt_mafc(nrow(dat), dat$n_trials, m = 4,
+                           dprime = rnorm(20, 1.5, 0.4))
 
 model <- sdt_mafc(
   response = "n_correct",

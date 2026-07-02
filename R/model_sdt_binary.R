@@ -5,8 +5,6 @@
 .model_sdt_binary <- function(response = NULL, stimulus = NULL,
                               n_trials = NULL, dist = "normal",
                               links = NULL, call = NULL, ...) {
-  dist_int <- .sdt_dist_id(dist)
-
   parameters <- list(
     dprime = "Sensitivity: distance between signal and noise distributions",
     criterion = "Response bias: location of decision boundary",
@@ -20,9 +18,6 @@
     criterion = list(main = "normal(0, 1.5)", effects = "normal(0, 0.5)"),
     sdratio = list(main = "normal(0, 0.5)", effects = "normal(0, 0.3)")
   )
-  param_links <- list(dprime = "identity", criterion = "identity",
-                      sdratio = "identity")
-
   requirements <- glue(
     "Provide pre-aggregated data with the following columns:", "\n\n",
     "  - Response counts (n_old): number of 'old'/'signal' responses", "\n",
@@ -33,7 +28,7 @@
   out <- structure(
     list(
       resp_vars = nlist(response),
-      other_vars = nlist(stimulus, n_trials, dist, dist_int),
+      other_vars = nlist(stimulus, n_trials, dist),
       domain = "Perception & Recognition Memory",
       task = "Signal/Noise or Old/New Recognition",
       name = "Signal Detection Theory (Binary)",
@@ -44,7 +39,8 @@
       version = "binary",
       requirements = requirements,
       parameters = parameters,
-      links = param_links,
+      links = list(dprime = "identity", criterion = "identity",
+                   sdratio = "identity"),
       fixed_parameters = list(sdratio = 0),
       default_priors = default_priors,
       init_ranges = list(
@@ -93,8 +89,10 @@
 #' @export
 #' @examples
 #' \dontrun{
-#' dat <- rsdt_binary(n_per_cell = 100, n_subjects = 20,
-#'                    dprime = 1.5, criterion = 0.2)
+#' dat <- expand.grid(id = 1:20, stimulus = c(0L, 1L))
+#' dat$n_trials <- 100L
+#' dat$n_old <- rsdt_binary(nrow(dat), dat$n_trials, dat$stimulus,
+#'                          dprime = 1.5, criterion = 0.2)
 #'
 #' model <- sdt_binary(
 #'   response = "n_old",
@@ -141,19 +139,14 @@ check_data.sdt_binary <- function(model, data, formula) {
   stim_var <- model$other_vars$stimulus
   stopif(!stim_var %in% colnames(data),
          "Stimulus variable '{stim_var}' missing in the data")
-  stim_vals <- unique(data[[stim_var]])
-  stopif(!all(stim_vals %in% c(0, 1)),
+  stim_vals <- data[[stim_var]]
+  stopif(!is.numeric(stim_vals) || !all(stim_vals %in% c(0, 1)),
          "Stimulus variable '{stim_var}' must be coded as 0 (noise) and 1 (signal)")
 
-  resp_var <- model$resp_vars$response
-  n_trials_var <- model$other_vars$n_trials
+  .validate_sdt_counts(data, model$resp_vars$response,
+                       model$other_vars$n_trials)
 
-  .validate_sdt_counts(data, resp_var, n_trials_var)
-
-  warnif(any(data[[n_trials_var]] != round(data[[n_trials_var]]), na.rm = TRUE),
-         "Variable '{n_trials_var}' should contain integer counts")
-
-  data$dist_type <- model$other_vars$dist_int
+  data$dist_type <- .sdt_dist_id(model$other_vars$dist)
 
   NextMethod("check_data")
 }
@@ -216,25 +209,18 @@ log_lik_sdt_binary <- function(i, prep) {
   dprime <- brms::get_dpar(prep, "dprime", i = i)
   criterion <- brms::get_dpar(prep, "criterion", i = i)
   sdratio <- exp(brms::get_dpar(prep, "sdratio", i = i))
-  stimulus <- prep$data$vint1[i]
   dist <- .sdt_dist_names[prep$data$vint2[i]]
-  n_trials <- prep$data$trials[i]
-  y <- prep$data$Y[i]
 
-  eta <- .sdt_eta(dprime, criterion, stimulus, sdratio)
-  p <- .sdt_cdf(eta, dist)
-  stats::dbinom(y, n_trials, p, log = TRUE)
+  dsdt_binary(prep$data$Y[i], prep$data$trials[i], prep$data$vint1[i],
+              dprime, criterion, sdratio = sdratio, dist = dist, log = TRUE)
 }
 
 posterior_predict_sdt_binary <- function(i, prep, ...) {
   dprime <- brms::get_dpar(prep, "dprime", i = i)
   criterion <- brms::get_dpar(prep, "criterion", i = i)
   sdratio <- exp(brms::get_dpar(prep, "sdratio", i = i))
-  stimulus <- prep$data$vint1[i]
   dist <- .sdt_dist_names[prep$data$vint2[i]]
-  n_trials <- prep$data$trials[i]
 
-  eta <- .sdt_eta(dprime, criterion, stimulus, sdratio)
-  p <- .sdt_cdf(eta, dist)
-  stats::rbinom(length(p), n_trials, p)
+  rsdt_binary(length(dprime), prep$data$trials[i], prep$data$vint1[i],
+              dprime, criterion, sdratio = sdratio, dist = dist)
 }

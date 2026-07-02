@@ -1,5 +1,6 @@
-// Shared SDT noise-distribution dispatch
-// dist_type: 1=Gaussian, 2=Gumbel_min, 3=Gumbel_max, 4=Logistic
+// Shared noise-distribution dispatchers for SDT models
+// dist_type codes follow the position in the .sdt_dists registry
+// (R/distributions.R): 1=Gaussian, 2=Gumbel_min, 3=Gumbel_max, 4=Logistic
 // Used by every SDT model that needs the noise CDF, log-CDF, log-CCDF, or
 // quantile on the latent evidence scale.
 
