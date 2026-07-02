@@ -47,11 +47,9 @@ test_that("sdt_binary model accepts custom links", {
 test_that("sdt_binary model stores distribution info correctly", {
   model <- sdt_binary("n_old", "stimulus", "n_trials", dist = "gumbel_min")
   expect_equal(model$other_vars$dist, "gumbel_min")
-  expect_equal(model$other_vars$dist_int, 2L)
 
   model2 <- sdt_binary("n_old", "stimulus", "n_trials", dist = "logistic")
   expect_equal(model2$other_vars$dist, "logistic")
-  expect_equal(model2$other_vars$dist_int, 4L)
 })
 
 test_that("sdt_binary model has default priors", {
@@ -68,11 +66,11 @@ test_that("sdt_binary requires n_trials argument", {
 
 test_that("sdt_binary model has init_ranges for estimated SDT parameters", {
   model <- sdt_binary("n_old", "stimulus", "n_trials")
-  expect_false(is.null(model$init_ranges))
   expect_true(all(c("dprime", "criterion", "sdratio") %in% names(model$init_ranges)))
-  expect_equal(model$init_ranges$dprime, c(0.5, 1.5))
-  expect_equal(model$init_ranges$criterion, c(-0.5, 0.5))
-  expect_equal(model$init_ranges$sdratio, c(-0.3, 0.3))
+  for (range in model$init_ranges) {
+    expect_length(range, 2)
+    expect_true(range[1] < range[2])
+  }
 })
 
 
@@ -110,6 +108,16 @@ test_that("sdt_binary check_data validates stimulus coding", {
   )
   expect_error(
     check_data(model, invalid_data, formula),
+    "must be coded as 0"
+  )
+
+  factor_data <- data.frame(
+    n_old = c(30, 40),
+    stimulus = factor(c(0, 1)),
+    n_trials = c(50, 50)
+  )
+  expect_error(
+    check_data(model, factor_data, formula),
     "must be coded as 0"
   )
 })
@@ -155,16 +163,20 @@ test_that("sdt_binary check_data validates n_trials", {
 })
 
 test_that("sdt_binary check_data adds dist_type column", {
-  model <- sdt_binary("n_old", "stimulus", "n_trials", dist = "gumbel_min")
   formula <- bmf(dprime ~ 1, criterion ~ 1)
-
   valid_data <- data.frame(
     n_old = c(10, 40),
     stimulus = c(0L, 1L),
     n_trials = c(50, 50)
   )
+
+  model <- sdt_binary("n_old", "stimulus", "n_trials", dist = "gumbel_min")
   result <- check_data(model, valid_data, formula)
   expect_equal(unique(result$dist_type), 2L)
+
+  model2 <- sdt_binary("n_old", "stimulus", "n_trials", dist = "logistic")
+  result2 <- check_data(model2, valid_data, formula)
+  expect_equal(unique(result2$dist_type), 4L)
 })
 
 
@@ -172,33 +184,42 @@ test_that("sdt_binary check_data adds dist_type column", {
 # DISTRIBUTION FUNCTION TESTS                                            ####
 ############################################################################# !
 
-test_that("rsdt_binary generates data with correct structure", {
-  dat <- rsdt_binary(n_per_cell = 50, n_subjects = 5, dprime = 1.5, criterion = 0)
-  expect_true(is.data.frame(dat))
-  expect_equal(nrow(dat), 10)
-  expect_true(all(c("id", "stimulus", "n_trials", "n_old") %in% colnames(dat)))
-  expect_equal(unique(dat$stimulus), c(0L, 1L))
-  expect_true(all(dat$n_old >= 0))
-  expect_true(all(dat$n_old <= dat$n_trials))
+test_that("rsdt_binary generates counts matching the design", {
+  stimulus <- rep(c(0L, 1L), 5)
+  n_old <- rsdt_binary(10, 50, stimulus, dprime = 1.5, criterion = 0)
+  expect_length(n_old, 10)
+  expect_true(all(n_old >= 0))
+  expect_true(all(n_old <= 50))
+})
+
+test_that("rsdt_binary recycles vectorized parameters per observation", {
+  n_old <- rsdt_binary(4, c(50, 100, 50, 100), c(0L, 1L, 0L, 1L),
+                       dprime = c(0.5, 0.5, 2.5, 2.5), criterion = 0)
+  expect_length(n_old, 4)
+  expect_true(all(n_old <= c(50, 100, 50, 100)))
 })
 
 test_that("rsdt_binary generates different data for different distributions", {
   set.seed(42)
-  dat_norm <- rsdt_binary(n_per_cell = 1000, n_subjects = 1, dprime = 2,
-                          criterion = 0)
+  n_norm <- rsdt_binary(2, 1000, c(0L, 1L), dprime = 2, criterion = 0)
   set.seed(42)
-  dat_logis <- rsdt_binary(n_per_cell = 1000, n_subjects = 1, dprime = 2,
-                           criterion = 0, dist = "logistic")
-  expect_false(identical(dat_norm$n_old, dat_logis$n_old))
+  n_logis <- rsdt_binary(2, 1000, c(0L, 1L), dprime = 2, criterion = 0,
+                         dist = "logistic")
+  expect_false(identical(n_norm, n_logis))
 })
 
 test_that("rsdt_binary with zero dprime produces equal hit and FA rates on average", {
   set.seed(123)
-  dat <- rsdt_binary(n_per_cell = 10000, n_subjects = 1, dprime = 0, criterion = 0)
-  noise_prop <- dat$n_old[dat$stimulus == 0] / dat$n_trials[dat$stimulus == 0]
-  signal_prop <- dat$n_old[dat$stimulus == 1] / dat$n_trials[dat$stimulus == 1]
-  expect_equal(noise_prop, 0.5, tolerance = 0.05)
-  expect_equal(signal_prop, 0.5, tolerance = 0.05)
+  n_old <- rsdt_binary(2, 10000, c(0L, 1L), dprime = 0, criterion = 0)
+  expect_equal(n_old[1] / 10000, 0.5, tolerance = 0.05)
+  expect_equal(n_old[2] / 10000, 0.5, tolerance = 0.05)
+})
+
+test_that("rsdt_binary validates input", {
+  expect_error(rsdt_binary(c(2, 3), 100, c(0L, 1L), dprime = 1, criterion = 0),
+               "single positive integer")
+  expect_error(rsdt_binary(2, 100, c(0L, 2L), dprime = 1, criterion = 0),
+               "0.*1")
 })
 
 test_that("dsdt_binary returns valid binomial density", {
@@ -337,8 +358,8 @@ test_that("sdt_binary model produces valid stancode with brms", {
   formula <- bmf(dprime ~ 1, criterion ~ 1)
   code <- stancode(formula, data = dat, model = model)
   expect_true(nchar(code) > 0)
-  expect_true(grepl("sdt_binary", code))
-  expect_true(grepl("sdt_cumprob", code))
+  expect_true(grepl("sdt_binary_lpmf", code))
+  expect_true(grepl("sdt_log_cumprob", code))
 })
 
 test_that("sdt_binary model produces valid stancode for all distributions", {

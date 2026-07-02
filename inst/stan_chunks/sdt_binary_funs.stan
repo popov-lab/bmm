@@ -7,7 +7,7 @@
 //   criterion: response bias (identity link)
 //   sdratio:   log ratio of signal to noise SD (0 = equal variance)
 //   stimulus:  0 = noise/new, 1 = signal/old
-//   dist_type: noise distribution (1-4, see sdt_cumprob)
+//   dist_type: noise distribution (1-4, see sdt_dist_funs.stan)
 //   trials:    total number of trials in this cell
 real sdt_binary_lpmf(int y, real mu, real dprime, real criterion, real sdratio,
                      int stimulus, int dist_type, int trials) {
