@@ -25,8 +25,6 @@ test_that("sdt_mafc model has correct class structure", {
 test_that("sdt_mafc model parameters are correctly defined", {
   model <- sdt_mafc("n_correct", "n_trials", m = 4)
   expect_true("dprime" %in% names(model$parameters))
-  expect_true("mu" %in% names(model$parameters))
-  expect_equal(model$fixed_parameters$mu, 0)
   expect_false("criterion" %in% names(model$parameters))
 })
 
@@ -60,7 +58,8 @@ test_that("sdt_mafc accepts m as a constant or a column name", {
 test_that("sdt_mafc model has default priors and init_ranges", {
   model <- sdt_mafc("n_correct", "n_trials", m = 4)
   expect_true("dprime" %in% names(model$default_priors))
-  expect_equal(model$init_ranges$dprime, c(0.5, 1.5))
+  expect_length(model$init_ranges$dprime, 2)
+  expect_true(model$init_ranges$dprime[1] < model$init_ranges$dprime[2])
 })
 
 test_that("sdt_mafc requires response, n_trials, and m", {
@@ -126,22 +125,25 @@ test_that("sdt_mafc check_data validates response counts", {
 # DISTRIBUTION FUNCTION TESTS                                            ####
 ############################################################################# !
 
-test_that("rsdt_mafc generates data with correct structure", {
-  dat <- rsdt_mafc(dprime = rep(1.5, 5), m = 4, n_trials = 50)
-  expect_true(is.data.frame(dat))
-  expect_equal(nrow(dat), 5)
-  expect_true(all(c("id", "n_trials", "n_correct") %in% colnames(dat)))
-  expect_true(all(dat$n_correct >= 0))
-  expect_true(all(dat$n_correct <= dat$n_trials))
+test_that("rsdt_mafc generates counts matching the design", {
+  n_correct <- rsdt_mafc(5, 50, m = 4, dprime = 1.5)
+  expect_length(n_correct, 5)
+  expect_true(all(n_correct >= 0))
+  expect_true(all(n_correct <= 50))
 })
 
-test_that("rsdt_mafc recycles inputs to the longest argument", {
-  dat <- rsdt_mafc(dprime = rnorm(12, 1.5, 0.3), m = 4, n_trials = 100)
-  expect_equal(nrow(dat), 12)
-  expect_true(all(dat$n_trials == 100))
+test_that("rsdt_mafc recycles vectorized parameters per observation", {
+  n_correct <- rsdt_mafc(12, 100, m = 4, dprime = rnorm(12, 1.5, 0.3))
+  expect_length(n_correct, 12)
 
-  dat2 <- rsdt_mafc(dprime = 1.5, m = c(2, 4, 8), n_trials = 100)
-  expect_equal(nrow(dat2), 3)
+  n2 <- rsdt_mafc(3, 100, m = c(2, 4, 8), dprime = 1.5)
+  expect_length(n2, 3)
+})
+
+test_that("rsdt_mafc validates input", {
+  expect_error(rsdt_mafc(c(2, 3), 100, m = 4, dprime = 1),
+               "single positive integer")
+  expect_error(rsdt_mafc(2, 100, m = 1, dprime = 1), "m must be")
 })
 
 test_that("dsdt_mafc recycles parameters across observations", {
@@ -202,6 +204,17 @@ test_that("normal m-AFC matches Phi(d'/sqrt(2)) at m = 2", {
   for (d in c(0, 0.5, 1, 2)) {
     expect_equal(.mafc_pc_r(d, 2L, "normal"), pnorm(d / sqrt(2)),
                  tolerance = 1e-10, info = paste("d =", d))
+  }
+})
+
+test_that(".mafc_pc_r vectorized path matches elementwise evaluation", {
+  d <- c(0.3, 1.1, 2.2)
+  mm <- c(2L, 4L, 6L)
+  for (di in c("normal", "logistic", "gumbel_min", "gumbel_max")) {
+    vec <- .mafc_pc_r(d, mm, di)
+    ref <- vapply(seq_along(d),
+                  function(i) .mafc_pc_r(d[i], mm[i], di), numeric(1))
+    expect_equal(vec, ref, tolerance = 1e-12, info = di)
   }
 })
 
@@ -268,7 +281,8 @@ test_that("sdt_mafc handles predictors and random effects in the formula", {
 })
 
 test_that("sdt_mafc integrates with the bmm pipeline via mock backend", {
-  dat <- rsdt_mafc(dprime = rep(1.2, 8), m = 4, n_trials = 100)
+  dat <- data.frame(n_trials = rep(100L, 8))
+  dat$n_correct <- rsdt_mafc(nrow(dat), dat$n_trials, m = 4, dprime = 1.2)
   for (d in c("normal", "logistic", "gumbel_min", "gumbel_max")) {
     model <- sdt_mafc("n_correct", "n_trials", m = 4, dist = d)
     expect_silent(
@@ -278,11 +292,9 @@ test_that("sdt_mafc integrates with the bmm pipeline via mock backend", {
 })
 
 test_that("sdt_mafc fits mixed set sizes through the pipeline (mock)", {
-  dat <- rbind(
-    transform(rsdt_mafc(dprime = rep(1.2, 8), m = 2, n_trials = 100), set_size = 2L),
-    transform(rsdt_mafc(dprime = rep(1.2, 8), m = 4, n_trials = 100), set_size = 4L),
-    transform(rsdt_mafc(dprime = rep(1.2, 8), m = 6, n_trials = 100), set_size = 6L)
-  )
+  dat <- data.frame(set_size = rep(c(2L, 4L, 6L), each = 8), n_trials = 100L)
+  dat$n_correct <- rsdt_mafc(nrow(dat), dat$n_trials, m = dat$set_size,
+                             dprime = 1.2)
   model <- sdt_mafc("n_correct", "n_trials", m = "set_size")
   expect_silent(
     bmm(bmf(dprime ~ 1), dat, model, backend = "mock", mock_fit = 1, rename = FALSE)

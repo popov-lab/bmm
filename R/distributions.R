@@ -2130,6 +2130,113 @@ rsdt_binary <- function(n, n_trials, stimulus, dprime, criterion,
 }
 
 
+############################################################################# !
+# M-AFC SDT DISTRIBUTION FUNCTIONS                                        ####
+############################################################################# !
+
+# Quadrature tables for .mafc_pc_r, mirroring the Stan tables in
+# inst/stan_chunks/sdt_mafc_funs.stan: 40-point Gauss-Hermite (normal) and
+# 64-point Gauss-Legendre on [0, 1] (logistic)
+.mafc_gh_nodes <- c(
+  -1.14533778415487379e+01, -1.04815605346742640e+01, -9.67355636693402765e+00, -8.94950454385556249e+00,
+  -8.27894062365948535e+00, -7.64616376454146440e+00, -7.04173840645382576e+00, -6.45942337758375906e+00,
+  -5.89480567537201416e+00, -5.34460544572008622e+00, -4.80628719209386723e+00, -4.27782615636274777e+00,
+  -3.75755977616898207e+00, -3.24408873299986844e+00, -2.73620834046542960e+00, -2.23285921863486791e+00,
+  -1.73309059063171489e+00, -1.23603200479915287e+00, -7.40870725285924792e-01, -2.46832896022723958e-01,
+   2.46832896022727510e-01,  7.40870725285931897e-01,  1.23603200479916175e+00,  1.73309059063172377e+00,
+   2.23285921863487502e+00,  2.73620834046543315e+00,  3.24408873299987022e+00,  3.75755977616898384e+00,
+   4.27782615636274954e+00,  4.80628719209387523e+00,  5.34460544572008622e+00,  5.89480567537201683e+00,
+   6.45942337758376706e+00,  7.04173840645382842e+00,  7.64616376454145907e+00,  8.27894062365947647e+00,
+   8.94950454385555538e+00,  9.67355636693403120e+00,  1.04815605346742657e+01,  1.14533778415487308e+01
+)
+.mafc_gh_weights <- c(
+   1.46183987386930516e-29,  4.82046794020072741e-25,  1.44860943155167746e-21,  1.12227520682703716e-18,
+   3.38985344324777725e-16,  4.96808852919722085e-14,  4.03763858169491567e-12,  1.98911852602780986e-10,
+   6.32589718854883025e-09,  1.36034242157482606e-07,  2.04889743608149897e-06,  2.22117714324753619e-05,
+   1.77072928799239520e-04,  1.05587901690180051e-03,  4.77354488182319455e-03,  1.65378441425691192e-02,
+   4.42745552022761890e-02,  9.21765791700618065e-02,  1.49921111763569481e-01,  1.91059009661991935e-01,
+   1.91059009661987633e-01,  1.49921111763571979e-01,  9.21765791700600856e-02,  4.42745552022768551e-02,
+   1.65378441425699553e-02,  4.77354488182340705e-03,  1.05587901690182349e-03,  1.77072928799244128e-04,
+   2.22117714324759446e-05,  2.04889743608150575e-06,  1.36034242157490811e-07,  6.32589718854897914e-09,
+   1.98911852602780831e-10,  4.03763858169524929e-12,  4.96808852919782859e-14,  3.38985344324820570e-16,
+   1.12227520682709321e-18,  1.44860943155158925e-21,  4.82046794020079904e-25,  1.46183987386941726e-29
+)
+.mafc_gl_nodes <- c(
+  3.47479132114081324e-04, 1.82994161402261213e-03, 4.49331426162824510e-03, 8.33187305768723352e-03,
+  1.33365861050445123e-02, 1.94956001739736706e-02, 2.67943125707985619e-02, 3.52154139340299377e-02,
+  4.47389314607484767e-02, 5.53422770024430966e-02, 6.70003009229536151e-02, 7.96853518737098421e-02,
+  9.33673424386013417e-02, 1.08013820528329307e-01, 1.23590046369734252e-01, 1.40059074914194670e-01,
+  1.57381843472883531e-01, 1.75517264372671455e-01, 1.94422322413803195e-01, 2.14052176898682944e-01,
+  2.34360267990052940e-01, 2.55298427146473550e-01, 2.76816991373267984e-01, 2.98864921018004326e-01,
+  3.21389920831166132e-01, 3.44338564004894487e-01, 3.67656418895616288e-01, 3.91288178129996389e-01,
+  4.15177789788003682e-01, 4.39268590351939658e-01, 4.63503439106100479e-01, 4.87824853668287650e-01,
+  5.12175146331712128e-01, 5.36496560893899632e-01, 5.60731409648060231e-01, 5.84822210211996207e-01,
+  6.08711821870003611e-01, 6.32343581104383823e-01, 6.55661435995105624e-01, 6.78610079168834091e-01,
+  7.01135078981995896e-01, 7.23183008626732016e-01, 7.44701572853526450e-01, 7.65639732009947283e-01,
+  7.85947823101317056e-01, 8.05577677586196583e-01, 8.24482735627328656e-01, 8.42618156527116580e-01,
+  8.59940925085805441e-01, 8.76409953630265970e-01, 8.91986179471670804e-01, 9.06632657561398769e-01,
+  9.20314648126290269e-01, 9.32999699077046385e-01, 9.44657722997557014e-01, 9.55261068539251412e-01,
+  9.64784586065969840e-01, 9.73205687429201438e-01, 9.80504399826026884e-01, 9.86663413894955488e-01,
+  9.91668126942312989e-01, 9.95506685738372088e-01, 9.98170058385977610e-01, 9.99652520867886141e-01
+)
+.mafc_gl_weights <- c(
+  8.91640360848292403e-04, 2.07351663028077990e-03, 3.25222898448934228e-03, 4.42337991318164214e-03,
+  5.58406973006490056e-03, 6.73152394835961187e-03, 7.86301523801327153e-03, 8.97585788784879823e-03,
+  1.00674115767644488e-02, 1.11350869041918748e-02, 1.21763512843553277e-02, 1.31887348575272928e-02,
+  1.41698363071303297e-02, 1.51173285362008816e-02, 1.60289641774256156e-02, 1.69025809185709350e-02,
+  1.77361066284417446e-02, 1.85275642701207242e-02, 1.92750765893085693e-02, 1.99768705663597619e-02,
+  2.06312816213114793e-02, 2.12367575618269550e-02, 2.17918622646615483e-02, 2.22952790818779396e-02,
+  2.27458139637090571e-02, 2.31423982906572012e-02, 2.34840914081049928e-02, 2.37700828574146442e-02,
+  2.39996942982292662e-02, 2.41723811174017686e-02, 2.42877337207512492e-02, 2.43454785045694837e-02,
+  2.43454785045695184e-02, 2.42877337207515927e-02, 2.41723811174016194e-02, 2.39996942982290164e-02,
+  2.37700828574152270e-02, 2.34840914081047535e-02, 2.31423982906576141e-02, 2.27458139637086477e-02,
+  2.22952790818782449e-02, 2.17918622646617877e-02, 2.12367575618269445e-02, 2.06312816213118297e-02,
+  1.99768705663600533e-02, 1.92750765893081426e-02, 1.85275642701202004e-02, 1.77361066284411686e-02,
+  1.69025809185707407e-02, 1.60289641774257301e-02, 1.51173285362012598e-02, 1.41698363071297347e-02,
+  1.31887348575274056e-02, 1.21763512843555601e-02, 1.11350869041916285e-02, 1.00674115767651357e-02,
+  8.97585788784880864e-03, 7.86301523801245968e-03, 6.73152394835926579e-03, 5.58406973006549817e-03,
+  4.42337991318194831e-03, 3.25222898448917618e-03, 2.07351663028124350e-03, 8.91640360848207835e-04
+)
+
+# R-side probability correct for m-AFC, mirroring the Stan mafc_pc function.
+# gumbel_min has a closed-form softmax, gumbel_max a closed-form Gamma ratio,
+# normal uses 40-point Gauss-Hermite quadrature (closed form Phi(d'/sqrt(2))
+# at m = 2), logistic uses 64-point Gauss-Legendre on the probability scale.
+# Vectorized over dprime and m (recycled to a common length). The rep(each =)
+# factor aligns the per-observation exponent m - 1 with the column-major
+# layout of the nodes-by-observations matrix from outer().
+.mafc_pc_r <- function(dprime, m, dist = "normal") {
+  if (dist == "gumbel_min") {
+    return(1 / (1 + (m - 1) * exp(-dprime)))
+  }
+  if (dist == "gumbel_max") {
+    return(exp(lgamma(1 + exp(-dprime)) + lgamma(m) - lgamma(m + exp(-dprime))))
+  }
+
+  n <- max(length(dprime), length(m))
+  dprime <- rep_len(dprime, n)
+  m <- rep_len(m, n)
+
+  if (dist == "normal") {
+    out <- stats::pnorm(dprime / sqrt(2))
+    quad <- m != 2L
+    if (any(quad)) {
+      log_cdf <- stats::pnorm(outer(.mafc_gh_nodes, dprime[quad], "+"),
+                              log.p = TRUE)
+      log_terms <- log(.mafc_gh_weights) +
+        log_cdf * rep(m[quad] - 1, each = length(.mafc_gh_nodes))
+      out[quad] <- exp(matrixStats::colLogSumExps(log_terms))
+    }
+    return(out)
+  }
+
+  cdf_mat <- .sdt_dists[[dist]]$cdf(
+    outer(.sdt_dists[[dist]]$qf(.mafc_gl_nodes), dprime, "+")
+  )
+  colSums(.mafc_gl_weights * cdf_mat^rep(m - 1, each = length(.mafc_gl_nodes)))
+}
+
+
 #' @title Distribution functions for m-AFC SDT
 #'
 #' @description Density and random generation for m-alternative forced choice
@@ -2143,16 +2250,18 @@ rsdt_binary <- function(n, n_trials, stimulus, dprime, criterion,
 #'
 #' @param n_correct Integer vector. Number of correct responses.
 #' @param n_trials Integer vector. Total number of trials per observation.
-#' @param dprime Numeric vector. Sensitivity parameter(s).
 #' @param m Integer vector. Number of alternatives per observation. Must be
 #'   at least 2.
+#' @param dprime Numeric vector. Sensitivity parameter(s).
 #' @param dist The noise distribution: one of "normal" (default), "logistic",
 #'   "gumbel_min", or "gumbel_max".
 #' @param log Logical. If `TRUE`, returns log-density (default `FALSE`).
+#' @param n Integer. Number of observations to generate. `n_trials`, `m`, and
+#'   `dprime` are recycled to this length.
 #'
 #' @return `dsdt_mafc` returns the (log-)density (binomial probability).
-#'   `rsdt_mafc` returns a data frame with one row per observation and columns
-#'   `id`, `n_trials`, and `n_correct`.
+#'   `rsdt_mafc` returns an integer vector with the number of correct
+#'   responses per observation.
 #'
 #' @references
 #' DeCarlo, L. T. (2012). On a signal detection approach to m-alternative
@@ -2164,23 +2273,22 @@ rsdt_binary <- function(n, n_trials, stimulus, dprime, criterion,
 #' @export
 #' @examples
 #' # 4-AFC density
-#' dsdt_mafc(n_correct = 80, n_trials = 100, dprime = 1.5, m = 4)
-dsdt_mafc <- function(n_correct, n_trials, dprime, m,
-                      dist = "normal", log = FALSE) {
-  stopif(!dist %in% names(.sdt_dists),
-         "dist must be one of {collapse_comma(names(.sdt_dists))}")
+#' dsdt_mafc(n_correct = 80, n_trials = 100, m = 4, dprime = 1.5)
+dsdt_mafc <- function(n_correct, n_trials, m, dprime,
+                      dist = c("normal", "logistic",
+                               "gumbel_min", "gumbel_max"),
+                      log = FALSE) {
+  dist <- match.arg(dist)
   stopif(any(m < 2), "m must be an integer >= 2")
 
-  n <- max(lengths(list(n_correct, n_trials, dprime, m)))
+  n <- max(lengths(list(n_correct, n_trials, m, dprime)))
   n_correct <- rep_len(n_correct, n)
   n_trials <- rep_len(n_trials, n)
-  dprime <- rep_len(dprime, n)
-  m <- rep_len(as.integer(m), n)
 
   stopif(any(n_correct < 0), "n_correct must be non-negative")
   stopif(any(n_correct > n_trials), "n_correct must not exceed n_trials")
 
-  pc <- vapply(seq_len(n), function(i) .mafc_pc_r(dprime[i], m[i], dist), numeric(1))
+  pc <- .mafc_pc_r(rep_len(dprime, n), rep_len(as.integer(m), n), dist)
   stats::dbinom(n_correct, n_trials, pc, log = log)
 }
 
@@ -2189,23 +2297,18 @@ dsdt_mafc <- function(n_correct, n_trials, dprime, m,
 #' @export
 #' @examples
 #' # Generate 4-AFC data for 20 subjects with varying sensitivity
-#' dat <- rsdt_mafc(dprime = rnorm(20, 1.5, 0.4), m = 4, n_trials = 200)
+#' dat <- data.frame(id = 1:20, n_trials = 200L)
+#' dat$n_correct <- rsdt_mafc(nrow(dat), dat$n_trials, m = 4,
+#'                            dprime = rnorm(20, 1.5, 0.4))
 #' head(dat)
-rsdt_mafc <- function(dprime, m, n_trials, dist = "normal") {
-  stopif(!dist %in% names(.sdt_dists),
-         "dist must be one of {collapse_comma(names(.sdt_dists))}")
+rsdt_mafc <- function(n, n_trials, m, dprime,
+                      dist = c("normal", "logistic",
+                               "gumbel_min", "gumbel_max")) {
+  dist <- match.arg(dist)
+  stopif(length(n) != 1 || n < 1, "n must be a single positive integer")
   stopif(any(m < 2), "m must be an integer >= 2")
-  stopif(any(n_trials < 1), "n_trials must be a positive integer")
+  stopif(any(n_trials < 1), "n_trials must be positive")
 
-  n <- max(lengths(list(dprime, m, n_trials)))
-  dprime <- rep_len(dprime, n)
-  m <- rep_len(as.integer(m), n)
-  n_trials <- rep_len(as.integer(n_trials), n)
-
-  pc <- vapply(seq_len(n), function(i) .mafc_pc_r(dprime[i], m[i], dist), numeric(1))
-  data.frame(
-    id = seq_len(n),
-    n_trials = n_trials,
-    n_correct = stats::rbinom(n, n_trials, pc)
-  )
+  pc <- .mafc_pc_r(rep_len(dprime, n), rep_len(as.integer(m), n), dist)
+  stats::rbinom(n, n_trials, pc)
 }

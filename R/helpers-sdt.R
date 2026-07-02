@@ -48,6 +48,10 @@
   if (is.character(m)) {
     stopif(!m %in% colnames(data),
       "Set-size column '{m}' missing in the data")
+    stopif(!is.numeric(data[[m]]),
+      "Set-size column '{m}' must be numeric")
+    warnif(any(data[[m]] != round(data[[m]]), na.rm = TRUE),
+      "Set-size column '{m}' should contain integer values")
     out <- as.integer(data[[m]])
   } else {
     out <- rep.int(as.integer(m), nrow(data))

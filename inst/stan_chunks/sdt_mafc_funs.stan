@@ -2,7 +2,7 @@
 // over the m latent alternatives (one signal shifted by d', m-1 noise), where
 // the observer picks the maximum. F is the noise CDF (see sdt_dist_funs.stan).
 //
-//   normal     : 20-point Gauss-Hermite quadrature (closed form Phi(d'/sqrt(2)) at m = 2)
+//   normal     : 40-point Gauss-Hermite quadrature (closed form Phi(d'/sqrt(2)) at m = 2)
 //   gumbel_min : exact softmax 1 / (1 + (m-1) * exp(-d'))
 //   gumbel_max : exact gamma ratio Gamma(1 + e^-d') * Gamma(m) / Gamma(m + e^-d')
 //   logistic   : 64-point Gauss-Legendre on [0, 1] of F(Q(u) + d')^(m-1)
