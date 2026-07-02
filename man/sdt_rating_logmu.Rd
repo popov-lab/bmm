@@ -22,7 +22,7 @@ sdt_rating_logmu(
 
 \item{K}{Integer number of rating categories.}
 
-\item{dist}{Integer noise-distribution id (see the \code{.SDT_DISTS} table).}
+\item{dist}{Integer noise-distribution id (see the \code{.sdt_dists} registry).}
 
 \item{thresh}{Integer threshold-parameterization id.}
 

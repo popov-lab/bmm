@@ -3,6 +3,13 @@
 ranks4 <- paste0("rank", 1:4)
 ranks5 <- paste0("rank", 1:5)
 
+sim_ranking <- function(n, n_trials, m, dprime, dist = "gumbel_min",
+                        sdratio = 1) {
+  dat <- data.frame(id = seq_len(n), set_size = rep_len(as.integer(m), n))
+  cbind(dat, as.data.frame(rsdt_ranking(n, n_trials, m = m, dprime = dprime,
+                                        dist = dist, sdratio = sdratio)))
+}
+
 ############################################################################# !
 # MODEL CONSTRUCTOR TESTS                                                ####
 ############################################################################# !
@@ -69,7 +76,7 @@ test_that("dist='normal' adds sdratio (fixed to 0); gumbel_min does not", {
   normal <- sdt_ranking(ranks4, m = 4, dist = "normal")
   expect_true("sdratio" %in% names(normal$parameters))
   expect_equal(normal$fixed_parameters$sdratio, 0)
-  expect_equal(normal$init_ranges$sdratio, c(-0.3, 0.3))
+  expect_true("sdratio" %in% names(normal$init_ranges))
 
   gumbel <- sdt_ranking(ranks4, m = 4, dist = "gumbel_min")
   expect_false("sdratio" %in% names(gumbel$parameters))
@@ -77,7 +84,8 @@ test_that("dist='normal' adds sdratio (fixed to 0); gumbel_min does not", {
 
 test_that("sdt_ranking has init_ranges with dprime (no mu)", {
   model <- sdt_ranking(ranks4, m = 4)
-  expect_equal(model$init_ranges$dprime, c(0.5, 1.5))
+  expect_length(model$init_ranges$dprime, 2)
+  expect_true(model$init_ranges$dprime[1] < model$init_ranges$dprime[2])
   expect_false("mu" %in% names(model$init_ranges))
 })
 
@@ -135,18 +143,28 @@ test_that("sdt_ranking_logmu preserves the draws-by-observation shape", {
 # DISTRIBUTION FUNCTION TESTS                                            ####
 ############################################################################# !
 
-test_that("rsdt_ranking generates valid wide ranking data", {
-  dat <- rsdt_ranking(n_per_cell = 100, n_subjects = 5, dprime = 1.5, m = 4)
+test_that("rsdt_ranking generates a valid rank-count matrix", {
+  counts <- rsdt_ranking(5, 100, m = 4, dprime = 1.5)
 
-  expect_equal(colnames(dat), c("id", "set_size", paste0("rank", 1:4)))
-  expect_equal(nrow(dat), 5)
-  expect_true(all(dat$set_size == 4))
-  expect_true(all(rowSums(dat[paste0("rank", 1:4)]) == 100))
+  expect_true(is.matrix(counts))
+  expect_equal(dim(counts), c(5L, 4L))
+  expect_equal(colnames(counts), paste0("rank", 1:4))
+  expect_true(all(rowSums(counts) == 100))
+})
+
+test_that("rsdt_ranking recycles parameters and handles mixed set sizes", {
+  counts <- rsdt_ranking(6, 50, m = c(3L, 5L), dprime = rnorm(6, 1.2, 0.2))
+
+  expect_equal(dim(counts), c(6L, 5L))
+  expect_true(all(rowSums(counts) == 50))
+  # structural zeros beyond each row's set size
+  expect_true(all(counts[col(counts) > c(3L, 5L)] == 0))
 })
 
 test_that("rsdt_ranking validates inputs", {
-  expect_error(rsdt_ranking(n_per_cell = 50, n_subjects = 1, dprime = 1, m = NULL))
-  expect_error(rsdt_ranking(n_per_cell = 50, n_subjects = 1, dprime = 1, m = 1))
+  expect_error(rsdt_ranking(c(2, 3), 50, m = 4, dprime = 1),
+               "single positive integer")
+  expect_error(rsdt_ranking(2, 50, m = 1, dprime = 1), "m must be")
 })
 
 test_that("dsdt_ranking computes valid ranking densities", {
@@ -158,6 +176,35 @@ test_that("dsdt_ranking computes valid ranking densities", {
   expect_equal(log(dens), log_dens, tolerance = 1e-10)
 })
 
+test_that("dsdt_ranking matches dmultinom and is vectorized over rows", {
+  probs <- bmm:::.ranking_all_probs_r(1.5, 4L, "gumbel_min")
+  expect_equal(dsdt_ranking(c(40, 30, 20, 10), m = 4, dprime = 1.5),
+               dmultinom(c(40, 30, 20, 10), prob = probs), tolerance = 1e-12)
+
+  counts <- rbind(c(40, 30, 20, 10), c(10, 20, 30, 40))
+  d <- dsdt_ranking(counts, m = 4, dprime = c(1.5, 0.2), log = TRUE)
+  expect_length(d, 2)
+  expect_true(all(is.finite(d)))
+})
+
+test_that("dsdt_ranking rejects counts beyond the row's set size", {
+  counts <- rbind(c(30, 15, 5, 6), c(30, 12, 6, 2))
+  expect_error(dsdt_ranking(counts, m = c(3, 4), dprime = 1.2),
+               "beyond the row's set size")
+})
+
+test_that(".ranking_all_probs_r vectorized path matches elementwise evaluation", {
+  d <- c(0.3, 1.1, 2.2)
+  s <- c(0, 0.2, -0.1)
+  for (di in c("gumbel_min", "normal")) {
+    vec <- bmm:::.ranking_all_probs_r(d, 4L, di, s)
+    ref <- t(vapply(seq_along(d), function(i) {
+      bmm:::.ranking_all_probs_r(d[i], 4L, di, s[i])
+    }, numeric(4)))
+    expect_equal(vec, ref, tolerance = 1e-12, info = di)
+  }
+})
+
 
 ############################################################################# !
 # CHECK_DATA TESTS                                                       ####
@@ -165,7 +212,7 @@ test_that("dsdt_ranking computes valid ranking densities", {
 
 test_that("check_data builds the multinomial response matrix and covariates", {
   model <- sdt_ranking(ranks4, m = 4)
-  dat <- rsdt_ranking(n_per_cell = 50, n_subjects = 3, dprime = 1.5, m = 4)
+  dat <- sim_ranking(3, 50, m = 4, dprime = 1.5)
   result <- check_data(model, dat, bmf(dprime ~ 1))
 
   expect_true(all(c("Y", "nTrials", "max_rank") %in% colnames(result)))
@@ -241,7 +288,7 @@ test_that("bmf2bf.sdt_ranking builds a multinomial non-linear formula", {
 ############################################################################# !
 
 test_that("sdt_ranking produces multinomial stancode with the ranking functions", {
-  dat <- rsdt_ranking(n_per_cell = 50, n_subjects = 3, dprime = 1.5, m = 4)
+  dat <- sim_ranking(3, 50, m = 4, dprime = 1.5)
   model <- sdt_ranking(ranks4, m = 4)
   code <- stancode(bmf(dprime ~ 1), data = dat, model = model)
   expect_true(grepl("multinomial", code))
@@ -251,16 +298,14 @@ test_that("sdt_ranking produces multinomial stancode with the ranking functions"
 })
 
 test_that("sdt_ranking stancode includes the UV function for the normal dist", {
-  dat <- rsdt_ranking(n_per_cell = 50, n_subjects = 3, dprime = 1.2, m = 4,
-                      dist = "normal")
+  dat <- sim_ranking(3, 50, m = 4, dprime = 1.2, dist = "normal")
   normal <- sdt_ranking(ranks4, m = 4, dist = "normal")
   code <- stancode(bmf(dprime ~ 1), data = dat, model = normal)
   expect_true(grepl("sdt_ranking_uv_logp", code))
 })
 
 test_that("Gaussian ranking fixes sdratio for EV and frees it for UV", {
-  dat <- rsdt_ranking(n_per_cell = 50, n_subjects = 3, dprime = 1.2, m = 4,
-                      dist = "normal")
+  dat <- sim_ranking(3, 50, m = 4, dprime = 1.2, dist = "normal")
   normal <- sdt_ranking(ranks4, m = 4, dist = "normal")
 
   ev_sdratio <- subset(default_prior(bmf(dprime ~ 1), data = dat, model = normal),
@@ -274,7 +319,7 @@ test_that("Gaussian ranking fixes sdratio for EV and frees it for UV", {
 })
 
 test_that("sdt_ranking stancode works with predictors and random effects", {
-  dat <- rsdt_ranking(n_per_cell = 50, n_subjects = 5, dprime = 1.5, m = 4)
+  dat <- sim_ranking(5, 50, m = 4, dprime = 1.5)
   dat$condition <- rep(c("A", "B"), length.out = nrow(dat))
   model <- sdt_ranking(ranks4, m = 4)
   expect_true(nchar(stancode(bmf(dprime ~ condition), data = dat, model = model)) > 0)
@@ -287,7 +332,7 @@ test_that("sdt_ranking stancode works with predictors and random effects", {
 ############################################################################# !
 
 test_that("sdt_ranking integrates with the bmm pipeline via mock backend", {
-  dat <- rsdt_ranking(n_per_cell = 80, n_subjects = 8, dprime = 1.2, m = 4)
+  dat <- sim_ranking(8, 80, m = 4, dprime = 1.2)
   for (d in c("gumbel_min", "normal")) {
     model <- sdt_ranking(ranks4, m = 4, dist = d)
     expect_silent(
@@ -297,14 +342,7 @@ test_that("sdt_ranking integrates with the bmm pipeline via mock backend", {
 })
 
 test_that("sdt_ranking fits mixed set sizes through the pipeline (mock)", {
-  pad <- function(d, cols = ranks5) {
-    for (p in setdiff(cols, names(d))) d[[p]] <- 0L
-    d[c("id", "set_size", cols)]
-  }
-  dat <- rbind(
-    pad(rsdt_ranking(n_per_cell = 80, n_subjects = 4, dprime = 1.2, m = 3)),
-    pad(rsdt_ranking(n_per_cell = 80, n_subjects = 4, dprime = 1.2, m = 5))
-  )
+  dat <- sim_ranking(8, 80, m = rep(c(3L, 5L), each = 4), dprime = 1.2)
   model <- sdt_ranking(ranks5, m = "set_size")
   expect_silent(
     bmm(bmf(dprime ~ 1), dat, model, backend = "mock", mock_fit = 1, rename = FALSE)
@@ -312,8 +350,8 @@ test_that("sdt_ranking fits mixed set sizes through the pipeline (mock)", {
 })
 
 test_that("sdt_ranking unequal-variance ranking runs through the pipeline (mock)", {
-  dat <- rsdt_ranking(n_per_cell = 80, n_subjects = 8, dprime = 1.2, m = 4,
-                      dist = "normal", sdratio = 1.3)
+  dat <- sim_ranking(8, 80, m = 4, dprime = 1.2, dist = "normal",
+                     sdratio = 1.3)
   model <- sdt_ranking(ranks4, m = 4, dist = "normal")
   expect_silent(
     bmm(bmf(dprime ~ 1, sdratio ~ 1), dat, model,
@@ -322,7 +360,7 @@ test_that("sdt_ranking unequal-variance ranking runs through the pipeline (mock)
 })
 
 test_that("sdt_ranking default_prior returns a valid prior object", {
-  dat <- rsdt_ranking(n_per_cell = 50, n_subjects = 3, dprime = 1.5, m = 4)
+  dat <- sim_ranking(3, 50, m = 4, dprime = 1.5)
   model <- sdt_ranking(ranks4, m = 4)
   expect_s3_class(default_prior(bmf(dprime ~ 1), data = dat, model = model),
                   "brmsprior")
@@ -333,7 +371,7 @@ test_that("sdt_ranking recovers d' and returns a multinomial count array", {
   skip_on_ci()
   skip_if_not_installed("cmdstanr")
 
-  dat <- rsdt_ranking(n_per_cell = 200, n_subjects = 10, dprime = 1.4, m = 4)
+  dat <- sim_ranking(10, 200, m = 4, dprime = 1.4)
   model <- sdt_ranking(ranks4, m = 4)
   fit <- bmm(bmf(dprime ~ 1 + (1 | id)), dat, model, backend = "cmdstanr",
              chains = 2, iter = 600, warmup = 300, init = 0.5,

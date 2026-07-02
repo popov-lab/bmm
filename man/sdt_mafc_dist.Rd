@@ -6,29 +6,45 @@
 \alias{rsdt_mafc}
 \title{Distribution functions for m-AFC SDT}
 \usage{
-dsdt_mafc(n_correct, n_trials, dprime, m, dist = "normal", log = FALSE)
+dsdt_mafc(
+  n_correct,
+  n_trials,
+  m,
+  dprime,
+  dist = c("normal", "logistic", "gumbel_min", "gumbel_max"),
+  log = FALSE
+)
 
-rsdt_mafc(dprime, m, n_trials, dist = "normal")
+rsdt_mafc(
+  n,
+  n_trials,
+  m,
+  dprime,
+  dist = c("normal", "logistic", "gumbel_min", "gumbel_max")
+)
 }
 \arguments{
 \item{n_correct}{Integer vector. Number of correct responses.}
 
 \item{n_trials}{Integer vector. Total number of trials per observation.}
 
-\item{dprime}{Numeric vector. Sensitivity parameter(s).}
-
 \item{m}{Integer vector. Number of alternatives per observation. Must be
 at least 2.}
+
+\item{dprime}{Numeric vector. Sensitivity parameter(s).}
 
 \item{dist}{The noise distribution: one of "normal" (default), "logistic",
 "gumbel_min", or "gumbel_max".}
 
 \item{log}{Logical. If \code{TRUE}, returns log-density (default \code{FALSE}).}
+
+\item{n}{Integer. Number of observations to generate. \code{n_trials}, \code{m}, and
+\code{dprime} are recycled to this length.}
 }
 \value{
 \code{dsdt_mafc} returns the (log-)density (binomial probability).
-\code{rsdt_mafc} returns a data frame with one row per observation and columns
-\code{id}, \code{n_trials}, and \code{n_correct}.
+\code{rsdt_mafc} returns an integer vector with the number of correct
+responses per observation.
 }
 \description{
 Density and random generation for m-alternative forced choice
@@ -40,9 +56,11 @@ generates (or evaluates) one observation per element.
 }
 \examples{
 # 4-AFC density
-dsdt_mafc(n_correct = 80, n_trials = 100, dprime = 1.5, m = 4)
+dsdt_mafc(n_correct = 80, n_trials = 100, m = 4, dprime = 1.5)
 # Generate 4-AFC data for 20 subjects with varying sensitivity
-dat <- rsdt_mafc(dprime = rnorm(20, 1.5, 0.4), m = 4, n_trials = 200)
+dat <- data.frame(id = 1:20, n_trials = 200L)
+dat$n_correct <- rsdt_mafc(nrow(dat), dat$n_trials, m = 4,
+                           dprime = rnorm(20, 1.5, 0.4))
 head(dat)
 }
 \references{

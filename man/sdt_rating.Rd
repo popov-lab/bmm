@@ -72,6 +72,15 @@ Confidence Rating Signal Detection Theory Model
 }
 \item \strong{Version:} rating
 \item \strong{Requirements:}
+
+Provide pre-aggregated data with the following columns:
+}
+\itemize{
+\item Response counts: one column per rating category (K columns)
+\item Stimulus type (stimulus): 0 = noise, 1 = signal
+Categories should be ordered: 1 = 'definitely noise' to K = 'definitely signal'
+}
+\itemize{
 \item \strong{Parameters:}
 \itemize{
 \item \code{dprime}: Sensitivity: distance between signal and noise distributions

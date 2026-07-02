@@ -88,16 +88,13 @@
                               dist = "normal", n_ratings = NULL,
                               threshold_type = "parsimonious",
                               links = NULL, call = NULL, ...) {
-  dist_int <- .sdt_dist_id(dist)
-  thresh_type_int <- .sdt_threshold_type_id(threshold_type)
-
   if (is.null(n_ratings) && length(response) > 1) {
     n_ratings <- length(response)
   }
 
   parameters <- list(
-    dprime = glue("Sensitivity: distance between signal and noise distributions"),
-    criterion = glue("Response bias: location of decision boundary")
+    dprime = "Sensitivity: distance between signal and noise distributions",
+    criterion = "Response bias: location of decision boundary"
   )
   default_priors <- list(
     dprime = list(main = "normal(1, 1)", effects = "normal(0, 0.5)"),
@@ -110,7 +107,7 @@
   default_priors <- c(default_priors, threshold_parts$default_priors)
   param_links <- c(param_links, threshold_parts$param_links)
 
-  parameters$sdratio <- glue(
+  parameters$sdratio <- paste0(
     "Log SD ratio: the log of the signal-to-noise standard deviation ratio, ",
     "so exp(sdratio) is the ratio itself and 0 means equal variance"
   )
@@ -133,17 +130,16 @@
 
   requirements <- glue(
     "Provide pre-aggregated data with the following columns:", "\n\n",
-    "  - Response counts: one column per rating category ({n_ratings} columns)", "\n",
+    "  - Response counts: one column per rating category (K columns)", "\n",
     "  - Stimulus type (stimulus): 0 = noise, 1 = signal", "\n",
     "  Categories should be ordered: 1 = 'definitely noise' to ",
-    "{n_ratings} = 'definitely signal'"
+    "K = 'definitely signal'"
   )
 
   out <- structure(
     list(
       resp_vars = nlist(response),
-      other_vars = nlist(stimulus, dist, dist_int, n_ratings,
-                         threshold_type, thresh_type_int),
+      other_vars = nlist(stimulus, dist, n_ratings, threshold_type),
       domain = "Perception & Recognition Memory",
       task = "Signal/Noise or Old/New Recognition",
       name = "Signal Detection Theory (Confidence Rating)",
@@ -339,8 +335,9 @@ check_data.sdt_rating <- function(model, data, formula) {
 # (threshold types without spacing ignore it).
 .sdt_rating_logmu_args <- function(model) {
   has_spacing <- "spacing" %in% names(model$parameters)
-  c(model$other_vars$n_ratings, model$other_vars$dist_int,
-    model$other_vars$thresh_type_int, "dprime", "criterion",
+  c(model$other_vars$n_ratings, .sdt_dist_id(model$other_vars$dist),
+    .sdt_threshold_type_id(model$other_vars$threshold_type),
+    "dprime", "criterion",
     if (has_spacing) "spacing" else "0", "sdratio",
     model$other_vars$stimulus, .sdt_threshold_delta_names(model))
 }
@@ -436,7 +433,7 @@ configure_model.sdt_rating <- function(model, data, formula) {
 #'   the search path; it is exported for that reason and is not called directly.
 #' @param cat Integer rating category index.
 #' @param K Integer number of rating categories.
-#' @param dist Integer noise-distribution id (see the `.SDT_DISTS` table).
+#' @param dist Integer noise-distribution id (see the `.sdt_dists` registry).
 #' @param thresh Integer threshold-parameterization id.
 #' @param dprime,criterion,spacing,sdratio Model parameters (draws-by-observation
 #'   matrices supplied by brms). `spacing` is `0` for threshold types without it.

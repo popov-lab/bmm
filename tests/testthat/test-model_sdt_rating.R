@@ -63,7 +63,6 @@ test_that("sdt_rating model stores all distribution options", {
   for (di in c("normal", "logistic", "gumbel_min", "gumbel_max")) {
     model <- sdt_rating(c("r1", "r2", "r3", "r4"), "stimulus", dist = di)
     expect_equal(model$other_vars$dist, di)
-    expect_equal(model$other_vars$dist_int, .sdt_dist_id(di))
   }
 })
 

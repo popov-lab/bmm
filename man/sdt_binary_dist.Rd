@@ -18,8 +18,9 @@ dsdt_binary(
 )
 
 rsdt_binary(
-  n_per_cell,
-  n_subjects,
+  n,
+  n_trials,
+  stimulus,
   dprime,
   criterion,
   sdratio = 1,
@@ -45,14 +46,13 @@ rsdt_binary(
 
 \item{log}{Logical. If \code{TRUE}, returns log-density (default \code{FALSE}).}
 
-\item{n_per_cell}{Integer. Number of trials per stimulus type per subject.}
-
-\item{n_subjects}{Integer. Number of subjects.}
+\item{n}{Integer. Number of observations to generate. \code{n_trials},
+\code{stimulus}, and the model parameters are recycled to this length.}
 }
 \value{
 \code{dsdt_binary} returns the (log-)density (binomial probability).
-\code{rsdt_binary} returns a data frame with columns \code{id}, \code{stimulus}, \code{n_trials},
-and \code{n_old}.
+\code{rsdt_binary} returns an integer vector with the number of "old"/"signal"
+responses per observation.
 }
 \description{
 Density and random generation for the binary signal detection
@@ -68,9 +68,11 @@ dsdt_binary(n_old = 80, n_trials = 100, stimulus = 1,
 dsdt_binary(n_old = c(30, 80), n_trials = c(100, 100),
             stimulus = c(0, 1), dprime = 1.5, criterion = 0.2,
             log = TRUE)
-# Generate binary SDT data
-dat <- rsdt_binary(n_per_cell = 100, n_subjects = 20,
-                   dprime = 1.5, criterion = 0.2)
+# Generate binary SDT data for a design
+dat <- expand.grid(id = 1:20, stimulus = c(0L, 1L))
+dat$n_trials <- 100L
+dat$n_old <- rsdt_binary(nrow(dat), dat$n_trials, dat$stimulus,
+                         dprime = 1.5, criterion = 0.2)
 head(dat)
 }
 \references{
