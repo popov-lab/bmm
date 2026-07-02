@@ -99,13 +99,6 @@ vector sdt_thresholds_softmax_rating(real criterion, real spacing,
 
   thresholds[mid] = criterion;
 
-  if (n_intervals == 1) {
-    real interval = exp(spacing);
-    thresholds[mid - 1] = criterion - interval;
-    thresholds[mid + 1] = criterion + interval;
-    return thresholds;
-  }
-
   vector[n_intervals] logits;
   vector[n_intervals] intervals;
   if (n_intervals > 1) {
