@@ -80,8 +80,39 @@ latent plot simply shows the noise and signal densities without a boundary line.
 
 This article walks through fitting each model and then through the
 post-processing toolkit: `roc_sdt()`, `roc_observed()`, `auc_sdt()`,
-`latent_sdt()`, the `plot()` methods (including the quantile-transformed ROC via
-`scale = "quantile"`), and `pp_check()`.
+`latent_sdt()`, `sdt_thresholds()`, the `plot()` methods (including the
+quantile-transformed ROC via `scale = "quantile"`), and `pp_check()`.
+
+## The bmm workflow for SDT models
+
+Fitting any of the four models follows the same recipe as every `bmm` model;
+only the ingredients are SDT-specific.
+
+1. **Aggregate the data.** All four models consume *pre-aggregated counts*, not
+   trial-level responses: one row per design cell (for example per subject and
+   stimulus type), with the counts in the columns the constructor names. If
+   your data hold one row per trial, aggregate them first (e.g. with
+   `dplyr::count()` or `stats::aggregate()`); the Rating SDT section below
+   shows a real reshaping example.
+2. **Create the model object.** The constructor maps your column names onto the
+   model's response format — for example `sdt_binary(response = "n_old",
+   stimulus = "stimulus", n_trials = "n_trials")` — and selects the noise
+   distribution via `dist`. Printing the model object lists its parameters and
+   data requirements.
+3. **Specify the formula and fit.** `bmf()` takes one regression formula per
+   model parameter, each with full `brms` syntax: predictors for design effects
+   and random effects such as `(1 | id)` for hierarchical estimation.
+   Parameters you leave out of the formula are held fixed at their default —
+   this is how `sdratio` stays at 0 (equal variance) until you add
+   `sdratio ~ 1`. `bmm()` then compiles and samples the model through
+   `brms`/Stan, and all `brms` arguments (`cores`, `iter`, `prior`, `file`,
+   ...) pass through.
+4. **Post-process.** The fitted object is a `brmsfit`, so the general `brms`
+   toolkit applies (`summary()`, `hypothesis()`, `brms::fixef()`, ...). The
+   SDT-specific extractors add the signal-detection views: ROC curves, AUC,
+   latent distributions, and threshold locations.
+
+Every example below follows these four steps.
 
 # SDT in brief
 
@@ -457,9 +488,10 @@ The population estimates recover the simulated `dprime = 1.5` and
 `criterion = 0.2`.
 
 By default `sdratio` is fixed to 0, i.e. the signal and noise distributions have
-equal variance (`exp(0) = 1`). With a single (hit, false-alarm) pair per subject
-the signal/noise variance ratio is not identified, so leaving it fixed is the
-right default.
+equal variance (`exp(0) = 1`) — it appears in the model's parameter list but got
+no formula, so it stays at its fixed default (step 3 of the workflow recipe).
+With a single (hit, false-alarm) pair per subject the signal/noise variance
+ratio is not identified, so leaving it fixed is the right default here.
 
 ## Multiple criteria: identifying the unequal-variance ratio
 
@@ -762,6 +794,28 @@ principled alternative for aggregated data is k-fold cross-validation via
 altogether. `"log_distance"` behaves like `"log_ratio"`, and `"softmax"` offers an
 intermediate option with a shared spacing plus fewer free deltas.
 
+## Extracting the thresholds
+
+The `delta` parameters are only interpretable through the parameterization that
+maps them to threshold locations. `sdt_thresholds()` performs that mapping: it
+reconstructs the K-1 thresholds per posterior draw on the latent
+decision-variable scale, so the confidence criteria can be reported directly,
+whatever the `threshold_type`.
+
+```{r}
+attr(sdt_thresholds(fit_rating_lr), "summary")
+```
+
+`latent_sdt()` shows the same thresholds in context — the noise and signal
+evidence densities with the K-1 confidence criteria cutting the axis into the
+six rating bins, each threshold carrying the credible band on its location. The
+uneven spacing the `log_ratio` fit recovered (and the parsimonious model could
+not) is directly visible:
+
+```{r}
+plot(latent_sdt(fit_rating_lr))
+```
+
 # m-AFC SDT
 
 In an m-alternative forced-choice task the observer picks the target among `m`
@@ -870,6 +924,7 @@ pp_check(fit_rank, group = "set_size", ndraws = 100)
 | `roc_observed()` | binary, rating | empirical ROC points from the data |
 | `auc_sdt()` | binary, rating | posterior AUC |
 | `latent_sdt()` | all four | noise/signal latent densities + criterion/threshold locations (no boundary for m-AFC/ranking) |
+| `sdt_thresholds()` | rating | K-1 threshold locations per draw on the latent scale, with posterior summary |
 | `plot()` | `bmm_sdt_roc` (incl. `scale = "quantile"`), `bmm_sdt_auc`, `bmm_sdt_latent` | `ggplot2` ROC / quantile-ROC / AUC / latent-distribution figures |
 | `pp_check()` | all four | posterior predictive check |
 
