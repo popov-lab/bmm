@@ -5,8 +5,6 @@
 .model_sdt_mafc <- function(response = NULL, n_trials = NULL, m = NULL,
                             dist = "normal",
                             links = NULL, call = NULL, ...) {
-  dist_int <- .sdt_dist_id(dist)
-
   parameters <- list(
     mu = glue("Internal parameter (fixed to 0)"),
     dprime = glue("Sensitivity: distance between signal and noise distributions")
@@ -14,8 +12,6 @@
   default_priors <- list(
     dprime = list(main = "normal(1, 1)", effects = "normal(0, 0.5)")
   )
-  param_links <- list(mu = "identity", dprime = "identity")
-
   requirements <- glue(
     "Provide pre-aggregated accuracy data with the following columns:", "\n\n",
     "  - Correct responses ({response}): number of correct responses", "\n",
@@ -26,7 +22,7 @@
   out <- structure(
     list(
       resp_vars = nlist(response),
-      other_vars = nlist(n_trials, dist, dist_int, m),
+      other_vars = nlist(n_trials, dist, m),
       domain = "Perception & Recognition Memory",
       task = "m-Alternative Forced Choice",
       name = "Signal Detection Theory (m-AFC)",
@@ -40,7 +36,7 @@
       version = "mafc",
       requirements = requirements,
       parameters = parameters,
-      links = param_links,
+      links = list(mu = "identity", dprime = "identity"),
       fixed_parameters = list(mu = 0),
       default_priors = default_priors,
       init_ranges = list(mu = c(0, 0), dprime = c(0.5, 1.5)),
@@ -143,7 +139,7 @@ check_data.sdt_mafc <- function(model, data, formula) {
   .validate_sdt_counts(data, resp_var, n_trials_var)
 
   data$m_afc <- .sdt_resolve_set_size(model$other_vars$m, data)
-  data$dist_type <- model$other_vars$dist_int
+  data$dist_type <- .sdt_dist_id(model$other_vars$dist)
 
   NextMethod("check_data")
 }
@@ -276,8 +272,8 @@ configure_model.sdt_mafc <- function(model, data, formula) {
     8.97585788784880864e-03, 7.86301523801245968e-03, 6.73152394835926579e-03, 5.58406973006549817e-03,
     4.42337991318194831e-03, 3.25222898448917618e-03, 2.07351663028124350e-03, 8.91640360848207835e-04
   )
-  cdf <- .SDT_DISTS[[dist]]$cdf
-  qf <- .SDT_DISTS[[dist]]$qf
+  cdf <- .sdt_dists[[dist]]$cdf
+  qf <- .sdt_dists[[dist]]$qf
   sum(gl_weights * cdf(qf(gl_nodes) + dprime)^(m - 1))
 }
 

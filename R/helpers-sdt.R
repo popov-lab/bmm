@@ -8,12 +8,12 @@
 # DISTRIBUTION ID & NAME MAPPING                                          ####
 ############################################################################# !
 
+# registry position defines the Stan dist_type integer (see .sdt_dists)
 .sdt_dist_id <- function(dist) {
-  .SDT_DISTS[[dist]]$id
+  match(dist, names(.sdt_dists))
 }
 
-# ordered by id so vint2[i] in log_lik/posterior_predict indexes the right name
-.sdt_dist_names <- names(.SDT_DISTS)[order(vapply(.SDT_DISTS, `[[`, 0L, "id"))]
+.sdt_dist_names <- names(.sdt_dists)
 
 
 ############################################################################# !
@@ -35,6 +35,8 @@
   trial_vals <- data[[n_trials_var]]
   stopif(any(trial_vals <= 0, na.rm = TRUE),
     "Variable '{n_trials_var}' must contain positive values")
+  warnif(any(trial_vals != round(trial_vals), na.rm = TRUE),
+    "Variable '{n_trials_var}' should contain integer counts")
 
   stopif(any(resp_vals > trial_vals, na.rm = TRUE),
     "Response counts in '{resp_var}' must not exceed '{n_trials_var}'")

@@ -44,10 +44,9 @@ test_that("sdt_mafc model stores m and distribution info correctly", {
   model <- sdt_mafc("n_correct", "n_trials", m = 6, dist = "gumbel_min")
   expect_equal(model$other_vars$m, 6L)
   expect_equal(model$other_vars$dist, "gumbel_min")
-  expect_equal(model$other_vars$dist_int, 2L)
 
   model2 <- sdt_mafc("n_correct", "n_trials", m = 3, dist = "logistic")
-  expect_equal(model2$other_vars$dist_int, 4L)
+  expect_equal(model2$other_vars$dist, "logistic")
 })
 
 test_that("sdt_mafc accepts m as a constant or a column name", {
