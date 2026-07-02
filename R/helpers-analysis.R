@@ -328,7 +328,7 @@ roc_sdt <- function(fit, conditions = NULL, n_points = 100,
 # than drawing them as densities. Ro/Rn are returned on the probability scale;
 # the metad version reports the M-ratio and meta-d' derived from logmratio. NULL
 # for the standard version.
-.sdt_latent_extra <- function(fit, model, panel_cond, use_nlpar, probs, ...) {
+.sdt_latent_extra <- function(fit, model, panel_cond, probs, ...) {
   summarise <- function(parameter, mat) {
     summ <- data.frame(
       parameter = parameter,
@@ -341,13 +341,13 @@ roc_sdt <- function(fit, conditions = NULL, n_points = 100,
 
   version <- model$version %||% "standard"
   if (version == "dpsdt") {
-    mats <- list(Ro = stats::plogis(.sdt_linpred(fit, "Ro", panel_cond, use_nlpar, ...)),
-                 Rn = stats::plogis(.sdt_linpred(fit, "Rn", panel_cond, use_nlpar, ...)))
+    mats <- list(Ro = stats::plogis(.sdt_linpred(fit, "Ro", panel_cond, ...)),
+                 Rn = stats::plogis(.sdt_linpred(fit, "Rn", panel_cond, ...)))
     return(do.call(rbind, Map(summarise, names(mats), mats)))
   }
   if (version == "metad") {
-    mratio <- exp(.sdt_linpred(fit, "logmratio", panel_cond, use_nlpar, ...))
-    dprime <- .sdt_linpred(fit, "dprime", panel_cond, use_nlpar, ...)
+    mratio <- exp(.sdt_linpred(fit, "logmratio", panel_cond, ...))
+    dprime <- .sdt_linpred(fit, "dprime", panel_cond, ...)
     return(do.call(rbind, Map(summarise, c("mratio", "metad"),
                               list(mratio, mratio * dprime))))
   }
@@ -897,7 +897,7 @@ latent_sdt <- function(fit, conditions = NULL, n_grid = 200,
     class        = c("bmm_sdt_latent", "data.frame"),
     lines        = do.call(rbind, lines_list),
     competitors  = if (competitors) do.call(rbind, comp_list),
-    extra        = .sdt_latent_extra(fit, model, panel_cond, use_nlpar, probs, ...),
+    extra        = .sdt_latent_extra(fit, model, panel_cond, probs, ...),
     probs        = probs,
     model_class  = class(model),
     dist         = dist,

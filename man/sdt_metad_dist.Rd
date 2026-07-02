@@ -32,43 +32,27 @@ rsdt_metad(
 )
 }
 \arguments{
-\item{counts}{Integer vector of length K. Response counts per rating
-category for a single observation, ordered from "definitely noise" (1) to
-"definitely signal" (K).}
+\item{counts}{Integer matrix with one row per observation and one column
+per rating category, ordered from "definitely noise" (1) to "definitely
+signal" (K), or a vector for a single observation.}
 
-\item{stimulus}{Integer (0 or 1). Stimulus type: 0 = noise, 1 = signal.}
+\item{stimulus}{Integer vector (0/1). Stimulus type: 0 = noise, 1 = signal.}
 
-\item{dprime}{Numeric. Sensitivity parameter.}
+\item{dprime}{Numeric vector. Sensitivity parameter(s).}
 
-\item{thresholds}{Numeric vector of length K-1. Ordered decision thresholds.}
+\item{thresholds}{Numeric vector of length K-1 with the ordered decision
+thresholds, or an n-by-(K-1) matrix with one row per observation.}
 
 \item{metad}{Numeric. Metacognitive sensitivity (type-2 d'). \code{metad = dprime}
 corresponds to ideal metacognition (recovers rating SDT).}
 
-\item{sdratio}{Numeric. Ratio of signal to noise standard deviations
+\item{sdratio}{Numeric vector. Ratio of signal to noise standard deviations
 (default 1, i.e., equal variance).}
 
 \item{dist}{Character. Noise distribution: "normal" (default), "logistic",
 "gumbel_min", or "gumbel_max".}
 
 \item{log}{Logical. If \code{TRUE}, returns log-density (default \code{FALSE}).}
-
-\item{n_per_cell}{Integer. Number of trials per stimulus type per subject.}
-
-\item{n_subjects}{Integer. Number of subjects.}
-
-\item{criterion}{Numeric. Central decision threshold (response bias).}
-
-\item{n_ratings}{Integer. Number of response categories (must be >= 3).}
-
-\item{spacing}{Numeric. Threshold spacing parameter for "equidistant",
-"parsimonious", and "softmax" threshold types.}
-
-\item{deltas}{Numeric vector. Parameters for "log_distance", "log_ratio", or
-"softmax" threshold types.}
-
-\item{threshold_type}{Character. Threshold parameterization: "parsimonious"
-(default), "equidistant", "log_distance", "log_ratio", or "softmax".}
 }
 \value{
 \code{dsdt_metad} returns the (log-)density (multinomial probability).

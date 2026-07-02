@@ -152,6 +152,15 @@ are the recollection probabilities. Both are fixed off by default
 }
 \item \strong{Version:} dpsdt
 \item \strong{Requirements:}
+
+Provide pre-aggregated data with the following columns:
+}
+\itemize{
+\item Response counts: one column per rating category (K columns)
+\item Stimulus type (stimulus): 0 = noise, 1 = signal
+Categories should be ordered: 1 = 'definitely noise' to K = 'definitely signal'
+}
+\itemize{
 \item \strong{Parameters:}
 \itemize{
 \item \code{dprime}: Sensitivity: distance between signal and noise distributions
@@ -230,6 +239,15 @@ with \code{\link[=mratio]{mratio()}}.
 }
 \item \strong{Version:} metad
 \item \strong{Requirements:}
+
+Provide pre-aggregated data with the following columns:
+}
+\itemize{
+\item Response counts: one column per rating category (K columns)
+\item Stimulus type (stimulus): 0 = noise, 1 = signal
+Categories should be ordered: 1 = 'definitely noise' to K = 'definitely signal'
+}
+\itemize{
 \item \strong{Parameters:}
 \itemize{
 \item \code{dprime}: Sensitivity: distance between signal and noise distributions

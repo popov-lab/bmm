@@ -2558,8 +2558,8 @@ rsdt_rating <- function(n, n_trials, stimulus, dprime, thresholds,
 #'            dprime = 1.5, thresholds = c(-0.5, 0.0, 0.5), Ro = 0.3, Rn = 0)
 dsdt_dpsdt <- function(counts, stimulus, dprime, thresholds, Ro, Rn,
                        sdratio = 1, dist = "normal", log = FALSE) {
-  stopif(!dist %in% names(.SDT_DISTS),
-         "dist must be one of {collapse_comma(names(.SDT_DISTS))}")
+  stopif(!dist %in% names(.sdt_dists),
+         "dist must be one of {collapse_comma(names(.sdt_dists))}")
   stopif(is.null(counts), "counts is required for DPSDT density")
   stopif(is.null(thresholds), "thresholds is required for DPSDT density")
   stopif(any(counts < 0), "counts must be non-negative")
@@ -2591,8 +2591,8 @@ rsdt_dpsdt <- function(n_per_cell, n_subjects, dprime, criterion, Ro, Rn,
                        sdratio = 1, dist = "normal",
                        n_ratings = NULL, spacing = NULL, deltas = NULL,
                        threshold_type = "parsimonious") {
-  stopif(!dist %in% names(.SDT_DISTS),
-         "dist must be one of {collapse_comma(names(.SDT_DISTS))}")
+  stopif(!dist %in% names(.sdt_dists),
+         "dist must be one of {collapse_comma(names(.sdt_dists))}")
   stopif(length(sdratio) != 1, "sdratio must be a single value for rating SDT")
   stopif(is.null(n_ratings) || n_ratings < 3,
          "n_ratings must be >= 3 for rating SDT")
@@ -2651,8 +2651,8 @@ rsdt_dpsdt <- function(n_per_cell, n_subjects, dprime, criterion, Ro, Rn,
 #'            dprime = 1.5, thresholds = c(-0.5, 0.0, 0.5), metad = 1.0)
 dsdt_metad <- function(counts, stimulus, dprime, thresholds, metad,
                        sdratio = 1, dist = "normal", log = FALSE) {
-  stopif(!dist %in% names(.SDT_DISTS),
-         "dist must be one of {collapse_comma(names(.SDT_DISTS))}")
+  stopif(!dist %in% names(.sdt_dists),
+         "dist must be one of {collapse_comma(names(.sdt_dists))}")
   stopif(is.null(counts), "counts is required for meta-d' density")
   stopif(is.null(thresholds), "thresholds is required for meta-d' density")
   stopif(any(counts < 0), "counts must be non-negative")
@@ -2682,8 +2682,8 @@ rsdt_metad <- function(n_per_cell, n_subjects, dprime, criterion, metad,
                        sdratio = 1, dist = "normal",
                        n_ratings = NULL, spacing = NULL, deltas = NULL,
                        threshold_type = "parsimonious") {
-  stopif(!dist %in% names(.SDT_DISTS),
-         "dist must be one of {collapse_comma(names(.SDT_DISTS))}")
+  stopif(!dist %in% names(.sdt_dists),
+         "dist must be one of {collapse_comma(names(.sdt_dists))}")
   stopif(length(sdratio) != 1, "sdratio must be a single value for rating SDT")
   stopif(is.null(n_ratings) || n_ratings < 3,
          "n_ratings must be >= 3 for rating SDT")
