@@ -176,7 +176,7 @@ Condition effects are added exactly as in any other `bmm` model. For example, if
 
 Some MPT models contain probabilities that are fixed by the experimental design rather than estimated — for example, guessing rates determined by the number of response options. Such quantities can be included in branch expressions as *covariates*: data columns that are declared in the `covariates` argument and passed through to the model unchanged.
 
-The model @oberauerRehearsal2019 used for simple-span recognition data illustrates this. The probability of a correct response depends on binding memory (`Pb`) and item memory (`Pi`), while three guessing rates are computed from the size of the response set in each condition:
+The model @oberauerBindings2019 used for n-AFC recognition data illustrates this. The probability of a correct response depends on binding memory (`Pb`) and item memory (`Pi`), while three guessing rates are computed from the size of the response set in each condition:
 
 ```{r}
 tree_ss <- mpt_tree("ss", list(
