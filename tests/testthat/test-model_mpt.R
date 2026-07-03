@@ -640,3 +640,72 @@ test_that("constants that Stan would receive in scientific notation error", {
   ))
   expect_equal(tree$branches$b, "(1 - p) * 0.001")
 })
+
+test_that("the item-memory-first MPT matches the simple-rule m3 with a distractor category", {
+  # bijection for act_funs corr ~ b+a+c, other ~ b+a, dist ~ b+d, npl ~ b
+  # with candidate counts (1, 4, 5, 5) and S = 15b + 5a + c + 5d:
+  #   Pi = (5a + c + 5d)/S, Pb = c/(5a + c + 5d), Pd = d/(a + d)
+  b <- 0.1
+  mpt_dist <- mpt(mpt_tree("newdist", list(
+    corr = "Pi * Pb + Pi * (1 - Pb) * (1 - Pd) * (1/5) + (1 - Pi) * (1/15)",
+    other = "Pi * (1 - Pb) * (1 - Pd) * (4/5) + (1 - Pi) * (4/15)",
+    dist = "Pi * (1 - Pb) * Pd + (1 - Pi) * (5/15)",
+    npl = "(1 - Pi) * (5/15)"
+  )))
+  m3_dist <- m3(
+    resp_cats = c("corr", "other", "dist", "npl"),
+    num_options = c(1, 4, 5, 5), choice_rule = "simple", version = "custom"
+  )
+  acts_dist <- bmf(corr ~ b + a + c, other ~ b + a, dist ~ b + d, npl ~ b)
+
+  grid <- expand.grid(a = c(0.2, 1, 3), c = c(0.5, 2, 6), d = c(0.1, 0.8, 2))
+  max_diff <- max(vapply(seq_len(nrow(grid)), function(i) {
+    a <- grid$a[i]
+    c_par <- grid$c[i]
+    d <- grid$d[i]
+    denom <- 5 * a + c_par + 5 * d
+    p_mpt <- .compute_mpt_probability_vector(
+      pars = c(
+        Pi = denom / (15 * b + denom),
+        Pb = c_par / denom,
+        Pd = d / (a + d)
+      ),
+      mpt_model = mpt_dist
+    )
+    p_m3 <- .compute_m3_probability_vector(
+      pars = c(a = a, c = c_par, d = d, b = b),
+      m3_model = m3_dist, act_funs = acts_dist
+    )
+    max(abs(p_mpt - p_m3))
+  }, numeric(1)))
+  expect_lt(max_diff, 1e-10)
+
+  # no-distractor condition: counts (1, 4, 10), S = 15b + 5a + c
+  mpt_nodist <- mpt(mpt_tree("nodist", list(
+    corr = "Pi * Pb + Pi * (1 - Pb) * (1/5) + (1 - Pi) * (1/15)",
+    other = "Pi * (1 - Pb) * (4/5) + (1 - Pi) * (4/15)",
+    npl = "(1 - Pi) * (10/15)"
+  )))
+  m3_nodist <- m3(
+    resp_cats = c("corr", "other", "npl"),
+    num_options = c(1, 4, 10), choice_rule = "simple", version = "custom"
+  )
+  acts_nodist <- bmf(corr ~ b + a + c, other ~ b + a, npl ~ b)
+  max_diff_nodist <- max(vapply(seq_len(nrow(grid)), function(i) {
+    a <- grid$a[i]
+    c_par <- grid$c[i]
+    p_mpt <- .compute_mpt_probability_vector(
+      pars = c(
+        Pi = (5 * a + c_par) / (15 * b + 5 * a + c_par),
+        Pb = c_par / (5 * a + c_par)
+      ),
+      mpt_model = mpt_nodist
+    )
+    p_m3 <- .compute_m3_probability_vector(
+      pars = c(a = a, c = c_par, b = b),
+      m3_model = m3_nodist, act_funs = acts_nodist
+    )
+    max(abs(p_mpt - p_m3))
+  }, numeric(1)))
+  expect_lt(max_diff_nodist, 1e-10)
+})

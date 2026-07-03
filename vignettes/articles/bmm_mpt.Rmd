@@ -246,13 +246,21 @@ plot(model_ol$trees$oldsame)
 par(old_par)
 ```
 
-Binding memory is allowed to differ between the three conditions, item memory is shared, and the distractor-intrusion probability gets a single intercept — its formula applies only where the parameter appears in a tree:
+This MPT is not merely inspired by the [m3 analysis of the same data](https://venpopov.github.io/bmm/articles/bmm_m3.html) — under the `simple` choice rule the two models are *the same likelihood* in different parameterizations. With the m3 activations `corr ~ b + a + c`, `other ~ b + a`, `dist ~ b + d`, `npl ~ b` (candidate counts 1, 4, 5, 5 and $S = 15b + 5a + c + 5d$), the mapping is
+
+$$
+P_i = \frac{5a + c + 5d}{S}, \qquad
+P_b = \frac{c}{5a + c + 5d}, \qquad
+P_d = \frac{d}{a + d},
+$$
+
+and both parameter sets span exactly the same category probabilities (the identity is verified to machine precision in the package's test suite). Item memory corresponds to responding from list-related activation rather than background noise, and binding to the share of context activation within it. Because the m3 analysis lets both `a` and `c` vary by condition, the equivalent MPT lets both `Pi` and `Pb` vary by condition; `d` — and hence `Pd` — only enters the distractor condition. What remains different is where the priors and random effects live: on the log scale of activations in the m3, on the logit scale of the process probabilities here.
 
 ```{r fit-ol, results = "hide", message = FALSE, warning = FALSE}
 fit_ol <- bmm(
   formula = bmf(
-    Pb ~ 0 + cond + (1 | ID),
-    Pi ~ 1 + (1 | ID),
+    Pi ~ 0 + cond + (0 + cond || ID),
+    Pb ~ 0 + cond + (0 + cond || ID),
     Pd ~ 1 + (1 | ID)
   ),
   data = data_ol,
@@ -267,7 +275,7 @@ fit_ol <- bmm(
 plogis(brms::fixef(fit_ol)[, c("Estimate", "Q2.5", "Q97.5")])
 ```
 
-Item memory is nearly always intact — not-presented lures are rarely chosen — while binding memory is clearly higher when the list is re-presented in its original order than in the other two conditions. When item memory succeeds but the binding is unavailable in the distractor condition, distractor activation captures the response about half of the time. The posterior predictive distribution reproduces the response-category proportions within each condition, including the near-zero `dist` proportions where no distractors were shown:
+Item memory is high in all three conditions — not-presented lures are rarely chosen — while binding memory is clearly higher when the list is re-presented in its original order than in the other two conditions. When item memory succeeds but the binding is unavailable in the distractor condition, distractor activation captures the response about half of the time. The posterior predictive distribution reproduces the response-category proportions within each condition, including the near-zero `dist` proportions where no distractors were shown:
 
 ```{r fig-ppc-ol, fig.width = 7, fig.asp = 0.7, out.width = "100%"}
 pp_check(fit_ol, group = "cond")
