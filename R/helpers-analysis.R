@@ -330,12 +330,7 @@ roc_sdt <- function(fit, conditions = NULL, n_points = 100,
 # for the standard version.
 .sdt_latent_extra <- function(fit, model, panel_cond, probs, ...) {
   summarise <- function(parameter, mat) {
-    summ <- data.frame(
-      parameter = parameter,
-      mean      = colMeans(mat),
-      lower     = unname(apply(mat, 2L, stats::quantile, probs[1L])),
-      upper     = unname(apply(mat, 2L, stats::quantile, probs[2L]))
-    )
+    summ <- data.frame(parameter = parameter, .sdt_summarise_draws(mat, probs))
     if (ncol(panel_cond) > 0L) cbind(summ, panel_cond, row.names = NULL) else summ
   }
 
@@ -527,31 +522,17 @@ roc_sdt <- function(fit, conditions = NULL, n_points = 100,
     dp_vec <- dprime_mat[, c_i]
     sr_vec <- sdratio_mat[, c_i]
 
-    if (model$version %in% c("dpsdt", "metad")) {
-      # the version probability kernels are still scalar, so the discrete
-      # operating points fall back to a per-draw loop for these versions
-      fa_pts  <- matrix(NA_real_, n_draws, K1)
-      hit_pts <- matrix(NA_real_, n_draws, K1)
-      for (d_i in seq_len(n_draws)) {
-        pars <- list(
-          Ro    = if (!is.null(ro_mat)) ro_mat[d_i, c_i],
-          Rn    = if (!is.null(rn_mat)) rn_mat[d_i, c_i],
-          metad = if (!is.null(metad_mat)) metad_mat[d_i, c_i]
-        )
-        thr_d <- thr_list[[c_i]][d_i, ]
-        pn <- .sdt_version_category_probs(model, thr_d, dp_vec[d_i], 1,
-                                          0L, dist, pars)
-        ps <- .sdt_version_category_probs(model, thr_d, dp_vec[d_i], sr_vec[d_i],
-                                          1L, dist, pars)
-        fa_pts[d_i, ]  <- 1 - cumsum(pn)[seq_len(K1)]
-        hit_pts[d_i, ] <- 1 - cumsum(ps)[seq_len(K1)]
-      }
-    } else {
-      pn <- .sdt_category_probs(thr_list[[c_i]], dp_vec, 1,      0L, dist)
-      ps <- .sdt_category_probs(thr_list[[c_i]], dp_vec, sr_vec, 1L, dist)
-      fa_pts  <- 1 - matrixStats::rowCumsums(pn)[, seq_len(K1), drop = FALSE]
-      hit_pts <- 1 - matrixStats::rowCumsums(ps)[, seq_len(K1), drop = FALSE]
-    }
+    pars <- list(
+      Ro    = if (!is.null(ro_mat)) ro_mat[, c_i],
+      Rn    = if (!is.null(rn_mat)) rn_mat[, c_i],
+      metad = if (!is.null(metad_mat)) metad_mat[, c_i]
+    )
+    pn <- rbind(.sdt_version_category_probs(model, thr_list[[c_i]], dp_vec, 1,
+                                            0L, dist, pars))
+    ps <- rbind(.sdt_version_category_probs(model, thr_list[[c_i]], dp_vec,
+                                            sr_vec, 1L, dist, pars))
+    fa_pts  <- 1 - matrixStats::rowCumsums(pn)[, seq_len(K1), drop = FALSE]
+    hit_pts <- 1 - matrixStats::rowCumsums(ps)[, seq_len(K1), drop = FALSE]
 
     cond_row <- if (cond_has_cols) conditions[c_i, , drop = FALSE]
     cond_df <- data.frame(
@@ -1085,25 +1066,25 @@ mratio <- function(fit, conditions = NULL, probs = c(0.025, 0.975), ...) {
   conditions <- .sdt_resolve_conditions(fit, conditions)
   cond_rows  <- .sdt_unique_subset(conditions, names(conditions))
 
-  mratio_mat <- exp(.sdt_linpred(fit, "logmratio", cond_rows, is_rating = TRUE, ...))
-  dprime_mat <- .sdt_linpred(fit, "dprime", cond_rows, is_rating = TRUE, ...)
+  mratio_mat <- exp(.sdt_linpred(fit, "logmratio", cond_rows, ...))
+  dprime_mat <- .sdt_linpred(fit, "dprime", cond_rows, ...)
   mats       <- list(mratio = mratio_mat, metad = mratio_mat * dprime_mat)
 
   draws_list   <- vector("list", ncol(mratio_mat))
   summary_list <- vector("list", ncol(mratio_mat))
   for (c_i in seq_len(ncol(mratio_mat))) {
-    crow <- if (ncol(cond_rows) > 0L) cond_rows[c_i, , drop = FALSE]
+    crow <- cond_rows[c_i, , drop = FALSE]
     draws_list[[c_i]] <- do.call(rbind, lapply(names(mats), function(nm) {
-      v  <- mats[[nm]][, c_i]
-      df <- data.frame(parameter = nm, value = v, .draw = seq_along(v))
-      if (!is.null(crow)) cbind(df, crow[rep(1L, nrow(df)), , drop = FALSE], row.names = NULL) else df
+      v <- mats[[nm]][, c_i]
+      .sdt_bind_cond(data.frame(parameter = nm, value = v,
+                                .draw = seq_along(v)), crow)
     }))
     summary_list[[c_i]] <- do.call(rbind, lapply(names(mats), function(nm) {
       v <- mats[[nm]][, c_i]
-      s <- data.frame(parameter = nm, mean = mean(v), median = stats::median(v),
-                      lower = unname(stats::quantile(v, probs[1L])),
-                      upper = unname(stats::quantile(v, probs[2L])))
-      if (!is.null(crow)) cbind(s, crow, row.names = NULL) else s
+      summ <- .sdt_summarise_draws(v, probs)
+      .sdt_bind_cond(data.frame(parameter = nm, mean = summ$mean,
+                                median = stats::median(v),
+                                lower = summ$lower, upper = summ$upper), crow)
     }))
   }
 

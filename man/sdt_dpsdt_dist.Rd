@@ -14,23 +14,20 @@ dsdt_dpsdt(
   Ro,
   Rn,
   sdratio = 1,
-  dist = "normal",
+  dist = c("normal", "logistic", "gumbel_min", "gumbel_max"),
   log = FALSE
 )
 
 rsdt_dpsdt(
-  n_per_cell,
-  n_subjects,
+  n,
+  n_trials,
+  stimulus,
   dprime,
-  criterion,
+  thresholds,
   Ro,
   Rn,
   sdratio = 1,
-  dist = "normal",
-  n_ratings = NULL,
-  spacing = NULL,
-  deltas = NULL,
-  threshold_type = "parsimonious"
+  dist = c("normal", "logistic", "gumbel_min", "gumbel_max")
 )
 }
 \arguments{
@@ -45,11 +42,11 @@ signal" (K), or a vector for a single observation.}
 \item{thresholds}{Numeric vector of length K-1 with the ordered decision
 thresholds, or an n-by-(K-1) matrix with one row per observation.}
 
-\item{Ro}{Numeric in \verb{[0, 1]}. Recollection probability for old (signal)
-items.}
+\item{Ro}{Numeric vector in \verb{[0, 1]}. Recollection probability for old
+(signal) items.}
 
-\item{Rn}{Numeric in \verb{[0, 1]}. Recollection (recall-to-reject) probability
-for new (noise) items.}
+\item{Rn}{Numeric vector in \verb{[0, 1]}. Recollection (recall-to-reject)
+probability for new (noise) items.}
 
 \item{sdratio}{Numeric vector. Ratio of signal to noise standard deviations
 (default 1, i.e., equal variance).}
@@ -58,11 +55,17 @@ for new (noise) items.}
 "gumbel_min", or "gumbel_max".}
 
 \item{log}{Logical. If \code{TRUE}, returns log-density (default \code{FALSE}).}
+
+\item{n}{Integer. Number of observations to generate. \code{n_trials},
+\code{stimulus}, \code{thresholds}, and the model parameters are recycled to this
+length.}
+
+\item{n_trials}{Integer vector. Number of trials per observation.}
 }
 \value{
 \code{dsdt_dpsdt} returns the (log-)density (multinomial probability).
-\code{rsdt_dpsdt} returns a data frame with columns \code{id}, \code{stimulus},
-\code{r1}, ..., \code{rK}, and \code{nTrials}.
+\code{rsdt_dpsdt} returns an integer matrix with one row per observation and
+one rating-count column per category (\code{r1} ... \code{rK}).
 }
 \description{
 Density and random generation for the dual-process signal
@@ -76,10 +79,11 @@ here \code{Ro}/\code{Rn} are supplied directly as probabilities in \verb{[0, 1]}
 # Density for a single observation (K=4) with recollection of old items
 dsdt_dpsdt(counts = c(2, 8, 20, 70), stimulus = 1,
            dprime = 1.5, thresholds = c(-0.5, 0.0, 0.5), Ro = 0.3, Rn = 0)
-# Generate DPSDT rating data (K=4)
-dat <- rsdt_dpsdt(n_per_cell = 100, n_subjects = 10, dprime = 1.5,
-                  criterion = 0, Ro = 0.3, Rn = 0.1, n_ratings = 4,
-                  spacing = 0.5)
+# Generate DPSDT rating data (K=4) for 10 subjects and both stimulus types
+dat <- expand.grid(id = 1:10, stimulus = c(0L, 1L))
+dat <- cbind(dat, rsdt_dpsdt(nrow(dat), 100, dat$stimulus, dprime = 1.5,
+                             thresholds = c(-0.5, 0, 0.5),
+                             Ro = 0.3, Rn = 0.1))
 head(dat)
 }
 \references{

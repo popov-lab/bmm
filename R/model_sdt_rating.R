@@ -199,10 +199,6 @@
   param_links <- c(param_links, variant$links)
   init_ranges <- c(init_ranges, variant$init_ranges)
   fixed_parameters <- c(list(sdratio = 0), variant$fixed_parameters)
-  logmu_fun <- variant$logmu_fun
-  logmu_cat_call <- variant$logmu_cat_call
-  extra_params <- variant$extra_params
-  stan_chunk <- variant$stan_chunk
 
   requirements <- glue(
     "Provide pre-aggregated data with the following columns:", "\n\n",
@@ -215,8 +211,7 @@
   out <- structure(
     list(
       resp_vars = nlist(response),
-      other_vars = nlist(stimulus, dist, n_ratings, threshold_type,
-                         logmu_fun, logmu_cat_call, extra_params, stan_chunk),
+      other_vars = nlist(stimulus, dist, n_ratings, threshold_type),
       domain = "Perception & Recognition Memory",
       task = "Signal/Noise or Old/New Recognition",
       name = "Signal Detection Theory (Confidence Rating)",
@@ -474,6 +469,14 @@ check_data.sdt_rating <- function(model, data, formula) {
 # from brms — proper joint multinomial draws — while the four distributions and
 # five threshold parameterizations stay supported.
 
+# The dispatch pieces (kernel names, extra parameters, Stan chunk) are pure
+# derived state: look them up in the variant registry instead of storing them
+# in the model object. Legacy model objects from before the version machinery
+# carry version = "rating" and resolve to the standard variant.
+.sdt_rating_variant <- function(model) {
+  .sdt_rating_variants[[model$version]] %||% .sdt_rating_variants$standard
+}
+
 # cat, K, dist, and threshold type travel as integer literals so the same
 # non-linear call resolves against both the generated Stan function and the R
 # companion. spacing is the parameter when present, otherwise the literal 0
@@ -484,16 +487,17 @@ check_data.sdt_rating <- function(model, data, formula) {
     .sdt_threshold_type_id(model$other_vars$threshold_type),
     "dprime", "criterion",
     if (has_spacing) "spacing" else "0", "sdratio",
-    model$other_vars$extra_params,
+    .sdt_rating_variant(model)$extra_params,
     model$other_vars$stimulus, .sdt_threshold_delta_names(model))
 }
 
 # Stan function generated per model: the delta arity is fixed here, while cat,
 # K, dist, and threshold type arrive as the integer arguments described above.
 .sdt_rating_logmu_stan <- function(model) {
+  variant <- .sdt_rating_variant(model)
   delta_names <- .sdt_threshold_delta_names(model)
   nd <- length(delta_names)
-  extra <- model$other_vars$extra_params
+  extra <- variant$extra_params
 
   signature <- paste(
     c("int cat", "int K", "int dist_type", "int thresh_type",
@@ -511,10 +515,10 @@ check_data.sdt_rating <- function(model, data, formula) {
   }
 
   paste0(
-    "real ", model$other_vars$logmu_fun, "(", signature, ") {\n",
+    "real ", variant$logmu_fun, "(", signature, ") {\n",
     delta_decl,
     "  vector[K - 1] thr = sdt_make_thresholds_rating(criterion, spacing, deltas, K, thresh_type);\n",
-    "  return ", model$other_vars$logmu_cat_call, ";\n",
+    "  return ", variant$logmu_cat_call, ";\n",
     "}\n"
   )
 }
@@ -531,7 +535,7 @@ check_data.sdt_rating <- function(model, data, formula) {
 #' @export
 bmf2bf.sdt_rating <- function(model, formula) {
   resp_cats <- model$resp_vars$response
-  fun <- model$other_vars$logmu_fun
+  fun <- .sdt_rating_variant(model)$logmu_fun
   args <- paste(.sdt_rating_logmu_args(model), collapse = ", ")
 
   bform <- brms::bf(
@@ -562,7 +566,7 @@ configure_model.sdt_rating <- function(model, data, formula) {
 
   sc_path <- system.file("stan_chunks", package = "bmm")
   chunks <- unique(c("sdt_dist_funs.stan", "sdt_rating_funs.stan",
-                     model$other_vars$stan_chunk))
+                     .sdt_rating_variant(model)$stan_chunk))
   stan_funs <- paste(
     paste(vapply(chunks, function(f) read_lines2(paste0(sc_path, "/", f)),
                  character(1)), collapse = "\n"),
@@ -633,23 +637,22 @@ sdt_dpsdt_logmu <- function(cat, K, dist, thresh, dprime, criterion, spacing,
   shape <- dim(dprime)
   dprime <- as.vector(dprime)
   n <- length(dprime)
-  criterion <- as.vector(criterion)
+  criterion <- rep_len(as.vector(criterion), n)
   spacing <- rep_len(as.vector(spacing), n)
-  sdratio <- as.vector(sdratio)
+  sdratio <- rep_len(as.vector(sdratio), n)
   Ro <- rep_len(as.vector(Ro), n)
   Rn <- rep_len(as.vector(Rn), n)
   stimulus <- rep_len(as.vector(stimulus), n)
-  deltas <- lapply(list(...), as.vector)
+  deltas <- if (...length() > 0L) {
+    do.call(cbind, lapply(list(...), function(d) rep_len(as.vector(d), n)))
+  }
 
-  out <- vapply(seq_len(n), function(j) {
-    deltas_j <- if (length(deltas)) vapply(deltas, `[`, numeric(1), j) else NULL
-    thr <- .sdt_make_thresholds(criterion[j], K, thresh_name, spacing[j], deltas_j)
-    ratio <- if (stimulus[j] > 0.5) exp(sdratio[j]) else 1
-    probs <- .sdt_dpsdt_category_probs(thr, dprime[j], ratio, stimulus[j],
-                                       dist_name, stats::plogis(Ro[j]),
-                                       stats::plogis(Rn[j]))
-    log(probs[cat])
-  }, numeric(1))
+  thr <- .sdt_make_thresholds(criterion, K, thresh_name, spacing, deltas)
+  probs <- rbind(.sdt_dpsdt_category_probs(rbind(thr), dprime, exp(sdratio),
+                                           stimulus, dist_name,
+                                           stats::plogis(Ro),
+                                           stats::plogis(Rn)))
+  out <- log(probs[, cat])
 
   if (!is.null(shape)) dim(out) <- shape
   out
@@ -666,22 +669,20 @@ sdt_metad_logmu <- function(cat, K, dist, thresh, dprime, criterion, spacing,
   shape <- dim(dprime)
   dprime <- as.vector(dprime)
   n <- length(dprime)
-  criterion <- as.vector(criterion)
+  criterion <- rep_len(as.vector(criterion), n)
   spacing <- rep_len(as.vector(spacing), n)
-  sdratio <- as.vector(sdratio)
+  sdratio <- rep_len(as.vector(sdratio), n)
   # meta-d' is derived from the estimated log M-ratio, mirroring the Stan call
   metad <- exp(rep_len(as.vector(logmratio), n)) * dprime
   stimulus <- rep_len(as.vector(stimulus), n)
-  deltas <- lapply(list(...), as.vector)
+  deltas <- if (...length() > 0L) {
+    do.call(cbind, lapply(list(...), function(d) rep_len(as.vector(d), n)))
+  }
 
-  out <- vapply(seq_len(n), function(j) {
-    deltas_j <- if (length(deltas)) vapply(deltas, `[`, numeric(1), j) else NULL
-    thr <- .sdt_make_thresholds(criterion[j], K, thresh_name, spacing[j], deltas_j)
-    ratio <- if (stimulus[j] > 0.5) exp(sdratio[j]) else 1
-    probs <- .sdt_metad_category_probs(thr, dprime[j], metad[j], stimulus[j],
-                                       ratio, dist_name)
-    log(probs[cat])
-  }, numeric(1))
+  thr <- .sdt_make_thresholds(criterion, K, thresh_name, spacing, deltas)
+  probs <- rbind(.sdt_metad_category_probs(rbind(thr), dprime, metad, stimulus,
+                                           exp(sdratio), dist_name))
+  out <- log(probs[, cat])
 
   if (!is.null(shape)) dim(out) <- shape
   out
