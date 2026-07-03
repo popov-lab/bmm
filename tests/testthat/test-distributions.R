@@ -1263,3 +1263,95 @@ test_that("dezdm 3par handles varying n_trials correctly", {
   expect_length(ll_vec, 3)
   expect_true(all(is.finite(ll_vec)))
 })
+
+test_that("dmpt matches hand-computed multinomial densities", {
+  tree_old <- mpt_tree("old", list(
+    old = "D + (1 - D) * g",
+    new = "(1 - D) * (1 - g)"
+  ))
+  tree_new <- mpt_tree("new", list(
+    old = "(1 - D) * g",
+    new = "D + (1 - D) * (1 - g)"
+  ))
+  model <- mpt(list(tree_old, tree_new), condition = "item_type")
+
+  d_old <- dmpt(
+    x = c(35, 15), pars = c(D = 0.7, g = 0.5),
+    mpt_model = model, tree = "old"
+  )
+  expect_equal(d_old, dbinom(35, 50, 0.7 + 0.3 * 0.5, log = TRUE))
+
+  d_new <- dmpt(
+    x = c(10, 40), pars = c(D = 0.7, g = 0.5),
+    mpt_model = model, tree = "new", log = FALSE
+  )
+  expect_equal(d_new, dbinom(10, 50, 0.3 * 0.5))
+})
+
+test_that("dmpt evaluates covariates in branch expressions", {
+  tree <- mpt_tree("main", list(
+    correct = "D + (1 - D) * Gcorr",
+    incorrect = "(1 - D) * (1 - Gcorr)"
+  ))
+  model <- mpt(tree, covariates = "Gcorr")
+  d <- dmpt(
+    x = c(30, 10), pars = c(D = 0.6), mpt_model = model,
+    covariates = c(Gcorr = 0.25), log = FALSE
+  )
+  expect_equal(d, dbinom(30, 40, 0.6 + 0.4 * 0.25))
+})
+
+test_that("rmpt generates counts with category names and unpacks", {
+  tree <- mpt_tree("study", list(
+    C = "cp + (1 - cp) * rp * rp",
+    E = "2 * (1 - cp) * rp * (1 - rp)",
+    U = "(1 - cp) * (1 - rp) * (1 - rp)"
+  ))
+  model <- mpt(tree)
+  draws <- rmpt(n = 7, size = 40, pars = c(cp = 0.6, rp = 0.75), mpt_model = model)
+  expect_equal(dim(draws), c(7, 3))
+  expect_equal(colnames(draws), c("C", "E", "U"))
+  expect_true(all(rowSums(draws) == 40))
+
+  unpacked <- rmpt(
+    n = 1, size = 40, pars = c(cp = 0.6, rp = 0.75),
+    mpt_model = model, unpack = TRUE
+  )
+  expect_named(unpacked, c("C", "E", "U"))
+  expect_equal(sum(unpacked), 40)
+})
+
+test_that("dmpt validates its inputs", {
+  tree_old <- mpt_tree("old", list(
+    old = "D + (1 - D) * g",
+    new = "(1 - D) * (1 - g)"
+  ))
+  tree_new <- mpt_tree("new", list(
+    old = "(1 - D) * g",
+    new = "D + (1 - D) * (1 - g)"
+  ))
+  model <- mpt(list(tree_old, tree_new), condition = "item_type")
+
+  expect_error(
+    dmpt(c(1, 1), pars = c(D = 0.7), mpt_model = model, tree = "old"),
+    "Required"
+  )
+  expect_error(
+    dmpt(c(1, 1), pars = c(D = 0.7, g = 0.5), mpt_model = model),
+    "multiple trees"
+  )
+  expect_error(
+    dmpt(c(1, 1), pars = c(D = 0.7, g = 0.5), mpt_model = model, tree = "foo"),
+    "Unknown tree"
+  )
+  expect_error(
+    dmpt(c(1, 1), pars = c(D = 1.7, g = 0.5), mpt_model = model, tree = "old"),
+    "between 0 and 1"
+  )
+  expect_error(
+    dmpt(c(1, 1), pars = c(D = 0.7, g = 0.5), mpt_model = m3(
+      resp_cats = c("a", "b"), num_options = c(1, 1)
+    )),
+    "created with mpt"
+  )
+})

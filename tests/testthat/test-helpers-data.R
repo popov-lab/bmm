@@ -163,7 +163,8 @@ test_that("check_data() returns a data.frame()", {
       resp_error = "y", nt_features = "x", set_size = 2,
       nt_distances = "z", resp_cats = c("w", "l"), num_options = c(1, 1),
       mean_rt = "mean_rt", var_rt = "var_rt", n_upper = "n_upper",
-      n_trials = "n_trials", rt = "rt", response = "response"
+      n_trials = "n_trials", rt = "rt", response = "response",
+      trees = mpt_tree("t", list(w = "p", l = "1 - p"))
     )
     expect_s3_class(
       check_data(model, test_data, bmf(kappa ~ 1)),
