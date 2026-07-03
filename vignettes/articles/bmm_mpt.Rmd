@@ -88,6 +88,12 @@ model_2htm <- mpt(
 )
 ```
 
+The `plot()` method draws the processing trees implied by the branch expressions — each product in an expression is one root-to-leaf path, and paths sharing a common prefix share the corresponding nodes. This is a quick way to verify that the specified expressions encode the intended tree:
+
+```{r fig-tree-2htm, fig.width = 8, fig.asp = 0.45, out.width = "100%"}
+plot(model_2htm)
+```
+
 The latent parameters are identified automatically from the branch expressions: every symbol that is not a declared covariate (see below) is treated as a parameter. Equality constraints follow directly from the naming — because both trees use the same symbol `D`, detection is equated for old and new items. To estimate separate detection probabilities, you would simply write `Do` and `Dn` instead.
 
 Two things to keep in mind when writing branch expressions:
@@ -158,6 +164,12 @@ All estimates are on the logit scale. The population-level detection and guessin
 plogis(brms::fixef(fit_2htm)[, c("Estimate", "Q2.5", "Q97.5")])
 ```
 
+Because the model uses a multinomial family, `pp_check()` produces a response-proportion plot: the observed proportion of each response category against the posterior predictive distribution. Grouping by the condition variable checks the fit within each tree:
+
+```{r fig-ppc-2htm, fig.width = 7, fig.asp = 0.5, out.width = "100%"}
+pp_check(fit_2htm, group = "item_type")
+```
+
 Condition effects are added exactly as in any other `bmm` model. For example, if the design manipulated encoding strength between blocks, `D ~ 0 + strength + (1 | id)` estimates a separate latent-scale detection parameter per strength level, and `brms::hypothesis()` can be used to test differences between them.
 
 # Design-fixed covariates in branch expressions
@@ -182,6 +194,79 @@ model_ss
 ```
 
 Only `Pb` and `Pi` are latent parameters; the `Gcorr*` symbols must exist as numeric columns in the data (e.g., `GcorrPi = 1 / rsizeList`). This mechanism goes beyond what classical MPT software supports, because the guessing rates can vary continuously across trials or conditions.
+
+# Fitting real data: an MPT for the m3 example data set
+
+The `oberauer_lewandowsky_2019_e1` data set that the [m3 article](https://venpopov.github.io/bmm/articles/bmm_m3.html) analyzes with activation-based measurement models can equally be described by a processing-tree model, which makes for an instructive real-data example. Participants recalled a list item from a set of candidates in three conditions: in the `new distractors` condition the response set additionally contained five distractors, while in the `old reordered` and `old same` conditions no distractors were present. Each row records how often a participant chose the correct item (`corr`, 1 candidate), another list item (`other`, 4 candidates), a distractor (`dist`, 5 or 0 candidates), or a not-presented lure (`npl`, 5 or 10 candidates):
+
+```{r}
+data_ol <- oberauer_lewandowsky_2019_e1
+data_ol$cond <- factor(
+  data_ol$cond,
+  levels = c("new distractors", "old reordered", "old same"),
+  labels = c("newdist", "oldreord", "oldsame")
+)
+head(data_ol[, 1:6])
+```
+
+We describe the responses by three processes: with probability `Pb` the correct binding is retrieved; failing that, with probability `Pi` the list items are still remembered and the response is a guess among the five list candidates; failing that too, the response is a guess across the full response set. In the distractor condition, distractors compete in this last stage: with probability `Pd` a distractor captures the response. This yields two tree structures — and illustrates a parameter that exists only in some conditions: `Pd` appears only in the branch expressions of the `newdist` tree, so it is estimated exclusively from that condition, without any indicator-variable bookkeeping.
+
+One response category is impossible in the no-distractor conditions: `dist` responses cannot occur. Because the multinomial likelihood requires strictly positive probabilities, the `dist` category receives a small constant guessing probability there (0.001, compensated in the `npl` branch so the tree still sums to exactly 1); the `m3` implementation uses an equivalent device internally for empty response categories. Written with candidate-count fractions — which `mpt_tree()` folds into exact decimal literals — the trees are:
+
+```{r}
+tree_newdist <- mpt_tree("newdist", list(
+  corr  = "Pb + (1 - Pb) * Pi * (1/5) + (1 - Pb) * (1 - Pi) * (1 - Pd) * (1/10)",
+  other = "(1 - Pb) * Pi * (4/5) + (1 - Pb) * (1 - Pi) * (1 - Pd) * (4/10)",
+  dist  = "(1 - Pb) * (1 - Pi) * Pd",
+  npl   = "(1 - Pb) * (1 - Pi) * (1 - Pd) * (5/10)"
+))
+tree_nodist <- list(
+  corr  = "Pb + (1 - Pb) * Pi * (1/5) + (1 - Pb) * (1 - Pi) * (1/15)",
+  other = "(1 - Pb) * Pi * (4/5) + (1 - Pb) * (1 - Pi) * (4/15)",
+  dist  = "(1 - Pb) * (1 - Pi) * 0.001",
+  npl   = "(1 - Pb) * (1 - Pi) * (10/15 - 0.001)"
+)
+
+model_ol <- mpt(
+  trees = list(
+    tree_newdist,
+    mpt_tree("oldreord", tree_nodist),
+    mpt_tree("oldsame", tree_nodist)
+  ),
+  condition = "cond"
+)
+```
+
+```{r fig-tree-ol, fig.width = 8, fig.asp = 0.9, out.width = "100%"}
+plot(model_ol)
+```
+
+Binding memory is allowed to differ between the three conditions, item memory is shared, and the distractor-intrusion probability gets a single intercept — its formula applies only where the parameter appears in a tree:
+
+```{r fit-ol, results = "hide", message = FALSE, warning = FALSE}
+fit_ol <- bmm(
+  formula = bmf(
+    Pb ~ 0 + cond + (1 | ID),
+    Pi ~ 1 + (1 | ID),
+    Pd ~ 1 + (1 | ID)
+  ),
+  data = data_ol,
+  model = model_ol,
+  backend = "cmdstanr",
+  cores = 4,
+  refresh = 0
+)
+```
+
+```{r}
+plogis(brms::fixef(fit_ol)[, c("Estimate", "Q2.5", "Q97.5")])
+```
+
+Binding memory is clearly higher when the list is re-presented in its original order than in the other two conditions. The large distractor-intrusion probability shows that when neither binding nor item memory succeeds in the distractor condition, the response is almost always captured by one of the distractors — plausibly because the distractors were themselves recently presented and thus familiar. The posterior predictive distribution reproduces the response-category proportions within each condition, including the near-zero `dist` proportions where no distractors were shown:
+
+```{r fig-ppc-ol, fig.width = 7, fig.asp = 0.7, out.width = "100%"}
+pp_check(fit_ol, group = "cond")
+```
 
 # Simplex-constrained parameter groups
 
