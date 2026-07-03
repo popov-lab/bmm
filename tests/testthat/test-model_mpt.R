@@ -387,3 +387,128 @@ test_that("mpt category probabilities match the production m3 likelihood", {
 
   expect_lt(max_diff, 1e-10)
 })
+
+test_that("mpt_from_string parses MPTinR-style model definitions", {
+  model_2htm <- "
+  D + (1 - D) * g        # old
+  (1 - D) * (1 - g)      # new
+
+  (1 - D) * g            # old
+  D + (1 - D) * (1 - g)  # new
+  "
+  model <- mpt_from_string(
+    model_2htm, tree_names = c("old", "new"), condition = "item_type"
+  )
+  manual <- mpt(mpt_2htm_trees(), condition = "item_type")
+  expect_equal(model$trees, manual$trees)
+  expect_equal(names(model$parameters), names(manual$parameters))
+
+  summed <- mpt_from_string(
+    "D # hit\n(1 - D) * g # hit\n(1 - D) * (1 - g) # miss",
+    tree_names = "old"
+  )
+  expect_equal(summed$trees$old$branches$hit, "(D) + ((1 - D) * g)")
+
+  no_comments <- mpt_from_string(
+    "D + (1 - D) * g\n(1 - D) * (1 - g)",
+    tree_names = "old", categories = c("hit", "miss")
+  )
+  expect_equal(names(no_comments$trees$old$branches), c("hit", "miss"))
+
+  expect_error(
+    mpt_from_string("D # a\n1 - D # b", tree_names = c("t1", "t2")),
+    "tree block"
+  )
+  expect_error(
+    mpt_from_string("D + (1 - D) * g\n(1 - D) * (1 - g)", tree_names = "old"),
+    "categories"
+  )
+})
+
+test_that("mpt_from_eqn imports EQN files with restrictions and renaming", {
+  eqn_file <- tempfile(fileext = ".eqn")
+  writeLines(c(
+    "6",
+    "old  old_hit   D_o",
+    "old  old_hit   (1-D_o)*g_uess*G_fix",
+    "old  old_miss  (1-D_o)*(1-g_uess*G_fix)",
+    "new  new_fa    (1-D_n)*g_uess*G_fix",
+    "new  new_cr    D_n",
+    "new  new_cr    (1-D_n)*(1-g_uess*G_fix)"
+  ), eqn_file)
+
+  category_map <- c(
+    old_hit = "yes", new_fa = "yes", old_miss = "no", new_cr = "no"
+  )
+  model <- suppressMessages(mpt_from_eqn(
+    eqn_file,
+    restrictions = c(G_fix = 1 / 4),
+    categories = category_map,
+    condition = "item_type"
+  ))
+  expect_setequal(names(model$parameters), c("Do", "Dn", "guess"))
+  expect_setequal(model$resp_vars$resp_cats, c("yes", "no"))
+  expect_false(any(grepl("G_fix", unlist(model$trees$old$branches))))
+  expect_true(grepl("0.25", model$trees$old$branches$yes, fixed = TRUE))
+
+  renaming <- attr(model, "mpt_renaming")
+  expect_equal(renaming[["D_o"]], "Do")
+  expect_equal(renaming[["old_hit"]], "yes")
+
+  expect_error(
+    suppressMessages(mpt_from_eqn(
+      eqn_file, restrictions = c(G_fix = "D_o"), categories = category_map
+    )),
+    "numeric constants"
+  )
+
+  # per-tree category labels without a mapping cannot be combined
+  expect_error(
+    suppressMessages(mpt_from_eqn(eqn_file, restrictions = c(G_fix = 0.25))),
+    "categories argument"
+  )
+})
+
+test_that("mpt_from_eqn errors on names that clash after sanitizing", {
+  eqn_file <- tempfile(fileext = ".eqn")
+  writeLines(c(
+    "t  a  d_A + dA",
+    "t  b  1 - d_A - dA"
+  ), eqn_file)
+  expect_error(mpt_from_eqn(eqn_file), "duplicated names")
+})
+
+test_that("mpt supports multiple simplex groups", {
+  tree <- mpt_tree("t", list(
+    A = "m * gA + (1 - m) * hA",
+    B = "m * gB + (1 - m) * hB",
+    C = "m * gC + (1 - m) * hC"
+  ))
+  model <- mpt(
+    tree,
+    simplex = list(c("gA", "gB", "gC"), c("hA", "hB", "hC"))
+  )
+  expect_setequal(
+    names(model$parameters),
+    c("m", "gA", "gB", "gC", "hA", "hB", "hC", "gAraw", "gBraw", "hAraw", "hBraw")
+  )
+
+  dat <- data.frame(id = factor(1:8), A = 10, B = 10, C = 10)
+  formula <- bmf(m ~ 1, gA ~ 1, gB ~ 1, hA ~ 1, hB ~ 1)
+  expect_warning(
+    suppressMessages(bmm(
+      formula, dat, model,
+      backend = "mock", mock_fit = 1, rename = FALSE
+    )),
+    "Non-linear transformations"
+  )
+})
+
+test_that("factor condition columns are matched to tree names", {
+  model <- mpt(mpt_2htm_trees(), condition = "item_type")
+  dat <- mpt_2htm_data()
+  dat$item_type <- factor(dat$item_type, levels = c("old", "new"))
+  checked <- check_data(model, dat, bmf(D ~ 1, g ~ 1))
+  expect_equal(checked$Idx_old, as.integer(dat$item_type == "old"))
+  expect_equal(checked$Idx_new, as.integer(dat$item_type == "new"))
+})
