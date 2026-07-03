@@ -579,7 +579,7 @@ test_that("branch expressions expand into root-to-leaf paths", {
   expect_equal(paths_factored, list(c("Pm", "Pb"), c("Pm", "1 - Pb", "0.25")))
 })
 
-test_that("the tree graph merges shared path prefixes", {
+test_that("the tree graph merges shared path prefixes only", {
   tree <- mpt_tree("old", list(
     old = "D + (1 - D) * g",
     new = "(1 - D) * (1 - g)"
@@ -587,12 +587,22 @@ test_that("the tree graph merges shared path prefixes", {
   graph <- .mpt_tree_graph(tree)
   leaves <- graph$nodes[!is.na(graph$nodes$category), ]
   expect_equal(leaves$category, c("old", "old", "new"))
-  # root, the shared (1 - D) node, and one leaf-anchor per category path
-  expect_equal(sum(is.na(graph$nodes$category)), 5)
-  expect_setequal(
-    setdiff(graph$edges$label, ""),
-    c("D", "1 - D", "g", "1 - g")
-  )
+  # internal nodes: the root and the shared (1 - D) node
+  expect_equal(sum(is.na(graph$nodes$category)), 2)
+  expect_setequal(graph$edges$label, c("D", "1 - D", "g", "1 - g"))
+})
+
+test_that("equal terminal weights stay separate leaf edges", {
+  fan <- mpt_tree("t", list(
+    a = "m + (1 - m) * (1/3)",
+    b = "(1 - m) * (1/3)",
+    c = "(1 - m) * (1/3)"
+  ))
+  graph <- .mpt_tree_graph(fan)
+  leaves <- graph$nodes[!is.na(graph$nodes$category), ]
+  expect_equal(leaves$category, c("a", "a", "b", "c"))
+  # constant edge labels are rounded for display
+  expect_equal(sum(graph$edges$label == "0.333"), 3)
 })
 
 test_that("plot methods run for trees and models", {

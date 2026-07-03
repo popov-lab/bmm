@@ -209,22 +209,22 @@ data_ol$cond <- factor(
 head(data_ol[, 1:6])
 ```
 
-We describe the responses by three processes: with probability `Pb` the correct binding is retrieved; failing that, with probability `Pi` the list items are still remembered and the response is a guess among the five list candidates; failing that too, the response is a guess across the full response set. In the distractor condition, distractors compete in this last stage: with probability `Pd` a distractor captures the response. This yields two tree structures — and illustrates a parameter that exists only in some conditions: `Pd` appears only in the branch expressions of the `newdist` tree, so it is estimated exclusively from that condition, without any indicator-variable bookkeeping.
+We describe the responses by three processes, ordered by how much they constrain the response. First, with probability `Pi`, the list items themselves are remembered. Given item memory, with probability `Pb` the item bound to the probed position is retrieved, yielding a correct response. If the binding is not available, distractor activation may still persist (probability `Pd`) and capture the response — this stage exists only in the distractor condition; otherwise the response is a guess among the five known list candidates. Without item memory, the response is a guess across the full response set of 15 candidates. This yields two tree structures — and illustrates a parameter that exists only in some conditions: `Pd` appears only in the branch expressions of the `newdist` tree, so it is estimated exclusively from that condition, without any indicator-variable bookkeeping.
 
 One response category is impossible in the no-distractor conditions: `dist` responses cannot occur. Because the multinomial likelihood requires strictly positive probabilities, the `dist` category receives a small constant guessing probability there (0.001, compensated in the `npl` branch so the tree still sums to exactly 1); the `m3` implementation uses an equivalent device internally for empty response categories. Written with candidate-count fractions — which `mpt_tree()` folds into exact decimal literals — the trees are:
 
 ```{r}
 tree_newdist <- mpt_tree("newdist", list(
-  corr  = "Pb + (1 - Pb) * Pi * (1/5) + (1 - Pb) * (1 - Pi) * (1 - Pd) * (1/10)",
-  other = "(1 - Pb) * Pi * (4/5) + (1 - Pb) * (1 - Pi) * (1 - Pd) * (4/10)",
-  dist  = "(1 - Pb) * (1 - Pi) * Pd",
-  npl   = "(1 - Pb) * (1 - Pi) * (1 - Pd) * (5/10)"
+  corr  = "Pi * Pb + Pi * (1 - Pb) * (1 - Pd) * (1/5) + (1 - Pi) * (1/15)",
+  other = "Pi * (1 - Pb) * (1 - Pd) * (4/5) + (1 - Pi) * (4/15)",
+  dist  = "Pi * (1 - Pb) * Pd + (1 - Pi) * (5/15)",
+  npl   = "(1 - Pi) * (5/15)"
 ))
 tree_nodist <- list(
-  corr  = "Pb + (1 - Pb) * Pi * (1/5) + (1 - Pb) * (1 - Pi) * (1/15)",
-  other = "(1 - Pb) * Pi * (4/5) + (1 - Pb) * (1 - Pi) * (4/15)",
-  dist  = "(1 - Pb) * (1 - Pi) * 0.001",
-  npl   = "(1 - Pb) * (1 - Pi) * (10/15 - 0.001)"
+  corr  = "Pi * Pb + Pi * (1 - Pb) * (1/5) + (1 - Pi) * (1/15)",
+  other = "Pi * (1 - Pb) * (4/5) + (1 - Pi) * (4/15)",
+  dist  = "(1 - Pi) * 0.001",
+  npl   = "(1 - Pi) * (10/15 - 0.001)"
 )
 
 model_ol <- mpt(
@@ -237,8 +237,13 @@ model_ol <- mpt(
 )
 ```
 
-```{r fig-tree-ol, fig.width = 8, fig.asp = 0.9, out.width = "100%"}
-plot(model_ol)
+The two distinct tree structures (the `oldreord` tree is identical to the `oldsame` tree):
+
+```{r fig-tree-ol, fig.width = 9, fig.asp = 0.44, out.width = "100%"}
+old_par <- par(mfrow = c(1, 2))
+plot(model_ol$trees$newdist)
+plot(model_ol$trees$oldsame)
+par(old_par)
 ```
 
 Binding memory is allowed to differ between the three conditions, item memory is shared, and the distractor-intrusion probability gets a single intercept — its formula applies only where the parameter appears in a tree:
@@ -262,7 +267,7 @@ fit_ol <- bmm(
 plogis(brms::fixef(fit_ol)[, c("Estimate", "Q2.5", "Q97.5")])
 ```
 
-Binding memory is clearly higher when the list is re-presented in its original order than in the other two conditions. The large distractor-intrusion probability shows that when neither binding nor item memory succeeds in the distractor condition, the response is almost always captured by one of the distractors — plausibly because the distractors were themselves recently presented and thus familiar. The posterior predictive distribution reproduces the response-category proportions within each condition, including the near-zero `dist` proportions where no distractors were shown:
+Item memory is nearly always intact — not-presented lures are rarely chosen — while binding memory is clearly higher when the list is re-presented in its original order than in the other two conditions. When item memory succeeds but the binding is unavailable in the distractor condition, distractor activation captures the response about half of the time. The posterior predictive distribution reproduces the response-category proportions within each condition, including the near-zero `dist` proportions where no distractors were shown:
 
 ```{r fig-ppc-ol, fig.width = 7, fig.asp = 0.7, out.width = "100%"}
 pp_check(fit_ol, group = "cond")

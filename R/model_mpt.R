@@ -1284,17 +1284,19 @@ plot.mpt <- function(x, cex = 0.9, ...) {
 
 # merges the paths of all branch expressions into a prefix trie and computes
 # plot coordinates: leaves are stacked top to bottom in specification order,
-# internal nodes are centered on their children
+# internal nodes are centered on their children. Only the shared process
+# prefixes of the paths merge; the final factor of each path is the
+# category-specific weight and stays a separate leaf edge, so parallel
+# branches with equal weights (e.g. uniform guessing fans) do not collapse
 .mpt_tree_graph <- function(tree) {
-  trie <- list(children = list(), categories = character(0))
+  trie <- list(children = list(), leaves = list())
   insert <- function(node, factors, category) {
-    if (length(factors) == 0L) {
-      node$categories <- c(node$categories, category)
+    if (length(factors) == 1L) {
+      node$leaves <- c(node$leaves, list(list(label = factors[[1]], category = category)))
       return(node)
     }
     key <- factors[[1]]
-    child <- node$children[[key]] %||%
-      list(children = list(), categories = character(0))
+    child <- node$children[[key]] %||% list(children = list(), leaves = list())
     node$children[[key]] <- insert(child, factors[-1], category)
     node
   }
@@ -1314,15 +1316,19 @@ plot.mpt <- function(x, cex = 0.9, ...) {
   next_y <- 0
   walk <- function(node, depth) {
     child_pos <- list()
-    for (category in node$categories) {
+    for (leaf in node$leaves) {
       leaf_y <- next_y
       next_y <<- next_y - 1
-      nodes[nrow(nodes) + 1L, ] <<- list(depth + 1, leaf_y, category)
-      child_pos <- c(child_pos, list(list(x = depth + 1, y = leaf_y, label = "")))
+      nodes[nrow(nodes) + 1L, ] <<- list(depth + 1, leaf_y, leaf$category)
+      child_pos <- c(child_pos, list(
+        list(x = depth + 1, y = leaf_y, label = .mpt_edge_label(leaf$label))
+      ))
     }
     for (key in names(node$children)) {
       child <- walk(node$children[[key]], depth + 1)
-      child_pos <- c(child_pos, list(list(x = depth + 1, y = child, label = key)))
+      child_pos <- c(child_pos, list(
+        list(x = depth + 1, y = child, label = .mpt_edge_label(key))
+      ))
     }
     node_y <- mean(vapply(child_pos, `[[`, numeric(1), "y"))
     nodes[nrow(nodes) + 1L, ] <<- list(depth, node_y, NA_character_)
@@ -1333,4 +1339,15 @@ plot.mpt <- function(x, cex = 0.9, ...) {
   }
   walk(trie, 0)
   nlist(nodes, edges)
+}
+
+# constant factors are displayed rounded (1/15 folds to 0.0666666666666667,
+# which would be unreadable as an edge label)
+.mpt_edge_label <- function(factor_label) {
+  parsed <- str2lang(factor_label)
+  if (length(all.vars(parsed)) == 0L) {
+    as.character(signif(eval(parsed), 3))
+  } else {
+    factor_label
+  }
 }
