@@ -95,7 +95,7 @@ Two things to keep in mind when writing branch expressions:
 - Parameter and category names must consist of letters and digits only (no underscores or dots), because they become non-linear parameters in **brms**.
 - Numeric fractions such as `1/4` are automatically converted to decimal literals (`0.25`) — in Stan, a bare integer fraction would be evaluated as integer division.
 
-The default priors place a `logistic(0, 1)` distribution on the latent-scale intercepts, which corresponds to a uniform distribution on the probability scale. With `links = "probit"`, the default is `normal(0, 1)`, matching the priors typically used in latent-trait MPT models.
+The default priors are matched to the link function: with the logit link, intercepts get a `logistic(0, 1)` prior — a uniform distribution on the probability scale — and regression effects get a `logistic(0, 0.5)` prior, the same family at half the scale. With `links = "probit"`, the corresponding defaults are `normal(0, 1)` and `normal(0, 0.5)`, matching the priors typically used in latent-trait MPT models.
 
 ```{r}
 default_prior(bmf(D ~ 1, g ~ 1), data = data.frame(
@@ -220,6 +220,30 @@ fit_tv <- bmm(
 ```
 
 When a parameter receives a non-linear formula, the automatic link transformation is switched off for it: the user-supplied expression is responsible for keeping the parameter within (0, 1). The sub-parameters of the expression (`Dmax` and `rate` above) are estimated on the identity scale with `normal(0, 1)` default priors. When the random-effect standard deviations of such sub-parameters are close to zero, the posterior can develop a funnel geometry — increasing `adapt_delta` (e.g., to 0.95) is then advisable.
+
+# Ordered parameter constraints
+
+The same mechanism expresses order constraints between parameters — for example, requiring detection of old items to exceed detection of new items ($D_o > D_n$) in a 2HTM with separate detection parameters. No dedicated constraint syntax is needed: derive the larger parameter from the smaller one such that the constraint holds by construction.
+
+The recommended formulation interpolates on the probability scale:
+
+```{r, eval = FALSE}
+fit_ordered <- bmm(
+  bmf(
+    Do ~ Dn + (1 - Dn) * inv_logit(phi),
+    Dn ~ 1 + (1 | id),
+    g ~ 1 + (1 | id),
+    phi ~ 1 + (1 | id)
+  ),
+  data, model_2htm_separate
+)
+```
+
+Here `Dn` remains an ordinary logit-scale parameter with its usual priors, and `phi` is the (logit of the) proportion of the remaining probability space above $D_n$ that $D_o$ covers: $D_o = D_n + (1 - D_n) \cdot \text{logit}^{-1}(\phi)$, which lies in $(D_n, 1)$ for every posterior draw. Because `Dn` appears in a non-linear formula, its link transformation is applied automatically — you write plain `Dn` and get $\text{logit}^{-1}(D_n)$ in the model. For a uniform prior on the covered proportion, set `prior("logistic(0, 1)", class = "b", nlpar = "phi")`.
+
+An equivalent alternative shifts on the latent scale, as latent-trait MPT implementations usually do: `Dn ~ inv_logit(lDn)` and `Do ~ inv_logit(lDn + exp(delta))`, with `lDn` and `delta` receiving the predictor formulas. Both formulations enforce the order in every posterior draw and recover the generating parameters. In a validation on simulated 2HTM data, however, the interpolation sampled cleanly with default settings, while the latent-offset version developed a funnel (the log-gap parameter `delta` degenerates when the gap closes) that required `adapt_delta = 0.99` — another reason to prefer the interpolation.
+
+One pitfall to avoid: do **not** write the latent offset against the parameter name directly, as in `Do ~ inv_logit(Dn + exp(delta))`. The automatic link substitution turns the inner `Dn` into $\text{logit}^{-1}(D_n)$ — a probability — so the expression adds a probability and a latent-scale offset, and the resulting $D_o$ is *not* guaranteed to exceed $D_n$ (e.g., $D_n = 0.9$ with a small offset yields $D_o \approx 0.71$). Constraint expressions must keep all terms on one scale: either work with probabilities (the interpolation above) or introduce explicit latent-scale sub-parameters like `lDn`.
 
 # Importing existing model definitions
 
