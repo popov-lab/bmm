@@ -85,8 +85,10 @@ print.mpt_tree <- function(x, ...) {
   raw_pars <- unlist(lapply(simplex, function(grp) paste0(grp[-length(grp)], "raw")))
   standard_pars <- setdiff(parameters, simplex_pars)
 
+  # matched priors: effects use the same family as the intercept at half the
+  # scale, so both links imply comparable regularization on their latent scale
   latent_prior <- switch(links,
-    logit = list(main = "logistic(0, 1)", effects = "normal(0, 0.5)"),
+    logit = list(main = "logistic(0, 1)", effects = "logistic(0, 0.5)"),
     probit = list(main = "normal(0, 1)", effects = "normal(0, 0.5)")
   )
 
@@ -551,7 +553,50 @@ check_data.mpt <- function(model, data, formula) {
     {collapse_comma(non_numeric)}"
   )
 
+  .mpt_validate_covariate_sums(model, data)
+
   NextMethod("check_data")
+}
+
+# the construction-time branch-sum validation uses synthetic covariate values;
+# once the data are known, the sum-to-1 property is re-checked row by row with
+# the observed covariate values to catch data-preparation errors
+.mpt_validate_covariate_sums <- function(model, data, tolerance = 1e-6) {
+  covariates <- model$other_vars$covariates
+  if (length(covariates) == 0L) {
+    return(invisible(NULL))
+  }
+  parameters <- setdiff(
+    unique(unlist(lapply(model$trees, .mpt_tree_vars))), covariates
+  )
+  par_vals <- setNames(rep(0.5, length(parameters)), parameters)
+  for (grp in model$simplex) {
+    par_vals[grp] <- 1 / length(grp)
+  }
+
+  condition <- model$other_vars$condition
+  for (tree in model$trees) {
+    rows <- if (is.null(condition)) {
+      seq_len(nrow(data))
+    } else {
+      which(data[[paste0("Idx_", tree$name)]] == 1L)
+    }
+    if (length(rows) == 0L) next
+    env <- c(as.list(par_vals), as.list(data[rows, covariates, drop = FALSE]))
+    total <- Reduce(`+`, lapply(tree$branches, function(branch) {
+      eval(str2lang(branch), envir = env)
+    }))
+    total <- rep(total, length.out = length(rows))
+    deviates <- is.na(total) | abs(total - 1) > tolerance
+    warnif(
+      any(deviates),
+      "With the covariate values in the data, the branch probabilities of \\
+      tree '{tree$name}' do not sum to 1 for {sum(deviates)} row(s) \\
+      (first: row {rows[deviates][1]}, sum = {signif(total[deviates][1], 6)}).
+      Please check the covariate column(s): {collapse_comma(covariates)}"
+    )
+  }
+  invisible(NULL)
 }
 
 ############################################################################# !
