@@ -3016,117 +3016,168 @@ rsdt_ranking <- function(n, n_trials, m, dprime,
 # Bivariate standard-normal CDF P(Z1 <= z1, Z2 <= z2) with correlation rho.
 # Genz (2004) asin-substitution + 20-point Gauss-Legendre: dependency-free and
 # matches the Stan owens_t-based cdp_Phi2 to ~1e-7 (well inside the parity
-# tolerance), so R-side prediction reproduces the likelihood.
+# tolerance), so R-side prediction reproduces the likelihood. Vectorized over
+# recycled z1/z2/rho; infinite bounds and rho ~ 0 reduce to closed forms (the
+# quadrature produces NaN there and is overwritten).
 .cdp_phi2 <- function(z1, z2, rho) {
-  if (is.infinite(z1)) return(if (z1 < 0) 0 else stats::pnorm(z2))
-  if (is.infinite(z2)) return(if (z2 < 0) 0 else stats::pnorm(z1))
-  if (abs(rho) < 1e-12) return(stats::pnorm(z1) * stats::pnorm(z2))
+  n <- max(length(z1), length(z2), length(rho))
+  z1 <- rep_len(z1, n)
+  z2 <- rep_len(z2, n)
+  rho <- rep_len(rho, n)
+
   asr <- asin(rho)
-  hs <- -(z1 * z1 + z2 * z2) / 2
-  ab <- z1 * z2
-  sn <- sin(asr * (.cdp_gl20_nodes + 1) / 2)
-  vals <- exp((ab * sn + hs) / (1 - sn * sn))
-  stats::pnorm(z1) * stats::pnorm(z2) + sum(.cdp_gl20_weights * vals) * asr / (4 * pi)
+  sn <- sin(outer(asr / 2, .cdp_gl20_nodes + 1))
+  vals <- exp((z1 * z2 * sn - (z1 * z1 + z2 * z2) / 2) / (1 - sn * sn))
+  out <- stats::pnorm(z1) * stats::pnorm(z2) +
+    as.vector(vals %*% .cdp_gl20_weights) * asr / (4 * pi)
+
+  small <- abs(rho) < 1e-12
+  if (any(small)) out[small] <- (stats::pnorm(z1) * stats::pnorm(z2))[small]
+  i2 <- is.infinite(z2)
+  if (any(i2)) out[i2] <- ifelse(z2[i2] < 0, 0, stats::pnorm(z1[i2]))
+  i1 <- is.infinite(z1)
+  if (any(i1)) out[i1] <- ifelse(z1[i1] < 0, 0, stats::pnorm(z2[i1]))
+  out
 }
 
 # Confidence thresholds on the strength axis S = F + R, anchored so the old/new
 # boundary (between bin n_new and n_new + 1) sits at `criterion`. Mirrors the
 # Stan cdp_make_thresholds; reduces to symmetric centring when n_new == n_old.
+# Vectorized over draws like .sdt_make_thresholds: criterion/spacing may be
+# vectors and deltas an n-by-(K-2) matrix (a vector describes a single draw).
+# Returns an n-by-(K-1) matrix, or a length-(K-1) vector for a single draw.
+# For log_distance the between-threshold increments are exp(deltas) in
+# threshold order (the anchor carries no delta), so the shared assembler
+# applies directly with the anchor at n_new.
 .cdp_make_thresholds <- function(criterion, spacing, n_new, n_old,
                                  threshold_type = "parsimonious",
                                  deltas = NULL) {
   K_full <- n_new + n_old
   K1 <- K_full - 1L
-  k <- seq_len(K1)
-  s <- exp(spacing)
-  if (threshold_type == "equidistant") {
-    criterion + (k - n_new) * s
-  } else if (threshold_type == "parsimonious") {
-    criterion + s * (log(k / (K_full - k)) - log(n_new / (K_full - n_new)))
-  } else {
-    # log_distance: free cumulative log-distances, anchored at the old/new
-    # boundary thr[n_new] = criterion. The anchor index carries no delta, so
-    # slot j maps to threshold k via didx (skip n_new).
-    stopif(length(deltas) != K_full - 2L,
+  n <- max(length(criterion), length(spacing),
+           if (is.matrix(deltas)) nrow(deltas) else 0L, 1L)
+  criterion <- rep_len(criterion, n)
+
+  thr <- if (threshold_type == "log_distance") {
+    stopif(is.null(deltas), "deltas is required for log_distance thresholds")
+    if (!is.matrix(deltas)) {
+      deltas <- matrix(deltas, n, length(deltas), byrow = TRUE)
+    }
+    if (nrow(deltas) != n) {
+      deltas <- deltas[rep_len(seq_len(nrow(deltas)), n), , drop = FALSE]
+    }
+    stopif(ncol(deltas) != K_full - 2L,
            "deltas must have length n_new + n_old - 2 = {K_full - 2L}")
-    didx <- function(j) if (j < n_new) j else j - 1L
-    thr <- numeric(K1)
-    thr[n_new] <- criterion
-    if (n_new < K1) {
-      for (j in (n_new + 1L):K1) thr[j] <- thr[j - 1L] + exp(deltas[didx(j)])
+    .sdt_assemble_thresholds(criterion, exp(deltas), n_new, K1)
+  } else {
+    k <- seq_len(K1)
+    canonical <- if (threshold_type == "equidistant") {
+      k - n_new
+    } else {
+      log(k / (K_full - k)) - log(n_new / (K_full - n_new))
     }
-    if (n_new > 1L) {
-      for (j in (n_new - 1L):1L) thr[j] <- thr[j + 1L] - exp(deltas[didx(j)])
-    }
-    thr
+    criterion + exp(rep_len(spacing, n)) %o% canonical
   }
+  if (n == 1L) thr[1L, ] else thr
 }
 
 # Guess-region mass for one strength bin: P(R < rcrit, F < kcrit, c_lo < S < c_hi)
 # with F | R normal (accounts for corr = tanh(rho)). Mirrors Stan cdp_guess_mass.
+# Vectorized over observations: all arguments are length-n vectors (c_lo/c_hi
+# may contain +-Inf per row); the quadrature runs on n-by-20 matrices.
 .cdp_guess_mass_r <- function(mu_F, mu_R, sd_R, corr, c_lo, c_hi, rcrit, kcrit) {
   t <- 0.5 * (.cdp_gl20_nodes + 1)
   y <- t / (1 - t)
-  R <- rcrit - y
-  jac <- 1 / (1 - t)^2
-  cond_sd <- sqrt(max(1 - corr * corr, 1e-12))
+  R <- outer(rcrit, y, `-`)
+  cond_sd <- sqrt(pmax(1 - corr * corr, 1e-12))
   cond_mean <- mu_F + corr * (R - mu_R) / sd_R
-  f_lo <- if (is.infinite(c_lo)) rep(-Inf, length(R)) else c_lo - R
-  f_hi <- pmin(if (is.infinite(c_hi)) Inf else c_hi - R, kcrit)
-  u_hi <- ifelse(is.infinite(f_hi), 1, stats::pnorm((f_hi - cond_mean) / cond_sd))
-  u_lo <- ifelse(is.infinite(f_lo), 0, stats::pnorm((f_lo - cond_mean) / cond_sd))
-  mass_f <- pmax(u_hi - u_lo, 0)
-  max(0.5 * sum(.cdp_gl20_weights * jac * stats::dnorm(R, mu_R, sd_R) * mass_f),
-      1e-20)
+  f_lo <- c_lo - R
+  f_hi <- pmin(c_hi - R, kcrit)
+  mass_f <- pmax(stats::pnorm((f_hi - cond_mean) / cond_sd) -
+                   stats::pnorm((f_lo - cond_mean) / cond_sd), 0)
+  w <- 0.5 * .cdp_gl20_weights / (1 - t)^2
+  pmax(as.vector((stats::dnorm(R, mu_R, sd_R) * mass_f) %*% w), 1e-20)
 }
 
-# CDP category probabilities for a single observation, in the canonical order
-#   new(1..n_new), [guess(1..n_old)], know(1..n_old), remember(1..n_old).
-# Normal noise only (exact via .cdp_phi2). `rho` is the F-R correlation on the
-# unconstrained scale (tanh applied internally); default 0 = independent CDP.
+# CDP probability of a single response category, vectorized over observations.
+# Mirrors Stan cdp_category_prob one-to-one (same branching, same 1e-20 floor,
+# no normalization -- softmax absorbs the shared constant): for a fixed
+# category the judgment type and strength bin are constants, so all n
+# observations vectorize. thresholds is an n-by-(K-1) matrix (or a vector for
+# a shared single draw); the parameters are recycled to n.
+.sdt_cdp_category_prob <- function(cat, thresholds, dprimef, dprimer, sigmar,
+                                   rho, rcrit, kcrit, stimulus, n_new, n_old,
+                                   has_guess) {
+  thr <- rbind(thresholds)
+  dimnames(thr) <- NULL
+  n <- max(nrow(thr), length(dprimef), length(dprimer), length(sigmar),
+           length(rho), length(rcrit), length(stimulus))
+  if (nrow(thr) != n) thr <- thr[rep_len(seq_len(nrow(thr)), n), , drop = FALSE]
+  K_full <- n_new + n_old
+
+  if (cat <= n_new) {
+    type <- 1L
+    conf <- cat
+  } else {
+    r <- cat - n_new
+    block <- (r - 1L) %/% n_old
+    type <- if (has_guess) block + 2L else block + 3L
+    conf <- r - block * n_old
+  }
+  global_k <- if (type == 1L) conf else n_new + conf
+
+  old <- rep_len(stimulus, n) == 1
+  mu_F <- ifelse(old, rep_len(dprimef, n), 0)
+  mu_R <- ifelse(old, rep_len(dprimer, n), 0)
+  sd_R <- ifelse(old, exp(rep_len(sigmar, n)), 1)
+  corr <- tanh(rep_len(rho, n))
+  mu_S <- mu_F + mu_R
+  sigma_S <- sqrt((sd_R + corr)^2 + (1 - corr^2))
+
+  c_lo <- if (global_k == 1L) rep(-Inf, n) else thr[, global_k - 1L]
+  c_hi <- if (global_k == K_full) rep(Inf, n) else thr[, global_k]
+  z_lo <- (c_lo - mu_S) / sigma_S
+  z_hi <- (c_hi - mu_S) / sigma_S
+  p_bin <- stats::pnorm(z_hi) - stats::pnorm(z_lo)
+  if (type == 1L) return(pmax(p_bin, 1e-20))
+
+  rho_RS <- (sd_R + corr) / sigma_S
+  hcrit <- (rep_len(rcrit, n) - mu_R) / sd_R
+  p_know <- .cdp_phi2(hcrit, z_hi, rho_RS) - .cdp_phi2(hcrit, z_lo, rho_RS)
+  if (type == 4L) return(pmax(p_bin - p_know, 1e-20))
+  if (!has_guess) return(pmax(p_know, 1e-20))
+
+  p_guess <- .cdp_guess_mass_r(mu_F, mu_R, sd_R, corr, c_lo, c_hi,
+                               rep_len(rcrit, n), rep_len(kcrit, n))
+  if (type == 2L) p_guess else pmax(p_know - p_guess, 1e-20)
+}
+
+# CDP category probabilities in the canonical order
+#   new(1..n_new), [guess(1..n_old)], know(1..n_old), remember(1..n_old),
+# normalized to a proper pmf. Normal noise only (exact via .cdp_phi2). `rho` is
+# the F-R correlation on the unconstrained scale (tanh applied internally);
+# default 0 = independent CDP. Vectorized over observations like
+# .sdt_category_probs: returns an n-by-K matrix, or a length-K vector when all
+# inputs describe a single observation.
 .sdt_cdp_category_probs <- function(thresholds, dprimef, dprimer, sigmar,
                                     rcrit, kcrit, stimulus, n_new, n_old = NULL,
                                     dist = "normal", rho = 0) {
   if (is.null(n_old)) n_old <- n_new
   stopif(dist != "normal", "sdt_cdp currently supports only dist = 'normal'")
+  has_guess <- !is.null(kcrit) && all(is.finite(kcrit))
+  K_cat <- n_new + (if (has_guess) 3L else 2L) * n_old
 
-  K_full <- n_new + n_old
-  has_guess <- !is.null(kcrit) && is.finite(kcrit)
-
-  mu_F <- if (stimulus == 1) dprimef else 0
-  mu_R <- if (stimulus == 1) dprimer else 0
-  sd_R <- if (stimulus == 1) exp(sigmar) else 1
-  corr <- tanh(rho)
-  mu_S <- mu_F + mu_R
-  sigma_S <- sqrt((sd_R + corr)^2 + (1 - corr^2))
-  rho_RS <- (sd_R + corr) / sigma_S
-  hcrit <- (rcrit - mu_R) / sd_R
-
-  z_edges <- c(-Inf, (thresholds - mu_S) / sigma_S, Inf)
-  p_bin <- diff(stats::pnorm(z_edges))
-  joint_edges <- vapply(z_edges, function(z) {
-    if (is.infinite(z)) if (z < 0) 0 else stats::pnorm(hcrit)
-    else .cdp_phi2(hcrit, z, rho_RS)
-  }, numeric(1))
-  p_know_total <- diff(joint_edges)
-
-  old_bins <- (n_new + 1L):K_full
-  new_p <- p_bin[seq_len(n_new)]
-  remember_p <- p_bin[old_bins] - p_know_total[old_bins]
-  if (has_guess) {
-    guess_p <- vapply(old_bins, function(gk) {
-      c_lo <- if (gk == 1L) -Inf else thresholds[gk - 1L]
-      c_hi <- if (gk == K_full) Inf else thresholds[gk]
-      .cdp_guess_mass_r(mu_F, mu_R, sd_R, corr, c_lo, c_hi, rcrit, kcrit)
-    }, numeric(1))
-    probs <- c(new_p, guess_p, p_know_total[old_bins] - guess_p, remember_p)
-  } else {
-    probs <- c(new_p, p_know_total[old_bins], remember_p)
+  thr <- rbind(thresholds)
+  n <- max(nrow(thr), length(dprimef), length(dprimer), length(sigmar),
+           length(rho), length(rcrit), length(stimulus))
+  probs <- matrix(0, n, K_cat)
+  for (cat in seq_len(K_cat)) {
+    probs[, cat] <- .sdt_cdp_category_prob(cat, thr, dprimef, dprimer, sigmar,
+                                           rho, rcrit, kcrit, stimulus,
+                                           n_new, n_old, has_guess)
   }
-  # match the Stan cdp_category_prob floor so R-side prediction reproduces the
-  # likelihood for effectively-zero categories
-  probs <- pmax(probs, 1e-20)
-  probs / sum(probs)
+  probs <- probs / rowSums(probs)
+  if (n == 1L && !is.matrix(thresholds)) probs[1L, ] else probs
 }
 
 
@@ -3136,38 +3187,45 @@ rsdt_ranking <- function(n, n_trials, m, dprime,
 #'   continuous dimensions, Familiarity (F) and Recollection (R), generate the
 #'   aggregate strength S = F + R that drives old/new confidence; Remember/Know
 #'   judgments split "old" responses on R, and an optional Know/Guess split uses
-#'   F. See [sdt_cdp()] for the model and [sdt_rating()] when no R/K split is
+#'   F. The response is a vector of counts across the response categories
+#'   (multinomial likelihood), in the same format [sdt_cdp()] is fit to. See
+#'   [sdt_cdp()] for the model and [sdt_rating()] when no R/K split is
 #'   available.
 #' @name sdt_cdp_dist
-#' @param counts Integer vector of response counts in the canonical order
-#'   `new`, `[guess]`, `know`, `remember` (each block ordered by confidence).
-#'   Length `n_new + 2 * n_old` (R/K) or `n_new + 3 * n_old` (R/K/G).
-#' @param n_new,n_old Integer numbers of "new" and "old" confidence levels.
-#' @param stimulus Integer. 0 (noise/new) or 1 (signal/old).
-#' @param dprimef,dprimer Familiarity and recollection sensitivities (target
-#'   means on the F and R axes).
+#' @param counts Integer matrix with one row per observation and one column per
+#'   response category in the canonical order `new`, `[guess]`, `know`,
+#'   `remember` (each block ordered by confidence; see [sdt_cdp()]), or a
+#'   vector for a single observation. `n_new + 2 * n_old` columns (R/K) or
+#'   `n_new + 3 * n_old` (R/K/G).
+#' @param stimulus Integer vector (0/1). Stimulus type: 0 = new/lure,
+#'   1 = old/target.
+#' @param dprimef,dprimer Numeric vectors. Familiarity and recollection
+#'   sensitivities (target means on the F and R axes).
 #' @param thresholds Numeric vector of `n_new + n_old - 1` ordered confidence
-#'   thresholds on the aggregate F+R axis.
-#' @param rcrit Remember criterion on the recollection axis.
-#' @param kcrit Know criterion on the familiarity axis. `NULL`/non-finite for
-#'   the R/K model; a finite value enables the R/K/G model.
-#' @param sigmar Log SD of the recollection target distribution (0 = SD 1).
-#' @param rho F-R correlation on the unconstrained scale; `tanh(rho)` is the
-#'   correlation. 0 (default) = independent processes (classic CDP).
+#'   thresholds on the aggregate F+R axis, or a matrix with one row per
+#'   observation.
+#' @param rcrit Numeric vector. Remember criterion on the recollection axis.
+#' @param kcrit Know criterion on the familiarity axis. `NULL` (default) for
+#'   the R/K model; finite values enable the R/K/G model.
+#' @param sigmar Numeric vector. Log SD of the recollection target
+#'   distribution (0 = SD 1).
+#' @param rho Numeric vector. F-R correlation on the unconstrained scale;
+#'   `tanh(rho)` is the correlation. 0 (default) = independent processes
+#'   (classic CDP).
+#' @param n_new Integer number of "new" confidence levels. Defaults to a
+#'   symmetric split of the confidence scale; the number of "old" levels
+#'   follows as `length(thresholds) + 1 - n_new`.
 #' @param dist Noise distribution. Only `"normal"` is currently supported.
 #' @param log Logical; if `TRUE` return the log-density (default `FALSE`).
-#' @param n_per_cell Integer trials per stimulus class per subject.
-#' @param n_subjects Integer number of subjects.
-#' @param criterion Central old/new criterion for threshold generation.
-#' @param spacing Threshold spacing parameter.
-#' @param n_ratings Integer total number of confidence levels (`n_new + n_old`).
-#' @param threshold_type `"parsimonious"` (default), `"equidistant"`, or
-#'   `"log_distance"` (free cumulative log-distances; requires `deltas`).
-#' @param deltas Numeric vector of `n_new + n_old - 2` log-distances for
-#'   `threshold_type = "log_distance"`; ignored otherwise.
-#' @return `dsdt_cdp` returns the (log-)multinomial density. `rsdt_cdp` returns a
-#'   tidy long data frame (`id`, `stimulus`, `judgment`, `confidence`, `count`)
-#'   ready to pass to [sdt_cdp()].
+#' @param n Integer. Number of observations to generate. `n_trials`,
+#'   `stimulus`, `thresholds`, and the model parameters are recycled to this
+#'   length.
+#' @param n_trials Integer vector. Number of trials per observation.
+#' @return `dsdt_cdp` returns the (log-)density (multinomial probability).
+#'   `rsdt_cdp` returns an integer matrix with one row per observation and the
+#'   canonical response count columns (`new1`, ..., `remember<K>`) that
+#'   [sdt_cdp()] expects -- `cbind()` it to a design data frame for a
+#'   ready-to-fit data set.
 #' @references
 #' Wixted, J. T., & Mickes, L. (2010). A continuous dual-process model of
 #'   remember/know judgments. \emph{Psychological Review}, \emph{117}(4),
@@ -3175,84 +3233,83 @@ rsdt_ranking <- function(n, n_trials, m, dprime,
 #' @keywords distribution
 #' @export
 #' @examples
-#' # CDP density (R/K, 1 new + 3 old levels)
+#' # CDP density (R/K, 1 new + 3 old levels: 3 thresholds, 7 count columns)
 #' dsdt_cdp(
 #'   counts = c(40, 5, 12, 30, 10, 18, 60), stimulus = 1,
 #'   dprimef = 0.8, dprimer = 1.0,
-#'   thresholds = c(-0.5, 0.3, 1.0, 1.8),
-#'   rcrit = 0.7, n_new = 1, n_old = 3
+#'   thresholds = c(-0.5, 0.3, 1.0),
+#'   rcrit = 0.7, n_new = 1
 #' )
 dsdt_cdp <- function(counts, stimulus, dprimef, dprimer, thresholds,
-                     rcrit, kcrit = NULL, sigmar = 0, rho = 0, dist = "normal",
-                     n_new = NULL, n_old = NULL, log = FALSE) {
-  stopif(is.null(counts), "counts is required for CDP density")
-  stopif(is.null(thresholds), "thresholds is required for CDP density")
+                     rcrit, kcrit = NULL, sigmar = 0, rho = 0,
+                     n_new = NULL, dist = "normal", log = FALSE) {
+  dist <- match.arg(dist)
+  counts <- rbind(counts)
+  dimnames(counts) <- NULL
+  thr <- rbind(thresholds)
+  K_full <- ncol(thr) + 1L
+  if (is.null(n_new)) n_new <- K_full %/% 2L
+  n_old <- K_full - n_new
+  has_guess <- !is.null(kcrit) && all(is.finite(kcrit))
+  expected <- n_new + (if (has_guess) 3L else 2L) * n_old
+  stopif(ncol(counts) != expected, "counts must have {expected} columns")
   stopif(any(counts < 0), "counts must be non-negative")
-  stopif(length(stimulus) != 1 || !stimulus %in% c(0L, 1L),
+
+  n <- max(nrow(counts), length(stimulus), length(dprimef), length(dprimer),
+           length(sigmar), length(rho), length(rcrit))
+  if (nrow(counts) != n) {
+    counts <- counts[rep_len(seq_len(nrow(counts)), n), , drop = FALSE]
+  }
+  stimulus <- rep_len(stimulus, n)
+  stopif(any(!stimulus %in% c(0L, 1L)),
          "stimulus must be 0 (noise) or 1 (signal)")
 
-  K_full <- length(thresholds) + 1L
-  if (is.null(n_new) || is.null(n_old)) {
-    n_new <- K_full %/% 2L
-    n_old <- K_full - n_new
-  }
-  has_guess <- !is.null(kcrit) && is.finite(kcrit)
-  expected_len <- n_new + (if (has_guess) 3L else 2L) * n_old
-  stopif(length(counts) != expected_len,
-         "counts must have length {expected_len}")
-
-  probs <- .sdt_cdp_category_probs(thresholds, dprimef, dprimer, sigmar,
-                                   rcrit, kcrit, stimulus, n_new, n_old,
-                                   dist, rho)
-  stats::dmultinom(counts, prob = probs, log = log)
+  probs <- rbind(.sdt_cdp_category_probs(thr, rep_len(dprimef, n),
+                                         rep_len(dprimer, n),
+                                         rep_len(sigmar, n), rep_len(rcrit, n),
+                                         kcrit, stimulus, n_new, n_old, dist,
+                                         rep_len(rho, n)))
+  log_dens <- lgamma(rowSums(counts) + 1) - rowSums(lgamma(counts + 1)) +
+    rowSums(counts * log(probs))
+  if (log) log_dens else exp(log_dens)
 }
 
 
 #' @rdname sdt_cdp_dist
 #' @export
 #' @examples
-#' # Generate tidy CDP data (R/K, 3 new + 3 old levels) ready for sdt_cdp()
-#' dat <- rsdt_cdp(n_per_cell = 100, n_subjects = 10,
-#'                 dprimef = 0.8, dprimer = 1.0,
-#'                 criterion = 0, spacing = 0.5, rcrit = 0.5,
-#'                 n_new = 3, n_old = 3)
-rsdt_cdp <- function(n_per_cell, n_subjects, dprimef, dprimer,
-                     criterion, spacing, rcrit, kcrit = NULL,
-                     sigmar = 0, rho = 0, dist = "normal",
-                     n_ratings = NULL, n_new = NULL, n_old = NULL,
-                     threshold_type = "parsimonious", deltas = NULL) {
-  if (is.null(n_new) || is.null(n_old)) {
-    stopif(is.null(n_ratings) || n_ratings < 3, "n_ratings must be >= 3")
-    n_new <- n_ratings %/% 2L
-    n_old <- n_ratings - n_new
+#' # Generate CDP count data (R/K, 3 new + 3 old levels) for 10 subjects
+#' dat <- expand.grid(id = 1:10, stimulus = c(0L, 1L))
+#' dat <- cbind(dat, rsdt_cdp(nrow(dat), 100, dat$stimulus,
+#'                            dprimef = 0.8, dprimer = 1.0,
+#'                            thresholds = c(-1.1, -0.5, 0, 0.6, 1.3),
+#'                            rcrit = 0.5, n_new = 3))
+#' head(dat)
+rsdt_cdp <- function(n, n_trials, stimulus, dprimef, dprimer, thresholds,
+                     rcrit, kcrit = NULL, sigmar = 0, rho = 0,
+                     n_new = NULL, dist = "normal") {
+  dist <- match.arg(dist)
+  stopif(length(n) != 1 || n < 1, "n must be a single positive integer")
+  stopif(any(n_trials < 1), "n_trials must be positive")
+  stopif(any(!stimulus %in% c(0L, 1L)),
+         "stimulus must be 0 (noise) or 1 (signal)")
+
+  thr <- rbind(thresholds)
+  K_full <- ncol(thr) + 1L
+  if (is.null(n_new)) n_new <- K_full %/% 2L
+  n_old <- K_full - n_new
+  has_guess <- !is.null(kcrit) && all(is.finite(kcrit))
+
+  n_trials <- rep_len(as.integer(n_trials), n)
+  probs <- rbind(.sdt_cdp_category_probs(thr, rep_len(dprimef, n),
+                                         rep_len(dprimer, n),
+                                         rep_len(sigmar, n), rep_len(rcrit, n),
+                                         kcrit, rep_len(stimulus, n),
+                                         n_new, n_old, dist, rep_len(rho, n)))
+  cols <- .sdt_cdp_response_cols(n_new, n_old, has_guess)
+  counts <- matrix(0L, n, ncol(probs), dimnames = list(NULL, cols))
+  for (i in seq_len(n)) {
+    counts[i, ] <- as.integer(stats::rmultinom(1, n_trials[i], probs[i, ]))
   }
-  stopif(n_new < 1 || n_old < 1, "n_new and n_old must be >= 1")
-  stopif(length(n_per_cell) != 1 || n_per_cell < 1,
-         "n_per_cell must be a single positive integer")
-
-  thresholds <- .cdp_make_thresholds(criterion, spacing, n_new, n_old,
-                                     threshold_type, deltas)
-  has_guess <- !is.null(kcrit) && is.finite(kcrit)
-
-  # Category metadata in canonical order, with confidence on the unified
-  # old/new scale (new: 1..n_new, old: n_new+1..n_new+n_old).
-  old_levels <- n_new + seq_len(n_old)
-  cat_judg <- c(rep("new", n_new),
-                if (has_guess) rep("guess", n_old),
-                rep("know", n_old), rep("remember", n_old))
-  cat_conf <- c(seq_len(n_new),
-                if (has_guess) old_levels, old_levels, old_levels)
-
-  cells <- expand.grid(id = seq_len(n_subjects), stimulus = c(0L, 1L))
-  rows <- lapply(seq_len(nrow(cells)), function(i) {
-    probs <- .sdt_cdp_category_probs(thresholds, dprimef, dprimer, sigmar,
-                                     rcrit, kcrit, cells$stimulus[i],
-                                     n_new, n_old, dist, rho)
-    data.frame(
-      id = cells$id[i], stimulus = cells$stimulus[i],
-      judgment = cat_judg, confidence = cat_conf,
-      count = as.integer(stats::rmultinom(1, n_per_cell, probs))
-    )
-  })
-  do.call(rbind, rows)
+  counts
 }

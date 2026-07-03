@@ -493,34 +493,49 @@ bivariate-normal CDF.
 We fit the model to the group Remember/Know ROC data of @Rotello_2005 (neutral
 condition): a 6-point scale where rating 1 is a confident "new" response and
 ratings 2--6 are "old" responses, each accompanied by a Remember or Know
-judgment. The data go in **tidy long** form — a `judgment` column
-(`"new"`/`"remember"`/`"know"`), a `confidence` rating on the unified old/new
-scale, a `stimulus` column, and a `count` column:
+judgment. We enter the data in **tidy long** form — one row per combination of
+stimulus class, judgment, and confidence level, with a `count` column — since
+that is how Remember/Know data typically leave an experiment (trial-level data
+work the same way, just without `count`):
 
 ```{r}
-mk <- function(stim, n, k, r) rbind(
-  data.frame(stimulus = stim, judgment = "new",      confidence = 1L,  count = n),
-  data.frame(stimulus = stim, judgment = "know",     confidence = 2:6, count = k),
-  data.frame(stimulus = stim, judgment = "remember", confidence = 2:6, count = r)
+rotello_long <- rbind(
+  data.frame(stimulus = 1L, judgment = "new",      confidence = 1L,  count = 290),
+  data.frame(stimulus = 1L, judgment = "know",     confidence = 2:6, count = c(122, 106, 101, 92, 59)),
+  data.frame(stimulus = 1L, judgment = "remember", confidence = 2:6, count = c(26, 38, 61, 109, 433)),
+  data.frame(stimulus = 0L, judgment = "new",      confidence = 1L,  count = 745),
+  data.frame(stimulus = 0L, judgment = "know",     confidence = 2:6, count = c(199, 124, 84, 45, 13)),
+  data.frame(stimulus = 0L, judgment = "remember", confidence = 2:6, count = c(46, 29, 47, 51, 55))
 )
-rotello <- rbind(
-  mk(1L, 290, c(122, 106, 101, 92, 59), c(26, 38, 61, 109, 433)),  # targets (old)
-  mk(0L, 745, c(199, 124, 84, 45, 13),  c(46, 29, 47, 51, 55))     # lures (new)
-)
-rotello$id <- 1L
-head(rotello)
+head(rotello_long)
 ```
 
-The scale is asymmetric — one "new" level and five "old" levels — which
-`sdt_cdp()` infers directly from the data (the numbers of "new" and "old"
-confidence levels need not match). We free `sigmar` so recollection can add
-variance to the old-item strength distribution (the canonical Wixted--Mickes
-result) and keep the familiarity--recollection correlation `rho` at its default
-of zero, the classic independent-process model:
+Like `sdt_rating()`, the model itself is fit to **aggregated counts** — one row
+per cell and one count column per response category.
+`aggregate_sdt_cdp_data()` pivots the long rows into these canonical columns;
+every column other than `judgment`, `confidence`, and `count` (here just
+`stimulus`) defines the cells and is carried over:
 
 ```{r}
-model_cdp <- sdt_cdp(judgment = "judgment", confidence = "confidence",
-                     count = "count", stimulus = "stimulus")
+rotello <- aggregate_sdt_cdp_data(rotello_long, judgment = "judgment",
+                                  confidence = "confidence", count = "count")
+rotello
+```
+
+The 22 long rows collapse to one row per stimulus class, with columns `new1`
+(the single "new" level) and `know2`...`know6` / `remember2`...`remember6` on
+the unified confidence scale. This is also the format `rsdt_cdp()` simulates
+directly, and if your own wide columns carry a shared prefix (say `cdp_new1`),
+you declare it once via the constructor's `response` argument. The scale is
+asymmetric — one "new" level and five "old" levels — which the constructor is
+told via `n_new` and `n_old` (the two need not match). We free `sigmar` so
+recollection can add variance to the
+old-item strength distribution (the canonical Wixted--Mickes result) and keep
+the familiarity--recollection correlation `rho` at its default of zero, the
+classic independent-process model:
+
+```{r}
+model_cdp <- sdt_cdp(stimulus = "stimulus", n_new = 1, n_old = 5)
 
 fit_cdp <- bmm(
   formula = bmf(dprimef ~ 1, dprimer ~ 1, criterion ~ 1, spacing ~ 1,
@@ -533,9 +548,9 @@ fit_cdp <- bmm(
 summary(fit_cdp)
 ```
 
-Recollection (`dprimer` ≈ 0.81) and familiarity (`dprimef` ≈ 0.77) contribute
+Recollection (`dprimer` ≈ 0.81) and familiarity (`dprimef` ≈ 0.78) contribute
 comparable sensitivities, the Remember criterion sits well into the recollection
-distribution (`rcrit` ≈ 0.92), and `exp(sigmar)` ≈ 1.47 puts the recollection SD
+distribution (`rcrit` ≈ 0.92), and `exp(sigmar)` ≈ 1.48 puts the recollection SD
 half again above one — the model's account of the recognition-ROC asymmetry as
 *added recollection variance* rather than a uniformly wider strength
 distribution. Despite using the two-parameter `parsimonious` thresholds rather
@@ -548,8 +563,9 @@ familiarity--recollection correlation is freed with `rho ~ 1` (and can itself be
 predicted, e.g. `rho ~ condition`); it is bounded to $(-1, 1)$ internally and is
 a *within-item* correlation, distinct from a between-subject correlation of
 random effects (which you would write as `(1 |p| id)`). And when the task also
-collects an explicit *Guess* response, adding a `"guess"` judgment level to the
-data switches on the three-way Remember/Know/Guess model, with a familiarity
+collects an explicit *Guess* response, include `"guess"` judgments in the long
+data: `aggregate_sdt_cdp_data()` turns them into `guess` count columns, whose
+presence switches on the three-way Remember/Know/Guess model with a familiarity
 criterion `kcrit` separating Know from Guess.
 
 # Choosing and comparing the models

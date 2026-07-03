@@ -16,80 +16,75 @@ dsdt_cdp(
   kcrit = NULL,
   sigmar = 0,
   rho = 0,
-  dist = "normal",
   n_new = NULL,
-  n_old = NULL,
+  dist = "normal",
   log = FALSE
 )
 
 rsdt_cdp(
-  n_per_cell,
-  n_subjects,
+  n,
+  n_trials,
+  stimulus,
   dprimef,
   dprimer,
-  criterion,
-  spacing,
+  thresholds,
   rcrit,
   kcrit = NULL,
   sigmar = 0,
   rho = 0,
-  dist = "normal",
-  n_ratings = NULL,
   n_new = NULL,
-  n_old = NULL,
-  threshold_type = "parsimonious",
-  deltas = NULL
+  dist = "normal"
 )
 }
 \arguments{
-\item{counts}{Integer vector of response counts in the canonical order
-\code{new}, \verb{[guess]}, \code{know}, \code{remember} (each block ordered by confidence).
-Length \code{n_new + 2 * n_old} (R/K) or \code{n_new + 3 * n_old} (R/K/G).}
+\item{counts}{Integer matrix with one row per observation and one column per
+response category in the canonical order \code{new}, \verb{[guess]}, \code{know},
+\code{remember} (each block ordered by confidence; see \code{\link[=sdt_cdp]{sdt_cdp()}}), or a
+vector for a single observation. \code{n_new + 2 * n_old} columns (R/K) or
+\code{n_new + 3 * n_old} (R/K/G).}
 
-\item{stimulus}{Integer. 0 (noise/new) or 1 (signal/old).}
+\item{stimulus}{Integer vector (0/1). Stimulus type: 0 = new/lure,
+1 = old/target.}
 
-\item{dprimef, dprimer}{Familiarity and recollection sensitivities (target
-means on the F and R axes).}
+\item{dprimef, dprimer}{Numeric vectors. Familiarity and recollection
+sensitivities (target means on the F and R axes).}
 
 \item{thresholds}{Numeric vector of \code{n_new + n_old - 1} ordered confidence
-thresholds on the aggregate F+R axis.}
+thresholds on the aggregate F+R axis, or a matrix with one row per
+observation.}
 
-\item{rcrit}{Remember criterion on the recollection axis.}
+\item{rcrit}{Numeric vector. Remember criterion on the recollection axis.}
 
-\item{kcrit}{Know criterion on the familiarity axis. \code{NULL}/non-finite for
-the R/K model; a finite value enables the R/K/G model.}
+\item{kcrit}{Know criterion on the familiarity axis. \code{NULL} (default) for
+the R/K model; finite values enable the R/K/G model.}
 
-\item{sigmar}{Log SD of the recollection target distribution (0 = SD 1).}
+\item{sigmar}{Numeric vector. Log SD of the recollection target
+distribution (0 = SD 1).}
 
-\item{rho}{F-R correlation on the unconstrained scale; \code{tanh(rho)} is the
-correlation. 0 (default) = independent processes (classic CDP).}
+\item{rho}{Numeric vector. F-R correlation on the unconstrained scale;
+\code{tanh(rho)} is the correlation. 0 (default) = independent processes
+(classic CDP).}
+
+\item{n_new}{Integer number of "new" confidence levels. Defaults to a
+symmetric split of the confidence scale; the number of "old" levels
+follows as \code{length(thresholds) + 1 - n_new}.}
 
 \item{dist}{Noise distribution. Only \code{"normal"} is currently supported.}
 
-\item{n_new, n_old}{Integer numbers of "new" and "old" confidence levels.}
-
 \item{log}{Logical; if \code{TRUE} return the log-density (default \code{FALSE}).}
 
-\item{n_per_cell}{Integer trials per stimulus class per subject.}
+\item{n}{Integer. Number of observations to generate. \code{n_trials},
+\code{stimulus}, \code{thresholds}, and the model parameters are recycled to this
+length.}
 
-\item{n_subjects}{Integer number of subjects.}
-
-\item{criterion}{Central old/new criterion for threshold generation.}
-
-\item{spacing}{Threshold spacing parameter.}
-
-\item{n_ratings}{Integer total number of confidence levels (\code{n_new + n_old}).}
-
-\item{threshold_type}{\code{"parsimonious"} (default), \code{"equidistant"}, or
-\code{"log_distance"} (free cumulative log-distances; requires \code{deltas}).}
-
-\item{deltas}{Numeric vector of \code{n_new + n_old - 2} log-distances for
-\code{threshold_type = "log_distance"}; ignored otherwise.}
+\item{n_trials}{Integer vector. Number of trials per observation.}
 }
 \value{
-\code{dsdt_cdp} returns the (log-)multinomial density. \code{rsdt_cdp} returns a
-tidy long data frame (\code{id}, \code{stimulus}, \code{judgment}, \code{confidence}, \code{count})
-ready to pass to \code{\link[=sdt_cdp]{sdt_cdp()}}.
+\code{dsdt_cdp} returns the (log-)density (multinomial probability).
+\code{rsdt_cdp} returns an integer matrix with one row per observation and the
+canonical response count columns (\code{new1}, ..., \verb{remember<K>}) that
+\code{\link[=sdt_cdp]{sdt_cdp()}} expects -- \code{cbind()} it to a design data frame for a
+ready-to-fit data set.
 }
 \description{
 Density and random generation for the continuous dual-process
@@ -97,22 +92,26 @@ signal detection theory model (Wixted & Mickes, 2010). Two correlated
 continuous dimensions, Familiarity (F) and Recollection (R), generate the
 aggregate strength S = F + R that drives old/new confidence; Remember/Know
 judgments split "old" responses on R, and an optional Know/Guess split uses
-F. See \code{\link[=sdt_cdp]{sdt_cdp()}} for the model and \code{\link[=sdt_rating]{sdt_rating()}} when no R/K split is
+F. The response is a vector of counts across the response categories
+(multinomial likelihood), in the same format \code{\link[=sdt_cdp]{sdt_cdp()}} is fit to. See
+\code{\link[=sdt_cdp]{sdt_cdp()}} for the model and \code{\link[=sdt_rating]{sdt_rating()}} when no R/K split is
 available.
 }
 \examples{
-# CDP density (R/K, 1 new + 3 old levels)
+# CDP density (R/K, 1 new + 3 old levels: 3 thresholds, 7 count columns)
 dsdt_cdp(
   counts = c(40, 5, 12, 30, 10, 18, 60), stimulus = 1,
   dprimef = 0.8, dprimer = 1.0,
-  thresholds = c(-0.5, 0.3, 1.0, 1.8),
-  rcrit = 0.7, n_new = 1, n_old = 3
+  thresholds = c(-0.5, 0.3, 1.0),
+  rcrit = 0.7, n_new = 1
 )
-# Generate tidy CDP data (R/K, 3 new + 3 old levels) ready for sdt_cdp()
-dat <- rsdt_cdp(n_per_cell = 100, n_subjects = 10,
-                dprimef = 0.8, dprimer = 1.0,
-                criterion = 0, spacing = 0.5, rcrit = 0.5,
-                n_new = 3, n_old = 3)
+# Generate CDP count data (R/K, 3 new + 3 old levels) for 10 subjects
+dat <- expand.grid(id = 1:10, stimulus = c(0L, 1L))
+dat <- cbind(dat, rsdt_cdp(nrow(dat), 100, dat$stimulus,
+                           dprimef = 0.8, dprimer = 1.0,
+                           thresholds = c(-1.1, -0.5, 0, 0.6, 1.3),
+                           rcrit = 0.5, n_new = 3))
+head(dat)
 }
 \references{
 Wixted, J. T., & Mickes, L. (2010). A continuous dual-process model of

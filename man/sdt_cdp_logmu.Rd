@@ -48,10 +48,13 @@ log_distance, which uses the per-distance deltas in \code{...} instead.}
 }
 \description{
 R companion to the Stan \code{sdt_cdp_logmu} function. It returns
-\code{log(p_cat)} for response category \code{cat}, which the \code{\link[=sdt_cdp]{sdt_cdp()}} multinomial
-formula uses as the category logit (so \code{softmax} recovers the CDP category
-probabilities). \code{brms} evaluates the non-linear formula in R for
-\code{posterior_predict()} and \code{posterior_epred()}, so this function must be on
-the search path; it is exported for that reason and is not called directly.
+\code{log(p_cat)} for response category \code{cat} (unnormalized, exactly like the
+Stan function -- the category probabilities sum to 1 analytically and
+\code{softmax} absorbs the shared constant), which the \code{\link[=sdt_cdp]{sdt_cdp()}} multinomial
+formula uses as the category logit. \code{brms} evaluates the non-linear
+formula in R for \code{posterior_predict()} and \code{posterior_epred()}, so this
+function must be on the search path; it is exported for that reason and is
+not called directly. Vectorized over the draws-by-observations matrices
+brms supplies.
 }
 \keyword{internal}

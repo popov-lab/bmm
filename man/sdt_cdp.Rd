@@ -5,32 +5,27 @@
 \title{Continuous Dual-Process Signal Detection Theory Model}
 \usage{
 sdt_cdp(
-  judgment,
-  confidence,
+  response = "",
   stimulus,
-  count = NULL,
+  n_new,
+  n_old,
   dist = "normal",
   threshold_type = c("parsimonious", "equidistant", "log_distance"),
-  n_new = NULL,
-  n_old = NULL,
   links = NULL,
   ...
 )
 }
 \arguments{
-\item{judgment}{The name of the column coding the memory judgment, with
-values \code{"new"}, \code{"remember"}, \code{"know"}, and optionally \code{"guess"}.}
-
-\item{confidence}{The name of the column coding confidence on the unified
-old/new scale (integer, 1 = most confident "new" to K = most confident
-"old").}
+\item{response}{An optional common prefix for the response count columns
+(default \code{""}, i.e. the bare canonical names \code{new1}, \code{know2}, ... that
+\code{\link[=aggregate_sdt_cdp_data]{aggregate_sdt_cdp_data()}} and \code{\link[=rsdt_cdp]{rsdt_cdp()}} produce).}
 
 \item{stimulus}{The name of the variable coding the stimulus type.
 Must be coded as 0 (new/lure) and 1 (old/target).}
 
-\item{count}{Optional name of a column of response counts. If \code{NULL}
-(default), each row is treated as a single trial and counts are aggregated
-internally.}
+\item{n_new, n_old}{Integer numbers of "new" and "old" confidence levels.
+Together with \code{response} they determine the response count columns and
+the threshold parameters.}
 
 \item{dist}{The noise distribution. Only \code{"normal"} is currently supported
 (the CDP model is inherently Gaussian).}
@@ -40,12 +35,7 @@ axis: \code{"parsimonious"} (default) and \code{"equidistant"} use a single \cod
 parameter; \code{"log_distance"} (Meyer-Grant et al., 2025) estimates the
 \code{n_new + n_old - 2} distances between adjacent thresholds freely, each as a
 \code{deltaN} parameter on the log scale (the distance leading into threshold
-\code{N} from the old/new boundary). \code{"log_distance"} requires \code{n_new}/\code{n_old}.}
-
-\item{n_new, n_old}{Integer numbers of "new" and "old" confidence levels.
-Required for \code{threshold_type = "log_distance"} (the per-distance parameters
-are fixed at construction); for \code{"parsimonious"}/\code{"equidistant"} they are
-ignored and detected from the data.}
+\code{N} from the old/new boundary).}
 
 \item{links}{A named list of link functions for the parameters.}
 
@@ -69,14 +59,16 @@ Continuous Dual-Process Signal Detection Theory Model
 \item \strong{Version:} cdp
 \item \strong{Requirements:}
 
-Provide tidy long data with the following columns:
-}
+Provide aggregated data with one row per cell (unique combination of predictors and stimulus class) and one integer count column per response category:
 \itemize{
-\item judgment: 'new', 'remember', 'know' (and optionally 'guess')
-\item confidence: the rating on the unified old/new scale (1 = most confident 'new' ... K = most confident 'old')
+\item new1 ... new<n_new> for 'new' judgments
+\item know\if{html}{\out{<k>}} and remember\if{html}{\out{<k>}} (and optionally guess\if{html}{\out{<k>}}) for 'old' judgments, with k on the unified confidence scale n_new+1 ... n_new+n_old
+\item an optional common column prefix is set via \code{response}
 \item stimulus: 0 = new/lure, 1 = old/target
-\item count: response counts (omit for trial-level data)
 }
+}
+
+Use aggregate_sdt_cdp_data() to build these columns from long-format (trial-level) data
 \itemize{
 \item \strong{Parameters:}
 \itemize{
@@ -87,7 +79,7 @@ Provide tidy long data with the following columns:
 \item \code{rcrit}: Remember criterion: threshold on the recollection axis
 \item \code{sigmar}: Log SD of the recollection target distribution, so exp(sigmar) is the SD and 0 means SD = 1
 \item \code{rho}: Familiarity-recollection correlation on an unconstrained scale; tanh(rho) is the correlation and 0 means independent processes
-\item \code{kcrit}: Know criterion: threshold on the familiarity axis that splits Know from Guess. Active only when the data include 'guess' judgments
+\item \code{kcrit}: Know criterion: threshold on the familiarity axis that splits Know from Guess. Active only when the data include 'guess' counts
 }
 \item \strong{Fixed parameters:}
 \itemize{
@@ -150,16 +142,21 @@ with correlation \code{tanh(rho)}. Old/new confidence is read off the aggregate
 strength S = F + R; the Remember/Know judgment splits "old" responses on R
 (against \code{rcrit}); an optional Know/Guess split uses F (against \code{kcrit}).
 
-\strong{Response format.} Data are supplied in tidy long form: a \code{judgment} column
-(\code{"new"}, \code{"remember"}, \code{"know"}, and optionally \code{"guess"}), a \code{confidence}
-column on the unified old/new scale (1 = most confident "new" to K = most
-confident "old"; "new" judgments occupy the low levels, "old" judgments the
-high levels), a \code{stimulus} column (0 = new/lure, 1 = old/target), and an
-optional \code{count} column (omit for trial-level data, which is aggregated
-internally). The number of "new" and "old" confidence levels need not be
-equal (e.g. the 1-new / 5-old scale of Rotello et al., 2005). Whether the
-Know/Guess split is modelled is \strong{driven by the data}: include a \code{"guess"}
-judgment level to fit the three-way Remember/Know/Guess model.
+\strong{Response format.} The model is fit to aggregated counts, like
+\code{\link[=sdt_rating]{sdt_rating()}}: one row per cell (e.g. participant x stimulus class x
+condition) and one integer count column per response category. The columns
+follow a fixed naming scheme -- \verb{new1 ... new<n_new>} for "new" judgments,
+and \verb{know<k>} / \verb{remember<k>} (optionally \verb{guess<k>}) for "old" judgments,
+where \code{k} runs over the unified confidence scale \verb{n_new + 1 ... n_new + n_old} (1 = most confident "new", K = most confident "old") -- so
+the constructor only needs the numbers of confidence levels, not a long
+vector of column names. An optional common prefix is set via \code{response}
+(e.g. \code{response = "cdp_"} for columns \code{cdp_new1}, \code{cdp_know2}, ...). Use
+\code{\link[=aggregate_sdt_cdp_data]{aggregate_sdt_cdp_data()}} to build these columns from long-format
+(trial-level or count) data; \code{\link[=rsdt_cdp]{rsdt_cdp()}} generates them directly. The
+numbers of "new" and "old" confidence levels need not be equal (e.g. the
+1-new / 5-old scale of Rotello et al., 2005). Whether the Know/Guess split
+is modelled is \strong{driven by the data}: include \verb{guess<k>} columns to fit
+the three-way Remember/Know/Guess model.
 
 \strong{Variants via the formula.} By default \code{sigmar}, \code{rho}, and \code{kcrit} are
 fixed (equal recollection variance, independent F and R, no Know/Guess
@@ -181,15 +178,16 @@ When no Remember/Know split is available (confidence ratings only), use
 }
 \examples{
 \dontrun{
-# Simulate a Remember/Know data set (3 new + 3 old confidence levels)
-dat <- rsdt_cdp(n_per_cell = 200, n_subjects = 20,
-                dprimef = 0.8, dprimer = 1.0, criterion = 0,
-                spacing = -0.4, rcrit = 0.7, n_new = 3, n_old = 3)
+# Simulate a Remember/Know data set (3 new + 3 old confidence levels) for
+# 20 subjects: rsdt_cdp() returns the count columns sdt_cdp() expects
+dat <- expand.grid(id = 1:20, stimulus = c(0L, 1L))
+thresholds <- c(-1.1, -0.5, 0, 0.6, 1.3)
+dat <- cbind(dat, rsdt_cdp(nrow(dat), 200, dat$stimulus,
+                           dprimef = 0.8, dprimer = 1.0,
+                           thresholds = thresholds, rcrit = 0.7,
+                           n_new = 3))
 
-model <- sdt_cdp(
-  judgment = "judgment", confidence = "confidence",
-  count = "count", stimulus = "stimulus"
-)
+model <- sdt_cdp(stimulus = "stimulus", n_new = 3, n_old = 3)
 
 fit <- bmm(
   formula = bmf(dprimef ~ 1, dprimer ~ 1, criterion ~ 1,

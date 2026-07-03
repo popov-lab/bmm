@@ -2,45 +2,55 @@
 # MODELS                                                                 ####
 ############################################################################# !
 
-.model_sdt_cdp <- function(judgment = NULL, confidence = NULL, stimulus = NULL,
-                           count = NULL, dist = "normal",
+# Canonical response-category columns in the order the multinomial likelihood
+# expects: new(1..n_new), [guess], know, remember, with the old blocks on the
+# unified confidence scale n_new+1..K. Single source of truth shared by
+# check_data, aggregate_sdt_cdp_data(), and rsdt_cdp().
+.sdt_cdp_response_cols <- function(n_new, n_old, has_guess, response = "") {
+  old_levels <- n_new + seq_len(n_old)
+  paste0(response, c(paste0("new", seq_len(n_new)),
+                     if (has_guess) paste0("guess", old_levels),
+                     paste0("know", old_levels),
+                     paste0("remember", old_levels)))
+}
+
+.model_sdt_cdp <- function(response = NULL, stimulus = NULL,
+                           n_new = NULL, n_old = NULL, dist = "normal",
                            threshold_type = "parsimonious",
-                           n_new = NULL, n_old = NULL,
                            links = NULL, call = NULL, ...) {
   dist_int <- .sdt_dist_id(dist)
   thresh_type_int <- .sdt_threshold_type_id(threshold_type)
-  delta_based <- threshold_type %in% c("log_distance", "log_ratio", "softmax")
 
   # Threshold parameters are either a single `spacing` (parsimonious/equidistant)
   # or per-distance `deltaN` (log_distance), with the anchor at the old/new
   # boundary n_new. They must be declared here so configure_prior/create_initfun
-  # see them, hence n_new/n_old are required up front for delta-based types.
+  # see them.
   thr_parts <- .sdt_threshold_parameter_parts(
-    n_ratings = if (delta_based) n_new + n_old else NULL,
+    n_ratings = n_new + n_old,
     threshold_type = threshold_type,
-    anchor = if (delta_based) n_new else 0L
+    anchor = n_new
   )
 
   parameters <- c(
     list(
-      dprimef = glue("Familiarity sensitivity: target mean on the familiarity axis"),
-      dprimer = glue("Recollection sensitivity: target mean on the recollection axis"),
-      criterion = glue("Response bias: old/new boundary on the strength (F+R) axis")
+      dprimef = "Familiarity sensitivity: target mean on the familiarity axis",
+      dprimer = "Recollection sensitivity: target mean on the recollection axis",
+      criterion = "Response bias: old/new boundary on the strength (F+R) axis"
     ),
     thr_parts$parameters,
     list(
-      rcrit = glue("Remember criterion: threshold on the recollection axis"),
-      sigmar = glue(
+      rcrit = "Remember criterion: threshold on the recollection axis",
+      sigmar = paste0(
         "Log SD of the recollection target distribution, so exp(sigmar) is the ",
         "SD and 0 means SD = 1"
       ),
-      rho = glue(
+      rho = paste0(
         "Familiarity-recollection correlation on an unconstrained scale; ",
         "tanh(rho) is the correlation and 0 means independent processes"
       ),
-      kcrit = glue(
+      kcrit = paste0(
         "Know criterion: threshold on the familiarity axis that splits Know from ",
-        "Guess. Active only when the data include 'guess' judgments"
+        "Guess. Active only when the data include 'guess' counts"
       )
     )
   )
@@ -68,13 +78,18 @@
   # independent processes, no Know/Guess split) and freed through the formula.
   fixed_parameters <- list(sigmar = 0, rho = 0, kcrit = -100)
 
-  requirements <- glue(
-    "Provide tidy long data with the following columns:", "\n\n",
-    "  - judgment: 'new', 'remember', 'know' (and optionally 'guess')", "\n",
-    "  - confidence: the rating on the unified old/new scale (1 = most ",
-    "confident 'new' ... K = most confident 'old')", "\n",
-    "  - stimulus: 0 = new/lure, 1 = old/target", "\n",
-    "  - count: response counts (omit for trial-level data)"
+  requirements <- paste0(
+    "Provide aggregated data with one row per cell (unique combination of ",
+    "predictors and stimulus class) and one integer count column per response ",
+    "category:", "\n\n",
+    "  - new1 ... new<n_new> for 'new' judgments", "\n",
+    "  - know<k> and remember<k> (and optionally guess<k>) for 'old' ",
+    "judgments, with k on the unified confidence scale n_new+1 ... ",
+    "n_new+n_old", "\n",
+    "  - an optional common column prefix is set via `response`", "\n",
+    "  - stimulus: 0 = new/lure, 1 = old/target", "\n\n",
+    "Use aggregate_sdt_cdp_data() to build these columns from long-format ",
+    "(trial-level) data"
   )
 
   init_ranges <- list(
@@ -88,9 +103,9 @@
 
   out <- structure(
     list(
-      resp_vars = nlist(judgment, confidence, count),
+      resp_vars = nlist(response),
       other_vars = nlist(stimulus, dist, dist_int, threshold_type,
-                         thresh_type_int, delta_based, n_new, n_old),
+                         thresh_type_int, n_new, n_old),
       domain = "Recognition Memory",
       task = "Old/New Recognition with Remember/Know Judgments",
       name = "Continuous Dual-Process Signal Detection Theory (CDP)",
@@ -125,16 +140,22 @@
 #' strength S = F + R; the Remember/Know judgment splits "old" responses on R
 #' (against `rcrit`); an optional Know/Guess split uses F (against `kcrit`).
 #'
-#' **Response format.** Data are supplied in tidy long form: a `judgment` column
-#' (`"new"`, `"remember"`, `"know"`, and optionally `"guess"`), a `confidence`
-#' column on the unified old/new scale (1 = most confident "new" to K = most
-#' confident "old"; "new" judgments occupy the low levels, "old" judgments the
-#' high levels), a `stimulus` column (0 = new/lure, 1 = old/target), and an
-#' optional `count` column (omit for trial-level data, which is aggregated
-#' internally). The number of "new" and "old" confidence levels need not be
-#' equal (e.g. the 1-new / 5-old scale of Rotello et al., 2005). Whether the
-#' Know/Guess split is modelled is **driven by the data**: include a `"guess"`
-#' judgment level to fit the three-way Remember/Know/Guess model.
+#' **Response format.** The model is fit to aggregated counts, like
+#' [sdt_rating()]: one row per cell (e.g. participant x stimulus class x
+#' condition) and one integer count column per response category. The columns
+#' follow a fixed naming scheme -- `new1 ... new<n_new>` for "new" judgments,
+#' and `know<k>` / `remember<k>` (optionally `guess<k>`) for "old" judgments,
+#' where `k` runs over the unified confidence scale `n_new + 1 ...
+#' n_new + n_old` (1 = most confident "new", K = most confident "old") -- so
+#' the constructor only needs the numbers of confidence levels, not a long
+#' vector of column names. An optional common prefix is set via `response`
+#' (e.g. `response = "cdp_"` for columns `cdp_new1`, `cdp_know2`, ...). Use
+#' [aggregate_sdt_cdp_data()] to build these columns from long-format
+#' (trial-level or count) data; [rsdt_cdp()] generates them directly. The
+#' numbers of "new" and "old" confidence levels need not be equal (e.g. the
+#' 1-new / 5-old scale of Rotello et al., 2005). Whether the Know/Guess split
+#' is modelled is **driven by the data**: include `guess<k>` columns to fit
+#' the three-way Remember/Know/Guess model.
 #'
 #' **Variants via the formula.** By default `sigmar`, `rho`, and `kcrit` are
 #' fixed (equal recollection variance, independent F and R, no Know/Guess
@@ -154,16 +175,14 @@
 #' When no Remember/Know split is available (confidence ratings only), use
 #' [sdt_rating()] instead.
 #'
-#' @param judgment The name of the column coding the memory judgment, with
-#'   values `"new"`, `"remember"`, `"know"`, and optionally `"guess"`.
-#' @param confidence The name of the column coding confidence on the unified
-#'   old/new scale (integer, 1 = most confident "new" to K = most confident
-#'   "old").
+#' @param response An optional common prefix for the response count columns
+#'   (default `""`, i.e. the bare canonical names `new1`, `know2`, ... that
+#'   [aggregate_sdt_cdp_data()] and [rsdt_cdp()] produce).
 #' @param stimulus The name of the variable coding the stimulus type.
 #'   Must be coded as 0 (new/lure) and 1 (old/target).
-#' @param count Optional name of a column of response counts. If `NULL`
-#'   (default), each row is treated as a single trial and counts are aggregated
-#'   internally.
+#' @param n_new,n_old Integer numbers of "new" and "old" confidence levels.
+#'   Together with `response` they determine the response count columns and
+#'   the threshold parameters.
 #' @param dist The noise distribution. Only `"normal"` is currently supported
 #'   (the CDP model is inherently Gaussian).
 #' @param threshold_type Character. Threshold parameterization on the strength
@@ -171,11 +190,7 @@
 #'   parameter; `"log_distance"` (Meyer-Grant et al., 2025) estimates the
 #'   `n_new + n_old - 2` distances between adjacent thresholds freely, each as a
 #'   `deltaN` parameter on the log scale (the distance leading into threshold
-#'   `N` from the old/new boundary). `"log_distance"` requires `n_new`/`n_old`.
-#' @param n_new,n_old Integer numbers of "new" and "old" confidence levels.
-#'   Required for `threshold_type = "log_distance"` (the per-distance parameters
-#'   are fixed at construction); for `"parsimonious"`/`"equidistant"` they are
-#'   ignored and detected from the data.
+#'   `N` from the old/new boundary).
 #' @param links A named list of link functions for the parameters.
 #' @param ... used internally for testing, ignore it
 #' @return An object of class `bmmodel`
@@ -192,15 +207,16 @@
 #' @export
 #' @examples
 #' \dontrun{
-#' # Simulate a Remember/Know data set (3 new + 3 old confidence levels)
-#' dat <- rsdt_cdp(n_per_cell = 200, n_subjects = 20,
-#'                 dprimef = 0.8, dprimer = 1.0, criterion = 0,
-#'                 spacing = -0.4, rcrit = 0.7, n_new = 3, n_old = 3)
+#' # Simulate a Remember/Know data set (3 new + 3 old confidence levels) for
+#' # 20 subjects: rsdt_cdp() returns the count columns sdt_cdp() expects
+#' dat <- expand.grid(id = 1:20, stimulus = c(0L, 1L))
+#' thresholds <- c(-1.1, -0.5, 0, 0.6, 1.3)
+#' dat <- cbind(dat, rsdt_cdp(nrow(dat), 200, dat$stimulus,
+#'                            dprimef = 0.8, dprimer = 1.0,
+#'                            thresholds = thresholds, rcrit = 0.7,
+#'                            n_new = 3))
 #'
-#' model <- sdt_cdp(
-#'   judgment = "judgment", confidence = "confidence",
-#'   count = "count", stimulus = "stimulus"
-#' )
+#' model <- sdt_cdp(stimulus = "stimulus", n_new = 3, n_old = 3)
 #'
 #' fit <- bmm(
 #'   formula = bmf(dprimef ~ 1, dprimer ~ 1, criterion ~ 1,
@@ -215,11 +231,9 @@
 #'   data = dat, model = model, backend = "cmdstanr"
 #' )
 #' }
-sdt_cdp <- function(judgment, confidence, stimulus,
-                    count = NULL, dist = "normal",
+sdt_cdp <- function(response = "", stimulus, n_new, n_old, dist = "normal",
                     threshold_type = c("parsimonious", "equidistant",
                                        "log_distance"),
-                    n_new = NULL, n_old = NULL,
                     links = NULL, ...) {
   call <- match.call()
   stop_missing_args()
@@ -227,45 +241,67 @@ sdt_cdp <- function(judgment, confidence, stimulus,
   stopif(!identical(dist, "normal"),
          "sdt_cdp currently supports only dist = 'normal'; other noise \\
          distributions are deferred to a future release")
+  stopif(n_new < 1 || n_old < 1 || n_new + n_old < 3,
+         "n_new and n_old must be >= 1 and sum to >= 3")
 
-  if (threshold_type == "log_distance") {
-    stopif(is.null(n_new) || is.null(n_old),
-           "n_new and n_old are required when threshold_type = 'log_distance' \\
-           (the per-distance threshold parameters depend on the scale size)")
-    stopif(n_new < 1 || n_old < 1 || n_new + n_old < 3,
-           "n_new and n_old must be >= 1 and sum to >= 3")
-  }
-
-  .model_sdt_cdp(judgment = judgment, confidence = confidence,
-                 stimulus = stimulus, count = count, dist = dist,
-                 threshold_type = threshold_type, n_new = n_new, n_old = n_old,
+  .model_sdt_cdp(response = response, stimulus = stimulus, n_new = n_new,
+                 n_old = n_old, dist = dist, threshold_type = threshold_type,
                  links = links, call = call, ...)
 }
 
 
 ############################################################################# !
-# CHECK_DATA S3 METHODS                                                  ####
+# DATA PREPARATION                                                       ####
 ############################################################################# !
 
+#' @title Aggregate long-format Remember/Know data for [sdt_cdp()]
+#' @description Reshapes long-format Remember/Know recognition data -- one row
+#'   per trial, or one row per response category with a count column -- into
+#'   the aggregated wide format [sdt_cdp()] is fit to: one row per cell and
+#'   one count column per response category, named `new1 ... new<n_new>`,
+#'   `know<k>` / `remember<k>` (and `guess<k>` when the data contain "guess"
+#'   judgments), with `k` on the unified confidence scale
+#'   `n_new + 1 ... n_new + n_old`.
+#' @param data A data frame in long format. Cells are defined by all columns
+#'   other than `judgment`, `confidence`, and `count` (e.g. participant,
+#'   stimulus class, and any condition variables), which are carried over to
+#'   the output unchanged.
+#' @param judgment The name of the column coding the memory judgment, with
+#'   values `"new"`, `"remember"`, `"know"`, and optionally `"guess"`.
+#' @param confidence The name of the column coding confidence on the unified
+#'   old/new scale (integer, 1 = most confident "new" to K = most confident
+#'   "old"; "new" judgments occupy the low levels, "old" judgments the high
+#'   levels).
+#' @param count Optional name of a column of response counts. If `NULL`
+#'   (default), each row is treated as a single trial.
+#' @param response Optional common prefix for the generated count columns
+#'   (default `""`). Pass the same value to the `response` argument of
+#'   [sdt_cdp()].
+#' @return A data frame with one row per cell: the cell-defining columns
+#'   followed by the response count columns, ready to pass to [bmm()] with an
+#'   [sdt_cdp()] model. The numbers of "new" and "old" confidence levels are
+#'   inferred from the data.
+#' @examples
+#' dat <- data.frame(
+#'   stimulus = c(1L, 1L, 1L, 0L, 0L, 0L),
+#'   judgment = c("remember", "know", "new", "new", "know", "new"),
+#'   confidence = c(3L, 2L, 1L, 1L, 3L, 1L),
+#'   count = c(40L, 25L, 15L, 55L, 10L, 20L)
+#' )
+#' aggregate_sdt_cdp_data(dat, "judgment", "confidence", "count")
+#' @keywords transform
 #' @export
-check_data.sdt_cdp <- function(model, data, formula) {
-  stim_var <- model$other_vars$stimulus
-  judg_var <- model$resp_vars$judgment
-  conf_var <- model$resp_vars$confidence
-  count_var <- model$resp_vars$count
+aggregate_sdt_cdp_data <- function(data, judgment, confidence, count = NULL,
+                                   response = "") {
+  stop_missing_args()
+  stopif(!judgment %in% colnames(data),
+         "Judgment variable '{judgment}' missing in the data")
+  stopif(!confidence %in% colnames(data),
+         "Confidence variable '{confidence}' missing in the data")
+  stopif(!is.null(count) && !count %in% colnames(data),
+         "Count variable '{count}' missing in the data")
 
-  stopif(!stim_var %in% colnames(data),
-         "Stimulus variable '{stim_var}' missing in the data")
-  stopif(!all(unique(data[[stim_var]]) %in% c(0, 1)),
-         "Stimulus variable '{stim_var}' must be coded as 0 (new/lure) and 1 (old/target)")
-  stopif(!judg_var %in% colnames(data),
-         "Judgment variable '{judg_var}' missing in the data")
-  stopif(!conf_var %in% colnames(data),
-         "Confidence variable '{conf_var}' missing in the data")
-  stopif(!is.null(count_var) && !count_var %in% colnames(data),
-         "Count variable '{count_var}' missing in the data")
-
-  judg <- as.character(data[[judg_var]])
+  judg <- as.character(data[[judgment]])
   allowed <- c("new", "remember", "know", "guess")
   bad <- setdiff(unique(judg), allowed)
   stopif(length(bad) > 0,
@@ -274,7 +310,7 @@ check_data.sdt_cdp <- function(model, data, formula) {
          "Judgment column must contain 'new', 'remember', and 'know' values")
   has_guess <- "guess" %in% judg
 
-  conf <- data[[conf_var]]
+  conf <- data[[confidence]]
   warnif(any(conf != round(conf), na.rm = TRUE),
          "Confidence values should be integers")
   conf <- as.integer(round(conf))
@@ -286,21 +322,13 @@ check_data.sdt_cdp <- function(model, data, formula) {
   n_old <- K_full - n_new
   stopif(n_old < 1,
          "Data must contain 'old' confidence levels above the 'new' levels")
-  # For delta-based thresholds the parameter set is fixed at construction from
-  # the declared scale, so the data must match it exactly.
-  if (isTRUE(model$other_vars$delta_based)) {
-    stopif(n_new != model$other_vars$n_new || n_old != model$other_vars$n_old,
-           "Declared n_new = {model$other_vars$n_new}, n_old = \\
-           {model$other_vars$n_old} do not match the data \\
-           (n_new = {n_new}, n_old = {n_old})")
-  }
   stopif(!all(conf[is_new] %in% seq_len(n_new)),
          "'new' confidence values must occupy levels 1..{n_new}")
   stopif(!all(conf[!is_new] %in% (n_new + 1L):K_full),
          "old (remember/know/guess) confidence values must occupy levels {n_new + 1L}..{K_full}")
 
-  counts_in <- if (!is.null(count_var)) {
-    vals <- data[[count_var]]
+  counts_in <- if (!is.null(count)) {
+    vals <- data[[count]]
     stopif(any(vals < 0, na.rm = TRUE), "Count values must be non-negative")
     as.integer(vals)
   } else {
@@ -318,27 +346,67 @@ check_data.sdt_cdp <- function(model, data, formula) {
   col_idx <- ifelse(is_new, conf, n_new + block * n_old + (conf - n_new))
   K_cat <- n_new + (if (has_guess) 3L else 2L) * n_old
 
-  cell_cols <- setdiff(colnames(data),
-                       c(judg_var, conf_var, if (!is.null(count_var)) count_var))
+  cell_cols <- setdiff(colnames(data), c(judgment, confidence, count))
   cell_key <- do.call(paste, c(data[cell_cols], sep = "\r"))
   first_idx <- which(!duplicated(cell_key))
-  cell_data <- data[first_idx, cell_cols, drop = FALSE]
-  rownames(cell_data) <- NULL
+  cells <- data[first_idx, cell_cols, drop = FALSE]
+  rownames(cells) <- NULL
   row_of <- match(cell_key, cell_key[first_idx])
 
   Y <- matrix(0L, nrow = length(first_idx), ncol = K_cat)
   lin <- (col_idx - 1L) * nrow(Y) + row_of
   summed <- tapply(counts_in, lin, sum)
   Y[as.integer(names(summed))] <- as.integer(summed)
-  colnames(Y) <- paste0("cdp", seq_len(K_cat))
-  stopif(any(rowSums(Y) <= 0), "Each cell must have positive total counts")
+  colnames(Y) <- .sdt_cdp_response_cols(n_new, n_old, has_guess, response)
+  cbind(cells, as.data.frame(Y))
+}
 
-  cell_data$Y <- Y
-  cell_data$nTrials <- rowSums(Y)
-  attr(cell_data, "n_new") <- n_new
-  attr(cell_data, "n_old") <- n_old
-  attr(cell_data, "has_guess") <- has_guess
-  data <- cell_data
+
+############################################################################# !
+# CHECK_DATA S3 METHODS                                                  ####
+############################################################################# !
+
+#' @export
+check_data.sdt_cdp <- function(model, data, formula) {
+  stim_var <- model$other_vars$stimulus
+  stopif(!stim_var %in% colnames(data),
+         "Stimulus variable '{stim_var}' missing in the data")
+  stopif(!all(unique(data[[stim_var]]) %in% c(0, 1)),
+         "Stimulus variable '{stim_var}' must be coded as 0 (new/lure) and 1 (old/target)")
+
+  n_new <- model$other_vars$n_new
+  n_old <- model$other_vars$n_old
+  prefix <- model$resp_vars$response
+  guess_cols <- paste0(prefix, "guess", n_new + seq_len(n_old))
+  n_guess_found <- sum(guess_cols %in% colnames(data))
+  stopif(n_guess_found > 0 && n_guess_found < n_old,
+         "Found only some of the 'guess' count columns \\
+         ({collapse_comma(guess_cols)}); provide all of them or none")
+  has_guess <- n_guess_found == n_old
+
+  resp_cols <- .sdt_cdp_response_cols(n_new, n_old, has_guess, prefix)
+  missing <- setdiff(resp_cols, colnames(data))
+  stopif(length(missing) > 0,
+         "Response columns {collapse_comma(missing)} missing in the data. \\
+         Use aggregate_sdt_cdp_data() to build them from long-format data")
+
+  for (col in resp_cols) {
+    vals <- data[[col]]
+    stopif(any(vals < 0, na.rm = TRUE),
+           "Response column '{col}' must contain non-negative counts")
+    warnif(any(vals != round(vals), na.rm = TRUE),
+           "Response column '{col}' should contain integer counts")
+  }
+
+  Y <- as.matrix(data[resp_cols])
+  colnames(Y) <- paste0("cdp", seq_len(ncol(Y)))
+  stopif(any(rowSums(Y) <= 0, na.rm = TRUE),
+         "Row sums of response columns must be positive (no empty rows)")
+
+  data <- data[!colnames(data) %in% resp_cols]
+  data$Y <- Y
+  data$nTrials <- rowSums(Y)
+  attr(data, "has_guess") <- has_guess
 
   NextMethod("check_data")
 }
@@ -390,10 +458,9 @@ bmf2bf.sdt_cdp <- function(model, formula) {
 
 #' @export
 configure_model.sdt_cdp <- function(model, data, formula) {
-  # n_new/n_old/has_guess are detected from the data in check_data; bridge them
-  # onto the model so bmf2bf can emit the right number of categories.
-  model$other_vars$n_new <- attr(data, "n_new")
-  model$other_vars$n_old <- attr(data, "n_old")
+  # whether the Know/Guess split is active is detected from the data in
+  # check_data; bridge it onto the model so bmf2bf can emit the right number
+  # of categories.
   model$other_vars$has_guess <- attr(data, "has_guess")
   K_cat <- model$other_vars$n_new +
     (if (model$other_vars$has_guess) 3L else 2L) * model$other_vars$n_old
@@ -449,11 +516,14 @@ configure_model.sdt_cdp <- function(model, data, formula) {
 
 #' @title CDP category log-probability (multinomial logit)
 #' @description R companion to the Stan `sdt_cdp_logmu` function. It returns
-#'   `log(p_cat)` for response category `cat`, which the [sdt_cdp()] multinomial
-#'   formula uses as the category logit (so `softmax` recovers the CDP category
-#'   probabilities). `brms` evaluates the non-linear formula in R for
-#'   `posterior_predict()` and `posterior_epred()`, so this function must be on
-#'   the search path; it is exported for that reason and is not called directly.
+#'   `log(p_cat)` for response category `cat` (unnormalized, exactly like the
+#'   Stan function -- the category probabilities sum to 1 analytically and
+#'   `softmax` absorbs the shared constant), which the [sdt_cdp()] multinomial
+#'   formula uses as the category logit. `brms` evaluates the non-linear
+#'   formula in R for `posterior_predict()` and `posterior_epred()`, so this
+#'   function must be on the search path; it is exported for that reason and is
+#'   not called directly. Vectorized over the draws-by-observations matrices
+#'   brms supplies.
 #' @param cat Integer response-category index (canonical order: new, then
 #'   guess/know/remember blocks).
 #' @param n_new,n_old Integer numbers of "new" and "old" confidence levels.
@@ -474,37 +544,24 @@ sdt_cdp_logmu <- function(cat, n_new, n_old, thresh, has_guess,
                           dprimef, dprimer, criterion, spacing, rcrit,
                           sigmar, rho, kcrit, stimulus, ...) {
   thresh_name <- .sdt_threshold_type_name(thresh)
-
   shape <- dim(dprimef)
-  dprimef <- as.vector(dprimef)
   n <- length(dprimef)
-  dprimer <- as.vector(dprimer)
-  criterion <- as.vector(criterion)
-  spacing <- rep_len(as.vector(spacing), n)
-  rcrit <- as.vector(rcrit)
-  sigmar <- rep_len(as.vector(sigmar), n)
-  rho <- rep_len(as.vector(rho), n)
-  kcrit <- rep_len(as.vector(kcrit), n)
-  stimulus <- rep_len(as.vector(stimulus), n)
-  kc_active <- has_guess == 1L
 
   # log_distance passes its per-distance deltas as the trailing formula args,
   # so they arrive through `...` in the same contiguous order as the parameters.
-  n_deltas <- if (thresh_name == "log_distance") n_new + n_old - 2L else 0L
-  deltas <- lapply(list(...)[seq_len(n_deltas)],
-                   function(d) rep_len(as.vector(d), n))
+  deltas <- if (thresh_name == "log_distance") {
+    do.call(cbind, lapply(list(...)[seq_len(n_new + n_old - 2L)],
+                          function(d) rep_len(as.vector(d), n)))
+  }
+  thr <- rbind(.cdp_make_thresholds(as.vector(criterion),
+                                    rep_len(as.vector(spacing), n),
+                                    n_new, n_old, thresh_name, deltas))
 
-  out <- vapply(seq_len(n), function(j) {
-    deltas_j <- if (n_deltas) vapply(deltas, `[`, numeric(1), j) else NULL
-    thr <- .cdp_make_thresholds(criterion[j], spacing[j], n_new, n_old,
-                                thresh_name, deltas_j)
-    kc <- if (kc_active) kcrit[j] else NULL
-    probs <- .sdt_cdp_category_probs(thr, dprimef[j], dprimer[j], sigmar[j],
-                                     rcrit[j], kc, stimulus[j], n_new, n_old,
-                                     "normal", rho[j])
-    log(probs[cat])
-  }, numeric(1))
-
+  out <- log(.sdt_cdp_category_prob(
+    cat, thr, as.vector(dprimef), as.vector(dprimer), as.vector(sigmar),
+    as.vector(rho), as.vector(rcrit), as.vector(kcrit), as.vector(stimulus),
+    n_new, n_old, has_guess == 1L
+  ))
   if (!is.null(shape)) dim(out) <- shape
   out
 }
