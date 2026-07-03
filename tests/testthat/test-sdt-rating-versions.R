@@ -14,8 +14,8 @@ test_that("dpsdt version adds Ro/Rn fixed off by default", {
   expect_equal(m$version, "dpsdt")
   expect_true(all(c("Ro", "Rn") %in% names(m$parameters)))
   expect_equal(m$fixed_parameters, list(sdratio = 0, Ro = -100, Rn = -100))
-  expect_equal(m$other_vars$logmu_fun, "sdt_dpsdt_logmu")
-  expect_equal(m$other_vars$extra_params, c("Ro", "Rn"))
+  expect_equal(bmm:::.sdt_rating_variant(m)$logmu_fun, "sdt_dpsdt_logmu")
+  expect_equal(bmm:::.sdt_rating_variant(m)$extra_params, c("Ro", "Rn"))
 })
 
 test_that("metad version adds logmratio (log M-ratio) estimated by default", {
@@ -26,8 +26,14 @@ test_that("metad version adds logmratio (log M-ratio) estimated by default", {
   expect_false("metad" %in% names(m$parameters))
   expect_equal(m$links$logmratio, "identity")
   expect_equal(m$fixed_parameters, list(sdratio = 0))
-  expect_equal(m$other_vars$logmu_fun, "sdt_metad_logmu")
-  expect_equal(m$other_vars$extra_params, "logmratio")
+  expect_equal(bmm:::.sdt_rating_variant(m)$logmu_fun, "sdt_metad_logmu")
+  expect_equal(bmm:::.sdt_rating_variant(m)$extra_params, "logmratio")
+})
+
+test_that("legacy model objects without a variant resolve to the standard one", {
+  m <- sdt_rating(c("r1", "r2", "r3", "r4"), "stimulus")
+  m$version <- "rating"
+  expect_equal(bmm:::.sdt_rating_variant(m)$logmu_fun, "sdt_rating_logmu")
 })
 
 test_that("standard version is the default and keeps the base parameters", {
@@ -102,15 +108,17 @@ test_that("recollection moves mass to the most-confident category and sums to 1"
 # DISTRIBUTION & SIMULATION FUNCTIONS                                    ####
 ############################################################################# !
 
-test_that("rsdt_dpsdt / rsdt_metad return wide rating count data frames", {
-  d <- rsdt_dpsdt(n_per_cell = 50, n_subjects = 4, dprime = 1.4, criterion = 0,
-                  Ro = 0.3, Rn = 0.1, n_ratings = 4, spacing = 0.3)
-  expect_named(d, c("id", "stimulus", "r1", "r2", "r3", "r4", "nTrials"))
-  expect_true(all(rowSums(d[paste0("r", 1:4)]) == 50))
+test_that("rsdt_dpsdt / rsdt_metad return rating count matrices", {
+  thr <- bmm:::.sdt_make_thresholds(0, 4L, "parsimonious", 0.3)
+  d <- rsdt_dpsdt(8, 50, rep(c(0L, 1L), 4), dprime = 1.4, thresholds = thr,
+                  Ro = 0.3, Rn = 0.1)
+  expect_true(is.matrix(d))
+  expect_equal(colnames(d), paste0("r", 1:4))
+  expect_true(all(rowSums(d) == 50))
 
-  m <- rsdt_metad(n_per_cell = 50, n_subjects = 4, dprime = 1.4, criterion = 0,
-                  metad = 1.0, n_ratings = 4, spacing = 0.3)
-  expect_equal(nrow(m), 8L)
+  m <- rsdt_metad(8, 50, rep(c(0L, 1L), 4), dprime = 1.4, thresholds = thr,
+                  metad = 1.0)
+  expect_equal(dim(m), c(8L, 4L))
 })
 
 test_that("dsdt_dpsdt / dsdt_metad return finite densities and validate inputs", {
@@ -120,8 +128,50 @@ test_that("dsdt_dpsdt / dsdt_metad return finite densities and validate inputs",
                                    c(-0.5, 0, 0.5), metad = 1.0)))
   expect_error(dsdt_dpsdt(c(1, 2, 3, 4), 1L, 1, c(0, 0.5, 1), Ro = 1.5, Rn = 0),
                "Ro must be a probability")
-  expect_error(rsdt_metad(50, 4, 1.4, 0, metad = c(1, 2), n_ratings = 4,
-                          spacing = 0.3), "metad must be a single value")
+  expect_error(rsdt_metad(c(2, 3), 50, 1L, 1.4, c(-0.5, 0, 0.5), metad = 1),
+               "single positive integer")
+})
+
+test_that("dsdt version densities match dmultinom and vectorize over rows", {
+  thr <- c(-0.5, 0, 0.5)
+  p_dp <- bmm:::.sdt_dpsdt_category_probs(thr, 1.5, 1, 1L, "normal", 0.3, 0)
+  expect_equal(dsdt_dpsdt(c(2, 8, 20, 70), 1L, 1.5, thr, Ro = 0.3, Rn = 0),
+               dmultinom(c(2, 8, 20, 70), prob = p_dp), tolerance = 1e-12)
+
+  p_md <- bmm:::.sdt_metad_category_probs(thr, 1.5, 1.0, 1L, 1, "normal")
+  expect_equal(dsdt_metad(c(5, 15, 25, 55), 1L, 1.5, thr, metad = 1.0),
+               dmultinom(c(5, 15, 25, 55), prob = p_md), tolerance = 1e-12)
+
+  counts <- rbind(c(2, 8, 20, 70), c(70, 20, 8, 2))
+  d <- dsdt_dpsdt(counts, c(1L, 0L), 1.5, thr, Ro = c(0.3, 0.2),
+                  Rn = c(0, 0.1), log = TRUE)
+  expect_length(d, 2)
+  expect_true(all(is.finite(d)))
+})
+
+test_that("version category probs vectorized path matches per-draw evaluation", {
+  thr <- rbind(c(-0.5, 0, 0.5), c(-1, 0.2, 0.9), c(-0.8, -0.1, 0.4))
+  dp <- c(1.2, 0.8, 1.6)
+  sr <- c(1.3, 1, 1.1)
+  ro <- c(0.3, 0.1, 0.5)
+  rn <- c(0.05, 0.2, 0)
+  md <- c(1.0, 0.6, 1.4)
+  for (stim in c(0L, 1L)) {
+    vec_dp <- bmm:::.sdt_dpsdt_category_probs(thr, dp, sr, stim, "normal",
+                                              ro, rn)
+    ref_dp <- t(vapply(1:3, function(i) {
+      bmm:::.sdt_dpsdt_category_probs(thr[i, ], dp[i], sr[i], stim, "normal",
+                                      ro[i], rn[i])
+    }, numeric(4)))
+    expect_equal(vec_dp, ref_dp, tolerance = 1e-12, info = paste("dpsdt", stim))
+
+    vec_md <- bmm:::.sdt_metad_category_probs(thr, dp, md, stim, sr, "normal")
+    ref_md <- t(vapply(1:3, function(i) {
+      bmm:::.sdt_metad_category_probs(thr[i, ], dp[i], md[i], stim, sr[i],
+                                      "normal")
+    }, numeric(4)))
+    expect_equal(vec_md, ref_md, tolerance = 1e-12, info = paste("metad", stim))
+  }
 })
 
 ############################################################################# !
@@ -129,8 +179,11 @@ test_that("dsdt_dpsdt / dsdt_metad return finite densities and validate inputs",
 ############################################################################# !
 
 test_that("all rating versions configure through the bmm pipeline", {
-  dat <- rsdt_dpsdt(n_per_cell = 40, n_subjects = 4, dprime = 1.4, criterion = 0,
-                    Ro = 0.3, Rn = 0.1, n_ratings = 4, spacing = 0.3)
+  thr <- bmm:::.sdt_make_thresholds(0, 4L, "parsimonious", 0.3)
+  dat <- expand.grid(id = 1:4, stimulus = c(0L, 1L))
+  dat <- cbind(dat, as.data.frame(rsdt_dpsdt(nrow(dat), 40, dat$stimulus,
+                                             dprime = 1.4, thresholds = thr,
+                                             Ro = 0.3, Rn = 0.1)))
   md <- sdt_rating(paste0("r", 1:4), "stimulus", version = "dpsdt")
   mm <- sdt_rating(paste0("r", 1:4), "stimulus", version = "metad")
   expect_silent(bmm(bmf(dprime ~ 1, criterion ~ 1, spacing ~ 1, Ro ~ 1, Rn ~ 1),

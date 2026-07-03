@@ -61,7 +61,7 @@ plot.bmm_sdt_roc <- function(x, observed = NULL, condition_col = NULL,
   stopif(!requireNamespace("ggplot2", quietly = TRUE),
          "ggplot2 is required for plot.bmm_sdt_roc(). Please install it.")
   scale <- match.arg(scale)
-  qf    <- if (scale != "probability") .SDT_DISTS[[attr(x, "dist")]]$qf
+  qf    <- if (scale != "probability") .sdt_dists[[attr(x, "dist")]]$qf
 
   cond_cols <- setdiff(names(x), c("FA", "Hit", ".draw"))
   colour_col <- .roc_colour_col(condition_col, cond_cols)
@@ -102,7 +102,7 @@ plot.bmm_sdt_roc <- function(x, observed = NULL, condition_col = NULL,
     ggplot2::labs(x = "False alarm rate", y = "Hit rate",
                   colour = colour_col, fill = colour_col)
   } else {
-    zl <- .SDT_DISTS[[attr(x, "dist")]]$qf_label
+    zl <- .sdt_dists[[attr(x, "dist")]]$qf_label
     ggplot2::labs(x = paste0(zl, "(False alarm rate)"),
                   y = paste0(zl, "(Hit rate)"),
                   colour = colour_col, fill = colour_col)

@@ -92,8 +92,8 @@ rank categories (the multinomial then renormalizes over the valid ranks).
 }
 \examples{
 \dontrun{
-dat <- rsdt_ranking(n_per_cell = 200, n_subjects = 20,
-                    dprime = 1.5, m = 4)
+dat <- data.frame(id = 1:20)
+dat <- cbind(dat, rsdt_ranking(20, 200, m = 4, dprime = 1.5))
 
 model <- sdt_ranking(
   response = c("rank1", "rank2", "rank3", "rank4"),

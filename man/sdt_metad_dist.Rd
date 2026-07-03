@@ -13,39 +13,37 @@ dsdt_metad(
   thresholds,
   metad,
   sdratio = 1,
-  dist = "normal",
+  dist = c("normal", "logistic", "gumbel_min", "gumbel_max"),
   log = FALSE
 )
 
 rsdt_metad(
-  n_per_cell,
-  n_subjects,
+  n,
+  n_trials,
+  stimulus,
   dprime,
-  criterion,
+  thresholds,
   metad,
   sdratio = 1,
-  dist = "normal",
-  n_ratings = NULL,
-  spacing = NULL,
-  deltas = NULL,
-  threshold_type = "parsimonious"
+  dist = c("normal", "logistic", "gumbel_min", "gumbel_max")
 )
 }
 \arguments{
-\item{counts}{Integer vector of length K. Response counts per rating
-category for a single observation, ordered from "definitely noise" (1) to
-"definitely signal" (K).}
+\item{counts}{Integer matrix with one row per observation and one column
+per rating category, ordered from "definitely noise" (1) to "definitely
+signal" (K), or a vector for a single observation.}
 
-\item{stimulus}{Integer (0 or 1). Stimulus type: 0 = noise, 1 = signal.}
+\item{stimulus}{Integer vector (0/1). Stimulus type: 0 = noise, 1 = signal.}
 
-\item{dprime}{Numeric. Sensitivity parameter.}
+\item{dprime}{Numeric vector. Sensitivity parameter(s).}
 
-\item{thresholds}{Numeric vector of length K-1. Ordered decision thresholds.}
+\item{thresholds}{Numeric vector of length K-1 with the ordered decision
+thresholds, or an n-by-(K-1) matrix with one row per observation.}
 
-\item{metad}{Numeric. Metacognitive sensitivity (type-2 d'). \code{metad = dprime}
-corresponds to ideal metacognition (recovers rating SDT).}
+\item{metad}{Numeric vector. Metacognitive sensitivity (type-2 d').
+\code{metad = dprime} corresponds to ideal metacognition (recovers rating SDT).}
 
-\item{sdratio}{Numeric. Ratio of signal to noise standard deviations
+\item{sdratio}{Numeric vector. Ratio of signal to noise standard deviations
 (default 1, i.e., equal variance).}
 
 \item{dist}{Character. Noise distribution: "normal" (default), "logistic",
@@ -53,27 +51,16 @@ corresponds to ideal metacognition (recovers rating SDT).}
 
 \item{log}{Logical. If \code{TRUE}, returns log-density (default \code{FALSE}).}
 
-\item{n_per_cell}{Integer. Number of trials per stimulus type per subject.}
+\item{n}{Integer. Number of observations to generate. \code{n_trials},
+\code{stimulus}, \code{thresholds}, and the model parameters are recycled to this
+length.}
 
-\item{n_subjects}{Integer. Number of subjects.}
-
-\item{criterion}{Numeric. Central decision threshold (response bias).}
-
-\item{n_ratings}{Integer. Number of response categories (must be >= 3).}
-
-\item{spacing}{Numeric. Threshold spacing parameter for "equidistant",
-"parsimonious", and "softmax" threshold types.}
-
-\item{deltas}{Numeric vector. Parameters for "log_distance", "log_ratio", or
-"softmax" threshold types.}
-
-\item{threshold_type}{Character. Threshold parameterization: "parsimonious"
-(default), "equidistant", "log_distance", "log_ratio", or "softmax".}
+\item{n_trials}{Integer vector. Number of trials per observation.}
 }
 \value{
 \code{dsdt_metad} returns the (log-)density (multinomial probability).
-\code{rsdt_metad} returns a data frame with columns \code{id}, \code{stimulus},
-\code{r1}, ..., \code{rK}, and \code{nTrials}.
+\code{rsdt_metad} returns an integer matrix with one row per observation and
+one rating-count column per category (\code{r1} ... \code{rK}).
 }
 \description{
 Density and random generation for the meta-d' model
@@ -86,9 +73,10 @@ counterparts of the \code{metad} version of \code{\link[=sdt_rating]{sdt_rating(
 # Density for a single observation (K=4) with imperfect metacognition
 dsdt_metad(counts = c(5, 15, 25, 55), stimulus = 1,
            dprime = 1.5, thresholds = c(-0.5, 0.0, 0.5), metad = 1.0)
-# Generate meta-d' rating data (K=4)
-dat <- rsdt_metad(n_per_cell = 100, n_subjects = 10, dprime = 1.5,
-                  criterion = 0, metad = 1.0, n_ratings = 4, spacing = 0.5)
+# Generate meta-d' rating data (K=4) for 10 subjects and both stimulus types
+dat <- expand.grid(id = 1:10, stimulus = c(0L, 1L))
+dat <- cbind(dat, rsdt_metad(nrow(dat), 100, dat$stimulus, dprime = 1.5,
+                             thresholds = c(-0.5, 0, 0.5), metad = 1.0))
 head(dat)
 }
 \references{

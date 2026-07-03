@@ -98,8 +98,10 @@ Provide pre-aggregated data with the following columns:
 }
 \examples{
 \dontrun{
-dat <- rsdt_binary(n_per_cell = 100, n_subjects = 20,
-                   dprime = 1.5, criterion = 0.2)
+dat <- expand.grid(id = 1:20, stimulus = c(0L, 1L))
+dat$n_trials <- 100L
+dat$n_old <- rsdt_binary(nrow(dat), dat$n_trials, dat$stimulus,
+                         dprime = 1.5, criterion = 0.2)
 
 model <- sdt_binary(
   response = "n_old",
