@@ -427,7 +427,7 @@ test_that("initfun output matches standata dimensions for no-intercept models", 
 
 test_that("initfun handles LBA simple models", {
   dat <- rlba(n = 120, drift = c(3, 1.5), gap = 0.5, sp = 0.5, ndt = 0.2)
-  mod <- lba(rt = "rt", response = "response", n_alternatives = 2)
+  mod <- lba(rt = "rt", response = "response", n_choices = 2)
   ff <- bmf(driftc ~ 1, drifte ~ 1, gap ~ 1, sp ~ 1, ndt ~ 1)
   mod <- check_model(mod, data = dat, formula = ff)
   dat <- check_data(mod, dat, ff)

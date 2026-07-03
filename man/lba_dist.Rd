@@ -12,7 +12,7 @@ dlba(
   rt,
   response,
   drift,
-  bound,
+  gap,
   sp,
   ndt,
   s = 1,
@@ -23,7 +23,7 @@ dlba(
 rlba(
   n,
   drift,
-  bound,
+  gap,
   sp,
   ndt,
   s = 1,
@@ -33,7 +33,7 @@ rlba(
 plba(
   q,
   drift,
-  bound,
+  gap,
   sp,
   ndt,
   s = 1,
@@ -45,7 +45,7 @@ plba(
 qlba(
   p,
   drift,
-  bound,
+  gap,
   sp,
   ndt,
   s = 1,
@@ -64,14 +64,13 @@ qlba(
 Interpretation depends on \code{distribution}: mean drift for \code{"normal"}, shape
 for \code{"gamma"} and \code{"frechet"}, meanlog for \code{"lognormal"}.}
 
-\item{bound}{Numeric. Decision threshold (> 0). The total threshold for
-the accumulation process.}
+\item{gap}{Numeric. Threshold gap (> 0). The distance between the maximum
+starting point and the decision threshold. The total threshold is computed
+as \code{b = gap + sp}, ensuring \code{b > sp} structurally.}
 
-\item{sp}{Numeric. Starting point proportion (0 to 1). The maximum starting
-point A is computed as \code{A = sp * bound}, so that starting evidence is
-uniformly distributed on \verb{[0, sp * bound]}. Values near 0 mean minimal
-starting point variability; values near 1 mean the starting point can be
-close to the threshold.}
+\item{sp}{Numeric. Maximum starting point (>= 0). Starting evidence is
+uniformly distributed on \verb{[0, sp]}. When \code{sp = 0}, there is no starting
+point variability.}
 
 \item{ndt}{Numeric. Non-decision time in seconds (>= 0).}
 
@@ -110,10 +109,10 @@ generation for the Linear Ballistic Accumulator (LBA) model with multiple
 drift rate distributions.
 }
 \examples{
-dat <- rlba(n = 1000, drift = c(3, 1.5), bound = 1, sp = 0.3, ndt = 0.3)
+dat <- rlba(n = 1000, drift = c(3, 1.5), gap = 0.5, sp = 0.3, ndt = 0.3)
 head(dat)
 dlba(dat$rt[1:5], dat$response[1:5], drift = c(3, 1.5),
-     bound = 1, sp = 0.3, ndt = 0.3)
+     gap = 0.5, sp = 0.3, ndt = 0.3)
 
 }
 \references{

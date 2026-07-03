@@ -7,10 +7,10 @@
 lba(
   rt,
   response,
-  n_alternatives = NULL,
+  n_choices = NULL,
   version = c("simple", "custom"),
   distribution = c("normal", "gamma", "frechet", "lognormal"),
-  num_alternatives = NULL,
+  accumulators = NULL,
   links = NULL,
   ...
 )
@@ -26,7 +26,7 @@ Factor and character-digit responses are accepted and converted
 automatically. For the \code{"custom"} version, responses should be character
 or factor labels matching the accumulator names in the formula.}
 
-\item{n_alternatives}{An integer specifying the total number of response
+\item{n_choices}{An integer specifying the total number of response
 alternatives (K >= 2). Required for \code{version = "simple"}. Not used for
 \code{version = "custom"} (inferred from the formula).}
 
@@ -41,7 +41,7 @@ error processing.
 \item \code{"custom"}: Per-category drift parameters. Response categories
 are defined by the formula LHS names (e.g., \verb{cat1 ~ 1, cat2 ~ 1}).
 The response column must contain character labels matching these names.
-Supports per-category \code{num_alternatives}.
+Supports per-category \code{accumulators}.
 }}
 
 \item{distribution}{A character string specifying the trial-to-trial drift
@@ -60,7 +60,7 @@ function differ:
 (fixed=1).
 }}
 
-\item{num_alternatives}{For \code{version = "custom"} only. A named vector
+\item{accumulators}{For \code{version = "custom"} only. A named vector
 specifying the number of racing accumulators per response category.
 Can be a named integer vector for constant counts or a named character
 vector of column names for trial-varying counts. If omitted, defaults to
@@ -102,8 +102,8 @@ Psychology, 57(3), 153-178. https://doi.org/10.1016/j.cogpsych.2007.12.002
 \itemize{
 \item \code{driftc}: mean drift rate for correct accumulator
 \item \code{drifte}: mean drift rate for error accumulators
-\item \code{bound}: decision threshold
-\item \code{sp}: starting point proportion (A/bound, on logit scale)
+\item \code{gap}: threshold gap (b = gap + sp)
+\item \code{sp}: maximum starting point (uniform on 0 to sp)
 \item \code{ndt}: non-decision time
 \item \code{s}: drift rate SD (fixed to 1 by default)
 }
@@ -114,7 +114,7 @@ Psychology, 57(3), 153-178. https://doi.org/10.1016/j.cogpsych.2007.12.002
 }
 \item \strong{Default parameter links:}
 \itemize{
-\item driftc = identity; drifte = identity; bound = log; sp = logit; ndt = log; s = log
+\item driftc = identity; drifte = identity; gap = log; sp = log; ndt = log; s = log
 }
 \item \strong{Default priors:}
 \itemize{
@@ -128,15 +128,15 @@ Psychology, 57(3), 153-178. https://doi.org/10.1016/j.cogpsych.2007.12.002
 \item \code{main}: normal(1, 1)
 \item \code{effects}: normal(0, 0.5)
 }
-\item \code{bound}:
+\item \code{gap}:
 \itemize{
-\item \code{main}: normal(0, 0.5)
+\item \code{main}: normal(-0.5, 0.5)
 \item \code{effects}: normal(0, 0.3)
 }
 \item \code{sp}:
 \itemize{
-\item \code{main}: normal(-1, 1)
-\item \code{effects}: normal(0, 0.5)
+\item \code{main}: normal(-1, 0.5)
+\item \code{effects}: normal(0, 0.3)
 }
 \item \code{ndt}:
 \itemize{
@@ -151,12 +151,18 @@ Psychology, 57(3), 153-178. https://doi.org/10.1016/j.cogpsych.2007.12.002
 }
 }
 }
+\note{
+Both versions describe the same response type (a categorical winner in
+a choice-RT race), so they live in one constructor rather than separate
+model functions: \code{"simple"} is an accuracy-coded convenience layer (correct
+vs. error) over the general per-accumulator case handled by \code{"custom"}.
+}
 \examples{
 \dontshow{if (isTRUE(Sys.getenv("BMM_EXAMPLES"))) withAutoprint(\{ # examplesIf}
 # simple version with 2 alternatives
-dat <- rlba(n = 500, drift = c(3, 1.5), B = 0.5, A = 0.5, ndt = 0.2)
-model <- lba(rt = "rt", response = "response", n_alternatives = 2)
-formula <- bmf(driftc ~ 1, drifte ~ 1, bound ~ 1, sp ~ 1, ndt ~ 1)
+dat <- rlba(n = 500, drift = c(3, 1.5), gap = 0.5, sp = 0.5, ndt = 0.2)
+model <- lba(rt = "rt", response = "response", n_choices = 2)
+formula <- bmf(driftc ~ 1, drifte ~ 1, gap ~ 1, sp ~ 1, ndt ~ 1)
 fit <- bmm(formula, dat, model, cores = 4, backend = "cmdstanr")
 \dontshow{\}) # examplesIf}
 }

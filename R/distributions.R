@@ -2086,33 +2086,44 @@ qlba <- function(p, drift, gap, sp, ndt, s = 1,
   if (log) out else exp(out)
 }
 
+# Draw trial-to-trial drift rates for a single LBA accumulator. `mean` and `s`
+# must be conformable (equal-length vectors or equal-shape matrices). The normal
+# distribution resamples non-positive draws so drifts stay positive, matching the
+# posdrift likelihood; the other distributions are positive by construction. This
+# is the single source of drift sampling shared by rlba() and the posterior
+# predict/epred methods.
+.rlba_drift <- function(distribution, mean, s) {
+  d <- switch(distribution,
+    normal = {
+      out <- stats::rnorm(length(mean), mean, s)
+      neg <- which(out <= 0)
+      while (length(neg) > 0) {
+        out[neg] <- stats::rnorm(length(neg), mean[neg], s[neg])
+        neg <- neg[out[neg] <= 0]
+      }
+      out
+    },
+    gamma = stats::rgamma(length(mean), shape = mean, rate = s),
+    frechet = .rfrechet(length(mean), shape = mean, scale = s),
+    lognormal = stats::rlnorm(length(mean), meanlog = mean, sdlog = s)
+  )
+  if (is.matrix(mean)) dim(d) <- dim(mean)
+  d
+}
+
 .rlba <- function(n, drift, b, A, ndt, s, distribution) {
   K <- length(drift)
 
   ft <- matrix(NA_real_, nrow = n, ncol = K)
   for (j in seq_len(K)) {
-    sp <- stats::runif(n, min = 0, max = A)
-    d <- switch(distribution,
-      normal = {
-        d_raw <- stats::rnorm(n, mean = drift[j], sd = s)
-        neg <- which(d_raw <= 0)
-        while (length(neg) > 0) {
-          d_raw[neg] <- stats::rnorm(length(neg), mean = drift[j], sd = s)
-          neg <- neg[d_raw[neg] <= 0]
-        }
-        d_raw
-      },
-      gamma = stats::rgamma(n, shape = drift[j], rate = s),
-      frechet = .rfrechet(n, shape = drift[j], scale = s),
-      lognormal = stats::rlnorm(n, meanlog = drift[j], sdlog = s)
-    )
-    ft[, j] <- (b - sp) / d
+    start <- stats::runif(n, min = 0, max = A)
+    d <- .rlba_drift(distribution, rep_len(drift[j], n), rep_len(s, n))
+    ft[, j] <- (b - start) / d
   }
 
-  winner <- apply(ft, 1, which.min)
   data.frame(
     rt = apply(ft, 1, min) + ndt,
-    response = winner
+    response = apply(ft, 1, which.min)
   )
 }
 

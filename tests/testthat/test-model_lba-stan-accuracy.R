@@ -1,10 +1,5 @@
-.stan_lba_softplus <- function(x, scale = 1e-12) {
-  scaled <- x / scale
-  ifelse(scaled > 30, x, scale * log1p(exp(scaled)))
-}
-
-.stan_lba_log_positive <- function(x) {
-  log(.stan_lba_softplus(x))
+.stan_lba_log_clip <- function(x) {
+  log(pmax(x, 1e-300))
 }
 
 .stan_lba_log_diff_exp <- function(log_x, log_y) {
@@ -30,7 +25,7 @@
   phi_lo <- stats::dnorm(z_lo)
   M <- v * (Phi_hi - Phi_lo) + s * (phi_lo - phi_hi)
   log_denom <- stats::pnorm(v / s, log.p = TRUE)
-  .stan_lba_log_positive(M) - log(A) - log_denom
+  .stan_lba_log_clip(M) - log(A) - log_denom
 }
 
 .stan_lba_normal_single_lccdf <- function(t, v, b, A, s) {
@@ -45,8 +40,8 @@
   M <- v * (Phi_hi - Phi_lo) + s * (phi_lo - phi_hi)
   surv_num <- (b * Phi_hi) - ((b - A) * Phi_lo) - (t * M)
   log_denom <- stats::pnorm(v / s, log.p = TRUE)
-  corrected_surv_num <- surv_num - A * stats::pnorm(-v / s)
-  .stan_lba_log_positive(corrected_surv_num) - log(A) - log_denom
+  corrected_surv_num <- surv_num - A * (-expm1(log_denom))
+  .stan_lba_log_clip(corrected_surv_num) - log(A) - log_denom
 }
 
 .stan_lba_gamma_single_lpdf <- function(t, v, b, A, s) {
@@ -70,8 +65,13 @@
     log(b) + stats::pgamma(hi, shape = v, rate = s, log.p = TRUE),
     log(b - A) + stats::pgamma(lo, shape = v, rate = s, log.p = TRUE)
   )
-  surv_num <- exp(log_u) - t * exp(log_M)
-  .stan_lba_log_positive(surv_num) - log(A)
+  log_tM <- log(t) + log_M
+  log_surv_num <- if (log_u > log_tM) {
+    .stan_lba_log_diff_exp(log_u, log_tM)
+  } else {
+    log(1e-300)
+  }
+  log_surv_num - log(A)
 }
 
 .stan_lba_lognormal_single_lpdf <- function(t, v, b, A, s) {
@@ -97,8 +97,13 @@
     log(b) + stats::pnorm((log(hi) - v) / s, log.p = TRUE),
     log(b - A) + stats::pnorm((log(lo) - v) / s, log.p = TRUE)
   )
-  surv_num <- exp(log_u) - t * exp(log_M)
-  .stan_lba_log_positive(surv_num) - log(A)
+  log_tM <- log(t) + log_M
+  log_surv_num <- if (log_u > log_tM) {
+    .stan_lba_log_diff_exp(log_u, log_tM)
+  } else {
+    log(1e-300)
+  }
+  log_surv_num - log(A)
 }
 
 .stan_lba_frechet_log_cdf <- function(x, v, s) {
@@ -146,8 +151,13 @@
     log(b) + .stan_lba_frechet_log_cdf(hi, v, s),
     log(b - A) + .stan_lba_frechet_log_cdf(lo, v, s)
   )
-  surv_num <- exp(log_u) - t * exp(log_M)
-  .stan_lba_log_positive(surv_num) - log(A)
+  log_tM <- log(t) + log_M
+  log_surv_num <- if (log_u > log_tM) {
+    .stan_lba_log_diff_exp(log_u, log_tM)
+  } else {
+    log(1e-300)
+  }
+  log_surv_num - log(A)
 }
 
 .stan_lba_simple_loglik <- function(rt, response, driftc, drifte, gap, sp, s,

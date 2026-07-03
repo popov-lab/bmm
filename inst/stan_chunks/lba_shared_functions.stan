@@ -1,23 +1,9 @@
-real lba_softplus(real x) {
-  return 1e-12 * log1p_exp(x / 1e-12);
-}
-
-real lba_log_positive(real x) {
-  return log(lba_softplus(x));
-}
-
-real lba_race_loglik(int response, array[] int n, real log_pdf_response,
-                     array[] real log_surv) {
-  int n_cats = size(n);
-  real log_lik = log(n[response]) + log_pdf_response;
-  for (j in 1:n_cats) {
-    if (j == response) {
-      if (n[j] > 1) {
-        log_lik += (n[j] - 1) * log_surv[j];
-      }
-    } else if (n[j] > 0) {
-      log_lik += n[j] * log_surv[j];
-    }
-  }
-  return log_lik;
+// M(t) (the truncated first moment) and the survival numerator are analytically
+// non-negative; they can dip below 0 only through floating-point cancellation at
+// extreme parameter values. Clip at a small positive floor before taking the log:
+// legitimate positive values pass through exactly (a softplus would distort small
+// positives), while cancellation noise is floored to a large finite penalty rather
+// than -inf, keeping HMC gradients well-behaved during warmup.
+real lba_log_clip(real x) {
+  return log(fmax(x, 1e-300));
 }

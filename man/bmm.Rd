@@ -106,7 +106,7 @@ The following models are supported:
 \item ddm(rt, response, links)
 \item ezdm(mean_rt, var_rt, n_upper, n_trials, links, version)
 \item imm(resp_error, nt_features, nt_distances, set_size, regex, version)
-\item lba(rt, response, n_alternatives, version, distribution, num_alternatives, links)
+\item lba(rt, response, n_choices, version, distribution, accumulators, links)
 \item m3(resp_cats, num_options, choice_rule, version)
 \item mixture2p(resp_error)
 \item mixture3p(resp_error, nt_features, set_size, regex)

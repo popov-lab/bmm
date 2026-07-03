@@ -1,99 +1,110 @@
+# Per-distribution spec: everything that differs between the four drift-rate
+# distributions. `drift` describes the driftc/drifte accumulator parameters; the
+# gap/sp/ndt/s block lives in .lba_shared (identical across all distributions).
 .lba_dist_specs <- list(
   normal = list(
     s_desc = "drift rate SD (fixed to 1 by default)",
-    drift_desc = "mean drift rate",
-    drift_link = "identity",
-    drift_priors = list(
-      driftc = list(main = "normal(3, 1)", effects = "normal(0, 0.5)"),
-      drifte = list(main = "normal(1, 1)", effects = "normal(0, 0.5)")
-    ),
-    drift_inits = list(driftc = c(2, 4), drifte = c(0.5, 2))
+    drift = list(
+      desc = "mean drift rate",
+      link = "identity",
+      priors = list(
+        driftc = list(main = "normal(3, 1)", effects = "normal(0, 0.5)"),
+        drifte = list(main = "normal(1, 1)", effects = "normal(0, 0.5)")
+      ),
+      inits = list(driftc = c(2, 4), drifte = c(0.5, 2))
+    )
   ),
   gamma = list(
     s_desc = "rate parameter (fixed to 1 by default)",
-    drift_desc = "drift rate (gamma shape)",
-    drift_link = "log",
-    drift_priors = list(
-      driftc = list(main = "normal(1, 0.5)", effects = "normal(0, 0.3)"),
-      drifte = list(main = "normal(0.5, 0.5)", effects = "normal(0, 0.3)")
-    ),
-    drift_inits = list(driftc = c(1.5, 3), drifte = c(0.8, 2))
+    drift = list(
+      desc = "drift rate (gamma shape)",
+      link = "log",
+      priors = list(
+        driftc = list(main = "normal(1, 0.5)", effects = "normal(0, 0.3)"),
+        drifte = list(main = "normal(0.5, 0.5)", effects = "normal(0, 0.3)")
+      ),
+      inits = list(driftc = c(1.5, 3), drifte = c(0.8, 2))
+    )
   ),
   frechet = list(
     s_desc = "scale parameter (fixed to 1 by default)",
-    drift_desc = "drift rate (Frechet shape)",
-    drift_link = "log",
-    drift_priors = list(
-      driftc = list(main = "normal(1, 0.5)", effects = "normal(0, 0.3)"),
-      drifte = list(main = "normal(0.5, 0.5)", effects = "normal(0, 0.3)")
-    ),
-    drift_inits = list(driftc = c(1.5, 3), drifte = c(0.8, 2))
+    drift = list(
+      desc = "drift rate (Frechet shape)",
+      link = "log",
+      priors = list(
+        driftc = list(main = "normal(1, 0.5)", effects = "normal(0, 0.3)"),
+        drifte = list(main = "normal(0.5, 0.5)", effects = "normal(0, 0.3)")
+      ),
+      inits = list(driftc = c(1.5, 3), drifte = c(0.8, 2))
+    )
   ),
   lognormal = list(
     s_desc = "sdlog parameter (fixed to 1 by default)",
-    drift_desc = "drift rate (meanlog)",
-    drift_link = "identity",
-    drift_priors = list(
-      driftc = list(main = "normal(0.5, 0.5)", effects = "normal(0, 0.3)"),
-      drifte = list(main = "normal(0, 0.5)", effects = "normal(0, 0.3)")
-    ),
-    drift_inits = list(driftc = c(0.2, 0.8), drifte = c(-0.3, 0.3))
-  )
-)
-
-.lba_shared_priors <- list(
-  gap = list(main = "normal(-0.5, 0.5)", effects = "normal(0, 0.3)"),
-  sp = list(main = "normal(-1, 0.5)", effects = "normal(0, 0.3)"),
-  ndt = list(main = "normal(-2, 0.3)", effects = "normal(0, 0.3)"),
-  s = list(main = "normal(0, 0.3)", effects = "normal(0, 0.2)")
-)
-
-.lba_shared_inits <- list(
-  mu = c(-0.5, 0.5), gap = c(0.3, 0.8), sp = c(0.2, 0.5),
-  ndt = c(0.025, 0.05), s = c(0.8, 1.2)
-)
-
-.build_lba_version <- function(dist) {
-  spec <- .lba_dist_specs[[dist]]
-  shared_params <- list(
-    gap = "threshold gap (b = gap + sp)",
-    sp = "maximum starting point (uniform on 0 to sp)",
-    ndt = "non-decision time",
-    s = spec$s_desc
-  )
-  shared_links <- list(gap = "log", sp = "log", ndt = "log", s = "log")
-
-  simple_params <- c(
-    list(
-      driftc = paste(spec$drift_desc, "for correct accumulator"),
-      drifte = paste(spec$drift_desc, "for error accumulators")
-    ),
-    shared_params
-  )
-  simple_links <- c(
-    list(driftc = spec$drift_link, drifte = spec$drift_link),
-    shared_links
-  )
-
-  list(
-    simple = list(
-      parameters = simple_params,
-      links = simple_links,
-      fixed_parameters = list(mu = 0, s = 0),
-      priors = c(spec$drift_priors, .lba_shared_priors),
-      init_ranges = c(.lba_shared_inits, spec$drift_inits)
-    ),
-    custom = list(
-      parameters = shared_params,
-      links = shared_links,
-      fixed_parameters = list(mu = 0, s = 0),
-      priors = .lba_shared_priors,
-      init_ranges = .lba_shared_inits
+    drift = list(
+      desc = "drift rate (meanlog)",
+      link = "identity",
+      priors = list(
+        driftc = list(main = "normal(0.5, 0.5)", effects = "normal(0, 0.3)"),
+        drifte = list(main = "normal(0, 0.5)", effects = "normal(0, 0.3)")
+      ),
+      inits = list(driftc = c(0.2, 0.8), drifte = c(-0.3, 0.3))
     )
   )
-}
+)
 
-.lba_version_table <- Map(.build_lba_version, names(.lba_dist_specs))
+# The gap/sp/ndt/s block, shared by all distributions and both versions. `s` has
+# a shared link but a per-distribution description (added from .lba_dist_specs).
+.lba_shared <- list(
+  parameters = list(
+    gap = "threshold gap (b = gap + sp)",
+    sp = "maximum starting point (uniform on 0 to sp)",
+    ndt = "non-decision time"
+  ),
+  links = list(gap = "log", sp = "log", ndt = "log", s = "log"),
+  priors = list(
+    gap = list(main = "normal(-0.5, 0.5)", effects = "normal(0, 0.3)"),
+    sp = list(main = "normal(-1, 0.5)", effects = "normal(0, 0.3)"),
+    ndt = list(main = "normal(-2, 0.3)", effects = "normal(0, 0.3)"),
+    s = list(main = "normal(0, 0.3)", effects = "normal(0, 0.2)")
+  ),
+  inits = list(
+    mu = c(-0.5, 0.5), gap = c(0.3, 0.8), sp = c(0.2, 0.5),
+    ndt = c(0.025, 0.05), s = c(0.8, 1.2)
+  )
+)
+
+# Compose the spec for one (distribution, version). Drift parameters precede the
+# shared block: downstream code recovers accumulator names via
+# setdiff(names(parameters), c("gap", "sp", "ndt", "s")), which relies on order.
+.lba_model_spec <- function(distribution, version) {
+  ds <- .lba_dist_specs[[distribution]]
+  shared_params <- c(.lba_shared$parameters, list(s = ds$s_desc))
+  fixed_parameters <- list(mu = 0, s = 0)
+
+  if (version == "custom") {
+    return(nlist(
+      parameters = shared_params,
+      links = .lba_shared$links,
+      fixed_parameters,
+      priors = .lba_shared$priors,
+      init_ranges = .lba_shared$inits
+    ))
+  }
+
+  nlist(
+    parameters = c(
+      list(
+        driftc = paste(ds$drift$desc, "for correct accumulator"),
+        drifte = paste(ds$drift$desc, "for error accumulators")
+      ),
+      shared_params
+    ),
+    links = c(list(driftc = ds$drift$link, drifte = ds$drift$link), .lba_shared$links),
+    fixed_parameters,
+    priors = c(ds$drift$priors, .lba_shared$priors),
+    init_ranges = c(.lba_shared$inits, ds$drift$inits)
+  )
+}
 
 .stan_reserved <- c(
   "int", "real", "vector", "matrix", "array", "if", "else", "for", "while",
@@ -102,31 +113,21 @@
   "parameters"
 )
 
-.lba_cat_defaults <- lapply(.lba_dist_specs, function(spec) {
-  list(
-    link = spec$drift_link,
-    prior = spec$drift_priors$driftc$main,
-    init = spec$drift_inits$driftc,
-    desc = spec$drift_desc
-  )
-})
-
-
 .model_lba <- function(
     rt = NULL,
     response = NULL,
-    n_alternatives = NULL,
-    num_alternatives = NULL,
+    n_choices = NULL,
+    accumulators = NULL,
     links = NULL,
     version = "simple",
     distribution = "normal",
     call = NULL,
     ...) {
-  vt <- .lba_version_table[[distribution]][[version]]
+  vt <- .lba_model_spec(distribution, version)
   out <- structure(
     list(
       resp_vars = nlist(rt, response),
-      other_vars = nlist(n_alternatives, num_alternatives),
+      other_vars = nlist(n_choices, accumulators),
       domain = "Decision Making / Response times",
       task = "Choice Reaction Time tasks (multi-alternative)",
       name = "Linear Ballistic Accumulator",
@@ -168,7 +169,7 @@
 #'   Factor and character-digit responses are accepted and converted
 #'   automatically. For the `"custom"` version, responses should be character
 #'   or factor labels matching the accumulator names in the formula.
-#' @param n_alternatives An integer specifying the total number of response
+#' @param n_choices An integer specifying the total number of response
 #'   alternatives (K >= 2). Required for `version = "simple"`. Not used for
 #'   `version = "custom"` (inferred from the formula).
 #' @param version A character string specifying which version of the LBA model
@@ -182,7 +183,7 @@
 #'     \item `"custom"`: Per-category drift parameters. Response categories
 #'       are defined by the formula LHS names (e.g., `cat1 ~ 1, cat2 ~ 1`).
 #'       The response column must contain character labels matching these names.
-#'       Supports per-category `num_alternatives`.
+#'       Supports per-category `accumulators`.
 #'   }
 #' @param distribution A character string specifying the trial-to-trial drift
 #'   rate distribution. All distributions use `driftc`/`drifte` as drift
@@ -199,7 +200,7 @@
 #'       `driftc`/`drifte` = meanlog parameter (identity link), `s` = sdlog
 #'       (fixed=1).
 #'   }
-#' @param num_alternatives For `version = "custom"` only. A named vector
+#' @param accumulators For `version = "custom"` only. A named vector
 #'   specifying the number of racing accumulators per response category.
 #'   Can be a named integer vector for constant counts or a named character
 #'   vector of column names for trial-varying counts. If omitted, defaults to
@@ -207,6 +208,10 @@
 #' @param links A named list of link functions for the model parameters.
 #' @param ... Additional arguments passed internally (for testing purposes).
 #' @return An object of class `bmmodel`
+#' @note Both versions describe the same response type (a categorical winner in
+#'   a choice-RT race), so they live in one constructor rather than separate
+#'   model functions: `"simple"` is an accuracy-coded convenience layer (correct
+#'   vs. error) over the general per-accumulator case handled by `"custom"`.
 #' @export
 #' @keywords bmmodel
 #' @seealso [dlba()] and [rlba()] for the density and random generation
@@ -214,37 +219,45 @@
 #' @examplesIf isTRUE(Sys.getenv("BMM_EXAMPLES"))
 #' # simple version with 2 alternatives
 #' dat <- rlba(n = 500, drift = c(3, 1.5), gap = 0.5, sp = 0.5, ndt = 0.2)
-#' model <- lba(rt = "rt", response = "response", n_alternatives = 2)
+#' model <- lba(rt = "rt", response = "response", n_choices = 2)
 #' formula <- bmf(driftc ~ 1, drifte ~ 1, gap ~ 1, sp ~ 1, ndt ~ 1)
 #' fit <- bmm(formula, dat, model, cores = 4, backend = "cmdstanr")
-lba <- function(rt, response, n_alternatives = NULL,
+lba <- function(rt, response, n_choices = NULL,
                 version = c("simple", "custom"),
                 distribution = c("normal", "gamma", "frechet", "lognormal"),
-                num_alternatives = NULL, links = NULL, ...) {
+                accumulators = NULL, links = NULL, ...) {
   call <- match.call()
+  dots <- list(...)
+  if ("n_alternatives" %in% names(dots)) {
+    n_choices <- dots$n_alternatives
+    warning2("The argument 'n_alternatives' is deprecated. Please use 'n_choices' instead.")
+  }
+  if ("num_alternatives" %in% names(dots)) {
+    accumulators <- dots$num_alternatives
+    warning2("The argument 'num_alternatives' is deprecated. Please use 'accumulators' instead.")
+  }
   stop_missing_args()
   version <- match.arg(version)
   distribution <- match.arg(distribution)
   if (version == "simple") {
     stopif(
-      is.null(n_alternatives) || !is.numeric(n_alternatives) ||
-        n_alternatives < 2 || n_alternatives != round(n_alternatives),
-      "n_alternatives must be an integer >= 2 for version 'simple'."
+      is.null(n_choices) || !is.numeric(n_choices) ||
+        n_choices < 2 || n_choices != round(n_choices),
+      "n_choices must be an integer >= 2 for version 'simple'."
     )
-    n_alternatives <- as.integer(n_alternatives)
+    n_choices <- as.integer(n_choices)
   } else {
-    n_alternatives <- NULL
+    n_choices <- NULL
   }
   .model_lba(
     rt = rt,
     response = response,
-    n_alternatives = n_alternatives,
-    num_alternatives = num_alternatives,
+    n_choices = n_choices,
+    accumulators = accumulators,
     links = links,
     version = version,
     distribution = distribution,
-    call = call,
-    ...
+    call = call
   )
 }
 
@@ -281,17 +294,17 @@ check_model.lba_custom <- function(model, data = NULL, formula = NULL) {
       Please rename the affected response categories."
     )
 
-    defaults <- .lba_cat_defaults[[model$distribution]]
+    drift <- .lba_dist_specs[[model$distribution]]$drift
     for (p in cat_pars) {
-      model$parameters[[p]] <- paste0(defaults$desc, " for '", p, "' accumulator")
-      if (is.null(model$links[[p]])) model$links[[p]] <- defaults$link
+      model$parameters[[p]] <- paste0(drift$desc, " for '", p, "' accumulator")
+      if (is.null(model$links[[p]])) model$links[[p]] <- drift$link
       if (is.null(model$default_priors[[p]])) {
         model$default_priors[[p]] <- list(
-          main = defaults$prior, effects = "normal(0, 0.3)"
+          main = drift$priors$driftc$main, effects = "normal(0, 0.3)"
         )
       }
       if (is.null(model$init_ranges[[p]])) {
-        model$init_ranges[[p]] <- defaults$init
+        model$init_ranges[[p]] <- drift$inits$driftc
       }
     }
 
@@ -361,7 +374,7 @@ check_data.lba <- function(model, data, formula) {
 #' @export
 check_data.lba_simple <- function(model, data, formula) {
   response_var <- model$resp_vars$response
-  n_alt <- model$other_vars$n_alternatives
+  n_alt <- model$other_vars$n_choices
 
   if (is.factor(data[, response_var])) {
     data[, response_var] <- as.integer(as.character(data[, response_var]))
@@ -393,7 +406,7 @@ check_data.lba_simple <- function(model, data, formula) {
 check_data.lba_custom <- function(model, data, formula) {
   response_var <- model$resp_vars$response
   cat_names <- model$other_vars$resp_cats
-  num_alt <- model$other_vars$num_alternatives
+  num_alt <- model$other_vars$accumulators
   n_cats <- length(cat_names)
 
   if (is.factor(data[, response_var])) {
@@ -429,7 +442,7 @@ check_data.lba_custom <- function(model, data, formula) {
   } else if (is.numeric(num_alt)) {
     stopif(
       !all(cat_names %in% names(num_alt)),
-      "num_alternatives must have names matching formula categories: \\
+      "accumulators must have names matching formula categories: \\
       {collapse_comma(cat_names)}"
     )
     for (i in seq_along(cat_names)) {
@@ -438,13 +451,13 @@ check_data.lba_custom <- function(model, data, formula) {
   } else if (is.character(num_alt)) {
     stopif(
       !all(cat_names %in% names(num_alt)),
-      "num_alternatives must have names matching formula categories: \\
+      "accumulators must have names matching formula categories: \\
       {collapse_comma(cat_names)}"
     )
     missing_cols <- setdiff(num_alt, colnames(data))
     stopif(
       length(missing_cols) > 0,
-      "num_alternatives columns {collapse_comma(missing_cols)} not found \\
+      "accumulators columns {collapse_comma(missing_cols)} not found \\
       in the data."
     )
     for (i in seq_along(cat_names)) {
@@ -452,7 +465,7 @@ check_data.lba_custom <- function(model, data, formula) {
     }
   }
 
-  model$other_vars$n_alternatives <- n_cats
+  model$other_vars$n_choices <- n_cats
   NextMethod("check_data")
 }
 
@@ -504,18 +517,20 @@ bmf2bf.lba_custom <- function(model, formula) {
     "    real t = rt[i] - ndt[i];\n",
     "    array[{n_cats}] real drift;\n",
     "    array[{n_cats}] int n;\n",
-    "    array[{n_cats}] real log_surv;\n",
+    "    int win;\n",
+    "    real lp;\n",
     "    if (t <= 0) return negative_infinity();\n",
     "    {drift_assignments}\n",
     "    {n_assignments}\n",
+    "    win = response[i];\n",
+    "    lp = log(n[win]) + {prefix}_single_lpdf(t | drift[win], b, A, s[i]);\n",
     "    for (j in 1:{n_cats}) {{\n",
-    "      log_surv[j] = {prefix}_single_lccdf(t | drift[j], b, A, s[i]);\n",
+    "      int reps = (j == win) ? n[j] - 1 : n[j];\n",
+    "      if (reps > 0) {{\n",
+    "        lp += reps * {prefix}_single_lccdf(t | drift[j], b, A, s[i]);\n",
+    "      }}\n",
     "    }}\n",
-    "    log_lik += lba_race_loglik(\n",
-    "      response[i], n,\n",
-    "      {prefix}_single_lpdf(t | drift[response[i]], b, A, s[i]),\n",
-    "      log_surv\n",
-    "    );\n",
+    "    log_lik += lp;\n",
     "  }}\n",
     "  return log_lik;\n",
     "}}"
@@ -528,10 +543,7 @@ bmf2bf.lba_custom <- function(model, formula) {
 configure_model.lba_simple <- function(model, data, formula) {
   links <- model$links
   dist <- model$distribution
-  cat_names <- setdiff(
-    names(.lba_version_table[[dist]][["simple"]]$parameters),
-    c("gap", "sp", "ndt", "s")
-  )
+  cat_names <- c("driftc", "drifte")
   formula <- bmf2bf(model, formula)
 
   dpars <- c("mu", cat_names, "gap", "sp", "ndt", "s")
@@ -634,7 +646,7 @@ configure_model.lba_custom <- function(model, data, formula) {
   }
 
   for (j in seq_len(n_cats)) {
-    if (j == response) next
+    if (j == response || n_cat[j] == 0) next
     drift_j <- brms::get_dpar(prep, cat_names[j], i = i)
     surv_j <- 1 - .plba_single(t, drift_j, b, A, s, dist)
     surv_j[surv_j <= 0] <- 1e-300
@@ -652,88 +664,59 @@ configure_model.lba_custom <- function(model, data, formula) {
   s <- brms::get_dpar(prep, "s", i = i)
   dist <- .lba_dist_from_family(prep$family$name)
   n_draws <- length(ndt)
-
+  drift <- lapply(cat_names, function(p) brms::get_dpar(prep, p, i = i))
   n_cat <- vapply(
     seq_len(n_cats),
     function(j) prep$data[[paste0("vint", j + 1)]][i],
     integer(1)
   )
-  total_acc <- sum(n_cat)
 
-  rt <- numeric(n_draws)
-  for (d in seq_len(n_draws)) {
-    b <- gap[d] + sp[d]
-    A <- sp[d]
-    ft <- numeric(total_acc)
-    idx <- 1
-    for (j in seq_len(n_cats)) {
-      drift_j <- brms::get_dpar(prep, cat_names[j], i = i)[d]
-      for (k in seq_len(n_cat[j])) {
-        start <- stats::runif(1, 0, A)
-        dv <- switch(dist,
-          normal = {
-            v_draw <- stats::rnorm(1, drift_j, s[d])
-            while (v_draw <= 0) v_draw <- stats::rnorm(1, drift_j, s[d])
-            v_draw
-          },
-          gamma = stats::rgamma(1, shape = drift_j, rate = s[d]),
-          frechet = .rfrechet(1, shape = drift_j, scale = s[d]),
-          lognormal = stats::rlnorm(1, meanlog = drift_j, sdlog = s[d])
-        )
-        ft[idx] <- (b - start) / dv
-        idx <- idx + 1
-      }
+  b <- gap + sp
+  min_ft <- rep(Inf, n_draws)
+  for (j in seq_len(n_cats)) {
+    if (n_cat[j] == 0) next
+    for (k in seq_len(n_cat[j])) {
+      start <- stats::runif(n_draws, 0, sp)
+      dv <- .rlba_drift(dist, drift[[j]], s)
+      min_ft <- pmin(min_ft, (b - start) / dv)
     }
-    rt[d] <- min(ft) + ndt[d]
   }
-  rt
+  min_ft + ndt
 }
 
 .lba_posterior_epred <- function(prep, cat_names, n_cats, ...) {
   n_obs <- prep$nobs
   n_draws <- prep$ndraws
-  n_sim <- 100
+  n_sim <- 100L
   dist <- .lba_dist_from_family(prep$family$name)
 
   epred <- matrix(NA_real_, nrow = n_draws, ncol = n_obs)
   for (i in seq_len(n_obs)) {
     gap <- brms::get_dpar(prep, "gap", i = i)
-    sp_val <- brms::get_dpar(prep, "sp", i = i)
+    sp <- brms::get_dpar(prep, "sp", i = i)
     ndt <- brms::get_dpar(prep, "ndt", i = i)
     s <- brms::get_dpar(prep, "s", i = i)
-
+    drift <- lapply(cat_names, function(p) brms::get_dpar(prep, p, i = i))
     n_cat <- vapply(
       seq_len(n_cats),
       function(j) prep$data[[paste0("vint", j + 1)]][i],
       integer(1)
     )
-    total_acc <- sum(n_cat)
 
-    for (d in seq_len(n_draws)) {
-      b <- gap[d] + sp_val[d]
-      A <- sp_val[d]
-      min_rts <- numeric(n_sim)
-      for (sim in seq_len(n_sim)) {
-        ft <- numeric(total_acc)
-        idx <- 1
-        for (j in seq_len(n_cats)) {
-          drift_j <- brms::get_dpar(prep, cat_names[j], i = i)[d]
-          for (k in seq_len(n_cat[j])) {
-            start <- stats::runif(1, 0, A)
-            dv <- switch(dist,
-              normal = stats::rnorm(1, drift_j, s[d]),
-              gamma = stats::rgamma(1, shape = drift_j, rate = s[d]),
-              frechet = .rfrechet(1, shape = drift_j, scale = s[d]),
-              lognormal = stats::rlnorm(1, meanlog = drift_j, sdlog = s[d])
-            )
-            ft[idx] <- if (dv > 0) (b - start) / dv else Inf
-            idx <- idx + 1
-          }
-        }
-        min_rts[sim] <- min(ft)
+    b_m <- matrix(gap + sp, n_draws, n_sim)
+    sp_m <- matrix(sp, n_draws, n_sim)
+    s_m <- matrix(s, n_draws, n_sim)
+    min_ft <- matrix(Inf, n_draws, n_sim)
+    for (j in seq_len(n_cats)) {
+      if (n_cat[j] == 0) next
+      dj <- matrix(drift[[j]], n_draws, n_sim)
+      for (k in seq_len(n_cat[j])) {
+        start <- matrix(stats::runif(n_draws * n_sim), n_draws, n_sim) * sp_m
+        dv <- .rlba_drift(dist, dj, s_m)
+        min_ft <- pmin(min_ft, (b_m - start) / dv)
       }
-      epred[d, i] <- mean(min_rts) + ndt[d]
     }
+    epred[, i] <- rowMeans(min_ft) + ndt
   }
   epred
 }

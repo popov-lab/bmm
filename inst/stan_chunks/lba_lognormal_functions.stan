@@ -26,6 +26,9 @@ real lba_lognormal_single_lccdf(real t, real v, real b, real A, real s) {
     log(b) + std_normal_lcdf((log(hi) - v) / s | ),
     log(b - A) + std_normal_lcdf((log(lo) - v) / s | )
   );
-  real surv_num = exp(log_u) - t * exp(log_M);
-  return lba_log_positive(surv_num) - log(A);
+  // survival numerator (u - t*M) in log space: log_diff_exp is exact where
+  // log_u > log(t) + log_M; the cancellation tail (survival numerically 0) floors
+  // to the same penalty as lba_log_clip (log(1e-300)).
+  real log_tM = log(t) + log_M;
+  return (log_u > log_tM ? log_diff_exp(log_u, log_tM) : log(1e-300)) - log(A);
 }

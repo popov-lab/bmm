@@ -540,24 +540,24 @@ lba_custom_data$response <- ifelse(lba_custom_data$response == 1, "correct", "wr
 lba_bench <- list(
   normal = run_lba_benchmark(
     lba_normal_data,
-    lba(rt = "rt", response = "response", n_alternatives = 2),
+    lba(rt = "rt", response = "response", n_choices = 2),
     bmf(driftc ~ 1, drifte ~ 1, gap ~ 1, sp ~ 1, ndt ~ 1)
   ),
   gamma = run_lba_benchmark(
     lba_gamma_data,
-    lba(rt = "rt", response = "response", n_alternatives = 2,
+    lba(rt = "rt", response = "response", n_choices = 2,
         distribution = "gamma"),
     bmf(driftc ~ 1, drifte ~ 1, gap ~ 1, sp ~ 1, ndt ~ 1)
   ),
   lognormal = run_lba_benchmark(
     lba_lognormal_data,
-    lba(rt = "rt", response = "response", n_alternatives = 2,
+    lba(rt = "rt", response = "response", n_choices = 2,
         distribution = "lognormal"),
     bmf(driftc ~ 1, drifte ~ 1, gap ~ 1, sp ~ 1, ndt ~ 1)
   ),
   frechet = run_lba_benchmark(
     lba_frechet_data,
-    lba(rt = "rt", response = "response", n_alternatives = 2,
+    lba(rt = "rt", response = "response", n_choices = 2,
         distribution = "frechet"),
     bmf(driftc ~ 1, drifte ~ 1, gap ~ 1, sp ~ 1, ndt ~ 1)
   ),
