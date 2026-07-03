@@ -569,3 +569,64 @@ test_that("covariate sum check respects tree membership", {
   # the covariates, so no warning should be raised
   expect_silent(check_data(model, dat, bmf(D ~ 1)))
 })
+
+test_that("branch expressions expand into root-to-leaf paths", {
+  paths <- .mpt_branch_paths("D + (1 - D) * g")
+  expect_equal(paths, list("D", c("1 - D", "g")))
+
+  # factored subtrees are expanded distributively
+  paths_factored <- .mpt_branch_paths("Pm*(Pb + (1 - Pb)*0.25)")
+  expect_equal(paths_factored, list(c("Pm", "Pb"), c("Pm", "1 - Pb", "0.25")))
+})
+
+test_that("the tree graph merges shared path prefixes", {
+  tree <- mpt_tree("old", list(
+    old = "D + (1 - D) * g",
+    new = "(1 - D) * (1 - g)"
+  ))
+  graph <- .mpt_tree_graph(tree)
+  leaves <- graph$nodes[!is.na(graph$nodes$category), ]
+  expect_equal(leaves$category, c("old", "old", "new"))
+  # root, the shared (1 - D) node, and one leaf-anchor per category path
+  expect_equal(sum(is.na(graph$nodes$category)), 5)
+  expect_setequal(
+    setdiff(graph$edges$label, ""),
+    c("D", "1 - D", "g", "1 - g")
+  )
+})
+
+test_that("plot methods run for trees and models", {
+  tree_old <- mpt_tree("old", list(
+    old = "D + (1 - D) * g",
+    new = "(1 - D) * (1 - g)"
+  ))
+  model <- mpt(
+    list(tree_old, mpt_tree("new", list(
+      old = "(1 - D) * g",
+      new = "D + (1 - D) * (1 - g)"
+    ))),
+    condition = "item_type"
+  )
+  grDevices::pdf(NULL)
+  expect_silent(plot(tree_old))
+  expect_silent(plot(model))
+  grDevices::dev.off()
+})
+
+test_that("constants that Stan would receive in scientific notation error", {
+  # brms deparses formula constants into the Stan code and spaces out
+  # operators, so 6.7e-05 would become the subtraction '6.7e - 05'
+  expect_error(
+    mpt_tree("t", list(
+      a = "p + (1 - p) * (1 - 0.001/15.001)",
+      b = "(1 - p) * (0.001/15.001)"
+    )),
+    "scientific"
+  )
+  # constants that deparse in fixed notation are fine
+  tree <- mpt_tree("t", list(
+    a = "p + (1 - p) * (1 - 0.001)",
+    b = "(1 - p) * 0.001"
+  ))
+  expect_equal(tree$branches$b, "(1 - p) * 0.001")
+})
