@@ -63,12 +63,14 @@ test_that("mpt identifies parameters and excludes covariates", {
   expect_equal(model$other_vars$covariates, "GcorrPi")
   expect_equal(model$links$Pb, "logit")
   expect_equal(model$default_priors$Pb$main, "logistic(0, 1)")
+  expect_equal(model$default_priors$Pb$effects, "logistic(0, 0.5)")
 })
 
-test_that("mpt uses probit priors for the probit link", {
+test_that("mpt uses matched priors for the probit link", {
   model <- mpt(mpt_2htm_trees(), condition = "item_type", links = "probit")
   expect_equal(model$links$D, "probit")
   expect_equal(model$default_priors$D$main, "normal(0, 1)")
+  expect_equal(model$default_priors$D$effects, "normal(0, 0.5)")
 })
 
 test_that("mpt errors on invalid parameter and category names", {
@@ -511,4 +513,59 @@ test_that("factor condition columns are matched to tree names", {
   checked <- check_data(model, dat, bmf(D ~ 1, g ~ 1))
   expect_equal(checked$Idx_old, as.integer(dat$item_type == "old"))
   expect_equal(checked$Idx_new, as.integer(dat$item_type == "new"))
+})
+
+test_that("check_data validates branch sums with observed covariate values", {
+  # the tree sums to 1 only when Gcorr + Gother = 1, which synthetic test
+  # values at construction cannot verify (mpt() warns there) but the observed
+  # covariate columns can
+  tree <- mpt_tree("main", list(
+    correct = "D + (1 - D) * Gcorr",
+    incorrect = "(1 - D) * Gother"
+  ))
+  model <- suppressWarnings(mpt(tree, covariates = c("Gcorr", "Gother")))
+  dat <- data.frame(
+    id = factor(1:6), Gcorr = 0.25, Gother = 0.75,
+    correct = 10, incorrect = 30
+  )
+  expect_silent(check_data(model, dat, bmf(D ~ 1)))
+
+  dat_bad <- dat
+  dat_bad$Gother[3] <- 0.9
+  expect_warning(
+    check_data(model, dat_bad, bmf(D ~ 1)),
+    "do not sum to 1 for 1 row"
+  )
+
+  dat_na <- dat
+  dat_na$Gcorr[c(2, 5)] <- NA
+  expect_warning(
+    check_data(model, dat_na, bmf(D ~ 1)),
+    "do not sum to 1 for 2 row"
+  )
+})
+
+test_that("covariate sum check respects tree membership", {
+  trees <- list(
+    mpt_tree("cued", list(
+      correct = "D + (1 - D) * Gcorr",
+      incorrect = "(1 - D) * Gother"
+    )),
+    mpt_tree("free", list(
+      correct = "D",
+      incorrect = "1 - D"
+    ))
+  )
+  model <- suppressWarnings(
+    mpt(trees, condition = "cond", covariates = c("Gcorr", "Gother"))
+  )
+  dat <- data.frame(
+    cond = rep(c("cued", "free"), each = 3),
+    Gcorr = c(0.25, 0.25, 0.25, 99, 99, 99),
+    Gother = c(0.75, 0.75, 0.75, 99, 99, 99),
+    correct = 10, incorrect = 30
+  )
+  # the invalid covariate values sit in rows of the tree that does not use
+  # the covariates, so no warning should be raised
+  expect_silent(check_data(model, dat, bmf(D ~ 1)))
 })
