@@ -5,6 +5,7 @@ run_sdm_baseline_benchmark <- function(config_name = "smoke",
                                        iter = 100L,
                                        warmup = 50L,
                                        chains = 2L,
+                                       threads_per_chain = 1L,
                                        seed = 123,
                                        output_dir = "inst/benchmarks/sdm/results") {
   configs <- sdm_benchmark_configs()
@@ -14,8 +15,10 @@ run_sdm_baseline_benchmark <- function(config_name = "smoke",
   check_positive_int(iter, "iter")
   check_positive_int(warmup, "warmup")
   check_positive_int(chains, "chains")
-  if (chains > 6L) {
-    stop("chains must be <= 6 for local benchmark runs.", call. = FALSE)
+  check_positive_int(threads_per_chain, "threads_per_chain")
+  estimated_cpu_threads <- chains * threads_per_chain
+  if (estimated_cpu_threads > 6L) {
+    stop("chains * threads_per_chain must be <= 6 for local benchmark runs.", call. = FALSE)
   }
 
   dir.create(output_dir, recursive = TRUE, showWarnings = FALSE)
@@ -26,31 +29,36 @@ run_sdm_baseline_benchmark <- function(config_name = "smoke",
     kappa ~ 0 + condition + (0 + condition | subject)
   )
   model <- sdm(resp_error = "y")
+  threads <- if (threads_per_chain > 1L) {
+    brms::threading(threads_per_chain)
+  }
 
   translation_time <- system.time({
-    stan_code <- stancode(formula, data = sim$data, model = model)
+    stan_code <- stancode(formula, data = sim$data, model = model, threads = threads)
   })
   stan_data_time <- system.time({
-    stan_data <- standata(formula, data = sim$data, model = model)
+    stan_data <- standata(formula, data = sim$data, model = model, threads = threads)
   })
   stan_code_hash <- hash_text(stan_code)
 
   started_at <- Sys.time()
+  fit_args <- list(
+    formula = formula,
+    data = sim$data,
+    model = model,
+    backend = "cmdstanr",
+    sort_data = TRUE,
+    silent = 2,
+    chains = chains,
+    cores = chains,
+    iter = iter,
+    warmup = warmup,
+    seed = seed,
+    refresh = 0,
+    threads = threads
+  )
   fit_time <- system.time({
-    fit <- bmm(
-      formula = formula,
-      data = sim$data,
-      model = model,
-      backend = "cmdstanr",
-      sort_data = TRUE,
-      silent = 2,
-      chains = chains,
-      cores = chains,
-      iter = iter,
-      warmup = warmup,
-      seed = seed,
-      refresh = 0
-    )
+    fit <- do.call(bmm, fit_args)
   })
   finished_at <- Sys.time()
 
@@ -76,6 +84,8 @@ run_sdm_baseline_benchmark <- function(config_name = "smoke",
       hardware = paste(Sys.info()[c("sysname", "release", "machine")], collapse = " "),
       detected_cores = parallel::detectCores(logical = TRUE),
       chains = chains,
+      threads_per_chain = threads_per_chain,
+      estimated_cpu_threads = estimated_cpu_threads,
       iter = iter,
       warmup = warmup,
       seed = seed,
@@ -150,6 +160,7 @@ parse_sdm_benchmark_args <- function(args) {
     iter = as.integer(get_arg("--iter", "100")),
     warmup = as.integer(get_arg("--warmup", "50")),
     chains = as.integer(get_arg("--chains", "2")),
+    threads_per_chain = as.integer(get_arg("--threads-per-chain", "1")),
     seed = as.integer(get_arg("--seed", "123"))
   )
 }
