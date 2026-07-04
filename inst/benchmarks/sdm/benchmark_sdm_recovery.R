@@ -3,13 +3,21 @@ source("inst/benchmarks/sdm/simulate_sdm_data.R")
 run_sdm_recovery_check <- function(iter = 3000L,
                                    warmup = 1000L,
                                    chains = 4L,
+                                   cores = chains,
+                                   threads_per_chain = 1L,
                                    seed = 123,
                                    output_dir = "inst/benchmarks/sdm/results") {
   check_positive_int(iter, "iter")
   check_positive_int(warmup, "warmup")
   check_positive_int(chains, "chains")
-  if (chains > 6L) {
-    stop("chains must be <= 6 for local recovery runs.", call. = FALSE)
+  check_positive_int(cores, "cores")
+  check_positive_int(threads_per_chain, "threads_per_chain")
+  if (cores > chains) {
+    stop("cores must be <= chains for local recovery runs.", call. = FALSE)
+  }
+  estimated_cpu_threads <- cores * threads_per_chain
+  if (estimated_cpu_threads > 6L) {
+    stop("cores * threads_per_chain must be <= 6 for local recovery runs.", call. = FALSE)
   }
 
   dir.create(output_dir, recursive = TRUE, showWarnings = FALSE)
@@ -18,6 +26,9 @@ run_sdm_recovery_check <- function(iter = 3000L,
     c ~ 0 + condition + (0 + condition | subject),
     kappa ~ 0 + condition + (0 + condition | subject)
   )
+  threads <- if (threads_per_chain > 1L) {
+    brms::threading(threads_per_chain)
+  }
 
   fit_time <- system.time({
     fit <- bmm(
@@ -28,11 +39,12 @@ run_sdm_recovery_check <- function(iter = 3000L,
       sort_data = TRUE,
       silent = 2,
       chains = chains,
-      cores = chains,
+      cores = cores,
       iter = iter,
       warmup = warmup,
       seed = seed,
-      refresh = 0
+      refresh = 0,
+      threads = threads
     )
   })
 
@@ -48,6 +60,9 @@ run_sdm_recovery_check <- function(iter = 3000L,
   recovery$min_bulk_ess <- diagnostics$min_bulk_ess
   recovery$min_bulk_ess_per_total_sec <- diagnostics$min_bulk_ess_per_total_sec
   recovery$chains <- chains
+  recovery$cores <- cores
+  recovery$threads_per_chain <- threads_per_chain
+  recovery$estimated_cpu_threads <- estimated_cpu_threads
   recovery$iter <- iter
   recovery$warmup <- warmup
   recovery$seed <- seed
@@ -122,6 +137,8 @@ parse_sdm_recovery_args <- function(args) {
     iter = as.integer(get_arg("--iter", "3000")),
     warmup = as.integer(get_arg("--warmup", "1000")),
     chains = as.integer(get_arg("--chains", "4")),
+    cores = as.integer(get_arg("--cores", "4")),
+    threads_per_chain = as.integer(get_arg("--threads-per-chain", "1")),
     seed = as.integer(get_arg("--seed", "123"))
   )
 }
