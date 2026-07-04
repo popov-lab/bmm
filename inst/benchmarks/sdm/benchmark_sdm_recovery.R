@@ -16,8 +16,8 @@ run_sdm_recovery_check <- function(iter = 3000L,
     stop("cores must be <= chains for local recovery runs.", call. = FALSE)
   }
   estimated_cpu_threads <- cores * threads_per_chain
-  if (estimated_cpu_threads > 6L) {
-    stop("cores * threads_per_chain must be <= 6 for local recovery runs.", call. = FALSE)
+  if (estimated_cpu_threads > 8L) {
+    stop("cores * threads_per_chain must be <= 8 for local recovery runs.", call. = FALSE)
   }
 
   dir.create(output_dir, recursive = TRUE, showWarnings = FALSE)
