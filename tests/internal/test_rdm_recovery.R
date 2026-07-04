@@ -127,13 +127,13 @@ recovery_cases <- list(
   simple_2choice = list(
     data = simple_2choice_data,
     formula = bmf(driftc ~ 1, drifte ~ 1, gap ~ 1, ndt ~ 1),
-    model = rdm(rt = "rt", response = "response", n_alternatives = 2),
+    model = rdm(rt = "rt", response = "response", n_choices = 2),
     truth = c(driftc = 3.2, drifte = 1.2, gap = 1.0, ndt = 0.2)
   ),
   simple_4choice_free_sp = list(
     data = simple_4choice_data,
     formula = bmf(driftc ~ 1, drifte ~ 1, gap ~ 1, ndt ~ 1, s ~ 1, sp ~ 1),
-    model = rdm(rt = "rt", response = "response", n_alternatives = 4),
+    model = rdm(rt = "rt", response = "response", n_choices = 4),
     truth = c(driftc = 3.0, drifte = 1.3, gap = 1.0, ndt = 0.22, s = 0.9, sp = 0.04)
   ),
   custom_fixed = list(
@@ -143,7 +143,7 @@ recovery_cases <- list(
       rt = "rt",
       response = "response",
       version = "custom",
-      num_alternatives = c(corr = 1, lure = 2, npl = 3)
+      accumulators = c(corr = 1, lure = 2, npl = 3)
     ),
     truth = c(corr = 3.1, lure = 1.8, npl = 1.0, gap = 0.95, ndt = 0.23)
   ),
@@ -154,7 +154,7 @@ recovery_cases <- list(
       rt = "rt",
       response = "response",
       version = "custom",
-      num_alternatives = c(corr = 1, lure = 2, npl = 2)
+      accumulators = c(corr = 1, lure = 2, npl = 2)
     ),
     truth = c(corr = 2.8, lure = 1.9, npl = 1.2, gap = 1.05, ndt = 0.24, s = 0.95, sp = 0.03)
   )

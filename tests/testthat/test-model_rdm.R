@@ -8,27 +8,27 @@
 # -----------------------------------------------------------------------------
 
 test_that("rdm() creates simple model with correct structure", {
-  model <- rdm(rt = "rt", response = "response", n_alternatives = 2)
+  model <- rdm(rt = "rt", response = "response", n_choices = 2)
 
   expect_s3_class(model, "bmmodel")
   expect_s3_class(model, "rdm")
   expect_s3_class(model, "rdm_simple")
   expect_equal(model$resp_vars$rt, "rt")
   expect_equal(model$resp_vars$response, "response")
-  expect_equal(model$other_vars$n_alternatives, 2L)
+  expect_equal(model$other_vars$n_choices, 2L)
   expect_equal(model$version, "simple")
 })
 
 test_that("rdm simple version has correct parameters", {
-  model <- rdm(rt = "rt", response = "response", n_alternatives = 4)
+  model <- rdm(rt = "rt", response = "response", n_choices = 4)
 
   expect_true(all(c("driftc", "drifte", "gap", "ndt", "s", "sp") %in%
                     names(model$parameters)))
-  expect_equal(model$other_vars$n_alternatives, 4L)
+  expect_equal(model$other_vars$n_choices, 4L)
 })
 
 test_that("rdm simple version has correct links", {
-  model <- rdm(rt = "rt", response = "response", n_alternatives = 2)
+  model <- rdm(rt = "rt", response = "response", n_choices = 2)
 
   expect_equal(model$links$driftc, "log")
   expect_equal(model$links$drifte, "log")
@@ -39,7 +39,7 @@ test_that("rdm simple version has correct links", {
 })
 
 test_that("rdm has correct fixed parameters", {
-  model <- rdm(rt = "rt", response = "response", n_alternatives = 2)
+  model <- rdm(rt = "rt", response = "response", n_choices = 2)
 
   expect_equal(model$fixed_parameters$mu, 0)
   expect_equal(model$fixed_parameters$s, 0)
@@ -50,7 +50,7 @@ test_that("rdm rejects unsupported custom links during model checks", {
   model_bad_drift <- rdm(
     rt = "rt",
     response = "response",
-    n_alternatives = 2,
+    n_choices = 2,
     links = list(driftc = "identity")
   )
   expect_error(
@@ -61,7 +61,7 @@ test_that("rdm rejects unsupported custom links during model checks", {
   model_bad_ndt <- rdm(
     rt = "rt",
     response = "response",
-    n_alternatives = 2,
+    n_choices = 2,
     links = list(ndt = "identity")
   )
   expect_error(
@@ -70,14 +70,14 @@ test_that("rdm rejects unsupported custom links during model checks", {
   )
 })
 
-test_that("rdm errors on invalid n_alternatives", {
-  expect_error(rdm(rt = "rt", response = "response", n_alternatives = 1))
-  expect_error(rdm(rt = "rt", response = "response", n_alternatives = 2.5))
+test_that("rdm errors on invalid n_choices", {
+  expect_error(rdm(rt = "rt", response = "response", n_choices = 1))
+  expect_error(rdm(rt = "rt", response = "response", n_choices = 2.5))
 })
 
 test_that("rdm errors on missing required arguments", {
-  expect_error(rdm(response = "response", n_alternatives = 2))
-  expect_error(rdm(rt = "rt", n_alternatives = 2))
+  expect_error(rdm(response = "response", n_choices = 2))
+  expect_error(rdm(rt = "rt", n_choices = 2))
 })
 
 test_that("rdm() creates custom model with correct structure", {
@@ -85,13 +85,28 @@ test_that("rdm() creates custom model with correct structure", {
 
   expect_s3_class(model, "rdm_custom")
   expect_equal(model$version, "custom")
-  expect_null(model$other_vars$n_alternatives)
+  expect_null(model$other_vars$n_choices)
 })
 
-test_that("rdm custom accepts num_alternatives", {
+test_that("rdm custom accepts accumulators", {
   model <- rdm(rt = "rt", response = "resp", version = "custom",
-               num_alternatives = c(corr = 1, err = 3))
-  expect_equal(model$other_vars$num_alternatives, c(corr = 1, err = 3))
+               accumulators = c(corr = 1, err = 3))
+  expect_equal(model$other_vars$accumulators, c(corr = 1, err = 3))
+})
+
+test_that("rdm deprecates n_alternatives and num_alternatives", {
+  expect_warning(
+    model <- rdm(rt = "rt", response = "response", n_alternatives = 2),
+    "n_alternatives.*deprecated.*n_choices"
+  )
+  expect_equal(model$other_vars$n_choices, 2L)
+
+  expect_warning(
+    model <- rdm(rt = "rt", response = "resp", version = "custom",
+                 num_alternatives = c(corr = 1, err = 3)),
+    "num_alternatives.*deprecated.*accumulators"
+  )
+  expect_equal(model$other_vars$accumulators, c(corr = 1, err = 3))
 })
 
 # -----------------------------------------------------------------------------
@@ -99,7 +114,7 @@ test_that("rdm custom accepts num_alternatives", {
 # -----------------------------------------------------------------------------
 
 test_that("check_data.rdm errors when required variables missing", {
-  model <- rdm(rt = "rt", response = "response", n_alternatives = 2)
+  model <- rdm(rt = "rt", response = "response", n_choices = 2)
 
   expect_error(
     check_data(model, data.frame(x = 1), bmf(driftc ~ 1)),
@@ -113,43 +128,43 @@ test_that("check_data.rdm errors when required variables missing", {
 })
 
 test_that("check_data.rdm errors when RT contains NA", {
-  model <- rdm(rt = "rt", response = "response", n_alternatives = 2)
+  model <- rdm(rt = "rt", response = "response", n_choices = 2)
   dat <- data.frame(rt = c(0.5, NA), response = c(1, 2))
   expect_error(check_data(model, dat, bmf(driftc ~ 1)), "NA values")
 })
 
 test_that("check_data.rdm errors when response contains NA", {
-  model <- rdm(rt = "rt", response = "response", n_alternatives = 2)
+  model <- rdm(rt = "rt", response = "response", n_choices = 2)
   dat <- data.frame(rt = c(0.5, 0.6), response = c(1, NA))
   expect_error(check_data(model, dat, bmf(driftc ~ 1)), "NA values")
 })
 
 test_that("check_data.rdm errors when RT contains negative values", {
-  model <- rdm(rt = "rt", response = "response", n_alternatives = 2)
+  model <- rdm(rt = "rt", response = "response", n_choices = 2)
   dat <- data.frame(rt = c(-0.1, 0.5), response = c(1, 2))
   expect_error(check_data(model, dat, bmf(driftc ~ 1)), "lower than zero")
 })
 
 test_that("check_data.rdm warns when RT > 10 seconds", {
-  model <- rdm(rt = "rt", response = "response", n_alternatives = 2)
+  model <- rdm(rt = "rt", response = "response", n_choices = 2)
   dat <- data.frame(rt = c(0.5, 15), response = c(1, 2))
   expect_warning(check_data(model, dat, bmf(driftc ~ 1)), "larger than 10")
 })
 
 test_that("check_data.rdm warns when RT < 0.1 seconds", {
-  model <- rdm(rt = "rt", response = "response", n_alternatives = 2)
+  model <- rdm(rt = "rt", response = "response", n_choices = 2)
   dat <- data.frame(rt = c(0.05, 0.5), response = c(1, 2))
   expect_warning(check_data(model, dat, bmf(driftc ~ 1)), "smaller than 0.100")
 })
 
 test_that("check_data.rdm_simple errors on response out of range", {
-  model <- rdm(rt = "rt", response = "response", n_alternatives = 2)
+  model <- rdm(rt = "rt", response = "response", n_choices = 2)
   dat <- data.frame(rt = c(0.5, 0.6), response = c(1, 3))
   expect_error(check_data(model, dat, bmf(driftc ~ 1)), "integers in 1:2")
 })
 
 test_that("check_data.rdm_simple creates category mapping columns", {
-  model <- rdm(rt = "rt", response = "response", n_alternatives = 3)
+  model <- rdm(rt = "rt", response = "response", n_choices = 3)
   dat <- data.frame(rt = c(0.5, 0.6, 0.7), response = c(1, 2, 3))
   result <- check_data(model, dat, bmf(driftc ~ 1))
 
@@ -159,7 +174,7 @@ test_that("check_data.rdm_simple creates category mapping columns", {
 })
 
 test_that("check_data.rdm_simple handles factor responses", {
-  model <- rdm(rt = "rt", response = "response", n_alternatives = 2)
+  model <- rdm(rt = "rt", response = "response", n_choices = 2)
   dat <- data.frame(rt = c(0.5, 0.6), response = factor(c("1", "2")))
   result <- check_data(model, dat, bmf(driftc ~ 1))
 
@@ -167,7 +182,7 @@ test_that("check_data.rdm_simple handles factor responses", {
 })
 
 test_that("check_data.rdm returns a data.frame", {
-  model <- rdm(rt = "rt", response = "response", n_alternatives = 2)
+  model <- rdm(rt = "rt", response = "response", n_choices = 2)
   dat <- data.frame(rt = c(0.5, 0.6), response = c(1, 2))
   result <- check_data(model, dat, bmf(driftc ~ 1))
   expect_s3_class(result, "data.frame")
@@ -189,9 +204,9 @@ test_that("check_data.rdm_custom maps character responses to integers", {
   expect_equal(result$.rdm_n2, c(1L, 1L))
 })
 
-test_that("check_data.rdm_custom handles num_alternatives (integer)", {
+test_that("check_data.rdm_custom handles accumulators (integer)", {
   model <- rdm(rt = "rt", response = "resp", version = "custom",
-               num_alternatives = c(corr = 1, err = 3))
+               accumulators = c(corr = 1, err = 3))
   f <- bmf(corr ~ 1, err ~ 1, ndt ~ 1)
   model <- check_model(model, formula = f)
   dat <- data.frame(rt = c(0.5, 0.6), resp = c("corr", "err"))
@@ -201,9 +216,9 @@ test_that("check_data.rdm_custom handles num_alternatives (integer)", {
   expect_equal(result$.rdm_n2, c(3L, 3L))
 })
 
-test_that("check_data.rdm_custom handles num_alternatives (column names)", {
+test_that("check_data.rdm_custom handles accumulators (column names)", {
   model <- rdm(rt = "rt", response = "resp", version = "custom",
-               num_alternatives = c(corr = "n_corr", err = "n_err"))
+               accumulators = c(corr = "n_corr", err = "n_err"))
   f <- bmf(corr ~ 1, err ~ 1, ndt ~ 1)
   model <- check_model(model, formula = f)
   dat <- data.frame(rt = c(0.5, 0.6), resp = c("corr", "err"),
@@ -269,7 +284,7 @@ test_that("check_model.rdm_custom errors on category names containing underscore
 # -----------------------------------------------------------------------------
 
 test_that("bmf2bf.rdm_simple creates correct brms formula", {
-  model <- rdm(rt = "rt", response = "response", n_alternatives = 2)
+  model <- rdm(rt = "rt", response = "response", n_choices = 2)
   bf <- bmf2bf(model, bmf(driftc ~ 1))
   resp_term <- deparse(bf$formula[[2]])
   expect_true(grepl("vint", resp_term))
@@ -296,7 +311,7 @@ test_that(".rdm_stan_code generates valid Stan for sp=0 (2 categories)", {
   code <- .rdm_stan_code("rdm_simple", c("driftc", "drifte"), has_sp = FALSE)
   expect_true(grepl("rdm_simple_lpdf", code))
   expect_true(grepl("vector driftc", code))
-  expect_true(grepl("rdm_simple_log_lik_one", code))
+  expect_true(grepl("rdm_log_lik_one", code))
   expect_true(grepl("0\\)", code))
 })
 
@@ -304,7 +319,7 @@ test_that(".rdm_stan_code generates valid Stan for sp>0 (2 categories)", {
   code <- .rdm_stan_code("rdm_simple", c("driftc", "drifte"), has_sp = TRUE)
   expect_true(grepl("rdm_simple_lpdf", code))
   expect_true(grepl("vector driftc", code))
-  expect_true(grepl("rdm_simple_log_lik_one", code))
+  expect_true(grepl("rdm_log_lik_one", code))
   expect_true(grepl("1\\)", code))
 })
 
@@ -330,7 +345,7 @@ test_that(".rdm_stan_code generates sp>0 Stan for custom version", {
 # -----------------------------------------------------------------------------
 
 test_that("configure_model.rdm_simple returns correct components", {
-  model <- rdm(rt = "rt", response = "response", n_alternatives = 2)
+  model <- rdm(rt = "rt", response = "response", n_choices = 2)
   dat <- data.frame(rt = c(0.5, 0.6), response = c(1, 2))
   f <- bmf(driftc ~ 1, drifte ~ 1, gap ~ 1, ndt ~ 1)
   model <- check_model(model, data = dat, formula = f)
@@ -350,7 +365,7 @@ test_that("configure_model.rdm_simple returns correct components", {
 })
 
 test_that("configure_model.rdm_simple loads RDM helper functions", {
-  model <- rdm(rt = "rt", response = "response", n_alternatives = 2)
+  model <- rdm(rt = "rt", response = "response", n_choices = 2)
   dat <- data.frame(rt = c(0.5, 0.6), response = c(1, 2))
   f <- bmf(driftc ~ 1, drifte ~ 1, gap ~ 1, ndt ~ 1)
   model <- check_model(model, data = dat, formula = f)
@@ -363,11 +378,11 @@ test_that("configure_model.rdm_simple loads RDM helper functions", {
   )
   expect_true(grepl("swald_lpdf", stanvar_code))
   expect_true(grepl("rdm_log_lik_one", stanvar_code))
-  expect_true(grepl("rdm_simple_log_lik_one", stanvar_code))
+  expect_false(grepl("rdm_simple_log_lik_one", stanvar_code))
 })
 
 test_that("configure_model.rdm_simple keeps ndt as a regular log-linked parameter", {
-  model <- rdm(rt = "rt", response = "response", n_alternatives = 2)
+  model <- rdm(rt = "rt", response = "response", n_choices = 2)
   dat <- data.frame(rt = c(0.5, 0.6), response = c(1, 2), cond = c(0, 1))
   f <- bmf(driftc ~ cond, drifte ~ 1, gap ~ 1, ndt ~ cond)
   model <- check_model(model, data = dat, formula = f)
@@ -382,7 +397,7 @@ test_that("configure_model.rdm_simple keeps ndt as a regular log-linked paramete
 })
 
 test_that("create_initfun for rdm keeps intercept ndt draws in 10 to 50 ms", {
-  model <- rdm(rt = "rt", response = "response", n_alternatives = 2)
+  model <- rdm(rt = "rt", response = "response", n_choices = 2)
   dat <- data.frame(rt = c(0.45, 0.62), response = c(1, 2))
   f <- bmf(driftc ~ 1, drifte ~ 1, gap ~ 1, ndt ~ 1)
   model <- check_model(model, data = dat, formula = f)
@@ -396,7 +411,7 @@ test_that("create_initfun for rdm keeps intercept ndt draws in 10 to 50 ms", {
 })
 
 test_that("create_initfun for rdm keeps no-intercept ndt draws in 10 to 50 ms", {
-  model <- rdm(rt = "rt", response = "response", n_alternatives = 2)
+  model <- rdm(rt = "rt", response = "response", n_choices = 2)
   dat <- data.frame(
     rt = c(0.45, 0.62, 0.58, 0.71),
     response = c(1, 2, 1, 2),
@@ -414,7 +429,7 @@ test_that("create_initfun for rdm keeps no-intercept ndt draws in 10 to 50 ms", 
 })
 
 test_that("create_initfun for rdm ndt draws do not depend on observed RT range", {
-  model <- rdm(rt = "rt", response = "response", n_alternatives = 2)
+  model <- rdm(rt = "rt", response = "response", n_choices = 2)
   dat_small_rt <- data.frame(rt = c(0.18, 0.23), response = c(1, 2))
   dat_large_rt <- data.frame(rt = c(0.75, 0.92), response = c(1, 2))
   f <- bmf(driftc ~ 1, drifte ~ 1, gap ~ 1, ndt ~ 1)
@@ -441,7 +456,7 @@ test_that("stancode for rdm includes user predictors for drift parameters", {
     response = c(1, 2),
     cond = factor(c("A", "B"))
   )
-  model <- rdm(rt = "rt", response = "response", n_alternatives = 2)
+  model <- rdm(rt = "rt", response = "response", n_choices = 2)
   f <- bmf(driftc ~ cond, drifte ~ 1, gap ~ 1, ndt ~ 1)
   code <- suppressWarnings(stancode(f, dat, model))
 
@@ -457,7 +472,7 @@ test_that("stancode for rdm includes user predictors for drift parameters", {
 test_that("rdm simple version runs with mock backend (2-choice)", {
   skip_on_cran()
   dat <- rrdm(n = 200, drift = c(3, 1.5), gap = 1, ndt = 0.2)
-  model <- rdm(rt = "rt", response = "response", n_alternatives = 2)
+  model <- rdm(rt = "rt", response = "response", n_choices = 2)
   f <- bmf(driftc ~ 1, drifte ~ 1, gap ~ 1, ndt ~ 1)
   expect_no_error(
     bmm(f, dat, model, backend = "mock", mock_fit = 1, rename = FALSE)
@@ -467,7 +482,7 @@ test_that("rdm simple version runs with mock backend (2-choice)", {
 test_that("rdm simple version runs with mock backend (4-choice)", {
   skip_on_cran()
   dat <- rrdm(n = 200, drift = c(3, 1.5, 1.5, 1.5), gap = 1, ndt = 0.2)
-  model <- rdm(rt = "rt", response = "response", n_alternatives = 4)
+  model <- rdm(rt = "rt", response = "response", n_choices = 4)
   f <- bmf(driftc ~ 1, drifte ~ 1, gap ~ 1, ndt ~ 1)
   expect_no_error(
     bmm(f, dat, model, backend = "mock", mock_fit = 1, rename = FALSE)
@@ -478,7 +493,7 @@ test_that("rdm simple version runs with predictor", {
   skip_on_cran()
   dat <- rrdm(n = 200, drift = c(3, 1.5), gap = 1, ndt = 0.2)
   dat$cond <- rep(c("A", "B"), 100)
-  model <- rdm(rt = "rt", response = "response", n_alternatives = 2)
+  model <- rdm(rt = "rt", response = "response", n_choices = 2)
   f <- bmf(driftc ~ 1 + cond, drifte ~ 1, gap ~ 1, ndt ~ 1)
   expect_no_error(
     bmm(f, dat, model, backend = "mock", mock_fit = 1, rename = FALSE)
@@ -491,7 +506,7 @@ test_that("rdm custom version runs with mock backend", {
   cats <- c("corr", "err", "npl")
   dat$resp <- cats[dat$response]
   model <- rdm(rt = "rt", response = "resp", version = "custom",
-               num_alternatives = c(corr = 1, err = 1, npl = 1))
+               accumulators = c(corr = 1, err = 1, npl = 1))
   f <- bmf(corr ~ 1, err ~ 1, npl ~ 1, gap ~ 1, ndt ~ 1)
   expect_no_error(
     bmm(f, dat, model, backend = "mock", mock_fit = 1, rename = FALSE)
@@ -513,7 +528,7 @@ test_that("rdm custom version runs with predictor", {
 test_that("rdm simple with sp estimated runs with mock backend", {
   skip_on_cran()
   dat <- rrdm(n = 200, drift = c(3, 1.5), gap = 0.7, sp = 0.3, ndt = 0.2)
-  model <- rdm(rt = "rt", response = "response", n_alternatives = 2)
+  model <- rdm(rt = "rt", response = "response", n_choices = 2)
   f <- bmf(driftc ~ 1, drifte ~ 1, gap ~ 1, ndt ~ 1, sp ~ 1)
   expect_no_error(
     bmm(f, dat, model, backend = "mock", mock_fit = 1, rename = FALSE)

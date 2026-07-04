@@ -112,12 +112,12 @@ benchmark_cases <- list(
   simple_fixed = list(
     data = simple_fixed_data,
     formula = bmf(driftc ~ 1, drifte ~ 1, gap ~ 1, ndt ~ 1),
-    model = rdm(rt = "rt", response = "response", n_alternatives = 2)
+    model = rdm(rt = "rt", response = "response", n_choices = 2)
   ),
   simple_free_sp = list(
     data = simple_free_data,
     formula = bmf(driftc ~ 1, drifte ~ 1, gap ~ 1, ndt ~ 1, s ~ 1, sp ~ 1),
-    model = rdm(rt = "rt", response = "response", n_alternatives = 4)
+    model = rdm(rt = "rt", response = "response", n_choices = 4)
   ),
   custom_free_sp = list(
     data = custom_free_data,
@@ -126,7 +126,7 @@ benchmark_cases <- list(
       rt = "rt",
       response = "response",
       version = "custom",
-      num_alternatives = c(corr = 1, lure = 2, npl = 2)
+      accumulators = c(corr = 1, lure = 2, npl = 2)
     )
   )
 )

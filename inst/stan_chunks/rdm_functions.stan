@@ -92,23 +92,21 @@ real rdm_full_surv_raw(real t, real drift, real bound, real A, real s) {
   ) / A;
 }
 
+// Log-survival policy: the CDF form is well-conditioned when the CDF is small
+// (log1m(cdf)), the direct survival antiderivative when it is large. A CDF
+// dipping below 0 is cancellation noise near the support boundary where the
+// true CDF ~ 0, so survival ~ 1 (log = 0); a non-positive direct survival in
+// the deep tail means the true survival underflowed (log = -inf).
 real rdm_log_full_surv(real t, real drift, real bound, real A, real s) {
   real cdf = rdm_full_cdf_raw(t, drift, bound, A, s);
 
-  if (cdf > 0 && cdf < 1) {
-    if (cdf < 0.5) {
-      return log1m(cdf);
-    }
-    {
-      real surv = rdm_full_surv_raw(t, drift, bound, A, s);
-      if (surv > 0 && surv < 1) {
-        return log(surv);
-      }
-    }
-  }
   if (cdf <= 0) {
     return 0;
   }
+  if (cdf < 0.5) {
+    return log1m(cdf);
+  }
+
   {
     real surv = rdm_full_surv_raw(t, drift, bound, A, s);
     if (surv > 0 && surv < 1) {
@@ -124,65 +122,33 @@ real rdm_log_lik_one(real rt, array[] real drift, real gap, real ndt,
   int n_cats = size(drift);
   real b = gap + sp;
   real t = rt - ndt;
-  real log_pdf;
-  real weighted_log_surv = 0;
-  real response_log_surv = 0;
+  real lp;
 
   if (t <= 0) return negative_infinity();
 
   if (use_start_var == 0) {
-    log_pdf = swald_lpdf(rt | drift[response], b, ndt, s);
+    lp = log(n[response]) + swald_lpdf(rt | drift[response], b, ndt, s);
   } else {
-    log_pdf = rdm_log_full_pdf(t, drift[response], b, sp, s);
+    lp = log(n[response]) + rdm_log_full_pdf(t, drift[response], b, sp, s);
   }
 
+  // single-pass race: the winner contributes n_win - 1 survival copies, each
+  // loser n_j copies. The strict reps > 0 guard skips the winner's survival
+  // when its category has one accumulator (all correct trials; every trial
+  // for K = 2) and keeps zero-count or underflowed terms out of the sum
+  // (0 * -inf would otherwise poison the likelihood with NaN).
   for (j in 1:n_cats) {
-    real log_surv;
-
-    if (use_start_var == 0) {
-      log_surv = swald_lccdf(rt | drift[j], b, ndt, s);
-    } else {
-      log_surv = rdm_log_full_surv(t, drift[j], b, sp, s);
-    }
-
-    weighted_log_surv += n[j] * log_surv;
-    if (j == response) response_log_surv = log_surv;
-  }
-
-  return log(n[response]) + log_pdf + weighted_log_surv - response_log_surv;
-}
-
-real rdm_simple_log_lik_one(real rt, real driftc, real drifte, real gap,
-                            real ndt, real s, real sp, int response,
-                            int n1, int n2, int use_start_var) {
-  real b = gap + sp;
-  real t = rt - ndt;
-  real log_pdf;
-  real log_surv_c;
-  real log_surv_e;
-
-  if (t <= 0) return negative_infinity();
-
-  if (use_start_var == 0) {
-    log_surv_c = swald_lccdf(rt | driftc, b, ndt, s);
-    log_surv_e = swald_lccdf(rt | drifte, b, ndt, s);
-    if (response == 1) {
-      log_pdf = swald_lpdf(rt | driftc, b, ndt, s);
-    } else {
-      log_pdf = swald_lpdf(rt | drifte, b, ndt, s);
-    }
-  } else {
-    log_surv_c = rdm_log_full_surv(t, driftc, b, sp, s);
-    log_surv_e = rdm_log_full_surv(t, drifte, b, sp, s);
-    if (response == 1) {
-      log_pdf = rdm_log_full_pdf(t, driftc, b, sp, s);
-    } else {
-      log_pdf = rdm_log_full_pdf(t, drifte, b, sp, s);
+    int reps = (j == response) ? n[j] - 1 : n[j];
+    if (reps > 0) {
+      real log_surv;
+      if (use_start_var == 0) {
+        log_surv = swald_lccdf(rt | drift[j], b, ndt, s);
+      } else {
+        log_surv = rdm_log_full_surv(t, drift[j], b, sp, s);
+      }
+      lp += reps * log_surv;
     }
   }
 
-  if (response == 1) {
-    return log(n1) + log_pdf + (n1 - 1) * log_surv_c + n2 * log_surv_e;
-  }
-  return log(n2) + log_pdf + n1 * log_surv_c + (n2 - 1) * log_surv_e;
+  return lp;
 }

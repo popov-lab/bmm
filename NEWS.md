@@ -1,5 +1,8 @@
 # bmm (development version)
 
+### New models
+* Add the **Racing Diffusion Model** (`rdm`) (Tillman, Van Zandt, & Logan, 2020) for multi-alternative choice reaction time tasks. Racing Wald accumulators estimate drift rates, threshold gap, and non-decision time from trial-level RT and choice data; starting-point variability (`sp`) is fixed to ~0 by default and can be freed via the formula. Supports two versions — **simple** (correct-vs-error drift rates with integer-coded responses) and **custom** (per-accumulator drift rates with labelled responses, including per-category accumulator counts). Density and RNG helpers `drdm()`/`rrdm()`/`prdm()`/`qrdm()` are exported. Thanks to @GidonFrischkorn
+
 ### New features
 * New S3 method **conditional_effects()** for `bmmfit` objects. Provides an intuitive interface for visualizing predictor effects on model parameters, with automatic routing between distributional and non-linear parameters, inverse link transformations to show parameters on their natural scale (`scale = "native"`), softmax handling for mixture3p weight parameters, and filtering of internal model variables (#203).
 * New S3 methods for **emmeans** support on `bmmfit` objects. Users can now call `emmeans(fit, ~ condition, dpar = "kappa")` for any bmmodel (#323).

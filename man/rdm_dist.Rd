@@ -8,13 +8,13 @@
 \alias{qrdm}
 \title{Distribution functions for the Racing Diffusion Model (RDM)}
 \usage{
-drdm(rt, response, drift, bound, ndt, s = 1, sp = 0, log = FALSE)
+drdm(rt, response, drift, gap, ndt, s = 1, sp = 0, log = FALSE)
 
-rrdm(n, drift, bound, ndt, s = 1, sp = 0)
+rrdm(n, drift, gap, ndt, s = 1, sp = 0)
 
-prdm(q, drift, bound, ndt, s = 1, sp = 0, lower.tail = TRUE, log.p = FALSE)
+prdm(q, drift, gap, ndt, s = 1, sp = 0, lower.tail = TRUE, log.p = FALSE)
 
-qrdm(p, drift, bound, ndt, s = 1, sp = 0, lower.tail = TRUE, log.p = FALSE)
+qrdm(p, drift, gap, ndt, s = 1, sp = 0, lower.tail = TRUE, log.p = FALSE)
 }
 \arguments{
 \item{rt}{Numeric vector of response times (in seconds).}
@@ -23,16 +23,16 @@ qrdm(p, drift, bound, ndt, s = 1, sp = 0, lower.tail = TRUE, log.p = FALSE)
 
 \item{drift}{Numeric vector of drift rates for each accumulator (all > 0).}
 
-\item{bound}{Decision threshold (> 0). The total boundary for accumulation.}
+\item{gap}{Threshold gap (> 0). The distance between the maximum starting
+point and the decision threshold. The total threshold is computed as
+\code{b = gap + sp}, ensuring \code{b > sp} structurally.}
 
 \item{ndt}{Non-decision time in seconds (>= 0).}
 
 \item{s}{Diffusion constant (> 0), default = 1.}
 
-\item{sp}{Starting point proportion (0 to 1). The maximum starting point A
-is computed as \code{A = sp * bound}, so starting evidence is uniformly
-distributed on \verb{[0, sp * bound]}. Default = 0 (no starting point
-variability).}
+\item{sp}{Maximum starting point (>= 0). Starting evidence is uniformly
+distributed on \verb{[0, sp]}. Default = 0 (no starting point variability).}
 
 \item{log}{Logical; if \code{TRUE}, values are returned on the log scale.}
 
@@ -62,12 +62,12 @@ Gaussian) distribution. The first accumulator to finish determines the
 response and the RT.
 }
 \examples{
-dat <- rrdm(n = 1000, drift = c(3, 1.5), bound = 1, ndt = 0.2)
+dat <- rrdm(n = 1000, drift = c(3, 1.5), gap = 1, sp = 0, ndt = 0.2)
 head(dat)
 hist(dat$rt)
 
 # with starting point variability
-dat2 <- rrdm(n = 1000, drift = c(3, 1.5), bound = 1, ndt = 0.2, sp = 0.3)
+dat2 <- rrdm(n = 1000, drift = c(3, 1.5), gap = 0.7, sp = 0.3, ndt = 0.2)
 }
 \references{
 Tillman, G., Van Zandt, T., & Logan, G. D. (2020). Sequential sampling

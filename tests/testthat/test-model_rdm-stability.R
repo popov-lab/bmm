@@ -47,12 +47,12 @@
        kind,
        simple_fixed = list(
          data = data.frame(rt = c(0.5, 0.6), response = c(1L, 2L)),
-         model = rdm(rt = "rt", response = "response", n_alternatives = 2),
+         model = rdm(rt = "rt", response = "response", n_choices = 2),
          formula = bmf(driftc ~ 1, drifte ~ 1, gap ~ 1, ndt ~ 1)
        ),
        simple_free = list(
          data = data.frame(rt = c(0.5, 0.6), response = c(1L, 2L)),
-         model = rdm(rt = "rt", response = "response", n_alternatives = 2),
+         model = rdm(rt = "rt", response = "response", n_choices = 2),
          formula = bmf(driftc ~ 1, drifte ~ 1, gap ~ 1, ndt ~ 1, s ~ 1, sp ~ 1)
        ),
        custom_free = list(

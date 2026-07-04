@@ -2,80 +2,75 @@
 # MODELS                                                                 ####
 ############################################################################# !
 
-.rdm_version_table <- list(
-  simple = list(
-    parameters = list(
-      driftc = "drift rate for correct accumulator",
-      drifte = "drift rate for error accumulators",
-      gap = "threshold gap (b = gap + sp)",
-      ndt = "non-decision time",
-      s = "diffusion constant",
-      sp = "maximum starting point (uniform on 0 to sp)"
-    ),
-    links = list(
-      driftc = "log",
-      drifte = "log",
-      gap = "log",
-      ndt = "log",
-      s = "log",
-      sp = "log"
-    ),
-    fixed_parameters = list(
-      mu = 0,
-      s = 0,
-      sp = -100
-    ),
-    priors = list(
-      driftc = list(main = "normal(1, 0.5)", effects = "normal(0, 0.3)"),
-      drifte = list(main = "normal(0.5, 0.5)", effects = "normal(0, 0.3)"),
-      gap = list(main = "normal(0, 0.3)", effects = "normal(0, 0.3)"),
-      ndt = list(main = "normal(-2, 0.3)", effects = "normal(0, 0.3)"),
-      s = list(main = "normal(0, 0.3)", effects = "normal(0, 0.2)"),
-      sp = list(main = "normal(-1, 0.5)", effects = "normal(0, 0.3)")
-    ),
-    init_ranges = list(
-      mu = c(-0.5, 0.5),
-      driftc = c(2, 4),
-      drifte = c(1, 2.5),
-      gap = c(0.8, 1.2),
-      ndt = c(0.01, 0.05),
-      s = c(0.8, 1.2),
-      sp = c(0.2, 0.5)
-    )
+# Drift-rate defaults for the simple driftc/drifte parameters. Per-category
+# parameters discovered in the custom version default to the error-accumulator
+# (drifte) values.
+.rdm_drift_spec <- list(
+  desc = "drift rate",
+  link = "log",
+  priors = list(
+    driftc = list(main = "normal(1, 0.5)", effects = "normal(0, 0.3)"),
+    drifte = list(main = "normal(0.5, 0.5)", effects = "normal(0, 0.3)")
   ),
-  custom = list(
-    parameters = list(
-      gap = "threshold gap (b = gap + sp)",
-      ndt = "non-decision time",
-      s = "diffusion constant",
-      sp = "maximum starting point (uniform on 0 to sp)"
-    ),
-    links = list(
-      gap = "log",
-      ndt = "log",
-      s = "log",
-      sp = "log"
-    ),
-    fixed_parameters = list(
-      mu = 0,
-      s = 0,
-      sp = -100
-    ),
-    priors = list(
-      gap = list(main = "normal(0, 0.3)", effects = "normal(0, 0.3)"),
-      ndt = list(main = "normal(-2, 0.3)", effects = "normal(0, 0.3)"),
-      s = list(main = "normal(0, 0.3)", effects = "normal(0, 0.2)"),
-      sp = list(main = "normal(-1, 0.5)", effects = "normal(0, 0.3)")
-    ),
-    init_ranges = list(
-      mu = c(-0.5, 0.5),
-      gap = c(0.8, 1.2),
-      ndt = c(0.01, 0.05),
-      s = c(0.8, 1.2),
-      sp = c(0.2, 0.5)
-    )
+  inits = list(driftc = c(2, 4), drifte = c(1, 2.5))
+)
+
+# The gap/ndt/s/sp block shared by both versions, declared once.
+.rdm_shared <- list(
+  parameters = list(
+    gap = "threshold gap (b = gap + sp)",
+    ndt = "non-decision time",
+    s = "diffusion constant",
+    sp = "maximum starting point (uniform on 0 to sp)"
+  ),
+  links = list(gap = "log", ndt = "log", s = "log", sp = "log"),
+  priors = list(
+    gap = list(main = "normal(0, 0.3)", effects = "normal(0, 0.3)"),
+    ndt = list(main = "normal(-2, 0.3)", effects = "normal(0, 0.3)"),
+    s = list(main = "normal(0, 0.3)", effects = "normal(0, 0.2)"),
+    sp = list(main = "normal(-1, 0.5)", effects = "normal(0, 0.3)")
+  ),
+  inits = list(
+    mu = c(-0.5, 0.5), gap = c(0.8, 1.2), ndt = c(0.01, 0.05),
+    s = c(0.8, 1.2), sp = c(0.2, 0.5)
   )
 )
+
+# Compose the spec for one version. Drift parameters precede the shared block:
+# downstream code recovers accumulator names via
+# setdiff(names(parameters), c("gap", "ndt", "s", "sp")), which relies on order.
+# sp = -100 on the log scale fixes the starting point to ~0 by default; adding
+# sp to the formula frees it and switches the likelihood to the full-Wald forms.
+.rdm_model_spec <- function(version) {
+  fixed_parameters <- list(mu = 0, s = 0, sp = -100)
+
+  if (version == "custom") {
+    return(nlist(
+      parameters = .rdm_shared$parameters,
+      links = .rdm_shared$links,
+      fixed_parameters,
+      priors = .rdm_shared$priors,
+      init_ranges = .rdm_shared$inits
+    ))
+  }
+
+  nlist(
+    parameters = c(
+      list(
+        driftc = paste(.rdm_drift_spec$desc, "for correct accumulator"),
+        drifte = paste(.rdm_drift_spec$desc, "for error accumulators")
+      ),
+      .rdm_shared$parameters
+    ),
+    links = c(
+      list(driftc = .rdm_drift_spec$link, drifte = .rdm_drift_spec$link),
+      .rdm_shared$links
+    ),
+    fixed_parameters,
+    priors = c(.rdm_drift_spec$priors, .rdm_shared$priors),
+    init_ranges = c(.rdm_shared$inits, .rdm_drift_spec$inits)
+  )
+}
 
 .rdm_stan_reserved <- c(
   "int", "real", "vector", "matrix", "array", "if", "else", "for", "while",
@@ -87,16 +82,17 @@
 .model_rdm <- function(
     rt = NULL,
     response = NULL,
-    n_alternatives = NULL,
-    num_alternatives = NULL,
+    n_choices = NULL,
+    accumulators = NULL,
     links = NULL,
     version = "simple",
     call = NULL,
     ...) {
+  vt <- .rdm_model_spec(version)
   out <- structure(
     list(
       resp_vars = nlist(rt, response),
-      other_vars = nlist(n_alternatives, num_alternatives),
+      other_vars = nlist(n_choices, accumulators),
       domain = "Decision Making / Response times",
       task = "Choice Reaction Time tasks (multi-alternative)",
       name = "Racing Diffusion Model",
@@ -112,11 +108,11 @@
         "- For version 'custom': response variable should contain character ",
         "labels matching formula parameter names"
       ),
-      parameters = .rdm_version_table[[version]][["parameters"]],
-      links = .rdm_version_table[[version]][["links"]],
-      fixed_parameters = .rdm_version_table[[version]][["fixed_parameters"]],
-      default_priors = .rdm_version_table[[version]][["priors"]],
-      init_ranges = .rdm_version_table[[version]][["init_ranges"]],
+      parameters = vt[["parameters"]],
+      links = vt[["links"]],
+      fixed_parameters = vt[["fixed_parameters"]],
+      default_priors = vt[["priors"]],
+      init_ranges = vt[["init_ranges"]],
       void_mu = TRUE
     ),
     class = c("bmmodel", "rdm", paste0("rdm_", version)),
@@ -138,10 +134,10 @@
 #'   Factor and character-digit responses are accepted and converted
 #'   automatically. For the `"custom"` version, responses should be character
 #'   or factor labels matching the accumulator names in the formula.
-#' @param n_alternatives An integer specifying the total number of response
+#' @param n_choices An integer specifying the total number of response
 #'   alternatives (K >= 2). Required for `version = "simple"`. Not used for
 #'   `version = "custom"` (inferred from the formula).
-#' @param num_alternatives For `version = "custom"` only. A named vector
+#' @param accumulators For `version = "custom"` only. A named vector
 #'   specifying the number of racing accumulators per response category.
 #'   Can be a named integer vector for constant counts (e.g.,
 #'   `c(correct = 1, other = 3, npl = 5)`) or a named character vector
@@ -159,7 +155,7 @@
 #'     \item `"custom"`: Per-category drift parameters. Response categories
 #'       are defined by the formula LHS names (e.g., `correct ~ 1, other ~ 1,
 #'       npl ~ 1`). The response column must contain character labels matching
-#'       these names. Supports per-category `num_alternatives`.
+#'       these names. Supports per-category `accumulators`.
 #'   }
 #' @param links A named list of link functions for the model parameters.
 #'   For `"simple"`: parameters are `driftc`, `drifte`, `gap`, `ndt`, `s`,
@@ -167,6 +163,10 @@
 #'   link and only support that link.
 #' @param ... Additional arguments passed internally (for testing purposes).
 #' @return An object of class `bmmodel`
+#' @note Both versions describe the same response type (a categorical winner in
+#'   a choice-RT race), so they live in one constructor rather than separate
+#'   model functions: `"simple"` is an accuracy-coded convenience layer (correct
+#'   vs. error) over the general per-accumulator case handled by `"custom"`.
 #' @export
 #' @keywords bmmodel
 #' @seealso [drdm()] and [rrdm()] for the density and random generation
@@ -174,38 +174,46 @@
 #' @examplesIf isTRUE(Sys.getenv("BMM_EXAMPLES"))
 #' # simple version with 2 alternatives
 #' dat <- rrdm(n = 500, drift = c(3, 1.5), gap = 1, sp = 0, ndt = 0.2)
-#' model <- rdm(rt = "rt", response = "response", n_alternatives = 2)
+#' model <- rdm(rt = "rt", response = "response", n_choices = 2)
 #' formula <- bmf(driftc ~ 1, drifte ~ 1, gap ~ 1, ndt ~ 1)
 #' fit <- bmm(formula, dat, model, cores = 4, backend = "cmdstanr")
 #'
 #' # with starting point variability
 #' formula2 <- bmf(driftc ~ 1, drifte ~ 1, gap ~ 1, ndt ~ 1, sp ~ 1)
 #' fit2 <- bmm(formula2, dat, model, cores = 4, backend = "cmdstanr")
-rdm <- function(rt, response, n_alternatives = NULL,
+rdm <- function(rt, response, n_choices = NULL,
                 version = c("simple", "custom"),
-                num_alternatives = NULL, links = NULL, ...) {
+                accumulators = NULL, links = NULL, ...) {
   call <- match.call()
+  dots <- list(...)
+  if ("n_alternatives" %in% names(dots)) {
+    n_choices <- dots$n_alternatives
+    warning2("The argument 'n_alternatives' is deprecated. Please use 'n_choices' instead.")
+  }
+  if ("num_alternatives" %in% names(dots)) {
+    accumulators <- dots$num_alternatives
+    warning2("The argument 'num_alternatives' is deprecated. Please use 'accumulators' instead.")
+  }
   stop_missing_args()
   version <- match.arg(version)
   if (version == "simple") {
     stopif(
-      is.null(n_alternatives) || !is.numeric(n_alternatives) ||
-        n_alternatives < 2 || n_alternatives != round(n_alternatives),
-      "n_alternatives must be an integer >= 2 for version 'simple'."
+      is.null(n_choices) || !is.numeric(n_choices) ||
+        n_choices < 2 || n_choices != round(n_choices),
+      "n_choices must be an integer >= 2 for version 'simple'."
     )
-    n_alternatives <- as.integer(n_alternatives)
+    n_choices <- as.integer(n_choices)
   } else {
-    n_alternatives <- NULL
+    n_choices <- NULL
   }
   .model_rdm(
     rt = rt,
     response = response,
-    n_alternatives = n_alternatives,
-    num_alternatives = num_alternatives,
+    n_choices = n_choices,
+    accumulators = accumulators,
     links = links,
     version = version,
-    call = call,
-    ...
+    call = call
   )
 }
 
@@ -266,15 +274,13 @@ check_model.rdm_custom <- function(model, data = NULL, formula = NULL) {
     )
 
     for (p in cat_pars) {
-      model$parameters[[p]] <- paste0("drift rate for '", p, "' accumulator")
-      if (is.null(model$links[[p]])) model$links[[p]] <- "log"
+      model$parameters[[p]] <- paste0(.rdm_drift_spec$desc, " for '", p, "' accumulator")
+      if (is.null(model$links[[p]])) model$links[[p]] <- .rdm_drift_spec$link
       if (is.null(model$default_priors[[p]])) {
-        model$default_priors[[p]] <- list(
-          main = "normal(0.5, 0.5)", effects = "normal(0, 0.3)"
-        )
+        model$default_priors[[p]] <- .rdm_drift_spec$priors$drifte
       }
       if (is.null(model$init_ranges[[p]])) {
-        model$init_ranges[[p]] <- c(1, 2.5)
+        model$init_ranges[[p]] <- .rdm_drift_spec$inits$drifte
       }
     }
 
@@ -348,7 +354,7 @@ check_data.rdm <- function(model, data, formula) {
 #' @export
 check_data.rdm_simple <- function(model, data, formula) {
   response_var <- model$resp_vars$response
-  n_alt <- model$other_vars$n_alternatives
+  n_alt <- model$other_vars$n_choices
 
   if (is.factor(data[, response_var])) {
     data[, response_var] <- as.integer(as.character(data[, response_var]))
@@ -380,7 +386,7 @@ check_data.rdm_simple <- function(model, data, formula) {
 check_data.rdm_custom <- function(model, data, formula) {
   response_var <- model$resp_vars$response
   cat_names <- model$other_vars$resp_cats
-  num_alt <- model$other_vars$num_alternatives
+  num_alt <- model$other_vars$accumulators
   n_cats <- length(cat_names)
 
   if (is.factor(data[, response_var])) {
@@ -416,7 +422,7 @@ check_data.rdm_custom <- function(model, data, formula) {
   } else if (is.numeric(num_alt)) {
     stopif(
       !all(cat_names %in% names(num_alt)),
-      "num_alternatives must have names matching formula categories: \\
+      "accumulators must have names matching formula categories: \\
       {collapse_comma(cat_names)}"
     )
     for (i in seq_along(cat_names)) {
@@ -425,13 +431,13 @@ check_data.rdm_custom <- function(model, data, formula) {
   } else if (is.character(num_alt)) {
     stopif(
       !all(cat_names %in% names(num_alt)),
-      "num_alternatives must have names matching formula categories: \\
+      "accumulators must have names matching formula categories: \\
       {collapse_comma(cat_names)}"
     )
     missing_cols <- setdiff(num_alt, colnames(data))
     stopif(
       length(missing_cols) > 0,
-      "num_alternatives columns {collapse_comma(missing_cols)} not found \\
+      "accumulators columns {collapse_comma(missing_cols)} not found \\
       in the data."
     )
     for (i in seq_along(cat_names)) {
@@ -439,7 +445,7 @@ check_data.rdm_custom <- function(model, data, formula) {
     }
   }
 
-  model$other_vars$n_alternatives <- n_cats
+  model$other_vars$n_choices <- n_cats
   NextMethod("check_data")
 }
 
@@ -469,23 +475,6 @@ bmf2bf.rdm_custom <- function(model, formula) {
 .rdm_stan_code <- function(family_name, cat_names, has_sp) {
   n_cats <- length(cat_names)
   use_start_var <- if (has_sp) 1 else 0
-
-  if (identical(family_name, "rdm_simple")) {
-    return(glue(
-      "real {family_name}_lpdf(vector rt, vector mu, vector driftc, vector drifte, ",
-      "vector gap, vector ndt, vector s, vector sp, array[] int response, ",
-      "array[] int n1, array[] int n2) {{\n",
-      "  int N = rows(rt);\n",
-      "  real log_lik = 0;\n",
-      "  for (i in 1:N) {{\n",
-      "    log_lik += rdm_simple_log_lik_one(\n",
-      "      rt[i], driftc[i], drifte[i], gap[i], ndt[i], s[i], sp[i], ",
-      "response[i], n1[i], n2[i], {use_start_var});\n",
-      "  }}\n",
-      "  return log_lik;\n",
-      "}}"
-    ))
-  }
 
   cat_args <- paste(paste0("vector ", cat_names), collapse = ", ")
   n_args <- paste(paste0("array[] int n", seq_len(n_cats)), collapse = ", ")
@@ -608,11 +597,6 @@ configure_model.rdm_custom <- function(model, data, formula) {
   nlist(formula, data, stanvars)
 }
 
-#' @export
-configure_prior.rdm <- function(model, data, formula, user_prior = NULL, ...) {
-  NULL
-}
-
 ############################################################################# !
 # Post-processing functions (shared helpers)                             ####
 ############################################################################# !
@@ -650,7 +634,7 @@ configure_prior.rdm <- function(model, data, formula, user_prior = NULL, ...) {
     }
 
     for (j in seq_len(n_cats)) {
-      if (j == response) next
+      if (j == response || n_cat[j] == 0) next
       drift_j <- brms::get_dpar(prep, cat_names[j], i = i)
       log_lik <- log_lik + n_cat[j] *
         .pwald(t, drift = drift_j, bound = b, s = s,
@@ -667,7 +651,7 @@ configure_prior.rdm <- function(model, data, formula, user_prior = NULL, ...) {
     }
 
     for (j in seq_len(n_cats)) {
-      if (j == response) next
+      if (j == response || n_cat[j] == 0) next
       drift_j <- brms::get_dpar(prep, cat_names[j], i = i)
       log_lik <- log_lik + n_cat[j] *
         .pwald_full(t, drift = drift_j, bound = b, A = A, s = s,
@@ -683,41 +667,34 @@ configure_prior.rdm <- function(model, data, formula, user_prior = NULL, ...) {
   gap <- brms::get_dpar(prep, "gap", i = i)
   ndt <- brms::get_dpar(prep, "ndt", i = i)
   s <- brms::get_dpar(prep, "s", i = i)
-  sp_val <- brms::get_dpar(prep, "sp", i = i)
+  sp <- brms::get_dpar(prep, "sp", i = i)
   n_draws <- length(ndt)
   has_sp <- isTRUE(prep$family$rdm_has_sp)
-
+  drift <- lapply(cat_names, function(p) brms::get_dpar(prep, p, i = i))
   n_cat <- vapply(
     seq_len(n_cats),
     function(j) prep$data[[paste0("vint", j + 1)]][i],
     integer(1)
   )
-  total_acc <- sum(n_cat)
 
-  rt <- numeric(n_draws)
-  for (d in seq_len(n_draws)) {
-    b <- if (has_sp) gap[d] + sp_val[d] else gap[d]
-    A <- if (has_sp) sp_val[d] else 0
-    drift_vec <- unlist(lapply(seq_len(n_cats), function(j) {
-      rep(brms::get_dpar(prep, cat_names[j], i = i)[d], n_cat[j])
-    }))
-
-    if (!has_sp) {
-      ft <- .rwald_ig(total_acc, drift = drift_vec, bound = b, s = s[d])
-    } else {
-      start <- stats::runif(total_acc, min = 0, max = A)
-      ft <- .rwald_ig(total_acc, drift = drift_vec, bound = b - start,
-                      s = s[d])
+  b <- if (has_sp) gap + sp else gap
+  min_ft <- rep(Inf, n_draws)
+  for (j in seq_len(n_cats)) {
+    if (n_cat[j] == 0) next
+    for (k in seq_len(n_cat[j])) {
+      bound <- if (has_sp) b - stats::runif(n_draws, 0, sp) else b
+      min_ft <- pmin(
+        min_ft, .rwald_ig(n_draws, drift = drift[[j]], bound = bound, s = s)
+      )
     }
-    rt[d] <- min(ft) + ndt[d]
   }
-  rt
+  min_ft + ndt
 }
 
 .rdm_posterior_epred <- function(prep, cat_names, n_cats, ...) {
   n_obs <- prep$nobs
   n_draws <- prep$ndraws
-  n_sim <- 100
+  n_sim <- 100L
   has_sp <- isTRUE(prep$family$rdm_has_sp)
 
   epred <- matrix(NA_real_, nrow = n_draws, ncol = n_obs)
@@ -725,38 +702,33 @@ configure_prior.rdm <- function(model, data, formula, user_prior = NULL, ...) {
     gap <- brms::get_dpar(prep, "gap", i = i)
     ndt <- brms::get_dpar(prep, "ndt", i = i)
     s <- brms::get_dpar(prep, "s", i = i)
-    sp_val <- brms::get_dpar(prep, "sp", i = i)
-
+    sp <- brms::get_dpar(prep, "sp", i = i)
+    drift <- lapply(cat_names, function(p) brms::get_dpar(prep, p, i = i))
     n_cat <- vapply(
       seq_len(n_cats),
       function(j) prep$data[[paste0("vint", j + 1)]][i],
       integer(1)
     )
-    total_acc <- sum(n_cat)
 
-    for (d in seq_len(n_draws)) {
-      b <- if (has_sp) gap[d] + sp_val[d] else gap[d]
-      A <- if (has_sp) sp_val[d] else 0
-      drift_vec <- unlist(lapply(seq_len(n_cats), function(j) {
-        rep(brms::get_dpar(prep, cat_names[j], i = i)[d], n_cat[j])
-      }))
-
-      if (!has_sp) {
-        ft <- matrix(
-          .rwald_ig(total_acc * n_sim, drift = drift_vec, bound = b, s = s[d]),
-          nrow = n_sim, ncol = total_acc, byrow = TRUE
-        )
-      } else {
-        start <- matrix(stats::runif(total_acc * n_sim, min = 0, max = A),
-                        nrow = n_sim, ncol = total_acc)
-        ft <- matrix(NA_real_, nrow = n_sim, ncol = total_acc)
-        for (k in seq_len(total_acc)) {
-          ft[, k] <- .rwald_ig(n_sim, drift = drift_vec[k],
-                               bound = b - start[, k], s = s[d])
+    b_m <- matrix(if (has_sp) gap + sp else gap, n_draws, n_sim)
+    s_m <- matrix(s, n_draws, n_sim)
+    min_ft <- matrix(Inf, n_draws, n_sim)
+    for (j in seq_len(n_cats)) {
+      if (n_cat[j] == 0) next
+      dj <- matrix(drift[[j]], n_draws, n_sim)
+      for (k in seq_len(n_cat[j])) {
+        bound <- if (has_sp) {
+          b_m - matrix(stats::runif(n_draws * n_sim), n_draws, n_sim) *
+            matrix(sp, n_draws, n_sim)
+        } else {
+          b_m
         }
+        ft <- .rwald_ig(n_draws * n_sim, drift = dj, bound = bound, s = s_m)
+        dim(ft) <- c(n_draws, n_sim)
+        min_ft <- pmin(min_ft, ft)
       }
-      epred[d, i] <- mean(apply(ft, 1, min)) + ndt[d]
     }
+    epred[, i] <- rowMeans(min_ft) + ndt
   }
   epred
 }
