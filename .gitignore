@@ -26,3 +26,7 @@ bmm-dev
 # Internal test artifacts
 /tests/internal/cmdstanr_output/
 /tests/internal/*cache*
+
+# Local benchmark outputs
+inst/benchmarks/sdm/results/*
+!inst/benchmarks/sdm/results/.gitkeep
