@@ -7,9 +7,9 @@
 lnr(
   rt,
   response,
-  n_alternatives = NULL,
+  n_choices = NULL,
   version = c("simple", "custom"),
-  num_alternatives = NULL,
+  accumulators = NULL,
   links = NULL,
   ...
 )
@@ -27,7 +27,7 @@ or factor labels matching the accumulator names in the formula. Category
 names must not use reserved internal parameter names such as \code{"mu"},
 \code{"ndt"}, or \code{"s"}.}
 
-\item{n_alternatives}{An integer specifying the total number of response
+\item{n_choices}{An integer specifying the total number of response
 alternatives (K >= 2). Required for \code{version = "simple"}. Not used for
 \code{version = "custom"} (inferred from the formula).}
 
@@ -43,10 +43,10 @@ of correct vs. error processing.
 are defined by the formula LHS names (e.g., \verb{correct ~ 1, other ~ 1, npl ~ 1}). The response column must contain character labels matching
 these names. Category names must not be \code{"mu"}, \code{"ndt"}, \code{"s"},
 Stan reserved words, or names ending in a number. Supports
-per-category \code{num_alternatives}.
+per-category \code{accumulators}.
 }}
 
-\item{num_alternatives}{For \code{version = "custom"} only. A named vector
+\item{accumulators}{For \code{version = "custom"} only. A named vector
 specifying the number of racing accumulators per response category.
 Can be a named integer vector of positive counts for constant numbers of
 accumulators (e.g., \code{c(correct = 1, other = 3, npl = 5)}) or a named
@@ -129,17 +129,23 @@ Psychometric Properties. Psychometrika, 80(2), 491-513. https://doi.org/10.1007/
 }
 }
 }
+\note{
+Both versions describe the same response type (a categorical winner in
+a choice-RT race), so they live in one constructor rather than separate
+model functions: \code{"simple"} is an accuracy-coded convenience layer (correct
+vs. error) over the general per-accumulator case handled by \code{"custom"}.
+}
 \examples{
 \dontshow{if (isTRUE(Sys.getenv("BMM_EXAMPLES"))) withAutoprint(\{ # examplesIf}
 # simple version with 2 alternatives
 dat <- rlnr(n = 500, m = c(-1, 0), s = c(1, 1), ndt = 0.2)
-model <- lnr(rt = "rt", response = "response", n_alternatives = 2)
+model <- lnr(rt = "rt", response = "response", n_choices = 2)
 formula <- bmf(correct ~ 1, error ~ 1, ndt ~ 1)
 fit <- bmm(formula, dat, model, cores = 4, backend = "cmdstanr")
 
 # custom version with named categories
 model2 <- lnr(rt = "rt", response = "resp", version = "custom",
-              num_alternatives = c(target = 1, similar = 3, other = 5))
+              accumulators = c(target = 1, similar = 3, other = 5))
 formula2 <- bmf(target ~ 1, similar ~ 1, other ~ 1, ndt ~ 1)
 \dontshow{\}) # examplesIf}
 }

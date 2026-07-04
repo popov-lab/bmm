@@ -2,62 +2,68 @@
 # MODELS                                                                 ####
 ############################################################################# !
 
-.lnr_version_table <- list(
-  simple = list(
-    parameters = list(
-      correct = "meanlog for correct accumulator",
-      error = "meanlog for error accumulators",
-      ndt = "non-decision time",
-      s = "sdlog (shared across accumulators)"
-    ),
-    links = list(
-      correct = "identity",
-      error = "identity",
-      ndt = "log",
-      s = "log"
-    ),
-    fixed_parameters = list(
-      mu = 0,
-      s = 0
-    ),
-    priors = list(
-      correct = list(main = "normal(-1, 0.5)", effects = "normal(0, 0.3)"),
-      error = list(main = "normal(0, 0.5)", effects = "normal(0, 0.3)"),
-      ndt = list(main = "normal(-2, 0.3)", effects = "normal(0, 0.3)"),
-      s = list(main = "normal(0, 0.3)", effects = "normal(0, 0.2)")
-    ),
-    init_ranges = list(
-      mu = c(-0.5, 0.5),
-      correct = c(-1.5, -0.5),
-      error = c(-0.5, 0.5),
-      ndt = c(0.025, 0.05),
-      s = c(0.8, 1.2)
-    )
+# Meanlog defaults for the simple correct/error parameters. Per-category
+# parameters discovered in the custom version default to the error-accumulator
+# values. Note: these are locations of the finishing-time distribution (higher
+# = slower), not drift rates — hence the names differ from lba/rdm's
+# driftc/drifte on purpose.
+.lnr_meanlog_spec <- list(
+  desc = "meanlog",
+  link = "identity",
+  priors = list(
+    correct = list(main = "normal(-1, 0.5)", effects = "normal(0, 0.3)"),
+    error = list(main = "normal(0, 0.5)", effects = "normal(0, 0.3)")
   ),
-  custom = list(
-    parameters = list(
-      ndt = "non-decision time",
-      s = "sdlog (shared across accumulators)"
-    ),
-    links = list(
-      ndt = "log",
-      s = "log"
-    ),
-    fixed_parameters = list(
-      mu = 0,
-      s = 0
-    ),
-    priors = list(
-      ndt = list(main = "normal(-2, 0.3)", effects = "normal(0, 0.3)"),
-      s = list(main = "normal(0, 0.3)", effects = "normal(0, 0.2)")
-    ),
-    init_ranges = list(
-      mu = c(-0.5, 0.5),
-      ndt = c(0.025, 0.05),
-      s = c(0.8, 1.2)
-    )
-  )
+  inits = list(correct = c(-1.5, -0.5), error = c(-0.5, 0.5))
 )
+
+# The ndt/s block shared by both versions, declared once.
+.lnr_shared <- list(
+  parameters = list(
+    ndt = "non-decision time",
+    s = "sdlog (shared across accumulators)"
+  ),
+  links = list(ndt = "log", s = "log"),
+  priors = list(
+    ndt = list(main = "normal(-2, 0.3)", effects = "normal(0, 0.3)"),
+    s = list(main = "normal(0, 0.3)", effects = "normal(0, 0.2)")
+  ),
+  inits = list(mu = c(-0.5, 0.5), ndt = c(0.025, 0.05), s = c(0.8, 1.2))
+)
+
+# Compose the spec for one version. Meanlog parameters precede the shared
+# block: downstream code recovers accumulator names via
+# setdiff(names(parameters), c("ndt", "s")), which relies on order.
+.lnr_model_spec <- function(version) {
+  fixed_parameters <- list(mu = 0, s = 0)
+
+  if (version == "custom") {
+    return(nlist(
+      parameters = .lnr_shared$parameters,
+      links = .lnr_shared$links,
+      fixed_parameters,
+      priors = .lnr_shared$priors,
+      init_ranges = .lnr_shared$inits
+    ))
+  }
+
+  nlist(
+    parameters = c(
+      list(
+        correct = paste(.lnr_meanlog_spec$desc, "for correct accumulator"),
+        error = paste(.lnr_meanlog_spec$desc, "for error accumulators")
+      ),
+      .lnr_shared$parameters
+    ),
+    links = c(
+      list(correct = .lnr_meanlog_spec$link, error = .lnr_meanlog_spec$link),
+      .lnr_shared$links
+    ),
+    fixed_parameters,
+    priors = c(.lnr_meanlog_spec$priors, .lnr_shared$priors),
+    init_ranges = c(.lnr_shared$inits, .lnr_meanlog_spec$inits)
+  )
+}
 
 # Stan reserved words that cannot be used as category names
 .stan_reserved <- c(
@@ -73,16 +79,17 @@
 .model_lnr <- function(
     rt = NULL,
     response = NULL,
-    n_alternatives = NULL,
-    num_alternatives = NULL,
+    n_choices = NULL,
+    accumulators = NULL,
     links = NULL,
     version = "simple",
     call = NULL,
     ...) {
+  vt <- .lnr_model_spec(version)
   out <- structure(
     list(
       resp_vars = nlist(rt, response),
-      other_vars = nlist(n_alternatives, num_alternatives),
+      other_vars = nlist(n_choices, accumulators),
       domain = "Decision Making / Response times",
       task = "Choice Reaction Time tasks (multi-alternative)",
       name = "Log-Normal Race Model",
@@ -97,11 +104,11 @@
         "- For version 'custom': response variable should contain character ",
         "labels matching formula parameter names"
       ),
-      parameters = .lnr_version_table[[version]][["parameters"]],
-      links = .lnr_version_table[[version]][["links"]],
-      fixed_parameters = .lnr_version_table[[version]][["fixed_parameters"]],
-      default_priors = .lnr_version_table[[version]][["priors"]],
-      init_ranges = .lnr_version_table[[version]][["init_ranges"]],
+      parameters = vt[["parameters"]],
+      links = vt[["links"]],
+      fixed_parameters = vt[["fixed_parameters"]],
+      default_priors = vt[["priors"]],
+      init_ranges = vt[["init_ranges"]],
       void_mu = TRUE
     ),
     class = c("bmmodel", "lnr", paste0("lnr_", version)),
@@ -125,10 +132,10 @@
 #'   or factor labels matching the accumulator names in the formula. Category
 #'   names must not use reserved internal parameter names such as `"mu"`,
 #'   `"ndt"`, or `"s"`.
-#' @param n_alternatives An integer specifying the total number of response
+#' @param n_choices An integer specifying the total number of response
 #'   alternatives (K >= 2). Required for `version = "simple"`. Not used for
 #'   `version = "custom"` (inferred from the formula).
-#' @param num_alternatives For `version = "custom"` only. A named vector
+#' @param accumulators For `version = "custom"` only. A named vector
 #'   specifying the number of racing accumulators per response category.
 #'   Can be a named integer vector of positive counts for constant numbers of
 #'   accumulators (e.g., `c(correct = 1, other = 3, npl = 5)`) or a named
@@ -148,7 +155,7 @@
 #'       npl ~ 1`). The response column must contain character labels matching
 #'       these names. Category names must not be `"mu"`, `"ndt"`, `"s"`,
 #'       Stan reserved words, or names ending in a number. Supports
-#'       per-category `num_alternatives`.
+#'       per-category `accumulators`.
 #'   }
 #' @param links A named list of link functions for the model parameters.
 #'   For `"simple"`: parameters are `correct`, `error`, `ndt`, and `s`.
@@ -156,6 +163,10 @@
 #'   `ndt` and `s`. For `"custom"`: category parameters default to "identity".
 #' @param ... Additional arguments passed internally (for testing purposes).
 #' @return An object of class `bmmodel`
+#' @note Both versions describe the same response type (a categorical winner in
+#'   a choice-RT race), so they live in one constructor rather than separate
+#'   model functions: `"simple"` is an accuracy-coded convenience layer (correct
+#'   vs. error) over the general per-accumulator case handled by `"custom"`.
 #' @export
 #' @keywords bmmodel
 #' @seealso [dlnr()] and [rlnr()] for the density and random generation
@@ -163,47 +174,55 @@
 #' @examplesIf isTRUE(Sys.getenv("BMM_EXAMPLES"))
 #' # simple version with 2 alternatives
 #' dat <- rlnr(n = 500, m = c(-1, 0), s = c(1, 1), ndt = 0.2)
-#' model <- lnr(rt = "rt", response = "response", n_alternatives = 2)
+#' model <- lnr(rt = "rt", response = "response", n_choices = 2)
 #' formula <- bmf(correct ~ 1, error ~ 1, ndt ~ 1)
 #' fit <- bmm(formula, dat, model, cores = 4, backend = "cmdstanr")
 #'
 #' # custom version with named categories
 #' model2 <- lnr(rt = "rt", response = "resp", version = "custom",
-#'               num_alternatives = c(target = 1, similar = 3, other = 5))
+#'               accumulators = c(target = 1, similar = 3, other = 5))
 #' formula2 <- bmf(target ~ 1, similar ~ 1, other ~ 1, ndt ~ 1)
-lnr <- function(rt, response, n_alternatives = NULL,
+lnr <- function(rt, response, n_choices = NULL,
                 version = c("simple", "custom"),
-                num_alternatives = NULL, links = NULL, ...) {
+                accumulators = NULL, links = NULL, ...) {
   call <- match.call()
+  dots <- list(...)
+  if ("n_alternatives" %in% names(dots)) {
+    n_choices <- dots$n_alternatives
+    warning2("The argument 'n_alternatives' is deprecated. Please use 'n_choices' instead.")
+  }
+  if ("num_alternatives" %in% names(dots)) {
+    accumulators <- dots$num_alternatives
+    warning2("The argument 'num_alternatives' is deprecated. Please use 'accumulators' instead.")
+  }
   stop_missing_args()
   version <- match.arg(version)
   if (version == "simple") {
     stopif(
-      !is.null(num_alternatives),
-      "num_alternatives is only supported for version 'custom'."
+      !is.null(accumulators),
+      "accumulators is only supported for version 'custom'."
     )
     stopif(
-      is.null(n_alternatives) || !is.numeric(n_alternatives) ||
-        n_alternatives < 2 || n_alternatives != round(n_alternatives),
-      "n_alternatives must be an integer >= 2 for version 'simple'."
+      is.null(n_choices) || !is.numeric(n_choices) ||
+        n_choices < 2 || n_choices != round(n_choices),
+      "n_choices must be an integer >= 2 for version 'simple'."
     )
-    n_alternatives <- as.integer(n_alternatives)
+    n_choices <- as.integer(n_choices)
   } else {
     stopif(
-      !is.null(n_alternatives),
-      "n_alternatives is only supported for version 'simple'. Use num_alternatives for version 'custom'."
+      !is.null(n_choices),
+      "n_choices is only supported for version 'simple'. Use accumulators for version 'custom'."
     )
-    n_alternatives <- NULL
+    n_choices <- NULL
   }
   .model_lnr(
     rt = rt,
     response = response,
-    n_alternatives = n_alternatives,
-    num_alternatives = num_alternatives,
+    n_choices = n_choices,
+    accumulators = accumulators,
     links = links,
     version = version,
-    call = call,
-    ...
+    call = call
   )
 }
 
@@ -253,15 +272,13 @@ check_model.lnr_custom <- function(model, data = NULL, formula = NULL) {
     )
 
     for (p in cat_pars) {
-      model$parameters[[p]] <- paste0("meanlog for '", p, "' accumulator")
-      if (is.null(model$links[[p]])) model$links[[p]] <- "identity"
+      model$parameters[[p]] <- paste0(.lnr_meanlog_spec$desc, " for '", p, "' accumulator")
+      if (is.null(model$links[[p]])) model$links[[p]] <- .lnr_meanlog_spec$link
       if (is.null(model$default_priors[[p]])) {
-        model$default_priors[[p]] <- list(
-          main = "normal(0, 0.5)", effects = "normal(0, 0.3)"
-        )
+        model$default_priors[[p]] <- .lnr_meanlog_spec$priors$error
       }
       if (is.null(model$init_ranges[[p]])) {
-        model$init_ranges[[p]] <- c(-0.5, 0.5)
+        model$init_ranges[[p]] <- .lnr_meanlog_spec$inits$error
       }
     }
 
@@ -335,7 +352,7 @@ check_data.lnr <- function(model, data, formula) {
 #' @export
 check_data.lnr_simple <- function(model, data, formula) {
   response_var <- model$resp_vars$response
-  n_alt <- model$other_vars$n_alternatives
+  n_alt <- model$other_vars$n_choices
 
   if (is.factor(data[, response_var])) {
     data[, response_var] <- as.integer(as.character(data[, response_var]))
@@ -367,7 +384,7 @@ check_data.lnr_simple <- function(model, data, formula) {
 check_data.lnr_custom <- function(model, data, formula) {
   response_var <- model$resp_vars$response
   cat_names <- model$other_vars$resp_cats
-  num_alt <- model$other_vars$num_alternatives
+  num_alt <- model$other_vars$accumulators
 
   if (is.factor(data[, response_var])) {
     data[, response_var] <- as.character(data[, response_var])
@@ -408,14 +425,14 @@ check_data.lnr_custom <- function(model, data, formula) {
     stopif(
       is.null(names(num_alt)) || any(names(num_alt) == "") ||
         anyDuplicated(names(num_alt)) > 0,
-      "num_alternatives must be a uniquely named vector with one entry for each formula category: \\
+      "accumulators must be a uniquely named vector with one entry for each formula category: \\
       {collapse_comma(cat_names)}"
     )
     missing_cats <- setdiff(cat_names, names(num_alt))
     extra_cats <- setdiff(names(num_alt), cat_names)
     stopif(
       length(missing_cats) > 0 || length(extra_cats) > 0,
-      "num_alternatives must have exactly the formula categories: \\
+      "accumulators must have exactly the formula categories: \\
       {collapse_comma(cat_names)}"
     )
     invalid_num_alt <- num_alt[
@@ -423,7 +440,7 @@ check_data.lnr_custom <- function(model, data, formula) {
     ]
     stopif(
       length(invalid_num_alt) > 0,
-      "num_alternatives must contain positive integers for each formula category. Invalid value(s): \\
+      "accumulators must contain positive integers for each formula category. Invalid value(s): \\
       {collapse_comma(glue::glue('{names(invalid_num_alt)} = {invalid_num_alt}'))}"
     )
     for (i in seq_along(cat_names)) {
@@ -433,20 +450,20 @@ check_data.lnr_custom <- function(model, data, formula) {
     stopif(
       is.null(names(num_alt)) || any(names(num_alt) == "") ||
         anyDuplicated(names(num_alt)) > 0,
-      "num_alternatives must be a uniquely named vector with one entry for each formula category: \\
+      "accumulators must be a uniquely named vector with one entry for each formula category: \\
       {collapse_comma(cat_names)}"
     )
     missing_cats <- setdiff(cat_names, names(num_alt))
     extra_cats <- setdiff(names(num_alt), cat_names)
     stopif(
       length(missing_cats) > 0 || length(extra_cats) > 0,
-      "num_alternatives must have exactly the formula categories: \\
+      "accumulators must have exactly the formula categories: \\
       {collapse_comma(cat_names)}"
     )
     missing_cols <- setdiff(num_alt, colnames(data))
     stopif(
       length(missing_cols) > 0,
-      "num_alternatives columns {collapse_comma(missing_cols)} not found \\
+      "accumulators columns {collapse_comma(missing_cols)} not found \\
       in the data."
     )
     for (i in seq_along(cat_names)) {
@@ -454,25 +471,25 @@ check_data.lnr_custom <- function(model, data, formula) {
       col_vals <- data[, col_name]
       stopif(
         !is.numeric(col_vals),
-        "num_alternatives column '{col_name}' must be numeric."
+        "accumulators column '{col_name}' must be numeric."
       )
       stopif(
         anyNA(col_vals),
-        "num_alternatives column '{col_name}' contains NA values."
+        "accumulators column '{col_name}' contains NA values."
       )
       stopif(
         any(!is.finite(col_vals)),
-        "num_alternatives column '{col_name}' contains non-finite values."
+        "accumulators column '{col_name}' contains non-finite values."
       )
       stopif(
         any(col_vals < 1 | col_vals != round(col_vals)),
-        "num_alternatives column '{col_name}' must contain integers >= 1."
+        "accumulators column '{col_name}' must contain integers >= 1."
       )
       data[[paste0(".lnr_n", i)]] <- as.integer(col_vals)
     }
   } else {
     stop2(
-      "num_alternatives must be NULL, a named numeric vector of positive integers, \\
+      "accumulators must be NULL, a named numeric vector of positive integers, \\
       or a named character vector of column names."
     )
   }
@@ -505,33 +522,40 @@ bmf2bf.lnr_custom <- function(model, formula) {
 
 .lnr_stan_code <- function(family_name, cat_names) {
   n_cats <- length(cat_names)
-  cat_args <- paste(paste0("real ", cat_names), collapse = ", ")
-  n_args <- paste(paste0("int n", seq_len(n_cats)), collapse = ", ")
-  m_array <- paste0(
-    "array[", n_cats, "] real m = {",
-    paste(cat_names, collapse = ", "), "};"
+  cat_args <- paste(paste0("vector ", cat_names), collapse = ", ")
+  n_args <- paste(paste0("array[] int n", seq_len(n_cats)), collapse = ", ")
+  m_assignments <- paste(
+    paste0("m[", seq_len(n_cats), "] = ", cat_names, "[i];"),
+    collapse = "\n    "
   )
-  n_array <- paste0(
-    "array[", n_cats, "] int n = {",
-    paste(paste0("n", seq_len(n_cats)), collapse = ", "), "};"
+  n_assignments <- paste(
+    paste0("n[", seq_len(n_cats), "] = n", seq_len(n_cats), "[i];"),
+    collapse = "\n    "
   )
 
   glue(
-    "real {family_name}_lpdf(real rt, real mu, {cat_args}, ",
-    "real ndt, real s, int response, {n_args}) {{\n",
-    "  real t = rt - ndt;\n",
-    "  if (t <= 0) return negative_infinity();\n",
-    "  {m_array}\n",
-    "  {n_array}\n",
-    "  real log_lik = log(n[response]) + ",
-    "lognormal_lpdf(t | m[response], s);\n",
-    "  for (j in 1:{n_cats}) {{\n",
-    "    if (j == response) {{\n",
-    "      if (n[j] > 1)\n",
-    "        log_lik += (n[j] - 1) * lognormal_lccdf(t | m[j], s);\n",
-    "    }} else {{\n",
-    "      log_lik += n[j] * lognormal_lccdf(t | m[j], s);\n",
+    "real {family_name}_lpdf(vector rt, vector mu, {cat_args}, ",
+    "vector ndt, vector s, array[] int response, {n_args}) {{\n",
+    "  int N = num_elements(rt);\n",
+    "  real log_lik = 0;\n",
+    "  for (i in 1:N) {{\n",
+    "    real t = rt[i] - ndt[i];\n",
+    "    array[{n_cats}] real m;\n",
+    "    array[{n_cats}] int n;\n",
+    "    int win;\n",
+    "    real lp;\n",
+    "    if (t <= 0) return negative_infinity();\n",
+    "    {m_assignments}\n",
+    "    {n_assignments}\n",
+    "    win = response[i];\n",
+    "    lp = log(n[win]) + lognormal_lpdf(t | m[win], s[i]);\n",
+    "    for (j in 1:{n_cats}) {{\n",
+    "      int reps = (j == win) ? n[j] - 1 : n[j];\n",
+    "      if (reps > 0) {{\n",
+    "        lp += reps * lognormal_lccdf(t | m[j], s[i]);\n",
+    "      }}\n",
     "    }}\n",
+    "    log_lik += lp;\n",
     "  }}\n",
     "  return log_lik;\n",
     "}}"
@@ -560,8 +584,8 @@ configure_model.lnr_simple <- function(model, data, formula) {
     ub = rep(NA, length(dpars)),
     lb = c(NA, NA, NA, 0, 0),
     type = "real",
-    vars = c("vint1[n]", "vint2[n]", "vint3[n]"),
-    loop = TRUE,
+    vars = c("vint1", "vint2", "vint3"),
+    loop = FALSE,
     log_lik = log_lik_lnr_simple,
     posterior_predict = posterior_predict_lnr_simple,
     posterior_epred = posterior_epred_lnr_simple
@@ -589,7 +613,7 @@ configure_model.lnr_custom <- function(model, data, formula) {
   lb_vec <- c(NA, rep(NA, n_cats), 0, 0)
 
   # brms vint() order must match Stan function signature
-  vars_vec <- paste0("vint", seq_len(n_cats + 1), "[n]")
+  vars_vec <- paste0("vint", seq_len(n_cats + 1))
 
   formula$family <- brms::custom_family(
     "lnr_custom",
@@ -599,7 +623,7 @@ configure_model.lnr_custom <- function(model, data, formula) {
     lb = lb_vec,
     type = "real",
     vars = vars_vec,
-    loop = TRUE,
+    loop = FALSE,
     log_lik = log_lik_lnr_custom,
     posterior_predict = posterior_predict_lnr_custom,
     posterior_epred = posterior_epred_lnr_custom
@@ -641,7 +665,7 @@ configure_model.lnr_custom <- function(model, data, formula) {
   }
 
   for (j in seq_len(n_cats)) {
-    if (j == response) next
+    if (j == response || n_cat[j] == 0) next
     m_j <- brms::get_dpar(prep, cat_names[j], i = i)
     log_lik <- log_lik + n_cat[j] *
       stats::plnorm(t, meanlog = m_j, sdlog = s,
@@ -656,53 +680,53 @@ configure_model.lnr_custom <- function(model, data, formula) {
   ndt <- brms::get_dpar(prep, "ndt", i = i)
   s <- brms::get_dpar(prep, "s", i = i)
   n_draws <- length(ndt)
-
+  m <- lapply(cat_names, function(p) brms::get_dpar(prep, p, i = i))
   n_cat <- vapply(
     seq_len(n_cats),
     function(j) prep$data[[paste0("vint", j + 1)]][i],
     integer(1)
   )
-  total_acc <- sum(n_cat)
 
-  rt <- numeric(n_draws)
-  for (d in seq_len(n_draws)) {
-    m_vec <- unlist(lapply(seq_len(n_cats), function(j) {
-      rep(brms::get_dpar(prep, cat_names[j], i = i)[d], n_cat[j])
-    }))
-    s_vec <- rep(s[d], total_acc)
-    ft <- stats::rlnorm(total_acc, meanlog = m_vec, sdlog = s_vec)
-    rt[d] <- min(ft) + ndt[d]
+  min_ft <- rep(Inf, n_draws)
+  for (j in seq_len(n_cats)) {
+    if (n_cat[j] == 0) next
+    for (k in seq_len(n_cat[j])) {
+      min_ft <- pmin(
+        min_ft, stats::rlnorm(n_draws, meanlog = m[[j]], sdlog = s)
+      )
+    }
   }
-  rt
+  min_ft + ndt
 }
 
 .lnr_posterior_epred <- function(prep, cat_names, n_cats, ...) {
   n_obs <- prep$nobs
   n_draws <- prep$ndraws
-  n_sim <- 100
+  n_sim <- 100L
 
   epred <- matrix(NA_real_, nrow = n_draws, ncol = n_obs)
   for (i in seq_len(n_obs)) {
     ndt <- brms::get_dpar(prep, "ndt", i = i)
     s <- brms::get_dpar(prep, "s", i = i)
-
+    m <- lapply(cat_names, function(p) brms::get_dpar(prep, p, i = i))
     n_cat <- vapply(
       seq_len(n_cats),
       function(j) prep$data[[paste0("vint", j + 1)]][i],
       integer(1)
     )
-    total_acc <- sum(n_cat)
 
-    for (d in seq_len(n_draws)) {
-      m_vec <- unlist(lapply(seq_len(n_cats), function(j) {
-        rep(brms::get_dpar(prep, cat_names[j], i = i)[d], n_cat[j])
-      }))
-      s_vec <- rep(s[d], total_acc)
-      ft <- matrix(stats::rlnorm(total_acc * n_sim, meanlog = m_vec,
-                                  sdlog = s_vec),
-                   nrow = n_sim, ncol = total_acc, byrow = TRUE)
-      epred[d, i] <- mean(apply(ft, 1, min)) + ndt[d]
+    s_m <- matrix(s, n_draws, n_sim)
+    min_ft <- matrix(Inf, n_draws, n_sim)
+    for (j in seq_len(n_cats)) {
+      if (n_cat[j] == 0) next
+      mj <- matrix(m[[j]], n_draws, n_sim)
+      for (k in seq_len(n_cat[j])) {
+        ft <- stats::rlnorm(n_draws * n_sim, meanlog = mj, sdlog = s_m)
+        dim(ft) <- c(n_draws, n_sim)
+        min_ft <- pmin(min_ft, ft)
+      }
     }
+    epred[, i] <- rowMeans(min_ft) + ndt
   }
   epred
 }

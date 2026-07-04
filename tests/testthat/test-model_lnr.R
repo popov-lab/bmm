@@ -8,40 +8,40 @@
 # -----------------------------------------------------------------------------
 
 test_that("lnr() creates simple model with correct structure", {
-  model <- lnr(rt = "rt", response = "response", n_alternatives = 2)
+  model <- lnr(rt = "rt", response = "response", n_choices = 2)
 
   expect_s3_class(model, "bmmodel")
   expect_s3_class(model, "lnr")
   expect_s3_class(model, "lnr_simple")
   expect_equal(model$resp_vars$rt, "rt")
   expect_equal(model$resp_vars$response, "response")
-  expect_equal(model$other_vars$n_alternatives, 2L)
+  expect_equal(model$other_vars$n_choices, 2L)
   expect_equal(model$version, "simple")
 })
 
 test_that("lnr simple version has correct parameters", {
-  model <- lnr(rt = "rt", response = "response", n_alternatives = 4)
+  model <- lnr(rt = "rt", response = "response", n_choices = 4)
 
   expect_true(all(c("correct", "error", "ndt", "s") %in%
                     names(model$parameters)))
-  expect_equal(model$other_vars$n_alternatives, 4L)
+  expect_equal(model$other_vars$n_choices, 4L)
 })
 
 test_that("lnr accepts custom links", {
-  model <- lnr(rt = "rt", response = "response", n_alternatives = 2,
+  model <- lnr(rt = "rt", response = "response", n_choices = 2,
                links = list(correct = "log"))
   expect_equal(model$links$correct, "log")
   expect_equal(model$links$error, "identity")
 })
 
-test_that("lnr errors on invalid n_alternatives", {
-  expect_error(lnr(rt = "rt", response = "response", n_alternatives = 1))
-  expect_error(lnr(rt = "rt", response = "response", n_alternatives = 2.5))
+test_that("lnr errors on invalid n_choices", {
+  expect_error(lnr(rt = "rt", response = "response", n_choices = 1))
+  expect_error(lnr(rt = "rt", response = "response", n_choices = 2.5))
 })
 
 test_that("lnr errors on missing required arguments", {
-  expect_error(lnr(response = "response", n_alternatives = 2))
-  expect_error(lnr(rt = "rt", n_alternatives = 2))
+  expect_error(lnr(response = "response", n_choices = 2))
+  expect_error(lnr(rt = "rt", n_choices = 2))
 })
 
 test_that("lnr() creates custom model with correct structure", {
@@ -49,23 +49,38 @@ test_that("lnr() creates custom model with correct structure", {
 
   expect_s3_class(model, "lnr_custom")
   expect_equal(model$version, "custom")
-  expect_null(model$other_vars$n_alternatives)
+  expect_null(model$other_vars$n_choices)
 })
 
-test_that("lnr custom accepts num_alternatives", {
+test_that("lnr custom accepts accumulators", {
   model <- lnr(rt = "rt", response = "resp", version = "custom",
-               num_alternatives = c(target = 1, lure = 3))
-  expect_equal(model$other_vars$num_alternatives, c(target = 1, lure = 3))
+               accumulators = c(target = 1, lure = 3))
+  expect_equal(model$other_vars$accumulators, c(target = 1, lure = 3))
+})
+
+test_that("lnr deprecates n_alternatives and num_alternatives", {
+  expect_warning(
+    model <- lnr(rt = "rt", response = "response", n_alternatives = 2),
+    "n_alternatives.*deprecated.*n_choices"
+  )
+  expect_equal(model$other_vars$n_choices, 2L)
+
+  expect_warning(
+    model <- lnr(rt = "rt", response = "resp", version = "custom",
+                 num_alternatives = c(target = 1, lure = 3)),
+    "num_alternatives.*deprecated.*accumulators"
+  )
+  expect_equal(model$other_vars$accumulators, c(target = 1, lure = 3))
 })
 
 test_that("lnr errors on version-specific alternative arguments", {
   expect_error(
-    lnr(rt = "rt", response = "response", n_alternatives = 2,
-        num_alternatives = c(correct = 1, error = 1)),
+    lnr(rt = "rt", response = "response", n_choices = 2,
+        accumulators = c(correct = 1, error = 1)),
     "only supported for version 'custom'"
   )
   expect_error(
-    lnr(rt = "rt", response = "resp", version = "custom", n_alternatives = 2),
+    lnr(rt = "rt", response = "resp", version = "custom", n_choices = 2),
     "only supported for version 'simple'"
   )
 })
@@ -75,7 +90,7 @@ test_that("lnr errors on version-specific alternative arguments", {
 # -----------------------------------------------------------------------------
 
 test_that("check_data.lnr errors when required variables missing", {
-  model <- lnr(rt = "rt", response = "response", n_alternatives = 2)
+  model <- lnr(rt = "rt", response = "response", n_choices = 2)
 
   expect_error(
     check_data(model, data.frame(x = 1), bmf(correct ~ 1)),
@@ -89,7 +104,7 @@ test_that("check_data.lnr errors when required variables missing", {
 })
 
 test_that("check_data.lnr errors when RT contains NA", {
-  model <- lnr(rt = "rt", response = "response", n_alternatives = 2)
+  model <- lnr(rt = "rt", response = "response", n_choices = 2)
   dat <- data.frame(rt = c(0.5, NA, 0.8), response = c(1, 1, 2))
 
   expect_error(
@@ -99,7 +114,7 @@ test_that("check_data.lnr errors when RT contains NA", {
 })
 
 test_that("check_data.lnr errors when response contains NA", {
-  model <- lnr(rt = "rt", response = "response", n_alternatives = 2)
+  model <- lnr(rt = "rt", response = "response", n_choices = 2)
   dat <- data.frame(rt = c(0.5, 0.6, 0.8), response = c(1, NA, 2))
 
   expect_error(
@@ -109,7 +124,7 @@ test_that("check_data.lnr errors when response contains NA", {
 })
 
 test_that("check_data.lnr errors when RT contains negative values", {
-  model <- lnr(rt = "rt", response = "response", n_alternatives = 2)
+  model <- lnr(rt = "rt", response = "response", n_choices = 2)
   dat <- data.frame(rt = c(-0.5, 0.6, 0.8), response = c(1, 1, 2))
 
   expect_error(
@@ -119,7 +134,7 @@ test_that("check_data.lnr errors when RT contains negative values", {
 })
 
 test_that("check_data.lnr warns when RT > 10 seconds", {
-  model <- lnr(rt = "rt", response = "response", n_alternatives = 2)
+  model <- lnr(rt = "rt", response = "response", n_choices = 2)
   dat <- data.frame(
     rt = c(runif(99, 0.4, 1.5), 15),
     response = rep(c(1L, 2L), 50)
@@ -132,7 +147,7 @@ test_that("check_data.lnr warns when RT > 10 seconds", {
 })
 
 test_that("check_data.lnr warns when RT < 0.1 seconds", {
-  model <- lnr(rt = "rt", response = "response", n_alternatives = 2)
+  model <- lnr(rt = "rt", response = "response", n_choices = 2)
   dat <- data.frame(
     rt = c(0.05, runif(99, 0.4, 1.5)),
     response = rep(c(1L, 2L), 50)
@@ -145,7 +160,7 @@ test_that("check_data.lnr warns when RT < 0.1 seconds", {
 })
 
 test_that("check_data.lnr_simple errors on response out of range", {
-  model <- lnr(rt = "rt", response = "response", n_alternatives = 2)
+  model <- lnr(rt = "rt", response = "response", n_choices = 2)
 
   dat <- data.frame(
     rt = runif(10, 0.4, 1.5), response = c(rep(1, 5), rep(3, 5))
@@ -159,7 +174,7 @@ test_that("check_data.lnr_simple errors on response out of range", {
 })
 
 test_that("check_data.lnr_simple creates category mapping columns", {
-  model <- lnr(rt = "rt", response = "response", n_alternatives = 4)
+  model <- lnr(rt = "rt", response = "response", n_choices = 4)
   dat <- data.frame(
     rt = runif(100, 0.4, 1.5),
     response = sample(1:4, 100, replace = TRUE)
@@ -176,7 +191,7 @@ test_that("check_data.lnr_simple creates category mapping columns", {
 })
 
 test_that("check_data.lnr_simple handles factor responses", {
-  model <- lnr(rt = "rt", response = "response", n_alternatives = 3)
+  model <- lnr(rt = "rt", response = "response", n_choices = 3)
   dat <- data.frame(
     rt = runif(90, 0.4, 1.5),
     response = factor(rep(c("1", "2", "3"), 30))
@@ -187,7 +202,7 @@ test_that("check_data.lnr_simple handles factor responses", {
 })
 
 test_that("check_data.lnr returns a data.frame", {
-  model <- lnr(rt = "rt", response = "response", n_alternatives = 2)
+  model <- lnr(rt = "rt", response = "response", n_choices = 2)
   dat <- data.frame(
     rt = runif(100, 0.4, 1.5), response = rep(c(1, 2), 50)
   )
@@ -215,9 +230,9 @@ test_that("check_data.lnr_custom maps character responses to integers", {
   expect_true(all(result$.lnr_n2 == 1L))
 })
 
-test_that("check_data.lnr_custom handles num_alternatives (integer)", {
+test_that("check_data.lnr_custom handles accumulators (integer)", {
   model <- lnr(rt = "rt", response = "resp", version = "custom",
-               num_alternatives = c(correct = 1, other = 3, npl = 5))
+               accumulators = c(correct = 1, other = 3, npl = 5))
   model$other_vars$resp_cats <- c("correct", "other", "npl")
   dat <- data.frame(
     rt = runif(90, 0.4, 1.5),
@@ -232,9 +247,9 @@ test_that("check_data.lnr_custom handles num_alternatives (integer)", {
   expect_true(all(result$.lnr_n3 == 5L))
 })
 
-test_that("check_data.lnr_custom handles num_alternatives (column names)", {
+test_that("check_data.lnr_custom handles accumulators (column names)", {
   model <- lnr(rt = "rt", response = "resp", version = "custom",
-               num_alternatives = c(target = "n_tgt", lure = "n_lure"))
+               accumulators = c(target = "n_tgt", lure = "n_lure"))
   model$other_vars$resp_cats <- c("target", "lure")
   dat <- data.frame(
     rt = runif(100, 0.4, 1.5),
@@ -248,9 +263,9 @@ test_that("check_data.lnr_custom handles num_alternatives (column names)", {
   expect_equal(result$.lnr_n2, dat$n_lure)
 })
 
-test_that("check_data.lnr_custom requires exact num_alternatives names", {
+test_that("check_data.lnr_custom requires exact accumulators names", {
   model <- lnr(rt = "rt", response = "resp", version = "custom",
-               num_alternatives = c(target = 1, extra = 3))
+               accumulators = c(target = 1, extra = 3))
   model$other_vars$resp_cats <- c("target", "lure")
   dat <- data.frame(
     rt = runif(100, 0.4, 1.5),
@@ -263,9 +278,9 @@ test_that("check_data.lnr_custom requires exact num_alternatives names", {
   )
 })
 
-test_that("check_data.lnr_custom errors on invalid num_alternatives counts", {
+test_that("check_data.lnr_custom errors on invalid accumulators counts", {
   model <- lnr(rt = "rt", response = "resp", version = "custom",
-               num_alternatives = c(target = 1, lure = 0))
+               accumulators = c(target = 1, lure = 0))
   model$other_vars$resp_cats <- c("target", "lure")
   dat <- data.frame(
     rt = runif(100, 0.4, 1.5),
@@ -277,16 +292,16 @@ test_that("check_data.lnr_custom errors on invalid num_alternatives counts", {
     "positive integers"
   )
 
-  model$other_vars$num_alternatives <- c(target = 1, lure = Inf)
+  model$other_vars$accumulators <- c(target = 1, lure = Inf)
   expect_error(
     check_data(model, dat, bmf(target ~ 1, lure ~ 1, ndt ~ 1)),
     "positive integers"
   )
 })
 
-test_that("check_data.lnr_custom validates num_alternatives columns", {
+test_that("check_data.lnr_custom validates accumulators columns", {
   model <- lnr(rt = "rt", response = "resp", version = "custom",
-               num_alternatives = c(target = "n_tgt", lure = "n_lure"))
+               accumulators = c(target = "n_tgt", lure = "n_lure"))
   model$other_vars$resp_cats <- c("target", "lure")
   dat <- data.frame(
     rt = runif(100, 0.4, 1.5),
@@ -307,9 +322,9 @@ test_that("check_data.lnr_custom validates num_alternatives columns", {
   )
 })
 
-test_that("check_data.lnr_custom errors on unsupported num_alternatives types", {
+test_that("check_data.lnr_custom errors on unsupported accumulators types", {
   model <- lnr(rt = "rt", response = "resp", version = "custom",
-               num_alternatives = list(target = 1, lure = 3))
+               accumulators = list(target = 1, lure = 3))
   model$other_vars$resp_cats <- c("target", "lure")
   dat <- data.frame(
     rt = runif(100, 0.4, 1.5),
@@ -423,7 +438,7 @@ test_that("check_model.lnr_custom errors on category names containing underscore
 # -----------------------------------------------------------------------------
 
 test_that("bmf2bf.lnr_simple creates correct brms formula", {
-  model <- lnr(rt = "rt", response = "response", n_alternatives = 2)
+  model <- lnr(rt = "rt", response = "response", n_choices = 2)
   formula <- bmf(correct ~ 1, error ~ 1, ndt ~ 1)
 
   bf <- bmf2bf(model, formula)
@@ -455,11 +470,13 @@ test_that(".lnr_stan_code generates valid Stan for 2 categories", {
   code <- bmm:::.lnr_stan_code("lnr_simple", c("correct", "error"))
 
   expect_true(grepl("lnr_simple_lpdf", code))
-  expect_true(grepl("real correct", code))
-  expect_true(grepl("real error", code))
-  expect_true(grepl("int n1", code))
-  expect_true(grepl("int n2", code))
-  expect_true(grepl("log\\(n\\[response\\]\\)", code))
+  expect_true(grepl("vector correct", code))
+  expect_true(grepl("vector error", code))
+  expect_true(grepl("array\\[\\] int n1", code))
+  expect_true(grepl("array\\[\\] int n2", code))
+  # single-pass race combination shared with lba/rdm
+  expect_true(grepl("log\\(n\\[win\\]\\)", code))
+  expect_true(grepl("reps", code))
 })
 
 test_that(".lnr_stan_code generates valid Stan for 4 categories", {
@@ -467,10 +484,41 @@ test_that(".lnr_stan_code generates valid Stan for 4 categories", {
   code <- bmm:::.lnr_stan_code("lnr_custom", cats)
 
   expect_true(grepl("lnr_custom_lpdf", code))
-  for (cat in cats) expect_true(grepl(paste0("real ", cat), code))
-  expect_true(grepl("int n4", code))
+  for (cat in cats) expect_true(grepl(paste0("vector ", cat), code))
+  expect_true(grepl("array\\[\\] int n4", code))
   expect_true(grepl("array\\[4\\] real m", code))
   expect_true(grepl("array\\[4\\] int n", code))
+})
+
+test_that("LNR generated Stan code uses vectorized custom likelihoods", {
+  dat <- rlnr(n = 20, m = c(-1, 0), s = c(1, 1), ndt = 0.2)
+  simple_model <- lnr(rt = "rt", response = "response", n_choices = 2)
+  simple_formula <- bmf(correct ~ 1, error ~ 1, ndt ~ 1)
+  simple_code <- stancode(simple_formula, data = dat, model = simple_model,
+                          backend = "cmdstanr")
+
+  expect_true(grepl(
+    "target \\+= lnr_simple_lpdf\\(Y \\| mu, correct, error, ndt, s, vint1, vint2, vint3\\);",
+    simple_code
+  ))
+  expect_false(grepl(
+    "for \\(n in 1:N\\) \\{\\s+target \\+= lnr_simple_lpdf",
+    simple_code,
+    perl = TRUE
+  ))
+
+  dat$response <- ifelse(dat$response == 1, "corr", "wrong")
+  custom_model <- lnr(rt = "rt", response = "response", version = "custom")
+  custom_formula <- bmf(corr ~ 1, wrong ~ 1, ndt ~ 1)
+  custom_code <- stancode(custom_formula, data = dat, model = custom_model,
+                          backend = "cmdstanr")
+
+  expect_true(grepl("target \\+= lnr_custom_lpdf\\(Y \\|", custom_code))
+  expect_false(grepl(
+    "for \\(n in 1:N\\) \\{\\s+target \\+= lnr_custom_lpdf",
+    custom_code,
+    perl = TRUE
+  ))
 })
 
 # -----------------------------------------------------------------------------
@@ -480,7 +528,7 @@ test_that(".lnr_stan_code generates valid Stan for 4 categories", {
 test_that("configure_model.lnr_simple returns correct components", {
   skip_on_cran()
 
-  model <- lnr(rt = "rt", response = "response", n_alternatives = 2)
+  model <- lnr(rt = "rt", response = "response", n_choices = 2)
   dat <- data.frame(
     rt = runif(100, 0.4, 1.5),
     response = sample(c(1L, 2L), 100, replace = TRUE)
@@ -502,7 +550,7 @@ test_that("configure_model.lnr_custom returns correct components", {
   skip_on_cran()
 
   model <- lnr(rt = "rt", response = "resp", version = "custom",
-               num_alternatives = c(fast = 1, slow = 3))
+               accumulators = c(fast = 1, slow = 3))
   dat <- data.frame(
     rt = runif(100, 0.4, 1.5),
     resp = rep(c("fast", "slow"), 50)
@@ -558,7 +606,7 @@ test_that("lnr simple version runs with mock backend (2-choice)", {
   skip_on_cran()
 
   dat <- rlnr(n = 100, m = c(-1, 0), s = c(1, 1), ndt = 0.2)
-  model <- lnr(rt = "rt", response = "response", n_alternatives = 2)
+  model <- lnr(rt = "rt", response = "response", n_choices = 2)
   formula <- bmf(correct ~ 1, error ~ 1, ndt ~ 1)
 
   expect_silent(
@@ -570,7 +618,7 @@ test_that("lnr simple version runs with mock backend (4-choice)", {
   skip_on_cran()
 
   dat <- rlnr(n = 200, m = c(-1, 0, 0, 0), s = c(1, 1, 1, 1), ndt = 0.2)
-  model <- lnr(rt = "rt", response = "response", n_alternatives = 4)
+  model <- lnr(rt = "rt", response = "response", n_choices = 4)
   formula <- bmf(correct ~ 1, error ~ 1, ndt ~ 1)
 
   expect_silent(
@@ -583,7 +631,7 @@ test_that("lnr simple with predictors runs with mock backend", {
 
   dat <- rlnr(n = 200, m = c(-1, 0), s = c(1, 1), ndt = 0.2)
   dat$condition <- rep(c("A", "B"), each = 100)
-  model <- lnr(rt = "rt", response = "response", n_alternatives = 2)
+  model <- lnr(rt = "rt", response = "response", n_choices = 2)
   formula <- bmf(correct ~ condition, error ~ 1, ndt ~ 1)
 
   expect_silent(
@@ -606,7 +654,7 @@ test_that("lnr custom version runs with mock backend", {
   )
 })
 
-test_that("lnr custom with num_alternatives runs with mock backend", {
+test_that("lnr custom with accumulators runs with mock backend", {
   skip_on_cran()
 
   dat <- data.frame(
@@ -614,7 +662,7 @@ test_that("lnr custom with num_alternatives runs with mock backend", {
     resp = rep(c("correct", "other", "npl"), length.out = 100)
   )
   model <- lnr(rt = "rt", response = "resp", version = "custom",
-               num_alternatives = c(correct = 1, other = 3, npl = 5))
+               accumulators = c(correct = 1, other = 3, npl = 5))
   formula <- bmf(correct ~ 1, other ~ 1, npl ~ 1, ndt ~ 1)
 
   expect_silent(
