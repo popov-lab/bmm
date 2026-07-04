@@ -27,6 +27,5 @@ bmm-dev
 /tests/internal/cmdstanr_output/
 /tests/internal/*cache*
 
-# Local benchmark outputs
-inst/benchmarks/sdm/results/*
-!inst/benchmarks/sdm/results/.gitkeep
+# Local SDM benchmarks
+inst/benchmarks/sdm/
