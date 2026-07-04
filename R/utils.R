@@ -127,8 +127,12 @@ combine_args <- function(args) {
 
 local_brms_threads <- function(dots) {
   if (!is.null(dots$threads)) {
+    threads <- dots$threads
+    if (is.numeric(threads)) {
+      threads <- brms::threading(threads)
+    }
     withr::local_options(
-      brms.threads = dots$threads,
+      brms.threads = threads,
       .local_envir = parent.frame()
     )
   }

@@ -50,3 +50,18 @@ test_that("SDM threaded Stan code slices denominator runs correctly", {
   expect_match(code, "run_start[g] <= end", fixed = TRUE)
   expect_match(code, "run_start[g] - start + 1", fixed = TRUE)
 })
+
+test_that("SDM accepts numeric threads shorthand", {
+  dat <- simulate_sdm_smoke_data()
+  formula <- bmf(c ~ 0 + condition, kappa ~ 0 + condition)
+
+  code <- stancode(
+    formula,
+    data = dat,
+    model = sdm(resp_error = "y"),
+    threads = 2
+  )
+
+  expect_match(code, "target += reduce_sum", fixed = TRUE)
+  expect_match(code, "sdm_simple_run_ldenom_slice", fixed = TRUE)
+})
