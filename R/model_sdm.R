@@ -146,8 +146,8 @@ configure_model.sdm <- function(model, data, formula) {
   stanvars <- brms::stanvar(scode = stan_funs, block = "functions") +
     brms::stanvar(scode = stan_tdata, block = "tdata") +
     brms::stanvar(x = run_metadata$G_sdm_runs, name = "G_sdm_runs") +
-    brms::stanvar(x = run_metadata$sdm_run_start, name = "sdm_run_start") +
-    brms::stanvar(x = run_metadata$sdm_run_count, name = "sdm_run_count") +
+    sdm_stanvar_int_array(run_metadata$sdm_run_start, "sdm_run_start", "G_sdm_runs") +
+    sdm_stanvar_int_array(run_metadata$sdm_run_count, "sdm_run_count", "G_sdm_runs") +
     brms::stanvar(scode = stan_likelihood, block = "likelihood", position = "end")
 
   # construct main brms formula from the bmm formula
@@ -220,4 +220,11 @@ sdm_predictor_vars <- function(data, formula) {
   predictors <- rhs_vars(formula)
   predictors <- predictors[not_in(predictors, dpars)]
   predictors[predictors %in% colnames(data)]
+}
+
+sdm_stanvar_int_array <- function(x, name, size) {
+  out <- brms::stanvar(x = as.integer(x), name = name)
+  out[[name]]$scode <- paste0("array[", size, "] int ", name, ";")
+  out[[name]]$pll_args <- paste("data array[] int", name)
+  out
 }
