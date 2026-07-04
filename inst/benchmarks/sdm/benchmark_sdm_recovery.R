@@ -37,11 +37,16 @@ run_sdm_recovery_check <- function(iter = 3000L,
   })
 
   recovery <- fixed_effect_recovery(fit, sim$metadata$n_conditions)
+  diagnostics <- collect_recovery_diagnostics(fit, unname(fit_time[["elapsed"]]))
   git <- git_metadata()
   recovery$benchmark_name <- "sdm_recovery"
   recovery$git_branch <- git$branch
   recovery$git_commit <- git$commit
   recovery$total_model_time_sec <- unname(fit_time[["elapsed"]])
+  recovery$divergent_transitions <- diagnostics$divergent_transitions
+  recovery$total_leapfrog_steps <- diagnostics$total_leapfrog_steps
+  recovery$min_bulk_ess <- diagnostics$min_bulk_ess
+  recovery$min_bulk_ess_per_total_sec <- diagnostics$min_bulk_ess_per_total_sec
   recovery$chains <- chains
   recovery$iter <- iter
   recovery$warmup <- warmup
@@ -73,6 +78,29 @@ fixed_effect_recovery <- function(fit, n_conditions) {
   out$abs_error <- abs(out$estimate_native - out$true)
   out$true_in_95_ci <- out$true >= out$q2.5_native & out$true <= out$q97.5_native
   out
+}
+
+collect_recovery_diagnostics <- function(fit, total_time_sec) {
+  nuts <- try(brms::nuts_params(fit), silent = TRUE)
+  divergent <- NA_integer_
+  leapfrog <- NA_real_
+  if (!inherits(nuts, "try-error")) {
+    divergent <- sum(nuts$Parameter == "divergent__" & nuts$Value == 1, na.rm = TRUE)
+    leapfrog <- sum(nuts$Value[nuts$Parameter == "n_leapfrog__"], na.rm = TRUE)
+  }
+
+  draws <- try(posterior::summarise_draws(fit, "ess_bulk"), silent = TRUE)
+  min_ess_bulk <- NA_real_
+  if (!inherits(draws, "try-error") && "ess_bulk" %in% names(draws)) {
+    min_ess_bulk <- min(draws$ess_bulk, na.rm = TRUE)
+  }
+
+  data.frame(
+    divergent_transitions = divergent,
+    total_leapfrog_steps = leapfrog,
+    min_bulk_ess = min_ess_bulk,
+    min_bulk_ess_per_total_sec = min_ess_bulk / max(total_time_sec, .Machine$double.eps)
+  )
 }
 
 git_metadata <- function() {
