@@ -26,3 +26,20 @@ test_that("SDM generated Stan code includes custom SDM chunks", {
   expect_false(grepl("c[n] != c[n-1]", code, fixed = TRUE))
   expect_match(code, "COSN", fixed = TRUE)
 })
+
+test_that("SDM threaded Stan code slices denominator runs correctly", {
+  sim <- simulate_sdm_benchmark_data(config = sdm_benchmark_configs()$smoke)
+  formula <- bmf(c ~ 0 + condition, kappa ~ 0 + condition)
+
+  code <- stancode(
+    formula,
+    data = sim$data,
+    model = sdm(resp_error = "y"),
+    threads = brms::threading(2, grainsize = 1)
+  )
+
+  expect_match(code, "target += reduce_sum", fixed = TRUE)
+  expect_match(code, "sdm_run_start[g] >= start", fixed = TRUE)
+  expect_match(code, "sdm_run_start[g] <= end", fixed = TRUE)
+  expect_match(code, "sdm_run_start[g] - start + 1", fixed = TRUE)
+})

@@ -138,13 +138,21 @@ configure_model.sdm <- function(model, data, formula) {
   sc_path <- system.file("stan_chunks", package = "bmm")
   stan_funs <- read_lines2(paste0(sc_path, "/sdm_simple_funs.stan"))
   stan_tdata <- read_lines2(paste0(sc_path, "/sdm_simple_tdata.stan"))
-  stan_likelihood <- read_lines2(paste0(sc_path, "/sdm_simple_likelihood.stan"))
+  likelihood_file <- if (sdm_use_threaded_likelihood()) {
+    "sdm_simple_likelihood_threaded.stan"
+  } else {
+    "sdm_simple_likelihood.stan"
+  }
+  stan_likelihood <- read_lines2(paste0(sc_path, "/", likelihood_file))
+  stan_tdata_pll_args <- if (sdm_use_threaded_likelihood()) {
+    "data matrix COSN"
+  }
   run_metadata <- attr(data, "sdm_run_metadata")
   if (is.null(run_metadata)) {
     run_metadata <- sdm_run_metadata(data, formula)
   }
   stanvars <- brms::stanvar(scode = stan_funs, block = "functions") +
-    brms::stanvar(scode = stan_tdata, block = "tdata") +
+    brms::stanvar(scode = stan_tdata, block = "tdata", pll_args = stan_tdata_pll_args) +
     brms::stanvar(x = run_metadata$G_sdm_runs, name = "G_sdm_runs") +
     sdm_stanvar_int_array(run_metadata$sdm_run_start, "sdm_run_start", "G_sdm_runs") +
     sdm_stanvar_int_array(run_metadata$sdm_run_count, "sdm_run_count", "G_sdm_runs") +
@@ -227,4 +235,9 @@ sdm_stanvar_int_array <- function(x, name, size) {
   out[[name]]$scode <- paste0("array[", size, "] int ", name, ";")
   out[[name]]$pll_args <- paste("data array[] int", name)
   out
+}
+
+sdm_use_threaded_likelihood <- function() {
+  threads <- getOption("brms.threads", NULL)
+  is.list(threads) && isTRUE(threads$threads > 0)
 }
