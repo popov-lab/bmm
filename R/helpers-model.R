@@ -673,6 +673,8 @@ use_model_template <- function(model_name,
 #' @export
 stancode.bmmformula <- function(object, data, model, prior = NULL, ...) {
   withr::local_options(bmm.sort_data = FALSE)
+  dots <- list(...)
+  local_brms_threads(dots)
 
   # check model, formula and data, and transform data if necessary
   formula <- object
@@ -687,7 +689,6 @@ stancode.bmmformula <- function(object, data, model, prior = NULL, ...) {
   prior <- configure_prior(model, data, config_args$formula, prior)
 
   # extract stan code
-  dots <- list(...)
   fit_args <- combine_args(nlist(config_args, dots, prior))
   fit_args$object <- fit_args$formula
   fit_args$formula <- NULL
@@ -1010,4 +1011,3 @@ parse_bounds <- function(s) {
   }
   Reduce(function(a, b) c(a, b), kvs)
 }
-

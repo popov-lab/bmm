@@ -42,6 +42,7 @@
 #'
 update.bmmfit <- function(object, formula., newdata = NULL, recompile = NULL, ...) {
   dots <- list(...)
+  local_brms_threads(dots)
   stopif(
     isTRUE(object$version$bmm < "0.3.0"),
     "Updating bmm models works only with models fitted with version 0.3.0 or higher"
