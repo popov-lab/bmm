@@ -125,6 +125,20 @@ combine_args <- function(args) {
   c(config_args, args$opts)
 }
 
+local_brms_threads <- function(dots) {
+  if (!is.null(dots$threads)) {
+    threads <- dots$threads
+    if (is.numeric(threads)) {
+      threads <- brms::threading(threads)
+    }
+    withr::local_options(
+      brms.threads = threads,
+      .local_envir = parent.frame()
+    )
+  }
+  invisible(NULL)
+}
+
 ############################
 #' @description
 #'  stop2, warning2, and message2 are wrappers to the builting functions stop, warning and message.
