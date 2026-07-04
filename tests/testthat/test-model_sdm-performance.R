@@ -21,8 +21,8 @@ test_that("SDM generated Stan code includes custom SDM chunks", {
   code <- stancode(formula, data = sim$data, model = sdm(resp_error = "y"))
 
   expect_match(code, "sdm_simple_ldenom_chquad_adaptive", fixed = TRUE)
-  expect_match(code, "for (g in 1:G_sdm_runs)", fixed = TRUE)
-  expect_match(code, "target += sdm_run_count[g] * z", fixed = TRUE)
+  expect_match(code, "sdm_simple_run_ldenom", fixed = TRUE)
+  expect_match(code, "target += sdm_simple_run_ldenom", fixed = TRUE)
   expect_false(grepl("c[n] != c[n-1]", code, fixed = TRUE))
   expect_match(code, "COSN", fixed = TRUE)
 })
@@ -39,7 +39,8 @@ test_that("SDM threaded Stan code slices denominator runs correctly", {
   )
 
   expect_match(code, "target += reduce_sum", fixed = TRUE)
-  expect_match(code, "sdm_run_start[g] >= start", fixed = TRUE)
-  expect_match(code, "sdm_run_start[g] <= end", fixed = TRUE)
-  expect_match(code, "sdm_run_start[g] - start + 1", fixed = TRUE)
+  expect_match(code, "sdm_simple_run_ldenom_slice", fixed = TRUE)
+  expect_match(code, "run_start[g] >= start", fixed = TRUE)
+  expect_match(code, "run_start[g] <= end", fixed = TRUE)
+  expect_match(code, "run_start[g] - start + 1", fixed = TRUE)
 })
