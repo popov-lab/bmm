@@ -110,6 +110,7 @@ sdmSimple <- function(resp_error, version = "simple", ...) {
 check_data.sdm <- function(model, data, formula) {
   # data sorted by predictors is necessary for speedy computation of normalizing constant
   data <- order_data_query(model, data, formula)
+  attr(data, "sdm_run_metadata") <- sdm_run_metadata(data, formula)
   NextMethod("check_data")
 }
 
@@ -138,8 +139,15 @@ configure_model.sdm <- function(model, data, formula) {
   stan_funs <- read_lines2(paste0(sc_path, "/sdm_simple_funs.stan"))
   stan_tdata <- read_lines2(paste0(sc_path, "/sdm_simple_tdata.stan"))
   stan_likelihood <- read_lines2(paste0(sc_path, "/sdm_simple_likelihood.stan"))
+  run_metadata <- attr(data, "sdm_run_metadata")
+  if (is.null(run_metadata)) {
+    run_metadata <- sdm_run_metadata(data, formula)
+  }
   stanvars <- brms::stanvar(scode = stan_funs, block = "functions") +
     brms::stanvar(scode = stan_tdata, block = "tdata") +
+    brms::stanvar(x = run_metadata$G_sdm_runs, name = "G_sdm_runs") +
+    sdm_stanvar_int_array(run_metadata$sdm_run_start, "sdm_run_start", "G_sdm_runs") +
+    sdm_stanvar_int_array(run_metadata$sdm_run_count, "sdm_run_count", "G_sdm_runs") +
     brms::stanvar(scode = stan_likelihood, block = "likelihood", position = "end")
 
   # construct main brms formula from the bmm formula
@@ -185,4 +193,38 @@ posterior_predict_sdm_simple <- function(i, prep, ...) {
   c <- brms::get_dpar(prep, "c", i = i)
   kappa <- brms::get_dpar(prep, "kappa", i = i)
   rsdm(length(mu), mu, c, kappa)
+}
+
+sdm_run_metadata <- function(data, formula) {
+  predictors <- sdm_predictor_vars(data, formula)
+  if (length(predictors) == 0L) {
+    return(list(
+      G_sdm_runs = 1L,
+      sdm_run_start = 1L,
+      sdm_run_count = nrow(data)
+    ))
+  }
+
+  run_id <- interaction(data[predictors], drop = TRUE, lex.order = TRUE)
+  run_start <- c(1L, which(run_id[-1] != run_id[-length(run_id)]) + 1L)
+  run_count <- diff(c(run_start, nrow(data) + 1L))
+  list(
+    G_sdm_runs = length(run_start),
+    sdm_run_start = as.integer(run_start),
+    sdm_run_count = as.integer(run_count)
+  )
+}
+
+sdm_predictor_vars <- function(data, formula) {
+  dpars <- names(formula)
+  predictors <- rhs_vars(formula)
+  predictors <- predictors[not_in(predictors, dpars)]
+  predictors[predictors %in% colnames(data)]
+}
+
+sdm_stanvar_int_array <- function(x, name, size) {
+  out <- brms::stanvar(x = as.integer(x), name = name)
+  out[[name]]$scode <- paste0("array[", size, "] int ", name, ";")
+  out[[name]]$pll_args <- paste("data array[] int", name)
+  out
 }
