@@ -1,5 +1,8 @@
 # bmm 1.3.1
 
+### New models
+* Add the **Utility Choice Model** (`utility`) for utility-theoretic multinomial choice: random-utility (softmax / McFadden logit) and Luce-ratio (simple) welfare-weight and expected-utility designs. Welfare weights come from a known `payoffs` matrix whose cells may be constants **or** the names of per-trial data columns; `value_cols` designs estimate a value sensitivity `gamma` with optional power-utility curvature (`rho`) and Prelec probability weighting (`alpha`). The constructor generates the per-category activation formulas automatically, fixes the numeraire, and dispatches design-dependent identifiability guards at fit time. Built on the same multinomial-logit likelihood as the **m3** model (#358). Thanks to @GidonFrischkorn
+
 ### Bug fixes
 * Fix `swald_lccdf()` returning incorrect log-survival probability when response time equals non-decision time in the **cswald** model. Previously returned `-Inf` instead of `0` (log of survival = 1) (#348).
 

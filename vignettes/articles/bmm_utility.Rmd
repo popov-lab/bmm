@@ -1,0 +1,207 @@
+---
+title: "Random-Utility Choice Models (utility)"
+output: bookdown::html_document2
+author:
+  - Gidon Frischkorn
+bibliography: REFERENCES.bib
+header-includes:
+  - \usepackage{amsmath}
+vignette: >
+  %\VignetteIndexEntry{Random-Utility Choice Models (utility)}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+pkgdown:
+  as_is: true
+---
+
+```{=html}
+<style type="text/css">
+div.main-container {
+max-width: 800px !important;
+}
+p {
+margin-top: 1.5em ;
+margin-bottom: 1.5em ;
+}
+.author{
+    display: none;
+}
+</style>
+```
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>"
+)
+```
+
+```{r setup, message = FALSE}
+library(bmm)
+```
+
+## Scope
+
+The `utility()` model fits **category-count choice** data: on each trial a person
+chooses one of a fixed set of categories, and you record how often each category
+was chosen. Each category carries a *systematic utility* built from either known
+payoffs or observed values, and the category is selected through a random-utility
+(softmax) or Luce-ratio (simple) rule.
+
+This model does **not** cover per-option attribute or binary-lottery choice
+(prospect theory in the sense of @nilsson_hierarchical_2011), where every option
+has its own outcome-and-probability attributes. That design needs a different data
+interface and is out of scope here.
+
+## Two ways to build utility
+
+A category's utility is a weighted sum of components. `utility()` gives you two
+entry points, depending on whether the weights or the values are known:
+
+* **`payoffs`** — a matrix of *known* coefficients (from the experimental design)
+  multiplying *estimated* weights. This is the welfare-weight case: the payoff
+  structure is fixed by the game, and you estimate how much each payoff component
+  matters.
+* **`value_cols`** — *observed* per-trial value columns multiplied by an estimated
+  sensitivity `gamma`. This is the expected-utility case, optionally with a power
+  value function (`rho`) and Prelec probability weighting (`alpha`).
+
+The two are mutually exclusive.
+
+## Welfare weights from a payoff matrix
+
+Consider a nested social dilemma [@gross_nested_2025] with three options — keep the
+resource, share it with the in-group, or share it universally. Each option has a
+known payoff vector for self, in-group, and out-group. We want the **welfare
+weights** `wi` (in-group) and `wo` (out-group), relative to the self-payoff, which
+we fix as the numeraire.
+
+```{r welfare-model}
+model_welfare <- utility(
+  resp_cats = c("nkeep", "ningroup", "nuniversal"),
+  payoffs = rbind(
+    nkeep      = c(b = 1.0, wi = 0.0, wo = 0.0),
+    ningroup   = c(b = 0.5, wi = 1.0, wo = 0.0),
+    nuniversal = c(b = 0.3, wi = 0.6, wo = 0.9)
+  ),
+  choice_rule = "simple",
+  numeraire   = c(b = 1)
+)
+```
+
+The rows are the response categories, the columns are the weight parameters, and
+`b` is the numeraire — the self-payoff weight, fixed to 1 so the other weights are
+interpretable on that scale. You never write the activation formulas by hand; the
+model generates one per category from the payoff matrix:
+
+```{r welfare-actfuns}
+construct_utility_act_funs(model_welfare)
+```
+
+You only supply formulas for the parameters you want to predict. To fit the model,
+predict each welfare weight (here by a fixed intercept):
+
+```{r welfare-fit, eval = FALSE}
+fit_welfare <- bmm(
+  formula = bmf(wi ~ 1, wo ~ 1),
+  data    = my_data,
+  model   = model_welfare,
+  # the simple (Luce) rule takes log(utility); keep utilities positive
+  prior   = brms::set_prior("normal(1, 0.5)", nlpar = "wi", lb = 0) +
+            brms::set_prior("normal(1, 0.5)", nlpar = "wo", lb = 0)
+)
+```
+
+In a recovery simulation with true `wi = 1.2` and `wo = 0.8` (30 subjects, 100
+trials), the model recovers both weights with 95% intervals covering the truth and
+no divergent transitions.
+
+### Positive activations for the simple rule
+
+The `simple` (Luce) rule normalises raw utilities, `P(i) = U_i / \sum_j U_j`, which
+`bmm` computes on the log scale. If an identity-linked weight turns a utility
+negative during sampling, `log()` returns `NaN`. `utility()` warns you about this
+and the fix is a lower bound on the weight priors (`lb = 0`), as above. Welfare
+weights are naturally non-negative, so this bound is also substantively sensible.
+
+## Payoffs that vary by trial
+
+Payoffs are not always fixed across the whole experiment. If the payoff structure
+changes trial-by-trial (say the in-group return depends on a manipulated pie
+size), pass a **data.frame** whose cells are either constants or the *names of data
+columns*:
+
+```{r pertrial-model}
+model_trial <- utility(
+  resp_cats = c("nkeep", "ningroup", "nuniversal"),
+  payoffs = data.frame(
+    row.names = c("nkeep", "ningroup", "nuniversal"),
+    b  = c(1.0, 0.5, 0.3),
+    wi = c(0.0, "wi_ingroup", 0.6),   # column name -> per-trial payoff
+    wo = c(0.0, 0.0, 0.9)
+  ),
+  choice_rule = "simple",
+  numeraire   = c(b = 1)
+)
+construct_utility_act_funs(model_trial)
+```
+
+Here `wi_ingroup` is a column in the data that supplies the in-group payoff for the
+`ningroup` category on each trial, while the other coefficients stay constant. The
+estimated weights `wi` and `wo` are unchanged — only the *known* coefficients now
+vary per trial.
+
+## Expected utility with value columns
+
+When options carry observed values rather than known payoffs, use `value_cols` to
+map each category to its per-trial value column and estimate a single value
+sensitivity `gamma`:
+
+```{r eu-model}
+model_eu <- utility(
+  resp_cats  = c("corr", "other", "npl"),
+  num_options = c(1, 1, 8),
+  value_cols = c(corr = "V_corr", other = "V_other"),
+  utility_fn = "power"      # gamma * V^rho
+)
+construct_utility_act_funs(model_eu)
+```
+
+`utility_fn = "power"` adds a curvature parameter `rho`, and
+`weighting = "prelec"` adds a probability-weighting parameter `alpha` that
+reweights the choice-set proportions `n_i / N`. Both `rho` and `alpha` use a log
+link, so their priors are placed on the log scale — a `normal(0, 0.5)` prior on the
+linear predictor, which is a median of 1 (linear utility / no weighting) on the
+natural scale. You read them back as `exp(rho)` and `exp(alpha)`.
+
+## Identifiability guards
+
+Utility parameters are only identifiable under specific design conditions. Instead
+of returning a flat posterior, `utility()` checks the design at fit time and raises
+an informative message:
+
+| Parameter | Requirement | If violated |
+|-----------|-------------|-------------|
+| `gamma` (value slope) | the value column must vary (≥ 2 distinct values) | error |
+| `rho` (power utility) | the value range should span a ratio ≥ 3 | warning |
+| `alpha` (Prelec) | the choice-set proportions `n_i / N` must vary across trials | error |
+| identity-linked weights + `simple` rule | positive activations (`lb = 0` priors) | warning |
+
+The constructor also rejects incoherent specifications early — for example, value
+curvature or probability weighting on the `payoffs` path (where coefficients are
+already known), or Prelec weighting with the `simple` rule.
+
+## Theoretical note
+
+The softmax rule is McFadden's multinomial-logit random-utility model
+[@mcfadden_conditional_1974]: `P(i) \propto n_i \exp(a_i)` is the choice
+probability of `U_i = a_i + \ln n_i + \varepsilon_i` with i.i.d. Gumbel noise, and
+a hierarchical fit is a mixed logit [@train_discrete_2009]. The simple rule is
+Luce's ratio rule [@luce_individual_1959] over raw utilities. These are genuine
+random-utility choice models, but they are *not* a claim of von
+Neumann–Morgenstern subjective utility: softmax is interval-scale, simple is
+ratio-scale, and `gamma` measures how strongly value modulates activation rather
+than a normative utility. The `utility()` model is built on the same
+multinomial-logit likelihood as the [m3](bmm_m3.html) model.
+
+## References
