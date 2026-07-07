@@ -1,3 +1,8 @@
+# bmm (development version)
+
+### Bug fixes
+* `fixed_pars_priors()` now raises a clear error when a model's `fixed_parameters` includes a parameter that is absent from the constructed formula (neither a dpar nor an nlpar). Previously it silently emitted a malformed `b_Intercept ~ constant()` prior that `brm()` rejected with a cryptic message (#377).
+
 # bmm 1.3.1
 
 ### Bug fixes

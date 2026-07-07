@@ -161,6 +161,12 @@ fixed_pars_priors <- function(model, formula, additional_pars = list()) {
   dpars <- names(bterms$dpars)
   nlpars <- names(bterms$nlpars)
 
+  stopif(
+    any(!pars %in% c(dpars, nlpars)),
+    "Fixed parameter(s) {collapse_comma(pars[!pars %in% c(dpars, nlpars)])} \\
+    are not part of the model formula."
+  )
+
   # flexibly set the variables for set_prior
   classes <- ifelse(pars %in% dpars, "Intercept", "b")
   coefs <- ifelse(pars %in% dpars, "", "Intercept")
