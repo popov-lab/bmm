@@ -1,3 +1,8 @@
+# bmm 1.3.1.9000
+
+### Bug fixes
+* `bmm()` now warns when a predictor in the formula shares its name with both a predicted parameter and a column in the data. Such a predictor was silently treated as a non-linear term (emitted via `nlf()` instead of `lf()`), changing the likelihood without any error. Short parameter names (`c`, `a`, `s`, `b`) collide naturally with condition codes or columns like `accuracy`/`stimulus` (#378).
+
 # bmm 1.3.1
 
 ### Bug fixes

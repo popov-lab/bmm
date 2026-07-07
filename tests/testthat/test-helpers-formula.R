@@ -185,6 +185,28 @@ test_that("check_formula works", {
   )
 })
 
+test_that("check_formula warns when a predictor clashes with a parameter name", {
+  withr::local_options(bmm.silent = 2, bmm.sort_data = FALSE)
+  model <- sdm(resp_error = "y")
+
+  clash <- data.frame(y = rnorm(10), c = rep(0:1, 5))
+  expect_warning(
+    check_formula(model, clash, bmf(kappa ~ c)),
+    "used both as a predicted parameter and as a column"
+  )
+
+  no_clash <- data.frame(y = rnorm(10), cond = rep(0:1, 5))
+  expect_no_warning(check_formula(model, no_clash, bmf(kappa ~ cond)))
+
+  # 'c' predicts kappa (genuinely non-linear) but no data column 'c' exists
+  expect_no_warning(
+    check_formula(model, data.frame(y = rnorm(10)), bmf(kappa ~ c, c ~ 1))
+  )
+
+  # column 'c' present but not used as a predictor
+  expect_no_warning(check_formula(model, clash, bmf(kappa ~ 1)))
+})
+
 test_that("has_intercept works", {
   expect_true(has_intercept(y ~ 1))
   expect_true(has_intercept(y ~ A))
