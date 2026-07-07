@@ -1,3 +1,8 @@
+# bmm (development version)
+
+### Bug fixes
+* Fix `.pwald()` returning `NaN`/`-Inf` in the upper tail of the shifted-Wald survival function, which propagated to `dcswald()` (and therefore `log_lik`/`posterior_predict`) for the **cswald** model at extreme reaction times. The R-side survival now uses the stable `log_diff_exp` form already used by the Stan likelihood (`swald_lccdf`) (#376).
+
 # bmm 1.3.1
 
 ### Bug fixes
