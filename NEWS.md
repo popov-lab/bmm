@@ -2,6 +2,7 @@
 
 ### Bug fixes
 * Fix `swald_lccdf()` returning incorrect log-survival probability when response time equals non-decision time in the **cswald** model. Previously returned `-Inf` instead of `0` (log of survival = 1) (#348).
+* Fix `print()` for model summaries selecting regression-coefficient rows by an unanchored substring match, so a parameter such as `a` could pull in rows of another parameter like `kappa` (e.g. in the **imm** model). Rows are now matched on the exact parameter prefix. This also fixes a crash when only a single coefficient row is shown (#379, #369).
 
 ### Other changes
 * The **ddm** model supports both `cmdstanr` and `rstan` backends. Previously, `cmdstanr` was required.

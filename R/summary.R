@@ -87,9 +87,9 @@ print.bmmsummary <- function(x, digits = 2, color = getOption("bmm.color_summary
   }
   if (nrow(x$fixed)) {
     cat(style("green")("Regression Coefficients:\n"))
-    include <- sapply(paste0(pars_to_print, "_"), function(p) grepl(p, rownames(x$fixed)))
-    include <- apply(include, 1, any)
-    reduced <- x$fixed[include, ]
+    # match the exact parameter prefix, not a substring, so "a_" does not also
+    # select "kappa_Intercept" for models with both parameters (#379)
+    reduced <- x$fixed[sub("_.*$", "", rownames(x$fixed)) %in% pars_to_print, ]
     is_constant <- is.na(reduced$Rhat)
     print_format(reduced[!is_constant, ], digits)
     cat("\n")
