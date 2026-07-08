@@ -1,6 +1,10 @@
 # bmm (development version)
 
+### New features
+* The **cswald** model (both versions) gains an optional parameter `sndt` for uniform trial-to-trial variability in the non-decision time (the `st0` of rtdists/fast-dm): the non-decision time is distributed as `Uniform(ndt, ndt + sndt)`, so `ndt` is the minimum and `ndt + sndt/2` the mean non-decision time. `sndt` is fixed to 0 by default (reproducing the previous behavior exactly) and is estimated by adding a formula for it, e.g. `bmf(..., sndt ~ 1)`. This prevents a handful of fast response times from biasing `ndt`, `drift`, and `bound` (Miller et al., 2018, Eq. 6). The distribution functions `dcswald()`, `pcswald()`, `qcswald()`, and `rcswald()` gain a matching `sndt = 0` argument (#387).
+
 ### Bug fixes
+* Fix the Stan likelihood of the **cswald** model returning `NaN` for extreme reaction times at high drift rates: `swald_lccdf()` now computes the survivor via `std_normal_lcdf(-z)` instead of `std_normal_lccdf(z)`, which underflows to `-Inf` for `z > ~8.3` (Stan-side analog of #376) (#387).
 * Fix `.pwald()` returning `NaN`/`-Inf` in the upper tail of the shifted-Wald survival function, which propagated to `dcswald()` (and therefore `log_lik`/`posterior_predict`) for the **cswald** model at extreme reaction times. The R-side survival now uses the stable `log_diff_exp` form already used by the Stan likelihood (`swald_lccdf`) (#376).
 * `create_initfun()` now matches Stan parameters to model parameters with a word-boundary regex (`(^|_)param(_|$)`) instead of a substring match, preventing collisions in models with short parameter names (e.g. `s`, `c`, `a`) that are substrings of longer ones (`sim`, `correct`, `activation`); the longest (most specific) match is selected when several apply (#354, #355).
 * `create_initfun()` now resolves initialization terms from `nlpars` when a model parameter is not a distributional parameter, so models built as non-linear brms formulas (e.g. native-multinomial models whose parameters live in `bterms$nlpars`) no longer error with `no applicable method for 'has_intercept' applied to an object of class "NULL"` (#362).
