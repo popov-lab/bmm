@@ -56,46 +56,46 @@ real swald_lccdf(real rt, real drift, real bound, real ndt, real sigma) {
 }
 
 // log-PDF of the shifted Wald with uniform trial-to-trial variability in the
-// non-decision time, onset convention NDT ~ uniform(ndt, ndt + st0):
-// f(t) = [S_W(t - ndt - st0) - S_W(t - ndt)] / st0 (Miller et al. 2018, Eq. 6)
-real swald_st0_lpdf(real rt, real drift, real bound, real ndt, real st0, real sigma) {
-  if (st0 < 0) return negative_infinity();
-  // the convolution is continuous at st0 = 0, so tiny st0 can use the plain
-  // density (also the code path for the default fixed st0 = 0)
-  if (st0 < 1e-8) return swald_lpdf(rt | drift, bound, ndt, sigma);
+// non-decision time, onset convention NDT ~ uniform(ndt, ndt + sndt):
+// f(t) = [S_W(t - ndt - sndt) - S_W(t - ndt)] / sndt (Miller et al. 2018, Eq. 6)
+real swald_sndt_lpdf(real rt, real drift, real bound, real ndt, real sndt, real sigma) {
+  if (sndt < 0) return negative_infinity();
+  // the convolution is continuous at sndt = 0, so tiny sndt can use the plain
+  // density (also the code path for the default fixed sndt = 0)
+  if (sndt < 1e-8) return swald_lpdf(rt | drift, bound, ndt, sigma);
   if (rt - ndt <= 0) return negative_infinity();
 
-  real ls_lo = swald_lccdf(rt | drift, bound, ndt + st0, sigma);
+  real ls_lo = swald_lccdf(rt | drift, bound, ndt + sndt, sigma);
   real ls_hi = swald_lccdf(rt | drift, bound, ndt, sigma);
 
   // for defective (negative-drift) accumulators both survivors converge to
   // the same positive constant in the deep tail, so their log-difference
   // drops below fp precision; the midpoint rule for the density is second
-  // order in st0 and stable there. The strip rt - ndt <= st0 is excluded
+  // order in sndt and stable there. The strip rt - ndt <= sndt is excluded
   // because ls_lo = 0 exactly, making log_diff_exp accurate at any gap.
-  if (ls_lo - ls_hi < 1e-8 && rt - ndt - st0 > 0) {
-    return swald_lpdf(rt | drift, bound, ndt + st0 / 2, sigma);
+  if (ls_lo - ls_hi < 1e-8 && rt - ndt - sndt > 0) {
+    return swald_lpdf(rt | drift, bound, ndt + sndt / 2, sigma);
   }
-  return log_diff_exp(ls_lo, ls_hi) - log(st0);
+  return log_diff_exp(ls_lo, ls_hi) - log(sndt);
 }
 
 // log survivor of the shifted Wald + uniform NDT, for censored observations:
-// S_conv(t) = [G(x1) - G(x2)] / st0 with x1 = t - ndt, x2 = x1 - st0, and
+// S_conv(t) = [G(x1) - G(x2)] / sndt with x1 = t - ndt, x2 = x1 - sndt, and
 // G(x) = int_0^x S_W(u) du = x * S_W(x) + M1(x), extended by G(x) = x for
-// x <= 0 where S_W = 1 (this covers the strip ndt < t < ndt + st0 without a
+// x <= 0 where S_W = 1 (this covers the strip ndt < t < ndt + sndt without a
 // special case). M1(x) = int_0^x u f_W(u) du is the partial expectation of
 // the (possibly defective) Wald. Computed in natural space: for negative
 // drift the signs of mu = bound/drift and the Phi-bracket flip together and
 // cancel, which a log-space form would need explicit sign tracking for.
-real swald_st0_lccdf(real rt, real drift, real bound, real ndt, real st0, real sigma) {
-  if (st0 < 0) return negative_infinity();
-  if (st0 < 1e-8) return swald_lccdf(rt | drift, bound, ndt, sigma);
+real swald_sndt_lccdf(real rt, real drift, real bound, real ndt, real sndt, real sigma) {
+  if (sndt < 0) return negative_infinity();
+  if (sndt < 1e-8) return swald_lccdf(rt | drift, bound, ndt, sigma);
 
   real x1 = rt - ndt;
   if (x1 <= 0) return 0;
 
   real sigma_sq = square(sigma);
-  vector[2] xs = [x1, x1 - st0]';
+  vector[2] xs = [x1, x1 - sndt]';
   vector[2] g;
   for (k in 1:2) {
     real x = xs[k];
@@ -120,11 +120,11 @@ real swald_st0_lccdf(real rt, real drift, real bound, real ndt, real st0, real s
     }
   }
 
-  real s_conv = (g[1] - g[2]) / st0;
+  real s_conv = (g[1] - g[2]) / sndt;
   // deep-tail cancellation of the G-difference: fall back to the midpoint
-  // rule, second order in st0 and irrelevant at ~ -35 nats
+  // rule, second order in sndt and irrelevant at ~ -35 nats
   if (s_conv <= 1e-300) {
-    return swald_lccdf(rt | drift, bound, ndt + st0 / 2, sigma);
+    return swald_lccdf(rt | drift, bound, ndt + sndt / 2, sigma);
   }
   return log(s_conv);
 }

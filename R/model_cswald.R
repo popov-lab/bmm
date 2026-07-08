@@ -7,28 +7,28 @@
     parameters = list(
       drift = "drift rate",
       bound = "boundary (distance from starting point to correct boundary)",
-      ndt = "non-decision time (minimum non-decision time when st0 > 0)",
+      ndt = "non-decision time (minimum non-decision time when sndt > 0)",
       s = "diffusion constant",
-      st0 = "range of the uniform trial-to-trial variability in the non-decision time"
+      sndt = "range of the uniform trial-to-trial variability in the non-decision time"
     ),
     links = list(
       drift = "log",
       bound = "log",
       ndt = "log",
       s = "log",
-      st0 = "identity"
+      sndt = "log"
     ),
     fixed_parameters = list(
       mu = 0,
       s = 0,
-      st0 = 0
+      sndt = 0
     ),
     priors = list(
       drift = list(main = "normal(0,1)", effects = "normal(0,0.3)"),
       bound = list(main = "normal(0,0.3)", effects = "normal(0,0.3)"),
       ndt = list(main = "normal(-2,0.3)", effects = "normal(0,0.3)"),
       s = list(main = "normal(0,0.3)", effects = "normal(0,0.2)"),
-      st0 = list(main = "normal(0,0.1)", effects = "normal(0,0.05)")
+      sndt = list(main = "normal(-3,0.75)", effects = "normal(0,0.3)")
     ),
     init_ranges = list(
       mu = c(-0.5, 0.5),
@@ -36,17 +36,17 @@
       bound = c(1.5, 2),
       ndt = c(0.025, 0.05),
       s = c(0.95, 1.05),
-      st0 = c(0.01, 0.05)
+      sndt = c(0.01, 0.05)
     )
   ),
   crisk = list(
     parameters = list(
       drift = "drift rate",
       bound = "boundary separation (total distance between boundaries)",
-      ndt = "non-decision time (minimum non-decision time when st0 > 0)",
+      ndt = "non-decision time (minimum non-decision time when sndt > 0)",
       zr = "relative starting point",
       s = "diffusion constant",
-      st0 = "range of the uniform trial-to-trial variability in the non-decision time"
+      sndt = "range of the uniform trial-to-trial variability in the non-decision time"
     ),
     links = list(
       drift = "identity",
@@ -54,13 +54,13 @@
       ndt = "log",
       zr = "logit",
       s = "log",
-      st0 = "identity"
+      sndt = "log"
     ),
     fixed_parameters = list(
       mu = 0,
       zr = 0,
       s = 0,
-      st0 = 0
+      sndt = 0
     ),
     priors = list(
       drift = list(main = "normal(0,1)", effects = "normal(0,0.5)"),
@@ -68,7 +68,7 @@
       ndt = list(main = "normal(-2,0.3)", effects = "normal(0,0.3)"),
       zr = list(main = "normal(0,0.3)", effects = "normal(0,0.2)"),
       s = list(main = "normal(0,0.5)", effects = "normal(0,0.2)"),
-      st0 = list(main = "normal(0,0.1)", effects = "normal(0,0.05)")
+      sndt = list(main = "normal(-3,0.75)", effects = "normal(0,0.3)")
     ),
     init_ranges = list(
       mu = c(-0.5, 0.5),
@@ -77,7 +77,7 @@
       ndt = c(0.025, 0.05),
       zr = c(0.45, 0.55),
       s = c(0.95, 1.05),
-      st0 = c(0.01, 0.05)
+      sndt = c(0.01, 0.05)
     )
   )
 )
@@ -132,12 +132,12 @@
 #'   automatically.
 #' @param links A named list of link functions for the model parameters.
 #'   Available parameters depend on the version: "simple" has `drift`, `bound`,
-#'   `ndt`, `s`, and `st0`; "crisk" additionally has `zr`. Default links are
-#'   "log" for most parameters, "logit" for `zr`, and "identity" for `st0`.
-#'   The identity link is required for `st0` while it is fixed at 0 (the
-#'   default); when `st0` is estimated with predictors, `links = list(st0 =
-#'   "log")` together with an explicit prior is recommended to keep predicted
-#'   values positive.
+#'   `ndt`, `s`, and `sndt`; "crisk" additionally has `zr`. Default links are
+#'   "log" for most parameters (including `sndt`) and "logit" for `zr`. While
+#'   `sndt` is fixed at 0 (the default), the family internally uses the
+#'   identity link for it so that the constant equals 0 on the natural scale;
+#'   the log link applies as soon as `sndt` is estimated, keeping all
+#'   predicted values positive.
 #' @param version A character string specifying which version of the cswald
 #'   model to use. Options are:
 #'   \itemize{
@@ -157,32 +157,33 @@
 #'   }
 #'   For more details, see Miller et al. (2017).
 #'
-#'   **Trial-to-trial variability in the non-decision time (`st0`)**
+#'   **Trial-to-trial variability in the non-decision time (`sndt`)**
 #'
-#'   Both versions include an optional parameter `st0` for uniform
+#'   Both versions include an optional parameter `sndt` for uniform
 #'   trial-to-trial variability in the non-decision time: the non-decision
-#'   time is distributed as `Uniform(ndt, ndt + st0)`, so `ndt` is the
+#'   time is distributed as `Uniform(ndt, ndt + sndt)`, so `ndt` is the
 #'   *minimum* non-decision time and the mean non-decision time is
-#'   `ndt + st0/2`. By default `st0` is fixed to 0, which reproduces the
-#'   standard censored shifted Wald model. To estimate it, add a formula for
-#'   `st0` to the model formula (e.g., `bmf(..., st0 ~ 1)`); to fix it at a
-#'   different value, supply a constant (e.g., `bmf(..., st0 = 0.15)`).
+#'   `ndt + sndt/2`. It corresponds to the `st0` parameter in rtdists and
+#'   fast-dm. By default `sndt` is fixed to 0, which reproduces the standard
+#'   censored shifted Wald model. To estimate it, add a formula for `sndt` to
+#'   the model formula (e.g., `bmf(..., sndt ~ 1)`); to fix it at a different
+#'   value, supply a constant in seconds (e.g., `bmf(..., sndt = 0.15)`).
 #'
-#'   Without `st0`, a handful of fast response times caps the entire `ndt`
+#'   Without `sndt`, a handful of fast response times caps the entire `ndt`
 #'   estimate (the likelihood requires `ndt < min(rt)`), which biases `ndt`,
 #'   `drift`, and `bound` when the generating process has variable
-#'   non-decision times (Miller et al., 2017, Fig. 3). Estimating `st0`
-#'   removes this bias. Note that `st0` itself is weakly identified at
+#'   non-decision times (Miller et al., 2017, Fig. 3). Estimating `sndt`
+#'   removes this bias. Note that `sndt` itself is weakly identified at
 #'   typical trial numbers: its value lies in de-biasing the other
 #'   parameters, not in substantive interpretation. Estimating it
-#'   population-level only (`st0 ~ 1`, no random effects) and checking prior
+#'   population-level only (`sndt ~ 1`, no random effects) and checking prior
 #'   sensitivity is recommended, since the prior acts as the effective
 #'   regularizer.
 #'
-#'   For the "crisk" version with `st0 > 0`, the two accumulators receive
+#'   For the "crisk" version with `sndt > 0`, the two accumulators receive
 #'   independent non-decision-time draws (a race between total finishing
 #'   times). Compared to a single shared draw per trial, choice probabilities
-#'   are identical and densities differ by less than ~2% even at `st0 = 0.3`.
+#'   are identical and densities differ by less than ~2% even at `sndt = 0.3`.
 #' @param ... Additional arguments passed internally (for testing purposes).
 #' @return An object of class `bmmodel`
 #' @export
@@ -355,30 +356,25 @@ bmf2bf.cswald <- function(model, formula) {
 # CONFIGURE_MODEL S3 METHODS                                             ####
 ############################################################################# !
 
-# a fixed st0 is realized as a constant(0) prior on the link scale, so any
-# link other than identity would silently fix st0 at a different natural
-# value (e.g. exp(0) = 1 under log)
-check_cswald_st0_link <- function(model) {
-  stopif(
-    !is.null(model$fixed_parameters[["st0"]]) && model$links$st0 != "identity",
-    "The st0 parameter is fixed to 0 via a constant prior on the link scale, \\
-    which requires the identity link. With link '{model$links$st0}' st0 would \\
-    silently be fixed to a different value. Keep the default identity link, \\
-    or estimate st0 by adding a formula for it (e.g., st0 ~ 1)."
-  )
+# a fixed sndt is realized as a constant(0) prior on the link scale, so the
+# family must use the identity link while sndt is fixed (constant(0) under
+# the default log link would silently fix sndt = 1); once the user frees
+# sndt via a formula, the model's link (log by default) keeps it positive
+resolve_cswald_sndt_link <- function(model) {
+  if (is.null(model$fixed_parameters[["sndt"]])) model$links$sndt else "identity"
 }
 
 #' @export
 configure_model.cswald_simple <- function(model, data, formula) {
   links <- model$links
-  check_cswald_st0_link(model)
+  link_sndt <- resolve_cswald_sndt_link(model)
   formula <- bmf2bf(model, formula)
 
-  cswald_family <- function(link_drift, link_bound, link_ndt, link_s, link_st0) {
+  cswald_family <- function(link_drift, link_bound, link_ndt, link_s, link_sndt) {
     brms::custom_family(
       "cswald",
-      dpars = c("mu", "drift", "bound", "ndt", "s", "st0"),
-      links = c("identity", link_drift, link_bound, link_ndt, link_s, link_st0),
+      dpars = c("mu", "drift", "bound", "ndt", "s", "sndt"),
+      links = c("identity", link_drift, link_bound, link_ndt, link_s, link_sndt),
       ub = c(NA, NA, NA, NA, NA, NA),
       lb = c(NA, 0, 0, 0, 0, 0),
       type = "real",
@@ -394,7 +390,7 @@ configure_model.cswald_simple <- function(model, data, formula) {
     link_bound = links$bound,
     link_ndt = links$ndt,
     link_s = links$s,
-    link_st0 = links$st0
+    link_sndt = link_sndt
   )
 
   sc_path <- system.file("stan_chunks", package = "bmm")
@@ -412,7 +408,7 @@ posterior_predict_cswald_simple <- function(i, prep, ...) {
   bound <- brms::get_dpar(prep, "bound", i = i)
   ndt <- brms::get_dpar(prep, "ndt", i = i)
   s <- brms::get_dpar(prep, "s", i = i)
-  st0 <- brms::get_dpar(prep, "st0", i = i)
+  sndt <- brms::get_dpar(prep, "sndt", i = i)
 
   # convert single-boundary bound to total separation for the full DDM generator
   out <- .rcswald(
@@ -422,7 +418,7 @@ posterior_predict_cswald_simple <- function(i, prep, ...) {
     ndt = ndt,
     zr = 0.5,
     s = s,
-    st0 = st0
+    sndt = sndt
   )
 
   dots <- list(...)
@@ -438,27 +434,27 @@ log_lik_cswald_simple <- function(i, prep) {
   bound <- brms::get_dpar(prep, "bound", i = i)
   ndt <- brms::get_dpar(prep, "ndt", i = i)
   s <- brms::get_dpar(prep, "s", i = i)
-  st0 <- brms::get_dpar(prep, "st0", i = i)
+  sndt <- brms::get_dpar(prep, "sndt", i = i)
 
   rt <- rep(prep$data$Y[i], length(drift))
   response <- rep(prep$data$dec[i], length(drift))
 
   .dcswald(rt, response, drift, bound, ndt,
-    zr = 0.5, s = s, st0 = st0, version = "simple", log = TRUE
+    zr = 0.5, s = s, sndt = sndt, version = "simple", log = TRUE
   )
 }
 
 #' @export
 configure_model.cswald_crisk <- function(model, data, formula) {
   links <- model$links
-  check_cswald_st0_link(model)
+  link_sndt <- resolve_cswald_sndt_link(model)
   formula <- bmf2bf(model, formula)
 
-  cswald_crisk_family <- function(link_drift, link_bound, link_ndt, link_zr, link_s, link_st0) {
+  cswald_crisk_family <- function(link_drift, link_bound, link_ndt, link_zr, link_s, link_sndt) {
     brms::custom_family(
       "cswald_crisk",
-      dpars = c("mu", "drift", "bound", "ndt", "zr", "s", "st0"),
-      links = c("identity", link_drift, link_bound, link_ndt, link_zr, link_s, link_st0),
+      dpars = c("mu", "drift", "bound", "ndt", "zr", "s", "sndt"),
+      links = c("identity", link_drift, link_bound, link_ndt, link_zr, link_s, link_sndt),
       ub = c(NA, NA, NA, NA, 1, NA, NA),
       lb = c(NA, NA, 0, 0, 0, 0, 0),
       type = "real",
@@ -474,7 +470,7 @@ configure_model.cswald_crisk <- function(model, data, formula) {
     link_ndt = links$ndt,
     link_zr = links$zr,
     link_s = links$s,
-    link_st0 = links$st0
+    link_sndt = link_sndt
   )
 
   sc_path <- system.file("stan_chunks", package = "bmm")
@@ -493,13 +489,13 @@ log_lik_cswald_crisk <- function(i, prep) {
   ndt <- brms::get_dpar(prep, "ndt", i = i)
   zr <- brms::get_dpar(prep, "zr", i = i)
   s <- brms::get_dpar(prep, "s", i = i)
-  st0 <- brms::get_dpar(prep, "st0", i = i)
+  sndt <- brms::get_dpar(prep, "sndt", i = i)
 
   rt <- rep(prep$data$Y[i], length(drift))
   response <- rep(prep$data$dec[i], length(drift))
 
   .dcswald(rt, response, drift, bound, ndt,
-    zr = zr, s = s, st0 = st0, version = "crisk", log = TRUE
+    zr = zr, s = s, sndt = sndt, version = "crisk", log = TRUE
   )
 }
 
@@ -509,7 +505,7 @@ posterior_predict_cswald_crisk <- function(i, prep, ...) {
   ndt <- brms::get_dpar(prep, "ndt", i = i)
   zr <- brms::get_dpar(prep, "zr", i = i)
   s <- brms::get_dpar(prep, "s", i = i)
-  st0 <- brms::get_dpar(prep, "st0", i = i)
+  sndt <- brms::get_dpar(prep, "sndt", i = i)
 
   out <- .rcswald(
     n = length(drift),
@@ -518,7 +514,7 @@ posterior_predict_cswald_crisk <- function(i, prep, ...) {
     ndt = ndt,
     zr = zr,
     s = s,
-    st0 = st0
+    sndt = sndt
   )
 
   dots <- list(...)

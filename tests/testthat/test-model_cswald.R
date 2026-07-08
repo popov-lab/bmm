@@ -374,22 +374,22 @@ test_that("cswald handles high error rate data with crisk version", {
 })
 
 # -----------------------------------------------------------------------------
-# st0 (trial-to-trial NDT variability) tests
+# sndt (trial-to-trial NDT variability) tests
 # -----------------------------------------------------------------------------
 
-test_that("cswald includes st0 as an overridable fixed parameter", {
+test_that("cswald includes sndt as an overridable fixed parameter", {
   for (version in c("simple", "crisk")) {
     model <- cswald(rt = "rt", response = "response", version = version)
 
-    expect_true("st0" %in% names(model$parameters))
-    expect_equal(model$fixed_parameters$st0, 0)
-    expect_equal(model$links$st0, "identity")
-    expect_true("st0" %in% names(model$default_priors))
-    expect_equal(model$init_ranges$st0, c(0.01, 0.05))
+    expect_true("sndt" %in% names(model$parameters))
+    expect_equal(model$fixed_parameters$sndt, 0)
+    expect_equal(model$links$sndt, "log")
+    expect_true("sndt" %in% names(model$default_priors))
+    expect_equal(model$init_ranges$sndt, c(0.01, 0.05))
   }
 })
 
-test_that("configure_model includes st0 as the last family dpar", {
+test_that("configure_model includes sndt as the last family dpar", {
   skip_on_cran()
 
   dat <- data.frame(
@@ -401,41 +401,38 @@ test_that("configure_model includes st0 as the last family dpar", {
   config <- configure_model(model, dat, bmf(drift ~ 1, bound ~ 1, ndt ~ 1))
   expect_equal(
     config$formula$family$dpars,
-    c("mu", "drift", "bound", "ndt", "s", "st0")
+    c("mu", "drift", "bound", "ndt", "s", "sndt")
   )
 
   model <- cswald(rt = "rt", response = "response", version = "crisk")
   config <- configure_model(model, dat, bmf(drift ~ 1, bound ~ 1, ndt ~ 1, zr ~ 1))
   expect_equal(
     config$formula$family$dpars,
-    c("mu", "drift", "bound", "ndt", "zr", "s", "st0")
+    c("mu", "drift", "bound", "ndt", "zr", "s", "sndt")
   )
 })
 
-test_that("configure_model errors for non-identity st0 link while st0 is fixed", {
+test_that("configure_model uses identity link for fixed sndt and log when freed", {
   skip_on_cran()
 
   dat <- data.frame(
     rt = runif(100, 0.4, 1.5),
     response = sample(c(0, 1), 100, replace = TRUE)
   )
-  model <- cswald(
-    rt = "rt", response = "response",
-    links = list(st0 = "log"), version = "simple"
-  )
+  model <- cswald(rt = "rt", response = "response", version = "simple")
 
-  expect_error(
-    configure_model(model, dat, bmf(drift ~ 1, bound ~ 1, ndt ~ 1)),
-    "requires the identity link"
-  )
+  # sndt fixed at 0: the family link must be identity so constant(0) = 0 s
+  config <- configure_model(model, dat, bmf(drift ~ 1, bound ~ 1, ndt ~ 1))
+  expect_equal(config$formula$family$link_sndt, "identity")
 
-  # freeing st0 via the formula lifts the restriction
-  formula <- bmf(drift ~ 1, bound ~ 1, ndt ~ 1, st0 ~ 1)
+  # sndt freed by a formula: the model's default log link applies
+  formula <- bmf(drift ~ 1, bound ~ 1, ndt ~ 1, sndt ~ 1)
   model_free <- bmm:::check_model(model, dat, formula)
-  expect_silent(configure_model(model_free, dat, formula))
+  config <- configure_model(model_free, dat, formula)
+  expect_equal(config$formula$family$link_sndt, "log")
 })
 
-test_that("cswald default st0 produces a well-formed constant prior", {
+test_that("cswald default sndt produces a well-formed constant prior", {
   skip_on_cran()
 
   dat <- data.frame(
@@ -450,13 +447,13 @@ test_that("cswald default st0 produces a well-formed constant prior", {
   config <- configure_model(model2, dat, formula2)
   prior <- configure_prior(model2, dat, config$formula, NULL)
 
-  st0_rows <- prior[prior$dpar == "st0" & prior$prior != "", ]
-  expect_equal(nrow(st0_rows), 1)
-  expect_equal(st0_rows$prior, "constant(0)")
-  expect_equal(st0_rows$class, "Intercept")
+  sndt_rows <- prior[prior$dpar == "sndt" & prior$prior != "", ]
+  expect_equal(nrow(sndt_rows), 1)
+  expect_equal(sndt_rows$prior, "constant(0)")
+  expect_equal(sndt_rows$class, "Intercept")
 })
 
-test_that("cswald default prior applies when st0 is estimated", {
+test_that("cswald default prior applies when sndt is estimated", {
   skip_on_cran()
 
   dat <- data.frame(
@@ -464,40 +461,40 @@ test_that("cswald default prior applies when st0 is estimated", {
     response = sample(c(0, 1), 100, replace = TRUE)
   )
   model <- cswald(rt = "rt", response = "response", version = "simple")
-  formula <- bmf(drift ~ 1, bound ~ 1, ndt ~ 1, st0 ~ 1)
+  formula <- bmf(drift ~ 1, bound ~ 1, ndt ~ 1, sndt ~ 1)
 
   model2 <- bmm:::check_model(model, dat, formula)
   formula2 <- bmm:::check_formula(model2, dat, formula)
   config <- configure_model(model2, dat, formula2)
   prior <- configure_prior(model2, dat, config$formula, NULL)
 
-  st0_rows <- prior[prior$dpar == "st0" & prior$prior != "", ]
-  expect_equal(st0_rows$prior, "normal(0,0.1)")
+  sndt_rows <- prior[prior$dpar == "sndt" & prior$prior != "", ]
+  expect_equal(sndt_rows$prior, "normal(-3,0.75)")
 })
 
-test_that("cswald with estimated st0 runs with mock backend", {
+test_that("cswald with estimated sndt runs with mock backend", {
   skip_on_cran()
 
-  dat <- rcswald(n = 100, drift = 2, bound = 1.5, ndt = 0.3, st0 = 0.2)
+  dat <- rcswald(n = 100, drift = 2, bound = 1.5, ndt = 0.3, sndt = 0.2)
   model <- cswald(rt = "rt", response = "response", version = "simple")
-  formula <- bmf(drift ~ 1, bound ~ 1, ndt ~ 1, st0 ~ 1)
+  formula <- bmf(drift ~ 1, bound ~ 1, ndt ~ 1, sndt ~ 1)
   expect_silent(
     bmm(formula, dat, model, backend = "mock", mock = 1, rename = FALSE)
   )
 
   model <- cswald(rt = "rt", response = "response", version = "crisk")
-  formula <- bmf(drift ~ 1, bound ~ 1, ndt ~ 1, zr ~ 1, st0 ~ 1)
+  formula <- bmf(drift ~ 1, bound ~ 1, ndt ~ 1, zr ~ 1, sndt ~ 1)
   expect_silent(
     bmm(formula, dat, model, backend = "mock", mock = 1, rename = FALSE)
   )
 })
 
-test_that("cswald with st0 fixed at a nonzero constant runs with mock backend", {
+test_that("cswald with sndt fixed at a nonzero constant runs with mock backend", {
   skip_on_cran()
 
-  dat <- rcswald(n = 100, drift = 2, bound = 1.5, ndt = 0.3, st0 = 0.15)
+  dat <- rcswald(n = 100, drift = 2, bound = 1.5, ndt = 0.3, sndt = 0.15)
   model <- cswald(rt = "rt", response = "response", version = "simple")
-  formula <- bmf(drift ~ 1, bound ~ 1, ndt ~ 1, st0 = 0.15)
+  formula <- bmf(drift ~ 1, bound ~ 1, ndt ~ 1, sndt = 0.15)
 
   expect_silent(
     bmm(formula, dat, model, backend = "mock", mock = 1, rename = FALSE)
@@ -505,31 +502,28 @@ test_that("cswald with st0 fixed at a nonzero constant runs with mock backend", 
 
   # the constant lands on the identity-link Intercept, so 0.15 means 0.15 s
   model2 <- bmm:::check_model(model, dat, formula)
-  expect_equal(model2$fixed_parameters$st0, 0.15)
+  expect_equal(model2$fixed_parameters$sndt, 0.15)
   formula2 <- bmm:::check_formula(model2, dat, formula)
   config <- configure_model(model2, dat, formula2)
   prior <- configure_prior(model2, dat, config$formula, NULL)
-  st0_rows <- prior[prior$dpar == "st0" & prior$prior != "", ]
-  expect_equal(st0_rows$prior, "constant(0.15)")
+  sndt_rows <- prior[prior$dpar == "sndt" & prior$prior != "", ]
+  expect_equal(sndt_rows$prior, "constant(0.15)")
 })
 
-test_that("cswald with st0 predictors and log link runs with mock backend", {
+test_that("cswald with sndt predictors runs with mock backend", {
   skip_on_cran()
 
-  dat <- rcswald(n = 200, drift = 2, bound = 1.5, ndt = 0.3, st0 = 0.2)
+  dat <- rcswald(n = 200, drift = 2, bound = 1.5, ndt = 0.3, sndt = 0.2)
   dat$condition <- rep(c("A", "B"), each = 100)
-  model <- cswald(
-    rt = "rt", response = "response",
-    links = list(st0 = "log"), version = "simple"
-  )
-  formula <- bmf(drift ~ 1, bound ~ 1, ndt ~ 1, st0 ~ condition)
+  model <- cswald(rt = "rt", response = "response", version = "simple")
+  formula <- bmf(drift ~ 1, bound ~ 1, ndt ~ 1, sndt ~ condition)
 
   expect_silent(
     bmm(formula, dat, model, backend = "mock", mock = 1, rename = FALSE)
   )
 })
 
-test_that("create_initfun generates in-range inits for estimated st0", {
+test_that("create_initfun generates in-range inits for estimated sndt", {
   skip_on_cran()
 
   dat <- data.frame(
@@ -537,7 +531,7 @@ test_that("create_initfun generates in-range inits for estimated st0", {
     response = sample(c(0, 1), 100, replace = TRUE)
   )
   model <- cswald(rt = "rt", response = "response", version = "simple")
-  formula <- bmf(drift ~ 1, bound ~ 1, ndt ~ 1, st0 ~ 1)
+  formula <- bmf(drift ~ 1, bound ~ 1, ndt ~ 1, sndt ~ 1)
 
   model2 <- bmm:::check_model(model, dat, formula)
   formula2 <- bmm:::check_formula(model2, dat, formula)
@@ -545,10 +539,11 @@ test_that("create_initfun generates in-range inits for estimated st0", {
   initfun <- create_initfun(model2, dat, config$formula)
   inits <- initfun()
 
-  # the s / st0 substring collision is resolved by word-boundary matching
-  expect_true("Intercept_st0" %in% names(inits))
-  expect_gte(inits$Intercept_st0, 0.01)
-  expect_lte(inits$Intercept_st0, 0.05)
+  # the s / sndt substring collision is resolved by word-boundary matching;
+  # inits are drawn on the natural scale and transformed to the log link
+  expect_true("Intercept_sndt" %in% names(inits))
+  expect_gte(exp(inits$Intercept_sndt), 0.01)
+  expect_lte(exp(inits$Intercept_sndt), 0.05)
   expect_gte(exp(inits$Intercept_s), 0.95)
   expect_lte(exp(inits$Intercept_s), 1.05)
 })

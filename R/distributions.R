@@ -825,13 +825,13 @@ rddm <- function(n, drift, bound, ndt, zr = 0.5) {
 #'   approximation to the Wiener diffusion model for tasks with high accuracy
 #'   (few errors).
 #'
-#'   When `st0 > 0`, the `"crisk"` density treats the non-decision time of the
+#'   When `sndt > 0`, the `"crisk"` density treats the non-decision time of the
 #'   two accumulators as *independent* draws (a race between total finishing
 #'   times), whereas the rtdists-based `"crisk"` `r`/`p`/`q` functions use the
 #'   diffusion process with a single shared non-decision time per trial. This
 #'   is the same approximation class as the crisk model itself: choice
 #'   probabilities are identical and densities differ by less than ~2% even at
-#'   `st0 = 0.3`.
+#'   `sndt = 0.3`.
 #'
 #' @param rt A vector of response times in seconds for which the likelihood
 #'   should be evaluated
@@ -845,11 +845,13 @@ rddm <- function(n, drift, bound, ndt, zr = 0.5) {
 #'   Default is `0.5` (unbiased). Values must be between 0 and 1.
 #' @param s The diffusion constant - the standard deviation of the noise in the
 #'   evidence accumulation process. Default is `s = 1`
-#' @param st0 The range of the trial-to-trial variability in the non-decision
+#' @param sndt The range of the trial-to-trial variability in the non-decision
 #'   time. The non-decision time is uniformly distributed on
-#'   `[ndt, ndt + st0]`, so `ndt` is the *minimum* non-decision time and the
-#'   mean non-decision time is `ndt + st0/2`. Default is `st0 = 0` (no
+#'   `[ndt, ndt + sndt]`, so `ndt` is the *minimum* non-decision time and the
+#'   mean non-decision time is `ndt + sndt/2`. Default is `sndt = 0` (no
 #'   variability), which reproduces the standard censored shifted Wald model.
+#'   Corresponds to the `st0` parameter in [rtdists::rdiffusion()] and
+#'   fast-dm.
 #' @param version A character string specifying the version of the `cswald` for
 #'   which the likelihood should be returned. Available versions are "simple"
 #'   and "crisk", the default is "simple."
@@ -873,9 +875,9 @@ rddm <- function(n, drift, bound, ndt, zr = 0.5) {
 #' head(dat)
 #' hist(dat$rt)
 #' @export
-dcswald <- function(rt, response, drift, bound, ndt, zr = 0.5, s = 1, st0 = 0,
+dcswald <- function(rt, response, drift, bound, ndt, zr = 0.5, s = 1, sndt = 0,
                     version = c("simple", "crisk"), log = TRUE) {
-  validate_cswald_parameters(drift, bound, ndt, zr, s, st0)
+  validate_cswald_parameters(drift, bound, ndt, zr, s, sndt)
   version <- match.arg(version)
 
   stopif(
@@ -885,22 +887,22 @@ dcswald <- function(rt, response, drift, bound, ndt, zr = 0.5, s = 1, st0 = 0,
     the shortest reaction time."
   )
 
-  .dcswald(rt, response, drift, bound, ndt, zr, s, st0, version, log)
+  .dcswald(rt, response, drift, bound, ndt, zr, s, sndt, version, log)
 }
 
-# st0 = 0 default is load-bearing: pre-st0 bmmfit objects carry serialized
-# log_lik closures that call .dcswald without st0
-.dcswald <- function(rt, response, drift, bound, ndt, zr, s, st0 = 0, version, log) {
+# sndt = 0 default is load-bearing: pre-sndt bmmfit objects carry serialized
+# log_lik closures that call .dcswald without sndt
+.dcswald <- function(rt, response, drift, bound, ndt, zr, s, sndt = 0, version, log) {
   rt_shifted <- rt - ndt
 
   if (version == "simple") {
-    log_ll <- .pwald_st0(rt_shifted, drift, bound, s, st0)
-    ll1 <- .dwald_st0(rt_shifted, drift, bound, s, st0)
+    log_ll <- .pwald_sndt(rt_shifted, drift, bound, s, sndt)
+    ll1 <- .dwald_sndt(rt_shifted, drift, bound, s, sndt)
   } else {
-    log_ll <- .dwald_st0(rt_shifted, -drift, bound * zr, s, st0) +
-      .pwald_st0(rt_shifted, drift, bound - bound * zr, s, st0)
-    ll1 <- .dwald_st0(rt_shifted, drift, bound - bound * zr, s, st0) +
-      .pwald_st0(rt_shifted, -drift, bound * zr, s, st0)
+    log_ll <- .dwald_sndt(rt_shifted, -drift, bound * zr, s, sndt) +
+      .pwald_sndt(rt_shifted, drift, bound - bound * zr, s, sndt)
+    ll1 <- .dwald_sndt(rt_shifted, drift, bound - bound * zr, s, sndt) +
+      .pwald_sndt(rt_shifted, -drift, bound * zr, s, sndt)
   }
 
   log_ll[response == 1] <- ll1[response == 1]
@@ -910,14 +912,14 @@ dcswald <- function(rt, response, drift, bound, ndt, zr = 0.5, s = 1, st0 = 0,
 
 #' @rdname cswald_dist
 #' @export
-rcswald <- function(n, drift, bound, ndt, zr = 0.5, s = 1, st0 = 0) {
-  validate_cswald_parameters(drift, bound, ndt, zr, s, st0)
-  .rcswald(n, drift, bound, ndt, zr, s, st0)
+rcswald <- function(n, drift, bound, ndt, zr = 0.5, s = 1, sndt = 0) {
+  validate_cswald_parameters(drift, bound, ndt, zr, s, sndt)
+  .rcswald(n, drift, bound, ndt, zr, s, sndt)
 }
 
-.rcswald <- function(n, drift, bound, ndt, zr, s, st0 = 0) {
+.rcswald <- function(n, drift, bound, ndt, zr, s, sndt = 0) {
   out <- rtdists::rdiffusion(
-    n = n, a = bound, v = drift, t0 = ndt, z = zr * bound, s = s, st0 = st0
+    n = n, a = bound, v = drift, t0 = ndt, z = zr * bound, s = s, st0 = sndt
   )
   data.frame(rt = out$rt, response = as.numeric(out$response == "upper"))
 }
@@ -950,9 +952,9 @@ rcswald <- function(n, drift, bound, ndt, zr = 0.5, s = 1, st0 = 0) {
 #'   defined for `response = 1`. For the `"crisk"` version, this uses
 #'   [rtdists::qdiffusion()] internally.
 #' @export
-pcswald <- function(q, response, drift, bound, ndt, zr = 0.5, s = 1, st0 = 0,
+pcswald <- function(q, response, drift, bound, ndt, zr = 0.5, s = 1, sndt = 0,
                     version = "simple", lower.tail = TRUE, log.p = FALSE) {
-  validate_cswald_parameters(drift, bound, ndt, zr, s, st0)
+  validate_cswald_parameters(drift, bound, ndt, zr, s, sndt)
   q_shifted <- q - ndt
   p <- numeric(length(q))
 
@@ -966,7 +968,7 @@ pcswald <- function(q, response, drift, bound, ndt, zr = 0.5, s = 1, st0 = 0,
 
     idx1 <- response == 1 & q_shifted > 0
     if (any(idx1)) {
-      p[idx1] <- (1 - exp(.pwald_st0(q_shifted, drift, bound, s, st0)))[idx1]
+      p[idx1] <- (1 - exp(.pwald_sndt(q_shifted, drift, bound, s, sndt)))[idx1]
     }
 
     p[response == 0] <- NA
@@ -981,7 +983,7 @@ pcswald <- function(q, response, drift, bound, ndt, zr = 0.5, s = 1, st0 = 0,
         t0 = ndt,
         z = zr * bound,
         s = s,
-        st0 = st0
+        st0 = sndt
       )[idx_valid]
     }
   } else {
@@ -1005,9 +1007,9 @@ pcswald <- function(q, response, drift, bound, ndt, zr = 0.5, s = 1, st0 = 0,
 #' @rdname cswald_dist
 #' @param p A vector of probabilities for which to compute quantiles
 #' @export
-qcswald <- function(p, response, drift, bound, ndt, zr = 0.5, s = 1, st0 = 0,
+qcswald <- function(p, response, drift, bound, ndt, zr = 0.5, s = 1, sndt = 0,
                     version = "simple", lower.tail = TRUE, log.p = FALSE) {
-  validate_cswald_parameters(drift, bound, ndt, zr, s, st0)
+  validate_cswald_parameters(drift, bound, ndt, zr, s, sndt)
 
   if (log.p) {
     p <- exp(p)
@@ -1023,7 +1025,7 @@ qcswald <- function(p, response, drift, bound, ndt, zr = 0.5, s = 1, st0 = 0,
   drift <- rep(drift, length.out = n)
   bound <- rep(bound, length.out = n)
   s <- rep(s, length.out = n)
-  st0 <- rep(st0, length.out = n)
+  sndt <- rep(sndt, length.out = n)
   response <- rep(response, length.out = n)
   q <- ndt # default
 
@@ -1040,13 +1042,13 @@ qcswald <- function(p, response, drift, bound, ndt, zr = 0.5, s = 1, st0 = 0,
     # adaptive upper bound based on expected RT (mean of Wald ~ bound/drift)
     # use 20x the expected RT as upper bound, with minimum of 10 seconds
     expected_rt <- bound / max(abs(drift), 0.01)
-    upper_bound <- ndt + st0 + max(10, 20 * expected_rt)
+    upper_bound <- ndt + sndt + max(10, 20 * expected_rt)
 
     idx1 <- which(response == 1)
     for (i in idx1) {
       q[i] <- stats::uniroot(
         function(x) {
-          1 - exp(.pwald_st0(x - ndt[i], drift[i], bound[i], s[i], st0[i])) - p[i]
+          1 - exp(.pwald_sndt(x - ndt[i], drift[i], bound[i], s[i], sndt[i])) - p[i]
         },
         interval = c(ndt[i] + 1e-10, upper_bound[i]),
         extendInt = "upX"
@@ -1063,7 +1065,7 @@ qcswald <- function(p, response, drift, bound, ndt, zr = 0.5, s = 1, st0 = 0,
       t0 = ndt,
       z = zr * bound,
       s = s,
-      st0 = st0
+      st0 = sndt
     )
   } else {
     stop2(
@@ -1075,7 +1077,7 @@ qcswald <- function(p, response, drift, bound, ndt, zr = 0.5, s = 1, st0 = 0,
   q
 }
 
-validate_cswald_parameters <- function(drift, bound, ndt, zr, s, st0 = 0) {
+validate_cswald_parameters <- function(drift, bound, ndt, zr, s, sndt = 0) {
   stopif(
     any(bound <= 0),
     "Values for the boundary separation 'bound' must be positive."
@@ -1093,8 +1095,8 @@ validate_cswald_parameters <- function(drift, bound, ndt, zr, s, st0 = 0) {
     "Values for diffusion constant 's' must be positive."
   )
   stopif(
-    any(st0 < 0),
-    "Values for the non-decision time variability 'st0' must be non-negative."
+    any(sndt < 0),
+    "Values for the non-decision time variability 'sndt' must be non-negative."
   )
 }
 
@@ -1159,7 +1161,7 @@ log_diff_exp <- function(a, b) {
 # G(x) = int_0^x S_W(u) du -- the integrated survivor of the (possibly
 # defective) Wald, extended by G(x) = x for x <= 0 where S_W = 1. This
 # extension lets the convolved survivor below cover the partial-support
-# strip ndt < t < ndt + st0 without a special case. M1 is the partial
+# strip ndt < t < ndt + sndt without a special case. M1 is the partial
 # expectation int_0^x u f_W(u) du.
 .gwald <- function(x, drift, bound, s) {
   n <- max(length(x), length(drift), length(bound), length(s))
@@ -1195,25 +1197,25 @@ log_diff_exp <- function(a, b) {
   out
 }
 
-# log density of the Wald whose shift is smeared over Uniform(0, st0):
-# f(x) = [S_W(x - st0) - S_W(x)] / st0 (Miller et al., 2018, Eq. 6), where
-# x is the onset-shifted time rt - ndt. Entries with st0 below 1e-8 use the
-# plain Wald density (the convolution is continuous at st0 = 0); negative
-# st0 yields -Inf so the brms log_lik path rejects rather than errors.
-.dwald_st0 <- function(x, drift, bound, s, st0) {
-  n <- max(length(x), length(drift), length(bound), length(s), length(st0))
+# log density of the Wald whose shift is smeared over Uniform(0, sndt):
+# f(x) = [S_W(x - sndt) - S_W(x)] / sndt (Miller et al., 2018, Eq. 6), where
+# x is the onset-shifted time rt - ndt. Entries with sndt below 1e-8 use the
+# plain Wald density (the convolution is continuous at sndt = 0); negative
+# sndt yields -Inf so the brms log_lik path rejects rather than errors.
+.dwald_sndt <- function(x, drift, bound, s, sndt) {
+  n <- max(length(x), length(drift), length(bound), length(s), length(sndt))
   x <- rep_len(x, n)
   drift <- rep_len(drift, n)
   bound <- rep_len(bound, n)
   s <- rep_len(s, n)
-  st0 <- rep_len(st0, n)
+  sndt <- rep_len(sndt, n)
 
   out <- rep(-Inf, n)
-  novar <- st0 >= 0 & st0 < 1e-8
-  conv <- st0 >= 1e-8
+  novar <- sndt >= 0 & sndt < 1e-8
+  conv <- sndt >= 1e-8
   out[novar] <- .dwald(x[novar], drift[novar], bound[novar], s[novar], log = TRUE)
   if (any(conv)) {
-    ls_lo <- .pwald(x[conv] - st0[conv], drift[conv], bound[conv], s[conv],
+    ls_lo <- .pwald(x[conv] - sndt[conv], drift[conv], bound[conv], s[conv],
       lower.tail = FALSE, log.p = TRUE
     )
     ls_hi <- .pwald(x[conv], drift[conv], bound[conv], s[conv],
@@ -1222,14 +1224,14 @@ log_diff_exp <- function(a, b) {
     # for defective (negative-drift) accumulators both survivors converge to
     # the same positive constant in the deep tail, so their log-difference
     # drops below fp precision; the midpoint rule for the density is second
-    # order in st0 and stable there. The strip x <= st0 is excluded because
+    # order in sndt and stable there. The strip x <= sndt is excluded because
     # ls_lo = 0 exactly, making log_diff_exp accurate at any gap.
-    fallback <- (ls_lo - ls_hi) < 1e-8 & (x[conv] - st0[conv]) > 0
+    fallback <- (ls_lo - ls_hi) < 1e-8 & (x[conv] - sndt[conv]) > 0
     ld <- rep(-Inf, length(ls_lo))
     ld[!fallback] <- log_diff_exp(ls_lo[!fallback], ls_hi[!fallback]) -
-      log(st0[conv][!fallback])
+      log(sndt[conv][!fallback])
     ld[fallback] <- .dwald(
-      x[conv][fallback] - st0[conv][fallback] / 2,
+      x[conv][fallback] - sndt[conv][fallback] / 2,
       drift[conv][fallback], bound[conv][fallback], s[conv][fallback],
       log = TRUE
     )
@@ -1238,36 +1240,36 @@ log_diff_exp <- function(a, b) {
   out
 }
 
-# log survivor of the Wald + Uniform(0, st0) shift, used for censored
-# observations: S_conv(x) = [G(x) - G(x - st0)] / st0. Computed in natural
+# log survivor of the Wald + Uniform(0, sndt) shift, used for censored
+# observations: S_conv(x) = [G(x) - G(x - sndt)] / sndt. Computed in natural
 # space: for negative (defective) drift the signs of mu and the Phi-bracket
 # in M1 flip together and cancel, which a log-space form would need explicit
 # sign tracking for. Deep in the right tail the G-difference can cancel to
-# <= 0; there we fall back to the midpoint rule S_W(x - st0/2), whose
-# relative error is second order in st0 and irrelevant at ~ -35 nats.
-.pwald_st0 <- function(x, drift, bound, s, st0) {
-  n <- max(length(x), length(drift), length(bound), length(s), length(st0))
+# <= 0; there we fall back to the midpoint rule S_W(x - sndt/2), whose
+# relative error is second order in sndt and irrelevant at ~ -35 nats.
+.pwald_sndt <- function(x, drift, bound, s, sndt) {
+  n <- max(length(x), length(drift), length(bound), length(s), length(sndt))
   x <- rep_len(x, n)
   drift <- rep_len(drift, n)
   bound <- rep_len(bound, n)
   s <- rep_len(s, n)
-  st0 <- rep_len(st0, n)
+  sndt <- rep_len(sndt, n)
 
   out <- rep(-Inf, n)
-  novar <- st0 >= 0 & st0 < 1e-8
-  conv <- st0 >= 1e-8
+  novar <- sndt >= 0 & sndt < 1e-8
+  conv <- sndt >= 1e-8
   out[novar] <- .pwald(x[novar], drift[novar], bound[novar], s[novar],
     lower.tail = FALSE, log.p = TRUE
   )
   if (any(conv)) {
     s_conv <- (.gwald(x[conv], drift[conv], bound[conv], s[conv]) -
-      .gwald(x[conv] - st0[conv], drift[conv], bound[conv], s[conv])) / st0[conv]
+      .gwald(x[conv] - sndt[conv], drift[conv], bound[conv], s[conv])) / sndt[conv]
     fallback <- s_conv <= 1e-300
     s_conv[fallback] <- 1 # avoids log(<= 0) warnings; overwritten below
     ls <- log(s_conv)
     if (any(fallback)) {
       ls[fallback] <- .pwald(
-        x[conv][fallback] - st0[conv][fallback] / 2,
+        x[conv][fallback] - sndt[conv][fallback] / 2,
         drift[conv][fallback], bound[conv][fallback], s[conv][fallback],
         lower.tail = FALSE, log.p = TRUE
       )

@@ -743,71 +743,71 @@ test_that("dcswald error-response survival equals 1 - CDF in mid-range (#376)", 
   expect_equal(ll_error, log(1 - cdf))
 })
 
-test_that("dcswald with st0 = 0 equals dcswald without st0", {
+test_that("dcswald with sndt = 0 equals dcswald without sndt", {
   rt <- c(0.35, 0.5, 0.8, 1.5, 3)
   for (version in c("simple", "crisk")) {
     for (resp in c(0, 1)) {
       expect_identical(
         dcswald(rt, resp, drift = 2, bound = 1, ndt = 0.3, version = version),
         dcswald(rt, resp,
-          drift = 2, bound = 1, ndt = 0.3, st0 = 0, version = version
+          drift = 2, bound = 1, ndt = 0.3, sndt = 0, version = version
         )
       )
     }
   }
 })
 
-test_that("dcswald with st0 matches the numerical convolution (simple)", {
+test_that("dcswald with sndt matches the numerical convolution (simple)", {
   drift <- 3.5
   bound <- 1.2
   ndt <- 0.3
-  st0 <- 0.2
+  sndt <- 0.2
   rt <- c(0.35, 0.45, 0.49, 0.6, 1, 2)
   f_num <- sapply(rt, function(ti) {
     stats::integrate(
-      function(th) exp(bmm:::.dwald(ti - th, drift, bound, s = 1)) / st0,
-      lower = ndt, upper = ndt + st0, rel.tol = 1e-12
+      function(th) exp(bmm:::.dwald(ti - th, drift, bound, s = 1)) / sndt,
+      lower = ndt, upper = ndt + sndt, rel.tol = 1e-12
     )$value
   })
-  f_bmm <- dcswald(rt, 1, drift, bound, ndt, st0 = st0, log = FALSE)
+  f_bmm <- dcswald(rt, 1, drift, bound, ndt, sndt = sndt, log = FALSE)
   expect_equal(f_bmm, f_num, tolerance = 1e-8)
 })
 
-test_that("dcswald censored term with st0 matches the numerical integral", {
+test_that("dcswald censored term with sndt matches the numerical integral", {
   ndt <- 0.3
-  st0 <- 0.25
+  sndt <- 0.25
   rt <- c(0.4, 0.6, 1, 1.8)
   for (drift in c(2, -0.8)) {
     bound <- if (drift > 0) 1.2 else 0.8
     s_num <- sapply(rt, function(ti) {
       1 - stats::integrate(
         function(th) {
-          bmm:::.pwald(ti - th, drift, bound, s = 1, lower.tail = TRUE, log.p = FALSE) / st0
+          bmm:::.pwald(ti - th, drift, bound, s = 1, lower.tail = TRUE, log.p = FALSE) / sndt
         },
-        lower = ndt, upper = ndt + st0, rel.tol = 1e-12
+        lower = ndt, upper = ndt + sndt, rel.tol = 1e-12
       )$value
     })
-    s_bmm <- exp(bmm:::.pwald_st0(rt - ndt, drift, bound, s = 1, st0 = st0))
+    s_bmm <- exp(bmm:::.pwald_sndt(rt - ndt, drift, bound, s = 1, sndt = sndt))
     expect_equal(s_bmm, s_num, tolerance = 1e-8)
   }
 })
 
-test_that("dcswald with st0 integrates to 1 for the simple version", {
+test_that("dcswald with sndt integrates to 1 for the simple version", {
   total <- stats::integrate(
-    function(t) dcswald(t, 1, drift = 3.5, bound = 1.2, ndt = 0.3, st0 = 0.2, log = FALSE),
+    function(t) dcswald(t, 1, drift = 3.5, bound = 1.2, ndt = 0.3, sndt = 0.2, log = FALSE),
     lower = 0.3001, upper = Inf, rel.tol = 1e-10
   )$value
   expect_equal(total, 1, tolerance = 1e-6)
 })
 
-test_that("dcswald crisk defective densities with st0 sum to 1", {
+test_that("dcswald crisk defective densities with sndt sum to 1", {
   for (drift in c(0.5, 2)) {
     total <- stats::integrate(
       function(t) {
-        dcswald(t, 1, drift, bound = 1.6, ndt = 0.3, st0 = 0.2,
+        dcswald(t, 1, drift, bound = 1.6, ndt = 0.3, sndt = 0.2,
           version = "crisk", log = FALSE
         ) +
-          dcswald(t, 0, drift, bound = 1.6, ndt = 0.3, st0 = 0.2,
+          dcswald(t, 0, drift, bound = 1.6, ndt = 0.3, sndt = 0.2,
             version = "crisk", log = FALSE
           )
       },
@@ -817,27 +817,27 @@ test_that("dcswald crisk defective densities with st0 sum to 1", {
   }
 })
 
-test_that("dcswald with st0 covers the partial-support strip", {
+test_that("dcswald with sndt covers the partial-support strip", {
   drift <- 2
   bound <- 1
   ndt <- 0.3
-  st0 <- 0.2
-  # inside the strip (ndt, ndt + st0) the density is F_W(t - ndt) / st0
+  sndt <- 0.2
+  # inside the strip (ndt, ndt + sndt) the density is F_W(t - ndt) / sndt
   t_strip <- 0.4
   expect_equal(
-    dcswald(t_strip, 1, drift, bound, ndt, st0 = st0, log = FALSE),
+    dcswald(t_strip, 1, drift, bound, ndt, sndt = sndt, log = FALSE),
     bmm:::.pwald(t_strip - ndt, drift, bound, s = 1,
       lower.tail = TRUE, log.p = FALSE
-    ) / st0
+    ) / sndt
   )
   # at or below the support edge the internal density is zero
   expect_identical(
-    bmm:::.dwald_st0(c(-0.05, 0), drift, bound, s = 1, st0 = st0),
+    bmm:::.dwald_sndt(c(-0.05, 0), drift, bound, s = 1, sndt = sndt),
     c(-Inf, -Inf)
   )
   # the internal survivor is 1 at or below the support edge
   expect_identical(
-    bmm:::.pwald_st0(c(-0.05, 0), drift, bound, s = 1, st0 = st0),
+    bmm:::.pwald_sndt(c(-0.05, 0), drift, bound, s = 1, sndt = sndt),
     c(0, 0)
   )
 })
@@ -856,10 +856,10 @@ test_that(".gwald handles nonpositive x and is continuous around drift = 0", {
   }
 })
 
-test_that("dcswald with st0 stays finite and monotone in the far tail", {
+test_that("dcswald with sndt stays finite and monotone in the far tail", {
   rt <- seq(5, 40, by = 5)
   for (resp in c(0, 1)) {
-    ll <- dcswald(rt, resp, drift = 3.5, bound = 1.2, ndt = 0.3, st0 = 0.2)
+    ll <- dcswald(rt, resp, drift = 3.5, bound = 1.2, ndt = 0.3, sndt = 0.2)
     expect_true(all(is.finite(ll)))
     expect_true(all(diff(ll) < 0))
   }
@@ -867,84 +867,84 @@ test_that("dcswald with st0 stays finite and monotone in the far tail", {
   # whose survivor difference cancels in the deep tail (midpoint fallback)
   for (resp in c(0, 1)) {
     ll <- dcswald(rt, resp,
-      drift = 0.5, bound = 1.6, ndt = 0.3, st0 = 0.2, version = "crisk"
+      drift = 0.5, bound = 1.6, ndt = 0.3, sndt = 0.2, version = "crisk"
     )
     expect_true(all(is.finite(ll)))
     expect_true(all(diff(ll) < 0))
   }
 })
 
-test_that(".dcswald returns -Inf for negative st0 without erroring", {
+test_that(".dcswald returns -Inf for negative sndt without erroring", {
   ll <- bmm:::.dcswald(0.8, 1,
-    drift = 2, bound = 1, ndt = 0.3, zr = 0.5, s = 1, st0 = -0.1,
+    drift = 2, bound = 1, ndt = 0.3, zr = 0.5, s = 1, sndt = -0.1,
     version = "simple", log = TRUE
   )
   expect_identical(ll, -Inf)
 })
 
-test_that("dcswald errors when rt < ndt regardless of st0", {
+test_that("dcswald errors when rt < ndt regardless of sndt", {
   expect_error(
-    dcswald(0.2, 1, drift = 2, bound = 1, ndt = 0.3, st0 = 0.2),
+    dcswald(0.2, 1, drift = 2, bound = 1, ndt = 0.3, sndt = 0.2),
     "smaller than the non-decision time"
   )
 })
 
-test_that("dcswald with st0 handles draws-vector parameters mixing 0 and 0.2", {
-  st0 <- c(0, 0.2, 0, 0.2)
+test_that("dcswald with sndt handles draws-vector parameters mixing 0 and 0.2", {
+  sndt <- c(0, 0.2, 0, 0.2)
   drift <- c(2, 2, 3, 3)
-  ll <- dcswald(0.8, 1, drift, bound = 1, ndt = 0.3, st0 = st0)
+  ll <- dcswald(0.8, 1, drift, bound = 1, ndt = 0.3, sndt = sndt)
   expect_length(ll, 4)
   expect_equal(ll[1], dcswald(0.8, 1, 2, 1, 0.3))
-  expect_equal(ll[2], dcswald(0.8, 1, 2, 1, 0.3, st0 = 0.2))
-  expect_equal(ll[4], dcswald(0.8, 1, 3, 1, 0.3, st0 = 0.2))
+  expect_equal(ll[2], dcswald(0.8, 1, 2, 1, 0.3, sndt = 0.2))
+  expect_equal(ll[4], dcswald(0.8, 1, 3, 1, 0.3, sndt = 0.2))
 })
 
-test_that("rcswald with st0 generates valid output", {
+test_that("rcswald with sndt generates valid output", {
   dat0 <- rcswald(5000, drift = 2, bound = 1.5, ndt = 0.3)
-  dat1 <- rcswald(5000, drift = 2, bound = 1.5, ndt = 0.3, st0 = 0.3)
+  dat1 <- rcswald(5000, drift = 2, bound = 1.5, ndt = 0.3, sndt = 0.3)
   expect_true(all(dat1$rt > 0.3))
-  # onset convention: mean NDT is ndt + st0/2, shifting the mean RT
+  # onset convention: mean NDT is ndt + sndt/2, shifting the mean RT
   expect_equal(mean(dat1$rt) - mean(dat0$rt), 0.15, tolerance = 0.03)
 })
 
-test_that("pcswald with st0 is consistent with dcswald", {
+test_that("pcswald with sndt is consistent with dcswald", {
   drift <- 2
   bound <- 1
   ndt <- 0.3
-  st0 <- 0.2
+  sndt <- 0.2
   q <- c(0.5, 0.8, 1.2)
   eps <- 1e-6
-  cdf_slope <- (pcswald(q + eps, 1, drift, bound, ndt, st0 = st0) -
-    pcswald(q - eps, 1, drift, bound, ndt, st0 = st0)) / (2 * eps)
-  dens <- dcswald(q, 1, drift, bound, ndt, st0 = st0, log = FALSE)
+  cdf_slope <- (pcswald(q + eps, 1, drift, bound, ndt, sndt = sndt) -
+    pcswald(q - eps, 1, drift, bound, ndt, sndt = sndt)) / (2 * eps)
+  dens <- dcswald(q, 1, drift, bound, ndt, sndt = sndt, log = FALSE)
   expect_equal(cdf_slope, dens, tolerance = 1e-5)
 })
 
-test_that("pcswald and qcswald are inverses with st0", {
+test_that("pcswald and qcswald are inverses with sndt", {
   p <- c(0.1, 0.25, 0.5, 0.75, 0.9)
-  q <- qcswald(p, 1, drift = 2, bound = 1, ndt = 0.3, st0 = 0.2)
-  p_back <- pcswald(q, 1, drift = 2, bound = 1, ndt = 0.3, st0 = 0.2)
+  q <- qcswald(p, 1, drift = 2, bound = 1, ndt = 0.3, sndt = 0.2)
+  p_back <- pcswald(q, 1, drift = 2, bound = 1, ndt = 0.3, sndt = 0.2)
   expect_equal(p_back, p, tolerance = 1e-4)
 })
 
-test_that("cswald parameter validation works for st0", {
+test_that("cswald parameter validation works for sndt", {
   expect_error(
-    dcswald(0.8, 1, drift = 2, bound = 1, ndt = 0.3, st0 = -0.1),
+    dcswald(0.8, 1, drift = 2, bound = 1, ndt = 0.3, sndt = -0.1),
     "must be non-negative"
   )
   expect_error(
-    rcswald(10, drift = 2, bound = 1, ndt = 0.3, st0 = -0.1),
+    rcswald(10, drift = 2, bound = 1, ndt = 0.3, sndt = -0.1),
     "must be non-negative"
   )
   expect_error(
-    pcswald(0.8, 1, drift = 2, bound = 1, ndt = 0.3, st0 = -0.1),
+    pcswald(0.8, 1, drift = 2, bound = 1, ndt = 0.3, sndt = -0.1),
     "must be non-negative"
   )
   expect_error(
-    qcswald(0.5, 1, drift = 2, bound = 1, ndt = 0.3, st0 = -0.1),
+    qcswald(0.5, 1, drift = 2, bound = 1, ndt = 0.3, sndt = -0.1),
     "must be non-negative"
   )
-  expect_silent(dcswald(0.8, 1, drift = 2, bound = 1, ndt = 0.3, st0 = 0))
+  expect_silent(dcswald(0.8, 1, drift = 2, bound = 1, ndt = 0.3, sndt = 0))
 })
 
 test_that("rm3 works without providing b parameter", {
