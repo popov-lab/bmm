@@ -20,6 +20,45 @@ test_that("SDM smoke data works with current SDM workflow", {
   expect_true(all(dat$y >= -pi & dat$y <= pi))
 })
 
+test_that("SDM run metadata works with common predictor formulas", {
+  dat <- data.frame(
+    y = rsdm(12),
+    task = factor(rep(c("task1", "task2"), each = 6)),
+    condition = factor(rep(rep(c("easy", "hard"), each = 3), times = 2))
+  )
+
+  sdata <- standata(bmf(c ~ 1, kappa ~ 1),
+    data = dat,
+    model = sdm(resp_error = "y")
+  )
+  expect_equal(sdata$G_sdm_runs, 1L)
+  expect_equal(as.integer(sdata$sdm_run_start), 1L)
+  expect_equal(as.integer(sdata$sdm_run_count), nrow(dat))
+  expect_true(is.array(sdata$sdm_run_start))
+  expect_true(is.array(sdata$sdm_run_count))
+
+  sdata <- standata(bmf(c ~ 0 + task, kappa ~ 1),
+    data = dat,
+    model = sdm(resp_error = "y")
+  )
+  expect_equal(sdata$G_sdm_runs, 2L)
+  expect_equal(as.integer(sdata$sdm_run_count), c(6L, 6L))
+
+  sdata <- standata(bmf(c ~ 0 + task + task:condition, kappa ~ 1),
+    data = dat,
+    model = sdm(resp_error = "y")
+  )
+  expect_equal(sdata$G_sdm_runs, 4L)
+  expect_equal(as.integer(sdata$sdm_run_count), rep(3L, 4))
+
+  sdata <- standata(bmf(c ~ 0 + task, kappa ~ 0 + condition),
+    data = dat,
+    model = sdm(resp_error = "y")
+  )
+  expect_equal(sdata$G_sdm_runs, 4L)
+  expect_equal(as.integer(sdata$sdm_run_count), rep(3L, 4))
+})
+
 test_that("SDM generated Stan code includes run-level denominator chunks", {
   dat <- simulate_sdm_smoke_data()
   formula <- bmf(c ~ 0 + condition, kappa ~ 0 + condition)

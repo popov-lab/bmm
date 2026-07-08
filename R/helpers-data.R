@@ -278,10 +278,10 @@ standata.bmmformula <- function(object, data, model, ...) {
 
 # check if the data is sorted by the predictors
 is_data_ordered <- function(data, formula) {
-  dpars <- names(formula)
-  predictors <- rhs_vars(formula)
-  predictors <- predictors[not_in(predictors, dpars)]
-  predictors <- predictors[predictors %in% colnames(data)]
+  predictors <- data_predictor_vars(data, formula)
+  if (length(predictors) == 0) {
+    return(TRUE)
+  }
   data <- data[predictors]
   if (length(predictors) > 1) {
     gr_idx <- do.call(paste, c(data, list(sep = "_")))

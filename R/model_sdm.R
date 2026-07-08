@@ -149,6 +149,7 @@ configure_model.sdm <- function(model, data, formula) {
   }
   run_metadata <- attr(data, "sdm_run_metadata")
   if (is.null(run_metadata)) {
+    # Guard direct configure_model.sdm() calls that bypass check_data.sdm().
     run_metadata <- sdm_run_metadata(data, formula)
   }
   stanvars <- brms::stanvar(scode = stan_funs, block = "functions") +
@@ -204,7 +205,7 @@ posterior_predict_sdm_simple <- function(i, prep, ...) {
 }
 
 sdm_run_metadata <- function(data, formula) {
-  predictors <- sdm_predictor_vars(data, formula)
+  predictors <- data_predictor_vars(data, formula)
   if (length(predictors) == 0L) {
     return(list(
       G_sdm_runs = 1L,
@@ -223,15 +224,9 @@ sdm_run_metadata <- function(data, formula) {
   )
 }
 
-sdm_predictor_vars <- function(data, formula) {
-  dpars <- names(formula)
-  predictors <- rhs_vars(formula)
-  predictors <- predictors[not_in(predictors, dpars)]
-  predictors[predictors %in% colnames(data)]
-}
-
 sdm_stanvar_int_array <- function(x, name, size) {
-  out <- brms::stanvar(x = as.integer(x), name = name)
+  x <- array(as.integer(x), dim = length(x))
+  out <- brms::stanvar(x = x, name = name)
   out[[name]]$scode <- paste0("array[", size, "] int ", name, ";")
   out[[name]]$pll_args <- paste("data array[] int", name)
   out
