@@ -469,7 +469,7 @@ test_that("cswald default prior applies when sndt is estimated", {
   prior <- configure_prior(model2, dat, config$formula, NULL)
 
   sndt_rows <- prior[prior$dpar == "sndt" & prior$prior != "", ]
-  expect_equal(sndt_rows$prior, "normal(-3,0.75)")
+  expect_equal(sndt_rows$prior, "normal(-2.5,1)")
 })
 
 test_that("cswald with estimated sndt runs with mock backend", {

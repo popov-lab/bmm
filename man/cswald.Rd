@@ -72,13 +72,41 @@ independent non-decision-time draws (a race between total finishing
 times). Compared to a single shared draw per trial, choice probabilities
 are identical and densities differ by less than ~2\% even at \code{sndt = 0.3};
 parameter recovery on data generated from this racing process is
-unbiased. However, the crisk model as a whole only \emph{approximates} the
-Wiener diffusion process, and when error rates are substantial a freed
-\code{sndt} can absorb this approximation error, underestimating \code{bound} and
-overestimating \code{sndt} (this affects a shared non-decision-time
-formulation identically). For diffusion-generated data with substantial
-error rates, prefer the \code{ddm} model or validate the crisk fit with
-posterior-predictive checks.}
+unbiased.
+
+\strong{Estimating \code{sndt} in the "crisk" version at substantial error rates.}
+The crisk model treats the two response options as independent racing
+accumulators, which only \emph{approximates} a single Wiener diffusion
+process: the approximation is excellent when one boundary dominates (few
+errors) but imperfect when error rates are substantial. A freed \code{sndt}
+hands the model a flexible direction along which it can absorb this
+approximation error rather than genuine non-decision-time variability:
+in simulations with diffusion-generated data at 10-17\% errors (true
+\code{bound} 1.6, \code{sndt} 0.2), the crisk fit converged to \code{bound} ~1.2 and
+\code{sndt} ~0.4 even with very large samples, while the same likelihood
+recovered data from its own racing process without bias. A shared
+(rather than independent) non-decision-time formulation yields the same
+estimates, so this is a property of the crisk approximation itself.
+Options:
+\itemize{
+\item At low error rates (roughly below 10\%), use the \code{"simple"}
+version: the censored shifted Wald is then an excellent
+approximation of the diffusion process and \code{sndt} recovery is
+unbiased.
+\item At substantial error rates, when the data plausibly stem from a
+single diffusion process, prefer the \code{ddm} model (exact two-boundary
+likelihood, currently without non-decision-time variability), or
+keep \code{sndt} fixed at 0 in the crisk fit -- without the extra
+flexibility the crisk estimates stay close to the diffusion values.
+\item Fixing \code{sndt} at a plausible nonzero value (e.g.,
+\code{bmf(..., sndt = 0.1)}) bounds its influence while still allowing
+the mean non-decision time to exceed the fastest response time.
+\item Treat a freed \code{sndt} that comes out much larger -- together with
+a much smaller \code{bound} -- than in a fit with \code{sndt} fixed (or than a
+\code{ddm} fit) as the signature of approximation-error absorption, and
+validate with posterior-predictive checks (\code{pp_check()}) before
+interpreting the parameters.
+}}
 
 \item{...}{Additional arguments passed internally (for testing purposes).}
 }
@@ -151,7 +179,7 @@ for Choice Response Times. Applied Psychological Measurement, 42(2), 116-135. ht
 }
 \item \code{sndt}:
 \itemize{
-\item \code{main}: normal(-3,0.75)
+\item \code{main}: normal(-2.5,1)
 \item \code{effects}: normal(0,0.3)
 }
 }

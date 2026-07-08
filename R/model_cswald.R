@@ -28,7 +28,7 @@
       bound = list(main = "normal(0,0.3)", effects = "normal(0,0.3)"),
       ndt = list(main = "normal(-2,0.3)", effects = "normal(0,0.3)"),
       s = list(main = "normal(0,0.3)", effects = "normal(0,0.2)"),
-      sndt = list(main = "normal(-3,0.75)", effects = "normal(0,0.3)")
+      sndt = list(main = "normal(-2.5,1)", effects = "normal(0,0.3)")
     ),
     init_ranges = list(
       mu = c(-0.5, 0.5),
@@ -68,7 +68,7 @@
       ndt = list(main = "normal(-2,0.3)", effects = "normal(0,0.3)"),
       zr = list(main = "normal(0,0.3)", effects = "normal(0,0.2)"),
       s = list(main = "normal(0,0.5)", effects = "normal(0,0.2)"),
-      sndt = list(main = "normal(-3,0.75)", effects = "normal(0,0.3)")
+      sndt = list(main = "normal(-2.5,1)", effects = "normal(0,0.3)")
     ),
     init_ranges = list(
       mu = c(-0.5, 0.5),
@@ -185,13 +185,41 @@
 #'   times). Compared to a single shared draw per trial, choice probabilities
 #'   are identical and densities differ by less than ~2% even at `sndt = 0.3`;
 #'   parameter recovery on data generated from this racing process is
-#'   unbiased. However, the crisk model as a whole only *approximates* the
-#'   Wiener diffusion process, and when error rates are substantial a freed
-#'   `sndt` can absorb this approximation error, underestimating `bound` and
-#'   overestimating `sndt` (this affects a shared non-decision-time
-#'   formulation identically). For diffusion-generated data with substantial
-#'   error rates, prefer the `ddm` model or validate the crisk fit with
-#'   posterior-predictive checks.
+#'   unbiased.
+#'
+#'   **Estimating `sndt` in the "crisk" version at substantial error rates.**
+#'   The crisk model treats the two response options as independent racing
+#'   accumulators, which only *approximates* a single Wiener diffusion
+#'   process: the approximation is excellent when one boundary dominates (few
+#'   errors) but imperfect when error rates are substantial. A freed `sndt`
+#'   hands the model a flexible direction along which it can absorb this
+#'   approximation error rather than genuine non-decision-time variability:
+#'   in simulations with diffusion-generated data at 10-17% errors (true
+#'   `bound` 1.6, `sndt` 0.2), the crisk fit converged to `bound` ~1.2 and
+#'   `sndt` ~0.4 even with very large samples, while the same likelihood
+#'   recovered data from its own racing process without bias. A shared
+#'   (rather than independent) non-decision-time formulation yields the same
+#'   estimates, so this is a property of the crisk approximation itself.
+#'   Options:
+#'   \itemize{
+#'     \item At low error rates (roughly below 10%), use the `"simple"`
+#'       version: the censored shifted Wald is then an excellent
+#'       approximation of the diffusion process and `sndt` recovery is
+#'       unbiased.
+#'     \item At substantial error rates, when the data plausibly stem from a
+#'       single diffusion process, prefer the `ddm` model (exact two-boundary
+#'       likelihood, currently without non-decision-time variability), or
+#'       keep `sndt` fixed at 0 in the crisk fit -- without the extra
+#'       flexibility the crisk estimates stay close to the diffusion values.
+#'     \item Fixing `sndt` at a plausible nonzero value (e.g.,
+#'       `bmf(..., sndt = 0.1)`) bounds its influence while still allowing
+#'       the mean non-decision time to exceed the fastest response time.
+#'     \item Treat a freed `sndt` that comes out much larger -- together with
+#'       a much smaller `bound` -- than in a fit with `sndt` fixed (or than a
+#'       `ddm` fit) as the signature of approximation-error absorption, and
+#'       validate with posterior-predictive checks (`pp_check()`) before
+#'       interpreting the parameters.
+#'   }
 #' @param ... Additional arguments passed internally (for testing purposes).
 #' @return An object of class `bmmodel`
 #' @export
