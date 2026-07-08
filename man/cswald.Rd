@@ -70,7 +70,15 @@ regularizer.
 For the "crisk" version with \code{sndt > 0}, the two accumulators receive
 independent non-decision-time draws (a race between total finishing
 times). Compared to a single shared draw per trial, choice probabilities
-are identical and densities differ by less than ~2\% even at \code{sndt = 0.3}.}
+are identical and densities differ by less than ~2\% even at \code{sndt = 0.3};
+parameter recovery on data generated from this racing process is
+unbiased. However, the crisk model as a whole only \emph{approximates} the
+Wiener diffusion process, and when error rates are substantial a freed
+\code{sndt} can absorb this approximation error, underestimating \code{bound} and
+overestimating \code{sndt} (this affects a shared non-decision-time
+formulation identically). For diffusion-generated data with substantial
+error rates, prefer the \code{ddm} model or validate the crisk fit with
+posterior-predictive checks.}
 
 \item{...}{Additional arguments passed internally (for testing purposes).}
 }

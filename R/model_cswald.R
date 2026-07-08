@@ -183,7 +183,15 @@
 #'   For the "crisk" version with `sndt > 0`, the two accumulators receive
 #'   independent non-decision-time draws (a race between total finishing
 #'   times). Compared to a single shared draw per trial, choice probabilities
-#'   are identical and densities differ by less than ~2% even at `sndt = 0.3`.
+#'   are identical and densities differ by less than ~2% even at `sndt = 0.3`;
+#'   parameter recovery on data generated from this racing process is
+#'   unbiased. However, the crisk model as a whole only *approximates* the
+#'   Wiener diffusion process, and when error rates are substantial a freed
+#'   `sndt` can absorb this approximation error, underestimating `bound` and
+#'   overestimating `sndt` (this affects a shared non-decision-time
+#'   formulation identically). For diffusion-generated data with substantial
+#'   error rates, prefer the `ddm` model or validate the crisk fit with
+#'   posterior-predictive checks.
 #' @param ... Additional arguments passed internally (for testing purposes).
 #' @return An object of class `bmmodel`
 #' @export
