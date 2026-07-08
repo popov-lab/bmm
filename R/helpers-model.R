@@ -345,6 +345,11 @@ get_model2 <- function(model) {
 #'  `model_model_name.R` and all necessary functions will be created with
 #'  the appropriate names and structure. The file will be saved in the `R/`
 #'  directory
+#' @param versions An optional character vector naming the model versions. If
+#'  `NULL` (default), the template generates a single flat `.{model_name}_defaults`
+#'  specification (like `ddm`). If supplied, it generates a
+#'  `.{model_name}_version_table` with one entry per version and a versioned
+#'  user-facing alias validated with `match.arg()` (like `cswald`).
 #' @param testing Logical; If TRUE, the function will return the file content but
 #'  will not save the file. If FALSE (default), the function will save the file
 #' @param custom_family Logical; Do you plan to define a brms::custom_family()?
@@ -387,6 +392,7 @@ get_model2 <- function(model) {
 #' )
 #'
 use_model_template <- function(model_name,
+                               versions = NULL,
                                custom_family = FALSE,
                                stanvar_blocks = c(
                                  "data", "tdata", "parameters",
@@ -405,11 +411,13 @@ use_model_template <- function(model_name,
     stop2("File {file_name} already exists")
   }
 
+  versioned <- !is.null(versions)
+
   model_header <- glue(
     "#############################################################################!
      # MODELS                                                                 ####
      #############################################################################!
-     # see file 'R/model_mixture3p.R' for an example\n\n\n"
+     # see 'R/model_ddm.R' (flat defaults) or 'R/model_cswald.R' (versioned) for examples\n\n\n"
   )
 
 
@@ -452,32 +460,144 @@ use_model_template <- function(model_name,
   )
 
 
-  model_object <- glue('
-    .model_<<model_name>> <- function(resp_var1 = NULL, required_arg1 = NULL, required_arg2 = NULL, links = NULL, version = NULL, call = NULL, ...) {
-      out <- structure(
-        list(
-          resp_vars = nlist(resp_var1),
-          other_vars = nlist(required_arg1, required_arg2),
-          domain = "",
-          task = "",
-          name = "",
-          citation = "",
-          version = version,
-          requirements = "",
-          parameters = list(),
-          links = list(),
-          fixed_parameters = list(),
-          default_priors = list(par1 = list(), par2 = list()),
-          void_mu = FALSE
-        ),
-        class = c("bmmodel", "<<model_name>>"),
-        call = call
-      )
-      if(!is.null(version)) class(out) <- c(class(out), paste0("<<model_name>>_",version))
-      out$links[names(links)] <- links
-      out
-    }\n\n',
-    .open = "<<", .close = ">>"
+  # the parameter specification block. paste0 (not glue) because the nested
+  # list() calls are full of parentheses and commas that glue mishandles.
+  spec_body <- paste(
+    "  parameters = list(",
+    '    par1 = "Parameter 1 = description of parameter 1",',
+    '    par2 = "Parameter 2 = description of parameter 2"',
+    "  ),",
+    "  links = list(",
+    '    par1 = "identity",',
+    '    par2 = "log"',
+    "  ),",
+    "  fixed_parameters = list(",
+    "    mu = 0",
+    "  ),",
+    "  priors = list(",
+    '    par1 = list(main = "normal(0, 1)", effects = "normal(0, 0.5)"),',
+    '    par2 = list(main = "normal(0, 0.5)", effects = "normal(0, 0.5)")',
+    "  ),",
+    "  init_ranges = list(",
+    "    par1 = c(-1, 1),",
+    "    par2 = c(0.5, 1.5)",
+    "  )",
+    sep = "\n"
+  )
+
+  if (versioned) {
+    indented_body <- gsub("(^|\n)", "\\1  ", spec_body)
+    version_entries <- vapply(versions, function(v) {
+      paste0("  ", v, " = list(\n", indented_body, "\n  )")
+    }, character(1))
+    defaults_block <- paste0(
+      ".", model_name, "_version_table <- list(\n",
+      paste(version_entries, collapse = ",\n"), "\n)\n\n\n"
+    )
+  } else {
+    defaults_block <- paste0(
+      ".", model_name, "_defaults <- list(\n", spec_body, "\n)\n\n\n"
+    )
+  }
+
+  if (versioned) {
+    model_object <- glue('
+      .model_<<model_name>> <- function(resp_var1 = NULL, required_arg1 = NULL, required_arg2 = NULL,
+                                        links = NULL, version = "<<versions[1]>>", call = NULL, ...) {
+        out <- structure(
+          list(
+            resp_vars = nlist(resp_var1),
+            other_vars = nlist(required_arg1, required_arg2),
+            domain = "",
+            task = "",
+            name = "",
+            citation = "",
+            version = version,
+            requirements = "",
+            parameters = .<<model_name>>_version_table[[version]][["parameters"]],
+            links = .<<model_name>>_version_table[[version]][["links"]],
+            fixed_parameters = .<<model_name>>_version_table[[version]][["fixed_parameters"]],
+            default_priors = .<<model_name>>_version_table[[version]][["priors"]],
+            init_ranges = .<<model_name>>_version_table[[version]][["init_ranges"]]
+          ),
+          class = c("bmmodel", "<<model_name>>", paste0("<<model_name>>_", version)),
+          call = call
+        )
+        out$links[names(links)] <- links
+        out
+      }\n\n',
+      .open = "<<", .close = ">>"
+    )
+  } else {
+    model_object <- glue('
+      .model_<<model_name>> <- function(resp_var1 = NULL, required_arg1 = NULL, required_arg2 = NULL,
+                                        links = NULL, call = NULL, ...) {
+        out <- structure(
+          list(
+            resp_vars = nlist(resp_var1),
+            other_vars = nlist(required_arg1, required_arg2),
+            domain = "",
+            task = "",
+            name = "",
+            citation = "",
+            version = "NA",
+            requirements = "",
+            parameters = .<<model_name>>_defaults[["parameters"]],
+            links = .<<model_name>>_defaults[["links"]],
+            fixed_parameters = .<<model_name>>_defaults[["fixed_parameters"]],
+            default_priors = .<<model_name>>_defaults[["priors"]],
+            init_ranges = .<<model_name>>_defaults[["init_ranges"]]
+          ),
+          class = c("bmmodel", "<<model_name>>"),
+          call = call
+        )
+        out$links[names(links)] <- links
+        out
+      }\n\n',
+      .open = "<<", .close = ">>"
+    )
+  }
+
+  # the dependency check is commented out; uncomment and adapt if the model
+  # requires a specific backend (see e.g. 'R/model_ddm.R', which needs cmdstanr)
+  dependency_check <- paste(
+    "   # uncomment if your model requires a specific backend:",
+    '   # stopif(!requireNamespace("cmdstanr", quietly = TRUE),',
+    "   #        'The \"cmdstanr\" package is required for this model.')",
+    sep = "\n"
+  )
+
+  param_docs <- c(
+    "#' @param resp_var1 A description of the response variable",
+    "#' @param required_arg1 A description of the required argument",
+    "#' @param required_arg2 A description of the required argument",
+    "#' @param links A list of links for the model parameters."
+  )
+
+  if (versioned) {
+    param_docs <- c(param_docs, glue(
+      "#' @param version A character string selecting the model version. \\
+       One of <<collapse_comma(versions)>>.",
+      .open = "<<", .close = ">>"
+    ))
+    version_formal <- glue(", version = c(<<collapse_comma(versions)>>)",
+      .open = "<<", .close = ">>"
+    )
+    version_validation <- "   version <- match.arg(version)\n"
+    version_pass <- "version = version, "
+    alias_example_ref <- "R/model_cswald.R"
+  } else {
+    version_formal <- ""
+    version_validation <- ""
+    version_pass <- ""
+    alias_example_ref <- "R/model_ddm.R"
+  }
+
+  # assemble the @param block as one contiguous chunk so an absent version
+  # parameter never leaves a blank line that would split the roxygen block
+  params_doc <- paste(
+    c(param_docs, "#' @param ... used internally for testing, ignore it"),
+    collapse = "\n"
   )
 
   user_facing_alias <- glue("
@@ -485,25 +605,21 @@ use_model_template <- function(model_name,
     # information in the title and details sections will be filled in
     # automatically based on the information in the .model_<<model_name>>()$info\n
     #\' @title `r .model_<<model_name>>()$name`
-    #\' @name Model Name,
+    #\' @name <<model_name>>
     #\' @details `r model_info(.model_<<model_name>>())`
-    #\' @param resp_var1 A description of the response variable
-    #\' @param required_arg1 A description of the required argument
-    #\' @param required_arg2 A description of the required argument
-    #\' @param links A list of links for the parameters.
-    #\' @param version A character label for the version of the model. Can be empty or NULL if there is only one version.
-    #\' @param ... used internally for testing, ignore it
+    <<params_doc>>
     #\' @return An object of class `bmmodel`
     #\' @export
     #\' @examples
     #\' \\dontrun{
-    #\' # put a full example here (see 'R/model_mixture3p.R' for an example)
+    #\' # put a full example here (see '<<alias_example_ref>>' for an example)
     #\' }
-    <<model_name>> <- function(resp_var1, required_arg1, required_arg2, links = NULL, version = NULL, ...) {
+    <<model_name>> <- function(resp_var1, required_arg1, required_arg2, links = NULL<<version_formal>>, ...) {
        call <- match.call()
        stop_missing_args()
+    <<version_validation>><<dependency_check>>
        .model_<<model_name>>(resp_var1 = resp_var1, required_arg1 = required_arg1, required_arg2 = required_arg2,
-                    links = links, version = version,call = call, ...)
+                    links = links, <<version_pass>>call = call, ...)
     }\n\n\n",
     .open = "<<", .close = ">>"
   )
@@ -624,6 +740,7 @@ use_model_template <- function(model_name,
 
   file_content <- paste0(
     model_header,
+    defaults_block,
     model_object,
     user_facing_alias,
     check_data_header,

@@ -6,6 +6,10 @@
 * **EZDM now supports negative drift rates** to model below-chance performance. The drift parameter uses an identity link (previously log) and employs a soft absolute value approximation (sqrt(drift² + τ²) with τ = 0.01) to maintain smooth gradients for MCMC sampling while allowing bidirectional drift estimation.
 * New **pp_check()** method for multinomial models (e.g., `m3`). Since `brms::pp_check()` does not support the multinomial family, `bmm` now provides a custom method that compares observed and predicted response proportions in the `ppc_bars` style from `bayesplot`. The method supports faceting by experimental conditions via `group`, configurable credible intervals via `probs`, and population-level predictions via `re_formula = NA`. For non-multinomial models, `pp_check()` delegates to `brms::pp_check()` and auto-selects the grouped plot variant when `group` is specified.
 
+### Developer-facing changes
+* **`use_model_template()` now scaffolds the current model-specification patterns.** It generates a flat `.{model}_defaults` block for unversioned models (like `ddm`) or, with the new `versions` argument, a `.{model}_version_table` block for versioned models (like `cswald`). The generated constructor spells out every field of the model object inline (referencing the defaults/version table for `parameters`, `links`, `fixed_parameters`, `default_priors`, and `init_ranges`), and versioned aliases validate `version` with `match.arg()` (#350).
+* **Removed the unused `void_mu` field** from all model definitions and the template. It was assigned but never read anywhere — response-mean suppression is already handled via `fixed_parameters` and the family's `dpars` (#350).
+
 # bmm 1.3.0
 
 ### New models

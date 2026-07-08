@@ -80,8 +80,7 @@
         b = if (choice_rule == "softmax") 0 else 0.1
       ),
       links = .m3_version_table[[version]][["links"]][[choice_rule]],
-      default_priors = .m3_version_table[[version]][["priors"]][[choice_rule]],
-      void_mu = FALSE
+      default_priors = .m3_version_table[[version]][["priors"]][[choice_rule]]
     ),
     class = c("bmmodel", "m3", paste0("m3_", version)),
     call = call
