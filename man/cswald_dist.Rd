@@ -16,11 +16,12 @@ dcswald(
   ndt,
   zr = 0.5,
   s = 1,
+  sndt = 0,
   version = c("simple", "crisk"),
   log = TRUE
 )
 
-rcswald(n, drift, bound, ndt, zr = 0.5, s = 1)
+rcswald(n, drift, bound, ndt, zr = 0.5, s = 1, sndt = 0)
 
 pcswald(
   q,
@@ -30,6 +31,7 @@ pcswald(
   ndt,
   zr = 0.5,
   s = 1,
+  sndt = 0,
   version = "simple",
   lower.tail = TRUE,
   log.p = FALSE
@@ -43,6 +45,7 @@ qcswald(
   ndt,
   zr = 0.5,
   s = 1,
+  sndt = 0,
   version = "simple",
   lower.tail = TRUE,
   log.p = FALSE
@@ -66,6 +69,14 @@ Default is \code{0.5} (unbiased). Values must be between 0 and 1.}
 
 \item{s}{The diffusion constant - the standard deviation of the noise in the
 evidence accumulation process. Default is \code{s = 1}}
+
+\item{sndt}{The range of the trial-to-trial variability in the non-decision
+time. The non-decision time is uniformly distributed on
+\verb{[ndt, ndt + sndt]}, so \code{ndt} is the \emph{minimum} non-decision time and the
+mean non-decision time is \code{ndt + sndt/2}. Default is \code{sndt = 0} (no
+variability), which reproduces the standard censored shifted Wald model.
+Corresponds to the \code{st0} parameter in \code{\link[rtdists:Diffusion]{rtdists::rdiffusion()}} and
+fast-dm.}
 
 \item{version}{A character string specifying the version of the \code{cswald} for
 which the likelihood should be returned. Available versions are "simple"
@@ -104,6 +115,14 @@ The random generation (\code{rcswald}) and distribution functions (\code{pcswald
 theoretically consistent since the censored shifted Wald model is an
 approximation to the Wiener diffusion model for tasks with high accuracy
 (few errors).
+
+When \code{sndt > 0}, the \code{"crisk"} density treats the non-decision time of the
+two accumulators as \emph{independent} draws (a race between total finishing
+times), whereas the rtdists-based \code{"crisk"} \code{r}/\code{p}/\code{q} functions use the
+diffusion process with a single shared non-decision time per trial. This
+is the same approximation class as the crisk model itself: choice
+probabilities are identical and densities differ by less than ~2\% even at
+\code{sndt = 0.3}.
 }
 \details{
 \strong{Cumulative Distribution Function (\code{pcswald})}

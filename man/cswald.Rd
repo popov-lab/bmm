@@ -18,8 +18,12 @@ automatically.}
 
 \item{links}{A named list of link functions for the model parameters.
 Available parameters depend on the version: "simple" has \code{drift}, \code{bound},
-\code{ndt}, and \code{s}; "crisk" additionally has \code{zr}. Default links are "log" for
-most parameters and "logit" for \code{zr}.}
+\code{ndt}, \code{s}, and \code{sndt}; "crisk" additionally has \code{zr}. Default links are
+"log" for most parameters (including \code{sndt}) and "logit" for \code{zr}. While
+\code{sndt} is fixed at 0 (the default), the family internally uses the
+identity link for it so that the constant equals 0 on the natural scale;
+the log link applies as soon as \code{sndt} is estimated, keeping all
+predicted values positive.}
 
 \item{version}{A character string specifying which version of the cswald
 model to use. Options are:
@@ -38,7 +42,35 @@ Better suited for tasks with substantial error rates. The \code{bound}
 parameter represents the total boundary separation, consistent with
 the diffusion model parameterization.
 }
-For more details, see Miller et al. (2017).}
+For more details, see Miller et al. (2017).
+
+\strong{Trial-to-trial variability in the non-decision time (\code{sndt})}
+
+Both versions include an optional parameter \code{sndt} for uniform
+trial-to-trial variability in the non-decision time: the non-decision
+time is distributed as \code{Uniform(ndt, ndt + sndt)}, so \code{ndt} is the
+\emph{minimum} non-decision time and the mean non-decision time is
+\code{ndt + sndt/2}. It corresponds to the \code{st0} parameter in rtdists and
+fast-dm. By default \code{sndt} is fixed to 0, which reproduces the standard
+censored shifted Wald model. To estimate it, add a formula for \code{sndt} to
+the model formula (e.g., \code{bmf(..., sndt ~ 1)}); to fix it at a different
+value, supply a constant in seconds (e.g., \code{bmf(..., sndt = 0.15)}).
+
+Without \code{sndt}, a handful of fast response times caps the entire \code{ndt}
+estimate (the likelihood requires \code{ndt < min(rt)}), which biases \code{ndt},
+\code{drift}, and \code{bound} when the generating process has variable
+non-decision times (Miller et al., 2017, Fig. 3). Estimating \code{sndt}
+removes this bias. Note that \code{sndt} itself is weakly identified at
+typical trial numbers: its value lies in de-biasing the other
+parameters, not in substantive interpretation. Estimating it
+population-level only (\code{sndt ~ 1}, no random effects) and checking prior
+sensitivity is recommended, since the prior acts as the effective
+regularizer.
+
+For the "crisk" version with \code{sndt > 0}, the two accumulators receive
+independent non-decision-time draws (a race between total finishing
+times). Compared to a single shared draw per trial, choice probabilities
+are identical and densities differ by less than ~2\% even at \code{sndt = 0.3}.}
 
 \item{...}{Additional arguments passed internally (for testing purposes).}
 }
@@ -73,17 +105,19 @@ for Choice Response Times. Applied Psychological Measurement, 42(2), 116-135. ht
 \itemize{
 \item \code{drift}: drift rate
 \item \code{bound}: boundary (distance from starting point to correct boundary)
-\item \code{ndt}: non-decision time
+\item \code{ndt}: non-decision time (minimum non-decision time when sndt > 0)
 \item \code{s}: diffusion constant
+\item \code{sndt}: range of the uniform trial-to-trial variability in the non-decision time
 }
 \item \strong{Fixed parameters:}
 \itemize{
 \item \code{mu} = 0
 \item \code{s} = 0
+\item \code{sndt} = 0
 }
 \item \strong{Default parameter links:}
 \itemize{
-\item drift = log; bound = log; ndt = log; s = log
+\item drift = log; bound = log; ndt = log; s = log; sndt = log
 }
 \item \strong{Default priors:}
 \itemize{
@@ -106,6 +140,11 @@ for Choice Response Times. Applied Psychological Measurement, 42(2), 116-135. ht
 \itemize{
 \item \code{main}: normal(0,0.3)
 \item \code{effects}: normal(0,0.2)
+}
+\item \code{sndt}:
+\itemize{
+\item \code{main}: normal(-3,0.75)
+\item \code{effects}: normal(0,0.3)
 }
 }
 }
