@@ -86,8 +86,10 @@ update.bmmfit <- function(object, formula., newdata = NULL, recompile = NULL, ..
     attr(data, "data_name") <- substitute_name(newdata)
   }
 
-  # standard bmm checks and transformations
+  # standard bmm checks and transformations; threading cannot be changed on
+  # update, so the original fit's threading spec determines the family form
   formula <- check_formula(model, data, user_formula)
+  attr(model, "threads") <- uses_threading(object$threads)
   config_args <- configure_model(model, data, formula)
   prior <- configure_prior(model, data, config_args$formula, object$prior)
   prior <- combine_prior(prior, dots$prior)

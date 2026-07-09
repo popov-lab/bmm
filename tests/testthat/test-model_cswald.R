@@ -547,3 +547,94 @@ test_that("create_initfun generates in-range inits for estimated sndt", {
   expect_gte(exp(inits$Intercept_s), 0.95)
   expect_lte(exp(inits$Intercept_s), 1.05)
 })
+
+# -----------------------------------------------------------------------------
+# Vectorized (loop = FALSE) family and threading safety
+# -----------------------------------------------------------------------------
+
+test_that("configure_model uses the vectorized family when sndt is fixed", {
+  skip_on_cran()
+
+  dat <- data.frame(
+    rt = runif(100, 0.4, 1.5),
+    response = sample(c(0, 1), 100, replace = TRUE)
+  )
+
+  model <- cswald(rt = "rt", response = "response", version = "simple")
+  config <- configure_model(model, dat, bmf(drift ~ 1, bound ~ 1, ndt ~ 1))
+  expect_false(config$formula$family$loop)
+  expect_equal(config$formula$family$vars, "dec")
+
+  model <- cswald(rt = "rt", response = "response", version = "crisk")
+  config <- configure_model(model, dat, bmf(drift ~ 1, bound ~ 1, ndt ~ 1, zr ~ 1))
+  expect_false(config$formula$family$loop)
+  expect_equal(config$formula$family$vars, "dec")
+})
+
+test_that("configure_model keeps the looped family when sndt is freed", {
+  skip_on_cran()
+
+  dat <- data.frame(
+    rt = runif(100, 0.4, 1.5),
+    response = sample(c(0, 1), 100, replace = TRUE)
+  )
+  model <- cswald(rt = "rt", response = "response", version = "simple")
+  formula <- bmf(drift ~ 1, bound ~ 1, ndt ~ 1, sndt ~ 1)
+
+  model_free <- bmm:::check_model(model, dat, formula)
+  config <- configure_model(model_free, dat, formula)
+  expect_true(config$formula$family$loop)
+  expect_equal(config$formula$family$vars, "dec[n]")
+})
+
+test_that("a threading request switches the vectorized family to sliced vars", {
+  skip_on_cran()
+
+  dat <- data.frame(
+    rt = runif(100, 0.4, 1.5),
+    response = sample(c(0, 1), 100, replace = TRUE)
+  )
+  model <- cswald(rt = "rt", response = "response", version = "simple")
+  attr(model, "threads") <- TRUE
+
+  # reduce_sum slices Y but passes vars through whole, so the vectorized
+  # family must slice dec itself when threading is requested
+  config <- configure_model(model, dat, bmf(drift ~ 1, bound ~ 1, ndt ~ 1))
+  expect_false(config$formula$family$loop)
+  expect_equal(config$formula$family$vars, "dec[start:end]")
+
+  # the looped family is thread-safe as is (brms rewrites dec[n] itself)
+  formula <- bmf(drift ~ 1, bound ~ 1, ndt ~ 1, sndt ~ 1)
+  model_free <- bmm:::check_model(model, dat, formula)
+  attr(model_free, "threads") <- TRUE
+  config <- configure_model(model_free, dat, formula)
+  expect_true(config$formula$family$loop)
+  expect_equal(config$formula$family$vars, "dec[n]")
+})
+
+test_that("stancode emits thread-safe slicing when threads is passed", {
+  skip_on_cran()
+
+  dat <- data.frame(
+    rt = runif(100, 0.4, 1.5),
+    response = rbinom(100, 1, 0.9)
+  )
+  model <- cswald(rt = "rt", response = "response", version = "simple")
+  formula <- bmf(drift ~ 1, bound ~ 1, ndt ~ 1)
+
+  sc <- stancode(formula, dat, model = model)
+  expect_true(grepl("cswald_lpdf(Y | mu, drift, bound, ndt, s, sndt, dec);",
+                    sc, fixed = TRUE))
+
+  sc_threaded <- stancode(formula, dat, model = model,
+                          threads = brms::threading(2))
+  expect_true(grepl("dec[start:end]", sc_threaded, fixed = TRUE))
+  expect_true(grepl("reduce_sum", sc_threaded))
+})
+
+test_that("uses_threading detects threading requests", {
+  expect_false(bmm:::uses_threading(NULL))
+  expect_false(bmm:::uses_threading(brms::threading(NULL)))
+  expect_true(bmm:::uses_threading(brms::threading(2)))
+  expect_true(bmm:::uses_threading(2))
+})

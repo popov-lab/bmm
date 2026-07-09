@@ -9,6 +9,9 @@
 * `create_initfun()` now matches Stan parameters to model parameters with a word-boundary regex (`(^|_)param(_|$)`) instead of a substring match, preventing collisions in models with short parameter names (e.g. `s`, `c`, `a`) that are substrings of longer ones (`sim`, `correct`, `activation`); the longest (most specific) match is selected when several apply (#354, #355).
 * `create_initfun()` now resolves initialization terms from `nlpars` when a model parameter is not a distributional parameter, so models built as non-linear brms formulas (e.g. native-multinomial models whose parameters live in `bterms$nlpars`) no longer error with `no applicable method for 'has_intercept' applied to an object of class "NULL"` (#362).
 
+### Other changes
+* The Stan likelihood of the **cswald** model samples substantially faster, with numerically identical results. While `sndt` is fixed (the default), a vectorized (`loop = FALSE`) family evaluates observed responses via a closed-form vectorized density and censored responses with vectorized z-score preparation, reducing the cost per gradient evaluation by ~29% ("simple"), ~18% ("crisk"), and ~24% in hierarchical models. When `sndt` is estimated, the scalar convolution helpers share the survivor scaling constant and compute the censoring survivor in natural space, saving two `std_normal_lcdf` calls per evaluation point (~24% faster gradients for "crisk" with estimated `sndt`). When within-chain threading is requested (via the `threads` argument to `bmm()` or the `brms.threads` option), the vectorized family emits sliced data indexing (`dec[start:end]`) so that `reduce_sum` partial sums pair each data slice with the correct decisions; threaded and non-threaded models produce identical log-posteriors (verification script at `local/cswald_threading_verification.R`) (#387).
+
 # bmm 1.3.1
 
 ### Bug fixes

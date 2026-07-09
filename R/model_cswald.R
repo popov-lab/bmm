@@ -400,10 +400,36 @@ resolve_cswald_sndt_link <- function(model) {
   if (is.null(model$fixed_parameters[["sndt"]])) model$links$sndt else "identity"
 }
 
+# While sndt is fixed at 0 the likelihood reduces to closed-form density and
+# survivor terms that the vectorized (loop = FALSE) family overload evaluates
+# 18-29% faster per gradient; the freed-sndt convolution is dominated by
+# scalar std_normal_lcdf calls, where the per-observation loop is faster, so
+# it keeps the looped family.
+#
+# Under brms within-chain threading a loop = FALSE family must slice its
+# `vars` itself: reduce_sum slices Y inside partial_log_lik but passes vars
+# through whole, so a bare "dec" would pair each slice's Y with dec[1:N_slice]
+# from the top of the data -- silently wrong results. brms only defines
+# start/end inside the threaded partial_log_lik, so the thread-safe
+# "dec[start:end]" cannot be emitted without threading (it would not compile).
+# bmm() records the threading request as attr(model, "threads") before
+# configure_model runs; when the attribute is absent (e.g. direct calls in
+# tests) the unthreaded form is the safe default.
+resolve_cswald_family_args <- function(model) {
+  if (is.null(model$fixed_parameters[["sndt"]])) {
+    list(loop = TRUE, vars = "dec[n]")
+  } else if (isTRUE(attr(model, "threads"))) {
+    list(loop = FALSE, vars = "dec[start:end]")
+  } else {
+    list(loop = FALSE, vars = "dec")
+  }
+}
+
 #' @export
 configure_model.cswald_simple <- function(model, data, formula) {
   links <- model$links
   link_sndt <- resolve_cswald_sndt_link(model)
+  family_args <- resolve_cswald_family_args(model)
   formula <- bmf2bf(model, formula)
 
   cswald_family <- function(link_drift, link_bound, link_ndt, link_s, link_sndt) {
@@ -414,8 +440,8 @@ configure_model.cswald_simple <- function(model, data, formula) {
       ub = c(NA, NA, NA, NA, NA, NA),
       lb = c(NA, 0, 0, 0, 0, 0),
       type = "real",
-      vars = "dec[n]",
-      loop = TRUE,
+      vars = family_args$vars,
+      loop = family_args$loop,
       log_lik = log_lik_cswald_simple,
       posterior_predict = posterior_predict_cswald_simple
     )
@@ -484,6 +510,7 @@ log_lik_cswald_simple <- function(i, prep) {
 configure_model.cswald_crisk <- function(model, data, formula) {
   links <- model$links
   link_sndt <- resolve_cswald_sndt_link(model)
+  family_args <- resolve_cswald_family_args(model)
   formula <- bmf2bf(model, formula)
 
   cswald_crisk_family <- function(link_drift, link_bound, link_ndt, link_zr, link_s, link_sndt) {
@@ -494,8 +521,8 @@ configure_model.cswald_crisk <- function(model, data, formula) {
       ub = c(NA, NA, NA, NA, 1, NA, NA),
       lb = c(NA, NA, 0, 0, 0, 0, 0),
       type = "real",
-      vars = "dec[n]",
-      loop = TRUE,
+      vars = family_args$vars,
+      loop = family_args$loop,
       log_lik = log_lik_cswald_crisk,
       posterior_predict = posterior_predict_cswald_crisk
     )

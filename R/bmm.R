@@ -131,6 +131,12 @@ bmm <- function(formula, data, model,
   data <- check_data(model, data, formula)
   formula <- check_formula(model, data, formula)
 
+  # record the threading request so configure_model can emit thread-safe
+  # families (brms falls back to the global option when threads is not passed)
+  attr(model, "threads") <- uses_threading(
+    dots$threads %||% getOption("brms.threads", NULL)
+  )
+
   # generate the model specification to pass to brms later
   config_args <- configure_model(model, data, formula)
 

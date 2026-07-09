@@ -58,22 +58,40 @@ real swald_lccdf(real rt, real drift, real bound, real ndt, real sigma) {
 // log-PDF of the shifted Wald with uniform trial-to-trial variability in the
 // non-decision time, onset convention NDT ~ uniform(ndt, ndt + sndt):
 // f(t) = [S_W(t - ndt - sndt) - S_W(t - ndt)] / sndt (Miller et al. 2018, Eq. 6)
+// The two survivor evaluations are inlined (rather than calling swald_lccdf
+// twice) because they share drift, bound, and sigma: the scaling constant
+// log_c and sigma^2 only need to be computed once
 real swald_sndt_lpdf(real rt, real drift, real bound, real ndt, real sndt, real sigma) {
   if (sndt < 0) return negative_infinity();
   // the convolution is continuous at sndt = 0, so tiny sndt can use the plain
   // density (also the code path for the default fixed sndt = 0)
   if (sndt < 1e-8) return swald_lpdf(rt | drift, bound, ndt, sigma);
-  if (rt - ndt <= 0) return negative_infinity();
+  real t1 = rt - ndt;
+  if (t1 <= 0) return negative_infinity();
 
-  real ls_lo = swald_lccdf(rt | drift, bound, ndt + sndt, sigma);
-  real ls_hi = swald_lccdf(rt | drift, bound, ndt, sigma);
+  real t2 = t1 - sndt;
+  real log_c = 2 * bound * drift / square(sigma);
+
+  // survivor at shift ndt + sndt; the process has not started for t2 <= 0,
+  // so survival = 1 (mirrors the early return in swald_lccdf)
+  real ls_lo = 0;
+  if (t2 > 0) {
+    real st2 = sigma * sqrt(t2);
+    real dt2 = drift * t2;
+    ls_lo = log_diff_exp(std_normal_lcdf(-(dt2 - bound) / st2 | ),
+                         log_c + std_normal_lcdf(-(dt2 + bound) / st2 | ));
+  }
+  real st1 = sigma * sqrt(t1);
+  real dt1 = drift * t1;
+  real ls_hi = log_diff_exp(std_normal_lcdf(-(dt1 - bound) / st1 | ),
+                            log_c + std_normal_lcdf(-(dt1 + bound) / st1 | ));
 
   // for defective (negative-drift) accumulators both survivors converge to
   // the same positive constant in the deep tail, so their log-difference
   // drops below fp precision; the midpoint rule for the density is second
   // order in sndt and stable there. The strip rt - ndt <= sndt is excluded
   // because ls_lo = 0 exactly, making log_diff_exp accurate at any gap.
-  if (ls_lo - ls_hi < 1e-8 && rt - ndt - sndt > 0) {
+  if (ls_lo - ls_hi < 1e-8 && t2 > 0) {
     return swald_lpdf(rt | drift, bound, ndt + sndt / 2, sigma);
   }
   return log_diff_exp(ls_lo, ls_hi) - log(sndt);
@@ -95,6 +113,7 @@ real swald_sndt_lccdf(real rt, real drift, real bound, real ndt, real sndt, real
   if (x1 <= 0) return 0;
 
   real sigma_sq = square(sigma);
+  real log_c = 2 * bound * drift / sigma_sq;
   vector[2] xs = [x1, x1 - sndt]';
   vector[2] g;
   for (k in 1:2) {
@@ -103,6 +122,17 @@ real swald_sndt_lccdf(real rt, real drift, real bound, real ndt, real sndt, real
       g[k] = x;
     } else {
       real sqrt_x = sqrt(x);
+      real dx = drift * x;
+      real z1 = (dx - bound) / (sigma * sqrt_x);
+      real z2 = -(dx + bound) / (sigma * sqrt_x);
+      // q = exp(c) * Phi(z2) is shared by the survivor S_W(x) and the
+      // partial expectation M1(x); computing S_W(x) = Phi(-z1) - q directly
+      // in natural space (instead of exp(swald_lccdf(x))) saves two
+      // std_normal_lcdf calls and a log_diff_exp/exp round trip per point.
+      // If fp rounding makes the difference tiny-negative, g[1] - g[2]
+      // lands in the midpoint fallback below instead of producing NaN.
+      real q = exp(log_c + std_normal_lcdf(z2 | ));
+      real surv = Phi(-z1) - q;
       real m1;
       if (abs(drift) < 1e-6 * sigma_sq / bound) {
         // mu = bound/drift diverges as drift -> 0 while the Phi-bracket
@@ -111,12 +141,9 @@ real swald_sndt_lccdf(real rt, real drift, real bound, real ndt, real sndt, real
         m1 = 2 * bound * (sqrt_x * exp(std_normal_lpdf(w)) / sigma
                           - (bound / sigma_sq) * Phi(-w));
       } else {
-        real z1 = (drift * x - bound) / (sigma * sqrt_x);
-        real z2 = -(drift * x + bound) / (sigma * sqrt_x);
-        m1 = (bound / drift)
-             * (Phi(z1) - exp(2 * drift * bound / sigma_sq + std_normal_lcdf(z2)));
+        m1 = (bound / drift) * (Phi(z1) - q);
       }
-      g[k] = x * exp(swald_lccdf(x | drift, bound, 0, sigma)) + m1;
+      g[k] = x * surv + m1;
     }
   }
 
