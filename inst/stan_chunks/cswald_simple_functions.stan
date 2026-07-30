@@ -83,8 +83,8 @@ real cswald_lpdf(vector rt, vector mu, vector drift, vector bound,
       vector[nk] z2 = -(dxt + b) ./ denom;
       vector[nk] log_c = 2 * (b .* d) ./ square(sg);
       for (k in 1:nk) {
-        lp += log_diff_exp(std_normal_lcdf(-z1[k] | ),
-                           log_c[k] + std_normal_lcdf(z2[k] | ));
+        lp += swald_log_diff_exp(std_normal_lcdf(-z1[k] | ),
+                                 log_c[k] + std_normal_lcdf(z2[k] | ));
       }
     }
   }

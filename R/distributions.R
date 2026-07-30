@@ -1124,8 +1124,13 @@ log1m_exp <- function(x) {
   ifelse(x > -log(2), log(-expm1(x)), log1p(-exp(x)))
 }
 
+# guarded like Stan's swald_log_diff_exp: rounding can push b >= a when the
+# true difference underflows; the continuation there is probability zero
+# (-Inf), not NaN
 log_diff_exp <- function(a, b) {
-  a + log1m_exp(b - a)
+  out <- a + log1m_exp(pmin(b - a, 0))
+  out[b >= a] <- -Inf
+  out
 }
 
 .pwald <- function(rt, drift, bound, s, lower.tail = TRUE, log.p = TRUE) {
@@ -1215,26 +1220,48 @@ log_diff_exp <- function(a, b) {
   conv <- sndt >= 1e-8
   out[novar] <- .dwald(x[novar], drift[novar], bound[novar], s[novar], log = TRUE)
   if (any(conv)) {
-    ls_lo <- .pwald(x[conv] - sndt[conv], drift[conv], bound[conv], s[conv],
-      lower.tail = FALSE, log.p = TRUE
-    )
-    ls_hi <- .pwald(x[conv], drift[conv], bound[conv], s[conv],
-      lower.tail = FALSE, log.p = TRUE
-    )
-    # for defective (negative-drift) accumulators both survivors converge to
-    # the same positive constant in the deep tail, so their log-difference
-    # drops below fp precision; the midpoint rule for the density is second
-    # order in sndt and stable there. The strip x <= sndt is excluded because
-    # ls_lo = 0 exactly, making log_diff_exp accurate at any gap.
-    fallback <- (ls_lo - ls_hi) < 1e-8 & (x[conv] - sndt[conv]) > 0
-    ld <- rep(-Inf, length(ls_lo))
-    ld[!fallback] <- log_diff_exp(ls_lo[!fallback], ls_hi[!fallback]) -
-      log(sndt[conv][!fallback])
-    ld[fallback] <- .dwald(
-      x[conv][fallback] - sndt[conv][fallback] / 2,
-      drift[conv][fallback], bound[conv][fallback], s[conv][fallback],
-      log = TRUE
-    )
+    xc <- x[conv]
+    dc <- drift[conv]
+    bc <- bound[conv]
+    sc <- s[conv]
+    snc <- sndt[conv]
+    ld <- rep(-Inf, length(xc))
+
+    # strip 0 < x <= sndt: the earlier survivor is exactly 1, so the density
+    # reduces to F_W(x) / sndt. The log-CDF is a stable logSumExp at any gap;
+    # the survivor route log_diff_exp(0, log S(x)) returns -Inf once
+    # log S(x) ~ -F(x) underflows below the smallest subnormal
+    # (x < ~bound^2 / (1416 s^2)) although the true log density
+    # ~ -bound^2 / (2 s^2 x) is still representable
+    strip <- xc > 0 & xc <= snc
+    ld[strip] <- .pwald(xc[strip], dc[strip], bc[strip], sc[strip],
+      lower.tail = TRUE, log.p = TRUE
+    ) - log(snc[strip])
+
+    interior <- xc > snc
+    if (any(interior)) {
+      ls_lo <- .pwald(xc[interior] - snc[interior], dc[interior], bc[interior],
+        sc[interior],
+        lower.tail = FALSE, log.p = TRUE
+      )
+      ls_hi <- .pwald(xc[interior], dc[interior], bc[interior], sc[interior],
+        lower.tail = FALSE, log.p = TRUE
+      )
+      # for defective (negative-drift) accumulators both survivors converge to
+      # the same positive constant in the deep tail, so their log-difference
+      # drops below fp precision; the midpoint rule for the density is second
+      # order in sndt and stable there
+      fallback <- (ls_lo - ls_hi) < 1e-8
+      li <- rep(-Inf, sum(interior))
+      li[!fallback] <- log_diff_exp(ls_lo[!fallback], ls_hi[!fallback]) -
+        log(snc[interior][!fallback])
+      li[fallback] <- .dwald(
+        xc[interior][fallback] - snc[interior][fallback] / 2,
+        dc[interior][fallback], bc[interior][fallback], sc[interior][fallback],
+        log = TRUE
+      )
+      ld[interior] <- li
+    }
     out[conv] <- ld
   }
   out

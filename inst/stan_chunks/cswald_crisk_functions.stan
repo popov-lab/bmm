@@ -68,8 +68,8 @@ real cswald_crisk_lpdf(vector rt, vector mu, vector drift, vector bound,
   vector[N] z2 = -(dxt + bL) ./ denom;
   vector[N] log_c = -2 * (bL .* dw) ./ sg_sq;
   for (n in 1:N) {
-    lp += log_diff_exp(std_normal_lcdf(-z1[n] | ),
-                       log_c[n] + std_normal_lcdf(z2[n] | ));
+    lp += swald_log_diff_exp(std_normal_lcdf(-z1[n] | ),
+                             log_c[n] + std_normal_lcdf(z2[n] | ));
   }
   return lp;
 }

@@ -1,3 +1,12 @@
+// log(exp(a) - exp(b)) for survivor differences. Floating-point rounding can
+// push b >= a when the true difference underflows; the continuation there is
+// probability zero (-inf), not the NaN that log_diff_exp would emit, which
+// poisons the gradient of the entire proposal
+real swald_log_diff_exp(real a, real b) {
+  if (b >= a) return negative_infinity();
+  return log_diff_exp(a, b);
+}
+
 // log-PDF of the shifted Wald distribution
 // Optimized to compute entirely in log-space for numerical stability
 real swald_lpdf(real rt, real drift, real bound, real ndt, real sigma) {
@@ -51,8 +60,10 @@ real swald_lccdf(real rt, real drift, real bound, real ndt, real sigma) {
   real log_term1 = std_normal_lcdf(-z1 | );  // log(1 - Phi(z1)) = log(Phi(-z1))
   real log_term2 = log_c + std_normal_lcdf(z2 | );  // log(exp(c) * Phi(z2))
 
-  // log_diff_exp(a, b) = log(exp(a) - exp(b)), stable when a > b
-  return log_diff_exp(log_term1, log_term2);
+  // log_diff_exp(a, b) = log(exp(a) - exp(b)), stable when a > b; the guarded
+  // wrapper returns -inf instead of NaN when rounding makes log_term2 >=
+  // log_term1 (reachable when sigma is freed and pushed to extreme proposals)
+  return swald_log_diff_exp(log_term1, log_term2);
 }
 
 // log-PDF of the shifted Wald with uniform trial-to-trial variability in the
@@ -71,30 +82,36 @@ real swald_sndt_lpdf(real rt, real drift, real bound, real ndt, real sndt, real 
 
   real t2 = t1 - sndt;
   real log_c = 2 * bound * drift / square(sigma);
-
-  // survivor at shift ndt + sndt; the process has not started for t2 <= 0,
-  // so survival = 1 (mirrors the early return in swald_lccdf)
-  real ls_lo = 0;
-  if (t2 > 0) {
-    real st2 = sigma * sqrt(t2);
-    real dt2 = drift * t2;
-    ls_lo = log_diff_exp(std_normal_lcdf(-(dt2 - bound) / st2 | ),
-                         log_c + std_normal_lcdf(-(dt2 + bound) / st2 | ));
-  }
   real st1 = sigma * sqrt(t1);
   real dt1 = drift * t1;
-  real ls_hi = log_diff_exp(std_normal_lcdf(-(dt1 - bound) / st1 | ),
-                            log_c + std_normal_lcdf(-(dt1 + bound) / st1 | ));
+
+  // strip ndt < rt <= ndt + sndt: the earlier survivor is exactly 1, so the
+  // density reduces to F_W(t1) / sndt. The log-CDF is a stable SUM of two
+  // log-space terms at any gap; the survivor route log_diff_exp(0, log S(t1))
+  // returns -inf once log S(t1) ~ -F(t1) underflows below the smallest
+  // subnormal (t1 < ~bound^2 / (1416 sigma^2)) although the true log density
+  // ~ -bound^2 / (2 sigma^2 t1) is still representable
+  if (t2 <= 0) {
+    return log_sum_exp(std_normal_lcdf((dt1 - bound) / st1 | ),
+                       log_c + std_normal_lcdf(-(dt1 + bound) / st1 | ))
+           - log(sndt);
+  }
+
+  real st2 = sigma * sqrt(t2);
+  real dt2 = drift * t2;
+  real ls_lo = swald_log_diff_exp(std_normal_lcdf(-(dt2 - bound) / st2 | ),
+                                  log_c + std_normal_lcdf(-(dt2 + bound) / st2 | ));
+  real ls_hi = swald_log_diff_exp(std_normal_lcdf(-(dt1 - bound) / st1 | ),
+                                  log_c + std_normal_lcdf(-(dt1 + bound) / st1 | ));
 
   // for defective (negative-drift) accumulators both survivors converge to
   // the same positive constant in the deep tail, so their log-difference
   // drops below fp precision; the midpoint rule for the density is second
-  // order in sndt and stable there. The strip rt - ndt <= sndt is excluded
-  // because ls_lo = 0 exactly, making log_diff_exp accurate at any gap.
-  if (ls_lo - ls_hi < 1e-8 && t2 > 0) {
+  // order in sndt and stable there
+  if (ls_lo - ls_hi < 1e-8) {
     return swald_lpdf(rt | drift, bound, ndt + sndt / 2, sigma);
   }
-  return log_diff_exp(ls_lo, ls_hi) - log(sndt);
+  return swald_log_diff_exp(ls_lo, ls_hi) - log(sndt);
 }
 
 // log survivor of the shifted Wald + uniform NDT, for censored observations:

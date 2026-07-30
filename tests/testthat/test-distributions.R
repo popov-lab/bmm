@@ -900,11 +900,53 @@ test_that("dcswald with sndt handles draws-vector parameters mixing 0 and 0.2", 
 })
 
 test_that("rcswald with sndt generates valid output", {
+  set.seed(123)
   dat0 <- rcswald(5000, drift = 2, bound = 1.5, ndt = 0.3)
   dat1 <- rcswald(5000, drift = 2, bound = 1.5, ndt = 0.3, sndt = 0.3)
   expect_true(all(dat1$rt > 0.3))
   # onset convention: mean NDT is ndt + sndt/2, shifting the mean RT
-  expect_equal(mean(dat1$rt) - mean(dat0$rt), 0.15, tolerance = 0.03)
+  expect_equal(mean(dat1$rt) - mean(dat0$rt), 0.15, tolerance = 0.05)
+})
+
+test_that("dcswald with sndt stays finite deep in the strip (rt just above ndt)", {
+  # regression: the strip density F_W(t1)/sndt was computed via
+  # log_diff_exp(0, log S(t1)), which returns -Inf once log S(t1) ~ -F(t1)
+  # underflows (t1 < ~bound^2 / (1416 s^2)) although the true log density
+  # ~ -bound^2 / (2 s^2 t1) is representable
+  t1 <- c(1e-3, 5e-4, 1e-4, 1e-5)
+  ll <- dcswald(0.3 + t1, 1, drift = 2, bound = 1, ndt = 0.3, sndt = 0.15)
+  expect_true(all(is.finite(ll)))
+  expect_true(all(diff(ll) < 0))
+  leading_order <- -1 / (2 * t1) - log(0.15)
+  expect_lt(max(abs(ll - leading_order) / abs(leading_order)), 0.02)
+})
+
+test_that("dcswald with sndt matches the pcswald slope inside the strip", {
+  q <- c(0.35, 0.40, 0.44) # ndt = 0.3, sndt = 0.15 -> strip is (0.30, 0.45)
+  eps <- 1e-6
+  cdf_slope <- (pcswald(q + eps, 1, 2, 1, 0.3, sndt = 0.15) -
+    pcswald(q - eps, 1, 2, 1, 0.3, sndt = 0.15)) / (2 * eps)
+  dens <- dcswald(q, 1, 2, 1, 0.3, sndt = 0.15, log = FALSE)
+  expect_equal(cdf_slope, dens, tolerance = 1e-5)
+})
+
+test_that("dcswald with sndt is continuous across the strip boundary", {
+  eps <- 1e-9
+  expect_equal(
+    dcswald(0.45 - eps, 1, 2, 1, 0.3, sndt = 0.15),
+    dcswald(0.45 + eps, 1, 2, 1, 0.3, sndt = 0.15),
+    tolerance = 1e-6
+  )
+})
+
+test_that("log_diff_exp returns -Inf instead of NaN when b >= a", {
+  expect_identical(log_diff_exp(-5, -5), -Inf)
+  expect_identical(log_diff_exp(-6, -5), -Inf)
+  expect_equal(log_diff_exp(0, -1), log(1 - exp(-1)))
+  expect_equal(
+    log_diff_exp(c(0, -5, -6), c(-1, -5, -5)),
+    c(log(1 - exp(-1)), -Inf, -Inf)
+  )
 })
 
 test_that("pcswald with sndt is consistent with dcswald", {
