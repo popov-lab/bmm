@@ -939,6 +939,39 @@ test_that("dcswald with sndt is continuous across the strip boundary", {
   )
 })
 
+test_that("the Stan survivor matches the defective-Wald limit crisk relies on", {
+  skip_on_cran()
+  skip_if_not_installed("cmdstanr")
+  skip_if(is.null(cmdstanr::cmdstan_version(error_on_NA = FALSE)))
+
+  sc <- system.file("stan_chunks", package = "bmm")
+  wrapper <- "
+real w_surv(real rt, real drift, real bound, real ndt, real sigma) {
+  return swald_lccdf(rt | drift, bound, ndt, sigma);
+}
+"
+  stan_file <- cmdstanr::write_stan_file(paste0(
+    "functions {\n",
+    read_lines2(file.path(sc, "cswald_helper_functions.stan")),
+    "\n", wrapper, "\n}\n"
+  ))
+  mod <- cmdstanr::cmdstan_model(stan_file, compile_standalone = TRUE)
+
+  # cswald_crisk_lpdf calls swald_lccdf with a negative drift, where the process
+  # is defective: the survivor tends to 1 - exp(2 * bound * drift / s^2) rather
+  # than to 0. The (drift, bound, s) form handles this without special-casing,
+  # and crisk's likelihood depends on it
+  for (pars in list(c(1.0, 1.0), c(2.0, 1.5), c(0.5, 0.8))) {
+    drift <- pars[1]
+    bound <- pars[2]
+    expect_equal(
+      mod$functions$w_surv(1e7, -drift, bound, 0, 1),
+      log1m_exp(-2 * bound * drift),
+      tolerance = 1e-10
+    )
+  }
+})
+
 test_that("log_diff_exp returns -Inf instead of NaN when b >= a", {
   expect_identical(log_diff_exp(-5, -5), -Inf)
   expect_identical(log_diff_exp(-6, -5), -Inf)

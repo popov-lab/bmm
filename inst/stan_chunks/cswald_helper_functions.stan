@@ -10,6 +10,12 @@ real swald_log_diff_exp(real a, real b) {
 // log-PDF of the shifted Wald distribution
 // Optimized to compute entirely in log-space for numerical stability
 real swald_lpdf(real rt, real drift, real bound, real ndt, real sigma) {
+  // the default log links keep these positive, but a user-supplied identity
+  // link can propose values where log(bound) and log(sigma) silently give NaN
+  if (!(bound > 0) || !(sigma > 0) || is_inf(bound) || is_inf(sigma)) {
+    return negative_infinity();
+  }
+
   // compute shifted response time
   real t_shifted = rt - ndt;
   if (t_shifted <= 0) return negative_infinity();

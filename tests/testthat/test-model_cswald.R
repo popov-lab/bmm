@@ -548,6 +548,52 @@ test_that("create_initfun generates in-range inits for estimated sndt", {
   expect_lte(exp(inits$Intercept_s), 1.05)
 })
 
+test_that("adjust_init_ranges anchors the ndt init on the fastest response", {
+  dat <- data.frame(rt = c(0.5, 0.8, 1.2), response = c(1, 1, 0))
+
+  for (version in c("simple", "crisk")) {
+    model <- cswald(rt = "rt", response = "response", version = version)
+    ranges <- adjust_init_ranges(model, dat)
+
+    expect_equal(ranges$ndt, c(0.2, 0.3))
+    expect_lt(max(ranges$ndt), min(dat$rt))
+    expect_equal(ranges$drift, model$init_ranges$drift)
+  }
+})
+
+test_that("create_initfun draws ndt below the fastest response time", {
+  skip_on_cran()
+
+  dat <- data.frame(
+    rt = runif(100, 0.25, 0.45),
+    response = sample(c(0, 1), 100, replace = TRUE)
+  )
+  model <- cswald(rt = "rt", response = "response", version = "simple")
+  formula <- bmf(drift ~ 1, bound ~ 1, ndt ~ 1)
+
+  model2 <- bmm:::check_model(model, dat, formula)
+  formula2 <- bmm:::check_formula(model2, dat, formula)
+  config <- configure_model(model2, dat, formula2)
+  inits <- create_initfun(model2, dat, config$formula)()
+
+  expect_lt(exp(inits$Intercept_ndt), min(dat$rt))
+  expect_gt(exp(inits$Intercept_ndt), 0.3 * min(dat$rt))
+})
+
+test_that("check_data warns when the ndt prior reaches past the fastest RT", {
+  model <- cswald(rt = "rt", response = "response")
+  formula <- bmf(drift ~ 1, bound ~ 1, ndt ~ 1)
+
+  fast <- data.frame(rt = c(0.20, 0.35, 0.50, 0.60), response = c(1, 1, 1, 1))
+  expect_warning(
+    check_data(model, fast, formula),
+    "places substantial mass above the fastest reaction time"
+  )
+
+  slow <- data.frame(rt = c(0.45, 0.60, 0.70, 0.90), response = c(1, 1, 1, 1))
+  expect_no_warning(check_data(model, slow, formula))
+})
+
 # -----------------------------------------------------------------------------
 # Vectorized (loop = FALSE) family and threading safety
 # -----------------------------------------------------------------------------

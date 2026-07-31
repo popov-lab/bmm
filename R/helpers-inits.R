@@ -18,6 +18,28 @@ create_initfun <- function(model, data, formula) {
   UseMethod("create_initfun")
 }
 
+#' @title Generic S3 method for adapting initial value ranges to the data
+#'
+#' @description Called by `create_initfun()` to let a model rescale its
+#'   `init_ranges` using the data it is fitted to. The default returns the
+#'   ranges unchanged.
+#'
+#' @param model The `bmmodel` object for which initial values are generated
+#' @param data The user supplied data.frame used to fit the model
+#'
+#' @return A named list of initial value ranges on the natural scale
+#'
+#' @export
+#' @keywords internal developer
+adjust_init_ranges <- function(model, data) {
+  UseMethod("adjust_init_ranges")
+}
+
+#' @export
+adjust_init_ranges.default <- function(model, data) {
+  model$init_ranges
+}
+
 #' @export
 create_initfun.bmmodel <- function(model, data, formula) {
   if (is.null(model$init_ranges)) {
@@ -39,7 +61,7 @@ create_initfun.bmmodel <- function(model, data, formula) {
 
     bterms <- brms::brmsterms(formula)
     model_pars <- names(model$parameters)
-    init_ranges <- model$init_ranges
+    init_ranges <- adjust_init_ranges(model, data)
     links <- model$links
     inits <- list()
 

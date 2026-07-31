@@ -7,6 +7,11 @@ real cswald_crisk_lpdf(real rt, real mu, real drift, real bound, real ndt, real 
   real bound_upper = bound - zr*bound;
   real bound_lower = zr*bound;
 
+  // an extreme zr collapses one sub-boundary to zero, where log(bound) is -inf
+  // in exact arithmetic but NaN in floating point; NaN poisons the gradient of
+  // the whole proposal instead of rejecting it
+  if (bound_upper <= 0 || bound_lower <= 0) return negative_infinity();
+
   // compute lpdf dependent on response type
   if (response == 1) {
     return swald_sndt_lpdf(rt | drift, bound_upper, ndt, sndt, s) + swald_sndt_lccdf(rt | -drift, bound_lower, ndt, sndt, s);
@@ -54,6 +59,8 @@ real cswald_crisk_lpdf(vector rt, vector mu, vector drift, vector bound,
   vector[N] w = to_vector(dec);
   vector[N] bu = bound - zr .* bound;
   vector[N] bl = zr .* bound;
+  // see the scalar overload: a collapsed sub-boundary yields NaN, not -inf
+  if (min(bu) <= 0 || min(bl) <= 0) return negative_infinity();
   vector[N] dw = (2 * w - 1) .* drift;
   vector[N] bw = w .* bu + (1 - w) .* bl;
   vector[N] bL = bound - bw;

@@ -319,6 +319,22 @@ check_data.cswald <- function(model, data, formula) {
       Either pass your own initial value function or consider filtering \\
       reaction times below 0.100 seconds."
     )
+
+    # implausibly fast RTs already trigger the more specific warning above
+    ndt_prior_upper <- .cswald_ndt_prior_upper(model)
+    warnif(
+      !is.null(ndt_prior_upper) &&
+        min(data[, rt_var]) >= 0.100 &&
+        ndt_prior_upper >= min(data[, rt_var]),
+      "The default prior for 'ndt' places substantial mass above the fastest \\
+      reaction time in your data ({round(min(data[, rt_var]), 3)} s), but the \\
+      model requires ndt < rt for every trial.\n
+      Consider passing a narrower prior for 'ndt', or filtering implausibly \\
+      fast reaction times.\n
+      This compares the population-level prior against the overall minimum; \\
+      with grouping factors the constraint binds per group, so a prior that \\
+      passes this check can still be too wide for individual groups."
+    )
   } else {
     stop2("The RT variable '{rt_var}' needs to be of type double or integer.")
   }
@@ -423,6 +439,29 @@ resolve_cswald_family_args <- function(model) {
   } else {
     list(loop = FALSE, vars = "dec")
   }
+}
+
+# upper edge of the ndt prior's bulk (mu + 2 sd) on the natural scale; NULL when
+# the prior is not a normal on a log link, where the comparison does not apply
+.cswald_ndt_prior_upper <- function(model) {
+  prior <- model$default_priors$ndt$main
+  if (is.null(prior) || !identical(model$links$ndt, "log")) {
+    return(NULL)
+  }
+  pars <- regmatches(prior, regexec("^normal\\(\\s*(-?[0-9.]+)\\s*,\\s*([0-9.]+)\\s*\\)$", prior))[[1]]
+  if (length(pars) != 3) {
+    return(NULL)
+  }
+  exp(as.numeric(pars[2]) + 2 * as.numeric(pars[3]))
+}
+
+# ndt must stay below the fastest response time, so the fixed natural-scale
+# default init range is replaced by one anchored on the data
+#' @export
+adjust_init_ranges.cswald <- function(model, data) {
+  init_ranges <- model$init_ranges
+  init_ranges$ndt <- c(0.4, 0.6) * min(data[[model$resp_vars$rt]])
+  init_ranges
 }
 
 #' @export
