@@ -633,19 +633,21 @@ print_cells_section <- function(cells) {
   observed <- cells$counts$n[cells$counts$n > 0]
   cat(style("green")("Observations per design cell:\n"))
   cat("  ", paste(c(cells$group_vars, cells$cell_vars), collapse = " x "),
-    ": ", length(observed), " non-empty cell(s), observations per cell min ",
-    min(observed), " / median ", stats::median(observed), " / max ", max(observed),
-    "\n\n",
+    ": ", length(observed), " non-empty cell(s)\n",
+    sep = ""
+  )
+  cat("  observations per cell min ", min(observed),
+    " / median ", stats::median(observed), " / max ", max(observed), "\n\n",
     sep = ""
   )
 }
 
 print_findings_section <- function(findings) {
-  cat(style("green")("Findings:\n"))
   if (length(findings) == 0) {
-    cat(style("green")("  No issues detected.\n"), "\n", sep = "")
+    cat("Findings: ", style("green")("No issues detected."), "\n\n", sep = "")
     return(invisible())
   }
+  cat("Findings:\n")
   severities <- vapply(findings, `[[`, character(1), "severity")
   for (f in findings[order(severities != "warning")]) {
     if (f$severity == "warning") {
@@ -658,13 +660,14 @@ print_findings_section <- function(findings) {
 }
 
 print_pipeline_section <- function(pipeline) {
-  cat(style("green")("Hard checks (check_data, check_formula):\n"))
+  cat("Hard checks: ")
   if (!is.null(pipeline$error)) {
+    cat("\n")
     cat_wrapped(glue("FAILED: {pipeline$error}"), "  ! ", color = "red")
   } else if (length(pipeline$warnings) == 0) {
-    cat(style("green")("  passed\n"))
+    cat(style("green")("passed"), "\n", sep = "")
   } else {
-    cat("  passed with ", length(pipeline$warnings), " warning(s):\n", sep = "")
+    cat("passed with ", length(pipeline$warnings), " warning(s):\n", sep = "")
   }
   for (w in pipeline$warnings) {
     cat_wrapped(w, "  ! ", color = "red")
