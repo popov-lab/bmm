@@ -182,8 +182,14 @@ update_model_fixed_parameters <- function(model, formula) {
 #' @export
 print.bmmodel <- function(x, ...) {
   cat(construct_model_call(x), "\n")
-  par_names <- names(x$parameters)
-  cat("Parameters:", paste(par_names, collapse = ", "), "\n")
+  resp_str <- sapply(names(x$resp_vars), function(var) {
+    paste0(var, " = ", paste(x$resp_vars[[var]], collapse = ", "))
+  })
+  cat("Response:  ", paste(resp_str, collapse = ", "), "\n")
+  cat("Parameters:", paste(names(x$parameters), collapse = ", "), "\n")
+  if (length(x$links) > 0) {
+    cat("Links:     ", summarise_links(x$links), "\n")
+  }
   if (length(x$fixed_parameters) > 0) {
     fixed_str <- paste(
       names(x$fixed_parameters), "=", x$fixed_parameters,

@@ -1,3 +1,8 @@
+# bmm (development version)
+
+### Other changes
+* `print.bmmodel()` now also displays the required response variables and the default parameter links, answering "what does my data frame need to look like?" directly at the console (#392).
+
 # bmm 1.3.1
 
 ### Bug fixes

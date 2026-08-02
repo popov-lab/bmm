@@ -129,3 +129,31 @@ test_that("print.bmmodel() shows fixed parameters", {
   expect_true(any(grepl("Fixed:", out)))
   expect_true(any(grepl("mu", out)))
 })
+
+test_that("print.bmmodel() shows response variables and links", {
+  m <- sdm(resp_error = "y")
+  out <- capture.output(print(m))
+
+  expect_true(any(grepl("Response:.*resp_error = y", out)))
+  expect_true(any(grepl("Links:.*mu = tan_half; c = log; kappa = log", out)))
+})
+
+test_that("print.bmmodel() lists multiple response variables", {
+  m <- ddm(rt = "myrt", response = "myresp")
+  out <- capture.output(print(m))
+
+  expect_true(any(grepl("Response:.*rt = myrt, response = myresp", out)))
+})
+
+test_that("print.bmmodel() lists vector-valued response variables", {
+  m <- m3(
+    resp_cats = c("corr", "other", "npl"),
+    num_options = c(1, 4, 5),
+    choice_rule = "simple",
+    version = "ss"
+  )
+  out <- capture.output(print(m))
+
+  expect_true(any(grepl("Response:.*resp_cats = corr, other, npl", out)))
+  expect_true(any(grepl("Links:.*c = log; a = log", out)))
+})
