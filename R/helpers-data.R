@@ -172,21 +172,6 @@ check_var_set_size <- function(set_size, data) {
 #'
 #'   Problems are reported as findings rather than errors, so a single call
 #'   shows everything that needs fixing at once.
-#' @details ## For model developers
-#'
-#'   The report requires nothing beyond the standard model contract: it is
-#'   fully functional for any model that defines the usual [check_data()] and
-#'   [check_formula()] methods and declares its response variables in
-#'   `resp_vars`. Three optional hooks refine the report further:
-#'
-#'   - an entry in `response_annotations()` adds the "(expected: ...)" coding
-#'     annotation to the response variables
-#'   - a [data_check_findings()] method adds model-specific findings
-#'   - an entry in `uses_aggregate_data()` exempts models whose rows summarize
-#'     many trials (e.g. `m3`, `ezdm`) from the `min_trials` cell-count note
-#'
-#'   Models without these hooks simply print the corresponding sections
-#'   without the extra information.
 #' @inheritParams bmm
 #' @param min_trials Numeric. Design cells with fewer observations are flagged
 #'   in the report. Defaults to 10. Ignored for models fit to aggregated data
