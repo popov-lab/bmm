@@ -25,6 +25,11 @@ method should concatenate its own findings with \code{NextMethod()}. Each
 finding is a list with elements \code{severity} ("warning" or "note") and
 \code{message}. Unlike \code{\link[=check_data]{check_data()}}, these diagnostics never throw - they
 only describe likely problems, so a report can always be produced.
+
+Defining a method is entirely optional: the default method returns an
+empty list, and \code{\link[=bmm_data_check]{bmm_data_check()}} produces its full generic report for
+models without any method. Add one only when a model has a common data
+mistake that the hard checks in \code{\link[=check_data]{check_data()}} deliberately tolerate.
 }
 \keyword{developer}
 \keyword{internal}

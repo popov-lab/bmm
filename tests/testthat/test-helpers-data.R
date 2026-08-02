@@ -1181,3 +1181,19 @@ test_that("bmm_data_check skips the min_trials note for aggregate-data models", 
   expect_false(any(grepl("fewer than", finding_messages(res))))
   expect_equal(min(res$cells$counts$n), 3)
 })
+
+test_that("bmm_data_check needs nothing beyond check_data and check_formula", {
+  dat <- data.frame(y = runif(40, -3, 3), cond = rep(c("a", "b"), 20))
+  model <- sdm(resp_error = "y")
+  class(model) <- setdiff(class(model), "circular")
+
+  expect_length(response_annotations(model), 0)
+  expect_identical(data_check_findings(model, dat, bmf(c ~ cond, kappa ~ 1)), list())
+
+  res <- bmm_data_check(bmf(c ~ cond, kappa ~ 1), dat, model)
+  expect_null(res$pipeline$error)
+  expect_true(is.na(res$response$expected))
+  expect_setequal(res$predictors$coding$variable, "cond")
+  expect_output(print(res), "Response variables")
+  expect_output(print(res), "Hard checks")
+})

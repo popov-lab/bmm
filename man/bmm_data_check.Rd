@@ -56,6 +56,25 @@ can extend
 Problems are reported as findings rather than errors, so a single call
 shows everything that needs fixing at once.
 }
+\details{
+\subsection{For model developers}{
+
+The report requires nothing beyond the standard model contract: it is
+fully functional for any model that defines the usual \code{\link[=check_data]{check_data()}} and
+\code{\link[=check_formula]{check_formula()}} methods and declares its response variables in
+\code{resp_vars}. Three optional hooks refine the report further:
+\itemize{
+\item an entry in \code{response_annotations()} adds the "(expected: ...)" coding
+annotation to the response variables
+\item a \code{\link[=data_check_findings]{data_check_findings()}} method adds model-specific findings
+\item an entry in \code{uses_aggregate_data()} exempts models whose rows summarize
+many trials (e.g. \code{m3}, \code{ezdm}) from the \code{min_trials} cell-count note
+}
+
+Models without these hooks simply print the corresponding sections
+without the extra information.
+}
+}
 \examples{
 # three-parameter mixture model: radians check, NA padding of the
 # non-target features across set sizes, trials per participant x set size

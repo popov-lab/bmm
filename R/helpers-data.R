@@ -172,6 +172,21 @@ check_var_set_size <- function(set_size, data) {
 #'
 #'   Problems are reported as findings rather than errors, so a single call
 #'   shows everything that needs fixing at once.
+#' @details ## For model developers
+#'
+#'   The report requires nothing beyond the standard model contract: it is
+#'   fully functional for any model that defines the usual [check_data()] and
+#'   [check_formula()] methods and declares its response variables in
+#'   `resp_vars`. Three optional hooks refine the report further:
+#'
+#'   - an entry in `response_annotations()` adds the "(expected: ...)" coding
+#'     annotation to the response variables
+#'   - a [data_check_findings()] method adds model-specific findings
+#'   - an entry in `uses_aggregate_data()` exempts models whose rows summarize
+#'     many trials (e.g. `m3`, `ezdm`) from the `min_trials` cell-count note
+#'
+#'   Models without these hooks simply print the corresponding sections
+#'   without the extra information.
 #' @inheritParams bmm
 #' @param min_trials Numeric. Design cells with fewer observations are flagged
 #'   in the report. Defaults to 10. Ignored for models fit to aggregated data
@@ -511,6 +526,11 @@ format_cell_labels <- function(counts) {
 #'   finding is a list with elements `severity` ("warning" or "note") and
 #'   `message`. Unlike [check_data()], these diagnostics never throw - they
 #'   only describe likely problems, so a report can always be produced.
+#'
+#'   Defining a method is entirely optional: the default method returns an
+#'   empty list, and [bmm_data_check()] produces its full generic report for
+#'   models without any method. Add one only when a model has a common data
+#'   mistake that the hard checks in [check_data()] deliberately tolerate.
 #' @param model A `bmmodel` object
 #' @param data The user supplied data.frame, before any transformations by
 #'   [check_data()]
@@ -648,6 +668,9 @@ print.bmm_data_check <- function(x, color = getOption("bmm.color_summary", TRUE)
 }
 
 print_response_section <- function(response) {
+  if (is.null(response) || nrow(response) == 0) {
+    return(invisible())
+  }
   cat(style("green")("Response variables:\n"))
   labels <- format(response$variable)
   for (i in seq_len(nrow(response))) {
