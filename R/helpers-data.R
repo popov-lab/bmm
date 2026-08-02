@@ -578,10 +578,11 @@ set_size_padding_findings <- function(data, cols, set_size, arg) {
 }
 
 #' @export
-print.bmm_data_check <- function(x, ...) {
+print.bmm_data_check <- function(x, color = getOption("bmm.color_summary", TRUE), ...) {
+  withr::local_options(bmm.color_summary = color)
   cat("Pre-fit data check\n")
-  cat("Model:", gsub("\\s+", " ", construct_model_call(x$model)), "\n")
-  cat(glue("Data:  {x$n_obs} observations ('{x$data_name}')"), "\n\n")
+  cat(style("purple1")("Model:"), gsub("\\s+", " ", construct_model_call(x$model)), "\n")
+  cat(style("purple1")("Data: "), glue("{x$n_obs} observations ('{x$data_name}')"), "\n\n")
   print_response_section(x$response)
   print_predictor_section(x$predictors)
   print_cells_section(x$cells)
@@ -591,7 +592,7 @@ print.bmm_data_check <- function(x, ...) {
 }
 
 print_response_section <- function(response) {
-  cat("Response variables:\n")
+  cat(style("green")("Response variables:\n"))
   labels <- format(response$variable)
   for (i in seq_len(nrow(response))) {
     expected <- if (is.na(response$expected[i])) {
@@ -608,14 +609,14 @@ print_predictor_section <- function(predictors) {
   if (length(predictors$pred_map) == 0) {
     return(invisible())
   }
-  cat("Data columns used by each parameter formula:\n")
+  cat(style("green")("Data columns used by each parameter formula:\n"))
   pars <- format(names(predictors$pred_map))
   for (i in seq_along(predictors$pred_map)) {
     cat("  ", pars[i], "  ", paste(predictors$pred_map[[i]], collapse = ", "), "\n", sep = "")
   }
   coding <- predictors$coding
   if (nrow(coding) > 0) {
-    cat("\nPredictor coding:\n")
+    cat(style("green")("\nPredictor coding:\n"))
     labels <- format(coding$variable)
     roles <- format(paste0("[", coding$role, "]"))
     for (i in seq_len(nrow(coding))) {
@@ -630,7 +631,7 @@ print_cells_section <- function(cells) {
     return(invisible())
   }
   observed <- cells$counts$n[cells$counts$n > 0]
-  cat("Observations per design cell:\n")
+  cat(style("green")("Observations per design cell:\n"))
   cat("  ", paste(c(cells$group_vars, cells$cell_vars), collapse = " x "),
     ": ", length(observed), " non-empty cell(s), observations per cell min ",
     min(observed), " / median ", stats::median(observed), " / max ", max(observed),
@@ -640,29 +641,33 @@ print_cells_section <- function(cells) {
 }
 
 print_findings_section <- function(findings) {
-  cat("Findings:\n")
+  cat(style("green")("Findings:\n"))
   if (length(findings) == 0) {
-    cat("  No issues detected.\n\n")
+    cat(style("green")("  No issues detected.\n"), "\n", sep = "")
     return(invisible())
   }
   severities <- vapply(findings, `[[`, character(1), "severity")
   for (f in findings[order(severities != "warning")]) {
-    cat_wrapped(f$message, if (f$severity == "warning") "  ! " else "  - ")
+    if (f$severity == "warning") {
+      cat_wrapped(f$message, "  ! ", color = "red")
+    } else {
+      cat_wrapped(f$message, "  - ")
+    }
   }
   cat("\n")
 }
 
 print_pipeline_section <- function(pipeline) {
-  cat("Hard checks (check_data, check_formula):\n")
+  cat(style("green")("Hard checks (check_data, check_formula):\n"))
   if (!is.null(pipeline$error)) {
-    cat_wrapped(glue("FAILED: {pipeline$error}"), "  ! ")
+    cat_wrapped(glue("FAILED: {pipeline$error}"), "  ! ", color = "red")
   } else if (length(pipeline$warnings) == 0) {
-    cat("  passed\n")
+    cat(style("green")("  passed\n"))
   } else {
     cat("  passed with ", length(pipeline$warnings), " warning(s):\n", sep = "")
   }
   for (w in pipeline$warnings) {
-    cat_wrapped(w, "  ! ")
+    cat_wrapped(w, "  ! ", color = "red")
   }
   for (m in pipeline$messages) {
     cat_wrapped(m, "  - ")
@@ -670,9 +675,13 @@ print_pipeline_section <- function(pipeline) {
   invisible()
 }
 
-cat_wrapped <- function(text, prefix) {
+cat_wrapped <- function(text, prefix, color = NULL) {
   text <- gsub("\\s+", " ", text)
-  cat(strwrap(text, width = 80, initial = prefix, exdent = nchar(prefix)), sep = "\n")
+  lines <- strwrap(text, width = 80, initial = prefix, exdent = nchar(prefix))
+  if (!is.null(color)) {
+    lines <- style(color)(lines)
+  }
+  cat(lines, sep = "\n")
 }
 
 ############################################################################# !
