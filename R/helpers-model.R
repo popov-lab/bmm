@@ -179,13 +179,43 @@ update_model_fixed_parameters <- function(model, formula) {
   model
 }
 
+# kept central rather than as a field in each model constructor so the console
+# annotations stay short, uniform and reviewable in one place
+response_annotations <- function(model) {
+  if (inherits(model, "circular")) {
+    return(list(resp_error = "radians in [-pi, pi]"))
+  }
+  if (inherits(model, "ddm") || inherits(model, "cswald")) {
+    return(list(
+      rt = "seconds",
+      response = "0/1 or logical; 1 = upper boundary"
+    ))
+  }
+  if (inherits(model, "ezdm")) {
+    return(list(
+      mean_rt = "seconds",
+      var_rt = "seconds^2",
+      n_upper = "count of upper-boundary responses"
+    ))
+  }
+  if (inherits(model, "m3")) {
+    return(list(resp_cats = "counts per response category"))
+  }
+  list()
+}
+
 #' @export
 print.bmmodel <- function(x, ...) {
   cat(construct_model_call(x), "\n")
+  annotations <- response_annotations(x)
   resp_str <- sapply(names(x$resp_vars), function(var) {
-    paste0(var, " = ", paste(x$resp_vars[[var]], collapse = ", "))
+    annot <- annotations[[var]]
+    paste0(
+      var, " = ", paste(x$resp_vars[[var]], collapse = ", "),
+      if (!is.null(annot)) paste0(" (", annot, ")")
+    )
   })
-  cat("Response:  ", paste(resp_str, collapse = ", "), "\n")
+  cat("Response:  ", paste(resp_str, collapse = "\n            "), "\n")
   cat("Parameters:", paste(names(x$parameters), collapse = ", "), "\n")
   if (length(x$links) > 0) {
     cat("Links:     ", summarise_links(x$links), "\n")
