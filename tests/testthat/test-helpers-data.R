@@ -1166,3 +1166,18 @@ test_that("data_check_findings returns an empty list for models without methods"
     list()
   )
 })
+
+test_that("bmm_data_check skips the min_trials note for aggregate-data models", {
+  res <- bmm_data_check(
+    bmf(c ~ 1 + (1 | ID), a ~ 1 + (1 | ID)),
+    oberauer_lewandowsky_2019_e1,
+    m3(
+      resp_cats = c("corr", "other", "npl"),
+      num_options = c("n_corr", "n_other", "n_npl"),
+      choice_rule = "simple", version = "ss"
+    )
+  )
+  expect_null(res$pipeline$error)
+  expect_false(any(grepl("fewer than", finding_messages(res))))
+  expect_equal(min(res$cells$counts$n), 3)
+})

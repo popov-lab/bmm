@@ -21,7 +21,8 @@ call. Call \code{\link[=supported_models]{supported_models()}} to see the list o
 their required arguments}
 
 \item{min_trials}{Numeric. Design cells with fewer observations are flagged
-in the report. Defaults to 10.}
+in the report. Defaults to 10. Ignored for models fit to aggregated data
+(e.g. \code{m3}, \code{ezdm}), where one row summarizes many trials.}
 }
 \value{
 An object of class \code{bmm_data_check} with a print method. The object
@@ -56,6 +57,8 @@ Problems are reported as findings rather than errors, so a single call
 shows everything that needs fixing at once.
 }
 \examples{
+# three-parameter mixture model: radians check, NA padding of the
+# non-target features across set sizes, trials per participant x set size
 bmm_data_check(
   bmf(kappa ~ 0 + set_size + (0 + set_size | ID), thetat ~ 0 + set_size),
   data = oberauer_lin_2017,
@@ -64,6 +67,46 @@ bmm_data_check(
     nt_features = paste0("col_nt", 1:7),
     set_size = "set_size"
   )
+)
+
+# interference measurement model: additionally checks the NA padding
+# of the non-target distances
+bmm_data_check(
+  bmf(c ~ 1, a ~ 1, kappa ~ 1, s ~ 1),
+  data = oberauer_lin_2017,
+  model = imm(
+    resp_error = "dev_rad",
+    nt_features = paste0("col_nt", 1:7),
+    nt_distances = paste0("dist_nt", 1:7),
+    set_size = "set_size",
+    version = "full"
+  )
+)
+
+# signal discrimination model
+bmm_data_check(
+  bmf(c ~ 0 + setsize, kappa ~ 0 + setsize),
+  data = zhang_luck_2008,
+  model = sdm(resp_error = "response_error")
+)
+
+# memory measurement model: response category counts as response variables
+bmm_data_check(
+  bmf(c ~ 1 + (1 | ID), a ~ 1 + (1 | ID)),
+  data = oberauer_lewandowsky_2019_e1,
+  model = m3(
+    resp_cats = c("corr", "other", "npl"),
+    num_options = c("n_corr", "n_other", "n_npl"),
+    choice_rule = "simple",
+    version = "ss"
+  )
+)
+
+# diffusion decision model: reaction time plausibility and response coding
+bmm_data_check(
+  bmf(drift ~ condition + (condition | ID)),
+  data = data_color_judgement_task,
+  model = ddm(rt = "rt", response = "response_correct")
 )
 }
 \seealso{

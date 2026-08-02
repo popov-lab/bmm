@@ -174,7 +174,8 @@ check_var_set_size <- function(set_size, data) {
 #'   shows everything that needs fixing at once.
 #' @inheritParams bmm
 #' @param min_trials Numeric. Design cells with fewer observations are flagged
-#'   in the report. Defaults to 10.
+#'   in the report. Defaults to 10. Ignored for models fit to aggregated data
+#'   (e.g. `m3`, `ezdm`), where one row summarizes many trials.
 #' @return An object of class `bmm_data_check` with a print method. The object
 #'   is a list containing the summarized `response`, `predictors` and `cells`
 #'   information (including the full cell count table in `$cells$counts`), all
@@ -182,6 +183,8 @@ check_var_set_size <- function(set_size, data) {
 #' @seealso [bmm()], [check_data()], [data_check_findings()]
 #' @keywords extract_info
 #' @examples
+#' # three-parameter mixture model: radians check, NA padding of the
+#' # non-target features across set sizes, trials per participant x set size
 #' bmm_data_check(
 #'   bmf(kappa ~ 0 + set_size + (0 + set_size | ID), thetat ~ 0 + set_size),
 #'   data = oberauer_lin_2017,
@@ -190,6 +193,46 @@ check_var_set_size <- function(set_size, data) {
 #'     nt_features = paste0("col_nt", 1:7),
 #'     set_size = "set_size"
 #'   )
+#' )
+#'
+#' # interference measurement model: additionally checks the NA padding
+#' # of the non-target distances
+#' bmm_data_check(
+#'   bmf(c ~ 1, a ~ 1, kappa ~ 1, s ~ 1),
+#'   data = oberauer_lin_2017,
+#'   model = imm(
+#'     resp_error = "dev_rad",
+#'     nt_features = paste0("col_nt", 1:7),
+#'     nt_distances = paste0("dist_nt", 1:7),
+#'     set_size = "set_size",
+#'     version = "full"
+#'   )
+#' )
+#'
+#' # signal discrimination model
+#' bmm_data_check(
+#'   bmf(c ~ 0 + setsize, kappa ~ 0 + setsize),
+#'   data = zhang_luck_2008,
+#'   model = sdm(resp_error = "response_error")
+#' )
+#'
+#' # memory measurement model: response category counts as response variables
+#' bmm_data_check(
+#'   bmf(c ~ 1 + (1 | ID), a ~ 1 + (1 | ID)),
+#'   data = oberauer_lewandowsky_2019_e1,
+#'   model = m3(
+#'     resp_cats = c("corr", "other", "npl"),
+#'     num_options = c("n_corr", "n_other", "n_npl"),
+#'     choice_rule = "simple",
+#'     version = "ss"
+#'   )
+#' )
+#'
+#' # diffusion decision model: reaction time plausibility and response coding
+#' bmm_data_check(
+#'   bmf(drift ~ condition + (condition | ID)),
+#'   data = data_color_judgement_task,
+#'   model = ddm(rt = "rt", response = "response_correct")
 #' )
 #' @export
 bmm_data_check <- function(formula, data, model, min_trials = 10) {
@@ -220,7 +263,10 @@ bmm_data_check <- function(formula, data, model, min_trials = 10) {
   cells <- summarise_design_cells(data, formula)
   findings <- c(
     response_var_findings(response),
-    generic_data_findings(predictors, cells, min_trials),
+    generic_data_findings(
+      predictors, cells,
+      min_trials = if (uses_aggregate_data(model)) NULL else min_trials
+    ),
     data_check_findings(model, data, formula)
   )
 
@@ -416,12 +462,22 @@ generic_data_findings <- function(predictors, cells, min_trials) {
   c(findings, cell_count_findings(cells$counts, min_trials))
 }
 
+# aggregate-response models code many trials per row, so row counts per
+# design cell say nothing about trial numbers and min_trials does not apply
+uses_aggregate_data <- function(model) {
+  inherits(model, "m3") || inherits(model, "ezdm")
+}
+
 cell_count_findings <- function(counts, min_trials) {
   if (is.null(counts)) {
     return(list())
   }
   findings <- list()
-  low <- counts[counts$n > 0 & counts$n < min_trials, , drop = FALSE]
+  low <- if (is.null(min_trials)) {
+    counts[0, , drop = FALSE]
+  } else {
+    counts[counts$n > 0 & counts$n < min_trials, , drop = FALSE]
+  }
   if (nrow(low) > 0) {
     findings <- c(findings, list(data_check_finding("note", glue(
       "{nrow(low)} design cell(s) have fewer than {min_trials} observations: \\
