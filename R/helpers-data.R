@@ -636,7 +636,7 @@ print_cells_section <- function(cells) {
     ": ", length(observed), " non-empty cell(s)\n",
     sep = ""
   )
-  cat("  observations per cell min ", min(observed),
+  cat("  observations per cell: min ", min(observed),
     " / median ", stats::median(observed), " / max ", max(observed), "\n\n",
     sep = ""
   )
