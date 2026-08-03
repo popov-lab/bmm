@@ -60,7 +60,14 @@ default_prior.bmmformula <- function(object, data, model, formula = object, ...)
 #' @param fit A `bmmfit` object returned by [bmm()]
 #' @param format Character. `"table"` (default) prints the report as a table;
 #'   `"text"` prints sentences ready for a methods section.
-#' @details The provenance of each prior is determined by re-deriving the
+#' @details All priors and constants apply on the sampling scale set by each
+#'   parameter's link function: a prior for a log-link parameter describes the
+#'   log of that parameter, and a constant fixes the parameter on that scale
+#'   (e.g. `constant(0)` with a log link fixes the parameter to 1 on the
+#'   native scale). Constants are therefore printed together with their exact
+#'   native-scale value whenever the two differ.
+#'
+#'   The provenance of each prior is determined by re-deriving the
 #'   default priors from the model, formula and data stored in the fit. A
 #'   user-specified prior that is identical to the bmm default is therefore
 #'   reported as a default. Coefficients that inherit their prior from a more
@@ -115,6 +122,12 @@ print.bmm_report_priors <- function(x, ...) {
 
   print_df <- as.data.frame(x)
   print_df$prior[x$source == "flat"] <- "(flat)"
+  for (i in seq_len(nrow(x))) {
+    native <- constant_native_value(x$prior[i], x$link[i])
+    if (!is.na(native)) {
+      print_df$prior[i] <- glue("{x$prior[i]} [native: {format(signif(native, 3))}]")
+    }
+  }
   all_empty <- vapply(print_df, function(col) all(is.na(col) | !nzchar(col)), logical(1))
   print_df <- print_df[, !all_empty, drop = FALSE]
   for (col in names(print_df)) {
@@ -122,10 +135,17 @@ print.bmm_report_priors <- function(x, ...) {
   }
   print.data.frame(print_df, right = FALSE, row.names = FALSE)
 
+  if (any(!is.na(x$link) & x$link != "identity")) {
+    scale_note <- "Priors and constants apply on the sampling scale set by each
+      parameter's link function."
+    cat("\n")
+    cat(strwrap(gsub("\\s+", " ", scale_note), width = 80), sep = "\n")
+  }
   if (any(x$source == "flat")) {
     flat_note <- "Flat priors are improper: Bayes factors via bridge sampling are
       undefined unless you specify proper priors for these coefficients."
-    cat("\n", strwrap(gsub("\\s+", " ", flat_note), width = 80), sep = "\n")
+    cat("\n")
+    cat(strwrap(gsub("\\s+", " ", flat_note), width = 80), sep = "\n")
   }
   invisible(x)
 }
@@ -236,6 +256,21 @@ has_parent_prior <- function(prior) {
   }, logical(1))
 }
 
+# exact native-scale value of a constant() prior; NA when the row is not a
+# numeric constant, the link cannot be inverted here (e.g. softmax), or the
+# value is unchanged by the transformation (nothing worth reporting)
+constant_native_value <- function(prior, link) {
+  if (!grepl("^constant\\(", prior) || is.na(link) || link == "identity") {
+    return(NA_real_)
+  }
+  value <- suppressWarnings(as.numeric(sub("^constant\\((.*)\\)$", "\\1", prior)))
+  if (is.na(value)) {
+    return(NA_real_)
+  }
+  native <- tryCatch(link_transform(value, link, inverse = TRUE), error = function(e) NA_real_)
+  if (isTRUE(all.equal(native, value))) NA_real_ else native
+}
+
 # a flat class- or group-level row is vacuous when every row that could
 # inherit from it resolved to its own prior (brms emits a class-level b row
 # even when the only coefficient below it has an explicit prior)
@@ -266,13 +301,14 @@ prior_report_text <- function(x) {
       glue("{upfirst(scope)} received a {x$prior[i]} prior ({x$source[i]}).")
     }
   }, character(1))
-  paste(
-    c(
-      "Priors were specified on the sampling (link) scale of each parameter.",
-      sentences, standalone
-    ),
-    collapse = " "
-  )
+  lead <- "Priors were specified on the sampling (link) scale of each parameter."
+  if (any(!is.na(x$link) & x$link != "identity")) {
+    lead <- paste(
+      lead,
+      "For parameters with a non-identity link, priors therefore apply to the transformed parameter."
+    )
+  }
+  paste(c(lead, sentences, standalone), collapse = " ")
 }
 
 parameter_prior_sentences <- function(rows, par_labels) {
@@ -281,7 +317,17 @@ parameter_prior_sentences <- function(rows, par_labels) {
   sentences <- character(0)
   if (any(is_const)) {
     value <- sub("^constant\\((.*)\\)$", "\\1", rows$prior[is_const])
-    sentences <- glue("{upfirst(subject)} was fixed to {value}.")
+    native <- vapply(which(is_const), function(i) {
+      constant_native_value(rows$prior[i], rows$link[i])
+    }, numeric(1))
+    scale_note <- ifelse(
+      is.na(native), "",
+      glue(
+        " on the {rows$link[is_const]} (sampling) scale,",
+        " i.e. {format(signif(native, 3))} on the native scale"
+      )
+    )
+    sentences <- glue("{upfirst(subject)} was fixed to {value}{scale_note}.")
   }
   rest <- rows[!is_const, , drop = FALSE]
   if (nrow(rest) > 0) {

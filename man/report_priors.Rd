@@ -24,6 +24,13 @@ user-specified prior. Parameters without a proper prior are flagged as
 flat.
 }
 \details{
+All priors and constants apply on the sampling scale set by each
+parameter's link function: a prior for a log-link parameter describes the
+log of that parameter, and a constant fixes the parameter on that scale
+(e.g. \code{constant(0)} with a log link fixes the parameter to 1 on the
+native scale). Constants are therefore printed together with their exact
+native-scale value whenever the two differ.
+
 The provenance of each prior is determined by re-deriving the
 default priors from the model, formula and data stored in the fit. A
 user-specified prior that is identical to the bmm default is therefore

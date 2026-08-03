@@ -251,6 +251,36 @@ test_that("report_priors() classifies the fixture fit correctly", {
   expect_equal(out$prior[out$parameter == "mu"], "constant(0)")
 })
 
+test_that("constant_native_value() translates constants to the native scale", {
+  expect_equal(constant_native_value("constant(0)", "log"), 1)
+  expect_equal(constant_native_value("constant(0)", "logit"), 0.5)
+  # unchanged values, non-constants, and non-invertible links carry no information
+  expect_true(is.na(constant_native_value("constant(0)", "identity")))
+  expect_true(is.na(constant_native_value("constant(0)", "tan_half")))
+  expect_true(is.na(constant_native_value("constant(0)", "softmax")))
+  expect_true(is.na(constant_native_value("constant(0)", NA_character_)))
+  expect_true(is.na(constant_native_value("normal(0, 1)", "log")))
+})
+
+test_that("printed reports annotate constants with their native-scale value", {
+  skip_on_cran()
+  path <- test_path("assets/bmmfit_example1.rds")
+  skip_if_not(file.exists(path), "SDM fixture not available (excluded by .Rbuildignore)")
+  out <- report_priors(readRDS(path))
+
+  # sampling-scale footnote is always present when links are non-identity
+  expect_true(any(grepl("sampling scale", capture.output(print(out)), fixed = TRUE)))
+
+  # log-link constant: table shows the native value, text names both scales
+  out$link[out$parameter == "mu"] <- "log"
+  printed <- capture.output(print(out))
+  expect_true(any(grepl("constant(0) [native: 1]", printed, fixed = TRUE)))
+  attr(out, "format") <- "text"
+  printed_text <- paste(capture.output(print(out)), collapse = " ")
+  expect_match(printed_text, "log \\(sampling\\) scale")
+  expect_match(printed_text, "1 on the native scale")
+})
+
 test_that("report_priors() omits the technical mu parameter for void_mu models", {
   skip_on_cran()
   path <- test_path("assets/bmmfit_example1.rds")
