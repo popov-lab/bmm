@@ -251,6 +251,17 @@ test_that("report_priors() classifies the fixture fit correctly", {
   expect_equal(out$prior[out$parameter == "mu"], "constant(0)")
 })
 
+test_that("report_priors() omits the technical mu parameter for void_mu models", {
+  skip_on_cran()
+  path <- test_path("assets/bmmfit_example1.rds")
+  skip_if_not(file.exists(path), "SDM fixture not available (excluded by .Rbuildignore)")
+  fit <- readRDS(path)
+
+  fit$bmm$model$void_mu <- TRUE
+  out <- report_priors(fit)
+  expect_setequal(out$parameter, c("c", "kappa"))
+})
+
 test_that("report_priors() detects user-modified priors without refitting", {
   skip_on_cran()
   path <- test_path("assets/bmmfit_example1.rds")

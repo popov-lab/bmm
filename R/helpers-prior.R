@@ -68,6 +68,12 @@ default_prior.bmmformula <- function(object, data, model, formula = object, ...)
 #'
 #'   Flat priors are flagged because they are improper: Bayes factors via
 #'   bridge sampling are undefined when any parameter has an improper prior.
+#'
+#'   For models in which the brms `mu` parameter is only a technical
+#'   requirement of the custom family rather than a model parameter (e.g. the
+#'   response-time models), the fixed `mu` is omitted from the report. For
+#'   circular models `mu` is reported, as it can be estimated as a response
+#'   bias.
 #' @return A `data.frame` of class `bmm_report_priors` with columns
 #'   `parameter`, `link`, `class`, `coef`, `group`, `prior` and `source`.
 #' @seealso [default_prior()], [parameters()]
@@ -151,6 +157,12 @@ prior_provenance <- function(fit) {
   # check_model, so the reconstruction reports them as defaults
   user_fixed <- names(fit$bmm$user_formula)[is_constant(fit$bmm$user_formula)]
   out$source[out$parameter %in% user_fixed & out$source == "bmm default"] <- "user"
+  # models that declare void_mu carry a fixed mu only because brms requires
+  # one for custom families; it is not a model parameter and is not reported
+  if (isTRUE(model$void_mu)) {
+    out <- out[!(out$parameter %in% "mu"), , drop = FALSE]
+    row.names(out) <- NULL
+  }
   out
 }
 

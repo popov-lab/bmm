@@ -32,6 +32,12 @@ general class are collapsed into the row of the prior they inherit from.
 
 Flat priors are flagged because they are improper: Bayes factors via
 bridge sampling are undefined when any parameter has an improper prior.
+
+For models in which the brms \code{mu} parameter is only a technical
+requirement of the custom family rather than a model parameter (e.g. the
+response-time models), the fixed \code{mu} is omitted from the report. For
+circular models \code{mu} is reported, as it can be estimated as a response
+bias.
 }
 \examples{
 \dontshow{if (isTRUE(Sys.getenv("BMM_EXAMPLES"))) withAutoprint(\{ # examplesIf}
