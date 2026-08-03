@@ -92,3 +92,193 @@ test_that("no check for sort_data with default_priors function", {
   ))
   expect_false(any(grepl("sort", res)))
 })
+
+prior_row <- function(prior = "", class = "b", coef = "", group = "", resp = "",
+                      dpar = "", nlpar = "", source = "user") {
+  out <- brms::empty_prior()
+  out[1, c("prior", "class", "coef", "group", "resp", "dpar", "nlpar", "source")] <-
+    list(prior, class, coef, group, resp, dpar, nlpar, source)
+  out
+}
+
+test_that("resolve_effective_prior() resolves coef -> group -> class inheritance", {
+  prior <- rbind(
+    prior_row("student_t(3, 0, 2.5)", class = "sd", dpar = "kappa"),
+    prior_row(class = "sd", dpar = "kappa", group = "ID"),
+    prior_row(class = "sd", dpar = "kappa", group = "ID", coef = "Intercept"),
+    prior_row("normal(0, 1)", class = "b", nlpar = "c"),
+    prior_row(class = "b", nlpar = "c", coef = "x1"),
+    prior_row(class = "b", dpar = "a"),
+    prior_row(class = "b", dpar = "a", coef = "x1")
+  )
+  expect_equal(
+    resolve_effective_prior(prior),
+    c(
+      "student_t(3, 0, 2.5)", "student_t(3, 0, 2.5)", "student_t(3, 0, 2.5)",
+      "normal(0, 1)", "normal(0, 1)", "", ""
+    )
+  )
+})
+
+test_that("classify_priors() distinguishes bmm defaults, brms defaults, user and flat", {
+  defaults <- rbind(
+    prior_row("normal(0, 1)", class = "b", nlpar = "a"),
+    prior_row("student_t(5, 2, 0.75)", class = "Intercept", dpar = "k"),
+    prior_row("student_t(3, 0, 2.5)", class = "sd", dpar = "k", source = "default"),
+    prior_row(class = "b", dpar = "k", source = "default")
+  )
+  fit_prior <- rbind(
+    prior_row("normal(0, 1)", class = "b", nlpar = "a"),
+    prior_row("normal(2, 1)", class = "Intercept", dpar = "k"),
+    prior_row("student_t(3, 0, 2.5)", class = "sd", dpar = "k"),
+    prior_row(class = "b", dpar = "k", source = "default"),
+    prior_row("exponential(1)", class = "sds", dpar = "a")
+  )
+  res <- classify_priors(fit_prior, defaults, links = list(a = "log", k = "logit"))
+  expect_s3_class(res, "data.frame")
+  expect_equal(
+    res$source,
+    c("bmm default", "user", "brms default", "flat", "user")
+  )
+  expect_equal(res$prior, c("normal(0, 1)", "normal(2, 1)", "student_t(3, 0, 2.5)", "", "exponential(1)"))
+})
+
+test_that("classify_priors() drops rows that inherit from a parent row in the table", {
+  defaults <- rbind(
+    prior_row("normal(0, 1)", class = "b", nlpar = "a"),
+    prior_row("student_t(3, 0, 2.5)", class = "sd", nlpar = "a", source = "default")
+  )
+  fit_prior <- rbind(
+    prior_row("normal(0, 1)", class = "b", nlpar = "a"),
+    prior_row(class = "b", nlpar = "a", coef = "x1", source = "default"),
+    prior_row(class = "b", nlpar = "a", coef = "x2", source = "default"),
+    prior_row("student_t(3, 0, 2.5)", class = "sd", nlpar = "a", source = "default"),
+    prior_row(class = "sd", nlpar = "a", group = "ID", source = "default"),
+    prior_row(class = "sd", nlpar = "a", group = "ID", coef = "Intercept", source = "default"),
+    prior_row(class = "b", dpar = "k", source = "default"),
+    prior_row(class = "b", dpar = "k", coef = "x1", source = "default")
+  )
+  res <- classify_priors(fit_prior, defaults, links = list(a = "log"))
+  expect_equal(nrow(res), 3)
+  expect_equal(res$class, c("b", "sd", "b"))
+  expect_equal(res$source, c("bmm default", "brms default", "flat"))
+  # coef rows without any class-level parent are kept individually
+  orphan <- prior_row("normal(0, 2)", class = "b", coef = "x1", nlpar = "a")
+  res_orphan <- classify_priors(orphan, defaults, links = list(a = "log"))
+  expect_equal(nrow(res_orphan), 1)
+  expect_equal(res_orphan$source, "user")
+})
+
+test_that("classify_priors() drops vacuous flat class rows", {
+  fit_prior <- rbind(
+    prior_row(class = "b", nlpar = "d", source = "default"),
+    prior_row("normal(1, 1)", class = "b", nlpar = "d", coef = "Intercept")
+  )
+  res <- classify_priors(fit_prior, brms::empty_prior(), links = list(d = "log"))
+  expect_equal(nrow(res), 1)
+  expect_equal(res$coef, "Intercept")
+})
+
+test_that("classify_priors() maps prior rows to model parameters and links", {
+  fit_prior <- rbind(
+    prior_row("normal(0, 1)", class = "b", nlpar = "a"),
+    prior_row("normal(0, 1)", class = "Intercept", dpar = "k"),
+    prior_row("constant(0)", class = "Intercept"),
+    prior_row("student_t(3, 0, 2.5)", class = "sd"),
+    prior_row("lkj(1)", class = "cor"),
+    prior_row("normal(0, 1)", class = "b", dpar = "z")
+  )
+  res <- classify_priors(fit_prior, brms::empty_prior(), links = list(a = "log", k = "logit"))
+  expect_equal(res$parameter, c("a", "k", "mu", NA, NA, "z"))
+  expect_equal(res$link, c("log", "logit", "identity", NA, NA, "identity"))
+})
+
+test_that("classify_priors() is robust to schema differences across brms versions", {
+  defaults <- prior_row("normal(0, 1)", class = "b", nlpar = "a")
+  fit_prior <- prior_row("normal(0, 1)", class = "b", nlpar = "a")
+  fit_prior$tag <- NULL
+  fit_prior$lb <- ""
+  fit_prior$ub <- ""
+  res <- classify_priors(fit_prior, defaults, links = list(a = "log"))
+  expect_equal(res$source, "bmm default")
+})
+
+test_that("report_priors() validates its input", {
+  expect_error(report_priors(1), "bmmfit")
+})
+
+test_that("report_priors() rejects fits without prior information", {
+  skip_on_cran()
+  path <- test_path("assets/mock_bmmfit_mixture2p.rds")
+  skip_if_not(file.exists(path), "Mock fixture not available (excluded by .Rbuildignore)")
+  expect_error(report_priors(readRDS(path)), "no prior information")
+})
+
+test_that("report_priors() handles models whose data pipeline transforms the response (m3)", {
+  skip_on_cran()
+  path <- test_path("assets/bmmfit_m3_ppcheck.rds")
+  skip_if_not(file.exists(path), "M3 fixture not available (excluded by .Rbuildignore)")
+  fit <- readRDS(path)
+
+  out <- report_priors(fit)
+  expect_s3_class(out, "bmm_report_priors")
+  # a & c: effects + intercept; d: intercept; b: fixed constant; sd: a, c, d
+  expect_equal(nrow(out), 9)
+  expect_setequal(out$parameter, c("a", "b", "c", "d"))
+  expect_equal(sum(out$source == "bmm default"), 6)
+  expect_equal(sum(out$source == "brms default"), 3)
+  expect_true(all(out$class[out$source == "brms default"] == "sd"))
+  expect_equal(out$prior[out$parameter == "b"], "constant(0.1)")
+  expect_false(any(out$source == "flat"))
+})
+
+test_that("report_priors() classifies the fixture fit correctly", {
+  skip_on_cran()
+  path <- test_path("assets/bmmfit_example1.rds")
+  skip_if_not(file.exists(path), "SDM fixture not available (excluded by .Rbuildignore)")
+  fit <- readRDS(path)
+
+  expect_error(report_priors(fit, format = "foo"), "'arg'")
+  expect_silent(out <- report_priors(fit))
+  expect_s3_class(out, "bmm_report_priors")
+  expect_s3_class(out, "data.frame")
+  expect_equal(nrow(out), 3)
+  expect_setequal(out$parameter, c("c", "kappa", "mu"))
+  expect_equal(out$link[match(c("c", "kappa", "mu"), out$parameter)], c("log", "log", "tan_half"))
+  expect_true(all(out$source == "bmm default"))
+  expect_equal(out$prior[out$parameter == "c"], "student_t(5, 2, 0.75)")
+  expect_equal(out$prior[out$parameter == "kappa"], "student_t(5, 1.75, 0.75)")
+  expect_equal(out$prior[out$parameter == "mu"], "constant(0)")
+})
+
+test_that("report_priors() detects user-modified priors without refitting", {
+  skip_on_cran()
+  path <- test_path("assets/bmmfit_example1.rds")
+  skip_if_not(file.exists(path), "SDM fixture not available (excluded by .Rbuildignore)")
+  fit <- readRDS(path)
+
+  kappa_row <- fit$prior$dpar == "kappa" & fit$prior$class == "Intercept"
+  fit$prior$prior[kappa_row] <- "normal(0, 1)"
+  out <- report_priors(fit)
+  expect_equal(out$source[out$parameter == "kappa"], "user")
+  expect_true(all(out$source[out$parameter != "kappa"] == "bmm default"))
+})
+
+test_that("print.bmm_report_priors() renders table and text formats", {
+  skip_on_cran()
+  path <- test_path("assets/bmmfit_example1.rds")
+  skip_if_not(file.exists(path), "SDM fixture not available (excluded by .Rbuildignore)")
+  fit <- readRDS(path)
+
+  out <- report_priors(fit)
+  printed <- capture.output(print(out))
+  expect_true(any(grepl("bmm default", printed, fixed = TRUE)))
+  expect_true(any(grepl("tan_half", printed, fixed = TRUE)))
+  expect_false(any(grepl("coef", printed, fixed = TRUE)))
+
+  text_out <- report_priors(fit, format = "text")
+  printed_text <- capture.output(print(text_out))
+  expect_true(any(grepl("log link", printed_text, fixed = TRUE)))
+  expect_true(any(grepl("fixed to 0", printed_text, fixed = TRUE)))
+  expect_true(any(grepl("sampling \\(link\\) scale", printed_text)))
+})
