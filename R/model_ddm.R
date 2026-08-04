@@ -83,7 +83,7 @@
 #' # Simulate data for one subject using rddm
 #' set.seed(123)
 #' n_trials <- 500
-#' 
+#'
 #' # Simulate DDM data with fixed parameters
 #' sim_data <- rddm(
 #'   n = n_trials,
@@ -92,23 +92,23 @@
 #'   ndt = 0.3,      # non-decision time
 #'   zr = 0.5        # relative starting point
 #' )
-#' 
+#'
 #' # Prepare data frame
 #' dat <- data.frame(
 #'   rt = sim_data$rt,
 #'   response = sim_data$response
 #' )
-#' 
+#'
 #' # Define formula (intercept-only model)
 #' ff <- bmmformula(
 #'   drift ~ 1,
 #'   bound ~ 1,
 #'   ndt ~ 1
 #' )
-#' 
+#'
 #' # Specify the DDM model
 #' model <- ddm(rt = "rt", response = "response")
-#' 
+#'
 #' # Fit the model
 #' fit <- bmm(
 #'   formula = ff,
@@ -118,15 +118,10 @@
 #'   iter = 1000,
 #'   backend = "cmdstanr"
 #' )
-#' 
+#'
 #' # Check parameter recovery
 #' summary(fit)
 ddm <- function(rt, response, links = NULL, ...) {
-  stopif(
-    !requireNamespace("cmdstanr", quietly = TRUE),
-    'The "cmdstanr" package is required for this functionality'
-  )
-
   call <- match.call()
   stop_missing_args()
   .model_ddm(rt = rt, response = response,

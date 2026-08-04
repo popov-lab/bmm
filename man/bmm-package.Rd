@@ -7,7 +7,7 @@
 \description{
 \if{html}{\figure{logo.png}{options: style='float: right' alt='logo' width='120'}}
 
-Fit computational and measurement models using full Bayesian inference. The package provides a simple and accessible interface by translating complex domain-specific models into 'brms' syntax, a powerful and flexible framework for fitting Bayesian regression models using 'Stan'. The package is designed so that users can easily apply state-of-the-art models in various research fields, and so that researchers can use it as a new model development framework. References: Frischkorn and Popov (2023) \doi{10.31234/osf.io/umt57}.
+Fit computational and measurement models using full Bayesian inference. The package provides a simple and accessible interface by translating complex domain-specific models into 'brms' syntax, a powerful and flexible framework for fitting Bayesian regression models using 'Stan'. The package is designed so that users can easily apply state-of-the-art models in various research fields, and so that researchers can use it as a new model development framework. References: Frischkorn and Popov (2025) \doi{10.3758/s13428-025-02643-0}.
 }
 \seealso{
 Useful links:
