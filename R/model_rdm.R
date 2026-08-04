@@ -507,6 +507,22 @@ bmf2bf.rdm_custom <- function(model, formula) {
 # CONFIGURE_MODEL S3 METHODS                                             ####
 ############################################################################# !
 
+# The vint() columns hold the winning category and the per-category
+# accumulator counts, one value per observation, in the order the Stan
+# signature expects. Under brms within-chain threading a loop = FALSE family
+# must slice them itself: reduce_sum slices Y inside partial_log_lik but
+# passes custom family `vars` through whole, so a bare "vint1" would pair each
+# slice's response times with the top of the data -- silently wrong results.
+# brms only defines start/end inside the threaded partial_log_lik, so the
+# thread-safe sliced form cannot be emitted without threading (it would not
+# compile). bmm() records the threading request as attr(model, "threads")
+# before configure_model runs; when the attribute is absent (e.g. direct calls
+# in tests) the unthreaded form is the safe default.
+.rdm_family_vars <- function(model, n_cats) {
+  vars <- paste0("vint", seq_len(n_cats + 1))
+  if (isTRUE(attr(model, "threads"))) paste0(vars, "[start:end]") else vars
+}
+
 #' @export
 configure_model.rdm_simple <- function(model, data, formula) {
   cat_names <- c("driftc", "drifte")
@@ -522,7 +538,7 @@ configure_model.rdm_simple <- function(model, data, formula) {
     ub = rep(NA, 7),
     lb = c(NA, 0, 0, 0, 0, 0, 0),
     type = "real",
-    vars = c("vint1", "vint2", "vint3"),
+    vars = .rdm_family_vars(model, length(cat_names)),
     loop = FALSE,
     log_lik = log_lik_rdm_simple,
     posterior_predict = posterior_predict_rdm_simple,
@@ -569,7 +585,7 @@ configure_model.rdm_custom <- function(model, data, formula) {
     ub = rep(NA, n_dpars),
     lb = c(NA, rep(0, n_cats), 0, 0, 0, 0),
     type = "real",
-    vars = paste0("vint", seq_len(n_cats + 1)),
+    vars = .rdm_family_vars(model, n_cats),
     loop = FALSE,
     log_lik = log_lik_rdm_custom,
     posterior_predict = posterior_predict_rdm_custom,
