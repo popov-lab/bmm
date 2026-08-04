@@ -9,6 +9,9 @@
 * **EZDM now supports negative drift rates** to model below-chance performance. The drift parameter uses an identity link (previously log) and employs a soft absolute value approximation (sqrt(drift² + τ²) with τ = 0.01) to maintain smooth gradients for MCMC sampling while allowing bidirectional drift estimation.
 * New **pp_check()** method for multinomial models (e.g., `m3`). Since `brms::pp_check()` does not support the multinomial family, `bmm` now provides a custom method that compares observed and predicted response proportions in the `ppc_bars` style from `bayesplot`. The method supports faceting by experimental conditions via `group`, configurable credible intervals via `probs`, and population-level predictions via `re_formula = NA`. For non-multinomial models, `pp_check()` delegates to `brms::pp_check()` and auto-selects the grouped plot variant when `group` is specified.
 
+### Other changes
+* Within-chain threading (the `threads` argument of `bmm()` or the `brms.threads` option) is now safe for the **lnr** model. Its vectorized (`loop = FALSE`) family emits sliced data indexing (`vint1[start:end]`, ...) when threading is requested, so that each `reduce_sum` partial sum pairs its slice of response times with the matching responses and accumulator counts. Without the slicing, `brms` passed the `vint` columns through whole and every partial sum except the first evaluated the likelihood against the top of the data --- the model compiled and sampled without any error or warning, but returned wrong posteriors. Threaded and non-threaded models now produce identical log-posteriors (verification script at `local/lnr_threading_verification.R`) (#352).
+
 # bmm 1.3.0
 
 ### New models

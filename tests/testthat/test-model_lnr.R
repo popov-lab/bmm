@@ -521,6 +521,75 @@ test_that("LNR generated Stan code uses vectorized custom likelihoods", {
   ))
 })
 
+test_that("a threading request switches the vectorized family to sliced vars", {
+  skip_on_cran()
+
+  dat <- data.frame(
+    rt = runif(100, 0.4, 1.5),
+    response = sample(c(1L, 2L), 100, replace = TRUE)
+  )
+
+  # reduce_sum slices Y but passes vars through whole, so the vectorized
+  # family must slice the vint columns itself when threading is requested
+  model <- lnr(rt = "rt", response = "response", n_choices = 2)
+  formula <- bmf(correct ~ 1, error ~ 1, ndt ~ 1)
+  dat <- check_data(model, dat, formula)
+
+  config <- configure_model(model, dat, formula)
+  expect_equal(config$formula$family$vars, c("vint1", "vint2", "vint3"))
+
+  attr(model, "threads") <- TRUE
+  config <- configure_model(model, dat, formula)
+  expect_equal(
+    config$formula$family$vars,
+    c("vint1[start:end]", "vint2[start:end]", "vint3[start:end]")
+  )
+})
+
+test_that("the custom version slices every vint column when threading", {
+  skip_on_cran()
+
+  model <- lnr(rt = "rt", response = "resp", version = "custom",
+               accumulators = c(fast = 1, mid = 2, slow = 3))
+  formula <- bmf(fast ~ 1, mid ~ 1, slow ~ 1, ndt ~ 1)
+  dat <- data.frame(
+    rt = runif(99, 0.4, 1.5),
+    resp = rep(c("fast", "mid", "slow"), 33)
+  )
+  model <- check_model(model, dat, formula)
+  dat <- check_data(model, dat, formula)
+
+  attr(model, "threads") <- TRUE
+  config <- configure_model(model, dat, formula)
+  expect_equal(
+    config$formula$family$vars,
+    paste0("vint", 1:4, "[start:end]")
+  )
+})
+
+test_that("stancode emits thread-safe slicing when threads is passed", {
+  skip_on_cran()
+
+  dat <- rlnr(n = 100, m = c(-1, 0), s = c(1, 1), ndt = 0.2)
+  model <- lnr(rt = "rt", response = "response", n_choices = 2)
+  formula <- bmf(correct ~ 1, error ~ 1, ndt ~ 1)
+
+  sc <- stancode(formula, dat, model = model, backend = "cmdstanr")
+  expect_true(grepl(
+    "lnr_simple_lpdf(Y | mu, correct, error, ndt, s, vint1, vint2, vint3);",
+    sc, fixed = TRUE
+  ))
+
+  sc_threaded <- stancode(formula, dat, model = model, backend = "cmdstanr",
+                          threads = brms::threading(2))
+  expect_true(grepl(
+    paste0("lnr_simple_lpdf(Y[start:end] | mu, correct, error, ndt, s, ",
+           "vint1[start:end], vint2[start:end], vint3[start:end]);"),
+    sc_threaded, fixed = TRUE
+  ))
+  expect_true(grepl("reduce_sum", sc_threaded))
+})
+
 # -----------------------------------------------------------------------------
 # Model configuration tests
 # -----------------------------------------------------------------------------

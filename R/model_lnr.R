@@ -566,6 +566,22 @@ bmf2bf.lnr_custom <- function(model, formula) {
 # CONFIGURE_MODEL S3 METHODS                                             ####
 ############################################################################# !
 
+# The vint() columns hold the winning category and the per-category
+# accumulator counts, one value per observation, in the order the Stan
+# signature expects. Under brms within-chain threading a loop = FALSE family
+# must slice them itself: reduce_sum slices Y inside partial_log_lik but
+# passes custom family `vars` through whole, so a bare "vint1" would pair each
+# slice's response times with the top of the data -- silently wrong results.
+# brms only defines start/end inside the threaded partial_log_lik, so the
+# thread-safe sliced form cannot be emitted without threading (it would not
+# compile). bmm() records the threading request as attr(model, "threads")
+# before configure_model runs; when the attribute is absent (e.g. direct calls
+# in tests) the unthreaded form is the safe default.
+.lnr_family_vars <- function(model, n_cats) {
+  vars <- paste0("vint", seq_len(n_cats + 1))
+  if (isTRUE(attr(model, "threads"))) paste0(vars, "[start:end]") else vars
+}
+
 #' @export
 configure_model.lnr_simple <- function(model, data, formula) {
   links <- model$links
@@ -584,7 +600,7 @@ configure_model.lnr_simple <- function(model, data, formula) {
     ub = rep(NA, length(dpars)),
     lb = c(NA, NA, NA, 0, 0),
     type = "real",
-    vars = c("vint1", "vint2", "vint3"),
+    vars = .lnr_family_vars(model, length(cat_names)),
     loop = FALSE,
     log_lik = log_lik_lnr_simple,
     posterior_predict = posterior_predict_lnr_simple,
@@ -612,9 +628,6 @@ configure_model.lnr_custom <- function(model, data, formula) {
   )
   lb_vec <- c(NA, rep(NA, n_cats), 0, 0)
 
-  # brms vint() order must match Stan function signature
-  vars_vec <- paste0("vint", seq_len(n_cats + 1))
-
   formula$family <- brms::custom_family(
     "lnr_custom",
     dpars = dpars,
@@ -622,7 +635,7 @@ configure_model.lnr_custom <- function(model, data, formula) {
     ub = rep(NA, length(dpars)),
     lb = lb_vec,
     type = "real",
-    vars = vars_vec,
+    vars = .lnr_family_vars(model, n_cats),
     loop = FALSE,
     log_lik = log_lik_lnr_custom,
     posterior_predict = posterior_predict_lnr_custom,
