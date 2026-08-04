@@ -266,3 +266,10 @@ test_that("softmax and softmaxinv work with example from documentation", {
   recovered <- softmaxinv(result, ref_position = 1, ref_value = 5)
   expect_equal(recovered, 5:7, tolerance = 1e-10)
 })
+
+test_that("uses_threading detects threading requests", {
+  expect_false(bmm:::uses_threading(NULL))
+  expect_false(bmm:::uses_threading(brms::threading(NULL)))
+  expect_true(bmm:::uses_threading(brms::threading(2)))
+  expect_true(bmm:::uses_threading(2))
+})
