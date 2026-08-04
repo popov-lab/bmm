@@ -49,9 +49,10 @@ detection:
 - `mixture3p_cd()` for the three-parameter mixture model with non-targets
 - `imm_cd()` for the full interference measurement model
 
-These constructors replace the older `task = "cd"` entry points. The legacy
-calls are still accepted during the transition, but they now issue a
-deprecation warning.
+Each constructor takes one response format, so the change detection models are
+separate from their continuous reproduction counterparts rather than a mode of
+them. The generic entry points (`mixture2p()`, `mixture3p()`, `imm()`, `sdm()`)
+dispatch to the right one based on the response arguments you supply.
 
 # Choosing a model
 

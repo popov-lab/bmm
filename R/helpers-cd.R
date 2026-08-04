@@ -1,6 +1,51 @@
 # shared constants and helpers for change-detection models
 .cd_sharpness <- 5
 
+# Number of Gauss-Legendre nodes used to integrate the retrieval distribution
+# over the "same" arc. 32 nodes match a 2e6-point reference rule to ~1e-10.
+.cd_n_nodes <- 32
+
+# Gauss-Legendre nodes and weights on [-1, 1] via Golub-Welsch: the nodes are
+# the eigenvalues of the Jacobi matrix of the Legendre recurrence.
+.cd_gauss_legendre <- function(n = .cd_n_nodes) {
+  k <- seq_len(n - 1)
+  b <- k / sqrt(4 * k^2 - 1)
+  jacobi <- matrix(0, n, n)
+  jacobi[cbind(k, k + 1)] <- b
+  jacobi[cbind(k + 1, k)] <- b
+  eig <- eigen(jacobi, symmetric = TRUE)
+  ord <- order(eig$values)
+  nlist(nodes = eig$values[ord], weights = 2 * eig$vectors[1, ord]^2)
+}
+
+.cd_log_i0 <- function(kappa) {
+  log(besselI(kappa, nu = 0, expon.scaled = TRUE)) + kappa
+}
+
+# Half-width of the arc around the probe within which the Bayesian decision rule
+# of Lin & Oberauer (2022) yields a "same" response. Their Eq. 8 sets
+# LLR = log[(1/2pi) / (p_mem * vonMises(x | probe, kappa) + (1 - p_mem)/2pi)],
+# and the response is "change" when LLR > criterion. Because the von Mises
+# density decreases monotonically in |x - probe|, that region is always an arc.
+# Their Appendix B shows p_mem drops out of the boundary when criterion = 0.
+.cd_crit_angle <- function(kappa, criterion = 0, p_mem = 1) {
+  offset <- if (all(criterion == 0)) {
+    0
+  } else {
+    log(pmax((exp(-criterion) - 1 + p_mem) / p_mem, 0))
+  }
+  acos(pmin(pmax((.cd_log_i0(kappa) + offset) / kappa, -1), 1))
+}
+
+# Mass of a von Mises(mu, kappa) inside the arc centred on `centre` with
+# half-width `half_width`, by Gauss-Legendre quadrature. All arguments are
+# recycled to a common length n; `centre` and `half_width` are length n.
+.cd_vm_arc_mass <- function(centre, half_width, kappa, mu = 0, gl = .cd_gauss_legendre()) {
+  x <- outer(half_width, gl$nodes) + centre - mu
+  dens <- exp(kappa * cos(x) - .cd_log_i0(kappa)) / (2 * pi)
+  half_width * drop(dens %*% gl$weights)
+}
+
 .log1mexp <- function(x) {
   stopif(
     any(x > 0, na.rm = TRUE),
@@ -106,19 +151,6 @@
     out$nt_distances <- nt_distances
   }
 
-  out
-}
-
-.resolve_mixture2p_cd_p_target <- function(p_target = NULL, thetat = NULL) {
-  if (!is.null(p_target) && !is.null(thetat)) {
-    stopif(
-      any(abs(p_target - thetat) > sqrt(.Machine$double.eps), na.rm = TRUE),
-      "Please specify only one of 'p_target' or 'thetat'."
-    )
-  }
-
-  out <- p_target %||% thetat %||% 0.6
-  stopif(isTRUE(any(out < 0 | out > 1, na.rm = TRUE)), "p_target must be in [0, 1].")
   out
 }
 

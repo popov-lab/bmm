@@ -2,6 +2,7 @@
 % Please edit documentation in R/model_mixture2p.R
 \name{mixture2p}
 \alias{mixture2p}
+\alias{mixture2p_de}
 \alias{mixture2p_cd}
 \title{Two-parameter mixture model by Zhang and Luck (2008).}
 \usage{
@@ -10,30 +11,30 @@ mixture2p(
   response = NULL,
   probe = NULL,
   target = NULL,
-  task = "de",
+  links = NULL,
   ...
 )
 
-mixture2p_cd(response, probe, target, ...)
+mixture2p_de(resp_error, links = NULL, ...)
+
+mixture2p_cd(response, probe, target, links = NULL, ...)
 }
 \arguments{
 \item{resp_error}{The name of the variable in the provided dataset containing
-the response error. The response Error should code the response relative to
+the response error. The response error should code the response relative to
 the to-be-recalled target in radians. You can transform the response error
-in degrees to radian using the \code{deg2rad} function. Required when
-\code{task = "de"}.}
+in degrees to radian using the \code{deg2rad} function.}
 
 \item{response}{The name of the variable in the dataset containing the binary
-response (0 = "same", 1 = "change"). Required when \code{task = "cd"}.}
+change detection response, coded 0 = "same" and 1 = "change".}
 
-\item{probe}{The name of the variable containing the probe color in radians.
-Required when \code{task = "cd"}.}
+\item{probe}{The name of the variable containing the probed feature in
+radians.}
 
-\item{target}{The name of the variable containing the target color in
-radians. Required when \code{task = "cd"}.}
+\item{target}{The name of the variable containing the feature that was shown
+at the probed location, in radians.}
 
-\item{task}{Character. The experimental task: \code{"de"} for delayed estimation
-(continuous reproduction) or \code{"cd"} for change detection. Default is \code{"de"}.}
+\item{links}{A list of links for the model parameters}
 
 \item{...}{used internally for testing, ignore it}
 }
@@ -44,6 +45,13 @@ An object of class \code{bmmodel}
 Two-parameter mixture model by Zhang and Luck (2008).
 }
 \details{
+\code{mixture2p()} is a generic entry point that dispatches on the response
+arguments you supply: \code{resp_error} selects the continuous reproduction model
+and \code{response}/\code{probe}/\code{target} select the change detection model. The two
+tasks require different response formats, so each has its own constructor
+with its own parameters and likelihood — \code{mixture2p_de()} and
+\code{mixture2p_cd()}. Call those directly when you want to be explicit.
+\subsection{Continuous reproduction}{
 \itemize{
 \item \strong{Domain:} Visual working memory
 \item \strong{Task:} Continuous reproduction
@@ -90,25 +98,94 @@ Two-parameter mixture model by Zhang and Luck (2008).
 }
 }
 }
+
+\subsection{Change detection}{
+\itemize{
+\item \strong{Domain:} Visual working memory
+\item \strong{Task:} Change detection
+\item \strong{Name:} Two-parameter mixture model for single-probe change detection.
+\item \strong{Citation:}
+\itemize{
+\item Zhang, W., & Luck, S. J. (2008). Discrete fixed-resolution representations in visual working memory. Nature, 453(7192), 233-235; Lin, H.Y., & Oberauer, K. (2022). An interference model for visual working memory: Applications to the change detection task. Cognitive Psychology, 133, 101463.
+}
+\item \strong{Requirements:}
+\itemize{
+\item response: binary, coded 0 = 'same' and 1 = 'change'
+}
+}
+\itemize{
+\item probe: the probed feature in radians
+\item target: the feature shown at the probed location in radians
+}
+\itemize{
+\item \strong{Parameters:}
+\itemize{
+\item \code{mu}: Bias of the retrieval distribution relative to the target (in radians). Fixed internally to 0 by default.
+\item \code{kappa}: Concentration parameter of the von Mises distribution
+\item \code{thetat}: Probability of retrieving the target from memory
+\item \code{criterion}: Decision criterion. A 'change' response is given when the log-likelihood ratio exceeds the criterion, so larger values make 'change' responses less likely. Fixed to 0 (unbiased) by default; supply a formula for criterion to estimate it.
+}
+\item \strong{Fixed parameters:}
+\itemize{
+\item \code{mu} = 0
+\item \code{criterion} = 0
+}
+\item \strong{Default parameter links:}
+\itemize{
+\item mu = tan_half; kappa = log; thetat = logit; criterion = identity
+}
+\item \strong{Default priors:}
+\itemize{
+\item \code{mu}:
+\itemize{
+\item \code{main}: student_t(1, 0, 1)
+}
+\item \code{kappa}:
+\itemize{
+\item \code{main}: normal(2, 1)
+\item \code{effects}: normal(0, 1)
+}
+\item \code{thetat}:
+\itemize{
+\item \code{main}: logistic(0, 1)
+}
+\item \code{criterion}:
+\itemize{
+\item \code{main}: normal(0, 0.5)
+\item \code{effects}: normal(0, 0.5)
+}
+}
+}
+}
+}
 \examples{
 \dontshow{if (isTRUE(Sys.getenv("BMM_EXAMPLES"))) withAutoprint(\{ # examplesIf}
-# generate artificial data
+# continuous reproduction
 dat <- data.frame(y = rmixture2p(n = 2000))
-
-# define formula
-ff <- bmmformula(kappa ~ 1, thetat ~ 1)
-
-model <- mixture2p(resp_error = "y")
-
-# fit the model
 fit <- bmm(
-  formula = ff,
+  formula = bmmformula(kappa ~ 1, thetat ~ 1),
   data = dat,
-  model = model,
-  cores = 4,
-  iter = 500,
-  backend = "cmdstanr"
+  model = mixture2p(resp_error = "y"),
+  cores = 4, iter = 500, backend = "cmdstanr"
+)
+
+# change detection
+dat_cd <- data.frame(target = 0, probe = runif(2000, -pi, pi))
+dat_cd$resp <- rmixture2p_cd(2000, dat_cd$probe, kappa = 5, p_mem = 0.7)
+fit_cd <- bmm(
+  formula = bmmformula(kappa ~ 1, thetat ~ 1),
+  data = dat_cd,
+  model = mixture2p_cd(response = "resp", probe = "probe", target = "target"),
+  cores = 4, iter = 500, backend = "cmdstanr"
 )
 \dontshow{\}) # examplesIf}
+}
+\references{
+Zhang, W., & Luck, S. J. (2008). Discrete fixed-resolution representations in
+visual working memory. \emph{Nature}, \emph{453}(7192), 233--235.
+
+Lin, H. Y., & Oberauer, K. (2022). An interference model for visual working
+memory: Applications to the change detection task. \emph{Cognitive
+Psychology}, \emph{133}, 101463. \doi{10.1016/j.cogpsych.2022.101463}
 }
 \keyword{bmmodel}

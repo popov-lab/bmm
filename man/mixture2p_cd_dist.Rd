@@ -10,35 +10,29 @@ dmixture2p_cd(
   response,
   probe,
   kappa = 5,
-  thetat = NULL,
-  p_target = NULL,
-  beta = 0,
+  p_mem = 0.6,
+  criterion = 0,
   mu = 0,
-  log = FALSE,
-  n_quad = 101
+  log = FALSE
 )
 
-rmixture2p_cd(
-  n,
-  probe,
-  kappa = 5,
-  thetat = NULL,
-  p_target = NULL,
-  beta = 0,
-  mu = 0,
-  n_quad = 101
-)
+rmixture2p_cd(n, probe, kappa = 5, p_mem = 0.6, criterion = 0, mu = 0)
 }
 \arguments{
 \item{response}{Binary vector (0 = "same", 1 = "change")}
 
-\item{probe}{Probe value in radians (centered relative to target)}
+\item{probe}{Probe value in radians, relative to the target}
 
 \item{kappa}{Concentration parameter of the von Mises distribution}
 
-\item{thetat}{Probability of target memory retrieval (between 0 and 1)}
+\item{p_mem}{Probability of retrieving the target from memory}
 
-\item{beta}{Decision criterion (log prior odds). Default 0 for unbiased.}
+\item{criterion}{Decision criterion, called beta in Lin & Oberauer (2022).
+The response is "change" when the log-likelihood ratio exceeds \code{criterion},
+so \code{criterion = 0} (the default) is the unbiased observer and larger values
+make "change" responses less likely.}
+
+\item{mu}{Bias of the retrieval distribution in radians}
 
 \item{log}{Logical; if \code{TRUE}, values are returned on the log scale.}
 
@@ -51,6 +45,15 @@ rmixture2p_cd(
 \description{
 Density and random generation for the two-parameter mixture
 model applied to the change detection task, based on Lin & Oberauer (2022).
+}
+\details{
+The observer retrieves a feature \code{x} from memory and responds
+"change" when the log-likelihood ratio of Equation 8 in Lin & Oberauer
+(2022) exceeds \code{criterion}. Since the ratio increases monotonically in the
+distance between \code{x} and the probe, that decision region is an arc, and
+the probability of a "change" response is the retrieval mass outside it.
+When \code{criterion = 0} the boundary depends on \code{kappa} alone (their
+Appendix B).
 }
 \references{
 Lin, H.Y., & Oberauer, K. (2022). An interference model for

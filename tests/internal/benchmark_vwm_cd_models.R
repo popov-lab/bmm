@@ -16,7 +16,7 @@ benchmark_vwm_cd_models <- function(iter = 400, warmup = 200, backend = "rstan")
     mixture2p = list(
       data = {
         dat <- data.frame(target = 0, probe = runif(80, -pi, pi))
-        dat$resp <- rmixture2p_cd(80, probe = dat$probe, kappa = 5, p_target = 0.75)
+        dat$resp <- rmixture2p_cd(80, probe = dat$probe, kappa = 5, p_mem = 0.75)
         dat
       },
       formula = bmf(kappa ~ 1, thetat ~ 1),

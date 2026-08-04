@@ -1,3 +1,12 @@
+# bmm 1.4.0
+
+### New models
+* Add **`mixture2p_cd()`**, the two-parameter mixture model for the single-probe change detection task, following the Bayesian decision rule of Lin & Oberauer (2022). The observer retrieves a feature from memory and responds "change" when the log-likelihood ratio of their Equation 8 exceeds a criterion. Because that ratio increases monotonically with the distance between the retrieved feature and the probe, the decision region is an arc whose boundary is available in closed form, so the likelihood needs no approximation of the decision step. Includes distribution functions `dmixture2p_cd()` and `rmixture2p_cd()` (#136).
+* The `criterion` parameter is fixed to 0 (the unbiased observer) by default. Supplying a formula for it, e.g. `bmf(kappa ~ 1, thetat ~ 1, criterion ~ 1)`, estimates it instead; the extra Stan code and its gradient contribution are only generated in that case. At an unbiased criterion the decision boundary depends on `kappa` alone, as shown in Appendix B of Lin & Oberauer (2022).
+
+### New features
+* `mixture2p()` now dispatches on the response arguments it is given: `resp_error` selects the continuous reproduction model and `response`/`probe`/`target` select the change detection model. `mixture2p_de()` and `mixture2p_cd()` are available to be explicit. Each constructor takes exactly one response format, and the two models have independent S3 classes so neither inherits the other's methods.
+
 # bmm 1.3.1
 
 ### Bug fixes

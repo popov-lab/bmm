@@ -414,11 +414,23 @@ rmixture2p <- function(n, mu = 0, kappa = 5, p_mem = 0.6) {
 #'
 #' @param response Binary vector (0 = "same", 1 = "change")
 #' @param n Number of observations to generate
-#' @param probe Probe value in radians (centered relative to target)
+#' @param probe Probe value in radians, relative to the target
 #' @param kappa Concentration parameter of the von Mises distribution
-#' @param thetat Probability of target memory retrieval (between 0 and 1)
-#' @param beta Decision criterion (log prior odds). Default 0 for unbiased.
+#' @param p_mem Probability of retrieving the target from memory
+#' @param criterion Decision criterion, called beta in Lin & Oberauer (2022).
+#'   The response is "change" when the log-likelihood ratio exceeds `criterion`,
+#'   so `criterion = 0` (the default) is the unbiased observer and larger values
+#'   make "change" responses less likely.
+#' @param mu Bias of the retrieval distribution in radians
 #' @param log Logical; if `TRUE`, values are returned on the log scale.
+#'
+#' @details The observer retrieves a feature `x` from memory and responds
+#'   "change" when the log-likelihood ratio of Equation 8 in Lin & Oberauer
+#'   (2022) exceeds `criterion`. Since the ratio increases monotonically in the
+#'   distance between `x` and the probe, that decision region is an arc, and
+#'   the probability of a "change" response is the retrieval mass outside it.
+#'   When `criterion = 0` the boundary depends on `kappa` alone (their
+#'   Appendix B).
 #'
 #' @keywords distribution
 #'
@@ -430,68 +442,51 @@ rmixture2p <- function(n, mu = 0, kappa = 5, p_mem = 0.6) {
 #'   `rmixture2p_cd` gives random binary responses.
 #'
 #' @export
-dmixture2p_cd <- function(response, probe, kappa = 5, thetat = NULL,
-                           p_target = NULL, beta = 0, mu = 0,
-                           log = FALSE, n_quad = 101) {
+dmixture2p_cd <- function(response, probe, kappa = 5, p_mem = 0.6,
+                          criterion = 0, mu = 0, log = FALSE) {
   stopif(isTRUE(any(kappa < 0)), "kappa must be non-negative")
+  stopif(isTRUE(any(p_mem < 0 | p_mem > 1)), "p_mem must be between zero and one.")
 
-  p_target <- .resolve_mixture2p_cd_p_target(p_target = p_target, thetat = thetat)
   obs <- .recycle_cd_args(
     response = response, probe = probe, kappa = kappa,
-    p_target = p_target, beta = beta, mu = mu
+    p_mem = p_mem, criterion = criterion, mu = mu
   )
   stopif(
     !all(obs$response %in% c(0, 1)),
     "response must be binary (0 or 1)."
   )
 
-  quad <- .cd_quadrature(n_quad)
-  loglik <- vapply(seq_len(obs$n), function(i) {
-    .mixture2p_cd_loglik(
-      obs$response[i], obs$probe[i], obs$kappa[i], obs$p_target[i],
-      obs$beta[i], obs$mu[i], quad
-    )
-  }, numeric(1))
+  p_same <- .mixture2p_cd_psame(
+    obs$probe, obs$kappa, obs$p_mem, obs$criterion, obs$mu
+  )
+  loglik <- ifelse(obs$response == 1, log1p(-p_same), log(p_same))
 
   if (log) loglik else exp(loglik)
 }
 
 #' @rdname mixture2p_cd_dist
 #' @export
- rmixture2p_cd <- function(n, probe, kappa = 5, thetat = NULL, p_target = NULL,
-                           beta = 0, mu = 0, n_quad = 101) {
-  p_change <- dmixture2p_cd(
-    response = rep(1, n), probe = probe, kappa = kappa, thetat = thetat,
-    p_target = p_target, beta = beta, mu = mu, n_quad = n_quad
-  )
-  stats::rbinom(n, size = 1, prob = p_change)
+rmixture2p_cd <- function(n, probe, kappa = 5, p_mem = 0.6, criterion = 0,
+                          mu = 0) {
+  obs <- .recycle_cd_args(probe = probe, kappa = kappa, p_mem = p_mem,
+                          criterion = criterion, mu = mu)
+  p_same <- .mixture2p_cd_psame(obs$probe, obs$kappa, obs$p_mem, obs$criterion,
+                                obs$mu)
+  stats::rbinom(n, size = 1, prob = 1 - p_same)
 }
 
-.mixture2p_cd_loglik <- function(response, probe, kappa, p_target, beta, mu, quad) {
-  log_uniform <- -log(2 * pi)
-  log_vm_norm <- .vm_log_norm(kappa)
-  vm_ret <- kappa * cos(quad$x_grid - mu) - log_vm_norm
-  vm_same <- kappa * cos(quad$x_grid - probe - mu) - log_vm_norm
+# Probability of a "same" response: the retrieval mass inside the decision arc.
+# Kept on the "same" scale rather than the complement so that the log-likelihood
+# of rare "same" responses does not lose precision to cancellation.
+.mixture2p_cd_psame <- function(probe, kappa, p_mem, criterion, mu) {
+  half_width <- .cd_crit_angle(kappa, criterion, p_mem)
 
-  log_p_ret <- matrixStats::rowLogSumExps(cbind(
-    .safe_log(p_target) + vm_ret,
-    .safe_log(1 - p_target) + log_uniform
-  ))
-  log_p_same <- matrixStats::rowLogSumExps(cbind(
-    .safe_log(p_target) + vm_same,
-    .safe_log(1 - p_target) + log_uniform
-  ))
+  p_same <- p_mem * .cd_vm_arc_mass(wrap(probe), half_width, kappa, mu) +
+    (1 - p_mem) * half_width / pi
+  p_same[half_width <= 0] <- 0
+  p_same[half_width >= pi] <- 1
 
-  log_p_change <- matrixStats::logSumExp(
-    stats::plogis(.cd_sharpness * (log_p_ret - log_p_same - beta), log.p = TRUE) +
-      log_p_ret
-  ) + log(quad$dx)
-  log_p_change <- max(min(log_p_change, log1p(-1e-10)), log(1e-10))
-
-  if (response == 1) {
-    return(log_p_change)
-  }
-  .log1mexp(log_p_change)
+  pmin(pmax(p_same, .Machine$double.eps), 1 - .Machine$double.eps)
 }
 
 .log_mix <- function(weight, log_p1, log_p2) {
