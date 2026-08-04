@@ -673,6 +673,7 @@ use_model_template <- function(model_name,
 #' @export
 stancode.bmmformula <- function(object, data, model, prior = NULL, ...) {
   withr::local_options(bmm.sort_data = FALSE)
+  dots <- list(...)
 
   # check model, formula and data, and transform data if necessary
   formula <- object
@@ -680,14 +681,17 @@ stancode.bmmformula <- function(object, data, model, prior = NULL, ...) {
   data <- check_data(model, data, formula)
   formula <- check_formula(model, data, formula)
 
+  # record the threading request so configure_model can emit thread-safe
+  # families (brms falls back to the global option when threads is not passed)
+  attr(model, "threads") <- uses_threading(
+    dots$threads %||% getOption("brms.threads", NULL)
+  )
+
   # generate the model specification to pass to brms later
   config_args <- configure_model(model, data, formula)
 
   # configure the default prior and combine with user-specified prior
   prior <- configure_prior(model, data, config_args$formula, prior)
-
-  # extract stan code
-  dots <- list(...)
   fit_args <- combine_args(nlist(config_args, dots, prior))
   fit_args$object <- fit_args$formula
   fit_args$formula <- NULL

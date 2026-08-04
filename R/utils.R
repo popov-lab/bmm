@@ -746,6 +746,18 @@ check_rds_file <- function(file) {
   if (!is.null(l)) l else r
 }
 
+# TRUE if the user requested brms within-chain threading, given the `threads`
+# argument destined for brms::brm() (an integer or a brms::threading() object;
+# threading(NULL) is brms's "no threading" default). The result is stored as
+# attr(model, "threads") before configure_model runs, so model families that
+# use loop = FALSE can emit thread-safe `vars` slicing (see model_cswald.R)
+uses_threading <- function(threads) {
+  if (inherits(threads, "brmsthreads")) {
+    return(!is.null(threads$threads))
+  }
+  !is.null(threads)
+}
+
 # like unlist, but keeps the final outcome a list of all
 # elements of nested lists. Only works 1-level deep
 unnest_list <- function(list_of_lists) {
