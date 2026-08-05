@@ -1,108 +1,107 @@
-test_that("mixture3p CD constructor works", {
-  m <- mixture3p_cd(response = "resp", probe = "probe", target = "target",
-                    nt_features = paste0("nt", 1:2, "_loc"), set_size = 3)
-  expect_s3_class(m, "bmmodel")
+cd3p_data <- function(n = 100, seed = 1) {
+  withr::with_seed(seed, {
+    dat <- data.frame(
+      target = 0,
+      probe = runif(n, -pi, pi),
+      nt1 = runif(n, -pi, pi),
+      nt2 = runif(n, -pi, pi),
+      ss = 3
+    )
+    dat$resp <- rmixture3p_cd(
+      n, dat$probe, nt_features = cbind(dat$nt1, dat$nt2),
+      kappa = 6, thetat = 1.2, thetant = 0.1
+    )
+    dat
+  })
+}
+
+cd3p_model <- function() {
+  mixture3p_cd(
+    response = "resp", probe = "probe", target = "target",
+    nt_features = c("nt1", "nt2"), set_size = "ss"
+  )
+}
+
+test_that("mixture3p_cd is independent of the continuous reproduction model", {
+  m <- cd3p_model()
   expect_s3_class(m, "change_detection")
   expect_s3_class(m, "non_targets")
-  expect_s3_class(m, "mixture3p")
   expect_s3_class(m, "mixture3p_cd")
+  expect_false(inherits(m, "mixture3p"))
   expect_false(inherits(m, "circular"))
-  expect_equal(m$resp_vars$response, "resp")
-  expect_true(m$void_mu)
-  expect_equal(m$fixed_parameters$beta, 0)
+  expect_equal(m$fixed_parameters, list(mu = 0, criterion = 0))
 })
 
-test_that("mixture3p(task = 'cd') still works", {
-  expect_warning(
-    m <- mixture3p(response = "resp", probe = "probe", target = "target",
-                   nt_features = paste0("nt", 1:2, "_loc"), set_size = 3,
-                   task = "cd"),
-    "deprecated"
-  )
-  expect_s3_class(m, "mixture3p_cd")
-})
+test_that("mixture3p() dispatches on the response arguments", {
+  de <- mixture3p(resp_error = "y", nt_features = c("nt1", "nt2"), set_size = "ss")
+  expect_s3_class(de, "mixture3p")
+  expect_false(inherits(de, "change_detection"))
 
-test_that("mixture3p DE constructor still works", {
-  m <- mixture3p(resp_error = "y", nt_features = paste0("nt", 1:2), set_size = 3)
-  expect_s3_class(m, "circular")
-  expect_s3_class(m, "mixture3p_de")
-  expect_false(inherits(m, "change_detection"))
-  expect_equal(m$links$mu1, "tan_half")
-})
+  cd <- mixture3p(response = "r", probe = "p", target = "t",
+                  nt_features = c("nt1", "nt2"), set_size = "ss")
+  expect_s3_class(cd, "mixture3p_cd")
 
-test_that("mixture3p CD validates required arguments", {
+  expect_error(mixture3p(nt_features = "nt1", set_size = 2), "Provide either")
   expect_error(
-    mixture3p_cd(probe = "p", target = "t",
-                 nt_features = paste0("nt", 1:2, "_loc"), set_size = 3),
-    "response"
-  )
-  expect_error(
-    mixture3p_cd(response = "r", probe = "p", target = "t", set_size = 3),
-    "nt_features"
+    mixture3p(resp_error = "y", response = "r", nt_features = "nt1", set_size = 2),
+    "not both"
   )
 })
 
-test_that("dmixture3p_cd returns valid probabilities", {
-  p <- dmixture3p_cd(1, probe = 0, nt_features = c(1, -1),
-                     lure_idx = c(1, 1), kappa = 5, thetat = log(6),
-                     thetant = log(3))
-  expect_true(p >= 0 && p <= 1)
-})
-
-test_that("dmixture3p_cd is vectorized for matrix non-target inputs", {
-  nt_features <- matrix(c(1, -1, 0.5, -0.5), nrow = 2, byrow = TRUE)
-  lure_idx <- matrix(c(1, 1, 1, 0), nrow = 2, byrow = TRUE)
-  p <- dmixture3p_cd(
-    c(0, 1), probe = c(0, pi / 2), nt_features = nt_features,
-    lure_idx = lure_idx, kappa = c(5, 6), p_target = c(0.6, 0.7),
-    p_nontarget = c(0.3, 0.2)
-  )
-  expect_length(p, 2)
+test_that("dmixture3p_cd returns a proper probability mass function", {
+  p <- dmixture3p_cd(c(0, 1), probe = 0.7, nt_features = c(1.5, -2),
+                     kappa = 5, thetat = 1, thetant = 0.2)
+  expect_equal(sum(p), 1)
   expect_true(all(p >= 0 & p <= 1))
 })
 
-test_that("mixture3p CD pipeline runs with mock backend", {
-  set.seed(42)
-  dat <- data.frame(
-    resp = c(rep(0, 50), rep(1, 50)),
-    probe = runif(100, -pi, pi),
-    target = runif(100, -pi, pi),
-    nt1_loc = runif(100, -pi, pi),
-    nt2_loc = runif(100, -pi, pi),
-    ss = 3
-  )
-
-  m <- mixture3p_cd(
-    response = "resp", probe = "probe", target = "target",
-    nt_features = c("nt1_loc", "nt2_loc"), set_size = "ss"
-  )
-  f <- bmf(kappa ~ 1, thetat ~ 1, thetant ~ 1)
-
-  mock_fit <- bmm(f, dat, m, backend = "mock", mock_fit = 1, rename = FALSE)
-  expect_equal(mock_fit$fit, 1)
-  expect_type(mock_fit$bmm, "list")
+test_that("an identical probe is rejected far above chance", {
+  p <- dmixture3p_cd(1, probe = 0, nt_features = c(2, -2.5), kappa = 8,
+                     thetat = 1.5, thetant = -0.5)
+  expect_lt(p, 0.35)
 })
 
-test_that("mixture3p_cd stancode uses matrix non-target data", {
-  dat <- data.frame(
-    resp = c(0, 1),
-    probe = c(0.2, -0.1),
-    target = c(0, 0),
-    nt1 = c(0.5, -0.5),
-    nt2 = c(-0.5, 0.5),
-    ss = 3
-  )
-  sc <- stancode(
-    bmf(kappa ~ 1, thetat ~ 1, thetant ~ 1),
-    dat,
-    model = mixture3p_cd(
-      response = "resp", probe = "probe", target = "target",
-      nt_features = c("nt1", "nt2"), set_size = "ss"
-    )
-  )
+test_that("mixture3p_cd predicts an intrusion cost", {
+  # a probe matching a non-target is harder to reject than a new probe at the
+  # same distance from the target (Lin & Oberauer, 2022)
+  nt <- 2.0
+  intrusion <- dmixture3p_cd(1, probe = nt, nt_features = c(nt, -0.9),
+                             kappa = 8, thetat = 1, thetant = 0.5)
+  new_probe <- dmixture3p_cd(1, probe = -nt, nt_features = c(nt, -0.9),
+                             kappa = 8, thetat = 1, thetant = 0.5)
+  expect_lt(intrusion, new_probe)
+})
 
-  expect_match(sc, "matrix\\[2, 2\\] cd_nt_features;", perl = TRUE)
-  expect_match(sc, "matrix\\[2, 2\\] cd_lure_idx;", perl = TRUE)
-  expect_no_match(sc, "vint1")
-  expect_no_match(sc, "vreal2")
+test_that("inactive lures drop out of the retrieval distribution", {
+  args <- list(response = 1, probe = 1.3, kappa = 6, thetat = 1, thetant = 0.4)
+  with_lure <- do.call(dmixture3p_cd, c(args, list(
+    nt_features = c(1.3, 2.0), lure_idx = c(1, 0)
+  )))
+  only_lure <- do.call(dmixture3p_cd, c(args, list(
+    nt_features = 1.3, lure_idx = 1
+  )))
+  expect_equal(with_lure, only_lure)
+})
+
+test_that("mixture3p_cd matches mixture2p_cd when non-targets carry no weight", {
+  p3 <- dmixture3p_cd(1, probe = 1.1, nt_features = c(2, -2), lure_idx = c(0, 0),
+                      kappa = 6, thetat = 0, thetant = -100)
+  p2 <- dmixture2p_cd(1, probe = 1.1, kappa = 6, p_mem = 0.5)
+  expect_equal(p3, p2, tolerance = 1e-8)
+})
+
+test_that("the mixture3p_cd pipeline runs and wires its Stan data", {
+  dat <- cd3p_data()
+  m <- cd3p_model()
+  f <- bmf(kappa ~ 1, thetat ~ 1, thetant ~ 1)
+  expect_equal(bmm(f, dat, m, backend = "mock", mock_fit = 1, rename = FALSE)$fit, 1)
+
+  sd_ <- standata(f, dat, model = m)
+  expect_equal(dim(sd_$cd_nt_features), c(nrow(dat), 2L))
+  expect_equal(dim(sd_$cd_lure_idx), c(nrow(dat), 2L))
+  expect_equal(as.integer(sd_$cd_free_criterion), 0L)
+
+  free <- standata(bmf(kappa ~ 1, thetat ~ 1, thetant ~ 1, criterion ~ 1),
+                   dat, model = m)
+  expect_equal(as.integer(free$cd_free_criterion), 1L)
 })

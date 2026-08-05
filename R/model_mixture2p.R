@@ -236,9 +236,6 @@ configure_model.mixture2p <- function(model, data, formula) {
 
 #' @export
 configure_model.mixture2p_cd <- function(model, data, formula) {
-  free_crit <- as.integer(not_in("criterion", names(model$fixed_parameters)))
-  gl <- .cd_gauss_legendre()
-
   family <- brms::custom_family(
     name = "mixture2p_cd",
     dpars = c("mu", "kappa", "thetat", "criterion"),
@@ -252,12 +249,7 @@ configure_model.mixture2p_cd <- function(model, data, formula) {
     posterior_predict = posterior_predict_mixture2p_cd
   )
 
-  sc_path <- system.file("stan_chunks", package = "bmm")
-  stan_funs <- read_lines2(paste0(sc_path, "/mixture2p_cd_funs.stan"))
-  stanvars <- brms::stanvar(x = gl$nodes, name = "cd_gl_x") +
-    brms::stanvar(x = gl$weights, name = "cd_gl_w") +
-    brms::stanvar(x = free_crit, name = "cd_free_criterion", scode = "int cd_free_criterion;") +
-    brms::stanvar(scode = stan_funs, block = "functions")
+  stanvars <- .cd_stanvars(model, "mixture2p_cd_funs.stan")
 
   formula <- bmf2bf(model, formula)
   formula$family <- family

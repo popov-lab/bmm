@@ -12,14 +12,11 @@ dmixture3p_cd(
   nt_features,
   lure_idx = NULL,
   kappa = 5,
-  p_target = NULL,
-  p_nontarget = NULL,
-  thetat = NULL,
-  thetant = NULL,
-  beta = 0,
+  thetat = 1,
+  thetant = 0,
+  criterion = 0,
   mu = 0,
-  log = FALSE,
-  n_quad = 101
+  log = FALSE
 )
 
 rmixture3p_cd(
@@ -28,45 +25,58 @@ rmixture3p_cd(
   nt_features,
   lure_idx = NULL,
   kappa = 5,
-  p_target = NULL,
-  p_nontarget = NULL,
-  thetat = NULL,
-  thetant = NULL,
-  beta = 0,
-  mu = 0,
-  n_quad = 101
+  thetat = 1,
+  thetant = 0,
+  criterion = 0,
+  mu = 0
 )
 }
 \arguments{
 \item{response}{Binary vector (0 = "same", 1 = "change")}
 
-\item{probe}{Probe value in radians (centered relative to target)}
+\item{probe}{Probe value in radians, relative to the target}
 
-\item{nt_features}{Numeric vector of non-target feature values (radians,
-centered relative to target)}
+\item{nt_features}{Numeric vector or matrix of non-target feature values in
+radians, relative to the target}
 
-\item{lure_idx}{Integer vector indicating active non-targets (1) or
-inactive (0)}
+\item{lure_idx}{Numeric vector or matrix flagging active non-targets (1) and
+inactive ones (0). Defaults to all active.}
 
 \item{kappa}{Concentration parameter of the von Mises distribution}
 
-\item{p_target}{Probability of retrieving the target item from memory.}
+\item{thetat}{Mixture weight for retrieving the target}
 
-\item{p_nontarget}{Probability mass assigned to non-target retrieval.}
+\item{thetant}{Mixture weight for retrieving a non-target}
 
-\item{thetat}{Deprecated legacy target log-weight argument. If supplied
-together with \code{thetant}, it is converted to \code{p_target}.}
+\item{criterion}{Decision criterion, called beta in Lin & Oberauer (2022).
+The response is "change" when the log-likelihood ratio exceeds
+\code{criterion}, so \code{criterion = 0} (the default) is the unbiased observer.}
 
-\item{thetant}{Deprecated legacy non-target log-weight argument.}
-
-\item{beta}{Decision criterion. Default 0.}
+\item{mu}{Location of the target component in radians}
 
 \item{log}{Logical; if \code{TRUE}, return log probability.}
 
 \item{n}{Number of observations to generate}
 }
+\value{
+\code{dmixture3p_cd} gives the likelihood of the binary response,
+\code{rmixture3p_cd} gives random binary responses.
+}
 \description{
 Density and random generation for the three-parameter mixture
-model applied to the change detection task.
+model applied to the single-probe change detection task, based on
+Lin & Oberauer (2022).
+}
+\details{
+The mixture weights are on the log scale and normalised by softmax
+together with a fixed guessing weight of 0, matching the continuous
+reproduction model. Only the target component counts towards the decision
+process, which treats non-target retrievals and guesses alike as uniform
+(Lin & Oberauer, 2022, Eq. 5).
+}
+\references{
+Lin, H.Y., & Oberauer, K. (2022). An interference model for
+visual working memory: Applications to the change detection task.
+Cognitive Psychology, 133, 101463.
 }
 \keyword{distribution}

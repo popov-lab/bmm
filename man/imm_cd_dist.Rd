@@ -13,13 +13,12 @@ dimm_cd(
   nt_distances,
   lure_idx = NULL,
   kappa = 5,
-  c = 2,
-  a = 0.5,
+  c = 5,
+  a = 2,
   s = 2,
-  beta = 0,
+  criterion = 0,
   mu = 0,
-  log = FALSE,
-  n_quad = 101
+  log = FALSE
 )
 
 rimm_cd(
@@ -29,47 +28,62 @@ rimm_cd(
   nt_distances,
   lure_idx = NULL,
   kappa = 5,
-  c = 2,
-  a = 0.5,
+  c = 5,
+  a = 2,
   s = 2,
-  beta = 0,
-  mu = 0,
-  n_quad = 101
+  criterion = 0,
+  mu = 0
 )
 }
 \arguments{
-\item{response}{Binary response (0 = "same", 1 = "change")}
+\item{response}{Binary vector (0 = "same", 1 = "change")}
 
-\item{probe}{Probe position (centered, in radians)}
+\item{probe}{Probe value in radians, relative to the target}
 
-\item{nt_features}{Numeric vector of non-target feature values (radians)}
+\item{nt_features}{Numeric vector or matrix of non-target feature values in
+radians, relative to the target}
 
-\item{nt_distances}{Numeric vector of distances of non-targets to target}
+\item{nt_distances}{Numeric vector or matrix of non-negative distances
+between each non-target location and the probed location}
 
-\item{lure_idx}{Integer vector indicating active non-targets (1) or
-inactive (0)}
+\item{lure_idx}{Numeric vector or matrix flagging active non-targets (1) and
+inactive ones (0). Defaults to all active.}
 
 \item{kappa}{Concentration parameter of the von Mises distribution}
 
-\item{c}{Context activation parameter (log scale)}
+\item{c}{Context activation, on the natural scale}
 
-\item{a}{General activation parameter (log scale)}
+\item{a}{General activation of memory items, on the natural scale}
 
-\item{s}{Spatial similarity gradient (log scale)}
+\item{s}{Spatial similarity gradient, on the natural scale}
 
-\item{beta}{Decision criterion. Default 0.}
+\item{criterion}{Decision criterion, called beta in Lin & Oberauer (2022).
+The response is "change" when the log-likelihood ratio exceeds
+\code{criterion}, so \code{criterion = 0} (the default) is the unbiased observer.}
+
+\item{mu}{Location of the target component in radians}
 
 \item{log}{Logical; if \code{TRUE}, return log probability.}
 
 \item{n}{Number of observations to generate}
 }
 \value{
-\code{dimm_cd} gives the likelihood, \code{rimm_cd} gives random binary
-responses.
+\code{dimm_cd} gives the likelihood of the binary response, \code{rimm_cd}
+gives random binary responses.
 }
 \description{
 Density and random generation for the interference measurement
-model applied to change detection tasks, based on Lin & Oberauer (2022).
+model applied to the single-probe change detection task, based on
+Lin & Oberauer (2022).
+}
+\details{
+The retrieval distribution is the activation-weighted mixture of the
+continuous reproduction model: the target draws activation from both the
+context cue and the context-independent source, each non-target draws
+context activation attenuated over its distance from the probed location,
+and the background contributes a constant. The decision process treats
+everything but the target as uniform, and the target's mixture weight plays
+the role of P_s in Equation B.21 of Lin & Oberauer (2022).
 }
 \references{
 Lin, H.Y., & Oberauer, K. (2022). An interference model for

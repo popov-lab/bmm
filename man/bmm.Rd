@@ -105,11 +105,13 @@ The following models are supported:
 \item cswald(rt, response, links, version)
 \item ddm(rt, response, links)
 \item ezdm(mean_rt, var_rt, n_upper, n_trials, links, version)
-\item imm(resp_error, nt_features, nt_distances, set_size, response, probe, target, regex, version, task)
+\item imm(resp_error, nt_features, nt_distances, set_size, response, probe, target, regex, version, links)
+\item imm_cd(response, probe, target, nt_features, nt_distances, set_size, regex, version, links)
 \item m3(resp_cats, num_options, choice_rule, version)
 \item mixture2p(resp_error, response, probe, target, links)
 \item mixture2p_cd(response, probe, target, links)
-\item mixture3p(resp_error, nt_features, set_size, response, probe, target, regex, task)
+\item mixture3p(resp_error, nt_features, set_size, response, probe, target, regex, links)
+\item mixture3p_cd(response, probe, target, nt_features, set_size, regex, links)
 \item sdm(resp_error, response, probe, target, version, task)
 }
 

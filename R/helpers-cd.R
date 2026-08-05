@@ -37,6 +37,28 @@
   acos(pmin(pmax((.cd_log_i0(kappa) + offset) / kappa, -1), 1))
 }
 
+# Stanvars every change-detection model needs: the shared decision-rule
+# functions, the model's own likelihood, the quadrature rule, and the flag that
+# gates the criterion code out of the unbiased model.
+.cd_stanvars <- function(model, funs_file) {
+  sc_path <- system.file("stan_chunks", package = "bmm")
+  gl <- .cd_gauss_legendre()
+  free_crit <- as.integer(not_in("criterion", names(model$fixed_parameters)))
+
+  brms::stanvar(x = gl$nodes, name = "cd_gl_x") +
+    brms::stanvar(x = gl$weights, name = "cd_gl_w") +
+    brms::stanvar(
+      x = free_crit, name = "cd_free_criterion", scode = "int cd_free_criterion;"
+    ) +
+    brms::stanvar(
+      scode = read_lines2(paste0(sc_path, "/cd_shared_funs.stan")),
+      block = "functions"
+    ) +
+    brms::stanvar(
+      scode = read_lines2(paste0(sc_path, "/", funs_file)), block = "functions"
+    )
+}
+
 # Mass of a von Mises(mu, kappa) inside the arc centred on `centre` with
 # half-width `half_width`, by Gauss-Legendre quadrature. All arguments are
 # recycled to a common length n; `centre` and `half_width` are length n.

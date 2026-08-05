@@ -602,119 +602,96 @@ rmixture3p <- function(n, mu = c(0, 2, -1.5), kappa = 5, p_mem = 0.6, p_nt = 0.2
 #' @name mixture3p_cd_dist
 #'
 #' @description Density and random generation for the three-parameter mixture
-#'   model applied to the change detection task.
+#'   model applied to the single-probe change detection task, based on
+#'   Lin & Oberauer (2022).
 #'
 #' @param response Binary vector (0 = "same", 1 = "change")
 #' @param n Number of observations to generate
-#' @param probe Probe value in radians (centered relative to target)
-#' @param nt_features Numeric vector of non-target feature values (radians,
-#'   centered relative to target)
-#' @param lure_idx Integer vector indicating active non-targets (1) or
-#'   inactive (0)
+#' @param probe Probe value in radians, relative to the target
+#' @param nt_features Numeric vector or matrix of non-target feature values in
+#'   radians, relative to the target
+#' @param lure_idx Numeric vector or matrix flagging active non-targets (1) and
+#'   inactive ones (0). Defaults to all active.
 #' @param kappa Concentration parameter of the von Mises distribution
-#' @param p_target Probability of retrieving the target item from memory.
-#' @param p_nontarget Probability mass assigned to non-target retrieval.
-#' @param thetat Deprecated legacy target log-weight argument. If supplied
-#'   together with `thetant`, it is converted to `p_target`.
-#' @param thetant Deprecated legacy non-target log-weight argument.
-#' @param beta Decision criterion. Default 0.
+#' @param thetat Mixture weight for retrieving the target
+#' @param thetant Mixture weight for retrieving a non-target
+#' @param criterion Decision criterion, called beta in Lin & Oberauer (2022).
+#'   The response is "change" when the log-likelihood ratio exceeds
+#'   `criterion`, so `criterion = 0` (the default) is the unbiased observer.
+#' @param mu Location of the target component in radians
 #' @param log Logical; if `TRUE`, return log probability.
+#'
+#' @details The mixture weights are on the log scale and normalised by softmax
+#'   together with a fixed guessing weight of 0, matching the continuous
+#'   reproduction model. Only the target component counts towards the decision
+#'   process, which treats non-target retrievals and guesses alike as uniform
+#'   (Lin & Oberauer, 2022, Eq. 5).
+#'
+#' @references Lin, H.Y., & Oberauer, K. (2022). An interference model for
+#'   visual working memory: Applications to the change detection task.
+#'   Cognitive Psychology, 133, 101463.
+#'
+#' @return `dmixture3p_cd` gives the likelihood of the binary response,
+#'   `rmixture3p_cd` gives random binary responses.
 #'
 #' @keywords distribution
 #' @export
 dmixture3p_cd <- function(response, probe, nt_features, lure_idx = NULL,
-                           kappa = 5, p_target = NULL, p_nontarget = NULL,
-                           thetat = NULL, thetant = NULL, beta = 0,
-                           mu = 0, log = FALSE, n_quad = 101) {
-  probs <- .resolve_mixture3p_cd_probs(
-    p_target = p_target, p_nontarget = p_nontarget,
-    thetat = thetat, thetant = thetant
-  )
+                          kappa = 5, thetat = 1, thetant = 0, criterion = 0,
+                          mu = 0, log = FALSE) {
+  stopif(isTRUE(any(kappa < 0)), "kappa must be non-negative")
+
   obs <- .recycle_cd_args(
-    response = response, probe = probe, kappa = kappa, beta = beta,
-    mu = mu, p_target = probs$p_target, p_nontarget = probs$p_nontarget
+    response = response, probe = probe, kappa = kappa, thetat = thetat,
+    thetant = thetant, criterion = criterion, mu = mu
   )
   stopif(
     !all(obs$response %in% c(0, 1)),
     "response must be binary (0 or 1)."
   )
+  nt <- .prepare_cd_nt_inputs(nt_features, lure_idx, n = obs$n)
 
-  nt_data <- .prepare_cd_nt_inputs(nt_features, lure_idx = lure_idx, n = obs$n)
-  quad <- .cd_quadrature(n_quad)
-  loglik <- vapply(seq_len(obs$n), function(i) {
-    .mixture3p_cd_loglik(
-      obs$response[i], obs$probe[i], nt_data$nt_features[i, ],
-      nt_data$lure_idx[i, ], obs$kappa[i], obs$p_target[i],
-      obs$p_nontarget[i], obs$beta[i], obs$mu[i], quad
-    )
-  }, numeric(1))
+  p_same <- .mixture3p_cd_psame(obs, nt)
+  loglik <- ifelse(obs$response == 1, log1p(-p_same), log(p_same))
 
   if (log) loglik else exp(loglik)
 }
 
-.mixture3p_cd_loglik <- function(response, probe, nt_features, lure_idx,
-                                 kappa, p_target, p_nontarget, beta, mu, quad) {
-  log_uniform <- -log(2 * pi)
-  log_vm_norm <- .vm_log_norm(kappa)
-  active_idx <- which(lure_idx > 0)
-  n_active <- length(active_idx)
-  p_nontarget_eff <- if (n_active == 0) 0 else p_nontarget
-  log_pguess <- .safe_log(1 - p_target - p_nontarget_eff)
-
-  vm_ret <- kappa * cos(quad$x_grid - mu) - log_vm_norm
-  vm_same <- kappa * cos(quad$x_grid - probe - mu) - log_vm_norm
-  log_p_ret <- matrixStats::rowLogSumExps(cbind(
-    .safe_log(p_target) + vm_ret,
-    log_pguess + log_uniform
-  ))
-  log_p_same <- matrixStats::rowLogSumExps(cbind(
-    .safe_log(p_target) + vm_same,
-    log_pguess + log_uniform
-  ))
-
-  if (n_active > 0) {
-    log_nt_weight <- .safe_log(p_nontarget_eff) - log(n_active)
-    nt_ret <- vapply(active_idx, function(k) {
-      log_nt_weight + kappa * cos(quad$x_grid - nt_features[k]) - log_vm_norm
-    }, numeric(length(quad$x_grid)))
-    nt_same <- vapply(active_idx, function(k) {
-      log_nt_weight + kappa * cos(quad$x_grid - nt_features[k] - probe) - log_vm_norm
-    }, numeric(length(quad$x_grid)))
-
-    if (is.null(dim(nt_ret))) {
-      nt_ret <- matrix(nt_ret, ncol = 1)
-      nt_same <- matrix(nt_same, ncol = 1)
-    }
-
-    log_p_ret <- matrixStats::rowLogSumExps(cbind(log_p_ret, nt_ret))
-    log_p_same <- matrixStats::rowLogSumExps(cbind(log_p_same, nt_same))
-  }
-
-  log_p_change <- matrixStats::logSumExp(
-    stats::plogis(.cd_sharpness * (log_p_ret - log_p_same - beta), log.p = TRUE) +
-      log_p_ret
-  ) + log(quad$dx)
-  log_p_change <- max(min(log_p_change, log1p(-1e-10)), log(1e-10))
-
-  if (response == 1) {
-    return(log_p_change)
-  }
-  .log1mexp(log_p_change)
-}
-
 #' @rdname mixture3p_cd_dist
 #' @export
-rmixture3p_cd <- function(n, probe, nt_features, lure_idx = NULL,
-                           kappa = 5, p_target = NULL, p_nontarget = NULL,
-                           thetat = NULL, thetant = NULL, beta = 0,
-                           mu = 0, n_quad = 101) {
-  p_change <- dmixture3p_cd(
-    response = rep(1, n), probe = probe, nt_features = nt_features,
-    lure_idx = lure_idx, kappa = kappa, p_target = p_target,
-    p_nontarget = p_nontarget, thetat = thetat, thetant = thetant,
-    beta = beta, mu = mu, n_quad = n_quad
+rmixture3p_cd <- function(n, probe, nt_features, lure_idx = NULL, kappa = 5,
+                          thetat = 1, thetant = 0, criterion = 0, mu = 0) {
+  obs <- .recycle_cd_args(
+    probe = probe, kappa = kappa, thetat = thetat, thetant = thetant,
+    criterion = criterion, mu = mu
   )
-  stats::rbinom(n, size = 1, prob = p_change)
+  nt <- .prepare_cd_nt_inputs(nt_features, lure_idx, n = obs$n)
+  stats::rbinom(n, size = 1, prob = 1 - .mixture3p_cd_psame(obs, nt))
+}
+
+.mixture3p_cd_psame <- function(obs, nt) {
+  n_active <- rowSums(nt$lure_idx)
+  w_target <- exp(obs$thetat)
+  w_nt <- ifelse(n_active > 0, exp(obs$thetant), 0)
+  z <- w_target + w_nt + 1
+
+  half_width <- .cd_crit_angle(obs$kappa, obs$criterion, w_target / z)
+  centre <- wrap(obs$probe)
+
+  inside <- w_target * .cd_vm_arc_mass(centre, half_width, obs$kappa, obs$mu) +
+    half_width / pi
+  for (k in seq_len(ncol(nt$nt_features))) {
+    active <- nt$lure_idx[, k] > 0.5
+    if (!any(active)) next
+    contrib <- (w_nt / pmax(n_active, 1)) *
+      .cd_vm_arc_mass(centre, half_width, obs$kappa, nt$nt_features[, k])
+    inside <- inside + ifelse(active, contrib, 0)
+  }
+
+  p_same <- inside / z
+  p_same[half_width <= 0] <- 0
+  p_same[half_width >= pi] <- 1
+  pmin(pmax(p_same, .Machine$double.eps), 1 - .Machine$double.eps)
 }
 
 #' @title Distribution functions for the Interference Measurement Model (IMM)
@@ -845,134 +822,103 @@ rimm <- function(n, mu = c(0, 2, -1.5), dist = c(0, 0.5, 2),
 
 #' @title Distribution functions for the IMM change detection model
 #'
-#' @description Density and random generation for the interference measurement
-#'   model applied to change detection tasks, based on Lin & Oberauer (2022).
-#'
 #' @name imm_cd_dist
 #'
-#' @param response Binary response (0 = "same", 1 = "change")
+#' @description Density and random generation for the interference measurement
+#'   model applied to the single-probe change detection task, based on
+#'   Lin & Oberauer (2022).
+#'
+#' @param response Binary vector (0 = "same", 1 = "change")
 #' @param n Number of observations to generate
-#' @param probe Probe position (centered, in radians)
-#' @param nt_features Numeric vector of non-target feature values (radians)
-#' @param nt_distances Numeric vector of distances of non-targets to target
-#' @param lure_idx Integer vector indicating active non-targets (1) or
-#'   inactive (0)
+#' @param probe Probe value in radians, relative to the target
+#' @param nt_features Numeric vector or matrix of non-target feature values in
+#'   radians, relative to the target
+#' @param nt_distances Numeric vector or matrix of non-negative distances
+#'   between each non-target location and the probed location
+#' @param lure_idx Numeric vector or matrix flagging active non-targets (1) and
+#'   inactive ones (0). Defaults to all active.
 #' @param kappa Concentration parameter of the von Mises distribution
-#' @param c Context activation parameter (log scale)
-#' @param a General activation parameter (log scale)
-#' @param s Spatial similarity gradient (log scale)
-#' @param beta Decision criterion. Default 0.
+#' @param c Context activation, on the natural scale
+#' @param a General activation of memory items, on the natural scale
+#' @param s Spatial similarity gradient, on the natural scale
+#' @param criterion Decision criterion, called beta in Lin & Oberauer (2022).
+#'   The response is "change" when the log-likelihood ratio exceeds
+#'   `criterion`, so `criterion = 0` (the default) is the unbiased observer.
+#' @param mu Location of the target component in radians
 #' @param log Logical; if `TRUE`, return log probability.
 #'
-#' @keywords distribution
+#' @details The retrieval distribution is the activation-weighted mixture of the
+#'   continuous reproduction model: the target draws activation from both the
+#'   context cue and the context-independent source, each non-target draws
+#'   context activation attenuated over its distance from the probed location,
+#'   and the background contributes a constant. The decision process treats
+#'   everything but the target as uniform, and the target's mixture weight plays
+#'   the role of P_s in Equation B.21 of Lin & Oberauer (2022).
 #'
 #' @references Lin, H.Y., & Oberauer, K. (2022). An interference model for
 #'   visual working memory: Applications to the change detection task.
 #'   Cognitive Psychology, 133, 101463.
 #'
-#' @return `dimm_cd` gives the likelihood, `rimm_cd` gives random binary
-#'   responses.
+#' @return `dimm_cd` gives the likelihood of the binary response, `rimm_cd`
+#'   gives random binary responses.
 #'
+#' @keywords distribution
 #' @export
-dimm_cd <- function(response, probe, nt_features, nt_distances, lure_idx = NULL,
-                     kappa = 5, c = 2, a = 0.5, s = 2, beta = 0,
-                     mu = 0, log = FALSE, n_quad = 101) {
+dimm_cd <- function(response, probe, nt_features, nt_distances,
+                    lure_idx = NULL, kappa = 5, c = 5, a = 2, s = 2,
+                    criterion = 0, mu = 0, log = FALSE) {
   stopif(isTRUE(any(kappa < 0)), "kappa must be non-negative")
   stopif(isTRUE(any(c < 0)), "c must be non-negative")
   stopif(isTRUE(any(a < 0)), "a must be non-negative")
   stopif(isTRUE(any(s < 0)), "s must be non-negative")
 
   obs <- .recycle_cd_args(
-    response = response, probe = probe, kappa = kappa, c = c,
-    a = a, s = s, beta = beta, mu = mu
+    response = response, probe = probe, kappa = kappa, c = c, a = a, s = s,
+    criterion = criterion, mu = mu
   )
   stopif(
     !all(obs$response %in% c(0, 1)),
     "response must be binary (0 or 1)."
   )
+  nt <- .prepare_cd_nt_inputs(nt_features, lure_idx, nt_distances, n = obs$n)
 
-  nt_data <- .prepare_cd_nt_inputs(
-    nt_features, lure_idx = lure_idx, nt_distances = nt_distances, n = obs$n
-  )
-  quad <- .cd_quadrature(n_quad)
-  loglik <- vapply(seq_len(obs$n), function(i) {
-    .imm_cd_loglik(
-      obs$response[i], obs$probe[i], nt_data$nt_features[i, ],
-      nt_data$nt_distances[i, ], nt_data$lure_idx[i, ], obs$kappa[i],
-      obs$c[i], obs$a[i], obs$s[i], obs$beta[i], obs$mu[i], quad
-    )
-  }, numeric(1))
+  p_same <- .imm_cd_psame(obs, nt)
+  loglik <- ifelse(obs$response == 1, log1p(-p_same), log(p_same))
 
   if (log) loglik else exp(loglik)
-}
-
-.imm_cd_loglik <- function(response, probe, nt_features, nt_distances, lure_idx,
-                           kappa, c, a, s, beta, mu, quad) {
-  log_uniform <- -log(2 * pi)
-  log_vm_norm <- .vm_log_norm(kappa)
-  log_w_bg <- 0
-  log_w_target <- matrixStats::logSumExp(c(c, a))
-  active_idx <- which(lure_idx > 0)
-  log_w_nt <- if (length(active_idx) == 0) {
-    numeric(0)
-  } else {
-    vapply(active_idx, function(k) {
-      matrixStats::logSumExp(c(c - exp(s) * nt_distances[k], a))
-    }, numeric(1))
-  }
-
-  log_total_weight <- matrixStats::logSumExp(c(log_w_bg, log_w_target, log_w_nt))
-  vm_ret <- kappa * cos(quad$x_grid - mu) - log_vm_norm
-  vm_same <- kappa * cos(quad$x_grid - probe - mu) - log_vm_norm
-  log_p_ret <- matrixStats::rowLogSumExps(cbind(
-    log_w_target + vm_ret,
-    log_w_bg + log_uniform
-  )) - log_total_weight
-  log_p_same <- matrixStats::rowLogSumExps(cbind(
-    log_w_target + vm_same,
-    log_w_bg + log_uniform
-  )) - log_total_weight
-
-  if (length(active_idx) > 0) {
-    nt_ret <- vapply(seq_along(active_idx), function(j) {
-      log_w_nt[j] + kappa * cos(quad$x_grid - nt_features[active_idx[j]]) - log_vm_norm
-    }, numeric(length(quad$x_grid)))
-    nt_same <- vapply(seq_along(active_idx), function(j) {
-      log_w_nt[j] + kappa * cos(quad$x_grid - nt_features[active_idx[j]] - probe) - log_vm_norm
-    }, numeric(length(quad$x_grid)))
-
-    if (is.null(dim(nt_ret))) {
-      nt_ret <- matrix(nt_ret, ncol = 1)
-      nt_same <- matrix(nt_same, ncol = 1)
-    }
-
-    log_p_ret <- matrixStats::rowLogSumExps(cbind(log_p_ret + log_total_weight, nt_ret)) - log_total_weight
-    log_p_same <- matrixStats::rowLogSumExps(cbind(log_p_same + log_total_weight, nt_same)) - log_total_weight
-  }
-
-  log_p_change <- matrixStats::logSumExp(
-    stats::plogis(.cd_sharpness * (log_p_ret - log_p_same - beta), log.p = TRUE) +
-      log_p_ret
-  ) + log(quad$dx)
-  log_p_change <- max(min(log_p_change, log1p(-1e-10)), log(1e-10))
-
-  if (response == 1) {
-    return(log_p_change)
-  }
-  .log1mexp(log_p_change)
 }
 
 #' @rdname imm_cd_dist
 #' @export
 rimm_cd <- function(n, probe, nt_features, nt_distances, lure_idx = NULL,
-                     kappa = 5, c = 2, a = 0.5, s = 2, beta = 0,
-                     mu = 0, n_quad = 101) {
-  p_change <- dimm_cd(
-    response = rep(1, n), probe = probe, nt_features = nt_features,
-    nt_distances = nt_distances, lure_idx = lure_idx, kappa = kappa,
-    c = c, a = a, s = s, beta = beta, mu = mu, n_quad = n_quad
+                    kappa = 5, c = 5, a = 2, s = 2, criterion = 0, mu = 0) {
+  obs <- .recycle_cd_args(
+    probe = probe, kappa = kappa, c = c, a = a, s = s, criterion = criterion,
+    mu = mu
   )
-  stats::rbinom(n, size = 1, prob = p_change)
+  nt <- .prepare_cd_nt_inputs(nt_features, lure_idx, nt_distances, n = obs$n)
+  stats::rbinom(n, size = 1, prob = 1 - .imm_cd_psame(obs, nt))
+}
+
+.imm_cd_psame <- function(obs, nt) {
+  w_target <- obs$c + obs$a
+  w_nt <- (obs$c * exp(-obs$s * nt$nt_distances) + obs$a) * nt$lure_idx
+  z <- w_target + rowSums(w_nt) + 1
+
+  half_width <- .cd_crit_angle(obs$kappa, obs$criterion, w_target / z)
+  centre <- wrap(obs$probe)
+
+  inside <- w_target * .cd_vm_arc_mass(centre, half_width, obs$kappa, obs$mu) +
+    half_width / pi
+  for (k in seq_len(ncol(nt$nt_features))) {
+    inside <- inside + w_nt[, k] *
+      .cd_vm_arc_mass(centre, half_width, obs$kappa, nt$nt_features[, k])
+  }
+
+  p_same <- inside / z
+  p_same[half_width <= 0] <- 0
+  p_same[half_width >= pi] <- 1
+  pmin(pmax(p_same, .Machine$double.eps), 1 - .Machine$double.eps)
 }
 
 #' @title Distribution functions for the Memory Measurement Model (M3)

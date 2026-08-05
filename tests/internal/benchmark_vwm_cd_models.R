@@ -4,15 +4,6 @@ benchmark_vwm_cd_models <- function(iter = 400, warmup = 200, backend = "rstan")
   set.seed(1)
 
   simulate_cases <- list(
-    sdm = list(
-      data = {
-        dat <- data.frame(target = 0, probe = runif(80, -pi, pi))
-        dat$resp <- rsdm_cd(80, probe = dat$probe, c = 4, kappa = 3)
-        dat
-      },
-      formula = bmf(c ~ 1, kappa ~ 1),
-      model = sdm_cd(response = "resp", probe = "probe", target = "target")
-    ),
     mixture2p = list(
       data = {
         dat <- data.frame(target = 0, probe = runif(80, -pi, pi))
@@ -37,8 +28,8 @@ benchmark_vwm_cd_models <- function(iter = 400, warmup = 200, backend = "rstan")
             probe = dat$probe[i],
             nt_features = c(dat$nt1[i], dat$nt2[i]),
             lure_idx = c(1, 1),
-            p_target = 0.6,
-            p_nontarget = 0.25,
+            thetat = 1.2,
+            thetant = 0.2,
             kappa = 5
           )
         }, numeric(1))

@@ -2,6 +2,7 @@
 % Please edit documentation in R/model_imm.R
 \name{imm}
 \alias{imm}
+\alias{imm_de}
 \alias{imm_cd}
 \alias{IMMfull}
 \alias{IMMbsc}
@@ -18,7 +19,18 @@ imm(
   target = NULL,
   regex = FALSE,
   version = "full",
-  task = "de",
+  links = NULL,
+  ...
+)
+
+imm_de(
+  resp_error,
+  nt_features,
+  nt_distances = NULL,
+  set_size,
+  regex = FALSE,
+  version = "full",
+  links = NULL,
   ...
 )
 
@@ -31,6 +43,7 @@ imm_cd(
   set_size,
   regex = FALSE,
   version = "full",
+  links = NULL,
   ...
 )
 
@@ -76,9 +89,6 @@ columns in the dataset.}
 
 \item{version}{Character. The version of the IMM model to use. Can be one of
 \code{full}, \code{bsc}, or \code{abc}. The default is \code{full}.}
-
-\item{task}{Character. The experimental task: \code{"de"} for delayed estimation
-(continuous reproduction) or \code{"cd"} for change detection. Default is \code{"de"}.}
 
 \item{...}{used internally for testing, ignore it}
 }

@@ -2,6 +2,7 @@
 % Please edit documentation in R/model_mixture3p.R
 \name{mixture3p}
 \alias{mixture3p}
+\alias{mixture3p_de}
 \alias{mixture3p_cd}
 \title{Three-parameter mixture model by Bays et al (2009).}
 \usage{
@@ -13,7 +14,16 @@ mixture3p(
   probe = NULL,
   target = NULL,
   regex = FALSE,
-  task = "de",
+  links = NULL,
+  ...
+)
+
+mixture3p_de(
+  resp_error,
+  nt_features,
+  set_size,
+  regex = FALSE,
+  links = NULL,
   ...
 )
 
@@ -24,6 +34,7 @@ mixture3p_cd(
   nt_features,
   set_size,
   regex = FALSE,
+  links = NULL,
   ...
 )
 }
@@ -44,19 +55,18 @@ set_size varies) or a numeric value for the set_size, if the set_size is
 fixed.}
 
 \item{response}{The name of the variable in the dataset containing the binary
-response (0 = "same", 1 = "change"). Required when \code{task = "cd"}.}
+change detection response, coded 0 = "same" and 1 = "change".}
 
-\item{probe}{The name of the variable containing the probe color in radians.
-Required when \code{task = "cd"}.}
+\item{probe}{The name of the variable containing the probed feature in
+radians.}
 
-\item{target}{The name of the variable containing the target color in
-radians. Required when \code{task = "cd"}.}
+\item{target}{The name of the variable containing the feature that was shown
+at the probed location, in radians.}
 
 \item{regex}{Logical. If TRUE, the \code{nt_features} argument is interpreted as
 a regular expression to match the non-target feature columns in the dataset.}
 
-\item{task}{Character. The experimental task: \code{"de"} for delayed estimation
-(continuous reproduction) or \code{"cd"} for change detection. Default is \code{"de"}.}
+\item{links}{A list of links for the model parameters}
 
 \item{...}{used internally for testing, ignore it}
 }
@@ -67,6 +77,11 @@ An object of class \code{bmmodel}
 Three-parameter mixture model by Bays et al (2009).
 }
 \details{
+\code{mixture3p()} dispatches on the response arguments you supply: \code{resp_error}
+selects the continuous reproduction model and \code{response}/\code{probe}/\code{target}
+select the change detection model. Each has its own constructor,
+\code{mixture3p_de()} and \code{mixture3p_cd()}.
+\subsection{Continuous reproduction}{
 \itemize{
 \item \strong{Domain:} Visual working memory
 \item \strong{Task:} Continuous reproduction
@@ -99,7 +114,7 @@ Three-parameter mixture model by Bays et al (2009).
 }
 \item \strong{Default parameter links:}
 \itemize{
-\item mu1 = tan_half; kappa = log; thetat = softmax; thetant = softmax
+\item mu1 = tan_half; kappa = log; thetat = identity; thetant = identity
 }
 \item \strong{Default priors:}
 \itemize{
@@ -119,6 +134,72 @@ Three-parameter mixture model by Bays et al (2009).
 \item \code{thetant}:
 \itemize{
 \item \code{main}: logistic(0, 1)
+}
+}
+}
+}
+
+\subsection{Change detection}{
+\itemize{
+\item \strong{Domain:} Visual working memory
+\item \strong{Task:} Change detection
+\item \strong{Name:} Three-parameter mixture model for single-probe change detection.
+\item \strong{Citation:}
+\itemize{
+\item Bays, P. M., Catalao, R. F. G., & Husain, M. (2009). The precision of visual working memory is set by allocation of a shared resource. Journal of Vision, 9(10), 1-11; Lin, H.Y., & Oberauer, K. (2022). An interference model for visual working memory: Applications to the change detection task. Cognitive Psychology, 133, 101463.
+}
+\item \strong{Requirements:}
+\itemize{
+\item response: binary, coded 0 = 'same' and 1 = 'change'
+}
+}
+\itemize{
+\item probe: the probed feature in radians
+\item target: the feature shown at the probed location in radians
+\item The non-target features should be in radians and be centered relative to the target
+}
+\itemize{
+\item \strong{Parameters:}
+\itemize{
+\item \code{mu}: Location of the target component of the retrieval distribution (in radians). Fixed internally to 0 by default.
+\item \code{kappa}: Concentration parameter of the von Mises distribution
+\item \code{thetat}: Mixture weight for retrieving the target
+\item \code{thetant}: Mixture weight for retrieving a non-target
+\item \code{criterion}: Decision criterion. A 'change' response is given when the log-likelihood ratio exceeds the criterion, so larger values make 'change' responses less likely. Fixed to 0 (unbiased) by default; supply a formula for criterion to estimate it.
+}
+\item \strong{Fixed parameters:}
+\itemize{
+\item \code{mu} = 0
+\item \code{criterion} = 0
+}
+\item \strong{Default parameter links:}
+\itemize{
+\item mu = tan_half; kappa = log; thetat = identity; thetant = identity; criterion = identity
+}
+\item \strong{Default priors:}
+\itemize{
+\item \code{mu}:
+\itemize{
+\item \code{main}: student_t(1, 0, 1)
+}
+\item \code{kappa}:
+\itemize{
+\item \code{main}: normal(2, 1)
+\item \code{effects}: normal(0, 1)
+}
+\item \code{thetat}:
+\itemize{
+\item \code{main}: logistic(0, 1)
+}
+\item \code{thetant}:
+\itemize{
+\item \code{main}: logistic(0, 1)
+}
+\item \code{criterion}:
+\itemize{
+\item \code{main}: normal(0, 0.5)
+\item \code{effects}: normal(0, 0.5)
+}
 }
 }
 }
