@@ -46,13 +46,14 @@ fansi::set_knit_hooks(knitr::knit_hooks, which = c("output", "message", "error")
 - `mixture2p_cd()` for the two-parameter mixture model
 - `mixture3p_cd()` for the three-parameter mixture model with non-targets
 - `imm_cd()` for the full interference measurement model
+- `sdm_cd()` for the signal discrimination model
 
 Each constructor takes one response format, so the change detection models are
 separate from their continuous reproduction counterparts rather than a mode of
-them. The generic entry points (`mixture2p()`, `mixture3p()`, `imm()`) dispatch
-to the right one based on the response arguments you supply.
+them. The generic entry points (`mixture2p()`, `mixture3p()`, `imm()`, `sdm()`)
+dispatch to the right one based on the response arguments you supply.
 
-All three share the Bayesian decision rule of @lin2022: the observer retrieves a
+All four share the Bayesian decision rule of @lin2022: the observer retrieves a
 feature from memory and responds "change" when the log-likelihood ratio of a
 change trial against a same trial exceeds a criterion. The models differ only in
 the retrieval distribution they supply. Because that ratio increases
@@ -77,8 +78,17 @@ the model predict an intrusion cost: a probe matching a non-target is harder to
 reject than a new probe the same distance from the target.
 
 Use `imm_cd()` when interference from non-target features and their distances is
-a core scientific question. It is the richest and typically the slowest of the
-three.
+a core scientific question.
+
+Use `sdm_cd()` when you want a continuous-strength account of memory rather than
+a discrete one. Note that @lin2022 do not fit the sdm, so applying their decision
+rule to it is an extension of their framework; the boundary is still the point
+where the memory density crosses the uniform, but it depends on both `c` and
+`kappa` and no parameter drops out of it at an unbiased criterion.
+
+On 800 trials with two chains, `mixture2p_cd()` samples in about 12 s, while
+`mixture3p_cd()`, `imm_cd()` and `sdm_cd()` all take roughly four to five times
+as long; `tests/internal/benchmark_vwm_cd_models.R` reproduces those numbers.
 
 # Required data
 
@@ -98,6 +108,12 @@ The examples below show the constructor surface for each model family.
 
 ```{r eval = FALSE}
 library(bmm)
+
+sdm_model <- sdm_cd(
+  response = "resp",
+  probe = "probe",
+  target = "target"
+)
 
 mix2_model <- mixture2p_cd(
   response = "resp",

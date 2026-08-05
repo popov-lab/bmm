@@ -221,17 +221,31 @@ rsdm <- function(n, mu = 0, c = 3, kappa = 3.5, parametrization = "sqrtexp") {
 #' @title Distribution functions for the SDM change detection model
 #'
 #' @description Density and random generation for the signal discrimination
-#'   model applied to change detection tasks, based on Lin & Oberauer (2022).
+#'   model applied to the single-probe change detection task. The decision rule
+#'   is the one of Lin & Oberauer (2022), extended to the sdm: the observer
+#'   responds "change" when the memory density at the probe falls below the
+#'   uniform, scaled by the criterion. The sdm is not one of the models they
+#'   compare, so this is an extension of their framework rather than a model
+#'   they fit.
 #'
 #' @name sdm_cd_dist
 #'
-#' @param response Binary response (0 = "same", 1 = "change")
+#' @param response Binary vector (0 = "same", 1 = "change")
 #' @param n Number of observations to generate
-#' @param probe Probe position (centered, in radians)
-#' @param c Memory strength parameter of the SDM distribution
-#' @param kappa Precision parameter of the SDM distribution
-#' @param beta Decision criterion. Default 0.
+#' @param probe Probe value in radians, relative to the target
+#' @param c Memory strength
+#' @param kappa Precision of the memory distribution
+#' @param criterion Decision criterion, called beta in Lin & Oberauer (2022).
+#'   The response is "change" when the log-likelihood ratio exceeds
+#'   `criterion`, so `criterion = 0` (the default) is the unbiased observer.
+#' @param mu Location of the memory distribution in radians
 #' @param log Logical; if `TRUE`, return log probability.
+#'
+#' @details Because the sdm density is far more peaked than a von Mises, the
+#'   integral over the decision arc is taken with an adaptive rule: the arc is
+#'   split at every periodic image of the density's peak and at multiples of
+#'   the spike width, and Gauss-Legendre is applied to each piece. A fixed rule
+#'   over the whole arc is not usable here.
 #'
 #' @keywords distribution
 #'
@@ -239,58 +253,51 @@ rsdm <- function(n, mu = 0, c = 3, kappa = 3.5, parametrization = "sqrtexp") {
 #'   visual working memory: Applications to the change detection task.
 #'   Cognitive Psychology, 133, 101463.
 #'
-#' @return `dsdm_cd` gives the likelihood, `rsdm_cd` gives random binary
-#'   responses.
+#' @return `dsdm_cd` gives the likelihood of the binary response, `rsdm_cd`
+#'   gives random binary responses.
 #'
 #' @export
-dsdm_cd <- function(response, probe, c = 4, kappa = 3, beta = 0,
-                     mu = 0, log = FALSE, n_quad = 51) {
+dsdm_cd <- function(response, probe, c = 5, kappa = 4, criterion = 0, mu = 0,
+                    log = FALSE) {
   stopif(isTRUE(any(kappa < 0)), "kappa must be non-negative")
   stopif(isTRUE(any(c < 0)), "c must be non-negative")
 
-  obs <- .recycle_cd_args(response = response, probe = probe, c = c,
-                          kappa = kappa, beta = beta, mu = mu)
+  obs <- .recycle_cd_args(
+    response = response, probe = probe, c = c, kappa = kappa,
+    criterion = criterion, mu = mu
+  )
   stopif(
     !all(obs$response %in% c(0, 1)),
     "response must be binary (0 or 1)."
   )
 
-  quad <- .cd_quadrature(n_quad)
-  loglik <- vapply(seq_len(obs$n), function(i) {
-    .sdm_cd_loglik(
-      obs$response[i], obs$probe[i], obs$c[i], obs$kappa[i],
-      obs$beta[i], obs$mu[i], quad
-    )
-  }, numeric(1))
+  p_same <- .sdm_cd_psame(obs)
+  loglik <- ifelse(obs$response == 1, log1p(-p_same), log(p_same))
 
   if (log) loglik else exp(loglik)
 }
 
 #' @rdname sdm_cd_dist
 #' @export
-rsdm_cd <- function(n, probe, c = 4, kappa = 3, beta = 0, mu = 0, n_quad = 51) {
-  p_change <- dsdm_cd(
-    response = rep(1, n), probe = probe, c = c, kappa = kappa,
-    beta = beta, mu = mu, n_quad = n_quad
-  )
-  stats::rbinom(n, size = 1, prob = p_change)
+rsdm_cd <- function(n, probe, c = 5, kappa = 4, criterion = 0, mu = 0) {
+  obs <- .recycle_cd_args(probe = probe, c = c, kappa = kappa,
+                          criterion = criterion, mu = mu)
+  stats::rbinom(n, size = 1, prob = 1 - .sdm_cd_psame(obs))
 }
 
-.sdm_cd_loglik <- function(response, probe, c, kappa, beta, mu, quad) {
-  eta_ret <- .dsdm_numer_sqrtexp(quad$x_grid, mu = mu, c = c, kappa = kappa, log = TRUE)
-  eta_same <- .dsdm_numer_sqrtexp(
-    quad$x_grid, mu = probe + mu, c = c, kappa = kappa, log = TRUE
-  )
-
-  log_p_change <- matrixStats::logSumExp(
-    stats::plogis(.cd_sharpness * (eta_ret - eta_same - beta), log.p = TRUE) + eta_ret
-  ) - matrixStats::logSumExp(eta_ret)
-
-  log_p_change <- max(min(log_p_change, log1p(-1e-10)), log(1e-10))
-  if (response == 1) {
-    return(log_p_change)
-  }
-  .log1mexp(log_p_change)
+.sdm_cd_psame <- function(obs) {
+  gl <- .cd_gauss_legendre()
+  vapply(seq_len(obs$n), function(i) {
+    log_z <- .sdm_log_int(-pi, pi, 0, obs$c[i], obs$kappa[i], gl)
+    hw <- .sdm_crit_angle(obs$c[i], obs$kappa[i], obs$criterion[i], log_z)
+    if (hw <= 0) return(.Machine$double.eps)
+    if (hw >= pi) return(1 - .Machine$double.eps)
+    p <- exp(
+      .sdm_log_int(obs$probe[i] - hw, obs$probe[i] + hw, obs$mu[i],
+                   obs$c[i], obs$kappa[i], gl) - log_z
+    )
+    min(max(p, .Machine$double.eps), 1 - .Machine$double.eps)
+  }, numeric(1))
 }
 
 # helper functions for calculating the density of the SDM distribution

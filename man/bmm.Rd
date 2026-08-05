@@ -112,7 +112,8 @@ The following models are supported:
 \item mixture2p_cd(response, probe, target, links)
 \item mixture3p(resp_error, nt_features, set_size, response, probe, target, regex, links)
 \item mixture3p_cd(response, probe, target, nt_features, set_size, regex, links)
-\item sdm(resp_error, response, probe, target, version, task)
+\item sdm(resp_error, response, probe, target, version, links)
+\item sdm_cd(response, probe, target, version, links)
 }
 
 Type  ?modelname  to get information about a specific model, e.g.  ?imm

@@ -6,41 +6,48 @@
 \alias{rsdm_cd}
 \title{Distribution functions for the SDM change detection model}
 \usage{
-dsdm_cd(
-  response,
-  probe,
-  c = 4,
-  kappa = 3,
-  beta = 0,
-  mu = 0,
-  log = FALSE,
-  n_quad = 51
-)
+dsdm_cd(response, probe, c = 5, kappa = 4, criterion = 0, mu = 0, log = FALSE)
 
-rsdm_cd(n, probe, c = 4, kappa = 3, beta = 0, mu = 0, n_quad = 51)
+rsdm_cd(n, probe, c = 5, kappa = 4, criterion = 0, mu = 0)
 }
 \arguments{
-\item{response}{Binary response (0 = "same", 1 = "change")}
+\item{response}{Binary vector (0 = "same", 1 = "change")}
 
-\item{probe}{Probe position (centered, in radians)}
+\item{probe}{Probe value in radians, relative to the target}
 
-\item{c}{Memory strength parameter of the SDM distribution}
+\item{c}{Memory strength}
 
-\item{kappa}{Precision parameter of the SDM distribution}
+\item{kappa}{Precision of the memory distribution}
 
-\item{beta}{Decision criterion. Default 0.}
+\item{criterion}{Decision criterion, called beta in Lin & Oberauer (2022).
+The response is "change" when the log-likelihood ratio exceeds
+\code{criterion}, so \code{criterion = 0} (the default) is the unbiased observer.}
+
+\item{mu}{Location of the memory distribution in radians}
 
 \item{log}{Logical; if \code{TRUE}, return log probability.}
 
 \item{n}{Number of observations to generate}
 }
 \value{
-\code{dsdm_cd} gives the likelihood, \code{rsdm_cd} gives random binary
-responses.
+\code{dsdm_cd} gives the likelihood of the binary response, \code{rsdm_cd}
+gives random binary responses.
 }
 \description{
 Density and random generation for the signal discrimination
-model applied to change detection tasks, based on Lin & Oberauer (2022).
+model applied to the single-probe change detection task. The decision rule
+is the one of Lin & Oberauer (2022), extended to the sdm: the observer
+responds "change" when the memory density at the probe falls below the
+uniform, scaled by the criterion. The sdm is not one of the models they
+compare, so this is an extension of their framework rather than a model
+they fit.
+}
+\details{
+Because the sdm density is far more peaked than a von Mises, the
+integral over the decision arc is taken with an adaptive rule: the arc is
+split at every periodic image of the density's peak and at multiples of
+the spike width, and Gauss-Legendre is applied to each piece. A fixed rule
+over the whole arc is not usable here.
 }
 \references{
 Lin, H.Y., & Oberauer, K. (2022). An interference model for

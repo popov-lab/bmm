@@ -2,8 +2,9 @@
 % Please edit documentation in R/model_sdm.R
 \name{sdm}
 \alias{sdm}
-\alias{sdmSimple}
+\alias{sdm_de}
 \alias{sdm_cd}
+\alias{sdmSimple}
 \title{Signal Discrimination Model (SDM) by Oberauer (2023)}
 \usage{
 sdm(
@@ -12,13 +13,15 @@ sdm(
   probe = NULL,
   target = NULL,
   version = "simple",
-  task = "de",
+  links = NULL,
   ...
 )
 
-sdmSimple(resp_error, version = "simple", task = "de", ...)
+sdm_de(resp_error, version = "simple", links = NULL, ...)
 
-sdm_cd(response, probe, target, version = "simple", ...)
+sdm_cd(response, probe, target, version = "simple", links = NULL, ...)
+
+sdmSimple(resp_error, version = "simple", ...)
 }
 \arguments{
 \item{resp_error}{The name of the variable in the dataset containing the
@@ -37,9 +40,6 @@ radians. Required when \code{task = "cd"}.}
 
 \item{version}{Character. The version of the model to use. Currently only
 "simple" is supported.}
-
-\item{task}{Character. The experimental task: \code{"de"} for delayed estimation
-(continuous reproduction) or \code{"cd"} for change detection. Default is \code{"de"}.}
 
 \item{...}{used internally for testing, ignore it}
 }
@@ -119,4 +119,3 @@ fit <- bmm(
 \dontshow{\}) # examplesIf}
 }
 \keyword{bmmodel}
-\keyword{deprecated}

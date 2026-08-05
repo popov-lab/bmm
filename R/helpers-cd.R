@@ -59,6 +59,50 @@
     )
 }
 
+# Half-width of the spike in the sdm density: near its peak the activation
+# behaves like eta ~ peak * exp(-kappa u^2 / 2), so the density has settled on
+# its floor once that drops below 1.
+.sdm_spike_width <- function(c, kappa) {
+  peak <- c * sqrt(kappa / (2 * pi))
+  pmin(pi, sqrt(2 * log(pmax(peak, exp(1))) / kappa))
+}
+
+# log of the integral of the unnormalised sdm density over [lo, hi]. Split at
+# every periodic image of the peak and at multiples of the spike width so the
+# spike sits at a sub-interval endpoint, then Gauss-Legendre on each piece and
+# accumulate by log-sum-exp. Mirrors sdm_cd_funs.stan.
+.sdm_log_int <- function(lo, hi, mu, c, kappa, gl = .cd_gauss_legendre()) {
+  w <- .sdm_spike_width(c, kappa)
+  base <- c * sqrt(kappa / (2 * pi))
+  mult <- c(-3, -2, -1, -0.5, 0, 0.5, 1, 2, 3)
+  cuts <- sort(pmin(pmax(
+    c(lo, hi, as.vector(outer(mu + c(-2 * pi, 0, 2 * pi), mult * w, "+"))), lo
+  ), hi))
+
+  terms <- numeric(0)
+  for (i in seq_len(length(cuts) - 1L)) {
+    a <- cuts[i]
+    b <- cuts[i + 1L]
+    if (b <= a) next
+    half <- (b - a) / 2
+    u <- (a + b) / 2 + half * gl$nodes - mu
+    terms <- c(terms, log(half) + log(gl$weights) + base * exp(kappa * (cos(u) - 1)))
+  }
+  if (!length(terms)) -Inf else matrixStats::logSumExp(terms)
+}
+
+# Half-width of the arc around the probe within which a "same" response is
+# given. The sdm density decreases monotonically in the distance from its
+# centre, so the region is an arc, but unlike the von Mises models the boundary
+# needs the normalising constant and nothing drops out of it at criterion 0.
+.sdm_crit_angle <- function(c, kappa, criterion, log_z) {
+  peak <- c * sqrt(kappa / (2 * pi))
+  thresh <- log_z - criterion - log(2 * pi)
+  if (thresh >= peak) return(0)
+  if (thresh <= peak * exp(-2 * kappa)) return(pi)
+  acos(min(max(1 + log(thresh / peak) / kappa, -1), 1))
+}
+
 # Mass of a von Mises(mu, kappa) inside the arc centred on `centre` with
 # half-width `half_width`, by Gauss-Legendre quadrature. All arguments are
 # recycled to a common length n; `centre` and `half_width` are length n.
