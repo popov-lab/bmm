@@ -93,12 +93,12 @@ print.mpt_tree <- function(x, ...) {
   )
 
   parameter_info <- c(
-    named_value_list(
+    .mpt_named_list(
       standard_pars,
       glue("Latent probability parameter from the tree branch expressions. \\
            Fitted on the {links} scale.")
     ),
-    named_value_list(
+    .mpt_named_list(
       simplex_pars,
       paste0(
         "Probability parameter constrained within a simplex group via ",
@@ -106,7 +106,7 @@ print.mpt_tree <- function(x, ...) {
         "minus the sum of the other group members."
       )
     ),
-    named_value_list(
+    .mpt_named_list(
       raw_pars,
       glue("Unconstrained stick-breaking component of a simplex parameter. \\
            Fitted on the {links} scale.")
@@ -114,14 +114,14 @@ print.mpt_tree <- function(x, ...) {
   )
 
   link_info <- c(
-    named_value_list(standard_pars, links),
-    named_value_list(simplex_pars, "identity"),
-    named_value_list(raw_pars, "identity")
+    .mpt_named_list(standard_pars, links),
+    .mpt_named_list(simplex_pars, "identity"),
+    .mpt_named_list(raw_pars, "identity")
   )
 
   prior_info <- c(
-    named_value_list(standard_pars, latent_prior),
-    named_value_list(raw_pars, latent_prior)
+    .mpt_named_list(standard_pars, latent_prior),
+    .mpt_named_list(raw_pars, latent_prior)
   )
 
   out <- structure(
@@ -432,11 +432,11 @@ check_model.mpt <- function(model, data = NULL, formula = NULL) {
       priors. Apply any required transformation inside your formula and \\
       adjust the priors to the scale of your predictors."
     )
-    model$parameters[sub_pars] <- named_value_list(
+    model$parameters[sub_pars] <- .mpt_named_list(
       sub_pars, "User-defined sub-parameter of a non-linear parameter formula."
     )
-    model$links[sub_pars] <- named_value_list(sub_pars, "identity")
-    model$default_priors[sub_pars] <- named_value_list(
+    model$links[sub_pars] <- .mpt_named_list(sub_pars, "identity")
+    model$default_priors[sub_pars] <- .mpt_named_list(
       sub_pars, list(main = "normal(0, 1)", effects = "normal(0, 0.5)")
     )
   }
@@ -658,9 +658,11 @@ check_formula.mpt <- function(model, data, formula) {
   formula
 }
 
+# a missing formula is treated as the intercept-only default the pipeline
+# would add, so direct calls before add_missing_parameters() cannot produce NA
 .mpt_rhs_chr <- function(pform) {
   if (!is_formula(pform)) {
-    return(NA_character_)
+    return("1")
   }
   paste(deparse(pform[[3]]), collapse = " ")
 }
@@ -879,7 +881,7 @@ configure_model.mpt <- function(model, data, formula) {
   invisible(NULL)
 }
 
-named_value_list <- function(names, value) {
+.mpt_named_list <- function(names, value) {
   if (length(names) == 0L) {
     return(list())
   }
@@ -1054,7 +1056,9 @@ mpt_from_eqn <- function(file, restrictions = NULL, categories = NULL,
 
   symbols <- unique(unlist(lapply(eqn$expr, function(e) all.vars(str2lang(e)))))
   par_renaming <- .mpt_sanitize_names(setdiff(symbols, covariates))
-  for (old in names(par_renaming)) {
+  # longest names first: a dot creates a word boundary, so the pattern for
+  # 'd_A' would otherwise also match the prefix of a parameter named 'd_A.x'
+  for (old in names(par_renaming)[order(-nchar(names(par_renaming)))]) {
     eqn$expr <- gsub(
       paste0("\\b", .mpt_escape_regex(old), "\\b"), par_renaming[[old]], eqn$expr
     )
@@ -1132,7 +1136,7 @@ mpt_from_eqn <- function(file, restrictions = NULL, categories = NULL,
     parameter names to numeric constants. Express equality restrictions by \\
     using the same parameter name in the model definition."
   )
-  for (par in names(restrictions)) {
+  for (par in names(restrictions)[order(-nchar(names(restrictions)))]) {
     exprs <- gsub(
       paste0("\\b", .mpt_escape_regex(par), "\\b"),
       format(restrictions[[par]], scientific = FALSE),

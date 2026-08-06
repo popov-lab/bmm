@@ -471,6 +471,26 @@ test_that("mpt_from_eqn imports EQN files with restrictions and renaming", {
   )
 })
 
+test_that("mpt_from_eqn renames correctly when one name prefixes another", {
+  # 'd_A' matches the prefix of 'd_A.x' at the dot boundary, so substitution
+  # must run longest-first to avoid partially renamed leftovers like 'dA.x'
+  eqn_file <- tempfile(fileext = ".eqn")
+  writeLines(c(
+    "t  a  d_A*d_A.x",
+    "t  b  1-d_A*d_A.x"
+  ), eqn_file)
+  model <- suppressMessages(mpt_from_eqn(eqn_file))
+  expect_setequal(names(model$parameters), c("dA", "dAx"))
+  expect_equal(attr(model, "mpt_renaming")[["d_A.x"]], "dAx")
+})
+
+test_that("simplex formula handling tolerates omitted parameter formulas", {
+  trees <- list(mpt_tree("t", list(A = "gA", B = "gB", C = "gC")))
+  model <- mpt(trees, simplex = c("gA", "gB", "gC"))
+  moved <- .mpt_move_simplex_formulas(model, bmf(gA ~ 1))
+  expect_false(any(c("gA", "gB", "gC") %in% names(moved)))
+})
+
 test_that("mpt_from_eqn errors on names that clash after sanitizing", {
   eqn_file <- tempfile(fileext = ".eqn")
   writeLines(c(
