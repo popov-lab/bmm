@@ -759,6 +759,10 @@ rm3 <- function(n, size, pars, m3_model, act_funs = NULL, unpack = FALSE,
 #' @param ... can be used to pass additional values used in the branch
 #'   expressions, as an alternative to the `covariates` argument.
 #'
+#' @note Unlike the densities of the circular models in this package (`dsdm()`,
+#'   `dmixture2p()`, `dmixture3p()`, `dimm()`) and unlike [stats::dmultinom()],
+#'   `dmpt()` returns the log density by default, matching [dm3()].
+#'
 #' @keywords distribution
 #'
 #' @references Batchelder, W. H., & Riefer, D. M. (1999). Theoretical and
@@ -777,7 +781,7 @@ rm3 <- function(n, size, pars, m3_model, act_funs = NULL, unpack = FALSE,
 #'   old = "(1 - D) * g",
 #'   new = "D + (1 - D) * (1 - g)"
 #' ))
-#' model <- mpt(list(tree_old, tree_new), condition = "item_type")
+#' model <- mpt(list(tree_old, tree_new), tree_id = "item_type")
 #'
 #' dmpt(
 #'   x = c(35, 15), pars = c(D = 0.7, g = 0.5),
@@ -857,7 +861,11 @@ rmpt <- function(n, size, pars, mpt_model, tree = NULL, covariates = NULL,
     instead of 1 for the provided values. Check the parameter values (e.g., \\
     simplex constraints) and covariates."
   )
-  probs
+
+  resp_cats <- mpt_model$resp_vars$resp_cats
+  full_probs <- setNames(numeric(length(resp_cats)), resp_cats)
+  full_probs[names(probs)] <- probs
+  full_probs
 }
 
 

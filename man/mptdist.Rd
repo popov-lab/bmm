@@ -61,6 +61,11 @@ Density and random generation functions for multinomial
 processing tree models specified with \code{\link[=mpt]{mpt()}}. Please note that these
 functions are currently not vectorized.
 }
+\note{
+Unlike the densities of the circular models in this package (\code{dsdm()},
+\code{dmixture2p()}, \code{dmixture3p()}, \code{dimm()}) and unlike \code{\link[stats:dmultinom]{stats::dmultinom()}},
+\code{dmpt()} returns the log density by default, matching \code{\link[=dm3]{dm3()}}.
+}
 \examples{
 tree_old <- mpt_tree("old", list(
   old = "D + (1 - D) * g",
@@ -70,7 +75,7 @@ tree_new <- mpt_tree("new", list(
   old = "(1 - D) * g",
   new = "D + (1 - D) * (1 - g)"
 ))
-model <- mpt(list(tree_old, tree_new), condition = "item_type")
+model <- mpt(list(tree_old, tree_new), tree_id = "item_type")
 
 dmpt(
   x = c(35, 15), pars = c(D = 0.7, g = 0.5),

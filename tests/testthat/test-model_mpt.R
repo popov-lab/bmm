@@ -67,7 +67,7 @@ test_that("mpt identifies parameters and excludes covariates", {
 })
 
 test_that("mpt uses matched priors for the probit link", {
-  model <- mpt(mpt_2htm_trees(), condition = "item_type", links = "probit")
+  model <- mpt(mpt_2htm_trees(), tree_id = "item_type", links = "probit")
   expect_equal(model$links$D, "probit")
   expect_equal(model$default_priors$D$main, "normal(0, 1)")
   expect_equal(model$default_priors$D$effects, "normal(0, 0.5)")
@@ -80,18 +80,18 @@ test_that("mpt errors on invalid parameter and category names", {
   expect_error(mpt(bad_cat), "underscores or dots")
 })
 
-test_that("mpt errors on inconsistent trees and missing condition", {
+test_that("mpt errors on inconsistent trees and a missing tree_id", {
   trees <- list(
     mpt_tree("t1", list(a = "p", b = "1 - p")),
     mpt_tree("t2", list(a = "p", c = "1 - p"))
   )
-  expect_error(mpt(trees, condition = "cond"), "same response categories")
-  expect_error(mpt(mpt_2htm_trees()), "require the condition argument")
+  expect_error(mpt(trees, tree_id = "cond"), "same response categories")
+  expect_error(mpt(mpt_2htm_trees()), "require the tree_id argument")
   dup_trees <- list(
     mpt_tree("t1", list(a = "p", b = "1 - p")),
     mpt_tree("t1", list(a = "p", b = "1 - p"))
   )
-  expect_error(mpt(dup_trees, condition = "cond"), "unique")
+  expect_error(mpt(dup_trees, tree_id = "cond"), "unique")
 })
 
 test_that("mpt errors on name collisions and reserved names", {
@@ -104,11 +104,11 @@ test_that("mpt errors on name collisions and reserved names", {
 test_that("mpt validates simplex groups", {
   trees <- mpt_2htm_trees()
   expect_error(
-    mpt(trees, condition = "item_type", simplex = c("g", "x")),
+    mpt(trees, tree_id = "item_type", simplex = c("g", "x")),
     "Unknown"
   )
   expect_error(
-    mpt(trees, condition = "item_type", simplex = "g"),
+    mpt(trees, tree_id = "item_type", simplex = "g"),
     "at least two parameters"
   )
 })
@@ -119,7 +119,7 @@ test_that("mpt warns when branch probabilities do not sum to 1", {
 })
 
 test_that("check_formula generates linked category formulas", {
-  model <- mpt(mpt_2htm_trees(), condition = "item_type")
+  model <- mpt(mpt_2htm_trees(), tree_id = "item_type")
   dat <- mpt_2htm_data()
   formula <- bmf(D ~ 1 + (1 | id), g ~ 1)
   model_checked <- check_model(model, dat, formula)
@@ -134,7 +134,7 @@ test_that("check_formula generates linked category formulas", {
 })
 
 test_that("check_formula uses Phi for the probit link", {
-  model <- mpt(mpt_2htm_trees(), condition = "item_type", links = "probit")
+  model <- mpt(mpt_2htm_trees(), tree_id = "item_type", links = "probit")
   dat <- mpt_2htm_data()
   formula <- bmf(D ~ 1, g ~ 1)
   model_checked <- check_model(model, dat, formula)
@@ -146,7 +146,7 @@ test_that("check_formula uses Phi for the probit link", {
 })
 
 test_that("formulas for response categories are rejected", {
-  model <- mpt(mpt_2htm_trees(), condition = "item_type")
+  model <- mpt(mpt_2htm_trees(), tree_id = "item_type")
   dat <- mpt_2htm_data()
   formula <- bmf(old ~ 1, D ~ 1, g ~ 1)
   expect_error(
@@ -156,7 +156,7 @@ test_that("formulas for response categories are rejected", {
 })
 
 test_that("mpt compiles for a multi-tree binary-category model", {
-  model <- mpt(mpt_2htm_trees(), condition = "item_type")
+  model <- mpt(mpt_2htm_trees(), tree_id = "item_type")
   dat <- mpt_2htm_data()
   formula <- bmf(D ~ 1 + (1 | id), g ~ 1)
   expect_silent(bmm(
@@ -234,7 +234,7 @@ test_that("non-linear parameter formulas bypass the link transformation", {
 })
 
 test_that("fixed parameter values are transformed to the latent scale", {
-  model <- mpt(mpt_2htm_trees(), condition = "item_type")
+  model <- mpt(mpt_2htm_trees(), tree_id = "item_type")
   dat <- mpt_2htm_data()
   formula <- bmf(D ~ 1, g = 0.5)
   model_checked <- suppressMessages(check_model(model, dat, formula))
@@ -266,7 +266,7 @@ test_that("mpt compiles with a simplex group via stick-breaking", {
     )),
     mpt_tree("new", list(A = "gA", B = "gB", New = "gNew"))
   )
-  model <- mpt(trees, condition = "source", simplex = c("gA", "gB", "gNew"))
+  model <- mpt(trees, tree_id = "source", simplex = c("gA", "gB", "gNew"))
   expect_setequal(
     names(model$parameters),
     c("dA", "dB", "gA", "gB", "gNew", "gAraw", "gBraw")
@@ -320,7 +320,7 @@ test_that("predictors on the derived simplex parameter are rejected", {
 })
 
 test_that("check_data errors are informative", {
-  model <- mpt(mpt_2htm_trees(), condition = "item_type")
+  model <- mpt(mpt_2htm_trees(), tree_id = "item_type")
   dat <- mpt_2htm_data()
 
   dat_missing <- dat[setdiff(names(dat), "new")]
@@ -399,9 +399,9 @@ test_that("mpt_from_string parses MPTinR-style model definitions", {
   D + (1 - D) * (1 - g)  # new
   "
   model <- mpt_from_string(
-    model_2htm, tree_names = c("old", "new"), condition = "item_type"
+    model_2htm, tree_names = c("old", "new"), tree_id = "item_type"
   )
-  manual <- mpt(mpt_2htm_trees(), condition = "item_type")
+  manual <- mpt(mpt_2htm_trees(), tree_id = "item_type")
   expect_equal(model$trees, manual$trees)
   expect_equal(names(model$parameters), names(manual$parameters))
 
@@ -446,7 +446,7 @@ test_that("mpt_from_eqn imports EQN files with restrictions and renaming", {
     eqn_file,
     restrictions = c(G_fix = 1 / 4),
     categories = category_map,
-    condition = "item_type"
+    tree_id = "item_type"
   ))
   expect_setequal(names(model$parameters), c("Do", "Dn", "guess"))
   expect_setequal(model$resp_vars$resp_cats, c("yes", "no"))
@@ -526,13 +526,158 @@ test_that("mpt supports multiple simplex groups", {
   )
 })
 
-test_that("factor condition columns are matched to tree names", {
-  model <- mpt(mpt_2htm_trees(), condition = "item_type")
+test_that("factor tree identifier columns are matched to tree names", {
+  model <- mpt(mpt_2htm_trees(), tree_id = "item_type")
   dat <- mpt_2htm_data()
   dat$item_type <- factor(dat$item_type, levels = c("old", "new"))
   checked <- check_data(model, dat, bmf(D ~ 1, g ~ 1))
   expect_equal(checked$Idx_old, as.integer(dat$item_type == "old"))
   expect_equal(checked$Idx_new, as.integer(dat$item_type == "new"))
+})
+
+mpt_impossible_trees <- function() {
+  list(
+    mpt_tree("withdist", list(
+      corr = "Pm * Pb + (1 - Pm) * 0.2",
+      dist = "(1 - Pm) * 0.2",
+      npl = "Pm * (1 - Pb) + (1 - Pm) * 0.6"
+    )),
+    mpt_tree("nodist", list(
+      corr = "Pm * Pb + (1 - Pm) * 0.2",
+      npl = "Pm * (1 - Pb) + (1 - Pm) * 0.8"
+    ), impossible = "dist")
+  )
+}
+
+# two of the three conditions share the nodist branch structure, so the tree
+# identifier column is coarser than the experimental factor
+mpt_impossible_data <- function(n_id = 6) {
+  dat <- expand.grid(
+    id = factor(seq_len(n_id)), cond = c("withdist", "reord", "same"),
+    stringsAsFactors = FALSE
+  )
+  dat$tree <- ifelse(dat$cond == "withdist", "withdist", "nodist")
+  dat$corr <- 30L
+  dat$npl <- 20L
+  dat$dist <- ifelse(dat$cond == "withdist", 10L, 0L)
+  dat
+}
+
+test_that("mpt_tree validates impossible response categories", {
+  branches <- list(a = "D", b = "1 - D")
+  expect_error(
+    mpt_tree("t", branches, impossible = "a"),
+    "cannot be both impossible and have a branch"
+  )
+  expect_error(
+    mpt_tree("t", branches, impossible = c("c", "c")),
+    "must be unique"
+  )
+  expect_error(mpt_tree("t", branches, impossible = 1), "character vector")
+
+  tree <- mpt_tree("t", branches, impossible = "c")
+  expect_equal(tree$impossible, "c")
+  expect_output(print(tree), "P\\(c\\) = 0 \\(structurally impossible\\)")
+})
+
+test_that("mpt requires impossible categories to exist in some other tree", {
+  trees <- list(
+    mpt_tree("one", list(a = "D", b = "1 - D"), impossible = "c"),
+    mpt_tree("two", list(a = "1 - D", b = "D"), impossible = "c")
+  )
+  expect_error(
+    mpt(trees, tree_id = "cond"),
+    "impossible in every tree"
+  )
+  expect_error(
+    mpt(mpt_tree("one", list(a = "D", b = "1 - D"), impossible = "c")),
+    "impossible in every tree"
+  )
+})
+
+test_that("mpt counts impossible categories when comparing trees", {
+  model <- mpt(mpt_impossible_trees(), tree_id = "tree")
+  expect_equal(model$resp_vars$resp_cats, c("corr", "dist", "npl"))
+
+  mismatched <- list(
+    mpt_tree("one", list(a = "D", b = "1 - D"), impossible = "c"),
+    mpt_tree("two", list(a = "D", b = "1 - D", d = "0"))
+  )
+  expect_error(mpt(mismatched, tree_id = "cond"), "same response categories")
+})
+
+test_that("check_data builds possibility indicators for impossible categories", {
+  model <- mpt(mpt_impossible_trees(), tree_id = "tree")
+  dat <- mpt_impossible_data()
+  checked <- check_data(model, dat, bmf(Pm ~ 1, Pb ~ 1))
+  expect_equal(checked$Poss_dist, as.integer(dat$cond == "withdist"))
+
+  dat_collide <- dat
+  dat_collide$Poss_dist <- 1
+  expect_error(check_data(model, dat_collide, bmf(Pm ~ 1, Pb ~ 1)), "reserved")
+
+  dat_observed <- dat
+  dat_observed$dist[dat_observed$cond == "same"][1] <- 3L
+  expect_error(
+    check_data(model, dat_observed, bmf(Pm ~ 1, Pb ~ 1)),
+    "declared impossible for 1 observation"
+  )
+})
+
+test_that("impossible categories are switched off in the linear predictor", {
+  model <- mpt(mpt_impossible_trees(), tree_id = "tree")
+  dat <- mpt_impossible_data()
+  formula <- bmf(Pm ~ 1, Pb ~ 1)
+  checked_data <- check_data(model, dat, formula)
+  checked_formula <- check_formula(model, checked_data, formula)
+
+  # the tree that cannot produce the category contributes a placeholder, so
+  # log() stays defined for its rows
+  expect_match(.mpt_rhs_chr(checked_formula$dist), "Idx_nodist * (1)", fixed = TRUE)
+
+  brms_formula <- configure_model(model, checked_data, checked_formula)$formula
+  expect_match(
+    .mpt_rhs_chr(brms_formula$pforms$mudist),
+    "Poss_dist * log(dist) + (1 - Poss_dist) * (-100)",
+    fixed = TRUE
+  )
+  expect_match(.mpt_rhs_chr(brms_formula$formula), "log(corr)", fixed = TRUE)
+})
+
+test_that("mpt compiles with structurally impossible categories", {
+  expect_silent(bmm(
+    bmf(Pm ~ 1 + (1 | id), Pb ~ 1),
+    mpt_impossible_data(), mpt(mpt_impossible_trees(), tree_id = "tree"),
+    backend = "mock", mock_fit = 1, rename = FALSE
+  ))
+})
+
+test_that("several levels of a factor can share one tree", {
+  model <- mpt(mpt_impossible_trees(), tree_id = "tree")
+  dat <- mpt_impossible_data()
+  checked <- check_data(model, dat, bmf(Pm ~ 0 + cond, Pb ~ 1))
+  expect_equal(checked$Idx_withdist, as.integer(dat$cond == "withdist"))
+  expect_equal(checked$Idx_nodist, as.integer(dat$cond %in% c("reord", "same")))
+
+  # the experimental factor survives untouched for the parameter formulas
+  expect_equal(checked$cond, dat$cond)
+})
+
+test_that("tree identifier values must match tree names", {
+  model <- mpt(mpt_impossible_trees(), tree_id = "tree")
+  dat <- mpt_impossible_data()
+  dat$tree[dat$cond == "reord"] <- "reord"
+  expect_error(
+    check_data(model, dat, bmf(Pm ~ 1, Pb ~ 1)),
+    "Unmatched values: 'reord'"
+  )
+
+  missing_col <- mpt_impossible_data()
+  missing_col$tree <- NULL
+  expect_error(
+    check_data(model, missing_col, bmf(Pm ~ 1, Pb ~ 1)),
+    "not present in the data"
+  )
 })
 
 test_that("check_data validates branch sums with observed covariate values", {
@@ -577,7 +722,7 @@ test_that("covariate sum check respects tree membership", {
     ))
   )
   model <- suppressWarnings(
-    mpt(trees, condition = "cond", covariates = c("Gcorr", "Gother"))
+    mpt(trees, tree_id = "cond", covariates = c("Gcorr", "Gother"))
   )
   dat <- data.frame(
     cond = rep(c("cued", "free"), each = 3),
@@ -635,7 +780,7 @@ test_that("plot methods run for trees and models", {
       old = "(1 - D) * g",
       new = "D + (1 - D) * (1 - g)"
     ))),
-    condition = "item_type"
+    tree_id = "item_type"
   )
   grDevices::pdf(NULL)
   expect_silent(plot(tree_old))

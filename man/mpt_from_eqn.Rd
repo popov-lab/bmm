@@ -8,7 +8,7 @@ mpt_from_eqn(
   file,
   restrictions = NULL,
   categories = NULL,
-  condition = NULL,
+  tree_id = NULL,
   covariates = NULL,
   simplex = NULL,
   links = "logit"
@@ -30,9 +30,9 @@ file itself.}
 used in the EQN file onto the shared response categories of the model
 (see Details). Categories not listed keep their (sanitized) name.}
 
-\item{condition}{Character. Name of the data column identifying the tree
-an observation belongs to (see \code{\link[=mpt]{mpt()}}). Defaults to the tree names used
-in the EQN file.}
+\item{tree_id}{Character. Name of the data column whose values name the tree
+each observation belongs to (see \code{\link[=mpt]{mpt()}}); the tree names come from the
+EQN file.}
 
 \item{covariates, simplex, links}{passed to \code{\link[=mpt]{mpt()}}. Covariate names are
 excluded from the renaming.}
@@ -75,7 +75,7 @@ writeLines(c(
 model <- mpt_from_eqn(
   eqn_file,
   categories = c(hit = "yes", fa = "yes", miss = "no", cr = "no"),
-  condition = "item_type"
+  tree_id = "item_type"
 )
 attr(model, "mpt_renaming")
 }

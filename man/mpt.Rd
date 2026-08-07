@@ -6,7 +6,7 @@
 \usage{
 mpt(
   trees,
-  condition = NULL,
+  tree_id = NULL,
   covariates = NULL,
   simplex = NULL,
   links = "logit",
@@ -15,11 +15,13 @@ mpt(
 }
 \arguments{
 \item{trees}{A single \code{mpt_tree} object or a list of \code{mpt_tree} objects.
-All trees must share the same set of response categories.}
+All trees must share the same set of response categories, counting those
+declared impossible.}
 
-\item{condition}{Character. Name of the data column identifying which tree
-an observation belongs to; its values must match the tree names. Can be
-omitted for single-tree models.}
+\item{tree_id}{Character. Name of the data column whose values name the tree
+each observation belongs to; the values must match the tree names. Can be
+omitted for single-tree models. Effects of experimental conditions belong
+in the parameter formulas, not here — see Details.}
 
 \item{covariates}{Character vector. Names of data columns that appear in
 branch expressions but are not latent parameters, for example
@@ -44,8 +46,8 @@ An object of class \code{bmmodel}
 \description{
 Multinomial Processing Tree (MPT) models measure the probabilities of
 discrete latent cognitive states from categorical responses. A model is
-specified as a set of trees (one per experimental condition) created with
-\code{\link[=mpt_tree]{mpt_tree()}}. Branch expressions that terminate in the same response
+specified as a set of trees (one per distinct branch structure) created
+with \code{\link[=mpt_tree]{mpt_tree()}}. Branch expressions that terminate in the same response
 category are summed within each tree, and parameters shared across trees
 are equated by giving them the same name. All latent probability
 parameters are estimated on an unconstrained latent scale (logit or
@@ -62,6 +64,17 @@ latent scale.
 \item Batchelder, W. H., & Riefer, D. M. (1999). Theoretical and empirical review of multinomial process tree modeling. Psychonomic Bulletin & Review, 6(1), 57-86. https://doi.org/10.3758/BF03210812
 }
 
+A separate tree is needed only when the \emph{branch expressions} differ — that
+is, when the trial determines which latent processes apply or which
+response categories are reachable (old versus new probes, a response set
+with or without distractors, inclusion versus exclusion instructions).
+Experimental factors whose \emph{effect on the parameters} you want to estimate
+belong in the parameter formulas, exactly as in every other \code{bmm} model:
+\code{bmf(D ~ 0 + condition)}. The two roles are independent, and one data
+column can serve both when a factor happens to change the structure as
+well. When several levels of a factor share a branch structure, add a
+column naming the tree and keep the factor for the formulas.
+
 Parameters that receive a non-linear predictor formula (a formula whose
 right-hand side references other formula parameters, e.g.
 \code{D ~ Dmax * (1 - exp(-rate * ptime))}) are not transformed by the link
@@ -72,6 +85,14 @@ estimated on the identity scale with \code{normal(0, 1)} default priors.
 Parameter and response category names must start with a letter and may
 contain only letters and digits, because brms does not allow underscores
 or dots in non-linear parameter names.
+
+All latent parameters are non-linear parameters of the underlying brms
+model, and brms has no separate \code{Intercept} prior class for those: their
+intercept prior is stored as \verb{class = "b", coef = "Intercept"}. Overriding
+the default prior of an intercept therefore requires \code{coef = "Intercept"};
+a prior given as \verb{class = "b", nlpar = "D"} reaches the remaining
+coefficients only. Call \code{\link[=default_prior]{default_prior()}} to see which rows a given
+formula produces.
 }
 }
 \examples{
@@ -88,7 +109,7 @@ tree_new <- mpt_tree("new", list(
 
 model <- mpt(
   trees = list(tree_old, tree_new),
-  condition = "item_type"
+  tree_id = "item_type"
 )
 
 # simulate data for 20 participants with D = 0.7, g = 0.5

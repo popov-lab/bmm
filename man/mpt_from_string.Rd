@@ -8,7 +8,7 @@ mpt_from_string(
   text,
   tree_names,
   categories = NULL,
-  condition = NULL,
+  tree_id = NULL,
   covariates = NULL,
   simplex = NULL,
   links = "logit"
@@ -20,14 +20,14 @@ as a vector of lines.}
 
 \item{tree_names}{Character vector with one name per tree block, in the
 order the blocks appear. For multi-tree models the names must match the
-values of the condition variable in the data.}
+values of the tree identifier column in the data.}
 
 \item{categories}{Character vector with the response category of each line
 within a tree, used for lines without an inline \verb{# category} comment.
 Must have as many entries as the tree with the most lines.}
 
-\item{condition}{Character. Name of the data column identifying the tree
-an observation belongs to (see \code{\link[=mpt]{mpt()}}).}
+\item{tree_id}{Character. Name of the data column whose values name the tree
+each observation belongs to (see \code{\link[=mpt]{mpt()}}).}
 
 \item{covariates, simplex, links}{passed to \code{\link[=mpt]{mpt()}}.}
 }
@@ -53,7 +53,7 @@ D + (1 - D) * (1 - g)  # new
 model <- mpt_from_string(
   model_2htm,
   tree_names = c("old", "new"),
-  condition = "item_type"
+  tree_id = "item_type"
 )
 model
 }

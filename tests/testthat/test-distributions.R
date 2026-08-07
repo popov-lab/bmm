@@ -1273,7 +1273,7 @@ test_that("dmpt matches hand-computed multinomial densities", {
     old = "(1 - D) * g",
     new = "D + (1 - D) * (1 - g)"
   ))
-  model <- mpt(list(tree_old, tree_new), condition = "item_type")
+  model <- mpt(list(tree_old, tree_new), tree_id = "item_type")
 
   d_old <- dmpt(
     x = c(35, 15), pars = c(D = 0.7, g = 0.5),
@@ -1321,6 +1321,57 @@ test_that("rmpt generates counts with category names and unpacks", {
   expect_equal(sum(unpacked), 40)
 })
 
+test_that("dmpt and rmpt give impossible categories zero probability", {
+  model <- mpt(
+    list(
+      mpt_tree("withdist", list(
+        corr = "Pm * 0.5",
+        dist = "(1 - Pm) * 0.5",
+        npl = "Pm * 0.5 + (1 - Pm) * 0.5"
+      )),
+      mpt_tree("nodist", list(
+        corr = "Pm * 0.5",
+        npl = "Pm * 0.5 + (1 - Pm)"
+      ), impossible = "dist")
+    ),
+    tree_id = "cond"
+  )
+
+  probs <- .compute_mpt_probability_vector(c(Pm = 0.4), model, tree = "nodist")
+  expect_named(probs, c("corr", "dist", "npl"))
+  expect_equal(unname(probs), c(0.2, 0, 0.8))
+
+  # the density must reduce to the multinomial over the possible categories
+  expect_equal(
+    dmpt(c(10, 0, 30), pars = c(Pm = 0.4), mpt_model = model, tree = "nodist"),
+    dmultinom(c(10, 30), prob = c(0.2, 0.8), log = TRUE)
+  )
+  expect_equal(
+    dmpt(c(10, 2, 30), pars = c(Pm = 0.4), mpt_model = model, tree = "nodist"),
+    -Inf
+  )
+
+  draws <- rmpt(n = 5, size = 40, pars = c(Pm = 0.4), mpt_model = model, tree = "nodist")
+  expect_equal(colnames(draws), c("corr", "dist", "npl"))
+  expect_true(all(draws[, "dist"] == 0))
+})
+
+test_that("the categorical densities default to the log scale", {
+  model <- mpt(mpt_tree("t", list(a = "D", b = "1 - D")))
+  expect_equal(
+    dmpt(c(3, 7), pars = c(D = 0.4), mpt_model = model),
+    dmpt(c(3, 7), pars = c(D = 0.4), mpt_model = model, log = TRUE)
+  )
+  m3_model <- m3(
+    resp_cats = c("corr", "other", "npl"), num_options = c(1, 4, 5),
+    choice_rule = "simple", version = "ss"
+  )
+  expect_equal(
+    dm3(c(20, 10, 10), pars = c(a = 1, c = 2), m3_model = m3_model),
+    dm3(c(20, 10, 10), pars = c(a = 1, c = 2), m3_model = m3_model, log = TRUE)
+  )
+})
+
 test_that("dmpt validates its inputs", {
   tree_old <- mpt_tree("old", list(
     old = "D + (1 - D) * g",
@@ -1330,7 +1381,7 @@ test_that("dmpt validates its inputs", {
     old = "(1 - D) * g",
     new = "D + (1 - D) * (1 - g)"
   ))
-  model <- mpt(list(tree_old, tree_new), condition = "item_type")
+  model <- mpt(list(tree_old, tree_new), tree_id = "item_type")
 
   expect_error(
     dmpt(c(1, 1), pars = c(D = 0.7), mpt_model = model, tree = "old"),

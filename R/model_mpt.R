@@ -11,18 +11,29 @@
 #'   full model specification with [mpt()].
 #'
 #' @param name Character. Label for the tree. For models with multiple trees,
-#'   the label must match the values of the condition variable in the data that
-#'   identify observations from this tree.
+#'   the label identifies the tree in the data: the column named by the
+#'   `tree_id` argument of [mpt()] holds one such label per observation.
 #' @param branches A named list of character strings. Each element gives the
 #'   branch probability expression for one response category, and the element
 #'   names are the response categories. The expressions can use latent
 #'   parameters (e.g., `"D + (1 - D) * g"`), numeric constants, and declared
 #'   covariates (see [mpt()]).
+#' @param impossible Character vector. Response categories that cannot occur in
+#'   this tree, for example distractor responses when no distractors were
+#'   presented. Such categories get no branch expression, and the remaining
+#'   branches must sum to 1 on their own.
 #'
 #' @details Numeric fractions such as `1/4` are folded into decimal literals
 #'   (`0.25`) when the tree is created. Stan compiles a bare integer fraction
 #'   as integer division (`1/4 == 0`), which would silently corrupt the
 #'   likelihood.
+#'
+#'   Categories listed in `impossible` keep their column in the data and their
+#'   place in the response matrix, but their probability is set to zero for the
+#'   observations belonging to this tree. Because the model is estimated on the
+#'   log scale, "zero" is implemented as a large negative linear predictor
+#'   rather than a literal zero; no probability has to be taken away from the
+#'   remaining branches to compensate.
 #'
 #' @return An object of class `mpt_tree`
 #'
@@ -37,8 +48,36 @@
 #'   )
 #' )
 #' tree_old
+#'
+#' # a three-alternative recognition task in which lures are shown on some
+#' # trials only: `lure` responses cannot occur on the others
+#' tree_lures <- mpt_tree(
+#'   name = "lures",
+#'   branches = list(
+#'     target = "D * b + (1 - D) * (1/3)",
+#'     lure   = "D * (1 - b) + (1 - D) * (1/3)",
+#'     new    = "(1 - D) * (1/3)"
+#'   )
+#' )
+#'
+#' # the branches of the lure-free tree sum to 1 without the `lure` category;
+#' # no probability is reserved for it
+#' tree_nolures <- mpt_tree(
+#'   name = "nolures",
+#'   branches = list(
+#'     target = "D + (1 - D) * (1/2)",
+#'     new    = "(1 - D) * (1/2)"
+#'   ),
+#'   impossible = "lure"
+#' )
+#' tree_nolures
+#'
+#' # a `tree` column in the data holds "lures" or "nolures" per observation;
+#' # effects of experimental conditions go in the parameter formulas instead,
+#' # e.g. bmf(D ~ 0 + cond)
+#' model <- mpt(list(tree_lures, tree_nolures), tree_id = "tree")
 #' @export
-mpt_tree <- function(name, branches) {
+mpt_tree <- function(name, branches, impossible = NULL) {
   stop_missing_args()
   stopif(
     !is.character(name) || length(name) != 1L || !nzchar(name),
@@ -59,25 +98,50 @@ mpt_tree <- function(name, branches) {
     "Response category names must be unique within a tree. Branch lines that \\
     terminate in the same response category must be summed into one expression."
   )
+  impossible <- impossible %||% character(0)
+  stopif(
+    !is.character(impossible),
+    "The impossible argument must be a character vector of response category names."
+  )
+  stopif(
+    anyDuplicated(impossible) > 0,
+    "Impossible response categories must be unique within a tree. Duplicated: \\
+    {collapse_comma(unique(impossible[duplicated(impossible)]))}"
+  )
+  impossible_with_branch <- intersect(impossible, resp_cats)
+  stopif(
+    length(impossible_with_branch) > 0,
+    "A response category cannot be both impossible and have a branch \\
+    expression in tree '{name}': {collapse_comma(impossible_with_branch)}"
+  )
   branches[] <- lapply(branches, .mpt_canonical_expr, tree_name = name)
-  structure(nlist(name, branches), class = "mpt_tree")
+  structure(nlist(name, branches, impossible), class = "mpt_tree")
 }
 
 #' @export
 print.mpt_tree <- function(x, ...) {
   branch_lines <- glue("  P({names(x$branches)}) = {unlist(x$branches)}")
+  if (length(x$impossible) > 0) {
+    branch_lines <- c(
+      branch_lines, glue("  P({x$impossible}) = 0 (structurally impossible)")
+    )
+  }
   cat(glue("MPT tree '{x$name}':"), branch_lines, sep = "\n")
   invisible(x)
 }
 
-.model_mpt <- function(trees = NULL, condition = NULL, covariates = NULL,
+.model_mpt <- function(trees = NULL, tree_id = NULL, covariates = NULL,
                        simplex = NULL, links = "logit", default_priors = NULL,
                        call = NULL, ...) {
   trees <- .mpt_as_tree_list(trees)
   if (length(trees)) names(trees) <- vapply(trees, `[[`, character(1), "name")
   covariates <- covariates %||% character(0)
   simplex <- .mpt_as_simplex_list(simplex)
-  resp_cats <- if (length(trees)) names(trees[[1]]$branches) else character(0)
+  resp_cats <- if (length(trees)) {
+    c(names(trees[[1]]$branches), trees[[1]]$impossible)
+  } else {
+    character(0)
+  }
   parameters <- setdiff(
     unique(unlist(lapply(trees, .mpt_tree_vars))), covariates
   )
@@ -127,7 +191,7 @@ print.mpt_tree <- function(x, ...) {
   out <- structure(
     list(
       resp_vars = nlist(resp_cats),
-      other_vars = nlist(condition, covariates, link = links),
+      other_vars = nlist(tree_id, covariates, link = links),
       trees = trees,
       simplex = simplex,
       domain = "Categorical decision making, memory, and reasoning",
@@ -140,11 +204,12 @@ print.mpt_tree <- function(x, ...) {
       ),
       version = "",
       requirements = paste0(
-        "- One tree per experimental condition created with mpt_tree(); ",
+        "- One tree per distinct branch structure, created with mpt_tree(); ",
         "all trees share the same response categories\n",
         "  - The data contain one column with aggregated response counts per ",
         "response category, named after the branch names\n",
-        "  - For multi-tree models, a condition column whose values match the tree names\n",
+        "  - For multi-tree models, a column whose values name the tree each ",
+        "observation belongs to, declared via the tree_id argument\n",
         "  - Data columns used inside branch expressions must be declared via the covariates argument\n"
       ),
       parameters = parameter_info,
@@ -170,8 +235,8 @@ print.mpt_tree <- function(x, ...) {
 #' @description
 #' Multinomial Processing Tree (MPT) models measure the probabilities of
 #' discrete latent cognitive states from categorical responses. A model is
-#' specified as a set of trees (one per experimental condition) created with
-#' [mpt_tree()]. Branch expressions that terminate in the same response
+#' specified as a set of trees (one per distinct branch structure) created
+#' with [mpt_tree()]. Branch expressions that terminate in the same response
 #' category are summed within each tree, and parameters shared across trees
 #' are equated by giving them the same name. All latent probability
 #' parameters are estimated on an unconstrained latent scale (logit or
@@ -179,10 +244,12 @@ print.mpt_tree <- function(x, ...) {
 #' latent scale.
 #'
 #' @param trees A single `mpt_tree` object or a list of `mpt_tree` objects.
-#'   All trees must share the same set of response categories.
-#' @param condition Character. Name of the data column identifying which tree
-#'   an observation belongs to; its values must match the tree names. Can be
-#'   omitted for single-tree models.
+#'   All trees must share the same set of response categories, counting those
+#'   declared impossible.
+#' @param tree_id Character. Name of the data column whose values name the tree
+#'   each observation belongs to; the values must match the tree names. Can be
+#'   omitted for single-tree models. Effects of experimental conditions belong
+#'   in the parameter formulas, not here — see Details.
 #' @param covariates Character vector. Names of data columns that appear in
 #'   branch expressions but are not latent parameters, for example
 #'   design-fixed guessing rates. Covariates pass into the model formulas
@@ -199,6 +266,17 @@ print.mpt_tree <- function(x, ...) {
 #'
 #' @details `r model_info(.model_mpt(), components = c('domain', 'task', 'name', 'citation'))`
 #'
+#'   A separate tree is needed only when the *branch expressions* differ — that
+#'   is, when the trial determines which latent processes apply or which
+#'   response categories are reachable (old versus new probes, a response set
+#'   with or without distractors, inclusion versus exclusion instructions).
+#'   Experimental factors whose *effect on the parameters* you want to estimate
+#'   belong in the parameter formulas, exactly as in every other `bmm` model:
+#'   `bmf(D ~ 0 + condition)`. The two roles are independent, and one data
+#'   column can serve both when a factor happens to change the structure as
+#'   well. When several levels of a factor share a branch structure, add a
+#'   column naming the tree and keep the factor for the formulas.
+#'
 #'   Parameters that receive a non-linear predictor formula (a formula whose
 #'   right-hand side references other formula parameters, e.g.
 #'   `D ~ Dmax * (1 - exp(-rate * ptime))`) are not transformed by the link
@@ -209,6 +287,14 @@ print.mpt_tree <- function(x, ...) {
 #'   Parameter and response category names must start with a letter and may
 #'   contain only letters and digits, because brms does not allow underscores
 #'   or dots in non-linear parameter names.
+#'
+#'   All latent parameters are non-linear parameters of the underlying brms
+#'   model, and brms has no separate `Intercept` prior class for those: their
+#'   intercept prior is stored as `class = "b", coef = "Intercept"`. Overriding
+#'   the default prior of an intercept therefore requires `coef = "Intercept"`;
+#'   a prior given as `class = "b", nlpar = "D"` reaches the remaining
+#'   coefficients only. Call [default_prior()] to see which rows a given
+#'   formula produces.
 #'
 #' @return An object of class `bmmodel`
 #'
@@ -227,7 +313,7 @@ print.mpt_tree <- function(x, ...) {
 #'
 #' model <- mpt(
 #'   trees = list(tree_old, tree_new),
-#'   condition = "item_type"
+#'   tree_id = "item_type"
 #' )
 #'
 #' # simulate data for 20 participants with D = 0.7, g = 0.5
@@ -259,7 +345,7 @@ print.mpt_tree <- function(x, ...) {
 #' summary(fit)
 #'
 #' @export
-mpt <- function(trees, condition = NULL, covariates = NULL, simplex = NULL,
+mpt <- function(trees, tree_id = NULL, covariates = NULL, simplex = NULL,
                 links = "logit", ...) {
   call <- match.call()
   stop_missing_args()
@@ -285,30 +371,37 @@ mpt <- function(trees, condition = NULL, covariates = NULL, simplex = NULL,
     underscores. Please rename: {collapse_comma(bad_tree_names)}"
   )
 
-  resp_cats <- names(trees[[1]]$branches)
-  cats_match <- vapply(
-    trees, function(tree) setequal(names(tree$branches), resp_cats), logical(1)
-  )
+  tree_cats <- lapply(trees, function(tree) c(names(tree$branches), tree$impossible))
+  resp_cats <- tree_cats[[1]]
+  cats_match <- vapply(tree_cats, setequal, logical(1), resp_cats)
   stopif(
     !all(cats_match),
-    "All trees must have the same response categories.
+    "All trees must have the same response categories, counting those declared
+    impossible.
     Tree '{trees[[1]]$name}' has: {collapse_comma(resp_cats)}
-    Tree '{tree_names[!cats_match][1]}' has: {collapse_comma(names(trees[!cats_match][[1]]$branches))}"
+    Tree '{tree_names[!cats_match][1]}' has: {collapse_comma(tree_cats[!cats_match][[1]])}"
+  )
+  always_impossible <- Reduce(intersect, lapply(trees, `[[`, "impossible"))
+  stopif(
+    length(always_impossible) > 0,
+    "The response category(ies) {collapse_comma(always_impossible)} are \\
+    impossible in every tree and are therefore not identified. Please remove \\
+    them from the model."
   )
   trees <- lapply(trees, function(tree) {
-    tree$branches <- tree$branches[resp_cats]
+    tree$branches <- tree$branches[intersect(resp_cats, names(tree$branches))]
     tree
   })
   names(trees) <- tree_names
 
   stopif(
-    length(trees) > 1L && is.null(condition),
-    "Models with multiple trees require the condition argument: the name of \\
-    the data column whose values identify the tree each observation belongs to."
+    length(trees) > 1L && is.null(tree_id),
+    "Models with multiple trees require the tree_id argument: the name of the \\
+    data column whose values identify the tree each observation belongs to."
   )
   stopif(
-    !is.null(condition) && (!is.character(condition) || length(condition) != 1L),
-    "The condition argument must be a single character string naming a data column."
+    !is.null(tree_id) && (!is.character(tree_id) || length(tree_id) != 1L),
+    "The tree_id argument must be a single character string naming a data column."
   )
   stopif(
     length(covariates) > 0L && !is.character(covariates),
@@ -373,7 +466,7 @@ mpt <- function(trees, condition = NULL, covariates = NULL, simplex = NULL,
   .mpt_validate_tree_sums(trees, parameters, covariates, simplex)
 
   .model_mpt(
-    trees = trees, condition = condition, covariates = covariates,
+    trees = trees, tree_id = tree_id, covariates = covariates,
     simplex = simplex, links = links, call = call, ...
   )
 }
@@ -422,7 +515,7 @@ check_model.mpt <- function(model, data = NULL, formula = NULL) {
   sub_pars <- setdiff(sub_pars, colnames(data))
   sub_pars <- setdiff(
     sub_pars,
-    c(model$other_vars$covariates, model$other_vars$condition)
+    c(model$other_vars$covariates, model$other_vars$tree_id)
   )
   if (length(sub_pars) > 0) {
     .mpt_check_names(sub_pars, "parameter")
@@ -505,22 +598,25 @@ check_data.mpt <- function(model, data, formula) {
   data$nTrials <- rowSums(resp_matrix)
   data$Y <- resp_matrix
 
-  condition <- model$other_vars$condition
-  if (!is.null(condition)) {
+  tree_id <- model$other_vars$tree_id
+  if (!is.null(tree_id)) {
     stopif(
-      !condition %in% colnames(data),
-      "The condition variable '{condition}' is not present in the data."
+      !tree_id %in% colnames(data),
+      "The tree identifier column '{tree_id}' is not present in the data."
     )
-    cond_values <- as.character(data[[condition]])
+    tree_values <- as.character(data[[tree_id]])
     tree_names <- names(model$trees)
-    unmatched <- setdiff(unique(cond_values), tree_names)
+    unmatched <- setdiff(unique(tree_values), tree_names)
     stopif(
       length(unmatched) > 0,
-      "All values of the condition variable '{condition}' must match a tree name.
+      "All values of the tree identifier column '{tree_id}' must match a tree name.
       Tree names: {collapse_comma(tree_names)}
-      Unmatched values: {collapse_comma(unmatched)}"
+      Unmatched values: {collapse_comma(unmatched)}
+      Values of an experimental factor that share a branch structure belong to
+      the same tree; add a column that names the tree for each observation and
+      keep the factor for the parameter formulas."
     )
-    unused_trees <- setdiff(tree_names, unique(cond_values))
+    unused_trees <- setdiff(tree_names, unique(tree_values))
     warnif(
       length(unused_trees) > 0,
       "The data contain no observations for tree(s): {collapse_comma(unused_trees)}"
@@ -533,9 +629,11 @@ check_data.mpt <- function(model, data, formula) {
       reserved for the generated tree indicator variables. Please rename them."
     )
     for (i in seq_along(tree_names)) {
-      data[[idx_vars[i]]] <- as.integer(cond_values == tree_names[i])
+      data[[idx_vars[i]]] <- as.integer(tree_values == tree_names[i])
     }
   }
+
+  data <- .mpt_possibility_indicators(model, data)
 
   covariates <- model$other_vars$covariates
   missing_covariates <- setdiff(covariates, colnames(data))
@@ -558,6 +656,42 @@ check_data.mpt <- function(model, data, formula) {
   NextMethod("check_data")
 }
 
+# structurally impossible categories are switched off per row rather than per
+# tree, because a category can be impossible in some trees and not in others
+.mpt_possibility_indicators <- function(model, data) {
+  guarded <- unique(unlist(lapply(model$trees, `[[`, "impossible")))
+  if (length(guarded) == 0L) {
+    return(data)
+  }
+  poss_vars <- paste0("Poss_", guarded)
+  poss_collisions <- intersect(poss_vars, colnames(data))
+  stopif(
+    length(poss_collisions) > 0,
+    "The data contain column(s) {collapse_comma(poss_collisions)}, which are \\
+    reserved for the generated indicators of structurally impossible response \\
+    categories. Please rename them."
+  )
+  # a category impossible in every tree is rejected by mpt(), so any model that
+  # reaches here has several trees and therefore tree indicator columns
+  for (i in seq_along(guarded)) {
+    impossible_rows <- logical(nrow(data))
+    for (tree in model$trees) {
+      if (!guarded[i] %in% tree$impossible) next
+      impossible_rows <- impossible_rows | data[[paste0("Idx_", tree$name)]] == 1L
+    }
+    observed <- which(impossible_rows & data$Y[, guarded[i]] > 0)
+    stopif(
+      length(observed) > 0,
+      "The response category '{guarded[i]}' is declared impossible for \\
+      {length(observed)} observation(s), but the data record responses in it \\
+      (first: row {observed[1]}, count {data$Y[observed[1], guarded[i]]}). \\
+      Please check the impossible argument of mpt_tree() and the response counts."
+    )
+    data[[poss_vars[i]]] <- as.integer(!impossible_rows)
+  }
+  data
+}
+
 # the construction-time branch-sum validation uses synthetic covariate values;
 # once the data are known, the sum-to-1 property is re-checked row by row with
 # the observed covariate values to catch data-preparation errors
@@ -574,9 +708,9 @@ check_data.mpt <- function(model, data, formula) {
     par_vals[grp] <- 1 / length(grp)
   }
 
-  condition <- model$other_vars$condition
+  tree_id <- model$other_vars$tree_id
   for (tree in model$trees) {
-    rows <- if (is.null(condition)) {
+    rows <- if (is.null(tree_id)) {
       seq_len(nrow(data))
     } else {
       which(data[[paste0("Idx_", tree$name)]] == 1L)
@@ -669,9 +803,13 @@ check_formula.mpt <- function(model, data, formula) {
 
 .mpt_category_formulas <- function(model) {
   trees <- model$trees
-  use_indicators <- !is.null(model$other_vars$condition)
+  use_indicators <- !is.null(model$other_vars$tree_id)
   category_formulas <- lapply(model$resp_vars$resp_cats, function(resp_cat) {
-    branch_exprs <- vapply(trees, function(tree) tree$branches[[resp_cat]], character(1))
+    # a placeholder keeps log() defined for trees where the category is
+    # impossible; bmf2bf.mpt() overrides the linear predictor for those rows
+    branch_exprs <- vapply(
+      trees, function(tree) tree$branches[[resp_cat]] %||% "1", character(1)
+    )
     rhs <- if (use_indicators) {
       paste(glue("Idx_{names(trees)} * ({branch_exprs})"), collapse = " + ")
     } else {
@@ -718,13 +856,22 @@ check_formula.mpt <- function(model, data, formula) {
 #' @export
 bmf2bf.mpt <- function(model, formula) {
   resp_cats <- model$resp_vars$resp_cats
+  guarded <- resp_cats %in% unlist(lapply(model$trees, `[[`, "impossible"))
+
+  # -100 on the log scale is an effectively zero probability that stays finite;
+  # the multinomial family renormalizes, so nothing has to compensate for it
+  linpreds <- ifelse(
+    guarded,
+    glue("Poss_{resp_cats} * log({resp_cats}) + (1 - Poss_{resp_cats}) * (-100)"),
+    glue("log({resp_cats})")
+  )
 
   brms_formula <- brms::bf(
-    glue("Y | trials(nTrials) ~ log({resp_cats[1]})"),
+    glue("Y | trials(nTrials) ~ {linpreds[1]}"),
     nl = TRUE
   )
-  for (resp_cat in resp_cats[-1]) {
-    brms_formula <- brms_formula + glue_nlf("mu{resp_cat} ~ log({resp_cat})")
+  for (i in seq_along(resp_cats)[-1]) {
+    brms_formula <- brms_formula + glue_nlf("mu{resp_cats[i]} ~ {linpreds[i]}")
   }
 
   brms_formula
@@ -905,12 +1052,12 @@ configure_model.mpt <- function(model, data, formula) {
 #'   as a vector of lines.
 #' @param tree_names Character vector with one name per tree block, in the
 #'   order the blocks appear. For multi-tree models the names must match the
-#'   values of the condition variable in the data.
+#'   values of the tree identifier column in the data.
 #' @param categories Character vector with the response category of each line
 #'   within a tree, used for lines without an inline `# category` comment.
 #'   Must have as many entries as the tree with the most lines.
-#' @param condition Character. Name of the data column identifying the tree
-#'   an observation belongs to (see [mpt()]).
+#' @param tree_id Character. Name of the data column whose values name the tree
+#'   each observation belongs to (see [mpt()]).
 #' @param covariates,simplex,links passed to [mpt()].
 #'
 #' @return An object of class `bmmodel` (see [mpt()])
@@ -928,12 +1075,12 @@ configure_model.mpt <- function(model, data, formula) {
 #' model <- mpt_from_string(
 #'   model_2htm,
 #'   tree_names = c("old", "new"),
-#'   condition = "item_type"
+#'   tree_id = "item_type"
 #' )
 #' model
 #' @export
 mpt_from_string <- function(text, tree_names, categories = NULL,
-                            condition = NULL, covariates = NULL,
+                            tree_id = NULL, covariates = NULL,
                             simplex = NULL, links = "logit") {
   stop_missing_args()
   lines <- trimws(unlist(strsplit(text, "\n")))
@@ -963,7 +1110,7 @@ mpt_from_string <- function(text, tree_names, categories = NULL,
   }, blocks, tree_names, SIMPLIFY = FALSE)
 
   mpt(
-    trees = trees, condition = condition, covariates = covariates,
+    trees = trees, tree_id = tree_id, covariates = covariates,
     simplex = simplex, links = links
   )
 }
@@ -1001,9 +1148,9 @@ mpt_from_string <- function(text, tree_names, categories = NULL,
 #' @param categories A named character vector mapping response category names
 #'   used in the EQN file onto the shared response categories of the model
 #'   (see Details). Categories not listed keep their (sanitized) name.
-#' @param condition Character. Name of the data column identifying the tree
-#'   an observation belongs to (see [mpt()]). Defaults to the tree names used
-#'   in the EQN file.
+#' @param tree_id Character. Name of the data column whose values name the tree
+#'   each observation belongs to (see [mpt()]); the tree names come from the
+#'   EQN file.
 #' @param covariates,simplex,links passed to [mpt()]. Covariate names are
 #'   excluded from the renaming.
 #'
@@ -1026,12 +1173,12 @@ mpt_from_string <- function(text, tree_names, categories = NULL,
 #' model <- mpt_from_eqn(
 #'   eqn_file,
 #'   categories = c(hit = "yes", fa = "yes", miss = "no", cr = "no"),
-#'   condition = "item_type"
+#'   tree_id = "item_type"
 #' )
 #' attr(model, "mpt_renaming")
 #' @export
 mpt_from_eqn <- function(file, restrictions = NULL, categories = NULL,
-                         condition = NULL, covariates = NULL, simplex = NULL,
+                         tree_id = NULL, covariates = NULL, simplex = NULL,
                          links = "logit") {
   stop_missing_args()
   covariates <- covariates %||% character(0)
@@ -1107,7 +1254,7 @@ mpt_from_eqn <- function(file, restrictions = NULL, categories = NULL,
   })
 
   model <- mpt(
-    trees = trees, condition = condition, covariates = covariates,
+    trees = trees, tree_id = tree_id, covariates = covariates,
     simplex = simplex, links = links
   )
   attr(model, "mpt_renaming") <- renaming
@@ -1205,7 +1352,7 @@ mpt_from_eqn <- function(file, restrictions = NULL, categories = NULL,
 #'       new = "D + (1 - D) * (1 - g)"
 #'     ))
 #'   ),
-#'   condition = "item_type"
+#'   tree_id = "item_type"
 #' )
 #' plot(model)
 #' @export

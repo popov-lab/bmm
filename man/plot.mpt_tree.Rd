@@ -49,7 +49,7 @@ model <- mpt(
       new = "D + (1 - D) * (1 - g)"
     ))
   ),
-  condition = "item_type"
+  tree_id = "item_type"
 )
 plot(model)
 }
