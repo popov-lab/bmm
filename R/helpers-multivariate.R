@@ -102,6 +102,7 @@ mvbmm_config <- function(spec, prior = NULL) {
   components <- lapply(spec, mv_configure_component)
   validate_component_resps(components)
   warn_missing_shared_re(spec)
+  check_grouping_overlap(spec)
   warn_factor_level_mismatch(spec)
 
   formula <- Reduce(`+`, lapply(components, function(x) x$cfg$formula)) +
@@ -219,6 +220,66 @@ formula_re_ids <- function(formula) {
   txt <- vapply(forms, deparse1, character(1))
   ids <- unlist(regmatches(txt, gregexpr("\\|\\s*[^|()~+ ]+\\s*\\|", txt)))
   unique(gsub("[| ]", "", ids))
+}
+
+# the (|ID| label, grouping variable) pairs of the random-effects terms in a
+# bmmformula, e.g. ("p", "id") for (1 | p | id)
+formula_re_pairs <- function(formula) {
+  forms <- Filter(is_formula, unclass(formula))
+  txt <- vapply(forms, deparse1, character(1))
+  matches <- unlist(regmatches(
+    txt,
+    gregexpr("\\|\\s*[^|()~+ ]+\\s*\\|\\s*[^|()~+ ]+", txt)
+  ))
+  if (length(matches) == 0) {
+    return(NULL)
+  }
+  parts <- strsplit(gsub(" ", "", matches), "|", fixed = TRUE)
+  unique(do.call(rbind, lapply(parts, function(p) {
+    data.frame(id = p[2], group = p[3])
+  })))
+}
+
+# Cross-component correlations are identified only by grouping values (e.g.
+# persons) observed in several components. Zero overlap leaves them
+# unidentified — the posterior just reproduces the LKJ prior — and arises
+# silently when IDs are coded differently across the component datasets
+check_grouping_overlap <- function(spec) {
+  pair_list <- lapply(spec, function(component) formula_re_pairs(component$formula))
+  all_pairs <- unique(do.call(rbind, pair_list))
+  for (i in seq_len(NROW(all_pairs))) {
+    id_label <- all_pairs$id[i]
+    group <- all_pairs$group[i]
+    has_pair <- vapply(seq_along(spec), function(j) {
+      !is.null(pair_list[[j]]) &&
+        any(pair_list[[j]]$id == id_label & pair_list[[j]]$group == group) &&
+        group %in% names(spec[[j]]$data)
+    }, logical(1))
+    if (sum(has_pair) < 2) {
+      next
+    }
+    value_sets <- lapply(spec[has_pair], function(component) {
+      unique(as.character(component$data[[group]]))
+    })
+    shared <- Reduce(intersect, value_sets)
+    total <- unique(unlist(value_sets))
+    warnif(
+      length(shared) == 0,
+      "The components tied by the random-effects ID '{id_label}' have no \\
+      values of the grouping variable '{group}' in common. The correlations \\
+      between their parameters cannot be estimated from these data, and \\
+      their posterior will just reproduce the prior. Check that the values \\
+      of '{group}' are coded identically across the component datasets."
+    )
+    if (length(shared) > 0 && length(shared) < length(total)) {
+      message2(
+        "{length(shared)} of {length(total)} unique values of '{group}' \\
+        appear in all components tied by the random-effects ID '{id_label}'. \\
+        The correlations between the components' parameters are informed by \\
+        these {length(shared)} groups."
+      )
+    }
+  }
 }
 
 # Factors used as fixed-effect predictors must have identical levels across

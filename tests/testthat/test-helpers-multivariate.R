@@ -134,6 +134,35 @@ test_that("a missing shared random-effects ID triggers a warning", {
   expect_silent(bmm:::mvbmm_config(mv_comp_mixture + mv_comp_lognormal))
 })
 
+test_that("formula_re_pairs() extracts ID labels with their grouping variables", {
+  pairs <- bmm:::formula_re_pairs(
+    bmf(kappa ~ 1 + (1 | p | id), thetat ~ cond + (cond | q | session))
+  )
+  expect_equal(pairs$id, c("p", "q"))
+  expect_equal(pairs$group, c("id", "session"))
+
+  expect_null(bmm:::formula_re_pairs(bmf(kappa ~ 1 + (1 | id))))
+})
+
+test_that("components with no shared grouping values trigger a warning", {
+  d1 <- data.frame(id = factor(1:10), y1 = rnorm(10))
+  d2 <- data.frame(id = factor(paste0("P", 1:10)), y2 = rnorm(10))
+  joint <- bmm_component(bmf(y1 ~ 1 + (1 | p | id)), family = gaussian(), data = d1) +
+    bmm_component(bmf(y2 ~ 1 + (1 | p | id)), family = gaussian(), data = d2)
+  expect_warning(
+    bmm:::mvbmm_config(joint),
+    "values of the grouping variable 'id' in common"
+  )
+})
+
+test_that("partially overlapping grouping values are reported", {
+  d1 <- data.frame(id = factor(1:6), y1 = rnorm(6))
+  d2 <- data.frame(id = factor(4:9), y2 = rnorm(6))
+  joint <- bmm_component(bmf(y1 ~ 1 + (1 | p | id)), family = gaussian(), data = d1) +
+    bmm_component(bmf(y2 ~ 1 + (1 | p | id)), family = gaussian(), data = d2)
+  expect_message(bmm:::mvbmm_config(joint), "3 of 9 unique values of 'id'")
+})
+
 test_that("factor predictors with different levels across components warn", {
   d1 <- data.frame(
     id = factor(rep(1:5, 2)), y1 = rnorm(10),
