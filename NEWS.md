@@ -1,3 +1,8 @@
+# bmm (development version)
+
+### New features
+* New **multivariate models** (experimental): several models can be estimated jointly to obtain the full correlation matrix of their subject-level parameters. Each model is wrapped in a **bmm_component()** together with its formula and data; components are combined with `+` and passed to `bmm()` as the formula argument. Random effects that share an ID within `|ID|` bars across components (e.g. `(1 | p | id)`) are placed in a single correlation matrix spanning all components, which can be extracted with `brms::VarCorr()`. This estimates individual-difference correlations between measurement model parameters, or between model parameters and external covariates (via plain distributional families such as `lognormal()`), without the attenuation of two-step approaches. Supports `stancode()`, `standata()`, `default_prior()`, `summary()`, `pp_check(resp = )`, `parameters()`, and `brms::log_lik(resp = )`; the `sdm` model and families requiring response addition terms (e.g. `binomial`) are not yet supported (#394).
+
 # bmm 1.3.1
 
 ### Bug fixes
