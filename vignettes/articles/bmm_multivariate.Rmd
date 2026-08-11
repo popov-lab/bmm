@@ -1,0 +1,419 @@
+---
+title: "Estimating individual differences with multivariate models"
+output: bookdown::html_document2
+author:
+  - Gidon Frischkorn
+  - Ven Popov
+bibliography: REFERENCES.bib
+vignette: >
+  %\VignetteIndexEntry{Estimating individual differences with multivariate models}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+pkgdown:
+  as_is: true
+---
+
+```{=html}
+<style type="text/css">
+div.main-container {
+max-width: 850px !important;
+}
+
+p {
+margin-top: 1.5em ;
+margin-bottom: 1.5em ;
+}
+.author{
+    display: none;
+}
+</style>
+```
+
+```{r, include = FALSE}
+options(crayon.enabled = TRUE)
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>",
+  dev = "jpeg",
+  dpi = 100,
+  fig.asp = 0.8,
+  fig.align = "center"
+)
+fansi::set_knit_hooks(knitr::knit_hooks, which = c("output","message","error"))
+options(width = 300)
+
+ggplot2::theme_set(tidybayes::theme_tidybayes() + cowplot::panel_border())
+```
+
+# Why joint models for individual differences
+
+Individual-differences research asks questions of the form: do people who remember more precisely also respond faster? Is the tendency to guess in a memory task related to the rate of evidence accumulation in a decision task? Measurement models make such questions precise, because their parameters separate the cognitive processes that raw performance scores mix together — a person's average error in a continuous reproduction task confounds how *often* they remember with how *precisely* they remember, and the two-parameter mixture model [@Zhang_Luck_2008] disentangles exactly that.
+
+The common workflow for relating model parameters across tasks proceeds in two steps: fit a model to each task separately, extract one parameter estimate per person, and correlate the estimates. However, each estimate is computed from a limited number of trials and therefore contains measurement error. Correlating error-laden estimates as if they were the true values systematically pushes the correlation toward zero — a problem known since @Spearman_1904 as attenuation, and one that hits experimental tasks harder than one might expect, because measures optimized to show robust group effects often have low between-person reliability [@Hedge_Powell_Sumner_2018; @Rouder_Haaf_2019].
+
+`bmm` can instead estimate all models jointly in one Bayesian hierarchical model (also called a multilevel model). The correlation between subject-level parameters then is a parameter of the joint model: it is estimated directly from the trial-level data of all tasks, it accounts for the uncertainty in every person's parameters, and it comes with a full posterior distribution [@Matzke_2017]. In this article we simulate two tasks with a known parameter correlation of 0.60, fit them jointly, and then run the two-step analysis on the very same data — the joint model recovers the correlation, the two-step estimate undershoots it by more than a tenth, and you will see exactly why.
+
+This article assumes you know how to fit a single model with `bmm()` and how the `bmf()` formula syntax works. If you do not, we recommend starting with [the mixture models article](https://venpopov.com/bmm/articles/bmm_mixture_models.html) and [the bmmformula article](https://venpopov.com/bmm/articles/bmm_bmmformula.html). The multivariate feature is experimental — the interface may still change, and feedback is welcome on [GitHub issue #394](https://github.com/venpopov/bmm/issues/394).
+
+# Two tasks, one known correlation
+
+We simulate a study in which 40 participants complete two tasks: a visual working memory task with continuous reproduction (modeled with `mixture2p`), and a speeded task in which we only analyze response times (modeled with a lognormal distribution). Each participant contributes 20 trials per task — deliberately few, because scarce trials produce noisy person-level estimates, and noisy estimates are where the two-step approach breaks down.
+
+The two-parameter mixture model has two person-level parameters: the precision of memory responses, `kappa`, and the tendency to respond from memory rather than guess, `thetat`. Inside the model, `kappa` is estimated on the log scale and `thetat` on the logit scale (these transformed scales are called the parameters' *link scales*): this guarantees that precision stays positive and the memory probability stays between 0 and 1. Accordingly, we simulate each person's true parameters on those scales: we draw them from a multivariate normal distribution whose correlation matrix we choose ourselves. For the speeded task, the person-level parameter is the mean of the log response times, `meanlogrt`. Larger values mean *slower* responses.
+
+We set the correlation between memory precision and response speed to 0.60 — this is the value the analysis has to recover:
+
+```{r}
+library(bmm)
+library(dplyr)
+library(ggplot2)
+
+# set seed for reproducibility
+set.seed(22)
+
+n_id <- 40
+n_trials <- 20
+
+# population means and standard deviations of the person parameters, on the
+# link scales; qlogis() converts a probability to the logit scale
+mu_true <- c(logkappa = log(8), logitthetat = qlogis(0.8), meanlogrt = -0.5)
+sd_true <- c(logkappa = 0.4, logitthetat = 0.8, meanlogrt = 0.3)
+
+# the correlation matrix we want to recover
+R_true <- matrix(c(
+  1.0, 0.4, 0.6,
+  0.4, 1.0, 0.2,
+  0.6, 0.2, 1.0
+), nrow = 3, dimnames = list(names(mu_true), names(mu_true)))
+R_true
+
+# turn the SDs and the correlation matrix into a covariance matrix
+Sigma_true <- diag(sd_true) %*% R_true %*% diag(sd_true)
+
+# draw correlated person parameters (via the Cholesky factor of the
+# covariance matrix) and shift them to the true means
+subject_pars <- matrix(rnorm(n_id * 3), nrow = n_id) %*% chol(Sigma_true)
+subject_pars <- sweep(subject_pars, 2, mu_true, "+")
+colnames(subject_pars) <- names(mu_true)
+```
+
+With 40 participants, the parameters we drew will not correlate at exactly 0.60: in this particular sample, memory precision and response speed correlate at `r round(cor(subject_pars)["logkappa", "meanlogrt"], 2)`. This sample value, not the population value, is what a perfect analysis of these 40 people would recover.
+
+Each person's trial data then comes from their own parameters: `rmixture2p()` generates response errors for the memory task (its `p_mem` argument is the memory probability that `thetat` represents), and `rlnorm()` generates the response times, with the trial-level variability `sdlog` held constant across participants:
+
+```{r}
+dat_vwm <- do.call(rbind, lapply(1:n_id, function(i) {
+  data.frame(
+    id = factor(i, levels = 1:n_id),
+    error = rmixture2p(n_trials,
+      kappa = exp(subject_pars[i, "logkappa"]),
+      p_mem = plogis(subject_pars[i, "logitthetat"])
+    )
+  )
+}))
+
+dat_speed <- do.call(rbind, lapply(1:n_id, function(i) {
+  data.frame(
+    id = factor(i, levels = 1:n_id),
+    rt = rlnorm(n_trials, meanlog = subject_pars[i, "meanlogrt"], sdlog = 0.3)
+  )
+}))
+```
+
+Note that the two tasks live in two separate data frames. They do not need the same number of trials or even the same participants on every trial — the only requirement is a shared `id` variable whose values identify the same person across tasks.
+
+The individual differences are visible in the raw data. Here are the response error distributions and response times for the participants with the lowest, intermediate, and highest true memory precision:
+
+```{r subjects-raw, message=FALSE, warning=FALSE, fig.width=7, fig.asp=0.6, fig.cap="Response errors (top) and response times (bottom) for three participants with low, medium, and high true memory precision."}
+show_ids <- order(subject_pars[, "logkappa"])[c(1, 20, 40)]
+labels <- setNames(paste("Participant", show_ids), show_ids)
+
+p_error <- dat_vwm |>
+  filter(id %in% show_ids) |>
+  ggplot(aes(error)) +
+  geom_histogram(binwidth = 0.5, fill = "lightblue", color = "black") +
+  facet_wrap(~id, labeller = as_labeller(labels)) +
+  labs(x = "Response error (radians)", y = "Count")
+
+p_rt <- dat_speed |>
+  filter(id %in% show_ids) |>
+  ggplot(aes(rt)) +
+  geom_histogram(binwidth = 0.1, fill = "lightblue", color = "black") +
+  facet_wrap(~id, labeller = as_labeller(labels)) +
+  labs(x = "Response time (s)", y = "Count")
+
+cowplot::plot_grid(p_error, p_rt, nrow = 2)
+```
+
+The question is not whether people differ — they clearly do — but whether the differences are *correlated* across tasks: are the participants with sharply peaked error distributions also the fast responders?
+
+# Specifying the joint model
+
+A joint model needs three ingredients per task: a formula, a model (or a plain distributional family), and the data. The function `bmm_component()` bundles these into one component, and components are combined with `+`. The only new syntax inside the formulas is the additional `p` between the bars of the random-effects terms; we unpack it right after the code:
+
+```{r}
+joint <- bmm_component(
+  bmf(kappa ~ 1 + (1 | p | id), thetat ~ 1 + (1 | p | id)),
+  model = mixture2p(resp_error = "error"),
+  data = dat_vwm
+) +
+  bmm_component(
+    bmf(rt ~ 1 + (1 | p | id)),
+    family = brms::lognormal(),
+    data = dat_speed
+  )
+```
+
+The first component is an ordinary `mixture2p` specification — the same formula, model, and data you would pass to `bmm()` for a univariate fit. The second component uses a plain `brms` family instead of a measurement model. Note that the first formula plays a different role here: in a measurement-model component the left-hand sides are model parameters (`kappa`, `thetat`) and the response variable is set in the model function, whereas in a family component the left-hand side of the first formula *is* the response variable (`rt`). This component simply fits a hierarchical lognormal distribution to the response times.
+
+The crucial piece of syntax is `(1 | p | id)`. In a `brms` random-effects term, the middle position between the two `|` bars is an arbitrary label — we chose `p` for "person". All random effects that carry the *same* label are modeled as draws from one multivariate normal distribution with a full correlation matrix, and this works both within a formula and *across components*. Concretely: `kappa`, `thetat`, and the response-time intercept all carry the label `p`, so the joint model estimates a 3×3 correlation matrix of these person-level parameters. That correlation matrix is the individual-differences quantity we are after. In other words, the entire purpose of the multivariate model sits in that one letter: leave it out, and the components are still fitted jointly, but their parameters are treated as uncorrelated.
+
+Printing the specification shows what we built:
+
+```{r, comment=NA}
+joint
+```
+
+The specification behaves like any other `bmm` model object: `default_prior(joint)` shows the priors, and `stancode(joint)` and `standata(joint)` return the generated Stan code and data (see [the article on extracting model information](https://venpopov.com/bmm/articles/bmm_extract_info.html)). For all options of the component syntax, see `?bmm_component`.
+
+# Fitting the model and reading the summary
+
+The specification is passed to `bmm()` as the formula. The `data` and `model` arguments are omitted, because every component carries its own:
+
+```{r}
+fit <- bmm(
+  joint,
+  cores = 4,
+  refresh = 100,
+  backend = "cmdstanr",
+  file = "assets/bmmfit_mv_joint_vignette"
+)
+```
+
+On a regular laptop this model samples in about two minutes; the `file` argument stores the fitted model and re-uses it on any later run of the same call. The summary now contains blocks for both components:
+
+```{r, comment=NA}
+summary(fit)
+```
+
+Reading this output from top to bottom:
+
+- The header lists each component with its model, links, formula, and data — component 1 is the mixture model for `error`, component 2 the lognormal model for `rt`.
+- Under **Multilevel Hyperparameters**, the `sd(...)` rows give the between-person standard deviations of the parameters, on their link scales. The row names combine the response variable and the parameter: `error_kappa_Intercept` is the person-level intercept of `kappa` in the component whose response variable is `error`. Depending on the model type, the response appears before or after the parameter name, so read the exact names off the printed output rather than memorizing a rule.
+- The `cor(...)` rows in the same block are the estimates we came for. `cor(error_kappa_Intercept, rt_Intercept)` is the correlation between memory precision and mean log response time — estimated jointly from the trial-level data of both tasks.
+- The **Regression Coefficients** blocks list the population-level parameters per component (the parameters of the average person, called fixed effects in multilevel terminology), again on the link scales.
+
+All Rhat values are below 1.01 and the effective sample sizes are large, so the chains have converged and mixed well. As with any model, you should also check the posterior predictive fit — for multivariate models, each component is checked separately via the `resp` argument, using the response variable's name:
+
+```{r, message=FALSE, warning=FALSE, fig.width=5}
+pp_check(fit, resp = "error", ndraws = 50)
+```
+
+# Extracting and plotting the correlations
+
+For a quick look at the full matrix, `brms::VarCorr()` returns the standard deviations and correlations of all person-level parameters:
+
+```{r}
+vc <- brms::VarCorr(fit)
+round(vc$id$cor[, "Estimate", ], 2)
+```
+
+The `$id$cor` element is a three-dimensional array (parameters × summary statistic × parameters), so the code above slices out the matrix of posterior means.
+
+Point estimates are only half the story: the joint model gives us the full posterior distribution of every correlation. The correlation parameters follow the naming scheme `cor_id__<parameter>__<parameter>` (the same quantities printed as `cor(...)` rows in the summary), and we can extract their posterior draws directly:
+
+```{r, message=FALSE, warning=FALSE}
+library(tidybayes)
+library(tidyr)
+
+# select all posterior draws whose names start with cor_id__
+cor_draws <- brms::as_draws_df(fit, variable = "^cor_id__", regex = TRUE)
+
+pair_labels <- c(
+  cor_id__error_kappa_Intercept__error_thetat_Intercept = "precision ~ memory weight",
+  cor_id__error_kappa_Intercept__rt_Intercept = "precision ~ speed",
+  cor_id__error_thetat_Intercept__rt_Intercept = "memory weight ~ speed"
+)
+```
+
+We plot the three posteriors and overlay the generating correlations as red diamonds:
+
+```{r cor-posterior, message=FALSE, warning=FALSE, fig.width=6, fig.asp=0.55, fig.cap="Posterior distributions of the three parameter correlations. Red diamonds mark the true generating values."}
+cor_long <- cor_draws |>
+  select(starts_with("cor_id__")) |>
+  pivot_longer(everything(), names_to = "pair", values_to = "correlation") |>
+  mutate(pair = pair_labels[pair])
+
+true_cors <- data.frame(
+  pair = c("precision ~ memory weight", "precision ~ speed", "memory weight ~ speed"),
+  correlation = c(0.4, 0.6, 0.2)
+)
+
+ggplot(cor_long, aes(x = correlation, y = pair)) +
+  stat_halfeye(normalize = "groups") +
+  geom_point(data = true_cors, shape = "diamond", size = 3.5, color = "red3") +
+  geom_vline(xintercept = 0, linetype = "dashed", color = "grey50") +
+  labs(x = "Correlation", y = NULL)
+```
+
+In each row, the black dot marks the posterior median, and the thick and thin lines the 50% and 95% credible intervals. All three posteriors credibly cover the generating values: each red diamond falls inside the 95% interval. The intervals are wide — that is what 40 participants with 20 trials per task can tell you about a correlation, and the joint model is honest about it. The two-step approach, as we will now see, is not.
+
+# Why two-step correlations mislead
+
+The two-step analysis of the same data fits each task separately and correlates the resulting person-level estimates. We run the strongest version of this approach: hierarchical models for both tasks, whose person-level estimates already profit from partial pooling. That is, each person's estimate is informed by their own data *and* by the group distribution, so noisy individuals are pulled toward the group mean. These are considerably better estimates than fitting each person separately would give.^[The classic two-step analysis — computing per-person point estimates without any pooling, or even correlating raw summary statistics — suffers from strictly more attenuation than what we show here.]
+
+```{r}
+fit_vwm <- bmm(
+  bmf(kappa ~ 1 + (1 | id), thetat ~ 1 + (1 | id)),
+  data = dat_vwm,
+  model = mixture2p(resp_error = "error"),
+  chains = 2,
+  cores = 2,
+  refresh = 100,
+  backend = "cmdstanr",
+  file = "assets/bmmfit_mv_twostep_vwm_vignette"
+)
+
+fit_speed <- brms::brm(
+  rt ~ 1 + (1 | id),
+  data = dat_speed,
+  family = brms::lognormal(),
+  chains = 2,
+  cores = 2,
+  refresh = 100,
+  backend = "cmdstanr",
+  file = "assets/brmsfit_mv_twostep_rt_vignette"
+)
+```
+
+The `coef()` function returns each person's estimated parameters — the posterior means of the person-level effects. We collect them into one score per person and task, exactly as a two-step analysis would, and correlate (in these univariate fits the coefficient names carry no response prefix, because each model has only one response):
+
+```{r}
+person_scores <- data.frame(
+  precision = coef(fit_vwm)$id[, "Estimate", "kappa_Intercept"],
+  memory_weight = coef(fit_vwm)$id[, "Estimate", "thetat_Intercept"],
+  speed = coef(fit_speed)$id[, "Estimate", "Intercept"]
+)
+two_step <- cor(person_scores)
+round(two_step, 2)
+```
+
+```{r, include=FALSE}
+joint_cor <- vc$id$cor
+pairs_idx <- rbind(
+  c("error_kappa_Intercept", "error_thetat_Intercept"),
+  c("error_kappa_Intercept", "rt_Intercept"),
+  c("error_thetat_Intercept", "rt_Intercept")
+)
+two_step_est <- c(
+  two_step["precision", "memory_weight"],
+  two_step["precision", "speed"],
+  two_step["memory_weight", "speed"]
+)
+comparison <- data.frame(
+  pair = c("precision ~ memory weight", "precision ~ speed", "memory weight ~ speed"),
+  true = c(0.4, 0.6, 0.2),
+  joint = round(joint_cor[cbind(pairs_idx[, 1], "Estimate", pairs_idx[, 2])], 2),
+  `joint 95% CI` = sprintf(
+    "[%.2f, %.2f]",
+    joint_cor[cbind(pairs_idx[, 1], "Q2.5", pairs_idx[, 2])],
+    joint_cor[cbind(pairs_idx[, 1], "Q97.5", pairs_idx[, 2])]
+  ),
+  `two-step` = round(two_step_est, 2),
+  check.names = FALSE
+)
+```
+
+Placing the estimates side by side:
+
+```{r, echo=FALSE}
+knitr::kable(comparison, row.names = FALSE)
+```
+
+Critically, the two-step correlation between memory precision and speed comes out at `r round(two_step["precision", "speed"], 2)`, although these data were generated with a true correlation of 0.60. The joint model's estimate of `r round(joint_cor["error_kappa_Intercept", "Estimate", "rt_Intercept"], 2)`, in contrast, sits close to the truth, and its credible interval covers it. The same figure as before makes the pattern visible at a glance:
+
+```{r cor-posterior-twostep, message=FALSE, warning=FALSE, fig.width=6, fig.asp=0.55, fig.cap="Posterior distributions of the parameter correlations from the joint model. Red diamonds mark the true generating values; black crosses mark the two-step estimates."}
+two_step_df <- data.frame(
+  pair = c("precision ~ memory weight", "precision ~ speed", "memory weight ~ speed"),
+  correlation = two_step_est
+)
+
+ggplot(cor_long, aes(x = correlation, y = pair)) +
+  stat_halfeye(normalize = "groups") +
+  geom_point(data = true_cors, shape = "diamond", size = 3.5, color = "red3") +
+  geom_point(data = two_step_df, shape = 4, size = 3.5, stroke = 1.2) +
+  geom_vline(xintercept = 0, linetype = "dashed", color = "grey50") +
+  labs(x = "Correlation", y = NULL)
+```
+
+Why does this happen? The person-level estimates from the separate fits are point estimates: they collapse each person's posterior to a single number and discard the uncertainty around it. With 20 trials per person, that uncertainty is large — especially for `kappa`, which is only informed by the subset of trials on which the person responded from memory. The discarded uncertainty acts like measurement error in both variables, and measurement error in both variables biases a sample correlation toward zero [@Spearman_1904]. Partial pooling does not rescue this: the shrinkage toward the group mean improves each individual estimate, but correlating shrunken point estimates still ignores that the estimates are uncertain [@Matzke_2017]. The joint model avoids the problem at the root, because the correlation is estimated from the full posterior of every person's parameters — no intermediate point estimates exist.
+
+One honest caveat: the exact size of the gap between the two-step and the joint estimate varies from one simulated data set to the next. The direction does not: with few trials per person, the two-step correlation is systematically too small.
+
+# Correlating parameters of two measurement models
+
+Nothing restricts components to the combination of a measurement model and a response-time distribution. Any models that `bmm` supports can be joined, and this is where the approach becomes most useful for individual-differences research: correlating the parameters of two *measurement models*, each fitted to its own task. As an example, we give the same 40 participants a speeded two-choice task and model it with the diffusion decision model (`?ddm`; see [the DDM article](https://venpopov.com/bmm/articles/bmm_ddm.html) for an introduction), asking whether memory precision is related to the drift rate — the speed of evidence accumulation.
+
+We generate each person's drift rate to correlate at 0.50 with their memory precision, keeping boundary separation (the amount of evidence required for a decision, `bound`) and non-decision time (the time taken up by encoding and motor processes, `ndt`) constant across participants for simplicity. `rddm()` generates the trial-level data: a response time `rt` and a binary `response` coding which decision boundary was reached (1 = upper, 0 = lower). Note one instructive difference: the drift rate is estimated on the identity scale, so no transformation is involved:
+
+```{r}
+# set seed for reproducibility
+set.seed(8)
+
+# 0.5 * z_kappa + sqrt(1 - 0.5^2) * noise correlates at 0.5 with z_kappa
+z_kappa <- as.numeric(scale(subject_pars[, "logkappa"]))
+drift_true <- 1.0 + 0.3 * (0.5 * z_kappa + sqrt(0.75) * rnorm(n_id))
+
+dat_choice <- do.call(rbind, lapply(1:n_id, function(i) {
+  data.frame(
+    id = factor(i, levels = 1:n_id),
+    rddm(50, drift = drift_true[i], bound = 1.5, ndt = 0.3)
+  )
+}))
+```
+
+The joint specification looks exactly like before, except that the second component now carries a `ddm` model. The formulas `bound ~ 1` and `ndt ~ 1` contain no `(1 | p | id)` term, matching the simulation: a single common value is estimated for all participants:
+
+```{r}
+joint_ddm <- bmm_component(
+  bmf(kappa ~ 1 + (1 | p | id), thetat ~ 1 + (1 | p | id)),
+  model = mixture2p(resp_error = "error"),
+  data = dat_vwm
+) +
+  bmm_component(
+    bmf(drift ~ 1 + (1 | p | id), bound ~ 1, ndt ~ 1),
+    model = ddm(rt = "rt", response = "response"),
+    data = dat_choice
+  )
+
+fit_ddm <- bmm(
+  joint_ddm,
+  cores = 4,
+  refresh = 100,
+  backend = "cmdstanr",
+  file = "assets/bmmfit_mv_ddm_vignette"
+)
+```
+
+The diffusion model's likelihood is more expensive, so this fit takes around five to ten minutes. The correlation matrix now spans the parameters of both measurement models:
+
+```{r}
+vc_ddm <- brms::VarCorr(fit_ddm)
+round(vc_ddm$id$cor[, "Estimate", ], 2)
+```
+
+The correlation between `error_kappa_Intercept` and `drift_rt_Intercept` is the estimate of interest: participants with more precise memory representations credibly tend to accumulate evidence faster, and the posterior covers the generating value of 0.50.
+
+# Practical notes and current limitations
+
+A few points to keep in mind when using multivariate models in your own work:
+
+- **Correlations live on the link scale.** The estimated correlation involves log `kappa`, logit `thetat`, and so on. Link functions are monotone, so the sign and the rank-order interpretation carry over to the natural scale, but the numerical value is not the correlation of `kappa` in its natural units. For parameters with an identity link, such as the drift rate, no transformation is involved.
+- **One grouping variable across components.** All components whose parameters should correlate must use the same grouping variable, with identical values identifying the same person. Participants who contribute data to only some tasks are handled naturally: their parameters for the missing tasks are simply informed by the group distribution alone.
+- **The correlation matrix has a prior.** `brms` places an LKJ prior on it (the standard prior family for correlation matrices), which weakly pulls correlations toward zero. With many participants this hardly matters; with few participants it does, and we recommend checking how sensitive your conclusions are to that prior: refit with, e.g., `prior = brms::set_prior("lkj(1)", class = "cor")` passed to `bmm()` and compare the posteriors. `default_prior(joint)` shows the current settings.
+- **Components are linked only through their person-level parameters.** Trial-level residuals are never correlated across components; with separate data sets per task, trial-level correlations are not even defined.
+- **Some things do not work yet.** The `sdm` model and families that require response addition terms (extra response-side information in the formula, such as `trials()` for the `binomial` family) cannot be used as components; `update()` and `conditional_effects()` are not yet available for multivariate fits. Model fit can be assessed per component with `pp_check(fit, resp = ...)` and `brms::log_lik(fit, resp = ...)`.
+
+Taken together, joint estimation changes the status of a cross-task correlation: instead of a statistic computed from error-laden intermediate scores, it becomes a parameter of one model, estimated with all available data and with honest uncertainty. For individual-differences research with measurement models, that is the difference between reporting an attenuated number and reporting the estimate your study was designed to provide.
+
+# References
