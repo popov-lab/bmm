@@ -123,7 +123,7 @@ mvbmm_config <- function(spec, prior = NULL) {
   # such as prior(lkj(2), class = "cor"); component-targeted rows require an
   # explicit resp
   prior <- combine_prior(component_priors, prior)
-  init <- mv_create_initfun(components, formula, data)
+  init <- mv_create_initfun(components, formula, data, prior)
 
   nlist(
     config_args = nlist(formula, data, stanvars, init),
@@ -320,11 +320,12 @@ formula_fe_vars <- function(formula) {
 }
 
 # Multivariate counterpart of create_initfun.bmmodel. Stan parameters
-# belonging to components with init_ranges are initialized from those ranges;
-# the shared random-effects and correlation parameters generically; all other
-# parameters keep the sampler's default inits (partial init lists are
-# accepted by all backends)
-mv_create_initfun <- function(components, formula, data) {
+# belonging to components with init_ranges are initialized from those ranges,
+# the shared random-effects and correlation parameters generically, and every
+# remaining parameter as brm(init = 1) would initialize it — the value a
+# component without init_ranges receives in a univariate bmm() fit. Leaving
+# them out instead would make the backend fill the gaps silently and warn
+mv_create_initfun <- function(components, formula, data, prior) {
   needs_init <- vapply(
     components,
     function(x) !is.null(x$model$init_ranges),
@@ -334,8 +335,10 @@ mv_create_initfun <- function(components, formula, data) {
     return(1)
   }
 
-  standata_list <- standata(formula, data)
-  stan_code <- stancode(formula, data)
+  # the prior decides which parameters exist: parameters held constant by a
+  # fixed_parameters prior are absent from the parameters block
+  standata_list <- standata(formula, data, prior = prior)
+  stan_code <- stancode(formula, data, prior = prior)
   stanpars_list <- extract_parameter_dimensions(extract_stan_blocks(stan_code)$parameters)
   par_matches <- mv_match_stan_parameters(names(stanpars_list), components[needs_init])
 
@@ -349,8 +352,9 @@ mv_create_initfun <- function(components, formula, data) {
     bterms <- brms::brmsterms(formula)
     inits <- list()
     for (spar in names(stanpars_list)) {
-      type <- stanpars_list[[spar]]$type
-      dim <- unlist(standata_list[stanpars_list[[spar]]$dims])
+      spec <- stanpars_list[[spar]]
+      type <- spec$type
+      dim <- resolve_stan_dim(spec$dims, standata_list)
       match <- par_matches[[spar]]
 
       inits[[spar]] <- if (!is.null(match)) {
@@ -371,7 +375,7 @@ mv_create_initfun <- function(components, formula, data) {
           cov_matrix = ,
           corr_matrix = diag(nrow = dim),
           NULL
-        )
+        ) %||% mv_default_init(spec, dim, standata_list)
       }
     }
     inits[!vapply(inits, is.null, logical(1))]
@@ -406,6 +410,58 @@ mv_match_stan_parameters <- function(spar_names, components) {
     }
   }
   matches
+}
+
+# Stan draws initial values uniformly on the unconstrained scale and maps them
+# through the parameter's declared bounds; with a radius of 1 this is exactly
+# what brm(init = 1) does, the init a bmmodel without init_ranges gets in a
+# univariate fit. Returns NULL for the types whose transform is not
+# reimplemented here (simplex, ordered, ...) and for bounds that cannot be
+# resolved to a number, leaving those parameters to the sampler
+mv_default_init <- function(spec, dim, standata_list) {
+  if (!spec$type %in% c("real", "vector", "row_vector", "matrix")) {
+    return(NULL)
+  }
+  lower <- resolve_stan_bound(spec$bounds$lower, standata_list, -Inf)
+  upper <- resolve_stan_bound(spec$bounds$upper, standata_list, Inf)
+  if (is.na(lower) || is.na(upper) || anyNA(dim)) {
+    return(NULL)
+  }
+
+  raw <- runif(prod(dim), min = -1, max = 1)
+  value <- if (is.infinite(lower) && is.infinite(upper)) {
+    raw
+  } else if (is.infinite(upper)) {
+    lower + exp(raw)
+  } else if (is.infinite(lower)) {
+    upper - exp(raw)
+  } else {
+    lower + (upper - lower) * plogis(raw)
+  }
+  if (length(dim) > 1) array(value, dim = dim) else value
+}
+
+# Stan declarations carry their dimensions either as a literal (scalars) or as
+# the name of a variable in the data block
+resolve_stan_dim <- function(dims, standata_list) {
+  vapply(dims, function(d) {
+    literal <- suppressWarnings(as.numeric(d))
+    if (is.na(literal)) as.numeric(standata_list[[d]])[1] else literal
+  }, numeric(1), USE.NAMES = FALSE)
+}
+
+# Bounds are parsed as strings and may be numbers or the names of data
+# variables; NA marks a bound that is neither
+resolve_stan_bound <- function(value, standata_list, default) {
+  if (is.null(value)) {
+    return(default)
+  }
+  number <- suppressWarnings(as.numeric(value))
+  if (!is.na(number)) {
+    return(number)
+  }
+  from_data <- standata_list[[value]]
+  if (is.numeric(from_data) && length(from_data) == 1) from_data else NA_real_
 }
 
 ############################################################################# !

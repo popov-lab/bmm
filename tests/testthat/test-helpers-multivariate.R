@@ -332,8 +332,80 @@ test_that("components with init_ranges produce a valid init function", {
   expect_equal(inits$L_1, diag(3))
   expect_length(inits$sd_1, 3)
 
-  expect_false("Intercept_error" %in% names(inits))
-  expect_false("sigma_error" %in% names(inits))
+  # the gaussian component has no init_ranges, so its parameters are drawn as
+  # brm(init = 1) would draw them: uniformly on the unconstrained scale
+  expect_gte(inits$Intercept_error, -1)
+  expect_lte(inits$Intercept_error, 1)
+  expect_gte(inits$sigma_error, exp(-1))
+  expect_lte(inits$sigma_error, exp(1))
+})
+
+test_that("the init list covers every parameter of the Stan model", {
+  joint <- suppressMessages(
+    mv_comp_ddm +
+      bmm_component(bmf(error ~ 1 + (1 | p | id)), family = gaussian(), data = mv_dat_vwm)
+  )
+  cfg <- suppressMessages(bmm:::mvbmm_config(joint))
+  spars <- names(bmm:::extract_parameter_dimensions(
+    bmm:::extract_stan_blocks(suppressMessages(stancode(joint)))$parameters
+  ))
+  expect_setequal(names(cfg$config_args$init()), spars)
+})
+
+test_that("components without init_ranges are initialized in a joint model", {
+  m3dat <- oberauer_lewandowsky_2019_e1
+  rt_dat <- data.frame(
+    ID = rep(unique(m3dat$ID), each = 4),
+    rt = rlnorm(length(unique(m3dat$ID)) * 4, -0.5, 0.3),
+    resp = rbinom(length(unique(m3dat$ID)) * 4, 1, 0.7)
+  )
+  m3_model <- m3(
+    resp_cats = c("corr", "other", "npl"),
+    num_options = c("n_corr", "n_other", "n_npl"),
+    choice_rule = "simple", version = "ss"
+  )
+  joint <- suppressMessages(
+    bmm_component(bmf(c ~ 1 + (1 | p | ID), a ~ 1 + (1 | p | ID)),
+      model = m3_model, data = m3dat
+    ) +
+      bmm_component(
+        bmf(drift ~ 1 + (1 | p | ID), bound ~ 1 + (1 | p | ID), ndt ~ 1, zr ~ 1),
+        model = ddm(rt = "rt", response = "resp"), data = rt_dat
+      )
+  )
+  cfg <- suppressMessages(bmm:::mvbmm_config(joint))
+  inits <- cfg$config_args$init()
+  sdata <- suppressMessages(standata(joint))
+  spars <- names(bmm:::extract_parameter_dimensions(
+    bmm:::extract_stan_blocks(suppressMessages(stancode(joint)))$parameters
+  ))
+
+  expect_setequal(names(inits), spars)
+  expect_length(inits$b_Y_c, sdata$K_Y_c)
+  expect_length(inits$b_Y_a, sdata$K_Y_a)
+  expect_true(all(abs(unlist(inits[c("b_Y_c", "b_Y_a")])) <= 1))
+})
+
+test_that("mv_default_init() maps the draw through the declared bounds", {
+  spec <- function(type, bounds, dims = "K") nlist(type, bounds, dims)
+  unbounded <- bmm:::mv_default_init(spec("vector", NULL), 20, list())
+  lower <- bmm:::mv_default_init(spec("vector", list(lower = "2")), 20, list())
+  upper <- bmm:::mv_default_init(spec("vector", list(upper = "-3")), 20, list())
+  both <- bmm:::mv_default_init(
+    spec("vector", list(lower = "0", upper = "min_Y")), 20, list(min_Y = 4)
+  )
+
+  expect_true(all(abs(unbounded) <= 1))
+  expect_true(all(lower > 2))
+  expect_true(all(upper < -3))
+  expect_true(all(both > 0 & both < 4))
+  expect_equal(dim(bmm:::mv_default_init(spec("matrix", NULL), c(2, 3), list())), c(2, 3))
+})
+
+test_that("mv_default_init() leaves unsupported declarations to the sampler", {
+  spec <- function(type, bounds) nlist(type, bounds, dims = "K")
+  expect_null(bmm:::mv_default_init(spec("simplex", NULL), 3, list()))
+  expect_null(bmm:::mv_default_init(spec("real", list(lower = "unknown_var")), 1, list()))
 })
 
 test_that("init matching distinguishes the same model on two tasks", {
