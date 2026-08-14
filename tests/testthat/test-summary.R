@@ -19,6 +19,54 @@ test_that("summary has reasonable outputs", {
   expect_output(print(summary1), "Formula: mu = 0")
 })
 
+# minimal bmmsummary around a real model so the print helpers run
+make_bmmsummary <- function(model, formula, fixed) {
+  structure(
+    list(
+      fixed = fixed, random = list(), ngrps = list(),
+      formula = formula, model = model,
+      data = structure(data.frame(y = 0), data_name = "d"),
+      iter = 100, warmup = 50, thin = 1, chains = 1,
+      sampler = "NUTS", algorithm = "sampling"
+    ),
+    class = "bmmsummary"
+  )
+}
+
+make_fixed <- function(rows) {
+  n <- length(rows)
+  data.frame(
+    Estimate = seq_len(n), Est.Error = rep(0.1, n),
+    "l-95% CI" = seq_len(n) - 1, "u-95% CI" = seq_len(n) + 1,
+    Rhat = rep(1, n), Bulk_ESS = rep(500, n), Tail_ESS = rep(500, n),
+    check.names = FALSE, row.names = rows
+  )
+}
+
+test_that("print.bmmsummary selects rows by exact parameter prefix (#379)", {
+  # imm has parameters a and kappa; "a_" is a substring of "kappa_", so an
+  # unanchored grepl kept rows whose true parameter is not among those printed.
+  model <- imm(
+    resp_error = "y", nt_features = "nt", nt_distances = "d",
+    set_size = "ss", version = "abc"
+  )
+  formula <- bmf(kappa ~ 1, a ~ 1, c ~ 1)
+  fixed <- make_fixed(c("kappa_Intercept", "a_Intercept", "c_Intercept", "Xa_decoy"))
+  out <- capture.output(print(make_bmmsummary(model, formula, fixed), color = FALSE))
+
+  expect_true(any(grepl("kappa_Intercept", out)))
+  expect_true(any(grepl("a_Intercept", out)))
+  expect_false(any(grepl("Xa_decoy", out)))
+})
+
+test_that("print.bmmsummary handles a single regression coefficient row (#369)", {
+  model <- sdm(resp_error = "y")
+  formula <- bmf(c ~ 1, kappa ~ 1)
+  fixed <- make_fixed("kappa_Intercept")
+  out <- capture.output(print(make_bmmsummary(model, formula, fixed), color = FALSE))
+  expect_true(any(grepl("kappa_Intercept", out)))
+})
+
 test_that(".summary_fixed_rows keeps a single fixed-effect row", {
   # gumbel-min sdt_ranking has one population coefficient (dprime_Intercept) but
   # two printed parameters (dprime, sdratio); the old sapply+apply errored here.

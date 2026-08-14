@@ -40,8 +40,7 @@
         mu = c(-0.5,0.5),
         kappa = c(2.5,3.5),
         c = c(4,6)
-      ),
-      void_mu = FALSE
+      )
     ),
     class = c("bmmodel", "circular", "sdm", paste0("sdm_", version)),
     call = call
