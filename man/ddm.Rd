@@ -11,7 +11,10 @@ ddm(rt, response, links = NULL, ...)
 
 \item{response}{Name of the response variable coding the response numerically (0 = lower response / incorrect, 1 = upper response / correct)}
 
-\item{links}{A list of links for the parameters.}
+\item{links}{A list of links for the parameters. For positive parameters
+(e.g. \code{bound}, \code{ndt}), "softplus" is available as an alternative to the
+default "log" link that grows linearly for large values and avoids the
+numerical blow-up of \code{exp()}.}
 
 \item{...}{used internally for testing, ignore it}
 }
