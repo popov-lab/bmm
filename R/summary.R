@@ -87,9 +87,7 @@ print.bmmsummary <- function(x, digits = 2, color = getOption("bmm.color_summary
   }
   if (nrow(x$fixed)) {
     cat(style("green")("Regression Coefficients:\n"))
-    include <- sapply(paste0(pars_to_print, "_"), function(p) grepl(p, rownames(x$fixed)))
-    include <- apply(include, 1, any)
-    reduced <- x$fixed[include, ]
+    reduced <- .summary_fixed_rows(x$fixed, pars_to_print)
     is_constant <- is.na(reduced$Rhat)
     print_format(reduced[!is_constant, ], digits)
     cat("\n")
@@ -132,6 +130,16 @@ select_pars <- function(x) {
   model_pars <- names(x$model$parameters)
   provided_dpars <- names(x$formula)[!is_nl(x$formula)]
   union(model_pars, provided_dpars)
+}
+
+# Fixed-effect rows whose name matches any printed parameter. Uses lapply+Reduce
+# rather than sapply+apply so a single fixed-effect row or a single parameter
+# does not collapse to a dimensionless object — which broke summaries of
+# single-coefficient models such as gumbel-min sdt_ranking (dprime ~ 1).
+.summary_fixed_rows <- function(fixed, pars) {
+  patterns <- paste0(pars, "_")
+  include <- Reduce(`|`, lapply(patterns, function(p) grepl(p, rownames(fixed))))
+  fixed[include, , drop = FALSE]
 }
 
 summarise_links <- function(links) {
