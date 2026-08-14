@@ -413,15 +413,16 @@ configure_model.m3 <- function(model, data, formula) {
   formula$family$cats <- model$resp_vars$resp_cats
   formula$family$dpars <- paste0("mu", model$resp_vars$resp_cats)
 
-  # set initial values to be set to zero if the choice rule is "simple" and "identity"
-  # link functions are used
-  if(model$other_vars$choice_rule == "simple" && any(model$links == "identity")){
-    init <- 0
-  } else {
-    init <- NULL
-  }
+  nlist(formula, data)
+}
 
-  nlist(formula, data, init)
+#' @export
+create_initfun.m3 <- function(model, data, formula) {
+  # the "simple" choice rule with an identity link samples stably only from zero
+  if (model$other_vars$choice_rule == "simple" && any(model$links == "identity")) {
+    return(0)
+  }
+  NextMethod()
 }
 
 

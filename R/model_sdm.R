@@ -145,11 +145,7 @@ configure_model.sdm <- function(model, data, formula) {
   formula <- bmf2bf(model, formula)
   formula$family <- sdm_simple
 
-  # set initial values to be sampled between [-1,1] to avoid extreme SDs that
-  # can cause the sampler to fail
-  init <- 1
-
-  nlist(formula, data, stanvars, init)
+  nlist(formula, data, stanvars)
 }
 
 ############################################################################# !
