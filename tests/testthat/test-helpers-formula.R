@@ -323,6 +323,17 @@ test_that("apply_links works when parameter appears in to parts of a formula", {
   expect_equal(reform, bmf(x ~ log(Phi(a)^exp(c)) + exp(c)^2, kappa ~ 1, a ~ 1, c ~ 1))
 })
 
+test_that("apply_links applies softplus link via log1p_exp", {
+  form <- bmf(x ~ a + c, kappa ~ 1, a ~ 1, c ~ 1)
+  links <- list(a = "softplus", c = "log")
+  reform <- apply_links(form, links)
+  expect_equal(reform, bmf(x ~ log1p_exp(a) + exp(c), kappa ~ 1, a ~ 1, c ~ 1))
+})
+
+test_that("inv_link maps softplus to log1p_exp", {
+  expect_identical(inv_link("x", "softplus"), quote(log1p_exp(x)))
+})
+
 test_that("apply_links gives error when unknown link type is given", {
   form <- bmf(x ~ log(a^c) + c^2, kappa ~ 1, a ~ 1, c ~ 1)
   links <- list(a = "probit", c = "logggg")
