@@ -18,3 +18,21 @@ test_that("summary has reasonable outputs", {
   expect_output(print(summary1), "Links: mu = tan_half; c = log; kappa = log")
   expect_output(print(summary1), "Formula: mu = 0")
 })
+
+test_that(".summary_fixed_rows keeps a single fixed-effect row", {
+  # gumbel-min sdt_ranking has one population coefficient (dprime_Intercept) but
+  # two printed parameters (dprime, sdratio); the old sapply+apply errored here.
+  one_row <- data.frame(Estimate = 0.6, Rhat = 1, row.names = "dprime_Intercept")
+  out <- .summary_fixed_rows(one_row, c("dprime", "sdratio"))
+  expect_s3_class(out, "data.frame")
+  expect_identical(rownames(out), "dprime_Intercept")
+})
+
+test_that(".summary_fixed_rows selects all rows matching the printed parameters", {
+  fixed <- data.frame(
+    Estimate = 1:3, Rhat = c(1, NA, 1),
+    row.names = c("dprime_Intercept", "sdratio_Intercept", "nuisance_Intercept")
+  )
+  out <- .summary_fixed_rows(fixed, c("dprime", "sdratio"))
+  expect_identical(sort(rownames(out)), c("dprime_Intercept", "sdratio_Intercept"))
+})
