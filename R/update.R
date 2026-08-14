@@ -103,10 +103,13 @@ update.bmmfit <- function(object, formula., newdata = NULL, recompile = NULL, ..
     newdata <- new_fit_args$data
   }
 
-  # pass back to brms::update.brmsfit
+  # pass back to brms::update.brmsfit; stanvars must be the freshly configured
+  # ones — brms otherwise reuses object$stanvars, whose data values (e.g. the
+  # sdm run metadata) were computed for the original data and formula
   object <- NextMethod("update", object,
     formula = formula., newdata = newdata,
-    prior = prior, recompile = recompile, ...
+    prior = prior, recompile = recompile,
+    stanvars = new_fit_args$stanvars, ...
   )
 
   # bmm postprocessing

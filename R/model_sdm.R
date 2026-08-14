@@ -109,7 +109,7 @@ sdmSimple <- function(resp_error, version = "simple", ...) {
 check_data.sdm <- function(model, data, formula) {
   # data sorted by predictors is necessary for speedy computation of normalizing constant
   data <- order_data_query(model, data, formula)
-  attr(data, "sdm_run_metadata") <- sdm_run_metadata(data, formula)
+  attr(data, "sdm_run_metadata") <- sdm_run_metadata(data, formula, model)
   NextMethod("check_data")
 }
 
@@ -149,7 +149,7 @@ configure_model.sdm <- function(model, data, formula) {
   run_metadata <- attr(data, "sdm_run_metadata")
   if (is.null(run_metadata)) {
     # Guard direct configure_model.sdm() calls that bypass check_data.sdm().
-    run_metadata <- sdm_run_metadata(data, formula)
+    run_metadata <- sdm_run_metadata(data, formula, model)
   }
   stanvars <- brms::stanvar(scode = stan_funs, block = "functions") +
     brms::stanvar(scode = stan_tdata, block = "tdata", pll_args = stan_tdata_pll_args) +
@@ -199,8 +199,15 @@ posterior_predict_sdm_simple <- function(i, prep, ...) {
   rsdm(length(mu), mu, c, kappa)
 }
 
-sdm_run_metadata <- function(data, formula) {
+sdm_run_metadata <- function(data, formula, model) {
   predictors <- data_predictor_vars(data, formula)
+  # brms excludes rows with missing values in any model variable before
+  # fitting, so run boundaries must be computed on the rows brms will keep
+  model_vars <- unique(c(unlist(model$resp_vars), predictors))
+  model_vars <- model_vars[model_vars %in% colnames(data)]
+  if (length(model_vars) > 0L) {
+    data <- data[stats::complete.cases(data[model_vars]), , drop = FALSE]
+  }
   if (length(predictors) == 0L) {
     return(list(
       G_sdm_runs = 1L,
@@ -229,5 +236,10 @@ sdm_stanvar_int_array <- function(x, name, size) {
 
 sdm_use_threaded_likelihood <- function() {
   threads <- getOption("brms.threads", NULL)
+  # brms accepts a bare number for this option, so normalize it the same way
+  # brms::validate_threads() does, else brm() threads while we emit the serial chunk
+  if (is.numeric(threads)) {
+    threads <- brms::threading(threads)
+  }
   is.list(threads) && isTRUE(threads$threads > 0)
 }

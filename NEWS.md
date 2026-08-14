@@ -1,6 +1,7 @@
 # bmm (development version)
 
 ### New features
+* The **sdm** model now evaluates its normalizing constant once per contiguous run of identical predictor values (precomputed in R) instead of comparing parameter values row-by-row in Stan, and supports within-chain parallelization via the `threads` argument (e.g. `bmm(..., threads = 2)` or `threads = brms::threading(2)`), reducing fitting time by ~35-45% in benchmarks with 2-3 threads per chain. The run metadata is computed on the rows brms retains after excluding missing values, is refreshed by `update()`, and is validated in Stan's transformed data block, so any mismatch between the metadata and the model data fails with a clear error instead of silently corrupting the posterior (#374).
 * Add `softplus` as an opt-in link function for positively-bounded parameters, as an alternative to the default `log` link. `softplus(x) = log(1 + exp(x))` keeps parameters positive while growing linearly for large values, avoiding the numerical blow-up of `exp()` and giving predictor effects an additive (rather than multiplicative) interpretation on the natural scale. Enable it per parameter via the model's `links` list, e.g. `m3(...)$links <- list(c = "softplus", a = "softplus")` or `ddm(rt, response, links = list(bound = "softplus"))` (#363).
 
 ### Bug fixes
