@@ -314,3 +314,30 @@ test_that("m3 with numerical vector as num_options containing 0 returns error", 
     rename = F
   ), "not identified")
 })
+
+test_that("softmax default priors give a and c equal main means (c - a centered at 0)", {
+  for (v in c("ss", "cs")) {
+    p <- m3(
+      resp_cats = if (v == "ss") c("corr", "other", "npl") else
+        c("corr", "dist_context", "other", "dist_other", "npl"),
+      num_options = if (v == "ss") c(1, 2, 3) else c(1, 2, 2, 2, 3),
+      choice_rule = "softmax", version = v
+    )$default_priors
+    expect_identical(p$a$main, p$c$main)
+  }
+})
+
+test_that("no activation effect prior is wider than the shared normal(0,0.5)", {
+  for (v in c("ss", "cs")) {
+    for (cr in c("simple", "softmax")) {
+      p <- m3(
+        resp_cats = if (v == "ss") c("corr", "other", "npl") else
+          c("corr", "dist_context", "other", "dist_other", "npl"),
+        num_options = if (v == "ss") c(1, 2, 3) else c(1, 2, 2, 2, 3),
+        choice_rule = cr, version = v
+      )$default_priors
+      expect_identical(p$a$effects, "normal(0,0.5)")
+      expect_identical(p$c$effects, "normal(0,0.5)")
+    }
+  }
+})
