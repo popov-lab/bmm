@@ -83,8 +83,7 @@
       links = .ezdm_version_table[[version]][["links"]],
       fixed_parameters = .ezdm_version_table[[version]][["fixed_parameters"]],
       default_priors = .ezdm_version_table[[version]][["priors"]],
-      init_ranges = .ezdm_version_table[[version]][["init_ranges"]],
-      void_mu = TRUE
+      init_ranges = .ezdm_version_table[[version]][["init_ranges"]]
     ),
     class = c("bmmodel", "ezdm"),
     call = call

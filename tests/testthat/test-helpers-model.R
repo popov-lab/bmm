@@ -95,6 +95,91 @@ test_that("use_model_template() prevents duplicate models", {
   }
 })
 
+test_that("use_model_template() generates a flat-defaults unversioned scaffold", {
+  skip_on_cran()
+  out <- paste(
+    capture.output(use_model_template("tmpl_unver", testing = TRUE)),
+    collapse = "\n"
+  )
+  expect_match(out, ".tmpl_unver_defaults <- list(", fixed = TRUE)
+  expect_match(out, 'parameters = .tmpl_unver_defaults[["parameters"]]', fixed = TRUE)
+  expect_match(out, 'init_ranges = .tmpl_unver_defaults[["init_ranges"]]', fixed = TRUE)
+  expect_match(out, 'main = "normal(0, 1)", effects = "normal(0, 0.5)"', fixed = TRUE)
+  expect_false(grepl("_version_table", out, fixed = TRUE))
+  expect_false(grepl("match.arg", out, fixed = TRUE))
+  expect_false(grepl("void_mu", out, fixed = TRUE))
+  expect_no_error(parse(text = out))
+})
+
+test_that("use_model_template() generates a version-table versioned scaffold", {
+  skip_on_cran()
+  out <- paste(
+    capture.output(
+      use_model_template("tmpl_ver", versions = c("simple", "full"), testing = TRUE)
+    ),
+    collapse = "\n"
+  )
+  expect_match(out, ".tmpl_ver_version_table <- list(", fixed = TRUE)
+  expect_match(out, "simple = list(", fixed = TRUE)
+  expect_match(out, "full = list(", fixed = TRUE)
+  expect_match(out, "version = c('simple', 'full')", fixed = TRUE)
+  expect_match(out, "version <- match.arg(version)", fixed = TRUE)
+  expect_match(out, 'parameters = .tmpl_ver_version_table[[version]][["parameters"]]', fixed = TRUE)
+  expect_match(out, 'paste0("tmpl_ver_", version)', fixed = TRUE)
+  expect_false(grepl("void_mu", out, fixed = TRUE))
+  expect_no_error(parse(text = out))
+})
+
+test_that("use_model_template() composes a custom family with versions", {
+  skip_on_cran()
+  out <- paste(
+    capture.output(
+      use_model_template(
+        "tmpl_cf",
+        versions = c("a", "b"),
+        custom_family = TRUE,
+        stanvar_blocks = c("functions", "likelihood"),
+        testing = TRUE
+      )
+    ),
+    collapse = "\n"
+  )
+  expect_match(out, "custom_family(", fixed = TRUE)
+  expect_match(out, "_version_table", fixed = TRUE)
+  expect_match(out, "match.arg", fixed = TRUE)
+  expect_match(out, "stanvar(", fixed = TRUE)
+  expect_no_error(parse(text = out))
+})
+
+test_that("generated template code constructs a valid bmmodel", {
+  skip_on_cran()
+  gen_env <- function(name, ...) {
+    txt <- paste(
+      capture.output(use_model_template(name, testing = TRUE, ...)),
+      collapse = "\n"
+    )
+    env <- new.env(parent = asNamespace("bmm"))
+    eval(parse(text = txt), envir = env)
+    env
+  }
+
+  unver <- gen_env("tmpl_build_unver")
+  model_u <- unver$.model_tmpl_build_unver(resp_var1 = "y", links = list(par1 = "log"))
+  expect_equal(class(model_u), c("bmmodel", "tmpl_build_unver"))
+  expect_equal(model_u$version, "NA")
+  expect_equal(model_u$links$par1, "log")
+  expect_false("void_mu" %in% names(model_u))
+
+  ver <- gen_env("tmpl_build_ver", versions = c("simple", "full"))
+  model_v <- ver$.model_tmpl_build_ver(resp_var1 = "y", version = "full")
+  expect_equal(class(model_v), c("bmmodel", "tmpl_build_ver", "tmpl_build_ver_full"))
+  expect_equal(model_v$version, "full")
+  expect_error(
+    ver$tmpl_build_ver("y", "a", "b", version = "nope"),
+    "should be one of"
+  )
+})
+
 test_that("stancode() works with brmsformula", {
   ff <- brms::bf(count ~ zAge + zBase * Trt + (1 | patient))
   sd <- stancode(ff, data = brms::epilepsy, family = poisson())

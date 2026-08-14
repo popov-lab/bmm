@@ -1,23 +1,32 @@
-# bmm 1.3.1.9000
-
-### Bug fixes
-* `bmm()` now warns when a predictor in the formula shares its name with both a predicted parameter and a column in the data. Such a predictor was silently treated as a non-linear term (emitted via `nlf()` instead of `lf()`), changing the likelihood without any error. Short parameter names (`c`, `a`, `s`, `b`) collide naturally with condition codes or columns like `accuracy`/`stimulus` (#378).
-
-# bmm 1.3.1
+# bmm (development version)
 
 ### New features
 * Add `softplus` as an opt-in link function for positively-bounded parameters, as an alternative to the default `log` link. `softplus(x) = log(1 + exp(x))` keeps parameters positive while growing linearly for large values, avoiding the numerical blow-up of `exp()` and giving predictor effects an additive (rather than multiplicative) interpretation on the natural scale. Enable it per parameter via the model's `links` list, e.g. `m3(...)$links <- list(c = "softplus", a = "softplus")` or `ddm(rt, response, links = list(bound = "softplus"))` (#363).
+
+### Bug fixes
+* Fix initial values being set in two places, where the `init` returned by `configure_model()` was silently overwritten by `create_initfun()`. This caused the **m3** model's intended `init = 0` (needed for stable sampling with the `simple` choice rule and an `identity` link) to be lost, and left dead `init` code in the **sdm** model. `create_initfun()` is now the single source of truth for initial values, with model-specific behaviour expressed through S3 methods (#375).
+* Fix `.pwald()` returning `NaN`/`-Inf` in the upper tail of the shifted-Wald survival function, which propagated to `dcswald()` (and therefore `log_lik`/`posterior_predict`) for the **cswald** model at extreme reaction times. The R-side survival now uses the stable `log_diff_exp` form already used by the Stan likelihood (`swald_lccdf`) (#376).
+* Fix `print()` for model summaries selecting regression-coefficient rows by an unanchored substring match, so a parameter such as `a` could pull in rows of another parameter like `kappa` (e.g. in the **imm** model). Rows are now matched on the exact parameter prefix. This also fixes a crash when only a single coefficient row is shown (#379, #369).
+* `create_initfun()` now matches Stan parameters to model parameters with a word-boundary regex (`(^|_)param(_|$)`) instead of a substring match, preventing collisions in models with short parameter names (e.g. `s`, `c`, `a`) that are substrings of longer ones (`sim`, `correct`, `activation`); the longest (most specific) match is selected when several apply (#354, #355).
+* `create_initfun()` now resolves initialization terms from `nlpars` when a model parameter is not a distributional parameter, so models built as non-linear brms formulas (e.g. native-multinomial models whose parameters live in `bterms$nlpars`) no longer error with `no applicable method for 'has_intercept' applied to an object of class "NULL"` (#362).
+* `bmm()` now warns when a predictor in the formula shares its name with both a predicted parameter and a column in the data. Such a predictor was silently treated as a non-linear term (emitted via `nlf()` instead of `lf()`), changing the likelihood without any error. Short parameter names (`c`, `a`, `s`, `b`) collide naturally with condition codes or columns like `accuracy`/`stimulus` (#378).
+
+### Other changes
+* Added an internal consistency check in `configure_prior()`: if a model's `fixed_parameters` includes a parameter that its `configure_model()` never wires into the formula (neither a dpar nor an nlpar), bmm now fails with a clear model-definition error instead of letting a malformed `b_Intercept ~ constant()` prior reach `brm()`. This is a safety net for model development; it cannot be reached through the normal `bmm()` interface, where an unrecognized parameter is already caught earlier by `check_formula()` (#377).
+* `print.bmmodel()` now also displays the required response variables (one per line, annotated with the expected coding — e.g. radians in [-pi, pi] for the circular models, seconds and 0/1 responses for the trial-wise RT models) and the default parameter links, answering "what does my data frame need to look like?" directly at the console (#392).
+* Recalibrated the default priors for the **m3** activation parameters (`a`, `c`) so that the `simple` and `softmax` choice rules imply a comparable, broad prior-predictive range of average performance, and so that the `softmax` defaults place equal prior means on general (`a`) and context (`c`) activation — centering the implied `c - a` prior at zero for fair comparisons under cell-means coding. The mis-scaled `normal(0, 2)` effect prior on `c` is replaced by the shared `normal(0, 0.5)`. Because the `simple` rule requires `c > a` to predict accurate recall, its defaults remain asymmetric; direct comparisons of context and general activation should use the `softmax` choice rule (#364).
+
+### Developer-facing changes
+* **`use_model_template()` now scaffolds the current model-specification patterns.** It generates a flat `.{model}_defaults` block for unversioned models (like `ddm`) or, with the new `versions` argument, a `.{model}_version_table` block for versioned models (like `cswald`). The generated constructor spells out every field of the model object inline (referencing the defaults/version table for `parameters`, `links`, `fixed_parameters`, `default_priors`, and `init_ranges`), and versioned aliases validate `version` with `match.arg()` (#350).
+* **Removed the unused `void_mu` field** from all model definitions and the template. It was assigned but never read anywhere — response-mean suppression is already handled via `fixed_parameters` and the family's `dpars` (#350).
+
+# bmm 1.3.1
 
 ### Bug fixes
 * Fix `swald_lccdf()` returning incorrect log-survival probability when response time equals non-decision time in the **cswald** model. Previously returned `-Inf` instead of `0` (log of survival = 1) (#348).
 
 ### Other changes
 * The **ddm** model supports both `cmdstanr` and `rstan` backends. Previously, `cmdstanr` was required.
-* Recalibrated the default priors for the **m3** activation parameters (`a`, `c`) so that the `simple` and `softmax` choice rules imply a comparable, broad prior-predictive range of average performance, and so that the `softmax` defaults place equal prior means on general (`a`) and context (`c`) activation — centering the implied `c - a` prior at zero for fair comparisons under cell-means coding. The mis-scaled `normal(0, 2)` effect prior on `c` is replaced by the shared `normal(0, 0.5)`. Because the `simple` rule requires `c > a` to predict accurate recall, its defaults remain asymmetric; direct comparisons of context and general activation should use the `softmax` choice rule (#364).
-
-### Bug fixes
-* `create_initfun()` now matches Stan parameters to model parameters with a word-boundary regex (`(^|_)param(_|$)`) instead of a substring match, preventing collisions in models with short parameter names (e.g. `s`, `c`, `a`) that are substrings of longer ones (`sim`, `correct`, `activation`); the longest (most specific) match is selected when several apply (#354, #355).
-* `create_initfun()` now resolves initialization terms from `nlpars` when a model parameter is not a distributional parameter, so models built as non-linear brms formulas (e.g. native-multinomial models whose parameters live in `bterms$nlpars`) no longer error with `no applicable method for 'has_intercept' applied to an object of class "NULL"` (#362).
 
 # bmm 1.3.0
 
