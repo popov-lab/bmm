@@ -44,8 +44,7 @@
         kappa = list(main = "normal(2, 1)", effects = "normal(0, 1)"),
         thetat = list(main = "logistic(0, 1)"),
         thetant = list(main = "logistic(0, 1)")
-      ),
-      void_mu = FALSE
+      )
     ),
     # attributes
     regex = regex,

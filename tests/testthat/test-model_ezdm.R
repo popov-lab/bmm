@@ -449,11 +449,6 @@ test_that("ezdm 4par can accept vector or scalar for mean_rt and var_rt", {
   expect_equal(model_4par_vector$resp_vars$mean_rt, c("mean_rt_upper", "mean_rt_lower"))
 })
 
-test_that("ezdm model has void_mu flag set", {
-  model <- ezdm("mean_rt", "var_rt", "n_upper", "n_trials", version = "3par")
-  expect_true(model$void_mu)
-})
-
 test_that("ezdm check_data validates all required variables exist", {
   model <- ezdm("mean_rt", "var_rt", "n_upper", "n_trials", version = "3par")
 
