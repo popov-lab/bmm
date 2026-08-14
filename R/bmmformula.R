@@ -464,18 +464,19 @@ apply_links.formula <- function(formula, links = nlist()) {
 #' The inverse of a specified link function applied to a parameter.
 #'
 #' @param par A character string representing the parameter to which the inverse link function will be applied.
-#' @param link A character string specifying the link function. Options are "log", "logit", "probit", and "identity".
+#' @param link A character string specifying the link function. Options are "log", "softplus", "logit", "probit", and "identity".
 #' @return An expression representing the inverse link function applied to the parameter.
 #' @examples
 #' inv_link("x", "log")
 #' identical(inv_link("x", "log"), quote(exp(x))) # TRUE
 #' @noRd
-inv_link <- function(par = character(0), link = c("log", "logit", "probit", "identity")) {
+inv_link <- function(par = character(0), link = c("log", "softplus", "logit", "probit", "identity")) {
   stopifnot(is.character(par), length(par) == 1)
   par <- as.symbol(par)
   link <- match.arg(link)
   switch(link,
     log = substitute(exp(par)),
+    softplus = substitute(log1p_exp(par)),
     logit = substitute(inv_logit(par)),
     probit = substitute(Phi(par)),
     identity = par
