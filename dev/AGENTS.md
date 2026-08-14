@@ -18,6 +18,7 @@ translation → Stan compilation
 ### Development Cycle
 
 ``` r
+
 devtools::load_all()      # Load package functions (NOT library())
 devtools::document()      # Generate man/ files from roxygen
 devtools::check()         # R CMD CHECK - must pass before PR
@@ -43,6 +44,7 @@ testthat::test_file()     # Run single test file
 Use custom utility functions instead of base R equivalents:
 
 ``` r
+
 stop2("Invalid parameter {param_name}")     # NOT stop()
 warning2("Set size mismatch: {details}")    # NOT warning()
 message2("Processing {n} observations")     # NOT message()
@@ -76,6 +78,7 @@ messages - Support glue syntax without explicit `glue()` calls - Accept
   reduce nesting
 
 ``` r
+
 # Bad - never do this
 myfun <- function(n, seed) {
    set.seed(seed)
@@ -89,6 +92,7 @@ Use [`glue::glue()`](https://glue.tidyverse.org/reference/glue.html)
 instead of [`sprintf()`](https://rdrr.io/r/base/sprintf.html):
 
 ``` r
+
 # Good
 message2("Processing {nrow(data)} rows with set_size={ss}")
 
@@ -100,6 +104,7 @@ Use the internal function `collapse_comma()` to create a comma separated
 string from a character vector
 
 ``` r
+
 message2("The following variables are missing from the data: {collapse_comma(missing_vars)}")
 
 # Bad
@@ -127,6 +132,7 @@ user-facing aliases:
 **Internal function** (`R/model_mixture3p.R`):
 
 ``` r
+
 .model_mixture3p <- function(resp_error, nt_features, set_size, ...) {
   structure(
     list(
@@ -145,6 +151,7 @@ user-facing aliases:
 **User-facing alias**:
 
 ``` r
+
 #' @keywords bmmodel
 #' @export
 mixture3p <- function(...) { .model_mixture3p(...) }
@@ -184,6 +191,7 @@ scripts (not tracked by git)
 Test patterns from codebase:
 
 ``` r
+
 test_that("check_data() produces expected errors", {
   expect_error(
     check_data(model, data, formula),
@@ -201,6 +209,7 @@ test_that("check_data() produces expected errors", {
 bmm uses explicit parameter prediction (NOT implicit mu):
 
 ``` r
+
 # brms: response on LHS implies mu parameter
 brmsformula(rt | dec(response) ~ condition)
 
@@ -214,6 +223,7 @@ bmmformula(drift ~ condition, bs ~ 1, ndt ~ 1)
 Set parameters to constants using assignment syntax:
 
 ``` r
+
 bmf(kappa ~ set_size, c ~ 1, a = 0.5)  # 'a' fixed to 0.5
 ```
 

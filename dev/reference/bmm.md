@@ -173,8 +173,8 @@ article](https://venpopov.com/bmm/articles/bmm_extract_info.html).
 
 ## Miscellaneous
 
-Type [`help(package=bmm)`](https://venpopov.github.io/bmm/reference) for
-a full list of available help topics.
+Type [`help(package=bmm)`](https://venpopov.com/bmm/reference) for a
+full list of available help topics.
 
 **fit_model()** is a deprecated alias for **bmm()**.
 

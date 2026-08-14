@@ -175,6 +175,7 @@ the equivalent total boundary separation.
 ### 4.1 Setup
 
 ``` r
+
 library(bmm)
 library(ggplot2)
 ```
@@ -188,6 +189,7 @@ where participants judged whether pixel arrays were “high” or “low”
 brightness.
 
 ``` r
+
 # Load the dataset from rtdists (already a dependency of bmm)
 data(rr98, package = "rtdists")
 
@@ -240,6 +242,7 @@ differences in drift rates, demonstrating how to fit hierarchical models
 with `bmm`:
 
 ``` r
+
 # set seed for reproducibility
 set.seed(42)
 
@@ -306,6 +309,7 @@ print(error_rates)
 Let’s visualize the RT distributions by participant:
 
 ``` r
+
 ggplot(dat, aes(x = rt, fill = factor(response))) +
   geom_histogram(binwidth = 0.05, position = "identity", alpha = 0.7) +
   facet_grid(id ~ condition, labeller = labeller(
@@ -327,6 +331,7 @@ First, specify the model using
 [`cswald()`](https://venpopov.com/bmm/dev/reference/cswald.md):
 
 ``` r
+
 model <- cswald(
   rt = "rt",
   response = "response",
@@ -348,6 +353,7 @@ The formula includes both fixed effects for condition and random effects
 (varying intercepts) for participants:
 
 ``` r
+
 formula <- bmf(
   drift ~ 0 + condition + (0 + condition | id),  # fixed condition effects + random subject effects
   bound ~ 1,                          # shared boundary
@@ -381,6 +387,7 @@ allow each participant to have their own drift rate while estimating the
 population-level mean drift for each condition:
 
 ``` r
+
 fit <- bmm(
   formula = formula,
   data = dat,
@@ -398,6 +405,7 @@ fit <- bmm(
 ### 4.7 Inspecting Results
 
 ``` r
+
 summary(fit)
 #> Loading required namespace: rstan
 #> Warning: There were 12 divergent transitions after warmup. Increasing
@@ -452,6 +460,7 @@ parameters), so we need to exponentiate to get values on the original
 scale:
 
 ``` r
+
 # Extract population-level (fixed) effects
 fixef_est <- brms::fixef(fit)
 
@@ -485,6 +494,7 @@ cat("ndt:", ndt, "\n")
 The random effects capture individual differences in drift rate:
 
 ``` r
+
 # Extract random effects (deviations from population mean on log scale)
 ranef_est <- brms::ranef(fit)
 
@@ -537,6 +547,7 @@ cat("True SD (log scale):", drift_sd, "\n")
 Check posterior predictive distributions:
 
 ``` r
+
 brms::pp_check(fit, type = "dens_overlay", ndraws = 10) +
   labs(title = "Posterior Predictive Check")
 ```
@@ -550,6 +561,7 @@ We can test whether drift rates differ between conditions using the
 function. This tests the difference on the log scale:
 
 ``` r
+
 # Test if drift rate is higher in Condition A than B
 hyp_test <- brms::hypothesis(fit, "drift_conditionA > drift_conditionB")
 print(hyp_test)
@@ -578,6 +590,7 @@ To express the difference on the original scale, we can compute the
 ratio of drift rates:
 
 ``` r
+
 # Extract posterior samples
 posterior <- brms::as_draws_df(fit)
 

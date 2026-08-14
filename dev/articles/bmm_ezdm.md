@@ -9,13 +9,13 @@ diffusion model is fit to trial-level reaction time distributions, which
 can be computationally intensive, especially for hierarchical Bayesian
 estimation.
 
-The **EZ-Diffusion Model** (Wagenmakers, Van Der Maas, and Grasman 2007)
-provides a simplified alternative building on closed-form equations that
-relate the parameters of the diffusion model to easily computed summary
-statistics: mean reaction time (MRT), reaction time variance (VRT), and
-accuracy (proportion correct, Pc). This makes it possible to calculate
-diffusion model parameters from aggregated data without fitting to
-individual trials.
+The **EZ-Diffusion Model** (Wagenmakers et al. 2007) provides a
+simplified alternative building on closed-form equations that relate the
+parameters of the diffusion model to easily computed summary statistics:
+mean reaction time (MRT), reaction time variance (VRT), and accuracy
+(proportion correct, Pc). This makes it possible to calculate diffusion
+model parameters from aggregated data without fitting to individual
+trials.
 
 ### 1.1 The Diffusion Model
 
@@ -41,10 +41,10 @@ from the starting point until reaching the upper (correct) or lower
 
 ### 1.2 The EZ Equations
 
-Wagenmakers, Van Der Maas, and Grasman (2007) provided closed-form
-solutions relating the diffusion model parameters to observable summary
-statistics. For the **3-parameter version** (assuming symmetric starting
-point, \\z = a/2\\):
+Wagenmakers et al. (2007) provided closed-form solutions relating the
+diffusion model parameters to observable summary statistics. For the
+**3-parameter version** (assuming symmetric starting point, \\z =
+a/2\\):
 
 Given the proportion correct (\\P_c\\), mean RT of correct responses
 (\\MRT\\), and variance of correct RTs (\\VRT\\), the parameters can be
@@ -65,9 +65,9 @@ identification).
 
 ### 1.3 The 4-Parameter Extension
 
-The original EZ model assumes a symmetric starting point. Srivastava,
-Holmes, and Simen (2016) derived the moments of first-passage times for
-the Wiener diffusion process with arbitrary starting points, enabling a
+The original EZ model assumes a symmetric starting point. Srivastava et
+al. (2016) derived the moments of first-passage times for the Wiener
+diffusion process with arbitrary starting points, enabling a
 **4-parameter version** that can estimate starting point bias (\\z_r\\,
 the relative starting point). This 4-parameter version, however,
 requires separate summary statistics for responses to each boundary:
@@ -125,11 +125,11 @@ The `bmm` package implements two versions of the EZ-diffusion model:
 Estimates three parameters with a fixed symmetric starting point (\\z_r
 = 0.5\\):
 
-| Parameter | Description                                             | Link Function |
-|-----------|---------------------------------------------------------|---------------|
-| `drift`   | Drift rate (\\v\\) - rate of evidence accumulation      | identity      |
-| `bound`   | Boundary separation (\\a\\) - response caution          | log           |
-| `ndt`     | Non-decision time (\\T\_{er}\\) - encoding + motor time | log           |
+| Parameter | Description | Link Function |
+|----|----|----|
+| `drift` | Drift rate (\\v\\) - rate of evidence accumulation | identity |
+| `bound` | Boundary separation (\\a\\) - response caution | log |
+| `ndt` | Non-decision time (\\T\_{er}\\) - encoding + motor time | log |
 
 The diffusion constant `s` is fixed to 1 for identification.
 
@@ -178,11 +178,11 @@ attentional failures) can severely distort mean and variance estimates,
 leading to biased parameter estimates (Wagenmakers et al. 2008). The
 function offers three methods to address this:
 
-| Method      | Description                     | Use when                                      |
-|-------------|---------------------------------|-----------------------------------------------|
-| `"simple"`  | Standard mean/variance          | Data is pre-cleaned                           |
-| `"robust"`  | Median + IQR/MAD-based variance | Moderate contamination                        |
-| `"mixture"` | EM mixture modeling (default)   | General use; provides contamination estimates |
+| Method | Description | Use when |
+|----|----|----|
+| `"simple"` | Standard mean/variance | Data is pre-cleaned |
+| `"robust"` | Median + IQR/MAD-based variance | Moderate contamination |
+| `"mixture"` | EM mixture modeling (default) | General use; provides contamination estimates |
 
 For detailed coverage of RT contamination handling, including mixture
 model theory, distribution options, contaminant bounds, and diagnostics,
@@ -194,6 +194,7 @@ To illustrate the impact of contamination, we generate trial-level data
 with known parameters and introduce 5% contaminant trials:
 
 ``` r
+
 library(bmm)
 library(rtdists)
 library(dplyr)
@@ -239,6 +240,7 @@ We can now compare the three methods. The function takes `rt` and
 with [`reframe()`](https://dplyr.tidyverse.org/reference/reframe.html):
 
 ``` r
+
 summary_simple <- ezdm_summary_stats(
   trials_contaminated$rt, trials_contaminated$correct,
   method = "simple", version = "3par"
@@ -275,7 +277,7 @@ print(comparison)
 #>    Method   Mean_RT     Var_RT Contaminant
 #> 1  Simple 0.5409176 0.10605857          NA
 #> 2  Robust 0.4568634 0.02440439          NA
-#> 3 Mixture 0.4962307 0.03633472  0.03539257
+#> 3 Mixture 0.4964177 0.03642890  0.03532347
 #> 4    TRUE 0.4755037 0.02050638  0.05000000
 ```
 
@@ -291,6 +293,7 @@ This assumes contaminants are random guesses (50% accuracy by default)
 and is applied as a separate step after computing summary statistics:
 
 ``` r
+
 summary_no_adjust <- ezdm_summary_stats(
   trials_contaminated$rt, trials_contaminated$correct, version = "3par"
 )
@@ -317,6 +320,7 @@ The 4-parameter version estimates starting point bias (`zr`) and
 requires separate statistics for upper and lower boundary responses:
 
 ``` r
+
 # Generate data with response bias (zr = 0.6, favoring upper boundary)
 trials_biased <- rdiffusion(
   n = 200,
@@ -339,9 +343,9 @@ summary_4par <- ezdm_summary_stats(
 
 summary_4par
 #>    mean_rt_upper mean_rt_lower var_rt_upper var_rt_lower n_upper n_trials
-#> mu     0.3943676            NA   0.01611958           NA     195      200
+#> mu     0.3952879            NA   0.01637452           NA     195      200
 #>    contaminant_prop_upper contaminant_prop_lower
-#> mu             0.01217136                     NA
+#> mu             0.01116972                     NA
 ```
 
 Notice the output now includes: - `mean_rt_upper`, `var_rt_upper`:
@@ -356,6 +360,7 @@ Here’s the complete pipeline from trial-level data to parameter
 estimation:
 
 ``` r
+
 # Step 1: Generate or load trial-level data
 trial_data <- rdiffusion(
   n = 100 * 20,  # 20 subjects, 100 trials each
@@ -400,6 +405,7 @@ RT contaminants throughout the analysis pipeline.
 We start by loading the `bmm` package:
 
 ``` r
+
 library(bmm)
 ```
 
@@ -416,6 +422,7 @@ function allows for evaluating parameter recovery simulations and
 predicitions based on the `ezdm`.
 
 ``` r
+
 set.seed(123)
 
 # Define true parameters for two conditions
@@ -477,6 +484,7 @@ For this example, we want to estimate separate drift rates for each
 condition while keeping boundary and non-decision time constant:
 
 ``` r
+
 model_formula <- bmf(
   drift ~ 0 + condition,
   bound ~ 1,
@@ -490,6 +498,7 @@ Next, we specify the `bmmodel`object for the EZDM model by calling
 `ezdm` and passing the respective variable names from our dataset:
 
 ``` r
+
 model <- ezdm(
   mean_rt = "mean_rt",
   var_rt = "var_rt",
@@ -508,6 +517,7 @@ Now we can fit the model using
 [`bmm()`](https://venpopov.com/bmm/dev/reference/bmm.md):
 
 ``` r
+
 fit <- bmm(
   formula = model_formula,
   data = sim_data,
@@ -562,6 +572,7 @@ To provide stable sampling all parameters use log link functions, so we
 need to exponentiate to get estimates on the natural scale:
 
 ``` r
+
 # Extract fixed effects
 fixef_est <- brms::fixef(fit)
 
@@ -579,6 +590,7 @@ cat("Non-decision time:", exp(fixef_est["ndt_Intercept", "Estimate"]), "\n")
 As you can see, these match the generating values well:
 
 ``` r
+
 print(true_params)
 #>   condition drift bound ndt
 #> 1      easy   3.0   1.5 0.3
@@ -588,6 +600,7 @@ print(true_params)
 ### 5.6 Visualizing posterior distributions
 
 ``` r
+
 library(tidybayes)
 library(dplyr)
 library(tidyr)
@@ -631,6 +644,7 @@ testing via Savage-Dickey density ratios to compare drift rates between
 conditions:
 
 ``` r
+
 # Test if drift rate is higher in easy vs hard condition
 brms::hypothesis(fit, "exp(drift_conditioneasy) > exp(drift_conditionhard)")
 #> Hypothesis Tests for class b:
@@ -650,6 +664,7 @@ brms::hypothesis(fit, "exp(drift_conditioneasy) > exp(drift_conditionhard)")
 For hierarchical models with random effects across subjects:
 
 ``` r
+
 # Formula with random effects
 model_formula_re <- bmf(
   drift ~ 0 + condition + (0 + condition | subject),
@@ -670,7 +685,7 @@ fit_re <- bmm(
 
 Chávez De la Peña, Adriana F., and Joachim Vandekerckhove. 2025. “An EZ
 Bayesian Hierarchical Drift Diffusion Model for Response Time and
-Accuracy.” *Psychonomic Bulletin & Review*.
+Accuracy.” *Psychonomic Bulletin & Review*, ahead of print.
 <https://doi.org/10.3758/s13423-025-02729-y>.
 
 Ratcliff, Roger. 1978. “A Theory of Memory Retrieval.” *Psychological
@@ -684,7 +699,7 @@ Diffusion Models.” *Journal of Mathematical Psychology* 77: 94–110.
 Wagenmakers, Eric-Jan, Han L. J. van der Maas, Conor V. Dolan, and Raoul
 P. P. P. Grasman. 2008. “EZ Does It! Extensions of the EZ-diffusion
 Model.” *Psychonomic Bulletin & Review* 15 (6): 1229–35.
-<https://doi.org/bwq9dw>.
+<https://doi.org/10/bwq9dw>.
 
 Wagenmakers, Eric-Jan, Han L. J. Van Der Maas, and Raoul P. P. P.
 Grasman. 2007. “An EZ-diffusion Model for Response Time and Accuracy.”

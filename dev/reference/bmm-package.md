@@ -7,8 +7,9 @@ flexible framework for fitting Bayesian regression models using 'Stan'.
 The package is designed so that users can easily apply state-of-the-art
 models in various research fields, and so that researchers can use it as
 a new model development framework. References: Frischkorn and Popov
-(2023)
-[doi:10.31234/osf.io/umt57](https://doi.org/10.31234/osf.io/umt57) .
+(2025)
+[doi:10.3758/s13428-025-02643-0](https://doi.org/10.3758/s13428-025-02643-0)
+.
 
 ## See also
 

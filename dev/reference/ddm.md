@@ -22,7 +22,10 @@ ddm(rt, response, links = NULL, ...)
 
 - links:
 
-  A list of links for the parameters.
+  A list of links for the parameters. For positive parameters (e.g.
+  `bound`, `ndt`), "softplus" is available as an alternative to the
+  default "log" link that grows linearly for large values and avoids the
+  numerical blow-up of [`exp()`](https://rdrr.io/r/base/Log.html).
 
 - ...:
 

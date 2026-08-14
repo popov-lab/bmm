@@ -8,6 +8,7 @@ is the main entry point for users to fit models. It is set-up to be
 independent of the specific models that are implemented in the package.
 
 ``` r
+
 bmm <- function(formula, data, model,
                 prior = NULL,
                 sort_data = getOption('bmm.sort_data', "check"),
@@ -88,6 +89,7 @@ alias. For a complete example model file and an explanation, see
 this:
 
 ``` r
+
 .model_my_new_model <- function(resp_var1 = NULL, required_args1 = NULL, 
                                 required_arg2 = NULL, links = NULL, version = NULL,
                                 call = NULL, ...) {
@@ -121,6 +123,7 @@ which is generated automatically based on the info list in the model
 definition.
 
 ``` r
+
 # user facing alias
 # information in the title and details sections will be filled in
 # automatically based on the information in the .model_modelname()$info
@@ -151,6 +154,7 @@ Then users can fit the model using the
 the model will be automatically recognized and handled by the package:
 
 ``` r
+
 fit <- bmm(formula = my_bmmformula, 
            data = my_data, 
            model = my_new_model(resp_var1, required_arg1, required_arg2))
@@ -166,6 +170,7 @@ function called by
 generally defined as:
 
 ``` r
+
 configure_model <- function(model) {
    UseMethod('configure_model')
 }

@@ -13,8 +13,8 @@
     }
   };
 </script><script src="../deps/jquery-3.6.0/jquery-3.6.0.min.js"></script><meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
-<link href="../deps/bootstrap-5.3.1/bootstrap.min.css" rel="stylesheet">
-<script src="../deps/bootstrap-5.3.1/bootstrap.bundle.min.js"></script><link href="../deps/font-awesome-6.5.2/css/all.min.css" rel="stylesheet">
+<link href="../deps/bootstrap-5.3.8/bootstrap.min.css" rel="stylesheet">
+<script src="../deps/bootstrap-5.3.8/bootstrap.bundle.min.js"></script><link href="../deps/font-awesome-6.5.2/css/all.min.css" rel="stylesheet">
 <link href="../deps/font-awesome-6.5.2/css/v4-shims.min.css" rel="stylesheet">
 <script src="../deps/headroom-0.11.0/headroom.min.js"></script><script src="../deps/headroom-0.11.0/jQuery.headroom.min.js"></script><script src="../deps/bootstrap-toc-1.0.1/bootstrap-toc.min.js"></script><script src="../deps/clipboard.js-2.0.11/clipboard.min.js"></script><script src="../deps/search-1.0.0/autocomplete.jquery.min.js"></script><script src="../deps/search-1.0.0/fuse.min.js"></script><script src="../deps/search-1.0.0/mark.min.js"></script><!-- pkgdown --><script src="../pkgdown.js"></script><meta property="og:title" content="The EZ-Diffusion Model (EZDM)">
 <meta name="robots" content="noindex">
@@ -27,7 +27,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">bmm</a>
 
-    <small class="nav-text text-danger me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="In-development version">1.2.0.9000</small>
+    <small class="nav-text text-danger me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="In-development version">1.3.1.9000</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -86,7 +86,7 @@ margin-bottom: 1.5em ;
 <span class="header-section-number">1</span> Introduction to the model<a class="anchor" aria-label="anchor" href="#introduction-to-the-model"></a>
 </h2>
 <p>The diffusion model <span class="citation">(Ratcliff 1978)</span> is a widely used model in speeded decision-making. It describes how participants accumulate noisy evidence over time until reaching one of two decision boundaries. Usually, the diffusion model is fit to trial-level reaction time distributions, which can be computationally intensive, especially for hierarchical Bayesian estimation.</p>
-<p>The <strong>EZ-Diffusion Model</strong> <span class="citation">(Wagenmakers, Van Der Maas, and Grasman 2007)</span> provides a simplified alternative building on closed-form equations that relate the parameters of the diffusion model to easily computed summary statistics: mean reaction time (MRT), reaction time variance (VRT), and accuracy (proportion correct, Pc). This makes it possible to calculate diffusion model parameters from aggregated data without fitting to individual trials.</p>
+<p>The <strong>EZ-Diffusion Model</strong> <span class="citation">(Wagenmakers et al. 2007)</span> provides a simplified alternative building on closed-form equations that relate the parameters of the diffusion model to easily computed summary statistics: mean reaction time (MRT), reaction time variance (VRT), and accuracy (proportion correct, Pc). This makes it possible to calculate diffusion model parameters from aggregated data without fitting to individual trials.</p>
 <div class="section level3" number="1.1">
 <h3 id="the-diffusion-model">
 <span class="header-section-number">1.1</span> The Diffusion Model<a class="anchor" aria-label="anchor" href="#the-diffusion-model"></a>
@@ -113,7 +113,7 @@ Figure 1.1: Illustration of the diffusion model. Evidence accumulates from the s
 <h3 id="the-ez-equations">
 <span class="header-section-number">1.2</span> The EZ Equations<a class="anchor" aria-label="anchor" href="#the-ez-equations"></a>
 </h3>
-<p><span class="citation">Wagenmakers, Van Der Maas, and Grasman (2007)</span> provided closed-form solutions relating the diffusion model parameters to observable summary statistics. For the <strong>3-parameter version</strong> (assuming symmetric starting point, <span class="math inline">\(z = a/2\)</span>):</p>
+<p><span class="citation">Wagenmakers et al. (2007)</span> provided closed-form solutions relating the diffusion model parameters to observable summary statistics. For the <strong>3-parameter version</strong> (assuming symmetric starting point, <span class="math inline">\(z = a/2\)</span>):</p>
 <p>Given the proportion correct (<span class="math inline">\(P_c\)</span>), mean RT of correct responses (<span class="math inline">\(MRT\)</span>), and variance of correct RTs (<span class="math inline">\(VRT\)</span>), the parameters can be computed as:</p>
 <p><span class="math display">\[
 v = \text{sign}(P_c - 0.5) \cdot s \cdot \left[ L(P_c) \cdot \frac{P_c^2 L(P_c) - P_c \cdot L(P_c) + P_c - 0.5}{VRT} \right]^{1/4}
@@ -130,7 +130,7 @@ T_{er} = MRT - \frac{a}{2v} \cdot \frac{1 - e^{-\frac{va}{s^2}}}{1 + e^{-\frac{v
 <h3 id="the-4-parameter-extension">
 <span class="header-section-number">1.3</span> The 4-Parameter Extension<a class="anchor" aria-label="anchor" href="#the-4-parameter-extension"></a>
 </h3>
-<p>The original EZ model assumes a symmetric starting point. <span class="citation">Srivastava, Holmes, and Simen (2016)</span> derived the moments of first-passage times for the Wiener diffusion process with arbitrary starting points, enabling a <strong>4-parameter version</strong> that can estimate starting point bias (<span class="math inline">\(z_r\)</span>, the relative starting point). This 4-parameter version, however, requires separate summary statistics for responses to each boundary:</p>
+<p>The original EZ model assumes a symmetric starting point. <span class="citation">Srivastava et al. (2016)</span> derived the moments of first-passage times for the Wiener diffusion process with arbitrary starting points, enabling a <strong>4-parameter version</strong> that can estimate starting point bias (<span class="math inline">\(z_r\)</span>, the relative starting point). This 4-parameter version, however, requires separate summary statistics for responses to each boundary:</p>
 <ul>
 <li>Mean and variance of RTs for upper boundary responses (typically correct)</li>
 <li>Mean and variance of RTs for lower boundary responses (typically errors)</li>
@@ -272,7 +272,7 @@ T_{er} = MRT - \frac{a}{2v} \cdot \frac{1 - e^{-\frac{va}{s^2}}}{1 + e^{-\frac{v
 <h2 id="preparing-data-with-ezdm_summary_stats">
 <span class="header-section-number">4</span> Preparing data with <code>ezdm_summary_stats()</code><a class="anchor" aria-label="anchor" href="#preparing-data-with-ezdm_summary_stats"></a>
 </h2>
-<p>The <code>bmm</code> package provides the <code><a href="../reference/ezdm_summary_stats.html">ezdm_summary_stats()</a></code> function to compute the required aggregated statistics from trial-level RT data in the correct format. RT contaminants (fast guesses, lapses, attentional failures) can severely distort mean and variance estimates, leading to biased parameter estimates <span class="citation">(Wagenmakers et al. 2008)</span>. The function offers three methods to address this:</p>
+<p>The <code>bmm</code> package provides the <code><a href="../reference/ezdm_summary_stats.html">ezdm_summary_stats()</a></code> function to compute the required aggregated statistics from trial-level RT data in the correct format. RT contaminants (fast guesses, lapses, attentional failures) can severely distort mean and variance estimates, leading to biased parameter estimates <span class="citation">(<span class="nocase">Wagenmakers et al.</span> 2008)</span>. The function offers three methods to address this:</p>
 <table class="table">
 <colgroup>
 <col width="25%">
@@ -384,7 +384,7 @@ T_{er} = MRT - \frac{a}{2v} \cdot \frac{1 - e^{-\frac{va}{s^2}}}{1 + e^{-\frac{v
 <span><span class="co">#&gt;    Method   Mean_RT     Var_RT Contaminant</span></span>
 <span><span class="co">#&gt; 1  Simple 0.5409176 0.10605857          NA</span></span>
 <span><span class="co">#&gt; 2  Robust 0.4568634 0.02440439          NA</span></span>
-<span><span class="co">#&gt; 3 Mixture 0.4962307 0.03633472  0.03539257</span></span>
+<span><span class="co">#&gt; 3 Mixture 0.4964177 0.03642890  0.03532347</span></span>
 <span><span class="co">#&gt; 4    TRUE 0.4755037 0.02050638  0.05000000</span></span></code></pre></div>
 <p>The mixture method identifies contaminants and provides more accurate moment estimates.</p>
 </div>
@@ -441,9 +441,9 @@ T_{er} = MRT - \frac{a}{2v} \cdot \frac{1 - e^{-\frac{va}{s^2}}}{1 + e^{-\frac{v
 <span></span>
 <span><span class="va">summary_4par</span></span>
 <span><span class="co">#&gt;    mean_rt_upper mean_rt_lower var_rt_upper var_rt_lower n_upper n_trials</span></span>
-<span><span class="co">#&gt; mu     0.3943676            NA   0.01611958           NA     195      200</span></span>
+<span><span class="co">#&gt; mu     0.3952879            NA   0.01637452           NA     195      200</span></span>
 <span><span class="co">#&gt;    contaminant_prop_upper contaminant_prop_lower</span></span>
-<span><span class="co">#&gt; mu             0.01217136                     NA</span></span></code></pre></div>
+<span><span class="co">#&gt; mu             0.01116972                     NA</span></span></code></pre></div>
 <p>Notice the output now includes:
 - <code>mean_rt_upper</code>, <code>var_rt_upper</code>: Statistics for upper boundary responses
 - <code>mean_rt_lower</code>, <code>var_rt_lower</code>: Statistics for lower boundary responses</p>
@@ -738,9 +738,9 @@ scale reduction factor on split chains (at convergence, Rhat = 1).
 <div class="section level2">
 <h2 id="references">References<a class="anchor" aria-label="anchor" href="#references"></a>
 </h2>
-<div id="refs" class="references csl-bib-body hanging-indent" entry-spacing="0">
+<div id="refs" class="references csl-bib-body hanging-indent">
 <div id="ref-Chavez_Vandekerckhove_2025" class="csl-entry">
-Chávez De la Peña, Adriana F., and Joachim Vandekerckhove. 2025. <span>“An <span>EZ Bayesian</span> Hierarchical Drift Diffusion Model for Response Time and Accuracy.”</span> <em>Psychonomic Bulletin &amp; Review</em>. <a href="https://doi.org/10.3758/s13423-025-02729-y" class="external-link">https://doi.org/10.3758/s13423-025-02729-y</a>.
+Chávez De la Peña, Adriana F., and Joachim Vandekerckhove. 2025. <span>“An <span>EZ Bayesian</span> Hierarchical Drift Diffusion Model for Response Time and Accuracy.”</span> <em>Psychonomic Bulletin &amp; Review</em>, ahead of print. <a href="https://doi.org/10.3758/s13423-025-02729-y" class="external-link">https://doi.org/10.3758/s13423-025-02729-y</a>.
 </div>
 <div id="ref-Ratcliff_1978" class="csl-entry">
 Ratcliff, Roger. 1978. <span>“A Theory of Memory Retrieval.”</span> <em>Psychological Review</em> 85 (2): 59–108. <a href="https://doi.org/10.1037/0033-295X.85.2.59" class="external-link">https://doi.org/10.1037/0033-295X.85.2.59</a>.
@@ -749,7 +749,7 @@ Ratcliff, Roger. 1978. <span>“A Theory of Memory Retrieval.”</span> <em>Psyc
 Srivastava, Vaibhav, Philip Holmes, and Patrick Simen. 2016. <span>“A Martingale Analysis of First Passage Times of Time-Dependent <span>Wiener</span> Diffusion Models.”</span> <em>Journal of Mathematical Psychology</em> 77: 94–110. <a href="https://doi.org/10.1016/j.jmp.2016.10.001" class="external-link">https://doi.org/10.1016/j.jmp.2016.10.001</a>.
 </div>
 <div id="ref-wagenmakers_EZDoesIt_2008" class="csl-entry">
-Wagenmakers, Eric-Jan, Han L. J. van der Maas, Conor V. Dolan, and Raoul P. P. P. Grasman. 2008. <span>“<span>EZ</span> Does It! <span>Extensions</span> of the <span class="nocase">EZ-diffusion</span> Model.”</span> <em>Psychonomic Bulletin &amp; Review</em> 15 (6): 1229–35. <a href="https://doi.org/bwq9dw" class="external-link">https://doi.org/bwq9dw</a>.
+<span class="nocase">Wagenmakers, Eric-Jan, Han L. J. van der Maas, Conor V. Dolan, and Raoul P. P. P. Grasman</span>. 2008. <span>“<span>EZ</span> Does It! <span>Extensions</span> of the <span class="nocase">EZ-diffusion</span> Model.”</span> <em>Psychonomic Bulletin &amp; Review</em> 15 (6): 1229–35. <a href="https://doi.org/10/bwq9dw" class="external-link">https://doi.org/10/bwq9dw</a>.
 </div>
 <div id="ref-Wagenmakers_2007" class="csl-entry">
 Wagenmakers, Eric-Jan, Han L. J. Van Der Maas, and Raoul P. P. P. Grasman. 2007. <span>“An <span class="nocase">EZ-diffusion</span> Model for Response Time and Accuracy.”</span> <em>Psychonomic Bulletin &amp; Review</em> 14 (1): 3–22. <a href="https://doi.org/10.3758/BF03194023" class="external-link">https://doi.org/10.3758/BF03194023</a>.
@@ -767,7 +767,7 @@ Wagenmakers, Eric-Jan, Han L. J. Van Der Maas, and Raoul P. P. P. Grasman. 2007.
 </div>
 
 <div class="pkgdown-footer-right">
-  <p>Site built with <a href="https://pkgdown.r-lib.org/" class="external-link">pkgdown</a> 2.2.0.</p>
+  <p>Site built with <a href="https://pkgdown.r-lib.org/" class="external-link">pkgdown</a> 2.2.1.</p>
 </div>
 
     </footer>

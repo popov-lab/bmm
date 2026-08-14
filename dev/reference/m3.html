@@ -5,7 +5,7 @@
       fontURL: "https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/output/chtml/fonts/woff-v2"
     }
   };
-</script><script src="../deps/jquery-3.6.0/jquery-3.6.0.min.js"></script><meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no"><link href="../deps/bootstrap-5.3.1/bootstrap.min.css" rel="stylesheet"><script src="../deps/bootstrap-5.3.1/bootstrap.bundle.min.js"></script><link href="../deps/font-awesome-6.5.2/css/all.min.css" rel="stylesheet"><link href="../deps/font-awesome-6.5.2/css/v4-shims.min.css" rel="stylesheet"><script src="../deps/headroom-0.11.0/headroom.min.js"></script><script src="../deps/headroom-0.11.0/jQuery.headroom.min.js"></script><script src="../deps/bootstrap-toc-1.0.1/bootstrap-toc.min.js"></script><script src="../deps/clipboard.js-2.0.11/clipboard.min.js"></script><script src="../deps/search-1.0.0/autocomplete.jquery.min.js"></script><script src="../deps/search-1.0.0/fuse.min.js"></script><script src="../deps/search-1.0.0/mark.min.js"></script><!-- pkgdown --><script src="../pkgdown.js"></script><meta property="og:title" content="The Multinomial / Memory Measurement Model — m3"><meta name="description" content="The Multinomial / Memory Measurement Model (M3) is a measurement model that was originally introduced
+</script><script src="../deps/jquery-3.6.0/jquery-3.6.0.min.js"></script><meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no"><link href="../deps/bootstrap-5.3.8/bootstrap.min.css" rel="stylesheet"><script src="../deps/bootstrap-5.3.8/bootstrap.bundle.min.js"></script><link href="../deps/font-awesome-6.5.2/css/all.min.css" rel="stylesheet"><link href="../deps/font-awesome-6.5.2/css/v4-shims.min.css" rel="stylesheet"><script src="../deps/headroom-0.11.0/headroom.min.js"></script><script src="../deps/headroom-0.11.0/jQuery.headroom.min.js"></script><script src="../deps/bootstrap-toc-1.0.1/bootstrap-toc.min.js"></script><script src="../deps/clipboard.js-2.0.11/clipboard.min.js"></script><script src="../deps/search-1.0.0/autocomplete.jquery.min.js"></script><script src="../deps/search-1.0.0/fuse.min.js"></script><script src="../deps/search-1.0.0/mark.min.js"></script><!-- pkgdown --><script src="../pkgdown.js"></script><meta property="og:title" content="The Multinomial / Memory Measurement Model — m3"><meta name="description" content="The Multinomial / Memory Measurement Model (M3) is a measurement model that was originally introduced
 for working memory tasks with categorical responses. It assumes that each candidate in each response
 category is activated by a combination of sources of activation. The probability of choosing a response
 category is determined by the activation of the candidates. The model can be used for any n-AFC categorical
@@ -21,7 +21,7 @@ decision task."><meta property="og:image" content="https://venpopov.com/bmm/logo
 
     <a class="navbar-brand me-2" href="../index.html">bmm</a>
 
-    <small class="nav-text text-danger me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="In-development version">1.2.0.9000</small>
+    <small class="nav-text text-danger me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="In-development version">1.3.1.9000</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -125,11 +125,11 @@ on the differences of these choice rules please see the appendix of Oberauer &am
 </ul></li>
 <li><p><strong>Default parameter links:</strong></p><ul><li><p>c = identity; a = identity</p></li>
 </ul></li>
-<li><p><strong>Default priors:</strong></p><ul><li><p><code>a</code>:</p><ul><li><p><code>main</code>: normal(2,1)</p></li>
+<li><p><strong>Default priors:</strong></p><ul><li><p><code>a</code>:</p><ul><li><p><code>main</code>: normal(3,1)</p></li>
 <li><p><code>effects</code>: normal(0,0.5)</p></li>
 </ul></li>
 <li><p><code>c</code>:</p><ul><li><p><code>main</code>: normal(3,1)</p></li>
-<li><p><code>effects</code>: normal(0,2)</p></li>
+<li><p><code>effects</code>: normal(0,0.5)</p></li>
 </ul></li>
 </ul></li>
 </ul></div>
@@ -155,7 +155,7 @@ on the differences of these choice rules please see the appendix of Oberauer &am
 <li><p><code>effects</code>: normal(0,0.5)</p></li>
 </ul></li>
 <li><p><code>c</code>:</p><ul><li><p><code>main</code>: normal(3,1)</p></li>
-<li><p><code>effects</code>: normal(0,2)</p></li>
+<li><p><code>effects</code>: normal(0,0.5)</p></li>
 </ul></li>
 <li><p><code>f</code>:</p><ul><li><p><code>main</code>: logistic(0,1)</p></li>
 <li><p><code>effects</code>: normal(0,1)</p></li>
@@ -237,7 +237,7 @@ on the differences of these choice rules please see the appendix of Oberauer &am
 </div>
 
 <div class="pkgdown-footer-right">
-  <p>Site built with <a href="https://pkgdown.r-lib.org/" class="external-link">pkgdown</a> 2.2.0.</p>
+  <p>Site built with <a href="https://pkgdown.r-lib.org/" class="external-link">pkgdown</a> 2.2.1.</p>
 </div>
 
     </footer></div>

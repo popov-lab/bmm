@@ -84,6 +84,7 @@ the `bmm.sort_data`, `bmm.default_priors`, and `bmm.silent` options.
 ## Examples
 
 ``` r
+
 # view the current options
 bmm_options()
 #> Current bmm options:

@@ -13,8 +13,8 @@
     }
   };
 </script><script src="../deps/jquery-3.6.0/jquery-3.6.0.min.js"></script><meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
-<link href="../deps/bootstrap-5.3.1/bootstrap.min.css" rel="stylesheet">
-<script src="../deps/bootstrap-5.3.1/bootstrap.bundle.min.js"></script><link href="../deps/font-awesome-6.5.2/css/all.min.css" rel="stylesheet">
+<link href="../deps/bootstrap-5.3.8/bootstrap.min.css" rel="stylesheet">
+<script src="../deps/bootstrap-5.3.8/bootstrap.bundle.min.js"></script><link href="../deps/font-awesome-6.5.2/css/all.min.css" rel="stylesheet">
 <link href="../deps/font-awesome-6.5.2/css/v4-shims.min.css" rel="stylesheet">
 <script src="../deps/headroom-0.11.0/headroom.min.js"></script><script src="../deps/headroom-0.11.0/jQuery.headroom.min.js"></script><script src="../deps/bootstrap-toc-1.0.1/bootstrap-toc.min.js"></script><script src="../deps/clipboard.js-2.0.11/clipboard.min.js"></script><script src="../deps/search-1.0.0/autocomplete.jquery.min.js"></script><script src="../deps/search-1.0.0/fuse.min.js"></script><script src="../deps/search-1.0.0/mark.min.js"></script><!-- pkgdown --><script src="../pkgdown.js"></script><meta property="og:title" content="Handling RT Contamination in Evidence Accumulation Models">
 <meta name="robots" content="noindex">
@@ -27,7 +27,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">bmm</a>
 
-    <small class="nav-text text-danger me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="In-development version">1.2.0.9000</small>
+    <small class="nav-text text-danger me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="In-development version">1.3.1.9000</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -75,9 +75,9 @@
 <span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://github.com/rtdists/rtdists/" class="external-link">rtdists</a></span><span class="op">)</span></span>
 <span></span>
 <span><span class="fu"><a href="https://ggplot2.tidyverse.org/reference/get_theme.html" class="external-link">theme_set</a></span><span class="op">(</span><span class="fu"><a href="https://ggplot2.tidyverse.org/reference/ggtheme.html" class="external-link">theme_minimal</a></span><span class="op">(</span>base_size <span class="op">=</span> <span class="fl">12</span><span class="op">)</span><span class="op">)</span></span></code></pre></div>
-<div class="section level2" number="0.1">
+<div class="section level2" number="1">
 <h2 id="introduction">
-<span class="header-section-number">0.1</span> Introduction<a class="anchor" aria-label="anchor" href="#introduction"></a>
+<span class="header-section-number">1</span> Introduction<a class="anchor" aria-label="anchor" href="#introduction"></a>
 </h2>
 <p>Evidence accumulation models assume that all observed RTs arise from a single cognitive process. In practice, some trials reflect something else entirely: anticipatory responses, attention lapses, or accidental button presses. Even a few such contaminant trials can bias parameter estimates and distort model fit <span class="citation">(Ratcliff and Tuerlinckx 2002)</span>.</p>
 <p>The <code>bmm</code> package provides two functions for dealing with contamination, one for each type of model it supports:</p>
@@ -113,16 +113,16 @@
 <p><span class="math display">\[
 f(RT) = (1 - \pi) \cdot f_{\text{cognitive}}(RT) + \pi \cdot f_{\text{uniform}}(RT)
 \]</span></p>
-<p>where <span class="math inline">\(\pi\)</span> is the contamination proportion. The cognitive component <span class="math inline">\(f_{\text{cognitive}}\)</span> can be ex-Gaussian (default), log-normal, or inverse Gaussian. For background on the EZ diffusion model, see <span class="citation">Wagenmakers, Van Der Maas, and Grasman (2007)</span> and <span class="citation">Wagenmakers et al. (2008)</span>; for the full diffusion model, see <span class="citation">Ratcliff and McKoon (2008)</span>.</p>
+<p>where <span class="math inline">\(\pi\)</span> is the contamination proportion. The cognitive component <span class="math inline">\(f_{\text{cognitive}}\)</span> can be ex-Gaussian (default), log-normal, or inverse Gaussian. For background on the EZ diffusion model, see <span class="citation">Wagenmakers et al. (2007)</span> and <span class="citation"><span class="nocase">Wagenmakers et al.</span> (2008)</span>; for the full diffusion model, see <span class="citation">Ratcliff and McKoon (2008)</span>.</p>
 </div>
-<div class="section level2" number="0.2">
+<div class="section level2" number="2">
 <h2 id="contamination-handling-for-ezdm">
-<span class="header-section-number">0.2</span> Contamination handling for EZDM<a class="anchor" aria-label="anchor" href="#contamination-handling-for-ezdm"></a>
+<span class="header-section-number">2</span> Contamination handling for EZDM<a class="anchor" aria-label="anchor" href="#contamination-handling-for-ezdm"></a>
 </h2>
 <p>EZDM estimates parameters from pre-computed moments of the reaction times (mean RT, variance) and proportion correct. Once data are aggregated, individual trials are gone, so contamination must be addressed during the aggregation step.</p>
-<div class="section level3" number="0.2.1">
+<div class="section level3" number="2.1">
 <h3 id="method-options">
-<span class="header-section-number">0.2.1</span> Method options<a class="anchor" aria-label="anchor" href="#method-options"></a>
+<span class="header-section-number">2.1</span> Method options<a class="anchor" aria-label="anchor" href="#method-options"></a>
 </h3>
 <div class="sourceCode" id="cb2"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">my_data</span> <span class="op">|&gt;</span></span>
@@ -147,7 +147,7 @@ f(RT) = (1 - \pi) \cdot f_{\text{cognitive}}(RT) + \pi \cdot f_{\text{uniform}}(
 </tr>
 <tr class="even">
 <td><code>"robust"</code></td>
-<td>Median + IQR/MAD-based variance <span class="citation">(Wagenmakers et al. 2008)</span>
+<td>Median + IQR/MAD-based variance <span class="citation">(<span class="nocase">Wagenmakers et al.</span> 2008)</span>
 </td>
 <td>Moderate contamination</td>
 </tr>
@@ -160,9 +160,9 @@ f(RT) = (1 - \pi) \cdot f_{\text{cognitive}}(RT) + \pi \cdot f_{\text{uniform}}(
 </tbody>
 </table>
 </div>
-<div class="section level3" number="0.2.2">
+<div class="section level3" number="2.2">
 <h3 id="example-method-comparison">
-<span class="header-section-number">0.2.2</span> Example: method comparison<a class="anchor" aria-label="anchor" href="#example-method-comparison"></a>
+<span class="header-section-number">2.2</span> Example: method comparison<a class="anchor" aria-label="anchor" href="#example-method-comparison"></a>
 </h3>
 <p>As an example, we use data from <span class="citation">Ratcliff and Rouder (1998)</span>, available in the <code>rtdists</code> package. First we show how the <code><a href="../reference/ezdm_summary_stats.html">ezdm_summary_stats()</a></code> method options work on a single participant’s data from the accuracy instruction condition in this data. The histogram below shows a long tail of slow RTs, which are likely contaminants:</p>
 <div class="sourceCode" id="cb3"><pre class="downlit sourceCode r">
@@ -201,12 +201,12 @@ f(RT) = (1 - \pi) \cdot f_{\text{cognitive}}(RT) + \pi \cdot f_{\text{uniform}}(
 <span><span class="co">#&gt;       method   mean_rt     var_rt  accuracy contaminant_prop</span></span>
 <span><span class="co">#&gt; ...1  simple 0.8231905 0.39684254 0.4752726               NA</span></span>
 <span><span class="co">#&gt; ...2  robust 0.6440000 0.05804206 0.4752726               NA</span></span>
-<span><span class="co">#&gt; mu   mixture 0.7500098 0.11366415 0.4752726       0.02797548</span></span></code></pre></div>
+<span><span class="co">#&gt; mu   mixture 0.7500167 0.11366858 0.4752726       0.02797528</span></span></code></pre></div>
 <p>The mixture method also returns a contamination proportion estimate. The robust method is faster and makes no distributional assumptions, but does not quantify contamination.</p>
 </div>
-<div class="section level3" number="0.2.3">
+<div class="section level3" number="2.3">
 <h3 id="parameter-vs-4-parameter-version">
-<span class="header-section-number">0.2.3</span> 3-parameter vs 4-parameter version<a class="anchor" aria-label="anchor" href="#parameter-vs-4-parameter-version"></a>
+<span class="header-section-number">2.3</span> 3-parameter vs 4-parameter version<a class="anchor" aria-label="anchor" href="#parameter-vs-4-parameter-version"></a>
 </h3>
 <p>The <code>version</code> argument controls whether moments are computed jointly or separately by response boundary:</p>
 <div class="sourceCode" id="cb5"><pre class="downlit sourceCode r">
@@ -227,9 +227,9 @@ f(RT) = (1 - \pi) \cdot f_{\text{cognitive}}(RT) + \pi \cdot f_{\text{uniform}}(
 <span><span class="co">#&gt; 4par - upper: 0.032   lower: 0.024</span></span></code></pre></div>
 <p>The <code>"4par"</code> version is useful when contamination rates might differ between response boundaries and users are interested in estimating response bias for one response over the other. In most cases, <code>"3par"</code> is more stable and sufficient.</p>
 </div>
-<div class="section level3" number="0.2.4">
+<div class="section level3" number="2.4">
 <h3 id="ezdm-workflow">
-<span class="header-section-number">0.2.4</span> EZDM workflow<a class="anchor" aria-label="anchor" href="#ezdm-workflow"></a>
+<span class="header-section-number">2.4</span> EZDM workflow<a class="anchor" aria-label="anchor" href="#ezdm-workflow"></a>
 </h3>
 <p>In a typical analysis, you would aggregate data for all subjects and conditions with <code>ezdm_summary_stats(method = "mixture")</code>, then fit the EZDM to those summary stats. If you want to adjust accuracy for contamination, use <code><a href="../reference/adjust_ezdm_accuracy.html">adjust_ezdm_accuracy()</a></code> before fitting the model. This accounts for the fact that some contaminant trials are likely random guesses, which can bias accuracy estimates.</p>
 <div class="sourceCode" id="cb6"><pre class="downlit sourceCode r">
@@ -254,14 +254,14 @@ f(RT) = (1 - \pi) \cdot f_{\text{cognitive}}(RT) + \pi \cdot f_{\text{uniform}}(
 <hr>
 </div>
 </div>
-<div class="section level2" number="0.3">
+<div class="section level2" number="3">
 <h2 id="contamination-handling-for-ddmcswald">
-<span class="header-section-number">0.3</span> Contamination handling for DDM/csWald<a class="anchor" aria-label="anchor" href="#contamination-handling-for-ddmcswald"></a>
+<span class="header-section-number">3</span> Contamination handling for DDM/csWald<a class="anchor" aria-label="anchor" href="#contamination-handling-for-ddmcswald"></a>
 </h2>
 <p>DDM and csWald work with individual trials, so contamination handling is optional. <code><a href="../reference/flag_contaminant_rts.html">flag_contaminant_rts()</a></code> implements the same mixture modelling approach as <code>ezdm_summary_stats(method = "mixture")</code> and returns a contamination probability for each trial; You can use these probabilities in various ways, such as filtering, probabilistic flagging, or weighting trials.</p>
-<div class="section level3" number="0.3.1">
+<div class="section level3" number="3.1">
 <h3 id="basic-usage">
-<span class="header-section-number">0.3.1</span> Basic usage<a class="anchor" aria-label="anchor" href="#basic-usage"></a>
+<span class="header-section-number">3.1</span> Basic usage<a class="anchor" aria-label="anchor" href="#basic-usage"></a>
 </h3>
 <div class="sourceCode" id="cb7"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">flagged</span> <span class="op">&lt;-</span> <span class="va">rr98_subset</span> <span class="op">|&gt;</span></span>
@@ -269,24 +269,24 @@ f(RT) = (1 - \pi) \cdot f_{\text{cognitive}}(RT) + \pi \cdot f_{\text{uniform}}(
 <span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/utils/head.html" class="external-link">head</a></span><span class="op">(</span><span class="va">flagged</span><span class="op">)</span></span>
 <span><span class="co">#&gt;      rt response strength correct contam_prob</span></span>
-<span><span class="co">#&gt; 1 0.801    upper        8    TRUE 0.002307926</span></span>
-<span><span class="co">#&gt; 2 0.680    upper        7    TRUE 0.001599957</span></span>
-<span><span class="co">#&gt; 3 0.694    lower       19    TRUE 0.001669003</span></span>
-<span><span class="co">#&gt; 4 0.582    lower       21   FALSE 0.001215204</span></span>
-<span><span class="co">#&gt; 5 0.925    upper       19   FALSE 0.003359771</span></span>
-<span><span class="co">#&gt; 6 0.605    upper       10    TRUE 0.001286841</span></span></code></pre></div>
+<span><span class="co">#&gt; 1 0.801    upper        8    TRUE 0.002307907</span></span>
+<span><span class="co">#&gt; 2 0.680    upper        7    TRUE 0.001599956</span></span>
+<span><span class="co">#&gt; 3 0.694    lower       19    TRUE 0.001669001</span></span>
+<span><span class="co">#&gt; 4 0.582    lower       21   FALSE 0.001215208</span></span>
+<span><span class="co">#&gt; 5 0.925    upper       19   FALSE 0.003359717</span></span>
+<span><span class="co">#&gt; 6 0.605    upper       10    TRUE 0.001286845</span></span></code></pre></div>
 <p>Diagnostics (convergence, parameters, log-likelihood) are available via <code>attr(result, "diagnostics")</code>:</p>
 <div class="sourceCode" id="cb8"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">probs</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/flag_contaminant_rts.html">flag_contaminant_rts</a></span><span class="op">(</span><span class="va">rr98_subset</span><span class="op">$</span><span class="va">rt</span><span class="op">)</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/attr.html" class="external-link">attr</a></span><span class="op">(</span><span class="va">probs</span>, <span class="st">"diagnostics"</span><span class="op">)</span></span>
 <span><span class="co">#&gt;   mixture_params contaminant_prop converged iterations    loglik n_trials</span></span>
-<span><span class="co">#&gt; 1   0.420729....       0.02797548      TRUE         13 -926.5735     3943</span></span>
+<span><span class="co">#&gt; 1   0.420729....       0.02797528      TRUE         12 -926.5735     3943</span></span>
 <span><span class="co">#&gt;   distribution     method</span></span>
 <span><span class="co">#&gt; 1   exgaussian mixture_em</span></span></code></pre></div>
 </div>
-<div class="section level3" number="0.3.2">
+<div class="section level3" number="3.2">
 <h3 id="grouped-fitting">
-<span class="header-section-number">0.3.2</span> Grouped fitting<a class="anchor" aria-label="anchor" href="#grouped-fitting"></a>
+<span class="header-section-number">3.2</span> Grouped fitting<a class="anchor" aria-label="anchor" href="#grouped-fitting"></a>
 </h3>
 <p>For obtaining the probability of contamination by subject, condition, or response, use <code><a href="https://dplyr.tidyverse.org/reference/group_by.html" class="external-link">dplyr::group_by()</a></code>:</p>
 <div class="sourceCode" id="cb9"><pre class="downlit sourceCode r">
@@ -311,9 +311,9 @@ f(RT) = (1 - \pi) \cdot f_{\text{cognitive}}(RT) + \pi \cdot f_{\text{uniform}}(
 <span><span class="co">#&gt; <span style="color: #BCBCBC;">6</span> jf          2     1    26 accuracy    dark         10 upper               1</span></span>
 <span><span class="co">#&gt; <span style="color: #949494;"># ℹ 4 more variables: correct &lt;lgl&gt;, rt &lt;dbl&gt;, outlier &lt;lgl&gt;, contam_prob &lt;dbl&gt;</span></span></span></code></pre></div>
 </div>
-<div class="section level3" number="0.3.3">
+<div class="section level3" number="3.3">
 <h3 id="filtering-strategies">
-<span class="header-section-number">0.3.3</span> Filtering strategies<a class="anchor" aria-label="anchor" href="#filtering-strategies"></a>
+<span class="header-section-number">3.3</span> Filtering strategies<a class="anchor" aria-label="anchor" href="#filtering-strategies"></a>
 </h3>
 <p>The simplest approach is a hard threshold: remove trials where <span class="math inline">\(P(\text{contaminant} \mid RT) &gt; 0.5\)</span>.</p>
 <div class="sourceCode" id="cb10"><pre class="downlit sourceCode r">
@@ -327,9 +327,9 @@ f(RT) = (1 - \pi) \cdot f_{\text{cognitive}}(RT) + \pi \cdot f_{\text{uniform}}(
 <span>  <span class="fu"><a href="https://dplyr.tidyverse.org/reference/mutate.html" class="external-link">mutate</a></span><span class="op">(</span>contam_prob <span class="op">=</span> <span class="fu"><a href="../reference/flag_contaminant_rts.html">flag_contaminant_rts</a></span><span class="op">(</span><span class="va">rt</span><span class="op">)</span><span class="op">)</span> <span class="op">|&gt;</span></span>
 <span>  <span class="fu"><a href="https://dplyr.tidyverse.org/reference/filter.html" class="external-link">filter</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/stats/Binomial.html" class="external-link">rbinom</a></span><span class="op">(</span><span class="fu"><a href="https://dplyr.tidyverse.org/reference/context.html" class="external-link">n</a></span><span class="op">(</span><span class="op">)</span>, <span class="fl">1</span>, <span class="va">contam_prob</span><span class="op">)</span> <span class="op">==</span> <span class="fl">0</span><span class="op">)</span></span></code></pre></div>
 </div>
-<div class="section level3" number="0.3.4">
+<div class="section level3" number="3.4">
 <h3 id="ddmcswald-workflow">
-<span class="header-section-number">0.3.4</span> DDM/csWald workflow<a class="anchor" aria-label="anchor" href="#ddmcswald-workflow"></a>
+<span class="header-section-number">3.4</span> DDM/csWald workflow<a class="anchor" aria-label="anchor" href="#ddmcswald-workflow"></a>
 </h3>
 <p>In a full analysis, you would flag contaminated trials first, then either filter or weight them before fitting the DDM or csWald. The example below shows a simple filtering workflow:</p>
 <div class="sourceCode" id="cb12"><pre class="downlit sourceCode r">
@@ -349,9 +349,9 @@ f(RT) = (1 - \pi) \cdot f_{\text{cognitive}}(RT) + \pi \cdot f_{\text{uniform}}(
 <span>  model <span class="op">=</span> <span class="fu"><a href="../reference/ddm.html">ddm</a></span><span class="op">(</span>resp1 <span class="op">=</span> <span class="st">"rt"</span>, resp2 <span class="op">=</span> <span class="st">"response"</span><span class="op">)</span></span>
 <span><span class="op">)</span></span></code></pre></div>
 </div>
-<div class="section level3" number="0.3.5">
+<div class="section level3" number="3.5">
 <h3 id="validating-fast-guesses">
-<span class="header-section-number">0.3.5</span> Validating fast guesses<a class="anchor" aria-label="anchor" href="#validating-fast-guesses"></a>
+<span class="header-section-number">3.5</span> Validating fast guesses<a class="anchor" aria-label="anchor" href="#validating-fast-guesses"></a>
 </h3>
 <p>In 2AFC tasks, if fast contaminants are truly random guesses, their accuracy should be around 50%. The helper function <code><a href="../reference/validate_fast_guesses.html">validate_fast_guesses()</a></code> checks this with a Bayesian Beta-Binomial test (Savage-Dickey Bayes Factor):</p>
 <div class="sourceCode" id="cb13"><pre class="downlit sourceCode r">
@@ -369,14 +369,14 @@ f(RT) = (1 - \pi) \cdot f_{\text{cognitive}}(RT) + \pi \cdot f_{\text{uniform}}(
 <p>This function can also be used with grouped data to check for differences in fast guess rates across conditions or subjects.</p>
 </div>
 </div>
-<div class="section level2" number="0.4">
+<div class="section level2" number="4">
 <h2 id="case-study-multi-subject-analysis">
-<span class="header-section-number">0.4</span> Case study: multi-subject analysis<a class="anchor" aria-label="anchor" href="#case-study-multi-subject-analysis"></a>
+<span class="header-section-number">4</span> Case study: multi-subject analysis<a class="anchor" aria-label="anchor" href="#case-study-multi-subject-analysis"></a>
 </h2>
 <p>The full <span class="citation">Ratcliff and Rouder (1998)</span> dataset has three participants in a brightness discrimination task under speed and accuracy instructions. We walk through both workflows on these data.</p>
-<div class="section level3" number="0.4.1">
+<div class="section level3" number="4.1">
 <h3 id="data-preparation">
-<span class="header-section-number">0.4.1</span> Data preparation<a class="anchor" aria-label="anchor" href="#data-preparation"></a>
+<span class="header-section-number">4.1</span> Data preparation<a class="anchor" aria-label="anchor" href="#data-preparation"></a>
 </h3>
 <div class="sourceCode" id="cb14"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/utils/data.html" class="external-link">data</a></span><span class="op">(</span><span class="va">rr98</span><span class="op">)</span></span>
@@ -398,9 +398,9 @@ f(RT) = (1 - \pi) \cdot f_{\text{cognitive}}(RT) + \pi \cdot f_{\text{uniform}}(
 <span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/lims.html" class="external-link">xlim</a></span><span class="op">(</span><span class="fl">0</span>, <span class="fl">3</span><span class="op">)</span></span></code></pre></div>
 <p><img src="bmm_rt_contamination_files/figure-html/explore-case-study-1.png" alt="" width="672" style="display: block; margin: auto;"></p>
 </div>
-<div class="section level3" number="0.4.2">
+<div class="section level3" number="4.2">
 <h3 id="workflow-a-ezdm">
-<span class="header-section-number">0.4.2</span> Workflow A: EZDM<a class="anchor" aria-label="anchor" href="#workflow-a-ezdm"></a>
+<span class="header-section-number">4.2</span> Workflow A: EZDM<a class="anchor" aria-label="anchor" href="#workflow-a-ezdm"></a>
 </h3>
 <div class="sourceCode" id="cb16"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">ezdm_data</span> <span class="op">&lt;-</span> <span class="va">case_study_data</span> <span class="op">|&gt;</span></span>
@@ -418,7 +418,7 @@ f(RT) = (1 - \pi) \cdot f_{\text{cognitive}}(RT) + \pi \cdot f_{\text{uniform}}(
 <span><span class="co">#&gt; <span style="color: #BCBCBC;">1</span> jf    speed                      0.001<span style="text-decoration: underline;">61</span>                0.001<span style="text-decoration: underline;">45</span></span></span>
 <span><span class="co">#&gt; <span style="color: #BCBCBC;">2</span> jf    accuracy                   0.031<span style="text-decoration: underline;">6</span>                 0.024<span style="text-decoration: underline;">0</span> </span></span>
 <span><span class="co">#&gt; <span style="color: #BCBCBC;">3</span> kr    speed                      0.002<span style="text-decoration: underline;">41</span>                0.003<span style="text-decoration: underline;">62</span></span></span>
-<span><span class="co">#&gt; <span style="color: #BCBCBC;">4</span> kr    accuracy                   0.014<span style="text-decoration: underline;">7</span>                 0.028<span style="text-decoration: underline;">5</span> </span></span>
+<span><span class="co">#&gt; <span style="color: #BCBCBC;">4</span> kr    accuracy                   0.014<span style="text-decoration: underline;">7</span>                 0.028<span style="text-decoration: underline;">4</span> </span></span>
 <span><span class="co">#&gt; <span style="color: #BCBCBC;">5</span> nh    speed                      0.002<span style="text-decoration: underline;">57</span>                0.001<span style="text-decoration: underline;">55</span></span></span>
 <span><span class="co">#&gt; <span style="color: #BCBCBC;">6</span> nh    accuracy                   0.039<span style="text-decoration: underline;">6</span>                 0.050<span style="text-decoration: underline;">6</span></span></span></code></pre></div>
 <div class="sourceCode" id="cb17"><pre class="downlit sourceCode r">
@@ -447,9 +447,9 @@ f(RT) = (1 - \pi) \cdot f_{\text{cognitive}}(RT) + \pi \cdot f_{\text{uniform}}(
 <span><span class="co">#&gt; <span style="color: #BCBCBC;">3</span> accuracy    mixture         0.713      0.134  </span></span>
 <span><span class="co">#&gt; <span style="color: #BCBCBC;">4</span> accuracy    simple          0.793      0.463</span></span></code></pre></div>
 </div>
-<div class="section level3" number="0.4.3">
+<div class="section level3" number="4.3">
 <h3 id="workflow-b-ddmcswald">
-<span class="header-section-number">0.4.3</span> Workflow B: DDM/csWald<a class="anchor" aria-label="anchor" href="#workflow-b-ddmcswald"></a>
+<span class="header-section-number">4.3</span> Workflow B: DDM/csWald<a class="anchor" aria-label="anchor" href="#workflow-b-ddmcswald"></a>
 </h3>
 <div class="sourceCode" id="cb18"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">flagged_data</span> <span class="op">&lt;-</span> <span class="va">case_study_data</span> <span class="op">|&gt;</span></span>
@@ -488,9 +488,9 @@ f(RT) = (1 - \pi) \cdot f_{\text{cognitive}}(RT) + \pi \cdot f_{\text{uniform}}(
 <p>Both workflows pick up on contamination differences between instruction conditions.</p>
 </div>
 </div>
-<div class="section level2" number="0.5">
+<div class="section level2" number="5">
 <h2 id="practical-guidance">
-<span class="header-section-number">0.5</span> Practical guidance<a class="anchor" aria-label="anchor" href="#practical-guidance"></a>
+<span class="header-section-number">5</span> Practical guidance<a class="anchor" aria-label="anchor" href="#practical-guidance"></a>
 </h2>
 <p>Before applying these functions, filter out implausible RTs that clearly cannot reflect any cognitive process. For example, RTs below 100ms are too fast for a voluntary motor response, and in many experiments RTs exceeding 10s in a speeded task likely reflect disengagement rather than slow accumulation. Removing these extreme values before mixture modeling ensures the algorithm focuses on distinguishing genuine slow responses from moderate contaminants, rather than being distorted by impossible values.</p>
 <p>Group by factors that affect the RT distribution (subject, condition), but keep at least 50 to 100 trials per group so the mixture model has enough data to work with.</p>
@@ -503,7 +503,7 @@ f(RT) = (1 - \pi) \cdot f_{\text{cognitive}}(RT) + \pi \cdot f_{\text{uniform}}(
 <div class="section level2 unnumbered">
 <h2 id="references">References<a class="anchor" aria-label="anchor" href="#references"></a>
 </h2>
-<div id="refs" class="references csl-bib-body hanging-indent" entry-spacing="0">
+<div id="refs" class="references csl-bib-body hanging-indent">
 <div id="ref-Ratcliff_McKoon_2008" class="csl-entry">
 Ratcliff, Roger, and Gail McKoon. 2008. <span>“The Diffusion Decision Model: <span>Theory</span> and Data for Two-Choice Decision Tasks.”</span> <em>Neural Computation</em> 20 (4): 873–922. <a href="https://doi.org/10.1162/neco.2008.12-06-420" class="external-link">https://doi.org/10.1162/neco.2008.12-06-420</a>.
 </div>
@@ -511,10 +511,10 @@ Ratcliff, Roger, and Gail McKoon. 2008. <span>“The Diffusion Decision Model: <
 Ratcliff, Roger, and Jeffrey N. Rouder. 1998. <span>“Modeling Response Times for Two-Choice Decisions.”</span> <em>Psychological Science</em> 9 (5): 347–56. <a href="https://doi.org/10.1111/1467-9280.00067" class="external-link">https://doi.org/10.1111/1467-9280.00067</a>.
 </div>
 <div id="ref-ratcliff_EstimatingParametersDiffusion_2002" class="csl-entry">
-Ratcliff, Roger, and Francis Tuerlinckx. 2002. <span>“Estimating Parameters of the Diffusion Model: <span>Approaches</span> to Dealing with Contaminant Reaction Times and Parameter Variability.”</span> <em>Psychonomic Bulletin &amp; Review</em> 9 (3): 438–81. <a href="https://doi.org/cjg24z" class="external-link">https://doi.org/cjg24z</a>.
+Ratcliff, Roger, and Francis Tuerlinckx. 2002. <span>“Estimating Parameters of the Diffusion Model: <span>Approaches</span> to Dealing with Contaminant Reaction Times and Parameter Variability.”</span> <em>Psychonomic Bulletin &amp; Review</em> 9 (3): 438–81. <a href="https://doi.org/10/cjg24z" class="external-link">https://doi.org/10/cjg24z</a>.
 </div>
 <div id="ref-wagenmakers_EZDoesIt_2008" class="csl-entry">
-Wagenmakers, Eric-Jan, Han L. J. van der Maas, Conor V. Dolan, and Raoul P. P. P. Grasman. 2008. <span>“<span>EZ</span> Does It! <span>Extensions</span> of the <span class="nocase">EZ-diffusion</span> Model.”</span> <em>Psychonomic Bulletin &amp; Review</em> 15 (6): 1229–35. <a href="https://doi.org/bwq9dw" class="external-link">https://doi.org/bwq9dw</a>.
+<span class="nocase">Wagenmakers, Eric-Jan, Han L. J. van der Maas, Conor V. Dolan, and Raoul P. P. P. Grasman</span>. 2008. <span>“<span>EZ</span> Does It! <span>Extensions</span> of the <span class="nocase">EZ-diffusion</span> Model.”</span> <em>Psychonomic Bulletin &amp; Review</em> 15 (6): 1229–35. <a href="https://doi.org/10/bwq9dw" class="external-link">https://doi.org/10/bwq9dw</a>.
 </div>
 <div id="ref-Wagenmakers_2007" class="csl-entry">
 Wagenmakers, Eric-Jan, Han L. J. Van Der Maas, and Raoul P. P. P. Grasman. 2007. <span>“An <span class="nocase">EZ-diffusion</span> Model for Response Time and Accuracy.”</span> <em>Psychonomic Bulletin &amp; Review</em> 14 (1): 3–22. <a href="https://doi.org/10.3758/BF03194023" class="external-link">https://doi.org/10.3758/BF03194023</a>.
@@ -532,7 +532,7 @@ Wagenmakers, Eric-Jan, Han L. J. Van Der Maas, and Raoul P. P. P. Grasman. 2007.
 </div>
 
 <div class="pkgdown-footer-right">
-  <p>Site built with <a href="https://pkgdown.r-lib.org/" class="external-link">pkgdown</a> 2.2.0.</p>
+  <p>Site built with <a href="https://pkgdown.r-lib.org/" class="external-link">pkgdown</a> 2.2.1.</p>
 </div>
 
     </footer>

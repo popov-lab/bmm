@@ -112,6 +112,7 @@ experiment should be taken as robust results.
 You should start by loading the `bmm` package:
 
 ``` r
+
 library(bmm)
 ```
 
@@ -123,6 +124,7 @@ section. Alternatively, you can use data provided with the package (see
 function provided in the `bmm` package.
 
 ``` r
+
 # set seed for reproducibility
 set.seed(123)
 
@@ -185,6 +187,7 @@ for `brmsformula` we do not provide the dependent variable in this
 formula.:
 
 ``` r
+
 model_formula <- bmf(
   c ~ 0 + cond,
   a ~ 0 + cond,
@@ -203,6 +206,7 @@ either be a fixed integer, if there is only one set_size in your data,
 or the name of the variable coding the `set_size` in your data:
 
 ``` r
+
 model <- imm(resp_error = "resp_error",
              nt_features = paste0("color_item",2:5),
              set_size = set_size,
@@ -217,6 +221,7 @@ dataset. For example, you can specify the model a few different ways via
 regular expressions:
 
 ``` r
+
 model <- imm(resp_error = "resp_error",
              nt_features = "color_item[2-5]",
              set_size = set_size,
@@ -232,6 +237,7 @@ Finally, we can fit the model by passing all the relevant arguments to
 the [`bmm()`](https://venpopov.com/bmm/dev/reference/bmm.md) function:
 
 ``` r
+
 fit <- bmm(
   formula = model_formula,
   data = simData,
@@ -252,6 +258,7 @@ Using this `fit` object we can have a quick look at the summary of the
 fitted model:
 
 ``` r
+
 summary(fit)
 ```
 
@@ -317,6 +324,7 @@ scale, but both `s` and `kappa` are estimated using a `log` link
 function, so we have to transform these back to the native scale.
 
 ``` r
+
 fixedFX <- brms::fixef(fit)
 
 # print posterior means for the s parameter
@@ -365,6 +373,7 @@ parameters. For this we need to extract the posterior draws using the
 plots of the posteriors.
 
 ``` r
+
 library(tidybayes)
 library(dplyr)
 library(tidyr)
@@ -390,6 +399,7 @@ as.data.frame(draws) |>
 ![](bmm_imm_files/figure-html/unnamed-chunk-9-1.jpeg)
 
 ``` r
+
 
 colnames(draws)
 #>  [1] "b_kappa_cond1" "b_kappa_cond2" "b_kappa_cond3" "b_kappa_cond4"

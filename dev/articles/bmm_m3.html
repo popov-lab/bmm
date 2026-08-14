@@ -13,8 +13,8 @@
     }
   };
 </script><script src="../deps/jquery-3.6.0/jquery-3.6.0.min.js"></script><meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
-<link href="../deps/bootstrap-5.3.1/bootstrap.min.css" rel="stylesheet">
-<script src="../deps/bootstrap-5.3.1/bootstrap.bundle.min.js"></script><link href="../deps/font-awesome-6.5.2/css/all.min.css" rel="stylesheet">
+<link href="../deps/bootstrap-5.3.8/bootstrap.min.css" rel="stylesheet">
+<script src="../deps/bootstrap-5.3.8/bootstrap.bundle.min.js"></script><link href="../deps/font-awesome-6.5.2/css/all.min.css" rel="stylesheet">
 <link href="../deps/font-awesome-6.5.2/css/v4-shims.min.css" rel="stylesheet">
 <script src="../deps/headroom-0.11.0/headroom.min.js"></script><script src="../deps/headroom-0.11.0/jQuery.headroom.min.js"></script><script src="../deps/bootstrap-toc-1.0.1/bootstrap-toc.min.js"></script><script src="../deps/clipboard.js-2.0.11/clipboard.min.js"></script><script src="../deps/search-1.0.0/autocomplete.jquery.min.js"></script><script src="../deps/search-1.0.0/fuse.min.js"></script><script src="../deps/search-1.0.0/mark.min.js"></script><!-- pkgdown --><script src="../pkgdown.js"></script><meta property="og:title" content="The Multinomial / Memory Measurement Model (M3)">
 <meta name="robots" content="noindex">
@@ -27,7 +27,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">bmm</a>
 
-    <small class="nav-text text-danger me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="In-development version">1.2.0.9000</small>
+    <small class="nav-text text-danger me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="In-development version">1.3.1.9000</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -136,6 +136,7 @@ p_i = \frac{n_i \cdot A_i}{\sum^n_{j = 1} n_j \cdot A_j}
 p_i = \frac{n_i \cdot e^{A_i}}{\sum^n_{j = 1} n_j \cdot e^{A_j}}
 \]</span></p>
 <p>This choice rule can be interpreted as an n-alternative SDT model over the different response candidates with a Gumbel (or double-exponential) noise distribution.</p>
+<p>The two choice rules differ in how they translate the activation sources into probabilities, and this has a consequence for comparing activation sources. The default priors for the predefined <code>ss</code> and <code>cs</code> versions are calibrated so that both rules imply a comparable, broad range of average performance. For the <code>softmax</code> rule the priors for general (<code>a</code>) and context (<code>c</code>) activation share the same mean, so the implied prior on their difference is centered at zero. This makes <code>softmax</code> the appropriate choice rule when you want to compare or test activation sources against each other directly (e.g., whether context activation exceeds general activation). The <code>simple</code> rule normalizes the raw activations, so context activation has to exceed general activation (<code>c &gt; a</code>) for the model to predict accurate recall; its default priors therefore encode <code>c &gt; a</code> and are not suited for directly comparing <code>c</code> and <code>a</code>. If your research question concerns the contrast between activation sources, use the <code>softmax</code> choice rule (or supply your own symmetric priors).</p>
 <p>Finally, the model then links the response frequencies <span class="math inline">\(Y\)</span> for each response category to the probabilities <span class="math inline">\(p\)</span> using a multinomial distribution with the total number of trials:</p>
 <p><span class="math display">\[
 Y \sim multinomial(p, trials)
@@ -574,7 +575,7 @@ scale reduction factor on split chains (at convergence, Rhat = 1).
 <div class="section level2">
 <h2 id="references">References<a class="anchor" aria-label="anchor" href="#references"></a>
 </h2>
-<div id="refs" class="references csl-bib-body hanging-indent" entry-spacing="0">
+<div id="refs" class="references csl-bib-body hanging-indent">
 <div id="ref-oberauerSimpleMeasurementModels2019" class="csl-entry">
 Oberauer, Klaus, and Stephan Lewandowsky. 2019. <span>“Simple Measurement Models for Complex Working-Memory Tasks.”</span> <em>Psychological Review</em> 126 (6): 880–932. <a href="https://doi.org/10.1037/rev0000159" class="external-link">https://doi.org/10.1037/rev0000159</a>.
 </div>
@@ -592,7 +593,7 @@ Oberauer, Klaus, and Stephan Lewandowsky. 2019. <span>“Simple Measurement Mode
 </div>
 
 <div class="pkgdown-footer-right">
-  <p>Site built with <a href="https://pkgdown.r-lib.org/" class="external-link">pkgdown</a> 2.2.0.</p>
+  <p>Site built with <a href="https://pkgdown.r-lib.org/" class="external-link">pkgdown</a> 2.2.1.</p>
 </div>
 
     </footer>

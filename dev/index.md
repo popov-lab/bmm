@@ -39,6 +39,7 @@ package:
 You can install the latest version of the `bmm` package from CRAN:
 
 ``` r
+
 install.packages("bmm")
 ```
 
@@ -64,6 +65,7 @@ a specific version of the package from GitHub:
 **Install the latest development version of bmm**
 
 ``` r
+
 if (!requireNamespace("remotes")) {
   install.packages("remotes")
 }
@@ -79,6 +81,7 @@ preprint](https://osf.io/preprints/psyarxiv/umt57), you need to install
 the 0.0.1 version of the bmm package with:
 
 ``` r
+
 if (!requireNamespace("remotes")) {
   install.packages("remotes")
 }
@@ -126,6 +129,7 @@ Given the dynamic nature the `bmm` package is currently in, you can
 always view the latest list of supported models by running:
 
 ``` r
+
 bmm::supported_models()
 #> The following models are supported:
 #> 
@@ -160,6 +164,7 @@ console. For example, calling the information on Interference
 Measurement Model `imm` would look like this:
 
 ``` r
+
 ?imm
 ```
 
@@ -172,6 +177,7 @@ the model, please have a look at [the IMM
 article](https://venpopov.com/bmm/articles/bmm_imm.html).
 
 ``` r
+
 library(bmm)
 
 formula <- bmmformula(c ~ 0 + set_size,
@@ -192,6 +198,7 @@ the fitted model. As `bmm` calls `brms` to fit the models, these objects
 can be handled the same way a normal `brmsfit` object is handled:
 
 ``` r
+
 # print summary
 summary(fit)
 
@@ -224,6 +231,7 @@ randomly generated data from the IMM with a setsize of four, and
 overlaying the probability density function of the model:
 
 ``` r
+
 library(bmm)
 library(ggplot2)
 

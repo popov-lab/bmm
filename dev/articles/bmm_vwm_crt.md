@@ -60,7 +60,7 @@ continuous reproduction data:
   and [the mixture models
   article](https://venpopov.com/bmm/articles/bmm_mixture_models.html)
 
-##### The three-parameter mixture model (Bays, Catalao, and Husain 2009)
+##### The three-parameter mixture model (Bays et al. 2009)
 
 - see
   [`?mixture3p`](https://venpopov.com/bmm/dev/reference/mixture3p.md)
@@ -101,8 +101,8 @@ Reallocation of Visual Working Memory.” *Journal of Vision* 11 (10):
 6–6.
 
 Oberauer, Klaus. 2023. “Measurement Models for Visual Working Memory—a
-Factorial Model Comparison.” *Psychological Review* 130 (3): 841–52.
-<https://doi.org/10.1037/rev0000328>.
+Factorial Model Comparison.” *Psychological Review* (US) 130 (3):
+841–52. <https://doi.org/10.1037/rev0000328>.
 
 Oberauer, Klaus, and Hsuan-Yu Lin. 2017. “An Interference Model of
 Visual Working Memory.” *Psychological Review* 124 (1): 21–59.

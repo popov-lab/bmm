@@ -1,6 +1,7 @@
 # Handling RT Contamination in Evidence Accumulation Models
 
 ``` r
+
 library(bmm)
 library(dplyr)
 library(ggplot2)
@@ -10,7 +11,7 @@ library(rtdists)
 theme_set(theme_minimal(base_size = 12))
 ```
 
-## 0.1 Introduction
+## 1 Introduction
 
 Evidence accumulation models assume that all observed RTs arise from a
 single cognitive process. In practice, some trials reflect something
@@ -21,10 +22,10 @@ estimates and distort model fit (Ratcliff and Tuerlinckx 2002).
 The `bmm` package provides two functions for dealing with contamination,
 one for each type of model it supports:
 
-| Model        | Data type        | Function                                                                                   | Role                        |
-|--------------|------------------|--------------------------------------------------------------------------------------------|-----------------------------|
-| EZDM         | Aggregated stats | [`ezdm_summary_stats()`](https://venpopov.com/bmm/dev/reference/ezdm_summary_stats.md)     | Required during aggregation |
-| DDM / csWald | Trial-level      | [`flag_contaminant_rts()`](https://venpopov.com/bmm/dev/reference/flag_contaminant_rts.md) | Optional preprocessing      |
+| Model | Data type | Function | Role |
+|----|----|----|----|
+| EZDM | Aggregated stats | [`ezdm_summary_stats()`](https://venpopov.com/bmm/dev/reference/ezdm_summary_stats.md) | Required during aggregation |
+| DDM / csWald | Trial-level | [`flag_contaminant_rts()`](https://venpopov.com/bmm/dev/reference/flag_contaminant_rts.md) | Optional preprocessing |
 
 Both fit a mixture model via the EM algorithm, separating cognitive RTs
 from a uniform contaminant distribution (Ratcliff and Tuerlinckx 2002):
@@ -35,31 +36,32 @@ f\_{\text{uniform}}(RT) \\
 where \\\pi\\ is the contamination proportion. The cognitive component
 \\f\_{\text{cognitive}}\\ can be ex-Gaussian (default), log-normal, or
 inverse Gaussian. For background on the EZ diffusion model, see
-Wagenmakers, Van Der Maas, and Grasman (2007) and Wagenmakers et al.
-(2008); for the full diffusion model, see Ratcliff and McKoon (2008).
+Wagenmakers et al. (2007) and Wagenmakers et al. (2008); for the full
+diffusion model, see Ratcliff and McKoon (2008).
 
-## 0.2 Contamination handling for EZDM
+## 2 Contamination handling for EZDM
 
 EZDM estimates parameters from pre-computed moments of the reaction
 times (mean RT, variance) and proportion correct. Once data are
 aggregated, individual trials are gone, so contamination must be
 addressed during the aggregation step.
 
-### 0.2.1 Method options
+### 2.1 Method options
 
 ``` r
+
 my_data |>
   group_by(subject, condition) |>
   reframe(ezdm_summary_stats(rt, response, method = "mixture"))
 ```
 
-| Method      | Description                                               | Use when                                  |
-|-------------|-----------------------------------------------------------|-------------------------------------------|
-| `"simple"`  | Standard mean/variance                                    | Data is pre-cleaned                       |
-| `"robust"`  | Median + IQR/MAD-based variance (Wagenmakers et al. 2008) | Moderate contamination                    |
-| `"mixture"` | EM mixture modeling (Ratcliff and Tuerlinckx 2002)        | Default; provides contamination estimates |
+| Method | Description | Use when |
+|----|----|----|
+| `"simple"` | Standard mean/variance | Data is pre-cleaned |
+| `"robust"` | Median + IQR/MAD-based variance (Wagenmakers et al. 2008) | Moderate contamination |
+| `"mixture"` | EM mixture modeling (Ratcliff and Tuerlinckx 2002) | Default; provides contamination estimates |
 
-### 0.2.2 Example: method comparison
+### 2.2 Example: method comparison
 
 As an example, we use data from Ratcliff and Rouder (1998), available in
 the `rtdists` package. First we show how the
@@ -69,6 +71,7 @@ instruction condition in this data. The histogram below shows a long
 tail of slow RTs, which are likely contaminants:
 
 ``` r
+
 data(rr98)
 
 rr98_subset <- rr98 |>
@@ -86,6 +89,7 @@ ggplot(rr98_subset, aes(x = rt)) +
 ![](bmm_rt_contamination_files/figure-html/load-rr98-data-1.png)
 
 ``` r
+
 stats_simple <- ezdm_summary_stats(
   rr98_subset$rt, rr98_subset$response, method = "simple"
 )
@@ -107,19 +111,20 @@ bind_rows(
 #>       method   mean_rt     var_rt  accuracy contaminant_prop
 #> ...1  simple 0.8231905 0.39684254 0.4752726               NA
 #> ...2  robust 0.6440000 0.05804206 0.4752726               NA
-#> mu   mixture 0.7500098 0.11366415 0.4752726       0.02797548
+#> mu   mixture 0.7500167 0.11366858 0.4752726       0.02797528
 ```
 
 The mixture method also returns a contamination proportion estimate. The
 robust method is faster and makes no distributional assumptions, but
 does not quantify contamination.
 
-### 0.2.3 3-parameter vs 4-parameter version
+### 2.3 3-parameter vs 4-parameter version
 
 The `version` argument controls whether moments are computed jointly or
 separately by response boundary:
 
 ``` r
+
 stats_3par <- ezdm_summary_stats(
   rr98_subset$rt, rr98_subset$response,
   method = "mixture", version = "3par"
@@ -142,7 +147,7 @@ between response boundaries and users are interested in estimating
 response bias for one response over the other. In most cases, `"3par"`
 is more stable and sufficient.
 
-### 0.2.4 EZDM workflow
+### 2.4 EZDM workflow
 
 In a typical analysis, you would aggregate data for all subjects and
 conditions with `ezdm_summary_stats(method = "mixture")`, then fit the
@@ -154,6 +159,7 @@ contaminant trials are likely random guesses, which can bias accuracy
 estimates.
 
 ``` r
+
 # Step 1: Aggregate with contamination handling
 ezdm_data <- raw_trial_data |>
   group_by(subject, condition) |>
@@ -176,7 +182,7 @@ fit <- bmm(
 
 ------------------------------------------------------------------------
 
-## 0.3 Contamination handling for DDM/csWald
+## 3 Contamination handling for DDM/csWald
 
 DDM and csWald work with individual trials, so contamination handling is
 optional.
@@ -186,41 +192,44 @@ implements the same mixture modelling approach as
 probability for each trial; You can use these probabilities in various
 ways, such as filtering, probabilistic flagging, or weighting trials.
 
-### 0.3.1 Basic usage
+### 3.1 Basic usage
 
 ``` r
+
 flagged <- rr98_subset |>
   mutate(contam_prob = flag_contaminant_rts(rt))
 
 head(flagged)
 #>      rt response strength correct contam_prob
-#> 1 0.801    upper        8    TRUE 0.002307926
-#> 2 0.680    upper        7    TRUE 0.001599957
-#> 3 0.694    lower       19    TRUE 0.001669003
-#> 4 0.582    lower       21   FALSE 0.001215204
-#> 5 0.925    upper       19   FALSE 0.003359771
-#> 6 0.605    upper       10    TRUE 0.001286841
+#> 1 0.801    upper        8    TRUE 0.002307907
+#> 2 0.680    upper        7    TRUE 0.001599956
+#> 3 0.694    lower       19    TRUE 0.001669001
+#> 4 0.582    lower       21   FALSE 0.001215208
+#> 5 0.925    upper       19   FALSE 0.003359717
+#> 6 0.605    upper       10    TRUE 0.001286845
 ```
 
 Diagnostics (convergence, parameters, log-likelihood) are available via
 `attr(result, "diagnostics")`:
 
 ``` r
+
 probs <- flag_contaminant_rts(rr98_subset$rt)
 attr(probs, "diagnostics")
 #>   mixture_params contaminant_prop converged iterations    loglik n_trials
-#> 1   0.420729....       0.02797548      TRUE         13 -926.5735     3943
+#> 1   0.420729....       0.02797528      TRUE         12 -926.5735     3943
 #>   distribution     method
 #> 1   exgaussian mixture_em
 ```
 
-### 0.3.2 Grouped fitting
+### 3.2 Grouped fitting
 
 For obtaining the probability of contamination by subject, condition, or
 response, use
 [`dplyr::group_by()`](https://dplyr.tidyverse.org/reference/group_by.html):
 
 ``` r
+
 rr98_grouped <- rr98 |>
   filter(id %in% c("jf", "kr")) |>
   mutate(response = ifelse(response == "dark", "upper", "lower"))
@@ -243,12 +252,13 @@ head(flagged_grouped)
 #> # ℹ 4 more variables: correct <lgl>, rt <dbl>, outlier <lgl>, contam_prob <dbl>
 ```
 
-### 0.3.3 Filtering strategies
+### 3.3 Filtering strategies
 
 The simplest approach is a hard threshold: remove trials where
 \\P(\text{contaminant} \mid RT) \> 0.5\\.
 
 ``` r
+
 clean_data <- my_data |>
   mutate(contam_prob = flag_contaminant_rts(rt)) |>
   filter(contam_prob <= 0.5)
@@ -259,19 +269,21 @@ proportional to each trial’s contamination probability from a binomial
 distribution, which avoids the sharp cutoff:
 
 ``` r
+
 set.seed(123)
 clean_data <- my_data |>
   mutate(contam_prob = flag_contaminant_rts(rt)) |>
   filter(rbinom(n(), 1, contam_prob) == 0)
 ```
 
-### 0.3.4 DDM/csWald workflow
+### 3.4 DDM/csWald workflow
 
 In a full analysis, you would flag contaminated trials first, then
 either filter or weight them before fitting the DDM or csWald. The
 example below shows a simple filtering workflow:
 
 ``` r
+
 # Step 1: Flag contaminated trials
 flagged_data <- raw_data |>
   group_by(subject, condition) |>
@@ -289,7 +301,7 @@ fit <- bmm(
 )
 ```
 
-### 0.3.5 Validating fast guesses
+### 3.5 Validating fast guesses
 
 In 2AFC tasks, if fast contaminants are truly random guesses, their
 accuracy should be around 50%. The helper function
@@ -298,6 +310,7 @@ checks this with a Bayesian Beta-Binomial test (Savage-Dickey Bayes
 Factor):
 
 ``` r
+
 my_data$is_contaminant <- flag_contaminant_rts(my_data$rt) > 0.5
 
 validation <- validate_fast_guesses(
@@ -314,15 +327,16 @@ validation$guess_in_hdi # Is 0.5 in 95% HDI?
 This function can also be used with grouped data to check for
 differences in fast guess rates across conditions or subjects.
 
-## 0.4 Case study: multi-subject analysis
+## 4 Case study: multi-subject analysis
 
 The full Ratcliff and Rouder (1998) dataset has three participants in a
 brightness discrimination task under speed and accuracy instructions. We
 walk through both workflows on these data.
 
-### 0.4.1 Data preparation
+### 4.1 Data preparation
 
 ``` r
+
 data(rr98)
 
 case_study_data <- rr98 |>
@@ -336,6 +350,7 @@ cat("Trials:", nrow(case_study_data),
 ```
 
 ``` r
+
 ggplot(case_study_data, aes(x = rt, fill = instruction)) +
   geom_histogram(bins = 50, alpha = 0.6, position = "identity") +
   scale_fill_manual(values = c("speed" = "coral", "accuracy" = "steelblue")) +
@@ -346,9 +361,10 @@ ggplot(case_study_data, aes(x = rt, fill = instruction)) +
 
 ![](bmm_rt_contamination_files/figure-html/explore-case-study-1.png)
 
-### 0.4.2 Workflow A: EZDM
+### 4.2 Workflow A: EZDM
 
 ``` r
+
 ezdm_data <- case_study_data |>
   group_by(id, instruction) |>
   reframe(ezdm_summary_stats(
@@ -364,12 +380,13 @@ ezdm_data |>
 #> 1 jf    speed                      0.00161                0.00145
 #> 2 jf    accuracy                   0.0316                 0.0240 
 #> 3 kr    speed                      0.00241                0.00362
-#> 4 kr    accuracy                   0.0147                 0.0285 
+#> 4 kr    accuracy                   0.0147                 0.0284 
 #> 5 nh    speed                      0.00257                0.00155
 #> 6 nh    accuracy                   0.0396                 0.0506
 ```
 
 ``` r
+
 ezdm_simple <- case_study_data |>
   group_by(id, instruction) |>
   reframe(ezdm_summary_stats(rt, response, method = "simple"))
@@ -396,9 +413,10 @@ bind_rows(
 #> 4 accuracy    simple          0.793      0.463
 ```
 
-### 0.4.3 Workflow B: DDM/csWald
+### 4.3 Workflow B: DDM/csWald
 
 ``` r
+
 flagged_data <- case_study_data |>
   group_by(id, instruction, response) |>
   mutate(contam_prob = flag_contaminant_rts(
@@ -408,6 +426,7 @@ flagged_data <- case_study_data |>
 ```
 
 ``` r
+
 ggplot(flagged_data, aes(x = rt, y = contam_prob, color = instruction)) +
   geom_point(alpha = 0.1) +
   geom_hline(yintercept = 0.5, linetype = "dashed", color = "red") +
@@ -420,6 +439,7 @@ ggplot(flagged_data, aes(x = rt, y = contam_prob, color = instruction)) +
 ![](bmm_rt_contamination_files/figure-html/ddm-viz-probabilities-1.png)
 
 ``` r
+
 clean_data <- flagged_data |> filter(contam_prob < 0.5)
 
 case_study_data |>
@@ -442,7 +462,7 @@ case_study_data |>
 Both workflows pick up on contamination differences between instruction
 conditions.
 
-## 0.5 Practical guidance
+## 5 Practical guidance
 
 Before applying these functions, filter out implausible RTs that clearly
 cannot reflect any cognitive process. For example, RTs below 100ms are
@@ -497,12 +517,12 @@ for Two-Choice Decisions.” *Psychological Science* 9 (5): 347–56.
 Ratcliff, Roger, and Francis Tuerlinckx. 2002. “Estimating Parameters of
 the Diffusion Model: Approaches to Dealing with Contaminant Reaction
 Times and Parameter Variability.” *Psychonomic Bulletin & Review* 9 (3):
-438–81. <https://doi.org/cjg24z>.
+438–81. <https://doi.org/10/cjg24z>.
 
 Wagenmakers, Eric-Jan, Han L. J. van der Maas, Conor V. Dolan, and Raoul
 P. P. P. Grasman. 2008. “EZ Does It! Extensions of the EZ-diffusion
 Model.” *Psychonomic Bulletin & Review* 15 (6): 1229–35.
-<https://doi.org/bwq9dw>.
+<https://doi.org/10/bwq9dw>.
 
 Wagenmakers, Eric-Jan, Han L. J. Van Der Maas, and Raoul P. P. P.
 Grasman. 2007. “An EZ-diffusion Model for Response Time and Accuracy.”

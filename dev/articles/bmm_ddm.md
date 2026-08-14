@@ -163,6 +163,7 @@ brightness discrimination task where participants judged whether pixel
 arrays were “high” or “low” brightness.
 
 ``` r
+
 library(bmm)
 library(ggplot2)
 library(dplyr)
@@ -208,6 +209,7 @@ The DDM requires:
 2.  A binary response variable coded as 0/1 or “lower”/“upper”
 
 ``` r
+
 # Prepare data for DDM analysis
 # Focus on one participant and instruction condition for demonstration
 demo_data <- rr98 %>%
@@ -235,6 +237,7 @@ ggplot(demo_data, aes(x = rt, fill = factor(response))) +
 The simplest DDM with drift, boundary, and non-decision time:
 
 ``` r
+
 # Define the model
 model_fixed_zr <- ddm(rt = "rt", 
                       response = "response")
@@ -279,6 +282,7 @@ Adding starting point bias allows modeling a priori response
 preferences:
 
 ``` r
+
 # Define the model with free `zr`
 model_free_zr <- ddm(rt = "rt", 
                      response = "response")
@@ -322,6 +326,7 @@ for individual differences.
 ### 5.1 Multi-Subject Analysis
 
 ``` r
+
 # Use multiple subjects from rr98
 multi_subject_data <- rr98 %>%
   filter(instruction == "accuracy") %>%
@@ -368,6 +373,7 @@ Test how experimental manipulations affect different cognitive
 processes:
 
 ``` r
+
 # Compare speed vs accuracy emphasis
 full_data <- rr98 %>%
   mutate(response = ifelse(response_num == 1, 0, 1)) %>%
@@ -402,6 +408,7 @@ fit_instruction <- bmm(
 Use information criteria to compare model fit:
 
 ``` r
+
 # Compute LOO for each model
 loo_fixed_zr <- loo(fit_fixed_zr)
 loo_free_zr <- loo(fit_free_zr)
@@ -424,6 +431,7 @@ plot(loo_free_zr)
 Assess model adequacy by comparing predictions to data:
 
 ``` r
+
 # Generate posterior predictions
 pp_fixed_zr <- posterior_predict(fit_fixed_zr)
 
@@ -443,6 +451,7 @@ ppc_dens_overlay(demo_data$rt, pp_fixed_zr[1:50, ])
 Use Bayesian hypothesis testing to compare parameters across conditions:
 
 ``` r
+
 # Test if drift differs between conditions
 hypothesis(fit_instruction, "driftinstructionspeed < 0")
 
@@ -461,6 +470,7 @@ hypothesis(fit_instruction, c(
 Compare specific hypotheses using bridge sampling:
 
 ``` r
+
 # Fit constrained model (drift doesn't vary by strength)
 formula_null <- bmf(
   drift ~ 1 + (1 | id),
@@ -486,6 +496,7 @@ fit_null <- bmm(
 Specify informative priors based on prior research or pilot data:
 
 ``` r
+
 # Define custom priors
 custom_priors <- c(
   prior(normal(2, 1), nlpar = "drift", coef = "Intercept"),
@@ -508,6 +519,7 @@ fit_custom <- bmm(
 Fix parameters to specific values for hypothesis testing:
 
 ``` r
+
 # Fix starting point to 0.5 (unbiased) while estimating others
 formula_fixed <- bmf(
   drift ~ strength,
@@ -538,6 +550,7 @@ By default, `bmm` uses appropriate link functions:
 You can customize links if needed:
 
 ``` r
+
 # Use log link for drift (forces positive values)
 model_custom_links <- ddm(
   rt = "rt",

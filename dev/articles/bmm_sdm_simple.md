@@ -63,8 +63,7 @@ distribution:
 \sqrt{\frac{k}{2\pi}} e^{k \\ (cos(\theta-\mu)-1)}} }{Z}} \\
 
 This parametrization is derived from the known approximation of the
-modified bessel function for large \\k\\ (Abramowitz, Stegun, and Romer
-(1988)):
+modified bessel function for large \\k\\ (Abramowitz et al. (1988)):
 
 \\ I_0(\kappa) \sim ~ \frac{e^{\kappa}}{\sqrt{2\pi \kappa}}, \\ \\ \\ \\
 \kappa \rightarrow \infty \\
@@ -101,6 +100,7 @@ the number of response options is small, for example in 4-AFC tasks.
 Begin by loading the `bmm` package:
 
 ``` r
+
 library(bmm)
 ```
 
@@ -115,6 +115,7 @@ and (`rsdm`) for generating random deviates. Here’s how to simulate data
 from the SDM distribution for three conditions:
 
 ``` r
+
 # set seed for reproducibility
 set.seed(123)
 
@@ -133,6 +134,7 @@ This gives us the following distribution of response errors, with lines
 overlaying the predicted density generated with `dsdm`:
 
 ``` r
+
 # generate predicted SDM density:
 dd <- data.frame(y = rep(seq(-pi, pi, length.out=1000),3),
                  cond = factor(rep(c('A','B','C'), each=1000)),
@@ -173,6 +175,7 @@ parameters vary over conditions. In this case, we want them to vary over
 the `cond` variable, so we use `c ~ 0 + cond` and `kappa ~ 0 + cond`:
 
 ``` r
+
 ff <- bmf(c ~ 0 + cond, kappa ~ 0 + cond)
 ```
 
@@ -181,6 +184,7 @@ Then we specify the model, which in this case is just
 provide the name of the response error variable in the dataset:
 
 ``` r
+
 model <- sdm(resp_error = "y")
 ```
 
@@ -190,6 +194,7 @@ stable than the default `rstan` backend for this particular model.
 Here’s how to fit the model with `cmdstanr`:
 
 ``` r
+
 fit <- bmm(
   formula = ff,
   data = dat,
@@ -245,6 +250,7 @@ log-link function for the `c` and `kappa` parameters, so we have to
 exponentiate the coefficients to get the estimated parameters:
 
 ``` r
+
 exp(brms::fixef(fit)[2:7,1])
 #>     c_condA     c_condB     c_condC kappa_condA kappa_condB kappa_condC 
 #>   1.9954823  11.5761748   1.7743522   2.9970034   0.7443611   7.7180565
@@ -253,6 +259,7 @@ exp(brms::fixef(fit)[2:7,1])
 which are close to the true values we used to simulate the data:
 
 ``` r
+
 par_labels[,1:3]
 #>   cond c kappa
 #> 1    A 2     3
@@ -265,6 +272,7 @@ not exactly the same as the true parameters. To get a better picture, we
 can plot the estimated posterior distributions of the parameters:
 
 ``` r
+
 library(tidybayes)
 library(dplyr)
 library(tidyr)
@@ -297,6 +305,7 @@ As a final step, we can plot our data again, adding another line overlay
 with the density predicted by the estimated parameters:
 
 ``` r
+
 # generate predicted SDM density:
 ddest <- data.frame(
   y = rep(seq(-pi, pi, length.out = 1000), 3),
@@ -347,10 +356,10 @@ estimated parameters are able to capture the main features of the data.
 
 ## References
 
-Abramowitz, Milton, Irene A Stegun, and Robert H Romer. 1988. “Handbook
+Abramowitz, Milton, Irene A Stegun, and Robert H Romer. 1988. *Handbook
 of Mathematical Functions with Formulas, Graphs, and Mathematical
-Tables.” American Association of Physics Teachers.
+Tables*. American Association of Physics Teachers.
 
 Oberauer, Klaus. 2023. “Measurement Models for Visual Working Memory—a
-Factorial Model Comparison.” *Psychological Review* 130 (3): 841–52.
-<https://doi.org/10.1037/rev0000328>.
+Factorial Model Comparison.” *Psychological Review* (US) 130 (3):
+841–52. <https://doi.org/10.1037/rev0000328>.

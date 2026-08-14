@@ -22,6 +22,7 @@ where you have a set_size categorical predictor of `c` and `kappa`, you
 can use the following code:
 
 ``` r
+
 library(bmm)
 
 default_prior(bmf(c ~ 0 + set_size, kappa ~ 0 + set_size), 
@@ -61,6 +62,7 @@ corresponds to the following prior distribution over the log scale, with
 80% of the prior mass between 0.9 and 3.10:
 
 ``` r
+
 log_c <- seq(-2,6, 0.01)
 y <- brms::dstudent_t(log_c, df = 5, mu = 2, sigma = 0.75)
 plot(log_c, y, type = 'l', xlab = 'log(c)', ylab = 'Density', 
@@ -74,6 +76,7 @@ This corresponds to the following log-T prior over the native scale of
 22.35:
 
 ``` r
+
 c <- seq(0, 50, 0.01)
 y <- brms::dstudent_t(log(c), df = 5, mu = 2, sigma = 0.75) / c
 plot(c, y, type = 'l', xlab = 'c', ylab = 'Density', 
@@ -92,6 +95,7 @@ would be placed on the intercept, while the effects of each factor level
 relative to the intercept would have a default prior of normal(0, 1):
 
 ``` r
+
 default_prior(bmf(c ~ 1 + set_size, kappa ~ 1 + set_size), 
               data = oberauer_lin_2017,
               model = sdm(resp_error = 'dev_rad'))
@@ -126,6 +130,7 @@ output. If you wanted to estimate `mu`, instead of leaving it fixed, the
 prior for it would change as well:
 
 ``` r
+
 default_prior(bmf(mu ~ 1 + set_size, c ~ 1, kappa ~ 1),
               data = oberauer_lin_2017,
               model = sdm(resp_error = 'dev_rad'))
@@ -174,12 +179,13 @@ the
 function from `brms`:
 
 ``` r
+
 stancode(bmf(c ~ 0 + set_size, kappa ~ 0 + set_size), 
          data = oberauer_lin_2017,
          model = sdm(resp_error = 'dev_rad'))
 ```
 
-    // generated with brms 2.23.0 and bmm 1.2.0.9000
+    // generated with brms 2.23.0 and bmm 1.3.1.9000
     functions {
       /* compute the tan_half link
        * Args:
@@ -332,6 +338,7 @@ call
 on that object, which will give you the same result:
 
 ``` r
+
 fit <- bmm(bmf(c ~ 0 + set_size, kappa ~ 0 + set_size), 
               data = oberauer_lin_2017,
               model = sdm(resp_error = 'dev_rad'))
@@ -347,6 +354,7 @@ function from `brms`. This function will return a list with the data
 that would be passed to Stan for fitting the model.
 
 ``` r
+
 sd <- standata(bmf(c ~ 0 + set_size, kappa ~ 0 + set_size), 
                data = oberauer_lin_2017,
                model = sdm(resp_error = 'dev_rad'))

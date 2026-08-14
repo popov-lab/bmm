@@ -113,6 +113,23 @@ This choice rule can be interpreted as an n-alternative SDT model over
 the different response candidates with a Gumbel (or double-exponential)
 noise distribution.
 
+The two choice rules differ in how they translate the activation sources
+into probabilities, and this has a consequence for comparing activation
+sources. The default priors for the predefined `ss` and `cs` versions
+are calibrated so that both rules imply a comparable, broad range of
+average performance. For the `softmax` rule the priors for general (`a`)
+and context (`c`) activation share the same mean, so the implied prior
+on their difference is centered at zero. This makes `softmax` the
+appropriate choice rule when you want to compare or test activation
+sources against each other directly (e.g., whether context activation
+exceeds general activation). The `simple` rule normalizes the raw
+activations, so context activation has to exceed general activation
+(`c > a`) for the model to predict accurate recall; its default priors
+therefore encode `c > a` and are not suited for directly comparing `c`
+and `a`. If your research question concerns the contrast between
+activation sources, use the `softmax` choice rule (or supply your own
+symmetric priors).
+
 Finally, the model then links the response frequencies \\Y\\ for each
 response category to the probabilities \\p\\ using a multinomial
 distribution with the total number of trials:
@@ -139,10 +156,10 @@ simple span task, the complex span model distinguished two additional
 response categories: distractors in or close to the cued position
 (\\dist\_{context}\\), and distractors from other or far away positions
 (\\dist\_{other}\\). Thus, the `m3` for complex span tasks requires that
-you use distractors that could be potentially recalled.[¹](#fn1)
+you use distractors that could be potentially recalled.[^1]
 
 The activation equation for the `m3` for complex span tasks are as
-follows[²](#fn2):
+follows[^2]:
 
 \\ \begin{align} corr & = b + a + c \\ other & = b + a \\ dist\_{c} & =
 b + f \cdot a + f \cdot c \\ dist\_{o} & = b + f \cdot a \\ npi & = b
@@ -230,6 +247,7 @@ below.
 Let’s begin by loading the `bmm` package.
 
 ``` r
+
 library(bmm)
 ```
 
@@ -238,6 +256,7 @@ from Oberauer and Lewandowsky (2019). This data set is part of the `bmm`
 package as `oberauer_lewandowsky_2019_e1`
 
 ``` r
+
 data <- oberauer_lewandowsky_2019_e1
 head(data)
 ```
@@ -280,6 +299,7 @@ linear model formulas for each of the model parameters. These could look
 like this:
 
 ``` r
+
 # example formula for version = ss
 ss_formula <- bmf(
   c ~ 1 + cond + (1 + cond | ID),
@@ -304,6 +324,7 @@ parameters and other variables in the data, as exemplified in the more
 complex models in Oberauer and Lewandowsky (2019):
 
 ``` r
+
 cat_label ~ activation_function
 ```
 
@@ -312,6 +333,7 @@ If we wanted to implement the model proposed by Oberauer and Lewandowsky
 for the response categories `corr`, `other`, `dist`, and `npl`:
 
 ``` r
+
 act_formulas <- bmf(
   corr ~ b + a + c,
   other ~ b + a,
@@ -331,6 +353,7 @@ Based on the parameter labels that we used in these activation
 functions, we can then specify the linear formulas for each parameter:
 
 ``` r
+
 par_formulas <- bmf(
   c ~ 1 + cond + (1 + cond | ID),
   a ~ 1 + cond + (1 + cond | ID),
@@ -343,6 +366,7 @@ operator. Alternatively you can include all formulas in one call to
 `bmmformula`:
 
 ``` r
+
 full_formula <- act_formulas + par_formulas
 
 # pass all formulas in one call
@@ -374,6 +398,7 @@ provide the relevant information for the model. This entails:
 Thus, a basic set up of an `m3` object looks like this:
 
 ``` r
+
 my_model <- m3(resp_cats = c("corr","other","dist","npl"),
                num_options = c("n_corr","n_other","n_dist","n_npl"),
                choice_rule = "simple",
@@ -400,6 +425,7 @@ intercepts as `main` and for effects as `effects`.
 Setting up a `m3` object including these info looks like this:
 
 ``` r
+
 my_links <- list(
   c = "log", a = "log", d = "log"
 )
@@ -474,6 +500,7 @@ After having set up the `data`, the `bmmformula`, and the `bmmodel`, we
 can pass all information to `bmm` to fit the model:
 
 ``` r
+
 m3_fit <- bmm(
   formula = full_formula,
   data = data,
@@ -492,6 +519,7 @@ of your computer). Using the `bmmfit` object we can have a quick look at
 the summary of the fitted model:
 
 ``` r
+
 summary(m3_fit)
 ```
 
@@ -563,6 +591,7 @@ The parameter estimates for `c`, `a`, and `d` are estimated using a
 scale using the `exp` function:
 
 ``` r
+
 fixedFX <- brms::fixef(m3_fit)
 
 # print posterior means for the c parameter
@@ -605,6 +634,7 @@ evaluate the posterior differences between the conditions, we can use
 the `hypothesis` function from `brms`:
 
 ``` r
+
 post_diff <- c(
   c_newVoldR = "c_condoldreordered = 0",
   c_newVoldS = "c_condoldsame = 0",
@@ -653,6 +683,7 @@ plots using the `pp_check` function. For multinomial models like the
 and predicted response proportions across experimental conditions.
 
 ``` r
+
 pp_check(m3_fit, ndraws = 100)
 ```
 
@@ -673,6 +704,7 @@ predictions directly using the `tidybayes` package and build a custom
 plot.
 
 ``` r
+
 library(tidybayes)
 library(dplyr)
 library(ggplot2)
@@ -725,9 +757,7 @@ Oberauer, Klaus, and Stephan Lewandowsky. 2019. “Simple Measurement
 Models for Complex Working-Memory Tasks.” *Psychological Review* 126
 (6): 880–932. <https://doi.org/10.1037/rev0000159>.
 
-------------------------------------------------------------------------
-
-1.  Traditional complex span tasks, such as the operation span or
+[^1]: Traditional complex span tasks, such as the operation span or
     reading span task are thus not suited for the `m3`, as the
     distractors are different from the to-be-remembered items. For
     example, in the operation span task, participants are instructed
@@ -740,7 +770,7 @@ Models for Complex Working-Memory Tasks.” *Psychological Review* 126
     model would however not provide any insight on the way distractors
     are encoded and processed in working memory.
 
-2.  Please note that assuming that item and context activation are
+[^2]: Please note that assuming that item and context activation are
     filtered equally for the distractors is just one way that filtering
     might reduce the activation of distractors. More recent research on
     the removal of information from working memory suggests that item

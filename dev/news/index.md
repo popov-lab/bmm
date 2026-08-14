@@ -4,6 +4,178 @@
 
 #### New features
 
+- Add `softplus` as an opt-in link function for positively-bounded
+  parameters, as an alternative to the default `log` link.
+  `softplus(x) = log(1 + exp(x))` keeps parameters positive while
+  growing linearly for large values, avoiding the numerical blow-up of
+  [`exp()`](https://rdrr.io/r/base/Log.html) and giving predictor
+  effects an additive (rather than multiplicative) interpretation on the
+  natural scale. Enable it per parameter via the model’s `links` list,
+  e.g. `m3(...)$links <- list(c = "softplus", a = "softplus")` or
+  `ddm(rt, response, links = list(bound = "softplus"))`
+  ([\#363](https://github.com/venpopov/bmm/issues/363)).
+
+#### Bug fixes
+
+- Fix initial values being set in two places, where the `init` returned
+  by
+  [`configure_model()`](https://venpopov.com/bmm/dev/reference/configure_model.md)
+  was silently overwritten by
+  [`create_initfun()`](https://venpopov.com/bmm/dev/reference/create_initfun.md).
+  This caused the **m3** model’s intended `init = 0` (needed for stable
+  sampling with the `simple` choice rule and an `identity` link) to be
+  lost, and left dead `init` code in the **sdm** model.
+  [`create_initfun()`](https://venpopov.com/bmm/dev/reference/create_initfun.md)
+  is now the single source of truth for initial values, with
+  model-specific behaviour expressed through S3 methods
+  ([\#375](https://github.com/venpopov/bmm/issues/375)).
+- Fix `.pwald()` returning `NaN`/`-Inf` in the upper tail of the
+  shifted-Wald survival function, which propagated to
+  [`dcswald()`](https://venpopov.com/bmm/dev/reference/cswald_dist.md)
+  (and therefore `log_lik`/`posterior_predict`) for the **cswald** model
+  at extreme reaction times. The R-side survival now uses the stable
+  `log_diff_exp` form already used by the Stan likelihood
+  (`swald_lccdf`) ([\#376](https://github.com/venpopov/bmm/issues/376)).
+- Fix [`print()`](https://rdrr.io/r/base/print.html) for model summaries
+  selecting regression-coefficient rows by an unanchored substring
+  match, so a parameter such as `a` could pull in rows of another
+  parameter like `kappa` (e.g. in the **imm** model). Rows are now
+  matched on the exact parameter prefix. This also fixes a crash when
+  only a single coefficient row is shown
+  ([\#379](https://github.com/venpopov/bmm/issues/379),
+  [\#369](https://github.com/venpopov/bmm/issues/369)).
+- [`create_initfun()`](https://venpopov.com/bmm/dev/reference/create_initfun.md)
+  now matches Stan parameters to model parameters with a word-boundary
+  regex (`(^|_)param(_|$)`) instead of a substring match, preventing
+  collisions in models with short parameter names (e.g. `s`, `c`, `a`)
+  that are substrings of longer ones (`sim`, `correct`, `activation`);
+  the longest (most specific) match is selected when several apply
+  ([\#354](https://github.com/venpopov/bmm/issues/354),
+  [\#355](https://github.com/venpopov/bmm/issues/355)).
+- [`create_initfun()`](https://venpopov.com/bmm/dev/reference/create_initfun.md)
+  now resolves initialization terms from `nlpars` when a model parameter
+  is not a distributional parameter, so models built as non-linear brms
+  formulas (e.g. native-multinomial models whose parameters live in
+  `bterms$nlpars`) no longer error with
+  `no applicable method for 'has_intercept' applied to an object of class "NULL"`
+  ([\#362](https://github.com/venpopov/bmm/issues/362)).
+- [`bmm()`](https://venpopov.com/bmm/dev/reference/bmm.md) now warns
+  when a predictor in the formula shares its name with both a predicted
+  parameter and a column in the data. Such a predictor was silently
+  treated as a non-linear term (emitted via `nlf()` instead of `lf()`),
+  changing the likelihood without any error. Short parameter names (`c`,
+  `a`, `s`, `b`) collide naturally with condition codes or columns like
+  `accuracy`/`stimulus`
+  ([\#378](https://github.com/venpopov/bmm/issues/378)).
+
+#### Other changes
+
+- Added an internal consistency check in
+  [`configure_prior()`](https://venpopov.com/bmm/dev/reference/configure_prior.md):
+  if a model’s `fixed_parameters` includes a parameter that its
+  [`configure_model()`](https://venpopov.com/bmm/dev/reference/configure_model.md)
+  never wires into the formula (neither a dpar nor an nlpar), bmm now
+  fails with a clear model-definition error instead of letting a
+  malformed `b_Intercept ~ constant()` prior reach `brm()`. This is a
+  safety net for model development; it cannot be reached through the
+  normal [`bmm()`](https://venpopov.com/bmm/dev/reference/bmm.md)
+  interface, where an unrecognized parameter is already caught earlier
+  by
+  [`check_formula()`](https://venpopov.com/bmm/dev/reference/check_formula.md)
+  ([\#377](https://github.com/venpopov/bmm/issues/377)).
+- `print.bmmodel()` now also displays the required response variables
+  (one per line, annotated with the expected coding — e.g. radians in
+  \[-pi, pi\] for the circular models, seconds and 0/1 responses for the
+  trial-wise RT models) and the default parameter links, answering “what
+  does my data frame need to look like?” directly at the console
+  ([\#392](https://github.com/venpopov/bmm/issues/392)).
+- Recalibrated the default priors for the **m3** activation parameters
+  (`a`, `c`) so that the `simple` and `softmax` choice rules imply a
+  comparable, broad prior-predictive range of average performance, and
+  so that the `softmax` defaults place equal prior means on general
+  (`a`) and context (`c`) activation — centering the implied `c - a`
+  prior at zero for fair comparisons under cell-means coding. The
+  mis-scaled `normal(0, 2)` effect prior on `c` is replaced by the
+  shared `normal(0, 0.5)`. Because the `simple` rule requires `c > a` to
+  predict accurate recall, its defaults remain asymmetric; direct
+  comparisons of context and general activation should use the `softmax`
+  choice rule ([\#364](https://github.com/venpopov/bmm/issues/364)).
+
+#### Developer-facing changes
+
+- **[`use_model_template()`](https://venpopov.com/bmm/dev/reference/use_model_template.md)
+  now scaffolds the current model-specification patterns.** It generates
+  a flat `.{model}_defaults` block for unversioned models (like `ddm`)
+  or, with the new `versions` argument, a `.{model}_version_table` block
+  for versioned models (like `cswald`). The generated constructor spells
+  out every field of the model object inline (referencing the
+  defaults/version table for `parameters`, `links`, `fixed_parameters`,
+  `default_priors`, and `init_ranges`), and versioned aliases validate
+  `version` with [`match.arg()`](https://rdrr.io/r/base/match.arg.html)
+  ([\#350](https://github.com/venpopov/bmm/issues/350)).
+- **Removed the unused `void_mu` field** from all model definitions and
+  the template. It was assigned but never read anywhere — response-mean
+  suppression is already handled via `fixed_parameters` and the family’s
+  `dpars` ([\#350](https://github.com/venpopov/bmm/issues/350)).
+
+## bmm 1.3.1
+
+CRAN release: 2026-06-05
+
+#### Bug fixes
+
+- Fix `swald_lccdf()` returning incorrect log-survival probability when
+  response time equals non-decision time in the **cswald** model.
+  Previously returned `-Inf` instead of `0` (log of survival = 1)
+  ([\#348](https://github.com/venpopov/bmm/issues/348)).
+
+#### Other changes
+
+- The **ddm** model supports both `cmdstanr` and `rstan` backends.
+  Previously, `cmdstanr` was required.
+
+## bmm 1.3.0
+
+CRAN release: 2026-03-30
+
+#### New models
+
+- Add the **Diffusion Decision Model** (`ddm`) for speeded
+  decision-making tasks with trial-level RT and response data. The model
+  estimates drift rate, boundary separation, non-decision time, and
+  (optionally) relative starting point. Includes distribution functions
+  [`dddm()`](https://venpopov.com/bmm/dev/reference/ddm_dist.md) and
+  [`rddm()`](https://venpopov.com/bmm/dev/reference/ddm_dist.md)
+  ([\#280](https://github.com/venpopov/bmm/issues/280)).
+- Add the **EZ-Diffusion Model** (`ezdm`) for speeded decision-making
+  tasks. The model estimates drift rate, boundary separation, and
+  non-decision time from aggregated summary statistics (mean RT,
+  variance of RT, accuracy) using the closed-form equations derived by
+  Wagenmakers et al. (2007). Supports both 3-parameter (symmetric
+  starting point) and 4-parameter (asymmetric starting point) versions
+  based on Srivastava et al. (2016). Implements Bayesian hierarchical
+  estimation following Chavez & Vandekerckhove (2025). Includes
+  distribution functions
+  [`dezdm()`](https://venpopov.com/bmm/dev/reference/ezdm_dist.md) and
+  [`rezdm()`](https://venpopov.com/bmm/dev/reference/ezdm_dist.md)
+  ([\#281](https://github.com/venpopov/bmm/issues/281)).
+- Add the **Censored Shifted Wald Model** (`cswald`) for choice reaction
+  time tasks with two response boundaries. The model estimates drift
+  rate, boundary separation, and non-decision time from trial-level RT
+  and response data. Implements two versions: **simple** (treats errors
+  as censored correct responses, appropriate for high-accuracy tasks)
+  and **crisk** (competing risks version with separate accumulators for
+  each response, suitable for balanced accuracy). Includes distribution
+  functions
+  [`dcswald()`](https://venpopov.com/bmm/dev/reference/cswald_dist.md),
+  [`pcswald()`](https://venpopov.com/bmm/dev/reference/cswald_dist.md),
+  [`qcswald()`](https://venpopov.com/bmm/dev/reference/cswald_dist.md),
+  and
+  [`rcswald()`](https://venpopov.com/bmm/dev/reference/cswald_dist.md).
+  Thanks to [@GidonFrischkorn](https://github.com/GidonFrischkorn)
+
+#### New features
+
 - New S3 method **conditional_effects()** for `bmmfit` objects. Provides
   an intuitive interface for visualizing predictor effects on model
   parameters, with automatic routing between distributional and
@@ -14,11 +186,6 @@
 - New S3 methods for **emmeans** support on `bmmfit` objects. Users can
   now call `emmeans(fit, ~ condition, dpar = "kappa")` for any bmmodel
   ([\#323](https://github.com/venpopov/bmm/issues/323)).
-- **EZDM now supports negative drift rates** to model below-chance
-  performance. The drift parameter uses an identity link (previously
-  log) and employs a soft absolute value approximation (sqrt(drift² +
-  τ²) with τ = 0.01) to maintain smooth gradients for MCMC sampling
-  while allowing bidirectional drift estimation.
 - New **pp_check()** method for multinomial models (e.g., `m3`). Since
   [`brms::pp_check()`](https://mc-stan.org/bayesplot/reference/pp_check.html)
   does not support the multinomial family, `bmm` now provides a custom
@@ -30,66 +197,51 @@
   [`pp_check()`](https://venpopov.com/bmm/dev/reference/pp_check.bmmfit.md)
   delegates to
   [`brms::pp_check()`](https://mc-stan.org/bayesplot/reference/pp_check.html)
-  and auto-selects the grouped plot variant when `group` is specified.
-
-## bmm 1.3.0
-
-CRAN release: 2026-03-30
-
-#### New models
-
-- Add the **EZ-Diffusion Model** (`ezdm`) for speeded decision-making
-  tasks. The model estimates drift rate, boundary separation, and
-  non-decision time from aggregated summary statistics (mean RT,
-  variance of RT, accuracy) using the closed-form equations derived by
-  Wagenmakers et al. (2007). Supports both 3-parameter (symmetric
-  starting point) and 4-parameter (asymmetric starting point) versions
-  based on Srivastava et al. (2016). Implements Bayesian hierarchical
-  estimation following Chavez & Vandekerckhove (2025). See the
-  [article](https://venpopov.github.io/bmm/dev/articles/bmm_ezdm.html)
-  on the `bmm` website for details.
-- Add the **Censored Shifted Wald Model** (`cswald`) for choice reaction
-  time tasks with two response boundaries. The model estimates drift
-  rate, boundary separation, and non-decision time from trial-level RT
-  and response data. Implements two versions: **simple** (treats errors
-  as censored correct responses, appropriate for high-accuracy tasks)
-  and **crisk** (competing risks version with separate accumulators for
-  each response, suitable for balanced accuracy). See the
-  [article](https://venpopov.github.io/bmm/dev/articles/bmm_cswald.html)
-  on the `bmm` website for details. Thanks to
-  [@GidonFrischkorn](https://github.com/GidonFrischkorn)
-
-#### New features
-
-- New function **ezdm_summary_stats()** to compute summary statistics
-  from trial-level RT data for the EZ-Diffusion Model.
-- New function **create_initfun()** creates initialization functions for
-  models that benefit from or require initial values for MCMC sampling.
-  Supports automatic parameter initialization based on model-specific
-  ranges with proper link function transformations.
-- New utility function **link_transform()** applies link functions (log,
-  logit, identity, etc.) to parameter values, with proper handling of
-  NULL inputs.
-
-#### New features
-
-- New function **ezdm_summary_stats()** to compute summary statistics
-  from trial-level RT data for the EZ-Diffusion Model.
-- New function **flag_contaminant_rts()** for trial-level contamination
-  detection in RT data. Identifies fast guesses and attention lapses
-  using mixture modeling (uniform + RT distribution). Supports both
-  3-parameter (pooled) and 4-parameter (boundary-specific) versions,
-  analogous to
-  [`ezdm_summary_stats()`](https://venpopov.com/bmm/dev/reference/ezdm_summary_stats.md).
-  Returns contamination probabilities, likelihood ratios, or binary
-  flags for filtering trials before model fitting. Includes Bayesian
-  validation of fast guess assumptions for 2AFC tasks via
-  `validate_fast_guessing` parameter
+  and auto-selects the grouped plot variant when `group` is specified
+  ([\#324](https://github.com/venpopov/bmm/issues/324)).
+- New function **parameters()** lists all parameters of a `bmmodel` or
+  `bmmfit` object with descriptions, link functions, and fixed values
+  ([\#329](https://github.com/venpopov/bmm/issues/329)).
+- New function **extract_stan_blocks()** extracts individual program
+  blocks (functions, data, parameters, etc.) from compiled Stan code
+  ([\#286](https://github.com/venpopov/bmm/issues/286)).
+- New function **extract_parameter_dimensions()** extracts parameter
+  names, dimensions, and types from a Stan parameters block.
+- New functions **ezdm_summary_stats()** and **adjust_ezdm_accuracy()**
+  to compute and pre-process summary statistics from trial-level RT data
+  for the EZ-Diffusion Model
+  ([\#291](https://github.com/venpopov/bmm/issues/291)).
+- New functions **flag_contaminant_rts()** and
+  **validate_fast_guesses()** for trial-level contamination detection in
+  RT data. Identifies fast guesses and attention lapses using mixture
+  modeling and provides Bayesian validation of fast guess assumptions
   ([\#307](https://github.com/venpopov/bmm/issues/307)).
-- New function **validate_fast_guesses()** for standalone Bayesian
-  validation of fast guess assumptions using Beta-Binomial conjugate
-  analysis with Savage-Dickey Bayes Factors. Supports both
-  quantile-based (adaptive) and absolute (fixed) RT thresholds.
+- New function **create_initfun()** creates initialization functions for
+  models that benefit from or require initial values for MCMC sampling
+  ([\#285](https://github.com/venpopov/bmm/issues/285)).
+
+#### Documentation
+
+- New online
+  [article](https://venpopov.com/bmm/dev/articles/bmm_ddm.html) to
+  accompany the **ddm** model
+- New online
+  [article](https://venpopov.com/bmm/dev/articles/bmm_ezdm.html) to
+  accompany the **ezdm** model
+- New online
+  [article](https://venpopov.com/bmm/dev/articles/bmm_cswald.html) to
+  accompany the **cswald** model
+- New online
+  [article](https://venpopov.com/bmm/dev/articles/bmm_rt_contamination.html)
+  on pre-processing and contamination detection for reaction time data
+
+#### Other changes
+
+- Improved **rm3()** random generation function for the M3 model
+  ([\#279](https://github.com/venpopov/bmm/issues/279)).
+- Removed magrittr dependency; replaced `%>%` with the native pipe `|>`
+  ([\#341](https://github.com/venpopov/bmm/issues/341)).
+- Minimum R version is now 4.1.0.
 
 ## bmm 1.2.0
 
@@ -102,9 +254,9 @@ CRAN release: 2025-07-24
   categorical decision tasks as new model class **m3** with three
   versions: simple span (**ss**), complex span (**cs**), and **custom**.
   For details, see the
-  [article](https://venpopov.com/bmm/dev/articles/bmm_m3.html) on the
-  `bmm` website ([\#237](https://github.com/venpopov/bmm/issues/237)).
-  Thanks to [@GidonFrischkorn](https://github.com/GidonFrischkorn) and
+  [article](https://venpopov.com/bmm/articles/bmm_m3.html) on the `bmm`
+  website ([\#237](https://github.com/venpopov/bmm/issues/237)). Thanks
+  to [@GidonFrischkorn](https://github.com/GidonFrischkorn) and
   [@chenyu-psy](https://github.com/chenyu-psy)
 
 #### New features
@@ -141,8 +293,7 @@ CRAN release: 2025-07-24
   the `circular` model class
   ([\#229](https://github.com/venpopov/bmm/issues/229),
   [\#233](https://github.com/venpopov/bmm/issues/233)).
-- New online
-  [article](https://venpopov.com/bmm/dev/articles/bmm_m3.html) to
+- New online [article](https://venpopov.com/bmm/articles/bmm_m3.html) to
   accompany the m3 model
 
 #### Other changes

@@ -3,9 +3,9 @@
 ## 1 Introduction to the models
 
 The two-parameter mixture model (Zhang and Luck 2008) and the
-three-parameter mixture model (Bays, Catalao, and Husain 2009) are
-measurement models for continuous reproduction tasks in the visual
-working memory domain (for details on the task, see [the online
+three-parameter mixture model (Bays et al. 2009) are measurement models
+for continuous reproduction tasks in the visual working memory domain
+(for details on the task, see [the online
 article](https://venpopov.com/bmm/articles/bmm_vwm_crt.html). As other
 measurement models for continuous reproduction tasks, their goal is to
 model the distribution of angular response errors.
@@ -81,14 +81,16 @@ the `bmm` package:
 Begin by loading the `bmm` package:
 
 ``` r
+
 library(bmm)
 ```
 
-For this example, we will analyze data from Bays, Catalao, and Husain
-(2009). The data is included in the `mixtur` R package and can be loaded
-with the following command:
+For this example, we will analyze data from Bays et al. (2009). The data
+is included in the `mixtur` R package and can be loaded with the
+following command:
 
 ``` r
+
 # install the mixtur package if you haven't done so
 # install.packages("mixtur")
 dat <- mixtur::bays2009_full
@@ -96,14 +98,14 @@ dat <- mixtur::bays2009_full
 
 The data contains the following columns:
 
-|     |  id | set_size | duration | response | target | non_target_1 | non_target_2 | non_target_3 | non_target_4 | non_target_5 |
-|:----|----:|---------:|---------:|---------:|-------:|-------------:|-------------:|-------------:|-------------:|-------------:|
-| 321 |   1 |        4 |     2000 |    0.846 |  0.100 |        3.025 |       -0.665 |        2.054 |           NA |           NA |
-| 322 |   1 |        4 |     2000 |   -1.634 | -0.845 |        2.985 |        2.633 |        2.103 |           NA |           NA |
-| 323 |   1 |        4 |      100 |   -1.684 | -1.951 |        0.312 |       -1.924 |        0.622 |           NA |           NA |
-| 324 |   1 |        4 |      100 |    0.713 |  0.133 |        1.502 |        3.089 |       -0.958 |           NA |           NA |
-| 325 |   1 |        4 |     2000 |    1.317 |  1.439 |       -2.675 |       -1.191 |        1.970 |           NA |           NA |
-| 326 |   1 |        4 |     2000 |   -1.316 | -0.384 |        0.845 |        0.274 |       -0.465 |           NA |           NA |
+|  | id | set_size | duration | response | target | non_target_1 | non_target_2 | non_target_3 | non_target_4 | non_target_5 |
+|:---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| 321 | 1 | 4 | 2000 | 0.846 | 0.100 | 3.025 | -0.665 | 2.054 | NA | NA |
+| 322 | 1 | 4 | 2000 | -1.634 | -0.845 | 2.985 | 2.633 | 2.103 | NA | NA |
+| 323 | 1 | 4 | 100 | -1.684 | -1.951 | 0.312 | -1.924 | 0.622 | NA | NA |
+| 324 | 1 | 4 | 100 | 0.713 | 0.133 | 1.502 | 3.089 | -0.958 | NA | NA |
+| 325 | 1 | 4 | 2000 | 1.317 | 1.439 | -2.675 | -1.191 | 1.970 | NA | NA |
+| 326 | 1 | 4 | 2000 | -1.316 | -0.384 | 0.845 | 0.274 | -0.465 | NA | NA |
 
 where:
 
@@ -133,6 +135,7 @@ selected at random on each trial, the non-centered responses show a
 uniform distribution:
 
 ``` r
+
 library(ggplot2)
 ggplot(dat, aes(response)) +
   geom_histogram(binwidth = 0.5, fill = "lightblue", color = "black") +
@@ -150,6 +153,7 @@ the `bmm` package. As we can see from the new plot, the response
 distribution is now centered on 0.
 
 ``` r
+
 library(dplyr)
 dat_preprocessed <- dat |>
   mutate(error = wrap(response - target),
@@ -190,11 +194,11 @@ The model formula has three components:
     is internally fixed to have a mean of 0
 2.  The precision parameter `kappa` is predicted by set size, and the
     effect of set size varies across participants
-3.  The mixture weight[¹](#fn1) for memory responses `thetat` is
-    predicted by set size, and the effect of set size varies across
-    participants.
+3.  The mixture weight[^1] for memory responses `thetat` is predicted by
+    set size, and the effect of set size varies across participants.
 
 ``` r
+
 ff <- bmf(thetat ~ 0 + set_size + (0 + set_size | id),
           kappa ~ 0 + set_size + (0 + set_size | id))
 ```
@@ -202,6 +206,7 @@ ff <- bmf(thetat ~ 0 + set_size + (0 + set_size | id),
 Then we specify the model as simply as:
 
 ``` r
+
 model <- mixture2p(resp_error = "error")
 ```
 
@@ -211,6 +216,7 @@ fit model function uses the `brms` package to fit the model, so you can
 pass to it any argument that you would pass to the `brm` function.
 
 ``` r
+
 fit <- bmm(
   formula = ff,
   data = dat_preprocessed,
@@ -290,6 +296,7 @@ We now want to understand the estimated parameters.
   memory responses.
 
 ``` r
+
 # extract the fixed effects from the model and determine the rows that contain
 # the relevant parameter estimates
 fixedEff <- brms::fixef(fit)
@@ -306,6 +313,7 @@ pg <- exp(0)/(exp(thetat)+1)
 Our estimates for kappa over set_size are:
 
 ``` r
+
 kappa
 #>                  Estimate Est.Error      Q2.5    Q97.5
 #> kappa_set_size1 17.974163  1.126196 14.314425 22.69904
@@ -317,6 +325,7 @@ kappa
 Standard deviation:
 
 ``` r
+
 names(sd) <- paste0("Set size ", c(1,2,4,6))
 round(sd,3)
 #> Set size 1 Set size 2 Set size 4 Set size 6 
@@ -326,6 +335,7 @@ round(sd,3)
 Probability that responses comes from memory:
 
 ``` r
+
 rownames(p_mem) <- paste0("Set size ", c(1,2,4,6))
 round(p_mem,3)
 #>            Estimate Est.Error  Q2.5 Q97.5
@@ -339,6 +349,7 @@ It is even better to visualize the entire posterior distribution of the
 parameters.
 
 ``` r
+
 library(tidybayes)
 library(tidyr)
 
@@ -378,11 +389,11 @@ represents the 95% credible interval.
 
 Fitting the 3-parameter mixture model is very similar. We have an extra
 parameter `thetant` that represents the mixture weight for non-target
-responses[²](#fn2). We also need to specify the names of the non-target
-variables and the set_size[³](#fn3) variable in the `mixture3p`
-function.
+responses[^2]. We also need to specify the names of the non-target
+variables and the set_size[^3] variable in the `mixture3p` function.
 
 ``` r
+
 ff <- bmf(
   thetat ~ 0 + set_size + (0 + set_size | id),
   thetant ~ 0 + set_size + (0 + set_size | id),
@@ -395,6 +406,7 @@ model <- mixture3p(resp_error = "error", nt_features = paste0('non_target_',1:5)
 Then we run the model just like before:
 
 ``` r
+
 fit3p <- bmm(
   formula = ff,
   data = dat_preprocessed,
@@ -418,6 +430,7 @@ etc. For example, you can specify the model a few different ways via
 regular expressions:
 
 ``` r
+
 model <- mixture3p(resp_error = "error", 
                    nt_features = "non_target_[1-5]", 
                    set_size = 'set_size', 
@@ -439,9 +452,7 @@ Zhang, Weiwei, and Steven J. Luck. 2008. “Discrete Fixed-Resolution
 Representations in Visual Working Memory.” *Nature* 453 (7192): 233–35.
 <https://doi.org/10.1038/nature06860>.
 
-------------------------------------------------------------------------
-
-1.  `brms` does not directly estimate the probabilities that each
+[^1]: `brms` does not directly estimate the probabilities that each
     response comes from each distribution (e.g. \\p\_{mem}\\ and
     \\p\_{guess}\\). Instead, brms estimates mixing proportions that are
     weights applied to each of the mixture distributions and they are
@@ -450,7 +461,7 @@ Representations in Visual Working Memory.” *Nature* 453 (7192): 233–35.
     we can use the softmax function, that is: \\p\_{mem} =
     \frac{exp(\theta\_{target})}{1+exp(\theta\_{target})}\\
 
-2.  because now we have three mixture weights, you will need later to
+[^2]: because now we have three mixture weights, you will need later to
     calculate the probability of target responses as \\p\_{mem} =
     \frac{exp(\theta\_{target})}{1+exp(\theta\_{target})+exp(\theta\_{nontarget})}\\,
     the probability of non-target responses as \\p\_{nt}
@@ -458,6 +469,6 @@ Representations in Visual Working Memory.” *Nature* 453 (7192): 233–35.
     and the probability of guessing as \\p\_{guess} =
     1-p\_{mem}-p\_{nt}\\
 
-3.  When the set_size varies in an experiment, provide the name of the
+[^3]: When the set_size varies in an experiment, provide the name of the
     variable containing the set_size information. If the set size is the
     same for all trials, provide a number, e.g. `set_size=4`
