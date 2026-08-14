@@ -1,5 +1,16 @@
 # Changelog
 
+## bmm (development version)
+
+#### Other changes
+
+- `print.bmmodel()` now also displays the required response variables
+  (one per line, annotated with the expected coding — e.g. radians in
+  \[-pi, pi\] for the circular models, seconds and 0/1 responses for the
+  trial-wise RT models) and the default parameter links, answering “what
+  does my data frame need to look like?” directly at the console
+  ([\#392](https://github.com/venpopov/bmm/issues/392)).
+
 ## bmm 1.3.1
 
 CRAN release: 2026-06-05
