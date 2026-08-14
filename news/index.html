@@ -44,7 +44,8 @@
 <h2 class="pkg-version" data-toc-text="development version" id="bmm-development-version">bmm (development version)<a class="anchor" aria-label="anchor" href="#bmm-development-version"></a></h2>
 <div class="section level4">
 <h4 id="other-changes-development-version">Other changes<a class="anchor" aria-label="anchor" href="#other-changes-development-version"></a></h4>
-<ul><li>
+<ul><li>Added an internal consistency check in <code><a href="../reference/configure_prior.html">configure_prior()</a></code>: if a model’s <code>fixed_parameters</code> includes a parameter that its <code><a href="../reference/configure_model.html">configure_model()</a></code> never wires into the formula (neither a dpar nor an nlpar), bmm now fails with a clear model-definition error instead of letting a malformed <code>b_Intercept ~ constant()</code> prior reach <code>brm()</code>. This is a safety net for model development; it cannot be reached through the normal <code><a href="../reference/bmm.html">bmm()</a></code> interface, where an unrecognized parameter is already caught earlier by <code><a href="../reference/check_formula.html">check_formula()</a></code> (<a href="https://github.com/venpopov/bmm/issues/377" class="external-link">#377</a>).</li>
+<li>
 <code>print.bmmodel()</code> now also displays the required response variables (one per line, annotated with the expected coding — e.g. radians in [-pi, pi] for the circular models, seconds and 0/1 responses for the trial-wise RT models) and the default parameter links, answering “what does my data frame need to look like?” directly at the console (<a href="https://github.com/venpopov/bmm/issues/392" class="external-link">#392</a>).</li>
 </ul></div>
 </div>
@@ -69,6 +70,13 @@
 <code><a href="../reference/create_initfun.html">create_initfun()</a></code> now matches Stan parameters to model parameters with a word-boundary regex (<code>(^|_)param(_|$)</code>) instead of a substring match, preventing collisions in models with short parameter names (e.g. <code>s</code>, <code>c</code>, <code>a</code>) that are substrings of longer ones (<code>sim</code>, <code>correct</code>, <code>activation</code>); the longest (most specific) match is selected when several apply (<a href="https://github.com/venpopov/bmm/issues/354" class="external-link">#354</a>, <a href="https://github.com/venpopov/bmm/issues/355" class="external-link">#355</a>).</li>
 <li>
 <code><a href="../reference/create_initfun.html">create_initfun()</a></code> now resolves initialization terms from <code>nlpars</code> when a model parameter is not a distributional parameter, so models built as non-linear brms formulas (e.g. native-multinomial models whose parameters live in <code>bterms$nlpars</code>) no longer error with <code>no applicable method for 'has_intercept' applied to an object of class "NULL"</code> (<a href="https://github.com/venpopov/bmm/issues/362" class="external-link">#362</a>).</li>
+</ul></div>
+<div class="section level4">
+<h4 id="developer-facing-changes-1-3-1">Developer-facing changes<a class="anchor" aria-label="anchor" href="#developer-facing-changes-1-3-1"></a></h4>
+<ul><li>
+<strong><code><a href="../reference/use_model_template.html">use_model_template()</a></code> now scaffolds the current model-specification patterns.</strong> It generates a flat <code>.{model}_defaults</code> block for unversioned models (like <code>ddm</code>) or, with the new <code>versions</code> argument, a <code>.{model}_version_table</code> block for versioned models (like <code>cswald</code>). The generated constructor spells out every field of the model object inline (referencing the defaults/version table for <code>parameters</code>, <code>links</code>, <code>fixed_parameters</code>, <code>default_priors</code>, and <code>init_ranges</code>), and versioned aliases validate <code>version</code> with <code><a href="https://rdrr.io/r/base/match.arg.html" class="external-link">match.arg()</a></code> (<a href="https://github.com/venpopov/bmm/issues/350" class="external-link">#350</a>).</li>
+<li>
+<strong>Removed the unused <code>void_mu</code> field</strong> from all model definitions and the template. It was assigned but never read anywhere — response-mean suppression is already handled via <code>fixed_parameters</code> and the family’s <code>dpars</code> (<a href="https://github.com/venpopov/bmm/issues/350" class="external-link">#350</a>).</li>
 </ul></div>
 </div>
     <div class="section level2">
