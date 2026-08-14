@@ -87,9 +87,7 @@ print.bmmsummary <- function(x, digits = 2, color = getOption("bmm.color_summary
   }
   if (nrow(x$fixed)) {
     cat(style("green")("Regression Coefficients:\n"))
-    # match the exact parameter prefix, not a substring, so "a_" does not also
-    # select "kappa_Intercept" for models with both parameters (#379)
-    reduced <- x$fixed[sub("_.*$", "", rownames(x$fixed)) %in% pars_to_print, ]
+    reduced <- .summary_fixed_rows(x$fixed, pars_to_print)
     is_constant <- is.na(reduced$Rhat)
     print_format(reduced[!is_constant, ], digits)
     cat("\n")
@@ -132,6 +130,17 @@ select_pars <- function(x) {
   model_pars <- names(x$model$parameters)
   provided_dpars <- names(x$formula)[!is_nl(x$formula)]
   union(model_pars, provided_dpars)
+}
+
+# Fixed-effect rows whose brms prefix (the parameter name before the first
+# underscore) is among the printed parameters. The prefix is tokenized and
+# compared exactly — not via an unanchored grepl() — so "a_" does not also
+# select rows of another parameter such as "kappa_Intercept" (#379). Plain
+# data.frame subsetting with drop = FALSE also keeps a single fixed-effect row
+# intact, which broke the old sapply+apply approach for single-coefficient
+# models such as gumbel-min sdt_ranking (dprime ~ 1) (#369).
+.summary_fixed_rows <- function(fixed, pars) {
+  fixed[sub("_.*$", "", rownames(fixed)) %in% pars, , drop = FALSE]
 }
 
 summarise_links <- function(links) {
