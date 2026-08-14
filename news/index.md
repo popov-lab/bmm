@@ -4,6 +4,13 @@
 
 #### Bug fixes
 
+- Fix `.pwald()` returning `NaN`/`-Inf` in the upper tail of the
+  shifted-Wald survival function, which propagated to
+  [`dcswald()`](https://venpopov.com/bmm/reference/cswald_dist.md) (and
+  therefore `log_lik`/`posterior_predict`) for the **cswald** model at
+  extreme reaction times. The R-side survival now uses the stable
+  `log_diff_exp` form already used by the Stan likelihood
+  (`swald_lccdf`) ([\#376](https://github.com/venpopov/bmm/issues/376)).
 - Fix [`print()`](https://rdrr.io/r/base/print.html) for model summaries
   selecting regression-coefficient rows by an unanchored substring
   match, so a parameter such as `a` could pull in rows of another
