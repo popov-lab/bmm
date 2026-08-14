@@ -113,6 +113,23 @@ This choice rule can be interpreted as an n-alternative SDT model over
 the different response candidates with a Gumbel (or double-exponential)
 noise distribution.
 
+The two choice rules differ in how they translate the activation sources
+into probabilities, and this has a consequence for comparing activation
+sources. The default priors for the predefined `ss` and `cs` versions
+are calibrated so that both rules imply a comparable, broad range of
+average performance. For the `softmax` rule the priors for general (`a`)
+and context (`c`) activation share the same mean, so the implied prior
+on their difference is centered at zero. This makes `softmax` the
+appropriate choice rule when you want to compare or test activation
+sources against each other directly (e.g., whether context activation
+exceeds general activation). The `simple` rule normalizes the raw
+activations, so context activation has to exceed general activation
+(`c > a`) for the model to predict accurate recall; its default priors
+therefore encode `c > a` and are not suited for directly comparing `c`
+and `a`. If your research question concerns the contrast between
+activation sources, use the `softmax` choice rule (or supply your own
+symmetric priors).
+
 Finally, the model then links the response frequencies \\Y\\ for each
 response category to the probabilities \\p\\ using a multinomial
 distribution with the total number of trials:

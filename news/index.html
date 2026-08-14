@@ -49,6 +49,7 @@
 <div class="section level4">
 <h4 id="other-changes-1-3-1">Other changes<a class="anchor" aria-label="anchor" href="#other-changes-1-3-1"></a></h4>
 <ul><li>The <strong>ddm</strong> model supports both <code>cmdstanr</code> and <code>rstan</code> backends. Previously, <code>cmdstanr</code> was required.</li>
+<li>Recalibrated the default priors for the <strong>m3</strong> activation parameters (<code>a</code>, <code>c</code>) so that the <code>simple</code> and <code>softmax</code> choice rules imply a comparable, broad prior-predictive range of average performance, and so that the <code>softmax</code> defaults place equal prior means on general (<code>a</code>) and context (<code>c</code>) activation — centering the implied <code>c - a</code> prior at zero for fair comparisons under cell-means coding. The mis-scaled <code>normal(0, 2)</code> effect prior on <code>c</code> is replaced by the shared <code>normal(0, 0.5)</code>. Because the <code>simple</code> rule requires <code>c &gt; a</code> to predict accurate recall, its defaults remain asymmetric; direct comparisons of context and general activation should use the <code>softmax</code> choice rule (<a href="https://github.com/venpopov/bmm/issues/364" class="external-link">#364</a>).</li>
 </ul></div>
 <div class="section level4">
 <h4 id="bug-fixes-1-3-1-1">Bug fixes<a class="anchor" aria-label="anchor" href="#bug-fixes-1-3-1-1"></a></h4>

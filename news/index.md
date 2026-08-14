@@ -15,6 +15,17 @@ CRAN release: 2026-06-05
 
 - The **ddm** model supports both `cmdstanr` and `rstan` backends.
   Previously, `cmdstanr` was required.
+- Recalibrated the default priors for the **m3** activation parameters
+  (`a`, `c`) so that the `simple` and `softmax` choice rules imply a
+  comparable, broad prior-predictive range of average performance, and
+  so that the `softmax` defaults place equal prior means on general
+  (`a`) and context (`c`) activation — centering the implied `c - a`
+  prior at zero for fair comparisons under cell-means coding. The
+  mis-scaled `normal(0, 2)` effect prior on `c` is replaced by the
+  shared `normal(0, 0.5)`. Because the `simple` rule requires `c > a` to
+  predict accurate recall, its defaults remain asymmetric; direct
+  comparisons of context and general activation should use the `softmax`
+  choice rule ([\#364](https://github.com/venpopov/bmm/issues/364)).
 
 #### Bug fixes
 
