@@ -723,6 +723,26 @@ test_that("pcswald and qcswald handle extreme parameters", {
   expect_true(q_small > 0.3 && q_small < 0.5)
 })
 
+test_that("dcswald error-response likelihood stays finite in the upper tail (#376)", {
+  # The simple version routes response = 0 through the shifted-Wald survival.
+  # The old naive log(1 - exp(cdf)) cancelled to NaN/-Inf for late RTs.
+  ll <- dcswald(c(5, 10, 20, 40),
+    response = 0, drift = 2, bound = 1, ndt = 0.3, version = "simple"
+  )
+  expect_true(all(is.finite(ll)))
+})
+
+test_that("dcswald error-response survival equals 1 - CDF in mid-range (#376)", {
+  rt <- c(0.4, 0.6, 0.9, 1.3)
+  ll_error <- dcswald(rt,
+    response = 0, drift = 2, bound = 1, ndt = 0.3, version = "simple"
+  )
+  cdf <- pcswald(rt,
+    response = 1, drift = 2, bound = 1, ndt = 0.3, version = "simple"
+  )
+  expect_equal(ll_error, log(1 - cdf))
+})
+
 test_that("rm3 works without providing b parameter", {
   model <- m3(
     resp_cats = c("corr", "other", "npl"),
