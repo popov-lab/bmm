@@ -1,6 +1,7 @@
 # bmm (development version)
 
 ### Other changes
+* Added an internal consistency check in `configure_prior()`: if a model's `fixed_parameters` includes a parameter that its `configure_model()` never wires into the formula (neither a dpar nor an nlpar), bmm now fails with a clear model-definition error instead of letting a malformed `b_Intercept ~ constant()` prior reach `brm()`. This is a safety net for model development; it cannot be reached through the normal `bmm()` interface, where an unrecognized parameter is already caught earlier by `check_formula()` (#377).
 * `print.bmmodel()` now also displays the required response variables (one per line, annotated with the expected coding — e.g. radians in [-pi, pi] for the circular models, seconds and 0/1 responses for the trial-wise RT models) and the default parameter links, answering "what does my data frame need to look like?" directly at the console (#392).
 
 # bmm 1.3.1
