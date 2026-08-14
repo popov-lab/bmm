@@ -1,5 +1,5 @@
 pandoc: 3.8.3
-pkgdown: 2.2.0
+pkgdown: 2.2.1
 pkgdown_sha: ~
 articles:
   articles/bmm_bmmformula: bmm_bmmformula.html
@@ -13,7 +13,7 @@ articles:
   articles/bmm_rt_contamination: bmm_rt_contamination.html
   articles/bmm_sdm_simple: bmm_sdm_simple.html
   articles/bmm_vwm_crt: bmm_vwm_crt.html
-last_built: 2026-06-05T06:24Z
+last_built: 2026-08-14T16:19Z
 urls:
   reference: https://venpopov.com/bmm/reference
   article: https://venpopov.com/bmm/articles

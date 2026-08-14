@@ -2,6 +2,8 @@
 
 ## bmm 1.3.1
 
+CRAN release: 2026-06-05
+
 #### Bug fixes
 
 - Fix `swald_lccdf()` returning incorrect log-survival probability when
@@ -13,6 +15,24 @@
 
 - The **ddm** model supports both `cmdstanr` and `rstan` backends.
   Previously, `cmdstanr` was required.
+
+#### Bug fixes
+
+- [`create_initfun()`](https://venpopov.com/bmm/reference/create_initfun.md)
+  now matches Stan parameters to model parameters with a word-boundary
+  regex (`(^|_)param(_|$)`) instead of a substring match, preventing
+  collisions in models with short parameter names (e.g. `s`, `c`, `a`)
+  that are substrings of longer ones (`sim`, `correct`, `activation`);
+  the longest (most specific) match is selected when several apply
+  ([\#354](https://github.com/venpopov/bmm/issues/354),
+  [\#355](https://github.com/venpopov/bmm/issues/355)).
+- [`create_initfun()`](https://venpopov.com/bmm/reference/create_initfun.md)
+  now resolves initialization terms from `nlpars` when a model parameter
+  is not a distributional parameter, so models built as non-linear brms
+  formulas (e.g. native-multinomial models whose parameters live in
+  `bterms$nlpars`) no longer error with
+  `no applicable method for 'has_intercept' applied to an object of class "NULL"`
+  ([\#362](https://github.com/venpopov/bmm/issues/362)).
 
 ## bmm 1.3.0
 
