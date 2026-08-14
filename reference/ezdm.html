@@ -71,7 +71,10 @@
 
 
 <dt id="arg-links">links<a class="anchor" aria-label="anchor" href="#arg-links"></a></dt>
-<dd><p>A list of links for the parameters.</p></dd>
+<dd><p>A list of links for the parameters. For positive parameters
+(e.g. <code>bound</code>, <code>ndt</code>), "softplus" is available as an alternative to the
+default "log" link that grows linearly for large values and avoids the
+numerical blow-up of <code><a href="https://rdrr.io/r/base/Log.html" class="external-link">exp()</a></code>.</p></dd>
 
 
 <dt id="arg-version">version<a class="anchor" aria-label="anchor" href="#arg-version"></a></dt>

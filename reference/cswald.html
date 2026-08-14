@@ -71,7 +71,9 @@ automatically.</p></dd>
 <dd><p>A named list of link functions for the model parameters.
 Available parameters depend on the version: "simple" has <code>drift</code>, <code>bound</code>,
 <code>ndt</code>, and <code>s</code>; "crisk" additionally has <code>zr</code>. Default links are "log" for
-most parameters and "logit" for <code>zr</code>.</p></dd>
+most parameters and "logit" for <code>zr</code>. For positive parameters, "softplus"
+is available as an alternative to "log" that grows linearly for large
+values and avoids the numerical blow-up of <code><a href="https://rdrr.io/r/base/Log.html" class="external-link">exp()</a></code>.</p></dd>
 
 
 <dt id="arg-version">version<a class="anchor" aria-label="anchor" href="#arg-version"></a></dt>

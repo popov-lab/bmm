@@ -4,6 +4,19 @@
 
 CRAN release: 2026-06-05
 
+#### New features
+
+- Add `softplus` as an opt-in link function for positively-bounded
+  parameters, as an alternative to the default `log` link.
+  `softplus(x) = log(1 + exp(x))` keeps parameters positive while
+  growing linearly for large values, avoiding the numerical blow-up of
+  [`exp()`](https://rdrr.io/r/base/Log.html) and giving predictor
+  effects an additive (rather than multiplicative) interpretation on the
+  natural scale. Enable it per parameter via the model’s `links` list,
+  e.g. `m3(...)$links <- list(c = "softplus", a = "softplus")` or
+  `ddm(rt, response, links = list(bound = "softplus"))`
+  ([\#363](https://github.com/venpopov/bmm/issues/363)).
+
 #### Bug fixes
 
 - Fix `swald_lccdf()` returning incorrect log-survival probability when
