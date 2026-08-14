@@ -53,8 +53,7 @@
       links = .ddm_defaults[["links"]],
       fixed_parameters = .ddm_defaults[["fixed_parameters"]],
       default_priors = .ddm_defaults[["priors"]],
-      init_ranges = .ddm_defaults[["init_ranges"]],
-      void_mu = TRUE
+      init_ranges = .ddm_defaults[["init_ranges"]]
     ),
     class = c("bmmodel", "ddm"),
     call = call

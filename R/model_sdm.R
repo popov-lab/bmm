@@ -40,8 +40,7 @@
         mu = c(-0.5,0.5),
         kappa = c(2.5,3.5),
         c = c(4,6)
-      ),
-      void_mu = FALSE
+      )
     ),
     class = c("bmmodel", "circular", "sdm", paste0("sdm_", version)),
     call = call
@@ -163,11 +162,7 @@ configure_model.sdm <- function(model, data, formula) {
   formula <- bmf2bf(model, formula)
   formula$family <- sdm_simple
 
-  # set initial values to be sampled between [-1,1] to avoid extreme SDs that
-  # can cause the sampler to fail
-  init <- 1
-
-  nlist(formula, data, stanvars, init)
+  nlist(formula, data, stanvars)
 }
 
 ############################################################################# !

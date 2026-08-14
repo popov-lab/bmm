@@ -132,14 +132,15 @@ select_pars <- function(x) {
   union(model_pars, provided_dpars)
 }
 
-# Fixed-effect rows whose name matches any printed parameter. Uses lapply+Reduce
-# rather than sapply+apply so a single fixed-effect row or a single parameter
-# does not collapse to a dimensionless object — which broke summaries of
-# single-coefficient models such as gumbel-min sdt_ranking (dprime ~ 1).
+# Fixed-effect rows whose brms prefix (the parameter name before the first
+# underscore) is among the printed parameters. The prefix is tokenized and
+# compared exactly — not via an unanchored grepl() — so "a_" does not also
+# select rows of another parameter such as "kappa_Intercept" (#379). Plain
+# data.frame subsetting with drop = FALSE also keeps a single fixed-effect row
+# intact, which broke the old sapply+apply approach for single-coefficient
+# models such as gumbel-min sdt_ranking (dprime ~ 1) (#369).
 .summary_fixed_rows <- function(fixed, pars) {
-  patterns <- paste0(pars, "_")
-  include <- Reduce(`|`, lapply(patterns, function(p) grepl(p, rownames(fixed))))
-  fixed[include, , drop = FALSE]
+  fixed[sub("_.*$", "", rownames(fixed)) %in% pars, , drop = FALSE]
 }
 
 summarise_links <- function(links) {

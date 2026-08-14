@@ -31,6 +31,25 @@ test_that("create_initfun returns 1 for mixture2p models", {
   expect_equal(init_fun, 1)
 })
 
+test_that("create_initfun returns 0 for m3 with simple choice rule and identity link", {
+  dat <- oberauer_lewandowsky_2019_e1
+  ff <- bmf(c ~ 1, a ~ 1)
+
+  model <- m3(
+    resp_cats = c("corr", "other", "npl"),
+    num_options = c("n_corr", "n_other", "n_npl"),
+    choice_rule = "simple",
+    version = "ss"
+  )
+
+  # default simple links are log -> falls through to the default method (1)
+  expect_equal(create_initfun(model, dat, ff), 1)
+
+  # an identity link on any parameter requires zeros for stable sampling
+  model$links$c <- "identity"
+  expect_equal(create_initfun(model, dat, ff), 0)
+})
+
 # =============================================================================
 # BASIC FUNCTIONALITY TESTS
 # =============================================================================
