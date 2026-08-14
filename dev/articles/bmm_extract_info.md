@@ -268,6 +268,33 @@ stancode(bmf(c ~ 0 + set_size, kappa ~ 0 + set_size),
         real out = -log_sum_exp(fn)+log(m);
         return(out);
       }
+
+      real sdm_simple_run_ldenom(vector c, vector kappa, matrix CN,
+                                 int G_runs, array[] int run_start,
+                                 array[] int run_count) {
+        real out = 0;
+        for (g in 1:G_runs) {
+          int n = run_start[g];
+          real z = sdm_simple_ldenom_chquad_adaptive(c[n], kappa[n], CN);
+          out += run_count[g] * z;
+        }
+        return(out);
+      }
+
+      real sdm_simple_run_ldenom_slice(vector c, vector kappa, matrix CN,
+                                       int start, int end, int G_runs,
+                                       array[] int run_start,
+                                       array[] int run_count) {
+        real out = 0;
+        for (g in 1:G_runs) {
+          if (run_start[g] >= start && run_start[g] <= end) {
+            int n = run_start[g] - start + 1;
+            real z = sdm_simple_ldenom_chquad_adaptive(c[n], kappa[n], CN);
+            out += run_count[g] * z;
+          }
+        }
+        return(out);
+      }
     }
     data {
       int<lower=1> N;  // total number of observations
@@ -277,6 +304,9 @@ stancode(bmf(c ~ 0 + set_size, kappa ~ 0 + set_size),
       int<lower=1> K_kappa;  // number of population-level effects
       matrix[N, K_kappa] X_kappa;  // population-level design matrix
       int prior_only;  // should the likelihood be ignored?
+      int G_sdm_runs;
+      array[G_sdm_runs] int sdm_run_start;
+      array[G_sdm_runs] int sdm_run_count;
     }
     transformed data {
         // precompute chebyshev points
@@ -284,6 +314,30 @@ stancode(bmf(c ~ 0 + set_size, kappa ~ 0 + set_size),
       for (m in 1:200) {
         for (i in 1:m) {
           COSN[i,m] = cos((2*i-1)*pi()/(2*m))-1;
+        }
+      }
+      // fail fast if the precomputed run metadata does not describe the data Stan
+      // received (it is computed in R and can drift out of sync with the data)
+      {
+        int sdm_run_total = 0;
+        for (g in 1:G_sdm_runs) {
+          if (sdm_run_start[g] < 1 || sdm_run_start[g] > N) {
+            reject("bmm error: sdm_run_start[", g, "] = ", sdm_run_start[g],
+                   " is outside the data range [1, ", N, "]. The SDM run metadata ",
+                   "does not match the model data. Please report this at ",
+                   "https://github.com/popov-lab/bmm/issues");
+          }
+          if (g > 1 && sdm_run_start[g] <= sdm_run_start[g - 1]) {
+            reject("bmm error: sdm_run_start must be strictly increasing. The SDM ",
+                   "run metadata does not match the model data. Please report ",
+                   "this at https://github.com/popov-lab/bmm/issues");
+          }
+          sdm_run_total += sdm_run_count[g];
+        }
+        if (sdm_run_total != N) {
+          reject("bmm error: sum(sdm_run_count) = ", sdm_run_total, " but N = ", N,
+                 ". The SDM run metadata does not match the model data. Please ",
+                 "report this at https://github.com/popov-lab/bmm/issues");
         }
       }
     }
@@ -314,14 +368,8 @@ stancode(bmf(c ~ 0 + set_size, kappa ~ 0 + set_size),
         mu = inv_tan_half(mu);
         kappa = exp(kappa);
         target += sdm_simple_lpdf(Y | mu, c, kappa);
-          // adaptive calculation of the normalization constant
-        real z;
-        for (n in 1:N) {
-            if (n == 1 || c[n] != c[n-1] || kappa[n] != kappa[n-1]) {
-                z = sdm_simple_ldenom_chquad_adaptive(c[n],kappa[n],COSN);
-            }
-            target += z;
-        }
+          target += sdm_simple_run_ldenom(c, kappa, COSN, G_sdm_runs,
+                                        sdm_run_start, sdm_run_count);
         target += -(log2()+log(pi()))*N;
       }
       // priors including constants
@@ -359,18 +407,18 @@ sd <- standata(bmf(c ~ 0 + set_size, kappa ~ 0 + set_size),
                data = oberauer_lin_2017,
                model = sdm(resp_error = 'dev_rad'))
 str(sd)
-#> List of 10
-#>  $ N         : int 15200
-#>  $ Y         : num [1:15200(1d)] 0.384 -0.4538 -0.0873 0.3665 -0.0349 ...
-#>  $ K         : int 1
-#>  $ Kc        : num 0
-#>  $ X         : num [1:15200, 1] 1 1 1 1 1 1 1 1 1 1 ...
+#> List of 13
+#>  $ N            : int 15200
+#>  $ Y            : num [1:15200(1d)] 0.384 -0.4538 -0.0873 0.3665 -0.0349 ...
+#>  $ K            : int 1
+#>  $ Kc           : num 0
+#>  $ X            : num [1:15200, 1] 1 1 1 1 1 1 1 1 1 1 ...
 #>   ..- attr(*, "dimnames")=List of 2
 #>   .. ..$ : chr [1:15200] "1" "2" "3" "4" ...
 #>   .. ..$ : chr "Intercept"
 #>   ..- attr(*, "assign")= int 0
-#>  $ K_c       : int 8
-#>  $ X_c       : num [1:15200, 1:8] 0 0 0 0 1 1 0 0 0 0 ...
+#>  $ K_c          : int 8
+#>  $ X_c          : num [1:15200, 1:8] 0 0 0 0 1 1 0 0 0 0 ...
 #>   ..- attr(*, "dimnames")=List of 2
 #>   .. ..$ : chr [1:15200] "1" "2" "3" "4" ...
 #>   .. ..$ : chr [1:8] "set_size1" "set_size2" "set_size3" "set_size4" ...
@@ -380,8 +428,8 @@ str(sd)
 #>   .. .. ..- attr(*, "dimnames")=List of 2
 #>   .. .. .. ..$ : chr [1:8] "1" "2" "3" "4" ...
 #>   .. .. .. ..$ : chr [1:7] "2" "3" "4" "5" ...
-#>  $ K_kappa   : int 8
-#>  $ X_kappa   : num [1:15200, 1:8] 0 0 0 0 1 1 0 0 0 0 ...
+#>  $ K_kappa      : int 8
+#>  $ X_kappa      : num [1:15200, 1:8] 0 0 0 0 1 1 0 0 0 0 ...
 #>   ..- attr(*, "dimnames")=List of 2
 #>   .. ..$ : chr [1:15200] "1" "2" "3" "4" ...
 #>   .. ..$ : chr [1:8] "set_size1" "set_size2" "set_size3" "set_size4" ...
@@ -391,6 +439,9 @@ str(sd)
 #>   .. .. ..- attr(*, "dimnames")=List of 2
 #>   .. .. .. ..$ : chr [1:8] "1" "2" "3" "4" ...
 #>   .. .. .. ..$ : chr [1:7] "2" "3" "4" "5" ...
-#>  $ prior_only: int 0
+#>  $ prior_only   : int 0
+#>  $ G_sdm_runs   : int 13397
+#>  $ sdm_run_start: int [1:13397(1d)] 1 2 3 4 5 7 8 9 10 11 ...
+#>  $ sdm_run_count: int [1:13397(1d)] 1 1 1 1 2 1 1 1 1 1 ...
 #>  - attr(*, "class")= chr [1:2] "standata" "list"
 ```

@@ -191,11 +191,41 @@ bmm model.</p>
 <span class="r-out co"><span class="r-pr">#&gt;</span>     real out = -log_sum_exp(fn)+log(m);</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>     return(out);</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   }</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   real sdm_simple_run_ldenom(vector c, vector kappa, matrix CN,</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>                              int G_runs, array[] int run_start,</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>                              array[] int run_count) {</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>     real out = 0;</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>     for (g in 1:G_runs) {</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>       int n = run_start[g];</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>       real z = sdm_simple_ldenom_chquad_adaptive(c[n], kappa[n], CN);</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>       out += run_count[g] * z;</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>     }</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>     return(out);</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   }</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   real sdm_simple_run_ldenom_slice(vector c, vector kappa, matrix CN,</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>                                    int start, int end, int G_runs,</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>                                    array[] int run_start,</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>                                    array[] int run_count) {</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>     real out = 0;</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>     for (g in 1:G_runs) {</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>       if (run_start[g] &gt;= start &amp;&amp; run_start[g] &lt;= end) {</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>         int n = run_start[g] - start + 1;</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>         real z = sdm_simple_ldenom_chquad_adaptive(c[n], kappa[n], CN);</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>         out += run_count[g] * z;</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>       }</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>     }</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>     return(out);</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   }</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> }</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> data {</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   int&lt;lower=1&gt; N;  // total number of observations</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   vector[N] Y;  // response variable</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   int prior_only;  // should the likelihood be ignored?</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   int G_sdm_runs;</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   array[G_sdm_runs] int sdm_run_start;</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   array[G_sdm_runs] int sdm_run_count;</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> }</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> transformed data {</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>     // precompute chebyshev points</span>
@@ -203,6 +233,30 @@ bmm model.</p>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   for (m in 1:200) {</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>     for (i in 1:m) {</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>       COSN[i,m] = cos((2*i-1)*pi()/(2*m))-1;</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>     }</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   }</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   // fail fast if the precomputed run metadata does not describe the data Stan</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   // received (it is computed in R and can drift out of sync with the data)</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   {</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>     int sdm_run_total = 0;</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>     for (g in 1:G_sdm_runs) {</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>       if (sdm_run_start[g] &lt; 1 || sdm_run_start[g] &gt; N) {</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>         reject("bmm error: sdm_run_start[", g, "] = ", sdm_run_start[g],</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>                " is outside the data range [1, ", N, "]. The SDM run metadata ",</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>                "does not match the model data. Please report this at ",</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>                "https://github.com/popov-lab/bmm/issues");</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>       }</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>       if (g &gt; 1 &amp;&amp; sdm_run_start[g] &lt;= sdm_run_start[g - 1]) {</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>         reject("bmm error: sdm_run_start must be strictly increasing. The SDM ",</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>                "run metadata does not match the model data. Please report ",</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>                "this at https://github.com/popov-lab/bmm/issues");</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>       }</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>       sdm_run_total += sdm_run_count[g];</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>     }</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>     if (sdm_run_total != N) {</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>       reject("bmm error: sum(sdm_run_count) = ", sdm_run_total, " but N = ", N,</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>              ". The SDM run metadata does not match the model data. Please ",</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>              "report this at https://github.com/popov-lab/bmm/issues");</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>     }</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   }</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> }</span>
@@ -233,14 +287,8 @@ bmm model.</p>
 <span class="r-out co"><span class="r-pr">#&gt;</span>     mu = inv_tan_half(mu);</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>     kappa = exp(kappa);</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>     target += sdm_simple_lpdf(Y | mu, c, kappa);</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>       // adaptive calculation of the normalization constant</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>     real z;</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>     for (n in 1:N) {</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>     	if (n == 1 || c[n] != c[n-1] || kappa[n] != kappa[n-1]) {</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>     		z = sdm_simple_ldenom_chquad_adaptive(c[n],kappa[n],COSN);</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>     	}</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>     	target += z;</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>     }</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>       target += sdm_simple_run_ldenom(c, kappa, COSN, G_sdm_runs,</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>                                     sdm_run_start, sdm_run_count);</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>     target += -(log2()+log(pi()))*N;</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   }</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   // priors including constants</span>

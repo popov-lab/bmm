@@ -4,6 +4,10 @@
 
 #### New features
 
+- The **sdm** model now supports within-chain parallelization via the
+  `threads` argument (e.g. `bmm(..., threads = 2)`), reducing fitting
+  time by up to ~45% in benchmarks
+  ([\#374](https://github.com/venpopov/bmm/issues/374)).
 - Add `softplus` as an opt-in link function for positively-bounded
   parameters, as an alternative to the default `log` link.
   `softplus(x) = log(1 + exp(x))` keeps parameters positive while

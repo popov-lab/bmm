@@ -308,6 +308,33 @@ functions {
     real out = -log_sum_exp(fn)+log(m);
     return(out);
   }
+
+  real sdm_simple_run_ldenom(vector c, vector kappa, matrix CN,
+                             int G_runs, array[] int run_start,
+                             array[] int run_count) {
+    real out = 0;
+    for (g in 1:G_runs) {
+      int n = run_start[g];
+      real z = sdm_simple_ldenom_chquad_adaptive(c[n], kappa[n], CN);
+      out += run_count[g] * z;
+    }
+    return(out);
+  }
+
+  real sdm_simple_run_ldenom_slice(vector c, vector kappa, matrix CN,
+                                   int start, int end, int G_runs,
+                                   array[] int run_start,
+                                   array[] int run_count) {
+    real out = 0;
+    for (g in 1:G_runs) {
+      if (run_start[g] &gt;= start &amp;&amp; run_start[g] &lt;= end) {
+        int n = run_start[g] - start + 1;
+        real z = sdm_simple_ldenom_chquad_adaptive(c[n], kappa[n], CN);
+        out += run_count[g] * z;
+      }
+    }
+    return(out);
+  }
 }
 data {
   int&lt;lower=1&gt; N;  // total number of observations
@@ -317,6 +344,9 @@ data {
   int&lt;lower=1&gt; K_kappa;  // number of population-level effects
   matrix[N, K_kappa] X_kappa;  // population-level design matrix
   int prior_only;  // should the likelihood be ignored?
+  int G_sdm_runs;
+  array[G_sdm_runs] int sdm_run_start;
+  array[G_sdm_runs] int sdm_run_count;
 }
 transformed data {
     // precompute chebyshev points
@@ -324,6 +354,30 @@ transformed data {
   for (m in 1:200) {
     for (i in 1:m) {
       COSN[i,m] = cos((2*i-1)*pi()/(2*m))-1;
+    }
+  }
+  // fail fast if the precomputed run metadata does not describe the data Stan
+  // received (it is computed in R and can drift out of sync with the data)
+  {
+    int sdm_run_total = 0;
+    for (g in 1:G_sdm_runs) {
+      if (sdm_run_start[g] &lt; 1 || sdm_run_start[g] &gt; N) {
+        reject("bmm error: sdm_run_start[", g, "] = ", sdm_run_start[g],
+               " is outside the data range [1, ", N, "]. The SDM run metadata ",
+               "does not match the model data. Please report this at ",
+               "https://github.com/popov-lab/bmm/issues");
+      }
+      if (g &gt; 1 &amp;&amp; sdm_run_start[g] &lt;= sdm_run_start[g - 1]) {
+        reject("bmm error: sdm_run_start must be strictly increasing. The SDM ",
+               "run metadata does not match the model data. Please report ",
+               "this at https://github.com/popov-lab/bmm/issues");
+      }
+      sdm_run_total += sdm_run_count[g];
+    }
+    if (sdm_run_total != N) {
+      reject("bmm error: sum(sdm_run_count) = ", sdm_run_total, " but N = ", N,
+             ". The SDM run metadata does not match the model data. Please ",
+             "report this at https://github.com/popov-lab/bmm/issues");
     }
   }
 }
@@ -354,14 +408,8 @@ model {
     mu = inv_tan_half(mu);
     kappa = exp(kappa);
     target += sdm_simple_lpdf(Y | mu, c, kappa);
-      // adaptive calculation of the normalization constant
-    real z;
-    for (n in 1:N) {
-        if (n == 1 || c[n] != c[n-1] || kappa[n] != kappa[n-1]) {
-            z = sdm_simple_ldenom_chquad_adaptive(c[n],kappa[n],COSN);
-        }
-        target += z;
-    }
+      target += sdm_simple_run_ldenom(c, kappa, COSN, G_sdm_runs,
+                                    sdm_run_start, sdm_run_count);
     target += -(log2()+log(pi()))*N;
   }
   // priors including constants
@@ -391,18 +439,18 @@ the data that would be passed to Stan for fitting the model.</p>
 <span>               data <span class="op">=</span> <span class="va">oberauer_lin_2017</span>,</span>
 <span>               model <span class="op">=</span> <span class="fu"><a href="../reference/sdm.html">sdm</a></span><span class="op">(</span>resp_error <span class="op">=</span> <span class="st">'dev_rad'</span><span class="op">)</span><span class="op">)</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/utils/str.html" class="external-link">str</a></span><span class="op">(</span><span class="va">sd</span><span class="op">)</span></span>
-<span><span class="co">#&gt; List of 10</span></span>
-<span><span class="co">#&gt;  $ N         : int 15200</span></span>
-<span><span class="co">#&gt;  $ Y         : num [1:15200(1d)] 0.384 -0.4538 -0.0873 0.3665 -0.0349 ...</span></span>
-<span><span class="co">#&gt;  $ K         : int 1</span></span>
-<span><span class="co">#&gt;  $ Kc        : num 0</span></span>
-<span><span class="co">#&gt;  $ X         : num [1:15200, 1] 1 1 1 1 1 1 1 1 1 1 ...</span></span>
+<span><span class="co">#&gt; List of 13</span></span>
+<span><span class="co">#&gt;  $ N            : int 15200</span></span>
+<span><span class="co">#&gt;  $ Y            : num [1:15200(1d)] 0.384 -0.4538 -0.0873 0.3665 -0.0349 ...</span></span>
+<span><span class="co">#&gt;  $ K            : int 1</span></span>
+<span><span class="co">#&gt;  $ Kc           : num 0</span></span>
+<span><span class="co">#&gt;  $ X            : num [1:15200, 1] 1 1 1 1 1 1 1 1 1 1 ...</span></span>
 <span><span class="co">#&gt;   ..- attr(*, "dimnames")=List of 2</span></span>
 <span><span class="co">#&gt;   .. ..$ : chr [1:15200] "1" "2" "3" "4" ...</span></span>
 <span><span class="co">#&gt;   .. ..$ : chr "Intercept"</span></span>
 <span><span class="co">#&gt;   ..- attr(*, "assign")= int 0</span></span>
-<span><span class="co">#&gt;  $ K_c       : int 8</span></span>
-<span><span class="co">#&gt;  $ X_c       : num [1:15200, 1:8] 0 0 0 0 1 1 0 0 0 0 ...</span></span>
+<span><span class="co">#&gt;  $ K_c          : int 8</span></span>
+<span><span class="co">#&gt;  $ X_c          : num [1:15200, 1:8] 0 0 0 0 1 1 0 0 0 0 ...</span></span>
 <span><span class="co">#&gt;   ..- attr(*, "dimnames")=List of 2</span></span>
 <span><span class="co">#&gt;   .. ..$ : chr [1:15200] "1" "2" "3" "4" ...</span></span>
 <span><span class="co">#&gt;   .. ..$ : chr [1:8] "set_size1" "set_size2" "set_size3" "set_size4" ...</span></span>
@@ -412,8 +460,8 @@ the data that would be passed to Stan for fitting the model.</p>
 <span><span class="co">#&gt;   .. .. ..- attr(*, "dimnames")=List of 2</span></span>
 <span><span class="co">#&gt;   .. .. .. ..$ : chr [1:8] "1" "2" "3" "4" ...</span></span>
 <span><span class="co">#&gt;   .. .. .. ..$ : chr [1:7] "2" "3" "4" "5" ...</span></span>
-<span><span class="co">#&gt;  $ K_kappa   : int 8</span></span>
-<span><span class="co">#&gt;  $ X_kappa   : num [1:15200, 1:8] 0 0 0 0 1 1 0 0 0 0 ...</span></span>
+<span><span class="co">#&gt;  $ K_kappa      : int 8</span></span>
+<span><span class="co">#&gt;  $ X_kappa      : num [1:15200, 1:8] 0 0 0 0 1 1 0 0 0 0 ...</span></span>
 <span><span class="co">#&gt;   ..- attr(*, "dimnames")=List of 2</span></span>
 <span><span class="co">#&gt;   .. ..$ : chr [1:15200] "1" "2" "3" "4" ...</span></span>
 <span><span class="co">#&gt;   .. ..$ : chr [1:8] "set_size1" "set_size2" "set_size3" "set_size4" ...</span></span>
@@ -423,7 +471,10 @@ the data that would be passed to Stan for fitting the model.</p>
 <span><span class="co">#&gt;   .. .. ..- attr(*, "dimnames")=List of 2</span></span>
 <span><span class="co">#&gt;   .. .. .. ..$ : chr [1:8] "1" "2" "3" "4" ...</span></span>
 <span><span class="co">#&gt;   .. .. .. ..$ : chr [1:7] "2" "3" "4" "5" ...</span></span>
-<span><span class="co">#&gt;  $ prior_only: int 0</span></span>
+<span><span class="co">#&gt;  $ prior_only   : int 0</span></span>
+<span><span class="co">#&gt;  $ G_sdm_runs   : int 13397</span></span>
+<span><span class="co">#&gt;  $ sdm_run_start: int [1:13397(1d)] 1 2 3 4 5 7 8 9 10 11 ...</span></span>
+<span><span class="co">#&gt;  $ sdm_run_count: int [1:13397(1d)] 1 1 1 1 2 1 1 1 1 1 ...</span></span>
 <span><span class="co">#&gt;  - attr(*, "class")= chr [1:2] "standata" "list"</span></span></code></pre></div>
 </div>
   </main><aside class="col-md-3"><nav id="toc" aria-label="Table of contents"><h2>On this page</h2>

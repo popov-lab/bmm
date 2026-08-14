@@ -152,11 +152,41 @@ cat(scode1)
 #>     real out = -log_sum_exp(fn)+log(m);
 #>     return(out);
 #>   }
+#> 
+#>   real sdm_simple_run_ldenom(vector c, vector kappa, matrix CN,
+#>                              int G_runs, array[] int run_start,
+#>                              array[] int run_count) {
+#>     real out = 0;
+#>     for (g in 1:G_runs) {
+#>       int n = run_start[g];
+#>       real z = sdm_simple_ldenom_chquad_adaptive(c[n], kappa[n], CN);
+#>       out += run_count[g] * z;
+#>     }
+#>     return(out);
+#>   }
+#> 
+#>   real sdm_simple_run_ldenom_slice(vector c, vector kappa, matrix CN,
+#>                                    int start, int end, int G_runs,
+#>                                    array[] int run_start,
+#>                                    array[] int run_count) {
+#>     real out = 0;
+#>     for (g in 1:G_runs) {
+#>       if (run_start[g] >= start && run_start[g] <= end) {
+#>         int n = run_start[g] - start + 1;
+#>         real z = sdm_simple_ldenom_chquad_adaptive(c[n], kappa[n], CN);
+#>         out += run_count[g] * z;
+#>       }
+#>     }
+#>     return(out);
+#>   }
 #> }
 #> data {
 #>   int<lower=1> N;  // total number of observations
 #>   vector[N] Y;  // response variable
 #>   int prior_only;  // should the likelihood be ignored?
+#>   int G_sdm_runs;
+#>   array[G_sdm_runs] int sdm_run_start;
+#>   array[G_sdm_runs] int sdm_run_count;
 #> }
 #> transformed data {
 #>     // precompute chebyshev points
@@ -164,6 +194,30 @@ cat(scode1)
 #>   for (m in 1:200) {
 #>     for (i in 1:m) {
 #>       COSN[i,m] = cos((2*i-1)*pi()/(2*m))-1;
+#>     }
+#>   }
+#>   // fail fast if the precomputed run metadata does not describe the data Stan
+#>   // received (it is computed in R and can drift out of sync with the data)
+#>   {
+#>     int sdm_run_total = 0;
+#>     for (g in 1:G_sdm_runs) {
+#>       if (sdm_run_start[g] < 1 || sdm_run_start[g] > N) {
+#>         reject("bmm error: sdm_run_start[", g, "] = ", sdm_run_start[g],
+#>                " is outside the data range [1, ", N, "]. The SDM run metadata ",
+#>                "does not match the model data. Please report this at ",
+#>                "https://github.com/popov-lab/bmm/issues");
+#>       }
+#>       if (g > 1 && sdm_run_start[g] <= sdm_run_start[g - 1]) {
+#>         reject("bmm error: sdm_run_start must be strictly increasing. The SDM ",
+#>                "run metadata does not match the model data. Please report ",
+#>                "this at https://github.com/popov-lab/bmm/issues");
+#>       }
+#>       sdm_run_total += sdm_run_count[g];
+#>     }
+#>     if (sdm_run_total != N) {
+#>       reject("bmm error: sum(sdm_run_count) = ", sdm_run_total, " but N = ", N,
+#>              ". The SDM run metadata does not match the model data. Please ",
+#>              "report this at https://github.com/popov-lab/bmm/issues");
 #>     }
 #>   }
 #> }
@@ -194,14 +248,8 @@ cat(scode1)
 #>     mu = inv_tan_half(mu);
 #>     kappa = exp(kappa);
 #>     target += sdm_simple_lpdf(Y | mu, c, kappa);
-#>       // adaptive calculation of the normalization constant
-#>     real z;
-#>     for (n in 1:N) {
-#>      if (n == 1 || c[n] != c[n-1] || kappa[n] != kappa[n-1]) {
-#>          z = sdm_simple_ldenom_chquad_adaptive(c[n],kappa[n],COSN);
-#>      }
-#>      target += z;
-#>     }
+#>       target += sdm_simple_run_ldenom(c, kappa, COSN, G_sdm_runs,
+#>                                     sdm_run_start, sdm_run_count);
 #>     target += -(log2()+log(pi()))*N;
 #>   }
 #>   // priors including constants
