@@ -2,6 +2,7 @@
 
 ### Other changes
 * Added an internal consistency check in `configure_prior()`: if a model's `fixed_parameters` includes a parameter that its `configure_model()` never wires into the formula (neither a dpar nor an nlpar), bmm now fails with a clear model-definition error instead of letting a malformed `b_Intercept ~ constant()` prior reach `brm()`. This is a safety net for model development; it cannot be reached through the normal `bmm()` interface, where an unrecognized parameter is already caught earlier by `check_formula()` (#377).
+* `print.bmmodel()` now also displays the required response variables (one per line, annotated with the expected coding — e.g. radians in [-pi, pi] for the circular models, seconds and 0/1 responses for the trial-wise RT models) and the default parameter links, answering "what does my data frame need to look like?" directly at the console (#392).
 
 # bmm 1.3.1
 
@@ -18,6 +19,10 @@
 ### Bug fixes
 * `create_initfun()` now matches Stan parameters to model parameters with a word-boundary regex (`(^|_)param(_|$)`) instead of a substring match, preventing collisions in models with short parameter names (e.g. `s`, `c`, `a`) that are substrings of longer ones (`sim`, `correct`, `activation`); the longest (most specific) match is selected when several apply (#354, #355).
 * `create_initfun()` now resolves initialization terms from `nlpars` when a model parameter is not a distributional parameter, so models built as non-linear brms formulas (e.g. native-multinomial models whose parameters live in `bterms$nlpars`) no longer error with `no applicable method for 'has_intercept' applied to an object of class "NULL"` (#362).
+
+### Developer-facing changes
+* **`use_model_template()` now scaffolds the current model-specification patterns.** It generates a flat `.{model}_defaults` block for unversioned models (like `ddm`) or, with the new `versions` argument, a `.{model}_version_table` block for versioned models (like `cswald`). The generated constructor spells out every field of the model object inline (referencing the defaults/version table for `parameters`, `links`, `fixed_parameters`, `default_priors`, and `init_ranges`), and versioned aliases validate `version` with `match.arg()` (#350).
+* **Removed the unused `void_mu` field** from all model definitions and the template. It was assigned but never read anywhere — response-mean suppression is already handled via `fixed_parameters` and the family's `dpars` (#350).
 
 # bmm 1.3.0
 
