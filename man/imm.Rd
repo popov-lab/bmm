@@ -105,6 +105,7 @@ Please use \code{imm(version = 'full')}, \code{imm(version = 'bsc')}, or \code{i
 \item \code{mu1}:
 \itemize{
 \item \code{main}: student_t(1, 0, 1)
+\item \code{effects}: normal(0,1)
 }
 \item \code{kappa}:
 \itemize{
@@ -163,6 +164,7 @@ Please use \code{imm(version = 'full')}, \code{imm(version = 'bsc')}, or \code{i
 \item \code{mu1}:
 \itemize{
 \item \code{main}: student_t(1, 0, 1)
+\item \code{effects}: normal(0,1)
 }
 \item \code{kappa}:
 \itemize{
@@ -216,6 +218,7 @@ Please use \code{imm(version = 'full')}, \code{imm(version = 'bsc')}, or \code{i
 \item \code{mu1}:
 \itemize{
 \item \code{main}: student_t(1, 0, 1)
+\item \code{effects}: normal(0,1)
 }
 \item \code{kappa}:
 \itemize{

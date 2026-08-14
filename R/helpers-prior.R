@@ -243,32 +243,52 @@ construct_default_priors_list <- function(par, bterms, default_priors, data) {
 
   priors <- list()
 
-  # priors on fixed effects
-  if (has_effects_prior && fixed_effects_count > 0) {
-    fixed_effects_prior <- .build_prior(prior_desc$effects, "b", par = par, bterms = bterms)
-    priors <- c(priors, list(fixed_effects_prior))
-  }
-
-  # priors on intercept; unfortunately too convoluted to use the create_prior function
+  # brms Intercept class requires special handling outside .build_prior
   if (has_intercept(terms)) {
     intercept_prior <- .build_prior(prior_desc$main, "Intercept", par = par, bterms = bterms)
     priors <- c(priors, list(intercept_prior))
+    if (has_effects_prior && (fixed_effects_count > 0 || interactions_count > 0)) {
+      fixed_effects_prior <- .build_prior(prior_desc$effects, "b", par = par, bterms = bterms)
+      priors <- c(priors, list(fixed_effects_prior))
+    }
     return(priors)
   }
 
-  # priors when intercept is supressed and all levels are explicit
+  # suppressed intercept with single predictor or interaction-only: one class prior suffices
   if ((fixed_effects_count == 1 && interactions_count == 0) || interaction_only) {
     levels_only_prior <- .build_prior(prior_desc[[1]], "b", par = par, bterms = bterms)
     priors <- c(priors, list(levels_only_prior))
     return(priors)
   }
 
-  # edge case: with multiple predictors and no intercept, set the main prior on
-  # the levels of the first predictor
-  first_predictor_coefs <- paste0(rhs_vars(terms)[1], levels(data[[rhs_vars(terms)[1]]]))
-  for (coef in first_predictor_coefs) {
-    first_predictor_prior <- .build_prior(prior_desc[[1]], "b", par, coef = coef, bterms = bterms)
-    priors <- c(priors, list(first_predictor_prior))
+  if (has_effects_prior) {
+    fixed_effects_prior <- .build_prior(prior_desc$effects, "b", par = par, bterms = bterms)
+    priors <- c(priors, list(fixed_effects_prior))
+  }
+
+  # without intercept, brms expands all factor levels as coefficients, so
+  # main effect predictors need explicit priors on each level. Variables that
+  # only appear in interactions (e.g., set_size in 0 + group + group:set_size)
+  # have no standalone coefficients and are covered by the class-level prior
+  main_effects <- attr(terms, "term.labels")[attr(terms, "order") == 1]
+  for (i in seq_along(main_effects)) {
+    predictor <- main_effects[i]
+
+    if (!is.factor(data[[predictor]])) {
+      predictor_coefs <- predictor
+    } else {
+      predictor_coefs <- paste0(predictor, levels(data[[predictor]]))
+    }
+
+    prior_to_use <- if (i == 1) prior_desc$main else prior_desc$effects
+
+    for (coef in predictor_coefs) {
+      if (is.null(prior_to_use)) {
+        next
+      }
+      coef_prior <- .build_prior(prior_to_use, "b", par, coef = coef, bterms = bterms)
+      priors <- c(priors, list(coef_prior))
+    }
   }
   priors
 }
@@ -322,11 +342,11 @@ summarise_default_prior <- function(prior_list) {
 constrain_set_size1_fixef <- function(formula, nlpars, set_size_var, prior_value) {
   nl_pforms <- formula$pforms[nlpars]
   has_setsize <- vapply(nl_pforms, function(x) set_size_var %in% rhs_vars(x), logical(1))
-  
+
   if (!any(has_setsize)) {
     return(NULL)
   }
-    
+
   brms::prior_(prior_value,
     class = "b",
     coef = paste0(set_size_var, 1),
@@ -342,14 +362,14 @@ constrain_set_size1_ranef <- function(formula, nlpars, set_size_var, prior_value
       data.frame(nlpar = nlp, group = re$group, form = I(re$form), stringsAsFactors = FALSE)
     }
   })
-  
+
   re_terms_df <- do.call(rbind, re_terms_list)
   if (is.null(re_terms_df)) {
     return(NULL)
   }
-  
+
   has_setsize <- vapply(re_terms_df$form, function(x) set_size_var %in% rhs_vars(x), logical(1))
-  
+
   if (!any(has_setsize)) {
     return(NULL)
   }
