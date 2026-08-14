@@ -425,6 +425,22 @@ test_that("initfun output matches standata dimensions for no-intercept models", 
   }
 })
 
+# =============================================================================
+# SOFTPLUS LINK (opt-in alternative to log for positive parameters)
+# =============================================================================
+
+test_that("create_initfun handles a softplus link override on a positive parameter", {
+  ff <- bmmformula(kappa ~ 1, c ~ 1)
+  dat <- oberauer_lin_2017
+  mod <- sdm(resp_error = "dev_rad", links = list(kappa = "softplus"))
+  config_args <- configure_model(mod, data = dat, formula = ff)
+
+  init_fun <- create_initfun(mod, dat, config_args$formula)
+  inits <- init_fun()
+
+  expect_type(inits, "list")
+  expect_true(all(sapply(inits, function(x) all(is.finite(x)))))
+})
 
 # -----------------------------------------------------------------------------
 # match_stan_to_model_par tests (substring collision scenarios)
