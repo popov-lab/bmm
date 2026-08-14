@@ -2,8 +2,33 @@
 
 ## bmm (development version)
 
+#### New features
+
+- Add `softplus` as an opt-in link function for positively-bounded
+  parameters, as an alternative to the default `log` link.
+  `softplus(x) = log(1 + exp(x))` keeps parameters positive while
+  growing linearly for large values, avoiding the numerical blow-up of
+  [`exp()`](https://rdrr.io/r/base/Log.html) and giving predictor
+  effects an additive (rather than multiplicative) interpretation on the
+  natural scale. Enable it per parameter via the model’s `links` list,
+  e.g. `m3(...)$links <- list(c = "softplus", a = "softplus")` or
+  `ddm(rt, response, links = list(bound = "softplus"))`
+  ([\#363](https://github.com/venpopov/bmm/issues/363)).
+
 #### Bug fixes
 
+- Fix initial values being set in two places, where the `init` returned
+  by
+  [`configure_model()`](https://venpopov.com/bmm/reference/configure_model.md)
+  was silently overwritten by
+  [`create_initfun()`](https://venpopov.com/bmm/reference/create_initfun.md).
+  This caused the **m3** model’s intended `init = 0` (needed for stable
+  sampling with the `simple` choice rule and an `identity` link) to be
+  lost, and left dead `init` code in the **sdm** model.
+  [`create_initfun()`](https://venpopov.com/bmm/reference/create_initfun.md)
+  is now the single source of truth for initial values, with
+  model-specific behaviour expressed through S3 methods
+  ([\#375](https://github.com/venpopov/bmm/issues/375)).
 - Fix `.pwald()` returning `NaN`/`-Inf` in the upper tail of the
   shifted-Wald survival function, which propagated to
   [`dcswald()`](https://venpopov.com/bmm/reference/cswald_dist.md) (and
@@ -19,6 +44,21 @@
   only a single coefficient row is shown
   ([\#379](https://github.com/venpopov/bmm/issues/379),
   [\#369](https://github.com/venpopov/bmm/issues/369)).
+- [`create_initfun()`](https://venpopov.com/bmm/reference/create_initfun.md)
+  now matches Stan parameters to model parameters with a word-boundary
+  regex (`(^|_)param(_|$)`) instead of a substring match, preventing
+  collisions in models with short parameter names (e.g. `s`, `c`, `a`)
+  that are substrings of longer ones (`sim`, `correct`, `activation`);
+  the longest (most specific) match is selected when several apply
+  ([\#354](https://github.com/venpopov/bmm/issues/354),
+  [\#355](https://github.com/venpopov/bmm/issues/355)).
+- [`create_initfun()`](https://venpopov.com/bmm/reference/create_initfun.md)
+  now resolves initialization terms from `nlpars` when a model parameter
+  is not a distributional parameter, so models built as non-linear brms
+  formulas (e.g. native-multinomial models whose parameters live in
+  `bterms$nlpars`) no longer error with
+  `no applicable method for 'has_intercept' applied to an object of class "NULL"`
+  ([\#362](https://github.com/venpopov/bmm/issues/362)).
 
 #### Other changes
 
@@ -40,35 +80,6 @@
   trial-wise RT models) and the default parameter links, answering “what
   does my data frame need to look like?” directly at the console
   ([\#392](https://github.com/venpopov/bmm/issues/392)).
-
-## bmm 1.3.1
-
-CRAN release: 2026-06-05
-
-#### New features
-
-- Add `softplus` as an opt-in link function for positively-bounded
-  parameters, as an alternative to the default `log` link.
-  `softplus(x) = log(1 + exp(x))` keeps parameters positive while
-  growing linearly for large values, avoiding the numerical blow-up of
-  [`exp()`](https://rdrr.io/r/base/Log.html) and giving predictor
-  effects an additive (rather than multiplicative) interpretation on the
-  natural scale. Enable it per parameter via the model’s `links` list,
-  e.g. `m3(...)$links <- list(c = "softplus", a = "softplus")` or
-  `ddm(rt, response, links = list(bound = "softplus"))`
-  ([\#363](https://github.com/venpopov/bmm/issues/363)).
-
-#### Bug fixes
-
-- Fix `swald_lccdf()` returning incorrect log-survival probability when
-  response time equals non-decision time in the **cswald** model.
-  Previously returned `-Inf` instead of `0` (log of survival = 1)
-  ([\#348](https://github.com/venpopov/bmm/issues/348)).
-
-#### Other changes
-
-- The **ddm** model supports both `cmdstanr` and `rstan` backends.
-  Previously, `cmdstanr` was required.
 - Recalibrated the default priors for the **m3** activation parameters
   (`a`, `c`) so that the `simple` and `softmax` choice rules imply a
   comparable, broad prior-predictive range of average performance, and
@@ -80,24 +91,6 @@ CRAN release: 2026-06-05
   predict accurate recall, its defaults remain asymmetric; direct
   comparisons of context and general activation should use the `softmax`
   choice rule ([\#364](https://github.com/venpopov/bmm/issues/364)).
-
-#### Bug fixes
-
-- [`create_initfun()`](https://venpopov.com/bmm/reference/create_initfun.md)
-  now matches Stan parameters to model parameters with a word-boundary
-  regex (`(^|_)param(_|$)`) instead of a substring match, preventing
-  collisions in models with short parameter names (e.g. `s`, `c`, `a`)
-  that are substrings of longer ones (`sim`, `correct`, `activation`);
-  the longest (most specific) match is selected when several apply
-  ([\#354](https://github.com/venpopov/bmm/issues/354),
-  [\#355](https://github.com/venpopov/bmm/issues/355)).
-- [`create_initfun()`](https://venpopov.com/bmm/reference/create_initfun.md)
-  now resolves initialization terms from `nlpars` when a model parameter
-  is not a distributional parameter, so models built as non-linear brms
-  formulas (e.g. native-multinomial models whose parameters live in
-  `bterms$nlpars`) no longer error with
-  `no applicable method for 'has_intercept' applied to an object of class "NULL"`
-  ([\#362](https://github.com/venpopov/bmm/issues/362)).
 
 #### Developer-facing changes
 
@@ -115,6 +108,22 @@ CRAN release: 2026-06-05
   the template. It was assigned but never read anywhere — response-mean
   suppression is already handled via `fixed_parameters` and the family’s
   `dpars` ([\#350](https://github.com/venpopov/bmm/issues/350)).
+
+## bmm 1.3.1
+
+CRAN release: 2026-06-05
+
+#### Bug fixes
+
+- Fix `swald_lccdf()` returning incorrect log-survival probability when
+  response time equals non-decision time in the **cswald** model.
+  Previously returned `-Inf` instead of `0` (log of survival = 1)
+  ([\#348](https://github.com/venpopov/bmm/issues/348)).
+
+#### Other changes
+
+- The **ddm** model supports both `cmdstanr` and `rstan` backends.
+  Previously, `cmdstanr` was required.
 
 ## bmm 1.3.0
 
