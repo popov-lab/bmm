@@ -440,6 +440,7 @@ test_that("create_initfun handles a softplus link override on a positive paramet
 
   expect_type(inits, "list")
   expect_true(all(sapply(inits, function(x) all(is.finite(x)))))
+})
 
 # -----------------------------------------------------------------------------
 # match_stan_to_model_par tests (substring collision scenarios)
