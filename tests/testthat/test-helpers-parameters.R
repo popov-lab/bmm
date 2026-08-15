@@ -59,6 +59,20 @@ test_that("log and inverse log round-trip on positive values", {
   expect_equal(back, x, tolerance = 1e-12)
 })
 
+test_that("softplus and inverse softplus round-trip on positive values", {
+  x <- c(0.5, 2, 5)
+  eta <- link_transform(x, "softplus", inverse = FALSE)
+  back <- link_transform(eta, "softplus", inverse = TRUE)
+  expect_equal(back, x, tolerance = 1e-12)
+})
+
+test_that("softplus inverse maps reals to positive values", {
+  eta <- c(-5, -1, 0, 2, 10)
+  x <- link_transform(eta, "softplus", inverse = TRUE)
+  expect_true(all(is.finite(x)))
+  expect_true(all(x > 0))
+})
+
 test_that("log1p and inverse expm1 round-trip for x > -1", {
   x <- c(-0.5, -0.1, 0, 0.3, 5)
   eta <- link_transform(x, "log1p", inverse = FALSE)
