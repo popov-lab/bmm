@@ -9,10 +9,62 @@ test_that(".sdt_cdf returns correct values for known inputs", {
   expect_equal(bmm:::.sdt_cdf(0, "normal"), 0.5)
   # Logistic: inv_logit(0) = 0.5
   expect_equal(bmm:::.sdt_cdf(0, "logistic"), 0.5)
-  # Gumbel_min at 0: exp(-exp(0)) = exp(-1)
-  expect_equal(bmm:::.sdt_cdf(0, "gumbel_min"), exp(-1), tolerance = 1e-10)
-  # Gumbel_max at 0: 1 - exp(-exp(0)) = 1 - exp(-1)
-  expect_equal(bmm:::.sdt_cdf(0, "gumbel_max"), 1 - exp(-1), tolerance = 1e-10)
+  # Gumbel_min (smallest extreme value) at 0: 1 - exp(-exp(0)) = 1 - exp(-1)
+  expect_equal(bmm:::.sdt_cdf(0, "gumbel_min"), 1 - exp(-1), tolerance = 1e-10)
+  # Gumbel_max (largest extreme value) at 0: exp(-exp(0)) = exp(-1)
+  expect_equal(bmm:::.sdt_cdf(0, "gumbel_max"), exp(-1), tolerance = 1e-10)
+})
+
+test_that("gumbel labels follow the extreme-value convention", {
+  # the min-type is the mirror image of the max-type about zero
+  eta <- c(-2, -0.5, 0, 0.5, 2)
+  expect_equal(bmm:::.sdt_cdf(eta, "gumbel_min"),
+               1 - bmm:::.sdt_cdf(-eta, "gumbel_max"))
+  # gumbel_max is the log-log / evd::pgumbel parameterisation
+  expect_equal(bmm:::.sdt_cdf(eta, "gumbel_max"), exp(-exp(-eta)))
+})
+
+test_that("every dist argument offers exactly the registry's distributions", {
+  # the registry order defines the dist_type integer passed to Stan, so a
+  # signature that drifts out of step with it becomes an off-by-one
+  fns <- list(sdt_binary, dsdt_binary, rsdt_binary, sdt_dprime, sdt_criterion)
+  for (f in fns) {
+    expect_equal(eval(formals(f)$dist), names(bmm:::.sdt_dists))
+  }
+})
+
+test_that("quantile functions invert their cdfs", {
+  p <- c(0.05, 0.25, 0.5, 0.75, 0.95)
+  for (d in names(bmm:::.sdt_dists)) {
+    expect_equal(bmm:::.sdt_cdf(bmm:::.sdt_dists[[d]]$qf(p), d), p,
+                 tolerance = 1e-10, info = d)
+  }
+})
+
+
+############################################################################# !
+# LOG-SCALE CDF TESTS                                                    ####
+############################################################################# !
+
+test_that("lcdf and lccdf agree with the probability scale where it is exact", {
+  # only the central range: further out the naive log(cdf) is the inaccurate
+  # side of the comparison, which is the whole reason the log-scale pair exists
+  eta <- seq(-2, 2, by = 0.5)
+  for (d in names(bmm:::.sdt_dists)) {
+    p <- bmm:::.sdt_cdf(eta, d)
+    expect_equal(bmm:::.sdt_log_cdf(eta, d), log(p), tolerance = 1e-10, info = d)
+    expect_equal(bmm:::.sdt_log_ccdf(eta, d), log(1 - p),
+                 tolerance = 1e-10, info = d)
+  }
+})
+
+test_that("lcdf and lccdf stay finite where the probability scale underflows", {
+  # the naive path returns log(0) = -Inf here; Stan and the log-scale path do not
+  for (d in names(bmm:::.sdt_dists)) {
+    expect_true(is.finite(bmm:::.sdt_log_cdf(-40, d)), info = d)
+    expect_true(is.finite(bmm:::.sdt_log_ccdf(40, d)), info = d)
+  }
+  expect_equal(log(bmm:::.sdt_cdf(-40, "normal")), -Inf)
 })
 
 test_that(".sdt_cdf is vectorized over eta", {

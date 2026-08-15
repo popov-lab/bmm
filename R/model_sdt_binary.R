@@ -9,8 +9,8 @@
     dprime = "Sensitivity: distance between signal and noise distributions",
     criterion = "Response bias: location of decision boundary",
     sdratio = paste0(
-      "Log SD ratio: the log of the signal-to-noise standard deviation ratio, ",
-      "so exp(sdratio) is the ratio itself and 0 means equal variance"
+      "SD ratio: the signal-to-noise standard deviation ratio, estimated on ",
+      "the log scale, so 1 means equal variance"
     )
   )
   default_priors <- list(
@@ -20,7 +20,7 @@
   )
   requirements <- glue(
     "Provide pre-aggregated data with the following columns:", "\n\n",
-    "  - Response counts (n_old): number of 'old'/'signal' responses", "\n",
+    "  - Response counts (response): number of 'old'/'signal' responses", "\n",
     "  - Stimulus type (stimulus): 0 = noise, 1 = signal", "\n",
     "  - Number of trials (n_trials): total trials per cell"
   )
@@ -40,13 +40,15 @@
       requirements = requirements,
       parameters = parameters,
       links = list(dprime = "identity", criterion = "identity",
-                   sdratio = "identity"),
+                   sdratio = "log"),
+      # on the link scale, so exp(0) = 1 = equal variance
       fixed_parameters = list(sdratio = 0),
       default_priors = default_priors,
+      # on the natural scale; create_initfun() applies the forward link
       init_ranges = list(
         dprime    = c(0.5, 1.5),
         criterion = c(-0.5, 0.5),
-        sdratio   = c(-0.3, 0.3)
+        sdratio   = c(0.75, 1.35)
       )
     ),
     class = c("bmmodel", "sdt", "sdt_binary"),
@@ -66,13 +68,15 @@
 #'   type. Stimuli should be coded as 0 (noise/new) and 1 (signal/old).
 #' @param n_trials The name of the variable in the dataset containing the
 #'   total number of trials for each cell.
-#' @param dist The noise distribution assumed for the latent evidence variable.
-#'   One of:
+#' @param dist The noise distribution assumed for the latent evidence variable,
+#'   given here by its cumulative distribution function. One of:
 #'   \itemize{
-#'     \item "normal" (default): Gaussian SDT
-#'     \item "logistic": Logistic SDT
-#'     \item "gumbel_min": Extreme-value (Gumbel minimum) SDT
-#'     \item "gumbel_max": Gumbel maximum SDT
+#'     \item "normal" (default): Gaussian SDT, \eqn{\Phi(x)}
+#'     \item "gumbel_min": smallest-extreme-value SDT,
+#'       \eqn{1 - \exp(-\exp(x))} (complementary log-log)
+#'     \item "gumbel_max": largest-extreme-value SDT, \eqn{\exp(-\exp(-x))}
+#'       (log-log, as in \code{evd::pgumbel})
+#'     \item "logistic": logistic SDT, \eqn{1 / (1 + \exp(-x))}
 #'   }
 #' @param links A named list of link functions for the parameters.
 #' @param ... used internally for testing, ignore it
@@ -117,7 +121,8 @@
 #' )
 #' }
 sdt_binary <- function(response, stimulus, n_trials,
-                       dist = c("normal", "logistic", "gumbel_min", "gumbel_max"),
+                       dist = c("normal", "gumbel_min", "gumbel_max",
+                                "logistic"),
                        links = NULL, ...) {
   call <- match.call()
   stop_missing_args()
@@ -145,6 +150,9 @@ check_data.sdt_binary <- function(model, data, formula) {
   .validate_sdt_counts(data, model$resp_vars$response,
                        model$other_vars$n_trials)
 
+  warnif("dist_type" %in% colnames(data),
+         "Column 'dist_type' in your data is reserved by {model$name} and \\
+         will be overwritten with the code for dist = '{model$other_vars$dist}'")
   data$dist_type <- .sdt_dist_id(model$other_vars$dist)
 
   NextMethod("check_data")
@@ -207,7 +215,7 @@ configure_model.sdt_binary <- function(model, data, formula) {
 log_lik_sdt_binary <- function(i, prep) {
   dprime <- brms::get_dpar(prep, "dprime", i = i)
   criterion <- brms::get_dpar(prep, "criterion", i = i)
-  sdratio <- exp(brms::get_dpar(prep, "sdratio", i = i))
+  sdratio <- brms::get_dpar(prep, "sdratio", i = i)
   dist <- .sdt_dist_names[prep$data$vint2[i]]
 
   dsdt_binary(prep$data$Y[i], prep$data$trials[i], prep$data$vint1[i],
@@ -217,7 +225,7 @@ log_lik_sdt_binary <- function(i, prep) {
 posterior_predict_sdt_binary <- function(i, prep, ...) {
   dprime <- brms::get_dpar(prep, "dprime", i = i)
   criterion <- brms::get_dpar(prep, "criterion", i = i)
-  sdratio <- exp(brms::get_dpar(prep, "sdratio", i = i))
+  sdratio <- brms::get_dpar(prep, "sdratio", i = i)
   dist <- .sdt_dist_names[prep$data$vint2[i]]
 
   rsdt_binary(length(dprime), prep$data$trials[i], prep$data$vint1[i],
