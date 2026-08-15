@@ -185,6 +185,28 @@ test_that("check_formula works", {
   )
 })
 
+test_that("check_formula warns when a predictor clashes with a parameter name", {
+  withr::local_options(bmm.silent = 2, bmm.sort_data = FALSE)
+  model <- sdm(resp_error = "y")
+
+  clash <- data.frame(y = rnorm(10), c = rep(0:1, 5))
+  expect_warning(
+    check_formula(model, clash, bmf(kappa ~ c)),
+    "used both as a predicted parameter and as a column"
+  )
+
+  no_clash <- data.frame(y = rnorm(10), cond = rep(0:1, 5))
+  expect_no_warning(check_formula(model, no_clash, bmf(kappa ~ cond)))
+
+  # 'c' predicts kappa (genuinely non-linear) but no data column 'c' exists
+  expect_no_warning(
+    check_formula(model, data.frame(y = rnorm(10)), bmf(kappa ~ c, c ~ 1))
+  )
+
+  # column 'c' present but not used as a predictor
+  expect_no_warning(check_formula(model, clash, bmf(kappa ~ 1)))
+})
+
 test_that("has_intercept works", {
   expect_true(has_intercept(y ~ 1))
   expect_true(has_intercept(y ~ A))
@@ -321,6 +343,17 @@ test_that("apply_links works when parameter appears in to parts of a formula", {
   links <- list(a = "probit", c = "log")
   reform <- apply_links(form, links)
   expect_equal(reform, bmf(x ~ log(Phi(a)^exp(c)) + exp(c)^2, kappa ~ 1, a ~ 1, c ~ 1))
+})
+
+test_that("apply_links applies softplus link via log1p_exp", {
+  form <- bmf(x ~ a + c, kappa ~ 1, a ~ 1, c ~ 1)
+  links <- list(a = "softplus", c = "log")
+  reform <- apply_links(form, links)
+  expect_equal(reform, bmf(x ~ log1p_exp(a) + exp(c), kappa ~ 1, a ~ 1, c ~ 1))
+})
+
+test_that("inv_link maps softplus to log1p_exp", {
+  expect_identical(inv_link("x", "softplus"), quote(log1p_exp(x)))
 })
 
 test_that("apply_links gives error when unknown link type is given", {

@@ -51,7 +51,6 @@ Binary Signal Detection Theory Model
 \itemize{
 \item Green, D. M., & Swets, J. A. (1966). Signal detection theory and psychophysics. Wiley.
 }
-\item \strong{Version:} binary
 \item \strong{Requirements:}
 
 Provide pre-aggregated data with the following columns:
