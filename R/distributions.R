@@ -2547,8 +2547,7 @@ rsdt_binary <- function(n, n_trials, stimulus, dprime, criterion,
 #'   thresholds, or an n-by-(K-1) matrix with one row per observation.
 #' @param sdratio Numeric vector. Ratio of signal to noise standard deviations
 #'   (default 1, i.e., equal variance).
-#' @param dist Character. Noise distribution: "normal" (default), "logistic",
-#'   "gumbel_min", or "gumbel_max".
+#' @inheritParams SDTdist
 #' @param log Logical. If `TRUE`, returns log-density (default `FALSE`).
 #' @param n Integer. Number of observations to generate. `n_trials`,
 #'   `stimulus`, `thresholds`, and the model parameters are recycled to this
@@ -2671,8 +2670,8 @@ rsdt_rating <- function(n, n_trials, stimulus, dprime, thresholds,
 #'            dprime = 1.5, thresholds = c(-0.5, 0.0, 0.5), Ro = 0.3, Rn = 0)
 dsdt_dpsdt <- function(counts, stimulus, dprime, thresholds, Ro, Rn,
                        sdratio = 1,
-                       dist = c("normal", "logistic",
-                                "gumbel_min", "gumbel_max"),
+                       dist = c("normal", "gumbel_min", "gumbel_max",
+                                "logistic"),
                        log = FALSE) {
   dist <- match.arg(dist)
   counts <- rbind(counts)
@@ -2714,8 +2713,8 @@ dsdt_dpsdt <- function(counts, stimulus, dprime, thresholds, Ro, Rn,
 #' head(dat)
 rsdt_dpsdt <- function(n, n_trials, stimulus, dprime, thresholds, Ro, Rn,
                        sdratio = 1,
-                       dist = c("normal", "logistic",
-                                "gumbel_min", "gumbel_max")) {
+                       dist = c("normal", "gumbel_min", "gumbel_max",
+                                "logistic")) {
   dist <- match.arg(dist)
   stopif(length(n) != 1 || n < 1, "n must be a single positive integer")
   stopif(any(n_trials < 1), "n_trials must be positive")
@@ -2772,8 +2771,8 @@ rsdt_dpsdt <- function(n, n_trials, stimulus, dprime, thresholds, Ro, Rn,
 #'            dprime = 1.5, thresholds = c(-0.5, 0.0, 0.5), metad = 1.0)
 dsdt_metad <- function(counts, stimulus, dprime, thresholds, metad,
                        sdratio = 1,
-                       dist = c("normal", "logistic",
-                                "gumbel_min", "gumbel_max"),
+                       dist = c("normal", "gumbel_min", "gumbel_max",
+                                "logistic"),
                        log = FALSE) {
   dist <- match.arg(dist)
   counts <- rbind(counts)
@@ -2812,8 +2811,8 @@ dsdt_metad <- function(counts, stimulus, dprime, thresholds, metad,
 #' head(dat)
 rsdt_metad <- function(n, n_trials, stimulus, dprime, thresholds, metad,
                        sdratio = 1,
-                       dist = c("normal", "logistic",
-                                "gumbel_min", "gumbel_max")) {
+                       dist = c("normal", "gumbel_min", "gumbel_max",
+                                "logistic")) {
   dist <- match.arg(dist)
   stopif(length(n) != 1 || n < 1, "n must be a single positive integer")
   stopif(any(n_trials < 1), "n_trials must be positive")

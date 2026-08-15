@@ -14,7 +14,7 @@ dsdt_dpsdt(
   Ro,
   Rn,
   sdratio = 1,
-  dist = c("normal", "logistic", "gumbel_min", "gumbel_max"),
+  dist = c("normal", "gumbel_min", "gumbel_max", "logistic"),
   log = FALSE
 )
 
@@ -27,7 +27,7 @@ rsdt_dpsdt(
   Ro,
   Rn,
   sdratio = 1,
-  dist = c("normal", "logistic", "gumbel_min", "gumbel_max")
+  dist = c("normal", "gumbel_min", "gumbel_max", "logistic")
 )
 }
 \arguments{
@@ -51,8 +51,16 @@ probability for new (noise) items.}
 \item{sdratio}{Numeric vector. Ratio of signal to noise standard deviations
 (default 1, i.e., equal variance).}
 
-\item{dist}{Character. Noise distribution: "normal" (default), "logistic",
-"gumbel_min", or "gumbel_max".}
+\item{dist}{Character. The distribution assumed for the latent evidence,
+given here by its cumulative distribution function:
+\itemize{
+\item "normal" (default): Gaussian, \eqn{\Phi(x)}
+\item "gumbel_min": smallest extreme value, \eqn{1 - \exp(-\exp(x))}
+(the complementary log-log distribution)
+\item "gumbel_max": largest extreme value, \eqn{\exp(-\exp(-x))}
+(the log-log distribution, as in \code{evd::pgumbel})
+\item "logistic": \eqn{1 / (1 + \exp(-x))}
+}}
 
 \item{log}{Logical. If \code{TRUE}, returns log-density (default \code{FALSE}).}
 
