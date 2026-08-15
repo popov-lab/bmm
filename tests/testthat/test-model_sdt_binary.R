@@ -34,7 +34,15 @@ test_that("sdt_binary model has correct default link functions", {
   model <- sdt_binary("n_old", "stimulus", "n_trials")
   expect_equal(model$links$dprime, "identity")
   expect_equal(model$links$criterion, "identity")
-  expect_equal(model$links$sdratio, "identity")
+  expect_equal(model$links$sdratio, "log")
+})
+
+test_that("sdt_binary fixes sdratio on the link scale and inits on the natural scale", {
+  model <- sdt_binary("n_old", "stimulus", "n_trials")
+  # constant() prior on the Intercept, so exp(0) = 1 = equal variance
+  expect_equal(model$fixed_parameters$sdratio, 0)
+  # create_initfun() applies the forward link, so log() of these must be finite
+  expect_true(all(model$init_ranges$sdratio > 0))
 })
 
 test_that("sdt_binary model accepts custom links", {
@@ -256,8 +264,95 @@ test_that("dsdt_binary works for all distributions", {
 test_that("dsdt_binary validates input", {
   expect_error(dsdt_binary(n_old = -1, n_trials = 100, stimulus = 1,
                            dprime = 1, criterion = 0), "non-negative")
+  expect_error(dsdt_binary(n_old = 150, n_trials = 100, stimulus = 1,
+                           dprime = 1, criterion = 0), "must not exceed")
   expect_error(dsdt_binary(n_old = 50, n_trials = 100, stimulus = 2,
                            dprime = 1, criterion = 0), "0.*1")
+  expect_error(dsdt_binary(n_old = 50, n_trials = 100, stimulus = 1,
+                           dprime = 1, criterion = 0, sdratio = 0),
+               "sdratio must be positive")
+  expect_error(dsdt_binary(n_old = 50, n_trials = 100, stimulus = 1,
+                           dprime = 1, criterion = 0, dist = "cauchy"),
+               "should be one of")
+})
+
+test_that("dsdt_binary stays finite where the probability scale underflows", {
+  # naive dbinom(y, n, pnorm(eta)) returns -Inf here and poisons loo()
+  for (d in c("normal", "logistic", "gumbel_min", "gumbel_max")) {
+    ld <- dsdt_binary(n_old = 1, n_trials = 100, stimulus = 1,
+                      dprime = -80, criterion = 0, dist = d, log = TRUE)
+    expect_true(is.finite(ld), info = d)
+  }
+})
+
+test_that("dsdt_binary handles the y = 0 and y = n_trials edges", {
+  # 0 * -Inf must contribute nothing rather than becoming NaN
+  expect_equal(dsdt_binary(n_old = 0, n_trials = 10, stimulus = 1,
+                           dprime = -80, criterion = 0, log = TRUE), 0)
+  expect_equal(dsdt_binary(n_old = 10, n_trials = 10, stimulus = 1,
+                           dprime = 80, criterion = 0, log = TRUE), 0)
+})
+
+test_that("dist names the evidence distribution, not the likelihood's CDF", {
+  # bmm must reproduce the textbook generative story -- draw evidence from
+  # `dist`, respond "old" when it exceeds the criterion -- for asymmetric
+  # distributions too. Using F(eta) instead of S(-eta) silently fits the mirror
+  # distribution and only shows up for the extreme-value families.
+  dprime <- 1.5
+  criterion_textbook <- 0.3
+  criterion <- criterion_textbook - dprime / 2
+
+  quantile_fun <- list(
+    normal     = qnorm,
+    gumbel_min = function(p) log(-log(1 - p)),
+    gumbel_max = function(p) -log(-log(p)),
+    logistic   = qlogis
+  )
+
+  for (d in names(quantile_fun)) {
+    # inverse-transform sampling, independent of .sdt_dists
+    u <- (seq_len(20000) - 0.5) / 20000
+    p_noise <- mean(quantile_fun[[d]](u) > criterion_textbook)
+    p_signal <- mean(dprime + quantile_fun[[d]](u) > criterion_textbook)
+
+    expect_equal(
+      dsdt_binary(1, 1, 0L, dprime, criterion, dist = d), p_noise,
+      tolerance = 1e-3, info = paste(d, "noise")
+    )
+    expect_equal(
+      dsdt_binary(1, 1, 1L, dprime, criterion, dist = d), p_signal,
+      tolerance = 1e-3, info = paste(d, "signal")
+    )
+  }
+})
+
+test_that("sdt_dprime and sdt_criterion invert the model's decision rule", {
+  dprime <- 1.2
+  criterion <- -0.2
+  for (d in c("normal", "gumbel_min", "gumbel_max", "logistic")) {
+    fa <- dsdt_binary(1, 1, 0L, dprime, criterion, dist = d)
+    hit <- dsdt_binary(1, 1, 1L, dprime, criterion, dist = d)
+    expect_equal(sdt_dprime(hit, fa, dist = d), dprime,
+                 tolerance = 1e-8, info = d)
+    expect_equal(sdt_criterion(hit, fa, dist = d), criterion,
+                 tolerance = 1e-8, info = d)
+  }
+})
+
+test_that("dsdt_binary matches dbinom in the well-conditioned range", {
+  eta <- (1.5 / 2 - 0.2) / 1.3
+  expect_equal(
+    dsdt_binary(n_old = 70, n_trials = 100, stimulus = 1, dprime = 1.5,
+                criterion = 0.2, sdratio = 1.3, log = TRUE),
+    dbinom(70, 100, pnorm(eta), log = TRUE)
+  )
+})
+
+test_that("dsdt_binary returns one value per posterior draw for a scalar count", {
+  # times_nonzero() must recycle: ifelse() alone would collapse to length 1
+  d <- dsdt_binary(n_old = 70, n_trials = 100, stimulus = 1,
+                   dprime = rep(1.5, 20), criterion = 0.2, log = TRUE)
+  expect_length(d, 20)
 })
 
 test_that("dsdt_binary with sdratio produces different densities than EV-SDT", {
@@ -289,15 +384,16 @@ test_that("dsdt_binary is vectorized over sdratio", {
 # LOG_LIK & POSTERIOR_PREDICT                                            ####
 ############################################################################# !
 
-# brmsprep stand-in: get_dpar() returns the supplied per-draw vectors (sdratio
-# on the log link, as brms passes it). dprime/criterion are held constant so the
-# only across-draw variation comes from sdratio -- isolating the unequal-variance
-# signal scaling that the .sdt_eta() collapse bug got wrong.
+# brmsprep stand-in: get_dpar() returns the supplied per-draw vectors already on
+# the natural scale, as brms does once it has applied the inverse link.
+# dprime/criterion are held constant so the only across-draw variation comes
+# from sdratio -- isolating the unequal-variance signal scaling that the
+# .sdt_eta() collapse bug got wrong.
 uv_prep <- function(ndraws = 50L) {
   draws <- list(
     dprime    = rep(1.2, ndraws),
     criterion = rep(0.0, ndraws),
-    sdratio   = log(seq(1.1, 1.9, length.out = ndraws))
+    sdratio   = seq(1.1, 1.9, length.out = ndraws)
   )
   prep <- list(data = list(
     vint1  = c(0L, 1L),      # stimulus: noise, signal
@@ -314,11 +410,11 @@ test_that("log_lik_sdt_binary scales the signal per draw under UV-SDT", {
     get_dpar = function(prep, dpar, i = NULL, ...) mk$draws[[dpar]],
     .package = "brms"
   )
-  # signal row (stimulus = 1): p = Phi((dprime/2 - criterion) / exp(sdratio))
-  p_expected <- pnorm((1.2 / 2 - 0) / exp(mk$draws$sdratio))
+  # signal row (stimulus = 1): p = Phi((dprime/2 - criterion) / sdratio)
+  p_expected <- pnorm((1.2 / 2 - 0) / mk$draws$sdratio)
   expect_equal(log_lik_sdt_binary(2L, mk$prep),
                dbinom(70L, 100L, p_expected, log = TRUE))
-  # the collapse bug divided every draw by exp(sdratio[1]), giving a constant p
+  # the collapse bug divided every draw by sdratio[1], giving a constant p
   expect_gt(length(unique(round(log_lik_sdt_binary(2L, mk$prep), 8))), 1L)
   # noise row (stimulus = 0) is scale-free and must ignore sdratio entirely
   expect_equal(log_lik_sdt_binary(1L, mk$prep),
@@ -339,7 +435,7 @@ test_that("posterior_predict_sdt_binary feeds per-draw signal probabilities", {
   )
   out <- posterior_predict_sdt_binary(2L, mk$prep)
   expect_length(out, length(mk$draws$dprime))
-  expect_equal(captured, pnorm((1.2 / 2) / exp(mk$draws$sdratio)))
+  expect_equal(captured, pnorm((1.2 / 2) / mk$draws$sdratio))
 })
 
 

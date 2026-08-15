@@ -1098,6 +1098,17 @@ log_diff_exp <- function(a, b) {
   a + log1m_exp(b - a)
 }
 
+# count * log_prob, treating a zero count as contributing nothing even when the
+# log probability is -Inf. The R counterpart of the `if (y > 0)` guards Stan
+# likelihoods use to keep 0 * -Inf from becoming NaN. Both arguments are
+# recycled first because ifelse() returns the length of its test, which would
+# otherwise collapse a vector of posterior draws to a scalar count's length.
+times_nonzero <- function(count, log_prob) {
+  n <- max(length(count), length(log_prob))
+  count <- rep_len(count, n)
+  ifelse(count == 0, 0, count * rep_len(log_prob, n))
+}
+
 .pwald <- function(rt, drift, bound, s, lower.tail = TRUE, log.p = TRUE) {
   z1 <- (drift * rt - bound) / (s * sqrt(rt))
   z2 <- -(drift * rt + bound) / (s * sqrt(rt))
@@ -1952,30 +1963,74 @@ neg_loglik <- function(x, params, distribution, weights = NULL) {
 ############################################################################# !
 
 # SDT distribution registry: single source of truth for all CDF/quantile logic
-# Each entry: cdf (R CDF), qf (R quantile function). The list position defines
-# the integer dist_type code passed to Stan -- reordering entries changes the
-# R <-> Stan contract (see inst/stan_chunks/sdt_dist_funs.stan)
+# Each entry: cdf, qf (quantile function), and lcdf/lccdf (log CDF and log
+# complementary CDF). The lcdf/lccdf entries mirror the Stan dispatchers in
+# inst/stan_chunks/sdt_dist_funs.stan branch for branch, so the two
+# implementations can be read side by side.
+#
+# The list position defines the integer dist_type code passed to Stan --
+# reordering entries changes the R <-> Stan contract.
+#
+# gumbel_min / gumbel_max follow the extreme-value convention: gumbel_min is
+# the smallest-extreme-value (cloglog) distribution, gumbel_max the largest
+# (loglog, i.e. evd::pgumbel). Taking the max of gumbel_max variates is what
+# yields the m-AFC softmax; the ranking Gamma-ratio kernel is the gumbel_min
+# result. Swapping these labels silently fits the mirror model.
 .sdt_dists <- list(
   normal = list(
     cdf = pnorm,
-    qf = qnorm
+    qf = qnorm,
+    lcdf = function(x) pnorm(x, log.p = TRUE),
+    lccdf = function(x) pnorm(x, lower.tail = FALSE, log.p = TRUE)
   ),
   gumbel_min = list(
-    cdf = function(x) exp(-exp(-x)),
-    qf = function(p) -log(-log(p))
+    cdf = function(x) 1 - exp(-exp(x)),
+    qf = function(p) log(-log(1 - p)),
+    lcdf = function(x) log1m_exp(-exp(x)),
+    lccdf = function(x) -exp(x)
   ),
   gumbel_max = list(
-    cdf = function(x) 1 - exp(-exp(x)),
-    qf = function(p) log(-log(1 - p))
+    cdf = function(x) exp(-exp(-x)),
+    qf = function(p) -log(-log(p)),
+    lcdf = function(x) -exp(-x),
+    lccdf = function(x) log1m_exp(-exp(-x))
   ),
   logistic = list(
     cdf = plogis,
-    qf = qlogis
+    qf = qlogis,
+    lcdf = function(x) plogis(x, log.p = TRUE),
+    lccdf = function(x) plogis(x, lower.tail = FALSE, log.p = TRUE)
   )
 )
 
+# Internal CDF helpers for SDT distributions. All vectorized over eta.
+# Prefer the log-scale pair inside likelihoods: the probability scale
+# underflows to 0 or 1 in the tails, where Stan stays finite.
 .sdt_cdf <- function(eta, dist) {
   .sdt_dists[[dist]]$cdf(eta)
+}
+
+.sdt_log_cdf <- function(eta, dist) {
+  .sdt_dists[[dist]]$lcdf(eta)
+}
+
+.sdt_log_ccdf <- function(eta, dist) {
+  .sdt_dists[[dist]]$lccdf(eta)
+}
+
+
+# Probability of responding "old"/"signal" under the SDT decision rule: the
+# evidence exceeds the criterion. `dist` names the distribution of the evidence
+# itself, so this is its survival function; .sdt_eta() returns the distance from
+# the distribution to the criterion, hence the sign flip. For symmetric
+# distributions S(-eta) == F(eta) and the flip is invisible, which is why it
+# only bites for the extreme-value distributions.
+.sdt_log_p_old <- function(eta, dist) {
+  .sdt_log_ccdf(-eta, dist)
+}
+
+.sdt_log_p_new <- function(eta, dist) {
+  .sdt_log_cdf(-eta, dist)
 }
 
 
@@ -1993,6 +2048,8 @@ neg_loglik <- function(x, params, distribution, weights = NULL) {
 
 
 .validate_sdt_rates <- function(hit_rate, fa_rate) {
+  stopif(anyNA(hit_rate) || anyNA(fa_rate),
+         "hit_rate and fa_rate must not contain missing values")
   stopif(any(hit_rate <= 0 | hit_rate >= 1),
          "hit_rate must be between 0 and 1 (exclusive)")
   stopif(any(fa_rate <= 0 | fa_rate >= 1),
@@ -2009,8 +2066,16 @@ neg_loglik <- function(x, params, distribution, weights = NULL) {
 #'
 #' @param hit_rate Numeric. Proportion of hits (P("old" | signal)).
 #' @param fa_rate Numeric. Proportion of false alarms (P("old" | noise)).
-#' @param dist Character. Noise distribution: "normal" (default), "logistic",
-#'   "gumbel_min", or "gumbel_max".
+#' @param dist Character. The distribution assumed for the latent evidence,
+#'   given here by its cumulative distribution function:
+#'   \itemize{
+#'     \item "normal" (default): Gaussian, \eqn{\Phi(x)}
+#'     \item "gumbel_min": smallest extreme value, \eqn{1 - \exp(-\exp(x))}
+#'       (the complementary log-log distribution)
+#'     \item "gumbel_max": largest extreme value, \eqn{\exp(-\exp(-x))}
+#'       (the log-log distribution, as in \code{evd::pgumbel})
+#'     \item "logistic": \eqn{1 / (1 + \exp(-x))}
+#'   }
 #'
 #' @references
 #' Green, D. M., & Swets, J. A. (1966). \emph{Signal detection theory and
@@ -2021,42 +2086,46 @@ NULL
 
 
 #' @rdname SDTdist
-#' @return `sdt_dprime` returns the sensitivity index appropriate for the
-#'   chosen distribution: \eqn{d' = \Phi^{-1}(H) - \Phi^{-1}(FA)} for `dist =
-#'   "normal"`; g' = log(FA) - log(H) for `dist = "gumbel_min"` (Meyer-Grant
-#'   et al., 2025); analogous quantile-difference measures for other
-#'   distributions.
+#' @return `sdt_dprime` returns the distance between the signal and noise
+#'   distributions on the latent evidence axis, obtained by inverting the
+#'   decision rule "respond old when the evidence exceeds the criterion":
+#'   \eqn{Q(1 - FA) - Q(1 - H)}, where \eqn{Q} is the quantile function of
+#'   `dist`. For `dist = "normal"` this reduces to the familiar
+#'   \eqn{d' = \Phi^{-1}(H) - \Phi^{-1}(FA)}.
 #' @export
 #' @examples
 #' # Compute d' from hit and false alarm rates (Gaussian SDT)
 #' sdt_dprime(hit_rate = 0.8, fa_rate = 0.2, dist = "normal")
 #'
-#' # Compute g' from hit and false alarm rates (Gumbel-min SDT)
-#' # g' = log(FA) - log(H), invariant under uniform choice-set expansion
-#' sdt_dprime(hit_rate = 0.8, fa_rate = 0.2, dist = "gumbel_min")
+#' # The extreme-value analogue
+#' sdt_dprime(hit_rate = 0.75, fa_rate = 0.25, dist = "gumbel_min")
 sdt_dprime <- function(hit_rate, fa_rate,
-                       dist = c("normal", "logistic",
-                                "gumbel_min", "gumbel_max")) {
+                       dist = c("normal", "gumbel_min", "gumbel_max",
+                                "logistic")) {
   dist <- match.arg(dist)
   .validate_sdt_rates(hit_rate, fa_rate)
   qf <- .sdt_dists[[dist]]$qf
-  qf(hit_rate) - qf(fa_rate)
+  qf(1 - fa_rate) - qf(1 - hit_rate)
 }
 
 
 #' @rdname SDTdist
-#' @return `sdt_criterion` returns the criterion (response bias) value.
+#' @return `sdt_criterion` returns the criterion (response bias) on the
+#'   centred evidence axis used by [sdt_binary()], where the noise and signal
+#'   distributions sit at -d'/2 and +d'/2:
+#'   \eqn{(Q(1 - FA) + Q(1 - H)) / 2}. For `dist = "normal"` this reduces to
+#'   the familiar \eqn{-(\Phi^{-1}(H) + \Phi^{-1}(FA)) / 2}.
 #' @export
 #' @examples
 #' # Compute criterion from hit and false alarm rates
 #' sdt_criterion(hit_rate = 0.8, fa_rate = 0.2, dist = "normal")
 sdt_criterion <- function(hit_rate, fa_rate,
-                          dist = c("normal", "logistic",
-                                   "gumbel_min", "gumbel_max")) {
+                          dist = c("normal", "gumbel_min", "gumbel_max",
+                                   "logistic")) {
   dist <- match.arg(dist)
   .validate_sdt_rates(hit_rate, fa_rate)
   qf <- .sdt_dists[[dist]]$qf
-  -(qf(hit_rate) + qf(fa_rate)) / 2
+  (qf(1 - fa_rate) + qf(1 - hit_rate)) / 2
 }
 
 
@@ -2078,9 +2147,9 @@ sdt_criterion <- function(hit_rate, fa_rate,
 #' @param dprime Numeric. Sensitivity parameter.
 #' @param criterion Numeric. Response bias (decision boundary location).
 #' @param sdratio Numeric. Ratio of signal to noise standard deviations
-#'   (default 1, i.e., equal variance).
-#' @param dist Character. Noise distribution: "normal" (default), "logistic",
-#'   "gumbel_min", or "gumbel_max".
+#'   (default 1, i.e., equal variance). Must be positive. This is the same
+#'   scale as the `sdratio` parameter of [sdt_binary()], which uses a log link.
+#' @inheritParams SDTdist
 #' @param log Logical. If `TRUE`, returns log-density (default `FALSE`).
 #' @param n Integer. Number of observations to generate. `n_trials`,
 #'   `stimulus`, and the model parameters are recycled to this length.
@@ -2105,15 +2174,26 @@ sdt_criterion <- function(hit_rate, fa_rate,
 #'             stimulus = c(0, 1), dprime = 1.5, criterion = 0.2,
 #'             log = TRUE)
 dsdt_binary <- function(n_old, n_trials, stimulus, dprime, criterion,
-                        sdratio = 1, dist = "normal", log = FALSE) {
+                        sdratio = 1,
+                        dist = c("normal", "gumbel_min", "gumbel_max",
+                                 "logistic"),
+                        log = FALSE) {
+  dist <- match.arg(dist)
   stopif(any(n_old < 0), "n_old must be non-negative")
   stopif(any(n_trials < 1), "n_trials must be positive")
+  stopif(any(n_old > n_trials), "n_old must not exceed n_trials")
   stopif(any(!stimulus %in% c(0L, 1L)),
          "stimulus must be 0 (noise) or 1 (signal)")
+  stopif(any(sdratio <= 0), "sdratio must be positive")
 
   eta <- .sdt_eta(dprime, criterion, stimulus, sdratio)
-  p <- .sdt_cdf(eta, dist)
-  stats::dbinom(n_old, n_trials, p, log = log)
+  # assembled on the log scale to match sdt_binary_lpmf: the probability scale
+  # underflows to 0 or 1 in the tails, which would return -Inf here while Stan
+  # stays finite, silently poisoning log_lik() and loo()
+  out <- lchoose(n_trials, n_old) +
+    times_nonzero(n_old, .sdt_log_p_old(eta, dist)) +
+    times_nonzero(n_trials - n_old, .sdt_log_p_new(eta, dist))
+  if (log) out else exp(out)
 }
 
 
@@ -2127,15 +2207,18 @@ dsdt_binary <- function(n_old, n_trials, stimulus, dprime, criterion,
 #'                          dprime = 1.5, criterion = 0.2)
 #' head(dat)
 rsdt_binary <- function(n, n_trials, stimulus, dprime, criterion,
-                        sdratio = 1, dist = "normal") {
+                        sdratio = 1,
+                        dist = c("normal", "gumbel_min", "gumbel_max",
+                                 "logistic")) {
+  dist <- match.arg(dist)
   stopif(length(n) != 1 || n < 1, "n must be a single positive integer")
   stopif(any(n_trials < 1), "n_trials must be positive")
   stopif(any(!stimulus %in% c(0L, 1L)),
          "stimulus must be 0 (noise) or 1 (signal)")
+  stopif(any(sdratio <= 0), "sdratio must be positive")
 
   eta <- .sdt_eta(dprime, criterion, stimulus, sdratio)
-  p <- .sdt_cdf(eta, dist)
-  stats::rbinom(n, n_trials, p)
+  stats::rbinom(n, n_trials, exp(.sdt_log_p_old(eta, dist)))
 }
 
 
@@ -2208,17 +2291,18 @@ rsdt_binary <- function(n, n_trials, stimulus, dprime, criterion,
 )
 
 # R-side probability correct for m-AFC, mirroring the Stan mafc_pc function.
-# gumbel_min has a closed-form softmax, gumbel_max a closed-form Gamma ratio,
+# Taking the max of gumbel_max variates is what yields the softmax, so that is
+# the branch with the closed form; gumbel_min gives the closed-form Gamma ratio.
 # normal uses 40-point Gauss-Hermite quadrature (closed form Phi(d'/sqrt(2))
 # at m = 2), logistic uses 64-point Gauss-Legendre on the probability scale.
 # Vectorized over dprime and m (recycled to a common length). The rep(each =)
 # factor aligns the per-observation exponent m - 1 with the column-major
 # layout of the nodes-by-observations matrix from outer().
 .mafc_pc_r <- function(dprime, m, dist = "normal") {
-  if (dist == "gumbel_min") {
+  if (dist == "gumbel_max") {
     return(1 / (1 + (m - 1) * exp(-dprime)))
   }
-  if (dist == "gumbel_max") {
+  if (dist == "gumbel_min") {
     return(exp(lgamma(1 + exp(-dprime)) + lgamma(m) - lgamma(m + exp(-dprime))))
   }
 
@@ -2421,8 +2505,8 @@ rsdt_binary <- function(n, n_trials, stimulus, dprime, criterion,
 #'             dprime = 1.5, thresholds = c(-0.5, 0.0, 0.5))
 dsdt_rating <- function(counts, stimulus, dprime, thresholds,
                         sdratio = 1,
-                        dist = c("normal", "logistic",
-                                 "gumbel_min", "gumbel_max"),
+                        dist = c("normal", "gumbel_min", "gumbel_max",
+                                 "logistic"),
                         log = FALSE) {
   dist <- match.arg(dist)
   counts <- rbind(counts)
@@ -2459,8 +2543,8 @@ dsdt_rating <- function(counts, stimulus, dprime, thresholds,
 #' head(dat)
 rsdt_rating <- function(n, n_trials, stimulus, dprime, thresholds,
                         sdratio = 1,
-                        dist = c("normal", "logistic",
-                                 "gumbel_min", "gumbel_max")) {
+                        dist = c("normal", "gumbel_min", "gumbel_max",
+                                 "logistic")) {
   dist <- match.arg(dist)
   stopif(length(n) != 1 || n < 1, "n must be a single positive integer")
   stopif(any(n_trials < 1), "n_trials must be positive")
@@ -2497,8 +2581,7 @@ rsdt_rating <- function(n, n_trials, stimulus, dprime, thresholds,
 #' @param m Integer vector. Number of alternatives per observation. Must be
 #'   at least 2.
 #' @param dprime Numeric vector. Sensitivity parameter(s).
-#' @param dist The noise distribution: one of "normal" (default), "logistic",
-#'   "gumbel_min", or "gumbel_max".
+#' @inheritParams SDTdist
 #' @param log Logical. If `TRUE`, returns log-density (default `FALSE`).
 #' @param n Integer. Number of observations to generate. `n_trials`, `m`, and
 #'   `dprime` are recycled to this length.
@@ -2519,8 +2602,8 @@ rsdt_rating <- function(n, n_trials, stimulus, dprime, thresholds,
 #' # 4-AFC density
 #' dsdt_mafc(n_correct = 80, n_trials = 100, m = 4, dprime = 1.5)
 dsdt_mafc <- function(n_correct, n_trials, m, dprime,
-                      dist = c("normal", "logistic",
-                               "gumbel_min", "gumbel_max"),
+                      dist = c("normal", "gumbel_min", "gumbel_max",
+                               "logistic"),
                       log = FALSE) {
   dist <- match.arg(dist)
   stopif(any(m < 2), "m must be an integer >= 2")
@@ -2546,8 +2629,8 @@ dsdt_mafc <- function(n_correct, n_trials, m, dprime,
 #'                            dprime = rnorm(20, 1.5, 0.4))
 #' head(dat)
 rsdt_mafc <- function(n, n_trials, m, dprime,
-                      dist = c("normal", "logistic",
-                               "gumbel_min", "gumbel_max")) {
+                      dist = c("normal", "gumbel_min", "gumbel_max",
+                               "logistic")) {
   dist <- match.arg(dist)
   stopif(length(n) != 1 || n < 1, "n must be a single positive integer")
   stopif(any(m < 2), "m must be an integer >= 2")
@@ -2636,8 +2719,10 @@ rsdt_mafc <- function(n, n_trials, m, dprime,
 #' @param dprime Numeric vector. Ranking discrimination parameter(s).
 #' @param m Integer vector. Number of ranked items per observation. Must be
 #'   at least 2 and no larger than the number of count columns.
-#' @param dist Character. Distribution: "gumbel_min" (default, closed form)
-#'   or "normal" (Gaussian UV-SDT, numerical integration).
+#' @param dist Character. The distribution assumed for the latent evidence:
+#'   "gumbel_min" (default), the smallest extreme value distribution with
+#'   cumulative distribution function \eqn{1 - \exp(-\exp(x))}, evaluated in
+#'   closed form; or "normal", Gaussian UV-SDT by numerical integration.
 #' @param sdratio Numeric vector. Ratio of signal to noise standard deviations
 #'   (default 1). Only used when `dist = "normal"`.
 #' @param log Logical. If `TRUE`, returns log-density (default `FALSE`).
