@@ -217,6 +217,43 @@ test_that("m3 compiles for the custom model / softmax choice rule", {
 })
 
 
+test_that("m3 custom accepts softplus links and generates default priors", {
+  formula <- bmf(
+    corr ~ b + a + c,
+    other ~ b + a,
+    npl ~ b,
+    c ~ 1,
+    a ~ 1
+  )
+
+  softplus_main <- list(simple = "normal(2, 1)", softmax = "normal(1, 1)")
+
+  for (rule in c("simple", "softmax")) {
+    my_model <- m3(
+      resp_cats = c("corr", "other", "npl"),
+      num_options = c(1, 2, 5),
+      choice_rule = rule,
+      links = list(c = "softplus", a = "softplus")
+    )
+
+    fit <- suppressWarnings(bmm(
+      formula = formula,
+      data = oberauer_lewandowsky_2019_e1,
+      model = my_model,
+      backend = "mock",
+      mock_fit = 1,
+      rename = F
+    ))
+
+    for (par in c("c", "a")) {
+      expect_equal(
+        fit$bmm$model$default_priors[[par]],
+        list(main = softplus_main[[rule]], effects = "normal(0, 0.5)")
+      )
+    }
+  }
+})
+
 test_that("m3 works with num_options as a numeric vector", {
   formula <- bmf(
     c ~ 1 + (1 | ID),
@@ -313,4 +350,31 @@ test_that("m3 with numerical vector as num_options containing 0 returns error", 
     mock_fit = 1,
     rename = F
   ), "not identified")
+})
+
+test_that("softmax default priors give a and c equal main means (c - a centered at 0)", {
+  for (v in c("ss", "cs")) {
+    p <- m3(
+      resp_cats = if (v == "ss") c("corr", "other", "npl") else
+        c("corr", "dist_context", "other", "dist_other", "npl"),
+      num_options = if (v == "ss") c(1, 2, 3) else c(1, 2, 2, 2, 3),
+      choice_rule = "softmax", version = v
+    )$default_priors
+    expect_identical(p$a$main, p$c$main)
+  }
+})
+
+test_that("no activation effect prior is wider than the shared normal(0,0.5)", {
+  for (v in c("ss", "cs")) {
+    for (cr in c("simple", "softmax")) {
+      p <- m3(
+        resp_cats = if (v == "ss") c("corr", "other", "npl") else
+          c("corr", "dist_context", "other", "dist_other", "npl"),
+        num_options = if (v == "ss") c(1, 2, 3) else c(1, 2, 2, 2, 3),
+        choice_rule = cr, version = v
+      )$default_priors
+      expect_identical(p$a$effects, "normal(0,0.5)")
+      expect_identical(p$c$effects, "normal(0,0.5)")
+    }
+  }
 })

@@ -53,8 +53,7 @@
       links = .ddm_defaults[["links"]],
       fixed_parameters = .ddm_defaults[["fixed_parameters"]],
       default_priors = .ddm_defaults[["priors"]],
-      init_ranges = .ddm_defaults[["init_ranges"]],
-      void_mu = TRUE
+      init_ranges = .ddm_defaults[["init_ranges"]]
     ),
     class = c("bmmodel", "ddm"),
     call = call
@@ -71,7 +70,10 @@
 #' @details `r model_info(.model_ddm())`
 #' @param rt Name of the reaction time variable coding reaction time in seconds in the data.
 #' @param response Name of the response variable coding the response numerically (0 = lower response / incorrect, 1 = upper response / correct)
-#' @param links A list of links for the parameters.
+#' @param links A list of links for the parameters. For positive parameters
+#'   (e.g. `bound`, `ndt`), "softplus" is available as an alternative to the
+#'   default "log" link that grows linearly for large values and avoids the
+#'   numerical blow-up of `exp()`.
 #' @section Default behavior:
 #' By default, `zr` is fixed at 0. If you want to estimate `zr`, add a formula
 #' for `zr` in your `bmf()` call.
