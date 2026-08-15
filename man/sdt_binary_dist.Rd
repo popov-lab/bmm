@@ -13,7 +13,7 @@ dsdt_binary(
   dprime,
   criterion,
   sdratio = 1,
-  dist = "normal",
+  dist = c("normal", "gumbel_min", "gumbel_max", "logistic"),
   log = FALSE
 )
 
@@ -24,7 +24,7 @@ rsdt_binary(
   dprime,
   criterion,
   sdratio = 1,
-  dist = "normal"
+  dist = c("normal", "gumbel_min", "gumbel_max", "logistic")
 )
 }
 \arguments{
@@ -39,10 +39,19 @@ rsdt_binary(
 \item{criterion}{Numeric. Response bias (decision boundary location).}
 
 \item{sdratio}{Numeric. Ratio of signal to noise standard deviations
-(default 1, i.e., equal variance).}
+(default 1, i.e., equal variance). Must be positive. This is the same
+scale as the \code{sdratio} parameter of \code{\link[=sdt_binary]{sdt_binary()}}, which uses a log link.}
 
-\item{dist}{Character. Noise distribution: "normal" (default), "logistic",
-"gumbel_min", or "gumbel_max".}
+\item{dist}{Character. The distribution assumed for the latent evidence,
+given here by its cumulative distribution function:
+\itemize{
+\item "normal" (default): Gaussian, \eqn{\Phi(x)}
+\item "gumbel_min": smallest extreme value, \eqn{1 - \exp(-\exp(x))}
+(the complementary log-log distribution)
+\item "gumbel_max": largest extreme value, \eqn{\exp(-\exp(-x))}
+(the log-log distribution, as in \code{evd::pgumbel})
+\item "logistic": \eqn{1 / (1 + \exp(-x))}
+}}
 
 \item{log}{Logical. If \code{TRUE}, returns log-density (default \code{FALSE}).}
 

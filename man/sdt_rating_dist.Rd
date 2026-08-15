@@ -12,7 +12,7 @@ dsdt_rating(
   dprime,
   thresholds,
   sdratio = 1,
-  dist = c("normal", "logistic", "gumbel_min", "gumbel_max"),
+  dist = c("normal", "gumbel_min", "gumbel_max", "logistic"),
   log = FALSE
 )
 
@@ -23,7 +23,7 @@ rsdt_rating(
   dprime,
   thresholds,
   sdratio = 1,
-  dist = c("normal", "logistic", "gumbel_min", "gumbel_max")
+  dist = c("normal", "gumbel_min", "gumbel_max", "logistic")
 )
 }
 \arguments{

@@ -41,7 +41,7 @@ distractor samples (one curve per set size) -- the "effective competitor"
 the target must beat -- which shifts rightward as \code{m} grows and visualises
 why accuracy falls with set size. Ignored for \code{sdt_binary}/\code{sdt_rating}.}
 
-\item{...}{Additional arguments passed to \code{\link[brms:posterior_linpred.brmsfit]{brms::posterior_linpred()}}.}
+\item{...}{Additional arguments passed to \code{\link[brms:posterior_linpred]{brms::posterior_linpred()}}.}
 }
 \value{
 A data frame of class \code{"bmm_sdt_latent"} with columns \code{x} (the

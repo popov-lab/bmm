@@ -373,10 +373,13 @@ roc_sdt <- function(fit, conditions = NULL, n_points = 100,
     sr <- sdratio_mat[, c_i]
     cond_row <- if (curve_has_cols) curve_cond[c_i, , drop = FALSE]
     # Anchor the criterion grid to the mean dprime so FA is ~evenly spaced; the
-    # noise scale is 1, so FA = cdf(-dprime/2 - criterion) inverts to this.
-    c_grid  <- -mean(dp) / 2 - qf(fa_grid)
-    fa_mat  <- cdf(outer(-dp / 2, c_grid, "-"))
-    hit_mat <- cdf(sweep(outer(dp / 2, c_grid, "-"), 1L, sr, "/"))
+    # noise scale is 1, so FA = 1 - cdf(dprime/2 + criterion) inverts to this.
+    c_grid  <- -mean(dp) / 2 + qf(1 - fa_grid)
+    # P("old") is the survival function of the evidence distribution, matching
+    # the likelihood; cdf(eta) would trace the mirror ROC for the asymmetric
+    # extreme-value distributions.
+    fa_mat  <- 1 - cdf(-outer(-dp / 2, c_grid, "-"))
+    hit_mat <- 1 - cdf(-sweep(outer(dp / 2, c_grid, "-"), 1L, sr, "/"))
 
     fa_full  <- cbind(0, fa_mat, 1)
     hit_full <- cbind(0, hit_mat, 1)
@@ -417,8 +420,10 @@ roc_sdt <- function(fit, conditions = NULL, n_points = 100,
 
   rows <- vector("list", n_pt)
   for (c_i in seq_len(n_pt)) {
-    fa  <- cdf(.sdt_eta(dprime_mat[, c_i], crit_mat[, c_i], 0L, sdratio_mat[, c_i]))
-    hit <- cdf(.sdt_eta(dprime_mat[, c_i], crit_mat[, c_i], 1L, sdratio_mat[, c_i]))
+    fa  <- 1 - cdf(-.sdt_eta(dprime_mat[, c_i], crit_mat[, c_i], 0L,
+                             sdratio_mat[, c_i]))
+    hit <- 1 - cdf(-.sdt_eta(dprime_mat[, c_i], crit_mat[, c_i], 1L,
+                             sdratio_mat[, c_i]))
     row <- cbind(.sdt_summarise_draws(fa, probs, prefix = "FA"),
                  .sdt_summarise_draws(hit, probs, prefix = "Hit"))
     if (ncol(point_cond) > 0L) {
