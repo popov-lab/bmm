@@ -2295,17 +2295,18 @@ rsdt_binary <- function(n, n_trials, stimulus, dprime, criterion,
 )
 
 # R-side probability correct for m-AFC, mirroring the Stan mafc_pc function.
-# gumbel_min has a closed-form softmax, gumbel_max a closed-form Gamma ratio,
+# Taking the max of gumbel_max variates is what yields the softmax, so that is
+# the branch with the closed form; gumbel_min gives the closed-form Gamma ratio.
 # normal uses 40-point Gauss-Hermite quadrature (closed form Phi(d'/sqrt(2))
 # at m = 2), logistic uses 64-point Gauss-Legendre on the probability scale.
 # Vectorized over dprime and m (recycled to a common length). The rep(each =)
 # factor aligns the per-observation exponent m - 1 with the column-major
 # layout of the nodes-by-observations matrix from outer().
 .mafc_pc_r <- function(dprime, m, dist = "normal") {
-  if (dist == "gumbel_min") {
+  if (dist == "gumbel_max") {
     return(1 / (1 + (m - 1) * exp(-dprime)))
   }
-  if (dist == "gumbel_max") {
+  if (dist == "gumbel_min") {
     return(exp(lgamma(1 + exp(-dprime)) + lgamma(m) - lgamma(m + exp(-dprime))))
   }
 
@@ -2349,8 +2350,7 @@ rsdt_binary <- function(n, n_trials, stimulus, dprime, criterion,
 #' @param m Integer vector. Number of alternatives per observation. Must be
 #'   at least 2.
 #' @param dprime Numeric vector. Sensitivity parameter(s).
-#' @param dist The noise distribution: one of "normal" (default), "logistic",
-#'   "gumbel_min", or "gumbel_max".
+#' @inheritParams SDTdist
 #' @param log Logical. If `TRUE`, returns log-density (default `FALSE`).
 #' @param n Integer. Number of observations to generate. `n_trials`, `m`, and
 #'   `dprime` are recycled to this length.
@@ -2371,8 +2371,8 @@ rsdt_binary <- function(n, n_trials, stimulus, dprime, criterion,
 #' # 4-AFC density
 #' dsdt_mafc(n_correct = 80, n_trials = 100, m = 4, dprime = 1.5)
 dsdt_mafc <- function(n_correct, n_trials, m, dprime,
-                      dist = c("normal", "logistic",
-                               "gumbel_min", "gumbel_max"),
+                      dist = c("normal", "gumbel_min", "gumbel_max",
+                               "logistic"),
                       log = FALSE) {
   dist <- match.arg(dist)
   stopif(any(m < 2), "m must be an integer >= 2")
@@ -2398,8 +2398,8 @@ dsdt_mafc <- function(n_correct, n_trials, m, dprime,
 #'                            dprime = rnorm(20, 1.5, 0.4))
 #' head(dat)
 rsdt_mafc <- function(n, n_trials, m, dprime,
-                      dist = c("normal", "logistic",
-                               "gumbel_min", "gumbel_max")) {
+                      dist = c("normal", "gumbel_min", "gumbel_max",
+                               "logistic")) {
   dist <- match.arg(dist)
   stopif(length(n) != 1 || n < 1, "n must be a single positive integer")
   stopif(any(m < 2), "m must be an integer >= 2")

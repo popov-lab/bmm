@@ -191,11 +191,23 @@ test_that("m-AFC probability correct is monotone increasing in d'", {
   }
 })
 
-test_that("gumbel_min m-AFC matches the exact softmax closed form", {
+test_that("gumbel_max m-AFC matches the exact softmax closed form", {
   for (m in c(2L, 3L, 4L, 8L)) {
     for (d in c(0, 1, 2, 3)) {
-      expect_equal(.mafc_pc_r(d, m, "gumbel_min"), 1 / (1 + (m - 1) * exp(-d)),
+      expect_equal(.mafc_pc_r(d, m, "gumbel_max"), 1 / (1 + (m - 1) * exp(-d)),
                    tolerance = 1e-12, info = paste("m =", m, "d =", d))
+    }
+  }
+})
+
+test_that("gumbel_min m-AFC matches the exact Gamma-ratio closed form", {
+  for (m in c(2L, 3L, 4L, 8L)) {
+    for (d in c(0, 1, 2, 3)) {
+      expect_equal(
+        .mafc_pc_r(d, m, "gumbel_min"),
+        exp(lgamma(1 + exp(-d)) + lgamma(m) - lgamma(m + exp(-d))),
+        tolerance = 1e-12, info = paste("m =", m, "d =", d)
+      )
     }
   }
 })
@@ -229,11 +241,13 @@ test_that("m-AFC probability correct matches independent numerical oracles", {
     stats::integrate(function(z) dlogis(z) * plogis(z + d)^(m - 1),
                      -Inf, Inf, rel.tol = 1e-12)$value
   }
-  o_gmin <- function(d, m) {
+  # largest extreme value: pdf exp(-z - exp(-z)), cdf exp(-exp(-z))
+  o_gmax <- function(d, m) {
     stats::integrate(function(z) exp(-z - exp(-z)) * exp(-exp(-(z + d)))^(m - 1),
                      -Inf, Inf, rel.tol = 1e-12)$value
   }
-  o_gmax <- function(d, m) {
+  # smallest extreme value: binomial-sum closed form of the same integral
+  o_gmin <- function(d, m) {
     a <- exp(d)
     k <- 0:(m - 1)
     sum(choose(m - 1, k) * (-1)^k / (a * k + 1))
@@ -242,8 +256,8 @@ test_that("m-AFC probability correct matches independent numerical oracles", {
     for (d in c(0.5, 1, 2)) {
       expect_equal(.mafc_pc_r(d, m, "normal"), o_norm(d, m), tolerance = 1e-5)
       expect_equal(.mafc_pc_r(d, m, "logistic"), o_logis(d, m), tolerance = 1e-7)
-      expect_equal(.mafc_pc_r(d, m, "gumbel_min"), o_gmin(d, m), tolerance = 1e-6)
-      expect_equal(.mafc_pc_r(d, m, "gumbel_max"), o_gmax(d, m), tolerance = 1e-9)
+      expect_equal(.mafc_pc_r(d, m, "gumbel_max"), o_gmax(d, m), tolerance = 1e-6)
+      expect_equal(.mafc_pc_r(d, m, "gumbel_min"), o_gmin(d, m), tolerance = 1e-9)
     }
   }
 })
