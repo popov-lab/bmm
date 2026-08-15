@@ -8,7 +8,7 @@ sdt_rating(
   response,
   stimulus,
   n_ratings = NULL,
-  dist = c("normal", "logistic", "gumbel_min", "gumbel_max"),
+  dist = c("normal", "gumbel_min", "gumbel_max", "logistic"),
   threshold_type = c("parsimonious", "equidistant", "log_distance", "log_ratio",
     "softmax"),
   version = c("standard", "dpsdt", "metad"),
@@ -27,13 +27,15 @@ Must be coded as 0 (noise/new) and 1 (signal/old).}
 \item{n_ratings}{Integer. Number of response categories. When \code{response}
 is a character vector, defaults to its length. Must be > 2.}
 
-\item{dist}{The noise distribution assumed for the latent evidence variable.
-One of:
+\item{dist}{The distribution assumed for the latent evidence, given here by
+its cumulative distribution function. One of:
 \itemize{
-\item "normal" (default): Gaussian SDT
-\item "logistic": Logistic SDT
-\item "gumbel_min": Extreme-value (Gumbel minimum) SDT
-\item "gumbel_max": Gumbel maximum SDT
+\item "normal" (default): Gaussian SDT, \eqn{\Phi(x)}
+\item "gumbel_min": smallest-extreme-value SDT,
+\eqn{1 - \exp(-\exp(x))} (complementary log-log)
+\item "gumbel_max": largest-extreme-value SDT, \eqn{\exp(-\exp(-x))}
+(log-log, as in \code{evd::pgumbel})
+\item "logistic": logistic SDT, \eqn{1 / (1 + \exp(-x))}
 }}
 
 \item{threshold_type}{Character. Threshold parameterization:

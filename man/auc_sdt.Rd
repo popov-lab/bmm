@@ -30,7 +30,7 @@ on one curve. Pass a character vector of column names to force that
 classification, or \code{FALSE} to disable it (one separate curve per predictor
 combination). Ignored for rating models.}
 
-\item{...}{Additional arguments passed to \code{\link[brms:posterior_linpred.brmsfit]{brms::posterior_linpred()}}.}
+\item{...}{Additional arguments passed to \code{\link[brms:posterior_linpred]{brms::posterior_linpred()}}.}
 }
 \value{
 A data frame of class \code{"bmm_sdt_auc"} with columns \code{AUC}, \code{.draw},

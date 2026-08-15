@@ -16,11 +16,14 @@ supply \code{max(m)} columns.}
 (constant across all rows), or a single string naming a data column that
 gives the number of ranked items per row.}
 
-\item{dist}{Character. The noise distribution:
+\item{dist}{Character. The distribution assumed for the latent evidence,
+given here by its cumulative distribution function:
 \itemize{
-\item "gumbel_min" (default): Closed-form Gumbel-min ranking
-\item "normal": Gaussian ranking (supports unequal variance via
-sdratio)
+\item "gumbel_min" (default): smallest extreme value,
+\eqn{1 - \exp(-\exp(x))} (complementary log-log). Closed form via
+gamma-function ratios.
+\item "normal": Gaussian, \eqn{\Phi(x)} (supports unequal variance via
+\code{sdratio})
 }}
 
 \item{links}{A named list of link functions for the parameters.}

@@ -259,13 +259,18 @@ test_that("roc_sdt() rating attaches a smooth implied curve + threshold points",
                     "Hit_mean", "Hit_lower", "Hit_upper") %in% names(pts)))
 })
 
-test_that("roc_sdt() rating threshold points fall on the smooth curve", {
-  for (dist in c("normal", "logistic", "gumbel_min")) {
+test_that("roc_sdt() rating threshold points fall on the model-implied ROC", {
+  # Checked against the ROC evaluated at each point's own FA rather than against
+  # a linear interpolation of `summary`: a threshold can land at an FA below the
+  # curve's grid floor (0.001) -- for gumbel_min the ROC is already at Hit ~ 0.1
+  # by FA = 1e-5 -- where interpolating from the (0, 0) endpoint is inaccurate
+  # no matter how large n_points is.
+  base <- list(dprime = 1.4, criterion = 0.1, spacing = 0, sdratio = log(1.2))
+  z    <- stats::qnorm(stats::ppoints(n_draws_mock))
+
+  roc_points <- function(dist, spread) {
     fit <- fake_rating_fit(uv = TRUE)
     fit$bmm$model$other_vars$dist <- dist
-    z      <- stats::qnorm(stats::ppoints(n_draws_mock))
-    spread <- list(dprime = 0.15, criterion = 0.10, spacing = 0.05, sdratio = 0.10)
-    base   <- list(dprime = 1.4, criterion = 0.1, spacing = 0, sdratio = log(1.2))
     local_mocked_bindings(
       posterior_linpred = function(object, dpar = NULL, nlpar = NULL,
                                    newdata = NULL, ...) {
@@ -278,15 +283,37 @@ test_that("roc_sdt() rating threshold points fall on the smooth curve", {
       variables = function(...) c("bsp_sdratio"),
       .package = "brms"
     )
-    roc  <- roc_sdt(fit, n_points = 200)
-    summ <- attr(roc, "summary")
-    pts  <- attr(roc, "points")
-    hit_on_curve <- stats::approx(summ$FA, summ$Hit_mean, xout = pts$FA_mean)$y
-    # Tolerance covers the small posterior-mean-point vs posterior-mean-curve
-    # (Jensen) gap, larger for the curved Gumbel ROC. A wrong sign convention
-    # would put the Gumbel points off the curve by >0.1, which this still
-    # catches; exact placement is checked above with constant draws.
-    expect_lt(max(abs(pts$Hit_mean - hit_on_curve)), 0.02)
+    roc <- roc_sdt(fit, n_points = 200)
+    list(points = attr(roc, "points"), summary = attr(roc, "summary"))
+  }
+
+  hit_on_roc <- function(dist, fa) {
+    1 - .sdt_dists[[dist]]$cdf(
+      (.sdt_dists[[dist]]$qf(1 - fa) - base$dprime) / exp(base$sdratio)
+    )
+  }
+
+  flat <- list(dprime = 0, criterion = 0, spacing = 0, sdratio = 0)
+  wide <- list(dprime = 0.15, criterion = 0.10, spacing = 0.05, sdratio = 0.10)
+
+  for (dist in names(.sdt_dists)) {
+    # With no posterior spread the operating points must sit on the ROC exactly.
+    # This is the sharp check: a mirrored distribution convention breaks it by
+    # >0.05 even though every marginal probability still looks plausible.
+    flat_res <- roc_points(dist, flat)
+    expect_equal(flat_res$points$Hit_mean,
+                 hit_on_roc(dist, flat_res$points$FA_mean),
+                 tolerance = 1e-8, info = dist)
+
+    # With spread the points are posterior means of a non-linear map, so they
+    # sit slightly off the mean-parameter curve. The gap is largest for
+    # gumbel_min, whose ROC is steepest near the origin.
+    wide_res <- roc_points(dist, wide)
+    expect_lt(max(abs(wide_res$points$Hit_mean -
+                        hit_on_roc(dist, wide_res$points$FA_mean))), 0.06)
+
+    expect_true(all(diff(wide_res$summary$FA) >= 0), info = dist)
+    expect_equal(range(wide_res$summary$FA), c(0, 1), info = dist)
   }
 })
 

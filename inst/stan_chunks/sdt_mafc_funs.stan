@@ -3,16 +3,16 @@
 // the observer picks the maximum. F is the noise CDF (see sdt_dist_funs.stan).
 //
 //   normal     : 40-point Gauss-Hermite quadrature (closed form Phi(d'/sqrt(2)) at m = 2)
-//   gumbel_min : exact softmax 1 / (1 + (m-1) * exp(-d'))
-//   gumbel_max : exact gamma ratio Gamma(1 + e^-d') * Gamma(m) / Gamma(m + e^-d')
+//   gumbel_max : exact softmax 1 / (1 + (m-1) * exp(-d'))
+//   gumbel_min : exact gamma ratio Gamma(1 + e^-d') * Gamma(m) / Gamma(m + e^-d')
 //   logistic   : 64-point Gauss-Legendre on [0, 1] of F(Q(u) + d')^(m-1)
 //
 // Reference: DeCarlo (2012); Green & Swets (1966)
 
 real mafc_pc(real dprime, int m, int dist_type) {
-  if (dist_type == 2)                                      // gumbel_min: softmax
+  if (dist_type == 3)                                      // gumbel_max: softmax
     return 1.0 / (1 + (m - 1) * exp(-dprime));
-  if (dist_type == 3)                                      // gumbel_max: gamma ratio
+  if (dist_type == 2)                                      // gumbel_min: gamma ratio
     return exp(lgamma(1 + exp(-dprime)) + lgamma(m) - lgamma(m + exp(-dprime)));
 
   if (dist_type == 1) {                                    // normal: Gauss-Hermite

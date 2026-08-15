@@ -66,6 +66,27 @@ test_that("constant m must match the number of response columns", {
   expect_error(sdt_ranking("rank1", m = 4), "at least 2")
 })
 
+test_that("the gumbel_min ranking kernel is the smallest-extreme-value one", {
+  # Independent oracle: rank the target among m items whose evidence is drawn
+  # from the documented cdf 1 - exp(-exp(x)), i.e. quantile log(-log(1 - u)).
+  # The mirror (largest extreme value) gives visibly different rank
+  # probabilities, so this fails loudly if the two labels are ever swapped.
+  set.seed(4711)
+  rmin <- function(n) log(-log(1 - runif(n)))
+  n <- 200000
+  dprime <- 1.5
+  for (m in c(3L, 4L)) {
+    target <- rmin(n) + dprime
+    distractors <- matrix(rmin(n * (m - 1)), n, m - 1)
+    rank_of_target <- 1L + rowSums(distractors > target)
+    sim <- vapply(seq_len(m), function(r) mean(rank_of_target == r), numeric(1))
+    expect_equal(
+      bmm:::.ranking_all_probs_r(dprime, m, "gumbel_min"), sim,
+      tolerance = 0.02, info = paste("m =", m)
+    )
+  }
+})
+
 test_that("sdt_ranking only supports gumbel_min and normal", {
   expect_silent(sdt_ranking(ranks4, m = 4, dist = "gumbel_min"))
   expect_silent(sdt_ranking(ranks4, m = 4, dist = "normal"))
