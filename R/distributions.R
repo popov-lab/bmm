@@ -2488,8 +2488,10 @@ rsdt_mafc <- function(n, n_trials, m, dprime,
 #' @param dprime Numeric vector. Ranking discrimination parameter(s).
 #' @param m Integer vector. Number of ranked items per observation. Must be
 #'   at least 2 and no larger than the number of count columns.
-#' @param dist Character. Distribution: "gumbel_min" (default, closed form)
-#'   or "normal" (Gaussian UV-SDT, numerical integration).
+#' @param dist Character. The distribution assumed for the latent evidence:
+#'   "gumbel_min" (default), the smallest extreme value distribution with
+#'   cumulative distribution function \eqn{1 - \exp(-\exp(x))}, evaluated in
+#'   closed form; or "normal", Gaussian UV-SDT by numerical integration.
 #' @param sdratio Numeric vector. Ratio of signal to noise standard deviations
 #'   (default 1). Only used when `dist = "normal"`.
 #' @param log Logical. If `TRUE`, returns log-density (default `FALSE`).
