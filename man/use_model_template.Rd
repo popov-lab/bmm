@@ -6,6 +6,7 @@
 \usage{
 use_model_template(
   model_name,
+  versions = NULL,
   custom_family = FALSE,
   stanvar_blocks = c("data", "tdata", "parameters", "tparameters", "model", "likelihood",
     "genquant", "functions"),
@@ -18,6 +19,12 @@ use_model_template(
 \code{model_model_name.R} and all necessary functions will be created with
 the appropriate names and structure. The file will be saved in the \verb{R/}
 directory}
+
+\item{versions}{An optional character vector naming the model versions. If
+\code{NULL} (default), the template generates a single flat \verb{.\{model_name\}_defaults}
+specification (like \code{ddm}). If supplied, it generates a
+\verb{.\{model_name\}_version_table} with one entry per version and a versioned
+user-facing alias validated with \code{match.arg()} (like \code{cswald}).}
 
 \item{custom_family}{Logical; Do you plan to define a brms::custom_family()?
 If TRUE the function will add a section for the custom family, placeholders

@@ -42,6 +42,7 @@
 #'
 update.bmmfit <- function(object, formula., newdata = NULL, recompile = NULL, ...) {
   dots <- list(...)
+  local_brms_threads(dots)
   stopif(
     isTRUE(object$version$bmm < "0.3.0"),
     "Updating bmm models works only with models fitted with version 0.3.0 or higher"
@@ -102,10 +103,13 @@ update.bmmfit <- function(object, formula., newdata = NULL, recompile = NULL, ..
     newdata <- new_fit_args$data
   }
 
-  # pass back to brms::update.brmsfit
+  # pass back to brms::update.brmsfit; stanvars must be the freshly configured
+  # ones — brms otherwise reuses object$stanvars, whose data values (e.g. the
+  # sdm run metadata) were computed for the original data and formula
   object <- NextMethod("update", object,
     formula = formula., newdata = newdata,
-    prior = prior, recompile = recompile, ...
+    prior = prior, recompile = recompile,
+    stanvars = new_fit_args$stanvars, ...
   )
 
   # bmm postprocessing

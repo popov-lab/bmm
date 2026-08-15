@@ -19,7 +19,7 @@ create_initfun <- function(model, data, formula) {
 }
 
 #' @export
-create_initfun.bmmodel <- function(model, data, formula) {
+create_initfun.default <- function(model, data, formula) {
   if (is.null(model$init_ranges)) {
     return(1)
   }
@@ -44,14 +44,7 @@ create_initfun.bmmodel <- function(model, data, formula) {
     inits <- list()
 
     for (spar in names(stanpars_list)) {
-      # parse stan parameter names; if it contains a model parameter return that,
-      # otherwise get the type of parameter, e.g. for  covariance matrices and z-values
-      # for random effects over groups
-      parameter <- model_pars[unlist(lapply(paste0("_", model_pars), grepl, x = spar))]
-      if (length(parameter) == 0) {
-        parameter <- strsplit(spar, "_")[[1]][1]
-      }
-      parameter <- if (parameter == "Intercept") "mu" else parameter
+      parameter <- match_stan_to_model_par(spar, model_pars)
 
       type <- stanpars_list[[spar]]$type
       dim_names <- stanpars_list[[spar]]$dims
@@ -59,8 +52,7 @@ create_initfun.bmmodel <- function(model, data, formula) {
       range <- init_ranges[[parameter]]
       link <- links[[parameter]]
 
-      # Native-multinomial / non-linear models (e.g. sdt_rating, sdt_ranking)
-      # carry their parameters as nlpars, not dpars.
+      # non-linear model parameters live in nlpars, custom-family ones in dpars
       par_terms <- bterms$dpars[[parameter]] %||% bterms$nlpars[[parameter]]
 
       # Handle different parameter types
@@ -78,6 +70,20 @@ create_initfun.bmmodel <- function(model, data, formula) {
 
     inits
   }
+}
+
+
+match_stan_to_model_par <- function(spar, model_pars) {
+  parameter <- model_pars[unlist(lapply(
+    paste0("(^|_)", model_pars, "(_|$)"), grepl, x = spar
+  ))]
+  if (length(parameter) > 1) {
+    parameter <- parameter[which.max(nchar(parameter))]
+  }
+  if (length(parameter) == 0) {
+    parameter <- strsplit(spar, "_")[[1]][1]
+  }
+  if (parameter == "Intercept") "mu" else parameter
 }
 
 
