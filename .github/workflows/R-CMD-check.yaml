@@ -73,10 +73,46 @@ jobs:
             fansi
             yaml
 
-      - name: Build Cmdstan
+      # Cache the built CmdStan so it is only compiled when a new version is
+      # released (the cache key includes the latest release version)
+      - name: Get latest CmdStan release
+        id: cmdstan-version
+        shell: bash
         run: |
-          cmdstanr::check_cmdstan_toolchain(fix = TRUE)
-          cmdstanr::install_cmdstan(cores = parallel::detectCores())
+          tag=$(curl -sSL --retry 3 \
+            -H "Authorization: Bearer ${GITHUB_PAT}" \
+            https://api.github.com/repos/stan-dev/cmdstan/releases/latest | jq -r '.tag_name // empty')
+          if [ -z "$tag" ]; then
+            echo "Failed to determine the latest CmdStan release" >&2
+            exit 1
+          fi
+          echo "version=${tag#v}" >> "$GITHUB_OUTPUT"
+
+      - name: Locate CmdStan install path
+        id: cmdstan-path
+        run: |
+          cat(sprintf("path=%s\n", cmdstanr::cmdstan_default_install_path()),
+              file = Sys.getenv("GITHUB_OUTPUT"), append = TRUE)
+        shell: Rscript {0}
+
+      - name: Cache CmdStan
+        id: cmdstan-cache
+        uses: actions/cache@v4
+        with:
+          path: ${{ steps.cmdstan-path.outputs.path }}
+          key: cmdstan-${{ runner.os }}-${{ steps.cmdstan-version.outputs.version }}
+
+      - name: Set up CmdStan toolchain
+        run: cmdstanr::check_cmdstan_toolchain(fix = TRUE)
+        shell: Rscript {0}
+
+      - name: Build CmdStan
+        if: steps.cmdstan-cache.outputs.cache-hit != 'true'
+        run: |
+          cmdstanr::install_cmdstan(
+            cores = parallel::detectCores(),
+            version = "${{ steps.cmdstan-version.outputs.version }}"
+          )
         shell: Rscript {0}
 
       - uses: r-lib/actions/check-r-package@v2
