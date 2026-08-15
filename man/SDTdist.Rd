@@ -9,13 +9,13 @@
 sdt_dprime(
   hit_rate,
   fa_rate,
-  dist = c("normal", "logistic", "gumbel_min", "gumbel_max")
+  dist = c("normal", "gumbel_min", "gumbel_max", "logistic")
 )
 
 sdt_criterion(
   hit_rate,
   fa_rate,
-  dist = c("normal", "logistic", "gumbel_min", "gumbel_max")
+  dist = c("normal", "gumbel_min", "gumbel_max", "logistic")
 )
 }
 \arguments{
@@ -23,16 +23,30 @@ sdt_criterion(
 
 \item{fa_rate}{Numeric. Proportion of false alarms (P("old" | noise)).}
 
-\item{dist}{Character. Noise distribution: "normal" (default), "logistic",
-"gumbel_min", or "gumbel_max".}
+\item{dist}{Character. The distribution assumed for the latent evidence,
+given here by its cumulative distribution function:
+\itemize{
+\item "normal" (default): Gaussian, \eqn{\Phi(x)}
+\item "gumbel_min": smallest extreme value, \eqn{1 - \exp(-\exp(x))}
+(the complementary log-log distribution)
+\item "gumbel_max": largest extreme value, \eqn{\exp(-\exp(-x))}
+(the log-log distribution, as in \code{evd::pgumbel})
+\item "logistic": \eqn{1 / (1 + \exp(-x))}
+}}
 }
 \value{
-\code{sdt_dprime} returns the sensitivity index appropriate for the
-chosen distribution: \eqn{d' = \Phi^{-1}(H) - \Phi^{-1}(FA)} for \code{dist = "normal"}; g' = log(FA) - log(H) for \code{dist = "gumbel_min"} (Meyer-Grant
-et al., 2025); analogous quantile-difference measures for other
-distributions.
+\code{sdt_dprime} returns the distance between the signal and noise
+distributions on the latent evidence axis, obtained by inverting the
+decision rule "respond old when the evidence exceeds the criterion":
+\eqn{Q(1 - FA) - Q(1 - H)}, where \eqn{Q} is the quantile function of
+\code{dist}. For \code{dist = "normal"} this reduces to the familiar
+\eqn{d' = \Phi^{-1}(H) - \Phi^{-1}(FA)}.
 
-\code{sdt_criterion} returns the criterion (response bias) value.
+\code{sdt_criterion} returns the criterion (response bias) on the
+centred evidence axis used by \code{\link[=sdt_binary]{sdt_binary()}}, where the noise and signal
+distributions sit at -d'/2 and +d'/2:
+\eqn{(Q(1 - FA) + Q(1 - H)) / 2}. For \code{dist = "normal"} this reduces to
+the familiar \eqn{-(\Phi^{-1}(H) + \Phi^{-1}(FA)) / 2}.
 }
 \description{
 Compute sensitivity (d') and criterion from hit and false
@@ -42,9 +56,8 @@ alarm rates for different SDT distribution families.
 # Compute d' from hit and false alarm rates (Gaussian SDT)
 sdt_dprime(hit_rate = 0.8, fa_rate = 0.2, dist = "normal")
 
-# Compute g' from hit and false alarm rates (Gumbel-min SDT)
-# g' = log(FA) - log(H), invariant under uniform choice-set expansion
-sdt_dprime(hit_rate = 0.8, fa_rate = 0.2, dist = "gumbel_min")
+# The extreme-value analogue
+sdt_dprime(hit_rate = 0.75, fa_rate = 0.25, dist = "gumbel_min")
 # Compute criterion from hit and false alarm rates
 sdt_criterion(hit_rate = 0.8, fa_rate = 0.2, dist = "normal")
 }

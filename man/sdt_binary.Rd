@@ -8,7 +8,7 @@ sdt_binary(
   response,
   stimulus,
   n_trials,
-  dist = c("normal", "logistic", "gumbel_min", "gumbel_max"),
+  dist = c("normal", "gumbel_min", "gumbel_max", "logistic"),
   links = NULL,
   ...
 )
@@ -23,13 +23,15 @@ type. Stimuli should be coded as 0 (noise/new) and 1 (signal/old).}
 \item{n_trials}{The name of the variable in the dataset containing the
 total number of trials for each cell.}
 
-\item{dist}{The noise distribution assumed for the latent evidence variable.
-One of:
+\item{dist}{The noise distribution assumed for the latent evidence variable,
+given here by its cumulative distribution function. One of:
 \itemize{
-\item "normal" (default): Gaussian SDT
-\item "logistic": Logistic SDT
-\item "gumbel_min": Extreme-value (Gumbel minimum) SDT
-\item "gumbel_max": Gumbel maximum SDT
+\item "normal" (default): Gaussian SDT, \eqn{\Phi(x)}
+\item "gumbel_min": smallest-extreme-value SDT,
+\eqn{1 - \exp(-\exp(x))} (complementary log-log)
+\item "gumbel_max": largest-extreme-value SDT, \eqn{\exp(-\exp(-x))}
+(log-log, as in \code{evd::pgumbel})
+\item "logistic": logistic SDT, \eqn{1 / (1 + \exp(-x))}
 }}
 
 \item{links}{A named list of link functions for the parameters.}
@@ -56,7 +58,7 @@ Binary Signal Detection Theory Model
 Provide pre-aggregated data with the following columns:
 }
 \itemize{
-\item Response counts (n_old): number of 'old'/'signal' responses
+\item Response counts (response): number of 'old'/'signal' responses
 \item Stimulus type (stimulus): 0 = noise, 1 = signal
 \item Number of trials (n_trials): total trials per cell
 }
@@ -65,7 +67,7 @@ Provide pre-aggregated data with the following columns:
 \itemize{
 \item \code{dprime}: Sensitivity: distance between signal and noise distributions
 \item \code{criterion}: Response bias: location of decision boundary
-\item \code{sdratio}: Log SD ratio: the log of the signal-to-noise standard deviation ratio, so exp(sdratio) is the ratio itself and 0 means equal variance
+\item \code{sdratio}: SD ratio: the signal-to-noise standard deviation ratio, estimated on the log scale, so 1 means equal variance
 }
 \item \strong{Fixed parameters:}
 \itemize{
@@ -73,7 +75,7 @@ Provide pre-aggregated data with the following columns:
 }
 \item \strong{Default parameter links:}
 \itemize{
-\item dprime = identity; criterion = identity; sdratio = identity
+\item dprime = identity; criterion = identity; sdratio = log
 }
 \item \strong{Default priors:}
 \itemize{

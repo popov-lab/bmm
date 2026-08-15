@@ -57,8 +57,8 @@
 #' `m` alternatives and the observer chooses the strongest one. Only `dprime`
 #' is estimated (m-AFC has no response bias). The probability correct,
 #' \eqn{P_c = \int f(x - d')\, F(x)^{m-1}\, dx}, is computed per noise
-#' distribution: a closed-form softmax for `gumbel_min`, a closed-form Gamma
-#' ratio for `gumbel_max`, Gauss-Hermite quadrature for `normal`
+#' distribution: a closed-form softmax for `gumbel_max`, a closed-form Gamma
+#' ratio for `gumbel_min`, Gauss-Hermite quadrature for `normal`
 #' (\eqn{\Phi(d'/\sqrt{2})} at m = 2), and Gauss-Legendre quadrature for
 #' `logistic`.
 #' @param response A single string naming the column with counts of correct
@@ -69,13 +69,15 @@
 #'   (constant across all rows), or a single string naming a data column that
 #'   gives the number of alternatives per row. A column lets trials with
 #'   different set sizes be fit jointly.
-#' @param dist The noise distribution assumed for the latent evidence variable.
-#'   One of:
+#' @param dist The distribution assumed for the latent evidence, given here by
+#'   its cumulative distribution function. One of:
 #'   \itemize{
-#'     \item "normal" (default): Gaussian m-AFC
-#'     \item "logistic": Logistic m-AFC
-#'     \item "gumbel_min": Extreme-value (Gumbel minimum) m-AFC
-#'     \item "gumbel_max": Gumbel maximum m-AFC
+#'     \item "normal" (default): Gaussian m-AFC, \eqn{\Phi(x)}
+#'     \item "gumbel_min": smallest-extreme-value m-AFC,
+#'       \eqn{1 - \exp(-\exp(x))} (complementary log-log)
+#'     \item "gumbel_max": largest-extreme-value m-AFC, \eqn{\exp(-\exp(-x))}
+#'       (log-log, as in \code{evd::pgumbel})
+#'     \item "logistic": logistic m-AFC, \eqn{1 / (1 + \exp(-x))}
 #'   }
 #' @param links A named list of link functions for the parameters.
 #' @param ... used internally for testing, ignore it
@@ -111,7 +113,7 @@
 #' )
 #' }
 sdt_mafc <- function(response, n_trials, m,
-                     dist = c("normal", "logistic", "gumbel_min", "gumbel_max"),
+                     dist = c("normal", "gumbel_min", "gumbel_max", "logistic"),
                      links = NULL, ...) {
   call <- match.call()
   stop_missing_args()
