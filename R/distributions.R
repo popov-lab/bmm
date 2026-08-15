@@ -1087,17 +1087,33 @@ validate_cswald_parameters <- function(drift, bound, ndt, zr, s) {
   if (log) log_d else exp(log_d)
 }
 
+# Stable log-space helpers mirroring the Stan functions of the same name. The
+# naive forms log(1 - exp(x)) and log(exp(a) - exp(b)) cancel catastrophically
+# near their boundaries, returning NaN/-Inf where the stable forms stay finite.
+log1m_exp <- function(x) {
+  ifelse(x > -log(2), log(-expm1(x)), log1p(-exp(x)))
+}
+
+log_diff_exp <- function(a, b) {
+  a + log1m_exp(b - a)
+}
+
 .pwald <- function(rt, drift, bound, s, lower.tail = TRUE, log.p = TRUE) {
   z1 <- (drift * rt - bound) / (s * sqrt(rt))
   z2 <- -(drift * rt + bound) / (s * sqrt(rt))
   logE <- (2 * drift * bound) / (s^2)
 
-  a1 <- pnorm(z1, log.p = TRUE)
   a2 <- logE + pnorm(z2, log.p = TRUE)
-  matrix_a <- cbind(a1, a2)
-  log_p <- apply(matrix_a, 1, matrixStats::logSumExp)
 
-  if (!lower.tail) log_p <- log(1 - exp(log_p))
+  if (lower.tail) {
+    a1 <- pnorm(z1, log.p = TRUE)
+    log_p <- apply(cbind(a1, a2), 1, matrixStats::logSumExp)
+  } else {
+    # log-survival via log_diff_exp mirrors Stan's swald_lccdf, staying finite in
+    # the upper tail where log(1 - exp(cdf)) would cancel to NaN/-Inf
+    log_p <- log_diff_exp(pnorm(z1, lower.tail = FALSE, log.p = TRUE), a2)
+  }
+
   if (log.p) log_p else exp(log_p)
 }
 

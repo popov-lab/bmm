@@ -19,7 +19,7 @@ create_initfun <- function(model, data, formula) {
 }
 
 #' @export
-create_initfun.bmmodel <- function(model, data, formula) {
+create_initfun.default <- function(model, data, formula) {
   if (is.null(model$init_ranges)) {
     return(1)
   }

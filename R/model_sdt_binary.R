@@ -36,7 +36,7 @@
         "Green, D. M., & Swets, J. A. (1966). Signal detection theory ",
         "and psychophysics. Wiley."
       ),
-      version = "binary",
+      version = "NA",
       requirements = requirements,
       parameters = parameters,
       links = list(dprime = "identity", criterion = "identity",
@@ -47,8 +47,7 @@
         dprime    = c(0.5, 1.5),
         criterion = c(-0.5, 0.5),
         sdratio   = c(-0.3, 0.3)
-      ),
-      void_mu = FALSE
+      )
     ),
     class = c("bmmodel", "sdt", "sdt_binary"),
     call = call

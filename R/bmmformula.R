@@ -154,7 +154,29 @@ check_formula.bmmodel <- function(model, data, formula) {
   stopif(length(wpar), "Unrecognized model parameters: {collapse_comma(wpar)}")
 
   formula <- add_missing_parameters(model, formula)
+  warn_predictor_parameter_clash(data, formula)
   NextMethod("check_formula")
+}
+
+# A predictor whose name matches a predicted parameter is flagged non-linear
+# (nlf instead of lf) purely from the name match, silently changing the
+# likelihood. When that name is also a data column, bmm cannot tell whether the
+# user means the parameter or the column, so warn. See issue #378.
+warn_predictor_parameter_clash <- function(data, formula) {
+  clash <- intersect(
+    intersect(lhs_vars(formula), colnames(data)),
+    rhs_vars(formula)
+  )
+  if (length(clash) == 0) {
+    return(invisible())
+  }
+  warning2(
+    "The name(s) {collapse_comma(clash)} are used both as a predicted parameter \\
+    and as a column in your data, and appear as predictors in your formula. bmm \\
+    treats such predictors as the parameter (a non-linear formula), not the data \\
+    column, which changes the likelihood. If you meant the data column, rename \\
+    it to avoid this clash."
+  )
 }
 
 #' @export
