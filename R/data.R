@@ -102,7 +102,7 @@
 #' proportion of old items shifts the decision criterion from conservative
 #' (`br1`) to liberal (`br5`) while leaving sensitivity unchanged, tracing a
 #' five-point binary ROC per subject. This criterion variation is what makes the
-#' unequal-variance ratio (`sdratio`) of [sdt_binary()] identifiable: a single
+#' unequal-variance ratio (`sdratio`) of [sdt_yn()] identifiable: a single
 #' condition yields only one hit/false-alarm pair and cannot separate a wider
 #' signal distribution from a larger d'. Counts were digitised from the
 #' frequencies reported in the original article.
@@ -126,10 +126,10 @@
 #'   Cognition}, 35(3), 587--606. \doi{10.1037/a0015279}
 #' @examples
 #' \dontrun{
-#' # Unequal-variance binary SDT: the criterion varies across base-rate
+#' # Unequal-variance yes/no SDT: the criterion varies across base-rate
 #' # conditions, while sensitivity (d) and the signal/noise SD ratio (sdratio)
 #' # are held constant across conditions.
-#' model <- sdt_binary(
+#' model <- sdt_yn(
 #'   response = "n_old", stimulus = "stimulus", n_trials = "n_trials"
 #' )
 #' fit <- bmm(

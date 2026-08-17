@@ -27,7 +27,7 @@ test_that("gumbel labels follow the extreme-value convention", {
 test_that("every dist argument offers exactly the registry's distributions", {
   # the registry order defines the dist_type integer passed to Stan, so a
   # signature that drifts out of step with it becomes an off-by-one
-  fns <- list(sdt_binary, dsdt_binary, rsdt_binary, sdt_d, sdt_criterion)
+  fns <- list(sdt_yn, dsdt_yn, rsdt_yn, sdt_d, sdt_criterion)
   for (f in fns) {
     expect_equal(eval(formals(f)$dist), names(bmm:::.sdt_dists))
   }

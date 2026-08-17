@@ -2079,7 +2079,7 @@ neg_loglik <- function(x, params, distribution, weights = NULL) {
 #' @description Compute sensitivity and criterion from hit and false alarm
 #'   rates for different SDT distribution families. A single (hit, false alarm)
 #'   pair cannot identify the signal-to-noise SD ratio, so both quantities are
-#'   the equal-variance values; see [sdt_binary()] for the unequal-variance
+#'   the equal-variance values; see [sdt_yn()] for the unequal-variance
 #'   model.
 #'
 #' @name SDTdist
@@ -2112,7 +2112,7 @@ NULL
 #'   \eqn{Q(1 - FA) - Q(1 - H)}, where \eqn{Q} is the quantile function of
 #'   `dist`. For `dist = "normal"` this reduces to the familiar
 #'   \eqn{d' = \Phi^{-1}(H) - \Phi^{-1}(FA)}. Because one operating point implies
-#'   equal variance, this matches the `d` parameter of [sdt_binary()] whenever
+#'   equal variance, this matches the `d` parameter of [sdt_yn()] whenever
 #'   `sdratio` is at its default.
 #' @export
 #' @examples
@@ -2133,7 +2133,7 @@ sdt_d <- function(hit_rate, fa_rate,
 
 #' @rdname SDTdist
 #' @return `sdt_criterion` returns the criterion (response bias) on the
-#'   centred, noise-standardized evidence axis used by [sdt_binary()], where the
+#'   centred, noise-standardized evidence axis used by [sdt_yn()], where the
 #'   noise and signal distributions sit at -d'/2 and +d'/2:
 #'   \eqn{(Q(1 - FA) + Q(1 - H)) / 2}. For `dist = "normal"` this reduces to
 #'   the familiar \eqn{-(\Phi^{-1}(H) + \Phi^{-1}(FA)) / 2}.
@@ -2155,13 +2155,13 @@ sdt_criterion <- function(hit_rate, fa_rate,
 # BINARY SDT DISTRIBUTION FUNCTIONS                                       ####
 ############################################################################# !
 
-#' @title Distribution functions for Binary SDT
+#' @title Distribution functions for Yes/No SDT
 #'
-#' @description Density and random generation for the binary signal detection
+#' @description Density and random generation for the yes/no signal detection
 #'   theory model, where the response is the number of "old"/"signal" responses
 #'   out of a fixed number of trials (a binomial likelihood).
 #'
-#' @name sdt_binary_dist
+#' @name sdt_yn_dist
 #'
 #' @param n_old Integer vector. Number of "old"/"signal" responses.
 #' @param n_trials Integer vector. Total number of trials per cell.
@@ -2173,14 +2173,14 @@ sdt_criterion <- function(hit_rate, fa_rate,
 #'   noise-standardized axis.
 #' @param sdratio Numeric. Ratio of signal to noise standard deviations
 #'   (default 1, i.e., equal variance). Must be positive. This is the same
-#'   scale as the `sdratio` parameter of [sdt_binary()], which uses a log link.
+#'   scale as the `sdratio` parameter of [sdt_yn()], which uses a log link.
 #' @inheritParams SDTdist
 #' @param log Logical. If `TRUE`, returns log-density (default `FALSE`).
 #' @param n Integer. Number of observations to generate. `n_trials`,
 #'   `stimulus`, and the model parameters are recycled to this length.
 #'
-#' @return `dsdt_binary` returns the (log-)density (binomial probability).
-#'   `rsdt_binary` returns an integer vector with the number of "old"/"signal"
+#' @return `dsdt_yn` returns the (log-)density (binomial probability).
+#'   `rsdt_yn` returns an integer vector with the number of "old"/"signal"
 #'   responses per observation.
 #'
 #' @references
@@ -2190,15 +2190,15 @@ sdt_criterion <- function(hit_rate, fa_rate,
 #' @keywords distribution
 #' @export
 #' @examples
-#' # Density of binary SDT data
-#' dsdt_binary(n_old = 80, n_trials = 100, stimulus = 1,
+#' # Density of yes/no SDT data
+#' dsdt_yn(n_old = 80, n_trials = 100, stimulus = 1,
 #'             d = 1.5, criterion = 0.2)
 #'
 #' # Vectorized over observations
-#' dsdt_binary(n_old = c(30, 80), n_trials = c(100, 100),
+#' dsdt_yn(n_old = c(30, 80), n_trials = c(100, 100),
 #'             stimulus = c(0, 1), d = 1.5, criterion = 0.2,
 #'             log = TRUE)
-dsdt_binary <- function(n_old, n_trials, stimulus, d, criterion,
+dsdt_yn <- function(n_old, n_trials, stimulus, d, criterion,
                         sdratio = 1,
                         dist = c("normal", "gumbel_min", "gumbel_max",
                                  "logistic"),
@@ -2212,7 +2212,7 @@ dsdt_binary <- function(n_old, n_trials, stimulus, d, criterion,
   stopif(any(sdratio <= 0), "sdratio must be positive")
 
   eta <- .sdt_eta(d, criterion, stimulus, sdratio)
-  # assembled on the log scale to match sdt_binary_lpmf: the probability scale
+  # assembled on the log scale to match sdt_yn_lpmf: the probability scale
   # underflows to 0 or 1 in the tails, which would return -Inf here while Stan
   # stays finite, silently poisoning log_lik() and loo()
   out <- lchoose(n_trials, n_old) +
@@ -2222,16 +2222,16 @@ dsdt_binary <- function(n_old, n_trials, stimulus, d, criterion,
 }
 
 
-#' @rdname sdt_binary_dist
+#' @rdname sdt_yn_dist
 #' @export
 #' @examples
-#' # Generate binary SDT data for a design
+#' # Generate yes/no SDT data for a design
 #' dat <- expand.grid(id = 1:20, stimulus = c(0L, 1L))
 #' dat$n_trials <- 100L
-#' dat$n_old <- rsdt_binary(nrow(dat), dat$n_trials, dat$stimulus,
+#' dat$n_old <- rsdt_yn(nrow(dat), dat$n_trials, dat$stimulus,
 #'                          d = 1.5, criterion = 0.2)
 #' head(dat)
-rsdt_binary <- function(n, n_trials, stimulus, d, criterion,
+rsdt_yn <- function(n, n_trials, stimulus, d, criterion,
                         sdratio = 1,
                         dist = c("normal", "gumbel_min", "gumbel_max",
                                  "logistic")) {

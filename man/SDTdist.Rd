@@ -41,11 +41,11 @@ decision rule "respond old when the evidence exceeds the criterion":
 \eqn{Q(1 - FA) - Q(1 - H)}, where \eqn{Q} is the quantile function of
 \code{dist}. For \code{dist = "normal"} this reduces to the familiar
 \eqn{d' = \Phi^{-1}(H) - \Phi^{-1}(FA)}. Because one operating point implies
-equal variance, this matches the \code{d} parameter of \code{\link[=sdt_binary]{sdt_binary()}} whenever
+equal variance, this matches the \code{d} parameter of \code{\link[=sdt_yn]{sdt_yn()}} whenever
 \code{sdratio} is at its default.
 
 \code{sdt_criterion} returns the criterion (response bias) on the
-centred, noise-standardized evidence axis used by \code{\link[=sdt_binary]{sdt_binary()}}, where the
+centred, noise-standardized evidence axis used by \code{\link[=sdt_yn]{sdt_yn()}}, where the
 noise and signal distributions sit at -d'/2 and +d'/2:
 \eqn{(Q(1 - FA) + Q(1 - H)) / 2}. For \code{dist = "normal"} this reduces to
 the familiar \eqn{-(\Phi^{-1}(H) + \Phi^{-1}(FA)) / 2}.
@@ -54,7 +54,7 @@ the familiar \eqn{-(\Phi^{-1}(H) + \Phi^{-1}(FA)) / 2}.
 Compute sensitivity and criterion from hit and false alarm
 rates for different SDT distribution families. A single (hit, false alarm)
 pair cannot identify the signal-to-noise SD ratio, so both quantities are
-the equal-variance values; see \code{\link[=sdt_binary]{sdt_binary()}} for the unequal-variance
+the equal-variance values; see \code{\link[=sdt_yn]{sdt_yn()}} for the unequal-variance
 model.
 }
 \examples{

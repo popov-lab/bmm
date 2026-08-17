@@ -1,6 +1,6 @@
-// Binary SDT likelihood with binomial on aggregated data
+// Yes/no SDT likelihood with binomial on aggregated data
 // Distribution dispatch (sdt_log_cumprob, sdt_log_one_minus_cumprob) lives in
-// sdt_dist_funs.stan, which configure_model.sdt_binary loads before this chunk.
+// sdt_dist_funs.stan, which configure_model.sdt_yn loads before this chunk.
 // Parameters:
 //   y:         count of "old"/"signal" responses
 //   d:         sensitivity as d_a (on link scale, transformed by brms); the
@@ -10,7 +10,7 @@
 //   stimulus:  0 = noise/new, 1 = signal/old
 //   dist_type: noise distribution (1-4, see sdt_dist_funs.stan)
 //   trials:    total number of trials in this cell
-real sdt_binary_lpmf(int y, real mu, real d, real criterion, real sdratio,
+real sdt_yn_lpmf(int y, real mu, real d, real criterion, real sdratio,
                      int stimulus, int dist_type, int trials) {
   real scale = stimulus == 1 ? sdratio : 1.0;
   real eta = (d * sdt_rms_scale(sdratio) / 2.0 * (2 * stimulus - 1)

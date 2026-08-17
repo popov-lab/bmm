@@ -2,7 +2,7 @@
 # MODELS                                                                 ####
 ############################################################################# !
 
-.model_sdt_binary <- function(response = NULL, stimulus = NULL,
+.model_sdt_yn <- function(response = NULL, stimulus = NULL,
                               n_trials = NULL, dist = "normal",
                               links = NULL, call = NULL, ...) {
   parameters <- list(
@@ -36,8 +36,8 @@
       resp_vars = nlist(response),
       other_vars = nlist(stimulus, n_trials, dist),
       domain = "Perception & Recognition Memory",
-      task = "Signal/Noise or Old/New Recognition",
-      name = "Signal Detection Theory (Binary)",
+      task = "Yes/No Detection or Old/New Recognition",
+      name = "Signal Detection Theory (Yes/No)",
       citation = glue(
         "Green, D. M., & Swets, J. A. (1966). Signal detection theory ",
         "and psychophysics. Wiley."
@@ -57,7 +57,7 @@
         sdratio   = c(0.75, 1.35)
       )
     ),
-    class = c("bmmodel", "sdt", "sdt_binary"),
+    class = c("bmmodel", "sdt", "sdt_yn"),
     call = call
   )
   out$links[names(links)] <- links
@@ -65,9 +65,9 @@
 }
 
 
-#' @title Binary Signal Detection Theory Model
-#' @name sdt_binary
-#' @details `r model_info(.model_sdt_binary())`
+#' @title Yes/No Signal Detection Theory Model
+#' @name sdt_yn
+#' @details `r model_info(.model_sdt_yn())`
 #' @param response The name of the variable in the dataset containing the
 #'   count of "old"/"signal" responses for each cell.
 #' @param stimulus The name of the variable in the dataset coding the stimulus
@@ -135,10 +135,10 @@
 #' \dontrun{
 #' dat <- expand.grid(id = 1:20, stimulus = c(0L, 1L))
 #' dat$n_trials <- 100L
-#' dat$n_old <- rsdt_binary(nrow(dat), dat$n_trials, dat$stimulus,
+#' dat$n_old <- rsdt_yn(nrow(dat), dat$n_trials, dat$stimulus,
 #'                          d = 1.5, criterion = 0.2)
 #'
-#' model <- sdt_binary(
+#' model <- sdt_yn(
 #'   response = "n_old",
 #'   stimulus = "stimulus",
 #'   n_trials = "n_trials"
@@ -152,7 +152,7 @@
 #'   backend = "cmdstanr"
 #' )
 #'
-#' # Unequal-variance binary SDT
+#' # Unequal-variance yes/no SDT
 #' fit_uv <- bmm(
 #'   formula = bmf(d ~ 1, criterion ~ 1, sdratio ~ 1),
 #'   data = dat,
@@ -161,7 +161,7 @@
 #'   backend = "cmdstanr"
 #' )
 #' }
-sdt_binary <- function(response, stimulus, n_trials,
+sdt_yn <- function(response, stimulus, n_trials,
                        dist = c("normal", "gumbel_min", "gumbel_max",
                                 "logistic"),
                        links = NULL, ...) {
@@ -169,7 +169,7 @@ sdt_binary <- function(response, stimulus, n_trials,
   stop_missing_args()
   dist <- match.arg(dist)
 
-  .model_sdt_binary(response = response, stimulus = stimulus,
+  .model_sdt_yn(response = response, stimulus = stimulus,
                     n_trials = n_trials, dist = dist,
                     links = links, call = call, ...)
 }
@@ -180,7 +180,7 @@ sdt_binary <- function(response, stimulus, n_trials,
 ############################################################################# !
 
 #' @export
-check_data.sdt_binary <- function(model, data, formula) {
+check_data.sdt_yn <- function(model, data, formula) {
   stim_var <- model$other_vars$stimulus
   stopif(!stim_var %in% colnames(data),
          "Stimulus variable '{stim_var}' missing in the data")
@@ -205,7 +205,7 @@ check_data.sdt_binary <- function(model, data, formula) {
 ############################################################################# !
 
 #' @export
-bmf2bf.sdt_binary <- function(model, formula) {
+bmf2bf.sdt_yn <- function(model, formula) {
   resp_var <- model$resp_vars$response
   stim_var <- model$other_vars$stimulus
   n_trials_var <- model$other_vars$n_trials
@@ -222,25 +222,25 @@ bmf2bf.sdt_binary <- function(model, formula) {
 ############################################################################# !
 
 #' @export
-configure_model.sdt_binary <- function(model, data, formula) {
+configure_model.sdt_yn <- function(model, data, formula) {
   formula <- bmf2bf(model, formula)
 
   formula$family <- brms::custom_family(
-    "sdt_binary",
+    "sdt_yn",
     dpars = c("mu", "d", "criterion", "sdratio"),
     links = c("identity", model$links$d, model$links$criterion,
               model$links$sdratio),
     type = "int",
     loop = TRUE,
-    log_lik = log_lik_sdt_binary,
-    posterior_predict = posterior_predict_sdt_binary,
+    log_lik = log_lik_sdt_yn,
+    posterior_predict = posterior_predict_sdt_yn,
     vars = c("vint1[n]", "vint2[n]", "trials[n]")
   )
 
   sc_path <- system.file("stan_chunks", package = "bmm")
   stan_funs <- paste(
     read_lines2(paste0(sc_path, "/sdt_dist_funs.stan")),
-    read_lines2(paste0(sc_path, "/sdt_binary_funs.stan")),
+    read_lines2(paste0(sc_path, "/sdt_yn_funs.stan")),
     sep = "\n"
   )
   stanvars <- brms::stanvar(scode = stan_funs, block = "functions")
@@ -253,22 +253,22 @@ configure_model.sdt_binary <- function(model, data, formula) {
 # LOG_LIK & POSTERIOR_PREDICT                                            ####
 ############################################################################# !
 
-log_lik_sdt_binary <- function(i, prep) {
+log_lik_sdt_yn <- function(i, prep) {
   d <- brms::get_dpar(prep, "d", i = i)
   criterion <- brms::get_dpar(prep, "criterion", i = i)
   sdratio <- brms::get_dpar(prep, "sdratio", i = i)
   dist <- .sdt_dist_names[prep$data$vint2[i]]
 
-  dsdt_binary(prep$data$Y[i], prep$data$trials[i], prep$data$vint1[i],
+  dsdt_yn(prep$data$Y[i], prep$data$trials[i], prep$data$vint1[i],
               d, criterion, sdratio = sdratio, dist = dist, log = TRUE)
 }
 
-posterior_predict_sdt_binary <- function(i, prep, ...) {
+posterior_predict_sdt_yn <- function(i, prep, ...) {
   d <- brms::get_dpar(prep, "d", i = i)
   criterion <- brms::get_dpar(prep, "criterion", i = i)
   sdratio <- brms::get_dpar(prep, "sdratio", i = i)
   dist <- .sdt_dist_names[prep$data$vint2[i]]
 
-  rsdt_binary(length(d), prep$data$trials[i], prep$data$vint1[i],
+  rsdt_yn(length(d), prep$data$trials[i], prep$data$vint1[i],
               d, criterion, sdratio = sdratio, dist = dist)
 }
