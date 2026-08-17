@@ -6,14 +6,18 @@
                                dist = "gumbel_min",
                                links = NULL, call = NULL, ...) {
   parameters <- list(
-    dprime = "Sensitivity: ranking discrimination parameter"
+    d = paste0(
+      "Sensitivity: the balanced discriminability index d_a, the distance ",
+      "between the target and lure distributions in units of their ",
+      "root-mean-square SD; equals d' (g' for gumbel_min) under equal variance"
+    )
   )
   default_priors <- list(
-    dprime = list(main = "normal(1, 1)", effects = "normal(0, 0.5)")
+    d = list(main = "normal(1, 1)", effects = "normal(0, 0.5)")
   )
-  param_links <- list(dprime = "identity")
+  param_links <- list(d = "identity")
   fixed_pars <- list()
-  init_ranges <- list(dprime = c(0.5, 1.5))
+  init_ranges <- list(d = c(0.5, 1.5))
 
   # Gaussian ranking carries sdratio as an overridable fixed parameter (fixed to
   # 0 = equal variance, sampled when the user adds sdratio ~ ...), mirroring the
@@ -60,8 +64,7 @@
       links = param_links,
       fixed_parameters = fixed_pars,
       default_priors = default_priors,
-      init_ranges = init_ranges,
-      void_mu = FALSE
+      init_ranges = init_ranges
     ),
     class = c("bmmodel", "sdt", "sdt_ranking"),
     call = call
@@ -75,7 +78,7 @@
 #' @name sdt_ranking
 #' @details `r model_info(.model_sdt_ranking())`
 #'
-#' Models the rank ordering of `m` items by perceived strength. Only `dprime`
+#' Models the rank ordering of `m` items by perceived strength. Only `d`
 #' is estimated (no criterion). Supports `dist = "gumbel_min"` (closed-form via
 #' lgamma ratios) and `dist = "normal"` (Gauss-Hermite quadrature).
 #'
@@ -84,6 +87,24 @@
 #' recovers the rank distribution exactly. This means `log_lik`,
 #' `posterior_predict`, `posterior_epred`, and `pp_check` come from brms as
 #' proper joint multinomial draws.
+#'
+#' @section Sensitivity is on the same scale as [sdt_yn()]:
+#' `d` is the balanced index \eqn{d_a} that the rest of the SDT family reports:
+#' the separation between the target and lure distributions divided by the
+#' root-mean-square of their SDs. It equals \eqn{d'} whenever the two share a
+#' scale, which is always the case for `dist = "gumbel_min"` (there it is the
+#' \eqn{g'} of Meyer-Grant et al.) and is the default for `dist = "normal"`.
+#'
+#' Ranking is the one SDT design that identifies the variance ratio from a
+#' single condition. The rank distribution supplies `m - 1` free probabilities
+#' per set size, so with `m >= 3` there is enough information to separate `d`
+#' from `sdratio` without the criterion sweep that [sdt_yn()] needs -- the
+#' *shape* of the rank distribution, not just its mean, carries the ratio.
+#'
+#' At `m = 2` the model reduces to 2AFC and the two parameters are no longer
+#' separable: the probability of ranking the target first is the area under the
+#' yes/no ROC, which for Gaussian noise is \eqn{\Phi(d/\sqrt{2})} whatever
+#' `sdratio` is. Keep `sdratio` fixed for two-item designs.
 #'
 #' For Gaussian ranking (`dist = "normal"`), `sdratio` is fixed to 0 by default.
 #' Add `sdratio ~ 1` to the formula for unequal-variance ranking.
@@ -121,7 +142,7 @@
 #' @examples
 #' \dontrun{
 #' dat <- data.frame(id = 1:20)
-#' dat <- cbind(dat, rsdt_ranking(20, 200, m = 4, dprime = 1.5))
+#' dat <- cbind(dat, rsdt_ranking(20, 200, m = 4, d = 1.5))
 #'
 #' model <- sdt_ranking(
 #'   response = c("rank1", "rank2", "rank3", "rank4"),
@@ -129,7 +150,7 @@
 #' )
 #'
 #' fit <- bmm(
-#'   formula = bmf(dprime ~ 1),
+#'   formula = bmf(d ~ 1),
 #'   data = dat,
 #'   model = model,
 #'   cores = 4,
@@ -229,7 +250,7 @@ bmf2bf.sdt_ranking <- function(model, formula) {
   # the distribution id selects the kernel in both the Stan function and the
   # R companion.
   sdratio_arg <- if ("sdratio" %in% names(model$parameters)) "sdratio" else "0"
-  args <- paste("max_rank", "dprime", sdratio_arg,
+  args <- paste("max_rank", "d", sdratio_arg,
                 .sdt_dist_id(model$other_vars$dist), sep = ", ")
 
   bform <- brms::bf(
@@ -258,8 +279,14 @@ configure_model.sdt_ranking <- function(model, data, formula) {
   formula$family$cats <- resp_cats
   formula$family$dpars <- paste0("mu", resp_cats)
 
+  # sdt_dist_funs.stan supplies sdt_rms_scale(), which the Gaussian branch needs
+  # to turn d_a into the noise-standardized separation
   sc_path <- system.file("stan_chunks", package = "bmm")
-  stan_funs <- read_lines2(paste0(sc_path, "/sdt_ranking_funs.stan"))
+  stan_funs <- paste(
+    read_lines2(paste0(sc_path, "/sdt_dist_funs.stan")),
+    read_lines2(paste0(sc_path, "/sdt_ranking_funs.stan")),
+    sep = "\n"
+  )
   stanvars <- brms::stanvar(scode = stan_funs, block = "functions")
 
   nlist(formula, data, stanvars)
@@ -276,18 +303,18 @@ configure_model.sdt_ranking <- function(model, data, formula) {
 #' @param cat Integer rank position index.
 #' @param max_rank Set size (number of ranked items) for the observation; ranks
 #'   above it return the finite `-100` sentinel so the category switches off.
-#' @param dprime Sensitivity (draws-by-observation matrix supplied by brms).
+#' @param d Sensitivity (draws-by-observation matrix supplied by brms).
 #' @param sdratio Log SD ratio; `0` for the gumbel_min distribution.
 #' @param dist Integer noise-distribution id (2 = gumbel_min, 1 = normal).
-#' @return `log(p(cat))`, matching the shape of `dprime`.
+#' @return `log(p(cat))`, matching the shape of `d`.
 #' @keywords internal
 #' @export
-sdt_ranking_logmu <- function(cat, max_rank, dprime, sdratio = 0, dist = 2L) {
+sdt_ranking_logmu <- function(cat, max_rank, d, sdratio = 0, dist = 2L) {
   dist_name <- .sdt_dist_names[dist]
 
-  shape <- dim(dprime)
-  dprime <- as.vector(dprime)
-  n <- length(dprime)
+  shape <- dim(d)
+  d <- as.vector(d)
+  n <- length(d)
   max_rank <- rep_len(as.vector(max_rank), n)
   sdratio <- rep_len(as.vector(sdratio), n)
 
@@ -296,7 +323,7 @@ sdt_ranking_logmu <- function(cat, max_rank, dprime, sdratio = 0, dist = 2L) {
   out <- rep(-100, n)
   for (m_j in unique(max_rank[max_rank >= cat])) {
     idx <- which(max_rank == m_j)
-    probs <- rbind(.ranking_all_probs_r(dprime[idx], m_j, dist_name,
+    probs <- rbind(.ranking_all_probs_r(d[idx], m_j, dist_name,
                                         sdratio[idx]))
     out[idx] <- log(probs[, cat])
   }

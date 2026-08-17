@@ -4,7 +4,7 @@
 \alias{sdt_ranking_logmu}
 \title{Ranking SDT rank log-probability (multinomial logit)}
 \usage{
-sdt_ranking_logmu(cat, max_rank, dprime, sdratio = 0, dist = 2L)
+sdt_ranking_logmu(cat, max_rank, d, sdratio = 0, dist = 2L)
 }
 \arguments{
 \item{cat}{Integer rank position index.}
@@ -12,14 +12,14 @@ sdt_ranking_logmu(cat, max_rank, dprime, sdratio = 0, dist = 2L)
 \item{max_rank}{Set size (number of ranked items) for the observation; ranks
 above it return the finite \code{-100} sentinel so the category switches off.}
 
-\item{dprime}{Sensitivity (draws-by-observation matrix supplied by brms).}
+\item{d}{Sensitivity (draws-by-observation matrix supplied by brms).}
 
 \item{sdratio}{Log SD ratio; \code{0} for the gumbel_min distribution.}
 
 \item{dist}{Integer noise-distribution id (2 = gumbel_min, 1 = normal).}
 }
 \value{
-\code{log(p(cat))}, matching the shape of \code{dprime}.
+\code{log(p(cat))}, matching the shape of \code{d}.
 }
 \description{
 R companion to the Stan \code{sdt_ranking_logmu} function. It returns

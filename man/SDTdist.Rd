@@ -2,11 +2,11 @@
 % Please edit documentation in R/distributions.R
 \name{SDTdist}
 \alias{SDTdist}
-\alias{sdt_dprime}
+\alias{sdt_d}
 \alias{sdt_criterion}
 \title{Utility functions for Signal Detection Theory}
 \usage{
-sdt_dprime(
+sdt_d(
   hit_rate,
   fa_rate,
   dist = c("normal", "gumbel_min", "gumbel_max", "logistic")
@@ -35,29 +35,34 @@ given here by its cumulative distribution function:
 }}
 }
 \value{
-\code{sdt_dprime} returns the distance between the signal and noise
+\code{sdt_d} returns the distance between the signal and noise
 distributions on the latent evidence axis, obtained by inverting the
 decision rule "respond old when the evidence exceeds the criterion":
 \eqn{Q(1 - FA) - Q(1 - H)}, where \eqn{Q} is the quantile function of
 \code{dist}. For \code{dist = "normal"} this reduces to the familiar
-\eqn{d' = \Phi^{-1}(H) - \Phi^{-1}(FA)}.
+\eqn{d' = \Phi^{-1}(H) - \Phi^{-1}(FA)}. Because one operating point implies
+equal variance, this matches the \code{d} parameter of \code{\link[=sdt_yn]{sdt_yn()}} whenever
+\code{sdratio} is at its default.
 
 \code{sdt_criterion} returns the criterion (response bias) on the
-centred evidence axis used by \code{\link[=sdt_binary]{sdt_binary()}}, where the noise and signal
-distributions sit at -d'/2 and +d'/2:
+centred, noise-standardized evidence axis used by \code{\link[=sdt_yn]{sdt_yn()}}, where the
+noise and signal distributions sit at -d'/2 and +d'/2:
 \eqn{(Q(1 - FA) + Q(1 - H)) / 2}. For \code{dist = "normal"} this reduces to
 the familiar \eqn{-(\Phi^{-1}(H) + \Phi^{-1}(FA)) / 2}.
 }
 \description{
-Compute sensitivity (d') and criterion from hit and false
-alarm rates for different SDT distribution families.
+Compute sensitivity and criterion from hit and false alarm
+rates for different SDT distribution families. A single (hit, false alarm)
+pair cannot identify the signal-to-noise SD ratio, so both quantities are
+the equal-variance values; see \code{\link[=sdt_yn]{sdt_yn()}} for the unequal-variance
+model.
 }
 \examples{
-# Compute d' from hit and false alarm rates (Gaussian SDT)
-sdt_dprime(hit_rate = 0.8, fa_rate = 0.2, dist = "normal")
+# Compute d from hit and false alarm rates (Gaussian SDT)
+sdt_d(hit_rate = 0.8, fa_rate = 0.2, dist = "normal")
 
 # The extreme-value analogue
-sdt_dprime(hit_rate = 0.75, fa_rate = 0.25, dist = "gumbel_min")
+sdt_d(hit_rate = 0.75, fa_rate = 0.25, dist = "gumbel_min")
 # Compute criterion from hit and false alarm rates
 sdt_criterion(hit_rate = 0.8, fa_rate = 0.2, dist = "normal")
 }

@@ -25,6 +25,14 @@ real sdt_log_cumprob(real eta, int dist_type) {
   reject("sdt_log_cumprob: unknown dist_type: ", dist_type);
 }
 
+// Root-mean-square of the noise and signal scales, in noise units. Sensitivity
+// is parameterized as d_a (separation / this factor), which weights the two
+// distributions equally. Returns 1 for sdratio = 1, so every equal-variance
+// model is unaffected. sdratio arrives on the natural scale (log link).
+real sdt_rms_scale(real sdratio) {
+  return sqrt((1 + square(sdratio)) / 2);
+}
+
 // Log complementary CDF: log(1 - F(eta))
 real sdt_log_one_minus_cumprob(real eta, int dist_type) {
   // std_normal_lcdf(-eta), not std_normal_lccdf(eta): the two are equal by

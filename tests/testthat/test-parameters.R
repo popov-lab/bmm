@@ -171,8 +171,8 @@ test_that("print.bmmodel() annotates aggregated ezdm response variables", {
   )))
 })
 
-test_that("print.bmmodel() annotates aggregated sdt_binary response counts", {
-  m <- sdt_binary(response = "n_old", stimulus = "stim", n_trials = "nt")
+test_that("print.bmmodel() annotates aggregated sdt_yn response counts", {
+  m <- sdt_yn(response = "n_old", stimulus = "stim", n_trials = "nt")
   out <- capture.output(print(m))
 
   expect_true(any(grepl(

@@ -11,9 +11,10 @@
 // Meyer-Grant et al. (2025), based on extreme-value (min) order statistics.
 //   cat:      rank position (1 = most likely target, max_rank = least)
 //   max_rank: number of ranked items (m) on this row
-//   dprime:   sensitivity (g' in the Gumbel parameterization)
-real sdt_ranking_logp(int cat, real max_rank, real dprime) {
-  real g = dprime;
+//   d:   sensitivity as d_a; for the Gumbel branch it is the equal-variance
+//        g' of Meyer-Grant et al., since that model carries no sdratio
+real sdt_ranking_logp(int cat, real max_rank, real d) {
+  real g = d;
   real e_neg_g = exp(-g);
   return -g + lgamma(max_rank) + lgamma(cat - 1 + e_neg_g)
          - lgamma(cat) - lgamma(max_rank + e_neg_g);
@@ -22,7 +23,7 @@ real sdt_ranking_logp(int cat, real max_rank, real dprime) {
 // Gaussian UV-SDT ranking: 20-point Gauss-Hermite quadrature over the target
 // distribution. Retains smooth gradients without adaptive integration.
 //   sdratio: log ratio of signal to noise SD (exp(sdratio) = sigma_s / sigma_n)
-real sdt_ranking_uv_logp(int cat, real max_rank, real dprime, real sdratio) {
+real sdt_ranking_uv_logp(int cat, real max_rank, real d, real sdratio) {
   real sigma = exp(sdratio);
   int N_GH = 20;
   vector[N_GH] gh_nodes = to_vector({
@@ -53,7 +54,9 @@ real sdt_ranking_uv_logp(int cat, real max_rank, real dprime, real sdratio) {
   real p = 0;
 
   for (i in 1:N_GH) {
-    real eta = dprime + sigma * gh_nodes[i];
+    // `d` is d_a; sdt_rms_scale() converts it to noise-SD units, and is 1
+    // when sigma is 1, so the equal-variance case is unchanged
+    real eta = d * sdt_rms_scale(sigma) + sigma * gh_nodes[i];
     // Probability-space formulation: avoids log-CDF underflow (→ -Inf) and the
     // 0 * Inf = NaN that arises when multiplying a zero coefficient by a -Inf
     // log-CDF. Boundary guards use 1.0 so pow(1, 0) = 1.
@@ -68,9 +71,9 @@ real sdt_ranking_uv_logp(int cat, real max_rank, real dprime, real sdratio) {
 // Multinomial-logit value for rank category `cat`. Returns the finite -100
 // sentinel when the rank exceeds this row's set size; otherwise dispatches on
 // the noise distribution (id 2 = gumbel_min, id 1 = normal; see .sdt_dists).
-real sdt_ranking_logmu(int cat, real max_rank, real dprime, real sdratio,
+real sdt_ranking_logmu(int cat, real max_rank, real d, real sdratio,
                        int dist_type) {
   if (cat > max_rank) return -100;
-  if (dist_type == 2) return sdt_ranking_logp(cat, max_rank, dprime);
-  return sdt_ranking_uv_logp(cat, max_rank, dprime, sdratio);
+  if (dist_type == 2) return sdt_ranking_logp(cat, max_rank, d);
+  return sdt_ranking_uv_logp(cat, max_rank, d, sdratio);
 }
