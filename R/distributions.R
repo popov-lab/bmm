@@ -2320,26 +2320,26 @@ rsdt_yn <- function(n, n_trials, stimulus, d, criterion,
 # the branch with the closed form; gumbel_min gives the closed-form Gamma ratio.
 # normal uses 40-point Gauss-Hermite quadrature (closed form Phi(d'/sqrt(2))
 # at m = 2), logistic uses 64-point Gauss-Legendre on the probability scale.
-# Vectorized over dprime and m (recycled to a common length). The rep(each =)
+# Vectorized over d and m (recycled to a common length). The rep(each =)
 # factor aligns the per-observation exponent m - 1 with the column-major
 # layout of the nodes-by-observations matrix from outer().
-.mafc_pc_r <- function(dprime, m, dist = "normal") {
+.mafc_pc_r <- function(d, m, dist = "normal") {
   if (dist == "gumbel_max") {
-    return(1 / (1 + (m - 1) * exp(-dprime)))
+    return(1 / (1 + (m - 1) * exp(-d)))
   }
   if (dist == "gumbel_min") {
-    return(exp(lgamma(1 + exp(-dprime)) + lgamma(m) - lgamma(m + exp(-dprime))))
+    return(exp(lgamma(1 + exp(-d)) + lgamma(m) - lgamma(m + exp(-d))))
   }
 
-  n <- max(length(dprime), length(m))
-  dprime <- rep_len(dprime, n)
+  n <- max(length(d), length(m))
+  d <- rep_len(d, n)
   m <- rep_len(m, n)
 
   if (dist == "normal") {
-    out <- stats::pnorm(dprime / sqrt(2))
+    out <- stats::pnorm(d / sqrt(2))
     quad <- m != 2L
     if (any(quad)) {
-      log_cdf <- stats::pnorm(outer(.mafc_gh_nodes, dprime[quad], "+"),
+      log_cdf <- stats::pnorm(outer(.mafc_gh_nodes, d[quad], "+"),
                               log.p = TRUE)
       log_terms <- log(.mafc_gh_weights) +
         log_cdf * rep(m[quad] - 1, each = length(.mafc_gh_nodes))
@@ -2349,7 +2349,7 @@ rsdt_yn <- function(n, n_trials, stimulus, d, criterion,
   }
 
   cdf_mat <- .sdt_dists[[dist]]$cdf(
-    outer(.sdt_dists[[dist]]$qf(.mafc_gl_nodes), dprime, "+")
+    outer(.sdt_dists[[dist]]$qf(.mafc_gl_nodes), d, "+")
   )
   colSums(.mafc_gl_weights * cdf_mat^rep(m - 1, each = length(.mafc_gl_nodes)))
 }
@@ -2359,9 +2359,9 @@ rsdt_yn <- function(n, n_trials, stimulus, d, criterion,
 #'
 #' @description Density and random generation for m-alternative forced choice
 #'   signal detection theory (DeCarlo, 2012). Models accuracy in tasks where
-#'   one of `m` alternatives contains the signal. Only the `dprime` parameter
+#'   one of `m` alternatives contains the signal. Only the `d` parameter
 #'   is estimated (no criterion). All arguments are recycled to the length of
-#'   the longest one, so passing vectors of `dprime`, `m`, or `n_trials`
+#'   the longest one, so passing vectors of `d`, `m`, or `n_trials`
 #'   generates (or evaluates) one observation per element.
 #'
 #' @name sdt_mafc_dist
@@ -2370,11 +2370,11 @@ rsdt_yn <- function(n, n_trials, stimulus, d, criterion,
 #' @param n_trials Integer vector. Total number of trials per observation.
 #' @param m Integer vector. Number of alternatives per observation. Must be
 #'   at least 2.
-#' @param dprime Numeric vector. Sensitivity parameter(s).
+#' @param d Numeric vector. Sensitivity parameter(s).
 #' @inheritParams SDTdist
 #' @param log Logical. If `TRUE`, returns log-density (default `FALSE`).
 #' @param n Integer. Number of observations to generate. `n_trials`, `m`, and
-#'   `dprime` are recycled to this length.
+#'   `d` are recycled to this length.
 #'
 #' @return `dsdt_mafc` returns the (log-)density (binomial probability).
 #'   `rsdt_mafc` returns an integer vector with the number of correct
@@ -2390,22 +2390,22 @@ rsdt_yn <- function(n, n_trials, stimulus, d, criterion,
 #' @export
 #' @examples
 #' # 4-AFC density
-#' dsdt_mafc(n_correct = 80, n_trials = 100, m = 4, dprime = 1.5)
-dsdt_mafc <- function(n_correct, n_trials, m, dprime,
+#' dsdt_mafc(n_correct = 80, n_trials = 100, m = 4, d = 1.5)
+dsdt_mafc <- function(n_correct, n_trials, m, d,
                       dist = c("normal", "gumbel_min", "gumbel_max",
                                "logistic"),
                       log = FALSE) {
   dist <- match.arg(dist)
   stopif(any(m < 2), "m must be an integer >= 2")
 
-  n <- max(lengths(list(n_correct, n_trials, m, dprime)))
+  n <- max(lengths(list(n_correct, n_trials, m, d)))
   n_correct <- rep_len(n_correct, n)
   n_trials <- rep_len(n_trials, n)
 
   stopif(any(n_correct < 0), "n_correct must be non-negative")
   stopif(any(n_correct > n_trials), "n_correct must not exceed n_trials")
 
-  pc <- .mafc_pc_r(rep_len(dprime, n), rep_len(as.integer(m), n), dist)
+  pc <- .mafc_pc_r(rep_len(d, n), rep_len(as.integer(m), n), dist)
   stats::dbinom(n_correct, n_trials, pc, log = log)
 }
 
@@ -2416,9 +2416,9 @@ dsdt_mafc <- function(n_correct, n_trials, m, dprime,
 #' # Generate 4-AFC data for 20 subjects with varying sensitivity
 #' dat <- data.frame(id = 1:20, n_trials = 200L)
 #' dat$n_correct <- rsdt_mafc(nrow(dat), dat$n_trials, m = 4,
-#'                            dprime = rnorm(20, 1.5, 0.4))
+#'                            d = rnorm(20, 1.5, 0.4))
 #' head(dat)
-rsdt_mafc <- function(n, n_trials, m, dprime,
+rsdt_mafc <- function(n, n_trials, m, d,
                       dist = c("normal", "gumbel_min", "gumbel_max",
                                "logistic")) {
   dist <- match.arg(dist)
@@ -2426,6 +2426,6 @@ rsdt_mafc <- function(n, n_trials, m, dprime,
   stopif(any(m < 2), "m must be an integer >= 2")
   stopif(any(n_trials < 1), "n_trials must be positive")
 
-  pc <- .mafc_pc_r(rep_len(dprime, n), rep_len(as.integer(m), n), dist)
+  pc <- .mafc_pc_r(rep_len(d, n), rep_len(as.integer(m), n), dist)
   stats::rbinom(n, n_trials, pc)
 }
