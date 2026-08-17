@@ -2458,9 +2458,11 @@ rsdt_mafc <- function(n, n_trials, m, d,
 # converges fast but NON-uniformly, so a single fixed count is either wasteful
 # or wrong. Counts were calibrated against adaptive quadrature over
 # d_a in [0.3, 3.5]: the equal-variance ladder holds max error below 1e-8, and
-# the free-sdratio ladder below 1e-6 across sdratio in [0.5, 2.0] (about 5e-5
-# out at the 2-SD edge of the default normal(0, 0.5) prior). Beyond m = 8 with a
-# free sdratio even 128 nodes miss the 1e-6 target; check_data warns there.
+# the free-sdratio ladder below 1e-6 across sdratio in [0.5, 2.0]. That interval
+# is chosen to match the default normal(0, 0.3) prior on log sdratio, 97.9% of
+# which falls inside it -- the wider normal(0, 0.5) this replaced left one prior
+# draw in six outside the range the quadrature was verified over. Beyond m = 8
+# with a free sdratio even 128 nodes miss the 1e-6 target; check_data warns.
 .ranking_gh_n <- function(max_m, free_sdratio) {
   if (free_sdratio) {
     counts <- c(32L, 48L, 64L, 80L, 96L, 128L)

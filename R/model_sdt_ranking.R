@@ -27,8 +27,12 @@
       "Log SD ratio: log ratio of signal to noise standard deviations ",
       "(exp(sdratio) is the ratio, 0 = equal variance)"
     )
+    # Matches sdt_yn: on the log scale, normal(0, 0.3) covers ratios in
+    # [0.56, 1.80] at 95%, which spans the empirical recognition range and keeps
+    # the prior inside the interval the Gauss-Hermite ladder is calibrated over
+    # (see .ranking_gh_n).
     default_priors$sdratio <- list(
-      main = "normal(0, 0.5)", effects = "normal(0, 0.3)"
+      main = "normal(0, 0.3)", effects = "normal(0, 0.15)"
     )
     param_links$sdratio <- "identity"
     fixed_pars$sdratio <- 0
