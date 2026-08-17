@@ -2,19 +2,25 @@
 # MODELS                                                                 ####
 ############################################################################# !
 
-.model_sdt_binary <- function(response = NULL, stimulus = NULL,
+.model_sdt_yn <- function(response = NULL, stimulus = NULL,
                               n_trials = NULL, dist = "normal",
                               links = NULL, call = NULL, ...) {
   parameters <- list(
-    dprime = "Sensitivity: distance between signal and noise distributions",
+    d = paste0(
+      "Sensitivity: the balanced discriminability index d_a, which measures ",
+      "the distance between the signal and noise distributions in units of ",
+      "their root-mean-square SD, so it equals d' when sdratio is 1"
+    ),
     criterion = "Response bias: location of decision boundary",
     sdratio = paste0(
       "SD ratio: the signal-to-noise standard deviation ratio, estimated on ",
       "the log scale, so 1 means equal variance"
     )
   )
+  # d_a and the noise-standardized separation differ by at most ~16% over the
+  # plausible sdratio range, so the sensitivity prior needs no recalibration.
   default_priors <- list(
-    dprime = list(main = "normal(1, 1)", effects = "normal(0, 0.5)"),
+    d = list(main = "normal(1, 1)", effects = "normal(0, 0.5)"),
     criterion = list(main = "normal(0, 1.5)", effects = "normal(0, 0.5)"),
     sdratio = list(main = "normal(0, 0.5)", effects = "normal(0, 0.3)")
   )
@@ -30,8 +36,8 @@
       resp_vars = nlist(response),
       other_vars = nlist(stimulus, n_trials, dist),
       domain = "Perception & Recognition Memory",
-      task = "Signal/Noise or Old/New Recognition",
-      name = "Signal Detection Theory (Binary)",
+      task = "Yes/No Detection or Old/New Recognition",
+      name = "Signal Detection Theory (Yes/No)",
       citation = glue(
         "Green, D. M., & Swets, J. A. (1966). Signal detection theory ",
         "and psychophysics. Wiley."
@@ -39,19 +45,19 @@
       version = "NA",
       requirements = requirements,
       parameters = parameters,
-      links = list(dprime = "identity", criterion = "identity",
+      links = list(d = "identity", criterion = "identity",
                    sdratio = "log"),
       # on the link scale, so exp(0) = 1 = equal variance
       fixed_parameters = list(sdratio = 0),
       default_priors = default_priors,
       # on the natural scale; create_initfun() applies the forward link
       init_ranges = list(
-        dprime    = c(0.5, 1.5),
+        d         = c(0.5, 1.5),
         criterion = c(-0.5, 0.5),
         sdratio   = c(0.75, 1.35)
       )
     ),
-    class = c("bmmodel", "sdt", "sdt_binary"),
+    class = c("bmmodel", "sdt", "sdt_yn"),
     call = call
   )
   out$links[names(links)] <- links
@@ -59,9 +65,9 @@
 }
 
 
-#' @title Binary Signal Detection Theory Model
-#' @name sdt_binary
-#' @details `r model_info(.model_sdt_binary())`
+#' @title Yes/No Signal Detection Theory Model
+#' @name sdt_yn
+#' @details `r model_info(.model_sdt_yn())`
 #' @param response The name of the variable in the dataset containing the
 #'   count of "old"/"signal" responses for each cell.
 #' @param stimulus The name of the variable in the dataset coding the stimulus
@@ -81,6 +87,29 @@
 #' @param links A named list of link functions for the parameters.
 #' @param ... used internally for testing, ignore it
 #' @return An object of class `bmmodel`
+#'
+#' @section Which sensitivity measure `d` is:
+#' When the signal and noise distributions have different widths there is no
+#' single natural way to express their separation, because the separation only
+#' becomes dimensionless after choosing a scale to divide by. `bmm` reports
+#' \eqn{d_a}, the separation divided by the root-mean-square of the two SDs:
+#' \deqn{d_a = \sqrt{2}\,\delta / \sqrt{1 + r^2},}
+#' where \eqn{\delta} is the separation in noise-SD units and \eqn{r} is
+#' `sdratio`. This weights the two distributions equally, and it is the measure
+#' Macmillan and Creelman (2005) and Mickes et al. (2007) recommend under
+#' unequal variance. `sdratio` is fixed at 1 by default, where \eqn{d_a} equals
+#' the familiar \eqn{d'}, so the choice only matters for unequal-variance fits.
+#'
+#' The alternative — dividing by the noise SD alone — is not comparable across
+#' conditions that differ in `sdratio`: two conditions that are equally
+#' discriminable can then show a large, confidently estimated difference in
+#' sensitivity. Note that `criterion` is **not** rescaled and stays on the
+#' noise-standardized axis, following the same convention.
+#'
+#' Because `d` is a short name, a column called `d` in your data that is also
+#' used as a predictor will collide with this parameter; `bmm()` warns when that
+#' happens.
+#'
 #' @references
 #' Green, D. M., & Swets, J. A. (1966). \emph{Signal detection theory and
 #'   psychophysics}. Wiley.
@@ -88,39 +117,51 @@
 #' DeCarlo, L. T. (1998). Signal detection theory and generalized linear
 #'   models. \emph{Psychological Methods}, \emph{3}(2), 186--205.
 #'   \doi{10.1037/1082-989X.3.2.186}
+#'
+#' Simpson, A. J., & Fitter, M. J. (1973). What is the best index of
+#'   detectability? \emph{Psychological Bulletin}, \emph{80}(6), 481--488.
+#'   \doi{10.1037/h0035203}
+#'
+#' Macmillan, N. A., & Creelman, C. D. (2005). \emph{Detection theory: A user's
+#'   guide} (2nd ed.). Erlbaum.
+#'
+#' Mickes, L., Wixted, J. T., & Wais, P. E. (2007). A direct test of the
+#'   unequal-variance signal detection model of recognition memory.
+#'   \emph{Psychonomic Bulletin & Review}, \emph{14}(5), 858--865.
+#'   \doi{10.3758/BF03194112}
 #' @keywords bmmodel
 #' @export
 #' @examples
 #' \dontrun{
 #' dat <- expand.grid(id = 1:20, stimulus = c(0L, 1L))
 #' dat$n_trials <- 100L
-#' dat$n_old <- rsdt_binary(nrow(dat), dat$n_trials, dat$stimulus,
-#'                          dprime = 1.5, criterion = 0.2)
+#' dat$n_old <- rsdt_yn(nrow(dat), dat$n_trials, dat$stimulus,
+#'                          d = 1.5, criterion = 0.2)
 #'
-#' model <- sdt_binary(
+#' model <- sdt_yn(
 #'   response = "n_old",
 #'   stimulus = "stimulus",
 #'   n_trials = "n_trials"
 #' )
 #'
 #' fit <- bmm(
-#'   formula = bmf(dprime ~ 1, criterion ~ 1),
+#'   formula = bmf(d ~ 1, criterion ~ 1),
 #'   data = dat,
 #'   model = model,
 #'   cores = 4,
 #'   backend = "cmdstanr"
 #' )
 #'
-#' # Unequal-variance binary SDT
+#' # Unequal-variance yes/no SDT
 #' fit_uv <- bmm(
-#'   formula = bmf(dprime ~ 1, criterion ~ 1, sdratio ~ 1),
+#'   formula = bmf(d ~ 1, criterion ~ 1, sdratio ~ 1),
 #'   data = dat,
 #'   model = model,
 #'   cores = 4,
 #'   backend = "cmdstanr"
 #' )
 #' }
-sdt_binary <- function(response, stimulus, n_trials,
+sdt_yn <- function(response, stimulus, n_trials,
                        dist = c("normal", "gumbel_min", "gumbel_max",
                                 "logistic"),
                        links = NULL, ...) {
@@ -128,7 +169,7 @@ sdt_binary <- function(response, stimulus, n_trials,
   stop_missing_args()
   dist <- match.arg(dist)
 
-  .model_sdt_binary(response = response, stimulus = stimulus,
+  .model_sdt_yn(response = response, stimulus = stimulus,
                     n_trials = n_trials, dist = dist,
                     links = links, call = call, ...)
 }
@@ -139,7 +180,7 @@ sdt_binary <- function(response, stimulus, n_trials,
 ############################################################################# !
 
 #' @export
-check_data.sdt_binary <- function(model, data, formula) {
+check_data.sdt_yn <- function(model, data, formula) {
   stim_var <- model$other_vars$stimulus
   stopif(!stim_var %in% colnames(data),
          "Stimulus variable '{stim_var}' missing in the data")
@@ -164,7 +205,7 @@ check_data.sdt_binary <- function(model, data, formula) {
 ############################################################################# !
 
 #' @export
-bmf2bf.sdt_binary <- function(model, formula) {
+bmf2bf.sdt_yn <- function(model, formula) {
   resp_var <- model$resp_vars$response
   stim_var <- model$other_vars$stimulus
   n_trials_var <- model$other_vars$n_trials
@@ -181,25 +222,25 @@ bmf2bf.sdt_binary <- function(model, formula) {
 ############################################################################# !
 
 #' @export
-configure_model.sdt_binary <- function(model, data, formula) {
+configure_model.sdt_yn <- function(model, data, formula) {
   formula <- bmf2bf(model, formula)
 
   formula$family <- brms::custom_family(
-    "sdt_binary",
-    dpars = c("mu", "dprime", "criterion", "sdratio"),
-    links = c("identity", model$links$dprime, model$links$criterion,
+    "sdt_yn",
+    dpars = c("mu", "d", "criterion", "sdratio"),
+    links = c("identity", model$links$d, model$links$criterion,
               model$links$sdratio),
     type = "int",
     loop = TRUE,
-    log_lik = log_lik_sdt_binary,
-    posterior_predict = posterior_predict_sdt_binary,
+    log_lik = log_lik_sdt_yn,
+    posterior_predict = posterior_predict_sdt_yn,
     vars = c("vint1[n]", "vint2[n]", "trials[n]")
   )
 
   sc_path <- system.file("stan_chunks", package = "bmm")
   stan_funs <- paste(
     read_lines2(paste0(sc_path, "/sdt_dist_funs.stan")),
-    read_lines2(paste0(sc_path, "/sdt_binary_funs.stan")),
+    read_lines2(paste0(sc_path, "/sdt_yn_funs.stan")),
     sep = "\n"
   )
   stanvars <- brms::stanvar(scode = stan_funs, block = "functions")
@@ -212,22 +253,22 @@ configure_model.sdt_binary <- function(model, data, formula) {
 # LOG_LIK & POSTERIOR_PREDICT                                            ####
 ############################################################################# !
 
-log_lik_sdt_binary <- function(i, prep) {
-  dprime <- brms::get_dpar(prep, "dprime", i = i)
+log_lik_sdt_yn <- function(i, prep) {
+  d <- brms::get_dpar(prep, "d", i = i)
   criterion <- brms::get_dpar(prep, "criterion", i = i)
   sdratio <- brms::get_dpar(prep, "sdratio", i = i)
   dist <- .sdt_dist_names[prep$data$vint2[i]]
 
-  dsdt_binary(prep$data$Y[i], prep$data$trials[i], prep$data$vint1[i],
-              dprime, criterion, sdratio = sdratio, dist = dist, log = TRUE)
+  dsdt_yn(prep$data$Y[i], prep$data$trials[i], prep$data$vint1[i],
+              d, criterion, sdratio = sdratio, dist = dist, log = TRUE)
 }
 
-posterior_predict_sdt_binary <- function(i, prep, ...) {
-  dprime <- brms::get_dpar(prep, "dprime", i = i)
+posterior_predict_sdt_yn <- function(i, prep, ...) {
+  d <- brms::get_dpar(prep, "d", i = i)
   criterion <- brms::get_dpar(prep, "criterion", i = i)
   sdratio <- brms::get_dpar(prep, "sdratio", i = i)
   dist <- .sdt_dist_names[prep$data$vint2[i]]
 
-  rsdt_binary(length(dprime), prep$data$trials[i], prep$data$vint1[i],
-              dprime, criterion, sdratio = sdratio, dist = dist)
+  rsdt_yn(length(d), prep$data$trials[i], prep$data$vint1[i],
+              d, criterion, sdratio = sdratio, dist = dist)
 }
