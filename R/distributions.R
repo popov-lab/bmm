@@ -2477,11 +2477,15 @@ rsdt_mafc <- function(n, n_trials, m, d,
     # equal-variance case (sigma = 1) leaves eta untouched.
     #
     # Accuracy envelope of the 20-node Gauss-Hermite rule, measured against
-    # adaptive quadrature at d_a = 1.5 (max abs error over ranks): <= 2e-5 for
-    # sigma <= 1.4 and m <= 4, but 1.5e-3 at sigma 1.4 / m 8 and 2e-2 at
-    # sigma 3 / m 8. It degrades in BOTH sigma and m, because a wider signal
-    # distribution pushes the integrand into the tails. Raise N_GH here and in
-    # sdt_ranking_funs.stan together if large-sigma, large-m fits are needed.
+    # adaptive quadrature over d_a in [0.3, 3.5] (max abs error over ranks).
+    # At sigma = 1 it is fine (<1e-6 to m = 4), but it degrades in BOTH sigma
+    # and m, because a wider signal distribution pushes the integrand into the
+    # tails where the Hermite nodes are sparse. Across the recognition range
+    # sigma in [0.6, 1.8]: 1.9e-4 (m=3), 1.0e-3 (m=4), 2.2e-3 (m=5), 9.4e-3
+    # (m=8). GH converges fast but NON-uniformly -- 60 nodes reach 1e-9 at
+    # m = 3 yet only 8e-4 at sigma 2.7, m = 8, which the default
+    # normal(0, 0.5) prior on sdratio does reach during warmup.
+    # Raise N_GH here and in sdt_ranking_funs.stan TOGETHER.
     delta <- rep_len(d, n) * .sdt_rms_scale(sigma)
     eta <- outer(.ranking_gh_nodes, sigma) +
       rep(delta, each = length(.ranking_gh_nodes))
