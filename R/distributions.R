@@ -455,6 +455,12 @@ rmixture3p <- function(n, mu = c(0, 2, -1.5), kappa = 5, p_mem = 0.6, p_nt = 0.2
 #' @param a Vector of strengths for cue-independent activation
 #' @param s Vector of generalization gradients
 #' @param b Vector of baseline activation
+#' @param tau Vector of scales for trial-to-trial variability in precision. The
+#'   Fisher information `J` of a memory representation is drawn from
+#'   `gamma(mean = J(kappa), scale = tau)`. `tau = 0`, the default, is constant
+#'   precision. See [imm()].
+#' @param vp_nodes Number of quadrature nodes used when `tau > 0`; must be an
+#'   odd number of at least 41. See [mixture2p()].
 #' @param log Logical; if `TRUE`, values are returned on the log scale.
 #'
 #' @keywords distribution
@@ -486,41 +492,107 @@ rmixture3p <- function(n, mu = c(0, 2, -1.5), kappa = 5, p_mem = 0.6, p_nt = 0.2
 #' lines(x, d, type = "l", col = "red")
 #'
 dimm <- function(x, mu = c(0, 2, -1.5), dist = c(0, 0.5, 2),
-                 c = 5, a = 2, b = 1, s = 2, kappa = 5, log = FALSE) {
-  stopif(isTRUE(any(kappa < 0)), "kappa must be non-negative")
-  len_mu <- length(mu)
-  stopif(
-    len_mu != length(dist),
-    "The number of items does not match the distances provided from the cued location."
+                 c = 5, a = 2, b = 1, s = 2, kappa = 5, tau = 0,
+                 vp_nodes = 41L, log = FALSE) {
+  .check_imm_args(kappa, s, dist, tau, length(mu))
+
+  n <- length(x)
+  weights <- .imm_item_weights(
+    rep_len(c, n), rep_len(a, n), rep_len(s, n), rep_len(b, n), dist
   )
-  stopif(isTRUE(any(s < 0)), "s must be non-negative")
-  stopif(isTRUE(any(dist < 0)), "all distances have to be positive.")
-
-  # compute activation for all items
-  weights <- rep(c, len_mu) * exp(-s * dist) + rep(a, len_mu)
-
-  # add activation of background noise
-  weights <- c(weights, b)
-
-  # compute probability for responding stemming from each distribution
-  probs <- weights / sum(weights)
-  density <- matrix(data = NaN, nrow = length(x), ncol = len_mu + 1)
-
-  for (i in seq_along(mu)) {
-    density[, i] <- log(probs[i]) +
-      brms::dvon_mises(x, mu = mu[i], kappa = kappa, log = T)
-  }
-
-  density[, len_mu + 1] <- log(probs[len_mu + 1]) +
-    stats::dunif(x = x, -pi, pi, log = T)
-
-  density <- matrixStats::rowLogSumExps(density)
+  density <- .circmix_vp_ld(
+    .circmix_cos(x, mu[1], mu[-1], length(mu)),
+    weights$logw, weights$logw_guess,
+    rep_len(kappa, n), rep_len(tau, n), vp_nodes
+  )
 
   if (!log) {
     return(exp(density))
   }
 
   density
+}
+
+.check_imm_args <- function(kappa, s, dist, tau, n_items) {
+  stopif(isTRUE(any(kappa < 0)), "kappa must be non-negative")
+  stopif(
+    n_items != length(dist),
+    "The number of items does not match the distances provided from the cued location."
+  )
+  stopif(isTRUE(any(s < 0)), "s must be non-negative")
+  stopif(isTRUE(any(dist < 0)), "all distances have to be positive.")
+  stopif(isTRUE(any(tau < 0)), "tau must be non-negative")
+}
+
+.log_sum2 <- function(x, y) {
+  pmax(x, y) + log1p(exp(-abs(x - y)))
+}
+
+# Activation of every item, including the target at distance zero, weighed
+# against the background. Assembled on the log scale, which is the same
+# quantity as c * exp(-s * d) + a without the intermediate exponentials.
+.imm_item_weights <- function(c, a, s, b, dist) {
+  n <- length(c)
+  logw <- vapply(dist, function(d) .log_sum2(log(c) - s * d, log(a)), numeric(n))
+  logw <- matrix(logw, nrow = n)
+  total <- matrixStats::rowLogSumExps(cbind(logw, log(b)))
+  list(logw = logw - total, logw_guess = log(b) - total)
+}
+
+# As .imm_item_weights(), but for the reduced versions and with the non-target
+# distances padded to max_set_size - 1. "abc" has no distance gradient at all,
+# and "bsc" no cue-independent activation.
+.imm_log_weights <- function(c, a, s, b, set_size, dist, version) {
+  n <- length(c)
+  log_c <- log(c)
+  log_a <- log(a)
+
+  logw <- matrix(
+    if (version == "bsc") log_c else .log_sum2(log_c, log_a),
+    nrow = n
+  )
+  for (j in seq_len(set_size - 1)) {
+    logw <- cbind(logw, switch(version,
+      abc = log_a,
+      bsc = log_c - s * dist[j],
+      .log_sum2(log_c - s * dist[j], log_a)
+    ))
+  }
+
+  total <- matrixStats::rowLogSumExps(cbind(logw, log(b)))
+  list(logw = logw - total, logw_guess = log(b) - total)
+}
+
+.dimm_version <- function(x, mu, kappa, c, a, s, b, set_size, nt, dist, tau,
+                          nodes, version) {
+  args <- .circmix_recycle(
+    x = x, mu = mu, kappa = kappa, c = c, a = a %||% 1, s = s %||% 0,
+    b = b, tau = tau
+  )
+  weights <- .imm_log_weights(
+    args$c, args$a, args$s, args$b, set_size, dist, version
+  )
+  .circmix_vp_ld(
+    .circmix_cos(args$x, args$mu, nt, set_size),
+    weights$logw, weights$logw_guess, args$kappa, args$tau, nodes
+  )
+}
+
+.rimm_version <- function(mu, kappa, c, a, s, b, set_size, nt, dist, tau,
+                          version) {
+  args <- .circmix_recycle(
+    mu = mu, kappa = kappa, c = c, a = a %||% 1, s = s %||% 0, b = b, tau = tau
+  )
+  n <- length(args$mu)
+  weights <- .imm_log_weights(
+    args$c, args$a, args$s, args$b, set_size, dist, version
+  )
+
+  locations <- matrix(args$mu, nrow = n)
+  for (j in seq_len(set_size - 1)) {
+    locations <- cbind(locations, nt[j])
+  }
+  .rcircmix(locations, weights$logw, weights$logw_guess, args$kappa, args$tau)
 }
 
 #' @rdname IMMdist
@@ -540,23 +612,15 @@ qimm <- function(p, mu = c(0, 2, -1.5), dist = c(0, 0.5, 2),
 #' @rdname IMMdist
 #' @export
 rimm <- function(n, mu = c(0, 2, -1.5), dist = c(0, 0.5, 2),
-                 c = 1, a = 0.2, b = 1, s = 2, kappa = 5) {
-  stopif(isTRUE(any(kappa < 0)), "kappa must be non-negative")
-  stopif(isTRUE(any(s < 0)), "s must be non-negative")
-  stopif(isTRUE(any(dist < 0)), "all distances have to be positive.")
-  stopif(
-    length(mu) != length(dist),
-    "The number of items does not match the distances provided from the cued location."
+                 c = 1, a = 0.2, b = 1, s = 2, kappa = 5, tau = 0) {
+  .check_imm_args(kappa, s, dist, tau, length(mu))
+
+  weights <- .imm_item_weights(
+    rep_len(c, n), rep_len(a, n), rep_len(s, n), rep_len(b, n), dist
   )
-
-  xm <- seq(-pi, pi, length.out = 361)
-  max_y <- max(dimm(xm, mu, dist, c, a, b, s, kappa))
-
-  rejection_sampling(
-    n = n,
-    f = function(x) dimm(x, mu, dist, c, a, b, s, kappa),
-    max_f = max_y,
-    proposal_fun = function(n) stats::runif(n, -pi, pi)
+  .rcircmix(
+    matrix(mu, nrow = n, ncol = length(mu), byrow = TRUE),
+    weights$logw, weights$logw_guess, rep_len(kappa, n), rep_len(tau, n)
   )
 }
 

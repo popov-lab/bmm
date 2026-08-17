@@ -14,6 +14,9 @@ imm(
   set_size,
   regex = FALSE,
   version = "full",
+  variable_precision = FALSE,
+  vp_nodes = 41L,
+  links = NULL,
   ...
 )
 
@@ -51,6 +54,19 @@ columns in the dataset.}
 \item{version}{Character. The version of the IMM model to use. Can be one of
 \code{full}, \code{bsc}, or \code{abc}. The default is \code{full}.}
 
+\item{variable_precision}{Logical; if \code{TRUE}, the precision of memory varies
+from trial to trial (van den Berg et al., 2012). This adds the parameter
+\code{tau}; see \code{\link[=mixture2p]{mixture2p()}} for the parameterisation. The capacity models of
+Zhang and Luck (2008) do not apply to the IMM, which has no discrete slots
+-- its bottleneck is the ratio of context to general activation -- so
+variable precision is the only additional version offered here.}
+
+\item{vp_nodes}{Number of quadrature nodes used when
+\code{variable_precision = TRUE}; must be an odd number of at least 41. See
+\code{\link[=mixture2p]{mixture2p()}}.}
+
+\item{links}{A named list of link functions for the model parameters.}
+
 \item{...}{used internally for testing, ignore it}
 }
 \value{
@@ -84,25 +100,25 @@ Please use \code{imm(version = 'full')}, \code{imm(version = 'bsc')}, or \code{i
 \itemize{
 \item \strong{Parameters:}
 \itemize{
-\item \code{mu1}: Location parameter of the von Mises distribution for memory responses (in radians). Fixed internally to 0 by default.
-\item \code{kappa}: Concentration parameter of the von Mises distribution
+\item \code{mu}: Location of the von Mises distribution of memory responses (in radians). Fixed internally to 0 by default.
+\item \code{kappa}: Concentration of the von Mises distribution of memory responses
 \item \code{a}: General activation of memory items
 \item \code{c}: Context activation
 \item \code{s}: Spatial similarity gradient
+\item \code{b}: Background activation, the reference against which the activations of the target and the non-targets are weighed. Fixed internally to 1; freeing it leaves the remaining activations unidentified, since only their ratio to the background enters the likelihood.
 }
 \item \strong{Fixed parameters:}
 \itemize{
-\item \code{mu1} = 0
-\item \code{mu2} = 0
-\item \code{kappa2} = -100
+\item \code{mu} = 0
+\item \code{b} = 0
 }
 \item \strong{Default parameter links:}
 \itemize{
-\item mu1 = tan_half; kappa = log; a = log; c = log; s = log
+\item mu = tan_half; kappa = log; a = log; c = log; s = log; b = log
 }
 \item \strong{Default priors:}
 \itemize{
-\item \code{mu1}:
+\item \code{mu}:
 \itemize{
 \item \code{main}: student_t(1, 0, 1)
 }
@@ -125,6 +141,10 @@ Please use \code{imm(version = 'full')}, \code{imm(version = 'bsc')}, or \code{i
 \itemize{
 \item \code{main}: normal(0, 1)
 \item \code{effects}: normal(0, 1)
+}
+\item \code{b}:
+\itemize{
+\item \code{main}: normal(0, 1)
 }
 }
 }
@@ -143,24 +163,24 @@ Please use \code{imm(version = 'full')}, \code{imm(version = 'bsc')}, or \code{i
 \itemize{
 \item \strong{Parameters:}
 \itemize{
-\item \code{mu1}: Location parameter of the von Mises distribution for memory responses (in radians). Fixed internally to 0 by default.
-\item \code{kappa}: Concentration parameter of the von Mises distribution
+\item \code{mu}: Location of the von Mises distribution of memory responses (in radians). Fixed internally to 0 by default.
+\item \code{kappa}: Concentration of the von Mises distribution of memory responses
 \item \code{c}: Context activation
 \item \code{s}: Spatial similarity gradient
+\item \code{b}: Background activation, the reference against which the activations of the target and the non-targets are weighed. Fixed internally to 1; freeing it leaves the remaining activations unidentified, since only their ratio to the background enters the likelihood.
 }
 \item \strong{Fixed parameters:}
 \itemize{
-\item \code{mu1} = 0
-\item \code{mu2} = 0
-\item \code{kappa2} = -100
+\item \code{mu} = 0
+\item \code{b} = 0
 }
 \item \strong{Default parameter links:}
 \itemize{
-\item mu1 = tan_half; kappa = log; c = log; s = log
+\item mu = tan_half; kappa = log; c = log; s = log; b = log
 }
 \item \strong{Default priors:}
 \itemize{
-\item \code{mu1}:
+\item \code{mu}:
 \itemize{
 \item \code{main}: student_t(1, 0, 1)
 }
@@ -179,6 +199,10 @@ Please use \code{imm(version = 'full')}, \code{imm(version = 'bsc')}, or \code{i
 \item \code{main}: normal(0, 1)
 \item \code{effects}: normal(0, 1)
 }
+\item \code{b}:
+\itemize{
+\item \code{main}: normal(0, 1)
+}
 }
 }
 }
@@ -196,24 +220,24 @@ Please use \code{imm(version = 'full')}, \code{imm(version = 'bsc')}, or \code{i
 \itemize{
 \item \strong{Parameters:}
 \itemize{
-\item \code{mu1}: Location parameter of the von Mises distribution for memory responses (in radians). Fixed internally to 0 by default.
-\item \code{kappa}: Concentration parameter of the von Mises distribution
+\item \code{mu}: Location of the von Mises distribution of memory responses (in radians). Fixed internally to 0 by default.
+\item \code{kappa}: Concentration of the von Mises distribution of memory responses
 \item \code{a}: General activation of memory items
 \item \code{c}: Context activation
+\item \code{b}: Background activation, the reference against which the activations of the target and the non-targets are weighed. Fixed internally to 1; freeing it leaves the remaining activations unidentified, since only their ratio to the background enters the likelihood.
 }
 \item \strong{Fixed parameters:}
 \itemize{
-\item \code{mu1} = 0
-\item \code{mu2} = 0
-\item \code{kappa2} = -100
+\item \code{mu} = 0
+\item \code{b} = 0
 }
 \item \strong{Default parameter links:}
 \itemize{
-\item mu1 = tan_half; kappa = log; a = log; c = log
+\item mu = tan_half; kappa = log; a = log; c = log; b = log
 }
 \item \strong{Default priors:}
 \itemize{
-\item \code{mu1}:
+\item \code{mu}:
 \itemize{
 \item \code{main}: student_t(1, 0, 1)
 }
@@ -231,6 +255,10 @@ Please use \code{imm(version = 'full')}, \code{imm(version = 'bsc')}, or \code{i
 \itemize{
 \item \code{main}: normal(0, 1)
 \item \code{effects}: normal(0, 1)
+}
+\item \code{b}:
+\itemize{
+\item \code{main}: normal(0, 1)
 }
 }
 }

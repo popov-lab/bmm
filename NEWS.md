@@ -1,6 +1,12 @@
 # bmm (development version)
 
+### Breaking changes
+* **The `imm` model is now built on a custom family rather than on `brms::mixture()`.** Its location parameter is renamed from `mu1` to `mu`, because brms requires a custom family's first distributional parameter to be called `mu`; formulas written against `mu1` still work and warn. Its parameters are distributional rather than non-linear now, so user priors move from `nlpar` to `dpar`, and their intercept priors carry a real `Intercept` class instead of `class = "b", coef = "Intercept"`, where a user prior on `class = "b"` silently failed to replace them. The background activation `b` is now a visible parameter fixed to 1, rather than an implicit reference mentioned only in prose.
+
 ### New features
+* **`imm()` gains a `variable_precision` argument**, which lets the precision of memory vary from trial to trial (van den Berg et al., 2012). The capacity models of Zhang and Luck (2008) do not apply to the IMM, which has no discrete slots -- its bottleneck is the ratio of context to general activation -- so this is the only version added here. The Luce choice over activations is unchanged: it is the theory, not a link (#398).
+* The `links` argument is now honoured by `imm()`. Previously the field was stored and printed but never reached the generated Stan code, because the exponentials were written into the non-linear formulas by hand.
+* `dimm()` and `rimm()` gain a `tau` argument for variable precision. `rimm()` now samples a component and then draws from it rather than rejection-sampling the marginal density.
 * The **sdm** model now supports within-chain parallelization via the `threads` argument (e.g. `bmm(..., threads = 2)`), reducing fitting time by up to ~45% in benchmarks (#374).
 * Add `softplus` as an opt-in link function for positively-bounded parameters, as an alternative to the default `log` link. `softplus(x) = log(1 + exp(x))` keeps parameters positive while growing linearly for large values, avoiding the numerical blow-up of `exp()` and giving predictor effects an additive (rather than multiplicative) interpretation on the natural scale. Enable it per parameter via the model's `links` list, e.g. `m3(...)$links <- list(c = "softplus", a = "softplus")` or `ddm(rt, response, links = list(bound = "softplus"))` (#363).
 

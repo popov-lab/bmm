@@ -17,6 +17,8 @@ dimm(
   b = 1,
   s = 2,
   kappa = 5,
+  tau = 0,
+  vp_nodes = 41L,
   log = FALSE
 )
 
@@ -50,7 +52,8 @@ rimm(
   a = 0.2,
   b = 1,
   s = 2,
-  kappa = 5
+  kappa = 5,
+  tau = 0
 )
 }
 \arguments{
@@ -69,6 +72,14 @@ rimm(
 \item{s}{Vector of generalization gradients}
 
 \item{kappa}{Vector of precision values}
+
+\item{tau}{Vector of scales for trial-to-trial variability in precision. The
+Fisher information \code{J} of a memory representation is drawn from
+\code{gamma(mean = J(kappa), scale = tau)}. \code{tau = 0}, the default, is constant
+precision. See \code{\link[=imm]{imm()}}.}
+
+\item{vp_nodes}{Number of quadrature nodes used when \code{tau > 0}; must be an
+odd number of at least 41. See \code{\link[=mixture2p]{mixture2p()}}.}
 
 \item{log}{Logical; if \code{TRUE}, values are returned on the log scale.}
 
