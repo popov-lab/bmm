@@ -150,12 +150,41 @@ check_formula.bmmodel <- function(model, data, formula) {
     bmmformula(kappa ~ 1, thetat ~ 1) or bmf(kappa ~ 1, thetat ~ 1)"
   )
 
+  formula <- rename_deprecated_parameters(model, formula)
+
   wpar <- unrecognized_parameters(model, formula)
   stopif(length(wpar), "Unrecognized model parameters: {collapse_comma(wpar)}")
 
   formula <- add_missing_parameters(model, formula)
   warn_predictor_parameter_clash(data, formula)
   NextMethod("check_formula")
+}
+
+# A model that renames a parameter lists the old name in deprecated_parameters,
+# so that formulas written against the old name keep working for a release
+# instead of failing as an unrecognized parameter.
+rename_deprecated_parameters <- function(model, formula) {
+  renames <- model$deprecated_parameters
+  used <- intersect(names(renames), names(formula))
+  if (length(used) == 0) {
+    return(formula)
+  }
+
+  new_names <- unlist(renames[used], use.names = FALSE)
+  warning2(
+    "The parameter(s) {collapse_comma(used)} were renamed to \\
+    {collapse_comma(new_names)}. The old name(s) still work, but will be \\
+    removed in a future release."
+  )
+
+  out <- unclass(formula)
+  for (i in seq_along(used)) {
+    if (is_formula(out[[used[i]]])) {
+      out[[used[i]]][[2]] <- as.name(new_names[i])
+    }
+  }
+  names(out)[match(used, names(out))] <- new_names
+  new_bmmformula(out)
 }
 
 # A predictor whose name matches a predicted parameter is flagged non-linear
