@@ -195,6 +195,17 @@ test_that(".circmix_stan_wrapper() packs the vreal arguments and passes the tabl
   expect_match(wrapper, "41, circmix_logk, circmix_dlogk, circmix_logJ_min, circmix_dlogJ")
 })
 
+test_that(".circmix_stan_wrapper() can pass the core a value its family omits", {
+  wrapper <- .circmix_stan_wrapper(
+    "mixture2p_simple",
+    dpars = c("mu", "kappa", "thetat"),
+    core_dpars = c("mu", "kappa", "0.0", "thetat")
+  )
+  expect_match(wrapper, "real mixture2p_simple_lpdf\\(real y, real mu, real kappa, real thetat")
+  expect_false(grepl("real 0.0", wrapper, fixed = TRUE))
+  expect_match(wrapper, "mixture2p_simple_core\\(y, mu, kappa, 0.0, thetat, 41")
+})
+
 # The functions are evaluated through a fixed_param run rather than through
 # cmdstanr::expose_functions(), which links against RcppParallel's libtbb and so
 # fails on toolchains where that disagrees with the one cmdstan was built with.

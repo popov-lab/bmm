@@ -284,11 +284,18 @@
 # brms needs the likelihood to be a single `<family>_lpdf`, and its signature
 # depends on max_set_size because every non-target needs its own vreal term. That
 # makes this the one piece of Stan that has to be generated. It only packs the
-# scalar vreal arguments into the vectors that `<family>_core` expects, and holds
-# no numbers besides the quadrature node count, so the arithmetic and every
-# numeric constant stay in inst/stan_chunks.
-.circmix_stan_wrapper <- function(family, dpars, vint = NULL, vreal = list(),
-                                  nodes = 41L) {
+# scalar vreal arguments into the vectors that `<family>_core` expects, so the
+# arithmetic stays in inst/stan_chunks.
+#
+# core_dpars lets a model hand the core something its family does not estimate,
+# which is how the constant-precision versions reach the same core as the
+# variable-precision ones: they pass a literal 0 for tau, and circmix_vp_ld()
+# then takes its point-mass branch. The alternative -- carrying tau as a
+# parameter fixed to zero -- would need a fixed value interpreted on a different
+# link scale than the estimated one, and would leave a dead parameter in every
+# constant-precision model.
+.circmix_stan_wrapper <- function(family, dpars, core_dpars = dpars, vint = NULL,
+                                  vreal = list(), nodes = 41L) {
   vreal_names <- lapply(names(vreal), function(g) paste0(g, seq_len(vreal[[g]])))
   args <- c(
     "real y", paste("real", dpars),
@@ -303,7 +310,7 @@
     character(1)
   )
   call_args <- c(
-    "y", dpars, vint, packed, as.character(as.integer(nodes)),
+    "y", core_dpars, vint, packed, as.character(as.integer(nodes)),
     .circmix_table_vars()
   )
   as.character(glue(
