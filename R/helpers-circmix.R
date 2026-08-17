@@ -253,6 +253,18 @@
   lapply(args, rep_len, length.out = max(lengths(args)))
 }
 
+# cos(y - mu) for the target and the active non-targets. nt is padded to
+# max_set_size - 1, so only the first set_size - 1 entries are ever read and a
+# trial never pays for components its set size does not have.
+.circmix_cos <- function(x, mu, nt, set_size) {
+  args <- .circmix_recycle(x = x, mu = mu)
+  cosd <- matrix(cos(args$x - args$mu), nrow = length(args$x))
+  for (j in seq_len(set_size - 1)) {
+    cosd <- cbind(cosd, cos(args$x - nt[j]))
+  }
+  cosd
+}
+
 # tau is only a distributional parameter when the model estimates variable
 # precision; otherwise the likelihood is the tau = 0 limit.
 .circmix_prep_tau <- function(prep, i) {

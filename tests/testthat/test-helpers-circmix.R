@@ -187,6 +187,21 @@ test_that(".circmix_recycle() extends every argument to the longest", {
   expect_equal(out$kappa, c(5, 6, 7))
 })
 
+test_that(".circmix_cos() reads only as many non-targets as the set size has", {
+  nt <- c(1, 2, 3)
+  expect_equal(dim(.circmix_cos(0.5, 0, nt, set_size = 1)), c(1L, 1L))
+  expect_equal(dim(.circmix_cos(0.5, 0, nt, set_size = 3)), c(1L, 3L))
+  expect_equal(
+    .circmix_cos(0.5, 0, nt, set_size = 3)[1, ],
+    cos(0.5 - c(0, 1, 2))
+  )
+  # padding beyond the set size cannot change the result
+  expect_equal(
+    .circmix_cos(0.5, 0, c(1, 2, 999), set_size = 3),
+    .circmix_cos(0.5, 0, c(1, 2, -7), set_size = 3)
+  )
+})
+
 test_that(".circmix_bounds() derives natural-scale bounds from the links", {
   bounds <- .circmix_bounds(list(mu = "tan_half", kappa = "log", thetat = "logit"))
   expect_equal(bounds$lb, c(NA, 0, 0))
