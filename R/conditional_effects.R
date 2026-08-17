@@ -453,7 +453,9 @@ conditional_effects.bmmfit <- function(x,
 #' @keywords internal
 #' @noRd
 .compute_softmax_conditional_effects <- function(bmmfit, par, ...) {
-  if (!"mixture3p" %in% class(bmmfit$bmm$model)) {
+  # only the simple version normalises its weights by a softmax; the
+  # capacity-limited versions parameterise them directly
+  if (!"mixture3p_simple" %in% class(bmmfit$bmm$model)) {
     NULL
   } else {
     .compute_softmax_ce_inner(bmmfit, par, ...)
@@ -462,7 +464,8 @@ conditional_effects.bmmfit <- function(x,
 
 
 .compute_softmax_ce_inner <- function(bmmfit, par, ...) {
-  ce_par <- .brms_conditional_effects(bmmfit, nlpar = par, ...)
+  ce_par <- .brms_conditional_effects(bmmfit, dpar = par, ...)
+  set_size_var <- bmmfit$bmm$model$other_vars$set_size
 
   dots <- list(...)
   prob <- dots$prob %||% 0.95
@@ -484,12 +487,21 @@ conditional_effects.bmmfit <- function(x,
 
     draws_t <- do.call(
       brms::posterior_linpred,
-      c(linpred_args, list(nlpar = "thetat"))
+      c(linpred_args, list(dpar = "thetat"))
     )
     draws_nt <- do.call(
       brms::posterior_linpred,
-      c(linpred_args, list(nlpar = "thetant"))
+      c(linpred_args, list(dpar = "thetant"))
     )
+
+    # The non-target components share the weight exp(thetant) between them, so
+    # their total is exp(thetant) whatever the set size -- except at set size 1,
+    # where the likelihood has no non-target component at all.
+    has_non_targets <- rep(TRUE, ncol(draws_nt))
+    if (!is.null(set_size_var) && set_size_var %in% names(newdata)) {
+      has_non_targets <- as_numeric_vector(newdata[[set_size_var]]) > 1
+    }
+    draws_nt[, !has_non_targets] <- -Inf
 
     # numerically stable softmax: subtract max before exponentiating
     shift <- pmax(draws_t, draws_nt, 0)
