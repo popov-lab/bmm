@@ -58,40 +58,26 @@ A bare bones configure_model.* method should look like this:
 \examples{
 \dontshow{if (isTRUE(Sys.getenv("BMM_EXAMPLES"))) withAutoprint(\{ # examplesIf}
 configure_model.mixture3p <- function(model, data, formula) {
-  # retrieve arguments from the data check
-  max_set_size <- attr(data, "max_set_size")
-  lure_idx <- attr(data, "lure_idx_vars")
-  nt_features <- model$other_vars$nt_features
-  set_size_var <- model$other_vars$set_size
+  # the number of non-target covariates the family needs is fixed by the data
+  n_nt <- attr(data, "max_set_size") - 1
 
-  # construct initial brms formula
-  formula <- bmf2bf(model, formula) +
-    brms::lf(kappa2 ~ 1) +
-    brms::lf(mu2 ~ 1) +
-    brms::nlf(theta1 ~ thetat) +
-    brms::nlf(kappa1 ~ kappa)
+  formula <- bmf2bf(model, formula)
+  formula$family <- .circmix_custom_family(
+    model,
+    family = "mixture3p_simple",
+    weight_parameters = c("thetat", "thetant"),
+    vint = TRUE, n_vreal = n_nt,
+    log_lik = log_lik_mixture3p_simple,
+    posterior_predict = posterior_predict_mixture3p_simple
+  )
 
-  # additional internal terms for the mixture model formula
-  kappa_nts <- paste0("kappa", 3:(max_set_size + 1))
-  theta_nts <- paste0("theta", 3:(max_set_size + 1))
-  mu_nts <- paste0("mu", 3:(max_set_size + 1))
-
-  for (i in 1:(max_set_size - 1)) {
-    formula <- formula +
-      glue_nlf("{kappa_nts[i]} ~ kappa") +
-      glue_nlf(
-        "{theta_nts[i]} ~ {lure_idx[i]} * (thetant + log(inv_ss)) + ",
-        "(1 - {lure_idx[i]}) * (-100)"
-      ) +
-      glue_nlf("{mu_nts[i]} ~ {nt_features[i]}")
-  }
-
-  # define mixture family
-  vm_list <- lapply(1:(max_set_size + 1), function(x) brms::von_mises(link = "identity"))
-  vm_list$order <- "none"
-  formula$family <- brms::do_call(brms::mixture, vm_list)
-
-  nlist(formula, data)
+  nlist(
+    formula, data,
+    stanvars = .circmix_model_stanvars(
+      model, formula$family, "mixture3p_funs.stan",
+      vint = "ss", vreal = list(nt = n_nt)
+    )
+  )
 }
 \dontshow{\}) # examplesIf}
 }

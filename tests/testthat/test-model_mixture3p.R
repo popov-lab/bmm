@@ -135,13 +135,14 @@ test_that("configure_model() drops the set-size sentinel machinery", {
   expect_match(code, "array[N] real vreal7", fixed = TRUE)
 })
 
-test_that("an intercept is still refused when set_size is a predictor", {
-  expect_error(
+test_that("set_size may now be used with an intercept", {
+  # the restriction existed so that the set-size-1 coefficient could be pinned
+  # by a constant prior; with a ragged likelihood there is nothing to pin
+  expect_silent(
     bmm(bmf(kappa ~ 1 + set_size, thetat ~ 1, thetant ~ 1), oberauer_lin_2017,
       nt_model(),
       backend = "mock", mock_fit = 1, rename = FALSE
-    ),
-    "contains \\s*an intercept"
+    )
   )
 })
 

@@ -213,23 +213,6 @@ check_formula.default <- function(model, data, formula) {
   formula
 }
 
-#' @export
-check_formula.non_targets <- function(model, data, formula) {
-  set_size_var <- model$other_vars$set_size
-  pred_list <- rhs_vars(formula, collapse = FALSE)
-  has_set_size <- vapply(pred_list, function(x) set_size_var %in% x, logical(1))
-  ss_forms <- formula[has_set_size]
-  intercepts <- vapply(ss_forms, has_intercept, logical(1))
-  stopif(
-    any(intercepts),
-    "The formula for parameter(s) {names(ss_forms)[intercepts]} contains \\
-    an intercept and also uses set_size as a predictor. This model requires \\
-    that the intercept is supressed when set_size is used as predictor. \\
-    Try using 0 + {set_size_var} instead."
-  )
-  NextMethod("check_formula")
-}
-
 #' @title Convert `bmmformula` objects to `brmsformula` objects
 #' @description
 #'  Called by [configure_model()] inside [bmm()] to convert the `bmmformula` into a

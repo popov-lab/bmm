@@ -219,13 +219,12 @@ test_that(".filter_internal_effects removes internal variables", {
     )
   )
 
+  # LureIdx*, inv_ss and expS are gone: the circular mixture likelihoods index
+  # their own covariates instead of switching components off with indicators
   ce <- mock_ce(
     set_size = mock_ce_df(1:3, 0:2, 2:4),
-    LureIdx1 = mock_ce_df(1:3, 0:2, 2:4),
     Idx_corr = mock_ce_df(1:3, 0:2, 2:4),
-    inv_ss = mock_ce_df(1:3, 0:2, 2:4),
-    Item1_Col_rad = mock_ce_df(1:3, 0:2, 2:4),
-    expS = mock_ce_df(1:3, 0:2, 2:4)
+    Item1_Col_rad = mock_ce_df(1:3, 0:2, 2:4)
   )
 
   result <- .filter_internal_effects(ce, mock_bmmfit)

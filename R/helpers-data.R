@@ -89,19 +89,12 @@ check_data.non_targets <- function(model, data, formula) {
     'nt_features' should equal max(set_size)-1"
   )
 
-  # create index variables for nt_features and correction variable for theta due to set_size
-  lure_idx_vars <- paste0("LureIdx", 1:(max_set_size - 1))
-  for (i in 1:(max_set_size - 1)) {
-    data[[lure_idx_vars[i]]] <- ifelse(ss_numeric >= (i + 1), 1, 0)
-  }
   data$ss_numeric <- ss_numeric
-  data$inv_ss <- 1 / (ss_numeric - 1)
-  data$inv_ss <- ifelse(is.infinite(data$inv_ss), 1, data$inv_ss)
+  # the likelihood reads only as many non-target columns as a trial's set size
+  # has, so the padding value never enters it; it only has to not be missing
   data[, nt_features][is.na(data[, nt_features])] <- 0
 
-  # save some variables for later use
   attr(data, "max_set_size") <- max_set_size
-  attr(data, "lure_idx_vars") <- lure_idx_vars
 
   NextMethod("check_data")
 }

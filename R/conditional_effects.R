@@ -216,7 +216,7 @@ conditional_effects.bmmfit <- function(x,
 #'
 #' @description
 #' Removes conditional effects plots for internal model variables
-#' (like LureIdx, Idx_*, inv_ss, etc.) that are created during data
+#' (like Idx_*, Item*_, etc.) that are created during data
 #' preprocessing but are not part of the user's formula.
 #'
 #' @param ce_result A brms_conditional_effects object
@@ -228,11 +228,8 @@ conditional_effects.bmmfit <- function(x,
 #' @noRd
 .filter_internal_effects <- function(ce_result, bmmfit) {
   internal_patterns <- c(
-    "^LureIdx",
     "^Idx_",
-    "^inv_ss$",
-    "^Item[0-9]+_",
-    "^expS$"
+    "^Item[0-9]+_"
   )
   
   model <- bmmfit$bmm$model
