@@ -355,10 +355,11 @@
 .circmix_stan_wrapper <- function(family, dpars, core_dpars = dpars, vint = NULL,
                                   vreal = list(), nodes = 41L) {
   vreal_names <- lapply(names(vreal), function(g) paste0(g, seq_len(vreal[[g]])))
+  vreal_args <- unlist(vreal_names)
   args <- c(
     "real y", paste("real", dpars),
     if (!is.null(vint)) paste("int", vint),
-    paste("real", unlist(vreal_names)),
+    if (length(vreal_args)) paste("real", vreal_args),
     "data vector circmix_logk", "data vector circmix_dlogk",
     "data real circmix_logJ_min", "data real circmix_dlogJ"
   )

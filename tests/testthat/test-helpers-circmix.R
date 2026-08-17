@@ -237,9 +237,44 @@ test_that(".circmix_stan_wrapper() can pass the core a value its family omits", 
     dpars = c("mu", "kappa", "thetat"),
     core_dpars = c("mu", "kappa", "0.0", "thetat")
   )
-  expect_match(wrapper, "real mixture2p_simple_lpdf\\(real y, real mu, real kappa, real thetat")
-  expect_false(grepl("real 0.0", wrapper, fixed = TRUE))
+  # the whole signature, because an empty argument left by a zero-length
+  # covariate group still matches any prefix assertion
+  expect_match(
+    wrapper,
+    paste0(
+      "real mixture2p_simple_lpdf\\(real y, real mu, real kappa, real thetat, ",
+      "data vector circmix_logk, data vector circmix_dlogk, ",
+      "data real circmix_logJ_min, data real circmix_dlogJ\\) \\{"
+    )
+  )
   expect_match(wrapper, "mixture2p_simple_core\\(y, mu, kappa, 0.0, thetat, 41")
+})
+
+test_that(".circmix_stan_wrapper() emits Stan that parses", {
+  skip_on_cran()
+  skip_if_not(
+    requireNamespace("cmdstanr", quietly = TRUE),
+    "cmdstanr is required to check the generated Stan"
+  )
+  wrappers <- c(
+    .circmix_stan_wrapper("no_covariates", c("mu", "kappa")),
+    .circmix_stan_wrapper("with_set_size", c("mu", "kappa"), vint = "ss"),
+    .circmix_stan_wrapper(
+      "with_covariates", c("mu", "kappa", "tau"),
+      vint = "ss", vreal = list(nt = 2, dist = 2)
+    )
+  )
+  stubs <- c(
+    "real no_covariates_core(real y, real mu, real kappa, int n, data vector a, data vector b, data real c, data real d) { return 0; }",
+    "real with_set_size_core(real y, real mu, real kappa, int ss, int n, data vector a, data vector b, data real c, data real d) { return 0; }",
+    "real with_covariates_core(real y, real mu, real kappa, real tau, int ss, vector nt, vector dist, int n, data vector a, data vector b, data real c, data real d) { return 0; }"
+  )
+  code <- paste0(
+    "functions {\n", paste(stubs, collapse = "\n"), "\n",
+    paste(wrappers, collapse = "\n"), "\n}\nmodel {}\n"
+  )
+  model <- cmdstanr::cmdstan_model(cmdstanr::write_stan_file(code), compile = FALSE)
+  expect_silent(model$check_syntax(quiet = TRUE))
 })
 
 # The functions are evaluated through a fixed_param run rather than through
