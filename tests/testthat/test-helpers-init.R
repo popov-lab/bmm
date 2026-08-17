@@ -14,7 +14,7 @@ test_that("create_initfun returns function for sdm", {
 })
 
 
-test_that("create_initfun returns 1 for mixture2p models", {
+test_that("create_initfun returns a function for mixture2p models", {
   # prepare info for tests
   dat <- oberauer_lin_2017
   model_mix2p <- mixture2p(resp_error = "dev_rad")
@@ -27,8 +27,31 @@ test_that("create_initfun returns 1 for mixture2p models", {
   init_fun <- create_initfun(model_mix2p, dat, config_args_mix2p$formula)
 
   # run tests
-  expect_equal(class(init_fun), "numeric")
-  expect_equal(init_fun, 1)
+  expect_equal(class(init_fun), "function")
+
+  # the init ranges are on the natural scale and have to reach Stan on the link
+  # scale, which is what keeps the variable-precision quadrature inside the
+  # range of gamma shapes it can integrate
+  inits <- init_fun()
+  expect_true(exp(inits$Intercept_kappa) >= 3 && exp(inits$Intercept_kappa) <= 8)
+  expect_true(
+    stats::plogis(inits$Intercept_thetat) >= 0.6 &&
+      stats::plogis(inits$Intercept_thetat) <= 0.9
+  )
+})
+
+test_that("create_initfun keeps the variable-precision gamma shape integrable", {
+  dat <- oberauer_lin_2017
+  model <- mixture2p(resp_error = "dev_rad", variable_precision = TRUE)
+  ff <- bmf(thetat ~ 1, kappa ~ 1, tau ~ 1)
+  config_args <- configure_model(model, data = dat, formula = ff)
+  init_fun <- create_initfun(model, dat, config_args$formula)
+
+  shapes <- replicate(50, {
+    inits <- init_fun()
+    .circmix_J(exp(inits$Intercept_kappa)) / exp(inits$Intercept_tau)
+  })
+  expect_true(all(shapes > 40 / model$vp_nodes))
 })
 
 test_that("create_initfun returns 0 for m3 with simple choice rule and identity link", {

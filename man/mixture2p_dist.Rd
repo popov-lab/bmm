@@ -8,22 +8,61 @@
 \alias{rmixture2p}
 \title{Distribution functions for the two-parameter mixture model (mixture2p)}
 \usage{
-dmixture2p(x, mu = 0, kappa = 5, p_mem = 0.6, log = FALSE)
+dmixture2p(
+  x,
+  mu = 0,
+  kappa = 5,
+  p_mem = 0.6,
+  tau = 0,
+  K = 3,
+  set_size = 1,
+  version = "simple",
+  vp_nodes = 41L,
+  log = FALSE
+)
 
 pmixture2p(q, mu = 0, kappa = 7, p_mem = 0.8)
 
 qmixture2p(p, mu = 0, kappa = 5, p_mem = 0.6)
 
-rmixture2p(n, mu = 0, kappa = 5, p_mem = 0.6)
+rmixture2p(
+  n,
+  mu = 0,
+  kappa = 5,
+  p_mem = 0.6,
+  tau = 0,
+  K = 3,
+  set_size = 1,
+  version = "simple"
+)
 }
 \arguments{
 \item{x}{Vector of observed responses}
 
 \item{mu}{Vector of locations}
 
-\item{kappa}{Vector of precision values}
+\item{kappa}{Vector of precision values. With \code{tau > 0} this is the mean
+precision rather than the precision itself.}
 
-\item{p_mem}{Vector of probabilities for memory recall}
+\item{p_mem}{Vector of probabilities for memory recall. Used by the
+\code{"simple"} version; the other versions derive it from \code{K} and \code{set_size}.}
+
+\item{tau}{Vector of scales for trial-to-trial variability in precision. The
+Fisher information \code{J} of a memory representation is drawn from
+\code{gamma(mean = J(kappa), scale = tau)}. \code{tau = 0}, the default, is constant
+precision.}
+
+\item{K}{Vector of memory capacities. Used by the \code{"slot"} and
+\code{"slot_averaging"} versions and ignored by \code{"simple"}.}
+
+\item{set_size}{Vector of set sizes. Used by the \code{"slot"} and
+\code{"slot_averaging"} versions and ignored by \code{"simple"}.}
+
+\item{version}{A character string selecting the storage model: \code{"simple"},
+\code{"slot"} or \code{"slot_averaging"}. See \code{\link[=mixture2p]{mixture2p()}}.}
+
+\item{vp_nodes}{Number of quadrature nodes used when \code{tau > 0}; must be an
+odd number of at least 41. See \code{\link[=mixture2p]{mixture2p()}}.}
 
 \item{log}{Logical; if \code{TRUE}, values are returned on the log scale.}
 
@@ -58,5 +97,9 @@ lines(x, d, type = "l", col = "red")
 \references{
 Zhang, W., & Luck, S. J. (2008). Discrete fixed-resolution
 representations in visual working memory. Nature, 453.
+
+van den Berg, R., Shin, H., Chou, W.-C., George, R., & Ma, W. J. (2012).
+Variability in encoding precision accounts for visual short-term memory
+limitations. PNAS, 109(22), 8780-8785.
 }
 \keyword{distribution}
