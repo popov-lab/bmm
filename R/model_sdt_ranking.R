@@ -225,6 +225,18 @@ check_data.sdt_ranking <- function(model, data, formula) {
   data$nTrials <- rowSums(Y)
   data$max_rank <- as.numeric(max_rank)
 
+  free_sdratio <- "sdratio" %in% names(model$parameters) &&
+    !"sdratio" %in% names(model$fixed_parameters)
+  warnif(free_sdratio && max(max_rank, na.rm = TRUE) > 8,
+         "Estimating `sdratio` with set sizes above 8 pushes the Gaussian \\
+         quadrature past the node count bmm calibrates for (128), so the rank \\
+         probabilities may carry errors above 1e-6. Consider fixing `sdratio`, \\
+         or `dist = \"gumbel_min\"`, which is closed form")
+  warnif(free_sdratio && max(max_rank, na.rm = TRUE) < 3,
+         "`sdratio` cannot be identified from two-item rankings: the model \\
+         reduces to 2AFC, where the rank probabilities depend only on `d`. \\
+         Remove `sdratio` from the formula so it stays fixed at equal variance")
+
   NextMethod("check_data")
 }
 
@@ -284,12 +296,29 @@ configure_model.sdt_ranking <- function(model, data, formula) {
   sc_path <- system.file("stan_chunks", package = "bmm")
   stan_funs <- paste(
     read_lines2(paste0(sc_path, "/sdt_dist_funs.stan")),
-    read_lines2(paste0(sc_path, "/sdt_ranking_funs.stan")),
+    .ranking_fill_quadrature(
+      read_lines2(paste0(sc_path, "/sdt_ranking_funs.stan")),
+      max_m = max(data$max_rank),
+      free_sdratio = "sdratio" %in% names(model$parameters) &&
+        !"sdratio" %in% names(model$fixed_parameters)
+    ),
     sep = "\n"
   )
   stanvars <- brms::stanvar(scode = stan_funs, block = "functions")
 
   nlist(formula, data, stanvars)
+}
+
+
+# Substitute the quadrature tokens in sdt_ranking_funs.stan with the rule that
+# .ranking_gh_n() selects, so the compiled Stan code and .ranking_prob_r() use
+# the same nodes. 17 significant digits round-trips a double exactly.
+.ranking_fill_quadrature <- function(scode, max_m, free_sdratio) {
+  gh <- .gh_rule(.ranking_gh_n(max_m, free_sdratio))
+  brace <- function(x) paste0("({", paste(sprintf("%.17g", x), collapse = ", "), "})")
+  scode <- gsub("{{N_GH}}", length(gh$nodes), scode, fixed = TRUE)
+  scode <- gsub("({{GH_NODES}})", brace(gh$nodes), scode, fixed = TRUE)
+  gsub("({{GH_WEIGHTS}})", brace(gh$weights), scode, fixed = TRUE)
 }
 
 

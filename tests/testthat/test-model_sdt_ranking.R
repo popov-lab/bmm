@@ -142,8 +142,9 @@ test_that(".ranking_all_probs_r works for m=3 and for Gaussian UV-SDT", {
 test_that("ranking d is d_a: equal variance is a no-op", {
   # sdratio = 0 gives an RMS scale of 1, so the kernel must be untouched
   for (m in c(3L, 4L, 5L)) {
-    nodes <- bmm:::.ranking_gh_nodes
-    w <- bmm:::.ranking_gh_weights
+    gh <- bmm:::.gh_rule(bmm:::.ranking_gh_n(m, TRUE))
+    nodes <- gh$nodes
+    w <- gh$weights
     textbook <- vapply(seq_len(m), function(k) {
       eta <- 1.4 + nodes
       exp(lchoose(m - 1, k - 1) + matrixStats::logSumExp(
@@ -157,12 +158,14 @@ test_that("ranking d is d_a: equal variance is a no-op", {
 
 test_that("ranking d is d_a: unequal variance uses the RMS-scaled separation", {
   # the same model written with the separation in noise-SD units
+  m <- 4L
   for (sdr in c(-0.25, 0.35)) {
     r <- exp(sdr)
     s <- sqrt((1 + r^2) / 2)
-    nodes <- bmm:::.ranking_gh_nodes
-    w <- bmm:::.ranking_gh_weights
-    m <- 4L
+    # a non-zero sdratio selects the free-sdratio node ladder
+    gh <- bmm:::.gh_rule(bmm:::.ranking_gh_n(m, TRUE))
+    nodes <- gh$nodes
+    w <- gh$weights
     ref <- vapply(seq_len(m), function(k) {
       eta <- 1.4 * s + r * nodes
       exp(lchoose(m - 1, k - 1) + matrixStats::logSumExp(
@@ -181,6 +184,46 @@ test_that("ranking at m = 2 is the yes/no AUC and carries no sdratio information
     expect_equal(bmm:::.ranking_all_probs_r(1.5, 2L, "normal", sdr)[1],
                  pnorm(1.5 / sqrt(2)), tolerance = 1e-6,
                  info = paste("sdratio =", sdr))
+  }
+})
+
+test_that("the quadrature ladder grows with set size and with a free sdratio", {
+  # a free sdratio always needs at least as many nodes as the fixed case
+  for (m in c(2L, 3L, 4L, 5L, 8L, 12L)) {
+    expect_gte(bmm:::.ranking_gh_n(m, TRUE), bmm:::.ranking_gh_n(m, FALSE))
+  }
+  # and both ladders are non-decreasing in m
+  for (free in c(FALSE, TRUE)) {
+    counts <- vapply(2:16, bmm:::.ranking_gh_n, integer(1), free_sdratio = free)
+    expect_false(is.unsorted(counts), info = paste("free =", free))
+  }
+})
+
+test_that("the generated Gauss-Hermite rule integrates the normal exactly", {
+  # a rule with n nodes is exact for polynomials up to degree 2n-1; check the
+  # moments of the standard normal, which is what the weights must reproduce
+  for (n in c(20L, 32L, 64L)) {
+    gh <- bmm:::.gh_rule(n)
+    expect_equal(sum(gh$weights), 1)
+    expect_equal(sum(gh$weights * gh$nodes), 0)
+    expect_equal(sum(gh$weights * gh$nodes^2), 1)
+    expect_equal(sum(gh$weights * gh$nodes^4), 3)
+    expect_equal(sum(gh$weights * gh$nodes^6), 15)
+  }
+})
+
+test_that("configure_model substitutes every quadrature token", {
+  sc <- system.file("stan_chunks", package = "bmm")
+  tpl <- read_lines2(file.path(sc, "sdt_ranking_funs.stan"))
+  for (free in c(FALSE, TRUE)) {
+    code <- bmm:::.ranking_fill_quadrature(tpl, max_m = 4, free_sdratio = free)
+    expect_false(grepl("{{", code, fixed = TRUE), info = paste("free =", free))
+    n <- bmm:::.ranking_gh_n(4, free)
+    expect_match(code, paste0("int N_GH = ", n, ";"), fixed = TRUE)
+    # the emitted vectors must hold exactly N_GH entries
+    nodes <- sub(".*gh_nodes = to_vector\\(\\{([^}]*)\\}\\).*", "\\1",
+                 gsub("\n", " ", code))
+    expect_length(strsplit(nodes, ",")[[1]], n)
   }
 })
 

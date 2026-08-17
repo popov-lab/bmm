@@ -2431,32 +2431,46 @@ rsdt_mafc <- function(n, n_trials, m, d,
 }
 
 
-# 20-point Gauss-Hermite table for the Gaussian ranking quadrature, mirroring
-# the Stan table in inst/stan_chunks/sdt_ranking_funs.stan
-.ranking_gh_nodes <- c(
-  -7.6190485416797546e+00, -6.5105901570136488e+00,
-  -5.5787388058932059e+00, -4.7345813340460463e+00,
-  -3.9439673506573110e+00, -3.1890148165533843e+00,
-  -2.4586636111723603e+00, -1.7452473208141255e+00,
-  -1.0429453488027509e+00, -3.4696415708135458e-01,
-   3.4696415708135830e-01,  1.0429453488027574e+00,
-   1.7452473208141317e+00,  2.4586636111723683e+00,
-   3.1890148165533900e+00,  3.9439673506573163e+00,
-   4.7345813340460552e+00,  5.5787388058932033e+00,
-   6.5105901570136551e+00,  7.6190485416797591e+00
-)
-.ranking_gh_weights <- c(
-  1.2578006724378954e-13, 2.4820623623151972e-10,
-  6.1274902599825256e-08, 4.4021210902309806e-06,
-  1.2882627996193093e-04, 1.8301031310804826e-03,
-  1.3997837447100857e-02, 6.1506372063977507e-02,
-  1.6173933398399959e-01, 2.6079306344955683e-01,
-  2.6079306344955305e-01, 1.6173933398399776e-01,
-  6.1506372063977438e-02, 1.3997837447101162e-02,
-  1.8301031310805052e-03, 1.2882627996193072e-04,
-  4.4021210902309052e-06, 6.1274902599829068e-08,
-  2.4820623623151936e-10, 1.2578006724379269e-13
-)
+# Gauss-Hermite rule for the probabilists' weight (the standard normal density),
+# built by Golub-Welsch on the Hermite Jacobi matrix so that any node count is
+# available without shipping hand-copied constants. Cached, because the
+# eigendecomposition is far too slow to repeat inside a likelihood.
+.gh_cache <- new.env(parent = emptyenv())
+
+.gh_rule <- function(n) {
+  key <- as.character(n)
+  cached <- .gh_cache[[key]]
+  if (!is.null(cached)) return(cached)
+  i <- seq_len(n - 1L)
+  jacobi <- matrix(0, n, n)
+  jacobi[cbind(i, i + 1L)] <- sqrt(i)
+  jacobi[cbind(i + 1L, i)] <- sqrt(i)
+  e <- eigen(jacobi, symmetric = TRUE)
+  ord <- order(e$values)
+  out <- list(nodes = e$values[ord], weights = (e$vectors[1, ord])^2)
+  .gh_cache[[key]] <- out
+  out
+}
+
+# How many nodes the ranking quadrature needs. The integrand gets harder in both
+# the set size (the CDF power concentrates the mass in a tail) and the SD ratio
+# (a wider signal distribution pushes it further out), and Gauss-Hermite
+# converges fast but NON-uniformly, so a single fixed count is either wasteful
+# or wrong. Counts were calibrated against adaptive quadrature over
+# d_a in [0.3, 3.5]: the equal-variance ladder holds max error below 1e-8, and
+# the free-sdratio ladder below 1e-6 across sdratio in [0.5, 2.0] (about 5e-5
+# out at the 2-SD edge of the default normal(0, 0.5) prior). Beyond m = 8 with a
+# free sdratio even 128 nodes miss the 1e-6 target; check_data warns there.
+.ranking_gh_n <- function(max_m, free_sdratio) {
+  if (free_sdratio) {
+    counts <- c(32L, 48L, 64L, 80L, 96L, 128L)
+    breaks <- c(2, 3, 4, 5, 6)
+  } else {
+    counts <- c(20L, 24L, 32L, 40L, 48L, 64L, 80L, 96L, 128L)
+    breaks <- c(2, 3, 4, 6, 8, 10, 12, 16)
+  }
+  counts[findInterval(max_m, breaks, left.open = TRUE) + 1L]
+}
 
 # Rank probability P(target rank = rank_pos | set size m). Mirrors the Stan
 # sdt_ranking_logp / sdt_ranking_uv_logp kernels; shared by the density,
@@ -2476,20 +2490,17 @@ rsdt_mafc <- function(n, n_trials, m, d,
     # `d` is d_a; the separation in noise-SD units is d * the RMS scale, so the
     # equal-variance case (sigma = 1) leaves eta untouched.
     #
-    # Accuracy envelope of the 20-node Gauss-Hermite rule, measured against
-    # adaptive quadrature over d_a in [0.3, 3.5] (max abs error over ranks).
-    # At sigma = 1 it is fine (<1e-6 to m = 4), but it degrades in BOTH sigma
-    # and m, because a wider signal distribution pushes the integrand into the
-    # tails where the Hermite nodes are sparse. Across the recognition range
-    # sigma in [0.6, 1.8]: 1.9e-4 (m=3), 1.0e-3 (m=4), 2.2e-3 (m=5), 9.4e-3
-    # (m=8). GH converges fast but NON-uniformly -- 60 nodes reach 1e-9 at
-    # m = 3 yet only 8e-4 at sigma 2.7, m = 8, which the default
-    # normal(0, 0.5) prior on sdratio does reach during warmup.
-    # Raise N_GH here and in sdt_ranking_funs.stan TOGETHER.
+    # Deliberately the free-sdratio ladder regardless of the sdratio values:
+    # this kernel serves log_lik/posterior_epred and the d*/r* functions, where
+    # accuracy matters and speed does not, and a count inferred from the values
+    # would make the result depend on how calls are batched (a vector holding
+    # one exact zero would quadrature differently from that element alone).
+    # configure_model() may compile Stan with the cheaper equal-variance ladder;
+    # both sit inside the calibrated tolerance, so the two agree to ~1e-9.
+    gh <- .gh_rule(.ranking_gh_n(m, free_sdratio = TRUE))
     delta <- rep_len(d, n) * .sdt_rms_scale(sigma)
-    eta <- outer(.ranking_gh_nodes, sigma) +
-      rep(delta, each = length(.ranking_gh_nodes))
-    log_terms <- log(.ranking_gh_weights) +
+    eta <- outer(gh$nodes, sigma) + rep(delta, each = length(gh$nodes))
+    log_terms <- log(gh$weights) +
       (m - rank_pos) * stats::pnorm(eta, log.p = TRUE) +
       (rank_pos - 1) * stats::pnorm(eta, lower.tail = FALSE, log.p = TRUE)
     exp(lchoose(m - 1, rank_pos - 1) + matrixStats::colLogSumExps(log_terms))
