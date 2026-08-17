@@ -116,7 +116,12 @@ add_links.bmmfit <- function(x) {
 
 #' @export
 add_links.bmmodel <- function(x) {
-  model_name <- class(x)[length(class(x))]
+  # the last class of a versioned model is <model>_<version>, which has no
+  # constructor of its own, so walk back to the most specific class that does
+  model_name <- Find(
+    function(name) exists(paste0(".model_", name), mode = "function"),
+    rev(class(x))
+  )
   new_model <- get_model(model_name)()
   x$links <- new_model$links
   x
