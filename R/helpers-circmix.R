@@ -1,0 +1,271 @@
+############################################################################# !
+# SHARED NUMERICS FOR THE CIRCULAR MIXTURE MODELS                        ####
+############################################################################# !
+# R mirror of inst/stan_chunks/circmix_funs.stan, used by the log_lik and
+# posterior_predict methods and by the d* functions in distributions.R. The two
+# implementations must agree to within floating point;
+# tests/testthat/test-helpers-circmix.R checks that against the compiled Stan
+# functions rather than against a second R implementation.
+
+# I1(kappa) / I0(kappa). besselI() underflows to zero above kappa ~ 1e5, while
+# the asymptotic series is already accurate to 2e-13 at kappa = 1e3.
+.circmix_A <- function(kappa) {
+  out <- besselI(kappa, 1, expon.scaled = TRUE) / besselI(kappa, 0, expon.scaled = TRUE)
+  large <- which(!is.finite(out) | kappa > 1e3)
+  if (length(large)) {
+    k <- kappa[large]
+    out[large] <- 1 - 1 / (2 * k) - 1 / (8 * k^2) - 1 / (8 * k^3)
+  }
+  out
+}
+
+.circmix_log_besselI0 <- function(kappa) {
+  out <- log(besselI(kappa, 0, expon.scaled = TRUE)) + kappa
+  large <- which(!is.finite(out))
+  if (length(large)) {
+    k <- kappa[large]
+    out[large] <- k - 0.5 * log(2 * pi * k) +
+      log1p(1 / (8 * k) + 9 / (128 * k^2) + 225 / (3072 * k^3))
+  }
+  out
+}
+
+# Fisher information of a von Mises about its location
+.circmix_J <- function(kappa) {
+  kappa * .circmix_A(kappa)
+}
+
+.circmix_dlogkappa_dlogJ <- function(kappa) {
+  a <- .circmix_A(kappa)
+  a / (kappa * (1 - a^2))
+}
+
+############################################################################# !
+# INVERTING J(kappa)                                                     ####
+############################################################################# !
+
+# Newton on log kappa, where f'(u) is the reciprocal of d log kappa / d log J.
+# The step is clamped because the asymptotic starting values are poor near the
+# crossover at J ~ 2, where an undamped step can overshoot into the range where
+# besselI() has already underflowed.
+.circmix_invert_J <- function(logJ, tol = 1e-13, maxit = 40L) {
+  J <- exp(logJ)
+  u <- ifelse(J > 2, log(J + 0.5), 0.5 * log(2 * J))
+  for (i in seq_len(maxit)) {
+    kappa <- exp(u)
+    step <- (log(.circmix_J(kappa)) - logJ) * .circmix_dlogkappa_dlogJ(kappa)
+    u <- u - pmax(pmin(step, 1), -1)
+    if (max(abs(step)) < tol) break
+  }
+  u
+}
+
+.build_circmix_kappa_table <- function(n = 2001L, logJ_min = log(1e-5),
+                                       logJ_max = log(1e5)) {
+  logJ <- seq(logJ_min, logJ_max, length.out = n)
+  logkappa <- .circmix_invert_J(logJ)
+  list(
+    logkappa = logkappa,
+    dlogkappa = .circmix_dlogkappa_dlogJ(exp(logkappa)),
+    logJ_min = logJ_min,
+    dlogJ = (logJ_max - logJ_min) / (n - 1)
+  )
+}
+
+# The table is a pure function of its defaults but costs about a second to
+# build, and configure_model() is re-run by stancode(), standata() and
+# default_prior() as well as by bmm(), so hold it in the closure.
+.circmix_kappa_table <- local({
+  cache <- NULL
+  function() {
+    if (is.null(cache)) {
+      cache <<- .build_circmix_kappa_table()
+    }
+    cache
+  }
+})
+
+# Cubic Hermite interpolation of log kappa against log J, with the exact
+# asymptotics outside the tabulated range. Max relative error 1.7e-11.
+.circmix_kappa <- function(J, tab = .circmix_kappa_table()) {
+  n <- length(tab$logkappa)
+  t <- log(J)
+  out <- J + 0.5
+  low <- which(t <= tab$logJ_min)
+  out[low] <- sqrt(2 * J[low])
+  mid <- which(t > tab$logJ_min & t < tab$logJ_min + (n - 1) * tab$dlogJ)
+  if (!length(mid)) {
+    return(out)
+  }
+  pos <- (t[mid] - tab$logJ_min) / tab$dlogJ
+  i <- floor(pos) + 1L
+  s <- pos - (i - 1)
+  s2 <- s * s
+  s3 <- s2 * s
+  out[mid] <- exp(
+    (2 * s3 - 3 * s2 + 1) * tab$logkappa[i] +
+      (-2 * s3 + 3 * s2) * tab$logkappa[i + 1] +
+      tab$dlogJ * ((s3 - 2 * s2 + s) * tab$dlogkappa[i] +
+        (s3 - s2) * tab$dlogkappa[i + 1])
+  )
+  out
+}
+
+############################################################################# !
+# MIXTURE DENSITIES                                                      ####
+############################################################################# !
+# cosd and logw are n x K matrices holding cos(y - mu_k) and the normalised log
+# weight of each memory component; logw_guess and kappa are length n. cosd is
+# supplied by the caller because it does not depend on kappa, which is what lets
+# the whole variable-precision grid re-use one set of cosines.
+
+.circmix_ld <- function(cosd, logw, logw_guess, kappa) {
+  memory <- matrixStats::rowLogSumExps(logw + kappa * cosd) -
+    .circmix_log_besselI0(kappa)
+  matrixStats::rowLogSumExps(cbind(memory, logw_guess)) - log(2 * pi)
+}
+
+.circmix_het_ld <- function(cosd, logw, logw_guess, kappa) {
+  log_i0 <- matrix(.circmix_log_besselI0(as.vector(kappa)), nrow = nrow(cosd))
+  memory <- matrixStats::rowLogSumExps(logw + kappa * cosd - log_i0)
+  matrixStats::rowLogSumExps(cbind(memory, logw_guess)) - log(2 * pi)
+}
+
+# Marginalises the Fisher information of the memory components over
+# J ~ gamma(shape = J(kappa) / tau, scale = tau) on a composite Simpson grid in
+# log J. tau = 0 is the point mass at J(kappa), so rows with tau = 0 fall back
+# to the constant-precision density.
+.circmix_vp_ld <- function(cosd, logw, logw_guess, kappa, tau, nodes = 41L,
+                           tab = .circmix_kappa_table()) {
+  out <- .circmix_ld(cosd, logw, logw_guess, kappa)
+  shape <- .circmix_J(kappa) / tau
+  half_width <- 8 * sqrt(trigamma(shape))
+  vp <- which(tau > 0 & is.finite(half_width) & half_width >= 1e-6)
+  if (!length(vp)) {
+    return(out)
+  }
+  stopif(
+    any(shape[vp] < 40 / nodes),
+    "The variable-precision quadrature holds the log density to about 1e-5 \\
+    while the gamma shape J(kappa)/tau stays above {40 / nodes}, but the \\
+    smallest value here is {min(shape[vp])}. Raise vp_nodes."
+  )
+
+  centre <- digamma(shape[vp]) + log(tau[vp])
+  offsets <- seq(-1, 1, length.out = nodes)
+  simpson <- log(c(1, rep(c(4, 2), length.out = nodes - 2), 1))
+  lp <- vapply(seq_len(nodes), function(i) {
+    t <- centre + half_width[vp] * offsets[i]
+    J <- exp(t)
+    simpson[i] + t +
+      stats::dgamma(J, shape = shape[vp], scale = tau[vp], log = TRUE) +
+      .circmix_ld(
+        cosd[vp, , drop = FALSE], logw[vp, , drop = FALSE], logw_guess[vp],
+        .circmix_kappa(J, tab)
+      )
+  }, numeric(length(vp)))
+
+  step <- 2 * half_width[vp] / (nodes - 1)
+  out[vp] <- matrixStats::rowLogSumExps(matrix(lp, nrow = length(vp))) +
+    log(step / 3)
+  out
+}
+
+# An item receives floor(K / set_size) slots with probability 1 - extra and one
+# more with probability extra, which is continuous in K across the crossings.
+.circmix_slots <- function(K, set_size) {
+  q <- K / set_size
+  slots <- floor(q)
+  nlist(slots, extra = q - slots)
+}
+
+############################################################################# !
+# STAN PLUMBING                                                          ####
+############################################################################# !
+
+# Stan functions cannot reach the data block, so the kappa(J) table has to be
+# handed to the likelihood through the family's `vars`. pll_args declares it for
+# the threaded partial_log_lik, without which the model fails to compile under
+# threading.
+.circmix_stanvars <- function() {
+  tab <- .circmix_kappa_table()
+  sc_path <- system.file("stan_chunks", package = "bmm")
+  brms::stanvar(
+    scode = read_lines2(paste0(sc_path, "/circmix_funs.stan")),
+    block = "functions", name = "circmix_funs"
+  ) +
+    brms::stanvar(
+      x = tab$logkappa, name = "circmix_logk",
+      pll_args = "data vector circmix_logk"
+    ) +
+    brms::stanvar(
+      x = tab$dlogkappa, name = "circmix_dlogk",
+      pll_args = "data vector circmix_dlogk"
+    ) +
+    brms::stanvar(
+      x = tab$logJ_min, name = "circmix_logJ_min",
+      pll_args = "data real circmix_logJ_min"
+    ) +
+    brms::stanvar(
+      x = tab$dlogJ, name = "circmix_dlogJ",
+      pll_args = "data real circmix_dlogJ"
+    )
+}
+
+.circmix_table_vars <- function() {
+  c("circmix_logk", "circmix_dlogk", "circmix_logJ_min", "circmix_dlogJ")
+}
+
+# Only bare `name[n]` entries are rewritten to the global index by brms when
+# threading is on. Anything more elaborate is passed through untouched and would
+# pair each thread's response slice with the top of the data.
+.circmix_family_vars <- function(vint = FALSE, n_vreal = 0) {
+  c(
+    if (vint) "vint1[n]",
+    if (n_vreal > 0) paste0("vreal", seq_len(n_vreal), "[n]"),
+    .circmix_table_vars()
+  )
+}
+
+.circmix_aterm <- function(resp, vint = NULL, vreal = character(0)) {
+  terms <- c(
+    if (!is.null(vint)) glue("vint({vint})"),
+    if (length(vreal)) glue("vreal({paste(vreal, collapse = ', ')})")
+  )
+  if (!length(terms)) {
+    return(glue("{resp} ~ 1"))
+  }
+  glue("{resp} | {paste(terms, collapse = ' + ')} ~ 1")
+}
+
+# brms needs the likelihood to be a single `<family>_lpdf`, and its signature
+# depends on max_set_size because every non-target needs its own vreal term. That
+# makes this the one piece of Stan that has to be generated. It only packs the
+# scalar vreal arguments into the vectors that `<family>_core` expects, and holds
+# no numbers besides the quadrature node count, so the arithmetic and every
+# numeric constant stay in inst/stan_chunks.
+.circmix_stan_wrapper <- function(family, dpars, vint = NULL, vreal = list(),
+                                  nodes = 41L) {
+  vreal_names <- lapply(names(vreal), function(g) paste0(g, seq_len(vreal[[g]])))
+  args <- c(
+    "real y", paste("real", dpars),
+    if (!is.null(vint)) paste("int", vint),
+    paste("real", unlist(vreal_names)),
+    "data vector circmix_logk", "data vector circmix_dlogk",
+    "data real circmix_logJ_min", "data real circmix_dlogJ"
+  )
+  packed <- vapply(
+    vreal_names,
+    function(x) glue("to_vector({{{paste(x, collapse = ', ')}}})"),
+    character(1)
+  )
+  call_args <- c(
+    "y", dpars, vint, packed, as.character(as.integer(nodes)),
+    .circmix_table_vars()
+  )
+  as.character(glue(
+    "  real {family}_lpdf({paste(args, collapse = ', ')}) {{\n",
+    "    return {family}_core({paste(call_args, collapse = ', ')});\n",
+    "  }}\n"
+  ))
+}
