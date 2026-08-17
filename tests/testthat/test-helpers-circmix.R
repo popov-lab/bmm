@@ -166,6 +166,20 @@ test_that(".rcircmix() draws from the variable-precision mixture density", {
   })
 })
 
+test_that(".circmix_add_variable_precision() inserts tau next to kappa", {
+  spec <- list(
+    parameters = list(mu = "location", kappa = "precision", thetat = "weight"),
+    links = list(mu = "tan_half", kappa = "log", thetat = "logit"),
+    priors = list(kappa = list(main = "normal(2, 1)")),
+    init_ranges = list(kappa = c(3, 8))
+  )
+  out <- .circmix_add_variable_precision(spec)
+  expect_equal(names(out$parameters), c("mu", "kappa", "tau", "thetat"))
+  expect_equal(names(out$links), c("mu", "kappa", "tau", "thetat"))
+  expect_equal(out$links$tau, "log")
+  expect_true(!is.null(out$priors$tau) && !is.null(out$init_ranges$tau))
+})
+
 test_that(".circmix_family_vars() emits only bare indices", {
   vars <- .circmix_family_vars(vint = TRUE, n_vreal = 3)
   indexed <- grep("\\[", vars, value = TRUE)

@@ -223,6 +223,30 @@
 }
 
 ############################################################################# !
+# MODEL SPECIFICATION                                                    ####
+############################################################################# !
+
+# tau means the same thing in every model that offers variable precision, so the
+# parameter a variable_precision = TRUE argument adds to a version's
+# specification is defined once here. It sits next to kappa because it modifies
+# it, and because a summary that separates the two reads badly.
+.circmix_add_variable_precision <- function(spec) {
+  after_kappa <- which(names(spec$parameters) == "kappa")
+  spec$parameters <- append(spec$parameters, list(tau = glue(
+    "Scale of the trial-to-trial variability in memory precision. The Fisher \\
+    information J of a memory representation is drawn from \\
+    gamma(mean = J(kappa), scale = tau), so tau -> 0 recovers constant precision \\
+    and larger values spread precision more widely across trials."
+  )), after = after_kappa)
+  spec$links <- append(spec$links, list(tau = "log"),
+    after = which(names(spec$links) == "kappa")
+  )
+  spec$priors$tau <- list(main = "normal(0, 1)", effects = "normal(0, 0.5)")
+  spec$init_ranges$tau <- c(0.2, 1)
+  spec
+}
+
+############################################################################# !
 # STAN PLUMBING                                                          ####
 ############################################################################# !
 
