@@ -2034,13 +2034,26 @@ neg_loglik <- function(x, params, distribution, weights = NULL) {
 }
 
 
+# Internal: root-mean-square of the noise and signal scales, in noise units.
+# Sensitivity is reported as d_a = separation / this factor, which weights the
+# two distributions equally instead of privileging the noise distribution. The
+# factor is 1 whenever sdratio is 1, so everything below is a no-op for an
+# equal-variance fit. sdratio arrives on the natural scale (the model uses a log
+# link, so brms and get_dpar() have already applied the inverse link).
+.sdt_rms_scale <- function(sdratio) {
+  sqrt((1 + sdratio^2) / 2)
+}
+
+
 # Internal: compute SDT decision variable (eta)
 # Shared by density, random generation, and log_lik across versions
-# For EV-SDT (sdratio = 1): eta = dprime/2 * (2*stimulus - 1) - criterion
-# For UV-SDT (sdratio != 1): noise eta unchanged, signal eta scaled
+# `d` is the balanced sensitivity index d_a; the separation between the
+# distributions in noise units is d * .sdt_rms_scale(sdratio), which is d itself
+# for EV-SDT (sdratio = 1). The criterion is NOT rescaled: it stays on the
+# noise-standardized axis, so eta is unchanged for any equal-variance fit.
 # All arguments are vectorized (recycled to common length)
-.sdt_eta <- function(dprime, criterion, stimulus, sdratio = 1) {
-  shift <- dprime / 2 * (2 * stimulus - 1)
+.sdt_eta <- function(d, criterion, stimulus, sdratio = 1) {
+  shift <- d * .sdt_rms_scale(sdratio) / 2 * (2 * stimulus - 1)
   # sdratio^(stimulus == 1) scales the signal by sdratio and the noise by 1,
   # broadcasting whether stimulus is a per-observation vector (likelihood) or a
   # scalar with sdratio a vector of draws (ROC points) -- unlike ifelse(), whose
@@ -2063,8 +2076,11 @@ neg_loglik <- function(x, params, distribution, weights = NULL) {
 
 #' @title Utility functions for Signal Detection Theory
 #'
-#' @description Compute sensitivity (d') and criterion from hit and false
-#'   alarm rates for different SDT distribution families.
+#' @description Compute sensitivity and criterion from hit and false alarm
+#'   rates for different SDT distribution families. A single (hit, false alarm)
+#'   pair cannot identify the signal-to-noise SD ratio, so both quantities are
+#'   the equal-variance values; see [sdt_binary()] for the unequal-variance
+#'   model.
 #'
 #' @name SDTdist
 #'
@@ -2090,22 +2106,24 @@ NULL
 
 
 #' @rdname SDTdist
-#' @return `sdt_dprime` returns the distance between the signal and noise
+#' @return `sdt_d` returns the distance between the signal and noise
 #'   distributions on the latent evidence axis, obtained by inverting the
 #'   decision rule "respond old when the evidence exceeds the criterion":
 #'   \eqn{Q(1 - FA) - Q(1 - H)}, where \eqn{Q} is the quantile function of
 #'   `dist`. For `dist = "normal"` this reduces to the familiar
-#'   \eqn{d' = \Phi^{-1}(H) - \Phi^{-1}(FA)}.
+#'   \eqn{d' = \Phi^{-1}(H) - \Phi^{-1}(FA)}. Because one operating point implies
+#'   equal variance, this matches the `d` parameter of [sdt_binary()] whenever
+#'   `sdratio` is at its default.
 #' @export
 #' @examples
-#' # Compute d' from hit and false alarm rates (Gaussian SDT)
-#' sdt_dprime(hit_rate = 0.8, fa_rate = 0.2, dist = "normal")
+#' # Compute d from hit and false alarm rates (Gaussian SDT)
+#' sdt_d(hit_rate = 0.8, fa_rate = 0.2, dist = "normal")
 #'
 #' # The extreme-value analogue
-#' sdt_dprime(hit_rate = 0.75, fa_rate = 0.25, dist = "gumbel_min")
-sdt_dprime <- function(hit_rate, fa_rate,
-                       dist = c("normal", "gumbel_min", "gumbel_max",
-                                "logistic")) {
+#' sdt_d(hit_rate = 0.75, fa_rate = 0.25, dist = "gumbel_min")
+sdt_d <- function(hit_rate, fa_rate,
+                  dist = c("normal", "gumbel_min", "gumbel_max",
+                           "logistic")) {
   dist <- match.arg(dist)
   .validate_sdt_rates(hit_rate, fa_rate)
   qf <- .sdt_dists[[dist]]$qf
@@ -2115,8 +2133,8 @@ sdt_dprime <- function(hit_rate, fa_rate,
 
 #' @rdname SDTdist
 #' @return `sdt_criterion` returns the criterion (response bias) on the
-#'   centred evidence axis used by [sdt_binary()], where the noise and signal
-#'   distributions sit at -d'/2 and +d'/2:
+#'   centred, noise-standardized evidence axis used by [sdt_binary()], where the
+#'   noise and signal distributions sit at -d'/2 and +d'/2:
 #'   \eqn{(Q(1 - FA) + Q(1 - H)) / 2}. For `dist = "normal"` this reduces to
 #'   the familiar \eqn{-(\Phi^{-1}(H) + \Phi^{-1}(FA)) / 2}.
 #' @export
@@ -2148,8 +2166,11 @@ sdt_criterion <- function(hit_rate, fa_rate,
 #' @param n_old Integer vector. Number of "old"/"signal" responses.
 #' @param n_trials Integer vector. Total number of trials per cell.
 #' @param stimulus Integer vector (0/1). Stimulus type: 0 = noise, 1 = signal.
-#' @param dprime Numeric. Sensitivity parameter.
-#' @param criterion Numeric. Response bias (decision boundary location).
+#' @param d Numeric. Sensitivity: the balanced discriminability index
+#'   \eqn{d_a}, which equals \eqn{d'} when `sdratio` is 1. The separation
+#'   between the distributions in noise units is `d * sqrt((1 + sdratio^2) / 2)`.
+#' @param criterion Numeric. Response bias (decision boundary location), on the
+#'   noise-standardized axis.
 #' @param sdratio Numeric. Ratio of signal to noise standard deviations
 #'   (default 1, i.e., equal variance). Must be positive. This is the same
 #'   scale as the `sdratio` parameter of [sdt_binary()], which uses a log link.
@@ -2171,13 +2192,13 @@ sdt_criterion <- function(hit_rate, fa_rate,
 #' @examples
 #' # Density of binary SDT data
 #' dsdt_binary(n_old = 80, n_trials = 100, stimulus = 1,
-#'             dprime = 1.5, criterion = 0.2)
+#'             d = 1.5, criterion = 0.2)
 #'
 #' # Vectorized over observations
 #' dsdt_binary(n_old = c(30, 80), n_trials = c(100, 100),
-#'             stimulus = c(0, 1), dprime = 1.5, criterion = 0.2,
+#'             stimulus = c(0, 1), d = 1.5, criterion = 0.2,
 #'             log = TRUE)
-dsdt_binary <- function(n_old, n_trials, stimulus, dprime, criterion,
+dsdt_binary <- function(n_old, n_trials, stimulus, d, criterion,
                         sdratio = 1,
                         dist = c("normal", "gumbel_min", "gumbel_max",
                                  "logistic"),
@@ -2190,7 +2211,7 @@ dsdt_binary <- function(n_old, n_trials, stimulus, dprime, criterion,
          "stimulus must be 0 (noise) or 1 (signal)")
   stopif(any(sdratio <= 0), "sdratio must be positive")
 
-  eta <- .sdt_eta(dprime, criterion, stimulus, sdratio)
+  eta <- .sdt_eta(d, criterion, stimulus, sdratio)
   # assembled on the log scale to match sdt_binary_lpmf: the probability scale
   # underflows to 0 or 1 in the tails, which would return -Inf here while Stan
   # stays finite, silently poisoning log_lik() and loo()
@@ -2208,9 +2229,9 @@ dsdt_binary <- function(n_old, n_trials, stimulus, dprime, criterion,
 #' dat <- expand.grid(id = 1:20, stimulus = c(0L, 1L))
 #' dat$n_trials <- 100L
 #' dat$n_old <- rsdt_binary(nrow(dat), dat$n_trials, dat$stimulus,
-#'                          dprime = 1.5, criterion = 0.2)
+#'                          d = 1.5, criterion = 0.2)
 #' head(dat)
-rsdt_binary <- function(n, n_trials, stimulus, dprime, criterion,
+rsdt_binary <- function(n, n_trials, stimulus, d, criterion,
                         sdratio = 1,
                         dist = c("normal", "gumbel_min", "gumbel_max",
                                  "logistic")) {
@@ -2221,6 +2242,6 @@ rsdt_binary <- function(n, n_trials, stimulus, dprime, criterion,
          "stimulus must be 0 (noise) or 1 (signal)")
   stopif(any(sdratio <= 0), "sdratio must be positive")
 
-  eta <- .sdt_eta(dprime, criterion, stimulus, sdratio)
+  eta <- .sdt_eta(d, criterion, stimulus, sdratio)
   stats::rbinom(n, n_trials, exp(.sdt_log_p_old(eta, dist)))
 }

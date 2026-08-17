@@ -43,14 +43,14 @@ frequencies reported in the original article.
 \examples{
 \dontrun{
 # Unequal-variance binary SDT: the criterion varies across base-rate
-# conditions, while d' and the signal/noise SD ratio (sdratio) are held
-# constant across conditions.
+# conditions, while sensitivity (d) and the signal/noise SD ratio (sdratio)
+# are held constant across conditions.
 model <- sdt_binary(
   response = "n_old", stimulus = "stimulus", n_trials = "n_trials"
 )
 fit <- bmm(
   formula = bmf(
-    dprime ~ 1 + (1 | id),
+    d ~ 1 + (1 | id),
     criterion ~ 0 + condition + (1 | id),
     sdratio ~ 1
   ),

@@ -27,7 +27,7 @@ test_that("gumbel labels follow the extreme-value convention", {
 test_that("every dist argument offers exactly the registry's distributions", {
   # the registry order defines the dist_type integer passed to Stan, so a
   # signature that drifts out of step with it becomes an off-by-one
-  fns <- list(sdt_binary, dsdt_binary, rsdt_binary, sdt_dprime, sdt_criterion)
+  fns <- list(sdt_binary, dsdt_binary, rsdt_binary, sdt_d, sdt_criterion)
   for (f in fns) {
     expect_equal(eval(formals(f)$dist), names(bmm:::.sdt_dists))
   }
@@ -79,10 +79,10 @@ test_that(".sdt_cdf is vectorized over eta", {
 # DPRIME AND CRITERION TESTS                                              ####
 ############################################################################# !
 
-test_that("sdt_dprime computes correct values for normal distribution", {
+test_that("sdt_d computes correct values for normal distribution", {
   hr <- pnorm(1)
   far <- pnorm(-1)
-  expect_equal(sdt_dprime(hr, far, dist = "normal"), 2, tolerance = 1e-10)
+  expect_equal(sdt_d(hr, far, dist = "normal"), 2, tolerance = 1e-10)
 })
 
 test_that("sdt_criterion computes correct values for normal distribution", {
@@ -91,10 +91,10 @@ test_that("sdt_criterion computes correct values for normal distribution", {
   expect_equal(sdt_criterion(hr, far, dist = "normal"), 0, tolerance = 1e-10)
 })
 
-test_that("sdt_dprime validates input", {
-  expect_error(sdt_dprime(0, 0.5), "between 0 and 1")
-  expect_error(sdt_dprime(1, 0.5), "between 0 and 1")
-  expect_error(sdt_dprime(0.5, 0), "between 0 and 1")
+test_that("sdt_d validates input", {
+  expect_error(sdt_d(0, 0.5), "between 0 and 1")
+  expect_error(sdt_d(1, 0.5), "between 0 and 1")
+  expect_error(sdt_d(0.5, 0), "between 0 and 1")
 })
 
 
@@ -113,14 +113,19 @@ test_that(".sdt_eta is vectorized over all arguments", {
   expect_equal(eta[1], -1.0/2 - 0.2)
   expect_equal(eta[2], 2.0/2 - 0.2)
 
+  # `d` is d_a, so the separation in noise units is d * sqrt((1 + r^2) / 2)
+  s <- sqrt((1 + c(1.0, 1.3)^2) / 2)
   eta <- bmm:::.sdt_eta(1.5, 0.2, c(0, 1), sdratio = c(1.0, 1.3))
   expect_length(eta, 2)
-  expect_equal(eta[1], -1.5/2 - 0.2)
-  expect_equal(eta[2], (1.5/2 - 0.2) / 1.3)
+  expect_equal(eta[1], -1.5 * s[1] / 2 - 0.2)
+  expect_equal(eta[2], (1.5 * s[2] / 2 - 0.2) / 1.3)
 })
 
-test_that(".sdt_eta EV and UV give same results for noise trials", {
-  eta_ev <- bmm:::.sdt_eta(1.5, 0.2, 0, sdratio = 1)
+test_that(".sdt_eta divides only the signal trials by sdratio", {
+  # the noise trial carries no scale division, so its eta must match an
+  # equal-variance call with the separation widened to d * s
+  s <- sqrt((1 + 1.5^2) / 2)
   eta_uv <- bmm:::.sdt_eta(1.5, 0.2, 0, sdratio = 1.5)
-  expect_equal(eta_ev, eta_uv)
+  eta_ev <- bmm:::.sdt_eta(1.5 * s, 0.2, 0, sdratio = 1)
+  expect_equal(eta_uv, eta_ev)
 })

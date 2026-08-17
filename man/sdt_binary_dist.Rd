@@ -10,7 +10,7 @@ dsdt_binary(
   n_old,
   n_trials,
   stimulus,
-  dprime,
+  d,
   criterion,
   sdratio = 1,
   dist = c("normal", "gumbel_min", "gumbel_max", "logistic"),
@@ -21,7 +21,7 @@ rsdt_binary(
   n,
   n_trials,
   stimulus,
-  dprime,
+  d,
   criterion,
   sdratio = 1,
   dist = c("normal", "gumbel_min", "gumbel_max", "logistic")
@@ -34,9 +34,12 @@ rsdt_binary(
 
 \item{stimulus}{Integer vector (0/1). Stimulus type: 0 = noise, 1 = signal.}
 
-\item{dprime}{Numeric. Sensitivity parameter.}
+\item{d}{Numeric. Sensitivity: the balanced discriminability index
+\eqn{d_a}, which equals \eqn{d'} when \code{sdratio} is 1. The separation
+between the distributions in noise units is \code{d * sqrt((1 + sdratio^2) / 2)}.}
 
-\item{criterion}{Numeric. Response bias (decision boundary location).}
+\item{criterion}{Numeric. Response bias (decision boundary location), on the
+noise-standardized axis.}
 
 \item{sdratio}{Numeric. Ratio of signal to noise standard deviations
 (default 1, i.e., equal variance). Must be positive. This is the same
@@ -71,17 +74,17 @@ out of a fixed number of trials (a binomial likelihood).
 \examples{
 # Density of binary SDT data
 dsdt_binary(n_old = 80, n_trials = 100, stimulus = 1,
-            dprime = 1.5, criterion = 0.2)
+            d = 1.5, criterion = 0.2)
 
 # Vectorized over observations
 dsdt_binary(n_old = c(30, 80), n_trials = c(100, 100),
-            stimulus = c(0, 1), dprime = 1.5, criterion = 0.2,
+            stimulus = c(0, 1), d = 1.5, criterion = 0.2,
             log = TRUE)
 # Generate binary SDT data for a design
 dat <- expand.grid(id = 1:20, stimulus = c(0L, 1L))
 dat$n_trials <- 100L
 dat$n_old <- rsdt_binary(nrow(dat), dat$n_trials, dat$stimulus,
-                         dprime = 1.5, criterion = 0.2)
+                         d = 1.5, criterion = 0.2)
 head(dat)
 }
 \references{

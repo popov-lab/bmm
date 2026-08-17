@@ -184,7 +184,7 @@ export(sdm)
 export(sdmSimple)
 export(sdt_binary)
 export(sdt_criterion)
-export(sdt_dprime)
+export(sdt_d)
 export(softmax)
 export(softmaxinv)
 export(stancode)
@@ -194,12 +194,14 @@ export(use_model_template)
 export(validate_fast_guesses)
 export(wrap)
 import(stats)
-importFrom(brms,conditional_effects)
-importFrom(brms,default_prior)
-importFrom(brms,pp_check)
-importFrom(brms,restructure)
-importFrom(brms,stancode)
-importFrom(brms,standata)
+importFrom(brms,
+  conditional_effects,
+  default_prior,
+  pp_check,
+  restructure,
+  stancode,
+  standata
+)
 importFrom(glue,glue)
 importFrom(rlang,.data)
 importFrom(utils,packageVersion)
