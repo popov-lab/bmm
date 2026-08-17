@@ -180,6 +180,28 @@ test_that(".circmix_add_variable_precision() inserts tau next to kappa", {
   expect_true(!is.null(out$priors$tau) && !is.null(out$init_ranges$tau))
 })
 
+test_that(".circmix_recycle() extends every argument to the longest", {
+  out <- .circmix_recycle(x = 1:3, mu = 0, kappa = c(5, 6, 7))
+  expect_equal(out$x, 1:3)
+  expect_equal(out$mu, c(0, 0, 0))
+  expect_equal(out$kappa, c(5, 6, 7))
+})
+
+test_that(".circmix_bounds() derives natural-scale bounds from the links", {
+  bounds <- .circmix_bounds(list(mu = "tan_half", kappa = "log", thetat = "logit"))
+  expect_equal(bounds$lb, c(NA, 0, 0))
+  expect_equal(bounds$ub, c(NA, NA, 1))
+})
+
+test_that(".circmix_prep_tau() is zero when the model has no tau parameter", {
+  expect_equal(.circmix_prep_tau(list(dpars = list(kappa = 1), ndraws = 4), 1), rep(0, 4))
+})
+
+test_that(".circmix_prep_nodes() falls back to the default node count", {
+  expect_equal(.circmix_prep_nodes(list(family = list())), 41L)
+  expect_equal(.circmix_prep_nodes(list(family = list(vp_nodes = 81L))), 81L)
+})
+
 test_that(".circmix_family_vars() emits only bare indices", {
   vars <- .circmix_family_vars(vint = TRUE, n_vreal = 3)
   indexed <- grep("\\[", vars, value = TRUE)

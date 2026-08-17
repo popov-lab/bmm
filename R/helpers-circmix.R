@@ -246,6 +246,40 @@
   spec
 }
 
+# The d* functions are called both with a vector of responses and scalar
+# parameters, and from log_lik() with one response and a draw per parameter.
+.circmix_recycle <- function(...) {
+  args <- list(...)
+  lapply(args, rep_len, length.out = max(lengths(args)))
+}
+
+# tau is only a distributional parameter when the model estimates variable
+# precision; otherwise the likelihood is the tau = 0 limit.
+.circmix_prep_tau <- function(prep, i) {
+  if (is.null(prep$dpars$tau)) {
+    return(rep(0, prep$ndraws))
+  }
+  brms::get_dpar(prep, "tau", i = i)
+}
+
+# The quadrature node count is carried on the family so that log_lik() and
+# posterior_predict() use the same grid the Stan likelihood was fitted with,
+# without capturing the whole configure_model() frame in a closure.
+.circmix_prep_nodes <- function(prep) {
+  prep$family$vp_nodes %||% 41L
+}
+
+# brms wants bounds on the natural scale of each distributional parameter, which
+# the declared link already determines.
+.circmix_bounds <- function(links) {
+  lower <- c(tan_half = NA, log = 0, softplus = 0, logit = 0, identity = NA)
+  upper <- c(tan_half = NA, log = NA, softplus = NA, logit = 1, identity = NA)
+  list(
+    lb = unname(lower[unlist(links)]),
+    ub = unname(upper[unlist(links)])
+  )
+}
+
 ############################################################################# !
 # STAN PLUMBING                                                          ####
 ############################################################################# !
