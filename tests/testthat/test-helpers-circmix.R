@@ -126,6 +126,46 @@ test_that(".circmix_slots() gives a slot distribution that is continuous in K", 
   expect_equal(.circmix_slots(3.5, 1), list(slots = 3, extra = 0.5))
 })
 
+# Compares the sampler against the density it is meant to draw from. n is large
+# enough that a bin proportion has a standard error near 5e-4, so the tolerance
+# below is about ten standard errors and does not need a seed to be stable.
+expect_samples_match_density <- function(draws, density, n_bins = 20) {
+  breaks <- seq(-pi, pi, length.out = n_bins + 1)
+  observed <- as.numeric(table(cut(draws, breaks))) / length(draws)
+  expected <- vapply(seq_len(n_bins), function(i) {
+    stats::integrate(density, breaks[i], breaks[i + 1])$value
+  }, numeric(1))
+  expect_lt(max(abs(observed - expected)), 0.005)
+}
+
+test_that(".rcircmix() draws from the constant-precision mixture density", {
+  n <- 2e5
+  mu_nt <- 1.2
+  draws <- .rcircmix(
+    mu = matrix(c(0, mu_nt), nrow = n, ncol = 2, byrow = TRUE),
+    logw = matrix(log(c(0.5, 0.3)), nrow = n, ncol = 2, byrow = TRUE),
+    logw_guess = rep(log(0.2), n), kappa = rep(8, n), tau = rep(0, n)
+  )
+  expect_samples_match_density(draws, function(y) {
+    exp(ld_mixture(y, mu_nt = mu_nt, kappa = 8, w_mem = c(0.5, 0.3), w_guess = 0.2))
+  })
+})
+
+test_that(".rcircmix() draws from the variable-precision mixture density", {
+  n <- 2e5
+  draws <- .rcircmix(
+    mu = matrix(0, nrow = n, ncol = 1),
+    logw = matrix(log(0.8), nrow = n, ncol = 1),
+    logw_guess = rep(log(0.2), n), kappa = rep(10, n), tau = rep(2, n)
+  )
+  expect_samples_match_density(draws, function(y) {
+    exp(.circmix_vp_ld(
+      matrix(cos(y)), matrix(log(0.8), nrow = length(y)),
+      rep(log(0.2), length(y)), rep(10, length(y)), rep(2, length(y))
+    ))
+  })
+})
+
 test_that(".circmix_family_vars() emits only bare indices", {
   vars <- .circmix_family_vars(vint = TRUE, n_vreal = 3)
   indexed <- grep("\\[", vars, value = TRUE)

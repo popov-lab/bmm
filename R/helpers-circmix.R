@@ -171,6 +171,49 @@
   out
 }
 
+# Draws from the mixture by picking a component and then sampling from it, which
+# is exact and vectorised over rows, rather than by rejection sampling the
+# marginal density. Under variable precision the per-draw concentration is drawn
+# from the gamma on J first, so this samples the hierarchy the likelihood
+# integrates out and is therefore an independent check on it.
+.rcircmix <- function(mu, logw, logw_guess, kappa, tau) {
+  n <- nrow(mu)
+  n_components <- ncol(mu)
+  component <- .circmix_sample_component(exp(cbind(logw, logw_guess)))
+
+  out <- numeric(n)
+  guessed <- which(component > n_components)
+  out[guessed] <- stats::runif(length(guessed), -pi, pi)
+
+  remembered <- which(component <= n_components)
+  if (length(remembered) == 0) {
+    return(out)
+  }
+
+  drawn_kappa <- kappa[remembered]
+  variable <- which(tau[remembered] > 0)
+  if (length(variable)) {
+    mean_kappa <- kappa[remembered][variable]
+    scale <- tau[remembered][variable]
+    drawn_kappa[variable] <- .circmix_kappa(stats::rgamma(
+      length(variable),
+      shape = .circmix_J(mean_kappa) / scale, scale = scale
+    ))
+  }
+  out[remembered] <- brms::rvon_mises(
+    length(remembered),
+    mu[cbind(remembered, component[remembered])],
+    drawn_kappa
+  )
+  out
+}
+
+.circmix_sample_component <- function(weights) {
+  cumulative <- matrixStats::rowCumsums(weights)
+  total <- cumulative[, ncol(cumulative)]
+  rowSums(cumulative < stats::runif(nrow(weights)) * total) + 1L
+}
+
 # An item receives floor(K / set_size) slots with probability 1 - extra and one
 # more with probability extra, which is continuous in K across the crossings.
 .circmix_slots <- function(K, set_size) {
