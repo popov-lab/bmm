@@ -42,7 +42,10 @@
 #'
 update.bmmfit <- function(object, formula., newdata = NULL, recompile = NULL, ...) {
   dots <- list(...)
-  local_brms_threads(dots)
+  # brms::update.brmsfit falls back to the original fit's threading spec when
+  # `threads` is not passed, so the effective spec -- not just the new request --
+  # must drive the option that configure_model reads
+  local_brms_threads(list(threads = dots$threads %||% object$threads))
   stopif(
     isTRUE(object$version$bmm < "0.3.0"),
     "Updating bmm models works only with models fitted with version 0.3.0 or higher"
@@ -79,6 +82,16 @@ update.bmmfit <- function(object, formula., newdata = NULL, recompile = NULL, ..
   } else {
     user_formula <- formula.
   }
+
+  # bmm() resolves constants in check_model() before check_data(); update() never
+  # calls check_model(), so without this a formula that frees a default-fixed
+  # parameter is silently ignored and the parameter stays pinned by constant()
+  freed_pars <- intersect(
+    names(model$fixed_parameters),
+    names(user_formula)[!is_constant(user_formula)]
+  )
+  model <- update_model_fixed_parameters(model, user_formula)
+
   if (is.null(newdata)) {
     data <- check_data(model, olddata, user_formula)
     attr(data, "data_name") <- attr(olddata, "data_name")
@@ -90,7 +103,21 @@ update.bmmfit <- function(object, formula., newdata = NULL, recompile = NULL, ..
   # standard bmm checks and transformations
   formula <- check_formula(model, data, user_formula)
   config_args <- configure_model(model, data, formula)
-  prior <- configure_prior(model, data, config_args$formula, object$prior)
+
+  # the old fit's prior still pins every parameter the new formula frees, and
+  # configure_prior() treats it as a user prior, so it would override the freshly
+  # configured one; brms stores the main dpar without a `dpar` label, so a freed
+  # mu appears as a bare Intercept row
+  old_prior <- object$prior
+  if (length(freed_pars) > 0) {
+    stale <- grepl("^constant\\(", old_prior$prior) &
+      (old_prior$dpar %in% freed_pars |
+        old_prior$nlpar %in% freed_pars |
+        ("mu" %in% freed_pars & old_prior$class == "Intercept" &
+          !nzchar(old_prior$dpar) & !nzchar(old_prior$nlpar)))
+    old_prior <- old_prior[!stale, ]
+  }
+  prior <- configure_prior(model, data, config_args$formula, old_prior)
   prior <- combine_prior(prior, dots$prior)
   dots$prior <- NULL
   new_fit_args <- combine_args(nlist(config_args, dots, prior))
