@@ -280,9 +280,76 @@
   )
 }
 
+# Called from the user-facing model constructors, which is where bmm validates
+# arguments; the models share the wording because they share the arguments.
+.circmix_check_variable_precision <- function(variable_precision, vp_nodes) {
+  stopif(
+    !isTRUE(variable_precision) && !isFALSE(variable_precision),
+    "The variable_precision argument must be either TRUE or FALSE."
+  )
+  stopif(
+    vp_nodes < 41 || vp_nodes %% 2 == 0,
+    "vp_nodes must be an odd number of at least 41, but is {vp_nodes}."
+  )
+}
+
+# The non-target locations reach the likelihood as vreal1..vrealK, padded to
+# max_set_size - 1; the likelihood reads only as many as the trial's set size.
+.circmix_prep_nt <- function(prep, i) {
+  columns <- grep("^vreal[0-9]+$", names(prep$data), value = TRUE)
+  columns <- columns[order(as.integer(sub("vreal", "", columns)))]
+  vapply(columns, function(column) prep$data[[column]][i], numeric(1))
+}
+
 ############################################################################# !
 # STAN PLUMBING                                                          ####
 ############################################################################# !
+
+# The distributional parameters are always the location, the concentration,
+# optionally tau, and then whatever weights the version uses. core_dpars is
+# carried on the family so that the Stan wrapper can pass a literal zero where a
+# model without variable precision has no tau to pass.
+.circmix_custom_family <- function(model, family, weight_parameters,
+                                   vint = FALSE, n_vreal = 0, log_lik,
+                                   posterior_predict) {
+  variable_precision <- isTRUE(model$variable_precision)
+  dpars <- c("mu", "kappa", if (variable_precision) "tau", weight_parameters)
+  bounds <- .circmix_bounds(model$links[dpars])
+
+  out <- brms::custom_family(
+    family,
+    dpars = dpars,
+    links = unlist(model$links[dpars], use.names = FALSE),
+    lb = bounds$lb, ub = bounds$ub,
+    type = "real",
+    vars = .circmix_family_vars(vint = vint, n_vreal = n_vreal),
+    loop = TRUE,
+    log_lik = log_lik,
+    posterior_predict = posterior_predict
+  )
+  out$vp_nodes <- model$vp_nodes
+  out$core_dpars <- c(
+    "mu", "kappa", if (variable_precision) "tau" else "0.0", weight_parameters
+  )
+  out
+}
+
+.circmix_model_stanvars <- function(model, family, chunk, vint = NULL,
+                                    vreal = list()) {
+  sc_path <- system.file("stan_chunks", package = "bmm")
+  .circmix_stanvars() +
+    brms::stanvar(
+      scode = read_lines2(paste0(sc_path, "/", chunk)),
+      block = "functions", name = sub("\\.stan$", "", chunk)
+    ) +
+    brms::stanvar(
+      scode = .circmix_stan_wrapper(
+        family$name, family$dpars, family$core_dpars,
+        vint = vint, vreal = vreal, nodes = model$vp_nodes
+      ),
+      block = "functions", name = paste0(family$name, "_lpdf")
+    )
+}
 
 # Stan functions cannot reach the data block, so the kappa(J) table has to be
 # handed to the likelihood through the family's `vars`. pll_args declares it for

@@ -202,6 +202,46 @@ test_that(".circmix_prep_nodes() falls back to the default node count", {
   expect_equal(.circmix_prep_nodes(list(family = list(vp_nodes = 81L))), 81L)
 })
 
+test_that(".circmix_check_variable_precision() rejects unusable node counts", {
+  expect_error(.circmix_check_variable_precision(NA, 41L), "TRUE or FALSE")
+  expect_error(.circmix_check_variable_precision(FALSE, 21L), "at least 41")
+  expect_error(.circmix_check_variable_precision(FALSE, 42L), "at least 41")
+  expect_silent(.circmix_check_variable_precision(TRUE, 81L))
+})
+
+test_that(".circmix_prep_nt() returns the covariates in numeric order", {
+  prep <- list(data = list(
+    Y = 1:3, vreal10 = c(10, 0, 0), vreal2 = c(2, 0, 0), vreal1 = c(1, 0, 0)
+  ))
+  expect_equal(unname(.circmix_prep_nt(prep, 1)), c(1, 2, 10))
+})
+
+test_that(".circmix_custom_family() adds tau only when the model estimates it", {
+  model <- list(
+    links = list(mu = "tan_half", kappa = "log", tau = "log", thetat = "logit"),
+    vp_nodes = 41L, variable_precision = FALSE
+  )
+  stub_lik <- function(i, prep) NULL
+  stub_pred <- function(i, prep, ...) NULL
+  constant <- .circmix_custom_family(
+    model, "demo", "thetat",
+    log_lik = stub_lik, posterior_predict = stub_pred
+  )
+  expect_equal(constant$dpars, c("mu", "kappa", "thetat"))
+  expect_equal(constant$core_dpars, c("mu", "kappa", "0.0", "thetat"))
+
+  model$variable_precision <- TRUE
+  varying <- .circmix_custom_family(
+    model, "demo", "thetat",
+    log_lik = stub_lik, posterior_predict = stub_pred
+  )
+  expect_equal(varying$dpars, c("mu", "kappa", "tau", "thetat"))
+  expect_equal(varying$core_dpars, varying$dpars)
+  # brms normalises the bounds into a list of Stan bound expressions
+  expect_equal(as.numeric(unlist(varying$lb)), c(NA, 0, 0, 0))
+  expect_equal(as.numeric(unlist(varying$ub)), c(NA, NA, NA, 1))
+})
+
 test_that(".circmix_family_vars() emits only bare indices", {
   vars <- .circmix_family_vars(vint = TRUE, n_vreal = 3)
   indexed <- grep("\\[", vars, value = TRUE)
