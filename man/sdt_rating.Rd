@@ -72,7 +72,6 @@ Confidence Rating Signal Detection Theory Model
 \itemize{
 \item Green, D. M., & Swets, J. A. (1966). Signal detection theory and psychophysics. Wiley.
 }
-\item \strong{Version:} rating
 \item \strong{Requirements:}
 
 Provide pre-aggregated data with the following columns:
@@ -117,8 +116,8 @@ Categories should be ordered: 1 = 'definitely noise' to K = 'definitely signal'
 }
 \item \code{sdratio}:
 \itemize{
-\item \code{main}: normal(0, 0.5)
-\item \code{effects}: normal(0, 0.3)
+\item \code{main}: normal(0, 0.3)
+\item \code{effects}: normal(0, 0.15)
 }
 }
 }
@@ -127,6 +126,17 @@ By default, the model assumes equal variance (sdratio fixed to 0). To
 estimate unequal variance, add \code{sdratio ~ 1} (or \code{sdratio ~ predictors})
 to the formula.
 }
+\section{Sensitivity is on the same scale as \code{\link[=sdt_yn]{sdt_yn()}}}{
+
+\code{d} is the balanced index \eqn{d_a} that \code{\link[=sdt_yn]{sdt_yn()}} reports: the separation
+between the signal and noise distributions divided by the root-mean-square
+of their SDs. It equals \eqn{d'} whenever \code{sdratio} stays fixed at 0, and
+unlike \eqn{d'} it remains comparable across conditions that differ in
+\code{sdratio} -- see the sensitivity section of \code{\link[=sdt_yn]{sdt_yn()}} for the reasoning.
+The \code{criterion} and the confidence thresholds are \strong{not} rescaled and stay
+on the noise-standardized axis.
+}
+
 \examples{
 \dontrun{
 # EV-SDT rating model

@@ -54,15 +54,14 @@ m-Alternative Forced Choice Signal Detection Theory Model
 \item \strong{Citation:}
 \itemize{
 \item Green, D. M., & Swets, J. A. (1966). Signal detection theory and psychophysics. Wiley.
-DeCarlo, L. T. (2012). On a signal detection approach to m-alternative forced choice with bias, with maximum likelihood and Bayesian approaches to estimation. JMASM, 11(1), 257-282.
+DeCarlo, L. T. (2012). On a signal detection approach to m-alternative forced choice with bias, with maximum likelihood and Bayesian approaches to estimation. Journal of Mathematical Psychology, 56(3), 196-207.
 }
-\item \strong{Version:} mafc
 \item \strong{Requirements:}
 
 Provide pre-aggregated accuracy data with the following columns:
 }
 \itemize{
-\item Response counts (n_correct): number of correct responses
+\item Response counts (response): number of correct responses
 \item Number of trials (n_trials): total trials per cell
 No stimulus column needed (each trial has exactly one signal alternative)
 }
@@ -135,7 +134,7 @@ psychophysics}. Wiley.
 
 DeCarlo, L. T. (2012). On a signal detection approach to m-alternative
 forced choice with bias, with maximum likelihood and Bayesian approaches
-to estimation. \emph{Journal of Mathematical and Statistical Psychology},
-\emph{11}(1), 257--282.
+to estimation. \emph{Journal of Mathematical Psychology}, \emph{56}(3),
+196--207. \doi{10.1016/j.jmp.2012.02.004}
 }
 \keyword{bmmodel}

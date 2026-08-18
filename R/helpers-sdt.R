@@ -44,6 +44,22 @@
     "Response counts in '{resp_var}' must not exceed '{n_trials_var}'")
 }
 
+# Multi-column variant for the multinomial models (ranking, rating), whose
+# response is one count column per category.
+.validate_sdt_count_cols <- function(data, resp_cols) {
+  missing <- setdiff(resp_cols, colnames(data))
+  stopif(length(missing) > 0,
+    "Response columns {collapse_comma(missing)} missing in the data")
+
+  for (col in resp_cols) {
+    vals <- data[[col]]
+    stopif(any(vals < 0, na.rm = TRUE),
+      "Response column '{col}' must contain non-negative counts")
+    warnif(any(vals != round(vals), na.rm = TRUE),
+      "Response column '{col}' should contain integer counts")
+  }
+}
+
 # Accept the set size either as a constant or as a column name, so models can
 # fit trials with different set sizes jointly. Returns one set size per row.
 .sdt_resolve_set_size <- function(m, data) {
