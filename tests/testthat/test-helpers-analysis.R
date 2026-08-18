@@ -581,6 +581,56 @@ test_that("sdt_thresholds() errors for fits without rating thresholds", {
   expect_error(sdt_thresholds(fake_ranking_fit()), "rating")
 })
 
+test_that("mratio() returns a posterior summary with per-draw values in an attribute", {
+  fit <- fake_rating_fit(n_ratings = 6L, version = "metad")
+  local_mocked_bindings(
+    posterior_linpred = mock_linpred_factory(
+      list(d = 1.6, criterion = 0, spacing = 0, logmratio = log(0.75))),
+    ranef = function(...) list(),
+    variables = function(...) character(0),
+    .package = "brms"
+  )
+  mr <- mratio(fit)
+  expect_s3_class(mr, "bmm_sdt_mratio")
+  # body is the summary (one row per parameter), NOT every posterior draw
+  expect_true(all(c("parameter", "mean", "median", "lower", "upper") %in% names(mr)))
+  expect_equal(nrow(mr), 2L)
+  expect_setequal(unique(mr$parameter), c("mratio", "metad"))
+
+  # M-ratio = exp(logmratio); meta-d' = M-ratio * d
+  expect_equal(mr$mean[mr$parameter == "mratio"], 0.75, tolerance = 1e-6)
+  expect_equal(mr$median[mr$parameter == "mratio"], 0.75, tolerance = 1e-6)
+  expect_equal(mr$mean[mr$parameter == "metad"], 0.75 * 1.6, tolerance = 1e-6)
+
+  # full per-draw posteriors are retained in the draws attribute
+  dr <- attr(mr, "draws")
+  expect_true(all(c("parameter", "value", ".draw") %in% names(dr)))
+  expect_equal(nrow(dr), n_draws_mock * 2L)
+
+  expect_output(print(mr), "Metacognitive efficiency")
+  expect_output(print(mr), "95% CrI")
+})
+
+test_that("mratio() errors for non-metad fits", {
+  expect_error(mratio(list()), "bmmfit")
+  expect_error(mratio(fake_rating_fit()), "meta-d'")
+  expect_error(mratio(fake_rating_fit(version = "dpsdt")), "meta-d'")
+  expect_error(mratio(fake_binary_fit()), "meta-d'")
+})
+
+test_that("latent_sdt() reports M-ratio and meta-d' for the metad version", {
+  fit <- fake_rating_fit(n_ratings = 6L, version = "metad")
+  local_mocked_bindings(ranef = function(...) list(), .package = "brms")
+  local_mocked_bindings(
+    posterior_linpred = mock_linpred_factory(
+      list(d = 1.6, criterion = 0, spacing = 0, logmratio = log(0.75))),
+    .package = "brms")
+  extra <- attr(latent_sdt(fit), "extra")
+  expect_false(is.null(extra))
+  expect_setequal(extra$parameter, c("mratio", "metad"))
+  expect_equal(extra$mean[extra$parameter == "mratio"], 0.75, tolerance = 1e-6)
+})
+
 test_that("sdt_thresholds() summary matches latent_sdt() lines across parameterizations", {
   specs <- list(
     list(tt = "equidistant",  K = 6L),   # spacing-based, even K

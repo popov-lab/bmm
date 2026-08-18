@@ -2390,6 +2390,76 @@ rsdt_yn <- function(n, n_trials, stimulus, d, criterion,
 }
 
 
+# Dual-process category probabilities (Yonelinas, 1994): recollection adds mass
+# to the most-confident category -- old items recollected as old (Ro) load the
+# top category, new items recall-rejected (Rn) load the bottom one -- on top of
+# the familiarity SDT probabilities. Ro/Rn are probabilities here; the model
+# entry points map inv_logit(linear) before calling, and fix them near 0 to
+# recover standard SDT. `d` is the familiarity distributions' d_a: recollection
+# is a separate threshold process, so the d_a scaling belongs to the familiarity
+# SDT process alone and is applied by .sdt_category_probs() below.
+# Vectorized over observations like .sdt_category_probs:
+# thresholds may be an n-by-(K-1) matrix and the parameters vectors.
+.sdt_dpsdt_category_probs <- function(thresholds, d, sdratio, stimulus,
+                                      dist, Ro, Rn) {
+  probs <- rbind(.sdt_category_probs(thresholds, d, sdratio, stimulus,
+                                     dist))
+  n <- nrow(probs)
+  K <- ncol(probs)
+  stimulus <- rep_len(stimulus, n)
+
+  rec    <- ifelse(stimulus == 1, rep_len(Ro, n), rep_len(Rn, n))
+  loaded <- cbind(seq_len(n), ifelse(stimulus == 1, K, 1L))
+  probs <- (1 - rec) * probs
+  probs[loaded] <- probs[loaded] + rec
+
+  probs <- pmax(probs, .Machine$double.eps)
+  probs <- probs / rowSums(probs)
+  if (n == 1L && !is.matrix(thresholds)) probs[1L, ] else probs
+}
+
+
+# Meta-d' category probabilities (Maniscalco & Lau, 2012): confidence thresholds
+# are read off the metacognitive sensitivity metad, then each side of the central
+# criterion is rescaled so the summed "old"/"new" mass still matches what the
+# type-1 sensitivity d implies. mid uses the Stan central-threshold index so the
+# R-side prediction reproduces the likelihood for odd K. Both d and metad are
+# d_a indices, and .sdt_rms_scale() converts both to noise-SD units: a shared
+# factor leaves the M-ratio metad/d unchanged and keeps the metad = d reduction
+# to standard rating SDT exact under unequal variance. Vectorized over
+# observations like .sdt_category_probs.
+.sdt_metad_category_probs <- function(thresholds, d, metad, stimulus,
+                                      sdratio, dist) {
+  thr <- rbind(thresholds)
+  dimnames(thr) <- NULL
+  n <- max(nrow(thr), length(d), length(metad), length(sdratio),
+           length(stimulus))
+  if (nrow(thr) != n) thr <- thr[rep_len(seq_len(nrow(thr)), n), , drop = FALSE]
+  K <- ncol(thr) + 1L
+  mid <- (K - 1L) %/% 2L + 1L
+  stimulus <- rep_len(stimulus, n)
+  sdratio <- rep_len(sdratio, n)
+
+  rms <- .sdt_rms_scale(sdratio)
+  d_shift <- rep_len(d, n) * rms / 2 * (2 * stimulus - 1)
+  metad_shift <- rep_len(metad, n) * rms / 2 * (2 * stimulus - 1)
+  scale <- ifelse(stimulus == 1, sdratio, 1)
+
+  cum_p_metad <- .sdt_cdf((thr - metad_shift) / scale, dist)
+  raw_probs <- cbind(cum_p_metad, 1) - cbind(0, cum_p_metad)
+
+  crit <- thr[, mid]
+  cdf_d <- .sdt_cdf((crit - d_shift) / scale, dist)
+  cdf_metad <- .sdt_cdf((crit - metad_shift) / scale, dist)
+  norm <- cbind(matrix(cdf_d / cdf_metad, n, mid),
+                matrix((1 - cdf_d) / (1 - cdf_metad), n, K - mid))
+
+  probs <- pmax(raw_probs * norm, .Machine$double.eps)
+  probs <- probs / rowSums(probs)
+  if (n == 1L && !is.matrix(thresholds)) probs[1L, ] else probs
+}
+
+
 # Assemble ordered thresholds from per-draw interval widths anchored at the
 # middle threshold: inc[, j] is the width of the interval between threshold j
 # and threshold j + 1. Returns an n-by-K1 matrix.
@@ -2596,6 +2666,212 @@ rsdt_rating <- function(n, n_trials, stimulus, d, thresholds,
   probs <- rbind(.sdt_category_probs(rbind(thresholds), rep_len(d, n),
                                      rep_len(sdratio, n),
                                      rep_len(stimulus, n), dist))
+
+  K <- ncol(probs)
+  counts <- matrix(0L, n, K, dimnames = list(NULL, paste0("r", seq_len(K))))
+  for (i in seq_len(n)) {
+    counts[i, ] <- as.integer(stats::rmultinom(1, n_trials[i], probs[i, ]))
+  }
+  counts
+}
+
+
+#' @title Distribution functions for dual-process SDT (DPSDT)
+#'
+#' @description Density and random generation for the dual-process signal
+#'   detection model (Yonelinas, 1994). Extends rating SDT with recollection
+#'   probabilities `Ro` (old items recollected as old) and `Rn` (new items
+#'   recall-rejected) that add mass to the most-confident rating category. These
+#'   are the simulation counterparts of the `dpsdt` version of [sdt_rating()];
+#'   here `Ro`/`Rn` are supplied directly as probabilities in `[0, 1]`.
+#'
+#' @name sdt_dpsdt_dist
+#'
+#' @inheritParams sdt_rating_dist
+#' @param Ro Numeric vector in `[0, 1]`. Recollection probability for old
+#'   (signal) items.
+#' @param Rn Numeric vector in `[0, 1]`. Recollection (recall-to-reject)
+#'   probability for new (noise) items.
+#'
+#' @return `dsdt_dpsdt` returns the (log-)density (multinomial probability).
+#'   `rsdt_dpsdt` returns an integer matrix with one row per observation and
+#'   one rating-count column per category (`r1` ... `rK`).
+#'
+#' @references
+#' Yonelinas, A. P. (1994). Receiver-operating characteristics in recognition
+#'   memory: Evidence for a dual-process model. \emph{Journal of Experimental
+#'   Psychology: Learning, Memory, and Cognition}, \emph{20}(6), 1341--1354.
+#'   \doi{10.1037/0278-7393.20.6.1341}
+#'
+#' @keywords distribution
+#' @export
+#' @examples
+#' # Density for a single observation (K=4) with recollection of old items
+#' dsdt_dpsdt(counts = c(2, 8, 20, 70), stimulus = 1,
+#'            d = 1.5, thresholds = c(-0.5, 0.0, 0.5), Ro = 0.3, Rn = 0)
+dsdt_dpsdt <- function(counts, stimulus, d, thresholds, Ro, Rn,
+                       sdratio = 1,
+                       dist = c("normal", "gumbel_min", "gumbel_max",
+                                "logistic"),
+                       log = FALSE) {
+  dist <- match.arg(dist)
+  stopif(any(sdratio <= 0), "sdratio must be positive")
+  counts <- rbind(counts)
+  dimnames(counts) <- NULL
+  K <- ncol(counts)
+  thr <- rbind(thresholds)
+  stopif(ncol(thr) != K - 1,
+         "thresholds must have length K - 1 = {K - 1}")
+  stopif(any(counts < 0), "counts must be non-negative")
+  stopif(any(Ro < 0 | Ro > 1), "Ro must be a probability in [0, 1]")
+  stopif(any(Rn < 0 | Rn > 1), "Rn must be a probability in [0, 1]")
+
+  n <- max(nrow(counts), length(d), length(sdratio), length(stimulus),
+           length(Ro), length(Rn))
+  if (nrow(counts) != n) {
+    counts <- counts[rep_len(seq_len(nrow(counts)), n), , drop = FALSE]
+  }
+  stimulus <- rep_len(stimulus, n)
+  stopif(any(!stimulus %in% c(0L, 1L)),
+         "stimulus must be 0 (noise) or 1 (signal)")
+
+  probs <- rbind(.sdt_dpsdt_category_probs(thr, rep_len(d, n),
+                                           rep_len(sdratio, n), stimulus, dist,
+                                           rep_len(Ro, n), rep_len(Rn, n)))
+  log_dens <- lgamma(rowSums(counts) + 1) - rowSums(lgamma(counts + 1)) +
+    rowSums(counts * log(probs))
+  if (log) log_dens else exp(log_dens)
+}
+
+
+#' @rdname sdt_dpsdt_dist
+#' @export
+#' @examples
+#' # Generate DPSDT rating data (K=4) for 10 subjects and both stimulus types
+#' dat <- expand.grid(id = 1:10, stimulus = c(0L, 1L))
+#' dat <- cbind(dat, rsdt_dpsdt(nrow(dat), 100, dat$stimulus, d = 1.5,
+#'                              thresholds = c(-0.5, 0, 0.5),
+#'                              Ro = 0.3, Rn = 0.1))
+#' head(dat)
+rsdt_dpsdt <- function(n, n_trials, stimulus, d, thresholds, Ro, Rn,
+                       sdratio = 1,
+                       dist = c("normal", "gumbel_min", "gumbel_max",
+                                "logistic")) {
+  dist <- match.arg(dist)
+  stopif(length(n) != 1 || n < 1, "n must be a single positive integer")
+  stopif(any(n_trials < 1), "n_trials must be positive")
+  stopif(any(!stimulus %in% c(0L, 1L)),
+         "stimulus must be 0 (noise) or 1 (signal)")
+  stopif(any(Ro < 0 | Ro > 1), "Ro must be a probability in [0, 1]")
+  stopif(any(Rn < 0 | Rn > 1), "Rn must be a probability in [0, 1]")
+  stopif(any(sdratio <= 0), "sdratio must be positive")
+
+  n_trials <- rep_len(as.integer(n_trials), n)
+  probs <- rbind(.sdt_dpsdt_category_probs(rbind(thresholds),
+                                           rep_len(d, n),
+                                           rep_len(sdratio, n),
+                                           rep_len(stimulus, n), dist,
+                                           rep_len(Ro, n), rep_len(Rn, n)))
+
+  K <- ncol(probs)
+  counts <- matrix(0L, n, K, dimnames = list(NULL, paste0("r", seq_len(K))))
+  for (i in seq_len(n)) {
+    counts[i, ] <- as.integer(stats::rmultinom(1, n_trials[i], probs[i, ]))
+  }
+  counts
+}
+
+
+#' @title Distribution functions for meta-d' SDT
+#'
+#' @description Density and random generation for the meta-d' model
+#'   (Maniscalco & Lau, 2012). Confidence thresholds are placed using the
+#'   metacognitive sensitivity `metad`, then rescaled so the total "old"/"new"
+#'   response rates match what type-1 `d` predicts. These are the simulation
+#'   counterparts of the `metad` version of [sdt_rating()].
+#'
+#' @name sdt_metad_dist
+#'
+#' @inheritParams sdt_rating_dist
+#' @param metad Numeric vector. Metacognitive sensitivity (type-2 sensitivity),
+#'   on the same balanced \eqn{d_a} scale as `d`, so the M-ratio `metad / d` is
+#'   unaffected by `sdratio`. `metad = d` corresponds to ideal metacognition
+#'   (recovers rating SDT).
+#'
+#' @return `dsdt_metad` returns the (log-)density (multinomial probability).
+#'   `rsdt_metad` returns an integer matrix with one row per observation and
+#'   one rating-count column per category (`r1` ... `rK`).
+#'
+#' @references
+#' Maniscalco, B., & Lau, H. (2012). A signal detection theoretic approach for
+#'   estimating metacognitive sensitivity from confidence ratings.
+#'   \emph{Consciousness and Cognition}, \emph{21}(1), 422--430.
+#'   \doi{10.1016/j.concog.2011.09.021}
+#'
+#' @keywords distribution
+#' @export
+#' @examples
+#' # Density for a single observation (K=4) with imperfect metacognition
+#' dsdt_metad(counts = c(5, 15, 25, 55), stimulus = 1,
+#'            d = 1.5, thresholds = c(-0.5, 0.0, 0.5), metad = 1.0)
+dsdt_metad <- function(counts, stimulus, d, thresholds, metad,
+                       sdratio = 1,
+                       dist = c("normal", "gumbel_min", "gumbel_max",
+                                "logistic"),
+                       log = FALSE) {
+  dist <- match.arg(dist)
+  stopif(any(sdratio <= 0), "sdratio must be positive")
+  counts <- rbind(counts)
+  dimnames(counts) <- NULL
+  K <- ncol(counts)
+  thr <- rbind(thresholds)
+  stopif(ncol(thr) != K - 1,
+         "thresholds must have length K - 1 = {K - 1}")
+  stopif(any(counts < 0), "counts must be non-negative")
+
+  n <- max(nrow(counts), length(d), length(metad), length(sdratio),
+           length(stimulus))
+  if (nrow(counts) != n) {
+    counts <- counts[rep_len(seq_len(nrow(counts)), n), , drop = FALSE]
+  }
+  stimulus <- rep_len(stimulus, n)
+  stopif(any(!stimulus %in% c(0L, 1L)),
+         "stimulus must be 0 (noise) or 1 (signal)")
+
+  probs <- rbind(.sdt_metad_category_probs(thr, rep_len(d, n),
+                                           rep_len(metad, n), stimulus,
+                                           rep_len(sdratio, n), dist))
+  log_dens <- lgamma(rowSums(counts) + 1) - rowSums(lgamma(counts + 1)) +
+    rowSums(counts * log(probs))
+  if (log) log_dens else exp(log_dens)
+}
+
+
+#' @rdname sdt_metad_dist
+#' @export
+#' @examples
+#' # Generate meta-d' rating data (K=4) for 10 subjects and both stimulus types
+#' dat <- expand.grid(id = 1:10, stimulus = c(0L, 1L))
+#' dat <- cbind(dat, rsdt_metad(nrow(dat), 100, dat$stimulus, d = 1.5,
+#'                              thresholds = c(-0.5, 0, 0.5), metad = 1.0))
+#' head(dat)
+rsdt_metad <- function(n, n_trials, stimulus, d, thresholds, metad,
+                       sdratio = 1,
+                       dist = c("normal", "gumbel_min", "gumbel_max",
+                                "logistic")) {
+  dist <- match.arg(dist)
+  stopif(length(n) != 1 || n < 1, "n must be a single positive integer")
+  stopif(any(n_trials < 1), "n_trials must be positive")
+  stopif(any(!stimulus %in% c(0L, 1L)),
+         "stimulus must be 0 (noise) or 1 (signal)")
+  stopif(any(sdratio <= 0), "sdratio must be positive")
+
+  n_trials <- rep_len(as.integer(n_trials), n)
+  probs <- rbind(.sdt_metad_category_probs(rbind(thresholds),
+                                           rep_len(d, n),
+                                           rep_len(metad, n),
+                                           rep_len(stimulus, n),
+                                           rep_len(sdratio, n), dist))
 
   K <- ncol(probs)
   counts <- matrix(0L, n, K, dimnames = list(NULL, paste0("r", seq_len(K))))

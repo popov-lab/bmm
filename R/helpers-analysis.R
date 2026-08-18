@@ -333,6 +333,34 @@ roc_sdt <- function(fit, conditions = NULL, n_points = 100,
 }
 
 
+# Recollection (dpsdt) or metacognitive (metad) posterior summary per density
+# panel. These are response-process parameters, not latent-axis densities, so
+# latent_sdt() reports them alongside the familiarity/type-1 distributions rather
+# than drawing them as densities. Ro/Rn are returned on the probability scale;
+# the metad version reports the M-ratio and meta-d' derived from logmratio. NULL
+# for the standard version.
+.sdt_latent_extra <- function(fit, model, panel_cond, probs, ...) {
+  summarise <- function(parameter, mat) {
+    summ <- data.frame(parameter = parameter, .sdt_summarise_draws(mat, probs))
+    if (ncol(panel_cond) > 0L) cbind(summ, panel_cond, row.names = NULL) else summ
+  }
+
+  version <- model$version %||% "standard"
+  if (version == "dpsdt") {
+    mats <- list(Ro = stats::plogis(.sdt_linpred(fit, "Ro", panel_cond, ...)),
+                 Rn = stats::plogis(.sdt_linpred(fit, "Rn", panel_cond, ...)))
+    return(do.call(rbind, Map(summarise, names(mats), mats)))
+  }
+  if (version == "metad") {
+    mratio <- exp(.sdt_linpred(fit, "logmratio", panel_cond, ...))
+    d <- .sdt_linpred(fit, "d", panel_cond, ...)
+    return(do.call(rbind, Map(summarise, c("mratio", "metad"),
+                              list(mratio, mratio * d))))
+  }
+  NULL
+}
+
+
 # Posterior-mean ROC + quantile band at each swept-cut node, with the (0,0) and
 # (1,1) endpoints appended and any condition columns recycled in. Shared by the
 # binary and rating smooth implied curves so a model's K-1 thresholds (rating) or
@@ -436,6 +464,23 @@ roc_sdt <- function(fit, conditions = NULL, n_points = 100,
 }
 
 
+# Category probabilities for the active rating SDT version, so roc_sdt() traces
+# the dual-process / meta-d' operating points rather than the familiarity-only
+# curve. `pars` carries the per-draw recollection (Ro/Rn, already on the
+# probability scale) or metacognitive (metad) values; standard ignores it. `d`
+# is d_a throughout, and each kernel converts it to noise-SD units itself.
+.sdt_version_category_probs <- function(model, thresholds, d, sdratio,
+                                        stimulus, dist, pars = list()) {
+  switch(model$version,
+    dpsdt = .sdt_dpsdt_category_probs(thresholds, d, sdratio, stimulus,
+                                      dist, pars$Ro, pars$Rn),
+    metad = .sdt_metad_category_probs(thresholds, d, pars$metad, stimulus,
+                                      sdratio, dist),
+    .sdt_category_probs(thresholds, d, sdratio, stimulus, dist)
+  )
+}
+
+
 # ROC for rating SDT models. Returns three pieces (like .roc_sdt_yn): the
 # discrete K+1-point ROC per draw (`curve`, also used by the numerical AUC), the
 # smooth model-implied curve swept over a virtual cut (`summary`), and the K-1
@@ -459,6 +504,16 @@ roc_sdt <- function(fit, conditions = NULL, n_points = 100,
   n_draws  <- nrow(geom$d)
   thr_list <- .sdt_rating_thresholds(fit, model, conditions, ...)
 
+  ro_mat <- rn_mat <- metad_mat <- NULL
+  if (model$version == "dpsdt") {
+    ro_mat <- stats::plogis(.sdt_linpred(fit, "Ro", conditions, ...))
+    rn_mat <- stats::plogis(.sdt_linpred(fit, "Rn", conditions, ...))
+  } else if (model$version == "metad") {
+    # meta-d = exp(log M-ratio) * d, both on the d_a scale, so the kernels can
+    # apply the same root-mean-square conversion to each
+    metad_mat <- exp(.sdt_linpred(fit, "logmratio", conditions, ...)) * geom$d
+  }
+
   fa_grid       <- seq(0.001, 0.999, length.out = n_points)
   thr_levels    <- paste0("c", seq_len(K1))
   cond_has_cols <- ncol(conditions) > 0L
@@ -470,12 +525,19 @@ roc_sdt <- function(fit, conditions = NULL, n_points = 100,
     sep_vec <- geom$sep[, c_i]
     sr_vec  <- geom$sdratio[, c_i]
 
-    # sdratio goes into both calls: .sdt_category_probs derives the noise/signal
-    # scale from the stimulus flag, but it also needs sdratio to convert d_a into
-    # the separation. Passing 1 for the noise row would silently drop that
+    pars <- list(
+      Ro    = if (!is.null(ro_mat)) ro_mat[, c_i],
+      Rn    = if (!is.null(rn_mat)) rn_mat[, c_i],
+      metad = if (!is.null(metad_mat)) metad_mat[, c_i]
+    )
+    # sdratio goes into both calls: the kernels derive the noise/signal scale
+    # from the stimulus flag, but they also need sdratio to convert d_a into the
+    # separation. Passing 1 for the noise row would silently drop that
     # conversion and place the noise density at -d_a/2 instead of -sep/2.
-    pn <- .sdt_category_probs(thr_list[[c_i]], d_vec, sr_vec, 0L, dist)
-    ps <- .sdt_category_probs(thr_list[[c_i]], d_vec, sr_vec, 1L, dist)
+    pn <- rbind(.sdt_version_category_probs(model, thr_list[[c_i]], d_vec,
+                                            sr_vec, 0L, dist, pars))
+    ps <- rbind(.sdt_version_category_probs(model, thr_list[[c_i]], d_vec,
+                                            sr_vec, 1L, dist, pars))
     fa_pts  <- 1 - matrixStats::rowCumsums(pn)[, seq_len(K1), drop = FALSE]
     hit_pts <- 1 - matrixStats::rowCumsums(ps)[, seq_len(K1), drop = FALSE]
 
@@ -489,6 +551,14 @@ roc_sdt <- function(fit, conditions = NULL, n_points = 100,
     t_grid  <- qf(1 - fa_grid) - mean(sep_vec) / 2
     fa_mat  <- 1 - cdf(outer(sep_vec / 2, t_grid, "+"))
     hit_mat <- 1 - cdf(sweep(outer(-sep_vec / 2, t_grid, "+"), 1L, sr_vec, "/"))
+    # Dual-process recollection lifts the smooth curve off the familiarity ROC:
+    # Ro adds a Hit-axis intercept, Rn scales false alarms toward the new end.
+    if (model$version == "dpsdt") {
+      ro_vec  <- ro_mat[, c_i]
+      rn_vec  <- rn_mat[, c_i]
+      fa_mat  <- (1 - rn_vec) * fa_mat
+      hit_mat <- ro_vec + (1 - ro_vec) * hit_mat
+    }
 
     pts <- data.frame(
       threshold = factor(thr_levels, levels = thr_levels),
@@ -816,6 +886,7 @@ latent_sdt <- function(fit, conditions = NULL, n_grid = 200,
     class        = c("bmm_sdt_latent", "data.frame"),
     lines        = do.call(rbind, lines_list),
     competitors  = if (competitors) do.call(rbind, comp_list),
+    extra        = .sdt_latent_extra(fit, model, panel_cond, probs, ...),
     probs        = probs,
     model_class  = class(model),
     dist         = dist,
@@ -864,6 +935,13 @@ print.bmm_sdt_latent <- function(x, ...) {
   }
   if (!is.null(attr(x, "competitors"))) {
     cat("  max-of-distractors densities overlaid\n")
+  }
+  extra <- attr(x, "extra")
+  if (!is.null(extra)) {
+    first <- extra[!duplicated(extra$parameter), , drop = FALSE]
+    cat("  response process: ",
+        paste(sprintf("%s~%.2f", first$parameter, first$mean), collapse = ", "),
+        "\n", sep = "")
   }
   cat("Use plot() to visualise, or attr(x, 'lines') for boundary locations.\n")
   invisible(x)
@@ -946,6 +1024,98 @@ print.bmm_sdt_thresholds <- function(x, ...) {
   cat("SDT decision thresholds (", model_name, ", dist = ", attr(x, "dist"),
       ")\n", sep = "")
   print(attr(x, "summary"), digits = 3, row.names = FALSE)
+  invisible(x)
+}
+
+
+############################################################################# !
+# M-RATIO (METACOGNITIVE EFFICIENCY)                                     ####
+############################################################################# !
+
+#' Metacognitive efficiency (M-ratio) from a fitted meta-d' SDT model
+#'
+#' Extracts the posterior of the M-ratio (\eqn{\mathrm{meta\text{-}d'}/d'}) and
+#' of meta-d' from a [sdt_rating()] model fit with `version = "metad"`. That
+#' model estimates the log M-ratio (`logmratio`) directly, so the M-ratio is
+#' `exp(logmratio)` and meta-d' is `exp(logmratio) * d`. The M-ratio is the
+#' standard measure of metacognitive efficiency (Maniscalco & Lau, 2014;
+#' Fleming, 2017): 1 is ideal metacognition, below 1 is inefficiency, and above
+#' 1 is hyper-efficiency. Type-1 and type-2 sensitivity are both reported on the
+#' balanced \eqn{d_a} scale (see [sdt_sensitivity()]), so the ratio is
+#' unaffected by `sdratio`.
+#'
+#' @inheritParams roc_sdt
+#' @param probs Numeric vector of length 2. Lower and upper quantiles for the
+#'   credible interval (default `c(0.025, 0.975)`).
+#'
+#' @return A data frame of class `"bmm_sdt_mratio"` summarising the posterior:
+#'   columns `parameter` (`"mratio"` or `"metad"`), `mean`, `median`, `lower`,
+#'   `upper` (the credible-interval bounds at `probs`), and any condition
+#'   columns. The full per-draw posteriors are kept in the `draws` attribute
+#'   (long format: `parameter`, `value`, `.draw`, plus condition columns) for
+#'   downstream computation such as plotting or condition contrasts.
+#'
+#' @seealso [sdt_rating()], [latent_sdt()]
+#' @references
+#' Maniscalco, B., & Lau, H. (2014). Signal detection theory analysis of type 1
+#'   and type 2 data: meta-d', response-specific meta-d', and the unequal
+#'   variance SDT model. In S. M. Fleming & C. D. Frith (Eds.), \emph{The
+#'   cognitive neuroscience of metacognition} (pp. 25--66). Springer.
+#'
+#' Fleming, S. M. (2017). HMeta-d: hierarchical Bayesian estimation of
+#'   metacognitive efficiency from confidence ratings. \emph{Neuroscience of
+#'   Consciousness}, \emph{2017}(1), nix007. \doi{10.1093/nc/nix007}
+#' @export
+mratio <- function(fit, conditions = NULL, probs = c(0.025, 0.975), ...) {
+  stopif(!inherits(fit, "bmmfit"),
+         "fit must be a bmmfit object returned by bmm()")
+  model <- fit$bmm$model
+  stopif(!inherits(model, "sdt_rating") || (model$version %||% "standard") != "metad",
+         "mratio() is only available for the meta-d' version of sdt_rating() (version = 'metad')")
+
+  conditions <- .sdt_resolve_conditions(fit, conditions)
+  cond_rows  <- .sdt_unique_subset(conditions, names(conditions))
+
+  mratio_mat <- exp(.sdt_linpred(fit, "logmratio", cond_rows, ...))
+  d_mat      <- .sdt_linpred(fit, "d", cond_rows, ...)
+  mats       <- list(mratio = mratio_mat, metad = mratio_mat * d_mat)
+
+  draws_list   <- vector("list", ncol(mratio_mat))
+  summary_list <- vector("list", ncol(mratio_mat))
+  for (c_i in seq_len(ncol(mratio_mat))) {
+    crow <- cond_rows[c_i, , drop = FALSE]
+    draws_list[[c_i]] <- do.call(rbind, lapply(names(mats), function(nm) {
+      v <- mats[[nm]][, c_i]
+      .sdt_bind_cond(data.frame(parameter = nm, value = v,
+                                .draw = seq_along(v)), crow)
+    }))
+    summary_list[[c_i]] <- do.call(rbind, lapply(names(mats), function(nm) {
+      v <- mats[[nm]][, c_i]
+      summ <- .sdt_summarise_draws(v, probs)
+      .sdt_bind_cond(data.frame(parameter = nm, mean = summ$mean,
+                                median = stats::median(v),
+                                lower = summ$lower, upper = summ$upper), crow)
+    }))
+  }
+
+  structure(
+    do.call(rbind, summary_list),
+    class       = c("bmm_sdt_mratio", "data.frame"),
+    draws       = do.call(rbind, draws_list),
+    probs       = probs,
+    model_class = class(model),
+    conditions  = cond_rows
+  )
+}
+
+
+#' @export
+print.bmm_sdt_mratio <- function(x, ...) {
+  probs <- attr(x, "probs") %||% c(0.025, 0.975)
+  cat("Metacognitive efficiency (meta-d' SDT)\n")
+  cat("posterior mean/median with ", round(100 * (probs[2L] - probs[1L])),
+      "% CrI [lower, upper]\n", sep = "")
+  print(`class<-`(x, "data.frame"), digits = 3, row.names = FALSE)
   invisible(x)
 }
 

@@ -2,6 +2,8 @@
 % Please edit documentation in R/model_sdt_rating.R
 \name{sdt_rating_logmu}
 \alias{sdt_rating_logmu}
+\alias{sdt_dpsdt_logmu}
+\alias{sdt_metad_logmu}
 \title{Rating SDT category log-probability (multinomial logit)}
 \usage{
 sdt_rating_logmu(
@@ -13,6 +15,35 @@ sdt_rating_logmu(
   criterion,
   spacing,
   sdratio,
+  stimulus,
+  ...
+)
+
+sdt_dpsdt_logmu(
+  cat,
+  K,
+  dist,
+  thresh,
+  d,
+  criterion,
+  spacing,
+  sdratio,
+  Ro,
+  Rn,
+  stimulus,
+  ...
+)
+
+sdt_metad_logmu(
+  cat,
+  K,
+  dist,
+  thresh,
+  d,
+  criterion,
+  spacing,
+  sdratio,
+  logmratio,
   stimulus,
   ...
 )
@@ -33,6 +64,12 @@ matrices supplied by brms). \code{d} is the balanced sensitivity index d_a;
 \item{stimulus}{Stimulus covariate (0 = noise, 1 = signal).}
 
 \item{...}{Threshold \code{delta} parameters, when the threshold type uses them.}
+
+\item{Ro, Rn}{Linear-scale recollection parameters for the \code{dpsdt} version;
+\code{inv_logit(Ro)}/\code{inv_logit(Rn)} are the recollection probabilities.}
+
+\item{logmratio}{Log M-ratio for the \code{metad} version; meta-d' is recovered
+as \code{exp(logmratio) * d}, on the same d_a scale as \code{d}.}
 }
 \value{
 \code{log(p_cat)}, matching the shape of \code{d}.

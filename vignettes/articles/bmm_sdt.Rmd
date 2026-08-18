@@ -868,6 +868,17 @@ $\Phi(d/\sqrt{2})$, and for $m \geq 3$ the Gaussian and logistic models evaluate
 the accuracy by quadrature while both Gumbel models stay in closed form. The set size `m` may be a constant or a data column (for mixed set
 sizes).
 
+One caveat matters when interpreting `d` here. At a single set size,
+percent correct is a single number, and any evidence distribution can reproduce
+it with a suitable `d` — the Gaussian-evidence-plus-max-rule assumption is
+a convention the data at one `m` cannot test. This is a general property of
+best-choice data: choice probabilities underdetermine the latent evidence model
+that generates them [@Falmagne_1978; @Kilani_Colonius_2026]. What gives the
+distributional assumption empirical content is varying the set size within an
+experiment: different evidence distributions imply different accuracy-versus-`m`
+curves, so passing `m` as a data column with mixed set sizes is what makes the
+choice of evidence distribution testable at all.
+
 ```{r}
 # rsdt_mafc() is vectorised over its arguments; varying d by subject
 # gives hierarchical data.
@@ -927,6 +938,21 @@ Thurstonian ranking assumption). The model uses the native multinomial family wi
 position, and `m` may again be a constant or a column for mixed set sizes. The
 bundled `meyer_grant_jakob_2025` data [@MeyerGrant_Jakob_2025] illustrate the
 wide format.
+
+Ranking responses are not just another response format — they are formally
+richer than forced-choice responses. Best-choice probabilities are marginals of
+the underlying distribution over rankings, and with four or more alternatives
+infinitely many ranking distributions are consistent with the same choice
+probabilities [@Falmagne_1978; @Kilani_Colonius_2026]. A ranking task observes
+the target's position in the ordering directly rather than only whether it won,
+which is the formal reason the paradigm supports stronger inferences about the
+evidence distribution than m-AFC accuracy does [@MeyerGrant_2025]. One limit
+remains even here: rank probabilities identify the distribution over orderings,
+not the joint distribution of the latent evidence behind it — in the max-Gumbel
+(Plackett–Luce) family, for example, independent and copula-dependent evidence
+models produce identical ranking probabilities [@Kilani_2025]. Independence of
+the evidence samples therefore stays a modeling convention in the ranking
+models too.
 
 ```{r}
 model <- sdt_ranking(
