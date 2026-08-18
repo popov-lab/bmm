@@ -17,7 +17,7 @@ from the data.}
 \item{probs}{Numeric vector of length 2. Lower and upper quantiles for the
 credible interval (default \code{c(0.025, 0.975)}).}
 
-\item{...}{Additional arguments passed to \code{\link[brms:posterior_linpred.brmsfit]{brms::posterior_linpred()}}.}
+\item{...}{Additional arguments passed to \code{\link[brms:posterior_linpred]{brms::posterior_linpred()}}.}
 }
 \value{
 A data frame of class \code{"bmm_sdt_mratio"} summarising the posterior:
@@ -31,10 +31,12 @@ downstream computation such as plotting or condition contrasts.
 Extracts the posterior of the M-ratio (\eqn{\mathrm{meta\text{-}d'}/d'}) and
 of meta-d' from a \code{\link[=sdt_rating]{sdt_rating()}} model fit with \code{version = "metad"}. That
 model estimates the log M-ratio (\code{logmratio}) directly, so the M-ratio is
-\code{exp(logmratio)} and meta-d' is \code{exp(logmratio) * dprime}. The M-ratio is the
+\code{exp(logmratio)} and meta-d' is \code{exp(logmratio) * d}. The M-ratio is the
 standard measure of metacognitive efficiency (Maniscalco & Lau, 2014;
 Fleming, 2017): 1 is ideal metacognition, below 1 is inefficiency, and above
-1 is hyper-efficiency.
+1 is hyper-efficiency. Type-1 and type-2 sensitivity are both reported on the
+balanced \eqn{d_a} scale (see \code{\link[=sdt_sensitivity]{sdt_sensitivity()}}), so the ratio is
+unaffected by \code{sdratio}.
 }
 \references{
 Maniscalco, B., & Lau, H. (2014). Signal detection theory analysis of type 1

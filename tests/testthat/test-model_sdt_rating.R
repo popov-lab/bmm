@@ -31,7 +31,7 @@ test_that("sdt_rating model rejects n_ratings <= 2", {
 test_that("sdt_rating model has parsimonious threshold params by default", {
   model <- sdt_rating(c("r1", "r2", "r3", "r4"), "stimulus")
   expect_true("spacing" %in% names(model$parameters))
-  expect_true("dprime" %in% names(model$parameters))
+  expect_true("d" %in% names(model$parameters))
   expect_true("criterion" %in% names(model$parameters))
   expect_false("mu" %in% names(model$parameters))
 })
@@ -93,8 +93,8 @@ test_that("sdt_rating always has sdratio as parameter (fixed to 0 by default)", 
 
 test_that("sdt_rating model accepts custom links", {
   model <- sdt_rating(c("r1", "r2", "r3", "r4"), "stimulus",
-                      links = list(dprime = "log"))
-  expect_equal(model$links$dprime, "log")
+                      links = list(d = "log"))
+  expect_equal(model$links$d, "log")
   expect_equal(model$links$criterion, "identity")
 })
 
@@ -146,7 +146,7 @@ test_that("odd-K delta labels skip the same middle threshold as the builders", {
 # CHECK_DATA TESTS                                                       ####
 ############################################################################# !
 
-sim_rating <- function(n_subjects, n_trials, dprime, criterion, n_ratings,
+sim_rating <- function(n_subjects, n_trials, d, criterion, n_ratings,
                        spacing = NULL, deltas = NULL,
                        threshold_type = "parsimonious",
                        sdratio = 1, dist = "normal") {
@@ -154,13 +154,13 @@ sim_rating <- function(n_subjects, n_trials, dprime, criterion, n_ratings,
                                     spacing, deltas)
   dat <- expand.grid(id = seq_len(n_subjects), stimulus = c(0L, 1L))
   cbind(dat, as.data.frame(rsdt_rating(nrow(dat), n_trials, dat$stimulus,
-                                       dprime, thr, sdratio = sdratio,
+                                       d, thr, sdratio = sdratio,
                                        dist = dist)))
 }
 
 test_that("sdt_rating check_data validates response columns", {
   model <- sdt_rating(c("r1", "r2", "r3", "r4"), "stimulus")
-  formula <- bmf(dprime ~ 1, criterion ~ 1, spacing ~ 1)
+  formula <- bmf(d ~ 1, criterion ~ 1, spacing ~ 1)
 
   valid_data <- data.frame(
     r1 = c(10, 5), r2 = c(20, 10), r3 = c(15, 30), r4 = c(5, 55),
@@ -176,7 +176,7 @@ test_that("sdt_rating check_data validates response columns", {
 
 test_that("sdt_rating check_data rejects missing response columns", {
   model <- sdt_rating(c("r1", "r2", "r3", "r4"), "stimulus")
-  formula <- bmf(dprime ~ 1, criterion ~ 1, spacing ~ 1)
+  formula <- bmf(d ~ 1, criterion ~ 1, spacing ~ 1)
 
   invalid_data <- data.frame(
     r1 = c(10, 5), r2 = c(20, 10),
@@ -187,7 +187,7 @@ test_that("sdt_rating check_data rejects missing response columns", {
 
 test_that("sdt_rating check_data rejects negative counts", {
   model <- sdt_rating(c("r1", "r2", "r3", "r4"), "stimulus")
-  formula <- bmf(dprime ~ 1, criterion ~ 1, spacing ~ 1)
+  formula <- bmf(d ~ 1, criterion ~ 1, spacing ~ 1)
 
   invalid_data <- data.frame(
     r1 = c(-1, 5), r2 = c(20, 10), r3 = c(15, 30), r4 = c(5, 55),
@@ -198,7 +198,7 @@ test_that("sdt_rating check_data rejects negative counts", {
 
 test_that("sdt_rating check_data validates stimulus coding", {
   model <- sdt_rating(c("r1", "r2", "r3", "r4"), "stimulus")
-  formula <- bmf(dprime ~ 1, criterion ~ 1, spacing ~ 1)
+  formula <- bmf(d ~ 1, criterion ~ 1, spacing ~ 1)
 
   invalid_data <- data.frame(
     r1 = c(10, 5), r2 = c(20, 10), r3 = c(15, 30), r4 = c(5, 55),
@@ -213,7 +213,7 @@ test_that("sdt_rating check_data validates stimulus coding", {
 ############################################################################# !
 
 test_that("rsdt_rating generates counts matching the design", {
-  counts <- rsdt_rating(10, 50, rep(c(0L, 1L), 5), dprime = 1.5,
+  counts <- rsdt_rating(10, 50, rep(c(0L, 1L), 5), d = 1.5,
                         thresholds = c(-0.5, 0, 0.5))
   expect_true(is.matrix(counts))
   expect_equal(dim(counts), c(10L, 4L))
@@ -222,24 +222,24 @@ test_that("rsdt_rating generates counts matching the design", {
 })
 
 test_that("rsdt_rating recycles vectorized parameters per observation", {
-  counts <- rsdt_rating(6, c(50, 100), c(0L, 1L), dprime = rnorm(6, 1.5, 0.2),
+  counts <- rsdt_rating(6, c(50, 100), c(0L, 1L), d = rnorm(6, 1.5, 0.2),
                         thresholds = c(-0.5, 0, 0.5), sdratio = c(1, 1.3))
   expect_equal(dim(counts), c(6L, 4L))
   expect_true(all(rowSums(counts) == c(50, 100)))
 
   thr <- rbind(c(-0.5, 0, 0.5), c(-1, 0, 1))
-  counts2 <- rsdt_rating(2, 100, c(0L, 1L), dprime = 1.5, thresholds = thr)
+  counts2 <- rsdt_rating(2, 100, c(0L, 1L), d = 1.5, thresholds = thr)
   expect_equal(dim(counts2), c(2L, 4L))
 })
 
 test_that("rsdt_rating validates inputs", {
-  expect_error(rsdt_rating(c(2, 3), 50, 1L, dprime = 1,
+  expect_error(rsdt_rating(c(2, 3), 50, 1L, d = 1,
                            thresholds = c(-0.5, 0, 0.5)),
                "single positive integer")
-  expect_error(rsdt_rating(2, 50, c(0L, 2L), dprime = 1,
+  expect_error(rsdt_rating(2, 50, c(0L, 2L), d = 1,
                            thresholds = c(-0.5, 0, 0.5)),
                "0 \\(noise\\) or 1 \\(signal\\)")
-  expect_error(rsdt_rating(2, 50, c(0L, 1L), dprime = 1,
+  expect_error(rsdt_rating(2, 50, c(0L, 1L), d = 1,
                            thresholds = c(-0.5, 0, 0.5), dist = "cauchy"),
                "should be one of")
 })
@@ -254,7 +254,7 @@ test_that("sim helper round-trips every threshold parameterization", {
          threshold_type = "softmax")
   )
   for (cfg in configs) {
-    dat <- do.call(sim_rating, c(list(3, 50, dprime = 1.5, criterion = 0), cfg))
+    dat <- do.call(sim_rating, c(list(3, 50, d = 1.5, criterion = 0), cfg))
     rcols <- paste0("r", seq_len(cfg$n_ratings))
     expect_equal(nrow(dat), 6, info = cfg$threshold_type)
     expect_true(all(rowSums(dat[, rcols]) == 50), info = cfg$threshold_type)
@@ -262,46 +262,46 @@ test_that("sim helper round-trips every threshold parameterization", {
 })
 
 test_that("dsdt_rating returns valid density", {
-  d <- dsdt_rating(counts = c(10, 20, 30, 40), stimulus = 1,
-                   dprime = 1.5, thresholds = c(-0.5, 0, 0.5))
-  expect_true(d > 0)
-  expect_true(d <= 1)
+  dens <- dsdt_rating(counts = c(10, 20, 30, 40), stimulus = 1,
+                      d = 1.5, thresholds = c(-0.5, 0, 0.5))
+  expect_true(dens > 0)
+  expect_true(dens <= 1)
 })
 
 test_that("dsdt_rating log matches log of density", {
-  d <- dsdt_rating(counts = c(10, 20, 30, 40), stimulus = 1,
-                   dprime = 1.5, thresholds = c(-0.5, 0, 0.5))
+  dens <- dsdt_rating(counts = c(10, 20, 30, 40), stimulus = 1,
+                      d = 1.5, thresholds = c(-0.5, 0, 0.5))
   ld <- dsdt_rating(counts = c(10, 20, 30, 40), stimulus = 1,
-                    dprime = 1.5, thresholds = c(-0.5, 0, 0.5), log = TRUE)
-  expect_equal(log(d), ld, tolerance = 1e-10)
+                    d = 1.5, thresholds = c(-0.5, 0, 0.5), log = TRUE)
+  expect_equal(log(dens), ld, tolerance = 1e-10)
 })
 
 test_that("dsdt_rating validates inputs", {
   expect_error(
     dsdt_rating(counts = c(-1, 20, 30, 40), stimulus = 1,
-                dprime = 1.5, thresholds = c(-0.5, 0, 0.5)),
+                d = 1.5, thresholds = c(-0.5, 0, 0.5)),
     "non-negative"
   )
   expect_error(
     dsdt_rating(counts = c(10, 20, 30), stimulus = 1,
-                dprime = 1.5, thresholds = c(-0.5, 0, 0.5)),
+                d = 1.5, thresholds = c(-0.5, 0, 0.5)),
     "K - 1"
   )
 })
 
 test_that("dsdt_rating works for all distributions", {
   for (di in c("normal", "logistic", "gumbel_min", "gumbel_max")) {
-    d <- dsdt_rating(counts = c(10, 20, 30, 40), stimulus = 1,
-                     dprime = 1.5, thresholds = c(-0.5, 0, 0.5), dist = di)
-    expect_true(d > 0, info = paste("dist:", di))
+    dens <- dsdt_rating(counts = c(10, 20, 30, 40), stimulus = 1,
+                        d = 1.5, thresholds = c(-0.5, 0, 0.5), dist = di)
+    expect_true(dens > 0, info = paste("dist:", di))
   }
 })
 
 test_that("dsdt_rating with sdratio != 1 changes density", {
   d_ev <- dsdt_rating(counts = c(10, 20, 30, 40), stimulus = 1,
-                      dprime = 1.5, thresholds = c(-0.5, 0, 0.5), sdratio = 1)
+                      d = 1.5, thresholds = c(-0.5, 0, 0.5), sdratio = 1)
   d_uv <- dsdt_rating(counts = c(10, 20, 30, 40), stimulus = 1,
-                      dprime = 1.5, thresholds = c(-0.5, 0, 0.5), sdratio = 1.3)
+                      d = 1.5, thresholds = c(-0.5, 0, 0.5), sdratio = 1.3)
   expect_false(d_ev == d_uv)
 })
 
@@ -312,10 +312,10 @@ test_that("dsdt_rating matches dmultinom and is vectorized over rows", {
                dmultinom(c(10, 20, 30, 40), prob = probs), tolerance = 1e-12)
 
   counts <- rbind(c(10, 20, 30, 40), c(40, 30, 20, 10))
-  d <- dsdt_rating(counts, stimulus = c(1L, 0L), dprime = 1.5,
-                   thresholds = thr, log = TRUE)
-  expect_length(d, 2)
-  expect_true(all(is.finite(d)))
+  dens <- dsdt_rating(counts, stimulus = c(1L, 0L), d = 1.5,
+                      thresholds = thr, log = TRUE)
+  expect_length(dens, 2)
+  expect_true(all(is.finite(dens)))
 })
 
 test_that(".sdt_make_thresholds vectorized path matches per-draw evaluation", {
@@ -349,15 +349,15 @@ test_that(".sdt_category_probs vectorized path matches per-row evaluation", {
 })
 
 test_that("sdt_rating_logmu is vectorized and preserves the draw shape", {
-  dprime <- matrix(c(1, 1.5, 0.5, 2), nrow = 2)
-  out <- sdt_rating_logmu(2L, 4L, 1L, 1L, dprime, criterion = 0.1,
+  d <- matrix(c(1, 1.5, 0.5, 2), nrow = 2)
+  out <- sdt_rating_logmu(2L, 4L, 1L, 1L, d, criterion = 0.1,
                           spacing = 0.3, sdratio = 0.2, stimulus = c(0, 1))
-  expect_equal(dim(out), dim(dprime))
+  expect_equal(dim(out), dim(d))
 
   thr <- bmm:::.sdt_make_thresholds(0.1, 4L, "parsimonious", 0.3)
   stim <- rep_len(c(0, 1), 4)
-  ref <- vapply(seq_along(dprime), function(j) {
-    log(bmm:::.sdt_category_probs(thr, as.vector(dprime)[j], exp(0.2),
+  ref <- vapply(seq_along(d), function(j) {
+    log(bmm:::.sdt_category_probs(thr, as.vector(d)[j], exp(0.2),
                                   stim[j], "normal")[2])
   }, numeric(1))
   expect_equal(as.vector(out), ref, tolerance = 1e-12)
@@ -373,10 +373,10 @@ test_that("K = 3 softmax reduces to a single symmetric interval", {
   thr <- bmm:::.sdt_make_thresholds(0.1, 3L, "softmax", spacing = 0.2)
   expect_equal(thr, c(0.1 - exp(0.2), 0.1), tolerance = 1e-12)
 
-  dat <- sim_rating(3, 50, dprime = 1.2, criterion = 0, n_ratings = 3,
+  dat <- sim_rating(3, 50, d = 1.2, criterion = 0, n_ratings = 3,
                     spacing = 0.2, threshold_type = "softmax")
   model <- sdt_rating(paste0("r", 1:3), "stimulus", threshold_type = "softmax")
-  code <- stancode(bmf(dprime ~ 1, criterion ~ 1, spacing ~ 1),
+  code <- stancode(bmf(d ~ 1, criterion ~ 1, spacing ~ 1),
                    data = dat, model = model)
   expect_true(nchar(code) > 0)
 })
@@ -387,10 +387,10 @@ test_that("K = 3 softmax reduces to a single symmetric interval", {
 ############################################################################# !
 
 test_that("sdt_rating produces valid stancode with parsimonious thresholds", {
-  dat <- sim_rating(3, 50, dprime = 1.5, criterion = 0, n_ratings = 4,
+  dat <- sim_rating(3, 50, d = 1.5, criterion = 0, n_ratings = 4,
                     spacing = 0.5)
   model <- sdt_rating(c("r1", "r2", "r3", "r4"), "stimulus")
-  formula <- bmf(dprime ~ 1, criterion ~ 1, spacing ~ 1)
+  formula <- bmf(d ~ 1, criterion ~ 1, spacing ~ 1)
   code <- stancode(formula, data = dat, model = model)
   expect_true(nchar(code) > 0)
   expect_true(grepl("sdt_rating_logmu", code, fixed = TRUE))
@@ -400,10 +400,10 @@ test_that("sdt_rating produces valid stancode with parsimonious thresholds", {
 test_that("sdt_rating stancode loads the shared distribution dispatch", {
   # the noise-distribution dispatch lives in sdt_dist_funs.stan; the rating
   # likelihood relies on the log-scale dispatchers from that shared chunk.
-  dat <- sim_rating(3, 50, dprime = 1.5, criterion = 0, n_ratings = 4,
+  dat <- sim_rating(3, 50, d = 1.5, criterion = 0, n_ratings = 4,
                     spacing = 0.5)
   model <- sdt_rating(c("r1", "r2", "r3", "r4"), "stimulus")
-  formula <- bmf(dprime ~ 1, criterion ~ 1, spacing ~ 1)
+  formula <- bmf(d ~ 1, criterion ~ 1, spacing ~ 1)
   code <- stancode(formula, data = dat, model = model)
   expect_true(grepl("sdt_log_cumprob", code, fixed = TRUE))
   expect_true(grepl("sdt_log_one_minus_cumprob", code, fixed = TRUE))
@@ -411,11 +411,11 @@ test_that("sdt_rating stancode loads the shared distribution dispatch", {
 })
 
 test_that("sdt_rating produces valid stancode with log_distance thresholds", {
-  dat <- sim_rating(3, 50, dprime = 1.5, criterion = 0, n_ratings = 4,
+  dat <- sim_rating(3, 50, d = 1.5, criterion = 0, n_ratings = 4,
                     deltas = c(0.5, 0.5), threshold_type = "log_distance")
   model <- sdt_rating(c("r1", "r2", "r3", "r4"), "stimulus",
                       threshold_type = "log_distance")
-  formula <- bmf(dprime ~ 1, criterion ~ 1, delta1 ~ 1, delta3 ~ 1)
+  formula <- bmf(d ~ 1, criterion ~ 1, delta1 ~ 1, delta3 ~ 1)
   code <- stancode(formula, data = dat, model = model)
   expect_true(nchar(code) > 0)
   expect_true(grepl("sdt_rating_logmu", code, fixed = TRUE))
@@ -423,11 +423,11 @@ test_that("sdt_rating produces valid stancode with log_distance thresholds", {
 })
 
 test_that("sdt_rating produces valid stancode with log_ratio thresholds", {
-  dat <- sim_rating(3, 50, dprime = 1.5, criterion = 0, n_ratings = 4,
+  dat <- sim_rating(3, 50, d = 1.5, criterion = 0, n_ratings = 4,
                     deltas = c(0, 0), threshold_type = "log_ratio")
   model <- sdt_rating(c("r1", "r2", "r3", "r4"), "stimulus",
                       threshold_type = "log_ratio")
-  formula <- bmf(dprime ~ 1, criterion ~ 1, delta1 ~ 1, delta3 ~ 1)
+  formula <- bmf(d ~ 1, criterion ~ 1, delta1 ~ 1, delta3 ~ 1)
   code <- stancode(formula, data = dat, model = model)
   expect_true(nchar(code) > 0)
   expect_true(grepl("sdt_thresholds_log_ratio_rating", code, fixed = TRUE))
@@ -435,11 +435,11 @@ test_that("sdt_rating produces valid stancode with log_ratio thresholds", {
 })
 
 test_that("sdt_rating produces valid stancode with softmax thresholds", {
-  dat <- sim_rating(3, 50, dprime = 1.5, criterion = 0, n_ratings = 6,
+  dat <- sim_rating(3, 50, d = 1.5, criterion = 0, n_ratings = 6,
                     spacing = 0.3, deltas = c(0, 0, 0),
                     threshold_type = "softmax")
   model <- sdt_rating(paste0("r", 1:6), "stimulus", threshold_type = "softmax")
-  formula <- bmf(dprime ~ 1, criterion ~ 1, spacing ~ 1,
+  formula <- bmf(d ~ 1, criterion ~ 1, spacing ~ 1,
                  delta1 ~ 1, delta2 ~ 1, delta3 ~ 1)
   code <- stancode(formula, data = dat, model = model)
   expect_true(nchar(code) > 0)
@@ -447,20 +447,20 @@ test_that("sdt_rating produces valid stancode with softmax thresholds", {
 })
 
 test_that("sdt_rating handles K=6 parsimonious", {
-  dat <- sim_rating(2, 50, dprime = 1.5, criterion = 0, n_ratings = 6,
+  dat <- sim_rating(2, 50, d = 1.5, criterion = 0, n_ratings = 6,
                     spacing = 0.3)
   model <- sdt_rating(paste0("r", 1:6), "stimulus")
-  formula <- bmf(dprime ~ 1, criterion ~ 1, spacing ~ 1)
+  formula <- bmf(d ~ 1, criterion ~ 1, spacing ~ 1)
   code <- stancode(formula, data = dat, model = model)
   expect_true(nchar(code) > 0)
 })
 
-test_that("sdt_rating handles predictors on dprime", {
-  dat <- sim_rating(3, 50, dprime = 1.5, criterion = 0, n_ratings = 4,
+test_that("sdt_rating handles predictors on d", {
+  dat <- sim_rating(3, 50, d = 1.5, criterion = 0, n_ratings = 4,
                     spacing = 0.5)
   dat$condition <- rep(c("A", "B"), length.out = nrow(dat))
   model <- sdt_rating(c("r1", "r2", "r3", "r4"), "stimulus")
-  formula <- bmf(dprime ~ condition, criterion ~ 1, spacing ~ 1)
+  formula <- bmf(d ~ condition, criterion ~ 1, spacing ~ 1)
   code <- stancode(formula, data = dat, model = model)
   expect_true(nchar(code) > 0)
 })
@@ -471,10 +471,10 @@ test_that("sdt_rating handles predictors on dprime", {
 ############################################################################# !
 
 test_that("sdt_rating with sdratio ~ 1 produces valid stancode", {
-  dat <- sim_rating(3, 50, dprime = 1.5, criterion = 0, n_ratings = 4,
+  dat <- sim_rating(3, 50, d = 1.5, criterion = 0, n_ratings = 4,
                     spacing = 0.5, sdratio = 1.3)
   model <- sdt_rating(c("r1", "r2", "r3", "r4"), "stimulus")
-  formula <- bmf(dprime ~ 1, criterion ~ 1, spacing ~ 1, sdratio ~ 1)
+  formula <- bmf(d ~ 1, criterion ~ 1, spacing ~ 1, sdratio ~ 1)
   code <- stancode(formula, data = dat, model = model)
   expect_true(nchar(code) > 0)
   expect_true(grepl("sdt_rating_logmu", code, fixed = TRUE))
@@ -482,12 +482,12 @@ test_that("sdt_rating with sdratio ~ 1 produces valid stancode", {
 })
 
 test_that("sdt_rating UV-SDT with log_distance thresholds produces valid stancode", {
-  dat <- sim_rating(3, 50, dprime = 1.5, criterion = 0, n_ratings = 4,
+  dat <- sim_rating(3, 50, d = 1.5, criterion = 0, n_ratings = 4,
                     deltas = c(0.5, 0.5), threshold_type = "log_distance",
                     sdratio = 1.3)
   model <- sdt_rating(c("r1", "r2", "r3", "r4"), "stimulus",
                       threshold_type = "log_distance")
-  formula <- bmf(dprime ~ 1, criterion ~ 1, delta1 ~ 1, delta3 ~ 1,
+  formula <- bmf(d ~ 1, criterion ~ 1, delta1 ~ 1, delta3 ~ 1,
                  sdratio ~ 1)
   code <- stancode(formula, data = dat, model = model)
   expect_true(nchar(code) > 0)
@@ -500,23 +500,23 @@ test_that("sdt_rating UV-SDT with log_distance thresholds produces valid stancod
 ############################################################################# !
 
 test_that("sdt_rating integrates with the bmm pipeline via mock backend", {
-  dat <- sim_rating(6, 80, dprime = 1.2, criterion = 0, n_ratings = 4,
+  dat <- sim_rating(6, 80, d = 1.2, criterion = 0, n_ratings = 4,
                     spacing = 0.4)
   for (di in c("normal", "logistic", "gumbel_min", "gumbel_max")) {
     model <- sdt_rating(c("r1", "r2", "r3", "r4"), "stimulus", dist = di)
     expect_silent(
-      bmm(bmf(dprime ~ 1, criterion ~ 1, spacing ~ 1),
+      bmm(bmf(d ~ 1, criterion ~ 1, spacing ~ 1),
           dat, model, backend = "mock", mock_fit = 1, rename = FALSE)
     )
   }
 })
 
 test_that("sdt_rating UV-SDT integrates with the bmm pipeline via mock backend", {
-  dat <- sim_rating(6, 80, dprime = 1.2, criterion = 0, n_ratings = 4,
+  dat <- sim_rating(6, 80, d = 1.2, criterion = 0, n_ratings = 4,
                     spacing = 0.4, sdratio = 1.3)
   model <- sdt_rating(c("r1", "r2", "r3", "r4"), "stimulus")
   expect_silent(
-    bmm(bmf(dprime ~ 1, criterion ~ 1, spacing ~ 1, sdratio ~ 1),
+    bmm(bmf(d ~ 1, criterion ~ 1, spacing ~ 1, sdratio ~ 1),
         dat, model, backend = "mock", mock_fit = 1, rename = FALSE)
   )
 })
@@ -524,12 +524,12 @@ test_that("sdt_rating UV-SDT integrates with the bmm pipeline via mock backend",
 test_that("sdt_rating log_distance integrates with the bmm pipeline via mock backend", {
   # log_distance has variable-arity delta parameters, so this exercises the
   # generated multinomial formula and Stan function for that case.
-  dat <- sim_rating(5, 60, dprime = 1.5, criterion = 0, n_ratings = 4,
+  dat <- sim_rating(5, 60, d = 1.5, criterion = 0, n_ratings = 4,
                     deltas = c(0.5, 0.5), threshold_type = "log_distance")
   model <- sdt_rating(c("r1", "r2", "r3", "r4"), "stimulus",
                       threshold_type = "log_distance")
   expect_silent(
-    bmm(bmf(dprime ~ 1, criterion ~ 1, delta1 ~ 1, delta3 ~ 1),
+    bmm(bmf(d ~ 1, criterion ~ 1, delta1 ~ 1, delta3 ~ 1),
         dat, model, backend = "mock", mock_fit = 1, rename = FALSE)
   )
 })
@@ -540,10 +540,10 @@ test_that("sdt_rating posterior_predict draws joint multinomial counts (real fit
   skip_if_not_installed("cmdstanr")
   skip_if(is.null(tryCatch(cmdstanr::cmdstan_version(), error = function(e) NULL)))
 
-  dat <- sim_rating(6, 120, dprime = 1.4, criterion = 0, n_ratings = 4,
+  dat <- sim_rating(6, 120, d = 1.4, criterion = 0, n_ratings = 4,
                     spacing = 0.5)
   model <- sdt_rating(c("r1", "r2", "r3", "r4"), "stimulus")
-  fit <- bmm(bmf(dprime ~ 1, criterion ~ 1, spacing ~ 1), dat, model,
+  fit <- bmm(bmf(d ~ 1, criterion ~ 1, spacing ~ 1), dat, model,
              backend = "cmdstanr", chains = 1, iter = 300, warmup = 150,
              refresh = 0, silent = 2)
 
@@ -563,11 +563,11 @@ test_that("sdt_rating log_distance fits with finite likelihood at K=6 (real fit)
   skip_if_not_installed("cmdstanr")
   skip_if(is.null(tryCatch(cmdstanr::cmdstan_version(), error = function(e) NULL)))
 
-  dat <- sim_rating(6, 150, dprime = 1.4, criterion = 0, n_ratings = 6,
+  dat <- sim_rating(6, 150, d = 1.4, criterion = 0, n_ratings = 6,
                     deltas = c(-0.4, -0.4, -0.4, -0.4),
                     threshold_type = "log_distance")
   model <- sdt_rating(paste0("r", 1:6), "stimulus", threshold_type = "log_distance")
-  fit <- bmm(bmf(dprime ~ 1, criterion ~ 1, delta1 ~ 1, delta2 ~ 1,
+  fit <- bmm(bmf(d ~ 1, criterion ~ 1, delta1 ~ 1, delta2 ~ 1,
                  delta4 ~ 1, delta5 ~ 1),
              dat, model, backend = "cmdstanr", chains = 1, iter = 300, warmup = 150,
              refresh = 0, silent = 2)

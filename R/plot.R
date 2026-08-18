@@ -30,7 +30,9 @@ utils::globalVariables(c(
 #' the fitted noise distribution, and the axis label names that transform
 #' (`z` for normal, `logit` for logistic, `loglog`/`cloglog` for the Gumbel
 #' distributions). On this axis the binary model ROC is a straight line with
-#' slope `1 / exp(sdratio)` and intercept `dprime / exp(sdratio)`, so a slope
+#' slope `1 / exp(sdratio)` and intercept `d * sqrt((1 + exp(sdratio)^2) / 2) /
+#' exp(sdratio)` -- the separation in noise-SD units over the signal SD, since
+#' `d` is \eqn{d_a} -- so a slope
 #' below 1 is the unequal-variance signature (signal SD > noise SD), and
 #' departures of the observed points from a straight line diagnose misfit. This
 #' linearity holds for the symmetric distributions (`"normal"`, `"logistic"`);
@@ -75,7 +77,7 @@ plot.bmm_sdt_roc <- function(x, observed = NULL, condition_col = NULL,
   p <- .plot_roc_curve(p, x, colour_col, ribbon_alpha, point_size, qf)
 
   if (!is.null(observed)) {
-    obs <- .roc_observed_xy(observed)
+    obs <- as.data.frame(observed)
     if (!is.null(qf)) {
       obs <- obs[obs$FA > 0 & obs$FA < 1 & obs$Hit > 0 & obs$Hit < 1, , drop = FALSE]
       obs$FA <- qf(obs$FA)
@@ -117,12 +119,6 @@ plot.bmm_sdt_roc <- function(x, observed = NULL, condition_col = NULL,
   } else if (length(cond_cols) == 1L) {
     cond_cols
   }
-}
-
-
-.roc_observed_xy <- function(observed) {
-  obs <- as.data.frame(observed)
-  obs[, c("FA", "Hit", setdiff(names(obs), c("FA", "Hit"))), drop = FALSE]
 }
 
 
@@ -201,13 +197,13 @@ plot.bmm_sdt_roc <- function(x, observed = NULL, condition_col = NULL,
 #' Plot the latent decision-variable distributions of an SDT model
 #'
 #' Draws the model-implied noise and signal evidence densities on the latent
-#' decision axis. For [sdt_binary()]/[sdt_rating()] the response criterion or the
+#' decision axis. For [sdt_yn()]/[sdt_rating()] the response criterion or the
 #' K-1 confidence thresholds are added as dashed vertical lines with a shaded
 #' credible band; when several boundaries are shown together (e.g. base-rate
 #' criteria or the rating thresholds) they are colour-coded. [sdt_mafc()] and
 #' [sdt_ranking()] have no boundary; with `show_competitors = TRUE` in
 #' [latent_sdt()] the max-of-distractors densities are overlaid as dashed lines,
-#' one per set size. Distinct `dprime`/`sdratio` conditions are faceted.
+#' one per set size. Distinct `d`/`sdratio` conditions are faceted.
 #'
 #' @param x A `"bmm_sdt_latent"` object from [latent_sdt()].
 #' @param condition_col Optional character. Condition column(s) for faceting. If

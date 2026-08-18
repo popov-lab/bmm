@@ -87,9 +87,9 @@ test_that(".sdt_criterion_point_dims classifies criterion-only predictors", {
   expect_length(dims$curves, 0L)
 })
 
-test_that(".sdt_criterion_point_dims treats dprime predictors as curves", {
+test_that(".sdt_criterion_point_dims treats d predictors as curves", {
   fit <- fake_binary_fit()
-  fit$bmm$user_formula <- bmf(dprime ~ 0 + condition, criterion ~ 0 + condition,
+  fit$bmm$user_formula <- bmf(d ~ 0 + condition, criterion ~ 0 + condition,
                               sdratio ~ 1)
   local_mocked_bindings(ranef = function(...) list(), .package = "brms")
   dims <- .sdt_criterion_point_dims(fit)
@@ -111,7 +111,7 @@ test_that(".sdt_criterion_point_dims is empty for intercept-only fits", {
 ############################################################################# !
 
 test_that(".sdt_has_estimated_sdratio uses the model object", {
-  m_ev <- sdt_binary(response = "n_old", stimulus = "stimulus", n_trials = "n_trials")
+  m_ev <- sdt_yn(response = "n_old", stimulus = "stimulus", n_trials = "n_trials")
   expect_false(.sdt_has_estimated_sdratio(m_ev))
   m_uv <- m_ev
   m_uv$fixed_parameters$sdratio <- NULL
@@ -119,10 +119,10 @@ test_that(".sdt_has_estimated_sdratio uses the model object", {
 })
 
 test_that(".sdt_has_estimated_sdratio cross-checks brms::variables", {
-  m_ev <- sdt_binary(response = "n_old", stimulus = "stimulus", n_trials = "n_trials")
+  m_ev <- sdt_yn(response = "n_old", stimulus = "stimulus", n_trials = "n_trials")
   fit <- structure(list(), class = c("bmmfit", "brmsfit"))
   local_mocked_bindings(
-    variables = function(...) c("b_dprime_Intercept", "bsp_sdratio"),
+    variables = function(...) c("b_d_Intercept", "bsp_sdratio"),
     .package = "brms"
   )
   expect_true(.sdt_has_estimated_sdratio(m_ev, fit))
@@ -136,9 +136,9 @@ test_that(".sdt_has_estimated_sdratio cross-checks brms::variables", {
 test_that("roc_sdt() binary single criterion returns a smooth curve", {
   fit <- fake_binary_fit()
   local_mocked_bindings(
-    posterior_linpred = mock_linpred_factory(list(dprime = 1.5, criterion = 0)),
+    posterior_linpred = mock_linpred_factory(list(d = 1.5, criterion = 0)),
     ranef = function(...) list(),
-    variables = function(...) c("b_dprime_Intercept"),
+    variables = function(...) c("b_d_Intercept"),
     .package = "brms"
   )
   roc <- roc_sdt(fit, n_points = 20)
@@ -157,9 +157,9 @@ test_that("roc_sdt() binary auto-detects multi-criteria operating points", {
   fit <- fake_binary_fit(uv = TRUE, multi = TRUE)
   local_mocked_bindings(
     posterior_linpred = mock_linpred_factory(list(
-      dprime = 1.2, criterion = c(-0.8, -0.3, 0, 0.3, 0.8), sdratio = log(1.3))),
+      d = 1.2, criterion = c(-0.8, -0.3, 0, 0.3, 0.8), sdratio = log(1.3))),
     ranef = function(...) list(id = array(0, dim = c(1, 1, 1))),
-    variables = function(...) c("b_dprime_Intercept", "bsp_sdratio"),
+    variables = function(...) c("b_d_Intercept", "bsp_sdratio"),
     .package = "brms"
   )
   roc <- roc_sdt(fit)
@@ -173,8 +173,8 @@ test_that("roc_sdt() binary auto-detects multi-criteria operating points", {
 test_that("roc_sdt() binary multi-criteria points fall on the curve (UV + spread)", {
   fit <- fake_binary_fit(uv = TRUE, multi = TRUE)
   z      <- stats::qnorm(stats::ppoints(n_draws_mock))
-  spread <- list(dprime = 0.18, criterion = 0.10, sdratio = 0.12)
-  base   <- list(dprime = 1.2, criterion = c(-0.8, -0.3, 0, 0.3, 0.8),
+  spread <- list(d = 0.18, criterion = 0.10, sdratio = 0.12)
+  base   <- list(d = 1.2, criterion = c(-0.8, -0.3, 0, 0.3, 0.8),
                  sdratio = log(1.3))
   local_mocked_bindings(
     posterior_linpred = function(object, dpar = NULL, nlpar = NULL,
@@ -185,7 +185,7 @@ test_that("roc_sdt() binary multi-criteria points fall on the curve (UV + spread
              nrow = n_draws_mock)
     },
     ranef = function(...) list(id = array(0, dim = c(1, 1, 1))),
-    variables = function(...) c("b_dprime_Intercept", "bsp_sdratio"),
+    variables = function(...) c("b_d_Intercept", "bsp_sdratio"),
     .package = "brms"
   )
   roc  <- roc_sdt(fit, n_points = 100)
@@ -199,7 +199,7 @@ test_that("roc_sdt() criterion_points = FALSE disables multi-criteria points", {
   fit <- fake_binary_fit(uv = TRUE, multi = TRUE)
   local_mocked_bindings(
     posterior_linpred = mock_linpred_factory(list(
-      dprime = 1.2, criterion = c(-0.8, -0.3, 0, 0.3, 0.8), sdratio = log(1.3))),
+      d = 1.2, criterion = c(-0.8, -0.3, 0, 0.3, 0.8), sdratio = log(1.3))),
     ranef = function(...) list(id = array(0, dim = c(1, 1, 1))),
     variables = function(...) c("bsp_sdratio"),
     .package = "brms"
@@ -217,7 +217,7 @@ test_that("roc_sdt() criterion_points = FALSE disables multi-criteria points", {
 test_that("roc_sdt() rating returns K+1 points per draw with endpoints", {
   fit <- fake_rating_fit()
   local_mocked_bindings(
-    posterior_linpred = mock_linpred_factory(list(dprime = 1.5, criterion = 0, spacing = 0)),
+    posterior_linpred = mock_linpred_factory(list(d = 1.5, criterion = 0, spacing = 0)),
     ranef = function(...) list(),
     variables = function(...) character(0),
     .package = "brms"
@@ -236,7 +236,7 @@ test_that("roc_sdt() rating returns K+1 points per draw with endpoints", {
 test_that("roc_sdt() rating attaches a smooth implied curve + threshold points", {
   fit <- fake_rating_fit()
   local_mocked_bindings(
-    posterior_linpred = mock_linpred_factory(list(dprime = 1.5, criterion = 0, spacing = 0)),
+    posterior_linpred = mock_linpred_factory(list(d = 1.5, criterion = 0, spacing = 0)),
     ranef = function(...) list(),
     variables = function(...) character(0),
     .package = "brms"
@@ -259,13 +259,18 @@ test_that("roc_sdt() rating attaches a smooth implied curve + threshold points",
                     "Hit_mean", "Hit_lower", "Hit_upper") %in% names(pts)))
 })
 
-test_that("roc_sdt() rating threshold points fall on the smooth curve", {
-  for (dist in c("normal", "logistic", "gumbel_min")) {
+test_that("roc_sdt() rating threshold points fall on the model-implied ROC", {
+  # Checked against the ROC evaluated at each point's own FA rather than against
+  # a linear interpolation of `summary`: a threshold can land at an FA below the
+  # curve's grid floor (0.001) -- for gumbel_min the ROC is already at Hit ~ 0.1
+  # by FA = 1e-5 -- where interpolating from the (0, 0) endpoint is inaccurate
+  # no matter how large n_points is.
+  base <- list(d = 1.4, criterion = 0.1, spacing = 0, sdratio = log(1.2))
+  z    <- stats::qnorm(stats::ppoints(n_draws_mock))
+
+  roc_points <- function(dist, spread) {
     fit <- fake_rating_fit(uv = TRUE)
     fit$bmm$model$other_vars$dist <- dist
-    z      <- stats::qnorm(stats::ppoints(n_draws_mock))
-    spread <- list(dprime = 0.15, criterion = 0.10, spacing = 0.05, sdratio = 0.10)
-    base   <- list(dprime = 1.4, criterion = 0.1, spacing = 0, sdratio = log(1.2))
     local_mocked_bindings(
       posterior_linpred = function(object, dpar = NULL, nlpar = NULL,
                                    newdata = NULL, ...) {
@@ -278,15 +283,46 @@ test_that("roc_sdt() rating threshold points fall on the smooth curve", {
       variables = function(...) c("bsp_sdratio"),
       .package = "brms"
     )
-    roc  <- roc_sdt(fit, n_points = 200)
-    summ <- attr(roc, "summary")
-    pts  <- attr(roc, "points")
-    hit_on_curve <- stats::approx(summ$FA, summ$Hit_mean, xout = pts$FA_mean)$y
-    # Tolerance covers the small posterior-mean-point vs posterior-mean-curve
-    # (Jensen) gap, larger for the curved Gumbel ROC. A wrong sign convention
-    # would put the Gumbel points off the curve by >0.1, which this still
-    # catches; exact placement is checked above with constant draws.
-    expect_lt(max(abs(pts$Hit_mean - hit_on_curve)), 0.02)
+    roc <- roc_sdt(fit, n_points = 200)
+    list(points = attr(roc, "points"), summary = attr(roc, "summary"))
+  }
+
+  # FA = 1 - cdf(t + sep/2) and Hit = 1 - cdf((t - sep/2) / sigma), so
+  # eliminating t gives Hit as a function of FA. `d` is d_a, so the separation
+  # on the noise-standardized axis is d * sqrt((1 + sigma^2) / 2).
+  hit_on_roc <- function(dist, fa) {
+    sigma <- exp(base$sdratio)
+    sep   <- base$d * sqrt((1 + sigma^2) / 2)
+    1 - .sdt_dists[[dist]]$cdf(
+      (.sdt_dists[[dist]]$qf(1 - fa) - sep) / sigma
+    )
+  }
+
+  flat <- list(d = 0, criterion = 0, spacing = 0, sdratio = 0)
+  wide <- list(d = 0.15, criterion = 0.10, spacing = 0.05, sdratio = 0.10)
+
+  for (dist in names(.sdt_dists)) {
+    # With no posterior spread the operating points must sit on the ROC exactly.
+    # This is the sharp check: a mirrored distribution convention breaks it by
+    # >0.05 even though every marginal probability still looks plausible.
+    flat_res <- roc_points(dist, flat)
+    expect_equal(flat_res$points$Hit_mean,
+                 hit_on_roc(dist, flat_res$points$FA_mean),
+                 tolerance = 1e-8, info = dist)
+
+    # With spread the points are posterior means of a non-linear map, so they
+    # sit slightly off the mean-parameter curve. The gap is largest for
+    # gumbel_min, whose ROC is steepest near the origin (0.063 here; the other
+    # three stay under 0.023). Reporting d_a widens it: the separation is
+    # d * sqrt((1 + sigma^2)/2), so the draws pass through a second non-linear
+    # step before reaching the ROC. This is a slack bound on that Jensen gap,
+    # not an accuracy claim -- the sharp check is the flat case above.
+    wide_res <- roc_points(dist, wide)
+    expect_lt(max(abs(wide_res$points$Hit_mean -
+                        hit_on_roc(dist, wide_res$points$FA_mean))), 0.07)
+
+    expect_true(all(diff(wide_res$summary$FA) >= 0), info = dist)
+    expect_equal(range(wide_res$summary$FA), c(0, 1), info = dist)
   }
 })
 
@@ -299,9 +335,9 @@ test_that("auc_sdt() binary normal EV uses the analytical Phi(d/sqrt(2))", {
   fit <- fake_binary_fit()
   dpr <- 1.5
   local_mocked_bindings(
-    posterior_linpred = mock_linpred_factory(list(dprime = dpr, criterion = 0)),
+    posterior_linpred = mock_linpred_factory(list(d = dpr, criterion = 0)),
     ranef = function(...) list(),
-    variables = function(...) c("b_dprime_Intercept"),
+    variables = function(...) c("b_d_Intercept"),
     .package = "brms"
   )
   auc <- auc_sdt(fit)
@@ -312,7 +348,7 @@ test_that("auc_sdt() binary normal EV uses the analytical Phi(d/sqrt(2))", {
 test_that("auc_sdt() rating uses the numerical path and stays in (0.5, 1)", {
   fit <- fake_rating_fit()
   local_mocked_bindings(
-    posterior_linpred = mock_linpred_factory(list(dprime = 1.5, criterion = 0, spacing = 0)),
+    posterior_linpred = mock_linpred_factory(list(d = 1.5, criterion = 0, spacing = 0)),
     ranef = function(...) list(),
     variables = function(...) character(0),
     .package = "brms"
@@ -356,7 +392,7 @@ test_that("latent_sdt() draws densities without boundary lines (mafc, ranking)",
   for (maker in list(fake_mafc_fit, fake_ranking_fit)) {
     fit <- maker()
     local_mocked_bindings(
-      posterior_linpred = mock_linpred_factory(list(dprime = 1.4)),
+      posterior_linpred = mock_linpred_factory(list(d = 1.4)),
       ranef = function(...) list(),
       variables = function(...) character(0),
       .package = "brms"
@@ -374,9 +410,9 @@ test_that("latent_sdt() binary returns noise/signal densities + criterion line",
   fit <- fake_binary_fit()
   dp  <- 1.5
   local_mocked_bindings(
-    posterior_linpred = mock_linpred_factory(list(dprime = dp, criterion = 0.3)),
+    posterior_linpred = mock_linpred_factory(list(d = dp, criterion = 0.3)),
     ranef = function(...) list(),
-    variables = function(...) "b_dprime_Intercept",
+    variables = function(...) "b_d_Intercept",
     .package = "brms"
   )
   lat <- latent_sdt(fit, n_grid = 200L)
@@ -407,7 +443,7 @@ test_that("latent_sdt() binary returns noise/signal densities + criterion line",
 test_that("latent_sdt() rating returns ordered threshold lines per condition", {
   fit <- fake_rating_fit(n_ratings = 6L)
   local_mocked_bindings(
-    posterior_linpred = mock_linpred_factory(list(dprime = 1.5, criterion = 0, spacing = 0)),
+    posterior_linpred = mock_linpred_factory(list(d = 1.5, criterion = 0, spacing = 0)),
     ranef = function(...) list(),
     variables = function(...) character(0),
     .package = "brms"
@@ -424,7 +460,7 @@ test_that("latent_sdt() collapses criterion-only dimensions into one panel", {
   fit <- fake_binary_fit(uv = TRUE, multi = TRUE)   # criterion ~ 0 + condition
   local_mocked_bindings(
     posterior_linpred = mock_linpred_factory(list(
-      dprime = 1.2, criterion = c(-0.8, -0.3, 0, 0.3, 0.8), sdratio = log(1.3))),
+      d = 1.2, criterion = c(-0.8, -0.3, 0, 0.3, 0.8), sdratio = log(1.3))),
     ranef = function(...) list(id = array(0, dim = c(1, 1, 1))),
     variables = function(...) "bsp_sdratio",
     .package = "brms"
@@ -445,7 +481,7 @@ test_that("latent_sdt() collapses criterion-only dimensions into one panel", {
 test_that("latent_sdt() show_competitors overlays max-of-distractors per set size", {
   fit <- fake_ranking_fit()                          # constant m = 3
   local_mocked_bindings(
-    posterior_linpred = mock_linpred_factory(list(dprime = 1.4)),
+    posterior_linpred = mock_linpred_factory(list(d = 1.4)),
     ranef = function(...) list(),
     variables = function(...) character(0),
     .package = "brms"
@@ -468,16 +504,43 @@ test_that("latent_sdt() UV widens the signal distribution by exp(sdratio)", {
   fit  <- fake_binary_fit(uv = TRUE)
   sdr  <- log(1.4)
   local_mocked_bindings(
-    posterior_linpred = mock_linpred_factory(list(dprime = 1.2, criterion = 0,
+    posterior_linpred = mock_linpred_factory(list(d = 1.2, criterion = 0,
                                                   sdratio = sdr)),
     ranef = function(...) list(),
-    variables = function(...) c("b_dprime_Intercept", "bsp_sdratio"),
+    variables = function(...) c("b_d_Intercept", "bsp_sdratio"),
     .package = "brms"
   )
   lat    <- latent_sdt(fit, n_grid = 200L)
   signal <- lat[lat$distribution == "signal", ]
-  expect_equal(signal$density, dnorm(signal$x, 1.2 / 2, exp(sdr)),
+  noise  <- lat[lat$distribution == "noise", ]
+  # d is d_a, so the densities sit at +/- sep/2 with sep the separation in
+  # noise-SD units -- not at +/- d/2, which would understate it whenever
+  # sdratio > 0.
+  sep <- 1.2 * sqrt((1 + exp(sdr)^2) / 2)
+  expect_equal(signal$density, dnorm(signal$x, sep / 2, exp(sdr)),
                tolerance = 1e-10)
+  expect_equal(noise$density, dnorm(noise$x, -sep / 2, 1), tolerance = 1e-10)
+})
+
+test_that("latent_sdt() density separation is d_a in RMS-SD units", {
+  # the defining property of d_a: the gap between the two density modes,
+  # divided by the root-mean-square of the two SDs, returns the d parameter
+  fit <- fake_binary_fit(uv = TRUE)
+  sdr <- log(1.7)
+  local_mocked_bindings(
+    posterior_linpred = mock_linpred_factory(list(d = 1.2, criterion = 0,
+                                                  sdratio = sdr)),
+    ranef = function(...) list(),
+    variables = function(...) c("b_d_Intercept", "bsp_sdratio"),
+    .package = "brms"
+  )
+  lat  <- latent_sdt(fit, n_grid = 4001L)
+  mode_of <- function(which) {
+    sub <- lat[lat$distribution == which, ]
+    sub$x[which.max(sub$density)]
+  }
+  sep <- mode_of("signal") - mode_of("noise")
+  expect_equal(sep / sqrt((1 + exp(sdr)^2) / 2), 1.2, tolerance = 1e-2)
 })
 
 
@@ -488,7 +551,7 @@ test_that("latent_sdt() UV widens the signal distribution by exp(sdratio)", {
 test_that("sdt_thresholds() returns per-draw samples + a K-1 summary", {
   fit <- fake_rating_fit(n_ratings = 6L)
   local_mocked_bindings(
-    posterior_linpred = mock_linpred_factory(list(dprime = 1.5, criterion = 0, spacing = 0)),
+    posterior_linpred = mock_linpred_factory(list(d = 1.5, criterion = 0, spacing = 0)),
     ranef = function(...) list(),
     variables = function(...) character(0),
     .package = "brms"
@@ -522,7 +585,7 @@ test_that("mratio() returns a posterior summary with per-draw values in an attri
   fit <- fake_rating_fit(n_ratings = 6L, version = "metad")
   local_mocked_bindings(
     posterior_linpred = mock_linpred_factory(
-      list(dprime = 1.6, criterion = 0, spacing = 0, logmratio = log(0.75))),
+      list(d = 1.6, criterion = 0, spacing = 0, logmratio = log(0.75))),
     ranef = function(...) list(),
     variables = function(...) character(0),
     .package = "brms"
@@ -534,7 +597,7 @@ test_that("mratio() returns a posterior summary with per-draw values in an attri
   expect_equal(nrow(mr), 2L)
   expect_setequal(unique(mr$parameter), c("mratio", "metad"))
 
-  # M-ratio = exp(logmratio); meta-d' = M-ratio * dprime
+  # M-ratio = exp(logmratio); meta-d' = M-ratio * d
   expect_equal(mr$mean[mr$parameter == "mratio"], 0.75, tolerance = 1e-6)
   expect_equal(mr$median[mr$parameter == "mratio"], 0.75, tolerance = 1e-6)
   expect_equal(mr$mean[mr$parameter == "metad"], 0.75 * 1.6, tolerance = 1e-6)
@@ -560,7 +623,7 @@ test_that("latent_sdt() reports M-ratio and meta-d' for the metad version", {
   local_mocked_bindings(ranef = function(...) list(), .package = "brms")
   local_mocked_bindings(
     posterior_linpred = mock_linpred_factory(
-      list(dprime = 1.6, criterion = 0, spacing = 0, logmratio = log(0.75))),
+      list(d = 1.6, criterion = 0, spacing = 0, logmratio = log(0.75))),
     .package = "brms")
   extra <- attr(latent_sdt(fit), "extra")
   expect_false(is.null(extra))
@@ -578,7 +641,7 @@ test_that("sdt_thresholds() summary matches latent_sdt() lines across parameteri
   for (s in specs) {
     fit  <- fake_rating_fit(threshold_type = s$tt, n_ratings = s$K)
     pars <- names(fit$bmm$model$parameters)
-    draws <- list(dprime = 1.5, criterion = 0.2)
+    draws <- list(d = 1.5, criterion = 0.2)
     if ("spacing" %in% pars) draws$spacing <- 0
     for (d in grep("^delta", pars, value = TRUE)) draws[[d]] <- 0
 
@@ -612,7 +675,7 @@ test_that(".auc_sdt_summary reports the posterior mean and band", {
 test_that("print methods emit a short header", {
   fit <- fake_binary_fit()
   local_mocked_bindings(
-    posterior_linpred = mock_linpred_factory(list(dprime = 1.5, criterion = 0)),
+    posterior_linpred = mock_linpred_factory(list(d = 1.5, criterion = 0)),
     ranef = function(...) list(),
     variables = function(...) character(0),
     .package = "brms"
@@ -620,4 +683,111 @@ test_that("print methods emit a short header", {
   expect_output(print(roc_sdt(fit, n_points = 10)), "SDT ROC curve")
   expect_output(print(auc_sdt(fit)), "SDT AUC")
   expect_output(print(latent_sdt(fit, n_grid = 20)), "SDT latent distributions")
+})
+
+
+############################################################################# !
+# SENSITIVITY                                                            ####
+############################################################################# !
+
+test_that("sdt_sensitivity() converts d_a to the noise and signal scales", {
+  fit <- fake_binary_fit(uv = TRUE)
+  sdr <- log(1.6)
+  local_mocked_bindings(
+    posterior_linpred = mock_linpred_factory(list(d = 1.3, criterion = 0,
+                                                  sdratio = sdr)),
+    ranef = function(...) list(),
+    variables = function(...) c("b_d_Intercept", "bsp_sdratio"),
+    .package = "brms"
+  )
+  res <- sdt_sensitivity(fit)
+  val <- function(m) unique(res$value[res$measure == m])
+
+  # first principles: separation = d_a * rms scale; divide by each reference SD
+  sigma <- exp(sdr)
+  sep   <- 1.3 * sqrt((1 + sigma^2) / 2)
+  expect_equal(val("da"), 1.3, tolerance = 1e-12)
+  expect_equal(val("dn"), sep, tolerance = 1e-12)
+  expect_equal(val("ds"), sep / sigma, tolerance = 1e-12)
+
+  # the ratio of the two reference scales is the SD ratio itself
+  expect_equal(val("dn") / val("ds"), sigma, tolerance = 1e-12)
+  # and d_a orders between them whenever the SDs differ
+  expect_true(val("ds") < val("da") && val("da") < val("dn"))
+})
+
+test_that("sdt_sensitivity() collapses to one value under equal variance", {
+  fit <- fake_binary_fit()
+  local_mocked_bindings(
+    posterior_linpred = mock_linpred_factory(list(d = 1.5, criterion = 0)),
+    ranef = function(...) list(),
+    variables = function(...) character(0),
+    .package = "brms"
+  )
+  res <- sdt_sensitivity(fit)
+  expect_equal(unique(res$value), 1.5, tolerance = 1e-12)
+  expect_setequal(unique(res$measure), c("da", "dn", "ds"))
+})
+
+test_that("sdt_sensitivity() converts per draw, not from point estimates", {
+  # d and sdratio are correlated across draws here, so a conversion applied to
+  # the posterior means would give a different mean than converting draw-wise
+  fit <- fake_binary_fit(uv = TRUE)
+  z   <- stats::qnorm(stats::ppoints(n_draws_mock))
+  local_mocked_bindings(
+    posterior_linpred = function(object, dpar = NULL, nlpar = NULL,
+                                 newdata = NULL, ...) {
+      par <- if (!is.null(dpar)) dpar else nlpar
+      base <- c(d = 1.3, criterion = 0, sdratio = log(1.6))[[par]]
+      spread <- c(d = 0.4, criterion = 0, sdratio = 0.35)[[par]]
+      matrix(base + spread * z, nrow = n_draws_mock)
+    },
+    ranef = function(...) list(),
+    variables = function(...) c("b_d_Intercept", "bsp_sdratio"),
+    .package = "brms"
+  )
+  res <- sdt_sensitivity(fit, measure = "dn")
+
+  d_draws     <- 1.3 + 0.4 * z
+  sigma_draws <- exp(log(1.6) + 0.35 * z)
+  expect_equal(res$value, d_draws * sqrt((1 + sigma_draws^2) / 2),
+               tolerance = 1e-12)
+  # the plug-in shortcut would be biased -- confirm the two really differ
+  plug_in <- mean(d_draws) * sqrt((1 + mean(sigma_draws)^2) / 2)
+  expect_gt(abs(mean(res$value) - plug_in), 1e-3)
+})
+
+test_that("sdt_sensitivity() honours measure selection and summarises draws", {
+  fit <- fake_binary_fit(uv = TRUE)
+  local_mocked_bindings(
+    posterior_linpred = mock_linpred_factory(list(d = 1.3, criterion = 0,
+                                                  sdratio = log(1.6))),
+    ranef = function(...) list(),
+    variables = function(...) c("b_d_Intercept", "bsp_sdratio"),
+    .package = "brms"
+  )
+  res <- sdt_sensitivity(fit, measure = c("dn", "ds"))
+  expect_setequal(unique(res$measure), c("dn", "ds"))
+  expect_equal(nrow(res), 2L * n_draws_mock)
+
+  summ <- attr(res, "summary")
+  expect_true(all(c("measure", "mean", "lower", "upper") %in% names(summ)))
+  expect_equal(summ$mean[summ$measure == "dn"],
+               mean(res$value[res$measure == "dn"]), tolerance = 1e-12)
+  expect_error(sdt_sensitivity(fit, measure = "dprime"), "arg")
+})
+
+test_that("sdt_sensitivity() rejects non-SDT and non-bmmfit input", {
+  expect_error(sdt_sensitivity(list()), "bmmfit")
+})
+
+test_that("sdt_sensitivity() print method labels the three scales", {
+  fit <- fake_binary_fit()
+  local_mocked_bindings(
+    posterior_linpred = mock_linpred_factory(list(d = 1.5, criterion = 0)),
+    ranef = function(...) list(),
+    variables = function(...) character(0),
+    .package = "brms"
+  )
+  expect_output(print(sdt_sensitivity(fit)), "SDT sensitivity")
 })

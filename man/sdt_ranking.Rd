@@ -16,11 +16,14 @@ supply \code{max(m)} columns.}
 (constant across all rows), or a single string naming a data column that
 gives the number of ranked items per row.}
 
-\item{dist}{Character. The noise distribution:
+\item{dist}{Character. The distribution assumed for the latent evidence,
+given here by its cumulative distribution function:
 \itemize{
-\item "gumbel_min" (default): Closed-form Gumbel-min ranking
-\item "normal": Gaussian ranking (supports unequal variance via
-sdratio)
+\item "gumbel_min" (default): smallest extreme value,
+\eqn{1 - \exp(-\exp(x))} (complementary log-log). Closed form via
+gamma-function ratios.
+\item "normal": Gaussian, \eqn{\Phi(x)} (supports unequal variance via
+\code{sdratio})
 }}
 
 \item{links}{A named list of link functions for the parameters.}
@@ -42,7 +45,6 @@ Ranking Signal Detection Theory Model
 \itemize{
 \item Meyer-Grant, C. G., Kellen, D., Harding, S. M., & Singmann, H. (2025). Extreme-value signal detection theory for recognition memory: The parametric road not taken. PsyArXiv. https://doi.org/10.31234/osf.io/qhrfj
 }
-\item \strong{Version:} ranking
 \item \strong{Requirements:}
 
 Provide pre-aggregated ranking counts in wide format:
@@ -55,16 +57,16 @@ No stimulus column needed (all trials include exactly one target)
 \itemize{
 \item \strong{Parameters:}
 \itemize{
-\item \code{dprime}: Sensitivity: ranking discrimination parameter
+\item \code{d}: Sensitivity: the balanced discriminability index d_a, the distance between the target and lure distributions in units of their root-mean-square SD; equals d' (g' for gumbel_min) under equal variance
 }
 \item \strong{Fixed parameters:}
 \item \strong{Default parameter links:}
 \itemize{
-\item dprime = identity
+\item d = identity
 }
 \item \strong{Default priors:}
 \itemize{
-\item \code{dprime}:
+\item \code{d}:
 \itemize{
 \item \code{main}: normal(1, 1)
 \item \code{effects}: normal(0, 0.5)
@@ -72,7 +74,7 @@ No stimulus column needed (all trials include exactly one target)
 }
 }
 
-Models the rank ordering of \code{m} items by perceived strength. Only \code{dprime}
+Models the rank ordering of \code{m} items by perceived strength. Only \code{d}
 is estimated (no criterion). Supports \code{dist = "gumbel_min"} (closed-form via
 lgamma ratios) and \code{dist = "normal"} (Gauss-Hermite quadrature).
 
@@ -81,6 +83,25 @@ multinomial category whose logit is set to \verb{log p(rank)}, so \code{softmax}
 recovers the rank distribution exactly. This means \code{log_lik},
 \code{posterior_predict}, \code{posterior_epred}, and \code{pp_check} come from brms as
 proper joint multinomial draws.
+}
+\section{Sensitivity is on the same scale as \code{\link[=sdt_yn]{sdt_yn()}}}{
+
+\code{d} is the balanced index \eqn{d_a} that the rest of the SDT family reports:
+the separation between the target and lure distributions divided by the
+root-mean-square of their SDs. It equals \eqn{d'} whenever the two share a
+scale, which is always the case for \code{dist = "gumbel_min"} (there it is the
+\eqn{g'} of Meyer-Grant et al.) and is the default for \code{dist = "normal"}.
+
+Ranking is the one SDT design that identifies the variance ratio from a
+single condition. The rank distribution supplies \code{m - 1} free probabilities
+per set size, so with \code{m >= 3} there is enough information to separate \code{d}
+from \code{sdratio} without the criterion sweep that \code{\link[=sdt_yn]{sdt_yn()}} needs -- the
+\emph{shape} of the rank distribution, not just its mean, carries the ratio.
+
+At \code{m = 2} the model reduces to 2AFC and the two parameters are no longer
+separable: the probability of ranking the target first is the area under the
+yes/no ROC, which for Gaussian noise is \eqn{\Phi(d/\sqrt{2})} whatever
+\code{sdratio} is. Keep \code{sdratio} fixed for two-item designs.
 
 For Gaussian ranking (\code{dist = "normal"}), \code{sdratio} is fixed to 0 by default.
 Add \code{sdratio ~ 1} to the formula for unequal-variance ranking.
@@ -90,10 +111,11 @@ column to fit trials with different set sizes in a single model: the response
 has \code{max(m)} columns, and rows with a smaller set size switch off the surplus
 rank categories (the multinomial then renormalizes over the valid ranks).
 }
+
 \examples{
 \dontrun{
 dat <- data.frame(id = 1:20)
-dat <- cbind(dat, rsdt_ranking(20, 200, m = 4, dprime = 1.5))
+dat <- cbind(dat, rsdt_ranking(20, 200, m = 4, d = 1.5))
 
 model <- sdt_ranking(
   response = c("rank1", "rank2", "rank3", "rank4"),
@@ -101,7 +123,7 @@ model <- sdt_ranking(
 )
 
 fit <- bmm(
-  formula = bmf(dprime ~ 1),
+  formula = bmf(d ~ 1),
   data = dat,
   model = model,
   cores = 4,

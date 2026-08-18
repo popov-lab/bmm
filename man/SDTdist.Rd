@@ -2,20 +2,20 @@
 % Please edit documentation in R/distributions.R
 \name{SDTdist}
 \alias{SDTdist}
-\alias{sdt_dprime}
+\alias{sdt_d}
 \alias{sdt_criterion}
 \title{Utility functions for Signal Detection Theory}
 \usage{
-sdt_dprime(
+sdt_d(
   hit_rate,
   fa_rate,
-  dist = c("normal", "logistic", "gumbel_min", "gumbel_max")
+  dist = c("normal", "gumbel_min", "gumbel_max", "logistic")
 )
 
 sdt_criterion(
   hit_rate,
   fa_rate,
-  dist = c("normal", "logistic", "gumbel_min", "gumbel_max")
+  dist = c("normal", "gumbel_min", "gumbel_max", "logistic")
 )
 }
 \arguments{
@@ -23,28 +23,46 @@ sdt_criterion(
 
 \item{fa_rate}{Numeric. Proportion of false alarms (P("old" | noise)).}
 
-\item{dist}{Character. Noise distribution: "normal" (default), "logistic",
-"gumbel_min", or "gumbel_max".}
+\item{dist}{Character. The distribution assumed for the latent evidence,
+given here by its cumulative distribution function:
+\itemize{
+\item "normal" (default): Gaussian, \eqn{\Phi(x)}
+\item "gumbel_min": smallest extreme value, \eqn{1 - \exp(-\exp(x))}
+(the complementary log-log distribution)
+\item "gumbel_max": largest extreme value, \eqn{\exp(-\exp(-x))}
+(the log-log distribution, as in \code{evd::pgumbel})
+\item "logistic": \eqn{1 / (1 + \exp(-x))}
+}}
 }
 \value{
-\code{sdt_dprime} returns the sensitivity index appropriate for the
-chosen distribution: \eqn{d' = \Phi^{-1}(H) - \Phi^{-1}(FA)} for \code{dist = "normal"}; g' = log(FA) - log(H) for \code{dist = "gumbel_min"} (Meyer-Grant
-et al., 2025); analogous quantile-difference measures for other
-distributions.
+\code{sdt_d} returns the distance between the signal and noise
+distributions on the latent evidence axis, obtained by inverting the
+decision rule "respond old when the evidence exceeds the criterion":
+\eqn{Q(1 - FA) - Q(1 - H)}, where \eqn{Q} is the quantile function of
+\code{dist}. For \code{dist = "normal"} this reduces to the familiar
+\eqn{d' = \Phi^{-1}(H) - \Phi^{-1}(FA)}. Because one operating point implies
+equal variance, this matches the \code{d} parameter of \code{\link[=sdt_yn]{sdt_yn()}} whenever
+\code{sdratio} is at its default.
 
-\code{sdt_criterion} returns the criterion (response bias) value.
+\code{sdt_criterion} returns the criterion (response bias) on the
+centred, noise-standardized evidence axis used by \code{\link[=sdt_yn]{sdt_yn()}}, where the
+noise and signal distributions sit at -d'/2 and +d'/2:
+\eqn{(Q(1 - FA) + Q(1 - H)) / 2}. For \code{dist = "normal"} this reduces to
+the familiar \eqn{-(\Phi^{-1}(H) + \Phi^{-1}(FA)) / 2}.
 }
 \description{
-Compute sensitivity (d') and criterion from hit and false
-alarm rates for different SDT distribution families.
+Compute sensitivity and criterion from hit and false alarm
+rates for different SDT distribution families. A single (hit, false alarm)
+pair cannot identify the signal-to-noise SD ratio, so both quantities are
+the equal-variance values; see \code{\link[=sdt_yn]{sdt_yn()}} for the unequal-variance
+model.
 }
 \examples{
-# Compute d' from hit and false alarm rates (Gaussian SDT)
-sdt_dprime(hit_rate = 0.8, fa_rate = 0.2, dist = "normal")
+# Compute d from hit and false alarm rates (Gaussian SDT)
+sdt_d(hit_rate = 0.8, fa_rate = 0.2, dist = "normal")
 
-# Compute g' from hit and false alarm rates (Gumbel-min SDT)
-# g' = log(FA) - log(H), invariant under uniform choice-set expansion
-sdt_dprime(hit_rate = 0.8, fa_rate = 0.2, dist = "gumbel_min")
+# The extreme-value analogue
+sdt_d(hit_rate = 0.75, fa_rate = 0.25, dist = "gumbel_min")
 # Compute criterion from hit and false alarm rates
 sdt_criterion(hit_rate = 0.8, fa_rate = 0.2, dist = "normal")
 }

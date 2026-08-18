@@ -10,8 +10,8 @@ dsdt_mafc(
   n_correct,
   n_trials,
   m,
-  dprime,
-  dist = c("normal", "logistic", "gumbel_min", "gumbel_max"),
+  d,
+  dist = c("normal", "gumbel_min", "gumbel_max", "logistic"),
   log = FALSE
 )
 
@@ -19,8 +19,8 @@ rsdt_mafc(
   n,
   n_trials,
   m,
-  dprime,
-  dist = c("normal", "logistic", "gumbel_min", "gumbel_max")
+  d,
+  dist = c("normal", "gumbel_min", "gumbel_max", "logistic")
 )
 }
 \arguments{
@@ -31,15 +31,26 @@ rsdt_mafc(
 \item{m}{Integer vector. Number of alternatives per observation. Must be
 at least 2.}
 
-\item{dprime}{Numeric vector. Sensitivity parameter(s).}
+\item{d}{Numeric vector. Sensitivity: the distance between the signal and
+distractor distributions in SD units. m-AFC assumes a common scale for
+the two distributions, so this is the equal-variance case of the balanced
+index \eqn{d_a} that \code{\link[=sdt_yn]{sdt_yn()}} reports, where it coincides with \eqn{d'}.}
 
-\item{dist}{The noise distribution: one of "normal" (default), "logistic",
-"gumbel_min", or "gumbel_max".}
+\item{dist}{Character. The distribution assumed for the latent evidence,
+given here by its cumulative distribution function:
+\itemize{
+\item "normal" (default): Gaussian, \eqn{\Phi(x)}
+\item "gumbel_min": smallest extreme value, \eqn{1 - \exp(-\exp(x))}
+(the complementary log-log distribution)
+\item "gumbel_max": largest extreme value, \eqn{\exp(-\exp(-x))}
+(the log-log distribution, as in \code{evd::pgumbel})
+\item "logistic": \eqn{1 / (1 + \exp(-x))}
+}}
 
 \item{log}{Logical. If \code{TRUE}, returns log-density (default \code{FALSE}).}
 
 \item{n}{Integer. Number of observations to generate. \code{n_trials}, \code{m}, and
-\code{dprime} are recycled to this length.}
+\code{d} are recycled to this length.}
 }
 \value{
 \code{dsdt_mafc} returns the (log-)density (binomial probability).
@@ -49,24 +60,24 @@ responses per observation.
 \description{
 Density and random generation for m-alternative forced choice
 signal detection theory (DeCarlo, 2012). Models accuracy in tasks where
-one of \code{m} alternatives contains the signal. Only the \code{dprime} parameter
+one of \code{m} alternatives contains the signal. Only the \code{d} parameter
 is estimated (no criterion). All arguments are recycled to the length of
-the longest one, so passing vectors of \code{dprime}, \code{m}, or \code{n_trials}
+the longest one, so passing vectors of \code{d}, \code{m}, or \code{n_trials}
 generates (or evaluates) one observation per element.
 }
 \examples{
 # 4-AFC density
-dsdt_mafc(n_correct = 80, n_trials = 100, m = 4, dprime = 1.5)
+dsdt_mafc(n_correct = 80, n_trials = 100, m = 4, d = 1.5)
 # Generate 4-AFC data for 20 subjects with varying sensitivity
 dat <- data.frame(id = 1:20, n_trials = 200L)
 dat$n_correct <- rsdt_mafc(nrow(dat), dat$n_trials, m = 4,
-                           dprime = rnorm(20, 1.5, 0.4))
+                           d = rnorm(20, 1.5, 0.4))
 head(dat)
 }
 \references{
 DeCarlo, L. T. (2012). On a signal detection approach to m-alternative
 forced choice with bias, with maximum likelihood and Bayesian approaches
-to estimation. \emph{Journal of Mathematical and Statistical Psychology},
-\emph{11}(1), 257--282.
+to estimation. \emph{Journal of Mathematical Psychology}, \emph{56}(3),
+196--207. \doi{10.1016/j.jmp.2012.02.004}
 }
 \keyword{distribution}

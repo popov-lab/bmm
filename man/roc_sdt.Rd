@@ -31,12 +31,12 @@ credible band (default \code{c(0.025, 0.975)}).}
 
 \item{criterion_points}{Optional. Control of the binary multi-criteria
 behaviour. \code{NULL} (default) auto-detects predictors that vary the criterion
-only (not \code{dprime}/\code{sdratio}) and treats their levels as operating points
+only (not \code{d}/\code{sdratio}) and treats their levels as operating points
 on one curve. Pass a character vector of column names to force that
 classification, or \code{FALSE} to disable it (one separate curve per predictor
 combination). Ignored for rating models.}
 
-\item{...}{Additional arguments passed to \code{\link[brms:posterior_linpred.brmsfit]{brms::posterior_linpred()}}.}
+\item{...}{Additional arguments passed to \code{\link[brms:posterior_linpred]{brms::posterior_linpred()}}.}
 }
 \value{
 A data frame of class \code{"bmm_sdt_roc"} with columns \code{FA}, \code{Hit},
@@ -49,14 +49,14 @@ or the K-1 confidence thresholds (labelled \code{c1}..\code{c(K-1)}) for rating 
 \description{
 Computes the receiver operating characteristic (ROC) curve implied by the
 posterior distribution of a signal detection model fit with \code{\link[=bmm]{bmm()}}. ROC
-curves require a response criterion, so they are defined for \code{\link[=sdt_binary]{sdt_binary()}}
+curves require a response criterion, so they are defined for \code{\link[=sdt_yn]{sdt_yn()}}
 and \code{\link[=sdt_rating]{sdt_rating()}} only (not the criterion-free \code{\link[=sdt_mafc]{sdt_mafc()}} and
 \code{\link[=sdt_ranking]{sdt_ranking()}}).
 }
 \details{
 For \strong{binary} models the ROC is traced analytically from the posterior of
-\code{dprime} (and \code{sdratio} for unequal-variance SDT) over a grid of criterion
-values. When the criterion varies across conditions but \code{dprime}/\code{sdratio}
+\code{d} (and \code{sdratio} for unequal-variance SDT) over a grid of criterion
+values. When the criterion varies across conditions but \code{d}/\code{sdratio}
 do not (e.g. a base-rate manipulation, as in \link{broeder_schuetz_2009_e3}), the
 several criteria are operating points on a single curve: \code{roc_sdt()} returns
 one smooth curve and attaches the model-implied points (one per criterion
@@ -65,7 +65,7 @@ level) as a \code{points} attribute.
 For \strong{rating} models the K-1 confidence thresholds define K-1 empirical ROC
 points per posterior draw (returned as the data frame). The smooth
 model-implied curve is traced over a virtual cut from the posterior of
-\code{dprime} (and \code{sdratio}) and attached as the \code{summary} attribute, with the K-1
+\code{d} (and \code{sdratio}) and attached as the \code{summary} attribute, with the K-1
 thresholds attached as the \code{points} attribute (labelled \code{c1}..\code{c(K-1)}) so
 they fall on the curve.
 }

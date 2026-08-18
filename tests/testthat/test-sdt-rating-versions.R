@@ -45,15 +45,15 @@ test_that("standard version is the default and keeps the base parameters", {
 
 test_that("recollection is freed from fixed_parameters via the formula", {
   m <- sdt_rating(c("r1", "r2", "r3", "r4"), "stimulus", version = "dpsdt")
-  f <- bmf(dprime ~ 1, criterion ~ 1, spacing ~ 1)
+  f <- bmf(d ~ 1, criterion ~ 1, spacing ~ 1)
   expect_equal(names(update_model_fixed_parameters(m, f)$fixed_parameters),
                c("sdratio", "Ro", "Rn"))
 
-  f1 <- bmf(dprime ~ 1, criterion ~ 1, spacing ~ 1, Ro ~ 1)
+  f1 <- bmf(d ~ 1, criterion ~ 1, spacing ~ 1, Ro ~ 1)
   expect_equal(names(update_model_fixed_parameters(m, f1)$fixed_parameters),
                c("sdratio", "Rn"))
 
-  f2 <- bmf(dprime ~ 1, criterion ~ 1, spacing ~ 1, Ro ~ 1, Rn ~ 1)
+  f2 <- bmf(d ~ 1, criterion ~ 1, spacing ~ 1, Ro ~ 1, Rn ~ 1)
   expect_equal(names(update_model_fixed_parameters(m, f2)$fixed_parameters),
                "sdratio")
 })
@@ -72,7 +72,7 @@ test_that("dpsdt with no recollection reduces to the standard category probs", {
   }
 })
 
-test_that("metad equal to dprime reduces to the standard category probs", {
+test_that("metad equal to d reduces to the standard category probs", {
   thr <- bmm:::.sdt_make_thresholds(0, 5, "parsimonious", spacing = 0.3)
   for (stim in c(0L, 1L)) {
     base <- bmm:::.sdt_category_probs(thr, 1.4, 1.2, stim, "normal")
@@ -110,13 +110,13 @@ test_that("recollection moves mass to the most-confident category and sums to 1"
 
 test_that("rsdt_dpsdt / rsdt_metad return rating count matrices", {
   thr <- bmm:::.sdt_make_thresholds(0, 4L, "parsimonious", 0.3)
-  d <- rsdt_dpsdt(8, 50, rep(c(0L, 1L), 4), dprime = 1.4, thresholds = thr,
-                  Ro = 0.3, Rn = 0.1)
-  expect_true(is.matrix(d))
-  expect_equal(colnames(d), paste0("r", 1:4))
-  expect_true(all(rowSums(d) == 50))
+  counts_dp <- rsdt_dpsdt(8, 50, rep(c(0L, 1L), 4), d = 1.4, thresholds = thr,
+                          Ro = 0.3, Rn = 0.1)
+  expect_true(is.matrix(counts_dp))
+  expect_equal(colnames(counts_dp), paste0("r", 1:4))
+  expect_true(all(rowSums(counts_dp) == 50))
 
-  m <- rsdt_metad(8, 50, rep(c(0L, 1L), 4), dprime = 1.4, thresholds = thr,
+  m <- rsdt_metad(8, 50, rep(c(0L, 1L), 4), d = 1.4, thresholds = thr,
                   metad = 1.0)
   expect_equal(dim(m), c(8L, 4L))
 })
@@ -143,10 +143,10 @@ test_that("dsdt version densities match dmultinom and vectorize over rows", {
                dmultinom(c(5, 15, 25, 55), prob = p_md), tolerance = 1e-12)
 
   counts <- rbind(c(2, 8, 20, 70), c(70, 20, 8, 2))
-  d <- dsdt_dpsdt(counts, c(1L, 0L), 1.5, thr, Ro = c(0.3, 0.2),
-                  Rn = c(0, 0.1), log = TRUE)
-  expect_length(d, 2)
-  expect_true(all(is.finite(d)))
+  dens <- dsdt_dpsdt(counts, c(1L, 0L), 1.5, thr, Ro = c(0.3, 0.2),
+                     Rn = c(0, 0.1), log = TRUE)
+  expect_length(dens, 2)
+  expect_true(all(is.finite(dens)))
 })
 
 test_that("version category probs vectorized path matches per-draw evaluation", {
@@ -182,13 +182,13 @@ test_that("all rating versions configure through the bmm pipeline", {
   thr <- bmm:::.sdt_make_thresholds(0, 4L, "parsimonious", 0.3)
   dat <- expand.grid(id = 1:4, stimulus = c(0L, 1L))
   dat <- cbind(dat, as.data.frame(rsdt_dpsdt(nrow(dat), 40, dat$stimulus,
-                                             dprime = 1.4, thresholds = thr,
+                                             d = 1.4, thresholds = thr,
                                              Ro = 0.3, Rn = 0.1)))
   md <- sdt_rating(paste0("r", 1:4), "stimulus", version = "dpsdt")
   mm <- sdt_rating(paste0("r", 1:4), "stimulus", version = "metad")
-  expect_silent(bmm(bmf(dprime ~ 1, criterion ~ 1, spacing ~ 1, Ro ~ 1, Rn ~ 1),
+  expect_silent(bmm(bmf(d ~ 1, criterion ~ 1, spacing ~ 1, Ro ~ 1, Rn ~ 1),
                     dat, md, backend = "mock", mock_fit = 1, rename = FALSE))
-  expect_silent(bmm(bmf(dprime ~ 1, criterion ~ 1, spacing ~ 1, logmratio ~ 1),
+  expect_silent(bmm(bmf(d ~ 1, criterion ~ 1, spacing ~ 1, logmratio ~ 1),
                     dat, mm, backend = "mock", mock_fit = 1, rename = FALSE))
 })
 
@@ -197,19 +197,19 @@ test_that("the generated Stan wrapper carries the version-specific call", {
   code <- bmm:::.sdt_rating_logmu_stan(md)
   expect_match(code, "real sdt_dpsdt_logmu\\(")
   expect_match(code, "real Ro, real Rn, real stimulus")
-  expect_match(code, "sdt_dpsdt_logmu_cat\\(cat, thr, dprime, sdratio, stimulus, dist_type, Ro, Rn\\)")
+  expect_match(code, "sdt_dpsdt_logmu_cat\\(cat, thr, d, sdratio, stimulus, dist_type, Ro, Rn\\)")
 
   mm <- sdt_rating(paste0("r", 1:4), "stimulus", version = "metad")
   code_md <- bmm:::.sdt_rating_logmu_stan(mm)
   # the estimated parameter is the log M-ratio; meta-d' is derived in the call
   expect_match(code_md, "real logmratio, real stimulus")
-  expect_match(code_md, "sdt_metad_logmu_cat\\(cat, thr, dprime, exp\\(logmratio\\) \\* dprime")
+  expect_match(code_md, "sdt_metad_logmu_cat\\(cat, thr, d, exp\\(logmratio\\) \\* d")
 })
 
 test_that("metad R companion with logmratio = 0 reduces to the standard model", {
   mm  <- sdt_rating(paste0("r", 1:5), "stimulus", version = "metad")
   std <- sdt_rating(paste0("r", 1:5), "stimulus")
-  args <- list(K = 5L, dist = 1L, thresh = 1L, dprime = matrix(1.4),
+  args <- list(K = 5L, dist = 1L, thresh = 1L, d = matrix(1.4),
                criterion = matrix(0), spacing = matrix(0.3),
                sdratio = matrix(0), stimulus = matrix(1))
   for (k in 1:5) {
@@ -226,7 +226,7 @@ test_that("metad R companion with logmratio = 0 reduces to the standard model", 
 test_that("roc_sdt reflects dual-process recollection (higher AUC, lifted curve)", {
   fit_std <- fake_rating_fit(n_ratings = 6L)
   fit_dp  <- fake_rating_fit(n_ratings = 6L, version = "dpsdt")
-  draws_std <- list(dprime = 1.2, criterion = 0, spacing = 0)
+  draws_std <- list(d = 1.2, criterion = 0, spacing = 0)
   draws_dp  <- c(draws_std, list(Ro = qlogis(0.4), Rn = qlogis(0.2)))
 
   local_mocked_bindings(ranef = function(...) list(), .package = "brms")
@@ -248,7 +248,7 @@ test_that("roc_sdt reflects dual-process recollection (higher AUC, lifted curve)
 test_that("default dpsdt roc_sdt (recollection off) matches the standard roc", {
   fit_std <- fake_rating_fit(n_ratings = 6L)
   fit_dp  <- fake_rating_fit(n_ratings = 6L, version = "dpsdt")
-  draws_std <- list(dprime = 1.2, criterion = 0, spacing = 0)
+  draws_std <- list(d = 1.2, criterion = 0, spacing = 0)
   draws_off <- c(draws_std, list(Ro = -100, Rn = -100))
 
   local_mocked_bindings(ranef = function(...) list(), .package = "brms")
@@ -269,7 +269,7 @@ test_that("latent_sdt reports the response-process parameters as an attribute", 
   local_mocked_bindings(ranef = function(...) list(), .package = "brms")
   local_mocked_bindings(
     posterior_linpred = mock_linpred_factory(
-      list(dprime = 1.2, criterion = 0, spacing = 0,
+      list(d = 1.2, criterion = 0, spacing = 0,
            Ro = qlogis(0.4), Rn = qlogis(0.2))),
     .package = "brms")
   lat <- latent_sdt(fit_dp)

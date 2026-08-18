@@ -201,7 +201,7 @@ response_annotations <- function(model) {
   if (inherits(model, "m3")) {
     return(list(resp_cats = "counts per response category"))
   }
-  if (inherits(model, "sdt_binary")) {
+  if (inherits(model, "sdt_yn")) {
     return(list(response = "count of 'old'/'signal' responses per cell"))
   }
   list()

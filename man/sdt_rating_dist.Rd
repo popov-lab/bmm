@@ -9,10 +9,10 @@
 dsdt_rating(
   counts,
   stimulus,
-  dprime,
+  d,
   thresholds,
   sdratio = 1,
-  dist = c("normal", "logistic", "gumbel_min", "gumbel_max"),
+  dist = c("normal", "gumbel_min", "gumbel_max", "logistic"),
   log = FALSE
 )
 
@@ -20,10 +20,10 @@ rsdt_rating(
   n,
   n_trials,
   stimulus,
-  dprime,
+  d,
   thresholds,
   sdratio = 1,
-  dist = c("normal", "logistic", "gumbel_min", "gumbel_max")
+  dist = c("normal", "gumbel_min", "gumbel_max", "logistic")
 )
 }
 \arguments{
@@ -33,13 +33,19 @@ signal" (K), or a vector for a single observation.}
 
 \item{stimulus}{Integer vector (0/1). Stimulus type: 0 = noise, 1 = signal.}
 
-\item{dprime}{Numeric vector. Sensitivity parameter(s).}
+\item{d}{Numeric vector. Sensitivity: the balanced discriminability index
+\eqn{d_a}, which equals \eqn{d'} when \code{sdratio} is 1. The separation
+between the distributions in noise units is \code{d * sqrt((1 + sdratio^2) / 2)}.}
 
 \item{thresholds}{Numeric vector of length K-1 with the ordered decision
-thresholds, or an n-by-(K-1) matrix with one row per observation.}
+thresholds, or an n-by-(K-1) matrix with one row per observation. The
+thresholds are on the noise-standardized axis and are not rescaled by
+\code{sdratio}.}
 
 \item{sdratio}{Numeric vector. Ratio of signal to noise standard deviations
-(default 1, i.e., equal variance).}
+(default 1, i.e., equal variance). Must be positive. Note that this is the
+natural scale: the \code{sdratio} parameter of \code{\link[=sdt_rating]{sdt_rating()}} is sampled on the
+log scale, so it corresponds to \code{log(sdratio)} here.}
 
 \item{dist}{Character. Noise distribution: "normal" (default), "logistic",
 "gumbel_min", or "gumbel_max".}
@@ -65,11 +71,11 @@ ordered rating categories (multinomial likelihood).
 \examples{
 # Density for a single observation (K=4)
 dsdt_rating(counts = c(5, 15, 25, 55), stimulus = 1,
-            dprime = 1.5, thresholds = c(-0.5, 0.0, 0.5))
+            d = 1.5, thresholds = c(-0.5, 0.0, 0.5))
 # Generate rating data (K=4) for 10 subjects and both stimulus types
 dat <- expand.grid(id = 1:10, stimulus = c(0L, 1L))
 dat <- cbind(dat, rsdt_rating(nrow(dat), 100, dat$stimulus,
-                              dprime = 1.5, thresholds = c(-0.5, 0, 0.5)))
+                              d = 1.5, thresholds = c(-0.5, 0, 0.5)))
 head(dat)
 }
 \references{

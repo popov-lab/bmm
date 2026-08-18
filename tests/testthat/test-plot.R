@@ -6,7 +6,7 @@ test_that("plot.bmm_sdt_roc() returns a ggplot for binary single-criterion", {
   skip_if_not_installed("ggplot2")
   fit <- fake_binary_fit()
   local_mocked_bindings(
-    posterior_linpred = mock_linpred_factory(list(dprime = 1.5, criterion = 0)),
+    posterior_linpred = mock_linpred_factory(list(d = 1.5, criterion = 0)),
     ranef = function(...) list(),
     variables = function(...) character(0),
     .package = "brms"
@@ -20,7 +20,7 @@ test_that("plot.bmm_sdt_roc() overlays operating points for binary multi-criteri
   fit <- fake_binary_fit(uv = TRUE, multi = TRUE)
   local_mocked_bindings(
     posterior_linpred = mock_linpred_factory(list(
-      dprime = 1.2, criterion = c(-0.8, -0.3, 0, 0.3, 0.8), sdratio = log(1.3))),
+      d = 1.2, criterion = c(-0.8, -0.3, 0, 0.3, 0.8), sdratio = log(1.3))),
     ranef = function(...) list(id = array(0, dim = c(1, 1, 1))),
     variables = function(...) c("bsp_sdratio"),
     .package = "brms"
@@ -39,7 +39,7 @@ test_that("plot.bmm_sdt_roc() draws implied curve + colored thresholds (rating)"
   skip_if_not_installed("ggplot2")
   fit <- fake_rating_fit()
   local_mocked_bindings(
-    posterior_linpred = mock_linpred_factory(list(dprime = 1.5, criterion = 0, spacing = 0)),
+    posterior_linpred = mock_linpred_factory(list(d = 1.5, criterion = 0, spacing = 0)),
     ranef = function(...) list(),
     variables = function(...) character(0),
     .package = "brms"
@@ -60,7 +60,7 @@ test_that("plot.bmm_sdt_auc() returns a ggplot", {
   skip_if_not_installed("ggplot2")
   fit <- fake_binary_fit()
   local_mocked_bindings(
-    posterior_linpred = mock_linpred_factory(list(dprime = 1.5, criterion = 0)),
+    posterior_linpred = mock_linpred_factory(list(d = 1.5, criterion = 0)),
     ranef = function(...) list(),
     variables = function(...) character(0),
     .package = "brms"
@@ -78,7 +78,7 @@ test_that("scale 'quantile' and 'z' are aliases with distribution-aware labels",
   skip_if_not_installed("ggplot2")
   fit <- fake_binary_fit()
   local_mocked_bindings(
-    posterior_linpred = mock_linpred_factory(list(dprime = 1.5, criterion = 0)),
+    posterior_linpred = mock_linpred_factory(list(d = 1.5, criterion = 0)),
     ranef = function(...) list(),
     variables = function(...) character(0),
     .package = "brms"
@@ -100,7 +100,7 @@ test_that("plot.bmm_sdt_roc(scale = 'z') drops endpoints and stays finite", {
   fit <- fake_binary_fit(uv = TRUE, multi = TRUE)
   local_mocked_bindings(
     posterior_linpred = mock_linpred_factory(list(
-      dprime = 1.2, criterion = c(-0.8, -0.3, 0, 0.3, 0.8), sdratio = log(1.3))),
+      d = 1.2, criterion = c(-0.8, -0.3, 0, 0.3, 0.8), sdratio = log(1.3))),
     ranef = function(...) list(id = array(0, dim = c(1, 1, 1))),
     variables = function(...) c("bsp_sdratio"),
     .package = "brms"
@@ -123,7 +123,7 @@ test_that("plot.bmm_sdt_roc(scale = 'z') returns a ggplot for a rating fit", {
   skip_if_not_installed("ggplot2")
   fit <- fake_rating_fit()
   local_mocked_bindings(
-    posterior_linpred = mock_linpred_factory(list(dprime = 1.5, criterion = 0, spacing = 0)),
+    posterior_linpred = mock_linpred_factory(list(d = 1.5, criterion = 0, spacing = 0)),
     ranef = function(...) list(),
     variables = function(...) character(0),
     .package = "brms"
@@ -141,7 +141,7 @@ test_that("plot.bmm_sdt_latent() draws densities and boundary lines (binary)", {
   skip_if_not_installed("ggplot2")
   fit <- fake_binary_fit()
   local_mocked_bindings(
-    posterior_linpred = mock_linpred_factory(list(dprime = 1.5, criterion = 0.3)),
+    posterior_linpred = mock_linpred_factory(list(d = 1.5, criterion = 0.3)),
     ranef = function(...) list(),
     variables = function(...) character(0),
     .package = "brms"
@@ -156,7 +156,7 @@ test_that("plot.bmm_sdt_latent() returns a ggplot for a rating fit", {
   skip_if_not_installed("ggplot2")
   fit <- fake_rating_fit()
   local_mocked_bindings(
-    posterior_linpred = mock_linpred_factory(list(dprime = 1.5, criterion = 0, spacing = 0)),
+    posterior_linpred = mock_linpred_factory(list(d = 1.5, criterion = 0, spacing = 0)),
     ranef = function(...) list(),
     variables = function(...) character(0),
     .package = "brms"
@@ -170,7 +170,7 @@ test_that("plot.bmm_sdt_latent() draws densities only for mafc/ranking", {
   for (maker in list(fake_mafc_fit, fake_ranking_fit)) {
     fit <- maker()
     local_mocked_bindings(
-      posterior_linpred = mock_linpred_factory(list(dprime = 1.4)),
+      posterior_linpred = mock_linpred_factory(list(d = 1.4)),
       ranef = function(...) list(),
       variables = function(...) character(0),
       .package = "brms"
@@ -188,7 +188,7 @@ test_that("plot.bmm_sdt_latent() colour-codes collapsed criteria", {
   fit <- fake_binary_fit(uv = TRUE, multi = TRUE)
   local_mocked_bindings(
     posterior_linpred = mock_linpred_factory(list(
-      dprime = 1.2, criterion = c(-0.8, -0.3, 0, 0.3, 0.8), sdratio = log(1.3))),
+      d = 1.2, criterion = c(-0.8, -0.3, 0, 0.3, 0.8), sdratio = log(1.3))),
     ranef = function(...) list(id = array(0, dim = c(1, 1, 1))),
     variables = function(...) "bsp_sdratio",
     .package = "brms"
@@ -205,7 +205,7 @@ test_that("plot.bmm_sdt_latent() draws competitor curves when requested", {
   skip_if_not_installed("ggplot2")
   fit <- fake_mafc_fit()
   local_mocked_bindings(
-    posterior_linpred = mock_linpred_factory(list(dprime = 1.4)),
+    posterior_linpred = mock_linpred_factory(list(d = 1.4)),
     ranef = function(...) list(),
     variables = function(...) character(0),
     .package = "brms"

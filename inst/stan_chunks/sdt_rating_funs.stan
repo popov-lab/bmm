@@ -149,12 +149,17 @@ vector sdt_make_thresholds_rating(real criterion, real spacing,
 // log probability of rating category `cat` for the multinomial family. The
 // stimulus is a real covariate (brms passes data covariates as reals into
 // non-linear formulas).
+//   d:       sensitivity as d_a; sdt_rms_scale() converts it to noise-SD units
+//            and is 1 when sigma is 1, so equal-variance fits are unchanged
+//   sdratio: log ratio of signal to noise SD (exp(sdratio) = sigma_s / sigma_n)
+// The thresholds are NOT rescaled: they stay on the noise-standardized axis.
 real sdt_rating_logmu_cat(int cat, vector thresholds,
-                          real dprime, real sdratio, real stimulus,
+                          real d, real sdratio, real stimulus,
                           int dist_type) {
   int K_full = num_elements(thresholds) + 1;
-  real shift = dprime / 2.0 * (2 * stimulus - 1);
-  real scale = stimulus > 0.5 ? exp(sdratio) : 1.0;
+  real sigma = exp(sdratio);
+  real shift = d * sdt_rms_scale(sigma) / 2.0 * (2 * stimulus - 1);
+  real scale = stimulus > 0.5 ? sigma : 1.0;
 
   if (cat == 1) {
     return sdt_log_cumprob((thresholds[1] - shift) / scale, dist_type);

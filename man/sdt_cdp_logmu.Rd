@@ -10,8 +10,8 @@ sdt_cdp_logmu(
   n_old,
   thresh,
   has_guess,
-  dprimef,
-  dprimer,
+  dfam,
+  drec,
   criterion,
   spacing,
   rcrit,
@@ -33,7 +33,7 @@ guess/know/remember blocks).}
 
 \item{has_guess}{Integer flag (1 if the Know/Guess split is active).}
 
-\item{dprimef, dprimer, criterion, spacing, rcrit, sigmar, rho, kcrit}{Model
+\item{dfam, drec, criterion, spacing, rcrit, sigmar, rho, kcrit}{Model
 parameters (draws-by-observation matrices supplied by brms). \code{kcrit} is
 ignored when \code{has_guess} is 0. \code{spacing} is the fixed literal 0 for
 log_distance, which uses the per-distance deltas in \code{...} instead.}
@@ -44,7 +44,7 @@ log_distance, which uses the per-distance deltas in \code{...} instead.}
 (\code{delta1}, ...) supplied by brms in contiguous order; otherwise unused.}
 }
 \value{
-\code{log(p_cat)}, matching the shape of \code{dprimef}.
+\code{log(p_cat)}, matching the shape of \code{dfam}.
 }
 \description{
 R companion to the Stan \code{sdt_cdp_logmu} function. It returns

@@ -56,7 +56,6 @@ Continuous Dual-Process Signal Detection Theory Model
 \itemize{
 \item Wixted, J. T., & Mickes, L. (2010). A continuous dual-process model of remember/know judgments. Psychological Review, 117(4), 1025-1054.
 }
-\item \strong{Version:} cdp
 \item \strong{Requirements:}
 
 Provide aggregated data with one row per cell (unique combination of predictors and stimulus class) and one integer count column per response category:
@@ -72,8 +71,8 @@ Use aggregate_sdt_cdp_data() to build these columns from long-format (trial-leve
 \itemize{
 \item \strong{Parameters:}
 \itemize{
-\item \code{dprimef}: Familiarity sensitivity: target mean on the familiarity axis
-\item \code{dprimer}: Recollection sensitivity: target mean on the recollection axis
+\item \code{dfam}: Familiarity sensitivity: target mean on the familiarity axis, in lure-SD units. Not the balanced d_a that the other SDT models report as d -- the old/new decision is read off the aggregate strength F + R
+\item \code{drec}: Recollection sensitivity: target mean on the recollection axis, in lure-SD units (the target SD is exp(sigmar))
 \item \code{criterion}: Response bias: old/new boundary on the strength (F+R) axis
 \item \code{spacing}: Threshold spacing: controls distance between adjacent thresholds (exp(spacing) ensures positive spacing)
 \item \code{rcrit}: Remember criterion: threshold on the recollection axis
@@ -89,16 +88,16 @@ Use aggregate_sdt_cdp_data() to build these columns from long-format (trial-leve
 }
 \item \strong{Default parameter links:}
 \itemize{
-\item dprimef = identity; dprimer = identity; criterion = identity; spacing = identity; rcrit = identity; sigmar = identity; rho = identity; kcrit = identity
+\item dfam = identity; drec = identity; criterion = identity; spacing = identity; rcrit = identity; sigmar = identity; rho = identity; kcrit = identity
 }
 \item \strong{Default priors:}
 \itemize{
-\item \code{dprimef}:
+\item \code{dfam}:
 \itemize{
 \item \code{main}: normal(1, 1)
 \item \code{effects}: normal(0, 0.5)
 }
-\item \code{dprimer}:
+\item \code{drec}:
 \itemize{
 \item \code{main}: normal(1, 1)
 \item \code{effects}: normal(0, 0.5)
@@ -183,21 +182,21 @@ When no Remember/Know split is available (confidence ratings only), use
 dat <- expand.grid(id = 1:20, stimulus = c(0L, 1L))
 thresholds <- c(-1.1, -0.5, 0, 0.6, 1.3)
 dat <- cbind(dat, rsdt_cdp(nrow(dat), 200, dat$stimulus,
-                           dprimef = 0.8, dprimer = 1.0,
+                           dfam = 0.8, drec = 1.0,
                            thresholds = thresholds, rcrit = 0.7,
                            n_new = 3))
 
 model <- sdt_cdp(stimulus = "stimulus", n_new = 3, n_old = 3)
 
 fit <- bmm(
-  formula = bmf(dprimef ~ 1, dprimer ~ 1, criterion ~ 1,
+  formula = bmf(dfam ~ 1, drec ~ 1, criterion ~ 1,
                 spacing ~ 1, rcrit ~ 1),
   data = dat, model = model, backend = "cmdstanr"
 )
 
 # Estimate unequal recollection variance and the F-R correlation
 fit_uv <- bmm(
-  formula = bmf(dprimef ~ 1, dprimer ~ 1, criterion ~ 1,
+  formula = bmf(dfam ~ 1, drec ~ 1, criterion ~ 1,
                 spacing ~ 1, rcrit ~ 1, sigmar ~ 1, rho ~ 1),
   data = dat, model = model, backend = "cmdstanr"
 )

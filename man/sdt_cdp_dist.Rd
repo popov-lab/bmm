@@ -9,8 +9,8 @@
 dsdt_cdp(
   counts,
   stimulus,
-  dprimef,
-  dprimer,
+  dfam,
+  drec,
   thresholds,
   rcrit,
   kcrit = NULL,
@@ -25,8 +25,8 @@ rsdt_cdp(
   n,
   n_trials,
   stimulus,
-  dprimef,
-  dprimer,
+  dfam,
+  drec,
   thresholds,
   rcrit,
   kcrit = NULL,
@@ -46,8 +46,13 @@ vector for a single observation. \code{n_new + 2 * n_old} columns (R/K) or
 \item{stimulus}{Integer vector (0/1). Stimulus type: 0 = new/lure,
 1 = old/target.}
 
-\item{dprimef, dprimer}{Numeric vectors. Familiarity and recollection
-sensitivities (target means on the F and R axes).}
+\item{dfam, drec}{Numeric vectors. Familiarity and recollection
+sensitivities: the target means on the F and R axes, each in units of the
+corresponding lure SD (both lure SDs are 1). They are component means of a
+bivariate latent space, not the balanced \eqn{d_a} that the other SDT
+models report as \code{d} -- the old/new decision here is read off the aggregate
+strength S = F + R, so the model's discriminability is a derived quantity
+rather than either of these.}
 
 \item{thresholds}{Numeric vector of \code{n_new + n_old - 1} ordered confidence
 thresholds on the aggregate F+R axis, or a matrix with one row per
@@ -101,14 +106,14 @@ available.
 # CDP density (R/K, 1 new + 3 old levels: 3 thresholds, 7 count columns)
 dsdt_cdp(
   counts = c(40, 5, 12, 30, 10, 18, 60), stimulus = 1,
-  dprimef = 0.8, dprimer = 1.0,
+  dfam = 0.8, drec = 1.0,
   thresholds = c(-0.5, 0.3, 1.0),
   rcrit = 0.7, n_new = 1
 )
 # Generate CDP count data (R/K, 3 new + 3 old levels) for 10 subjects
 dat <- expand.grid(id = 1:10, stimulus = c(0L, 1L))
 dat <- cbind(dat, rsdt_cdp(nrow(dat), 100, dat$stimulus,
-                           dprimef = 0.8, dprimer = 1.0,
+                           dfam = 0.8, drec = 1.0,
                            thresholds = c(-1.1, -0.5, 0, 0.6, 1.3),
                            rcrit = 0.5, n_new = 3))
 head(dat)

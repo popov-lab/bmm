@@ -3,20 +3,20 @@
 // the observer picks the maximum. F is the noise CDF (see sdt_dist_funs.stan).
 //
 //   normal     : 40-point Gauss-Hermite quadrature (closed form Phi(d'/sqrt(2)) at m = 2)
-//   gumbel_min : exact softmax 1 / (1 + (m-1) * exp(-d'))
-//   gumbel_max : exact gamma ratio Gamma(1 + e^-d') * Gamma(m) / Gamma(m + e^-d')
+//   gumbel_max : exact softmax 1 / (1 + (m-1) * exp(-d'))
+//   gumbel_min : exact gamma ratio Gamma(1 + e^-d') * Gamma(m) / Gamma(m + e^-d')
 //   logistic   : 64-point Gauss-Legendre on [0, 1] of F(Q(u) + d')^(m-1)
 //
 // Reference: DeCarlo (2012); Green & Swets (1966)
 
-real mafc_pc(real dprime, int m, int dist_type) {
-  if (dist_type == 2)                                      // gumbel_min: softmax
-    return 1.0 / (1 + (m - 1) * exp(-dprime));
-  if (dist_type == 3)                                      // gumbel_max: gamma ratio
-    return exp(lgamma(1 + exp(-dprime)) + lgamma(m) - lgamma(m + exp(-dprime)));
+real mafc_pc(real d, int m, int dist_type) {
+  if (dist_type == 3)                                      // gumbel_max: softmax
+    return 1.0 / (1 + (m - 1) * exp(-d));
+  if (dist_type == 2)                                      // gumbel_min: gamma ratio
+    return exp(lgamma(1 + exp(-d)) + lgamma(m) - lgamma(m + exp(-d)));
 
   if (dist_type == 1) {                                    // normal: Gauss-Hermite
-    if (m == 2) return Phi(dprime / sqrt(2.0));
+    if (m == 2) return Phi(d / sqrt(2.0));
   vector[40] gh_nodes = to_vector({
     -1.14533778415487379e+01, -1.04815605346742640e+01, -9.67355636693402765e+00, -8.94950454385556249e+00,
     -8.27894062365948535e+00, -7.64616376454146440e+00, -7.04173840645382576e+00, -6.45942337758375906e+00,
@@ -43,7 +43,7 @@ real mafc_pc(real dprime, int m, int dist_type) {
   });
     vector[40] log_terms;
     for (i in 1:40)
-      log_terms[i] = log(gh_weights[i]) + (m - 1) * std_normal_lcdf(gh_nodes[i] + dprime);
+      log_terms[i] = log(gh_weights[i]) + (m - 1) * std_normal_lcdf(gh_nodes[i] + d);
     return exp(log_sum_exp(log_terms));
   }
 
@@ -87,10 +87,10 @@ real mafc_pc(real dprime, int m, int dist_type) {
   real p = 0;
   for (i in 1:64)
     p += gl_weights[i] *
-         pow(sdt_cumprob(sdt_quantile(gl_nodes[i], dist_type) + dprime, dist_type), m - 1);
+         pow(sdt_cumprob(sdt_quantile(gl_nodes[i], dist_type) + d, dist_type), m - 1);
   return p;
 }
 
-real sdt_mafc_lpmf(int y, real mu, real dprime, int m, int dist_type, int trials) {
-  return binomial_lpmf(y | trials, mafc_pc(dprime, m, dist_type));
+real sdt_mafc_lpmf(int y, real mu, real d, int m, int dist_type, int trials) {
+  return binomial_lpmf(y | trials, mafc_pc(d, m, dist_type));
 }

@@ -54,6 +54,7 @@ reference:
     - "latent_sdt"
     - "sdt_thresholds"
     - "mratio"
+    - "sdt_sensitivity"
     - "plot.bmm_sdt_roc"
     - "plot.bmm_sdt_auc"
     - "plot.bmm_sdt_latent"

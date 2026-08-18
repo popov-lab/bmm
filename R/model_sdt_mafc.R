@@ -6,14 +6,18 @@
                             dist = "normal",
                             links = NULL, call = NULL, ...) {
   parameters <- list(
-    dprime = "Sensitivity: distance between signal and noise distributions"
+    d = paste0(
+      "Sensitivity: the balanced discriminability index d_a, which for the ",
+      "equal-variance m-AFC model equals d' -- the distance between the ",
+      "signal and distractor distributions in noise SD units"
+    )
   )
   default_priors <- list(
-    dprime = list(main = "normal(1, 1)", effects = "normal(0, 0.5)")
+    d = list(main = "normal(1, 1)", effects = "normal(0, 0.5)")
   )
   requirements <- glue(
     "Provide pre-aggregated accuracy data with the following columns:", "\n\n",
-    "  - Response counts (n_correct): number of correct responses", "\n",
+    "  - Response counts (response): number of correct responses", "\n",
     "  - Number of trials (n_trials): total trials per cell", "\n",
     "  No stimulus column needed (each trial has exactly one signal alternative)"
   )
@@ -30,16 +34,16 @@
         "and psychophysics. Wiley.\n",
         "DeCarlo, L. T. (2012). On a signal detection approach to ",
         "m-alternative forced choice with bias, with maximum likelihood ",
-        "and Bayesian approaches to estimation. JMASM, 11(1), 257-282."
+        "and Bayesian approaches to estimation. Journal of Mathematical ",
+        "Psychology, 56(3), 196-207."
       ),
-      version = "mafc",
+      version = "NA",
       requirements = requirements,
       parameters = parameters,
-      links = list(dprime = "identity"),
+      links = list(d = "identity"),
       fixed_parameters = list(),
       default_priors = default_priors,
-      init_ranges = list(dprime = c(0.5, 1.5)),
-      void_mu = FALSE
+      init_ranges = list(d = c(0.5, 1.5))
     ),
     class = c("bmmodel", "sdt", "sdt_mafc"),
     call = call
@@ -54,13 +58,24 @@
 #' @details `r model_info(.model_sdt_mafc())`
 #'
 #' Models accuracy in m-AFC tasks where each trial presents one signal among
-#' `m` alternatives and the observer chooses the strongest one. Only `dprime`
+#' `m` alternatives and the observer chooses the strongest one. Only `d`
 #' is estimated (m-AFC has no response bias). The probability correct,
-#' \eqn{P_c = \int f(x - d')\, F(x)^{m-1}\, dx}, is computed per noise
-#' distribution: a closed-form softmax for `gumbel_min`, a closed-form Gamma
-#' ratio for `gumbel_max`, Gauss-Hermite quadrature for `normal`
-#' (\eqn{\Phi(d'/\sqrt{2})} at m = 2), and Gauss-Legendre quadrature for
+#' \eqn{P_c = \int f(x - d)\, F(x)^{m-1}\, dx}, is computed per noise
+#' distribution: a closed-form softmax for `gumbel_max`, a closed-form Gamma
+#' ratio for `gumbel_min`, Gauss-Hermite quadrature for `normal`
+#' (\eqn{\Phi(d/\sqrt{2})} at m = 2), and Gauss-Legendre quadrature for
 #' `logistic`.
+#'
+#' @section Sensitivity is on the same scale as [sdt_yn()]:
+#' `d` is the balanced index \eqn{d_a} that [sdt_yn()] reports. m-AFC assumes
+#' the signal and distractor distributions share a scale, so \eqn{d_a} coincides
+#' with \eqn{d'} here and no `sdratio` parameter is needed.
+#'
+#' The two models agree exactly at `m = 2`: 2AFC proportion correct equals the
+#' area under the yes/no ROC (Green's theorem), and for Gaussian noise both give
+#' \eqn{P_c = \Phi(d/\sqrt{2})}. The same observer therefore yields the same `d`
+#' whether it is measured by a yes/no ROC or by 2AFC accuracy, which is the
+#' property that makes \eqn{d_a} the right common scale for the SDT family.
 #' @param response A single string naming the column with counts of correct
 #'   responses.
 #' @param n_trials The name of the variable containing the total number of
@@ -69,13 +84,15 @@
 #'   (constant across all rows), or a single string naming a data column that
 #'   gives the number of alternatives per row. A column lets trials with
 #'   different set sizes be fit jointly.
-#' @param dist The noise distribution assumed for the latent evidence variable.
-#'   One of:
+#' @param dist The distribution assumed for the latent evidence, given here by
+#'   its cumulative distribution function. One of:
 #'   \itemize{
-#'     \item "normal" (default): Gaussian m-AFC
-#'     \item "logistic": Logistic m-AFC
-#'     \item "gumbel_min": Extreme-value (Gumbel minimum) m-AFC
-#'     \item "gumbel_max": Gumbel maximum m-AFC
+#'     \item "normal" (default): Gaussian m-AFC, \eqn{\Phi(x)}
+#'     \item "gumbel_min": smallest-extreme-value m-AFC,
+#'       \eqn{1 - \exp(-\exp(x))} (complementary log-log)
+#'     \item "gumbel_max": largest-extreme-value m-AFC, \eqn{\exp(-\exp(-x))}
+#'       (log-log, as in \code{evd::pgumbel})
+#'     \item "logistic": logistic m-AFC, \eqn{1 / (1 + \exp(-x))}
 #'   }
 #' @param links A named list of link functions for the parameters.
 #' @param ... used internally for testing, ignore it
@@ -86,15 +103,15 @@
 #'
 #' DeCarlo, L. T. (2012). On a signal detection approach to m-alternative
 #'   forced choice with bias, with maximum likelihood and Bayesian approaches
-#'   to estimation. \emph{Journal of Mathematical and Statistical Psychology},
-#'   \emph{11}(1), 257--282.
+#'   to estimation. \emph{Journal of Mathematical Psychology}, \emph{56}(3),
+#'   196--207. \doi{10.1016/j.jmp.2012.02.004}
 #' @keywords bmmodel
 #' @export
 #' @examples
 #' \dontrun{
 #' dat <- data.frame(id = 1:20, n_trials = 200L)
 #' dat$n_correct <- rsdt_mafc(nrow(dat), dat$n_trials, m = 4,
-#'                            dprime = rnorm(20, 1.5, 0.4))
+#'                            d = rnorm(20, 1.5, 0.4))
 #'
 #' model <- sdt_mafc(
 #'   response = "n_correct",
@@ -103,7 +120,7 @@
 #' )
 #'
 #' fit <- bmm(
-#'   formula = bmf(dprime ~ 1),
+#'   formula = bmf(d ~ 1),
 #'   data = dat,
 #'   model = model,
 #'   cores = 4,
@@ -111,7 +128,7 @@
 #' )
 #' }
 sdt_mafc <- function(response, n_trials, m,
-                     dist = c("normal", "logistic", "gumbel_min", "gumbel_max"),
+                     dist = c("normal", "gumbel_min", "gumbel_max", "logistic"),
                      links = NULL, ...) {
   call <- match.call()
   stop_missing_args()
@@ -139,6 +156,10 @@ check_data.sdt_mafc <- function(model, data, formula) {
 
   .validate_sdt_counts(data, resp_var, n_trials_var)
 
+  reserved <- intersect(c("m_afc", "dist_type"), colnames(data))
+  warnif(length(reserved) > 0,
+         "Column(s) {collapse_comma(reserved)} in your data are reserved by \\
+         {model$name} and will be overwritten")
   data$m_afc <- .sdt_resolve_set_size(model$other_vars$m, data)
   data$dist_type <- .sdt_dist_id(model$other_vars$dist)
 
@@ -172,8 +193,8 @@ configure_model.sdt_mafc <- function(model, data, formula) {
 
   formula$family <- brms::custom_family(
     "sdt_mafc",
-    dpars = c("mu", "dprime"),
-    links = c("identity", model$links$dprime),
+    dpars = c("mu", "d"),
+    links = c("identity", model$links$d),
     type = "int",
     loop = TRUE,
     log_lik = log_lik_sdt_mafc,
@@ -198,17 +219,17 @@ configure_model.sdt_mafc <- function(model, data, formula) {
 ############################################################################# !
 
 log_lik_sdt_mafc <- function(i, prep) {
-  dprime <- brms::get_dpar(prep, "dprime", i = i)
+  d <- brms::get_dpar(prep, "d", i = i)
   dist <- .sdt_dist_names[prep$data$vint2[i]]
 
   dsdt_mafc(prep$data$Y[i], prep$data$trials[i], prep$data$vint1[i],
-            dprime, dist = dist, log = TRUE)
+            d, dist = dist, log = TRUE)
 }
 
 posterior_predict_sdt_mafc <- function(i, prep, ...) {
-  dprime <- brms::get_dpar(prep, "dprime", i = i)
+  d <- brms::get_dpar(prep, "d", i = i)
   dist <- .sdt_dist_names[prep$data$vint2[i]]
 
-  rsdt_mafc(length(dprime), prep$data$trials[i], prep$data$vint1[i],
-            dprime, dist = dist)
+  rsdt_mafc(length(d), prep$data$trials[i], prep$data$vint1[i],
+            d, dist = dist)
 }
