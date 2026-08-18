@@ -96,8 +96,8 @@ Categories should be ordered: 1 = 'definitely noise' to K = 'definitely signal'
 \itemize{
 \item \strong{Parameters:}
 \itemize{
-\item \code{dprime}: Sensitivity: distance between signal and noise distributions
-\item \code{criterion}: Response bias: location of decision boundary
+\item \code{d}: Sensitivity: the balanced discriminability index d_a, which measures the distance between the signal and noise distributions in units of their root-mean-square SD, so it equals d' when sdratio is 1
+\item \code{criterion}: Response bias: location of the decision boundary on the noise-standardized axis
 \item \code{spacing}: Threshold spacing: controls distance between adjacent thresholds (exp(spacing) ensures positive spacing)
 \item \code{sdratio}: Log SD ratio: the log of the signal-to-noise standard deviation ratio, so exp(sdratio) is the ratio itself and 0 means equal variance
 }
@@ -107,11 +107,11 @@ Categories should be ordered: 1 = 'definitely noise' to K = 'definitely signal'
 }
 \item \strong{Default parameter links:}
 \itemize{
-\item dprime = identity; criterion = identity; spacing = identity; sdratio = identity
+\item d = identity; criterion = identity; spacing = identity; sdratio = identity
 }
 \item \strong{Default priors:}
 \itemize{
-\item \code{dprime}:
+\item \code{d}:
 \itemize{
 \item \code{main}: normal(1, 1)
 \item \code{effects}: normal(0, 0.5)
@@ -128,8 +128,8 @@ Categories should be ordered: 1 = 'definitely noise' to K = 'definitely signal'
 }
 \item \code{sdratio}:
 \itemize{
-\item \code{main}: normal(0, 0.5)
-\item \code{effects}: normal(0, 0.3)
+\item \code{main}: normal(0, 0.3)
+\item \code{effects}: normal(0, 0.15)
 }
 }
 }
@@ -143,7 +143,9 @@ most-confident "signal" category) and \code{Rn} is recall-to-reject of new items
 (loads the most-confident "noise" category); \code{inv_logit(Ro)}/\code{inv_logit(Rn)}
 are the recollection probabilities. Both are fixed off by default
 (recovering \code{standard}); add \code{Ro ~ 1} for the one-sided model and
-\verb{Ro ~ 1, Rn ~ 1} for the two-sided model.
+\verb{Ro ~ 1, Rn ~ 1} for the two-sided model. \code{d} describes the familiarity
+distributions only -- the observed ROC is a mixture of familiarity and
+recollection, so it is not the discriminability of that mixture.
 \itemize{
 \item \strong{Domain:} Perception & Recognition Memory
 \item \strong{Task:} Signal/Noise or Old/New Recognition
@@ -165,8 +167,8 @@ Categories should be ordered: 1 = 'definitely noise' to K = 'definitely signal'
 \itemize{
 \item \strong{Parameters:}
 \itemize{
-\item \code{dprime}: Sensitivity: distance between signal and noise distributions
-\item \code{criterion}: Response bias: location of decision boundary
+\item \code{d}: Sensitivity: the balanced discriminability index d_a, which measures the distance between the signal and noise distributions in units of their root-mean-square SD, so it equals d' when sdratio is 1
+\item \code{criterion}: Response bias: location of the decision boundary on the noise-standardized axis
 \item \code{spacing}: Threshold spacing: controls distance between adjacent thresholds (exp(spacing) ensures positive spacing)
 \item \code{sdratio}: Log SD ratio: the log of the signal-to-noise standard deviation ratio, so exp(sdratio) is the ratio itself and 0 means equal variance
 \item \code{Ro}: Recollection of old items: probability inv_logit(Ro) that an old item is recollected as old, loading the most-confident 'signal' category
@@ -180,11 +182,11 @@ Categories should be ordered: 1 = 'definitely noise' to K = 'definitely signal'
 }
 \item \strong{Default parameter links:}
 \itemize{
-\item dprime = identity; criterion = identity; spacing = identity; sdratio = identity; Ro = identity; Rn = identity
+\item d = identity; criterion = identity; spacing = identity; sdratio = identity; Ro = identity; Rn = identity
 }
 \item \strong{Default priors:}
 \itemize{
-\item \code{dprime}:
+\item \code{d}:
 \itemize{
 \item \code{main}: normal(1, 1)
 \item \code{effects}: normal(0, 0.5)
@@ -201,8 +203,8 @@ Categories should be ordered: 1 = 'definitely noise' to K = 'definitely signal'
 }
 \item \code{sdratio}:
 \itemize{
-\item \code{main}: normal(0, 0.5)
-\item \code{effects}: normal(0, 0.3)
+\item \code{main}: normal(0, 0.3)
+\item \code{effects}: normal(0, 0.15)
 }
 \item \code{Ro}:
 \itemize{
@@ -222,15 +224,16 @@ Categories should be ordered: 1 = 'definitely noise' to K = 'definitely signal'
 
 Meta-d' (Maniscalco & Lau, 2012): a type-2 metacognitive sensitivity governs
 confidence-threshold placement, with the total "old"/"new" response rates
-held to what type-1 \code{dprime} implies. Rather than estimating meta-d'
+held to what type-1 \code{d} implies. Rather than estimating meta-d'
 directly, the model estimates \code{logmratio}, the log M-ratio
 \eqn{\log(\mathrm{meta\text{-}d'}/d')}, and recovers meta-d' as
-\code{exp(logmratio) * dprime}. The M-ratio is the field-standard measure of
+\code{exp(logmratio) * d}. The M-ratio is the field-standard measure of
 metacognitive efficiency (Maniscalco & Lau, 2014; Fleming, 2017): estimating
-it on the log scale keeps meta-d' positive, regularizes it toward \code{dprime},
-and anchors the ideal point (meta-d' = \code{dprime}, perfect metacognition) at
-\code{logmratio = 0}, which recovers \code{standard}. Extract the M-ratio posterior
-with \code{\link[=mratio]{mratio()}}.
+it on the log scale keeps meta-d' positive, regularizes it toward \code{d},
+and anchors the ideal point (meta-d' = \code{d}, perfect metacognition) at
+\code{logmratio = 0}, which recovers \code{standard}. Type-1 and type-2 sensitivity are
+both on the \eqn{d_a} scale, so the M-ratio is unaffected by \code{sdratio}.
+Extract the M-ratio posterior with \code{\link[=mratio]{mratio()}}.
 \itemize{
 \item \strong{Domain:} Perception & Recognition Memory
 \item \strong{Task:} Signal/Noise or Old/New Recognition
@@ -252,11 +255,11 @@ Categories should be ordered: 1 = 'definitely noise' to K = 'definitely signal'
 \itemize{
 \item \strong{Parameters:}
 \itemize{
-\item \code{dprime}: Sensitivity: distance between signal and noise distributions
-\item \code{criterion}: Response bias: location of decision boundary
+\item \code{d}: Sensitivity: the balanced discriminability index d_a, which measures the distance between the signal and noise distributions in units of their root-mean-square SD, so it equals d' when sdratio is 1
+\item \code{criterion}: Response bias: location of the decision boundary on the noise-standardized axis
 \item \code{spacing}: Threshold spacing: controls distance between adjacent thresholds (exp(spacing) ensures positive spacing)
 \item \code{sdratio}: Log SD ratio: the log of the signal-to-noise standard deviation ratio, so exp(sdratio) is the ratio itself and 0 means equal variance
-\item \code{logmratio}: Log M-ratio, log(meta-d'/d'): metacognitive efficiency. 0 is ideal metacognition (meta-d' = d'), negative is inefficiency, positive is hyper-efficiency. meta-d' is recovered as exp(logmratio) * dprime
+\item \code{logmratio}: Log M-ratio, log(meta-d/d): metacognitive efficiency. 0 is ideal metacognition (meta-d = d), negative is inefficiency, positive is hyper-efficiency. meta-d is recovered as exp(logmratio) * d, on the same d_a scale
 }
 \item \strong{Fixed parameters:}
 \itemize{
@@ -264,11 +267,11 @@ Categories should be ordered: 1 = 'definitely noise' to K = 'definitely signal'
 }
 \item \strong{Default parameter links:}
 \itemize{
-\item dprime = identity; criterion = identity; spacing = identity; sdratio = identity; logmratio = identity
+\item d = identity; criterion = identity; spacing = identity; sdratio = identity; logmratio = identity
 }
 \item \strong{Default priors:}
 \itemize{
-\item \code{dprime}:
+\item \code{d}:
 \itemize{
 \item \code{main}: normal(1, 1)
 \item \code{effects}: normal(0, 0.5)
@@ -285,8 +288,8 @@ Categories should be ordered: 1 = 'definitely noise' to K = 'definitely signal'
 }
 \item \code{sdratio}:
 \itemize{
-\item \code{main}: normal(0, 0.5)
-\item \code{effects}: normal(0, 0.3)
+\item \code{main}: normal(0, 0.3)
+\item \code{effects}: normal(0, 0.15)
 }
 \item \code{logmratio}:
 \itemize{
@@ -301,12 +304,26 @@ estimate unequal variance, add \code{sdratio ~ 1} (or \code{sdratio ~ predictors
 to the formula.
 }
 }
+\section{Sensitivity is on the same scale as \code{\link[=sdt_yn]{sdt_yn()}}}{
+
+\code{d} is the balanced index \eqn{d_a} that \code{\link[=sdt_yn]{sdt_yn()}} reports: the separation
+between the signal and noise distributions divided by the root-mean-square
+of their SDs. It equals \eqn{d'} whenever \code{sdratio} stays fixed at 0, and
+unlike \eqn{d'} it remains comparable across conditions that differ in
+\code{sdratio} -- see the sensitivity section of \code{\link[=sdt_yn]{sdt_yn()}} for the reasoning.
+The \code{criterion} and the confidence thresholds are \strong{not} rescaled and stay
+on the noise-standardized axis. The \code{dpsdt} and \code{metad} versions inherit the
+same convention: \code{d} there is the \eqn{d_a} of the familiarity (type-1)
+distributions, and meta-d' is scaled the same way, which leaves the M-ratio
+invariant to \code{sdratio}.
+}
+
 \examples{
 \dontrun{
 # EV-SDT rating model
 dat <- expand.grid(id = 1:20, stimulus = c(0L, 1L))
 dat <- cbind(dat, rsdt_rating(nrow(dat), 200, dat$stimulus,
-                              dprime = 1.5, thresholds = c(-0.5, 0, 0.5)))
+                              d = 1.5, thresholds = c(-0.5, 0, 0.5)))
 
 model <- sdt_rating(
   response = c("r1", "r2", "r3", "r4"),
@@ -314,7 +331,7 @@ model <- sdt_rating(
 )
 
 fit <- bmm(
-  formula = bmf(dprime ~ 1, criterion ~ 1, spacing ~ 1),
+  formula = bmf(d ~ 1, criterion ~ 1, spacing ~ 1),
   data = dat,
   model = model,
   cores = 4,
@@ -323,7 +340,7 @@ fit <- bmm(
 
 # UV-SDT: add sdratio to the formula
 fit_uv <- bmm(
-  formula = bmf(dprime ~ 1, criterion ~ 1, spacing ~ 1, sdratio ~ 1),
+  formula = bmf(d ~ 1, criterion ~ 1, spacing ~ 1, sdratio ~ 1),
   data = dat,
   model = model,
   cores = 4,
@@ -333,12 +350,12 @@ fit_uv <- bmm(
 # Dual-process SDT: free recollection of old items (one-sided) or both
 # old and new items (two-sided) via the formula
 model_dp <- sdt_rating(c("r1", "r2", "r3", "r4"), "stimulus", version = "dpsdt")
-fit_dp <- bmm(bmf(dprime ~ 1, criterion ~ 1, spacing ~ 1, Ro ~ 1, Rn ~ 1),
+fit_dp <- bmm(bmf(d ~ 1, criterion ~ 1, spacing ~ 1, Ro ~ 1, Rn ~ 1),
               data = dat, model = model_dp, backend = "cmdstanr")
 
 # Meta-d': estimate metacognitive efficiency (log M-ratio)
 model_md <- sdt_rating(c("r1", "r2", "r3", "r4"), "stimulus", version = "metad")
-fit_md <- bmm(bmf(dprime ~ 1, criterion ~ 1, spacing ~ 1, logmratio ~ 1),
+fit_md <- bmm(bmf(d ~ 1, criterion ~ 1, spacing ~ 1, logmratio ~ 1),
               data = dat, model = model_md, backend = "cmdstanr")
 mratio(fit_md) # posterior M-ratio (meta-d'/d')
 }

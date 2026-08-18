@@ -20,7 +20,7 @@ A data frame of class \code{"bmm_sdt_roc_observed"} with columns \code{FA},
 }
 \description{
 Computes empirical (observed) ROC points from the response-count data used to
-fit a \code{\link[=sdt_rating]{sdt_rating()}} or \code{\link[=sdt_binary]{sdt_binary()}} model. Rating models pool counts
+fit a \code{\link[=sdt_rating]{sdt_rating()}} or \code{\link[=sdt_yn]{sdt_yn()}} model. Rating models pool counts
 across observations within each stimulus type (and optional condition) to
 produce cumulative hit/false-alarm rates at each confidence threshold; binary
 models produce one operating point per criterion level (the empirical

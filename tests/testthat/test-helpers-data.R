@@ -152,7 +152,7 @@ test_that("check_data() returns a data.frame()", {
   # - y, x, z, w, l, s for circular/mixture models
   # - mean_rt, var_rt, n_upper, n_trials for ezdm 3par
   # - mean_rt_upper/lower, var_rt_upper/lower for ezdm 4par
-  # - stimulus (0/1) for sdt_binary (response counts come from `response`)
+  # - stimulus (0/1) for sdt_yn (response counts come from `response`)
   # - rank1, rank2 for sdt_ranking (wide rank-frequency count columns)
   # Use 50 rows to avoid small sample size warnings from cswald
   test_data <- data.frame(

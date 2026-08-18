@@ -25,7 +25,7 @@ from the data.}
 
 \item{criterion_points}{Optional. Control of the binary multi-criteria
 behaviour. \code{NULL} (default) auto-detects predictors that vary the criterion
-only (not \code{dprime}/\code{sdratio}) and treats their levels as operating points
+only (not \code{d}/\code{sdratio}) and treats their levels as operating points
 on one curve. Pass a character vector of column names to force that
 classification, or \code{FALSE} to disable it (one separate curve per predictor
 combination). Ignored for rating models.}
@@ -40,14 +40,19 @@ and any condition columns, plus a \code{summary} attribute (\code{AUC_mean},
 \description{
 Computes the posterior area under the ROC curve (AUC). For Gaussian and
 Gumbel-min equal-variance binary SDT the AUC is available in closed form from
-the \code{dprime} draws; otherwise it is obtained by trapezoidal integration of
+the \code{d} draws; otherwise it is obtained by trapezoidal integration of
 the ROC points from \code{\link[=roc_sdt]{roc_sdt()}}. The returned AUC is always the area under
 the full curve (for binary multi-criteria fits this is one value per curve,
 not the trapezoid of the discrete operating points).
 }
 \details{
-Analytical formulas: normal EV-SDT \eqn{AUC = \Phi(d'/\sqrt{2})};
-Gumbel-min EV-SDT \eqn{AUC = \mathrm{logistic}(g')}.
+The closed form is used only when \code{sdratio} is fixed, where \code{d} (which is
+\eqn{d_a}) equals \eqn{d'}; every unequal-variance fit takes the numerical
+route, so the AUC is invariant to the sensitivity parameterization.
+
+Analytical formulas (equal variance, where \eqn{d_a = d'}): normal
+EV-SDT \eqn{AUC = \Phi(d'/\sqrt{2})}; Gumbel-min EV-SDT
+\eqn{AUC = \mathrm{logistic}(g')}.
 }
 \seealso{
 \code{\link[=roc_sdt]{roc_sdt()}}, \code{\link[=plot.bmm_sdt_auc]{plot.bmm_sdt_auc()}}

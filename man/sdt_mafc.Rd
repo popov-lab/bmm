@@ -54,31 +54,30 @@ m-Alternative Forced Choice Signal Detection Theory Model
 \item \strong{Citation:}
 \itemize{
 \item Green, D. M., & Swets, J. A. (1966). Signal detection theory and psychophysics. Wiley.
-DeCarlo, L. T. (2012). On a signal detection approach to m-alternative forced choice with bias, with maximum likelihood and Bayesian approaches to estimation. JMASM, 11(1), 257-282.
+DeCarlo, L. T. (2012). On a signal detection approach to m-alternative forced choice with bias, with maximum likelihood and Bayesian approaches to estimation. Journal of Mathematical Psychology, 56(3), 196-207.
 }
-\item \strong{Version:} mafc
 \item \strong{Requirements:}
 
 Provide pre-aggregated accuracy data with the following columns:
 }
 \itemize{
-\item Response counts (n_correct): number of correct responses
+\item Response counts (response): number of correct responses
 \item Number of trials (n_trials): total trials per cell
 No stimulus column needed (each trial has exactly one signal alternative)
 }
 \itemize{
 \item \strong{Parameters:}
 \itemize{
-\item \code{dprime}: Sensitivity: distance between signal and noise distributions
+\item \code{d}: Sensitivity: the balanced discriminability index d_a, which for the equal-variance m-AFC model equals d' -- the distance between the signal and distractor distributions in noise SD units
 }
 \item \strong{Fixed parameters:}
 \item \strong{Default parameter links:}
 \itemize{
-\item dprime = identity
+\item d = identity
 }
 \item \strong{Default priors:}
 \itemize{
-\item \code{dprime}:
+\item \code{d}:
 \itemize{
 \item \code{main}: normal(1, 1)
 \item \code{effects}: normal(0, 0.5)
@@ -87,19 +86,32 @@ No stimulus column needed (each trial has exactly one signal alternative)
 }
 
 Models accuracy in m-AFC tasks where each trial presents one signal among
-\code{m} alternatives and the observer chooses the strongest one. Only \code{dprime}
+\code{m} alternatives and the observer chooses the strongest one. Only \code{d}
 is estimated (m-AFC has no response bias). The probability correct,
-\eqn{P_c = \int f(x - d')\, F(x)^{m-1}\, dx}, is computed per noise
+\eqn{P_c = \int f(x - d)\, F(x)^{m-1}\, dx}, is computed per noise
 distribution: a closed-form softmax for \code{gumbel_max}, a closed-form Gamma
 ratio for \code{gumbel_min}, Gauss-Hermite quadrature for \code{normal}
-(\eqn{\Phi(d'/\sqrt{2})} at m = 2), and Gauss-Legendre quadrature for
+(\eqn{\Phi(d/\sqrt{2})} at m = 2), and Gauss-Legendre quadrature for
 \code{logistic}.
 }
+\section{Sensitivity is on the same scale as \code{\link[=sdt_yn]{sdt_yn()}}}{
+
+\code{d} is the balanced index \eqn{d_a} that \code{\link[=sdt_yn]{sdt_yn()}} reports. m-AFC assumes
+the signal and distractor distributions share a scale, so \eqn{d_a} coincides
+with \eqn{d'} here and no \code{sdratio} parameter is needed.
+
+The two models agree exactly at \code{m = 2}: 2AFC proportion correct equals the
+area under the yes/no ROC (Green's theorem), and for Gaussian noise both give
+\eqn{P_c = \Phi(d/\sqrt{2})}. The same observer therefore yields the same \code{d}
+whether it is measured by a yes/no ROC or by 2AFC accuracy, which is the
+property that makes \eqn{d_a} the right common scale for the SDT family.
+}
+
 \examples{
 \dontrun{
 dat <- data.frame(id = 1:20, n_trials = 200L)
 dat$n_correct <- rsdt_mafc(nrow(dat), dat$n_trials, m = 4,
-                           dprime = rnorm(20, 1.5, 0.4))
+                           d = rnorm(20, 1.5, 0.4))
 
 model <- sdt_mafc(
   response = "n_correct",
@@ -108,7 +120,7 @@ model <- sdt_mafc(
 )
 
 fit <- bmm(
-  formula = bmf(dprime ~ 1),
+  formula = bmf(d ~ 1),
   data = dat,
   model = model,
   cores = 4,
@@ -122,7 +134,7 @@ psychophysics}. Wiley.
 
 DeCarlo, L. T. (2012). On a signal detection approach to m-alternative
 forced choice with bias, with maximum likelihood and Bayesian approaches
-to estimation. \emph{Journal of Mathematical and Statistical Psychology},
-\emph{11}(1), 257--282.
+to estimation. \emph{Journal of Mathematical Psychology}, \emph{56}(3),
+196--207. \doi{10.1016/j.jmp.2012.02.004}
 }
 \keyword{bmmodel}

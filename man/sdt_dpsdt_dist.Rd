@@ -9,7 +9,7 @@
 dsdt_dpsdt(
   counts,
   stimulus,
-  dprime,
+  d,
   thresholds,
   Ro,
   Rn,
@@ -22,7 +22,7 @@ rsdt_dpsdt(
   n,
   n_trials,
   stimulus,
-  dprime,
+  d,
   thresholds,
   Ro,
   Rn,
@@ -37,10 +37,14 @@ signal" (K), or a vector for a single observation.}
 
 \item{stimulus}{Integer vector (0/1). Stimulus type: 0 = noise, 1 = signal.}
 
-\item{dprime}{Numeric vector. Sensitivity parameter(s).}
+\item{d}{Numeric vector. Sensitivity: the balanced discriminability index
+\eqn{d_a}, which equals \eqn{d'} when \code{sdratio} is 1. The separation
+between the distributions in noise units is \code{d * sqrt((1 + sdratio^2) / 2)}.}
 
 \item{thresholds}{Numeric vector of length K-1 with the ordered decision
-thresholds, or an n-by-(K-1) matrix with one row per observation.}
+thresholds, or an n-by-(K-1) matrix with one row per observation. The
+thresholds are on the noise-standardized axis and are not rescaled by
+\code{sdratio}.}
 
 \item{Ro}{Numeric vector in \verb{[0, 1]}. Recollection probability for old
 (signal) items.}
@@ -49,18 +53,12 @@ thresholds, or an n-by-(K-1) matrix with one row per observation.}
 probability for new (noise) items.}
 
 \item{sdratio}{Numeric vector. Ratio of signal to noise standard deviations
-(default 1, i.e., equal variance).}
+(default 1, i.e., equal variance). Must be positive. Note that this is the
+natural scale: the \code{sdratio} parameter of \code{\link[=sdt_rating]{sdt_rating()}} is sampled on the
+log scale, so it corresponds to \code{log(sdratio)} here.}
 
-\item{dist}{Character. The distribution assumed for the latent evidence,
-given here by its cumulative distribution function:
-\itemize{
-\item "normal" (default): Gaussian, \eqn{\Phi(x)}
-\item "gumbel_min": smallest extreme value, \eqn{1 - \exp(-\exp(x))}
-(the complementary log-log distribution)
-\item "gumbel_max": largest extreme value, \eqn{\exp(-\exp(-x))}
-(the log-log distribution, as in \code{evd::pgumbel})
-\item "logistic": \eqn{1 / (1 + \exp(-x))}
-}}
+\item{dist}{Character. Noise distribution: "normal" (default), "logistic",
+"gumbel_min", or "gumbel_max".}
 
 \item{log}{Logical. If \code{TRUE}, returns log-density (default \code{FALSE}).}
 
@@ -86,10 +84,10 @@ here \code{Ro}/\code{Rn} are supplied directly as probabilities in \verb{[0, 1]}
 \examples{
 # Density for a single observation (K=4) with recollection of old items
 dsdt_dpsdt(counts = c(2, 8, 20, 70), stimulus = 1,
-           dprime = 1.5, thresholds = c(-0.5, 0.0, 0.5), Ro = 0.3, Rn = 0)
+           d = 1.5, thresholds = c(-0.5, 0.0, 0.5), Ro = 0.3, Rn = 0)
 # Generate DPSDT rating data (K=4) for 10 subjects and both stimulus types
 dat <- expand.grid(id = 1:10, stimulus = c(0L, 1L))
-dat <- cbind(dat, rsdt_dpsdt(nrow(dat), 100, dat$stimulus, dprime = 1.5,
+dat <- cbind(dat, rsdt_dpsdt(nrow(dat), 100, dat$stimulus, d = 1.5,
                              thresholds = c(-0.5, 0, 0.5),
                              Ro = 0.3, Rn = 0.1))
 head(dat)

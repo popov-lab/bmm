@@ -44,7 +44,7 @@ model <- sdt_ranking(
   response = c("rank1", "rank2", "rank3", "rank4", "rank5"), m = "set_size"
 )
 fit <- bmm(
-  formula = bmf(dprime ~ 1 + (1 | id)),
+  formula = bmf(d ~ 1 + (1 | id)),
   data = meyer_grant_jakob_2025,
   model = model,
   backend = "cmdstanr"

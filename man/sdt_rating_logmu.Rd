@@ -11,7 +11,7 @@ sdt_rating_logmu(
   K,
   dist,
   thresh,
-  dprime,
+  d,
   criterion,
   spacing,
   sdratio,
@@ -24,7 +24,7 @@ sdt_dpsdt_logmu(
   K,
   dist,
   thresh,
-  dprime,
+  d,
   criterion,
   spacing,
   sdratio,
@@ -39,7 +39,7 @@ sdt_metad_logmu(
   K,
   dist,
   thresh,
-  dprime,
+  d,
   criterion,
   spacing,
   sdratio,
@@ -57,8 +57,9 @@ sdt_metad_logmu(
 
 \item{thresh}{Integer threshold-parameterization id.}
 
-\item{dprime, criterion, spacing, sdratio}{Model parameters (draws-by-observation
-matrices supplied by brms). \code{spacing} is \code{0} for threshold types without it.}
+\item{d, criterion, spacing, sdratio}{Model parameters (draws-by-observation
+matrices supplied by brms). \code{d} is the balanced sensitivity index d_a;
+\code{spacing} is \code{0} for threshold types without it.}
 
 \item{stimulus}{Stimulus covariate (0 = noise, 1 = signal).}
 
@@ -68,10 +69,10 @@ matrices supplied by brms). \code{spacing} is \code{0} for threshold types witho
 \code{inv_logit(Ro)}/\code{inv_logit(Rn)} are the recollection probabilities.}
 
 \item{logmratio}{Log M-ratio for the \code{metad} version; meta-d' is recovered
-as \code{exp(logmratio) * dprime}.}
+as \code{exp(logmratio) * d}, on the same d_a scale as \code{d}.}
 }
 \value{
-\code{log(p_cat)}, matching the shape of \code{dprime}.
+\code{log(p_cat)}, matching the shape of \code{d}.
 }
 \description{
 R companion to the Stan \code{sdt_rating_logmu} function. It returns
