@@ -35,22 +35,22 @@ counts. Each subject was tested under five base-rate conditions: the
 proportion of old items shifts the decision criterion from conservative
 (\code{br1}) to liberal (\code{br5}) while leaving sensitivity unchanged, tracing a
 five-point binary ROC per subject. This criterion variation is what makes the
-unequal-variance ratio (\code{sdratio}) of \code{\link[=sdt_binary]{sdt_binary()}} identifiable: a single
+unequal-variance ratio (\code{sdratio}) of \code{\link[=sdt_yn]{sdt_yn()}} identifiable: a single
 condition yields only one hit/false-alarm pair and cannot separate a wider
 signal distribution from a larger d'. Counts were digitised from the
 frequencies reported in the original article.
 }
 \examples{
 \dontrun{
-# Unequal-variance binary SDT: the criterion varies across base-rate
-# conditions, while d' and the signal/noise SD ratio (sdratio) are held
-# constant across conditions.
-model <- sdt_binary(
+# Unequal-variance yes/no SDT: the criterion varies across base-rate
+# conditions, while sensitivity (d) and the signal/noise SD ratio (sdratio)
+# are held constant across conditions.
+model <- sdt_yn(
   response = "n_old", stimulus = "stimulus", n_trials = "n_trials"
 )
 fit <- bmm(
   formula = bmf(
-    dprime ~ 1 + (1 | id),
+    d ~ 1 + (1 | id),
     criterion ~ 0 + condition + (1 | id),
     sdratio ~ 1
   ),

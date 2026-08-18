@@ -9,20 +9,13 @@
 dsdt_ranking(
   counts,
   m,
-  dprime,
+  d,
   dist = c("gumbel_min", "normal"),
   sdratio = 1,
   log = FALSE
 )
 
-rsdt_ranking(
-  n,
-  n_trials,
-  m,
-  dprime,
-  dist = c("gumbel_min", "normal"),
-  sdratio = 1
-)
+rsdt_ranking(n, n_trials, m, d, dist = c("gumbel_min", "normal"), sdratio = 1)
 }
 \arguments{
 \item{counts}{Integer matrix with one row per observation and one rank-count
@@ -32,7 +25,7 @@ single observation. Columns beyond a row's set size \code{m} must be 0.}
 \item{m}{Integer vector. Number of ranked items per observation. Must be
 at least 2 and no larger than the number of count columns.}
 
-\item{dprime}{Numeric vector. Ranking discrimination parameter(s).}
+\item{d}{Numeric vector. Ranking discrimination parameter(s).}
 
 \item{dist}{Character. The distribution assumed for the latent evidence:
 "gumbel_min" (default), the smallest extreme value distribution with
@@ -45,7 +38,7 @@ closed form; or "normal", Gaussian UV-SDT by numerical integration.}
 \item{log}{Logical. If \code{TRUE}, returns log-density (default \code{FALSE}).}
 
 \item{n}{Integer. Number of observations to generate. \code{n_trials}, \code{m},
-\code{dprime}, and \code{sdratio} are recycled to this length.}
+\code{d}, and \code{sdratio} are recycled to this length.}
 
 \item{n_trials}{Integer vector. Number of ranking trials per observation.}
 }
@@ -59,16 +52,16 @@ matching the wide format \code{\link[=sdt_ranking]{sdt_ranking()}} expects.
 \description{
 Density and random generation for ranking signal detection
 theory (Meyer-Grant et al., 2025). Models rank ordering of m items by
-perceived strength. Only \code{dprime} is estimated (no criterion or stimulus
+perceived strength. Only \code{d} is estimated (no criterion or stimulus
 column). Supports Gumbel-min (closed form) and Gaussian UV-SDT
 (numerical integration).
 }
 \examples{
 # Gumbel-min ranking density
-dsdt_ranking(counts = c(40, 30, 20, 10), m = 4, dprime = 1.0)
+dsdt_ranking(counts = c(40, 30, 20, 10), m = 4, d = 1.0)
 # Generate ranking data (m=4, Gumbel-min) for 10 subjects
 dat <- data.frame(id = 1:10, set_size = 4L)
-dat <- cbind(dat, rsdt_ranking(10, 100, m = 4, dprime = 1.0))
+dat <- cbind(dat, rsdt_ranking(10, 100, m = 4, d = 1.0))
 head(dat)
 }
 \references{

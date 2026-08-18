@@ -9,7 +9,7 @@ sdt_rating_logmu(
   K,
   dist,
   thresh,
-  dprime,
+  d,
   criterion,
   spacing,
   sdratio,
@@ -26,15 +26,16 @@ sdt_rating_logmu(
 
 \item{thresh}{Integer threshold-parameterization id.}
 
-\item{dprime, criterion, spacing, sdratio}{Model parameters (draws-by-observation
-matrices supplied by brms). \code{spacing} is \code{0} for threshold types without it.}
+\item{d, criterion, spacing, sdratio}{Model parameters (draws-by-observation
+matrices supplied by brms). \code{d} is the balanced sensitivity index d_a;
+\code{spacing} is \code{0} for threshold types without it.}
 
 \item{stimulus}{Stimulus covariate (0 = noise, 1 = signal).}
 
 \item{...}{Threshold \code{delta} parameters, when the threshold type uses them.}
 }
 \value{
-\code{log(p_cat)}, matching the shape of \code{dprime}.
+\code{log(p_cat)}, matching the shape of \code{d}.
 }
 \description{
 R companion to the Stan \code{sdt_rating_logmu} function. It returns
