@@ -17,7 +17,7 @@ mock_linpred_factory <- function(draws) {
 }
 
 fake_binary_fit <- function(uv = FALSE, multi = FALSE) {
-  model <- sdt_binary(response = "n_old", stimulus = "stimulus", n_trials = "n_trials")
+  model <- sdt_yn(response = "n_old", stimulus = "stimulus", n_trials = "n_trials")
   if (uv) model$fixed_parameters$sdratio <- NULL
 
   if (multi) {
@@ -28,11 +28,11 @@ fake_binary_fit <- function(uv = FALSE, multi = FALSE) {
       n_trials  = 100L,
       dist_type = 1L
     )
-    uf <- bmf(dprime ~ 1 + (1 | id), criterion ~ 0 + condition + (1 | id), sdratio ~ 1)
+    uf <- bmf(d ~ 1 + (1 | id), criterion ~ 0 + condition + (1 | id), sdratio ~ 1)
   } else {
     data <- data.frame(stimulus = 0:1, n_old = c(20L, 80L),
                        n_trials = 100L, dist_type = 1L)
-    uf <- bmf(dprime ~ 1, criterion ~ 1)
+    uf <- bmf(d ~ 1, criterion ~ 1)
   }
   structure(list(data = data, bmm = list(model = model, user_formula = uf)),
             class = c("bmmfit", "brmsfit"))
@@ -49,7 +49,7 @@ fake_rating_fit <- function(uv = FALSE, threshold_type = "parsimonious",
   Ys <- c(4, 8, 13, 20, 25, 30)
   data <- data.frame(stimulus = c(0, 1), nTrials = c(sum(Yn), sum(Ys)))
   data$Y <- rbind(Yn, Ys)
-  uf <- bmf(dprime ~ 1, criterion ~ 1, spacing ~ 1)
+  uf <- bmf(d ~ 1, criterion ~ 1, spacing ~ 1)
   structure(list(data = data, bmm = list(model = model, user_formula = uf)),
             class = c("bmmfit", "brmsfit"))
 }
@@ -57,7 +57,7 @@ fake_rating_fit <- function(uv = FALSE, threshold_type = "parsimonious",
 fake_mafc_fit <- function(dist = "normal", m = 4L) {
   model <- sdt_mafc(response = "n_correct", n_trials = "n_trials", m = m, dist = dist)
   data <- data.frame(n_correct = 80L, n_trials = 100L, dist_type = 1L)
-  uf <- bmf(dprime ~ 1)
+  uf <- bmf(d ~ 1)
   structure(list(data = data, bmm = list(model = model, user_formula = uf)),
             class = c("bmmfit", "brmsfit"))
 }
@@ -66,7 +66,7 @@ fake_ranking_fit <- function(dist = "gumbel_min", m = 3L) {
   resp <- paste0("rank", seq_len(m))
   model <- sdt_ranking(response = resp, m = m, dist = dist)
   data <- data.frame(rank1 = 10L, rank2 = 6L, rank3 = 4L, nTrials = 20L)
-  uf <- bmf(dprime ~ 1)
+  uf <- bmf(d ~ 1)
   structure(list(data = data, bmm = list(model = model, user_formula = uf)),
             class = c("bmmfit", "brmsfit"))
 }

@@ -91,14 +91,21 @@
   }
 
   parameters <- list(
-    dprime = "Sensitivity: distance between signal and noise distributions",
-    criterion = "Response bias: location of decision boundary"
+    d = paste0(
+      "Sensitivity: the balanced discriminability index d_a, which measures ",
+      "the distance between the signal and noise distributions in units of ",
+      "their root-mean-square SD, so it equals d' when sdratio is 1"
+    ),
+    criterion = paste0(
+      "Response bias: location of the decision boundary on the ",
+      "noise-standardized axis"
+    )
   )
   default_priors <- list(
-    dprime = list(main = "normal(1, 1)", effects = "normal(0, 0.5)"),
+    d = list(main = "normal(1, 1)", effects = "normal(0, 0.5)"),
     criterion = list(main = "normal(0, 1.5)", effects = "normal(0, 0.5)")
   )
-  param_links <- list(dprime = "identity", criterion = "identity")
+  param_links <- list(d = "identity", criterion = "identity")
 
   threshold_parts <- .sdt_threshold_parameter_parts(n_ratings, threshold_type)
   parameters <- c(parameters, threshold_parts$parameters)
@@ -120,7 +127,7 @@
   # underflows to log_diff_exp(-Inf, -Inf) = NaN, so every chain rejects its
   # initial value.
   init_ranges <- list(
-    dprime = c(0.5, 1.5), criterion = c(-0.5, 0.5), sdratio = c(-0.3, 0.3)
+    d = c(0.5, 1.5), criterion = c(-0.5, 0.5), sdratio = c(-0.3, 0.3)
   )
   for (p in names(threshold_parts$parameters)) {
     init_ranges[[p]] <- if (p == "spacing") c(-0.7, -0.2) else c(-0.5, 0.2)
@@ -224,7 +231,7 @@
 #' # EV-SDT rating model
 #' dat <- expand.grid(id = 1:20, stimulus = c(0L, 1L))
 #' dat <- cbind(dat, rsdt_rating(nrow(dat), 200, dat$stimulus,
-#'                               dprime = 1.5, thresholds = c(-0.5, 0, 0.5)))
+#'                               d = 1.5, thresholds = c(-0.5, 0, 0.5)))
 #'
 #' model <- sdt_rating(
 #'   response = c("r1", "r2", "r3", "r4"),
@@ -232,7 +239,7 @@
 #' )
 #'
 #' fit <- bmm(
-#'   formula = bmf(dprime ~ 1, criterion ~ 1, spacing ~ 1),
+#'   formula = bmf(d ~ 1, criterion ~ 1, spacing ~ 1),
 #'   data = dat,
 #'   model = model,
 #'   cores = 4,
@@ -241,7 +248,7 @@
 #'
 #' # UV-SDT: add sdratio to the formula
 #' fit_uv <- bmm(
-#'   formula = bmf(dprime ~ 1, criterion ~ 1, spacing ~ 1, sdratio ~ 1),
+#'   formula = bmf(d ~ 1, criterion ~ 1, spacing ~ 1, sdratio ~ 1),
 #'   data = dat,
 #'   model = model,
 #'   cores = 4,
@@ -340,7 +347,7 @@ check_data.sdt_rating <- function(model, data, formula) {
   has_spacing <- "spacing" %in% names(model$parameters)
   c(model$other_vars$n_ratings, .sdt_dist_id(model$other_vars$dist),
     .sdt_threshold_type_id(model$other_vars$threshold_type),
-    "dprime", "criterion",
+    "d", "criterion",
     if (has_spacing) "spacing" else "0", "sdratio",
     model$other_vars$stimulus, .sdt_threshold_delta_names(model))
 }
@@ -353,7 +360,7 @@ check_data.sdt_rating <- function(model, data, formula) {
 
   signature <- paste(
     c("int cat", "int K", "int dist_type", "int thresh_type",
-      "real dprime", "real criterion", "real spacing", "real sdratio",
+      "real d", "real criterion", "real spacing", "real sdratio",
       "real stimulus", if (nd) paste("real", delta_names)),
     collapse = ", "
   )
@@ -369,7 +376,7 @@ check_data.sdt_rating <- function(model, data, formula) {
     "real sdt_rating_logmu(", signature, ") {\n",
     delta_decl,
     "  vector[K - 1] thr = sdt_make_thresholds_rating(criterion, spacing, deltas, K, thresh_type);\n",
-    "  return sdt_rating_logmu_cat(cat, thr, dprime, sdratio, stimulus, dist_type);\n",
+    "  return sdt_rating_logmu_cat(cat, thr, d, sdratio, stimulus, dist_type);\n",
     "}\n"
   )
 }
@@ -381,7 +388,7 @@ check_data.sdt_rating <- function(model, data, formula) {
 
 # Base multinomial brmsformula: Y | trials(nTrials) carries the counts and each
 # category gets a non-linear mu calling sdt_rating_logmu. The user's parameter
-# formulas (dprime, criterion, spacing/deltas, sdratio) are added afterwards by
+# formulas (d, criterion, spacing/deltas, sdratio) are added afterwards by
 # bmf2bf.bmmodel, so they are deliberately not added here.
 #' @export
 bmf2bf.sdt_rating <- function(model, formula) {
@@ -438,31 +445,32 @@ configure_model.sdt_rating <- function(model, data, formula) {
 #' @param K Integer number of rating categories.
 #' @param dist Integer noise-distribution id (see the `.sdt_dists` registry).
 #' @param thresh Integer threshold-parameterization id.
-#' @param dprime,criterion,spacing,sdratio Model parameters (draws-by-observation
-#'   matrices supplied by brms). `spacing` is `0` for threshold types without it.
+#' @param d,criterion,spacing,sdratio Model parameters (draws-by-observation
+#'   matrices supplied by brms). `d` is the balanced sensitivity index d_a;
+#'   `spacing` is `0` for threshold types without it.
 #' @param stimulus Stimulus covariate (0 = noise, 1 = signal).
 #' @param ... Threshold `delta` parameters, when the threshold type uses them.
-#' @return `log(p_cat)`, matching the shape of `dprime`.
+#' @return `log(p_cat)`, matching the shape of `d`.
 #' @keywords internal
 #' @export
-sdt_rating_logmu <- function(cat, K, dist, thresh, dprime, criterion, spacing,
+sdt_rating_logmu <- function(cat, K, dist, thresh, d, criterion, spacing,
                              sdratio, stimulus, ...) {
   dist_name <- .sdt_dist_names[dist]
   thresh_name <- .sdt_threshold_type_name(thresh)
 
-  shape <- dim(dprime)
-  dprime <- as.vector(dprime)
-  n <- length(dprime)
+  shape <- dim(d)
+  d <- as.vector(d)
+  n <- length(d)
   criterion <- rep_len(as.vector(criterion), n)
   spacing <- rep_len(as.vector(spacing), n)
   sdratio <- rep_len(as.vector(sdratio), n)
   stimulus <- rep_len(as.vector(stimulus), n)
   deltas <- if (...length() > 0L) {
-    do.call(cbind, lapply(list(...), function(d) rep_len(as.vector(d), n)))
+    do.call(cbind, lapply(list(...), function(x) rep_len(as.vector(x), n)))
   }
 
   thr <- .sdt_make_thresholds(criterion, K, thresh_name, spacing, deltas)
-  probs <- rbind(.sdt_category_probs(rbind(thr), dprime, exp(sdratio),
+  probs <- rbind(.sdt_category_probs(rbind(thr), d, exp(sdratio),
                                      stimulus, dist_name))
   out <- log(probs[, cat])
 

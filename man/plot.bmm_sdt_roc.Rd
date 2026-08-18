@@ -55,7 +55,8 @@ the distribution's quantile axis: \code{qf(rate)}, where \code{qf} is the invers
 the fitted noise distribution, and the axis label names that transform
 (\code{z} for normal, \code{logit} for logistic, \code{loglog}/\code{cloglog} for the Gumbel
 distributions). On this axis the binary model ROC is a straight line with
-slope \code{1 / exp(sdratio)} and intercept \code{dprime / exp(sdratio)}, so a slope
+slope \code{1 / exp(sdratio)} and intercept \code{d * sqrt((1 + exp(sdratio)^2) / 2) / exp(sdratio)} -- the separation in noise-SD units over the signal SD, since
+\code{d} is \eqn{d_a} -- so a slope
 below 1 is the unequal-variance signature (signal SD > noise SD), and
 departures of the observed points from a straight line diagnose misfit. This
 linearity holds for the symmetric distributions (\code{"normal"}, \code{"logistic"});

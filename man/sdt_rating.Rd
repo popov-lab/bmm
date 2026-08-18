@@ -85,8 +85,8 @@ Categories should be ordered: 1 = 'definitely noise' to K = 'definitely signal'
 \itemize{
 \item \strong{Parameters:}
 \itemize{
-\item \code{dprime}: Sensitivity: distance between signal and noise distributions
-\item \code{criterion}: Response bias: location of decision boundary
+\item \code{d}: Sensitivity: the balanced discriminability index d_a, which measures the distance between the signal and noise distributions in units of their root-mean-square SD, so it equals d' when sdratio is 1
+\item \code{criterion}: Response bias: location of the decision boundary on the noise-standardized axis
 \item \code{spacing}: Threshold spacing: controls distance between adjacent thresholds (exp(spacing) ensures positive spacing)
 \item \code{sdratio}: Log SD ratio: the log of the signal-to-noise standard deviation ratio, so exp(sdratio) is the ratio itself and 0 means equal variance
 }
@@ -96,11 +96,11 @@ Categories should be ordered: 1 = 'definitely noise' to K = 'definitely signal'
 }
 \item \strong{Default parameter links:}
 \itemize{
-\item dprime = identity; criterion = identity; spacing = identity; sdratio = identity
+\item d = identity; criterion = identity; spacing = identity; sdratio = identity
 }
 \item \strong{Default priors:}
 \itemize{
-\item \code{dprime}:
+\item \code{d}:
 \itemize{
 \item \code{main}: normal(1, 1)
 \item \code{effects}: normal(0, 0.5)
@@ -132,7 +132,7 @@ to the formula.
 # EV-SDT rating model
 dat <- expand.grid(id = 1:20, stimulus = c(0L, 1L))
 dat <- cbind(dat, rsdt_rating(nrow(dat), 200, dat$stimulus,
-                              dprime = 1.5, thresholds = c(-0.5, 0, 0.5)))
+                              d = 1.5, thresholds = c(-0.5, 0, 0.5)))
 
 model <- sdt_rating(
   response = c("r1", "r2", "r3", "r4"),
@@ -140,7 +140,7 @@ model <- sdt_rating(
 )
 
 fit <- bmm(
-  formula = bmf(dprime ~ 1, criterion ~ 1, spacing ~ 1),
+  formula = bmf(d ~ 1, criterion ~ 1, spacing ~ 1),
   data = dat,
   model = model,
   cores = 4,
@@ -149,7 +149,7 @@ fit <- bmm(
 
 # UV-SDT: add sdratio to the formula
 fit_uv <- bmm(
-  formula = bmf(dprime ~ 1, criterion ~ 1, spacing ~ 1, sdratio ~ 1),
+  formula = bmf(d ~ 1, criterion ~ 1, spacing ~ 1, sdratio ~ 1),
   data = dat,
   model = model,
   cores = 4,

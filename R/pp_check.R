@@ -32,9 +32,9 @@
 #'   `group = NA` to pool them into a single profile. The [sdt_ranking()] model
 #'   facets by rank position; for mixed set sizes, pass the set-size column as
 #'   `group` so each facet has a homogeneous denominator. The custom-family
-#'   models [sdt_binary()] and [sdt_mafc()] delegate to [brms::pp_check()]; for
+#'   models [sdt_yn()] and [sdt_mafc()] delegate to [brms::pp_check()]; for
 #'   their aggregated counts an overlaid empirical CDF (`type = "ecdf_overlay"`,
-#'   adding `group = "stimulus"` for [sdt_binary()]) is usually clearer than the
+#'   adding `group = "stimulus"` for [sdt_yn()]) is usually clearer than the
 #'   default bar view.
 #' @param ... Additional arguments forwarded to [brms::pp_check()] (non-multinomial)
 #'   or to [brms::posterior_predict()] (multinomial). For multinomial models,

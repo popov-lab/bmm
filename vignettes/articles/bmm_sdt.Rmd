@@ -60,16 +60,16 @@ requirements; they are not modes of a single function.
 
 | Constructor | Response format | Key parameters | ROC defined? |
 |-------------|-----------------|----------------|--------------|
-| `sdt_binary()` | counts of "signal"/"old" responses | `dprime`, `criterion`, `sdratio` | yes |
-| `sdt_rating()` | counts per confidence-rating category | `dprime`, `criterion`, threshold params, `sdratio` | yes |
-| `sdt_mafc()` | counts of correct m-AFC responses | `dprime` | no |
-| `sdt_ranking()` | counts per rank position | `dprime`, `sdratio` | no |
+| `sdt_yn()` | counts of "signal"/"old" responses | `d`, `criterion`, `sdratio` | yes |
+| `sdt_rating()` | counts per confidence-rating category | `d`, `criterion`, threshold params, `sdratio` | yes |
+| `sdt_mafc()` | counts of correct m-AFC responses | `d` | no |
+| `sdt_ranking()` | counts per rank position | `d`, `sdratio` | no |
 
 All four assume a latent evidence variable whose noise distribution is selected
 with the `dist` argument: `"normal"` (Gaussian SDT), `"logistic"`,
 `"gumbel_min"` (extreme-value SDT), or `"gumbel_max"`.
 
-Two of the models — `sdt_binary()` and `sdt_rating()` — have an explicit
+Two of the models — `sdt_yn()` and `sdt_rating()` — have an explicit
 response criterion, so a **receiver operating characteristic (ROC)** curve and
 its **area under the curve (AUC)** are defined. The m-AFC and ranking models
 have no criterion: accuracy already integrates over the decision rule, so
@@ -95,7 +95,7 @@ only the ingredients are SDT-specific.
    `dplyr::count()` or `stats::aggregate()`); the Rating SDT section below
    shows a real reshaping example.
 2. **Create the model object.** The constructor maps your column names onto the
-   model's response format — for example `sdt_binary(response = "n_old",
+   model's response format — for example `sdt_yn(response = "n_old",
    stimulus = "stimulus", n_trials = "n_trials")` — and selects the noise
    distribution via `dist`. Printing the model object lists its parameters and
    data requirements.
@@ -125,20 +125,37 @@ model the two distributions are
 $$
 X \mid \text{noise} \sim \mathrm{Normal}(0,\, 1),
 \qquad
-X \mid \text{signal} \sim \mathrm{Normal}(d',\, s^2),
+X \mid \text{signal} \sim \mathrm{Normal}(\delta,\, s^2),
 $$
 
-where **sensitivity** $d'$ is the mean separation expressed in units of the noise
-standard deviation, and $s$ is the signal-to-noise SD ratio (the `sdratio`
-parameter, fixed to $s = 1$ unless estimated). In a binary task the observer
-responds "signal" whenever the evidence exceeds a **criterion** $k$. The two
-response probabilities are then tail areas of the two distributions:
+where $\delta$ is the mean separation and $s$ is the signal-to-noise SD ratio
+(the `sdratio` parameter, fixed to $s = 1$ unless estimated). In a binary task
+the observer responds "signal" whenever the evidence exceeds a **criterion**
+$k$. The two response probabilities are then tail areas of the two
+distributions:
 
 $$
 \text{FA} = P(X > k \mid \text{noise}) = 1 - \Phi(k),
 \qquad
-\text{Hit} = P(X > k \mid \text{signal}) = 1 - \Phi\!\left(\tfrac{k - d'}{s}\right).
+\text{Hit} = P(X > k \mid \text{signal}) = 1 - \Phi\!\left(\tfrac{k - \delta}{s}\right).
 $$
+
+**Sensitivity** is that separation expressed in standard-deviation units — but
+the two distributions have *different* SDs as soon as $s \neq 1$, so which one
+is the yardstick has to be stated. bmm reports
+
+$$
+d_a = \frac{\delta}{\sqrt{(1 + s^2)/2}},
+$$
+
+the separation in units of the root-mean-square of the two SDs, which weights
+noise and signal equally. This is the `d` parameter in every formula below. When
+$s = 1$ it reduces to the familiar $d' = \delta$, so nothing changes for
+equal-variance models. Dividing by the noise SD instead gives $d_N$ (the
+classical $d'$) and by the signal SD gives $d_S$; `sdt_sensitivity()` returns
+all three from a fitted model. $d_a$ is the default because it is the only one
+that remains comparable across conditions whose $s$ differs
+[@Simpson_Fitter_1973; @Macmillan_Creelman_2005].
 
 ```{r sdt-distributions, echo = FALSE, fig.cap = "Latent evidence model. Noise and signal distributions overlap; responses above the criterion are labelled as signal. The shaded right tails are the false-alarm rate (noise) and the hit rate (signal); their separation is the sensitivity d-prime."}
 crit <- 0.75
@@ -385,13 +402,13 @@ only `dist`. Neither model estimates `sdratio`, so they have an identical number
 of parameters — any difference in ROC shape is the distribution's doing.
 
 ```{r}
-ev_formula <- bmf(dprime ~ 1 + (1 | id), criterion ~ 0 + condition + (1 | id))
+ev_formula <- bmf(d ~ 1 + (1 | id), criterion ~ 0 + condition + (1 | id))
 
 fit_normal <- bmm(
   formula = ev_formula,
   data    = broeder_schuetz_2009_e3,
-  model   = sdt_binary(response = "n_old", stimulus = "stimulus",
-                       n_trials = "n_trials", dist = "normal"),
+  model   = sdt_yn(response = "n_old", stimulus = "stimulus",
+                   n_trials = "n_trials", dist = "normal"),
   backend = "cmdstanr", cores = 4, refresh = 0, silent = 2,
   file = "assets/bmmfit_sdt_noise_normal_vignette"
 )
@@ -399,8 +416,8 @@ fit_normal <- bmm(
 fit_gumbel <- bmm(
   formula = ev_formula,
   data    = broeder_schuetz_2009_e3,
-  model   = sdt_binary(response = "n_old", stimulus = "stimulus",
-                       n_trials = "n_trials", dist = "gumbel_min"),
+  model   = sdt_yn(response = "n_old", stimulus = "stimulus",
+                   n_trials = "n_trials", dist = "gumbel_min"),
   backend = "cmdstanr", cores = 4, refresh = 0, silent = 2,
   file = "assets/bmmfit_sdt_noise_gumbel_vignette"
 )
@@ -454,37 +471,37 @@ whether the implied decision process is plausible for the task at hand.
 In a binary old/new recognition task each cell of the design contributes a count
 of "old" responses out of a number of trials, separately for old (`signal`) and
 new (`noise`) items. The latent decision variable places "old" responses above a
-criterion; sensitivity `dprime` is the distance between the signal and noise
+criterion; sensitivity `d` is the distance between the signal and noise
 distributions and `criterion` is the location of the boundary.
 
 ## A single condition: equal-variance SDT
 
-We simulate one condition with `rsdt_binary()` and fit an equal-variance model.
+We simulate one condition with `rsdt_yn()` and fit an equal-variance model.
 
 ```{r}
 set.seed(123)
 dat <- expand.grid(id = 1:30, stimulus = c(0L, 1L))
 dat$n_trials <- 100L
-dat$n_old <- rsdt_binary(nrow(dat), dat$n_trials, dat$stimulus,
-                         dprime = 1.5, criterion = 0.2)
+dat$n_old <- rsdt_yn(nrow(dat), dat$n_trials, dat$stimulus,
+                     d = 1.5, criterion = 0.2)
 
-model <- sdt_binary(response = "n_old", stimulus = "stimulus",
-                    n_trials = "n_trials")
+model <- sdt_yn(response = "n_old", stimulus = "stimulus",
+                n_trials = "n_trials")
 
 fit_ev <- bmm(
-  formula = bmf(dprime ~ 1 + (1 | id), criterion ~ 1 + (1 | id)),
+  formula = bmf(d ~ 1 + (1 | id), criterion ~ 1 + (1 | id)),
   data = dat,
   model = model,
   backend = "cmdstanr",
   cores = 4,
   refresh = 0,
   silent = 2,
-  file = "assets/bmmfit_sdt_binary_ev_vignette"
+  file = "assets/bmmfit_sdt_yn_ev_vignette"
 )
 summary(fit_ev)
 ```
 
-The population estimates recover the simulated `dprime = 1.5` and
+The population estimates recover the simulated `d = 1.5` and
 `criterion = 0.2`.
 
 By default `sdratio` is fixed to 0, i.e. the signal and noise distributions have
@@ -505,12 +522,12 @@ signal-to-noise SD ratio $s$, whose reciprocal is the slope of the zROC
 base-rate conditions (`br1` conservative … `br5` liberal).
 
 ```{r}
-model <- sdt_binary(response = "n_old", stimulus = "stimulus",
-                    n_trials = "n_trials")
+model <- sdt_yn(response = "n_old", stimulus = "stimulus",
+                n_trials = "n_trials")
 
 fit_uv <- bmm(
   formula = bmf(
-    dprime    ~ 1 + (1 | id),
+    d    ~ 1 + (1 | id),
     criterion ~ 0 + condition + (1 | id),
     sdratio   ~ 1
   ),
@@ -520,12 +537,12 @@ fit_uv <- bmm(
   cores = 4,
   refresh = 0,
   silent = 2,
-  file = "assets/bmmfit_sdt_binary_uv_vignette"
+  file = "assets/bmmfit_sdt_yn_uv_vignette"
 )
 summary(fit_uv)
 ```
 
-Here `dprime` and `sdratio` are shared across conditions while `criterion` varies
+Here `d` and `sdratio` are shared across conditions while `criterion` varies
 by `condition` — the five criteria are five operating points on a single ROC.
 `sdratio` is estimated on the log scale, so exponentiate it for the SD ratio on
 the natural scale:
@@ -537,10 +554,31 @@ exp(brms::fixef(fit_uv)["sdratio_Intercept", c("Estimate", "Q2.5", "Q97.5")])
 A value above 1 means the signal distribution is wider than the noise
 distribution, the classic recognition-memory pattern.
 
+### Which sensitivity index?
+
+Once `sdratio` is free, "the" distance between the two distributions depends on
+which standard deviation you measure it in. bmm estimates $d_a$, the separation
+divided by the root-mean-square of the two SDs. The alternatives are $d_N$
+(divide by the noise SD — the classical $d'$) and $d_S$ (divide by the signal
+SD). `sdt_sensitivity()` returns any of them, converting draw by draw so the
+intervals carry the joint uncertainty in `d` and `sdratio`:
+
+```{r}
+sdt_sensitivity(fit_uv)
+```
+
+Under equal variance all three are the same number, which is why the
+distinction only appears once `sdratio` is estimated. $d_a$ is the default
+because it is the only one of the three that stays comparable across conditions
+that differ in `sdratio`: two conditions that are exactly equally discriminable
+can show a large, confidently estimated $d_N$ difference purely because their
+variance ratios differ. Report $d_N$ or $d_S$ when you need to line up with a
+literature that uses them, but prefer $d_a$ for contrasts.
+
 ## ROC and AUC
 
 `roc_sdt()` returns the model-implied ROC from the posterior. For a binary fit it
-traces the smooth analytical curve from the posterior of `dprime` (and `sdratio`
+traces the smooth analytical curve from the posterior of `d` (and `sdratio`
 when estimated). When it detects a predictor that varies the criterion only — as
 `condition` does above — it additionally returns the model-implied operating
 points (one per criterion level) in a `points` attribute. `roc_observed()` gives
@@ -592,11 +630,11 @@ plot(roc, observed = obs, scale = "quantile")
 ```
 
 `latent_sdt()` reconstructs the latent decision-variable distributions
-themselves: the noise and signal evidence densities, separated by `dprime` and
+themselves: the noise and signal evidence densities, separated by `d` and
 scaled by `exp(sdratio)`, with the criterion drawn as a dashed line carrying a
-credible band on its location. This is the picture the criterion and `dprime`
+credible band on its location. This is the picture the criterion and `d`
 estimates describe. Here the criterion varies across the base-rate conditions but
-`dprime`/`sdratio` do not, so the densities are identical across conditions:
+`d`/`sdratio` do not, so the densities are identical across conditions:
 `latent_sdt()` collapses them into one panel and overlays the several criteria,
 colour-coded by condition (pass `collapse = FALSE` for one panel per condition).
 
@@ -606,7 +644,7 @@ plot(latent_sdt(fit_uv))
 
 ## Posterior predictive checks
 
-`sdt_binary()` uses a custom binomial family, so `pp_check()` delegates to
+`sdt_yn()` uses a custom binomial family, so `pp_check()` delegates to
 `brms`. The "old"-response counts span a wide range whose ceiling differs across
 cells (the base-rate conditions have different numbers of trials), so the bar
 view is cluttered and hard to read. An overlaid empirical CDF split by stimulus
@@ -652,7 +690,7 @@ model <- sdt_rating(response = paste0("r", 1:6), stimulus = "stimulus")
 
 # Recognition ROCs are classically asymmetric, so estimate unequal variance
 fit_rating <- bmm(
-  formula = bmf(dprime ~ 1 + (1 | id), criterion ~ 1 + (1 | id),
+  formula = bmf(d ~ 1 + (1 | id), criterion ~ 1 + (1 | id),
                 spacing ~ 1, sdratio ~ 1),
   data = rating_data,
   model = model,
@@ -710,7 +748,7 @@ Add `sdratio ~ 1` to the formula to estimate unequal variance.
 
 For a rating model the K-1 thresholds define K-1 ROC points per posterior draw.
 `roc_sdt()` returns those points together with the smooth model-implied ROC curve
-traced from the posterior of `dprime` (and `sdratio`); `plot()` shows that curve
+traced from the posterior of `d` (and `sdratio`); `plot()` shows that curve
 as a credible-band ribbon with the K-1 thresholds overlaid as colour-coded
 operating points (`c1`..`c(K-1)`) carrying crosshair credible intervals — the same
 display as the binary ROC. `roc_observed()` gives the empirical points from the
@@ -758,7 +796,7 @@ model_lr <- sdt_rating(response = paste0("r", 1:6), stimulus = "stimulus",
                        threshold_type = "log_ratio")
 
 fit_rating_lr <- bmm(
-  formula = bmf(dprime ~ 1 + (1 | id), criterion ~ 1 + (1 | id),
+  formula = bmf(d ~ 1 + (1 | id), criterion ~ 1 + (1 | id),
                 delta1 ~ 1, delta2 ~ 1, delta4 ~ 1, delta5 ~ 1,
                 sdratio ~ 1),
   data = rating_data,
@@ -820,26 +858,26 @@ plot(latent_sdt(fit_rating_lr))
 
 In an m-alternative forced-choice task the observer picks the target among `m`
 alternatives; the data are counts of correct responses. There is no criterion and
-no stimulus column — accuracy alone identifies `dprime` [@DeCarlo_2012]. A correct
+no stimulus column — accuracy alone identifies `d` [@DeCarlo_2012]. A correct
 response occurs when the target's evidence exceeds that of all $m-1$ distractors,
-so `dprime` is referenced to the maximum of the $m-1$ noise samples and stays on
+so `d` is referenced to the maximum of the $m-1$ noise samples and stays on
 the same scale as binary $d'$: for $m = 2$ this is the closed form
 $\Phi(d'/\sqrt{2})$, and for $m \geq 3$ `bmm` evaluates the accuracy by
 quadrature. The set size `m` may be a constant or a data column (for mixed set
 sizes).
 
 ```{r}
-# rsdt_mafc() is vectorised over its arguments; varying dprime by subject
+# rsdt_mafc() is vectorised over its arguments; varying d by subject
 # gives hierarchical data.
 set.seed(123)
 dat <- data.frame(id = 1:30, n_trials = 100L)
 dat$n_correct <- rsdt_mafc(nrow(dat), dat$n_trials, m = 4,
-                           dprime = rnorm(30, mean = 1.5, sd = 0.3))
+                           d = rnorm(30, mean = 1.5, sd = 0.3))
 
 model <- sdt_mafc(response = "n_correct", n_trials = "n_trials", m = 4)
 
 fit_mafc <- bmm(
-  formula = bmf(dprime ~ 1 + (1 | id)),
+  formula = bmf(d ~ 1 + (1 | id)),
   data = dat,
   model = model,
   backend = "cmdstanr",
@@ -896,7 +934,7 @@ model <- sdt_ranking(
 )
 
 fit_rank <- bmm(
-  formula = bmf(dprime ~ 1 + (1 | id)),
+  formula = bmf(d ~ 1 + (1 | id)),
   data = meyer_grant_jakob_2025,
   model = model,
   backend = "cmdstanr",

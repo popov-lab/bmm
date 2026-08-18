@@ -12,13 +12,13 @@
 #'
 #' Computes the receiver operating characteristic (ROC) curve implied by the
 #' posterior distribution of a signal detection model fit with [bmm()]. ROC
-#' curves require a response criterion, so they are defined for [sdt_binary()]
+#' curves require a response criterion, so they are defined for [sdt_yn()]
 #' and [sdt_rating()] only (not the criterion-free [sdt_mafc()] and
 #' [sdt_ranking()]).
 #'
 #' For **binary** models the ROC is traced analytically from the posterior of
-#' `dprime` (and `sdratio` for unequal-variance SDT) over a grid of criterion
-#' values. When the criterion varies across conditions but `dprime`/`sdratio`
+#' `d` (and `sdratio` for unequal-variance SDT) over a grid of criterion
+#' values. When the criterion varies across conditions but `d`/`sdratio`
 #' do not (e.g. a base-rate manipulation, as in [broeder_schuetz_2009_e3]), the
 #' several criteria are operating points on a single curve: `roc_sdt()` returns
 #' one smooth curve and attaches the model-implied points (one per criterion
@@ -27,7 +27,7 @@
 #' For **rating** models the K-1 confidence thresholds define K-1 empirical ROC
 #' points per posterior draw (returned as the data frame). The smooth
 #' model-implied curve is traced over a virtual cut from the posterior of
-#' `dprime` (and `sdratio`) and attached as the `summary` attribute, with the K-1
+#' `d` (and `sdratio`) and attached as the `summary` attribute, with the K-1
 #' thresholds attached as the `points` attribute (labelled `c1`..`c(K-1)`) so
 #' they fall on the curve.
 #'
@@ -44,7 +44,7 @@
 #'   credible band (default `c(0.025, 0.975)`).
 #' @param criterion_points Optional. Control of the binary multi-criteria
 #'   behaviour. `NULL` (default) auto-detects predictors that vary the criterion
-#'   only (not `dprime`/`sdratio`) and treats their levels as operating points
+#'   only (not `d`/`sdratio`) and treats their levels as operating points
 #'   on one curve. Pass a character vector of column names to force that
 #'   classification, or `FALSE` to disable it (one separate curve per predictor
 #'   combination). Ignored for rating models.
@@ -65,7 +65,7 @@ roc_sdt <- function(fit, conditions = NULL, n_points = 100,
          "fit must be a bmmfit object returned by bmm()")
   model <- fit$bmm$model
   stopif(!inherits(model, "sdt"),
-         "roc_sdt() is only available for SDT models (sdt_binary, sdt_rating)")
+         "roc_sdt() is only available for SDT models (sdt_yn, sdt_rating)")
   stopif(inherits(model, "sdt_mafc"),
          "ROC curves are not defined for the m-AFC SDT model: it has no response criterion.")
   stopif(inherits(model, "sdt_ranking"),
@@ -81,7 +81,7 @@ roc_sdt <- function(fit, conditions = NULL, n_points = 100,
     points      <- rating$points
     roc_summary <- rating$summary
   } else {
-    binary      <- .roc_sdt_binary(fit, model, conditions, n_points,
+    binary      <- .roc_sdt_yn(fit, model, conditions, n_points,
                                    criterion_points = criterion_points,
                                    probs = probs, ...)
     roc_data    <- binary$curve
@@ -134,7 +134,7 @@ roc_sdt <- function(fit, conditions = NULL, n_points = 100,
 
 
 # Classify the formula predictors of a binary fit into criterion "operating
-# points" (predict the criterion only) and "curves" (predict dprime/sdratio).
+# points" (predict the criterion only) and "curves" (predict d/sdratio).
 # Random-effect grouping factors are stripped so (1 | id) is never a dimension.
 .sdt_criterion_point_dims <- function(fit) {
   uf <- fit$bmm$user_formula
@@ -142,7 +142,7 @@ roc_sdt <- function(fit, conditions = NULL, n_points = 100,
   re_vars <- tryCatch(names(brms::ranef(fit)), error = function(e) character(0))
   strip <- function(v) setdiff(v %||% character(0), re_vars)
 
-  curve_vars <- union(strip(preds[["dprime"]]), strip(preds[["sdratio"]]))
+  curve_vars <- union(strip(preds[["d"]]), strip(preds[["sdratio"]]))
   list(points = setdiff(strip(preds[["criterion"]]), curve_vars),
        curves = curve_vars)
 }
@@ -221,7 +221,7 @@ roc_sdt <- function(fit, conditions = NULL, n_points = 100,
 
 
 # Classify the predictor columns present in `conditions` for latent_sdt(). The
-# latent densities depend only on dprime/sdratio, so `density` dims (predictors
+# latent densities depend only on d/sdratio, so `density` dims (predictors
 # of either) get distinct density panels (faceted), while `boundary` dims
 # (predictors of the criterion/threshold parameters only) leave the densities
 # unchanged and are collapsed into one panel with the boundaries overlaid.
@@ -242,7 +242,7 @@ roc_sdt <- function(fit, conditions = NULL, n_points = 100,
   re_vars <- tryCatch(names(brms::ranef(fit)), error = function(e) character(0))
   strip <- function(v) setdiff(v %||% character(0), re_vars)
 
-  density_par   <- intersect(c("dprime", "sdratio"), names(preds))
+  density_par   <- intersect(c("d", "sdratio"), names(preds))
   density_vars  <- unique(unlist(lapply(preds[density_par], strip)))
   boundary_vars <- setdiff(
     unique(unlist(lapply(preds[setdiff(names(preds), density_par)], strip))),
@@ -344,7 +344,7 @@ roc_sdt <- function(fit, conditions = NULL, n_points = 100,
 # operating point (FA, Hit) at each node -- the same functional as the
 # model-implied points -- so those points fall on the curve. Averaging Hit at a
 # fixed FA instead would put them slightly off it on the concave ROC.
-.roc_sdt_binary <- function(fit, model, conditions, n_points,
+.roc_sdt_yn <- function(fit, model, conditions, n_points,
                             criterion_points = NULL,
                             probs = c(0.025, 0.975), ...) {
   dist        <- model$other_vars$dist
@@ -356,24 +356,27 @@ roc_sdt <- function(fit, conditions = NULL, n_points = 100,
   curve_cond <- .sdt_unique_subset(conditions, dims$curves)
 
   n_curve     <- max(1L, nrow(curve_cond))
-  dprime_mat  <- .sdt_linpred(fit, "dprime", curve_cond, ...)
-  n_draws     <- nrow(dprime_mat)
+  d_mat       <- .sdt_linpred(fit, "d", curve_cond, ...)
+  n_draws     <- nrow(d_mat)
   sdratio_mat <- if (has_sdratio) {
     exp(.sdt_linpred(fit, "sdratio", curve_cond, ...))
   } else {
     matrix(1, nrow = n_draws, ncol = n_curve)
   }
+  # `d` is d_a; the geometry below is built on the separation in noise-SD units,
+  # which is d_a times the root-mean-square scale (= d_a itself under EV).
+  sep_mat <- d_mat * .sdt_rms_scale(sdratio_mat)
 
   fa_grid        <- seq(0.001, 0.999, length.out = n_points)
   curve_has_cols <- ncol(curve_cond) > 0L
   curve_list     <- vector("list", n_curve)
   summary_list   <- vector("list", n_curve)
   for (c_i in seq_len(n_curve)) {
-    dp <- dprime_mat[, c_i]
+    dp <- sep_mat[, c_i]
     sr <- sdratio_mat[, c_i]
     cond_row <- if (curve_has_cols) curve_cond[c_i, , drop = FALSE]
-    # Anchor the criterion grid to the mean dprime so FA is ~evenly spaced; the
-    # noise scale is 1, so FA = 1 - cdf(dprime/2 + criterion) inverts to this.
+    # Anchor the criterion grid to the mean separation so FA is ~evenly spaced;
+    # the noise scale is 1, so FA = 1 - cdf(sep/2 + criterion) inverts to this.
     c_grid  <- -mean(dp) / 2 + qf(1 - fa_grid)
     # P("old") is the survival function of the evidence distribution, matching
     # the likelihood; cdf(eta) would trace the mirror ROC for the asymmetric
@@ -394,7 +397,7 @@ roc_sdt <- function(fit, conditions = NULL, n_points = 100,
   }
 
   points <- if (length(dims$points) > 0L) {
-    .roc_sdt_binary_points(fit, conditions, dims, has_sdratio, cdf, probs, ...)
+    .roc_sdt_yn_points(fit, conditions, dims, has_sdratio, cdf, probs, ...)
   }
 
   list(curve   = do.call(rbind, curve_list),
@@ -404,25 +407,25 @@ roc_sdt <- function(fit, conditions = NULL, n_points = 100,
 
 
 # Model-implied operating points: one (FA, Hit) per criterion level, predicted
-# from the shared dprime/sdratio. FA = P("old" | noise), Hit = P("old" | signal).
-.roc_sdt_binary_points <- function(fit, conditions, dims, has_sdratio,
+# from the shared d/sdratio. FA = P("old" | noise), Hit = P("old" | signal).
+.roc_sdt_yn_points <- function(fit, conditions, dims, has_sdratio,
                                    cdf, probs, ...) {
   point_cond <- .sdt_unique_subset(conditions, union(dims$curves, dims$points))
   n_pt <- max(1L, nrow(point_cond))
 
-  dprime_mat  <- .sdt_linpred(fit, "dprime",    point_cond, ...)
+  d_mat  <- .sdt_linpred(fit, "d",    point_cond, ...)
   crit_mat    <- .sdt_linpred(fit, "criterion", point_cond, ...)
   sdratio_mat <- if (has_sdratio) {
     exp(.sdt_linpred(fit, "sdratio", point_cond, ...))
   } else {
-    matrix(1, nrow = nrow(dprime_mat), ncol = n_pt)
+    matrix(1, nrow = nrow(d_mat), ncol = n_pt)
   }
 
   rows <- vector("list", n_pt)
   for (c_i in seq_len(n_pt)) {
-    fa  <- 1 - cdf(-.sdt_eta(dprime_mat[, c_i], crit_mat[, c_i], 0L,
+    fa  <- 1 - cdf(-.sdt_eta(d_mat[, c_i], crit_mat[, c_i], 0L,
                              sdratio_mat[, c_i]))
-    hit <- 1 - cdf(-.sdt_eta(dprime_mat[, c_i], crit_mat[, c_i], 1L,
+    hit <- 1 - cdf(-.sdt_eta(d_mat[, c_i], crit_mat[, c_i], 1L,
                              sdratio_mat[, c_i]))
     row <- cbind(.sdt_summarise_draws(fa, probs, prefix = "FA"),
                  .sdt_summarise_draws(hit, probs, prefix = "Hit"))
@@ -435,15 +438,15 @@ roc_sdt <- function(fit, conditions = NULL, n_points = 100,
 }
 
 
-# ROC for rating SDT models. Returns three pieces (like .roc_sdt_binary): the
+# ROC for rating SDT models. Returns three pieces (like .roc_sdt_yn): the
 # discrete K+1-point ROC per draw (`curve`, also used by the numerical AUC), the
 # smooth model-implied curve swept over a virtual cut (`summary`), and the K-1
 # threshold operating points with a credible band (`points`, labelled c1..cK-1).
 # The smooth curve uses the rating model's own probability map -- FA = 1 - cdf(t
-# + dprime/2), Hit = 1 - cdf((t - dprime/2) / sdratio) -- the continuous envelope
-# of the discrete points, so the thresholds fall on it for every distribution
-# (the binary curve's criterion sign convention would mismatch for the
-# asymmetric Gumbel distributions).
+# + sep/2), Hit = 1 - cdf((t - sep/2) / sdratio), where sep is the separation in
+# noise-SD units -- the continuous envelope of the discrete points, so the
+# thresholds fall on it for every distribution (the binary curve's criterion
+# sign convention would mismatch for the asymmetric Gumbel distributions).
 .roc_sdt_rating <- function(fit, model, conditions, n_points,
                             probs = c(0.025, 0.975), ...) {
   dist        <- model$other_vars$dist
@@ -453,14 +456,16 @@ roc_sdt <- function(fit, conditions = NULL, n_points = 100,
   qf          <- .sdt_dists[[dist]]$qf
   K1          <- n_ratings - 1L
 
-  n_cond     <- max(1L, nrow(conditions))
-  dprime_mat <- .sdt_linpred(fit, "dprime", conditions, ...)
-  n_draws    <- nrow(dprime_mat)
+  n_cond      <- max(1L, nrow(conditions))
+  d_mat       <- .sdt_linpred(fit, "d", conditions, ...)
+  n_draws     <- nrow(d_mat)
   sdratio_mat <- if (has_sdratio) {
     exp(.sdt_linpred(fit, "sdratio", conditions, ...))
   } else {
     matrix(1, nrow = n_draws, ncol = n_cond)
   }
+  # separation in noise-SD units; `d` is d_a (see .sdt_rms_scale)
+  sep_mat  <- d_mat * .sdt_rms_scale(sdratio_mat)
   thr_list <- .sdt_rating_thresholds(fit, model, conditions, ...)
 
   fa_grid       <- seq(0.001, 0.999, length.out = n_points)
@@ -470,11 +475,16 @@ roc_sdt <- function(fit, conditions = NULL, n_points = 100,
   summary_list <- vector("list", n_cond)
   points_list  <- vector("list", n_cond)
   for (c_i in seq_len(n_cond)) {
-    dp_vec <- dprime_mat[, c_i]
-    sr_vec <- sdratio_mat[, c_i]
+    d_vec   <- d_mat[, c_i]
+    sep_vec <- sep_mat[, c_i]
+    sr_vec  <- sdratio_mat[, c_i]
 
-    pn <- .sdt_category_probs(thr_list[[c_i]], dp_vec, 1,      0L, dist)
-    ps <- .sdt_category_probs(thr_list[[c_i]], dp_vec, sr_vec, 1L, dist)
+    # sdratio goes into both calls: .sdt_category_probs derives the noise/signal
+    # scale from the stimulus flag, but it also needs sdratio to convert d_a into
+    # the separation. Passing 1 for the noise row would silently drop that
+    # conversion and place the noise density at -d_a/2 instead of -sep/2.
+    pn <- .sdt_category_probs(thr_list[[c_i]], d_vec, sr_vec, 0L, dist)
+    ps <- .sdt_category_probs(thr_list[[c_i]], d_vec, sr_vec, 1L, dist)
     fa_pts  <- 1 - matrixStats::rowCumsums(pn)[, seq_len(K1), drop = FALSE]
     hit_pts <- 1 - matrixStats::rowCumsums(ps)[, seq_len(K1), drop = FALSE]
 
@@ -485,9 +495,9 @@ roc_sdt <- function(fit, conditions = NULL, n_points = 100,
       .draw = rep(seq_len(n_draws), each = K1 + 2L)
     )
 
-    t_grid  <- qf(1 - fa_grid) - mean(dp_vec) / 2
-    fa_mat  <- 1 - cdf(outer(dp_vec / 2, t_grid, "+"))
-    hit_mat <- 1 - cdf(sweep(outer(-dp_vec / 2, t_grid, "+"), 1L, sr_vec, "/"))
+    t_grid  <- qf(1 - fa_grid) - mean(sep_vec) / 2
+    fa_mat  <- 1 - cdf(outer(sep_vec / 2, t_grid, "+"))
+    hit_mat <- 1 - cdf(sweep(outer(-sep_vec / 2, t_grid, "+"), 1L, sr_vec, "/"))
 
     pts <- data.frame(
       threshold = factor(thr_levels, levels = thr_levels),
@@ -539,7 +549,7 @@ print.bmm_sdt_roc <- function(x, ...) {
 #' Observed ROC points from a fitted SDT model
 #'
 #' Computes empirical (observed) ROC points from the response-count data used to
-#' fit a [sdt_rating()] or [sdt_binary()] model. Rating models pool counts
+#' fit a [sdt_rating()] or [sdt_yn()] model. Rating models pool counts
 #' across observations within each stimulus type (and optional condition) to
 #' produce cumulative hit/false-alarm rates at each confidence threshold; binary
 #' models produce one operating point per criterion level (the empirical
@@ -561,9 +571,9 @@ roc_observed <- function(fit, conditions = NULL) {
          "fit must be a bmmfit object returned by bmm()")
   model <- fit$bmm$model
   stopif(!inherits(model, "sdt"),
-         "roc_observed() is only available for SDT models (sdt_binary, sdt_rating)")
+         "roc_observed() is only available for SDT models (sdt_yn, sdt_rating)")
   if (inherits(model, "sdt_rating")) return(.roc_observed_rating(fit, model, conditions))
-  if (inherits(model, "sdt_binary")) return(.roc_observed_binary(fit, model, conditions))
+  if (inherits(model, "sdt_yn")) return(.roc_observed_yn(fit, model, conditions))
   stop2("roc_observed() requires a binary or rating SDT model with a response criterion.")
 }
 
@@ -598,7 +608,7 @@ roc_observed <- function(fit, conditions = NULL) {
 }
 
 
-.roc_observed_binary <- function(fit, model, conditions = NULL) {
+.roc_observed_yn <- function(fit, model, conditions = NULL) {
   data     <- fit$data
   resp_var <- model$resp_vars$response
   stim_var <- model$other_vars$stimulus
@@ -637,14 +647,17 @@ roc_observed <- function(fit, conditions = NULL) {
 #' Model-implied latent decision-variable distributions
 #'
 #' Computes the noise and signal latent decision-variable densities implied by a
-#' fitted [sdt_binary()] or [sdt_rating()] model, together with the response
+#' fitted [sdt_yn()] or [sdt_rating()] model, together with the response
 #' criterion (binary) or the K-1 confidence thresholds (rating). This is the
 #' canonical signal detection picture: two evidence distributions separated by
-#' `dprime` and cut by one or more decision boundaries.
+#' the sensitivity and cut by one or more decision boundaries.
 #'
 #' Densities are evaluated at the posterior-mean parameters of each condition,
-#' on the centred evidence axis the model uses internally (noise at `-dprime/2`
-#' with unit SD, signal at `+dprime/2` with SD `exp(sdratio)`). The decision
+#' on the centred evidence axis the model uses internally: noise at `-sep/2`
+#' with unit SD and signal at `+sep/2` with SD `exp(sdratio)`, where
+#' `sep = d * sqrt((1 + exp(sdratio)^2) / 2)` is the separation in noise-SD
+#' units. `d` is \eqn{d_a}, measured in root-mean-square SD units, so `sep`
+#' equals `d` whenever `sdratio` is fixed at 0. The decision
 #' boundaries additionally carry a posterior credible band on their location.
 #' For the symmetric distributions (`"normal"`, `"logistic"`) the area beyond a
 #' boundary equals the corresponding hit/false-alarm rate; for the Gumbel
@@ -652,21 +665,21 @@ roc_observed <- function(fit, conditions = NULL) {
 #' identity does not hold (the model applies the CDF to a signed distance, not
 #' to a survivor probability).
 #'
-#' Available for all four SDT models. [sdt_binary()] draws the criterion and
+#' Available for all four SDT models. [sdt_yn()] draws the criterion and
 #' [sdt_rating()] the K-1 confidence thresholds as boundary lines. [sdt_mafc()]
 #' and [sdt_ranking()] have no response criterion -- the decision is a max/rank
 #' rule over the `m` alternatives -- so only the densities are drawn (no boundary
 #' lines); there the noise density represents each of the `m - 1` distractor
 #' alternatives and the signal density the target.
 #'
-#' Because the densities depend only on `dprime`/`sdratio`, predictors that vary
+#' Because the densities depend only on `d`/`sdratio`, predictors that vary
 #' the criterion/thresholds *only* (e.g. a base-rate manipulation, as in
 #' [broeder_schuetz_2009_e3]) leave the densities unchanged: by default they are
 #' collapsed into a single panel with their several boundaries overlaid and
 #' colour-coded, rather than shown as repeated identical panels. Predictors that
-#' vary `dprime`/`sdratio` produce distinct density panels (faceted). For
+#' vary `d`/`sdratio` produce distinct density panels (faceted). For
 #' `sdt_mafc`/`sdt_ranking` the set size is likewise collapsed unless it predicts
-#' `dprime`. Use `collapse` to override the auto-detection.
+#' `d`. Use `collapse` to override the auto-detection.
 #'
 #' @inheritParams roc_sdt
 #' @param n_grid Integer. Number of points on the evidence-axis grid at which
@@ -676,14 +689,14 @@ roc_observed <- function(fit, conditions = NULL) {
 #'   `c(0.025, 0.975)`).
 #' @param collapse Control of which predictor dimensions are collapsed into one
 #'   panel. `NULL` (default) auto-detects: predictors of the criterion/thresholds
-#'   only (and the set size) are collapsed; predictors of `dprime`/`sdratio` are
+#'   only (and the set size) are collapsed; predictors of `d`/`sdratio` are
 #'   faceted. Pass a character vector of column names to force those columns to
 #'   collapse, or `FALSE` to facet every dimension (one panel per combination).
 #' @param show_competitors Logical (default `FALSE`). For `sdt_mafc`/`sdt_ranking`
 #'   only, additionally overlay the density of the maximum of the `m - 1`
 #'   distractor samples (one curve per set size) -- the "effective competitor"
 #'   the target must beat -- which shifts rightward as `m` grows and visualises
-#'   why accuracy falls with set size. Ignored for `sdt_binary`/`sdt_rating`.
+#'   why accuracy falls with set size. Ignored for `sdt_yn`/`sdt_rating`.
 #'
 #' @return A data frame of class `"bmm_sdt_latent"` with columns `x` (the
 #'   evidence axis), `density`, `distribution` (`"noise"` or `"signal"`), and any
@@ -721,10 +734,15 @@ latent_sdt <- function(fit, conditions = NULL, n_grid = 200,
   line_cond  <- .sdt_unique_subset(conditions, c(dims$density, dims$boundary))
   n_panel    <- max(1L, nrow(panel_cond))
 
-  dprime_panel  <- .sdt_linpred(fit, "dprime", panel_cond, ...)
+  d_panel       <- .sdt_linpred(fit, "d", panel_cond, ...)
   sdratio_panel <- if (has_sdratio) {
     exp(.sdt_linpred(fit, "sdratio", panel_cond, ...))
+  } else {
+    matrix(1, nrow = nrow(d_panel), ncol = ncol(d_panel))
   }
+  # The densities live on the noise-standardized axis, so the signal mean is
+  # half the separation, not half of d_a. The two coincide under equal variance.
+  sep_panel <- d_panel * .sdt_rms_scale(sdratio_panel)
 
   # Boundary positions are evaluated over the density x boundary combinations so
   # that each density panel can carry all its criteria/thresholds.
@@ -763,8 +781,8 @@ latent_sdt <- function(fit, conditions = NULL, n_grid = 200,
   lines_list <- vector("list", n_panel)
   comp_list  <- vector("list", n_panel)
   for (p_i in seq_len(n_panel)) {
-    dp <- mean(dprime_panel[, p_i])
-    s  <- if (!is.null(sdratio_panel)) mean(sdratio_panel[, p_i]) else 1
+    dp <- mean(sep_panel[, p_i])
+    s  <- mean(sdratio_panel[, p_i])
     panel_row <- panel_cond[p_i, , drop = FALSE]
 
     # Each density panel carries only the boundaries sharing its density-dim
@@ -956,10 +974,14 @@ print.bmm_sdt_thresholds <- function(x, ...) {
 #'
 #' Computes the posterior area under the ROC curve (AUC). For Gaussian and
 #' Gumbel-min equal-variance binary SDT the AUC is available in closed form from
-#' the `dprime` draws; otherwise it is obtained by trapezoidal integration of
+#' the `d` draws; otherwise it is obtained by trapezoidal integration of
 #' the ROC points from [roc_sdt()]. The returned AUC is always the area under
 #' the full curve (for binary multi-criteria fits this is one value per curve,
 #' not the trapezoid of the discrete operating points).
+#'
+#' The closed form is used only when `sdratio` is fixed, where `d` (which is
+#' \eqn{d_a}) equals \eqn{d'}; every unequal-variance fit takes the numerical
+#' route, so the AUC is invariant to the sensitivity parameterization.
 #'
 #' @inheritParams roc_sdt
 #' @param probs Numeric vector of length 2. Quantiles for the credible interval
@@ -969,8 +991,9 @@ print.bmm_sdt_thresholds <- function(x, ...) {
 #'   and any condition columns, plus a `summary` attribute (`AUC_mean`,
 #'   `AUC_lower`, `AUC_upper`).
 #'
-#' @details Analytical formulas: normal EV-SDT \eqn{AUC = \Phi(d'/\sqrt{2})};
-#'   Gumbel-min EV-SDT \eqn{AUC = \mathrm{logistic}(g')}.
+#' @details Analytical formulas (equal variance, where \eqn{d_a = d'}): normal
+#'   EV-SDT \eqn{AUC = \Phi(d'/\sqrt{2})}; Gumbel-min EV-SDT
+#'   \eqn{AUC = \mathrm{logistic}(g')}.
 #'
 #' @seealso [roc_sdt()], [plot.bmm_sdt_auc()]
 #' @export
@@ -980,7 +1003,7 @@ auc_sdt <- function(fit, conditions = NULL, probs = c(0.025, 0.975),
          "fit must be a bmmfit object returned by bmm()")
   model <- fit$bmm$model
   stopif(!inherits(model, "sdt"),
-         "auc_sdt() is only available for SDT models (sdt_binary, sdt_rating)")
+         "auc_sdt() is only available for SDT models (sdt_yn, sdt_rating)")
   stopif(inherits(model, "sdt_mafc"),
          "AUC is not defined for the m-AFC SDT model: it has no response criterion.")
   stopif(inherits(model, "sdt_ranking"),
@@ -1000,11 +1023,11 @@ auc_sdt <- function(fit, conditions = NULL, probs = c(0.025, 0.975),
 
   if (use_analytical) {
     auc_fn <- if (dist == "normal") function(d) stats::pnorm(d / sqrt(2)) else stats::plogis
-    dprime_mat <- .sdt_linpred(fit, "dprime", conditions, ...)
-    n_draws <- nrow(dprime_mat)
-    result <- vector("list", ncol(dprime_mat))
-    for (c_i in seq_len(ncol(dprime_mat))) {
-      df <- data.frame(AUC = auc_fn(dprime_mat[, c_i]), .draw = seq_len(n_draws))
+    d_mat <- .sdt_linpred(fit, "d", conditions, ...)
+    n_draws <- nrow(d_mat)
+    result <- vector("list", ncol(d_mat))
+    for (c_i in seq_len(ncol(d_mat))) {
+      df <- data.frame(AUC = auc_fn(d_mat[, c_i]), .draw = seq_len(n_draws))
       result[[c_i]] <- .sdt_bind_cond(df, conditions[c_i, , drop = FALSE])
     }
     auc_data <- do.call(rbind, result)
@@ -1067,6 +1090,129 @@ auc_sdt <- function(fit, conditions = NULL, probs = c(0.025, 0.975),
 print.bmm_sdt_auc <- function(x, ...) {
   model_name <- utils::tail(attr(x, "model_class"), 1L) %||% "sdt"
   cat("SDT AUC (", model_name, ", dist = ", attr(x, "dist"), ")\n", sep = "")
+  print(attr(x, "summary"), digits = 3, row.names = FALSE)
+  invisible(x)
+}
+
+
+############################################################################# !
+# SENSITIVITY                                                            ####
+############################################################################# !
+
+#' Sensitivity on the noise, signal, or root-mean-square scale
+#'
+#' Re-expresses the posterior sensitivity of a fitted SDT model against a
+#' different reference standard deviation. bmm estimates \eqn{d_a}, which
+#' measures the separation of the two evidence distributions in units of their
+#' root-mean-square SD. Under unequal variance the same separation can also be
+#' read against the noise SD (\eqn{d_N}, the classical \eqn{d'}) or against the
+#' signal SD (\eqn{d_S}). This function returns any of the three as posterior
+#' draws, so contrasts and intervals can be computed on whichever scale a
+#' literature reports.
+#'
+#' @details
+#' The model places the noise distribution at \eqn{-\delta/2} with SD
+#' \eqn{\sigma_N = 1} and the signal distribution at \eqn{+\delta/2} with SD
+#' \eqn{\sigma_S = \exp(\mathrm{sdratio})}, so \eqn{\delta} is the separation in
+#' noise-SD units. Dividing that separation by each reference SD gives
+#'
+#' \deqn{d_N = \delta / \sigma_N, \quad d_S = \delta / \sigma_S, \quad
+#'       d_a = \delta / \sqrt{(\sigma_N^2 + \sigma_S^2)/2}.}
+#'
+#' The estimated parameter is \eqn{d_a}, hence
+#' \eqn{\delta = d_a \sqrt{(1 + \sigma_S^2)/2}} and
+#'
+#' \deqn{d_N = d_a \sqrt{(1 + \sigma_S^2)/2}, \qquad
+#'       d_S = d_a \sqrt{(1 + \sigma_S^2)/2} \,/\, \sigma_S.}
+#'
+#' All three coincide when `sdratio` is 0 (equal variance), which is the case
+#' for [sdt_mafc()] and for any fit that does not give `sdratio` a formula. The
+#' conversion is applied draw by draw, so the returned intervals propagate the
+#' joint posterior uncertainty in `d` and `sdratio` rather than combining
+#' point estimates.
+#'
+#' Only \eqn{d_a} is invariant to which distribution is treated as the
+#' reference. \eqn{d_N} and \eqn{d_S} are not comparable across conditions that
+#' differ in `sdratio`: two conditions with identical discriminability can show
+#' a large, confidently estimated \eqn{d_N} difference. Prefer \eqn{d_a} for
+#' contrasts, and use \eqn{d_N}/\eqn{d_S} for comparison with published values.
+#'
+#' @inheritParams roc_sdt
+#' @param measure Character vector naming the scales to return: `"da"`
+#'   (root-mean-square SD, the estimated parameter), `"dn"` (noise SD), and/or
+#'   `"ds"` (signal SD). Defaults to all three.
+#' @param probs Numeric vector of length 2. Lower and upper quantiles for the
+#'   credible interval (default `c(0.025, 0.975)`).
+#'
+#' @return A data frame of class `"bmm_sdt_sensitivity"` with columns `measure`,
+#'   `value`, `.draw`, and any condition columns. The object carries a `summary`
+#'   attribute (`measure`, `mean`, `lower`, `upper`, plus condition columns).
+#'
+#' @seealso [auc_sdt()], [roc_sdt()], [latent_sdt()]
+#' @export
+sdt_sensitivity <- function(fit, measure = c("da", "dn", "ds"),
+                            conditions = NULL, probs = c(0.025, 0.975), ...) {
+  stopif(!inherits(fit, "bmmfit"),
+         "fit must be a bmmfit object returned by bmm()")
+  measure <- match.arg(measure, several.ok = TRUE)
+  model <- fit$bmm$model
+  stopif(!inherits(model, "sdt"),
+         "sdt_sensitivity() is only available for SDT models")
+  stopif(!"d" %in% names(model$parameters),
+         "sdt_sensitivity() requires a model with a sensitivity parameter `d`")
+
+  conditions <- .sdt_resolve_conditions(fit, conditions)
+  cond_rows  <- .sdt_unique_subset(conditions, names(conditions))
+
+  d_mat   <- .sdt_linpred(fit, "d", cond_rows, ...)
+  sig_mat <- if (.sdt_has_estimated_sdratio(model, fit)) {
+    exp(.sdt_linpred(fit, "sdratio", cond_rows, ...))
+  } else {
+    matrix(1, nrow = nrow(d_mat), ncol = ncol(d_mat))
+  }
+
+  sep_mat <- d_mat * .sdt_rms_scale(sig_mat)
+  scales  <- list(da = d_mat, dn = sep_mat, ds = sep_mat / sig_mat)[measure]
+
+  draws_list   <- vector("list", length(scales) * ncol(d_mat))
+  summary_list <- vector("list", length(draws_list))
+  i <- 0L
+  for (nm in names(scales)) {
+    for (c_i in seq_len(ncol(d_mat))) {
+      i <- i + 1L
+      crow <- cond_rows[c_i, , drop = FALSE]
+      draws_list[[i]] <- .sdt_bind_cond(
+        data.frame(measure = nm, value = scales[[nm]][, c_i],
+                   .draw = seq_len(nrow(d_mat))),
+        crow
+      )
+      summary_list[[i]] <- .sdt_bind_cond(
+        data.frame(measure = nm,
+                   .sdt_summarise_draws(scales[[nm]][, c_i], probs)),
+        crow
+      )
+    }
+  }
+
+  structure(
+    do.call(rbind, draws_list),
+    class       = c("bmm_sdt_sensitivity", "data.frame"),
+    summary     = do.call(rbind, summary_list),
+    probs       = probs,
+    model_class = class(model),
+    dist        = model$other_vars$dist,
+    conditions  = cond_rows
+  )
+}
+
+
+#' @export
+print.bmm_sdt_sensitivity <- function(x, ...) {
+  model_name <- utils::tail(attr(x, "model_class"), 1L) %||% "sdt"
+  cat("SDT sensitivity (", model_name, ", dist = ", attr(x, "dist"), ")\n",
+      sep = "")
+  cat("  da = RMS-SD units (estimated) | dn = noise-SD units (d') |",
+      "ds = signal-SD units\n")
   print(attr(x, "summary"), digits = 3, row.names = FALSE)
   invisible(x)
 }

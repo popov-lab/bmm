@@ -6,10 +6,14 @@
                             dist = "normal",
                             links = NULL, call = NULL, ...) {
   parameters <- list(
-    dprime = "Sensitivity: distance between signal and noise distributions"
+    d = paste0(
+      "Sensitivity: the balanced discriminability index d_a, which for the ",
+      "equal-variance m-AFC model equals d' -- the distance between the ",
+      "signal and distractor distributions in noise SD units"
+    )
   )
   default_priors <- list(
-    dprime = list(main = "normal(1, 1)", effects = "normal(0, 0.5)")
+    d = list(main = "normal(1, 1)", effects = "normal(0, 0.5)")
   )
   requirements <- glue(
     "Provide pre-aggregated accuracy data with the following columns:", "\n\n",
@@ -35,11 +39,10 @@
       version = "mafc",
       requirements = requirements,
       parameters = parameters,
-      links = list(dprime = "identity"),
+      links = list(d = "identity"),
       fixed_parameters = list(),
       default_priors = default_priors,
-      init_ranges = list(dprime = c(0.5, 1.5)),
-      void_mu = FALSE
+      init_ranges = list(d = c(0.5, 1.5))
     ),
     class = c("bmmodel", "sdt", "sdt_mafc"),
     call = call
@@ -54,13 +57,24 @@
 #' @details `r model_info(.model_sdt_mafc())`
 #'
 #' Models accuracy in m-AFC tasks where each trial presents one signal among
-#' `m` alternatives and the observer chooses the strongest one. Only `dprime`
+#' `m` alternatives and the observer chooses the strongest one. Only `d`
 #' is estimated (m-AFC has no response bias). The probability correct,
-#' \eqn{P_c = \int f(x - d')\, F(x)^{m-1}\, dx}, is computed per noise
+#' \eqn{P_c = \int f(x - d)\, F(x)^{m-1}\, dx}, is computed per noise
 #' distribution: a closed-form softmax for `gumbel_max`, a closed-form Gamma
 #' ratio for `gumbel_min`, Gauss-Hermite quadrature for `normal`
-#' (\eqn{\Phi(d'/\sqrt{2})} at m = 2), and Gauss-Legendre quadrature for
+#' (\eqn{\Phi(d/\sqrt{2})} at m = 2), and Gauss-Legendre quadrature for
 #' `logistic`.
+#'
+#' @section Sensitivity is on the same scale as [sdt_yn()]:
+#' `d` is the balanced index \eqn{d_a} that [sdt_yn()] reports. m-AFC assumes
+#' the signal and distractor distributions share a scale, so \eqn{d_a} coincides
+#' with \eqn{d'} here and no `sdratio` parameter is needed.
+#'
+#' The two models agree exactly at `m = 2`: 2AFC proportion correct equals the
+#' area under the yes/no ROC (Green's theorem), and for Gaussian noise both give
+#' \eqn{P_c = \Phi(d/\sqrt{2})}. The same observer therefore yields the same `d`
+#' whether it is measured by a yes/no ROC or by 2AFC accuracy, which is the
+#' property that makes \eqn{d_a} the right common scale for the SDT family.
 #' @param response A single string naming the column with counts of correct
 #'   responses.
 #' @param n_trials The name of the variable containing the total number of
@@ -96,7 +110,7 @@
 #' \dontrun{
 #' dat <- data.frame(id = 1:20, n_trials = 200L)
 #' dat$n_correct <- rsdt_mafc(nrow(dat), dat$n_trials, m = 4,
-#'                            dprime = rnorm(20, 1.5, 0.4))
+#'                            d = rnorm(20, 1.5, 0.4))
 #'
 #' model <- sdt_mafc(
 #'   response = "n_correct",
@@ -105,7 +119,7 @@
 #' )
 #'
 #' fit <- bmm(
-#'   formula = bmf(dprime ~ 1),
+#'   formula = bmf(d ~ 1),
 #'   data = dat,
 #'   model = model,
 #'   cores = 4,
@@ -174,8 +188,8 @@ configure_model.sdt_mafc <- function(model, data, formula) {
 
   formula$family <- brms::custom_family(
     "sdt_mafc",
-    dpars = c("mu", "dprime"),
-    links = c("identity", model$links$dprime),
+    dpars = c("mu", "d"),
+    links = c("identity", model$links$d),
     type = "int",
     loop = TRUE,
     log_lik = log_lik_sdt_mafc,
@@ -200,17 +214,17 @@ configure_model.sdt_mafc <- function(model, data, formula) {
 ############################################################################# !
 
 log_lik_sdt_mafc <- function(i, prep) {
-  dprime <- brms::get_dpar(prep, "dprime", i = i)
+  d <- brms::get_dpar(prep, "d", i = i)
   dist <- .sdt_dist_names[prep$data$vint2[i]]
 
   dsdt_mafc(prep$data$Y[i], prep$data$trials[i], prep$data$vint1[i],
-            dprime, dist = dist, log = TRUE)
+            d, dist = dist, log = TRUE)
 }
 
 posterior_predict_sdt_mafc <- function(i, prep, ...) {
-  dprime <- brms::get_dpar(prep, "dprime", i = i)
+  d <- brms::get_dpar(prep, "d", i = i)
   dist <- .sdt_dist_names[prep$data$vint2[i]]
 
-  rsdt_mafc(length(dprime), prep$data$trials[i], prep$data$vint1[i],
-            dprime, dist = dist)
+  rsdt_mafc(length(d), prep$data$trials[i], prep$data$vint1[i],
+            d, dist = dist)
 }

@@ -53,6 +53,7 @@ reference:
     - "auc_sdt"
     - "latent_sdt"
     - "sdt_thresholds"
+    - "sdt_sensitivity"
     - "plot.bmm_sdt_roc"
     - "plot.bmm_sdt_auc"
     - "plot.bmm_sdt_latent"
