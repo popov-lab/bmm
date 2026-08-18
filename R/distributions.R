@@ -2431,3 +2431,208 @@ rsdt_mafc <- function(n, n_trials, m, d,
   pc <- .mafc_pc_r(rep_len(d, n), rep_len(as.integer(m), n), dist)
   stats::rbinom(n, n_trials, pc)
 }
+
+
+# Gauss-Hermite rule for the probabilists' weight (the standard normal density),
+# built by Golub-Welsch on the Hermite Jacobi matrix so that any node count is
+# available without shipping hand-copied constants. Cached, because the
+# eigendecomposition is far too slow to repeat inside a likelihood.
+.gh_cache <- new.env(parent = emptyenv())
+
+.gh_rule <- function(n) {
+  key <- as.character(n)
+  cached <- .gh_cache[[key]]
+  if (!is.null(cached)) return(cached)
+  i <- seq_len(n - 1L)
+  jacobi <- matrix(0, n, n)
+  jacobi[cbind(i, i + 1L)] <- sqrt(i)
+  jacobi[cbind(i + 1L, i)] <- sqrt(i)
+  e <- eigen(jacobi, symmetric = TRUE)
+  ord <- order(e$values)
+  out <- list(nodes = e$values[ord], weights = (e$vectors[1, ord])^2)
+  .gh_cache[[key]] <- out
+  out
+}
+
+# How many nodes the ranking quadrature needs. The integrand gets harder in both
+# the set size (the CDF power concentrates the mass in a tail) and the SD ratio
+# (a wider signal distribution pushes it further out), and Gauss-Hermite
+# converges fast but NON-uniformly, so a single fixed count is either wasteful
+# or wrong. Counts were calibrated against adaptive quadrature over
+# d_a in [0.3, 3.5]: the equal-variance ladder holds max error below 1e-8, and
+# the free-sdratio ladder below 1e-6 across sdratio in [0.5, 2.0]. That interval
+# is chosen to match the default normal(0, 0.3) prior on log sdratio, 97.9% of
+# which falls inside it -- the wider normal(0, 0.5) this replaced left one prior
+# draw in six outside the range the quadrature was verified over. Beyond m = 8
+# with a free sdratio even 128 nodes miss the 1e-6 target; check_data warns.
+.ranking_gh_n <- function(max_m, free_sdratio) {
+  if (free_sdratio) {
+    counts <- c(32L, 48L, 64L, 80L, 96L, 128L)
+    breaks <- c(2, 3, 4, 5, 6)
+  } else {
+    counts <- c(20L, 24L, 32L, 40L, 48L, 64L, 80L, 96L, 128L)
+    breaks <- c(2, 3, 4, 6, 8, 10, 12, 16)
+  }
+  counts[findInterval(max_m, breaks, left.open = TRUE) + 1L]
+}
+
+# Rank probability P(target rank = rank_pos | set size m). Mirrors the Stan
+# sdt_ranking_logp / sdt_ranking_uv_logp kernels; shared by the density,
+# generator, and the sdt_ranking_logmu R companion. Vectorized over d and
+# sdratio (log SD ratio) for a scalar rank_pos and m; the rep(each =) factor
+# aligns per-draw d with the column-major nodes-by-draws matrix.
+.ranking_prob_r <- function(d, rank_pos, m, dist = "gumbel_min",
+                            sdratio = 0) {
+  if (dist == "gumbel_min") {
+    e_neg_g <- exp(-d)
+    log_p <- -d + lgamma(m) + lgamma(rank_pos - 1 + e_neg_g) -
+             lgamma(rank_pos) - lgamma(m + e_neg_g)
+    exp(log_p)
+  } else {
+    n <- max(length(d), length(sdratio))
+    sigma <- rep_len(exp(sdratio), n)
+    # `d` is d_a; the separation in noise-SD units is d * the RMS scale, so the
+    # equal-variance case (sigma = 1) leaves eta untouched.
+    #
+    # Deliberately the free-sdratio ladder regardless of the sdratio values:
+    # this kernel serves log_lik/posterior_epred and the d*/r* functions, where
+    # accuracy matters and speed does not, and a count inferred from the values
+    # would make the result depend on how calls are batched (a vector holding
+    # one exact zero would quadrature differently from that element alone).
+    # configure_model() may compile Stan with the cheaper equal-variance ladder;
+    # both sit inside the calibrated tolerance, so the two agree to ~1e-9.
+    gh <- .gh_rule(.ranking_gh_n(m, free_sdratio = TRUE))
+    delta <- rep_len(d, n) * .sdt_rms_scale(sigma)
+    eta <- outer(gh$nodes, sigma) + rep(delta, each = length(gh$nodes))
+    log_terms <- log(gh$weights) +
+      (m - rank_pos) * stats::pnorm(eta, log.p = TRUE) +
+      (rank_pos - 1) * stats::pnorm(eta, lower.tail = FALSE, log.p = TRUE)
+    exp(lchoose(m - 1, rank_pos - 1) + matrixStats::colLogSumExps(log_terms))
+  }
+}
+
+# All rank probabilities (ranks 1..m), normalized. Returns a length-m vector
+# for scalar input and an observations-by-m matrix for vectorized input.
+.ranking_all_probs_r <- function(d, m, dist = "gumbel_min",
+                                 sdratio = 0) {
+  n <- max(length(d), length(sdratio))
+  probs <- vapply(seq_len(m), function(r) {
+    .ranking_prob_r(rep_len(d, n), r, m, dist, rep_len(sdratio, n))
+  }, numeric(n))
+  if (n == 1) probs / sum(probs) else probs / rowSums(probs)
+}
+
+
+#' @title Distribution functions for Ranking SDT
+#'
+#' @description Density and random generation for ranking signal detection
+#'   theory (Meyer-Grant et al., 2025). Models rank ordering of m items by
+#'   perceived strength. Only `d` is estimated (no criterion or stimulus
+#'   column). Supports Gumbel-min (closed form) and Gaussian UV-SDT
+#'   (numerical integration).
+#'
+#' @name sdt_ranking_dist
+#'
+#' @param counts Integer matrix with one row per observation and one rank-count
+#'   column per rank position (1 = most likely target), or a vector for a
+#'   single observation. Columns beyond a row's set size `m` must be 0.
+#' @param d Numeric vector. Sensitivity: the distance between the target and
+#'   lure distributions. For `dist = "normal"` this is the balanced index
+#'   \eqn{d_a} that [sdt_yn()] reports (in root-mean-square SD units); for
+#'   `dist = "gumbel_min"` the two distributions share a scale and `d` is the
+#'   \eqn{g'} of Meyer-Grant et al. (2025).
+#' @param m Integer vector. Number of ranked items per observation. Must be
+#'   at least 2 and no larger than the number of count columns.
+#' @param sdratio Numeric vector. Ratio of signal to noise standard deviations
+#'   (default 1, i.e., equal variance). Must be positive. Only used when
+#'   `dist = "normal"`.
+#' @param dist Character. The distribution assumed for the latent evidence:
+#'   "gumbel_min" (default), the smallest extreme value distribution with
+#'   cumulative distribution function \eqn{1 - \exp(-\exp(x))}, evaluated in
+#'   closed form; or "normal", Gaussian UV-SDT by numerical integration.
+#' @param log Logical. If `TRUE`, returns log-density (default `FALSE`).
+#' @param n Integer. Number of observations to generate. `n_trials`, `m`,
+#'   `d`, and `sdratio` are recycled to this length.
+#' @param n_trials Integer vector. Number of ranking trials per observation.
+#'
+#' @return `dsdt_ranking` returns the (log-)density (multinomial probability).
+#'   `rsdt_ranking` returns an integer matrix with one row per observation and
+#'   one rank-count column per rank position (`rank1` ... `rank max(m)`); rows
+#'   with a smaller set size have structural zeros in the surplus columns,
+#'   matching the wide format [sdt_ranking()] expects.
+#'
+#' @references
+#' Meyer-Grant, C. G., Kellen, D., Harding, S. M., & Singmann, H. (2025).
+#'   \emph{Extreme-value signal detection theory for recognition memory: The
+#'   parametric road not taken}. PsyArXiv preprint.
+#'   \doi{10.31234/osf.io/qhrfj}
+#'
+#' @keywords distribution
+#' @export
+#' @examples
+#' # Gumbel-min ranking density
+#' dsdt_ranking(counts = c(40, 30, 20, 10), m = 4, d = 1.0)
+dsdt_ranking <- function(counts, m, d, sdratio = 1,
+                         dist = c("gumbel_min", "normal"),
+                         log = FALSE) {
+  dist <- match.arg(dist)
+  stopif(any(sdratio <= 0), "sdratio must be positive")
+  counts <- rbind(counts)
+  n <- nrow(counts)
+  m <- rep_len(as.integer(m), n)
+  d <- rep_len(d, n)
+  sdratio <- rep_len(sdratio, n)
+
+  stopif(any(m < 2), "m must be an integer >= 2")
+  stopif(any(m > ncol(counts)),
+         "m must not exceed the number of count columns")
+  stopif(any(counts < 0), "counts must be non-negative")
+  stopif(any(counts[col(counts) > m] != 0),
+         "Count columns beyond the row's set size (m) must be 0")
+
+  log_dens <- numeric(n)
+  for (m_i in unique(m)) {
+    idx <- which(m == m_i)
+    probs <- rbind(.ranking_all_probs_r(d[idx], m_i, dist,
+                                        log(sdratio[idx])))
+    cnt <- counts[idx, seq_len(m_i), drop = FALSE]
+    log_dens[idx] <- lgamma(rowSums(cnt) + 1) - rowSums(lgamma(cnt + 1)) +
+      rowSums(cnt * log(probs))
+  }
+  if (log) log_dens else exp(log_dens)
+}
+
+
+#' @rdname sdt_ranking_dist
+#' @export
+#' @examples
+#' # Generate ranking data (m=4, Gumbel-min) for 10 subjects
+#' dat <- data.frame(id = 1:10, set_size = 4L)
+#' dat <- cbind(dat, rsdt_ranking(10, 100, m = 4, d = 1.0))
+#' head(dat)
+rsdt_ranking <- function(n, n_trials, m, d, sdratio = 1,
+                         dist = c("gumbel_min", "normal")) {
+  dist <- match.arg(dist)
+  stopif(length(n) != 1 || n < 1, "n must be a single positive integer")
+  stopif(any(n_trials < 1), "n_trials must be positive")
+  stopif(any(m < 2), "m must be an integer >= 2")
+  stopif(any(sdratio <= 0), "sdratio must be positive")
+
+  n_trials <- rep_len(as.integer(n_trials), n)
+  m <- rep_len(as.integer(m), n)
+  d <- rep_len(d, n)
+  sdratio <- rep_len(sdratio, n)
+
+  counts <- matrix(0L, n, max(m),
+                   dimnames = list(NULL, paste0("rank", seq_len(max(m)))))
+  for (m_i in unique(m)) {
+    idx <- which(m == m_i)
+    probs <- rbind(.ranking_all_probs_r(d[idx], m_i, dist,
+                                        log(sdratio[idx])))
+    for (k in seq_along(idx)) {
+      counts[idx[k], seq_len(m_i)] <-
+        as.integer(stats::rmultinom(1, n_trials[idx[k]], probs[k, ]))
+    }
+  }
+  counts
+}
