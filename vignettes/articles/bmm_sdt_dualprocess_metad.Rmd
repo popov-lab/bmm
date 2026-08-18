@@ -187,7 +187,7 @@ model_dp <- sdt_rating(response = paste0("r", 1:6), stimulus = "stimulus",
                        version = "dpsdt")
 
 fit_dp <- bmm(
-  formula = bmf(dprime ~ 1 + (1 | id), criterion ~ 1 + (1 | id),
+  formula = bmf(d ~ 1 + (1 | id), criterion ~ 1 + (1 | id),
                 spacing ~ 1, Ro ~ 1, Rn ~ 1),
   data = rating_data,
   model = model_dp,
@@ -233,7 +233,7 @@ model here too, for a direct comparison:
 model_uv <- sdt_rating(response = paste0("r", 1:6), stimulus = "stimulus")
 
 fit_uv <- bmm(
-  formula = bmf(dprime ~ 1 + (1 | id), criterion ~ 1 + (1 | id),
+  formula = bmf(d ~ 1 + (1 | id), criterion ~ 1 + (1 | id),
                 spacing ~ 1, sdratio ~ 1),
   data = rating_data,
   model = model_uv,
@@ -290,21 +290,21 @@ extremes.
 
 A confidence-rating task answers two different questions at once. *Type-1*: how
 well does the observer tell old from new? That is ordinary sensitivity,
-`dprime`. *Type-2*: how well does the observer's **confidence** track whether
+`d`. *Type-2*: how well does the observer's **confidence** track whether
 each decision was actually correct? That is *metacognitive* sensitivity, and it
 need not match type-1 sensitivity — an observer can discriminate well yet place
 confidence poorly, or vice versa [@Fleming_Lau_2014].
 
 Meta-d′ [@Maniscalco_Lau_2012] expresses type-2 sensitivity in the same units as
-type-1 `dprime`. It is the sensitivity that a metacognitively *ideal*
+type-1 `d`. It is the sensitivity that a metacognitively *ideal*
 signal-detection observer would need in order to produce the observed confidence
 data, **holding the type-1 decision fixed** — that is, the old/new response rates
-are constrained to match what `dprime` already implies, so meta-d′ is identified
+are constrained to match what `d` already implies, so meta-d′ is identified
 purely from the *spread of confidence* within each response. The natural summary
 is the
 
 $$
-\text{M-ratio} = \frac{\text{meta-}d'}{\texttt{dprime}},
+\text{M-ratio} = \frac{\text{meta-}d'}{\texttt{d}},
 $$
 
 the **metacognitive efficiency**: a value of 1 means confidence is as
@@ -314,12 +314,12 @@ confidence draws on information the decision did not.
 
 Rather than estimating meta-d′ directly, `bmm` estimates the **log M-ratio**,
 `logmratio` $= \log(\text{meta-}d'/d')$, and recovers meta-d′ as
-`exp(logmratio) * dprime`. This is the parameterization used by the HMeta-d
+`exp(logmratio) * d`. This is the parameterization used by the HMeta-d
 toolbox [@Fleming_2017]: the M-ratio is the quantity researchers actually report,
 so making it the estimated parameter places the prior, hierarchical
 between-subject SD, and any group contrasts directly on metacognitive efficiency.
-It also keeps meta-d′ positive and regularizes it toward `dprime`, and it anchors
-the ideal point — perfect metacognition, meta-d′ = `dprime` — at `logmratio = 0`,
+It also keeps meta-d′ positive and regularizes it toward `d`, and it anchors
+the ideal point — perfect metacognition, meta-d′ = `d` — at `logmratio = 0`,
 which recovers the standard rating model. Add `logmratio` to the formula to
 estimate it; extract the M-ratio posterior with `mratio()`.
 
@@ -358,7 +358,7 @@ We stay with the same @Pratte_2010 recognition data reshaped above
 (`rating_data`). No new response format is needed: in a confidence-rating task
 the 6-point scale is exactly the *joint* type-1/type-2 response — the side of
 the scale is the old/new decision and the distance from the middle is
-confidence — so the same counts that identified `dprime` also identify
+confidence — so the same counts that identified `d` also identify
 metacognitive efficiency. Only the `version` changes:
 
 ```{r}
@@ -366,7 +366,7 @@ model_md <- sdt_rating(response = paste0("r", 1:6), stimulus = "stimulus",
                        version = "metad")
 
 fit_md <- bmm(
-  formula = bmf(dprime ~ 1 + (1 | id), criterion ~ 1 + (1 | id),
+  formula = bmf(d ~ 1 + (1 | id), criterion ~ 1 + (1 | id),
                 spacing ~ 1, logmratio ~ 1 + (1 | id)),
   data = rating_data,
   model = model_md,
@@ -382,7 +382,7 @@ summary(fit_md)
 ```
 
 The M-ratio is the headline quantity, so `bmm` provides it directly: `mratio()`
-reconstructs meta-d′ $= \exp(\texttt{logmratio}) \times \texttt{dprime}$ from the
+reconstructs meta-d′ $= \exp(\texttt{logmratio}) \times \texttt{d}$ from the
 fit and returns a posterior summary of both the M-ratio and meta-d′ (with the
 full per-draw posteriors kept in the `draws` attribute for plotting or contrasts).
 
@@ -409,7 +409,7 @@ path.
 
 Meta-d′ is most useful when the substantive question is about *metacognition* —
 whether confidence is well-calibrated to performance — rather than about
-discrimination itself. Expressing type-2 sensitivity on the `dprime` scale makes
+discrimination itself. Expressing type-2 sensitivity on the `d` scale makes
 the M-ratio comparable across tasks and observers with different type-1
 performance, which is why it has become the standard index of metacognitive
 efficiency [@Fleming_Lau_2014; @Fleming_2017].
@@ -455,7 +455,7 @@ comparing estimates against toolboxes that use the relative anchor.
 
 The rating-profile check works as for the other rating models, faceted by
 `stimulus`. For meta-d′ the categories to watch are the *interior* ones: the
-model constrains the total "old"/"new" rates to match `dprime`, so any misfit
+model constrains the total "old"/"new" rates to match `d`, so any misfit
 shows up in how confidence spreads within each response side. Systematic
 one-sided deviations there suggest the confidence thresholds are too
 constrained — see the threshold-parameterization note above.
@@ -477,7 +477,7 @@ answer:
   whether confidence is efficiently calibrated to accuracy.
 - Stay with **`version = "standard"`** when a single strength process suffices;
   both extensions reduce to it when their extra parameter is switched off
-  (`Ro`, `Rn` → 0; `logmratio` = 0, i.e. meta-d′ = `dprime`).
+  (`Ro`, `Rn` → 0; `logmratio` = 0, i.e. meta-d′ = `d`).
 
 Because each extension nests the standard model, the most direct evidence is the
 **posterior of the extra parameter**: is `Ro` credibly greater than zero, is

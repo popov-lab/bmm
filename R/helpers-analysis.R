@@ -342,9 +342,9 @@ roc_sdt <- function(fit, conditions = NULL, n_points = 100,
   }
   if (version == "metad") {
     mratio <- exp(.sdt_linpred(fit, "logmratio", panel_cond, ...))
-    dprime <- .sdt_linpred(fit, "dprime", panel_cond, ...)
+    d <- .sdt_linpred(fit, "d", panel_cond, ...)
     return(do.call(rbind, Map(summarise, c("mratio", "metad"),
-                              list(mratio, mratio * dprime))))
+                              list(mratio, mratio * d))))
   }
   NULL
 }
@@ -466,15 +466,16 @@ roc_sdt <- function(fit, conditions = NULL, n_points = 100,
 # Category probabilities for the active rating SDT version, so roc_sdt() traces
 # the dual-process / meta-d' operating points rather than the familiarity-only
 # curve. `pars` carries the per-draw recollection (Ro/Rn, already on the
-# probability scale) or metacognitive (metad) values; standard ignores it.
-.sdt_version_category_probs <- function(model, thresholds, dprime, sdratio,
+# probability scale) or metacognitive (metad) values; standard ignores it. `d`
+# is d_a throughout, and each kernel converts it to noise-SD units itself.
+.sdt_version_category_probs <- function(model, thresholds, d, sdratio,
                                         stimulus, dist, pars = list()) {
   switch(model$version,
-    dpsdt = .sdt_dpsdt_category_probs(thresholds, dprime, sdratio, stimulus,
+    dpsdt = .sdt_dpsdt_category_probs(thresholds, d, sdratio, stimulus,
                                       dist, pars$Ro, pars$Rn),
-    metad = .sdt_metad_category_probs(thresholds, dprime, pars$metad, stimulus,
+    metad = .sdt_metad_category_probs(thresholds, d, pars$metad, stimulus,
                                       sdratio, dist),
-    .sdt_category_probs(thresholds, dprime, sdratio, stimulus, dist)
+    .sdt_category_probs(thresholds, d, sdratio, stimulus, dist)
   )
 }
 
@@ -497,14 +498,9 @@ roc_sdt <- function(fit, conditions = NULL, n_points = 100,
   qf          <- .sdt_dists[[dist]]$qf
   K1          <- n_ratings - 1L
 
-  n_cond     <- max(1L, nrow(conditions))
-  dprime_mat <- .sdt_linpred(fit, "dprime", conditions, ...)
-  n_draws    <- nrow(dprime_mat)
-  sdratio_mat <- if (has_sdratio) {
-    exp(.sdt_linpred(fit, "sdratio", conditions, ...))
-  } else {
-    matrix(1, nrow = n_draws, ncol = n_cond)
-  }
+  n_cond   <- max(1L, nrow(conditions))
+  geom     <- .sdt_latent_geometry(fit, conditions, has_sdratio, ...)
+  n_draws  <- nrow(geom$d)
   thr_list <- .sdt_rating_thresholds(fit, model, conditions, ...)
 
   ro_mat <- rn_mat <- metad_mat <- NULL
@@ -512,9 +508,9 @@ roc_sdt <- function(fit, conditions = NULL, n_points = 100,
     ro_mat <- stats::plogis(.sdt_linpred(fit, "Ro", conditions, ...))
     rn_mat <- stats::plogis(.sdt_linpred(fit, "Rn", conditions, ...))
   } else if (model$version == "metad") {
-    # meta-d' = exp(log M-ratio) * d'; dprime_mat is already drawn above
-    metad_mat <- exp(.sdt_linpred(fit, "logmratio", conditions, ...)) *
-      dprime_mat
+    # meta-d = exp(log M-ratio) * d, both on the d_a scale, so the kernels can
+    # apply the same root-mean-square conversion to each
+    metad_mat <- exp(.sdt_linpred(fit, "logmratio", conditions, ...)) * geom$d
   }
 
   fa_grid       <- seq(0.001, 0.999, length.out = n_points)
@@ -524,17 +520,22 @@ roc_sdt <- function(fit, conditions = NULL, n_points = 100,
   summary_list <- vector("list", n_cond)
   points_list  <- vector("list", n_cond)
   for (c_i in seq_len(n_cond)) {
-    dp_vec <- dprime_mat[, c_i]
-    sr_vec <- sdratio_mat[, c_i]
+    d_vec   <- geom$d[, c_i]
+    sep_vec <- geom$sep[, c_i]
+    sr_vec  <- geom$sdratio[, c_i]
 
     pars <- list(
       Ro    = if (!is.null(ro_mat)) ro_mat[, c_i],
       Rn    = if (!is.null(rn_mat)) rn_mat[, c_i],
       metad = if (!is.null(metad_mat)) metad_mat[, c_i]
     )
-    pn <- rbind(.sdt_version_category_probs(model, thr_list[[c_i]], dp_vec, 1,
-                                            0L, dist, pars))
-    ps <- rbind(.sdt_version_category_probs(model, thr_list[[c_i]], dp_vec,
+    # sdratio goes into both calls: the kernels derive the noise/signal scale
+    # from the stimulus flag, but they also need sdratio to convert d_a into the
+    # separation. Passing 1 for the noise row would silently drop that
+    # conversion and place the noise density at -d_a/2 instead of -sep/2.
+    pn <- rbind(.sdt_version_category_probs(model, thr_list[[c_i]], d_vec,
+                                            sr_vec, 0L, dist, pars))
+    ps <- rbind(.sdt_version_category_probs(model, thr_list[[c_i]], d_vec,
                                             sr_vec, 1L, dist, pars))
     fa_pts  <- 1 - matrixStats::rowCumsums(pn)[, seq_len(K1), drop = FALSE]
     hit_pts <- 1 - matrixStats::rowCumsums(ps)[, seq_len(K1), drop = FALSE]
@@ -546,9 +547,9 @@ roc_sdt <- function(fit, conditions = NULL, n_points = 100,
       .draw = rep(seq_len(n_draws), each = K1 + 2L)
     )
 
-    t_grid  <- qf(1 - fa_grid) - mean(dp_vec) / 2
-    fa_mat  <- 1 - cdf(outer(dp_vec / 2, t_grid, "+"))
-    hit_mat <- 1 - cdf(sweep(outer(-dp_vec / 2, t_grid, "+"), 1L, sr_vec, "/"))
+    t_grid  <- qf(1 - fa_grid) - mean(sep_vec) / 2
+    fa_mat  <- 1 - cdf(outer(sep_vec / 2, t_grid, "+"))
+    hit_mat <- 1 - cdf(sweep(outer(-sep_vec / 2, t_grid, "+"), 1L, sr_vec, "/"))
     # Dual-process recollection lifts the smooth curve off the familiarity ROC:
     # Ro adds a Hit-axis intercept, Rn scales false alarms toward the new end.
     if (model$version == "dpsdt") {
@@ -1034,10 +1035,12 @@ print.bmm_sdt_thresholds <- function(x, ...) {
 #' Extracts the posterior of the M-ratio (\eqn{\mathrm{meta\text{-}d'}/d'}) and
 #' of meta-d' from a [sdt_rating()] model fit with `version = "metad"`. That
 #' model estimates the log M-ratio (`logmratio`) directly, so the M-ratio is
-#' `exp(logmratio)` and meta-d' is `exp(logmratio) * dprime`. The M-ratio is the
+#' `exp(logmratio)` and meta-d' is `exp(logmratio) * d`. The M-ratio is the
 #' standard measure of metacognitive efficiency (Maniscalco & Lau, 2014;
 #' Fleming, 2017): 1 is ideal metacognition, below 1 is inefficiency, and above
-#' 1 is hyper-efficiency.
+#' 1 is hyper-efficiency. Type-1 and type-2 sensitivity are both reported on the
+#' balanced \eqn{d_a} scale (see [sdt_sensitivity()]), so the ratio is
+#' unaffected by `sdratio`.
 #'
 #' @inheritParams roc_sdt
 #' @param probs Numeric vector of length 2. Lower and upper quantiles for the
@@ -1072,8 +1075,8 @@ mratio <- function(fit, conditions = NULL, probs = c(0.025, 0.975), ...) {
   cond_rows  <- .sdt_unique_subset(conditions, names(conditions))
 
   mratio_mat <- exp(.sdt_linpred(fit, "logmratio", cond_rows, ...))
-  dprime_mat <- .sdt_linpred(fit, "dprime", cond_rows, ...)
-  mats       <- list(mratio = mratio_mat, metad = mratio_mat * dprime_mat)
+  d_mat      <- .sdt_linpred(fit, "d", cond_rows, ...)
+  mats       <- list(mratio = mratio_mat, metad = mratio_mat * d_mat)
 
   draws_list   <- vector("list", ncol(mratio_mat))
   summary_list <- vector("list", ncol(mratio_mat))

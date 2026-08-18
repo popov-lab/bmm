@@ -2371,11 +2371,14 @@ rsdt_binary <- function(n, n_trials, stimulus, dprime, criterion,
 # top category, new items recall-rejected (Rn) load the bottom one -- on top of
 # the familiarity SDT probabilities. Ro/Rn are probabilities here; the model
 # entry points map inv_logit(linear) before calling, and fix them near 0 to
-# recover standard SDT. Vectorized over observations like .sdt_category_probs:
+# recover standard SDT. `d` is the familiarity distributions' d_a: recollection
+# is a separate threshold process, so the d_a scaling belongs to the familiarity
+# SDT process alone and is applied by .sdt_category_probs() below.
+# Vectorized over observations like .sdt_category_probs:
 # thresholds may be an n-by-(K-1) matrix and the parameters vectors.
-.sdt_dpsdt_category_probs <- function(thresholds, dprime, sdratio, stimulus,
+.sdt_dpsdt_category_probs <- function(thresholds, d, sdratio, stimulus,
                                       dist, Ro, Rn) {
-  probs <- rbind(.sdt_category_probs(thresholds, dprime, sdratio, stimulus,
+  probs <- rbind(.sdt_category_probs(thresholds, d, sdratio, stimulus,
                                      dist))
   n <- nrow(probs)
   K <- ncol(probs)
@@ -2395,23 +2398,28 @@ rsdt_binary <- function(n, n_trials, stimulus, dprime, criterion,
 # Meta-d' category probabilities (Maniscalco & Lau, 2012): confidence thresholds
 # are read off the metacognitive sensitivity metad, then each side of the central
 # criterion is rescaled so the summed "old"/"new" mass still matches what the
-# type-1 dprime implies. mid uses the Stan central-threshold index so the R-side
-# prediction reproduces the likelihood for odd K. Vectorized over observations
-# like .sdt_category_probs.
-.sdt_metad_category_probs <- function(thresholds, dprime, metad, stimulus,
+# type-1 sensitivity d implies. mid uses the Stan central-threshold index so the
+# R-side prediction reproduces the likelihood for odd K. Both d and metad are
+# d_a indices, and .sdt_rms_scale() converts both to noise-SD units: a shared
+# factor leaves the M-ratio metad/d unchanged and keeps the metad = d reduction
+# to standard rating SDT exact under unequal variance. Vectorized over
+# observations like .sdt_category_probs.
+.sdt_metad_category_probs <- function(thresholds, d, metad, stimulus,
                                       sdratio, dist) {
   thr <- rbind(thresholds)
   dimnames(thr) <- NULL
-  n <- max(nrow(thr), length(dprime), length(metad), length(sdratio),
+  n <- max(nrow(thr), length(d), length(metad), length(sdratio),
            length(stimulus))
   if (nrow(thr) != n) thr <- thr[rep_len(seq_len(nrow(thr)), n), , drop = FALSE]
   K <- ncol(thr) + 1L
   mid <- (K - 1L) %/% 2L + 1L
   stimulus <- rep_len(stimulus, n)
+  sdratio <- rep_len(sdratio, n)
 
-  d_shift <- rep_len(dprime, n) / 2 * (2 * stimulus - 1)
-  metad_shift <- rep_len(metad, n) / 2 * (2 * stimulus - 1)
-  scale <- ifelse(stimulus == 1, rep_len(sdratio, n), 1)
+  rms <- .sdt_rms_scale(sdratio)
+  d_shift <- rep_len(d, n) * rms / 2 * (2 * stimulus - 1)
+  metad_shift <- rep_len(metad, n) * rms / 2 * (2 * stimulus - 1)
+  scale <- ifelse(stimulus == 1, sdratio, 1)
 
   cum_p_metad <- .sdt_cdf((thr - metad_shift) / scale, dist)
   raw_probs <- cbind(cum_p_metad, 1) - cbind(0, cum_p_metad)
@@ -2667,13 +2675,14 @@ rsdt_rating <- function(n, n_trials, stimulus, dprime, thresholds,
 #' @examples
 #' # Density for a single observation (K=4) with recollection of old items
 #' dsdt_dpsdt(counts = c(2, 8, 20, 70), stimulus = 1,
-#'            dprime = 1.5, thresholds = c(-0.5, 0.0, 0.5), Ro = 0.3, Rn = 0)
-dsdt_dpsdt <- function(counts, stimulus, dprime, thresholds, Ro, Rn,
+#'            d = 1.5, thresholds = c(-0.5, 0.0, 0.5), Ro = 0.3, Rn = 0)
+dsdt_dpsdt <- function(counts, stimulus, d, thresholds, Ro, Rn,
                        sdratio = 1,
                        dist = c("normal", "gumbel_min", "gumbel_max",
                                 "logistic"),
                        log = FALSE) {
   dist <- match.arg(dist)
+  stopif(any(sdratio <= 0), "sdratio must be positive")
   counts <- rbind(counts)
   dimnames(counts) <- NULL
   K <- ncol(counts)
@@ -2684,7 +2693,7 @@ dsdt_dpsdt <- function(counts, stimulus, dprime, thresholds, Ro, Rn,
   stopif(any(Ro < 0 | Ro > 1), "Ro must be a probability in [0, 1]")
   stopif(any(Rn < 0 | Rn > 1), "Rn must be a probability in [0, 1]")
 
-  n <- max(nrow(counts), length(dprime), length(sdratio), length(stimulus),
+  n <- max(nrow(counts), length(d), length(sdratio), length(stimulus),
            length(Ro), length(Rn))
   if (nrow(counts) != n) {
     counts <- counts[rep_len(seq_len(nrow(counts)), n), , drop = FALSE]
@@ -2693,7 +2702,7 @@ dsdt_dpsdt <- function(counts, stimulus, dprime, thresholds, Ro, Rn,
   stopif(any(!stimulus %in% c(0L, 1L)),
          "stimulus must be 0 (noise) or 1 (signal)")
 
-  probs <- rbind(.sdt_dpsdt_category_probs(thr, rep_len(dprime, n),
+  probs <- rbind(.sdt_dpsdt_category_probs(thr, rep_len(d, n),
                                            rep_len(sdratio, n), stimulus, dist,
                                            rep_len(Ro, n), rep_len(Rn, n)))
   log_dens <- lgamma(rowSums(counts) + 1) - rowSums(lgamma(counts + 1)) +
@@ -2707,11 +2716,11 @@ dsdt_dpsdt <- function(counts, stimulus, dprime, thresholds, Ro, Rn,
 #' @examples
 #' # Generate DPSDT rating data (K=4) for 10 subjects and both stimulus types
 #' dat <- expand.grid(id = 1:10, stimulus = c(0L, 1L))
-#' dat <- cbind(dat, rsdt_dpsdt(nrow(dat), 100, dat$stimulus, dprime = 1.5,
+#' dat <- cbind(dat, rsdt_dpsdt(nrow(dat), 100, dat$stimulus, d = 1.5,
 #'                              thresholds = c(-0.5, 0, 0.5),
 #'                              Ro = 0.3, Rn = 0.1))
 #' head(dat)
-rsdt_dpsdt <- function(n, n_trials, stimulus, dprime, thresholds, Ro, Rn,
+rsdt_dpsdt <- function(n, n_trials, stimulus, d, thresholds, Ro, Rn,
                        sdratio = 1,
                        dist = c("normal", "gumbel_min", "gumbel_max",
                                 "logistic")) {
@@ -2722,10 +2731,11 @@ rsdt_dpsdt <- function(n, n_trials, stimulus, dprime, thresholds, Ro, Rn,
          "stimulus must be 0 (noise) or 1 (signal)")
   stopif(any(Ro < 0 | Ro > 1), "Ro must be a probability in [0, 1]")
   stopif(any(Rn < 0 | Rn > 1), "Rn must be a probability in [0, 1]")
+  stopif(any(sdratio <= 0), "sdratio must be positive")
 
   n_trials <- rep_len(as.integer(n_trials), n)
   probs <- rbind(.sdt_dpsdt_category_probs(rbind(thresholds),
-                                           rep_len(dprime, n),
+                                           rep_len(d, n),
                                            rep_len(sdratio, n),
                                            rep_len(stimulus, n), dist,
                                            rep_len(Ro, n), rep_len(Rn, n)))
@@ -2744,14 +2754,16 @@ rsdt_dpsdt <- function(n, n_trials, stimulus, dprime, thresholds, Ro, Rn,
 #' @description Density and random generation for the meta-d' model
 #'   (Maniscalco & Lau, 2012). Confidence thresholds are placed using the
 #'   metacognitive sensitivity `metad`, then rescaled so the total "old"/"new"
-#'   response rates match what type-1 `dprime` predicts. These are the simulation
+#'   response rates match what type-1 `d` predicts. These are the simulation
 #'   counterparts of the `metad` version of [sdt_rating()].
 #'
 #' @name sdt_metad_dist
 #'
 #' @inheritParams sdt_rating_dist
-#' @param metad Numeric vector. Metacognitive sensitivity (type-2 d').
-#'   `metad = dprime` corresponds to ideal metacognition (recovers rating SDT).
+#' @param metad Numeric vector. Metacognitive sensitivity (type-2 sensitivity),
+#'   on the same balanced \eqn{d_a} scale as `d`, so the M-ratio `metad / d` is
+#'   unaffected by `sdratio`. `metad = d` corresponds to ideal metacognition
+#'   (recovers rating SDT).
 #'
 #' @return `dsdt_metad` returns the (log-)density (multinomial probability).
 #'   `rsdt_metad` returns an integer matrix with one row per observation and
@@ -2768,13 +2780,14 @@ rsdt_dpsdt <- function(n, n_trials, stimulus, dprime, thresholds, Ro, Rn,
 #' @examples
 #' # Density for a single observation (K=4) with imperfect metacognition
 #' dsdt_metad(counts = c(5, 15, 25, 55), stimulus = 1,
-#'            dprime = 1.5, thresholds = c(-0.5, 0.0, 0.5), metad = 1.0)
-dsdt_metad <- function(counts, stimulus, dprime, thresholds, metad,
+#'            d = 1.5, thresholds = c(-0.5, 0.0, 0.5), metad = 1.0)
+dsdt_metad <- function(counts, stimulus, d, thresholds, metad,
                        sdratio = 1,
                        dist = c("normal", "gumbel_min", "gumbel_max",
                                 "logistic"),
                        log = FALSE) {
   dist <- match.arg(dist)
+  stopif(any(sdratio <= 0), "sdratio must be positive")
   counts <- rbind(counts)
   dimnames(counts) <- NULL
   K <- ncol(counts)
@@ -2783,7 +2796,7 @@ dsdt_metad <- function(counts, stimulus, dprime, thresholds, metad,
          "thresholds must have length K - 1 = {K - 1}")
   stopif(any(counts < 0), "counts must be non-negative")
 
-  n <- max(nrow(counts), length(dprime), length(metad), length(sdratio),
+  n <- max(nrow(counts), length(d), length(metad), length(sdratio),
            length(stimulus))
   if (nrow(counts) != n) {
     counts <- counts[rep_len(seq_len(nrow(counts)), n), , drop = FALSE]
@@ -2792,7 +2805,7 @@ dsdt_metad <- function(counts, stimulus, dprime, thresholds, metad,
   stopif(any(!stimulus %in% c(0L, 1L)),
          "stimulus must be 0 (noise) or 1 (signal)")
 
-  probs <- rbind(.sdt_metad_category_probs(thr, rep_len(dprime, n),
+  probs <- rbind(.sdt_metad_category_probs(thr, rep_len(d, n),
                                            rep_len(metad, n), stimulus,
                                            rep_len(sdratio, n), dist))
   log_dens <- lgamma(rowSums(counts) + 1) - rowSums(lgamma(counts + 1)) +
@@ -2806,10 +2819,10 @@ dsdt_metad <- function(counts, stimulus, dprime, thresholds, metad,
 #' @examples
 #' # Generate meta-d' rating data (K=4) for 10 subjects and both stimulus types
 #' dat <- expand.grid(id = 1:10, stimulus = c(0L, 1L))
-#' dat <- cbind(dat, rsdt_metad(nrow(dat), 100, dat$stimulus, dprime = 1.5,
+#' dat <- cbind(dat, rsdt_metad(nrow(dat), 100, dat$stimulus, d = 1.5,
 #'                              thresholds = c(-0.5, 0, 0.5), metad = 1.0))
 #' head(dat)
-rsdt_metad <- function(n, n_trials, stimulus, dprime, thresholds, metad,
+rsdt_metad <- function(n, n_trials, stimulus, d, thresholds, metad,
                        sdratio = 1,
                        dist = c("normal", "gumbel_min", "gumbel_max",
                                 "logistic")) {
@@ -2818,10 +2831,11 @@ rsdt_metad <- function(n, n_trials, stimulus, dprime, thresholds, metad,
   stopif(any(n_trials < 1), "n_trials must be positive")
   stopif(any(!stimulus %in% c(0L, 1L)),
          "stimulus must be 0 (noise) or 1 (signal)")
+  stopif(any(sdratio <= 0), "sdratio must be positive")
 
   n_trials <- rep_len(as.integer(n_trials), n)
   probs <- rbind(.sdt_metad_category_probs(rbind(thresholds),
-                                           rep_len(dprime, n),
+                                           rep_len(d, n),
                                            rep_len(metad, n),
                                            rep_len(stimulus, n),
                                            rep_len(sdratio, n), dist))
