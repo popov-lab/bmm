@@ -2063,7 +2063,6 @@ neg_loglik <- function(x, params, distribution, weights = NULL) {
 }
 
 
-# Internal: validate hit_rate and fa_rate are in (0, 1)
 .validate_sdt_rates <- function(hit_rate, fa_rate) {
   stopif(anyNA(hit_rate) || anyNA(fa_rate),
          "hit_rate and fa_rate must not contain missing values")
@@ -2351,6 +2350,250 @@ rsdt_yn <- function(n, n_trials, stimulus, d, criterion,
     outer(.sdt_dists[[dist]]$qf(.mafc_gl_nodes), d, "+")
   )
   colSums(.mafc_gl_weights * cdf_mat^rep(m - 1, each = length(.mafc_gl_nodes)))
+}
+
+
+# Category probabilities from thresholds: F(thresholds) differenced into K
+# interval masses. `d` is d_a, so the separation in noise units is
+# d * .sdt_rms_scale(sdratio); the thresholds are NOT rescaled, they stay on the
+# noise-standardized axis. sdratio is the signal/noise SD ratio on the natural
+# scale, and the unequal-variance scaling of signal trials lives here alone (the
+# Stan counterpart is sdt_rating_logmu_cat). Vectorized over observations:
+# thresholds may be an n-by-(K-1) matrix (or a vector, recycled across rows)
+# and d/sdratio/stimulus vectors. Returns an n-by-K matrix, or a length-K
+# vector when all inputs describe a single observation.
+.sdt_category_probs <- function(thresholds, d, sdratio, stimulus, dist) {
+  thr <- rbind(thresholds)
+  dimnames(thr) <- NULL
+  n <- max(nrow(thr), length(d), length(sdratio), length(stimulus))
+  if (nrow(thr) != n) thr <- thr[rep_len(seq_len(nrow(thr)), n), , drop = FALSE]
+  stimulus <- rep_len(stimulus, n)
+  sdratio <- rep_len(sdratio, n)
+
+  shift <- rep_len(d, n) * .sdt_rms_scale(sdratio) / 2 * (2 * stimulus - 1)
+  scale <- ifelse(stimulus == 1, sdratio, 1)
+  cum_p <- .sdt_cdf((thr - shift) / scale, dist)
+
+  probs <- cbind(cum_p, 1) - cbind(0, cum_p)
+  probs <- pmax(probs, .Machine$double.eps)
+  probs <- probs / rowSums(probs)
+  if (n == 1L && !is.matrix(thresholds)) probs[1L, ] else probs
+}
+
+
+# Assemble ordered thresholds from per-draw interval widths anchored at the
+# middle threshold: inc[, j] is the width of the interval between threshold j
+# and threshold j + 1. Returns an n-by-K1 matrix.
+.sdt_assemble_thresholds <- function(criterion, inc, mid, K1) {
+  thr <- matrix(0, length(criterion), K1)
+  thr[, mid] <- criterion
+  if (mid < K1) {
+    thr[, (mid + 1L):K1] <- criterion +
+      matrixStats::rowCumsums(inc[, mid:(K1 - 1L), drop = FALSE])
+  }
+  if (mid > 1L) {
+    thr[, (mid - 1L):1L] <- criterion -
+      matrixStats::rowCumsums(inc[, (mid - 1L):1L, drop = FALSE])
+  }
+  thr
+}
+
+# Build K-1 ordered thresholds from criterion plus a parameterization-specific
+# canonical spread. parsimonious/equidistant use exp(spacing) steps; the log_*
+# and softmax types place thresholds from positive distance/ratio deltas so the
+# ordering is guaranteed. Vectorized over draws: criterion/spacing may be
+# vectors and deltas an n-by-nd matrix (a vector describes a single draw).
+# Returns an n-by-(K-1) matrix, or a length-(K-1) vector for a single draw.
+# The middle index must match the Stan builders in sdt_rating_funs.stan
+# ((K_full - 1) %/% 2 + 1) so R-side prediction reproduces the likelihood for
+# odd K; identical for even K.
+.sdt_make_thresholds <- function(criterion, n_ratings, threshold_type,
+                                 spacing = NULL, deltas = NULL) {
+  K1 <- n_ratings - 1L
+  mid <- (n_ratings - 1L) %/% 2L + 1L
+
+  n <- max(length(criterion), length(spacing),
+           if (is.matrix(deltas)) nrow(deltas) else 0L)
+  criterion <- rep_len(criterion, n)
+  if (!is.null(spacing)) spacing <- rep_len(spacing, n)
+  if (!is.null(deltas)) {
+    if (!is.matrix(deltas)) deltas <- matrix(deltas, n, length(deltas),
+                                             byrow = TRUE)
+    if (nrow(deltas) != n) {
+      deltas <- deltas[rep_len(seq_len(nrow(deltas)), n), , drop = FALSE]
+    }
+  }
+
+  if (threshold_type %in% c("equidistant", "parsimonious")) {
+    stopif(is.null(spacing), "spacing is required for {threshold_type} thresholds")
+    canonical <- if (threshold_type == "equidistant") {
+      seq_len(K1) - mid
+    } else {
+      log(seq_len(K1) / (n_ratings - seq_len(K1)))
+    }
+    thr <- criterion + exp(spacing) %o% canonical
+  } else if (threshold_type == "softmax") {
+    stopif(is.null(spacing), "spacing is required for softmax thresholds")
+    n_deltas <- max(0L, n_ratings - 3L)
+    if (n_deltas > 0L) {
+      stopif(is.null(deltas), "deltas is required for softmax thresholds")
+      stopif(ncol(deltas) != n_deltas,
+             "deltas must have length n_ratings - 3 = {n_deltas}")
+    } else {
+      deltas <- matrix(0, n, 0L)
+    }
+
+    expl <- cbind(exp(deltas), 1)
+    inc <- expl / rowSums(expl) * (n_ratings - 2L) * exp(spacing)
+    thr <- .sdt_assemble_thresholds(criterion, inc, mid, K1)
+  } else if (threshold_type == "log_ratio") {
+    stopif(is.null(deltas), "deltas is required for log_ratio thresholds")
+    n_deltas <- n_ratings - 2L
+    stopif(ncol(deltas) != n_deltas,
+           "deltas must have length n_ratings - 2 = {n_deltas}")
+    stopif(n_ratings < 4L, "log_ratio thresholds require n_ratings >= 4")
+
+    # interval mid is the anchor spread; intervals above scale by it, the
+    # first interval below sets the below spread, and further intervals below
+    # scale by that (Paulewicz & Blaut, 2020)
+    inc <- exp(deltas)
+    spread_above <- inc[, mid]
+    if (mid + 1L <= K1 - 1L) {
+      inc[, (mid + 1L):(K1 - 1L)] <-
+        inc[, (mid + 1L):(K1 - 1L), drop = FALSE] * spread_above
+    }
+    if (mid > 1L) {
+      spread_below <- inc[, mid - 1L] * spread_above
+      inc[, mid - 1L] <- spread_below
+      if (mid - 2L >= 1L) {
+        inc[, 1L:(mid - 2L)] <- inc[, 1L:(mid - 2L), drop = FALSE] * spread_below
+      }
+    }
+    thr <- .sdt_assemble_thresholds(criterion, inc, mid, K1)
+  } else {
+    stopif(is.null(deltas), "deltas is required for log_distance thresholds")
+    n_deltas <- n_ratings - 2L
+    stopif(ncol(deltas) != n_deltas,
+           "deltas must have length n_ratings - 2 = {n_deltas}")
+
+    thr <- .sdt_assemble_thresholds(criterion, exp(deltas), mid, K1)
+  }
+
+  if (n == 1L) thr[1L, ] else thr
+}
+
+
+#' @title Distribution functions for Confidence Rating SDT
+#'
+#' @description Density and random generation for confidence rating signal
+#'   detection theory models. The response is a vector of counts across K
+#'   ordered rating categories (multinomial likelihood).
+#'
+#' @name sdt_rating_dist
+#'
+#' @param counts Integer matrix with one row per observation and one column
+#'   per rating category, ordered from "definitely noise" (1) to "definitely
+#'   signal" (K), or a vector for a single observation.
+#' @param stimulus Integer vector (0/1). Stimulus type: 0 = noise, 1 = signal.
+#' @param d Numeric vector. Sensitivity: the balanced discriminability index
+#'   \eqn{d_a}, which equals \eqn{d'} when `sdratio` is 1. The separation
+#'   between the distributions in noise units is `d * sqrt((1 + sdratio^2) / 2)`.
+#' @param thresholds Numeric vector of length K-1 with the ordered decision
+#'   thresholds, or an n-by-(K-1) matrix with one row per observation. The
+#'   thresholds are on the noise-standardized axis and are not rescaled by
+#'   `sdratio`.
+#' @param sdratio Numeric vector. Ratio of signal to noise standard deviations
+#'   (default 1, i.e., equal variance). Must be positive. Note that this is the
+#'   natural scale: the `sdratio` parameter of [sdt_rating()] is sampled on the
+#'   log scale, so it corresponds to `log(sdratio)` here.
+#' @param dist Character. Noise distribution: "normal" (default), "logistic",
+#'   "gumbel_min", or "gumbel_max".
+#' @param log Logical. If `TRUE`, returns log-density (default `FALSE`).
+#' @param n Integer. Number of observations to generate. `n_trials`,
+#'   `stimulus`, `thresholds`, and the model parameters are recycled to this
+#'   length.
+#' @param n_trials Integer vector. Number of trials per observation.
+#'
+#' @return `dsdt_rating` returns the (log-)density (multinomial probability).
+#'   `rsdt_rating` returns an integer matrix with one row per observation and
+#'   one rating-count column per category (`r1` ... `rK`).
+#'
+#' @references
+#' Green, D. M., & Swets, J. A. (1966). \emph{Signal detection theory and
+#'   psychophysics}. Wiley.
+#'
+#' Selker, R., van den Bergh, D., Criss, A. H., & Wagenmakers, E.-J. (2019).
+#'   Parsimonious estimation of signal detection models from confidence ratings.
+#'   \emph{Behavior Research Methods}, \emph{51}(5), 1953--1967.
+#'   \doi{10.3758/s13428-019-01231-3}
+#'
+#' @keywords distribution
+#' @export
+#' @examples
+#' # Density for a single observation (K=4)
+#' dsdt_rating(counts = c(5, 15, 25, 55), stimulus = 1,
+#'             d = 1.5, thresholds = c(-0.5, 0.0, 0.5))
+dsdt_rating <- function(counts, stimulus, d, thresholds,
+                        sdratio = 1,
+                        dist = c("normal", "gumbel_min", "gumbel_max",
+                                 "logistic"),
+                        log = FALSE) {
+  dist <- match.arg(dist)
+  stopif(any(sdratio <= 0), "sdratio must be positive")
+  counts <- rbind(counts)
+  dimnames(counts) <- NULL
+  K <- ncol(counts)
+  thr <- rbind(thresholds)
+  stopif(ncol(thr) != K - 1,
+         "thresholds must have length K - 1 = {K - 1}")
+  stopif(any(counts < 0), "counts must be non-negative")
+
+  n <- max(nrow(counts), length(d), length(sdratio), length(stimulus))
+  if (nrow(counts) != n) {
+    counts <- counts[rep_len(seq_len(nrow(counts)), n), , drop = FALSE]
+  }
+  stimulus <- rep_len(stimulus, n)
+  stopif(any(!stimulus %in% c(0L, 1L)),
+         "stimulus must be 0 (noise) or 1 (signal)")
+
+  probs <- rbind(.sdt_category_probs(thr, rep_len(d, n),
+                                     rep_len(sdratio, n), stimulus, dist))
+  log_dens <- lgamma(rowSums(counts) + 1) - rowSums(lgamma(counts + 1)) +
+    rowSums(counts * log(probs))
+  if (log) log_dens else exp(log_dens)
+}
+
+
+#' @rdname sdt_rating_dist
+#' @export
+#' @examples
+#' # Generate rating data (K=4) for 10 subjects and both stimulus types
+#' dat <- expand.grid(id = 1:10, stimulus = c(0L, 1L))
+#' dat <- cbind(dat, rsdt_rating(nrow(dat), 100, dat$stimulus,
+#'                               d = 1.5, thresholds = c(-0.5, 0, 0.5)))
+#' head(dat)
+rsdt_rating <- function(n, n_trials, stimulus, d, thresholds,
+                        sdratio = 1,
+                        dist = c("normal", "gumbel_min", "gumbel_max",
+                                 "logistic")) {
+  dist <- match.arg(dist)
+  stopif(length(n) != 1 || n < 1, "n must be a single positive integer")
+  stopif(any(n_trials < 1), "n_trials must be positive")
+  stopif(any(!stimulus %in% c(0L, 1L)),
+         "stimulus must be 0 (noise) or 1 (signal)")
+  stopif(any(sdratio <= 0), "sdratio must be positive")
+
+  n_trials <- rep_len(as.integer(n_trials), n)
+  probs <- rbind(.sdt_category_probs(rbind(thresholds), rep_len(d, n),
+                                     rep_len(sdratio, n),
+                                     rep_len(stimulus, n), dist))
+
+  K <- ncol(probs)
+  counts <- matrix(0L, n, K, dimnames = list(NULL, paste0("r", seq_len(K))))
+  for (i in seq_len(n)) {
+    counts[i, ] <- as.integer(stats::rmultinom(1, n_trials[i], probs[i, ]))
+  }
+  counts
 }
 
 

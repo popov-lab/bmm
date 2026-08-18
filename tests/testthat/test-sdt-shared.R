@@ -28,9 +28,26 @@ test_that("every dist argument offers exactly the registry's distributions", {
   # the registry order defines the dist_type integer passed to Stan, so a
   # signature that drifts out of step with it becomes an off-by-one
   fns <- list(sdt_yn, dsdt_yn, rsdt_yn, sdt_d, sdt_criterion,
-              sdt_mafc, dsdt_mafc, rsdt_mafc)
+              sdt_mafc, dsdt_mafc, rsdt_mafc,
+              sdt_rating, dsdt_rating, rsdt_rating)
   for (f in fns) {
     expect_equal(eval(formals(f)$dist), names(bmm:::.sdt_dists))
+  }
+})
+
+test_that("a two-category rating reduces to the binary likelihood", {
+  # both models must implement the same decision rule -- evidence above the
+  # criterion is an "old" response -- which for the asymmetric extreme-value
+  # distributions is only true if neither evaluates its cdf on the mirrored axis
+  for (di in names(bmm:::.sdt_dists)) {
+    for (stim in c(0L, 1L)) {
+      expect_equal(
+        bmm:::.sdt_category_probs(-0.2, 1.5, 1.3, stim, di)[2],
+        dsdt_yn(1, 1, stim, d = 1.5, criterion = -0.2,
+                sdratio = 1.3, dist = di),
+        info = paste(di, "stimulus", stim)
+      )
+    }
   }
 })
 
