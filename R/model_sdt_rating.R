@@ -8,14 +8,6 @@
 .sdt_threshold_types <- c("parsimonious", "equidistant", "log_distance",
                           "log_ratio", "softmax")
 
-.sdt_threshold_type_id <- function(threshold_type) {
-  match(threshold_type, .sdt_threshold_types)
-}
-
-.sdt_threshold_type_name <- function(thresh_type) {
-  .sdt_threshold_types[thresh_type]
-}
-
 # Parameter spec for one threshold parameterization. parsimonious/equidistant
 # need a single spacing; log_distance/log_ratio need K-2 distance deltas;
 # softmax needs spacing plus K-3 allocation deltas.
@@ -116,8 +108,10 @@
     "Log SD ratio: the log of the signal-to-noise standard deviation ratio, ",
     "so exp(sdratio) is the ratio itself and 0 means equal variance"
   )
+  # Matches sdt_yn and sdt_ranking: on the log scale, normal(0, 0.3) covers
+  # ratios in [0.56, 1.80] at 95%, spanning the empirical recognition range.
   default_priors$sdratio <- list(
-    main = "normal(0, 0.5)", effects = "normal(0, 0.3)"
+    main = "normal(0, 0.3)", effects = "normal(0, 0.15)"
   )
   param_links$sdratio <- "identity"
 
@@ -152,14 +146,13 @@
         "Green, D. M., & Swets, J. A. (1966). Signal detection theory ",
         "and psychophysics. Wiley."
       ),
-      version = "rating",
+      version = "NA",
       requirements = requirements,
       parameters = parameters,
       links = param_links,
       fixed_parameters = list(sdratio = 0),
       default_priors = default_priors,
-      init_ranges = init_ranges,
-      void_mu = FALSE
+      init_ranges = init_ranges
     ),
     class = c("bmmodel", "sdt", "sdt_rating"),
     call = call
@@ -176,6 +169,15 @@
 #' By default, the model assumes equal variance (sdratio fixed to 0). To
 #' estimate unequal variance, add `sdratio ~ 1` (or `sdratio ~ predictors`)
 #' to the formula.
+#'
+#' @section Sensitivity is on the same scale as [sdt_yn()]:
+#' `d` is the balanced index \eqn{d_a} that [sdt_yn()] reports: the separation
+#' between the signal and noise distributions divided by the root-mean-square
+#' of their SDs. It equals \eqn{d'} whenever `sdratio` stays fixed at 0, and
+#' unlike \eqn{d'} it remains comparable across conditions that differ in
+#' `sdratio` -- see the sensitivity section of [sdt_yn()] for the reasoning.
+#' The `criterion` and the confidence thresholds are **not** rescaled and stay
+#' on the noise-standardized axis.
 #' @param response A character vector of K column names containing response
 #'   counts per rating category, ordered from "definitely noise" to
 #'   "definitely signal".
@@ -298,26 +300,22 @@ check_data.sdt_rating <- function(model, data, formula) {
   stim_var <- model$other_vars$stimulus
   stopif(!stim_var %in% colnames(data),
          "Stimulus variable '{stim_var}' missing in the data")
-  stopif(!all(unique(data[[stim_var]]) %in% c(0, 1)),
+  stim_vals <- data[[stim_var]]
+  stopif(!is.numeric(stim_vals) || !all(stim_vals %in% c(0, 1)),
          "Stimulus variable '{stim_var}' must be coded as 0 (noise) and 1 (signal)")
 
   resp_cols <- model$resp_vars$response
-  missing <- setdiff(resp_cols, colnames(data))
-  stopif(length(missing) > 0,
-         "Response columns {collapse_comma(missing)} missing in the data")
-
-  for (col in resp_cols) {
-    vals <- data[[col]]
-    stopif(any(vals < 0, na.rm = TRUE),
-           "Response column '{col}' must contain non-negative counts")
-    warnif(any(vals != round(vals), na.rm = TRUE),
-           "Response column '{col}' should contain integer counts")
-  }
+  .validate_sdt_count_cols(data, resp_cols)
 
   Y <- as.matrix(data[resp_cols])
-  stopif(any(rowSums(Y) <= 0, na.rm = TRUE),
+  stopif(anyNA(Y), "Response columns must not contain NA counts")
+  stopif(any(rowSums(Y) <= 0),
          "Row sums of response columns must be positive (no empty rows)")
 
+  reserved <- intersect(c("Y", "nTrials"), colnames(data))
+  warnif(length(reserved) > 0,
+         "Column(s) {collapse_comma(reserved)} in your data are reserved by \\
+         {model$name} and will be overwritten")
   data <- data[!colnames(data) %in% resp_cols]
   data$Y <- Y
   data$nTrials <- rowSums(Y)
@@ -346,7 +344,7 @@ check_data.sdt_rating <- function(model, data, formula) {
 .sdt_rating_logmu_args <- function(model) {
   has_spacing <- "spacing" %in% names(model$parameters)
   c(model$other_vars$n_ratings, .sdt_dist_id(model$other_vars$dist),
-    .sdt_threshold_type_id(model$other_vars$threshold_type),
+    match(model$other_vars$threshold_type, .sdt_threshold_types),
     "d", "criterion",
     if (has_spacing) "spacing" else "0", "sdratio",
     model$other_vars$stimulus, .sdt_threshold_delta_names(model))
@@ -456,7 +454,7 @@ configure_model.sdt_rating <- function(model, data, formula) {
 sdt_rating_logmu <- function(cat, K, dist, thresh, d, criterion, spacing,
                              sdratio, stimulus, ...) {
   dist_name <- .sdt_dist_names[dist]
-  thresh_name <- .sdt_threshold_type_name(thresh)
+  thresh_name <- .sdt_threshold_types[thresh]
 
   shape <- dim(d)
   d <- as.vector(d)

@@ -43,8 +43,9 @@ thresholds are on the noise-standardized axis and are not rescaled by
 \code{sdratio}.}
 
 \item{sdratio}{Numeric vector. Ratio of signal to noise standard deviations
-(default 1, i.e., equal variance). This is the same scale as the \code{sdratio}
-parameter of \code{\link[=sdt_rating]{sdt_rating()}}, which uses a log link.}
+(default 1, i.e., equal variance). Must be positive. Note that this is the
+natural scale: the \code{sdratio} parameter of \code{\link[=sdt_rating]{sdt_rating()}} is sampled on the
+log scale, so it corresponds to \code{log(sdratio)} here.}
 
 \item{dist}{Character. Noise distribution: "normal" (default), "logistic",
 "gumbel_min", or "gumbel_max".}

@@ -2503,8 +2503,9 @@ rsdt_yn <- function(n, n_trials, stimulus, d, criterion,
 #'   thresholds are on the noise-standardized axis and are not rescaled by
 #'   `sdratio`.
 #' @param sdratio Numeric vector. Ratio of signal to noise standard deviations
-#'   (default 1, i.e., equal variance). This is the same scale as the `sdratio`
-#'   parameter of [sdt_rating()], which uses a log link.
+#'   (default 1, i.e., equal variance). Must be positive. Note that this is the
+#'   natural scale: the `sdratio` parameter of [sdt_rating()] is sampled on the
+#'   log scale, so it corresponds to `log(sdratio)` here.
 #' @param dist Character. Noise distribution: "normal" (default), "logistic",
 #'   "gumbel_min", or "gumbel_max".
 #' @param log Logical. If `TRUE`, returns log-density (default `FALSE`).
@@ -2538,6 +2539,7 @@ dsdt_rating <- function(counts, stimulus, d, thresholds,
                                  "logistic"),
                         log = FALSE) {
   dist <- match.arg(dist)
+  stopif(any(sdratio <= 0), "sdratio must be positive")
   counts <- rbind(counts)
   dimnames(counts) <- NULL
   K <- ncol(counts)
@@ -2579,6 +2581,7 @@ rsdt_rating <- function(n, n_trials, stimulus, d, thresholds,
   stopif(any(n_trials < 1), "n_trials must be positive")
   stopif(any(!stimulus %in% c(0L, 1L)),
          "stimulus must be 0 (noise) or 1 (signal)")
+  stopif(any(sdratio <= 0), "sdratio must be positive")
 
   n_trials <- rep_len(as.integer(n_trials), n)
   probs <- rbind(.sdt_category_probs(rbind(thresholds), rep_len(d, n),
