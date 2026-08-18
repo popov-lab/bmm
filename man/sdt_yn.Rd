@@ -67,7 +67,7 @@ Provide pre-aggregated data with the following columns:
 \itemize{
 \item \code{d}: Sensitivity: the balanced discriminability index d_a, which measures the distance between the signal and noise distributions in units of their root-mean-square SD, so it equals d' when sdratio is 1
 \item \code{criterion}: Response bias: location of decision boundary
-\item \code{sdratio}: SD ratio: the signal-to-noise standard deviation ratio, estimated on the log scale, so 1 means equal variance
+\item \code{sdratio}: Log SD ratio: the log of the signal-to-noise standard deviation ratio, so 0 means equal variance (an SD ratio of 1)
 }
 \item \strong{Fixed parameters:}
 \itemize{
@@ -107,8 +107,9 @@ becomes dimensionless after choosing a scale to divide by. \code{bmm} reports
 where \eqn{\delta} is the separation in noise-SD units and \eqn{r} is
 \code{sdratio}. This weights the two distributions equally, and it is the measure
 Macmillan and Creelman (2005) and Mickes et al. (2007) recommend under
-unequal variance. \code{sdratio} is fixed at 1 by default, where \eqn{d_a} equals
-the familiar \eqn{d'}, so the choice only matters for unequal-variance fits.
+unequal variance. \code{sdratio} is sampled on the log scale and fixed at 0 by
+default (an SD ratio of 1), where \eqn{d_a} equals the familiar \eqn{d'}, so
+the choice only matters for unequal-variance fits.
 
 The alternative — dividing by the noise SD alone — is not comparable across
 conditions that differ in \code{sdratio}: two conditions that are equally
@@ -126,7 +127,7 @@ happens.
 dat <- expand.grid(id = 1:20, stimulus = c(0L, 1L))
 dat$n_trials <- 100L
 dat$n_old <- rsdt_yn(nrow(dat), dat$n_trials, dat$stimulus,
-                         d = 1.5, criterion = 0.2)
+                     d = 1.5, criterion = 0.2)
 
 model <- sdt_yn(
   response = "n_old",
