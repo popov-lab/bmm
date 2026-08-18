@@ -45,7 +45,6 @@ Ranking Signal Detection Theory Model
 \itemize{
 \item Meyer-Grant, C. G., Kellen, D., Harding, S. M., & Singmann, H. (2025). Extreme-value signal detection theory for recognition memory: The parametric road not taken. PsyArXiv. https://doi.org/10.31234/osf.io/qhrfj
 }
-\item \strong{Version:} ranking
 \item \strong{Requirements:}
 
 Provide pre-aggregated ranking counts in wide format:
