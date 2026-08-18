@@ -19,7 +19,7 @@
                            threshold_type = "parsimonious",
                            links = NULL, call = NULL, ...) {
   dist_int <- .sdt_dist_id(dist)
-  thresh_type_int <- .sdt_threshold_type_id(threshold_type)
+  thresh_type_int <- match(threshold_type, .sdt_threshold_types)
 
   # Threshold parameters are either a single `spacing` (parsimonious/equidistant)
   # or per-distance `deltaN` (log_distance), with the anchor at the old/new
@@ -33,8 +33,15 @@
 
   parameters <- c(
     list(
-      dprimef = "Familiarity sensitivity: target mean on the familiarity axis",
-      dprimer = "Recollection sensitivity: target mean on the recollection axis",
+      dfam = paste0(
+        "Familiarity sensitivity: target mean on the familiarity axis, in ",
+        "lure-SD units. Not the balanced d_a that the other SDT models report ",
+        "as d -- the old/new decision is read off the aggregate strength F + R"
+      ),
+      drec = paste0(
+        "Recollection sensitivity: target mean on the recollection axis, in ",
+        "lure-SD units (the target SD is exp(sigmar))"
+      ),
       criterion = "Response bias: old/new boundary on the strength (F+R) axis"
     ),
     thr_parts$parameters,
@@ -56,8 +63,8 @@
   )
   default_priors <- c(
     list(
-      dprimef = list(main = "normal(1, 1)", effects = "normal(0, 0.5)"),
-      dprimer = list(main = "normal(1, 1)", effects = "normal(0, 0.5)"),
+      dfam = list(main = "normal(1, 1)", effects = "normal(0, 0.5)"),
+      drec = list(main = "normal(1, 1)", effects = "normal(0, 0.5)"),
       criterion = list(main = "normal(0, 1.5)", effects = "normal(0, 0.5)")
     ),
     thr_parts$default_priors,
@@ -69,7 +76,7 @@
     )
   )
   param_links <- c(
-    list(dprimef = "identity", dprimer = "identity", criterion = "identity"),
+    list(dfam = "identity", drec = "identity", criterion = "identity"),
     thr_parts$param_links,
     list(rcrit = "identity", sigmar = "identity", rho = "identity",
          kcrit = "identity")
@@ -93,7 +100,7 @@
   )
 
   init_ranges <- list(
-    dprimef = c(0.3, 1.0), dprimer = c(0.3, 1.0), criterion = c(-0.3, 0.3),
+    dfam = c(0.3, 1.0), drec = c(0.3, 1.0), criterion = c(-0.3, 0.3),
     rcrit = c(-0.5, 0.5), sigmar = c(-0.1, 0.1), rho = c(-0.2, 0.2),
     kcrit = c(-1.0, 0.0)
   )
@@ -113,14 +120,13 @@
         "Wixted, J. T., & Mickes, L. (2010). A continuous dual-process model ",
         "of remember/know judgments. Psychological Review, 117(4), 1025-1054."
       ),
-      version = "cdp",
+      version = "NA",
       requirements = requirements,
       parameters = parameters,
       links = param_links,
       fixed_parameters = fixed_parameters,
       default_priors = default_priors,
-      init_ranges = init_ranges,
-      void_mu = FALSE
+      init_ranges = init_ranges
     ),
     class = c("bmmodel", "sdt", "sdt_cdp"),
     call = call
@@ -212,21 +218,21 @@
 #' dat <- expand.grid(id = 1:20, stimulus = c(0L, 1L))
 #' thresholds <- c(-1.1, -0.5, 0, 0.6, 1.3)
 #' dat <- cbind(dat, rsdt_cdp(nrow(dat), 200, dat$stimulus,
-#'                            dprimef = 0.8, dprimer = 1.0,
+#'                            dfam = 0.8, drec = 1.0,
 #'                            thresholds = thresholds, rcrit = 0.7,
 #'                            n_new = 3))
 #'
 #' model <- sdt_cdp(stimulus = "stimulus", n_new = 3, n_old = 3)
 #'
 #' fit <- bmm(
-#'   formula = bmf(dprimef ~ 1, dprimer ~ 1, criterion ~ 1,
+#'   formula = bmf(dfam ~ 1, drec ~ 1, criterion ~ 1,
 #'                 spacing ~ 1, rcrit ~ 1),
 #'   data = dat, model = model, backend = "cmdstanr"
 #' )
 #'
 #' # Estimate unequal recollection variance and the F-R correlation
 #' fit_uv <- bmm(
-#'   formula = bmf(dprimef ~ 1, dprimer ~ 1, criterion ~ 1,
+#'   formula = bmf(dfam ~ 1, drec ~ 1, criterion ~ 1,
 #'                 spacing ~ 1, rcrit ~ 1, sigmar ~ 1, rho ~ 1),
 #'   data = dat, model = model, backend = "cmdstanr"
 #' )
@@ -371,7 +377,8 @@ check_data.sdt_cdp <- function(model, data, formula) {
   stim_var <- model$other_vars$stimulus
   stopif(!stim_var %in% colnames(data),
          "Stimulus variable '{stim_var}' missing in the data")
-  stopif(!all(unique(data[[stim_var]]) %in% c(0, 1)),
+  stim_vals <- data[[stim_var]]
+  stopif(!is.numeric(stim_vals) || !all(stim_vals %in% c(0, 1)),
          "Stimulus variable '{stim_var}' must be coded as 0 (new/lure) and 1 (old/target)")
 
   n_new <- model$other_vars$n_new
@@ -390,19 +397,18 @@ check_data.sdt_cdp <- function(model, data, formula) {
          "Response columns {collapse_comma(missing)} missing in the data. \\
          Use aggregate_sdt_cdp_data() to build them from long-format data")
 
-  for (col in resp_cols) {
-    vals <- data[[col]]
-    stopif(any(vals < 0, na.rm = TRUE),
-           "Response column '{col}' must contain non-negative counts")
-    warnif(any(vals != round(vals), na.rm = TRUE),
-           "Response column '{col}' should contain integer counts")
-  }
+  .validate_sdt_count_cols(data, resp_cols)
 
   Y <- as.matrix(data[resp_cols])
   colnames(Y) <- paste0("cdp", seq_len(ncol(Y)))
-  stopif(any(rowSums(Y) <= 0, na.rm = TRUE),
+  stopif(anyNA(Y), "Response columns must not contain NA counts")
+  stopif(any(rowSums(Y) <= 0),
          "Row sums of response columns must be positive (no empty rows)")
 
+  reserved <- intersect(c("Y", "nTrials"), colnames(data))
+  warnif(length(reserved) > 0,
+         "Column(s) {collapse_comma(reserved)} in your data are reserved by \\
+         {model$name} and will be overwritten")
   data <- data[!colnames(data) %in% resp_cols]
   data$Y <- Y
   data$nTrials <- rowSums(Y)
@@ -427,7 +433,7 @@ check_data.sdt_cdp <- function(model, data, formula) {
   ov <- model$other_vars
   has_spacing <- "spacing" %in% names(model$parameters)
   c(ov$n_new, ov$n_old, ov$thresh_type_int, as.integer(ov$has_guess),
-    "dprimef", "dprimer", "criterion",
+    "dfam", "drec", "criterion",
     if (has_spacing) "spacing" else "0", "rcrit", "sigmar", "rho",
     "kcrit", ov$stimulus, .sdt_threshold_delta_names(model))
 }
@@ -489,7 +495,7 @@ configure_model.sdt_cdp <- function(model, data, formula) {
 
   signature <- paste(
     c("int cat", "int n_new", "int n_old", "int thresh_type", "int has_guess",
-      "real dprimef", "real dprimer", "real criterion", "real spacing",
+      "real dfam", "real drec", "real criterion", "real spacing",
       "real rcrit", "real sigmar", "real rho", "real kcrit", "real stimulus",
       if (nd) paste("real", delta_names)),
     collapse = ", "
@@ -507,7 +513,7 @@ configure_model.sdt_cdp <- function(model, data, formula) {
     delta_decl,
     "  vector[n_new + n_old - 1] thr = cdp_make_thresholds(criterion, spacing, ",
     "deltas, n_new, n_old, thresh_type);\n",
-    "  return log(cdp_category_prob(cat, thr, dprimef, dprimer, sigmar, rho, ",
+    "  return log(cdp_category_prob(cat, thr, dfam, drec, sigmar, rho, ",
     "rcrit, kcrit, stimulus, n_new, n_old, has_guess));\n",
     "}\n"
   )
@@ -530,22 +536,22 @@ configure_model.sdt_cdp <- function(model, data, formula) {
 #' @param thresh Integer threshold-parameterization id (1 parsimonious,
 #'   2 equidistant, 3 log_distance).
 #' @param has_guess Integer flag (1 if the Know/Guess split is active).
-#' @param dprimef,dprimer,criterion,spacing,rcrit,sigmar,rho,kcrit Model
+#' @param dfam,drec,criterion,spacing,rcrit,sigmar,rho,kcrit Model
 #'   parameters (draws-by-observation matrices supplied by brms). `kcrit` is
 #'   ignored when `has_guess` is 0. `spacing` is the fixed literal 0 for
 #'   log_distance, which uses the per-distance deltas in `...` instead.
 #' @param stimulus Stimulus covariate (0 = new/lure, 1 = old/target).
 #' @param ... For `log_distance`, the per-distance threshold parameters
 #'   (`delta1`, ...) supplied by brms in contiguous order; otherwise unused.
-#' @return `log(p_cat)`, matching the shape of `dprimef`.
+#' @return `log(p_cat)`, matching the shape of `dfam`.
 #' @keywords internal
 #' @export
 sdt_cdp_logmu <- function(cat, n_new, n_old, thresh, has_guess,
-                          dprimef, dprimer, criterion, spacing, rcrit,
+                          dfam, drec, criterion, spacing, rcrit,
                           sigmar, rho, kcrit, stimulus, ...) {
-  thresh_name <- .sdt_threshold_type_name(thresh)
-  shape <- dim(dprimef)
-  n <- length(dprimef)
+  thresh_name <- .sdt_threshold_types[thresh]
+  shape <- dim(dfam)
+  n <- length(dfam)
 
   # log_distance passes its per-distance deltas as the trailing formula args,
   # so they arrive through `...` in the same contiguous order as the parameters.
@@ -558,7 +564,7 @@ sdt_cdp_logmu <- function(cat, n_new, n_old, thresh, has_guess,
                                     n_new, n_old, thresh_name, deltas))
 
   out <- log(.sdt_cdp_category_prob(
-    cat, thr, as.vector(dprimef), as.vector(dprimer), as.vector(sigmar),
+    cat, thr, as.vector(dfam), as.vector(drec), as.vector(sigmar),
     as.vector(rho), as.vector(rcrit), as.vector(kcrit), as.vector(stimulus),
     n_new, n_old, has_guess == 1L
   ))

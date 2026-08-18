@@ -4,7 +4,7 @@ sim_cdp_data <- function(n_subjects = 4, n_trials = 100, n_new = 3, n_old = 3,
   thresholds <- thresholds %||%
     .cdp_make_thresholds(0, -0.3, n_new, n_old, "parsimonious")
   cbind(dat, rsdt_cdp(nrow(dat), n_trials, dat$stimulus,
-                      dprimef = 0.8, dprimer = 1.0, thresholds = thresholds,
+                      dfam = 0.8, drec = 1.0, thresholds = thresholds,
                       rcrit = 0.5, kcrit = kcrit, n_new = n_new, ...))
 }
 
@@ -19,7 +19,7 @@ test_that("sdt_cdp has the CDP parameters and no mu", {
   m <- sdt_cdp(stimulus = "s", n_new = 3, n_old = 3)
   expect_setequal(
     names(m$parameters),
-    c("dprimef", "dprimer", "criterion", "spacing", "rcrit", "sigmar",
+    c("dfam", "drec", "criterion", "spacing", "rcrit", "sigmar",
       "rho", "kcrit")
   )
   expect_false("mu" %in% names(m$parameters))
@@ -37,8 +37,8 @@ test_that("sdt_cdp has identity links and accepts custom links", {
   m <- sdt_cdp(stimulus = "s", n_new = 3, n_old = 3)
   expect_true(all(unlist(m$links) == "identity"))
   m2 <- sdt_cdp(stimulus = "s", n_new = 3, n_old = 3,
-                links = list(dprimef = "log"))
-  expect_equal(m2$links$dprimef, "log")
+                links = list(dfam = "log"))
+  expect_equal(m2$links$dfam, "log")
 })
 
 test_that("sdt_cdp only supports dist = 'normal'", {
@@ -141,7 +141,7 @@ test_that("sdt_cdp log_distance integrates with the pipeline via mock backend", 
   m <- sdt_cdp(stimulus = "stimulus", n_new = 3, n_old = 3,
                threshold_type = "log_distance")
   expect_silent(
-    bmm(bmf(dprimef ~ 1, dprimer ~ 1, criterion ~ 1, rcrit ~ 1,
+    bmm(bmf(dfam ~ 1, drec ~ 1, criterion ~ 1, rcrit ~ 1,
             delta1 ~ 1, delta2 ~ 1, delta4 ~ 1, delta5 ~ 1),
         dat, m, backend = "mock", mock_fit = 1, rename = FALSE)
   )
@@ -210,13 +210,13 @@ test_that(".sdt_cdp_category_probs vectorizes over observations", {
 test_that("sdt_cdp_logmu matches .sdt_cdp_category_probs and preserves shape", {
   thr_name <- "parsimonious"
   args <- list(n_new = 3, n_old = 3, thresh = 1L, has_guess = 0L,
-               dprimef = 0.8, dprimer = 1.0, criterion = 0.1, spacing = -0.3,
+               dfam = 0.8, drec = 1.0, criterion = 0.1, spacing = -0.3,
                rcrit = 0.5, sigmar = 0, rho = 0.2, kcrit = -100, stimulus = 1)
   thr <- .cdp_make_thresholds(args$criterion, args$spacing, 3, 3, thr_name)
-  probs <- .sdt_cdp_category_probs(thr, args$dprimef, args$dprimer, args$sigmar,
+  probs <- .sdt_cdp_category_probs(thr, args$dfam, args$drec, args$sigmar,
                                    args$rcrit, NULL, 1, 3, 3, "normal", args$rho)
   for (cat in seq_len(9)) {
-    val <- sdt_cdp_logmu(cat, 3, 3, 1L, 0L, args$dprimef, args$dprimer,
+    val <- sdt_cdp_logmu(cat, 3, 3, 1L, 0L, args$dfam, args$drec,
                          args$criterion, args$spacing, args$rcrit, args$sigmar,
                          args$rho, args$kcrit, args$stimulus)
     expect_equal(val, log(probs[cat]), tolerance = 1e-10)
@@ -234,20 +234,20 @@ test_that("sdt_cdp_logmu vectorized path matches per-element evaluation", {
   nobs <- 4
   set.seed(11)
   mk <- function(center, spread) matrix(rnorm(nd * nobs, center, spread), nd, nobs)
-  a <- list(dprimef = mk(0.8, 0.2), dprimer = mk(1.0, 0.2),
+  a <- list(dfam = mk(0.8, 0.2), drec = mk(1.0, 0.2),
             criterion = mk(0.1, 0.1), spacing = mk(-0.3, 0.1),
             rcrit = mk(0.5, 0.1), sigmar = mk(0.1, 0.1), rho = mk(0.2, 0.1),
             kcrit = mk(-0.3, 0.1),
             stimulus = matrix(rep(c(0, 0, 1, 1), each = nd), nd, nobs))
   for (cat in c(1L, 5L, 9L, 12L)) {
-    vec <- sdt_cdp_logmu(cat, 3, 3, 1L, 1L, a$dprimef, a$dprimer, a$criterion,
+    vec <- sdt_cdp_logmu(cat, 3, 3, 1L, 1L, a$dfam, a$drec, a$criterion,
                          a$spacing, a$rcrit, a$sigmar, a$rho, a$kcrit,
                          a$stimulus)
     ref <- matrix(0, nd, nobs)
     for (i in seq_len(nd)) {
       for (j in seq_len(nobs)) {
-        ref[i, j] <- sdt_cdp_logmu(cat, 3, 3, 1L, 1L, a$dprimef[i, j],
-                                   a$dprimer[i, j], a$criterion[i, j],
+        ref[i, j] <- sdt_cdp_logmu(cat, 3, 3, 1L, 1L, a$dfam[i, j],
+                                   a$drec[i, j], a$criterion[i, j],
                                    a$spacing[i, j], a$rcrit[i, j],
                                    a$sigmar[i, j], a$rho[i, j], a$kcrit[i, j],
                                    a$stimulus[i, j])
@@ -280,11 +280,11 @@ test_that("rsdt_cdp returns the count columns sdt_cdp expects", {
 test_that("dsdt_cdp computes a valid multinomial density and vectorizes", {
   thr <- .cdp_make_thresholds(0, -0.3, 3, 3, "parsimonious")
   cnt <- c(40, 20, 10, 15, 25, 35, 5, 20, 80)
-  d <- dsdt_cdp(counts = cnt, stimulus = 1, dprimef = 0.8, dprimer = 1.0,
+  d <- dsdt_cdp(counts = cnt, stimulus = 1, dfam = 0.8, drec = 1.0,
                 thresholds = thr, rcrit = 0.5, n_new = 3)
   expect_true(is.finite(d))
   expect_true(d > 0)
-  dl <- dsdt_cdp(counts = cnt, stimulus = 1, dprimef = 0.8, dprimer = 1.0,
+  dl <- dsdt_cdp(counts = cnt, stimulus = 1, dfam = 0.8, drec = 1.0,
                  thresholds = thr, rcrit = 0.5, n_new = 3, log = TRUE)
   expect_equal(log(d), dl, tolerance = 1e-10)
   # matches dmultinom against the category probabilities
@@ -361,7 +361,7 @@ test_that("aggregate_sdt_cdp_data emits guess columns and validates input", {
 test_that("check_data.sdt_cdp binds the count columns into a multinomial matrix", {
   m <- sdt_cdp(stimulus = "stimulus", n_new = 3, n_old = 3)
   dat <- sim_cdp_data(n_trials = 200)
-  cd <- check_data(m, dat, bmf(dprimef ~ 1))
+  cd <- check_data(m, dat, bmf(dfam ~ 1))
   expect_false(attr(cd, "has_guess"))
   expect_equal(ncol(cd$Y), 9)
   expect_equal(nrow(cd), 8)                  # 4 subjects x 2 stimulus classes
@@ -373,12 +373,12 @@ test_that("check_data.sdt_cdp handles asymmetric scales and guess columns", {
   thr_a <- .cdp_make_thresholds(0.2, -0.2, 1, 5, "parsimonious")
   dat_a <- sim_cdp_data(n_subjects = 3, n_trials = 300, n_new = 1, n_old = 5,
                         thresholds = thr_a, sigmar = log(1.5))
-  cd_a <- check_data(m_a, dat_a, bmf(dprimef ~ 1))
+  cd_a <- check_data(m_a, dat_a, bmf(dfam ~ 1))
   expect_equal(ncol(cd_a$Y), 11)
 
   m_g <- sdt_cdp(stimulus = "stimulus", n_new = 3, n_old = 3)
   dat_g <- sim_cdp_data(n_subjects = 3, n_trials = 200, kcrit = 0.0)
-  cd_g <- check_data(m_g, dat_g, bmf(dprimef ~ 1))
+  cd_g <- check_data(m_g, dat_g, bmf(dfam ~ 1))
   expect_true(attr(cd_g, "has_guess"))
   expect_equal(ncol(cd_g$Y), 12)
 })
@@ -388,23 +388,23 @@ test_that("check_data.sdt_cdp validates columns, stimulus, and counts", {
   dat <- sim_cdp_data()
   # missing response columns point at the aggregation helper
   expect_error(check_data(m, dat[-which(colnames(dat) == "new1")],
-                          bmf(dprimef ~ 1)),
+                          bmf(dfam ~ 1)),
                "aggregate_sdt_cdp_data")
   # a declared scale that mismatches the columns is a missing-column error
   m_big <- sdt_cdp(stimulus = "stimulus", n_new = 2, n_old = 4)
-  expect_error(check_data(m_big, dat, bmf(dprimef ~ 1)), "missing in the data")
+  expect_error(check_data(m_big, dat, bmf(dfam ~ 1)), "missing in the data")
   # partial guess columns
   dat_pg <- dat
   dat_pg$guess4 <- 1L
-  expect_error(check_data(m, dat_pg, bmf(dprimef ~ 1)), "all of them or none")
+  expect_error(check_data(m, dat_pg, bmf(dfam ~ 1)), "all of them or none")
   # bad stimulus coding
   bad_s <- dat
   bad_s$stimulus <- 2
-  expect_error(check_data(m, bad_s, bmf(dprimef ~ 1)), "0 .* and 1")
+  expect_error(check_data(m, bad_s, bmf(dfam ~ 1)), "0 .* and 1")
   # negative counts
   bad_n <- dat
   bad_n$new1[1] <- -1L
-  expect_error(check_data(m, bad_n, bmf(dprimef ~ 1)), "non-negative")
+  expect_error(check_data(m, bad_n, bmf(dfam ~ 1)), "non-negative")
 })
 
 test_that("sdt_cdp accepts a response prefix for the count columns", {
@@ -412,10 +412,10 @@ test_that("sdt_cdp accepts a response prefix for the count columns", {
   resp_cols <- grep("new|know|remember", colnames(dat))
   colnames(dat)[resp_cols] <- paste0("cdp", colnames(dat)[resp_cols])
   m <- sdt_cdp(response = "cdp", stimulus = "stimulus", n_new = 3, n_old = 3)
-  cd <- check_data(m, dat, bmf(dprimef ~ 1))
+  cd <- check_data(m, dat, bmf(dfam ~ 1))
   expect_equal(ncol(cd$Y), 9)
   expect_silent(
-    bmm(bmf(dprimef ~ 1, dprimer ~ 1, criterion ~ 1, spacing ~ 1, rcrit ~ 1),
+    bmm(bmf(dfam ~ 1, drec ~ 1, criterion ~ 1, spacing ~ 1, rcrit ~ 1),
         dat, m, backend = "mock", mock_fit = 1, rename = FALSE)
   )
 })
@@ -423,9 +423,9 @@ test_that("sdt_cdp accepts a response prefix for the count columns", {
 test_that("bmf2bf builds a multinomial non-linear formula with one mu per category", {
   m <- sdt_cdp(stimulus = "stimulus", n_new = 3, n_old = 3)
   dat <- sim_cdp_data(n_subjects = 3)
-  cd <- check_data(m, dat, bmf(dprimef ~ 1))
+  cd <- check_data(m, dat, bmf(dfam ~ 1))
   m$other_vars$has_guess <- attr(cd, "has_guess")
-  bf <- bmf2bf(m, bmf(dprimef ~ 1))
+  bf <- bmf2bf(m, bmf(dfam ~ 1))
   expect_s3_class(bf, "brmsformula")
   # 9 categories => 1 main + 8 mu non-linear formulas referencing sdt_cdp_logmu
   pforms <- vapply(bf$pforms, function(f) paste(deparse(f), collapse = " "),
@@ -436,7 +436,7 @@ test_that("bmf2bf builds a multinomial non-linear formula with one mu per catego
 test_that("sdt_cdp produces multinomial stancode with the CDP functions", {
   m <- sdt_cdp(stimulus = "stimulus", n_new = 3, n_old = 3)
   dat <- sim_cdp_data()
-  sc <- stancode(bmf(dprimef ~ 1, dprimer ~ 1, criterion ~ 1, spacing ~ 1,
+  sc <- stancode(bmf(dfam ~ 1, drec ~ 1, criterion ~ 1, spacing ~ 1,
                      rcrit ~ 1), dat, m)
   expect_true(grepl("sdt_cdp_logmu", sc))
   expect_true(grepl("cdp_Phi2", sc))
@@ -447,7 +447,7 @@ test_that("sdt_cdp produces multinomial stancode with the CDP functions", {
 test_that("freeing rho and sigmar adds them to the stancode", {
   m <- sdt_cdp(stimulus = "stimulus", n_new = 3, n_old = 3)
   dat <- sim_cdp_data()
-  sc <- stancode(bmf(dprimef ~ 1, dprimer ~ 1, criterion ~ 1, spacing ~ 1,
+  sc <- stancode(bmf(dfam ~ 1, drec ~ 1, criterion ~ 1, spacing ~ 1,
                      rcrit ~ 1, sigmar ~ 1, rho ~ 1), dat, m)
   expect_true(grepl("rho", sc))
   expect_true(grepl("sigmar", sc))

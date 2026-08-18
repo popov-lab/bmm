@@ -7,7 +7,7 @@
 //
 // Two correlated continuous dimensions per item, Familiarity F and Recollection
 // R, with corr(F, R) = tanh(rho):
-//   target: F ~ N(dprimef, 1),  R ~ N(dprimer, exp(sigmar))
+//   target: F ~ N(dfam, 1),  R ~ N(drec, exp(sigmar))
 //   lure:   F ~ N(0, 1),        R ~ N(0, 1)
 // Old/new confidence is read off the aggregate strength S = F + R; the
 // Remember/Know split is read off R against rcrit; the optional Know/Guess split
@@ -120,7 +120,7 @@ vector cdp_make_thresholds(real criterion, real spacing, array[] real deltas,
 // CDP probability for a single response category, ordered
 //   new(1..n_new), [guess(1..n_old)], know(1..n_old), remember(1..n_old).
 real cdp_category_prob(int cat, vector thresholds,
-                       real dprimef, real dprimer, real sigmar, real rho,
+                       real dfam, real drec, real sigmar, real rho,
                        real rcrit, real kcrit, real stimulus,
                        int n_new, int n_old, int has_guess) {
   int K_full = n_new + n_old;
@@ -144,8 +144,8 @@ real cdp_category_prob(int cat, vector thresholds,
   real c_lo = global_k == 1 ? negative_infinity() : thresholds[global_k - 1];
   real c_hi = global_k == K_full ? positive_infinity() : thresholds[global_k];
 
-  real mu_F = stimulus > 0.5 ? dprimef : 0.0;
-  real mu_R = stimulus > 0.5 ? dprimer : 0.0;
+  real mu_F = stimulus > 0.5 ? dfam : 0.0;
+  real mu_R = stimulus > 0.5 ? drec : 0.0;
   real sd_R = stimulus > 0.5 ? exp(sigmar) : 1.0;
   real corr = tanh(rho);
   real mu_S = mu_F + mu_R;

@@ -481,7 +481,7 @@ confidence rating, but a Remember/Know judgment on every "old" response — so b
 provides it as a dedicated model, `sdt_cdp()`, rather than a `version` of
 `sdt_rating()`. For a target, $F \sim \mathrm{Normal}(\mu_F, 1)$ and
 $R \sim \mathrm{Normal}(\mu_R, \sigma_R)$ (lures fix both means to 0 and
-$\sigma_R$ to 1); `dprimef` and `dprimer` are the two sensitivities and `sigmar`
+$\sigma_R$ to 1); `dfam` and `drec` are the two sensitivities and `sigmar`
 is $\log \sigma_R$. Old/new confidence partitions the strength axis $S$ with
 ordered thresholds, exactly as in the rating model, while the Remember/Know split
 is the probability that $R$ exceeds `rcrit` *within* each confidence bin — a
@@ -538,7 +538,7 @@ classic independent-process model:
 model_cdp <- sdt_cdp(stimulus = "stimulus", n_new = 1, n_old = 5)
 
 fit_cdp <- bmm(
-  formula = bmf(dprimef ~ 1, dprimer ~ 1, criterion ~ 1, spacing ~ 1,
+  formula = bmf(dfam ~ 1, drec ~ 1, criterion ~ 1, spacing ~ 1,
                 rcrit ~ 1, sigmar ~ 1),
   data = rotello, model = model_cdp,
   backend = "cmdstanr", cores = 4, chains = 4, iter = 2000,
@@ -548,7 +548,7 @@ fit_cdp <- bmm(
 summary(fit_cdp)
 ```
 
-Recollection (`dprimer` ≈ 0.81) and familiarity (`dprimef` ≈ 0.78) contribute
+Recollection (`drec` ≈ 0.81) and familiarity (`dfam` ≈ 0.78) contribute
 comparable sensitivities, the Remember criterion sits well into the recollection
 distribution (`rcrit` ≈ 0.92), and `exp(sigmar)` ≈ 1.48 puts the recollection SD
 half again above one — the model's account of the recognition-ROC asymmetry as
