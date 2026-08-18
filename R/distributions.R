@@ -1098,6 +1098,17 @@ log_diff_exp <- function(a, b) {
   a + log1m_exp(b - a)
 }
 
+# count * log_prob, treating a zero count as contributing nothing even when the
+# log probability is -Inf. The R counterpart of the `if (y > 0)` guards Stan
+# likelihoods use to keep 0 * -Inf from becoming NaN. Both arguments are
+# recycled first because ifelse() returns the length of its test, which would
+# otherwise collapse a vector of posterior draws to a scalar count's length.
+times_nonzero <- function(count, log_prob) {
+  n <- max(length(count), length(log_prob))
+  count <- rep_len(count, n)
+  ifelse(count == 0, 0, count * rep_len(log_prob, n))
+}
+
 .pwald <- function(rt, drift, bound, s, lower.tail = TRUE, log.p = TRUE) {
   z1 <- (drift * rt - bound) / (s * sqrt(rt))
   z2 <- -(drift * rt + bound) / (s * sqrt(rt))
@@ -1944,4 +1955,292 @@ neg_loglik <- function(x, params, distribution, weights = NULL) {
     iterations = iter,
     loglik = if (converged) loglik else NA
   )
+}
+
+
+############################################################################# !
+# SIGNAL DETECTION THEORY (SDT) — SHARED NUMERICS                        ####
+############################################################################# !
+
+# SDT distribution registry: single source of truth for all CDF/quantile logic
+# Each entry: cdf, qf (quantile function), and lcdf/lccdf (log CDF and log
+# complementary CDF). The lcdf/lccdf entries mirror the Stan dispatchers in
+# inst/stan_chunks/sdt_dist_funs.stan branch for branch, so the two
+# implementations can be read side by side.
+#
+# The list position defines the integer dist_type code passed to Stan --
+# reordering entries changes the R <-> Stan contract.
+#
+# gumbel_min / gumbel_max follow the extreme-value convention: gumbel_min is
+# the smallest-extreme-value (cloglog) distribution, gumbel_max the largest
+# (loglog, i.e. evd::pgumbel). Taking the max of gumbel_max variates is what
+# yields the m-AFC softmax; the ranking Gamma-ratio kernel is the gumbel_min
+# result. Swapping these labels silently fits the mirror model.
+.sdt_dists <- list(
+  normal = list(
+    cdf = pnorm,
+    qf = qnorm,
+    lcdf = function(x) pnorm(x, log.p = TRUE),
+    lccdf = function(x) pnorm(x, lower.tail = FALSE, log.p = TRUE)
+  ),
+  gumbel_min = list(
+    cdf = function(x) 1 - exp(-exp(x)),
+    qf = function(p) log(-log(1 - p)),
+    lcdf = function(x) log1m_exp(-exp(x)),
+    lccdf = function(x) -exp(x)
+  ),
+  gumbel_max = list(
+    cdf = function(x) exp(-exp(-x)),
+    qf = function(p) -log(-log(p)),
+    lcdf = function(x) -exp(-x),
+    lccdf = function(x) log1m_exp(-exp(-x))
+  ),
+  logistic = list(
+    cdf = plogis,
+    qf = qlogis,
+    lcdf = function(x) plogis(x, log.p = TRUE),
+    lccdf = function(x) plogis(x, lower.tail = FALSE, log.p = TRUE)
+  )
+)
+
+# Internal CDF helpers for SDT distributions. All vectorized over eta.
+# Prefer the log-scale pair inside likelihoods: the probability scale
+# underflows to 0 or 1 in the tails, where Stan stays finite.
+.sdt_cdf <- function(eta, dist) {
+  .sdt_dists[[dist]]$cdf(eta)
+}
+
+.sdt_log_cdf <- function(eta, dist) {
+  .sdt_dists[[dist]]$lcdf(eta)
+}
+
+.sdt_log_ccdf <- function(eta, dist) {
+  .sdt_dists[[dist]]$lccdf(eta)
+}
+
+
+# Probability of responding "old"/"signal" under the SDT decision rule: the
+# evidence exceeds the criterion. `dist` names the distribution of the evidence
+# itself, so this is its survival function; .sdt_eta() returns the distance from
+# the distribution to the criterion, hence the sign flip. For symmetric
+# distributions S(-eta) == F(eta) and the flip is invisible, which is why it
+# only bites for the extreme-value distributions.
+.sdt_log_p_old <- function(eta, dist) {
+  .sdt_log_ccdf(-eta, dist)
+}
+
+.sdt_log_p_new <- function(eta, dist) {
+  .sdt_log_cdf(-eta, dist)
+}
+
+
+# Internal: root-mean-square of the noise and signal scales, in noise units.
+# Sensitivity is reported as d_a = separation / this factor, which weights the
+# two distributions equally instead of privileging the noise distribution. The
+# factor is 1 whenever sdratio is 1, so everything below is a no-op for an
+# equal-variance fit. sdratio arrives on the natural scale (the model uses a log
+# link, so brms and get_dpar() have already applied the inverse link).
+.sdt_rms_scale <- function(sdratio) {
+  sqrt((1 + sdratio^2) / 2)
+}
+
+
+# Internal: compute SDT decision variable (eta)
+# Shared by density, random generation, and log_lik across versions
+# `d` is the balanced sensitivity index d_a; the separation between the
+# distributions in noise units is d * .sdt_rms_scale(sdratio), which is d itself
+# for EV-SDT (sdratio = 1). The criterion is NOT rescaled: it stays on the
+# noise-standardized axis, so eta is unchanged for any equal-variance fit.
+# All arguments are vectorized (recycled to common length)
+.sdt_eta <- function(d, criterion, stimulus, sdratio = 1) {
+  shift <- d * .sdt_rms_scale(sdratio) / 2 * (2 * stimulus - 1)
+  # sdratio^(stimulus == 1) scales the signal by sdratio and the noise by 1,
+  # broadcasting whether stimulus is a per-observation vector (likelihood) or a
+  # scalar with sdratio a vector of draws (ROC points) -- unlike ifelse(), whose
+  # result length follows the scalar condition and would drop all but sdratio[1].
+  scale <- sdratio^(stimulus == 1)
+  (shift - criterion) / scale
+}
+
+
+# Internal: validate hit_rate and fa_rate are in (0, 1)
+.validate_sdt_rates <- function(hit_rate, fa_rate) {
+  stopif(anyNA(hit_rate) || anyNA(fa_rate),
+         "hit_rate and fa_rate must not contain missing values")
+  stopif(any(hit_rate <= 0 | hit_rate >= 1),
+         "hit_rate must be between 0 and 1 (exclusive)")
+  stopif(any(fa_rate <= 0 | fa_rate >= 1),
+         "fa_rate must be between 0 and 1 (exclusive)")
+}
+
+
+#' @title Utility functions for Signal Detection Theory
+#'
+#' @description Compute sensitivity and criterion from hit and false alarm
+#'   rates for different SDT distribution families. A single (hit, false alarm)
+#'   pair cannot identify the signal-to-noise SD ratio, so both quantities are
+#'   the equal-variance values; see [sdt_yn()] for the unequal-variance
+#'   model.
+#'
+#' @name SDTdist
+#'
+#' @param hit_rate Numeric. Proportion of hits (P("old" | signal)).
+#' @param fa_rate Numeric. Proportion of false alarms (P("old" | noise)).
+#' @param dist Character. The distribution assumed for the latent evidence,
+#'   given here by its cumulative distribution function:
+#'   \itemize{
+#'     \item "normal" (default): Gaussian, \eqn{\Phi(x)}
+#'     \item "gumbel_min": smallest extreme value, \eqn{1 - \exp(-\exp(x))}
+#'       (the complementary log-log distribution)
+#'     \item "gumbel_max": largest extreme value, \eqn{\exp(-\exp(-x))}
+#'       (the log-log distribution, as in \code{evd::pgumbel})
+#'     \item "logistic": \eqn{1 / (1 + \exp(-x))}
+#'   }
+#'
+#' @references
+#' Green, D. M., & Swets, J. A. (1966). \emph{Signal detection theory and
+#'   psychophysics}. Wiley.
+#'
+#' @keywords distribution
+NULL
+
+
+#' @rdname SDTdist
+#' @return `sdt_d` returns the distance between the signal and noise
+#'   distributions on the latent evidence axis, obtained by inverting the
+#'   decision rule "respond old when the evidence exceeds the criterion":
+#'   \eqn{Q(1 - FA) - Q(1 - H)}, where \eqn{Q} is the quantile function of
+#'   `dist`. For `dist = "normal"` this reduces to the familiar
+#'   \eqn{d' = \Phi^{-1}(H) - \Phi^{-1}(FA)}. Because one operating point implies
+#'   equal variance, this matches the `d` parameter of [sdt_yn()] whenever
+#'   `sdratio` is at its default.
+#' @export
+#' @examples
+#' # Compute d from hit and false alarm rates (Gaussian SDT)
+#' sdt_d(hit_rate = 0.8, fa_rate = 0.2, dist = "normal")
+#'
+#' # The extreme-value analogue
+#' sdt_d(hit_rate = 0.75, fa_rate = 0.25, dist = "gumbel_min")
+sdt_d <- function(hit_rate, fa_rate,
+                  dist = c("normal", "gumbel_min", "gumbel_max",
+                           "logistic")) {
+  dist <- match.arg(dist)
+  .validate_sdt_rates(hit_rate, fa_rate)
+  qf <- .sdt_dists[[dist]]$qf
+  qf(1 - fa_rate) - qf(1 - hit_rate)
+}
+
+
+#' @rdname SDTdist
+#' @return `sdt_criterion` returns the criterion (response bias) on the
+#'   centred, noise-standardized evidence axis used by [sdt_yn()], where the
+#'   noise and signal distributions sit at -d'/2 and +d'/2:
+#'   \eqn{(Q(1 - FA) + Q(1 - H)) / 2}. For `dist = "normal"` this reduces to
+#'   the familiar \eqn{-(\Phi^{-1}(H) + \Phi^{-1}(FA)) / 2}.
+#' @export
+#' @examples
+#' # Compute criterion from hit and false alarm rates
+#' sdt_criterion(hit_rate = 0.8, fa_rate = 0.2, dist = "normal")
+sdt_criterion <- function(hit_rate, fa_rate,
+                          dist = c("normal", "gumbel_min", "gumbel_max",
+                                   "logistic")) {
+  dist <- match.arg(dist)
+  .validate_sdt_rates(hit_rate, fa_rate)
+  qf <- .sdt_dists[[dist]]$qf
+  (qf(1 - fa_rate) + qf(1 - hit_rate)) / 2
+}
+
+
+############################################################################# !
+# BINARY SDT DISTRIBUTION FUNCTIONS                                       ####
+############################################################################# !
+
+#' @title Distribution functions for Yes/No SDT
+#'
+#' @description Density and random generation for the yes/no signal detection
+#'   theory model, where the response is the number of "old"/"signal" responses
+#'   out of a fixed number of trials (a binomial likelihood).
+#'
+#' @name sdt_yn_dist
+#'
+#' @param n_old Integer vector. Number of "old"/"signal" responses.
+#' @param n_trials Integer vector. Total number of trials per cell.
+#' @param stimulus Integer vector (0/1). Stimulus type: 0 = noise, 1 = signal.
+#' @param d Numeric. Sensitivity: the balanced discriminability index
+#'   \eqn{d_a}, which equals \eqn{d'} when `sdratio` is 1. The separation
+#'   between the distributions in noise units is `d * sqrt((1 + sdratio^2) / 2)`.
+#' @param criterion Numeric. Response bias (decision boundary location), on the
+#'   noise-standardized axis.
+#' @param sdratio Numeric. Ratio of signal to noise standard deviations
+#'   (default 1, i.e., equal variance). Must be positive. Note that this is the
+#'   natural scale: the `sdratio` parameter of [sdt_yn()] is sampled on the log
+#'   scale, so it corresponds to `log(sdratio)` here.
+#' @inheritParams SDTdist
+#' @param log Logical. If `TRUE`, returns log-density (default `FALSE`).
+#' @param n Integer. Number of observations to generate. `n_trials`,
+#'   `stimulus`, and the model parameters are recycled to this length.
+#'
+#' @return `dsdt_yn` returns the (log-)density (binomial probability).
+#'   `rsdt_yn` returns an integer vector with the number of "old"/"signal"
+#'   responses per observation.
+#'
+#' @references
+#' Green, D. M., & Swets, J. A. (1966). \emph{Signal detection theory and
+#'   psychophysics}. Wiley.
+#'
+#' @keywords distribution
+#' @export
+#' @examples
+#' # Density of yes/no SDT data
+#' dsdt_yn(n_old = 80, n_trials = 100, stimulus = 1,
+#'         d = 1.5, criterion = 0.2)
+#'
+#' # Vectorized over observations
+#' dsdt_yn(n_old = c(30, 80), n_trials = c(100, 100),
+#'         stimulus = c(0, 1), d = 1.5, criterion = 0.2,
+#'         log = TRUE)
+dsdt_yn <- function(n_old, n_trials, stimulus, d, criterion,
+                    sdratio = 1,
+                    dist = c("normal", "gumbel_min", "gumbel_max", "logistic"),
+                    log = FALSE) {
+  dist <- match.arg(dist)
+  stopif(any(n_old < 0), "n_old must be non-negative")
+  stopif(any(n_trials < 1), "n_trials must be positive")
+  stopif(any(n_old > n_trials), "n_old must not exceed n_trials")
+  stopif(any(!stimulus %in% c(0L, 1L)),
+         "stimulus must be 0 (noise) or 1 (signal)")
+  stopif(any(sdratio <= 0), "sdratio must be positive")
+
+  eta <- .sdt_eta(d, criterion, stimulus, sdratio)
+  # assembled on the log scale to match sdt_yn_lpmf: the probability scale
+  # underflows to 0 or 1 in the tails, which would return -Inf here while Stan
+  # stays finite, silently poisoning log_lik() and loo()
+  out <- lchoose(n_trials, n_old) +
+    times_nonzero(n_old, .sdt_log_p_old(eta, dist)) +
+    times_nonzero(n_trials - n_old, .sdt_log_p_new(eta, dist))
+  if (log) out else exp(out)
+}
+
+
+#' @rdname sdt_yn_dist
+#' @export
+#' @examples
+#' # Generate yes/no SDT data for a design
+#' dat <- expand.grid(id = 1:20, stimulus = c(0L, 1L))
+#' dat$n_trials <- 100L
+#' dat$n_old <- rsdt_yn(nrow(dat), dat$n_trials, dat$stimulus,
+#'                      d = 1.5, criterion = 0.2)
+#' head(dat)
+rsdt_yn <- function(n, n_trials, stimulus, d, criterion,
+                    sdratio = 1,
+                    dist = c("normal", "gumbel_min", "gumbel_max", "logistic")) {
+  dist <- match.arg(dist)
+  stopif(length(n) != 1 || n < 1, "n must be a single positive integer")
+  stopif(any(n_trials < 1), "n_trials must be positive")
+  stopif(any(!stimulus %in% c(0L, 1L)),
+         "stimulus must be 0 (noise) or 1 (signal)")
+  stopif(any(sdratio <= 0), "sdratio must be positive")
+
+  eta <- .sdt_eta(d, criterion, stimulus, sdratio)
+  stats::rbinom(n, n_trials, exp(.sdt_log_p_old(eta, dist)))
 }
