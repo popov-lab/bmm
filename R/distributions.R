@@ -2369,7 +2369,10 @@ rsdt_yn <- function(n, n_trials, stimulus, d, criterion,
 #' @param n_trials Integer vector. Total number of trials per observation.
 #' @param m Integer vector. Number of alternatives per observation. Must be
 #'   at least 2.
-#' @param d Numeric vector. Sensitivity parameter(s).
+#' @param d Numeric vector. Sensitivity: the distance between the signal and
+#'   distractor distributions in SD units. m-AFC assumes a common scale for
+#'   the two distributions, so this is the equal-variance case of the balanced
+#'   index \eqn{d_a} that [sdt_yn()] reports, where it coincides with \eqn{d'}.
 #' @inheritParams SDTdist
 #' @param log Logical. If `TRUE`, returns log-density (default `FALSE`).
 #' @param n Integer. Number of observations to generate. `n_trials`, `m`, and
@@ -2382,8 +2385,8 @@ rsdt_yn <- function(n, n_trials, stimulus, d, criterion,
 #' @references
 #' DeCarlo, L. T. (2012). On a signal detection approach to m-alternative
 #'   forced choice with bias, with maximum likelihood and Bayesian approaches
-#'   to estimation. \emph{Journal of Mathematical and Statistical Psychology},
-#'   \emph{11}(1), 257--282.
+#'   to estimation. \emph{Journal of Mathematical Psychology}, \emph{56}(3),
+#'   196--207. \doi{10.1016/j.jmp.2012.02.004}
 #'
 #' @keywords distribution
 #' @export
