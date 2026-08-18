@@ -2172,8 +2172,9 @@ sdt_criterion <- function(hit_rate, fa_rate,
 #' @param criterion Numeric. Response bias (decision boundary location), on the
 #'   noise-standardized axis.
 #' @param sdratio Numeric. Ratio of signal to noise standard deviations
-#'   (default 1, i.e., equal variance). Must be positive. This is the same
-#'   scale as the `sdratio` parameter of [sdt_yn()], which uses a log link.
+#'   (default 1, i.e., equal variance). Must be positive. Note that this is the
+#'   natural scale: the `sdratio` parameter of [sdt_yn()] is sampled on the log
+#'   scale, so it corresponds to `log(sdratio)` here.
 #' @inheritParams SDTdist
 #' @param log Logical. If `TRUE`, returns log-density (default `FALSE`).
 #' @param n Integer. Number of observations to generate. `n_trials`,
@@ -2192,17 +2193,16 @@ sdt_criterion <- function(hit_rate, fa_rate,
 #' @examples
 #' # Density of yes/no SDT data
 #' dsdt_yn(n_old = 80, n_trials = 100, stimulus = 1,
-#'             d = 1.5, criterion = 0.2)
+#'         d = 1.5, criterion = 0.2)
 #'
 #' # Vectorized over observations
 #' dsdt_yn(n_old = c(30, 80), n_trials = c(100, 100),
-#'             stimulus = c(0, 1), d = 1.5, criterion = 0.2,
-#'             log = TRUE)
+#'         stimulus = c(0, 1), d = 1.5, criterion = 0.2,
+#'         log = TRUE)
 dsdt_yn <- function(n_old, n_trials, stimulus, d, criterion,
-                        sdratio = 1,
-                        dist = c("normal", "gumbel_min", "gumbel_max",
-                                 "logistic"),
-                        log = FALSE) {
+                    sdratio = 1,
+                    dist = c("normal", "gumbel_min", "gumbel_max", "logistic"),
+                    log = FALSE) {
   dist <- match.arg(dist)
   stopif(any(n_old < 0), "n_old must be non-negative")
   stopif(any(n_trials < 1), "n_trials must be positive")
@@ -2229,12 +2229,11 @@ dsdt_yn <- function(n_old, n_trials, stimulus, d, criterion,
 #' dat <- expand.grid(id = 1:20, stimulus = c(0L, 1L))
 #' dat$n_trials <- 100L
 #' dat$n_old <- rsdt_yn(nrow(dat), dat$n_trials, dat$stimulus,
-#'                          d = 1.5, criterion = 0.2)
+#'                      d = 1.5, criterion = 0.2)
 #' head(dat)
 rsdt_yn <- function(n, n_trials, stimulus, d, criterion,
-                        sdratio = 1,
-                        dist = c("normal", "gumbel_min", "gumbel_max",
-                                 "logistic")) {
+                    sdratio = 1,
+                    dist = c("normal", "gumbel_min", "gumbel_max", "logistic")) {
   dist <- match.arg(dist)
   stopif(length(n) != 1 || n < 1, "n must be a single positive integer")
   stopif(any(n_trials < 1), "n_trials must be positive")

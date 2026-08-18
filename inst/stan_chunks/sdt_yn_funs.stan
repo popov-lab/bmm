@@ -11,7 +11,7 @@
 //   dist_type: noise distribution (1-4, see sdt_dist_funs.stan)
 //   trials:    total number of trials in this cell
 real sdt_yn_lpmf(int y, real mu, real d, real criterion, real sdratio,
-                     int stimulus, int dist_type, int trials) {
+                 int stimulus, int dist_type, int trials) {
   real scale = stimulus == 1 ? sdratio : 1.0;
   real eta = (d * sdt_rms_scale(sdratio) / 2.0 * (2 * stimulus - 1)
               - criterion) / scale;

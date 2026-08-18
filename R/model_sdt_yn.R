@@ -3,8 +3,8 @@
 ############################################################################# !
 
 .model_sdt_yn <- function(response = NULL, stimulus = NULL,
-                              n_trials = NULL, dist = "normal",
-                              links = NULL, call = NULL, ...) {
+                          n_trials = NULL, dist = "normal",
+                          links = NULL, call = NULL, ...) {
   parameters <- list(
     d = paste0(
       "Sensitivity: the balanced discriminability index d_a, which measures ",
@@ -13,8 +13,8 @@
     ),
     criterion = "Response bias: location of decision boundary",
     sdratio = paste0(
-      "SD ratio: the signal-to-noise standard deviation ratio, estimated on ",
-      "the log scale, so 1 means equal variance"
+      "Log SD ratio: the log of the signal-to-noise standard deviation ",
+      "ratio, so 0 means equal variance (an SD ratio of 1)"
     )
   )
   # d_a and the noise-standardized separation differ by at most ~16% over the
@@ -97,8 +97,9 @@
 #' where \eqn{\delta} is the separation in noise-SD units and \eqn{r} is
 #' `sdratio`. This weights the two distributions equally, and it is the measure
 #' Macmillan and Creelman (2005) and Mickes et al. (2007) recommend under
-#' unequal variance. `sdratio` is fixed at 1 by default, where \eqn{d_a} equals
-#' the familiar \eqn{d'}, so the choice only matters for unequal-variance fits.
+#' unequal variance. `sdratio` is sampled on the log scale and fixed at 0 by
+#' default (an SD ratio of 1), where \eqn{d_a} equals the familiar \eqn{d'}, so
+#' the choice only matters for unequal-variance fits.
 #'
 #' The alternative — dividing by the noise SD alone — is not comparable across
 #' conditions that differ in `sdratio`: two conditions that are equally
@@ -136,7 +137,7 @@
 #' dat <- expand.grid(id = 1:20, stimulus = c(0L, 1L))
 #' dat$n_trials <- 100L
 #' dat$n_old <- rsdt_yn(nrow(dat), dat$n_trials, dat$stimulus,
-#'                          d = 1.5, criterion = 0.2)
+#'                      d = 1.5, criterion = 0.2)
 #'
 #' model <- sdt_yn(
 #'   response = "n_old",
@@ -162,16 +163,15 @@
 #' )
 #' }
 sdt_yn <- function(response, stimulus, n_trials,
-                       dist = c("normal", "gumbel_min", "gumbel_max",
-                                "logistic"),
-                       links = NULL, ...) {
+                   dist = c("normal", "gumbel_min", "gumbel_max", "logistic"),
+                   links = NULL, ...) {
   call <- match.call()
   stop_missing_args()
   dist <- match.arg(dist)
 
   .model_sdt_yn(response = response, stimulus = stimulus,
-                    n_trials = n_trials, dist = dist,
-                    links = links, call = call, ...)
+                n_trials = n_trials, dist = dist,
+                links = links, call = call, ...)
 }
 
 
