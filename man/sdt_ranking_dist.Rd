@@ -10,12 +10,12 @@ dsdt_ranking(
   counts,
   m,
   d,
-  dist = c("gumbel_min", "normal"),
   sdratio = 1,
+  dist = c("gumbel_min", "normal"),
   log = FALSE
 )
 
-rsdt_ranking(n, n_trials, m, d, dist = c("gumbel_min", "normal"), sdratio = 1)
+rsdt_ranking(n, n_trials, m, d, sdratio = 1, dist = c("gumbel_min", "normal"))
 }
 \arguments{
 \item{counts}{Integer matrix with one row per observation and one rank-count
@@ -25,15 +25,20 @@ single observation. Columns beyond a row's set size \code{m} must be 0.}
 \item{m}{Integer vector. Number of ranked items per observation. Must be
 at least 2 and no larger than the number of count columns.}
 
-\item{d}{Numeric vector. Ranking discrimination parameter(s).}
+\item{d}{Numeric vector. Sensitivity: the distance between the target and
+lure distributions. For \code{dist = "normal"} this is the balanced index
+\eqn{d_a} that \code{\link[=sdt_yn]{sdt_yn()}} reports (in root-mean-square SD units); for
+\code{dist = "gumbel_min"} the two distributions share a scale and \code{d} is the
+\eqn{g'} of Meyer-Grant et al. (2025).}
+
+\item{sdratio}{Numeric vector. Ratio of signal to noise standard deviations
+(default 1, i.e., equal variance). Must be positive. Only used when
+\code{dist = "normal"}.}
 
 \item{dist}{Character. The distribution assumed for the latent evidence:
 "gumbel_min" (default), the smallest extreme value distribution with
 cumulative distribution function \eqn{1 - \exp(-\exp(x))}, evaluated in
 closed form; or "normal", Gaussian UV-SDT by numerical integration.}
-
-\item{sdratio}{Numeric vector. Ratio of signal to noise standard deviations
-(default 1). Only used when \code{dist = "normal"}.}
 
 \item{log}{Logical. If \code{TRUE}, returns log-density (default \code{FALSE}).}
 

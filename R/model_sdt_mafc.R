@@ -17,7 +17,7 @@
   )
   requirements <- glue(
     "Provide pre-aggregated accuracy data with the following columns:", "\n\n",
-    "  - Response counts (n_correct): number of correct responses", "\n",
+    "  - Response counts (response): number of correct responses", "\n",
     "  - Number of trials (n_trials): total trials per cell", "\n",
     "  No stimulus column needed (each trial has exactly one signal alternative)"
   )
@@ -34,9 +34,10 @@
         "and psychophysics. Wiley.\n",
         "DeCarlo, L. T. (2012). On a signal detection approach to ",
         "m-alternative forced choice with bias, with maximum likelihood ",
-        "and Bayesian approaches to estimation. JMASM, 11(1), 257-282."
+        "and Bayesian approaches to estimation. Journal of Mathematical ",
+        "Psychology, 56(3), 196-207."
       ),
-      version = "mafc",
+      version = "NA",
       requirements = requirements,
       parameters = parameters,
       links = list(d = "identity"),
@@ -102,8 +103,8 @@
 #'
 #' DeCarlo, L. T. (2012). On a signal detection approach to m-alternative
 #'   forced choice with bias, with maximum likelihood and Bayesian approaches
-#'   to estimation. \emph{Journal of Mathematical and Statistical Psychology},
-#'   \emph{11}(1), 257--282.
+#'   to estimation. \emph{Journal of Mathematical Psychology}, \emph{56}(3),
+#'   196--207. \doi{10.1016/j.jmp.2012.02.004}
 #' @keywords bmmodel
 #' @export
 #' @examples
@@ -155,6 +156,10 @@ check_data.sdt_mafc <- function(model, data, formula) {
 
   .validate_sdt_counts(data, resp_var, n_trials_var)
 
+  reserved <- intersect(c("m_afc", "dist_type"), colnames(data))
+  warnif(length(reserved) > 0,
+         "Column(s) {collapse_comma(reserved)} in your data are reserved by \\
+         {model$name} and will be overwritten")
   data$m_afc <- .sdt_resolve_set_size(model$other_vars$m, data)
   data$dist_type <- .sdt_dist_id(model$other_vars$dist)
 

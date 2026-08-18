@@ -62,7 +62,7 @@
         "The parametric road not taken. PsyArXiv. ",
         "https://doi.org/10.31234/osf.io/qhrfj"
       ),
-      version = "ranking",
+      version = "NA",
       requirements = requirements,
       parameters = parameters,
       links = param_links,
@@ -196,17 +196,7 @@ sdt_ranking <- function(response, m,
 #' @export
 check_data.sdt_ranking <- function(model, data, formula) {
   resp_cols <- model$resp_vars$response
-  missing <- setdiff(resp_cols, colnames(data))
-  stopif(length(missing) > 0,
-         "Response columns {collapse_comma(missing)} missing in the data")
-
-  for (col in resp_cols) {
-    vals <- data[[col]]
-    stopif(any(vals < 0, na.rm = TRUE),
-           "Response column '{col}' must contain non-negative counts")
-    warnif(any(vals != round(vals), na.rm = TRUE),
-           "Response column '{col}' should contain integer counts")
-  }
+  .validate_sdt_count_cols(data, resp_cols)
 
   max_rank <- .sdt_resolve_set_size(model$other_vars$m, data)
   n_ranks <- length(resp_cols)
@@ -214,6 +204,11 @@ check_data.sdt_ranking <- function(model, data, formula) {
          "Set size must not exceed the number of rank columns ({n_ranks})")
 
   Y <- as.matrix(data[resp_cols])
+  # NAs are only allowed as structural blanks beyond a row's set size; an NA
+  # within the set size would silently shrink nTrials if zeroed.
+  stopif(anyNA(Y[col(Y) <= max_rank]),
+         "Response columns must not contain NA counts within the row's set \\
+         size (m); only rank columns beyond the set size may be NA")
   Y[is.na(Y)] <- 0
   stopif(any(rowSums(Y) <= 0, na.rm = TRUE),
          "Row sums of response columns must be positive (no empty rows)")
@@ -224,6 +219,10 @@ check_data.sdt_ranking <- function(model, data, formula) {
   stopif(any(Y[surplus] != 0),
          "Rank columns beyond the row's set size (m) must be 0")
 
+  reserved <- intersect(c("Y", "nTrials", "max_rank"), colnames(data))
+  warnif(length(reserved) > 0,
+         "Column(s) {collapse_comma(reserved)} in your data are reserved by \\
+         {model$name} and will be overwritten")
   data <- data[!colnames(data) %in% resp_cols]
   data$Y <- Y
   data$nTrials <- rowSums(Y)

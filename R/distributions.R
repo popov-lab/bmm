@@ -2171,8 +2171,9 @@ sdt_criterion <- function(hit_rate, fa_rate,
 #' @param criterion Numeric. Response bias (decision boundary location), on the
 #'   noise-standardized axis.
 #' @param sdratio Numeric. Ratio of signal to noise standard deviations
-#'   (default 1, i.e., equal variance). Must be positive. This is the same
-#'   scale as the `sdratio` parameter of [sdt_yn()], which uses a log link.
+#'   (default 1, i.e., equal variance). Must be positive. Note that this is the
+#'   natural scale: the `sdratio` parameter of [sdt_yn()] is sampled on the log
+#'   scale, so it corresponds to `log(sdratio)` here.
 #' @inheritParams SDTdist
 #' @param log Logical. If `TRUE`, returns log-density (default `FALSE`).
 #' @param n Integer. Number of observations to generate. `n_trials`,
@@ -2191,17 +2192,16 @@ sdt_criterion <- function(hit_rate, fa_rate,
 #' @examples
 #' # Density of yes/no SDT data
 #' dsdt_yn(n_old = 80, n_trials = 100, stimulus = 1,
-#'             d = 1.5, criterion = 0.2)
+#'         d = 1.5, criterion = 0.2)
 #'
 #' # Vectorized over observations
 #' dsdt_yn(n_old = c(30, 80), n_trials = c(100, 100),
-#'             stimulus = c(0, 1), d = 1.5, criterion = 0.2,
-#'             log = TRUE)
+#'         stimulus = c(0, 1), d = 1.5, criterion = 0.2,
+#'         log = TRUE)
 dsdt_yn <- function(n_old, n_trials, stimulus, d, criterion,
-                        sdratio = 1,
-                        dist = c("normal", "gumbel_min", "gumbel_max",
-                                 "logistic"),
-                        log = FALSE) {
+                    sdratio = 1,
+                    dist = c("normal", "gumbel_min", "gumbel_max", "logistic"),
+                    log = FALSE) {
   dist <- match.arg(dist)
   stopif(any(n_old < 0), "n_old must be non-negative")
   stopif(any(n_trials < 1), "n_trials must be positive")
@@ -2228,12 +2228,11 @@ dsdt_yn <- function(n_old, n_trials, stimulus, d, criterion,
 #' dat <- expand.grid(id = 1:20, stimulus = c(0L, 1L))
 #' dat$n_trials <- 100L
 #' dat$n_old <- rsdt_yn(nrow(dat), dat$n_trials, dat$stimulus,
-#'                          d = 1.5, criterion = 0.2)
+#'                      d = 1.5, criterion = 0.2)
 #' head(dat)
 rsdt_yn <- function(n, n_trials, stimulus, d, criterion,
-                        sdratio = 1,
-                        dist = c("normal", "gumbel_min", "gumbel_max",
-                                 "logistic")) {
+                    sdratio = 1,
+                    dist = c("normal", "gumbel_min", "gumbel_max", "logistic")) {
   dist <- match.arg(dist)
   stopif(length(n) != 1 || n < 1, "n must be a single positive integer")
   stopif(any(n_trials < 1), "n_trials must be positive")
@@ -2610,7 +2609,10 @@ rsdt_rating <- function(n, n_trials, stimulus, d, thresholds,
 #' @param n_trials Integer vector. Total number of trials per observation.
 #' @param m Integer vector. Number of alternatives per observation. Must be
 #'   at least 2.
-#' @param d Numeric vector. Sensitivity parameter(s).
+#' @param d Numeric vector. Sensitivity: the distance between the signal and
+#'   distractor distributions in SD units. m-AFC assumes a common scale for
+#'   the two distributions, so this is the equal-variance case of the balanced
+#'   index \eqn{d_a} that [sdt_yn()] reports, where it coincides with \eqn{d'}.
 #' @inheritParams SDTdist
 #' @param log Logical. If `TRUE`, returns log-density (default `FALSE`).
 #' @param n Integer. Number of observations to generate. `n_trials`, `m`, and
@@ -2623,8 +2625,8 @@ rsdt_rating <- function(n, n_trials, stimulus, d, thresholds,
 #' @references
 #' DeCarlo, L. T. (2012). On a signal detection approach to m-alternative
 #'   forced choice with bias, with maximum likelihood and Bayesian approaches
-#'   to estimation. \emph{Journal of Mathematical and Statistical Psychology},
-#'   \emph{11}(1), 257--282.
+#'   to estimation. \emph{Journal of Mathematical Psychology}, \emph{56}(3),
+#'   196--207. \doi{10.1016/j.jmp.2012.02.004}
 #'
 #' @keywords distribution
 #' @export
@@ -2774,15 +2776,20 @@ rsdt_mafc <- function(n, n_trials, m, d,
 #' @param counts Integer matrix with one row per observation and one rank-count
 #'   column per rank position (1 = most likely target), or a vector for a
 #'   single observation. Columns beyond a row's set size `m` must be 0.
-#' @param d Numeric vector. Ranking discrimination parameter(s).
+#' @param d Numeric vector. Sensitivity: the distance between the target and
+#'   lure distributions. For `dist = "normal"` this is the balanced index
+#'   \eqn{d_a} that [sdt_yn()] reports (in root-mean-square SD units); for
+#'   `dist = "gumbel_min"` the two distributions share a scale and `d` is the
+#'   \eqn{g'} of Meyer-Grant et al. (2025).
 #' @param m Integer vector. Number of ranked items per observation. Must be
 #'   at least 2 and no larger than the number of count columns.
+#' @param sdratio Numeric vector. Ratio of signal to noise standard deviations
+#'   (default 1, i.e., equal variance). Must be positive. Only used when
+#'   `dist = "normal"`.
 #' @param dist Character. The distribution assumed for the latent evidence:
 #'   "gumbel_min" (default), the smallest extreme value distribution with
 #'   cumulative distribution function \eqn{1 - \exp(-\exp(x))}, evaluated in
 #'   closed form; or "normal", Gaussian UV-SDT by numerical integration.
-#' @param sdratio Numeric vector. Ratio of signal to noise standard deviations
-#'   (default 1). Only used when `dist = "normal"`.
 #' @param log Logical. If `TRUE`, returns log-density (default `FALSE`).
 #' @param n Integer. Number of observations to generate. `n_trials`, `m`,
 #'   `d`, and `sdratio` are recycled to this length.
@@ -2805,10 +2812,11 @@ rsdt_mafc <- function(n, n_trials, m, d,
 #' @examples
 #' # Gumbel-min ranking density
 #' dsdt_ranking(counts = c(40, 30, 20, 10), m = 4, d = 1.0)
-dsdt_ranking <- function(counts, m, d,
+dsdt_ranking <- function(counts, m, d, sdratio = 1,
                          dist = c("gumbel_min", "normal"),
-                         sdratio = 1, log = FALSE) {
+                         log = FALSE) {
   dist <- match.arg(dist)
+  stopif(any(sdratio <= 0), "sdratio must be positive")
   counts <- rbind(counts)
   n <- nrow(counts)
   m <- rep_len(as.integer(m), n)
@@ -2842,12 +2850,13 @@ dsdt_ranking <- function(counts, m, d,
 #' dat <- data.frame(id = 1:10, set_size = 4L)
 #' dat <- cbind(dat, rsdt_ranking(10, 100, m = 4, d = 1.0))
 #' head(dat)
-rsdt_ranking <- function(n, n_trials, m, d,
-                         dist = c("gumbel_min", "normal"), sdratio = 1) {
+rsdt_ranking <- function(n, n_trials, m, d, sdratio = 1,
+                         dist = c("gumbel_min", "normal")) {
   dist <- match.arg(dist)
   stopif(length(n) != 1 || n < 1, "n must be a single positive integer")
   stopif(any(n_trials < 1), "n_trials must be positive")
   stopif(any(m < 2), "m must be an integer >= 2")
+  stopif(any(sdratio <= 0), "sdratio must be positive")
 
   n_trials <- rep_len(as.integer(n_trials), n)
   m <- rep_len(as.integer(m), n)
