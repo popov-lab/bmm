@@ -67,11 +67,9 @@ with unit SD and signal at \code{+sep/2} with SD \code{exp(sdratio)}, where
 units. \code{d} is \eqn{d_a}, measured in root-mean-square SD units, so \code{sep}
 equals \code{d} whenever \code{sdratio} is fixed at 0. The decision
 boundaries additionally carry a posterior credible band on their location.
-For the symmetric distributions (\code{"normal"}, \code{"logistic"}) the area beyond a
-boundary equals the corresponding hit/false-alarm rate; for the Gumbel
-distributions the densities and boundaries are faithful but that area
-identity does not hold (the model applies the CDF to a signed distance, not
-to a survivor probability).
+The area beyond a boundary equals the corresponding hit/false-alarm rate for
+every noise distribution: the likelihood evaluates the survivor function of
+the evidence distribution at the boundary, which is exactly that area.
 
 Available for all four SDT models. \code{\link[=sdt_yn]{sdt_yn()}} draws the criterion and
 \code{\link[=sdt_rating]{sdt_rating()}} the K-1 confidence thresholds as boundary lines. \code{\link[=sdt_mafc]{sdt_mafc()}}

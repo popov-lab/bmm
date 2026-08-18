@@ -65,7 +65,7 @@ roc_sdt <- function(fit, conditions = NULL, n_points = 100,
          "fit must be a bmmfit object returned by bmm()")
   model <- fit$bmm$model
   stopif(!inherits(model, "sdt"),
-         "roc_sdt() is only available for SDT models (sdt_yn, sdt_rating)")
+         "roc_sdt() is only available for SDT models")
   stopif(inherits(model, "sdt_mafc"),
          "ROC curves are not defined for the m-AFC SDT model: it has no response criterion.")
   stopif(inherits(model, "sdt_ranking"),
@@ -122,28 +122,26 @@ roc_sdt <- function(fit, conditions = NULL, n_points = 100,
   pred_cols <- setdiff(names(data), exclude)
 
   is_matrix_col <- vapply(pred_cols, function(col) is.matrix(data[[col]]), logical(1))
-  pred_cols <- pred_cols[!is_matrix_col]
+  .sdt_unique_subset(data, pred_cols[!is_matrix_col])
+}
 
-  if (length(pred_cols) == 0L) {
-    return(data[1L, character(0), drop = FALSE])
-  }
-  out <- unique(data[, pred_cols, drop = FALSE])
-  rownames(out) <- NULL
-  out
+
+# Formula predictors per parameter, with random-effect grouping factors
+# stripped so (1 | id) is never a dimension.
+.sdt_stripped_preds <- function(fit) {
+  uf <- fit$bmm$user_formula
+  preds <- if (inherits(uf, "bmmformula")) rhs_vars(uf, collapse = FALSE) else list()
+  re_vars <- tryCatch(names(brms::ranef(fit)), error = function(e) character(0))
+  lapply(preds, function(v) setdiff(v %||% character(0), re_vars))
 }
 
 
 # Classify the formula predictors of a binary fit into criterion "operating
 # points" (predict the criterion only) and "curves" (predict d/sdratio).
-# Random-effect grouping factors are stripped so (1 | id) is never a dimension.
 .sdt_criterion_point_dims <- function(fit) {
-  uf <- fit$bmm$user_formula
-  preds <- if (inherits(uf, "bmmformula")) rhs_vars(uf, collapse = FALSE) else list()
-  re_vars <- tryCatch(names(brms::ranef(fit)), error = function(e) character(0))
-  strip <- function(v) setdiff(v %||% character(0), re_vars)
-
-  curve_vars <- union(strip(preds[["d"]]), strip(preds[["sdratio"]]))
-  list(points = setdiff(strip(preds[["criterion"]]), curve_vars),
+  preds <- .sdt_stripped_preds(fit)
+  curve_vars <- union(preds[["d"]], preds[["sdratio"]]) %||% character(0)
+  list(points = setdiff(preds[["criterion"]] %||% character(0), curve_vars),
        curves = curve_vars)
 }
 
@@ -237,15 +235,12 @@ roc_sdt <- function(fit, conditions = NULL, n_points = 100,
     return(list(density = all_vars, boundary = character(0)))
   }
 
-  uf    <- fit$bmm$user_formula
-  preds <- if (inherits(uf, "bmmformula")) rhs_vars(uf, collapse = FALSE) else list()
-  re_vars <- tryCatch(names(brms::ranef(fit)), error = function(e) character(0))
-  strip <- function(v) setdiff(v %||% character(0), re_vars)
+  preds <- .sdt_stripped_preds(fit)
 
   density_par   <- intersect(c("d", "sdratio"), names(preds))
-  density_vars  <- unique(unlist(lapply(preds[density_par], strip)))
+  density_vars  <- unique(unlist(preds[density_par]))
   boundary_vars <- setdiff(
-    unique(unlist(lapply(preds[setdiff(names(preds), density_par)], strip))),
+    unique(unlist(preds[setdiff(names(preds), density_par)])),
     density_vars
   )
 
@@ -291,6 +286,22 @@ roc_sdt <- function(fit, conditions = NULL, n_points = 100,
     brms::posterior_linpred(fit, dpar = param, newdata = newdata,
                             re_formula = NA, allow_new_levels = TRUE, ...)
   }
+}
+
+
+# Posterior draws of the latent geometry per condition: `d` is d_a, `sdratio`
+# the natural-scale SD ratio (1 everywhere when fixed), and `sep` their product
+# with the root-mean-square scale -- the separation between the distributions
+# in noise-SD units, which equals d_a itself under equal variance. Every
+# analysis function builds on these three matrices (draws x conditions).
+.sdt_latent_geometry <- function(fit, conditions, has_sdratio, ...) {
+  d <- .sdt_linpred(fit, "d", conditions, ...)
+  sdratio <- if (has_sdratio) {
+    exp(.sdt_linpred(fit, "sdratio", conditions, ...))
+  } else {
+    matrix(1, nrow = nrow(d), ncol = ncol(d))
+  }
+  list(d = d, sdratio = sdratio, sep = d * .sdt_rms_scale(sdratio))
 }
 
 
@@ -355,25 +366,17 @@ roc_sdt <- function(fit, conditions = NULL, n_points = 100,
   dims       <- .sdt_resolve_point_dims(fit, conditions, criterion_points)
   curve_cond <- .sdt_unique_subset(conditions, dims$curves)
 
-  n_curve     <- max(1L, nrow(curve_cond))
-  d_mat       <- .sdt_linpred(fit, "d", curve_cond, ...)
-  n_draws     <- nrow(d_mat)
-  sdratio_mat <- if (has_sdratio) {
-    exp(.sdt_linpred(fit, "sdratio", curve_cond, ...))
-  } else {
-    matrix(1, nrow = n_draws, ncol = n_curve)
-  }
-  # `d` is d_a; the geometry below is built on the separation in noise-SD units,
-  # which is d_a times the root-mean-square scale (= d_a itself under EV).
-  sep_mat <- d_mat * .sdt_rms_scale(sdratio_mat)
+  n_curve <- max(1L, nrow(curve_cond))
+  geom    <- .sdt_latent_geometry(fit, curve_cond, has_sdratio, ...)
+  n_draws <- nrow(geom$d)
 
   fa_grid        <- seq(0.001, 0.999, length.out = n_points)
   curve_has_cols <- ncol(curve_cond) > 0L
   curve_list     <- vector("list", n_curve)
   summary_list   <- vector("list", n_curve)
   for (c_i in seq_len(n_curve)) {
-    dp <- sep_mat[, c_i]
-    sr <- sdratio_mat[, c_i]
+    dp <- geom$sep[, c_i]
+    sr <- geom$sdratio[, c_i]
     cond_row <- if (curve_has_cols) curve_cond[c_i, , drop = FALSE]
     # Anchor the criterion grid to the mean separation so FA is ~evenly spaced;
     # the noise scale is 1, so FA = 1 - cdf(sep/2 + criterion) inverts to this.
@@ -413,20 +416,15 @@ roc_sdt <- function(fit, conditions = NULL, n_points = 100,
   point_cond <- .sdt_unique_subset(conditions, union(dims$curves, dims$points))
   n_pt <- max(1L, nrow(point_cond))
 
-  d_mat  <- .sdt_linpred(fit, "d",    point_cond, ...)
-  crit_mat    <- .sdt_linpred(fit, "criterion", point_cond, ...)
-  sdratio_mat <- if (has_sdratio) {
-    exp(.sdt_linpred(fit, "sdratio", point_cond, ...))
-  } else {
-    matrix(1, nrow = nrow(d_mat), ncol = n_pt)
-  }
+  geom     <- .sdt_latent_geometry(fit, point_cond, has_sdratio, ...)
+  crit_mat <- .sdt_linpred(fit, "criterion", point_cond, ...)
 
   rows <- vector("list", n_pt)
   for (c_i in seq_len(n_pt)) {
-    fa  <- 1 - cdf(-.sdt_eta(d_mat[, c_i], crit_mat[, c_i], 0L,
-                             sdratio_mat[, c_i]))
-    hit <- 1 - cdf(-.sdt_eta(d_mat[, c_i], crit_mat[, c_i], 1L,
-                             sdratio_mat[, c_i]))
+    fa  <- 1 - cdf(-.sdt_eta(geom$d[, c_i], crit_mat[, c_i], 0L,
+                             geom$sdratio[, c_i]))
+    hit <- 1 - cdf(-.sdt_eta(geom$d[, c_i], crit_mat[, c_i], 1L,
+                             geom$sdratio[, c_i]))
     row <- cbind(.sdt_summarise_draws(fa, probs, prefix = "FA"),
                  .sdt_summarise_draws(hit, probs, prefix = "Hit"))
     if (ncol(point_cond) > 0L) {
@@ -456,16 +454,9 @@ roc_sdt <- function(fit, conditions = NULL, n_points = 100,
   qf          <- .sdt_dists[[dist]]$qf
   K1          <- n_ratings - 1L
 
-  n_cond      <- max(1L, nrow(conditions))
-  d_mat       <- .sdt_linpred(fit, "d", conditions, ...)
-  n_draws     <- nrow(d_mat)
-  sdratio_mat <- if (has_sdratio) {
-    exp(.sdt_linpred(fit, "sdratio", conditions, ...))
-  } else {
-    matrix(1, nrow = n_draws, ncol = n_cond)
-  }
-  # separation in noise-SD units; `d` is d_a (see .sdt_rms_scale)
-  sep_mat  <- d_mat * .sdt_rms_scale(sdratio_mat)
+  n_cond   <- max(1L, nrow(conditions))
+  geom     <- .sdt_latent_geometry(fit, conditions, has_sdratio, ...)
+  n_draws  <- nrow(geom$d)
   thr_list <- .sdt_rating_thresholds(fit, model, conditions, ...)
 
   fa_grid       <- seq(0.001, 0.999, length.out = n_points)
@@ -475,9 +466,9 @@ roc_sdt <- function(fit, conditions = NULL, n_points = 100,
   summary_list <- vector("list", n_cond)
   points_list  <- vector("list", n_cond)
   for (c_i in seq_len(n_cond)) {
-    d_vec   <- d_mat[, c_i]
-    sep_vec <- sep_mat[, c_i]
-    sr_vec  <- sdratio_mat[, c_i]
+    d_vec   <- geom$d[, c_i]
+    sep_vec <- geom$sep[, c_i]
+    sr_vec  <- geom$sdratio[, c_i]
 
     # sdratio goes into both calls: .sdt_category_probs derives the noise/signal
     # scale from the stimulus flag, but it also needs sdratio to convert d_a into
@@ -571,7 +562,7 @@ roc_observed <- function(fit, conditions = NULL) {
          "fit must be a bmmfit object returned by bmm()")
   model <- fit$bmm$model
   stopif(!inherits(model, "sdt"),
-         "roc_observed() is only available for SDT models (sdt_yn, sdt_rating)")
+         "roc_observed() is only available for SDT models")
   if (inherits(model, "sdt_rating")) return(.roc_observed_rating(fit, model, conditions))
   if (inherits(model, "sdt_yn")) return(.roc_observed_yn(fit, model, conditions))
   stop2("roc_observed() requires a binary or rating SDT model with a response criterion.")
@@ -587,10 +578,10 @@ roc_observed <- function(fit, conditions = NULL) {
   split  <- .sdt_condition_masks(data, conditions %||% character(0))
   n_cond <- length(split$masks)
 
+  stim_col <- data[[stim_var]]
   result <- vector("list", n_cond)
   for (c_i in seq_len(n_cond)) {
-    mask     <- split$masks[[c_i]]
-    stim_col <- data[[stim_var]]
+    mask <- split$masks[[c_i]]
     pn <- colSums(y_mat[mask & stim_col == 0, , drop = FALSE])
     ps <- colSums(y_mat[mask & stim_col == 1, , drop = FALSE])
     pn <- pn / sum(pn)
@@ -619,10 +610,10 @@ roc_observed <- function(fit, conditions = NULL) {
   split  <- .sdt_condition_masks(data, cond_cols)
   n_cond <- length(split$masks)
 
+  stim_col <- data[[stim_var]]
   rows <- vector("list", n_cond)
   for (c_i in seq_len(n_cond)) {
-    mask     <- split$masks[[c_i]]
-    stim_col <- data[[stim_var]]
+    mask   <- split$masks[[c_i]]
     noise  <- mask & stim_col == 0
     signal <- mask & stim_col == 1
     row <- data.frame(
@@ -659,11 +650,9 @@ roc_observed <- function(fit, conditions = NULL) {
 #' units. `d` is \eqn{d_a}, measured in root-mean-square SD units, so `sep`
 #' equals `d` whenever `sdratio` is fixed at 0. The decision
 #' boundaries additionally carry a posterior credible band on their location.
-#' For the symmetric distributions (`"normal"`, `"logistic"`) the area beyond a
-#' boundary equals the corresponding hit/false-alarm rate; for the Gumbel
-#' distributions the densities and boundaries are faithful but that area
-#' identity does not hold (the model applies the CDF to a signed distance, not
-#' to a survivor probability).
+#' The area beyond a boundary equals the corresponding hit/false-alarm rate for
+#' every noise distribution: the likelihood evaluates the survivor function of
+#' the evidence distribution at the boundary, which is exactly that area.
 #'
 #' Available for all four SDT models. [sdt_yn()] draws the criterion and
 #' [sdt_rating()] the K-1 confidence thresholds as boundary lines. [sdt_mafc()]
@@ -734,15 +723,10 @@ latent_sdt <- function(fit, conditions = NULL, n_grid = 200,
   line_cond  <- .sdt_unique_subset(conditions, c(dims$density, dims$boundary))
   n_panel    <- max(1L, nrow(panel_cond))
 
-  d_panel       <- .sdt_linpred(fit, "d", panel_cond, ...)
-  sdratio_panel <- if (has_sdratio) {
-    exp(.sdt_linpred(fit, "sdratio", panel_cond, ...))
-  } else {
-    matrix(1, nrow = nrow(d_panel), ncol = ncol(d_panel))
-  }
   # The densities live on the noise-standardized axis, so the signal mean is
-  # half the separation, not half of d_a. The two coincide under equal variance.
-  sep_panel <- d_panel * .sdt_rms_scale(sdratio_panel)
+  # half the separation (geom$sep), not half of d_a. The two coincide under
+  # equal variance.
+  geom <- .sdt_latent_geometry(fit, panel_cond, has_sdratio, ...)
 
   # Boundary positions are evaluated over the density x boundary combinations so
   # that each density panel can carry all its criteria/thresholds.
@@ -781,8 +765,8 @@ latent_sdt <- function(fit, conditions = NULL, n_grid = 200,
   lines_list <- vector("list", n_panel)
   comp_list  <- vector("list", n_panel)
   for (p_i in seq_len(n_panel)) {
-    dp <- mean(sep_panel[, p_i])
-    s  <- mean(sdratio_panel[, p_i])
+    dp <- mean(geom$sep[, p_i])
+    s  <- mean(geom$sdratio[, p_i])
     panel_row <- panel_cond[p_i, , drop = FALSE]
 
     # Each density panel carries only the boundaries sharing its density-dim
@@ -1003,7 +987,7 @@ auc_sdt <- function(fit, conditions = NULL, probs = c(0.025, 0.975),
          "fit must be a bmmfit object returned by bmm()")
   model <- fit$bmm$model
   stopif(!inherits(model, "sdt"),
-         "auc_sdt() is only available for SDT models (sdt_yn, sdt_rating)")
+         "auc_sdt() is only available for SDT models")
   stopif(inherits(model, "sdt_mafc"),
          "AUC is not defined for the m-AFC SDT model: it has no response criterion.")
   stopif(inherits(model, "sdt_ranking"),
@@ -1164,26 +1148,20 @@ sdt_sensitivity <- function(fit, measure = c("da", "dn", "ds"),
   conditions <- .sdt_resolve_conditions(fit, conditions)
   cond_rows  <- .sdt_unique_subset(conditions, names(conditions))
 
-  d_mat   <- .sdt_linpred(fit, "d", cond_rows, ...)
-  sig_mat <- if (.sdt_has_estimated_sdratio(model, fit)) {
-    exp(.sdt_linpred(fit, "sdratio", cond_rows, ...))
-  } else {
-    matrix(1, nrow = nrow(d_mat), ncol = ncol(d_mat))
-  }
+  geom <- .sdt_latent_geometry(fit, cond_rows,
+                               .sdt_has_estimated_sdratio(model, fit), ...)
+  scales <- list(da = geom$d, dn = geom$sep, ds = geom$sep / geom$sdratio)[measure]
 
-  sep_mat <- d_mat * .sdt_rms_scale(sig_mat)
-  scales  <- list(da = d_mat, dn = sep_mat, ds = sep_mat / sig_mat)[measure]
-
-  draws_list   <- vector("list", length(scales) * ncol(d_mat))
+  draws_list   <- vector("list", length(scales) * ncol(geom$d))
   summary_list <- vector("list", length(draws_list))
   i <- 0L
   for (nm in names(scales)) {
-    for (c_i in seq_len(ncol(d_mat))) {
+    for (c_i in seq_len(ncol(geom$d))) {
       i <- i + 1L
       crow <- cond_rows[c_i, , drop = FALSE]
       draws_list[[i]] <- .sdt_bind_cond(
         data.frame(measure = nm, value = scales[[nm]][, c_i],
-                   .draw = seq_len(nrow(d_mat))),
+                   .draw = seq_len(nrow(geom$d))),
         crow
       )
       summary_list[[i]] <- .sdt_bind_cond(

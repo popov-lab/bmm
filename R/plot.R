@@ -77,7 +77,7 @@ plot.bmm_sdt_roc <- function(x, observed = NULL, condition_col = NULL,
   p <- .plot_roc_curve(p, x, colour_col, ribbon_alpha, point_size, qf)
 
   if (!is.null(observed)) {
-    obs <- .roc_observed_xy(observed)
+    obs <- as.data.frame(observed)
     if (!is.null(qf)) {
       obs <- obs[obs$FA > 0 & obs$FA < 1 & obs$Hit > 0 & obs$Hit < 1, , drop = FALSE]
       obs$FA <- qf(obs$FA)
@@ -119,12 +119,6 @@ plot.bmm_sdt_roc <- function(x, observed = NULL, condition_col = NULL,
   } else if (length(cond_cols) == 1L) {
     cond_cols
   }
-}
-
-
-.roc_observed_xy <- function(observed) {
-  obs <- as.data.frame(observed)
-  obs[, c("FA", "Hit", setdiff(names(obs), c("FA", "Hit"))), drop = FALSE]
 }
 
 

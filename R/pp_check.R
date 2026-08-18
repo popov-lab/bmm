@@ -30,8 +30,9 @@
 #'   the [sdt_rating()] model `group` defaults to the `stimulus` variable so the
 #'   signal and noise rating distributions are checked separately; pass
 #'   `group = NA` to pool them into a single profile. The [sdt_ranking()] model
-#'   facets by rank position; for mixed set sizes, pass the set-size column as
-#'   `group` so each facet has a homogeneous denominator. The custom-family
+#'   shows the rank positions as the categories of the proportion profile; for
+#'   mixed set sizes, pass the set-size column as `group` so each facet has a
+#'   homogeneous denominator. The custom-family
 #'   models [sdt_yn()] and [sdt_mafc()] delegate to [brms::pp_check()]; for
 #'   their aggregated counts an overlaid empirical CDF (`type = "ecdf_overlay"`,
 #'   adding `group = "stimulus"` for [sdt_yn()]) is usually clearer than the

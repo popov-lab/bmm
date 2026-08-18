@@ -63,7 +63,7 @@ requirements; they are not modes of a single function.
 | `sdt_yn()` | counts of "signal"/"old" responses | `d`, `criterion`, `sdratio` | yes |
 | `sdt_rating()` | counts per confidence-rating category | `d`, `criterion`, threshold params, `sdratio` | yes |
 | `sdt_mafc()` | counts of correct m-AFC responses | `d` | no |
-| `sdt_ranking()` | counts per rank position | `d`, `sdratio` | no |
+| `sdt_ranking()` | counts per rank position | `d`, `sdratio` (`dist = "normal"` only) | no |
 
 All four assume a latent evidence variable whose noise distribution is selected
 with the `dist` argument: `"normal"` (Gaussian SDT), `"logistic"`,
@@ -80,8 +80,9 @@ latent plot simply shows the noise and signal densities without a boundary line.
 
 This article walks through fitting each model and then through the
 post-processing toolkit: `roc_sdt()`, `roc_observed()`, `auc_sdt()`,
-`latent_sdt()`, `sdt_thresholds()`, the `plot()` methods (including the
-quantile-transformed ROC via `scale = "quantile"`), and `pp_check()`.
+`latent_sdt()`, `sdt_thresholds()`, `sdt_sensitivity()`, the `plot()` methods
+(including the quantile-transformed ROC via `scale = "quantile"`), and
+`pp_check()`.
 
 ## The bmm workflow for SDT models
 
@@ -218,11 +219,10 @@ is worth choosing.
 
 # Noise distributions
 
-The Gaussian model above is a *choice*, not a law. SDT needs only two overlapping
-evidence distributions and a criterion; their shape is a modelling assumption.
-And because the model never observes the latent samples — only the two response
-probabilities — the shape of the noise distribution is exactly what fixes the
-shape of the ROC. `bmm` exposes that choice through the `dist` argument, shared by
+The Gaussian assumption in the model above is a modelling choice, not part of
+SDT itself. Because the model never observes the latent samples — only the two
+response probabilities — the shape of the noise distribution is exactly what
+fixes the shape of the ROC. `bmm` exposes that choice through the `dist` argument, shared by
 all four constructors: `"normal"`, `"logistic"`, `"gumbel_min"`, and
 `"gumbel_max"`.
 
@@ -278,7 +278,7 @@ mismatch — the extreme-value theorem drives it toward a Gumbel distribution, i
 same way and for the same mathematical reasons [@MeyerGrant_2025; @Robinson_2023].
 Pooling gives the bell curve; a max (or min) rule gives the skew.
 
-This is more than an analogy. A signal-detection model with extreme-value noise and
+The parallel is exact: a signal-detection model with extreme-value noise and
 a maximum decision rule is *formally equivalent* to the softmax (normalized
 exponential) choice rule — that is, to Luce's choice axiom [@Yellott_1977;
 @Robinson_2023]. Choosing the noise distribution is therefore also choosing a theory
@@ -294,8 +294,8 @@ behavioural invariance axiom rather than in distributional convenience
 [@MeyerGrant_2025]. In visual working memory, by contrast, the Gaussian (pooling)
 account reproduces a *stable* sensitivity across changes in the number of
 alternatives, whereas the softmax (max-rule) account does not — favouring pooling in
-that domain [@Robinson_2023]. `bmm` keeps the distribution switchable precisely
-because this is a question to be answered, not assumed.
+that domain [@Robinson_2023]. `bmm` keeps the distribution switchable so the
+data can answer this question.
 
 Statistically, the choice of distribution is the choice of a *link function*.
 Written as a generalized linear model, SDT pairs the probit link with the Gaussian
@@ -619,7 +619,9 @@ model). The axis label names the transform: `z` for the normal (the classic
 z-ROC, and `scale = "z"` is accepted as an alias), `logit` for the logistic, and
 `loglog`/`cloglog` for the Gumbel distributions. On this axis the symmetric
 (normal/logistic) model ROC is a straight line whose slope is
-$1/\exp(\mathtt{sdratio})$ and whose intercept is $d'/\exp(\mathtt{sdratio})$, so
+$1/\exp(\mathtt{sdratio})$ and whose intercept is
+$\delta/\exp(\mathtt{sdratio})$, where $\delta$ is the separation in noise-SD
+units (the $d_N$ that `sdt_sensitivity()` reports, not the fitted `d`), so
 a slope below 1 is the visual signature of unequal variance and observed points
 that bow away from a straight line flag misfit. (The Gumbel ROC is curved on this
 axis; its natural linearising transform is the log-log power-ROC. The $(0,0)$ and
@@ -859,11 +861,11 @@ plot(latent_sdt(fit_rating_lr))
 In an m-alternative forced-choice task the observer picks the target among `m`
 alternatives; the data are counts of correct responses. There is no criterion and
 no stimulus column — accuracy alone identifies `d` [@DeCarlo_2012]. A correct
-response occurs when the target's evidence exceeds that of all $m-1$ distractors,
-so `d` is referenced to the maximum of the $m-1$ noise samples and stays on
-the same scale as binary $d'$: for $m = 2$ this is the closed form
-$\Phi(d'/\sqrt{2})$, and for $m \geq 3$ `bmm` evaluates the accuracy by
-quadrature. The set size `m` may be a constant or a data column (for mixed set
+response occurs when the target's evidence exceeds that of all $m-1$ distractors;
+`d` is the target--distractor separation and stays on the same scale as the `d`
+of `sdt_yn()`: for $m = 2$ the Gaussian model has the closed form
+$\Phi(d/\sqrt{2})$, and for $m \geq 3$ the Gaussian and logistic models evaluate
+the accuracy by quadrature while both Gumbel models stay in closed form. The set size `m` may be a constant or a data column (for mixed set
 sizes).
 
 ```{r}
@@ -890,7 +892,7 @@ summary(fit_mafc)
 ```
 
 ROC curves are undefined here (`roc_sdt(fit_mafc)` errors), but `latent_sdt()`
-still works: it shows the noise and signal evidence densities the estimated `d'`
+still works: it shows the noise and signal evidence densities the estimated `d`
 implies (the noise density stands for each of the $m-1$ distractors), now without
 a criterion line because the decision is a max rule over the alternatives.
 Setting `show_competitors = TRUE` overlays the density of the *maximum* of the
@@ -919,9 +921,9 @@ statistic* of the latent evidence, so the probability of each rank follows from
 the evidence distribution directly. With `dist = "gumbel_min"` these rank
 probabilities have a closed form (the extreme-value assumption that makes ranking
 analytically tractable); `dist = "normal"` is also available and evaluated by
-quadrature — prefer `gumbel_min` for speed and the standard Thurstonian ranking
-model, `normal` when you want Gaussian evidence comparable to the other SDT
-models. The model uses the native multinomial family with one category per rank
+quadrature — prefer `gumbel_min` for speed (its closed form is exact), and
+`normal` for Gaussian evidence comparable to the other SDT models (the classical
+Thurstonian ranking assumption). The model uses the native multinomial family with one category per rank
 position, and `m` may again be a constant or a column for mixed set sizes. The
 bundled `meyer_grant_jakob_2025` data [@MeyerGrant_Jakob_2025] illustrate the
 wide format.
@@ -963,6 +965,7 @@ pp_check(fit_rank, group = "set_size", ndraws = 100)
 | `auc_sdt()` | binary, rating | posterior AUC |
 | `latent_sdt()` | all four | noise/signal latent densities + criterion/threshold locations (no boundary for m-AFC/ranking) |
 | `sdt_thresholds()` | rating | K-1 threshold locations per draw on the latent scale, with posterior summary |
+| `sdt_sensitivity()` | all four | sensitivity converted per draw to $d_a$, $d_N$, and $d_S$, with posterior summary |
 | `plot()` | `bmm_sdt_roc` (incl. `scale = "quantile"`), `bmm_sdt_auc`, `bmm_sdt_latent` | `ggplot2` ROC / quantile-ROC / AUC / latent-distribution figures |
 | `pp_check()` | all four | posterior predictive check |
 
