@@ -31,7 +31,10 @@ rsdt_mafc(
 \item{m}{Integer vector. Number of alternatives per observation. Must be
 at least 2.}
 
-\item{d}{Numeric vector. Sensitivity parameter(s).}
+\item{d}{Numeric vector. Sensitivity: the distance between the signal and
+distractor distributions in SD units. m-AFC assumes a common scale for
+the two distributions, so this is the equal-variance case of the balanced
+index \eqn{d_a} that \code{\link[=sdt_yn]{sdt_yn()}} reports, where it coincides with \eqn{d'}.}
 
 \item{dist}{Character. The distribution assumed for the latent evidence,
 given here by its cumulative distribution function:
@@ -74,7 +77,7 @@ head(dat)
 \references{
 DeCarlo, L. T. (2012). On a signal detection approach to m-alternative
 forced choice with bias, with maximum likelihood and Bayesian approaches
-to estimation. \emph{Journal of Mathematical and Statistical Psychology},
-\emph{11}(1), 257--282.
+to estimation. \emph{Journal of Mathematical Psychology}, \emph{56}(3),
+196--207. \doi{10.1016/j.jmp.2012.02.004}
 }
 \keyword{distribution}

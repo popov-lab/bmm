@@ -42,8 +42,9 @@ between the distributions in noise units is \code{d * sqrt((1 + sdratio^2) / 2)}
 noise-standardized axis.}
 
 \item{sdratio}{Numeric. Ratio of signal to noise standard deviations
-(default 1, i.e., equal variance). Must be positive. This is the same
-scale as the \code{sdratio} parameter of \code{\link[=sdt_yn]{sdt_yn()}}, which uses a log link.}
+(default 1, i.e., equal variance). Must be positive. Note that this is the
+natural scale: the \code{sdratio} parameter of \code{\link[=sdt_yn]{sdt_yn()}} is sampled on the log
+scale, so it corresponds to \code{log(sdratio)} here.}
 
 \item{dist}{Character. The distribution assumed for the latent evidence,
 given here by its cumulative distribution function:
@@ -74,17 +75,17 @@ out of a fixed number of trials (a binomial likelihood).
 \examples{
 # Density of yes/no SDT data
 dsdt_yn(n_old = 80, n_trials = 100, stimulus = 1,
-            d = 1.5, criterion = 0.2)
+        d = 1.5, criterion = 0.2)
 
 # Vectorized over observations
 dsdt_yn(n_old = c(30, 80), n_trials = c(100, 100),
-            stimulus = c(0, 1), d = 1.5, criterion = 0.2,
-            log = TRUE)
+        stimulus = c(0, 1), d = 1.5, criterion = 0.2,
+        log = TRUE)
 # Generate yes/no SDT data for a design
 dat <- expand.grid(id = 1:20, stimulus = c(0L, 1L))
 dat$n_trials <- 100L
 dat$n_old <- rsdt_yn(nrow(dat), dat$n_trials, dat$stimulus,
-                         d = 1.5, criterion = 0.2)
+                     d = 1.5, criterion = 0.2)
 head(dat)
 }
 \references{
