@@ -337,14 +337,10 @@ log_lik_ezdm_3par <- function(i, prep) {
   )
 }
 
-# posterior_predict for pp_check
-# Returns predictions for EZDM 3par dependent variables
-# By default returns mean_rt (the primary response Y)
-# Use dv argument to select other variables: "var_rt", "n_upper"
-# Usage: posterior_predict(fit, dv = "var_rt")
-posterior_predict_ezdm_3par <- function(i, prep, ..., dv = c("mean_rt", "var_rt", "n_upper")) {
-  dv <- match.arg(dv)
-
+# brms forwards posterior_predict() dots to prepare_predictions() only, never
+# to this function, so the other observables cannot be selected here; use
+# pp_check(fit, resp_var = ...) instead (#401)
+posterior_predict_ezdm_3par <- function(i, prep, ...) {
   rezdm(
     n = length(brms::get_dpar(prep, "drift", i = i)),
     n_trials = prep$data$trials[i],
@@ -353,7 +349,7 @@ posterior_predict_ezdm_3par <- function(i, prep, ..., dv = c("mean_rt", "var_rt"
     ndt = brms::get_dpar(prep, "ndt", i = i),
     s = brms::get_dpar(prep, "s", i = i),
     version = "3par"
-  )[[dv]]
+  )[["mean_rt"]]
 }
 
 #' @export
@@ -406,17 +402,8 @@ log_lik_ezdm_4par <- function(i, prep) {
   )
 }
 
-# posterior_predict for pp_check
-# Returns predictions for EZDM 4par dependent variables
-# By default returns mean_rt_upper (the primary response Y)
-# Use dv argument to select other variables:
-#   "mean_rt_upper", "mean_rt_lower", "var_rt_upper", "var_rt_lower", "n_upper"
-# Usage: posterior_predict(fit, dv = "var_rt_upper")
-posterior_predict_ezdm_4par <- function(i, prep, ..., dv = c(
-                                          "mean_rt_upper", "mean_rt_lower",
-                                          "var_rt_upper", "var_rt_lower", "n_upper"
-                                        )) {
-  dv <- match.arg(dv)
+# no dv argument: see posterior_predict_ezdm_3par()
+posterior_predict_ezdm_4par <- function(i, prep, ...) {
   rezdm(
     n = length(brms::get_dpar(prep, "drift", i = i)),
     n_trials = prep$data$vint2[i],
@@ -426,5 +413,61 @@ posterior_predict_ezdm_4par <- function(i, prep, ..., dv = c(
     zr = brms::get_dpar(prep, "zr", i = i),
     s = brms::get_dpar(prep, "s", i = i),
     version = "4par"
-  )[[dv]]
+  )[["mean_rt_upper"]]
+}
+
+############################################################################# !
+# PP_CHECK OBSERVABLES                                                    ####
+############################################################################# !
+
+# mean_pc rather than raw n_upper: n_trials varies across cells, so counts
+# are not comparable between observations while proportions are.
+
+#' @export
+pp_observables.ezdm_3par <- function(model) {
+  list(
+    observed = c(mean_rt = "Y", var_rt = "vreal1", n_upper = "vint1",
+                 n_trials = "trials"),
+    checks = list(
+      mean_rt = .pp_observable(function(d) d$mean_rt,
+                               label = "Mean response time"),
+      var_rt = .pp_observable(function(d) d$var_rt,
+                              label = "Response time variance"),
+      mean_pc = .pp_observable(function(d) d$n_upper / d$n_trials,
+                               label = "Proportion of upper responses")
+    )
+  )
+}
+
+#' @export
+pp_simulate.ezdm_3par <- function(model, prep) {
+  .pp_simulate_joint(prep, .rezdm_3par, c("drift", "bound", "ndt", "s"),
+                     n_trials = rep(prep$data$trials, each = prep$ndraws))
+}
+
+#' @export
+pp_observables.ezdm_4par <- function(model) {
+  list(
+    observed = c(mean_rt_upper = "Y", mean_rt_lower = "vreal1",
+                 var_rt_upper = "vreal2", var_rt_lower = "vreal3",
+                 n_upper = "vint1", n_trials = "vint2"),
+    checks = list(
+      mean_rt_upper = .pp_observable(function(d) d$mean_rt_upper,
+                                     label = "Mean RT (upper responses)"),
+      mean_rt_lower = .pp_observable(function(d) d$mean_rt_lower,
+                                     label = "Mean RT (lower responses)"),
+      var_rt_upper = .pp_observable(function(d) d$var_rt_upper,
+                                    label = "RT variance (upper responses)"),
+      var_rt_lower = .pp_observable(function(d) d$var_rt_lower,
+                                    label = "RT variance (lower responses)"),
+      mean_pc = .pp_observable(function(d) d$n_upper / d$n_trials,
+                               label = "Proportion of upper responses")
+    )
+  )
+}
+
+#' @export
+pp_simulate.ezdm_4par <- function(model, prep) {
+  .pp_simulate_joint(prep, .rezdm_4par, c("drift", "bound", "ndt", "zr", "s"),
+                     n_trials = rep(prep$data$vint2, each = prep$ndraws))
 }

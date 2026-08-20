@@ -305,3 +305,17 @@ posterior_predict_ddm <- function(i, prep, ...) {
     out[["rt"]]
   }
 }
+
+#############################################################################!
+# PP_CHECK OBSERVABLES                                                    ####
+#############################################################################!
+
+#' @export
+pp_observables.ddm <- function(model) {
+  .pp_spec_rt_response()
+}
+
+#' @export
+pp_simulate.ddm <- function(model, prep) {
+  .pp_simulate_joint(prep, rddm, c("drift", "bound", "ndt", "zr"))
+}

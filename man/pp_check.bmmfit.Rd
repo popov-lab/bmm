@@ -5,39 +5,59 @@
 \alias{pp_check}
 \title{Posterior predictive check for bmmfit objects}
 \usage{
-\method{pp_check}{bmmfit}(object, type = "dens_overlay", ndraws = NULL, group = NULL, ...)
+\method{pp_check}{bmmfit}(
+  object,
+  type = NULL,
+  ndraws = NULL,
+  group = NULL,
+  resp_var = NULL,
+  ...
+)
 }
 \arguments{
 \item{object}{A \code{bmmfit} object returned by \code{\link[=bmm]{bmm()}}.}
 
-\item{type}{Character. Type of pp_check (default \code{"dens_overlay"}). For
-non-multinomial models, passed to \code{\link[brms:pp_check.brmsfit]{brms::pp_check()}}. When \code{group} is
-specified, the grouped variant (e.g., \code{"dens_overlay_grouped"}) is
-auto-selected if available. Multinomial models produce a response
-proportion profile regardless of the value supplied.}
+\item{type}{Character. Type of pp_check. When \code{NULL} (default), resolves to
+\code{"dens_overlay"}, or to the selected observable's default type when
+\code{resp_var} is specified. When \code{group} is specified, the grouped variant
+(e.g., \code{"dens_overlay_grouped"}) is auto-selected if available.
+Multinomial models produce a response proportion profile regardless of
+the value supplied.}
 
 \item{ndraws}{Integer. Number of posterior draws. Defaults to \code{100} for
-multinomial models; otherwise passed to \code{\link[brms:pp_check.brmsfit]{brms::pp_check()}}.}
+multinomial models and \code{10} when \code{resp_var} is specified; otherwise
+passed to \code{\link[brms:pp_check]{brms::pp_check()}}.}
 
 \item{group}{Character. Optional grouping variable for faceting. For
-non-multinomial models, passed to \code{\link[brms:pp_check.brmsfit]{brms::pp_check()}}; when specified, the
+non-multinomial models, passed to \code{\link[brms:pp_check]{brms::pp_check()}}; when specified, the
 grouped variant of \code{type} (e.g., \code{"dens_overlay_grouped"}) is auto-selected
 if available. For multinomial models, facets by the named predictor.}
 
-\item{...}{Additional arguments forwarded to \code{\link[brms:pp_check.brmsfit]{brms::pp_check()}} (non-multinomial)
-or to \code{\link[brms:posterior_predict.brmsfit]{brms::posterior_predict()}} (multinomial). For multinomial models,
-\code{probs} (numeric vector of length 2, default \code{c(0.025, 0.975)}) controls the
-credible interval. Both model types accept \code{re_formula} (e.g.,
-\code{re_formula = NA} to predict at the population level, excluding random
-effects).}
+\item{resp_var}{Character. For models that declare several observables,
+the name of the observable to check, or \code{"all"} for a panel of all
+available checks built from one shared simulation. See \code{\link[=pp_check_vars]{pp_check_vars()}}
+for the options of a fitted model. The default \code{NULL} checks the primary
+response via \code{\link[brms:pp_check]{brms::pp_check()}}. For the RT models, passing
+\code{negative_rt = TRUE} (a \code{\link[brms:posterior_predict]{brms::posterior_predict()}} argument) is
+redirected to \code{resp_var = "signed_rt"}, so that observed and predicted
+response times are both signed by the response.}
+
+\item{...}{Additional arguments. Without \code{resp_var}, forwarded to
+\code{\link[brms:pp_check]{brms::pp_check()}}, or for multinomial models to
+\code{\link[brms:posterior_predict]{brms::posterior_predict()}} (\code{probs}, a numeric vector of length 2 with
+default \code{c(0.025, 0.975)}, sets the credible interval). With \code{resp_var},
+\code{draw_ids} and \code{re_formula} go to \code{\link[brms:prepare_predictions]{brms::prepare_predictions()}} and the
+rest to the \verb{bayesplot::ppc_*} function. \code{re_formula = NA} predicts at
+the population level on every path.}
 }
 \value{
-For multinomial models, a \code{ggplot2} object. For other models, the
-result of \code{\link[brms:pp_check.brmsfit]{brms::pp_check()}}.
+For multinomial models or when \code{resp_var} is specified, a \code{ggplot2}
+object (a \code{bayesplot_grid} for \code{resp_var = "all"}). For other models, the
+result of \code{\link[brms:pp_check]{brms::pp_check()}}.
 }
 \description{
 For models where brms provides \code{pp_check} support, this method delegates to
-\code{\link[brms:pp_check.brmsfit]{brms::pp_check()}}. For models with multinomial families (e.g., the m3
+\code{\link[brms:pp_check]{brms::pp_check()}}. For models with multinomial families (e.g., the m3
 model), brms's \code{pp_check} is unavailable; this method dispatches to a
 model-specific visualisation instead.
 }
@@ -46,7 +66,15 @@ For \strong{multinomial models}, the plot mirrors the bayesplot \code{ppc_bars} 
 observed proportions are shown as bars and posterior predictive medians with
 credible intervals are shown as point-ranges, using the bayesplot default
 colour scheme and theme.
+
+Some models describe several observables jointly (e.g. \code{\link[=ddm]{ddm()}}: response
+times \emph{and} responses; \code{\link[=ezdm]{ezdm()}}: mean RT, RT variance \emph{and} accuracy), but
+brms only ever checks the primary response. For these models the \code{resp_var}
+argument selects which observable to check; \code{\link[=pp_check_vars]{pp_check_vars()}} lists the
+available checks. All selected observables are drawn from \strong{one} joint
+posterior predictive simulation, so \code{resp_var = "all"} panels are mutually
+consistent.
 }
 \seealso{
-\code{\link[brms:pp_check.brmsfit]{brms::pp_check()}}
+\code{\link[brms:pp_check]{brms::pp_check()}}, \code{\link[=pp_check_vars]{pp_check_vars()}}
 }

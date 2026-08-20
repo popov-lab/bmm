@@ -435,15 +435,27 @@ plot(loo_free_zr)
 
 ## Posterior Predictive Checks
 
-Assess model adequacy by comparing predictions to data:
+The DDM is a joint model of response times *and* responses, so an adequate
+model has to reproduce both. `pp_check()` checks the RT distribution by
+default; the `resp_var` argument selects the other observables of the
+likelihood (see `pp_check_vars(fit)` for the options):
 
 ```{r, eval=FALSE}
-# Generate posterior predictions
-pp_fixed_zr <- posterior_predict(fit_fixed_zr)
+# Default: the RT distribution
+pp_check(fit_fixed_zr)
 
-# Compare predicted vs observed RT distributions
-library(bayesplot)
-ppc_dens_overlay(demo_data$rt, pp_fixed_zr[1:50, ])
+# The response distribution (choice proportions)
+pp_check(fit_fixed_zr, resp_var = "response")
+
+# RTs signed by the response (lower-boundary RTs negative), so the
+# speed *and* frequency of errors are checked in one display
+pp_check(fit_fixed_zr, resp_var = "signed_rt")
+
+# All checks as a panel, drawn from one shared joint simulation
+pp_check(fit_fixed_zr, resp_var = "all")
+
+# Facet any check by a predictor
+pp_check(fit_fixed_zr, resp_var = "signed_rt", group = "condition")
 
 # Quantile-probability plots (QP plots)
 # These are the gold standard for evaluating DDM fits
