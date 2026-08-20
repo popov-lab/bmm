@@ -281,13 +281,15 @@ test_that("printed reports annotate constants with their native-scale value", {
   expect_match(printed_text, "1 on the native scale")
 })
 
-test_that("report_priors() omits the technical mu parameter for void_mu models", {
+test_that("report_priors() omits a fixed mu that is not a model parameter", {
   skip_on_cran()
   path <- test_path("assets/bmmfit_example1.rds")
   skip_if_not(file.exists(path), "SDM fixture not available (excluded by .Rbuildignore)")
   fit <- readRDS(path)
 
-  fit$bmm$model$void_mu <- TRUE
+  expect_true("mu" %in% report_priors(fit)$parameter)
+
+  fit$bmm$model$parameters$mu <- NULL
   out <- report_priors(fit)
   expect_setequal(out$parameter, c("c", "kappa"))
 })

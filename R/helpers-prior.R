@@ -177,9 +177,13 @@ prior_provenance <- function(fit) {
   # check_model, so the reconstruction reports them as defaults
   user_fixed <- names(fit$bmm$user_formula)[is_constant(fit$bmm$user_formula)]
   out$source[out$parameter %in% user_fixed & out$source == "bmm default"] <- "user"
-  # models that declare void_mu carry a fixed mu only because brms requires
-  # one for custom families; it is not a model parameter and is not reported
-  if (isTRUE(model$void_mu)) {
+  # a mu that is fixed but not declared in the model's parameters exists only
+  # because brms requires custom families to have one (e.g. the response-time
+  # models); it is not a model parameter and is not reported. Models that
+  # declare mu (e.g. sdm, where it is an estimable response bias) keep it.
+  mu_is_technical <- "mu" %in% names(model$fixed_parameters) &&
+    !"mu" %in% names(model$parameters)
+  if (mu_is_technical) {
     out <- out[!(out$parameter %in% "mu"), , drop = FALSE]
     row.names(out) <- NULL
   }
