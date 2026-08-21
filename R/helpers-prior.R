@@ -51,6 +51,349 @@ default_prior.bmmformula <- function(object, data, model, formula = object, ...)
   combine_prior(brms_priors, prior_args$prior)
 }
 
+#' @title Report the priors used in a fitted bmm model
+#' @description For each parameter of a fitted bmm model, reports the link
+#'   function, the prior actually applied on the sampling (link) scale, and
+#'   where that prior came from: a bmm default, a brms default, or a
+#'   user-specified prior. Parameters without a proper prior are flagged as
+#'   flat.
+#' @param fit A `bmmfit` object returned by [bmm()]
+#' @param format Character. `"table"` (default) prints the report as a table;
+#'   `"text"` prints sentences ready for a methods section.
+#' @details All priors and constants apply on the sampling scale set by each
+#'   parameter's link function: a prior for a log-link parameter describes the
+#'   log of that parameter, and a constant fixes the parameter on that scale
+#'   (e.g. `constant(0)` with a log link fixes the parameter to 1 on the
+#'   native scale). Constants are therefore printed together with their exact
+#'   native-scale value whenever the two differ.
+#'
+#'   The provenance of each prior is determined by re-deriving the
+#'   default priors from the model, formula and data stored in the fit. A
+#'   user-specified prior that is identical to the bmm default is therefore
+#'   reported as a default. Coefficients that inherit their prior from a more
+#'   general class are collapsed into the row of the prior they inherit from.
+#'
+#'   Flat priors are flagged because they are improper: Bayes factors via
+#'   bridge sampling are undefined when any parameter has an improper prior.
+#'
+#'   For models in which the brms `mu` parameter is only a technical
+#'   requirement of the custom family rather than a model parameter (e.g. the
+#'   response-time models), the fixed `mu` is omitted from the report. For
+#'   circular models `mu` is reported, as it can be estimated as a response
+#'   bias.
+#' @return A `data.frame` of class `bmm_report_priors` with columns
+#'   `parameter`, `link`, `class`, `coef`, `group`, `prior` and `source`.
+#' @seealso [default_prior()], [parameters()]
+#' @keywords extract_info
+#' @examplesIf isTRUE(Sys.getenv("BMM_EXAMPLES"))
+#' fit <- bmm(
+#'   bmf(c ~ 0 + set_size, kappa ~ 1),
+#'   data = oberauer_lin_2017,
+#'   model = sdm(resp_error = "dev_rad")
+#' )
+#' report_priors(fit)
+#' report_priors(fit, format = "text")
+#' @export
+report_priors <- function(fit, format = "table") {
+  stopif(!inherits(fit, "bmmfit"), "The fit argument must be a bmmfit object returned by bmm()")
+  stopif(is.null(fit$prior), "The fit object contains no prior information")
+  format <- match.arg(format, c("table", "text"))
+  fit <- restructure(fit)
+  structure(
+    prior_provenance(fit),
+    class = c("bmm_report_priors", "data.frame"),
+    model_name = fit$bmm$model$name,
+    par_labels = unlist(fit$bmm$model$parameters),
+    format = format
+  )
+}
+
+#' @export
+print.bmm_report_priors <- function(x, ...) {
+  if (identical(attr(x, "format"), "text")) {
+    cat(strwrap(prior_report_text(x), width = 80), sep = "\n")
+    return(invisible(x))
+  }
+
+  model_name <- attr(x, "model_name")
+  if (!is.null(model_name) && nzchar(model_name)) {
+    cat(style("purple1")("Model: "), model_name, "\n\n")
+  }
+
+  print_df <- as.data.frame(x)
+  print_df$prior[x$source == "flat"] <- "(flat)"
+  for (i in seq_len(nrow(x))) {
+    native <- constant_native_value(x$prior[i], x$link[i])
+    if (!is.na(native)) {
+      print_df$prior[i] <- glue("{x$prior[i]} [native: {format(signif(native, 3))}]")
+    }
+  }
+  all_empty <- vapply(print_df, function(col) all(is.na(col) | !nzchar(col)), logical(1))
+  print_df <- print_df[, !all_empty, drop = FALSE]
+  for (col in names(print_df)) {
+    print_df[[col]][is.na(print_df[[col]]) | !nzchar(print_df[[col]])] <- "--"
+  }
+  print.data.frame(print_df, right = FALSE, row.names = FALSE)
+
+  if (any(!is.na(x$link) & x$link != "identity")) {
+    scale_note <- "Priors and constants apply on the sampling scale set by each
+      parameter's link function."
+    cat("\n")
+    cat(strwrap(gsub("\\s+", " ", scale_note), width = 80), sep = "\n")
+  }
+  if (any(x$source == "flat")) {
+    flat_note <- "Flat priors are improper: Bayes factors via bridge sampling are
+      undefined unless you specify proper priors for these coefficients."
+    cat("\n")
+    cat(strwrap(gsub("\\s+", " ", flat_note), width = 80), sep = "\n")
+  }
+  invisible(x)
+}
+
+# fit -> tidy classified prior table; the shared extraction layer for #194
+prior_provenance <- function(fit) {
+  # force defaults on so reconstruction is deterministic regardless of session
+  # options; fits made with bmm.default_priors = FALSE still classify correctly
+  # because their flat rows can never match a non-empty default
+  withr::local_options(bmm.default_priors = TRUE)
+  model <- fit$bmm$model
+  defaults <- suppressWarnings(suppressMessages({
+    # reconstruct from the post-pipeline formula and model frame stored on the
+    # fit instead of re-running the data pipeline: brms drops raw response
+    # columns from the model frame for some models (e.g. m3), so check_data
+    # cannot be re-run there; it is still tried because it restores helper
+    # columns that model-specific configure_prior methods inspect (ss_numeric)
+    data <- tryCatch(
+      check_data(model, fit$data, fit$bmm$user_formula),
+      error = function(e) fit$data
+    )
+    combine_prior(
+      brms::default_prior(fit$formula, data = fit$data),
+      configure_prior(model, data, fit$formula, user_prior = NULL)
+    )
+  }))
+  out <- classify_priors(fit$prior, defaults, links = model$links)
+  # constants the user set in the formula are folded into the model object by
+  # check_model, so the reconstruction reports them as defaults
+  user_fixed <- names(fit$bmm$user_formula)[is_constant(fit$bmm$user_formula)]
+  out$source[out$parameter %in% user_fixed & out$source == "bmm default"] <- "user"
+  # a mu that is fixed but not declared in the model's parameters exists only
+  # because brms requires custom families to have one (e.g. the response-time
+  # models); it is not a model parameter and is not reported. Models that
+  # declare mu (e.g. sdm, where it is an estimable response bias) keep it.
+  mu_is_technical <- "mu" %in% names(model$fixed_parameters) &&
+    !"mu" %in% names(model$parameters)
+  if (mu_is_technical) {
+    out <- out[!(out$parameter %in% "mu"), , drop = FALSE]
+    row.names(out) <- NULL
+  }
+  out
+}
+
+# compare the prior table of a fit against a freshly reconstructed default
+# prior table to determine the provenance of each prior; brms stamps every
+# prior passed to brm(prior = ...) as "user", so the source column of the fit
+# cannot distinguish bmm defaults from user-set priors
+classify_priors <- function(prior, defaults, links = list()) {
+  key_cols <- c("class", "dpar", "nlpar", "coef", "group", "resp")
+  eff <- resolve_effective_prior(prior)
+  keys <- do.call(paste, prior[key_cols])
+  def_keys <- do.call(paste, defaults[key_cols])
+  def_eff <- resolve_effective_prior(defaults)[match(keys, def_keys)]
+  def_eff[is.na(def_eff)] <- ""
+  from_bmm <- keys %in% def_keys[defaults$source == "user"]
+
+  source <- ifelse(
+    !nzchar(eff), "flat",
+    ifelse(eff == def_eff & from_bmm, "bmm default",
+      ifelse(eff == def_eff, "brms default", "user")
+    )
+  )
+
+  parameter <- ifelse(
+    nzchar(prior$nlpar), prior$nlpar,
+    ifelse(nzchar(prior$dpar), prior$dpar,
+      ifelse(prior$class %in% c("b", "Intercept"), "mu", NA)
+    )
+  )
+  link <- vapply(parameter, function(p) {
+    if (is.na(p)) NA_character_ else links[[p]] %||% "identity"
+  }, character(1), USE.NAMES = FALSE)
+
+  out <- data.frame(
+    parameter, link,
+    class = prior$class, coef = prior$coef, group = prior$group,
+    prior = prior$prior, source,
+    stringsAsFactors = FALSE
+  )
+  keep <- nzchar(prior$prior) | (!has_parent_prior(prior) & !vacuous_flat_prior(prior, eff))
+  out <- out[keep, , drop = FALSE]
+  row.names(out) <- NULL
+  out
+}
+
+# brms semantics: an empty prior string inherits from the row with the same
+# class/dpar/nlpar/resp at coef = "" (first within the same group, then at
+# group = ""); a row that stays empty after resolution has a flat prior
+resolve_effective_prior <- function(prior) {
+  base <- paste(prior$class, prior$dpar, prior$nlpar, prior$resp)
+  eff <- prior$prior
+  parent_prior <- function(i, group) {
+    hit <- which(base == base[i] & prior$group == group & !nzchar(prior$coef) & nzchar(prior$prior))
+    if (length(hit)) prior$prior[hit[1]] else ""
+  }
+  for (i in which(!nzchar(eff))) {
+    eff[i] <- parent_prior(i, prior$group[i])
+    if (!nzchar(eff[i])) eff[i] <- parent_prior(i, "")
+  }
+  eff
+}
+
+# rows that inherit from a parent row shown in the report are redundant
+has_parent_prior <- function(prior) {
+  base <- paste(prior$class, prior$dpar, prior$nlpar, prior$resp)
+  vapply(seq_len(nrow(prior)), function(i) {
+    parents <- base == base[i] & !nzchar(prior$coef) &
+      (prior$group == prior$group[i] | !nzchar(prior$group))
+    parents[i] <- FALSE
+    any(parents)
+  }, logical(1))
+}
+
+# exact native-scale value of a constant() prior; NA when the row is not a
+# numeric constant, the link cannot be inverted here (e.g. softmax), or the
+# value is unchanged by the transformation (nothing worth reporting)
+constant_native_value <- function(prior, link) {
+  if (!grepl("^constant\\(", prior) || is.na(link) || link == "identity") {
+    return(NA_real_)
+  }
+  value <- suppressWarnings(as.numeric(sub("^constant\\((.*)\\)$", "\\1", prior)))
+  if (is.na(value)) {
+    return(NA_real_)
+  }
+  native <- tryCatch(link_transform(value, link, inverse = TRUE), error = function(e) NA_real_)
+  if (isTRUE(all.equal(native, value))) NA_real_ else native
+}
+
+# a flat class- or group-level row is vacuous when every row that could
+# inherit from it resolved to its own prior (brms emits a class-level b row
+# even when the only coefficient below it has an explicit prior)
+vacuous_flat_prior <- function(prior, eff) {
+  base <- paste(prior$class, prior$dpar, prior$nlpar, prior$resp)
+  vapply(seq_len(nrow(prior)), function(i) {
+    if (nzchar(eff[i]) || nzchar(prior$coef[i])) {
+      return(FALSE)
+    }
+    children <- base == base[i] &
+      (prior$group == prior$group[i] | !nzchar(prior$group[i]))
+    children[i] <- FALSE
+    any(children) && all(nzchar(eff[children]))
+  }, logical(1))
+}
+
+prior_report_text <- function(x) {
+  par_labels <- attr(x, "par_labels")
+  in_par <- !is.na(x$parameter)
+  sentences <- unlist(lapply(unique(x$parameter[in_par]), function(par) {
+    parameter_prior_sentences(x[in_par & x$parameter == par, ], par_labels)
+  }))
+  standalone <- vapply(which(!in_par), function(i) {
+    scope <- prior_scope_phrase(x[i, ])
+    if (!nzchar(x$prior[i])) {
+      glue("No prior was specified for {scope}; an improper flat prior was used.")
+    } else {
+      glue("{upfirst(scope)} received a {x$prior[i]} prior ({x$source[i]}).")
+    }
+  }, character(1))
+  lead <- "Priors were specified on the sampling (link) scale of each parameter."
+  if (any(!is.na(x$link) & x$link != "identity")) {
+    lead <- paste(
+      lead,
+      "For parameters with a non-identity link, priors therefore apply to the transformed parameter."
+    )
+  }
+  paste(c(lead, sentences, standalone), collapse = " ")
+}
+
+parameter_prior_sentences <- function(rows, par_labels) {
+  subject <- prior_subject_phrase(rows$parameter[1], par_labels)
+  is_const <- grepl("^constant\\(", rows$prior)
+  sentences <- character(0)
+  if (any(is_const)) {
+    value <- sub("^constant\\((.*)\\)$", "\\1", rows$prior[is_const])
+    native <- vapply(which(is_const), function(i) {
+      constant_native_value(rows$prior[i], rows$link[i])
+    }, numeric(1))
+    scale_note <- ifelse(
+      is.na(native), "",
+      glue(
+        " on the {rows$link[is_const]} (sampling) scale,",
+        " i.e. {format(signif(native, 3))} on the native scale"
+      )
+    )
+    sentences <- glue("{upfirst(subject)} was fixed to {value}{scale_note}.")
+  }
+  rest <- rows[!is_const, , drop = FALSE]
+  if (nrow(rest) > 0) {
+    clauses <- vapply(seq_len(nrow(rest)), function(i) {
+      scope <- prior_scope_phrase(rest[i, ])
+      if (!nzchar(rest$prior[i])) {
+        glue("{scope} received no prior (improper flat prior)")
+      } else {
+        glue("{scope} received a {rest$prior[i]} prior ({rest$source[i]})")
+      }
+    }, character(1))
+    sentences <- c(
+      sentences,
+      glue("For {subject} ({rest$link[1]} link), {collapse_and(clauses)}.")
+    )
+  }
+  sentences
+}
+
+# use the model's parameter description only when it names the parameter in
+# the form "<label> parameter ..."; descriptions vary too much across models
+# to be quoted whole
+prior_subject_phrase <- function(par, par_labels) {
+  desc <- if (par %in% names(par_labels)) par_labels[[par]] else ""
+  label <- trimws(sub("\\s*[Pp]arameter.*$", "", desc))
+  if (identical(label, trimws(desc)) || !nzchar(label) ||
+    nchar(label) > 40 || tolower(label) == tolower(par)) {
+    return(glue("parameter {par}"))
+  }
+  glue("the {tolower(label)} parameter {par}")
+}
+
+collapse_and <- function(x) {
+  if (length(x) < 3) {
+    return(paste(x, collapse = " and "))
+  }
+  paste0(paste(x[-length(x)], collapse = ", "), ", and ", x[length(x)])
+}
+
+prior_scope_phrase <- function(row) {
+  grouping <- if (nzchar(row$group)) glue(" (grouping: {row$group})") else ""
+  if (row$class == "b" && row$coef == "Intercept") {
+    "the intercept"
+  } else if (row$class == "b" && nzchar(row$coef)) {
+    glue("the coefficient {row$coef}")
+  } else if (row$class == "b") {
+    "all population-level coefficients"
+  } else if (row$class == "Intercept") {
+    "the intercept"
+  } else if (row$class == "sd") {
+    glue("the group-level standard deviations{grouping}")
+  } else if (row$class %in% c("cor", "L")) {
+    glue("the correlations among group-level effects{grouping}")
+  } else {
+    glue("the {row$class} parameters")
+  }
+}
+
+upfirst <- function(x) {
+  paste0(toupper(substr(x, 1, 1)), substring(x, 2))
+}
+
 #' Generic S3 method for configuring the default prior for a bmmodel
 #'
 #' Called by bmm() to automatically construct the priors for a given

@@ -3,6 +3,7 @@
 ### New features
 * The **sdm** model now supports within-chain parallelization via the `threads` argument (e.g. `bmm(..., threads = 2)`), reducing fitting time by up to ~45% in benchmarks (#374).
 * Add `softplus` as an opt-in link function for positively-bounded parameters, as an alternative to the default `log` link. `softplus(x) = log(1 + exp(x))` keeps parameters positive while growing linearly for large values, avoiding the numerical blow-up of `exp()` and giving predictor effects an additive (rather than multiplicative) interpretation on the natural scale. Enable it per parameter via the model's `links` list, e.g. `m3(...)$links <- list(c = "softplus", a = "softplus")` or `ddm(rt, response, links = list(bound = "softplus"))` (#363).
+* New function `report_priors()` reports, for each parameter of a fitted model, its link function, the prior actually used on the sampling scale, and whether it was a bmm default, a brms default, or user-specified; parameters left with improper flat priors are flagged. `format = "text"` produces methods-section-ready sentences (#391).
 
 ### Bug fixes
 * Fix initial values being set in two places, where the `init` returned by `configure_model()` was silently overwritten by `create_initfun()`. This caused the **m3** model's intended `init = 0` (needed for stable sampling with the `simple` choice rule and an `identity` link) to be lost, and left dead `init` code in the **sdm** model. `create_initfun()` is now the single source of truth for initial values, with model-specific behaviour expressed through S3 methods (#375).
