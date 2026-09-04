@@ -19,19 +19,6 @@ test_that("mpt_tree validates its inputs", {
   expect_error(mpt_tree("t", list(a = 0.5, b = "x")), "character strings")
 })
 
-test_that("mpt identifies parameters and excludes covariates", {
-  tree <- mpt_tree("main", list(
-    correct = "Pb + (1 - Pb) * Pi * GcorrPi",
-    other = "(1 - Pb) * Pi * (1 - GcorrPi) + (1 - Pb) * (1 - Pi)"
-  ))
-  model <- mpt(tree, covariates = "GcorrPi")
-  expect_setequal(names(model$parameters), c("Pb", "Pi"))
-  expect_equal(model$other_vars$covariates, "GcorrPi")
-  expect_equal(model$links$Pb, "logit")
-  expect_equal(model$default_priors$Pb$main, "logistic(0, 1)")
-  expect_equal(model$default_priors$Pb$effects, "logistic(0, 0.5)")
-})
-
 test_that("mpt stores its derived state once and can rebuild itself", {
   model <- mpt(mpt_impossible_trees(), tree_id = "tree")
   expect_equal(model$link, "logit")
@@ -39,6 +26,10 @@ test_that("mpt stores its derived state once and can rebuild itself", {
   expect_equal(model$indicators$tree, c(withdist = "Idx_withdist", nodist = "Idx_nodist"))
   expect_equal(model$indicators$possible, c(dist = "Poss_dist"))
   expect_null(model$simplex_raw)
+  expect_setequal(names(model$parameters), c("Pm", "Pb"))
+  expect_equal(model$links$Pm, "logit")
+  expect_equal(model$default_priors$Pm$main, "logistic(0, 1)")
+  expect_equal(model$default_priors$Pm$effects, "logistic(0, 0.5)")
 
   # the recorded call differs by construction; every other field must match
   without_call <- function(m) {
@@ -54,8 +45,19 @@ test_that("mpt stores its derived state once and can rebuild itself", {
   expect_null(single$indicators$tree)
   expect_null(single$indicators$possible)
   expect_equal(single$simplex_raw, c(gA = "gAraw", gB = "gBraw"))
+  expect_equal(single$links$gA, "identity")
+  expect_equal(single$default_priors$gAraw$main, "normal(0, 1)")
+  expect_equal(single$default_priors$gAraw$effects, "normal(0, 0.5)")
   rebuilt_single <- do.call("mpt", .mpt_constructor_args(single))
   expect_equal(without_call(rebuilt_single), without_call(single))
+
+  covariate_tree <- mpt_tree("main", list(
+    correct = "Pb + (1 - Pb) * Pi * GcorrPi",
+    other = "(1 - Pb) * Pi * (1 - GcorrPi) + (1 - Pb) * (1 - Pi)"
+  ))
+  with_covariate <- mpt(covariate_tree, covariates = "GcorrPi")
+  expect_setequal(names(with_covariate$parameters), c("Pb", "Pi"))
+  expect_equal(with_covariate$other_vars$covariates, "GcorrPi")
 })
 
 test_that("importers record their own call", {
@@ -66,11 +68,39 @@ test_that("importers record their own call", {
   expect_output(print(model), "mpt_from_string")
 })
 
-test_that("mpt uses matched priors for the probit link", {
-  model <- mpt(mpt_2htm_trees(), tree_id = "item_type", links = "probit")
-  expect_equal(model$links$D, "probit")
-  expect_equal(model$default_priors$D$main, "normal(0, 1)")
-  expect_equal(model$default_priors$D$effects, "normal(0, 0.5)")
+test_that("an empty formula fits every parameter with an intercept", {
+  model <- mpt(mpt_2htm_trees(), tree_id = "item_type")
+  fit <- suppressMessages(bmm(
+    bmf(), mpt_2htm_data(), model, backend = "mock", mock_fit = 1, rename = FALSE
+  ))
+  expect_s3_class(fit, "bmmfit")
+  expect_setequal(names(fit$bmm$model$parameters), c("D", "g"))
+})
+
+test_that("update() re-runs the mpt data preparation for new data", {
+  model <- mpt(mpt_2htm_trees(), tree_id = "item_type")
+  dat10 <- mpt_2htm_data(n_id = 10)
+  dat20 <- mpt_2htm_data(n_id = 20)
+
+  # a mock stanfit with just enough structure for brms::update.brmsfit to
+  # reach its data-revalidation path without any compilation or sampling
+  methods::setClass("bmm_mock_stanfit", representation(sim = "list"))
+  mockfit <- methods::new("bmm_mock_stanfit", sim = list(
+    warmup = 1000, iter = 2000, chains = 1, thin = 1,
+    samples = list(structure(list(), args = list(control = list())))
+  ))
+  fit <- suppressMessages(bmm(
+    bmf(D ~ 1, g ~ 1), dat10, model,
+    backend = "mock", mock_fit = mockfit, rename = FALSE
+  ))
+  expect_equal(nrow(fit$data), nrow(dat10))
+  expect_true(all(c("Idx_old", "Idx_new") %in% names(fit$data)))
+
+  fit2 <- suppressMessages(
+    update(fit, newdata = dat20, testmode = TRUE, recompile = FALSE)
+  )
+  expect_equal(nrow(fit2$data), nrow(dat20))
+  expect_equal(sum(fit2$data$Idx_old), nrow(dat20) / 2)
 })
 
 test_that("mpt errors on invalid parameter and category names", {
