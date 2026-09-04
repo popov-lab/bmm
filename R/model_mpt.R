@@ -546,7 +546,14 @@ mpt <- function(trees, tree_id = NULL, covariates = NULL, simplex = NULL,
     use: {collapse_comma(raw_collisions)}"
   )
 
-  .mpt_validate_tree_sums(trees, parameters, covariates, simplex)
+  deviations <- .mpt_tree_sum_deviations(trees, parameters, covariates, simplex)
+  for (tree_name in names(deviations)[!is.na(deviations)]) {
+    warning2(
+      "The branch probabilities of tree '{tree_name}' sum to \\
+      {signif(deviations[[tree_name]], 6)} instead of 1 when evaluated at \\
+      numeric test values. Please check the branch expressions."
+    )
+  }
 
   .model_mpt(
     trees = trees, tree_id = tree_id, covariates = covariates,
@@ -613,75 +620,82 @@ check_model.mpt <- function(model, data = NULL, formula = NULL) {
       branch expressions and cannot be predicted directly. Please remove the \\
       formula(s) for: {collapse_comma(user_cat_formulas)}"
     )
-    model <- .mpt_apply_nl_bypass(model, formula, data)
-    .mpt_check_fixed_values(model)
+    nl_pars <- intersect(names(formula)[is_nl(formula)], names(model$parameters))
+    nl_simplex <- intersect(nl_pars, unlist(model$simplex))
+    stopif(
+      length(nl_simplex) > 0,
+      "Non-linear predictor formulas are not supported for simplex parameters: \\
+      {collapse_comma(nl_simplex)}"
+    )
+    sub_pars <- .mpt_nl_subparameters(model, formula, data)
+    .mpt_check_names(sub_pars, "parameter")
+    if (length(sub_pars) > 0) {
+      message2(
+        "The parameter(s) {collapse_comma(sub_pars)} from your non-linear \\
+        formulas are estimated on the identity scale with normal(0, 1) default \\
+        priors. Apply any required transformation inside your formula and \\
+        adjust the priors to the scale of your predictors."
+      )
+    }
+    model <- .mpt_bypass_links(model, nl_pars)
+    model <- .mpt_add_subparameters(model, sub_pars)
+
+    # fixed values from the bmmformula (e.g. g = 0.5) stay on the probability
+    # scale in the model object; configure_prior.mpt() maps them to the
+    # latent scale when it builds the constant priors
+    fixed_simplex <- intersect(names(model$fixed_parameters), unlist(model$simplex))
+    stopif(
+      length(fixed_simplex) > 0,
+      "Fixing simplex parameters to constants is not supported: \\
+      {collapse_comma(fixed_simplex)}"
+    )
+    for (par in .mpt_latent_fixed_pars(model)) {
+      value <- model$fixed_parameters[[par]]
+      stopif(
+        !is.numeric(value) || value <= 0 || value >= 1,
+        "The fixed value for parameter '{par}' must be a probability strictly \\
+        between 0 and 1. Provided: {value}"
+      )
+    }
   }
   NextMethod("check_model")
 }
 
-# parameters with a user-supplied non-linear formula own their (0,1)
-# constraint, so the automatic link transformation must be switched off for
-# them; sub-parameters referenced by such formulas become model parameters
-.mpt_apply_nl_bypass <- function(model, formula, data) {
-  nl_pars <- names(formula)[is_nl(formula)]
-  bypass_pars <- intersect(nl_pars, names(model$parameters))
-  simplex_bypass <- intersect(bypass_pars, unlist(model$simplex))
-  stopif(
-    length(simplex_bypass) > 0,
-    "Non-linear predictor formulas are not supported for simplex parameters: \\
-    {collapse_comma(simplex_bypass)}"
+# symbols of non-linear formulas that are neither parameters, formula
+# parameters nor data columns are sub-parameters the user introduces
+.mpt_nl_subparameters <- function(model, formula, data) {
+  nl_formulas <- formula[is_nl(formula)]
+  setdiff(
+    rhs_vars(nl_formulas),
+    c(
+      names(nl_formulas), names(model$parameters), colnames(data),
+      model$other_vars$covariates, model$other_vars$tree_id
+    )
   )
-  for (par in bypass_pars) {
+}
+
+# parameters with a user-supplied non-linear formula own their (0,1)
+# constraint, so the automatic link transformation is switched off for them
+.mpt_bypass_links <- function(model, pars) {
+  for (par in pars) {
     model$links[[par]] <- "identity"
     model$default_priors[[par]] <- NULL
-  }
-
-  sub_pars <- rhs_vars(formula[is_nl(formula)])
-  sub_pars <- setdiff(sub_pars, nl_pars)
-  sub_pars <- setdiff(sub_pars, names(model$parameters))
-  sub_pars <- setdiff(sub_pars, colnames(data))
-  sub_pars <- setdiff(
-    sub_pars,
-    c(model$other_vars$covariates, model$other_vars$tree_id)
-  )
-  if (length(sub_pars) > 0) {
-    .mpt_check_names(sub_pars, "parameter")
-    message2(
-      "The parameter(s) {collapse_comma(sub_pars)} from your non-linear \\
-      formulas are estimated on the identity scale with normal(0, 1) default \\
-      priors. Apply any required transformation inside your formula and \\
-      adjust the priors to the scale of your predictors."
-    )
-    model$parameters[sub_pars] <- .mpt_named_list(
-      sub_pars, "User-defined sub-parameter of a non-linear parameter formula."
-    )
-    model$links[sub_pars] <- .mpt_named_list(sub_pars, "identity")
-    model$default_priors[sub_pars] <- .mpt_named_list(
-      sub_pars, list(main = "normal(0, 1)", effects = "normal(0, 0.5)")
-    )
   }
   model
 }
 
-# fixed values from the bmmformula (e.g. g = 0.5) stay on the probability
-# scale in the model object; configure_prior.mpt() maps them to the latent
-# scale when it builds the constant priors
-.mpt_check_fixed_values <- function(model) {
-  fixed_simplex <- intersect(names(model$fixed_parameters), unlist(model$simplex))
-  stopif(
-    length(fixed_simplex) > 0,
-    "Fixing simplex parameters to constants is not supported: \\
-    {collapse_comma(fixed_simplex)}"
-  )
-  for (par in .mpt_latent_fixed_pars(model)) {
-    value <- model$fixed_parameters[[par]]
-    stopif(
-      !is.numeric(value) || value <= 0 || value >= 1,
-      "The fixed value for parameter '{par}' must be a probability strictly \\
-      between 0 and 1. Provided: {value}"
-    )
+.mpt_add_subparameters <- function(model, sub_pars) {
+  if (length(sub_pars) == 0L) {
+    return(model)
   }
-  invisible(NULL)
+  model$parameters[sub_pars] <- .mpt_named_list(
+    sub_pars, "User-defined sub-parameter of a non-linear parameter formula."
+  )
+  model$links[sub_pars] <- .mpt_named_list(sub_pars, "identity")
+  model$default_priors[sub_pars] <- .mpt_named_list(
+    sub_pars, list(main = "normal(0, 1)", effects = "normal(0, 0.5)")
+  )
+  model
 }
 
 # fixed latent probability parameters; sub-parameters of non-linear formulas
@@ -757,6 +771,14 @@ check_data.mpt <- function(model, data, formula) {
       data[[idx_vars[[tree_name]]]] <- as.integer(tree_values == tree_name)
     }
   }
+
+  raw_collisions <- intersect(model$simplex_raw, colnames(data))
+  stopif(
+    length(raw_collisions) > 0,
+    "The data contain column(s) {collapse_comma(raw_collisions)}, which are \\
+    the names of the stick-breaking components of the simplex parameters. \\
+    Please rename them."
+  )
 
   data <- .mpt_possibility_indicators(model, data)
 
@@ -860,6 +882,26 @@ check_data.mpt <- function(model, data, formula) {
 
 #' @export
 check_formula.mpt <- function(model, data, formula) {
+  for (grp in model$simplex) {
+    free_pars <- grp[-length(grp)]
+    derived_par <- grp[length(grp)]
+    conflicts <- free_pars[vapply(free_pars, function(par) {
+      .mpt_formulas_conflict(formula[[par]], formula[[model$simplex_raw[[par]]]])
+    }, logical(1))]
+    stopif(
+      length(conflicts) > 0,
+      "Conflicting predictor formulas for the simplex parameter(s) \\
+      {collapse_comma(conflicts)} and the stick-breaking component(s) \\
+      {collapse_comma(model$simplex_raw[conflicts])}. Specify predictors for \\
+      the simplex parameters only."
+    )
+    stopif(
+      !.mpt_intercept_only(formula[[derived_par]]),
+      "The parameter '{derived_par}' is derived as 1 minus the sum of \\
+      {collapse_comma(free_pars)} and cannot have its own predictors. Specify \\
+      predictors for the other parameters of the simplex group instead."
+    )
+  }
   formula <- .mpt_move_simplex_formulas(model, formula)
 
   generated <- .mpt_category_formulas(model)
@@ -882,46 +924,28 @@ check_formula.mpt <- function(model, data, formula) {
 
 # predictor formulas for the free parameters of a simplex group apply to
 # their unconstrained stick-breaking components; the parameters themselves
-# receive generated stick-breaking formulas
+# receive generated stick-breaking formulas. check_formula.bmmodel() has added
+# `par ~ 1` for every parameter by the time these run, so a user's explicit
+# `par ~ 1` counts as "no predictors" and the raw component's formula stands.
 .mpt_move_simplex_formulas <- function(model, formula) {
   for (grp in model$simplex) {
-    free_pars <- grp[-length(grp)]
-    derived_par <- grp[length(grp)]
-    for (par in free_pars) {
+    for (par in grp[-length(grp)]) {
+      if (.mpt_intercept_only(formula[[par]])) next
       raw_par <- model$simplex_raw[[par]]
-      par_rhs <- .mpt_rhs_chr(formula[[par]])
-      raw_rhs <- .mpt_rhs_chr(formula[[raw_par]])
-      stopif(
-        par_rhs != "1" && raw_rhs != "1" && par_rhs != raw_rhs,
-        "Conflicting predictor formulas for the simplex parameter '{par}' and \\
-        its stick-breaking component '{raw_par}'. Specify predictors for \\
-        '{par}' only."
-      )
-      if (par_rhs != "1") {
-        formula[raw_par] <- list(
-          stats::as.formula(call("~", as.name(raw_par), formula[[par]][[3]]))
-        )
-      }
+      formula[raw_par] <- list(.mpt_formula(raw_par, formula[[par]][[3]]))
     }
-    derived_rhs <- .mpt_rhs_chr(formula[[derived_par]])
-    stopif(
-      derived_rhs != "1",
-      "The parameter '{derived_par}' is derived as 1 minus the sum of \\
-      {collapse_comma(free_pars)} and cannot have its own predictors. Specify \\
-      predictors for the other parameters of the simplex group instead."
-    )
     formula <- formula[setdiff(names(formula), grp)]
   }
   formula
 }
 
-# a missing formula is treated as the intercept-only default the pipeline
-# would add, so direct calls before add_missing_parameters() cannot produce NA
-.mpt_rhs_chr <- function(pform) {
-  if (!is_formula(pform)) {
-    return("1")
-  }
-  paste(deparse(pform[[3]]), collapse = " ")
+.mpt_intercept_only <- function(pform) {
+  identical(pform[[3]], 1)
+}
+
+.mpt_formulas_conflict <- function(par_form, raw_form) {
+  !.mpt_intercept_only(par_form) && !.mpt_intercept_only(raw_form) &&
+    !identical(par_form[[3]], raw_form[[3]])
 }
 
 .mpt_category_formulas <- function(model) {

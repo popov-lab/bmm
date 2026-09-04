@@ -177,7 +177,8 @@ mpt_from_eqn <- function(file, restrictions = NULL, categories = NULL,
     unlist(lapply(exprs, all.vars)),
     names(restrictions), unlist(lapply(restrictions, all.vars))
   ))
-  par_renaming <- .mpt_sanitize_names(setdiff(symbols, covariates))
+  par_renaming <- .mpt_sanitized_names(setdiff(symbols, covariates))
+  .mpt_check_sanitized_names(par_renaming)
   symbol_map <- lapply(par_renaming, as.name)
   eqn$expr <- vapply(exprs, function(expr) {
     deparse1(.mpt_substitute_symbols(expr, symbol_map))
@@ -197,7 +198,8 @@ mpt_from_eqn <- function(file, restrictions = NULL, categories = NULL,
   category_clean[has_tree_prefix] <- substring(
     category_clean[has_tree_prefix], nchar(eqn$tree[has_tree_prefix]) + 2
   )
-  cat_renaming <- .mpt_sanitize_names(unique(category_clean))
+  cat_renaming <- .mpt_sanitized_names(unique(category_clean))
+  .mpt_check_sanitized_names(cat_renaming)
   renamed_cats <- unlist(cat_renaming[category_clean], use.names = FALSE)
   cat_renaming <- setNames(renamed_cats, eqn$category)
   cat_renaming <- cat_renaming[!duplicated(names(cat_renaming))]
@@ -253,13 +255,17 @@ mpt_from_eqn <- function(file, restrictions = NULL, categories = NULL,
 
 # maps each name to a version without underscores and dots (the brms nlpar
 # constraint); names that are already valid map to themselves
-.mpt_sanitize_names <- function(names) {
-  sanitized <- gsub("[._]", "", names)
+.mpt_sanitized_names <- function(names) {
+  setNames(as.list(gsub("[._]", "", names)), names)
+}
+
+.mpt_check_sanitized_names <- function(renaming) {
+  sanitized <- unlist(renaming)
   clashes <- sanitized[duplicated(sanitized)]
   stopif(
     length(clashes) > 0,
     "Removing underscores and dots produces duplicated names: \\
     {collapse_comma(unique(clashes))}. Please rename them in the model file."
   )
-  setNames(as.list(sanitized), names)
+  invisible(NULL)
 }

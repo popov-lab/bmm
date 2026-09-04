@@ -471,11 +471,30 @@ test_that("mpt category probabilities match the production m3 likelihood", {
   expect_lt(max_diff, 1e-10)
 })
 
-test_that("simplex formula handling tolerates omitted parameter formulas", {
+test_that("simplex predictors may be given on the parameter or its raw component", {
   trees <- list(mpt_tree("t", list(A = "gA", B = "gB", C = "gC")))
   model <- mpt(trees, simplex = c("gA", "gB", "gC"))
-  moved <- .mpt_move_simplex_formulas(model, bmf(gA ~ 1))
-  expect_false(any(c("gA", "gB", "gC") %in% names(moved)))
+  dat <- data.frame(id = factor(1:5), A = 10, B = 10, C = 10)
+
+  # an explicit gA ~ 1 does not override predictors on gAraw
+  on_raw <- suppressMessages(check_formula(
+    model, dat, bmf(gA ~ 1, gAraw ~ 1 + (1 | id), gB ~ 1, gBraw ~ 1)
+  ))
+  expect_equal(deparse1(on_raw$gAraw[[3]]), "1 + (1 | id)")
+  expect_equal(deparse1(on_raw$gA[[3]]), "inv_logit(gAraw)")
+
+  expect_error(
+    suppressMessages(check_formula(
+      model, dat, bmf(gA ~ 0 + id, gAraw ~ 1 + (1 | id), gB ~ 1, gBraw ~ 1)
+    )),
+    "Conflicting"
+  )
+  expect_no_error(suppressMessages(check_formula(
+    model, dat, bmf(gA ~ 0 + id, gAraw ~ 0 + id, gB ~ 1, gBraw ~ 1)
+  )))
+
+  dat$gAraw <- 1
+  expect_error(check_data(model, dat, bmf(gA ~ 1, gB ~ 1)), "stick-breaking")
 })
 
 test_that("mpt supports multiple simplex groups", {
@@ -583,15 +602,15 @@ test_that("impossible categories are switched off in the linear predictor", {
 
   # the tree that cannot produce the category contributes a placeholder, so
   # log() stays defined for its rows
-  expect_match(.mpt_rhs_chr(checked_formula$dist), "Idx_nodist * (1)", fixed = TRUE)
+  expect_match(deparse1(checked_formula$dist[[3]]), "Idx_nodist * (1)", fixed = TRUE)
 
   brms_formula <- configure_model(model, checked_data, checked_formula)$formula
   expect_match(
-    .mpt_rhs_chr(brms_formula$pforms$mudist),
+    deparse1(brms_formula$pforms$mudist[[3]]),
     "Poss_dist * log(dist) + (1 - Poss_dist) * (-100)",
     fixed = TRUE
   )
-  expect_match(.mpt_rhs_chr(brms_formula$formula), "log(corr)", fixed = TRUE)
+  expect_match(deparse1(brms_formula$formula[[3]]), "log(corr)", fixed = TRUE)
 })
 
 test_that("mpt compiles with structurally impossible categories", {

@@ -158,15 +158,13 @@
 
 # branches of each tree must sum to 1 for any parameter values; evaluating at
 # several distinct test points catches swapped-complement errors that a single
-# symmetric point (e.g. all 0.5) would miss
-.mpt_validate_tree_sums <- function(trees, parameters, covariates, simplex,
-                                    tolerance = 1e-6) {
+# symmetric point (e.g. all 0.5) would miss. Returns the first deviating
+# branch sum per tree, NA where every test point sums to 1.
+.mpt_tree_sum_deviations <- function(trees, parameters, covariates, simplex,
+                                     tolerance = 1e-6) {
   symbols <- c(parameters, covariates)
-  if (length(symbols) == 0L) {
-    return(invisible(NULL))
-  }
   test_vals <- c(0.137, 0.421, 0.683, 0.852)
-  for (tree in trees) {
+  vapply(trees, function(tree) {
     for (shift in seq_along(test_vals)) {
       vals <- setNames(
         test_vals[(seq_along(symbols) + shift - 2L) %% length(test_vals) + 1L],
@@ -177,14 +175,9 @@
       }
       total <- sum(.mpt_eval_branches(tree, as.list(vals)))
       if (abs(total - 1) > tolerance) {
-        warning2(
-          "The branch probabilities of tree '{tree$name}' sum to \\
-          {signif(total, 6)} instead of 1 when evaluated at numeric test \\
-          values. Please check the branch expressions."
-        )
-        break
+        return(total)
       }
     }
-  }
-  invisible(NULL)
+    NA_real_
+  }, numeric(1))
 }

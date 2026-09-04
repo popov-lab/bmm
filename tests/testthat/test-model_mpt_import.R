@@ -115,6 +115,13 @@ test_that("mpt_from_eqn renames correctly when one name prefixes another", {
   expect_equal(attr(model, "mpt_renaming")[["d_A.x"]], "dAx")
 })
 
+test_that("sanitized names map onto brms-safe names", {
+  expect_equal(
+    .mpt_sanitized_names(c("d_A", "d.B", "g")),
+    list(d_A = "dA", d.B = "dB", g = "g")
+  )
+})
+
 test_that("mpt_from_eqn errors on names that clash after sanitizing", {
   eqn_file <- tempfile(fileext = ".eqn")
   writeLines(c(
