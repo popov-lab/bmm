@@ -215,8 +215,7 @@ print.mpt_tree <- function(x, ...) {
       parameters = parameter_info,
       fixed_parameters = list(),
       links = link_info,
-      default_priors = prior_info,
-      void_mu = FALSE
+      default_priors = prior_info
     ),
     class = c("bmmodel", "mpt"),
     call = call

@@ -198,7 +198,7 @@ response_annotations <- function(model) {
       n_upper = "count of upper-boundary responses"
     ))
   }
-  if (inherits(model, "m3")) {
+  if (inherits(model, "m3") || inherits(model, "mpt")) {
     return(list(resp_cats = "counts per response category"))
   }
   list()

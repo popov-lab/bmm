@@ -29,6 +29,7 @@ Imports:
     crayon,
     fs,
     glue,
+    graphics,
     matrixStats,
     methods,
     parallel,

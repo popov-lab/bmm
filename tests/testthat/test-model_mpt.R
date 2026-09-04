@@ -200,6 +200,29 @@ test_that("mpt compiles with design-fixed covariates", {
   ))
 })
 
+test_that("generated indicator and covariate columns do not trigger the clash warning", {
+  model <- mpt(mpt_2htm_trees(), tree_id = "item_type")
+  dat <- mpt_2htm_data()
+  expect_no_warning(bmm(
+    bmf(D ~ 1 + (1 | id), g ~ 1), dat, model,
+    backend = "mock", mock_fit = 1, rename = FALSE
+  ))
+})
+
+test_that("a fixed non-linear sub-parameter reaches the constant prior", {
+  model <- mpt(mpt_2htm_trees(), tree_id = "item_type")
+  dat <- mpt_2htm_data()
+  dat$ptime <- rep(c(1, 2), length.out = nrow(dat))
+  formula <- bmf(
+    D ~ inv_logit(Dmax) * (1 - exp(-exp(rate) * ptime)),
+    Dmax = 1, rate ~ 1, g ~ 1
+  )
+  prior <- suppressWarnings(suppressMessages(default_prior(formula, dat, model)))
+  constant_row <- prior[grepl("constant", prior$prior), ]
+  expect_equal(constant_row$nlpar, "Dmax")
+  expect_equal(constant_row$prior, "constant(1)")
+})
+
 test_that("non-linear parameter formulas bypass the link transformation", {
   tree <- mpt_tree("main", list(
     correct = "D + (1 - D) * 0.25",
