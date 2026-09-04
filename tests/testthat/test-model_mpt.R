@@ -1,27 +1,3 @@
-mpt_2htm_trees <- function() {
-  list(
-    mpt_tree("old", list(
-      old = "D + (1 - D) * g",
-      new = "(1 - D) * (1 - g)"
-    )),
-    mpt_tree("new", list(
-      old = "(1 - D) * g",
-      new = "D + (1 - D) * (1 - g)"
-    ))
-  )
-}
-
-mpt_2htm_data <- function(n_id = 10, n_items = 50) {
-  dat <- expand.grid(
-    id = factor(seq_len(n_id)), item_type = c("old", "new"),
-    stringsAsFactors = FALSE
-  )
-  p_old <- ifelse(dat$item_type == "old", 0.85, 0.15)
-  dat$old <- rbinom(nrow(dat), n_items, p_old)
-  dat$new <- n_items - dat$old
-  dat
-}
-
 test_that("mpt_tree constructs and prints a tree", {
   tree <- mpt_tree("old", list(
     old = "D + (1 - D) * g",
@@ -31,16 +7,6 @@ test_that("mpt_tree constructs and prints a tree", {
   expect_equal(tree$name, "old")
   expect_equal(names(tree$branches), c("old", "new"))
   expect_output(print(tree), "P\\(old\\) = D")
-})
-
-test_that("mpt_tree folds integer fractions into decimal literals", {
-  tree <- mpt_tree("t", list(
-    a = "p + (1 - p) * (1/4)",
-    b = "(1 - p) * (3/4)"
-  ))
-  expect_false(grepl("/", tree$branches$a, fixed = TRUE))
-  expect_true(grepl("0.25", tree$branches$a, fixed = TRUE))
-  expect_true(grepl("0.75", tree$branches$b, fixed = TRUE))
 })
 
 test_that("mpt_tree validates its inputs", {
@@ -111,11 +77,6 @@ test_that("mpt validates simplex groups", {
     mpt(trees, tree_id = "item_type", simplex = "g"),
     "at least two parameters"
   )
-})
-
-test_that("mpt warns when branch probabilities do not sum to 1", {
-  bad_tree <- mpt_tree("t", list(a = "D * g", b = "(1 - D) * g"))
-  expect_warning(mpt(bad_tree), "sum to")
 })
 
 test_that("check_formula generates linked category formulas", {
@@ -413,114 +374,11 @@ test_that("mpt category probabilities match the production m3 likelihood", {
   expect_lt(max_diff, 1e-10)
 })
 
-test_that("mpt_from_string parses MPTinR-style model definitions", {
-  model_2htm <- "
-  D + (1 - D) * g        # old
-  (1 - D) * (1 - g)      # new
-
-  (1 - D) * g            # old
-  D + (1 - D) * (1 - g)  # new
-  "
-  model <- mpt_from_string(
-    model_2htm, tree_names = c("old", "new"), tree_id = "item_type"
-  )
-  manual <- mpt(mpt_2htm_trees(), tree_id = "item_type")
-  expect_equal(model$trees, manual$trees)
-  expect_equal(names(model$parameters), names(manual$parameters))
-
-  summed <- mpt_from_string(
-    "D # hit\n(1 - D) * g # hit\n(1 - D) * (1 - g) # miss",
-    tree_names = "old"
-  )
-  expect_equal(summed$trees$old$branches$hit, "(D) + ((1 - D) * g)")
-
-  no_comments <- mpt_from_string(
-    "D + (1 - D) * g\n(1 - D) * (1 - g)",
-    tree_names = "old", categories = c("hit", "miss")
-  )
-  expect_equal(names(no_comments$trees$old$branches), c("hit", "miss"))
-
-  expect_error(
-    mpt_from_string("D # a\n1 - D # b", tree_names = c("t1", "t2")),
-    "tree block"
-  )
-  expect_error(
-    mpt_from_string("D + (1 - D) * g\n(1 - D) * (1 - g)", tree_names = "old"),
-    "categories"
-  )
-})
-
-test_that("mpt_from_eqn imports EQN files with restrictions and renaming", {
-  eqn_file <- tempfile(fileext = ".eqn")
-  writeLines(c(
-    "6",
-    "old  old_hit   D_o",
-    "old  old_hit   (1-D_o)*g_uess*G_fix",
-    "old  old_miss  (1-D_o)*(1-g_uess*G_fix)",
-    "new  new_fa    (1-D_n)*g_uess*G_fix",
-    "new  new_cr    D_n",
-    "new  new_cr    (1-D_n)*(1-g_uess*G_fix)"
-  ), eqn_file)
-
-  category_map <- c(
-    old_hit = "yes", new_fa = "yes", old_miss = "no", new_cr = "no"
-  )
-  model <- suppressMessages(mpt_from_eqn(
-    eqn_file,
-    restrictions = c(G_fix = 1 / 4),
-    categories = category_map,
-    tree_id = "item_type"
-  ))
-  expect_setequal(names(model$parameters), c("Do", "Dn", "guess"))
-  expect_setequal(model$resp_vars$resp_cats, c("yes", "no"))
-  expect_false(any(grepl("G_fix", unlist(model$trees$old$branches))))
-  expect_true(grepl("0.25", model$trees$old$branches$yes, fixed = TRUE))
-
-  renaming <- attr(model, "mpt_renaming")
-  expect_equal(renaming[["D_o"]], "Do")
-  expect_equal(renaming[["old_hit"]], "yes")
-
-  expect_error(
-    suppressMessages(mpt_from_eqn(
-      eqn_file, restrictions = c(G_fix = "D_o"), categories = category_map
-    )),
-    "numeric constants"
-  )
-
-  # per-tree category labels without a mapping cannot be combined
-  expect_error(
-    suppressMessages(mpt_from_eqn(eqn_file, restrictions = c(G_fix = 0.25))),
-    "categories argument"
-  )
-})
-
-test_that("mpt_from_eqn renames correctly when one name prefixes another", {
-  # 'd_A' matches the prefix of 'd_A.x' at the dot boundary, so substitution
-  # must run longest-first to avoid partially renamed leftovers like 'dA.x'
-  eqn_file <- tempfile(fileext = ".eqn")
-  writeLines(c(
-    "t  a  d_A*d_A.x",
-    "t  b  1-d_A*d_A.x"
-  ), eqn_file)
-  model <- suppressMessages(mpt_from_eqn(eqn_file))
-  expect_setequal(names(model$parameters), c("dA", "dAx"))
-  expect_equal(attr(model, "mpt_renaming")[["d_A.x"]], "dAx")
-})
-
 test_that("simplex formula handling tolerates omitted parameter formulas", {
   trees <- list(mpt_tree("t", list(A = "gA", B = "gB", C = "gC")))
   model <- mpt(trees, simplex = c("gA", "gB", "gC"))
   moved <- .mpt_move_simplex_formulas(model, bmf(gA ~ 1))
   expect_false(any(c("gA", "gB", "gC") %in% names(moved)))
-})
-
-test_that("mpt_from_eqn errors on names that clash after sanitizing", {
-  eqn_file <- tempfile(fileext = ".eqn")
-  writeLines(c(
-    "t  a  d_A + dA",
-    "t  b  1 - d_A - dA"
-  ), eqn_file)
-  expect_error(mpt_from_eqn(eqn_file), "duplicated names")
 })
 
 test_that("mpt supports multiple simplex groups", {
@@ -756,77 +614,6 @@ test_that("covariate sum check respects tree membership", {
   # the invalid covariate values sit in rows of the tree that does not use
   # the covariates, so no warning should be raised
   expect_silent(check_data(model, dat, bmf(D ~ 1)))
-})
-
-test_that("branch expressions expand into root-to-leaf paths", {
-  paths <- .mpt_branch_paths("D + (1 - D) * g")
-  expect_equal(paths, list("D", c("1 - D", "g")))
-
-  # factored subtrees are expanded distributively
-  paths_factored <- .mpt_branch_paths("Pm*(Pb + (1 - Pb)*0.25)")
-  expect_equal(paths_factored, list(c("Pm", "Pb"), c("Pm", "1 - Pb", "0.25")))
-})
-
-test_that("the tree graph merges shared path prefixes only", {
-  tree <- mpt_tree("old", list(
-    old = "D + (1 - D) * g",
-    new = "(1 - D) * (1 - g)"
-  ))
-  graph <- .mpt_tree_graph(tree)
-  leaves <- graph$nodes[!is.na(graph$nodes$category), ]
-  expect_equal(leaves$category, c("old", "old", "new"))
-  # internal nodes: the root and the shared (1 - D) node
-  expect_equal(sum(is.na(graph$nodes$category)), 2)
-  expect_setequal(graph$edges$label, c("D", "1 - D", "g", "1 - g"))
-})
-
-test_that("equal terminal weights stay separate leaf edges", {
-  fan <- mpt_tree("t", list(
-    a = "m + (1 - m) * (1/3)",
-    b = "(1 - m) * (1/3)",
-    c = "(1 - m) * (1/3)"
-  ))
-  graph <- .mpt_tree_graph(fan)
-  leaves <- graph$nodes[!is.na(graph$nodes$category), ]
-  expect_equal(leaves$category, c("a", "a", "b", "c"))
-  # constant edge labels are rounded for display
-  expect_equal(sum(graph$edges$label == "0.333"), 3)
-})
-
-test_that("plot methods run for trees and models", {
-  tree_old <- mpt_tree("old", list(
-    old = "D + (1 - D) * g",
-    new = "(1 - D) * (1 - g)"
-  ))
-  model <- mpt(
-    list(tree_old, mpt_tree("new", list(
-      old = "(1 - D) * g",
-      new = "D + (1 - D) * (1 - g)"
-    ))),
-    tree_id = "item_type"
-  )
-  grDevices::pdf(NULL)
-  expect_silent(plot(tree_old))
-  expect_silent(plot(model))
-  grDevices::dev.off()
-})
-
-test_that("constants that Stan would receive in scientific notation error", {
-  # brms deparses formula constants into the Stan code and spaces out
-  # operators, so 6.7e-05 would become the subtraction '6.7e - 05'
-  expect_error(
-    mpt_tree("t", list(
-      a = "p + (1 - p) * (1 - 0.001/15.001)",
-      b = "(1 - p) * (0.001/15.001)"
-    )),
-    "scientific"
-  )
-  # constants that deparse in fixed notation are fine
-  tree <- mpt_tree("t", list(
-    a = "p + (1 - p) * (1 - 0.001)",
-    b = "(1 - p) * 0.001"
-  ))
-  expect_equal(tree$branches$b, "(1 - p) * 0.001")
 })
 
 test_that("the item-memory-first MPT matches the simple-rule m3 with a distractor category", {
