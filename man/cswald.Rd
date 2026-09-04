@@ -18,8 +18,8 @@ automatically.}
 
 \item{links}{A named list of link functions for the model parameters.
 Available parameters depend on the version: "simple" has \code{drift}, \code{bound},
-\code{ndt}, and \code{s}; "crisk" additionally has \code{zr}. Default links are "log" for
-most parameters and "logit" for \code{zr}. For positive parameters, "softplus"
+\code{ndt}, \code{s}, and \code{sndt}; "crisk" additionally has \code{zr}. Default links are
+"log" for most parameters and "logit" for \code{zr}. For positive parameters, "softplus"
 is available as an alternative to "log" that grows linearly for large
 values and avoids the numerical blow-up of \code{exp()}.}
 
@@ -75,17 +75,19 @@ for Choice Response Times. Applied Psychological Measurement, 42(2), 116-135. ht
 \itemize{
 \item \code{drift}: drift rate
 \item \code{bound}: boundary (distance from starting point to correct boundary)
-\item \code{ndt}: non-decision time
+\item \code{ndt}: non-decision time (minimum non-decision time when sndt > 0)
 \item \code{s}: diffusion constant
+\item \code{sndt}: range of the uniform trial-to-trial variability in the non-decision time
 }
 \item \strong{Fixed parameters:}
 \itemize{
 \item \code{mu} = 0
 \item \code{s} = 0
+\item \code{sndt} = 0
 }
 \item \strong{Default parameter links:}
 \itemize{
-\item drift = log; bound = log; ndt = log; s = log
+\item drift = log; bound = log; ndt = log; s = log; sndt = identity
 }
 \item \strong{Default priors:}
 \itemize{
@@ -108,6 +110,11 @@ for Choice Response Times. Applied Psychological Measurement, 42(2), 116-135. ht
 \itemize{
 \item \code{main}: normal(0,0.3)
 \item \code{effects}: normal(0,0.2)
+}
+\item \code{sndt}:
+\itemize{
+\item \code{main}: normal(-2.5,1)
+\item \code{effects}: normal(0,0.3)
 }
 }
 }
