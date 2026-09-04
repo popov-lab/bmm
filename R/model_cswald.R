@@ -158,6 +158,58 @@
 #'   For more details, see Miller et al. (2017).
 #' @param ... Additional arguments passed internally (for testing purposes).
 #' @return An object of class `bmmodel`
+#' @section Trial-to-trial variability in the non-decision time:
+#'
+#'   Both versions have an optional parameter `sndt`: the non-decision time is
+#'   `Uniform(ndt, ndt + sndt)`, so `ndt` is the *minimum* non-decision time and
+#'   `ndt + sndt/2` the mean. This is the `st0` of [rtdists::rdiffusion()];
+#'   fast-dm centers the same uniform on its `t0`, which is then the mean.
+#'
+#'   `sndt` is fixed at 0 by default, which reproduces the standard censored
+#'   shifted Wald model. Estimate it with a formula (`bmf(..., sndt ~ 1)`) or
+#'   fix it in seconds (`bmf(..., sndt = 0.15)`); fixed values are on the
+#'   natural scale, and `sndt` uses the log link only once it is estimated.
+#'
+#'   Without `sndt`, the fastest responses cap the `ndt` estimate (the
+#'   likelihood requires `ndt < min(rt)`), which biases `ndt`, `drift`, and
+#'   `bound` when the true non-decision time varies (Miller et al., 2017,
+#'   Fig. 3). Estimating `sndt` removes this bias, but `sndt` itself is weakly
+#'   identified at typical trial numbers and the prior acts as its regularizer:
+#'   estimate it at the population level only (`sndt ~ 1`) and check prior
+#'   sensitivity.
+#'
+#'   In the `"crisk"` version with `sndt > 0`, each accumulator draws its own
+#'   non-decision time instead of sharing one draw per trial. Choice
+#'   probabilities agree exactly with the shared-draw model at `zr = 0.5`; away
+#'   from it they differ by up to ~1 percentage point at `sndt = 0.3` (~4 at
+#'   `zr = 0.2`), and densities by up to ~10%. `posterior_predict()` simulates
+#'   through [rtdists::rdiffusion()], which shares the draw, so `pp_check()`
+#'   compares against a slightly different model whenever `zr` departs from 0.5.
+#'
+#' @section Estimating `sndt` in the "crisk" version at substantial error rates:
+#'
+#'   The crisk race only approximates a single diffusion process, and the
+#'   approximation degrades as errors become frequent. A free `sndt` can absorb
+#'   that approximation error rather than genuine non-decision-time
+#'   variability: on diffusion-generated data with 10-17% errors (true `bound`
+#'   1.6, `sndt` 0.2), the crisk fit converged to `bound` ~1.2 and `sndt` ~0.4
+#'   even with very large samples, while data from its own racing process were
+#'   recovered without bias. A shared-draw formulation gives the same estimates,
+#'   so this is a property of the crisk approximation itself. Options:
+#'   \itemize{
+#'     \item Below roughly 10% errors, use the `"simple"` version, where `sndt`
+#'       recovery is unbiased.
+#'     \item At substantial error rates, prefer the `ddm` model (exact, but
+#'       currently without non-decision-time variability) or keep `sndt` fixed
+#'       at 0, where the crisk estimates stay close to the diffusion values.
+#'     \item Fix `sndt` at a plausible value (e.g. `bmf(..., sndt = 0.1)`) to
+#'       bound its influence while letting the mean non-decision time exceed
+#'       the fastest response.
+#'     \item Treat a free `sndt` that comes out much larger, with a much smaller
+#'       `bound`, than in a fit with `sndt` fixed or a `ddm` fit as a sign of
+#'       absorbed approximation error, and check with `pp_check()` before
+#'       interpreting the parameters.
+#'   }
 #' @export
 #' @keywords bmmodel
 #' @seealso [dcswald()] and [rcswald()] for the density and random generation

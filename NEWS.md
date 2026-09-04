@@ -2,6 +2,7 @@
 
 ### New features
 * The **sdm** model now supports within-chain parallelization via the `threads` argument (e.g. `bmm(..., threads = 2)`), reducing fitting time by up to ~45% in benchmarks (#374).
+* The **cswald** model (both versions) gains an optional parameter `sndt` for uniform trial-to-trial variability in the non-decision time (the `st0` of rtdists): the non-decision time is `Uniform(ndt, ndt + sndt)`, so `ndt` is the minimum and `ndt + sndt/2` the mean. It is fixed at 0 by default, which reproduces the previous likelihood exactly, and is estimated by adding `sndt ~ 1` to the formula. This stops a few fast responses from biasing `ndt`, `drift`, and `bound`. `sndt` itself is weakly identified, and in the `crisk` version at substantial error rates it can absorb approximation error; see `?cswald`. `dcswald()`, `pcswald()`, `qcswald()`, and `rcswald()` gain a matching `sndt` argument (#387).
 * Add `softplus` as an opt-in link function for positively-bounded parameters, as an alternative to the default `log` link. `softplus(x) = log(1 + exp(x))` keeps parameters positive while growing linearly for large values, avoiding the numerical blow-up of `exp()` and giving predictor effects an additive (rather than multiplicative) interpretation on the natural scale. Enable it per parameter via the model's `links` list, e.g. `m3(...)$links <- list(c = "softplus", a = "softplus")` or `ddm(rt, response, links = list(bound = "softplus"))` (#363).
 
 ### Bug fixes

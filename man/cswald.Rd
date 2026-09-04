@@ -119,6 +119,63 @@ for Choice Response Times. Applied Psychological Measurement, 42(2), 116-135. ht
 }
 }
 }
+\section{Trial-to-trial variability in the non-decision time}{
+
+
+Both versions have an optional parameter \code{sndt}: the non-decision time is
+\code{Uniform(ndt, ndt + sndt)}, so \code{ndt} is the \emph{minimum} non-decision time and
+\code{ndt + sndt/2} the mean. This is the \code{st0} of \code{\link[rtdists:Diffusion]{rtdists::rdiffusion()}};
+fast-dm centers the same uniform on its \code{t0}, which is then the mean.
+
+\code{sndt} is fixed at 0 by default, which reproduces the standard censored
+shifted Wald model. Estimate it with a formula (\code{bmf(..., sndt ~ 1)}) or
+fix it in seconds (\code{bmf(..., sndt = 0.15)}); fixed values are on the
+natural scale, and \code{sndt} uses the log link only once it is estimated.
+
+Without \code{sndt}, the fastest responses cap the \code{ndt} estimate (the
+likelihood requires \code{ndt < min(rt)}), which biases \code{ndt}, \code{drift}, and
+\code{bound} when the true non-decision time varies (Miller et al., 2017,
+Fig. 3). Estimating \code{sndt} removes this bias, but \code{sndt} itself is weakly
+identified at typical trial numbers and the prior acts as its regularizer:
+estimate it at the population level only (\code{sndt ~ 1}) and check prior
+sensitivity.
+
+In the \code{"crisk"} version with \code{sndt > 0}, each accumulator draws its own
+non-decision time instead of sharing one draw per trial. Choice
+probabilities agree exactly with the shared-draw model at \code{zr = 0.5}; away
+from it they differ by up to ~1 percentage point at \code{sndt = 0.3} (~4 at
+\code{zr = 0.2}), and densities by up to ~10\%. \code{posterior_predict()} simulates
+through \code{\link[rtdists:Diffusion]{rtdists::rdiffusion()}}, which shares the draw, so \code{pp_check()}
+compares against a slightly different model whenever \code{zr} departs from 0.5.
+}
+
+\section{Estimating \code{sndt} in the "crisk" version at substantial error rates}{
+
+
+The crisk race only approximates a single diffusion process, and the
+approximation degrades as errors become frequent. A free \code{sndt} can absorb
+that approximation error rather than genuine non-decision-time
+variability: on diffusion-generated data with 10-17\% errors (true \code{bound}
+1.6, \code{sndt} 0.2), the crisk fit converged to \code{bound} ~1.2 and \code{sndt} ~0.4
+even with very large samples, while data from its own racing process were
+recovered without bias. A shared-draw formulation gives the same estimates,
+so this is a property of the crisk approximation itself. Options:
+\itemize{
+\item Below roughly 10\% errors, use the \code{"simple"} version, where \code{sndt}
+recovery is unbiased.
+\item At substantial error rates, prefer the \code{ddm} model (exact, but
+currently without non-decision-time variability) or keep \code{sndt} fixed
+at 0, where the crisk estimates stay close to the diffusion values.
+\item Fix \code{sndt} at a plausible value (e.g. \code{bmf(..., sndt = 0.1)}) to
+bound its influence while letting the mean non-decision time exceed
+the fastest response.
+\item Treat a free \code{sndt} that comes out much larger, with a much smaller
+\code{bound}, than in a fit with \code{sndt} fixed or a \code{ddm} fit as a sign of
+absorbed approximation error, and check with \code{pp_check()} before
+interpreting the parameters.
+}
+}
+
 \examples{
 \dontshow{if (isTRUE(Sys.getenv("BMM_EXAMPLES"))) withAutoprint(\{ # examplesIf}
 # generate simulated data from the diffusion model
