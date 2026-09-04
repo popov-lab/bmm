@@ -340,6 +340,11 @@ print.mpt_tree <- function(x, ...) {
 #'   (0, 1). Sub-parameters of such formulas (e.g., `Dmax` and `rate`) are
 #'   estimated on the identity scale with `normal(0, 1)` default priors.
 #'
+#'   A parameter can be fixed to a probability in the formula, e.g.
+#'   `bmf(D ~ 1, g = 0.5)`. The value is mapped to the latent scale when the
+#'   constant prior is built, so [default_prior()] shows `constant(0)` for a
+#'   guessing rate of 0.5 under the logit link.
+#'
 #'   Parameter and response category names must start with a letter and may
 #'   contain only letters and digits, because brms does not allow underscores
 #'   or dots in non-linear parameter names.
@@ -543,7 +548,7 @@ check_model.mpt <- function(model, data = NULL, formula = NULL) {
       formula(s) for: {collapse_comma(user_cat_formulas)}"
     )
     model <- .mpt_apply_nl_bypass(model, formula, data)
-    model <- .mpt_fixed_to_latent_scale(model)
+    .mpt_check_fixed_values(model)
   }
   NextMethod("check_model")
 }
@@ -592,38 +597,34 @@ check_model.mpt <- function(model, data = NULL, formula = NULL) {
   model
 }
 
-# fixed values from the bmmformula (e.g. g = 0.5) are probabilities, but the
-# constant() prior applies to the latent intercept, so the values must be
-# mapped through the link function
-.mpt_fixed_to_latent_scale <- function(model) {
-  if (isTRUE(attr(model, "mpt_fixed_on_latent_scale"))) {
-    return(model)
-  }
-  fixed_pars <- intersect(names(model$fixed_parameters), names(model$parameters))
-  fixed_simplex <- intersect(fixed_pars, unlist(model$simplex))
+# fixed values from the bmmformula (e.g. g = 0.5) stay on the probability
+# scale in the model object; configure_prior.mpt() maps them to the latent
+# scale when it builds the constant priors
+.mpt_check_fixed_values <- function(model) {
+  fixed_simplex <- intersect(names(model$fixed_parameters), unlist(model$simplex))
   stopif(
     length(fixed_simplex) > 0,
     "Fixing simplex parameters to constants is not supported: \\
     {collapse_comma(fixed_simplex)}"
   )
-  for (par in fixed_pars) {
-    link <- model$links[[par]]
-    if (link == "identity") next
+  for (par in .mpt_latent_fixed_pars(model)) {
     value <- model$fixed_parameters[[par]]
     stopif(
       !is.numeric(value) || value <= 0 || value >= 1,
       "The fixed value for parameter '{par}' must be a probability strictly \\
       between 0 and 1. Provided: {value}"
     )
-    latent <- switch(link, logit = stats::qlogis(value), probit = stats::qnorm(value))
-    message2(
-      "The fixed value {value} for parameter '{par}' is applied on the \\
-      {link} scale as {round(latent, 4)}."
-    )
-    model$fixed_parameters[[par]] <- latent
   }
-  attr(model, "mpt_fixed_on_latent_scale") <- TRUE
-  model
+  invisible(NULL)
+}
+
+# fixed latent probability parameters; sub-parameters of non-linear formulas
+# have an identity link and take their fixed value as is
+.mpt_latent_fixed_pars <- function(model) {
+  fixed_pars <- intersect(names(model$fixed_parameters), names(model$parameters))
+  fixed_pars[vapply(fixed_pars, function(par) {
+    model$links[[par]] != "identity"
+  }, logical(1))]
 }
 
 ############################################################################# !
@@ -954,6 +955,29 @@ configure_model.mpt <- function(model, data, formula) {
   formula$family$dpars <- paste0("mu", model$resp_vars$resp_cats)
 
   nlist(formula, data)
+}
+
+############################################################################# !
+# CONFIGURE_PRIOR S3 METHODS                                             ####
+############################################################################# !
+
+# the constant() prior applies to the latent intercept, so the fixed
+# probability is mapped through the link; combined last by
+# configure_prior.bmmodel, it overrides the probability-scale constant from
+# fixed_pars_priors()
+#' @export
+configure_prior.mpt <- function(model, data, formula, user_prior, ...) {
+  fixed_pars <- .mpt_latent_fixed_pars(model)
+  if (length(fixed_pars) == 0L) {
+    return(brms::empty_prior())
+  }
+  latent <- vapply(fixed_pars, function(par) {
+    link_transform(model$fixed_parameters[[par]], model$links[[par]])
+  }, numeric(1))
+  brms::set_prior(
+    glue("constant({latent})"),
+    class = "b", coef = "Intercept", nlpar = fixed_pars
+  )
 }
 
 ############################################################################# !

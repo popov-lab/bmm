@@ -251,22 +251,36 @@ test_that("non-linear parameter formulas bypass the link transformation", {
   expect_false(grepl("inv_logit(D)", correct_rhs, fixed = TRUE))
 })
 
-test_that("fixed parameter values are transformed to the latent scale", {
+test_that("fixed parameter values stay probabilities and reach the prior on the latent scale", {
   model <- mpt(mpt_2htm_trees(), tree_id = "item_type")
   dat <- mpt_2htm_data()
-  formula <- bmf(D ~ 1, g = 0.5)
-  model_checked <- suppressMessages(check_model(model, dat, formula))
-  expect_equal(model_checked$fixed_parameters$g, qlogis(0.5))
+  formula <- bmf(D ~ 1, g = 0.7)
+  model_checked <- check_model(model, dat, formula)
+  expect_equal(model_checked$fixed_parameters$g, 0.7)
+  expect_equal(check_model(model_checked, dat, formula), model_checked)
 
-  prior <- suppressMessages(default_prior(formula, dat, model))
+  prior <- default_prior(formula, dat, model)
   constant_row <- prior[grepl("constant", prior$prior), ]
   expect_equal(constant_row$nlpar, "g")
-  expect_equal(constant_row$prior, "constant(0)")
+  expect_equal(constant_row$prior, glue("constant({qlogis(0.7)})"))
 
-  formula_bad <- bmf(D ~ 1, g = 1.5)
+  model_probit <- mpt(mpt_2htm_trees(), tree_id = "item_type", links = "probit")
+  prior_probit <- default_prior(formula, dat, model_probit)
+  constant_row <- prior_probit[grepl("constant", prior_probit$prior), ]
+  expect_equal(constant_row$prior, glue("constant({qnorm(0.7)})"))
+
+  expect_error(check_model(model, dat, bmf(D ~ 1, g = 1.5)), "strictly")
+})
+
+test_that("simplex parameters cannot be fixed to constants", {
+  trees <- list(
+    mpt_tree("A", list(a = "gA", b = "gB", c = "gC")),
+    mpt_tree("B", list(a = "gB", b = "gC", c = "gA"))
+  )
+  model <- mpt(trees, tree_id = "tree", simplex = c("gA", "gB", "gC"))
   expect_error(
-    suppressMessages(check_model(model, dat, formula_bad)),
-    "strictly"
+    check_model(model, formula = bmf(gA = 0.3)),
+    "Fixing simplex parameters"
   )
 })
 

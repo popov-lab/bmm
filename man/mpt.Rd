@@ -82,6 +82,11 @@ function: the user-supplied expression must keep the parameter within
 (0, 1). Sub-parameters of such formulas (e.g., \code{Dmax} and \code{rate}) are
 estimated on the identity scale with \code{normal(0, 1)} default priors.
 
+A parameter can be fixed to a probability in the formula, e.g.
+\code{bmf(D ~ 1, g = 0.5)}. The value is mapped to the latent scale when the
+constant prior is built, so \code{\link[=default_prior]{default_prior()}} shows \code{constant(0)} for a
+guessing rate of 0.5 under the logit link.
+
 Parameter and response category names must start with a letter and may
 contain only letters and digits, because brms does not allow underscores
 or dots in non-linear parameter names.
