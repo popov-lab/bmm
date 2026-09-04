@@ -241,7 +241,7 @@ pp_check.bmmfit <- function(object, type = "dens_overlay", ndraws = NULL,
   is_matrix <- vapply(pred_cols, function(col) is.matrix(data[[col]]), logical(1))
   pred_cols <- pred_cols[!is_matrix]
 
-  pred_cols <- pred_cols[!grepl("^(Idx_|n_)", pred_cols)]
+  pred_cols <- pred_cols[!grepl("^(Idx_|Poss_|n_)", pred_cols)]
 
   pred_cols
 }
