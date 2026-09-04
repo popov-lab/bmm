@@ -16,11 +16,12 @@ dcswald(
   ndt,
   zr = 0.5,
   s = 1,
+  sndt = 0,
   version = c("simple", "crisk"),
   log = TRUE
 )
 
-rcswald(n, drift, bound, ndt, zr = 0.5, s = 1)
+rcswald(n, drift, bound, ndt, zr = 0.5, s = 1, sndt = 0)
 
 pcswald(
   q,
@@ -30,6 +31,7 @@ pcswald(
   ndt,
   zr = 0.5,
   s = 1,
+  sndt = 0,
   version = "simple",
   lower.tail = TRUE,
   log.p = FALSE
@@ -43,6 +45,7 @@ qcswald(
   ndt,
   zr = 0.5,
   s = 1,
+  sndt = 0,
   version = "simple",
   lower.tail = TRUE,
   log.p = FALSE
@@ -66,6 +69,15 @@ Default is \code{0.5} (unbiased). Values must be between 0 and 1.}
 
 \item{s}{The diffusion constant - the standard deviation of the noise in the
 evidence accumulation process. Default is \code{s = 1}}
+
+\item{sndt}{The range of the trial-to-trial variability in the non-decision
+time. The non-decision time is uniformly distributed on
+\verb{[ndt, ndt + sndt]}, so \code{ndt} is the \emph{minimum} non-decision time and the
+mean non-decision time is \code{ndt + sndt/2}. Default is \code{sndt = 0} (no
+variability), which reproduces the standard censored shifted Wald model.
+Corresponds to the \code{st0} parameter of \code{\link[rtdists:Diffusion]{rtdists::rdiffusion()}}. (fast-dm
+uses the same name for a uniform of the same width but centers it on \code{t0},
+so its \code{t0} is the mean rather than the minimum non-decision time.)}
 
 \item{version}{A character string specifying the version of the \code{cswald} for
 which the likelihood should be returned. Available versions are "simple"
@@ -104,6 +116,11 @@ The random generation (\code{rcswald}) and distribution functions (\code{pcswald
 theoretically consistent since the censored shifted Wald model is an
 approximation to the Wiener diffusion model for tasks with high accuracy
 (few errors).
+
+With \code{sndt > 0}, the \code{"crisk"} density gives the two accumulators
+independent non-decision-time draws, whereas the rtdists-based functions
+share one draw per trial, so \code{dcswald()} and \code{rcswald()} are not exact
+inverses for a biased \code{zr}; see the section on \code{sndt} in \code{\link[=cswald]{cswald()}}.
 }
 \details{
 \strong{Cumulative Distribution Function (\code{pcswald})}
@@ -130,6 +147,12 @@ defined for \code{response = 1}. For the \code{"crisk"} version, this uses
 dat <- rcswald(n = 1000, drift = 2, bound = 1, ndt = 0.3)
 head(dat)
 hist(dat$rt)
+
+# with uniform trial-to-trial variability in the non-decision time: ndt is
+# then the minimum, so the fastest responses no longer pin it
+dat_var <- rcswald(n = 1000, drift = 2, bound = 1, ndt = 0.3, sndt = 0.15)
+min(dat_var$rt) - min(dat$rt)
+dcswald(0.5, 1, drift = 2, bound = 1, ndt = 0.3, sndt = 0.15)
 }
 \seealso{
 \code{\link[rtdists:Diffusion]{rtdists::rdiffusion()}}, \code{\link[rtdists:Diffusion]{rtdists::pdiffusion()}},
