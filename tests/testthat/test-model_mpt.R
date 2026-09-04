@@ -32,6 +32,35 @@ test_that("mpt identifies parameters and excludes covariates", {
   expect_equal(model$default_priors$Pb$effects, "logistic(0, 0.5)")
 })
 
+test_that("mpt stores its derived state once and can rebuild itself", {
+  model <- mpt(mpt_impossible_trees(), tree_id = "tree")
+  expect_equal(model$link, "logit")
+  expect_null(model$other_vars$link)
+  expect_equal(model$indicators$tree, c(withdist = "Idx_withdist", nodist = "Idx_nodist"))
+  expect_equal(model$indicators$possible, c(dist = "Poss_dist"))
+  expect_null(model$simplex_raw)
+
+  rebuilt <- do.call("mpt", .mpt_constructor_args(model))
+  expect_equal(unclass(rebuilt), unclass(model))
+
+  single <- mpt(mpt_tree("t", list(A = "gA", B = "gB", C = "gC")),
+    simplex = c("gA", "gB", "gC"), links = "probit"
+  )
+  expect_null(single$indicators$tree)
+  expect_null(single$indicators$possible)
+  expect_equal(single$simplex_raw, c(gA = "gAraw", gB = "gBraw"))
+  rebuilt_single <- do.call("mpt", .mpt_constructor_args(single))
+  expect_equal(unclass(rebuilt_single), unclass(single))
+})
+
+test_that("importers record their own call", {
+  model <- mpt_from_string(
+    "D + (1 - D) * g # old\n(1 - D) * (1 - g) # new", tree_names = "old"
+  )
+  expect_equal(deparse(attr(model, "call")[[1]]), "mpt_from_string")
+  expect_output(print(model), "mpt_from_string")
+})
+
 test_that("mpt uses matched priors for the probit link", {
   model <- mpt(mpt_2htm_trees(), tree_id = "item_type", links = "probit")
   expect_equal(model$links$D, "probit")
@@ -415,34 +444,6 @@ test_that("factor tree identifier columns are matched to tree names", {
   expect_equal(checked$Idx_old, as.integer(dat$item_type == "old"))
   expect_equal(checked$Idx_new, as.integer(dat$item_type == "new"))
 })
-
-mpt_impossible_trees <- function() {
-  list(
-    mpt_tree("withdist", list(
-      corr = "Pm * Pb + (1 - Pm) * 0.2",
-      dist = "(1 - Pm) * 0.2",
-      npl = "Pm * (1 - Pb) + (1 - Pm) * 0.6"
-    )),
-    mpt_tree("nodist", list(
-      corr = "Pm * Pb + (1 - Pm) * 0.2",
-      npl = "Pm * (1 - Pb) + (1 - Pm) * 0.8"
-    ), impossible = "dist")
-  )
-}
-
-# two of the three conditions share the nodist branch structure, so the tree
-# identifier column is coarser than the experimental factor
-mpt_impossible_data <- function(n_id = 6) {
-  dat <- expand.grid(
-    id = factor(seq_len(n_id)), cond = c("withdist", "reord", "same"),
-    stringsAsFactors = FALSE
-  )
-  dat$tree <- ifelse(dat$cond == "withdist", "withdist", "nodist")
-  dat$corr <- 30L
-  dat$npl <- 20L
-  dat$dist <- ifelse(dat$cond == "withdist", 10L, 0L)
-  dat
-}
 
 test_that("mpt_tree validates impossible response categories", {
   branches <- list(a = "D", b = "1 - D")

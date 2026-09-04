@@ -72,10 +72,12 @@ mpt_from_string <- function(text, tree_names, categories = NULL,
     mpt_tree(tree_name, .mpt_sum_branch_lines(exprs, line_cats))
   }, blocks, tree_names, SIMPLIFY = FALSE)
 
-  mpt(
+  model <- mpt(
     trees = trees, tree_id = tree_id, covariates = covariates,
     simplex = simplex, links = links
   )
+  attr(model, "call") <- match.call()
+  model
 }
 
 #' @title Create an MPT model from an EQN model file
@@ -221,6 +223,7 @@ mpt_from_eqn <- function(file, restrictions = NULL, categories = NULL,
     simplex = simplex, links = links
   )
   attr(model, "mpt_renaming") <- renaming
+  attr(model, "call") <- match.call()
   model
 }
 
