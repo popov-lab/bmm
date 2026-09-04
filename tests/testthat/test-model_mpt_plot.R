@@ -33,6 +33,27 @@ test_that("equal terminal weights stay separate leaf edges", {
   expect_equal(sum(graph$edges$label == "0.333"), 3)
 })
 
+test_that("a three-level tree yields one node per process state and leaf", {
+  tree <- mpt_tree("t", list(
+    a = "D * b * c",
+    b = "D * b * (1 - c)",
+    c = "D * (1 - b)",
+    d = "1 - D"
+  ))
+  graph <- .mpt_tree_graph(tree)
+  # root, the D node, the D > b node, and four leaves
+  expect_equal(nrow(graph$nodes), 7)
+  expect_equal(nrow(graph$edges), 6)
+  leaves <- graph$nodes[!is.na(graph$nodes$category), ]
+  expect_equal(leaves$category, c("d", "c", "a", "b"))
+  expect_equal(leaves$y, c(0, -1, -2, -3))
+  expect_equal(leaves$x, c(1, 2, 3, 3))
+  # every edge starts at an internal node and ends one level deeper
+  expect_true(all(graph$edges$x1 == graph$edges$x0 + 1))
+  root <- graph$nodes[graph$nodes$x == 0, ]
+  expect_equal(nrow(root), 1)
+})
+
 test_that("plot methods run for trees and models", {
   tree_old <- mpt_tree("old", list(
     old = "D + (1 - D) * g",

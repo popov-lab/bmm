@@ -129,55 +129,63 @@ plot.mpt <- function(x, cex = 0.9, ...) {
 # branches with equal weights (e.g. uniform guessing fans) do not collapse
 .mpt_tree_graph <- function(tree) {
   trie <- list(children = list(), leaves = list())
-  insert <- function(node, factors, category) {
-    if (length(factors) == 1L) {
-      node$leaves <- c(node$leaves, list(list(label = factors[[1]], category = category)))
-      return(node)
-    }
-    key <- factors[[1]]
-    child <- node$children[[key]] %||% list(children = list(), leaves = list())
-    node$children[[key]] <- insert(child, factors[-1], category)
-    node
-  }
   for (resp_cat in names(tree$branches)) {
     for (path in .mpt_branch_paths(tree$branches[[resp_cat]])) {
-      trie <- insert(trie, path, resp_cat)
+      trie <- .mpt_trie_insert(trie, path, resp_cat)
     }
   }
-
-  nodes <- data.frame(
-    x = numeric(0), y = numeric(0), category = character(0)
-  )
-  edges <- data.frame(
-    x0 = numeric(0), y0 = numeric(0), x1 = numeric(0), y1 = numeric(0),
-    label = character(0)
-  )
-  next_y <- 0
-  walk <- function(node, depth) {
-    child_pos <- list()
-    for (leaf in node$leaves) {
-      leaf_y <- next_y
-      next_y <<- next_y - 1
-      nodes[nrow(nodes) + 1L, ] <<- list(depth + 1, leaf_y, leaf$category)
-      child_pos <- c(child_pos, list(
-        list(x = depth + 1, y = leaf_y, label = .mpt_edge_label(leaf$label))
-      ))
-    }
-    for (key in names(node$children)) {
-      child <- walk(node$children[[key]], depth + 1)
-      child_pos <- c(child_pos, list(
-        list(x = depth + 1, y = child, label = .mpt_edge_label(key))
-      ))
-    }
-    node_y <- mean(vapply(child_pos, `[[`, numeric(1), "y"))
-    nodes[nrow(nodes) + 1L, ] <<- list(depth, node_y, NA_character_)
-    for (pos in child_pos) {
-      edges[nrow(edges) + 1L, ] <<- list(depth, node_y, pos$x, pos$y, pos$label)
-    }
-    node_y
-  }
-  walk(trie, 0)
+  layout <- .mpt_layout_subtree(trie, depth = 0, next_y = 0)
+  nodes <- do.call(rbind, layout$nodes)
+  edges <- do.call(rbind, layout$edges)
+  rownames(nodes) <- NULL
+  rownames(edges) <- NULL
   nlist(nodes, edges)
+}
+
+.mpt_trie_insert <- function(node, factors, category) {
+  if (length(factors) == 1L) {
+    node$leaves <- c(
+      node$leaves, list(list(label = factors[[1]], category = category))
+    )
+    return(node)
+  }
+  key <- factors[[1]]
+  child <- node$children[[key]] %||% list(children = list(), leaves = list())
+  node$children[[key]] <- .mpt_trie_insert(child, factors[-1], category)
+  node
+}
+
+# lays out one subtree: leaves take the next free rows from the top, child
+# subtrees follow, and the node itself is centered on its children. Returns
+# the node's y, the next free row, and the node and edge rows of the subtree.
+.mpt_layout_subtree <- function(node, depth, next_y) {
+  nodes <- list()
+  edges <- list()
+  children <- list()
+  for (leaf in node$leaves) {
+    nodes <- c(nodes, list(
+      data.frame(x = depth + 1, y = next_y, category = leaf$category)
+    ))
+    children <- c(children, list(
+      list(x = depth + 1, y = next_y, label = .mpt_edge_label(leaf$label))
+    ))
+    next_y <- next_y - 1
+  }
+  for (key in names(node$children)) {
+    subtree <- .mpt_layout_subtree(node$children[[key]], depth + 1, next_y)
+    next_y <- subtree$next_y
+    nodes <- c(nodes, subtree$nodes)
+    edges <- c(edges, subtree$edges)
+    children <- c(children, list(
+      list(x = depth + 1, y = subtree$y, label = .mpt_edge_label(key))
+    ))
+  }
+  y <- mean(vapply(children, `[[`, numeric(1), "y"))
+  nodes <- c(nodes, list(data.frame(x = depth, y = y, category = NA_character_)))
+  edges <- c(edges, lapply(children, function(child) {
+    data.frame(x0 = depth, y0 = y, x1 = child$x, y1 = child$y, label = child$label)
+  }))
+  nlist(y, next_y, nodes, edges)
 }
 
 # constant factors are displayed rounded (1/15 folds to 0.0666666666666667,
