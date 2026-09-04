@@ -3,9 +3,18 @@ test_that("mpt_tree folds integer fractions into decimal literals", {
     a = "p + (1 - p) * (1/4)",
     b = "(1 - p) * (3/4)"
   ))
-  expect_false(grepl("/", tree$branches$a, fixed = TRUE))
-  expect_true(grepl("0.25", tree$branches$a, fixed = TRUE))
-  expect_true(grepl("0.75", tree$branches$b, fixed = TRUE))
+  expect_equal(deparse1(tree$branches$a), "p + (1 - p) * 0.25")
+  expect_equal(deparse1(tree$branches$b), "(1 - p) * 0.75")
+})
+
+test_that("mpt_tree stores branch expressions as parsed calls", {
+  tree <- mpt_tree("t", list(a = "D + (1 - D) * g", b = "(1 - D) * (1 - g)"))
+  expect_identical(tree$branches$a, quote(D + (1 - D) * g))
+  expect_equal(.mpt_expr_vars(tree), c("D", "g"))
+  expect_equal(
+    .mpt_eval_branches(tree, list(D = 0.7, g = 0.5)),
+    c(a = 0.85, b = 0.15)
+  )
 })
 
 test_that("mpt warns when branch probabilities do not sum to 1", {
@@ -28,5 +37,5 @@ test_that("constants that Stan would receive in scientific notation error", {
     a = "p + (1 - p) * (1 - 0.001)",
     b = "(1 - p) * 0.001"
   ))
-  expect_equal(tree$branches$b, "(1 - p) * 0.001")
+  expect_equal(deparse1(tree$branches$b), "(1 - p) * 0.001")
 })

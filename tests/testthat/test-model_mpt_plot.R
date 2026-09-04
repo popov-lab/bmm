@@ -1,9 +1,9 @@
 test_that("branch expressions expand into root-to-leaf paths", {
-  paths <- .mpt_branch_paths("D + (1 - D) * g")
+  paths <- .mpt_branch_paths(quote(D + (1 - D) * g))
   expect_equal(paths, list("D", c("1 - D", "g")))
 
   # factored subtrees are expanded distributively
-  paths_factored <- .mpt_branch_paths("Pm*(Pb + (1 - Pb)*0.25)")
+  paths_factored <- .mpt_branch_paths(quote(Pm * (Pb + (1 - Pb) * 0.25)))
   expect_equal(paths_factored, list(c("Pm", "Pb"), c("Pm", "1 - Pb", "0.25")))
 })
 

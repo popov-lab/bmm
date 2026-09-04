@@ -794,7 +794,7 @@ rm3 <- function(n, size, pars, m3_model, act_funs = NULL, unpack = FALSE,
 #' @export
 dmpt <- function(x, pars, mpt_model, tree = NULL, covariates = NULL,
                  log = TRUE, ...) {
-  probs <- .compute_mpt_probability_vector(pars, mpt_model, tree, covariates, ...)
+  probs <- .mpt_probability_vector(pars, mpt_model, tree, covariates, ...)
   dmultinom(x, prob = probs, log = log)
 }
 
@@ -802,7 +802,7 @@ dmpt <- function(x, pars, mpt_model, tree = NULL, covariates = NULL,
 #' @export
 rmpt <- function(n, size, pars, mpt_model, tree = NULL, covariates = NULL,
                  unpack = FALSE, ...) {
-  probs <- .compute_mpt_probability_vector(pars, mpt_model, tree, covariates, ...)
+  probs <- .mpt_probability_vector(pars, mpt_model, tree, covariates, ...)
   result <- t(rmultinom(n, size = size, prob = probs))
   colnames(result) <- names(probs)
 
@@ -815,8 +815,8 @@ rmpt <- function(n, size, pars, mpt_model, tree = NULL, covariates = NULL,
   result
 }
 
-.compute_mpt_probability_vector <- function(pars, mpt_model, tree = NULL,
-                                            covariates = NULL, ...) {
+.mpt_probability_vector <- function(pars, mpt_model, tree = NULL,
+                                    covariates = NULL, ...) {
   stopif(
     !inherits(mpt_model, "mpt"),
     "The mpt_model argument must be a bmmodel object created with mpt()."
@@ -834,10 +834,8 @@ rmpt <- function(n, size, pars, mpt_model, tree = NULL, covariates = NULL,
     !tree %in% names(trees),
     "Unknown tree '{tree}'. The model contains: {collapse_comma(names(trees))}"
   )
-  branches <- trees[[tree]]$branches
-
   values <- c(as.list(pars), as.list(covariates), list(...))
-  required <- .mpt_tree_vars(trees[[tree]])
+  required <- .mpt_expr_vars(trees[[tree]])
   stopif(
     !identical(sort(required), sort(names(values))),
     "The names or number of the provided values mismatch the symbols used in \\
@@ -852,9 +850,7 @@ rmpt <- function(n, size, pars, mpt_model, tree = NULL, covariates = NULL,
     "All parameter values must be probabilities between 0 and 1."
   )
 
-  probs <- vapply(branches, function(branch) {
-    eval(str2lang(branch), envir = values)
-  }, numeric(1))
+  probs <- .mpt_eval_branches(trees[[tree]], values)
   warnif(
     abs(sum(probs) - 1) > 1e-6,
     "The branch probabilities of tree '{tree}' sum to {signif(sum(probs), 6)} \\

@@ -359,7 +359,7 @@ test_that("mpt category probabilities match the production m3 likelihood", {
   max_diff <- max(vapply(seq_len(nrow(grid)), function(i) {
     Pm <- grid$Pm[i]
     Pb <- grid$Pb[i]
-    p_mpt <- .compute_mpt_probability_vector(
+    p_mpt <- .mpt_probability_vector(
       pars = c(Pm = Pm, Pb = Pb), mpt_model = mpt_model
     )
     a <- 2 * b * Pm * (1 - Pb) / (1 - Pm)
@@ -639,7 +639,7 @@ test_that("the item-memory-first MPT matches the simple-rule m3 with a distracto
     c_par <- grid$c[i]
     d <- grid$d[i]
     denom <- 5 * a + c_par + 5 * d
-    p_mpt <- .compute_mpt_probability_vector(
+    p_mpt <- .mpt_probability_vector(
       pars = c(
         Pi = denom / (15 * b + denom),
         Pb = c_par / denom,
@@ -669,7 +669,7 @@ test_that("the item-memory-first MPT matches the simple-rule m3 with a distracto
   max_diff_nodist <- max(vapply(seq_len(nrow(grid)), function(i) {
     a <- grid$a[i]
     c_par <- grid$c[i]
-    p_mpt <- .compute_mpt_probability_vector(
+    p_mpt <- .mpt_probability_vector(
       pars = c(
         Pi = (5 * a + c_par) / (15 * b + 5 * a + c_par),
         Pb = c_par / (5 * a + c_par)

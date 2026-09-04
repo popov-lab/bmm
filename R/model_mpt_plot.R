@@ -116,9 +116,9 @@ plot.mpt <- function(x, cex = 0.9, ...) {
         return(expand(node[[2]]))
       }
     }
-    list(paste(deparse(node), collapse = " "))
+    list(deparse1(node))
   }
-  expand(str2lang(expr))
+  expand(expr)
 }
 
 # merges the paths of all branch expressions into a prefix trie and computes

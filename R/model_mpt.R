@@ -114,13 +114,38 @@ mpt_tree <- function(name, branches, impossible = NULL) {
     "A response category cannot be both impossible and have a branch \\
     expression in tree '{name}': {collapse_comma(impossible_with_branch)}"
   )
-  branches[] <- lapply(branches, .mpt_canonical_expr, tree_name = name)
+  branches[] <- lapply(resp_cats, function(resp_cat) {
+    expr <- branches[[resp_cat]]
+    stopif(
+      !is.character(expr) || length(expr) != 1L || !nzchar(expr),
+      "Branch probability expressions must be single character strings \\
+      (tree '{name}', category '{resp_cat}')."
+    )
+    parsed <- try(str2lang(expr), silent = TRUE)
+    stopif(
+      is_try_error(parsed),
+      "Cannot parse the branch expression '{expr}' in tree '{name}'."
+    )
+    parsed <- .mpt_fold_numeric_division(parsed)
+    scientific <- .mpt_scientific_constants(parsed)
+    stopif(
+      length(scientific) > 0,
+      "The numeric constant(s) {collapse_comma(scientific)} in tree '{name}' \\
+      are too extreme to be written into the generated Stan code (brms emits \\
+      them in scientific notation, which breaks the Stan syntax). Please \\
+      provide such values as a data column declared in the covariates \\
+      argument, or use a larger constant."
+    )
+    parsed
+  })
   structure(nlist(name, branches, impossible), class = "mpt_tree")
 }
 
 #' @export
 print.mpt_tree <- function(x, ...) {
-  branch_lines <- glue("  P({names(x$branches)}) = {unlist(x$branches)}")
+  branch_lines <- glue(
+    "  P({names(x$branches)}) = {vapply(x$branches, deparse1, character(1))}"
+  )
   if (length(x$impossible) > 0) {
     branch_lines <- c(
       branch_lines, glue("  P({x$impossible}) = 0 (structurally impossible)")
@@ -143,7 +168,7 @@ print.mpt_tree <- function(x, ...) {
     character(0)
   }
   parameters <- setdiff(
-    unique(unlist(lapply(trees, .mpt_tree_vars))), covariates
+    unique(unlist(lapply(trees, .mpt_expr_vars))), covariates
   )
   simplex_pars <- unlist(simplex)
   raw_pars <- unlist(lapply(simplex, function(grp) paste0(grp[-length(grp)], "raw")))
@@ -407,7 +432,7 @@ mpt <- function(trees, tree_id = NULL, covariates = NULL, simplex = NULL,
     "The covariates argument must be a character vector of data column names."
   )
 
-  parameters <- setdiff(unique(unlist(lapply(trees, .mpt_tree_vars))), covariates)
+  parameters <- setdiff(unique(unlist(lapply(trees, .mpt_expr_vars))), covariates)
   stopif(
     length(parameters) == 0L,
     "The tree branch expressions contain no latent parameters. Symbols listed \\
@@ -700,7 +725,7 @@ check_data.mpt <- function(model, data, formula) {
     return(invisible(NULL))
   }
   parameters <- setdiff(
-    unique(unlist(lapply(model$trees, .mpt_tree_vars))), covariates
+    unique(unlist(lapply(model$trees, .mpt_expr_vars))), covariates
   )
   par_vals <- setNames(rep(0.5, length(parameters)), parameters)
   for (grp in model$simplex) {
@@ -716,9 +741,7 @@ check_data.mpt <- function(model, data, formula) {
     }
     if (length(rows) == 0L) next
     env <- c(as.list(par_vals), as.list(data[rows, covariates, drop = FALSE]))
-    total <- Reduce(`+`, lapply(tree$branches, function(branch) {
-      eval(str2lang(branch), envir = env)
-    }))
+    total <- Reduce(`+`, lapply(tree$branches, eval, envir = env))
     total <- rep(total, length.out = length(rows))
     deviates <- is.na(total) | abs(total - 1) > tolerance
     warnif(
@@ -807,7 +830,7 @@ check_formula.mpt <- function(model, data, formula) {
     # a placeholder keeps log() defined for trees where the category is
     # impossible; bmf2bf.mpt() overrides the linear predictor for those rows
     branch_exprs <- vapply(
-      trees, function(tree) tree$branches[[resp_cat]] %||% "1", character(1)
+      trees, function(tree) deparse1(tree$branches[[resp_cat]] %||% 1), character(1)
     )
     rhs <- if (use_indicators) {
       paste(glue("Idx_{names(trees)} * ({branch_exprs})"), collapse = " + ")
@@ -931,4 +954,3 @@ configure_model.mpt <- function(model, data, formula) {
   }
   setNames(rep(list(value), length(names)), names)
 }
-

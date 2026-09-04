@@ -1357,7 +1357,7 @@ test_that("dmpt and rmpt give impossible categories zero probability", {
     tree_id = "cond"
   )
 
-  probs <- .compute_mpt_probability_vector(c(Pm = 0.4), model, tree = "nodist")
+  probs <- .mpt_probability_vector(c(Pm = 0.4), model, tree = "nodist")
   expect_named(probs, c("corr", "dist", "npl"))
   expect_equal(unname(probs), c(0.2, 0, 0.8))
 

@@ -17,7 +17,7 @@ test_that("mpt_from_string parses MPTinR-style model definitions", {
     "D # hit\n(1 - D) * g # hit\n(1 - D) * (1 - g) # miss",
     tree_names = "old"
   )
-  expect_equal(summed$trees$old$branches$hit, "(D) + ((1 - D) * g)")
+  expect_equal(deparse1(summed$trees$old$branches$hit), "(D) + ((1 - D) * g)")
 
   no_comments <- mpt_from_string(
     "D + (1 - D) * g\n(1 - D) * (1 - g)",
@@ -58,8 +58,8 @@ test_that("mpt_from_eqn imports EQN files with restrictions and renaming", {
   ))
   expect_setequal(names(model$parameters), c("Do", "Dn", "guess"))
   expect_setequal(model$resp_vars$resp_cats, c("yes", "no"))
-  expect_false(any(grepl("G_fix", unlist(model$trees$old$branches))))
-  expect_true(grepl("0.25", model$trees$old$branches$yes, fixed = TRUE))
+  expect_false("Gfix" %in% .mpt_expr_vars(model$trees$old))
+  expect_true(grepl("0.25", deparse1(model$trees$old$branches$yes), fixed = TRUE))
 
   renaming <- attr(model, "mpt_renaming")
   expect_equal(renaming[["D_o"]], "Do")
