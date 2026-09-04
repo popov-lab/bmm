@@ -19,12 +19,10 @@ mpt_from_eqn(
 contain three fields (the line-count header of classical EQN files) is
 skipped.}
 
-\item{restrictions}{A named list or vector mapping parameter names to
-numeric constants. The constants are substituted into the branch
-expressions as decimal literals before the parameters are identified,
-which mirrors the \code{restrictions} mechanism of MPTinR/TreeBUGS. Equality
-restrictions are expressed by using the same parameter name in the EQN
-file itself.}
+\item{restrictions}{Parameter restrictions as in \code{\link[=mpt]{mpt()}}, written with the
+parameter names used in the EQN file, e.g. \code{c("D_n = D_o", "g = 0.5")}
+or \code{list(D_n = "D_o", g = 0.5)}. They mirror the \code{restrictions} argument
+of MPTinR and TreeBUGS and are renamed together with the parameters.}
 
 \item{categories}{A named character vector mapping response category names
 used in the EQN file onto the shared response categories of the model

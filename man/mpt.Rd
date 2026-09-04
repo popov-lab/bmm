@@ -9,6 +9,7 @@ mpt(
   tree_id = NULL,
   covariates = NULL,
   simplex = NULL,
+  restrictions = NULL,
   links = "logit",
   ...
 )
@@ -34,6 +35,16 @@ is reparameterized via stick-breaking: the last parameter of each group
 is derived as 1 minus the sum of the other members, and each other member
 \code{p} gets an unconstrained component \code{praw} that predictor formulas for
 \code{p} are applied to.}
+
+\item{restrictions}{Parameter restrictions in the string syntax of MPTinR
+and TreeBUGS, e.g. \code{c("Dn = Do", "g = 0.5")}, or as a named list,
+\code{list(Dn = "Do", g = 0.5)}. A restriction either equates a parameter with
+another one (chains such as \code{"G1 = G2 = G3"} map all earlier names onto
+the last) or fixes it to a numeric constant (\code{"g = 0.5"}, \code{"g = 1/4"}).
+Restrictions are substituted into the branch expressions before the
+parameters are identified, so a restricted parameter is not part of the
+model. Order constraints (\code{"Do > Dn"}) are not supported here; see
+Details.}
 
 \item{links}{Character. The link function for all latent probability
 parameters: \code{"logit"} (default) or \code{"probit"}.}
@@ -82,10 +93,18 @@ function: the user-supplied expression must keep the parameter within
 (0, 1). Sub-parameters of such formulas (e.g., \code{Dmax} and \code{rate}) are
 estimated on the identity scale with \code{normal(0, 1)} default priors.
 
-A parameter can be fixed to a probability in the formula, e.g.
-\code{bmf(D ~ 1, g = 0.5)}. The value is mapped to the latent scale when the
-constant prior is built, so \code{\link[=default_prior]{default_prior()}} shows \code{constant(0)} for a
-guessing rate of 0.5 under the logit link.
+A parameter can also be fixed to a probability at fit time, in the
+formula: \code{bmf(D ~ 1, g = 0.5)}. Unlike a restriction, the parameter stays
+part of the model and can be freed again by giving it a formula. The
+value is mapped to the latent scale when the constant prior is built, so
+\code{\link[=default_prior]{default_prior()}} shows \code{constant(0)} for a guessing rate of 0.5 under
+the logit link.
+
+Order constraints between parameters (\code{Do > Dn}) are expressed by
+reparameterizing the larger parameter in the model formula, e.g.
+\code{bmf(Do ~ Dn + (1 - Dn) * inv_logit(phi), Dn ~ 1, phi ~ 1)}; the section
+"Ordered parameter constraints" of the MPT article walks through the
+recipe.
 
 Parameter and response category names must start with a letter and may
 contain only letters and digits, because brms does not allow underscores

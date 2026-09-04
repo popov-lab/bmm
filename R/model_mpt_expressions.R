@@ -45,6 +45,113 @@
   unique(unlist(lapply(tree$branches, all.vars)))
 }
 
+.mpt_substitute_symbols <- function(expr, values) {
+  .mpt_fold_numeric_division(do.call(substitute, list(expr, values)))
+}
+
+.mpt_apply_restrictions <- function(tree, restrictions) {
+  tree$branches[] <- lapply(tree$branches, .mpt_substitute_symbols, restrictions)
+  tree
+}
+
+# restrictions in the MPTinR/TreeBUGS string syntax ("Dn = Do", "g = 0.5",
+# "G1 = G2 = G3") or as a named list (list(Dn = "Do", g = 0.5)) become one
+# named list mapping each restricted parameter to a symbol or a number
+.mpt_parse_restrictions <- function(restrictions) {
+  if (length(restrictions) == 0L) {
+    return(list())
+  }
+  if (is.null(names(restrictions))) {
+    stopif(
+      !is.character(restrictions),
+      "The restrictions argument must be a character vector such as \\
+      c('Dn = Do', 'g = 0.5') or a named list such as list(Dn = 'Do', g = 0.5)."
+    )
+    return(do.call(c, lapply(restrictions, .mpt_parse_restriction_string)))
+  }
+  stopif(
+    any(!nzchar(names(restrictions))),
+    "Every element of a named restrictions list must be named after the \\
+    parameter it restricts."
+  )
+  values <- lapply(names(restrictions), function(par) {
+    value <- restrictions[[par]]
+    if (is.character(value)) {
+      parsed <- try(str2lang(value), silent = TRUE)
+      stopif(
+        is_try_error(parsed),
+        "Cannot parse the restriction '{par} = {value}'."
+      )
+      value <- parsed
+    }
+    .mpt_restriction_value(value, glue("{par} = {deparse1(value)}"))
+  })
+  setNames(values, names(restrictions))
+}
+
+.mpt_parse_restriction_string <- function(text) {
+  expr <- try(str2lang(text), silent = TRUE)
+  stopif(is_try_error(expr), "Cannot parse the restriction '{text}'.")
+  lhs <- character(0)
+  while (is.call(expr) && identical(expr[[1]], quote(`=`))) {
+    stopif(
+      !is.symbol(expr[[2]]),
+      "The left-hand side of the restriction '{text}' must be a parameter name."
+    )
+    lhs <- c(lhs, as.character(expr[[2]]))
+    expr <- expr[[3]]
+  }
+  stopif(
+    is.call(expr) && as.character(expr[[1]]) %in% c("<", ">", "<=", ">="),
+    "Order constraints such as '{text}' are not supported by the \\
+    restrictions argument. Reparameterize the larger parameter instead, e.g. \\
+    Do ~ Dn + (1 - Dn) * inv_logit(phi) in the model formula; see the section \\
+    'Ordered parameter constraints' of the MPT article."
+  )
+  stopif(
+    length(lhs) == 0L,
+    "Each restriction must have the form 'parameter = parameter' or \\
+    'parameter = constant', not '{text}'."
+  )
+  setNames(rep(list(.mpt_restriction_value(expr, text)), length(lhs)), lhs)
+}
+
+# a right-hand side without symbols is a constant (1/4, 1 - 0.75); a single
+# symbol equates two parameters; anything else has no MPT interpretation
+.mpt_restriction_value <- function(expr, text) {
+  if (is.symbol(expr)) {
+    return(expr)
+  }
+  if (length(all.vars(expr)) == 0L) {
+    value <- try(eval(expr, envir = baseenv()), silent = TRUE)
+    stopif(
+      is_try_error(value) || !is.numeric(value) || length(value) != 1L ||
+        is.na(value),
+      "The restriction '{text}' does not evaluate to a single number."
+    )
+    return(value)
+  }
+  stop2(
+    "Restrictions can equate a parameter with another parameter or fix it to \\
+    a numeric constant. '{text}' does neither."
+  )
+}
+
+# chains such as A = B, B = C resolve to the final target; a cycle leaves a
+# parameter pointing at a restricted name, which mpt() reports
+.mpt_resolve_restrictions <- function(restrictions) {
+  for (i in seq_along(restrictions)) {
+    restrictions <- lapply(restrictions, function(value) {
+      if (is.symbol(value) && as.character(value) %in% names(restrictions)) {
+        restrictions[[as.character(value)]]
+      } else {
+        value
+      }
+    })
+  }
+  restrictions
+}
+
 .mpt_eval_branches <- function(tree, values) {
   vapply(tree$branches, function(branch) eval(branch, envir = values), numeric(1))
 }

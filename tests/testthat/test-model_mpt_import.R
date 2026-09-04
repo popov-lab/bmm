@@ -65,11 +65,26 @@ test_that("mpt_from_eqn imports EQN files with restrictions and renaming", {
   expect_equal(renaming[["D_o"]], "Do")
   expect_equal(renaming[["old_hit"]], "yes")
 
+  # restrictions are written with the EQN names and renamed with the branches
+  string_form <- suppressMessages(mpt_from_eqn(
+    eqn_file, restrictions = "G_fix = 1/4", categories = category_map,
+    tree_id = "item_type"
+  ))
+  expect_equal(string_form$trees, model$trees)
+  expect_equal(string_form$restrictions, list(Gfix = 0.25))
+
+  equated <- suppressMessages(mpt_from_eqn(
+    eqn_file, restrictions = c("G_fix = 1/4", "D_n = D_o"),
+    categories = category_map, tree_id = "item_type"
+  ))
+  expect_setequal(names(equated$parameters), c("Do", "guess"))
+  expect_equal(deparse1(equated$trees$new$branches$no), "(Do) + ((1 - Do) * (1 - guess * 0.25))")
+
   expect_error(
     suppressMessages(mpt_from_eqn(
-      eqn_file, restrictions = c(G_fix = "D_o"), categories = category_map
+      eqn_file, restrictions = "D_o > D_n", categories = category_map
     )),
-    "numeric constants"
+    "Order constraints"
   )
 
   # per-tree category labels without a mapping cannot be combined
@@ -79,9 +94,17 @@ test_that("mpt_from_eqn imports EQN files with restrictions and renaming", {
   )
 })
 
+test_that("mpt_from_string passes restrictions on to mpt()", {
+  model <- mpt_from_string(
+    "D + (1 - D) * g # old\n(1 - D) * (1 - g) # new",
+    tree_names = "old", restrictions = "g = 0.5"
+  )
+  expect_equal(names(model$parameters), "D")
+  expect_equal(model$restrictions, list(g = 0.5))
+})
+
 test_that("mpt_from_eqn renames correctly when one name prefixes another", {
-  # 'd_A' matches the prefix of 'd_A.x' at the dot boundary, so substitution
-  # must run longest-first to avoid partially renamed leftovers like 'dA.x'
+  # renaming substitutes whole symbols, so 'd_A' never touches 'd_A.x'
   eqn_file <- tempfile(fileext = ".eqn")
   writeLines(c(
     "t  a  d_A*d_A.x",

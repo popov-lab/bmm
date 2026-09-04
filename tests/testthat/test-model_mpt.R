@@ -251,6 +251,55 @@ test_that("non-linear parameter formulas bypass the link transformation", {
   expect_false(grepl("inv_logit(D)", correct_rhs, fixed = TRUE))
 })
 
+test_that("restrictions are substituted into the trees before parameters are identified", {
+  trees <- list(
+    mpt_tree("old", list(yes = "Do + (1 - Do) * g", no = "(1 - Do) * (1 - g)")),
+    mpt_tree("new", list(yes = "(1 - Dn) * g", no = "Dn + (1 - Dn) * (1 - g)"))
+  )
+  equated <- mpt(trees, tree_id = "item_type", restrictions = "Dn = Do")
+  expect_setequal(names(equated$parameters), c("Do", "g"))
+  expect_equal(equated$trees$new$branches$yes, quote((1 - Do) * g))
+  expect_equal(equated$restrictions, list(Dn = quote(Do)))
+
+  fixed <- mpt(trees, tree_id = "item_type", restrictions = c("g = 0.5", "Dn = Do"))
+  expect_equal(names(fixed$parameters), "Do")
+  expect_equal(
+    dmpt(c(yes = 6, no = 4), pars = c(Do = 0.2), mpt_model = fixed, tree = "old", log = FALSE),
+    dmultinom(c(6, 4), prob = c(0.2 + 0.8 * 0.5, 0.8 * 0.5))
+  )
+  expect_equal(
+    mpt(trees, tree_id = "item_type", restrictions = list(g = 0.5, Dn = "Do"))$trees,
+    fixed$trees
+  )
+
+  expect_error(
+    mpt(trees, tree_id = "item_type", restrictions = "Do > Dn"),
+    "Order constraints"
+  )
+  expect_error(
+    mpt(trees, tree_id = "item_type", restrictions = "Dn = Dold"),
+    "do not appear"
+  )
+  expect_error(
+    mpt(trees, tree_id = "item_type", restrictions = c("Dn = Do", "Do = Dn")),
+    "circular"
+  )
+  expect_error(
+    mpt(trees, tree_id = "item_type", restrictions = c("g = 0.5", "g = 0.4")),
+    "more than once"
+  )
+  expect_error(
+    mpt(trees, tree_id = "item_type", restrictions = "g = 0.00001"),
+    "scientific"
+  )
+
+  cov_tree <- mpt_tree("t", list(a = "D + (1 - D) * gc", b = "(1 - D) * (1 - gc)"))
+  expect_error(
+    mpt(cov_tree, covariates = "gc", restrictions = "gc = 0.5"),
+    "Covariates"
+  )
+})
+
 test_that("fixed parameter values stay probabilities and reach the prior on the latent scale", {
   model <- mpt(mpt_2htm_trees(), tree_id = "item_type")
   dat <- mpt_2htm_data()

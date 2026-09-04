@@ -271,6 +271,8 @@ print.mpt_tree <- function(x, ...) {
   out
 }
 
+# restrictions are already substituted into the stored trees, so they are
+# not passed again
 .mpt_constructor_args <- function(model) {
   list(
     trees = unname(model$trees),
@@ -316,6 +318,15 @@ print.mpt_tree <- function(x, ...) {
 #'   is derived as 1 minus the sum of the other members, and each other member
 #'   `p` gets an unconstrained component `praw` that predictor formulas for
 #'   `p` are applied to.
+#' @param restrictions Parameter restrictions in the string syntax of MPTinR
+#'   and TreeBUGS, e.g. `c("Dn = Do", "g = 0.5")`, or as a named list,
+#'   `list(Dn = "Do", g = 0.5)`. A restriction either equates a parameter with
+#'   another one (chains such as `"G1 = G2 = G3"` map all earlier names onto
+#'   the last) or fixes it to a numeric constant (`"g = 0.5"`, `"g = 1/4"`).
+#'   Restrictions are substituted into the branch expressions before the
+#'   parameters are identified, so a restricted parameter is not part of the
+#'   model. Order constraints (`"Do > Dn"`) are not supported here; see
+#'   Details.
 #' @param links Character. The link function for all latent probability
 #'   parameters: `"logit"` (default) or `"probit"`.
 #' @param ... used internally for testing, ignore it
@@ -340,10 +351,18 @@ print.mpt_tree <- function(x, ...) {
 #'   (0, 1). Sub-parameters of such formulas (e.g., `Dmax` and `rate`) are
 #'   estimated on the identity scale with `normal(0, 1)` default priors.
 #'
-#'   A parameter can be fixed to a probability in the formula, e.g.
-#'   `bmf(D ~ 1, g = 0.5)`. The value is mapped to the latent scale when the
-#'   constant prior is built, so [default_prior()] shows `constant(0)` for a
-#'   guessing rate of 0.5 under the logit link.
+#'   A parameter can also be fixed to a probability at fit time, in the
+#'   formula: `bmf(D ~ 1, g = 0.5)`. Unlike a restriction, the parameter stays
+#'   part of the model and can be freed again by giving it a formula. The
+#'   value is mapped to the latent scale when the constant prior is built, so
+#'   [default_prior()] shows `constant(0)` for a guessing rate of 0.5 under
+#'   the logit link.
+#'
+#'   Order constraints between parameters (`Do > Dn`) are expressed by
+#'   reparameterizing the larger parameter in the model formula, e.g.
+#'   `bmf(Do ~ Dn + (1 - Dn) * inv_logit(phi), Dn ~ 1, phi ~ 1)`; the section
+#'   "Ordered parameter constraints" of the MPT article walks through the
+#'   recipe.
 #'
 #'   Parameter and response category names must start with a letter and may
 #'   contain only letters and digits, because brms does not allow underscores
@@ -407,13 +426,14 @@ print.mpt_tree <- function(x, ...) {
 #'
 #' @export
 mpt <- function(trees, tree_id = NULL, covariates = NULL, simplex = NULL,
-                links = "logit", ...) {
+                restrictions = NULL, links = "logit", ...) {
   call <- match.call()
   stop_missing_args()
   links <- match.arg(links, c("logit", "probit"))
   trees <- .mpt_as_tree_list(trees)
   covariates <- covariates %||% character(0)
   simplex <- .mpt_as_simplex_list(simplex)
+  restrictions <- .mpt_parse_restrictions(restrictions)
 
   stopif(
     length(trees) == 0L || !all(vapply(trees, inherits, logical(1), "mpt_tree")),
@@ -468,6 +488,8 @@ mpt <- function(trees, tree_id = NULL, covariates = NULL, simplex = NULL,
     length(covariates) > 0L && !is.character(covariates),
     "The covariates argument must be a character vector of data column names."
   )
+
+  trees <- .mpt_restrict_trees(trees, restrictions, covariates)
 
   parameters <- setdiff(unique(unlist(lapply(trees, .mpt_expr_vars))), covariates)
   stopif(
@@ -528,8 +550,52 @@ mpt <- function(trees, tree_id = NULL, covariates = NULL, simplex = NULL,
 
   .model_mpt(
     trees = trees, tree_id = tree_id, covariates = covariates,
-    simplex = simplex, links = links, call = call, ...
+    simplex = simplex, restrictions = restrictions, links = links,
+    call = call, ...
   )
+}
+
+# restrictions are checked against the symbols of the unrestricted trees and
+# then substituted, so every later step sees the restricted model only
+.mpt_restrict_trees <- function(trees, restrictions, covariates) {
+  if (length(restrictions) == 0L) {
+    return(trees)
+  }
+  restricted <- names(restrictions)
+  stopif(
+    anyDuplicated(restricted) > 0,
+    "Parameters cannot be restricted more than once: \\
+    {collapse_comma(unique(restricted[duplicated(restricted)]))}"
+  )
+  restricted_covariates <- intersect(restricted, covariates)
+  stopif(
+    length(restricted_covariates) > 0,
+    "Covariates are data columns and cannot be restricted: \\
+    {collapse_comma(restricted_covariates)}"
+  )
+  parameters <- setdiff(unique(unlist(lapply(trees, .mpt_expr_vars))), covariates)
+  restrictions <- .mpt_resolve_restrictions(restrictions)
+  targets <- unique(unlist(lapply(restrictions, all.vars)))
+  unknown <- setdiff(c(restricted, targets), parameters)
+  stopif(
+    length(unknown) > 0,
+    "Restrictions refer to parameters that do not appear in the tree branch \\
+    expressions: {collapse_comma(unknown)}"
+  )
+  circular <- intersect(targets, restricted)
+  stopif(
+    length(circular) > 0,
+    "The restrictions on {collapse_comma(circular)} are circular."
+  )
+  scientific <- unlist(lapply(restrictions, .mpt_scientific_constants))
+  stopif(
+    length(scientific) > 0,
+    "The restriction constant(s) {collapse_comma(scientific)} are too extreme \\
+    to be written into the generated Stan code (brms emits them in scientific \\
+    notation, which breaks the Stan syntax). Please provide such values as a \\
+    data column declared in the covariates argument, or use a larger constant."
+  )
+  lapply(trees, .mpt_apply_restrictions, restrictions)
 }
 
 ############################################################################# !

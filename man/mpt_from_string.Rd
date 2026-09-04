@@ -11,6 +11,7 @@ mpt_from_string(
   tree_id = NULL,
   covariates = NULL,
   simplex = NULL,
+  restrictions = NULL,
   links = "logit"
 )
 }
@@ -29,7 +30,7 @@ Must have as many entries as the tree with the most lines.}
 \item{tree_id}{Character. Name of the data column whose values name the tree
 each observation belongs to (see \code{\link[=mpt]{mpt()}}).}
 
-\item{covariates, simplex, links}{passed to \code{\link[=mpt]{mpt()}}.}
+\item{covariates, simplex, restrictions, links}{passed to \code{\link[=mpt]{mpt()}}.}
 }
 \value{
 An object of class \code{bmmodel} (see \code{\link[=mpt]{mpt()}})
@@ -56,5 +57,13 @@ model <- mpt_from_string(
   tree_id = "item_type"
 )
 model
+
+# fix the guessing rate as in MPTinR / TreeBUGS
+mpt_from_string(
+  model_2htm,
+  tree_names = c("old", "new"),
+  tree_id = "item_type",
+  restrictions = "g = 0.5"
+)
 }
 \keyword{transform}

@@ -21,7 +21,7 @@
 #'   Must have as many entries as the tree with the most lines.
 #' @param tree_id Character. Name of the data column whose values name the tree
 #'   each observation belongs to (see [mpt()]).
-#' @param covariates,simplex,links passed to [mpt()].
+#' @param covariates,simplex,restrictions,links passed to [mpt()].
 #'
 #' @return An object of class `bmmodel` (see [mpt()])
 #'
@@ -41,10 +41,19 @@
 #'   tree_id = "item_type"
 #' )
 #' model
+#'
+#' # fix the guessing rate as in MPTinR / TreeBUGS
+#' mpt_from_string(
+#'   model_2htm,
+#'   tree_names = c("old", "new"),
+#'   tree_id = "item_type",
+#'   restrictions = "g = 0.5"
+#' )
 #' @export
 mpt_from_string <- function(text, tree_names, categories = NULL,
                             tree_id = NULL, covariates = NULL,
-                            simplex = NULL, links = "logit") {
+                            simplex = NULL, restrictions = NULL,
+                            links = "logit") {
   stop_missing_args()
   lines <- trimws(unlist(strsplit(text, "\n")))
   blocks <- split(lines[nzchar(lines)], cumsum(!nzchar(lines))[nzchar(lines)])
@@ -74,7 +83,7 @@ mpt_from_string <- function(text, tree_names, categories = NULL,
 
   model <- mpt(
     trees = trees, tree_id = tree_id, covariates = covariates,
-    simplex = simplex, links = links
+    simplex = simplex, restrictions = restrictions, links = links
   )
   attr(model, "call") <- match.call()
   model
@@ -104,12 +113,10 @@ mpt_from_string <- function(text, tree_names, categories = NULL,
 #' @param file Character. Path to the EQN file. A first line that does not
 #'   contain three fields (the line-count header of classical EQN files) is
 #'   skipped.
-#' @param restrictions A named list or vector mapping parameter names to
-#'   numeric constants. The constants are substituted into the branch
-#'   expressions as decimal literals before the parameters are identified,
-#'   which mirrors the `restrictions` mechanism of MPTinR/TreeBUGS. Equality
-#'   restrictions are expressed by using the same parameter name in the EQN
-#'   file itself.
+#' @param restrictions Parameter restrictions as in [mpt()], written with the
+#'   parameter names used in the EQN file, e.g. `c("D_n = D_o", "g = 0.5")`
+#'   or `list(D_n = "D_o", g = 0.5)`. They mirror the `restrictions` argument
+#'   of MPTinR and TreeBUGS and are renamed together with the parameters.
 #' @param categories A named character vector mapping response category names
 #'   used in the EQN file onto the shared response categories of the model
 #'   (see Details). Categories not listed keep their (sanitized) name.
@@ -164,17 +171,23 @@ mpt_from_eqn <- function(file, restrictions = NULL, categories = NULL,
     expr = vapply(fields, function(f) paste(f[-(1:2)], collapse = ""), character(1))
   )
 
-  eqn$expr <- .mpt_substitute_constants(eqn$expr, restrictions)
-
-  symbols <- unique(unlist(lapply(eqn$expr, function(e) all.vars(str2lang(e)))))
+  restrictions <- .mpt_parse_restrictions(restrictions)
+  exprs <- lapply(eqn$expr, str2lang)
+  symbols <- unique(c(
+    unlist(lapply(exprs, all.vars)),
+    names(restrictions), unlist(lapply(restrictions, all.vars))
+  ))
   par_renaming <- .mpt_sanitize_names(setdiff(symbols, covariates))
-  # longest names first: a dot creates a word boundary, so the pattern for
-  # 'd_A' would otherwise also match the prefix of a parameter named 'd_A.x'
-  for (old in names(par_renaming)[order(-nchar(names(par_renaming)))]) {
-    eqn$expr <- gsub(
-      paste0("\\b", .mpt_escape_regex(old), "\\b"), par_renaming[[old]], eqn$expr
-    )
-  }
+  symbol_map <- lapply(par_renaming, as.name)
+  eqn$expr <- vapply(exprs, function(expr) {
+    deparse1(.mpt_substitute_symbols(expr, symbol_map))
+  }, character(1))
+  restrictions <- lapply(restrictions, function(value) {
+    if (is.language(value)) .mpt_substitute_symbols(value, symbol_map) else value
+  })
+  names(restrictions) <- vapply(names(restrictions), function(par) {
+    par_renaming[[par]] %||% par
+  }, character(1))
 
   category_clean <- eqn$category
   user_mapped <- category_clean %in% names(categories)
@@ -220,7 +233,7 @@ mpt_from_eqn <- function(file, restrictions = NULL, categories = NULL,
 
   model <- mpt(
     trees = trees, tree_id = tree_id, covariates = covariates,
-    simplex = simplex, links = links
+    simplex = simplex, restrictions = restrictions, links = links
   )
   attr(model, "mpt_renaming") <- renaming
   attr(model, "call") <- match.call()
@@ -238,27 +251,6 @@ mpt_from_eqn <- function(file, restrictions = NULL, categories = NULL,
   as.list(summed)[unique(categories)]
 }
 
-.mpt_substitute_constants <- function(exprs, restrictions) {
-  if (is.null(restrictions)) {
-    return(exprs)
-  }
-  stopif(
-    is.null(names(restrictions)) || !all(nzchar(names(restrictions))) ||
-      !all(vapply(restrictions, is.numeric, logical(1))),
-    "The restrictions argument must be a named list or vector mapping \\
-    parameter names to numeric constants. Express equality restrictions by \\
-    using the same parameter name in the model definition."
-  )
-  for (par in names(restrictions)[order(-nchar(names(restrictions)))]) {
-    exprs <- gsub(
-      paste0("\\b", .mpt_escape_regex(par), "\\b"),
-      format(restrictions[[par]], scientific = FALSE),
-      exprs
-    )
-  }
-  exprs
-}
-
 # maps each name to a version without underscores and dots (the brms nlpar
 # constraint); names that are already valid map to themselves
 .mpt_sanitize_names <- function(names) {
@@ -270,8 +262,4 @@ mpt_from_eqn <- function(file, restrictions = NULL, categories = NULL,
     {collapse_comma(unique(clashes))}. Please rename them in the model file."
   )
   setNames(as.list(sanitized), names)
-}
-
-.mpt_escape_regex <- function(x) {
-  gsub("([^A-Za-z0-9_])", "\\\\\\1", x)
 }
