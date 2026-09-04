@@ -1468,51 +1468,38 @@ rezdm <- function(n, n_trials, drift, bound, ndt, zr = 0.5, s = 1,
   moments <- .ezdm_moments_4par(drift, bound, zr, s)
 
   n_upper <- stats::rbinom(n, size = n_trials, prob = moments$pC)
-  n_lower <- n_trials - n_upper
-
-  # pre-allocate
-  mean_rt_upper <- var_rt_upper <- rep(NA_real_, n)
-  mean_rt_lower <- var_rt_lower <- rep(NA_real_, n)
-
-  # generate upper boundary statistics where n_upper >= 2
-  idx_upper <- n_upper >= 2
-  if (any(idx_upper)) {
-    n_u <- n_upper[idx_upper]
-    var_rt_upper[idx_upper] <- moments$vrt_upper *
-      stats::rchisq(sum(idx_upper), df = n_u - 1) / (n_u - 1)
-
-    # Use truncated normal to ensure mean_rt_upper >= ndt
-    mean_rt_upper[idx_upper] <- .rtruncnorm_lower(
-      n = sum(idx_upper),
-      mean = ndt + moments$mdt_upper,
-      sd = sqrt(var_rt_upper[idx_upper] / n_u),
-      lower = ndt
-    )
-  }
-
-  # generate lower boundary statistics where n_lower >= 2
-  idx_lower <- n_lower >= 2
-  if (any(idx_lower)) {
-    n_l <- n_lower[idx_lower]
-    var_rt_lower[idx_lower] <- moments$vrt_lower[idx_lower] *
-      stats::rchisq(sum(idx_lower), df = n_l - 1) / (n_l - 1)
-    # Use truncated normal to ensure mean_rt_lower >= ndt
-    mean_rt_lower[idx_lower] <- .rtruncnorm_lower(
-      n = sum(idx_lower),
-      mean = ndt[idx_lower] + moments$mdt_lower[idx_lower],
-      sd = sqrt(var_rt_lower[idx_lower] / n_l),
-      lower = ndt[idx_lower]
-    )
-  }
+  upper <- .rezdm_boundary_stats(n_upper, moments$mdt_upper,
+                                 moments$vrt_upper, ndt)
+  lower <- .rezdm_boundary_stats(n_trials - n_upper, moments$mdt_lower,
+                                 moments$vrt_lower, ndt)
 
   data.frame(
-    mean_rt_upper = mean_rt_upper,
-    mean_rt_lower = mean_rt_lower,
-    var_rt_upper = var_rt_upper,
-    var_rt_lower = var_rt_lower,
+    mean_rt_upper = upper$mean_rt,
+    mean_rt_lower = lower$mean_rt,
+    var_rt_upper = upper$var_rt,
+    var_rt_lower = lower$var_rt,
     n_upper = n_upper,
     n_trials = n_trials
   )
+}
+
+# Sample mean and variance of one boundary's RTs; both are undefined (NA)
+# where fewer than 2 responses reached that boundary
+.rezdm_boundary_stats <- function(n_k, mdt, vrt, ndt) {
+  mean_rt <- var_rt <- rep(NA_real_, length(n_k))
+  ok <- n_k >= 2
+  if (any(ok)) {
+    n_ok <- n_k[ok]
+    var_rt[ok] <- vrt[ok] * stats::rchisq(sum(ok), df = n_ok - 1) / (n_ok - 1)
+    # truncated normal keeps mean_rt >= ndt
+    mean_rt[ok] <- .rtruncnorm_lower(
+      n = sum(ok),
+      mean = ndt[ok] + mdt[ok],
+      sd = sqrt(var_rt[ok] / n_ok),
+      lower = ndt[ok]
+    )
+  }
+  nlist(mean_rt, var_rt)
 }
 
 # Internal: compute 3par moments (zr = 0.5) - vectorized

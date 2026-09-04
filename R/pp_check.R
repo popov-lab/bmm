@@ -15,57 +15,113 @@
 #' credible intervals are shown as point-ranges, using the bayesplot default
 #' colour scheme and theme.
 #'
+#' Some models describe several observables jointly (e.g. [ddm()]: response
+#' times *and* responses; [ezdm()]: mean RT, RT variance *and* accuracy), but
+#' brms only ever checks the primary response. For these models the `resp_var`
+#' argument selects which observable to check; [pp_check_vars()] lists the
+#' available checks. All selected observables are drawn from **one** joint
+#' posterior predictive simulation, so `resp_var = "all"` panels are mutually
+#' consistent.
+#'
 #' @param object A `bmmfit` object returned by [bmm()].
-#' @param type Character. Type of pp_check (default `"dens_overlay"`). For
-#'   non-multinomial models, passed to [brms::pp_check()]. When `group` is
-#'   specified, the grouped variant (e.g., `"dens_overlay_grouped"`) is
-#'   auto-selected if available. Multinomial models produce a response
-#'   proportion profile regardless of the value supplied.
+#' @param type Character. Type of pp_check. When `NULL` (default), resolves to
+#'   `"dens_overlay"`, or to the selected observable's default type when
+#'   `resp_var` is specified. When `group` is specified, the grouped variant
+#'   (e.g., `"dens_overlay_grouped"`) is auto-selected if available.
+#'   Multinomial models produce a response proportion profile regardless of
+#'   the value supplied.
 #' @param ndraws Integer. Number of posterior draws. Defaults to `100` for
-#'   multinomial models; otherwise passed to [brms::pp_check()].
+#'   multinomial models and `10` when `resp_var` is specified; otherwise
+#'   passed to [brms::pp_check()].
 #' @param group Character. Optional grouping variable for faceting. For
 #'   non-multinomial models, passed to [brms::pp_check()]; when specified, the
 #'   grouped variant of `type` (e.g., `"dens_overlay_grouped"`) is auto-selected
 #'   if available. For multinomial models, facets by the named predictor.
-#' @param ... Additional arguments forwarded to [brms::pp_check()] (non-multinomial)
-#'   or to [brms::posterior_predict()] (multinomial). For multinomial models,
-#'   `probs` (numeric vector of length 2, default `c(0.025, 0.975)`) controls the
-#'   credible interval. Both model types accept `re_formula` (e.g.,
-#'   `re_formula = NA` to predict at the population level, excluding random
-#'   effects).
-#' @return For multinomial models, a `ggplot2` object. For other models, the
+#' @param resp_var Character. For models that declare several observables,
+#'   the name of the observable to check, or `"all"` for a panel of all
+#'   available checks built from one shared simulation. See [pp_check_vars()]
+#'   for the options of a fitted model. The default `NULL` checks the primary
+#'   response via [brms::pp_check()]. For the RT models, passing
+#'   `negative_rt = TRUE` (a [brms::posterior_predict()] argument) is
+#'   redirected to `resp_var = "signed_rt"`, so that observed and predicted
+#'   response times are both signed by the response.
+#' @param ... Additional arguments. Without `resp_var`, forwarded to
+#'   [brms::pp_check()], or for multinomial models to
+#'   [brms::posterior_predict()] (`probs`, a numeric vector of length 2 with
+#'   default `c(0.025, 0.975)`, sets the credible interval). With `resp_var`,
+#'   `draw_ids` and `re_formula` go to [brms::prepare_predictions()] and the
+#'   rest to the `bayesplot::ppc_*` function. `re_formula = NA` predicts at
+#'   the population level on every path.
+#' @return For multinomial models or when `resp_var` is specified, a `ggplot2`
+#'   object (a `bayesplot_grid` for `resp_var = "all"`). For other models, the
 #'   result of [brms::pp_check()].
-#' @seealso [brms::pp_check()]
+#' @seealso [brms::pp_check()], [pp_check_vars()]
 #' @aliases pp_check
 #' @importFrom brms pp_check
 #' @importFrom rlang .data
 #' @export
-pp_check.bmmfit <- function(object, type = "dens_overlay", ndraws = NULL,
-                            group = NULL, ...) {
+pp_check.bmmfit <- function(object, type = NULL, ndraws = NULL,
+                            group = NULL, resp_var = NULL, ...) {
+  dots <- list(...)
+  spec <- pp_observables(object$bmm$model)
+
+  if (isTRUE(dots$negative_rt)) {
+    # brms would compare signed predicted RTs against the unsigned observed Y
+    # -- a silent mismatch that looks like severe misfit (#401)
+    stopif(!is.null(resp_var) && !identical(resp_var, "signed_rt"),
+           "'negative_rt = TRUE' cannot be combined with resp_var = '{resp_var}'.")
+    stopif(is.null(spec) || !"signed_rt" %in% names(spec$checks),
+           "'negative_rt = TRUE' is not supported in pp_check() for this model.")
+    message2("negative_rt = TRUE: checking the 'signed_rt' observable \\
+              (response times signed by the response).")
+    resp_var <- "signed_rt"
+  }
+
+  if (!is.null(resp_var)) {
+    stopif(is.null(spec),
+           "'resp_var' is not supported for the {object$bmm$model$name}: \\
+            it declares no additional observables.")
+    valid <- c(names(spec$checks), "all")
+    stopif(!is.character(resp_var) || length(resp_var) != 1L ||
+             !resp_var %in% valid,
+           "'resp_var' must be one of {collapse_comma(valid)}. \\
+            See pp_check_vars(fit).")
+    stopif(!is.null(group) && (!is.character(group) || length(group) != 1L ||
+             !group %in% names(object$data)),
+           "'group' must name a column of the model data.")
+    stopif(!is.null(dots$newdata),
+           "'newdata' is not supported when 'resp_var' is specified.")
+    dots$negative_rt <- NULL
+    return(.pp_check_observable(object, spec, resp_var, type, ndraws, group,
+                                dots))
+  }
+
   if (identical(family(object)$family, "multinomial")) {
-    .pp_check_multinomial(object, type = type, ndraws = ndraws %||% 100L,
-                          group = group, ...)
-  } else {
-    if (!is.null(group)) {
-      type <- .auto_grouped_type(type)
-    }
-    NextMethod()
+    return(.pp_check_multinomial(object, type = type, ndraws = ndraws %||% 100L,
+                                 group = group, ...))
+  }
+
+  # a bare NextMethod() re-supplies only the formals present in the original
+  # call, so the resolved type is passed explicitly (#401)
+  type <- type %||% "dens_overlay"
+  if (!is.null(group)) {
+    type <- .auto_grouped_type(type)
+  }
+  NextMethod(type = type)
+}
+
+
+.ppc_fun <- function(type) {
+  name <- paste0("ppc_", type)
+  if (name %in% as.character(bayesplot::available_ppc(""))) {
+    get(name, asNamespace("bayesplot"))
   }
 }
 
 
 .auto_grouped_type <- function(type) {
-  if (endsWith(type, "_grouped")) {
-    type
-  } else {
-    grouped <- paste0(type, "_grouped")
-    ppc_fn <- paste0("ppc_", grouped)
-    if (exists(ppc_fn, where = asNamespace("bayesplot"), mode = "function")) {
-      grouped
-    } else {
-      type
-    }
-  }
+  grouped <- paste0(type, "_grouped")
+  if (endsWith(type, "_grouped") || is.null(.ppc_fun(grouped))) type else grouped
 }
 
 

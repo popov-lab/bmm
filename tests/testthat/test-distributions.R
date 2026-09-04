@@ -1058,6 +1058,15 @@ test_that("dezdm validates parameters correctly", {
   )
 })
 
+test_that("rezdm 4par handles cells with fewer than 2 responses at a boundary", {
+  withr::local_seed(1)
+  res <- rezdm(n = 200, n_trials = 3, drift = 0, bound = 1, ndt = 0.3,
+               version = "4par")
+  expect_identical(is.na(res$mean_rt_upper), res$n_upper < 2)
+  expect_identical(is.na(res$var_rt_upper), res$n_upper < 2)
+  expect_identical(is.na(res$mean_rt_lower), res$n_trials - res$n_upper < 2)
+})
+
 test_that("rezdm validates parameters correctly", {
   # n must be single integer
   expect_error(

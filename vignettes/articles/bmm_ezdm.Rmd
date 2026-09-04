@@ -569,6 +569,20 @@ draws |>
   theme_minimal()
 ```
 
+# Posterior predictive checks
+
+The EZ-diffusion likelihood constrains three statistics per cell — the mean RT, the RT variance, and the number of upper-boundary (correct) responses — but by default `pp_check()` only shows the mean RT. The `resp_var` argument selects the other observables of the likelihood; `pp_check_vars()` lists the available checks:
+
+```{r}
+pp_check_vars(fit)
+```
+
+The `mean_pc` check is the proportion of correct responses (`n_upper / n_trials`), which stays comparable across cells even when the number of trials differs. With `resp_var = "all"` all checks are drawn from one shared joint simulation:
+
+```{r, message=FALSE, warning=FALSE, fig.width=7, fig.height=5}
+pp_check(fit, resp_var = "all", ndraws = 50)
+```
+
 # Comparing conditions
 
 As `bmm` feeds seamlessly into `brms`, we can use Bayesian hypothesis testing via Savage-Dickey density ratios to compare drift rates between conditions:
