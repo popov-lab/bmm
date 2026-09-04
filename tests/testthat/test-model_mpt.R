@@ -251,6 +251,34 @@ test_that("non-linear parameter formulas bypass the link transformation", {
   expect_false(grepl("inv_logit(D)", correct_rhs, fixed = TRUE))
 })
 
+test_that("printing an mpt model lists trees, restrictions and the identifiability bound", {
+  model <- mpt(mpt_2htm_trees(), tree_id = "item_type")
+  expect_output(print(model), "MPT tree 'old':")
+  expect_output(print(model), "P\\(new\\) = \\(1 - D\\) \\* \\(1 - g\\)")
+  expect_output(
+    print(model),
+    "2 free parameter\\(s\\), 2 degrees of freedom"
+  )
+  expect_no_match(capture.output(print(model)), "not identified")
+
+  trees <- list(
+    mpt_tree("old", list(yes = "Do + (1 - Do) * g", no = "(1 - Do) * (1 - g)")),
+    mpt_tree("new", list(yes = "(1 - Dn) * g", no = "Dn + (1 - Dn) * (1 - g)"))
+  )
+  unidentified <- mpt(trees, tree_id = "item_type")
+  expect_output(print(unidentified), "3 free parameter\\(s\\), 2 degrees of freedom")
+  expect_output(print(unidentified), "not identified")
+
+  restricted <- mpt(trees, tree_id = "item_type", restrictions = c("Dn = Do", "g = 0.5"))
+  expect_output(print(restricted), "Restrictions: Dn = Do, g = 0.5")
+
+  simplex <- mpt(
+    mpt_tree("t", list(A = "gA", B = "gB", C = "gC")),
+    simplex = c("gA", "gB", "gC")
+  )
+  expect_output(print(simplex), "2 free parameter\\(s\\), 2 degrees of freedom")
+})
+
 test_that("restrictions are substituted into the trees before parameters are identified", {
   trees <- list(
     mpt_tree("old", list(yes = "Do + (1 - Do) * g", no = "(1 - Do) * (1 - g)")),

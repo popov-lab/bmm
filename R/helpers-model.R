@@ -227,8 +227,21 @@ print.bmmodel <- function(x, ...) {
     )
     cat("Fixed:     ", fixed_str, "\n")
   }
+  print_model_details(x)
   cat("Use parameters() for more details.\n")
   invisible(x)
+}
+
+# print.bmmodel dispatches before any model-specific print method (classes
+# are ordered general to specific), so model-specific lines are added here
+#' @keywords internal
+print_model_details <- function(model, ...) {
+  UseMethod("print_model_details")
+}
+
+#' @export
+print_model_details.default <- function(model, ...) {
+  invisible(NULL)
 }
 
 

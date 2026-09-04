@@ -605,6 +605,39 @@ mpt <- function(trees, tree_id = NULL, covariates = NULL, simplex = NULL,
   lapply(trees, .mpt_apply_restrictions, restrictions)
 }
 
+#' @export
+print_model_details.mpt <- function(model, ...) {
+  for (tree in model$trees) {
+    print(tree)
+  }
+  if (length(model$restrictions) > 0) {
+    cat(
+      "Restrictions:",
+      paste(
+        names(model$restrictions),
+        vapply(model$restrictions, deparse1, character(1)),
+        sep = " = ", collapse = ", "
+      ),
+      "\n"
+    )
+  }
+  # the classical identifiability bound of MPTinR's check.mpt(): each tree
+  # contributes its number of possible categories minus one
+  n_free <- length(model$parameters) - length(unlist(model$simplex))
+  df <- sum(lengths(lapply(model$trees, `[[`, "branches")) - 1L)
+  cat(glue(
+    "Identifiability: {n_free} free parameter(s), {df} degrees of freedom \\
+    (response categories minus 1, summed over trees)"
+  ), "\n")
+  if (n_free > df) {
+    cat(
+      "  More free parameters than degrees of freedom: the model is not",
+      "identified without further constraints.\n"
+    )
+  }
+  invisible(NULL)
+}
+
 ############################################################################# !
 # CHECK_MODEL S3 methods                                                 ####
 ############################################################################# !
