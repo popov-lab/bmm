@@ -40,8 +40,13 @@ test_that("mpt stores its derived state once and can rebuild itself", {
   expect_equal(model$indicators$possible, c(dist = "Poss_dist"))
   expect_null(model$simplex_raw)
 
+  # the recorded call differs by construction; every other field must match
+  without_call <- function(m) {
+    attr(m, "call") <- NULL
+    m
+  }
   rebuilt <- do.call("mpt", .mpt_constructor_args(model))
-  expect_equal(unclass(rebuilt), unclass(model))
+  expect_equal(without_call(rebuilt), without_call(model))
 
   single <- mpt(mpt_tree("t", list(A = "gA", B = "gB", C = "gC")),
     simplex = c("gA", "gB", "gC"), links = "probit"
@@ -50,7 +55,7 @@ test_that("mpt stores its derived state once and can rebuild itself", {
   expect_null(single$indicators$possible)
   expect_equal(single$simplex_raw, c(gA = "gAraw", gB = "gBraw"))
   rebuilt_single <- do.call("mpt", .mpt_constructor_args(single))
-  expect_equal(unclass(rebuilt_single), unclass(single))
+  expect_equal(without_call(rebuilt_single), without_call(single))
 })
 
 test_that("importers record their own call", {
