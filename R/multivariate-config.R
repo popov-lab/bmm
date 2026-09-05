@@ -100,6 +100,8 @@ configure_fit.mvbmmformula <- function(formula, data = NULL, model = NULL, prior
   )
   components <- lapply(spec, mv_configure_component)
   validate_component_resps(components)
+  check_shared_random_effects(spec)
+  warn_factor_level_mismatch(spec)
 
   formula <- Reduce(`+`, lapply(components, function(x) x$cfg$formula)) +
     brms::set_rescor(FALSE)
