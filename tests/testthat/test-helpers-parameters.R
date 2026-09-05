@@ -192,10 +192,17 @@ test_that("NULL link is treated as identity", {
 # ===========================================================================
 
 test_that(".is_softmax_param detects mixture3p softmax params", {
-  mock_model <- structure(list(), class = c("mixture3p", "bmmodel"))
+  mock_model <- structure(list(), class = c("mixture3p", "mixture3p_simple", "bmmodel"))
   expect_true(.is_softmax_param("thetat", mock_model))
   expect_true(.is_softmax_param("thetant", mock_model))
   expect_false(.is_softmax_param("kappa", mock_model))
+})
+
+test_that(".is_softmax_param returns FALSE for the capacity-limited versions", {
+  # these parameterise the weights directly rather than through a softmax
+  mock_model <- structure(list(), class = c("mixture3p", "mixture3p_slot", "bmmodel"))
+  expect_false(.is_softmax_param("thetat", mock_model))
+  expect_false(.is_softmax_param("pnt", mock_model))
 })
 
 test_that(".is_softmax_param returns FALSE for non-mixture3p models", {

@@ -318,5 +318,5 @@ print.bmm_parameters <- function(x, max_desc_width = 50, ...) {
 #' @keywords internal
 #' @noRd
 .is_softmax_param <- function(par, model) {
-  "mixture3p" %in% class(model) && par %in% c("thetat", "thetant")
+  "mixture3p_simple" %in% class(model) && par %in% c("thetat", "thetant")
 }

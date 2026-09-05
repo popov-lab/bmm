@@ -432,6 +432,12 @@ rmixture2p <- function(n, mu = 0, kappa = 5, p_mem = 0.6, tau = 0, K = 3,
 #' @param kappa Vector of precision values
 #' @param p_mem Vector of probabilities for memory recall
 #' @param p_nt Vector of probabilities for swap errors
+#' @param tau Vector of scales for trial-to-trial variability in precision. The
+#'   Fisher information `J` of a memory representation is drawn from
+#'   `gamma(mean = J(kappa), scale = tau)`. `tau = 0`, the default, is constant
+#'   precision. See [mixture3p()].
+#' @param vp_nodes Number of quadrature nodes used when `tau > 0`; must be an
+#'   odd number of at least 41. See [mixture2p()].
 #' @param log Logical; if `TRUE`, values are returned on the log scale.
 #'
 #' @keywords distribution
@@ -456,34 +462,141 @@ rmixture2p <- function(n, mu = 0, kappa = 5, p_mem = 0.6, tau = 0, K = 3,
 #' hist(r, breaks = 60, freq = FALSE)
 #' lines(x, d, type = "l", col = "red")
 #'
-dmixture3p <- function(x, mu = c(0, 2, -1.5), kappa = 5, p_mem = 0.6, p_nt = 0.2, log = FALSE) {
-  stopif(isTRUE(any(kappa < 0)), "kappa must be non-negative")
-  stopif(isTRUE(any(p_mem < 0)), "p_mem must be larger than zero.")
-  stopif(isTRUE(any(p_nt < 0)), "p_nt must be larger than zero.")
-  stopif(isTRUE(any(p_mem + p_nt > 1)), "The sum of p_mem and p_nt must be smaller than one.")
+dmixture3p <- function(x, mu = c(0, 2, -1.5), kappa = 5, p_mem = 0.6, p_nt = 0.2,
+                       tau = 0, vp_nodes = 41L, log = FALSE) {
+  .check_mixture3p_args(kappa, p_mem, p_nt, tau)
 
-  density <- matrix(data = NaN, nrow = length(x), ncol = length(mu) + 1)
-  probs <- c(
-    p_mem,
-    rep(p_nt / (length(mu) - 1), each = length(mu) - 1),
-    (1 - p_mem - p_nt)
+  set_size <- length(mu)
+  weights <- .mixture3p_marginal_weights(p_mem, p_nt, set_size, length(x))
+  density <- .circmix_vp_ld(
+    .circmix_cos(x, mu[1], mu[-1], set_size),
+    weights$logw, weights$logw_guess,
+    rep_len(kappa, length(x)), rep_len(tau, length(x)), vp_nodes
   )
-
-  for (i in 1:(length(mu))) {
-    density[, i] <- log(probs[i]) +
-      brms::dvon_mises(x = x, mu = mu[i], kappa = kappa, log = T)
-  }
-
-  density[, length(mu) + 1] <- log(probs[length(mu) + 1]) +
-    stats::dunif(x = x, -pi, pi, log = T)
-
-  density <- matrixStats::rowLogSumExps(density)
 
   if (!log) {
     return(exp(density))
   }
 
   density
+}
+
+.check_mixture3p_args <- function(kappa, p_mem, p_nt, tau) {
+  stopif(isTRUE(any(kappa < 0)), "kappa must be non-negative")
+  stopif(isTRUE(any(tau < 0)), "tau must be non-negative")
+  stopif(isTRUE(any(p_mem < 0)), "p_mem must be larger than zero.")
+  stopif(isTRUE(any(p_nt < 0)), "p_nt must be larger than zero.")
+  stopif(isTRUE(any(p_mem + p_nt > 1)), "The sum of p_mem and p_nt must be smaller than one.")
+}
+
+# the weights the exported functions take: marginal probabilities of a target
+# and of a non-target response, with guessing taking the rest
+.mixture3p_marginal_weights <- function(p_mem, p_nt, set_size, n) {
+  p_mem <- rep_len(p_mem, n)
+  p_nt <- rep_len(p_nt, n)
+  logw <- matrix(log(p_mem), nrow = n)
+  if (set_size > 1) {
+    logw <- cbind(logw, matrix(log(p_nt) - log(set_size - 1), nrow = n, ncol = set_size - 1))
+  }
+  list(logw = logw, logw_guess = log1p(-p_mem - p_nt))
+}
+
+# the "simple" version fits a softmax over the components a trial actually has,
+# with guessing as the reference category
+.mixture3p_softmax_weights <- function(thetat, thetant, set_size) {
+  n <- length(thetat)
+  logw <- matrix(thetat, nrow = n)
+  if (set_size > 1) {
+    logw <- cbind(logw, matrix(thetant - log(set_size - 1), nrow = n, ncol = set_size - 1))
+  }
+  total <- matrixStats::rowLogSumExps(cbind(logw, 0))
+  list(logw = logw - total, logw_guess = -total)
+}
+
+# which stored item is reported: the target with 1 - p_nt and each non-target
+# with an equal share of p_nt; at set size 1 there is nothing to swap to
+.mixture3p_swap_weights <- function(p_nt, set_size) {
+  n <- length(p_nt)
+  if (set_size == 1) {
+    return(matrix(0, nrow = n))
+  }
+  cbind(
+    log1p(-p_nt),
+    matrix(log(p_nt) - log(set_size - 1), nrow = n, ncol = set_size - 1)
+  )
+}
+
+# the capacity versions separate storage from swapping: p_mem says how often a
+# response comes from memory and p_nt which stored item is reported
+.mixture3p_nested_weights <- function(p_mem, p_nt, set_size) {
+  list(
+    logw = log(p_mem) + .mixture3p_swap_weights(p_nt, set_size),
+    logw_guess = log1p(-p_mem)
+  )
+}
+
+.dmixture3p_simple <- function(x, mu, kappa, thetat, thetant, set_size, nt, tau, nodes) {
+  args <- .circmix_recycle(
+    x = x, mu = mu, kappa = kappa, thetat = thetat, thetant = thetant, tau = tau
+  )
+  weights <- .mixture3p_softmax_weights(args$thetat, args$thetant, set_size)
+  .circmix_vp_ld(
+    .circmix_cos(args$x, args$mu, nt, set_size),
+    weights$logw, weights$logw_guess, args$kappa, args$tau, nodes
+  )
+}
+
+.dmixture3p_slot <- function(x, mu, kappa, K, p_nt, set_size, nt, tau, nodes) {
+  args <- .circmix_recycle(
+    x = x, mu = mu, kappa = kappa, K = K, p_nt = p_nt, tau = tau
+  )
+  weights <- .mixture3p_nested_weights(
+    pmin(1, args$K / set_size), args$p_nt, set_size
+  )
+  .circmix_vp_ld(
+    .circmix_cos(args$x, args$mu, nt, set_size),
+    weights$logw, weights$logw_guess, args$kappa, args$tau, nodes
+  )
+}
+
+# Which item is reported and how many slots it holds are independent, so the
+# swap weights serve both slot counts and only the concentration differs.
+.dmixture3p_slot_averaging <- function(x, mu, kappa, K, p_nt, set_size, nt, tau, nodes) {
+  args <- .circmix_recycle(
+    x = x, mu = mu, kappa = kappa, K = K, p_nt = p_nt, tau = tau
+  )
+  .circmix_slot_averaging_ld(
+    .circmix_cos(args$x, args$mu, nt, set_size),
+    .mixture3p_swap_weights(args$p_nt, set_size),
+    args$K, set_size, args$kappa, args$tau, nodes
+  )
+}
+
+.mixture3p_locations <- function(mu, nt, set_size) {
+  locations <- matrix(mu, nrow = length(mu))
+  if (set_size > 1) {
+    locations <- cbind(locations, matrix(
+      nt[seq_len(set_size - 1)],
+      nrow = length(mu), ncol = set_size - 1, byrow = TRUE
+    ))
+  }
+  locations
+}
+
+.rmixture3p <- function(mu, nt, set_size, weights, kappa, tau) {
+  .rcircmix(
+    .mixture3p_locations(mu, nt, set_size), weights$logw, weights$logw_guess,
+    kappa, tau
+  )
+}
+
+.rmixture3p_slot_averaging <- function(mu, nt, set_size, kappa, K, p_nt, tau) {
+  args <- .circmix_recycle(mu = mu, kappa = kappa, K = K, p_nt = p_nt, tau = tau)
+  .rcircmix_slot_averaging(
+    .mixture3p_locations(args$mu, nt, set_size),
+    .mixture3p_swap_weights(args$p_nt, set_size),
+    args$K, set_size, args$kappa, args$tau
+  )
 }
 
 #' @rdname mixture3p_dist
@@ -500,20 +613,15 @@ qmixture3p <- function(p, mu = c(0, 2, -1.5), kappa = 5, p_mem = 0.6, p_nt = 0.2
 
 #' @rdname mixture3p_dist
 #' @export
-rmixture3p <- function(n, mu = c(0, 2, -1.5), kappa = 5, p_mem = 0.6, p_nt = 0.2) {
-  stopif(isTRUE(any(kappa < 0)), "kappa must be non-negative")
-  stopif(isTRUE(any(p_mem < 0)), "p_mem must be larger than zero.")
-  stopif(isTRUE(any(p_nt < 0)), "p_nt must be larger than zero.")
-  stopif(isTRUE(any(p_mem + p_nt > 1)), "The sum of p_mem and p_nt must be smaller than one.")
+rmixture3p <- function(n, mu = c(0, 2, -1.5), kappa = 5, p_mem = 0.6, p_nt = 0.2,
+                       tau = 0) {
+  .check_mixture3p_args(kappa, p_mem, p_nt, tau)
 
-  xm <- seq(-pi, pi, length.out = 361)
-  max_y <- max(dmixture3p(xm, mu, kappa, p_mem, p_nt))
-
-  rejection_sampling(
-    n = n,
-    f = function(x) dmixture3p(x, mu, kappa, p_mem, p_nt),
-    max_f = max_y,
-    proposal_fun = function(n) stats::runif(n, -pi, pi)
+  set_size <- length(mu)
+  .rmixture3p(
+    rep_len(mu[1], n), mu[-1], set_size,
+    .mixture3p_marginal_weights(p_mem, p_nt, set_size, n),
+    rep_len(kappa, n), rep_len(tau, n)
   )
 }
 
