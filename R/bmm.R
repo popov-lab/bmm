@@ -118,10 +118,19 @@ bmm <- function(formula, data, model,
                 file = NULL, file_compress = TRUE,
                 file_refit = getOption("bmm.file_refit", FALSE), ...) {
   stopif(
-    is_bmm_component(formula) || is_mvbmmformula(formula),
-    "Fitting multivariate specifications built with bmm_component() is not \\
-    yet available."
+    is_bmm_component(formula),
+    "A single bmm_component() cannot be fitted by itself. Combine at least \\
+    two components with `+`, or use bmm(formula, data, model) directly for a \\
+    univariate model."
   )
+  if (is_mvbmmformula(formula)) {
+    stopif(
+      !missing(data) || !missing(model),
+      "When fitting a multivariate model composed with bmm_component(), each \\
+      component carries its own data and model. Omit the 'data' and 'model' \\
+      arguments."
+    )
+  }
 
   deprecated_args(...)
   dots <- list(...)
@@ -142,7 +151,12 @@ bmm <- function(formula, data, model,
   opts <- configure_options(configure_opts)
   dots$parallel <- NULL
 
-  cfg <- configure_fit(formula, data, model, prior)
+  # a multivariate specification carries its data and models in its components
+  cfg <- if (is_mvbmmformula(formula)) {
+    configure_fit(formula, prior = prior)
+  } else {
+    configure_fit(formula, data, model, prior)
+  }
 
   fit_args <- combine_args(nlist(config_args = cfg$config_args, opts, dots, prior = cfg$prior))
   fit <- brms::do_call(brms::brm, fit_args)

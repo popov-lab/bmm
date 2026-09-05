@@ -167,13 +167,6 @@ test_that("constant distributional parameters work in family components", {
   expect_equal(constant_row$prior, "constant(0.3)")
 })
 
-test_that("bmm() refuses multivariate specifications until fitting is available", {
-  comp_vwm <- bmm_component(f_vwm, model = mixture2p(resp_error = "error"), data = dat_vwm)
-  comp_rt <- bmm_component(f_rt, family = brms::lognormal(), data = dat_rt)
-  expect_error(bmm(comp_vwm), "not yet available")
-  expect_error(bmm(comp_vwm + comp_rt), "not yet available")
-})
-
 test_that("printing components and specifications works", {
   comp_vwm <- bmm_component(f_vwm, model = mixture2p(resp_error = "error"), data = dat_vwm)
   comp_rt <- bmm_component(f_rt, family = brms::lognormal(), data = dat_rt)
