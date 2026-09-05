@@ -242,7 +242,7 @@ test_that("extracts only requested subset of blocks", {
   out <- extract_stan_blocks(stan_code, c("data", "model"))
   expect_setequal(names(out), c("data", "model"))
   expect_match(out$data, "int<lower=1> N;", fixed = TRUE)
-  expect_match(out$model, "von_mises_lpdf", fixed = TRUE)
+  expect_match(out$model, "mixture2p_simple_lpdf", fixed = TRUE)
 })
 
 test_that("unknown block names are ignored (no error)", {

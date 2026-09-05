@@ -259,14 +259,32 @@ rsdm <- function(n, mu = 0, c = 3, kappa = 3.5, parametrization = "sqrtexp") {
 #' @param p Vector of probability
 #' @param n Number of observations to generate data for
 #' @param mu Vector of locations
-#' @param kappa Vector of precision values
-#' @param p_mem Vector of probabilities for memory recall
+#' @param kappa Vector of precision values. With `tau > 0` this is the mean
+#'   precision rather than the precision itself.
+#' @param p_mem Vector of probabilities for memory recall. Used by the
+#'   `"simple"` version; the other versions derive it from `K` and `set_size`.
+#' @param tau Vector of scales for trial-to-trial variability in precision. The
+#'   Fisher information `J` of a memory representation is drawn from
+#'   `gamma(mean = J(kappa), scale = tau)`. `tau = 0`, the default, is constant
+#'   precision.
+#' @param K Vector of memory capacities. Used by the `"slot"` and
+#'   `"slot_averaging"` versions and ignored by `"simple"`.
+#' @param set_size Vector of set sizes. Used by the `"slot"` and
+#'   `"slot_averaging"` versions and ignored by `"simple"`.
+#' @param version A character string selecting the storage model: `"simple"`,
+#'   `"slot"` or `"slot_averaging"`. See [mixture2p()].
+#' @param vp_nodes Number of quadrature nodes used when `tau > 0`; must be an
+#'   odd number of at least 41. See [mixture2p()].
 #' @param log Logical; if `TRUE`, values are returned on the log scale.
 #'
 #' @keywords distribution
 #'
 #' @references Zhang, W., & Luck, S. J. (2008). Discrete fixed-resolution
 #'   representations in visual working memory. Nature, 453.
+#'
+#'   van den Berg, R., Shin, H., Chou, W.-C., George, R., & Ma, W. J. (2012).
+#'   Variability in encoding precision accounts for visual short-term memory
+#'   limitations. PNAS, 109(22), 8780-8785.
 #'
 #' @return `dmixture2p` gives the density of the two-parameter mixture model,
 #'   `pmixture2p` gives the cumulative distribution function of the
@@ -284,23 +302,81 @@ rsdm <- function(n, mu = 0, c = 3, kappa = 3.5, parametrization = "sqrtexp") {
 #' hist(r, breaks = 60, freq = FALSE)
 #' lines(x, d, type = "l", col = "red")
 #'
-dmixture2p <- function(x, mu = 0, kappa = 5, p_mem = 0.6, log = FALSE) {
-  stopif(isTRUE(any(kappa < 0)), "kappa must be non-negative")
-  stopif(isTRUE(any(p_mem < 0)), "p_mem must be larger than zero.")
-  stopif(isTRUE(any(p_mem > 1)), "p_mem must be smaller than one.")
+dmixture2p <- function(x, mu = 0, kappa = 5, p_mem = 0.6, tau = 0, K = 3,
+                       set_size = 1, version = "simple", vp_nodes = 41L,
+                       log = FALSE) {
+  version <- match.arg(version, names(.mixture2p_version_table))
+  .check_mixture2p_args(kappa, p_mem, tau, K, version)
 
-  density <- matrix(data = NaN, nrow = length(x), ncol = 2)
-
-  density[, 1] <- log(p_mem) + brms::dvon_mises(x = x, mu = mu, kappa = kappa, log = T)
-  density[, 2] <- log(1 - p_mem) + brms::dvon_mises(x = x, mu = 0, kappa = 0, log = T)
-
-  density <- matrixStats::rowLogSumExps(density)
+  density <- switch(version,
+    simple = .dmixture2p_simple(x, mu, kappa, p_mem, tau, vp_nodes),
+    slot = .dmixture2p_slot(x, mu, kappa, K, set_size, tau, vp_nodes),
+    slot_averaging = .dmixture2p_slot_averaging(x, mu, kappa, K, set_size, tau, vp_nodes)
+  )
 
   if (!log) {
     return(exp(density))
   }
 
   density
+}
+
+.check_mixture2p_args <- function(kappa, p_mem, tau, K, version) {
+  stopif(isTRUE(any(kappa < 0)), "kappa must be non-negative")
+  stopif(isTRUE(any(tau < 0)), "tau must be non-negative")
+  if (version == "simple") {
+    stopif(isTRUE(any(p_mem < 0)), "p_mem must be larger than zero.")
+    stopif(isTRUE(any(p_mem > 1)), "p_mem must be smaller than one.")
+    return(invisible())
+  }
+  stopif(isTRUE(any(K <= 0)), "K must be positive.")
+}
+
+.dmixture2p_simple <- function(x, mu, kappa, p_mem, tau, nodes) {
+  args <- .circmix_recycle(x = x, mu = mu, kappa = kappa, p_mem = p_mem, tau = tau)
+  .circmix_vp_ld(
+    cosd = matrix(cos(args$x - args$mu)),
+    logw = matrix(log(args$p_mem)),
+    logw_guess = log1p(-args$p_mem),
+    kappa = args$kappa, tau = args$tau, nodes = nodes
+  )
+}
+
+.dmixture2p_slot <- function(x, mu, kappa, K, set_size, tau, nodes) {
+  args <- .circmix_recycle(x = x, K = K, set_size = set_size)
+  .dmixture2p_simple(
+    args$x, mu, kappa, pmin(1, args$K / args$set_size), tau, nodes
+  )
+}
+
+.dmixture2p_slot_averaging <- function(x, mu, kappa, K, set_size, tau, nodes) {
+  args <- .circmix_recycle(
+    x = x, mu = mu, kappa = kappa, K = K, set_size = set_size, tau = tau
+  )
+  .circmix_slot_averaging_ld(
+    matrix(cos(args$x - args$mu)), matrix(0, nrow = length(args$x)),
+    args$K, args$set_size, args$kappa, args$tau, nodes
+  )
+}
+
+.rmixture2p_simple <- function(mu, kappa, p_mem, tau) {
+  args <- .circmix_recycle(mu = mu, kappa = kappa, p_mem = p_mem, tau = tau)
+  .rcircmix(
+    mu = matrix(args$mu),
+    logw = matrix(log(args$p_mem)),
+    logw_guess = log1p(-args$p_mem),
+    kappa = args$kappa, tau = args$tau
+  )
+}
+
+.rmixture2p_slot_averaging <- function(mu, kappa, K, set_size, tau) {
+  args <- .circmix_recycle(
+    mu = mu, kappa = kappa, K = K, set_size = set_size, tau = tau
+  )
+  .rcircmix_slot_averaging(
+    matrix(args$mu), matrix(0, nrow = length(args$mu)),
+    args$K, args$set_size, args$kappa, args$tau
+  )
 }
 
 #' @rdname mixture2p_dist
@@ -317,16 +393,23 @@ qmixture2p <- function(p, mu = 0, kappa = 5, p_mem = 0.6) {
 
 #' @rdname mixture2p_dist
 #' @export
-rmixture2p <- function(n, mu = 0, kappa = 5, p_mem = 0.6) {
-  stopif(isTRUE(any(kappa < 0)), "kappa must be non-negative")
-  stopif(isTRUE(any(p_mem < 0)), "p_mem must be larger than zero.")
-  stopif(isTRUE(any(p_mem > 1)), "p_mem must be smaller than one.")
+rmixture2p <- function(n, mu = 0, kappa = 5, p_mem = 0.6, tau = 0, K = 3,
+                       set_size = 1, version = "simple") {
+  version <- match.arg(version, names(.mixture2p_version_table))
+  .check_mixture2p_args(kappa, p_mem, tau, K, version)
 
-  rejection_sampling(
-    n = n,
-    f = function(x) dmixture2p(x, mu, kappa, p_mem),
-    max_f = dmixture2p(0, 0, kappa, p_mem),
-    proposal_fun = function(n) stats::runif(n, -pi, pi)
+  recycle <- function(x) rep_len(x, n)
+  switch(version,
+    simple = .rmixture2p_simple(
+      recycle(mu), recycle(kappa), recycle(p_mem), recycle(tau)
+    ),
+    slot = .rmixture2p_simple(
+      recycle(mu), recycle(kappa),
+      pmin(1, recycle(K) / recycle(set_size)), recycle(tau)
+    ),
+    slot_averaging = .rmixture2p_slot_averaging(
+      recycle(mu), recycle(kappa), recycle(K), recycle(set_size), recycle(tau)
+    )
   )
 }
 
