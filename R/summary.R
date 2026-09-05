@@ -65,12 +65,15 @@ print.bmmsummary <- function(x, digits = 2, color = getOption("bmm.color_summary
 }
 
 # The blocks of a printed summary, so that every summary method prints them
-# identically
-print_model_header <- function(model, formula, data_name, nobs) {
+# identically; a component of a multivariate specification prints the same
+# header without the links line
+print_model_header <- function(model, formula, data_name, nobs, links = TRUE) {
   cat(style("purple1")("  Model: "))
   cat(summarise_model(model, newline = TRUE, wsp = 9), "\n")
-  cat(style("purple1")("  Links: "))
-  cat(summarise_links(model$links), "\n")
+  if (links) {
+    cat(style("purple1")("  Links: "))
+    cat(summarise_links(model$links), "\n")
+  }
   cat(style("purple1")("Formula: "))
   cat(summarise_formula.bmmformula(formula, newline = TRUE, wsp = 9, model = model), "\n")
   cat(style("purple1")("   Data:"), data_name, "(Number of observations:", paste0(nobs, ")\n"))

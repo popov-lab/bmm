@@ -1,6 +1,7 @@
 # bmm (development version)
 
 ### New features
+* New **multivariate models** (experimental): several models can be estimated jointly to obtain the full correlation matrix of their subject-level parameters. Each model is wrapped in a **bmm_component()** together with its formula and data; components are combined with `+` and passed to `bmm()` as the formula argument. Plain distributional families such as `lognormal()` can be components too, so model parameters can be correlated with external covariates (#394).
 * The **sdm** model now supports within-chain parallelization via the `threads` argument (e.g. `bmm(..., threads = 2)`), reducing fitting time by up to ~45% in benchmarks (#374).
 * Add `softplus` as an opt-in link function for positively-bounded parameters, as an alternative to the default `log` link. `softplus(x) = log(1 + exp(x))` keeps parameters positive while growing linearly for large values, avoiding the numerical blow-up of `exp()` and giving predictor effects an additive (rather than multiplicative) interpretation on the natural scale. Enable it per parameter via the model's `links` list, e.g. `m3(...)$links <- list(c = "softplus", a = "softplus")` or `ddm(rt, response, links = list(bound = "softplus"))` (#363).
 

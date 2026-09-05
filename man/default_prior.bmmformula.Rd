@@ -21,7 +21,9 @@ call. Call \code{\link[=supported_models]{supported_models()}} to see the list o
 their required arguments}
 
 \item{formula}{An object of class \code{bmmformula}. A symbolic description of the
-model to be fitted.}
+model to be fitted. Alternatively, a multivariate specification created by
+combining \code{\link[=bmm_component]{bmm_component()}} objects with \code{+}, in which case the \code{data} and
+\code{model} arguments must be omitted (each component carries its own).}
 
 \item{...}{Further arguments passed to \code{\link[brms:default_prior]{brms::default_prior()}}}
 }
