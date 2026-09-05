@@ -221,7 +221,7 @@ validate_default_priors <- function(model, formula) {
     !is.list(default_priors) || !all(sapply(default_priors, is.list)),
     "The default_priors should be a list of lists"
   )
-  dpars_predicted_by_nlpars <- names(which(sapply(formula$pforms, is_nl)))
+  dpars_predicted_by_nlpars <- names(which(vapply(formula$pforms, is_nl, logical(1))))
   default_priors[dpars_predicted_by_nlpars] <- NULL
   warnif(
     any(dpars_predicted_by_nlpars %in% names(model$parameter)),
@@ -312,7 +312,7 @@ combine_prior <- function(prior1, prior2) {
   prior2_types <- do.call(paste, prior2[, cols])
   is_duplicate <- prior1_types %in% prior2_types
   prior <- prior1[!is_duplicate, ] + prior2
-  row.names(prior) <- 1:nrow(prior)
+  row.names(prior) <- seq_len(nrow(prior))
   prior
 }
 
