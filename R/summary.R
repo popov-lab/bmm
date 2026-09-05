@@ -64,9 +64,9 @@ print.bmmsummary <- function(x, digits = 2, color = getOption("bmm.color_summary
   invisible(x)
 }
 
-# The blocks of a printed summary, so that every summary method prints them
-# identically; a component of a multivariate specification prints the same
-# header without the links line
+# The blocks of a printed summary, shared by the univariate and the
+# multivariate summary methods (the latter prints one header and one
+# coefficient block per component)
 print_model_header <- function(model, formula, data_name, nobs, links = TRUE) {
   cat(style("purple1")("  Model: "))
   cat(summarise_model(model, newline = TRUE, wsp = 9), "\n")
@@ -102,15 +102,15 @@ print_summary_random <- function(x, digits) {
 
 # constant parameters (fixed via the formula) have no Rhat and are listed
 # separately with their value only
-print_summary_fixed <- function(rows, digits) {
+print_summary_fixed <- function(rows, digits, label = "") {
   is_constant <- is.na(rows$Rhat)
   if (any(!is_constant)) {
-    cat(style("green")("Regression Coefficients:\n"))
+    cat(style("green")(paste0("Regression Coefficients", label, ":\n")))
     print_format(rows[!is_constant, , drop = FALSE], digits)
     cat("\n")
   }
   if (any(is_constant)) {
-    cat(style("green")("Constant Parameters:\n"))
+    cat(style("green")(paste0("Constant Parameters", label, ":\n")))
     constants <- rows[is_constant, , drop = FALSE]
     print_format(
       data.frame(Value = constants[, 1], row.names = paste0(rownames(constants), "    ")),
