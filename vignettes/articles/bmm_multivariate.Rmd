@@ -193,7 +193,7 @@ fit <- bmm(
 
 On a regular laptop this model samples in about two minutes; the `file` argument stores the fitted model and re-uses it on any later run of the same call. The summary now contains blocks for both components:
 
-```{r, comment=NA}
+```{r, comment=NA, message=FALSE}
 summary(fit)
 ```
 
@@ -204,7 +204,7 @@ Reading this output from top to bottom:
 - The `cor(...)` rows in the same block are the estimates we came for. `cor(error_kappa_Intercept, rt_Intercept)` is the correlation between memory precision and mean log response time — estimated jointly from the trial-level data of both tasks.
 - The **Regression Coefficients** blocks list the population-level parameters per component (the parameters of the average person, called fixed effects in multilevel terminology), again on the link scales.
 
-All Rhat values are below 1.01 and the effective sample sizes are large, so the chains have converged and mixed well. As with any model, you should also check the posterior predictive fit — for multivariate models, each component is checked separately via the `resp` argument, using the response variable's name:
+No Rhat value exceeds 1.01, so the chains have converged. The effective sample sizes are in the thousands for most parameters and in the hundreds for the correlations, which are the hardest quantities to sample: that is enough for the summaries reported here, and you can raise `iter` if you need tighter credible intervals. As with any model, you should also check the posterior predictive fit — for multivariate models, each component is checked separately via the `resp` argument, using the response variable's name:
 
 ```{r, message=FALSE, warning=FALSE, fig.width=5}
 pp_check(fit, resp = "error", ndraws = 50)
