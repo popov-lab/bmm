@@ -33,22 +33,8 @@
 #' @export
 default_prior.bmmformula <- function(object, data, model, formula = object, ...) {
   withr::local_options(bmm.sort_data = FALSE)
-
-  formula <- object
-  model <- check_model(model, data, formula)
-  data <- check_data(model, data, formula)
-  formula <- check_formula(model, data, formula)
-  config_args <- configure_model(model, data, formula)
-  prior <- configure_prior(model, data, config_args$formula, user_prior = NULL)
-
-  dots <- list(...)
-  prior_args <- combine_args(nlist(config_args, dots, prior))
-  prior_args$object <- prior_args$formula
-  prior_args$formula <- NULL
-
-  brms_priors <- brms::do_call(brms::default_prior, prior_args)
-
-  combine_prior(brms_priors, prior_args$prior)
+  cfg <- configure_fit(object, data, model, init = FALSE)
+  combine_prior(call_brms_extractor(brms::default_prior, cfg, list(...)), cfg$prior)
 }
 
 #' Generic S3 method for configuring the default prior for a bmmodel

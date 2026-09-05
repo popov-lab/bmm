@@ -828,25 +828,42 @@ stancode.bmmformula <- function(object, data, model, prior = NULL, ...) {
   withr::local_options(bmm.sort_data = FALSE)
   dots <- list(...)
   local_brms_threads(dots)
+  cfg <- configure_fit(object, data, model, prior, init = FALSE)
+  add_bmm_version_to_stancode(call_brms_extractor(brms::stancode, cfg, dots))
+}
 
-  # check model, formula and data, and transform data if necessary
-  formula <- object
+# Everything brm() needs to fit a specification: the checked model, the brms
+# formula with its stanvars, the prior, and the initial values, plus the model
+# and user formula that postprocess_brm() stores in the fit. Shared by bmm()
+# and the stancode/standata/default_prior extractors; the extractors pass
+# init = FALSE because building the init function generates the Stan code
+# and data a second time
+configure_fit <- function(formula, data = NULL, model = NULL, prior = NULL, init = TRUE) {
+  UseMethod("configure_fit")
+}
+
+#' @export
+configure_fit.bmmformula <- function(formula, data = NULL, model = NULL, prior = NULL,
+                                     init = TRUE) {
+  user_formula <- formula
   model <- check_model(model, data, formula)
   data <- check_data(model, data, formula)
   formula <- check_formula(model, data, formula)
-
-  # generate the model specification to pass to brms later
   config_args <- configure_model(model, data, formula)
-
-  # configure the default prior and combine with user-specified prior
   prior <- configure_prior(model, data, config_args$formula, prior)
+  if (init) {
+    config_args$init <- create_initfun(model, data, config_args$formula)
+  }
+  nlist(config_args, prior, model, user_formula)
+}
 
-  # extract stan code
-  fit_args <- combine_args(nlist(config_args, dots, prior))
-  fit_args$object <- fit_args$formula
-  fit_args$formula <- NULL
-  code <- brms::do_call(brms::stancode, fit_args)
-  add_bmm_version_to_stancode(code)
+# The brms extractors take the formula as `object`; standata() receives no
+# prior because the Stan data does not depend on it
+call_brms_extractor <- function(fun, cfg, dots, prior = cfg$prior) {
+  args <- combine_args(nlist(config_args = cfg$config_args, dots, prior))
+  args$object <- args$formula
+  args$formula <- NULL
+  brms::do_call(fun, args)
 }
 
 add_bmm_version_to_stancode <- function(stancode) {

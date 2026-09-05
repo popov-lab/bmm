@@ -36,6 +36,7 @@ S3method(check_model,bmmodel)
 S3method(check_model,default)
 S3method(check_model,m3_custom)
 S3method(conditional_effects,bmmfit)
+S3method(configure_fit,bmmformula)
 S3method(configure_model,cswald_crisk)
 S3method(configure_model,cswald_simple)
 S3method(configure_model,ddm)
@@ -186,12 +187,14 @@ export(use_model_template)
 export(validate_fast_guesses)
 export(wrap)
 import(stats)
-importFrom(brms,conditional_effects)
-importFrom(brms,default_prior)
-importFrom(brms,pp_check)
-importFrom(brms,restructure)
-importFrom(brms,stancode)
-importFrom(brms,standata)
+importFrom(brms,
+  conditional_effects,
+  default_prior,
+  pp_check,
+  restructure,
+  stancode,
+  standata
+)
 importFrom(glue,glue)
 importFrom(rlang,.data)
 importFrom(utils,packageVersion)

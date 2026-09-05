@@ -54,55 +54,70 @@ summary.bmmfit <- function(object, priors = FALSE, prob = 0.95, robust = FALSE, 
 #' @export
 print.bmmsummary <- function(x, digits = 2, color = getOption("bmm.color_summary", TRUE), ...) {
   options(bmm.color_summary = color)
-  pars_to_print <- select_pars(x)
+  print_model_header(x$model, x$formula, attr(x$data, "data_name"), nrow(x$data))
+  print_summary_draws(x)
+  print_summary_random(x, digits)
+  if (nrow(x$fixed)) {
+    print_summary_fixed(.summary_fixed_rows(x$fixed, select_pars(x)), digits)
+  }
+  print_summary_footer(x)
+  invisible(x)
+}
 
+# The blocks of a printed summary, so that every summary method prints them
+# identically
+print_model_header <- function(model, formula, data_name, nobs) {
   cat(style("purple1")("  Model: "))
-  cat(summarise_model(x$model, newline = TRUE, wsp = 9), "\n")
+  cat(summarise_model(model, newline = TRUE, wsp = 9), "\n")
   cat(style("purple1")("  Links: "))
-  cat(summarise_links(x$model$links), "\n")
+  cat(summarise_links(model$links), "\n")
   cat(style("purple1")("Formula: "))
-  cat(summarise_formula.bmmformula(x$formula, newline = TRUE, wsp = 9, model = x$model), "\n")
-  cat(
-    style("purple1")("   Data:"), attr(x$data, "data_name"),
-    "(Number of observations:", paste0(nrow(x$data), ")")
-  )
-  cat("\n")
+  cat(summarise_formula.bmmformula(formula, newline = TRUE, wsp = 9, model = model), "\n")
+  cat(style("purple1")("   Data:"), data_name, "(Number of observations:", paste0(nobs, ")\n"))
+}
+
+print_summary_draws <- function(x) {
   total_ndraws <- ceiling((x$iter - x$warmup) / x$thin * x$chains)
   cat(paste0(
     style("purple1")("  Draws: "), x$chains, " chains, each with iter = ", x$iter,
     "; warmup = ", x$warmup, "; thin = ", x$thin, ";\n",
     "         total post-warmup draws = ", total_ndraws, "\n\n"
   ))
+}
 
+print_summary_random <- function(x, digits) {
   if (length(x$random)) {
     cat(style("green")("Multilevel Hyperparameters:\n"))
-    for (i in seq_along(x$random)) {
-      g <- names(x$random)[i]
+    for (g in names(x$random)) {
       cat(paste0("~", g, " (Number of levels: ", x$ngrps[[g]], ") \n"))
       re <- x$random[[g]]
-      re <- re[!is.na(re$Rhat), ]
-      print_format(re, digits)
+      print_format(re[!is.na(re$Rhat), , drop = FALSE], digits)
       cat("\n")
     }
   }
-  if (nrow(x$fixed)) {
+}
+
+# constant parameters (fixed via the formula) have no Rhat and are listed
+# separately with their value only
+print_summary_fixed <- function(rows, digits) {
+  is_constant <- is.na(rows$Rhat)
+  if (any(!is_constant)) {
     cat(style("green")("Regression Coefficients:\n"))
-    reduced <- .summary_fixed_rows(x$fixed, pars_to_print)
-    is_constant <- is.na(reduced$Rhat)
-    print_format(reduced[!is_constant, ], digits)
+    print_format(rows[!is_constant, , drop = FALSE], digits)
     cat("\n")
-
-    if (sum(is_constant)) {
-      cat(style("green")("Constant Parameters:\n"))
-      res <- reduced[is_constant, ]
-      constants <- rownames(res)
-
-      res <- data.frame("Value" = res[, 1], row.names = paste0(constants, "    "))
-      print_format(res, digits)
-      cat("\n")
-    }
   }
+  if (any(is_constant)) {
+    cat(style("green")("Constant Parameters:\n"))
+    constants <- rows[is_constant, , drop = FALSE]
+    print_format(
+      data.frame(Value = constants[, 1], row.names = paste0(rownames(constants), "    ")),
+      digits
+    )
+    cat("\n")
+  }
+}
 
+print_summary_footer <- function(x) {
   cat(paste0("Draws were sampled using ", x$sampler, ". "))
   if (x$algorithm == "sampling") {
     cat(
@@ -114,7 +129,6 @@ print.bmmsummary <- function(x, digits = 2, color = getOption("bmm.color_summary
     )
   }
   cat("\n")
-  invisible(x)
 }
 
 rename_mu_smry <- function(x, mu_pars) {
