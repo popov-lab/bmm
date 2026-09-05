@@ -126,6 +126,40 @@ test_that(".circmix_slots() gives a slot distribution that is continuous in K", 
   expect_equal(.circmix_slots(3.5, 1), list(slots = 3, extra = 0.5))
 })
 
+slot_averaging_density <- function(y, K, set_size, kappa = 6, tau = 0) {
+  n <- length(y)
+  .circmix_slot_averaging_ld(
+    matrix(cos(y)), matrix(0, nrow = n), rep(K, n), rep(set_size, n),
+    rep(kappa, n), rep(tau, n), 41L
+  )
+}
+
+test_that(".circmix_slot_averaging_ld() is a normalised density on the circle", {
+  for (case in list(c(3, 5, 0), c(7, 2, 0), c(7, 2, 1))) {
+    total <- stats::integrate(
+      function(y) exp(slot_averaging_density(y, case[1], case[2], tau = case[3])),
+      -pi, pi
+    )
+    expect_equal(total$value, 1, tolerance = 1e-6)
+  }
+})
+
+test_that(".circmix_slot_averaging_ld() sums the information of the slots an item holds", {
+  y <- seq(-pi, pi, length.out = 30)
+  two_slots <- .circmix_kappa(2 * .circmix_J(6))
+  expect_equal(
+    slot_averaging_density(y, K = 8, set_size = 4),
+    brms::dvon_mises(y, mu = 0, kappa = two_slots, log = TRUE),
+    tolerance = 1e-8
+  )
+  # with fewer slots than items, the items that received none are guessed
+  expect_equal(
+    slot_averaging_density(y, K = 2, set_size = 4),
+    ld_mixture(y, kappa = 6, w_mem = 0.5, w_guess = 0.5),
+    tolerance = 1e-8
+  )
+})
+
 # Compares the sampler against the density it is meant to draw from. n is large
 # enough that a bin proportion has a standard error near 5e-4, so the tolerance
 # below is about ten standard errors and does not need a seed to be stable.
@@ -163,6 +197,17 @@ test_that(".rcircmix() draws from the variable-precision mixture density", {
       matrix(cos(y)), matrix(log(0.8), nrow = length(y)),
       rep(log(0.2), length(y)), rep(10, length(y)), rep(2, length(y))
     ))
+  })
+})
+
+test_that(".rcircmix_slot_averaging() draws from the slot-averaging density", {
+  n <- 2e5
+  draws <- .rcircmix_slot_averaging(
+    mu = matrix(0, nrow = n), logw = matrix(0, nrow = n),
+    K = rep(7, n), set_size = rep(2, n), kappa = rep(6, n), tau = rep(1, n)
+  )
+  expect_samples_match_density(draws, function(y) {
+    exp(slot_averaging_density(y, K = 7, set_size = 2, tau = 1))
   })
 })
 
@@ -353,6 +398,7 @@ circmix_stan_values <- function(data) {
     generated quantities {
       vector[NKAP] out_J; vector[NKAP] out_ld; vector[NJ] out_kappa;
       real out_het; vector[NTAU] out_vp; vector[2] out_slots;
+      vector[NTAU] out_sa;
       for (i in 1:NKAP) {
         out_J[i] = circmix_J(kappa[i]);
         out_ld[i] = circmix_ld(cosd, logw, logw_guess, kappa[i]);
@@ -364,6 +410,9 @@ circmix_stan_values <- function(data) {
       for (i in 1:NTAU) {
         out_vp[i] = circmix_vp_ld(cosd, logw, logw_guess, kappa_vp, tau[i], nodes,
                                   logk, dlogk, logJ_min, dlogJ);
+        out_sa[i] = circmix_slot_averaging_ld(cosd, logw, K_slots, ss_slots,
+                                              kappa_vp, tau[i], nodes,
+                                              logk, dlogk, logJ_min, dlogJ);
       }
       out_slots = circmix_slots(K_slots, ss_slots);
     }"
@@ -428,4 +477,13 @@ test_that("the Stan and R implementations of the shared core agree", {
     tolerance = 1e-12
   )
   expect_equal(stan("out_slots"), unname(unlist(.circmix_slots(3.5, 2))))
+  expect_equal(
+    stan("out_sa"),
+    vapply(tau, function(c_tau) {
+      .circmix_slot_averaging_ld(
+        matrix(cosd, nrow = 1), matrix(logw, nrow = 1), 3.5, 2L, 10, c_tau, 41L
+      )
+    }, numeric(1)),
+    tolerance = 1e-12
+  )
 })

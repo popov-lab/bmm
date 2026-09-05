@@ -222,14 +222,62 @@
   nlist(slots, extra = q - slots)
 }
 
+# Slot averaging (Zhang & Luck, 2008): the reported item holds floor(K /
+# set_size) or one more slot, and averaging independent samples adds their
+# Fisher information, so a j-slot item has J_j = j * J(kappa) with kappa the
+# precision of a single slot. logw holds the item weights given that the item is
+# held; an item holding no slot is guessed. Under variable precision the sum of
+# j draws from gamma(J(kappa)/tau, tau) is gamma(j J(kappa)/tau, tau), which is
+# what passing kappa_j with the same tau gives, so the two mechanisms compose
+# without a second quadrature over slot counts.
+.circmix_slot_averaging_ld <- function(cosd, logw, K, set_size, kappa, tau, nodes) {
+  n <- nrow(cosd)
+  allocation <- .circmix_slots(K, set_size)
+  no_guessing <- rep(-Inf, n)
+  single_slot <- .circmix_J(kappa)
+
+  high <- log(allocation$extra) + .circmix_vp_ld(
+    cosd, logw, no_guessing,
+    .circmix_kappa((allocation$slots + 1) * single_slot), tau, nodes
+  )
+
+  low <- log1p(-allocation$extra) - log(2 * pi)
+  held <- which(allocation$slots >= 0.5)
+  if (length(held)) {
+    low[held] <- log1p(-allocation$extra[held]) + .circmix_vp_ld(
+      cosd[held, , drop = FALSE], logw[held, , drop = FALSE], no_guessing[held],
+      .circmix_kappa(allocation$slots[held] * single_slot[held]),
+      tau[held], nodes
+    )
+  }
+  matrixStats::rowLogSumExps(cbind(low, high))
+}
+
+# Draws the number of slots the reported item holds, then samples at that
+# precision: the mechanism .circmix_slot_averaging_ld() marginalises, which is
+# what makes it an independent check on that density.
+.rcircmix_slot_averaging <- function(mu, logw, K, set_size, kappa, tau) {
+  n <- nrow(mu)
+  allocation <- .circmix_slots(K, set_size)
+  slots <- allocation$slots + stats::rbinom(n, 1, allocation$extra)
+
+  out <- stats::runif(n, -pi, pi)
+  held <- which(slots >= 0.5)
+  if (length(held)) {
+    out[held] <- .rcircmix(
+      mu[held, , drop = FALSE], logw[held, , drop = FALSE], rep(-Inf, length(held)),
+      .circmix_kappa(slots[held] * .circmix_J(kappa[held])), tau[held]
+    )
+  }
+  out
+}
+
 ############################################################################# !
 # MODEL SPECIFICATION                                                    ####
 ############################################################################# !
 
-# tau means the same thing in every model that offers variable precision, so the
-# parameter a variable_precision = TRUE argument adds to a version's
-# specification is defined once here. It sits next to kappa because it modifies
-# it, and because a summary that separates the two reads badly.
+# tau means the same in every model that offers variable precision, so it is
+# defined once and inserted next to the kappa it modifies.
 .circmix_add_variable_precision <- function(spec) {
   after_kappa <- which(names(spec$parameters) == "kappa")
   spec$parameters <- append(spec$parameters, list(tau = glue(
@@ -274,9 +322,8 @@
   brms::get_dpar(prep, "tau", i = i)
 }
 
-# The quadrature node count is carried on the family so that log_lik() and
-# posterior_predict() use the same grid the Stan likelihood was fitted with,
-# without capturing the whole configure_model() frame in a closure.
+# The node count travels on the family so that log_lik() uses the grid the Stan
+# likelihood was fitted with.
 .circmix_prep_nodes <- function(prep) {
   prep$family$vp_nodes %||% 41L
 }
@@ -292,8 +339,7 @@
   )
 }
 
-# Called from the user-facing model constructors, which is where bmm validates
-# arguments; the models share the wording because they share the arguments.
+# Called from the exported constructors, where bmm validates arguments.
 .circmix_check_variable_precision <- function(variable_precision, vp_nodes) {
   stopif(
     !isTRUE(variable_precision) && !isFALSE(variable_precision),
@@ -348,12 +394,8 @@
 
 .circmix_model_stanvars <- function(model, family, chunk, vint = NULL,
                                     vreal = list()) {
-  sc_path <- system.file("stan_chunks", package = "bmm")
   .circmix_stanvars() +
-    brms::stanvar(
-      scode = read_lines2(paste0(sc_path, "/", chunk)),
-      block = "functions", name = sub("\\.stan$", "", chunk)
-    ) +
+    .circmix_chunk_stanvar(chunk) +
     brms::stanvar(
       scode = .circmix_stan_wrapper(
         family$name, family$dpars, family$core_dpars,
@@ -369,11 +411,7 @@
 # threading.
 .circmix_stanvars <- function() {
   tab <- .circmix_kappa_table()
-  sc_path <- system.file("stan_chunks", package = "bmm")
-  brms::stanvar(
-    scode = read_lines2(paste0(sc_path, "/circmix_funs.stan")),
-    block = "functions", name = "circmix_funs"
-  ) +
+  .circmix_chunk_stanvar("circmix_funs.stan") +
     brms::stanvar(
       x = tab$logkappa, name = "circmix_logk",
       pll_args = "data vector circmix_logk"
@@ -390,6 +428,13 @@
       x = tab$dlogJ, name = "circmix_dlogJ",
       pll_args = "data real circmix_dlogJ"
     )
+}
+
+.circmix_chunk_stanvar <- function(chunk) {
+  brms::stanvar(
+    scode = read_lines2(system.file("stan_chunks", chunk, package = "bmm")),
+    block = "functions", name = sub("\\.stan$", "", chunk)
+  )
 }
 
 .circmix_table_vars <- function() {
@@ -418,19 +463,12 @@
   glue("{resp} | {paste(terms, collapse = ' + ')} ~ 1")
 }
 
-# brms needs the likelihood to be a single `<family>_lpdf`, and its signature
-# depends on max_set_size because every non-target needs its own vreal term. That
-# makes this the one piece of Stan that has to be generated. It only packs the
-# scalar vreal arguments into the vectors that `<family>_core` expects, so the
-# arithmetic stays in inst/stan_chunks.
-#
-# core_dpars lets a model hand the core something its family does not estimate,
-# which is how the constant-precision versions reach the same core as the
-# variable-precision ones: they pass a literal 0 for tau, and circmix_vp_ld()
-# then takes its point-mass branch. The alternative -- carrying tau as a
-# parameter fixed to zero -- would need a fixed value interpreted on a different
-# link scale than the estimated one, and would leave a dead parameter in every
-# constant-precision model.
+# brms needs the likelihood to be a single `<family>_lpdf`, whose signature
+# depends on max_set_size because every non-target needs its own vreal term, so
+# this is the one piece of Stan that is generated. It only packs the scalar
+# vreal arguments into the vectors `<family>_core` expects; the arithmetic stays
+# in inst/stan_chunks. core_dpars may hold literals, which is how a
+# constant-precision model passes 0 for the tau its family does not estimate.
 .circmix_stan_wrapper <- function(family, dpars, core_dpars = dpars, vint = NULL,
                                   vreal = list(), nodes = 41L) {
   vreal_names <- lapply(names(vreal), function(g) paste0(g, seq_len(vreal[[g]])))

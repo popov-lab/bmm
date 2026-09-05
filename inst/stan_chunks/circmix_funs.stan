@@ -139,3 +139,40 @@
     real f = floor(q);
     return [f, q - f]';
   }
+
+  /* Slot averaging (Zhang & Luck, 2008): the reported item holds floor(K / ss)
+   * or one more slot, and averaging independent samples adds their Fisher
+   * information, so a j-slot item has J_j = j * J(kappa) with kappa the
+   * precision of a single slot. logw holds the item weights given that the item
+   * is held; an item holding no slot is guessed.
+   *
+   * Under variable precision the sum of j draws from gamma(J(kappa)/tau, tau)
+   * is gamma(j J(kappa)/tau, tau), which is what passing kappa_j with the same
+   * tau gives, so the two mechanisms compose without a second quadrature over
+   * slot counts.
+   */
+  real circmix_slot_averaging_ld(vector cosd, vector logw, real K, int ss,
+                                 real kappa, real tau, int nodes,
+                                 data vector logk, data vector dlogk,
+                                 data real logJ_min, data real dlogJ) {
+    vector[2] allocation = circmix_slots(K, ss);
+    real slots = allocation[1];
+    real extra = allocation[2];
+    real J1 = circmix_J(kappa);
+
+    real kappa_hi = circmix_kappa((slots + 1) * J1, logk, dlogk, logJ_min, dlogJ);
+    real lp_hi = log(extra)
+                 + circmix_vp_ld(cosd, logw, negative_infinity(), kappa_hi, tau,
+                                 nodes, logk, dlogk, logJ_min, dlogJ);
+
+    if (slots < 0.5) {
+      return log_sum_exp(log1m(extra) - log(2 * pi()), lp_hi);
+    }
+
+    real kappa_lo = circmix_kappa(slots * J1, logk, dlogk, logJ_min, dlogJ);
+    return log_sum_exp(
+      log1m(extra) + circmix_vp_ld(cosd, logw, negative_infinity(), kappa_lo,
+                                   tau, nodes, logk, dlogk, logJ_min, dlogJ),
+      lp_hi
+    );
+  }
