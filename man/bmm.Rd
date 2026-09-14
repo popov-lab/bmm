@@ -110,6 +110,7 @@ The following models are supported:
 \item mixture2p(resp_error)
 \item mixture3p(resp_error, nt_features, set_size, regex)
 \item sdm(resp_error, version)
+\item sdt_mafc(response, n_trials, m, dist, links)
 \item sdt_yn(response, stimulus, n_trials, dist, links)
 }
 
