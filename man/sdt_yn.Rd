@@ -65,7 +65,7 @@ Provide pre-aggregated data with the following columns:
 \itemize{
 \item \strong{Parameters:}
 \itemize{
-\item \code{d}: Sensitivity: the balanced discriminability index d_a, which measures the distance between the signal and noise distributions in units of their root-mean-square SD, so it equals d' when sdratio is 1
+\item \code{d}: Sensitivity: d' under equal variance (the default). When sdratio is estimated, d is d_a, the distance between the signal and noise distributions in units of their root-mean-square SD
 \item \code{criterion}: Response bias: location of decision boundary
 \item \code{sdratio}: Log SD ratio: the log of the signal-to-noise standard deviation ratio, so 0 means equal variance (an SD ratio of 1)
 }
@@ -99,23 +99,48 @@ Provide pre-aggregated data with the following columns:
 }
 \section{Which sensitivity measure \code{d} is}{
 
-When the signal and noise distributions have different widths there is no
-single natural way to express their separation, because the separation only
-becomes dimensionless after choosing a scale to divide by. \code{bmm} reports
-\eqn{d_a}, the separation divided by the root-mean-square of the two SDs:
-\deqn{d_a = \sqrt{2}\,\delta / \sqrt{1 + r^2},}
-where \eqn{\delta} is the separation in noise-SD units and \eqn{r} is
-\code{sdratio}. This weights the two distributions equally, and it is the measure
-Macmillan and Creelman (2005) and Mickes et al. (2007) recommend under
-unequal variance. \code{sdratio} is sampled on the log scale and fixed at 0 by
-default (an SD ratio of 1), where \eqn{d_a} equals the familiar \eqn{d'}, so
-the choice only matters for unequal-variance fits.
+\strong{\code{d} is the familiar \eqn{d'}} whenever \code{sdratio} keeps its default of 0
+(an SD ratio of 1, equal variance), which is every fit that does not give
+\code{sdratio} a formula. The rest of this section only matters once you estimate
+\code{sdratio}.
 
-The alternative — dividing by the noise SD alone — is not comparable across
-conditions that differ in \code{sdratio}: two conditions that are equally
-discriminable can then show a large, confidently estimated difference in
-sensitivity. Note that \code{criterion} is \strong{not} rescaled and stays on the
-noise-standardized axis, following the same convention.
+When the signal and noise distributions have different widths, their
+separation only becomes dimensionless after choosing an SD to divide by.
+\code{bmm} then reports \eqn{d_a}, the separation divided by the root-mean-square
+of the two SDs:
+\deqn{d_a = \sqrt{2}\,\delta / \sqrt{1 + r^2},}
+where \eqn{\delta} is the separation in noise-SD units and
+\eqn{r} is the SD ratio, \code{exp(sdratio)}. This weights the two
+distributions equally, and it is the measure Simpson and Fitter (1973),
+Macmillan and Creelman (2005), and Mickes et al. (2007) recommend under
+unequal variance. The classical noise-standardized index is
+\eqn{d_N = \delta = d_a \sqrt{(1 + r^2)/2}}, so a published \eqn{d'} from an
+unequal-variance analysis is larger than \code{d} when \eqn{r > 1}: by 13\% at
+\eqn{r = 1.25} and by 33\% at \eqn{r = 1.6}. \code{\link[=sdt_sensitivity]{sdt_sensitivity()}} returns
+\eqn{d_N} and the signal-standardized \eqn{d_S} from a fitted model, and
+\code{summary()} notes when \code{d} is \eqn{d_a}.
+
+\code{d} is \eqn{d_a} rather than \eqn{d_N} because only \eqn{d_a} is comparable
+across conditions or subjects that differ in \code{sdratio}: two conditions that
+are equally discriminable can show a large, confidently estimated difference
+in \eqn{d_N}. When \code{sdratio} is estimated but constant across the conditions
+you compare, the two indices differ by one common factor and give the same
+contrasts up to scale.
+
+\strong{Units of the other parameters.} \code{criterion} is \emph{not} rescaled. It is the
+location of the decision boundary relative to the midpoint between the two
+distributions, in noise-SD units, so under unequal variance \code{d} (in
+root-mean-square SD units) and \code{criterion} (in noise-SD units) are on
+different scales, and a ratio such as \code{criterion / d} mixes them.
+
+\strong{Extreme-value distributions.} For \code{dist = "normal"}, \eqn{d_a} is also the
+AUC-equivalent index, \eqn{d_a = \sqrt{2}\,\Phi^{-1}(\mathrm{AUC})}, so it
+carries the same information as 2AFC accuracy. For \code{"gumbel_min"} and
+\code{"gumbel_max"} that identity holds only under equal variance. With \code{sdratio}
+estimated, \eqn{d_a} keeps its balanced geometry but drifts away from the
+AUC-equivalent index as the SD ratio moves away from 1 (for \code{"gumbel_min"}
+at \eqn{\delta = 1.5} and \eqn{r = 2}, \eqn{d_a} is 31\% larger), so compare
+such fits on the AUC rather than on \code{d}.
 
 Because \code{d} is a short name, a column called \code{d} in your data that is also
 used as a predictor will collide with this parameter; \code{bmm()} warns when that

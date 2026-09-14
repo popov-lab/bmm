@@ -58,7 +58,7 @@ sdt_metad_logmu(
 \item{thresh}{Integer threshold-parameterization id.}
 
 \item{d, criterion, spacing, sdratio}{Model parameters (draws-by-observation
-matrices supplied by brms). \code{d} is the balanced sensitivity index d_a;
+matrices supplied by brms). \code{d} is d', or d_a when sdratio is not 0;
 \code{spacing} is \code{0} for threshold types without it.}
 
 \item{stimulus}{Stimulus covariate (0 = noise, 1 = signal).}
@@ -69,7 +69,7 @@ matrices supplied by brms). \code{d} is the balanced sensitivity index d_a;
 \code{inv_logit(Ro)}/\code{inv_logit(Rn)} are the recollection probabilities.}
 
 \item{logmratio}{Log M-ratio for the \code{metad} version; meta-d' is recovered
-as \code{exp(logmratio) * d}, on the same d_a scale as \code{d}.}
+as \code{exp(logmratio) * d}, on the same scale as \code{d}.}
 }
 \value{
 \code{log(p_cat)}, matching the shape of \code{d}.

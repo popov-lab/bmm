@@ -36,13 +36,15 @@ attribute (\code{measure}, \code{mean}, \code{lower}, \code{upper}, plus conditi
 }
 \description{
 Re-expresses the posterior sensitivity of a fitted SDT model against a
-different reference standard deviation. bmm estimates \eqn{d_a}, which
-measures the separation of the two evidence distributions in units of their
-root-mean-square SD. Under unequal variance the same separation can also be
-read against the noise SD (\eqn{d_N}, the classical \eqn{d'}) or against the
-signal SD (\eqn{d_S}). This function returns any of the three as posterior
-draws, so contrasts and intervals can be computed on whichever scale a
-literature reports.
+different reference standard deviation. As long as \code{sdratio} is fixed at its
+default, \code{d} is the familiar \eqn{d'} and all three scales below are the same
+number. Once \code{sdratio} is estimated, \code{d} is \eqn{d_a}, which measures the
+separation of the two evidence distributions in units of their
+root-mean-square SD, and the same separation can also be read against the
+noise SD (\eqn{d_N}, the classical \eqn{d'}) or against the signal SD
+(\eqn{d_S}). This function returns any of the three as posterior draws, so
+contrasts and intervals can be computed on whichever scale a literature
+reports.
 }
 \details{
 The model places the noise distribution at \eqn{-\delta/2} with SD
@@ -70,6 +72,15 @@ reference. \eqn{d_N} and \eqn{d_S} are not comparable across conditions that
 differ in \code{sdratio}: two conditions with identical discriminability can show
 a large, confidently estimated \eqn{d_N} difference. Prefer \eqn{d_a} for
 contrasts, and use \eqn{d_N}/\eqn{d_S} for comparison with published values.
+When \code{sdratio} is estimated but constant across the conditions being
+compared, all three differ by one common factor per draw and give the same
+contrasts up to scale.
+
+The \code{criterion} and rating thresholds are not converted: they stay on the
+noise-SD axis whichever sensitivity scale you report. Under the Gumbel
+distributions with \code{sdratio} estimated, none of the three is the
+AUC-equivalent index; use \code{\link[=auc_sdt]{auc_sdt()}} to compare discriminability on the
+probability scale.
 }
 \seealso{
 \code{\link[=auc_sdt]{auc_sdt()}}, \code{\link[=roc_sdt]{roc_sdt()}}, \code{\link[=latent_sdt]{latent_sdt()}}

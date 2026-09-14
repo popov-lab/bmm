@@ -35,8 +35,8 @@ signal" (K), or a vector for a single observation.}
 
 \item{stimulus}{Integer vector (0/1). Stimulus type: 0 = noise, 1 = signal.}
 
-\item{d}{Numeric vector. Sensitivity: the balanced discriminability index
-\eqn{d_a}, which equals \eqn{d'} when \code{sdratio} is 1. The separation
+\item{d}{Numeric vector. Sensitivity: \eqn{d'} when \code{sdratio} is 1, and
+otherwise the balanced index \eqn{d_a} (see \code{\link[=sdt_yn]{sdt_yn()}}). The separation
 between the distributions in noise units is \code{d * sqrt((1 + sdratio^2) / 2)}.}
 
 \item{thresholds}{Numeric vector of length K-1 with the ordered decision
@@ -45,7 +45,8 @@ thresholds are on the noise-standardized axis and are not rescaled by
 \code{sdratio}.}
 
 \item{metad}{Numeric vector. Metacognitive sensitivity (type-2 sensitivity),
-on the same balanced \eqn{d_a} scale as \code{d}, so the M-ratio \code{metad / d} is
+on the same scale as \code{d} (\eqn{d'}, or \eqn{d_a} when \code{sdratio} is not
+1), so the M-ratio \code{metad / d} is
 unaffected by \code{sdratio}. \code{metad = d} corresponds to ideal metacognition
 (recovers rating SDT).}
 

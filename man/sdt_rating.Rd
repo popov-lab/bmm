@@ -96,7 +96,7 @@ Categories should be ordered: 1 = 'definitely noise' to K = 'definitely signal'
 \itemize{
 \item \strong{Parameters:}
 \itemize{
-\item \code{d}: Sensitivity: the balanced discriminability index d_a, which measures the distance between the signal and noise distributions in units of their root-mean-square SD, so it equals d' when sdratio is 1
+\item \code{d}: Sensitivity: d' under equal variance (the default). When sdratio is estimated, d is d_a, the distance between the signal and noise distributions in units of their root-mean-square SD
 \item \code{criterion}: Response bias: location of the decision boundary on the noise-standardized axis
 \item \code{spacing}: Threshold spacing: controls distance between adjacent thresholds (exp(spacing) ensures positive spacing)
 \item \code{sdratio}: Log SD ratio: the log of the signal-to-noise standard deviation ratio, so exp(sdratio) is the ratio itself and 0 means equal variance
@@ -167,7 +167,7 @@ Categories should be ordered: 1 = 'definitely noise' to K = 'definitely signal'
 \itemize{
 \item \strong{Parameters:}
 \itemize{
-\item \code{d}: Sensitivity: the balanced discriminability index d_a, which measures the distance between the signal and noise distributions in units of their root-mean-square SD, so it equals d' when sdratio is 1
+\item \code{d}: Sensitivity: d' under equal variance (the default). When sdratio is estimated, d is d_a, the distance between the signal and noise distributions in units of their root-mean-square SD
 \item \code{criterion}: Response bias: location of the decision boundary on the noise-standardized axis
 \item \code{spacing}: Threshold spacing: controls distance between adjacent thresholds (exp(spacing) ensures positive spacing)
 \item \code{sdratio}: Log SD ratio: the log of the signal-to-noise standard deviation ratio, so exp(sdratio) is the ratio itself and 0 means equal variance
@@ -231,8 +231,9 @@ directly, the model estimates \code{logmratio}, the log M-ratio
 metacognitive efficiency (Maniscalco & Lau, 2014; Fleming, 2017): estimating
 it on the log scale keeps meta-d' positive, regularizes it toward \code{d},
 and anchors the ideal point (meta-d' = \code{d}, perfect metacognition) at
-\code{logmratio = 0}, which recovers \code{standard}. Type-1 and type-2 sensitivity are
-both on the \eqn{d_a} scale, so the M-ratio is unaffected by \code{sdratio}.
+\code{logmratio = 0}, which recovers \code{standard}. Type-1 and type-2 sensitivity
+share one scale (\eqn{d'}, or \eqn{d_a} when \code{sdratio} is estimated), so the
+M-ratio is unaffected by \code{sdratio}.
 Extract the M-ratio posterior with \code{\link[=mratio]{mratio()}}.
 \itemize{
 \item \strong{Domain:} Perception & Recognition Memory
@@ -255,11 +256,11 @@ Categories should be ordered: 1 = 'definitely noise' to K = 'definitely signal'
 \itemize{
 \item \strong{Parameters:}
 \itemize{
-\item \code{d}: Sensitivity: the balanced discriminability index d_a, which measures the distance between the signal and noise distributions in units of their root-mean-square SD, so it equals d' when sdratio is 1
+\item \code{d}: Sensitivity: d' under equal variance (the default). When sdratio is estimated, d is d_a, the distance between the signal and noise distributions in units of their root-mean-square SD
 \item \code{criterion}: Response bias: location of the decision boundary on the noise-standardized axis
 \item \code{spacing}: Threshold spacing: controls distance between adjacent thresholds (exp(spacing) ensures positive spacing)
 \item \code{sdratio}: Log SD ratio: the log of the signal-to-noise standard deviation ratio, so exp(sdratio) is the ratio itself and 0 means equal variance
-\item \code{logmratio}: Log M-ratio, log(meta-d/d): metacognitive efficiency. 0 is ideal metacognition (meta-d = d), negative is inefficiency, positive is hyper-efficiency. meta-d is recovered as exp(logmratio) * d, on the same d_a scale
+\item \code{logmratio}: Log M-ratio, log(meta-d/d): metacognitive efficiency. 0 is ideal metacognition (meta-d = d), negative is inefficiency, positive is hyper-efficiency. meta-d is recovered as exp(logmratio) * d, on the same scale as d
 }
 \item \strong{Fixed parameters:}
 \itemize{
@@ -306,16 +307,23 @@ to the formula.
 }
 \section{Sensitivity is on the same scale as \code{\link[=sdt_yn]{sdt_yn()}}}{
 
-\code{d} is the balanced index \eqn{d_a} that \code{\link[=sdt_yn]{sdt_yn()}} reports: the separation
-between the signal and noise distributions divided by the root-mean-square
-of their SDs. It equals \eqn{d'} whenever \code{sdratio} stays fixed at 0, and
-unlike \eqn{d'} it remains comparable across conditions that differ in
-\code{sdratio} -- see the sensitivity section of \code{\link[=sdt_yn]{sdt_yn()}} for the reasoning.
-The \code{criterion} and the confidence thresholds are \strong{not} rescaled and stay
-on the noise-standardized axis. The \code{dpsdt} and \code{metad} versions inherit the
-same convention: \code{d} there is the \eqn{d_a} of the familiarity (type-1)
-distributions, and meta-d' is scaled the same way, which leaves the M-ratio
-invariant to \code{sdratio}.
+\code{d} is \eqn{d'} whenever \code{sdratio} stays fixed at 0, which is every fit
+that does not give \code{sdratio} a formula. With \code{sdratio} estimated, \code{d} is the
+balanced index \eqn{d_a} that \code{\link[=sdt_yn]{sdt_yn()}} reports: the separation between the
+signal and noise distributions divided by the root-mean-square of their SDs.
+Unlike the noise-standardized \eqn{d'}, it remains comparable across
+conditions that differ in \code{sdratio}; see the sensitivity section of
+\code{\link[=sdt_yn]{sdt_yn()}} for the reasoning, for how far the two indices lie apart, and for
+the caveat that under the Gumbel distributions \eqn{d_a} is not the
+AUC-equivalent index once \code{sdratio} is estimated.
+
+The \code{criterion} and the confidence thresholds are \strong{not} rescaled. They stay
+on the noise-standardized axis, so under unequal variance they and \code{d} are
+in different units.
+
+The \code{dpsdt} and \code{metad} versions inherit the same convention: \code{d} there
+describes the familiarity (type-1) distributions, and meta-d' is scaled the
+same way, which leaves the M-ratio invariant to \code{sdratio}.
 }
 
 \examples{

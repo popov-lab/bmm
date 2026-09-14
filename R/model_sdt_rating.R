@@ -121,13 +121,14 @@
       logmratio = glue("Log M-ratio, log(meta-d/d): metacognitive efficiency. ",
                        "0 is ideal metacognition (meta-d = d), negative is ",
                        "inefficiency, positive is hyper-efficiency. meta-d is ",
-                       "recovered as exp(logmratio) * d, on the same d_a scale")
+                       "recovered as exp(logmratio) * d, on the same scale as d")
     ),
     # Estimating log(meta-d/d) rather than meta-d directly keeps meta-d
     # positive, regularizes it toward d, and anchors the field-standard
     # metacognitive-efficiency measure (M-ratio) at the ideal point of 0
-    # (Maniscalco & Lau, 2014; Fleming, 2017). Both sensitivities are d_a
-    # indices, so the ratio is invariant to sdratio.
+    # (Maniscalco & Lau, 2014; Fleming, 2017). Both sensitivities share one
+    # scale (d', or d_a when sdratio is estimated), so the ratio is invariant to
+    # sdratio.
     default_priors = list(
       logmratio = list(main = "normal(0, 0.5)", effects = "normal(0, 0.3)")
     ),
@@ -152,9 +153,9 @@
 
   parameters <- list(
     d = paste0(
-      "Sensitivity: the balanced discriminability index d_a, which measures ",
-      "the distance between the signal and noise distributions in units of ",
-      "their root-mean-square SD, so it equals d' when sdratio is 1"
+      "Sensitivity: d' under equal variance (the default). When sdratio is ",
+      "estimated, d is d_a, the distance between the signal and noise ",
+      "distributions in units of their root-mean-square SD"
     ),
     criterion = paste0(
       "Response bias: location of the decision boundary on the ",
@@ -267,8 +268,9 @@
 #' metacognitive efficiency (Maniscalco & Lau, 2014; Fleming, 2017): estimating
 #' it on the log scale keeps meta-d' positive, regularizes it toward `d`,
 #' and anchors the ideal point (meta-d' = `d`, perfect metacognition) at
-#' `logmratio = 0`, which recovers `standard`. Type-1 and type-2 sensitivity are
-#' both on the \eqn{d_a} scale, so the M-ratio is unaffected by `sdratio`.
+#' `logmratio = 0`, which recovers `standard`. Type-1 and type-2 sensitivity
+#' share one scale (\eqn{d'}, or \eqn{d_a} when `sdratio` is estimated), so the
+#' M-ratio is unaffected by `sdratio`.
 #' Extract the M-ratio posterior with [mratio()].
 #' `r model_info(.model_sdt_rating(version = "metad"))`
 #'
@@ -277,16 +279,23 @@
 #' to the formula.
 #'
 #' @section Sensitivity is on the same scale as [sdt_yn()]:
-#' `d` is the balanced index \eqn{d_a} that [sdt_yn()] reports: the separation
-#' between the signal and noise distributions divided by the root-mean-square
-#' of their SDs. It equals \eqn{d'} whenever `sdratio` stays fixed at 0, and
-#' unlike \eqn{d'} it remains comparable across conditions that differ in
-#' `sdratio` -- see the sensitivity section of [sdt_yn()] for the reasoning.
-#' The `criterion` and the confidence thresholds are **not** rescaled and stay
-#' on the noise-standardized axis. The `dpsdt` and `metad` versions inherit the
-#' same convention: `d` there is the \eqn{d_a} of the familiarity (type-1)
-#' distributions, and meta-d' is scaled the same way, which leaves the M-ratio
-#' invariant to `sdratio`.
+#' `d` is \eqn{d'} whenever `sdratio` stays fixed at 0, which is every fit
+#' that does not give `sdratio` a formula. With `sdratio` estimated, `d` is the
+#' balanced index \eqn{d_a} that [sdt_yn()] reports: the separation between the
+#' signal and noise distributions divided by the root-mean-square of their SDs.
+#' Unlike the noise-standardized \eqn{d'}, it remains comparable across
+#' conditions that differ in `sdratio`; see the sensitivity section of
+#' [sdt_yn()] for the reasoning, for how far the two indices lie apart, and for
+#' the caveat that under the Gumbel distributions \eqn{d_a} is not the
+#' AUC-equivalent index once `sdratio` is estimated.
+#'
+#' The `criterion` and the confidence thresholds are **not** rescaled. They stay
+#' on the noise-standardized axis, so under unequal variance they and `d` are
+#' in different units.
+#'
+#' The `dpsdt` and `metad` versions inherit the same convention: `d` there
+#' describes the familiarity (type-1) distributions, and meta-d' is scaled the
+#' same way, which leaves the M-ratio invariant to `sdratio`.
 #' @param response A character vector of K column names containing response
 #'   counts per rating category, ordered from "definitely noise" to
 #'   "definitely signal".
@@ -605,12 +614,12 @@ configure_model.sdt_rating <- function(model, data, formula) {
 #' @param dist Integer noise-distribution id (see the `.sdt_dists` registry).
 #' @param thresh Integer threshold-parameterization id.
 #' @param d,criterion,spacing,sdratio Model parameters (draws-by-observation
-#'   matrices supplied by brms). `d` is the balanced sensitivity index d_a;
+#'   matrices supplied by brms). `d` is d', or d_a when sdratio is not 0;
 #'   `spacing` is `0` for threshold types without it.
 #' @param Ro,Rn Linear-scale recollection parameters for the `dpsdt` version;
 #'   `inv_logit(Ro)`/`inv_logit(Rn)` are the recollection probabilities.
 #' @param logmratio Log M-ratio for the `metad` version; meta-d' is recovered
-#'   as `exp(logmratio) * d`, on the same d_a scale as `d`.
+#'   as `exp(logmratio) * d`, on the same scale as `d`.
 #' @param stimulus Stimulus covariate (0 = noise, 1 = signal).
 #' @param ... Threshold `delta` parameters, when the threshold type uses them.
 #' @return `log(p_cat)`, matching the shape of `d`.
