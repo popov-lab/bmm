@@ -8,7 +8,7 @@
 // integer-only choose().
 
 // Gumbel-min ranking: closed form via gamma-function ratios.
-// Meyer-Grant et al. (2025), based on extreme-value (min) order statistics.
+// Meyer-Grant et al. (2026), based on extreme-value (min) order statistics.
 //   cat:      rank position (1 = most likely target, max_rank = least)
 //   max_rank: number of ranked items (m) on this row
 //   d:   sensitivity as d_a; for the Gumbel branch it is the equal-variance

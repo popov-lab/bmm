@@ -2165,9 +2165,9 @@ sdt_criterion <- function(hit_rate, fa_rate,
 #' @param n_old Integer vector. Number of "old"/"signal" responses.
 #' @param n_trials Integer vector. Total number of trials per cell.
 #' @param stimulus Integer vector (0/1). Stimulus type: 0 = noise, 1 = signal.
-#' @param d Numeric. Sensitivity: the balanced discriminability index
-#'   \eqn{d_a}, which equals \eqn{d'} when `sdratio` is 1. The separation
-#'   between the distributions in noise units is `d * sqrt((1 + sdratio^2) / 2)`.
+#' @param d Numeric. Sensitivity: \eqn{d'} when `sdratio` is 1, and otherwise
+#'   the balanced index \eqn{d_a} (see [sdt_yn()]). The separation between the
+#'   distributions in noise units is `d * sqrt((1 + sdratio^2) / 2)`.
 #' @param criterion Numeric. Response bias (decision boundary location), on the
 #'   noise-standardized axis.
 #' @param sdratio Numeric. Ratio of signal to noise standard deviations
@@ -2612,10 +2612,10 @@ rsdt_rating <- function(n, n_trials, stimulus, d, thresholds,
 #' @param n_trials Integer vector. Total number of trials per observation.
 #' @param m Integer vector. Number of alternatives per observation. Must be
 #'   at least 2.
-#' @param d Numeric vector. Sensitivity: the distance between the signal and
-#'   distractor distributions in SD units. m-AFC assumes a common scale for
-#'   the two distributions, so this is the equal-variance case of the balanced
-#'   index \eqn{d_a} that [sdt_yn()] reports, where it coincides with \eqn{d'}.
+#' @param d Numeric vector. Sensitivity \eqn{d'}: the distance between the
+#'   signal and distractor distributions in SD units. m-AFC assumes a common
+#'   scale for the two distributions, so this is also the balanced index
+#'   \eqn{d_a} that [sdt_yn()] reports.
 #' @inheritParams SDTdist
 #' @param log Logical. If `TRUE`, returns log-density (default `FALSE`).
 #' @param n Integer. Number of observations to generate. `n_trials`, `m`, and
@@ -2769,7 +2769,7 @@ rsdt_mafc <- function(n, n_trials, m, d,
 #' @title Distribution functions for Ranking SDT
 #'
 #' @description Density and random generation for ranking signal detection
-#'   theory (Meyer-Grant et al., 2025). Models rank ordering of m items by
+#'   theory (Meyer-Grant et al., 2026). Models rank ordering of m items by
 #'   perceived strength. Only `d` is estimated (no criterion or stimulus
 #'   column). Supports Gumbel-min (closed form) and Gaussian UV-SDT
 #'   (numerical integration).
@@ -2780,10 +2780,10 @@ rsdt_mafc <- function(n, n_trials, m, d,
 #'   column per rank position (1 = most likely target), or a vector for a
 #'   single observation. Columns beyond a row's set size `m` must be 0.
 #' @param d Numeric vector. Sensitivity: the distance between the target and
-#'   lure distributions. For `dist = "normal"` this is the balanced index
-#'   \eqn{d_a} that [sdt_yn()] reports (in root-mean-square SD units); for
-#'   `dist = "gumbel_min"` the two distributions share a scale and `d` is the
-#'   \eqn{g'} of Meyer-Grant et al. (2025).
+#'   lure distributions. It is \eqn{d'} when `sdratio` is 1 and, for
+#'   `dist = "gumbel_min"`, the \eqn{g'} of Meyer-Grant et al. (2026). With
+#'   another `sdratio` it is the balanced index \eqn{d_a} that [sdt_yn()]
+#'   reports (in root-mean-square SD units).
 #' @param m Integer vector. Number of ranked items per observation. Must be
 #'   at least 2 and no larger than the number of count columns.
 #' @param sdratio Numeric vector. Ratio of signal to noise standard deviations
@@ -2805,10 +2805,10 @@ rsdt_mafc <- function(n, n_trials, m, d,
 #'   matching the wide format [sdt_ranking()] expects.
 #'
 #' @references
-#' Meyer-Grant, C. G., Kellen, D., Harding, S. M., & Singmann, H. (2025).
-#'   \emph{Extreme-value signal detection theory for recognition memory: The
-#'   parametric road not taken}. PsyArXiv preprint.
-#'   \doi{10.31234/osf.io/qhrfj}
+#' Meyer-Grant, C. G., Kellen, D., Harding, S. M., & Singmann, H. (2026).
+#'   Extreme-value signal detection theory for recognition memory: The
+#'   parametric road not taken. \emph{Psychological Review}. Advance online
+#'   publication. \doi{10.1037/rev0000615}
 #'
 #' @keywords distribution
 #' @export
