@@ -7,9 +7,9 @@
                             links = NULL, call = NULL, ...) {
   parameters <- list(
     d = paste0(
-      "Sensitivity: the balanced discriminability index d_a, which for the ",
-      "equal-variance m-AFC model equals d' -- the distance between the ",
-      "signal and distractor distributions in noise SD units"
+      "Sensitivity: d', the distance between the signal and distractor ",
+      "distributions in SD units (m-AFC assumes a common SD, so this is also ",
+      "the d_a that sdt_yn reports under unequal variance)"
     )
   )
   default_priors <- list(
@@ -67,15 +67,20 @@
 #' `logistic`.
 #'
 #' @section Sensitivity is on the same scale as [sdt_yn()]:
-#' `d` is the balanced index \eqn{d_a} that [sdt_yn()] reports. m-AFC assumes
-#' the signal and distractor distributions share a scale, so \eqn{d_a} coincides
-#' with \eqn{d'} here and no `sdratio` parameter is needed.
+#' `d` is \eqn{d'}. m-AFC assumes the signal and distractor distributions share
+#' an SD, so there is no `sdratio` parameter, and \eqn{d'} coincides with the
+#' balanced index \eqn{d_a} that [sdt_yn()] reports once its `sdratio` is
+#' estimated.
 #'
-#' The two models agree exactly at `m = 2`: 2AFC proportion correct equals the
-#' area under the yes/no ROC (Green's theorem), and for Gaussian noise both give
+#' At `m = 2` the two models agree: 2AFC proportion correct equals the area
+#' under the yes/no ROC (Green's theorem), and for Gaussian noise both give
 #' \eqn{P_c = \Phi(d/\sqrt{2})}. The same observer therefore yields the same `d`
 #' whether it is measured by a yes/no ROC or by 2AFC accuracy, which is the
-#' property that makes \eqn{d_a} the right common scale for the SDT family.
+#' property that makes \eqn{d_a} the right common scale for the SDT family. For
+#' `dist = "normal"` this holds even when [sdt_yn()] estimates unequal
+#' variance. For the other distributions it holds when [sdt_yn()] keeps
+#' `sdratio` at its default, because only the Gaussian \eqn{d_a} is exactly the
+#' AUC-equivalent index (see the sensitivity section of [sdt_yn()]).
 #' @param response A single string naming the column with counts of correct
 #'   responses.
 #' @param n_trials The name of the variable containing the total number of

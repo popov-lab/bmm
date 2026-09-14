@@ -2369,10 +2369,10 @@ rsdt_yn <- function(n, n_trials, stimulus, d, criterion,
 #' @param n_trials Integer vector. Total number of trials per observation.
 #' @param m Integer vector. Number of alternatives per observation. Must be
 #'   at least 2.
-#' @param d Numeric vector. Sensitivity: the distance between the signal and
-#'   distractor distributions in SD units. m-AFC assumes a common scale for
-#'   the two distributions, so this is the equal-variance case of the balanced
-#'   index \eqn{d_a} that [sdt_yn()] reports, where it coincides with \eqn{d'}.
+#' @param d Numeric vector. Sensitivity \eqn{d'}: the distance between the
+#'   signal and distractor distributions in SD units. m-AFC assumes a common
+#'   scale for the two distributions, so this is also the balanced index
+#'   \eqn{d_a} that [sdt_yn()] reports.
 #' @inheritParams SDTdist
 #' @param log Logical. If `TRUE`, returns log-density (default `FALSE`).
 #' @param n Integer. Number of observations to generate. `n_trials`, `m`, and
