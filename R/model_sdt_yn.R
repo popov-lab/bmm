@@ -18,7 +18,7 @@
     )
   )
   # d is d_a, and the noise-standardized separation is d * sqrt((1 + r^2) / 2).
-  # Over the empirical SD-ratio range r in [0.56, 1.80] that factor runs from
+  # Over plausible SD ratios, r in [0.56, 1.80], that factor runs from
   # 0.81 to 1.46, which normal(1, 1) is wide enough to absorb on either scale.
   default_priors <- list(
     d = list(main = "normal(1, 1)", effects = "normal(0, 0.5)"),
