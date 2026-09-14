@@ -114,7 +114,9 @@
 #' unequal variance. The classical noise-standardized index is
 #' \eqn{d_N = \delta = d_a \sqrt{(1 + r^2)/2}}, so a published \eqn{d'} from an
 #' unequal-variance analysis is larger than `d` when \eqn{r > 1}: by 13% at
-#' \eqn{r = 1.25} and by 33% at \eqn{r = 1.6}.
+#' \eqn{r = 1.25} and by 33% at \eqn{r = 1.6}. [sdt_sensitivity()] returns
+#' \eqn{d_N} and the signal-standardized \eqn{d_S} from a fitted model, and
+#' `summary()` notes when `d` is \eqn{d_a}.
 #'
 #' `d` is \eqn{d_a} rather than \eqn{d_N} because only \eqn{d_a} is comparable
 #' across conditions or subjects that differ in `sdratio`: two conditions that

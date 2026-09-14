@@ -1963,10 +1963,11 @@ neg_loglik <- function(x, params, distribution, weights = NULL) {
 ############################################################################# !
 
 # SDT distribution registry: single source of truth for all CDF/quantile logic
-# Each entry: cdf, qf (quantile function), and lcdf/lccdf (log CDF and log
-# complementary CDF). The lcdf/lccdf entries mirror the Stan dispatchers in
-# inst/stan_chunks/sdt_dist_funs.stan branch for branch, so the two
-# implementations can be read side by side.
+# Each entry: cdf, qf (quantile function), pdf (density, the derivative of cdf),
+# lcdf/lccdf (log CDF and log complementary CDF), and qf_label (axis label for
+# the inverse-CDF transformed ROC). The lcdf/lccdf entries mirror the Stan
+# dispatchers in inst/stan_chunks/sdt_dist_funs.stan branch for branch, so the
+# two implementations can be read side by side.
 #
 # The list position defines the integer dist_type code passed to Stan --
 # reordering entries changes the R <-> Stan contract.
@@ -1980,26 +1981,34 @@ neg_loglik <- function(x, params, distribution, weights = NULL) {
   normal = list(
     cdf = pnorm,
     qf = qnorm,
+    pdf = dnorm,
     lcdf = function(x) pnorm(x, log.p = TRUE),
-    lccdf = function(x) pnorm(x, lower.tail = FALSE, log.p = TRUE)
+    lccdf = function(x) pnorm(x, lower.tail = FALSE, log.p = TRUE),
+    qf_label = "z"
   ),
   gumbel_min = list(
     cdf = function(x) 1 - exp(-exp(x)),
     qf = function(p) log(-log(1 - p)),
+    pdf = function(x) exp(x - exp(x)),
     lcdf = function(x) log1m_exp(-exp(x)),
-    lccdf = function(x) -exp(x)
+    lccdf = function(x) -exp(x),
+    qf_label = "cloglog"
   ),
   gumbel_max = list(
     cdf = function(x) exp(-exp(-x)),
     qf = function(p) -log(-log(p)),
+    pdf = function(x) exp(-x - exp(-x)),
     lcdf = function(x) -exp(-x),
-    lccdf = function(x) log1m_exp(-exp(-x))
+    lccdf = function(x) log1m_exp(-exp(-x)),
+    qf_label = "loglog"
   ),
   logistic = list(
     cdf = plogis,
     qf = qlogis,
+    pdf = dlogis,
     lcdf = function(x) plogis(x, log.p = TRUE),
-    lccdf = function(x) plogis(x, lower.tail = FALSE, log.p = TRUE)
+    lccdf = function(x) plogis(x, lower.tail = FALSE, log.p = TRUE),
+    qf_label = "logit"
   )
 )
 
