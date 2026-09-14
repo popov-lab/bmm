@@ -1086,13 +1086,15 @@ print.bmm_sdt_auc <- function(x, ...) {
 #' Sensitivity on the noise, signal, or root-mean-square scale
 #'
 #' Re-expresses the posterior sensitivity of a fitted SDT model against a
-#' different reference standard deviation. bmm estimates \eqn{d_a}, which
-#' measures the separation of the two evidence distributions in units of their
-#' root-mean-square SD. Under unequal variance the same separation can also be
-#' read against the noise SD (\eqn{d_N}, the classical \eqn{d'}) or against the
-#' signal SD (\eqn{d_S}). This function returns any of the three as posterior
-#' draws, so contrasts and intervals can be computed on whichever scale a
-#' literature reports.
+#' different reference standard deviation. As long as `sdratio` is fixed at its
+#' default, `d` is the familiar \eqn{d'} and all three scales below are the same
+#' number. Once `sdratio` is estimated, `d` is \eqn{d_a}, which measures the
+#' separation of the two evidence distributions in units of their
+#' root-mean-square SD, and the same separation can also be read against the
+#' noise SD (\eqn{d_N}, the classical \eqn{d'}) or against the signal SD
+#' (\eqn{d_S}). This function returns any of the three as posterior draws, so
+#' contrasts and intervals can be computed on whichever scale a literature
+#' reports.
 #'
 #' @details
 #' The model places the noise distribution at \eqn{-\delta/2} with SD
@@ -1120,6 +1122,15 @@ print.bmm_sdt_auc <- function(x, ...) {
 #' differ in `sdratio`: two conditions with identical discriminability can show
 #' a large, confidently estimated \eqn{d_N} difference. Prefer \eqn{d_a} for
 #' contrasts, and use \eqn{d_N}/\eqn{d_S} for comparison with published values.
+#' When `sdratio` is estimated but constant across the conditions being
+#' compared, all three differ by one common factor per draw and give the same
+#' contrasts up to scale.
+#'
+#' The `criterion` and rating thresholds are not converted: they stay on the
+#' noise-SD axis whichever sensitivity scale you report. Under the Gumbel
+#' distributions with `sdratio` estimated, none of the three is the
+#' AUC-equivalent index; use [auc_sdt()] to compare discriminability on the
+#' probability scale.
 #'
 #' @inheritParams roc_sdt
 #' @param measure Character vector naming the scales to return: `"da"`
@@ -1193,4 +1204,17 @@ print.bmm_sdt_sensitivity <- function(x, ...) {
       "ds = signal-SD units\n")
   print(attr(x, "summary"), digits = 3, row.names = FALSE)
   invisible(x)
+}
+
+
+# `d` reads as d' in the coefficient table, which it only is while sdratio is
+# fixed
+#' @export
+summary_notes.sdt <- function(model, x) {
+  if (!.sdt_has_estimated_sdratio(model)) return(NULL)
+  paste(
+    "Note: sdratio is estimated, so d is d_a (root-mean-square SD units),",
+    "not the noise-standardized d'.\n      sdt_sensitivity() converts it",
+    "to d' (noise SD) and d_S (signal SD)."
+  )
 }
