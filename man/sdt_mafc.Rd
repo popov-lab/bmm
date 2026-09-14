@@ -68,7 +68,7 @@ No stimulus column needed (each trial has exactly one signal alternative)
 \itemize{
 \item \strong{Parameters:}
 \itemize{
-\item \code{d}: Sensitivity: the balanced discriminability index d_a, which for the equal-variance m-AFC model equals d' -- the distance between the signal and distractor distributions in noise SD units
+\item \code{d}: Sensitivity: d', the distance between the signal and distractor distributions in SD units (m-AFC assumes a common SD, so this is also the d_a that sdt_yn reports under unequal variance)
 }
 \item \strong{Fixed parameters:}
 \item \strong{Default parameter links:}
@@ -96,15 +96,20 @@ ratio for \code{gumbel_min}, Gauss-Hermite quadrature for \code{normal}
 }
 \section{Sensitivity is on the same scale as \code{\link[=sdt_yn]{sdt_yn()}}}{
 
-\code{d} is the balanced index \eqn{d_a} that \code{\link[=sdt_yn]{sdt_yn()}} reports. m-AFC assumes
-the signal and distractor distributions share a scale, so \eqn{d_a} coincides
-with \eqn{d'} here and no \code{sdratio} parameter is needed.
+\code{d} is \eqn{d'}. m-AFC assumes the signal and distractor distributions share
+an SD, so there is no \code{sdratio} parameter, and \eqn{d'} coincides with the
+balanced index \eqn{d_a} that \code{\link[=sdt_yn]{sdt_yn()}} reports once its \code{sdratio} is
+estimated.
 
-The two models agree exactly at \code{m = 2}: 2AFC proportion correct equals the
-area under the yes/no ROC (Green's theorem), and for Gaussian noise both give
+At \code{m = 2} the two models agree: 2AFC proportion correct equals the area
+under the yes/no ROC (Green's theorem), and for Gaussian noise both give
 \eqn{P_c = \Phi(d/\sqrt{2})}. The same observer therefore yields the same \code{d}
 whether it is measured by a yes/no ROC or by 2AFC accuracy, which is the
-property that makes \eqn{d_a} the right common scale for the SDT family.
+property that makes \eqn{d_a} the right common scale for the SDT family. For
+\code{dist = "normal"} this holds even when \code{\link[=sdt_yn]{sdt_yn()}} estimates unequal
+variance. For the other distributions it holds when \code{\link[=sdt_yn]{sdt_yn()}} keeps
+\code{sdratio} at its default, because only the Gaussian \eqn{d_a} is exactly the
+AUC-equivalent index (see the sensitivity section of \code{\link[=sdt_yn]{sdt_yn()}}).
 }
 
 \examples{

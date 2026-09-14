@@ -2166,9 +2166,9 @@ sdt_criterion <- function(hit_rate, fa_rate,
 #' @param n_old Integer vector. Number of "old"/"signal" responses.
 #' @param n_trials Integer vector. Total number of trials per cell.
 #' @param stimulus Integer vector (0/1). Stimulus type: 0 = noise, 1 = signal.
-#' @param d Numeric. Sensitivity: the balanced discriminability index
-#'   \eqn{d_a}, which equals \eqn{d'} when `sdratio` is 1. The separation
-#'   between the distributions in noise units is `d * sqrt((1 + sdratio^2) / 2)`.
+#' @param d Numeric. Sensitivity: \eqn{d'} when `sdratio` is 1, and otherwise
+#'   the balanced index \eqn{d_a} (see [sdt_yn()]). The separation between the
+#'   distributions in noise units is `d * sqrt((1 + sdratio^2) / 2)`.
 #' @param criterion Numeric. Response bias (decision boundary location), on the
 #'   noise-standardized axis.
 #' @param sdratio Numeric. Ratio of signal to noise standard deviations
@@ -2369,10 +2369,10 @@ rsdt_yn <- function(n, n_trials, stimulus, d, criterion,
 #' @param n_trials Integer vector. Total number of trials per observation.
 #' @param m Integer vector. Number of alternatives per observation. Must be
 #'   at least 2.
-#' @param d Numeric vector. Sensitivity: the distance between the signal and
-#'   distractor distributions in SD units. m-AFC assumes a common scale for
-#'   the two distributions, so this is the equal-variance case of the balanced
-#'   index \eqn{d_a} that [sdt_yn()] reports, where it coincides with \eqn{d'}.
+#' @param d Numeric vector. Sensitivity \eqn{d'}: the distance between the
+#'   signal and distractor distributions in SD units. m-AFC assumes a common
+#'   scale for the two distributions, so this is also the balanced index
+#'   \eqn{d_a} that [sdt_yn()] reports.
 #' @inheritParams SDTdist
 #' @param log Logical. If `TRUE`, returns log-density (default `FALSE`).
 #' @param n Integer. Number of observations to generate. `n_trials`, `m`, and

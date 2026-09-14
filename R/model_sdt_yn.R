@@ -7,9 +7,9 @@
                           links = NULL, call = NULL, ...) {
   parameters <- list(
     d = paste0(
-      "Sensitivity: the balanced discriminability index d_a, which measures ",
-      "the distance between the signal and noise distributions in units of ",
-      "their root-mean-square SD, so it equals d' when sdratio is 1"
+      "Sensitivity: d' under equal variance (the default). When sdratio is ",
+      "estimated, d is d_a, the distance between the signal and noise ",
+      "distributions in units of their root-mean-square SD"
     ),
     criterion = "Response bias: location of decision boundary",
     sdratio = paste0(
@@ -17,8 +17,9 @@
       "ratio, so 0 means equal variance (an SD ratio of 1)"
     )
   )
-  # d_a and the noise-standardized separation differ by at most ~16% over the
-  # plausible sdratio range, so the sensitivity prior needs no recalibration.
+  # d is d_a, and the noise-standardized separation is d * sqrt((1 + r^2) / 2).
+  # Over the empirical SD-ratio range r in [0.56, 1.80] that factor runs from
+  # 0.81 to 1.46, which normal(1, 1) is wide enough to absorb on either scale.
   default_priors <- list(
     d = list(main = "normal(1, 1)", effects = "normal(0, 0.5)"),
     criterion = list(main = "normal(0, 1.5)", effects = "normal(0, 0.5)"),
@@ -96,23 +97,46 @@
 #' @return An object of class `bmmodel`
 #'
 #' @section Which sensitivity measure `d` is:
-#' When the signal and noise distributions have different widths there is no
-#' single natural way to express their separation, because the separation only
-#' becomes dimensionless after choosing a scale to divide by. `bmm` reports
-#' \eqn{d_a}, the separation divided by the root-mean-square of the two SDs:
-#' \deqn{d_a = \sqrt{2}\,\delta / \sqrt{1 + r^2},}
-#' where \eqn{\delta} is the separation in noise-SD units and \eqn{r} is
-#' `sdratio`. This weights the two distributions equally, and it is the measure
-#' Macmillan and Creelman (2005) and Mickes et al. (2007) recommend under
-#' unequal variance. `sdratio` is sampled on the log scale and fixed at 0 by
-#' default (an SD ratio of 1), where \eqn{d_a} equals the familiar \eqn{d'}, so
-#' the choice only matters for unequal-variance fits.
+#' **`d` is the familiar \eqn{d'}** whenever `sdratio` keeps its default of 0
+#' (an SD ratio of 1, equal variance), which is every fit that does not give
+#' `sdratio` a formula. The rest of this section only matters once you estimate
+#' `sdratio`.
 #'
-#' The alternative — dividing by the noise SD alone — is not comparable across
-#' conditions that differ in `sdratio`: two conditions that are equally
-#' discriminable can then show a large, confidently estimated difference in
-#' sensitivity. Note that `criterion` is **not** rescaled and stays on the
-#' noise-standardized axis, following the same convention.
+#' When the signal and noise distributions have different widths, their
+#' separation only becomes dimensionless after choosing an SD to divide by.
+#' `bmm` then reports \eqn{d_a}, the separation divided by the root-mean-square
+#' of the two SDs:
+#' \deqn{d_a = \sqrt{2}\,\delta / \sqrt{1 + r^2},}
+#' where \eqn{\delta} is the separation in noise-SD units and
+#' \eqn{r} is the SD ratio, `exp(sdratio)`. This weights the two
+#' distributions equally, and it is the measure Simpson and Fitter (1973),
+#' Macmillan and Creelman (2005), and Mickes et al. (2007) recommend under
+#' unequal variance. The classical noise-standardized index is
+#' \eqn{d_N = \delta = d_a \sqrt{(1 + r^2)/2}}, so a published \eqn{d'} from an
+#' unequal-variance analysis is larger than `d` when \eqn{r > 1}: by 13% at
+#' \eqn{r = 1.25} and by 33% at \eqn{r = 1.6}.
+#'
+#' `d` is \eqn{d_a} rather than \eqn{d_N} because only \eqn{d_a} is comparable
+#' across conditions or subjects that differ in `sdratio`: two conditions that
+#' are equally discriminable can show a large, confidently estimated difference
+#' in \eqn{d_N}. When `sdratio` is estimated but constant across the conditions
+#' you compare, the two indices differ by one common factor and give the same
+#' contrasts up to scale.
+#'
+#' **Units of the other parameters.** `criterion` is *not* rescaled. It is the
+#' location of the decision boundary relative to the midpoint between the two
+#' distributions, in noise-SD units, so under unequal variance `d` (in
+#' root-mean-square SD units) and `criterion` (in noise-SD units) are on
+#' different scales, and a ratio such as `criterion / d` mixes them.
+#'
+#' **Extreme-value distributions.** For `dist = "normal"`, \eqn{d_a} is also the
+#' AUC-equivalent index, \eqn{d_a = \sqrt{2}\,\Phi^{-1}(\mathrm{AUC})}, so it
+#' carries the same information as 2AFC accuracy. For `"gumbel_min"` and
+#' `"gumbel_max"` that identity holds only under equal variance. With `sdratio`
+#' estimated, \eqn{d_a} keeps its balanced geometry but drifts away from the
+#' AUC-equivalent index as the SD ratio moves away from 1 (for `"gumbel_min"`
+#' at \eqn{\delta = 1.5} and \eqn{r = 2}, \eqn{d_a} is 31% larger), so compare
+#' such fits on the AUC rather than on `d`.
 #'
 #' Because `d` is a short name, a column called `d` in your data that is also
 #' used as a predictor will collide with this parameter; `bmm()` warns when that
