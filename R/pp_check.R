@@ -73,7 +73,7 @@ pp_check.bmmfit <- function(object, type = "dens_overlay", ndraws = NULL,
   if (length(group) == 1L && is.na(group)) {
     return(NULL)
   }
-  if (is.null(group) && inherits(object$bmm$model, "sdt_rating")) {
+  if (is.null(group) && inherits(object$bmm$model, c("sdt_rating", "sdt_cdp"))) {
     return(object$bmm$model$other_vars$stimulus)
   }
   group
