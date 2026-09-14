@@ -552,10 +552,17 @@ fit_cdp <- bmm(
 summary(fit_cdp)
 ```
 
-Recollection (`drec` ≈ 0.81) and familiarity (`dfam` ≈ 0.78) contribute
-comparable sensitivities, the Remember criterion sits well into the recollection
-distribution (`rcrit` ≈ 0.92), and `exp(sigmar)` ≈ 1.48 puts the recollection SD
-half again above one — the model's account of the recognition-ROC asymmetry as
+```{r cdp-estimates, include = FALSE}
+fmt2 <- function(x) format(round(x, 2), nsmall = 2)
+cdp_est <- brms::fixef(fit_cdp)[, "Estimate"]
+```
+
+Recollection (`drec` ≈ `r fmt2(cdp_est[["drec_Intercept"]])`) and familiarity
+(`dfam` ≈ `r fmt2(cdp_est[["dfam_Intercept"]])`) contribute comparable
+sensitivities, the Remember criterion sits well into the recollection
+distribution (`rcrit` ≈ `r fmt2(cdp_est[["rcrit_Intercept"]])`), and
+`exp(sigmar)` ≈ `r fmt2(exp(cdp_est[["sigmar_Intercept"]]))` puts the
+recollection SD above one — the model's account of the recognition-ROC asymmetry as
 *added recollection variance* rather than a uniformly wider strength
 distribution. Despite using the two-parameter `parsimonious` thresholds rather
 than five free criteria, these estimates reproduce the maximum-likelihood values
