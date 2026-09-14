@@ -2464,7 +2464,7 @@ rsdt_yn <- function(n, n_trials, stimulus, d, criterion,
 
     # interval mid is the anchor spread; intervals above scale by it, the
     # first interval below sets the below spread, and further intervals below
-    # scale by that (Paulewicz & Blaut, 2020)
+    # scale by that (Paulewicz & Blaut, 2022)
     inc <- exp(deltas)
     spread_above <- inc[, mid]
     if (mid + 1L <= K1 - 1L) {
