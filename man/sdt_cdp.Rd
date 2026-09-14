@@ -71,7 +71,7 @@ Use aggregate_sdt_cdp_data() to build these columns from long-format (trial-leve
 \itemize{
 \item \strong{Parameters:}
 \itemize{
-\item \code{dfam}: Familiarity sensitivity: target mean on the familiarity axis, in lure-SD units. Not the balanced d_a that the other SDT models report as d -- the old/new decision is read off the aggregate strength F + R
+\item \code{dfam}: Familiarity sensitivity: target mean on the familiarity axis, in lure-SD units, like d' in the other SDT models under equal variance (not their d_a) -- the old/new decision is read off the aggregate strength F + R
 \item \code{drec}: Recollection sensitivity: target mean on the recollection axis, in lure-SD units (the target SD is exp(sigmar))
 \item \code{criterion}: Response bias: old/new boundary on the strength (F+R) axis
 \item \code{spacing}: Threshold spacing: controls distance between adjacent thresholds (exp(spacing) ensures positive spacing)

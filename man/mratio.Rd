@@ -34,9 +34,9 @@ model estimates the log M-ratio (\code{logmratio}) directly, so the M-ratio is
 \code{exp(logmratio)} and meta-d' is \code{exp(logmratio) * d}. The M-ratio is the
 standard measure of metacognitive efficiency (Maniscalco & Lau, 2014;
 Fleming, 2017): 1 is ideal metacognition, below 1 is inefficiency, and above
-1 is hyper-efficiency. Type-1 and type-2 sensitivity are both reported on the
-balanced \eqn{d_a} scale (see \code{\link[=sdt_sensitivity]{sdt_sensitivity()}}), so the ratio is
-unaffected by \code{sdratio}.
+1 is hyper-efficiency. Type-1 and type-2 sensitivity are reported on one
+scale, \eqn{d'} or, once \code{sdratio} is estimated, \eqn{d_a} (see
+\code{\link[=sdt_sensitivity]{sdt_sensitivity()}}), so the ratio is unaffected by \code{sdratio}.
 }
 \references{
 Maniscalco, B., & Lau, H. (2014). Signal detection theory analysis of type 1

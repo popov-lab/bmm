@@ -35,8 +35,9 @@
     list(
       dfam = paste0(
         "Familiarity sensitivity: target mean on the familiarity axis, in ",
-        "lure-SD units. Not the balanced d_a that the other SDT models report ",
-        "as d -- the old/new decision is read off the aggregate strength F + R"
+        "lure-SD units, like d' in the other SDT models under equal variance ",
+        "(not their d_a) -- the old/new decision is read off the aggregate ",
+        "strength F + R"
       ),
       drec = paste0(
         "Recollection sensitivity: target mean on the recollection axis, in ",

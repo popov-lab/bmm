@@ -26,6 +26,12 @@ margin-bottom: 1.5em ;
 .author{
     display: none;
 }
+.dprime-box {
+  border-left: 4px solid #8c8c8c;
+  background: #f5f5f5;
+  padding: 0.2em 1.2em;
+  margin: 1.5em 0;
+}
 </style>
 
 ```{r, include = FALSE}
@@ -141,22 +147,32 @@ $$
 \text{Hit} = P(X > k \mid \text{signal}) = 1 - \Phi\!\left(\tfrac{k - \delta}{s}\right).
 $$
 
-**Sensitivity** is that separation expressed in standard-deviation units — but
-the two distributions have *different* SDs as soon as $s \neq 1$, so which one
-is the yardstick has to be stated. bmm reports
+**Sensitivity** is that separation expressed in standard-deviation units. With
+equal variances ($s = 1$, the default in every bmm SDT model) there is only one
+SD to divide by, and the separation is the familiar $d' = \delta$. That is the
+`d` parameter in every formula below, and nothing else in this section changes
+it.
+
+Once $s$ is estimated the two distributions have *different* SDs, so which one
+is the yardstick has to be stated. bmm then reports
 
 $$
 d_a = \frac{\delta}{\sqrt{(1 + s^2)/2}},
 $$
 
 the separation in units of the root-mean-square of the two SDs, which weights
-noise and signal equally. This is the `d` parameter in every formula below. When
-$s = 1$ it reduces to the familiar $d' = \delta$, so nothing changes for
-equal-variance models. Dividing by the noise SD instead gives $d_N$ (the
-classical $d'$) and by the signal SD gives $d_S$; `sdt_sensitivity()` returns
-all three from a fitted model. $d_a$ is the default because it is the only one
-that remains comparable across conditions whose $s$ differs
-[@Simpson_Fitter_1973; @Macmillan_Creelman_2005].
+noise and signal equally. Dividing by the noise SD instead gives $d_N = \delta$
+(the $d'$ of most unequal-variance analyses) and by the signal SD gives $d_S$;
+`sdt_sensitivity()` returns all three from a fitted model, and `summary()` adds a
+note whenever `d` is $d_a$. $d_a$ is the default because it is the only one that
+remains comparable across conditions whose $s$ differs
+[@Simpson_Fitter_1973; @Macmillan_Creelman_2005]. The Binary SDT section below
+shows how far the indices lie apart on real data.
+
+bmm places the two distributions symmetrically, at $-\delta/2$ and $+\delta/2$,
+and its `criterion` parameter is the boundary measured from their midpoint,
+$k - \delta/2$ in the notation above. The criterion is in noise-SD units whether
+or not $s$ is estimated.
 
 ```{r sdt-distributions, echo = FALSE, fig.cap = "Latent evidence model. Noise and signal distributions overlap; responses above the criterion are labelled as signal. The shaded right tails are the false-alarm rate (noise) and the hit rate (signal); their separation is the sensitivity d-prime."}
 crit <- 0.75
@@ -235,7 +251,7 @@ substantive assumption. The Gaussian became the default for historical and
 mathematical reasons — Fechner's and Thurstone's psychophysics, and the pull of
 the central limit theorem — and @Green_Swets_1966 adopted it on frankly pragmatic
 grounds (tractable mathematics) while conceding that other distributions would
-serve just as well [@MeyerGrant_2025].
+serve just as well [@MeyerGrant_2026].
 
 The choice is not cosmetic, because the shape of the distribution controls the
 shape of the ROC. Empirical recognition ROCs are almost always *asymmetric*: read
@@ -253,17 +269,17 @@ The second changes the *distribution* instead of adding a parameter. If the late
 evidence follows an extreme-value (Gumbel) distribution rather than a Gaussian, the
 ROC comes out asymmetric *intrinsically* — with equal variance and one fewer
 parameter. This is the extreme-value signal detection (EVSDT) model
-[@MeyerGrant_2025], and it is why `sdt_ranking()` defaults to `"gumbel_min"`.
+[@MeyerGrant_2026], and it is why `sdt_ranking()` defaults to `"gumbel_min"`.
 
 These two routes are easy to conflate, but ROC asymmetry and the variance ratio are
 in fact *logically independent*: a skewed equal-variance distribution can produce an
 asymmetric ROC, and unequal variances can produce a symmetric one
-[@MeyerGrant_2025]. Nor are the routes equally clean. The unequal-variance Gaussian
+[@MeyerGrant_2026]. Nor are the routes equally clean. The unequal-variance Gaussian
 buys the asymmetry at a conceptual cost: the extra variance it posits implies that
 some study events *lower* an item's familiarity, its likelihood ratio is
 non-monotonic (so it can predict below-chance hit rates at extreme criteria), and
 the simple $d'$ must give way to $d_a$, which no longer guarantees that a larger
-value means a uniformly higher ROC [@MeyerGrant_2025]. The extreme-value route
+value means a uniformly higher ROC [@MeyerGrant_2026]. The extreme-value route
 sidesteps all three.
 
 ## Where the distributions come from
@@ -275,7 +291,7 @@ evidence for an item is the *sum* or *average* of many small contributions, the
 central limit theorem drives the decision variable toward a Gaussian. If instead it
 is the *most extreme* contribution — the single strongest match, or the most glaring
 mismatch — the extreme-value theorem drives it toward a Gumbel distribution, in the
-same way and for the same mathematical reasons [@MeyerGrant_2025; @Robinson_2023].
+same way and for the same mathematical reasons [@MeyerGrant_2026; @Robinson_2023].
 Pooling gives the bell curve; a max (or min) rule gives the skew.
 
 The parallel is exact: a signal-detection model with extreme-value noise and
@@ -291,7 +307,7 @@ Whether human evidence is better described as pooled or as maximised is an empir
 question, and the answer can depend on the task. In recognition memory the
 extreme-value model is principled and parsimonious, and can be grounded in a
 behavioural invariance axiom rather than in distributional convenience
-[@MeyerGrant_2025]. In visual working memory, by contrast, the Gaussian (pooling)
+[@MeyerGrant_2026]. In visual working memory, by contrast, the Gaussian (pooling)
 account reproduces a *stable* sensitivity across changes in the number of
 alternatives, whereas the softmax (max-rule) account does not — favouring pooling in
 that domain [@Robinson_2023]. `bmm` keeps the distribution switchable so the
@@ -321,7 +337,7 @@ nearly indistinguishable in the criterion-based models (its honest role is the l
 link for users coming from logistic regression, not a separate theory of evidence).
 `"gumbel_max"` is the extreme-value family pointed the other way: it predicts the
 *opposite* (slope > 1) asymmetry that recognition data rarely show, and the choice
-rule it entails has been found empirically inadequate [@MeyerGrant_2025;
+rule it entails has been found empirically inadequate [@MeyerGrant_2026;
 @Robinson_2023]. It is kept for the rare opposite-asymmetry case and for
 non-recognition tasks, not as a co-equal recognition model.
 
@@ -460,7 +476,7 @@ observed-versus-model ROC overlap and AUC shown above, with `pp_check()`, or wit
 One caution on that comparison: the Gaussian model is the more *flexible* of the
 two — flexible enough to mimic extreme-value data closely, to the point that in
 simulations it wins on a clear majority of datasets that an extreme-value model
-actually generated [@MeyerGrant_2025]. A better Gaussian fit is therefore weak
+actually generated [@MeyerGrant_2026]. A better Gaussian fit is therefore weak
 evidence on its own. The distributions are best told apart not by raw fit but by
 parsimony, by whether their parameters stay invariant when the design changes (for
 example across set sizes or numbers of alternatives) [@Robinson_2023], and by
@@ -508,7 +524,8 @@ By default `sdratio` is fixed to 0, i.e. the signal and noise distributions have
 equal variance (`exp(0) = 1`) — it appears in the model's parameter list but got
 no formula, so it stays at its fixed default (step 3 of the workflow recipe).
 With a single (hit, false-alarm) pair per subject the signal/noise variance
-ratio is not identified, so leaving it fixed is the right default here.
+ratio is not identified, so leaving it fixed is the right default here, and `d`
+in this fit is $d'$ in the textbook sense.
 
 ## Multiple criteria: identifying the unequal-variance ratio
 
@@ -557,23 +574,61 @@ distribution, the classic recognition-memory pattern.
 ### Which sensitivity index?
 
 Once `sdratio` is free, "the" distance between the two distributions depends on
-which standard deviation you measure it in. bmm estimates $d_a$, the separation
-divided by the root-mean-square of the two SDs. The alternatives are $d_N$
-(divide by the noise SD — the classical $d'$) and $d_S$ (divide by the signal
-SD). `sdt_sensitivity()` returns any of them, converting draw by draw so the
-intervals carry the joint uncertainty in `d` and `sdratio`:
+which standard deviation you measure it in, and `d` is no longer $d'$ but $d_a$,
+the separation divided by the root-mean-square of the two SDs. The note below
+the coefficient table of `summary(fit_uv)` says so. The alternatives are $d_N$
+(divide by the noise SD, the $d'$ that most unequal-variance analyses report)
+and $d_S$ (divide by the signal SD). `sdt_sensitivity()` returns any of them,
+converting draw by draw so the intervals carry the joint uncertainty in `d` and
+`sdratio`:
 
 ```{r}
-sdt_sensitivity(fit_uv)
+sens <- sdt_sensitivity(fit_uv)
+sens
 ```
+
+```{r dprime-gap, include = FALSE}
+sens_summary <- attr(sens, "summary")
+dn_over_da <- mean(sens_summary$mean[sens_summary$measure == "dn"]) /
+  mean(sens_summary$mean[sens_summary$measure == "da"])
+```
+
+::: {.dprime-box}
+**For readers who know $d'$.** The classical index and bmm's `d` differ by the
+factor $\sqrt{(1 + s^2)/2}$, that is $d_N = d_a \sqrt{(1 + s^2)/2}$. The factor
+is 1 under equal variance and grows with the SD ratio:
+
+```{r dprime-factor, echo = FALSE}
+sd_ratio <- c(0.8, 1, 1.25, 1.5, 2)
+knitr::kable(
+  data.frame(sd_ratio, sqrt((1 + sd_ratio^2) / 2)),
+  col.names = c("SD ratio $s$", "$d_N / d_a$"), digits = 2
+)
+```
+
+For the base-rate data the posterior mean of $d_N$ is
+`r round(100 * (dn_over_da - 1))`% larger than the posterior mean of `d`. A
+$d'$ published for similar data under unequal variance should therefore be
+compared with the `dn` row above, not with `d`.
+:::
 
 Under equal variance all three are the same number, which is why the
 distinction only appears once `sdratio` is estimated. $d_a$ is the default
 because it is the only one of the three that stays comparable across conditions
 that differ in `sdratio`: two conditions that are exactly equally discriminable
 can show a large, confidently estimated $d_N$ difference purely because their
-variance ratios differ. Report $d_N$ or $d_S$ when you need to line up with a
-literature that uses them, but prefer $d_a$ for contrasts.
+variance ratios differ. When `sdratio` is estimated but shared by the conditions
+you compare, as in this fit, the three indices differ by one common factor and
+give the same contrasts up to scale. Report $d_N$ or $d_S$ when you need to line
+up with a literature that uses them, but prefer $d_a$ for contrasts.
+
+Two further points apply to unequal-variance fits. First, `criterion` is not
+converted: it stays in noise-SD units whichever sensitivity index you report,
+so a ratio such as `criterion / d` mixes two scales. Second, for
+`dist = "normal"` the index $d_a$ is also the AUC-equivalent index,
+$d_a = \sqrt{2}\,\Phi^{-1}(\mathrm{AUC})$. Under the Gumbel distributions that
+identity only holds with equal variance, so compare unequal-variance Gumbel fits
+with `auc_sdt()` rather than on `d`.
 
 ## ROC and AUC
 
@@ -632,8 +687,8 @@ plot(roc, observed = obs, scale = "quantile")
 ```
 
 `latent_sdt()` reconstructs the latent decision-variable distributions
-themselves: the noise and signal evidence densities, separated by `d` and
-scaled by `exp(sdratio)`, with the criterion drawn as a dashed line carrying a
+themselves: the noise and signal evidence densities, separated by the
+noise-SD distance $d_N$ and scaled by `exp(sdratio)`, with the criterion drawn as a dashed line carrying a
 credible band on its location. This is the picture the criterion and `d`
 estimates describe. Here the criterion varies across the base-rate conditions but
 `d`/`sdratio` do not, so the densities are identical across conditions:
@@ -862,8 +917,8 @@ In an m-alternative forced-choice task the observer picks the target among `m`
 alternatives; the data are counts of correct responses. There is no criterion and
 no stimulus column — accuracy alone identifies `d` [@DeCarlo_2012]. A correct
 response occurs when the target's evidence exceeds that of all $m-1$ distractors;
-`d` is the target--distractor separation and stays on the same scale as the `d`
-of `sdt_yn()`: for $m = 2$ the Gaussian model has the closed form
+`d` is $d'$, the target--distractor separation, and stays on the same scale as
+the `d` of `sdt_yn()`, including its $d_a$ when `sdratio` is estimated: for $m = 2$ the Gaussian model has the closed form
 $\Phi(d/\sqrt{2})$, and for $m \geq 3$ the Gaussian and logistic models evaluate
 the accuracy by quadrature while both Gumbel models stay in closed form. The set size `m` may be a constant or a data column (for mixed set
 sizes).
@@ -926,7 +981,7 @@ pp_check(fit_mafc, type = "ecdf_overlay", ndraws = 100)
 # Ranking SDT
 
 In a ranking task the observer orders `m` items by evidence and the data are
-counts per rank position assigned to the target [@MeyerGrant_2025]. As with
+counts per rank position assigned to the target [@MeyerGrant_2026]. As with
 m-AFC there is no criterion: the rank assigned to the target is an *order
 statistic* of the latent evidence, so the probability of each rank follows from
 the evidence distribution directly. With `dist = "gumbel_min"` these rank
@@ -934,7 +989,12 @@ probabilities have a closed form (the extreme-value assumption that makes rankin
 analytically tractable); `dist = "normal"` is also available and evaluated by
 quadrature — prefer `gumbel_min` for speed (its closed form is exact), and
 `normal` for Gaussian evidence comparable to the other SDT models (the classical
-Thurstonian ranking assumption). The model uses the native multinomial family with one category per rank
+Thurstonian ranking assumption). `d` is $d'$ (the $g'$ of @MeyerGrant_2026 under
+`gumbel_min`); with `dist = "normal"` and `sdratio ~ 1` it becomes $d_a$ as in
+the other models. Ranking has no criterion, so here $d_a$ is not read off an ROC:
+it keeps `d` on one scale across the family, and it fixes two-item accuracy at
+$\Phi(d/\sqrt{2})$ whatever the SD ratio. The model uses the native
+multinomial family with one category per rank
 position, and `m` may again be a constant or a column for mixed set sizes. The
 bundled `meyer_grant_jakob_2025` data [@MeyerGrant_Jakob_2025] illustrate the
 wide format.
@@ -946,7 +1006,7 @@ infinitely many ranking distributions are consistent with the same choice
 probabilities [@Falmagne_1978; @Kilani_Colonius_2026]. A ranking task observes
 the target's position in the ordering directly rather than only whether it won,
 which is the formal reason the paradigm supports stronger inferences about the
-evidence distribution than m-AFC accuracy does [@MeyerGrant_2025]. One limit
+evidence distribution than m-AFC accuracy does [@MeyerGrant_2026]. One limit
 remains even here: rank probabilities identify the distribution over orderings,
 not the joint distribution of the latent evidence behind it — in the max-Gumbel
 (Plackett–Luce) family, for example, independent and copula-dependent evidence
