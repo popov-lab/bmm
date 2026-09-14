@@ -27,7 +27,7 @@ sdt_rating_logmu(
 \item{thresh}{Integer threshold-parameterization id.}
 
 \item{d, criterion, spacing, sdratio}{Model parameters (draws-by-observation
-matrices supplied by brms). \code{d} is the balanced sensitivity index d_a;
+matrices supplied by brms). \code{d} is d', or d_a when sdratio is not 0;
 \code{spacing} is \code{0} for threshold types without it.}
 
 \item{stimulus}{Stimulus covariate (0 = noise, 1 = signal).}

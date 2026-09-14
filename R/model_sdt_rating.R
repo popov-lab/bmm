@@ -84,9 +84,9 @@
 
   parameters <- list(
     d = paste0(
-      "Sensitivity: the balanced discriminability index d_a, which measures ",
-      "the distance between the signal and noise distributions in units of ",
-      "their root-mean-square SD, so it equals d' when sdratio is 1"
+      "Sensitivity: d' under equal variance (the default). When sdratio is ",
+      "estimated, d is d_a, the distance between the signal and noise ",
+      "distributions in units of their root-mean-square SD"
     ),
     criterion = paste0(
       "Response bias: location of the decision boundary on the ",
@@ -171,13 +171,19 @@
 #' to the formula.
 #'
 #' @section Sensitivity is on the same scale as [sdt_yn()]:
-#' `d` is the balanced index \eqn{d_a} that [sdt_yn()] reports: the separation
-#' between the signal and noise distributions divided by the root-mean-square
-#' of their SDs. It equals \eqn{d'} whenever `sdratio` stays fixed at 0, and
-#' unlike \eqn{d'} it remains comparable across conditions that differ in
-#' `sdratio` -- see the sensitivity section of [sdt_yn()] for the reasoning.
-#' The `criterion` and the confidence thresholds are **not** rescaled and stay
-#' on the noise-standardized axis.
+#' `d` is \eqn{d'} whenever `sdratio` stays fixed at 0, which is every fit
+#' that does not give `sdratio` a formula. With `sdratio` estimated, `d` is the
+#' balanced index \eqn{d_a} that [sdt_yn()] reports: the separation between the
+#' signal and noise distributions divided by the root-mean-square of their SDs.
+#' Unlike the noise-standardized \eqn{d'}, it remains comparable across
+#' conditions that differ in `sdratio`; see the sensitivity section of
+#' [sdt_yn()] for the reasoning, for how far the two indices lie apart, and for
+#' the caveat that under the Gumbel distributions \eqn{d_a} is not the
+#' AUC-equivalent index once `sdratio` is estimated.
+#'
+#' The `criterion` and the confidence thresholds are **not** rescaled. They stay
+#' on the noise-standardized axis, so under unequal variance they and `d` are
+#' in different units.
 #' @param response A character vector of K column names containing response
 #'   counts per rating category, ordered from "definitely noise" to
 #'   "definitely signal".
@@ -444,7 +450,7 @@ configure_model.sdt_rating <- function(model, data, formula) {
 #' @param dist Integer noise-distribution id (see the `.sdt_dists` registry).
 #' @param thresh Integer threshold-parameterization id.
 #' @param d,criterion,spacing,sdratio Model parameters (draws-by-observation
-#'   matrices supplied by brms). `d` is the balanced sensitivity index d_a;
+#'   matrices supplied by brms). `d` is d', or d_a when sdratio is not 0;
 #'   `spacing` is `0` for threshold types without it.
 #' @param stimulus Stimulus covariate (0 = noise, 1 = signal).
 #' @param ... Threshold `delta` parameters, when the threshold type uses them.
