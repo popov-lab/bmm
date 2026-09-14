@@ -43,7 +43,7 @@ Ranking Signal Detection Theory Model
 \item \strong{Name:} Signal Detection Theory (Ranking)
 \item \strong{Citation:}
 \itemize{
-\item Meyer-Grant, C. G., Kellen, D., Harding, S. M., & Singmann, H. (2025). Extreme-value signal detection theory for recognition memory: The parametric road not taken. PsyArXiv. https://doi.org/10.31234/osf.io/qhrfj
+\item Meyer-Grant, C. G., Kellen, D., Harding, S. M., & Singmann, H. (2026). Extreme-value signal detection theory for recognition memory: The parametric road not taken. Psychological Review. https://doi.org/10.1037/rev0000615
 }
 \item \strong{Requirements:}
 
@@ -57,7 +57,7 @@ No stimulus column needed (all trials include exactly one target)
 \itemize{
 \item \strong{Parameters:}
 \itemize{
-\item \code{d}: Sensitivity: the balanced discriminability index d_a, the distance between the target and lure distributions in units of their root-mean-square SD; equals d' (g' for gumbel_min) under equal variance
+\item \code{d}: Sensitivity: d' under equal variance (g' for gumbel_min). When sdratio is estimated, d is d_a, the distance between the target and lure distributions in units of their root-mean-square SD
 }
 \item \strong{Fixed parameters:}
 \item \strong{Default parameter links:}
@@ -86,11 +86,18 @@ proper joint multinomial draws.
 }
 \section{Sensitivity is on the same scale as \code{\link[=sdt_yn]{sdt_yn()}}}{
 
-\code{d} is the balanced index \eqn{d_a} that the rest of the SDT family reports:
-the separation between the target and lure distributions divided by the
-root-mean-square of their SDs. It equals \eqn{d'} whenever the two share a
-scale, which is always the case for \code{dist = "gumbel_min"} (there it is the
-\eqn{g'} of Meyer-Grant et al.) and is the default for \code{dist = "normal"}.
+\code{d} is \eqn{d'} whenever the target and lure distributions share an SD:
+always for \code{dist = "gumbel_min"}, where it is the \eqn{g'} of Meyer-Grant et
+al. (2026), and for \code{dist = "normal"} unless you give \code{sdratio} a formula.
+With \code{sdratio} estimated, \code{d} is the balanced index \eqn{d_a} that
+\code{\link[=sdt_yn]{sdt_yn()}} reports, the separation divided by the root-mean-square of the two
+SDs; the noise-standardized separation is then
+\code{d * sqrt((1 + exp(sdratio)^2) / 2)}.
+
+Ranking has no criterion, so \eqn{d_a} is not read off an ROC here. It is
+adopted to keep \code{d} on the same scale across the SDT family, and it has a
+direct meaning for rankings: it fixes the two-item accuracy at
+\eqn{\Phi(d/\sqrt{2})} whatever \code{sdratio} is (see below).
 
 Ranking is the one SDT design that identifies the variance ratio from a
 single condition. The rank distribution supplies \code{m - 1} free probabilities
@@ -138,9 +145,9 @@ model_mixed <- sdt_ranking(
 }
 }
 \references{
-Meyer-Grant, C. G., Kellen, D., Harding, S. M., & Singmann, H. (2025).
-\emph{Extreme-value signal detection theory for recognition memory: The
-parametric road not taken}. PsyArXiv preprint.
-\doi{10.31234/osf.io/qhrfj}
+Meyer-Grant, C. G., Kellen, D., Harding, S. M., & Singmann, H. (2026).
+Extreme-value signal detection theory for recognition memory: The
+parametric road not taken. \emph{Psychological Review}. Advance online
+publication. \doi{10.1037/rev0000615}
 }
 \keyword{bmmodel}

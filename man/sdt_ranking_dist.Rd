@@ -26,10 +26,10 @@ single observation. Columns beyond a row's set size \code{m} must be 0.}
 at least 2 and no larger than the number of count columns.}
 
 \item{d}{Numeric vector. Sensitivity: the distance between the target and
-lure distributions. For \code{dist = "normal"} this is the balanced index
-\eqn{d_a} that \code{\link[=sdt_yn]{sdt_yn()}} reports (in root-mean-square SD units); for
-\code{dist = "gumbel_min"} the two distributions share a scale and \code{d} is the
-\eqn{g'} of Meyer-Grant et al. (2025).}
+lure distributions. It is \eqn{d'} when \code{sdratio} is 1 and, for
+\code{dist = "gumbel_min"}, the \eqn{g'} of Meyer-Grant et al. (2026). With
+another \code{sdratio} it is the balanced index \eqn{d_a} that \code{\link[=sdt_yn]{sdt_yn()}}
+reports (in root-mean-square SD units).}
 
 \item{sdratio}{Numeric vector. Ratio of signal to noise standard deviations
 (default 1, i.e., equal variance). Must be positive. Only used when
@@ -56,7 +56,7 @@ matching the wide format \code{\link[=sdt_ranking]{sdt_ranking()}} expects.
 }
 \description{
 Density and random generation for ranking signal detection
-theory (Meyer-Grant et al., 2025). Models rank ordering of m items by
+theory (Meyer-Grant et al., 2026). Models rank ordering of m items by
 perceived strength. Only \code{d} is estimated (no criterion or stimulus
 column). Supports Gumbel-min (closed form) and Gaussian UV-SDT
 (numerical integration).
@@ -70,9 +70,9 @@ dat <- cbind(dat, rsdt_ranking(10, 100, m = 4, d = 1.0))
 head(dat)
 }
 \references{
-Meyer-Grant, C. G., Kellen, D., Harding, S. M., & Singmann, H. (2025).
-\emph{Extreme-value signal detection theory for recognition memory: The
-parametric road not taken}. PsyArXiv preprint.
-\doi{10.31234/osf.io/qhrfj}
+Meyer-Grant, C. G., Kellen, D., Harding, S. M., & Singmann, H. (2026).
+Extreme-value signal detection theory for recognition memory: The
+parametric road not taken. \emph{Psychological Review}. Advance online
+publication. \doi{10.1037/rev0000615}
 }
 \keyword{distribution}

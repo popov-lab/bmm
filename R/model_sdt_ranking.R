@@ -7,9 +7,9 @@
                                links = NULL, call = NULL, ...) {
   parameters <- list(
     d = paste0(
-      "Sensitivity: the balanced discriminability index d_a, the distance ",
-      "between the target and lure distributions in units of their ",
-      "root-mean-square SD; equals d' (g' for gumbel_min) under equal variance"
+      "Sensitivity: d' under equal variance (g' for gumbel_min). When sdratio ",
+      "is estimated, d is d_a, the distance between the target and lure ",
+      "distributions in units of their root-mean-square SD"
     )
   )
   default_priors <- list(
@@ -58,9 +58,9 @@
       name = "Signal Detection Theory (Ranking)",
       citation = glue(
         "Meyer-Grant, C. G., Kellen, D., Harding, S. M., & Singmann, H. ",
-        "(2025). Extreme-value signal detection theory for recognition memory: ",
-        "The parametric road not taken. PsyArXiv. ",
-        "https://doi.org/10.31234/osf.io/qhrfj"
+        "(2026). Extreme-value signal detection theory for recognition memory: ",
+        "The parametric road not taken. Psychological Review. ",
+        "https://doi.org/10.1037/rev0000615"
       ),
       version = "NA",
       requirements = requirements,
@@ -93,11 +93,18 @@
 #' proper joint multinomial draws.
 #'
 #' @section Sensitivity is on the same scale as [sdt_yn()]:
-#' `d` is the balanced index \eqn{d_a} that the rest of the SDT family reports:
-#' the separation between the target and lure distributions divided by the
-#' root-mean-square of their SDs. It equals \eqn{d'} whenever the two share a
-#' scale, which is always the case for `dist = "gumbel_min"` (there it is the
-#' \eqn{g'} of Meyer-Grant et al.) and is the default for `dist = "normal"`.
+#' `d` is \eqn{d'} whenever the target and lure distributions share an SD:
+#' always for `dist = "gumbel_min"`, where it is the \eqn{g'} of Meyer-Grant et
+#' al. (2026), and for `dist = "normal"` unless you give `sdratio` a formula.
+#' With `sdratio` estimated, `d` is the balanced index \eqn{d_a} that
+#' [sdt_yn()] reports, the separation divided by the root-mean-square of the two
+#' SDs; the noise-standardized separation is then
+#' `d * sqrt((1 + exp(sdratio)^2) / 2)`.
+#'
+#' Ranking has no criterion, so \eqn{d_a} is not read off an ROC here. It is
+#' adopted to keep `d` on the same scale across the SDT family, and it has a
+#' direct meaning for rankings: it fixes the two-item accuracy at
+#' \eqn{\Phi(d/\sqrt{2})} whatever `sdratio` is (see below).
 #'
 #' Ranking is the one SDT design that identifies the variance ratio from a
 #' single condition. The rank distribution supplies `m - 1` free probabilities
@@ -137,10 +144,10 @@
 #' @param ... used internally for testing, ignore it
 #' @return An object of class `bmmodel`
 #' @references
-#' Meyer-Grant, C. G., Kellen, D., Harding, S. M., & Singmann, H. (2025).
-#'   \emph{Extreme-value signal detection theory for recognition memory: The
-#'   parametric road not taken}. PsyArXiv preprint.
-#'   \doi{10.31234/osf.io/qhrfj}
+#' Meyer-Grant, C. G., Kellen, D., Harding, S. M., & Singmann, H. (2026).
+#'   Extreme-value signal detection theory for recognition memory: The
+#'   parametric road not taken. \emph{Psychological Review}. Advance online
+#'   publication. \doi{10.1037/rev0000615}
 #' @keywords bmmodel
 #' @export
 #' @examples

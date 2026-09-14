@@ -84,7 +84,7 @@ Categories should be ordered: 1 = 'definitely noise' to K = 'definitely signal'
 \itemize{
 \item \strong{Parameters:}
 \itemize{
-\item \code{d}: Sensitivity: the balanced discriminability index d_a, which measures the distance between the signal and noise distributions in units of their root-mean-square SD, so it equals d' when sdratio is 1
+\item \code{d}: Sensitivity: d' under equal variance (the default). When sdratio is estimated, d is d_a, the distance between the signal and noise distributions in units of their root-mean-square SD
 \item \code{criterion}: Response bias: location of the decision boundary on the noise-standardized axis
 \item \code{spacing}: Threshold spacing: controls distance between adjacent thresholds (exp(spacing) ensures positive spacing)
 \item \code{sdratio}: Log SD ratio: the log of the signal-to-noise standard deviation ratio, so exp(sdratio) is the ratio itself and 0 means equal variance
@@ -128,13 +128,19 @@ to the formula.
 }
 \section{Sensitivity is on the same scale as \code{\link[=sdt_yn]{sdt_yn()}}}{
 
-\code{d} is the balanced index \eqn{d_a} that \code{\link[=sdt_yn]{sdt_yn()}} reports: the separation
-between the signal and noise distributions divided by the root-mean-square
-of their SDs. It equals \eqn{d'} whenever \code{sdratio} stays fixed at 0, and
-unlike \eqn{d'} it remains comparable across conditions that differ in
-\code{sdratio} -- see the sensitivity section of \code{\link[=sdt_yn]{sdt_yn()}} for the reasoning.
-The \code{criterion} and the confidence thresholds are \strong{not} rescaled and stay
-on the noise-standardized axis.
+\code{d} is \eqn{d'} whenever \code{sdratio} stays fixed at 0, which is every fit
+that does not give \code{sdratio} a formula. With \code{sdratio} estimated, \code{d} is the
+balanced index \eqn{d_a} that \code{\link[=sdt_yn]{sdt_yn()}} reports: the separation between the
+signal and noise distributions divided by the root-mean-square of their SDs.
+Unlike the noise-standardized \eqn{d'}, it remains comparable across
+conditions that differ in \code{sdratio}; see the sensitivity section of
+\code{\link[=sdt_yn]{sdt_yn()}} for the reasoning, for how far the two indices lie apart, and for
+the caveat that under the Gumbel distributions \eqn{d_a} is not the
+AUC-equivalent index once \code{sdratio} is estimated.
+
+The \code{criterion} and the confidence thresholds are \strong{not} rescaled. They stay
+on the noise-standardized axis, so under unequal variance they and \code{d} are
+in different units.
 }
 
 \examples{

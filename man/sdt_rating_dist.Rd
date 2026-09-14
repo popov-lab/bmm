@@ -33,8 +33,8 @@ signal" (K), or a vector for a single observation.}
 
 \item{stimulus}{Integer vector (0/1). Stimulus type: 0 = noise, 1 = signal.}
 
-\item{d}{Numeric vector. Sensitivity: the balanced discriminability index
-\eqn{d_a}, which equals \eqn{d'} when \code{sdratio} is 1. The separation
+\item{d}{Numeric vector. Sensitivity: \eqn{d'} when \code{sdratio} is 1, and
+otherwise the balanced index \eqn{d_a} (see \code{\link[=sdt_yn]{sdt_yn()}}). The separation
 between the distributions in noise units is \code{d * sqrt((1 + sdratio^2) / 2)}.}
 
 \item{thresholds}{Numeric vector of length K-1 with the ordered decision

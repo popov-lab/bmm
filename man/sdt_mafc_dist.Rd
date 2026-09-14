@@ -31,10 +31,10 @@ rsdt_mafc(
 \item{m}{Integer vector. Number of alternatives per observation. Must be
 at least 2.}
 
-\item{d}{Numeric vector. Sensitivity: the distance between the signal and
-distractor distributions in SD units. m-AFC assumes a common scale for
-the two distributions, so this is the equal-variance case of the balanced
-index \eqn{d_a} that \code{\link[=sdt_yn]{sdt_yn()}} reports, where it coincides with \eqn{d'}.}
+\item{d}{Numeric vector. Sensitivity \eqn{d'}: the distance between the
+signal and distractor distributions in SD units. m-AFC assumes a common
+scale for the two distributions, so this is also the balanced index
+\eqn{d_a} that \code{\link[=sdt_yn]{sdt_yn()}} reports.}
 
 \item{dist}{Character. The distribution assumed for the latent evidence,
 given here by its cumulative distribution function:
