@@ -2166,9 +2166,9 @@ sdt_criterion <- function(hit_rate, fa_rate,
 #' @param n_old Integer vector. Number of "old"/"signal" responses.
 #' @param n_trials Integer vector. Total number of trials per cell.
 #' @param stimulus Integer vector (0/1). Stimulus type: 0 = noise, 1 = signal.
-#' @param d Numeric. Sensitivity: the balanced discriminability index
-#'   \eqn{d_a}, which equals \eqn{d'} when `sdratio` is 1. The separation
-#'   between the distributions in noise units is `d * sqrt((1 + sdratio^2) / 2)`.
+#' @param d Numeric. Sensitivity: \eqn{d'} when `sdratio` is 1, and otherwise
+#'   the balanced index \eqn{d_a} (see [sdt_yn()]). The separation between the
+#'   distributions in noise units is `d * sqrt((1 + sdratio^2) / 2)`.
 #' @param criterion Numeric. Response bias (decision boundary location), on the
 #'   noise-standardized axis.
 #' @param sdratio Numeric. Ratio of signal to noise standard deviations
