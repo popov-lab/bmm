@@ -448,12 +448,19 @@ plot(roc_sdt(fit_normal), observed = roc_observed(fit_normal))
 plot(roc_sdt(fit_gumbel), observed = roc_observed(fit_gumbel))
 ```
 
+```{r noise-zroc-slope, include = FALSE}
+fmt2 <- function(x) format(round(x, 2), nsmall = 2)
+gumbel_points <- attr(roc_sdt(fit_gumbel), "points")
+gumbel_slope <- coef(lm(qnorm(Hit_mean) ~ qnorm(FA_mean), data = gumbel_points))[[2]]
+```
+
 The equal-variance Gaussian is locked to a symmetric curve and systematically
 misses the operating points; the equal-variance `gumbel_min` bends to follow them.
-Its implied zROC slope (~0.65) is close to the unequal-variance Gaussian slope of
-0.69 estimated for these data in the Binary SDT section — the extreme-value model
-reaches the same place that the Gaussian reaches only by widening the signal
-distribution. The two AUCs are similar (overall sensitivity is recovered either
+On z-transformed axes its model-implied operating points fall along a line with
+slope `r fmt2(gumbel_slope)`, below one: the extreme-value model produces the
+asymmetry that the Gaussian produces only by widening the signal distribution
+(the quantile-transformed ROC section below sets this slope beside the
+unequal-variance Gaussian fit). The two AUCs are similar (overall sensitivity is recovered either
 way); the distribution shows up in the *shape* of the curve, not its area.
 
 ```{r}
@@ -686,6 +693,16 @@ $(1,1)$ endpoints map to infinity and are dropped.)
 plot(roc, observed = obs, scale = "quantile")
 ```
 
+```{r uv-zroc-slope, include = FALSE}
+uv_slope <- 1 / exp(brms::as_draws_df(fit_uv)$b_sdratio_Intercept)
+```
+
+For the base-rate data the fitted slope is `r fmt2(mean(uv_slope))`
+(95% CrI [`r fmt2(quantile(uv_slope, 0.025))`, `r fmt2(quantile(uv_slope, 0.975))`]).
+The equal-variance `gumbel_min` fit from the noise-distribution section implied a
+slope of `r fmt2(gumbel_slope)` through the same operating points, without an
+`sdratio` parameter.
+
 `latent_sdt()` reconstructs the latent decision-variable distributions
 themselves: the noise and signal evidence densities, separated by the
 noise-SD distance $d_N$ and scaled by `exp(sdratio)`, with the criterion drawn as a dashed line carrying a
@@ -719,7 +736,7 @@ In a confidence-rating task each item is judged on an ordered scale (e.g. 1 =
 "sure new" … 6 = "sure old"). The data are counts per rating category, one column
 per category. Internally `bmm` fits this with `brms`' native multinomial family;
 the K-1 confidence criteria are parameterized by a `threshold_type`
-[@Selker_2019; @Paulewicz_Blaut_2020].
+[@Selker_2019; @Paulewicz_Blaut_2020; @Paulewicz_Blaut_2022].
 
 We use a real recognition ROC dataset. The `roc6` object in the
 [MPTinR](https://cran.r-project.org/package=MPTinR) package collects 12 published
@@ -796,7 +813,7 @@ therefore how many parameters they cost:
   (`criterion` + `spacing`) — the thresholds are evenly spaced around the
   criterion, differing only in their canonical anchor positions [@Selker_2019].
 - `"log_distance"` and `"log_ratio"`: K-2 `delta` parameters that allow uneven
-  spacing while guaranteeing the thresholds stay ordered [@Paulewicz_Blaut_2020].
+  spacing while guaranteeing the thresholds stay ordered [@Paulewicz_Blaut_2022].
 - `"softmax"`: a shared `spacing` plus K-3 allocation `delta` parameters.
 
 Add `sdratio ~ 1` to the formula to estimate unequal variance.
