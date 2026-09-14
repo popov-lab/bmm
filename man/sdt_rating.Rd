@@ -46,9 +46,9 @@ Thresholds follow logit-spaced canonical positions (Selker et al.,
 \item "equidistant": 2 parameters (criterion + spacing). Thresholds
 are equally spaced around criterion.
 \item "log_distance": K-2 parameters. Each threshold distance is
-exp(delta), guaranteeing ordering.
+exp(delta), guaranteeing ordering (Paulewicz & Blaut, 2022).
 \item "log_ratio": K-2 parameters. Threshold distances as ratios
-(Paulewicz & Blaut, 2020).
+(Paulewicz & Blaut, 2022).
 \item "softmax": K-2 parameters. A shared spacing parameter controls
 the average interval size, while softmax-transformed delta parameters
 allocate interval widths smoothly across the scale.
@@ -394,9 +394,7 @@ Parsimonious estimation of signal detection models from confidence ratings.
 \emph{Behavior Research Methods}, \emph{51}(5), 1953--1967.
 \doi{10.3758/s13428-019-01231-3}
 
-Paulewicz, B., & Blaut, A. (2020). The bhsdtr package: A general-purpose
-method of Bayesian inference for signal detection theory models.
-\emph{Behavior Research Methods}, \emph{52}, 2122--2141.
-\doi{10.3758/s13428-020-01370-y}
+Paulewicz, B., & Blaut, A. (2022). The general causal cumulative model of
+ordinal response. \emph{PsyArXiv}. \doi{10.31234/osf.io/e7a3x}
 }
 \keyword{bmmodel}
