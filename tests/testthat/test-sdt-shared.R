@@ -51,6 +51,28 @@ test_that("the m-AFC closed forms sit on the right extreme-value branch", {
   }
 })
 
+test_that("the sdratio prior stays inside the calibrated quadrature range", {
+  # .ranking_gh_n() is calibrated over sdratio in [0.5, 2.0]. If the default
+  # prior is ever widened past that, the sampler will visit ratios the
+  # quadrature was never verified for, so the two must be changed together.
+  models <- list(sdt_yn("n_old", "stimulus", "n_trials"),
+                 sdt_ranking(paste0("rank", 1:4), m = 4, dist = "normal"))
+  for (model in models) {
+    main <- model$default_priors$sdratio$main
+    sd <- as.numeric(sub("normal\\(0, ([0-9.]+)\\)", "\\1", main))
+    expect_true(is.finite(sd), info = main)
+    covered <- diff(pnorm(log(c(0.5, 2)), 0, sd))
+    expect_gt(covered, 0.95)
+  }
+})
+
+test_that("sdratio priors agree across the SDT models", {
+  yn <- sdt_yn("n_old", "stimulus", "n_trials")$default_priors$sdratio
+  rk <- sdt_ranking(paste0("rank", 1:4), m = 4,
+                    dist = "normal")$default_priors$sdratio
+  expect_identical(yn, rk)
+})
+
 test_that("quantile functions invert their cdfs", {
   p <- c(0.05, 0.25, 0.5, 0.75, 0.95)
   for (d in names(bmm:::.sdt_dists)) {
