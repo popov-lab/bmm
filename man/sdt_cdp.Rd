@@ -32,7 +32,7 @@ the threshold parameters.}
 
 \item{threshold_type}{Character. Threshold parameterization on the strength
 axis: \code{"parsimonious"} (default) and \code{"equidistant"} use a single \code{spacing}
-parameter; \code{"log_distance"} (Meyer-Grant et al., 2025) estimates the
+parameter; \code{"log_distance"} (Paulewicz & Blaut, 2022) estimates the
 \code{n_new + n_old - 2} distances between adjacent thresholds freely, each as a
 \code{deltaN} parameter on the log scale (the distance leading into threshold
 \code{N} from the old/new boundary).}
@@ -206,6 +206,9 @@ fit_uv <- bmm(
 Wixted, J. T., & Mickes, L. (2010). A continuous dual-process model of
 remember/know judgments. \emph{Psychological Review}, \emph{117}(4),
 1025--1054. \doi{10.1037/a0020874}
+
+Paulewicz, B., & Blaut, A. (2022). The general causal cumulative model of
+ordinal response. \emph{PsyArXiv}. \doi{10.31234/osf.io/e7a3x}
 
 Rotello, C. M., Macmillan, N. A., Reeder, J. A., & Wong, M. (2005). The
 remember response: Subject to bias, graded, and not a process-pure
