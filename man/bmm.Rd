@@ -112,6 +112,7 @@ The following models are supported:
 \item sdm(resp_error, version)
 \item sdt_mafc(response, n_trials, m, dist, links)
 \item sdt_ranking(response, m, dist, links)
+\item sdt_rating(response, stimulus, n_ratings, dist, threshold_type, links)
 \item sdt_yn(response, stimulus, n_trials, dist, links)
 }
 
