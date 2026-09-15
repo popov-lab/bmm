@@ -106,6 +106,38 @@ check_data.non_targets <- function(model, data, formula) {
   NextMethod("check_data")
 }
 
+# Shared by the EZ models, whose aggregated RT summaries obey the same rules.
+# Non-integer n_trials is an error rather than a warning because brms's
+# trials() term rejects it one step later with a message that names no column.
+check_rt_summary_vars <- function(data, mean_rt, var_rt, n_trials) {
+  mean_rt_values <- unlist(data[mean_rt])
+  # typical RTs in seconds are 0.2-3s; values > 10 suggest milliseconds
+  warnif(
+    any(mean_rt_values > 10, na.rm = TRUE),
+    "Some mean RT values are greater than 10. If your reaction times are in
+    milliseconds, please convert them to seconds before fitting the model.
+    The model assumes reaction times are measured in seconds."
+  )
+  stopif(
+    any(mean_rt_values <= 0, na.rm = TRUE),
+    "Mean RT values must be positive. Found non-positive values in the data."
+  )
+  stopif(
+    any(unlist(data[var_rt]) <= 0, na.rm = TRUE),
+    "Variance of RT must be positive. Found non-positive values in the data."
+  )
+
+  n_trials_values <- data[[n_trials]]
+  stopif(
+    any(n_trials_values <= 2, na.rm = TRUE),
+    "Number of trials (n_trials) must be larger than two."
+  )
+  stopif(
+    any(n_trials_values %% 1 != 0, na.rm = TRUE),
+    "Number of trials ('{n_trials}') must be whole numbers. Found non-integer values."
+  )
+}
+
 check_var_set_size <- function(set_size, data) {
   stopif(
     length(set_size) > 1,

@@ -152,16 +152,16 @@ test_that("ezdm check_data validates n_trials variable", {
     "must be larger than two"
   )
 
-  # Non-integer n_trials should warn
+  # brms's trials() rejects non-integer counts, so bmm must stop first
   invalid_data_nonint <- data.frame(
     mean_rt = c(0.5, 0.6),
     var_rt = c(0.02, 0.03),
     n_upper = c(80, 85),
     n_trials = c(100.5, 100)
   )
-  expect_warning(
+  expect_error(
     check_data(model, invalid_data_nonint, bmf(drift ~ 1, bound ~ 1, ndt ~ 1)),
-    "whole numbers"
+    "'n_trials'.*whole numbers"
   )
 })
 
