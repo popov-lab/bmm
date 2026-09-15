@@ -98,6 +98,7 @@ articles:
     desc: Fitting evidence accumulation models to response time and choice data
     contents:
     - articles/bmm_ezdm
+    - articles/bmm_ezcdm
     - articles/bmm_cswald
     - articles/bmm_ddm
     - articles/bmm_rt_contamination
