@@ -801,6 +801,113 @@ test_that("adjust_ezdm_accuracy() validates inputs", {
 })
 
 ############################################################################# !
+# ezcdm_summary_stats TESTS                                               ####
+############################################################################# !
+
+test_that("ezcdm_summary_stats() returns a 1-row data.frame with the EZ-CDM statistics", {
+  withr::local_seed(123)
+  angle <- runif(50, -pi, pi)
+  rt <- rgamma(50, shape = 5, rate = 10) + 0.3
+
+  result <- ezcdm_summary_stats(angle, rt)
+
+  expect_s3_class(result, "data.frame")
+  expect_equal(nrow(result), 1)
+  expect_named(result, c("mean_angle", "var_angle", "mean_rt", "var_rt", "n_trials"))
+  expect_equal(result$mean_rt, mean(rt))
+  expect_equal(result$var_rt, var(rt))
+  expect_equal(result$n_trials, 50)
+})
+
+test_that("ezcdm_summary_stats() gives zero circular variance for identical angles", {
+  result <- ezcdm_summary_stats(rep(1.2, 40), seq(0.4, 0.8, length.out = 40))
+  expect_equal(result$mean_angle, 1.2)
+  expect_equal(result$var_angle, 0)
+})
+
+test_that("ezcdm_summary_stats() gives circular variance one for evenly spaced angles", {
+  angle <- seq(-pi, pi, length.out = 361)[-361]
+  result <- ezcdm_summary_stats(angle, rep(0.5, 360))
+  expect_equal(result$var_angle, 1, tolerance = 1e-10)
+})
+
+test_that("ezcdm_summary_stats() averages across the -pi/pi boundary", {
+  result <- ezcdm_summary_stats(c(pi - 0.1, -pi + 0.1), c(0.5, 0.6))
+  expect_equal(abs(result$mean_angle), pi)
+  expect_equal(result$var_angle, 1 - cos(0.1))
+})
+
+test_that("ezcdm_summary_stats() computes deviations from the target in degrees", {
+  result <- ezcdm_summary_stats(c(179, -179), c(0.5, 0.6), target = 180, radians = FALSE)
+  expect_equal(result$mean_angle, 0, tolerance = 1e-12)
+  expect_equal(result$var_angle, 1 - cos(deg2rad(1)))
+})
+
+test_that("ezcdm_summary_stats() with a target matches the summary of the deviations", {
+  withr::local_seed(42)
+  deviation <- brms::rvon_mises(100, 0.3, 4)
+  target <- runif(100, -pi, pi)
+  rt <- rgamma(100, shape = 5, rate = 10) + 0.3
+
+  expect_equal(
+    ezcdm_summary_stats(wrap(target + deviation), rt, target = target),
+    ezcdm_summary_stats(deviation, rt)
+  )
+  expect_equal(
+    ezcdm_summary_stats(rad2deg(target + deviation), rt, target = rad2deg(target), radians = FALSE),
+    ezcdm_summary_stats(deviation, rt)
+  )
+})
+
+test_that("ezcdm_summary_stats() drops incomplete trials", {
+  angle <- c(0.1, NA, 0.3, 0.2)
+  rt <- c(0.5, 0.6, NA, 0.7)
+  result <- ezcdm_summary_stats(angle, rt)
+  expect_equal(result$n_trials, 2)
+  expect_equal(result$mean_rt, 0.6)
+  expect_equal(result, ezcdm_summary_stats(c(0.1, 0.2), c(0.5, 0.7)))
+})
+
+test_that("ezcdm_summary_stats() returns an NA row when no trial is complete", {
+  expected <- data.frame(
+    mean_angle = NA_real_, var_angle = NA_real_,
+    mean_rt = NA_real_, var_rt = NA_real_, n_trials = 0L
+  )
+  expect_equal(ezcdm_summary_stats(c(NA_real_, NA_real_), c(0.5, 0.6)), expected)
+  expect_equal(ezcdm_summary_stats(c(0.1, 0.2), c(NA_real_, NA_real_)), expected)
+  expect_equal(ezcdm_summary_stats(c(0.1, 0.2), c(0.5, 0.6), target = NA_real_), expected)
+})
+
+test_that("ezcdm_summary_stats() validates its arguments", {
+  expect_error(ezcdm_summary_stats(rt = c(0.5, 0.6)), "missing")
+  expect_error(ezcdm_summary_stats(angle = c(0.5, 0.6)), "missing")
+  expect_error(ezcdm_summary_stats("a", 0.5), "'angle' must be a numeric")
+  expect_error(ezcdm_summary_stats(0.1, "a"), "'rt' must be a numeric")
+  expect_error(ezcdm_summary_stats(numeric(0), numeric(0)), "has length 0")
+  expect_error(ezcdm_summary_stats(c(0.1, 0.2), 0.5), "same length")
+  expect_error(ezcdm_summary_stats(c(0.1, 0.2), c(0.5, 0.6), target = c(0, 0, 0)), "'target' must be")
+  expect_error(ezcdm_summary_stats(c(0.1, 0.2), c(0.5, 0.6), radians = "yes"), "'radians' must be")
+  expect_error(ezcdm_summary_stats(c(0.1, 0.2), c(0.5, -0.6)), "Non-positive RT")
+})
+
+test_that("ezcdm_summary_stats() warns about likely unit errors", {
+  expect_warning(ezcdm_summary_stats(c(0.1, 0.2), c(500, 600)), "seconds")
+  expect_warning(ezcdm_summary_stats(c(10, 170), c(0.5, 0.6)), "radians = FALSE")
+})
+
+test_that(".circular_summary() summarises each group separately", {
+  withr::local_seed(7)
+  angles <- runif(30, -pi, pi)
+  group <- rep(1:3, c(5, 10, 15))
+
+  grouped <- .circular_summary(angles, group)
+  separate <- do.call(rbind, lapply(split(angles, group), .circular_summary))
+
+  expect_equal(nrow(grouped), 3)
+  expect_equal(grouped, separate, ignore_attr = TRUE)
+})
+
+############################################################################# !
 # FLAG_CONTAMINANT_RTS TESTS                                              ####
 ############################################################################# !
 

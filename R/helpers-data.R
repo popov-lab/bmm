@@ -722,6 +722,135 @@ adjust_ezdm_accuracy <- function(n_upper, n_trials, contaminant_prop,
 }
 
 ############################################################################# !
+# EZCDM SUMMARY STATISTICS                                               ####
+############################################################################# !
+
+# Shared by ezcdm_summary_stats() and rezcdm() so that the summary users compute
+# and the summary the generator simulates cannot drift apart. rowsum() keeps it
+# vectorised over replicates, which posterior predictions with many draws need.
+.circular_summary <- function(angles, group = rep_len(1L, length(angles))) {
+  sums <- rowsum(cbind(1, cos(angles), sin(angles)), group)
+  mean_cos <- as.vector(sums[, 2] / sums[, 1])
+  mean_sin <- as.vector(sums[, 3] / sums[, 1])
+  data.frame(
+    mean_angle = atan2(mean_sin, mean_cos),
+    # rounding can push the resultant length of identical angles above 1
+    var_angle = 1 - pmin(1, sqrt(mean_cos^2 + mean_sin^2))
+  )
+}
+
+#' Compute Summary Statistics for the EZ Circular Diffusion Model
+#'
+#' @description Computes the four summary statistics required by `ezcdm()`
+#'   from trial-level continuous-report data: the circular mean and circular
+#'   variance of the response angles, and the mean and variance of the
+#'   reaction times.
+#'
+#' @param angle Numeric vector of response angles, in radians (default) or
+#'   degrees (see `radians`).
+#' @param rt Numeric vector of reaction times in seconds, of the same length as
+#'   `angle`.
+#' @param target Optional numeric vector of target angles, either of length one
+#'   or of the same length as `angle`, in the same unit as `angle`. If
+#'   provided, the statistics are computed on the response deviation
+#'   `angle - target`, so that a drift angle of 0 means responses centred on
+#'   the target. If `NULL` (default), `angle` is used as is.
+#' @param radians Logical. Are `angle` and `target` in radians (`TRUE`,
+#'   default) or degrees (`FALSE`)?
+#'
+#' @return A 1-row `data.frame` with columns
+#'   \itemize{
+#'     \item `mean_angle`: circular mean of the (deviation) angles in radians,
+#'       in \eqn{(-\pi, \pi]}
+#'     \item `var_angle`: circular variance, one minus the mean resultant
+#'       length, in \eqn{[0, 1]}
+#'     \item `mean_rt`: mean reaction time
+#'     \item `var_rt`: variance of the reaction times (denominator `n - 1`)
+#'     \item `n_trials`: number of complete trials used
+#'   }
+#'   If no trial is complete, all statistics are `NA` and `n_trials` is 0.
+#'
+#' @details With \eqn{\bar{C}} and \eqn{\bar{S}} the means of the cosines and
+#'   sines of the angles, the circular mean is
+#'   \eqn{\mathrm{atan2}(\bar{S}, \bar{C})} and the circular variance is
+#'   \eqn{1 - \sqrt{\bar{C}^2 + \bar{S}^2}}. Trials with a missing angle, reaction
+#'   time or target are dropped before the statistics are computed.
+#'
+#'   The function is designed for grouped operations with [dplyr::reframe()],
+#'   e.g. `reframe(ezcdm_summary_stats(angle, rt, target), .by = c(id, cond))`.
+#'
+#' @references Qarehdaghi, H., & Amani Rad, J. (2024). EZ-CDM: Fast, simple,
+#'   robust, and accurate estimation of circular diffusion model parameters.
+#'   *Psychonomic Bulletin & Review*, 31(5), 2058-2091.
+#'   https://doi.org/10.3758/s13423-024-02483-7
+#'
+#' @seealso `ezcdm()` for fitting the EZ circular diffusion model
+#'
+#' @keywords transform
+#' @export
+#'
+#' @examples
+#' set.seed(123)
+#' angle <- brms::rvon_mises(100, mu = 0.2, kappa = 5)
+#' rt <- rgamma(100, shape = 5, rate = 10) + 0.3
+#' ezcdm_summary_stats(angle, rt)
+#'
+#' # responses and targets in degrees
+#' target <- runif(100, -180, 180)
+#' response <- target + rad2deg(angle)
+#' ezcdm_summary_stats(response, rt, target = target, radians = FALSE)
+#'
+#' # With dplyr for grouped operations
+#' # library(dplyr)
+#' # mydata |>
+#' #   reframe(ezcdm_summary_stats(angle, rt, target), .by = c(id, cond))
+#'
+ezcdm_summary_stats <- function(angle, rt, target = NULL, radians = TRUE) {
+  stop_missing_args()
+  stopif(!is.numeric(angle), "Argument 'angle' must be a numeric vector")
+  stopif(!is.numeric(rt), "Argument 'rt' must be a numeric vector")
+  stopif(length(angle) == 0L, "Argument 'angle' has length 0")
+  stopif(length(rt) != length(angle), "Arguments 'angle' and 'rt' must have the same length")
+  stopif(
+    !is.null(target) && (!is.numeric(target) || !length(target) %in% c(1L, length(angle))),
+    "Argument 'target' must be NULL or a numeric vector of length 1 or of the same length as 'angle'"
+  )
+  stopif(
+    !is.logical(radians) || length(radians) != 1L || is.na(radians),
+    "Argument 'radians' must be TRUE or FALSE"
+  )
+
+  deviation <- angle - rep_len(target %||% 0, length(angle))
+  complete <- !is.na(deviation) & !is.na(rt)
+  # an empty cell must still yield a row, or one all-missing group aborts a
+  # grouped reframe(); check_data() then rejects it through n_trials
+  if (!any(complete)) {
+    return(data.frame(
+      mean_angle = NA_real_, var_angle = NA_real_,
+      mean_rt = NA_real_, var_rt = NA_real_, n_trials = 0L
+    ))
+  }
+  deviation <- deviation[complete]
+  rt <- rt[complete]
+
+  warnif(any(rt > 10), "Some RT values > 10. Ensure RTs are in seconds, not milliseconds.")
+  stopif(any(rt <= 0), "Non-positive RT values found.")
+  warnif(
+    radians && any(abs(deviation) > 2 * pi),
+    "Some angles are larger than 2*pi in absolute value. If they are in degrees, set radians = FALSE."
+  )
+
+  if (!radians) deviation <- deg2rad(deviation)
+
+  data.frame(
+    .circular_summary(deviation),
+    mean_rt = mean(rt),
+    var_rt = stats::var(rt),
+    n_trials = length(rt)
+  )
+}
+
+############################################################################# !
 # FLAG_CONTAMINANT_RTS                                                   ####
 ############################################################################# !
 
