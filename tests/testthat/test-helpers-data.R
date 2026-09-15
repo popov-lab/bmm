@@ -148,6 +148,7 @@ test_that("check_data() returns a data.frame()", {
   # - y, x, z, w, l, s for circular/mixture models
   # - mean_rt, var_rt, n_upper, n_trials for ezdm 3par
   # - mean_rt_upper/lower, var_rt_upper/lower for ezdm 4par
+  # - mean_angle, var_angle (with mean_rt, var_rt, n_trials) for ezcdm
   # Use 50 rows to avoid small sample size warnings from cswald
   test_data <- data.frame(
     y = rep(1, 50), x = rep(1, 50), z = rep(2, 50), w = rep(1, 50), 
@@ -156,14 +157,16 @@ test_that("check_data() returns a data.frame()", {
     n_upper = rep(80, 50), n_trials = rep(100, 50),
     mean_rt_upper = rep(0.45, 50), mean_rt_lower = rep(0.55, 50),
     var_rt_upper = rep(0.018, 50), var_rt_lower = rep(0.025, 50),
-    rt = rep(0.6, 50), response = rep(1, 50)
+    rt = rep(0.6, 50), response = rep(1, 50),
+    mean_angle = rep(0.1, 50), var_angle = rep(0.2, 50)
   )
   for (ml in mls) {
     model <- ml(
       resp_error = "y", nt_features = "x", set_size = 2,
       nt_distances = "z", resp_cats = c("w", "l"), num_options = c(1, 1),
       mean_rt = "mean_rt", var_rt = "var_rt", n_upper = "n_upper",
-      n_trials = "n_trials", rt = "rt", response = "response"
+      n_trials = "n_trials", rt = "rt", response = "response",
+      mean_angle = "mean_angle", var_angle = "var_angle"
     )
     expect_s3_class(
       check_data(model, test_data, bmf(kappa ~ 1)),

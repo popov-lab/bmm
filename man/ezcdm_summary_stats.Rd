@@ -36,7 +36,7 @@ length, in \eqn{[0, 1]}
 If no trial is complete, all statistics are \code{NA} and \code{n_trials} is 0.
 }
 \description{
-Computes the four summary statistics required by \code{ezcdm()}
+Computes the four summary statistics required by \code{\link[=ezcdm]{ezcdm()}}
 from trial-level continuous-report data: the circular mean and circular
 variance of the response angles, and the mean and variance of the
 reaction times.
@@ -75,6 +75,6 @@ robust, and accurate estimation of circular diffusion model parameters.
 https://doi.org/10.3758/s13423-024-02483-7
 }
 \seealso{
-\code{ezcdm()} for fitting the EZ circular diffusion model
+\code{\link[=ezcdm]{ezcdm()}} for fitting the EZ circular diffusion model
 }
 \keyword{transform}

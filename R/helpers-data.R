@@ -741,7 +741,7 @@ adjust_ezdm_accuracy <- function(n_upper, n_trials, contaminant_prop,
 
 #' Compute Summary Statistics for the EZ Circular Diffusion Model
 #'
-#' @description Computes the four summary statistics required by `ezcdm()`
+#' @description Computes the four summary statistics required by [ezcdm()]
 #'   from trial-level continuous-report data: the circular mean and circular
 #'   variance of the response angles, and the mean and variance of the
 #'   reaction times.
@@ -784,7 +784,7 @@ adjust_ezdm_accuracy <- function(n_upper, n_trials, contaminant_prop,
 #'   *Psychonomic Bulletin & Review*, 31(5), 2058-2091.
 #'   https://doi.org/10.3758/s13423-024-02483-7
 #'
-#' @seealso `ezcdm()` for fitting the EZ circular diffusion model
+#' @seealso [ezcdm()] for fitting the EZ circular diffusion model
 #'
 #' @keywords transform
 #' @export

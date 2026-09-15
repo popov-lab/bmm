@@ -104,6 +104,7 @@ The following models are supported:
 \itemize{
 \item cswald(rt, response, links, version)
 \item ddm(rt, response, links)
+\item ezcdm(mean_angle, var_angle, mean_rt, var_rt, n_trials, links, version)
 \item ezdm(mean_rt, var_rt, n_upper, n_trials, links, version)
 \item imm(resp_error, nt_features, nt_distances, set_size, regex, version)
 \item m3(resp_cats, num_options, choice_rule, version)

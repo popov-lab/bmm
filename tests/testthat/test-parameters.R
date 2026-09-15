@@ -171,6 +171,19 @@ test_that("print.bmmodel() annotates aggregated ezdm response variables", {
   )))
 })
 
+test_that("print.bmmodel() annotates aggregated ezcdm response variables", {
+  m <- ezcdm(
+    mean_angle = "ma", var_angle = "va", mean_rt = "mrt", var_rt = "vrt", n_trials = "nt"
+  )
+  out <- capture.output(print(m))
+
+  expect_true(any(grepl("mean_angle = ma (circular mean, radians)", out, fixed = TRUE)))
+  expect_true(any(grepl("var_angle = va (circular variance in [0, 1])", out, fixed = TRUE)))
+  expect_true(any(grepl("mean_rt = mrt (seconds)", out, fixed = TRUE)))
+  expect_true(any(grepl("var_rt = vrt (seconds^2)", out, fixed = TRUE)))
+  expect_false(any(grepl("radians in [-pi, pi]", out, fixed = TRUE)))
+})
+
 test_that("print.bmmodel() lists vector-valued response variables", {
   m <- m3(
     resp_cats = c("corr", "other", "npl"),

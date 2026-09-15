@@ -198,6 +198,14 @@ response_annotations <- function(model) {
       n_upper = "count of upper-boundary responses"
     ))
   }
+  if (inherits(model, "ezcdm")) {
+    return(list(
+      mean_angle = "circular mean, radians",
+      var_angle = "circular variance in [0, 1]",
+      mean_rt = "seconds",
+      var_rt = "seconds^2"
+    ))
+  }
   if (inherits(model, "m3")) {
     return(list(resp_cats = "counts per response category"))
   }

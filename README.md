@@ -136,6 +136,7 @@ working memory research and evidence accumulation models, such as:
 
 - Censored-Shifted Wald Model
 - Diffusion Decision Model
+- EZ Circular Diffusion Model
 - EZ-Diffusion Model
 
 **Visual working memory**
@@ -173,6 +174,7 @@ bmm::supported_models()
 #> 
 #> -  cswald(rt, response, links, version) 
 #> -  ddm(rt, response, links) 
+#> -  ezcdm(mean_angle, var_angle, mean_rt, var_rt, n_trials, links, version) 
 #> -  ezdm(mean_rt, var_rt, n_upper, n_trials, links, version) 
 #> -  imm(resp_error, nt_features, nt_distances, set_size, regex, version) 
 #> -  m3(resp_cats, num_options, choice_rule, version) 

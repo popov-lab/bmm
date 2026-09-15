@@ -217,3 +217,23 @@ test_that("pp_check(resp_var) drops undefined 4par ezdm cells with a warning", {
   expect_s3_class(suppressWarnings(pp_check(fit, resp_var = "all", ndraws = 5)),
                   "bayesplot_grid")
 })
+
+test_that("pp_check(resp_var) checks all four ezcdm summary statistics", {
+  fit <- load_ppcheck_fit("bmmfit_ezcdm_ppcheck.rds")
+  expect_identical(pp_check_vars(fit)$resp_var,
+                   c("mean_angle", "var_angle", "mean_rt", "var_rt"))
+  p <- pp_check(fit, resp_var = "var_rt", ndraws = 5)
+  expect_s3_class(p, "ggplot")
+  expect_setequal(p$data$value[p$data$is_y_label == "italic(y)"],
+                  fit$data$var_rt)
+  p_all <- pp_check(fit, resp_var = "all", ndraws = 5)
+  expect_s3_class(p_all, "bayesplot_grid")
+  expect_length(p_all$bayesplots, 4L)
+})
+
+test_that("the fixed 3par ezcdm drift angle reaches pp_simulate() as zeros", {
+  fit <- load_ppcheck_fit("bmmfit_ezcdm_ppcheck.rds")
+  prep <- brms::prepare_predictions(fit, ndraws = 5)
+  expect_identical(.pp_dpar_vector(prep, "driftangle"),
+                   rep(0, prep$ndraws * prep$nobs))
+})
