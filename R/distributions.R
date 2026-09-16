@@ -1118,6 +1118,24 @@ log_diff_exp <- function(a, b) {
 }
 
 
+# Sampling distribution of the two RT summaries of n trials.
+# W = k4 / n + 2 VRT^2 / (n - 1); mean_rt given var_rt is normal with mean
+# MRT + slope * (var_rt - VRT) and sd, so that Var(mean_rt) = VRT / n and
+# Cov(mean_rt, var_rt) = k3 / n are exact. k3 = k4 = 0 (normal RTs) gives the
+# independent normal and scaled chi-square terms.
+.ez_rt_terms <- function(VRT, k3, k4, n_trials) {
+  W <- k4 / n_trials + 2 * VRT^2 / (n_trials - 1)
+  shape <- VRT^2 / W
+  cov_mean_var <- k3 / n_trials
+  list(
+    shape = shape,
+    rate = shape / VRT,
+    slope = cov_mean_var / W,
+    sd = sqrt(VRT / n_trials - cov_mean_var^2 / W)
+  )
+}
+
+
 #' @title Distribution functions for the EZ-Diffusion Model (ezdm)
 #'
 #' @description Density and random generation functions for the EZ-Diffusion
@@ -1502,137 +1520,212 @@ rezdm <- function(n, n_trials, drift, bound, ndt, zr = 0.5, s = 1,
   nlist(mean_rt, var_rt)
 }
 
+# Series coefficients of log(sinh(x) / x) = sum_j a_j x^(2j), generated
+# symbolically by local/ezdm/k34_derivation.py. Published tables of these are
+# easy to mistranscribe past j = 8, and a wrong coefficient makes the truncated
+# series diverge instead of failing loudly.
+# Must match inst/stan_chunks/ezdm_cumulants.stan.
+.EZDM_LOG_SINHC_COEF <- c(
+  1 / 6,
+  -1 / 180,
+  1 / 2835,
+  -1 / 37800,
+  1 / 467775,
+  -691 / 3831077250,
+  2 / 127702575,
+  -3617 / 2605132530000,
+  43867 / 350813659321125,
+  -174611 / 15313294652906250,
+  155366 / 147926426347074375,
+  -236364091 / 2423034863565078262500,
+  1315862 / 144228265688397515625,
+  -3392780147 / 3952575621190533915703125,
+  6892673020804 / 84913182070036240111050234375,
+  -7709321041217 / 999843529136357459316262500000
+)
+
+# Cumulants of the decision time conditional on hitting a boundary.
+#
+# For X_t = x0 + v t + s W_t absorbing at +-z, the boundary-conditional cumulant
+# generating function is K(lambda) = log sinh(q b) - log sinh(q b0) up to a
+# constant, with q = sqrt(v^2 + 2 lambda s^2) / s^2, b0 = 2z = bound, and b the
+# distance from the starting point to the far boundary: b = zr * bound for the
+# upper boundary and (1 - zr) * bound for the lower one. The lower boundary is
+# the upper boundary at x0 -> -x0, so this one function covers both, and both
+# ezdm versions: 3par is zr = 1/2.
+#
+# q^2 = w + 2 lambda / s^2 is linear in lambda, so with w = drift^2 / s^4 the
+# cumulants k_n = (-1)^n d^n K / d lambda^n are (-1)^n (2 / s^2)^n f^(n)(w) for
+# f(w) = log sinh(b sqrt(w)) - log sinh(b0 sqrt(w)). Drift therefore enters only
+# through w: every expression below is even in drift, which is why the model
+# needs neither a soft absolute value nor a zero-drift special case.
+#
+# Derivation, reference values and the measured branch errors:
+# local/ezdm/k34_derivation.py.
+.ezdm_cumulants <- function(b, b0, w, s) {
+  n <- max(length(b), length(b0), length(w), length(s))
+  b <- rep_len(b, n)
+  b0 <- rep_len(b0, n)
+  w <- rep_len(w, n)
+  s <- rep_len(s, n)
+
+  # regimes must match inst/stan_chunks/ezdm_cumulants.stan. The closed forms
+  # differ two bounded functions whose leading terms cancel to order t^(2n), so
+  # below t = 0.7 they lose k4 outright (relative error 1e-4 at t = 0.1) and the
+  # series takes over; at the seam both are accurate to about 2e-11.
+  series <- !is.na(w) & b0 * sqrt(w) < 0.7
+
+  out <- list(MDT = numeric(n), VRT = numeric(n), k3 = numeric(n), k4 = numeric(n))
+  assign_branch <- function(out, take, cumulants) {
+    for (moment in names(out)) out[[moment]][take] <- cumulants[[moment]]
+    out
+  }
+
+  if (any(series)) {
+    out <- assign_branch(out, series, .ezdm_cumulants_series(
+      b[series], b0[series], w[series], s[series]
+    ))
+  }
+  if (any(!series)) {
+    out <- assign_branch(out, !series, .ezdm_cumulants_closed(
+      b[!series], b0[!series], w[!series], s[!series]
+    ))
+  }
+  out
+}
+
+# k_n = (-1)^n (2/s^2)^n sum_{j >= n} a_j (b^2j - b0^2j) j!/(j-n)! w^(j-n),
+# evaluated by Horner. The coefficient differences are formed analytically, so
+# the cancellation that defeats the closed forms at small drift never happens.
+# Exact at w = 0, which is what replaces the old zero-drift branch.
+.ezdm_cumulants_series <- function(b, b0, w, s) {
+  j_max <- length(.EZDM_LOG_SINHC_COEF)
+  b_sq <- b^2
+  b0_sq <- b0^2
+  power_b <- b_sq
+  power_b0 <- b0_sq
+  coef_diff <- vector("list", j_max)
+  for (j in seq_len(j_max)) {
+    coef_diff[[j]] <- .EZDM_LOG_SINHC_COEF[j] * (power_b - power_b0)
+    power_b <- power_b * b_sq
+    power_b0 <- power_b0 * b0_sq
+  }
+
+  cumulant <- function(n) {
+    acc <- coef_diff[[j_max]] * (factorial(j_max) / factorial(j_max - n))
+    for (j in seq(j_max - 1, n)) {
+      acc <- acc * w + coef_diff[[j]] * (factorial(j) / factorial(j - n))
+    }
+    (-1)^n * (2 / s^2)^n * acc
+  }
+
+  list(MDT = cumulant(1), VRT = cumulant(2), k3 = cumulant(3), k4 = cumulant(4))
+}
+
+.ezdm_cumulants_closed <- function(b, b0, w, s) {
+  root_w <- sqrt(w)
+  at_b <- .ezdm_cgf_derivatives(b * root_w)
+  at_b0 <- .ezdm_cgf_derivatives(b0 * root_w)
+  list(
+    MDT = (at_b0$P - at_b$P) / (s^2 * w),
+    VRT = (at_b$Q - at_b0$Q) / (s^4 * w^2),
+    k3 = (at_b0$R - at_b$R) / (s^6 * w^3),
+    k4 = (at_b$S - at_b0$S) / (s^8 * w^4)
+  )
+}
+
+# The w-derivatives of log sinh(b sqrt(w)) with their powers of w stripped out.
+# Each is a sum of same-sign terms, so nothing cancels here; only the difference
+# the caller takes does. Above t = 30 the csch^2 terms are below 1e-26 and are
+# dropped rather than evaluated, because t^4 * csch^2(t) becomes Inf * 0 = NaN
+# once t^4 overflows.
+.ezdm_cgf_derivatives <- function(t) {
+  P <- Q <- R <- S <- numeric(length(t))
+  saturated <- !is.na(t) & t > 30
+
+  if (any(saturated)) {
+    big <- t[saturated]
+    P[saturated] <- big
+    Q[saturated] <- -big
+    R[saturated] <- 3 * big
+    S[saturated] <- -15 * big
+  }
+
+  if (any(!saturated)) {
+    small <- t[!saturated]
+    # coth as 1 / tanh: cosh(t) / sinh(t) is Inf / Inf = NaN above t = 710
+    coth <- 1 / tanh(small)
+    csch_sq <- 1 / sinh(small)^2
+    t_sq <- small^2
+    t_cubed <- t_sq * small
+    p <- small * coth
+    P[!saturated] <- p
+    Q[!saturated] <- -p - t_sq * csch_sq
+    R[!saturated] <- 3 * p + 3 * t_sq * csch_sq + 2 * t_cubed * coth * csch_sq
+    S[!saturated] <- -(15 * p + 15 * t_sq * csch_sq + 12 * t_cubed * coth * csch_sq +
+      2 * t_sq * t_sq * csch_sq * (2 + 3 * csch_sq))
+  }
+
+  nlist(P, Q, R, S)
+}
+
+# P(hit the upper boundary) = expm1(-2 k b) / expm1(-2 k b0), the lambda = 0
+# value of the same transform, with k = drift / s^2 signed. Both expm1 calls
+# overflow when k < 0, so the identity expm1(u) = -exp(u) expm1(-u) moves the
+# evaluation to the finite side; the old exp(2 k z) form returned NaN from
+# |drift| ~ 400.
+.ezdm_pc <- function(b, b0, k) {
+  u <- -2 * k * b
+  u0 <- -2 * k * b0
+  flip <- !is.na(u0) & u0 > 0
+  no_drift <- !is.na(u0) & u0 == 0
+
+  pC <- numeric(length(u0))
+  pC[no_drift] <- (b / b0)[no_drift]
+  direct <- !flip & !no_drift
+  pC[direct] <- expm1(u[direct]) / expm1(u0[direct])
+  pC[flip] <- exp(u[flip] - u0[flip]) * expm1(-u[flip]) / expm1(-u0[flip])
+  pC
+}
+
 # Internal: compute 3par moments (zr = 0.5) - vectorized
 .ezdm_moments_3par <- function(drift, bound, s) {
-  # pre-allocate based on longest input
   n <- max(length(drift), length(bound), length(s))
-
-  # recycle to common length
   drift <- rep_len(drift, n)
   bound <- rep_len(bound, n)
   s <- rep_len(s, n)
 
-  # initialize outputs
-  pC <- rep(NA_real_, n)
-  MDT <- rep(NA_real_, n)
-  VRT <- rep(NA_real_, n)
-
-  # identify near-zero drift cases
-  zero_drift <- abs(drift) < 1e-6
-
-  # zero-drift formulas
-  if (any(zero_drift)) {
-    pC[zero_drift] <- 0.5
-    MDT[zero_drift] <- bound[zero_drift]^2 / (4 * s[zero_drift]^2)
-    VRT[zero_drift] <- bound[zero_drift]^4 / (24 * s[zero_drift]^4)
-  }
-
-  # non-zero drift formulas
-  if (any(!zero_drift)) {
-    i <- !zero_drift
-    # Use signed drift for pC calculation
-    y <- -(bound[i] * drift[i]) / s[i]^2
-    expy <- exp(y)
-    pC[i] <- 1 / (1 + expy)
-    # Use soft absolute value: sqrt(drift^2 + tau^2) with tau = 0.01
-    # This avoids extreme curvature while maintaining smoothness
-    tau <- 0.01
-    drift_abs <- sqrt(drift[i]^2 + tau^2)
-    y_abs <- -(bound[i] * drift_abs) / s[i]^2
-    expy_abs <- exp(y_abs)
-    MDT[i] <- (bound[i] / (2 * drift_abs)) * ((1 - expy_abs) / (1 + expy_abs))
-    VRT[i] <- ((bound[i] * s[i]^2) / (2 * drift_abs^3)) *
-      (2 * y_abs * expy_abs - exp(2 * y_abs) + 1) / ((expy_abs + 1)^2)
-  }
-
-  nlist(pC, MDT, VRT)
+  pC <- .ezdm_pc(bound / 2, bound, drift / s^2)
+  c(nlist(pC), .ezdm_cumulants(bound / 2, bound, drift^2 / s^4, s))
 }
 
-# Internal: compute 4par moments (Srivastava et al. formulas) - vectorized
+# Internal: compute 4par moments - vectorized. b is the distance from the
+# starting point to the boundary it is measured away from, so the upper boundary
+# sees zr * bound and the lower one (1 - zr) * bound.
 .ezdm_moments_4par <- function(drift, bound, zr, s) {
-  # helper functions
-  coth <- function(x) cosh(x) / sinh(x)
-  csch <- function(x) 1 / sinh(x)
-
-  # pre-allocate based on longest input
   n <- max(length(drift), length(bound), length(zr), length(s))
-
-  # recycle to common length
   drift <- rep_len(drift, n)
   bound <- rep_len(bound, n)
   zr <- rep_len(zr, n)
   s <- rep_len(s, n)
 
-  # compute intermediate values
-  z <- bound / 2
-  x0 <- (zr * bound) - z
+  b_upper <- zr * bound
+  b_lower <- bound - b_upper
+  w <- drift^2 / s^4
+  upper <- .ezdm_cumulants(b_upper, bound, w, s)
+  lower <- .ezdm_cumulants(b_lower, bound, w, s)
 
-  # Use signed drift for pC calculation
-  k_z_signed <- (drift * z) / s^2
-  k_x_signed <- (drift * x0) / s^2
-
-  # proportion correct
-  # Guard against drift -> 0, where the analytic limit is pC = zr
-  zero_drift <- abs(drift) < 1e-6
-  pC <- numeric(n)
-  if (any(!zero_drift)) {
-    kz_nz <- k_z_signed[!zero_drift]
-    kx_nz <- k_x_signed[!zero_drift]
-    denom <- exp(2 * kz_nz) - exp(-2 * kz_nz)
-    num <- exp(-2 * kx_nz) - exp(-2 * kz_nz)
-    pC[!zero_drift] <- 1 - num / denom
-  }
-  if (any(zero_drift)) {
-    pC[zero_drift] <- zr[zero_drift]
-  }
-  # Use soft absolute value: sqrt(drift^2 + tau^2) with tau = 0.01
-  # This provides smooth gradients without extreme curvature
-  tau <- 0.01
-  a <- sqrt(drift^2 + tau^2)
-  kz <- (a * z) / s^2
-  kx <- (a * x0) / s^2
-
-  # initialize outputs
-  mdt_upper <- rep(NA_real_, n)
-  mdt_lower <- rep(NA_real_, n)
-  vrt_upper <- rep(NA_real_, n)
-  vrt_lower <- rep(NA_real_, n)
-
-  # zero-drift formulas
-  if (any(zero_drift)) {
-    z_ <- z[zero_drift]
-    x0_ <- x0[zero_drift]
-    s_ <- s[zero_drift]
-
-    mdt_upper[zero_drift] <- (4 * z_^2 - (z_ + x0_)^2) / (3 * s_^2)
-    mdt_lower[zero_drift] <- (4 * z_^2 - (z_ - x0_)^2) / (3 * s_^2)
-    vrt_upper[zero_drift] <- (32 * z_^4 - 2 * (z_ + x0_)^4) / (45 * s_^4)
-    vrt_lower[zero_drift] <- (32 * z_^4 - 2 * (z_ - x0_)^4) / (45 * s_^4)
-  }
-
-  # non-zero drift formulas
-  if (any(!zero_drift)) {
-    a <- a[!zero_drift]
-    s <- s[!zero_drift]
-    kz <- kz[!zero_drift]
-    kx <- kx[!zero_drift]
-
-    mdt_upper[!zero_drift] <- (s / a)^2 * (2 * kz * coth(2 * kz) - (kx + kz) * coth(kx + kz))
-    mdt_lower[!zero_drift] <- (s / a)^2 * (2 * kz * coth(2 * kz) - (-kx + kz) * coth(-kx + kz))
-
-    vrt_upper[!zero_drift] <- (s / a)^4 *
-      (4 * kz^2 * csch(2 * kz)^2 +
-        2 * kz * coth(2 * kz) -
-        (kx + kz)^2 * csch(kx + kz)^2 -
-        (kx + kz) * coth(kx + kz))
-    vrt_lower[!zero_drift] <- (s / a)^4 *
-      (4 * kz^2 * csch(2 * kz)^2 +
-        2 * kz * coth(2 * kz) -
-        (-kx + kz)^2 * csch(-kx + kz)^2 -
-        (-kx + kz) * coth(-kx + kz))
-  }
-
-  nlist(pC, mdt_upper, mdt_lower, vrt_upper, vrt_lower)
+  list(
+    pC = .ezdm_pc(b_upper, bound, drift / s^2),
+    mdt_upper = upper$MDT,
+    mdt_lower = lower$MDT,
+    vrt_upper = upper$VRT,
+    vrt_lower = lower$VRT,
+    k3_upper = upper$k3,
+    k3_lower = lower$k3,
+    k4_upper = upper$k4,
+    k4_lower = lower$k4
+  )
 }
 
 
