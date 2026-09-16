@@ -42,10 +42,14 @@
 #'
 update.bmmfit <- function(object, formula., newdata = NULL, recompile = NULL, ...) {
   dots <- list(...)
-  # brms::update.brmsfit falls back to the original fit's threading spec when
-  # `threads` is not passed, so the effective spec -- not just the new request --
-  # must drive the option that configure_model reads
-  local_brms_threads(list(threads = dots$threads %||% object$threads))
+  # brms::update.brmsfit falls back to the original fit's threading spec only
+  # when `threads` is absent from the call -- an explicit NULL means "no
+  # threading" -- and the effective spec, not the new request, must drive the
+  # option that configure_model reads. The threading(NULL) tail pins the option
+  # for fits saved without a `threads` field, so a stray global brms.threads
+  # cannot slice a likelihood that brms will run serially
+  effective_threads <- if ("threads" %in% names(dots)) dots$threads else object$threads
+  local_brms_threads(list(threads = effective_threads %||% brms::threading(NULL)))
   stopif(
     isTRUE(object$version$bmm < "0.3.0"),
     "Updating bmm models works only with models fitted with version 0.3.0 or higher"

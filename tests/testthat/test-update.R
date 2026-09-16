@@ -73,12 +73,10 @@ test_that("update.bmmfit frees parameters that the new formula predicts", {
   expect_equal(constant_priors(update_mock(fit1)), 1)
 })
 
+# read the emitted program rather than bmm's own stanvars, and assert on the
+# call: the sliced function is declared in the functions block either way
 sdm_likelihood_is_sliced <- function(fit) {
-  blocks <- vapply(fit$stanvars, function(x) x$block %||% "", character(1))
-  scode <- vapply(fit$stanvars[blocks == "likelihood"],
-    function(x) paste(x$scode, collapse = "\n"), character(1)
-  )
-  any(grepl("ldenom_slice", scode, fixed = TRUE))
+  grepl("target += sdm_simple_run_ldenom_slice", brms::stancode(fit), fixed = TRUE)
 }
 
 test_that("update.bmmfit configures the likelihood for the effective threading spec", {
@@ -91,6 +89,21 @@ test_that("update.bmmfit configures the likelihood for the effective threading s
   threaded_fit$threads <- brms::threading(2)
   expect_true(sdm_likelihood_is_sliced(update_mock(threaded_fit)))
 
+  # brms reads an explicit threads = NULL as "turn threading off", which it
+  # distinguishes from an absent argument by name presence, not by NULL-ness
+  expect_false(sdm_likelihood_is_sliced(update_mock(threaded_fit, threads = NULL)))
+
   expect_false(sdm_likelihood_is_sliced(update_mock(fit1)))
   expect_true(sdm_likelihood_is_sliced(update_mock(fit1, threads = brms::threading(2))))
+
+  # the spec of the fit also has to win over a global brms.threads, which brms
+  # itself ignores once it has fallen back to the fit's own spec
+  withr::with_options(list(brms.threads = brms::threading(2)), {
+    expect_false(sdm_likelihood_is_sliced(update_mock(fit1)))
+
+    # a fit saved before brmsfit carried a $threads field
+    no_threads <- fit1
+    no_threads$threads <- NULL
+    expect_false(sdm_likelihood_is_sliced(update_mock(no_threads)))
+  })
 })
