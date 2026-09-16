@@ -28,6 +28,9 @@ Useful links:
 
 Authors:
 
+- Gidon T. Frischkorn <gfrischkorn@icloud.com>
+  ([ORCID](https://orcid.org/0000-0002-5055-9764)) \[copyright holder\]
+
 - Vencislav Popov <vencislav.popov@gmail.com>
   ([ORCID](https://orcid.org/0000-0002-8073-4199)) \[copyright holder\]
 

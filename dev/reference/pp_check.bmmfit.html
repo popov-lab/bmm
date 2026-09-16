@@ -49,7 +49,7 @@ model-specific visualisation instead."><meta property="og:image" content="https:
 
     <div class="ref-description section level2">
     <p>For models where brms provides <code>pp_check</code> support, this method delegates to
-<code><a href="https://paulbuerkner.com/brms/reference/pp_check.brmsfit.html" class="external-link">brms::pp_check()</a></code>. For models with multinomial families (e.g., the m3
+<code><a href="https://mc-stan.org/bayesplot/reference/pp_check.html" class="external-link">brms::pp_check()</a></code>. For models with multinomial families (e.g., the m3
 model), brms's <code>pp_check</code> is unavailable; this method dispatches to a
 model-specific visualisation instead.</p>
     </div>
@@ -70,7 +70,7 @@ model-specific visualisation instead.</p>
 
 <dt id="arg-type">type<a class="anchor" aria-label="anchor" href="#arg-type"></a></dt>
 <dd><p>Character. Type of pp_check (default <code>"dens_overlay"</code>). For
-non-multinomial models, passed to <code><a href="https://paulbuerkner.com/brms/reference/pp_check.brmsfit.html" class="external-link">brms::pp_check()</a></code>. When <code>group</code> is
+non-multinomial models, passed to <code><a href="https://mc-stan.org/bayesplot/reference/pp_check.html" class="external-link">brms::pp_check()</a></code>. When <code>group</code> is
 specified, the grouped variant (e.g., <code>"dens_overlay_grouped"</code>) is
 auto-selected if available. Multinomial models produce a response
 proportion profile regardless of the value supplied.</p></dd>
@@ -78,19 +78,19 @@ proportion profile regardless of the value supplied.</p></dd>
 
 <dt id="arg-ndraws">ndraws<a class="anchor" aria-label="anchor" href="#arg-ndraws"></a></dt>
 <dd><p>Integer. Number of posterior draws. Defaults to <code>100</code> for
-multinomial models; otherwise passed to <code><a href="https://paulbuerkner.com/brms/reference/pp_check.brmsfit.html" class="external-link">brms::pp_check()</a></code>.</p></dd>
+multinomial models; otherwise passed to <code><a href="https://mc-stan.org/bayesplot/reference/pp_check.html" class="external-link">brms::pp_check()</a></code>.</p></dd>
 
 
 <dt id="arg-group">group<a class="anchor" aria-label="anchor" href="#arg-group"></a></dt>
 <dd><p>Character. Optional grouping variable for faceting. For
-non-multinomial models, passed to <code><a href="https://paulbuerkner.com/brms/reference/pp_check.brmsfit.html" class="external-link">brms::pp_check()</a></code>; when specified, the
+non-multinomial models, passed to <code><a href="https://mc-stan.org/bayesplot/reference/pp_check.html" class="external-link">brms::pp_check()</a></code>; when specified, the
 grouped variant of <code>type</code> (e.g., <code>"dens_overlay_grouped"</code>) is auto-selected
 if available. For multinomial models, facets by the named predictor.</p></dd>
 
 
 <dt id="arg--">...<a class="anchor" aria-label="anchor" href="#arg--"></a></dt>
-<dd><p>Additional arguments forwarded to <code><a href="https://paulbuerkner.com/brms/reference/pp_check.brmsfit.html" class="external-link">brms::pp_check()</a></code> (non-multinomial)
-or to <code><a href="https://paulbuerkner.com/brms/reference/posterior_predict.brmsfit.html" class="external-link">brms::posterior_predict()</a></code> (multinomial). For multinomial models,
+<dd><p>Additional arguments forwarded to <code><a href="https://mc-stan.org/bayesplot/reference/pp_check.html" class="external-link">brms::pp_check()</a></code> (non-multinomial)
+or to <code><a href="https://mc-stan.org/rstantools/reference/posterior_predict.html" class="external-link">brms::posterior_predict()</a></code> (multinomial). For multinomial models,
 <code>probs</code> (numeric vector of length 2, default <code>c(0.025, 0.975)</code>) controls the
 credible interval. Both model types accept <code>re_formula</code> (e.g.,
 <code>re_formula = NA</code> to predict at the population level, excluding random
@@ -100,7 +100,7 @@ effects).</p></dd>
     <div class="section level2">
     <h2 id="value">Value<a class="anchor" aria-label="anchor" href="#value"></a></h2>
     <p>For multinomial models, a <code>ggplot2</code> object. For other models, the
-result of <code><a href="https://paulbuerkner.com/brms/reference/pp_check.brmsfit.html" class="external-link">brms::pp_check()</a></code>.</p>
+result of <code><a href="https://mc-stan.org/bayesplot/reference/pp_check.html" class="external-link">brms::pp_check()</a></code>.</p>
     </div>
     <div class="section level2">
     <h2 id="details">Details<a class="anchor" aria-label="anchor" href="#details"></a></h2>
@@ -111,7 +111,7 @@ colour scheme and theme.</p>
     </div>
     <div class="section level2">
     <h2 id="see-also">See also<a class="anchor" aria-label="anchor" href="#see-also"></a></h2>
-    <div class="dont-index"><p><code><a href="https://paulbuerkner.com/brms/reference/pp_check.brmsfit.html" class="external-link">brms::pp_check()</a></code></p></div>
+    <div class="dont-index"><p><code><a href="https://mc-stan.org/bayesplot/reference/pp_check.html" class="external-link">brms::pp_check()</a></code></p></div>
     </div>
 
   </main><aside class="col-md-3"><nav id="toc" aria-label="Table of contents"><h2>On this page</h2>
