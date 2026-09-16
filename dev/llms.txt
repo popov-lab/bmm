@@ -370,6 +370,9 @@ stan data, etc.
 - [`fit_info()`](https://venpopov.com/bmm/dev/reference/fit_info.md) :
   Extract information from a brmsfit object
 
+- [`report_priors()`](https://venpopov.com/bmm/dev/reference/report_priors.md)
+  : Report the priors used in a fitted bmm model
+
 - [`stancode(`*`<bmmformula>`*`)`](https://venpopov.com/bmm/dev/reference/stancode.bmmformula.md)
   : Generate Stan code for bmm models
 

@@ -2,8 +2,30 @@
 
 ## bmm (development version)
 
+#### New features
+
+- New function
+  [`report_priors()`](https://venpopov.com/bmm/dev/reference/report_priors.md)
+  reports, for each parameter of a fitted model, its link function, the
+  prior actually used on the sampling scale, and whether it was a bmm
+  default, a brms default, or user-specified; parameters left with
+  improper flat priors are flagged. `format = "text"` produces
+  methods-section-ready sentences. Parameters that exist only because
+  the family machinery requires them are omitted, so the report lists
+  the model’s own vocabulary: the `mu` brms forces on the response-time
+  custom families, the `mu2`/`kappa2` second component of a
+  [`brms::mixture()`](https://paulbuerkner.com/brms/reference/mixture.html)
+  family, and the `theta2` mixture-weight reference the sampler holds at
+  zero ([\#391](https://github.com/popov-lab/bmm/issues/391)).
+
 #### Bug fixes
 
+- Fix `combine_prior()` erroring with `second argument must be a list`
+  when its first argument is `NULL`. `set_default_prior()` returns
+  `NULL` when `options(bmm.default_priors = FALSE)` is set, so that
+  option made [`bmm()`](https://venpopov.com/bmm/dev/reference/bmm.md)
+  fail for every model instead of fitting with flat priors
+  ([\#391](https://github.com/popov-lab/bmm/issues/391)).
 - [`update()`](https://rdrr.io/r/stats/update.html) now configures the
   likelihood for the threading spec that will actually be used.
   [`brms::update.brmsfit`](https://paulbuerkner.com/brms/reference/update.brmsfit.html)
