@@ -46,7 +46,7 @@ ul.task-list li input[type="checkbox"] {
 <link href="site_libs/quarto-html/quarto-syntax-highlighting-64a204ab8560d761af7679ceaba22944.css" rel="stylesheet" id="quarto-text-highlighting-styles">
 <script src="site_libs/bootstrap/bootstrap.min.js"></script>
 <link href="site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
-<link href="site_libs/bootstrap/bootstrap-e2a0acc2e5cec106112107b2889cd56a.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
+<link href="site_libs/bootstrap/bootstrap-893fe9ddc644446a6c1ebe867bb6f684.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
 <script id="quarto-search-options" type="application/json">{
   "location": "navbar",
   "copy-button": false,
@@ -170,6 +170,12 @@ ul.task-list li input[type="checkbox"] {
  <span class="menu-text"><span class="chapter-number">5</span>&nbsp; <span class="chapter-title">Adding a new model</span></span></a>
   </div>
 </li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./coding-conventions.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">6</span>&nbsp; <span class="chapter-title">Coding conventions</span></span></a>
+  </div>
+</li>
     </ul>
     </div>
 </nav>
@@ -208,16 +214,23 @@ ul.task-list li input[type="checkbox"] {
 
 <section id="overview" class="level1 unnumbered">
 <h1 class="unnumbered">Overview</h1>
-<p><em>Last update: 02.04.2026</em></p>
+<p><em>Last update: 16.09.2026</em></p>
 <p>This guide aims to help developers contribute new models to bmm. It is a work in progress and will be updated as the package evolves. It explains how to set-up your system for package development, the structure of the package, and the workflow for contributing new models to the package.</p>
-<p>The bmm package now supports models across multiple domains, including visual working memory models (mixture models, IMM, SDM), response time / decision models (DDM, EZDM, Censored-Shifted Wald), and categorical response models (M3). The package requires <strong>R &gt;= 4.1.0</strong> and uses the native pipe operator <code>|&gt;</code> throughout.</p>
-<p>The current guide is up to date with <strong>bmm v1.3.0</strong> and it might not yet reflect changes implemented afterwards. If you run into problems, don’t hesitate to <a href="https://github.com/venpopov/bmm/issues">open an issue on github</a>.</p>
+<p>The bmm package now supports models across multiple domains, including visual working memory models (mixture models, IMM, SDM), response time / decision models (DDM, EZDM, Censored-Shifted Wald), and categorical response models (M3). The package requires <strong>R &gt;= 4.1.0</strong> and uses the native pipe operator <code>|&gt;</code> throughout. Further models are in development on feature branches; they are not part of a release and not covered here until they are.</p>
+<p>This guide describes bmm at the <strong>v1.3.2</strong> tag. Anything merged after that tag may not be reflected here yet, and the version on CRAN can lag behind the tag while a submission is being processed. If you run into problems, don’t hesitate to <a href="https://github.com/popov-lab/bmm/issues">open an issue on github</a>.</p>
 <p>We follow a <a href="https://jeffkreeftmeijer.com/git-flow/">github flow workflow</a>. The repository contains two main branches:</p>
 <ul>
 <li><p>Master (contains the latest released stable version of the <code>bmm</code> package)</p></li>
 <li><p>Develop (contains the latest stable development branch)</p></li>
 </ul>
-<p>All new feature development should occur on an independent branch from Develop. If you want to contribute a new model to the <code>bmm</code> package, you need to fork the repository, create a new branch for your model, extensively test the model, and eventually submit a pull request for your changes to be merged into the Develop branch of the main repository. Your changes will be reviewed by someone from the core team. Once your changes are merged into the Develop branch, they will be included in the next release of the package.</p>
+<p>All new feature development should occur on an independent branch from Develop. If you want to contribute a new model to the <code>bmm</code> package, you need to fork the repository, create a new branch for your model off Develop, extensively test the model, and eventually submit a pull request into the Develop branch of the main repository.</p>
+<p>How that pull request is reviewed:</p>
+<ul>
+<li><p>One reviewer approval is required to merge. Two are required when the pull request changes shared infrastructure rather than a single model — the pipeline helpers under <code>R/helpers-*.R</code>, or the exported API — because those changes affect every model rather than only yours.</p></li>
+<li><p>A pull request that adds a new model is approved by a human who has installed your branch and fitted the model. Reading the diff is not sufficient for a new model, because the failure modes that matter (a likelihood that compiles but samples badly, priors that make the model unidentifiable, initial values that hit the boundary) only show up in a fit.</p></li>
+</ul>
+<p>Accordingly, make the model easy to fit for whoever reviews it: include a short, runnable example with a small simulated dataset, and say in the pull request how long it takes to fit and what output to expect.</p>
+<p>Once your changes are merged into the Develop branch, they will be included in the next release of the package.</p>
 <p><img src="images/clipboard-674159866.png" class="img-fluid"></p>
 
 
