@@ -88,13 +88,19 @@ update.bmmfit <- function(object, formula., newdata = NULL, recompile = NULL, ..
   }
 
   # bmm() resolves constants in check_model() before check_data(); update() never
-  # calls check_model(), so without this a formula that frees a default-fixed
-  # parameter is silently ignored and the parameter stays pinned by constant()
-  freed_pars <- intersect(
-    names(model$fixed_parameters),
-    names(user_formula)[!is_constant(user_formula)]
-  )
+  # calls check_model(), so without this any change the new formula makes to a
+  # parameter's constant is silently ignored: a freed parameter stays pinned by
+  # the old constant(), a newly fixed one keeps its old non-constant prior, and a
+  # re-valued one keeps the old constant. Comparing the resolved constants rather
+  # than the formula covers all three
+  old_fixed <- model$fixed_parameters
   model <- update_model_fixed_parameters(model, user_formula)
+  changed_pars <- union(names(old_fixed), names(model$fixed_parameters))
+  changed_pars <- changed_pars[!vapply(
+    changed_pars,
+    function(par) identical(old_fixed[[par]], model$fixed_parameters[[par]]),
+    logical(1)
+  )]
 
   if (is.null(newdata)) {
     data <- check_data(model, olddata, user_formula)
@@ -108,17 +114,20 @@ update.bmmfit <- function(object, formula., newdata = NULL, recompile = NULL, ..
   formula <- check_formula(model, data, user_formula)
   config_args <- configure_model(model, data, formula)
 
-  # the old fit's prior still pins every parameter the new formula frees, and
-  # configure_prior() treats it as a user prior, so it would override the freshly
-  # configured one; brms stores the main dpar without a `dpar` label, so a freed
-  # mu appears as a bare Intercept row
+  # configure_prior() treats every row of the old fit's prior as a user prior, so
+  # for a parameter whose constant changed each of those rows would override the
+  # freshly configured one -- the stale constant() of a freed or re-valued
+  # parameter and the stale free prior of a newly fixed one alike. brms stores
+  # the main dpar without a `dpar` label, so its rows are the ones carrying
+  # neither label
   old_prior <- object$prior
-  if (length(freed_pars) > 0) {
-    stale <- grepl("^constant\\(", old_prior$prior) &
-      (old_prior$dpar %in% freed_pars |
-        old_prior$nlpar %in% freed_pars |
-        ("mu" %in% freed_pars & old_prior$class == "Intercept" &
-          !nzchar(old_prior$dpar) & !nzchar(old_prior$nlpar)))
+  if (length(changed_pars) > 0) {
+    main_dpar <- names(brms::brmsterms(config_args$formula)$dpars)[1]
+    is_main_dpar_row <- !nzchar(old_prior$dpar) & !nzchar(old_prior$nlpar)
+    stale <- old_prior$dpar %in% changed_pars |
+      old_prior$nlpar %in% changed_pars |
+      (isTRUE(main_dpar %in% changed_pars) &
+         old_prior$class %in% c("Intercept", "b") & is_main_dpar_row)
     old_prior <- old_prior[!stale, ]
   }
   prior <- configure_prior(model, data, config_args$formula, old_prior)

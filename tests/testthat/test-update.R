@@ -56,7 +56,7 @@ update_mock <- function(object, ...) {
 }
 
 constant_priors <- function(fit) {
-  sum(grepl("constant", as.data.frame(fit$prior)$prior))
+  sum(grepl("^constant\\(", as.data.frame(fit$prior)$prior))
 }
 
 test_that("update.bmmfit frees parameters that the new formula predicts", {
@@ -68,9 +68,39 @@ test_that("update.bmmfit frees parameters that the new formula predicts", {
   up <- update_mock(fit1, formula. = bmf(c ~ 1, kappa ~ 1, mu ~ 1))
   expect_length(up$bmm$model$fixed_parameters, 0)
   expect_equal(constant_priors(up), 0)
+  expect_match(brms::stancode(up), "real Intercept;", fixed = TRUE)
+
+  # freeing a parameter and replacing the data at once
+  new_data <- data.frame(
+    dev_rad = rsdm(80, c = 4, kappa = 3),
+    set_size = rep(1:2, each = 40)
+  )
+  up <- update_mock(fit1, formula. = bmf(c ~ 1, kappa ~ 1, mu ~ 1), newdata = new_data)
+  expect_length(up$bmm$model$fixed_parameters, 0)
+  expect_equal(constant_priors(up), 0)
+  expect_equal(nrow(up$data), 80)
 
   # a parameter left alone stays fixed
   expect_equal(constant_priors(update_mock(fit1)), 1)
+})
+
+test_that("update.bmmfit fixes parameters that the new formula sets to a constant", {
+  skip_on_cran()
+  fit1 <- sdm_fixture()
+
+  # the reverse direction: the old fit's free prior on kappa must not survive and
+  # override the constant() that the new formula asks for
+  up <- update_mock(fit1, formula. = bmf(c ~ 0 + set_size, kappa = 5))
+  expect_equal(up$bmm$model$fixed_parameters$kappa, 5)
+  expect_true(any(grepl("^constant\\(5\\)", as.data.frame(up$prior)$prior)))
+  expect_match(brms::stancode(up), "Intercept_kappa = 5;", fixed = TRUE)
+  expect_false(grepl("student_t_lpdf(Intercept_kappa", brms::stancode(up), fixed = TRUE))
+
+  # changing the value of an already fixed parameter is the same defect: the old
+  # constant() row would otherwise survive and pin mu at the original 0
+  up <- update_mock(fit1, formula. = bmf(c ~ 0 + set_size, mu = 0.5))
+  expect_equal(up$bmm$model$fixed_parameters$mu, 0.5)
+  expect_match(brms::stancode(up), "Intercept = 0.5;", fixed = TRUE)
 })
 
 # read the emitted program rather than bmm's own stanvars, and assert on the
