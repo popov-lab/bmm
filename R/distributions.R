@@ -2200,3 +2200,146 @@ neg_loglik <- function(x, params, distribution, weights = NULL) {
     loglik = if (converged) loglik else NA
   )
 }
+
+# Invert the mean resultant length R = I1(kappa) / I0(kappa). Used only for the
+# E-step weights of .fit_ezcdm_mixture(), where an error of 1e-6 in kappa moves
+# the responsibilities by nothing, so it deliberately does not share the regime
+# branches of .ezcdm_moments() and the Stan chunk, which would have to stay in
+# lockstep with them for no gain.
+.vm_kappa_from_R <- function(R) {
+  R <- min(max(R, 0), 1 - 1e-8)
+  if (R == 0) {
+    return(0)
+  }
+
+  kappa <- if (R < 0.53) {
+    2 * R + R^3 + 5 * R^5 / 6
+  } else if (R < 0.85) {
+    -0.4 + 1.39 * R + 0.43 / (1 - R)
+  } else {
+    1 / (R^3 - 4 * R^2 + 3 * R)
+  }
+
+  for (i in 1:2) {
+    kappa <- min(max(kappa, 1e-8), 1e4)
+    A <- besselI(kappa, 1, expon.scaled = TRUE) / besselI(kappa, 0, expon.scaled = TRUE)
+    kappa <- kappa - (A - R) / (1 - A^2 - A / kappa)
+  }
+
+  min(max(kappa, 0), 1e4)
+}
+
+# Log-likelihood of the one-component model, the null the mixture is gated
+# against: same parametric families, every trial a cognitive trial.
+.ezcdm_single_loglik <- function(angle, rt, distribution) {
+  params <- .fit_dist_params(
+    rt, distribution, rep_len(1, length(rt)),
+    .init_dist_params(rt, distribution)
+  )
+  kappa <- .vm_kappa_from_R(sqrt(mean(cos(angle))^2 + mean(sin(angle))^2))
+  mu <- atan2(mean(sin(angle)), mean(cos(angle)))
+  -neg_loglik(rt, params, distribution) +
+    sum(brms::dvon_mises(angle, mu = mu, kappa = kappa, log = TRUE))
+}
+
+# Joint two-component EM over response angles and reaction times: contaminants
+# are uniform on the circle and on the reaction-time bounds, cognitive trials
+# are the parametric RT distribution times a von Mises. The angles identify the
+# contaminant proportion far more sharply than the reaction times alone, which
+# is what makes the corrected circular variance usable; see the roxygen of
+# ezcdm_summary_stats().
+.fit_ezcdm_mixture <- function(angle, rt, distribution, contaminant_bound,
+                               init_contaminant, max_contaminant, maxit, tol) {
+  n <- length(rt)
+  rt_fit <- .fit_rt_mixture(
+    rt, distribution, contaminant_bound,
+    init_contaminant, max_contaminant, maxit, tol
+  )
+
+  dist_params <- rt_fit$params %||% .init_dist_params(rt, distribution)
+  pi_rt_only <- rt_fit$contaminant_prop
+  # a start of exactly zero is absorbing: log(pi_c) = -Inf makes every weight 1
+  pi_c <- if (is.na(pi_rt_only)) init_contaminant else max(pi_rt_only, init_contaminant)
+
+  mu <- atan2(mean(sin(angle)), mean(cos(angle)))
+  kappa <- .vm_kappa_from_R(sqrt(mean(cos(angle))^2 + mean(sin(angle))^2))
+
+  in_bounds <- rt >= contaminant_bound[1] & rt <= contaminant_bound[2]
+  log_uniform <- -log(contaminant_bound[2] - contaminant_bound[1]) - log(2 * pi)
+
+  w <- rep_len(1, n)
+  prev_loglik <- -Inf
+  converged <- FALSE
+
+  for (iter in seq_len(maxit)) {
+    log_rt <- switch(distribution,
+      exgaussian = dexgauss(rt, dist_params["mu"], dist_params["sigma"],
+        dist_params["tau"],
+        log = TRUE
+      ),
+      lognormal = dlnorm(rt, dist_params["mu"], dist_params["sigma"], log = TRUE),
+      invgaussian = dinvgauss(rt, dist_params["mu"], dist_params["lambda"], log = TRUE)
+    )
+    log_rt <- pmax(log_rt, log(1e-300))
+
+    log_c <- log1p(-pi_c) + log_rt +
+      brms::dvon_mises(angle, mu = mu, kappa = kappa, log = TRUE)
+    log_u <- rep_len(-Inf, n)
+    log_u[in_bounds] <- log(pi_c) + log_uniform
+
+    w <- 1 / (1 + exp(log_u - log_c))
+    w[!in_bounds] <- 1
+    if (anyNA(w)) break
+
+    hi <- pmax(log_c, log_u)
+    loglik <- sum(hi + log1p(exp(-abs(log_c - log_u))))
+    if (!is.finite(loglik)) break
+
+    if (abs(loglik - prev_loglik) < tol) {
+      converged <- TRUE
+      break
+    }
+    prev_loglik <- loglik
+
+    pi_c <- min(1 - sum(w) / n, max_contaminant)
+    if (is.na(pi_c) || pi_c < 0) pi_c <- 0
+
+    dist_params <- .fit_dist_params(rt, distribution, w, dist_params)
+    cos_sum <- sum(w * cos(angle))
+    sin_sum <- sum(w * sin(angle))
+    mu <- atan2(sin_sum, cos_sum)
+    kappa <- .vm_kappa_from_R(sqrt(cos_sum^2 + sin_sum^2) / sum(w))
+  }
+
+  if (pi_c >= max_contaminant) {
+    warning2("Contaminant proportion was clipped to max_contaminant \\
+             ({max_contaminant}). This may indicate data quality issues.",
+      env.frame = -1
+    )
+  }
+
+  # A handful of genuinely slow first-passage times look like contaminants to
+  # any parametric RT component, and because var_rt is dominated by its tail,
+  # down-weighting one of them can cut the variance by a quarter. The mixture
+  # therefore has to earn its extra parameter on BIC before it is applied at
+  # all; otherwise the plain statistics are returned unchanged.
+  if (converged && 2 * (loglik - .ezcdm_single_loglik(angle, rt, distribution)) < log(n)) {
+    w <- rep_len(1, n)
+    pi_c <- 0
+  }
+
+  weight_sum <- sum(w)
+  mean_rt <- sum(w * rt) / weight_sum
+  c(
+    as.list(.circular_summary(angle, weights = w)),
+    list(
+      mean_rt = mean_rt,
+      var_rt = sum(w * (rt - mean_rt)^2) / (weight_sum - 1),
+      n_eff = weight_sum,
+      contaminant_prop = 1 - weight_sum / n,
+      contaminant_prop_rt = pi_rt_only,
+      converged = converged,
+      iterations = iter
+    )
+  )
+}
