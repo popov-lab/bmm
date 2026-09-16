@@ -196,7 +196,7 @@ fixed_pars_priors <- function(model, formula, additional_pars = list()) {
 #' @keywords internal developer
 set_default_prior <- function(model, data, formula) {
   if (isFALSE(getOption("bmm.default_priors", TRUE))) {
-    return(NULL)
+    return(brms::empty_prior())
   }
 
   default_priors <- validate_default_priors(model, formula)
@@ -252,7 +252,7 @@ construct_default_priors_list <- function(par, bterms, default_priors, data) {
   interactions_count <- sum(attr(terms, "order") > 1)
   interaction_only <- fixed_effects_count == 0 && interactions_count > 0
 
-  priors <- list()
+  priors <- .construct_sd_priors(par, bterms, prior_desc)
 
   # priors on fixed effects
   if (has_effects_prior && fixed_effects_count > 0) {
@@ -284,6 +284,18 @@ construct_default_priors_list <- function(par, bterms, default_priors, data) {
   priors
 }
 
+# A blanket prior on all random-effects SDs of one model parameter (no coef, no
+# group). Emitted only when the parameter carries random effects: brms rejects a
+# prior for a parameter that does not exist in the model. Without random effects
+# brmsterms() stores "" rather than a data frame in $re.
+.construct_sd_priors <- function(par, bterms, prior_desc) {
+  re <- bterms$allpars[[par]]$re
+  if (is.null(prior_desc$sd) || !is.data.frame(re) || nrow(re) == 0) {
+    return(list())
+  }
+  list(.build_prior(prior_desc$sd, "sd", par = par, bterms = bterms))
+}
+
 # Helper function to create a prior object conditional on parameter type
 .build_prior <- function(prior_desc, class, par, bterms, ...) {
   args <- c(list(prior = prior_desc, class = class), list(...))
@@ -312,7 +324,7 @@ combine_prior <- function(prior1, prior2) {
   prior2_types <- do.call(paste, prior2[, cols])
   is_duplicate <- prior1_types %in% prior2_types
   prior <- prior1[!is_duplicate, ] + prior2
-  row.names(prior) <- 1:nrow(prior)
+  row.names(prior) <- seq_len(nrow(prior))
   prior
 }
 
