@@ -1,4 +1,7 @@
-# bmm (development version)
+# bmm 1.3.2
+
+### Changes to default priors
+* Recalibrated the default priors for the **m3** activation parameters (`a`, `c`) so that the `simple` and `softmax` choice rules imply a comparable, broad prior-predictive range of average performance, and so that the `softmax` defaults place equal prior means on general (`a`) and context (`c`) activation — centering the implied `c - a` prior at zero for fair comparisons under cell-means coding. The mis-scaled `normal(0, 2)` effect prior on `c` is replaced by the shared `normal(0, 0.5)`. Because the `simple` rule requires `c > a` to predict accurate recall, its defaults remain asymmetric; direct comparisons of context and general activation should use the `softmax` choice rule (#364).
 
 ### New features
 * The **sdm** model now supports within-chain parallelization via the `threads` argument (e.g. `bmm(..., threads = 2)`), reducing fitting time by up to ~45% in benchmarks (#374).
@@ -16,7 +19,7 @@
 ### Other changes
 * Added an internal consistency check in `configure_prior()`: if a model's `fixed_parameters` includes a parameter that its `configure_model()` never wires into the formula (neither a dpar nor an nlpar), bmm now fails with a clear model-definition error instead of letting a malformed `b_Intercept ~ constant()` prior reach `brm()`. This is a safety net for model development; it cannot be reached through the normal `bmm()` interface, where an unrecognized parameter is already caught earlier by `check_formula()` (#377).
 * `print.bmmodel()` now also displays the required response variables (one per line, annotated with the expected coding — e.g. radians in [-pi, pi] for the circular models, seconds and 0/1 responses for the trial-wise RT models) and the default parameter links, answering "what does my data frame need to look like?" directly at the console (#392).
-* Recalibrated the default priors for the **m3** activation parameters (`a`, `c`) so that the `simple` and `softmax` choice rules imply a comparable, broad prior-predictive range of average performance, and so that the `softmax` defaults place equal prior means on general (`a`) and context (`c`) activation — centering the implied `c - a` prior at zero for fair comparisons under cell-means coding. The mis-scaled `normal(0, 2)` effect prior on `c` is replaced by the shared `normal(0, 0.5)`. Because the `simple` rule requires `c > a` to predict accurate recall, its defaults remain asymmetric; direct comparisons of context and general activation should use the `softmax` choice rule (#364).
+* The package maintainer contact is now Gidon T. Frischkorn, and the repository URLs point to `https://github.com/popov-lab/bmm`.
 
 ### Developer-facing changes
 * **`use_model_template()` now scaffolds the current model-specification patterns.** It generates a flat `.{model}_defaults` block for unversioned models (like `ddm`) or, with the new `versions` argument, a `.{model}_version_table` block for versioned models (like `cswald`). The generated constructor spells out every field of the model object inline (referencing the defaults/version table for `parameters`, `links`, `fixed_parameters`, `default_priors`, and `init_ranges`), and versioned aliases validate `version` with `match.arg()` (#350).
