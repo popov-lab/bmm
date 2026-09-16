@@ -26,7 +26,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">bmm</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="Released version">1.3.1</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="Released version">1.3.2</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -45,7 +45,7 @@
 <li class="nav-item"><form class="form-inline" role="search">
  <input class="form-control" type="search" name="search-input" id="search-input" autocomplete="off" aria-label="Search site" placeholder="Search for" data-search-index="../search.json">
 </form></li>
-<li class="nav-item"><a class="external-link nav-link" href="https://github.com/venpopov/bmm/" aria-label="GitHub"><span class="fa fab fa-github fa-lg"></span></a></li>
+<li class="nav-item"><a class="external-link nav-link" href="https://github.com/popov-lab/bmm/" aria-label="GitHub"><span class="fa fab fa-github fa-lg"></span></a></li>
       </ul>
 </div>
 
@@ -62,7 +62,7 @@
                         <h4 data-toc-skip class="author">Isabel Courage</h4>
             
       
-      <small class="dont-index">Source: <a href="https://github.com/venpopov/bmm/blob/master/vignettes/articles/bmm_m3.Rmd" class="external-link"><code>vignettes/articles/bmm_m3.Rmd</code></a></small>
+      <small class="dont-index">Source: <a href="https://github.com/popov-lab/bmm/blob/master/vignettes/articles/bmm_m3.Rmd" class="external-link"><code>vignettes/articles/bmm_m3.Rmd</code></a></small>
       <div class="d-none name"><code>bmm_m3.Rmd</code></div>
     </div>
 
@@ -135,6 +135,7 @@ p_i = \frac{n_i \cdot A_i}{\sum^n_{j = 1} n_j \cdot A_j}
 p_i = \frac{n_i \cdot e^{A_i}}{\sum^n_{j = 1} n_j \cdot e^{A_j}}
 \]</span></p>
 <p>This choice rule can be interpreted as an n-alternative SDT model over the different response candidates with a Gumbel (or double-exponential) noise distribution.</p>
+<p>The two choice rules differ in how they translate the activation sources into probabilities, and this has a consequence for comparing activation sources. The default priors for the predefined <code>ss</code> and <code>cs</code> versions are calibrated so that both rules imply a comparable, broad range of average performance. For the <code>softmax</code> rule the priors for general (<code>a</code>) and context (<code>c</code>) activation share the same mean, so the implied prior on their difference is centered at zero. This makes <code>softmax</code> the appropriate choice rule when you want to compare or test activation sources against each other directly (e.g., whether context activation exceeds general activation). The <code>simple</code> rule normalizes the raw activations, so context activation has to exceed general activation (<code>c &gt; a</code>) for the model to predict accurate recall; its default priors therefore encode <code>c &gt; a</code> and are not suited for directly comparing <code>c</code> and <code>a</code>. If your research question concerns the contrast between activation sources, use the <code>softmax</code> choice rule (or supply your own symmetric priors).</p>
 <p>Finally, the model then links the response frequencies <span class="math inline">\(Y\)</span> for each response category to the probabilities <span class="math inline">\(p\)</span> using a multinomial distribution with the total number of trials:</p>
 <p><span class="math display">\[
 Y \sim multinomial(p, trials)
@@ -208,7 +209,7 @@ npi &amp; = b
 </h3>
 <p>Let’s begin by loading the <code>bmm</code> package.</p>
 <div class="sourceCode" id="cb1"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://github.com/venpopov/bmm" class="external-link">bmm</a></span><span class="op">)</span></span></code></pre></div>
+<code class="sourceCode R"><span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://github.com/popov-lab/bmm" class="external-link">bmm</a></span><span class="op">)</span></span></code></pre></div>
 <p>For this example, we will be using the data from the first experiment from <span class="citation">Oberauer and Lewandowsky (2019)</span>. This data set is part of the <code>bmm</code> package as <code>oberauer_lewandowsky_2019_e1</code></p>
 <div class="sourceCode" id="cb2"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">data</span> <span class="op">&lt;-</span> <span class="va">oberauer_lewandowsky_2019_e1</span></span>

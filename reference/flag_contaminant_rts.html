@@ -25,7 +25,7 @@ dplyr::group_by() workflows."><meta property="og:image" content="https://venpopo
 
     <a class="navbar-brand me-2" href="../index.html">bmm</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="Released version">1.3.1</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="Released version">1.3.2</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -40,7 +40,7 @@ dplyr::group_by() workflows."><meta property="og:image" content="https://venpopo
 <li class="nav-item"><a class="nav-link" href="https://venpopov.com/bmm/parameter-recovery/index.html">Parameter recovery</a></li>
       </ul><ul class="navbar-nav"><li class="nav-item"><form class="form-inline" role="search">
  <input class="form-control" type="search" name="search-input" id="search-input" autocomplete="off" aria-label="Search site" placeholder="Search for" data-search-index="../search.json"></form></li>
-<li class="nav-item"><a class="external-link nav-link" href="https://github.com/venpopov/bmm/" aria-label="GitHub"><span class="fa fab fa-github fa-lg"></span></a></li>
+<li class="nav-item"><a class="external-link nav-link" href="https://github.com/popov-lab/bmm/" aria-label="GitHub"><span class="fa fab fa-github fa-lg"></span></a></li>
       </ul></div>
 
 
@@ -49,7 +49,7 @@ dplyr::group_by() workflows."><meta property="og:image" content="https://venpopo
 <div class="row">
   <main id="main" class="col-md-9"><div class="page-header">
       <img src="../logo.png" class="logo" alt=""><h1>Flag contaminant reaction times using mixture modeling</h1>
-      <small class="dont-index">Source: <a href="https://github.com/venpopov/bmm/blob/master/R/helpers-data.R" class="external-link"><code>R/helpers-data.R</code></a></small>
+      <small class="dont-index">Source: <a href="https://github.com/popov-lab/bmm/blob/master/R/helpers-data.R" class="external-link"><code>R/helpers-data.R</code></a></small>
       <div class="d-none name"><code>flag_contaminant_rts.Rd</code></div>
     </div>
 
@@ -162,7 +162,7 @@ show random guessing behavior</p></div>
     <h2 id="ref-examples">Examples<a class="anchor" aria-label="anchor" href="#ref-examples"></a></h2>
     <div class="sourceCode"><pre class="sourceCode r"><code><span class="r-in"><span><span class="kw">if</span> <span class="op">(</span><span class="cn">FALSE</span><span class="op">)</span> <span class="op">{</span> <span class="co"># \dontrun{</span></span></span>
 <span class="r-in"><span><span class="co"># Simulate data with contaminants</span></span></span>
-<span class="r-in"><span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://github.com/venpopov/bmm" class="external-link">bmm</a></span><span class="op">)</span></span></span>
+<span class="r-in"><span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://github.com/popov-lab/bmm" class="external-link">bmm</a></span><span class="op">)</span></span></span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/base/Random.html" class="external-link">set.seed</a></span><span class="op">(</span><span class="fl">123</span><span class="op">)</span></span></span>
 <span class="r-in"><span><span class="va">rt_clean</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/stats/GammaDist.html" class="external-link">rgamma</a></span><span class="op">(</span><span class="fl">150</span>, shape <span class="op">=</span> <span class="fl">5</span>, rate <span class="op">=</span> <span class="fl">10</span><span class="op">)</span></span></span>
 <span class="r-in"><span><span class="va">rt_contam</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/stats/Uniform.html" class="external-link">runif</a></span><span class="op">(</span><span class="fl">50</span>, <span class="fl">0.1</span>, <span class="fl">0.2</span><span class="op">)</span></span></span>

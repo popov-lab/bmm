@@ -7,6 +7,7 @@ Create a file with a template for adding a new model (for developers)
 ``` r
 use_model_template(
   model_name,
+  versions = NULL,
   custom_family = FALSE,
   stanvar_blocks = c("data", "tdata", "parameters", "tparameters", "model", "likelihood",
     "genquant", "functions"),
@@ -23,6 +24,16 @@ use_model_template(
   `model_model_name.R` and all necessary functions will be created with
   the appropriate names and structure. The file will be saved in the
   `R/` directory
+
+- versions:
+
+  An optional character vector naming the model versions. If `NULL`
+  (default), the template generates a single flat
+  `.{model_name}_defaults` specification (like `ddm`). If supplied, it
+  generates a `.{model_name}_version_table` with one entry per version
+  and a versioned user-facing alias validated with
+  [`match.arg()`](https://rdrr.io/r/base/match.arg.html) (like
+  `cswald`).
 
 - custom_family:
 

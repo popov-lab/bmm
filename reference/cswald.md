@@ -28,7 +28,10 @@ cswald(rt, response, links = NULL, version = c("simple", "crisk"), ...)
   A named list of link functions for the model parameters. Available
   parameters depend on the version: "simple" has `drift`, `bound`,
   `ndt`, and `s`; "crisk" additionally has `zr`. Default links are "log"
-  for most parameters and "logit" for `zr`.
+  for most parameters and "logit" for `zr`. For positive parameters,
+  "softplus" is available as an alternative to "log" that grows linearly
+  for large values and avoids the numerical blow-up of
+  [`exp()`](https://rdrr.io/r/base/Log.html).
 
 - version:
 

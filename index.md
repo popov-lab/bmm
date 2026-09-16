@@ -69,7 +69,7 @@ a specific version of the package from GitHub:
 if (!requireNamespace("remotes")) {
   install.packages("remotes")
 }
-remotes::install_github("venpopov/bmm")
+remotes::install_github("popov-lab/bmm")
 ```
 
 **Install the 0.0.1 version of bmm (if following version 6 of the
@@ -85,7 +85,7 @@ the 0.0.1 version of the bmm package with:
 if (!requireNamespace("remotes")) {
   install.packages("remotes")
 }
-remotes::install_github("venpopov/bmm@v0.0.1")
+remotes::install_github("popov-lab/bmm@v0.0.1")
 ```
 
 ## Available models
@@ -120,7 +120,7 @@ fact, we are already working on implementing additional models, such as:
 If you have suggestions for models that should be added to the package
 or additional functionality that would improve the usability of the
 pacakge, feel free to create an
-[issue](https://github.com/venpopov/bmm/issues). Ideally this should
+[issue](https://github.com/popov-lab/bmm/issues). Ideally this should
 describe the model, point towards literature that gives details on the
 model, and if possible link to code that has already implemented the
 model.
@@ -300,7 +300,7 @@ Should be interested in contributing a model to the `bmm` package, you
 should first look into the [Developer
 Notes](https://venpopov.com/bmm/dev/dev-notes/index.html) as well as the
 [Contributor
-Guidelines](https://github.com/venpopov/bmm/blob/develop/.github/CONTRIBUTING.md).
+Guidelines](https://github.com/popov-lab/bmm/blob/develop/.github/CONTRIBUTING.md).
 These give a more in depth description of the package architecture, the
 steps necessary to add your own model to the package, and how
 contributions will be acknowledged.

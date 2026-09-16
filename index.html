@@ -29,7 +29,7 @@
 
     <a class="navbar-brand me-2" href="index.html">bmm</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="Released version">1.3.1</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="Released version">1.3.2</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -48,7 +48,7 @@
 <li class="nav-item"><form class="form-inline" role="search">
  <input class="form-control" type="search" name="search-input" id="search-input" autocomplete="off" aria-label="Search site" placeholder="Search for" data-search-index="search.json">
 </form></li>
-<li class="nav-item"><a class="external-link nav-link" href="https://github.com/venpopov/bmm/" aria-label="GitHub"><span class="fa fab fa-github fa-lg"></span></a></li>
+<li class="nav-item"><a class="external-link nav-link" href="https://github.com/popov-lab/bmm/" aria-label="GitHub"><span class="fa fab fa-github fa-lg"></span></a></li>
       </ul>
 </div>
 
@@ -111,7 +111,7 @@
 <code class="sourceCode R"><span><span class="kw">if</span> <span class="op">(</span><span class="op">!</span><span class="fu"><a href="https://rdrr.io/r/base/ns-load.html" class="external-link">requireNamespace</a></span><span class="op">(</span><span class="st">"remotes"</span><span class="op">)</span><span class="op">)</span> <span class="op">{</span></span>
 <span>  <span class="fu"><a href="https://rdrr.io/r/utils/install.packages.html" class="external-link">install.packages</a></span><span class="op">(</span><span class="st">"remotes"</span><span class="op">)</span></span>
 <span><span class="op">}</span></span>
-<span><span class="fu">remotes</span><span class="fu">::</span><span class="fu"><a href="https://remotes.r-lib.org/reference/install_github.html" class="external-link">install_github</a></span><span class="op">(</span><span class="st">"venpopov/bmm"</span><span class="op">)</span></span></code></pre></div>
+<span><span class="fu">remotes</span><span class="fu">::</span><span class="fu"><a href="https://remotes.r-lib.org/reference/install_github.html" class="external-link">install_github</a></span><span class="op">(</span><span class="st">"popov-lab/bmm"</span><span class="op">)</span></span></code></pre></div>
 </details><details><summary><b>Install the 0.0.1 version of bmm (if following version 6 of the tutorial paper on OSF)</b>
 </summary><p></p>
 <p>The package was significantly updated on Feb 03, 2024. If you are following older versions (earlier than Version 6) of the <a href="https://osf.io/preprints/psyarxiv/umt57" class="external-link">Tutorial preprint</a>, you need to install the 0.0.1 version of the bmm package with:</p>
@@ -119,7 +119,7 @@
 <code class="sourceCode R"><span><span class="kw">if</span> <span class="op">(</span><span class="op">!</span><span class="fu"><a href="https://rdrr.io/r/base/ns-load.html" class="external-link">requireNamespace</a></span><span class="op">(</span><span class="st">"remotes"</span><span class="op">)</span><span class="op">)</span> <span class="op">{</span></span>
 <span>  <span class="fu"><a href="https://rdrr.io/r/utils/install.packages.html" class="external-link">install.packages</a></span><span class="op">(</span><span class="st">"remotes"</span><span class="op">)</span></span>
 <span><span class="op">}</span></span>
-<span><span class="fu">remotes</span><span class="fu">::</span><span class="fu"><a href="https://remotes.r-lib.org/reference/install_github.html" class="external-link">install_github</a></span><span class="op">(</span><span class="st">"venpopov/bmm@v0.0.1"</span><span class="op">)</span></span></code></pre></div>
+<span><span class="fu">remotes</span><span class="fu">::</span><span class="fu"><a href="https://remotes.r-lib.org/reference/install_github.html" class="external-link">install_github</a></span><span class="op">(</span><span class="st">"popov-lab/bmm@v0.0.1"</span><span class="op">)</span></span></code></pre></div>
 </details>
 </div>
 <div class="section level2">
@@ -148,7 +148,7 @@
 <li>Signal-Detection Models</li>
 <li>further evidence accumulation models, such as the LBA</li>
 </ul>
-<p>If you have suggestions for models that should be added to the package or additional functionality that would improve the usability of the pacakge, feel free to create an <a href="https://github.com/venpopov/bmm/issues" class="external-link">issue</a>. Ideally this should describe the model, point towards literature that gives details on the model, and if possible link to code that has already implemented the model.</p>
+<p>If you have suggestions for models that should be added to the package or additional functionality that would improve the usability of the pacakge, feel free to create an <a href="https://github.com/popov-lab/bmm/issues" class="external-link">issue</a>. Ideally this should describe the model, point towards literature that gives details on the model, and if possible link to code that has already implemented the model.</p>
 <p>Given the dynamic nature the <code>bmm</code> package is currently in, you can always view the latest list of supported models by running:</p>
 <div class="sourceCode" id="cb4"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu">bmm</span><span class="fu">::</span><span class="fu"><a href="reference/supported_models.html">supported_models</a></span><span class="op">(</span><span class="op">)</span></span>
@@ -181,7 +181,7 @@
 <code class="sourceCode R"><span><span class="op">?</span><span class="va">imm</span></span></code></pre></div>
 <p>A complete call to fit a model using <code>bmm</code> could look like this. For this example, we are using the <code>oberauer_lin_2017</code> data that is provided with the package and we will show how to fit the Interference Measurement Model to this data. If you want a detailed description of this model and and in depth explanation of the parameters estimated in the model, please have a look at <a href="https://venpopov.com/bmm/articles/bmm_imm.html">the IMM article</a>.</p>
 <div class="sourceCode" id="cb6"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://github.com/venpopov/bmm" class="external-link">bmm</a></span><span class="op">)</span></span>
+<code class="sourceCode R"><span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://github.com/popov-lab/bmm" class="external-link">bmm</a></span><span class="op">)</span></span>
 <span></span>
 <span><span class="va">formula</span> <span class="op">&lt;-</span> <span class="fu"><a href="reference/bmmformula.html">bmmformula</a></span><span class="op">(</span><span class="va">c</span> <span class="op">~</span> <span class="fl">0</span> <span class="op">+</span> <span class="va">set_size</span>,</span>
 <span>                      <span class="va">a</span> <span class="op">~</span> <span class="fl">0</span> <span class="op">+</span> <span class="va">set_size</span>,</span>
@@ -209,7 +209,7 @@
 <p>To aid users in improving their intuition about what different models predict for observed data given a certain parameter set, the <code>bmm</code> package also includes density and random generation function for all implemented models.</p>
 <p>These function provide an easy way to see what a model predicts for data given a certain set of parameters. For example you can easily plot the probability density function of the data for the Interference Measurement model using the <code>dimm</code> function. In similar fashion the random generation function included for each model, generates random data based on a set of data generating parameters. For the IMM, you can use <code>rimm</code> to generate data given a set of parameters. Here is an example of how to use these functions. We are ploting a histogram of randomly generated data from the IMM with a setsize of four, and overlaying the probability density function of the model:</p>
 <div class="sourceCode" id="cb8"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://github.com/venpopov/bmm" class="external-link">bmm</a></span><span class="op">)</span></span>
+<code class="sourceCode R"><span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://github.com/popov-lab/bmm" class="external-link">bmm</a></span><span class="op">)</span></span>
 <span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://ggplot2.tidyverse.org" class="external-link">ggplot2</a></span><span class="op">)</span></span>
 <span></span>
 <span><span class="va">resp</span> <span class="op">&lt;-</span> <span class="fu"><a href="reference/IMMdist.html">rimm</a></span><span class="op">(</span></span>
@@ -256,15 +256,15 @@
 <div class="section level2">
 <h2 id="contributing-to-the-bmm-package">Contributing to the <code>bmm</code> package<a class="anchor" aria-label="anchor" href="#contributing-to-the-bmm-package"></a>
 </h2>
-<p>Should be interested in contributing a model to the <code>bmm</code> package, you should first look into the <a href="https://venpopov.com/bmm/dev/dev-notes/index.html">Developer Notes</a> as well as the <a href="https://github.com/venpopov/bmm/blob/develop/.github/CONTRIBUTING.md" class="external-link">Contributor Guidelines</a>. These give a more in depth description of the package architecture, the steps necessary to add your own model to the package, and how contributions will be acknowledged.</p>
+<p>Should be interested in contributing a model to the <code>bmm</code> package, you should first look into the <a href="https://venpopov.com/bmm/dev/dev-notes/index.html">Developer Notes</a> as well as the <a href="https://github.com/popov-lab/bmm/blob/develop/.github/CONTRIBUTING.md" class="external-link">Contributor Guidelines</a>. These give a more in depth description of the package architecture, the steps necessary to add your own model to the package, and how contributions will be acknowledged.</p>
 </div>
 </div>
   </main><aside class="col-md-3"><div class="links">
 <h2 data-toc-skip>Links</h2>
 <ul class="list-unstyled">
 <li><a href="https://cloud.r-project.org/package=bmm" class="external-link">View on CRAN</a></li>
-<li><a href="https://github.com/venpopov/bmm/" class="external-link">Browse source code</a></li>
-<li><a href="https://github.com/venpopov/bmm/issues" class="external-link">Report a bug</a></li>
+<li><a href="https://github.com/popov-lab/bmm/" class="external-link">Browse source code</a></li>
+<li><a href="https://github.com/popov-lab/bmm/issues" class="external-link">Report a bug</a></li>
 </ul>
 </div>
 
@@ -293,8 +293,8 @@
 <div class="developers">
 <h2 data-toc-skip>Developers</h2>
 <ul class="list-unstyled">
-<li>Vencislav Popov <br><small class="roles"> Author, maintainer, copyright holder </small> <a href="https://orcid.org/0000-0002-8073-4199" target="orcid.widget" aria-label="ORCID" class="external-link"><span class="fab fa-orcid orcid" aria-hidden="true"></span></a>  </li>
-<li>Gidon T. Frischkorn <br><small class="roles"> Author, copyright holder </small> <a href="https://orcid.org/0000-0002-5055-9764" target="orcid.widget" aria-label="ORCID" class="external-link"><span class="fab fa-orcid orcid" aria-hidden="true"></span></a>  </li>
+<li>Vencislav Popov <br><small class="roles"> Author, copyright holder </small> <a href="https://orcid.org/0000-0002-8073-4199" target="orcid.widget" aria-label="ORCID" class="external-link"><span class="fab fa-orcid orcid" aria-hidden="true"></span></a>  </li>
+<li>Gidon T. Frischkorn <br><small class="roles"> Author, maintainer, copyright holder </small> <a href="https://orcid.org/0000-0002-5055-9764" target="orcid.widget" aria-label="ORCID" class="external-link"><span class="fab fa-orcid orcid" aria-hidden="true"></span></a>  </li>
 <li><a href="authors.html">More about authors...</a></li>
 </ul>
 </div>
