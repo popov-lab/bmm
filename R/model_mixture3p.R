@@ -40,7 +40,7 @@
       ),
       fixed_parameters = list(mu1 = 0, mu2 = 0, kappa2 = -100),
       default_priors = list(
-        mu1 = list(main = "student_t(1, 0, 1)"),
+        mu1 = list(main = "normal(0, 0.5)", effects = "normal(0, 0.25)", sd = "exponential(4)"),
         kappa = list(main = "normal(2, 1)", effects = "normal(0, 1)", sd = "exponential(1)"),
         thetat = list(main = "logistic(0, 1)", effects = "normal(0, 0.5)", sd = "exponential(1)"),
         thetant = list(main = "logistic(0, 1)", effects = "normal(0, 0.5)", sd = "exponential(1)")

@@ -377,6 +377,20 @@ test_that("every model ships an sd default on the link scale of each parameter",
   for (par in c("bound", "ndt")) expect_equal(sd_default(pr, par), "exponential(2)")
 })
 
+test_that("a freed mu / mu1 gets regularizing main, effects and sd priors on the tan_half scale", {
+  data <- oberauer_lin_2017
+
+  pr <- default_prior(bmf(mu ~ 1 + set_size + (1 | ID), c ~ 1, kappa ~ 1), data, sdm("dev_rad"))
+  expect_equal(pr[pr$class == "Intercept" & pr$dpar == "", ]$prior, "normal(0, 0.5)")
+  expect_equal(pr[pr$class == "b" & pr$coef == "" & pr$dpar == "", ]$prior, "normal(0, 0.25)")
+  # brms treats mu as its own parameter, so its sd row is the global one
+  expect_equal(pr[pr$class == "sd" & pr$coef == "" & pr$group == "" & pr$dpar == "" & pr$nlpar == "", ]$prior, "exponential(4)")
+
+  pr <- default_prior(bmf(mu1 ~ 0 + session + (1 | ID), kappa ~ 1, thetat ~ 1), data, mixture2p("dev_rad"))
+  expect_equal(pr[pr$class == "b" & pr$coef == "" & pr$dpar == "mu1", ]$prior, "normal(0, 0.5)")
+  expect_equal(sd_default(pr, "mu1"), "exponential(4)")
+})
+
 test_that("the set-size-1 sd constraint survives next to the blanket sd prior", {
   data <- oberauer_lin_2017
   model <- mixture3p("dev_rad", nt_features = paste0("col_nt", 1:7), set_size = "set_size")
