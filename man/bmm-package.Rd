@@ -12,18 +12,18 @@ Fit computational and measurement models using full Bayesian inference. The pack
 \seealso{
 Useful links:
 \itemize{
-  \item \url{https://github.com/venpopov/bmm}
+  \item \url{https://github.com/popov-lab/bmm}
   \item \url{https://venpopov.com/bmm/}
-  \item Report bugs at \url{https://github.com/venpopov/bmm/issues}
+  \item Report bugs at \url{https://github.com/popov-lab/bmm/issues}
 }
 
 }
 \author{
-\strong{Maintainer}: Vencislav Popov \email{vencislav.popov@gmail.com} (\href{https://orcid.org/0000-0002-8073-4199}{ORCID}) [copyright holder]
+\strong{Maintainer}: Gidon T. Frischkorn \email{gfrischkorn@icloud.com} (\href{https://orcid.org/0000-0002-5055-9764}{ORCID}) [copyright holder]
 
 Authors:
 \itemize{
-  \item Gidon T. Frischkorn \email{gidon.frischkorn@psychologie.uzh.ch} (\href{https://orcid.org/0000-0002-5055-9764}{ORCID}) [copyright holder]
+  \item Vencislav Popov \email{vencislav.popov@gmail.com} (\href{https://orcid.org/0000-0002-8073-4199}{ORCID}) [copyright holder]
 }
 
 Other contributors:
