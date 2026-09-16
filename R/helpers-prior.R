@@ -73,16 +73,36 @@ default_prior.bmmformula <- function(object, data, model, formula = object, ...)
 #'   reported as a default. Coefficients that inherit their prior from a more
 #'   general class are collapsed into the row of the prior they inherit from.
 #'
+#'   The one exception is a parameter fixed to a constant in the formula: bmm
+#'   folds such a constant into the model object at fit time, overwriting the
+#'   default it replaced, so the original default is no longer recoverable
+#'   from the fit. Constants named in the formula are therefore always
+#'   reported as `"user"`, even when the value restates the bmm default.
+#'
+#'   Re-derivation uses the `default_priors` stored inside the fit, so later
+#'   changes to a model's default *values* do not affect the report of an
+#'   older fit. It does use the currently installed code that turns those
+#'   values into prior rows, so if that construction changes between versions,
+#'   the reported provenance of a fit made with an earlier version may differ
+#'   from what was actually applied. No check against `fit$version$bmm` is
+#'   performed.
+#'
 #'   Flat priors are flagged because they are improper: Bayes factors via
 #'   bridge sampling are undefined when any parameter has an improper prior.
 #'
-#'   For models in which the brms `mu` parameter is only a technical
-#'   requirement of the custom family rather than a model parameter (e.g. the
-#'   response-time models), the fixed `mu` is omitted from the report. For
-#'   circular models `mu` is reported, as it can be estimated as a response
-#'   bias.
+#'   Parameters that exist only because the family machinery requires them are
+#'   omitted: a fixed parameter the model does not declare (the `mu` brms
+#'   forces on the custom families of the response-time models, or the `mu2`
+#'   and `kappa2` of a two-component `brms::mixture()` family), and the
+#'   mixture-weight reference component `theta2`, which brms lists with a
+#'   default prior although the sampler holds it at zero. Fixed parameters the
+#'   model does declare are reported, since the user can estimate them: `mu`
+#'   for `sdm()`, `mu1` for the circular mixture models, `zr` for `ddm()`.
 #' @return A `data.frame` of class `bmm_report_priors` with columns
 #'   `parameter`, `link`, `class`, `coef`, `group`, `prior` and `source`.
+#'   Subsetting the report with `[` returns a plain `data.frame`, as the
+#'   report-specific printing depends on columns and attributes that
+#'   subsetting drops.
 #' @seealso [default_prior()], [parameters()]
 #' @keywords extract_info
 #' @examplesIf isTRUE(Sys.getenv("BMM_EXAMPLES"))
@@ -106,6 +126,15 @@ report_priors <- function(fit, format = "table") {
     par_labels = unlist(fit$bmm$model$parameters),
     format = format
   )
+}
+
+# the report is documented as a data.frame, so subsetting it yields one: the
+# report attributes and the link column that print.bmm_report_priors() needs
+# do not survive `[`, and keeping the class would dispatch the report printer
+# onto an object that no longer supports it
+#' @export
+"[.bmm_report_priors" <- function(x, ...) {
+  as.data.frame(NextMethod())
 }
 
 #' @export
@@ -153,8 +182,8 @@ print.bmm_report_priors <- function(x, ...) {
 # fit -> tidy classified prior table; the shared extraction layer for #194
 prior_provenance <- function(fit) {
   # force defaults on so reconstruction is deterministic regardless of session
-  # options; fits made with bmm.default_priors = FALSE still classify correctly
-  # because their flat rows can never match a non-empty default
+  # options; a fit made with bmm.default_priors = FALSE still classifies
+  # correctly because its flat rows can never match a non-empty default
   withr::local_options(bmm.default_priors = TRUE)
   model <- fit$bmm$model
   defaults <- suppressWarnings(suppressMessages({
@@ -177,23 +206,37 @@ prior_provenance <- function(fit) {
   # check_model, so the reconstruction reports them as defaults
   user_fixed <- names(fit$bmm$user_formula)[is_constant(fit$bmm$user_formula)]
   out$source[out$parameter %in% user_fixed & out$source == "bmm default"] <- "user"
-  # a mu that is fixed but not declared in the model's parameters exists only
-  # because brms requires custom families to have one (e.g. the response-time
-  # models); it is not a model parameter and is not reported. Models that
-  # declare mu (e.g. sdm, where it is an estimable response bias) keep it.
-  mu_is_technical <- "mu" %in% names(model$fixed_parameters) &&
-    !"mu" %in% names(model$parameters)
-  if (mu_is_technical) {
-    out <- out[!(out$parameter %in% "mu"), , drop = FALSE]
-    row.names(out) <- NULL
-  }
+  drop_technical_parameters(out, model)
+}
+
+# rows that exist only because the family machinery requires them, not because
+# the model has such a parameter:
+#   - fixed parameters the model never declares: the mu that brms forces on
+#     every custom family (the response-time models), and the second-component
+#     mu2/kappa2 of a brms::mixture() family. Fixed parameters the model does
+#     declare (sdm's mu, mixture2p's mu1) are real and stay.
+#   - the mixture-weight reference component: brms reports a default prior for
+#     the theta<k> it did not linearly predict, but the generated Stan code
+#     sets it to rep_vector(0.0, N) as the softmax reference, so the prior is
+#     never applied. bmm's own weight parameters (thetat, thetant) are mapped
+#     onto theta1 by nlf() and are reported under their own names.
+drop_technical_parameters <- function(out, model) {
+  declared <- names(model$parameters)
+  technical <- setdiff(names(model$fixed_parameters), declared)
+  mixture_ref <- grepl("^theta[0-9]+$", out$class) & !(out$class %in% declared)
+  out <- out[!(out$parameter %in% technical) & !mixture_ref, , drop = FALSE]
+  row.names(out) <- NULL
   out
 }
 
 # compare the prior table of a fit against a freshly reconstructed default
-# prior table to determine the provenance of each prior; brms stamps every
-# prior passed to brm(prior = ...) as "user", so the source column of the fit
-# cannot distinguish bmm defaults from user-set priors
+# prior table to determine the provenance of each prior; bmm passes its
+# defaults through brm(prior = ...), which brms stamps as "user" exactly like
+# a genuine user prior, so the reconstruction is what separates those two.
+# The converse is unambiguous: a row brms still marks "default" is one bmm
+# never passed, so it is a brms default whatever the reconstruction says. That
+# matters for fits made with bmm.default_priors = FALSE, where brms supplies
+# its own default for a parameter bmm would otherwise have claimed.
 classify_priors <- function(prior, defaults, links = list()) {
   key_cols <- c("class", "dpar", "nlpar", "coef", "group", "resp")
   eff <- resolve_effective_prior(prior)
@@ -202,11 +245,12 @@ classify_priors <- function(prior, defaults, links = list()) {
   def_eff <- resolve_effective_prior(defaults)[match(keys, def_keys)]
   def_eff[is.na(def_eff)] <- ""
   from_bmm <- keys %in% def_keys[defaults$source == "user"]
+  from_brms <- (prior$source %||% rep("", nrow(prior))) == "default"
 
   source <- ifelse(
     !nzchar(eff), "flat",
-    ifelse(eff == def_eff & from_bmm, "bmm default",
-      ifelse(eff == def_eff, "brms default", "user")
+    ifelse(eff == def_eff & from_bmm & !from_brms, "bmm default",
+      ifelse(eff == def_eff | from_brms, "brms default", "user")
     )
   )
 
@@ -216,8 +260,12 @@ classify_priors <- function(prior, defaults, links = list()) {
       ifelse(prior$class %in% c("b", "Intercept"), "mu", NA)
     )
   )
+  # an undeclared parameter has no known sampling scale; reporting "identity"
+  # would claim the prior applies to the native value, which for a technical
+  # dpar of a custom family (e.g. a mixture's kappa2, on kappa's log link) is
+  # wrong by orders of magnitude
   link <- vapply(parameter, function(p) {
-    if (is.na(p)) NA_character_ else links[[p]] %||% "identity"
+    if (is.na(p)) NA_character_ else links[[p]] %||% NA_character_
   }, character(1), USE.NAMES = FALSE)
 
   out <- data.frame(
@@ -343,9 +391,10 @@ parameter_prior_sentences <- function(rows, par_labels) {
         glue("{scope} received a {rest$prior[i]} prior ({rest$source[i]})")
       }
     }, character(1))
+    scale <- if (is.na(rest$link[1])) "" else glue(" ({rest$link[1]} link)")
     sentences <- c(
       sentences,
-      glue("For {subject} ({rest$link[1]} link), {collapse_and(clauses)}.")
+      glue("For {subject}{scale}, {collapse_and(clauses)}.")
     )
   }
   sentences
@@ -646,6 +695,9 @@ construct_default_priors_list <- function(par, bterms, default_priors, data) {
 # given prior) parts present in prior2 will overwrite the corresponding parts in
 # prior1
 combine_prior <- function(prior1, prior2) {
+  if (is.null(prior1)) {
+    return(prior2)
+  }
   if (is.null(prior2)) {
     return(prior1)
   }

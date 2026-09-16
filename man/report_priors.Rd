@@ -15,6 +15,9 @@ report_priors(fit, format = "table")
 \value{
 A \code{data.frame} of class \code{bmm_report_priors} with columns
 \code{parameter}, \code{link}, \code{class}, \code{coef}, \code{group}, \code{prior} and \code{source}.
+Subsetting the report with \code{[} returns a plain \code{data.frame}, as the
+report-specific printing depends on columns and attributes that
+subsetting drops.
 }
 \description{
 For each parameter of a fitted bmm model, reports the link
@@ -37,14 +40,31 @@ user-specified prior that is identical to the bmm default is therefore
 reported as a default. Coefficients that inherit their prior from a more
 general class are collapsed into the row of the prior they inherit from.
 
+The one exception is a parameter fixed to a constant in the formula: bmm
+folds such a constant into the model object at fit time, overwriting the
+default it replaced, so the original default is no longer recoverable
+from the fit. Constants named in the formula are therefore always
+reported as \code{"user"}, even when the value restates the bmm default.
+
+Re-derivation uses the \code{default_priors} stored inside the fit, so later
+changes to a model's default \emph{values} do not affect the report of an
+older fit. It does use the currently installed code that turns those
+values into prior rows, so if that construction changes between versions,
+the reported provenance of a fit made with an earlier version may differ
+from what was actually applied. No check against \code{fit$version$bmm} is
+performed.
+
 Flat priors are flagged because they are improper: Bayes factors via
 bridge sampling are undefined when any parameter has an improper prior.
 
-For models in which the brms \code{mu} parameter is only a technical
-requirement of the custom family rather than a model parameter (e.g. the
-response-time models), the fixed \code{mu} is omitted from the report. For
-circular models \code{mu} is reported, as it can be estimated as a response
-bias.
+Parameters that exist only because the family machinery requires them are
+omitted: a fixed parameter the model does not declare (the \code{mu} brms
+forces on the custom families of the response-time models, or the \code{mu2}
+and \code{kappa2} of a two-component \code{brms::mixture()} family), and the
+mixture-weight reference component \code{theta2}, which brms lists with a
+default prior although the sampler holds it at zero. Fixed parameters the
+model does declare are reported, since the user can estimate them: \code{mu}
+for \code{sdm()}, \code{mu1} for the circular mixture models, \code{zr} for \code{ddm()}.
 }
 \examples{
 \dontshow{if (isTRUE(Sys.getenv("BMM_EXAMPLES"))) withAutoprint(\{ # examplesIf}
