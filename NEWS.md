@@ -1,3 +1,5 @@
+# bmm (development version)
+
 # bmm 1.3.2
 
 ### Changes to default priors
