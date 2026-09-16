@@ -111,7 +111,7 @@ bind_rows(
 #>       method   mean_rt     var_rt  accuracy contaminant_prop
 #> ...1  simple 0.8231905 0.39684254 0.4752726               NA
 #> ...2  robust 0.6440000 0.05804206 0.4752726               NA
-#> mu   mixture 0.7500098 0.11366415 0.4752726       0.02797548
+#> mu   mixture 0.7500167 0.11366858 0.4752726       0.02797528
 ```
 
 The mixture method also returns a contamination proportion estimate. The
@@ -201,12 +201,12 @@ flagged <- rr98_subset |>
 
 head(flagged)
 #>      rt response strength correct contam_prob
-#> 1 0.801    upper        8    TRUE 0.002307926
-#> 2 0.680    upper        7    TRUE 0.001599957
-#> 3 0.694    lower       19    TRUE 0.001669003
-#> 4 0.582    lower       21   FALSE 0.001215204
-#> 5 0.925    upper       19   FALSE 0.003359771
-#> 6 0.605    upper       10    TRUE 0.001286841
+#> 1 0.801    upper        8    TRUE 0.002307907
+#> 2 0.680    upper        7    TRUE 0.001599956
+#> 3 0.694    lower       19    TRUE 0.001669001
+#> 4 0.582    lower       21   FALSE 0.001215208
+#> 5 0.925    upper       19   FALSE 0.003359717
+#> 6 0.605    upper       10    TRUE 0.001286845
 ```
 
 Diagnostics (convergence, parameters, log-likelihood) are available via
@@ -217,7 +217,7 @@ Diagnostics (convergence, parameters, log-likelihood) are available via
 probs <- flag_contaminant_rts(rr98_subset$rt)
 attr(probs, "diagnostics")
 #>   mixture_params contaminant_prop converged iterations    loglik n_trials
-#> 1   0.420729....       0.02797548      TRUE         13 -926.5735     3943
+#> 1   0.420729....       0.02797528      TRUE         12 -926.5735     3943
 #>   distribution     method
 #> 1   exgaussian mixture_em
 ```
@@ -380,7 +380,7 @@ ezdm_data |>
 #> 1 jf    speed                      0.00161                0.00145
 #> 2 jf    accuracy                   0.0316                 0.0240 
 #> 3 kr    speed                      0.00241                0.00362
-#> 4 kr    accuracy                   0.0147                 0.0285 
+#> 4 kr    accuracy                   0.0147                 0.0284 
 #> 5 nh    speed                      0.00257                0.00155
 #> 6 nh    accuracy                   0.0396                 0.0506
 ```
