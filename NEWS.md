@@ -1,5 +1,14 @@
 # bmm (development version)
 
+### New features
+* Random-effects standard deviations now get domain-informed default priors instead of the `student_t(3, 0, 2.5)` default of `brms`, which on a log link lets individual parameters vary by a factor of 12 around the group value. Every model parameter declares an `sd` entry in its `default_priors` (next to `main` and `effects`), applied as a blanket `class = "sd"` prior whenever the parameter has random effects. The priors are `exponential()` on the link scale: rate 1 for memory-strength, mixing-weight and identity-linked drift parameters, rate 2 for boundary, non-decision time, start point, contaminant and log-linked drift parameters, rate 4 for the circular bias `mu`/`mu1`. Override by addressing the parameter with `dpar` or `nlpar`, e.g. `set_prior("exponential(2)", class = "sd", nlpar = "kappa")` (#342).
+
+### Bug fixes
+* The mixing weights `thetat` (**mixture2p**) and `thetat`/`thetant` (**mixture3p**) had no `effects` prior, so any regression coefficient on them was flat. They now get `normal(0, 0.5)` on the logit/softmax scale (#305).
+* The circular bias parameters `mu` (**sdm**) and `mu1` (**mixture2p**, **mixture3p**, **imm**) had a `student_t(1, 0, 1)` intercept prior, uniform over the circle under the `tan_half` link, and no `effects` prior, which gave non-reference levels a bimodal prior on the native scale. They now get `normal(0, 0.5)` on the intercept (95% of the prior bias within 89 degrees of the target), `normal(0, 0.25)` on effects (a condition difference with SD 24 degrees) and `exponential(4)` on random-effects SDs. `mu`/`mu1` stay fixed at 0 by default, so this only affects models that free them (#306).
+* `options(bmm.default_priors = FALSE)` no longer errors: `set_default_prior()` returned `NULL`, which `combine_prior()` could not index.
+
+
 # bmm 1.3.2
 
 ### Changes to default priors

@@ -11,6 +11,17 @@
 #'   The default priors in `bmm` tend to be more informative than the default
 #'   priors in `brms`, as we use domain knowledge to specify the priors.
 #'
+#'   Each model parameter carries three default priors, listed in the
+#'   documentation of the model: `main` for the intercept (or for all levels of
+#'   a factor when the intercept is suppressed), `effects` for the remaining
+#'   regression coefficients, and `sd` for the standard deviations of its random
+#'   effects. The `sd` prior is applied as a blanket prior to every random-effects
+#'   standard deviation of that parameter (all grouping factors, intercepts and
+#'   slopes alike) and replaces the `student_t(3, 0, 2.5)` default of `brms`. To
+#'   override it, address the parameter with `dpar` or `nlpar` in
+#'   [brms::set_prior()], e.g. `set_prior("exponential(2)", class = "sd",
+#'   nlpar = "kappa")`.
+#'
 #' @inheritParams bmm
 #' @aliases default_prior
 #' @param object A `bmmformula` object

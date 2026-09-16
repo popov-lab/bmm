@@ -53,16 +53,21 @@ Two-parameter mixture model by Zhang and Luck (2008).
 \itemize{
 \item \code{mu1}:
 \itemize{
-\item \code{main}: student_t(1, 0, 1)
+\item \code{main}: normal(0, 0.5)
+\item \code{effects}: normal(0, 0.25)
+\item \code{sd}: exponential(4)
 }
 \item \code{kappa}:
 \itemize{
 \item \code{main}: normal(2, 1)
 \item \code{effects}: normal(0, 1)
+\item \code{sd}: exponential(1)
 }
 \item \code{thetat}:
 \itemize{
 \item \code{main}: logistic(0, 1)
+\item \code{effects}: normal(0, 0.5)
+\item \code{sd}: exponential(1)
 }
 }
 }
