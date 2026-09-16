@@ -82,7 +82,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <link href="site_libs/quarto-html/quarto-syntax-highlighting-64a204ab8560d761af7679ceaba22944.css" rel="stylesheet" id="quarto-text-highlighting-styles">
 <script src="site_libs/bootstrap/bootstrap.min.js"></script>
 <link href="site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
-<link href="site_libs/bootstrap/bootstrap-e2a0acc2e5cec106112107b2889cd56a.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
+<link href="site_libs/bootstrap/bootstrap-893fe9ddc644446a6c1ebe867bb6f684.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
 <script id="quarto-search-options" type="application/json">{
   "location": "navbar",
   "copy-button": false,
@@ -206,6 +206,12 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
  <span class="menu-text"><span class="chapter-number">5</span>&nbsp; <span class="chapter-title">Adding a new model</span></span></a>
   </div>
 </li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./coding-conventions.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">6</span>&nbsp; <span class="chapter-title">Coding conventions</span></span></a>
+  </div>
+</li>
     </ul>
     </div>
 </nav>
@@ -218,6 +224,10 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
   <ul>
   <li><a href="#git-commands" id="toc-git-commands" class="nav-link active" data-scroll-target="#git-commands"><span class="header-section-number">2.1</span> Git commands</a></li>
   <li><a href="#pull-requests" id="toc-pull-requests" class="nav-link" data-scroll-target="#pull-requests"><span class="header-section-number">2.2</span> Pull requests</a></li>
+  <li><a href="#ai-assisted-contributions" id="toc-ai-assisted-contributions" class="nav-link" data-scroll-target="#ai-assisted-contributions"><span class="header-section-number">2.3</span> AI-assisted contributions</a>
+  <ul class="collapse">
+  <li><a href="#what-review-will-send-back" id="toc-what-review-will-send-back" class="nav-link" data-scroll-target="#what-review-will-send-back"><span class="header-section-number">2.3.1</span> What review will send back</a></li>
+  </ul></li>
   </ul>
 </nav>
     </div>
@@ -247,8 +257,8 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <p>After your fork the <code>bmm</code> repository and create a branch for your new model/feature, you can follow a typical git workflow. As you make changes and add new files, you will want to:</p>
 <section id="git-commands" class="level2" data-number="2.1">
 <h2 data-number="2.1" class="anchored" data-anchor-id="git-commands"><span class="header-section-number">2.1</span> Git commands</h2>
-<p><a href="https://www.atlassian.com/git/tutorials/saving-changes">Add</a> your changes to git, <a href="https://www.atlassian.com/git/tutorials/saving-changes/git-commit">commit</a> them and then <a href="https://www.atlassian.com/git/tutorials/syncing/git-push">push</a> your changes to your forked repository. You can run these commands from a terminal or from the RStudio terminal (with the project working directory)</p>
-<p>Add changed files to the staging area. It is best to add specific files rather than using <code>git add *</code> or <code>git add .</code>, which can accidentally stage unintended files (e.g., <code>.env</code>, large data files, or files in <code>local/</code>):</p>
+<p><a href="https://www.atlassian.com/git/tutorials/saving-changes">Add</a> your changes to git, <a href="https://www.atlassian.com/git/tutorials/saving-changes/git-commit">commit</a> them and then <a href="https://www.atlassian.com/git/tutorials/syncing/git-push">push</a> your changes to your forked repository. You can run these commands from any terminal, including the one built into your editor, with the project as the working directory</p>
+<p>Add changed files to the staging area. It is best to add specific files rather than using <code>git add *</code> or <code>git add .</code>, which can accidentally stage unintended files (e.g., <code>.env</code>, large data files, or fitted model objects):</p>
 <div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb1"><pre class="sourceCode numberSource bash number-lines code-with-copy"><code class="sourceCode bash"><span id="cb1-1"><a href="#cb1-1" aria-label="1"></a><span class="fu">git</span> add R/model_my_model.R inst/stan_chunks/my_model_funs.stan</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <p>Commit the changes to the local repository</p>
 <div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb2"><pre class="sourceCode numberSource bash number-lines code-with-copy"><code class="sourceCode bash"><span id="cb2-1"><a href="#cb2-1" aria-label="1"></a><span class="fu">git</span> commit <span class="at">-m</span> <span class="st">"A short message describing the changes you made"</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
@@ -259,8 +269,27 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <section id="pull-requests" class="level2" data-number="2.2">
 <h2 data-number="2.2" class="anchored" data-anchor-id="pull-requests"><span class="header-section-number">2.2</span> Pull requests</h2>
 <p>When you are ready you can open a pull request from your forked repository to the main bmm repository. You can do this from the github website. Make sure to select the Develop branch as the base branch and your feature branch as the compare branch. You should add a detailed description of your changes, including the motivation for the changes and any relevant context. You should also mention any issues that your pull request resolves.</p>
+</section>
+<section id="ai-assisted-contributions" class="level2" data-number="2.3">
+<h2 data-number="2.3" class="anchored" data-anchor-id="ai-assisted-contributions"><span class="header-section-number">2.3</span> AI-assisted contributions</h2>
+<p>AI assistance is welcome. The maintainers use it. This section is not a warning against it, but a statement of what we need from you so that a pull request written with help from a language model can be reviewed like any other.</p>
+<p><strong>You are the author of every line you submit.</strong> Concretely, that means three things. You can explain what each function does and why it is written the way it is. You have run it — a real fit on real or simulated data, not only the test suite. And you answer for it in review, including the parts you did not type yourself.</p>
+<p><strong>Say in the pull request body which parts were AI-assisted and how you verified them.</strong> This is not a disclaimer and it does not count against you. It tells the reviewer where to look hardest, which makes the review faster and better, and it is the difference between a reviewer trusting the rest of the diff and checking all of it twice.</p>
+<p><strong>What the review does with it.</strong> A human approves, and for a new model that human has installed your branch and fitted the model. The disclosure tells them where to read closely; it does not shift the work onto a tool.</p>
+<section id="what-review-will-send-back" class="level3" data-number="2.3.1">
+<h3 data-number="2.3.1" class="anchored" data-anchor-id="what-review-will-send-back"><span class="header-section-number">2.3.1</span> What review will send back</h3>
+<p>AI-generated code in bmm fails in recognizable ways. These are the ones that come up most often, and they are all cheap to fix before you open the pull request rather than after:</p>
+<ul>
+<li><strong>Defensive validation sprinkled through internals.</strong> A model generated with help tends to acquire argument checks in <code>.model_*()</code>, in <code>configure_model.*()</code> and in every private helper. Validation belongs in the exported constructor, because that is the only place where the argument named in the message is the argument the user passed. See <a href="coding-conventions.html" class="quarto-xref"><span>Chapter 6</span></a>.</li>
+<li><strong>Base <code>stop()</code>, <code>warning()</code> and <code>sprintf()</code>.</strong> These are what a model trained on general R code reaches for. bmm uses <code>stop2()</code>, <code>warning2()</code>, <code>stopif()</code>, <code>warnif()</code> and <code>glue::glue()</code>, and the reasons are not stylistic: <code>message2()</code> respects <code>options(bmm.silent)</code> and <code>stopif()</code> interpolates in the caller’s frame.</li>
+<li><strong>Explicit <code>return()</code> on the last line</strong>, and <code>%&gt;%</code> where the package uses <code>|&gt;</code>.</li>
+<li><strong>Comments that restate the code.</strong> <code># construct the family</code> above a <code>custom_family()</code> call is noise. A comment should record why a line is the way it is, especially when it looks removable and is not.</li>
+<li><strong>A parameter recovery script that simulates and fits with the same function.</strong> This is the one that matters most, because it produces a result that looks like evidence. If you generate data with your own <code>r*()</code> function and fit a likelihood built from your own <code>d*()</code> function, any error common to both cancels and recovery looks clean whether the model is right or wrong. Use an independent generator.</li>
+</ul>
+<p>The last one is worth the extra sentence: a recovery study that cannot fail tells the reviewer nothing, and it is the artifact they will ask for first.</p>
 
 
+</section>
 </section>
 
 </main> <!-- /main -->

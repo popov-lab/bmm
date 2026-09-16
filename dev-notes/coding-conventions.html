@@ -1,0 +1,856 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
+
+<meta charset="utf-8">
+<meta name="generator" content="quarto-1.10.18">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+
+
+<title>6&nbsp; Coding conventions – BMM Developer Notes</title>
+<style>
+/* Default styles provided by pandoc.
+** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
+*/
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: 1.5em;}
+div.column{flex: auto;}
+@media screen {
+div.columns{gap: min(4vw, 1.5em);}
+div.column{overflow-x: auto;}
+}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+  width: 0.8em;
+  margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
+  vertical-align: middle;
+}
+/* CSS for syntax highlighting */
+html { -webkit-text-size-adjust: 100%; }
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+  { counter-reset: source-line 0; }
+pre.numberSource code > span
+  { position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+  { content: counter(source-line);
+    position: relative; left: -1em; text-align: right; vertical-align: baseline;
+    border: none; display: inline-block;
+    -webkit-touch-callout: none; -webkit-user-select: none;
+    -khtml-user-select: none; -moz-user-select: none;
+    -ms-user-select: none; user-select: none;
+    padding: 0 4px; width: 4em;
+  }
+pre.numberSource { margin-left: 3em;  padding-left: 4px; }
+div.sourceCode
+  {   }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+}
+</style>
+
+
+<script src="site_libs/quarto-nav/quarto-nav.js"></script>
+<script src="site_libs/quarto-nav/headroom.min.js"></script>
+<script src="site_libs/clipboard/clipboard.min.js"></script>
+<script src="site_libs/quarto-search/autocomplete.umd.js"></script>
+<script src="site_libs/quarto-search/fuse.min.js"></script>
+<script src="site_libs/quarto-search/quarto-search.js"></script>
+<meta name="quarto:offset" content="./">
+<link href="./add-new-model.html" rel="prev">
+<script src="site_libs/quarto-html/quarto.js" type="module"></script>
+<script src="site_libs/quarto-html/tabsets/tabsets.js" type="module"></script>
+<script src="site_libs/quarto-html/popper.min.js"></script>
+<script src="site_libs/quarto-html/tippy.umd.min.js"></script>
+<script src="site_libs/quarto-html/anchor.min.js"></script>
+<link href="site_libs/quarto-html/tippy.css" rel="stylesheet">
+<link href="site_libs/quarto-html/quarto-syntax-highlighting-64a204ab8560d761af7679ceaba22944.css" rel="stylesheet" id="quarto-text-highlighting-styles">
+<script src="site_libs/bootstrap/bootstrap.min.js"></script>
+<link href="site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
+<link href="site_libs/bootstrap/bootstrap-893fe9ddc644446a6c1ebe867bb6f684.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
+<script id="quarto-search-options" type="application/json">{
+  "location": "navbar",
+  "copy-button": false,
+  "collapse-after": 3,
+  "panel-placement": "end",
+  "type": "overlay",
+  "limit": 50,
+  "keyboard-shortcut": [
+    "f",
+    "/",
+    "s"
+  ],
+  "show-item-context": false,
+  "language": {
+    "search-no-results-text": "No results",
+    "search-matching-documents-text": "matching documents",
+    "search-copy-link-title": "Copy link to search",
+    "search-hide-matches-text": "Hide additional matches",
+    "search-more-match-text": "more match in this document",
+    "search-more-matches-text": "more matches in this document",
+    "search-clear-button-title": "Clear",
+    "search-text-placeholder": "",
+    "search-detached-cancel-button-title": "Cancel",
+    "search-submit-button-title": "Submit",
+    "search-label": "Search"
+  }
+}</script>
+
+
+</head>
+
+<body class="nav-sidebar floating nav-fixed quarto-light">
+
+<div id="quarto-search-results"></div>
+  <header id="quarto-header" class="headroom fixed-top">
+    <nav class="navbar navbar-expand-lg " data-bs-theme="dark">
+      <div class="navbar-container container-fluid">
+      <div class="navbar-brand-container mx-auto">
+    <a class="navbar-brand" href="./index.html">
+    <span class="navbar-title">BMM Developer Notes</span>
+    </a>
+  </div>
+            <div id="quarto-search" class="" title="Search"></div>
+          <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarCollapse" aria-controls="navbarCollapse" role="menu" aria-expanded="false" aria-label="Toggle navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">
+  <span class="navbar-toggler-icon"></span>
+</button>
+          <div class="collapse navbar-collapse" id="navbarCollapse">
+            <ul class="navbar-nav navbar-nav-scroll me-auto">
+  <li class="nav-item">
+    <a class="nav-link" href="./../reference/index.html"> 
+<span class="menu-text">Functions</span></a>
+  </li>  
+  <li class="nav-item">
+    <a class="nav-link" href="./../articles/index.html"> 
+<span class="menu-text">Articles</span></a>
+  </li>  
+  <li class="nav-item">
+    <a class="nav-link" href="./../news/index.html"> 
+<span class="menu-text">Changelog</span></a>
+  </li>  
+  <li class="nav-item">
+    <a class="nav-link" href="./../dev-notes/index.html"> 
+<span class="menu-text">Develop</span></a>
+  </li>  
+</ul>
+          </div> <!-- /navcollapse -->
+            <div class="quarto-navbar-tools">
+</div>
+      </div> <!-- /container-fluid -->
+    </nav>
+  <nav class="quarto-secondary-nav">
+    <div class="container-fluid d-flex">
+      <button type="button" class="quarto-btn-toggle btn" data-bs-toggle="collapse" role="button" data-bs-target=".quarto-sidebar-collapse-item" aria-controls="quarto-sidebar" aria-expanded="false" aria-label="Toggle sidebar navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">
+        <i class="bi bi-layout-text-sidebar-reverse"></i>
+      </button>
+        <nav class="quarto-page-breadcrumbs" aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item"><a href="./coding-conventions.html"><span class="chapter-number">6</span>&nbsp; <span class="chapter-title">Coding conventions</span></a></li></ol></nav>
+        <a class="flex-grow-1" role="navigation" data-bs-toggle="collapse" data-bs-target=".quarto-sidebar-collapse-item" aria-controls="quarto-sidebar" aria-expanded="false" aria-label="Toggle sidebar navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">      
+        </a>
+    </div>
+  </nav>
+</header>
+<!-- content -->
+<div id="quarto-content" class="quarto-container page-columns page-rows-contents page-layout-article page-navbar">
+<!-- sidebar -->
+  <nav id="quarto-sidebar" class="sidebar collapse collapse-horizontal quarto-sidebar-collapse-item sidebar-navigation floating overflow-auto">
+    <div class="sidebar-menu-container"> 
+    <ul class="list-unstyled mt-1">
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./index.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Overview</span></a>
+  </div>
+</li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./setup.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">1</span>&nbsp; <span class="chapter-title">System setup</span></span></a>
+  </div>
+</li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./git-workflow.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">2</span>&nbsp; <span class="chapter-title">Git and Github workflow</span></span></a>
+  </div>
+</li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./bmm-architecture.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">3</span>&nbsp; <span class="chapter-title">BMM code structure</span></span></a>
+  </div>
+</li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./example-model.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">4</span>&nbsp; <span class="chapter-title">Example model file</span></span></a>
+  </div>
+</li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./add-new-model.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">5</span>&nbsp; <span class="chapter-title">Adding a new model</span></span></a>
+  </div>
+</li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./coding-conventions.html" class="sidebar-item-text sidebar-link active">
+ <span class="menu-text"><span class="chapter-number">6</span>&nbsp; <span class="chapter-title">Coding conventions</span></span></a>
+  </div>
+</li>
+    </ul>
+    </div>
+</nav>
+<div id="quarto-sidebar-glass" class="quarto-sidebar-collapse-item" data-bs-toggle="collapse" data-bs-target=".quarto-sidebar-collapse-item"></div>
+<!-- margin-sidebar -->
+    <div id="quarto-margin-sidebar" class="sidebar margin-sidebar">
+        <nav id="TOC" role="doc-toc" class="toc-active">
+    <h2 id="toc-title">Table of contents</h2>
+   
+  <ul>
+  <li><a href="#errors-warnings-and-messages" id="toc-errors-warnings-and-messages" class="nav-link active" data-scroll-target="#errors-warnings-and-messages"><span class="header-section-number">6.1</span> Errors, warnings and messages</a></li>
+  <li><a href="#dependencies" id="toc-dependencies" class="nav-link" data-scroll-target="#dependencies"><span class="header-section-number">6.2</span> Dependencies</a></li>
+  <li><a href="#code-shape" id="toc-code-shape" class="nav-link" data-scroll-target="#code-shape"><span class="header-section-number">6.3</span> Code shape</a></li>
+  <li><a href="#s3-conventions" id="toc-s3-conventions" class="nav-link" data-scroll-target="#s3-conventions"><span class="header-section-number">6.4</span> S3 conventions</a></li>
+  <li><a href="#where-to-validate-arguments" id="toc-where-to-validate-arguments" class="nav-link" data-scroll-target="#where-to-validate-arguments"><span class="header-section-number">6.5</span> Where to validate arguments</a></li>
+  <li><a href="#log_lik-and-posterior_predict" id="toc-log_lik-and-posterior_predict" class="nav-link" data-scroll-target="#log_lik-and-posterior_predict"><span class="header-section-number">6.6</span> <code>log_lik</code> and <code>posterior_predict</code></a></li>
+  <li><a href="#naming-traps" id="toc-naming-traps" class="nav-link" data-scroll-target="#naming-traps"><span class="header-section-number">6.7</span> Naming traps</a></li>
+  <li><a href="#documentation-and-the-checks-that-enforce-it" id="toc-documentation-and-the-checks-that-enforce-it" class="nav-link" data-scroll-target="#documentation-and-the-checks-that-enforce-it"><span class="header-section-number">6.8</span> Documentation and the checks that enforce it</a></li>
+  <li><a href="#tests" id="toc-tests" class="nav-link" data-scroll-target="#tests"><span class="header-section-number">6.9</span> Tests</a>
+  <ul class="collapse">
+  <li><a href="#parameter-recovery-and-the-circularity-trap" id="toc-parameter-recovery-and-the-circularity-trap" class="nav-link" data-scroll-target="#parameter-recovery-and-the-circularity-trap"><span class="header-section-number">6.9.1</span> Parameter recovery, and the circularity trap</a></li>
+  </ul></li>
+  </ul>
+</nav>
+    </div>
+<!-- main -->
+<main class="content" id="quarto-document-content">
+
+<header id="title-block-header" class="quarto-title-block default">
+<div class="quarto-title">
+<h1 class="title"><span id="sec-conventions" class="quarto-section-identifier"><span class="chapter-number">6</span>&nbsp; <span class="chapter-title">Coding conventions</span></span></h1>
+</div>
+
+
+
+<div class="quarto-title-meta">
+
+    
+  
+    
+  </div>
+  
+
+
+</header>
+
+
+<p>This chapter is the reference for how bmm code is written. It exists because your pull request will be judged against these conventions, and until now they lived mainly in the repository’s <code>AGENTS.md</code>, which an outside contributor has no particular reason to open. Everything here is checked against bmm 1.3.2.</p>
+<p>Read it as conventions, not as a style war. Most of the entries have a reason attached, and the reason is usually that the alternative broke something.</p>
+<section id="errors-warnings-and-messages" class="level2" data-number="6.1">
+<h2 data-number="6.1" class="anchored" data-anchor-id="errors-warnings-and-messages"><span class="header-section-number">6.1</span> Errors, warnings and messages</h2>
+<p>Use the package’s own helpers rather than the base functions:</p>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 25%">
+<col style="width: 25%">
+<col style="width: 49%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Instead of</th>
+<th>Use</th>
+<th>Why</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>stop()</code></td>
+<td><code>stop2()</code></td>
+<td>Interpolates with glue, and suppresses the “Error in f(x):” call prefix so the user reads the message, not our internals</td>
+</tr>
+<tr class="even">
+<td><code>warning()</code></td>
+<td><code>warning2()</code></td>
+<td>Same</td>
+</tr>
+<tr class="odd">
+<td><code>message()</code></td>
+<td><code>message2()</code></td>
+<td>Same, and respects <code>options(bmm.silent)</code></td>
+</tr>
+<tr class="even">
+<td><code>if (cond) stop2(...)</code></td>
+<td><code>stopif(cond, ...)</code></td>
+<td>One line, and reads as the condition it guards</td>
+</tr>
+<tr class="odd">
+<td><code>if (cond) warning2(...)</code></td>
+<td><code>warnif(cond, ...)</code></td>
+<td>Same</td>
+</tr>
+<tr class="even">
+<td><code>sprintf()</code></td>
+<td><code>glue::glue()</code></td>
+<td>Named interpolation, no positional arguments to miscount</td>
+</tr>
+<tr class="odd">
+<td><code>paste(x, collapse = ", ")</code></td>
+<td><code>collapse_comma(x)</code></td>
+<td>Also quotes each element</td>
+</tr>
+</tbody>
+</table>
+<p>In 1.3.2 the counts are <code>stopif</code> 173, <code>stop2</code> 38, <code>warning2</code> 27, <code>warnif</code> 22, <code>message2</code> 11. The base equivalents appear four times, and every one of them is either inside the definition of <code>stop2()</code>/<code>warning2()</code> themselves (<code>R/utils.R:169</code>, <code>:174</code>) or in <code>R/brms-misc.R</code>, which is vendored code: a copy of brms internals kept inside bmm rather than called through <code>brms::</code>, and marked read-only.</p>
+<p>Two of the reasons deserve spelling out, because they are not stylistic.</p>
+<p><code>message2()</code> checks <code>getOption("bmm.silent", 1)</code> and prints nothing at silence level 2 or above (<code>R/utils.R:177-184</code>). Tests set <code>withr::local_options("bmm.silent" = 2)</code> to keep output clean. A base <code>message()</code> call ignores that and will make somebody’s test noisy.</p>
+<p><code>stopif()</code> and <code>warnif()</code> pass <code>env.frame = -2</code> down to <code>stop2()</code> (<code>R/utils.R:189-199</code>). That number counts frames back up the call stack: <code>-1</code> would interpolate in <code>stopif()</code>’s own frame, where your variables do not exist, so <code>-2</code> reaches past it into the function that called <code>stopif()</code>. This is what lets the message interpolate variables from <em>your</em> function. So this works and needs no <code>glue()</code> call of its own:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb1"><pre class="sourceCode numberSource r number-lines code-with-copy"><code class="sourceCode r"><span id="cb1-1"><a href="#cb1-1" aria-label="1"></a><span class="fu">stopif</span>(</span>
+<span id="cb1-2"><a href="#cb1-2" aria-label="2"></a>  <span class="sc">!</span>version <span class="sc">%in%</span> <span class="fu">c</span>(<span class="st">"custom"</span>, <span class="st">"cs"</span>, <span class="st">"ss"</span>),</span>
+<span id="cb1-3"><a href="#cb1-3" aria-label="3"></a>  <span class="st">'Unknown version: {version}. It should be one of "ss", "cs" or "custom"'</span></span>
+<span id="cb1-4"><a href="#cb1-4" aria-label="4"></a>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>Write messages as one glue string. <code>stop2()</code> handles multi-line strings with trailing <code>\\</code> continuations, so a long message does not need <code>paste0()</code>.</p>
+</section>
+<section id="dependencies" class="level2" data-number="6.2">
+<h2 data-number="6.2" class="anchored" data-anchor-id="dependencies"><span class="header-section-number">6.2</span> Dependencies</h2>
+<p>Package code is <strong>base R plus the native pipe</strong> <code>|&gt;</code>. bmm requires R &gt;= 4.1.0, so <code>|&gt;</code> is always available and <code>%&gt;%</code> is not used in package code.</p>
+<p><code>DESCRIPTION</code> Imports at 1.3.2 are <code>bayesplot</code>, <code>brms</code>, <code>crayon</code>, <code>fs</code>, <code>glue</code>, <code>matrixStats</code>, <code>methods</code>, <code>parallel</code>, <code>rtdists</code>, <code>rlang</code>, <code>stats</code> and <code>withr</code>. <strong>dplyr, tidyr, ggplot2 and stringr are <code>Suggests</code>, not Imports</strong> — 1.3.0 removed the dplyr/tidyr/magrittr dependencies. If you have seen bmm guidance that prescribes dplyr idiom for package code, it is out of date. Tidyverse packages belong in articles and tests, where they are already available.</p>
+<p>A function from a <code>Suggests</code> package must be guarded, or the package breaks for anyone who installed it without that suggestion. The pattern is:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb2"><pre class="sourceCode numberSource r number-lines code-with-copy"><code class="sourceCode r"><span id="cb2-1"><a href="#cb2-1" aria-label="1"></a><span class="fu">stopif</span>(</span>
+<span id="cb2-2"><a href="#cb2-2" aria-label="2"></a>  <span class="sc">!</span><span class="fu">requireNamespace</span>(<span class="st">"tidyr"</span>, <span class="at">quietly =</span> <span class="cn">TRUE</span>),</span>
+<span id="cb2-3"><a href="#cb2-3" aria-label="3"></a>  <span class="st">'The "tidyr" package is required for this functionality'</span></span>
+<span id="cb2-4"><a href="#cb2-4" aria-label="4"></a>)</span>
+<span id="cb2-5"><a href="#cb2-5" aria-label="5"></a>data <span class="ot">&lt;-</span> tidyr<span class="sc">::</span><span class="fu">gather</span>(data, non_target_name, non_target_value, <span class="fu">eval</span>(nt_features))</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>as at <code>R/helpers-data.R:174-178</code>. Note the same function opens with</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb3"><pre class="sourceCode numberSource r number-lines code-with-copy"><code class="sourceCode r"><span id="cb3-1"><a href="#cb3-1" aria-label="1"></a>y <span class="ot">&lt;-</span> y_nt <span class="ot">&lt;-</span> non_target_name <span class="ot">&lt;-</span> non_target_value <span class="ot">&lt;-</span> <span class="cn">NULL</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>which exists to silence <code>R CMD check</code>’s “no visible binding for global variable” notes from the non-standard evaluation in the <code>gather()</code> call. If you write code with bare column names, you need this line.</p>
+<p>Always namespace explicitly: <code>brms::stanvar()</code>, <code>stats::complete.cases()</code>, <code>methods::formalArgs()</code>. bmm imports few functions directly, and an unqualified call to an Imports package is the kind of thing that works on your machine and fails in <code>R CMD check</code>.</p>
+</section>
+<section id="code-shape" class="level2" data-number="6.3">
+<h2 data-number="6.3" class="anchored" data-anchor-id="code-shape"><span class="header-section-number">6.3</span> Code shape</h2>
+<p><strong>Return the last expression; use <code>return()</code> only to leave early.</strong> The 74 <code>return()</code> calls in 1.3.2 are almost all guard clauses, and that is the endorsed use:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb4"><pre class="sourceCode numberSource r number-lines code-with-copy"><code class="sourceCode r"><span id="cb4-1"><a href="#cb4-1" aria-label="1"></a>x <span class="ot">&lt;-</span> <span class="fu">try_read_bmmfit</span>(file, file_refit)</span>
+<span id="cb4-2"><a href="#cb4-2" aria-label="2"></a><span class="cf">if</span> (<span class="sc">!</span><span class="fu">is.null</span>(x)) {</span>
+<span id="cb4-3"><a href="#cb4-3" aria-label="3"></a>  <span class="fu">return</span>(x)</span>
+<span id="cb4-4"><a href="#cb4-4" aria-label="4"></a>}</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>Do not write <code>return(out)</code> as the last line of a function.</p>
+<p><strong>No <code>set.seed()</code> inside a function, and no <code>seed</code> argument.</strong> A function that sets the seed silently rewrites the caller’s random state. In 1.3.2 <code>set.seed()</code> appears six times and all six are in <code>@examples</code> blocks in the roxygen comments — the <code>#'</code> comments above each function from which <code>devtools::document()</code> generates the help pages — where it is the right thing. If you need reproducibility inside a function, take the draws you were given; if you need it in a test, set the seed in the test.</p>
+<p><strong>snake_case</strong> for functions and variables. Private helpers are prefixed with a dot (<code>.base_imm_formula</code>, <code>.imm_mixture_family</code>). One reservation: a private helper must <strong>not</strong> be named <code>.model_*</code>, because <code>supported_models()</code> lists every object matching <code>^\.model_</code> as a model (<code>R/helpers-model.R:251</code>).</p>
+<p><strong>Comments say why, not what.</strong> <code># construct the family</code> above a <code>brms::custom_family()</code> call adds nothing. The comment bmm’s own source carries at <code>R/model_sdm.R:124</code> — <code># note - c has a log link, but I've coded it manually for computational efficiency</code> — is worth its line, and so is every comment that records a constraint somebody would otherwise remove.</p>
+</section>
+<section id="s3-conventions" class="level2" data-number="6.4">
+<h2 data-number="6.4" class="anchored" data-anchor-id="s3-conventions"><span class="header-section-number">6.4</span> S3 conventions</h2>
+<p><strong>Dispatch runs general to specific.</strong> A model’s class vector starts with <code>"bmmodel"</code> (the class chains are listed in <a href="bmm-architecture.html#sec-class-chains" class="quarto-xref"><span>Section 3.4</span></a>), so <code>check_data.bmmodel</code> runs <em>before</em> <code>check_data.sdm</code>, not after. This is the opposite of the intuition most people bring, and it has one sharp corollary: <strong>a fall-through fallback belongs on <code>.default</code>, never on <code>.bmmodel</code>.</strong> A method defined on <code>.bmmodel</code> runs first and shadows nothing, but a <em>fallback</em> placed there would be reached before the model-specific method had a chance to run. <code>bmf2bf</code> is the worked example — <code>bmf2bf.default</code> returns <code>NULL</code> and <code>bmf2bf.bmmodel</code> supplies the fallback after <code>NextMethod()</code> has come back empty (see <a href="example-model.html" class="quarto-xref"><span>Chapter 4</span></a>).</p>
+<p><strong>Every <code>check_data</code> method ends with <code>NextMethod("check_data")</code>.</strong> Each method does its own model-specific validation and then hands on down the chain. In 1.3.2 there are 11 <code>check_data</code> methods and 10 <code>NextMethod("check_data")</code> calls; the one without it is <code>check_data.default</code>, which is the end of the chain and returns the data. Forget the <code>NextMethod()</code> and your model silently skips every generic check, including whether its response column exists.</p>
+<p><strong>Match the generic’s signature exactly</strong>, including <code>...</code> where the generic has one and the defaults on <code>check_model(model, data = NULL, formula = NULL)</code>. See the generics table in <a href="bmm-architecture.html" class="quarto-xref"><span>Chapter 3</span></a>.</p>
+</section>
+<section id="where-to-validate-arguments" class="level2" data-number="6.5">
+<h2 data-number="6.5" class="anchored" data-anchor-id="where-to-validate-arguments"><span class="header-section-number">6.5</span> Where to validate arguments</h2>
+<p>Validate in the <strong>exported constructor only</strong> — the user-facing alias. <code>.model_*()</code>, <code>configure_model.*()</code> and private helpers should not, because their error messages name arguments the user never typed. The alias is the one place where the argument the message refers to is the argument the user actually passed:</p>
+<div class="code-with-filename">
+<div class="code-with-filename-file">
+<pre><strong>R/model_m3.R</strong></pre>
+</div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb5" data-filename="R/model_m3.R" data-bmm-src="m3" data-bmm-excerpt="abridged"><pre class="sourceCode numberSource r number-lines code-with-copy"><code class="sourceCode r"><span id="cb5-1"><a href="#cb5-1" aria-label="1"></a>m3 <span class="ot">&lt;-</span> <span class="cf">function</span>(resp_cats, num_options, <span class="at">choice_rule =</span> <span class="st">"softmax"</span>, <span class="at">version =</span> <span class="st">"custom"</span>, ...) {</span>
+<span id="cb5-2"><a href="#cb5-2" aria-label="2"></a>  call <span class="ot">&lt;-</span> <span class="fu">match.call</span>()</span>
+<span id="cb5-3"><a href="#cb5-3" aria-label="3"></a>  <span class="fu">stop_missing_args</span>() <span class="co"># errors naming any argument with no default that the user omitted</span></span>
+<span id="cb5-4"><a href="#cb5-4" aria-label="4"></a>  <span class="fu">stopif</span>(</span>
+<span id="cb5-5"><a href="#cb5-5" aria-label="5"></a>    <span class="fu">length</span>(num_options) <span class="sc">!=</span> <span class="fu">length</span>(resp_cats),</span>
+<span id="cb5-6"><a href="#cb5-6" aria-label="6"></a>    <span class="st">"The option variables should have the same length as the response variables."</span></span>
+<span id="cb5-7"><a href="#cb5-7" aria-label="7"></a>  )</span>
+<span id="cb5-8"><a href="#cb5-8" aria-label="8"></a>  <span class="fu">.model_m3</span>(...)</span>
+<span id="cb5-9"><a href="#cb5-9" aria-label="9"></a>}</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div>
+<p><code>check_data.*()</code> is the exception, and not really an exception: it validates properties of the <em>data</em>, which the constructor cannot see. “Your <code>nt_distances</code> columns contain negative values” is a data message and belongs there.</p>
+</section>
+<section id="log_lik-and-posterior_predict" class="level2" data-number="6.6">
+<h2 data-number="6.6" class="anchored" data-anchor-id="log_lik-and-posterior_predict"><span class="header-section-number">6.6</span> <code>log_lik</code> and <code>posterior_predict</code></h2>
+<p>These are <strong>plain functions, not S3 methods.</strong> Do not name them <code>log_lik.mymodel</code> — that would register them against brms’ <code>log_lik</code> generic, which is not what you want. Name them <code>log_lik_&lt;family_name&gt;</code> and pass them to <code>brms::custom_family()</code>:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb6"><pre class="sourceCode numberSource r number-lines code-with-copy"><code class="sourceCode r"><span id="cb6-1"><a href="#cb6-1" aria-label="1"></a>sdm_simple <span class="ot">&lt;-</span> brms<span class="sc">::</span><span class="fu">custom_family</span>(</span>
+<span id="cb6-2"><a href="#cb6-2" aria-label="2"></a>  <span class="at">name =</span> <span class="st">"sdm_simple"</span>,</span>
+<span id="cb6-3"><a href="#cb6-3" aria-label="3"></a>  <span class="at">dpars =</span> <span class="fu">c</span>(<span class="st">"mu"</span>, <span class="st">"c"</span>, <span class="st">"kappa"</span>),   <span class="co"># distributional parameters</span></span>
+<span id="cb6-4"><a href="#cb6-4" aria-label="4"></a>  ...</span>
+<span id="cb6-5"><a href="#cb6-5" aria-label="5"></a>  <span class="at">log_lik =</span> log_lik_sdm_simple,</span>
+<span id="cb6-6"><a href="#cb6-6" aria-label="6"></a>  <span class="at">posterior_predict =</span> posterior_predict_sdm_simple</span>
+<span id="cb6-7"><a href="#cb6-7" aria-label="7"></a>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>brms checks the first arguments when you build the family: <code>log_lik</code> must start with <code>(i, prep)</code> and <code>posterior_predict</code> with <code>(i, prep, ...)</code>.</p>
+<p>Both take <code>i</code>, the index of one observation, and <code>prep</code>, an object brms assembles from the fitted model and hands to you. <code>prep</code> holds the posterior draws and the data, and you pull values out of it rather than computing them: <code>brms::get_dpar()</code> for a parameter, <code>prep$data$Y</code> for the response.</p>
+<p>The contract is easy to get wrong in one specific way. <code>brms::get_dpar(prep, "par", i = i)</code> returns a <strong>vector with one value per posterior draw</strong>, not a scalar, and your function must return a vector of that same length. The response is a scalar, <code>prep$data$Y[i]</code>:</p>
+<div class="code-with-filename">
+<div class="code-with-filename-file">
+<pre><strong>R/model_sdm.R</strong></pre>
+</div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb7" data-filename="R/model_sdm.R" data-bmm-src="log_lik_sdm_simple"><pre class="sourceCode numberSource r number-lines code-with-copy"><code class="sourceCode r"><span id="cb7-1"><a href="#cb7-1" aria-label="1"></a>log_lik_sdm_simple <span class="ot">&lt;-</span> <span class="cf">function</span>(i, prep) {</span>
+<span id="cb7-2"><a href="#cb7-2" aria-label="2"></a>  mu <span class="ot">&lt;-</span> brms<span class="sc">::</span><span class="fu">get_dpar</span>(prep, <span class="st">"mu"</span>, <span class="at">i =</span> i)</span>
+<span id="cb7-3"><a href="#cb7-3" aria-label="3"></a>  c <span class="ot">&lt;-</span> brms<span class="sc">::</span><span class="fu">get_dpar</span>(prep, <span class="st">"c"</span>, <span class="at">i =</span> i)</span>
+<span id="cb7-4"><a href="#cb7-4" aria-label="4"></a>  kappa <span class="ot">&lt;-</span> brms<span class="sc">::</span><span class="fu">get_dpar</span>(prep, <span class="st">"kappa"</span>, <span class="at">i =</span> i)</span>
+<span id="cb7-5"><a href="#cb7-5" aria-label="5"></a>  y <span class="ot">&lt;-</span> prep<span class="sc">$</span>data<span class="sc">$</span>Y[i]</span>
+<span id="cb7-6"><a href="#cb7-6" aria-label="6"></a>  <span class="fu">dsdm</span>(y, mu, c, kappa, <span class="at">log =</span> T)</span>
+<span id="cb7-7"><a href="#cb7-7" aria-label="7"></a>}</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div>
+<p>A density function that collapses its arguments (an <code>if</code> on a vector, a <code>sum()</code>) will return a scalar here, and brms will recycle it across all draws without complaint. The posterior predictive checks then look suspiciously clean. Check <code>length()</code> of what you return.</p>
+<p><code>loop</code> in <code>custom_family()</code> is about the generated <em>Stan</em> code, not about this R function. With <code>loop = FALSE</code> brms emits a vectorized likelihood call, and with <code>loop = TRUE</code> it emits one call per observation. The consequence you will hit concerns <code>vars</code>, the <code>custom_family()</code> argument that names extra Stan variables your likelihood needs beyond the parameters (aggregate counts, trial numbers). With <code>loop = FALSE</code> you may not index those with <code>[n]</code>, because there is no per-observation loop to index inside, and brms stops with “Invalid use of index ‘[n]’ in an unlooped custom likelihood”. SDM uses <code>loop = FALSE</code> and no <code>vars</code>; EZDM uses <code>loop = TRUE</code> with <code>vars = c("vreal1[n]", "vint1[n]", "trials[n]")</code>.</p>
+</section>
+<section id="naming-traps" class="level2" data-number="6.7">
+<h2 data-number="6.7" class="anchored" data-anchor-id="naming-traps"><span class="header-section-number">6.7</span> Naming traps</h2>
+<p>Each of these cost somebody real debugging time, and none of them produce an error message that points at the cause.</p>
+<p><strong>A custom family’s <code>dpars</code> may not contain <code>_</code> or <code>.</code>, and may not end with a digit.</strong> Both are checked in <code>brms::custom_family()</code> (brms 2.23.0): “Dots or underscores are not allowed in ‘dpars’” and “‘dpars’ should not end with a number”. So neither <code>delta_1</code> nor <code>delta1</code> is a legal dpar name. The digits you see on IMM parameters (<code>kappa1</code>, <code>theta3</code>, <code>mu2</code>) are generated by <code>brms::mixture()</code> itself, not declared by bmm, and non-linear parameters introduced through <code>nlf()</code> are not subject to this check.</p>
+<p><strong>Reusing a brms dpar name silently inherits its default prior.</strong> <code>brms:::def_dpar_prior()</code> attaches a default prior by dpar name (the three colons reach an unexported function, which is why you will not find it in brms’ documentation), and the names it recognizes are <code>mu</code>, <code>sigma</code>, <code>shape</code>, <code>nu</code>, <code>phi</code>, <code>kappa</code>, <code>beta</code>, <code>zi</code>, <code>hu</code>, <code>zoi</code>, <code>coi</code>, <code>bs</code>, <code>ndt</code>, <code>bias</code>, <code>quantile</code>, <code>xi</code>, <code>alpha</code>, <code>disc</code> and <code>theta</code>. Worse, the lookup goes through <code>brms:::dpar_class()</code>, which strips trailing digits, so <code>kappa1</code> is looked up as <code>kappa</code>. bmm reuses several of these names deliberately and sets its own defaults over the top, which is fine — the trap is a parameter you reuse and then <em>forget</em> to give a default prior, which will quietly get brms’ prior for an unrelated quantity.</p>
+<p><strong>A dpar must not be uniquely prefixed by <code>thres</code>.</strong> <code>brms:::stan_log_lik_custom()</code> assigns <code>p$thres</code> only for ordinal families but reads <code>p$thres</code> unconditionally when it builds the likelihood call. <code>p</code> is a list keyed by dpar name, and <code>$</code> partial-matches on lists, so a dpar named <code>threshold</code> is found by <code>p$thres</code> and passed where the ordinal thresholds belong. The result is Stan code that does not parse, from a name that looks perfectly reasonable.</p>
+<p><strong>Stan probability-function suffixes require the bar syntax at every call site.</strong> <code>stanc</code>, the Stan compiler, says it plainly (version 2.39):</p>
+<blockquote class="blockquote">
+<p>Probability functions with suffixes <code>_lpdf</code>, <code>_lupdf</code>, <code>_lpmf</code>, <code>_lupmf</code>, <code>_cdf</code>, <code>_lcdf</code> and <code>_lccdf</code>, require a vertical bar (|) between the first two arguments.</p>
+</blockquote>
+<p>A helper you name <code>sdt_cdf</code> therefore cannot be called as <code>sdt_cdf(x, mu)</code>; it has to be <code>sdt_cdf(x | mu)</code>. If the function is not really a distribution function, give it a different name — <code>sdt_cumprob</code> — and the problem disappears. bmm’s own distribution functions take the other route and use the bar: <code>swald_lpdf(rt | drift, bound, ndt, s)</code> and <code>swald_lccdf(rt | -drift, bound_lower, ndt, s)</code> in <code>inst/stan_chunks/cswald_*.stan</code>.</p>
+<p><strong>An <code>nlf()</code> right-hand side is pasted together as text</strong>, so operator precedence is yours to manage. The IMM builds its <code>theta</code> expressions with glue and parenthesizes every sub-expression, including the constant: <code>"{lure_idx} * log(exp(c-expS*{nt_distances}) + exp(a)) + (1 - {lure_idx}) * (-100)"</code> (<code>R/model_imm.R:328</code>). When you interpolate an expression into a larger one, wrap it.</p>
+</section>
+<section id="documentation-and-the-checks-that-enforce-it" class="level2" data-number="6.8">
+<h2 data-number="6.8" class="anchored" data-anchor-id="documentation-and-the-checks-that-enforce-it"><span class="header-section-number">6.8</span> Documentation and the checks that enforce it</h2>
+<p><code>NAMESPACE</code> and everything in <code>man/</code> are <strong>generated</strong>. Run <code>devtools::document()</code>; never hand-edit them.</p>
+<p>Exported functions need <code>@returns</code> and <code>@examples</code>. Two further requirements are enforced by tests rather than by review:</p>
+<p><strong><code>@keywords</code>.</strong> The package website is built by pkgdown, which needs every public help topic to appear somewhere in its reference index, and <code>_pkgdown.yml</code> is where that index is declared. <code>tests/testthat/test-pkgdown.R</code> reads every <code>man/*.Rd</code> file, drops the ones with <code>\keyword{internal}</code>, and fails if any remaining topic is not covered by the reference section of <code>_pkgdown.yml</code>. Coverage can be by name or through a <code>has_keyword()</code> selector, and <code>_pkgdown.yml:56</code> has <code>has_keyword("bmmodel")</code>. So a new model’s user-facing alias needs <code>#' @keywords bmmodel</code>, which all eight released model aliases carry and which <code>use_model_template()</code> does <strong>not</strong> generate. Add it yourself. An exported function that is not a model gets <code>@keywords internal</code> or a place in <code>_pkgdown.yml</code>.</p>
+<p><strong>A NEWS entry for every user-visible change</strong>, under the right heading in <code>NEWS.md</code>, with the issue or PR number in parentheses. Read the 1.3.2 section for the expected level of detail: entries say what changed, what the old behaviour was, and why it mattered, not just “fixed a bug”.</p>
+</section>
+<section id="tests" class="level2" data-number="6.9">
+<h2 data-number="6.9" class="anchored" data-anchor-id="tests"><span class="header-section-number">6.9</span> Tests</h2>
+<p>Test files mirror source file names — <code>R/model_ddm.R</code> is tested by <code>tests/testthat/test-model_ddm.R</code>. This is a convention rather than a rule: at 1.3.2 nine files under <code>R/</code> have no matching test file and six test files have no matching source file, usually because they test a theme (<code>test-default-priors.R</code>, <code>test-pkgdown.R</code>) rather than a file. A new model gets a matching test file.</p>
+<p>Use brms’ mock backend for pipeline tests (<a href="add-new-model.html" class="quarto-xref"><span>Chapter 5</span></a> explains what it is and the two ways to get the call wrong) and <code>testthat</code> edition 3 (<code>Config/testthat/edition: 3</code> in <code>DESCRIPTION</code>). Set <code>withr::local_options("bmm.silent" = 2)</code> so <code>message2()</code> output does not clutter the run.</p>
+<section id="parameter-recovery-and-the-circularity-trap" class="level3" data-number="6.9.1">
+<h3 data-number="6.9.1" class="anchored" data-anchor-id="parameter-recovery-and-the-circularity-trap"><span class="header-section-number">6.9.1</span> Parameter recovery, and the circularity trap</h3>
+<p>A new model needs a parameter recovery study. It is not part of the package sources, so it is not run by <code>R CMD check</code> and does not need to be fast. Report it in the pull request: the script, what generated the data, and the values you recovered. Where you keep the script is up to you — bmm’s <code>.gitignore</code> excludes <code>local/</code> for exactly this kind of scratch work (<a href="setup.html" class="quarto-xref"><span>Chapter 1</span></a>) — but a study the reviewer cannot see does not count as one.</p>
+<p><strong>Do not simulate and fit with the same distribution function.</strong> If you generate data with your own <code>rmymodel()</code> and then fit a likelihood built from your own <code>dmymodel()</code>, the study will report clean recovery whether or not either function is correct — any error shared by both cancels. Use an independent generator: <code>rtdists::rdiffusion()</code> for diffusion-type models (<code>rtdists</code> is already an Imports), a published reference implementation, or a direct simulation of the process the model describes. A recovery study that cannot fail is not evidence.</p>
+<p>Recover both the hyper-parameters (means and standard deviations) and the subject-level parameters, and report how much data was needed, because that is the question a user will ask.</p>
+
+
+</section>
+</section>
+
+</main> <!-- /main -->
+<script id="quarto-html-after-body" type="application/javascript">
+  window.document.addEventListener("DOMContentLoaded", function (event) {
+    const icon = "";
+    const anchorJS = new window.AnchorJS();
+    anchorJS.options = {
+      placement: 'right',
+      icon: icon
+    };
+    anchorJS.add('.anchored');
+    const isCodeAnnotation = (el) => {
+      for (const clz of el.classList) {
+        if (clz.startsWith('code-annotation-')) {                     
+          return true;
+        }
+      }
+      return false;
+    }
+    const onCopySuccess = function(e) {
+      // button target
+      const button = e.trigger;
+      // don't keep focus
+      button.blur();
+      // flash "checked"
+      button.classList.add('code-copy-button-checked');
+      var currentTitle = button.getAttribute("title");
+      button.setAttribute("title", "Copied!");
+      let tooltip;
+      if (window.bootstrap) {
+        button.setAttribute("data-bs-toggle", "tooltip");
+        button.setAttribute("data-bs-placement", "left");
+        button.setAttribute("data-bs-title", "Copied!");
+        tooltip = new bootstrap.Tooltip(button, 
+          { trigger: "manual", 
+            customClass: "code-copy-button-tooltip",
+            offset: [0, -8]});
+        tooltip.show();    
+      }
+      setTimeout(function() {
+        if (tooltip) {
+          tooltip.hide();
+          button.removeAttribute("data-bs-title");
+          button.removeAttribute("data-bs-toggle");
+          button.removeAttribute("data-bs-placement");
+        }
+        button.setAttribute("title", currentTitle);
+        button.classList.remove('code-copy-button-checked');
+      }, 1000);
+      // clear code selection
+      e.clearSelection();
+    }
+    const getTextToCopy = function(trigger) {
+      const outerScaffold = trigger.parentElement.cloneNode(true);
+      const codeEl = outerScaffold.querySelector('code');
+      for (const childEl of codeEl.children) {
+        if (isCodeAnnotation(childEl)) {
+          childEl.remove();
+        }
+      }
+      return codeEl.innerText;
+    }
+    const clipboard = new window.ClipboardJS('.code-copy-button:not([data-in-quarto-modal])', {
+      text: getTextToCopy
+    });
+    clipboard.on('success', onCopySuccess);
+    if (window.document.getElementById('quarto-embedded-source-code-modal')) {
+      const clipboardModal = new window.ClipboardJS('.code-copy-button[data-in-quarto-modal]', {
+        text: getTextToCopy,
+        container: window.document.getElementById('quarto-embedded-source-code-modal')
+      });
+      clipboardModal.on('success', onCopySuccess);
+    }
+      var localhostRegex = new RegExp(/^(?:http|https):\/\/localhost\:?[0-9]*\//);
+      var mailtoRegex = new RegExp(/^mailto:/);
+        var filterRegex = new RegExp('/' + window.location.host + '/');
+      var isInternal = (href) => {
+          return filterRegex.test(href) || localhostRegex.test(href) || mailtoRegex.test(href);
+      }
+      // Inspect non-navigation links and adorn them if external
+     var links = window.document.querySelectorAll('a[href]:not(.nav-link):not(.navbar-brand):not(.toc-action):not(.sidebar-link):not(.sidebar-item-toggle):not(.pagination-link):not(.no-external):not([aria-hidden]):not(.dropdown-item):not(.quarto-navigation-tool):not(.about-link)');
+      for (var i=0; i<links.length; i++) {
+        const link = links[i];
+        if (!isInternal(link.href)) {
+          // undo the damage that might have been done by quarto-nav.js in the case of
+          // links that we want to consider external
+          if (link.dataset.originalHref !== undefined) {
+            link.href = link.dataset.originalHref;
+          }
+        }
+      }
+    function tippyHover(el, contentFn, onTriggerFn, onUntriggerFn) {
+      const config = {
+        allowHTML: true,
+        maxWidth: 500,
+        delay: 100,
+        arrow: false,
+        appendTo: function(el) {
+            return el.parentElement;
+        },
+        interactive: true,
+        interactiveBorder: 10,
+        theme: 'quarto',
+        placement: 'bottom-start',
+      };
+      if (contentFn) {
+        config.content = contentFn;
+      }
+      if (onTriggerFn) {
+        config.onTrigger = onTriggerFn;
+      }
+      if (onUntriggerFn) {
+        config.onUntrigger = onUntriggerFn;
+      }
+      window.tippy(el, config); 
+    }
+    const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
+    for (var i=0; i<noterefs.length; i++) {
+      const ref = noterefs[i];
+      tippyHover(ref, function() {
+        // use id or data attribute instead here
+        let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
+        try { href = new URL(href).hash; } catch {}
+        const id = href.replace(/^#\/?/, "");
+        const note = window.document.getElementById(id);
+        if (note) {
+          return note.innerHTML;
+        } else {
+          return "";
+        }
+      });
+    }
+    const xrefs = window.document.querySelectorAll('a.quarto-xref');
+    const processXRef = (id, note) => {
+      // Strip column container classes
+      const stripColumnClz = (el) => {
+        el.classList.remove("page-full", "page-columns");
+        if (el.children) {
+          for (const child of el.children) {
+            stripColumnClz(child);
+          }
+        }
+      }
+      stripColumnClz(note)
+      if (id === null || id.startsWith('sec-')) {
+        // Special case sections, only their first couple elements
+        const container = document.createElement("div");
+        if (note.children && note.children.length > 2) {
+          container.appendChild(note.children[0].cloneNode(true));
+          for (let i = 1; i < note.children.length; i++) {
+            const child = note.children[i];
+            if (child.tagName === "P" && child.innerText === "") {
+              continue;
+            } else {
+              container.appendChild(child.cloneNode(true));
+              break;
+            }
+          }
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(container);
+          }
+          return container.innerHTML
+        } else {
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(note);
+          }
+          return note.innerHTML;
+        }
+      } else {
+        // Remove any anchor links if they are present
+        const anchorLink = note.querySelector('a.anchorjs-link');
+        if (anchorLink) {
+          anchorLink.remove();
+        }
+        if (window.Quarto?.typesetMath) {
+          window.Quarto.typesetMath(note);
+        }
+        if (note.classList.contains("callout")) {
+          return note.outerHTML;
+        } else {
+          return note.innerHTML;
+        }
+      }
+    }
+    for (var i=0; i<xrefs.length; i++) {
+      const xref = xrefs[i];
+      tippyHover(xref, undefined, function(instance) {
+        instance.disable();
+        let url = xref.getAttribute('href');
+        let hash = undefined; 
+        if (url.startsWith('#')) {
+          hash = url;
+        } else {
+          try { hash = new URL(url).hash; } catch {}
+        }
+        if (hash) {
+          const id = hash.replace(/^#\/?/, "");
+          const note = window.document.getElementById(id);
+          if (note !== null) {
+            try {
+              const html = processXRef(id, note.cloneNode(true));
+              instance.setContent(html);
+            } finally {
+              instance.enable();
+              instance.show();
+            }
+          } else {
+            // See if we can fetch this
+            fetch(url.split('#')[0])
+            .then(res => res.text())
+            .then(html => {
+              const parser = new DOMParser();
+              const htmlDoc = parser.parseFromString(html, "text/html");
+              const note = htmlDoc.getElementById(id);
+              if (note !== null) {
+                const html = processXRef(id, note);
+                instance.setContent(html);
+              } 
+            }).finally(() => {
+              instance.enable();
+              instance.show();
+            });
+          }
+        } else {
+          // See if we can fetch a full url (with no hash to target)
+          // This is a special case and we should probably do some content thinning / targeting
+          fetch(url)
+          .then(res => res.text())
+          .then(html => {
+            const parser = new DOMParser();
+            const htmlDoc = parser.parseFromString(html, "text/html");
+            const note = htmlDoc.querySelector('main.content');
+            if (note !== null) {
+              // This should only happen for chapter cross references
+              // (since there is no id in the URL)
+              // remove the first header
+              if (note.children.length > 0 && note.children[0].tagName === "HEADER") {
+                note.children[0].remove();
+              }
+              const html = processXRef(null, note);
+              instance.setContent(html);
+            } 
+          }).finally(() => {
+            instance.enable();
+            instance.show();
+          });
+        }
+      }, function(instance) {
+      });
+    }
+        let selectedAnnoteEl;
+        const selectorForAnnotation = ( cell, annotation) => {
+          let cellAttr = 'data-code-cell="' + cell + '"';
+          let lineAttr = 'data-code-annotation="' +  annotation + '"';
+          const selector = 'span[' + cellAttr + '][' + lineAttr + ']';
+          return selector;
+        }
+        const selectCodeLines = (annoteEl) => {
+          const doc = window.document;
+          const targetCell = annoteEl.getAttribute("data-target-cell");
+          const targetAnnotation = annoteEl.getAttribute("data-target-annotation");
+          const annoteSpan = window.document.querySelector(selectorForAnnotation(targetCell, targetAnnotation));
+          const lines = annoteSpan.getAttribute("data-code-lines").split(",");
+          const lineIds = lines.map((line) => {
+            return targetCell + "-" + line;
+          })
+          let top = null;
+          let height = null;
+          let parent = null;
+          if (lineIds.length > 0) {
+              //compute the position of the single el (top and bottom and make a div)
+              const el = window.document.getElementById(lineIds[0]);
+              top = el.offsetTop;
+              height = el.offsetHeight;
+              parent = el.parentElement.parentElement;
+            if (lineIds.length > 1) {
+              const lastEl = window.document.getElementById(lineIds[lineIds.length - 1]);
+              const bottom = lastEl.offsetTop + lastEl.offsetHeight;
+              height = bottom - top;
+            }
+            if (top !== null && height !== null && parent !== null) {
+              // cook up a div (if necessary) and position it 
+              let div = window.document.getElementById("code-annotation-line-highlight");
+              if (div === null) {
+                div = window.document.createElement("div");
+                div.setAttribute("id", "code-annotation-line-highlight");
+                div.style.position = 'absolute';
+                parent.appendChild(div);
+              }
+              div.style.top = top - 2 + "px";
+              div.style.height = height + 4 + "px";
+              div.style.left = 0;
+              let gutterDiv = window.document.getElementById("code-annotation-line-highlight-gutter");
+              if (gutterDiv === null) {
+                gutterDiv = window.document.createElement("div");
+                gutterDiv.setAttribute("id", "code-annotation-line-highlight-gutter");
+                gutterDiv.style.position = 'absolute';
+                const codeCell = window.document.getElementById(targetCell);
+                const gutter = codeCell.querySelector('.code-annotation-gutter');
+                gutter.appendChild(gutterDiv);
+              }
+              gutterDiv.style.top = top - 2 + "px";
+              gutterDiv.style.height = height + 4 + "px";
+            }
+            selectedAnnoteEl = annoteEl;
+          }
+        };
+        const unselectCodeLines = () => {
+          const elementsIds = ["code-annotation-line-highlight", "code-annotation-line-highlight-gutter"];
+          elementsIds.forEach((elId) => {
+            const div = window.document.getElementById(elId);
+            if (div) {
+              div.remove();
+            }
+          });
+          selectedAnnoteEl = undefined;
+        };
+          // Handle positioning of the toggle
+      window.addEventListener(
+        "resize",
+        throttle(() => {
+          elRect = undefined;
+          if (selectedAnnoteEl) {
+            selectCodeLines(selectedAnnoteEl);
+          }
+        }, 10)
+      );
+      function throttle(fn, ms) {
+      let throttle = false;
+      let timer;
+        return (...args) => {
+          if(!throttle) { // first call gets through
+              fn.apply(this, args);
+              throttle = true;
+          } else { // all the others get throttled
+              if(timer) clearTimeout(timer); // cancel #2
+              timer = setTimeout(() => {
+                fn.apply(this, args);
+                timer = throttle = false;
+              }, ms);
+          }
+        };
+      }
+        // Attach click handler to the DT
+        const annoteDls = window.document.querySelectorAll('dt[data-target-cell]');
+        for (const annoteDlNode of annoteDls) {
+          annoteDlNode.addEventListener('click', (event) => {
+            const clickedEl = event.target;
+            if (clickedEl !== selectedAnnoteEl) {
+              unselectCodeLines();
+              const activeEl = window.document.querySelector('dt[data-target-cell].code-annotation-active');
+              if (activeEl) {
+                activeEl.classList.remove('code-annotation-active');
+              }
+              selectCodeLines(clickedEl);
+              clickedEl.classList.add('code-annotation-active');
+            } else {
+              // Unselect the line
+              unselectCodeLines();
+              clickedEl.classList.remove('code-annotation-active');
+            }
+          });
+        }
+    const findCites = (el) => {
+      const parentEl = el.parentElement;
+      if (parentEl) {
+        const cites = parentEl.dataset.cites;
+        if (cites) {
+          return {
+            el,
+            cites: cites.split(' ')
+          };
+        } else {
+          return findCites(el.parentElement)
+        }
+      } else {
+        return undefined;
+      }
+    };
+    var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
+    for (var i=0; i<bibliorefs.length; i++) {
+      const ref = bibliorefs[i];
+      const citeInfo = findCites(ref);
+      if (citeInfo) {
+        tippyHover(citeInfo.el, function() {
+          var popup = window.document.createElement('div');
+          citeInfo.cites.forEach(function(cite) {
+            var citeDiv = window.document.createElement('div');
+            citeDiv.classList.add('hanging-indent');
+            citeDiv.classList.add('csl-entry');
+            var biblioDiv = window.document.getElementById('ref-' + cite);
+            if (biblioDiv) {
+              citeDiv.innerHTML = biblioDiv.innerHTML;
+            }
+            popup.appendChild(citeDiv);
+          });
+          return popup.innerHTML;
+        });
+      }
+    }
+  });
+  </script>
+<nav class="page-navigation">
+  <div class="nav-page nav-page-previous">
+      <a href="./add-new-model.html" class="pagination-link" aria-label="Adding a new model">
+        <i class="bi bi-arrow-left-short"></i> <span class="nav-page-text"><span class="chapter-number">5</span>&nbsp; <span class="chapter-title">Adding a new model</span></span>
+      </a>          
+  </div>
+  <div class="nav-page nav-page-next">
+  </div>
+</nav>
+</div> <!-- /content -->
+
+
+
+
+</body></html>

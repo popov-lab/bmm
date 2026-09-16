@@ -82,7 +82,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <link href="site_libs/quarto-html/quarto-syntax-highlighting-64a204ab8560d761af7679ceaba22944.css" rel="stylesheet" id="quarto-text-highlighting-styles">
 <script src="site_libs/bootstrap/bootstrap.min.js"></script>
 <link href="site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
-<link href="site_libs/bootstrap/bootstrap-e2a0acc2e5cec106112107b2889cd56a.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
+<link href="site_libs/bootstrap/bootstrap-893fe9ddc644446a6c1ebe867bb6f684.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
 <script id="quarto-search-options" type="application/json">{
   "location": "navbar",
   "copy-button": false,
@@ -206,6 +206,12 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
  <span class="menu-text"><span class="chapter-number">5</span>&nbsp; <span class="chapter-title">Adding a new model</span></span></a>
   </div>
 </li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./coding-conventions.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">6</span>&nbsp; <span class="chapter-title">Coding conventions</span></span></a>
+  </div>
+</li>
     </ul>
     </div>
 </nav>
@@ -218,8 +224,8 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
   <ul>
   <li><a href="#setting-up-a-local-fork-of-the-bmm-repository" id="toc-setting-up-a-local-fork-of-the-bmm-repository" class="nav-link active" data-scroll-target="#setting-up-a-local-fork-of-the-bmm-repository"><span class="header-section-number">1.1</span> Setting up a local fork of the bmm repository</a></li>
   <li><a href="#prerequisites" id="toc-prerequisites" class="nav-link" data-scroll-target="#prerequisites"><span class="header-section-number">1.2</span> Prerequisites</a></li>
-  <li><a href="#package-development-via-rstudio-and-devtools" id="toc-package-development-via-rstudio-and-devtools" class="nav-link" data-scroll-target="#package-development-via-rstudio-and-devtools"><span class="header-section-number">1.3</span> Package development via RStudio and devtools</a></li>
-  <li><a href="#the-local-directory" id="toc-the-local-directory" class="nav-link" data-scroll-target="#the-local-directory"><span class="header-section-number">1.4</span> The <code>local/</code> directory</a></li>
+  <li><a href="#package-development-with-devtools" id="toc-package-development-with-devtools" class="nav-link" data-scroll-target="#package-development-with-devtools"><span class="header-section-number">1.3</span> Package development with devtools</a></li>
+  <li><a href="#untracked-scratch-work" id="toc-untracked-scratch-work" class="nav-link" data-scroll-target="#untracked-scratch-work"><span class="header-section-number">1.4</span> Untracked scratch work</a></li>
   </ul>
 </nav>
     </div>
@@ -251,7 +257,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <li><p>Fork the bmm github repository. This will create a copy of the current development branch into your own github account</p>
 <p><img src="images/clipboard-758253314.png" class="img-fluid"></p></li>
 <li><p><a href="https://docs.github.com/en/repositories/creating-and-managing-repositories/cloning-a-repository">Clone</a> your fork to your local machine</p></li>
-<li><p><a href="https://github.com/Kunena/Kunena-Forum/wiki/Create-a-new-branch-with-git-and-manage-branches">Create a new branch</a> for your model, typically named <code>feature/name-of-my-model</code></p></li>
+<li><p><a href="https://github.com/Kunena/Kunena-Forum/wiki/Create-a-new-branch-with-git-and-manage-branches">Create a new branch</a> for your model off <code>develop</code>. Open an issue first and name the branch after it, as <code>&lt;issue-number&gt;-short-description</code> (for example <code>349-lba-model</code>). That is what the branches in the main repository look like, and it makes the branch, the issue and the eventual pull request easy to line up.</p></li>
 </ol>
 </section>
 <section id="prerequisites" class="level2" data-number="1.2">
@@ -260,22 +266,22 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb1"><pre class="sourceCode numberSource r number-lines code-with-copy"><code class="sourceCode r"><span id="cb1-1"><a href="#cb1-1" aria-label="1"></a><span class="fu">install.packages</span>(<span class="st">"cmdstanr"</span>, <span class="at">repos =</span> <span class="fu">c</span>(<span class="st">"https://stan-dev.r-universe.dev"</span>, <span class="fu">getOption</span>(<span class="st">"repos"</span>)))</span>
 <span id="cb1-2"><a href="#cb1-2" aria-label="2"></a>cmdstanr<span class="sc">::</span><span class="fu">install_cmdstan</span>()</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </section>
-<section id="package-development-via-rstudio-and-devtools" class="level2" data-number="1.3">
-<h2 data-number="1.3" class="anchored" data-anchor-id="package-development-via-rstudio-and-devtools"><span class="header-section-number">1.3</span> Package development via RStudio and devtools</h2>
-<p>The bmm package is setup as an RStudio project. Opening the <code>bmm.Rproj</code> file will open a new RStudio instance, which facilitates package development with a few commands from the <code>devtools</code> package. A great tutorial on package development can be found <a href="https://r-pkgs.org/">here</a>. Below is a summary of the most important steps</p>
+<section id="package-development-with-devtools" class="level2" data-number="1.3">
+<h2 data-number="1.3" class="anchored" data-anchor-id="package-development-with-devtools"><span class="header-section-number">1.3</span> Package development with devtools</h2>
+<p>Development runs on the <code>devtools</code> package, and the steps below are the same whichever editor you work in. The repository ships a <code>bmm.Rproj</code> file, so opening it starts a session with the package root as the working directory in RStudio or Positron; opening the directory in any other editor, or starting R in it from a terminal, gets you to the same place. A great tutorial on package development can be found <a href="https://r-pkgs.org/">here</a>. Below is a summary of the most important steps</p>
 <ol type="1">
 <li><p>Make sure you have the devtools package and a few others installed and loaded</p>
 <div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb2"><pre class="sourceCode numberSource r number-lines code-with-copy"><code class="sourceCode r"><span id="cb2-1"><a href="#cb2-1" aria-label="1"></a><span class="fu">install.packages</span>(<span class="fu">c</span>(<span class="st">"devtools"</span>, <span class="st">"roxygen2"</span>, <span class="st">"testthat"</span>, <span class="st">"knitr"</span>))</span>
 <span id="cb2-2"><a href="#cb2-2" aria-label="2"></a><span class="fu">library</span>(devtools)</span>
 <span id="cb2-3"><a href="#cb2-3" aria-label="3"></a><span class="fu">install_dev_deps</span>()</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
-<p>To avoid having to load the <strong>devtools</strong> package every time, you can add the following code to your <code>.Rprofile</code> file</p>
+<p>Optionally, to avoid loading <strong>devtools</strong> in every session, you can add the following to your <code>.Rprofile</code></p>
 <div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb3"><pre class="sourceCode numberSource r number-lines code-with-copy"><code class="sourceCode r"><span id="cb3-1"><a href="#cb3-1" aria-label="1"></a><span class="cf">if</span> (<span class="fu">interactive</span>()) {</span>
 <span id="cb3-2"><a href="#cb3-2" aria-label="2"></a>  <span class="fu">suppressMessages</span>(<span class="fu">require</span>(devtools))</span>
 <span id="cb3-3"><a href="#cb3-3" aria-label="3"></a>}</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <p>As noted <a href="https://r-pkgs.org/setup.html#personal-startup-configuration">here</a>, you can create and open an <code>.Rprofile</code> file, if you don’t already have one with</p>
 <div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb4"><pre class="sourceCode numberSource r number-lines code-with-copy"><code class="sourceCode r"><span id="cb4-1"><a href="#cb4-1" aria-label="1"></a><span class="fu">use_devtools</span>()</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div></li>
 <li><p>Load the current version of the <code>bmm</code> package based on your local files</p>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb5"><pre class="sourceCode numberSource r number-lines code-with-copy"><code class="sourceCode r"><span id="cb5-1"><a href="#cb5-1" aria-label="1"></a><span class="fu">load_all</span>()  <span class="co"># or ctrl+shift+L</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb5"><pre class="sourceCode numberSource r number-lines code-with-copy"><code class="sourceCode r"><span id="cb5-1"><a href="#cb5-1" aria-label="1"></a><span class="fu">load_all</span>()  <span class="co"># ctrl+shift+L in RStudio</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <p>you can use this command whenever you make changes to the package code to see the changes in action. You should not call <code>library(bmm)</code> or source the files manually, as this will load the installed version of the package, not the one you are developing.</p></li>
 <li><p>Make any changes to the package code that you need to make (elaborated in the next section)</p></li>
 <li><p>Use <code>check()</code> to check the package for errors and warnings</p>
@@ -285,9 +291,10 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb7"><pre class="sourceCode numberSource r number-lines code-with-copy"><code class="sourceCode r"><span id="cb7-1"><a href="#cb7-1" aria-label="1"></a><span class="fu">document</span>()</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div></li>
 </ol>
 </section>
-<section id="the-local-directory" class="level2" data-number="1.4">
-<h2 data-number="1.4" class="anchored" data-anchor-id="the-local-directory"><span class="header-section-number">1.4</span> The <code>local/</code> directory</h2>
-<p>The <code>local/</code> directory in the bmm repository is used for machine-specific scripts that are not tracked by git. When developing a new model, you should create a parameter recovery script at <code>local/&lt;model_name&gt;_parameter_recovery.R</code>. This script should simulate data from the model, fit it, and verify that parameters are recovered accurately. These scripts are not run by <code>R CMD check</code> but are expected for all new models.</p>
+<section id="untracked-scratch-work" class="level2" data-number="1.4">
+<h2 data-number="1.4" class="anchored" data-anchor-id="untracked-scratch-work"><span class="header-section-number">1.4</span> Untracked scratch work</h2>
+<p>Development produces files that belong on your machine rather than in the package: exploratory scripts, fitted model objects, scratch data. bmm’s <code>.gitignore</code> excludes <code>local/</code> for this purpose — <code>AGENTS.md</code> describes it as machine-specific scratch that is neither synced nor shared — so anything you put there stays out of your commits. Nothing requires you to use it; any location git ignores will do.</p>
+<p>Parameter recovery scripts are the main thing you will keep out of the package this way. What the study has to show, and how it reaches the reviewer given that it is not committed, is in <a href="coding-conventions.html" class="quarto-xref"><span>Chapter 6</span></a>.</p>
 
 
 </section>
