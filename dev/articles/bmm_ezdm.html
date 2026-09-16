@@ -27,7 +27,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">bmm</a>
 
-    <small class="nav-text text-danger me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="In-development version">1.3.1.9000</small>
+    <small class="nav-text text-danger me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="In-development version">1.3.2.9000</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -46,7 +46,7 @@
 <li class="nav-item"><form class="form-inline" role="search">
  <input class="form-control" type="search" name="search-input" id="search-input" autocomplete="off" aria-label="Search site" placeholder="Search for" data-search-index="../search.json">
 </form></li>
-<li class="nav-item"><a class="external-link nav-link" href="https://github.com/venpopov/bmm/" aria-label="GitHub"><span class="fa fab fa-github fa-lg"></span></a></li>
+<li class="nav-item"><a class="external-link nav-link" href="https://github.com/popov-lab/bmm/" aria-label="GitHub"><span class="fa fab fa-github fa-lg"></span></a></li>
       </ul>
 </div>
 
@@ -62,7 +62,7 @@
                         <h4 data-toc-skip class="author">Ven Popov</h4>
             
       
-      <small class="dont-index">Source: <a href="https://github.com/venpopov/bmm/blob/develop/vignettes/articles/bmm_ezdm.Rmd" class="external-link"><code>vignettes/articles/bmm_ezdm.Rmd</code></a></small>
+      <small class="dont-index">Source: <a href="https://github.com/popov-lab/bmm/blob/develop/vignettes/articles/bmm_ezdm.Rmd" class="external-link"><code>vignettes/articles/bmm_ezdm.Rmd</code></a></small>
       <div class="d-none name"><code>bmm_ezdm.Rmd</code></div>
     </div>
 
@@ -309,7 +309,7 @@ T_{er} = MRT - \frac{a}{2v} \cdot \frac{1 - e^{-\frac{va}{s^2}}}{1 + e^{-\frac{v
 </h3>
 <p>To illustrate the impact of contamination, we generate trial-level data with known parameters and introduce 5% contaminant trials:</p>
 <div class="sourceCode" id="cb1"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://github.com/venpopov/bmm" class="external-link">bmm</a></span><span class="op">)</span></span>
+<code class="sourceCode R"><span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://github.com/popov-lab/bmm" class="external-link">bmm</a></span><span class="op">)</span></span>
 <span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://github.com/rtdists/rtdists/" class="external-link">rtdists</a></span><span class="op">)</span></span>
 <span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://dplyr.tidyverse.org" class="external-link">dplyr</a></span><span class="op">)</span></span>
 <span></span>
@@ -384,7 +384,7 @@ T_{er} = MRT - \frac{a}{2v} \cdot \frac{1 - e^{-\frac{va}{s^2}}}{1 + e^{-\frac{v
 <span><span class="co">#&gt;    Method   Mean_RT     Var_RT Contaminant</span></span>
 <span><span class="co">#&gt; 1  Simple 0.5409176 0.10605857          NA</span></span>
 <span><span class="co">#&gt; 2  Robust 0.4568634 0.02440439          NA</span></span>
-<span><span class="co">#&gt; 3 Mixture 0.4964177 0.03642890  0.03532347</span></span>
+<span><span class="co">#&gt; 3 Mixture 0.4962307 0.03633472  0.03539257</span></span>
 <span><span class="co">#&gt; 4    TRUE 0.4755037 0.02050638  0.05000000</span></span></code></pre></div>
 <p>The mixture method identifies contaminants and provides more accurate moment estimates.</p>
 </div>
@@ -441,9 +441,9 @@ T_{er} = MRT - \frac{a}{2v} \cdot \frac{1 - e^{-\frac{va}{s^2}}}{1 + e^{-\frac{v
 <span></span>
 <span><span class="va">summary_4par</span></span>
 <span><span class="co">#&gt;    mean_rt_upper mean_rt_lower var_rt_upper var_rt_lower n_upper n_trials</span></span>
-<span><span class="co">#&gt; mu     0.3952879            NA   0.01637452           NA     195      200</span></span>
+<span><span class="co">#&gt; mu     0.3943676            NA   0.01611958           NA     195      200</span></span>
 <span><span class="co">#&gt;    contaminant_prop_upper contaminant_prop_lower</span></span>
-<span><span class="co">#&gt; mu             0.01116972                     NA</span></span></code></pre></div>
+<span><span class="co">#&gt; mu             0.01217136                     NA</span></span></code></pre></div>
 <p>Notice the output now includes:
 - <code>mean_rt_upper</code>, <code>var_rt_upper</code>: Statistics for upper boundary responses
 - <code>mean_rt_lower</code>, <code>var_rt_lower</code>: Statistics for lower boundary responses</p>
@@ -498,7 +498,7 @@ T_{er} = MRT - \frac{a}{2v} \cdot \frac{1 - e^{-\frac{va}{s^2}}}{1 + e^{-\frac{v
 </h2>
 <p>We start by loading the <code>bmm</code> package:</p>
 <div class="sourceCode" id="cb6"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://github.com/venpopov/bmm" class="external-link">bmm</a></span><span class="op">)</span></span></code></pre></div>
+<code class="sourceCode R"><span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://github.com/popov-lab/bmm" class="external-link">bmm</a></span><span class="op">)</span></span></code></pre></div>
 <div class="section level3" number="5.1">
 <h3 id="generating-simulated-data">
 <span class="header-section-number">5.1</span> Generating simulated data<a class="anchor" aria-label="anchor" href="#generating-simulated-data"></a>

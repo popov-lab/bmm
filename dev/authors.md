@@ -2,10 +2,10 @@
 
 ## Authors
 
-- **Vencislav Popov**. Author, maintainer, copyright holder.
+- **Vencislav Popov**. Author, copyright holder.
   [](https://orcid.org/0000-0002-8073-4199)
 
-- **Gidon T. Frischkorn**. Author, copyright holder.
+- **Gidon T. Frischkorn**. Author, maintainer, copyright holder.
   [](https://orcid.org/0000-0002-5055-9764)
 
 - **Chenyu Li**. Contributor.
@@ -16,7 +16,7 @@
 ## Citation
 
 Source:
-[`inst/CITATION`](https://github.com/venpopov/bmm/blob/develop/inst/CITATION)
+[`inst/CITATION`](https://github.com/popov-lab/bmm/blob/develop/inst/CITATION)
 
 Frischkorn G, Popov V (2025). “A tutorial for estimating mixture models
 for visual working memory tasks in brms: Introducing the Bayesian

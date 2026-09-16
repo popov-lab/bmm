@@ -17,7 +17,7 @@ contaminant responses from true responses."><meta property="og:image" content="h
 
     <a class="navbar-brand me-2" href="../index.html">bmm</a>
 
-    <small class="nav-text text-danger me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="In-development version">1.3.1.9000</small>
+    <small class="nav-text text-danger me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="In-development version">1.3.2.9000</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -32,7 +32,7 @@ contaminant responses from true responses."><meta property="og:image" content="h
 <li class="nav-item"><a class="nav-link" href="https://venpopov.com/bmm/parameter-recovery/index.html">Parameter recovery</a></li>
       </ul><ul class="navbar-nav"><li class="nav-item"><form class="form-inline" role="search">
  <input class="form-control" type="search" name="search-input" id="search-input" autocomplete="off" aria-label="Search site" placeholder="Search for" data-search-index="../search.json"></form></li>
-<li class="nav-item"><a class="external-link nav-link" href="https://github.com/venpopov/bmm/" aria-label="GitHub"><span class="fa fab fa-github fa-lg"></span></a></li>
+<li class="nav-item"><a class="external-link nav-link" href="https://github.com/popov-lab/bmm/" aria-label="GitHub"><span class="fa fab fa-github fa-lg"></span></a></li>
       </ul></div>
 
 
@@ -41,7 +41,7 @@ contaminant responses from true responses."><meta property="og:image" content="h
 <div class="row">
   <main id="main" class="col-md-9"><div class="page-header">
       <img src="../logo.png" class="logo" alt=""><h1>Compute Robust Summary Statistics for EZ-Diffusion Model</h1>
-      <small class="dont-index">Source: <a href="https://github.com/venpopov/bmm/blob/develop/R/helpers-data.R" class="external-link"><code>R/helpers-data.R</code></a></small>
+      <small class="dont-index">Source: <a href="https://github.com/popov-lab/bmm/blob/develop/R/helpers-data.R" class="external-link"><code>R/helpers-data.R</code></a></small>
       <div class="d-none name"><code>ezdm_summary_stats.Rd</code></div>
     </div>
 
@@ -182,7 +182,7 @@ contamination.</p>
 <span class="r-in"><span><span class="co"># 3par summary stats</span></span></span>
 <span class="r-in"><span><span class="fu">ezdm_summary_stats</span><span class="op">(</span><span class="va">rt</span>, <span class="va">response</span><span class="op">)</span></span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>      mean_rt     var_rt n_upper n_trials contaminant_prop</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> mu 0.7751987 0.03617631      82      100      4.68105e-08</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> mu 0.7751987 0.03617632      82      100      4.68105e-08</span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># With dplyr for grouped operations</span></span></span>
 <span class="r-in"><span><span class="co"># library(dplyr)</span></span></span>
@@ -193,9 +193,9 @@ contamination.</p>
 <span class="r-in"><span><span class="co"># 4par version with separate upper/lower moments</span></span></span>
 <span class="r-in"><span><span class="fu">ezdm_summary_stats</span><span class="op">(</span><span class="va">rt</span>, <span class="va">response</span>, version <span class="op">=</span> <span class="st">"4par"</span><span class="op">)</span></span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>    mean_rt_upper mean_rt_lower var_rt_upper var_rt_lower n_upper n_trials</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> mu     0.7751185     0.7755708   0.04176804   0.01614341      82      100</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> mu     0.7751185     0.7756404   0.04176804   0.01614607      82      100</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>    contaminant_prop_upper contaminant_prop_lower</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> mu           5.349368e-08           1.992978e-08</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> mu           5.349368e-08           5.258552e-08</span>
 <span class="r-in"><span></span></span>
 </code></pre></div>
     </div>

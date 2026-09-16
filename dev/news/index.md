@@ -2,12 +2,28 @@
 
 ## bmm (development version)
 
+## bmm 1.3.2
+
+#### Changes to default priors
+
+- Recalibrated the default priors for the **m3** activation parameters
+  (`a`, `c`) so that the `simple` and `softmax` choice rules imply a
+  comparable, broad prior-predictive range of average performance, and
+  so that the `softmax` defaults place equal prior means on general
+  (`a`) and context (`c`) activation — centering the implied `c - a`
+  prior at zero for fair comparisons under cell-means coding. The
+  mis-scaled `normal(0, 2)` effect prior on `c` is replaced by the
+  shared `normal(0, 0.5)`. Because the `simple` rule requires `c > a` to
+  predict accurate recall, its defaults remain asymmetric; direct
+  comparisons of context and general activation should use the `softmax`
+  choice rule ([\#364](https://github.com/popov-lab/bmm/issues/364)).
+
 #### New features
 
 - The **sdm** model now supports within-chain parallelization via the
   `threads` argument (e.g. `bmm(..., threads = 2)`), reducing fitting
   time by up to ~45% in benchmarks
-  ([\#374](https://github.com/venpopov/bmm/issues/374)).
+  ([\#374](https://github.com/popov-lab/bmm/issues/374)).
 - Add `softplus` as an opt-in link function for positively-bounded
   parameters, as an alternative to the default `log` link.
   `softplus(x) = log(1 + exp(x))` keeps parameters positive while
@@ -17,7 +33,7 @@
   natural scale. Enable it per parameter via the model’s `links` list,
   e.g. `m3(...)$links <- list(c = "softplus", a = "softplus")` or
   `ddm(rt, response, links = list(bound = "softplus"))`
-  ([\#363](https://github.com/venpopov/bmm/issues/363)).
+  ([\#363](https://github.com/popov-lab/bmm/issues/363)).
 
 #### Bug fixes
 
@@ -32,37 +48,42 @@
   [`create_initfun()`](https://venpopov.com/bmm/dev/reference/create_initfun.md)
   is now the single source of truth for initial values, with
   model-specific behaviour expressed through S3 methods
-  ([\#375](https://github.com/venpopov/bmm/issues/375)).
+  ([\#375](https://github.com/popov-lab/bmm/issues/375)).
 - Fix `.pwald()` returning `NaN`/`-Inf` in the upper tail of the
   shifted-Wald survival function, which propagated to
   [`dcswald()`](https://venpopov.com/bmm/dev/reference/cswald_dist.md)
   (and therefore `log_lik`/`posterior_predict`) for the **cswald** model
   at extreme reaction times. The R-side survival now uses the stable
   `log_diff_exp` form already used by the Stan likelihood
-  (`swald_lccdf`) ([\#376](https://github.com/venpopov/bmm/issues/376)).
+  (`swald_lccdf`)
+  ([\#376](https://github.com/popov-lab/bmm/issues/376)).
 - Fix [`print()`](https://rdrr.io/r/base/print.html) for model summaries
   selecting regression-coefficient rows by an unanchored substring
   match, so a parameter such as `a` could pull in rows of another
   parameter like `kappa` (e.g. in the **imm** model). Rows are now
   matched on the exact parameter prefix. This also fixes a crash when
   only a single coefficient row is shown
-  ([\#379](https://github.com/venpopov/bmm/issues/379),
-  [\#369](https://github.com/venpopov/bmm/issues/369)).
+  ([\#379](https://github.com/popov-lab/bmm/issues/379),
+  [\#369](https://github.com/popov-lab/bmm/issues/369)).
 - [`create_initfun()`](https://venpopov.com/bmm/dev/reference/create_initfun.md)
   now matches Stan parameters to model parameters with a word-boundary
   regex (`(^|_)param(_|$)`) instead of a substring match, preventing
   collisions in models with short parameter names (e.g. `s`, `c`, `a`)
   that are substrings of longer ones (`sim`, `correct`, `activation`);
   the longest (most specific) match is selected when several apply
-  ([\#354](https://github.com/venpopov/bmm/issues/354),
-  [\#355](https://github.com/venpopov/bmm/issues/355)).
+  ([\#354](https://github.com/popov-lab/bmm/issues/354),
+  [\#355](https://github.com/popov-lab/bmm/issues/355)).
 - [`create_initfun()`](https://venpopov.com/bmm/dev/reference/create_initfun.md)
   now resolves initialization terms from `nlpars` when a model parameter
   is not a distributional parameter, so models built as non-linear brms
   formulas (e.g. native-multinomial models whose parameters live in
   `bterms$nlpars`) no longer error with
   `no applicable method for 'has_intercept' applied to an object of class "NULL"`
-  ([\#362](https://github.com/venpopov/bmm/issues/362)).
+  ([\#362](https://github.com/popov-lab/bmm/issues/362)).
+- The **sdm** model now emits its serial likelihood under
+  `threading(n, force = TRUE)`, matching the unsliced Stan code brms
+  generates in that case. Previously the threaded chunk was emitted and
+  the model failed to compile.
 - [`bmm()`](https://venpopov.com/bmm/dev/reference/bmm.md) now warns
   when a predictor in the formula shares its name with both a predicted
   parameter and a column in the data. Such a predictor was silently
@@ -70,7 +91,7 @@
   changing the likelihood without any error. Short parameter names (`c`,
   `a`, `s`, `b`) collide naturally with condition codes or columns like
   `accuracy`/`stimulus`
-  ([\#378](https://github.com/venpopov/bmm/issues/378)).
+  ([\#378](https://github.com/popov-lab/bmm/issues/378)).
 
 #### Other changes
 
@@ -86,24 +107,15 @@
   interface, where an unrecognized parameter is already caught earlier
   by
   [`check_formula()`](https://venpopov.com/bmm/dev/reference/check_formula.md)
-  ([\#377](https://github.com/venpopov/bmm/issues/377)).
+  ([\#377](https://github.com/popov-lab/bmm/issues/377)).
 - `print.bmmodel()` now also displays the required response variables
   (one per line, annotated with the expected coding — e.g. radians in
   \[-pi, pi\] for the circular models, seconds and 0/1 responses for the
   trial-wise RT models) and the default parameter links, answering “what
   does my data frame need to look like?” directly at the console
-  ([\#392](https://github.com/venpopov/bmm/issues/392)).
-- Recalibrated the default priors for the **m3** activation parameters
-  (`a`, `c`) so that the `simple` and `softmax` choice rules imply a
-  comparable, broad prior-predictive range of average performance, and
-  so that the `softmax` defaults place equal prior means on general
-  (`a`) and context (`c`) activation — centering the implied `c - a`
-  prior at zero for fair comparisons under cell-means coding. The
-  mis-scaled `normal(0, 2)` effect prior on `c` is replaced by the
-  shared `normal(0, 0.5)`. Because the `simple` rule requires `c > a` to
-  predict accurate recall, its defaults remain asymmetric; direct
-  comparisons of context and general activation should use the `softmax`
-  choice rule ([\#364](https://github.com/venpopov/bmm/issues/364)).
+  ([\#392](https://github.com/popov-lab/bmm/issues/392)).
+- The package maintainer contact is now Gidon T. Frischkorn, and the
+  repository URLs point to `https://github.com/popov-lab/bmm`.
 
 #### Developer-facing changes
 
@@ -116,11 +128,11 @@
   defaults/version table for `parameters`, `links`, `fixed_parameters`,
   `default_priors`, and `init_ranges`), and versioned aliases validate
   `version` with [`match.arg()`](https://rdrr.io/r/base/match.arg.html)
-  ([\#350](https://github.com/venpopov/bmm/issues/350)).
+  ([\#350](https://github.com/popov-lab/bmm/issues/350)).
 - **Removed the unused `void_mu` field** from all model definitions and
   the template. It was assigned but never read anywhere — response-mean
   suppression is already handled via `fixed_parameters` and the family’s
-  `dpars` ([\#350](https://github.com/venpopov/bmm/issues/350)).
+  `dpars` ([\#350](https://github.com/popov-lab/bmm/issues/350)).
 
 ## bmm 1.3.1
 
@@ -131,7 +143,7 @@ CRAN release: 2026-06-05
 - Fix `swald_lccdf()` returning incorrect log-survival probability when
   response time equals non-decision time in the **cswald** model.
   Previously returned `-Inf` instead of `0` (log of survival = 1)
-  ([\#348](https://github.com/venpopov/bmm/issues/348)).
+  ([\#348](https://github.com/popov-lab/bmm/issues/348)).
 
 #### Other changes
 
@@ -150,7 +162,7 @@ CRAN release: 2026-03-30
   (optionally) relative starting point. Includes distribution functions
   [`dddm()`](https://venpopov.com/bmm/dev/reference/ddm_dist.md) and
   [`rddm()`](https://venpopov.com/bmm/dev/reference/ddm_dist.md)
-  ([\#280](https://github.com/venpopov/bmm/issues/280)).
+  ([\#280](https://github.com/popov-lab/bmm/issues/280)).
 - Add the **EZ-Diffusion Model** (`ezdm`) for speeded decision-making
   tasks. The model estimates drift rate, boundary separation, and
   non-decision time from aggregated summary statistics (mean RT,
@@ -162,7 +174,7 @@ CRAN release: 2026-03-30
   distribution functions
   [`dezdm()`](https://venpopov.com/bmm/dev/reference/ezdm_dist.md) and
   [`rezdm()`](https://venpopov.com/bmm/dev/reference/ezdm_dist.md)
-  ([\#281](https://github.com/venpopov/bmm/issues/281)).
+  ([\#281](https://github.com/popov-lab/bmm/issues/281)).
 - Add the **Censored Shifted Wald Model** (`cswald`) for choice reaction
   time tasks with two response boundaries. The model estimates drift
   rate, boundary separation, and non-decision time from trial-level RT
@@ -186,10 +198,10 @@ CRAN release: 2026-03-30
   non-linear parameters, inverse link transformations to show parameters
   on their natural scale (`scale = "native"`), softmax handling for
   mixture3p weight parameters, and filtering of internal model variables
-  ([\#203](https://github.com/venpopov/bmm/issues/203)).
+  ([\#203](https://github.com/popov-lab/bmm/issues/203)).
 - New S3 methods for **emmeans** support on `bmmfit` objects. Users can
   now call `emmeans(fit, ~ condition, dpar = "kappa")` for any bmmodel
-  ([\#323](https://github.com/venpopov/bmm/issues/323)).
+  ([\#323](https://github.com/popov-lab/bmm/issues/323)).
 - New **pp_check()** method for multinomial models (e.g., `m3`). Since
   [`brms::pp_check()`](https://mc-stan.org/bayesplot/reference/pp_check.html)
   does not support the multinomial family, `bmm` now provides a custom
@@ -202,27 +214,27 @@ CRAN release: 2026-03-30
   delegates to
   [`brms::pp_check()`](https://mc-stan.org/bayesplot/reference/pp_check.html)
   and auto-selects the grouped plot variant when `group` is specified
-  ([\#324](https://github.com/venpopov/bmm/issues/324)).
+  ([\#324](https://github.com/popov-lab/bmm/issues/324)).
 - New function **parameters()** lists all parameters of a `bmmodel` or
   `bmmfit` object with descriptions, link functions, and fixed values
-  ([\#329](https://github.com/venpopov/bmm/issues/329)).
+  ([\#329](https://github.com/popov-lab/bmm/issues/329)).
 - New function **extract_stan_blocks()** extracts individual program
   blocks (functions, data, parameters, etc.) from compiled Stan code
-  ([\#286](https://github.com/venpopov/bmm/issues/286)).
+  ([\#286](https://github.com/popov-lab/bmm/issues/286)).
 - New function **extract_parameter_dimensions()** extracts parameter
   names, dimensions, and types from a Stan parameters block.
 - New functions **ezdm_summary_stats()** and **adjust_ezdm_accuracy()**
   to compute and pre-process summary statistics from trial-level RT data
   for the EZ-Diffusion Model
-  ([\#291](https://github.com/venpopov/bmm/issues/291)).
+  ([\#291](https://github.com/popov-lab/bmm/issues/291)).
 - New functions **flag_contaminant_rts()** and
   **validate_fast_guesses()** for trial-level contamination detection in
   RT data. Identifies fast guesses and attention lapses using mixture
   modeling and provides Bayesian validation of fast guess assumptions
-  ([\#307](https://github.com/venpopov/bmm/issues/307)).
+  ([\#307](https://github.com/popov-lab/bmm/issues/307)).
 - New function **create_initfun()** creates initialization functions for
   models that benefit from or require initial values for MCMC sampling
-  ([\#285](https://github.com/venpopov/bmm/issues/285)).
+  ([\#285](https://github.com/popov-lab/bmm/issues/285)).
 
 #### Documentation
 
@@ -242,9 +254,9 @@ CRAN release: 2026-03-30
 #### Other changes
 
 - Improved **rm3()** random generation function for the M3 model
-  ([\#279](https://github.com/venpopov/bmm/issues/279)).
+  ([\#279](https://github.com/popov-lab/bmm/issues/279)).
 - Removed magrittr dependency; replaced `%>%` with the native pipe `|>`
-  ([\#341](https://github.com/venpopov/bmm/issues/341)).
+  ([\#341](https://github.com/popov-lab/bmm/issues/341)).
 - Minimum R version is now 4.1.0.
 
 ## bmm 1.2.0
@@ -259,7 +271,7 @@ CRAN release: 2025-07-24
   versions: simple span (**ss**), complex span (**cs**), and **custom**.
   For details, see the
   [article](https://venpopov.com/bmm/articles/bmm_m3.html) on the `bmm`
-  website ([\#237](https://github.com/venpopov/bmm/issues/237)). Thanks
+  website ([\#237](https://github.com/popov-lab/bmm/issues/237)). Thanks
   to [@GidonFrischkorn](https://github.com/GidonFrischkorn) and
   [@chenyu-psy](https://github.com/chenyu-psy)
 
@@ -267,7 +279,7 @@ CRAN release: 2025-07-24
 
 - Updates to the `bmf2bf` S3 methods for more flexible translation of
   `bmmformulas` into `brmsformulas`
-  ([\#227](https://github.com/venpopov/bmm/issues/227)).
+  ([\#227](https://github.com/popov-lab/bmm/issues/227)).
 - New function **apply_links** adds link functions to all non-linear
   formulas in a **bmmformula** object.
 - New example data set **oberauer_lewandowsky_2019_e1** for exploring
@@ -275,17 +287,17 @@ CRAN release: 2025-07-24
 - The `file_refit` argument of the `bmm` function now accepts character
   strings like `brms`. A warning is given when “on_change” is specified,
   as this is not currently implemented for `bmmodels`
-  ([\#228](https://github.com/venpopov/bmm/issues/228)).
+  ([\#228](https://github.com/popov-lab/bmm/issues/228)).
 - New function **rejection_sampling**
 
 #### Bug fixes
 
 - Fix conflict in setting default priors when model parameters were
   transformed in a non-linear formula
-  ([\#232](https://github.com/venpopov/bmm/issues/232)).
+  ([\#232](https://github.com/popov-lab/bmm/issues/232)).
 - Allow a NULL formula (`formula(NULL)`) to be added to a bmmformula for
   consistentcy with brms
-  ([\#264](https://github.com/venpopov/bmm/issues/264))
+  ([\#264](https://github.com/popov-lab/bmm/issues/264))
 - Improve error messages when attempting to construct bmmformulas
   without a left-hand-side variable
 
@@ -295,8 +307,8 @@ CRAN release: 2025-07-24
   task](https://venpopov.com/bmm/articles/bmm_vwm_crt.html) article for
   pre-processing half-circular stimulus spaces when using `bmmodels` of
   the `circular` model class
-  ([\#229](https://github.com/venpopov/bmm/issues/229),
-  [\#233](https://github.com/venpopov/bmm/issues/233)).
+  ([\#229](https://github.com/popov-lab/bmm/issues/229),
+  [\#233](https://github.com/popov-lab/bmm/issues/233)).
 - New online [article](https://venpopov.com/bmm/articles/bmm_m3.html) to
   accompany the m3 model
 
@@ -305,10 +317,10 @@ CRAN release: 2025-07-24
 - vectorize [`k2sd()`](https://venpopov.com/bmm/dev/reference/k2sd.md)
   function for improved performance
 - various internal refactorings
-  ([\#246](https://github.com/venpopov/bmm/issues/246),
-  [\#242](https://github.com/venpopov/bmm/issues/242))
+  ([\#246](https://github.com/popov-lab/bmm/issues/246),
+  [\#242](https://github.com/popov-lab/bmm/issues/242))
 - dplyr, magrittr and tidyr dependencies are now optional
-  ([\#240](https://github.com/venpopov/bmm/issues/240))
+  ([\#240](https://github.com/popov-lab/bmm/issues/240))
 - new contributor - Chenyun Li (chenyu-psy) for his work on the m3 model
 
 ## bmm 1.0.0
@@ -319,7 +331,7 @@ First version of the package on published on CRAN!
 
 - you can now specify to save the **bmmfit** object generated by
   **bmm()** to a file with the **file** argument, similarly to
-  **brms::brm()** ([\#190](https://github.com/venpopov/bmm/issues/190))
+  **brms::brm()** ([\#190](https://github.com/popov-lab/bmm/issues/190))
 - the parameterization of the **imm** was adapted to accurately reflect
   the model as implemented by Oberauer et al. (2017)
 - prepare package for CRAN submission
@@ -327,7 +339,7 @@ First version of the package on published on CRAN!
 #### Bug fixes
 
 - fix incorrect specification of default priors when only an interaction
-  is specified ([\#201](https://github.com/venpopov/bmm/issues/201))
+  is specified ([\#201](https://github.com/popov-lab/bmm/issues/201))
 - the random generation function for the **mixture3p** and **imm**
   returned incorrect samples for some rare parameter combinations, this
   has now been fixed, so that the functions now return correct samples
@@ -352,7 +364,7 @@ First version of the package on published on CRAN!
 #### New features
 
 - add a **summary()** method for **bmmfit** objects
-  ([\#144](https://github.com/venpopov/bmm/issues/144))
+  ([\#144](https://github.com/popov-lab/bmm/issues/144))
 - add a global option **bmm.summary_backend** to control the backend
   used for the **summary()** method (choices are *“bmm”* and *“brms”*)
 - function **restructure()** now allows to apply methods introduced in
@@ -360,16 +372,16 @@ First version of the package on published on CRAN!
   versions
 - you can now specify any model parameter to be a constant by using an
   equal sign in the **bmmformula**
-  ([\#142](https://github.com/venpopov/bmm/issues/142))
+  ([\#142](https://github.com/popov-lab/bmm/issues/142))
 - you can now choose to estimate parameters that are fixed to a constant
   by default for all models
-  ([\#145](https://github.com/venpopov/bmm/issues/145))
+  ([\#145](https://github.com/popov-lab/bmm/issues/145))
 - default priors for all models are now specified via the
   **configure_prior()** S3 method
-  ([\#145](https://github.com/venpopov/bmm/issues/145))
+  ([\#145](https://github.com/popov-lab/bmm/issues/145))
 - **cmdstanr** will be used as the default backend for **brms** if the
   user has it installed
-  ([\#145](https://github.com/venpopov/bmm/issues/145))
+  ([\#145](https://github.com/popov-lab/bmm/issues/145))
 - various updates to the documentation and data sets
 
 #### Documentation
@@ -383,13 +395,13 @@ First version of the package on published on CRAN!
 #### Bug fixes
 
 - fix a bug preventing the **sort_data** check from being executed
-  ([\#72](https://github.com/venpopov/bmm/issues/72))
+  ([\#72](https://github.com/popov-lab/bmm/issues/72))
 - fix bugs with the **summary()** function not displaying implicit
-  parameters ([\#152](https://github.com/venpopov/bmm/issues/152)) and
+  parameters ([\#152](https://github.com/popov-lab/bmm/issues/152)) and
   not working properly with some hierarchical designs
-  ([\#173](https://github.com/venpopov/bmm/issues/173))
+  ([\#173](https://github.com/popov-lab/bmm/issues/173))
 - fix a bug in which the **sort_data** check occurred in cases where it
-  shouldn’t ([\#158](https://github.com/venpopov/bmm/issues/158))
+  shouldn’t ([\#158](https://github.com/popov-lab/bmm/issues/158))
 
 #### Deprecated functions and arguments
 
@@ -401,25 +413,25 @@ First version of the package on published on CRAN!
   models.
 - the function **fit_model()** is deprecated in favor of **bmm()** and
   will be removed in a future version
-  ([\#163](https://github.com/venpopov/bmm/issues/163))
+  ([\#163](https://github.com/popov-lab/bmm/issues/163))
 - the argument **setsize** for the **mixture3p** and **IMM** models is
   now called **set_size** for consistency. The old argument name is
   deprecated and will be removed in a future version
-  ([\#163](https://github.com/venpopov/bmm/issues/163))
+  ([\#163](https://github.com/popov-lab/bmm/issues/163))
 - the distributions functions for the imm model are renamed from
   **dIMM**, **pIMM**, **rIMM** and **qIMM** to **dimm**, **pimm**,
   **rimm** and **qimm**
-  ([\#163](https://github.com/venpopov/bmm/issues/163))
+  ([\#163](https://github.com/popov-lab/bmm/issues/163))
 - the argument parallel for the **bmm()** function is deprecated and
   will be removed in a future version. Use **cores** instead, as for
-  **brms::brm()** ([\#163](https://github.com/venpopov/bmm/issues/163))
+  **brms::brm()** ([\#163](https://github.com/popov-lab/bmm/issues/163))
 - the models **IMMfull()**, **IMMabc()** and **IMMbsc()** are now called
   via **imm()**, **imm(version = “abc”)** or **imm(version = “bsc”)**.
   The old names are deprecated and will be removed in a future version
-  ([\#163](https://github.com/venpopov/bmm/issues/163))
+  ([\#163](https://github.com/popov-lab/bmm/issues/163))
 - the **sdmSimple()** model is now called **sdm()**. The old name is
   deprecated and will be removed in a future version
-  ([\#163](https://github.com/venpopov/bmm/issues/163))
+  ([\#163](https://github.com/popov-lab/bmm/issues/163))
 
 #### Other changes
 
@@ -432,13 +444,13 @@ First version of the package on published on CRAN!
 - add a check for the **sdmSimple** model if the data is sorted by
   predictors. This leads to much faster sampling. The user can control
   the default behavior with the **sort_data** argument
-  ([\#72](https://github.com/venpopov/bmm/issues/72))
+  ([\#72](https://github.com/popov-lab/bmm/issues/72))
 - the **mixture3p** and **IMM** models now require that the intercept
   must be suppressed when set size is used as a predictor
-  ([\#96](https://github.com/venpopov/bmm/issues/96)).
+  ([\#96](https://github.com/popov-lab/bmm/issues/96)).
 - add postprocessing methods for **sdmSimple** to allow the use of
   **pp_check()**, **conditional_effects** and **bridgesampling** with
-  the model ([\#30](https://github.com/venpopov/bmm/issues/30))
+  the model ([\#30](https://github.com/popov-lab/bmm/issues/30))
 - add informed default priors for all models. You can always use the
   **get_model_prior()** function to see the default priors for a model
 - add a new function **set_default_prior** for developers, which allows
@@ -446,7 +458,7 @@ First version of the package on published on CRAN!
   user-specified formula
 - you can now specify variables for models via regular expressions
   rather than character vectors
-  ([\#102](https://github.com/venpopov/bmm/issues/102))
+  ([\#102](https://github.com/popov-lab/bmm/issues/102))
 - you can now view and set all **bmm** global options via
   **bmm_options()**. See **?bmm_options** for more information
 - add a start-up message upon loading the package
@@ -457,7 +469,7 @@ First version of the package on published on CRAN!
   error when intercept was not suppressed and set size was used as
   predictor
 - **update()** now works properly with **bmmfit** objects
-  ([\#95](https://github.com/venpopov/bmm/issues/95))
+  ([\#95](https://github.com/popov-lab/bmm/issues/95))
 - fix a bug in the **sort_data** check which caused an error when using
   grouped covariance structure in random effects across different
   parameters
@@ -478,7 +490,7 @@ First version of the package on published on CRAN!
   a **bmmodel** change across experimental conditions or continuous
   predictors. The response variables that the model is fit to now have
   to be specified when the model is defined using **model = bmmodel()**.
-  ([\#79](https://github.com/venpopov/bmm/issues/79))
+  ([\#79](https://github.com/popov-lab/bmm/issues/79))
 - BREAKING CHANGE: The **non_target** and **spaPos** variables for the
   **mixture3p** and **IMM** models were relabeled to **nt_features** and
   **nt_distances** for consistency. This is also to communicate that
@@ -535,7 +547,8 @@ First version of the package on published on CRAN!
 
 - fixed a bug where passing a character vector or negative values to
   set_size argument of visual working memory models caused an error or
-  incorrect behavior ([\#97](https://github.com/venpopov/bmm/issues/97))
+  incorrect behavior
+  ([\#97](https://github.com/popov-lab/bmm/issues/97))
 
 ## bmm 0.2.1
 
@@ -554,38 +567,38 @@ First version of the package on published on CRAN!
   non-target activation
 - Add ability to extract information about the default priors in **bmm**
   models with **get_model_prior()**
-  ([\#53](https://github.com/venpopov/bmm/issues/53))
+  ([\#53](https://github.com/popov-lab/bmm/issues/53))
 - Add ability to generate stan code and stan data for each model with
   **get_model_stancode()** and **get_model_standata()**
-  ([\#81](https://github.com/venpopov/bmm/issues/81))
+  ([\#81](https://github.com/popov-lab/bmm/issues/81))
 - BREAKING CHANGE: Add distribution functions for likelihood
   (e.g. **dIMM()**) and random variate generation **rIMM()**) for all
   models in the package. Remove deprecated **gen_3p_data()** and
   **gen_imm_data()** functions
-  ([\#69](https://github.com/venpopov/bmm/issues/69))
+  ([\#69](https://github.com/popov-lab/bmm/issues/69))
 - Two new data sets are available: **zhang_luck_2008** and
   **oberauer_lin_2017**
-  ([\#22](https://github.com/venpopov/bmm/issues/22))
+  ([\#22](https://github.com/popov-lab/bmm/issues/22))
 
 #### Documentation
 
 - Website for the development version of the package is now available at
   <https://venpopov.com/bmm/dev/>
-  ([\#18](https://github.com/venpopov/bmm/issues/18))
+  ([\#18](https://github.com/popov-lab/bmm/issues/18))
 - Add articles for each model to the website at
   <https://venpopov.com/bmm/dev/articles/>
 - Add a detailed developer’s guide to the website at
   <https://venpopov.com/bmm/dev/dev-notes>
-  ([\#21](https://github.com/venpopov/bmm/issues/21))
+  ([\#21](https://github.com/popov-lab/bmm/issues/21))
 - Improve README with more detailed information about the package’s
   goals and its models
-  ([\#21](https://github.com/venpopov/bmm/issues/21))
+  ([\#21](https://github.com/popov-lab/bmm/issues/21))
 
 #### Other changes
 
 - Save **bmm** package version in the **brmsfit** object for
   reproducibility - e.g. `fit$version$bmm`
-  ([\#88](https://github.com/venpopov/bmm/issues/88))
+  ([\#88](https://github.com/popov-lab/bmm/issues/88))
 
 ## bmm 0.1.1
 
@@ -597,13 +610,13 @@ First version of the package on published on CRAN!
   (e.g. **mixture3p(non_targets, setsize)**). This allows for a more
   flexible and intuitive way to specify model arguments. Passing model
   specific arguments directly to the **fit_model()** function is now
-  deprecated ([\#43](https://github.com/venpopov/bmm/issues/43)).
+  deprecated ([\#43](https://github.com/popov-lab/bmm/issues/43)).
 - Add information about each model such as domain, task, name, version,
   citation, requirements and parameters
-  ([\#42](https://github.com/venpopov/bmm/issues/42))
+  ([\#42](https://github.com/popov-lab/bmm/issues/42))
 - Add ability to generate a template file for adding new models to the
   package with **use_model_template()** (for developers)
-  ([\#39](https://github.com/venpopov/bmm/issues/39))
+  ([\#39](https://github.com/popov-lab/bmm/issues/39))
 
 #### Other changes
 
@@ -616,37 +629,38 @@ First version of the package on published on CRAN!
 
 A major restructuring of the package to support stable and generalizable
 development of future models
-([\#41](https://github.com/venpopov/bmm/issues/41)).
+([\#41](https://github.com/popov-lab/bmm/issues/41)).
 
 #### New Features
 
 - Refactor the **fit_model()** function to be generic and independent of
   the model being fit
-  ([\#20](https://github.com/venpopov/bmm/issues/20))
+  ([\#20](https://github.com/popov-lab/bmm/issues/20))
 - Transform models to be S3 objects.
-  ([\#41](https://github.com/venpopov/bmm/issues/41)).
+  ([\#41](https://github.com/popov-lab/bmm/issues/41)).
 - View currently supported models with new function
   **supported_models()**. Currently supported models are:
   **mixture2p()**, **mixture3p()**, **IMMabc()**, **IMMbsc()**,
   **IMMfull()**
 - Add S3 methods for checking the data, formula, model and priors
-  ([\#41](https://github.com/venpopov/bmm/issues/41))
+  ([\#41](https://github.com/popov-lab/bmm/issues/41))
 - Add distribution functions for the Signal Discrimination Model. See
-  **?SDM** for usage ([\#27](https://github.com/venpopov/bmm/issues/27))
+  **?SDM** for usage
+  ([\#27](https://github.com/popov-lab/bmm/issues/27))
 - Add **softmax** and **softmaxinv** functions
 
 #### Bug Fixes
 
 - Change default prior on log(kappa) to Normal(2,1) for the
   **mixture3p()** model
-  ([\#15](https://github.com/venpopov/bmm/issues/15))
+  ([\#15](https://github.com/popov-lab/bmm/issues/15))
 
 #### Other changes
 
 - BREAKING CHANGE: deprecate **model_type** argument in **fit_model()**.
   Models must now be specified with S3 functions passed to argument
   **model** rather than model names as strings passed to argument
-  **model_type** ([\#41](https://github.com/venpopov/bmm/issues/41))
+  **model_type** ([\#41](https://github.com/popov-lab/bmm/issues/41))
 - Add extensive unit testing
 
 ## bmm 0.0.1

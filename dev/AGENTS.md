@@ -27,7 +27,7 @@ testthat::test_file()     # Run single test file
 ```
 
 **ALWAYS** use `devtools::load_all()` instead of
-[`library(bmm)`](https://github.com/venpopov/bmm) during development.
+[`library(bmm)`](https://github.com/popov-lab/bmm) during development.
 
 ### Package Requirements
 
@@ -265,7 +265,8 @@ developer maintains their own copy.
 4.  **Implicit returns** - avoid explicit
     [`return()`](https://rdrr.io/r/base/function.html) statements
 5.  **devtools::load_all()** - never use
-    [`library(bmm)`](https://github.com/venpopov/bmm) during development
+    [`library(bmm)`](https://github.com/popov-lab/bmm) during
+    development
 6.  **Git branching** - feature branches → PR to `develop` (never commit
     directly to `develop` or `master`)
 7.  **Local `.gitignore` changes** - to ignore files locally without

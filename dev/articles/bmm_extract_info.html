@@ -27,7 +27,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">bmm</a>
 
-    <small class="nav-text text-danger me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="In-development version">1.3.1.9000</small>
+    <small class="nav-text text-danger me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="In-development version">1.3.2.9000</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -46,7 +46,7 @@
 <li class="nav-item"><form class="form-inline" role="search">
  <input class="form-control" type="search" name="search-input" id="search-input" autocomplete="off" aria-label="Search site" placeholder="Search for" data-search-index="../search.json">
 </form></li>
-<li class="nav-item"><a class="external-link nav-link" href="https://github.com/venpopov/bmm/" aria-label="GitHub"><span class="fa fab fa-github fa-lg"></span></a></li>
+<li class="nav-item"><a class="external-link nav-link" href="https://github.com/popov-lab/bmm/" aria-label="GitHub"><span class="fa fab fa-github fa-lg"></span></a></li>
       </ul>
 </div>
 
@@ -62,7 +62,7 @@
                         <h4 data-toc-skip class="author">Gidon Frischkorn</h4>
             
       
-      <small class="dont-index">Source: <a href="https://github.com/venpopov/bmm/blob/develop/vignettes/articles/bmm_extract_info.Rmd" class="external-link"><code>vignettes/articles/bmm_extract_info.Rmd</code></a></small>
+      <small class="dont-index">Source: <a href="https://github.com/popov-lab/bmm/blob/develop/vignettes/articles/bmm_extract_info.Rmd" class="external-link"><code>vignettes/articles/bmm_extract_info.Rmd</code></a></small>
       <div class="d-none name"><code>bmm_extract_info.Rmd</code></div>
     </div>
 
@@ -98,7 +98,7 @@ default priors for the SDM model (<a href="https://venpopov.com/bmm/articles/bmm
 a set_size categorical predictor of <code>c</code> and <code>kappa</code>, you can use the following
 code:</p>
 <div class="sourceCode" id="cb1"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://github.com/venpopov/bmm" class="external-link">bmm</a></span><span class="op">)</span></span>
+<code class="sourceCode R"><span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://github.com/popov-lab/bmm" class="external-link">bmm</a></span><span class="op">)</span></span>
 <span></span>
 <span><span class="fu"><a href="../reference/default_prior.bmmformula.html">default_prior</a></span><span class="op">(</span><span class="fu"><a href="../reference/bmmformula.html">bmf</a></span><span class="op">(</span><span class="va">c</span> <span class="op">~</span> <span class="fl">0</span> <span class="op">+</span> <span class="va">set_size</span>, <span class="va">kappa</span> <span class="op">~</span> <span class="fl">0</span> <span class="op">+</span> <span class="va">set_size</span><span class="op">)</span>, </span>
 <span>              data <span class="op">=</span> <span class="va">oberauer_lin_2017</span>,</span>
@@ -225,7 +225,7 @@ can inspect it or modify it, you can use the <code><a href="../reference/stancod
 <code class="sourceCode R"><span><span class="fu"><a href="../reference/stancode.bmmformula.html">stancode</a></span><span class="op">(</span><span class="fu"><a href="../reference/bmmformula.html">bmf</a></span><span class="op">(</span><span class="va">c</span> <span class="op">~</span> <span class="fl">0</span> <span class="op">+</span> <span class="va">set_size</span>, <span class="va">kappa</span> <span class="op">~</span> <span class="fl">0</span> <span class="op">+</span> <span class="va">set_size</span><span class="op">)</span>, </span>
 <span>         data <span class="op">=</span> <span class="va">oberauer_lin_2017</span>,</span>
 <span>         model <span class="op">=</span> <span class="fu"><a href="../reference/sdm.html">sdm</a></span><span class="op">(</span>resp_error <span class="op">=</span> <span class="st">'dev_rad'</span><span class="op">)</span><span class="op">)</span></span></code></pre></div>
-<pre><code>// generated with brms 2.23.0 and bmm 1.3.1.9000
+<pre><code>// generated with brms 2.23.0 and bmm 1.3.2.9000
 functions {
   /* compute the tan_half link
    * Args:

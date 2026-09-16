@@ -13,7 +13,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">bmm</a>
 
-    <small class="nav-text text-danger me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="In-development version">1.3.1.9000</small>
+    <small class="nav-text text-danger me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="In-development version">1.3.2.9000</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -28,7 +28,7 @@
 <li class="nav-item"><a class="nav-link" href="https://venpopov.com/bmm/parameter-recovery/index.html">Parameter recovery</a></li>
       </ul><ul class="navbar-nav"><li class="nav-item"><form class="form-inline" role="search">
  <input class="form-control" type="search" name="search-input" id="search-input" autocomplete="off" aria-label="Search site" placeholder="Search for" data-search-index="../search.json"></form></li>
-<li class="nav-item"><a class="external-link nav-link" href="https://github.com/venpopov/bmm/" aria-label="GitHub"><span class="fa fab fa-github fa-lg"></span></a></li>
+<li class="nav-item"><a class="external-link nav-link" href="https://github.com/popov-lab/bmm/" aria-label="GitHub"><span class="fa fab fa-github fa-lg"></span></a></li>
       </ul></div>
 
 
@@ -37,48 +37,56 @@
 <div class="row">
   <main id="main" class="col-md-9"><div class="page-header">
       <img src="../logo.png" class="logo" alt=""><h1>Changelog</h1>
-      <small>Source: <a href="https://github.com/venpopov/bmm/blob/develop/NEWS.md" class="external-link"><code>NEWS.md</code></a></small>
+      <small>Source: <a href="https://github.com/popov-lab/bmm/blob/develop/NEWS.md" class="external-link"><code>NEWS.md</code></a></small>
     </div>
 
     <div class="section level2">
 <h2 class="pkg-version" data-toc-text="development version" id="bmm-development-version">bmm (development version)<a class="anchor" aria-label="anchor" href="#bmm-development-version"></a></h2>
+</div>
+    <div class="section level2">
+<h2 class="pkg-version" data-toc-text="1.3.2" id="bmm-132">bmm 1.3.2<a class="anchor" aria-label="anchor" href="#bmm-132"></a></h2>
 <div class="section level4">
-<h4 id="new-features-development-version">New features<a class="anchor" aria-label="anchor" href="#new-features-development-version"></a></h4>
-<ul><li>The <strong>sdm</strong> model now supports within-chain parallelization via the <code>threads</code> argument (e.g. <code>bmm(..., threads = 2)</code>), reducing fitting time by up to ~45% in benchmarks (<a href="https://github.com/venpopov/bmm/issues/374" class="external-link">#374</a>).</li>
-<li>Add <code>softplus</code> as an opt-in link function for positively-bounded parameters, as an alternative to the default <code>log</code> link. <code>softplus(x) = log(1 + exp(x))</code> keeps parameters positive while growing linearly for large values, avoiding the numerical blow-up of <code><a href="https://rdrr.io/r/base/Log.html" class="external-link">exp()</a></code> and giving predictor effects an additive (rather than multiplicative) interpretation on the natural scale. Enable it per parameter via the model’s <code>links</code> list, e.g. <code>m3(...)$links &lt;- list(c = "softplus", a = "softplus")</code> or <code>ddm(rt, response, links = list(bound = "softplus"))</code> (<a href="https://github.com/venpopov/bmm/issues/363" class="external-link">#363</a>).</li>
+<h4 id="changes-to-default-priors-1-3-2">Changes to default priors<a class="anchor" aria-label="anchor" href="#changes-to-default-priors-1-3-2"></a></h4>
+<ul><li>Recalibrated the default priors for the <strong>m3</strong> activation parameters (<code>a</code>, <code>c</code>) so that the <code>simple</code> and <code>softmax</code> choice rules imply a comparable, broad prior-predictive range of average performance, and so that the <code>softmax</code> defaults place equal prior means on general (<code>a</code>) and context (<code>c</code>) activation — centering the implied <code>c - a</code> prior at zero for fair comparisons under cell-means coding. The mis-scaled <code>normal(0, 2)</code> effect prior on <code>c</code> is replaced by the shared <code>normal(0, 0.5)</code>. Because the <code>simple</code> rule requires <code>c &gt; a</code> to predict accurate recall, its defaults remain asymmetric; direct comparisons of context and general activation should use the <code>softmax</code> choice rule (<a href="https://github.com/popov-lab/bmm/issues/364" class="external-link">#364</a>).</li>
 </ul></div>
 <div class="section level4">
-<h4 id="bug-fixes-development-version">Bug fixes<a class="anchor" aria-label="anchor" href="#bug-fixes-development-version"></a></h4>
-<ul><li>Fix initial values being set in two places, where the <code>init</code> returned by <code><a href="../reference/configure_model.html">configure_model()</a></code> was silently overwritten by <code><a href="../reference/create_initfun.html">create_initfun()</a></code>. This caused the <strong>m3</strong> model’s intended <code>init = 0</code> (needed for stable sampling with the <code>simple</code> choice rule and an <code>identity</code> link) to be lost, and left dead <code>init</code> code in the <strong>sdm</strong> model. <code><a href="../reference/create_initfun.html">create_initfun()</a></code> is now the single source of truth for initial values, with model-specific behaviour expressed through S3 methods (<a href="https://github.com/venpopov/bmm/issues/375" class="external-link">#375</a>).</li>
-<li>Fix <code>.pwald()</code> returning <code>NaN</code>/<code>-Inf</code> in the upper tail of the shifted-Wald survival function, which propagated to <code><a href="../reference/cswald_dist.html">dcswald()</a></code> (and therefore <code>log_lik</code>/<code>posterior_predict</code>) for the <strong>cswald</strong> model at extreme reaction times. The R-side survival now uses the stable <code>log_diff_exp</code> form already used by the Stan likelihood (<code>swald_lccdf</code>) (<a href="https://github.com/venpopov/bmm/issues/376" class="external-link">#376</a>).</li>
-<li>Fix <code><a href="https://rdrr.io/r/base/print.html" class="external-link">print()</a></code> for model summaries selecting regression-coefficient rows by an unanchored substring match, so a parameter such as <code>a</code> could pull in rows of another parameter like <code>kappa</code> (e.g. in the <strong>imm</strong> model). Rows are now matched on the exact parameter prefix. This also fixes a crash when only a single coefficient row is shown (<a href="https://github.com/venpopov/bmm/issues/379" class="external-link">#379</a>, <a href="https://github.com/venpopov/bmm/issues/369" class="external-link">#369</a>).</li>
-<li>
-<code><a href="../reference/create_initfun.html">create_initfun()</a></code> now matches Stan parameters to model parameters with a word-boundary regex (<code>(^|_)param(_|$)</code>) instead of a substring match, preventing collisions in models with short parameter names (e.g. <code>s</code>, <code>c</code>, <code>a</code>) that are substrings of longer ones (<code>sim</code>, <code>correct</code>, <code>activation</code>); the longest (most specific) match is selected when several apply (<a href="https://github.com/venpopov/bmm/issues/354" class="external-link">#354</a>, <a href="https://github.com/venpopov/bmm/issues/355" class="external-link">#355</a>).</li>
-<li>
-<code><a href="../reference/create_initfun.html">create_initfun()</a></code> now resolves initialization terms from <code>nlpars</code> when a model parameter is not a distributional parameter, so models built as non-linear brms formulas (e.g. native-multinomial models whose parameters live in <code>bterms$nlpars</code>) no longer error with <code>no applicable method for 'has_intercept' applied to an object of class "NULL"</code> (<a href="https://github.com/venpopov/bmm/issues/362" class="external-link">#362</a>).</li>
-<li>
-<code><a href="../reference/bmm.html">bmm()</a></code> now warns when a predictor in the formula shares its name with both a predicted parameter and a column in the data. Such a predictor was silently treated as a non-linear term (emitted via <code>nlf()</code> instead of <code>lf()</code>), changing the likelihood without any error. Short parameter names (<code>c</code>, <code>a</code>, <code>s</code>, <code>b</code>) collide naturally with condition codes or columns like <code>accuracy</code>/<code>stimulus</code> (<a href="https://github.com/venpopov/bmm/issues/378" class="external-link">#378</a>).</li>
+<h4 id="new-features-1-3-2">New features<a class="anchor" aria-label="anchor" href="#new-features-1-3-2"></a></h4>
+<ul><li>The <strong>sdm</strong> model now supports within-chain parallelization via the <code>threads</code> argument (e.g. <code>bmm(..., threads = 2)</code>), reducing fitting time by up to ~45% in benchmarks (<a href="https://github.com/popov-lab/bmm/issues/374" class="external-link">#374</a>).</li>
+<li>Add <code>softplus</code> as an opt-in link function for positively-bounded parameters, as an alternative to the default <code>log</code> link. <code>softplus(x) = log(1 + exp(x))</code> keeps parameters positive while growing linearly for large values, avoiding the numerical blow-up of <code><a href="https://rdrr.io/r/base/Log.html" class="external-link">exp()</a></code> and giving predictor effects an additive (rather than multiplicative) interpretation on the natural scale. Enable it per parameter via the model’s <code>links</code> list, e.g. <code>m3(...)$links &lt;- list(c = "softplus", a = "softplus")</code> or <code>ddm(rt, response, links = list(bound = "softplus"))</code> (<a href="https://github.com/popov-lab/bmm/issues/363" class="external-link">#363</a>).</li>
 </ul></div>
 <div class="section level4">
-<h4 id="other-changes-development-version">Other changes<a class="anchor" aria-label="anchor" href="#other-changes-development-version"></a></h4>
-<ul><li>Added an internal consistency check in <code><a href="../reference/configure_prior.html">configure_prior()</a></code>: if a model’s <code>fixed_parameters</code> includes a parameter that its <code><a href="../reference/configure_model.html">configure_model()</a></code> never wires into the formula (neither a dpar nor an nlpar), bmm now fails with a clear model-definition error instead of letting a malformed <code>b_Intercept ~ constant()</code> prior reach <code>brm()</code>. This is a safety net for model development; it cannot be reached through the normal <code><a href="../reference/bmm.html">bmm()</a></code> interface, where an unrecognized parameter is already caught earlier by <code><a href="../reference/check_formula.html">check_formula()</a></code> (<a href="https://github.com/venpopov/bmm/issues/377" class="external-link">#377</a>).</li>
+<h4 id="bug-fixes-1-3-2">Bug fixes<a class="anchor" aria-label="anchor" href="#bug-fixes-1-3-2"></a></h4>
+<ul><li>Fix initial values being set in two places, where the <code>init</code> returned by <code><a href="../reference/configure_model.html">configure_model()</a></code> was silently overwritten by <code><a href="../reference/create_initfun.html">create_initfun()</a></code>. This caused the <strong>m3</strong> model’s intended <code>init = 0</code> (needed for stable sampling with the <code>simple</code> choice rule and an <code>identity</code> link) to be lost, and left dead <code>init</code> code in the <strong>sdm</strong> model. <code><a href="../reference/create_initfun.html">create_initfun()</a></code> is now the single source of truth for initial values, with model-specific behaviour expressed through S3 methods (<a href="https://github.com/popov-lab/bmm/issues/375" class="external-link">#375</a>).</li>
+<li>Fix <code>.pwald()</code> returning <code>NaN</code>/<code>-Inf</code> in the upper tail of the shifted-Wald survival function, which propagated to <code><a href="../reference/cswald_dist.html">dcswald()</a></code> (and therefore <code>log_lik</code>/<code>posterior_predict</code>) for the <strong>cswald</strong> model at extreme reaction times. The R-side survival now uses the stable <code>log_diff_exp</code> form already used by the Stan likelihood (<code>swald_lccdf</code>) (<a href="https://github.com/popov-lab/bmm/issues/376" class="external-link">#376</a>).</li>
+<li>Fix <code><a href="https://rdrr.io/r/base/print.html" class="external-link">print()</a></code> for model summaries selecting regression-coefficient rows by an unanchored substring match, so a parameter such as <code>a</code> could pull in rows of another parameter like <code>kappa</code> (e.g. in the <strong>imm</strong> model). Rows are now matched on the exact parameter prefix. This also fixes a crash when only a single coefficient row is shown (<a href="https://github.com/popov-lab/bmm/issues/379" class="external-link">#379</a>, <a href="https://github.com/popov-lab/bmm/issues/369" class="external-link">#369</a>).</li>
 <li>
-<code>print.bmmodel()</code> now also displays the required response variables (one per line, annotated with the expected coding — e.g. radians in [-pi, pi] for the circular models, seconds and 0/1 responses for the trial-wise RT models) and the default parameter links, answering “what does my data frame need to look like?” directly at the console (<a href="https://github.com/venpopov/bmm/issues/392" class="external-link">#392</a>).</li>
-<li>Recalibrated the default priors for the <strong>m3</strong> activation parameters (<code>a</code>, <code>c</code>) so that the <code>simple</code> and <code>softmax</code> choice rules imply a comparable, broad prior-predictive range of average performance, and so that the <code>softmax</code> defaults place equal prior means on general (<code>a</code>) and context (<code>c</code>) activation — centering the implied <code>c - a</code> prior at zero for fair comparisons under cell-means coding. The mis-scaled <code>normal(0, 2)</code> effect prior on <code>c</code> is replaced by the shared <code>normal(0, 0.5)</code>. Because the <code>simple</code> rule requires <code>c &gt; a</code> to predict accurate recall, its defaults remain asymmetric; direct comparisons of context and general activation should use the <code>softmax</code> choice rule (<a href="https://github.com/venpopov/bmm/issues/364" class="external-link">#364</a>).</li>
+<code><a href="../reference/create_initfun.html">create_initfun()</a></code> now matches Stan parameters to model parameters with a word-boundary regex (<code>(^|_)param(_|$)</code>) instead of a substring match, preventing collisions in models with short parameter names (e.g. <code>s</code>, <code>c</code>, <code>a</code>) that are substrings of longer ones (<code>sim</code>, <code>correct</code>, <code>activation</code>); the longest (most specific) match is selected when several apply (<a href="https://github.com/popov-lab/bmm/issues/354" class="external-link">#354</a>, <a href="https://github.com/popov-lab/bmm/issues/355" class="external-link">#355</a>).</li>
+<li>
+<code><a href="../reference/create_initfun.html">create_initfun()</a></code> now resolves initialization terms from <code>nlpars</code> when a model parameter is not a distributional parameter, so models built as non-linear brms formulas (e.g. native-multinomial models whose parameters live in <code>bterms$nlpars</code>) no longer error with <code>no applicable method for 'has_intercept' applied to an object of class "NULL"</code> (<a href="https://github.com/popov-lab/bmm/issues/362" class="external-link">#362</a>).</li>
+<li>The <strong>sdm</strong> model now emits its serial likelihood under <code>threading(n, force = TRUE)</code>, matching the unsliced Stan code brms generates in that case. Previously the threaded chunk was emitted and the model failed to compile.</li>
+<li>
+<code><a href="../reference/bmm.html">bmm()</a></code> now warns when a predictor in the formula shares its name with both a predicted parameter and a column in the data. Such a predictor was silently treated as a non-linear term (emitted via <code>nlf()</code> instead of <code>lf()</code>), changing the likelihood without any error. Short parameter names (<code>c</code>, <code>a</code>, <code>s</code>, <code>b</code>) collide naturally with condition codes or columns like <code>accuracy</code>/<code>stimulus</code> (<a href="https://github.com/popov-lab/bmm/issues/378" class="external-link">#378</a>).</li>
 </ul></div>
 <div class="section level4">
-<h4 id="developer-facing-changes-development-version">Developer-facing changes<a class="anchor" aria-label="anchor" href="#developer-facing-changes-development-version"></a></h4>
+<h4 id="other-changes-1-3-2">Other changes<a class="anchor" aria-label="anchor" href="#other-changes-1-3-2"></a></h4>
+<ul><li>Added an internal consistency check in <code><a href="../reference/configure_prior.html">configure_prior()</a></code>: if a model’s <code>fixed_parameters</code> includes a parameter that its <code><a href="../reference/configure_model.html">configure_model()</a></code> never wires into the formula (neither a dpar nor an nlpar), bmm now fails with a clear model-definition error instead of letting a malformed <code>b_Intercept ~ constant()</code> prior reach <code>brm()</code>. This is a safety net for model development; it cannot be reached through the normal <code><a href="../reference/bmm.html">bmm()</a></code> interface, where an unrecognized parameter is already caught earlier by <code><a href="../reference/check_formula.html">check_formula()</a></code> (<a href="https://github.com/popov-lab/bmm/issues/377" class="external-link">#377</a>).</li>
+<li>
+<code>print.bmmodel()</code> now also displays the required response variables (one per line, annotated with the expected coding — e.g. radians in [-pi, pi] for the circular models, seconds and 0/1 responses for the trial-wise RT models) and the default parameter links, answering “what does my data frame need to look like?” directly at the console (<a href="https://github.com/popov-lab/bmm/issues/392" class="external-link">#392</a>).</li>
+<li>The package maintainer contact is now Gidon T. Frischkorn, and the repository URLs point to <code>https://github.com/popov-lab/bmm</code>.</li>
+</ul></div>
+<div class="section level4">
+<h4 id="developer-facing-changes-1-3-2">Developer-facing changes<a class="anchor" aria-label="anchor" href="#developer-facing-changes-1-3-2"></a></h4>
 <ul><li>
-<strong><code><a href="../reference/use_model_template.html">use_model_template()</a></code> now scaffolds the current model-specification patterns.</strong> It generates a flat <code>.{model}_defaults</code> block for unversioned models (like <code>ddm</code>) or, with the new <code>versions</code> argument, a <code>.{model}_version_table</code> block for versioned models (like <code>cswald</code>). The generated constructor spells out every field of the model object inline (referencing the defaults/version table for <code>parameters</code>, <code>links</code>, <code>fixed_parameters</code>, <code>default_priors</code>, and <code>init_ranges</code>), and versioned aliases validate <code>version</code> with <code><a href="https://rdrr.io/r/base/match.arg.html" class="external-link">match.arg()</a></code> (<a href="https://github.com/venpopov/bmm/issues/350" class="external-link">#350</a>).</li>
+<strong><code><a href="../reference/use_model_template.html">use_model_template()</a></code> now scaffolds the current model-specification patterns.</strong> It generates a flat <code>.{model}_defaults</code> block for unversioned models (like <code>ddm</code>) or, with the new <code>versions</code> argument, a <code>.{model}_version_table</code> block for versioned models (like <code>cswald</code>). The generated constructor spells out every field of the model object inline (referencing the defaults/version table for <code>parameters</code>, <code>links</code>, <code>fixed_parameters</code>, <code>default_priors</code>, and <code>init_ranges</code>), and versioned aliases validate <code>version</code> with <code><a href="https://rdrr.io/r/base/match.arg.html" class="external-link">match.arg()</a></code> (<a href="https://github.com/popov-lab/bmm/issues/350" class="external-link">#350</a>).</li>
 <li>
-<strong>Removed the unused <code>void_mu</code> field</strong> from all model definitions and the template. It was assigned but never read anywhere — response-mean suppression is already handled via <code>fixed_parameters</code> and the family’s <code>dpars</code> (<a href="https://github.com/venpopov/bmm/issues/350" class="external-link">#350</a>).</li>
+<strong>Removed the unused <code>void_mu</code> field</strong> from all model definitions and the template. It was assigned but never read anywhere — response-mean suppression is already handled via <code>fixed_parameters</code> and the family’s <code>dpars</code> (<a href="https://github.com/popov-lab/bmm/issues/350" class="external-link">#350</a>).</li>
 </ul></div>
 </div>
     <div class="section level2">
 <h2 class="pkg-version" data-toc-text="1.3.1" id="bmm-131">bmm 1.3.1<a class="anchor" aria-label="anchor" href="#bmm-131"></a></h2><p class="text-muted">CRAN release: 2026-06-05</p>
 <div class="section level4">
 <h4 id="bug-fixes-1-3-1">Bug fixes<a class="anchor" aria-label="anchor" href="#bug-fixes-1-3-1"></a></h4>
-<ul><li>Fix <code>swald_lccdf()</code> returning incorrect log-survival probability when response time equals non-decision time in the <strong>cswald</strong> model. Previously returned <code>-Inf</code> instead of <code>0</code> (log of survival = 1) (<a href="https://github.com/venpopov/bmm/issues/348" class="external-link">#348</a>).</li>
+<ul><li>Fix <code>swald_lccdf()</code> returning incorrect log-survival probability when response time equals non-decision time in the <strong>cswald</strong> model. Previously returned <code>-Inf</code> instead of <code>0</code> (log of survival = 1) (<a href="https://github.com/popov-lab/bmm/issues/348" class="external-link">#348</a>).</li>
 </ul></div>
 <div class="section level4">
 <h4 id="other-changes-1-3-1">Other changes<a class="anchor" aria-label="anchor" href="#other-changes-1-3-1"></a></h4>
@@ -89,21 +97,21 @@
 <h2 class="pkg-version" data-toc-text="1.3.0" id="bmm-130">bmm 1.3.0<a class="anchor" aria-label="anchor" href="#bmm-130"></a></h2><p class="text-muted">CRAN release: 2026-03-30</p>
 <div class="section level4">
 <h4 id="new-models-1-3-0">New models<a class="anchor" aria-label="anchor" href="#new-models-1-3-0"></a></h4>
-<ul><li>Add the <strong>Diffusion Decision Model</strong> (<code>ddm</code>) for speeded decision-making tasks with trial-level RT and response data. The model estimates drift rate, boundary separation, non-decision time, and (optionally) relative starting point. Includes distribution functions <code><a href="../reference/ddm_dist.html">dddm()</a></code> and <code><a href="../reference/ddm_dist.html">rddm()</a></code> (<a href="https://github.com/venpopov/bmm/issues/280" class="external-link">#280</a>).</li>
-<li>Add the <strong>EZ-Diffusion Model</strong> (<code>ezdm</code>) for speeded decision-making tasks. The model estimates drift rate, boundary separation, and non-decision time from aggregated summary statistics (mean RT, variance of RT, accuracy) using the closed-form equations derived by Wagenmakers et al. (2007). Supports both 3-parameter (symmetric starting point) and 4-parameter (asymmetric starting point) versions based on Srivastava et al. (2016). Implements Bayesian hierarchical estimation following Chavez &amp; Vandekerckhove (2025). Includes distribution functions <code><a href="../reference/ezdm_dist.html">dezdm()</a></code> and <code><a href="../reference/ezdm_dist.html">rezdm()</a></code> (<a href="https://github.com/venpopov/bmm/issues/281" class="external-link">#281</a>).</li>
+<ul><li>Add the <strong>Diffusion Decision Model</strong> (<code>ddm</code>) for speeded decision-making tasks with trial-level RT and response data. The model estimates drift rate, boundary separation, non-decision time, and (optionally) relative starting point. Includes distribution functions <code><a href="../reference/ddm_dist.html">dddm()</a></code> and <code><a href="../reference/ddm_dist.html">rddm()</a></code> (<a href="https://github.com/popov-lab/bmm/issues/280" class="external-link">#280</a>).</li>
+<li>Add the <strong>EZ-Diffusion Model</strong> (<code>ezdm</code>) for speeded decision-making tasks. The model estimates drift rate, boundary separation, and non-decision time from aggregated summary statistics (mean RT, variance of RT, accuracy) using the closed-form equations derived by Wagenmakers et al. (2007). Supports both 3-parameter (symmetric starting point) and 4-parameter (asymmetric starting point) versions based on Srivastava et al. (2016). Implements Bayesian hierarchical estimation following Chavez &amp; Vandekerckhove (2025). Includes distribution functions <code><a href="../reference/ezdm_dist.html">dezdm()</a></code> and <code><a href="../reference/ezdm_dist.html">rezdm()</a></code> (<a href="https://github.com/popov-lab/bmm/issues/281" class="external-link">#281</a>).</li>
 <li>Add the <strong>Censored Shifted Wald Model</strong> (<code>cswald</code>) for choice reaction time tasks with two response boundaries. The model estimates drift rate, boundary separation, and non-decision time from trial-level RT and response data. Implements two versions: <strong>simple</strong> (treats errors as censored correct responses, appropriate for high-accuracy tasks) and <strong>crisk</strong> (competing risks version with separate accumulators for each response, suitable for balanced accuracy). Includes distribution functions <code><a href="../reference/cswald_dist.html">dcswald()</a></code>, <code><a href="../reference/cswald_dist.html">pcswald()</a></code>, <code><a href="../reference/cswald_dist.html">qcswald()</a></code>, and <code><a href="../reference/cswald_dist.html">rcswald()</a></code>. Thanks to <a href="https://github.com/GidonFrischkorn" class="external-link">@GidonFrischkorn</a></li>
 </ul></div>
 <div class="section level4">
 <h4 id="new-features-1-3-0">New features<a class="anchor" aria-label="anchor" href="#new-features-1-3-0"></a></h4>
-<ul><li>New S3 method <strong>conditional_effects()</strong> for <code>bmmfit</code> objects. Provides an intuitive interface for visualizing predictor effects on model parameters, with automatic routing between distributional and non-linear parameters, inverse link transformations to show parameters on their natural scale (<code>scale = "native"</code>), softmax handling for mixture3p weight parameters, and filtering of internal model variables (<a href="https://github.com/venpopov/bmm/issues/203" class="external-link">#203</a>).</li>
-<li>New S3 methods for <strong>emmeans</strong> support on <code>bmmfit</code> objects. Users can now call <code>emmeans(fit, ~ condition, dpar = "kappa")</code> for any bmmodel (<a href="https://github.com/venpopov/bmm/issues/323" class="external-link">#323</a>).</li>
-<li>New <strong>pp_check()</strong> method for multinomial models (e.g., <code>m3</code>). Since <code><a href="https://mc-stan.org/bayesplot/reference/pp_check.html" class="external-link">brms::pp_check()</a></code> does not support the multinomial family, <code>bmm</code> now provides a custom method that compares observed and predicted response proportions in the <code>ppc_bars</code> style from <code>bayesplot</code>. The method supports faceting by experimental conditions via <code>group</code>, configurable credible intervals via <code>probs</code>, and population-level predictions via <code>re_formula = NA</code>. For non-multinomial models, <code><a href="../reference/pp_check.bmmfit.html">pp_check()</a></code> delegates to <code><a href="https://mc-stan.org/bayesplot/reference/pp_check.html" class="external-link">brms::pp_check()</a></code> and auto-selects the grouped plot variant when <code>group</code> is specified (<a href="https://github.com/venpopov/bmm/issues/324" class="external-link">#324</a>).</li>
-<li>New function <strong>parameters()</strong> lists all parameters of a <code>bmmodel</code> or <code>bmmfit</code> object with descriptions, link functions, and fixed values (<a href="https://github.com/venpopov/bmm/issues/329" class="external-link">#329</a>).</li>
-<li>New function <strong>extract_stan_blocks()</strong> extracts individual program blocks (functions, data, parameters, etc.) from compiled Stan code (<a href="https://github.com/venpopov/bmm/issues/286" class="external-link">#286</a>).</li>
+<ul><li>New S3 method <strong>conditional_effects()</strong> for <code>bmmfit</code> objects. Provides an intuitive interface for visualizing predictor effects on model parameters, with automatic routing between distributional and non-linear parameters, inverse link transformations to show parameters on their natural scale (<code>scale = "native"</code>), softmax handling for mixture3p weight parameters, and filtering of internal model variables (<a href="https://github.com/popov-lab/bmm/issues/203" class="external-link">#203</a>).</li>
+<li>New S3 methods for <strong>emmeans</strong> support on <code>bmmfit</code> objects. Users can now call <code>emmeans(fit, ~ condition, dpar = "kappa")</code> for any bmmodel (<a href="https://github.com/popov-lab/bmm/issues/323" class="external-link">#323</a>).</li>
+<li>New <strong>pp_check()</strong> method for multinomial models (e.g., <code>m3</code>). Since <code><a href="https://mc-stan.org/bayesplot/reference/pp_check.html" class="external-link">brms::pp_check()</a></code> does not support the multinomial family, <code>bmm</code> now provides a custom method that compares observed and predicted response proportions in the <code>ppc_bars</code> style from <code>bayesplot</code>. The method supports faceting by experimental conditions via <code>group</code>, configurable credible intervals via <code>probs</code>, and population-level predictions via <code>re_formula = NA</code>. For non-multinomial models, <code><a href="../reference/pp_check.bmmfit.html">pp_check()</a></code> delegates to <code><a href="https://mc-stan.org/bayesplot/reference/pp_check.html" class="external-link">brms::pp_check()</a></code> and auto-selects the grouped plot variant when <code>group</code> is specified (<a href="https://github.com/popov-lab/bmm/issues/324" class="external-link">#324</a>).</li>
+<li>New function <strong>parameters()</strong> lists all parameters of a <code>bmmodel</code> or <code>bmmfit</code> object with descriptions, link functions, and fixed values (<a href="https://github.com/popov-lab/bmm/issues/329" class="external-link">#329</a>).</li>
+<li>New function <strong>extract_stan_blocks()</strong> extracts individual program blocks (functions, data, parameters, etc.) from compiled Stan code (<a href="https://github.com/popov-lab/bmm/issues/286" class="external-link">#286</a>).</li>
 <li>New function <strong>extract_parameter_dimensions()</strong> extracts parameter names, dimensions, and types from a Stan parameters block.</li>
-<li>New functions <strong>ezdm_summary_stats()</strong> and <strong>adjust_ezdm_accuracy()</strong> to compute and pre-process summary statistics from trial-level RT data for the EZ-Diffusion Model (<a href="https://github.com/venpopov/bmm/issues/291" class="external-link">#291</a>).</li>
-<li>New functions <strong>flag_contaminant_rts()</strong> and <strong>validate_fast_guesses()</strong> for trial-level contamination detection in RT data. Identifies fast guesses and attention lapses using mixture modeling and provides Bayesian validation of fast guess assumptions (<a href="https://github.com/venpopov/bmm/issues/307" class="external-link">#307</a>).</li>
-<li>New function <strong>create_initfun()</strong> creates initialization functions for models that benefit from or require initial values for MCMC sampling (<a href="https://github.com/venpopov/bmm/issues/285" class="external-link">#285</a>).</li>
+<li>New functions <strong>ezdm_summary_stats()</strong> and <strong>adjust_ezdm_accuracy()</strong> to compute and pre-process summary statistics from trial-level RT data for the EZ-Diffusion Model (<a href="https://github.com/popov-lab/bmm/issues/291" class="external-link">#291</a>).</li>
+<li>New functions <strong>flag_contaminant_rts()</strong> and <strong>validate_fast_guesses()</strong> for trial-level contamination detection in RT data. Identifies fast guesses and attention lapses using mixture modeling and provides Bayesian validation of fast guess assumptions (<a href="https://github.com/popov-lab/bmm/issues/307" class="external-link">#307</a>).</li>
+<li>New function <strong>create_initfun()</strong> creates initialization functions for models that benefit from or require initial values for MCMC sampling (<a href="https://github.com/popov-lab/bmm/issues/285" class="external-link">#285</a>).</li>
 </ul></div>
 <div class="section level4">
 <h4 id="documentation-1-3-0">Documentation<a class="anchor" aria-label="anchor" href="#documentation-1-3-0"></a></h4>
@@ -114,8 +122,8 @@
 </ul></div>
 <div class="section level4">
 <h4 id="other-changes-1-3-0">Other changes<a class="anchor" aria-label="anchor" href="#other-changes-1-3-0"></a></h4>
-<ul><li>Improved <strong>rm3()</strong> random generation function for the M3 model (<a href="https://github.com/venpopov/bmm/issues/279" class="external-link">#279</a>).</li>
-<li>Removed magrittr dependency; replaced <code>%&gt;%</code> with the native pipe <code>|&gt;</code> (<a href="https://github.com/venpopov/bmm/issues/341" class="external-link">#341</a>).</li>
+<ul><li>Improved <strong>rm3()</strong> random generation function for the M3 model (<a href="https://github.com/popov-lab/bmm/issues/279" class="external-link">#279</a>).</li>
+<li>Removed magrittr dependency; replaced <code>%&gt;%</code> with the native pipe <code>|&gt;</code> (<a href="https://github.com/popov-lab/bmm/issues/341" class="external-link">#341</a>).</li>
 <li>Minimum R version is now 4.1.0.</li>
 </ul></div>
 </div>
@@ -123,33 +131,33 @@
 <h2 class="pkg-version" data-toc-text="1.2.0" id="bmm-120">bmm 1.2.0<a class="anchor" aria-label="anchor" href="#bmm-120"></a></h2><p class="text-muted">CRAN release: 2025-07-24</p>
 <div class="section level4">
 <h4 id="new-models-1-2-0">New models<a class="anchor" aria-label="anchor" href="#new-models-1-2-0"></a></h4>
-<ul><li>Add the Memory Measurement Model (Oberauer &amp; Lewandowsky, 2019) and its generalization as the Multinomial Measurement Model for categorical decision tasks as new model class <strong>m3</strong> with three versions: simple span (<strong>ss</strong>), complex span (<strong>cs</strong>), and <strong>custom</strong>. For details, see the <a href="https://venpopov.com/bmm/articles/bmm_m3.html">article</a> on the <code>bmm</code> website (<a href="https://github.com/venpopov/bmm/issues/237" class="external-link">#237</a>). Thanks to <a href="https://github.com/GidonFrischkorn" class="external-link">@GidonFrischkorn</a> and <a href="https://github.com/chenyu-psy" class="external-link">@chenyu-psy</a></li>
+<ul><li>Add the Memory Measurement Model (Oberauer &amp; Lewandowsky, 2019) and its generalization as the Multinomial Measurement Model for categorical decision tasks as new model class <strong>m3</strong> with three versions: simple span (<strong>ss</strong>), complex span (<strong>cs</strong>), and <strong>custom</strong>. For details, see the <a href="https://venpopov.com/bmm/articles/bmm_m3.html">article</a> on the <code>bmm</code> website (<a href="https://github.com/popov-lab/bmm/issues/237" class="external-link">#237</a>). Thanks to <a href="https://github.com/GidonFrischkorn" class="external-link">@GidonFrischkorn</a> and <a href="https://github.com/chenyu-psy" class="external-link">@chenyu-psy</a></li>
 </ul></div>
 <div class="section level4">
 <h4 id="new-features-1-2-0">New features<a class="anchor" aria-label="anchor" href="#new-features-1-2-0"></a></h4>
-<ul><li>Updates to the <code>bmf2bf</code> S3 methods for more flexible translation of <code>bmmformulas</code> into <code>brmsformulas</code> (<a href="https://github.com/venpopov/bmm/issues/227" class="external-link">#227</a>).</li>
+<ul><li>Updates to the <code>bmf2bf</code> S3 methods for more flexible translation of <code>bmmformulas</code> into <code>brmsformulas</code> (<a href="https://github.com/popov-lab/bmm/issues/227" class="external-link">#227</a>).</li>
 <li>New function <strong>apply_links</strong> adds link functions to all non-linear formulas in a <strong>bmmformula</strong> object.</li>
 <li>New example data set <strong>oberauer_lewandowsky_2019_e1</strong> for exploring the <strong>m3</strong> model.</li>
-<li>The <code>file_refit</code> argument of the <code>bmm</code> function now accepts character strings like <code>brms</code>. A warning is given when “on_change” is specified, as this is not currently implemented for <code>bmmodels</code> (<a href="https://github.com/venpopov/bmm/issues/228" class="external-link">#228</a>).</li>
+<li>The <code>file_refit</code> argument of the <code>bmm</code> function now accepts character strings like <code>brms</code>. A warning is given when “on_change” is specified, as this is not currently implemented for <code>bmmodels</code> (<a href="https://github.com/popov-lab/bmm/issues/228" class="external-link">#228</a>).</li>
 <li>New function <strong>rejection_sampling</strong>
 </li>
 </ul></div>
 <div class="section level4">
 <h4 id="bug-fixes-1-2-0">Bug fixes<a class="anchor" aria-label="anchor" href="#bug-fixes-1-2-0"></a></h4>
-<ul><li>Fix conflict in setting default priors when model parameters were transformed in a non-linear formula (<a href="https://github.com/venpopov/bmm/issues/232" class="external-link">#232</a>).</li>
-<li>Allow a NULL formula (<code>formula(NULL)</code>) to be added to a bmmformula for consistentcy with brms (<a href="https://github.com/venpopov/bmm/issues/264" class="external-link">#264</a>)</li>
+<ul><li>Fix conflict in setting default priors when model parameters were transformed in a non-linear formula (<a href="https://github.com/popov-lab/bmm/issues/232" class="external-link">#232</a>).</li>
+<li>Allow a NULL formula (<code>formula(NULL)</code>) to be added to a bmmformula for consistentcy with brms (<a href="https://github.com/popov-lab/bmm/issues/264" class="external-link">#264</a>)</li>
 <li>Improve error messages when attempting to construct bmmformulas without a left-hand-side variable</li>
 </ul></div>
 <div class="section level4">
 <h4 id="documentation-1-2-0">Documentation<a class="anchor" aria-label="anchor" href="#documentation-1-2-0"></a></h4>
-<ul><li>Add documentation to the <a href="https://venpopov.com/bmm/articles/bmm_vwm_crt.html">continuous reproduction task</a> article for pre-processing half-circular stimulus spaces when using <code>bmmodels</code> of the <code>circular</code> model class (<a href="https://github.com/venpopov/bmm/issues/229" class="external-link">#229</a>, <a href="https://github.com/venpopov/bmm/issues/233" class="external-link">#233</a>).</li>
+<ul><li>Add documentation to the <a href="https://venpopov.com/bmm/articles/bmm_vwm_crt.html">continuous reproduction task</a> article for pre-processing half-circular stimulus spaces when using <code>bmmodels</code> of the <code>circular</code> model class (<a href="https://github.com/popov-lab/bmm/issues/229" class="external-link">#229</a>, <a href="https://github.com/popov-lab/bmm/issues/233" class="external-link">#233</a>).</li>
 <li>New online <a href="https://venpopov.com/bmm/articles/bmm_m3.html">article</a> to accompany the m3 model</li>
 </ul></div>
 <div class="section level4">
 <h4 id="other-changes-1-2-0">Other changes<a class="anchor" aria-label="anchor" href="#other-changes-1-2-0"></a></h4>
 <ul><li>vectorize <code><a href="../reference/k2sd.html">k2sd()</a></code> function for improved performance</li>
-<li>various internal refactorings (<a href="https://github.com/venpopov/bmm/issues/246" class="external-link">#246</a>, <a href="https://github.com/venpopov/bmm/issues/242" class="external-link">#242</a>)</li>
-<li>dplyr, magrittr and tidyr dependencies are now optional (<a href="https://github.com/venpopov/bmm/issues/240" class="external-link">#240</a>)</li>
+<li>various internal refactorings (<a href="https://github.com/popov-lab/bmm/issues/246" class="external-link">#246</a>, <a href="https://github.com/popov-lab/bmm/issues/242" class="external-link">#242</a>)</li>
+<li>dplyr, magrittr and tidyr dependencies are now optional (<a href="https://github.com/popov-lab/bmm/issues/240" class="external-link">#240</a>)</li>
 <li>new contributor - Chenyun Li (chenyu-psy) for his work on the m3 model</li>
 </ul></div>
 </div>
@@ -158,13 +166,13 @@
 <p>First version of the package on published on CRAN!</p>
 <div class="section level4">
 <h4 id="new-features-1-0-0">New features<a class="anchor" aria-label="anchor" href="#new-features-1-0-0"></a></h4>
-<ul><li>you can now specify to save the <strong>bmmfit</strong> object generated by <strong>bmm()</strong> to a file with the <strong>file</strong> argument, similarly to <strong>brms::brm()</strong> (<a href="https://github.com/venpopov/bmm/issues/190" class="external-link">#190</a>)</li>
+<ul><li>you can now specify to save the <strong>bmmfit</strong> object generated by <strong>bmm()</strong> to a file with the <strong>file</strong> argument, similarly to <strong>brms::brm()</strong> (<a href="https://github.com/popov-lab/bmm/issues/190" class="external-link">#190</a>)</li>
 <li>the parameterization of the <strong>imm</strong> was adapted to accurately reflect the model as implemented by Oberauer et al. (2017)</li>
 <li>prepare package for CRAN submission</li>
 </ul></div>
 <div class="section level4">
 <h4 id="bug-fixes-1-0-0">Bug fixes<a class="anchor" aria-label="anchor" href="#bug-fixes-1-0-0"></a></h4>
-<ul><li>fix incorrect specification of default priors when only an interaction is specified (<a href="https://github.com/venpopov/bmm/issues/201" class="external-link">#201</a>)</li>
+<ul><li>fix incorrect specification of default priors when only an interaction is specified (<a href="https://github.com/popov-lab/bmm/issues/201" class="external-link">#201</a>)</li>
 <li>the random generation function for the <strong>mixture3p</strong> and <strong>imm</strong> returned incorrect samples for some rare parameter combinations, this has now been fixed, so that the functions now return correct samples for all parameter combinations.</li>
 </ul></div>
 <div class="section level4">
@@ -183,14 +191,14 @@
 <h2 class="pkg-version" data-toc-text="0.5.0" id="bmm-050">bmm 0.5.0<a class="anchor" aria-label="anchor" href="#bmm-050"></a></h2>
 <div class="section level4">
 <h4 id="new-features-0-5-0">New features<a class="anchor" aria-label="anchor" href="#new-features-0-5-0"></a></h4>
-<ul><li>add a <strong>summary()</strong> method for <strong>bmmfit</strong> objects (<a href="https://github.com/venpopov/bmm/issues/144" class="external-link">#144</a>)</li>
+<ul><li>add a <strong>summary()</strong> method for <strong>bmmfit</strong> objects (<a href="https://github.com/popov-lab/bmm/issues/144" class="external-link">#144</a>)</li>
 <li>add a global option <strong>bmm.summary_backend</strong> to control the backend used for the <strong>summary()</strong> method (choices are <em>“bmm”</em> and <em>“brms”</em>)</li>
 <li>function <strong>restructure()</strong> now allows to apply methods introduced in newer <strong>bmm</strong> versions to <strong>bmmfit</strong> objects created by older <strong>bmm</strong> versions</li>
-<li>you can now specify any model parameter to be a constant by using an equal sign in the <strong>bmmformula</strong> (<a href="https://github.com/venpopov/bmm/issues/142" class="external-link">#142</a>)</li>
-<li>you can now choose to estimate parameters that are fixed to a constant by default for all models (<a href="https://github.com/venpopov/bmm/issues/145" class="external-link">#145</a>)</li>
-<li>default priors for all models are now specified via the <strong>configure_prior()</strong> S3 method (<a href="https://github.com/venpopov/bmm/issues/145" class="external-link">#145</a>)</li>
+<li>you can now specify any model parameter to be a constant by using an equal sign in the <strong>bmmformula</strong> (<a href="https://github.com/popov-lab/bmm/issues/142" class="external-link">#142</a>)</li>
+<li>you can now choose to estimate parameters that are fixed to a constant by default for all models (<a href="https://github.com/popov-lab/bmm/issues/145" class="external-link">#145</a>)</li>
+<li>default priors for all models are now specified via the <strong>configure_prior()</strong> S3 method (<a href="https://github.com/popov-lab/bmm/issues/145" class="external-link">#145</a>)</li>
 <li>
-<strong>cmdstanr</strong> will be used as the default backend for <strong>brms</strong> if the user has it installed (<a href="https://github.com/venpopov/bmm/issues/145" class="external-link">#145</a>)</li>
+<strong>cmdstanr</strong> will be used as the default backend for <strong>brms</strong> if the user has it installed (<a href="https://github.com/popov-lab/bmm/issues/145" class="external-link">#145</a>)</li>
 <li>various updates to the documentation and data sets</li>
 </ul></div>
 <div class="section level4">
@@ -199,19 +207,19 @@
 </ul></div>
 <div class="section level4">
 <h4 id="bug-fixes-0-5-0">Bug fixes<a class="anchor" aria-label="anchor" href="#bug-fixes-0-5-0"></a></h4>
-<ul><li>fix a bug preventing the <strong>sort_data</strong> check from being executed (<a href="https://github.com/venpopov/bmm/issues/72" class="external-link">#72</a>)</li>
-<li>fix bugs with the <strong>summary()</strong> function not displaying implicit parameters (<a href="https://github.com/venpopov/bmm/issues/152" class="external-link">#152</a>) and not working properly with some hierarchical designs (<a href="https://github.com/venpopov/bmm/issues/173" class="external-link">#173</a>)</li>
-<li>fix a bug in which the <strong>sort_data</strong> check occurred in cases where it shouldn’t (<a href="https://github.com/venpopov/bmm/issues/158" class="external-link">#158</a>)</li>
+<ul><li>fix a bug preventing the <strong>sort_data</strong> check from being executed (<a href="https://github.com/popov-lab/bmm/issues/72" class="external-link">#72</a>)</li>
+<li>fix bugs with the <strong>summary()</strong> function not displaying implicit parameters (<a href="https://github.com/popov-lab/bmm/issues/152" class="external-link">#152</a>) and not working properly with some hierarchical designs (<a href="https://github.com/popov-lab/bmm/issues/173" class="external-link">#173</a>)</li>
+<li>fix a bug in which the <strong>sort_data</strong> check occurred in cases where it shouldn’t (<a href="https://github.com/popov-lab/bmm/issues/158" class="external-link">#158</a>)</li>
 </ul></div>
 <div class="section level4">
 <h4 id="deprecated-functions-and-arguments-0-5-0">Deprecated functions and arguments<a class="anchor" aria-label="anchor" href="#deprecated-functions-and-arguments-0-5-0"></a></h4>
 <ul><li>BREAKING CHANGE: remove <strong>get_model_prior(), get_stancode() and get_standata()</strong>. Due to <a href="https://github.com/paul-buerkner/brms/pull/1604" class="external-link">recent changes</a> in <em>brms</em> version 2.21.0, you can now use the <em>brms</em> functions <strong>default_prior</strong>, <strong>stancode</strong> and <strong>standata</strong> directly with <em>bmm</em> models.</li>
-<li>the function <strong>fit_model()</strong> is deprecated in favor of <strong>bmm()</strong> and will be removed in a future version (<a href="https://github.com/venpopov/bmm/issues/163" class="external-link">#163</a>)</li>
-<li>the argument <strong>setsize</strong> for the <strong>mixture3p</strong> and <strong>IMM</strong> models is now called <strong>set_size</strong> for consistency. The old argument name is deprecated and will be removed in a future version (<a href="https://github.com/venpopov/bmm/issues/163" class="external-link">#163</a>)</li>
-<li>the distributions functions for the imm model are renamed from <strong>dIMM</strong>, <strong>pIMM</strong>, <strong>rIMM</strong> and <strong>qIMM</strong> to <strong>dimm</strong>, <strong>pimm</strong>, <strong>rimm</strong> and <strong>qimm</strong> (<a href="https://github.com/venpopov/bmm/issues/163" class="external-link">#163</a>)</li>
-<li>the argument parallel for the <strong>bmm()</strong> function is deprecated and will be removed in a future version. Use <strong>cores</strong> instead, as for <strong>brms::brm()</strong> (<a href="https://github.com/venpopov/bmm/issues/163" class="external-link">#163</a>)</li>
-<li>the models <strong>IMMfull()</strong>, <strong>IMMabc()</strong> and <strong>IMMbsc()</strong> are now called via <strong>imm()</strong>, <strong>imm(version = “abc”)</strong> or <strong>imm(version = “bsc”)</strong>. The old names are deprecated and will be removed in a future version (<a href="https://github.com/venpopov/bmm/issues/163" class="external-link">#163</a>)</li>
-<li>the <strong>sdmSimple()</strong> model is now called <strong>sdm()</strong>. The old name is deprecated and will be removed in a future version (<a href="https://github.com/venpopov/bmm/issues/163" class="external-link">#163</a>)</li>
+<li>the function <strong>fit_model()</strong> is deprecated in favor of <strong>bmm()</strong> and will be removed in a future version (<a href="https://github.com/popov-lab/bmm/issues/163" class="external-link">#163</a>)</li>
+<li>the argument <strong>setsize</strong> for the <strong>mixture3p</strong> and <strong>IMM</strong> models is now called <strong>set_size</strong> for consistency. The old argument name is deprecated and will be removed in a future version (<a href="https://github.com/popov-lab/bmm/issues/163" class="external-link">#163</a>)</li>
+<li>the distributions functions for the imm model are renamed from <strong>dIMM</strong>, <strong>pIMM</strong>, <strong>rIMM</strong> and <strong>qIMM</strong> to <strong>dimm</strong>, <strong>pimm</strong>, <strong>rimm</strong> and <strong>qimm</strong> (<a href="https://github.com/popov-lab/bmm/issues/163" class="external-link">#163</a>)</li>
+<li>the argument parallel for the <strong>bmm()</strong> function is deprecated and will be removed in a future version. Use <strong>cores</strong> instead, as for <strong>brms::brm()</strong> (<a href="https://github.com/popov-lab/bmm/issues/163" class="external-link">#163</a>)</li>
+<li>the models <strong>IMMfull()</strong>, <strong>IMMabc()</strong> and <strong>IMMbsc()</strong> are now called via <strong>imm()</strong>, <strong>imm(version = “abc”)</strong> or <strong>imm(version = “bsc”)</strong>. The old names are deprecated and will be removed in a future version (<a href="https://github.com/popov-lab/bmm/issues/163" class="external-link">#163</a>)</li>
+<li>the <strong>sdmSimple()</strong> model is now called <strong>sdm()</strong>. The old name is deprecated and will be removed in a future version (<a href="https://github.com/popov-lab/bmm/issues/163" class="external-link">#163</a>)</li>
 </ul></div>
 <div class="section level4">
 <h4 id="other-changes-0-5-0">Other changes<a class="anchor" aria-label="anchor" href="#other-changes-0-5-0"></a></h4>
@@ -223,12 +231,12 @@
 <h2 class="pkg-version" data-toc-text="0.4.0" id="bmm-040">bmm 0.4.0<a class="anchor" aria-label="anchor" href="#bmm-040"></a></h2>
 <div class="section level4">
 <h4 id="new-features-0-4-0">New features<a class="anchor" aria-label="anchor" href="#new-features-0-4-0"></a></h4>
-<ul><li>add a check for the <strong>sdmSimple</strong> model if the data is sorted by predictors. This leads to much faster sampling. The user can control the default behavior with the <strong>sort_data</strong> argument (<a href="https://github.com/venpopov/bmm/issues/72" class="external-link">#72</a>)</li>
-<li>the <strong>mixture3p</strong> and <strong>IMM</strong> models now require that the intercept must be suppressed when set size is used as a predictor (<a href="https://github.com/venpopov/bmm/issues/96" class="external-link">#96</a>).</li>
-<li>add postprocessing methods for <strong>sdmSimple</strong> to allow the use of <strong>pp_check()</strong>, <strong>conditional_effects</strong> and <strong>bridgesampling</strong> with the model (<a href="https://github.com/venpopov/bmm/issues/30" class="external-link">#30</a>)</li>
+<ul><li>add a check for the <strong>sdmSimple</strong> model if the data is sorted by predictors. This leads to much faster sampling. The user can control the default behavior with the <strong>sort_data</strong> argument (<a href="https://github.com/popov-lab/bmm/issues/72" class="external-link">#72</a>)</li>
+<li>the <strong>mixture3p</strong> and <strong>IMM</strong> models now require that the intercept must be suppressed when set size is used as a predictor (<a href="https://github.com/popov-lab/bmm/issues/96" class="external-link">#96</a>).</li>
+<li>add postprocessing methods for <strong>sdmSimple</strong> to allow the use of <strong>pp_check()</strong>, <strong>conditional_effects</strong> and <strong>bridgesampling</strong> with the model (<a href="https://github.com/popov-lab/bmm/issues/30" class="external-link">#30</a>)</li>
 <li>add informed default priors for all models. You can always use the <strong>get_model_prior()</strong> function to see the default priors for a model</li>
 <li>add a new function <strong>set_default_prior</strong> for developers, which allows them to more easily set default priors on new models regardless of the user-specified formula</li>
-<li>you can now specify variables for models via regular expressions rather than character vectors (<a href="https://github.com/venpopov/bmm/issues/102" class="external-link">#102</a>)</li>
+<li>you can now specify variables for models via regular expressions rather than character vectors (<a href="https://github.com/popov-lab/bmm/issues/102" class="external-link">#102</a>)</li>
 <li>you can now view and set all <strong>bmm</strong> global options via <strong>bmm_options()</strong>. See <strong>?bmm_options</strong> for more information</li>
 <li>add a start-up message upon loading the package</li>
 </ul></div>
@@ -236,7 +244,7 @@
 <h4 id="bug-fixes-0-4-0">Bug fixes<a class="anchor" aria-label="anchor" href="#bug-fixes-0-4-0"></a></h4>
 <ul><li>fix a bug in the <strong>mixture3p</strong> and <strong>IMM</strong> models which caused an error when intercept was not suppressed and set size was used as predictor</li>
 <li>
-<strong>update()</strong> now works properly with <strong>bmmfit</strong> objects (<a href="https://github.com/venpopov/bmm/issues/95" class="external-link">#95</a>)</li>
+<strong>update()</strong> now works properly with <strong>bmmfit</strong> objects (<a href="https://github.com/popov-lab/bmm/issues/95" class="external-link">#95</a>)</li>
 <li>fix a bug in the <strong>sort_data</strong> check which caused an error when using grouped covariance structure in random effects across different parameters</li>
 </ul></div>
 <div class="section level4">
@@ -250,7 +258,7 @@
 <h2 class="pkg-version" data-toc-text="0.3.0" id="bmm-030">bmm 0.3.0<a class="anchor" aria-label="anchor" href="#bmm-030"></a></h2>
 <div class="section level4">
 <h4 id="new-features-0-3-0">New features<a class="anchor" aria-label="anchor" href="#new-features-0-3-0"></a></h4>
-<ul><li>BREAKING CHANGE: The <strong>fit_model</strong> function now requires a <strong>bmmformula</strong> to be passed. The syntax of the <strong>bmmformula</strong> or its short form <strong>bmf</strong> is equal to specifying a <strong>brmsformula</strong>. However, as of this version the <strong>bmmformula</strong> only specifies how parameters of a <strong>bmmodel</strong> change across experimental conditions or continuous predictors. The response variables that the model is fit to now have to be specified when the model is defined using <strong>model = bmmodel()</strong>. (<a href="https://github.com/venpopov/bmm/issues/79" class="external-link">#79</a>)</li>
+<ul><li>BREAKING CHANGE: The <strong>fit_model</strong> function now requires a <strong>bmmformula</strong> to be passed. The syntax of the <strong>bmmformula</strong> or its short form <strong>bmf</strong> is equal to specifying a <strong>brmsformula</strong>. However, as of this version the <strong>bmmformula</strong> only specifies how parameters of a <strong>bmmodel</strong> change across experimental conditions or continuous predictors. The response variables that the model is fit to now have to be specified when the model is defined using <strong>model = bmmodel()</strong>. (<a href="https://github.com/popov-lab/bmm/issues/79" class="external-link">#79</a>)</li>
 <li>BREAKING CHANGE: The <strong>non_target</strong> and <strong>spaPos</strong> variables for the <strong>mixture3p</strong> and <strong>IMM</strong> models were relabeled to <strong>nt_features</strong> and <strong>nt_distances</strong> for consistency. This is also to communicate that distance is not limited to spatial distance but distances on any feature dimensions of the retrieval cues. Currently, still only a single generalization gradient for the cue features is possible.</li>
 <li>This release includes reference fits for all implemented models to ensure that future changes to the package do not compromise the included models and change the results that their implementations produce.</li>
 <li>The <strong>check_formula</strong> methods have been adapted to match the new <strong>bmmformula</strong> syntax. It now evaluates if formulas have been specified using the <strong>bmmformula</strong> function, if formulas for all parameters of a <strong>bmmodel</strong> have been specified and warns the user that only a fixed intercept will be estimated if no formula for one of the parameters was provided. Additionally, <strong>check_formula</strong> throws an error should formulas be provided that do not match a parameter of the called <strong>bmmodel</strong> unless they are part of a non-linear transformation.</li>
@@ -275,7 +283,7 @@
 <h2 class="pkg-version" data-toc-text="0.2.2" id="bmm-022">bmm 0.2.2<a class="anchor" aria-label="anchor" href="#bmm-022"></a></h2>
 <div class="section level4">
 <h4 id="bug-fixes-0-2-2">Bug Fixes<a class="anchor" aria-label="anchor" href="#bug-fixes-0-2-2"></a></h4>
-<ul><li>fixed a bug where passing a character vector or negative values to set_size argument of visual working memory models caused an error or incorrect behavior (<a href="https://github.com/venpopov/bmm/issues/97" class="external-link">#97</a>)</li>
+<ul><li>fixed a bug where passing a character vector or negative values to set_size argument of visual working memory models caused an error or incorrect behavior (<a href="https://github.com/popov-lab/bmm/issues/97" class="external-link">#97</a>)</li>
 </ul></div>
 </div>
     <div class="section level2">
@@ -290,31 +298,31 @@
 <div class="section level4">
 <h4 id="new-features-0-2-0">New features<a class="anchor" aria-label="anchor" href="#new-features-0-2-0"></a></h4>
 <ul><li>New model available - The Signal Discrimination Model by Oberauer (2023) for visual working memory continuous reproduction tasks. See ?sdmSimple. The current version does not take into account non-target activation</li>
-<li>Add ability to extract information about the default priors in <strong>bmm</strong> models with <strong>get_model_prior()</strong> (<a href="https://github.com/venpopov/bmm/issues/53" class="external-link">#53</a>)</li>
-<li>Add ability to generate stan code and stan data for each model with <strong>get_model_stancode()</strong> and <strong>get_model_standata()</strong> (<a href="https://github.com/venpopov/bmm/issues/81" class="external-link">#81</a>)</li>
-<li>BREAKING CHANGE: Add distribution functions for likelihood (e.g. <strong>dIMM()</strong>) and random variate generation <strong>rIMM()</strong>) for all models in the package. Remove deprecated <strong>gen_3p_data()</strong> and <strong>gen_imm_data()</strong> functions (<a href="https://github.com/venpopov/bmm/issues/69" class="external-link">#69</a>)</li>
-<li>Two new data sets are available: <strong>zhang_luck_2008</strong> and <strong>oberauer_lin_2017</strong> (<a href="https://github.com/venpopov/bmm/issues/22" class="external-link">#22</a>)</li>
+<li>Add ability to extract information about the default priors in <strong>bmm</strong> models with <strong>get_model_prior()</strong> (<a href="https://github.com/popov-lab/bmm/issues/53" class="external-link">#53</a>)</li>
+<li>Add ability to generate stan code and stan data for each model with <strong>get_model_stancode()</strong> and <strong>get_model_standata()</strong> (<a href="https://github.com/popov-lab/bmm/issues/81" class="external-link">#81</a>)</li>
+<li>BREAKING CHANGE: Add distribution functions for likelihood (e.g. <strong>dIMM()</strong>) and random variate generation <strong>rIMM()</strong>) for all models in the package. Remove deprecated <strong>gen_3p_data()</strong> and <strong>gen_imm_data()</strong> functions (<a href="https://github.com/popov-lab/bmm/issues/69" class="external-link">#69</a>)</li>
+<li>Two new data sets are available: <strong>zhang_luck_2008</strong> and <strong>oberauer_lin_2017</strong> (<a href="https://github.com/popov-lab/bmm/issues/22" class="external-link">#22</a>)</li>
 </ul></div>
 <div class="section level4">
 <h4 id="documentation-0-2-0">Documentation<a class="anchor" aria-label="anchor" href="#documentation-0-2-0"></a></h4>
-<ul><li>Website for the development version of the package is now available at <a href="https://venpopov.com/bmm/dev/" class="uri">https://venpopov.com/bmm/dev/</a> (<a href="https://github.com/venpopov/bmm/issues/18" class="external-link">#18</a>)</li>
+<ul><li>Website for the development version of the package is now available at <a href="https://venpopov.com/bmm/dev/" class="uri">https://venpopov.com/bmm/dev/</a> (<a href="https://github.com/popov-lab/bmm/issues/18" class="external-link">#18</a>)</li>
 <li>Add articles for each model to the website at <a href="https://venpopov.com/bmm/dev/articles/" class="uri">https://venpopov.com/bmm/dev/articles/</a>
 </li>
-<li>Add a detailed developer’s guide to the website at <a href="https://venpopov.com/bmm/dev/dev-notes" class="uri">https://venpopov.com/bmm/dev/dev-notes</a> (<a href="https://github.com/venpopov/bmm/issues/21" class="external-link">#21</a>)</li>
-<li>Improve README with more detailed information about the package’s goals and its models (<a href="https://github.com/venpopov/bmm/issues/21" class="external-link">#21</a>)</li>
+<li>Add a detailed developer’s guide to the website at <a href="https://venpopov.com/bmm/dev/dev-notes" class="uri">https://venpopov.com/bmm/dev/dev-notes</a> (<a href="https://github.com/popov-lab/bmm/issues/21" class="external-link">#21</a>)</li>
+<li>Improve README with more detailed information about the package’s goals and its models (<a href="https://github.com/popov-lab/bmm/issues/21" class="external-link">#21</a>)</li>
 </ul></div>
 <div class="section level4">
 <h4 id="other-changes-0-2-0">Other changes<a class="anchor" aria-label="anchor" href="#other-changes-0-2-0"></a></h4>
-<ul><li>Save <strong>bmm</strong> package version in the <strong>brmsfit</strong> object for reproducibility - e.g. <code>fit$version$bmm</code> (<a href="https://github.com/venpopov/bmm/issues/88" class="external-link">#88</a>)</li>
+<ul><li>Save <strong>bmm</strong> package version in the <strong>brmsfit</strong> object for reproducibility - e.g. <code>fit$version$bmm</code> (<a href="https://github.com/popov-lab/bmm/issues/88" class="external-link">#88</a>)</li>
 </ul></div>
 </div>
     <div class="section level2">
 <h2 class="pkg-version" data-toc-text="0.1.1" id="bmm-011">bmm 0.1.1<a class="anchor" aria-label="anchor" href="#bmm-011"></a></h2>
 <div class="section level4">
 <h4 id="new-features-0-1-1">New features<a class="anchor" aria-label="anchor" href="#new-features-0-1-1"></a></h4>
-<ul><li>BREAKING CHANGE: Improve user interface to fit_model() ensures package stability and future development. Model specific arguments are now passed to the model functions as named arguments (e.g. <strong>mixture3p(non_targets, setsize)</strong>). This allows for a more flexible and intuitive way to specify model arguments. Passing model specific arguments directly to the <strong>fit_model()</strong> function is now deprecated (<a href="https://github.com/venpopov/bmm/issues/43" class="external-link">#43</a>).</li>
-<li>Add information about each model such as domain, task, name, version, citation, requirements and parameters (<a href="https://github.com/venpopov/bmm/issues/42" class="external-link">#42</a>)</li>
-<li>Add ability to generate a template file for adding new models to the package with <strong>use_model_template()</strong> (for developers) (<a href="https://github.com/venpopov/bmm/issues/39" class="external-link">#39</a>)</li>
+<ul><li>BREAKING CHANGE: Improve user interface to fit_model() ensures package stability and future development. Model specific arguments are now passed to the model functions as named arguments (e.g. <strong>mixture3p(non_targets, setsize)</strong>). This allows for a more flexible and intuitive way to specify model arguments. Passing model specific arguments directly to the <strong>fit_model()</strong> function is now deprecated (<a href="https://github.com/popov-lab/bmm/issues/43" class="external-link">#43</a>).</li>
+<li>Add information about each model such as domain, task, name, version, citation, requirements and parameters (<a href="https://github.com/popov-lab/bmm/issues/42" class="external-link">#42</a>)</li>
+<li>Add ability to generate a template file for adding new models to the package with <strong>use_model_template()</strong> (for developers) (<a href="https://github.com/popov-lab/bmm/issues/39" class="external-link">#39</a>)</li>
 </ul></div>
 <div class="section level4">
 <h4 id="other-changes-0-1-1">Other changes<a class="anchor" aria-label="anchor" href="#other-changes-0-1-1"></a></h4>
@@ -324,24 +332,24 @@
 </div>
     <div class="section level2">
 <h2 class="pkg-version" data-toc-text="0.1.0" id="bmm-010">bmm 0.1.0<a class="anchor" aria-label="anchor" href="#bmm-010"></a></h2>
-<p>A major restructuring of the package to support stable and generalizable development of future models (<a href="https://github.com/venpopov/bmm/issues/41" class="external-link">#41</a>).</p>
+<p>A major restructuring of the package to support stable and generalizable development of future models (<a href="https://github.com/popov-lab/bmm/issues/41" class="external-link">#41</a>).</p>
 <div class="section level4">
 <h4 id="new-features-0-1-0">New Features<a class="anchor" aria-label="anchor" href="#new-features-0-1-0"></a></h4>
-<ul><li>Refactor the <strong>fit_model()</strong> function to be generic and independent of the model being fit (<a href="https://github.com/venpopov/bmm/issues/20" class="external-link">#20</a>)</li>
-<li>Transform models to be S3 objects. (<a href="https://github.com/venpopov/bmm/issues/41" class="external-link">#41</a>).</li>
+<ul><li>Refactor the <strong>fit_model()</strong> function to be generic and independent of the model being fit (<a href="https://github.com/popov-lab/bmm/issues/20" class="external-link">#20</a>)</li>
+<li>Transform models to be S3 objects. (<a href="https://github.com/popov-lab/bmm/issues/41" class="external-link">#41</a>).</li>
 <li>View currently supported models with new function <strong>supported_models()</strong>. Currently supported models are: <strong>mixture2p()</strong>, <strong>mixture3p()</strong>, <strong>IMMabc()</strong>, <strong>IMMbsc()</strong>, <strong>IMMfull()</strong>
 </li>
-<li>Add S3 methods for checking the data, formula, model and priors (<a href="https://github.com/venpopov/bmm/issues/41" class="external-link">#41</a>)</li>
-<li>Add distribution functions for the Signal Discrimination Model. See <strong>?SDM</strong> for usage (<a href="https://github.com/venpopov/bmm/issues/27" class="external-link">#27</a>)</li>
+<li>Add S3 methods for checking the data, formula, model and priors (<a href="https://github.com/popov-lab/bmm/issues/41" class="external-link">#41</a>)</li>
+<li>Add distribution functions for the Signal Discrimination Model. See <strong>?SDM</strong> for usage (<a href="https://github.com/popov-lab/bmm/issues/27" class="external-link">#27</a>)</li>
 <li>Add <strong>softmax</strong> and <strong>softmaxinv</strong> functions</li>
 </ul></div>
 <div class="section level4">
 <h4 id="bug-fixes-0-1-0">Bug Fixes<a class="anchor" aria-label="anchor" href="#bug-fixes-0-1-0"></a></h4>
-<ul><li>Change default prior on log(kappa) to Normal(2,1) for the <strong>mixture3p()</strong> model (<a href="https://github.com/venpopov/bmm/issues/15" class="external-link">#15</a>)</li>
+<ul><li>Change default prior on log(kappa) to Normal(2,1) for the <strong>mixture3p()</strong> model (<a href="https://github.com/popov-lab/bmm/issues/15" class="external-link">#15</a>)</li>
 </ul></div>
 <div class="section level4">
 <h4 id="other-changes-0-1-0">Other changes<a class="anchor" aria-label="anchor" href="#other-changes-0-1-0"></a></h4>
-<ul><li>BREAKING CHANGE: deprecate <strong>model_type</strong> argument in <strong>fit_model()</strong>. Models must now be specified with S3 functions passed to argument <strong>model</strong> rather than model names as strings passed to argument <strong>model_type</strong> (<a href="https://github.com/venpopov/bmm/issues/41" class="external-link">#41</a>)</li>
+<ul><li>BREAKING CHANGE: deprecate <strong>model_type</strong> argument in <strong>fit_model()</strong>. Models must now be specified with S3 functions passed to argument <strong>model</strong> rather than model names as strings passed to argument <strong>model_type</strong> (<a href="https://github.com/popov-lab/bmm/issues/41" class="external-link">#41</a>)</li>
 <li>Add extensive unit testing</li>
 </ul></div>
 </div>
