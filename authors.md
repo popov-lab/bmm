@@ -16,7 +16,7 @@
 ## Citation
 
 Source:
-[`inst/CITATION`](https://github.com/venpopov/bmm/blob/develop/inst/CITATION)
+[`inst/CITATION`](https://github.com/venpopov/bmm/blob/master/inst/CITATION)
 
 Frischkorn G, Popov V (2025). “A tutorial for estimating mixture models
 for visual working memory tasks in brms: Introducing the Bayesian
