@@ -314,7 +314,11 @@ configure_model.ezdm_3par <- function(model, data, formula) {
 
   # prepare initial stanvars to pass to brms, model formula and priors
   sc_path <- system.file("stan_chunks", package = "bmm")
-  stan_functions <- read_lines2(paste0(sc_path, "/ezdm_3par_functions.stan"))
+  # the cumulants chunk defines what the likelihood calls, so it comes first
+  stan_functions <- paste0(
+    read_lines2(paste0(sc_path, "/ezdm_cumulants.stan")), "\n",
+    read_lines2(paste0(sc_path, "/ezdm_3par_functions.stan"))
+  )
   stanvars <- brms::stanvar(scode = stan_functions, block = "functions")
 
   # return the list
@@ -374,7 +378,11 @@ configure_model.ezdm_4par <- function(model, data, formula) {
 
   # prepare initial stanvars to pass to brms, model formula and priors
   sc_path <- system.file("stan_chunks", package = "bmm")
-  stan_functions <- read_lines2(paste0(sc_path, "/ezdm_4par_functions.stan"))
+  # the cumulants chunk defines what the likelihood calls, so it comes first
+  stan_functions <- paste0(
+    read_lines2(paste0(sc_path, "/ezdm_cumulants.stan")), "\n",
+    read_lines2(paste0(sc_path, "/ezdm_4par_functions.stan"))
+  )
   stanvars <- brms::stanvar(scode = stan_functions, block = "functions")
 
   # return the list

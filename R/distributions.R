@@ -1176,6 +1176,38 @@ log_diff_exp <- function(a, b) {
 #'   hierarchical drift diffusion model for response time and accuracy.
 #'   Psychonomic Bulletin & Review.
 #'
+#' @details The number of upper-boundary responses is binomial. The two RT
+#'   summaries follow the joint sampling distribution of the mean and the
+#'   variance of `n` independent decision times, matched to the exact first four
+#'   cumulants of the first-passage time. Writing \eqn{\mathrm{MDT}} and
+#'   \eqn{\mathrm{VRT}} for its mean and variance and \eqn{\kappa_3},
+#'   \eqn{\kappa_4} for its third and fourth cumulants, and
+#'   \eqn{W = \kappa_4 / n + 2\,\mathrm{VRT}^2 / (n - 1)} for the exact variance
+#'   of the sample variance,
+#'   \deqn{\mathrm{var\_rt} \sim \mathrm{Gamma}(\mathrm{VRT}^2 / W, \mathrm{VRT} / W),}
+#'   \deqn{\mathrm{mean\_rt} \mid \mathrm{var\_rt} \sim N\left(\mathrm{ndt} + \mathrm{MDT} + \frac{\kappa_3 / n}{W}(\mathrm{var\_rt} - \mathrm{VRT}),\ \sqrt{\mathrm{VRT} / n - (\kappa_3 / n)^2 / W}\right),}
+#'   so that \eqn{\mathrm{Var}(\mathrm{mean\_rt}) = \mathrm{VRT} / n} and
+#'   \eqn{\mathrm{Cov}(\mathrm{mean\_rt}, \mathrm{var\_rt}) = \kappa_3 / n} are
+#'   exact. Decision times are right-skewed (kurtosis 8.8 at zero drift, rising
+#'   with it), so the older form that assumes normal reaction times —
+#'   independent normal and scaled chi-square
+#'   \eqn{\mathrm{Gamma}((n - 1)/2, (n - 1)/(2\,\mathrm{VRT}))} terms —
+#'   understates the sampling variance of `var_rt` several-fold and ignores a
+#'   correlation of about 0.65 between the two statistics, making posteriors too
+#'   narrow. The terms above reduce to it when \eqn{\kappa_3 = \kappa_4 = 0}.
+#'
+#'   For version `"3par"` the start point is symmetric, so the decision time is
+#'   independent of which boundary is hit and all `n_trials` responses inform
+#'   one set of cumulants. For version `"4par"` the two boundaries have
+#'   different decision-time distributions, so each is given its own summaries
+#'   and its own response count; a boundary reached fewer than twice has no
+#'   sample variance and contributes only through the binomial term. The
+#'   per-boundary formulas condition on the realised counts, which are
+#'   themselves random.
+#'
+#'   Simulated `mean_rt` is not truncated at `ndt`; values below it occur only
+#'   at the smallest trial counts.
+#'
 #' @return `dezdm` gives the log-density of the observed summary statistics
 #'   under the EZDM, and `rezdm` generates random summary statistics from the
 #'   implied sampling distributions.
@@ -1293,26 +1325,17 @@ rezdm <- function(n, n_trials, drift, bound, ndt, zr = 0.5, s = 1,
   bound <- rep_len(bound, n)
   s <- rep_len(s, n)
 
-  # compute moments (already vectorized)
+  # a symmetric start point makes the decision time independent of the boundary
+  # hit, so all n_trials responses inform one set of cumulants
   moments <- .ezdm_moments_3par(drift, bound, s)
-  p_c <- moments$pC
-  mdt <- moments$MDT
-  vrt <- moments$VRT
+  rt <- .ez_rt_terms(moments$VRT, moments$k3, moments$k4, n_trials)
 
-  # binomial for n_upper
-  ll <- stats::dbinom(n_upper, size = n_trials, prob = p_c, log = TRUE)
-
-  # normal for mean RT
-  ll <- ll + stats::dnorm(mean_rt,
-    mean = ndt + mdt,
-    sd = sqrt(vrt / n_trials), log = TRUE
-  )
-
-  # gamma for variance RT
-  shape <- (n_trials - 1) / 2
-  rate <- (n_trials - 1) / (2 * vrt)
-
-  ll + stats::dgamma(var_rt, shape = shape, rate = rate, log = TRUE)
+  stats::dbinom(n_upper, size = n_trials, prob = moments$pC, log = TRUE) +
+    stats::dgamma(var_rt, shape = rt$shape, rate = rt$rate, log = TRUE) +
+    stats::dnorm(mean_rt,
+      mean = ndt + moments$MDT + rt$slope * (var_rt - moments$VRT),
+      sd = rt$sd, log = TRUE
+    )
 }
 
 # Internal: 4par density - vectorized
@@ -1366,84 +1389,51 @@ rezdm <- function(n, n_trials, drift, bound, ndt, zr = 0.5, s = 1,
   mdt_lower <- rep_len(moments$mdt_lower, n)
   vrt_upper <- rep_len(moments$vrt_upper, n)
   vrt_lower <- rep_len(moments$vrt_lower, n)
+  k3_upper <- rep_len(moments$k3_upper, n)
+  k3_lower <- rep_len(moments$k3_lower, n)
+  k4_upper <- rep_len(moments$k4_upper, n)
+  k4_lower <- rep_len(moments$k4_lower, n)
   ndt <- rep_len(ndt, n)
 
   # binomial for n_upper
   ll <- stats::dbinom(n_upper, size = n_trials, prob = pC, log = TRUE)
 
-  # upper boundary contributions (vectorized)
-  upper_valid <- n_upper >= 2
-  if (any(upper_valid)) {
-    ll[upper_valid] <- ll[upper_valid] +
-      stats::dnorm(mean_rt_upper[upper_valid],
-        mean = ndt[upper_valid] + mdt_upper[upper_valid],
-        sd = sqrt(vrt_upper[upper_valid] / n_upper[upper_valid]),
-        log = TRUE
-      ) +
-      stats::dgamma(var_rt_upper[upper_valid],
-        shape = (n_upper[upper_valid] - 1) / 2,
-        rate = (n_upper[upper_valid] - 1) / (2 * vrt_upper[upper_valid]),
-        log = TRUE
+  # a boundary with fewer than two responses has no sample variance and
+  # contributes only through the binomial term
+  boundary_ll <- function(valid, mean_rt, var_rt, n_boundary, MDT, VRT, k3, k4) {
+    rt <- .ez_rt_terms(VRT[valid], k3[valid], k4[valid], n_boundary[valid])
+    stats::dgamma(var_rt[valid], shape = rt$shape, rate = rt$rate, log = TRUE) +
+      stats::dnorm(mean_rt[valid],
+        mean = ndt[valid] + MDT[valid] + rt$slope * (var_rt[valid] - VRT[valid]),
+        sd = rt$sd, log = TRUE
       )
   }
 
-  # lower boundary contributions (vectorized)
+  upper_valid <- n_upper >= 2
+  if (any(upper_valid)) {
+    ll[upper_valid] <- ll[upper_valid] + boundary_ll(
+      upper_valid, mean_rt_upper, var_rt_upper, n_upper,
+      mdt_upper, vrt_upper, k3_upper, k4_upper
+    )
+  }
+
   lower_valid <- n_lower >= 2
   if (any(lower_valid)) {
-    ll[lower_valid] <- ll[lower_valid] +
-      stats::dnorm(mean_rt_lower[lower_valid],
-        mean = ndt[lower_valid] + mdt_lower[lower_valid],
-        sd = sqrt(vrt_lower[lower_valid] / n_lower[lower_valid]),
-        log = TRUE
-      ) +
-      stats::dgamma(var_rt_lower[lower_valid],
-        shape = (n_lower[lower_valid] - 1) / 2,
-        rate = (n_lower[lower_valid] - 1) / (2 * vrt_lower[lower_valid]),
-        log = TRUE
-      )
+    ll[lower_valid] <- ll[lower_valid] + boundary_ll(
+      lower_valid, mean_rt_lower, var_rt_lower, n_lower,
+      mdt_lower, vrt_lower, k3_lower, k4_lower
+    )
   }
 
   ll
 }
 
-# Internal: truncated normal sampling via rejection sampling
-# Samples from N(mean, sd) truncated to [lower, Inf)
-# @param n Number of samples
-# @param mean Mean of the normal distribution (scalar or vector of length n)
-# @param sd Standard deviation (scalar or vector of length n)
-# @param lower Lower truncation bound (scalar)
-# @param max_iter Maximum rejection sampling iterations (default 1000)
-# @return Numeric vector of n samples >= lower
-.rtruncnorm_lower <- function(n, mean, sd, lower, max_iter = 1000) {
-  samples <- stats::rnorm(n, mean = mean, sd = sd)
-  rejected <- samples < lower
-  iter <- 0
 
-  while (any(rejected) && iter < max_iter) {
-    n_rejected <- sum(rejected)
-    # Resample only rejected values, using corresponding mean/sd if vectorized
-    if (length(mean) == 1) {
-      samples[rejected] <- stats::rnorm(n_rejected, mean = mean, sd = sd)
-    } else {
-      samples[rejected] <- stats::rnorm(
-        n_rejected,
-        mean = mean[rejected],
-        sd = sd[rejected]
-      )
-    }
-    rejected <- samples < lower
-    iter <- iter + 1
-  }
-
-  # Fallback: clamp any remaining rejected samples (should be extremely rare)
-  if (any(rejected)) {
-    samples[rejected] <- lower
-  }
-
-  samples
-}
-
-# Internal: 3par random generation
+# Internal: 3par random generation. Draws from the same sampling distribution
+# dezdm() evaluates: var_rt from the moment-matched Gamma, then mean_rt from the
+# normal conditional on it. mean_rt is not truncated at ndt -- values below it
+# occur only at the smallest trial counts, and truncating would sample from
+# something the density does not evaluate.
 .rezdm_3par <- function(n, n_trials, drift, bound, ndt, s) {
   # recycle arguments to common size for vectorization
   n_trials <- rep_len(n_trials, n)
@@ -1453,22 +1443,18 @@ rezdm <- function(n, n_trials, drift, bound, ndt, zr = 0.5, s = 1,
   s <- rep_len(s, n)
 
   moments <- .ezdm_moments_3par(drift, bound, s)
+  rt <- .ez_rt_terms(moments$VRT, moments$k3, moments$k4, n_trials)
 
-  n_upper <- stats::rbinom(n, size = n_trials, prob = moments$pC)
-  var_rt <- moments$VRT * stats::rchisq(n, df = n_trials - 1) / (n_trials - 1)
-
-  # Use truncated normal to ensure mean_rt >= ndt
-  mean_rt <- .rtruncnorm_lower(
-    n = n,
-    mean = ndt + moments$MDT,
-    sd = sqrt(var_rt / n_trials),
-    lower = ndt
+  var_rt <- stats::rgamma(n, shape = rt$shape, rate = rt$rate)
+  mean_rt <- stats::rnorm(n,
+    mean = ndt + moments$MDT + rt$slope * (var_rt - moments$VRT),
+    sd = rt$sd
   )
 
   data.frame(
     mean_rt = mean_rt,
     var_rt = var_rt,
-    n_upper = n_upper,
+    n_upper = stats::rbinom(n, size = n_trials, prob = moments$pC),
     n_trials = n_trials
   )
 }
@@ -1486,10 +1472,14 @@ rezdm <- function(n, n_trials, drift, bound, ndt, zr = 0.5, s = 1,
   moments <- .ezdm_moments_4par(drift, bound, zr, s)
 
   n_upper <- stats::rbinom(n, size = n_trials, prob = moments$pC)
-  upper <- .rezdm_boundary_stats(n_upper, moments$mdt_upper,
-                                 moments$vrt_upper, ndt)
-  lower <- .rezdm_boundary_stats(n_trials - n_upper, moments$mdt_lower,
-                                 moments$vrt_lower, ndt)
+  upper <- .rezdm_boundary_stats(
+    n_upper, moments$mdt_upper, moments$vrt_upper,
+    moments$k3_upper, moments$k4_upper, ndt
+  )
+  lower <- .rezdm_boundary_stats(
+    n_trials - n_upper, moments$mdt_lower, moments$vrt_lower,
+    moments$k3_lower, moments$k4_lower, ndt
+  )
 
   data.frame(
     mean_rt_upper = upper$mean_rt,
@@ -1503,18 +1493,15 @@ rezdm <- function(n, n_trials, drift, bound, ndt, zr = 0.5, s = 1,
 
 # Sample mean and variance of one boundary's RTs; both are undefined (NA)
 # where fewer than 2 responses reached that boundary
-.rezdm_boundary_stats <- function(n_k, mdt, vrt, ndt) {
+.rezdm_boundary_stats <- function(n_k, mdt, vrt, k3, k4, ndt) {
   mean_rt <- var_rt <- rep(NA_real_, length(n_k))
   ok <- n_k >= 2
   if (any(ok)) {
-    n_ok <- n_k[ok]
-    var_rt[ok] <- vrt[ok] * stats::rchisq(sum(ok), df = n_ok - 1) / (n_ok - 1)
-    # truncated normal keeps mean_rt >= ndt
-    mean_rt[ok] <- .rtruncnorm_lower(
-      n = sum(ok),
-      mean = ndt[ok] + mdt[ok],
-      sd = sqrt(var_rt[ok] / n_ok),
-      lower = ndt[ok]
+    rt <- .ez_rt_terms(vrt[ok], k3[ok], k4[ok], n_k[ok])
+    var_rt[ok] <- stats::rgamma(sum(ok), shape = rt$shape, rate = rt$rate)
+    mean_rt[ok] <- stats::rnorm(sum(ok),
+      mean = ndt[ok] + mdt[ok] + rt$slope * (var_rt[ok] - vrt[ok]),
+      sd = rt$sd
     )
   }
   nlist(mean_rt, var_rt)

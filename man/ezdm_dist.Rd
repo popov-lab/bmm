@@ -74,6 +74,39 @@ Model. The model operates on aggregated data: mean
 reaction time, variance of reaction time, and number of responses to the
 upper boundary.
 }
+\details{
+The number of upper-boundary responses is binomial. The two RT
+summaries follow the joint sampling distribution of the mean and the
+variance of \code{n} independent decision times, matched to the exact first four
+cumulants of the first-passage time. Writing \eqn{\mathrm{MDT}} and
+\eqn{\mathrm{VRT}} for its mean and variance and \eqn{\kappa_3},
+\eqn{\kappa_4} for its third and fourth cumulants, and
+\eqn{W = \kappa_4 / n + 2\,\mathrm{VRT}^2 / (n - 1)} for the exact variance
+of the sample variance,
+\deqn{\mathrm{var\_rt} \sim \mathrm{Gamma}(\mathrm{VRT}^2 / W, \mathrm{VRT} / W),}
+\deqn{\mathrm{mean\_rt} \mid \mathrm{var\_rt} \sim N\left(\mathrm{ndt} + \mathrm{MDT} + \frac{\kappa_3 / n}{W}(\mathrm{var\_rt} - \mathrm{VRT}),\ \sqrt{\mathrm{VRT} / n - (\kappa_3 / n)^2 / W}\right),}
+so that \eqn{\mathrm{Var}(\mathrm{mean\_rt}) = \mathrm{VRT} / n} and
+\eqn{\mathrm{Cov}(\mathrm{mean\_rt}, \mathrm{var\_rt}) = \kappa_3 / n} are
+exact. Decision times are right-skewed (kurtosis 8.8 at zero drift, rising
+with it), so the older form that assumes normal reaction times —
+independent normal and scaled chi-square
+\eqn{\mathrm{Gamma}((n - 1)/2, (n - 1)/(2\,\mathrm{VRT}))} terms —
+understates the sampling variance of \code{var_rt} several-fold and ignores a
+correlation of about 0.65 between the two statistics, making posteriors too
+narrow. The terms above reduce to it when \eqn{\kappa_3 = \kappa_4 = 0}.
+
+For version \code{"3par"} the start point is symmetric, so the decision time is
+independent of which boundary is hit and all \code{n_trials} responses inform
+one set of cumulants. For version \code{"4par"} the two boundaries have
+different decision-time distributions, so each is given its own summaries
+and its own response count; a boundary reached fewer than twice has no
+sample variance and contributes only through the binomial term. The
+per-boundary formulas condition on the realised counts, which are
+themselves random.
+
+Simulated \code{mean_rt} is not truncated at \code{ndt}; values below it occur only
+at the smallest trial counts.
+}
 \examples{
 # 3-parameter version (single observation)
 dezdm(
