@@ -15,7 +15,10 @@ ezdm(mean_rt, var_rt, n_upper, n_trials, links = NULL, version = "3par", ...)
 
 \item{n_trials}{The name of the variable coding the number of trials that was used to calculated the aggregated statistics.}
 
-\item{links}{A list of links for the parameters.}
+\item{links}{A list of links for the parameters. For positive parameters
+(e.g. \code{bound}, \code{ndt}), "softplus" is available as an alternative to the
+default "log" link that grows linearly for large values and avoids the
+numerical blow-up of \code{exp()}.}
 
 \item{version}{A character label for the version of the model. There is a three-parameter version
 (version = "3par") of the \code{ezdm} that fixes the relative starting point \code{zr} to 0.5, and a

@@ -161,6 +161,17 @@ fixed_pars_priors <- function(model, formula, additional_pars = list()) {
   dpars <- names(bterms$dpars)
   nlpars <- names(bterms$nlpars)
 
+  # internal consistency check: a fixed parameter that configure_model never
+  # wires into the formula would collapse to a malformed b_Intercept prior
+  missing_pars <- pars[!pars %in% c(dpars, nlpars)]
+  stopif(
+    length(missing_pars) > 0,
+    "Fixed parameter(s) {collapse_comma(missing_pars)} are not part of the model \\
+    formula (neither a distributional nor a non-linear parameter). This is a \\
+    model-definition error: configure_model() must wire every fixed parameter \\
+    into the formula."
+  )
+
   # flexibly set the variables for set_prior
   classes <- ifelse(pars %in% dpars, "Intercept", "b")
   coefs <- ifelse(pars %in% dpars, "", "Intercept")

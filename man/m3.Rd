@@ -75,13 +75,13 @@ decision task.
 \itemize{
 \item \code{a}:
 \itemize{
-\item \code{main}: normal(2,1)
+\item \code{main}: normal(3,1)
 \item \code{effects}: normal(0,0.5)
 }
 \item \code{c}:
 \itemize{
 \item \code{main}: normal(3,1)
-\item \code{effects}: normal(0,2)
+\item \code{effects}: normal(0,0.5)
 }
 }
 }
@@ -121,7 +121,7 @@ decision task.
 \item \code{c}:
 \itemize{
 \item \code{main}: normal(3,1)
-\item \code{effects}: normal(0,2)
+\item \code{effects}: normal(0,0.5)
 }
 \item \code{f}:
 \itemize{

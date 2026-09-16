@@ -256,9 +256,12 @@ rad2deg <- function(rad) {
 #' @importFrom brms standata
 #' @export
 standata.bmmformula <- function(object, data, model, ...) {
+  dots <- list(...)
+  local_brms_threads(dots)
+
   # check model, formula and data, and transform data if necessary
   formula <- object
-  configure_options(list(...))
+  configure_options(dots)
   model <- check_model(model, data, formula)
   data <- check_data(model, data, formula)
   formula <- check_formula(model, data, formula)
@@ -267,7 +270,6 @@ standata.bmmformula <- function(object, data, model, ...) {
   config_args <- configure_model(model, data, formula)
 
   # extract stan data
-  dots <- list(...)
   fit_args <- combine_args(nlist(config_args, dots))
   fit_args$object <- fit_args$formula
   fit_args$formula <- NULL
@@ -276,10 +278,10 @@ standata.bmmformula <- function(object, data, model, ...) {
 
 # check if the data is sorted by the predictors
 is_data_ordered <- function(data, formula) {
-  dpars <- names(formula)
-  predictors <- rhs_vars(formula)
-  predictors <- predictors[not_in(predictors, dpars)]
-  predictors <- predictors[predictors %in% colnames(data)]
+  predictors <- data_predictor_vars(data, formula)
+  if (length(predictors) == 0) {
+    return(TRUE)
+  }
   data <- data[predictors]
   if (length(predictors) > 1) {
     gr_idx <- do.call(paste, c(data, list(sep = "_")))

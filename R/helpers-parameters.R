@@ -73,7 +73,7 @@ c_bessel2sqrtexp <- function(c, kappa) {
 #'
 #' @param values A numerical vector of values the transformation should be applied to
 #' @param link A character specifying the link to be applied.
-#' Available options are: "identity", "log", "log1p", "logm1", "inverse", "sqrt", "logit", "probit", "tan_half", and "cloglog".
+#' Available options are: "identity", "log", "softplus", "log1p", "logm1", "inverse", "sqrt", "logit", "probit", "tan_half", and "cloglog".
 #' @param inverse A Boolean value indicating if values should be transformed from the native to
 #' the parameter scale (FALSE), or from the parameter scale to the native scale (TRUE)
 #'
@@ -88,6 +88,7 @@ link_transform <- function(values, link, inverse = FALSE) {
       link,
       identity = values,
       log = exp(values),
+      softplus = log1p(exp(values)),
       log1p = expm1(values),
       logm1 = brms::expp1(values),
       inverse = 1 / values,
@@ -104,6 +105,7 @@ link_transform <- function(values, link, inverse = FALSE) {
       link,
       identity = values,
       log = log(values),
+      softplus = log(expm1(values)),
       log1p = log1p(values),
       logm1 = brms::logm1(values),
       inverse = 1 / values,

@@ -83,8 +83,7 @@
       links = .ezdm_version_table[[version]][["links"]],
       fixed_parameters = .ezdm_version_table[[version]][["fixed_parameters"]],
       default_priors = .ezdm_version_table[[version]][["priors"]],
-      init_ranges = .ezdm_version_table[[version]][["init_ranges"]],
-      void_mu = TRUE
+      init_ranges = .ezdm_version_table[[version]][["init_ranges"]]
     ),
     class = c("bmmodel", "ezdm"),
     call = call
@@ -104,7 +103,10 @@
 #' @param var_rt The names of the variable or variables (for 4par version) coding the variance of the reaction time in seconds in the data
 #' @param n_upper The name of the variable coding the number of responses that hit the upper response threshold (typically the number of correct responses) in the data.
 #' @param n_trials The name of the variable coding the number of trials that was used to calculated the aggregated statistics.
-#' @param links A list of links for the parameters.
+#' @param links A list of links for the parameters. For positive parameters
+#'   (e.g. `bound`, `ndt`), "softplus" is available as an alternative to the
+#'   default "log" link that grows linearly for large values and avoids the
+#'   numerical blow-up of `exp()`.
 #' @param version A character label for the version of the model. There is a three-parameter version
 #'   (version = "3par") of the `ezdm` that fixes the relative starting point `zr` to 0.5, and a
 #'   four parameter version (version = "4par"), that allows to freely estimate the starting point.

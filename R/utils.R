@@ -125,6 +125,20 @@ combine_args <- function(args) {
   c(config_args, args$opts)
 }
 
+local_brms_threads <- function(dots) {
+  if (!is.null(dots$threads)) {
+    threads <- dots$threads
+    if (is.numeric(threads)) {
+      threads <- brms::threading(threads)
+    }
+    withr::local_options(
+      brms.threads = threads,
+      .local_envir = parent.frame()
+    )
+  }
+  invisible(NULL)
+}
+
 ############################
 #' @description
 #'  stop2, warning2, and message2 are wrappers to the builting functions stop, warning and message.
@@ -292,10 +306,7 @@ stop_quietly <- function() {
 # ordered by the predictors, and if not, it suggests to the user to sort the data
 order_data_query <- function(model, data, formula) {
   sort_data <- getOption("bmm.sort_data", "check")
-  dpars <- names(formula)
-  predictors <- rhs_vars(formula)
-  predictors <- predictors[not_in(predictors, dpars)]
-  predictors <- predictors[predictors %in% colnames(data)]
+  predictors <- data_predictor_vars(data, formula)
 
   if (length(predictors) == 0) {
     return(data)
@@ -371,6 +382,13 @@ order_data_query <- function(model, data, formula) {
     message(caution_msg)
   }
   data
+}
+
+data_predictor_vars <- function(data, formula) {
+  dpars <- names(formula)
+  predictors <- rhs_vars(formula)
+  predictors <- predictors[not_in(predictors, dpars)]
+  predictors[predictors %in% colnames(data)]
 }
 
 # when called from another function, it will return a vector of arguments that are

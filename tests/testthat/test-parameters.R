@@ -129,3 +129,57 @@ test_that("print.bmmodel() shows fixed parameters", {
   expect_true(any(grepl("Fixed:", out)))
   expect_true(any(grepl("mu", out)))
 })
+
+test_that("print.bmmodel() shows response variables and links", {
+  m <- sdm(resp_error = "y")
+  out <- capture.output(print(m))
+
+  expect_true(any(grepl("Response:.*resp_error = y", out)))
+  expect_true(any(grepl("Links:.*mu = tan_half; c = log; kappa = log", out)))
+})
+
+test_that("print.bmmodel() lists response variables one per line with annotations", {
+  m <- ddm(rt = "myrt", response = "myresp")
+  out <- capture.output(print(m))
+
+  expect_true(any(grepl("Response:   rt = myrt (seconds)", out, fixed = TRUE)))
+  expect_true(any(grepl(
+    "            response = myresp (0/1 or logical; 1 = upper boundary)",
+    out,
+    fixed = TRUE
+  )))
+})
+
+test_that("print.bmmodel() shows response bounds for circular models", {
+  out <- capture.output(print(sdm(resp_error = "y")))
+
+  expect_true(any(grepl("resp_error = y (radians in [-pi, pi])", out, fixed = TRUE)))
+})
+
+test_that("print.bmmodel() annotates aggregated ezdm response variables", {
+  m <- ezdm(
+    mean_rt = "mrt", var_rt = "vrt", n_upper = "nu", n_trials = "nt"
+  )
+  out <- capture.output(print(m))
+
+  expect_true(any(grepl("mean_rt = mrt (seconds)", out, fixed = TRUE)))
+  expect_true(any(grepl("var_rt = vrt (seconds^2)", out, fixed = TRUE)))
+  expect_true(any(grepl(
+    "n_upper = nu (count of upper-boundary responses)",
+    out,
+    fixed = TRUE
+  )))
+})
+
+test_that("print.bmmodel() lists vector-valued response variables", {
+  m <- m3(
+    resp_cats = c("corr", "other", "npl"),
+    num_options = c(1, 4, 5),
+    choice_rule = "simple",
+    version = "ss"
+  )
+  out <- capture.output(print(m))
+
+  expect_true(any(grepl("Response:.*resp_cats = corr, other, npl", out)))
+  expect_true(any(grepl("Links:.*c = log; a = log", out)))
+})

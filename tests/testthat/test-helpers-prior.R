@@ -46,6 +46,43 @@ test_that("in combine prior, prior2 overwrites only shared components with prior
   expect_equal(dplyr::filter(prior, dpar == "kappa"), dplyr::filter(prior2, dpar == "kappa"))
 })
 
+test_that("fixed_pars_priors errors clearly when a fixed parameter is absent from the formula", {
+  model <- list(fixed_parameters = list(sdratio = 0))
+  formula <- brms::bf(y ~ 1)
+  expect_error(
+    fixed_pars_priors(model, formula),
+    "sdratio.*not part of the model formula"
+  )
+})
+
+test_that("the fixed-parameter guard fires through the full default_prior pipeline", {
+  # a fixed parameter that no configure_model wires into the formula survives
+  # check_model/check_formula reconciliation and must be caught before brms
+  model <- sdm(resp_error = "y")
+  model$fixed_parameters$sdratio <- 0
+  dat <- data.frame(y = rsdm(30, mu = 0, c = 3, kappa = 4))
+  expect_error(
+    default_prior(bmf(c ~ 1, kappa ~ 1), dat, model),
+    "sdratio.*not part of the model formula"
+  )
+})
+
+test_that("fixed_pars_priors builds constant priors for dpar and nlpar fixed parameters", {
+  dpar_prior <- fixed_pars_priors(
+    list(fixed_parameters = list(sigma = 1)),
+    brms::bf(y ~ 1, sigma ~ 1)
+  )
+  expect_equal(dpar_prior$prior, "constant(1)")
+  expect_equal(dpar_prior$dpar, "sigma")
+
+  nlpar_prior <- fixed_pars_priors(
+    list(fixed_parameters = list(b = 0)),
+    brms::bf(y ~ a + b, a ~ 1, b ~ 1, nl = TRUE)
+  )
+  expect_equal(nlpar_prior$prior, "constant(0)")
+  expect_equal(nlpar_prior$nlpar, "b")
+})
+
 test_that("no check for sort_data with default_priors function", {
   withr::local_options("bmm.sort_data" = "check")
   res <- capture_messages(default_prior(

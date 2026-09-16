@@ -37,8 +37,7 @@
         mu1 = list(main = "student_t(1, 0, 1)"),
         kappa = list(main = "normal(2, 1)", effects = "normal(0, 1)"),
         thetat = list(main = "logistic(0, 1)")
-      ),
-      void_mu = FALSE
+      )
     ),
     class = c("bmmodel", "circular", "mixture2p"),
     call = call

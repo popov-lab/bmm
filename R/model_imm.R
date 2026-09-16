@@ -47,8 +47,7 @@
         a = list(main = "normal(0, 1)", effects = "normal(0, 1)"),
         c = list(main = "normal(0, 1)", effects = "normal(0, 1)"),
         s = list(main = "normal(0, 1)", effects = "normal(0, 1)")
-      ),
-      void_mu = FALSE
+      )
     ),
     # attributes
     regex = regex,

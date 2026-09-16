@@ -99,8 +99,7 @@
       links = .cswald_version_table[[version]][["links"]],
       fixed_parameters = .cswald_version_table[[version]][["fixed_parameters"]],
       default_priors = .cswald_version_table[[version]][["priors"]],
-      init_ranges = .cswald_version_table[[version]][["init_ranges"]],
-      void_mu = TRUE
+      init_ranges = .cswald_version_table[[version]][["init_ranges"]]
     ),
     class = c("bmmodel", "cswald", paste0("cswald_", version)),
     call = call
@@ -123,7 +122,9 @@
 #' @param links A named list of link functions for the model parameters.
 #'   Available parameters depend on the version: "simple" has `drift`, `bound`,
 #'   `ndt`, and `s`; "crisk" additionally has `zr`. Default links are "log" for
-#'   most parameters and "logit" for `zr`.
+#'   most parameters and "logit" for `zr`. For positive parameters, "softplus"
+#'   is available as an alternative to "log" that grows linearly for large
+#'   values and avoids the numerical blow-up of `exp()`.
 #' @param version A character string specifying which version of the cswald
 #'   model to use. Options are:
 #'   \itemize{
