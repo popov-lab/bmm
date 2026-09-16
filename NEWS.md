@@ -1,5 +1,10 @@
 # bmm (development version)
 
+### Bug fixes
+* `update()` now configures the likelihood for the threading spec that will actually be used. `brms::update.brmsfit` falls back to the original fit's `threads` when the argument is not passed, but bmm only inspected the new request, so updating a threaded fit without repeating `threads` emitted the serial likelihood chunk into threaded Stan code — for the **sdm** model a compile error (`Identifier 'COSN' not in scope`), and for any `loop = FALSE` custom family a silently mis-sliced likelihood. The fallback follows brms in distinguishing an absent `threads` argument from an explicit `threads = NULL`, which turns threading off.
+* `update()` no longer lets a global `options(brms.threads = )` reach the likelihood configuration. Updating an unthreaded fit under a session-wide threading option emitted the sliced likelihood chunk while brms generated serial Stan code (`Identifier 'start' not in scope`); the spec of the fit being updated now always wins, as it does in brms.
+* `update()` now re-resolves every parameter whose constant the new formula changes. `update()` never called `check_model()`, so the constant was never resolved again and the original fit's prior overrode the freshly configured one: `update(fit, bmf(..., mu ~ 1))` returned a model in which `mu` was still pinned, `update(fit, bmf(..., kappa = 5))` one that reported `kappa = 5` while Stan estimated `kappa` freely, and `update(fit, bmf(..., mu = 0.5))` one that reported `mu = 0.5` while Stan kept `mu` at the original value — all three with no error or warning.
+
 # bmm 1.3.2
 
 ### Changes to default priors
