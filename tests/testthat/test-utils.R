@@ -103,6 +103,14 @@ test_that("validate_file_refit normalizes the user-facing values", {
   expect_equal(validate_file_refit("On_Change"), "on_change")
   expect_error(validate_file_refit("sometimes"), "invalid option")
   expect_error(validate_file_refit(1), "invalid option")
+
+  # a logical that is not a single TRUE/FALSE must error rather than degrade to
+  # "never", which would silently return a stale fit
+  expect_error(validate_file_refit(NA), "invalid option")
+  expect_error(validate_file_refit(c(TRUE, TRUE)), "invalid option")
+  expect_error(validate_file_refit(logical(0)), "invalid option")
+  expect_error(validate_file_refit(NA_character_), "invalid option")
+  expect_error(validate_file_refit(character(0)), "invalid option")
 })
 
 test_that("try_save_bmmfit works", {
@@ -207,6 +215,70 @@ test_that('file_refit = "on_change" refits when the model changes', {
     fit_cache(ff, data, file = file, mock_fit = 6, algorithm = "meanfield")$fit,
     6
   )
+
+  # threading is the bmm-specific hazard brms does not have: a loop = FALSE
+  # likelihood chunk is configured for the threading spec, so a cache hit across
+  # a change of `threads` would return a fit whose likelihood is sliced
+  # differently from the one the current call would compile
+  file <- tempfile()
+  fit_cache(ff, data, file = file, mock_fit = 1)
+  expect_equal(fit_cache(ff, data, file = file, mock_fit = 7, threads = 2)$fit, 7)
+
+  file <- tempfile()
+  fit_cache(ff, data, file = file, mock_fit = 1, threads = 2)
+  expect_equal(fit_cache(ff, data, file = file, mock_fit = 8)$fit, 8)
+})
+
+test_that('file_refit = "on_change" falls back when the cached fit has no algorithm', {
+  withr::local_options(bmm.sort_data = FALSE)
+  fit_cache <- function(mock_fit) {
+    bmm(bmf(c ~ 1, kappa ~ 1), oberauer_lin_2017, sdm("dev_rad"),
+      backend = "mock", mock_fit = mock_fit, rename = F,
+      file = file, file_refit = "on_change"
+    )
+  }
+  file <- tempfile()
+  cached <- fit_cache(1)
+
+  # brms compares the algorithm under a bare stopifnot(!is.null(fit$algorithm)),
+  # so without the guard this errors instead of using the other three channels
+  cached$algorithm <- NULL
+  saveRDS(cached, paste0(file, ".rds"))
+  expect_equal(fit_cache(2)$fit, 1)
+})
+
+test_that('file_refit = "on_change" refits a cached fit that cannot be restructured', {
+  withr::local_options(bmm.sort_data = FALSE)
+  fit_cache <- function(mock_fit) {
+    bmm(bmf(c ~ 1, kappa ~ 1), oberauer_lin_2017, sdm("dev_rad"),
+      backend = "mock", mock_fit = mock_fit, rename = F,
+      file = file, file_refit = "on_change"
+    )
+  }
+  file <- tempfile()
+  cached <- fit_cache(1)
+
+  # a pre-0.3.0 fit whose family carries no environment is what restructure()
+  # gives up on; "on_change" must do the refit it asks for rather than abort
+  cached$version$bmm_restructure <- NULL
+  cached$version$bmm <- as.package_version("0.2.1")
+  cached$family$env <- NULL
+  saveRDS(cached, paste0(file, ".rds"))
+  expect_error(restructure(readRDS(paste0(file, ".rds"))), "Unable to restructure")
+  expect_equal(fit_cache(2)$fit, 2)
+})
+
+test_that('file_refit = "on_change" rejects a cached file that is not a bmmfit', {
+  withr::local_options(bmm.sort_data = FALSE)
+  file <- tempfile()
+  saveRDS(1, paste0(file, ".rds"))
+  expect_error(
+    bmm(bmf(c ~ 1, kappa ~ 1), oberauer_lin_2017, sdm("dev_rad"),
+      backend = "mock", mock_fit = 1, rename = F,
+      file = file, file_refit = "on_change"
+    ),
+    "not of class 'bmmfit'"
+  )
 })
 
 test_that('file_refit = "on_change" reports why it refits at silent = 0', {
@@ -245,6 +317,16 @@ test_that('bmm_options() accepts and applies file_refit = "on_change"', {
     backend = "mock", mock_fit = 3, rename = F, file = file
   )
   expect_equal(changed$fit, 3)
+
+  # bmm_options() stores the value as given rather than the normalized string,
+  # so the logical forms have to survive the round trip through bmm() as well
+  logical_op <- suppressMessages(bmm_options(file_refit = TRUE))
+  withr::defer(options(logical_op))
+  expect_true(getOption("bmm.file_refit"))
+  refit <- bmm(bmf(c ~ 1, kappa ~ 1), oberauer_lin_2017, sdm("dev_rad"),
+    backend = "mock", mock_fit = 4, rename = F, file = file
+  )
+  expect_equal(refit$fit, 4)
 })
 
 test_that("is_namedlist works", {

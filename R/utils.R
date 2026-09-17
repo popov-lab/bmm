@@ -711,8 +711,11 @@ deprecated_args <- function(...) {
 # the package branches on. Called from the exported surfaces bmm() and
 # bmm_options()
 validate_file_refit <- function(file_refit) {
-  if (is.logical(file_refit)) {
-    return(if (isTRUE(file_refit)) "always" else "never")
+  # only a scalar non-NA logical is the TRUE/FALSE shorthand; NA, logical(0) and
+  # multi-element logicals fall through to the character branch, where tolower()
+  # keeps them out of the valid set and stopif() reports them
+  if (is.logical(file_refit) && length(file_refit) == 1L && !is.na(file_refit)) {
+    return(if (file_refit) "always" else "never")
   }
   file_refit <- tolower(file_refit)
   stopif(
@@ -752,7 +755,15 @@ bmmfit_needs_refit <- function(fit, fit_args, silent) {
     sdata = brms::do_call(brms::standata, fit_args),
     scode = brms::do_call(brms::stancode, fit_args),
     data = fit_args$data,
-    algorithm = fit_args$algorithm %||% getOption("brms.algorithm", "sampling"),
+    # a NULL algorithm skips the channel; brms compares it against the cached
+    # fit's own field under a bare stopifnot(), so a fit saved without one would
+    # otherwise abort with a raw error instead of falling back to the other
+    # three channels
+    algorithm = if (is.null(fit$algorithm)) {
+      NULL
+    } else {
+      fit_args$algorithm %||% getOption("brms.algorithm", "sampling")
+    },
     silent = silent
   )
 }

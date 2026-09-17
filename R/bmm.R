@@ -54,9 +54,20 @@
 #'   data, the factor levels of the model variables and the algorithm are
 #'   unchanged; otherwise the model is fitted again. Because that comparison
 #'   needs the Stan code and data of the current call, "on_change" runs the
-#'   full bmm configuration pipeline and [standata()][standata.bmmformula()]
-#'   even when the cached fit is returned; much cheaper than compiling and
-#'   sampling, but not free
+#'   full bmm configuration pipeline, [standata()][standata.bmmformula()] and
+#'   [stancode()][stancode.bmmformula()] even when the cached fit is returned:
+#'   about 0.4 s rather than 0.02 s for an **sdm** model of `oberauer_lin_2017`,
+#'   much cheaper than compiling and sampling, but not free. Only the four
+#'   things listed above are compared, so sampler settings do **not** force a
+#'   refit -- in particular `control = list(adapt_delta = )`, `iter`, `warmup`,
+#'   `chains`, `seed`, `init` and `save_pars`. Raising `adapt_delta` after
+#'   divergent transitions, or rerunning with `save_pars(all = TRUE)` for
+#'   `loo()`, therefore returns the cached fit unchanged; delete the file or
+#'   pass `file_refit = "always"` for those. Because the row order of the data
+#'   reaches the Stan data, `"on_change"` is most predictable with
+#'   `sort_data` fixed to `TRUE` or `FALSE` (globally via
+#'   `options(bmm.sort_data = )`): under the default `"check"`, answering the
+#'   interactive prompt differently than last time forces a refit.
 #' @param ... Further arguments passed to [brms::brm()] or Stan. See the
 #'   description of [brms::brm()] for more details
 #'
@@ -161,8 +172,10 @@ bmm <- function(formula, data, model,
   if (file_refit == "on_change") {
     x <- try_read_bmmfit(file)
     if (!is.null(x)) {
-      x <- restructure(x)
-      if (!bmmfit_needs_refit(x, fit_args, silent)) {
+      # a cached fit too old for restructure() to bring forward is precisely one
+      # "on_change" should replace, so its error refits rather than aborting
+      x <- try(restructure(x), silent = TRUE)
+      if (!is_try_error(x) && !bmmfit_needs_refit(x, fit_args, silent)) {
         return(x)
       }
     }

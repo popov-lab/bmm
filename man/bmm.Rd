@@ -90,9 +90,20 @@ the model saved under the name specified in \code{file} will be re-used. If
 data, the factor levels of the model variables and the algorithm are
 unchanged; otherwise the model is fitted again. Because that comparison
 needs the Stan code and data of the current call, "on_change" runs the
-full bmm configuration pipeline and \link[=standata.bmmformula]{standata()}
-even when the cached fit is returned; much cheaper than compiling and
-sampling, but not free}
+full bmm configuration pipeline, \link[=standata.bmmformula]{standata()} and
+\link[=stancode.bmmformula]{stancode()} even when the cached fit is returned:
+about 0.4 s rather than 0.02 s for an \strong{sdm} model of \code{oberauer_lin_2017},
+much cheaper than compiling and sampling, but not free. Only the four
+things listed above are compared, so sampler settings do \strong{not} force a
+refit -- in particular \code{control = list(adapt_delta = )}, \code{iter}, \code{warmup},
+\code{chains}, \code{seed}, \code{init} and \code{save_pars}. Raising \code{adapt_delta} after
+divergent transitions, or rerunning with \code{save_pars(all = TRUE)} for
+\code{loo()}, therefore returns the cached fit unchanged; delete the file or
+pass \code{file_refit = "always"} for those. Because the row order of the data
+reaches the Stan data, \code{"on_change"} is most predictable with
+\code{sort_data} fixed to \code{TRUE} or \code{FALSE} (globally via
+\code{options(bmm.sort_data = )}): under the default \code{"check"}, answering the
+interactive prompt differently than last time forces a refit.}
 
 \item{...}{Further arguments passed to \code{\link[brms:brm]{brms::brm()}} or Stan. See the
 description of \code{\link[brms:brm]{brms::brm()}} for more details}

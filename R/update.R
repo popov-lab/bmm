@@ -18,9 +18,12 @@
 #'   compression algorithms supported by [saveRDS] when saving the updated
 #'   model object.
 #' @param ... Further arguments passed to [brms::update.brmsfit()]
-#' @return An updated `bmmfit` object refit to the new data and/or formula. Its
-#'   `file` field names the file the *original* fit was saved in unless `file`
-#'   is given, in which case it names the newly written file.
+#' @return An updated `bmmfit` object refit to the new data and/or formula. If
+#'   `file` is given, it names the newly written file. If not, the `file` field
+#'   is carried over from the original fit, so the updated object still points
+#'   at the file it came from -- but that file is *not* rewritten: it still
+#'   holds the fit as it was before this update. Pass `file` to save the
+#'   updated fit.
 #' @details When updating a brmsfit created with the cmdstanr backend in a
 #'   different R session, a recompilation will be triggered because by default,
 #'   cmdstanr writes the model executable to a temporary directory. To avoid
@@ -52,7 +55,16 @@
 update.bmmfit <- function(object, formula., newdata = NULL, recompile = NULL,
                           file = NULL, file_compress = TRUE, ...) {
   dots <- list(...)
-  file <- check_rds_file(file)
+  save_file <- check_rds_file(file)
+  save_compress <- file_compress
+  # NextMethod() forwards this method's formals, so `file` would still reach
+  # brms::brm() even though it is not in `dots`: brms would then return the
+  # contents of an existing file instead of updating, and write a plain brmsfit
+  # before any bmm postprocessing has run. Naming file = NULL in the
+  # NextMethod() call errors with "matched by multiple actual arguments", so the
+  # formals are blanked here instead
+  file <- NULL
+  file_compress <- NULL
   # brms::update.brmsfit falls back to the original fit's threading spec only
   # when `threads` is absent from the call -- an explicit NULL means "no
   # threading" -- and the effective spec, not the new request, must drive the
@@ -170,15 +182,14 @@ update.bmmfit <- function(object, formula., newdata = NULL, recompile = NULL,
     configure_opts = configure_opts
   )
 
-  # brms::brm() writes the file from inside brms::update.brmsfit(), which is
-  # before any of the above has run, so letting `file` through would store a
-  # plain brmsfit that try_read_bmmfit() then refuses to load. Saving here is
-  # the same order bmm() uses. Without `file`, the field is carried over so the
-  # fit keeps naming the file it came from -- that file still holds the fit
-  # before the update
-  if (is.null(file)) {
+  # saving here, rather than letting brms write the file from inside
+  # brms::update.brmsfit(), is the same order bmm() uses: the object on disk is
+  # the postprocessed bmmfit that try_read_bmmfit() can load back. Without
+  # `file`, the field is carried over so the fit keeps naming the file it came
+  # from -- that file still holds the fit before the update
+  if (is.null(save_file)) {
     object$file <- old_file
     return(object)
   }
-  try_save_bmmfit(object, file, compress = file_compress)
+  try_save_bmmfit(object, save_file, compress = save_compress)
 }

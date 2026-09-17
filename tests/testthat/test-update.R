@@ -153,3 +153,19 @@ test_that("update.bmmfit keeps track of the file the fit is saved in", {
   expect_true(file.exists(paste0(file, ".rds")))
   expect_true(is_bmmfit(readRDS(paste0(file, ".rds"))))
 })
+
+test_that("update.bmmfit updates and writes even when `file` already exists", {
+  skip_on_cran()
+  fit1 <- sdm_fixture()
+
+  # `file` must not reach brms::brm(), which would read an existing file and
+  # return its contents instead of running the update
+  file <- tempfile()
+  saveRDS(fit1, paste0(file, ".rds"))
+  new_data <- fit1$data
+  new_data$dev_rad <- 0.1
+  up <- update_mock(fit1, newdata = new_data, file = file)
+  expect_equal(up$fit, 1)
+  expect_equal(readRDS(paste0(file, ".rds"))$fit, 1)
+  expect_true(is_bmmfit(readRDS(paste0(file, ".rds"))))
+})

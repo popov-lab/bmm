@@ -39,9 +39,12 @@ model object.}
 \item{...}{Further arguments passed to \code{\link[brms:update.brmsfit]{brms::update.brmsfit()}}}
 }
 \value{
-An updated \code{bmmfit} object refit to the new data and/or formula. Its
-\code{file} field names the file the \emph{original} fit was saved in unless \code{file}
-is given, in which case it names the newly written file.
+An updated \code{bmmfit} object refit to the new data and/or formula. If
+\code{file} is given, it names the newly written file. If not, the \code{file} field
+is carried over from the original fit, so the updated object still points
+at the file it came from -- but that file is \emph{not} rewritten: it still
+holds the fit as it was before this update. Pass \code{file} to save the
+updated fit.
 }
 \description{
 Update an existing bmm mode. This function calls
