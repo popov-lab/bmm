@@ -454,8 +454,8 @@ pp_check(fit_fixed_zr, resp_var = "signed_rt")
 # All checks as a panel, drawn from one shared joint simulation
 pp_check(fit_fixed_zr, resp_var = "all")
 
-# Facet any check by a predictor
-pp_check(fit_fixed_zr, resp_var = "signed_rt", group = "condition")
+# Facet any check by a predictor of the fitted model
+pp_check(fit_instruction, resp_var = "signed_rt", group = "instruction")
 
 # Quantile-probability plots (QP plots)
 # These are the gold standard for evaluating DDM fits
