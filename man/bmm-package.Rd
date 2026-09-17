@@ -23,6 +23,7 @@ Useful links:
 
 Authors:
 \itemize{
+  \item Gidon T. Frischkorn \email{gfrischkorn@icloud.com} (\href{https://orcid.org/0000-0002-5055-9764}{ORCID}) [copyright holder]
   \item Vencislav Popov \email{vencislav.popov@gmail.com} (\href{https://orcid.org/0000-0002-8073-4199}{ORCID}) [copyright holder]
 }
 

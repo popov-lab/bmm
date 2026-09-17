@@ -25,7 +25,7 @@ provided, takes precedence over \code{dpar}.}
 \item{trms, xlev, grid}{Arguments passed by emmeans internally.}
 }
 \value{
-See \code{\link[emmeans:extending-emmeans]{emmeans::recover_data()}} and \code{\link[emmeans:extending-emmeans]{emmeans::emm_basis()}} for return
+See \code{\link[emmeans:recover_data]{emmeans::recover_data()}} and \code{\link[emmeans:emm_basis]{emmeans::emm_basis()}} for return
 values.
 }
 \description{
