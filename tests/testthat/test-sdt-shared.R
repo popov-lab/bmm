@@ -27,9 +27,27 @@ test_that("gumbel labels follow the extreme-value convention", {
 test_that("every dist argument offers exactly the registry's distributions", {
   # the registry order defines the dist_type integer passed to Stan, so a
   # signature that drifts out of step with it becomes an off-by-one
-  fns <- list(sdt_yn, dsdt_yn, rsdt_yn, sdt_d, sdt_criterion)
+  fns <- list(sdt_yn, dsdt_yn, rsdt_yn, sdt_d, sdt_criterion,
+              sdt_mafc, dsdt_mafc, rsdt_mafc)
   for (f in fns) {
     expect_equal(eval(formals(f)$dist), names(bmm:::.sdt_dists))
+  }
+})
+
+test_that("the m-AFC closed forms sit on the right extreme-value branch", {
+  # taking the max of largest-extreme-value variates is what yields the softmax;
+  # the smallest-extreme-value case is the Gamma ratio. Swapping these fits the
+  # mirror model, and the two agree at m = 2, so check m > 2.
+  for (m in c(4L, 8L)) {
+    expect_equal(bmm:::.mafc_pc_r(1.2, m, "gumbel_max"),
+                 1 / (1 + (m - 1) * exp(-1.2)), info = paste("m =", m))
+    expect_equal(
+      bmm:::.mafc_pc_r(1.2, m, "gumbel_min"),
+      exp(lgamma(1 + exp(-1.2)) + lgamma(m) - lgamma(m + exp(-1.2))),
+      info = paste("m =", m)
+    )
+    expect_false(isTRUE(all.equal(bmm:::.mafc_pc_r(1.2, m, "gumbel_min"),
+                                  bmm:::.mafc_pc_r(1.2, m, "gumbel_max"))))
   }
 })
 
