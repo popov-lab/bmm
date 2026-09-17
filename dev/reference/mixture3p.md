@@ -97,7 +97,11 @@ An object of class `bmmodel`
 
   - `mu1`:
 
-    - `main`: student_t(1, 0, 1)
+    - `main`: normal(0, 0.5)
+
+    - `effects`: normal(0, 0.25)
+
+    - `sd`: exponential(4)
 
   - `kappa`:
 
@@ -105,13 +109,23 @@ An object of class `bmmodel`
 
     - `effects`: normal(0, 1)
 
+    - `sd`: exponential(1)
+
   - `thetat`:
 
     - `main`: logistic(0, 1)
 
+    - `effects`: normal(0, 0.5)
+
+    - `sd`: exponential(1)
+
   - `thetant`:
 
     - `main`: logistic(0, 1)
+
+    - `effects`: normal(0, 0.5)
+
+    - `sd`: exponential(1)
 
 ## Examples
 
