@@ -279,6 +279,58 @@ test_that("configure_model.cswald_crisk returns correct components", {
   expect_equal(config$formula$family$name, "cswald_crisk")
 })
 
+cswald_data <- function(n = 100) {
+  data.frame(
+    rt = runif(n, 0.4, 1.5),
+    response = sample(c(0, 1), n, replace = TRUE)
+  )
+}
+
+test_that("cswald slices its decision variable exactly when brms slices the data", {
+  skip_on_cran()
+
+  dat <- cswald_data()
+  model <- cswald(rt = "rt", response = "response", version = "simple")
+  formula <- bmf(drift ~ 1, bound ~ 1, ndt ~ 1)
+
+  expect_equal(configure_model(model, dat, formula)$formula$family$vars, "dec")
+
+  withr::with_options(list(brms.threads = brms::threading(2)), {
+    expect_equal(
+      configure_model(model, dat, formula)$formula$family$vars,
+      "dec[start:end]"
+    )
+  })
+
+  # force = TRUE tells brms to compile with threading but leave the generated
+  # code alone, so start/end are never defined and slicing would not compile
+  withr::with_options(list(brms.threads = brms::threading(2, force = TRUE)), {
+    expect_equal(configure_model(model, dat, formula)$formula$family$vars, "dec")
+  })
+
+  # brms accepts a bare number for the option
+  withr::with_options(list(brms.threads = 2), {
+    expect_equal(
+      configure_model(model, dat, formula)$formula$family$vars,
+      "dec[start:end]"
+    )
+  })
+})
+
+test_that("threaded stancode pairs the sliced response with the sliced decisions", {
+  skip_on_cran()
+
+  dat <- cswald_data()
+  code <- suppressWarnings(stancode(
+    bmf(drift ~ 1, bound ~ 1, ndt ~ 1), dat,
+    cswald(rt = "rt", response = "response", version = "simple"),
+    threads = brms::threading(2)
+  ))
+
+  expect_match(code, "cswald_lpdf(Y[start:end] |", fixed = TRUE)
+  expect_match(code, "dec[start:end]);", fixed = TRUE)
+})
+
 # -----------------------------------------------------------------------------
 # Integration tests with mock backend
 # -----------------------------------------------------------------------------
@@ -371,4 +423,101 @@ test_that("cswald handles high error rate data with crisk version", {
   expect_silent(
     bmm(formula, dat, model, backend = "mock", mock = 1, rename = FALSE)
   )
+})
+
+# -----------------------------------------------------------------------------
+# R <-> Stan parity of the likelihood
+# -----------------------------------------------------------------------------
+
+# Builds a standalone Stan program exposing both overloads of the cswald
+# likelihood as generated quantities, so the vectorized (loop = FALSE) form that
+# brms actually compiles can be compared against the scalar form and against the
+# R implementation used by log_lik() and posterior_predict()
+compile_cswald_parity_model <- function(version) {
+  sc_path <- system.file("stan_chunks", package = "bmm")
+  chunk <- function(f) read_lines2(file.path(sc_path, f))
+  crisk <- version == "crisk"
+  lpdf <- if (crisk) "cswald_crisk_lpdf" else "cswald_lpdf"
+  scalar_args <- if (crisk) {
+    "mu[n], drift[n], bound[n], ndt[n], zr[n], s[n], dec[n]"
+  } else {
+    "mu[n], drift[n], bound[n], ndt[n], s[n], dec[n]"
+  }
+  vector_args <- if (crisk) {
+    "mu, drift, bound, ndt, zr, s, dec"
+  } else {
+    "mu, drift, bound, ndt, s, dec"
+  }
+  code <- glue(
+    "functions {{\n{chunk('cswald_helper_functions.stan')}\n",
+    "{chunk(paste0('cswald_', version, '_functions.stan'))}\n}}\n",
+    "data {{\n  int N;\n  vector[N] rt;\n  array[N] int dec;\n  vector[N] mu;\n",
+    "  vector[N] drift;\n  vector[N] bound;\n  vector[N] ndt;\n  vector[N] s;\n",
+    "  vector<lower=0,upper=1>[N] zr;\n}}\n",
+    "generated quantities {{\n",
+    "  real lp_vector = {lpdf}(rt | {vector_args});\n",
+    "  vector[N] lp_scalar;\n",
+    "  for (n in 1:N) lp_scalar[n] = {lpdf}(rt[n] | {scalar_args});\n}}\n"
+  )
+  file <- file.path(tempdir(), glue("bmm_cswald_parity_{version}.stan"))
+  writeLines(code, file)
+  cmdstanr::cmdstan_model(file)
+}
+
+# Random parameters and observations for the parity test, plus 30 censored
+# observations in the two regimes where the survivor leaves its vectorized
+# probability-space path: 2*bound*drift/s^2 in the hundreds, and the deep tail
+# where Phi(-z1) underflows to 0
+cswald_parity_data <- function(n = 200) {
+  drift <- runif(n, 0.5, 4)
+  bound <- runif(n, 0.5, 2)
+  ndt <- runif(n, 0.05, 0.2)
+  rt <- ndt + runif(n, 0.05, 2.5)
+
+  drift_ext <- c(runif(15, 15, 25), runif(15, 20, 30))
+  bound_ext <- c(runif(15, 15, 25), runif(15, 0.3, 0.6))
+  ndt_ext <- runif(30, 0.05, 0.2)
+  rt_ext <- ndt_ext + c(
+    bound_ext[1:15] / drift_ext[1:15] * runif(15, 0.8, 1.2),
+    runif(15, 2, 3)
+  )
+
+  list(
+    N = n + 30,
+    rt = c(rt, rt_ext),
+    dec = c(sample(c(0L, 1L), n, replace = TRUE), rep(0L, 30)),
+    mu = rep(0, n + 30),
+    drift = c(drift, drift_ext),
+    bound = c(bound, bound_ext),
+    ndt = c(ndt, ndt_ext),
+    s = c(runif(n, 0.7, 1.3), runif(30, 0.9, 1.1)),
+    zr = c(runif(n, 0.2, 0.8), runif(30, 0.3, 0.7))
+  )
+}
+
+test_that("the vectorized cswald likelihood matches the scalar and R versions", {
+  skip_on_cran()
+  skip_if_not(requireNamespace("cmdstanr", quietly = TRUE), "cmdstanr not available")
+  skip_if_not(nzchar(Sys.getenv("CMDSTAN", unset = "")) ||
+    !is.null(tryCatch(cmdstanr::cmdstan_path(), error = function(e) NULL)),
+  "CmdStan not installed"
+  )
+
+  for (version in c("simple", "crisk")) {
+    sdata <- cswald_parity_data()
+    fit <- compile_cswald_parity_model(version)$sample(
+      data = sdata, chains = 1, iter_sampling = 1, fixed_param = TRUE,
+      refresh = 0, show_messages = FALSE, sig_figs = 18, seed = 1
+    )
+    lp_vector <- as.numeric(fit$draws("lp_vector", format = "draws_matrix")[1, 1])
+    lp_scalar <- as.numeric(fit$draws("lp_scalar", format = "draws_matrix")[1, ])
+    lp_r <- with(sdata, .dcswald(rt, dec, drift, bound, ndt, zr, s,
+      version = version, log = TRUE
+    ))
+
+    # the vectorized overload is what brms compiles; it must reproduce the scalar
+    # likelihood it replaced, and the R mirror used by log_lik()
+    expect_equal(lp_vector, sum(lp_scalar), tolerance = 1e-10)
+    expect_equal(lp_scalar, lp_r, tolerance = 1e-10)
+  }
 })
