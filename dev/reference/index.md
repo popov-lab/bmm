@@ -69,6 +69,9 @@ stan data, etc.
 - [`native_parameters()`](https://venpopov.com/bmm/dev/reference/native_parameters.md)
   : Posterior draws of model parameters on the native scale
 
+- [`pp_check_vars()`](https://venpopov.com/bmm/dev/reference/pp_check_vars.md)
+  : List the posterior predictive checks available for a model fit
+
 - [`report_priors()`](https://venpopov.com/bmm/dev/reference/report_priors.md)
   : Report the priors used in a fitted bmm model
 
@@ -263,6 +266,11 @@ Functions to assist in developing new models
 
 - [`postprocess_brm()`](https://venpopov.com/bmm/dev/reference/postprocess_brm.md)
   : Generic S3 method for postprocessing the fitted brm model
+
+- [`pp_observables()`](https://venpopov.com/bmm/dev/reference/pp_observables.md)
+  [`pp_simulate()`](https://venpopov.com/bmm/dev/reference/pp_observables.md)
+  : Declare the observables of a bmm model for posterior predictive
+  checks
 
 - [`revert_postprocess_brm()`](https://venpopov.com/bmm/dev/reference/revert_postprocess_brm.md)
   : Generic S3 method for reverting any postprocessing of the fitted brm

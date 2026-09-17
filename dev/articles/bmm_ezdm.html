@@ -696,11 +696,27 @@ scale reduction factor on split chains (at convergence, Rhat = 1).
 </div>
 </div>
 <div class="section level2" number="6">
+<h2 id="posterior-predictive-checks">
+<span class="header-section-number">6</span> Posterior predictive checks<a class="anchor" aria-label="anchor" href="#posterior-predictive-checks"></a>
+</h2>
+<p>The EZ-diffusion likelihood constrains three statistics per cell — the mean RT, the RT variance, and the number of upper-boundary (correct) responses — but by default <code><a href="../reference/pp_check.bmmfit.html">pp_check()</a></code> only shows the mean RT. The <code>resp_var</code> argument selects the other observables of the likelihood; <code><a href="../reference/pp_check_vars.html">pp_check_vars()</a></code> lists the available checks:</p>
+<div class="sourceCode" id="cb15"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="fu"><a href="../reference/pp_check_vars.html">pp_check_vars</a></span><span class="op">(</span><span class="va">fit</span><span class="op">)</span></span>
+<span><span class="co">#&gt;   resp_var                         label default_type          slot default</span></span>
+<span><span class="co">#&gt; 1  mean_rt            Mean response time    intervals             Y    TRUE</span></span>
+<span><span class="co">#&gt; 2   var_rt        Response time variance    intervals        vreal1   FALSE</span></span>
+<span><span class="co">#&gt; 3  mean_pc Proportion of upper responses    intervals vint1, trials   FALSE</span></span></code></pre></div>
+<p>The <code>mean_pc</code> check is the proportion of correct responses (<code>n_upper / n_trials</code>), which stays comparable across cells even when the number of trials differs. With <code>resp_var = "all"</code> all checks are drawn from one shared joint simulation:</p>
+<div class="sourceCode" id="cb16"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="fu"><a href="../reference/pp_check.bmmfit.html">pp_check</a></span><span class="op">(</span><span class="va">fit</span>, resp_var <span class="op">=</span> <span class="st">"all"</span>, ndraws <span class="op">=</span> <span class="fl">50</span><span class="op">)</span></span></code></pre></div>
+<p><img src="bmm_ezdm_files/figure-html/unnamed-chunk-12-1.jpeg" alt="" width="80%" style="display: block; margin: auto;"></p>
+</div>
+<div class="section level2" number="7">
 <h2 id="comparing-conditions">
-<span class="header-section-number">6</span> Comparing conditions<a class="anchor" aria-label="anchor" href="#comparing-conditions"></a>
+<span class="header-section-number">7</span> Comparing conditions<a class="anchor" aria-label="anchor" href="#comparing-conditions"></a>
 </h2>
 <p>As <code>bmm</code> feeds seamlessly into <code>brms</code>, we can use Bayesian hypothesis testing via Savage-Dickey density ratios to compare drift rates between conditions:</p>
-<div class="sourceCode" id="cb15"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb17"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="co"># Test if drift rate is higher in easy vs hard condition</span></span>
 <span><span class="fu">brms</span><span class="fu">::</span><span class="fu"><a href="https://paulbuerkner.com/brms/reference/hypothesis.brmsfit.html" class="external-link">hypothesis</a></span><span class="op">(</span><span class="va">fit</span>, <span class="st">"exp(drift_conditioneasy) &gt; exp(drift_conditionhard)"</span><span class="op">)</span></span>
 <span><span class="co">#&gt; Hypothesis Tests for class b:</span></span>
@@ -714,12 +730,12 @@ scale reduction factor on split chains (at convergence, Rhat = 1).
 <span><span class="co">#&gt; for two-sided hypotheses, the value tested against lies outside the 95%-CI.</span></span>
 <span><span class="co">#&gt; Posterior probabilities of point hypotheses assume equal prior probabilities.</span></span></code></pre></div>
 </div>
-<div class="section level2" number="7">
+<div class="section level2" number="8">
 <h2 id="adding-random-effects">
-<span class="header-section-number">7</span> Adding random effects<a class="anchor" aria-label="anchor" href="#adding-random-effects"></a>
+<span class="header-section-number">8</span> Adding random effects<a class="anchor" aria-label="anchor" href="#adding-random-effects"></a>
 </h2>
 <p>For hierarchical models with random effects across subjects:</p>
-<div class="sourceCode" id="cb16"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb18"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="co"># Formula with random effects</span></span>
 <span><span class="va">model_formula_re</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/bmmformula.html">bmf</a></span><span class="op">(</span></span>
 <span>  <span class="va">drift</span> <span class="op">~</span> <span class="fl">0</span> <span class="op">+</span> <span class="va">condition</span> <span class="op">+</span> <span class="op">(</span><span class="fl">0</span> <span class="op">+</span> <span class="va">condition</span> <span class="op">|</span> <span class="va">subject</span><span class="op">)</span>,</span>

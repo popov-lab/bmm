@@ -637,7 +637,39 @@ draws |>
 
 ![](bmm_ezdm_files/figure-html/unnamed-chunk-10-1.jpeg)
 
-## 6 Comparing conditions
+## 6 Posterior predictive checks
+
+The EZ-diffusion likelihood constrains three statistics per cell — the
+mean RT, the RT variance, and the number of upper-boundary (correct)
+responses — but by default
+[`pp_check()`](https://venpopov.com/bmm/dev/reference/pp_check.bmmfit.md)
+only shows the mean RT. The `resp_var` argument selects the other
+observables of the likelihood;
+[`pp_check_vars()`](https://venpopov.com/bmm/dev/reference/pp_check_vars.md)
+lists the available checks:
+
+``` r
+
+pp_check_vars(fit)
+#>   resp_var                         label default_type          slot default
+#> 1  mean_rt            Mean response time    intervals             Y    TRUE
+#> 2   var_rt        Response time variance    intervals        vreal1   FALSE
+#> 3  mean_pc Proportion of upper responses    intervals vint1, trials   FALSE
+```
+
+The `mean_pc` check is the proportion of correct responses
+(`n_upper / n_trials`), which stays comparable across cells even when
+the number of trials differs. With `resp_var = "all"` all checks are
+drawn from one shared joint simulation:
+
+``` r
+
+pp_check(fit, resp_var = "all", ndraws = 50)
+```
+
+![](bmm_ezdm_files/figure-html/unnamed-chunk-12-1.jpeg)
+
+## 7 Comparing conditions
 
 As `bmm` feeds seamlessly into `brms`, we can use Bayesian hypothesis
 testing via Savage-Dickey density ratios to compare drift rates between
@@ -659,7 +691,7 @@ brms::hypothesis(fit, "exp(drift_conditioneasy) > exp(drift_conditionhard)")
 #> Posterior probabilities of point hypotheses assume equal prior probabilities.
 ```
 
-## 7 Adding random effects
+## 8 Adding random effects
 
 For hierarchical models with random effects across subjects:
 

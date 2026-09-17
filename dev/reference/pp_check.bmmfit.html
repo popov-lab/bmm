@@ -57,7 +57,14 @@ model-specific visualisation instead.</p>
     <div class="section level2">
     <h2 id="ref-usage">Usage<a class="anchor" aria-label="anchor" href="#ref-usage"></a></h2>
     <div class="sourceCode"><pre class="sourceCode r"><code><span><span class="co"># S3 method for class 'bmmfit'</span></span>
-<span><span class="fu">pp_check</span><span class="op">(</span><span class="va">object</span>, type <span class="op">=</span> <span class="st">"dens_overlay"</span>, ndraws <span class="op">=</span> <span class="cn">NULL</span>, group <span class="op">=</span> <span class="cn">NULL</span>, <span class="va">...</span><span class="op">)</span></span></code></pre></div>
+<span><span class="fu">pp_check</span><span class="op">(</span></span>
+<span>  <span class="va">object</span>,</span>
+<span>  type <span class="op">=</span> <span class="cn">NULL</span>,</span>
+<span>  ndraws <span class="op">=</span> <span class="cn">NULL</span>,</span>
+<span>  group <span class="op">=</span> <span class="cn">NULL</span>,</span>
+<span>  resp_var <span class="op">=</span> <span class="cn">NULL</span>,</span>
+<span>  <span class="va">...</span></span>
+<span><span class="op">)</span></span></code></pre></div>
     </div>
 
     <div class="section level2">
@@ -69,16 +76,18 @@ model-specific visualisation instead.</p>
 
 
 <dt id="arg-type">type<a class="anchor" aria-label="anchor" href="#arg-type"></a></dt>
-<dd><p>Character. Type of pp_check (default <code>"dens_overlay"</code>). For
-non-multinomial models, passed to <code><a href="https://mc-stan.org/bayesplot/reference/pp_check.html" class="external-link">brms::pp_check()</a></code>. When <code>group</code> is
-specified, the grouped variant (e.g., <code>"dens_overlay_grouped"</code>) is
-auto-selected if available. Multinomial models produce a response
-proportion profile regardless of the value supplied.</p></dd>
+<dd><p>Character. Type of pp_check. When <code>NULL</code> (default), resolves to
+<code>"dens_overlay"</code>, or to the selected observable's default type when
+<code>resp_var</code> is specified. When <code>group</code> is specified, the grouped variant
+(e.g., <code>"dens_overlay_grouped"</code>) is auto-selected if available.
+Multinomial models produce a response proportion profile regardless of
+the value supplied.</p></dd>
 
 
 <dt id="arg-ndraws">ndraws<a class="anchor" aria-label="anchor" href="#arg-ndraws"></a></dt>
 <dd><p>Integer. Number of posterior draws. Defaults to <code>100</code> for
-multinomial models; otherwise passed to <code><a href="https://mc-stan.org/bayesplot/reference/pp_check.html" class="external-link">brms::pp_check()</a></code>.</p></dd>
+multinomial models and <code>10</code> when <code>resp_var</code> is specified; otherwise
+passed to <code><a href="https://mc-stan.org/bayesplot/reference/pp_check.html" class="external-link">brms::pp_check()</a></code>.</p></dd>
 
 
 <dt id="arg-group">group<a class="anchor" aria-label="anchor" href="#arg-group"></a></dt>
@@ -88,18 +97,31 @@ grouped variant of <code>type</code> (e.g., <code>"dens_overlay_grouped"</code>)
 if available. For multinomial models, facets by the named predictor.</p></dd>
 
 
+<dt id="arg-resp-var">resp_var<a class="anchor" aria-label="anchor" href="#arg-resp-var"></a></dt>
+<dd><p>Character. For models that declare several observables,
+the name of the observable to check, or <code>"all"</code> for a panel of all
+available checks built from one shared simulation. See <code><a href="pp_check_vars.html">pp_check_vars()</a></code>
+for the options of a fitted model. The default <code>NULL</code> checks the primary
+response via <code><a href="https://mc-stan.org/bayesplot/reference/pp_check.html" class="external-link">brms::pp_check()</a></code>. For the RT models, passing
+<code>negative_rt = TRUE</code> (a <code><a href="https://mc-stan.org/rstantools/reference/posterior_predict.html" class="external-link">brms::posterior_predict()</a></code> argument) is
+redirected to <code>resp_var = "signed_rt"</code>, so that observed and predicted
+response times are both signed by the response.</p></dd>
+
+
 <dt id="arg--">...<a class="anchor" aria-label="anchor" href="#arg--"></a></dt>
-<dd><p>Additional arguments forwarded to <code><a href="https://mc-stan.org/bayesplot/reference/pp_check.html" class="external-link">brms::pp_check()</a></code> (non-multinomial)
-or to <code><a href="https://mc-stan.org/rstantools/reference/posterior_predict.html" class="external-link">brms::posterior_predict()</a></code> (multinomial). For multinomial models,
-<code>probs</code> (numeric vector of length 2, default <code>c(0.025, 0.975)</code>) controls the
-credible interval. Both model types accept <code>re_formula</code> (e.g.,
-<code>re_formula = NA</code> to predict at the population level, excluding random
-effects).</p></dd>
+<dd><p>Additional arguments. Without <code>resp_var</code>, forwarded to
+<code><a href="https://mc-stan.org/bayesplot/reference/pp_check.html" class="external-link">brms::pp_check()</a></code>, or for multinomial models to
+<code><a href="https://mc-stan.org/rstantools/reference/posterior_predict.html" class="external-link">brms::posterior_predict()</a></code> (<code>probs</code>, a numeric vector of length 2 with
+default <code>c(0.025, 0.975)</code>, sets the credible interval). With <code>resp_var</code>,
+<code>draw_ids</code> and <code>re_formula</code> go to <code><a href="https://paulbuerkner.com/brms/reference/prepare_predictions.html" class="external-link">brms::prepare_predictions()</a></code> and the
+rest to the <code>bayesplot::ppc_*</code> function. <code>re_formula = NA</code> predicts at
+the population level on every path.</p></dd>
 
 </dl></div>
     <div class="section level2">
     <h2 id="value">Value<a class="anchor" aria-label="anchor" href="#value"></a></h2>
-    <p>For multinomial models, a <code>ggplot2</code> object. For other models, the
+    <p>For multinomial models or when <code>resp_var</code> is specified, a <code>ggplot2</code>
+object (a <code>bayesplot_grid</code> for <code>resp_var = "all"</code>). For other models, the
 result of <code><a href="https://mc-stan.org/bayesplot/reference/pp_check.html" class="external-link">brms::pp_check()</a></code>.</p>
     </div>
     <div class="section level2">
@@ -108,10 +130,27 @@ result of <code><a href="https://mc-stan.org/bayesplot/reference/pp_check.html" 
 observed proportions are shown as bars and posterior predictive medians with
 credible intervals are shown as point-ranges, using the bayesplot default
 colour scheme and theme.</p>
+<p>Some models describe several observables jointly (e.g. <code><a href="ddm.html">ddm()</a></code>: response
+times <em>and</em> responses; <code><a href="ezdm.html">ezdm()</a></code>: mean RT, RT variance <em>and</em> accuracy), but
+brms only ever checks the primary response. For these models the <code>resp_var</code>
+argument selects which observable to check; <code><a href="pp_check_vars.html">pp_check_vars()</a></code> lists the
+available checks. All selected observables are drawn from <strong>one</strong> joint
+posterior predictive simulation, so <code>resp_var = "all"</code> panels are mutually
+consistent.</p>
+<p>Some observables are undefined for some cells — an <code><a href="ezdm.html">ezdm()</a></code> boundary has no
+mean response time when fewer than two responses reach it. Observations
+whose <em>observed</em> value is undefined are dropped from the check; undefined
+values in the <em>simulated</em> replicates are absorbed by dropping those
+posterior draws instead, so the number of observations checked does not
+depend on <code>ndraws</code>. Dropped draws are not missing at random — they are
+draws whose parameters made a boundary sparse — so the retained predictive
+is mildly conditioned; both reductions are reported with a warning. With
+<code>resp_var = "all"</code> one reduction is shared by every panel, so the panels
+are computed on the same observations and draws.</p>
     </div>
     <div class="section level2">
     <h2 id="see-also">See also<a class="anchor" aria-label="anchor" href="#see-also"></a></h2>
-    <div class="dont-index"><p><code><a href="https://mc-stan.org/bayesplot/reference/pp_check.html" class="external-link">brms::pp_check()</a></code></p></div>
+    <div class="dont-index"><p><code><a href="https://mc-stan.org/bayesplot/reference/pp_check.html" class="external-link">brms::pp_check()</a></code>, <code><a href="pp_check_vars.html">pp_check_vars()</a></code></p></div>
     </div>
 
   </main><aside class="col-md-3"><nav id="toc" aria-label="Table of contents"><h2>On this page</h2>

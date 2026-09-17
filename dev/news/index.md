@@ -124,9 +124,69 @@ CRAN release: 2026-09-16
   e.g. `m3(...)$links <- list(c = "softplus", a = "softplus")` or
   `ddm(rt, response, links = list(bound = "softplus"))`
   ([\#363](https://github.com/popov-lab/bmm/issues/363)).
+- [`pp_check()`](https://venpopov.com/bmm/dev/reference/pp_check.bmmfit.md)
+  can now check every observable of a model’s likelihood, not just the
+  primary response. brms’s
+  [`pp_check()`](https://venpopov.com/bmm/dev/reference/pp_check.bmmfit.md)
+  only plots the brms `Y` variable, so the **ddm** and **cswald**
+  responses and the **ezdm** RT variance and accuracy went unchecked.
+  The new `resp_var` argument selects the observable
+  (e.g. `pp_check(fit, resp_var = "response")`), including derived ones
+  (`"signed_rt"` for the RT models; `"mean_pc"`, the proportion of
+  upper-boundary responses, for `ezdm`), and `resp_var = "all"` returns
+  a panel of all checks drawn from one shared joint simulation.
+  `pp_check_vars(fit)` lists the available checks, the plot type each
+  uses by default, and the brms standata slots it reads; model authors
+  declare observables via the
+  [`pp_observables()`](https://venpopov.com/bmm/dev/reference/pp_observables.md)/[`pp_simulate()`](https://venpopov.com/bmm/dev/reference/pp_observables.md)
+  S3 generics. The **ezdm** checks default to `type = "intervals"`,
+  since each observation is one design cell and a density overlay of a
+  handful of summary statistics is uninformative. Where an observable is
+  undefined for some cells (an **ezdm** boundary reached by fewer than
+  two responses), observations are dropped only when the *observed*
+  value is undefined; undefined *simulated* values are absorbed by
+  dropping those posterior draws, so the number of observations checked
+  does not depend on `ndraws`
+  ([\#401](https://github.com/popov-lab/bmm/issues/401)).
 
 #### Bug fixes
 
+- Fix
+  [`pp_check()`](https://venpopov.com/bmm/dev/reference/pp_check.bmmfit.md)
+  for the RT models silently producing a misleading plot with
+  `negative_rt = TRUE`: brms forwarded the argument to
+  `posterior_predict()` (signed predicted RTs) while the observed
+  response times stayed unsigned, so the plot looked like severe misfit.
+  [`pp_check()`](https://venpopov.com/bmm/dev/reference/pp_check.bmmfit.md)
+  now checks the `"signed_rt"` observable (with a message) so both
+  halves are signed, and errors for models without signed RTs
+  ([\#401](https://github.com/popov-lab/bmm/issues/401)).
+- Remove the unreachable `dv` argument of the internal **ezdm**
+  `posterior_predict` functions and its documentation.
+  `posterior_predict(fit, dv = "var_rt")` silently returned `mean_rt`:
+  brms forwards `posterior_predict()` dots to `prepare_predictions()`
+  only, never to the family’s prediction function, so `dv` was dropped
+  without a warning and has never worked. Use
+  `pp_check(fit, resp_var = ...)` instead
+  ([\#401](https://github.com/popov-lab/bmm/issues/401)).
+- Fix `rezdm(version = "4par")` crashing (recycling errors) when some
+  but not all simulated cells produced fewer than 2 responses at the
+  upper boundary — the upper-boundary branch did not subset its moments
+  and non-decision time by the affected cells, while the lower-boundary
+  branch did. The bug was invisible whenever every cell shared the same
+  parameters (the unindexed vectors are then constant), and is reachable
+  through
+  [`rezdm()`](https://venpopov.com/bmm/dev/reference/ezdm_dist.md)
+  directly; fixing it is a prerequisite for the multi-observable
+  [`pp_check()`](https://venpopov.com/bmm/dev/reference/pp_check.bmmfit.md),
+  which calls
+  [`rezdm()`](https://venpopov.com/bmm/dev/reference/ezdm_dist.md) with
+  per-draw posterior parameters
+  ([\#401](https://github.com/popov-lab/bmm/issues/401)).
+- Fix the grouped plot type auto-selected by `pp_check(group = )`
+  (e.g. `dens_overlay_grouped`) being silently dropped when `type` was
+  not supplied, so that brms fell back to the ungrouped type and
+  bayesplot warned about an unrecognized `group` argument.
 - Fix initial values being set in two places, where the `init` returned
   by
   [`configure_model()`](https://venpopov.com/bmm/dev/reference/configure_model.md)
