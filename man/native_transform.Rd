@@ -3,27 +3,42 @@
 \name{native_transform}
 \alias{native_transform}
 \alias{native_transform.default}
+\alias{native_transform.non_targets}
 \title{Transform parameter draws from the sampling scale to the native scale}
 \usage{
 native_transform(model, linpred, data, ...)
 
 \method{native_transform}{default}(model, linpred, data, ...)
+
+\method{native_transform}{non_targets}(model, linpred, data, ...)
 }
 \arguments{
 \item{model}{A \code{bmmodel} object.}
 
 \item{linpred}{A named list of matrices of linear predictor draws, one per
 model parameter, each with draws in rows and prediction grid cells in
-columns.}
+columns. These are \code{\link[brms:posterior_linpred]{brms::posterior_linpred()}} output, so they are on the
+\emph{link} scale for distributional parameters and are the raw value for
+non-linear parameters. For \code{bmm}'s \code{nlpar}-based models the link is a
+fiction maintained by the model's own \code{nlf()} expression — \code{imm} declares
+\code{c = "log"} because \code{configure_model.imm_abc()} writes \code{exp(c)} into the
+formula, not because \code{brms} applies a link — so a model that declares a link
+it does not actually apply in its \code{nlf()} will get silently wrong output
+here.}
 
-\item{data}{The prediction grid the draws were computed on. Available for
-transformations that depend on the design.}
+\item{data}{The prediction grid the draws were computed on, with one row per
+column of the \code{linpred} matrices. These are rows of the fitted model's own
+data, so they carry the \code{bmm}-internal columns a design-dependent
+transformation keys on (\verb{LureIdx*}, \code{inv_ss}, \verb{Idx_*}, matrix columns).
+\code{native_transform.non_targets()} is the worked example.}
 
 \item{...}{Currently unused.}
 }
 \value{
-A named list of matrices with the same names and dimensions as
-\code{linpred}, on the native scale.
+A named list of matrices on the native scale. A method \strong{must} return
+one element for every name it was given and preserve each matrix's
+dimensions; \code{\link[=native_parameters]{native_parameters()}} checks both and errors, naming the model,
+if either is broken. The order of the list is free.
 }
 \description{
 Applies a \code{bmmodel}'s inverse link functions to posterior draws of its
@@ -32,11 +47,14 @@ transformation is a property of the \emph{model}, not of an individual parameter
 because some models map several parameters jointly (e.g. mixture weights
 through a softmax).
 
-The default method covers every transformation that can be expressed through
-a \code{links} declaration in a \verb{.model_*()} constructor, so \strong{new models normally
-need no method at all} — declaring \code{links} is sufficient. Write a method only
-when a model's transformation cannot be written as an elementwise inverse link
-or as a single softmax group.
+\strong{A model whose parameters transform elementwise, or through one softmax group
+that is active on every row of the data, needs no method} — declaring \code{links}
+in its \verb{.model_*()} constructor is sufficient, and that covers every model
+\code{bmm} currently ships. Write a method when either condition fails. Two cases
+that are known to fail it: a model with several independent multinomial
+branches, because a \code{"softmax"} link carries no group identity and all such
+parameters are softmaxed together as one group; and a transformation that
+depends on the design rather than only on the parameter's own value.
 }
 \details{
 Methods for specific models follow the \code{bmm} S3 chain, which runs from the
@@ -50,6 +68,11 @@ remaining parameters reach the default method:
   c(NextMethod(), own)
 \}
 }\if{html}{\out{</div>}}
+
+Removing them before \code{NextMethod()} is what keeps a method idempotent with
+respect to the parameters it does not own: a parameter left in \code{linpred} is
+transformed a second time by the next method in the chain, which does not
+error and does not warn.
 }
 \seealso{
 \code{\link[=native_parameters]{native_parameters()}}

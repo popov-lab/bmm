@@ -73,6 +73,12 @@ test_that("softplus inverse maps reals to positive values", {
   expect_true(all(x > 0))
 })
 
+test_that("softplus does not overflow where it is indistinguishable from identity", {
+  eta <- c(700, 710, 800)
+  expect_equal(link_transform(eta, "softplus", inverse = TRUE), eta)
+  expect_equal(link_transform(eta, "softplus", inverse = FALSE), eta)
+})
+
 test_that("log1p and inverse expm1 round-trip for x > -1", {
   x <- c(-0.5, -0.1, 0, 0.3, 5)
   eta <- link_transform(x, "log1p", inverse = FALSE)
@@ -192,18 +198,22 @@ test_that("NULL link is treated as identity", {
 # ===========================================================================
 
 test_that(".is_softmax_param detects mixture3p softmax params", {
-  mock_model <- structure(list(), class = c("mixture3p", "bmmodel"))
-  expect_true(.is_softmax_param("thetat", mock_model))
-  expect_true(.is_softmax_param("thetant", mock_model))
-  expect_false(.is_softmax_param("kappa", mock_model))
+  model <- .model_mixture3p()
+  expect_true(.is_softmax_param("thetat", model))
+  expect_true(.is_softmax_param("thetant", model))
+  expect_false(.is_softmax_param("kappa", model))
 })
 
 test_that(".is_softmax_param returns FALSE for non-mixture3p models", {
-  mock_model <- structure(list(), class = c("mixture2p", "bmmodel"))
-  expect_false(.is_softmax_param("thetat", mock_model))
+  expect_false(.is_softmax_param("thetat", .model_mixture2p()))
+  expect_false(.is_softmax_param("kappa", .model_sdm()))
+})
 
-  mock_sdm <- structure(list(), class = c("sdm", "bmmodel"))
-  expect_false(.is_softmax_param("kappa", mock_sdm))
+test_that(".is_softmax_param follows a links override rather than the class", {
+  model <- .model_mixture3p()
+  model$links$thetat <- "logit"
+  expect_false(.is_softmax_param("thetat", model))
+  expect_true(.is_softmax_param("thetant", model))
 })
 
 # ===========================================================================
@@ -380,6 +390,124 @@ test_that("every link declared by a supported model can be transformed", {
   }
 })
 
+test_that("native_transform inverts the tan_half link at non-zero values", {
+  model <- .model_mixture2p()
+  eta <- matrix(c(-3, -1, 0, 0.5, 2, 7), nrow = 2)
+  out <- native_transform(model, list(mu1 = eta), data.frame())
+
+  expect_equal(out$mu1, 2 * atan(eta))
+  expect_false(isTRUE(all.equal(out$mu1, eta)))
+  expect_true(all(abs(out$mu1) < pi))
+})
+
+test_that("native_transform errors when a softmax group is incomplete", {
+  model <- .model_mixture3p()
+  linpred <- list(thetat = matrix(0.5, 2, 2))
+  expect_error(native_transform(model, linpred, data.frame()), "thetant")
+})
+
+test_that("native_transform pools every softmax link into a single group", {
+  model <- .model_mixture3p()
+  model$links <- list(a1 = "softmax", a2 = "softmax", b1 = "softmax", b2 = "softmax")
+  expect_setequal(
+    .np_softmax_pars(model, c("a1", "a2", "b1", "b2")),
+    c("a1", "a2", "b1", "b2")
+  )
+})
+
+# ===========================================================================
+# Tier 1: native_transform.non_targets()
+# ===========================================================================
+
+test_that("native_transform.non_targets zeroes the non-target weight without lures", {
+  model <- .model_mixture3p()
+  data <- data.frame(LureIdx1 = c(0, 1, 1), LureIdx2 = c(0, 0, 1))
+  linpred <- list(
+    thetat = matrix(0.8, nrow = 2, ncol = 3),
+    thetant = matrix(-0.4, nrow = 2, ncol = 3)
+  )
+  out <- native_transform(model, linpred, data)
+
+  expect_equal(out$thetant[, 1], rep(0, 2))
+  expect_equal(out$thetat[, 1], rep(plogis(0.8), 2))
+  expect_equal(out$thetant[, 2:3], matrix(softmax(c(0.8, -0.4, 0))[2], 2, 2))
+  expect_equal(out$thetat[, 2:3], matrix(softmax(c(0.8, -0.4, 0))[1], 2, 2))
+})
+
+test_that("native_transform.non_targets preserves names and dimensions", {
+  model <- .model_mixture3p()
+  data <- data.frame(LureIdx1 = c(0, 1))
+  linpred <- list(
+    mu1 = matrix(0.3, 4, 2),
+    kappa = matrix(1.1, 4, 2),
+    thetat = matrix(0.8, 4, 2),
+    thetant = matrix(-0.4, 4, 2)
+  )
+  out <- native_transform(model, linpred, data)
+
+  expect_setequal(names(out), names(linpred))
+  expect_equal(lapply(out[names(linpred)], dim), lapply(linpred, dim))
+  expect_equal(out$mu1, 2 * atan(linpred$mu1))
+  expect_equal(out$kappa, exp(linpred$kappa))
+})
+
+test_that("native_transform.non_targets is a no-op for imm, which has no softmax links", {
+  model <- .model_imm(version = "abc")
+  linpred <- list(kappa = matrix(1.1, 3, 2), c = matrix(0.4, 3, 2))
+  data <- data.frame(LureIdx1 = c(0, 1))
+
+  expect_equal(
+    native_transform(model, linpred, data),
+    native_transform.default(model, linpred, data)
+  )
+})
+
+test_that(".np_lure_free_rows trusts set_size over the derived indicators", {
+  model <- .model_mixture3p(set_size = "set_size")
+  # LureIdx is derived, and .np_complete_newdata() fills it from the first row of
+  # the model data rather than recomputing it, so it can contradict set_size
+  stale <- data.frame(set_size = c(1, 4), ss_numeric = c(4, 4), LureIdx1 = c(1, 1))
+  expect_equal(.np_lure_free_rows(model, stale), c(TRUE, FALSE))
+
+  factor_coded <- data.frame(set_size = factor(c("1", "4")), LureIdx1 = c(1, 1))
+  expect_equal(.np_lure_free_rows(model, factor_coded), c(TRUE, FALSE))
+})
+
+test_that(".np_lure_free_rows falls back when set_size is not in the data", {
+  model <- .model_mixture3p(set_size = "set_size")
+  expect_equal(
+    .np_lure_free_rows(model, data.frame(ss_numeric = c(1, 2))),
+    c(TRUE, FALSE)
+  )
+  expect_equal(
+    .np_lure_free_rows(model, data.frame(LureIdx1 = c(0, 1), LureIdx2 = c(0, 1))),
+    c(TRUE, FALSE)
+  )
+  expect_equal(.np_lure_free_rows(model, data.frame(x = 1:2)), c(FALSE, FALSE))
+})
+
+test_that(".np_reserved_names covers the columns each output format builds", {
+  expect_setequal(
+    .np_reserved_names(summary = FALSE, prob = 0.95),
+    c(".chain", ".iteration", ".draw", "parameter", "value")
+  )
+  expect_setequal(
+    .np_reserved_names(summary = TRUE, prob = 0.95),
+    c("parameter", "Estimate", "Est.Error", "Q2.5", "Q97.5")
+  )
+  expect_true("Q25" %in% .np_reserved_names(summary = TRUE, prob = 0.5))
+})
+
+test_that(".np_softmax stays finite when a member is switched off", {
+  out <- .np_softmax(list(
+    a = matrix(c(0.8, -2, 1000)),
+    b = matrix(rep(-Inf, 3))
+  ))
+  expect_true(all(is.finite(unlist(out))))
+  expect_equal(as.vector(out$b), rep(0, 3))
+  expect_equal(as.vector(out$a), plogis(c(0.8, -2, 1000)))
+})
+
 # ===========================================================================
 # Tier 1: .np_grid_vars() and .np_newdata()
 # ===========================================================================
@@ -516,15 +644,16 @@ test_that("native_parameters reports fixed parameters at their constant", {
   expect_true(all(out$value == 0))
 })
 
-test_that("native_parameters draw indices match the draws of the fit", {
+test_that("native_parameters labels each row with the draw it came from", {
   skip_on_cran()
   fit <- load_np_sdm_fit()
-  out <- native_parameters(fit, pars = "kappa")
-  reference <- .np_draw_index(fit, seq_len(brms::ndraws(fit)))
+  draws <- as.data.frame(posterior::as_draws_df(fit))
 
-  expect_equal(unique(out$.draw), reference$.draw)
-  expect_equal(out$.chain[seq_len(nrow(reference))], reference$.chain)
-  expect_equal(out$.iteration[seq_len(nrow(reference))], reference$.iteration)
+  out <- native_parameters(fit, pars = "c", draw_ids = c(37, 4, 21))
+  out <- out[out$set_size == 1, ]
+  expect_equal(out$value, exp(draws$b_c_set_size1)[out$.draw])
+  expect_equal(out$.chain, draws$.chain[out$.draw])
+  expect_equal(out$.iteration, draws$.iteration[out$.draw])
 })
 
 test_that("native_parameters uses the same draws for every parameter", {
@@ -598,6 +727,25 @@ test_that("native_parameters validates its inputs", {
   expect_error(native_parameters(fit, pars = "nope"), "mu.*c.*kappa")
   expect_error(native_parameters(fit, scale = "raw"))
   expect_error(native_parameters(fit$data), "bmmfit")
+})
+
+test_that("native_parameters validates prob and ndraws", {
+  skip_on_cran()
+  fit <- load_np_sdm_fit()
+  expect_error(native_parameters(fit, summary = TRUE, prob = -1), "'prob'")
+  expect_error(native_parameters(fit, summary = TRUE, prob = 0), "'prob'")
+  expect_error(native_parameters(fit, summary = TRUE, prob = NA), "'prob'")
+  expect_error(native_parameters(fit, ndraws = 1e5), "'ndraws'")
+  expect_error(native_parameters(fit, ndraws = -1), "'ndraws'")
+})
+
+test_that("native_parameters errors when a predictor shadows an output column", {
+  skip_on_cran()
+  fit <- load_np_sdm_fit()
+  fit$data$value <- fit$data$set_size
+  fit$bmm$user_formula$c <- bmf(c ~ 0 + value)$c
+
+  expect_error(native_parameters(fit, pars = "c"), "value")
 })
 
 test_that("native_parameters ignores re_formula when the model has no group-level effects", {

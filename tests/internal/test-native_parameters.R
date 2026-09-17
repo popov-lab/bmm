@@ -60,6 +60,34 @@ test_that("native_parameters returns mixture3p weights as probabilities", {
   expect_true(all(native$value[native$parameter == "mu1"] == 0))
 })
 
+test_that("native_parameters reports no non-target responses at set size 1", {
+  fit <- bmm(
+    bmf(thetat ~ 0 + set_size, thetant ~ 0 + set_size, kappa ~ 1),
+    data = subset(oberauer_lin_2017, ID %in% 1:4),
+    model = mixture3p(
+      resp_error = "dev_rad",
+      nt_features = paste0("col_nt", 1:7),
+      set_size = "set_size"
+    ),
+    chains = 1, iter = 400, warmup = 200, refresh = 0, silent = 2
+  )
+
+  native <- native_parameters(fit, re_formula = NA)
+  ss1 <- native[native$set_size == 1, ]
+  sampling <- native_parameters(fit, re_formula = NA, scale = "sampling")
+  sampling <- sampling[sampling$set_size == 1, ]
+
+  expect_true(all(ss1$value[ss1$parameter == "thetant"] == 0))
+  expect_equal(
+    ss1$value[ss1$parameter == "thetat"],
+    plogis(sampling$value[sampling$parameter == "thetat"])
+  )
+
+  # every other set size keeps the three-way softmax
+  ss4 <- native[native$set_size == 4, ]
+  expect_true(all(ss4$value[ss4$parameter == "thetant"] > 0))
+})
+
 test_that("native_parameters agrees with conditional_effects on the native scale", {
   fit <- fit_mixture3p()
 

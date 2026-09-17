@@ -78,6 +78,21 @@ median and the credible interval of a native-scale parameter are exact while
 its mean is not the inverse link of the linear predictor's mean. This function
 transforms the draws and only then summarises, which is why \code{summary = TRUE}
 is not the same as transforming the output of \code{\link[=summary.bmmfit]{summary.bmmfit()}}.
+
+The same order is what makes \code{summary = TRUE} correct for the mixture weights,
+whose softmax is not an elementwise map at all: summarising the transformed
+draws reports quantiles of the weight's own marginal posterior, whereas
+transforming the summaries would report the softmax of three separate
+quantiles, which is not a quantile of anything.
+}
+
+\section{Transforming coefficients is not the same thing}{
+The inverse link applies to the \strong{linear predictor} of a grid cell, not to an
+individual regression coefficient. For a model with \code{kappa ~ condition},
+\code{exp(b_kappa_conditionB)} is a multiplicative factor, not \code{kappa} in condition
+B; \code{kappa} in condition B is \code{exp(b_kappa_Intercept + b_kappa_conditionB)}.
+Building the grid is exactly what removes this step, which is why contrasts
+are taken between rows of the output rather than read off the coefficients.
 }
 
 \section{Group-level effects}{
@@ -112,6 +127,39 @@ The default grid contains the observed combinations of the predictors, not
 their full crossing, so cells that were never presented do not appear. A
 continuous predictor therefore produces one grid cell per observed value;
 supply \code{newdata} for such models.
+}
+
+\section{Circular location parameters}{
+The circular models sample their location parameter (\code{mu} for \code{sdm}, \code{mu1} for
+\code{mixture2p}, \code{mixture3p} and \code{imm}) through a \code{tan_half} link, and it is
+returned in radians in \verb{(-pi, pi)} — a response bias relative to the target,
+since the response variable is the angular error. It is fixed to \code{0} unless
+the \code{bmmformula} predicts it explicitly, so an all-zero \code{mu1} means the model
+never estimated one.
+
+The inverse link is \code{2 * atan()}, and the caveat above applies to it with
+particular force: \code{2 * atan(b_mu1_conditionB)} is neither the bias in
+condition B nor the difference between conditions. The bias in condition B is
+\code{2 * atan(b_mu1_Intercept + b_mu1_conditionB)}, and the difference between the
+conditions is that value minus \code{2 * atan(b_mu1_Intercept)}, taken draw by
+draw.
+}
+
+\section{Mixture weights}{
+For \code{mixture3p} the returned \code{thetat} and \code{thetant} are probabilities but they
+\strong{do not sum to 1}: \code{brms} holds the linear predictor of one mixture
+component at zero, and that component is the guessing distribution, so the
+remaining mass \code{1 - thetat - thetant} is the probability of a guess. \code{thetant}
+is the \emph{total} probability of a non-target response, summed over the lures,
+not the probability per lure.
+
+At set sizes where no non-target was presented the model switches its
+non-target components off, so \code{thetant} is reported as exactly \code{0} and
+\code{thetat} as \code{plogis()} of its linear predictor, rather than as the value the
+set-size regression extrapolates to. This correction reads the lure indicators
+out of the prediction grid; if you supply \code{newdata}, columns you do not supply
+are filled from the first row of the model data rather than recomputed, and
+\code{native_parameters()} warns when the two disagree.
 }
 
 \examples{
