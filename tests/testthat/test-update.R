@@ -56,7 +56,7 @@ update_mock <- function(object, ...) {
 }
 
 constant_priors <- function(fit) {
-  sum(grepl("constant", as.data.frame(fit$prior)$prior))
+  sum(grepl("^constant\\(", as.data.frame(fit$prior)$prior))
 }
 
 test_that("update.bmmfit frees parameters that the new formula predicts", {
@@ -68,17 +68,45 @@ test_that("update.bmmfit frees parameters that the new formula predicts", {
   up <- update_mock(fit1, formula. = bmf(c ~ 1, kappa ~ 1, mu ~ 1))
   expect_length(up$bmm$model$fixed_parameters, 0)
   expect_equal(constant_priors(up), 0)
+  expect_match(brms::stancode(up), "real Intercept;", fixed = TRUE)
+
+  # freeing a parameter and replacing the data at once
+  new_data <- data.frame(
+    dev_rad = rsdm(80, c = 4, kappa = 3),
+    set_size = rep(1:2, each = 40)
+  )
+  up <- update_mock(fit1, formula. = bmf(c ~ 1, kappa ~ 1, mu ~ 1), newdata = new_data)
+  expect_length(up$bmm$model$fixed_parameters, 0)
+  expect_equal(constant_priors(up), 0)
+  expect_equal(nrow(up$data), 80)
 
   # a parameter left alone stays fixed
   expect_equal(constant_priors(update_mock(fit1)), 1)
 })
 
+test_that("update.bmmfit fixes parameters that the new formula sets to a constant", {
+  skip_on_cran()
+  fit1 <- sdm_fixture()
+
+  # the reverse direction: the old fit's free prior on kappa must not survive and
+  # override the constant() that the new formula asks for
+  up <- update_mock(fit1, formula. = bmf(c ~ 0 + set_size, kappa = 5))
+  expect_equal(up$bmm$model$fixed_parameters$kappa, 5)
+  expect_true(any(grepl("^constant\\(5\\)", as.data.frame(up$prior)$prior)))
+  expect_match(brms::stancode(up), "Intercept_kappa = 5;", fixed = TRUE)
+  expect_false(grepl("student_t_lpdf(Intercept_kappa", brms::stancode(up), fixed = TRUE))
+
+  # changing the value of an already fixed parameter is the same defect: the old
+  # constant() row would otherwise survive and pin mu at the original 0
+  up <- update_mock(fit1, formula. = bmf(c ~ 0 + set_size, mu = 0.5))
+  expect_equal(up$bmm$model$fixed_parameters$mu, 0.5)
+  expect_match(brms::stancode(up), "Intercept = 0.5;", fixed = TRUE)
+})
+
+# read the emitted program rather than bmm's own stanvars, and assert on the
+# call: the sliced function is declared in the functions block either way
 sdm_likelihood_is_sliced <- function(fit) {
-  blocks <- vapply(fit$stanvars, function(x) x$block %||% "", character(1))
-  scode <- vapply(fit$stanvars[blocks == "likelihood"],
-    function(x) paste(x$scode, collapse = "\n"), character(1)
-  )
-  any(grepl("ldenom_slice", scode, fixed = TRUE))
+  grepl("target += sdm_simple_run_ldenom_slice", brms::stancode(fit), fixed = TRUE)
 }
 
 test_that("update.bmmfit configures the likelihood for the effective threading spec", {
@@ -91,6 +119,53 @@ test_that("update.bmmfit configures the likelihood for the effective threading s
   threaded_fit$threads <- brms::threading(2)
   expect_true(sdm_likelihood_is_sliced(update_mock(threaded_fit)))
 
+  # brms reads an explicit threads = NULL as "turn threading off", which it
+  # distinguishes from an absent argument by name presence, not by NULL-ness
+  expect_false(sdm_likelihood_is_sliced(update_mock(threaded_fit, threads = NULL)))
+
   expect_false(sdm_likelihood_is_sliced(update_mock(fit1)))
   expect_true(sdm_likelihood_is_sliced(update_mock(fit1, threads = brms::threading(2))))
+
+  # the spec of the fit also has to win over a global brms.threads, which brms
+  # itself ignores once it has fallen back to the fit's own spec
+  withr::with_options(list(brms.threads = brms::threading(2)), {
+    expect_false(sdm_likelihood_is_sliced(update_mock(fit1)))
+
+    # a fit saved before brmsfit carried a $threads field
+    no_threads <- fit1
+    no_threads$threads <- NULL
+    expect_false(sdm_likelihood_is_sliced(update_mock(no_threads)))
+  })
+})
+
+test_that("update.bmmfit keeps track of the file the fit is saved in", {
+  skip_on_cran()
+  fit1 <- sdm_fixture()
+  fit1$file <- "some/cached/fit.rds"
+
+  expect_equal(update_mock(fit1)$file, "some/cached/fit.rds")
+
+  # an explicit file must hold a bmmfit -- brms writes it from inside
+  # update.brmsfit(), before any of the bmm postprocessing has run
+  file <- tempfile()
+  up <- update_mock(fit1, file = file)
+  expect_equal(up$file, paste0(file, ".rds"))
+  expect_true(file.exists(paste0(file, ".rds")))
+  expect_true(is_bmmfit(readRDS(paste0(file, ".rds"))))
+})
+
+test_that("update.bmmfit updates and writes even when `file` already exists", {
+  skip_on_cran()
+  fit1 <- sdm_fixture()
+
+  # `file` must not reach brms::brm(), which would read an existing file and
+  # return its contents instead of running the update
+  file <- tempfile()
+  saveRDS(fit1, paste0(file, ".rds"))
+  new_data <- fit1$data
+  new_data$dev_rad <- 0.1
+  up <- update_mock(fit1, newdata = new_data, file = file)
+  expect_equal(up$fit, 1)
+  expect_equal(readRDS(paste0(file, ".rds"))$fit, 1)
+  expect_true(is_bmmfit(readRDS(paste0(file, ".rds"))))
 })

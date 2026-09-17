@@ -124,7 +124,7 @@ for Choice Response Times. Applied Psychological Measurement, 42(2), 116-135. ht
 
 Both versions have an optional parameter \code{sndt}: the non-decision time is
 \code{Uniform(ndt, ndt + sndt)}, so \code{ndt} is the \emph{minimum} non-decision time and
-\code{ndt + sndt/2} the mean. This is the \code{st0} of \code{\link[rtdists:Diffusion]{rtdists::rdiffusion()}};
+\code{ndt + sndt/2} the mean. This is the \code{st0} of \code{\link[rtdists:rdiffusion]{rtdists::rdiffusion()}};
 fast-dm centers the same uniform on its \code{t0}, which is then the mean.
 
 \code{sndt} is fixed at 0 by default, which reproduces the standard censored
@@ -145,7 +145,7 @@ non-decision time instead of sharing one draw per trial. Choice
 probabilities agree exactly with the shared-draw model at \code{zr = 0.5}; away
 from it they differ by up to ~1 percentage point at \code{sndt = 0.3} (~4 at
 \code{zr = 0.2}), and densities by up to ~10\%. \code{posterior_predict()} simulates
-through \code{\link[rtdists:Diffusion]{rtdists::rdiffusion()}}, which shares the draw, so \code{pp_check()}
+through \code{\link[rtdists:rdiffusion]{rtdists::rdiffusion()}}, which shares the draw, so \code{pp_check()}
 compares against a slightly different model whenever \code{zr} departs from 0.5.
 }
 

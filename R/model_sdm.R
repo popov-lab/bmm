@@ -241,5 +241,7 @@ sdm_use_threaded_likelihood <- function() {
   if (is.numeric(threads)) {
     threads <- brms::threading(threads)
   }
-  is.list(threads) && isTRUE(threads$threads > 0)
+  # threading(force = TRUE) makes brms compile with threads but emit unsliced
+  # code, so the sliced chunk would reference start/end outside partial_log_lik
+  is.list(threads) && isTRUE(threads$threads > 0) && !isTRUE(threads$force)
 }
