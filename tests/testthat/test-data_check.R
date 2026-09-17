@@ -181,3 +181,92 @@ test_that("bmm_data_check needs nothing beyond check_data and check_formula", {
   expect_output(print(res), "Response variables")
   expect_output(print(res), "Hard checks")
 })
+
+test_that("bmm_data_check captures check_model failures instead of throwing", {
+  dat <- data.frame(
+    corr = c(5, 6, 7, 4), other = c(2, 1, 0, 3), npl = 1,
+    n_corr = 1, n_other = 2, n_npl = 3, ID = 1:4
+  )
+  model <- m3(
+    resp_cats = c("corr", "other", "npl"),
+    num_options = c("n_corr", "n_other", "n_npl"), choice_rule = "simple"
+  )
+  res <- bmm_data_check(bmf(b ~ 1, c ~ 1, a ~ 1), dat, model)
+  expect_s3_class(res, "bmm_data_check")
+  expect_match(res$pipeline$error, "link function")
+  expect_output(print(res), "FAILED")
+
+  res_class <- bmm_data_check(bmf(kappa ~ 1), data.frame(y = 1:5), list(foo = "bar"))
+  expect_s3_class(res_class, "bmm_data_check")
+  expect_match(res_class$pipeline$error, "model argument")
+  expect_output(print(res_class), "FAILED")
+})
+
+test_that("bmm_data_check flags misplaced NAs in nt_distances for imm_bsc", {
+  dat <- data.frame(
+    y = 0, nt1 = 0.3, nt2 = -0.3,
+    d1 = 1, d2 = c(NA, rep(1, 5))
+  )
+  model <- imm(
+    resp_error = "y", nt_features = c("nt1", "nt2"),
+    nt_distances = c("d1", "d2"), set_size = 3, version = "bsc"
+  )
+  res <- bmm_data_check(bmf(kappa ~ 1, c ~ 1, s ~ 1), dat, model)
+  expect_true(any(grepl("'nt_distances'", finding_messages(res))))
+})
+
+# the Model: header prints the model call on one line, as print.bmmodel does,
+# so this guards the sections that describe the data
+test_that("bmm_data_check wraps every printed line at 80 characters", {
+  dat <- data.frame(
+    resp_error = seq(-3, 3, length.out = 400),
+    cond = factor(rep(paste0("condition_level_", 1:20), each = 20)),
+    ID = rep(1:20, each = 20)
+  )
+  res <- bmm_data_check(
+    bmf(c ~ 0 + cond, kappa ~ 1 + (1 | ID)), dat, sdm(resp_error = "resp_error")
+  )
+  expect_true(all(nchar(capture.output(print(res, color = FALSE))) <= 80))
+})
+
+test_that("bmm_data_check treats design-cell crossing and value display alike", {
+  dat <- data.frame(y = seq(-3, 3, length.out = 80), cond = rep(1:8, 10), ID = rep(1:4, 20))
+  res <- bmm_data_check(
+    bmf(kappa ~ 0 + cond, thetat ~ 1 + (1 | ID)), dat, mixture2p(resp_error = "y")
+  )
+  expect_true("cond" %in% res$cells$cell_vars)
+  coding <- res$predictors$coding
+  expect_match(coding$summary[coding$variable == "cond"], "8 unique values")
+  expect_true(any(grepl("Numeric predictor", finding_messages(res))))
+})
+
+test_that("bmm_data_check reports a skipped design-cell table instead of omitting it", {
+  dat <- data.frame(
+    y = seq(-3, 3, length.out = 400),
+    cond = factor(rep(paste0("c", 1:300), length.out = 400)),
+    ID = 1:400
+  )
+  res <- bmm_data_check(
+    bmf(kappa ~ 0 + cond, thetat ~ 1 + (1 | ID)), dat, mixture2p(resp_error = "y")
+  )
+  expect_null(res$cells$counts)
+  expect_equal(res$cells$n_combos, 120000)
+  expect_output(print(res), "not tabulated")
+})
+
+test_that("data_check_findings dispatches to the default method for RT models", {
+  dat <- data.frame(rt = 0.5, resp = 1)
+  expect_identical(
+    data_check_findings(ddm(rt = "rt", response = "resp"), dat, bmf(drift ~ 1)),
+    list()
+  )
+  expect_identical(
+    data_check_findings(cswald(rt = "rt", response = "resp"), dat, bmf(drift ~ 1)),
+    list()
+  )
+})
+
+test_that("data_check_finding rejects an unrecognized severity", {
+  expect_error(data_check_finding("warnings", "text"), "should be one of")
+  expect_equal(data_check_finding("note", "text")$severity, "note")
+})

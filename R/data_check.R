@@ -2,6 +2,13 @@
 # PRE-FIT DATA CHECK                                                     ####
 ############################################################################# !
 
+# one threshold keeps three decisions about a variable in agreement: whether
+# it is crossed as a design cell, whether the report lists its values instead
+# of a range, and whether a numeric predictor is called out as continuous.
+# Splitting them lets a predictor be crossed as a cell but displayed as a
+# range with no note, which reports a granularity the fit will not estimate.
+n_discrete_max <- 10
+
 #' @title Human-readable pre-fit data report for bmm models
 #' @description Inspect whether your data is coded the way a `bmmodel` expects
 #'   *before* committing to Stan compilation and sampling. The function runs
@@ -26,6 +33,11 @@
 #'
 #'   Problems are reported as findings rather than errors, so a single call
 #'   shows everything that needs fixing at once.
+#'
+#'   The report covers the data and the formula only. It stops after
+#'   [check_formula()] and takes no `prior` argument, so a malformed custom
+#'   prior or a problem with the initial values is out of its reach and will
+#'   only surface when you call [bmm()].
 #' @inheritParams bmm
 #' @param min_trials Numeric. Design cells with fewer observations are flagged
 #'   in the report. Defaults to 10. Ignored for models fit to aggregated data
@@ -106,8 +118,13 @@ bmm_data_check <- function(formula, data, model, min_trials = 10) {
   stopif(is_try_error(data), "Argument 'data' must be coercible to a data.frame.")
   stopif(!isTRUE(nrow(data) > 0L), "Argument 'data' does not contain observations.")
 
-  model <- check_model(model, data, formula)
+  # check_model() belongs inside the capture: it stops for ordinary mistakes,
+  # such as an m3() left at its default version = "custom" without links, and
+  # those are precisely the failures this report exists to surface. On failure
+  # `model` keeps the value the user supplied and the sections below degrade
+  # exactly as they already do for a check_data() failure.
   pipeline <- capture_check_conditions({
+    model <- check_model(model, data, formula)
     checked_data <- check_data(model, data, formula)
     check_formula(model, checked_data, formula)
   })
@@ -166,7 +183,7 @@ summarise_response_vars <- function(model, data) {
   do.call(rbind, info)
 }
 
-describe_data_column <- function(x, max_values = 6) {
+describe_data_column <- function(x, max_values = n_discrete_max) {
   if (is.null(x)) {
     return("not found in the data")
   }
@@ -245,31 +262,50 @@ summarise_design_cells <- function(data, formula) {
 
   vars <- c(group_vars, cell_vars)
   if (length(vars) == 0) {
-    return(nlist(group_vars, cell_vars, counts = NULL))
+    return(nlist(group_vars, cell_vars, counts = NULL, n_combos = NULL))
   }
 
   n_combos <- prod(vapply(vars, function(v) {
     length(unique(data[[v]]))
   }, numeric(1)))
-  if (n_combos > 1e5) {
-    return(nlist(group_vars, cell_vars, counts = NULL))
+  if (n_combos > max_design_cells) {
+    return(nlist(group_vars, cell_vars, counts = NULL, n_combos))
   }
 
   counts <- as.data.frame(
     table(data[, vars, drop = FALSE]),
     responseName = "n", stringsAsFactors = FALSE
   )
-  nlist(group_vars, cell_vars, counts)
+  nlist(group_vars, cell_vars, counts, n_combos)
 }
 
-is_discrete_var <- function(x, max_unique = 10) {
+# tabulating the full crossing allocates a cell per combination, so wide
+# designs are reported as skipped rather than tabulated
+max_design_cells <- 1e5
+
+is_discrete_var <- function(x, max_unique = n_discrete_max) {
   if (is.numeric(x)) {
     return(length(unique(x[!is.na(x)])) <= max_unique)
   }
   is.factor(x) || is.character(x) || is.logical(x)
 }
 
+#' @title Construct a single finding for a pre-fit data report
+#' @description Builds one finding in the shape [bmm_data_check()] expects.
+#'   Use it inside [data_check_findings()] methods rather than assembling the
+#'   list by hand, so that an unrecognized severity is caught where it is
+#'   written instead of being silently printed as a note.
+#' @param severity Either `"warning"` for a likely data coding mistake, or
+#'   `"note"` for something the user should merely be aware of. Warnings are
+#'   listed before notes and printed in red.
+#' @param message Character. The text shown in the report. It is re-wrapped
+#'   when printed, so do not hard-wrap it.
+#' @return A list with elements `severity` and `message`
+#' @seealso [data_check_findings()], [bmm_data_check()]
+#' @keywords internal developer
+#' @export
 data_check_finding <- function(severity, message) {
+  severity <- match.arg(severity, c("warning", "note"))
   nlist(severity, message = as.character(message))
 }
 
@@ -304,7 +340,7 @@ generic_data_findings <- function(predictors, cells, min_trials) {
     ))))
   }
   num_vars <- pred_rows$variable[pred_rows$class %in% c("numeric", "integer") &
-    pred_rows$n_unique <= 6]
+    pred_rows$n_unique <= n_discrete_max]
   if (length(num_vars) > 0) {
     findings <- c(findings, list(data_check_finding("note", glue(
       "Numeric predictor(s) {collapse_comma(num_vars)} have few unique values \\
@@ -369,12 +405,30 @@ format_cell_labels <- function(counts) {
 #'   Defining a method is entirely optional: the default method returns an
 #'   empty list, and [bmm_data_check()] produces its full generic report for
 #'   models without any method. Add one only when a model has a common data
-#'   mistake that the hard checks in [check_data()] deliberately tolerate.
+#'   mistake that the hard checks in [check_data()] deliberately tolerate - a
+#'   mistake [check_data()] already warns about needs no method, because
+#'   [bmm_data_check()] captures that warning and reports it under
+#'   "Hard checks".
 #' @param model A `bmmodel` object
 #' @param data The user supplied data.frame, before any transformations by
 #'   [check_data()]
 #' @param formula The user supplied `bmmformula`
-#' @return A list of findings (possibly empty)
+#' @return A list of findings (possibly empty), each built with
+#'   [data_check_finding()]
+#' @seealso [data_check_finding()], [bmm_data_check()]
+#' @examples
+#' # a method for a model whose check_data() tolerates unnormalized weights
+#' data_check_findings.my_model <- function(model, data, formula) {
+#'   weights <- data[[model$other_vars$weights]]
+#'   findings <- list()
+#'   if (!isTRUE(all.equal(sum(weights), 1))) {
+#'     findings <- list(data_check_finding(
+#'       "warning",
+#'       glue::glue("The weights sum to {sum(weights)} rather than 1.")
+#'     ))
+#'   }
+#'   c(findings, NextMethod())
+#' }
 #' @keywords internal developer
 #' @export
 data_check_findings <- function(model, data, formula) {
@@ -433,8 +487,10 @@ circular_range_findings <- function(data, vars, label) {
   if (max_abs > 2 * pi) {
     return(list(data_check_finding("warning", glue(
       "The {label} variable(s) {collapse_comma(vars)} contain values up to \\
-      {round(max_abs, 1)} - almost certainly degrees. The model requires \\
-      radians in [-pi, pi]; convert with deg2rad() and wrap()."
+      {signif(max_abs, 3)} - almost certainly degrees. The model requires \\
+      radians in [-pi, pi]; convert with deg2rad() and wrap(). check_data() \\
+      applies the same threshold, so this is one problem, not two: it is \\
+      also reported under 'Hard checks'."
     ))))
   }
   if (max_abs > pi) {
@@ -518,7 +574,7 @@ print_response_section <- function(response) {
     } else {
       glue(" (expected: {response$expected[i]})")
     }
-    cat("  ", labels[i], "  ", response$summary[i], expected, "\n", sep = "")
+    cat_wrapped(paste0(response$summary[i], expected), paste0("  ", labels[i], "  "))
   }
   cat("\n")
 }
@@ -530,7 +586,10 @@ print_predictor_section <- function(predictors) {
   cat(style("green")("Data columns used by each parameter formula:\n"))
   pars <- format(names(predictors$pred_map))
   for (i in seq_along(predictors$pred_map)) {
-    cat("  ", pars[i], "  ", paste(predictors$pred_map[[i]], collapse = ", "), "\n", sep = "")
+    cat_wrapped(
+      paste(predictors$pred_map[[i]], collapse = ", "),
+      paste0("  ", pars[i], "  ")
+    )
   }
   coding <- predictors$coding
   if (nrow(coding) > 0) {
@@ -538,7 +597,7 @@ print_predictor_section <- function(predictors) {
     labels <- format(coding$variable)
     roles <- format(paste0("[", coding$role, "]"))
     for (i in seq_len(nrow(coding))) {
-      cat("  ", labels[i], "  ", roles[i], " ", coding$summary[i], "\n", sep = "")
+      cat_wrapped(coding$summary[i], paste0("  ", labels[i], "  ", roles[i], " "))
     }
   }
   cat("\n")
@@ -546,6 +605,17 @@ print_predictor_section <- function(predictors) {
 
 print_cells_section <- function(cells) {
   if (is.null(cells$counts)) {
+    if (is.null(cells$n_combos)) {
+      return(invisible())
+    }
+    cat(style("green")("Observations per design cell:\n"))
+    cat_wrapped(glue(
+      "not tabulated - crossing \\
+      {collapse_comma(c(cells$group_vars, cells$cell_vars))} would give \\
+      {signif(cells$n_combos, 3)} cells, above the limit of \\
+      {format(max_design_cells, big.mark = ',', scientific = FALSE)}."
+    ), "  - ")
+    cat("\n")
     return(invisible())
   }
   observed <- cells$counts$n[cells$counts$n > 0]
