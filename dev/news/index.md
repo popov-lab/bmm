@@ -81,19 +81,6 @@
   methods, building each finding with the new
   [`data_check_finding()`](https://venpopov.com/bmm/dev/reference/data_check_finding.md)
   constructor ([\#389](https://github.com/popov-lab/bmm/issues/389)).
-- Random-effects standard deviations now get domain-informed default
-  priors instead of the `student_t(3, 0, 2.5)` default of `brms`, which
-  on a log link lets individual parameters vary by a factor of 12 around
-  the group value. Every model parameter declares an `sd` entry in its
-  `default_priors` (next to `main` and `effects`), applied as a blanket
-  `class = "sd"` prior whenever the parameter has random effects. The
-  priors are `exponential()` on the link scale: rate 1 for
-  memory-strength, mixing-weight and identity-linked drift parameters,
-  rate 2 for boundary, non-decision time, start point, contaminant and
-  log-linked drift parameters, rate 4 for the circular bias `mu`/`mu1`.
-  Override by addressing the parameter with `dpar` or `nlpar`,
-  e.g. `set_prior("exponential(2)", class = "sd", nlpar = "kappa")`
-  ([\#342](https://github.com/popov-lab/bmm/issues/342)).
 
 #### Bug fixes
 
@@ -138,12 +125,11 @@
   writes the file itself, after the postprocessing, as
   [`bmm()`](https://venpopov.com/bmm/dev/reference/bmm.md) does
   ([\#411](https://github.com/popov-lab/bmm/issues/411)).
-- Fix `options(bmm.default_priors = FALSE)` making
-  [`bmm()`](https://venpopov.com/bmm/dev/reference/bmm.md) fail for
-  every model instead of fitting with flat priors. `set_default_prior()`
-  returned `NULL`, which `combine_prior()` indexed unconditionally
-  (`second argument must be a list`); `set_default_prior()` now returns
-  an empty prior, and `combine_prior()` passes a `NULL` argument through
+- Fix `combine_prior()` erroring with `second argument must be a list`
+  when its first argument is `NULL`. `set_default_prior()` returns
+  `NULL` when `options(bmm.default_priors = FALSE)` is set, so that
+  option made [`bmm()`](https://venpopov.com/bmm/dev/reference/bmm.md)
+  fail for every model instead of fitting with flat priors
   ([\#391](https://github.com/popov-lab/bmm/issues/391)).
 - [`update()`](https://rdrr.io/r/stats/update.html) now configures the
   likelihood for the threading spec that will actually be used.
@@ -173,20 +159,6 @@
   Stan estimated `kappa` freely, and `update(fit, bmf(..., mu = 0.5))`
   one that reported `mu = 0.5` while Stan kept `mu` at the original
   value — all three with no error or warning.
-- The mixing weights `thetat` (**mixture2p**) and `thetat`/`thetant`
-  (**mixture3p**) had no `effects` prior, so any regression coefficient
-  on them was flat. They now get `normal(0, 0.5)` on the logit/softmax
-  scale ([\#305](https://github.com/popov-lab/bmm/issues/305)).
-- The circular bias parameters `mu` (**sdm**) and `mu1` (**mixture2p**,
-  **mixture3p**, **imm**) had a `student_t(1, 0, 1)` intercept prior,
-  uniform over the circle under the `tan_half` link, and no `effects`
-  prior, which gave non-reference levels a bimodal prior on the native
-  scale. They now get `normal(0, 0.5)` on the intercept (95% of the
-  prior bias within 89 degrees of the target), `normal(0, 0.25)` on
-  effects (a condition difference with SD 24 degrees) and
-  `exponential(4)` on random-effects SDs. `mu`/`mu1` stay fixed at 0 by
-  default, so this only affects models that free them
-  ([\#306](https://github.com/popov-lab/bmm/issues/306)).
 
 ## bmm 1.3.2
 

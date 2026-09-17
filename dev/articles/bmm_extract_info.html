@@ -187,68 +187,24 @@ parameter in all models, so it hides it in the output. If you wanted to estimate
 <span>              data <span class="op">=</span> <span class="va">oberauer_lin_2017</span>,</span>
 <span>              model <span class="op">=</span> <span class="fu"><a href="../reference/sdm.html">sdm</a></span><span class="op">(</span>resp_error <span class="op">=</span> <span class="st">'dev_rad'</span><span class="op">)</span><span class="op">)</span></span>
 <span><span class="co">#&gt;                     prior     class      coef group resp  dpar nlpar   lb   ub tag       source</span></span>
-<span><span class="co">#&gt;           normal(0, 0.25)         b set_size2                        &lt;NA&gt; &lt;NA&gt;     (vectorized)</span></span>
-<span><span class="co">#&gt;           normal(0, 0.25)         b set_size3                        &lt;NA&gt; &lt;NA&gt;     (vectorized)</span></span>
-<span><span class="co">#&gt;           normal(0, 0.25)         b set_size4                        &lt;NA&gt; &lt;NA&gt;     (vectorized)</span></span>
-<span><span class="co">#&gt;           normal(0, 0.25)         b set_size5                        &lt;NA&gt; &lt;NA&gt;     (vectorized)</span></span>
-<span><span class="co">#&gt;           normal(0, 0.25)         b set_size6                        &lt;NA&gt; &lt;NA&gt;     (vectorized)</span></span>
-<span><span class="co">#&gt;           normal(0, 0.25)         b set_size7                        &lt;NA&gt; &lt;NA&gt;     (vectorized)</span></span>
-<span><span class="co">#&gt;           normal(0, 0.25)         b set_size8                        &lt;NA&gt; &lt;NA&gt;     (vectorized)</span></span>
-<span><span class="co">#&gt;           normal(0, 0.25)         b                                  &lt;NA&gt; &lt;NA&gt;             user</span></span>
-<span><span class="co">#&gt;            normal(0, 0.5) Intercept                                  &lt;NA&gt; &lt;NA&gt;             user</span></span>
+<span><span class="co">#&gt;                    (flat)         b                                                     default</span></span>
+<span><span class="co">#&gt;                    (flat)         b set_size2                                      (vectorized)</span></span>
+<span><span class="co">#&gt;                    (flat)         b set_size3                                      (vectorized)</span></span>
+<span><span class="co">#&gt;                    (flat)         b set_size4                                      (vectorized)</span></span>
+<span><span class="co">#&gt;                    (flat)         b set_size5                                      (vectorized)</span></span>
+<span><span class="co">#&gt;                    (flat)         b set_size6                                      (vectorized)</span></span>
+<span><span class="co">#&gt;                    (flat)         b set_size7                                      (vectorized)</span></span>
+<span><span class="co">#&gt;                    (flat)         b set_size8                                      (vectorized)</span></span>
+<span><span class="co">#&gt;        student_t(1, 0, 1) Intercept                                  &lt;NA&gt; &lt;NA&gt;             user</span></span>
 <span><span class="co">#&gt;     student_t(5, 2, 0.75) Intercept                          c       &lt;NA&gt; &lt;NA&gt;             user</span></span>
 <span><span class="co">#&gt;  student_t(5, 1.75, 0.75) Intercept                      kappa       &lt;NA&gt; &lt;NA&gt;             user</span></span></code></pre></div>
-<p>The <code>mu</code> parameter uses a <code>tan_half</code> link function, so its priors live on the
-scale of <code>tan(mu / 2)</code>. The <code>normal(0, 0.5)</code> intercept prior places 95% of the
-prior mass within 89 degrees of the target and regularizes the bias toward zero,
-and the <code>normal(0, 0.25)</code> prior on the regression coefficients corresponds to a
-difference between two conditions with a standard deviation of 24 degrees on the
-native scale.</p>
-<p>Random effects get default priors too. <code>brms</code> puts a <code>student_t(3, 0, 2.5)</code>
-prior on every random-effects standard deviation, which on a log scale lets
-individual parameters vary by a factor of <code>exp(2.5) = 12</code> around the group value.
-<code>bmm</code> instead sets an exponential prior on the standard deviation of each
-parameter, with a rate chosen for the parameter’s link scale:</p>
-<div class="sourceCode" id="cb6"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="fu"><a href="../reference/default_prior.bmmformula.html">default_prior</a></span><span class="op">(</span><span class="fu"><a href="../reference/bmmformula.html">bmf</a></span><span class="op">(</span><span class="va">c</span> <span class="op">~</span> <span class="fl">1</span> <span class="op">+</span> <span class="va">set_size</span> <span class="op">+</span> <span class="op">(</span><span class="fl">1</span> <span class="op">+</span> <span class="va">set_size</span> <span class="op">|</span> <span class="va">ID</span><span class="op">)</span>, <span class="va">kappa</span> <span class="op">~</span> <span class="fl">1</span> <span class="op">+</span> <span class="op">(</span><span class="fl">1</span> <span class="op">|</span> <span class="va">ID</span><span class="op">)</span><span class="op">)</span>,</span>
-<span>              data <span class="op">=</span> <span class="va">oberauer_lin_2017</span>,</span>
-<span>              model <span class="op">=</span> <span class="fu"><a href="../reference/sdm.html">sdm</a></span><span class="op">(</span>resp_error <span class="op">=</span> <span class="st">'dev_rad'</span><span class="op">)</span><span class="op">)</span></span>
-<span><span class="co">#&gt;                     prior     class      coef group resp  dpar nlpar   lb   ub tag       source</span></span>
-<span><span class="co">#&gt;                    lkj(1)       cor                                                     default</span></span>
-<span><span class="co">#&gt;                    lkj(1)       cor              ID                                (vectorized)</span></span>
-<span><span class="co">#&gt;              normal(0, 1)         b set_size2                c       &lt;NA&gt; &lt;NA&gt;     (vectorized)</span></span>
-<span><span class="co">#&gt;              normal(0, 1)         b set_size3                c       &lt;NA&gt; &lt;NA&gt;     (vectorized)</span></span>
-<span><span class="co">#&gt;              normal(0, 1)         b set_size4                c       &lt;NA&gt; &lt;NA&gt;     (vectorized)</span></span>
-<span><span class="co">#&gt;              normal(0, 1)         b set_size5                c       &lt;NA&gt; &lt;NA&gt;     (vectorized)</span></span>
-<span><span class="co">#&gt;              normal(0, 1)         b set_size6                c       &lt;NA&gt; &lt;NA&gt;     (vectorized)</span></span>
-<span><span class="co">#&gt;              normal(0, 1)         b set_size7                c       &lt;NA&gt; &lt;NA&gt;     (vectorized)</span></span>
-<span><span class="co">#&gt;              normal(0, 1)         b set_size8                c       &lt;NA&gt; &lt;NA&gt;     (vectorized)</span></span>
-<span><span class="co">#&gt;            exponential(1)        sd              ID          c       &lt;NA&gt; &lt;NA&gt;     (vectorized)</span></span>
-<span><span class="co">#&gt;            exponential(1)        sd Intercept    ID          c       &lt;NA&gt; &lt;NA&gt;     (vectorized)</span></span>
-<span><span class="co">#&gt;            exponential(1)        sd set_size2    ID          c       &lt;NA&gt; &lt;NA&gt;     (vectorized)</span></span>
-<span><span class="co">#&gt;            exponential(1)        sd set_size3    ID          c       &lt;NA&gt; &lt;NA&gt;     (vectorized)</span></span>
-<span><span class="co">#&gt;            exponential(1)        sd set_size4    ID          c       &lt;NA&gt; &lt;NA&gt;     (vectorized)</span></span>
-<span><span class="co">#&gt;            exponential(1)        sd set_size5    ID          c       &lt;NA&gt; &lt;NA&gt;     (vectorized)</span></span>
-<span><span class="co">#&gt;            exponential(1)        sd set_size6    ID          c       &lt;NA&gt; &lt;NA&gt;     (vectorized)</span></span>
-<span><span class="co">#&gt;            exponential(1)        sd set_size7    ID          c       &lt;NA&gt; &lt;NA&gt;     (vectorized)</span></span>
-<span><span class="co">#&gt;            exponential(1)        sd set_size8    ID          c       &lt;NA&gt; &lt;NA&gt;     (vectorized)</span></span>
-<span><span class="co">#&gt;            exponential(1)        sd              ID      kappa       &lt;NA&gt; &lt;NA&gt;     (vectorized)</span></span>
-<span><span class="co">#&gt;            exponential(1)        sd Intercept    ID      kappa       &lt;NA&gt; &lt;NA&gt;     (vectorized)</span></span>
-<span><span class="co">#&gt;            exponential(1)        sd                          c       &lt;NA&gt; &lt;NA&gt;             user</span></span>
-<span><span class="co">#&gt;              normal(0, 1)         b                          c       &lt;NA&gt; &lt;NA&gt;             user</span></span>
-<span><span class="co">#&gt;     student_t(5, 2, 0.75) Intercept                          c       &lt;NA&gt; &lt;NA&gt;             user</span></span>
-<span><span class="co">#&gt;            exponential(1)        sd                      kappa       &lt;NA&gt; &lt;NA&gt;             user</span></span>
-<span><span class="co">#&gt;  student_t(5, 1.75, 0.75) Intercept                      kappa       &lt;NA&gt; &lt;NA&gt;             user</span></span>
-<span><span class="co">#&gt;               constant(0) Intercept                                  &lt;NA&gt; &lt;NA&gt;             user</span></span></code></pre></div>
-<p>The <code>exponential(1)</code> prior on the standard deviation of <code>c</code> and <code>kappa</code> has a
-median of 0.69 on the log scale, so a typical participant lies within a factor of
-2 of the group value, while its 95% quantile of 3 still admits large individual
-differences. The prior applies to all standard deviations of a parameter, for
-random intercepts and random slopes alike and for every grouping factor. To
-override it, address the standard deviation of the parameter with <code>dpar</code> (for
-example <code>mu</code>, <code>c</code> and <code>kappa</code> in the SDM) or <code>nlpar</code> (for example <code>kappa</code> and
-<code>thetat</code> in the mixture models), as in
-<code>set_prior("exponential(2)", class = "sd", dpar = "kappa")</code>.</p>
+<p>The <code>mu</code> parameter uses a <code>tan_half</code> link function, which means that the
+<code>student_t(1, 0, 1)</code> prior results in a uniform prior over the native scale of
+<code>mu</code> from -pi to pi. You will also notice above that for the regression
+coefficients on <code>mu</code>, the default prior is an improper flat prior - this is the
+only parameter in <code>bmm</code> models which has a flat prior by default, and we
+strongly recommend you set a prior on it, if you want to calculate Bayes Factors
+or use other Bayesian inference methods.</p>
 <p>All of the above examples make an important point - priors are always specified
 on the scale at which the parameters are sampled. You can always check the
 documentation for a given model to see the links for the parameters (e.g.
@@ -265,7 +221,7 @@ function from <code>brms</code>. For more information, see <code><a href="https:
 generates the code for the regression syntax, priors and everything else. If you
 want to get the Stan code that would be used for fitting a model, so that you
 can inspect it or modify it, you can use the <code><a href="../reference/stancode.bmmformula.html">stancode()</a></code> function from <code>brms</code>:</p>
-<div class="sourceCode" id="cb7"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb6"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="../reference/stancode.bmmformula.html">stancode</a></span><span class="op">(</span><span class="fu"><a href="../reference/bmmformula.html">bmf</a></span><span class="op">(</span><span class="va">c</span> <span class="op">~</span> <span class="fl">0</span> <span class="op">+</span> <span class="va">set_size</span>, <span class="va">kappa</span> <span class="op">~</span> <span class="fl">0</span> <span class="op">+</span> <span class="va">set_size</span><span class="op">)</span>, </span>
 <span>         data <span class="op">=</span> <span class="va">oberauer_lin_2017</span>,</span>
 <span>         model <span class="op">=</span> <span class="fu"><a href="../reference/sdm.html">sdm</a></span><span class="op">(</span>resp_error <span class="op">=</span> <span class="st">'dev_rad'</span><span class="op">)</span><span class="op">)</span></span></code></pre></div>
@@ -465,7 +421,7 @@ generated quantities {
 }</code></pre>
 <p>Alternatively, if you already have a fitted model object, you can just call
 <code><a href="../reference/stancode.bmmformula.html">stancode()</a></code> on that object, which will give you the same result:</p>
-<div class="sourceCode" id="cb9"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb8"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">fit</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/bmm.html">bmm</a></span><span class="op">(</span><span class="fu"><a href="../reference/bmmformula.html">bmf</a></span><span class="op">(</span><span class="va">c</span> <span class="op">~</span> <span class="fl">0</span> <span class="op">+</span> <span class="va">set_size</span>, <span class="va">kappa</span> <span class="op">~</span> <span class="fl">0</span> <span class="op">+</span> <span class="va">set_size</span><span class="op">)</span>, </span>
 <span>              data <span class="op">=</span> <span class="va">oberauer_lin_2017</span>,</span>
 <span>              model <span class="op">=</span> <span class="fu"><a href="../reference/sdm.html">sdm</a></span><span class="op">(</span>resp_error <span class="op">=</span> <span class="st">'dev_rad'</span><span class="op">)</span><span class="op">)</span></span>
@@ -478,7 +434,7 @@ generated quantities {
 <p>If you want to extract the data that would be used for fitting a model, you can
 use the <code><a href="../reference/standata.bmmformula.html">standata()</a></code> function from <code>brms</code>. This function will return a list with
 the data that would be passed to Stan for fitting the model.</p>
-<div class="sourceCode" id="cb10"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb9"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">sd</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/standata.bmmformula.html">standata</a></span><span class="op">(</span><span class="fu"><a href="../reference/bmmformula.html">bmf</a></span><span class="op">(</span><span class="va">c</span> <span class="op">~</span> <span class="fl">0</span> <span class="op">+</span> <span class="va">set_size</span>, <span class="va">kappa</span> <span class="op">~</span> <span class="fl">0</span> <span class="op">+</span> <span class="va">set_size</span><span class="op">)</span>, </span>
 <span>               data <span class="op">=</span> <span class="va">oberauer_lin_2017</span>,</span>
 <span>               model <span class="op">=</span> <span class="fu"><a href="../reference/sdm.html">sdm</a></span><span class="op">(</span>resp_error <span class="op">=</span> <span class="st">'dev_rad'</span><span class="op">)</span><span class="op">)</span></span>

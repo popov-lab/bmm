@@ -130,11 +130,7 @@ An object of class `bmmodel`
 
   - `mu1`:
 
-    - `main`: normal(0, 0.5)
-
-    - `effects`: normal(0, 0.25)
-
-    - `sd`: exponential(4)
+    - `main`: student_t(1, 0, 1)
 
   - `kappa`:
 
@@ -142,15 +138,11 @@ An object of class `bmmodel`
 
     - `effects`: normal(0, 1)
 
-    - `sd`: exponential(1)
-
   - `a`:
 
     - `main`: normal(0, 1)
 
     - `effects`: normal(0, 1)
-
-    - `sd`: exponential(1)
 
   - `c`:
 
@@ -158,15 +150,11 @@ An object of class `bmmodel`
 
     - `effects`: normal(0, 1)
 
-    - `sd`: exponential(1)
-
   - `s`:
 
     - `main`: normal(0, 1)
 
     - `effects`: normal(0, 1)
-
-    - `sd`: exponential(1)
 
 ### Version: `bsc`
 
@@ -209,11 +197,7 @@ An object of class `bmmodel`
 
   - `mu1`:
 
-    - `main`: normal(0, 0.5)
-
-    - `effects`: normal(0, 0.25)
-
-    - `sd`: exponential(4)
+    - `main`: student_t(1, 0, 1)
 
   - `kappa`:
 
@@ -221,23 +205,17 @@ An object of class `bmmodel`
 
     - `effects`: normal(0, 1)
 
-    - `sd`: exponential(1)
-
   - `c`:
 
     - `main`: normal(0, 1)
 
     - `effects`: normal(0, 1)
 
-    - `sd`: exponential(1)
-
   - `s`:
 
     - `main`: normal(0, 1)
 
     - `effects`: normal(0, 1)
-
-    - `sd`: exponential(1)
 
 ### Version: `abc`
 
@@ -280,11 +258,7 @@ An object of class `bmmodel`
 
   - `mu1`:
 
-    - `main`: normal(0, 0.5)
-
-    - `effects`: normal(0, 0.25)
-
-    - `sd`: exponential(4)
+    - `main`: student_t(1, 0, 1)
 
   - `kappa`:
 
@@ -292,23 +266,17 @@ An object of class `bmmodel`
 
     - `effects`: normal(0, 1)
 
-    - `sd`: exponential(1)
-
   - `a`:
 
     - `main`: normal(0, 1)
 
     - `effects`: normal(0, 1)
 
-    - `sd`: exponential(1)
-
   - `c`:
 
     - `main`: normal(0, 1)
 
     - `effects`: normal(0, 1)
-
-    - `sd`: exponential(1)
 
 Additionally, all imm models have an internal parameter that is fixed to
 0 to allow the model to be identifiable. This parameter is not estimated

@@ -135,77 +135,27 @@ default_prior(bmf(mu ~ 1 + set_size, c ~ 1, kappa ~ 1),
               data = oberauer_lin_2017,
               model = sdm(resp_error = 'dev_rad'))
 #>                     prior     class      coef group resp  dpar nlpar   lb   ub tag       source
-#>           normal(0, 0.25)         b set_size2                        <NA> <NA>     (vectorized)
-#>           normal(0, 0.25)         b set_size3                        <NA> <NA>     (vectorized)
-#>           normal(0, 0.25)         b set_size4                        <NA> <NA>     (vectorized)
-#>           normal(0, 0.25)         b set_size5                        <NA> <NA>     (vectorized)
-#>           normal(0, 0.25)         b set_size6                        <NA> <NA>     (vectorized)
-#>           normal(0, 0.25)         b set_size7                        <NA> <NA>     (vectorized)
-#>           normal(0, 0.25)         b set_size8                        <NA> <NA>     (vectorized)
-#>           normal(0, 0.25)         b                                  <NA> <NA>             user
-#>            normal(0, 0.5) Intercept                                  <NA> <NA>             user
+#>                    (flat)         b                                                     default
+#>                    (flat)         b set_size2                                      (vectorized)
+#>                    (flat)         b set_size3                                      (vectorized)
+#>                    (flat)         b set_size4                                      (vectorized)
+#>                    (flat)         b set_size5                                      (vectorized)
+#>                    (flat)         b set_size6                                      (vectorized)
+#>                    (flat)         b set_size7                                      (vectorized)
+#>                    (flat)         b set_size8                                      (vectorized)
+#>        student_t(1, 0, 1) Intercept                                  <NA> <NA>             user
 #>     student_t(5, 2, 0.75) Intercept                          c       <NA> <NA>             user
 #>  student_t(5, 1.75, 0.75) Intercept                      kappa       <NA> <NA>             user
 ```
 
-The `mu` parameter uses a `tan_half` link function, so its priors live
-on the scale of `tan(mu / 2)`. The `normal(0, 0.5)` intercept prior
-places 95% of the prior mass within 89 degrees of the target and
-regularizes the bias toward zero, and the `normal(0, 0.25)` prior on the
-regression coefficients corresponds to a difference between two
-conditions with a standard deviation of 24 degrees on the native scale.
-
-Random effects get default priors too. `brms` puts a
-`student_t(3, 0, 2.5)` prior on every random-effects standard deviation,
-which on a log scale lets individual parameters vary by a factor of
-`exp(2.5) = 12` around the group value. `bmm` instead sets an
-exponential prior on the standard deviation of each parameter, with a
-rate chosen for the parameter’s link scale:
-
-``` r
-
-default_prior(bmf(c ~ 1 + set_size + (1 + set_size | ID), kappa ~ 1 + (1 | ID)),
-              data = oberauer_lin_2017,
-              model = sdm(resp_error = 'dev_rad'))
-#>                     prior     class      coef group resp  dpar nlpar   lb   ub tag       source
-#>                    lkj(1)       cor                                                     default
-#>                    lkj(1)       cor              ID                                (vectorized)
-#>              normal(0, 1)         b set_size2                c       <NA> <NA>     (vectorized)
-#>              normal(0, 1)         b set_size3                c       <NA> <NA>     (vectorized)
-#>              normal(0, 1)         b set_size4                c       <NA> <NA>     (vectorized)
-#>              normal(0, 1)         b set_size5                c       <NA> <NA>     (vectorized)
-#>              normal(0, 1)         b set_size6                c       <NA> <NA>     (vectorized)
-#>              normal(0, 1)         b set_size7                c       <NA> <NA>     (vectorized)
-#>              normal(0, 1)         b set_size8                c       <NA> <NA>     (vectorized)
-#>            exponential(1)        sd              ID          c       <NA> <NA>     (vectorized)
-#>            exponential(1)        sd Intercept    ID          c       <NA> <NA>     (vectorized)
-#>            exponential(1)        sd set_size2    ID          c       <NA> <NA>     (vectorized)
-#>            exponential(1)        sd set_size3    ID          c       <NA> <NA>     (vectorized)
-#>            exponential(1)        sd set_size4    ID          c       <NA> <NA>     (vectorized)
-#>            exponential(1)        sd set_size5    ID          c       <NA> <NA>     (vectorized)
-#>            exponential(1)        sd set_size6    ID          c       <NA> <NA>     (vectorized)
-#>            exponential(1)        sd set_size7    ID          c       <NA> <NA>     (vectorized)
-#>            exponential(1)        sd set_size8    ID          c       <NA> <NA>     (vectorized)
-#>            exponential(1)        sd              ID      kappa       <NA> <NA>     (vectorized)
-#>            exponential(1)        sd Intercept    ID      kappa       <NA> <NA>     (vectorized)
-#>            exponential(1)        sd                          c       <NA> <NA>             user
-#>              normal(0, 1)         b                          c       <NA> <NA>             user
-#>     student_t(5, 2, 0.75) Intercept                          c       <NA> <NA>             user
-#>            exponential(1)        sd                      kappa       <NA> <NA>             user
-#>  student_t(5, 1.75, 0.75) Intercept                      kappa       <NA> <NA>             user
-#>               constant(0) Intercept                                  <NA> <NA>             user
-```
-
-The `exponential(1)` prior on the standard deviation of `c` and `kappa`
-has a median of 0.69 on the log scale, so a typical participant lies
-within a factor of 2 of the group value, while its 95% quantile of 3
-still admits large individual differences. The prior applies to all
-standard deviations of a parameter, for random intercepts and random
-slopes alike and for every grouping factor. To override it, address the
-standard deviation of the parameter with `dpar` (for example `mu`, `c`
-and `kappa` in the SDM) or `nlpar` (for example `kappa` and `thetat` in
-the mixture models), as in
-`set_prior("exponential(2)", class = "sd", dpar = "kappa")`.
+The `mu` parameter uses a `tan_half` link function, which means that the
+`student_t(1, 0, 1)` prior results in a uniform prior over the native
+scale of `mu` from -pi to pi. You will also notice above that for the
+regression coefficients on `mu`, the default prior is an improper flat
+prior - this is the only parameter in `bmm` models which has a flat
+prior by default, and we strongly recommend you set a prior on it, if
+you want to calculate Bayes Factors or use other Bayesian inference
+methods.
 
 All of the above examples make an important point - priors are always
 specified on the scale at which the parameters are sampled. You can

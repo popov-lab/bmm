@@ -94,17 +94,13 @@ and how to use it. * <strong>Domain:</strong> Visual working memory</p><ul><li><
 </ul></li>
 <li><p><strong>Default parameter links:</strong></p><ul><li><p>mu = tan_half; c = log; kappa = log</p></li>
 </ul></li>
-<li><p><strong>Default priors:</strong></p><ul><li><p><code>mu</code>:</p><ul><li><p><code>main</code>: normal(0, 0.5)</p></li>
-<li><p><code>effects</code>: normal(0, 0.25)</p></li>
-<li><p><code>sd</code>: exponential(4)</p></li>
+<li><p><strong>Default priors:</strong></p><ul><li><p><code>mu</code>:</p><ul><li><p><code>main</code>: student_t(1, 0, 1)</p></li>
 </ul></li>
 <li><p><code>kappa</code>:</p><ul><li><p><code>main</code>: student_t(5, 1.75, 0.75)</p></li>
 <li><p><code>effects</code>: normal(0, 1)</p></li>
-<li><p><code>sd</code>: exponential(1)</p></li>
 </ul></li>
 <li><p><code>c</code>:</p><ul><li><p><code>main</code>: student_t(5, 2, 0.75)</p></li>
 <li><p><code>effects</code>: normal(0, 1)</p></li>
-<li><p><code>sd</code>: exponential(1)</p></li>
 </ul></li>
 </ul></li>
 </ul></div>
