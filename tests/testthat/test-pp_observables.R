@@ -116,32 +116,61 @@ test_that("pp_simulate.ezdm_4par() emits NA where a boundary has < 2 responses",
   expect_identical(is.na(sims$mean_rt_lower), (3L - sims$n_upper) < 2)
 })
 
-test_that(".pp_build_ppc_plot() drops NA cells jointly with a warning", {
-  model <- ezdm(mean_rt = c("mu", "ml"), var_rt = c("vu", "vl"), n_upper = "nu",
-                n_trials = "nt", version = "4par")
-  spec <- pp_observables(model)
-  prep <- fake_prep(4L, 6L, dpars = list(
-    drift = rep(1, 24), bound = rep(1, 24), ndt = rep(0.3, 24), zr = 0.5, s = 1
-  ), data = list(Y = rep(0.5, 6), vreal1 = rep(0.5, 6), vreal2 = rep(0.02, 6),
-                 vreal3 = rep(0.02, 6), vint1 = rep(10L, 6), vint2 = rep(20L, 6)))
-  observed <- lapply(spec$observed, function(slot) prep$data[[slot]])
-  yrep_inputs <- lapply(observed, .pp_expand_data, ndraws = prep$ndraws)
-  sims <- pp_simulate(model, prep)
-  sims$mean_rt_upper[1L, 2L] <- NA_real_
-  yrep_inputs[names(spec$observed)] <- sims[names(spec$observed)]
-  expect_warning(
-    p <- .pp_build_ppc_plot(spec$checks$mean_rt_upper, observed, yrep_inputs,
-                            type = NULL, group_vec = NULL, plot_dots = list()),
-    "Dropped 1 of 6"
-  )
-  expect_s3_class(p, "ggplot")
+two_checks <- list(
+  a = .pp_observable(function(d) d$a, label = "A"),
+  b = .pp_observable(function(d) d$b, label = "B")
+)
 
-  yrep_inputs$mean_rt_upper[1L, ] <- NA_real_
-  expect_error(
-    .pp_build_ppc_plot(spec$checks$mean_rt_upper, observed, yrep_inputs,
-                       type = NULL, group_vec = NULL, plot_dots = list()),
-    "All observations"
-  )
+test_that(".pp_reduce_na() drops observations whose observed value is NA", {
+  observed <- list(a = c(1, 2, NA, 4), b = c(1, 2, 3, 4))
+  yrep <- list(a = .pp_expand_data(observed$a, 3L),
+               b = .pp_expand_data(observed$b, 3L))
+  expect_warning(out <- .pp_reduce_na(two_checks["a"], observed, yrep),
+                 "Dropped 1 of 4 observations")
+  expect_identical(out$keep, c(TRUE, TRUE, FALSE, TRUE))
+  expect_identical(out$values$a$y, c(1, 2, 4))
+  expect_identical(dim(out$values$a$yrep), c(3L, 3L))
+})
+
+# the defect this replaces: reducing observations for an NA in any draw made
+# the retained count decay as (1 - p)^ndraws
+test_that(".pp_reduce_na() drops draws, not observations, for NA replicates", {
+  observed <- list(a = c(1, 2, 3, 4), b = c(1, 2, 3, 4))
+  yrep <- list(a = .pp_expand_data(observed$a, 3L),
+               b = .pp_expand_data(observed$b, 3L))
+  yrep$a[2L, 2L] <- NA_real_
+  expect_warning(out <- .pp_reduce_na(two_checks["a"], observed, yrep),
+                 "Dropped 1 of 3 posterior draws")
+  expect_true(all(out$keep))
+  expect_identical(out$values$a$y, observed$a)
+  expect_identical(dim(out$values$a$yrep), c(2L, 4L))
+})
+
+test_that(".pp_reduce_na() shares one reduction across all checks", {
+  observed <- list(a = c(NA, 2, 3, 4), b = c(1, 2, NA, 4))
+  yrep <- list(a = .pp_expand_data(observed$a, 3L),
+               b = .pp_expand_data(observed$b, 3L))
+  yrep$a[1L, 2L] <- NA_real_
+  out <- suppressWarnings(.pp_reduce_na(two_checks, observed, yrep))
+  expect_identical(out$keep, c(FALSE, TRUE, FALSE, TRUE))
+  expect_identical(out$values$a$y, c(2, 4))
+  expect_identical(out$values$b$y, c(2, 4))
+  expect_identical(dim(out$values$a$yrep), dim(out$values$b$yrep))
+  expect_identical(dim(out$values$b$yrep), c(2L, 2L))
+})
+
+test_that(".pp_reduce_na() errors when nothing is left on either dimension", {
+  observed <- list(a = rep(NA_real_, 3), b = c(1, 2, 3))
+  yrep <- list(a = .pp_expand_data(observed$a, 2L),
+               b = .pp_expand_data(observed$b, 2L))
+  expect_error(.pp_reduce_na(two_checks["a"], observed, yrep),
+               "All observations")
+
+  observed$a <- c(1, 2, 3)
+  yrep$a <- .pp_expand_data(observed$a, 2L)
+  yrep$a[, 1L] <- NA_real_
+  expect_error(suppressWarnings(.pp_reduce_na(two_checks["a"], observed, yrep)),
+               "Every posterior draw")
 })
 
 test_that("pp_check_vars() lists the declared checks", {
@@ -179,3 +208,22 @@ test_that("pp_check() rejects negative_rt combined with another resp_var", {
   expect_error(pp_check(fit, resp_var = "rt", negative_rt = TRUE),
                "cannot be combined")
 })
+test_that(".pp_resolve_type() resolves the check's default and validates it", {
+  check <- .pp_observable(function(d) d$x, label = "X", type = "bars")
+  expect_identical(.pp_resolve_type(NULL, check, NULL), "bars")
+  expect_identical(.pp_resolve_type(NULL, check, "cond"), "bars_grouped")
+  expect_identical(.pp_resolve_type("hist", check, NULL), "hist")
+  expect_error(.pp_resolve_type("no_such_type", check, NULL), "not a supported")
+  expect_error(.pp_resolve_type("loo_pit", check, NULL), "not a supported")
+  expect_warning(resolved <- .pp_resolve_type("hist", NULL, NULL), "ignored")
+  expect_null(resolved)
+})
+
+# the fake fit carries no draws, so prepare_predictions() would fail: reaching
+# the type error proves 'type' is validated before anything is simulated
+test_that("pp_check() rejects an unknown type before simulating", {
+  fit <- fake_bmmfit(ddm(rt = "rt", response = "resp"))
+  expect_error(pp_check(fit, resp_var = "rt", type = "no_such_type"),
+               "not a supported")
+})
+

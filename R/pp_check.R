@@ -23,6 +23,17 @@
 #' posterior predictive simulation, so `resp_var = "all"` panels are mutually
 #' consistent.
 #'
+#' Some observables are undefined for some cells — an [ezdm()] boundary has no
+#' mean response time when fewer than two responses reach it. Observations
+#' whose *observed* value is undefined are dropped from the check; undefined
+#' values in the *simulated* replicates are absorbed by dropping those
+#' posterior draws instead, so the number of observations checked does not
+#' depend on `ndraws`. Dropped draws are not missing at random — they are
+#' draws whose parameters made a boundary sparse — so the retained predictive
+#' is mildly conditioned; both reductions are reported with a warning. With
+#' `resp_var = "all"` one reduction is shared by every panel, so the panels
+#' are computed on the same observations and draws.
+#'
 #' @param object A `bmmfit` object returned by [bmm()].
 #' @param type Character. Type of pp_check. When `NULL` (default), resolves to
 #'   `"dens_overlay"`, or to the selected observable's default type when
@@ -92,6 +103,7 @@ pp_check.bmmfit <- function(object, type = NULL, ndraws = NULL,
     stopif(!is.null(dots$newdata),
            "'newdata' is not supported when 'resp_var' is specified.")
     dots$negative_rt <- NULL
+    type <- .pp_resolve_type(type, spec$checks[[resp_var]], group)
     return(.pp_check_observable(object, spec, resp_var, type, ndraws, group,
                                 dots))
   }
@@ -122,6 +134,25 @@ pp_check.bmmfit <- function(object, type = NULL, ndraws = NULL,
 .auto_grouped_type <- function(type) {
   grouped <- paste0(type, "_grouped")
   if (endsWith(type, "_grouped") || is.null(.ppc_fun(grouped))) type else grouped
+}
+
+
+# 'type' defaults to the selected check's own type, so it cannot be resolved
+# before resp_var is known -- but it is still resolved here, at the boundary,
+# rather than after prepare_predictions() and pp_simulate() have run (#401)
+.pp_resolve_type <- function(type, check, group) {
+  if (is.null(check)) {
+    warnif(!is.null(type), "'type' is ignored for resp_var = 'all'; \\
+                            each panel uses its default type.")
+    return(NULL)
+  }
+  type <- type %||% check$type
+  if (!is.null(group)) {
+    type <- .auto_grouped_type(type)
+  }
+  stopif(is.null(.ppc_fun(type)) || startsWith(type, "loo_"),
+         "'{type}' is not a supported pp_check type for resp_var.")
+  type
 }
 
 

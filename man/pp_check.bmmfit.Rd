@@ -74,6 +74,17 @@ argument selects which observable to check; \code{\link[=pp_check_vars]{pp_check
 available checks. All selected observables are drawn from \strong{one} joint
 posterior predictive simulation, so \code{resp_var = "all"} panels are mutually
 consistent.
+
+Some observables are undefined for some cells — an \code{\link[=ezdm]{ezdm()}} boundary has no
+mean response time when fewer than two responses reach it. Observations
+whose \emph{observed} value is undefined are dropped from the check; undefined
+values in the \emph{simulated} replicates are absorbed by dropping those
+posterior draws instead, so the number of observations checked does not
+depend on \code{ndraws}. Dropped draws are not missing at random — they are
+draws whose parameters made a boundary sparse — so the retained predictive
+is mildly conditioned; both reductions are reported with a warning. With
+\code{resp_var = "all"} one reduction is shared by every panel, so the panels
+are computed on the same observations and draws.
 }
 \seealso{
 \code{\link[brms:pp_check]{brms::pp_check()}}, \code{\link[=pp_check_vars]{pp_check_vars()}}

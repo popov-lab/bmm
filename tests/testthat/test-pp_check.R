@@ -217,3 +217,26 @@ test_that("pp_check(resp_var) drops undefined 4par ezdm cells with a warning", {
   expect_s3_class(suppressWarnings(pp_check(fit, resp_var = "all", ndraws = 5)),
                   "bayesplot_grid")
 })
+
+# reducing the observation dimension would make the retained count decay as
+# (1 - p)^ndraws, so a user asking for more draws would silently check less data
+test_that("pp_check(resp_var) retains every defined observation at any ndraws", {
+  fit <- load_ppcheck_fit("bmmfit_ezdm4_ppcheck.rds")
+  retained <- vapply(c(10L, 50L, 150L), function(nd) {
+    withr::with_seed(7, {
+      p <- suppressWarnings(pp_check(fit, resp_var = "mean_rt_lower",
+                                     type = "dens_overlay", ndraws = nd))
+      length(p$data$value[p$data$is_y_label == "italic(y)"])
+    })
+  }, integer(1))
+  expect_identical(retained, rep(nrow(fit$data), 3L))
+})
+
+# without a shared reduction the mean_rt_lower panel would be computed on
+# fewer observations than mean_rt_upper, under an identical-looking subtitle
+test_that("pp_check(resp_var = 'all') panels share one set of observations", {
+  fit <- load_ppcheck_fit("bmmfit_ezdm4_ppcheck.rds")
+  p <- suppressWarnings(pp_check(fit, resp_var = "all", ndraws = 50))
+  n_rows <- vapply(p$bayesplots, function(panel) nrow(panel$data), integer(1))
+  expect_identical(n_rows, rep(n_rows[[1L]], length(n_rows)))
+})

@@ -137,17 +137,15 @@ pp_check_vars <- function(fit) {
   yrep_inputs[names(sims)] <- sims
 
   all_checks <- identical(resp_var, "all")
-  if (all_checks && !is.null(type)) {
-    warning2("'type' is ignored for resp_var = 'all'; \\
-              each panel uses its default type.")
-    type <- NULL
-  }
   checks <- if (all_checks) spec$checks else spec$checks[resp_var]
-  group_vec <- if (!is.null(group)) object$data[[group]]
   plot_dots <- dots[setdiff(names(dots), c("draw_ids", "re_formula"))]
 
-  plots <- lapply(checks, function(check) {
-    .pp_build_ppc_plot(check, observed, yrep_inputs, type, group_vec, plot_dots)
+  reduced <- .pp_reduce_na(checks, observed, yrep_inputs)
+  group_vec <- if (!is.null(group)) object$data[[group]][reduced$keep]
+
+  plots <- lapply(names(checks), function(nm) {
+    .pp_build_ppc_plot(checks[[nm]], reduced$values[[nm]], type, group_vec,
+                       plot_dots)
   })
   if (all_checks) {
     bayesplot::bayesplot_grid(plots = unname(plots))
@@ -156,24 +154,42 @@ pp_check_vars <- function(fit) {
   }
 }
 
-.pp_build_ppc_plot <- function(check, observed, yrep_inputs, type, group_vec,
-                               plot_dots) {
-  y <- check$compute(observed)
-  yrep <- check$compute(yrep_inputs)
+# A simulated statistic can be undefined (rezdm() returns NA for a boundary's
+# mean RT when fewer than 2 responses reach it). Reducing the OBSERVATION
+# dimension would make the retained count decay as (1 - p)^ndraws, so asking
+# for more draws would check less data; only observations whose observed value
+# is undefined are dropped, and the remaining NAs are absorbed by dropping
+# exchangeable draws. All panels of resp_var = "all" share one reduction so
+# that they are computed on the same observations and draws.
+.pp_reduce_na <- function(checks, observed, yrep_inputs) {
+  label <- collapse_comma(vapply(checks, `[[`, character(1), "label"))
+  values <- lapply(checks, function(check) {
+    list(y = check$compute(observed), yrep = check$compute(yrep_inputs))
+  })
 
-  # a simulated statistic can be undefined for some draws (rezdm() returns NA
-  # for a boundary's mean RT when fewer than 2 responses reach it); y and yrep
-  # must be reduced together or the two halves would be misaligned
-  keep <- !is.na(y) & colSums(is.na(yrep)) == 0L
-  stopif(!any(keep),
-         "All observations of '{check$label}' are undefined in the \\
-          posterior predictive simulation.")
+  keep <- Reduce(`&`, lapply(values, function(v) !is.na(v$y)))
+  stopif(!any(keep), "All observations of {label} are undefined in the data.")
   warnif(!all(keep),
-         "Dropped {sum(!keep)} of {length(keep)} observations from the \\
-          '{check$label}' check because the statistic was undefined for some \\
-          posterior draws (e.g. too few simulated responses at a boundary).")
-  y <- y[keep]
-  yrep <- yrep[, keep, drop = FALSE]
+         "Dropped {sum(!keep)} of {length(keep)} observations because the \\
+          observed {label} is undefined (too few responses at a boundary).")
+  values <- lapply(values, function(v) {
+    list(y = v$y[keep], yrep = v$yrep[, keep, drop = FALSE])
+  })
+
+  keep_draws <- Reduce(`&`, lapply(values, function(v) {
+    rowSums(is.na(v$yrep)) == 0L
+  }))
+  stopif(!any(keep_draws),
+         "Every posterior draw of {label} contains an undefined observation; \\
+          try a model with more trials per cell.")
+  warnif(!all(keep_draws),
+         "Dropped {sum(!keep_draws)} of {length(keep_draws)} posterior draws \\
+          because {label} was undefined for some observations.")
+  values <- lapply(values, function(v) {
+    list(y = v$y, yrep = v$yrep[keep_draws, , drop = FALSE])
+  })
+  nlist(values, keep)
+}
 
   type <- type %||% check$type
   if (!is.null(group_vec)) {
@@ -183,10 +199,10 @@ pp_check_vars <- function(fit) {
   stopif(is.null(ppc_fun) || startsWith(type, "loo_"),
          "'{type}' is not a supported pp_check type for resp_var.")
 
-  args <- c(list(y = y, yrep = yrep), plot_dots)
+  args <- c(list(y = value$y, yrep = value$yrep), plot_dots)
   if ("group" %in% names(formals(ppc_fun))) {
     stopif(is.null(group_vec), "Argument 'group' is required for type '{type}'.")
-    args$group <- group_vec[keep]
+    args$group <- group_vec
   }
   do.call(ppc_fun, args) + ggplot2::labs(subtitle = check$label)
 }
@@ -206,3 +222,4 @@ pp_check_vars <- function(fit) {
     )
   )
 }
+.pp_build_ppc_plot <- function(check, value, type, group_vec, plot_dots) {
