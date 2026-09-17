@@ -14,6 +14,15 @@ pp_simulate(model, prep)
 
 \item{prep}{A \code{brmsprep} object from \code{\link[brms:prepare_predictions]{brms::prepare_predictions()}}.}
 }
+\value{
+\code{pp_observables()} returns \code{NULL} for a model that delegates fully
+to \code{\link[brms:pp_check]{brms::pp_check()}}, or a list with elements \code{observed} (a named
+character vector mapping observable names to brms standata slots) and
+\code{checks} (a named list of check definitions, each with a \code{compute}
+closure, a \code{label} and a default bayesplot \code{type}). \code{pp_simulate()}
+returns a named list of \code{ndraws} x \code{nobs} matrices, one per simulated
+observable.
+}
 \description{
 \code{pp_observables()} returns the model's observable declaration used by
 \code{\link[=pp_check.bmmfit]{pp_check.bmmfit()}} when \code{resp_var} is specified, or \code{NULL} for models
@@ -42,6 +51,11 @@ data.
 
 Register exactly one method per model at the most general class level
 where the declaration is identical across versions.
+
+These two generics are exported so that model methods defined outside bmm
+can be registered against them, but they are an internal developer
+interface documented for bmm's own model authors and carry no stability
+guarantee across releases.
 }
 \keyword{developer}
 \keyword{internal}

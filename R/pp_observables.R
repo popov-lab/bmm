@@ -35,8 +35,20 @@
 #' Register exactly one method per model at the most general class level
 #' where the declaration is identical across versions.
 #'
+#' These two generics are exported so that model methods defined outside bmm
+#' can be registered against them, but they are an internal developer
+#' interface documented for bmm's own model authors and carry no stability
+#' guarantee across releases.
+#'
 #' @param model A `bmmodel` object.
 #' @param prep A `brmsprep` object from [brms::prepare_predictions()].
+#' @return `pp_observables()` returns `NULL` for a model that delegates fully
+#'   to [brms::pp_check()], or a list with elements `observed` (a named
+#'   character vector mapping observable names to brms standata slots) and
+#'   `checks` (a named list of check definitions, each with a `compute`
+#'   closure, a `label` and a default bayesplot `type`). `pp_simulate()`
+#'   returns a named list of `ndraws` x `nobs` matrices, one per simulated
+#'   observable.
 #' @keywords internal developer
 #' @export
 pp_observables <- function(model) {
@@ -122,25 +134,13 @@ pp_check_vars <- function(fit) {
     resp_var = names(spec$checks),
     label = vapply(spec$checks, `[[`, character(1), "label"),
     default_type = vapply(spec$checks, `[[`, character(1), "type"),
+    slot = vapply(spec$checks, .pp_check_slots, character(1),
+                  observed = spec$observed),
     default = names(spec$checks) == names(spec$observed)[spec$observed == "Y"],
     row.names = NULL
   )
 }
 
-.pp_check_observable <- function(object, spec, resp_var, type, ndraws, group,
-                                 dots) {
-  if (is.null(dots$draw_ids)) {
-    ndraws <- ndraws %||% 10L
-  }
-  prep <- brms::prepare_predictions(object, ndraws = ndraws,
-                                    draw_ids = dots$draw_ids,
-    slot = vapply(spec$checks, .pp_check_slots, character(1),
-                  observed = spec$observed),
-                                    re_formula = dots$re_formula)
-
-  observed <- lapply(spec$observed, function(slot) prep$data[[slot]])
-  yrep_inputs <- lapply(observed, .pp_expand_data, ndraws = prep$ndraws)
-  sims <- pp_simulate(object$bmm$model, prep)
 # Derived checks read several observables, so the slots are recovered from the
 # closure rather than declared twice. Anchoring on "$" and a trailing word
 # boundary keeps mean_rt from matching d$mean_rt_upper.
@@ -152,6 +152,18 @@ pp_check_vars <- function(fit) {
   paste(observed[reads], collapse = ", ")
 }
 
+.pp_check_observable <- function(object, spec, resp_var, type, ndraws, group,
+                                 dots) {
+  if (is.null(dots$draw_ids)) {
+    ndraws <- ndraws %||% 10L
+  }
+  prep <- brms::prepare_predictions(object, ndraws = ndraws,
+                                    draw_ids = dots$draw_ids,
+                                    re_formula = dots$re_formula)
+
+  observed <- lapply(spec$observed, function(slot) prep$data[[slot]])
+  yrep_inputs <- lapply(observed, .pp_expand_data, ndraws = prep$ndraws)
+  sims <- pp_simulate(object$bmm$model, prep)
   sims <- sims[intersect(names(sims), names(spec$observed))]
   yrep_inputs[names(sims)] <- sims
 
@@ -210,6 +222,7 @@ pp_check_vars <- function(fit) {
   nlist(values, keep)
 }
 
+.pp_build_ppc_plot <- function(check, value, type, group_vec, plot_dots) {
   type <- type %||% check$type
   if (!is.null(group_vec)) {
     type <- .auto_grouped_type(type)
@@ -222,7 +235,6 @@ pp_check_vars <- function(fit) {
   if ("group" %in% names(formals(ppc_fun))) {
     stopif(is.null(group_vec), "Argument 'group' is required for type '{type}'.")
     args$group <- group_vec
-.pp_build_ppc_plot <- function(check, value, type, group_vec, plot_dots) {
   }
   do.call(ppc_fun, args) + ggplot2::labs(subtitle = check$label)
 }
