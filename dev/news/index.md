@@ -17,6 +17,24 @@
   [`brms::mixture()`](https://paulbuerkner.com/brms/reference/mixture.html)
   family, and the `theta2` mixture-weight reference the sampler holds at
   zero ([\#391](https://github.com/popov-lab/bmm/issues/391)).
+- New function **native_parameters()** returns posterior draws of the
+  model parameters on their native scale, evaluated over a grid of
+  predictor values. Because draws are returned rather than summaries,
+  contrasts between conditions are ordinary arithmetic on the draws. The
+  inverse link transformation is applied to the draws before any summary
+  is computed, so quantiles and credible intervals are exact. Mixture
+  weights are transformed jointly through their softmax
+  ([\#388](https://github.com/popov-lab/bmm/issues/388)).
+- New developer generic **native_transform()** defines how a model maps
+  its parameters from the sampling scale to the native scale. The
+  default method covers every transformation that can be expressed
+  through an elementwise `links` declaration in a `.model_*()`
+  constructor, or through a single softmax group that is active on every
+  row of the data, so most new models are supported without writing a
+  method.
+  [`native_transform.non_targets()`](https://venpopov.com/bmm/dev/reference/native_transform.md)
+  ships as the worked example of a design-dependent method
+  ([\#388](https://github.com/popov-lab/bmm/issues/388)).
 
 #### Bug fixes
 

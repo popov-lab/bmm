@@ -63,6 +63,9 @@ stan data, etc.
 - [`fit_info()`](https://venpopov.com/bmm/dev/reference/fit_info.md) :
   Extract information from a brmsfit object
 
+- [`native_parameters()`](https://venpopov.com/bmm/dev/reference/native_parameters.md)
+  : Posterior draws of model parameters on the native scale
+
 - [`report_priors()`](https://venpopov.com/bmm/dev/reference/report_priors.md)
   : Report the priors used in a fitted bmm model
 
@@ -244,6 +247,10 @@ Functions to assist in developing new models
 
 - [`create_initfun()`](https://venpopov.com/bmm/dev/reference/create_initfun.md)
   : Generic S3 method for creating an initial values function
+
+- [`native_transform()`](https://venpopov.com/bmm/dev/reference/native_transform.md)
+  : Transform parameter draws from the sampling scale to the native
+  scale
 
 - [`postprocess_brm()`](https://venpopov.com/bmm/dev/reference/postprocess_brm.md)
   : Generic S3 method for postprocessing the fitted brm model
