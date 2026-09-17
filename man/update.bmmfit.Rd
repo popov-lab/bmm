@@ -4,7 +4,15 @@
 \alias{update.bmmfit}
 \title{Update a bmm model}
 \usage{
-\method{update}{bmmfit}(object, formula., newdata = NULL, recompile = NULL, ...)
+\method{update}{bmmfit}(
+  object,
+  formula.,
+  newdata = NULL,
+  recompile = NULL,
+  file = NULL,
+  file_compress = TRUE,
+  ...
+)
 }
 \arguments{
 \item{object}{An object of class \code{bmmfit}}
@@ -19,10 +27,21 @@ NULL (the default), update tries to figure out internally, if recompilation
 is necessary. Setting it to FALSE will cause all Stan code changing
 arguments to be ignored.}
 
+\item{file}{Either \code{NULL} or a character string. If a string, the updated
+model is saved via \link{saveRDS} in a file named after the string, as in
+\code{\link[=bmm]{bmm()}}. \code{update()} never writes to the file the original fit was read
+from: pass \code{file} explicitly to save the updated fit.}
+
+\item{file_compress}{Logical or a character string, specifying one of the
+compression algorithms supported by \link{saveRDS} when saving the updated
+model object.}
+
 \item{...}{Further arguments passed to \code{\link[brms:update.brmsfit]{brms::update.brmsfit()}}}
 }
 \value{
-An updated \code{bmmfit} object refit to the new data and/or formula
+An updated \code{bmmfit} object refit to the new data and/or formula. Its
+\code{file} field names the file the \emph{original} fit was saved in unless \code{file}
+is given, in which case it names the newly written file.
 }
 \description{
 Update an existing bmm mode. This function calls

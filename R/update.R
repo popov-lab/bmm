@@ -10,8 +10,17 @@
 #'   NULL (the default), update tries to figure out internally, if recompilation
 #'   is necessary. Setting it to FALSE will cause all Stan code changing
 #'   arguments to be ignored.
+#' @param file Either `NULL` or a character string. If a string, the updated
+#'   model is saved via [saveRDS] in a file named after the string, as in
+#'   [bmm()]. `update()` never writes to the file the original fit was read
+#'   from: pass `file` explicitly to save the updated fit.
+#' @param file_compress Logical or a character string, specifying one of the
+#'   compression algorithms supported by [saveRDS] when saving the updated
+#'   model object.
 #' @param ... Further arguments passed to [brms::update.brmsfit()]
-#' @return An updated `bmmfit` object refit to the new data and/or formula
+#' @return An updated `bmmfit` object refit to the new data and/or formula. Its
+#'   `file` field names the file the *original* fit was saved in unless `file`
+#'   is given, in which case it names the newly written file.
 #' @details When updating a brmsfit created with the cmdstanr backend in a
 #'   different R session, a recompilation will be triggered because by default,
 #'   cmdstanr writes the model executable to a temporary directory. To avoid
@@ -40,8 +49,10 @@
 #' # update the model
 #' fit <- update(fit, newdata = data.frame(y = rsdm(2000, kappa = 5)))
 #'
-update.bmmfit <- function(object, formula., newdata = NULL, recompile = NULL, ...) {
+update.bmmfit <- function(object, formula., newdata = NULL, recompile = NULL,
+                          file = NULL, file_compress = TRUE, ...) {
   dots <- list(...)
+  file <- check_rds_file(file)
   # brms::update.brmsfit falls back to the original fit's threading spec only
   # when `threads` is absent from the call -- an explicit NULL means "no
   # threading" -- and the effective spec, not the new request, must drive the
@@ -68,6 +79,7 @@ update.bmmfit <- function(object, formula., newdata = NULL, recompile = NULL, ..
   model <- object$bmm$model
   old_user_formula <- object$bmm$user_formula
   olddata <- object$data
+  old_file <- object$file
   configure_opts <- object$bmm$configure_opts
 
   # revert some postprocessing changes to brmsfit from postprocess_brm
@@ -153,8 +165,20 @@ update.bmmfit <- function(object, formula., newdata = NULL, recompile = NULL, ..
   )
 
   # bmm postprocessing
-  postprocess_brm(model, object,
+  object <- postprocess_brm(model, object,
     fit_args = new_fit_args, user_formula = user_formula,
     configure_opts = configure_opts
   )
+
+  # brms::brm() writes the file from inside brms::update.brmsfit(), which is
+  # before any of the above has run, so letting `file` through would store a
+  # plain brmsfit that try_read_bmmfit() then refuses to load. Saving here is
+  # the same order bmm() uses. Without `file`, the field is carried over so the
+  # fit keeps naming the file it came from -- that file still holds the fit
+  # before the update
+  if (is.null(file)) {
+    object$file <- old_file
+    return(object)
+  }
+  try_save_bmmfit(object, file, compress = file_compress)
 }
