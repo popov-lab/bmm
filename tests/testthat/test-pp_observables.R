@@ -119,7 +119,8 @@ test_that("pp_simulate.ddm() draws each cell from its own parameters", {
 # .rcswald() call, so a shared seed makes the streams comparable.
 test_that("pp_simulate.cswald_simple() mirrors posterior_predict_cswald_simple", {
   prep <- fake_prep(25L, 1L, dpars = list(
-    drift = rep(2, 25), bound = rep(0.8, 25), ndt = rep(0.2, 25), s = rep(1, 25)
+    drift = rep(2, 25), bound = rep(0.8, 25), ndt = rep(0.2, 25), s = rep(1, 25),
+    sndt = rep(0, 25)
   ))
   sims <- withr::with_seed(3, pp_simulate(cswald(rt = "rt", response = "r"),
                                           prep))
@@ -130,14 +131,28 @@ test_that("pp_simulate.cswald_simple() mirrors posterior_predict_cswald_simple",
 test_that("cswald simple doubles the bound of the two-boundary generator", {
   simple <- withr::with_seed(1, pp_simulate(
     cswald(rt = "rt", response = "r"),
-    fake_prep(3L, 4L, dpars = list(drift = 3, bound = 0.8, ndt = 0.2, s = 1))
+    fake_prep(3L, 4L, dpars = list(drift = 3, bound = 0.8, ndt = 0.2, s = 1,
+                                   sndt = 0))
   ))
   crisk <- withr::with_seed(1, pp_simulate(
     cswald(rt = "rt", response = "r", version = "crisk"),
     fake_prep(3L, 4L, dpars = list(drift = 3, bound = 1.6, ndt = 0.2, zr = 0.5,
-                                   s = 1))
+                                   s = 1, sndt = 0))
   ))
   expect_identical(simple, crisk)
+})
+
+# .rcswald() defaults sndt = 0, so omitting it from the dpar list does not error
+# -- it silently simulates a model the fit did not estimate
+test_that("pp_simulate() for cswald passes sndt through to the generator", {
+  sim <- function(sndt) withr::with_seed(7, pp_simulate(
+    cswald(rt = "rt", response = "r"),
+    fake_prep(200L, 1L, dpars = list(drift = rep(2, 200), bound = rep(0.8, 200),
+                                     ndt = rep(0.2, 200), s = rep(1, 200),
+                                     sndt = rep(sndt, 200)))
+  )$rt)
+  # non-decision time is Uniform(ndt, ndt + sndt), so the mean shifts by sndt/2
+  expect_equal(mean(sim(0.3)) - mean(sim(0)), 0.15, tolerance = 0.02)
 })
 
 test_that("pp_simulate() for ezdm respects per-observation trial counts", {

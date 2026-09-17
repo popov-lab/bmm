@@ -531,3 +531,27 @@ test_that("find_matching_brace handles lots of braces", {
   x <- paste0("{", strrep("{}", 100), "}")
   expect_equal(find_matching_brace(x, 1L), nchar(x))
 })
+
+test_that("resolve_fixed_links switches a parameter's link while it is fixed", {
+  model <- structure(
+    list(
+      parameters = list(a = "a", b = "b"),
+      links = list(a = "log", b = "log"),
+      links_fixed = list(b = "identity"),
+      fixed_parameters = list(b = 0)
+    ),
+    class = "bmmodel"
+  )
+
+  fixed <- resolve_fixed_links(model)
+  expect_equal(fixed$links$b, "identity")
+  expect_equal(fixed$links$a, "log")
+
+  freed <- update_model_fixed_parameters(fixed, bmf(a ~ 1, b ~ 1))
+  expect_null(freed$fixed_parameters$b)
+  expect_equal(freed$links$b, "log")
+
+  refixed <- update_model_fixed_parameters(freed, bmf(a ~ 1, b = 0))
+  expect_equal(refixed$fixed_parameters$b, 0)
+  expect_equal(refixed$links$b, "identity")
+})

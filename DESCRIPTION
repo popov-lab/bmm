@@ -49,6 +49,7 @@ Suggests:
     mixtur,
     remotes,
     rmarkdown,
+    statmod,
     stringr,
     testthat (>= 3.0.0),
     tidybayes,
