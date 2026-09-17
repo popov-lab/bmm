@@ -37,8 +37,11 @@ still printed. \strong{Default: 1}}
 \item{color_summary}{logical. If TRUE, the summary of the model will be
 printed in color. \strong{Default: TRUE}}
 
-\item{file_refit}{logical. If TRUE, bmm() will refit the model even if the
-file argument is specified. \strong{Default: FALSE}}
+\item{file_refit}{logical or character. Controls when \code{bmm()} re-uses a fit
+saved via its \code{file} argument. \code{TRUE} or "always" always refits, \code{FALSE} or
+"never" always re-uses the saved fit, and "on_change" re-uses it only while
+the Stan code and data are unchanged. See \code{\link[=bmm]{bmm()}} for details. \strong{Default:
+FALSE}}
 
 \item{reset_options}{logical. If TRUE, the options will be reset to their
 default values \strong{Default: FALSE}}

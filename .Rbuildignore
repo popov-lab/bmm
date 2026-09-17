@@ -23,6 +23,8 @@
 ^.Rprofile$
 ^CRAN-SUBMISSION$
 ^AGENTS.md$
+^CLAUDE.md$
 ^code-structure.md$
 ^\.lintr$
 ^\.claude$
+^\.git$
