@@ -563,10 +563,24 @@ pp_observables.cswald <- function(model) {
 pp_simulate.cswald_simple <- function(model, prep) {
   # .rcswald() is two-boundary; cswald's bound is the single-boundary distance
   .pp_simulate_joint(prep, .rcswald, c("drift", "ndt", "s"),
-                     bound = .pp_dpar_vector(prep, "bound") * 2, zr = 0.5)
+                     bound = .pp_dpar_vector(prep, "bound") * 2, zr = 0.5,
+                     sndt = .pp_cswald_sndt(prep))
 }
 
 #' @export
 pp_simulate.cswald_crisk <- function(model, prep) {
-  .pp_simulate_joint(prep, .rcswald, c("drift", "bound", "ndt", "zr", "s"))
+  .pp_simulate_joint(prep, .rcswald, c("drift", "bound", "ndt", "zr", "s"),
+                     sndt = .pp_cswald_sndt(prep))
+}
+
+
+# .rcswald() defaults sndt = 0, so simply omitting it from the dpar list would
+# silently simulate a model the fit did not estimate. Read it when the fit has
+# it, and fall back to 0 only for fits saved before sndt existed -- for those
+# the absent parameter *is* zero.
+.pp_cswald_sndt <- function(prep) {
+  if (is.null(prep$dpars$sndt)) {
+    return(0)
+  }
+  .pp_dpar_vector(prep, "sndt")
 }
