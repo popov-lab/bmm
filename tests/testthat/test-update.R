@@ -137,3 +137,35 @@ test_that("update.bmmfit configures the likelihood for the effective threading s
     expect_false(sdm_likelihood_is_sliced(update_mock(no_threads)))
   })
 })
+
+test_that("update.bmmfit keeps track of the file the fit is saved in", {
+  skip_on_cran()
+  fit1 <- sdm_fixture()
+  fit1$file <- "some/cached/fit.rds"
+
+  expect_equal(update_mock(fit1)$file, "some/cached/fit.rds")
+
+  # an explicit file must hold a bmmfit -- brms writes it from inside
+  # update.brmsfit(), before any of the bmm postprocessing has run
+  file <- tempfile()
+  up <- update_mock(fit1, file = file)
+  expect_equal(up$file, paste0(file, ".rds"))
+  expect_true(file.exists(paste0(file, ".rds")))
+  expect_true(is_bmmfit(readRDS(paste0(file, ".rds"))))
+})
+
+test_that("update.bmmfit updates and writes even when `file` already exists", {
+  skip_on_cran()
+  fit1 <- sdm_fixture()
+
+  # `file` must not reach brms::brm(), which would read an existing file and
+  # return its contents instead of running the update
+  file <- tempfile()
+  saveRDS(fit1, paste0(file, ".rds"))
+  new_data <- fit1$data
+  new_data$dev_rad <- 0.1
+  up <- update_mock(fit1, newdata = new_data, file = file)
+  expect_equal(up$fit, 1)
+  expect_equal(readRDS(paste0(file, ".rds"))$fit, 1)
+  expect_true(is_bmmfit(readRDS(paste0(file, ".rds"))))
+})
