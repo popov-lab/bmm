@@ -461,3 +461,24 @@ posterior_predict_cswald_crisk <- function(i, prep, ...) {
     out$rt
   }
 }
+
+############################################################################# !
+# PP_CHECK OBSERVABLES                                                    ####
+############################################################################# !
+
+#' @export
+pp_observables.cswald <- function(model) {
+  .pp_spec_rt_response()
+}
+
+#' @export
+pp_simulate.cswald_simple <- function(model, prep) {
+  # .rcswald() is two-boundary; cswald's bound is the single-boundary distance
+  .pp_simulate_joint(prep, .rcswald, c("drift", "ndt", "s"),
+                     bound = .pp_dpar_vector(prep, "bound") * 2, zr = 0.5)
+}
+
+#' @export
+pp_simulate.cswald_crisk <- function(model, prep) {
+  .pp_simulate_joint(prep, .rcswald, c("drift", "bound", "ndt", "zr", "s"))
+}
