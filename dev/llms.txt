@@ -358,6 +358,9 @@ Main functions for model fitting
 Utility functions for extracting default priors, generate stan code,
 stan data, etc.
 
+- [`bmm_data_check()`](https://venpopov.com/bmm/dev/reference/bmm_data_check.md)
+  : Human-readable pre-fit data report for bmm models
+
 - [`default_prior(`*`<bmmformula>`*`)`](https://venpopov.com/bmm/dev/reference/default_prior.bmmformula.md)
   : Get Default priors for Measurement Models specified in BMM
 
@@ -554,6 +557,12 @@ Functions to assist in developing new models
 
 - [`create_initfun()`](https://venpopov.com/bmm/dev/reference/create_initfun.md)
   : Generic S3 method for creating an initial values function
+
+- [`data_check_finding()`](https://venpopov.com/bmm/dev/reference/data_check_finding.md)
+  : Construct a single finding for a pre-fit data report
+
+- [`data_check_findings()`](https://venpopov.com/bmm/dev/reference/data_check_findings.md)
+  : Generic S3 method for model-specific pre-fit data findings
 
 - [`native_transform()`](https://venpopov.com/bmm/dev/reference/native_transform.md)
   : Transform parameter draws from the sampling scale to the native

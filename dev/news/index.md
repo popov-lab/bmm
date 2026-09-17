@@ -35,6 +35,23 @@
   [`native_transform.non_targets()`](https://venpopov.com/bmm/dev/reference/native_transform.md)
   ships as the worked example of a design-dependent method
   ([\#388](https://github.com/popov-lab/bmm/issues/388)).
+- New function
+  [`bmm_data_check()`](https://venpopov.com/bmm/dev/reference/bmm_data_check.md)
+  prints a human-readable pre-fit data report. It runs the same
+  validation pipeline as
+  [`bmm()`](https://venpopov.com/bmm/dev/reference/bmm.md) without
+  compiling the model, captures all errors, warnings and messages, and
+  summarizes the response variables (with the coding the model expects),
+  the data columns each parameter formula uses (including factor
+  coding), the number of observations per design cell, and
+  model-specific diagnostics for common data mistakes — e.g. circular
+  responses in degrees or coded on \[0, 2\*pi), and misplaced `NA`
+  values in `nt_features`/`nt_distances` for set size varying designs.
+  Developers can extend the model-specific diagnostics by adding
+  [`data_check_findings()`](https://venpopov.com/bmm/dev/reference/data_check_findings.md)
+  methods, building each finding with the new
+  [`data_check_finding()`](https://venpopov.com/bmm/dev/reference/data_check_finding.md)
+  constructor ([\#389](https://github.com/popov-lab/bmm/issues/389)).
 
 #### Bug fixes
 
