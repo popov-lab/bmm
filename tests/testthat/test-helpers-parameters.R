@@ -647,7 +647,7 @@ test_that("native_parameters reports fixed parameters at their constant", {
 test_that("native_parameters labels each row with the draw it came from", {
   skip_on_cran()
   fit <- load_np_sdm_fit()
-  draws <- as.data.frame(posterior::as_draws_df(fit))
+  draws <- as.data.frame(brms::as_draws_df(fit))
 
   out <- native_parameters(fit, pars = "c", draw_ids = c(37, 4, 21))
   out <- out[out$set_size == 1, ]
