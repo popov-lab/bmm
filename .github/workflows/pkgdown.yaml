@@ -62,9 +62,19 @@ jobs:
         id: cmdstan-version
         shell: bash
         run: |
-          tag=$(curl -sSL --retry 3 \
+          set +e
+          response=$(curl -sSL --fail \
+            --connect-timeout 10 --max-time 30 \
+            --retry 3 --retry-all-errors --retry-delay 2 \
             -H "Authorization: Bearer ${GITHUB_PAT}" \
-            https://api.github.com/repos/stan-dev/cmdstan/releases/latest | jq -r '.tag_name // empty')
+            https://api.github.com/repos/stan-dev/cmdstan/releases/latest)
+          curl_status=$?
+          set -e
+          if [ $curl_status -ne 0 ]; then
+            echo "Failed to reach the GitHub API (curl exit ${curl_status})" >&2
+            exit 1
+          fi
+          tag=$(echo "$response" | jq -r '.tag_name // empty')
           if [ -z "$tag" ]; then
             echo "Failed to determine the latest CmdStan release" >&2
             exit 1
