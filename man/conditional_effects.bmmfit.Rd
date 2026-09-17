@@ -24,7 +24,7 @@ logit (mixture2p) or softmax (mixture3p) link shown on the probability scale.}
 For example, \code{kappa} with log link shown on log scale.}
 }}
 
-\item{...}{Additional arguments passed to \code{\link[brms:conditional_effects.brmsfit]{brms::conditional_effects()}}.
+\item{...}{Additional arguments passed to \code{\link[brms:conditional_effects]{brms::conditional_effects()}}.
 Common arguments include:
 \itemize{
 \item \code{effects}: Character vector specifying which predictor effects to plot
@@ -46,7 +46,7 @@ A \code{brms_conditional_effects} object (from brms), which can be:
 \description{
 Compute conditional effects for parameters of a bmmfit object.
 This method provides a more intuitive interface than directly calling
-\code{\link[brms:conditional_effects.brmsfit]{brms::conditional_effects()}} on bmmfit objects, by:
+\code{\link[brms:conditional_effects]{brms::conditional_effects()}} on bmmfit objects, by:
 \itemize{
 \item Accepting model parameter names directly (e.g., \code{"kappa"}, \code{"thetat"})
 \item Automatically determining whether parameters are distributional or non-linear
@@ -119,5 +119,5 @@ ce_detailed <- conditional_effects(
 }
 }
 \seealso{
-\code{\link[brms:conditional_effects.brmsfit]{brms::conditional_effects()}} for the underlying brms function
+\code{\link[brms:conditional_effects]{brms::conditional_effects()}} for the underlying brms function
 }
