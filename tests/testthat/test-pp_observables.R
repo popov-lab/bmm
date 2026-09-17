@@ -113,6 +113,20 @@ test_that("pp_simulate.ezdm_4par() emits NA where a boundary has < 2 responses",
   ), data = list(vint2 = rep(3L, 4L)))
   sims <- pp_simulate(model, prep)
   expect_identical(is.na(sims$mean_rt_upper), sims$n_upper < 2)
+# The internal-consistency check below passes just as happily if both sides of
+# the bound * 2 mapping are wrong; this pins pp_simulate against the function
+# whose transform it must mirror. At nobs = 1 both paths make the same single
+# .rcswald() call, so a shared seed makes the streams comparable.
+test_that("pp_simulate.cswald_simple() mirrors posterior_predict_cswald_simple", {
+  prep <- fake_prep(25L, 1L, dpars = list(
+    drift = rep(2, 25), bound = rep(0.8, 25), ndt = rep(0.2, 25), s = rep(1, 25)
+  ))
+  sims <- withr::with_seed(3, pp_simulate(cswald(rt = "rt", response = "r"),
+                                          prep))
+  pp <- withr::with_seed(3, posterior_predict_cswald_simple(1L, prep))
+  expect_equal(as.vector(sims$rt), as.vector(pp))
+})
+
   expect_identical(is.na(sims$mean_rt_lower), (3L - sims$n_upper) < 2)
 })
 

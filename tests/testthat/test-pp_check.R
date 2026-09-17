@@ -88,6 +88,18 @@ test_that("pp_check() delegates to brms for non-multinomial bmmfit", {
   expect_s3_class(p, "ggplot")
 })
 
+# pins the claim that calls without resp_var are unchanged, rather than
+# asserting it: the plot data must equal what brms would have produced
+test_that("pp_check() without resp_var reproduces brms::pp_check() exactly", {
+  fit <- load_sdm_fit()
+  brms_method <- getS3method("pp_check", "brmsfit", envir = asNamespace("brms"))
+  for (type in c("dens_overlay", "stat")) {
+    withr::with_seed(1, mine <- pp_check(fit, type = type, ndraws = 5))
+    withr::with_seed(1, theirs <- brms_method(fit, type = type, ndraws = 5))
+    expect_equal(mine$data, theirs$data)
+  }
+})
+
 test_that("pp_check() accepts re_formula for multinomial model", {
   fit <- load_m3_fit()
   p <- pp_check(fit, ndraws = 5, re_formula = NA)
@@ -143,11 +155,14 @@ load_ppcheck_fit <- function(name) {
   readRDS(path)
 }
 
+# expect_equal rather than expect_setequal: y comes from prep$data while the
+# group vector comes from object$data, so their row alignment is load-bearing
+# and an order-blind comparison would pass through a permutation
 test_that("pp_check(resp_var = 'rt') checks the observed response times", {
   fit <- load_ppcheck_fit("bmmfit_ddm_ppcheck.rds")
   p <- pp_check(fit, resp_var = "rt", ndraws = 5)
   expect_s3_class(p, "ggplot")
-  expect_setequal(p$data$value[p$data$is_y_label == "italic(y)"], fit$data$rt)
+  expect_equal(p$data$value[p$data$is_y_label == "italic(y)"], fit$data$rt)
 })
 
 test_that("pp_check(resp_var = 'signed_rt') signs RTs by the response", {
@@ -155,7 +170,7 @@ test_that("pp_check(resp_var = 'signed_rt') signs RTs by the response", {
   p <- pp_check(fit, resp_var = "signed_rt", ndraws = 5)
   expect_s3_class(p, "ggplot")
   y <- p$data$value[p$data$is_y_label == "italic(y)"]
-  expect_setequal(y, fit$data$rt * (2 * fit$data$response - 1))
+  expect_equal(y, fit$data$rt * (2 * fit$data$response - 1))
   expect_true(any(y < 0))
 })
 
@@ -178,6 +193,16 @@ test_that("pp_check(resp_var = 'all') panels all checks", {
                  "ignored")
 })
 
+test_that("pp_check(resp_var = 'all') groups every panel, bars included", {
+  fit <- load_ppcheck_fit("bmmfit_ddm_ppcheck.rds")
+  p <- pp_check(fit, resp_var = "all", group = "cond", ndraws = 5)
+  expect_s3_class(p, "bayesplot_grid")
+  expect_length(p$bayesplots, 3L)
+  for (panel in p$bayesplots) {
+    expect_s3_class(panel$facet, "FacetWrap")
+  }
+})
+
 test_that("pp_check(resp_var) supports grouping and type overrides", {
   fit <- load_ppcheck_fit("bmmfit_ddm_ppcheck.rds")
   p <- pp_check(fit, resp_var = "rt", group = "cond", ndraws = 5)
@@ -198,6 +223,35 @@ test_that("pp_check(resp_var) accepts draw_ids and rejects newdata", {
   expect_s3_class(pp_check(fit, resp_var = "rt", draw_ids = 1:3), "ggplot")
   expect_error(pp_check(fit, resp_var = "rt", newdata = fit$data),
                "not supported")
+})
+
+test_that("pp_check(resp_var) works for the cswald model", {
+  fit <- load_ppcheck_fit("bmmfit_cswald_ppcheck.rds")
+  p <- pp_check(fit, resp_var = "rt", ndraws = 5)
+  expect_s3_class(p, "ggplot")
+  expect_equal(p$data$value[p$data$is_y_label == "italic(y)"], fit$data$rt)
+
+  signed <- pp_check(fit, resp_var = "signed_rt", ndraws = 5)
+  y <- signed$data$value[signed$data$is_y_label == "italic(y)"]
+  expect_equal(y, fit$data$rt * (2 * fit$data$response - 1))
+  expect_true(any(y < 0))
+
+  expect_s3_class(pp_check(fit, resp_var = "response", ndraws = 5), "ggplot")
+  expect_s3_class(pp_check(fit, resp_var = "all", group = "cond", ndraws = 5),
+                  "bayesplot_grid")
+})
+
+# the bound * 2 / zr = 0.5 mapping of pp_simulate.cswald_simple() is the only
+# non-trivial parameter transform in the resp_var path: on a real fit the
+# simulated RTs must cover the observed ones rather than a rescaled boundary
+test_that("pp_check(resp_var) simulates cswald RTs on the fitted scale", {
+  fit <- load_ppcheck_fit("bmmfit_cswald_ppcheck.rds")
+  prep <- brms::prepare_predictions(fit, ndraws = 50)
+  sims <- pp_simulate(fit$bmm$model, prep)
+  expect_identical(dim(sims$rt), c(50L, nrow(fit$data)))
+  expect_true(all(sims$rt > 0))
+  expect_lt(abs(median(sims$rt) - median(fit$data$rt)), 0.1)
+  expect_lt(abs(mean(sims$response) - mean(fit$data$response)), 0.15)
 })
 
 test_that("pp_check(resp_var) works for the 3par ezdm model", {
