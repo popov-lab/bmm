@@ -483,3 +483,176 @@ test_that("ezdm posterior_predict function is defined for 4par", {
   # Just verify the function is exported and callable
   expect_true(exists("posterior_predict_ezdm_4par", where = asNamespace("bmm")))
 })
+
+
+# R <-> Stan parity of the likelihood ------------------------------------------
+
+# Drives the installed Stan chunks through a fixed_param generated-quantities
+# run rather than cmdstanr::expose_functions(), which compiles through Rcpp and
+# links against RcppParallel's libtbb -- that fails inside the test suite after
+# the dependency chain is loaded, and silently skips, which is the worst failure
+# mode for a parity test. sig_figs = 17 round-trips a double; the default 6
+# would measure cmdstan's output precision instead of the code.
+ezdm_stan_lpdf <- function(version, data) {
+  sc_path <- system.file("stan_chunks", package = "bmm")
+  declarations <- if (version == "3par") {
+    "vector[N] mean_rt; vector[N] var_rt; vector[N] s;"
+  } else {
+    paste(
+      "vector[N] mean_rt_upper; vector[N] mean_rt_lower;",
+      "vector[N] var_rt_upper; vector[N] var_rt_lower;",
+      "vector[N] zr; vector[N] s;"
+    )
+  }
+  call <- if (version == "3par") {
+    "ezdm_3par_lpdf(mean_rt[i] | 0.0, drift[i], bound[i], ndt[i], s[i],
+                    var_rt[i], n_upper[i], n_trials[i])"
+  } else {
+    "ezdm_4par_lpdf(mean_rt_upper[i] | 0.0, drift[i], bound[i], ndt[i], zr[i],
+                    s[i], mean_rt_lower[i], var_rt_upper[i], var_rt_lower[i],
+                    n_upper[i], n_trials[i])"
+  }
+
+  program <- paste0(
+    "functions {\n",
+    read_lines2(file.path(sc_path, "ezdm_cumulants.stan")), "\n",
+    read_lines2(file.path(sc_path, paste0("ezdm_", version, "_functions.stan"))),
+    "\n}\ndata {\n  int<lower=1> N;\n  vector[N] drift; vector[N] bound;",
+    " vector[N] ndt;\n  array[N] int n_upper; array[N] int n_trials;\n  ",
+    declarations,
+    "\n}\ngenerated quantities {\n  vector[N] stan_lpdf;\n",
+    "  for (i in 1:N) {\n    stan_lpdf[i] = ", call, ";\n  }\n}\n"
+  )
+
+  fit <- cmdstanr::cmdstan_model(cmdstanr::write_stan_file(program))$sample(
+    data = data, fixed_param = TRUE, chains = 1, iter_sampling = 1,
+    iter_warmup = 0, refresh = 0, show_messages = FALSE, sig_figs = 17
+  )
+  # base-R read: cmdstanr's reader misparses long plain-decimal numbers
+  csv <- utils::read.csv(
+    fit$output_files()[1],
+    comment.char = "#", check.names = FALSE
+  )
+  as.numeric(csv[1, paste0("stan_lpdf.", seq_len(data$N))])
+}
+
+# drift spans the series branch (t < 0.7), the closed forms, the t > 30
+# saturation, and the values at which the old code returned NaN
+ezdm_parity_drift <- c(0, 1e-300, 1e-8, 0.001, 0.05, 0.2, 0.5, 1, 2, 5, 20, 1500)
+
+test_that("ezdm_3par_lpdf in Stan matches dezdm() in R", {
+  skip_on_cran()
+  skip_if_not_installed("cmdstanr")
+  skip_if(is.null(cmdstanr::cmdstan_version(error_on_NA = FALSE)))
+
+  grid <- expand.grid(
+    drift = ezdm_parity_drift, bound = c(0.4, 1.5, 3), s = c(1, 1.4),
+    n_trials = c(3L, 500L)
+  )
+  grid$ndt <- 0.25
+  moments <- .ezdm_moments_3par(grid$drift, grid$bound, grid$s)
+  # keep the summaries near the implied moments so the lpdf stays moderate
+  grid$mean_rt <- grid$ndt + moments$MDT * 1.02
+  grid$var_rt <- moments$VRT * 0.9
+  grid$n_upper <- pmin(grid$n_trials, round(grid$n_trials * 0.6))
+
+  r_lpdf <- dezdm(
+    mean_rt = grid$mean_rt, var_rt = grid$var_rt, n_upper = grid$n_upper,
+    n_trials = grid$n_trials, drift = grid$drift, bound = grid$bound,
+    ndt = grid$ndt, s = grid$s, version = "3par"
+  )
+  stan_lpdf <- ezdm_stan_lpdf("3par", c(
+    list(N = nrow(grid)),
+    as.list(grid[c(
+      "mean_rt", "var_rt", "drift", "bound", "ndt", "s", "n_upper", "n_trials"
+    )])
+  ))
+
+  # -Inf only where pC rounds to 1 while some responses went to the other
+  # boundary; never NaN
+  expect_false(any(is.nan(r_lpdf)))
+  expect_false(any(is.nan(stan_lpdf)))
+  expect_equal(is.finite(stan_lpdf), is.finite(r_lpdf))
+
+  finite <- is.finite(r_lpdf)
+  expect_lt(max(abs(stan_lpdf[finite] - r_lpdf[finite]) / abs(r_lpdf[finite])), 1e-9)
+})
+
+test_that("ezdm_4par_lpdf in Stan matches dezdm() in R", {
+  skip_on_cran()
+  skip_if_not_installed("cmdstanr")
+  skip_if(is.null(cmdstanr::cmdstan_version(error_on_NA = FALSE)))
+
+  grid <- expand.grid(
+    drift = ezdm_parity_drift, bound = c(0.4, 1.5, 3), zr = c(0.5, 0.7, 0.95),
+    n_upper = c(0L, 1L, 3L, 30L)
+  )
+  grid$n_trials <- 30L
+  grid$s <- 1
+  grid$ndt <- 0.25
+  # n_upper 0 and 1 exercise the lower gate, 30 and 29 the upper one
+  grid <- rbind(grid, transform(grid[grid$n_upper == 30L, ], n_upper = 29L))
+  moments <- .ezdm_moments_4par(grid$drift, grid$bound, grid$zr, grid$s)
+  grid$mean_rt_upper <- grid$ndt + moments$mdt_upper * 1.02
+  grid$mean_rt_lower <- grid$ndt + moments$mdt_lower * 0.98
+  grid$var_rt_upper <- moments$vrt_upper * 0.9
+  grid$var_rt_lower <- moments$vrt_lower * 1.1
+
+  r_lpdf <- dezdm(
+    mean_rt = as.matrix(grid[c("mean_rt_upper", "mean_rt_lower")]),
+    var_rt = as.matrix(grid[c("var_rt_upper", "var_rt_lower")]),
+    n_upper = grid$n_upper, n_trials = grid$n_trials, drift = grid$drift,
+    bound = grid$bound, ndt = grid$ndt, zr = grid$zr, s = grid$s,
+    version = "4par"
+  )
+  stan_lpdf <- ezdm_stan_lpdf("4par", c(
+    list(N = nrow(grid)),
+    as.list(grid[c(
+      "mean_rt_upper", "mean_rt_lower", "var_rt_upper", "var_rt_lower",
+      "drift", "bound", "ndt", "zr", "s", "n_upper", "n_trials"
+    )])
+  ))
+
+  expect_false(any(is.nan(r_lpdf)))
+  expect_false(any(is.nan(stan_lpdf)))
+  expect_equal(is.finite(stan_lpdf), is.finite(r_lpdf))
+
+  finite <- is.finite(r_lpdf)
+  expect_lt(max(abs(stan_lpdf[finite] - r_lpdf[finite]) / abs(r_lpdf[finite])), 1e-9)
+})
+
+test_that("ezdm Stan code calls the model lpdf and parses", {
+  skip_on_cran()
+  data <- data.frame(
+    mean_rt = c(0.5, 0.55), var_rt = c(0.02, 0.03), n_upper = c(60L, 40L),
+    n_trials = c(100L, 100L), mean_rt_upper = c(0.5, 0.55),
+    mean_rt_lower = c(0.6, 0.58), var_rt_upper = c(0.02, 0.03),
+    var_rt_lower = c(0.03, 0.04)
+  )
+
+  code3 <- stancode(
+    bmf(drift ~ 1, bound ~ 1, ndt ~ 1), data = data,
+    model = ezdm("mean_rt", "var_rt", "n_upper", "n_trials", version = "3par")
+  )
+  expect_match(code3, "real ezdm_3par_lpdf(", fixed = TRUE)
+  expect_match(code3, "vector ezdm_cumulants(", fixed = TRUE)
+  expect_match(code3, "ezdm_3par_lpdf(Y[n] |", fixed = TRUE)
+
+  code4 <- stancode(
+    bmf(drift ~ 1, bound ~ 1, ndt ~ 1, zr ~ 1), data = data,
+    model = ezdm(
+      c("mean_rt_upper", "mean_rt_lower"), c("var_rt_upper", "var_rt_lower"),
+      "n_upper", "n_trials",
+      version = "4par"
+    )
+  )
+  expect_match(code4, "real ezdm_4par_lpdf(", fixed = TRUE)
+  expect_match(code4, "vector ezdm_cumulants(", fixed = TRUE)
+
+  skip_if_not_installed("cmdstanr")
+  skip_if(is.null(cmdstanr::cmdstan_version(error_on_NA = FALSE)))
+  for (code in list(code3, code4)) {
+    model <- cmdstanr::cmdstan_model(cmdstanr::write_stan_file(code), compile = FALSE)
+    expect_true(model$check_syntax(quiet = TRUE))
+  }
+})

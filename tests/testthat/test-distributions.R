@@ -1292,3 +1292,147 @@ test_that("dezdm 3par handles varying n_trials correctly", {
   expect_length(ll_vec, 3)
   expect_true(all(is.finite(ll_vec)))
 })
+
+
+# Tests for the ezdm decision-time cumulants (issue #407) ----------------------
+
+# Reference values from local/ezdm/k34_derivation.py: the cumulants of the
+# boundary-conditional first-passage time, evaluated at 60+ digits from the
+# closed forms with enough guard digits for the cancellation, and cross-checked
+# against numerical differentiation of the CGF itself (agreement 7e-59).
+ezdm_cumulant_references <- function() {
+  # read.csv rather than a tribble: tibble is not a declared dependency, and the
+  # 17-digit decimals round-trip the doubles exactly
+  ref <- utils::read.csv(text = "drift,bound,zr,s,boundary,MDT,VRT,k3,k4
+0,1.5,0.5,1.0,upper,0.5625,0.2109375,0.18984375,0.25934012276785714
+1e-08,1.5,0.5,1.0,upper,0.56249999999999999,0.21093749999999999,0.18984374999999999,0.25934012276785712
+0.01,1.0,0.5,1.0,upper,0.24999791668749979,0.041665833345981972,0.016666160724536864,0.01011863757652396
+0.2,1.5,0.5,1.0,upper,0.5583188760874424,0.20719186958160496,0.1847501123616437,0.25009358517694253
+0.5,1.5,0.5,1.0,upper,0.53753609752617892,0.18908944624838941,0.16079771187077391,0.2077761272089794
+2.0,1.0,0.5,1.0,upper,0.19039853898894122,0.021351238396358676,0.0060181161652498743,0.0025955878267946837
+5.0,3.0,0.5,1.4,upper,0.29971538162917291,0.023326995904847908,0.0053841925909205833,0.0020413082600528851
+100.0,1.5,0.5,1.0,upper,0.0075,7.5e-7,2.25e-10,1.125e-13
+0.05,1.5,0.8,1.0,upper,0.2698340611020102,0.13266229314104025,0.14203028421087174,0.21614906104371065
+0.05,1.5,0.8,1.0,lower,0.71971935057529668,0.22439914724951283,0.19251972387929096,0.2597655971356454
+1.0,1.5,0.8,1.0,upper,0.21774203644294689,0.08200902526658194,0.071383919789698674,0.089504207727222578
+1.0,1.5,0.8,1.0,lower,0.62736556037724539,0.15310222810508356,0.10517772494355196,0.11488864600247718
+2.0,0.5,0.95,1.4,upper,0.004013234648407409,0.0001250812152839004,8.439155091234556e-6,7.9963594687025653e-7
+2.0,0.5,0.95,1.4,lower,0.041690711753955124,0.0006885741617546384,3.252941531017657e-5,2.4237919043289123e-6
+20.0,3.0,0.6,1.0,upper,0.060000000000000003,0.00015000000000000001,1.1250000000000001e-6,1.4062500000000001e-8
+1500.0,1.0,0.6,1.0,upper,0.00026666666666666668,1.1851851851851853e-10,1.580246913580247e-16,3.5116598079561044e-22")
+  ref$b <- ifelse(ref$boundary == "upper", ref$zr, 1 - ref$zr) * ref$bound
+  ref
+}
+
+test_that(".ezdm_cumulants matches high-precision references in both branches", {
+  ref <- ezdm_cumulant_references()
+  got <- .ezdm_cumulants(ref$b, ref$bound, ref$drift^2 / ref$s^4, ref$s)
+
+  for (moment in c("MDT", "VRT", "k3", "k4")) {
+    expect_equal(got[[moment]], ref[[moment]], tolerance = 1e-10, info = moment)
+  }
+})
+
+test_that(".ezdm_cumulants is continuous across the series/closed-form seam", {
+  for (bound in c(0.8, 1.5, 3)) {
+    for (zr in c(0.5, 0.7, 0.9)) {
+      w_seam <- (0.7 / bound)^2
+      below <- .ezdm_cumulants(zr * bound, bound, w_seam * (1 - 1e-12), 1)
+      above <- .ezdm_cumulants(zr * bound, bound, w_seam * (1 + 1e-12), 1)
+      expect_lt(max(abs(unlist(above) / unlist(below) - 1)), 1e-9)
+    }
+  }
+})
+
+test_that(".ezdm_cumulants reproduces the zero-drift limits", {
+  # k_n(w = 0) = (-1)^n (2/s^2)^n a_n n! (b^2n - b0^2n); for the symmetric start
+  # point these collapse to the 3par values below
+  a <- 1.3
+  zero_drift <- .ezdm_cumulants(a / 2, a, 0, 1)
+  expect_equal(zero_drift$MDT, a^2 / 4)
+  expect_equal(zero_drift$VRT, a^4 / 24)
+  expect_equal(zero_drift$k3, a^6 / 60)
+  expect_equal(zero_drift$k4, 17 * a^8 / 1680)
+
+  # excess kurtosis 17 * 576 / 1680 at zero drift, i.e. kurtosis 8.83
+  expect_equal(zero_drift$k4 / zero_drift$VRT^2, 17 * 576 / 1680)
+})
+
+test_that(".ezdm_cumulants reproduces the 4par zero-drift limits", {
+  bound <- 1.6
+  zr <- 0.7
+  z <- bound / 2
+  x0 <- zr * bound - z
+  zero_drift <- .ezdm_cumulants(c(z + x0, z - x0), bound, 0, 1)
+
+  expect_equal(
+    zero_drift$MDT,
+    c(4 * z^2 - (z + x0)^2, 4 * z^2 - (z - x0)^2) / 3
+  )
+  expect_equal(
+    zero_drift$VRT,
+    c(32 * z^4 - 2 * (z + x0)^4, 32 * z^4 - 2 * (z - x0)^4) / 45
+  )
+})
+
+test_that(".ezdm_cumulants agrees with the Laplace transform of the decision time", {
+  # E[exp(-lambda T) | upper] has CGF log sinh(q b) - log sinh(q b0) up to a
+  # constant, with q = sqrt(drift^2 + 2 lambda s^2) / s^2
+  bound <- 1.4
+  zr <- 0.65
+  drift <- 0.9
+  s <- 1
+  cgf <- function(lambda) {
+    q <- sqrt(drift^2 + 2 * lambda * s^2) / s^2
+    log(sinh(q * zr * bound)) - log(sinh(q * bound))
+  }
+  h <- 1e-4
+  mdt_fd <- -(cgf(h) - cgf(-h)) / (2 * h)
+  vrt_fd <- (cgf(h) - 2 * cgf(0) + cgf(-h)) / h^2
+
+  got <- .ezdm_cumulants(zr * bound, bound, drift^2 / s^4, s)
+  expect_equal(got$MDT, mdt_fd, tolerance = 1e-6)
+  expect_equal(got$VRT, vrt_fd, tolerance = 1e-5)
+})
+
+test_that(".ezdm_cumulants stays finite at extreme drift", {
+  # cosh(t)/sinh(t) is NaN above t = 710 and t^4 * csch^2(t) is Inf * 0 there;
+  # the old .ezdm_moments_4par() returned NaN for every moment at drift = 1500
+  extreme <- .ezdm_cumulants(0.6, 1, c(0, 1e-300, 1e-8, 1, 1e6, 1e12)^2, 1)
+  expect_true(all(is.finite(unlist(extreme))))
+
+  moments <- .ezdm_moments_4par(drift = 1500, bound = 1, zr = 0.6, s = 1)
+  expect_true(all(is.finite(unlist(moments))))
+  expect_true(all(is.finite(unlist(.ezdm_moments_3par(1500, 1, 1)))))
+})
+
+test_that(".ez_rt_terms keeps a positive conditional variance across the ezdm grid", {
+  grid <- expand.grid(
+    drift = 10^seq(-3, 2, length.out = 25), bound = c(0.5, 1, 2, 4),
+    zr = c(0.5, 0.7, 0.9), n = c(3, 5, 10, 50, 200, 1000)
+  )
+  moments <- .ezdm_cumulants(grid$zr * grid$bound, grid$bound, grid$drift^2, 1)
+  rt <- .ez_rt_terms(moments$VRT, moments$k3, moments$k4, grid$n)
+
+  ratio <- rt$sd^2 / (moments$VRT / grid$n)
+  expect_true(all(is.finite(ratio)))
+  expect_gt(min(ratio), 0.3)
+  expect_lte(max(ratio), 1)
+})
+
+test_that(".ezdm_pc is stable in both drift directions", {
+  # the old exp(2 k z) form returned NaN from |drift| ~ 400
+  drift <- c(-1500, -400, -1, 0, 1, 400, 1500)
+  pC <- .ezdm_moments_4par(drift = drift, bound = 1, zr = 0.6, s = 1)$pC
+
+  expect_true(all(is.finite(pC)))
+  expect_true(all(pC >= 0 & pC <= 1))
+  expect_equal(pC[drift == 0], 0.6)
+  expect_true(all(diff(pC) >= 0))
+
+  # 3par is the same function at zr = 0.5
+  expect_equal(
+    .ezdm_moments_3par(drift, 1, 1)$pC,
+    .ezdm_moments_4par(drift, bound = 1, zr = 0.5, s = 1)$pC
+  )
+})
