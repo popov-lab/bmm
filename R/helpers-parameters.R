@@ -88,7 +88,7 @@ link_transform <- function(values, link, inverse = FALSE) {
       link,
       identity = values,
       log = exp(values),
-      softplus = .softplus_inv(values),
+      softplus = .log1p_exp(values),
       log1p = expm1(values),
       logm1 = brms::expp1(values),
       inverse = 1 / values,
@@ -105,7 +105,7 @@ link_transform <- function(values, link, inverse = FALSE) {
       link,
       identity = values,
       log = log(values),
-      softplus = .softplus(values),
+      softplus = .log_expm1(values),
       log1p = log1p(values),
       logm1 = brms::logm1(values),
       inverse = 1 / values,
@@ -132,13 +132,13 @@ link_transform <- function(values, link, inverse = FALSE) {
 #'
 #' @keywords internal
 #' @noRd
-.softplus_inv <- function(values) {
+.log1p_exp <- function(values) {
   out <- log1p(exp(values))
   ifelse(out < Inf, out, values)
 }
 
 #' @noRd
-.softplus <- function(values) {
+.log_expm1 <- function(values) {
   out <- log(expm1(values))
   ifelse(out < Inf, out, values)
 }
@@ -737,18 +737,15 @@ native_transform.default <- function(model, linpred, data, ...) {
 #' @rdname native_transform
 #' @export
 native_transform.non_targets <- function(model, linpred, data, ...) {
-  softmax_pars <- .np_softmax_pars(model, names(linpred))
-  non_target <- intersect(softmax_pars, "thetant")
+  # configure_model.mixture3p() gates each non-target component on its LureIdx, so
+  # where no lure was presented the likelihood holds it at -100 and the weight is
+  # zero rather than whatever the set-size regression extrapolates to
+  non_target <- intersect(.np_softmax_pars(model, names(linpred)), "thetant")
   if (length(non_target) == 0) {
     return(NextMethod())
   }
-
-  no_lure <- .np_lure_free_rows(model, data)
-  linpred[[non_target]][, no_lure] <- -Inf
-
-  own <- .np_softmax(linpred[softmax_pars])
-  linpred <- linpred[not_in(names(linpred), softmax_pars)]
-  c(NextMethod(), own)
+  linpred[[non_target]][, .np_lure_free_rows(model, data)] <- -Inf
+  NextMethod()
 }
 
 
