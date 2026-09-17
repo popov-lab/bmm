@@ -45,11 +45,18 @@
 #' @param file_compress Logical or a character string, specifying one of the
 #'   compression algorithms supported by [saveRDS] when saving
 #'   the fitted model object.
-#' @param file_refit Logical or character string. Modifies when the fit stored via the `file` argument is
-#'   re-used. Can be set globally for the current R session via the
-#'   `"bmm.file_refit"` option (see [options]). If `TRUE` or "always", the
-#'   model is fitted again. If `FALSE` or "never" (the default), the model saved under the name specified in `file`
-#'   will be re-used. Note that unlike in `brms`, there is no "on_change" option
+#' @param file_refit Logical or character string. Modifies when the fit stored
+#'   via the `file` argument is re-used. Can be set globally for the current R
+#'   session via the `"bmm.file_refit"` option (see [options]). If `TRUE` or
+#'   "always", the model is fitted again. If `FALSE` or "never" (the default),
+#'   the model saved under the name specified in `file` will be re-used. If
+#'   "on_change", the saved model is re-used only if the Stan code, the Stan
+#'   data, the factor levels of the model variables and the algorithm are
+#'   unchanged; otherwise the model is fitted again. Because that comparison
+#'   needs the Stan code and data of the current call, "on_change" runs the
+#'   full bmm configuration pipeline and [standata()][standata.bmmformula()]
+#'   even when the cached fit is returned; much cheaper than compiling and
+#'   sampling, but not free
 #' @param ... Further arguments passed to [brms::brm()] or Stan. See the
 #'   description of [brms::brm()] for more details
 #'
@@ -110,11 +117,18 @@ bmm <- function(formula, data, model,
   deprecated_args(...)
   dots <- list(...)
   local_brms_threads(dots)
+  file <- check_rds_file(file)
+  file_refit <- validate_file_refit(file_refit)
 
-  # check if the model has been previously fit and return it if requested
-  x <- try_read_bmmfit(file, file_refit)
-  if (!is.null(x)) {
-    return(x)
+  # check if the model has been previously fit and return it if requested.
+  # "on_change" cannot be answered here -- it needs the Stan code and data that
+  # only exist further down -- so it is checked where brms checks it, after
+  # code and data generation and before compilation
+  if (file_refit == "never") {
+    x <- try_read_bmmfit(file)
+    if (!is.null(x)) {
+      return(x)
+    }
   }
 
   # set temporary global options and return modified arguments for brms
@@ -143,6 +157,17 @@ bmm <- function(formula, data, model,
 
   # estimate the model
   fit_args <- combine_args(nlist(config_args, opts, dots, prior))
+
+  if (file_refit == "on_change") {
+    x <- try_read_bmmfit(file)
+    if (!is.null(x)) {
+      x <- restructure(x)
+      if (!bmmfit_needs_refit(x, fit_args, silent)) {
+        return(x)
+      }
+    }
+  }
+
   fit <- brms::do_call(brms::brm, fit_args)
 
   # model post-processing

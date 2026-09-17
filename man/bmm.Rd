@@ -81,11 +81,18 @@ later usage. If the directory of the file does not exist, it will be created.}
 compression algorithms supported by \link{saveRDS} when saving
 the fitted model object.}
 
-\item{file_refit}{Logical or character string. Modifies when the fit stored via the \code{file} argument is
-re-used. Can be set globally for the current R session via the
-\code{"bmm.file_refit"} option (see \link{options}). If \code{TRUE} or "always", the
-model is fitted again. If \code{FALSE} or "never" (the default), the model saved under the name specified in \code{file}
-will be re-used. Note that unlike in \code{brms}, there is no "on_change" option}
+\item{file_refit}{Logical or character string. Modifies when the fit stored
+via the \code{file} argument is re-used. Can be set globally for the current R
+session via the \code{"bmm.file_refit"} option (see \link{options}). If \code{TRUE} or
+"always", the model is fitted again. If \code{FALSE} or "never" (the default),
+the model saved under the name specified in \code{file} will be re-used. If
+"on_change", the saved model is re-used only if the Stan code, the Stan
+data, the factor levels of the model variables and the algorithm are
+unchanged; otherwise the model is fitted again. Because that comparison
+needs the Stan code and data of the current call, "on_change" runs the
+full bmm configuration pipeline and \link[=standata.bmmformula]{standata()}
+even when the cached fit is returned; much cheaper than compiling and
+sampling, but not free}
 
 \item{...}{Further arguments passed to \code{\link[brms:brm]{brms::brm()}} or Stan. See the
 description of \code{\link[brms:brm]{brms::brm()}} for more details}

@@ -485,8 +485,11 @@ identical.formula <- function(x, y, ...) {
 #'  printed in color. **Default: TRUE**
 #' @param reset_options logical. If TRUE, the options will be reset to their
 #'   default values **Default: FALSE**
-#' @param file_refit logical. If TRUE, bmm() will refit the model even if the
-#'  file argument is specified. **Default: FALSE**
+#' @param file_refit logical or character. Controls when `bmm()` re-uses a fit
+#'  saved via its `file` argument. `TRUE` or "always" always refits, `FALSE` or
+#'  "never" always re-uses the saved fit, and "on_change" re-uses it only while
+#'  the Stan code and data are unchanged. See [bmm()] for details. **Default:
+#'  FALSE**
 #' @details The `bmm_options` function is used to view or change the current bmm
 #'   options. If no arguments are provided, the function will return the current
 #'   options. If arguments are provided, the function will change the options
@@ -547,10 +550,9 @@ bmm_options <- function(sort_data, parallel, default_priors, silent,
     !missing(color_summary) && !is.logical(color_summary),
     "color_summary must be either TRUE or FALSE"
   )
-  stopif(
-    !missing(file_refit) && !is.logical(file_refit),
-    "file_refit must be either TRUE or FALSE"
-  )
+  if (!missing(file_refit)) {
+    validate_file_refit(file_refit)
+  }
 
   # set default options if function is called for the first time or if reset_options is TRUE
   if (reset_options) {
@@ -705,25 +707,24 @@ deprecated_args <- function(...) {
   )
 }
 
-try_read_bmmfit <- function(file, file_refit) {
-  if (is.character(file_refit)) {
-    stopif(
-      !tolower(file_refit) %in% c("never", "always", "on_change"),
-      'You have provided an invalid option for the file_refit argument.
-      Valid options are: "never" or "always"
-      The "on_change" option available in brms is not yet implemented'
-    )
-
-    warnif(
-      tolower(file_refit) == "on_change",
-      'The "on_change" option for the file_refit argument available in brms,
-      is currently not implemented for bmm.
-      To avoid overwriting an already saved bmmfit object, file_refit was set to "never".'
-    )
-    file_refit <- ifelse(file_refit == "always", TRUE, FALSE)
+# normalize the user-facing file_refit values to the three strings the rest of
+# the package branches on. Called from the exported surfaces bmm() and
+# bmm_options()
+validate_file_refit <- function(file_refit) {
+  if (is.logical(file_refit)) {
+    return(if (isTRUE(file_refit)) "always" else "never")
   }
-  file <- check_rds_file(file)
-  if (is.null(file) || file_refit) {
+  file_refit <- tolower(file_refit)
+  stopif(
+    !isTRUE(file_refit %in% c("never", "always", "on_change")),
+    'You have provided an invalid option for the file_refit argument.
+    Valid options are: TRUE, FALSE, "never", "always" or "on_change"'
+  )
+  file_refit
+}
+
+try_read_bmmfit <- function(file) {
+  if (is.null(file)) {
     return(NULL)
   }
   dir <- try(fs::dir_create(dirname(file)))
@@ -737,6 +738,23 @@ try_read_bmmfit <- function(file, file_refit) {
   stopif(!is_bmmfit(out), "Object loaded via 'file' is not of class 'bmmfit'.")
   out$file <- file
   out
+}
+
+# the cached fit is compared against the Stan code and data that the current
+# call would compile, which is why this can only run once fit_args exist. The
+# `object`/`formula` swap is the same one standata.bmmformula() uses to turn
+# bmm's fit_args into a brms call
+bmmfit_needs_refit <- function(fit, fit_args, silent) {
+  fit_args$object <- fit_args$formula
+  fit_args$formula <- NULL
+  brms::brmsfit_needs_refit(
+    fit,
+    sdata = brms::do_call(brms::standata, fit_args),
+    scode = brms::do_call(brms::stancode, fit_args),
+    data = fit_args$data,
+    algorithm = fit_args$algorithm %||% getOption("brms.algorithm", "sampling"),
+    silent = silent
+  )
 }
 
 try_save_bmmfit <- function(object, file, compress) {

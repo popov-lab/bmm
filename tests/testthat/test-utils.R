@@ -85,14 +85,24 @@ test_that("try_read_bmmfit works", {
   file <- tempfile()
   mock_fit$file <- paste0(file, ".rds")
   saveRDS(mock_fit, paste0(file, ".rds"))
-  expect_equal(try_read_bmmfit(file, FALSE), mock_fit,
+  expect_equal(try_read_bmmfit(paste0(file, ".rds")), mock_fit,
     ignore_function_env = TRUE,
     ignore_formula_env = TRUE
   )
 
   x <- 1
   saveRDS(x, paste0(file, ".rds"))
-  expect_error(try_read_bmmfit(file, FALSE), "not of class 'bmmfit'")
+  expect_error(try_read_bmmfit(paste0(file, ".rds")), "not of class 'bmmfit'")
+})
+
+test_that("validate_file_refit normalizes the user-facing values", {
+  expect_equal(validate_file_refit(FALSE), "never")
+  expect_equal(validate_file_refit(TRUE), "always")
+  expect_equal(validate_file_refit("never"), "never")
+  expect_equal(validate_file_refit("Always"), "always")
+  expect_equal(validate_file_refit("On_Change"), "on_change")
+  expect_error(validate_file_refit("sometimes"), "invalid option")
+  expect_error(validate_file_refit(1), "invalid option")
 })
 
 test_that("try_save_bmmfit works", {
@@ -118,6 +128,123 @@ test_that("try_save_bmmfit works", {
     file = file, file_refit = TRUE
   )
   expect_error(expect_equal(mock_fit, mock_fit3))
+
+  # a mixed-case "always" must refit too, not silently read the cache
+  mock_fit4 <- bmm(bmf(c ~ 1, kappa ~ 1), oberauer_lin_2017, sdm("dev_rad"),
+    backend = "mock", mock_fit = 4, rename = F,
+    file = file, file_refit = "Always"
+  )
+  expect_equal(mock_fit4$fit, 4)
+})
+
+# `mock_fit` doubles as the identity of the fit: the cached object carries the
+# value it was fitted with, so a returned fit whose $fit differs from the value
+# passed to the current call is the cached one
+test_that('file_refit = "on_change" returns the cached fit while nothing changes', {
+  withr::local_options(bmm.sort_data = FALSE)
+  file <- tempfile()
+  cached <- bmm(bmf(c ~ 1, kappa ~ 1), oberauer_lin_2017, sdm("dev_rad"),
+    backend = "mock", mock_fit = 1, rename = F,
+    file = file, file_refit = "on_change"
+  )
+  expect_equal(cached$fit, 1)
+
+  same <- bmm(bmf(c ~ 1, kappa ~ 1), oberauer_lin_2017, sdm("dev_rad"),
+    backend = "mock", mock_fit = 2, rename = F,
+    file = file, file_refit = "on_change"
+  )
+  expect_equal(same$fit, 1)
+  expect_equal(same$file, paste0(file, ".rds"))
+})
+
+test_that('file_refit = "on_change" refits when the model changes', {
+  withr::local_options(bmm.sort_data = FALSE)
+  fit_cache <- function(formula, data, ..., file, mock_fit) {
+    bmm(formula, data, sdm("dev_rad"),
+      backend = "mock", mock_fit = mock_fit, rename = F,
+      file = file, file_refit = "on_change", ...
+    )
+  }
+  data <- oberauer_lin_2017
+  ff <- bmf(c ~ 1, kappa ~ 1)
+
+  file <- tempfile()
+  fit_cache(ff, data, file = file, mock_fit = 1)
+  expect_equal(
+    fit_cache(bmf(c ~ 0 + set_size, kappa ~ 1), data, file = file, mock_fit = 2)$fit,
+    2
+  )
+
+  # a row subset leaves the Stan code untouched and is seen through sdata alone
+  file <- tempfile()
+  fit_cache(ff, data, file = file, mock_fit = 1)
+  expect_equal(fit_cache(ff, data[1:100, ], file = file, mock_fit = 3)$fit, 3)
+
+  # a prior change is the mirror case: identical sdata, different Stan code
+  file <- tempfile()
+  fit_cache(ff, data, file = file, mock_fit = 1)
+  expect_equal(
+    fit_cache(ff, data,
+      file = file, mock_fit = 4,
+      prior = brms::set_prior("normal(0, 0.1)", class = "Intercept", dpar = "kappa")
+    )$fit,
+    4
+  )
+
+  # renaming factor levels changes neither the Stan code nor the Stan data, so
+  # only the data handed to brms::brmsfit_needs_refit() can catch it
+  data$set_size <- factor(data$set_size)
+  renamed <- data
+  levels(renamed$set_size) <- paste0("ss", levels(renamed$set_size))
+  ff_ss <- bmf(c ~ 0 + set_size, kappa ~ 1)
+  file <- tempfile()
+  fit_cache(ff_ss, data, file = file, mock_fit = 1)
+  expect_equal(fit_cache(ff_ss, renamed, file = file, mock_fit = 5)$fit, 5)
+
+  file <- tempfile()
+  fit_cache(ff, data, file = file, mock_fit = 1)
+  expect_equal(
+    fit_cache(ff, data, file = file, mock_fit = 6, algorithm = "meanfield")$fit,
+    6
+  )
+})
+
+test_that('file_refit = "on_change" reports why it refits at silent = 0', {
+  withr::local_options(bmm.sort_data = FALSE)
+  file <- tempfile()
+  suppressMessages(bmm(bmf(c ~ 1, kappa ~ 1), oberauer_lin_2017, sdm("dev_rad"),
+    backend = "mock", mock_fit = 1, rename = F,
+    file = file, file_refit = "on_change"
+  ))
+  expect_message(
+    bmm(bmf(c ~ 1, kappa ~ 1), oberauer_lin_2017, sdm("dev_rad"),
+      backend = "mock", mock_fit = 2, rename = F, silent = 0,
+      file = file, file_refit = "on_change",
+      prior = brms::set_prior("normal(0, 0.1)", class = "Intercept", dpar = "kappa")
+    ),
+    "Stan code has changed"
+  )
+})
+
+test_that('bmm_options() accepts and applies file_refit = "on_change"', {
+  withr::local_options(bmm.sort_data = FALSE)
+  old_op <- suppressMessages(bmm_options(file_refit = "on_change"))
+  withr::defer(options(old_op))
+  expect_equal(getOption("bmm.file_refit"), "on_change")
+  expect_error(suppressMessages(bmm_options(file_refit = "sometimes")), "invalid option")
+
+  file <- tempfile()
+  bmm(bmf(c ~ 1, kappa ~ 1), oberauer_lin_2017, sdm("dev_rad"),
+    backend = "mock", mock_fit = 1, rename = F, file = file
+  )
+  same <- bmm(bmf(c ~ 1, kappa ~ 1), oberauer_lin_2017, sdm("dev_rad"),
+    backend = "mock", mock_fit = 2, rename = F, file = file
+  )
+  expect_equal(same$fit, 1)
+  changed <- bmm(bmf(c ~ 0 + set_size, kappa ~ 1), oberauer_lin_2017, sdm("dev_rad"),
+    backend = "mock", mock_fit = 3, rename = F, file = file
+  )
+  expect_equal(changed$fit, 3)
 })
 
 test_that("is_namedlist works", {
