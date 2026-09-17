@@ -214,7 +214,7 @@ install_and_load_bmm_version <- function(version, path) {
   if (!dir.exists(path) || length(list.files(path)) == 0 ||
     length(list.files(file.path(path, "bmm"))) == 0) {
     dir.create(path)
-    remotes::install_github(paste0("venpopov/bmm@", version), lib = path)
+    remotes::install_github(paste0("popov-lab/bmm@", version), lib = path)
   }
   library(bmm, lib.loc = path)
 }
@@ -696,7 +696,7 @@ deprecated_args <- function(...) {
     'The "model_type" argument was deprecated on Feb 3, 2024. Either:
          - See ?bmm for the new usage;
          - or install the old version of the package with:
-           devtools::install_github("venpopov/bmm@v0.0.1")'
+           devtools::install_github("popov-lab/bmm@v0.0.1")'
   )
   warnif(
     "parallel" %in% names(dots),
