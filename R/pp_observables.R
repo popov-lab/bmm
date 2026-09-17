@@ -66,9 +66,14 @@ pp_simulate.default <- function(model, prep) {
 
 # get_dpar() returns a scalar for dpars that brms stores fixed and an
 # ndraws x nobs matrix otherwise; rep_len() flattens both to one column-major
-# vector
+# vector. Any other length would recycle into the wrong draw-major layout and
+# attribute every simulated value to the wrong observation, silently.
 .pp_dpar_vector <- function(prep, name) {
-  rep_len(as.vector(brms::get_dpar(prep, name)), prep$ndraws * prep$nobs)
+  v <- as.vector(brms::get_dpar(prep, name))
+  stopif(!length(v) %in% c(1L, prep$ndraws * prep$nobs),
+         "Cannot map dpar '{name}' (length {length(v)}) onto \\
+          {prep$ndraws} draws x {prep$nobs} observations.")
+  rep_len(v, prep$ndraws * prep$nobs)
 }
 
 # One RNG call over all draws and observations, reshaped column-major into
@@ -217,9 +222,9 @@ pp_check_vars <- function(fit) {
       response = .pp_observable(function(d) d$response,
                                 label = "Response (0 = lower, 1 = upper)",
                                 type = "bars"),
+.pp_build_ppc_plot <- function(check, value, type, group_vec, plot_dots) {
       signed_rt = .pp_observable(function(d) d$rt * (2 * d$response - 1),
                                  label = "Signed response time (lower = negative)")
     )
   )
 }
-.pp_build_ppc_plot <- function(check, value, type, group_vec, plot_dots) {

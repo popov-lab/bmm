@@ -59,6 +59,42 @@ test_that("signed_rt flips the sign of lower-boundary response times", {
                    c(0.5, -0.7, 0.4))
 })
 
+# The closures are called once with length-N vectors (-> y) and once with
+# ndraws x N matrices (-> yrep), so every row of the matrix result must equal
+# the vector result. A closure that aggregates, uses length(), indexes with a
+# scalar, or relies on column-major recycling would misalign y and yrep with
+# no error -- this invariant is what makes the same code serve both halves.
+test_that("every registered compute closure is elementwise", {
+  n_obs <- 7L
+  n_draws <- 4L
+  actual <- expected <- list()
+  for (m in seq_along(registered_models)) {
+    model <- registered_models[[m]]
+    spec <- pp_observables(model)
+    observed <- stats::setNames(
+      lapply(seq_along(spec$observed), function(i) seq_len(n_obs) + i),
+      names(spec$observed)
+    )
+    yrep_inputs <- lapply(observed, .pp_expand_data, ndraws = n_draws)
+    for (nm in names(spec$checks)) {
+      # keyed by position: two versions of one model share model$name, and a
+      # collision here would silently drop a closure from the audit
+      key <- paste(m, utils::tail(class(model), 1L), nm, sep = "/")
+      compute <- spec$checks[[nm]]$compute
+      actual[[key]] <- compute(yrep_inputs)
+      expected[[key]] <- .pp_expand_data(compute(observed), n_draws)
+    }
+  }
+  expect_length(actual, 17L)
+  expect_equal(actual, expected)
+})
+
+test_that(".pp_dpar_vector() rejects a dpar it cannot map onto the grid", {
+  prep <- fake_prep(4L, 3L, dpars = list(drift = rep(1, 12)))
+  prep$dpars$drift <- c(10, 20, 30)
+  expect_error(.pp_dpar_vector(prep, "drift"), "Cannot map dpar 'drift'")
+})
+
 test_that("pp_simulate() errors for a model without a method", {
   model <- structure(list(name = "fakemodel"), class = c("bmmodel", "fakemodel"))
   expect_error(pp_simulate(model, fake_prep(2L, 2L, list())),
@@ -75,6 +111,20 @@ test_that("pp_simulate.ddm() draws each cell from its own parameters", {
   expect_gt(min(colMeans(sims$response)[1:3]), 0.95)
   expect_lt(max(colMeans(sims$response)[4:6]), 0.05)
   expect_true(all(sims$rt > 0.2))
+})
+
+# The internal-consistency check below passes just as happily if both sides of
+# the bound * 2 mapping are wrong; this pins pp_simulate against the function
+# whose transform it must mirror. At nobs = 1 both paths make the same single
+# .rcswald() call, so a shared seed makes the streams comparable.
+test_that("pp_simulate.cswald_simple() mirrors posterior_predict_cswald_simple", {
+  prep <- fake_prep(25L, 1L, dpars = list(
+    drift = rep(2, 25), bound = rep(0.8, 25), ndt = rep(0.2, 25), s = rep(1, 25)
+  ))
+  sims <- withr::with_seed(3, pp_simulate(cswald(rt = "rt", response = "r"),
+                                          prep))
+  pp <- withr::with_seed(3, posterior_predict_cswald_simple(1L, prep))
+  expect_equal(as.vector(sims$rt), as.vector(pp))
 })
 
 test_that("cswald simple doubles the bound of the two-boundary generator", {
@@ -113,20 +163,6 @@ test_that("pp_simulate.ezdm_4par() emits NA where a boundary has < 2 responses",
   ), data = list(vint2 = rep(3L, 4L)))
   sims <- pp_simulate(model, prep)
   expect_identical(is.na(sims$mean_rt_upper), sims$n_upper < 2)
-# The internal-consistency check below passes just as happily if both sides of
-# the bound * 2 mapping are wrong; this pins pp_simulate against the function
-# whose transform it must mirror. At nobs = 1 both paths make the same single
-# .rcswald() call, so a shared seed makes the streams comparable.
-test_that("pp_simulate.cswald_simple() mirrors posterior_predict_cswald_simple", {
-  prep <- fake_prep(25L, 1L, dpars = list(
-    drift = rep(2, 25), bound = rep(0.8, 25), ndt = rep(0.2, 25), s = rep(1, 25)
-  ))
-  sims <- withr::with_seed(3, pp_simulate(cswald(rt = "rt", response = "r"),
-                                          prep))
-  pp <- withr::with_seed(3, posterior_predict_cswald_simple(1L, prep))
-  expect_equal(as.vector(sims$rt), as.vector(pp))
-})
-
   expect_identical(is.na(sims$mean_rt_lower), (3L - sims$n_upper) < 2)
 })
 
