@@ -4,6 +4,35 @@
 
 #### New features
 
+- `bmm(file_refit = "on_change")` is now implemented and no longer warns
+  and falls back to `"never"`. The cached fit saved under `file` is
+  returned only while the Stan code, the Stan data, the factor levels of
+  the model variables and the algorithm are unchanged; any change
+  refits. The comparison happens where `brms` makes it — after the bmm
+  configuration pipeline has produced the Stan code and data, before
+  compilation — so a cache hit costs one run of the pipeline plus
+  [`standata()`](https://venpopov.com/bmm/dev/reference/standata.bmmformula.md)
+  and
+  [`stancode()`](https://venpopov.com/bmm/dev/reference/stancode.bmmformula.md):
+  about 0.4 s rather than 0.02 s for an **sdm** model of
+  `oberauer_lin_2017`, far less than compiling and sampling but not
+  free. As in `brms`, only those four things are compared, so sampler
+  settings do not force a refit — `control = list(adapt_delta = )` in
+  particular, and also `iter`, `warmup`, `chains`, `seed`, `init` and
+  `save_pars`: rerunning with a higher `adapt_delta` after divergent
+  transitions, or with `save_pars(all = TRUE)` for `loo()`, returns the
+  cached fit unchanged
+  ([\#411](https://github.com/popov-lab/bmm/issues/411)).
+- `bmm_options(file_refit = )` accepts the same values as
+  [`bmm()`](https://venpopov.com/bmm/dev/reference/bmm.md). It
+  previously required a logical, so the string forms could be set only
+  through `options(bmm.file_refit = )`
+  ([\#411](https://github.com/popov-lab/bmm/issues/411)).
+- [`update()`](https://rdrr.io/r/stats/update.html) gained the `file`
+  and `file_compress` arguments. `file` writes the updated fit in the
+  same order [`bmm()`](https://venpopov.com/bmm/dev/reference/bmm.md)
+  does, i.e. after the bmm postprocessing
+  ([\#411](https://github.com/popov-lab/bmm/issues/411)).
 - New function
   [`report_priors()`](https://venpopov.com/bmm/dev/reference/report_priors.md)
   reports, for each parameter of a fitted model, its link function, the
@@ -55,6 +84,47 @@
 
 #### Bug fixes
 
+- `file_refit` no longer accepts a logical that is not a single
+  `TRUE`/`FALSE`. `NA`, `logical(0)` and multi-element logicals were
+  coerced to `"never"`, so `file_refit = cfg$refit` with a missing or
+  `NA` config key silently returned the cached fit instead of erroring
+  as it did before `"on_change"` was added
+  ([\#411](https://github.com/popov-lab/bmm/issues/411)).
+- Under `file_refit = "on_change"`, a cached fit that
+  [`restructure()`](https://venpopov.com/bmm/dev/reference/restructure.bmmfit.md)
+  cannot bring forward to the current bmm version is now refitted rather
+  than aborting [`bmm()`](https://venpopov.com/bmm/dev/reference/bmm.md)
+  with *“Unable to restructure the object… Please refit”* — that is the
+  one thing `"on_change"` exists to do. A cached fit with no `algorithm`
+  field also no longer aborts on `brms`’s bare
+  [`stopifnot()`](https://rdrr.io/r/base/stopifnot.html); the comparison
+  falls back to the Stan code, Stan data and factor levels
+  ([\#411](https://github.com/popov-lab/bmm/issues/411)).
+- Fix `file_refit` silently falling back to `"never"` for any
+  capitalisation other than all-lowercase. `"Always"` passed validation,
+  which lowercases, but the coercion that followed it did not, so
+  `bmm(..., file = , file_refit = "Always")` returned the cached fit
+  instead of refitting
+  ([\#411](https://github.com/popov-lab/bmm/issues/411)).
+- [`update()`](https://rdrr.io/r/stats/update.html) no longer returns a
+  fit whose `file` field has been dropped, and no longer lets `brms`
+  handle the file at all.
+  [`brms::update.brmsfit()`](https://paulbuerkner.com/brms/reference/update.brmsfit.html)
+  clears `file` and
+  [`brms::brm()`](https://paulbuerkner.com/brms/reference/brm.html)
+  writes it before any bmm postprocessing has run, so
+  `update(fit, file = )` stored a plain `brmsfit` that
+  [`bmm()`](https://venpopov.com/bmm/dev/reference/bmm.md) then refused
+  to read back (`Object loaded via 'file' is not of class 'bmmfit'`).
+  Worse, when the file already existed,
+  [`brms::brm()`](https://paulbuerkner.com/brms/reference/brm.html) read
+  it and returned its contents instead of fitting, so
+  `update(fit, newdata = , file = )` — rerunning a script that caches
+  its fits — silently discarded the update and returned the old fit with
+  no message. [`update()`](https://rdrr.io/r/stats/update.html) now
+  writes the file itself, after the postprocessing, as
+  [`bmm()`](https://venpopov.com/bmm/dev/reference/bmm.md) does
+  ([\#411](https://github.com/popov-lab/bmm/issues/411)).
 - Fix `combine_prior()` erroring with `second argument must be a list`
   when its first argument is `NULL`. `set_default_prior()` returns
   `NULL` when `options(bmm.default_priors = FALSE)` is set, so that
@@ -437,7 +507,9 @@ CRAN release: 2025-07-24
 - The `file_refit` argument of the `bmm` function now accepts character
   strings like `brms`. A warning is given when “on_change” is specified,
   as this is not currently implemented for `bmmodels`
-  ([\#228](https://github.com/popov-lab/bmm/issues/228)).
+  ([\#228](https://github.com/popov-lab/bmm/issues/228)). (The warning
+  was removed and “on_change” implemented in the development version,
+  see [\#411](https://github.com/popov-lab/bmm/issues/411).)
 - New function **rejection_sampling**
 
 #### Bug fixes

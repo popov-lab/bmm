@@ -54,8 +54,13 @@ bmm_options(
 
 - file_refit:
 
-  logical. If TRUE, bmm() will refit the model even if the file argument
-  is specified. **Default: FALSE**
+  logical or character. Controls when
+  [`bmm()`](https://venpopov.com/bmm/dev/reference/bmm.md) re-uses a fit
+  saved via its `file` argument. `TRUE` or "always" always refits,
+  `FALSE` or "never" always re-uses the saved fit, and "on_change"
+  re-uses it only while the Stan code and data are unchanged. See
+  [`bmm()`](https://venpopov.com/bmm/dev/reference/bmm.md) for details.
+  **Default: FALSE**
 
 - reset_options:
 

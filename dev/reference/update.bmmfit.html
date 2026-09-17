@@ -54,7 +54,15 @@ to the model object before and after the update.</p>
     <div class="section level2">
     <h2 id="ref-usage">Usage<a class="anchor" aria-label="anchor" href="#ref-usage"></a></h2>
     <div class="sourceCode"><pre class="sourceCode r"><code><span><span class="co"># S3 method for class 'bmmfit'</span></span>
-<span><span class="fu"><a href="https://rdrr.io/r/stats/update.html" class="external-link">update</a></span><span class="op">(</span><span class="va">object</span>, <span class="va">formula.</span>, newdata <span class="op">=</span> <span class="cn">NULL</span>, recompile <span class="op">=</span> <span class="cn">NULL</span>, <span class="va">...</span><span class="op">)</span></span></code></pre></div>
+<span><span class="fu"><a href="https://rdrr.io/r/stats/update.html" class="external-link">update</a></span><span class="op">(</span></span>
+<span>  <span class="va">object</span>,</span>
+<span>  <span class="va">formula.</span>,</span>
+<span>  newdata <span class="op">=</span> <span class="cn">NULL</span>,</span>
+<span>  recompile <span class="op">=</span> <span class="cn">NULL</span>,</span>
+<span>  file <span class="op">=</span> <span class="cn">NULL</span>,</span>
+<span>  file_compress <span class="op">=</span> <span class="cn">TRUE</span>,</span>
+<span>  <span class="va">...</span></span>
+<span><span class="op">)</span></span></code></pre></div>
     </div>
 
     <div class="section level2">
@@ -81,13 +89,31 @@ is necessary. Setting it to FALSE will cause all Stan code changing
 arguments to be ignored.</p></dd>
 
 
+<dt id="arg-file">file<a class="anchor" aria-label="anchor" href="#arg-file"></a></dt>
+<dd><p>Either <code>NULL</code> or a character string. If a string, the updated
+model is saved via <a href="https://rdrr.io/r/base/readRDS.html" class="external-link">saveRDS</a> in a file named after the string, as in
+<code><a href="bmm.html">bmm()</a></code>. <code><a href="https://rdrr.io/r/stats/update.html" class="external-link">update()</a></code> never writes to the file the original fit was read
+from: pass <code>file</code> explicitly to save the updated fit.</p></dd>
+
+
+<dt id="arg-file-compress">file_compress<a class="anchor" aria-label="anchor" href="#arg-file-compress"></a></dt>
+<dd><p>Logical or a character string, specifying one of the
+compression algorithms supported by <a href="https://rdrr.io/r/base/readRDS.html" class="external-link">saveRDS</a> when saving the updated
+model object.</p></dd>
+
+
 <dt id="arg--">...<a class="anchor" aria-label="anchor" href="#arg--"></a></dt>
 <dd><p>Further arguments passed to <code><a href="https://paulbuerkner.com/brms/reference/update.brmsfit.html" class="external-link">brms::update.brmsfit()</a></code></p></dd>
 
 </dl></div>
     <div class="section level2">
     <h2 id="value">Value<a class="anchor" aria-label="anchor" href="#value"></a></h2>
-    <p>An updated <code>bmmfit</code> object refit to the new data and/or formula</p>
+    <p>An updated <code>bmmfit</code> object refit to the new data and/or formula. If
+<code>file</code> is given, it names the newly written file. If not, the <code>file</code> field
+is carried over from the original fit, so the updated object still points
+at the file it came from – but that file is <em>not</em> rewritten: it still
+holds the fit as it was before this update. Pass <code>file</code> to save the
+updated fit.</p>
     </div>
     <div class="section level2">
     <h2 id="details">Details<a class="anchor" aria-label="anchor" href="#details"></a></h2>

@@ -95,8 +95,11 @@ printed in color. <strong>Default: TRUE</strong></p></dd>
 
 
 <dt id="arg-file-refit">file_refit<a class="anchor" aria-label="anchor" href="#arg-file-refit"></a></dt>
-<dd><p>logical. If TRUE, bmm() will refit the model even if the
-file argument is specified. <strong>Default: FALSE</strong></p></dd>
+<dd><p>logical or character. Controls when <code><a href="bmm.html">bmm()</a></code> re-uses a fit
+saved via its <code>file</code> argument. <code>TRUE</code> or "always" always refits, <code>FALSE</code> or
+"never" always re-uses the saved fit, and "on_change" re-uses it only while
+the Stan code and data are unchanged. See <code><a href="bmm.html">bmm()</a></code> for details. <strong>Default:
+FALSE</strong></p></dd>
 
 
 <dt id="arg-reset-options">reset_options<a class="anchor" aria-label="anchor" href="#arg-reset-options"></a></dt>

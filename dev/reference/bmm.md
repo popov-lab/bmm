@@ -119,7 +119,27 @@ fit_model(
   [options](https://rdrr.io/r/base/options.html)). If `TRUE` or
   "always", the model is fitted again. If `FALSE` or "never" (the
   default), the model saved under the name specified in `file` will be
-  re-used. Note that unlike in `brms`, there is no "on_change" option
+  re-used. If "on_change", the saved model is re-used only if the Stan
+  code, the Stan data, the factor levels of the model variables and the
+  algorithm are unchanged; otherwise the model is fitted again. Because
+  that comparison needs the Stan code and data of the current call,
+  "on_change" runs the full bmm configuration pipeline,
+  [standata()](https://venpopov.com/bmm/dev/reference/standata.bmmformula.md)
+  and
+  [stancode()](https://venpopov.com/bmm/dev/reference/stancode.bmmformula.md)
+  even when the cached fit is returned: about 0.4 s rather than 0.02 s
+  for an **sdm** model of `oberauer_lin_2017`, much cheaper than
+  compiling and sampling, but not free. Only the four things listed
+  above are compared, so sampler settings do **not** force a refit – in
+  particular `control = list(adapt_delta = )`, `iter`, `warmup`,
+  `chains`, `seed`, `init` and `save_pars`. Raising `adapt_delta` after
+  divergent transitions, or rerunning with `save_pars(all = TRUE)` for
+  `loo()`, therefore returns the cached fit unchanged; delete the file
+  or pass `file_refit = "always"` for those. Because the row order of
+  the data reaches the Stan data, `"on_change"` is most predictable with
+  `sort_data` fixed to `TRUE` or `FALSE` (globally via
+  `options(bmm.sort_data = )`): under the default `"check"`, answering
+  the interactive prompt differently than last time forces a refit.
 
 - ...:
 

@@ -149,11 +149,29 @@ the fitted model object.</p></dd>
 
 
 <dt id="arg-file-refit">file_refit<a class="anchor" aria-label="anchor" href="#arg-file-refit"></a></dt>
-<dd><p>Logical or character string. Modifies when the fit stored via the <code>file</code> argument is
-re-used. Can be set globally for the current R session via the
-<code>"bmm.file_refit"</code> option (see <a href="https://rdrr.io/r/base/options.html" class="external-link">options</a>). If <code>TRUE</code> or "always", the
-model is fitted again. If <code>FALSE</code> or "never" (the default), the model saved under the name specified in <code>file</code>
-will be re-used. Note that unlike in <code>brms</code>, there is no "on_change" option</p></dd>
+<dd><p>Logical or character string. Modifies when the fit stored
+via the <code>file</code> argument is re-used. Can be set globally for the current R
+session via the <code>"bmm.file_refit"</code> option (see <a href="https://rdrr.io/r/base/options.html" class="external-link">options</a>). If <code>TRUE</code> or
+"always", the model is fitted again. If <code>FALSE</code> or "never" (the default),
+the model saved under the name specified in <code>file</code> will be re-used. If
+"on_change", the saved model is re-used only if the Stan code, the Stan
+data, the factor levels of the model variables and the algorithm are
+unchanged; otherwise the model is fitted again. Because that comparison
+needs the Stan code and data of the current call, "on_change" runs the
+full bmm configuration pipeline, <a href="standata.bmmformula.html">standata()</a> and
+<a href="stancode.bmmformula.html">stancode()</a> even when the cached fit is returned:
+about 0.4 s rather than 0.02 s for an <strong>sdm</strong> model of <code>oberauer_lin_2017</code>,
+much cheaper than compiling and sampling, but not free. Only the four
+things listed above are compared, so sampler settings do <strong>not</strong> force a
+refit – in particular <code>control = list(adapt_delta = )</code>, <code>iter</code>, <code>warmup</code>,
+<code>chains</code>, <code>seed</code>, <code>init</code> and <code>save_pars</code>. Raising <code>adapt_delta</code> after
+divergent transitions, or rerunning with <code>save_pars(all = TRUE)</code> for
+<code>loo()</code>, therefore returns the cached fit unchanged; delete the file or
+pass <code>file_refit = "always"</code> for those. Because the row order of the data
+reaches the Stan data, <code>"on_change"</code> is most predictable with
+<code>sort_data</code> fixed to <code>TRUE</code> or <code>FALSE</code> (globally via
+<code>options(bmm.sort_data = )</code>): under the default <code>"check"</code>, answering the
+interactive prompt differently than last time forces a refit.</p></dd>
 
 
 <dt id="arg--">...<a class="anchor" aria-label="anchor" href="#arg--"></a></dt>
