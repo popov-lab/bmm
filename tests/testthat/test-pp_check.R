@@ -258,9 +258,15 @@ test_that("pp_check(resp_var) works for the 3par ezdm model", {
   fit <- load_ppcheck_fit("bmmfit_ezdm3_ppcheck.rds")
   p <- pp_check(fit, resp_var = "mean_pc", ndraws = 5)
   expect_s3_class(p, "ggplot")
-  y <- p$data$value[p$data$is_y_label == "italic(y)"]
-  expect_setequal(y, fit$data$n_upper / fit$data$n_trials)
+  expect_equal(p$data$y_obs, fit$data$n_upper / fit$data$n_trials)
   expect_s3_class(pp_check(fit, resp_var = "var_rt", ndraws = 5), "ggplot")
+})
+
+test_that("the ezdm checks default to per-cell intervals", {
+  fit <- load_ppcheck_fit("bmmfit_ezdm3_ppcheck.rds")
+  expect_true(all(pp_check_vars(fit)$default_type == "intervals"))
+  p <- pp_check(fit, resp_var = "mean_pc", group = "n_trials", ndraws = 5)
+  expect_s3_class(p$facet, "FacetWrap")
 })
 
 test_that("pp_check(resp_var) drops undefined 4par ezdm cells with a warning", {

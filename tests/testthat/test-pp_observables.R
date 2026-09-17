@@ -231,6 +231,30 @@ test_that("pp_check_vars() lists the declared checks", {
   expect_identical(out$default_type[out$resp_var == "response"], "bars")
 })
 
+# the reported slots are recovered from the closure, so assert they are both
+# sufficient (the check computes the same value from them alone) and minimal
+# (dropping any one changes the result)
+test_that("pp_check_vars() reports the standata slots each check reads", {
+  for (model in registered_models) {
+    spec <- pp_observables(model)
+    vars <- pp_check_vars(fake_bmmfit(model))
+    d <- stats::setNames(
+      lapply(seq_along(spec$observed), function(i) seq_len(5L) + i),
+      names(spec$observed)
+    )
+    for (i in seq_len(nrow(vars))) {
+      compute <- spec$checks[[vars$resp_var[i]]]$compute
+      slots <- strsplit(vars$slot[i], ", ", fixed = TRUE)[[1L]]
+      reads <- names(spec$observed)[match(slots, spec$observed)]
+      expect_false(anyNA(reads))
+      expect_equal(compute(d[reads]), compute(d))
+      for (dropped in reads) {
+        expect_false(identical(compute(d[setdiff(reads, dropped)]), compute(d)))
+      }
+    }
+  }
+})
+
 test_that("pp_check_vars() messages and returns NULL without a declaration", {
   fit <- fake_bmmfit(sdm(resp_error = "y"))
   expect_null(pp_observables(fit$bmm$model))
@@ -253,11 +277,6 @@ test_that("pp_check() rejects negative_rt without a signed_rt observable", {
   expect_error(pp_check(fit, negative_rt = TRUE), "not supported")
 })
 
-test_that("pp_check() rejects negative_rt combined with another resp_var", {
-  fit <- fake_bmmfit(ddm(rt = "rt", response = "resp"))
-  expect_error(pp_check(fit, resp_var = "rt", negative_rt = TRUE),
-               "cannot be combined")
-})
 test_that(".pp_resolve_type() resolves the check's default and validates it", {
   check <- .pp_observable(function(d) d$x, label = "X", type = "bars")
   expect_identical(.pp_resolve_type(NULL, check, NULL), "bars")
@@ -277,3 +296,8 @@ test_that("pp_check() rejects an unknown type before simulating", {
                "not a supported")
 })
 
+test_that("pp_check() rejects negative_rt combined with another resp_var", {
+  fit <- fake_bmmfit(ddm(rt = "rt", response = "resp"))
+  expect_error(pp_check(fit, resp_var = "rt", negative_rt = TRUE),
+               "cannot be combined")
+})

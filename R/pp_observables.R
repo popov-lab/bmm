@@ -97,9 +97,10 @@ pp_simulate.default <- function(model, prep) {
 #'
 #' @param fit A `bmmfit` object returned by [bmm()].
 #' @return A `data.frame` with one row per available check (columns `resp_var`,
-#'   `label`, `default_type`, and `default`, flagging the observable that
-#'   `pp_check()` plots when `resp_var` is not specified), or `NULL` invisibly
-#'   for models without multi-observable support.
+#'   `label`, `default_type`, `slot`, listing the brms standata slots the check
+#'   reads, and `default`, flagging the observable that `pp_check()` plots when
+#'   `resp_var` is not specified), or `NULL` invisibly for models without
+#'   multi-observable support.
 #' @seealso [pp_check.bmmfit()]
 #' @keywords extract_info
 #' @examples
@@ -133,11 +134,24 @@ pp_check_vars <- function(fit) {
   }
   prep <- brms::prepare_predictions(object, ndraws = ndraws,
                                     draw_ids = dots$draw_ids,
+    slot = vapply(spec$checks, .pp_check_slots, character(1),
+                  observed = spec$observed),
                                     re_formula = dots$re_formula)
 
   observed <- lapply(spec$observed, function(slot) prep$data[[slot]])
   yrep_inputs <- lapply(observed, .pp_expand_data, ndraws = prep$ndraws)
   sims <- pp_simulate(object$bmm$model, prep)
+# Derived checks read several observables, so the slots are recovered from the
+# closure rather than declared twice. Anchoring on "$" and a trailing word
+# boundary keeps mean_rt from matching d$mean_rt_upper.
+.pp_check_slots <- function(check, observed) {
+  code <- paste(deparse(body(check$compute)), collapse = " ")
+  reads <- vapply(names(observed), function(nm) {
+    grepl(paste0("\\$", nm, "\\b"), code)
+  }, logical(1))
+  paste(observed[reads], collapse = ", ")
+}
+
   sims <- sims[intersect(names(sims), names(spec$observed))]
   yrep_inputs[names(sims)] <- sims
 
@@ -208,6 +222,7 @@ pp_check_vars <- function(fit) {
   if ("group" %in% names(formals(ppc_fun))) {
     stopif(is.null(group_vec), "Argument 'group' is required for type '{type}'.")
     args$group <- group_vec
+.pp_build_ppc_plot <- function(check, value, type, group_vec, plot_dots) {
   }
   do.call(ppc_fun, args) + ggplot2::labs(subtitle = check$label)
 }
@@ -222,7 +237,6 @@ pp_check_vars <- function(fit) {
       response = .pp_observable(function(d) d$response,
                                 label = "Response (0 = lower, 1 = upper)",
                                 type = "bars"),
-.pp_build_ppc_plot <- function(check, value, type, group_vec, plot_dots) {
       signed_rt = .pp_observable(function(d) d$rt * (2 * d$response - 1),
                                  label = "Signed response time (lower = negative)")
     )
