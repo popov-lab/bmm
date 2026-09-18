@@ -89,12 +89,17 @@ in degrees to radian using the <code>deg2rad</code> function.</p></dd>
 </ul></li>
 <li><p><strong>Default parameter links:</strong></p><ul><li><p>mu1 = tan_half; kappa = log; thetat = logit</p></li>
 </ul></li>
-<li><p><strong>Default priors:</strong></p><ul><li><p><code>mu1</code>:</p><ul><li><p><code>main</code>: student_t(1, 0, 1)</p></li>
+<li><p><strong>Default priors:</strong></p><ul><li><p><code>mu1</code>:</p><ul><li><p><code>main</code>: normal(0, 0.5)</p></li>
+<li><p><code>effects</code>: normal(0, 0.25)</p></li>
+<li><p><code>sd</code>: exponential(4)</p></li>
 </ul></li>
 <li><p><code>kappa</code>:</p><ul><li><p><code>main</code>: normal(2, 1)</p></li>
 <li><p><code>effects</code>: normal(0, 1)</p></li>
+<li><p><code>sd</code>: exponential(1)</p></li>
 </ul></li>
 <li><p><code>thetat</code>:</p><ul><li><p><code>main</code>: logistic(0, 1)</p></li>
+<li><p><code>effects</code>: normal(0, 0.5)</p></li>
+<li><p><code>sd</code>: exponential(1)</p></li>
 </ul></li>
 </ul></li>
 </ul></div>

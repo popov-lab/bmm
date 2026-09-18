@@ -92,11 +92,15 @@ An object of class `bmmodel`
 
     - `effects`: normal(0,0.5)
 
+    - `sd`: exponential(1)
+
   - `bound`:
 
     - `main`: normal(0,0.5)
 
     - `effects`: normal(0,0.5)
+
+    - `sd`: exponential(2)
 
   - `ndt`:
 
@@ -104,11 +108,15 @@ An object of class `bmmodel`
 
     - `effects`: normal(0,0.3)
 
+    - `sd`: exponential(2)
+
   - `zr`:
 
     - `main`: normal(0,0.5)
 
     - `effects`: normal(0,0.3)
+
+    - `sd`: exponential(2)
 
 ## Default behavior
 

@@ -420,7 +420,8 @@ andconsider what parameter ranges are reasonable for the different model
 parameters and provide `default_priors` for all of them. For detailed
 information on priors in `bmm` please see the
 `vignette("extract_info")`. In short, you can provide priors for
-intercepts as `main` and for effects as `effects`.
+intercepts as `main`, for effects as `effects`, and for the standard
+deviations of random effects as `sd`.
 
 Setting up a `m3` object including these info looks like this:
 
@@ -440,58 +441,58 @@ my_model <- m3(resp_cats = c("corr","other","dist","npl"),
 default_prior(full_formula, data, my_model)
 #> Warning: Default priors for each parameter will be specified internally based on the provided link function.
 #> Please check if the used priors are reasonable for your application
-#>                 prior class             coef group resp dpar nlpar   lb   ub
-#>        normal(0, 0.5)     b condoldreordered                     a <NA> <NA>
-#>        normal(0, 0.5)     b      condoldsame                     a <NA> <NA>
-#>  student_t(3, 0, 2.5)    sd                                      a    0     
-#>  student_t(3, 0, 2.5)    sd                     ID               a    0     
-#>  student_t(3, 0, 2.5)    sd condoldreordered    ID               a    0     
-#>  student_t(3, 0, 2.5)    sd      condoldsame    ID               a    0     
-#>  student_t(3, 0, 2.5)    sd        Intercept    ID               a    0     
-#>                (flat)     b                                      b          
-#>        normal(0, 0.5)     b condoldreordered                     c <NA> <NA>
-#>        normal(0, 0.5)     b      condoldsame                     c <NA> <NA>
-#>  student_t(3, 0, 2.5)    sd                                      c    0     
-#>  student_t(3, 0, 2.5)    sd                     ID               c    0     
-#>  student_t(3, 0, 2.5)    sd condoldreordered    ID               c    0     
-#>  student_t(3, 0, 2.5)    sd      condoldsame    ID               c    0     
-#>  student_t(3, 0, 2.5)    sd        Intercept    ID               c    0     
-#>                (flat)     b                                      d          
-#>  student_t(3, 0, 2.5)    sd                                      d    0     
-#>  student_t(3, 0, 2.5)    sd                     ID               d    0     
-#>  student_t(3, 0, 2.5)    sd        Intercept    ID               d    0     
-#>        normal(0, 0.5)     b                                      a <NA> <NA>
-#>          normal(1, 1)     b        Intercept                     a <NA> <NA>
-#>        normal(0, 0.5)     b                                      c <NA> <NA>
-#>          normal(1, 1)     b        Intercept                     c <NA> <NA>
-#>          normal(1, 1)     b        Intercept                     d <NA> <NA>
-#>         constant(0.1)     b        Intercept                     b <NA> <NA>
-#>  tag       source
-#>      (vectorized)
-#>      (vectorized)
-#>           default
-#>      (vectorized)
-#>      (vectorized)
-#>      (vectorized)
-#>      (vectorized)
-#>           default
-#>      (vectorized)
-#>      (vectorized)
-#>           default
-#>      (vectorized)
-#>      (vectorized)
-#>      (vectorized)
-#>      (vectorized)
-#>           default
-#>           default
-#>      (vectorized)
-#>      (vectorized)
-#>              user
-#>              user
-#>              user
-#>              user
-#>              user
-#>              user
+#>           prior class             coef group resp dpar nlpar   lb   ub tag
+#>  normal(0, 0.5)     b condoldreordered                     a <NA> <NA>    
+#>  normal(0, 0.5)     b      condoldsame                     a <NA> <NA>    
+#>  exponential(1)    sd                     ID               a <NA> <NA>    
+#>  exponential(1)    sd condoldreordered    ID               a <NA> <NA>    
+#>  exponential(1)    sd      condoldsame    ID               a <NA> <NA>    
+#>  exponential(1)    sd        Intercept    ID               a <NA> <NA>    
+#>          (flat)     b                                      b              
+#>  normal(0, 0.5)     b condoldreordered                     c <NA> <NA>    
+#>  normal(0, 0.5)     b      condoldsame                     c <NA> <NA>    
+#>  exponential(1)    sd                     ID               c <NA> <NA>    
+#>  exponential(1)    sd condoldreordered    ID               c <NA> <NA>    
+#>  exponential(1)    sd      condoldsame    ID               c <NA> <NA>    
+#>  exponential(1)    sd        Intercept    ID               c <NA> <NA>    
+#>          (flat)     b                                      d              
+#>  exponential(1)    sd                     ID               d <NA> <NA>    
+#>  exponential(1)    sd        Intercept    ID               d <NA> <NA>    
+#>  exponential(1)    sd                                      a <NA> <NA>    
+#>  normal(0, 0.5)     b                                      a <NA> <NA>    
+#>    normal(1, 1)     b        Intercept                     a <NA> <NA>    
+#>  exponential(1)    sd                                      c <NA> <NA>    
+#>  normal(0, 0.5)     b                                      c <NA> <NA>    
+#>    normal(1, 1)     b        Intercept                     c <NA> <NA>    
+#>  exponential(1)    sd                                      d <NA> <NA>    
+#>    normal(1, 1)     b        Intercept                     d <NA> <NA>    
+#>   constant(0.1)     b        Intercept                     b <NA> <NA>    
+#>        source
+#>  (vectorized)
+#>  (vectorized)
+#>  (vectorized)
+#>  (vectorized)
+#>  (vectorized)
+#>  (vectorized)
+#>       default
+#>  (vectorized)
+#>  (vectorized)
+#>  (vectorized)
+#>  (vectorized)
+#>  (vectorized)
+#>  (vectorized)
+#>       default
+#>  (vectorized)
+#>  (vectorized)
+#>          user
+#>          user
+#>          user
+#>          user
+#>          user
+#>          user
+#>          user
+#>          user
+#>          user
 ```
 
 ### 3.4 Running `bmm` to estimate parameters

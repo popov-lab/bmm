@@ -76,7 +76,11 @@ Visual working memory
 
   - `mu`:
 
-    - `main`: student_t(1, 0, 1)
+    - `main`: normal(0, 0.5)
+
+    - `effects`: normal(0, 0.25)
+
+    - `sd`: exponential(4)
 
   - `kappa`:
 
@@ -84,11 +88,15 @@ Visual working memory
 
     - `effects`: normal(0, 1)
 
+    - `sd`: exponential(1)
+
   - `c`:
 
     - `main`: student_t(5, 2, 0.75)
 
     - `effects`: normal(0, 1)
+
+    - `sd`: exponential(1)
 
 ## Examples
 
