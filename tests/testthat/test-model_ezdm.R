@@ -655,3 +655,47 @@ test_that("ezdm Stan code calls the model lpdf and parses", {
     expect_true(model$check_syntax(quiet = TRUE))
   }
 })
+
+test_that("ezdm_4par_lpdf has the right drift gradient at and around zero drift", {
+  # Returning the limit of pC at drift = 0 as a constant gave the right value
+  # and a zero gradient, which only autodiff can see. CmdStan's standalone
+  # log_prob method is used because expose_functions() returns no gradients.
+  skip_on_cran()
+  skip_if_not_installed("cmdstanr")
+  skip_if(is.null(cmdstanr::cmdstan_version(error_on_NA = FALSE)))
+
+  chunk <- function(file) {
+    paste(readLines(system.file("stan_chunks", file, package = "bmm")), collapse = "\n")
+  }
+  program <- paste0(
+    "functions {\n", chunk("ezdm_cumulants.stan"), "\n", chunk("ezdm_4par_functions.stan"), "\n}\n",
+    "data { int N; vector[2] mrt; vector[2] vrt; }\n",
+    "parameters { vector[N] drift; }\n",
+    "model { for (i in 1:N) target += ezdm_4par_lpdf(mrt[1] | 0.0, drift[i], 1.5, 0.25, 0.3, 1.0,\n",
+    "  mrt[2], vrt[1], vrt[2], 12, 60); }\n"
+  )
+  # summaries of a cell with negative drift: most responses at the lower boundary
+  moments <- .ezdm_moments_4par(-1.2, 1.5, 0.3, 1)
+  mrt <- 0.25 + c(moments$mdt_upper, moments$mdt_lower)
+  vrt <- c(moments$vrt_upper, moments$vrt_lower)
+  drift <- c(-1.2, -1e-12, 0, 1e-12, 1.2)
+
+  dir <- withr::local_tempdir()
+  model <- cmdstanr::cmdstan_model(cmdstanr::write_stan_file(program, dir = dir), quiet = TRUE)
+  cmdstanr::write_stan_json(list(N = length(drift), mrt = mrt, vrt = vrt), file.path(dir, "data.json"))
+  cmdstanr::write_stan_json(list(drift = drift), file.path(dir, "pars.json"))
+  status <- system2(model$exe_file(), c(
+    "method=log_prob", paste0("constrained_params=", file.path(dir, "pars.json")), "jacobian=0",
+    "data", paste0("file=", file.path(dir, "data.json")),
+    "output", paste0("file=", file.path(dir, "out.csv")), "sig_figs=17"
+  ), stdout = FALSE, stderr = FALSE)
+  expect_equal(status, 0)
+  stan_gradient <- as.numeric(utils::read.csv(file.path(dir, "out.csv"), comment.char = "#")[1, -1])
+
+  lpdf <- function(drift) {
+    dezdm(mrt, vrt, n_upper = 12, n_trials = 60, drift = drift, bound = 1.5,
+          ndt = 0.25, zr = 0.3, version = "4par")
+  }
+  r_gradient <- vapply(drift, \(d) (lpdf(d + 1e-5) - lpdf(d - 1e-5)) / 2e-5, numeric(1))
+  expect_equal(stan_gradient / r_gradient, rep(1, length(drift)), tolerance = 1e-6)
+})

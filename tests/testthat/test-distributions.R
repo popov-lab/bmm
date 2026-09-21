@@ -1541,6 +1541,26 @@ test_that(".ezdm_pc is stable in both drift directions", {
   )
 })
 
+test_that(".ezdm_pc keeps its slope in drift through zero", {
+  # a constant b / b0 at k = 0 has the right value but no gradient, which is
+  # what a sampler started at drift = 0 would see; d pC / d k = r (b0 - b) there
+  b <- 0.45
+  b0 <- 1.5
+  h <- 1e-7
+  slope <- (.ezdm_pc(b, b0, h) - .ezdm_pc(b, b0, -h)) / (2 * h)
+  expect_equal(slope / (b / b0 * (b0 - b)), 1, tolerance = 1e-6)
+  expect_equal(.ezdm_pc(b, b0, 0), b / b0)
+
+  # continuous across the switch between the series and the expm1 ratio
+  k_switch <- 1e-4 / (2 * b0)
+  around <- .ezdm_pc(b, b0, c(-1, -1, 1, 1) * k_switch * (1 + c(1, -1, -1, 1) * 1e-9))
+  expect_equal(around[1] / around[2], 1, tolerance = 1e-12)
+  expect_equal(around[3] / around[4], 1, tolerance = 1e-12)
+
+  # negative drift mirrors positive drift at the mirrored start point
+  expect_equal(.ezdm_pc(b, b0, -1.3), 1 - .ezdm_pc(b0 - b, b0, 1.3))
+})
+
 test_that("the 3par density takes its binomial on the logit scale drift * bound / s^2", {
   # the identity the Stan likelihood and .dezdm_3par() both rely on
   drift <- c(-3, -0.4, 0, 0.7, 2.5)

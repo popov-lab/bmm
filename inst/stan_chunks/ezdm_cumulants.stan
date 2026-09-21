@@ -283,11 +283,21 @@
   // lambda = 0 value of the same transform with k = drift / s^2 signed. Both
   // expm1 calls overflow when k < 0, so the identity
   // expm1(u) = -exp(u) expm1(-u) moves the evaluation to the finite side.
+  //
+  // Near k = 0 the ratio is 0 / 0. Returning its limit b / b0 there would be a
+  // constant, whose gradient in drift is zero where the true one is not, and
+  // drift = 0 is where a sampler initialized at zero starts. The series
+  // expm1(x) / x = 1 + x / 2 + x^2 / 6 + x^3 / 24 is exact to 1e-18 below
+  // |x| = 1e-4 and carries the gradient.
+  real ezdm_expm1_ratio(real x) {
+    return 1 + x * (0.5 + x * (1.0 / 6 + x / 24));
+  }
+
   real ezdm_pc(real b, real b0, real k) {
     real u = -2 * k * b;
     real u0 = -2 * k * b0;
-    if (u0 == 0) {
-      return b / b0;
+    if (abs(u0) < 1e-4) {
+      return b / b0 * ezdm_expm1_ratio(u) / ezdm_expm1_ratio(u0);
     }
     if (u0 > 0) {
       return exp(u - u0) * expm1(-u) / expm1(-u0);

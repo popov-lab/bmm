@@ -1675,15 +1675,23 @@ rezdm <- function(n, n_trials, drift, bound, ndt, zr = 0.5, s = 1,
 # overflow when k < 0, so the identity expm1(u) = -exp(u) expm1(-u) moves the
 # evaluation to the finite side; the old exp(2 k z) form returned NaN from
 # |drift| * bound / s^2 ~ 710 at negative drift.
+#
+# Near k = 0 the ratio is 0 / 0. It is taken from expm1(x) / x =
+# 1 + x / 2 + x^2 / 6 + x^3 / 24 (relative error below 1e-18 for |x| < 1e-4)
+# rather than set to its limit b / b0: in Stan a constant there has no gradient
+# in drift, so a sampler started at drift = 0 would see a flat response
+# proportion. Must match ezdm_pc() in inst/stan_chunks/ezdm_cumulants.stan.
 .ezdm_pc <- function(b, b0, k) {
   u <- -2 * k * b
   u0 <- -2 * k * b0
   flip <- !is.na(u0) & u0 > 0
-  no_drift <- !is.na(u0) & u0 == 0
+  no_drift <- !is.na(u0) & abs(u0) < 1e-4
+  expm1_ratio <- function(x) 1 + x * (1 / 2 + x * (1 / 6 + x / 24))
 
   pC <- numeric(length(u0))
-  pC[no_drift] <- (b / b0)[no_drift]
+  pC[no_drift] <- (b / b0 * expm1_ratio(u) / expm1_ratio(u0))[no_drift]
   direct <- !flip & !no_drift
+  flip <- flip & !no_drift
   pC[direct] <- expm1(u[direct]) / expm1(u0[direct])
   pC[flip] <- exp(u[flip] - u0[flip]) * expm1(-u[flip]) / expm1(-u0[flip])
   pC
