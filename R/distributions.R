@@ -1188,25 +1188,32 @@ log_diff_exp <- function(a, b) {
 #'   \deqn{\mathrm{mean\_rt} \mid \mathrm{var\_rt} \sim N\left(\mathrm{ndt} + \mathrm{MDT} + \frac{\kappa_3 / n}{W}(\mathrm{var\_rt} - \mathrm{VRT}),\ \sqrt{\mathrm{VRT} / n - (\kappa_3 / n)^2 / W}\right),}
 #'   so that \eqn{\mathrm{Var}(\mathrm{mean\_rt}) = \mathrm{VRT} / n} and
 #'   \eqn{\mathrm{Cov}(\mathrm{mean\_rt}, \mathrm{var\_rt}) = \kappa_3 / n} are
-#'   exact. Decision times are right-skewed (kurtosis 8.8 at zero drift, rising
-#'   with it), so the older form that assumes normal reaction times —
-#'   independent normal and scaled chi-square
+#'   exact. Decision times are right-skewed (kurtosis 8.8 at zero drift, falling
+#'   towards 3 as drift grows), so the older form that assumes normal reaction
+#'   times — independent normal and scaled chi-square
 #'   \eqn{\mathrm{Gamma}((n - 1)/2, (n - 1)/(2\,\mathrm{VRT}))} terms —
-#'   understates the sampling variance of `var_rt` several-fold and ignores a
-#'   correlation of about 0.65 between the two statistics, making posteriors too
+#'   understates the sampling variance of `var_rt` by a factor of about 3.8
+#'   (3.7 to 3.9 at accuracies between .60 and .95, less at higher accuracy; up
+#'   to 5.7 with an asymmetric start point in version `"4par"`) and ignores a
+#'   correlation of about 0.7 between the two statistics, making posteriors too
 #'   narrow. The terms above reduce to it when \eqn{\kappa_3 = \kappa_4 = 0}.
 #'
 #'   For version `"3par"` the start point is symmetric, so the decision time is
 #'   independent of which boundary is hit and all `n_trials` responses inform
 #'   one set of cumulants. For version `"4par"` the two boundaries have
 #'   different decision-time distributions, so each is given its own summaries
-#'   and its own response count; a boundary reached fewer than twice has no
-#'   sample variance and contributes only through the binomial term. The
-#'   per-boundary formulas condition on the realised counts, which are
-#'   themselves random.
+#'   and its own response count. A boundary reached fewer than twice has no
+#'   sample variance; in `dezdm()` it contributes only through the binomial
+#'   term, but `bmm()` currently drops such cells, because `rezdm()` and
+#'   `ezdm_summary_stats()` code their missing summaries as `NA` and `brms`
+#'   excludes rows with missing values. The per-boundary formulas condition on
+#'   the realised counts, which are themselves random.
 #'
-#'   Simulated `mean_rt` is not truncated at `ndt`; values below it occur only
-#'   at the smallest trial counts.
+#'   Simulated `mean_rt` is not truncated at `ndt`. When a summary rests on few
+#'   responses (a handful of trials in version `"3par"`, or a rarely reached
+#'   boundary in version `"4par"`, whatever `n_trials` is), `rezdm()` can
+#'   return `mean_rt` below `ndt` or even `mean_rt <= 0`, which `bmm()`
+#'   rejects; drop those rows before fitting.
 #'
 #' @return `dezdm` gives the log-density of the observed summary statistics
 #'   under the EZDM, and `rezdm` generates random summary statistics from the
@@ -1508,9 +1515,9 @@ rezdm <- function(n, n_trials, drift, bound, ndt, zr = 0.5, s = 1,
 }
 
 # Series coefficients of log(sinh(x) / x) = sum_j a_j x^(2j), generated
-# symbolically by local/ezdm/k34_derivation.py. Published tables of these are
-# easy to mistranscribe past j = 8, and a wrong coefficient makes the truncated
-# series diverge instead of failing loudly.
+# symbolically (sympy series expansion) rather than copied: published tables of
+# these are easy to mistranscribe past j = 8, and a wrong coefficient makes the
+# truncated series diverge instead of failing loudly.
 # Must match inst/stan_chunks/ezdm_cumulants.stan.
 .EZDM_LOG_SINHC_COEF <- c(
   1 / 6,
@@ -1546,9 +1553,6 @@ rezdm <- function(n, n_trials, drift, bound, ndt, zr = 0.5, s = 1,
 # f(w) = log sinh(b sqrt(w)) - log sinh(b0 sqrt(w)). Drift therefore enters only
 # through w: every expression below is even in drift, which is why the model
 # needs neither a soft absolute value nor a zero-drift special case.
-#
-# Derivation, reference values and the measured branch errors:
-# local/ezdm/k34_derivation.py.
 .ezdm_cumulants <- function(b, b0, w, s) {
   n <- max(length(b), length(b0), length(w), length(s))
   b <- rep_len(b, n)
@@ -1559,7 +1563,9 @@ rezdm <- function(n, n_trials, drift, bound, ndt, zr = 0.5, s = 1,
   # regimes must match inst/stan_chunks/ezdm_cumulants.stan. The closed forms
   # differ two bounded functions whose leading terms cancel to order t^(2n), so
   # below t = 0.7 they lose k4 outright (relative error 1e-4 at t = 0.1) and the
-  # series takes over; at the seam both are accurate to about 2e-11.
+  # series takes over. At the seam the two agree in k4 to 1e-11 for
+  # b / b0 <= 0.5 but only to 3e-9 at b / b0 = 0.999, where the closed forms
+  # carry the roundoff; that is the worst error of the branch in use anywhere.
   series <- !is.na(w) & b0 * sqrt(w) < 0.7
 
   out <- list(MDT = numeric(n), VRT = numeric(n), k3 = numeric(n), k4 = numeric(n))
@@ -1660,7 +1666,7 @@ rezdm <- function(n, n_trials, drift, bound, ndt, zr = 0.5, s = 1,
 # value of the same transform, with k = drift / s^2 signed. Both expm1 calls
 # overflow when k < 0, so the identity expm1(u) = -exp(u) expm1(-u) moves the
 # evaluation to the finite side; the old exp(2 k z) form returned NaN from
-# |drift| ~ 400.
+# |drift| * bound / s^2 ~ 710 at negative drift.
 .ezdm_pc <- function(b, b0, k) {
   u <- -2 * k * b
   u0 <- -2 * k * b0

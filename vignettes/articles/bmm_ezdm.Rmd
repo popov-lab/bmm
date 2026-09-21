@@ -163,9 +163,10 @@ $\overline{\mathrm{RT}}$ normal around the predicted mean with variance
 $\mathrm{VRT}/n$, $s^2$ scaled chi-square, and the two independent. All three
 parts of that hold only if the response times themselves are normal, and
 diffusion decision times are conspicuously right-skewed. Their kurtosis is 8.8
-at zero drift and higher away from it, which inflates the sampling variance of
-$s^2$ by a factor of roughly four, and the skew makes the mean and the variance
-correlate at about 0.65. A likelihood that ignores both treats each cell as more
+at zero drift and falls towards 3 as drift grows. This inflates the sampling
+variance of $s^2$ by a factor of about 3.8 (3.7 to 3.9 at accuracies between .60
+and .95, less at higher accuracy, and up to 5.7 with an asymmetric starting
+point), and the skew makes the mean and the variance correlate at about 0.7. A likelihood that ignores both treats each cell as more
 informative than it is, and the resulting posteriors are too narrow — the
 credible intervals are not wrong about where the parameter is, but about how
 sure one should be.
@@ -186,8 +187,10 @@ One consequence is worth keeping in mind when designing a study: with a
 symmetric starting point the decision time does not depend on which boundary was
 reached, so all $n$ trials in a cell inform one set of moments. With a free
 starting point they do differ, which is why the 4-parameter version needs the
-summaries split by boundary — and why a cell in which one boundary was reached
-only once or twice contributes through the response counts alone.
+summaries split by boundary — and why a boundary reached fewer than twice in a
+cell has no variance to contribute. In `dezdm()` such a cell still contributes
+through the response counts; a `bmm()` fit currently drops it, because the
+missing summaries are coded as `NA`.
 
 # Parametrization in the `bmm` package
 

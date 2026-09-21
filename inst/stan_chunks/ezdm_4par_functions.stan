@@ -7,7 +7,9 @@
   // to the far boundary: zr * bound above, (1 - zr) * bound below.
   //
   // A boundary with fewer than two responses has no sample variance and
-  // contributes only through the binomial term.
+  // contributes only through the binomial term. bmm() rarely gets here: brms
+  // drops rows whose summaries are NA, which is how rezdm() and
+  // ezdm_summary_stats() code such a boundary.
   //
   // mu is a dummy dpar required by brms and is not used.
   real ezdm_4par_lpdf(real mrt_upper, real mu, real drift, real bound, real ndt,

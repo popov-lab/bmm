@@ -51,8 +51,10 @@
   // closed forms at small drift never happens; exact at w = 0.
   vector ezdm_cumulants_series(real b, real b0, real w, real s) {
     int j_max = 16;
-    // denominators carry a .0 because Stan integer literals stop at 2^31; the
-    // decimal strings parse to the same doubles R gets from the same fractions
+    // denominators carry a .0 because Stan integer literals stop at 2^31. R
+    // without long double (e.g. aarch64 macOS) misparses integers above 2^53,
+    // so a_12, a_13, a_15 and a_16 can differ from R's by 1-2 ulp; their weight
+    // below the t = 0.7 seam is under 1e-20
     array[16] real a = {
       1.0 / 6.0, -1.0 / 180.0, 1.0 / 2835.0, -1.0 / 37800.0,
       1.0 / 467775.0, -691.0 / 3831077250.0, 2.0 / 127702575.0,

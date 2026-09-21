@@ -87,25 +87,32 @@ of the sample variance,
 \deqn{\mathrm{mean\_rt} \mid \mathrm{var\_rt} \sim N\left(\mathrm{ndt} + \mathrm{MDT} + \frac{\kappa_3 / n}{W}(\mathrm{var\_rt} - \mathrm{VRT}),\ \sqrt{\mathrm{VRT} / n - (\kappa_3 / n)^2 / W}\right),}
 so that \eqn{\mathrm{Var}(\mathrm{mean\_rt}) = \mathrm{VRT} / n} and
 \eqn{\mathrm{Cov}(\mathrm{mean\_rt}, \mathrm{var\_rt}) = \kappa_3 / n} are
-exact. Decision times are right-skewed (kurtosis 8.8 at zero drift, rising
-with it), so the older form that assumes normal reaction times —
-independent normal and scaled chi-square
+exact. Decision times are right-skewed (kurtosis 8.8 at zero drift, falling
+towards 3 as drift grows), so the older form that assumes normal reaction
+times — independent normal and scaled chi-square
 \eqn{\mathrm{Gamma}((n - 1)/2, (n - 1)/(2\,\mathrm{VRT}))} terms —
-understates the sampling variance of \code{var_rt} several-fold and ignores a
-correlation of about 0.65 between the two statistics, making posteriors too
+understates the sampling variance of \code{var_rt} by a factor of about 3.8
+(3.7 to 3.9 at accuracies between .60 and .95, less at higher accuracy; up
+to 5.7 with an asymmetric start point in version \code{"4par"}) and ignores a
+correlation of about 0.7 between the two statistics, making posteriors too
 narrow. The terms above reduce to it when \eqn{\kappa_3 = \kappa_4 = 0}.
 
 For version \code{"3par"} the start point is symmetric, so the decision time is
 independent of which boundary is hit and all \code{n_trials} responses inform
 one set of cumulants. For version \code{"4par"} the two boundaries have
 different decision-time distributions, so each is given its own summaries
-and its own response count; a boundary reached fewer than twice has no
-sample variance and contributes only through the binomial term. The
-per-boundary formulas condition on the realised counts, which are
-themselves random.
+and its own response count. A boundary reached fewer than twice has no
+sample variance; in \code{dezdm()} it contributes only through the binomial
+term, but \code{bmm()} currently drops such cells, because \code{rezdm()} and
+\code{ezdm_summary_stats()} code their missing summaries as \code{NA} and \code{brms}
+excludes rows with missing values. The per-boundary formulas condition on
+the realised counts, which are themselves random.
 
-Simulated \code{mean_rt} is not truncated at \code{ndt}; values below it occur only
-at the smallest trial counts.
+Simulated \code{mean_rt} is not truncated at \code{ndt}. When a summary rests on few
+responses (a handful of trials in version \code{"3par"}, or a rarely reached
+boundary in version \code{"4par"}, whatever \code{n_trials} is), \code{rezdm()} can
+return \code{mean_rt} below \code{ndt} or even \code{mean_rt <= 0}, which \code{bmm()}
+rejects; drop those rows before fitting.
 }
 \examples{
 # 3-parameter version (single observation)
