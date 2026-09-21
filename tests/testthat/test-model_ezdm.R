@@ -537,8 +537,11 @@ ezdm_stan_lpdf <- function(version, data) {
 }
 
 # drift spans the series branch (t < 0.7), the closed forms, the t > 30
-# saturation, and the values at which the old code returned NaN
-ezdm_parity_drift <- c(0, 1e-300, 1e-8, 0.001, 0.05, 0.2, 0.5, 1, 2, 5, 20, 1500)
+# saturation, and the values at which the old code returned NaN; negative
+# drift takes the flipped branch of ezdm_pc
+ezdm_parity_drift <- c(
+  -1500, -5, -0.2, 0, 1e-300, 1e-8, 0.001, 0.05, 0.2, 0.5, 1, 2, 5, 20, 1500
+)
 
 test_that("ezdm_3par_lpdf in Stan matches dezdm() in R", {
   skip_on_cran()
@@ -584,11 +587,10 @@ test_that("ezdm_4par_lpdf in Stan matches dezdm() in R", {
   skip_if(is.null(cmdstanr::cmdstan_version(error_on_NA = FALSE)))
 
   grid <- expand.grid(
-    drift = ezdm_parity_drift, bound = c(0.4, 1.5, 3), zr = c(0.5, 0.7, 0.95),
-    n_upper = c(0L, 1L, 3L, 30L)
+    drift = ezdm_parity_drift, bound = c(0.4, 1.5, 3),
+    zr = c(0.2, 0.5, 0.7, 0.95), s = c(0.5, 1, 2), n_upper = c(0L, 1L, 3L, 30L)
   )
   grid$n_trials <- 30L
-  grid$s <- 1
   grid$ndt <- 0.25
   # n_upper 0 and 1 exercise the lower gate, 30 and 29 the upper one
   grid <- rbind(grid, transform(grid[grid$n_upper == 30L, ], n_upper = 29L))
