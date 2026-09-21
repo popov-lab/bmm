@@ -410,13 +410,14 @@ test_that("report_priors() collapses group-level effects into a single sd row", 
 
   out <- report_priors(fit)
   sd_rows <- out[out$class == "sd", ]
-  # brms applies one blanket sd prior at the class level; the per-group and
+  # one blanket sd prior is applied at the class level; the per-group and
   # per-coefficient rows below it are empty and inherit from it, so the report
   # shows the row that is actually in force rather than one row per coefficient
   expect_equal(nrow(sd_rows), 1)
   expect_equal(sd_rows$parameter, "c")
   expect_equal(sd_rows$group, "")
-  expect_equal(sd_rows$source, "brms default")
+  expect_equal(sd_rows$prior, "exponential(1)")
+  expect_equal(sd_rows$source, "bmm default")
 })
 
 test_that("subsetting a report returns a plain data.frame that still prints", {
