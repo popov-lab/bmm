@@ -16,30 +16,48 @@
                       real zr, real s, real mrt_lower, real vrt_upper,
                       real vrt_lower, int hits, int trials) {
     int misses = trials - hits;
+    real s_sq = square(s);
+    real k = drift / s_sq;
     real b_upper = zr * bound;
     real b_lower = bound - b_upper;
-    real w = square(drift) / pow(s, 4);
 
-    real lp = binomial_lpmf(hits | trials,
-                            ezdm_pc(b_upper, bound, drift / square(s)));
+    real lp = binomial_lpmf(hits | trials, ezdm_pc(b_upper, bound, k));
+    if (hits < 2 && misses < 2) {
+      return lp;
+    }
+
+    real w = square(k);
+    real x0 = square(bound) * w;
+    int series = x0 < 0.49;
+    real h1;
+    real h2;
+    real h3;
+    real h4;
+    if (series) {
+      real scale = 2 * square(bound) / s_sq;
+      real scale_sq = square(scale);
+      h1 = scale * ezdm_log_sinhc_d1(x0);
+      h2 = scale_sq * ezdm_log_sinhc_d2(x0);
+      h3 = scale_sq * scale * ezdm_log_sinhc_d3(x0);
+      h4 = square(scale_sq) * ezdm_log_sinhc_d4(x0);
+    } else {
+      real t0 = sqrt(x0);
+      real e0 = exp(-2 * t0);
+      real p0 = ezdm_coth_term(t0, e0);
+      real q0 = ezdm_csch_term(t0, e0);
+      h1 = p0;
+      h2 = -p0 - q0;
+      h3 = ezdm_cgf_d3(p0, q0);
+      h4 = ezdm_cgf_d4(p0, q0, t0);
+    }
 
     if (hits >= 2) {
-      vector[4] cumulants = ezdm_cumulants(b_upper, bound, w, s);
-      vector[4] rt = ezdm_rt_terms(cumulants, hits);
-      lp += gamma_lpdf(vrt_upper | rt[1], rt[2])
-            + normal_lpdf(mrt_upper | ndt + cumulants[1]
-                                      + rt[3] * (vrt_upper - cumulants[2]),
-                          rt[4]);
+      lp += ezdm_boundary_lpdf(mrt_upper | vrt_upper, hits, ndt, b_upper, w,
+                               s_sq, series, h1, h2, h3, h4);
     }
-
     if (misses >= 2) {
-      vector[4] cumulants = ezdm_cumulants(b_lower, bound, w, s);
-      vector[4] rt = ezdm_rt_terms(cumulants, misses);
-      lp += gamma_lpdf(vrt_lower | rt[1], rt[2])
-            + normal_lpdf(mrt_lower | ndt + cumulants[1]
-                                      + rt[3] * (vrt_lower - cumulants[2]),
-                          rt[4]);
+      lp += ezdm_boundary_lpdf(mrt_lower | vrt_lower, misses, ndt, b_lower, w,
+                               s_sq, series, h1, h2, h3, h4);
     }
-
     return lp;
   }

@@ -637,7 +637,7 @@ test_that("ezdm Stan code calls the model lpdf and parses", {
     model = ezdm("mean_rt", "var_rt", "n_upper", "n_trials", version = "3par")
   )
   expect_match(code3, "real ezdm_3par_lpdf(", fixed = TRUE)
-  expect_match(code3, "vector ezdm_cumulants(", fixed = TRUE)
+  expect_match(code3, "real ezdm_boundary_lpdf(", fixed = TRUE)
   expect_match(code3, "ezdm_3par_lpdf(Y[n] |", fixed = TRUE)
 
   code4 <- stancode(
@@ -649,7 +649,7 @@ test_that("ezdm Stan code calls the model lpdf and parses", {
     )
   )
   expect_match(code4, "real ezdm_4par_lpdf(", fixed = TRUE)
-  expect_match(code4, "vector ezdm_cumulants(", fixed = TRUE)
+  expect_match(code4, "real ezdm_boundary_lpdf(", fixed = TRUE)
 
   skip_if_not_installed("cmdstanr")
   skip_if(is.null(cmdstanr::cmdstan_version(error_on_NA = FALSE)))
