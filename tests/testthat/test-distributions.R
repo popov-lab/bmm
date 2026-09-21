@@ -1029,6 +1029,22 @@ test_that("dezdm validates parameters correctly", {
     "n_trials must be larger than 2"
   )
 
+  # the logit-scale binomial would return a finite density for fractional counts
+  expect_error(
+    dezdm(
+      mean_rt = 0.5, var_rt = 0.02, n_upper = 80.5, n_trials = 100,
+      drift = 2, bound = 1.5, ndt = 0.3
+    ),
+    "must be whole numbers"
+  )
+  expect_error(
+    dezdm(
+      mean_rt = 0.5, var_rt = 0.02, n_upper = 80, n_trials = 100.5,
+      drift = 2, bound = 1.5, ndt = 0.3
+    ),
+    "must be whole numbers"
+  )
+
   # version must be valid
   expect_error(
     dezdm(

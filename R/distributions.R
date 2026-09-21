@@ -1262,6 +1262,10 @@ dezdm <- function(mean_rt, var_rt, n_upper, n_trials,
   stopif(isTRUE(any(n_trials <= 2)), "n_trials must be larger than 2")
   stopif(isTRUE(any(n_upper < 0)), "n_upper cannot be negative")
   stopif(isTRUE(any(n_upper > n_trials)), "n_upper cannot exceed n_trials")
+  stopif(
+    isTRUE(any(n_upper != round(n_upper) | n_trials != round(n_trials))),
+    "n_upper and n_trials must be whole numbers"
+  )
 
   if (version == "4par") {
     stopif(isTRUE(any(zr <= 0 | zr >= 1)), "zr must be between 0 and 1")
