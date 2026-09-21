@@ -94,9 +94,10 @@ scaled chi-square
 \eqn{\mathrm{Gamma}((n - 1)/2, (n - 1)/(2\,\mathrm{VRT}))} terms —
 understates the sampling variance of \code{var_rt} by a factor of
 \eqn{1 + (\mathrm{kurtosis} - 3)(n - 1)/(2n)}: about 3.8 with 100 trials
-per cell and 3.5 to 3.6 with 10, less at accuracies above .95, and more
-with an asymmetric start point in version \code{"4par"} (up to 5.7 for \code{zr}
-between .3 and .7). It also ignores a correlation of about 0.7 between the
+per cell and 3.5 to 3.6 with 10, less at accuracies above .95. With an
+asymmetric start point in version \code{"4par"} it is more at the boundary
+nearer the start point (up to 5.7 for \code{zr} between .3 and .7) and less at
+the other. It also ignores a correlation of about 0.7 between the
 two statistics, making posteriors too narrow. The terms above reduce to it when \eqn{\kappa_3 = \kappa_4 = 0}.
 
 For version \code{"3par"} the start point is symmetric, so the decision time is
@@ -109,6 +110,13 @@ term, but \code{bmm()} currently drops such cells, because \code{rezdm()} and
 \code{ezdm_summary_stats()} code their missing summaries as \code{NA} and \code{brms}
 excludes rows with missing values. The per-boundary formulas condition on
 the realised counts, which are themselves random.
+
+The two additional cumulants cost sampling time. In two simulated designs
+(30 subjects with 200 or 250 trials, 3 seeds each, one machine) a gradient
+of the whole model took 1.3 times as long as with the older form for
+version \code{"3par"} and 1.9 times for version \code{"4par"}. The likelihood alone
+took 1.5 to 2.0 and 1.7 to 2.5 times as long, most where accuracy is near
+chance, so the ratio grows with the number of cells.
 
 Simulated \code{mean_rt} is not truncated at \code{ndt}. When a summary rests on few
 responses (a handful of trials in version \code{"3par"}, or a rarely reached

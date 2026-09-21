@@ -1195,9 +1195,10 @@ log_diff_exp <- function(a, b) {
 #'   \eqn{\mathrm{Gamma}((n - 1)/2, (n - 1)/(2\,\mathrm{VRT}))} terms —
 #'   understates the sampling variance of `var_rt` by a factor of
 #'   \eqn{1 + (\mathrm{kurtosis} - 3)(n - 1)/(2n)}: about 3.8 with 100 trials
-#'   per cell and 3.5 to 3.6 with 10, less at accuracies above .95, and more
-#'   with an asymmetric start point in version `"4par"` (up to 5.7 for `zr`
-#'   between .3 and .7). It also ignores a correlation of about 0.7 between the
+#'   per cell and 3.5 to 3.6 with 10, less at accuracies above .95. With an
+#'   asymmetric start point in version `"4par"` it is more at the boundary
+#'   nearer the start point (up to 5.7 for `zr` between .3 and .7) and less at
+#'   the other. It also ignores a correlation of about 0.7 between the
 #'   two statistics, making posteriors too narrow. The terms above reduce to it when \eqn{\kappa_3 = \kappa_4 = 0}.
 #'
 #'   For version `"3par"` the start point is symmetric, so the decision time is
@@ -1210,6 +1211,13 @@ log_diff_exp <- function(a, b) {
 #'   `ezdm_summary_stats()` code their missing summaries as `NA` and `brms`
 #'   excludes rows with missing values. The per-boundary formulas condition on
 #'   the realised counts, which are themselves random.
+#'
+#'   The two additional cumulants cost sampling time. In two simulated designs
+#'   (30 subjects with 200 or 250 trials, 3 seeds each, one machine) a gradient
+#'   of the whole model took 1.3 times as long as with the older form for
+#'   version `"3par"` and 1.9 times for version `"4par"`. The likelihood alone
+#'   took 1.5 to 2.0 and 1.7 to 2.5 times as long, most where accuracy is near
+#'   chance, so the ratio grows with the number of cells.
 #'
 #'   Simulated `mean_rt` is not truncated at `ndt`. When a summary rests on few
 #'   responses (a handful of trials in version `"3par"`, or a rarely reached
@@ -1583,7 +1591,9 @@ rezdm <- function(n, n_trials, drift, bound, ndt, zr = 0.5, s = 1,
   # below t = 0.7 they lose k4 outright (relative error 1e-4 at t = 0.1) and the
   # series takes over. At the seam the two agree in k4 to 1e-11 for
   # b / b0 <= 0.5 but only to 3e-9 at b / b0 = 0.999, where the closed forms
-  # carry the roundoff; that is the worst error of the branch in use anywhere.
+  # carry the roundoff; that is the worst error of the branch in use in R. The
+  # Stan closed forms are arranged differently and lose up to ten times more
+  # for b / b0 <= 0.2 just above the seam, 5e-10 nats in the log density.
   series <- !is.na(w) & b0 * sqrt(w) < 0.7
 
   out <- list(MDT = numeric(n), VRT = numeric(n), k3 = numeric(n), k4 = numeric(n))
