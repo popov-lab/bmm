@@ -571,14 +571,11 @@ test_that("ezdm_3par_lpdf in Stan matches dezdm() in R", {
     )])
   ))
 
-  # -Inf only where pC rounds to 1 while some responses went to the other
-  # boundary; never NaN
-  expect_false(any(is.nan(r_lpdf)))
-  expect_false(any(is.nan(stan_lpdf)))
-  expect_equal(is.finite(stan_lpdf), is.finite(r_lpdf))
-
-  finite <- is.finite(r_lpdf)
-  expect_lt(max(abs(stan_lpdf[finite] - r_lpdf[finite]) / abs(r_lpdf[finite])), 1e-9)
+  # the binomial is evaluated on the logit scale, so the density stays finite
+  # even at |drift| = 1500, where pC rounds to 1
+  expect_true(all(is.finite(r_lpdf)))
+  expect_true(all(is.finite(stan_lpdf)))
+  expect_lt(max(abs(stan_lpdf - r_lpdf) / abs(r_lpdf)), 1e-9)
 })
 
 test_that("ezdm_4par_lpdf in Stan matches dezdm() in R", {
@@ -637,7 +634,7 @@ test_that("ezdm Stan code calls the model lpdf and parses", {
     model = ezdm("mean_rt", "var_rt", "n_upper", "n_trials", version = "3par")
   )
   expect_match(code3, "real ezdm_3par_lpdf(", fixed = TRUE)
-  expect_match(code3, "real ezdm_boundary_lpdf(", fixed = TRUE)
+  expect_match(code3, "real ezdm_symmetric_lpdf(", fixed = TRUE)
   expect_match(code3, "ezdm_3par_lpdf(Y[n] |", fixed = TRUE)
 
   code4 <- stancode(

@@ -1328,8 +1328,10 @@ test_that(".ezdm_cumulants matches high-precision references in both branches", 
   ref <- ezdm_cumulant_references()
   got <- .ezdm_cumulants(ref$b, ref$bound, ref$drift^2 / ref$s^4, ref$s)
 
+  # row-wise ratios: expect_equal() pools its tolerance over the vector, and the
+  # references span 20 orders of magnitude
   for (moment in c("MDT", "VRT", "k3", "k4")) {
-    expect_equal(got[[moment]], ref[[moment]], tolerance = 1e-10, info = moment)
+    expect_equal(got[[moment]] / ref[[moment]], rep(1, nrow(ref)), tolerance = 1e-10, info = moment)
   }
 })
 
@@ -1410,8 +1412,9 @@ test_that(".ezdm_cumulants agrees with the eigenfunction series of the first-pas
     for (side in 1:2) {
       hit_distance <- c(1 - zr, zr)[side] * bound
       expected <- eigen_cumulants(hit_distance / s, bound / s, drift / s)
+      # as ratios, so an error in k4 alone is not pooled with the larger MDT
       expect_equal(
-        vapply(got, `[`, numeric(1), side), expected,
+        vapply(got, `[`, numeric(1), side) / expected, c(MDT = 1, VRT = 1, k3 = 1, k4 = 1),
         tolerance = 1e-7
       )
     }
@@ -1442,7 +1445,8 @@ test_that(".ez_rt_terms keeps a positive conditional variance across the ezdm gr
 
   ratio <- rt$sd^2 / (moments$VRT / grid$n)
   expect_true(all(is.finite(ratio)))
-  expect_gt(min(ratio), 0)
+  # the conditional sd never drops far below the marginal one: corr^2 < 0.7
+  expect_gt(min(ratio), 0.3)
   expect_lte(max(ratio), 1)
 })
 
@@ -1520,7 +1524,8 @@ test_that("dezdm 4par uses a boundary's RT summaries only from two responses on"
 })
 
 test_that(".ezdm_pc is stable in both drift directions", {
-  # the old exp(2 k z) form returned NaN from |drift| ~ 400
+  # the old exp(2 k z) form returned NaN from |drift| * bound / s^2 ~ 710 at
+  # negative drift
   drift <- c(-1500, -400, -1, 0, 1, 400, 1500)
   pC <- .ezdm_moments_4par(drift = drift, bound = 1, zr = 0.6, s = 1)$pC
 
@@ -1534,4 +1539,24 @@ test_that(".ezdm_pc is stable in both drift directions", {
     .ezdm_moments_3par(drift, 1, 1)$pC,
     .ezdm_moments_4par(drift, bound = 1, zr = 0.5, s = 1)$pC
   )
+})
+
+test_that("the 3par density takes its binomial on the logit scale drift * bound / s^2", {
+  # the identity the Stan likelihood and .dezdm_3par() both rely on
+  drift <- c(-3, -0.4, 0, 0.7, 2.5)
+  bound <- c(0.6, 1.2, 2, 1.5, 0.9)
+  s <- c(1, 0.7, 1.3, 2, 1)
+  expect_equal(stats::qlogis(.ezdm_moments_3par(drift, bound, s)$pC), drift * bound / s^2)
+
+  # and the density agrees with the probability-scale binomial where that is exact
+  moments <- .ezdm_moments_3par(1.2, 1.5, 1)
+  with_logit <- dezdm(0.6, 0.05, n_upper = 40, n_trials = 50, drift = 1.2, bound = 1.5, ndt = 0.25)
+  rt <- .ez_rt_terms(moments$VRT, moments$k3, moments$k4, 50)
+  with_prob <- stats::dbinom(40, 50, moments$pC, log = TRUE) +
+    stats::dgamma(0.05, rt$shape, rt$rate, log = TRUE) +
+    stats::dnorm(0.6, 0.25 + moments$MDT + rt$slope * (0.05 - moments$VRT), rt$sd, log = TRUE)
+  expect_equal(with_logit, with_prob)
+
+  # pC rounds to 1 here, and the old form returned -Inf
+  expect_true(is.finite(dezdm(0.3, 1e-4, n_upper = 49, n_trials = 50, drift = 60, bound = 1.5, ndt = 0.25)))
 })

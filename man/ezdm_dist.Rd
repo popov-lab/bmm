@@ -87,15 +87,17 @@ of the sample variance,
 \deqn{\mathrm{mean\_rt} \mid \mathrm{var\_rt} \sim N\left(\mathrm{ndt} + \mathrm{MDT} + \frac{\kappa_3 / n}{W}(\mathrm{var\_rt} - \mathrm{VRT}),\ \sqrt{\mathrm{VRT} / n - (\kappa_3 / n)^2 / W}\right),}
 so that \eqn{\mathrm{Var}(\mathrm{mean\_rt}) = \mathrm{VRT} / n} and
 \eqn{\mathrm{Cov}(\mathrm{mean\_rt}, \mathrm{var\_rt}) = \kappa_3 / n} are
-exact. Decision times are right-skewed (kurtosis 8.8 at zero drift, falling
-towards 3 as drift grows), so the older form that assumes normal reaction
-times — independent normal and scaled chi-square
+exact. Decision times are right-skewed (with a symmetric start point their
+kurtosis is 8.8 at zero drift and falls towards 3 as drift grows), so the
+older form that assumes normal reaction times — independent normal and
+scaled chi-square
 \eqn{\mathrm{Gamma}((n - 1)/2, (n - 1)/(2\,\mathrm{VRT}))} terms —
-understates the sampling variance of \code{var_rt} by a factor of about 3.8
-(3.7 to 3.9 at accuracies between .60 and .95, less at higher accuracy; up
-to 5.7 with an asymmetric start point in version \code{"4par"}) and ignores a
-correlation of about 0.7 between the two statistics, making posteriors too
-narrow. The terms above reduce to it when \eqn{\kappa_3 = \kappa_4 = 0}.
+understates the sampling variance of \code{var_rt} by a factor of
+\eqn{1 + (\mathrm{kurtosis} - 3)(n - 1)/(2n)}: about 3.8 with 100 trials
+per cell and 3.5 to 3.6 with 10, less at accuracies above .95, and more
+with an asymmetric start point in version \code{"4par"} (up to 5.7 for \code{zr}
+between .3 and .7). It also ignores a correlation of about 0.7 between the
+two statistics, making posteriors too narrow. The terms above reduce to it when \eqn{\kappa_3 = \kappa_4 = 0}.
 
 For version \code{"3par"} the start point is symmetric, so the decision time is
 independent of which boundary is hit and all \code{n_trials} responses inform
