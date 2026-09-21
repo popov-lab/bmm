@@ -653,7 +653,7 @@ test_that("ezdm Stan code calls the model lpdf and parses", {
   }
 })
 
-test_that("ezdm_4par_lpdf has the right drift gradient at and around zero drift", {
+test_that("ezdm_4par_lpdf has the right gradient at and around zero drift", {
   # Returning the limit of pC at drift = 0 as a constant gave the right value
   # and a zero gradient, which only autodiff can see. CmdStan's standalone
   # log_prob method is used because expose_functions() returns no gradients.
@@ -664,34 +664,52 @@ test_that("ezdm_4par_lpdf has the right drift gradient at and around zero drift"
   program <- paste0(
     "functions {\n", .ezdm_stan_functions("4par"), "\n}\n",
     "data { int N; vector[2] mrt; vector[2] vrt; }\n",
-    "parameters { vector[N] drift; }\n",
-    "model { for (i in 1:N) target += ezdm_4par_lpdf(mrt[1] | 0.0, drift[i], 1.5, 0.25, 0.3, 1.0,\n",
-    "  mrt[2], vrt[1], vrt[2], 12, 60); }\n"
+    "parameters { vector[N] drift; vector[N] bound; vector[N] zr; vector[N] s; }\n",
+    "model { for (i in 1:N) target += ezdm_4par_lpdf(mrt[1] | 0.0, drift[i], bound[i], 0.25,\n",
+    "  zr[i], s[i], mrt[2], vrt[1], vrt[2], 12, 60); }\n"
   )
   # summaries of a cell with negative drift: most responses at the lower boundary
   moments <- .ezdm_moments_4par(-1.2, 1.5, 0.3, 1)
   mrt <- 0.25 + c(moments$mdt_upper, moments$mdt_lower)
   vrt <- c(moments$vrt_upper, moments$vrt_lower)
-  drift <- c(-1.2, -1e-12, 0, 1e-12, 1.2)
+  # sw is the drift at which ezdm_logit_pc() leaves its series. The points inside
+  # that band catch a wrong series coefficient, which no R-side test can see,
+  # and the ones at 99 sw a switch that has moved outwards
+  sw <- 1e-4 / (2 * 1.5)
+  drift <- c(-1.2, -1e-12, 0, 1e-12, 1.2, -0.5 * sw, 0.99 * sw, -99 * sw, 99 * sw)
+  pars <- list(drift = drift, bound = 1.5, zr = 0.3, s = 1)
 
   dir <- withr::local_tempdir()
   model <- cmdstanr::cmdstan_model(cmdstanr::write_stan_file(program, dir = dir), quiet = TRUE)
   cmdstanr::write_stan_json(list(N = length(drift), mrt = mrt, vrt = vrt), file.path(dir, "data.json"))
-  cmdstanr::write_stan_json(list(drift = drift), file.path(dir, "pars.json"))
+  cmdstanr::write_stan_json(lapply(pars, rep_len, length(drift)), file.path(dir, "pars.json"))
   status <- system2(model$exe_file(), c(
     "method=log_prob", paste0("constrained_params=", file.path(dir, "pars.json")), "jacobian=0",
     "data", paste0("file=", file.path(dir, "data.json")),
     "output", paste0("file=", file.path(dir, "out.csv")), "sig_figs=17"
   ), stdout = FALSE, stderr = FALSE)
   expect_equal(status, 0)
-  stan_gradient <- as.numeric(utils::read.csv(file.path(dir, "out.csv"), comment.char = "#")[1, -1])
+  stan_gradient <- matrix(
+    as.numeric(utils::read.csv(file.path(dir, "out.csv"), comment.char = "#")[1, -1]),
+    ncol = length(pars), dimnames = list(NULL, names(pars))
+  )
 
-  lpdf <- function(drift) {
-    dezdm(mrt, vrt, n_upper = 12, n_trials = 60, drift = drift, bound = 1.5,
-          ndt = 0.25, zr = 0.3, version = "4par")
+  lpdf <- function(par, step, drift) {
+    point <- list(drift = drift, bound = 1.5, zr = 0.3, s = 1)
+    point[[par]] <- point[[par]] + step
+    dezdm(mrt, vrt, n_upper = 12, n_trials = 60, drift = point$drift, bound = point$bound,
+          ndt = 0.25, zr = point$zr, s = point$s, version = "4par")
   }
-  r_gradient <- vapply(drift, \(d) (lpdf(d + 1e-5) - lpdf(d - 1e-5)) / 2e-5, numeric(1))
-  expect_equal(stan_gradient / r_gradient, rep(1, length(drift)), tolerance = 1e-6)
+  # Richardson-extrapolated central difference: a plain one at a step small
+  # enough for its truncation error is too noisy for the tolerance below
+  central <- function(par, h, drift) (lpdf(par, h, drift) - lpdf(par, -h, drift)) / (2 * h)
+  r_gradient <- vapply(colnames(stan_gradient), function(par) {
+    vapply(drift, \(d) (4 * central(par, 5e-5, d) - central(par, 1e-4, d)) / 3, numeric(1))
+  }, numeric(length(drift)))
+
+  # max, not expect_equal(): its tolerance applies to the mean difference, so
+  # one wrong point among nine would pass
+  expect_lt(max(abs(stan_gradient / r_gradient - 1)), 1e-8)
 })
 
 test_that("the Stan series literals are the coefficients of log(sinh x / x)", {
