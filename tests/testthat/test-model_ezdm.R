@@ -494,7 +494,6 @@ test_that("ezdm posterior_predict function is defined for 4par", {
 # mode for a parity test. sig_figs = 17 round-trips a double; the default 6
 # would measure cmdstan's output precision instead of the code.
 ezdm_stan_lpdf <- function(version, data) {
-  sc_path <- system.file("stan_chunks", package = "bmm")
   declarations <- if (version == "3par") {
     "vector[N] mean_rt; vector[N] var_rt; vector[N] s;"
   } else {
@@ -514,9 +513,7 @@ ezdm_stan_lpdf <- function(version, data) {
   }
 
   program <- paste0(
-    "functions {\n",
-    read_lines2(file.path(sc_path, "ezdm_cumulants.stan")), "\n",
-    read_lines2(file.path(sc_path, paste0("ezdm_", version, "_functions.stan"))),
+    "functions {\n", .ezdm_stan_functions(version),
     "\n}\ndata {\n  int<lower=1> N;\n  vector[N] drift; vector[N] bound;",
     " vector[N] ndt;\n  array[N] int n_upper; array[N] int n_trials;\n  ",
     declarations,
@@ -664,11 +661,8 @@ test_that("ezdm_4par_lpdf has the right drift gradient at and around zero drift"
   skip_if_not_installed("cmdstanr")
   skip_if(is.null(cmdstanr::cmdstan_version(error_on_NA = FALSE)))
 
-  chunk <- function(file) {
-    paste(readLines(system.file("stan_chunks", file, package = "bmm")), collapse = "\n")
-  }
   program <- paste0(
-    "functions {\n", chunk("ezdm_cumulants.stan"), "\n", chunk("ezdm_4par_functions.stan"), "\n}\n",
+    "functions {\n", .ezdm_stan_functions("4par"), "\n}\n",
     "data { int N; vector[2] mrt; vector[2] vrt; }\n",
     "parameters { vector[N] drift; }\n",
     "model { for (i in 1:N) target += ezdm_4par_lpdf(mrt[1] | 0.0, drift[i], 1.5, 0.25, 0.3, 1.0,\n",
@@ -698,4 +692,28 @@ test_that("ezdm_4par_lpdf has the right drift gradient at and around zero drift"
   }
   r_gradient <- vapply(drift, \(d) (lpdf(d + 1e-5) - lpdf(d - 1e-5)) / 2e-5, numeric(1))
   expect_equal(stan_gradient / r_gradient, rep(1, length(drift)), tolerance = 1e-6)
+})
+
+test_that("the Stan series literals are the coefficients of log(sinh x / x)", {
+  # the only check of the Stan arithmetic that needs no Stan: every literal of
+  # the generated chunk against the rationals the R code uses
+  txt <- readLines(system.file("stan_chunks", "ezdm_series.stan", package = "bmm"))
+  literals <- function(name) {
+    from <- grep(paste0("real ", name, "\\(real x\\)"), txt)
+    to <- from + grep("return acc;", txt[-seq_len(from)])[1]
+    lines <- txt[from:to]
+    as.numeric(regmatches(lines, regexpr("-?[0-9.]+(e-?[0-9]+)?(?=\\);|;$)", lines, perl = TRUE)))
+  }
+  a <- .EZDM_LOG_SINHC_COEF
+  j <- seq_along(a)
+  for (n in 1:4) {
+    for (kind in c("log_sinhc", "log_cosh")) {
+      coef <- a * (if (kind == "log_cosh") 4^j - 1 else 1) *
+        ifelse(j >= n, factorial(j) / factorial(pmax(j - n, 0)), 0)
+      expected <- rev(coef[j >= n])
+      got <- literals(paste0("ezdm_", kind, "_d", n))
+      expect_length(got, length(expected))
+      expect_lt(max(abs(got / expected - 1)), 1e-14)
+    }
+  }
 })

@@ -1543,8 +1543,9 @@ rezdm <- function(n, n_trials, drift, bound, ndt, zr = 0.5, s = 1,
 # Series coefficients of log(sinh(x) / x) = sum_j a_j x^(2j), generated
 # symbolically (sympy series expansion) rather than copied: published tables of
 # these are easy to mistranscribe past j = 8, and a wrong coefficient makes the
-# truncated series diverge instead of failing loudly.
-# Must match inst/stan_chunks/ezdm_cumulants.stan.
+# truncated series diverge instead of failing loudly. The literals of
+# inst/stan_chunks/ezdm_series.stan are generated from the same a_j, and a test
+# compares the two.
 .EZDM_LOG_SINHC_COEF <- c(
   1 / 6,
   -1 / 180,

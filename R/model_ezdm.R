@@ -292,6 +292,17 @@ bmf2bf.ezdm_4par <- function(model, formula) {
 # CONFIGURE_MODEL S3 METHODS                                             ####
 ############################################################################# !
 
+# Stan functions of one ezdm version. The order matters: each chunk defines what
+# the next one calls.
+.ezdm_stan_functions <- function(version) {
+  chunks <- c(
+    "ezdm_series.stan", "ezdm_cumulants.stan",
+    paste0("ezdm_", version, "_functions.stan")
+  )
+  sc_path <- system.file("stan_chunks", package = "bmm")
+  paste(vapply(file.path(sc_path, chunks), read_lines2, character(1)), collapse = "\n")
+}
+
 #' @export
 configure_model.ezdm_3par <- function(model, data, formula) {
   # construct brms formula from the bmm formula
@@ -313,13 +324,7 @@ configure_model.ezdm_3par <- function(model, data, formula) {
   )
 
   # prepare initial stanvars to pass to brms, model formula and priors
-  sc_path <- system.file("stan_chunks", package = "bmm")
-  # the cumulants chunk defines what the likelihood calls, so it comes first
-  stan_functions <- paste0(
-    read_lines2(paste0(sc_path, "/ezdm_cumulants.stan")), "\n",
-    read_lines2(paste0(sc_path, "/ezdm_3par_functions.stan"))
-  )
-  stanvars <- brms::stanvar(scode = stan_functions, block = "functions")
+  stanvars <- brms::stanvar(scode = .ezdm_stan_functions("3par"), block = "functions")
 
   # return the list
   nlist(formula, data, stanvars)
@@ -377,13 +382,7 @@ configure_model.ezdm_4par <- function(model, data, formula) {
   )
 
   # prepare initial stanvars to pass to brms, model formula and priors
-  sc_path <- system.file("stan_chunks", package = "bmm")
-  # the cumulants chunk defines what the likelihood calls, so it comes first
-  stan_functions <- paste0(
-    read_lines2(paste0(sc_path, "/ezdm_cumulants.stan")), "\n",
-    read_lines2(paste0(sc_path, "/ezdm_4par_functions.stan"))
-  )
-  stanvars <- brms::stanvar(scode = stan_functions, block = "functions")
+  stanvars <- brms::stanvar(scode = .ezdm_stan_functions("4par"), block = "functions")
 
   # return the list
   nlist(formula, data, stanvars)
