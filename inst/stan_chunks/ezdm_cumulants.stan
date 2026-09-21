@@ -20,7 +20,7 @@
   // Everything is scalar on purpose. Each function is called once per
   // observation, and a vector or array built inside a user-defined function is
   // a heap allocation per call that stanc cannot optimize away; returning the
-  // cumulants as vectors cost 1.5 to 1.8 times as much per gradient.
+  // cumulants as vectors cost about one and a half times as much per gradient.
 
   // Series regime. log sinh(sqrt x) = G(x) + log(x) / 2 with
   // G(x) = log(sinh(sqrt x) / sqrt x) = sum_j a_j x^j, and the log terms of b
