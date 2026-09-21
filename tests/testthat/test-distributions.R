@@ -1580,3 +1580,41 @@ test_that("the 3par density takes its binomial on the logit scale drift * bound 
   # pC rounds to 1 here, and the old form returned -Inf
   expect_true(is.finite(dezdm(0.3, 1e-4, n_upper = 49, n_trials = 50, drift = 60, bound = 1.5, ndt = 0.25)))
 })
+
+test_that("the 4par density is the same when drift, zr and the boundaries are mirrored", {
+  # log(1 - pC) taken of a pC that had rounded to 1 broke this from
+  # |drift| * bound / s^2 of about 18 (drift = 10 here is 31), and returned -Inf
+  # on one side only from about 37
+  grid <- expand.grid(
+    drift = c(-25, -10, -5, -1.2, -0.3, 0.3, 1.2, 5, 10, 25), zr = c(0.2, 0.7),
+    n_upper = c(0, 1, 59, 60)
+  )
+  moments <- .ezdm_moments_4par(grid$drift, 1.5, grid$zr, 0.7)
+  mean_rt <- 0.25 + cbind(moments$mdt_upper * 1.03, moments$mdt_lower * 0.97)
+  var_rt <- cbind(moments$vrt_upper * 0.9, moments$vrt_lower * 1.2)
+
+  as_coded <- dezdm(mean_rt, var_rt, grid$n_upper, 60,
+    drift = grid$drift, bound = 1.5, ndt = 0.25, zr = grid$zr, s = 0.7, version = "4par"
+  )
+  mirrored <- dezdm(mean_rt[, 2:1], var_rt[, 2:1], 60 - grid$n_upper, 60,
+    drift = -grid$drift, bound = 1.5, ndt = 0.25, zr = 1 - grid$zr, s = 0.7, version = "4par"
+  )
+
+  expect_true(all(is.finite(as_coded)))
+  expect_lt(max(abs(mirrored / as_coded - 1)), 1e-11)
+})
+
+test_that(".ezdm_logit_pc is the logit of .ezdm_pc and the 3par logit at zr = 0.5", {
+  bound <- 1.5
+  k <- c(-40, -20, -5, 5, 20, 40) / bound
+  expect_lt(max(abs(.ezdm_logit_pc(bound / 2, bound / 2, k) / (k * bound) - 1)), 1e-13)
+
+  # where pC is exact, on both sides of the switch between the series and the
+  # closed form
+  k <- c(-3, -1e-3, -1e-6, 0, 1e-6, 1e-3, 3)
+  logit <- .ezdm_logit_pc(0.45, bound - 0.45, k)
+  expect_lt(max(abs(logit / stats::qlogis(.ezdm_pc(0.45, bound, k)) - 1)), 1e-13)
+
+  # pC rounds to 1 here and qlogis() of it is Inf
+  expect_equal(.ezdm_logit_pc(0.45, bound - 0.45, 30), 2 * 30 * 0.45)
+})

@@ -538,9 +538,9 @@ ezdm_stan_lpdf <- function(version, data) {
 
 # drift spans the series branch (t < 0.7), the closed forms, the t > 30
 # saturation, and the values at which the old code returned NaN; negative
-# drift takes the flipped branch of ezdm_pc
+# drift takes the negative-drift branch of ezdm_logit_pc, and 2e-5 its series
 ezdm_parity_drift <- c(
-  -1500, -5, -0.2, 0, 1e-300, 1e-8, 0.001, 0.05, 0.2, 0.5, 1, 2, 5, 20, 1500
+  -1500, -5, -0.2, 0, 1e-300, 1e-8, 2e-5, 0.001, 0.05, 0.2, 0.5, 1, 2, 5, 20, 1500
 )
 
 test_that("ezdm_3par_lpdf in Stan matches dezdm() in R", {

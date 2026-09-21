@@ -1339,13 +1339,8 @@ rezdm <- function(n, n_trials, drift, bound, ndt, zr = 0.5, s = 1,
   moments <- .ezdm_moments_3par(drift, bound, s)
   rt <- .ez_rt_terms(moments$VRT, moments$k3, moments$k4, n_trials)
 
-  # with a symmetric start point logit(pC) = drift * bound / s^2 exactly, and
-  # the binomial on that scale keeps log(1 - pC) where pC itself rounds to 1;
-  # matches binomial_logit_lpmf in inst/stan_chunks/ezdm_3par_functions.stan
-  logit_pc <- drift * bound / s^2
-  lchoose(n_trials, n_upper) +
-    n_upper * stats::plogis(logit_pc, log.p = TRUE) +
-    (n_trials - n_upper) * stats::plogis(-logit_pc, log.p = TRUE) +
+  # with a symmetric start point logit(pC) = drift * bound / s^2 exactly
+  .ez_binomial_logit(n_upper, n_trials, drift * bound / s^2) +
     stats::dgamma(var_rt, shape = rt$shape, rate = rt$rate, log = TRUE) +
     stats::dnorm(mean_rt,
       mean = ndt + moments$MDT + rt$slope * (var_rt - moments$VRT),
@@ -1399,7 +1394,6 @@ rezdm <- function(n, n_trials, drift, bound, ndt, zr = 0.5, s = 1,
   moments <- .ezdm_moments_4par(drift, bound, zr, s)
 
   # recycle moments and ndt to common length
-  pC <- rep_len(moments$pC, n)
   mdt_upper <- rep_len(moments$mdt_upper, n)
   mdt_lower <- rep_len(moments$mdt_lower, n)
   vrt_upper <- rep_len(moments$vrt_upper, n)
@@ -1410,8 +1404,12 @@ rezdm <- function(n, n_trials, drift, bound, ndt, zr = 0.5, s = 1,
   k4_lower <- rep_len(moments$k4_lower, n)
   ndt <- rep_len(ndt, n)
 
-  # binomial for n_upper
-  ll <- stats::dbinom(n_upper, size = n_trials, prob = pC, log = TRUE)
+  b_upper <- rep_len(zr * bound, n)
+  b_lower <- rep_len((1 - zr) * bound, n)
+  ll <- .ez_binomial_logit(
+    n_upper, n_trials,
+    .ezdm_logit_pc(b_upper, b_lower, rep_len(drift / s^2, n))
+  )
 
   # a boundary with fewer than two responses has no sample variance and
   # contributes only through the binomial term
@@ -1504,6 +1502,14 @@ rezdm <- function(n, n_trials, drift, bound, ndt, zr = 0.5, s = 1,
     n_upper = n_upper,
     n_trials = n_trials
   )
+}
+
+# Binomial log density on the logit scale, which keeps log(1 - pC) where pC
+# itself rounds to 1; matches binomial_logit_lpmf in the Stan likelihoods
+.ez_binomial_logit <- function(n_upper, n_trials, logit_pc) {
+  lchoose(n_trials, n_upper) +
+    n_upper * stats::plogis(logit_pc, log.p = TRUE) +
+    (n_trials - n_upper) * stats::plogis(-logit_pc, log.p = TRUE)
 }
 
 # Sample mean and variance of one boundary's RTs; both are undefined (NA)
@@ -1678,9 +1684,9 @@ rezdm <- function(n, n_trials, drift, bound, ndt, zr = 0.5, s = 1,
 #
 # Near k = 0 the ratio is 0 / 0. It is taken from expm1(x) / x =
 # 1 + x / 2 + x^2 / 6 + x^3 / 24 (relative error below 1e-18 for |x| < 1e-4)
-# rather than set to its limit b / b0: in Stan a constant there has no gradient
-# in drift, so a sampler started at drift = 0 would see a flat response
-# proportion. Must match ezdm_pc() in inst/stan_chunks/ezdm_cumulants.stan.
+# rather than set to its limit b / b0, so that it keeps its slope in drift
+# through zero. The densities use .ezdm_logit_pc() instead; this one serves
+# rezdm() and the moments.
 .ezdm_pc <- function(b, b0, k) {
   u <- -2 * k * b
   u0 <- -2 * k * b0
@@ -1695,6 +1701,28 @@ rezdm <- function(n, n_trials, drift, bound, ndt, zr = 0.5, s = 1,
   pC[direct] <- expm1(u[direct]) / expm1(u0[direct])
   pC[flip] <- exp(u[flip] - u0[flip]) * expm1(-u[flip]) / expm1(-u0[flip])
   pC
+}
+
+# logit of .ezdm_pc() for the binomial, with up = 2 k b_upper and
+# lo = 2 k b_lower: logit(pC) = up + log(1 - exp(-up)) - log(1 - exp(-lo)). The
+# bound terms of pC and 1 - pC cancel, no log is taken of a probability that has
+# rounded to 0 or 1, and mirroring drift and start point flips the sign exactly.
+# Must match ezdm_logit_pc() in inst/stan_chunks/ezdm_cumulants.stan.
+.ezdm_logit_pc <- function(b_upper, b_lower, k) {
+  up <- 2 * k * b_upper
+  lo <- 2 * k * b_lower
+  no_drift <- !is.na(k) & abs(up + lo) < 1e-4
+  rising <- !is.na(k) & k > 0 & !no_drift
+  falling <- !is.na(k) & k < 0 & !no_drift
+  log_expm1_ratio <- function(x) log1p(x * (1 / 2 + x * (1 / 6 + x / 24)))
+  log1m_exp <- function(x) ifelse(x > -log(2), log(-expm1(x)), log1p(-exp(x)))
+
+  out <- rep_len(NA_real_, length(up))
+  out[no_drift] <- (log(b_upper / b_lower) + up)[no_drift] +
+    log_expm1_ratio(-up[no_drift]) - log_expm1_ratio(-lo[no_drift])
+  out[rising] <- up[rising] + log1m_exp(-up[rising]) - log1m_exp(-lo[rising])
+  out[falling] <- lo[falling] + log1m_exp(up[falling]) - log1m_exp(lo[falling])
+  out
 }
 
 # Internal: compute 3par moments (zr = 0.5) - vectorized

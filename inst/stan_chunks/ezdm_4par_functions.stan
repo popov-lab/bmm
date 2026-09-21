@@ -21,7 +21,9 @@
     real b_upper = zr * bound;
     real b_lower = bound - b_upper;
 
-    real lp = binomial_lpmf(hits | trials, ezdm_pc(b_upper, bound, k));
+    // the logit of the EZ proportion correct for a free start point; at
+    // zr = 0.5 it is drift bound / s^2, the 3par one
+    real lp = binomial_logit_lpmf(hits | trials, ezdm_logit_pc(b_upper, b_lower, k));
     if (hits < 2 && misses < 2) {
       return lp;
     }

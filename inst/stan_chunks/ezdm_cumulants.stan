@@ -279,28 +279,35 @@
       -ezdm_cgf_d4(p, q, u) * square(c_sq));
   }
 
-  // P(hit the boundary at distance b) = expm1(-2 k b) / expm1(-2 k b0), the
-  // lambda = 0 value of the same transform with k = drift / s^2 signed. Both
-  // expm1 calls overflow when k < 0, so the identity
-  // expm1(u) = -exp(u) expm1(-u) moves the evaluation to the finite side.
+  // Logit of pC, the probability of the upper boundary, for a start point
+  // b_upper below it and b_lower above the lower one. With k = drift / s^2
+  // signed, pC = expm1(-2 k b_upper) / expm1(-2 k bound) is the lambda = 0 value
+  // of the same transform, and 1 - pC is pC at the mirrored start point and
+  // drift. In their ratio the bound terms cancel:
+  //   logit(pC) = up + log(1 - exp(-up)) - log(1 - exp(-lo)),
+  // up = 2 k b_upper, lo = 2 k b_lower. No log is taken of a probability that
+  // has rounded to 0 or 1, mirroring drift and start point flips the sign
+  // exactly, and at b_upper = b_lower it is drift bound / s^2, the 3par logit.
   //
-  // Near k = 0 the ratio is 0 / 0. Returning its limit b / b0 there would be a
-  // constant, whose gradient in drift is zero where the true one is not, and
+  // For k < 0 the same ratio is written in exp(up) and exp(lo), which stay
+  // finite there. Near k = 0 it is 0 / 0. Its limit b_upper / b_lower would be
+  // a constant, with a zero gradient in drift where the true one is not, and
   // drift = 0 is where a sampler initialized at zero starts. The series
   // expm1(x) / x = 1 + x / 2 + x^2 / 6 + x^3 / 24 is exact to 1e-18 below
   // |x| = 1e-4 and carries the gradient.
-  real ezdm_expm1_ratio(real x) {
-    return 1 + x * (0.5 + x * (1.0 / 6 + x / 24));
+  real ezdm_log_expm1_ratio(real x) {
+    return log1p(x * (0.5 + x * (1.0 / 6 + x / 24)));
   }
 
-  real ezdm_pc(real b, real b0, real k) {
-    real u = -2 * k * b;
-    real u0 = -2 * k * b0;
-    if (abs(u0) < 1e-4) {
-      return b / b0 * ezdm_expm1_ratio(u) / ezdm_expm1_ratio(u0);
+  real ezdm_logit_pc(real b_upper, real b_lower, real k) {
+    real up = 2 * k * b_upper;
+    real lo = 2 * k * b_lower;
+    if (abs(up + lo) < 1e-4) {
+      return log(b_upper / b_lower) + up + ezdm_log_expm1_ratio(-up)
+             - ezdm_log_expm1_ratio(-lo);
     }
-    if (u0 > 0) {
-      return exp(u - u0) * expm1(-u) / expm1(-u0);
+    if (k > 0) {
+      return up + log1m_exp(-up) - log1m_exp(-lo);
     }
-    return expm1(u) / expm1(u0);
+    return lo + log1m_exp(up) - log1m_exp(lo);
   }
