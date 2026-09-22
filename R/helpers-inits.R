@@ -134,26 +134,27 @@ init_fixef_param <- function(spar, types, dim, model, standata_list) {
     return(NULL)
   }
 
-  in_range <- range_coefficients(X, centered = !is.null(standata_list[[sub("^b", "Kc", stan_par)]]))
-  values <- runif(length(in_range), min = -0.1, max = 0.1)
-  values[in_range] <- from_range(sum(in_range))
+  values <- range_coefficients(
+    X, from_range(1), centered = !is.null(standata_list[[sub("^b", "Kc", stan_par)]])
+  )
   init_array(if (is.null(index)) values else values[index], types, dim)
 }
 
-# The coefficients that start from the model's range rather than near zero: the
-# intercept, which brms folds into the first coefficient of a non-linear
-# parameter, or else the columns of the first term, which are the cell means of
-# a no-intercept formula. Counting them on brms's own design matrix covers
-# function calls, interactions and dropped levels alike. brms centres an
-# intercept, whether a parameter of its own or a constant, and drops its column
-# from b, recording that as Kc_<par>; every coefficient left is then an effect.
-# A 0 + Intercept design matrix carries no assign attribute
-range_coefficients <- function(X, centered) {
-  assign <- attr(X, "assign") %||% seq_len(ncol(X))
+# The coefficients that put the linear predictor at `target` on every row of
+# brms's own design matrix: the least-squares solution of D b = target, where D
+# is the design the Stan program uses -- a separate intercept beside the centred
+# columns where brms records the centring as Kc_<par>, the matrix itself
+# otherwise. Cell means, treatment contrasts, interactions, a 0 + Intercept term
+# and dropped levels all follow from the one solve, and a design that cannot
+# reach the target exactly gets the closest it can. Aliased columns solve to NA
+# and start at zero
+range_coefficients <- function(X, target, centered) {
   if (centered) {
-    return(rep(FALSE, length(assign) - 1))
+    X <- cbind(Intercept = 1, scale(X[, -1, drop = FALSE], scale = FALSE))
   }
-  assign == assign[1]
+  values <- qr.coef(qr(X), rep(target, nrow(X)))
+  values[is.na(values)] <- 0
+  unname(if (centered) values[-1] else values)
 }
 
 # init_ranges of softmax parameters are declared on the sampling scale, as

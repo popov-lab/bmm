@@ -877,21 +877,48 @@ test_that("the first term of a no-intercept formula starts in range whatever its
   expect_equal(n_in_range(bmf(kappa ~ 0 + factor(ss_num), thetat ~ 1)), c(8, 8))
   expect_equal(n_in_range(bmf(kappa ~ 0 + set_size + session, thetat ~ 1)), c(9, 8))
   expect_equal(n_in_range(bmf(kappa ~ 0 + set_size:session, thetat ~ 1)), c(16, 16))
-  expect_equal(n_in_range(bmf(kappa ~ 0 + ss_num + session, thetat ~ 1)), c(3, 1))
+  # the numeric term carries no constant, so the session cell means hold it
+  expect_equal(n_in_range(bmf(kappa ~ 0 + ss_num + session, thetat ~ 1)), c(3, 2))
   # brms drops the unused level, and so does the count
   without_8 <- dat[dat$set_size != 8, ]
   expect_equal(n_in_range(bmf(kappa ~ 0 + set_size, thetat ~ 1), without_8), c(7, 7))
 })
 
-test_that("range_coefficients() picks the first term unless the intercept is centred", {
-  X <- stats::model.matrix(~ 0 + x + z, data.frame(x = factor(1:3), z = 1:3))
-  expect_equal(range_coefficients(X, centered = FALSE), c(TRUE, TRUE, TRUE, FALSE))
-  X <- stats::model.matrix(~ 1 + x, data.frame(x = factor(1:3)))
-  expect_equal(range_coefficients(X, centered = TRUE), c(FALSE, FALSE))
-  expect_equal(range_coefficients(X, centered = FALSE), c(TRUE, FALSE, FALSE))
+test_that("range_coefficients() puts the linear predictor at the target on every row", {
+  target <- 1.7
+  dat <- data.frame(f = factor(rep(1:3, 4)), x = rep(1:3, 4))
+  # brms holds the intercept of a centred design in a parameter of its own, so
+  # the centred columns have to leave whatever value it draws alone
+  predictor <- function(X, centered) {
+    b <- range_coefficients(X, target, centered = centered)
+    if (!centered) {
+      return(as.vector(X %*% b))
+    }
+    as.vector(target + scale(X[, -1, drop = FALSE], scale = FALSE) %*% b)
+  }
+
+  # the order of the terms must not matter
+  expect_equal(predictor(stats::model.matrix(~ 0 + f + x, dat), FALSE), rep(target, 12))
+  expect_equal(predictor(stats::model.matrix(~ 0 + x + f, dat), FALSE), rep(target, 12))
+  expect_equal(predictor(stats::model.matrix(~ 0 + f:x, dat), FALSE), rep(target, 12))
+  expect_equal(predictor(stats::model.matrix(~ 1 + f, dat), TRUE), rep(target, 12))
   # a 0 + Intercept design matrix has no assign attribute
+  X <- stats::model.matrix(~ 1 + f, dat)
   attr(X, "assign") <- NULL
-  expect_equal(range_coefficients(X, centered = FALSE), c(TRUE, FALSE, FALSE))
+  expect_equal(predictor(X, FALSE), rep(target, 12))
+
+  # a design that cannot reach a constant gets the closest fit: the residual is
+  # orthogonal to every column of the design
+  X <- stats::model.matrix(~ 0 + poly(x, 2), dat)
+  b <- range_coefficients(X, target, centered = FALSE)
+  expect_false(isTRUE(all.equal(as.vector(X %*% b), rep(target, 12))))
+  expect_equal(as.vector(t(X) %*% (X %*% b - target)), c(0, 0))
+
+  # an aliased column solves to NA, which would poison every value Stan reads
+  X <- cbind(Intercept = 1, x = dat$x, copy = dat$x)
+  b <- range_coefficients(X, target, centered = FALSE)
+  expect_false(anyNA(b))
+  expect_equal(as.vector(X %*% b), rep(target, 12))
 })
 
 test_that("the coefficients of the main dpar start from its range", {
