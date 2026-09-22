@@ -42,18 +42,23 @@ create_initfun.default <- function(model, data, formula, prior = NULL, ...) {
 
     stan_names <- names(stanpars_list)
     inits <- lapply(stan_names, function(spar) {
-      spec <- stanpars_list[[spar]]
-      dim <- resolve_stan_dim(spec$dims, standata_list)
-      if (anyNA(dim)) {
-        return(NULL)
-      }
-      init_ranef_param(spar, spec$types, dim) %||%
-        init_fixef_param(spar, spec$types, dim, model, standata_list) %||%
-        init_default_param(spec, dim, standata_list)
+      init_stan_param(spar, stanpars_list[[spar]], model, standata_list)
     })
     names(inits) <- stan_names
     inits[!vapply(inits, is.null, logical(1))]
   }
+}
+
+# A parameter whose size cannot be resolved from the Stan data is left to the
+# sampler, so that the rest of the list still reaches it
+init_stan_param <- function(spar, spec, model, standata_list) {
+  dim <- resolve_stan_dim(spec$dims, standata_list)
+  if (anyNA(dim)) {
+    return(NULL)
+  }
+  init_ranef_param(spar, spec$types, dim) %||%
+    init_fixef_param(spar, spec$types, dim, model, standata_list) %||%
+    init_default_param(spec, dim, standata_list)
 }
 
 
@@ -160,9 +165,12 @@ init_link <- function(link) {
 # Stan draws initial values uniformly on the unconstrained scale and maps them
 # through the parameter's declared bounds; with a radius of 1 this is exactly
 # what brm(init = 1) does. Returns NULL for the types whose transform is not
-# reimplemented here (simplex, ordered, ...) and for bounds that cannot be
+# reimplemented here (ordered, unit_vector, ...) and for bounds that cannot be
 # resolved to a number, leaving those parameters to the sampler
 init_default_param <- function(spec, dim, standata_list) {
+  if (identical(spec$type, "simplex")) {
+    return(init_array(init_simplex(runif(dim - 1, min = -1, max = 1), dim), spec$types, dim))
+  }
   if (!spec$type %in% c("real", "vector", "row_vector", "matrix")) {
     return(NULL)
   }
@@ -185,6 +193,19 @@ init_default_param <- function(spec, dim, standata_list) {
   init_array(value, spec$types, dim)
 }
 
+# Stan's stick-breaking transform of a simplex: each break is a logistic draw
+# shifted so that a zero draw leaves equal shares to every remaining element
+init_simplex <- function(raw, n) {
+  shares <- numeric(n)
+  left <- 1
+  for (k in seq_len(n - 1)) {
+    shares[k] <- left * stats::plogis(raw[k] - log(n - k))
+    left <- left - shares[k]
+  }
+  shares[n] <- left
+  shares
+}
+
 # rstan reads a bare length-1 numeric as a scalar and stops with "no more
 # scalars to read" at a size-1 vector; cmdstanr repairs the list, rstan does
 # not. The parser gives a real the dimension 1, which an array of reals drops
@@ -195,12 +216,18 @@ init_array <- function(values, types, dim) {
   array(values, dim = if ("real" %in% types) dim[-length(dim)] else dim)
 }
 
-# Stan declarations carry their dimensions either as a literal (scalars) or as
-# the name of a variable in the data block
+# Stan declarations carry their dimensions as a literal (scalars), as the name
+# of a variable in the data block, or as an element of a data array (Jmo_c[1]
+# for mo(), knots_kappa_1[1] for s()); NA marks a dimension that is none of these
 resolve_stan_dim <- function(dims, standata_list) {
   vapply(dims, function(d) {
     literal <- suppressWarnings(as.numeric(d))
-    if (is.na(literal)) as.numeric(standata_list[[d]])[1] else literal
+    if (!is.na(literal)) {
+      return(literal)
+    }
+    name <- sub("\\[.*$", "", d)
+    index <- if (grepl("[", d, fixed = TRUE)) sub("^[^\\[]*\\[([0-9]+)\\]$", "\\1", d) else "1"
+    as.numeric(standata_list[[name]])[suppressWarnings(as.integer(index))]
   }, numeric(1), USE.NAMES = FALSE)
 }
 

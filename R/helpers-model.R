@@ -1056,13 +1056,9 @@ parse_parameters_line <- function(x) {
   # 1) optional leading array[...] prefix
   array_dims <- character(0)
   if (grepl("^array\\s*\\[", x, perl = TRUE)) {
-    m <- regexpr("^array\\s*\\[([^\\]]*)\\]\\s*", x, perl = TRUE)
-    if (m > 0) {
-      dims_str <- sub("^array\\s*\\[([^\\]]*)\\]\\s*.*$", "\\1", regmatches(x, m), perl = TRUE)
-      array_dims <- trimws(unlist(strsplit(dims_str, ",")))
-      array_dims <- array_dims[nzchar(array_dims)]
-      x <- sub("^array\\s*\\[[^\\]]*\\]\\s*", "", x, perl = TRUE)
-    }
+    taken <- take_dims(x)
+    array_dims <- taken$dims
+    x <- trimws(taken$rest)
   }
   is_array <- length(array_dims) > 0
 
@@ -1094,12 +1090,9 @@ parse_parameters_line <- function(x) {
   # 4) base-type dims [ ... ] (needed for most non-scalars)
   base_dims <- character(0)
   if (grepl("^\\s*\\[", x_after_bt, perl = TRUE)) {
-    m <- regexpr("(?<=\\[)[^\\]]+(?=\\])", x_after_bt, perl = TRUE)
-    if (m[1] == -1) stop2("Could not parse base dimensions.")
-    dims_str <- regmatches(x_after_bt, m)
-    base_dims <- trimws(strsplit(dims_str, ",", fixed = TRUE)[[1]])
-    base_dims <- base_dims[nzchar(base_dims)]
-    x_after_bt <- sub("^\\s*\\[[^\\]]*\\]\\s*", "", x_after_bt, perl = TRUE)
+    taken <- take_dims(x_after_bt)
+    base_dims <- taken$dims
+    x_after_bt <- trimws(taken$rest)
   } else {
     if (base_type %in% c(
       "vector", "row_vector", "matrix",
@@ -1143,6 +1136,18 @@ parse_parameters_line <- function(x) {
     dims    = dims,
     bounds  = bounds
   )
+}
+
+# The dimensions in the leading [...] of a declaration and the text after it.
+# brms sizes the parameters of mo() and s() by an element of a data array
+# (simplex[Jmo_c[1]], vector[knots_kappa_1[1]]), so the closing bracket is the
+# one that balances the opening one, and only a top-level comma separates
+# dimensions
+take_dims <- function(x) {
+  open <- regexpr("[", x, fixed = TRUE)
+  close <- find_matching_brace(x, open, "[", "]")
+  dims <- trimws(strsplit(substr(x, open + 1L, close - 1L), ",(?![^\\[]*\\])", perl = TRUE)[[1]])
+  list(dims = dims[nzchar(dims)], rest = substring(x, close + 1L))
 }
 
 # helper: parse <...> constraints into a named list

@@ -458,6 +458,23 @@ test_that("strips trailing comments but keeps code", {
   expect_identical(res$r$dims, "J")
 })
 
+test_that("a size that indexes a data array keeps its brackets", {
+  mo <- parse_parameters_line("simplex[Jmo_c[1]] simo_c_1;")
+  expect_identical(mo$name, "simo_c_1")
+  expect_identical(mo$type, "simplex")
+  expect_identical(mo$dims, "Jmo_c[1]")
+
+  s <- parse_parameters_line("vector[knots_kappa_1[1]] zs_kappa_1_1;")
+  expect_identical(s$name, "zs_kappa_1_1")
+  expect_identical(s$dims, "knots_kappa_1[1]")
+
+  nested <- parse_parameters_line("array[J[1], N] matrix<lower=0>[M[2], K] A;")
+  expect_identical(nested$name, "A")
+  expect_identical(nested$dims, c("J[1]", "N", "M[2]", "K"))
+  expect_identical(nested$types, c("array", "matrix"))
+  expect_identical(nested$bounds$lower, "0")
+})
+
 test_that("robust to Windows-style CRLF line endings", {
   block <- "\r\nreal a;\r\nvector[K] b;\r\nmatrix[M,N] A;\r\n"
   res <- extract_parameter_dimensions(block)

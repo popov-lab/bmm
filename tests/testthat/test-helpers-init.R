@@ -686,14 +686,38 @@ test_that("init_default_param() maps the draw through the declared bounds", {
 
 test_that("init_default_param() leaves unsupported declarations to the sampler", {
   spec <- function(type, bounds) nlist(type, types = type, bounds, dims = "K")
-  expect_null(init_default_param(spec("simplex", NULL), 3, list()))
+  expect_null(init_default_param(spec("ordered", NULL), 3, list()))
   expect_null(init_default_param(spec("real", list(lower = "unknown_var")), 1, list()))
+})
+
+test_that("a simplex starts from Stan's stick-breaking draw", {
+  spec <- list(type = "simplex", types = "simplex", bounds = NULL, dims = "K")
+  for (i in 1:20) {
+    s <- init_default_param(spec, 4, list())
+    expect_equal(dim(s), 4)
+    expect_true(all(s > 0))
+    expect_equal(sum(s), 1)
+  }
+  # a zero draw on every break gives equal shares
+  expect_equal(init_simplex(rep(0, 4), 5), rep(0.2, 5))
+})
+
+test_that("a parameter whose size does not resolve is left to the sampler", {
+  model <- list(parameters = list(kappa = ""), init_ranges = list(), links = list())
+  spec <- list(type = "vector", types = "vector", bounds = NULL, dims = "missing[1]")
+  expect_null(init_stan_param("zs_kappa_1_1", spec, model, list()))
+  spec$dims <- "K"
+  expect_length(init_stan_param("zs_kappa_1_1", spec, model, list(K = 3L)), 3)
 })
 
 test_that("Stan dimensions and bounds resolve from literals and data", {
   sdata <- list(K = 3L, N = 10L, lb = 0.5)
   expect_equal(resolve_stan_dim(c("K", "N"), sdata), c(3, 10))
   expect_equal(resolve_stan_dim("1", sdata), 1)
+  # mo() and s() size their parameters by an element of a data array
+  expect_equal(resolve_stan_dim(c("Jmo[1]", "Jmo[2]"), list(Jmo = c(4L, 2L))), c(4, 2))
+  expect_true(is.na(resolve_stan_dim("missing[1]", sdata)))
+  expect_true(is.na(resolve_stan_dim("Jmo[i]", list(Jmo = c(4L, 2L)))))
   expect_equal(resolve_stan_bound(NULL, sdata, -Inf), -Inf)
   expect_equal(resolve_stan_bound("2.5", sdata, -Inf), 2.5)
   expect_equal(resolve_stan_bound("lb", sdata, -Inf), 0.5)
@@ -817,6 +841,16 @@ test_that("every init has the shape its Stan declaration asks for", {
   expect_stan_shapes(mixture2p("dev_rad"), bmf(
     kappa ~ 1 + (1 + set_size | gr(ID, by = grp)), thetat ~ 1
   ), dat)
+})
+
+test_that("mo() and s() terms get a complete init list", {
+  # their parameters are sized by an element of a data array, which the parser
+  # used to split at the inner bracket; cmdstanr then reported a partial list
+  dat <- oberauer_lin_2017
+  dat$x <- as.numeric(as.character(dat$set_size))
+  dat$xo <- factor(pmin(dat$x, 4), ordered = TRUE)
+  expect_stan_shapes(sdm("dev_rad"), bmf(c ~ 1 + mo(xo), kappa ~ 1), dat)
+  expect_stan_shapes(mixture2p("dev_rad"), bmf(kappa ~ 1 + s(x, k = 4), thetat ~ 1), dat)
 })
 
 test_that("the first term of a no-intercept formula starts in range whatever its form", {
