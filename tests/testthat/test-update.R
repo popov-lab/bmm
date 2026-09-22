@@ -234,7 +234,15 @@ test_that("update() keeps the fit's control on the same backend and algorithm on
   ))
   expect_equal(carried_control(object, list()), list(adapt_delta = 0.95))
   expect_equal(carried_control(object, list(backend = "cmdstanr")), list(adapt_delta = 0.95))
-  expect_equal(carried_control(object, list(control = list(max_treedepth = 12))), list(max_treedepth = 12))
+  # brms's rule: the call's keys win, the fit's remaining keys are kept
+  expect_equal(
+    carried_control(object, list(control = list(max_treedepth = 12))),
+    list(adapt_delta = 0.95, max_treedepth = 12)
+  )
+  expect_equal(
+    carried_control(object, list(control = list(adapt_delta = 0.8))),
+    list(adapt_delta = 0.8)
+  )
   expect_null(carried_control(object, list(backend = "rstan")))
   expect_null(carried_control(object, list(algorithm = "meanfield")))
   # brms resolves a missing field to its first choice and then finds it changed
@@ -259,4 +267,10 @@ test_that("update() of a fit with a stored control keeps it next to the step siz
   control <- update_mock(fit1, recompile = TRUE)$stan_args$control
   expect_equal(control$adapt_delta, 0.95)
   expect_equal(control$step_size, 0.02)
+
+  # a call that names another key leaves the step size the fit was run with
+  fit1$stan_args$control <- list(step_size = 0.5)
+  control <- update_mock(fit1, recompile = TRUE, control = list(adapt_delta = 0.99))$stan_args$control
+  expect_equal(control$adapt_delta, 0.99)
+  expect_equal(control$step_size, 0.5)
 })
