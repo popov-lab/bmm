@@ -43,7 +43,10 @@ create_initfun.default <- function(model, data, formula, prior = NULL) {
     inits <- lapply(stan_names, function(spar) {
       spec <- stanpars_list[[spar]]
       dim <- resolve_stan_dim(spec$dims, standata_list)
-      init_ranef_param(spar, spec$type, dim) %||%
+      if (anyNA(dim)) {
+        return(NULL)
+      }
+      init_ranef_param(spar, spec$types, dim) %||%
         init_fixef_param(spar, spec$type, dim, model, bterms, data, stan_names) %||%
         init_default_param(spec, dim, standata_list)
     })
@@ -72,17 +75,28 @@ match_stan_to_model_par <- function(spar, model_pars) {
 # brms names the random-effects parameters by their role, not by the model
 # parameter; a constant on one coefficient makes brms replace a vector by
 # per-coefficient scalars named par_<vector>_<index>
-init_ranef_param <- function(spar, type, dim) {
-  if (type %in% c("cholesky_factor_corr", "cholesky_factor_cov", "cov_matrix", "corr_matrix")) {
-    return(diag(nrow = dim))
+init_ranef_param <- function(spar, types, dim) {
+  if (any(types %in% c("cholesky_factor_corr", "cholesky_factor_cov", "cov_matrix", "corr_matrix"))) {
+    return(init_identity(types, dim))
   }
   if (grepl("^(par_)?sd_", spar)) {
-    return(init_array(runif(prod(dim), min = 0.05, max = 0.1), type, dim))
+    return(init_array(runif(prod(dim), min = 0.05, max = 0.1), types, dim))
   }
   if (grepl("^z_", spar)) {
-    return(init_array(runif(prod(dim), min = -0.5, max = 0.5), type, dim))
+    return(init_array(runif(prod(dim), min = -0.5, max = 0.5), types, dim))
   }
   NULL
+}
+
+# A matrix declaration names its size once; gr(by = ) declares an array of
+# them, one per level of the by variable
+init_identity <- function(types, dim) {
+  identity <- diag(nrow = dim[length(dim)])
+  if (!"array" %in% types) {
+    return(identity)
+  }
+  levels <- dim[-length(dim)]
+  array(rep(identity, each = prod(levels)), dim = c(levels, dim(identity)))
 }
 
 init_fixef_param <- function(spar, type, dim, model, bterms, data, stan_names) {
@@ -127,10 +141,10 @@ init_vector_param <- function(par, dim, init_range, link, bterms, data,
   effects <- function(n) runif(max(n, 0), min = -0.1, max = 0.1)
   if (has_intercept(bterms$fe)) {
     if (has_stan_intercept) {
-      return(effects(dim))
+      return(array(effects(dim), dim = dim))
     }
     # brms folds the intercept of a non-linear parameter into its first coefficient
-    return(c(link_transform(runif(1, min = init_range[1], max = init_range[2]), link), effects(dim - 1)))
+    return(array(c(link_transform(runif(1, min = init_range[1], max = init_range[2]), link), effects(dim - 1)), dim = dim))
   }
 
   # Without an intercept the levels of the first term are cell means and start
@@ -139,10 +153,10 @@ init_vector_param <- function(par, dim, init_range, link, bterms, data,
   variables <- strsplit(term_labels[1], ":")[[1]] # may be interaction terms (e.g., "var1:var2")
   n_first <- min(count_term_levels(data, variables), dim)
 
-  c(
+  array(c(
     link_transform(runif(n_first, min = init_range[1], max = init_range[2]), link),
     effects(dim - n_first)
-  )
+  ), dim = dim)
 }
 
 # Stan draws initial values uniformly on the unconstrained scale and maps them
@@ -156,7 +170,7 @@ init_default_param <- function(spec, dim, standata_list) {
   }
   lower <- resolve_stan_bound(spec$bounds$lower, standata_list, -Inf)
   upper <- resolve_stan_bound(spec$bounds$upper, standata_list, Inf)
-  if (is.na(lower) || is.na(upper) || anyNA(dim)) {
+  if (is.na(lower) || is.na(upper)) {
     return(NULL)
   }
 
@@ -170,13 +184,17 @@ init_default_param <- function(spec, dim, standata_list) {
   } else {
     lower + (upper - lower) * plogis(raw)
   }
-  init_array(value, spec$type, dim)
+  init_array(value, spec$types, dim)
 }
 
-# cmdstanr writes a bare length-1 numeric as a scalar and a 1-d array as [x];
-# Stan accepts the former only for a real
-init_array <- function(values, type, dim) {
-  if (type == "real") values else array(values, dim = dim)
+# rstan reads a bare length-1 numeric as a scalar and stops with "no more
+# scalars to read" at a size-1 vector; cmdstanr repairs the list, rstan does
+# not. The parser gives a real the dimension 1, which an array of reals drops
+init_array <- function(values, types, dim) {
+  if (identical(types, "real")) {
+    return(values)
+  }
+  array(values, dim = if ("real" %in% types) dim[-length(dim)] else dim)
 }
 
 # Stan declarations carry their dimensions either as a literal (scalars) or as

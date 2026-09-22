@@ -663,7 +663,7 @@ test_that("imm versions carry ranges for exactly their parameters", {
 # =============================================================================
 
 test_that("init_default_param() maps the draw through the declared bounds", {
-  spec <- function(type, bounds, dims = "K") nlist(type, bounds, dims)
+  spec <- function(type, bounds, dims = "K", types = type) nlist(type, types, bounds, dims)
   unbounded <- init_default_param(spec("vector", NULL), 20, list())
   lower <- init_default_param(spec("vector", list(lower = "2")), 20, list())
   upper <- init_default_param(spec("vector", list(upper = "-3")), 20, list())
@@ -679,10 +679,13 @@ test_that("init_default_param() maps the draw through the declared bounds", {
   # a size-1 vector must stay an array so that it is written as [x], not x
   expect_equal(dim(init_default_param(spec("vector", NULL), 1, list())), 1)
   expect_null(dim(init_default_param(spec("real", NULL, dims = "1"), 1, list())))
+  # the same holds for an array of reals, which the parser gives a trailing 1
+  real_array <- spec("real", NULL, dims = c("K", "1"), types = c("array", "real"))
+  expect_equal(dim(init_default_param(real_array, c(1, 1), list())), 1)
 })
 
 test_that("init_default_param() leaves unsupported declarations to the sampler", {
-  spec <- function(type, bounds) nlist(type, bounds, dims = "K")
+  spec <- function(type, bounds) nlist(type, types = type, bounds, dims = "K")
   expect_null(init_default_param(spec("simplex", NULL), 3, list()))
   expect_null(init_default_param(spec("real", list(lower = "unknown_var")), 1, list()))
 })
@@ -768,4 +771,50 @@ test_that("init terms resolve via nlpars for non-linear models (#362)", {
     "b_eta", dim = 1, init_range = c(0, 1), link = "identity",
     bterms = bterms$dpars[["eta"]], data = dat
   ))
+})
+
+# =============================================================================
+# SHAPES AND RANGES ACROSS FORMULA STRUCTURES
+# =============================================================================
+
+# rstan reads a real as a bare number and everything else as an array with the
+# declared dimensions; a matrix type declares its size once
+expect_stan_shapes <- function(model, formula, data) {
+  pars <- extract_parameter_dimensions(
+    extract_stan_blocks(stancode(formula, data, model))$parameters
+  )
+  sdata <- standata(formula, data, model)
+  inits <- configured_initfun(model, formula, data)()
+  expect_setequal(names(inits), names(pars))
+  for (nm in names(inits)) {
+    dims <- resolve_stan_dim(pars[[nm]]$dims, sdata)
+    expected <- switch(pars[[nm]]$type,
+      real = dims[-length(dims)],
+      cholesky_factor_corr = c(dims, dims[length(dims)]),
+      dims
+    )
+    if (length(expected) == 0) {
+      expect_null(dim(inits[[nm]]), label = nm)
+    } else {
+      expect_equal(dim(inits[[nm]]), expected, label = nm)
+    }
+  }
+}
+
+test_that("every init has the shape its Stan declaration asks for", {
+  dat <- oberauer_lin_2017
+  dat$grp <- factor(as.integer(dat$ID) %% 2)
+  mix3p <- mixture3p("dev_rad", nt_features = paste0("col_nt", 1:7), set_size = "set_size")
+  # size-1 coefficient vectors, which rstan cannot read from a bare number
+  expect_stan_shapes(mixture2p("dev_rad"), bmf(kappa ~ 1, thetat ~ 1 + set_size), dat)
+  # per-coefficient scalars and uncorrelated random effects
+  expect_stan_shapes(mix3p, bmf(
+    kappa ~ 1, thetat ~ 0 + set_size + (0 + set_size || ID), thetant ~ 0 + set_size
+  ), dat)
+  # the main dpar's coefficients and a Stan intercept
+  expect_stan_shapes(sdm("dev_rad"), bmf(mu ~ 0 + set_size, c ~ 1 + set_size, kappa ~ 1), dat)
+  # one correlation matrix per level of a gr(by = ) variable
+  expect_stan_shapes(mixture2p("dev_rad"), bmf(
+    kappa ~ 1 + (1 + set_size | gr(ID, by = grp)), thetat ~ 1
+  ), dat)
 })
