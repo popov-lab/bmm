@@ -170,6 +170,28 @@ test_that("update.bmmfit updates and writes even when `file` already exists", {
   expect_true(is_bmmfit(readRDS(paste0(file, ".rds"))))
 })
 
+test_that("update() builds the initial values for the data and formula it fits", {
+  skip_on_cran()
+  fit1 <- sdm_fixture()
+  # on the same backend brms carries every stored stan_args entry the call does
+  # not name, the init among them, and it leaves stan_args untouched unless the
+  # model is recompiled
+  fit1$backend <- "mock"
+  new_data <- fit1$data[fit1$data$set_size %in% 1:2, ]
+  new_data$set_size <- factor(as.character(new_data$set_size))
+  new_data$ID <- factor(rep(1:3, length.out = nrow(new_data)))
+
+  up <- update_mock(fit1, newdata = new_data, recompile = TRUE)
+  expect_length(up$stan_args$init()$b_c, brms::standata(up)$K_c)
+
+  up <- update_mock(fit1,
+    formula. = bmf(c ~ 0 + set_size + (1 | ID), kappa ~ 1), newdata = new_data, recompile = TRUE
+  )
+  expect_equal(ncol(up$stan_args$init()$z_1), brms::standata(up)$N_1)
+
+  expect_equal(update_mock(fit1, newdata = new_data, init = 0, recompile = TRUE)$stan_args$init, 0)
+})
+
 test_that("update() applies the package step-size default to a fit that had none", {
   skip_on_cran()
   withr::local_options(bmm.step_size = 0.02)

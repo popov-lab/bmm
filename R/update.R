@@ -169,6 +169,18 @@ update.bmmfit <- function(object, formula., newdata = NULL, recompile = NULL,
     newdata <- new_fit_args$data
   }
 
+  # the fit's stored init closure captured the Stan data of the original fit,
+  # so a new formula or data needs a new one, built from the prior as brms will
+  # read it: brms::update.brmsfit() tags the prior so that rows of the old fit
+  # that the new formula or data leave without a parameter are dropped instead
+  # of rejected. Built before the NextMethod() call, because an error inside a
+  # lazy argument of that call surfaces as "promise already under evaluation"
+  # rather than as itself
+  attr(prior, "allow_invalid_prior") <- TRUE
+  init <- if ("init" %in% names(dots)) dots$init else brms::do_call(
+    create_initfun, c(list(model, data, config_args$formula, prior), fit_frame_args(object, dots))
+  )
+
   # pass back to brms::update.brmsfit; stanvars must be the freshly configured
   # ones — brms otherwise reuses object$stanvars, whose data values (e.g. the
   # sdm run metadata) were computed for the original data and formula. The
@@ -176,7 +188,7 @@ update.bmmfit <- function(object, formula., newdata = NULL, recompile = NULL,
   object <- NextMethod("update", object,
     formula = formula., newdata = newdata,
     prior = prior, recompile = recompile,
-    stanvars = new_fit_args$stanvars,
+    stanvars = new_fit_args$stanvars, init = init,
     control = configure_control(
       carried_control(object, dots),
       dots$backend %||% object$backend,
