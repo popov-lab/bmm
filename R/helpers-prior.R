@@ -256,6 +256,7 @@ drop_technical_parameters <- function(out, model) {
 # its own default for a parameter bmm would otherwise have claimed.
 classify_priors <- function(prior, defaults, links = list()) {
   key_cols <- c("class", "dpar", "nlpar", "coef", "group", "resp")
+  prior <- as_prior_table(prior)
   eff <- resolve_effective_prior(prior)
   keys <- do.call(paste, prior[key_cols])
   def_keys <- do.call(paste, defaults[key_cols])
@@ -295,6 +296,16 @@ classify_priors <- function(prior, defaults, links = list()) {
   out <- out[keep, , drop = FALSE]
   row.names(out) <- NULL
   out
+}
+
+# A fitted object stores the prior on group-level correlations as class "L" with
+# the Cholesky density, a prior table as class "cor" with lkj(); the two name
+# the same prior
+as_prior_table <- function(prior) {
+  is_cholesky <- prior$class == "L"
+  prior$class[is_cholesky] <- "cor"
+  prior$prior[is_cholesky] <- sub("^lkj_corr_cholesky\\(", "lkj(", prior$prior[is_cholesky])
+  prior
 }
 
 # brms semantics: an empty prior string inherits from the row with the same
@@ -744,10 +755,12 @@ combine_prior <- function(prior1, prior2) {
     return(prior1)
   }
 
-  cols <- c("class", "dpar", "nlpar", "coef", "group", "resp")
-  prior1_types <- do.call(paste, prior1[, cols])
-  prior2_types <- do.call(paste, prior2[, cols])
-  is_duplicate <- prior1_types %in% prior2_types
+  # update() feeds a fit's prior back in, and brms rejects a stored "L" row next
+  # to a "cor" row as a duplicated prior
+  prior_types <- function(prior) {
+    do.call(paste, as_prior_table(prior)[, c("class", "dpar", "nlpar", "coef", "group", "resp")])
+  }
+  is_duplicate <- prior_types(prior1) %in% prior_types(prior2)
   prior <- prior1[!is_duplicate, ] + prior2
   row.names(prior) <- seq_len(nrow(prior))
   prior

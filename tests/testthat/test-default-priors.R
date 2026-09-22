@@ -370,6 +370,25 @@ test_that("the lkj default reaches the Stan code and yields to a user prior", {
   expect_no_match(brms::stancode(fit), "lkj_corr_cholesky_lpdf(L_1 | 2)", fixed = TRUE)
 })
 
+test_that("a fit's stored correlation prior replaces the cor default on a refit", {
+  data <- oberauer_lin_2017
+  model <- mixture2p("dev_rad")
+  formula <- bmf(kappa ~ set_size + (set_size | ID), thetat ~ 1)
+  fit <- bmm(formula, data, model,
+    prior = brms::prior_("lkj(4)", class = "cor"),
+    backend = "mock", mock_fit = 1, rename = FALSE
+  )
+
+  # update() feeds the stored prior back as the user prior, and a fit stores the
+  # row as class "L": next to a "cor" default brms sees a duplicated prior
+  expect_true("L" %in% fit$prior$class)
+  refit <- bmm(formula, data, model,
+    prior = fit$prior,
+    backend = "mock", mock_fit = 1, rename = FALSE
+  )
+  expect_match(brms::stancode(refit), "lkj_corr_cholesky_lpdf(L_1 | 4)", fixed = TRUE)
+})
+
 test_that("bmm.default_priors = FALSE also disables the cor default", {
   withr::local_options(bmm.default_priors = FALSE)
   pr <- default_prior(
