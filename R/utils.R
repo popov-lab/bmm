@@ -103,7 +103,7 @@ configure_control <- function(control, backend, algorithm = "sampling") {
   is_user_step <- names(control) %in% c("step_size", "stepsize")
   if (any(is_user_step)) {
     names(control)[is_user_step] <- key
-    return(control)
+    return(control[!duplicated(names(control))])
   }
   step_size <- getOption("bmm.step_size", 0.01)
   if (isFALSE(step_size)) {

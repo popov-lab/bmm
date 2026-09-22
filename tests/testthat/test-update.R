@@ -218,6 +218,13 @@ test_that("update() keeps the fit's control on the same backend and algorithm on
   expect_equal(carried_control(object, list(control = list(max_treedepth = 12))), list(max_treedepth = 12))
   expect_null(carried_control(object, list(backend = "rstan")))
   expect_null(carried_control(object, list(algorithm = "meanfield")))
+  # brms resolves a missing field to its first choice and then finds it changed
+  no_backend <- object
+  no_backend$backend <- NULL
+  expect_null(carried_control(no_backend, list()))
+  no_algorithm <- object
+  no_algorithm$algorithm <- NULL
+  expect_null(carried_control(no_algorithm, list()))
 })
 
 test_that("update() of a fit with a stored control keeps it next to the step size", {

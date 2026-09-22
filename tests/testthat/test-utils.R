@@ -493,6 +493,11 @@ test_that("configure_control() adds the starting step size under the user's cont
     configure_control(list(adapt_delta = 0.9, step_size = 0.5), "rstan"),
     list(adapt_delta = 0.9, stepsize = 0.5)
   )
+  # both spellings in one list would become two identical keys; the first wins
+  expect_equal(
+    configure_control(list(step_size = 0.5, stepsize = 0.2), "rstan"),
+    list(stepsize = 0.5)
+  )
   # only the sampler has a step size
   for (algorithm in c("meanfield", "fullrank", "pathfinder", "laplace", "fixed_param")) {
     expect_null(configure_control(NULL, "cmdstanr", algorithm), label = algorithm)

@@ -191,8 +191,8 @@ update.bmmfit <- function(object, formula., newdata = NULL, recompile = NULL,
     stanvars = new_fit_args$stanvars, init = init,
     control = configure_control(
       carried_control(object, dots),
-      dots$backend %||% object$backend,
-      dots$algorithm %||% object$algorithm
+      dots$backend %||% object$backend %||% "rstan",
+      dots$algorithm %||% object$algorithm %||% "sampling"
     ), ...
   )
 
@@ -217,9 +217,12 @@ update.bmmfit <- function(object, formula., newdata = NULL, recompile = NULL,
 # brms::update.brmsfit() keeps the fit's stored control only when the call names
 # none and neither backend nor algorithm changes. update.bmmfit() always names
 # one, so the rule is applied here. rstan fits also get the rest of the old
-# sampler's control from brms itself; cmdstanr fits store it nowhere else
+# sampler's control from brms itself; cmdstanr fits store it nowhere else. A
+# fit without a backend or algorithm field counts as changed, because brms
+# resolves the missing field to its first choice and then finds it different
 carried_control <- function(object, dots) {
-  same_run <- identical(dots$backend %||% object$backend, object$backend) &&
+  same_run <- !is.null(object$backend) && !is.null(object$algorithm) &&
+    identical(dots$backend %||% object$backend, object$backend) &&
     identical(dots$algorithm %||% object$algorithm, object$algorithm)
   if ("control" %in% names(dots) || !same_run) dots$control else object$stan_args$control
 }
