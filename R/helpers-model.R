@@ -839,7 +839,9 @@ stancode.bmmformula <- function(object, data, model, prior = NULL, ...) {
   config_args <- configure_model(model, data, formula)
 
   # configure the default prior and combine with user-specified prior
-  prior <- configure_prior(model, data, config_args$formula, prior)
+  prior <- brms::do_call(
+    configure_prior, c(list(model, data, config_args$formula, prior), brms_frame_args(dots))
+  )
 
   # extract stan code
   fit_args <- combine_args(nlist(config_args, dots, prior))

@@ -154,7 +154,9 @@ update.bmmfit <- function(object, formula., newdata = NULL, recompile = NULL,
          old_prior$class %in% c("Intercept", "b") & is_main_dpar_row)
     old_prior <- old_prior[!stale, ]
   }
-  prior <- configure_prior(model, data, config_args$formula, old_prior)
+  prior <- brms::do_call(
+    configure_prior, c(list(model, data, config_args$formula, old_prior), fit_frame_args(object, dots))
+  )
   prior <- combine_prior(prior, dots$prior)
   dots$prior <- NULL
   new_fit_args <- combine_args(nlist(config_args, dots, prior))

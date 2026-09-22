@@ -163,10 +163,13 @@ bmm <- function(formula, data, model,
   config_args <- configure_model(model, data, formula)
 
   # configure the default prior and combine with user-specified prior
-  prior <- configure_prior(model, data, config_args$formula, prior)
+  frame_args <- brms_frame_args(dots)
+  prior <- brms::do_call(configure_prior, c(list(model, data, config_args$formula, prior), frame_args))
 
   # configure initial values; the prior decides which parameters exist
-  config_args$init <- create_initfun(model, data, config_args$formula, prior)
+  config_args$init <- brms::do_call(
+    create_initfun, c(list(model, data, config_args$formula, prior), frame_args)
+  )
 
   # estimate the model
   fit_args <- combine_args(nlist(config_args, opts, dots, prior))

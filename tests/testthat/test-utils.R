@@ -498,6 +498,14 @@ test_that("configure_control() adds the starting step size under the user's cont
   expect_equal(configure_control(list(adapt_delta = 0.95), "cmdstanr"), list(adapt_delta = 0.95))
 })
 
+test_that("fit_frame_args() keeps the fit's frame arguments unless the call replaces them", {
+  data <- structure(data.frame(y = 1), knots = list(x = 1:3))
+  fit <- list(data = data, data2 = list(A = 1))
+  expect_equal(fit_frame_args(fit), list(data2 = list(A = 1), knots = list(x = 1:3), drop_unused_levels = TRUE))
+  replaced <- fit_frame_args(fit, list(data2 = list(A = 2), drop_unused_levels = FALSE, iter = 10))
+  expect_equal(replaced, list(data2 = list(A = 2), knots = list(x = 1:3), drop_unused_levels = FALSE))
+})
+
 test_that("bmm_options(step_size = ) validates and applies the option", {
   withr::defer(suppressMessages(bmm_options(reset_options = TRUE)))
   expect_error(bmm_options(step_size = -1), "step_size")

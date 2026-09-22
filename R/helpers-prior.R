@@ -56,9 +56,11 @@ default_prior.bmmformula <- function(object, data, model, formula = object, ...)
   data <- check_data(model, data, formula)
   formula <- check_formula(model, data, formula)
   config_args <- configure_model(model, data, formula)
-  prior <- configure_prior(model, data, config_args$formula, user_prior = NULL)
-
   dots <- list(...)
+  prior <- brms::do_call(
+    configure_prior, c(list(model, data, config_args$formula, user_prior = NULL), brms_frame_args(dots))
+  )
+
   prior_args <- combine_args(nlist(config_args, dots, prior))
   prior_args$object <- prior_args$formula
   prior_args$formula <- NULL
@@ -213,9 +215,10 @@ prior_provenance <- function(fit) {
       check_data(model, fit$data, fit$bmm$user_formula),
       error = function(e) fit$data
     )
+    frame_args <- fit_frame_args(fit)
     combine_prior(
-      brms::default_prior(fit$formula, data = fit$data),
-      configure_prior(model, data, fit$formula, user_prior = NULL)
+      brms::do_call(brms::default_prior, c(list(fit$formula, data = fit$data), frame_args)),
+      brms::do_call(configure_prior, c(list(model, data, fit$formula, user_prior = NULL), frame_args))
     )
   }))
   out <- classify_priors(fit$prior, defaults, links = model$links)
@@ -546,7 +549,7 @@ configure_prior.default <- function(model, data, formula, user_prior, ...) {
 #' @export
 configure_prior.bmmodel <- function(model, data, formula, user_prior = NULL, ...) {
   prior <- fixed_pars_priors(model, formula)
-  default_prior <- set_default_prior(model, data, formula)
+  default_prior <- set_default_prior(model, data, formula, ...)
   prior <- combine_prior(default_prior, prior)
   prior <- combine_prior(prior, user_prior)
   additional_prior <- NextMethod("configure_prior")
@@ -614,7 +617,7 @@ fixed_pars_priors <- function(model, formula, additional_pars = list()) {
 #'
 #' @noRd
 #' @keywords internal developer
-set_default_prior <- function(model, data, formula) {
+set_default_prior <- function(model, data, formula, ...) {
   if (isFALSE(getOption("bmm.default_priors", TRUE))) {
     return(brms::empty_prior())
   }
@@ -626,7 +629,7 @@ set_default_prior <- function(model, data, formula) {
   priors <- lapply(pars, function(par) {
     construct_default_priors_list(par, bterms, default_priors, data)
   })
-  priors <- c(unnest_list(priors), list(.construct_cor_prior(formula, data)))
+  priors <- c(unnest_list(priors), list(.construct_cor_prior(formula, data, ...)))
   Reduce(combine_prior, priors, init = brms::empty_prior())
 }
 
@@ -721,9 +724,10 @@ construct_default_priors_list <- function(par, bterms, default_priors, data) {
 # brms rejects the row unless some correlated term estimates more than one
 # coefficient per group -- (1 | g), (x || g) and single-column terms have no
 # matrix, an ID shared across parameters has one -- so brms is asked whether the
-# model has one rather than re-deriving that rule here.
-.construct_cor_prior <- function(formula, data) {
-  if (!"cor" %in% brms::default_prior(formula, data = data)$class) {
+# model has one rather than re-deriving that rule here. `...` carries the frame
+# arguments of brm(), such as the data2 a gr(cov = ) term needs.
+.construct_cor_prior <- function(formula, data, ...) {
+  if (!"cor" %in% brms::default_prior(formula, data = data, ...)$class) {
     return(brms::empty_prior())
   }
   brms::prior_("lkj(2)", class = "cor")

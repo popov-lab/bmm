@@ -451,7 +451,6 @@ test_that("classify_priors() recognises a fit's stored correlation prior", {
 })
 
 test_that("report_priors() attributes the correlation prior to bmm", {
-  skip_on_cran()
   formula <- bmf(kappa ~ set_size + (set_size | ID), thetat ~ 1)
   fit <- bmm(formula, oberauer_lin_2017, mixture2p("dev_rad"),
     backend = "mock", mock_fit = 1, rename = FALSE
@@ -468,6 +467,19 @@ test_that("report_priors() attributes the correlation prior to bmm", {
   cor_row <- report_priors(fit)[report_priors(fit)$class == "cor", ]
   expect_equal(cor_row$prior, "lkj(4)")
   expect_equal(cor_row$source, "user")
+})
+
+test_that("report_priors() reconstructs the defaults of a fit that needs data2", {
+  dat <- oberauer_lin_2017
+  ids <- levels(factor(dat$ID))
+  A <- diag(length(ids))
+  dimnames(A) <- list(ids, ids)
+  formula <- bmf(kappa ~ 1 + (1 | gr(ID, cov = A)), thetat ~ 1)
+  fit <- bmm(formula, dat, mixture2p("dev_rad"),
+    data2 = list(A = A), backend = "mock", mock_fit = 1, rename = FALSE
+  )
+  report <- report_priors(fit)
+  expect_equal(report$source[report$class == "sd"], "bmm default")
 })
 
 test_that("subsetting a report returns a plain data.frame that still prints", {

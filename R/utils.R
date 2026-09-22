@@ -101,6 +101,26 @@ configure_control <- function(control, backend) {
   c(control, stats::setNames(list(step_size), key))
 }
 
+# The arguments of brm() besides formula, data and prior that shape the model
+# frame. Without them, asking brms about the model before the fit (its default
+# priors, its Stan code) fails or describes a different model
+brms_frame_args <- function(args) {
+  args[intersect(names(args), c("data2", "knots", "drop_unused_levels"))]
+}
+
+# brms::update.brmsfit() keeps the fit's own frame arguments unless the call
+# replaces them
+fit_frame_args <- function(fit, dots = list()) {
+  args <- list(
+    data2 = fit$data2,
+    knots = attr(fit$data, "knots", exact = TRUE),
+    drop_unused_levels = attr(fit$data, "drop_unused_levels", exact = TRUE) %||% TRUE
+  )
+  replaced <- brms_frame_args(dots)
+  args[names(replaced)] <- replaced
+  args
+}
+
 # check if a value is not in a vector
 not_in <- function(value, vector) {
   !(value %in% vector)
