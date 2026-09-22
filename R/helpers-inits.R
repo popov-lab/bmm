@@ -48,7 +48,7 @@ create_initfun.default <- function(model, data, formula, prior = NULL, ...) {
         return(NULL)
       }
       init_ranef_param(spar, spec$types, dim) %||%
-        init_fixef_param(spar, spec$types, dim, model, standata_list, stan_names) %||%
+        init_fixef_param(spar, spec$types, dim, model, standata_list) %||%
         init_default_param(spec, dim, standata_list)
     })
     names(inits) <- stan_names
@@ -108,7 +108,7 @@ init_identity <- function(types, dim) {
 # replaces them by per-coefficient scalars par_b_<par>_<index> when a constant
 # holds some of them fixed; a scalar gets the value its position in the vector
 # would get
-init_fixef_param <- function(spar, types, dim, model, standata_list, stan_names) {
+init_fixef_param <- function(spar, types, dim, model, standata_list) {
   index <- if (grepl("^par_b_", spar)) as.integer(sub(".*_", "", spar))
   stan_par <- if (is.null(index)) spar else sub("^par_(.*)_[0-9]+$", "\\1", spar)
   parameter <- match_stan_to_model_par(stan_par, names(model$parameters))
@@ -129,8 +129,7 @@ init_fixef_param <- function(spar, types, dim, model, standata_list, stan_names)
     return(NULL)
   }
 
-  intercept_name <- if (parameter == "mu") "Intercept" else paste0("Intercept_", parameter)
-  in_range <- range_coefficients(X, has_stan_intercept = intercept_name %in% stan_names)
+  in_range <- range_coefficients(X, centered = !is.null(standata_list[[sub("^b", "Kc", stan_par)]]))
   values <- runif(length(in_range), min = -0.1, max = 0.1)
   values[in_range] <- from_range(sum(in_range))
   init_array(if (is.null(index)) values else values[index], types, dim)
@@ -140,11 +139,13 @@ init_fixef_param <- function(spar, types, dim, model, standata_list, stan_names)
 # intercept, which brms folds into the first coefficient of a non-linear
 # parameter, or else the columns of the first term, which are the cell means of
 # a no-intercept formula. Counting them on brms's own design matrix covers
-# function calls, interactions and dropped levels alike. A Stan intercept is a
-# parameter of its own, and every coefficient next to it is an effect
-range_coefficients <- function(X, has_stan_intercept) {
-  assign <- attr(X, "assign")
-  if (has_stan_intercept) {
+# function calls, interactions and dropped levels alike. brms centres an
+# intercept, whether a parameter of its own or a constant, and drops its column
+# from b, recording that as Kc_<par>; every coefficient left is then an effect.
+# A 0 + Intercept design matrix carries no assign attribute
+range_coefficients <- function(X, centered) {
+  assign <- attr(X, "assign") %||% seq_len(ncol(X))
+  if (centered) {
     return(rep(FALSE, length(assign) - 1))
   }
   assign == assign[1]

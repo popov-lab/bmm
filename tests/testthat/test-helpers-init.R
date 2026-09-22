@@ -755,7 +755,7 @@ test_that("the intercept of a non-linear parameter starts in range (#362)", {
     parameters = list(eta = ""), init_ranges = list(eta = c(2, 3)), links = list(eta = "identity")
   )
   X <- stats::model.matrix(~ 1, data.frame(y = 1:3))
-  inits <- init_fixef_param("b_eta", "vector", 1, model, list(X_eta = X), stan_names = "b_eta")
+  inits <- init_fixef_param("b_eta", "vector", 1, model, list(X_eta = X))
   expect_equal(dim(inits), 1)
   expect_true(inits >= 2 && inits <= 3)
 })
@@ -766,8 +766,8 @@ test_that("a per-coefficient scalar starts where its position in the vector woul
   )
   X <- stats::model.matrix(~ 1 + x, data.frame(x = factor(1:3)))
   sdata <- list(X_eta = X)
-  intercept <- init_fixef_param("par_b_eta_1", "real", 1, model, sdata, stan_names = "par_b_eta_1")
-  effect <- init_fixef_param("par_b_eta_3", "real", 1, model, sdata, stan_names = "par_b_eta_3")
+  intercept <- init_fixef_param("par_b_eta_1", "real", 1, model, sdata)
+  effect <- init_fixef_param("par_b_eta_3", "real", 1, model, sdata)
   expect_null(dim(intercept))
   expect_true(intercept >= 2 && intercept <= 3)
   expect_true(abs(effect) <= 0.1)
@@ -850,4 +850,30 @@ test_that("the coefficients of the main dpar start from its range", {
   effects <- configured_initfun(model, bmf(mu ~ 1 + set_size, c ~ 1, kappa ~ 1), dat)()
   expect_true(all(abs(effects$b) <= 0.1))
   expect_true(abs(effects$Intercept) <= upper)
+})
+
+test_that("a 0 + Intercept formula gets finite initial values", {
+  # brms's X_<par> carries no assign attribute for this term, and the intercept
+  # is not centred, so only its own column starts in range
+  dat <- oberauer_lin_2017
+  dat$x <- as.numeric(as.character(dat$set_size))
+  model <- mixture2p("dev_rad")
+  b <- configured_initfun(model, bmf(kappa ~ 0 + Intercept + x, thetat ~ 1), dat)()$b_kappa
+  expect_true(all(is.finite(b)))
+  expect_length(b, 2)
+  expect_true(b[1] >= log(model$init_ranges$kappa[1]) && b[1] <= log(model$init_ranges$kappa[2]))
+  expect_true(abs(b[2]) <= 0.1)
+})
+
+test_that("a constant intercept leaves every coefficient of a centred parameter an effect", {
+  # Stan has no Intercept_c, but X_c still holds the intercept column and b_c
+  # has one entry fewer: none of them may take the intercept's range
+  dat <- oberauer_lin_2017
+  prior <- brms::set_prior("constant(1)", class = "Intercept", dpar = "c")
+  fit <- bmm(bmf(c ~ 1 + set_size, kappa ~ 1), dat, sdm("dev_rad"),
+    prior = prior, backend = "mock", mock_fit = 1, rename = FALSE
+  )
+  b <- fit$stan_args$init()$b_c
+  expect_length(b, 7)
+  expect_true(all(abs(b) <= 0.1))
 })
