@@ -91,13 +91,24 @@ configure_options <- function(opts, env = parent.frame()) {
 # saturate the correlation transform and overflow exp(kappa), printing the
 # exceptions users read as failures. Starting lower removes those steps without
 # changing where adaptation ends. cmdstanr spells the argument step_size, rstan
-# stepsize; a user value under either spelling wins
-configure_control <- function(control, backend) {
-  step_size <- getOption("bmm.step_size", 0.01)
-  if (isFALSE(step_size) || any(c("step_size", "stepsize") %in% names(control))) {
+# stepsize; a user value under either spelling wins and is renamed to the
+# backend's. Only the sampler has a step size, and brms hands cmdstanr's
+# variational(), pathfinder() and laplace() the whole control list, which they
+# reject when it names an argument they lack
+configure_control <- function(control, backend, algorithm = "sampling") {
+  if (!identical(algorithm, "sampling")) {
     return(control)
   }
   key <- if (identical(backend, "rstan")) "stepsize" else "step_size"
+  is_user_step <- names(control) %in% c("step_size", "stepsize")
+  if (any(is_user_step)) {
+    names(control)[is_user_step] <- key
+    return(control)
+  }
+  step_size <- getOption("bmm.step_size", 0.01)
+  if (isFALSE(step_size)) {
+    return(control)
+  }
   c(control, stats::setNames(list(step_size), key))
 }
 
@@ -577,7 +588,7 @@ bmm_options <- function(sort_data, parallel, default_priors, silent,
   opts <- ls()
   stopif(
     !missing(step_size) && !isFALSE(step_size) &&
-      !(is.numeric(step_size) && length(step_size) == 1 && step_size > 0),
+      !(is.numeric(step_size) && length(step_size) == 1 && is.finite(step_size) && step_size > 0),
     "step_size must be a single positive number, or FALSE to leave the starting \\
     step size to Stan"
   )

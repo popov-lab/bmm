@@ -174,7 +174,9 @@ bmm <- function(formula, data, model,
   # estimate the model
   fit_args <- combine_args(nlist(config_args, opts, dots, prior))
   fit_args$control <- configure_control(
-    fit_args$control, opts$backend %||% getOption("brms.backend", "rstan")
+    fit_args$control,
+    opts$backend %||% getOption("brms.backend", "rstan"),
+    fit_args$algorithm %||% getOption("brms.algorithm", "sampling")
   )
 
   if (file_refit == "on_change") {

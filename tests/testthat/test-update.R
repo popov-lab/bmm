@@ -172,16 +172,43 @@ test_that("update.bmmfit updates and writes even when `file` already exists", {
 
 test_that("update() applies the package step-size default to a fit that had none", {
   skip_on_cran()
+  withr::local_options(bmm.step_size = 0.02)
   fit1 <- sdm_fixture()
   expect_null(fit1$stan_args$control)
 
   up <- update_mock(fit1)
-  expect_equal(up$stan_args$control, list(step_size = 0.01))
+  expect_equal(up$stan_args$control, list(step_size = 0.02))
   up <- update_mock(fit1, control = list(adapt_delta = 0.99))
-  expect_equal(up$stan_args$control, list(adapt_delta = 0.99, step_size = 0.01))
+  expect_equal(up$stan_args$control, list(adapt_delta = 0.99, step_size = 0.02))
   up <- update_mock(fit1, control = list(step_size = 0.5))
   expect_equal(up$stan_args$control, list(step_size = 0.5))
 
   withr::local_options(bmm.step_size = FALSE)
   expect_null(update_mock(fit1)$stan_args$control)
+})
+
+test_that("update() keeps the fit's control on the same backend and algorithm only", {
+  object <- list(backend = "cmdstanr", algorithm = "sampling", stan_args = list(
+    control = list(adapt_delta = 0.95)
+  ))
+  expect_equal(carried_control(object, list()), list(adapt_delta = 0.95))
+  expect_equal(carried_control(object, list(backend = "cmdstanr")), list(adapt_delta = 0.95))
+  expect_equal(carried_control(object, list(control = list(max_treedepth = 12))), list(max_treedepth = 12))
+  expect_null(carried_control(object, list(backend = "rstan")))
+  expect_null(carried_control(object, list(algorithm = "meanfield")))
+})
+
+test_that("update() of a fit with a stored control keeps it next to the step size", {
+  skip_on_cran()
+  withr::local_options(bmm.step_size = 0.02)
+  fit1 <- sdm_fixture()
+  fit1$stan_args$control <- list(adapt_delta = 0.95)
+  # a new backend starts from brms's defaults, as brms::update.brmsfit() does
+  expect_equal(update_mock(fit1)$stan_args$control, list(step_size = 0.02))
+
+  # recompiling keeps brms from reusing the fit's stored stan_args wholesale
+  fit1$backend <- "mock"
+  control <- update_mock(fit1, recompile = TRUE)$stan_args$control
+  expect_equal(control$adapt_delta, 0.95)
+  expect_equal(control$step_size, 0.02)
 })

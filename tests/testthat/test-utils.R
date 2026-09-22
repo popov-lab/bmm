@@ -483,12 +483,21 @@ test_that("configure_control() adds the starting step size under the user's cont
     configure_control(list(adapt_delta = 0.95), "cmdstanr"),
     list(adapt_delta = 0.95, step_size = 0.1)
   )
-  # the user's own value wins under either spelling
+  # the user's own value wins under either spelling, renamed to the backend's
   expect_equal(configure_control(list(step_size = 0.5), "cmdstanr"), list(step_size = 0.5))
-  expect_equal(configure_control(list(stepsize = 0.5), "cmdstanr"), list(stepsize = 0.5))
+  expect_equal(configure_control(list(stepsize = 0.5), "cmdstanr"), list(step_size = 0.5))
   # rstan spells the argument without the underscore
   expect_equal(configure_control(NULL, "rstan"), list(stepsize = 0.1))
   expect_equal(configure_control(list(stepsize = 0.5), "rstan"), list(stepsize = 0.5))
+  expect_equal(
+    configure_control(list(adapt_delta = 0.9, step_size = 0.5), "rstan"),
+    list(adapt_delta = 0.9, stepsize = 0.5)
+  )
+  # only the sampler has a step size
+  for (algorithm in c("meanfield", "fullrank", "pathfinder", "laplace", "fixed_param")) {
+    expect_null(configure_control(NULL, "cmdstanr", algorithm), label = algorithm)
+  }
+  expect_equal(configure_control(list(adapt_delta = 0.9), "cmdstanr", "meanfield"), list(adapt_delta = 0.9))
 
   withr::local_options(bmm.step_size = 0.02)
   expect_equal(configure_control(NULL, "cmdstanr"), list(step_size = 0.02))
@@ -511,6 +520,8 @@ test_that("bmm_options(step_size = ) validates and applies the option", {
   expect_error(bmm_options(step_size = -1), "step_size")
   expect_error(bmm_options(step_size = "a"), "step_size")
   expect_error(bmm_options(step_size = c(0.1, 0.2)), "step_size")
+  expect_error(bmm_options(step_size = NA_real_), "step_size")
+  expect_error(bmm_options(step_size = Inf), "step_size")
   expect_message(bmm_options(step_size = 0.3), "step_size = 0.3")
   expect_equal(getOption("bmm.step_size"), 0.3)
   suppressMessages(bmm_options(step_size = FALSE))

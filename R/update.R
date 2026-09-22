@@ -171,15 +171,17 @@ update.bmmfit <- function(object, formula., newdata = NULL, recompile = NULL,
 
   # pass back to brms::update.brmsfit; stanvars must be the freshly configured
   # ones — brms otherwise reuses object$stanvars, whose data values (e.g. the
-  # sdm run metadata) were computed for the original data and formula. brms
-  # carries only adapt_delta and max_treedepth over from the old fit, so the
-  # starting step size is re-derived here; a named argument replaces the
-  # `control` in the dots
+  # sdm run metadata) were computed for the original data and formula. The
+  # named `control` replaces the one in the dots and adds the starting step size
   object <- NextMethod("update", object,
     formula = formula., newdata = newdata,
     prior = prior, recompile = recompile,
     stanvars = new_fit_args$stanvars,
-    control = configure_control(dots$control, dots$backend %||% object$backend), ...
+    control = configure_control(
+      carried_control(object, dots),
+      dots$backend %||% object$backend,
+      dots$algorithm %||% object$algorithm
+    ), ...
   )
 
   # bmm postprocessing
@@ -198,4 +200,14 @@ update.bmmfit <- function(object, formula., newdata = NULL, recompile = NULL,
     return(object)
   }
   try_save_bmmfit(object, save_file, compress = save_compress)
+}
+
+# brms::update.brmsfit() keeps the fit's stored control only when the call names
+# none and neither backend nor algorithm changes. update.bmmfit() always names
+# one, so the rule is applied here. rstan fits also get the rest of the old
+# sampler's control from brms itself; cmdstanr fits store it nowhere else
+carried_control <- function(object, dots) {
+  same_run <- identical(dots$backend %||% object$backend, object$backend) &&
+    identical(dots$algorithm %||% object$algorithm, object$algorithm)
+  if ("control" %in% names(dots) || !same_run) dots$control else object$stan_args$control
 }
