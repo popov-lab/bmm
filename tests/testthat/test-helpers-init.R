@@ -747,30 +747,30 @@ test_that("match_stan_to_model_par falls back for structural params", {
 # nlpar parameter resolution (#362)
 # -----------------------------------------------------------------------------
 
-test_that("init terms resolve via nlpars for non-linear models (#362)", {
+test_that("the intercept of a non-linear parameter starts in range (#362)", {
   # native-multinomial / non-linear models (e.g. sdt_rating) carry their
-  # parameters in bterms$nlpars rather than bterms$dpars; an intercept-only
-  # nlpar is represented as a `b_` vector and so routes through init_vector_param
-  bterms <- brms::brmsterms(brms::bf(y ~ eta, eta ~ 1, nl = TRUE))
-  expect_null(bterms$dpars[["eta"]])
-  expect_false(is.null(bterms$nlpars[["eta"]]))
-
-  par_terms <- bterms$dpars[["eta"]] %||% bterms$nlpars[["eta"]]
-  expect_identical(par_terms, bterms$nlpars[["eta"]])
-
-  dat <- data.frame(y = rnorm(10))
-  inits <- init_vector_param(
-    "b_eta", dim = 1, init_range = c(0, 1), link = "identity",
-    bterms = par_terms, data = dat
+  # parameters as nlpars, whose intercept brms folds into the first coefficient
+  # of the b_ vector instead of declaring an Intercept_ parameter
+  model <- list(
+    parameters = list(eta = ""), init_ranges = list(eta = c(2, 3)), links = list(eta = "identity")
   )
-  expect_length(inits, 1)
-  expect_true(all(is.finite(inits)))
+  X <- stats::model.matrix(~ 1, data.frame(y = 1:3))
+  inits <- init_fixef_param("b_eta", "vector", 1, model, list(X_eta = X), stan_names = "b_eta")
+  expect_equal(dim(inits), 1)
+  expect_true(inits >= 2 && inits <= 3)
+})
 
-  # the pre-fix dpars-only lookup yields NULL and errors in has_intercept()
-  expect_error(init_vector_param(
-    "b_eta", dim = 1, init_range = c(0, 1), link = "identity",
-    bterms = bterms$dpars[["eta"]], data = dat
-  ))
+test_that("a per-coefficient scalar starts where its position in the vector would", {
+  model <- list(
+    parameters = list(eta = ""), init_ranges = list(eta = c(2, 3)), links = list(eta = "identity")
+  )
+  X <- stats::model.matrix(~ 1 + x, data.frame(x = factor(1:3)))
+  sdata <- list(X_eta = X)
+  intercept <- init_fixef_param("par_b_eta_1", "real", 1, model, sdata, stan_names = "par_b_eta_1")
+  effect <- init_fixef_param("par_b_eta_3", "real", 1, model, sdata, stan_names = "par_b_eta_3")
+  expect_null(dim(intercept))
+  expect_true(intercept >= 2 && intercept <= 3)
+  expect_true(abs(effect) <= 0.1)
 })
 
 # =============================================================================
@@ -817,4 +817,37 @@ test_that("every init has the shape its Stan declaration asks for", {
   expect_stan_shapes(mixture2p("dev_rad"), bmf(
     kappa ~ 1 + (1 + set_size | gr(ID, by = grp)), thetat ~ 1
   ), dat)
+})
+
+test_that("the first term of a no-intercept formula starts in range whatever its form", {
+  dat <- oberauer_lin_2017
+  dat$ss_num <- as.numeric(as.character(dat$set_size))
+  model <- mixture2p("dev_rad")
+  log_range <- log(model$init_ranges$kappa)
+  n_in_range <- function(formula, data = dat) {
+    b <- configured_initfun(model, formula, data)()$b_kappa
+    in_range <- b >= log_range[1] & b <= log_range[2]
+    expect_true(all(in_range | abs(b) <= 0.1))
+    c(length(b), sum(in_range))
+  }
+  expect_equal(n_in_range(bmf(kappa ~ 0 + factor(ss_num), thetat ~ 1)), c(8, 8))
+  expect_equal(n_in_range(bmf(kappa ~ 0 + set_size + session, thetat ~ 1)), c(9, 8))
+  expect_equal(n_in_range(bmf(kappa ~ 0 + set_size:session, thetat ~ 1)), c(16, 16))
+  expect_equal(n_in_range(bmf(kappa ~ 0 + ss_num + session, thetat ~ 1)), c(3, 1))
+  # brms drops the unused level, and so does the count
+  without_8 <- dat[dat$set_size != 8, ]
+  expect_equal(n_in_range(bmf(kappa ~ 0 + set_size, thetat ~ 1), without_8), c(7, 7))
+})
+
+test_that("the coefficients of the main dpar start from its range", {
+  dat <- oberauer_lin_2017
+  model <- sdm("dev_rad")
+  upper <- tan(model$init_ranges$mu[2] / 2)
+  cells <- configured_initfun(model, bmf(mu ~ 0 + set_size, c ~ 1, kappa ~ 1), dat)()
+  expect_length(cells$b, 8)
+  expect_true(all(abs(cells$b) <= upper))
+  expect_gt(max(abs(cells$b)), 0.1)
+  effects <- configured_initfun(model, bmf(mu ~ 1 + set_size, c ~ 1, kappa ~ 1), dat)()
+  expect_true(all(abs(effects$b) <= 0.1))
+  expect_true(abs(effects$Intercept) <= upper)
 })

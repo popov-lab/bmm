@@ -35,10 +35,7 @@ create_initfun.default <- function(model, data, formula, prior = NULL) {
     force(stanpars_list)
     force(standata_list)
     force(model)
-    force(formula)
-    force(data)
 
-    bterms <- brms::brmsterms(formula)
     stan_names <- names(stanpars_list)
     inits <- lapply(stan_names, function(spar) {
       spec <- stanpars_list[[spar]]
@@ -47,7 +44,7 @@ create_initfun.default <- function(model, data, formula, prior = NULL) {
         return(NULL)
       }
       init_ranef_param(spar, spec$types, dim) %||%
-        init_fixef_param(spar, spec$type, dim, model, bterms, data, stan_names) %||%
+        init_fixef_param(spar, spec$types, dim, model, standata_list, stan_names) %||%
         init_default_param(spec, dim, standata_list)
     })
     names(inits) <- stan_names
@@ -57,6 +54,10 @@ create_initfun.default <- function(model, data, formula, prior = NULL) {
 
 
 match_stan_to_model_par <- function(spar, model_pars) {
+  # brms leaves the intercept and coefficients of the main dpar unsuffixed
+  if (spar %in% c("Intercept", "b")) {
+    return("mu")
+  }
   parameter <- model_pars[unlist(lapply(
     paste0("(^|_)", model_pars, "(_|$)"), grepl, x = spar
   ))]
@@ -66,7 +67,7 @@ match_stan_to_model_par <- function(spar, model_pars) {
   if (length(parameter) == 0) {
     parameter <- strsplit(spar, "_")[[1]][1]
   }
-  if (parameter == "Intercept") "mu" else parameter
+  parameter
 }
 
 
@@ -99,64 +100,56 @@ init_identity <- function(types, dim) {
   array(rep(identity, each = prod(levels)), dim = c(levels, dim(identity)))
 }
 
-init_fixef_param <- function(spar, type, dim, model, bterms, data, stan_names) {
-  parameter <- match_stan_to_model_par(spar, names(model$parameters))
+# brms names the coefficients of a parameter b_<par> (b for the main dpar) and
+# replaces them by per-coefficient scalars par_b_<par>_<index> when a constant
+# holds some of them fixed; a scalar gets the value its position in the vector
+# would get
+init_fixef_param <- function(spar, types, dim, model, standata_list, stan_names) {
+  index <- if (grepl("^par_b_", spar)) as.integer(sub(".*_", "", spar))
+  stan_par <- if (is.null(index)) spar else sub("^par_(.*)_[0-9]+$", "\\1", spar)
+  parameter <- match_stan_to_model_par(stan_par, names(model$parameters))
   init_range <- model$init_ranges[[parameter]]
   if (is.null(init_range)) {
     return(NULL)
   }
   link <- init_link(model$links[[parameter]])
-  # non-linear model parameters live in nlpars, custom-family ones in dpars
-  par_terms <- bterms$dpars[[parameter]] %||% bterms$nlpars[[parameter]]
-  intercept_name <- if (parameter == "mu") "Intercept" else paste0("Intercept_", parameter)
+  from_range <- function(n) link_transform(runif(n, min = init_range[1], max = init_range[2]), link)
+  if (startsWith(stan_par, "Intercept")) {
+    return(from_range(1))
+  }
+  if (!grepl("^b(_|$)", stan_par)) {
+    return(NULL)
+  }
+  X <- standata_list[[sub("^b", "X", stan_par)]]
+  if (is.null(X)) {
+    return(NULL)
+  }
 
-  switch(type,
-    real = init_real_param(spar, init_range, link),
-    vector = init_vector_param(
-      spar, dim, init_range, link, par_terms, data,
-      has_stan_intercept = intercept_name %in% stan_names
-    ),
-    NULL
-  )
+  intercept_name <- if (parameter == "mu") "Intercept" else paste0("Intercept_", parameter)
+  in_range <- range_coefficients(X, has_stan_intercept = intercept_name %in% stan_names)
+  values <- runif(length(in_range), min = -0.1, max = 0.1)
+  values[in_range] <- from_range(sum(in_range))
+  init_array(if (is.null(index)) values else values[index], types, dim)
+}
+
+# The coefficients that start from the model's range rather than near zero: the
+# intercept, which brms folds into the first coefficient of a non-linear
+# parameter, or else the columns of the first term, which are the cell means of
+# a no-intercept formula. Counting them on brms's own design matrix covers
+# function calls, interactions and dropped levels alike. A Stan intercept is a
+# parameter of its own, and every coefficient next to it is an effect
+range_coefficients <- function(X, has_stan_intercept) {
+  assign <- attr(X, "assign")
+  if (has_stan_intercept) {
+    return(rep(FALSE, length(assign) - 1))
+  }
+  assign == assign[1]
 }
 
 # init_ranges of softmax parameters are declared on the sampling scale, as
 # a softmax weight has no native value of its own
 init_link <- function(link) {
   if (identical(link, "softmax")) "identity" else link
-}
-
-init_real_param <- function(par, init_range, link) {
-  if (!grepl("^(Intercept|par_b_)", par)) {
-    return(NULL)
-  }
-  link_transform(runif(1, min = init_range[1], max = init_range[2]), link)
-}
-
-init_vector_param <- function(par, dim, init_range, link, bterms, data,
-                              has_stan_intercept = FALSE) {
-  if (!grepl("^b(_|$)", par)) {
-    return(NULL)
-  }
-  effects <- function(n) runif(max(n, 0), min = -0.1, max = 0.1)
-  if (has_intercept(bterms$fe)) {
-    if (has_stan_intercept) {
-      return(array(effects(dim), dim = dim))
-    }
-    # brms folds the intercept of a non-linear parameter into its first coefficient
-    return(array(c(link_transform(runif(1, min = init_range[1], max = init_range[2]), link), effects(dim - 1)), dim = dim))
-  }
-
-  # Without an intercept the levels of the first term are cell means and start
-  # from the model-specific range; the rest are effects
-  term_labels <- attr(terms(bterms$fe), "term.labels")
-  variables <- strsplit(term_labels[1], ":")[[1]] # may be interaction terms (e.g., "var1:var2")
-  n_first <- min(count_term_levels(data, variables), dim)
-
-  array(c(
-    link_transform(runif(n_first, min = init_range[1], max = init_range[2]), link),
-    effects(dim - n_first)
-  ), dim = dim)
 }
 
 # Stan draws initial values uniformly on the unconstrained scale and maps them
@@ -218,23 +211,4 @@ resolve_stan_bound <- function(value, standata_list, default) {
   }
   from_data <- standata_list[[value]]
   if (is.numeric(from_data) && length(from_data) == 1) from_data else NA_real_
-}
-
-
-# Count levels for model formula terms - used for determining number of
-# coefficients when initializing models without intercepts
-count_term_levels <- function(data, vars) {
-  term_sizes <- vapply(data[vars], function(x) {
-    if (is.factor(x)) {
-      nlevels(x)
-    } else if (is.numeric(x)) {
-      # For continuous predictors, treat as single coefficient
-      1L
-    } else {
-      length(unique(na.omit(x)))
-    }
-  }, integer(1L))
-
-  # Return total number of coefficients (product for interactions)
-  prod(term_sizes)
 }
