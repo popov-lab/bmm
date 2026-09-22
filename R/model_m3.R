@@ -417,7 +417,7 @@ configure_model.m3 <- function(model, data, formula) {
 }
 
 #' @export
-create_initfun.m3 <- function(model, data, formula) {
+create_initfun.m3 <- function(model, data, formula, prior = NULL) {
   # the "simple" choice rule with an identity link samples stably only from zero
   if (model$other_vars$choice_rule == "simple" && any(model$links == "identity")) {
     return(0)

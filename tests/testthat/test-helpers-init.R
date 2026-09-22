@@ -14,21 +14,57 @@ test_that("create_initfun returns function for sdm", {
 })
 
 
-test_that("create_initfun returns 1 for mixture2p models", {
-  # prepare info for tests
+# the init function bmm() builds: the prior decides which parameters exist
+configured_initfun <- function(model, formula, data) {
+  model <- check_model(model, data, formula)
+  data <- check_data(model, data, formula)
+  formula <- check_formula(model, data, formula)
+  config_args <- configure_model(model, data, formula)
+  prior <- configure_prior(model, data, config_args$formula, NULL)
+  create_initfun(model, data, config_args$formula, prior)
+}
+
+stan_parameter_names <- function(model, formula, data) {
+  names(extract_parameter_dimensions(
+    extract_stan_blocks(stancode(formula, data, model))$parameters
+  ))
+}
+
+expect_re_inits <- function(inits, correlated = TRUE) {
+  sd_names <- grep("^sd_", names(inits), value = TRUE)
+  expect_gt(length(sd_names), 0)
+  for (nm in sd_names) {
+    expect_true(all(inits[[nm]] >= 0.05 & inits[[nm]] <= 0.1))
+  }
+  z_names <- grep("^z_", names(inits), value = TRUE)
+  expect_gt(length(z_names), 0)
+  for (nm in z_names) {
+    expect_true(all(abs(inits[[nm]]) <= 0.5))
+  }
+  L_names <- grep("^L_", names(inits), value = TRUE)
+  if (!correlated) {
+    expect_length(L_names, 0)
+    return(invisible())
+  }
+  expect_gt(length(L_names), 0)
+  for (nm in L_names) {
+    expect_equal(inits[[nm]], diag(nrow = nrow(inits[[nm]])))
+  }
+}
+
+test_that("create_initfun returns a function with random-effects inits for mixture2p", {
   dat <- oberauer_lin_2017
-  model_mix2p <- mixture2p(resp_error = "dev_rad")
+  model <- mixture2p(resp_error = "dev_rad")
+  init_fun <- configured_initfun(model, bmf(thetat ~ 1, kappa ~ 1), dat)
+  expect_true(is.function(init_fun))
+  inits <- init_fun()
+  expect_true(all(vapply(inits, function(x) all(is.finite(x)), logical(1))))
 
-  ff_mix2p <- bmf(thetat ~ 1, kappa ~ 1)
-
-  config_args_mix2p <- configure_model(model_mix2p, data = dat, formula = ff_mix2p)
-
-  # create initfun
-  init_fun <- create_initfun(model_mix2p, dat, config_args_mix2p$formula)
-
-  # run tests
-  expect_equal(class(init_fun), "numeric")
-  expect_equal(init_fun, 1)
+  formula <- bmf(
+    kappa ~ 0 + set_size + (0 + set_size | ID),
+    thetat ~ 0 + set_size + (0 + set_size | ID)
+  )
+  expect_re_inits(configured_initfun(model, formula, dat)())
 })
 
 test_that("create_initfun returns 0 for m3 with simple choice rule and identity link", {
@@ -42,12 +78,26 @@ test_that("create_initfun returns 0 for m3 with simple choice rule and identity 
     version = "ss"
   )
 
-  # default simple links are log -> falls through to the default method (1)
-  expect_equal(create_initfun(model, dat, ff), 1)
+  # default simple links are log -> falls through to the default method
+  expect_true(is.function(configured_initfun(model, ff, dat)))
 
   # an identity link on any parameter requires zeros for stable sampling
   model$links$c <- "identity"
-  expect_equal(create_initfun(model, dat, ff), 0)
+  expect_equal(configured_initfun(model, ff, dat), 0)
+})
+
+test_that("m3 with a softmax choice rule gets random-effects inits", {
+  model <- m3(
+    resp_cats = c("corr", "other", "npl"),
+    num_options = c("n_corr", "n_other", "n_npl"),
+    choice_rule = "softmax",
+    version = "ss"
+  )
+  formula <- bmf(c ~ 1 + cond + (1 + cond | ID), a ~ 1 + cond + (1 + cond | ID))
+  inits <- configured_initfun(model, formula, oberauer_lewandowsky_2019_e1)()
+  expect_re_inits(inits)
+  # m3 declares no init_ranges: its coefficients keep the radius-1 start
+  expect_true(all(abs(c(inits$b_c, inits$b_a)) <= 1))
 })
 
 # =============================================================================
@@ -459,6 +509,192 @@ test_that("create_initfun handles a softplus link override on a positive paramet
 
   expect_type(inits, "list")
   expect_true(all(sapply(inits, function(x) all(is.finite(x)))))
+})
+
+# =============================================================================
+# RANDOM-EFFECTS INITS FOR MODELS WITHOUT init_ranges BEFORE THIS CHANGE
+# =============================================================================
+
+test_that("imm and mixture3p get random-effects inits", {
+  dat <- oberauer_lin_2017
+  imm_model <- imm(
+    resp_error = "dev_rad", nt_features = paste0("col_nt", 1:7),
+    nt_distances = paste0("dist_nt", 1:7), set_size = "set_size"
+  )
+  imm_formula <- bmf(
+    c ~ 0 + set_size + (0 + set_size | ID), a ~ 1 + (1 | ID),
+    s ~ 1, kappa ~ 1
+  )
+  expect_re_inits(configured_initfun(imm_model, imm_formula, dat)())
+
+  mix3p_model <- mixture3p("dev_rad", nt_features = paste0("col_nt", 1:7), set_size = "set_size")
+  intercepts <- bmf(kappa ~ 1 + (1 | ID), thetat ~ 1 + (1 | ID), thetant ~ 1 + (1 | ID))
+  expect_re_inits(configured_initfun(mix3p_model, intercepts, dat)(), correlated = FALSE)
+  slopes <- bmf(
+    kappa ~ 0 + set_size + (0 + set_size | ID), thetat ~ 1,
+    thetant ~ 0 + set_size + (0 + set_size | ID)
+  )
+  expect_re_inits(configured_initfun(mix3p_model, slopes, dat)())
+})
+
+test_that("the init list names every parameter of the Stan model and nothing else", {
+  dat <- oberauer_lin_2017
+  cases <- list(
+    list(
+      model = mixture2p("dev_rad"),
+      formula = bmf(
+        kappa ~ 0 + set_size + (0 + set_size | ID),
+        thetat ~ 0 + set_size + (0 + set_size | ID)
+      )
+    ),
+    # set size 1 pins thetant and its sd to constants, which brms implements by
+    # replacing the vectors b_thetant and sd_3 with per-coefficient scalars
+    list(
+      model = mixture3p("dev_rad", nt_features = paste0("col_nt", 1:7), set_size = "set_size"),
+      formula = bmf(
+        kappa ~ 0 + set_size + (0 + set_size | ID),
+        thetat ~ 0 + set_size + (0 + set_size | ID),
+        thetant ~ 0 + set_size + (0 + set_size | ID)
+      )
+    )
+  )
+  for (case in cases) {
+    spars <- stan_parameter_names(case$model, case$formula, dat)
+    inits <- configured_initfun(case$model, case$formula, dat)()
+    expect_setequal(names(inits), spars)
+  }
+  expect_true(any(grepl("^par_b_thetant_", spars)))
+  par_sd <- unlist(inits[grep("^par_sd_", names(inits))])
+  expect_gt(length(par_sd), 0)
+  expect_true(all(par_sd >= 0.05 & par_sd <= 0.1))
+  par_b <- unlist(inits[grep("^par_b_thetant_", names(inits))])
+  expect_true(all(abs(par_b) <= 1.1))
+  sdata <- standata(cases[[2]]$formula, dat, cases[[2]]$model)
+  expect_length(inits$b_kappa, sdata$K_kappa)
+  expect_equal(dim(inits$z_1), c(sdata$M_1, sdata$N_1))
+})
+
+test_that("uncorrelated random effects get z inits and no correlation matrix", {
+  dat <- oberauer_lin_2017
+  model <- mixture2p("dev_rad")
+  formula <- bmf(kappa ~ 0 + set_size + (0 + set_size || ID), thetat ~ 1)
+  inits <- configured_initfun(model, formula, dat)()
+  sdata <- standata(formula, dat, model)
+  expect_re_inits(inits, correlated = FALSE)
+  expect_equal(dim(inits$z_1), c(sdata$M_1, sdata$N_1))
+})
+
+test_that("a user init replaces the package init", {
+  dat <- oberauer_lin_2017
+  model <- mixture2p("dev_rad")
+  formula <- bmf(kappa ~ 1 + (1 | ID), thetat ~ 1)
+  fit <- bmm(formula, dat, model, backend = "mock", mock_fit = 1, rename = FALSE)
+  expect_true(is.function(fit$stan_args$init))
+  fit <- bmm(formula, dat, model, init = 0, backend = "mock", mock_fit = 1, rename = FALSE)
+  expect_equal(fit$stan_args$init, 0)
+})
+
+# =============================================================================
+# POPULATION-LEVEL RANGES OF THE CIRCULAR MIXTURE MODELS
+# =============================================================================
+
+# central 50% of the main default prior, mapped to the native scale
+central_range <- function(location, scale, inverse) {
+  signif(inverse(location + c(-1, 1) * scale * stats::qnorm(0.75)), 2)
+}
+
+test_that("mixture2p starts inside the central 50% of its default priors", {
+  dat <- oberauer_lin_2017
+  model <- mixture2p("dev_rad")
+  ranges <- model$init_ranges
+  expect_equal(ranges$kappa, central_range(2, 1, exp))
+  expect_equal(ranges$mu1, central_range(0, 0.5, function(x) 2 * atan(x)))
+  expect_equal(ranges$thetat, signif(stats::plogis(c(-1, 1) * stats::qlogis(0.75)), 2))
+
+  formula <- bmf(kappa ~ 1 + (1 | ID), thetat ~ 1 + set_size, mu1 ~ 1)
+  init_fun <- configured_initfun(model, formula, dat)
+  for (i in 1:20) {
+    inits <- init_fun()
+    # nlpars carry their intercept in the first coefficient
+    expect_true(inits$b_kappa[1] >= log(ranges$kappa[1]) && inits$b_kappa[1] <= log(ranges$kappa[2]))
+    expect_true(inits$b_thetat[1] >= stats::qlogis(ranges$thetat[1]) &&
+      inits$b_thetat[1] <= stats::qlogis(ranges$thetat[2]))
+    expect_true(all(abs(inits$b_thetat[-1]) <= 0.1))
+    expect_true(abs(inits$Intercept_mu1) <= tan(ranges$mu1[2] / 2))
+  }
+})
+
+test_that("mixture3p softmax weights start inside their range on the sampling scale", {
+  model <- mixture3p("dev_rad", nt_features = paste0("col_nt", 1:7), set_size = "set_size")
+  expect_equal(model$init_ranges$thetat, c(-1.1, 1.1))
+  expect_equal(model$init_ranges$thetant, c(-1.1, 1.1))
+  formula <- bmf(kappa ~ 1, thetat ~ 1, thetant ~ 1)
+  init_fun <- configured_initfun(model, formula, oberauer_lin_2017)
+  for (i in 1:20) {
+    inits <- init_fun()
+    expect_true(abs(inits$b_thetat[1]) <= 1.1)
+    expect_true(abs(inits$b_thetant[1]) <= 1.1)
+  }
+})
+
+test_that("imm versions carry ranges for exactly their parameters", {
+  ranges <- imm(
+    resp_error = "dev_rad", nt_features = paste0("col_nt", 1:7),
+    nt_distances = paste0("dist_nt", 1:7), set_size = "set_size"
+  )$init_ranges
+  expect_setequal(names(ranges), c("mu1", "kappa", "a", "c", "s"))
+  expect_equal(ranges$a, central_range(0, 1, exp))
+  expect_equal(ranges$c, ranges$a)
+  expect_equal(ranges$s, ranges$a)
+  abc <- imm(
+    resp_error = "dev_rad", nt_features = paste0("col_nt", 1:7),
+    set_size = "set_size", version = "abc"
+  )$init_ranges
+  expect_setequal(names(abc), c("mu1", "kappa", "a", "c"))
+  bsc <- imm(
+    resp_error = "dev_rad", nt_features = paste0("col_nt", 1:7),
+    nt_distances = paste0("dist_nt", 1:7), set_size = "set_size", version = "bsc"
+  )$init_ranges
+  expect_setequal(names(bsc), c("mu1", "kappa", "c", "s"))
+})
+
+# =============================================================================
+# RADIUS-1 FILL FOR PARAMETERS WITHOUT A RANGE
+# =============================================================================
+
+test_that("init_default_param() maps the draw through the declared bounds", {
+  spec <- function(type, bounds, dims = "K") nlist(type, bounds, dims)
+  unbounded <- init_default_param(spec("vector", NULL), 20, list())
+  lower <- init_default_param(spec("vector", list(lower = "2")), 20, list())
+  upper <- init_default_param(spec("vector", list(upper = "-3")), 20, list())
+  both <- init_default_param(
+    spec("vector", list(lower = "0", upper = "min_Y")), 20, list(min_Y = 4)
+  )
+
+  expect_true(all(abs(unbounded) <= 1))
+  expect_true(all(lower > 2))
+  expect_true(all(upper < -3))
+  expect_true(all(both > 0 & both < 4))
+  expect_equal(dim(init_default_param(spec("matrix", NULL), c(2, 3), list())), c(2, 3))
+  # a size-1 vector must stay an array so that it is written as [x], not x
+  expect_equal(dim(init_default_param(spec("vector", NULL), 1, list())), 1)
+  expect_null(dim(init_default_param(spec("real", NULL, dims = "1"), 1, list())))
+})
+
+test_that("init_default_param() leaves unsupported declarations to the sampler", {
+  spec <- function(type, bounds) nlist(type, bounds, dims = "K")
+  expect_null(init_default_param(spec("simplex", NULL), 3, list()))
+  expect_null(init_default_param(spec("real", list(lower = "unknown_var")), 1, list()))
+})
+
+test_that("Stan dimensions and bounds resolve from literals and data", {
+  sdata <- list(K = 3L, N = 10L, lb = 0.5)
+  expect_equal(resolve_stan_dim(c("K", "N"), sdata), c(3, 10))
+  expect_equal(resolve_stan_dim("1", sdata), 1)
+  expect_equal(resolve_stan_bound(NULL, sdata, -Inf), -Inf)
+  expect_equal(resolve_stan_bound("2.5", sdata, -Inf), 2.5)
+  expect_equal(resolve_stan_bound("lb", sdata, -Inf), 0.5)
+  expect_true(is.na(resolve_stan_bound("missing", sdata, -Inf)))
 })
 
 # -----------------------------------------------------------------------------
