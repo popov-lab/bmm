@@ -69,7 +69,9 @@
 #'   `options(bmm.sort_data = )`): under the default `"check"`, answering the
 #'   interactive prompt differently than last time forces a refit.
 #' @param ... Further arguments passed to [brms::brm()] or Stan. See the
-#'   description of [brms::brm()] for more details
+#'   description of [brms::brm()] for more details. Unless `control` names a
+#'   `step_size` (`stepsize` for the rstan backend), bmm adds the starting step
+#'   size set in [bmm_options()] to it; the other entries of `control` are kept.
 #'
 #' @details # Supported Models
 #'
@@ -168,6 +170,9 @@ bmm <- function(formula, data, model,
 
   # estimate the model
   fit_args <- combine_args(nlist(config_args, opts, dots, prior))
+  fit_args$control <- configure_control(
+    fit_args$control, opts$backend %||% getOption("brms.backend", "rstan")
+  )
 
   if (file_refit == "on_change") {
     x <- try_read_bmmfit(file)

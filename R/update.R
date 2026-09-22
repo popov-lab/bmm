@@ -169,11 +169,15 @@ update.bmmfit <- function(object, formula., newdata = NULL, recompile = NULL,
 
   # pass back to brms::update.brmsfit; stanvars must be the freshly configured
   # ones — brms otherwise reuses object$stanvars, whose data values (e.g. the
-  # sdm run metadata) were computed for the original data and formula
+  # sdm run metadata) were computed for the original data and formula. brms
+  # carries only adapt_delta and max_treedepth over from the old fit, so the
+  # starting step size is re-derived here; a named argument replaces the
+  # `control` in the dots
   object <- NextMethod("update", object,
     formula = formula., newdata = newdata,
     prior = prior, recompile = recompile,
-    stanvars = new_fit_args$stanvars, ...
+    stanvars = new_fit_args$stanvars,
+    control = configure_control(dots$control, dots$backend %||% object$backend), ...
   )
 
   # bmm postprocessing

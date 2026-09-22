@@ -86,6 +86,21 @@ configure_options <- function(opts, env = parent.frame()) {
   opts[not_in(names(opts), exclude_args)]
 }
 
+# Stan starts its step-size search at 1; the hierarchical models bmm fits adapt
+# to step sizes near 0.01 or below, and the oversized trial steps of that search
+# saturate the correlation transform and overflow exp(kappa), printing the
+# exceptions users read as failures. Starting lower removes those steps without
+# changing where adaptation ends. cmdstanr spells the argument step_size, rstan
+# stepsize; a user value under either spelling wins
+configure_control <- function(control, backend) {
+  step_size <- getOption("bmm.step_size", 0.01)
+  if (isFALSE(step_size) || any(c("step_size", "stepsize") %in% names(control))) {
+    return(control)
+  }
+  key <- if (identical(backend, "rstan")) "stepsize" else "step_size"
+  c(control, stats::setNames(list(step_size), key))
+}
+
 # check if a value is not in a vector
 not_in <- function(value, vector) {
   !(value %in% vector)
@@ -490,6 +505,16 @@ identical.formula <- function(x, y, ...) {
 #'  "never" always re-uses the saved fit, and "on_change" re-uses it only while
 #'  the Stan code and data are unchanged. See [bmm()] for details. **Default:
 #'  FALSE**
+#' @param step_size numeric or `FALSE`. The step size at which `bmm()` and
+#'  `update()` start Stan's step-size search, passed as
+#'  `control = list(step_size = )` (`stepsize` for the rstan backend). Stan's
+#'  own starting value of 1 is far above the step sizes the hierarchical
+#'  models in bmm adapt to, and the oversized trial steps of the search print
+#'  `lkj_corr_cholesky_lpdf` and `von_mises_lpdf` exceptions at the start of
+#'  warmup. The adapted step size and the posterior do not depend on the
+#'  starting value. `FALSE` leaves the starting step size to Stan; a
+#'  `step_size` (or `stepsize`) in the `control` list of `bmm()` always wins.
+#'  **Default: 0.01**
 #' @details The `bmm_options` function is used to view or change the current bmm
 #'   options. If no arguments are provided, the function will return the current
 #'   options. If arguments are provided, the function will change the options
@@ -528,8 +553,14 @@ identical.formula <- function(x, y, ...) {
 #' bmm_options(reset_options = TRUE)
 #' @export
 bmm_options <- function(sort_data, parallel, default_priors, silent,
-                        color_summary, file_refit, reset_options = FALSE) {
+                        color_summary, file_refit, step_size, reset_options = FALSE) {
   opts <- ls()
+  stopif(
+    !missing(step_size) && !isFALSE(step_size) &&
+      !(is.numeric(step_size) && length(step_size) == 1 && step_size > 0),
+    "step_size must be a single positive number, or FALSE to leave the starting \\
+    step size to Stan"
+  )
   stopif(
     !missing(sort_data) && sort_data != "check" && !is.logical(sort_data),
     "sort_data must be one of TRUE, FALSE, or 'check'"
@@ -562,7 +593,8 @@ bmm_options <- function(sort_data, parallel, default_priors, silent,
       bmm.default_priors = TRUE,
       bmm.silent = 1,
       bmm.color_summary = TRUE,
-      bmm.file_refit = FALSE
+      bmm.file_refit = FALSE,
+      bmm.step_size = 0.01
     )
   }
 
@@ -583,6 +615,7 @@ bmm_options <- function(sort_data, parallel, default_priors, silent,
       "\n  default_priors = ", getOption("bmm.default_priors"),
       "\n  silent = ", getOption("bmm.silent"),
       "\n  file_refit = ", getOption("bmm.file_refit"),
+      "\n  step_size = ", getOption("bmm.step_size"),
       "\n  color_summary = ", getOption("bmm.color_summary"), "\n"
     )),
     "For more information on these options or how to change them, see help(bmm_options).\n"

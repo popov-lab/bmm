@@ -117,3 +117,22 @@ test_that("Available models produce expected errors", {
     )
   }
 })
+
+test_that("bmm() starts the step-size search at the package default unless the user sets it", {
+  skip_on_cran()
+  dat <- oberauer_lin_2017
+  formula <- bmf(c ~ 1 + (1 | ID), kappa ~ 1 + (1 | ID))
+  mock <- function(...) {
+    bmm(formula, dat, sdm("dev_rad"), backend = "mock", mock_fit = 1, rename = FALSE, ...)
+  }
+  expect_equal(mock()$stan_args$control, list(step_size = 0.01))
+  expect_equal(
+    mock(control = list(adapt_delta = 0.95))$stan_args$control,
+    list(adapt_delta = 0.95, step_size = 0.01)
+  )
+  expect_equal(mock(control = list(step_size = 0.5))$stan_args$control, list(step_size = 0.5))
+  expect_equal(mock(threads = brms::threading(2))$stan_args$control, list(step_size = 0.01))
+
+  withr::local_options(bmm.step_size = FALSE)
+  expect_null(mock()$stan_args$control)
+})

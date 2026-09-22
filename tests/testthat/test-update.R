@@ -169,3 +169,19 @@ test_that("update.bmmfit updates and writes even when `file` already exists", {
   expect_equal(readRDS(paste0(file, ".rds"))$fit, 1)
   expect_true(is_bmmfit(readRDS(paste0(file, ".rds"))))
 })
+
+test_that("update() applies the package step-size default to a fit that had none", {
+  skip_on_cran()
+  fit1 <- sdm_fixture()
+  expect_null(fit1$stan_args$control)
+
+  up <- update_mock(fit1)
+  expect_equal(up$stan_args$control, list(step_size = 0.01))
+  up <- update_mock(fit1, control = list(adapt_delta = 0.99))
+  expect_equal(up$stan_args$control, list(adapt_delta = 0.99, step_size = 0.01))
+  up <- update_mock(fit1, control = list(step_size = 0.5))
+  expect_equal(up$stan_args$control, list(step_size = 0.5))
+
+  withr::local_options(bmm.step_size = FALSE)
+  expect_null(update_mock(fit1)$stan_args$control)
+})
