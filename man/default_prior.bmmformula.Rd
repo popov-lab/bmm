@@ -53,6 +53,11 @@ standard deviation of that parameter (all grouping factors, intercepts and
 slopes alike) and replaces the \code{student_t(3, 0, 2.5)} default of \code{brms}. To
 override it, address the parameter with \code{dpar} or \code{nlpar} in
 \code{\link[brms:set_prior]{brms::set_prior()}}, e.g. \code{set_prior("exponential(2)", class = "sd", nlpar = "kappa")}.
+
+Correlations among random effects belong to a grouping factor rather than to
+one parameter, so they get a single default for the whole model: \code{lkj(2)}
+instead of the \code{lkj(1)} of \code{brms}, set whenever the model estimates a
+correlation matrix. To override it, use e.g. \code{set_prior("lkj(1)", class = "cor")}.
 }
 \examples{
 default_prior(bmf(c ~ 1, kappa ~ 1),

@@ -22,6 +22,12 @@
 #'   [brms::set_prior()], e.g. `set_prior("exponential(2)", class = "sd",
 #'   nlpar = "kappa")`.
 #'
+#'   Correlations among random effects belong to a grouping factor rather than to
+#'   one parameter, so they get a single default for the whole model: `lkj(2)`
+#'   instead of the `lkj(1)` of `brms`, set whenever the model estimates a
+#'   correlation matrix. To override it, use e.g. `set_prior("lkj(1)",
+#'   class = "cor")`.
+#'
 #' @inheritParams bmm
 #' @aliases default_prior
 #' @param object A `bmmformula` object
@@ -609,7 +615,7 @@ set_default_prior <- function(model, data, formula) {
   priors <- lapply(pars, function(par) {
     construct_default_priors_list(par, bterms, default_priors, data)
   })
-  priors <- unnest_list(priors)
+  priors <- c(unnest_list(priors), list(.construct_cor_prior(formula, data)))
   Reduce(combine_prior, priors, init = brms::empty_prior())
 }
 
@@ -697,6 +703,19 @@ construct_default_priors_list <- function(par, bterms, default_priors, data) {
     return(list())
   }
   list(.build_prior(prior_desc$sd, "sd", par = par, bterms = bterms))
+}
+
+# One prior on all group-level correlation matrices (no group, and no dpar/nlpar:
+# a correlation matrix belongs to a grouping factor, not to a model parameter).
+# brms rejects the row unless some correlated term estimates more than one
+# coefficient per group -- (1 | g), (x || g) and single-column terms have no
+# matrix, an ID shared across parameters has one -- so brms is asked whether the
+# model has one rather than re-deriving that rule here.
+.construct_cor_prior <- function(formula, data) {
+  if (!"cor" %in% brms::default_prior(formula, data = data)$class) {
+    return(brms::empty_prior())
+  }
+  brms::prior_("lkj(2)", class = "cor")
 }
 
 # Helper function to create a prior object conditional on parameter type
