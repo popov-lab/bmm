@@ -301,13 +301,16 @@ classify_priors <- function(prior, defaults, links = list()) {
   out
 }
 
-# A fitted object stores the prior on group-level correlations as class "L" with
-# the Cholesky density, a prior table as class "cor" with lkj(); the two name
-# the same prior
+# A fitted object stores a correlation prior under the internal class of its
+# Cholesky factor, a prior table under the class set_prior() accepts; brms's own
+# check_prior_content() lists the pairs
 as_prior_table <- function(prior) {
-  is_cholesky <- prior$class == "L"
-  prior$class[is_cholesky] <- "cor"
-  prior$prior[is_cholesky] <- sub("^lkj_corr_cholesky\\(", "lkj(", prior$prior[is_cholesky])
+  internal <- c(
+    L = "cor", Lrescor = "rescor", Lme = "corme", Llncor = "lncor", Lcortime = "cortime"
+  )
+  is_internal <- prior$class %in% names(internal)
+  prior$class[is_internal] <- internal[prior$class[is_internal]]
+  prior$prior[is_internal] <- sub("^lkj_corr_cholesky\\(", "lkj(", prior$prior[is_internal])
   prior
 }
 

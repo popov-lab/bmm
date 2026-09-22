@@ -450,6 +450,20 @@ test_that("classify_priors() recognises a fit's stored correlation prior", {
   expect_equal(classify_priors(stored("lkj_corr_cholesky(4)", "user"), bmm_default)$source, "user")
 })
 
+test_that("as_prior_table() maps every correlation class brms stores internally", {
+  # the pairs brms::check_prior_content() accepts, internal name first
+  pairs <- c(L = "cor", Lrescor = "rescor", Lme = "corme", Llncor = "lncor", Lcortime = "cortime")
+  stored <- do.call(rbind, lapply(
+    names(pairs), function(cl) prior_row("lkj_corr_cholesky(2)", class = cl)
+  ))
+  out <- as_prior_table(stored)
+
+  expect_equal(out$class, unname(pairs))
+  expect_true(all(out$prior == "lkj(2)"))
+  # a class brms does not rename passes through
+  expect_equal(as_prior_table(prior_row("exponential(1)", class = "sd"))$class, "sd")
+})
+
 test_that("report_priors() attributes the correlation prior to bmm", {
   formula <- bmf(kappa ~ set_size + (set_size | ID), thetat ~ 1)
   fit <- bmm(formula, oberauer_lin_2017, mixture2p("dev_rad"),
