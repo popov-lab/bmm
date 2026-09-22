@@ -710,6 +710,16 @@ test_that("a parameter whose size does not resolve is left to the sampler", {
   expect_length(init_stan_param("zs_kappa_1_1", spec, model, list(K = 3L)), 3)
 })
 
+test_that("a declaration the parser cannot type is left to the sampler", {
+  model <- list(
+    parameters = list(kappa = ""), init_ranges = list(kappa = c(1, 2)),
+    links = list(kappa = "log")
+  )
+  # a name the population-level rule would otherwise claim
+  spec <- parse_parameters_line("sum_to_zero_vector[K] b_kappa;")
+  expect_null(init_stan_param("b_kappa", spec, model, list(K = 3L, X_kappa = matrix(1, 3, 3))))
+})
+
 test_that("Stan dimensions and bounds resolve from literals and data", {
   sdata <- list(K = 3L, N = 10L, lb = 0.5)
   expect_equal(resolve_stan_dim(c("K", "N"), sdata), c(3, 10))
