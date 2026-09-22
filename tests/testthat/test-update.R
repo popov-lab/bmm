@@ -192,6 +192,25 @@ test_that("update() builds the initial values for the data and formula it fits",
   expect_equal(update_mock(fit1, newdata = new_data, init = 0, recompile = TRUE)$stan_args$init, 0)
 })
 
+test_that("update() configures the prior and the inits with the fit's data2", {
+  skip_on_cran()
+  fit1 <- sdm_fixture()
+  new_data <- fit1$data
+  new_data$ID <- factor(rep(1:3, length.out = nrow(new_data)))
+  A <- diag(3)
+  dimnames(A) <- list(levels(new_data$ID), levels(new_data$ID))
+  formula <- bmf(c ~ 0 + set_size + (1 | gr(ID, cov = A)), kappa ~ 1)
+
+  # the call passes data2
+  up <- update_mock(fit1, formula. = formula, newdata = new_data, data2 = list(A = A))
+  expect_equal(up$data2, list(A = A))
+  expect_equal(dim(up$stan_args$init()$z_1), c(1, 3))
+  # the fit carries it, as brms::update.brmsfit() reads it off object$data2
+  fit1$data2 <- list(A = A)
+  up <- update_mock(fit1, formula. = formula, newdata = new_data)
+  expect_equal(dim(up$stan_args$init()$z_1), c(1, 3))
+})
+
 test_that("update() applies the package step-size default to a fit that had none", {
   skip_on_cran()
   withr::local_options(bmm.step_size = 0.02)

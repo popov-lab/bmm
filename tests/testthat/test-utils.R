@@ -525,8 +525,9 @@ test_that("bmm_options(step_size = ) validates and applies the option", {
   expect_error(bmm_options(step_size = -1), "step_size")
   expect_error(bmm_options(step_size = "a"), "step_size")
   expect_error(bmm_options(step_size = c(0.1, 0.2)), "step_size")
-  expect_error(bmm_options(step_size = NA_real_), "step_size")
   expect_error(bmm_options(step_size = Inf), "step_size")
+  # NA raises R's own error in the condition, which ends the block, so it goes last
+  expect_error(bmm_options(step_size = NA_real_), "step_size")
   expect_message(bmm_options(step_size = 0.3), "step_size = 0.3")
   expect_equal(getOption("bmm.step_size"), 0.3)
   suppressMessages(bmm_options(step_size = FALSE))

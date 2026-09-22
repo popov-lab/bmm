@@ -839,7 +839,19 @@ test_that("the first term of a no-intercept formula starts in range whatever its
   expect_equal(n_in_range(bmf(kappa ~ 0 + set_size, thetat ~ 1), without_8), c(7, 7))
 })
 
+test_that("range_coefficients() picks the first term unless the intercept is centred", {
+  X <- stats::model.matrix(~ 0 + x + z, data.frame(x = factor(1:3), z = 1:3))
+  expect_equal(range_coefficients(X, centered = FALSE), c(TRUE, TRUE, TRUE, FALSE))
+  X <- stats::model.matrix(~ 1 + x, data.frame(x = factor(1:3)))
+  expect_equal(range_coefficients(X, centered = TRUE), c(FALSE, FALSE))
+  expect_equal(range_coefficients(X, centered = FALSE), c(TRUE, FALSE, FALSE))
+  # a 0 + Intercept design matrix has no assign attribute
+  attr(X, "assign") <- NULL
+  expect_equal(range_coefficients(X, centered = FALSE), c(TRUE, FALSE, FALSE))
+})
+
 test_that("the coefficients of the main dpar start from its range", {
+  withr::local_seed(20260922)
   dat <- oberauer_lin_2017
   model <- sdm("dev_rad")
   upper <- tan(model$init_ranges$mu[2] / 2)
@@ -850,6 +862,13 @@ test_that("the coefficients of the main dpar start from its range", {
   effects <- configured_initfun(model, bmf(mu ~ 1 + set_size, c ~ 1, kappa ~ 1), dat)()
   expect_true(all(abs(effects$b) <= 0.1))
   expect_true(abs(effects$Intercept) <= upper)
+})
+
+test_that("a declaration whose size the parser cannot resolve is left to the sampler", {
+  dat <- oberauer_lin_2017
+  dat$x <- as.numeric(as.character(dat$set_size))
+  init_fun <- configured_initfun(mixture2p("dev_rad"), bmf(kappa ~ 1 + s(x, k = 4), thetat ~ 1), dat)
+  expect_no_error(init_fun())
 })
 
 test_that("a 0 + Intercept formula gets finite initial values", {
