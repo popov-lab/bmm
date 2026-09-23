@@ -542,9 +542,11 @@ test_that("the vectorized cswald likelihood matches the scalar and R versions", 
   "CmdStan not installed"
   )
 
-  # seeded so a failure reproduces. Under this seed 23 of the censored
-  # observations take the log-space fallback and both clamp conditions fire;
-  # across 200 seeds that count never fell below 13
+  # seeded so a failure reproduces. Measured against Stan's Phi(): under this
+  # seed the log-space fallback, with both clamp conditions firing, takes 23
+  # survivor terms for simple and 8 for crisk. Over seeds 1-200 the floor was
+  # 13 for simple and 6 for crisk (below 13 in 166 of 200 seeds); neither
+  # version dropped to 0
   withr::local_seed(20260921)
 
   for (version in c("simple", "crisk")) {
