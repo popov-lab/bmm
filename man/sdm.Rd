@@ -59,17 +59,21 @@ and how to use it. * \strong{Domain:} Visual working memory
 \itemize{
 \item \code{mu}:
 \itemize{
-\item \code{main}: student_t(1, 0, 1)
+\item \code{main}: normal(0, 0.5)
+\item \code{effects}: normal(0, 0.25)
+\item \code{sd}: exponential(4)
 }
 \item \code{kappa}:
 \itemize{
 \item \code{main}: student_t(5, 1.75, 0.75)
 \item \code{effects}: normal(0, 1)
+\item \code{sd}: exponential(1)
 }
 \item \code{c}:
 \itemize{
 \item \code{main}: student_t(5, 2, 0.75)
 \item \code{effects}: normal(0, 1)
+\item \code{sd}: exponential(1)
 }
 }
 }

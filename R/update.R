@@ -154,7 +154,9 @@ update.bmmfit <- function(object, formula., newdata = NULL, recompile = NULL,
          old_prior$class %in% c("Intercept", "b") & is_main_dpar_row)
     old_prior <- old_prior[!stale, ]
   }
-  prior <- configure_prior(model, data, config_args$formula, old_prior)
+  prior <- brms::do_call(
+    configure_prior, c(list(model, data, config_args$formula, old_prior), fit_frame_args(object, dots))
+  )
   prior <- combine_prior(prior, dots$prior)
   dots$prior <- NULL
   new_fit_args <- combine_args(nlist(config_args, dots, prior))
@@ -167,13 +169,31 @@ update.bmmfit <- function(object, formula., newdata = NULL, recompile = NULL,
     newdata <- new_fit_args$data
   }
 
+  # the fit's stored init closure captured the Stan data of the original fit,
+  # so a new formula or data needs a new one, built from the prior as brms will
+  # read it: brms::update.brmsfit() tags the prior so that rows of the old fit
+  # that the new formula or data leave without a parameter are dropped instead
+  # of rejected. Built before the NextMethod() call, because an error inside a
+  # lazy argument of that call surfaces as "promise already under evaluation"
+  # rather than as itself
+  attr(prior, "allow_invalid_prior") <- TRUE
+  init <- if ("init" %in% names(dots)) dots$init else brms::do_call(
+    create_initfun, c(list(model, data, config_args$formula, prior), fit_frame_args(object, dots))
+  )
+
   # pass back to brms::update.brmsfit; stanvars must be the freshly configured
   # ones — brms otherwise reuses object$stanvars, whose data values (e.g. the
-  # sdm run metadata) were computed for the original data and formula
+  # sdm run metadata) were computed for the original data and formula. The
+  # named `control` replaces the one in the dots and adds the starting step size
   object <- NextMethod("update", object,
     formula = formula., newdata = newdata,
     prior = prior, recompile = recompile,
-    stanvars = new_fit_args$stanvars, ...
+    stanvars = new_fit_args$stanvars, init = init,
+    control = configure_control(
+      carried_control(object, dots),
+      dots$backend %||% object$backend %||% "rstan",
+      dots$algorithm %||% object$algorithm %||% "sampling"
+    ), ...
   )
 
   # bmm postprocessing
@@ -192,4 +212,28 @@ update.bmmfit <- function(object, formula., newdata = NULL, recompile = NULL,
     return(object)
   }
   try_save_bmmfit(object, save_file, compress = save_compress)
+}
+
+# brms::update.brmsfit() merges the fit's stored control key by key with the one
+# the call names, and keeps none of it when backend or algorithm changes.
+# update.bmmfit() always names a control, so the rule is applied here. rstan fits
+# also get the rest of the old sampler's control from brms itself; cmdstanr fits
+# store it nowhere else. A fit without a backend or algorithm field counts as
+# changed, because brms resolves the missing field to its first choice and then
+# finds it different. step_size and stepsize are one argument under two
+# spellings, so a call naming either replaces whichever the fit stored; merged
+# by name they would survive as two keys and configure_control() would then
+# resolve the duplicate in the fit's favour
+carried_control <- function(object, dots) {
+  same_run <- !is.null(object$backend) && !is.null(object$algorithm) &&
+    identical(dots$backend %||% object$backend, object$backend) &&
+    identical(dots$algorithm %||% object$algorithm, object$algorithm)
+  if (!same_run) {
+    return(dots$control)
+  }
+  stored <- object$stan_args$control %||% list()
+  if (any(names(dots$control) %in% c("step_size", "stepsize"))) {
+    stored <- stored[not_in(names(stored), c("step_size", "stepsize"))]
+  }
+  utils::modifyList(stored, dots$control %||% list())
 }

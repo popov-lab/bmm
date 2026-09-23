@@ -11,6 +11,7 @@ bmm_options(
   silent,
   color_summary,
   file_refit,
+  step_size,
   reset_options = FALSE
 )
 }
@@ -42,6 +43,17 @@ saved via its \code{file} argument. \code{TRUE} or "always" always refits, \code
 "never" always re-uses the saved fit, and "on_change" re-uses it only while
 the Stan code and data are unchanged. See \code{\link[=bmm]{bmm()}} for details. \strong{Default:
 FALSE}}
+
+\item{step_size}{numeric or \code{FALSE}. The step size at which \code{bmm()} and
+\code{update()} start Stan's step-size search, passed as
+\code{control = list(step_size = )} (\code{stepsize} for the rstan backend). Stan's
+own starting value of 1 is far above the step sizes the hierarchical
+models in bmm adapt to, and the oversized trial steps of the search print
+\code{lkj_corr_cholesky_lpdf} and \code{von_mises_lpdf} exceptions at the start of
+warmup. The adapted step size and the posterior do not depend on the
+starting value. \code{FALSE} leaves the starting step size to Stan; a
+\code{step_size} (or \code{stepsize}) in the \code{control} list of \code{bmm()} always wins.
+\strong{Default: 0.01}}
 
 \item{reset_options}{logical. If TRUE, the options will be reset to their
 default values \strong{Default: FALSE}}
