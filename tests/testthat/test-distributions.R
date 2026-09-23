@@ -972,6 +972,43 @@ test_that("dcswald with sndt stays accurate just above the strip", {
   )
 })
 
+test_that("dcswald with sndt matches the convolution for a defective accumulator", {
+  # the deep tail of a negative-drift accumulator, where the survivor
+  # difference has cancelled: the CDF difference carries it while the defective
+  # mass is still arriving, Simpson on the density once that has converged too
+  conv <- function(t1, drift, bound, sndt) {
+    c0 <- .dwald(t1, drift, bound, 1)
+    c0 + log(stats::integrate(
+      function(u) exp(.dwald(u, drift, bound, 1) - c0),
+      lower = t1 - sndt, upper = t1, rel.tol = 1e-12
+    )$value / sndt)
+  }
+  cdf_branch <- c(2.2, 3)
+  expect_equal(
+    .dwald_sndt(cdf_branch, -3.5, 1, 1, 0.3),
+    vapply(cdf_branch, conv, numeric(1), drift = -3.5, bound = 1, sndt = 0.3),
+    tolerance = 1e-6
+  )
+  # Simpson on four intervals, so the hazard times sndt must stay moderate:
+  # its error is 5e-8 nats here and 3e-4 at drift -3.5 with sndt 0.3
+  simpson_branch <- c(8, 12, 20)
+  expect_equal(
+    .dwald_sndt(simpson_branch, -2, 1, 1, 0.1),
+    vapply(simpson_branch, conv, numeric(1), drift = -2, bound = 1, sndt = 0.1),
+    tolerance = 1e-6
+  )
+})
+
+test_that("pcswald with sndt has no kink where the survivor guard switches", {
+  # the guard swaps the difference of integrated survivors for Simpson at
+  # x* ~ 2.7306 for these parameters; a coarser fallback shows up as curvature
+  # there. Over a step of 0.002 the smooth second difference is 5.9e-7 and the
+  # switch adds 4.2e-6 on top
+  x <- 2.73056 + 0.002 * (-4:4)
+  second_diff <- diff(diff(.pwald_sndt(x, 3.5, 1, 1, 0.1)))
+  expect_lt(max(abs(second_diff)), 2e-5)
+})
+
 test_that("log_diff_exp returns -Inf instead of NaN when b >= a", {
   expect_identical(log_diff_exp(-5, -5), -Inf)
   expect_identical(log_diff_exp(-6, -5), -Inf)
