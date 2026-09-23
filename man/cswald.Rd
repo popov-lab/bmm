@@ -93,21 +93,25 @@ for Choice Response Times. Applied Psychological Measurement, 42(2), 116-135. ht
 \itemize{
 \item \code{main}: normal(0,1)
 \item \code{effects}: normal(0,0.3)
+\item \code{sd}: exponential(2)
 }
 \item \code{bound}:
 \itemize{
 \item \code{main}: normal(0,0.3)
 \item \code{effects}: normal(0,0.3)
+\item \code{sd}: exponential(2)
 }
 \item \code{ndt}:
 \itemize{
 \item \code{main}: normal(-2,0.3)
 \item \code{effects}: normal(0,0.3)
+\item \code{sd}: exponential(2)
 }
 \item \code{s}:
 \itemize{
 \item \code{main}: normal(0,0.3)
 \item \code{effects}: normal(0,0.2)
+\item \code{sd}: exponential(2)
 }
 }
 }

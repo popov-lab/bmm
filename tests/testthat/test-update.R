@@ -169,3 +169,120 @@ test_that("update.bmmfit updates and writes even when `file` already exists", {
   expect_equal(readRDS(paste0(file, ".rds"))$fit, 1)
   expect_true(is_bmmfit(readRDS(paste0(file, ".rds"))))
 })
+
+test_that("update() builds the initial values for the data and formula it fits", {
+  skip_on_cran()
+  fit1 <- sdm_fixture()
+  # on the same backend brms carries every stored stan_args entry the call does
+  # not name, the init among them, and it leaves stan_args untouched unless the
+  # model is recompiled
+  fit1$backend <- "mock"
+  new_data <- fit1$data[fit1$data$set_size %in% 1:2, ]
+  new_data$set_size <- factor(as.character(new_data$set_size))
+  new_data$ID <- factor(rep(1:3, length.out = nrow(new_data)))
+
+  up <- update_mock(fit1, newdata = new_data, recompile = TRUE)
+  expect_length(up$stan_args$init()$b_c, brms::standata(up)$K_c)
+
+  up <- update_mock(fit1,
+    formula. = bmf(c ~ 0 + set_size + (1 | ID), kappa ~ 1), newdata = new_data, recompile = TRUE
+  )
+  expect_equal(ncol(up$stan_args$init()$z_1), brms::standata(up)$N_1)
+
+  expect_equal(update_mock(fit1, newdata = new_data, init = 0, recompile = TRUE)$stan_args$init, 0)
+})
+
+test_that("update() configures the prior and the inits with the fit's data2", {
+  skip_on_cran()
+  fit1 <- sdm_fixture()
+  new_data <- fit1$data
+  new_data$ID <- factor(rep(1:3, length.out = nrow(new_data)))
+  A <- diag(3)
+  dimnames(A) <- list(levels(new_data$ID), levels(new_data$ID))
+  formula <- bmf(c ~ 0 + set_size + (1 | gr(ID, cov = A)), kappa ~ 1)
+
+  # the call passes data2
+  up <- update_mock(fit1, formula. = formula, newdata = new_data, data2 = list(A = A))
+  expect_equal(up$data2, list(A = A))
+  expect_equal(dim(up$stan_args$init()$z_1), c(1, 3))
+  # the fit carries it, as brms::update.brmsfit() reads it off object$data2
+  fit1$data2 <- list(A = A)
+  up <- update_mock(fit1, formula. = formula, newdata = new_data)
+  expect_equal(dim(up$stan_args$init()$z_1), c(1, 3))
+})
+
+test_that("update() applies the package step-size default to a fit that had none", {
+  skip_on_cran()
+  withr::local_options(bmm.step_size = 0.02)
+  fit1 <- sdm_fixture()
+  expect_null(fit1$stan_args$control)
+
+  up <- update_mock(fit1)
+  expect_equal(up$stan_args$control, list(step_size = 0.02))
+  up <- update_mock(fit1, control = list(adapt_delta = 0.99))
+  expect_equal(up$stan_args$control, list(adapt_delta = 0.99, step_size = 0.02))
+  up <- update_mock(fit1, control = list(step_size = 0.5))
+  expect_equal(up$stan_args$control, list(step_size = 0.5))
+
+  withr::local_options(bmm.step_size = FALSE)
+  expect_null(update_mock(fit1)$stan_args$control)
+})
+
+test_that("update() keeps the fit's control on the same backend and algorithm only", {
+  object <- list(backend = "cmdstanr", algorithm = "sampling", stan_args = list(
+    control = list(adapt_delta = 0.95)
+  ))
+  expect_equal(carried_control(object, list()), list(adapt_delta = 0.95))
+  expect_equal(carried_control(object, list(backend = "cmdstanr")), list(adapt_delta = 0.95))
+  # brms's rule: the call's keys win, the fit's remaining keys are kept
+  expect_equal(
+    carried_control(object, list(control = list(max_treedepth = 12))),
+    list(adapt_delta = 0.95, max_treedepth = 12)
+  )
+  expect_equal(
+    carried_control(object, list(control = list(adapt_delta = 0.8))),
+    list(adapt_delta = 0.8)
+  )
+  expect_null(carried_control(object, list(backend = "rstan")))
+  expect_null(carried_control(object, list(algorithm = "meanfield")))
+  # brms resolves a missing field to its first choice and then finds it changed
+  no_backend <- object
+  no_backend$backend <- NULL
+  expect_null(carried_control(no_backend, list()))
+  no_algorithm <- object
+  no_algorithm$algorithm <- NULL
+  expect_null(carried_control(no_algorithm, list()))
+})
+
+test_that("a step size in the call replaces the one the fit stored, either spelling", {
+  # configure_control() renames both spellings to the backend's and drops the
+  # duplicate, so a merge by name alone would hand the fit's value the win
+  object <- list(backend = "rstan", algorithm = "sampling",
+                 stan_args = list(control = list(stepsize = 0.01, adapt_delta = 0.95)))
+  expect_equal(carried_control(object, list(control = list(step_size = 0.5))),
+               list(adapt_delta = 0.95, step_size = 0.5))
+  object$stan_args$control <- list(step_size = 0.01)
+  expect_equal(carried_control(object, list(control = list(stepsize = 0.5))),
+               list(stepsize = 0.5))
+})
+
+test_that("update() of a fit with a stored control keeps it next to the step size", {
+  skip_on_cran()
+  withr::local_options(bmm.step_size = 0.02)
+  fit1 <- sdm_fixture()
+  fit1$stan_args$control <- list(adapt_delta = 0.95)
+  # a new backend starts from brms's defaults, as brms::update.brmsfit() does
+  expect_equal(update_mock(fit1)$stan_args$control, list(step_size = 0.02))
+
+  # recompiling keeps brms from reusing the fit's stored stan_args wholesale
+  fit1$backend <- "mock"
+  control <- update_mock(fit1, recompile = TRUE)$stan_args$control
+  expect_equal(control$adapt_delta, 0.95)
+  expect_equal(control$step_size, 0.02)
+
+  # a call that names another key leaves the step size the fit was run with
+  fit1$stan_args$control <- list(step_size = 0.5)
+  control <- update_mock(fit1, recompile = TRUE, control = list(adapt_delta = 0.99))$stan_args$control
+  expect_equal(control$adapt_delta, 0.99)
+  expect_equal(control$step_size, 0.5)
+})
