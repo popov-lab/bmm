@@ -176,7 +176,9 @@ interactive prompt differently than last time forces a refit.</p></dd>
 
 <dt id="arg--">...<a class="anchor" aria-label="anchor" href="#arg--"></a></dt>
 <dd><p>Further arguments passed to <code><a href="https://paulbuerkner.com/brms/reference/brm.html" class="external-link">brms::brm()</a></code> or Stan. See the
-description of <code><a href="https://paulbuerkner.com/brms/reference/brm.html" class="external-link">brms::brm()</a></code> for more details</p></dd>
+description of <code><a href="https://paulbuerkner.com/brms/reference/brm.html" class="external-link">brms::brm()</a></code> for more details. Unless <code>control</code> names a
+<code>step_size</code> (<code>stepsize</code> for the rstan backend), bmm adds the starting step
+size set in <code><a href="bmm_options.html">bmm_options()</a></code> to it; the other entries of <code>control</code> are kept.</p></dd>
 
 </dl></div>
     <div class="section level2">

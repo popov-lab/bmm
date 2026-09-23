@@ -147,7 +147,10 @@ fit_model(
   [`brms::brm()`](https://paulbuerkner.com/brms/reference/brm.html) or
   Stan. See the description of
   [`brms::brm()`](https://paulbuerkner.com/brms/reference/brm.html) for
-  more details
+  more details. Unless `control` names a `step_size` (`stepsize` for the
+  rstan backend), bmm adds the starting step size set in
+  [`bmm_options()`](https://venpopov.com/bmm/dev/reference/bmm_options.md)
+  to it; the other entries of `control` are kept.
 
 ## Value
 

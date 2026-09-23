@@ -54,6 +54,7 @@
 <span>  <span class="va">silent</span>,</span>
 <span>  <span class="va">color_summary</span>,</span>
 <span>  <span class="va">file_refit</span>,</span>
+<span>  <span class="va">step_size</span>,</span>
 <span>  reset_options <span class="op">=</span> <span class="cn">FALSE</span></span>
 <span><span class="op">)</span></span></code></pre></div>
     </div>
@@ -102,6 +103,19 @@ the Stan code and data are unchanged. See <code><a href="bmm.html">bmm()</a></co
 FALSE</strong></p></dd>
 
 
+<dt id="arg-step-size">step_size<a class="anchor" aria-label="anchor" href="#arg-step-size"></a></dt>
+<dd><p>numeric or <code>FALSE</code>. The step size at which <code><a href="bmm.html">bmm()</a></code> and
+<code><a href="https://rdrr.io/r/stats/update.html" class="external-link">update()</a></code> start Stan's step-size search, passed as
+<code>control = list(step_size = )</code> (<code>stepsize</code> for the rstan backend). Stan's
+own starting value of 1 is far above the step sizes the hierarchical
+models in bmm adapt to, and the oversized trial steps of the search print
+<code>lkj_corr_cholesky_lpdf</code> and <code>von_mises_lpdf</code> exceptions at the start of
+warmup. The adapted step size and the posterior do not depend on the
+starting value. <code>FALSE</code> leaves the starting step size to Stan; a
+<code>step_size</code> (or <code>stepsize</code>) in the <code>control</code> list of <code><a href="bmm.html">bmm()</a></code> always wins.
+<strong>Default: 0.01</strong></p></dd>
+
+
 <dt id="arg-reset-options">reset_options<a class="anchor" aria-label="anchor" href="#arg-reset-options"></a></dt>
 <dd><p>logical. If TRUE, the options will be reset to their
 default values <strong>Default: FALSE</strong></p></dd>
@@ -136,6 +150,7 @@ manually using the built-in <code><a href="https://rdrr.io/r/base/options.html" 
 <span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BB00;">  default_priors = TRUE</span></span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BB00;">  silent = 1</span></span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BB00;">  file_refit = FALSE</span></span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BB00;">  step_size = 0.01</span></span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BB00;">  color_summary = TRUE</span></span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> For more information on these options or how to change them, see help(bmm_options).</span>
 <span class="r-in"><span></span></span>
@@ -147,6 +162,7 @@ manually using the built-in <code><a href="https://rdrr.io/r/base/options.html" 
 <span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BB00;">  default_priors = TRUE</span></span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BB00;">  silent = 1</span></span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BB00;">  file_refit = FALSE</span></span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BB00;">  step_size = 0.01</span></span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BB00;">  color_summary = TRUE</span></span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> For more information on these options or how to change them, see help(bmm_options).</span>
 <span class="r-in"><span></span></span>
@@ -158,6 +174,7 @@ manually using the built-in <code><a href="https://rdrr.io/r/base/options.html" 
 <span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BB00;">  default_priors = TRUE</span></span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BB00;">  silent = 1</span></span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BB00;">  file_refit = FALSE</span></span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BB00;">  step_size = 0.01</span></span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BB00;">  color_summary = TRUE</span></span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> For more information on these options or how to change them, see help(bmm_options).</span>
 <span class="r-in"><span></span></span>
@@ -170,6 +187,7 @@ manually using the built-in <code><a href="https://rdrr.io/r/base/options.html" 
 <span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BB00;">  default_priors = TRUE</span></span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BB00;">  silent = 1</span></span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BB00;">  file_refit = FALSE</span></span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BB00;">  step_size = 0.01</span></span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BB00;">  color_summary = TRUE</span></span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> For more information on these options or how to change them, see help(bmm_options).</span>
 <span class="r-in"><span></span></span>
@@ -181,6 +199,7 @@ manually using the built-in <code><a href="https://rdrr.io/r/base/options.html" 
 <span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BB00;">  default_priors = TRUE</span></span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BB00;">  silent = 1</span></span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BB00;">  file_refit = FALSE</span></span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BB00;">  step_size = 0.01</span></span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BB00;">  color_summary = TRUE</span></span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> For more information on these options or how to change them, see help(bmm_options).</span>
 <span class="r-in"><span></span></span>
@@ -193,6 +212,7 @@ manually using the built-in <code><a href="https://rdrr.io/r/base/options.html" 
 <span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BB00;">  default_priors = TRUE</span></span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BB00;">  silent = 1</span></span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BB00;">  file_refit = FALSE</span></span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BB00;">  step_size = 0.01</span></span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BB00;">  color_summary = TRUE</span></span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> For more information on these options or how to change them, see help(bmm_options).</span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/base/on.exit.html" class="external-link">on.exit</a></span><span class="op">(</span><span class="fu">bmm_options</span><span class="op">(</span><span class="va">old_op</span><span class="op">)</span><span class="op">)</span></span></span>
@@ -205,6 +225,7 @@ manually using the built-in <code><a href="https://rdrr.io/r/base/options.html" 
 <span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BB00;">  default_priors = TRUE</span></span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BB00;">  silent = 1</span></span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BB00;">  file_refit = FALSE</span></span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BB00;">  step_size = 0.01</span></span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BB00;">  color_summary = TRUE</span></span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> For more information on these options or how to change them, see help(bmm_options).</span>
 </code></pre></div>

@@ -112,7 +112,8 @@
 <code class="sourceCode R"><span><span class="kw">if</span> <span class="op">(</span><span class="op">!</span><span class="fu"><a href="https://rdrr.io/r/base/ns-load.html" class="external-link">requireNamespace</a></span><span class="op">(</span><span class="st">"remotes"</span><span class="op">)</span><span class="op">)</span> <span class="op">{</span></span>
 <span>  <span class="fu"><a href="https://rdrr.io/r/utils/install.packages.html" class="external-link">install.packages</a></span><span class="op">(</span><span class="st">"remotes"</span><span class="op">)</span></span>
 <span><span class="op">}</span></span>
-<span><span class="fu">remotes</span><span class="fu">::</span><span class="fu"><a href="https://remotes.r-lib.org/reference/install_github.html" class="external-link">install_github</a></span><span class="op">(</span><span class="st">"popov-lab/bmm"</span><span class="op">)</span></span></code></pre></div>
+<span><span class="fu">remotes</span><span class="fu">::</span><span class="fu"><a href="https://remotes.r-lib.org/reference/install_github.html" class="external-link">install_github</a></span><span class="op">(</span><span class="st">"popov-lab/bmm"</span>, upgrade <span class="op">=</span> <span class="st">"never"</span><span class="op">)</span></span></code></pre></div>
+<p><code>upgrade = "never"</code> keeps <code>remotes</code> from updating the packages <code>bmm</code> depends on. Updating <code>Rcpp</code>, <code>StanHeaders</code> or <code>RcppParallel</code> underneath an installed <code>rstan</code> can leave <code>rstan</code> unable to load, in particular on Windows, and <code>brms</code> needs <code>rstan</code> to store the results of every fit, also with the <code>cmdstanr</code> backend.</p>
 </details><details><summary><b>Install the 0.0.1 version of bmm (if following version 6 of the tutorial paper on OSF)</b>
 </summary><p></p>
 <p>The package was significantly updated on Feb 03, 2024. If you are following older versions (earlier than Version 6) of the <a href="https://osf.io/preprints/psyarxiv/umt57" class="external-link">Tutorial preprint</a>, you need to install the 0.0.1 version of the bmm package with:</p>
@@ -120,7 +121,7 @@
 <code class="sourceCode R"><span><span class="kw">if</span> <span class="op">(</span><span class="op">!</span><span class="fu"><a href="https://rdrr.io/r/base/ns-load.html" class="external-link">requireNamespace</a></span><span class="op">(</span><span class="st">"remotes"</span><span class="op">)</span><span class="op">)</span> <span class="op">{</span></span>
 <span>  <span class="fu"><a href="https://rdrr.io/r/utils/install.packages.html" class="external-link">install.packages</a></span><span class="op">(</span><span class="st">"remotes"</span><span class="op">)</span></span>
 <span><span class="op">}</span></span>
-<span><span class="fu">remotes</span><span class="fu">::</span><span class="fu"><a href="https://remotes.r-lib.org/reference/install_github.html" class="external-link">install_github</a></span><span class="op">(</span><span class="st">"popov-lab/bmm@v0.0.1"</span><span class="op">)</span></span></code></pre></div>
+<span><span class="fu">remotes</span><span class="fu">::</span><span class="fu"><a href="https://remotes.r-lib.org/reference/install_github.html" class="external-link">install_github</a></span><span class="op">(</span><span class="st">"popov-lab/bmm@v0.0.1"</span>, upgrade <span class="op">=</span> <span class="st">"never"</span><span class="op">)</span></span></code></pre></div>
 </details>
 </div>
 <div class="section level2">

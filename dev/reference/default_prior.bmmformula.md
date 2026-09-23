@@ -25,6 +25,12 @@ parameter with `dpar` or `nlpar` in
 [`brms::set_prior()`](https://paulbuerkner.com/brms/reference/set_prior.html),
 e.g. `set_prior("exponential(2)", class = "sd", nlpar = "kappa")`.
 
+Correlations among random effects belong to a grouping factor rather
+than to one parameter, so they get a single default for the whole model:
+`lkj(2)` instead of the `lkj(1)` of `brms`, set whenever the model
+estimates a correlation matrix. To override it, use e.g.
+`set_prior("lkj(1)", class = "cor")`.
+
 ## Usage
 
 ``` r

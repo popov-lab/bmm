@@ -94,9 +94,69 @@
   Override by addressing the parameter with `dpar` or `nlpar`,
   e.g. `set_prior("exponential(2)", class = "sd", nlpar = "kappa")`
   ([\#342](https://github.com/popov-lab/bmm/issues/342)).
+- Correlations among random effects now get an `lkj(2)` default prior
+  instead of the uniform `lkj(1)` of `brms`. For two correlated effects
+  this lowers the prior probability of a correlation beyond ±.9 from 10%
+  to 1.45%, so estimated correlations shrink slightly towards zero. The
+  default applies only to models that estimate a correlation matrix, not
+  to `(1 | ID)` or `(x || ID)`. To return to the previous behaviour,
+  pass `prior = set_prior("lkj(1)", class = "cor")`.
+  [`report_priors()`](https://venpopov.com/bmm/dev/reference/report_priors.md)
+  shows the prior as `lkj(2)`, class `cor`, as written in `set_prior()`
+  ([\#417](https://github.com/popov-lab/bmm/issues/417)).
+- [`bmm()`](https://venpopov.com/bmm/dev/reference/bmm.md) now starts
+  every model from tight initial values for its random effects, and
+  **mixture2p**, **mixture3p** and **imm** start their population-level
+  parameters inside the central 50% of their default priors, wherever
+  the predictors can hold the parameter at one value there — a design
+  that cannot, such as `~ 0 + poly(x, 2)`, starts as close as it can;
+  these models and **m3** previously used `init = 1`. This reduces the
+  `lkj_corr_cholesky_lpdf: Random variable[k] is 0`,
+  `von_mises_lpdf: Scale parameter is inf` and `Rejecting initial value`
+  messages at the start of warmup. Posteriors are unaffected. A
+  user-supplied `init` still replaces the bmm default.
+- [`bmm()`](https://venpopov.com/bmm/dev/reference/bmm.md) and
+  [`update()`](https://rdrr.io/r/stats/update.html) now start Stan’s
+  step-size search at 0.01 instead of 1, which further reduces the
+  `lkj_corr_cholesky_lpdf: Random variable[k] is 0` and
+  `von_mises_lpdf: Scale parameter is inf` messages at the start of
+  warmup. The adapted step size and the posterior do not change. A
+  `step_size` (or `stepsize`) in your own `control` list wins, and
+  `bmm_options(step_size = FALSE)` restores Stan’s default for new fits;
+  [`update()`](https://rdrr.io/r/stats/update.html) keeps the step size
+  a fit was run with.
 
 #### Bug fixes
 
+- **sdm** no longer fails before sampling when `mu` is predicted without
+  an intercept
+  (`Initial values for vectors are only specified for b-coefficients, sd and z parameters`).
+  **sdm**, **ddm**, **ezdm** and **cswald** no longer fail with the
+  rstan backend when a parameter has exactly one slope
+  (`no more scalars to read`), nor when their random effects use
+  `gr(..., by = )`.
+- [`report_priors()`](https://venpopov.com/bmm/dev/reference/report_priors.md)
+  no longer fails for a fit whose formula needs `data2`,
+  e.g. `(1 | gr(ID, cov = A))` (`Object 'A' was not found in 'data2'`).
+- [`report_priors()`](https://venpopov.com/bmm/dev/reference/report_priors.md)
+  now names every kind of correlation prior the way `set_prior()`
+  documents it, not only the one on group-level effects. A fit with two
+  or more `me()` terms was reported as class `Lme` with
+  `lkj_corr_cholesky(1)`, brms’s internal spelling, instead of `corme`
+  with `lkj(1)`. The same applied to `rescor`, `lncor` and `cortime`.
+- [`update()`](https://rdrr.io/r/stats/update.html) with `newdata` or a
+  new `formula.` no longer fails before sampling for a model that starts
+  from bmm’s initial values (`no more scalars to read` on rstan,
+  `Fitting failed` on cmdstanr). The initial values are now built for
+  the data and formula the update fits; an `init` passed to
+  [`update()`](https://rdrr.io/r/stats/update.html) still wins
+  ([\#415](https://github.com/popov-lab/bmm/issues/415)).
+- Formulas with `mo()` or `s()` terms no longer start with a partial
+  init list, which made cmdstanr print
+  `Init values were only set for a subset of parameters`.
+  [`extract_parameter_dimensions()`](https://venpopov.com/bmm/dev/reference/extract_parameter_dimensions.md)
+  now reads a declaration sized by an element of a data array, such as
+  `simplex[Jmo_c[1]]`, and simplex parameters get an initial value.
 - `file_refit` no longer accepts a logical that is not a single
   `TRUE`/`FALSE`. `NA`, `logical(0)` and multi-element logicals were
   coerced to `"never"`, so `file_refit = cfg$refit` with a missing or

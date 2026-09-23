@@ -23,7 +23,11 @@ effects. The sd prior is applied as a blanket prior to every random-effects
 standard deviation of that parameter (all grouping factors, intercepts and
 slopes alike) and replaces the student_t(3, 0, 2.5) default of brms. To
 override it, address the parameter with dpar or nlpar in
-brms::set_prior(), e.g. set_prior("exponential(2)", class = "sd", nlpar = "kappa").'><meta property="og:description" content='Obtain the default priors for a Bayesian multilevel measurement
+brms::set_prior(), e.g. set_prior("exponential(2)", class = "sd", nlpar = "kappa").
+Correlations among random effects belong to a grouping factor rather than to
+one parameter, so they get a single default for the whole model: lkj(2)
+instead of the lkj(1) of brms, set whenever the model estimates a
+correlation matrix. To override it, use e.g. set_prior("lkj(1)", class = "cor").'><meta property="og:description" content='Obtain the default priors for a Bayesian multilevel measurement
 model, as well as information for which parameters priors can be specified.
 Given the model, the data and the formula for the model, this
 function will return the default priors that would be used to estimate the
@@ -41,7 +45,11 @@ effects. The sd prior is applied as a blanket prior to every random-effects
 standard deviation of that parameter (all grouping factors, intercepts and
 slopes alike) and replaces the student_t(3, 0, 2.5) default of brms. To
 override it, address the parameter with dpar or nlpar in
-brms::set_prior(), e.g. set_prior("exponential(2)", class = "sd", nlpar = "kappa").'><meta property="og:image" content="https://venpopov.com/bmm/logo.png"><meta name="robots" content="noindex"></head><body>
+brms::set_prior(), e.g. set_prior("exponential(2)", class = "sd", nlpar = "kappa").
+Correlations among random effects belong to a grouping factor rather than to
+one parameter, so they get a single default for the whole model: lkj(2)
+instead of the lkj(1) of brms, set whenever the model estimates a
+correlation matrix. To override it, use e.g. set_prior("lkj(1)", class = "cor").'><meta property="og:image" content="https://venpopov.com/bmm/logo.png"><meta name="robots" content="noindex"></head><body>
     <a href="#main" class="visually-hidden-focusable">Skip to contents</a>
 
 
@@ -97,6 +105,10 @@ standard deviation of that parameter (all grouping factors, intercepts and
 slopes alike) and replaces the <code>student_t(3, 0, 2.5)</code> default of <code>brms</code>. To
 override it, address the parameter with <code>dpar</code> or <code>nlpar</code> in
 <code><a href="https://paulbuerkner.com/brms/reference/set_prior.html" class="external-link">brms::set_prior()</a></code>, e.g. <code>set_prior("exponential(2)", class = "sd", nlpar = "kappa")</code>.</p>
+<p>Correlations among random effects belong to a grouping factor rather than to
+one parameter, so they get a single default for the whole model: <code>lkj(2)</code>
+instead of the <code>lkj(1)</code> of <code>brms</code>, set whenever the model estimates a
+correlation matrix. To override it, use e.g. <code>set_prior("lkj(1)", class = "cor")</code>.</p>
     </div>
 
     <div class="section level2">

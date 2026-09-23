@@ -168,8 +168,7 @@ default_prior(bmf(c ~ 1 + set_size + (1 + set_size | ID), kappa ~ 1 + (1 | ID)),
               data = oberauer_lin_2017,
               model = sdm(resp_error = 'dev_rad'))
 #>                     prior     class      coef group resp  dpar nlpar   lb   ub tag       source
-#>                    lkj(1)       cor                                                     default
-#>                    lkj(1)       cor              ID                                (vectorized)
+#>                    lkj(2)       cor              ID                  <NA> <NA>     (vectorized)
 #>              normal(0, 1)         b set_size2                c       <NA> <NA>     (vectorized)
 #>              normal(0, 1)         b set_size3                c       <NA> <NA>     (vectorized)
 #>              normal(0, 1)         b set_size4                c       <NA> <NA>     (vectorized)
@@ -193,6 +192,7 @@ default_prior(bmf(c ~ 1 + set_size + (1 + set_size | ID), kappa ~ 1 + (1 | ID)),
 #>     student_t(5, 2, 0.75) Intercept                          c       <NA> <NA>             user
 #>            exponential(1)        sd                      kappa       <NA> <NA>             user
 #>  student_t(5, 1.75, 0.75) Intercept                      kappa       <NA> <NA>             user
+#>                    lkj(2)       cor                                  <NA> <NA>             user
 #>               constant(0) Intercept                                  <NA> <NA>             user
 ```
 
@@ -206,6 +206,17 @@ standard deviation of the parameter with `dpar` (for example `mu`, `c`
 and `kappa` in the SDM) or `nlpar` (for example `kappa` and `thetat` in
 the mixture models), as in
 `set_prior("exponential(2)", class = "sd", dpar = "kappa")`.
+
+The correlations among random effects belong to a grouping factor rather
+than to a single parameter. Accordingly, they get one default prior for
+the whole model: `lkj(2)`, the `cor` row in the output above, instead of
+the uniform `lkj(1)` of `brms`. For two correlated effects, `lkj(1)`
+places 10% of its mass on correlations beyond ±.9, whereas `lkj(2)`
+places 1.45% there and 95% within ±.81. The prior thus discounts
+near-perfect correlations without ruling out strong ones. `bmm` sets it
+only when the model estimates a correlation matrix, that is, not for
+`(1 | ID)` or `(1 + set_size || ID)`. To return to the `brms` default,
+use `set_prior("lkj(1)", class = "cor")`.
 
 All of the above examples make an important point - priors are always
 specified on the scale at which the parameters are sampled. You can
