@@ -321,12 +321,12 @@ test_that("cswald slices its decision variable exactly when brms slices the data
 # its own call, so the whole generated call is pinned here for both versions
 cswald_generated_calls <- list(
   simple = c(
-    serial = "cswald_lpdf(Y | mu, drift, bound, ndt, s, dec)",
-    threaded = "cswald_lpdf(Y[start:end] | mu, drift, bound, ndt, s, dec[start:end])"
+    serial = "cswald_lpdf(Y | mu, drift, bound, ndt, s, sndt, dec)",
+    threaded = "cswald_lpdf(Y[start:end] | mu, drift, bound, ndt, s, sndt, dec[start:end])"
   ),
   crisk = c(
-    serial = "cswald_crisk_lpdf(Y | mu, drift, bound, ndt, zr, s, dec)",
-    threaded = "cswald_crisk_lpdf(Y[start:end] | mu, drift, bound, ndt, zr, s, dec[start:end])"
+    serial = "cswald_crisk_lpdf(Y | mu, drift, bound, ndt, zr, s, sndt, dec)",
+    threaded = "cswald_crisk_lpdf(Y[start:end] | mu, drift, bound, ndt, zr, s, sndt, dec[start:end])"
   )
 )
 
@@ -370,6 +370,25 @@ test_that("an explicit threads = NULL beats a global threading option", {
   }
 })
 
+test_that("threading a non-zero sndt indexes the decisions with the sliced row", {
+  skip_on_cran()
+
+  dat <- cswald_data()
+  # a non-zero sndt drops the family back to loop = TRUE and vars = "dec[n]";
+  # brms rewrites that n to the nn it also indexes Y with, so the two stay paired
+  formula <- bmf(drift ~ 1, bound ~ 1, ndt ~ 1, sndt ~ 1)
+
+  for (version in names(cswald_generated_calls)) {
+    code <- suppressWarnings(stancode(
+      formula, dat, cswald(rt = "rt", response = "response", version = version),
+      threads = brms::threading(2)
+    ))
+    expect_match(code, "Y[nn] | mu[n]", fixed = TRUE)
+    expect_match(code, "dec[nn]);", fixed = TRUE)
+    expect_false(grepl("dec[n])", code, fixed = TRUE))
+  }
+})
+
 # -----------------------------------------------------------------------------
 # Integration tests with mock backend
 # -----------------------------------------------------------------------------
@@ -383,6 +402,25 @@ test_that("cswald simple version runs with mock backend", {
 
   expect_silent(
     bmm(formula, dat, model, backend = "mock", mock = 1, rename = FALSE)
+  )
+})
+
+test_that("cswald refuses a negative fixed sndt", {
+  skip_on_cran()
+
+  dat <- rcswald(n = 100, drift = 2, bound = 1.5, ndt = 0.3)
+  model <- cswald(rt = "rt", response = "response")
+
+  expect_error(
+    bmm(bmf(drift ~ 1, bound ~ 1, ndt ~ 1, sndt = -0.1), dat, model,
+      backend = "mock", mock = 1, rename = FALSE
+    ),
+    "cannot be fixed to a negative"
+  )
+  expect_silent(
+    bmm(bmf(drift ~ 1, bound ~ 1, ndt ~ 1, sndt = 0.1), dat, model,
+      backend = "mock", mock = 1, rename = FALSE
+    )
   )
 })
 
@@ -478,21 +516,21 @@ compile_cswald_parity_model <- function(version) {
   crisk <- version == "crisk"
   lpdf <- if (crisk) "cswald_crisk_lpdf" else "cswald_lpdf"
   scalar_args <- if (crisk) {
-    "mu[n], drift[n], bound[n], ndt[n], zr[n], s[n], dec[n]"
+    "mu[n], drift[n], bound[n], ndt[n], zr[n], s[n], sndt[n], dec[n]"
   } else {
-    "mu[n], drift[n], bound[n], ndt[n], s[n], dec[n]"
+    "mu[n], drift[n], bound[n], ndt[n], s[n], sndt[n], dec[n]"
   }
   vector_args <- if (crisk) {
-    "mu, drift, bound, ndt, zr, s, dec"
+    "mu, drift, bound, ndt, zr, s, sndt, dec"
   } else {
-    "mu, drift, bound, ndt, s, dec"
+    "mu, drift, bound, ndt, s, sndt, dec"
   }
   code <- glue(
     "functions {{\n{chunk('cswald_helper_functions.stan')}\n",
     "{chunk(paste0('cswald_', version, '_functions.stan'))}\n}}\n",
     "data {{\n  int N;\n  vector[N] rt;\n  array[N] int dec;\n  vector[N] mu;\n",
     "  vector[N] drift;\n  vector[N] bound;\n  vector[N] ndt;\n  vector[N] s;\n",
-    "  vector<lower=0,upper=1>[N] zr;\n}}\n",
+    "  vector<lower=0,upper=1>[N] zr;\n  vector<lower=0>[N] sndt;\n}}\n",
     "generated quantities {{\n",
     "  real lp_vector = {lpdf}(rt | {vector_args});\n",
     "  vector[N] lp_scalar;\n",
@@ -507,7 +545,7 @@ compile_cswald_parity_model <- function(version) {
 # observations in the two regimes where the survivor leaves its vectorized
 # probability-space path: 2*bound*drift/s^2 in the hundreds, and the deep tail
 # where Phi(-z1) underflows to 0
-cswald_parity_data <- function(n = 200) {
+cswald_parity_data <- function(n = 200, sndt = 0) {
   drift <- runif(n, 0.5, 4)
   bound <- runif(n, 0.5, 2)
   ndt <- runif(n, 0.05, 0.2)
@@ -530,7 +568,8 @@ cswald_parity_data <- function(n = 200) {
     bound = c(bound, bound_ext),
     ndt = c(ndt, ndt_ext),
     s = c(runif(n, 0.7, 1.3), runif(30, 0.9, 1.1)),
-    zr = c(runif(n, 0.2, 0.8), runif(30, 0.3, 0.7))
+    zr = c(runif(n, 0.2, 0.8), runif(30, 0.3, 0.7)),
+    sndt = rep(sndt, n + 30)
   )
 }
 
@@ -551,26 +590,91 @@ test_that("the vectorized cswald likelihood matches the scalar and R versions", 
   withr::local_seed(20260921)
 
   for (version in c("simple", "crisk")) {
-    sdata <- cswald_parity_data()
-    fit <- compile_cswald_parity_model(version)$sample(
-      data = sdata, chains = 1, iter_sampling = 1, fixed_param = TRUE,
-      refresh = 0, show_messages = FALSE, sig_figs = 18, seed = 1
-    )
-    lp_vector <- as.numeric(fit$draws("lp_vector", format = "draws_matrix")[1, 1])
-    lp_scalar <- as.numeric(fit$draws("lp_scalar", format = "draws_matrix")[1, ])
-    lp_r <- with(sdata, .dcswald(rt, dec, drift, bound, ndt, zr, s,
-      version = version, log = TRUE
-    ))
+    model <- compile_cswald_parity_model(version)
+    # sndt = 0 is the closed form the vectorized overload evaluates; sndt > 0
+    # exercises the convolution, including the strip where rt - ndt < sndt
+    for (sndt in c(0, 0.1, 0.3)) {
+      sdata <- cswald_parity_data(sndt = sndt)
+      fit <- model$sample(
+        data = sdata, chains = 1, iter_sampling = 1, fixed_param = TRUE,
+        refresh = 0, show_messages = FALSE, sig_figs = 18, seed = 1
+      )
+      lp_vector <- as.numeric(fit$draws("lp_vector", format = "draws_matrix")[1, 1])
+      lp_scalar <- as.numeric(fit$draws("lp_scalar", format = "draws_matrix")[1, ])
+      lp_r <- with(sdata, .dcswald(rt, dec, drift, bound, ndt, zr, s, sndt,
+        version = version, log = TRUE
+      ))
 
-    # the vectorized overload is what brms compiles; it must reproduce the scalar
-    # likelihood it replaced, and the R mirror used by log_lik()
-    expect_equal(lp_vector, sum(lp_scalar), tolerance = 1e-10)
-    expect_equal(lp_scalar, lp_r, tolerance = 1e-10)
-    # expect_equal() averages the relative difference over the differing
-    # elements, so one bad element next to 229 good ones passes. The floor here
-    # is Stan's Phi(), accurate to ~1e-10 absolute against a 60-digit reference
-    expect_lt(max(abs(lp_scalar - lp_r)), 1e-8)
+      # the scalar overload is what brms compiles once sndt is in play; it must
+      # match the R mirror used by log_lik()
+      expect_equal(lp_scalar, lp_r, tolerance = 1e-8)
+      # expect_equal() averages the relative difference over the differing
+      # elements, so one bad element next to 229 good ones passes. The floor at
+      # sndt = 0 is Stan's Phi(), accurate to ~1e-10 absolute against a 60-digit
+      # reference. With sndt > 0 the censored terms are a difference quotient
+      # of integrated survivors that swald_sndt_lccdf takes down to a relative
+      # difference of 1e-8, so rounding in G is amplified up to 1e8: 1.1e-8
+      # under this seed, 9.1e-8 over 60 seeds, all on censored deep-tail terms
+      expect_lt(max(abs(lp_scalar - lp_r)), if (sndt == 0) 1e-8 else 1e-7)
+      # the vectorized overload is what brms compiles at sndt = 0; it must
+      # reproduce the scalar likelihood it replaced
+      if (sndt == 0) expect_equal(lp_vector, sum(lp_scalar), tolerance = 1e-10)
+    }
   }
+})
+
+# -----------------------------------------------------------------------------
+# sndt: link resolution and family selection
+# -----------------------------------------------------------------------------
+
+test_that("cswald reports the link sndt is actually fixed on, and restores it", {
+  model <- cswald(rt = "rt", response = "response")
+
+  # a fixed value is a constant() on the link scale, so sndt = 0 is only
+  # sndt = 0 under an identity link (s = 0 under its log link means s = 1)
+  expect_equal(model$fixed_parameters$sndt, 0)
+  expect_equal(model$links$sndt, "identity")
+  expect_equal(model$links$s, "log")
+
+  freed <- update_model_fixed_parameters(
+    model, bmf(drift ~ 1, bound ~ 1, ndt ~ 1, sndt ~ 1)
+  )
+  expect_null(freed$fixed_parameters$sndt)
+  expect_equal(freed$links$sndt, "log")
+
+  refixed <- update_model_fixed_parameters(
+    freed, bmf(drift ~ 1, bound ~ 1, ndt ~ 1, sndt = 0)
+  )
+  expect_equal(refixed$links$sndt, "identity")
+})
+
+test_that("a fixed sndt reaches the likelihood on the natural scale", {
+  dat <- cswald_data()
+  model <- cswald(rt = "rt", response = "response")
+  formula <- bmf(drift ~ 1, bound ~ 1, ndt ~ 1, sndt = 0.15)
+
+  model <- check_model(model, dat, formula)
+  config <- configure_model(model, dat, check_formula(model, dat, formula))
+  prior <- configure_prior(model, dat, config$formula, NULL)
+
+  # constant(0.15), not constant(log(0.15)) and not exp(0.15)
+  expect_true(any(grepl("constant(0.15)", prior$prior, fixed = TRUE)))
+  expect_equal(config$formula$family$link_sndt, "identity")
+})
+
+test_that("the vectorized family is chosen by the value of sndt, not its fixedness", {
+  dat <- cswald_data()
+  model <- cswald(rt = "rt", response = "response")
+  configure <- function(f) {
+    m <- check_model(model, dat, f)
+    configure_model(m, dat, check_formula(m, dat, f))$formula$family
+  }
+
+  # only sndt == 0 collapses the likelihood to the closed form the vectorized
+  # overload evaluates; a non-zero constant is still a convolution
+  expect_false(configure(bmf(drift ~ 1, bound ~ 1, ndt ~ 1))$loop)
+  expect_true(configure(bmf(drift ~ 1, bound ~ 1, ndt ~ 1, sndt = 0.15))$loop)
+  expect_true(configure(bmf(drift ~ 1, bound ~ 1, ndt ~ 1, sndt ~ 1))$loop)
 })
 
 test_that("the cswald survivor keeps a finite gradient where Phi() nears underflow", {
