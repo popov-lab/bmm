@@ -47,7 +47,17 @@
 #' @param group Character. Optional grouping variable for faceting. For
 #'   non-multinomial models, passed to [brms::pp_check()]; when specified, the
 #'   grouped variant of `type` (e.g., `"dens_overlay_grouped"`) is auto-selected
-#'   if available. For multinomial models, facets by the named predictor.
+#'   if available. For multinomial models, facets by the named predictor. For
+#'   the [sdt_rating()] model `group` defaults to the `stimulus` variable so the
+#'   signal and noise rating distributions are checked separately; pass
+#'   `group = NA` to pool them into a single profile. The [sdt_ranking()] model
+#'   shows the rank positions as the categories of the proportion profile; for
+#'   mixed set sizes, pass the set-size column as `group` so each facet has a
+#'   homogeneous denominator. The custom-family
+#'   models [sdt_yn()] and [sdt_mafc()] delegate to [brms::pp_check()]; for
+#'   their aggregated counts an overlaid empirical CDF (`type = "ecdf_overlay"`,
+#'   adding `group = "stimulus"` for [sdt_yn()]) is usually clearer than the
+#'   default bar view.
 #' @param resp_var Character. For models that declare several observables,
 #'   the name of the observable to check, or `"all"` for a panel of all
 #'   available checks built from one shared simulation. See [pp_check_vars()]
@@ -109,6 +119,7 @@ pp_check.bmmfit <- function(object, type = NULL, ndraws = NULL,
   }
 
   if (identical(family(object)$family, "multinomial")) {
+    group <- .pp_check_resolve_group(object, group)
     return(.pp_check_multinomial(object, type = type, ndraws = ndraws %||% 100L,
                                  group = group, ...))
   }
@@ -128,6 +139,21 @@ pp_check.bmmfit <- function(object, type = NULL, ndraws = NULL,
   if (name %in% as.character(bayesplot::available_ppc(""))) {
     get(name, asNamespace("bayesplot"))
   }
+}
+
+
+# Resolve the multinomial pp_check grouping. sdt_rating defaults to faceting by
+# stimulus (signal vs noise — the meaningful SDT check); group = NA is the
+# explicit "pool everything" opt-out. Other multinomial models (e.g. m3) keep
+# the user-supplied group (NULL = pool).
+.pp_check_resolve_group <- function(object, group) {
+  if (length(group) == 1L && is.na(group)) {
+    return(NULL)
+  }
+  if (is.null(group) && inherits(object$bmm$model, "sdt_rating")) {
+    return(object$bmm$model$other_vars$stimulus)
+  }
+  group
 }
 
 

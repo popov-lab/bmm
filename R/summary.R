@@ -102,6 +102,7 @@ print.bmmsummary <- function(x, digits = 2, color = getOption("bmm.color_summary
       cat("\n")
     }
   }
+  for (note in summary_notes(x$model, x)) cat(note, "\n\n", sep = "")
 
   cat(paste0("Draws were sampled using ", x$sampler, ". "))
   if (x$algorithm == "sampling") {
@@ -141,6 +142,17 @@ select_pars <- function(x) {
 # models such as gumbel-min sdt_ranking (d ~ 1) (#369).
 .summary_fixed_rows <- function(fixed, pars) {
   fixed[sub("_.*$", "", rownames(fixed)) %in% pars, , drop = FALSE]
+}
+
+# Model-specific remarks printed below the coefficient tables, for facts about
+# the estimates that the table itself cannot show
+summary_notes <- function(model, x) {
+  UseMethod("summary_notes")
+}
+
+#' @export
+summary_notes.default <- function(model, x) {
+  NULL
 }
 
 summarise_links <- function(links) {

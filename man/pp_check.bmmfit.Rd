@@ -31,7 +31,17 @@ passed to \code{\link[brms:pp_check]{brms::pp_check()}}.}
 \item{group}{Character. Optional grouping variable for faceting. For
 non-multinomial models, passed to \code{\link[brms:pp_check]{brms::pp_check()}}; when specified, the
 grouped variant of \code{type} (e.g., \code{"dens_overlay_grouped"}) is auto-selected
-if available. For multinomial models, facets by the named predictor.}
+if available. For multinomial models, facets by the named predictor. For
+the \code{\link[=sdt_rating]{sdt_rating()}} model \code{group} defaults to the \code{stimulus} variable so the
+signal and noise rating distributions are checked separately; pass
+\code{group = NA} to pool them into a single profile. The \code{\link[=sdt_ranking]{sdt_ranking()}} model
+shows the rank positions as the categories of the proportion profile; for
+mixed set sizes, pass the set-size column as \code{group} so each facet has a
+homogeneous denominator. The custom-family
+models \code{\link[=sdt_yn]{sdt_yn()}} and \code{\link[=sdt_mafc]{sdt_mafc()}} delegate to \code{\link[brms:pp_check]{brms::pp_check()}}; for
+their aggregated counts an overlaid empirical CDF (\code{type = "ecdf_overlay"},
+adding \code{group = "stimulus"} for \code{\link[=sdt_yn]{sdt_yn()}}) is usually clearer than the
+default bar view.}
 
 \item{resp_var}{Character. For models that declare several observables,
 the name of the observable to check, or \code{"all"} for a panel of all
