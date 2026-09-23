@@ -134,7 +134,7 @@ real swald_gint(real x, real drift, real bound, real sigma) {
   real q = exp(2 * bound * drift / sigma_sq + swald_log_Phi(z2));
   real m1;
 
-  if (abs(drift) < 1e-6 * sigma_sq / bound) {
+  if (abs(drift) < 3e-8 * sigma_sq / bound) {
     // mu = bound / drift diverges as drift -> 0 while the Phi-bracket vanishes;
     // use the exact drift = 0 limit of M1 instead of the 0 * inf cancellation
     real w = bound / (sigma * sqrt_x);

@@ -1134,8 +1134,10 @@ validate_cswald_parameters <- function(drift, bound, ndt, zr, s, sndt = 0) {
 .cancellation_tol <- 1e-8
 
 # |drift| below this multiple of s^2 / bound is treated as the exact zero-drift
-# limit, where bound / drift would otherwise diverge against a vanishing bracket
-.zero_drift_tol <- 1e-6
+# limit, where bound / drift would otherwise diverge against a vanishing
+# bracket. The two formulas cross here: below it the limit is the more accurate
+# of the pair, above it the general form is
+.zero_drift_tol <- 3e-8
 
 # Stable log-space helpers mirroring the Stan functions of the same name. The
 # naive forms log(1 - exp(x)) and log(exp(a) - exp(b)) cancel catastrophically

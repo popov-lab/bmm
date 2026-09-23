@@ -844,6 +844,30 @@ test_that(".gwald handles nonpositive x and is continuous around drift = 0", {
   }
 })
 
+test_that(".gwald switches branches where the zero-drift limit becomes the better one", {
+  x <- 2
+  bound <- 0.5
+  s <- 1
+  d_switch <- .zero_drift_tol * s^2 / bound
+  g_num <- function(drift) {
+    stats::integrate(
+      function(u) .pwald(u, drift, bound, s, lower.tail = FALSE, log.p = FALSE),
+      lower = 0, upper = x, rel.tol = 1e-13
+    )$value
+  }
+  # the two formulas must agree where the code swaps them, from either side
+  for (sign in c(1, -1)) {
+    jump <- .gwald(x, sign * d_switch * (1 - 1e-9), bound, s) -
+      .gwald(x, sign * d_switch * (1 + 1e-9), bound, s)
+    expect_lt(abs(jump) / g_num(sign * d_switch), 3e-8)
+  }
+  # just above the switch the general formula must be the one in use: the
+  # limit formula is already off by 3.9e-7 relative at |drift| = 1e-7
+  for (drift in c(1e-7, -1e-7)) {
+    expect_lt(abs(.gwald(x, drift, bound, s) - g_num(drift)) / g_num(drift), 1e-8)
+  }
+})
+
 test_that("dcswald with sndt stays finite and monotone in the far tail", {
   rt <- seq(5, 40, by = 5)
   for (resp in c(0, 1)) {
