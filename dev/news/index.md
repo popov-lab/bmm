@@ -247,6 +247,26 @@
   `exponential(4)` on random-effects SDs. `mu`/`mu1` stay fixed at 0 by
   default, so this only affects models that free them
   ([\#306](https://github.com/popov-lab/bmm/issues/306)).
+- The **cswald** model no longer rejects extreme response times at high
+  drift rates. Its likelihood returned `NaN` there, which the sampler
+  reported as *“Log probability evaluates to log(0)”* or as divergent
+  transitions, and could bias the posterior for data with long tails.
+  Fits of such data change; refit to benefit
+  ([\#387](https://github.com/popov-lab/bmm/issues/387)).
+- Passing `threads = NULL` while `options(brms.threads = )` is set no
+  longer produces Stan code that fails to compile
+  (`Identifier 'start' not in scope`) for the **sdm** and **cswald**
+  models. `threads = NULL` now turns parallelization off, as it does in
+  `brms`.
+
+#### Other changes
+
+- The **cswald** likelihood now evaluates all observations in one call
+  instead of one at a time. This makes fitting faster, improves the
+  accuracy of the gradients the sampler uses, and adds support for
+  within-chain parallelization: `bmm(..., threads = 2)` now works for
+  **cswald** as it does for **sdm**. The posterior is unchanged
+  ([\#387](https://github.com/popov-lab/bmm/issues/387)).
 
 ## bmm 1.3.2
 
