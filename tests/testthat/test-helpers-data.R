@@ -163,7 +163,8 @@ test_that("check_data() returns a data.frame()", {
     mean_rt_upper = rep(0.45, 50), mean_rt_lower = rep(0.55, 50),
     var_rt_upper = rep(0.018, 50), var_rt_lower = rep(0.025, 50),
     rt = rep(0.6, 50), response = rep(1, 50),
-    stimulus = rep(c(0L, 1L), 25), rank1 = rep(30L, 50), rank2 = rep(20L, 50)
+    stimulus = rep(c(0L, 1L), 25), rank1 = rep(30L, 50), rank2 = rep(20L, 50),
+    new1 = rep(30L, 50), know2 = rep(10L, 50), remember2 = rep(10L, 50)
   )
   for (ml in mls) {
     model <- ml(
@@ -177,6 +178,11 @@ test_that("check_data() returns a data.frame()", {
     # `response` column shared by the other count models.
     if (inherits(model, "sdt_ranking")) {
       model <- ml(response = c("rank1", "rank2"), m = 2)
+    }
+    # sdt_cdp derives its count columns (new1/know2/remember2) from the
+    # declared scale size instead of a response argument.
+    if (inherits(model, "sdt_cdp")) {
+      model <- ml(response = "", stimulus = "stimulus", n_new = 1, n_old = 1)
     }
     expect_s3_class(
       check_data(model, test_data, bmf(kappa ~ 1)),

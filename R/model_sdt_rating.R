@@ -10,8 +10,13 @@
 
 # Parameter spec for one threshold parameterization. parsimonious/equidistant
 # need a single spacing; log_distance/log_ratio need K-2 distance deltas;
-# softmax needs spacing plus K-3 allocation deltas.
-.sdt_threshold_parameter_parts <- function(n_ratings, threshold_type) {
+# softmax needs spacing plus K-3 allocation deltas. `anchor` is the threshold
+# index that carries no delta (it sits at the criterion); it defaults to the
+# same middle threshold the builders skip ((K - 1) %/% 2 + 1, so delta labels
+# name the threshold they control for odd K); sdt_cdp passes its old/new
+# boundary (n_new) instead.
+.sdt_threshold_parameter_parts <- function(n_ratings, threshold_type,
+                                           anchor = (n_ratings - 1L) %/% 2L + 1L) {
   parameters <- list()
   default_priors <- list()
   param_links <- list()
@@ -27,11 +32,8 @@
     param_links$spacing <- "identity"
   } else if (threshold_type %in% c("log_distance", "log_ratio")) {
     n_deltas <- n_ratings - 2L
-    # skip the same middle threshold as the builders ((K - 1) %/% 2 + 1), so
-    # the delta labels name the threshold they control for odd K
-    mid <- (n_ratings - 1L) %/% 2L + 1L
     for (i in seq_len(n_deltas)) {
-      idx <- if (i < mid) i else i + 1L
+      idx <- if (i < anchor) i else i + 1L
       pname <- paste0("delta", idx)
       parameters[[pname]] <- glue("Threshold parameter for threshold {idx}")
       default_priors[[pname]] <- list(
