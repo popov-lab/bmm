@@ -902,6 +902,16 @@ test_that("range_coefficients() puts the linear predictor at the target on every
   expect_equal(predictor(stats::model.matrix(~ 0 + x + f, dat), FALSE), rep(target, 12))
   expect_equal(predictor(stats::model.matrix(~ 0 + f:x, dat), FALSE), rep(target, 12))
   expect_equal(predictor(stats::model.matrix(~ 1 + f, dat), TRUE), rep(target, 12))
+
+  # f:x above is a relabelled cell-means design because f and x are perfectly
+  # aligned in dat; genuinely crossed factors cannot reach a constant, the same
+  # orthogonality property as the poly() case below
+  crossed <- expand.grid(f = factor(1:3), x = 1:4)
+  X <- stats::model.matrix(~ 0 + f:x, crossed)
+  b <- range_coefficients(X, target, centered = FALSE)
+  expect_false(isTRUE(all.equal(as.vector(X %*% b), rep(target, nrow(crossed)))))
+  expect_equal(as.vector(t(X) %*% (X %*% b - target)), rep(0, ncol(X)))
+
   # a 0 + Intercept design matrix has no assign attribute
   X <- stats::model.matrix(~ 1 + f, dat)
   attr(X, "assign") <- NULL
