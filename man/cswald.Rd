@@ -135,7 +135,10 @@ fast-dm centers the same uniform on its \code{t0}, which is then the mean.
 \code{sndt} is fixed at 0 by default, which reproduces the standard censored
 shifted Wald model. Estimate it with a formula (\code{bmf(..., sndt ~ 1)}) or
 fix it in seconds (\code{bmf(..., sndt = 0.15)}); fixed values are on the
-natural scale, and \code{sndt} uses the log link only once it is estimated.
+natural scale, and \code{sndt} uses the log link only once it is estimated. A
+negative fixed value is an error. \code{update()} carries a non-zero \code{sndt}
+forward: a formula that omits it leaves the stored value in place, so
+pass \code{sndt = 0} explicitly to return to the model without variability.
 
 Without \code{sndt}, the fastest responses cap the \code{ndt} estimate (the
 likelihood requires \code{ndt < min(rt)}), which biases \code{ndt}, \code{drift}, and
@@ -150,8 +153,12 @@ non-decision time instead of sharing one draw per trial. Choice
 probabilities agree exactly with the shared-draw model at \code{zr = 0.5}; away
 from it they differ by up to ~1 percentage point at \code{sndt = 0.3} (~4 at
 \code{zr = 0.2}), and densities by up to ~10\%. \code{posterior_predict()} simulates
-through \code{\link[rtdists:rdiffusion]{rtdists::rdiffusion()}}, which shares the draw, so \code{pp_check()}
-compares against a slightly different model whenever \code{zr} departs from 0.5.
+through \code{\link[rtdists:rdiffusion]{rtdists::rdiffusion()}}, so for \code{"crisk"} \code{pp_check()} compares
+the data against the diffusion the race approximates rather than against
+the fitted likelihood -- at drift 1, bound 1.6, \code{zr = 0.5} the two differ
+by 7 percentage points in P(upper) (0.832 vs 0.899), at any \code{sndt}. That
+each accumulator draws its own non-decision time adds a smaller
+difference on top.
 }
 
 \section{Estimating \code{sndt} in the "crisk" version at substantial error rates}{

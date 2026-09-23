@@ -168,7 +168,10 @@
 #'   `sndt` is fixed at 0 by default, which reproduces the standard censored
 #'   shifted Wald model. Estimate it with a formula (`bmf(..., sndt ~ 1)`) or
 #'   fix it in seconds (`bmf(..., sndt = 0.15)`); fixed values are on the
-#'   natural scale, and `sndt` uses the log link only once it is estimated.
+#'   natural scale, and `sndt` uses the log link only once it is estimated. A
+#'   negative fixed value is an error. `update()` carries a non-zero `sndt`
+#'   forward: a formula that omits it leaves the stored value in place, so
+#'   pass `sndt = 0` explicitly to return to the model without variability.
 #'
 #'   Without `sndt`, the fastest responses cap the `ndt` estimate (the
 #'   likelihood requires `ndt < min(rt)`), which biases `ndt`, `drift`, and
@@ -183,8 +186,12 @@
 #'   probabilities agree exactly with the shared-draw model at `zr = 0.5`; away
 #'   from it they differ by up to ~1 percentage point at `sndt = 0.3` (~4 at
 #'   `zr = 0.2`), and densities by up to ~10%. `posterior_predict()` simulates
-#'   through [rtdists::rdiffusion()], which shares the draw, so `pp_check()`
-#'   compares against a slightly different model whenever `zr` departs from 0.5.
+#'   through [rtdists::rdiffusion()], so for `"crisk"` `pp_check()` compares
+#'   the data against the diffusion the race approximates rather than against
+#'   the fitted likelihood -- at drift 1, bound 1.6, `zr = 0.5` the two differ
+#'   by 7 percentage points in P(upper) (0.832 vs 0.899), at any `sndt`. That
+#'   each accumulator draws its own non-decision time adds a smaller
+#'   difference on top.
 #'
 #' @section Estimating `sndt` in the "crisk" version at substantial error rates:
 #'
