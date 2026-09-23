@@ -9,7 +9,8 @@ real swald_log_diff_exp(real a, real b) {
 // whereas std_normal_lcdf's gradient is an approximation (relative error up to
 // ~1e-4). The lcdf takes over below 1e-300 (z < ~-37.0), not only where Phi
 // rounds to 0: near underflow the reverse pass multiplies an adjoint by 1 / p,
-// which overflows once p nears 1e-308
+// which overflows once p nears 1e-308. The approximate gradient below the
+// crossover is accepted as the price of a finite one
 real swald_log_Phi(real z) {
   real p = Phi(z);
   return p >= 1e-300 ? log(p) : std_normal_lcdf(z | );
