@@ -395,9 +395,40 @@ test_that("errors on missing dims where required", {
   expect_error(parse_parameters_line("corr_matrix Omega;"), "Missing dimensions")
 })
 
-test_that("errors on unknown base type or missing name", {
-  expect_error(parse_parameters_line("weird_type[3] x;"), "Unknown or unsupported")
+test_that("errors on a missing name", {
   expect_error(parse_parameters_line("real<lower=0>;"), "Missing parameter name")
+})
+
+test_that("a declaration of an unmodelled type is named but left without a type", {
+  # legal Stan that this parser does not model, plus a type Stan does not have
+  declarations <- c(
+    "sum_to_zero_vector[K] beta;", "complex z;", "complex_vector[N] cv;",
+    "tuple(real, vector[N]) tv;", "weird_type[3] x;"
+  )
+  for (declaration in declarations) {
+    out <- parse_parameters_line(declaration)
+    expect_identical(out$type, NA_character_)
+    expect_identical(out$types, NA_character_)
+    expect_identical(out$dims, NA_character_)
+    expect_null(out$bounds)
+  }
+  expect_identical(
+    vapply(lapply(declarations, parse_parameters_line), `[[`, character(1), "name"),
+    c("beta", "z", "cv", "tv", "x")
+  )
+})
+
+test_that("one unmodelled declaration does not cost the rest of the block", {
+  block <- "
+    vector[K] b_kappa;
+    sum_to_zero_vector[K] beta;
+    real<lower=0> sd_1;
+  "
+  res <- extract_parameter_dimensions(block)
+
+  expect_identical(names(res), c("b_kappa", "beta", "sd_1"))
+  expect_identical(res$b_kappa$dims, "K")
+  expect_identical(res$sd_1$bounds$lower, "0")
 })
 
 test_that("empty/comment-only lines error out clearly", {
@@ -456,6 +487,23 @@ test_that("strips trailing comments but keeps code", {
   expect_identical(res$p$bounds$upper, "1")
   expect_identical(res$r$type, "row_vector")
   expect_identical(res$r$dims, "J")
+})
+
+test_that("a size that indexes a data array keeps its brackets", {
+  mo <- parse_parameters_line("simplex[Jmo_c[1]] simo_c_1;")
+  expect_identical(mo$name, "simo_c_1")
+  expect_identical(mo$type, "simplex")
+  expect_identical(mo$dims, "Jmo_c[1]")
+
+  s <- parse_parameters_line("vector[knots_kappa_1[1]] zs_kappa_1_1;")
+  expect_identical(s$name, "zs_kappa_1_1")
+  expect_identical(s$dims, "knots_kappa_1[1]")
+
+  nested <- parse_parameters_line("array[J[1], N] matrix<lower=0>[M[2], K] A;")
+  expect_identical(nested$name, "A")
+  expect_identical(nested$dims, c("J[1]", "N", "M[2]", "K"))
+  expect_identical(nested$types, c("array", "matrix"))
+  expect_identical(nested$bounds$lower, "0")
 })
 
 test_that("robust to Windows-style CRLF line endings", {

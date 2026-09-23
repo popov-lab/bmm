@@ -317,18 +317,76 @@ test_that("cswald slices its decision variable exactly when brms slices the data
   })
 })
 
-test_that("threaded stancode pairs the sliced response with the sliced decisions", {
+# stanc accepts a call with two vector dpars swapped, and the parity test builds
+# its own call, so the whole generated call is pinned here for both versions
+cswald_generated_calls <- list(
+  simple = c(
+    serial = "cswald_lpdf(Y | mu, drift, bound, ndt, s, sndt, dec)",
+    threaded = "cswald_lpdf(Y[start:end] | mu, drift, bound, ndt, s, sndt, dec[start:end])"
+  ),
+  crisk = c(
+    serial = "cswald_crisk_lpdf(Y | mu, drift, bound, ndt, zr, s, sndt, dec)",
+    threaded = "cswald_crisk_lpdf(Y[start:end] | mu, drift, bound, ndt, zr, s, sndt, dec[start:end])"
+  )
+)
+
+test_that("the generated cswald call pairs the sliced response with the sliced decisions", {
   skip_on_cran()
 
   dat <- cswald_data()
-  code <- suppressWarnings(stancode(
-    bmf(drift ~ 1, bound ~ 1, ndt ~ 1), dat,
-    cswald(rt = "rt", response = "response", version = "simple"),
-    threads = brms::threading(2)
-  ))
+  formula <- bmf(drift ~ 1, bound ~ 1, ndt ~ 1)
 
-  expect_match(code, "cswald_lpdf(Y[start:end] |", fixed = TRUE)
-  expect_match(code, "dec[start:end]);", fixed = TRUE)
+  for (version in names(cswald_generated_calls)) {
+    model <- cswald(rt = "rt", response = "response", version = version)
+    expect_match(
+      suppressWarnings(stancode(formula, dat, model)),
+      cswald_generated_calls[[version]][["serial"]],
+      fixed = TRUE
+    )
+    expect_match(
+      suppressWarnings(stancode(formula, dat, model, threads = brms::threading(2))),
+      cswald_generated_calls[[version]][["threaded"]],
+      fixed = TRUE
+    )
+  }
+})
+
+test_that("an explicit threads = NULL beats a global threading option", {
+  skip_on_cran()
+
+  dat <- cswald_data()
+  formula <- bmf(drift ~ 1, bound ~ 1, ndt ~ 1)
+
+  # brms reads threads = NULL as "threading off" and generates serial code, so
+  # the family must not slice its decisions even though the option is set
+  withr::local_options(brms.threads = brms::threading(2))
+  for (version in names(cswald_generated_calls)) {
+    code <- suppressWarnings(stancode(
+      formula, dat, cswald(rt = "rt", response = "response", version = version),
+      threads = NULL
+    ))
+    expect_match(code, cswald_generated_calls[[version]][["serial"]], fixed = TRUE)
+    expect_false(grepl("start:end", code, fixed = TRUE))
+  }
+})
+
+test_that("threading a non-zero sndt indexes the decisions with the sliced row", {
+  skip_on_cran()
+
+  dat <- cswald_data()
+  # a non-zero sndt drops the family back to loop = TRUE and vars = "dec[n]";
+  # brms rewrites that n to the nn it also indexes Y with, so the two stay paired
+  formula <- bmf(drift ~ 1, bound ~ 1, ndt ~ 1, sndt ~ 1)
+
+  for (version in names(cswald_generated_calls)) {
+    code <- suppressWarnings(stancode(
+      formula, dat, cswald(rt = "rt", response = "response", version = version),
+      threads = brms::threading(2)
+    ))
+    expect_match(code, "Y[nn] | mu[n]", fixed = TRUE)
+    expect_match(code, "dec[nn]);", fixed = TRUE)
+    expect_false(grepl("dec[n])", code, fixed = TRUE))
+  }
 })
 
 # -----------------------------------------------------------------------------
@@ -504,6 +562,14 @@ test_that("the vectorized cswald likelihood matches the scalar and R versions", 
   "CmdStan not installed"
   )
 
+  # seeded so a failure reproduces. Under this seed the log-space fallback,
+  # with both clamp conditions firing, takes 23 survivor terms for simple and 7
+  # for crisk. Over seeds 1-200 the floor was 13 for simple and 6 for crisk
+  # (below 13 in 170 of 200 seeds); neither version dropped to 0. Re-measuring
+  # needs this loop's draw order, not two cswald_parity_data() calls in a row:
+  # $sample() consumes two uniforms, so crisk draws from a shifted stream
+  withr::local_seed(20260921)
+
   for (version in c("simple", "crisk")) {
     model <- compile_cswald_parity_model(version)
     # sndt = 0 is the closed form the vectorized overload evaluates; sndt > 0
@@ -523,6 +589,11 @@ test_that("the vectorized cswald likelihood matches the scalar and R versions", 
       # the scalar overload is what brms compiles once sndt is in play; it must
       # match the R mirror used by log_lik()
       expect_equal(lp_scalar, lp_r, tolerance = 1e-8)
+      # expect_equal() averages the relative difference over the differing
+      # elements, so one bad element next to 229 good ones passes. The floor at
+      # sndt = 0 is Stan's Phi(), accurate to ~1e-10 absolute against a 60-digit
+      # reference; the convolution adds its own quadrature error on top
+      expect_lt(max(abs(lp_scalar - lp_r)), if (sndt == 0) 1e-8 else 1e-6)
       # the vectorized overload is what brms compiles at sndt = 0; it must
       # reproduce the scalar likelihood it replaced
       if (sndt == 0) expect_equal(lp_vector, sum(lp_scalar), tolerance = 1e-10)
@@ -582,4 +653,78 @@ test_that("the vectorized family is chosen by the value of sndt, not its fixedne
   expect_false(configure(bmf(drift ~ 1, bound ~ 1, ndt ~ 1))$loop)
   expect_true(configure(bmf(drift ~ 1, bound ~ 1, ndt ~ 1, sndt = 0.15))$loop)
   expect_true(configure(bmf(drift ~ 1, bound ~ 1, ndt ~ 1, sndt ~ 1))$loop)
+})
+
+test_that("the cswald survivor keeps a finite gradient where Phi() nears underflow", {
+  skip_on_cran()
+  skip_if_not(requireNamespace("cmdstanr", quietly = TRUE), "cmdstanr not available")
+  skip_if_not(nzchar(Sys.getenv("CMDSTAN", unset = "")) ||
+    !is.null(tryCatch(cmdstanr::cmdstan_path(), error = function(e) NULL)),
+  "CmdStan not installed"
+  )
+
+  sc_path <- system.file("stan_chunks", package = "bmm")
+  file <- file.path(tempdir(), "bmm_cswald_surv_grad.stan")
+  writeLines(c(
+    "functions {", read_lines2(file.path(sc_path, "cswald_helper_functions.stan")), "}",
+    "data { int N; vector[N] t; vector[N] drift0; vector[N] bound; vector[N] s; }",
+    "parameters { real shift; }",
+    "model { target += sum(swald_log_surv_vec(t, drift0 + shift, bound, s)); }"
+  ), file)
+  model <- cmdstanr::cmdstan_model(file)
+
+  # Phi(-z1) sits just above its underflow at -37.5: 1 / Phi(z2) overflows in the
+  # first case, and the survivor difference is subnormal in the second. Both go
+  # through the recompute loop, so a shared parameter inherits their gradient
+  sdata <- list(
+    N = 3, t = c(2.7870782702230001, 0.5, 1),
+    drift0 = c(22.120998953469002, 54.447222151364002, 2),
+    bound = c(0.44479261357337002, 0.70710678118655002, 1),
+    s = c(0.99227269766852, 1, 1)
+  )
+  # CmdStan rejects a point with a non-finite gradient, which makes cmdstanr
+  # error; the huge `error` threshold keeps finite-difference noise in this deep
+  # tail from failing the run on its own
+  grad <- model$diagnose(
+    data = sdata, init = list(list(shift = 0)), error = 1e6, seed = 1
+  )$gradients()
+
+  expect_true(all(is.finite(grad$model)))
+})
+
+test_that("swald_log_Phi keeps a finite gradient on its own where Phi() nears underflow", {
+  skip_on_cran() # compiles a Stan program
+  skip_if_not(requireNamespace("cmdstanr", quietly = TRUE), "cmdstanr not available")
+  skip_if_not(nzchar(Sys.getenv("CMDSTAN", unset = "")) ||
+    !is.null(tryCatch(cmdstanr::cmdstan_path(), error = function(e) NULL)),
+  "CmdStan not installed"
+  )
+
+  sc_path <- system.file("stan_chunks", package = "bmm")
+  file <- file.path(tempdir(), "bmm_cswald_log_phi_grad.stan")
+  writeLines(c(
+    "functions {", read_lines2(file.path(sc_path, "cswald_helper_functions.stan")), "}",
+    "data { real z0; real weight; }",
+    "parameters { real shift; }",
+    "model { target += weight * swald_log_Phi(z0 + shift); }"
+  ), file)
+  model <- cmdstanr::cmdstan_model(file)
+
+  # swald_log_surv redirects these points before swald_log_Phi sees them, so
+  # the test above cannot tell whether swald_log_Phi's own crossover holds; the
+  # callers that #406 adds are not behind that guard. Stan's Phi(-37.3) is
+  # 8.2e-305, below the 1e-300 crossover and above the -37.5 cutoff where Phi()
+  # returns 0. The weight stands in for the adjoint the callers pass down,
+  # which swald_log_surv scales by up to 1 / 1e-300: with a unit adjoint,
+  # 1 / Phi(z) still fits in a double and log(Phi(z)) would pass here. The
+  # multiplier that overflows scales with Phi(z), so this z is a mild case:
+  # 1.5e4 here against about 8 for a caller landing at the -37.5 cutoff
+  grad <- model$diagnose(
+    data = list(z0 = -37.3, weight = 1e6), # adjoint stand-in
+    init = list(list(shift = 0)),
+    error = 1e6, # finite-difference tolerance, unrelated to the weight
+    seed = 1
+  )$gradients()
+
+  expect_true(all(is.finite(grad$model)))
 })

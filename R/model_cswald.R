@@ -25,11 +25,11 @@
       sndt = 0
     ),
     priors = list(
-      drift = list(main = "normal(0,1)", effects = "normal(0,0.3)"),
-      bound = list(main = "normal(0,0.3)", effects = "normal(0,0.3)"),
-      ndt = list(main = "normal(-2,0.3)", effects = "normal(0,0.3)"),
-      s = list(main = "normal(0,0.3)", effects = "normal(0,0.2)"),
-      sndt = list(main = "normal(-2.5,1)", effects = "normal(0,0.3)")
+      drift = list(main = "normal(0,1)", effects = "normal(0,0.3)", sd = "exponential(2)"),
+      bound = list(main = "normal(0,0.3)", effects = "normal(0,0.3)", sd = "exponential(2)"),
+      ndt = list(main = "normal(-2,0.3)", effects = "normal(0,0.3)", sd = "exponential(2)"),
+      s = list(main = "normal(0,0.3)", effects = "normal(0,0.2)", sd = "exponential(2)"),
+      sndt = list(main = "normal(-2.5,1)", effects = "normal(0,0.3)", sd = "exponential(2)")
     ),
     init_ranges = list(
       mu = c(-0.5, 0.5),
@@ -65,12 +65,12 @@
       sndt = 0
     ),
     priors = list(
-      drift = list(main = "normal(0,1)", effects = "normal(0,0.5)"),
-      bound = list(main = "normal(0,0.3)", effects = "normal(0,0.3)"),
-      ndt = list(main = "normal(-2,0.3)", effects = "normal(0,0.3)"),
-      zr = list(main = "normal(0,0.3)", effects = "normal(0,0.2)"),
-      s = list(main = "normal(0,0.5)", effects = "normal(0,0.2)"),
-      sndt = list(main = "normal(-2.5,1)", effects = "normal(0,0.3)")
+      drift = list(main = "normal(0,1)", effects = "normal(0,0.5)", sd = "exponential(1)"),
+      bound = list(main = "normal(0,0.3)", effects = "normal(0,0.3)", sd = "exponential(2)"),
+      ndt = list(main = "normal(-2,0.3)", effects = "normal(0,0.3)", sd = "exponential(2)"),
+      zr = list(main = "normal(0,0.3)", effects = "normal(0,0.2)", sd = "exponential(2)"),
+      s = list(main = "normal(0,0.5)", effects = "normal(0,0.2)", sd = "exponential(2)"),
+      sndt = list(main = "normal(-2.5,1)", effects = "normal(0,0.3)", sd = "exponential(2)")
     ),
     init_ranges = list(
       mu = c(-0.5, 0.5),
@@ -387,19 +387,13 @@ bmf2bf.cswald <- function(model, formula) {
 #
 # brms slices Y per thread but pastes a custom family's `vars` in unsliced, so
 # under threading the family must emit "dec[start:end]" itself. start/end only
-# exist in threaded Stan code, and threading(force = TRUE) compiles threaded but
-# keeps the serial likelihood, so slice only when brms will really thread.
+# exist inside partial_log_lik, so the decisions are sliced only where brms
+# really threads (see brms_slices_likelihood)
 cswald_family_args <- function(model) {
   if (!isTRUE(model$fixed_parameters[["sndt"]] == 0)) {
     return(list(loop = TRUE, vars = "dec[n]"))
   }
-  threads <- getOption("brms.threads", NULL)
-  # brms also accepts a bare number for this option
-  if (is.numeric(threads)) {
-    threads <- brms::threading(threads)
-  }
-  threaded <- is.list(threads) && isTRUE(threads$threads > 0) && !isTRUE(threads$force)
-  list(loop = FALSE, vars = if (threaded) "dec[start:end]" else "dec")
+  list(loop = FALSE, vars = if (brms_slices_likelihood()) "dec[start:end]" else "dec")
 }
 
 #' @export
