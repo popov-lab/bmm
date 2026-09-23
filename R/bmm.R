@@ -69,7 +69,9 @@
 #'   `options(bmm.sort_data = )`): under the default `"check"`, answering the
 #'   interactive prompt differently than last time forces a refit.
 #' @param ... Further arguments passed to [brms::brm()] or Stan. See the
-#'   description of [brms::brm()] for more details
+#'   description of [brms::brm()] for more details. Unless `control` names a
+#'   `step_size` (`stepsize` for the rstan backend), bmm adds the starting step
+#'   size set in [bmm_options()] to it; the other entries of `control` are kept.
 #'
 #' @details # Supported Models
 #'
@@ -161,13 +163,21 @@ bmm <- function(formula, data, model,
   config_args <- configure_model(model, data, formula)
 
   # configure the default prior and combine with user-specified prior
-  prior <- configure_prior(model, data, config_args$formula, prior)
+  frame_args <- brms_frame_args(dots)
+  prior <- brms::do_call(configure_prior, c(list(model, data, config_args$formula, prior), frame_args))
 
-  # configure initial values if necessary
-  config_args$init <- create_initfun(model, data, config_args$formula)
+  # configure initial values; the prior decides which parameters exist
+  config_args$init <- brms::do_call(
+    create_initfun, c(list(model, data, config_args$formula, prior), frame_args)
+  )
 
   # estimate the model
   fit_args <- combine_args(nlist(config_args, opts, dots, prior))
+  fit_args$control <- configure_control(
+    fit_args$control,
+    opts$backend %||% getOption("brms.backend", "rstan"),
+    fit_args$algorithm %||% getOption("brms.algorithm", "sampling")
+  )
 
   if (file_refit == "on_change") {
     x <- try_read_bmmfit(file)

@@ -475,3 +475,63 @@ test_that("softmax and softmaxinv work with example from documentation", {
   recovered <- softmaxinv(result, ref_position = 1, ref_value = 5)
   expect_equal(recovered, 5:7, tolerance = 1e-10)
 })
+
+test_that("configure_control() adds the starting step size under the user's control list", {
+  withr::local_options(bmm.step_size = 0.1)
+  expect_equal(configure_control(NULL, "cmdstanr"), list(step_size = 0.1))
+  expect_equal(
+    configure_control(list(adapt_delta = 0.95), "cmdstanr"),
+    list(adapt_delta = 0.95, step_size = 0.1)
+  )
+  # the user's own value wins under either spelling, renamed to the backend's
+  expect_equal(configure_control(list(step_size = 0.5), "cmdstanr"), list(step_size = 0.5))
+  expect_equal(configure_control(list(stepsize = 0.5), "cmdstanr"), list(step_size = 0.5))
+  # rstan spells the argument without the underscore
+  expect_equal(configure_control(NULL, "rstan"), list(stepsize = 0.1))
+  expect_equal(configure_control(list(stepsize = 0.5), "rstan"), list(stepsize = 0.5))
+  expect_equal(
+    configure_control(list(adapt_delta = 0.9, step_size = 0.5), "rstan"),
+    list(adapt_delta = 0.9, stepsize = 0.5)
+  )
+  # both spellings in one list would become two identical keys; the first wins
+  expect_equal(
+    configure_control(list(step_size = 0.5, stepsize = 0.2), "rstan"),
+    list(stepsize = 0.5)
+  )
+  # only the sampler has a step size
+  for (algorithm in c("meanfield", "fullrank", "pathfinder", "laplace", "fixed_param")) {
+    expect_null(configure_control(NULL, "cmdstanr", algorithm), label = algorithm)
+  }
+  expect_equal(configure_control(list(adapt_delta = 0.9), "cmdstanr", "meanfield"), list(adapt_delta = 0.9))
+
+  withr::local_options(bmm.step_size = 0.02)
+  expect_equal(configure_control(NULL, "cmdstanr"), list(step_size = 0.02))
+
+  withr::local_options(bmm.step_size = FALSE)
+  expect_null(configure_control(NULL, "cmdstanr"))
+  expect_equal(configure_control(list(adapt_delta = 0.95), "cmdstanr"), list(adapt_delta = 0.95))
+})
+
+test_that("fit_frame_args() keeps the fit's frame arguments unless the call replaces them", {
+  data <- structure(data.frame(y = 1), knots = list(x = 1:3))
+  fit <- list(data = data, data2 = list(A = 1))
+  expect_equal(fit_frame_args(fit), list(data2 = list(A = 1), knots = list(x = 1:3), drop_unused_levels = TRUE))
+  replaced <- fit_frame_args(fit, list(data2 = list(A = 2), drop_unused_levels = FALSE, iter = 10))
+  expect_equal(replaced, list(data2 = list(A = 2), knots = list(x = 1:3), drop_unused_levels = FALSE))
+})
+
+test_that("bmm_options(step_size = ) validates and applies the option", {
+  withr::defer(suppressMessages(bmm_options(reset_options = TRUE)))
+  expect_error(bmm_options(step_size = -1), "step_size")
+  expect_error(bmm_options(step_size = "a"), "step_size")
+  expect_error(bmm_options(step_size = c(0.1, 0.2)), "step_size")
+  expect_error(bmm_options(step_size = Inf), "step_size")
+  # NA raises R's own error in the condition, which ends the block, so it goes last
+  expect_error(bmm_options(step_size = NA_real_), "step_size")
+  expect_message(bmm_options(step_size = 0.3), "step_size = 0.3")
+  expect_equal(getOption("bmm.step_size"), 0.3)
+  suppressMessages(bmm_options(step_size = FALSE))
+  expect_false(getOption("bmm.step_size"))
+  suppressMessages(bmm_options(reset_options = TRUE))
+  expect_equal(getOption("bmm.step_size"), 0.01)
+})

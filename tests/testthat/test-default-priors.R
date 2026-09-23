@@ -314,6 +314,89 @@ test_that("bmm.default_priors = FALSE also disables the sd defaults", {
   expect_false("exponential(1)" %in% pr$prior)
 })
 
+cor_default <- function(pr) {
+  pr[pr$class == "cor" & pr$group == "", ]$prior
+}
+
+test_that("correlated random effects get an lkj(2) default on their correlations", {
+  data <- oberauer_lin_2017
+  model <- mixture2p("dev_rad")
+
+  pr <- default_prior(bmf(kappa ~ set_size + (set_size | ID), thetat ~ 1), data, model)
+  expect_equal(cor_default(pr), "lkj(2)")
+
+  pr <- default_prior(bmf(kappa ~ 0 + set_size + (0 + set_size | ID), thetat ~ 1), data, model)
+  expect_equal(cor_default(pr), "lkj(2)")
+
+  # an ID shared across parameters builds one correlation matrix out of two intercepts
+  pr <- default_prior(bmf(kappa ~ 1 + (1 | q | ID), thetat ~ 1 + (1 | q | ID)), data, model)
+  expect_equal(cor_default(pr), "lkj(2)")
+})
+
+test_that("no cor prior is emitted for a model without a correlation matrix", {
+  data <- oberauer_lin_2017
+  model <- mixture2p("dev_rad")
+  no_cor <- list(
+    intercept_only = bmf(kappa ~ 1 + (1 | ID), thetat ~ 1),
+    uncorrelated = bmf(kappa ~ set_size + (set_size || ID), thetat ~ 1),
+    separate_parameters = bmf(kappa ~ 1 + (1 | ID), thetat ~ 1 + (1 | ID)),
+    no_ranef = bmf(kappa ~ 1, thetat ~ 1)
+  )
+
+  for (formula in no_cor) {
+    expect_false(any(default_prior(formula, data, model)$class == "cor"))
+  }
+
+  # brms rejects priors on non-existent parameters only when the model is built
+  for (formula in no_cor[c("intercept_only", "uncorrelated")]) {
+    expect_no_error(bmm(formula, data, model, backend = "mock", mock_fit = 1, rename = FALSE))
+  }
+})
+
+test_that("the lkj default reaches the Stan code and yields to a user prior", {
+  data <- oberauer_lin_2017
+  model <- mixture2p("dev_rad")
+  formula <- bmf(kappa ~ set_size + (set_size | ID), thetat ~ 1)
+
+  fit <- bmm(formula, data, model, backend = "mock", mock_fit = 1, rename = FALSE)
+  expect_match(brms::stancode(fit), "lkj_corr_cholesky_lpdf(L_1 | 2)", fixed = TRUE)
+
+  fit <- bmm(formula, data, model,
+    prior = brms::prior_("lkj(4)", class = "cor"),
+    backend = "mock", mock_fit = 1, rename = FALSE
+  )
+  # a fitted object stores the row as class "L", so the Stan code is the evidence
+  expect_match(brms::stancode(fit), "lkj_corr_cholesky_lpdf(L_1 | 4)", fixed = TRUE)
+  expect_no_match(brms::stancode(fit), "lkj_corr_cholesky_lpdf(L_1 | 2)", fixed = TRUE)
+})
+
+test_that("a fit's stored correlation prior replaces the cor default on a refit", {
+  data <- oberauer_lin_2017
+  model <- mixture2p("dev_rad")
+  formula <- bmf(kappa ~ set_size + (set_size | ID), thetat ~ 1)
+  fit <- bmm(formula, data, model,
+    prior = brms::prior_("lkj(4)", class = "cor"),
+    backend = "mock", mock_fit = 1, rename = FALSE
+  )
+
+  # update() feeds the stored prior back as the user prior, and a fit stores the
+  # row as class "L": next to a "cor" default brms sees a duplicated prior
+  expect_true("L" %in% fit$prior$class)
+  refit <- bmm(formula, data, model,
+    prior = fit$prior,
+    backend = "mock", mock_fit = 1, rename = FALSE
+  )
+  expect_match(brms::stancode(refit), "lkj_corr_cholesky_lpdf(L_1 | 4)", fixed = TRUE)
+})
+
+test_that("bmm.default_priors = FALSE also disables the cor default", {
+  withr::local_options(bmm.default_priors = FALSE)
+  pr <- default_prior(
+    bmf(kappa ~ set_size + (set_size | ID), thetat ~ 1), oberauer_lin_2017, mixture2p("dev_rad")
+  )
+  expect_equal(cor_default(pr), "lkj(1)")
+})
+
 sd_default <- function(pr, par) {
   rows <- sd_rows(pr)
   rows[rows$nlpar == par | rows$dpar == par, ]$prior

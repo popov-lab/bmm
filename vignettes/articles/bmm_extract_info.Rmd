@@ -147,6 +147,16 @@ example `mu`, `c` and `kappa` in the SDM) or `nlpar` (for example `kappa` and
 `thetat` in the mixture models), as in
 `set_prior("exponential(2)", class = "sd", dpar = "kappa")`.
 
+The correlations among random effects belong to a grouping factor rather than to
+a single parameter. Accordingly, they get one default prior for the whole model:
+`lkj(2)`, the `cor` row in the output above, instead of the uniform `lkj(1)` of
+`brms`. For two correlated effects, `lkj(1)` places 10% of its mass on
+correlations beyond ±.9, whereas `lkj(2)` places 1.45% there and 95% within
+±.81. The prior thus discounts near-perfect correlations without ruling out
+strong ones. `bmm` sets it only when the model estimates a correlation matrix,
+that is, not for `(1 | ID)` or `(1 + set_size || ID)`. To return to the `brms`
+default, use `set_prior("lkj(1)", class = "cor")`.
+
 All of the above examples make an important point - priors are always specified
 on the scale at which the parameters are sampled. You can always check the
 documentation for a given model to see the links for the parameters (e.g.

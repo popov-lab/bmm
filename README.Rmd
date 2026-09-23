@@ -89,8 +89,13 @@ Alternatively, you can install the development version of the package or a speci
 if (!requireNamespace("remotes")) {
   install.packages("remotes")
 }
-remotes::install_github("popov-lab/bmm")
+remotes::install_github("popov-lab/bmm", upgrade = "never")
 ```
+
+`upgrade = "never"` keeps `remotes` from updating the packages `bmm` depends on.
+Updating `Rcpp`, `StanHeaders` or `RcppParallel` underneath an installed `rstan`
+can leave `rstan` unable to load, in particular on Windows, and `brms` needs
+`rstan` to store the results of every fit, also with the `cmdstanr` backend.
 
 </details>
 
@@ -108,7 +113,7 @@ the 0.0.1 version of the bmm package with:
 if (!requireNamespace("remotes")) {
   install.packages("remotes")
 }
-remotes::install_github("popov-lab/bmm@v0.0.1")
+remotes::install_github("popov-lab/bmm@v0.0.1", upgrade = "never")
 ```
 
 </details>
