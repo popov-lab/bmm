@@ -317,18 +317,38 @@ test_that("cswald slices its decision variable exactly when brms slices the data
   })
 })
 
-test_that("threaded stancode pairs the sliced response with the sliced decisions", {
+# stanc accepts a call with two vector dpars swapped, and the parity test builds
+# its own call, so the whole generated call is pinned here for both versions
+cswald_generated_calls <- list(
+  simple = c(
+    serial = "cswald_lpdf(Y | mu, drift, bound, ndt, s, dec)",
+    threaded = "cswald_lpdf(Y[start:end] | mu, drift, bound, ndt, s, dec[start:end])"
+  ),
+  crisk = c(
+    serial = "cswald_crisk_lpdf(Y | mu, drift, bound, ndt, zr, s, dec)",
+    threaded = "cswald_crisk_lpdf(Y[start:end] | mu, drift, bound, ndt, zr, s, dec[start:end])"
+  )
+)
+
+test_that("the generated cswald call pairs the sliced response with the sliced decisions", {
   skip_on_cran()
 
   dat <- cswald_data()
-  code <- suppressWarnings(stancode(
-    bmf(drift ~ 1, bound ~ 1, ndt ~ 1), dat,
-    cswald(rt = "rt", response = "response", version = "simple"),
-    threads = brms::threading(2)
-  ))
+  formula <- bmf(drift ~ 1, bound ~ 1, ndt ~ 1)
 
-  expect_match(code, "cswald_lpdf(Y[start:end] |", fixed = TRUE)
-  expect_match(code, "dec[start:end]);", fixed = TRUE)
+  for (version in names(cswald_generated_calls)) {
+    model <- cswald(rt = "rt", response = "response", version = version)
+    expect_match(
+      suppressWarnings(stancode(formula, dat, model)),
+      cswald_generated_calls[[version]][["serial"]],
+      fixed = TRUE
+    )
+    expect_match(
+      suppressWarnings(stancode(formula, dat, model, threads = brms::threading(2))),
+      cswald_generated_calls[[version]][["threaded"]],
+      fixed = TRUE
+    )
+  }
 })
 
 # -----------------------------------------------------------------------------
@@ -503,6 +523,11 @@ test_that("the vectorized cswald likelihood matches the scalar and R versions", 
   "CmdStan not installed"
   )
 
+  # seeded so a failure reproduces. Under this seed 23 of the censored
+  # observations take the log-space fallback and both clamp conditions fire;
+  # across 200 seeds that count never fell below 13
+  withr::local_seed(20260921)
+
   for (version in c("simple", "crisk")) {
     sdata <- cswald_parity_data()
     fit <- compile_cswald_parity_model(version)$sample(
@@ -519,6 +544,10 @@ test_that("the vectorized cswald likelihood matches the scalar and R versions", 
     # likelihood it replaced, and the R mirror used by log_lik()
     expect_equal(lp_vector, sum(lp_scalar), tolerance = 1e-10)
     expect_equal(lp_scalar, lp_r, tolerance = 1e-10)
+    # expect_equal() averages the relative difference over the differing
+    # elements, so one bad element next to 229 good ones passes. The floor here
+    # is Stan's Phi(), accurate to ~1e-10 absolute against a 60-digit reference
+    expect_lt(max(abs(lp_scalar - lp_r)), 1e-8)
   }
 })
 
