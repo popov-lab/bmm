@@ -683,12 +683,24 @@ test_that("ezdm_4par_lpdf has the right gradient at and around zero drift", {
   model <- cmdstanr::cmdstan_model(cmdstanr::write_stan_file(program, dir = dir), quiet = TRUE)
   cmdstanr::write_stan_json(list(N = length(drift), mrt = mrt, vrt = vrt), file.path(dir, "data.json"))
   cmdstanr::write_stan_json(lapply(pars, rep_len, length(drift)), file.path(dir, "pars.json"))
-  status <- system2(model$exe_file(), c(
+  # On Windows the executable loads tbb.dll at startup, and CmdStan's makefile
+  # copies that dll next to it only when TBB was absent from PATH at link time.
+  # cmdstanr has it on PATH whenever it builds or runs a model, so launching
+  # the executable ourselves has to put it there too
+  run_path <- if (.Platform$OS.type == "windows") {
+    c(
+      getFromNamespace("toolchain_PATH_env_var", "cmdstanr")(),
+      getFromNamespace("tbb_path", "cmdstanr")()
+    )
+  }
+  status <- withr::with_path(run_path, system2(model$exe_file(), c(
     "method=log_prob", paste0("constrained_params=", file.path(dir, "pars.json")), "jacobian=0",
     "data", paste0("file=", file.path(dir, "data.json")),
     "output", paste0("file=", file.path(dir, "out.csv")), "sig_figs=17"
-  ), stdout = FALSE, stderr = FALSE)
-  expect_equal(status, 0)
+  ), stdout = FALSE, stderr = file.path(dir, "stderr.txt")))
+  expect_equal(status, 0, info = paste(
+    readLines(file.path(dir, "stderr.txt"), warn = FALSE), collapse = "\n"
+  ))
   stan_gradient <- matrix(
     as.numeric(utils::read.csv(file.path(dir, "out.csv"), comment.char = "#")[1, -1]),
     ncol = length(pars), dimnames = list(NULL, names(pars))
