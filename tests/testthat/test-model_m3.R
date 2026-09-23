@@ -248,7 +248,7 @@ test_that("m3 custom accepts softplus links and generates default priors", {
     for (par in c("c", "a")) {
       expect_equal(
         fit$bmm$model$default_priors[[par]],
-        list(main = softplus_main[[rule]], effects = "normal(0, 0.5)")
+        list(main = softplus_main[[rule]], effects = "normal(0, 0.5)", sd = "exponential(1)")
       )
     }
   }
