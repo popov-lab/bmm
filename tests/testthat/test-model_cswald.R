@@ -521,3 +521,40 @@ test_that("the vectorized cswald likelihood matches the scalar and R versions", 
     expect_equal(lp_scalar, lp_r, tolerance = 1e-10)
   }
 })
+
+test_that("the cswald survivor keeps a finite gradient where Phi() nears underflow", {
+  skip_on_cran()
+  skip_if_not(requireNamespace("cmdstanr", quietly = TRUE), "cmdstanr not available")
+  skip_if_not(nzchar(Sys.getenv("CMDSTAN", unset = "")) ||
+    !is.null(tryCatch(cmdstanr::cmdstan_path(), error = function(e) NULL)),
+  "CmdStan not installed"
+  )
+
+  sc_path <- system.file("stan_chunks", package = "bmm")
+  file <- file.path(tempdir(), "bmm_cswald_surv_grad.stan")
+  writeLines(c(
+    "functions {", read_lines2(file.path(sc_path, "cswald_helper_functions.stan")), "}",
+    "data { int N; vector[N] t; vector[N] drift0; vector[N] bound; vector[N] s; }",
+    "parameters { real shift; }",
+    "model { target += sum(swald_log_surv_vec(t, drift0 + shift, bound, s)); }"
+  ), file)
+  model <- cmdstanr::cmdstan_model(file)
+
+  # Phi(-z1) sits just above its underflow at -37.5: 1 / Phi(z2) overflows in the
+  # first case, and the survivor difference is subnormal in the second. Both go
+  # through the recompute loop, so a shared parameter inherits their gradient
+  sdata <- list(
+    N = 3, t = c(2.7870782702230001, 0.5, 1),
+    drift0 = c(22.120998953469002, 54.447222151364002, 2),
+    bound = c(0.44479261357337002, 0.70710678118655002, 1),
+    s = c(0.99227269766852, 1, 1)
+  )
+  # CmdStan rejects a point with a non-finite gradient, which makes cmdstanr
+  # error; the huge `error` threshold keeps finite-difference noise in this deep
+  # tail from failing the run on its own
+  grad <- model$diagnose(
+    data = sdata, init = list(list(shift = 0)), error = 1e6, seed = 1
+  )$gradients()
+
+  expect_true(all(is.finite(grad$model)))
+})

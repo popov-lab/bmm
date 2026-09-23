@@ -7,21 +7,24 @@ real swald_log_diff_exp(real a, real b) {
 
 // log(Phi(z)) with an exact derivative: Phi's derivative is the normal density,
 // whereas std_normal_lcdf's gradient is an approximation (relative error up to
-// ~1e-4). The lcdf is used only where Phi rounds to 0 (z < ~-37.5)
+// ~1e-4). The lcdf takes over below 1e-300 (z < ~-37.0), not only where Phi
+// rounds to 0: near underflow the reverse pass multiplies an adjoint by 1 / p,
+// which overflows once p nears 1e-308
 real swald_log_Phi(real z) {
   real p = Phi(z);
-  return p > 0 ? log(p) : std_normal_lcdf(z | );
+  return p >= 1e-300 ? log(p) : std_normal_lcdf(z | );
 }
 
 // log shifted Wald survivor S = Phi(-z1) - exp(log_c) * Phi(z2), with
 // z1 = (drift*t - bound) / (sigma*sqrt(t)), z2 = -(drift*t + bound) / (sigma*sqrt(t)),
 // log_c = 2*bound*drift/sigma^2. Computed in probability space for the exact
 // derivative (see swald_log_Phi); exp(log_c)*Phi(z2) <= Phi(-z1) <= 1, so the
-// exp cannot overflow. The log-space form takes over when the difference
-// underflows or rounds to <= 0
+// exp cannot overflow. The log-space form takes over below 1e-300, where
+// 1 / surv overflows for a subnormal difference, matching the recompute
+// condition in swald_log_surv_vec
 real swald_log_surv(real z1, real z2, real log_c) {
   real surv = Phi(-z1) - exp(log_c + swald_log_Phi(z2));
-  if (surv <= 0) {
+  if (surv < 1e-300) {
     return swald_log_diff_exp(std_normal_lcdf(-z1 | ),
                               log_c + std_normal_lcdf(z2 | ));
   }
