@@ -634,10 +634,14 @@ test_that("swald_log_Phi keeps a finite gradient on its own where Phi() nears un
   # 8.2e-305, below the 1e-300 crossover and above the -37.5 cutoff where Phi()
   # returns 0. The weight stands in for the adjoint the callers pass down,
   # which swald_log_surv scales by up to 1 / 1e-300: with a unit adjoint,
-  # 1 / Phi(z) still fits in a double and log(Phi(z)) would pass here
+  # 1 / Phi(z) still fits in a double and log(Phi(z)) would pass here. The
+  # multiplier that overflows scales with Phi(z), so this z is a mild case:
+  # 1.5e4 here against about 8 for a caller landing at the -37.5 cutoff
   grad <- model$diagnose(
-    data = list(z0 = -37.3, weight = 1e6), init = list(list(shift = 0)),
-    error = 1e6, seed = 1
+    data = list(z0 = -37.3, weight = 1e6), # adjoint stand-in
+    init = list(list(shift = 0)),
+    error = 1e6, # finite-difference tolerance, unrelated to the weight
+    seed = 1
   )$gradients()
 
   expect_true(all(is.finite(grad$model)))
