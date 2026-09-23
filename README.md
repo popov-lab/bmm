@@ -63,9 +63,7 @@ install the dependencies. If you are already using `brms`, you can skip
 this step.
 
 <details>
-
 <summary>
-
 <b> Install dependencies</b>
 </summary>
 
@@ -86,9 +84,7 @@ this step.
 package or a specific version of the package from GitHub:
 
 <details>
-
 <summary>
-
 <b>Install the latest development version of bmm</b>
 </summary>
 
@@ -98,15 +94,18 @@ package or a specific version of the package from GitHub:
 if (!requireNamespace("remotes")) {
   install.packages("remotes")
 }
-remotes::install_github("popov-lab/bmm")
+remotes::install_github("popov-lab/bmm", upgrade = "never")
 ```
 
+`upgrade = "never"` keeps `remotes` from updating the packages `bmm`
+depends on. Updating `Rcpp`, `StanHeaders` or `RcppParallel` underneath
+an installed `rstan` can leave `rstan` unable to load, in particular on
+Windows, and `brms` needs `rstan` to store the results of every fit,
+also with the `cmdstanr` backend.
+
 </details>
-
 <details>
-
 <summary>
-
 <b>Install the 0.0.1 version of bmm (if following version 6 of the
 tutorial paper on OSF)</b>
 </summary>
@@ -122,7 +121,7 @@ the 0.0.1 version of the bmm package with:
 if (!requireNamespace("remotes")) {
   install.packages("remotes")
 }
-remotes::install_github("popov-lab/bmm@v0.0.1")
+remotes::install_github("popov-lab/bmm@v0.0.1", upgrade = "never")
 ```
 
 </details>
