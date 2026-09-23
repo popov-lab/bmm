@@ -158,22 +158,25 @@ glue_lf <- function(..., env.frame = -1) {
   brms::lf(stats::as.formula(glue(..., .envir = sys.frame(env.frame))))
 }
 
-# function to ensure that if the user wants to overwrite an argument (such as
-# init), they can. args$prior is NULL by default or is a user-provided prior
-# any argument in args$dots is potentially overwrite a default argument in config_args
+# args$prior is NULL by default or is the combined default and user-provided
+# prior; args$dots holds whatever the user passed to bmm() and so overwrites the
+# configured default for any argument (such as init) they named themselves
 combine_args <- function(args) {
   config_args <- args$config_args
   dots <- args$dots
   stopif("family" %in% names(dots), "Unsupported argument 'family'. Use the model argument instead.")
   config_args$prior <- args$prior %||% config_args$prior
-  config_args$init <- args$init %||% config_args$init
   config_args[names(dots)] <- dots
   c(config_args, args$opts)
 }
 
 local_brms_threads <- function(dots) {
-  if (!is.null(dots$threads)) {
-    threads <- dots$threads
+  # brms reads an explicit threads = NULL as "threading off", so it has to
+  # override a global brms.threads here too, the way update.bmmfit() does it.
+  # Testing only for a non-NULL value left the option standing while brms
+  # generated serial code ("Identifier 'start' not in scope")
+  if ("threads" %in% names(dots)) {
+    threads <- dots$threads %||% brms::threading(NULL)
     if (is.numeric(threads)) {
       threads <- brms::threading(threads)
     }
@@ -183,6 +186,20 @@ local_brms_threads <- function(dots) {
     )
   }
   invisible(NULL)
+}
+
+# brms slices the response per thread but pastes a custom family's `vars` in
+# unsliced, and it emits sliced Stan code only when it will really thread:
+# threading(force = TRUE) compiles with threads but keeps the serial likelihood.
+# A model that slices its own likelihood chunk or `vars` therefore has to apply
+# the same test brms does in use_threading(threads, force = FALSE)
+brms_slices_likelihood <- function() {
+  threads <- getOption("brms.threads", NULL)
+  # brms also accepts a bare number for this option
+  if (is.numeric(threads)) {
+    threads <- brms::threading(threads)
+  }
+  is.list(threads) && isTRUE(threads$threads > 0) && !isTRUE(threads$force)
 }
 
 ############################
