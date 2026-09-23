@@ -351,6 +351,25 @@ test_that("the generated cswald call pairs the sliced response with the sliced d
   }
 })
 
+test_that("an explicit threads = NULL beats a global threading option", {
+  skip_on_cran()
+
+  dat <- cswald_data()
+  formula <- bmf(drift ~ 1, bound ~ 1, ndt ~ 1)
+
+  # brms reads threads = NULL as "threading off" and generates serial code, so
+  # the family must not slice its decisions even though the option is set
+  withr::local_options(brms.threads = brms::threading(2))
+  for (version in names(cswald_generated_calls)) {
+    code <- suppressWarnings(stancode(
+      formula, dat, cswald(rt = "rt", response = "response", version = version),
+      threads = NULL
+    ))
+    expect_match(code, cswald_generated_calls[[version]][["serial"]], fixed = TRUE)
+    expect_false(grepl("start:end", code, fixed = TRUE))
+  }
+})
+
 # -----------------------------------------------------------------------------
 # Integration tests with mock backend
 # -----------------------------------------------------------------------------

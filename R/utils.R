@@ -172,8 +172,12 @@ combine_args <- function(args) {
 }
 
 local_brms_threads <- function(dots) {
-  if (!is.null(dots$threads)) {
-    threads <- dots$threads
+  # brms reads an explicit threads = NULL as "threading off", so it has to
+  # override a global brms.threads here too, the way update.bmmfit() does it.
+  # Testing only for a non-NULL value left the option standing while brms
+  # generated serial code ("Identifier 'start' not in scope")
+  if ("threads" %in% names(dots)) {
+    threads <- dots$threads %||% brms::threading(NULL)
     if (is.numeric(threads)) {
       threads <- brms::threading(threads)
     }
