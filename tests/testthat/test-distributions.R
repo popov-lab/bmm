@@ -926,6 +926,28 @@ test_that("dcswald with sndt is continuous across the strip boundary", {
   )
 })
 
+test_that("dcswald with sndt stays accurate just above the strip", {
+  # bound^2 / (2 s^2 sndt) = 100, so F_W(sndt) ~ e^-100 and the survivors on
+  # both sides of the window round to 1: the survivor difference is empty here
+  # while the CDF difference still carries the density
+  drift <- 2
+  bound <- 2
+  ndt <- 0.3
+  sndt <- 0.02
+  rt <- ndt + c(0.021, 0.03, 0.05)
+  ref <- vapply(rt, function(t) {
+    c0 <- .dwald(t - ndt, drift, bound, 1)
+    c0 + log(stats::integrate(
+      function(u) exp(.dwald(u, drift, bound, 1) - c0),
+      lower = t - ndt - sndt, upper = t - ndt, rel.tol = 1e-12
+    )$value / sndt)
+  }, numeric(1))
+  expect_equal(
+    dcswald(rt, 1, drift, bound, ndt, sndt = sndt), ref,
+    tolerance = 1e-6
+  )
+})
+
 test_that("log_diff_exp returns -Inf instead of NaN when b >= a", {
   expect_identical(log_diff_exp(-5, -5), -Inf)
   expect_identical(log_diff_exp(-6, -5), -Inf)

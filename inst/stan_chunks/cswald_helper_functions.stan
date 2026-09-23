@@ -180,14 +180,30 @@ real swald_sndt_lpdf(real rt, real drift, real bound, real ndt, real sndt, real 
 
   real surv_early = swald_lccdf(rt | drift, bound, ndt + sndt, sigma);
   real surv_late = swald_lccdf(rt | drift, bound, ndt, sigma);
-
-  // for defective (negative-drift) accumulators both survivors converge to the
-  // same constant in the deep tail and their difference cancels; the midpoint
-  // rule (second order in sndt) is stable there
-  if (surv_early - surv_late < 1e-8) {
-    return swald_lpdf(rt | drift, bound, ndt + sndt / 2, sigma);
+  if (surv_early - surv_late >= 1e-8) {
+    return swald_log_diff_exp(surv_early, surv_late) - log(sndt);
   }
-  return swald_log_diff_exp(surv_early, surv_late) - log(sndt);
+
+  // the survivors have rounded to the same value. Just above the strip they
+  // have both rounded to 1 while the CDFs still carry the digits, and the CDF
+  // difference is continuous with the strip formula at t1 = sndt
+  real cdf_late = swald_lcdf(rt | drift, bound, ndt, sigma);
+  real cdf_early = swald_lcdf(rt | drift, bound, ndt + sndt, sigma);
+  if (cdf_late - cdf_early >= 1e-8) {
+    return swald_log_diff_exp(cdf_late, cdf_early) - log(sndt);
+  }
+
+  // deep tail of a defective accumulator: S and F have both converged, so
+  // integrate the density itself, by Simpson in log space as the survivor
+  // does. The nodes are passed as already-shifted times, which is also how
+  // .simpson_log_mean() forms them in R
+  vector[5] weights = log(to_vector({1, 4, 2, 4, 1}) / 12);
+  vector[5] terms;
+  for (k in 1:5) {
+    terms[k] = swald_lpdf(t1 - sndt + (k - 1) * sndt / 4 | drift, bound, 0, sigma)
+               + weights[k];
+  }
+  return log_sum_exp(terms);
 }
 
 // log survivor of the shifted Wald + uniform NDT, for censored observations:

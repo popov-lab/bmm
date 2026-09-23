@@ -1257,28 +1257,49 @@ log_diff_exp <- function(a, b) {
 
     interior <- xc > snc
     if (any(interior)) {
-      ls_lo <- .pwald(xc[interior] - snc[interior], dc[interior], bc[interior],
-        sc[interior],
-        lower.tail = FALSE, log.p = TRUE
-      )
-      ls_hi <- .pwald(xc[interior], dc[interior], bc[interior], sc[interior],
-        lower.tail = FALSE, log.p = TRUE
-      )
-      # for defective (negative-drift) accumulators both survivors converge to
-      # the same constant in the deep tail and their difference cancels; the
-      # midpoint rule (second order in sndt) is stable there
-      fallback <- (ls_lo - ls_hi) < .cancellation_tol
-      li <- rep(-Inf, sum(interior))
-      li[!fallback] <- log_diff_exp(ls_lo[!fallback], ls_hi[!fallback]) -
-        log(snc[interior][!fallback])
-      li[fallback] <- .dwald(
-        xc[interior][fallback] - snc[interior][fallback] / 2,
-        dc[interior][fallback], bc[interior][fallback], sc[interior][fallback],
-        log = TRUE
-      )
+      xi <- xc[interior]
+      di <- dc[interior]
+      bi <- bc[interior]
+      si <- sc[interior]
+      ni <- snc[interior]
+      ls_lo <- .pwald(xi - ni, di, bi, si, lower.tail = FALSE, log.p = TRUE)
+      ls_hi <- .pwald(xi, di, bi, si, lower.tail = FALSE, log.p = TRUE)
+
+      cancels <- (ls_lo - ls_hi) < .cancellation_tol
+      li <- rep(-Inf, length(xi))
+      li[!cancels] <- log_diff_exp(ls_lo[!cancels], ls_hi[!cancels]) -
+        log(ni[!cancels])
+      if (any(cancels)) {
+        li[cancels] <- .dwald_sndt_cancelled(
+          xi[cancels], di[cancels], bi[cancels], si[cancels], ni[cancels]
+        )
+      }
       ld[interior] <- li
     }
     out[conv] <- ld
+  }
+  out
+}
+
+# the density where the survivor difference has lost its digits, because both
+# survivors rounded to the same value. Just above the strip they have rounded
+# to 1 while the CDFs still carry the difference; in the deep tail of a
+# defective accumulator both survivor and CDF have converged, leaving
+# quadrature on the density itself as the only route
+.dwald_sndt_cancelled <- function(x, drift, bound, s, sndt) {
+  lf_hi <- .pwald(x, drift, bound, s, lower.tail = TRUE, log.p = TRUE)
+  lf_lo <- .pwald(x - sndt, drift, bound, s, lower.tail = TRUE, log.p = TRUE)
+  use_cdf <- (lf_hi - lf_lo) >= .cancellation_tol
+
+  out <- rep(-Inf, length(x))
+  out[use_cdf] <- log_diff_exp(lf_hi[use_cdf], lf_lo[use_cdf]) -
+    log(sndt[use_cdf])
+  if (any(!use_cdf)) {
+    out[!use_cdf] <- .simpson_log_mean(
+      x[!use_cdf], drift[!use_cdf], bound[!use_cdf], s[!use_cdf],
+      sndt[!use_cdf],
+      logfun = .dwald
+    )
   }
   out
 }
@@ -1322,7 +1343,9 @@ log_diff_exp <- function(a, b) {
     if (any(fallback)) {
       lp[fallback] <- .simpson_log_mean(
         xc[fallback], dc[fallback], bc[fallback], sc[fallback], snc[fallback],
-        lower.tail = lower.tail
+        logfun = function(...) {
+          .pwald(..., lower.tail = lower.tail, log.p = TRUE)
+        }
       )
     }
     out[conv] <- lp
@@ -1330,14 +1353,13 @@ log_diff_exp <- function(a, b) {
   out
 }
 
-# log of (1/sndt) * int_{x-sndt}^{x} P(u) du by composite Simpson on four
-# intervals, evaluated in log space
-.simpson_log_mean <- function(x, drift, bound, s, sndt, lower.tail) {
+# log of (1/sndt) * int_{x-sndt}^{x} logfun(u) du by composite Simpson on four
+# intervals, evaluated in log space. logfun() returns the log integrand on the
+# Wald parameters, so the survivor and the density share the quadrature
+.simpson_log_mean <- function(x, drift, bound, s, sndt, logfun) {
   weights <- log(c(1, 4, 2, 4, 1) / 12)
   nodes <- vapply(0:4, function(k) {
-    .pwald(x - sndt + k * sndt / 4, drift, bound, s,
-      lower.tail = lower.tail, log.p = TRUE
-    ) + weights[k + 1]
+    logfun(x - sndt + k * sndt / 4, drift, bound, s) + weights[k + 1]
   }, numeric(length(x)))
   if (length(x) == 1) nodes <- matrix(nodes, nrow = 1)
 
