@@ -189,6 +189,20 @@ local_brms_threads <- function(dots) {
   invisible(NULL)
 }
 
+# brms slices the response per thread but pastes a custom family's `vars` in
+# unsliced, and it emits sliced Stan code only when it will really thread:
+# threading(force = TRUE) compiles with threads but keeps the serial likelihood.
+# A model that slices its own likelihood chunk or `vars` therefore has to apply
+# the same test brms does in use_threading(threads, force = FALSE)
+brms_slices_likelihood <- function() {
+  threads <- getOption("brms.threads", NULL)
+  # brms also accepts a bare number for this option
+  if (is.numeric(threads)) {
+    threads <- brms::threading(threads)
+  }
+  is.list(threads) && isTRUE(threads$threads > 0) && !isTRUE(threads$force)
+}
+
 ############################
 #' @description
 #'  stop2, warning2, and message2 are wrappers to the builting functions stop, warning and message.

@@ -137,13 +137,13 @@ configure_model.sdm <- function(model, data, formula) {
   sc_path <- system.file("stan_chunks", package = "bmm")
   stan_funs <- read_lines2(paste0(sc_path, "/sdm_simple_funs.stan"))
   stan_tdata <- read_lines2(paste0(sc_path, "/sdm_simple_tdata.stan"))
-  likelihood_file <- if (sdm_use_threaded_likelihood()) {
+  likelihood_file <- if (brms_slices_likelihood()) {
     "sdm_simple_likelihood_threaded.stan"
   } else {
     "sdm_simple_likelihood.stan"
   }
   stan_likelihood <- read_lines2(paste0(sc_path, "/", likelihood_file))
-  stan_tdata_pll_args <- if (sdm_use_threaded_likelihood()) {
+  stan_tdata_pll_args <- if (brms_slices_likelihood()) {
     "data matrix COSN"
   }
   run_metadata <- attr(data, "sdm_run_metadata")
@@ -232,16 +232,4 @@ sdm_stanvar_int_array <- function(x, name, size) {
   out[[name]]$scode <- paste0("array[", size, "] int ", name, ";")
   out[[name]]$pll_args <- paste("data array[] int", name)
   out
-}
-
-sdm_use_threaded_likelihood <- function() {
-  threads <- getOption("brms.threads", NULL)
-  # brms accepts a bare number for this option, so normalize it the same way
-  # brms::validate_threads() does, else brm() threads while we emit the serial chunk
-  if (is.numeric(threads)) {
-    threads <- brms::threading(threads)
-  }
-  # threading(force = TRUE) makes brms compile with threads but emit unsliced
-  # code, so the sliced chunk would reference start/end outside partial_log_lik
-  is.list(threads) && isTRUE(threads$threads > 0) && !isTRUE(threads$force)
 }

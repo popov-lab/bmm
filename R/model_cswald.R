@@ -315,18 +315,10 @@ bmf2bf.cswald <- function(model, formula) {
 # CONFIGURE_MODEL S3 METHODS                                             ####
 ############################################################################# !
 
-# brms slices Y per thread but pastes a custom family's `vars` in unsliced, so
-# under threading the family must emit "dec[start:end]" itself. start/end only
-# exist in threaded Stan code, and threading(force = TRUE) compiles threaded but
-# keeps the serial likelihood, so slice only when brms will really thread.
+# start/end only exist inside partial_log_lik, so the decisions are sliced only
+# where brms really threads (see brms_slices_likelihood)
 cswald_decision_var <- function() {
-  threads <- getOption("brms.threads", NULL)
-  # brms also accepts a bare number for this option
-  if (is.numeric(threads)) {
-    threads <- brms::threading(threads)
-  }
-  threaded <- is.list(threads) && isTRUE(threads$threads > 0) && !isTRUE(threads$force)
-  if (threaded) "dec[start:end]" else "dec"
+  if (brms_slices_likelihood()) "dec[start:end]" else "dec"
 }
 
 #' @export
