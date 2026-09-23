@@ -11,6 +11,23 @@
 #'   The default priors in `bmm` tend to be more informative than the default
 #'   priors in `brms`, as we use domain knowledge to specify the priors.
 #'
+#'   Each model parameter carries three default priors, listed in the
+#'   documentation of the model: `main` for the intercept (or for all levels of
+#'   a factor when the intercept is suppressed), `effects` for the remaining
+#'   regression coefficients, and `sd` for the standard deviations of its random
+#'   effects. The `sd` prior is applied as a blanket prior to every random-effects
+#'   standard deviation of that parameter (all grouping factors, intercepts and
+#'   slopes alike) and replaces the `student_t(3, 0, 2.5)` default of `brms`. To
+#'   override it, address the parameter with `dpar` or `nlpar` in
+#'   [brms::set_prior()], e.g. `set_prior("exponential(2)", class = "sd",
+#'   nlpar = "kappa")`.
+#'
+#'   Correlations among random effects belong to a grouping factor rather than to
+#'   one parameter, so they get a single default for the whole model: `lkj(2)`
+#'   instead of the `lkj(1)` of `brms`, set whenever the model estimates a
+#'   correlation matrix. To override it, use e.g. `set_prior("lkj(1)",
+#'   class = "cor")`.
+#'
 #' @inheritParams bmm
 #' @aliases default_prior
 #' @param object A `bmmformula` object
@@ -39,9 +56,11 @@ default_prior.bmmformula <- function(object, data, model, formula = object, ...)
   data <- check_data(model, data, formula)
   formula <- check_formula(model, data, formula)
   config_args <- configure_model(model, data, formula)
-  prior <- configure_prior(model, data, config_args$formula, user_prior = NULL)
-
   dots <- list(...)
+  prior <- brms::do_call(
+    configure_prior, c(list(model, data, config_args$formula, user_prior = NULL), brms_frame_args(dots))
+  )
+
   prior_args <- combine_args(nlist(config_args, dots, prior))
   prior_args$object <- prior_args$formula
   prior_args$formula <- NULL
@@ -196,9 +215,10 @@ prior_provenance <- function(fit) {
       check_data(model, fit$data, fit$bmm$user_formula),
       error = function(e) fit$data
     )
+    frame_args <- fit_frame_args(fit)
     combine_prior(
-      brms::default_prior(fit$formula, data = fit$data),
-      configure_prior(model, data, fit$formula, user_prior = NULL)
+      brms::do_call(brms::default_prior, c(list(fit$formula, data = fit$data), frame_args)),
+      brms::do_call(configure_prior, c(list(model, data, fit$formula, user_prior = NULL), frame_args))
     )
   }))
   out <- classify_priors(fit$prior, defaults, links = model$links)
@@ -239,6 +259,7 @@ drop_technical_parameters <- function(out, model) {
 # its own default for a parameter bmm would otherwise have claimed.
 classify_priors <- function(prior, defaults, links = list()) {
   key_cols <- c("class", "dpar", "nlpar", "coef", "group", "resp")
+  prior <- as_prior_table(prior)
   eff <- resolve_effective_prior(prior)
   keys <- do.call(paste, prior[key_cols])
   def_keys <- do.call(paste, defaults[key_cols])
@@ -278,6 +299,19 @@ classify_priors <- function(prior, defaults, links = list()) {
   out <- out[keep, , drop = FALSE]
   row.names(out) <- NULL
   out
+}
+
+# A fitted object stores a correlation prior under the internal class of its
+# Cholesky factor, a prior table under the class set_prior() accepts; brms's own
+# check_prior_content() lists the pairs
+as_prior_table <- function(prior) {
+  internal <- c(
+    L = "cor", Lrescor = "rescor", Lme = "corme", Llncor = "lncor", Lcortime = "cortime"
+  )
+  is_internal <- prior$class %in% names(internal)
+  prior$class[is_internal] <- internal[prior$class[is_internal]]
+  prior$prior[is_internal] <- sub("^lkj_corr_cholesky\\(", "lkj(", prior$prior[is_internal])
+  prior
 }
 
 # brms semantics: an empty prior string inherits from the row with the same
@@ -518,7 +552,7 @@ configure_prior.default <- function(model, data, formula, user_prior, ...) {
 #' @export
 configure_prior.bmmodel <- function(model, data, formula, user_prior = NULL, ...) {
   prior <- fixed_pars_priors(model, formula)
-  default_prior <- set_default_prior(model, data, formula)
+  default_prior <- set_default_prior(model, data, formula, ...)
   prior <- combine_prior(default_prior, prior)
   prior <- combine_prior(prior, user_prior)
   additional_prior <- NextMethod("configure_prior")
@@ -586,9 +620,9 @@ fixed_pars_priors <- function(model, formula, additional_pars = list()) {
 #'
 #' @noRd
 #' @keywords internal developer
-set_default_prior <- function(model, data, formula) {
+set_default_prior <- function(model, data, formula, ...) {
   if (isFALSE(getOption("bmm.default_priors", TRUE))) {
-    return(NULL)
+    return(brms::empty_prior())
   }
 
   default_priors <- validate_default_priors(model, formula)
@@ -598,7 +632,7 @@ set_default_prior <- function(model, data, formula) {
   priors <- lapply(pars, function(par) {
     construct_default_priors_list(par, bterms, default_priors, data)
   })
-  priors <- unnest_list(priors)
+  priors <- c(unnest_list(priors), list(.construct_cor_prior(formula, data, ...)))
   Reduce(combine_prior, priors, init = brms::empty_prior())
 }
 
@@ -644,7 +678,7 @@ construct_default_priors_list <- function(par, bterms, default_priors, data) {
   interactions_count <- sum(attr(terms, "order") > 1)
   interaction_only <- fixed_effects_count == 0 && interactions_count > 0
 
-  priors <- list()
+  priors <- .construct_sd_priors(par, bterms, prior_desc)
 
   # priors on fixed effects
   if (has_effects_prior && fixed_effects_count > 0) {
@@ -676,6 +710,32 @@ construct_default_priors_list <- function(par, bterms, default_priors, data) {
   priors
 }
 
+# A blanket prior on all random-effects SDs of one model parameter (no coef, no
+# group). Emitted only when the parameter carries random effects: brms rejects a
+# prior for a parameter that does not exist in the model. Without random effects
+# brmsterms() stores "" rather than a data frame in $re.
+.construct_sd_priors <- function(par, bterms, prior_desc) {
+  re <- bterms$allpars[[par]]$re
+  if (is.null(prior_desc$sd) || !is.data.frame(re) || nrow(re) == 0) {
+    return(list())
+  }
+  list(.build_prior(prior_desc$sd, "sd", par = par, bterms = bterms))
+}
+
+# One prior on all group-level correlation matrices (no group, and no dpar/nlpar:
+# a correlation matrix belongs to a grouping factor, not to a model parameter).
+# brms rejects the row unless some correlated term estimates more than one
+# coefficient per group -- (1 | g), (x || g) and single-column terms have no
+# matrix, an ID shared across parameters has one -- so brms is asked whether the
+# model has one rather than re-deriving that rule here. `...` carries the frame
+# arguments of brm(), such as the data2 a gr(cov = ) term needs.
+.construct_cor_prior <- function(formula, data, ...) {
+  if (!"cor" %in% brms::default_prior(formula, data = data, ...)$class) {
+    return(brms::empty_prior())
+  }
+  brms::prior_("lkj(2)", class = "cor")
+}
+
 # Helper function to create a prior object conditional on parameter type
 .build_prior <- function(prior_desc, class, par, bterms, ...) {
   args <- c(list(prior = prior_desc, class = class), list(...))
@@ -702,12 +762,14 @@ combine_prior <- function(prior1, prior2) {
     return(prior1)
   }
 
-  cols <- c("class", "dpar", "nlpar", "coef", "group", "resp")
-  prior1_types <- do.call(paste, prior1[, cols])
-  prior2_types <- do.call(paste, prior2[, cols])
-  is_duplicate <- prior1_types %in% prior2_types
+  # update() feeds a fit's prior back in, and brms rejects a stored "L" row next
+  # to a "cor" row as a duplicated prior
+  prior_types <- function(prior) {
+    do.call(paste, as_prior_table(prior)[, c("class", "dpar", "nlpar", "coef", "group", "resp")])
+  }
+  is_duplicate <- prior_types(prior1) %in% prior_types(prior2)
   prior <- prior1[!is_duplicate, ] + prior2
-  row.names(prior) <- 1:nrow(prior)
+  row.names(prior) <- seq_len(nrow(prior))
   prior
 }
 
