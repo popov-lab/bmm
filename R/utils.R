@@ -158,15 +158,14 @@ glue_lf <- function(..., env.frame = -1) {
   brms::lf(stats::as.formula(glue(..., .envir = sys.frame(env.frame))))
 }
 
-# function to ensure that if the user wants to overwrite an argument (such as
-# init), they can. args$prior is NULL by default or is a user-provided prior
-# any argument in args$dots is potentially overwrite a default argument in config_args
+# args$prior is NULL by default or is the combined default and user-provided
+# prior; args$dots holds whatever the user passed to bmm() and so overwrites the
+# configured default for any argument (such as init) they named themselves
 combine_args <- function(args) {
   config_args <- args$config_args
   dots <- args$dots
   stopif("family" %in% names(dots), "Unsupported argument 'family'. Use the model argument instead.")
   config_args$prior <- args$prior %||% config_args$prior
-  config_args$init <- args$init %||% config_args$init
   config_args[names(dots)] <- dots
   c(config_args, args$opts)
 }
