@@ -606,3 +606,36 @@ test_that("the cswald survivor keeps a finite gradient where Phi() nears underfl
 
   expect_true(all(is.finite(grad$model)))
 })
+
+test_that("swald_log_Phi keeps a finite gradient on its own where Phi() nears underflow", {
+  skip_on_cran() # compiles a Stan program
+  skip_if_not(requireNamespace("cmdstanr", quietly = TRUE), "cmdstanr not available")
+  skip_if_not(nzchar(Sys.getenv("CMDSTAN", unset = "")) ||
+    !is.null(tryCatch(cmdstanr::cmdstan_path(), error = function(e) NULL)),
+  "CmdStan not installed"
+  )
+
+  sc_path <- system.file("stan_chunks", package = "bmm")
+  file <- file.path(tempdir(), "bmm_cswald_log_phi_grad.stan")
+  writeLines(c(
+    "functions {", read_lines2(file.path(sc_path, "cswald_helper_functions.stan")), "}",
+    "data { real z0; real weight; }",
+    "parameters { real shift; }",
+    "model { target += weight * swald_log_Phi(z0 + shift); }"
+  ), file)
+  model <- cmdstanr::cmdstan_model(file)
+
+  # swald_log_surv redirects these points before swald_log_Phi sees them, so
+  # the test above cannot tell whether swald_log_Phi's own crossover holds; the
+  # callers that #406 adds are not behind that guard. Stan's Phi(-37.3) is
+  # 8.2e-305, below the 1e-300 crossover and above the -37.5 cutoff where Phi()
+  # returns 0. The weight stands in for the adjoint the callers pass down,
+  # which swald_log_surv scales by up to 1 / 1e-300: with a unit adjoint,
+  # 1 / Phi(z) still fits in a double and log(Phi(z)) would pass here
+  grad <- model$diagnose(
+    data = list(z0 = -37.3, weight = 1e6), init = list(list(shift = 0)),
+    error = 1e6, seed = 1
+  )$gradients()
+
+  expect_true(all(is.finite(grad$model)))
+})
