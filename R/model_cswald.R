@@ -21,10 +21,10 @@
       s = 0
     ),
     priors = list(
-      drift = list(main = "normal(0,1)", effects = "normal(0,0.3)"),
-      bound = list(main = "normal(0,0.3)", effects = "normal(0,0.3)"),
-      ndt = list(main = "normal(-2,0.3)", effects = "normal(0,0.3)"),
-      s = list(main = "normal(0,0.3)", effects = "normal(0,0.2)")
+      drift = list(main = "normal(0,1)", effects = "normal(0,0.3)", sd = "exponential(2)"),
+      bound = list(main = "normal(0,0.3)", effects = "normal(0,0.3)", sd = "exponential(2)"),
+      ndt = list(main = "normal(-2,0.3)", effects = "normal(0,0.3)", sd = "exponential(2)"),
+      s = list(main = "normal(0,0.3)", effects = "normal(0,0.2)", sd = "exponential(2)")
     ),
     init_ranges = list(
       mu = c(-0.5, 0.5),
@@ -55,11 +55,11 @@
       s = 0
     ),
     priors = list(
-      drift = list(main = "normal(0,1)", effects = "normal(0,0.5)"),
-      bound = list(main = "normal(0,0.3)", effects = "normal(0,0.3)"),
-      ndt = list(main = "normal(-2,0.3)", effects = "normal(0,0.3)"),
-      zr = list(main = "normal(0,0.3)", effects = "normal(0,0.2)"),
-      s = list(main = "normal(0,0.5)", effects = "normal(0,0.2)")
+      drift = list(main = "normal(0,1)", effects = "normal(0,0.5)", sd = "exponential(1)"),
+      bound = list(main = "normal(0,0.3)", effects = "normal(0,0.3)", sd = "exponential(2)"),
+      ndt = list(main = "normal(-2,0.3)", effects = "normal(0,0.3)", sd = "exponential(2)"),
+      zr = list(main = "normal(0,0.3)", effects = "normal(0,0.2)", sd = "exponential(2)"),
+      s = list(main = "normal(0,0.5)", effects = "normal(0,0.2)", sd = "exponential(2)")
     ),
     init_ranges = list(
       mu = c(-0.5, 0.5),
