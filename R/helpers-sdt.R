@@ -1,6 +1,8 @@
 ############################################################################# !
 # SDT SHARED PIPELINE HELPERS                                            ####
-# Used by model_sdt_*.R files for check_data, bmf2bf, configure_model    #
+# Shared across model_sdt_*.R files (binary, mafc, ranking, rating) for  #
+# check_data and configure_model. Rating-only helpers live in            #
+# model_sdt_rating.R.                                                     #
 ############################################################################# !
 
 
