@@ -366,6 +366,23 @@ check_data.cswald <- function(model, data, formula) {
 }
 
 ############################################################################# !
+# CHECK_FORMULA S3 METHODS                                               ####
+############################################################################# !
+
+# a negative sndt makes every Stan evaluation -inf, which a real backend
+# reports as an initial-value storm that never names the parameter
+#' @export
+check_formula.cswald <- function(model, data, formula) {
+  stopif(
+    isTRUE(model$fixed_parameters$sndt < 0),
+    "The non-decision time variability 'sndt' cannot be fixed to a negative \\
+    value. Use sndt = 0 for a model without variability."
+  )
+
+  NextMethod("check_formula")
+}
+
+############################################################################# !
 # Convert bmmformula to brmsformla methods                               ####
 ############################################################################# !
 

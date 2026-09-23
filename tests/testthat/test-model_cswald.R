@@ -405,6 +405,25 @@ test_that("cswald simple version runs with mock backend", {
   )
 })
 
+test_that("cswald refuses a negative fixed sndt", {
+  skip_on_cran()
+
+  dat <- rcswald(n = 100, drift = 2, bound = 1.5, ndt = 0.3)
+  model <- cswald(rt = "rt", response = "response")
+
+  expect_error(
+    bmm(bmf(drift ~ 1, bound ~ 1, ndt ~ 1, sndt = -0.1), dat, model,
+      backend = "mock", mock = 1, rename = FALSE
+    ),
+    "cannot be fixed to a negative"
+  )
+  expect_silent(
+    bmm(bmf(drift ~ 1, bound ~ 1, ndt ~ 1, sndt = 0.1), dat, model,
+      backend = "mock", mock = 1, rename = FALSE
+    )
+  )
+})
+
 test_that("cswald crisk version runs with mock backend", {
   skip_on_cran()
 
