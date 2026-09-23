@@ -592,8 +592,11 @@ test_that("the vectorized cswald likelihood matches the scalar and R versions", 
       # expect_equal() averages the relative difference over the differing
       # elements, so one bad element next to 229 good ones passes. The floor at
       # sndt = 0 is Stan's Phi(), accurate to ~1e-10 absolute against a 60-digit
-      # reference; the convolution adds its own quadrature error on top
-      expect_lt(max(abs(lp_scalar - lp_r)), if (sndt == 0) 1e-8 else 1e-6)
+      # reference. With sndt > 0 the censored terms are a difference quotient
+      # of integrated survivors that swald_sndt_lccdf takes down to a relative
+      # difference of 1e-8, so rounding in G is amplified up to 1e8: 1.1e-8
+      # under this seed, 9.1e-8 over 60 seeds, all on censored deep-tail terms
+      expect_lt(max(abs(lp_scalar - lp_r)), if (sndt == 0) 1e-8 else 1e-7)
       # the vectorized overload is what brms compiles at sndt = 0; it must
       # reproduce the scalar likelihood it replaced
       if (sndt == 0) expect_equal(lp_vector, sum(lp_scalar), tolerance = 1e-10)
