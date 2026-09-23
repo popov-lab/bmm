@@ -147,12 +147,14 @@ init_fixef_param <- function(spar, types, dim, model, standata_list) {
 # otherwise. Cell means, treatment contrasts, interactions, a 0 + Intercept term
 # and dropped levels all follow from the one solve, and a design that cannot
 # reach the target exactly gets the closest it can. Aliased columns solve to NA
-# and start at zero
+# and start at zero, and so does every column of a design that carries a
+# non-finite value, which qr() rejects outright -- a predictor with an Inf in it
+# is Stan's error to report, not this function's
 range_coefficients <- function(X, target, centered) {
   if (centered) {
     X <- cbind(Intercept = 1, scale(X[, -1, drop = FALSE], scale = FALSE))
   }
-  values <- qr.coef(qr(X), rep(target, nrow(X)))
+  values <- if (all(is.finite(X))) qr.coef(qr(X), rep(target, nrow(X))) else rep(NA_real_, ncol(X))
   values[is.na(values)] <- 0
   unname(if (centered) values[-1] else values)
 }

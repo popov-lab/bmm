@@ -919,6 +919,12 @@ test_that("range_coefficients() puts the linear predictor at the target on every
   b <- range_coefficients(X, target, centered = FALSE)
   expect_false(anyNA(b))
   expect_equal(as.vector(X %*% b), rep(target, 12))
+
+  # log(0) in a predictor reaches brms's design matrix, and qr() rejects it; the
+  # coefficients start at zero rather than taking bmm() down before Stan sees it
+  X <- cbind(Intercept = 1, x = c(1, 2, -Inf, 4))
+  expect_equal(range_coefficients(X, target, centered = FALSE), c(0, 0))
+  expect_equal(range_coefficients(X, target, centered = TRUE), 0)
 })
 
 test_that("the coefficients of the main dpar start from its range", {
