@@ -5,6 +5,7 @@
 ^cran-comments\.md$
 ^local$
 ^bmm-dev$
+^data-raw$
 ^.github$
 ^\.github$
 ^_pkgdown\.yml$

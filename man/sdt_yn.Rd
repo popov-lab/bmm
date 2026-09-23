@@ -91,8 +91,8 @@ Provide pre-aggregated data with the following columns:
 }
 \item \code{sdratio}:
 \itemize{
-\item \code{main}: normal(0, 0.5)
-\item \code{effects}: normal(0, 0.3)
+\item \code{main}: normal(0, 0.3)
+\item \code{effects}: normal(0, 0.15)
 }
 }
 }
