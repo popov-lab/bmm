@@ -220,7 +220,10 @@ update.bmmfit <- function(object, formula., newdata = NULL, recompile = NULL,
 # also get the rest of the old sampler's control from brms itself; cmdstanr fits
 # store it nowhere else. A fit without a backend or algorithm field counts as
 # changed, because brms resolves the missing field to its first choice and then
-# finds it different
+# finds it different. step_size and stepsize are one argument under two
+# spellings, so a call naming either replaces whichever the fit stored; merged
+# by name they would survive as two keys and configure_control() would then
+# resolve the duplicate in the fit's favour
 carried_control <- function(object, dots) {
   same_run <- !is.null(object$backend) && !is.null(object$algorithm) &&
     identical(dots$backend %||% object$backend, object$backend) &&
@@ -228,5 +231,9 @@ carried_control <- function(object, dots) {
   if (!same_run) {
     return(dots$control)
   }
-  utils::modifyList(object$stan_args$control %||% list(), dots$control %||% list())
+  stored <- object$stan_args$control %||% list()
+  if (any(names(dots$control) %in% c("step_size", "stepsize"))) {
+    stored <- stored[not_in(names(stored), c("step_size", "stepsize"))]
+  }
+  utils::modifyList(stored, dots$control %||% list())
 }

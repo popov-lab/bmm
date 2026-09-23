@@ -254,6 +254,18 @@ test_that("update() keeps the fit's control on the same backend and algorithm on
   expect_null(carried_control(no_algorithm, list()))
 })
 
+test_that("a step size in the call replaces the one the fit stored, either spelling", {
+  # configure_control() renames both spellings to the backend's and drops the
+  # duplicate, so a merge by name alone would hand the fit's value the win
+  object <- list(backend = "rstan", algorithm = "sampling",
+                 stan_args = list(control = list(stepsize = 0.01, adapt_delta = 0.95)))
+  expect_equal(carried_control(object, list(control = list(step_size = 0.5))),
+               list(adapt_delta = 0.95, step_size = 0.5))
+  object$stan_args$control <- list(step_size = 0.01)
+  expect_equal(carried_control(object, list(control = list(stepsize = 0.5))),
+               list(stepsize = 0.5))
+})
+
 test_that("update() of a fit with a stored control keeps it next to the step size", {
   skip_on_cran()
   withr::local_options(bmm.step_size = 0.02)
