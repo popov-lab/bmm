@@ -315,31 +315,28 @@ bmf2bf.cswald <- function(model, formula) {
 # CONFIGURE_MODEL S3 METHODS                                             ####
 ############################################################################# !
 
+# start/end only exist inside partial_log_lik, so the decisions are sliced only
+# where brms really threads (see brms_slices_likelihood)
+cswald_decision_var <- function() {
+  if (brms_slices_likelihood()) "dec[start:end]" else "dec"
+}
+
 #' @export
 configure_model.cswald_simple <- function(model, data, formula) {
   links <- model$links
   formula <- bmf2bf(model, formula)
 
-  cswald_family <- function(link_drift, link_bound, link_ndt, link_s) {
-    brms::custom_family(
-      "cswald",
-      dpars = c("mu", "drift", "bound", "ndt", "s"),
-      links = c("identity", link_drift, link_bound, link_ndt, link_s),
-      ub = c(NA, NA, NA, NA, NA),
-      lb = c(NA, 0, 0, 0, 0),
-      type = "real",
-      vars = "dec[n]",
-      loop = TRUE,
-      log_lik = log_lik_cswald_simple,
-      posterior_predict = posterior_predict_cswald_simple
-    )
-  }
-
-  formula$family <- cswald_family(
-    link_drift = links$drift,
-    link_bound = links$bound,
-    link_ndt = links$ndt,
-    link_s = links$s
+  formula$family <- brms::custom_family(
+    "cswald",
+    dpars = c("mu", "drift", "bound", "ndt", "s"),
+    links = c("identity", links$drift, links$bound, links$ndt, links$s),
+    ub = c(NA, NA, NA, NA, NA),
+    lb = c(NA, 0, 0, 0, 0),
+    type = "real",
+    vars = cswald_decision_var(),
+    loop = FALSE,
+    log_lik = log_lik_cswald_simple,
+    posterior_predict = posterior_predict_cswald_simple
   )
 
   sc_path <- system.file("stan_chunks", package = "bmm")
@@ -393,26 +390,17 @@ configure_model.cswald_crisk <- function(model, data, formula) {
   links <- model$links
   formula <- bmf2bf(model, formula)
 
-  cswald_crisk_family <- function(link_drift, link_bound, link_ndt, link_zr, link_s) {
-    brms::custom_family(
-      "cswald_crisk",
-      dpars = c("mu", "drift", "bound", "ndt", "zr", "s"),
-      links = c("identity", link_drift, link_bound, link_ndt, link_zr, link_s),
-      ub = c(NA, NA, NA, NA, 1, NA),
-      lb = c(NA, NA, 0, 0, 0, 0),
-      type = "real",
-      vars = "dec[n]",
-      loop = TRUE,
-      log_lik = log_lik_cswald_crisk,
-      posterior_predict = posterior_predict_cswald_crisk
-    )
-  }
-  formula$family <- cswald_crisk_family(
-    link_drift = links$drift,
-    link_bound = links$bound,
-    link_ndt = links$ndt,
-    link_zr = links$zr,
-    link_s = links$s
+  formula$family <- brms::custom_family(
+    "cswald_crisk",
+    dpars = c("mu", "drift", "bound", "ndt", "zr", "s"),
+    links = c("identity", links$drift, links$bound, links$ndt, links$zr, links$s),
+    ub = c(NA, NA, NA, NA, 1, NA),
+    lb = c(NA, NA, 0, 0, 0, 0),
+    type = "real",
+    vars = cswald_decision_var(),
+    loop = FALSE,
+    log_lik = log_lik_cswald_crisk,
+    posterior_predict = posterior_predict_cswald_crisk
   )
 
   sc_path <- system.file("stan_chunks", package = "bmm")
