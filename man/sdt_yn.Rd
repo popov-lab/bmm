@@ -36,7 +36,10 @@ given here by its cumulative distribution function. One of:
 \item "logistic": logistic SDT, \eqn{1 / (1 + \exp(-x))}
 }}
 
-\item{links}{A named list of link functions for the parameters.}
+\item{links}{A named list of link functions for the parameters, one entry
+per parameter you want to change. \code{sdratio} keeps its log link: it is
+fixed on the link scale, so an identity link would set the SD ratio itself
+to 0 and divide the signal trials by zero.}
 
 \item{...}{used internally for testing, ignore it}
 }

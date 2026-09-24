@@ -77,6 +77,43 @@ test_that("sdt_yn rejects a link for a parameter it does not have", {
   )
 })
 
+test_that("sdt_yn rejects links it cannot apply by name", {
+  # the name-indexed assignment drops these silently, so the model samples on
+  # the default link while the user believes they changed it
+  expect_error(sdt_yn("n_old", "stimulus", "n_trials", links = list("log")),
+               "one unique name per entry")
+  expect_error(sdt_yn("n_old", "stimulus", "n_trials", links = "log"),
+               "one unique name per entry")
+  expect_error(
+    sdt_yn("n_old", "stimulus", "n_trials", links = list(d = "log", "identity")),
+    "one unique name per entry"
+  )
+  expect_error(
+    sdt_yn("n_old", "stimulus", "n_trials",
+           links = list(d = "log", d = "identity")),
+    "one unique name per entry"
+  )
+  expect_equal(sdt_yn("n_old", "stimulus", "n_trials", links = list())$links,
+               sdt_yn("n_old", "stimulus", "n_trials")$links)
+  expect_equal(
+    sdt_yn("n_old", "stimulus", "n_trials", links = c(d = "log"))$links$d,
+    "log"
+  )
+})
+
+test_that("sdt_yn refuses an identity link on sdratio", {
+  # sdratio is fixed at 0 on the link scale, so an identity link drops
+  # sdratio = exp(sdratio) from the generated Stan while the pin stays: the
+  # ratio itself becomes 0 and every signal trial is divided by zero
+  expect_error(
+    sdt_yn("n_old", "stimulus", "n_trials", links = list(sdratio = "identity")),
+    "divides the signal trials by zero"
+  )
+  expect_equal(.sdt_eta(1.5, 0, 1L, sdratio = 0), Inf)
+  expect_silent(sdt_yn("n_old", "stimulus", "n_trials",
+                       links = list(d = "identity")))
+})
+
 test_that("sdt_yn model stores distribution info correctly", {
   model <- sdt_yn("n_old", "stimulus", "n_trials", dist = "gumbel_min")
   expect_equal(model$other_vars$dist, "gumbel_min")

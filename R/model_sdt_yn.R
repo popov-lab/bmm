@@ -89,7 +89,10 @@
 #'       (log-log, as in \code{evd::pgumbel})
 #'     \item "logistic": logistic SDT, \eqn{1 / (1 + \exp(-x))}
 #'   }
-#' @param links A named list of link functions for the parameters.
+#' @param links A named list of link functions for the parameters, one entry
+#'   per parameter you want to change. `sdratio` keeps its log link: it is
+#'   fixed on the link scale, so an identity link would set the SD ratio itself
+#'   to 0 and divide the signal trials by zero.
 #' @param ... used internally for testing, ignore it
 #' @return An object of class `bmmodel`
 #'
@@ -286,13 +289,25 @@ sdt_yn <- function(response, stimulus, n_trials,
   stop_missing_args()
   dist <- match.arg(dist)
 
-  # an unmatched name is otherwise appended, so print() advertises a parameter
-  # that does not exist and the intended link is never applied
+  # the assignment that applies these is indexed by name, so an unnamed or
+  # duplicated entry is dropped and an unmatched name is appended -- in every
+  # case the intended link is lost and only print() shows anything odd
   valid_links <- names(.model_sdt_yn()$links)
+  links <- as.list(links)
+  stopif(length(names(links)) != length(links) ||
+           !all(nzchar(names(links))) || anyDuplicated(names(links)),
+         "links must be a list with one unique name per entry. \\
+         sdt_yn() takes links for {collapse_comma(valid_links)}")
   stopif(!all(names(links) %in% valid_links),
          "Unrecognized link target(s): \\
          {collapse_comma(setdiff(names(links), valid_links))}. \\
          sdt_yn() takes links for {collapse_comma(valid_links)}")
+  # sdratio is fixed on the link scale, so dropping the log link pins the ratio
+  # itself to 0 and every signal trial is divided by zero
+  stopif(identical(links$sdratio, "identity"),
+         "sdratio cannot take an identity link: it is fixed at 0 on the link \\
+         scale, so an identity link sets the SD ratio itself to 0 and divides \\
+         the signal trials by zero. Give sdratio a formula to estimate it.")
 
   .model_sdt_yn(response = response, stimulus = stimulus,
                 n_trials = n_trials, dist = dist,
