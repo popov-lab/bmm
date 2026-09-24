@@ -71,10 +71,13 @@
 
 
 <dt id="arg-links">links<a class="anchor" aria-label="anchor" href="#arg-links"></a></dt>
-<dd><p>A list of links for the parameters. For positive parameters
+<dd><p>A named list of links for the parameters, e.g.
+<code>links = list(bound = "softplus")</code>. For positive parameters
 (e.g. <code>bound</code>, <code>ndt</code>), "softplus" is available as an alternative to the
 default "log" link that grows linearly for large values and avoids the
-numerical blow-up of <code><a href="https://rdrr.io/r/base/Log.html" class="external-link">exp()</a></code>.</p></dd>
+numerical blow-up of <code><a href="https://rdrr.io/r/base/Log.html" class="external-link">exp()</a></code>. A name that is not a parameter of the model
+is an error, and a link that allows values the default link excludes
+(e.g. "identity" for a positive parameter) is a warning.</p></dd>
 
 
 <dt id="arg-version">version<a class="anchor" aria-label="anchor" href="#arg-version"></a></dt>

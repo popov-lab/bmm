@@ -31,7 +31,10 @@ cswald(rt, response, links = NULL, version = c("simple", "crisk"), ...)
   for most parameters and "logit" for `zr`. For positive parameters,
   "softplus" is available as an alternative to "log" that grows linearly
   for large values and avoids the numerical blow-up of
-  [`exp()`](https://rdrr.io/r/base/Log.html).
+  [`exp()`](https://rdrr.io/r/base/Log.html). A name that is not a
+  parameter of the model is an error, and a link that allows values the
+  default link excludes (e.g. "identity" for a positive parameter) is a
+  warning.
 
 - version:
 

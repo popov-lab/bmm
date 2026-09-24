@@ -128,6 +128,17 @@
 
 #### Bug fixes
 
+- A name in a model’s `links` argument that names no parameter of that
+  model is now an error instead of being added:
+  `sdm(resp_error = "y", links = list(kapa = "identity"))` reported a
+  parameter `kapa` while `kappa` kept its default link. A name one edit
+  from a parameter is read as that parameter, with a warning; a link
+  allowing values the default excludes warns once. A link the model
+  cannot apply is refused too, naming those it can:
+  `links = list(bound = "loglog")` used to fail with
+  `argument is of length zero`. **sdm**, **mixture2p**, **mixture3p**
+  and **imm** take none
+  ([\#420](https://github.com/popov-lab/bmm/issues/420)).
 - **sdm** no longer fails before sampling when `mu` is predicted without
   an intercept
   (`Initial values for vectors are only specified for b-coefficients, sd and z parameters`).

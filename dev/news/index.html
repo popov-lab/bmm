@@ -63,7 +63,8 @@
 </ul></div>
 <div class="section level4">
 <h4 id="bug-fixes-development-version">Bug fixes<a class="anchor" aria-label="anchor" href="#bug-fixes-development-version"></a></h4>
-<ul><li>
+<ul><li>A name in a model’s <code>links</code> argument that names no parameter of that model is now an error instead of being added: <code>sdm(resp_error = "y", links = list(kapa = "identity"))</code> reported a parameter <code>kapa</code> while <code>kappa</code> kept its default link. A name one edit from a parameter is read as that parameter, with a warning; a link allowing values the default excludes warns once. A link the model cannot apply is refused too, naming those it can: <code>links = list(bound = "loglog")</code> used to fail with <code>argument is of length zero</code>. <strong>sdm</strong>, <strong>mixture2p</strong>, <strong>mixture3p</strong> and <strong>imm</strong> take none (<a href="https://github.com/popov-lab/bmm/issues/420" class="external-link">#420</a>).</li>
+<li>
 <strong>sdm</strong> no longer fails before sampling when <code>mu</code> is predicted without an intercept (<code>Initial values for vectors are only specified for b-coefficients, sd and z parameters</code>). <strong>sdm</strong>, <strong>ddm</strong>, <strong>ezdm</strong> and <strong>cswald</strong> no longer fail with the rstan backend when a parameter has exactly one slope (<code>no more scalars to read</code>), nor when their random effects use <code>gr(..., by = )</code>.</li>
 <li>
 <code><a href="../reference/report_priors.html">report_priors()</a></code> no longer fails for a fit whose formula needs <code>data2</code>, e.g. <code>(1 | gr(ID, cov = A))</code> (<code>Object 'A' was not found in 'data2'</code>).</li>

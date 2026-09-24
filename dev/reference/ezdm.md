@@ -33,10 +33,14 @@ ezdm(mean_rt, var_rt, n_upper, n_trials, links = NULL, version = "3par", ...)
 
 - links:
 
-  A list of links for the parameters. For positive parameters (e.g.
+  A named list of links for the parameters, e.g.
+  `links = list(bound = "softplus")`. For positive parameters (e.g.
   `bound`, `ndt`), "softplus" is available as an alternative to the
   default "log" link that grows linearly for large values and avoids the
-  numerical blow-up of [`exp()`](https://rdrr.io/r/base/Log.html).
+  numerical blow-up of [`exp()`](https://rdrr.io/r/base/Log.html). A
+  name that is not a parameter of the model is an error, and a link that
+  allows values the default link excludes (e.g. "identity" for a
+  positive parameter) is a warning.
 
 - version:
 
