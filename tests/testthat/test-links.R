@@ -66,6 +66,33 @@ test_that("a link wider than the model's default warns", {
   expect_silent(ezdm("m", "v", "n", "t", links = list(bound = "softplus")))
 })
 
+test_that("a widening link warns once, not once per pipeline stage", {
+  dat <- data.frame(rt = c(0.5, 0.6, 0.7), response = c(1, 0, 1))
+  ff <- bmmformula(drift ~ 1, bound ~ 1, ndt ~ 1)
+  model <- suppressWarnings(
+    ddm(rt = "rt", response = "response", links = list(bound = "identity"))
+  )
+  expect_silent(check_links(model))
+  expect_equal(check_model(model, dat, ff)$links$bound, "identity")
+})
+
+test_that("a link the pipeline fixed itself is not re-checked", {
+  # resolve_fixed_links() swaps the link of a parameter that is fixed to a
+  # constant, after set_links() recorded the estimation link, so the swap is
+  # the pipeline's own doing and must not read as a user change
+  model <- cswald(rt = "rt", response = "resp")
+  model$parameters$p <- "a parameter the model can fix to a constant"
+  model$links$p <- "log"
+  attr(model, "links_default") <- model$links
+  attr(model, "links_checked") <- model$links
+  model$links_fixed <- list(p = "identity")
+  model$links$p <- "identity"
+  expect_silent(check_links(model))
+
+  model$links_fixed <- NULL
+  expect_warning(check_links(model), "allow values that the model's default")
+})
+
 test_that("a link the model does not pass on to the fit is refused", {
   expect_error(
     sdm(resp_error = "y", links = list(kappa = "softplus")),

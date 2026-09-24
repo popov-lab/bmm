@@ -232,26 +232,34 @@ settable_links.default <- function(model) {
 # meant was never applied (#420). Every constructor assigns through here.
 set_links <- function(out, links) {
   attr(out, "links_default") <- out$links
+  attr(out, "links_checked") <- out$links
   if (length(links) == 0) {
     return(out)
   }
   links <- validate_links(links, out)
   out$links[names(links)] <- links
+  attr(out, "links_checked") <- out$links
   out
 }
 
 # Links can also reach a model after construction -- `model$links <- list(...)`
 # is the documented idiom for m3 -- so the pipeline re-checks whatever differs
-# from what the model declared. Parameters in `links_fixed` are excluded
-# because the pipeline sets those itself (see resolve_fixed_links).
+# from the state set_links() last signed off on. Diffing against `links_default`
+# instead would re-validate the user's constructor argument and warn a second
+# time. Parameters in `links_fixed` are excluded because the pipeline sets those
+# itself (see resolve_fixed_links). A model that never went through set_links()
+# -- a custom m3, a fit from an older bmm -- carries no attribute and is left
+# alone; for a custom m3 the missing-links check in check_model.m3_custom is
+# what catches a garbage list.
 check_links <- function(model) {
   default <- attr(model, "links_default")
   if (is.null(default)) {
     return(model)
   }
+  checked <- attr(model, "links_checked") %||% default
   pars <- setdiff(names(model$links), names(model$links_fixed))
   changed <- pars[!vapply(pars, function(p) {
-    identical(model$links[[p]], default[[p]])
+    identical(model$links[[p]], checked[[p]])
   }, logical(1))]
   if (length(changed) == 0) {
     return(model)
