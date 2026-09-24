@@ -45,6 +45,18 @@ test_that("sdt_yn fixes sdratio on the link scale and inits on the natural scale
   expect_true(all(model$init_ranges$sdratio > 0))
 })
 
+test_that("the default sdratio reaches the Stan likelihood as 1, not 0", {
+  # a 0 on the link scale is an SD ratio of 1; a 0 that reached the lpmf would
+  # divide the signal trials by zero, so the generated code must carry both the
+  # pin and the forward link
+  dat <- data.frame(n_old = c(10, 40), stimulus = c(0L, 1L),
+                    n_trials = c(50, 50))
+  code <- stancode(bmf(d ~ 1, criterion ~ 1), data = dat,
+                   model = sdt_yn("n_old", "stimulus", "n_trials"))
+  expect_match(code, "Intercept_sdratio = 0;", fixed = TRUE)
+  expect_match(code, "sdratio = exp(sdratio);", fixed = TRUE)
+})
+
 test_that("sdt_yn model accepts custom links", {
   custom_links <- list(d = "log")
   model <- sdt_yn("n_old", "stimulus", "n_trials", links = custom_links)
@@ -126,6 +138,28 @@ test_that("sdt_yn check_data validates stimulus coding", {
   )
   expect_error(
     check_data(model, factor_data, formula),
+    "must be coded as 0"
+  )
+
+  # logical and character are the other two shapes a 0/1 column arrives in;
+  # dsdt_yn() accepts logical, so the fitting API rejecting it is a decision
+  logical_data <- data.frame(
+    n_old = c(30, 40),
+    stimulus = c(FALSE, TRUE),
+    n_trials = c(50, 50)
+  )
+  expect_error(
+    check_data(model, logical_data, formula),
+    "must be coded as 0"
+  )
+
+  character_data <- data.frame(
+    n_old = c(30, 40),
+    stimulus = c("0", "1"),
+    n_trials = c(50, 50)
+  )
+  expect_error(
+    check_data(model, character_data, formula),
     "must be coded as 0"
   )
 })
@@ -374,6 +408,24 @@ test_that("sdratio never divides the noise trials, it only widens the separation
   ev <- dsdt_yn(n_old = 70, n_trials = 100, stimulus = 0,
                     d = 1.5 * s, criterion = 0.2, sdratio = 1)
   expect_equal(uv, ev)
+})
+
+test_that("n_trials may vary within a design", {
+  # every other test holds n_trials constant, so a per-row count that silently
+  # recycled the first cell would go unnoticed; broeder_schuetz_2009_e3 has
+  # 6, 15, 30, 45 and 54 trials per cell
+  n_trials <- c(6, 15, 30)
+  n_old <- c(1, 10, 22)
+  eta <- 1.5 / 2 - 0.2
+  expect_equal(
+    dsdt_yn(n_old, n_trials, 1L, d = 1.5, criterion = 0.2, log = TRUE),
+    dbinom(n_old, n_trials, pnorm(eta), log = TRUE)
+  )
+
+  sdata <- standata(bmf(d ~ 1, criterion ~ 0 + condition),
+                    data = broeder_schuetz_2009_e3,
+                    model = sdt_yn("n_old", "stimulus", "n_trials"))
+  expect_equal(sort(unique(as.integer(sdata$trials))), c(6L, 15L, 30L, 45L, 54L))
 })
 
 test_that("dsdt_yn is vectorized over sdratio", {
