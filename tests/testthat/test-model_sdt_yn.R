@@ -144,37 +144,37 @@ test_that("sdt_yn check_data validates stimulus coding", {
     "must be coded as 0"
   )
 
-  factor_data <- data.frame(
-    n_old = c(30, 40),
-    stimulus = factor(c(0, 1)),
-    n_trials = c(50, 50)
-  )
-  expect_error(
-    check_data(model, factor_data, formula),
-    "must be numeric"
-  )
+  # factor, logical and character are the other shapes an unambiguous 0/1 column
+  # arrives in, and all three are coerced
+  for (coding in list(factor(c(0, 1)), c(FALSE, TRUE), c("0", "1"))) {
+    coercible_data <- data.frame(
+      n_old = c(30, 40),
+      stimulus = coding,
+      n_trials = c(50, 50)
+    )
+    result <- check_data(model, coercible_data, formula)
+    expect_identical(result$stimulus, c(0L, 1L), info = class(coding)[1])
+  }
 
-  # logical and character are the other two shapes a 0/1 column arrives in;
-  # dsdt_yn() accepts logical, so the fitting API rejecting it is a decision
-  logical_data <- data.frame(
+  # the one coding bmm must not guess at: which level is the signal?
+  labelled_data <- data.frame(
     n_old = c(30, 40),
-    stimulus = c(FALSE, TRUE),
+    stimulus = factor(c("noise", "signal")),
     n_trials = c(50, 50)
   )
   expect_error(
-    check_data(model, logical_data, formula),
-    "must be numeric"
+    check_data(model, labelled_data, formula),
+    "must not guess which level is the signal"
   )
+})
 
-  character_data <- data.frame(
-    n_old = c(30, 40),
-    stimulus = c("0", "1"),
-    n_trials = c(50, 50)
-  )
-  expect_error(
-    check_data(model, character_data, formula),
-    "must be numeric"
-  )
+test_that("the coerced stimulus column is what reaches Stan", {
+  # coercing in check_data is pointless if standata() still sees the factor
+  model <- sdt_yn("n_old", "stimulus", "n_trials")
+  dat <- data.frame(n_old = c(30, 40), stimulus = factor(c("0", "1")),
+                    n_trials = c(50, 50))
+  sdata <- standata(bmf(d ~ 1, criterion ~ 1), data = dat, model = model)
+  expect_equal(as.integer(sdata$vint1), c(0L, 1L))
 })
 
 test_that("sdt_yn check_data says which stimulus problem it found", {
@@ -194,7 +194,8 @@ test_that("sdt_yn check_data says which stimulus problem it found", {
 
   list_data <- base
   list_data$stimulus <- I(list(1, 2))
-  expect_error(check_data(model, list_data, formula), "must be numeric")
+  expect_error(check_data(model, list_data, formula),
+               "found AsIs with values")
 })
 
 test_that("sdt_yn check_data rejects a constant stimulus column", {

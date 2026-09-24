@@ -56,14 +56,38 @@ check_formula.sdt <- function(model, data, formula) {
 # DATA VALIDATION HELPERS                                                 ####
 ############################################################################# !
 
+# dsdt_yn(68, 100, TRUE, 1.5, 0) has always returned what the 1L call returns,
+# so the asymmetry pointed the wrong way: the density, which a user reaches
+# second and drives by hand, was the lenient side, while the fitting API,
+# reached first and with a real error channel, was the strict one. Anything
+# whose meaning is unambiguous is coerced here; factor(c("noise", "signal")) is
+# not, because bmm must not guess which level is the signal.
+.coerce_sdt_stimulus <- function(stim_vals) {
+  if (is.logical(stim_vals)) {
+    return(as.integer(stim_vals))
+  }
+  if (!is.factor(stim_vals) && !is.character(stim_vals)) {
+    return(stim_vals)
+  }
+  labels <- stats::na.omit(unique(as.character(stim_vals)))
+  if (!all(labels %in% c("0", "1"))) {
+    return(stim_vals)
+  }
+  as.integer(as.character(stim_vals))
+}
+
 .validate_sdt_stimulus <- function(data, stim_var) {
   stopif(!stim_var %in% colnames(data),
     "Stimulus variable '{stim_var}' missing in the data")
-  stim_vals <- data[[stim_var]]
+  stim_vals <- .coerce_sdt_stimulus(data[[stim_var]])
 
   stopif(!is.numeric(stim_vals),
-    "Stimulus variable '{stim_var}' must be numeric, coded as 0 (noise) and \\
-    1 (signal); found {class(stim_vals)[1]}")
+    "Stimulus variable '{stim_var}' must be coded as 0 (noise) and 1 \\
+    (signal). Numeric, logical, and factor or character columns holding \\
+    '0' and '1' are accepted; found {class(stim_vals)[1]} with values \\
+    {collapse_comma(utils::head(sort(unique(as.character(stim_vals))), 4))}. \\
+    Recode labels such as 'noise'/'signal' yourself -- bmm must not guess \\
+    which level is the signal")
 
   n_missing <- sum(is.na(stim_vals))
   stopif(n_missing > 0,
