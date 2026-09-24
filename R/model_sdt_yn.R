@@ -141,7 +141,8 @@
 #' (hit, false-alarm) pair is two numbers for three unknowns, so when every
 #' parameter is intercept-only with no random effects, `sdratio ~ 1` returns its
 #' prior and `d` is pulled along the resulting ridge: sampling converges, `Rhat`
-#' is fine, and the profile likelihood over `sdratio` is flat to 1e-12.
+#' is fine, and the profile likelihood over `sdratio` is flat to 1e-12. `bmm()`
+#' warns for that one design, which is the only shape that provably cannot work.
 #'
 #' Any linear predictor that moves the operating point along the ROC supplies
 #' what is missing, and it need not sit on `criterion`: a sensitivity
@@ -287,6 +288,36 @@ sdt_yn <- function(response, stimulus, n_trials,
   .model_sdt_yn(response = response, stimulus = stimulus,
                 n_trials = n_trials, dist = dist,
                 links = links, call = call, ...)
+}
+
+
+############################################################################# !
+# CHECK_FORMULA S3 METHODS                                               ####
+############################################################################# !
+
+# Per-format, not shared: sdt_rating and sdt_cdp carry n_ratings - 1 thresholds,
+# so one condition already gives 2(n_ratings - 1) cumulative statistics against
+# n_ratings + 1 parameters and sdratio is identified within it -- the
+# zROC-slope-from-confidence-ratings logic those formats exist for. A shared rule
+# would warn on every legitimate single-condition rating fit.
+#' @export
+check_formula.sdt_yn <- function(model, data, formula) {
+  # rhs_vars() reports random-effect grouping variables and the `Intercept`
+  # pseudo-predictor, so `1 + (1 | id)` and `0 + Intercept` are both visible
+  flat_design <- all(vapply(formula, function(x) {
+    all(rhs_vars(x) %in% "Intercept")
+  }, logical(1)))
+  warnif(
+    flat_design && !is_constant(formula)[["sdratio"]],
+    "'sdratio' is estimated, but every parameter formula is intercept-only with \\
+    no random effects. Such a design has two sufficient statistics (one hit \\
+    rate, one false-alarm rate) for three parameters, so 'sdratio' will return \\
+    its prior and 'd' will slide along the resulting ridge while sampling \\
+    converges and Rhat stays fine. Give a parameter a predictor or a random \\
+    effect, or leave 'sdratio' at its default. See the 'Identifying sdratio' \\
+    section of ?sdt_yn"
+  )
+  NextMethod("check_formula")
 }
 
 

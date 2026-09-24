@@ -153,7 +153,8 @@ happens.
 (hit, false-alarm) pair is two numbers for three unknowns, so when every
 parameter is intercept-only with no random effects, \code{sdratio ~ 1} returns its
 prior and \code{d} is pulled along the resulting ridge: sampling converges, \code{Rhat}
-is fine, and the profile likelihood over \code{sdratio} is flat to 1e-12.
+is fine, and the profile likelihood over \code{sdratio} is flat to 1e-12. \code{bmm()}
+warns for that one design, which is the only shape that provably cannot work.
 
 Any linear predictor that moves the operating point along the ROC supplies
 what is missing, and it need not sit on \code{criterion}: a sensitivity

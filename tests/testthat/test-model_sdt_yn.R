@@ -108,6 +108,72 @@ test_that("sdt_yn model has init_ranges for estimated SDT parameters", {
 
 
 ############################################################################# !
+# CHECK_FORMULA TESTS                                                    ####
+############################################################################# !
+
+# check_model() must run first: it is update_model_fixed_parameters() that
+# strips sdratio from model$fixed_parameters when the user gives it a formula,
+# and without that is_constant(formula)[["sdratio"]] is TRUE either way, so a
+# direct check_formula() call would pass while testing nothing
+sdt_yn_warns <- function(formula, data = NULL) {
+  if (is.null(data)) {
+    data <- data.frame(n_old = c(10, 40, 15, 35), stimulus = c(0L, 1L, 0L, 1L),
+                       n_trials = c(50, 50, 50, 50),
+                       condition = c("A", "A", "B", "B"), id = c(1, 1, 2, 2))
+  }
+  model <- sdt_yn("n_old", "stimulus", "n_trials")
+  model <- check_model(model, data, formula)
+  check_formula(model, data, formula)
+}
+
+test_that("a free sdratio on an all-intercept design warns", {
+  # provably three parameters for two sufficient statistics: the profile
+  # log-likelihood over sdratio is flat to 8e-13 on this design
+  expect_warning(
+    sdt_yn_warns(bmf(d ~ 1, criterion ~ 1, sdratio ~ 1)),
+    "every parameter formula is intercept-only"
+  )
+})
+
+test_that("the sdratio warning sees through the 0 + Intercept spelling", {
+  # rhs_vars(d ~ 0 + Intercept) is "Intercept", so a naive length() == 0 test
+  # would miss the same unidentified design
+  expect_warning(
+    sdt_yn_warns(bmf(d ~ 0 + Intercept, criterion ~ 0 + Intercept,
+                     sdratio ~ 1)),
+    "every parameter formula is intercept-only"
+  )
+})
+
+test_that("the sdratio warning stays silent on every identified design", {
+  # any predictor that moves the operating point identifies sdratio, whether it
+  # sits on criterion, on d, or in a random effect
+  identified <- list(
+    bmf(d ~ 1, criterion ~ condition, sdratio ~ 1),
+    bmf(d ~ condition, criterion ~ 1, sdratio ~ 1),
+    bmf(d ~ 1, criterion ~ 1 + (1 | id), sdratio ~ 1),
+    bmf(d ~ 1, criterion ~ 1, sdratio ~ condition)
+  )
+  for (formula in identified) {
+    expect_no_warning(sdt_yn_warns(formula))
+  }
+  # and the default, where sdratio is fixed, never warns
+  expect_no_warning(sdt_yn_warns(bmf(d ~ 1, criterion ~ 1)))
+})
+
+test_that("the sdratio warning reaches the user through bmm()", {
+  dat <- data.frame(n_old = c(10, 40), stimulus = c(0L, 1L),
+                    n_trials = c(50, 50))
+  expect_warning(
+    bmm(bmf(d ~ 1, criterion ~ 1, sdratio ~ 1), dat,
+        sdt_yn("n_old", "stimulus", "n_trials"),
+        backend = "mock", mock_fit = 1, rename = FALSE),
+    "every parameter formula is intercept-only"
+  )
+})
+
+
+############################################################################# !
 # CHECK_DATA TESTS                                                       ####
 ############################################################################# !
 
