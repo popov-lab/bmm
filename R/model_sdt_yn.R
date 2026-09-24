@@ -135,6 +135,16 @@
 #' used as a predictor will collide with this parameter; `bmm()` warns when that
 #' happens.
 #'
+#' @section Identifying `sdratio`:
+#' `sdratio` is identified only when the criterion varies across conditions. A
+#' single (hit, false-alarm) pair is two numbers for three unknowns, so on a
+#' one-condition design `sdratio ~ 1` returns its prior and `d` is pulled along
+#' the resulting ridge: sampling converges, `Rhat` is fine, and nothing warns.
+#' Give `criterion` a predictor that shifts the decision boundary — a base-rate,
+#' payoff, or confidence manipulation — as in `criterion ~ 0 + condition`; see
+#' [broeder_schuetz_2009_e3] for such a design. Leaving `sdratio` at its default
+#' is always identified.
+#'
 #' @references
 #' Green, D. M., & Swets, J. A. (1966). \emph{Signal detection theory and
 #'   psychophysics}. Wiley.
@@ -177,10 +187,12 @@
 #'   backend = "cmdstanr"
 #' )
 #'
-#' # Unequal-variance yes/no SDT
+#' # Unequal-variance yes/no SDT. sdratio needs a criterion manipulation: on
+#' # the single-condition `dat` above it would not be identified.
+#' # `model` already names the columns this dataset uses.
 #' fit_uv <- bmm(
-#'   formula = bmf(d ~ 1, criterion ~ 1, sdratio ~ 1),
-#'   data = dat,
+#'   formula = bmf(d ~ 1, criterion ~ 0 + condition, sdratio ~ 1),
+#'   data = broeder_schuetz_2009_e3,
 #'   model = model,
 #'   cores = 4,
 #'   backend = "cmdstanr"
