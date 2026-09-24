@@ -25,9 +25,9 @@ real sdt_rms_scale(real sdratio) {
 // Log complementary CDF: log(1 - F(eta))
 real sdt_log_one_minus_cumprob(real eta, int dist_type) {
   // std_normal_lcdf(-eta), not std_normal_lccdf(eta): the two are equal by
-  // symmetry, but lccdf loses accuracy from eta ~ 8 and underflows to -inf
-  // from eta ~ 10, which makes the likelihood log(0) for any cell with
-  // y < trials. lcdf stays exact past eta = 29.
+  // symmetry, but lccdf passes 1e-6 of error from eta ~ 7 and underflows to
+  // -inf from eta ~ 8.3, which makes the likelihood log(0) for any cell with
+  // y < trials. lcdf(-eta) stays exact to 1e-12 out to eta = 45.
   if (dist_type == 1) return std_normal_lcdf(-eta);
   if (dist_type == 2) return -exp(eta);                   // gumbel_min
   if (dist_type == 3) return log1m_exp(-exp(-eta));       // gumbel_max
