@@ -45,8 +45,15 @@
     class = c("bmmodel", "circular", "sdm", paste0("sdm_", version)),
     call = call
   )
-  out$links[names(links)] <- links
+  out <- set_links(out, links)
   out
+}
+
+# configure_model.sdm declares the family links itself, and the log link of `c`
+# is written into the Stan chunk as exp(c), so none of the three can be set
+#' @exportS3Method
+settable_links.sdm <- function(model) {
+  character(0)
 }
 
 # user facing alias

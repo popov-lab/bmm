@@ -89,7 +89,7 @@
     call = call
   )
   if (!is.null(version)) class(out) <- c(class(out), paste0("ezdm_", version))
-  out$links[names(links)] <- links
+  out <- set_links(out, links)
   out
 }
 # user facing alias
@@ -103,10 +103,13 @@
 #' @param var_rt The names of the variable or variables (for 4par version) coding the variance of the reaction time in seconds in the data
 #' @param n_upper The name of the variable coding the number of responses that hit the upper response threshold (typically the number of correct responses) in the data.
 #' @param n_trials The name of the variable coding the number of trials that was used to calculated the aggregated statistics.
-#' @param links A list of links for the parameters. For positive parameters
+#' @param links A named list of links for the parameters, e.g.
+#'   `links = list(bound = "softplus")`. For positive parameters
 #'   (e.g. `bound`, `ndt`), "softplus" is available as an alternative to the
 #'   default "log" link that grows linearly for large values and avoids the
-#'   numerical blow-up of `exp()`.
+#'   numerical blow-up of `exp()`. A name that is not a parameter of the model
+#'   is an error, and a link that allows values the default link excludes
+#'   (e.g. "identity" for a positive parameter) is a warning.
 #' @param version A character label for the version of the model. There is a three-parameter version
 #'   (version = "3par") of the `ezdm` that fixes the relative starting point `zr` to 0.5, and a
 #'   four parameter version (version = "4par"), that allows to freely estimate the starting point.
