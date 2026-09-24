@@ -25,6 +25,15 @@ test_that("a link target one edit from a parameter is read as that parameter", {
   expect_equal(model$links$bound, "softplus")
 })
 
+test_that("a link target that abbreviates a parameter is read as that parameter", {
+  # 'dr' is three edits from 'drift', so only the prefix branch can match it
+  expect_warning(
+    model <- ddm(rt = "rt", response = "resp", links = list(dr = "log")),
+    "'dr' read as 'drift'"
+  )
+  expect_equal(model$links$drift, "log")
+})
+
 test_that("a link target that names no single parameter is refused", {
   # 'b' is one edit from each of imm's a, c and s
   expect_error(
@@ -169,8 +178,6 @@ test_that("a link the model does not pass on to the fit is refused", {
 })
 
 test_that("the links a model applies are exactly the settable ones", {
-  # measured against the family each configure_model() builds: only these
-  # models read model$links at fit time
   expect_equal(
     settable_links(ddm(rt = "rt", response = "resp")),
     c("drift", "bound", "ndt", "zr")
@@ -185,6 +192,43 @@ test_that("the links a model applies are exactly the settable ones", {
   )
   expect_null(settable_links(m3(resp_cats = c("a", "b"), num_options = c(1, 4))))
   expect_equal(settable_links(sdm(resp_error = "y")), character(0))
+})
+
+test_that("a refused model builds the same fit whatever its links say", {
+  # the refusal is only correct while configure_model() ignores model$links, so
+  # that is measured rather than restated: the family carries the links of a
+  # custom or mixture family, the parameter formulas carry imm's log scale
+  dat <- oberauer_lin_2017
+  fingerprint <- function(model, formula) {
+    bf <- configure_model(model, check_data(model, dat, formula), formula)$formula
+    list(
+      # a custom family encloses the frame it was built in, and that frame holds
+      # the model itself -- post-fit reporting, not anything the sampler reads
+      family = bf$family[setdiff(names(bf$family), "env")],
+      pforms = lapply(bf$pforms, deparse)
+    )
+  }
+  nt <- paste0("col_nt", 1:7)
+  cases <- list(
+    list(sdm("dev_rad"), bmf(c ~ 1, kappa ~ 1), "kappa"),
+    list(mixture2p("dev_rad"), bmf(thetat ~ 1, kappa ~ 1), "kappa"),
+    list(
+      mixture3p("dev_rad", nt_features = nt, set_size = "set_size"),
+      bmf(thetat ~ 1, thetant ~ 1, kappa ~ 1), "kappa"
+    ),
+    list(
+      imm("dev_rad", nt_features = nt, nt_distances = paste0("dist_nt", 1:7),
+          set_size = "set_size"),
+      bmf(c ~ 1, a ~ 1, s ~ 1, kappa ~ 1), "c"
+    )
+  )
+  for (case in cases) {
+    model <- case[[1]]
+    # assigning directly is the only way in: set_links() would refuse it
+    changed <- model
+    changed$links[[case[[3]]]] <- "softplus"
+    expect_identical(fingerprint(changed, case[[2]]), fingerprint(model, case[[2]]))
+  }
 })
 
 test_that("a custom link set on a model reaches the brms family", {
@@ -220,7 +264,7 @@ test_that("links set after construction are checked by the pipeline", {
   expect_warning(
     expect_error(
       check_model(model, NULL, bmf(c ~ 1, a ~ 1)),
-      "'b' has no link in m3\\(\\).*Links can be set for 'c', 'a'"
+      "'b' has no link in m3\\(\\).*Links can be set for 'c', 'a'$"
     ),
     "'bb' read as 'b'"
   )

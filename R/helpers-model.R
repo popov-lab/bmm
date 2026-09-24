@@ -803,6 +803,7 @@ use_model_template <- function(model_name,
       # uncomment if configure_model() builds the links into the family or into
       # the non-linear formulas rather than reading them from the list above,
       # so that a link set by the user is refused instead of silently ignored:
+      #\' @exportS3Method
       # settable_links.<<model_name>> <- function(model) character(0)\n\n',
       .open = "<<", .close = ">>"
     )
@@ -836,6 +837,7 @@ use_model_template <- function(model_name,
       # uncomment if configure_model() builds the links into the family or into
       # the non-linear formulas rather than reading them from the list above,
       # so that a link set by the user is refused instead of silently ignored:
+      #\' @exportS3Method
       # settable_links.<<model_name>> <- function(model) character(0)\n\n',
       .open = "<<", .close = ">>"
     )
