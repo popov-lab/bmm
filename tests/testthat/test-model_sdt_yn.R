@@ -418,14 +418,22 @@ test_that("d equals the noise-standardized separation divided by the RMS scale",
 test_that("d is constant across iso-discriminable unequal-variance models", {
   # the property the parameterization exists for: two models with the same
   # area under the ROC must report the same sensitivity, whatever sdratio is.
-  # For the Gaussian, AUC = Phi(d_N / sqrt(1 + r^2)) = Phi(d / sqrt(2)).
-  auc <- function(d, r) {
-    stats::pnorm(d * sqrt((1 + r^2) / 2) / sqrt(1 + r^2))
-  }
-  expect_equal(auc(1.5, 1.0), auc(1.5, 1.6))
-  expect_equal(auc(1.5, 1.0), stats::pnorm(1.5 / sqrt(2)))
-  # and it is not vacuous: the noise-standardized separation does move
-  expect_false(isTRUE(all.equal(1.5 * sqrt((1 + 1.6^2) / 2), 1.5)))
+  # AUC is read off the model's own eta, so this goes red if .sdt_eta stops
+  # dividing the separation by the RMS scale.
+  d <- 1.5
+  sdratio <- c(0.7, 1, 1.25, 1.6, 2)
+  # a scalar stimulus against a vector of sdratio draws, the shape ROC points
+  # arrive in; an ifelse() scale would apply sdratio[1] to all of them
+  eta_noise <- .sdt_eta(d, 0, 0L, sdratio = sdratio)
+  eta_signal <- .sdt_eta(d, 0, 1L, sdratio = sdratio)
+
+  # undo the signal-scale division to get back the separation in noise units,
+  # then AUC for two normals with SDs 1 and sdratio
+  separation <- eta_signal * sdratio - eta_noise
+  expect_equal(stats::pnorm(separation / sqrt(1 + sdratio^2)),
+               rep(stats::pnorm(d / sqrt(2)), length(sdratio)))
+  # not vacuous: the separation the model implies genuinely moves with sdratio
+  expect_equal(separation, d * sqrt((1 + sdratio^2) / 2))
 })
 
 test_that("the sdt_yn sensitivity name is guarded against a data-column clash", {
