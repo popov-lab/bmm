@@ -2044,7 +2044,8 @@ neg_loglik <- function(x, params, distribution, weights = NULL) {
   # sdratio^(stimulus == 1) scales the signal by sdratio and the noise by 1,
   # broadcasting whether stimulus is a per-observation vector (likelihood) or a
   # scalar with sdratio a vector of draws (ROC points) -- unlike ifelse(), whose
-  # result length follows the scalar condition and would drop all but sdratio[1].
+  # result length follows the scalar condition, so the length-1 scale recycles
+  # and silently applies sdratio[1] to every draw rather than shortening eta.
   scale <- sdratio^(stimulus == 1)
   (shift - criterion) / scale
 }
