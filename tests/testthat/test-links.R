@@ -49,6 +49,30 @@ test_that("a link bmm does not implement is refused", {
        links = list(custom_par = "logg")),
     "Unknown link function"
   )
+  expect_error(
+    ddm(rt = "rt", response = "resp", links = stats::setNames(list("log"), "")),
+    "must be a named list"
+  )
+})
+
+test_that("a parameter fixed for scaling is refused with its own message", {
+  expect_error(
+    m3(resp_cats = c("corr", "other"), num_options = c(1, 4), version = "ss",
+       links = list(b = "log")),
+    "'b' has no link in m3\\(\\): the parameter is fixed for scaling"
+  )
+})
+
+test_that("a model outside supported_models() is named by its class", {
+  # what use_model_template() produces before the model is registered
+  model <- structure(
+    list(parameters = list(par1 = "", par2 = ""), links = list(par1 = "log")),
+    class = c("bmmodel", "tmpl_demo")
+  )
+  expect_error(
+    set_links(model, list(zzz = "log")),
+    "tmpl_demo\\(\\) takes links for"
+  )
 })
 
 test_that("a link wider than the model's default warns", {
@@ -160,6 +184,18 @@ test_that("links set after construction are checked by the pipeline", {
     "'kapa' read as 'kappa'"
   )
   expect_false("kapa" %in% names(model$links))
+
+  # a typo that resolves to a parameter the user cannot set is reported as a
+  # typo first, and is not offered back as a settable target
+  model <- m3(resp_cats = c("corr", "other"), num_options = c(1, 4), version = "ss")
+  model$links$bb <- "log"
+  expect_warning(
+    expect_error(
+      check_model(model, NULL, bmf(c ~ 1, a ~ 1)),
+      "'b' has no link in m3\\(\\).*Links can be set for 'c', 'a'"
+    ),
+    "'bb' read as 'b'"
+  )
 
   # the documented m3 idiom of replacing the whole list keeps working
   model <- m3(resp_cats = c("corr", "other"), num_options = c(1, 4))

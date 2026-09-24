@@ -264,7 +264,11 @@ check_links <- function(model) {
   if (length(changed) == 0) {
     return(model)
   }
-  links <- validate_links(model$links[changed], model)
+  # validated against the links the model declared, so that a target the user
+  # just added is not offered back as settable
+  declared <- model
+  declared$links <- default
+  links <- validate_links(model$links[changed], declared)
   model$links[setdiff(changed, names(links))] <- NULL
   model$links[names(links)] <- links
   model
@@ -277,14 +281,18 @@ check_links <- function(model) {
 # an error.
 validate_links <- function(links, model) {
   stopif(
-    !is_namedlist(links) || !all(nzchar(names(links))) ||
+    !is_namedlist(links) ||
       !all(vapply(links, function(l) is.character(l) && length(l) == 1, logical(1))),
     'The `links` argument must be a named list of link functions, \\
      e.g. links = list(kappa = "log")'
   )
   defaults <- attr(model, "links_default") %||% model$links
   settable <- settable_links(model)
-  model_name <- intersect(class(model), supported_models(print_call = FALSE))[1]
+  # a model built by use_model_template() is not in supported_models() yet
+  model_name <- c(
+    intersect(class(model), supported_models(print_call = FALSE)),
+    class(model)[2]
+  )[1]
   given <- names(links)
 
   if (!is.null(settable)) {
@@ -302,16 +310,37 @@ validate_links <- function(links, model) {
       "Several entries of `links` name the same parameter: \\
        {collapse_comma(duplicates)}"
     )
-    fixed <- setdiff(names(links), settable)
-    # naming the link the model already uses asks for no change, so it is a no-op
-    fixed <- fixed[!vapply(fixed, function(p) {
-      identical(links[[p]], defaults[[p]])
-    }, logical(1))]
+  }
+
+  # a repair is reported before anything is refused, so that a user whose typo
+  # resolved to a parameter they cannot set learns both halves of what happened
+  repaired <- names(links) != given
+  warnif(
+    any(repaired),
+    "Link target(s) {collapse_comma(given[repaired])} read as \\
+     {collapse_comma(names(links)[repaired])}. Check the spelling of your \\
+     `links` argument"
+  )
+
+  # naming the link the model already uses asks for no change, so it is a no-op
+  # and the refusals below do not apply to it
+  asked <- names(links)[!vapply(names(links), function(p) {
+    identical(links[[p]], defaults[[p]])
+  }, logical(1))]
+
+  if (!is.null(settable)) {
     settable_str <- if (length(settable) > 0) {
       glue("Links can be set for {collapse_comma(settable)}")
     } else {
       glue("No link of {model_name}() can be set")
     }
+    scaling <- setdiff(asked, names(defaults))
+    stopif(
+      length(scaling) > 0,
+      "{collapse_comma(scaling)} has no link in {model_name}(): the parameter \\
+       is fixed for scaling. {settable_str}"
+    )
+    fixed <- setdiff(setdiff(asked, settable), scaling)
     stopif(
       length(fixed) > 0,
       "The link of {collapse_comma(fixed)} cannot be changed in {model_name}(): \\
@@ -328,13 +357,6 @@ validate_links <- function(links, model) {
      bmm implements {collapse_comma(names(.link_ranges))}"
   )
 
-  repaired <- names(links) != given
-  warnif(
-    any(repaired),
-    "Link target(s) {collapse_comma(given[repaired])} read as \\
-     {collapse_comma(names(links)[repaired])}. Check the spelling of your \\
-     `links` argument"
-  )
   warn_link_range(links, defaults)
   links
 }
