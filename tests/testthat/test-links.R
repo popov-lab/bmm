@@ -56,6 +56,11 @@ test_that("a link wider than the model's default warns", {
     ezdm("m", "v", "n", "t", version = "4par", links = list(zr = "identity")),
     "allow values that the model's default"
   )
+  # 1/eta is negative for every eta < 0, so inverse widens a positive parameter
+  expect_warning(
+    ddm(rt = "rt", response = "resp", links = list(bound = "inverse")),
+    "allow values that the model's default"
+  )
   # narrowing the range is what a link is for, and does not warn
   expect_silent(ezdm("m", "v", "n", "t", links = list(drift = "log")))
   expect_silent(ezdm("m", "v", "n", "t", links = list(bound = "softplus")))

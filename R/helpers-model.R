@@ -194,8 +194,12 @@ update_model_fixed_parameters <- function(model, formula) {
   identity = c(-Inf, Inf),
   log = c(0, Inf),
   softplus = c(0, Inf),
+  # sqrt admits exactly 0, which log does not (link_transform(0, "sqrt",
+  # inverse = TRUE) is 0). The bound below is the closure of that range, so a
+  # log -> sqrt swap does not warn; a single point is not a sampling hazard.
   sqrt = c(0, Inf),
-  inverse = c(0, Inf),
+  # 1/eta on an unbounded linear predictor is negative for every eta < 0
+  inverse = c(-Inf, Inf),
   log1p = c(-1, Inf),
   logm1 = c(1, Inf),
   logit = c(0, 1),
