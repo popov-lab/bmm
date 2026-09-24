@@ -37,6 +37,12 @@
         mu1 = list(main = "normal(0, 0.5)", effects = "normal(0, 0.25)", sd = "exponential(4)"),
         kappa = list(main = "normal(2, 1)", effects = "normal(0, 1)", sd = "exponential(1)"),
         thetat = list(main = "logistic(0, 1)", effects = "normal(0, 0.5)", sd = "exponential(1)")
+      ),
+      # central 50% of the main default prior on the native scale
+      init_ranges = list(
+        mu1 = c(-0.65, 0.65),
+        kappa = c(3.8, 15),
+        thetat = c(0.25, 0.75)
       )
     ),
     class = c("bmmodel", "circular", "mixture2p"),

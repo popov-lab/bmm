@@ -55,6 +55,20 @@ test_that("combine_prior() passes through a NULL side from either argument", {
   expect_equal(combine_prior(prior, NULL), prior)
 })
 
+test_that("combine_prior() treats the classes 'cor' and 'L' as the same prior", {
+  # a prior table names the correlation prior "cor", a fitted object "L"; brms
+  # maps one onto the other and rejects the pair as duplicated
+  default <- brms::prior_("lkj(2)", class = "cor")
+  stored <- brms::prior_("lkj_corr_cholesky(1)", class = "L")
+
+  expect_equal(combine_prior(default, stored)$prior, "lkj_corr_cholesky(1)")
+  expect_equal(combine_prior(stored, default)$prior, "lkj(2)")
+
+  # a group-specific row is a different prior and survives
+  by_group <- brms::prior_("lkj_corr_cholesky(3)", class = "L", group = "ID")
+  expect_equal(nrow(combine_prior(default, by_group)), 2)
+})
+
 test_that("bmm() honours bmm.default_priors = FALSE and report_priors() flags the result as flat", {
   skip_on_cran()
   withr::local_options(bmm.default_priors = FALSE)
@@ -418,6 +432,68 @@ test_that("report_priors() collapses group-level effects into a single sd row", 
   expect_equal(sd_rows$group, "")
   expect_equal(sd_rows$prior, "exponential(1)")
   expect_equal(sd_rows$source, "bmm default")
+})
+
+test_that("classify_priors() recognises a fit's stored correlation prior", {
+  # a fit stores the prior on group-level correlations as class "L" with the
+  # Cholesky density; the reconstructed defaults name it as a prior table does
+  stored <- function(prior, source) prior_row(prior, class = "L", source = source)
+  bmm_default <- prior_row("lkj(2)", class = "cor", source = "user")
+  brms_default <- prior_row("lkj(1)", class = "cor", source = "default")
+
+  res <- classify_priors(stored("lkj_corr_cholesky(2)", "user"), bmm_default)
+  expect_equal(res$source, "bmm default")
+  expect_equal(res$class, "cor")
+  expect_equal(res$prior, "lkj(2)")
+
+  expect_equal(classify_priors(stored("lkj_corr_cholesky(1)", "default"), brms_default)$source, "brms default")
+  expect_equal(classify_priors(stored("lkj_corr_cholesky(4)", "user"), bmm_default)$source, "user")
+})
+
+test_that("as_prior_table() maps every correlation class brms stores internally", {
+  # the pairs brms::check_prior_content() accepts, internal name first
+  pairs <- c(L = "cor", Lrescor = "rescor", Lme = "corme", Llncor = "lncor", Lcortime = "cortime")
+  stored <- do.call(rbind, lapply(
+    names(pairs), function(cl) prior_row("lkj_corr_cholesky(2)", class = cl)
+  ))
+  out <- as_prior_table(stored)
+
+  expect_equal(out$class, unname(pairs))
+  expect_true(all(out$prior == "lkj(2)"))
+  # a class brms does not rename passes through
+  expect_equal(as_prior_table(prior_row("exponential(1)", class = "sd"))$class, "sd")
+})
+
+test_that("report_priors() attributes the correlation prior to bmm", {
+  formula <- bmf(kappa ~ set_size + (set_size | ID), thetat ~ 1)
+  fit <- bmm(formula, oberauer_lin_2017, mixture2p("dev_rad"),
+    backend = "mock", mock_fit = 1, rename = FALSE
+  )
+  cor_row <- report_priors(fit)[report_priors(fit)$class == "cor", ]
+  expect_equal(nrow(cor_row), 1)
+  expect_equal(cor_row$prior, "lkj(2)")
+  expect_equal(cor_row$source, "bmm default")
+
+  fit <- bmm(formula, oberauer_lin_2017, mixture2p("dev_rad"),
+    prior = brms::prior_("lkj(4)", class = "cor"),
+    backend = "mock", mock_fit = 1, rename = FALSE
+  )
+  cor_row <- report_priors(fit)[report_priors(fit)$class == "cor", ]
+  expect_equal(cor_row$prior, "lkj(4)")
+  expect_equal(cor_row$source, "user")
+})
+
+test_that("report_priors() reconstructs the defaults of a fit that needs data2", {
+  dat <- oberauer_lin_2017
+  ids <- levels(factor(dat$ID))
+  A <- diag(length(ids))
+  dimnames(A) <- list(ids, ids)
+  formula <- bmf(kappa ~ 1 + (1 | gr(ID, cov = A)), thetat ~ 1)
+  fit <- bmm(formula, dat, mixture2p("dev_rad"),
+    data2 = list(A = A), backend = "mock", mock_fit = 1, rename = FALSE
+  )
+  report <- report_priors(fit)
+  expect_equal(report$source[report$class == "sd"], "bmm default")
 })
 
 test_that("subsetting a report returns a plain data.frame that still prints", {
