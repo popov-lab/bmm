@@ -73,7 +73,9 @@
 #' @param stimulus The name of the variable in the dataset coding the stimulus
 #'   type. Stimuli should be coded as 0 (noise/new) and 1 (signal/old).
 #' @param n_trials The name of the variable in the dataset containing the
-#'   total number of trials for each cell.
+#'   total number of trials for each cell. It may differ from cell to cell.
+#'   Trial-level data also works: keep one row per trial, with `response`
+#'   0 or 1 and a column of `1`s for `n_trials`.
 #' @param dist The noise distribution assumed for the latent evidence variable,
 #'   given here by its cumulative distribution function. One of:
 #'   \itemize{
@@ -144,6 +146,51 @@
 #' [broeder_schuetz_2009_e3] for such a design. Leaving `sdratio` at its default
 #' is always identified.
 #'
+#' @section Reading `sdratio` and carrying it to [dsdt_yn()]/[rsdt_yn()]:
+#' As in every `bmm` model, the parameters the model *estimates* are on their
+#' link scale, while the distribution functions take their arguments on the
+#' *natural* scale. `sdratio` has a log link, so `summary()` reports
+#' \eqn{\log r} whereas [dsdt_yn()] and [rsdt_yn()] expect the ratio \eqn{r}
+#' itself (their default is 1, equal variance). Exponentiate before carrying a
+#' posterior value across:
+#'
+#' ```
+#' r <- exp(as_draws_matrix(fit)[, "b_sdratio_Intercept"])
+#' ```
+#'
+#' A posterior mean of `sdratio = 0.22` is a ratio of `exp(0.22) = 1.25`.
+#' Passing `0.22` straight to `rsdt_yn()` instead asks for a signal
+#' distribution 4.5 times *narrower* than the noise — a legal value that
+#' raises no error, and the one mistake worth checking for in a posterior
+#' predictive check written by hand. `d` and `criterion` have identity links,
+#' so they carry across unchanged.
+#'
+#' The **zROC slope** reported in the recognition-memory literature is the
+#' reciprocal of that ratio, \eqn{1/r = 1/\exp(\texttt{sdratio})}, so a
+#' `sdratio` posterior mean of 0.375 is a zROC slope of 0.69.
+#'
+#' @section Terms used on this page:
+#' \itemize{
+#'   \item **noise-standardized axis** — latent evidence expressed in units of
+#'     the noise distribution's SD. `criterion` always lives on this axis.
+#'   \item \eqn{\delta} (**separation**) — the distance between the signal and
+#'     noise means, on that axis.
+#'   \item \eqn{d_N} — the classical \eqn{d'}: \eqn{\delta} itself, i.e. the
+#'     separation in noise-SD units.
+#'   \item \eqn{d_a} — the separation divided by the root-mean-square of the
+#'     two SDs, which is what `d` reports. \eqn{d_a = d_N} under equal
+#'     variance.
+#'   \item **operating point** — one (false-alarm rate, hit rate) pair, i.e.
+#'     one point of an ROC curve. One condition gives one operating point.
+#'   \item **AUC** — the area under that ROC curve, equivalently the
+#'     probability that a random signal trial yields more evidence than a
+#'     random noise trial. Obtain it from the posterior with
+#'     `pnorm(d / sqrt(2))` for `dist = "normal"`.
+#'   \item `main` / `effects` — the keys of the default priors listed below:
+#'     `main` is the prior on the intercept, `effects` the prior on regression
+#'     coefficients.
+#' }
+#'
 #' @references
 #' Green, D. M., & Swets, J. A. (1966). \emph{Signal detection theory and
 #'   psychophysics}. Wiley.
@@ -186,6 +233,15 @@
 #'   backend = "cmdstanr"
 #' )
 #'
+#' # Sensitivity and bias per participant
+#' fit_re <- bmm(
+#'   formula = bmf(d ~ 1 + (1 | id), criterion ~ 1 + (1 | id)),
+#'   data = dat,
+#'   model = model,
+#'   cores = 4,
+#'   backend = "cmdstanr"
+#' )
+#'
 #' # Unequal-variance yes/no SDT. sdratio needs a criterion manipulation: on
 #' # the single-condition `dat` above it would not be identified.
 #' # `model` already names the columns this dataset uses.
@@ -196,6 +252,12 @@
 #'   cores = 4,
 #'   backend = "cmdstanr"
 #' )
+#'
+#' # Simulating from a fitted unequal-variance model: the model reports
+#' # sdratio on its log link, rsdt_yn() takes the ratio itself.
+#' sdratio_posterior <- 0.375
+#' rsdt_yn(2, 100L, c(0L, 1L),
+#'         d = 1.3, criterion = 0.1, sdratio = exp(sdratio_posterior))
 #' }
 sdt_yn <- function(response, stimulus, n_trials,
                    dist = c("normal", "gumbel_min", "gumbel_max", "logistic"),

@@ -2155,14 +2155,14 @@ sdt_criterion <- function(hit_rate, fa_rate,
 #' @param n_trials Integer vector. Total number of trials per cell.
 #' @param stimulus Integer vector (0/1). Stimulus type: 0 = noise, 1 = signal.
 #' @param d Numeric. Sensitivity: \eqn{d'} when `sdratio` is 1, and otherwise
-#'   the balanced index \eqn{d_a} (see [sdt_yn()]). The separation between the
-#'   distributions in noise units is `d * sqrt((1 + sdratio^2) / 2)`.
+#'   the balanced index \eqn{d_a}, the separation between the two distributions
+#'   divided by the root-mean-square of their SDs (see [sdt_yn()]). The
+#'   separation in noise units is `d * sqrt((1 + sdratio^2) / 2)`.
 #' @param criterion Numeric. Response bias (decision boundary location), on the
-#'   noise-standardized axis.
+#'   noise-standardized axis, i.e. in units of the noise distribution's SD.
 #' @param sdratio Numeric. Ratio of signal to noise standard deviations
-#'   (default 1, i.e., equal variance). Must be positive. Note that this is the
-#'   natural scale: the `sdratio` parameter of [sdt_yn()] is sampled on the log
-#'   scale, so it corresponds to `log(sdratio)` here.
+#'   (default 1, i.e., equal variance). Must be positive, and is on the
+#'   **natural** scale — see the section below before reusing a fitted value.
 #' @inheritParams SDTdist
 #' @param log Logical. If `TRUE`, returns log-density (default `FALSE`).
 #' @param n Integer. Number of observations to generate. `n_trials`,
@@ -2171,6 +2171,15 @@ sdt_criterion <- function(hit_rate, fa_rate,
 #' @return `dsdt_yn` returns the (log-)density (binomial probability).
 #'   `rsdt_yn` returns an integer vector with the number of "old"/"signal"
 #'   responses per observation.
+#'
+#' @section Parameter scales:
+#' As everywhere in `bmm`, these functions take their arguments on the
+#' **natural** scale, while the parameters [sdt_yn()] *estimates* are on their
+#' link scale. `d` and `criterion` have identity links and carry across
+#' unchanged, but `sdratio` has a log link: a fitted `sdratio` of 0.375 is a
+#' ratio of `exp(0.375) = 1.455`, and passing `0.375` here instead asks for a
+#' signal distribution 2.7 times narrower than the noise. That is a legal
+#' value and raises no error, so exponentiate first.
 #'
 #' @references
 #' Green, D. M., & Swets, J. A. (1966). \emph{Signal detection theory and
@@ -2187,6 +2196,11 @@ sdt_criterion <- function(hit_rate, fa_rate,
 #' dsdt_yn(n_old = c(30, 80), n_trials = c(100, 100),
 #'         stimulus = c(0, 1), d = 1.5, criterion = 0.2,
 #'         log = TRUE)
+#'
+#' # Unequal variance from a fitted model: sdt_yn() reports sdratio on its log
+#' # link, so exponentiate before passing it here
+#' dsdt_yn(n_old = 80, n_trials = 100, stimulus = 1,
+#'         d = 1.5, criterion = 0.2, sdratio = exp(0.375))
 dsdt_yn <- function(n_old, n_trials, stimulus, d, criterion,
                     sdratio = 1,
                     dist = c("normal", "gumbel_min", "gumbel_max", "logistic"),
