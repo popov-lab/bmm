@@ -95,10 +95,21 @@
 # formula, so there is no set of names to check a link target against
 # (check_model.m3_custom refuses a parameter left without a link). The ss and
 # cs versions build their activation functions from the version table, so their
-# parameters are known here
+# parameters are known here. The custom branch is defensive rather than
+# load-bearing: a custom m3 has no links at construction, so names() is already
+# NULL, and check_links() never runs on one because set_links() stored no
+# attribute.
 #' @exportS3Method
 settable_links.m3 <- function(model) {
   if (model$version == "custom") NULL else names(model$links)
+}
+
+# m3 is the one model that applies its links itself, by substituting the
+# inverse link into the activation formulas (apply_links -> inv_link), so the
+# links it can honour are inv_link()'s, not the ones a brms family can emit
+#' @exportS3Method
+settable_link_functions.m3 <- function(model) {
+  eval(formals(inv_link)$link)
 }
 
 

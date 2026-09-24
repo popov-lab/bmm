@@ -226,6 +226,21 @@ settable_links.default <- function(model) {
   names(model$links)
 }
 
+# The link functions a model can carry through to its likelihood. .link_ranges
+# is the wider vocabulary of links bmm knows a range for, including the ones a
+# model may declare as its own default but a user cannot ask for: brms writes
+# no inverse-link code for loglog or softmax, so a custom family built with
+# either dies in stancode() with "argument is of length zero". Models that
+# apply their links themselves rather than through a brms family override this.
+settable_link_functions <- function(model) {
+  UseMethod("settable_link_functions")
+}
+
+#' @exportS3Method
+settable_link_functions.default <- function(model) {
+  setdiff(names(.link_ranges), c("loglog", "softmax"))
+}
+
 # Assign user-supplied links onto the model's defaults. A name-indexed
 # assignment appends an unrecognized name instead of refusing it, so a typo
 # used to advertise a parameter the model does not have while the link the user
@@ -323,7 +338,7 @@ validate_links <- function(links, model) {
   )
 
   # naming the link the model already uses asks for no change, so it is a no-op
-  # and the refusals below do not apply to it
+  # and neither the refusals below nor the allow-list applies to it
   asked <- names(links)[!vapply(names(links), function(p) {
     identical(links[[p]], defaults[[p]])
   }, logical(1))]
@@ -350,11 +365,12 @@ validate_links <- function(links, model) {
     )
   }
 
-  unsupported <- setdiff(unlist(links), names(.link_ranges))
+  offered <- settable_link_functions(model)
+  unsupported <- setdiff(unlist(links[asked]), offered)
   stopif(
     length(unsupported) > 0,
     "Unknown link function(s): {collapse_comma(unsupported)}. \\
-     bmm implements {collapse_comma(names(.link_ranges))}"
+     {model_name}() takes {collapse_comma(offered)}"
   )
 
   warn_link_range(links, defaults)

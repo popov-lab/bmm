@@ -55,6 +55,34 @@ test_that("a link bmm does not implement is refused", {
   )
 })
 
+test_that("a link the model cannot honour is refused at the constructor", {
+  # brms writes no inverse-link code for loglog or softmax, so a custom family
+  # built with either dies in stancode() with "argument is of length zero"
+  expect_error(
+    ddm(rt = "rt", response = "resp", links = list(bound = "loglog")),
+    "Unknown link function\\(s\\): 'loglog'\\. ddm\\(\\) takes"
+  )
+  expect_error(
+    ddm(rt = "rt", response = "resp", links = list(bound = "softmax")),
+    "Unknown link function\\(s\\): 'softmax'\\. ddm\\(\\) takes"
+  )
+  expect_false(any(c("loglog", "softmax") %in% settable_link_functions(ddm("rt", "resp"))))
+
+  # m3 substitutes the inverse link into its activation formulas, so it honours
+  # inv_link()'s five rather than the ones a brms family can emit
+  m3_ss <- function(links) {
+    m3(resp_cats = c("corr", "other", "npl"),
+       num_options = c("n_corr", "n_other", "n_npl"),
+       choice_rule = "simple", version = "ss", links = links)
+  }
+  expect_error(m3_ss(list(c = "sqrt")), "'sqrt'\\. m3\\(\\) takes")
+  expect_silent(m3_ss(list(c = "log")))
+  expect_equal(
+    settable_link_functions(m3_ss(NULL)),
+    c("log", "softplus", "logit", "probit", "identity")
+  )
+})
+
 test_that("a parameter fixed for scaling is refused with its own message", {
   expect_error(
     m3(resp_cats = c("corr", "other"), num_options = c(1, 4), version = "ss",
