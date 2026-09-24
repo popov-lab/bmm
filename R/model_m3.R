@@ -86,9 +86,19 @@
     call = call
   )
 
-  out$links[names(links)] <- links
+  out <- set_links(out, links)
   out$default_priors[names(default_priors)] <- default_priors
   out
+}
+
+# the parameters of a custom m3 are the activation sources of the user's
+# formula, so there is no set of names to check a link target against
+# (check_model.m3_custom refuses a parameter left without a link). The ss and
+# cs versions build their activation functions from the version table, so their
+# parameters are known here
+#' @exportS3Method
+settable_links.m3 <- function(model) {
+  if (model$version == "custom") NULL else names(model$links)
 }
 
 

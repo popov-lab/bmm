@@ -83,7 +83,11 @@ test_that("create_initfun returns 0 for m3 with simple choice rule and identity 
 
   # an identity link on any parameter requires zeros for stable sampling
   model$links$c <- "identity"
-  expect_equal(configured_initfun(model, ff, dat), 0)
+  expect_warning(
+    init <- configured_initfun(model, ff, dat),
+    "allow values that the model's default"
+  )
+  expect_equal(init, 0)
 })
 
 test_that("m3 with a softmax choice rule gets random-effects inits", {
@@ -499,9 +503,17 @@ test_that("initfun output matches standata dimensions for no-intercept models", 
 # =============================================================================
 
 test_that("create_initfun handles a softplus link override on a positive parameter", {
-  ff <- bmmformula(kappa ~ 1, c ~ 1)
-  dat <- oberauer_lin_2017
-  mod <- sdm(resp_error = "dev_rad", links = list(kappa = "softplus"))
+  ff <- bmmformula(drift ~ 1, bound ~ 1, ndt ~ 1)
+  dat <- data.frame(
+    mean_rt = c(0.50, 0.60, 0.70, 0.55),
+    var_rt = c(0.020, 0.030, 0.025, 0.020),
+    n_upper = c(80, 85, 75, 78),
+    n_trials = 100
+  )
+  mod <- ezdm("mean_rt", "var_rt", "n_upper", "n_trials",
+    links = list(bound = "softplus")
+  )
+  dat <- check_data(mod, dat, ff)
   config_args <- configure_model(mod, data = dat, formula = ff)
 
   init_fun <- create_initfun(mod, dat, config_args$formula)

@@ -1,0 +1,146 @@
+test_that("an unrecognized link target is refused, not appended", {
+  expect_error(
+    ddm(rt = "rt", response = "resp", links = list(zzz = "log")),
+    "Unrecognized link target"
+  )
+  expect_error(
+    m3(resp_cats = c("corr", "other"), num_options = c(1, 4), version = "ss",
+       links = list(zzz = "log")),
+    "Unrecognized link target"
+  )
+})
+
+test_that("a link target one edit from a parameter is read as that parameter", {
+  expect_warning(
+    model <- ddm(rt = "rt", response = "resp", links = list(drif = "log")),
+    "'drif' read as 'drift'"
+  )
+  expect_equal(model$links$drift, "log")
+  expect_false("drif" %in% names(model$links))
+
+  expect_warning(
+    model <- ezdm("m", "v", "n", "t", links = list(bond = "softplus")),
+    "'bond' read as 'bound'"
+  )
+  expect_equal(model$links$bound, "softplus")
+})
+
+test_that("a link target that names no single parameter is refused", {
+  # 'b' is one edit from each of imm's a, c and s
+  expect_error(
+    imm(resp_error = "y", nt_features = "nt", nt_distances = "d",
+        set_size = "ss", links = list(b = "log")),
+    "Unrecognized link target"
+  )
+  # two entries resolving to the same parameter would silently drop one
+  expect_error(
+    ezdm("m", "v", "n", "t", links = list(bound = "log", boud = "softplus")),
+    "name the same parameter"
+  )
+})
+
+test_that("a link bmm does not implement is refused", {
+  expect_error(
+    ezdm("m", "v", "n", "t", links = list(bound = "logg")),
+    "Unknown link function"
+  )
+  expect_error(
+    m3(resp_cats = c("corr", "other"), num_options = c(1, 4),
+       links = list(custom_par = "logg")),
+    "Unknown link function"
+  )
+})
+
+test_that("a link wider than the model's default warns", {
+  expect_warning(
+    ezdm("m", "v", "n", "t", version = "4par", links = list(zr = "identity")),
+    "allow values that the model's default"
+  )
+  # narrowing the range is what a link is for, and does not warn
+  expect_silent(ezdm("m", "v", "n", "t", links = list(drift = "log")))
+  expect_silent(ezdm("m", "v", "n", "t", links = list(bound = "softplus")))
+})
+
+test_that("a link the model does not pass on to the fit is refused", {
+  expect_error(
+    sdm(resp_error = "y", links = list(kappa = "softplus")),
+    "cannot be changed in sdm\\(\\)"
+  )
+  expect_error(
+    imm(resp_error = "y", nt_features = "nt", nt_distances = "d",
+        set_size = "ss", links = list(c = "softplus")),
+    "cannot be changed in imm\\(\\)"
+  )
+  expect_error(
+    mixture2p(resp_error = "y", links = list(kappa = "softplus")),
+    "cannot be changed in mixture2p\\(\\)"
+  )
+  expect_error(
+    mixture3p(resp_error = "y", nt_features = "nt", set_size = "ss",
+              links = list(kappa = "softplus")),
+    "cannot be changed in mixture3p\\(\\)"
+  )
+  # naming the link the model already uses asks for no change
+  expect_silent(sdm(resp_error = "y", links = list(kappa = "log")))
+})
+
+test_that("the links a model applies are exactly the settable ones", {
+  # measured against the family each configure_model() builds: only these
+  # models read model$links at fit time
+  expect_equal(
+    settable_links(ddm(rt = "rt", response = "resp")),
+    c("drift", "bound", "ndt", "zr")
+  )
+  expect_equal(
+    settable_links(ezdm("m", "v", "n", "t")),
+    c("drift", "bound", "ndt", "s")
+  )
+  expect_equal(
+    settable_links(cswald(rt = "rt", response = "resp")),
+    names(cswald(rt = "rt", response = "resp")$links)
+  )
+  expect_null(settable_links(m3(resp_cats = c("a", "b"), num_options = c(1, 4))))
+  expect_equal(settable_links(sdm(resp_error = "y")), character(0))
+})
+
+test_that("a custom link set on a model reaches the brms family", {
+  dat <- data.frame(mean_rt = 0.6, var_rt = 0.03, n_upper = 80, n_trials = 100)
+  ff <- bmmformula(drift ~ 1, bound ~ 1, ndt ~ 1)
+  model <- ezdm("mean_rt", "var_rt", "n_upper", "n_trials",
+    links = list(bound = "softplus")
+  )
+  family <- configure_model(model, check_data(model, dat, ff), ff)$formula$family
+  expect_equal(family$link_bound, "softplus")
+})
+
+test_that("links set after construction are checked by the pipeline", {
+  ff <- bmmformula(c ~ 1, kappa ~ 1)
+  dat <- data.frame(y = c(0.1, -0.2, 0.3))
+
+  model <- sdm(resp_error = "y")
+  model$links$kappa <- "softplus"
+  expect_error(check_model(model, dat, ff), "cannot be changed in sdm\\(\\)")
+
+  model <- sdm(resp_error = "y")
+  model$links$kapa <- "log"
+  expect_warning(
+    model <- check_model(model, dat, ff),
+    "'kapa' read as 'kappa'"
+  )
+  expect_false("kapa" %in% names(model$links))
+
+  # the documented m3 idiom of replacing the whole list keeps working
+  model <- m3(resp_cats = c("corr", "other"), num_options = c(1, 4))
+  model$links <- list(c = "log", a = "log")
+  model <- suppressWarnings(
+    check_model(model, NULL, bmf(corr ~ b + c, other ~ b, c ~ 1, a ~ 1))
+  )
+  expect_equal(model$links, list(c = "log", a = "log"))
+})
+
+test_that("an unchanged model passes the pipeline check untouched", {
+  ff <- bmmformula(c ~ 1, kappa ~ 1)
+  dat <- data.frame(y = c(0.1, -0.2, 0.3))
+  model <- sdm(resp_error = "y")
+  expect_equal(check_model(model, dat, ff)$links, model$links)
+})
