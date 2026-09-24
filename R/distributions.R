@@ -2209,6 +2209,11 @@ dsdt_yn <- function(n_old, n_trials, stimulus, d, criterion,
   stopif(any(n_old < 0), "n_old must be non-negative")
   stopif(any(n_trials < 1), "n_trials must be positive")
   stopif(any(n_old > n_trials), "n_old must not exceed n_trials")
+  # %in% compares a factor as character, so the value check below passes and the
+  # arithmetic in .sdt_eta() then returns a silent NA
+  stopif(!is.numeric(stimulus) && !is.logical(stimulus),
+         "stimulus must be numeric or logical, coded 0 (noise) or 1 (signal); \\
+         found {class(stimulus)[1]}")
   stopif(any(!stimulus %in% c(0L, 1L)),
          "stimulus must be 0 (noise) or 1 (signal)")
   stopif(any(sdratio <= 0), "sdratio must be positive")
@@ -2239,6 +2244,9 @@ rsdt_yn <- function(n, n_trials, stimulus, d, criterion,
   dist <- match.arg(dist)
   stopif(length(n) != 1 || n < 1, "n must be a single positive integer")
   stopif(any(n_trials < 1), "n_trials must be positive")
+  stopif(!is.numeric(stimulus) && !is.logical(stimulus),
+         "stimulus must be numeric or logical, coded 0 (noise) or 1 (signal); \\
+         found {class(stimulus)[1]}")
   stopif(any(!stimulus %in% c(0L, 1L)),
          "stimulus must be 0 (noise) or 1 (signal)")
   stopif(any(sdratio <= 0), "sdratio must be positive")

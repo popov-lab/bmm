@@ -359,6 +359,30 @@ test_that("dsdt_yn validates input", {
                "should be one of")
 })
 
+test_that("d/rsdt_yn refuse a stimulus type they cannot read", {
+  # %in% compares a factor as character, so the value check passed and .sdt_eta()
+  # returned a silent NA that propagates into a hand-written pp check
+  for (bad in list(factor("1"), "1")) {
+    expect_error(
+      dsdt_yn(68, 100, bad, d = 1.5, criterion = 0),
+      "must be numeric or logical",
+      info = class(bad)[1]
+    )
+    expect_error(
+      rsdt_yn(2, 100L, bad, d = 1.5, criterion = 0),
+      "must be numeric or logical",
+      info = class(bad)[1]
+    )
+  }
+
+  # logical stays accepted, and gives the value the integer call gives
+  expect_equal(dsdt_yn(68, 100, TRUE, d = 1.5, criterion = 0),
+               dsdt_yn(68, 100, 1L, d = 1.5, criterion = 0))
+  expect_equal(dsdt_yn(30, 100, FALSE, d = 1.5, criterion = 0),
+               dsdt_yn(30, 100, 0L, d = 1.5, criterion = 0))
+  expect_length(rsdt_yn(2, 100L, c(FALSE, TRUE), d = 1.5, criterion = 0), 2)
+})
+
 test_that("dsdt_yn stays finite where the probability scale underflows", {
   # naive dbinom(y, n, pnorm(eta)) returns -Inf here and poisons loo()
   for (dist_name in c("normal", "logistic", "gumbel_min", "gumbel_max")) {
