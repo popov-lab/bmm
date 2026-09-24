@@ -151,7 +151,7 @@ test_that("sdt_yn check_data validates stimulus coding", {
   )
   expect_error(
     check_data(model, factor_data, formula),
-    "must be coded as 0"
+    "must be numeric"
   )
 
   # logical and character are the other two shapes a 0/1 column arrives in;
@@ -163,7 +163,7 @@ test_that("sdt_yn check_data validates stimulus coding", {
   )
   expect_error(
     check_data(model, logical_data, formula),
-    "must be coded as 0"
+    "must be numeric"
   )
 
   character_data <- data.frame(
@@ -173,8 +173,43 @@ test_that("sdt_yn check_data validates stimulus coding", {
   )
   expect_error(
     check_data(model, character_data, formula),
-    "must be coded as 0"
+    "must be numeric"
   )
+})
+
+test_that("sdt_yn check_data says which stimulus problem it found", {
+  model <- sdt_yn("n_old", "stimulus", "n_trials")
+  formula <- bmf(d ~ 1, criterion ~ 1)
+  base <- data.frame(n_old = c(30, 40), stimulus = c(0L, 1L),
+                     n_trials = c(50, 50))
+
+  # one message for every problem told the user nothing about theirs
+  na_data <- base
+  na_data$stimulus <- c(NA_integer_, 1L)
+  expect_error(check_data(model, na_data, formula), "1 of 2 values are NA")
+
+  value_data <- base
+  value_data$stimulus <- c(2, 3)
+  expect_error(check_data(model, value_data, formula), "found '2', '3'")
+
+  list_data <- base
+  list_data$stimulus <- I(list(1, 2))
+  expect_error(check_data(model, list_data, formula), "must be numeric")
+})
+
+test_that("sdt_yn check_data rejects a constant stimulus column", {
+  # accepted before, and d and criterion were then "estimated" from one rate
+  model <- sdt_yn("n_old", "stimulus", "n_trials")
+  formula <- bmf(d ~ 1, criterion ~ 1)
+
+  for (value in list(0L, 1L)) {
+    constant_data <- data.frame(n_old = c(30, 40), stimulus = value,
+                                n_trials = c(50, 50))
+    expect_error(
+      check_data(model, constant_data, formula),
+      paste0("is ", value, " in every row")
+    )
+  }
 })
 
 test_that("sdt_yn check_data validates response counts", {

@@ -40,10 +40,11 @@ check_formula.sdt <- function(model, data, formula) {
                       function(x) stim_var %in% x, logical(1))
   stopif(
     any(uses_stim),
-    "The formula for parameter(s) {collapse_comma(names(uses_stim)[uses_stim])} \\
-    uses the stimulus variable '{stim_var}'. {model$name} already uses \\
-    '{stim_var}' in the likelihood to tell noise rows from signal rows, so a \\
-    term in '{stim_var}' -- as a predictor or as a grouping factor -- is \\
+    "The formula for parameter(s) \\
+    {collapse_comma(names(uses_stim)[uses_stim])} uses the stimulus variable \\
+    '{stim_var}'. {model$name} already uses '{stim_var}' in the likelihood to \\
+    tell noise rows from signal rows, so a term in '{stim_var}' -- as a \\
+    predictor or as a grouping factor -- is \\
     confounded with that parameter's own intercept and the model is not \\
     identified. Drop '{stim_var}' from the formula."
   )
@@ -54,6 +55,34 @@ check_formula.sdt <- function(model, data, formula) {
 ############################################################################# !
 # DATA VALIDATION HELPERS                                                 ####
 ############################################################################# !
+
+.validate_sdt_stimulus <- function(data, stim_var) {
+  stopif(!stim_var %in% colnames(data),
+    "Stimulus variable '{stim_var}' missing in the data")
+  stim_vals <- data[[stim_var]]
+
+  stopif(!is.numeric(stim_vals),
+    "Stimulus variable '{stim_var}' must be numeric, coded as 0 (noise) and \\
+    1 (signal); found {class(stim_vals)[1]}")
+
+  n_missing <- sum(is.na(stim_vals))
+  stopif(n_missing > 0,
+    "Stimulus variable '{stim_var}' must be coded as 0 (noise) and 1 \\
+    (signal), but {n_missing} of {length(stim_vals)} values are NA")
+
+  unexpected <- unique(stim_vals[!stim_vals %in% c(0, 1)])
+  stopif(length(unexpected) > 0,
+    "Stimulus variable '{stim_var}' must be coded as 0 (noise) and 1 \\
+    (signal); found {collapse_comma(sort(unexpected))}")
+
+  # one rate cannot separate sensitivity from bias, so d and criterion would be
+  # estimated from a single hit or false-alarm rate
+  stopif(length(unique(stim_vals)) == 1,
+    "Stimulus variable '{stim_var}' is {stim_vals[1]} in every row. The model \\
+    needs both noise (0) and signal (1) rows to estimate d and criterion")
+
+  as.integer(stim_vals)
+}
 
 .validate_sdt_counts <- function(data, resp_var, n_trials_var) {
   required <- c(resp_var, n_trials_var)

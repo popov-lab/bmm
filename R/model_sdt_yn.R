@@ -297,11 +297,7 @@ sdt_yn <- function(response, stimulus, n_trials,
 #' @export
 check_data.sdt_yn <- function(model, data, formula) {
   stim_var <- model$other_vars$stimulus
-  stopif(!stim_var %in% colnames(data),
-         "Stimulus variable '{stim_var}' missing in the data")
-  stim_vals <- data[[stim_var]]
-  stopif(!is.numeric(stim_vals) || !all(stim_vals %in% c(0, 1)),
-         "Stimulus variable '{stim_var}' must be coded as 0 (noise) and 1 (signal)")
+  data[[stim_var]] <- .validate_sdt_stimulus(data, stim_var)
 
   .validate_sdt_counts(data, model$resp_vars$response,
                        model$other_vars$n_trials)
