@@ -149,14 +149,24 @@ happens.
 
 \section{Identifying \code{sdratio}}{
 
-\code{sdratio} is identified only when the criterion varies across conditions. A
-single (hit, false-alarm) pair is two numbers for three unknowns, so on a
-one-condition design \code{sdratio ~ 1} returns its prior and \code{d} is pulled along
-the resulting ridge: sampling converges, \code{Rhat} is fine, and nothing warns.
-Give \code{criterion} a predictor that shifts the decision boundary — a base-rate,
-payoff, or confidence manipulation — as in \code{criterion ~ 0 + condition}; see
-\link{broeder_schuetz_2009_e3} for such a design. Leaving \code{sdratio} at its default
-is always identified.
+\code{sdratio} needs a design that supplies more than one operating point. A single
+(hit, false-alarm) pair is two numbers for three unknowns, so when every
+parameter is intercept-only with no random effects, \code{sdratio ~ 1} returns its
+prior and \code{d} is pulled along the resulting ridge: sampling converges, \code{Rhat}
+is fine, and the profile likelihood over \code{sdratio} is flat to 1e-12.
+
+Any linear predictor that moves the operating point along the ROC supplies
+what is missing, and it need not sit on \code{criterion}: a sensitivity
+manipulation (\code{d ~ 0 + condition}, a study-time or strength manipulation with
+bias held constant) identifies \code{sdratio} just as a criterion manipulation
+does, and so does between-subject variation entering through a random effect
+such as \code{criterion ~ 1 + (1 | id)}.
+
+A criterion manipulation is still the cleanest design, because it traces the
+ROC at fixed sensitivity: give \code{criterion} a predictor that shifts the
+decision boundary — a base-rate, payoff, or confidence manipulation — as in
+\code{criterion ~ 0 + condition}; see \link{broeder_schuetz_2009_e3}. Leaving \code{sdratio}
+at its default is always identified.
 }
 
 \section{Reading \code{sdratio} and carrying it to \code{\link[=dsdt_yn]{dsdt_yn()}}/\code{\link[=rsdt_yn]{rsdt_yn()}}}{
@@ -237,8 +247,8 @@ fit_re <- bmm(
   backend = "cmdstanr"
 )
 
-# Unequal-variance yes/no SDT. sdratio needs a criterion manipulation: on
-# the single-condition `dat` above it would not be identified.
+# Unequal-variance yes/no SDT. sdratio needs more than one operating point:
+# on the single-condition `dat` above it would not be identified.
 # `model` already names the columns this dataset uses.
 fit_uv <- bmm(
   formula = bmf(d ~ 1, criterion ~ 0 + condition, sdratio ~ 1),
