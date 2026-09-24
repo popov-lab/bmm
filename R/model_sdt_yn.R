@@ -150,9 +150,9 @@
 #' As in every `bmm` model, the parameters the model *estimates* are on their
 #' link scale, while the distribution functions take their arguments on the
 #' *natural* scale. `sdratio` has a log link, so `summary()` reports
-#' \eqn{\log r} whereas [dsdt_yn()] and [rsdt_yn()] expect the ratio \eqn{r}
-#' itself (their default is 1, equal variance). Exponentiate before carrying a
-#' posterior value across:
+#' \eqn{\log r}{log(r)} whereas [dsdt_yn()] and [rsdt_yn()] expect the ratio
+#' \eqn{r} itself (their default is 1, equal variance). Exponentiate before
+#' carrying a posterior value across:
 #'
 #' ```
 #' r <- exp(as_draws_matrix(fit)[, "b_sdratio_Intercept"])
@@ -166,8 +166,8 @@
 #' so they carry across unchanged.
 #'
 #' The **zROC slope** reported in the recognition-memory literature is the
-#' reciprocal of that ratio, \eqn{1/r = 1/\exp(\texttt{sdratio})}, so a
-#' `sdratio` posterior mean of 0.375 is a zROC slope of 0.69.
+#' reciprocal of that ratio, `1 / exp(sdratio)`, so a `sdratio` posterior mean
+#' of 0.375 is a zROC slope of 0.69.
 #'
 #' @section Terms used on this page:
 #' \itemize{
@@ -186,9 +186,9 @@
 #'     probability that a random signal trial yields more evidence than a
 #'     random noise trial. Obtain it from the posterior with
 #'     `pnorm(d / sqrt(2))` for `dist = "normal"`.
-#'   \item `main` / `effects` — the keys of the default priors listed below:
-#'     `main` is the prior on the intercept, `effects` the prior on regression
-#'     coefficients.
+#'   \item `main` / `effects` — the keys of the default priors shown in the
+#'     model description above: `main` is the prior on the intercept,
+#'     `effects` the prior on regression coefficients.
 #' }
 #'
 #' @references

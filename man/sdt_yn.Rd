@@ -164,9 +164,9 @@ is always identified.
 As in every \code{bmm} model, the parameters the model \emph{estimates} are on their
 link scale, while the distribution functions take their arguments on the
 \emph{natural} scale. \code{sdratio} has a log link, so \code{summary()} reports
-\eqn{\log r} whereas \code{\link[=dsdt_yn]{dsdt_yn()}} and \code{\link[=rsdt_yn]{rsdt_yn()}} expect the ratio \eqn{r}
-itself (their default is 1, equal variance). Exponentiate before carrying a
-posterior value across:
+\eqn{\log r}{log(r)} whereas \code{\link[=dsdt_yn]{dsdt_yn()}} and \code{\link[=rsdt_yn]{rsdt_yn()}} expect the ratio
+\eqn{r} itself (their default is 1, equal variance). Exponentiate before
+carrying a posterior value across:
 
 \if{html}{\out{<div class="sourceCode">}}\preformatted{r <- exp(as_draws_matrix(fit)[, "b_sdratio_Intercept"])
 }\if{html}{\out{</div>}}
@@ -179,8 +179,8 @@ predictive check written by hand. \code{d} and \code{criterion} have identity li
 so they carry across unchanged.
 
 The \strong{zROC slope} reported in the recognition-memory literature is the
-reciprocal of that ratio, \eqn{1/r = 1/\exp(\texttt{sdratio})}, so a
-\code{sdratio} posterior mean of 0.375 is a zROC slope of 0.69.
+reciprocal of that ratio, \code{1 / exp(sdratio)}, so a \code{sdratio} posterior mean
+of 0.375 is a zROC slope of 0.69.
 }
 
 \section{Terms used on this page}{
@@ -201,9 +201,9 @@ one point of an ROC curve. One condition gives one operating point.
 probability that a random signal trial yields more evidence than a
 random noise trial. Obtain it from the posterior with
 \code{pnorm(d / sqrt(2))} for \code{dist = "normal"}.
-\item \code{main} / \code{effects} — the keys of the default priors listed below:
-\code{main} is the prior on the intercept, \code{effects} the prior on regression
-coefficients.
+\item \code{main} / \code{effects} — the keys of the default priors shown in the
+model description above: \code{main} is the prior on the intercept,
+\code{effects} the prior on regression coefficients.
 }
 }
 
