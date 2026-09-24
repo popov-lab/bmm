@@ -64,6 +64,19 @@ test_that("sdt_yn model accepts custom links", {
   expect_equal(model$links$criterion, "identity")
 })
 
+test_that("sdt_yn rejects a link for a parameter it does not have", {
+  # an unmatched name used to be appended, so print() advertised a parameter
+  # that does not exist while the intended link was never applied
+  expect_error(
+    sdt_yn("n_old", "stimulus", "n_trials", links = list(sdration = "log")),
+    "Unrecognized link target"
+  )
+  expect_equal(
+    names(sdt_yn("n_old", "stimulus", "n_trials")$links),
+    c("d", "criterion", "sdratio")
+  )
+})
+
 test_that("sdt_yn model stores distribution info correctly", {
   model <- sdt_yn("n_old", "stimulus", "n_trials", dist = "gumbel_min")
   expect_equal(model$other_vars$dist, "gumbel_min")

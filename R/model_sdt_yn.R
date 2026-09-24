@@ -204,6 +204,14 @@ sdt_yn <- function(response, stimulus, n_trials,
   stop_missing_args()
   dist <- match.arg(dist)
 
+  # an unmatched name is otherwise appended, so print() advertises a parameter
+  # that does not exist and the intended link is never applied
+  valid_links <- names(.model_sdt_yn()$links)
+  stopif(!all(names(links) %in% valid_links),
+         "Unrecognized link target(s): \\
+         {collapse_comma(setdiff(names(links), valid_links))}. \\
+         sdt_yn() takes links for {collapse_comma(valid_links)}")
+
   .model_sdt_yn(response = response, stimulus = stimulus,
                 n_trials = n_trials, dist = dist,
                 links = links, call = call, ...)
