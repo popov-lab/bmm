@@ -44,7 +44,10 @@ test_that("ezdm model has correct link functions", {
 
 test_that("ezdm model accepts custom links", {
   custom_links <- list(bound = "identity")  # Changed from drift since identity is now default
-  model <- ezdm("mean_rt", "var_rt", "n_upper", "n_trials", version = "3par", links = custom_links)
+  expect_warning(
+    model <- ezdm("mean_rt", "var_rt", "n_upper", "n_trials", version = "3par", links = custom_links),
+    "allow values that the model's default"
+  )
   expect_equal(model$links$drift, "identity")  # default
   expect_equal(model$links$bound, "identity")  # custom
 })

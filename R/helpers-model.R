@@ -127,6 +127,7 @@ check_model.default <- function(model, data = NULL, formula = NULL) {
 
 #' @export
 check_model.bmmodel <- function(model, data = NULL, formula = NULL) {
+  model <- check_links(model)
   model <- replace_regex_variables(model, data)
   model <- update_model_fixed_parameters(model, formula)
   NextMethod("check_model")
@@ -177,6 +178,242 @@ update_model_fixed_parameters <- function(model, formula) {
     model$fixed_parameters[overwrite] <- NULL
   }
   model
+}
+
+############################################################################# !
+# LINKS                                                                  ####
+############################################################################# !
+
+# The links bmm can apply, with the range each one confines its parameter to on
+# the native scale. A link is the model's statement about where the parameter
+# lives, which is why widening that range is worth a warning: the sampler is
+# then free to propose values the likelihood is not defined for, and the
+# default priors, which are written on the link scale, no longer imply the same
+# range. Keep in sync with link_transform().
+.link_ranges <- list(
+  identity = c(-Inf, Inf),
+  log = c(0, Inf),
+  softplus = c(0, Inf),
+  # sqrt admits exactly 0, which log does not (link_transform(0, "sqrt",
+  # inverse = TRUE) is 0). The bound below is the closure of that range, so a
+  # log -> sqrt swap does not warn; a single point is not a sampling hazard.
+  sqrt = c(0, Inf),
+  # 1/eta on an unbounded linear predictor is negative for every eta < 0
+  inverse = c(-Inf, Inf),
+  log1p = c(-1, Inf),
+  logm1 = c(1, Inf),
+  logit = c(0, 1),
+  probit = c(0, 1),
+  cloglog = c(0, 1),
+  loglog = c(0, 1),
+  softmax = c(0, 1),
+  tan_half = c(-pi, pi)
+)
+
+# The parameters whose link a model passes on to the fit. Models that build
+# their family from fixed links override this with character(0), so that
+# setting one is refused rather than silently applied to print(), the initial
+# values and the prior scale while the sampler keeps the default. NULL means
+# the model has no closed set of parameters (m3), so no name can be refused.
+# The methods are named for the model rather than for `bmmodel`, which comes
+# first in every class vector and would shadow them.
+settable_links <- function(model) {
+  UseMethod("settable_links")
+}
+
+#' @exportS3Method
+settable_links.default <- function(model) {
+  names(model$links)
+}
+
+# The link functions a model can carry through to its likelihood. .link_ranges
+# is the wider vocabulary of links bmm knows a range for, including the ones a
+# model may declare as its own default but a user cannot ask for: brms writes
+# no inverse-link code for loglog or softmax, so a custom family built with
+# either dies in stancode() with "argument is of length zero". Models that
+# apply their links themselves rather than through a brms family override this.
+settable_link_functions <- function(model) {
+  UseMethod("settable_link_functions")
+}
+
+#' @exportS3Method
+settable_link_functions.default <- function(model) {
+  setdiff(names(.link_ranges), c("loglog", "softmax"))
+}
+
+# Assign user-supplied links onto the model's defaults. A name-indexed
+# assignment appends an unrecognized name instead of refusing it, so a typo
+# used to advertise a parameter the model does not have while the link the user
+# meant was never applied (#420). Every constructor assigns through here.
+set_links <- function(out, links) {
+  attr(out, "links_default") <- out$links
+  attr(out, "links_checked") <- out$links
+  if (length(links) == 0) {
+    return(out)
+  }
+  links <- validate_links(links, out)
+  out$links[names(links)] <- links
+  attr(out, "links_checked") <- out$links
+  out
+}
+
+# Links can also reach a model after construction -- `model$links <- list(...)`
+# is the documented idiom for m3 -- so the pipeline re-checks whatever differs
+# from the state set_links() last signed off on. Diffing against `links_default`
+# instead would re-validate the user's constructor argument and warn a second
+# time. Parameters in `links_fixed` are excluded because the pipeline sets those
+# itself (see resolve_fixed_links). A model that never went through set_links()
+# -- a custom m3, a fit from an older bmm -- carries no attribute and is left
+# alone; for a custom m3 the missing-links check in check_model.m3_custom is
+# what catches a garbage list.
+check_links <- function(model) {
+  default <- attr(model, "links_default")
+  if (is.null(default)) {
+    return(model)
+  }
+  checked <- attr(model, "links_checked") %||% default
+  pars <- setdiff(names(model$links), names(model$links_fixed))
+  changed <- pars[!vapply(pars, function(p) {
+    identical(model$links[[p]], checked[[p]])
+  }, logical(1))]
+  if (length(changed) == 0) {
+    return(model)
+  }
+  # validated against the links the model declared, so that a target the user
+  # just added is not offered back as settable
+  declared <- model
+  declared$links <- default
+  links <- validate_links(model$links[changed], declared)
+  model$links[setdiff(changed, names(links))] <- NULL
+  model$links[names(links)] <- links
+  model
+}
+
+# One set of rules for every path by which a link reaches a model: the name
+# identifies a parameter (a single typo is repaired, with a warning), the model
+# can pass the link on to the fit, the link is one bmm implements, and a link
+# whose range is wider than the declared one is a sampling hazard rather than
+# an error.
+validate_links <- function(links, model) {
+  stopif(
+    !is_namedlist(links) ||
+      !all(vapply(links, function(l) is.character(l) && length(l) == 1, logical(1))),
+    'The `links` argument must be a named list of link functions, \\
+     e.g. links = list(kappa = "log")'
+  )
+  defaults <- attr(model, "links_default") %||% model$links
+  settable <- settable_links(model)
+  # a model built by use_model_template() is not in supported_models() yet
+  model_name <- c(
+    intersect(class(model), supported_models(print_call = FALSE)),
+    class(model)[2]
+  )[1]
+  given <- names(links)
+
+  if (!is.null(settable)) {
+    known <- unique(c(names(model$parameters), names(defaults)))
+    names(links) <- vapply(given, match_link_target, character(1), known = known)
+    unmatched <- given[is.na(names(links))]
+    stopif(
+      length(unmatched) > 0,
+      "Unrecognized link target(s): {collapse_comma(unmatched)}. \\
+       {model_name}() takes links for {collapse_comma(known)}"
+    )
+    duplicates <- given[names(links) %in% names(links)[duplicated(names(links))]]
+    stopif(
+      anyDuplicated(names(links)) > 0,
+      "Several entries of `links` name the same parameter: \\
+       {collapse_comma(duplicates)}"
+    )
+  }
+
+  # a repair is reported before anything is refused, so that a user whose typo
+  # resolved to a parameter they cannot set learns both halves of what happened
+  repaired <- names(links) != given
+  warnif(
+    any(repaired),
+    "Link target(s) {collapse_comma(given[repaired])} read as \\
+     {collapse_comma(names(links)[repaired])}. Check the spelling of your \\
+     `links` argument"
+  )
+
+  # naming the link the model already uses asks for no change, so it is a no-op
+  # and neither the refusals below nor the allow-list applies to it
+  asked <- names(links)[!vapply(names(links), function(p) {
+    identical(links[[p]], defaults[[p]])
+  }, logical(1))]
+
+  if (!is.null(settable)) {
+    settable_str <- if (length(settable) > 0) {
+      glue("Links can be set for {collapse_comma(settable)}")
+    } else {
+      glue("No link of {model_name}() can be set")
+    }
+    scaling <- setdiff(asked, names(defaults))
+    stopif(
+      length(scaling) > 0,
+      "{collapse_comma(scaling)} has no link in {model_name}(): the parameter \\
+       is fixed for scaling. {settable_str}"
+    )
+    fixed <- setdiff(setdiff(asked, settable), scaling)
+    stopif(
+      length(fixed) > 0,
+      "The link of {collapse_comma(fixed)} cannot be changed in {model_name}(): \\
+       the model builds its likelihood from {summarise_links(defaults[fixed])}, \\
+       so another link would reach print(), the initial values and the prior \\
+       scale but not the sampler. {settable_str}"
+    )
+  }
+
+  offered <- settable_link_functions(model)
+  unsupported <- setdiff(unlist(links[asked]), offered)
+  stopif(
+    length(unsupported) > 0,
+    "Unknown link function(s): {collapse_comma(unsupported)}. \\
+     {model_name}() takes {collapse_comma(offered)}"
+  )
+
+  warn_link_range(links, defaults)
+  links
+}
+
+# "kapa" is not a prefix of "kappa", so R's partial matching does not see it,
+# but a single edit does. A repair must be unique: imm's a, c and s are each
+# one edit apart, so a typo among them identifies no parameter.
+match_link_target <- function(name, known) {
+  if (name %in% known) {
+    return(name)
+  }
+  hit <- known[startsWith(known, name)]
+  if (length(hit) != 1) {
+    distance <- utils::adist(name, known, ignore.case = TRUE)[1, ]
+    hit <- known[distance == min(distance) & distance <= 1]
+  }
+  if (length(hit) == 1) hit else NA_character_
+}
+
+# A link that admits values the default one excludes (log -> identity for a
+# positive parameter) is legal -- it is how a parameter is freed from a bound
+# the model assumes by default -- but the likelihood is written for the default
+# range, so it is flagged.
+warn_link_range <- function(links, defaults) {
+  pars <- intersect(names(links), names(defaults))
+  wider <- vapply(pars, function(p) {
+    given <- .link_ranges[[links[[p]]]]
+    default <- .link_ranges[[defaults[[p]]]]
+    if (is.null(given) || is.null(default)) {
+      return(FALSE)
+    }
+    given[1] < default[1] || given[2] > default[2]
+  }, logical(1))
+  warnif(
+    any(wider),
+    "The link(s) {summarise_links(links[pars[wider]])} allow values that the \\
+     model's default {summarise_links(defaults[pars[wider]])} exclude. \\
+     Sampling a bounded parameter on a wider scale can push the likelihood out \\
+     of its domain, so check that your priors keep \\
+     {collapse_comma(pars[wider])} in range"
+  )
 }
 
 # kept central rather than as a field in each model constructor so the console
@@ -559,9 +796,15 @@ use_model_template <- function(model_name,
           class = c("bmmodel", "<<model_name>>", paste0("<<model_name>>_", version)),
           call = call
         )
-        out$links[names(links)] <- links
+        out <- set_links(out, links)
         out
-      }\n\n',
+      }
+
+      # uncomment if configure_model() builds the links into the family or into
+      # the non-linear formulas rather than reading them from the list above,
+      # so that a link set by the user is refused instead of silently ignored:
+      #\' @exportS3Method
+      # settable_links.<<model_name>> <- function(model) character(0)\n\n',
       .open = "<<", .close = ">>"
     )
   } else {
@@ -587,9 +830,15 @@ use_model_template <- function(model_name,
           class = c("bmmodel", "<<model_name>>"),
           call = call
         )
-        out$links[names(links)] <- links
+        out <- set_links(out, links)
         out
-      }\n\n',
+      }
+
+      # uncomment if configure_model() builds the links into the family or into
+      # the non-linear formulas rather than reading them from the list above,
+      # so that a link set by the user is refused instead of silently ignored:
+      #\' @exportS3Method
+      # settable_links.<<model_name>> <- function(model) character(0)\n\n',
       .open = "<<", .close = ">>"
     )
   }
