@@ -44,7 +44,9 @@ given here by its cumulative distribution function. One of:
 An object of class \code{bmmodel}
 }
 \description{
-Yes/No Signal Detection Theory Model
+Estimates sensitivity (\code{d}, which is \eqn{d'} under equal
+variance and \eqn{d_a} once \code{sdratio} is estimated) and response bias
+(\code{criterion}) from yes/no detection or old/new recognition counts.
 }
 \details{
 \itemize{
@@ -285,5 +287,12 @@ Mickes, L., Wixted, J. T., & Wais, P. E. (2007). A direct test of the
 unequal-variance signal detection model of recognition memory.
 \emph{Psychonomic Bulletin & Review}, \emph{14}(5), 858--865.
 \doi{10.3758/BF03194112}
+}
+\seealso{
+\code{\link[=sdt_d]{sdt_d()}} and \code{\link[=sdt_criterion]{sdt_criterion()}} compute the \code{d} and \code{criterion} of
+this model in closed form from a single pair of observed hit and false-alarm
+rates, without fitting: use them for a quick check of a fitted value, and
+this model when you need a hierarchical or condition-wise estimate, or
+unequal variance.
 }
 \keyword{bmmodel}

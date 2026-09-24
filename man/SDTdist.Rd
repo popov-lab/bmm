@@ -70,4 +70,10 @@ sdt_criterion(hit_rate = 0.8, fa_rate = 0.2, dist = "normal")
 Green, D. M., & Swets, J. A. (1966). \emph{Signal detection theory and
 psychophysics}. Wiley.
 }
+\seealso{
+\code{\link[=sdt_yn]{sdt_yn()}}, whose \code{d} and \code{criterion} parameters these two functions
+compute in closed form from observed rates: \code{sdt_d()} returns the same
+quantity as the \code{d} parameter and \code{sdt_criterion()} the same quantity as
+\code{criterion}, on the same axis, whenever \code{sdratio} is at its default.
+}
 \keyword{distribution}

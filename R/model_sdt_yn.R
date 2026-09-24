@@ -67,6 +67,9 @@
 
 #' @title Yes/No Signal Detection Theory Model
 #' @name sdt_yn
+#' @description Estimates sensitivity (`d`, which is \eqn{d'} under equal
+#'   variance and \eqn{d_a} once `sdratio` is estimated) and response bias
+#'   (`criterion`) from yes/no detection or old/new recognition counts.
 #' @details `r model_info(.model_sdt_yn())`
 #' @param response The name of the variable in the dataset containing the
 #'   count of "old"/"signal" responses for each cell.
@@ -201,6 +204,12 @@
 #'     model description above: `main` is the prior on the intercept,
 #'     `effects` the prior on regression coefficients.
 #' }
+#'
+#' @seealso [sdt_d()] and [sdt_criterion()] compute the `d` and `criterion` of
+#'   this model in closed form from a single pair of observed hit and false-alarm
+#'   rates, without fitting: use them for a quick check of a fitted value, and
+#'   this model when you need a hierarchical or condition-wise estimate, or
+#'   unequal variance.
 #'
 #' @references
 #' Green, D. M., & Swets, J. A. (1966). \emph{Signal detection theory and

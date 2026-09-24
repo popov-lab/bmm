@@ -2085,6 +2085,11 @@ neg_loglik <- function(x, params, distribution, weights = NULL) {
 #'     \item "logistic": \eqn{1 / (1 + \exp(-x))}
 #'   }
 #'
+#' @seealso [sdt_yn()], whose `d` and `criterion` parameters these two functions
+#'   compute in closed form from observed rates: `sdt_d()` returns the same
+#'   quantity as the `d` parameter and `sdt_criterion()` the same quantity as
+#'   `criterion`, on the same axis, whenever `sdratio` is at its default.
+#'
 #' @references
 #' Green, D. M., & Swets, J. A. (1966). \emph{Signal detection theory and
 #'   psychophysics}. Wiley.
