@@ -586,3 +586,37 @@ test_that("sdt_yn default_prior returns valid prior object", {
   prior_strs <- prior$prior
   expect_true(any(grepl("normal", prior_strs)))
 })
+
+
+############################################################################# !
+# R <-> STAN DIST_TYPE CONTRACT                                          ####
+############################################################################# !
+
+test_that("the Stan dist_type branches match the registry order", {
+  # The R side dispatches by position in .sdt_dists; the Stan side hardcodes
+  # the integers. Nothing else in the suite compares the two, so swapping two
+  # branches in the chunk would leave every test green while turning every
+  # dist = "normal" fit into a Gumbel model. Text-level, as in
+  # test-model_cswald.R, so it costs no compilation.
+  sc <- read_lines2(file.path(system.file("stan_chunks", package = "bmm"),
+                              "sdt_dist_funs.stan"))
+  dispatcher <- function(fun) {
+    sub("(?s)\n\\}.*", "",
+        sub(paste0("(?s).*real ", fun, "\\("), "", sc, perl = TRUE), perl = TRUE)
+  }
+  log_cdf <- c("std_normal_lcdf\\(eta\\)", "log1m_exp\\(-exp\\(eta\\)\\)",
+               "-exp\\(-eta\\)", "-log1p_exp\\(-eta\\)")
+  log_ccdf <- c("std_normal_lcdf\\(-eta\\)", "-exp\\(eta\\)",
+                "log1m_exp\\(-exp\\(-eta\\)\\)", "-eta - log1p_exp\\(-eta\\)")
+
+  expect_equal(names(.sdt_dists),
+               c("normal", "gumbel_min", "gumbel_max", "logistic"))
+  for (i in seq_along(.sdt_dists)) {
+    expect_match(dispatcher("sdt_log_cumprob"),
+                 paste0("dist_type == ", i, "\\) return ", log_cdf[i]),
+                 info = names(.sdt_dists)[i])
+    expect_match(dispatcher("sdt_log_one_minus_cumprob"),
+                 paste0("dist_type == ", i, "\\) return ", log_ccdf[i]),
+                 info = names(.sdt_dists)[i])
+  }
+})
