@@ -7,14 +7,13 @@
                           links = NULL, call = NULL, ...) {
   parameters <- list(
     d = paste0(
-      "Sensitivity: d' under equal variance (the default). When sdratio is ",
-      "estimated, d is d_a, the distance between the signal and noise ",
-      "distributions in units of their root-mean-square SD"
+      "d_a sensitivity (= d' when sdratio is fixed): the distance between ",
+      "the signal and noise distributions in units of their root-mean-square SD"
     ),
     criterion = "Response bias: location of decision boundary",
     sdratio = paste0(
-      "Log SD ratio: the log of the signal-to-noise standard deviation ",
-      "ratio, so 0 means equal variance (an SD ratio of 1)"
+      "SD ratio signal/noise, log link (0 = equal SDs): the parameter is the ",
+      "ratio itself, so exp() a value reported on this scale to read it"
     )
   )
   # d is d_a, and the noise-standardized separation is d * sqrt((1 + r^2) / 2).
