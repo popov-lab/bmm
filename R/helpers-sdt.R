@@ -17,6 +17,41 @@
 
 
 ############################################################################# !
+# FORMULA CHECKS                                                          ####
+############################################################################# !
+
+# The likelihood consumes the stimulus variable to set each row's role, so a
+# stimulus term in a parameter formula is confounded with that parameter's own
+# intercept: moving b_d_stimulus by +0.5 moves d's intercept by -0.25 and
+# criterion by +0.125 at identical likelihood. Profiled flat to 6e-11 on a
+# 5-condition design that is otherwise richly identified, for d, criterion and
+# sdratio alike. Formats without a stimulus other-var (sdt_mafc, sdt_ranking)
+# skip this.
+#' @export
+check_formula.sdt <- function(model, data, formula) {
+  stim_var <- model$other_vars$stimulus
+  if (is.null(stim_var)) {
+    return(NextMethod("check_formula"))
+  }
+  # rhs_vars() returns random-effect grouping variables too, so (1 | stimulus)
+  # is caught here as well -- a random intercept per stimulus level is the same
+  # confound
+  uses_stim <- vapply(rhs_vars(formula, collapse = FALSE),
+                      function(x) stim_var %in% x, logical(1))
+  stopif(
+    any(uses_stim),
+    "The formula for parameter(s) {collapse_comma(names(uses_stim)[uses_stim])} \\
+    uses the stimulus variable '{stim_var}'. {model$name} already uses \\
+    '{stim_var}' in the likelihood to tell noise rows from signal rows, so a \\
+    term in '{stim_var}' -- as a predictor or as a grouping factor -- is \\
+    confounded with that parameter's own intercept and the model is not \\
+    identified. Drop '{stim_var}' from the formula."
+  )
+  NextMethod("check_formula")
+}
+
+
+############################################################################# !
 # DATA VALIDATION HELPERS                                                 ####
 ############################################################################# !
 

@@ -99,6 +99,76 @@ test_that("sdt_d validates input", {
 
 
 ############################################################################# !
+# SHARED FORMULA CHECKS                                                    ####
+############################################################################# !
+
+sdt_stim_data <- function() {
+  data.frame(
+    n_old = c(10, 40, 15, 35),
+    stimulus = c(0L, 1L, 0L, 1L),
+    n_trials = c(50, 50, 50, 50),
+    condition = c("A", "A", "B", "B"),
+    id = c(1, 1, 2, 2)
+  )
+}
+
+# check_model() must run first, or add_missing_parameters() overwrites a formula
+# the user gave a fixed parameter: on a raw model `sdratio ~ stimulus` comes back
+# as `sdratio ~ 1` and a direct check_formula() call tests nothing
+sdt_check_formula <- function(formula, data = sdt_stim_data(),
+                              model = sdt_yn("n_old", "stimulus",
+                                             "n_trials")) {
+  model <- check_model(model, data, formula)
+  check_formula(model, data, formula)
+}
+
+test_that("a stimulus term on a parameter formula is refused", {
+  # the likelihood already consumes stimulus to set each row's role, so the term
+  # is confounded with the parameter's own intercept -- profiled flat to 6e-11
+  expect_error(
+    sdt_check_formula(bmf(d ~ stimulus, criterion ~ 1)),
+    "'d'.*uses the stimulus variable 'stimulus'"
+  )
+  expect_error(
+    sdt_check_formula(bmf(d ~ 1, criterion ~ stimulus)),
+    "'criterion'.*uses the stimulus variable"
+  )
+  expect_error(
+    sdt_check_formula(bmf(d ~ 1, criterion ~ 1, sdratio ~ stimulus)),
+    "'sdratio'.*uses the stimulus variable"
+  )
+  # both offenders are named, not just the first
+  expect_error(
+    sdt_check_formula(bmf(d ~ stimulus, criterion ~ stimulus)),
+    "'d', 'criterion'"
+  )
+})
+
+test_that("a stimulus grouping factor is refused with the same message", {
+  # rhs_vars() reports random-effect grouping variables, and a random intercept
+  # per stimulus level is the same confound as a fixed effect
+  expect_error(
+    sdt_check_formula(bmf(d ~ 1 + (1 | stimulus), criterion ~ 1)),
+    "as a predictor or as a grouping factor"
+  )
+})
+
+test_that("the stimulus check leaves legitimate predictors alone", {
+  expect_error(
+    sdt_check_formula(bmf(d ~ condition, criterion ~ 1 + (1 | id))),
+    NA
+  )
+  # and it fires through the full pipeline, not only on a direct call
+  expect_error(
+    bmm(bmf(d ~ stimulus, criterion ~ 1), sdt_stim_data(),
+        sdt_yn("n_old", "stimulus", "n_trials"),
+        backend = "mock", mock_fit = 1, rename = FALSE),
+    "uses the stimulus variable"
+  )
+})
+
+
+############################################################################# !
 # VECTORIZATION TESTS                                                      ####
 ############################################################################# !
 
