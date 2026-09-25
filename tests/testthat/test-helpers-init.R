@@ -996,43 +996,50 @@ test_that("a constant intercept leaves every coefficient of a centred parameter 
   expect_true(all(abs(b) <= 0.1))
 })
 
-test_that("initfun handles LBA simple models", {
-  dat <- rlba(n = 120, drift = c(3, 1.5), gap = 0.5, sp = 0.5, ndt = 0.2)
-  mod <- lba(rt = "rt", response = "response", n_choices = 2)
-  ff <- bmf(driftc ~ 1, drifte ~ 1, gap ~ 1, sp ~ 1, ndt ~ 1)
-  mod <- check_model(mod, data = dat, formula = ff)
-  dat <- check_data(mod, dat, ff)
-  ff <- check_formula(mod, dat, ff)
-  config_args <- configure_model(mod, data = dat, formula = ff)
+# Every Stan parameter of an LBA model gets a finite start inside the model's
+# init_ranges on the sampling scale, for both versions and all four drift
+# distributions (develop's init_stan_param() replaced the loop the branch
+# edited, so the four distribution specs are checked against it here)
+test_that("initfun starts every LBA parameter inside its init range", {
+  withr::local_seed(349)
+  lba_inits <- function(model, dat, ff) {
+    model <- check_model(model, data = dat, formula = ff)
+    list(model = model, inits = configured_initfun(model, ff, dat)())
+  }
+  expect_in_range <- function(model, inits, pars) {
+    for (par in pars) {
+      range <- model$init_ranges[[par]]
+      if (model$links[[par]] == "log") range <- log(range)
+      value <- inits[[paste0("Intercept_", par)]]
+      expect_true(is.finite(value) && value >= range[1] && value <= range[2],
+                  info = paste(model$distribution, model$version, par))
+    }
+  }
+  drifts <- list(normal = c(3, 1.5), gamma = c(2, 3), frechet = c(2, 3),
+                 lognormal = c(0.5, 0.3))
 
-  init_fun <- create_initfun(mod, dat, config_args$formula)
-  inits <- init_fun()
+  for (dist in names(drifts)) {
+    dat <- rlba(n = 120, drift = drifts[[dist]], gap = 0.5, sp = 0.5, ndt = 0.2,
+                distribution = dist)
+    simple <- lba_inits(
+      lba(rt = "rt", response = "response", n_choices = 2, distribution = dist),
+      dat, bmf(driftc ~ 1, drifte ~ 1, gap ~ 1, sp ~ 1, ndt ~ 1)
+    )
+    expect_setequal(
+      names(simple$inits),
+      paste0("Intercept_", c("driftc", "drifte", "gap", "sp", "ndt"))
+    )
+    expect_in_range(simple$model, simple$inits, c("driftc", "drifte", "gap", "sp", "ndt"))
 
-  expect_type(inits, "list")
-  expect_true(all(vapply(inits, function(x) all(is.finite(x)), logical(1))))
-  expect_true(all(c(
-    "Intercept_driftc", "Intercept_drifte", "Intercept_gap",
-    "Intercept_sp", "Intercept_ndt"
-  ) %in% names(inits)))
-})
-
-test_that("initfun handles LBA custom models with predictors", {
-  dat <- rlba(n = 160, drift = c(3, 1.5), gap = 0.5, sp = 0.5, ndt = 0.2)
-  dat$response <- ifelse(dat$response == 1, "correct", "wrong")
-  dat$condition <- factor(rep(c("A", "B"), length.out = nrow(dat)))
-
-  mod <- lba(rt = "rt", response = "response", version = "custom")
-  ff <- bmf(correct ~ condition, wrong ~ 1, gap ~ 1, sp ~ 1, ndt ~ 1)
-  mod <- check_model(mod, data = dat, formula = ff)
-  dat <- check_data(mod, dat, ff)
-  ff <- check_formula(mod, dat, ff)
-  config_args <- configure_model(mod, data = dat, formula = ff)
-
-  init_fun <- create_initfun(mod, dat, config_args$formula)
-  inits <- init_fun()
-
-  expect_type(inits, "list")
-  expect_true(all(vapply(inits, function(x) all(is.finite(x)), logical(1))))
-  expect_true(any(grepl("^b_", names(inits))))
-  expect_true("Intercept_correct" %in% names(inits))
+    dat$response <- ifelse(dat$response == 1, "correct", "wrong")
+    dat$condition <- factor(rep(c("A", "B"), length.out = nrow(dat)))
+    custom <- lba_inits(
+      lba(rt = "rt", response = "response", version = "custom", distribution = dist),
+      dat, bmf(correct ~ condition, wrong ~ 1, gap ~ 1, sp ~ 1, ndt ~ 1)
+    )
+    expect_true(all(vapply(custom$inits, function(x) all(is.finite(x)), logical(1))))
+    expect_in_range(custom$model, custom$inits, c("correct", "wrong", "gap", "sp", "ndt"))
+    expect_length(custom$inits$b_correct, 1)
+    expect_lte(abs(custom$inits$b_correct), 0.1)
+  }
 })
