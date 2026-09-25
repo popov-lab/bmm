@@ -334,7 +334,7 @@ test_that("bmf2bf.rdm_custom creates correct brms formula", {
 # -----------------------------------------------------------------------------
 
 test_that(".rdm_stan_code generates valid Stan for sp=0 (2 categories)", {
-  code <- .rdm_stan_code("rdm_simple", c("driftc", "drifte"), has_sp = FALSE)
+  code <- .rdm_stan_code("rdm_simple", c("driftc", "drifte"), start_var = FALSE)
   expect_true(grepl("rdm_simple_lpdf", code))
   expect_true(grepl("vector driftc", code))
   expect_true(grepl("rdm_log_lik_one", code))
@@ -342,7 +342,7 @@ test_that(".rdm_stan_code generates valid Stan for sp=0 (2 categories)", {
 })
 
 test_that(".rdm_stan_code generates valid Stan for sp>0 (2 categories)", {
-  code <- .rdm_stan_code("rdm_simple", c("driftc", "drifte"), has_sp = TRUE)
+  code <- .rdm_stan_code("rdm_simple", c("driftc", "drifte"), start_var = TRUE)
   expect_true(grepl("rdm_simple_lpdf", code))
   expect_true(grepl("vector driftc", code))
   expect_true(grepl("rdm_log_lik_one", code))
@@ -351,7 +351,7 @@ test_that(".rdm_stan_code generates valid Stan for sp>0 (2 categories)", {
 
 test_that(".rdm_stan_code generates valid Stan for 4 categories", {
   cats <- c("cat1", "cat2", "cat3", "cat4")
-  code <- .rdm_stan_code("rdm_custom", cats, has_sp = FALSE)
+  code <- .rdm_stan_code("rdm_custom", cats, start_var = FALSE)
   expect_true(grepl("rdm_custom_lpdf", code))
   expect_true(grepl("array\\[4\\]", code))
   expect_true(grepl("vector cat1", code))
@@ -360,7 +360,7 @@ test_that(".rdm_stan_code generates valid Stan for 4 categories", {
 
 test_that(".rdm_stan_code generates sp>0 Stan for custom version", {
   cats <- c("target", "lure", "npl")
-  code <- .rdm_stan_code("rdm_custom", cats, has_sp = TRUE)
+  code <- .rdm_stan_code("rdm_custom", cats, start_var = TRUE)
   expect_true(grepl("rdm_custom_lpdf", code))
   expect_true(grepl("array\\[3\\]", code))
   expect_true(grepl("rdm_log_lik_one", code))
@@ -653,6 +653,49 @@ test_that("rdm custom version runs with predictor", {
   )
 })
 
+# A constant sp other than the default is a start-point range the user asked
+# for, not a request for the plain-Wald path; the R posterior methods read
+# A = sp either way, so they must agree with the density at that range
+test_that("a fixed sp is honoured as the start-point range it names", {
+  dat <- data.frame(rt = c(0.5, 0.6), response = c(1, 2))
+  model <- rdm(rt = "rt", response = "response", n_choices = 2)
+
+  configure <- function(f) {
+    checked <- check_model(model, data = dat, formula = f)
+    configure_model(checked, check_data(checked, dat, f), f)
+  }
+  default <- configure(bmf(driftc ~ 1, drifte ~ 1, gap ~ 1, ndt ~ 1))
+  fixed <- configure(bmf(driftc ~ 1, drifte ~ 1, gap ~ 1, ndt ~ 1, sp = log(0.3)))
+  free <- configure(bmf(driftc ~ 1, drifte ~ 1, gap ~ 1, ndt ~ 1, sp ~ 1))
+  code_of <- function(config) config$stanvars[[3]]$scode
+  expect_match(code_of(default), "n_i, 0);", fixed = TRUE)
+  expect_match(code_of(fixed), "n_i, 1);", fixed = TRUE)
+  expect_match(code_of(free), "n_i, 1);", fixed = TRUE)
+
+  prep <- structure(
+    list(
+      ndraws = 2L,
+      data = list(Y = c(0.5, 0.6), vint1 = c(1L, 2L), vint2 = c(1L, 1L), vint3 = c(1L, 1L)),
+      dpars = list(driftc = c(3, 3.2), drifte = c(1.5, 1.4), gap = c(0.7, 0.8),
+                   ndt = c(0.2, 0.22), s = c(1, 1), sp = c(0.3, 0.3)),
+      family = list(dpars = c("mu", "driftc", "drifte", "gap", "ndt", "s", "sp"))
+    ),
+    class = "brmsprep"
+  )
+  for (i in 1:2) {
+    per_draw <- vapply(1:2, function(k) {
+      drdm(prep$data$Y[i], prep$data$vint1[i],
+           drift = c(prep$dpars$driftc[k], prep$dpars$drifte[k]),
+           gap = prep$dpars$gap[k], sp = 0.3, ndt = prep$dpars$ndt[k], s = 1,
+           log = TRUE)
+    }, numeric(1))
+    expect_equal(
+      .rdm_log_lik(i, prep, cat_names = c("driftc", "drifte"), n_cats = 2),
+      per_draw, tolerance = 1e-12
+    )
+  }
+})
+
 test_that("rdm simple with sp estimated runs with mock backend", {
   skip_on_cran()
   dat <- rrdm(n = 200, drift = c(3, 1.5), gap = 0.7, sp = 0.3, ndt = 0.2)
@@ -776,7 +819,7 @@ test_that("a mixed vector of draws takes each branch it needs", {
         s = c(1, 0.9, 1.1, 1, 0.5, 1.4),
         sp = c(0.05, 0.1, 1e-7, 0.06, 0.2, 0.3)
       ),
-      family = list(rdm_has_sp = TRUE, dpars = c("mu", "driftc", "drifte", "gap", "ndt", "s", "sp"))
+      family = list(dpars = c("mu", "driftc", "drifte", "gap", "ndt", "s", "sp"))
     ),
     class = "brmsprep"
   )

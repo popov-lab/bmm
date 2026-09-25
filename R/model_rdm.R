@@ -36,13 +36,22 @@
   )
 )
 
+# sp = -100 on the log link (A = exp(-100), zero to double precision) is the
+# constructor's "no start-point variability" default and the only value that
+# takes the plain-Wald fast path in Stan. Any other constant a user writes in
+# bmf() -- sp = log(0.3) -- is honoured as the start-point range it names, on
+# both the Stan side and in every posterior method, which read A = sp as it is.
+.rdm_sp_off <- -100
+
+.rdm_start_var <- function(model) {
+  !identical(model$fixed_parameters$sp, .rdm_sp_off)
+}
+
 # Compose the spec for one version. Drift parameters precede the shared block:
 # downstream code recovers accumulator names via
 # setdiff(names(parameters), c("gap", "ndt", "s", "sp")), which relies on order.
-# sp = -100 on the log scale fixes the starting point to ~0 by default; adding
-# sp to the formula frees it and switches the likelihood to the full-Wald forms.
 .rdm_model_spec <- function(version) {
-  fixed_parameters <- list(mu = 0, s = 0, sp = -100)
+  fixed_parameters <- list(mu = 0, s = 0, sp = .rdm_sp_off)
 
   if (version == "custom") {
     return(nlist(
@@ -165,7 +174,7 @@ settable_link_functions.rdm <- function(model) {
 #'     \item `"simple"` (default): Two drift parameters — `driftc` for the
 #'       correct accumulator (response = 1) and `drifte` for all error
 #'       accumulators. The diffusion constant `s` is shared and fixed by
-#'       default (s = 1). Starting point `sp` is fixed to ~0 by
+#'       default (s = 1). The start-point range `sp` is fixed to zero by
 #'       default; add `sp ~ 1` to the formula to estimate it.
 #'     \item `"custom"`: Per-category drift parameters. Response categories
 #'       are defined by the formula LHS names (e.g., `correct ~ 1, other ~ 1,
@@ -178,6 +187,20 @@ settable_link_functions.rdm <- function(model) {
 #'   link and only support that link.
 #' @param ... Additional arguments passed internally (for testing purposes).
 #' @return An object of class `bmmodel`
+#' @details
+#' ## Start-point variability (`sp`)
+#'
+#' Each accumulator starts at a point drawn uniformly from `[0, sp]` and
+#' finishes when it has travelled `gap + sp` minus that start; `sp` is the
+#' range of the start point and `gap` the distance from its top to the
+#' threshold, so the threshold is `b = gap + sp`. By default `sp` is fixed to
+#' `-100` on the log link, i.e. to zero: every accumulator starts at zero and
+#' its finishing time is a plain Wald with threshold `gap`. Write `sp ~ 1` (or
+#' a predictor) in `bmf()` to estimate it, or fix it to another range with a
+#' constant on the log link, e.g. `bmf(..., sp = log(0.3))`, which is honoured
+#' as a start point uniform on `[0, 0.3]` by the sampler and by `log_lik()`,
+#' `posterior_predict()`, `posterior_epred()` and `pp_check()` alike.
+#'
 #' @note Both versions describe the same response type (a categorical winner in
 #'   a choice-RT race), so they live in one constructor rather than separate
 #'   model functions: `"simple"` is an accuracy-coded convenience layer (correct
@@ -470,9 +493,9 @@ bmf2bf.rdm_custom <- function(model, formula) {
 # Stan code generation                                                   ####
 ############################################################################# !
 
-.rdm_stan_code <- function(family_name, cat_names, has_sp) {
+.rdm_stan_code <- function(family_name, cat_names, start_var) {
   n_cats <- length(cat_names)
-  use_start_var <- if (has_sp) 1 else 0
+  use_start_var <- if (start_var) 1 else 0
 
   cat_args <- paste(paste0("vector ", cat_names), collapse = ", ")
   n_args <- paste(paste0("array[] int n", seq_len(n_cats)), collapse = ", ")
@@ -519,7 +542,6 @@ bmf2bf.rdm_custom <- function(model, formula) {
 #' @export
 configure_model.rdm_simple <- function(model, data, formula) {
   cat_names <- c("driftc", "drifte")
-  has_sp <- !("sp" %in% names(model$fixed_parameters))
   formula <- bmf2bf(model, formula)
 
   formula$family <- brms::custom_family(
@@ -537,7 +559,6 @@ configure_model.rdm_simple <- function(model, data, formula) {
     posterior_predict = posterior_predict_rdm_simple,
     posterior_epred = posterior_epred_rdm_simple
   )
-  formula$family$rdm_has_sp <- has_sp
 
   stanvars <- brms::stanvar(
     scode = read_lines2(paste0(
@@ -552,7 +573,7 @@ configure_model.rdm_simple <- function(model, data, formula) {
     )),
     block = "functions"
   ) + brms::stanvar(
-    scode = .rdm_stan_code("rdm_simple", cat_names, has_sp),
+    scode = .rdm_stan_code("rdm_simple", cat_names, .rdm_start_var(model)),
     block = "functions"
   )
 
@@ -563,7 +584,6 @@ configure_model.rdm_simple <- function(model, data, formula) {
 configure_model.rdm_custom <- function(model, data, formula) {
   cat_names <- model$other_vars$resp_cats
   n_cats <- length(cat_names)
-  has_sp <- !("sp" %in% names(model$fixed_parameters))
   formula <- bmf2bf(model, formula)
 
   n_dpars <- n_cats + 5
@@ -584,7 +604,6 @@ configure_model.rdm_custom <- function(model, data, formula) {
     posterior_predict = posterior_predict_rdm_custom,
     posterior_epred = posterior_epred_rdm_custom
   )
-  formula$family$rdm_has_sp <- has_sp
 
   stanvars <- brms::stanvar(
     scode = read_lines2(paste0(
@@ -599,7 +618,7 @@ configure_model.rdm_custom <- function(model, data, formula) {
     )),
     block = "functions"
   ) + brms::stanvar(
-    scode = .rdm_stan_code("rdm_custom", cat_names, has_sp),
+    scode = .rdm_stan_code("rdm_custom", cat_names, .rdm_start_var(model)),
     block = "functions"
   )
 
@@ -636,20 +655,16 @@ configure_model.rdm_custom <- function(model, data, formula) {
 
 .rdm_log_lik <- function(i, prep, cat_names, n_cats) {
   d <- .rdm_draw_pars(i, prep, cat_names, n_cats)
-  has_sp <- isTRUE(prep$family$rdm_has_sp)
   .rdm_race_lpdf(
     t = d$rt - d$ndt, response = d$response, drift = d$drift, counts = d$counts,
-    gap = d$gap, A = if (has_sp) d$sp else 0 * d$sp, s = d$s
+    gap = d$gap, A = d$sp, s = d$s
   )
 }
 
 .rdm_posterior_predict <- function(i, prep, cat_names, n_cats, ...) {
   d <- .rdm_draw_pars(i, prep, cat_names, n_cats)
-  has_sp <- isTRUE(prep$family$rdm_has_sp)
-  race <- .rdm_race(
-    drift = d$drift, gap = d$gap, A = if (has_sp) d$sp else 0 * d$sp, s = d$s,
-    counts = d$counts
-  )
+  race <- .rdm_race(drift = d$drift, gap = d$gap, A = d$sp, s = d$s,
+                    counts = d$counts)
   race$rt + d$ndt
 }
 
@@ -657,7 +672,6 @@ configure_model.rdm_custom <- function(model, data, formula) {
   n_obs <- prep$nobs
   n_draws <- prep$ndraws
   n_sim <- 100L
-  has_sp <- isTRUE(prep$family$rdm_has_sp)
 
   epred <- matrix(NA_real_, nrow = n_draws, ncol = n_obs)
   for (i in seq_len(n_obs)) {
@@ -672,19 +686,15 @@ configure_model.rdm_custom <- function(model, data, formula) {
       integer(1)
     )
 
-    b_m <- matrix(if (has_sp) gap + sp else gap, n_draws, n_sim)
+    b_m <- matrix(gap + sp, n_draws, n_sim)
     s_m <- matrix(s, n_draws, n_sim)
     min_ft <- matrix(Inf, n_draws, n_sim)
     for (j in seq_len(n_cats)) {
       if (n_cat[j] == 0) next
       dj <- matrix(drift[[j]], n_draws, n_sim)
       for (k in seq_len(n_cat[j])) {
-        bound <- if (has_sp) {
-          b_m - matrix(stats::runif(n_draws * n_sim), n_draws, n_sim) *
-            matrix(sp, n_draws, n_sim)
-        } else {
-          b_m
-        }
+        bound <- b_m - matrix(stats::runif(n_draws * n_sim), n_draws, n_sim) *
+          matrix(sp, n_draws, n_sim)
         ft <- .rwald_ig(n_draws * n_sim, drift = dj, bound = bound, s = s_m)
         dim(ft) <- c(n_draws, n_sim)
         min_ft <- pmin(min_ft, ft)

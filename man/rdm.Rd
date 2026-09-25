@@ -35,7 +35,7 @@ use. Options are:
 \item \code{"simple"} (default): Two drift parameters — \code{driftc} for the
 correct accumulator (response = 1) and \code{drifte} for all error
 accumulators. The diffusion constant \code{s} is shared and fixed by
-default (s = 1). Starting point \code{sp} is fixed to ~0 by
+default (s = 1). The start-point range \code{sp} is fixed to zero by
 default; add \code{sp ~ 1} to the formula to estimate it.
 \item \code{"custom"}: Per-category drift parameters. Response categories
 are defined by the formula LHS names (e.g., \verb{correct ~ 1, other ~ 1, npl ~ 1}). The response column must contain character labels matching
@@ -138,6 +138,20 @@ Bulletin & Review, 27, 911-936. https://doi.org/10.3758/s13423-020-01719-6
 \item \code{effects}: normal(0, 0.3)
 }
 }
+}
+
+\subsection{Start-point variability (\code{sp})}{
+
+Each accumulator starts at a point drawn uniformly from \verb{[0, sp]} and
+finishes when it has travelled \code{gap + sp} minus that start; \code{sp} is the
+range of the start point and \code{gap} the distance from its top to the
+threshold, so the threshold is \code{b = gap + sp}. By default \code{sp} is fixed to
+\code{-100} on the log link, i.e. to zero: every accumulator starts at zero and
+its finishing time is a plain Wald with threshold \code{gap}. Write \code{sp ~ 1} (or
+a predictor) in \code{bmf()} to estimate it, or fix it to another range with a
+constant on the log link, e.g. \code{bmf(..., sp = log(0.3))}, which is honoured
+as a start point uniform on \verb{[0, 0.3]} by the sampler and by \code{log_lik()},
+\code{posterior_predict()}, \code{posterior_epred()} and \code{pp_check()} alike.
 }
 }
 \note{
