@@ -108,15 +108,22 @@
       links = vt[["links"]],
       fixed_parameters = vt[["fixed_parameters"]],
       default_priors = vt[["priors"]],
-      init_ranges = vt[["init_ranges"]],
-      void_mu = TRUE
+      init_ranges = vt[["init_ranges"]]
     ),
     class = c("bmmodel", "lnr", paste0("lnr_", version)),
     call = call
   )
 
-  out$links[names(links)] <- links
-  out
+  set_links(out, links)
+}
+
+# the accumulator parameters of the custom version are the response categories
+# of the user's formula, so at construction there is no set of names to check a
+# link target against (check_model.lnr_custom fills in the default link for a
+# category the user left alone). The simple version's parameters are fixed.
+#' @exportS3Method
+settable_links.lnr <- function(model) {
+  if (model$version == "custom") NULL else names(model$links)
 }
 
 #' @title `r .model_lnr()$name`

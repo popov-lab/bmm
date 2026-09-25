@@ -34,6 +34,34 @@ test_that("lnr accepts custom links", {
   expect_equal(model$links$error, "identity")
 })
 
+test_that("lnr refuses a link target it does not have", {
+  expect_error(
+    lnr(rt = "rt", response = "response", n_choices = 2,
+        links = list(typo = "log")),
+    "Unrecognized link target"
+  )
+  # the custom version's accumulators are named by the formula, so no link
+  # target can be refused at construction
+  model <- lnr(rt = "rt", response = "resp", version = "custom",
+               links = list(target = "log"))
+  expect_equal(model$links$target, "log")
+})
+
+test_that("report_priors() does not report the technical mu of the lnr family", {
+  skip_on_cran()
+
+  dat <- rlnr(n = 100, m = c(-1, 0), s = c(1, 1), ndt = 0.2)
+  fit <- bmm(
+    bmf(correct ~ 1, error ~ 1, ndt ~ 1, s ~ 1), dat,
+    lnr(rt = "rt", response = "response", n_choices = 2),
+    backend = "mock", mock_fit = 1, rename = FALSE
+  )
+
+  out <- report_priors(fit)
+  expect_false("mu" %in% out$parameter)
+  expect_true(all(c("correct", "error", "ndt") %in% out$parameter))
+})
+
 test_that("lnr errors on invalid n_choices", {
   expect_error(lnr(rt = "rt", response = "response", n_choices = 1))
   expect_error(lnr(rt = "rt", response = "response", n_choices = 2.5))
