@@ -660,21 +660,14 @@ configure_model.lba_custom <- function(model, data, formula) {
   )
 
   drift_win <- brms::get_dpar(prep, cat_names[response], i = i)
-  log_lik <- log(n_cat[response]) +
-    .dlba_single(t, drift_win, b, A, s, dist, log = TRUE)
-
+  log_lik <- log(n_cat[response]) + .lba_lpdf_single(t, drift_win, b, A, s, dist)
   if (n_cat[response] > 1) {
-    surv_win <- 1 - .plba_single(t, drift_win, b, A, s, dist)
-    surv_win[surv_win <= 0] <- 1e-300
-    log_lik <- log_lik + (n_cat[response] - 1) * log(surv_win)
+    log_lik <- log_lik + (n_cat[response] - 1) * .lba_lsurv_single(t, drift_win, b, A, s, dist)
   }
-
   for (j in seq_len(n_cats)) {
     if (j == response || n_cat[j] == 0) next
     drift_j <- brms::get_dpar(prep, cat_names[j], i = i)
-    surv_j <- 1 - .plba_single(t, drift_j, b, A, s, dist)
-    surv_j[surv_j <= 0] <- 1e-300
-    log_lik <- log_lik + n_cat[j] * log(surv_j)
+    log_lik <- log_lik + n_cat[j] * .lba_lsurv_single(t, drift_j, b, A, s, dist)
   }
 
   log_lik[is.na(log_lik)] <- -Inf
