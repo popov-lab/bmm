@@ -2140,6 +2140,20 @@ dlba <- function(rt, response, drift, gap, sp, ndt, s = 1,
                  log = FALSE) {
   distribution <- match.arg(distribution)
   validate_lba_parameters(drift, gap, sp, ndt, s, distribution)
+  stopif(
+    !is.numeric(rt) || !is.numeric(response),
+    "rt and response must be numeric vectors."
+  )
+  stopif(
+    !length(response) %in% c(1L, length(rt)),
+    "response must have length 1 or the length of rt ({length(rt)}), \\
+    not {length(response)}."
+  )
+  response <- rep_len(response, length(rt))
+  stopif(
+    !all(response[!is.na(response)] %in% seq_along(drift)),
+    "response must index the accumulators, i.e. take values in 1:{length(drift)}."
+  )
   b <- gap + sp
   A <- sp
   .dlba(rt, response, drift, b, A, ndt, s, distribution, log)
@@ -2209,6 +2223,7 @@ qlba <- function(p, drift, gap, sp, ndt, s = 1,
   s <- rep_len(s, n)
   t <- rt - rep_len(ndt, n)
   out <- .lba_lpdf_single(t, drift[response], b, A, s, distribution)
+  out[is.na(response)] <- NA_real_
   for (j in seq_along(drift)) {
     i <- which(response != j)
     out[i] <- out[i] + .lba_lsurv_single(t[i], drift[j], b[i], A[i], s[i], distribution)
@@ -2565,7 +2580,9 @@ validate_lba_parameters <- function(drift, gap, sp, ndt, s, distribution) {
   stopif(any(sp < 0), "sp (maximum starting point) must be non-negative.")
   stopif(any(ndt < 0), "ndt (non-decision time) must be non-negative.")
   stopif(any(s <= 0), "s (scale parameter) must be positive.")
-  if (distribution %in% c("gamma", "frechet", "lognormal")) {
+  # the normal drift is a mean and the lognormal a meanlog, both unrestricted;
+  # the gamma and Frechet drifts are shape parameters
+  if (distribution %in% c("gamma", "frechet")) {
     stopif(any(drift <= 0),
            "drift must be positive for distribution '{distribution}'.")
   }
