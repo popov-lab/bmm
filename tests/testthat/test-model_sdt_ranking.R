@@ -51,6 +51,28 @@ test_that("sdt_ranking has correct links and accepts custom links", {
   expect_equal(custom$links$d, "log")
 })
 
+test_that("sdt_ranking refuses any link on sdratio, and any unknown target", {
+  # Stan reads exp(sdratio), and the fixed 0 means equal variance only on the
+  # identity link, so sdratio cannot be relinked; d can.
+  expect_equal(settable_links(sdt_ranking(ranks4, m = 4, dist = "normal")), "d")
+  for (link in c("log", "softplus", "logit")) {
+    expect_error(
+      sdt_ranking(ranks4, m = 4, dist = "normal", links = list(sdratio = link)),
+      "link of 'sdratio' cannot be changed"
+    )
+  }
+  expect_silent(sdt_ranking(ranks4, m = 4, dist = "normal",
+                            links = list(sdratio = "identity")))
+  expect_error(
+    sdt_ranking(ranks4, m = 4, links = list(sensitivity = "log")),
+    "Unrecognized link target"
+  )
+  # and the refusal survives an assignment made after construction
+  model <- sdt_ranking(ranks4, m = 4, dist = "normal")
+  model$links$sdratio <- "log"
+  expect_error(check_links(model), "link of 'sdratio' cannot be changed")
+})
+
 test_that("sdt_ranking requires a valid m", {
   expect_error(sdt_ranking(ranks4, m = 1), "m must be")
   expect_error(sdt_ranking(ranks4, m = c(3, 4)), "m must be")

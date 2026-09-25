@@ -73,8 +73,17 @@
     class = c("bmmodel", "sdt", "sdt_ranking"),
     call = call
   )
-  out$links[names(links)] <- links
-  out
+  set_links(out, links)
+}
+
+# `sdratio` is the log SD ratio itself -- the Stan code reads exp(sdratio) --
+# and it is fixed at 0, which means equal variance only while the link is
+# identity. Any other link both rescales the fixed value and applies a second
+# transformation on top of the exp(), so the model would sample a ratio the
+# user never asked for. `d` fixes nothing, so its link stays settable.
+#' @exportS3Method
+settable_links.sdt_ranking <- function(model) {
+  "d"
 }
 
 
