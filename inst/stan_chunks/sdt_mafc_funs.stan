@@ -34,9 +34,10 @@ real mafc_logit_pc(real d, int m, int dist_type,
     // the tiny e = exp(-d') at which the difference of lgammas has cancelled to
     // zero -- off the telescoped form this branch dies where the probability
     // scale it is meant to rescue does
+    real e = exp(-d);
     real log_pc = 0;
     for (k in 1:(m - 1))
-      log_pc -= log1p(exp(-d) / k);
+      log_pc -= log1p(e / k);
     return log_pc - log(-expm1(log_pc));
   }
 

@@ -411,8 +411,9 @@ test_that("the Stan mafc_logit_pc branches match the registry order", {
   closed_form <- c(
     normal     = paste("{ if (m == 2) return sdt_log_cumprob(d / sqrt(2.0), dist_type)",
                        "- sdt_log_one_minus_cumprob(d / sqrt(2.0), dist_type);"),
-    gumbel_min = paste("{ real log_pc = 0; for (k in 1:(m - 1)) log_pc -=",
-                       "log1p(exp(-d) / k); return log_pc - log(-expm1(log_pc)); }"),
+    gumbel_min = paste("{ real e = exp(-d); real log_pc = 0;",
+                       "for (k in 1:(m - 1)) log_pc -= log1p(e / k);",
+                       "return log_pc - log(-expm1(log_pc)); }"),
     gumbel_max = "return d - log(m - 1);"
   )
   for (nm in names(closed_form)) {
