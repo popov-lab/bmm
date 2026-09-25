@@ -46,28 +46,39 @@ test_that("rdm has correct fixed parameters", {
   expect_equal(model$fixed_parameters$sp, -100)
 })
 
-test_that("rdm rejects unsupported custom links during model checks", {
-  model_bad_drift <- rdm(
-    rt = "rt",
-    response = "response",
-    n_choices = 2,
-    links = list(driftc = "identity")
+test_that("rdm refuses every link but log, at construction and afterwards", {
+  expect_error(
+    rdm(rt = "rt", response = "response", n_choices = 2,
+        links = list(driftc = "identity")),
+    "Unknown link function"
   )
   expect_error(
-    check_model(model_bad_drift, formula = bmf(driftc ~ 1)),
-    "only support the 'log' link"
+    rdm(rt = "rt", response = "resp", version = "custom",
+        links = list(ndt = "softplus")),
+    "Unknown link function"
   )
 
-  model_bad_ndt <- rdm(
-    rt = "rt",
-    response = "response",
-    n_choices = 2,
-    links = list(ndt = "identity")
-  )
+  # the documented idiom for changing a link after construction goes through
+  # check_model(), which re-validates whatever differs from the constructor
+  model <- rdm(rt = "rt", response = "response", n_choices = 2)
+  model$links$ndt <- "identity"
   expect_error(
-    check_model(model_bad_ndt, formula = bmf(driftc ~ 1)),
-    "only support the 'log' link"
+    check_model(model, formula = bmf(driftc ~ 1)),
+    "Unknown link function"
   )
+})
+
+test_that("rdm refuses a link target it does not have", {
+  expect_error(
+    rdm(rt = "rt", response = "response", n_choices = 2,
+        links = list(typo = "log")),
+    "Unrecognized link target"
+  )
+  # the custom version's accumulators are named by the formula, so no link
+  # target can be refused at construction
+  model <- rdm(rt = "rt", response = "resp", version = "custom",
+               links = list(target = "log"))
+  expect_equal(model$links$target, "log")
 })
 
 test_that("report_priors() does not report the technical mu of the rdm family", {

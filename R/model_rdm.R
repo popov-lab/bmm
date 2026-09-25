@@ -118,8 +118,24 @@
     call = call
   )
 
-  out$links[names(links)] <- links
-  out
+  set_links(out, links)
+}
+
+# the accumulator parameters of the custom version are the response categories
+# of the user's formula, so at construction there is no set of names to check a
+# link target against (check_model.rdm_custom fills in the default link for a
+# category the user left alone). The simple version's parameters are fixed.
+#' @exportS3Method
+settable_links.rdm <- function(model) {
+  if (model$version == "custom") NULL else names(model$links)
+}
+
+# every parameter is positive and enters the Stan likelihood on the natural
+# scale, so a wider link would reach print(), the initial values and the prior
+# scale but not the sampler
+#' @exportS3Method
+settable_link_functions.rdm <- function(model) {
+  "log"
 }
 
 #' @title `r .model_rdm()$name`
@@ -219,23 +235,6 @@ rdm <- function(rt, response, n_choices = NULL,
 ############################################################################# !
 # CHECK_MODEL S3 methods                                                 ####
 ############################################################################# !
-
-#' @export
-check_model.rdm <- function(model, data = NULL, formula = NULL) {
-  positive_pars <- setdiff(names(model$links), "mu")
-  bad_positive <- positive_pars[vapply(
-    positive_pars,
-    function(par) !identical(model$links[[par]], "log"),
-    logical(1)
-  )]
-
-  stopif(
-    length(bad_positive) > 0,
-    "RDM parameters {collapse_comma(bad_positive)} only support the 'log' link."
-  )
-
-  NextMethod("check_model")
-}
 
 #' @export
 check_model.rdm_custom <- function(model, data = NULL, formula = NULL) {
