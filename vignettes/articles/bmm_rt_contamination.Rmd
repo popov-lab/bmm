@@ -160,7 +160,7 @@ fit <- bmm(
 
 For the three-parameter version, splitting the estimated contaminants between the two boundaries requires an assumption about how accurate a contaminant response is. `guess_rate` carries that assumption and defaults to 0.5, the chance level of a two-choice task; set it to 0.25 for a 4AFC task, or to 0 if contaminants are never correct. The four-parameter version estimates contamination separately for each boundary and ignores `guess_rate`.
 
-If a cell's observed accuracy is higher than the estimated contamination and guess rate can produce — 95% correct is impossible when 15% of the trials were coin flips — the counts for that cell are returned uncorrected with a warning. That usually means the guess rate does not match the task, or that the contaminant reaction times were not distinguishable enough from the cognitive ones for the EM to separate them.
+If a cell's observed accuracy is higher than the estimated contamination and guess rate can produce — 95% correct is impossible when 15% of the trials were coin flips — the split cannot be trusted for that cell. The correction still runs, removing the estimated contaminants proportionally from both `n_upper` and `n_trials` and leaving observed accuracy as it was, but it warns. That usually means the guess rate does not match the task, or that the contaminant reaction times were not distinguishable enough from the cognitive ones for the EM to separate them.
 
 ---
 

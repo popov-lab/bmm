@@ -823,20 +823,25 @@ test_that("ezdm_summary_stats() validates guess_rate", {
     "guess_rate must be a single number between 0 and 1")
 })
 
-test_that("ezdm_summary_stats() warns and keeps raw counts above the accuracy ceiling", {
+test_that("ezdm_summary_stats() warns and degrades to an accuracy-neutral correction above the ceiling", {
+  # this fixture's EM estimate is a free optimum rather than clipped, so the
+  # counts are pinned against the returned proportion instead of as literals
   rt <- .contaminated_rt(170, 30)
   response <- c(rep(1L, 198), rep(0L, 2))
 
   expect_warning(
     result <- ezdm_summary_stats(rt, response, contaminant_bound = c(0.1, 4)),
-    "Observed accuracy \\(0.99\\) lies outside"
+    "Observed accuracy \\(0.99\\) lies outside.*removed proportionally from both"
   )
-  expect_equal(result$n_upper, 198L)
-  expect_equal(result$n_trials, 200L)
   expect_gt(result$contaminant_prop, 0)
+  expect_lt(result$n_upper, 198L)
+  expect_lt(result$n_trials, 200L)
+  expect_equal(result$n_upper, round(198 * (1 - result$contaminant_prop)))
+  expect_equal(result$n_trials, round(200 * (1 - result$contaminant_prop)))
+  expect_lte(result$n_upper, result$n_trials)
 })
 
-test_that("ezdm_summary_stats() warns and keeps raw counts below the accuracy floor", {
+test_that("ezdm_summary_stats() warns and degrades to an accuracy-neutral correction below the floor", {
   rt <- .contaminated_rt(170, 30)
   response <- c(rep(1L, 2), rep(0L, 198))
 
@@ -844,8 +849,11 @@ test_that("ezdm_summary_stats() warns and keeps raw counts below the accuracy fl
     result <- ezdm_summary_stats(rt, response, contaminant_bound = c(0.1, 4)),
     "Observed accuracy \\(0.01\\) lies outside"
   )
-  expect_equal(result$n_upper, 2L)
-  expect_equal(result$n_trials, 200L)
+  expect_gt(result$contaminant_prop, 0)
+  expect_lt(result$n_trials, 200L)
+  expect_equal(result$n_upper, round(2 * (1 - result$contaminant_prop)))
+  expect_equal(result$n_trials, round(200 * (1 - result$contaminant_prop)))
+  expect_lte(result$n_upper, result$n_trials)
 })
 
 test_that("ezdm_summary_stats() corrects a cell that sits exactly on the ceiling", {
@@ -882,6 +890,21 @@ test_that("ezdm_summary_stats() rounding keeps n_upper <= n_trials at the ceilin
   expect_lte(result$n_upper, result$n_trials)
   expect_equal(result$n_upper, 157L)
   expect_equal(result$n_trials, 158L)
+})
+
+test_that("ezdm_summary_stats() rounds n_upper rather than truncating it", {
+  # 184 trials, 165 correct, EM clipped to 0.2: clean_upper is 146.6, so only
+  # rounding gives 147 -- truncation would drop a response
+  rt <- .contaminated_rt(184 - 43, 43)
+  response <- c(rep(1L, 165), rep(0L, 19))
+
+  result <- suppressWarnings(ezdm_summary_stats(
+    rt, response, contaminant_bound = c(0.1, 4), max_contaminant = 0.2
+  ))
+
+  expect_equal(result$contaminant_prop, 0.2)
+  expect_equal(result$n_upper, 147L)
+  expect_equal(result$n_trials, 147L)
 })
 
 test_that("ezdm_summary_stats() 4par consumes both boundary proportions", {

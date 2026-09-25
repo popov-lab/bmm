@@ -377,7 +377,10 @@ has_nonconsecutive_duplicates <- function(vec) {
 #'   The buffer extends data-driven bounds to ensure conservative estimates.
 #'   Examples: c(0.1, 3.0), c("min", "max"), c(0.1, "max"), c("min", 3.0)
 #' @param min_trials Integer. Minimum number of trials required for fitting.
-#'   Returns NA if fewer trials are available. Default is 10
+#'   Returns NA if fewer trials are available. Compared against the total
+#'   number of trials for `version = "3par"` and against each boundary's own
+#'   count for `version = "4par"`, so the two versions can disagree about
+#'   whether the same cell is corrected. Default is 10
 #' @param init_contaminant Numeric. Initial proportion of contaminants for EM
 #'   algorithm. Default is 0.05
 #' @param max_contaminant Numeric. Maximum allowed contaminant proportion
@@ -414,9 +417,10 @@ has_nonconsecutive_duplicates <- function(vec) {
 #'   For `version = "3par"` the estimated contaminants are shared between the
 #'   boundaries at `guess_rate`; a cell whose observed accuracy lies outside
 #'   `[guess_rate * p, 1 - p * (1 - guess_rate)]` for an estimated proportion
-#'   `p` cannot have arisen that way, so its raw counts are returned with a
-#'   warning. For `version = "4par"` each boundary is corrected by its own
-#'   estimate.
+#'   `p` cannot have arisen that way, so the contaminants are removed
+#'   proportionally from both boundaries instead, leaving the observed accuracy
+#'   unchanged, and a warning is issued. For `version = "4par"` each boundary
+#'   is corrected by its own estimate.
 #'
 #'   This function is designed to work with [dplyr::group_by()] and
 #'   [dplyr::reframe()] for grouped operations.
@@ -562,11 +566,16 @@ ezdm_summary_stats <- function(
       "Observed accuracy ({round(accuracy, 3)}) lies outside \\
        [{round(lower_limit, 3)}, {round(upper_limit, 3)}], the range a \\
        contaminant proportion of {round(contaminant_prop, 3)} and a guess \\
-       rate of {guess_rate} can produce. The uncorrected counts are returned \\
-       for this cell. Check that guess_rate matches the task, or that the \\
-       contaminant reaction times are distinguishable from the cognitive ones."
+       rate of {guess_rate} can produce. The correction is degraded for this \\
+       cell: the contaminants are removed proportionally from both \\
+       boundaries, which leaves the observed accuracy as it was. Check that \\
+       guess_rate matches the task, or that the contaminant reaction times \\
+       are distinguishable from the cognitive ones."
     )
-    return(nlist(n_upper, n_trials))
+    return(list(
+      n_upper = as.integer(round(n_upper * (1 - contaminant_prop))),
+      n_trials = as.integer(round(n_trials * (1 - contaminant_prop)))
+    ))
   }
 
   list(

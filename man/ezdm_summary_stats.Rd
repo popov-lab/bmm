@@ -61,7 +61,10 @@ The buffer extends data-driven bounds to ensure conservative estimates.
 Examples: c(0.1, 3.0), c("min", "max"), c(0.1, "max"), c("min", 3.0)}
 
 \item{min_trials}{Integer. Minimum number of trials required for fitting.
-Returns NA if fewer trials are available. Default is 10}
+Returns NA if fewer trials are available. Compared against the total
+number of trials for \code{version = "3par"} and against each boundary's own
+count for \code{version = "4par"}, so the two versions can disagree about
+whether the same cell is corrected. Default is 10}
 
 \item{init_contaminant}{Numeric. Initial proportion of contaminants for EM
 algorithm. Default is 0.05}
@@ -110,9 +113,10 @@ The returned counts describe the same responses as the returned moments.
 For \code{version = "3par"} the estimated contaminants are shared between the
 boundaries at \code{guess_rate}; a cell whose observed accuracy lies outside
 \verb{[guess_rate * p, 1 - p * (1 - guess_rate)]} for an estimated proportion
-\code{p} cannot have arisen that way, so its raw counts are returned with a
-warning. For \code{version = "4par"} each boundary is corrected by its own
-estimate.
+\code{p} cannot have arisen that way, so the contaminants are removed
+proportionally from both boundaries instead, leaving the observed accuracy
+unchanged, and a warning is issued. For \code{version = "4par"} each boundary
+is corrected by its own estimate.
 
 This function is designed to work with \code{\link[dplyr:group_by]{dplyr::group_by()}} and
 \code{\link[dplyr:reframe]{dplyr::reframe()}} for grouped operations.
