@@ -21,7 +21,10 @@ Available parameters depend on the version: "simple" has \code{drift}, \code{bou
 \code{ndt}, and \code{s}; "crisk" additionally has \code{zr}. Default links are "log" for
 most parameters and "logit" for \code{zr}. For positive parameters, "softplus"
 is available as an alternative to "log" that grows linearly for large
-values and avoids the numerical blow-up of \code{exp()}.}
+values and avoids the numerical blow-up of \code{exp()}. A name that is not a
+parameter of the model is an error, and a link that allows values the
+default link excludes (e.g. "identity" for a positive parameter) is a
+warning.}
 
 \item{version}{A character string specifying which version of the cswald
 model to use. Options are:

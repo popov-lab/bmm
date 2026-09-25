@@ -101,11 +101,12 @@
 #' counts. Each subject was tested under five base-rate conditions: the
 #' proportion of old items shifts the decision criterion from conservative
 #' (`br1`) to liberal (`br5`) while leaving sensitivity unchanged, tracing a
-#' five-point binary ROC per subject. This criterion variation is what makes the
-#' unequal-variance ratio (`sdratio`) of [sdt_yn()] identifiable: a single
-#' condition yields only one hit/false-alarm pair and cannot separate a wider
-#' signal distribution from a larger d'. Counts were digitised from the
-#' frequencies reported in the original article.
+#' five-point binary ROC per subject. That is the cleanest design for estimating
+#' the unequal-variance ratio (`sdratio`) of [sdt_yn()], which needs more than
+#' one operating point: a single condition with no other varying predictor yields
+#' only one hit/false-alarm pair and cannot separate a wider signal distribution
+#' from a larger d'. Counts were digitised from the frequencies reported in the
+#' original article.
 #'
 #' @format ## `broeder_schuetz_2009_e3`
 #' A data frame with 400 rows (40 subjects x 5 conditions x 2 stimulus types)
