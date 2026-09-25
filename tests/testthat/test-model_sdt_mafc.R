@@ -38,6 +38,21 @@ test_that("sdt_mafc model accepts custom links", {
   expect_equal(model$links$d, "log")
 })
 
+test_that("sdt_mafc refuses a link it cannot apply, before and after construction", {
+  expect_equal(settable_links(sdt_mafc("n_correct", "n_trials", m = 4)), "d")
+  expect_error(
+    sdt_mafc("n_correct", "n_trials", m = 4, links = list(sensitivity = "log")),
+    "Unrecognized link target"
+  )
+  expect_warning(
+    sdt_mafc("n_correct", "n_trials", m = 4, links = list(dd = "log")),
+    "read as 'd'"
+  )
+  model <- sdt_mafc("n_correct", "n_trials", m = 4)
+  model$links$typo <- "log"
+  expect_error(check_links(model), "Unrecognized link target")
+})
+
 test_that("sdt_mafc model stores m and distribution info correctly", {
   model <- sdt_mafc("n_correct", "n_trials", m = 6, dist = "gumbel_min")
   expect_equal(model$other_vars$m, 6L)
@@ -58,6 +73,7 @@ test_that("sdt_mafc accepts m as a constant or a column name", {
 test_that("sdt_mafc model has default priors and init_ranges", {
   model <- sdt_mafc("n_correct", "n_trials", m = 4)
   expect_true("d" %in% names(model$default_priors))
+  expect_equal(model$default_priors$d$sd, "exponential(1)")
   expect_length(model$init_ranges$d, 2)
   expect_true(model$init_ranges$d[1] < model$init_ranges$d[2])
 })

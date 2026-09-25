@@ -40,9 +40,18 @@ test_that("cswald crisk version has correct parameters", {
 })
 
 test_that("cswald accepts custom links", {
-  model <- cswald(rt = "rt", response = "response",
-                  links = list(drift = "identity"), version = "simple")
+  expect_warning(
+    model <- cswald(rt = "rt", response = "response",
+                    links = list(drift = "identity"), version = "simple"),
+    "allow values that the model's default"
+  )
   expect_equal(model$links$drift, "identity")
+
+  expect_silent(
+    model <- cswald(rt = "rt", response = "response",
+                    links = list(drift = "softplus"), version = "simple")
+  )
+  expect_equal(model$links$drift, "softplus")
 })
 
 # -----------------------------------------------------------------------------

@@ -48,8 +48,15 @@
     class = c("bmmodel", "circular", "mixture2p"),
     call = call
   )
-  out$links[names(links)] <- links
+  out <- set_links(out, links)
   out
+}
+
+# the links come from the brms::mixture() of von Mises components that
+# configure_model.mixture2p builds, not from this list
+#' @exportS3Method
+settable_links.mixture2p <- function(model) {
+  character(0)
 }
 
 # user facing alias
