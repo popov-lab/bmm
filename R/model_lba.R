@@ -267,6 +267,23 @@ lba <- function(rt, response, n_choices = NULL,
   )
 }
 
+# The evidence scale of the LBA is arbitrary: multiplying every drift rate,
+# gap, sp and s by one constant leaves the likelihood unchanged, so s = 1 is
+# the convention that identifies the rest. Freeing s in the formula removes
+# that constraint silently; the user may constrain another parameter instead,
+# so this is a warning rather than an error.
+#' @export
+check_model.lba <- function(model, data = NULL, formula = NULL) {
+  warnif(
+    !is.null(formula) && "s" %in% names(formula) && !is_constant(formula)[["s"]],
+    "The formula estimates `s`, the scale of the evidence, which the LBA \\
+    likelihood cannot identify: scaling every drift rate, `gap`, `sp` and `s` \\
+    by one constant leaves it unchanged. `s` is fixed to 1 by convention; free \\
+    it only with another parameter fixed in its place. See ?lba."
+  )
+  NextMethod("check_model")
+}
+
 #' @export
 check_model.lba_custom <- function(model, data = NULL, formula = NULL) {
   if (!is.null(formula)) {
@@ -390,10 +407,16 @@ check_data.lba_simple <- function(model, data, formula) {
   response_var <- model$resp_vars$response
   n_alt <- model$other_vars$n_choices
 
-  if (is.factor(data[, response_var])) {
-    data[, response_var] <- as.integer(as.character(data[, response_var]))
-  } else if (is.character(data[, response_var])) {
-    data[, response_var] <- as.integer(data[, response_var])
+  if (is.factor(data[, response_var]) || is.character(data[, response_var])) {
+    labels <- as.character(data[, response_var])
+    stopif(
+      !all(grepl("^[0-9]+$", labels)),
+      "The response variable '{response_var}' must be integer-coded for \\
+      version 'simple' (1 = correct, 2:{n_alt} = errors); it contains the \\
+      labels {collapse_comma(unique(labels[!grepl('^[0-9]+$', labels)]))}. \\
+      Recode the responses or use version = 'custom' with labelled categories."
+    )
+    data[, response_var] <- as.integer(labels)
   }
 
   stopif(
@@ -478,6 +501,16 @@ check_data.lba_custom <- function(model, data, formula) {
       data[[paste0(".lba_n", i)]] <- as.integer(data[, num_alt[cat_names[i]]])
     }
   }
+
+  n_win <- vapply(seq_len(nrow(data)), function(i) {
+    data[[paste0(".lba_n", data$.lba_cat[i])]][i]
+  }, integer(1))
+  stopif(
+    any(n_win < 1),
+    "{sum(n_win < 1)} trial(s) were answered with a response category that has \\
+    no accumulator on that trial (accumulators = 0); the likelihood of such a \\
+    trial is zero. Check the `accumulators` columns against the responses."
+  )
 
   model$other_vars$n_choices <- n_cats
   NextMethod("check_data")
@@ -701,10 +734,14 @@ configure_model.lba_custom <- function(model, data, formula) {
   min_ft + ndt
 }
 
+# E[RT] = ndt + int_0^inf S_race(t) dt, with S_race = prod_j S_j(t)^n_j the
+# probability that no accumulator has finished by decision time t, on a log
+# grid extended until the survivor's tail no longer contributes (the K = 2
+# normal race decays like 1/t^2: a finite mean with an infinite variance, so a
+# Monte-Carlo mean of the draws never settles)
 .lba_posterior_epred <- function(prep, cat_names, n_cats, ...) {
   n_obs <- prep$nobs
   n_draws <- prep$ndraws
-  n_sim <- 100L
   dist <- .lba_dist_from_family(prep$family$name)
 
   epred <- matrix(NA_real_, nrow = n_draws, ncol = n_obs)
@@ -719,23 +756,80 @@ configure_model.lba_custom <- function(model, data, formula) {
       function(j) prep$data[[paste0("vint", j + 1)]][i],
       integer(1)
     )
-
-    b_m <- matrix(gap + sp, n_draws, n_sim)
-    sp_m <- matrix(sp, n_draws, n_sim)
-    s_m <- matrix(s, n_draws, n_sim)
-    min_ft <- matrix(Inf, n_draws, n_sim)
-    for (j in seq_len(n_cats)) {
-      if (n_cat[j] == 0) next
-      dj <- matrix(drift[[j]], n_draws, n_sim)
-      for (k in seq_len(n_cat[j])) {
-        start <- matrix(stats::runif(n_draws * n_sim), n_draws, n_sim) * sp_m
-        dv <- .rlba_drift(dist, dj, s_m)
-        min_ft <- pmin(min_ft, (b_m - start) / dv)
-      }
+    b <- gap + sp
+    log_survivor <- function(t) {
+      t_all <- rep(t, each = n_draws)
+      Reduce(`+`, lapply(which(n_cat > 0), function(j) {
+        n_cat[j] * .lba_lsurv_single(t_all, drift[[j]], b, sp, s, dist)
+      }))
     }
-    epred[, i] <- rowMeans(min_ft) + ndt
+    epred[, i] <- rep_len(ndt, n_draws) + race_mean_decision_time(log_survivor, n_draws)
   }
   epred
+}
+
+############################################################################# !
+# PP_CHECK OBSERVABLES                                                    ####
+############################################################################# !
+
+#' @export
+pp_observables.lba <- function(model) {
+  cats <- if (model$version == "simple") c("correct", "error") else model$other_vars$resp_cats
+  list(
+    observed = c(rt = "Y", response = "vint1"),
+    checks = list(
+      rt = .pp_observable(function(d) d$rt, label = "Response time"),
+      response = .pp_observable(
+        function(d) d$response,
+        label = paste0("Response category (", paste0(seq_along(cats), " = ", cats, collapse = ", "), ")"),
+        type = "bars"
+      )
+    )
+  )
+}
+
+# One race per draw x observation: every accumulator of every category draws
+# its start point and drift, the fastest finishing time and its category are
+# the observables. Category counts vary by observation (the custom version's
+# accumulators columns), so the inner loop runs over the largest count and
+# masks the observations where that accumulator exists.
+.lba_pp_simulate <- function(model, prep) {
+  cat_names <- setdiff(names(model$parameters), c("gap", "sp", "ndt", "s"))
+  dist <- model$distribution
+  n <- prep$ndraws * prep$nobs
+  sp <- .pp_dpar_vector(prep, "sp")
+  s <- .pp_dpar_vector(prep, "s")
+  ndt <- .pp_dpar_vector(prep, "ndt")
+  b <- .pp_dpar_vector(prep, "gap") + sp
+
+  min_ft <- rep(Inf, n)
+  winner <- rep(NA_integer_, n)
+  for (j in seq_along(cat_names)) {
+    n_cat <- as.vector(.pp_expand_data(prep$data[[paste0("vint", j + 1)]], prep$ndraws))
+    drift <- .pp_dpar_vector(prep, cat_names[j])
+    for (k in seq_len(max(n_cat))) {
+      active <- which(n_cat >= k)
+      ft <- (b[active] - stats::runif(length(active), 0, sp[active])) /
+        .rlba_drift(dist, drift[active], s[active])
+      faster <- active[ft < min_ft[active]]
+      min_ft[faster] <- ft[ft < min_ft[active]]
+      winner[faster] <- j
+    }
+  }
+  list(
+    rt = matrix(min_ft + ndt, nrow = prep$ndraws),
+    response = matrix(winner, nrow = prep$ndraws)
+  )
+}
+
+#' @export
+pp_simulate.lba_simple <- function(model, prep) {
+  .lba_pp_simulate(model, prep)
+}
+
+#' @export
+pp_simulate.lba_custom <- function(model, prep) {
+  .lba_pp_simulate(model, prep)
 }
 
 .lba_dist_from_family <- function(family_name) {

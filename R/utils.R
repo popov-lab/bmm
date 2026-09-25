@@ -874,6 +874,32 @@ check_rds_file <- function(file) {
   if (!is.null(l)) l else r
 }
 
+# Mean decision time of a race, int_0^inf S(t) dt, for every posterior draw at
+# once. `log_survivor(t)` returns the race's log survivor for a vector of
+# decision times as a length(t) x n_draws vector (draws fastest). The grid is
+# geometric, integrated by the trapezoid rule in log t (the integrand is then
+# S(t) t, smooth for any survivor with a power or exponential tail), and it is
+# extended one decade at a time until the tail S(T) T of every draw is below
+# `tol`, or `t_max` is reached. Below `t_min` the survivor is taken as 1.
+# Shared by the racing models (lba, lnr, rdm)
+race_mean_decision_time <- function(log_survivor, n_draws, t_min = 1e-3,
+                                    t_max = 1e7, tol = 1e-7, per_decade = 20L) {
+  total <- rep(t_min, n_draws)
+  lower <- log10(t_min)
+  previous <- NULL
+  while (lower < log10(t_max)) {
+    t <- 10^seq(lower, lower + 1, length.out = per_decade + 1L)
+    integrand <- matrix(exp(log_survivor(t)), nrow = n_draws) * rep(t, each = n_draws)
+    dlog <- log(t[2]) - log(t[1])
+    total <- total + rowSums(0.5 * (integrand[, -1, drop = FALSE] + integrand[, -ncol(integrand), drop = FALSE])) * dlog
+    if (max(integrand[, ncol(integrand)]) < tol) {
+      break
+    }
+    lower <- lower + 1
+  }
+  total
+}
+
 # like unlist, but keeps the final outcome a list of all
 # elements of nested lists. Only works 1-level deep
 unnest_list <- function(list_of_lists) {
