@@ -51,6 +51,28 @@ test_that("sdt_ranking has correct links and accepts custom links", {
   expect_equal(custom$links$d, "log")
 })
 
+test_that("sdt_ranking refuses any link on sdratio, and any unknown target", {
+  # Stan reads exp(sdratio), and the fixed 0 means equal variance only on the
+  # identity link, so sdratio cannot be relinked; d can.
+  expect_equal(settable_links(sdt_ranking(ranks4, m = 4, dist = "normal")), "d")
+  for (link in c("log", "softplus", "logit")) {
+    expect_error(
+      sdt_ranking(ranks4, m = 4, dist = "normal", links = list(sdratio = link)),
+      "link of 'sdratio' cannot be changed"
+    )
+  }
+  expect_silent(sdt_ranking(ranks4, m = 4, dist = "normal",
+                            links = list(sdratio = "identity")))
+  expect_error(
+    sdt_ranking(ranks4, m = 4, links = list(sensitivity = "log")),
+    "Unrecognized link target"
+  )
+  # and the refusal survives an assignment made after construction
+  model <- sdt_ranking(ranks4, m = 4, dist = "normal")
+  model$links$sdratio <- "log"
+  expect_error(check_links(model), "link of 'sdratio' cannot be changed")
+})
+
 test_that("sdt_ranking requires a valid m", {
   expect_error(sdt_ranking(ranks4, m = 1), "m must be")
   expect_error(sdt_ranking(ranks4, m = c(3, 4)), "m must be")
@@ -98,6 +120,7 @@ test_that("dist='normal' adds sdratio (fixed to 0); gumbel_min does not", {
   expect_true("sdratio" %in% names(normal$parameters))
   expect_equal(normal$fixed_parameters$sdratio, 0)
   expect_true("sdratio" %in% names(normal$init_ranges))
+  expect_equal(normal$default_priors$sdratio$sd, "exponential(2)")
 
   gumbel <- sdt_ranking(ranks4, m = 4, dist = "gumbel_min")
   expect_false("sdratio" %in% names(gumbel$parameters))
@@ -105,6 +128,7 @@ test_that("dist='normal' adds sdratio (fixed to 0); gumbel_min does not", {
 
 test_that("sdt_ranking has init_ranges with d (no mu)", {
   model <- sdt_ranking(ranks4, m = 4)
+  expect_equal(model$default_priors$d$sd, "exponential(1)")
   expect_length(model$init_ranges$d, 2)
   expect_true(model$init_ranges$d[1] < model$init_ranges$d[2])
   expect_false("mu" %in% names(model$init_ranges))

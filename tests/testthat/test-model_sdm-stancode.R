@@ -166,6 +166,20 @@ test_that("threading(force = TRUE) selects the serial SDM chunk", {
   expect_false(grepl("+= sdm_simple_run_ldenom_slice(", code, fixed = TRUE))
 })
 
+test_that("an explicit threads = NULL beats a global threading option", {
+  dat <- simulate_sdm_smoke_data()
+  formula <- bmf(c ~ 0 + condition, kappa ~ 0 + condition)
+
+  # brms reads threads = NULL as "threading off" and generates serial code, so
+  # the sliced chunk would reference start/end outside partial_log_lik
+  withr::local_options(brms.threads = brms::threading(2))
+  code <- stancode(formula, data = dat, model = sdm(resp_error = "y"), threads = NULL)
+
+  expect_false(grepl("reduce_sum", code, fixed = TRUE))
+  expect_match(code, "+= sdm_simple_run_ldenom(c", fixed = TRUE)
+  expect_false(grepl("+= sdm_simple_run_ldenom_slice(", code, fixed = TRUE))
+})
+
 test_that("SDM Stan code validates run metadata in transformed data", {
   dat <- simulate_sdm_smoke_data()
   formula <- bmf(c ~ 0 + condition, kappa ~ 0 + condition)

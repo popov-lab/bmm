@@ -58,7 +58,7 @@
     class = c("bmmodel", "ddm"),
     call = call
   )
-  out$links[names(links)] <- links
+  out <- set_links(out, links)
   out
 }
 # user facing alias
@@ -70,10 +70,13 @@
 #' @details `r model_info(.model_ddm())`
 #' @param rt Name of the reaction time variable coding reaction time in seconds in the data.
 #' @param response Name of the response variable coding the response numerically (0 = lower response / incorrect, 1 = upper response / correct)
-#' @param links A list of links for the parameters. For positive parameters
+#' @param links A named list of links for the parameters, e.g.
+#'   `links = list(bound = "softplus")`. For positive parameters
 #'   (e.g. `bound`, `ndt`), "softplus" is available as an alternative to the
 #'   default "log" link that grows linearly for large values and avoids the
-#'   numerical blow-up of `exp()`.
+#'   numerical blow-up of `exp()`. A name that is not a parameter of the model
+#'   is an error, and a link that allows values the default link excludes
+#'   (e.g. "identity" for a positive parameter) is a warning.
 #' @section Default behavior:
 #' By default, `zr` is fixed at 0. If you want to estimate `zr`, add a formula
 #' for `zr` in your `bmf()` call.

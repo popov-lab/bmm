@@ -40,11 +40,11 @@ scale for the two distributions, so this is also the balanced index
 given here by its cumulative distribution function:
 \itemize{
 \item "normal" (default): Gaussian, \eqn{\Phi(x)}
-\item "gumbel_min": smallest extreme value, \eqn{1 - \exp(-\exp(x))}
+\item "gumbel_min": smallest extreme value, \eqn{1 - \exp(-\exp(x))}{1 - exp(-exp(x))}
 (the complementary log-log distribution)
-\item "gumbel_max": largest extreme value, \eqn{\exp(-\exp(-x))}
+\item "gumbel_max": largest extreme value, \eqn{\exp(-\exp(-x))}{exp(-exp(-x))}
 (the log-log distribution, as in \code{evd::pgumbel})
-\item "logistic": \eqn{1 / (1 + \exp(-x))}
+\item "logistic": \eqn{1 / (1 + \exp(-x))}{1 / (1 + exp(-x))}
 }}
 
 \item{log}{Logical. If \code{TRUE}, returns log-density (default \code{FALSE}).}

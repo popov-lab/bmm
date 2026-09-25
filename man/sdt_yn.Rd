@@ -18,23 +18,38 @@ sdt_yn(
 count of "old"/"signal" responses for each cell.}
 
 \item{stimulus}{The name of the variable in the dataset coding the stimulus
-type. Stimuli should be coded as 0 (noise/new) and 1 (signal/old).}
+type: 0 (noise/new) and 1 (signal/old). Logical, and factor or character
+columns holding "0"/"1", are coerced automatically; anything else (e.g.
+"noise"/"signal" labels) must be recoded by hand, since bmm cannot guess
+which level is the signal. \code{\link[=dsdt_yn]{dsdt_yn()}} and \code{\link[=rsdt_yn]{rsdt_yn()}} take the same
+column but are stricter, accepting only numeric or logical input.}
 
 \item{n_trials}{The name of the variable in the dataset containing the
-total number of trials for each cell.}
+total number of trials for each cell. It may differ from cell to cell.
+Trial-level data also works: keep one row per trial, with the column
+named by \code{response} holding 0 or 1 and the column named by \code{n_trials}
+holding \code{1}s.}
 
 \item{dist}{The noise distribution assumed for the latent evidence variable,
 given here by its cumulative distribution function. One of:
 \itemize{
 \item "normal" (default): Gaussian SDT, \eqn{\Phi(x)}
 \item "gumbel_min": smallest-extreme-value SDT,
-\eqn{1 - \exp(-\exp(x))} (complementary log-log)
-\item "gumbel_max": largest-extreme-value SDT, \eqn{\exp(-\exp(-x))}
+\eqn{1 - \exp(-\exp(x))}{1 - exp(-exp(x))} (complementary log-log)
+\item "gumbel_max": largest-extreme-value SDT,
+\eqn{\exp(-\exp(-x))}{exp(-exp(-x))}
 (log-log, as in \code{evd::pgumbel})
-\item "logistic": logistic SDT, \eqn{1 / (1 + \exp(-x))}
+\item "logistic": logistic SDT,
+\eqn{1 / (1 + \exp(-x))}{1 / (1 + exp(-x))}
 }}
 
-\item{links}{A named list of link functions for the parameters.}
+\item{links}{A named list of link functions for the parameters, one entry
+per parameter you want to change, e.g. \code{links = list(d = "log")}. Only \code{d}
+and \code{criterion} can be set. \code{sdratio} keeps its log link, because the
+model's default of an equal-variance SD ratio is stored as the 0 that the
+log link maps to 1; read on any other link that same 0 is a different
+ratio, and on an identity link it is a ratio of zero that makes the signal
+trials' evidence infinite.}
 
 \item{...}{used internally for testing, ignore it}
 }
@@ -42,7 +57,9 @@ given here by its cumulative distribution function. One of:
 An object of class \code{bmmodel}
 }
 \description{
-Yes/No Signal Detection Theory Model
+Estimates sensitivity (\code{d}, which is \eqn{d'} under equal
+variance and \eqn{d_a} once \code{sdratio} is estimated) and response bias
+(\code{criterion}) from yes/no detection or old/new recognition counts.
 }
 \details{
 \itemize{
@@ -65,9 +82,9 @@ Provide pre-aggregated data with the following columns:
 \itemize{
 \item \strong{Parameters:}
 \itemize{
-\item \code{d}: Sensitivity: d' under equal variance (the default). When sdratio is estimated, d is d_a, the distance between the signal and noise distributions in units of their root-mean-square SD
+\item \code{d}: d_a sensitivity (= d' when sdratio is fixed): the distance between the signal and noise distributions in units of their root-mean-square SD
 \item \code{criterion}: Response bias: location of decision boundary
-\item \code{sdratio}: Log SD ratio: the log of the signal-to-noise standard deviation ratio, so 0 means equal variance (an SD ratio of 1)
+\item \code{sdratio}: SD ratio signal/noise, log link (0 = equal SDs): summary() prints the log of this ratio, not the ratio itself, so exp() a posterior value to read it
 }
 \item \strong{Fixed parameters:}
 \itemize{
@@ -83,16 +100,19 @@ Provide pre-aggregated data with the following columns:
 \itemize{
 \item \code{main}: normal(1, 1)
 \item \code{effects}: normal(0, 0.5)
+\item \code{sd}: exponential(1)
 }
 \item \code{criterion}:
 \itemize{
 \item \code{main}: normal(0, 1.5)
 \item \code{effects}: normal(0, 0.5)
+\item \code{sd}: exponential(2)
 }
 \item \code{sdratio}:
 \itemize{
 \item \code{main}: normal(0, 0.3)
 \item \code{effects}: normal(0, 0.15)
+\item \code{sd}: exponential(2)
 }
 }
 }
@@ -108,13 +128,13 @@ When the signal and noise distributions have different widths, their
 separation only becomes dimensionless after choosing an SD to divide by.
 \code{bmm} then reports \eqn{d_a}, the separation divided by the root-mean-square
 of the two SDs:
-\deqn{d_a = \sqrt{2}\,\delta / \sqrt{1 + r^2},}
+\deqn{d_a = \sqrt{2}\,\delta / \sqrt{1 + r^2},}{d_a = sqrt(2) * delta / sqrt(1 + r^2),}
 where \eqn{\delta} is the separation in noise-SD units and
 \eqn{r} is the SD ratio, \code{exp(sdratio)}. This weights the two
 distributions equally, and it is the measure Simpson and Fitter (1973),
 Macmillan and Creelman (2005), and Mickes et al. (2007) recommend under
 unequal variance. The classical noise-standardized index is
-\eqn{d_N = \delta = d_a \sqrt{(1 + r^2)/2}}, so a published \eqn{d'} from an
+\eqn{d_N = \delta = d_a \sqrt{(1 + r^2)/2}}{d_N = delta = d_a * sqrt((1 + r^2)/2)}, so a published \eqn{d'} from an
 unequal-variance analysis is larger than \code{d} when \eqn{r > 1}: by 13\% at
 \eqn{r = 1.25} and by 33\% at \eqn{r = 1.6}. \code{\link[=sdt_sensitivity]{sdt_sensitivity()}} returns
 \eqn{d_N} and the signal-standardized \eqn{d_S} from a fitted model, and
@@ -134,7 +154,7 @@ root-mean-square SD units) and \code{criterion} (in noise-SD units) are on
 different scales, and a ratio such as \code{criterion / d} mixes them.
 
 \strong{Extreme-value distributions.} For \code{dist = "normal"}, \eqn{d_a} is also the
-AUC-equivalent index, \eqn{d_a = \sqrt{2}\,\Phi^{-1}(\mathrm{AUC})}, so it
+AUC-equivalent index, \eqn{d_a = \sqrt{2}\,\Phi^{-1}(\mathrm{AUC})}{d_a = sqrt(2) * Phi^-1(AUC)}, so it
 carries the same information as 2AFC accuracy. For \code{"gumbel_min"} and
 \code{"gumbel_max"} that identity holds only under equal variance. With \code{sdratio}
 estimated, \eqn{d_a} keeps its balanced geometry but drifts away from the
@@ -145,6 +165,90 @@ such fits on the AUC rather than on \code{d}.
 Because \code{d} is a short name, a column called \code{d} in your data that is also
 used as a predictor will collide with this parameter; \code{bmm()} warns when that
 happens.
+}
+
+\section{Identifying \code{sdratio}}{
+
+\code{sdratio} needs a design that supplies more than one operating point. A single
+(hit, false-alarm) pair is two numbers for three unknowns, so when every
+parameter is intercept-only with no random effects, \code{sdratio ~ 1} returns its
+prior and \code{d} is pulled along the resulting ridge: sampling converges, \code{Rhat}
+is fine, and the profile likelihood over \code{sdratio} is flat to 1e-12. \code{bmm()}
+warns for that one design, which is the only shape that provably cannot work.
+
+Any linear predictor that moves the operating point along the ROC supplies
+what is missing, and it need not sit on \code{criterion}: a sensitivity
+manipulation (\code{d ~ 0 + condition}, a study-time or strength manipulation with
+bias held constant) identifies \code{sdratio} just as a criterion manipulation
+does, and so does between-subject variation entering through a random effect
+such as \code{criterion ~ 1 + (1 | id)} — though, like any predictor, only in
+proportion to how far it actually moves the operating point: a random
+effect with little between-subject spread carries little information and
+will not trigger the warning above, because that warning counts formula
+terms, not how much they move the design.
+
+A criterion manipulation is still the cleanest design, because it traces the
+ROC at fixed sensitivity: give \code{criterion} a predictor that shifts the
+decision boundary — a base-rate, payoff, or confidence manipulation — as in
+\code{criterion ~ 0 + condition}; see \link{broeder_schuetz_2009_e3}. Leaving \code{sdratio}
+at its default is always identified.
+}
+
+\section{Reading \code{sdratio} and carrying it to \code{\link[=dsdt_yn]{dsdt_yn()}}/\code{\link[=rsdt_yn]{rsdt_yn()}}}{
+
+As in every \code{bmm} model, the parameters the model \emph{estimates} are on their
+link scale, while the distribution functions take their arguments on the
+\emph{natural} scale. \code{sdratio} has a log link, so \code{summary()} reports
+\eqn{\log r}{log(r)} whereas \code{\link[=dsdt_yn]{dsdt_yn()}} and \code{\link[=rsdt_yn]{rsdt_yn()}} expect the ratio
+\eqn{r} itself (their default is 1, equal variance). Exponentiate before
+carrying a posterior value across:
+
+\if{html}{\out{<div class="sourceCode">}}\preformatted{r <- exp(as_draws_matrix(fit)[, "b_sdratio_Intercept"])
+}\if{html}{\out{</div>}}
+
+A posterior mean of \code{sdratio = 0.22} is a ratio of \code{exp(0.22) = 1.25}.
+Passing \code{0.22} straight to \code{rsdt_yn()} instead asks for a signal
+distribution 4.5 times \emph{narrower} than the noise — a legal value that
+raises no error, and the one mistake worth checking for in a posterior
+predictive check written by hand. \code{d} and \code{criterion} have identity links,
+so they carry across unchanged.
+
+The \strong{zROC slope} reported in the recognition-memory literature is the
+reciprocal of that ratio, \code{1 / exp(sdratio)}, so a \code{sdratio} posterior mean
+of 0.375 is a zROC slope of 0.69.
+
+The same log link applies going the other way: a constant you supply
+yourself, whether as \code{bmf(sdratio = )} or through a hand-written
+\code{brms::set_prior(..., dpar = "sdratio")}, is read on it too.
+\code{bmf(sdratio = 1)} does not fix a ratio of 1 — it fixes \code{exp(1) = 2.72},
+and \code{bmm()} raises no warning; a fixed ratio of 1.25 needs
+\code{bmf(sdratio = log(1.25))}. \code{default_prior()}'s \code{normal(0, 0.3)} for
+\code{sdratio} is on the same scale, unannotated.
+}
+
+\section{Terms used on this page}{
+
+\itemize{
+\item \strong{noise-standardized axis} — latent evidence expressed in units of
+the noise distribution's SD. \code{criterion} always lives on this axis.
+\item \eqn{\delta} (\strong{separation}) — the distance between the signal and
+noise means, on that axis.
+\item \eqn{d_N} — the classical \eqn{d'}: \eqn{\delta} itself, i.e. the
+separation in noise-SD units.
+\item \eqn{d_a} — the separation divided by the root-mean-square of the
+two SDs, which is what \code{d} reports. \eqn{d_a = d_N} under equal
+variance.
+\item \strong{operating point} — one (false-alarm rate, hit rate) pair, i.e.
+one point of an ROC curve. One condition gives one operating point.
+\item \strong{AUC} — the area under that ROC curve, equivalently the
+probability that a random signal trial yields more evidence than a
+random noise trial. Obtain it from the posterior with
+\code{pnorm(d / sqrt(2))} for \code{dist = "normal"}.
+\item \code{main} / \code{effects} / \code{sd} — the keys of the default priors shown in
+the model description above: \code{main} is the prior on the intercept,
+\code{effects} the prior on regression coefficients, and \code{sd} the prior on
+the standard deviations of the parameter's random effects.
+}
 }
 
 \examples{
@@ -168,14 +272,31 @@ fit <- bmm(
   backend = "cmdstanr"
 )
 
-# Unequal-variance yes/no SDT
-fit_uv <- bmm(
-  formula = bmf(d ~ 1, criterion ~ 1, sdratio ~ 1),
+# Sensitivity and bias per participant
+fit_re <- bmm(
+  formula = bmf(d ~ 1 + (1 | id), criterion ~ 1 + (1 | id)),
   data = dat,
   model = model,
   cores = 4,
   backend = "cmdstanr"
 )
+
+# Unequal-variance yes/no SDT. sdratio needs more than one operating point:
+# on the single-condition `dat` above it would not be identified.
+# `model` already names the columns this dataset uses.
+fit_uv <- bmm(
+  formula = bmf(d ~ 1, criterion ~ 0 + condition, sdratio ~ 1),
+  data = broeder_schuetz_2009_e3,
+  model = model,
+  cores = 4,
+  backend = "cmdstanr"
+)
+
+# Simulating from a fitted unequal-variance model: the model reports
+# sdratio on its log link, rsdt_yn() takes the ratio itself.
+sdratio_posterior <- 0.375
+rsdt_yn(2, 100L, c(0L, 1L),
+        d = 1.3, criterion = 0.1, sdratio = exp(sdratio_posterior))
 }
 }
 \references{
@@ -197,5 +318,12 @@ Mickes, L., Wixted, J. T., & Wais, P. E. (2007). A direct test of the
 unequal-variance signal detection model of recognition memory.
 \emph{Psychonomic Bulletin & Review}, \emph{14}(5), 858--865.
 \doi{10.3758/BF03194112}
+}
+\seealso{
+\code{\link[=sdt_d]{sdt_d()}} and \code{\link[=sdt_criterion]{sdt_criterion()}} compute the \code{d} and \code{criterion} of
+this model in closed form from a single pair of observed hit and false-alarm
+rates, without fitting: use them for a quick check of a fitted value, and
+this model when you need a hierarchical or condition-wise estimate, or
+unequal variance.
 }
 \keyword{bmmodel}
