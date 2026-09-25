@@ -110,6 +110,8 @@ Functions for specifying which model to fit
 - [`sdm()`](https://venpopov.com/bmm/dev/reference/sdm.md)
   [`sdmSimple()`](https://venpopov.com/bmm/dev/reference/sdm.md) :
   Signal Discrimination Model (SDM) by Oberauer (2023)
+- [`sdt_yn()`](https://venpopov.com/bmm/dev/reference/sdt_yn.md) :
+  Yes/No Signal Detection Theory Model
 
 ## Distributions
 
@@ -126,6 +128,10 @@ Functions for special distributions
   [`qsdm()`](https://venpopov.com/bmm/dev/reference/SDMdist.md)
   [`rsdm()`](https://venpopov.com/bmm/dev/reference/SDMdist.md) :
   Distribution functions for the Signal Discrimination Model (SDM)
+
+- [`sdt_d()`](https://venpopov.com/bmm/dev/reference/SDTdist.md)
+  [`sdt_criterion()`](https://venpopov.com/bmm/dev/reference/SDTdist.md)
+  : Utility functions for Signal Detection Theory
 
 - [`dcswald()`](https://venpopov.com/bmm/dev/reference/cswald_dist.md)
   [`rcswald()`](https://venpopov.com/bmm/dev/reference/cswald_dist.md)
@@ -163,6 +169,10 @@ Functions for special distributions
 
 - [`rejection_sampling()`](https://venpopov.com/bmm/dev/reference/rejection_sampling.md)
   : Rejection Sampling
+
+- [`dsdt_yn()`](https://venpopov.com/bmm/dev/reference/sdt_yn_dist.md)
+  [`rsdt_yn()`](https://venpopov.com/bmm/dev/reference/sdt_yn_dist.md) :
+  Distribution functions for Yes/No SDT
 
 ## Data, model and parameter transformations
 
@@ -214,6 +224,8 @@ Utility functions for transforming data and parameters
 
 Available datasets for fitting the models
 
+- [`broeder_schuetz_2009_e3`](https://venpopov.com/bmm/dev/reference/broeder_schuetz_2009_e3.md)
+  : Recognition ROC data from Broeder & Schuetz (2009, Experiment 3)
 - [`data_color_judgement_task`](https://venpopov.com/bmm/dev/reference/data_color_judgement_task.md)
   : Example Data from a Color Judgement Task
 - [`oberauer_lewandowsky_2019_e1`](https://venpopov.com/bmm/dev/reference/oberauer_lewandowsky_2019_e1.md)

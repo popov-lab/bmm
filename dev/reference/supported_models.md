@@ -35,6 +35,7 @@ supported_models()
 #> -  mixture2p(resp_error) 
 #> -  mixture3p(resp_error, nt_features, set_size, regex) 
 #> -  sdm(resp_error, version) 
+#> -  sdt_yn(response, stimulus, n_trials, dist, links) 
 #> 
 #> Type  ?modelname  to get information about a specific model, e.g.  ?imm 
 ```

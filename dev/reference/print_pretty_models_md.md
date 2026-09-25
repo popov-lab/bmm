@@ -34,4 +34,8 @@ print_pretty_models_md()
 #> 
 #> * The Multinomial / Memory Measurement Model 
 #> 
+#> **Perception & Recognition Memory**
+#> 
+#> * Signal Detection Theory (Yes/No) 
+#> 
 ```

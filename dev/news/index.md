@@ -2,6 +2,28 @@
 
 ## bmm (development version)
 
+#### New models
+
+- Add **Yes/No Signal Detection Theory** (`sdt_yn`) for detection and
+  old/new recognition tasks with aggregated response counts. It
+  estimates sensitivity (`d`) and response bias (`criterion`), and
+  optionally the unequal-variance ratio (`sdratio`). Also adds
+  [`dsdt_yn()`](https://venpopov.com/bmm/dev/reference/sdt_yn_dist.md),
+  [`rsdt_yn()`](https://venpopov.com/bmm/dev/reference/sdt_yn_dist.md),
+  [`sdt_d()`](https://venpopov.com/bmm/dev/reference/SDTdist.md) and
+  [`sdt_criterion()`](https://venpopov.com/bmm/dev/reference/SDTdist.md).
+  See [`?sdt_yn`](https://venpopov.com/bmm/dev/reference/sdt_yn.md) for
+  the parameters, links, default priors and the designs that identify
+  `sdratio`. Thanks to
+  [@GidonFrischkorn](https://github.com/GidonFrischkorn)
+
+#### New datasets
+
+- Add **`broeder_schuetz_2009_e3`**, binary old/new recognition data
+  from Broeder & Schuetz (2009, Exp. 3), with five base-rate conditions
+  from 40 subjects. See
+  [`?broeder_schuetz_2009_e3`](https://venpopov.com/bmm/dev/reference/broeder_schuetz_2009_e3.md).
+
 #### New features
 
 - `bmm(file_refit = "on_change")` is now implemented and no longer warns

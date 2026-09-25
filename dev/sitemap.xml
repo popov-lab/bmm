@@ -20,6 +20,7 @@
 <url><loc>https://venpopov.com/bmm/dev/news/index.html</loc></url>
 <url><loc>https://venpopov.com/bmm/dev/reference/IMMdist.html</loc></url>
 <url><loc>https://venpopov.com/bmm/dev/reference/SDMdist.html</loc></url>
+<url><loc>https://venpopov.com/bmm/dev/reference/SDTdist.html</loc></url>
 <url><loc>https://venpopov.com/bmm/dev/reference/adjust_ezdm_accuracy.html</loc></url>
 <url><loc>https://venpopov.com/bmm/dev/reference/apply_links.html</loc></url>
 <url><loc>https://venpopov.com/bmm/dev/reference/bmf2bf.html</loc></url>
@@ -28,6 +29,7 @@
 <url><loc>https://venpopov.com/bmm/dev/reference/bmm_data_check.html</loc></url>
 <url><loc>https://venpopov.com/bmm/dev/reference/bmm_options.html</loc></url>
 <url><loc>https://venpopov.com/bmm/dev/reference/bmmformula.html</loc></url>
+<url><loc>https://venpopov.com/bmm/dev/reference/broeder_schuetz_2009_e3.html</loc></url>
 <url><loc>https://venpopov.com/bmm/dev/reference/c_parametrizations.html</loc></url>
 <url><loc>https://venpopov.com/bmm/dev/reference/calc_error_relative_to_nontargets.html</loc></url>
 <url><loc>https://venpopov.com/bmm/dev/reference/check_data.html</loc></url>
@@ -79,6 +81,8 @@
 <url><loc>https://venpopov.com/bmm/dev/reference/restructure.bmmfit.html</loc></url>
 <url><loc>https://venpopov.com/bmm/dev/reference/revert_postprocess_brm.html</loc></url>
 <url><loc>https://venpopov.com/bmm/dev/reference/sdm.html</loc></url>
+<url><loc>https://venpopov.com/bmm/dev/reference/sdt_yn.html</loc></url>
+<url><loc>https://venpopov.com/bmm/dev/reference/sdt_yn_dist.html</loc></url>
 <url><loc>https://venpopov.com/bmm/dev/reference/softmax.html</loc></url>
 <url><loc>https://venpopov.com/bmm/dev/reference/stancode.bmmformula.html</loc></url>
 <url><loc>https://venpopov.com/bmm/dev/reference/standata.bmmformula.html</loc></url>
