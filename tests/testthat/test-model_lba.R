@@ -461,6 +461,18 @@ test_that("lba simple with predictor runs with mock backend", {
 })
 
 
+test_that("report_priors() omits the technical mu of the LBA family", {
+  dat <- rlba(n = 60, drift = c(3, 1.5), gap = 0.5, sp = 0.5, ndt = 0.2)
+  model <- lba(rt = "rt", response = "response", n_choices = 2)
+  formula <- bmf(driftc ~ 1, drifte ~ 1, gap ~ 1, sp ~ 1, ndt ~ 1)
+  fit <- bmm(formula, dat, model, backend = "mock", mock_fit = 1, rename = FALSE)
+
+  out <- report_priors(fit)
+  expect_false("mu" %in% out$parameter)
+  expect_true(all(c("driftc", "drifte", "gap", "sp", "ndt") %in% out$parameter))
+})
+
+
 # -----------------------------------------------------------------------------
 # Distribution function tests (dlba/rlba/plba use gap+sp interface)
 # -----------------------------------------------------------------------------
