@@ -184,11 +184,11 @@ settable_links.lba_custom <- function(model) {
 #' @param version A character string specifying which version of the LBA model
 #'   to use. Options are:
 #'   \itemize{
-#'     \item `"simple"` (default): Two drift parameters — one for the correct
+#'     \item `"simple"` (default): Two drift parameters, one for the correct
 #'       accumulator (response = 1) and one for all error accumulators. The
-#'       scale parameter `s` is shared and fixed by default (s = 1). This
-#'       covers the common case where interest is in the speed of correct vs.
-#'       error processing.
+#'       scale parameter `s` is shared and fixed to 1 by default (`s = 0` on
+#'       the log scale). This covers the common case where interest is in the
+#'       speed of correct vs. error processing.
 #'     \item `"custom"`: Per-category drift parameters. Response categories
 #'       are defined by the formula LHS names (e.g., `cat1 ~ 1, cat2 ~ 1`).
 #'       The response column must contain character labels matching these names.
@@ -206,8 +206,8 @@ settable_links.lba_custom <- function(model) {
 #'     \item `"frechet"`: Drift rates drawn from a Frechet distribution.
 #'       `driftc`/`drifte` = shape parameter (log link), `s` = scale (fixed=1).
 #'     \item `"lognormal"`: Drift rates drawn from a lognormal distribution.
-#'       `driftc`/`drifte` = meanlog parameter (identity link), `s` = sdlog
-#'       (fixed=1).
+#'       `driftc`/`drifte` = meanlog parameter, which may take any real value
+#'       (identity link), `s` = sdlog (fixed=1).
 #'   }
 #' @param accumulators For `version = "custom"` only. A named vector
 #'   specifying the number of racing accumulators per response category.
@@ -216,6 +216,52 @@ settable_links.lba_custom <- function(model) {
 #'   1 accumulator per category.
 #' @param links A named list of link functions for the model parameters.
 #' @param ... Additional arguments passed internally (for testing purposes).
+#' @section Default priors: The `ndt` intercept prior is `normal(-1.5, 0.5)`
+#'   on the log scale (median 0.22 s), the same as `ddm()`'s. An earlier
+#'   `normal(-2, 0.3)` (median 0.135 s, 2% of its mass above 0.25 s) pulled
+#'   `ndt` down and drift rates/thresholds up on a 400-trial recovery.
+#'
+#'   Random-effects SDs get `exponential(1)` for the identity-linked normal
+#'   mean drift and `exponential(2)` for the log-linked shape drifts (gamma,
+#'   Frechet), the lognormal meanlog, and for `gap`, `sp`, `ndt` and `s`,
+#'   following the package-wide rule of rate 1 for identity-linked drift
+#'   parameters and rate 2 for log-linked, boundary, non-decision-time and
+#'   start-point parameters. These rates are anchored on the hierarchical
+#'   simulation design used for the LBA recovery (between-subject SDs
+#'   0.30-0.60 for `driftc`, 0.20-0.50 for `drifte`, and 0.10-0.25 on the log
+#'   scale for `gap`, `sp`, `ndt`): `exponential(1)` puts 36% of its mass
+#'   below 0.45, `exponential(2)` puts 29% below 0.17.
+#' @section Numerical notes: For `distribution = "gamma"`, the accumulator's
+#'   shape is `driftc`/`drifte` + 1, and `s * b / t` grows without bound as
+#'   `ndt` approaches the fastest response time. Stan Math's gamma CDF has an
+#'   approximate shape partial above shape ~5 and an undefined one once the
+#'   CDF saturates (stan-dev/math #3408), making the gamma drift the slowest
+#'   and least robust of the four distributions near the fastest response
+#'   times; the default gamma prior keeps shape away from this region.
+#'
+#'   For `distribution = "frechet"`, the accumulator's moment integral has no
+#'   closed form and is evaluated by a 16-point Gauss-Legendre rule, accurate
+#'   to 1e-6 nats for `sp / gap <= 6`, 6e-5 nats at 10, and 8.7e-3 nats at 40;
+#'   the default priors put `sp / gap` near 0.6.
+#' @section Identifiability of `s`: The evidence scale of the LBA is
+#'   arbitrary: multiplying every drift rate, `gap`, `sp` and `s` by the same
+#'   constant leaves the likelihood unchanged. `s` is therefore fixed to 1 by
+#'   convention (`0` on the log scale) to identify the rest of the
+#'   parameters. `check_model()` warns if a formula frees `s`; free it only
+#'   with another parameter fixed in its place.
+#' @section log_lik and posterior predictions: `log_lik()`/`loo()` use the
+#'   category-level likelihood: for `version = "simple"`, an error trial with
+#'   `K` response categories contributes `log(K - 1)` more than a
+#'   per-response likelihood would, i.e. the likelihood of "some error"
+#'   rather than of the specific error observed.
+#'
+#'   `posterior_epred()` returns the expected response time (`ndt` plus the
+#'   integral of the race survivor); it is deterministic, not
+#'   simulation-based.
+#'
+#'   `pp_check(fit, resp_var = "response")` checks the response category
+#'   (1 = correct, 2 = error for `version = "simple"`; category order for
+#'   `version = "custom"`). `pp_check_vars(fit)` lists the available checks.
 #' @return An object of class `bmmodel`
 #' @note Both versions describe the same response type (a categorical winner in
 #'   a choice-RT race), so they live in one constructor rather than separate

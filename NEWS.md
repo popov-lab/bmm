@@ -1,7 +1,7 @@
 # bmm (development version)
 
 ### New models
-* Add the **Linear Ballistic Accumulator** (`lba`) model (Brown & Heathcote, 2008) for multi-alternative choice reaction time tasks. Estimates drift rates, threshold gap, starting-point variability, and non-decision time from trial-level RT and choice data. Supports two versions — **simple** (correct-vs-error drift rates with integer-coded responses) and **custom** (per-accumulator drift rates with labelled responses) — and four trial-to-trial drift-rate distributions (`normal`, `gamma`, `frechet`, `lognormal`). Density and RNG helpers `dlba()`/`rlba()`/`plba()`/`qlba()` are exported. Thanks to @GidonFrischkorn
+* Add the **Linear Ballistic Accumulator** (`lba`) model (Brown & Heathcote, 2008) for multi-alternative choice reaction time tasks, with **simple** (correct-vs-error) and **custom** (per-accumulator) versions and four trial-to-trial drift-rate distributions (`normal`, `gamma`, `frechet`, `lognormal`). Exports `dlba()`/`rlba()`/`plba()`/`qlba()`; supports `pp_check(resp_var = "response")` and `loo()`. See `?lba` for defaults and numerical notes. Thanks to @GidonFrischkorn (#349)
 
 ### New features
 * `bmm(file_refit = "on_change")` is now implemented and no longer warns and falls back to `"never"`. The cached fit saved under `file` is returned only while the Stan code, the Stan data, the factor levels of the model variables and the algorithm are unchanged; any change refits. The comparison happens where `brms` makes it — after the bmm configuration pipeline has produced the Stan code and data, before compilation — so a cache hit costs one run of the pipeline plus `standata()` and `stancode()`: about 0.4 s rather than 0.02 s for an **sdm** model of `oberauer_lin_2017`, far less than compiling and sampling but not free. As in `brms`, only those four things are compared, so sampler settings do not force a refit — `control = list(adapt_delta = )` in particular, and also `iter`, `warmup`, `chains`, `seed`, `init` and `save_pars`: rerunning with a higher `adapt_delta` after divergent transitions, or with `save_pars(all = TRUE)` for `loo()`, returns the cached fit unchanged (#411).
@@ -80,9 +80,6 @@
 
 ### Other changes
 * The **ddm** model supports both `cmdstanr` and `rstan` backends. Previously, `cmdstanr` was required.
-
-### Other changes
-* Within-chain threading (the `threads` argument of `bmm()` or the `brms.threads` option) is now safe for the **lba** model. Its vectorized (`loop = FALSE`) family emits sliced data indexing (`vint1[start:end]`, ...) when threading is requested, so that each `reduce_sum` partial sum pairs its slice of response times with the matching responses and accumulator counts. Without the slicing, `brms` passed the `vint` columns through whole and every partial sum except the first evaluated the likelihood against the top of the data --- the model compiled and sampled without any error or warning, but returned wrong posteriors. Threaded and non-threaded models now produce identical log-posteriors (verification script at `local/lba_threading_verification.R`) (#349).
 
 # bmm 1.3.0
 

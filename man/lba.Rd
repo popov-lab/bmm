@@ -33,11 +33,11 @@ alternatives (K >= 2). Required for \code{version = "simple"}. Not used for
 \item{version}{A character string specifying which version of the LBA model
 to use. Options are:
 \itemize{
-\item \code{"simple"} (default): Two drift parameters — one for the correct
+\item \code{"simple"} (default): Two drift parameters, one for the correct
 accumulator (response = 1) and one for all error accumulators. The
-scale parameter \code{s} is shared and fixed by default (s = 1). This
-covers the common case where interest is in the speed of correct vs.
-error processing.
+scale parameter \code{s} is shared and fixed to 1 by default (\code{s = 0} on
+the log scale). This covers the common case where interest is in the
+speed of correct vs. error processing.
 \item \code{"custom"}: Per-category drift parameters. Response categories
 are defined by the formula LHS names (e.g., \verb{cat1 ~ 1, cat2 ~ 1}).
 The response column must contain character labels matching these names.
@@ -56,8 +56,8 @@ function differ:
 \item \code{"frechet"}: Drift rates drawn from a Frechet distribution.
 \code{driftc}/\code{drifte} = shape parameter (log link), \code{s} = scale (fixed=1).
 \item \code{"lognormal"}: Drift rates drawn from a lognormal distribution.
-\code{driftc}/\code{drifte} = meanlog parameter (identity link), \code{s} = sdlog
-(fixed=1).
+\code{driftc}/\code{drifte} = meanlog parameter, which may take any real value
+(identity link), \code{s} = sdlog (fixed=1).
 }}
 
 \item{accumulators}{For \code{version = "custom"} only. A named vector
@@ -122,31 +122,37 @@ Psychology, 57(3), 153-178. https://doi.org/10.1016/j.cogpsych.2007.12.002
 \itemize{
 \item \code{main}: normal(3, 1)
 \item \code{effects}: normal(0, 0.5)
+\item \code{sd}: exponential(1)
 }
 \item \code{drifte}:
 \itemize{
 \item \code{main}: normal(1, 1)
 \item \code{effects}: normal(0, 0.5)
+\item \code{sd}: exponential(1)
 }
 \item \code{gap}:
 \itemize{
 \item \code{main}: normal(-0.5, 0.5)
 \item \code{effects}: normal(0, 0.3)
+\item \code{sd}: exponential(2)
 }
 \item \code{sp}:
 \itemize{
 \item \code{main}: normal(-1, 0.5)
 \item \code{effects}: normal(0, 0.3)
+\item \code{sd}: exponential(2)
 }
 \item \code{ndt}:
 \itemize{
-\item \code{main}: normal(-2, 0.3)
+\item \code{main}: normal(-1.5, 0.5)
 \item \code{effects}: normal(0, 0.3)
+\item \code{sd}: exponential(2)
 }
 \item \code{s}:
 \itemize{
 \item \code{main}: normal(0, 0.3)
 \item \code{effects}: normal(0, 0.2)
+\item \code{sd}: exponential(2)
 }
 }
 }
@@ -157,6 +163,64 @@ a choice-RT race), so they live in one constructor rather than separate
 model functions: \code{"simple"} is an accuracy-coded convenience layer (correct
 vs. error) over the general per-accumulator case handled by \code{"custom"}.
 }
+\section{Default priors}{
+ The \code{ndt} intercept prior is \code{normal(-1.5, 0.5)}
+on the log scale (median 0.22 s), the same as \code{ddm()}'s. An earlier
+\code{normal(-2, 0.3)} (median 0.135 s, 2\% of its mass above 0.25 s) pulled
+\code{ndt} down and drift rates/thresholds up on a 400-trial recovery.
+
+Random-effects SDs get \code{exponential(1)} for the identity-linked normal
+mean drift and \code{exponential(2)} for the log-linked shape drifts (gamma,
+Frechet), the lognormal meanlog, and for \code{gap}, \code{sp}, \code{ndt} and \code{s},
+following the package-wide rule of rate 1 for identity-linked drift
+parameters and rate 2 for log-linked, boundary, non-decision-time and
+start-point parameters. These rates are anchored on the hierarchical
+simulation design used for the LBA recovery (between-subject SDs
+0.30-0.60 for \code{driftc}, 0.20-0.50 for \code{drifte}, and 0.10-0.25 on the log
+scale for \code{gap}, \code{sp}, \code{ndt}): \code{exponential(1)} puts 36\% of its mass
+below 0.45, \code{exponential(2)} puts 29\% below 0.17.
+}
+
+\section{Numerical notes}{
+ For \code{distribution = "gamma"}, the accumulator's
+shape is \code{driftc}/\code{drifte} + 1, and \code{s * b / t} grows without bound as
+\code{ndt} approaches the fastest response time. Stan Math's gamma CDF has an
+approximate shape partial above shape ~5 and an undefined one once the
+CDF saturates (stan-dev/math #3408), making the gamma drift the slowest
+and least robust of the four distributions near the fastest response
+times; the default gamma prior keeps shape away from this region.
+
+For \code{distribution = "frechet"}, the accumulator's moment integral has no
+closed form and is evaluated by a 16-point Gauss-Legendre rule, accurate
+to 1e-6 nats for \code{sp / gap <= 6}, 6e-5 nats at 10, and 8.7e-3 nats at 40;
+the default priors put \code{sp / gap} near 0.6.
+}
+
+\section{Identifiability of \code{s}}{
+ The evidence scale of the LBA is
+arbitrary: multiplying every drift rate, \code{gap}, \code{sp} and \code{s} by the same
+constant leaves the likelihood unchanged. \code{s} is therefore fixed to 1 by
+convention (\code{0} on the log scale) to identify the rest of the
+parameters. \code{check_model()} warns if a formula frees \code{s}; free it only
+with another parameter fixed in its place.
+}
+
+\section{log_lik and posterior predictions}{
+ \code{log_lik()}/\code{loo()} use the
+category-level likelihood: for \code{version = "simple"}, an error trial with
+\code{K} response categories contributes \code{log(K - 1)} more than a
+per-response likelihood would, i.e. the likelihood of "some error"
+rather than of the specific error observed.
+
+\code{posterior_epred()} returns the expected response time (\code{ndt} plus the
+integral of the race survivor); it is deterministic, not
+simulation-based.
+
+\code{pp_check(fit, resp_var = "response")} checks the response category
+(1 = correct, 2 = error for \code{version = "simple"}; category order for
+\code{version = "custom"}). \code{pp_check_vars(fit)} lists the available checks.
+}
+
 \examples{
 \dontshow{if (isTRUE(Sys.getenv("BMM_EXAMPLES"))) withAutoprint(\{ # examplesIf}
 # simple version with 2 alternatives

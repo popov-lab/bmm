@@ -2091,20 +2091,29 @@ neg_loglik <- function(x, params, distribution, weights = NULL) {
 #'   generation for the Linear Ballistic Accumulator (LBA) model with multiple
 #'   drift rate distributions.
 #'
-#' @param rt Numeric vector of response times in seconds.
+#' @param rt Numeric vector of response times in seconds. Recycled with `gap`,
+#'   `sp` and `ndt` to a common length.
 #' @param n Integer. Number of samples to generate.
 #' @param response Integer vector indicating the winning accumulator
-#'   (1, 2, ..., K).
+#'   (1, 2, ..., K). May be recycled to the length of `rt`, and may contain
+#'   `NA`; the corresponding density is `NA`.
 #' @param drift Numeric vector of drift rate parameters (one per accumulator).
 #'   Interpretation depends on `distribution`: mean drift for `"normal"`, shape
-#'   for `"gamma"` and `"frechet"`, meanlog for `"lognormal"`.
+#'   for `"gamma"` and `"frechet"`, meanlog for `"lognormal"`. The lognormal
+#'   meanlog may take any real value, unlike the gamma and Frechet shapes,
+#'   which must be positive.
 #' @param gap Numeric. Threshold gap (> 0). The distance between the maximum
 #'   starting point and the decision threshold. The total threshold is computed
-#'   as `b = gap + sp`, ensuring `b > sp` structurally.
-#' @param sp Numeric. Maximum starting point (>= 0). Starting evidence is
-#'   uniformly distributed on `[0, sp]`. When `sp = 0`, there is no starting
-#'   point variability.
-#' @param ndt Numeric. Non-decision time in seconds (>= 0).
+#'   as `b = gap + sp`, ensuring `b > sp` structurally. Recycled with `rt`,
+#'   `sp` and `ndt` to a common length.
+#' @param sp Numeric. Maximum starting point (>= 0 here; strictly positive,
+#'   `sp > 0`, in the `lba()` model). Starting evidence is uniformly
+#'   distributed on `[0, sp]`. These distribution functions additionally
+#'   accept `sp = 0` as the no-starting-point-variability limit, which the
+#'   fitted model does not. Recycled with `rt`, `gap` and `ndt` to a common
+#'   length.
+#' @param ndt Numeric. Non-decision time in seconds (>= 0). Recycled with
+#'   `rt`, `gap` and `sp` to a common length.
 #' @param s Numeric. Scale parameter (> 0, default = 1). Interpretation depends
 #'   on `distribution`: drift SD for `"normal"`, rate for `"gamma"`, scale for
 #'   `"frechet"`, sdlog for `"lognormal"`. Typically fixed to 1 for

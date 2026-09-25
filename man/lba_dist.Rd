@@ -55,24 +55,33 @@ qlba(
 )
 }
 \arguments{
-\item{rt}{Numeric vector of response times in seconds.}
+\item{rt}{Numeric vector of response times in seconds. Recycled with \code{gap},
+\code{sp} and \code{ndt} to a common length.}
 
 \item{response}{Integer vector indicating the winning accumulator
-(1, 2, ..., K).}
+(1, 2, ..., K). May be recycled to the length of \code{rt}, and may contain
+\code{NA}; the corresponding density is \code{NA}.}
 
 \item{drift}{Numeric vector of drift rate parameters (one per accumulator).
 Interpretation depends on \code{distribution}: mean drift for \code{"normal"}, shape
-for \code{"gamma"} and \code{"frechet"}, meanlog for \code{"lognormal"}.}
+for \code{"gamma"} and \code{"frechet"}, meanlog for \code{"lognormal"}. The lognormal
+meanlog may take any real value, unlike the gamma and Frechet shapes,
+which must be positive.}
 
 \item{gap}{Numeric. Threshold gap (> 0). The distance between the maximum
 starting point and the decision threshold. The total threshold is computed
-as \code{b = gap + sp}, ensuring \code{b > sp} structurally.}
+as \code{b = gap + sp}, ensuring \code{b > sp} structurally. Recycled with \code{rt},
+\code{sp} and \code{ndt} to a common length.}
 
-\item{sp}{Numeric. Maximum starting point (>= 0). Starting evidence is
-uniformly distributed on \verb{[0, sp]}. When \code{sp = 0}, there is no starting
-point variability.}
+\item{sp}{Numeric. Maximum starting point (>= 0 here; strictly positive,
+\code{sp > 0}, in the \code{lba()} model). Starting evidence is uniformly
+distributed on \verb{[0, sp]}. These distribution functions additionally
+accept \code{sp = 0} as the no-starting-point-variability limit, which the
+fitted model does not. Recycled with \code{rt}, \code{gap} and \code{ndt} to a common
+length.}
 
-\item{ndt}{Numeric. Non-decision time in seconds (>= 0).}
+\item{ndt}{Numeric. Non-decision time in seconds (>= 0). Recycled with
+\code{rt}, \code{gap} and \code{sp} to a common length.}
 
 \item{s}{Numeric. Scale parameter (> 0, default = 1). Interpretation depends
 on \code{distribution}: drift SD for \code{"normal"}, rate for \code{"gamma"}, scale for
