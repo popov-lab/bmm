@@ -266,6 +266,18 @@
   Stan estimated `kappa` freely, and `update(fit, bmf(..., mu = 0.5))`
   one that reported `mu = 0.5` while Stan kept `mu` at the original
   value — all three with no error or warning.
+- `ezdm_summary_stats(method = "mixture")` now returns `n_upper` and
+  `n_trials` for the responses its `mean_rt`/`var_rt` are based on. It
+  previously returned the raw counts beside cleaned moments, so every
+  cell told **ezdm** it rested on more responses than it had and its
+  posterior came out too narrow. Summary statistics change and fits are
+  not reproduced; recompute them and refit. Use `guess_rate` to set the
+  accuracy expected of a contaminant response (`version = "3par"` only).
+  A cell whose accuracy `guess_rate` cannot explain is corrected without
+  it, and warns.
+  [`adjust_ezdm_accuracy()`](https://venpopov.com/bmm/dev/reference/adjust_ezdm_accuracy.md)
+  is deprecated — applying it now removes the same contaminants twice
+  ([\#423](https://github.com/popov-lab/bmm/issues/423)).
 - The **ezdm** likelihood no longer assumes that reaction times are
   normally distributed. Because response times are right-skewed, it
   treated each cell as more informative than it is, and posteriors,

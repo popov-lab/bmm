@@ -19,7 +19,8 @@ ezdm_summary_stats(
   init_contaminant = 0.05,
   max_contaminant = 0.5,
   maxit = 100,
-  tol = 1e-06
+  tol = 1e-06,
+  guess_rate = 0.5
 )
 ```
 
@@ -86,7 +87,10 @@ ezdm_summary_stats(
 - min_trials:
 
   Integer. Minimum number of trials required for fitting. Returns NA if
-  fewer trials are available. Default is 10
+  fewer trials are available. Compared against the total number of
+  trials for `version = "3par"` and against each boundary's own count
+  for `version = "4par"`, so the two versions can disagree about whether
+  the same cell is corrected. Default is 10
 
 - init_contaminant:
 
@@ -107,6 +111,15 @@ ezdm_summary_stats(
 
   Numeric. Convergence tolerance for EM algorithm. Default is 1e-6
 
+- guess_rate:
+
+  Numeric. Accuracy expected of a contaminant response, used to split
+  the estimated contaminants of `version = "3par"` across the two
+  boundaries. Default is 0.5, appropriate for a two-choice task; use
+  0.25 for a 4AFC task, or 0 if contaminants are never correct. Ignored
+  for `version = "4par"`, which estimates contamination separately per
+  boundary and needs no such assumption.
+
 ## Value
 
 A 1-row `data.frame`. For version = "3par": `mean_rt`, `var_rt`,
@@ -114,6 +127,12 @@ A 1-row `data.frame`. For version = "3par": `mean_rt`, `var_rt`,
 `mean_rt_upper`, `mean_rt_lower`, `var_rt_upper`, `var_rt_lower`,
 `n_upper`, `n_trials`, `contaminant_prop_upper`,
 `contaminant_prop_lower`.
+
+`n_upper` and `n_trials` count the responses the reported moments rest
+on. Whenever a contaminant proportion was estimated, the expected number
+of contaminants is removed from both counts and the result is rounded;
+with `method = "simple"`, `method = "robust"`, or an EM that did not
+converge, they are the raw counts.
 
 ## Details
 
@@ -124,19 +143,23 @@ mixture model with two components: a uniform distribution for
 contaminants and a parametric RT distribution for true responses. Robust
 moments are then extracted from the fitted parametric component.
 
+The returned counts describe the same responses as the returned moments.
+For `version = "3par"` the estimated contaminants are shared between the
+boundaries at `guess_rate`; a cell whose observed accuracy lies outside
+`[guess_rate * p, 1 - p * (1 - guess_rate)]` for an estimated proportion
+`p` cannot have arisen that way, so the contaminants are removed
+proportionally from both boundaries instead, leaving the observed
+accuracy unchanged apart from rounding, and a warning is issued. For
+`version = "4par"` each boundary is corrected by its own estimate.
+
 This function is designed to work with
 [`dplyr::group_by()`](https://dplyr.tidyverse.org/reference/group_by.html)
 and
 [`dplyr::reframe()`](https://dplyr.tidyverse.org/reference/reframe.html)
-for grouped operations. Use
-[`adjust_ezdm_accuracy()`](https://venpopov.com/bmm/dev/reference/adjust_ezdm_accuracy.md)
-as a separate step if you need to adjust accuracy counts for
-contamination.
+for grouped operations.
 
 ## See also
 
-[`adjust_ezdm_accuracy()`](https://venpopov.com/bmm/dev/reference/adjust_ezdm_accuracy.md)
-for adjusting accuracy counts,
 [`flag_contaminant_rts()`](https://venpopov.com/bmm/dev/reference/flag_contaminant_rts.md)
 for trial-level contamination probabilities,
 [`ezdm()`](https://venpopov.com/bmm/dev/reference/ezdm.md) for fitting
@@ -153,7 +176,7 @@ response <- rbinom(100, 1, 0.8)
 # 3par summary stats
 ezdm_summary_stats(rt, response)
 #>      mean_rt     var_rt n_upper n_trials contaminant_prop
-#> mu 0.7751987 0.03617632      82      100      4.68105e-08
+#> mu 0.7751987 0.03617631      82      100      4.68105e-08
 
 # With dplyr for grouped operations
 # library(dplyr)
@@ -164,7 +187,7 @@ ezdm_summary_stats(rt, response)
 # 4par version with separate upper/lower moments
 ezdm_summary_stats(rt, response, version = "4par")
 #>    mean_rt_upper mean_rt_lower var_rt_upper var_rt_lower n_upper n_trials
-#> mu     0.7751185     0.7756404   0.04176804   0.01614607      82      100
+#> mu     0.7751185     0.7755708   0.04176804   0.01614341      82      100
 #>    contaminant_prop_upper contaminant_prop_lower
-#> mu           5.349368e-08           5.258552e-08
+#> mu           5.349368e-08           1.992978e-08
 ```

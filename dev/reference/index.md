@@ -179,7 +179,7 @@ Functions for special distributions
 Utility functions for transforming data and parameters
 
 - [`adjust_ezdm_accuracy()`](https://venpopov.com/bmm/dev/reference/adjust_ezdm_accuracy.md)
-  : Adjust Accuracy Counts for Contamination
+  : Adjust Accuracy Counts for Contamination (deprecated)
 
 - [`c_sqrtexp2bessel()`](https://venpopov.com/bmm/dev/reference/c_parametrizations.md)
   [`c_bessel2sqrtexp()`](https://venpopov.com/bmm/dev/reference/c_parametrizations.md)

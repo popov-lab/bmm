@@ -111,7 +111,7 @@ bind_rows(
 #>       method   mean_rt     var_rt  accuracy contaminant_prop
 #> ...1  simple 0.8231905 0.39684254 0.4752726               NA
 #> ...2  robust 0.6440000 0.05804206 0.4752726               NA
-#> mu   mixture 0.7500098 0.11366415 0.4752726       0.02797548
+#> mu   mixture 0.7500167 0.11366858 0.4745630       0.02797528
 ```
 
 The mixture method also returns a contamination proportion estimate. The
@@ -151,12 +151,10 @@ is more stable and sufficient.
 
 In a typical analysis, you would aggregate data for all subjects and
 conditions with `ezdm_summary_stats(method = "mixture")`, then fit the
-EZDM to those summary stats. If you want to adjust accuracy for
-contamination, use
-[`adjust_ezdm_accuracy()`](https://venpopov.com/bmm/dev/reference/adjust_ezdm_accuracy.md)
-before fitting the model. This accounts for the fact that some
-contaminant trials are likely random guesses, which can bias accuracy
-estimates.
+EZDM to those summary stats. The returned `n_upper` and `n_trials`
+already exclude the estimated contaminants, so they describe the same
+responses as the returned `mean_rt` and `var_rt`, and you can pass them
+to [`ezdm()`](https://venpopov.com/bmm/dev/reference/ezdm.md) unchanged.
 
 ``` r
 
@@ -165,11 +163,7 @@ ezdm_data <- raw_trial_data |>
   group_by(subject, condition) |>
   reframe(ezdm_summary_stats(rt, response, method = "mixture"))
 
-# Step 2 (optional): Adjust accuracy for contamination
-ezdm_data <- ezdm_data |>
-  mutate(adjust_ezdm_accuracy(n_upper, n_trials, contaminant_prop))
-
-# Step 3: Fit EZDM model
+# Step 2: Fit EZDM model
 fit <- bmm(
   formula = bmf(drift ~ condition, bound ~ 1, ndt ~ 1),
   data = ezdm_data,
@@ -179,6 +173,27 @@ fit <- bmm(
   )
 )
 ```
+
+For the three-parameter version, splitting the estimated contaminants
+between the two boundaries requires an assumption about how accurate a
+contaminant response is. `guess_rate` carries that assumption and
+defaults to 0.5, the chance level of a two-choice task; set it to 0.25
+for a 4AFC task, or to 0 if contaminants are never correct. The
+four-parameter version estimates contamination separately for each
+boundary and ignores `guess_rate`.
+
+If a cell’s observed accuracy is higher than the estimated contamination
+and guess rate can produce — 95% correct is impossible when 15% of the
+trials were coin flips — the split cannot be trusted for that cell. The
+correction still runs, removing the estimated contaminants
+proportionally from both `n_upper` and `n_trials` and preserving
+observed accuracy up to rounding, but it warns. That usually means the
+guess rate does not match the task, or that the contaminant reaction
+times were not distinguishable enough from the cognitive ones for the EM
+to separate them. Both counts are rounded to integers, so the implied
+accuracy moves by at most one part in the corrected `n_trials`: at the
+default `max_contaminant`, a percent in a 200-trial cell and a fifth in
+a cell of ten trials, the default `min_trials`.
 
 ------------------------------------------------------------------------
 
@@ -201,12 +216,12 @@ flagged <- rr98_subset |>
 
 head(flagged)
 #>      rt response strength correct contam_prob
-#> 1 0.801    upper        8    TRUE 0.002307926
-#> 2 0.680    upper        7    TRUE 0.001599957
-#> 3 0.694    lower       19    TRUE 0.001669003
-#> 4 0.582    lower       21   FALSE 0.001215204
-#> 5 0.925    upper       19   FALSE 0.003359771
-#> 6 0.605    upper       10    TRUE 0.001286841
+#> 1 0.801    upper        8    TRUE 0.002307907
+#> 2 0.680    upper        7    TRUE 0.001599956
+#> 3 0.694    lower       19    TRUE 0.001669001
+#> 4 0.582    lower       21   FALSE 0.001215208
+#> 5 0.925    upper       19   FALSE 0.003359717
+#> 6 0.605    upper       10    TRUE 0.001286845
 ```
 
 Diagnostics (convergence, parameters, log-likelihood) are available via
@@ -217,7 +232,7 @@ Diagnostics (convergence, parameters, log-likelihood) are available via
 probs <- flag_contaminant_rts(rr98_subset$rt)
 attr(probs, "diagnostics")
 #>   mixture_params contaminant_prop converged iterations    loglik n_trials
-#> 1   0.420729....       0.02797548      TRUE         13 -926.5735     3943
+#> 1   0.420729....       0.02797528      TRUE         12 -926.5735     3943
 #>   distribution     method
 #> 1   exgaussian mixture_em
 ```
@@ -380,7 +395,7 @@ ezdm_data |>
 #> 1 jf    speed                      0.00161                0.00145
 #> 2 jf    accuracy                   0.0316                 0.0240 
 #> 3 kr    speed                      0.00241                0.00362
-#> 4 kr    accuracy                   0.0147                 0.0285 
+#> 4 kr    accuracy                   0.0147                 0.0284 
 #> 5 nh    speed                      0.00257                0.00155
 #> 6 nh    accuracy                   0.0396                 0.0506
 ```

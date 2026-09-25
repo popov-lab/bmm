@@ -326,42 +326,43 @@ print(comparison)
 #>    Method   Mean_RT     Var_RT Contaminant
 #> 1  Simple 0.5409176 0.10605857          NA
 #> 2  Robust 0.4568634 0.02440439          NA
-#> 3 Mixture 0.4962307 0.03633472  0.03539257
+#> 3 Mixture 0.4964177 0.03642890  0.03532347
 #> 4    TRUE 0.4755037 0.02050638  0.05000000
 ```
 
 The mixture method identifies contaminants and provides more accurate
 moment estimates.
 
-### 4.2 Accuracy Adjustment
+### 4.2 Accuracy and Trial Counts
 
-When using the mixture method, the
-[`adjust_ezdm_accuracy()`](https://venpopov.com/bmm/dev/reference/adjust_ezdm_accuracy.md)
-function can adjust accuracy counts by removing estimated contaminants.
-This assumes contaminants are random guesses (50% accuracy by default)
-and is applied as a separate step after computing summary statistics:
+The mixture method also corrects `n_upper` and `n_trials`, so that the
+counts describe the responses the moments were computed from. The
+`simple` and `robust` methods estimate no contaminant proportion and
+return the raw counts:
 
 ``` r
 
-summary_no_adjust <- ezdm_summary_stats(
-  trials_contaminated$rt, trials_contaminated$correct, version = "3par"
+summary_raw <- ezdm_summary_stats(
+  trials_contaminated$rt, trials_contaminated$correct,
+  method = "simple", version = "3par"
 )
 
-summary_adjust <- ezdm_summary_stats(
-  trials_contaminated$rt, trials_contaminated$correct, version = "3par"
-) |>
-  mutate(adjust_ezdm_accuracy(n_upper, n_trials, contaminant_prop))
-
-cat("Unadjusted accuracy:",
-    round(summary_no_adjust$n_upper / summary_no_adjust$n_trials, 3), "\n")
-#> Unadjusted accuracy: 0.93
-cat("Adjusted accuracy:",
-    round(summary_adjust$n_upper_adj / summary_adjust$n_trials_adj, 3), "\n")
-#> Adjusted accuracy: 0.948
+cat("Raw counts:", summary_raw$n_upper, "of", summary_raw$n_trials,
+    "- accuracy", round(summary_raw$n_upper / summary_raw$n_trials, 3), "\n")
+#> Raw counts: 186 of 200 - accuracy 0.93
+cat("Contaminant-free:", summary_mixture$n_upper, "of", summary_mixture$n_trials,
+    "- accuracy", round(summary_mixture$n_upper / summary_mixture$n_trials, 3), "\n")
+#> Contaminant-free: 182 of 193 - accuracy 0.943
 cat("True accuracy (no contaminants):",
     round(mean(trials_clean$response == "upper"), 3), "\n")
 #> True accuracy (no contaminants): 0.945
 ```
+
+Splitting the estimated contaminants between the two boundaries needs an
+assumption about how accurate a contaminant response is. The
+`guess_rate` argument carries it and defaults to 0.5, the chance level
+of a two-choice task. The 4-parameter version estimates contamination
+per boundary and ignores it.
 
 ### 4.3 Working with the 4-Parameter Version
 
@@ -392,9 +393,9 @@ summary_4par <- ezdm_summary_stats(
 
 summary_4par
 #>    mean_rt_upper mean_rt_lower var_rt_upper var_rt_lower n_upper n_trials
-#> mu     0.3943676            NA   0.01611958           NA     195      200
+#> mu     0.3950143            NA   0.01629836           NA     193      198
 #>    contaminant_prop_upper contaminant_prop_lower
-#> mu             0.01217136                     NA
+#> mu             0.01143807                     NA
 ```
 
 Notice the output now includes: - `mean_rt_upper`, `var_rt_upper`:
