@@ -756,6 +756,58 @@ test_that("drdm() integrates to one over responses and time when s != 1", {
   }
 })
 
+# log_lik() hands the kernels one observation with a vector of draws, so the
+# parameters vary along the vector and different draws need different branches
+# of the same kernel (start-point range below and above the midpoint switch,
+# decision time near and far from the non-decision time, either sign of the
+# exponential difference in the survival). Every branch must subset every
+# argument by the same mask; a stray full-length vector recycles silently.
+test_that("a mixed vector of draws takes each branch it needs", {
+  n_draws <- 6L
+  prep <- structure(
+    list(
+      ndraws = n_draws,
+      data = list(Y = 0.55, vint1 = 1L, vint2 = 1L, vint3 = 2L),
+      dpars = list(
+        driftc = c(3, 4, 2, 3.5, 5, 2.5),
+        drifte = c(1.5, 1.2, 1, 1.8, 2, 1.1),
+        gap = c(1, 1.1, 1, 0.8, 0.4, 0.6),
+        ndt = c(0.25, 0.548, 0.2, 0.549, 0.1, 0.3),
+        s = c(1, 0.9, 1.1, 1, 0.5, 1.4),
+        sp = c(0.05, 0.1, 1e-7, 0.06, 0.2, 0.3)
+      ),
+      family = list(rdm_has_sp = TRUE, dpars = c("mu", "driftc", "drifte", "gap", "ndt", "s", "sp"))
+    ),
+    class = "brmsprep"
+  )
+  vectorised <- .rdm_log_lik(1, prep, cat_names = c("driftc", "drifte"), n_cats = 2)
+  per_draw <- vapply(seq_len(n_draws), function(k) {
+    one <- prep
+    one$ndraws <- 1L
+    one$dpars <- lapply(prep$dpars, `[`, k)
+    .rdm_log_lik(1, one, cat_names = c("driftc", "drifte"), n_cats = 2)
+  }, numeric(1))
+  expect_true(all(is.finite(vectorised)))
+  expect_equal(vectorised, per_draw, tolerance = 1e-12)
+
+  # the same holds for the exported density with trial-varying parameters
+  rt <- c(0.3, 0.552, 0.9, 2.5, 0.35, 0.7)
+  response <- c(1L, 2L, 1L, 2L, 1L, 2L)
+  vec <- drdm(rt, response, drift = c(3, 1.5),
+              gap = prep$dpars$gap, sp = prep$dpars$sp, ndt = prep$dpars$ndt,
+              s = prep$dpars$s, log = TRUE)
+  each <- vapply(seq_along(rt), function(k) {
+    drdm(rt[k], response[k], drift = c(3, 1.5), gap = prep$dpars$gap[k],
+         sp = prep$dpars$sp[k], ndt = prep$dpars$ndt[k], s = prep$dpars$s[k], log = TRUE)
+  }, numeric(1))
+  expect_equal(vec, each, tolerance = 1e-12)
+})
+
+test_that("drdm() rejects a response outside the accumulators", {
+  expect_error(drdm(0.5, 3, drift = c(3, 1.5), gap = 1, ndt = 0.2), "1:2")
+  expect_error(drdm(0.5, 0, drift = c(3, 1.5), gap = 1, ndt = 0.2), "1:2")
+})
+
 test_that("rrdm returns valid data.frame", {
   dat <- rrdm(100, drift = c(3, 1.5), gap = 1, ndt = 0.2)
   expect_s3_class(dat, "data.frame")

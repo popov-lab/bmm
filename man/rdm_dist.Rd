@@ -19,9 +19,11 @@ qrdm(p, drift, gap, ndt, s = 1, sp = 0, lower.tail = TRUE, log.p = FALSE)
 \arguments{
 \item{rt}{Numeric vector of response times (in seconds).}
 
-\item{response}{Integer vector indicating which accumulator won (1-indexed).}
+\item{response}{Integer vector indicating which accumulator won (1-indexed,
+in \code{1:length(drift)}).}
 
-\item{drift}{Numeric vector of drift rates for each accumulator (all > 0).}
+\item{drift}{Numeric vector of drift rates, one per accumulator (all > 0).
+Its length sets the number of accumulators in the race.}
 
 \item{gap}{Threshold gap (> 0). The distance between the maximum starting
 point and the decision threshold. The total threshold is computed as
@@ -60,6 +62,12 @@ Racing Diffusion Model (Tillman, Van Zandt, & Logan, 2020). The RDM is a
 multi-accumulator race model where each accumulator follows a Wald (inverse
 Gaussian) distribution. The first accumulator to finish determines the
 response and the RT.
+}
+\details{
+\code{gap}, \code{ndt}, \code{s} and \code{sp} are recycled along \code{rt} (or \code{q}) in
+\code{drdm()} and \code{prdm()}, so trial-varying parameters can be passed as
+vectors. \code{rrdm()} and \code{qrdm()} take one value of each; \code{drift} is always
+one value per accumulator.
 }
 \examples{
 dat <- rrdm(n = 1000, drift = c(3, 1.5), gap = 1, sp = 0, ndt = 0.2)

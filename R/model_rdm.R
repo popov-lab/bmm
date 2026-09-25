@@ -610,94 +610,47 @@ configure_model.rdm_custom <- function(model, data, formula) {
 # Post-processing functions (shared helpers)                             ####
 ############################################################################# !
 
-.rdm_log_lik <- function(i, prep, cat_names, n_cats) {
-  rt <- prep$data$Y[i]
-  response <- prep$data$vint1[i]
-  gap <- brms::get_dpar(prep, "gap", i = i)
-  ndt <- brms::get_dpar(prep, "ndt", i = i)
-  s <- brms::get_dpar(prep, "s", i = i)
-  sp_val <- brms::get_dpar(prep, "sp", i = i)
-  has_sp <- isTRUE(prep$family$rdm_has_sp)
-
-  t <- rt - ndt
-  t[t <= 0] <- NA
-  b <- if (has_sp) gap + sp_val else gap
-  A <- if (has_sp) sp_val else 0
-
-  n_cat <- vapply(
-    seq_len(n_cats),
-    function(j) prep$data[[paste0("vint", j + 1)]][i],
-    integer(1)
+# The per-draw parameters of one observation as the row-per-draw matrices
+# .rdm_race_lpdf() and .rdm_race() take. get_dpar() returns a scalar for a dpar
+# brms stores fixed, so every vector is grown to ndraws, and the drifts go
+# through matrix() because vapply() returns a bare vector for a single draw.
+.rdm_draw_pars <- function(i, prep, cat_names, n_cats) {
+  n_draws <- prep$ndraws
+  list(
+    rt = prep$data$Y[i],
+    response = prep$data$vint1[i],
+    gap = rep_len(brms::get_dpar(prep, "gap", i = i), n_draws),
+    ndt = rep_len(brms::get_dpar(prep, "ndt", i = i), n_draws),
+    s = rep_len(brms::get_dpar(prep, "s", i = i), n_draws),
+    sp = rep_len(brms::get_dpar(prep, "sp", i = i), n_draws),
+    drift = matrix(vapply(cat_names, function(p) {
+      rep_len(brms::get_dpar(prep, p, i = i), n_draws)
+    }, numeric(n_draws)), nrow = n_draws),
+    counts = matrix(vapply(
+      seq_len(n_cats),
+      function(j) prep$data[[paste0("vint", j + 1)]][i],
+      integer(1)
+    ), n_draws, n_cats, byrow = TRUE)
   )
+}
 
-  drift_win <- brms::get_dpar(prep, cat_names[response], i = i)
-
-  if (!has_sp) {
-    log_lik <- log(n_cat[response]) +
-      .dwald(t, drift = drift_win, bound = b, s = s, log = TRUE)
-
-    if (n_cat[response] > 1) {
-      log_lik <- log_lik + (n_cat[response] - 1) *
-        .pwald(t, drift = drift_win, bound = b, s = s,
-               lower.tail = FALSE, log.p = TRUE)
-    }
-
-    for (j in seq_len(n_cats)) {
-      if (j == response || n_cat[j] == 0) next
-      drift_j <- brms::get_dpar(prep, cat_names[j], i = i)
-      log_lik <- log_lik + n_cat[j] *
-        .pwald(t, drift = drift_j, bound = b, s = s,
-               lower.tail = FALSE, log.p = TRUE)
-    }
-  } else {
-    log_lik <- log(n_cat[response]) +
-      .dwald_full(t, drift = drift_win, bound = b, A = A, s = s, log = TRUE)
-
-    if (n_cat[response] > 1) {
-      log_lik <- log_lik + (n_cat[response] - 1) *
-        .pwald_full(t, drift = drift_win, bound = b, A = A, s = s,
-                    lower.tail = FALSE, log.p = TRUE)
-    }
-
-    for (j in seq_len(n_cats)) {
-      if (j == response || n_cat[j] == 0) next
-      drift_j <- brms::get_dpar(prep, cat_names[j], i = i)
-      log_lik <- log_lik + n_cat[j] *
-        .pwald_full(t, drift = drift_j, bound = b, A = A, s = s,
-                    lower.tail = FALSE, log.p = TRUE)
-    }
-  }
-
-  log_lik[is.na(log_lik)] <- -Inf
-  log_lik
+.rdm_log_lik <- function(i, prep, cat_names, n_cats) {
+  d <- .rdm_draw_pars(i, prep, cat_names, n_cats)
+  has_sp <- isTRUE(prep$family$rdm_has_sp)
+  .rdm_race_lpdf(
+    t = d$rt - d$ndt, response = d$response, drift = d$drift, counts = d$counts,
+    gap = d$gap, A = if (has_sp) d$sp else 0 * d$sp, s = d$s
+  )
 }
 
 .rdm_posterior_predict <- function(i, prep, cat_names, n_cats, ...) {
-  gap <- brms::get_dpar(prep, "gap", i = i)
-  ndt <- brms::get_dpar(prep, "ndt", i = i)
-  s <- brms::get_dpar(prep, "s", i = i)
-  sp <- brms::get_dpar(prep, "sp", i = i)
-  n_draws <- length(ndt)
+  d <- .rdm_draw_pars(i, prep, cat_names, n_cats)
   has_sp <- isTRUE(prep$family$rdm_has_sp)
-  drift <- lapply(cat_names, function(p) brms::get_dpar(prep, p, i = i))
-  n_cat <- vapply(
-    seq_len(n_cats),
-    function(j) prep$data[[paste0("vint", j + 1)]][i],
-    integer(1)
+  race <- .rdm_race(
+    drift = d$drift, gap = d$gap, A = if (has_sp) d$sp else 0 * d$sp, s = d$s,
+    counts = d$counts
   )
-
-  b <- if (has_sp) gap + sp else gap
-  min_ft <- rep(Inf, n_draws)
-  for (j in seq_len(n_cats)) {
-    if (n_cat[j] == 0) next
-    for (k in seq_len(n_cat[j])) {
-      bound <- if (has_sp) b - stats::runif(n_draws, 0, sp) else b
-      min_ft <- pmin(
-        min_ft, .rwald_ig(n_draws, drift = drift[[j]], bound = bound, s = s)
-      )
-    }
-  }
-  min_ft + ndt
+  race$rt + d$ndt
 }
 
 .rdm_posterior_epred <- function(prep, cat_names, n_cats, ...) {

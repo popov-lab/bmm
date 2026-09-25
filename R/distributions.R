@@ -1099,8 +1099,7 @@ log_diff_exp <- function(a, b) {
 }
 
 .logsumexp2 <- function(a, b) {
-  m <- pmax(a, b)
-  m + log(exp(a - m) + exp(b - m))
+  matrixStats::rowLogSumExps(cbind(a, b))
 }
 
 # log_diff_exp() that returns -Inf instead of NaN where rounding makes b >= a
@@ -1108,44 +1107,6 @@ log_diff_exp <- function(a, b) {
   out <- rep(-Inf, length(a))
   ok <- is.finite(a) & (a > b)
   out[ok] <- log_diff_exp(a[ok], b[ok])
-  out
-}
-
-.log_normal_cdf_diff <- function(lower, upper) {
-  out <- rep(-Inf, length(lower))
-  valid <- upper > lower
-  if (!any(valid)) {
-    return(out)
-  }
-
-  lower_v <- lower[valid]
-  upper_v <- upper[valid]
-  lower_pos <- lower_v >= 0
-  upper_neg <- upper_v <= 0
-  mixed <- !(lower_pos | upper_neg)
-  valid_idx <- which(valid)
-
-  if (any(lower_pos)) {
-    idx <- valid_idx[lower_pos]
-    out[idx] <- .logdiffexp(
-      stats::pnorm(lower_v[lower_pos], lower.tail = FALSE, log.p = TRUE),
-      stats::pnorm(upper_v[lower_pos], lower.tail = FALSE, log.p = TRUE)
-    )
-  }
-  if (any(upper_neg)) {
-    idx <- valid_idx[upper_neg]
-    out[idx] <- .logdiffexp(
-      stats::pnorm(upper_v[upper_neg], log.p = TRUE),
-      stats::pnorm(lower_v[upper_neg], log.p = TRUE)
-    )
-  }
-  if (any(mixed)) {
-    idx <- valid_idx[mixed]
-    out[idx] <- log(
-      stats::pnorm(upper_v[mixed]) - stats::pnorm(lower_v[mixed])
-    )
-  }
-
   out
 }
 
@@ -2148,8 +2109,10 @@ neg_loglik <- function(x, params, distribution, weights = NULL) {
 #' @param q Numeric vector of quantiles (response times in seconds).
 #' @param p Numeric vector of probabilities.
 #' @param n Number of observations to generate.
-#' @param response Integer vector indicating which accumulator won (1-indexed).
-#' @param drift Numeric vector of drift rates for each accumulator (all > 0).
+#' @param response Integer vector indicating which accumulator won (1-indexed,
+#'   in `1:length(drift)`).
+#' @param drift Numeric vector of drift rates, one per accumulator (all > 0).
+#'   Its length sets the number of accumulators in the race.
 #' @param gap Threshold gap (> 0). The distance between the maximum starting
 #'   point and the decision threshold. The total threshold is computed as
 #'   `b = gap + sp`, ensuring `b > sp` structurally.
@@ -2160,6 +2123,11 @@ neg_loglik <- function(x, params, distribution, weights = NULL) {
 #' @param log Logical; if `TRUE`, values are returned on the log scale.
 #' @param lower.tail Logical; if `TRUE` (default), probabilities are P(X <= x).
 #' @param log.p Logical; if `TRUE`, probabilities are given as log(p).
+#'
+#' @details `gap`, `ndt`, `s` and `sp` are recycled along `rt` (or `q`) in
+#'   `drdm()` and `prdm()`, so trial-varying parameters can be passed as
+#'   vectors. `rrdm()` and `qrdm()` take one value of each; `drift` is always
+#'   one value per accumulator.
 #'
 #' @return
 #'   - `drdm()` returns a numeric vector of (log-)densities.
@@ -2186,75 +2154,22 @@ neg_loglik <- function(x, params, distribution, weights = NULL) {
 drdm <- function(rt, response, drift, gap, ndt, s = 1, sp = 0,
                  log = FALSE) {
   validate_rdm_parameters(drift, gap, ndt, s, sp)
+  K <- length(drift)
+  stopif(
+    any(is.na(response)) || any(response < 1 | response > K | response != round(response)),
+    "response must index one of the {K} accumulators (integers in 1:{K})."
+  )
 
   n <- max(length(rt), length(response), length(gap), length(ndt), length(s), length(sp))
-  rt <- rep_len(rt, n)
-  response <- rep_len(response, n)
-  gap <- rep_len(gap, n)
-  ndt <- rep_len(ndt, n)
-  s <- rep_len(s, n)
-  sp <- rep_len(sp, n)
-
-  b <- gap + sp
-  A <- sp
-  invalid <- rt - ndt <= 0
-
-  if (!any(invalid)) {
-    return(.drdm(rt, response, drift, b, A, ndt, s, log))
-  }
-
-  out <- rep(if (log) -Inf else 0, n)
-  valid <- !invalid
-  if (any(valid)) {
-    out[valid] <- .drdm(rt[valid], response[valid], drift, b[valid], A[valid],
-                        ndt[valid], s[valid], log)
-  }
-  out
-}
-
-.drdm <- function(rt, response, drift, b, A, ndt, s, log) {
-  K <- length(drift)
-  t <- rt - ndt
-
-  if (all(A == 0)) {
-    log_lik <- .dwald(t, drift = drift[response], bound = b, s = s, log = TRUE)
-    for (j in seq_len(K)) {
-      is_loser <- (j != response)
-      if (!any(is_loser)) next
-      log_lik[is_loser] <- log_lik[is_loser] +
-        .pwald(t[is_loser], drift = drift[j], bound = b[is_loser],
-               s = s[is_loser],
-               lower.tail = FALSE, log.p = TRUE)
-    }
-  } else if (all(A > 0)) {
-    log_lik <- .dwald_full(t, drift = drift[response], bound = b, A = A,
-                           s = s, log = TRUE)
-    for (j in seq_len(K)) {
-      is_loser <- (j != response)
-      if (!any(is_loser)) next
-      log_lik[is_loser] <- log_lik[is_loser] +
-        .pwald_full(t[is_loser], drift = drift[j], bound = b[is_loser],
-                    A = A[is_loser], s = s[is_loser], lower.tail = FALSE,
-                    log.p = TRUE)
-    }
-  } else {
-    zero_idx <- A == 0
-    log_lik <- numeric(length(t))
-
-    if (any(zero_idx)) {
-      log_lik[zero_idx] <- .drdm(
-        rt[zero_idx], response[zero_idx], drift,
-        b[zero_idx], A = 0, ndt[zero_idx], s[zero_idx], log = TRUE
-      )
-    }
-    if (any(!zero_idx)) {
-      log_lik[!zero_idx] <- .drdm(
-        rt[!zero_idx], response[!zero_idx], drift,
-        b[!zero_idx], A[!zero_idx], ndt[!zero_idx], s[!zero_idx], log = TRUE
-      )
-    }
-  }
-
+  log_lik <- .rdm_race_lpdf(
+    t = rep_len(rt, n) - rep_len(ndt, n),
+    response = as.integer(rep_len(response, n)),
+    drift = matrix(drift, n, K, byrow = TRUE),
+    counts = matrix(1L, n, K),
+    gap = rep_len(gap, n),
+    A = rep_len(sp, n),
+    s = rep_len(s, n)
+  )
   if (log) log_lik else exp(log_lik)
 }
 
@@ -2262,30 +2177,17 @@ drdm <- function(rt, response, drift, gap, ndt, s = 1, sp = 0,
 #' @export
 rrdm <- function(n, drift, gap, ndt, s = 1, sp = 0) {
   validate_rdm_parameters(drift, gap, ndt, s, sp)
-  b <- gap + sp
-  A <- sp
-  .rrdm(n, drift, b, A, ndt, s)
-}
-
-.rrdm <- function(n, drift, b, A, ndt, s) {
+  stopif(
+    any(lengths(list(gap, ndt, s, sp)) != 1),
+    "rrdm() takes a single value for each of gap, ndt, s and sp."
+  )
   K <- length(drift)
-
-  if (A == 0) {
-    ft <- matrix(
-      .rwald_ig(n * K, drift = rep(drift, each = n),
-                bound = b, s = s),
-      nrow = n, ncol = K
-    )
-  } else {
-    start <- matrix(stats::runif(n * K, min = 0, max = A), nrow = n, ncol = K)
-    ft <- matrix(NA_real_, nrow = n, ncol = K)
-    for (j in seq_len(K)) {
-      ft[, j] <- .rwald_ig(n, drift = drift[j], bound = b - start[, j], s = s)
-    }
-  }
-
-  winner <- apply(ft, 1, which.min)
-  data.frame(rt = apply(ft, 1, min) + ndt, response = winner)
+  race <- .rdm_race(
+    drift = matrix(drift, n, K, byrow = TRUE),
+    gap = rep(gap, n), A = rep(sp, n), s = rep(s, n),
+    counts = matrix(1L, n, K)
+  )
+  data.frame(rt = race$rt + ndt, response = race$response)
 }
 
 #' @rdname rdm_dist
@@ -2293,28 +2195,19 @@ rrdm <- function(n, drift, gap, ndt, s = 1, sp = 0) {
 prdm <- function(q, drift, gap, ndt, s = 1, sp = 0,
                  lower.tail = TRUE, log.p = FALSE) {
   validate_rdm_parameters(drift, gap, ndt, s, sp)
-  K <- length(drift)
-  t <- q - ndt
-  b <- gap + sp
-  A <- sp
+  n <- max(length(q), length(gap), length(ndt), length(s), length(sp))
+  t <- rep_len(q, n) - rep_len(ndt, n)
+  gap <- rep_len(gap, n)
+  A <- rep_len(sp, n)
+  s <- rep_len(s, n)
 
-  log_surv <- numeric(length(t))
-  if (A == 0) {
-    for (j in seq_len(K)) {
-      log_surv <- log_surv +
-        .pwald(t, drift = drift[j], bound = b, s = s,
-               lower.tail = FALSE, log.p = TRUE)
-    }
-  } else {
-    for (j in seq_len(K)) {
-      log_surv <- log_surv +
-        .pwald_full(t, drift = drift[j], bound = b, A = A, s = s,
-                    lower.tail = FALSE, log.p = TRUE)
-    }
+  log_surv <- numeric(n)
+  for (j in seq_along(drift)) {
+    log_surv <- log_surv +
+      .pwald_full(t, drift = drift[j], bound = gap + A, A = A, s = s,
+                  lower.tail = FALSE, log.p = TRUE)
   }
-  log_p <- log(1 - exp(log_surv))
-
-  if (!lower.tail) log_p <- log(1 - exp(log_p))
+  log_p <- if (lower.tail) log1m_exp(log_surv) else log_surv
   if (log.p) log_p else exp(log_p)
 }
 
@@ -2323,19 +2216,22 @@ prdm <- function(q, drift, gap, ndt, s = 1, sp = 0,
 qrdm <- function(p, drift, gap, ndt, s = 1, sp = 0,
                  lower.tail = TRUE, log.p = FALSE) {
   validate_rdm_parameters(drift, gap, ndt, s, sp)
+  stopif(
+    any(lengths(list(gap, ndt, s, sp)) != 1),
+    "qrdm() takes a single value for each of gap, ndt, s and sp."
+  )
   if (log.p) p <- exp(p)
   if (!lower.tail) p <- 1 - p
 
-  b <- gap + sp
-  A <- sp
+  cdf <- function(q) prdm(q, drift = drift, gap = gap, ndt = ndt, s = s, sp = sp)
   vapply(p, function(pi) {
     if (pi <= 0) return(ndt)
     if (pi >= 1) return(Inf)
-    cdf_fn <- function(q) {
-      prdm(q, drift = drift, gap = gap, ndt = ndt, s = s, sp = sp) - pi
-    }
-    upper <- ndt + max(b / drift) * 5
-    stats::uniroot(cdf_fn, interval = c(ndt + 1e-10, upper),
+    # the slowest accumulator's mean bounds the race from above only loosely,
+    # so the bracket is widened until it contains the quantile
+    upper <- ndt + max((gap + sp) / drift) * 5
+    while (cdf(upper) < pi) upper <- ndt + (upper - ndt) * 2
+    stats::uniroot(function(q) cdf(q) - pi, interval = c(ndt + 1e-10, upper),
                    tol = 1e-8)$root
   }, numeric(1))
 }
@@ -2348,6 +2244,58 @@ validate_rdm_parameters <- function(drift, gap, ndt, s, sp) {
   stopif(any(sp < 0), "sp (maximum starting point) must be non-negative.")
 }
 
+# Log-likelihood of one race per row: the winner's density times every other
+# accumulator's survival, with n_j identical accumulators per category
+# (log n_win for the winner's category, n_win - 1 survival copies for it).
+# `drift` and `counts` are row-per-trial matrices, so per-draw parameters line
+# up with the trials by row and every branch below subsets by the same mask.
+.rdm_race_lpdf <- function(t, response, drift, counts, gap, A, s) {
+  n <- length(t)
+  K <- ncol(drift)
+  win <- cbind(seq_len(n), response)
+  bound <- gap + A
+  log_lik <- log(counts[win]) +
+    .dwald_full(t, drift = drift[win], bound = bound, A = A, s = s, log = TRUE)
+  for (j in seq_len(K)) {
+    # a zero-count or underflowed survival must stay out of the sum:
+    # 0 * -Inf would poison the likelihood with NaN
+    reps <- counts[, j] - (response == j)
+    idx <- reps > 0 & t > 0
+    if (!any(idx)) next
+    log_lik[idx] <- log_lik[idx] + reps[idx] *
+      .pwald_full(t[idx], drift = drift[idx, j], bound = bound[idx], A = A[idx],
+                  s = s[idx], lower.tail = FALSE, log.p = TRUE)
+  }
+  log_lik[t <= 0] <- -Inf
+  log_lik
+}
+
+# One race per row from the same simulator that pp_simulate() and
+# posterior_predict() use: every accumulator draws its own uniform start point
+# on [0, A] and a Wald finishing time from the remaining distance. `drift` and
+# `counts` are row-per-trial matrices; a category with n_j accumulators draws
+# n_j finishing times and keeps the fastest.
+.rdm_race <- function(drift, gap, A, s, counts) {
+  n <- nrow(drift)
+  K <- ncol(drift)
+  ft <- matrix(Inf, n, K)
+  for (j in seq_len(K)) {
+    for (k in seq_len(max(counts[, j]))) {
+      active <- counts[, j] >= k
+      m <- sum(active)
+      start <- stats::runif(m, 0, A[active])
+      ft[active, j] <- pmin(
+        ft[active, j],
+        .rwald_ig(m, drift = drift[active, j], bound = gap[active] + A[active] - start,
+                  s = s[active])
+      )
+    }
+  }
+  list(
+    rt = matrixStats::rowMins(ft),
+    response = max.col(-ft, ties.method = "first")
+  )
+}
 
 # Michael-Schucany-Haas algorithm for inverse Gaussian
 .rwald_ig <- function(n, drift, bound, s) {
@@ -2361,144 +2309,156 @@ validate_rdm_parameters <- function(drift, gap, ndt, s, sp) {
   ifelse(u <= mu_ig / (mu_ig + x), x, mu_ig^2 / x)
 }
 
+# Wald with uniform start point on [0, A] and threshold `bound`, i.e. a distance
+# to threshold uniform on [bound - A, bound] (Tillman et al., 2020, Eq. 5 and
+# Appendix A, generalised to a diffusion scale s). Everything is computed in
+# log space so that the tails stay finite where the raw forms underflow, and
+# every argument is recycled to a common length so that per-draw parameter
+# vectors line up with t. Keep these in step with rdm_functions.stan.
 
-.rdm_full_pdf_raw <- function(t, drift, bound, A, s) {
-  s_sqrt_t <- s * sqrt(t)
-  alpha <- (bound - A - t * drift) / s_sqrt_t
-  beta <- (bound - t * drift) / s_sqrt_t
+# Below this ratio of start-point range to the diffusion spread s * sqrt(t)
+# the difference quotients over the start point cancel; the plain Wald at the
+# midpoint threshold is second-order accurate in A and takes over
+.rdm_midpoint_ratio <- 1e-4
 
-  (1 / A) * (
-    -drift * stats::pnorm(alpha) +
-      (s / sqrt(t)) * stats::dnorm(alpha) +
-      drift * stats::pnorm(beta) -
-      (s / sqrt(t)) * stats::dnorm(beta)
+# log(y Phi(y) + phi(y)), the antiderivative of Phi, given log Phi(y). For y
+# far below zero the two terms cancel to order y^-2, so g is written as
+# phi(y) * (1 - |y| M(|y|)) with M the Mills ratio and the bracket expanded
+# asymptotically (Abramowitz & Stegun 26.2.12): sum_j (-1)^(j+1) (2j-1)!! / y^2j.
+# At the seam both forms are accurate to about 1e-12
+.rdm_log_g <- function(y, log_Phi_y = stats::pnorm(y, log.p = TRUE)) {
+  out <- numeric(length(y))
+  series <- y < -12
+  if (any(series)) {
+    y2 <- y[series]^2
+    term <- rep(1, length(y2))
+    total <- 0
+    for (j in seq_len(12)) {
+      term <- term * (2 * j - 1) / y2
+      total <- total + if (j %% 2 == 1) term else -term
+    }
+    out[series] <- stats::dnorm(y[series], log = TRUE) + log(total)
+  }
+  neg <- !series & y < 0
+  out[neg] <- .logdiffexp(
+    stats::dnorm(y[neg], log = TRUE), log(-y[neg]) + log_Phi_y[neg]
   )
+  pos <- y >= 0
+  out[pos] <- .logsumexp2(log(y[pos]) + log_Phi_y[pos], stats::dnorm(y[pos], log = TRUE))
+  out
 }
 
-.rdm_full_cdf_raw <- function(t, drift, bound, A, s) {
-  s2 <- s^2
-  sqrt_t <- sqrt(t)
-  bA <- bound - A
-  alpha1 <- (drift * t - bound) / (s * sqrt_t)
-  alpha2 <- (drift * t - bA) / (s * sqrt_t)
-  beta1 <- -(drift * t + bound) / (s * sqrt_t)
-  beta2 <- -(drift * t + bA) / (s * sqrt_t)
-
-  use_limit <- abs(drift) < 1e-10
-  cdf_val <- numeric(length(t))
-
-  if (any(!use_limit)) {
-    idx <- !use_limit
-    cdf_val[idx] <-
-      (s2 / (2 * drift * A)) *
-        (stats::pnorm(alpha2[idx]) - stats::pnorm(alpha1[idx])) +
-      (s * sqrt_t[idx] / A) *
-        (alpha2[idx] * stats::pnorm(alpha2[idx]) -
-           alpha1[idx] * stats::pnorm(alpha1[idx])) -
-      (s2 / (2 * drift * A)) *
-        (exp(2 * drift * bA / s2) * stats::pnorm(beta2[idx]) -
-           exp(2 * drift * bound / s2) * stats::pnorm(beta1[idx])) +
-      (s * sqrt_t[idx] / A) *
-        (stats::dnorm(alpha2[idx]) - stats::dnorm(alpha1[idx]))
-  }
-
-  if (any(use_limit)) {
-    idx <- use_limit
-    a1_0 <- -bound / (s * sqrt_t[idx])
-    a2_0 <- -bA / (s * sqrt_t[idx])
-    cdf_val[idx] <-
-      (s * sqrt_t[idx] / A) *
-        (a2_0 * stats::pnorm(a2_0) - a1_0 * stats::pnorm(a1_0) +
-           stats::dnorm(a2_0) - stats::dnorm(a1_0))
-  }
-
-  cdf_val
+# log(Phi(b) - Phi(a)) for b > a, from whichever tail keeps both probabilities
+# away from 1; the straddling case has both O(1) and is exact directly
+.rdm_log_Phi_diff <- function(a, b) {
+  out <- rep(-Inf, length(a))
+  lower <- b <= 0
+  upper <- a >= 0
+  mid <- !(lower | upper) & b > a
+  out[lower] <- .logdiffexp(
+    stats::pnorm(b[lower], log.p = TRUE), stats::pnorm(a[lower], log.p = TRUE)
+  )
+  out[upper] <- .logdiffexp(
+    stats::pnorm(-a[upper], log.p = TRUE), stats::pnorm(-b[upper], log.p = TRUE)
+  )
+  out[mid] <- log(stats::pnorm(b[mid]) - stats::pnorm(a[mid]))
+  out
 }
 
-.rdm_full_surv_antiderivative <- function(u, t, drift, s) {
-  q <- s^2 / (2 * drift)
-  s_sqrt_t <- s * sqrt(t)
-  drift_t <- drift * t
-  y <- (u - drift_t) / s_sqrt_t
-  z <- -(drift_t + u) / s_sqrt_t
-
-  (u - drift_t - q) * stats::pnorm(y) +
-    s_sqrt_t * stats::dnorm(y) -
-    q * exp(2 * drift * u / (s^2)) * stats::pnorm(z)
+.rdm_recycle <- function(...) {
+  args <- list(...)
+  n <- max(lengths(args))
+  lapply(args, rep_len, length.out = n)
 }
 
-.rdm_full_surv_raw <- function(t, drift, bound, A, s) {
-  (
-    .rdm_full_surv_antiderivative(bound, t, drift, s) -
-      .rdm_full_surv_antiderivative(bound - A, t, drift, s)
-  ) / A
-}
-
-# Tillman et al. (2020), Eq. 5
+# Tillman et al. (2020), Eq. 5: f = (1 / A) [drift (Phi(beta) - Phi(alpha)) +
+# (s / sqrt(t)) (phi(alpha) - phi(beta))] with alpha, beta the standardised
+# distances at the two ends of the start-point range. The first bracket is
+# positive; the second takes the sign of |beta| - |alpha|
 .dwald_full <- function(t, drift, bound, A, s, log = TRUE) {
-  s_sqrt_t <- s * sqrt(t)
-  alpha <- (bound - A - t * drift) / s_sqrt_t
-  beta <- (bound - t * drift) / s_sqrt_t
+  r <- .rdm_recycle(t = t, drift = drift, bound = bound, A = A, s = s)
+  t <- r$t; drift <- r$drift; bound <- r$bound; A <- r$A; s <- r$s
+  gap <- bound - A
+  st <- sqrt(pmax(t, 0))
+  out <- rep(-Inf, length(t))
+  ok <- t > 0
 
-  use_tail <- alpha > 0
-  log_pdf <- rep(NA_real_, length(t))
-
-  if (any(use_tail)) {
-    idx <- use_tail
-    log_term1 <- log(drift) + .log_normal_cdf_diff(alpha[idx], beta[idx])
-    log_term2 <- log(s / sqrt(t[idx])) + .logdiffexp(
-      stats::dnorm(alpha[idx], log = TRUE),
-      stats::dnorm(beta[idx], log = TRUE)
-    )
-    log_pdf[idx] <- .logsumexp2(log_term1, log_term2) - log(A)
+  small <- ok & A < .rdm_midpoint_ratio * s * st
+  if (any(small)) {
+    out[small] <- .dwald(t[small], drift = drift[small],
+                         bound = gap[small] + A[small] / 2, s = s[small], log = TRUE)
   }
 
-  if (any(!use_tail)) {
-    idx <- !use_tail
-    pdf_val <- .rdm_full_pdf_raw(t[idx], drift, bound, A, s)
-    log_pdf[idx] <- log(pdf_val)
+  gen <- ok & !small
+  if (any(gen)) {
+    t_g <- t[gen]; st_g <- st[gen]; drift_g <- drift[gen]; s_g <- s[gen]
+    alpha <- (gap[gen] - drift_g * t_g) / (s_g * st_g)
+    beta <- (bound[gen] - drift_g * t_g) / (s_g * st_g)
+    l1 <- log(drift_g) + .rdm_log_Phi_diff(alpha, beta)
+    lpa <- stats::dnorm(alpha, log = TRUE)
+    lpb <- stats::dnorm(beta, log = TRUE)
+    second_positive <- abs(alpha) <= abs(beta)
+    l2 <- log(s_g / st_g) +
+      ifelse(second_positive, .logdiffexp(lpa, lpb), .logdiffexp(lpb, lpa))
+    lnum <- ifelse(second_positive, .logsumexp2(l1, l2), .logdiffexp(l1, l2))
+    out[gen] <- lnum - log(A[gen])
   }
 
-  if (log) log_pdf else exp(log_pdf)
+  if (log) out else exp(out)
 }
 
-
-# Tillman et al. (2020), Appendix A
+# Tillman et al. (2020), Appendix A, assembled from the antiderivative of the
+# plain Wald survival in the threshold. With G the antiderivative and
+# g(y) = y Phi(y) + phi(y), q = s^2 / (2 drift), E(u) = exp(2 u drift / s^2)
+# Phi(-(u + drift t) / (s sqrt(t))) and P = Phi(beta) - Phi(alpha):
+#   S * A = D1 - D2,  D1 = s sqrt(t) (g(beta) - g(alpha)),
+#                     D2 = q (P + E(bound) - E(gap)),
+#   F * A = C1 + D2,  C1 = s sqrt(t) (g(-alpha) - g(-beta)).
+# D1, D2, C1 and P are positive; E(bound) - E(gap) is signed and resolved
+# explicitly. F never cancels; S cancels only in the far tail, by a factor of
+# order drift t / gap, the same as the plain Wald survivor.
 .pwald_full <- function(t, drift, bound, A, s, lower.tail = TRUE,
                         log.p = TRUE) {
-  cdf_val <- .rdm_full_cdf_raw(t, drift, bound, A, s)
+  r <- .rdm_recycle(t = t, drift = drift, bound = bound, A = A, s = s)
+  t <- r$t; drift <- r$drift; bound <- r$bound; A <- r$A; s <- r$s
+  gap <- bound - A
+  st <- sqrt(pmax(t, 0))
+  out <- rep(if (lower.tail) -Inf else 0, length(t))
+  ok <- t > 0
 
-  if (lower.tail) {
-    log_p <- rep(-Inf, length(t))
-    use_cdf <- cdf_val > 0 & cdf_val < 1 & cdf_val >= 0.5
-    log_p[use_cdf] <- log(cdf_val[use_cdf])
+  small <- ok & A < .rdm_midpoint_ratio * s * st
+  if (any(small)) {
+    out[small] <- .pwald(t[small], drift = drift[small],
+                         bound = gap[small] + A[small] / 2, s = s[small],
+                         lower.tail = lower.tail, log.p = TRUE)
+  }
 
-    need_surv <- !use_cdf
-    if (any(need_surv)) {
-      idx <- which(need_surv)
-      surv_val <- .rdm_full_surv_raw(t[idx], drift, bound, A, s)
-      use_surv <- surv_val >= 0 & surv_val < 1
-      log_p[idx[use_surv]] <- log1p(-surv_val[use_surv])
-      use_fallback <- !use_surv & cdf_val[idx] > 0 & cdf_val[idx] < 1
-      log_p[idx[use_fallback]] <- log(cdf_val[idx[use_fallback]])
-      log_p[idx[!use_surv & cdf_val[idx] >= 1]] <- 0
-    }
-  } else {
-    log_p <- rep(0, length(t))
-    use_cdf <- cdf_val > 0 & cdf_val < 0.5
-    log_p[use_cdf] <- log1p(-cdf_val[use_cdf])
-
-    need_surv <- !use_cdf & cdf_val > 0
-    if (any(need_surv)) {
-      idx <- which(need_surv)
-      surv_val <- .rdm_full_surv_raw(t[idx], drift, bound, A, s)
-      use_surv <- surv_val > 0 & surv_val < 1
-      log_p[idx[use_surv]] <- log(surv_val[use_surv])
-      use_fallback <- !use_surv & cdf_val[idx] >= 0 & cdf_val[idx] < 1
-      log_p[idx[use_fallback]] <- log1p(-cdf_val[idx[use_fallback]])
-      log_p[idx[!use_surv & cdf_val[idx] >= 1]] <- -Inf
+  gen <- ok & !small
+  if (any(gen)) {
+    t_g <- t[gen]; st_g <- st[gen]; drift_g <- drift[gen]; s_g <- s[gen]
+    gap_g <- gap[gen]; bound_g <- bound[gen]
+    denom <- s_g * st_g
+    alpha <- (gap_g - drift_g * t_g) / denom
+    beta <- (bound_g - drift_g * t_g) / denom
+    log_q <- 2 * log(s_g) - log(2 * drift_g)
+    lEb <- 2 * drift_g * bound_g / s_g^2 +
+      stats::pnorm(-(bound_g + drift_g * t_g) / denom, log.p = TRUE)
+    lEk <- 2 * drift_g * gap_g / s_g^2 +
+      stats::pnorm(-(gap_g + drift_g * t_g) / denom, log.p = TRUE)
+    lP <- .rdm_log_Phi_diff(alpha, beta)
+    lD2 <- log_q + ifelse(
+      lEb >= lEk,
+      .logsumexp2(lP, .logdiffexp(lEb, lEk)),
+      .logdiffexp(.logsumexp2(lP, lEb), lEk)
+    )
+    if (lower.tail) {
+      lC1 <- log(denom) + .logdiffexp(.rdm_log_g(-alpha), .rdm_log_g(-beta))
+      out[gen] <- pmin(.logsumexp2(lC1, lD2) - log(A[gen]), 0)
+    } else {
+      lD1 <- log(denom) + .logdiffexp(.rdm_log_g(beta), .rdm_log_g(alpha))
+      out[gen] <- pmin(.logdiffexp(lD1, lD2) - log(A[gen]), 0)
     }
   }
 
-  if (log.p) log_p else exp(log_p)
+  if (log.p) out else exp(out)
 }
