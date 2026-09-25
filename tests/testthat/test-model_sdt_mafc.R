@@ -88,6 +88,18 @@ test_that("sdt_mafc rejects m < 2 and invalid distributions", {
   expect_error(sdt_mafc("n_correct", "n_trials", m = 4, dist = "foo"))
 })
 
+test_that("sdt_mafc warns and truncates a non-integer m", {
+  expect_warning(model <- sdt_mafc("n_correct", "n_trials", m = 2.7), "integer")
+  expect_equal(model$other_vars$m, 2L)
+})
+
+test_that("sdt_mafc rejects NA and non-finite m with its own message", {
+  expect_error(sdt_mafc("n_correct", "n_trials", m = NA), "m must be")
+  expect_error(sdt_mafc("n_correct", "n_trials", m = NA_real_), "m must be")
+  expect_error(sdt_mafc("n_correct", "n_trials", m = Inf), "m must be")
+  expect_error(sdt_mafc("n_correct", "n_trials", m = NaN), "m must be")
+})
+
 
 ############################################################################# !
 # CHECK_DATA TESTS                                                       ####

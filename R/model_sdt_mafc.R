@@ -54,6 +54,13 @@
   set_links(out, links)
 }
 
+# m-AFC has no fixed or scaling link -- `d` is the model's only parameter, so
+# it is also its only settable one.
+#' @exportS3Method
+settable_links.sdt_mafc <- function(model) {
+  "d"
+}
+
 
 #' @title m-Alternative Forced Choice Signal Detection Theory Model
 #' @name sdt_mafc
@@ -141,10 +148,13 @@ sdt_mafc <- function(response, n_trials, m,
   stop_missing_args()
   dist <- match.arg(dist)
 
-  stopif(!((is.numeric(m) && length(m) == 1 && m >= 2) ||
+  stopif(!((is.numeric(m) && length(m) == 1 && is.finite(m) && m >= 2) ||
            (is.character(m) && length(m) == 1)),
          "m must be a single integer >= 2, or the name of a set-size column in the data")
-  if (is.numeric(m)) m <- as.integer(m)
+  if (is.numeric(m)) {
+    warnif(m != trunc(m), "m should be an integer value; {m} was truncated to {as.integer(m)}")
+    m <- as.integer(m)
+  }
 
   .model_sdt_mafc(response = response, n_trials = n_trials,
                   m = m, dist = dist,
