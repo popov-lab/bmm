@@ -469,37 +469,42 @@ test_that("bmf2bf.rdm_custom creates correct brms formula", {
 # Stan code generation tests
 # -----------------------------------------------------------------------------
 
-test_that(".rdm_stan_code generates valid Stan for sp=0 (2 categories)", {
+# The family is unrolled over the categories (no per-row array temporaries,
+# which cost 8-22% per gradient); the plain-Wald path is taken only when the
+# generator is told the start point is off
+test_that(".rdm_stan_code unrolls the plain-Wald race for sp off (2 categories)", {
   code <- .rdm_stan_code("rdm_simple", c("driftc", "drifte"), start_var = FALSE)
-  expect_true(grepl("rdm_simple_lpdf", code))
-  expect_true(grepl("vector driftc", code))
-  expect_true(grepl("rdm_log_lik_one", code))
-  expect_true(grepl("0\\)", code))
+  expect_match(code, "real rdm_simple_lpdf(vector rt, vector mu, vector driftc, vector drifte, vector gap, vector ndt, vector s, vector sp, array[] int response, array[] int n1, array[] int n2)", fixed = TRUE)
+  expect_match(code, "if (response[i] == 1) lp = log(n1[i]) + swald_lpdf(rt[i] | driftc[i], gap[i] + sp[i], ndt[i], s[i]);", fixed = TRUE)
+  expect_match(code, "else lp = log(n2[i]) + swald_lpdf(rt[i] | drifte[i], gap[i] + sp[i], ndt[i], s[i]);", fixed = TRUE)
+  expect_match(code, "if (reps2 > 0) lp += reps2 * swald_lccdf(rt[i] | drifte[i], gap[i] + sp[i], ndt[i], s[i]);", fixed = TRUE)
+  expect_false(grepl("rdm_log_pdf", code, fixed = TRUE))
+  expect_false(grepl("array[", code, fixed = TRUE) && grepl("drift_i", code, fixed = TRUE))
 })
 
-test_that(".rdm_stan_code generates valid Stan for sp>0 (2 categories)", {
+test_that(".rdm_stan_code unrolls the start-point race for sp on (2 categories)", {
   code <- .rdm_stan_code("rdm_simple", c("driftc", "drifte"), start_var = TRUE)
-  expect_true(grepl("rdm_simple_lpdf", code))
-  expect_true(grepl("vector driftc", code))
-  expect_true(grepl("rdm_log_lik_one", code))
-  expect_true(grepl("1\\)", code))
+  expect_match(code, "int reps1 = (response[i] == 1) ? n1[i] - 1 : n1[i];", fixed = TRUE)
+  expect_match(code, "if (response[i] == 1) lp = log(n1[i]) + rdm_log_pdf(t, driftc[i], gap[i], sp[i], s[i]);", fixed = TRUE)
+  expect_match(code, "if (reps1 > 0) lp += reps1 * rdm_log_surv(t, driftc[i], gap[i], sp[i], s[i]);", fixed = TRUE)
+  expect_false(grepl("swald_", code, fixed = TRUE))
 })
 
-test_that(".rdm_stan_code generates valid Stan for 4 categories", {
+test_that(".rdm_stan_code chains the winner branches for 4 categories", {
   cats <- c("cat1", "cat2", "cat3", "cat4")
   code <- .rdm_stan_code("rdm_custom", cats, start_var = FALSE)
-  expect_true(grepl("rdm_custom_lpdf", code))
-  expect_true(grepl("array\\[4\\]", code))
-  expect_true(grepl("vector cat1", code))
-  expect_true(grepl("vector cat4", code))
+  expect_match(code, "real rdm_custom_lpdf(", fixed = TRUE)
+  expect_match(code, "array[] int n4)", fixed = TRUE)
+  expect_match(code, "else if (response[i] == 3) lp = log(n3[i]) + swald_lpdf(rt[i] | cat3[i]", fixed = TRUE)
+  expect_match(code, "else lp = log(n4[i]) + swald_lpdf(rt[i] | cat4[i]", fixed = TRUE)
+  expect_equal(lengths(regmatches(code, gregexpr("if (reps", code, fixed = TRUE))), 4)
 })
 
-test_that(".rdm_stan_code generates sp>0 Stan for custom version", {
+test_that(".rdm_stan_code generates the start-point race for the custom version", {
   cats <- c("target", "lure", "npl")
   code <- .rdm_stan_code("rdm_custom", cats, start_var = TRUE)
-  expect_true(grepl("rdm_custom_lpdf", code))
-  expect_true(grepl("array\\[3\\]", code))
-  expect_true(grepl("rdm_log_lik_one", code))
+  expect_match(code, "rdm_log_pdf(t, lure[i], gap[i], sp[i], s[i])", fixed = TRUE)
+  expect_match(code, "reps3 * rdm_log_surv(t, npl[i], gap[i], sp[i], s[i])", fixed = TRUE)
 })
 
 # -----------------------------------------------------------------------------
@@ -548,8 +553,8 @@ test_that("configure_model.rdm_simple loads RDM helper functions", {
     collapse = "\n"
   )
   expect_true(grepl("swald_lpdf", stanvar_code))
-  expect_true(grepl("rdm_log_lik_one", stanvar_code))
-  expect_false(grepl("rdm_simple_log_lik_one", stanvar_code))
+  expect_true(grepl("rdm_log_surv", stanvar_code))
+  expect_false(grepl("rdm_log_lik_one", stanvar_code))
 })
 
 test_that("configure_model.rdm_simple keeps ndt as a regular log-linked parameter", {
@@ -813,9 +818,10 @@ test_that("a fixed sp is honoured as the start-point range it names", {
   fixed <- configure(bmf(driftc ~ 1, drifte ~ 1, gap ~ 1, ndt ~ 1, sp = log(0.3)))
   free <- configure(bmf(driftc ~ 1, drifte ~ 1, gap ~ 1, ndt ~ 1, sp ~ 1))
   code_of <- function(config) config$stanvars[[3]]$scode
-  expect_match(code_of(default), "n_i, 0);", fixed = TRUE)
-  expect_match(code_of(fixed), "n_i, 1);", fixed = TRUE)
-  expect_match(code_of(free), "n_i, 1);", fixed = TRUE)
+  expect_match(code_of(default), "swald_lpdf(", fixed = TRUE)
+  expect_false(grepl("rdm_log_pdf(", code_of(default), fixed = TRUE))
+  expect_match(code_of(fixed), "rdm_log_pdf(", fixed = TRUE)
+  expect_match(code_of(free), "rdm_log_pdf(", fixed = TRUE)
 
   prep <- structure(
     list(

@@ -594,35 +594,59 @@ bmf2bf.rdm_custom <- function(model, formula) {
 # Stan code generation                                                   ####
 ############################################################################# !
 
+# The family's log-likelihood is unrolled over the response categories rather
+# than collecting the per-row drifts and counts into arrays for a per-trial
+# helper: a vector or array temporary in a per-row Stan function is allocated
+# on the autodiff stack for every observation on every leapfrog step, and the
+# unrolled form measured 22% (sp fixed) and 8% (sp free) less time per
+# gradient with bitwise-identical log density and gradients
+# (local/logs/benchmark_rdm_2026-09-25.md). The winner contributes log(n_win)
+# and n_win - 1 survival copies, each loser n_j copies; the strict reps > 0
+# guard keeps zero-count or underflowed survivals out of the sum (0 * -inf
+# would poison the likelihood with NaN). Only the constructor's default sp
+# (see .rdm_start_var) takes the plain-Wald path.
 .rdm_stan_code <- function(family_name, cat_names, start_var) {
   n_cats <- length(cat_names)
-  use_start_var <- if (start_var) 1 else 0
-
   cat_args <- paste(paste0("vector ", cat_names), collapse = ", ")
   n_args <- paste(paste0("array[] int n", seq_len(n_cats)), collapse = ", ")
-  drift_array <- paste0(
-    "      array[", n_cats, "] real drift_i = {",
-    paste0(cat_names, "[i]", collapse = ", "), "};\n"
-  )
-  n_array <- paste0(
-    "      array[", n_cats, "] int n_i = {",
-    paste(paste0("n", seq_len(n_cats), "[i]"), collapse = ", "), "};\n"
-  )
+  pdf <- if (start_var) {
+    "rdm_log_pdf(t, {cat}[i], gap[i], sp[i], s[i])"
+  } else {
+    "swald_lpdf(rt[i] | {cat}[i], gap[i] + sp[i], ndt[i], s[i])"
+  }
+  surv <- if (start_var) {
+    "rdm_log_surv(t, {cat}[i], gap[i], sp[i], s[i])"
+  } else {
+    "swald_lccdf(rt[i] | {cat}[i], gap[i] + sp[i], ndt[i], s[i])"
+  }
+  per_cat <- function(template, j) glue(template, cat = cat_names[j], j = j)
+  reps <- vapply(seq_len(n_cats), function(j) {
+    per_cat("    int reps{j} = (response[i] == {j}) ? n{j}[i] - 1 : n{j}[i];", j)
+  }, character(1))
+  winner <- vapply(seq_len(n_cats), function(j) {
+    head <- if (j == 1) "    if" else if (j < n_cats) "    else if" else "    else"
+    cond <- if (j < n_cats) glue(" (response[i] == {j})") else ""
+    per_cat(paste0(head, cond, " lp = log(n{j}[i]) + ", pdf, ";"), j)
+  }, character(1))
+  survivals <- vapply(seq_len(n_cats), function(j) {
+    per_cat(paste0("    if (reps{j} > 0) lp += reps{j} * ", surv, ";"), j)
+  }, character(1))
 
-  glue(
-    "real {family_name}_lpdf(vector rt, vector mu, {cat_args}, ",
-    "vector gap, vector ndt, vector s, vector sp, array[] int response, {n_args}) {{\n",
-    "  int N = rows(rt);\n",
-    "  real log_lik = 0;\n",
-    "  for (i in 1:N) {{\n",
-    "{drift_array}",
-    "{n_array}",
-    "    log_lik += rdm_log_lik_one(\n",
-    "      rt[i], drift_i, gap[i], ndt[i], s[i], sp[i], response[i], n_i, {use_start_var});\n",
-    "  }}\n",
-    "  return log_lik;\n",
-    "}}"
-  )
+  paste(c(
+    glue("real {family_name}_lpdf(vector rt, vector mu, {cat_args}, vector gap, ",
+         "vector ndt, vector s, vector sp, array[] int response, {n_args}) {{"),
+    "  int N = rows(rt);",
+    "  real log_lik = 0;",
+    "  for (i in 1:N) {",
+    "    real t = rt[i] - ndt[i];",
+    "    real lp;",
+    "    if (t <= 0) return negative_infinity();",
+    reps, winner, survivals,
+    "    log_lik += lp;",
+    "  }",
+    "  return log_lik;",
+    "}"
+  ), collapse = "\n")
 }
 
 ############################################################################# !
