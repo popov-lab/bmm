@@ -132,8 +132,18 @@
     class = c("bmmodel", "sdt", "sdt_cdp"),
     call = call
   )
-  out$links[names(links)] <- links
-  out
+  set_links(out, links)
+}
+
+# `sigmar`, `rho` and `kcrit` are fixed off by default, and their fixed values
+# mean what they mean only on the identity link: exp(0) = 1 is equal
+# recollection variance, tanh(0) = 0 is independence, and inv_logit(-100) is
+# the switched-off Know/Guess split. The threshold parameters are read through
+# exp() in the same way as in sdt_rating. The two sensitivities, the old/new
+# criterion and the Remember criterion fix nothing and stay settable.
+#' @exportS3Method
+settable_links.sdt_cdp <- function(model) {
+  c("dfam", "drec", "criterion", "rcrit")
 }
 
 

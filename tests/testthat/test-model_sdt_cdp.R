@@ -41,6 +41,26 @@ test_that("sdt_cdp has identity links and accepts custom links", {
   expect_equal(m2$links$dfam, "log")
 })
 
+test_that("sdt_cdp refuses a link on a fixed or transformed parameter", {
+  m <- sdt_cdp(stimulus = "s", n_new = 3, n_old = 3)
+  expect_equal(settable_links(m), c("dfam", "drec", "criterion", "rcrit"))
+  # sigmar, rho and kcrit are fixed, and spacing is read through exp()
+  for (par in c("sigmar", "rho", "kcrit", "spacing")) {
+    expect_error(
+      sdt_cdp(stimulus = "s", n_new = 3, n_old = 3,
+              links = stats::setNames(list("log"), par)),
+      paste0("link of '", par, "' cannot be changed")
+    )
+  }
+  expect_error(
+    sdt_cdp(stimulus = "s", n_new = 3, n_old = 3,
+            links = list(sensitivity = "log")),
+    "Unrecognized link target"
+  )
+  m$links$rho <- "log"
+  expect_error(check_links(m), "link of 'rho' cannot be changed")
+})
+
 test_that("sdt_cdp only supports dist = 'normal'", {
   expect_error(
     sdt_cdp(stimulus = "s", n_new = 3, n_old = 3, dist = "logistic"),
