@@ -477,12 +477,29 @@ test_that("a threading request switches the vectorized family to sliced vars", {
   config <- configure_model(model, dat, f)
   expect_equal(config$formula$family$vars, c("vint1", "vint2", "vint3"))
 
-  attr(model, "threads") <- TRUE
-  config <- configure_model(model, dat, f)
-  expect_equal(
-    config$formula$family$vars,
-    c("vint1[start:end]", "vint2[start:end]", "vint3[start:end]")
-  )
+  withr::with_options(list(brms.threads = brms::threading(2)), {
+    expect_equal(
+      configure_model(model, dat, f)$formula$family$vars,
+      c("vint1[start:end]", "vint2[start:end]", "vint3[start:end]")
+    )
+  })
+
+  # force = TRUE tells brms to compile with threading but leave the generated
+  # code alone, so start/end are never defined and slicing would not compile
+  withr::with_options(list(brms.threads = brms::threading(2, force = TRUE)), {
+    expect_equal(
+      configure_model(model, dat, f)$formula$family$vars,
+      c("vint1", "vint2", "vint3")
+    )
+  })
+
+  # brms accepts a bare number for the option
+  withr::with_options(list(brms.threads = 2), {
+    expect_equal(
+      configure_model(model, dat, f)$formula$family$vars,
+      c("vint1[start:end]", "vint2[start:end]", "vint3[start:end]")
+    )
+  })
 })
 
 test_that("the custom version slices every vint column when threading", {
@@ -496,9 +513,35 @@ test_that("the custom version slices every vint column when threading", {
   model <- check_model(model, data = dat, formula = f)
   dat <- check_data(model, dat, f)
 
-  attr(model, "threads") <- TRUE
-  config <- configure_model(model, dat, f)
-  expect_equal(config$formula$family$vars, paste0("vint", 1:4, "[start:end]"))
+  expect_equal(
+    configure_model(model, dat, f)$formula$family$vars,
+    paste0("vint", 1:4)
+  )
+  withr::with_options(list(brms.threads = brms::threading(2)), {
+    expect_equal(
+      configure_model(model, dat, f)$formula$family$vars,
+      paste0("vint", 1:4, "[start:end]")
+    )
+  })
+})
+
+test_that("an explicit threads = NULL beats a global threading option", {
+  skip_on_cran()
+
+  dat <- rrdm(n = 100, drift = c(3, 1.5), gap = 1, ndt = 0.2)
+  model <- rdm(rt = "rt", response = "response", n_choices = 2)
+  f <- bmf(driftc ~ 1, drifte ~ 1, gap ~ 1, ndt ~ 1)
+
+  # brms reads threads = NULL as "threading off" and generates serial code, so
+  # the family must not slice its vint columns even though the option is set
+  withr::local_options(brms.threads = brms::threading(2))
+  code <- suppressWarnings(stancode(f, dat, model, backend = "cmdstanr",
+                                    threads = NULL))
+  expect_true(grepl(
+    "rdm_simple_lpdf(Y | mu, driftc, drifte, gap, ndt, s, sp, vint1, vint2, vint3);",
+    code, fixed = TRUE
+  ))
+  expect_false(grepl("start:end", code, fixed = TRUE))
 })
 
 test_that("stancode emits thread-safe slicing when threads is passed", {
