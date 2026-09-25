@@ -2390,12 +2390,12 @@ validate_rdm_parameters <- function(drift, gap, ndt, s, sp) {
   if (any(!use_limit)) {
     idx <- !use_limit
     cdf_val[idx] <-
-      (1 / (2 * drift * A)) *
+      (s2 / (2 * drift * A)) *
         (stats::pnorm(alpha2[idx]) - stats::pnorm(alpha1[idx])) +
       (s * sqrt_t[idx] / A) *
         (alpha2[idx] * stats::pnorm(alpha2[idx]) -
            alpha1[idx] * stats::pnorm(alpha1[idx])) -
-      (1 / (2 * drift * A)) *
+      (s2 / (2 * drift * A)) *
         (exp(2 * drift * bA / s2) * stats::pnorm(beta2[idx]) -
            exp(2 * drift * bound / s2) * stats::pnorm(beta1[idx])) +
       (s * sqrt_t[idx] / A) *

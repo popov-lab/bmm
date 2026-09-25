@@ -721,6 +721,41 @@ test_that("drdm with positive sp approaches the sp=0 likelihood as sp -> 0", {
   expect_equal(ll_sp_eps, ll_sp0, tolerance = 1e-5)
 })
 
+# The likelihood of a Wald race depends on (drift, gap, sp) only relative to the
+# diffusion scale s, so scaling all four by one constant leaves it unchanged.
+# The identity holds by construction at sp = 0 and is broken at sp > 0 by any
+# term of the start-point CDF whose coefficient carries the wrong power of s.
+test_that("the race likelihood is invariant to a common scale of drift, gap, sp and s", {
+  rt <- c(0.35, 0.5, 0.8, 1.4)
+  response <- c(1L, 2L, 1L, 2L)
+  eval_one <- function(i, scale, sp) {
+    drdm(rt[i], response[i], drift = scale * c(3, 1.5), gap = scale * 0.8,
+         sp = scale * sp, ndt = 0.2, s = scale, log = TRUE)
+  }
+  for (sp in c(0, 0.25)) {
+    base <- vapply(seq_along(rt), eval_one, numeric(1), scale = 1, sp = sp)
+    for (scale in c(0.5, 2, 7)) {
+      scaled <- vapply(seq_along(rt), eval_one, numeric(1), scale = scale, sp = sp)
+      expect_equal(scaled, base, tolerance = 1e-10)
+    }
+  }
+})
+
+test_that("drdm() integrates to one over responses and time when s != 1", {
+  density <- function(rt, response, s) {
+    vapply(rt, function(x) {
+      drdm(x, response, drift = c(3, 1.5), gap = 0.7, sp = 0.3, ndt = 0.2, s = s)
+    }, numeric(1))
+  }
+  for (s in c(0.5, 0.8, 1.5)) {
+    total <- sum(vapply(1:2, function(response) {
+      stats::integrate(density, 0.2, Inf, response = response, s = s,
+                       rel.tol = 1e-9)$value
+    }, numeric(1)))
+    expect_equal(total, 1, tolerance = 1e-6)
+  }
+})
+
 test_that("rrdm returns valid data.frame", {
   dat <- rrdm(100, drift = c(3, 1.5), gap = 1, ndt = 0.2)
   expect_s3_class(dat, "data.frame")

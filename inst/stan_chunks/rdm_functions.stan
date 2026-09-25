@@ -61,12 +61,12 @@ real rdm_full_cdf_raw(real t, real drift, real bound, real A, real s) {
   real beta1 = -(drift * t + bound) / s_sqrt_t;
   real beta2 = -(drift * t + (bound - A)) / s_sqrt_t;
 
-  return (1.0 / (2 * drift * A)) * (Phi(alpha2) - Phi(alpha1)) +
+  return (s2 / (2 * drift * A)) * (Phi(alpha2) - Phi(alpha1)) +
     (s * sqrt_t / A) * (
       alpha2 * Phi(alpha2) - alpha1 * Phi(alpha1) +
         exp(std_normal_lpdf(alpha2)) - exp(std_normal_lpdf(alpha1))
     ) -
-    (1.0 / (2 * drift * A)) * (
+    (s2 / (2 * drift * A)) * (
       exp(2 * drift * (bound - A) / s2) * Phi(beta2) -
         exp(2 * drift * bound / s2) * Phi(beta1)
     );
