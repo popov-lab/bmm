@@ -203,9 +203,13 @@ test_that("dsdt_mafc validates input", {
 })
 
 test_that("m-AFC probability correct equals chance (1/m) at d' = 0", {
+  # 1e-7 is set by one cell, normal at m = 8, where the 40-point Gauss-Hermite
+  # rule sits 4.5e-8 from 1/m; the other fifteen are all below 5e-14. A
+  # tolerance loose enough for the whole grid would let that rule degrade by
+  # two orders of magnitude unnoticed.
   for (di in c("normal", "logistic", "gumbel_min", "gumbel_max")) {
     for (m in c(2L, 3L, 4L, 8L)) {
-      expect_equal(.mafc_pc_r(0, m, di), 1 / m, tolerance = 1e-5,
+      expect_equal(.mafc_pc_r(0, m, di), 1 / m, tolerance = 1e-7,
                    info = paste(di, "m =", m))
     }
   }

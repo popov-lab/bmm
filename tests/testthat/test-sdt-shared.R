@@ -38,12 +38,15 @@ test_that("the m-AFC probabilities agree with the registry's own cdf", {
   # P(correct) is the probability the signal variate beats m - 1 distractors,
   # int f(x - d) F(x)^(m - 1) dx, so a closed form is only right if it agrees
   # with the cdf the rest of the model uses. Taking the density off that same
-  # cdf by central difference keeps the check independent of every branch of
-  # .mafc_pc_r(): a swapped gumbel label and a self-consistent but mis-scaled
-  # exponent both survive a comparison against the formula itself. gumbel_min
-  # and gumbel_max coincide at m = 2, which is why the grid goes past it.
-  # 1e-7 is the implementation's side: its 40-point Gauss-Hermite normal branch
-  # sits 4.5e-8 from the integral at m = 8, d = 0, every other cell below 2e-10.
+  # cdf by central difference ties each branch of .mafc_pc_r() to the registry
+  # entry it claims: relabelling gumbel_min and gumbel_max leaves every block
+  # in test-model_sdt_mafc.R green, because its closed-form tests restate the
+  # formula the implementation already uses, and fails here. gumbel_min and
+  # gumbel_max coincide at m = 2, which is why the grid goes past it.
+  # 1e-7 is the implementation's side: the 40-point Gauss-Hermite normal branch
+  # sits 4.5e-8 from the integral at m = 8, d = 0, which is the rule's own
+  # error and not the central difference's (h = 1e-6 and an exact density both
+  # give 4.5e-8); every other cell stays below 7e-9.
   pc_integral <- function(d, m, dist) {
     cdf <- bmm:::.sdt_dists[[dist]]$cdf
     dens <- function(x) (cdf(x + 1e-5) - cdf(x - 1e-5)) / 2e-5
