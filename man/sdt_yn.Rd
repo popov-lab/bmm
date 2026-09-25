@@ -110,8 +110,8 @@ Provide pre-aggregated data with the following columns:
 }
 \item \code{sdratio}:
 \itemize{
-\item \code{main}: normal(0, 0.5)
-\item \code{effects}: normal(0, 0.3)
+\item \code{main}: normal(0, 0.3)
+\item \code{effects}: normal(0, 0.15)
 \item \code{sd}: exponential(2)
 }
 }
@@ -221,7 +221,7 @@ yourself, whether as \code{bmf(sdratio = )} or through a hand-written
 \code{bmf(sdratio = 1)} does not fix a ratio of 1 — it fixes \code{exp(1) = 2.72},
 and \code{bmm()} raises no warning; a fixed ratio of 1.25 needs
 \code{bmf(sdratio = log(1.25))}. Both \code{sdratio} defaults \code{default_prior()}
-reports — \code{normal(0, 0.5)} on the intercept and \code{exponential(2)} on the
+reports — \code{normal(0, 0.3)} on the intercept and \code{exponential(2)} on the
 random-effect SDs — are on that same scale, unannotated.
 }
 
