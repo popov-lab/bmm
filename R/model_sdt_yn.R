@@ -21,10 +21,13 @@
   # Over plausible SD ratios, r in [0.56, 1.80], that factor runs from
   # 0.81 to 1.46, which normal(1, 1) is wide enough to absorb on either scale.
   # sd rates track between-subject SDs fitted on broeder_schuetz_2009_e3 (40
-  # subjects): d ~0.6, criterion ~0.15, sdratio ~0.2. Rate 2's median (0.35)
-  # sits below d's SD, so d takes rate 1; criterion's small value reflects
-  # its condition predictor absorbing most bias variation, so it and
-  # sdratio take rate 2 rather than 4.
+  # subjects) with the wide brms sd default in force: d ~0.6, criterion ~0.15,
+  # sdratio ~0.2, against the rule that the prior median covers the typical SD
+  # and its 95% quantile twice the largest. Rate 2's median (0.35) sits below
+  # d's SD, so d takes rate 1. criterion's 0.15 is deflated by one subject
+  # intercept shared across five conditions -- a single condition alone gives
+  # 0.24, above rate 4's median (0.17) -- so criterion takes rate 2. sdratio's
+  # 0.2 clears that same median on its own, so it takes rate 2 too.
   default_priors <- list(
     d = list(main = "normal(1, 1)", effects = "normal(0, 0.5)", sd = "exponential(1)"),
     criterion = list(main = "normal(0, 1.5)", effects = "normal(0, 0.5)", sd = "exponential(2)"),
@@ -226,8 +229,9 @@ settable_links.sdt_yn <- function(model) {
 #' `brms::set_prior(..., dpar = "sdratio")`, is read on it too.
 #' `bmf(sdratio = 1)` does not fix a ratio of 1 — it fixes `exp(1) = 2.72`,
 #' and `bmm()` raises no warning; a fixed ratio of 1.25 needs
-#' `bmf(sdratio = log(1.25))`. `default_prior()`'s `normal(0, 0.5)` for
-#' `sdratio` is on the same scale, unannotated.
+#' `bmf(sdratio = log(1.25))`. Both `sdratio` defaults `default_prior()`
+#' reports — `normal(0, 0.5)` on the intercept and `exponential(2)` on the
+#' random-effect SDs — are on that same scale, unannotated.
 #'
 #' @section Terms used on this page:
 #' \itemize{

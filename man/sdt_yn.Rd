@@ -220,8 +220,9 @@ yourself, whether as \code{bmf(sdratio = )} or through a hand-written
 \code{brms::set_prior(..., dpar = "sdratio")}, is read on it too.
 \code{bmf(sdratio = 1)} does not fix a ratio of 1 — it fixes \code{exp(1) = 2.72},
 and \code{bmm()} raises no warning; a fixed ratio of 1.25 needs
-\code{bmf(sdratio = log(1.25))}. \code{default_prior()}'s \code{normal(0, 0.5)} for
-\code{sdratio} is on the same scale, unannotated.
+\code{bmf(sdratio = log(1.25))}. Both \code{sdratio} defaults \code{default_prior()}
+reports — \code{normal(0, 0.5)} on the intercept and \code{exponential(2)} on the
+random-effect SDs — are on that same scale, unannotated.
 }
 
 \section{Terms used on this page}{
