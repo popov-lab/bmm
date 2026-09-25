@@ -120,3 +120,4 @@ Brown, S. D., & Heathcote, A. (2008). The simplest complete
 model of choice response time: Linear ballistic accumulation. \emph{Cognitive
 Psychology}, 57(3), 153-178.
 }
+\keyword{distribution}
