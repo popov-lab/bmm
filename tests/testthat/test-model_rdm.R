@@ -1385,7 +1385,7 @@ test_that("Stan rdm_log_pdf()/rdm_log_surv() match the quadrature reference on a
     fixed_param = TRUE, chains = 1, iter_sampling = 1, iter_warmup = 0,
     refresh = 0, show_messages = FALSE, seed = 1, sig_figs = 18
   )
-  draws <- posterior::as_draws_matrix(fit$draws())
+  draws <- fit$draws(format = "matrix")
   nm <- colnames(draws)
   draws <- as.numeric(draws[1, ])
   ld <- draws[match(paste0("ld[", seq_len(n_grid), "]"), nm)]
