@@ -33,6 +33,17 @@ test_that("every dist argument offers exactly the registry's distributions", {
   }
 })
 
+test_that("the default sdratio prior covers the empirical recognition range", {
+  # Mickes et al. (2007) report subject ratios between 0.85 and 1.82, and the
+  # broeder_schuetz_2009_e3 fit gives 1.46 [1.25, 1.72]. Ratios past 2 are not
+  # observed, so a prior that spends much of its mass there is not merely
+  # uninformative about the task, it is wrong about it.
+  main <- sdt_yn("n_old", "stimulus", "n_trials")$default_priors$sdratio$main
+  sd <- as.numeric(sub("normal\\(0, ([0-9.]+)\\)", "\\1", main))
+  expect_true(is.finite(sd), info = main)
+  expect_gt(diff(pnorm(log(c(0.5, 2)), 0, sd)), 0.95)
+})
+
 test_that("quantile functions invert their cdfs", {
   p <- c(0.05, 0.25, 0.5, 0.75, 0.95)
   for (d in names(bmm:::.sdt_dists)) {

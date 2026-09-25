@@ -28,7 +28,13 @@
   default_priors <- list(
     d = list(main = "normal(1, 1)", effects = "normal(0, 0.5)", sd = "exponential(1)"),
     criterion = list(main = "normal(0, 1.5)", effects = "normal(0, 0.5)", sd = "exponential(2)"),
-    sdratio = list(main = "normal(0, 0.5)", effects = "normal(0, 0.3)", sd = "exponential(2)")
+    # sdratio is on the log scale, so normal(0, 0.3) puts 95% of the prior on
+    # ratios in [0.56, 1.80], i.e. zROC slopes in [0.56, 1.80]. That spans the
+    # empirical range with room -- Mickes et al. (2007) report a mean ratio of
+    # 1.25 with subjects between 0.85 and 1.82, and the broeder_schuetz_2009_e3
+    # fit gives 1.46 [1.25, 1.72] -- while excluding ratios above 2, which are
+    # not observed in recognition.
+    sdratio = list(main = "normal(0, 0.3)", effects = "normal(0, 0.15)", sd = "exponential(2)")
   )
   requirements <- glue(
     "Provide pre-aggregated data with the following columns:", "\n\n",
@@ -226,7 +232,7 @@ settable_links.sdt_yn <- function(model) {
 #' `brms::set_prior(..., dpar = "sdratio")`, is read on it too.
 #' `bmf(sdratio = 1)` does not fix a ratio of 1 — it fixes `exp(1) = 2.72`,
 #' and `bmm()` raises no warning; a fixed ratio of 1.25 needs
-#' `bmf(sdratio = log(1.25))`. `default_prior()`'s `normal(0, 0.5)` for
+#' `bmf(sdratio = log(1.25))`. `default_prior()`'s `normal(0, 0.3)` for
 #' `sdratio` is on the same scale, unannotated.
 #'
 #' @section Terms used on this page:
