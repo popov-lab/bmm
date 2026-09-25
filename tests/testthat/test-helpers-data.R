@@ -757,9 +757,14 @@ test_that("ezdm_summary_stats() works with dplyr::reframe()", {
 # adjust_ezdm_accuracy TESTS                                              ####
 ############################################################################# !
 
+test_that("adjust_ezdm_accuracy() signals its deprecation", {
+  expect_warning(adjust_ezdm_accuracy(80, 100, 0.1), "deprecated")
+  expect_warning(adjust_ezdm_accuracy(80, 100, 0.1), "ezdm_summary_stats")
+})
+
 test_that("adjust_ezdm_accuracy() returns 1-row data.frame", {
   set.seed(42)
-  result <- adjust_ezdm_accuracy(80, 100, 0.1)
+  result <- suppressWarnings(adjust_ezdm_accuracy(80, 100, 0.1))
 
   expect_s3_class(result, "data.frame")
   expect_equal(nrow(result), 1)
@@ -768,7 +773,7 @@ test_that("adjust_ezdm_accuracy() returns 1-row data.frame", {
 
 test_that("adjust_ezdm_accuracy() returns integer values", {
   set.seed(42)
-  result <- adjust_ezdm_accuracy(80, 100, 0.1)
+  result <- suppressWarnings(adjust_ezdm_accuracy(80, 100, 0.1))
 
   expect_type(result$n_upper_adj, "integer")
   expect_type(result$n_trials_adj, "integer")
@@ -778,26 +783,28 @@ test_that("adjust_ezdm_accuracy() returns integer values", {
 })
 
 test_that("adjust_ezdm_accuracy() handles NA contaminant_prop", {
-  result <- adjust_ezdm_accuracy(80, 100, NA)
+  result <- suppressWarnings(adjust_ezdm_accuracy(80, 100, NA))
 
   expect_equal(result$n_upper_adj, 80L)
   expect_equal(result$n_trials_adj, 100L)
 })
 
 test_that("adjust_ezdm_accuracy() handles zero contaminant_prop", {
-  result <- adjust_ezdm_accuracy(80, 100, 0)
+  result <- suppressWarnings(adjust_ezdm_accuracy(80, 100, 0))
 
   expect_equal(result$n_upper_adj, 80L)
   expect_equal(result$n_trials_adj, 100L)
 })
 
 test_that("adjust_ezdm_accuracy() validates inputs", {
-  expect_error(adjust_ezdm_accuracy("a", 100, 0.1), "n_upper must be numeric")
-  expect_error(adjust_ezdm_accuracy(80, "b", 0.1), "n_trials must be numeric")
-  expect_error(adjust_ezdm_accuracy(80, 100, 0.1, guess_rate = -0.1),
-    "guess_rate must be between 0 and 1")
-  expect_error(adjust_ezdm_accuracy(80, 100, 0.1, guess_rate = 1.5),
-    "guess_rate must be between 0 and 1")
+  suppressWarnings({
+    expect_error(adjust_ezdm_accuracy("a", 100, 0.1), "n_upper must be numeric")
+    expect_error(adjust_ezdm_accuracy(80, "b", 0.1), "n_trials must be numeric")
+    expect_error(adjust_ezdm_accuracy(80, 100, 0.1, guess_rate = -0.1),
+      "guess_rate must be between 0 and 1")
+    expect_error(adjust_ezdm_accuracy(80, 100, 0.1, guess_rate = 1.5),
+      "guess_rate must be between 0 and 1")
+  })
 })
 
 ############################################################################# !

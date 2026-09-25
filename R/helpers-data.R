@@ -717,9 +717,14 @@ ezdm_summary_stats <- function(
   )
 }
 
-#' Adjust Accuracy Counts for Contamination
+#' Adjust Accuracy Counts for Contamination (deprecated)
 #'
-#' @description Adjusts accuracy counts (`n_upper`, `n_trials`) by removing
+#' @description **Deprecated.** [ezdm_summary_stats()] now returns
+#'   contaminant-free `n_upper` and `n_trials`, so this second step is no
+#'   longer needed; applying it corrects the same cell twice. Set the guess
+#'   rate with the `guess_rate` argument of [ezdm_summary_stats()] instead.
+#'
+#'   Adjusts accuracy counts (`n_upper`, `n_trials`) by removing
 #'   estimated contaminant trials using binomial sampling. Contaminant trials
 #'   are assumed to produce correct responses at a fixed guess rate (e.g., 0.5
 #'   for 2AFC tasks).
@@ -747,19 +752,19 @@ ezdm_summary_stats <- function(
 #' @export
 #'
 #' @examples
-#' # Adjust accuracy for estimated 10% contamination
+#' # Deprecated. ezdm_summary_stats() returns contaminant-free counts already:
 #' set.seed(42)
-#' adjust_ezdm_accuracy(n_upper = 80, n_trials = 100, contaminant_prop = 0.1)
-#'
-#' # In a pipeline with ezdm_summary_stats
-#' # library(dplyr)
-#' # mydata |>
-#' #   group_by(subject) |>
-#' #   reframe(ezdm_summary_stats(rt, response)) |>
-#' #   mutate(adjust_ezdm_accuracy(n_upper, n_trials, contaminant_prop))
+#' rt <- c(rnorm(80, 0.55, 0.05), runif(20, 0.1, 4))
+#' response <- c(rbinom(80, 1, 0.85), rbinom(20, 1, 0.5))
+#' ezdm_summary_stats(rt, response, contaminant_bound = c(0.1, 4))
 #'
 adjust_ezdm_accuracy <- function(n_upper, n_trials, contaminant_prop,
                                  guess_rate = 0.5) {
+  warning2("The function `adjust_ezdm_accuracy()` is deprecated. \\
+            `ezdm_summary_stats()` already returns contaminant-free `n_upper` \\
+            and `n_trials`, so applying this correction on top of them counts \\
+            the same contaminants twice. Use its `guess_rate` argument to set \\
+            the accuracy expected of a contaminant response.")
   stopif(!is.numeric(n_upper), "n_upper must be numeric")
   stopif(!is.numeric(n_trials), "n_trials must be numeric")
   stopif(!is.numeric(guess_rate) || guess_rate < 0 || guess_rate > 1,
