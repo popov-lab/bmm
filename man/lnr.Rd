@@ -111,21 +111,25 @@ Psychometric Properties. Psychometrika, 80(2), 491-513. https://doi.org/10.1007/
 \itemize{
 \item \code{main}: normal(-1, 0.5)
 \item \code{effects}: normal(0, 0.3)
+\item \code{sd}: exponential(2)
 }
 \item \code{error}:
 \itemize{
 \item \code{main}: normal(0, 0.5)
 \item \code{effects}: normal(0, 0.3)
+\item \code{sd}: exponential(2)
 }
 \item \code{ndt}:
 \itemize{
 \item \code{main}: normal(-1.5, 0.5)
 \item \code{effects}: normal(0, 0.3)
+\item \code{sd}: exponential(4)
 }
 \item \code{s}:
 \itemize{
 \item \code{main}: normal(0, 0.5)
 \item \code{effects}: normal(0, 0.2)
+\item \code{sd}: exponential(4)
 }
 }
 }
@@ -165,7 +169,11 @@ upper bound sits below the true value drags the meanlogs with it.
 
 The group-level standard deviations get one rate per kind of parameter
 rather than one per model, shared with the other racing models, so that the
-same quantity is given the same prior wherever it appears.
+same quantity is given the same prior wherever it appears. A meanlog gets
+\code{exponential(2)} (median 0.35) and the two log-link parameters \code{ndt} and \code{s}
+get \code{exponential(4)} (median 0.17). Those medians come from hierarchical
+fits of simulated multi-subject data, which put the between-subject standard
+deviation of a meanlog at 0.26 to 0.43 and of \code{ndt} and \code{s} at 0.17 to 0.19.
 }
 
 \section{Likelihood and \code{loo()}}{

@@ -1,7 +1,7 @@
 # bmm (development version)
 
 ### New models
-* Add the **Log-Normal Race Model** (`lnr`) for multi-alternative choice reaction time tasks (Rouder et al., 2015). The LNR is a K-accumulator race model where finishing times follow lognormal distributions. Implements two versions: **simple** (correct vs. error accumulators, integer-coded responses) and **custom** (per-category meanlog parameters with character-labeled responses, analogous to the M3 `custom` version). The custom version supports per-category `accumulators` for tasks where response categories have different numbers of racing accumulators. Uses dynamically generated Stan code with built-in lognormal functions --- no custom Stan math required. See the [article](https://venpopov.github.io/bmm/dev/articles/bmm_lnr.html) on the `bmm` website for details. Thanks to @GidonFrischkorn (#352)
+* Add the **Log-Normal Race Model** (`lnr`) for multi-alternative choice reaction time tasks (Rouder et al., 2015), a race model in which each response alternative has a lognormal accumulator. Two versions: `simple` (one meanlog for correct, one shared by the errors, integer-coded responses) and `custom` (one meanlog per named response category, with optional per-category `accumulators`). The sdlog `s` is estimated by default; write `s = 0` in `bmf()` to hold it at 1 instead. See `?lnr` and the [article](https://venpopov.github.io/bmm/dev/articles/bmm_lnr.html) on the `bmm` website. Thanks to @GidonFrischkorn (#352)
 
 ### New features
 * `bmm(file_refit = "on_change")` is now implemented and no longer warns and falls back to `"never"`. The cached fit saved under `file` is returned only while the Stan code, the Stan data, the factor levels of the model variables and the algorithm are unchanged; any change refits. The comparison happens where `brms` makes it — after the bmm configuration pipeline has produced the Stan code and data, before compilation — so a cache hit costs one run of the pipeline plus `standata()` and `stancode()`: about 0.4 s rather than 0.02 s for an **sdm** model of `oberauer_lin_2017`, far less than compiling and sampling but not free. As in `brms`, only those four things are compared, so sampler settings do not force a refit — `control = list(adapt_delta = )` in particular, and also `iter`, `warmup`, `chains`, `seed`, `init` and `save_pars`: rerunning with a higher `adapt_delta` after divergent transitions, or with `save_pars(all = TRUE)` for `loo()`, returns the cached fit unchanged (#411).
@@ -80,9 +80,6 @@
 
 ### Other changes
 * The **ddm** model supports both `cmdstanr` and `rstan` backends. Previously, `cmdstanr` was required.
-
-### Other changes
-* Within-chain threading (the `threads` argument of `bmm()` or the `brms.threads` option) is now safe for the **lnr** model. Its vectorized (`loop = FALSE`) family emits sliced data indexing (`vint1[start:end]`, ...) when threading is requested, so that each `reduce_sum` partial sum pairs its slice of response times with the matching responses and accumulator counts. Without the slicing, `brms` passed the `vint` columns through whole and every partial sum except the first evaluated the likelihood against the top of the data --- the model compiled and sampled without any error or warning, but returned wrong posteriors. Threaded and non-threaded models now produce identical log-posteriors (verification script at `local/lnr_threading_verification.R`) (#352).
 
 # bmm 1.3.0
 
