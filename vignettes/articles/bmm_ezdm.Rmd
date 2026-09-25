@@ -150,6 +150,50 @@ So far, studies using the EZ-Diffusion model have adopted step-wise analyses app
 - Compare conditions using Bayesian hypothesis testing
 - Leverage the full power of the `brms` modeling framework
 
+## The sampling distribution of the summary statistics
+
+Because the summary statistics *are* the data, the likelihood is a statement
+about how they vary from one sample of trials to the next. The number of
+upper-boundary responses is binomial. The mean and the variance of the response
+times are the sample mean and sample variance of $n$ decision times, and their
+joint sampling distribution is what the model needs.
+
+It is tempting to treat them the way one would for normally distributed data:
+$\overline{\mathrm{RT}}$ normal around the predicted mean with variance
+$\mathrm{VRT}/n$, $s^2$ scaled chi-square, and the two independent. All three
+parts of that hold only if the response times themselves are normal, and
+diffusion decision times are conspicuously right-skewed. With a symmetric
+starting point their kurtosis is 8.8 at zero drift and falls towards 3 as drift
+grows. This inflates the sampling variance of $s^2$ by a factor of about 3.8
+with 100 trials per cell and 3.5 to 3.6 with 10 (less at accuracies above .95; with an
+asymmetric starting point it is more at the boundary nearer the starting point,
+up to 5.7 for a relative starting point between .3 and .7, and less at the
+other), and the skew makes the mean and the variance correlate at about 0.7. A likelihood that ignores both treats each cell as more
+informative than it is, and the resulting posteriors are too narrow — the
+credible intervals are not wrong about where the parameter is, but about how
+sure one should be.
+
+`bmm` therefore matches the first four cumulants of the first-passage time
+distribution. Writing $\kappa_3$ and $\kappa_4$ for its third and fourth
+cumulants and
+$W = \kappa_4 / n + 2\,\mathrm{VRT}^2 / (n - 1)$ for the exact variance of a
+sample variance, the observed variance follows
+$\mathrm{Gamma}(\mathrm{VRT}^2 / W,\ \mathrm{VRT} / W)$ and the observed mean is
+normal *conditional on it*, centred at
+$\mathrm{ndt} + \mathrm{MDT} + (\kappa_3 / n)\,W^{-1}(s^2 - \mathrm{VRT})$. Both
+reduce to the familiar normal and chi-square terms when $\kappa_3$ and
+$\kappa_4$ vanish, so nothing is lost when the decision times happen to be
+symmetric.
+
+One consequence is worth keeping in mind when designing a study: with a
+symmetric starting point the decision time does not depend on which boundary was
+reached, so all $n$ trials in a cell inform one set of moments. With a free
+starting point they do differ, which is why the 4-parameter version needs the
+summaries split by boundary — and why a boundary reached fewer than twice in a
+cell has no variance to contribute. In `dezdm()` such a cell still contributes
+through the response counts; a `bmm()` fit currently drops it, because the
+missing summaries are coded as `NA`.
+
 # Parametrization in the `bmm` package
 
 The `bmm` package implements two versions of the EZ-diffusion model:
@@ -567,6 +611,20 @@ draws |>
        subtitle = "Red diamonds indicate true generating values") +
   coord_cartesian(xlim = c(0,5)) +
   theme_minimal()
+```
+
+# Posterior predictive checks
+
+The EZ-diffusion likelihood constrains three statistics per cell — the mean RT, the RT variance, and the number of upper-boundary (correct) responses — but by default `pp_check()` only shows the mean RT. The `resp_var` argument selects the other observables of the likelihood; `pp_check_vars()` lists the available checks:
+
+```{r}
+pp_check_vars(fit)
+```
+
+The `mean_pc` check is the proportion of correct responses (`n_upper / n_trials`), which stays comparable across cells even when the number of trials differs. With `resp_var = "all"` all checks are drawn from one shared joint simulation:
+
+```{r, message=FALSE, warning=FALSE, fig.width=7, fig.height=5}
+pp_check(fit, resp_var = "all", ndraws = 50)
 ```
 
 # Comparing conditions

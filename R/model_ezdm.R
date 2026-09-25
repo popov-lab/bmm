@@ -15,10 +15,10 @@
     ),
     fixed_parameters = list(s = 0, mu = 0),
     priors = list(
-      drift = list(main = "cauchy(0,1)", effects = "normal(0,0.5)"),
-      bound = list(main = "normal(0,0.5)", effects = "normal(0,0.5)"),
-      ndt = list(main = "normal(-1.5,0.5)", effects = "normal(0,0.3)"),
-      s = list(main = "normal(0,1)", effects = "normal(0,0.3)")
+      drift = list(main = "cauchy(0,1)", effects = "normal(0,0.5)", sd = "exponential(1)"),
+      bound = list(main = "normal(0,0.5)", effects = "normal(0,0.5)", sd = "exponential(2)"),
+      ndt = list(main = "normal(-1.5,0.5)", effects = "normal(0,0.3)", sd = "exponential(2)"),
+      s = list(main = "normal(0,1)", effects = "normal(0,0.3)", sd = "exponential(2)")
     ),
     init_ranges = list(
       mu = c(0,1),
@@ -41,11 +41,11 @@
     ),
     fixed_parameters = list(s = 0, mu = 0),
     priors = list(
-      drift = list(main = "cauchy(0,1)", effects = "normal(0,0.5)"),
-      bound = list(main = "normal(0,0.5)", effects = "normal(0,0.5)"),
-      ndt = list(main = "normal(-1.5,0.5)", effects = "normal(0,0.3)"),
-      zr = list(main = "normal(0,0.5)", effects = "normal(0,0.3)"),
-      s = list(main = "normal(0,1)", effects = "normal(0,0.3)")
+      drift = list(main = "cauchy(0,1)", effects = "normal(0,0.5)", sd = "exponential(1)"),
+      bound = list(main = "normal(0,0.5)", effects = "normal(0,0.5)", sd = "exponential(2)"),
+      ndt = list(main = "normal(-1.5,0.5)", effects = "normal(0,0.3)", sd = "exponential(2)"),
+      zr = list(main = "normal(0,0.5)", effects = "normal(0,0.3)", sd = "exponential(2)"),
+      s = list(main = "normal(0,1)", effects = "normal(0,0.3)", sd = "exponential(2)")
     ),
     init_ranges = list(
       mu = c(0,1),
@@ -83,14 +83,13 @@
       links = .ezdm_version_table[[version]][["links"]],
       fixed_parameters = .ezdm_version_table[[version]][["fixed_parameters"]],
       default_priors = .ezdm_version_table[[version]][["priors"]],
-      init_ranges = .ezdm_version_table[[version]][["init_ranges"]],
-      void_mu = TRUE
+      init_ranges = .ezdm_version_table[[version]][["init_ranges"]]
     ),
     class = c("bmmodel", "ezdm"),
     call = call
   )
   if (!is.null(version)) class(out) <- c(class(out), paste0("ezdm_", version))
-  out$links[names(links)] <- links
+  out <- set_links(out, links)
   out
 }
 # user facing alias
@@ -104,7 +103,13 @@
 #' @param var_rt The names of the variable or variables (for 4par version) coding the variance of the reaction time in seconds in the data
 #' @param n_upper The name of the variable coding the number of responses that hit the upper response threshold (typically the number of correct responses) in the data.
 #' @param n_trials The name of the variable coding the number of trials that was used to calculated the aggregated statistics.
-#' @param links A list of links for the parameters.
+#' @param links A named list of links for the parameters, e.g.
+#'   `links = list(bound = "softplus")`. For positive parameters
+#'   (e.g. `bound`, `ndt`), "softplus" is available as an alternative to the
+#'   default "log" link that grows linearly for large values and avoids the
+#'   numerical blow-up of `exp()`. A name that is not a parameter of the model
+#'   is an error, and a link that allows values the default link excludes
+#'   (e.g. "identity" for a positive parameter) is a warning.
 #' @param version A character label for the version of the model. There is a three-parameter version
 #'   (version = "3par") of the `ezdm` that fixes the relative starting point `zr` to 0.5, and a
 #'   four parameter version (version = "4par"), that allows to freely estimate the starting point.
@@ -290,6 +295,17 @@ bmf2bf.ezdm_4par <- function(model, formula) {
 # CONFIGURE_MODEL S3 METHODS                                             ####
 ############################################################################# !
 
+# Stan functions of one ezdm version. The order matters: each chunk defines what
+# the next one calls.
+.ezdm_stan_functions <- function(version) {
+  chunks <- c(
+    "ezdm_series.stan", "ezdm_cumulants.stan",
+    paste0("ezdm_", version, "_functions.stan")
+  )
+  sc_path <- system.file("stan_chunks", package = "bmm")
+  paste(vapply(file.path(sc_path, chunks), read_lines2, character(1)), collapse = "\n")
+}
+
 #' @export
 configure_model.ezdm_3par <- function(model, data, formula) {
   # construct brms formula from the bmm formula
@@ -311,9 +327,7 @@ configure_model.ezdm_3par <- function(model, data, formula) {
   )
 
   # prepare initial stanvars to pass to brms, model formula and priors
-  sc_path <- system.file("stan_chunks", package = "bmm")
-  stan_functions <- read_lines2(paste0(sc_path, "/ezdm_3par_functions.stan"))
-  stanvars <- brms::stanvar(scode = stan_functions, block = "functions")
+  stanvars <- brms::stanvar(scode = .ezdm_stan_functions("3par"), block = "functions")
 
   # return the list
   nlist(formula, data, stanvars)
@@ -335,14 +349,10 @@ log_lik_ezdm_3par <- function(i, prep) {
   )
 }
 
-# posterior_predict for pp_check
-# Returns predictions for EZDM 3par dependent variables
-# By default returns mean_rt (the primary response Y)
-# Use dv argument to select other variables: "var_rt", "n_upper"
-# Usage: posterior_predict(fit, dv = "var_rt")
-posterior_predict_ezdm_3par <- function(i, prep, ..., dv = c("mean_rt", "var_rt", "n_upper")) {
-  dv <- match.arg(dv)
-
+# brms forwards posterior_predict() dots to prepare_predictions() only, never
+# to this function, so the other observables cannot be selected here; use
+# pp_check(fit, resp_var = ...) instead (#401)
+posterior_predict_ezdm_3par <- function(i, prep, ...) {
   rezdm(
     n = length(brms::get_dpar(prep, "drift", i = i)),
     n_trials = prep$data$trials[i],
@@ -351,7 +361,7 @@ posterior_predict_ezdm_3par <- function(i, prep, ..., dv = c("mean_rt", "var_rt"
     ndt = brms::get_dpar(prep, "ndt", i = i),
     s = brms::get_dpar(prep, "s", i = i),
     version = "3par"
-  )[[dv]]
+  )[["mean_rt"]]
 }
 
 #' @export
@@ -375,9 +385,7 @@ configure_model.ezdm_4par <- function(model, data, formula) {
   )
 
   # prepare initial stanvars to pass to brms, model formula and priors
-  sc_path <- system.file("stan_chunks", package = "bmm")
-  stan_functions <- read_lines2(paste0(sc_path, "/ezdm_4par_functions.stan"))
-  stanvars <- brms::stanvar(scode = stan_functions, block = "functions")
+  stanvars <- brms::stanvar(scode = .ezdm_stan_functions("4par"), block = "functions")
 
   # return the list
   nlist(formula, data, stanvars)
@@ -404,17 +412,8 @@ log_lik_ezdm_4par <- function(i, prep) {
   )
 }
 
-# posterior_predict for pp_check
-# Returns predictions for EZDM 4par dependent variables
-# By default returns mean_rt_upper (the primary response Y)
-# Use dv argument to select other variables:
-#   "mean_rt_upper", "mean_rt_lower", "var_rt_upper", "var_rt_lower", "n_upper"
-# Usage: posterior_predict(fit, dv = "var_rt_upper")
-posterior_predict_ezdm_4par <- function(i, prep, ..., dv = c(
-                                          "mean_rt_upper", "mean_rt_lower",
-                                          "var_rt_upper", "var_rt_lower", "n_upper"
-                                        )) {
-  dv <- match.arg(dv)
+# no dv argument: see posterior_predict_ezdm_3par()
+posterior_predict_ezdm_4par <- function(i, prep, ...) {
   rezdm(
     n = length(brms::get_dpar(prep, "drift", i = i)),
     n_trials = prep$data$vint2[i],
@@ -424,5 +423,68 @@ posterior_predict_ezdm_4par <- function(i, prep, ..., dv = c(
     zr = brms::get_dpar(prep, "zr", i = i),
     s = brms::get_dpar(prep, "s", i = i),
     version = "4par"
-  )[[dv]]
+  )[["mean_rt_upper"]]
+}
+
+############################################################################# !
+# PP_CHECK OBSERVABLES                                                    ####
+############################################################################# !
+
+# mean_pc rather than raw n_upper: n_trials varies across cells, so counts
+# are not comparable between observations while proportions are.
+
+# each ezdm observation is one design cell, so nobs is small by construction
+# and a density overlay of a handful of points is uninformative; "intervals"
+# shows each cell's observed statistic against its own predictive interval
+.pp_ezdm_observable <- function(compute, label) {
+  .pp_observable(compute, label, type = "intervals")
+}
+
+#' @export
+pp_observables.ezdm_3par <- function(model) {
+  list(
+    observed = c(mean_rt = "Y", var_rt = "vreal1", n_upper = "vint1",
+                 n_trials = "trials"),
+    checks = list(
+      mean_rt = .pp_ezdm_observable(function(d) d$mean_rt,
+                                    label = "Mean response time"),
+      var_rt = .pp_ezdm_observable(function(d) d$var_rt,
+                                   label = "Response time variance"),
+      mean_pc = .pp_ezdm_observable(function(d) d$n_upper / d$n_trials,
+                                    label = "Proportion of upper responses")
+    )
+  )
+}
+
+#' @export
+pp_simulate.ezdm_3par <- function(model, prep) {
+  .pp_simulate_joint(prep, .rezdm_3par, c("drift", "bound", "ndt", "s"),
+                     n_trials = rep(prep$data$trials, each = prep$ndraws))
+}
+
+#' @export
+pp_observables.ezdm_4par <- function(model) {
+  list(
+    observed = c(mean_rt_upper = "Y", mean_rt_lower = "vreal1",
+                 var_rt_upper = "vreal2", var_rt_lower = "vreal3",
+                 n_upper = "vint1", n_trials = "vint2"),
+    checks = list(
+      mean_rt_upper = .pp_ezdm_observable(function(d) d$mean_rt_upper,
+                                          label = "Mean RT (upper responses)"),
+      mean_rt_lower = .pp_ezdm_observable(function(d) d$mean_rt_lower,
+                                          label = "Mean RT (lower responses)"),
+      var_rt_upper = .pp_ezdm_observable(function(d) d$var_rt_upper,
+                                         label = "RT variance (upper responses)"),
+      var_rt_lower = .pp_ezdm_observable(function(d) d$var_rt_lower,
+                                         label = "RT variance (lower responses)"),
+      mean_pc = .pp_ezdm_observable(function(d) d$n_upper / d$n_trials,
+                                    label = "Proportion of upper responses")
+    )
+  )
+}
+
+#' @export
+pp_simulate.ezdm_4par <- function(model, prep) {
+  .pp_simulate_joint(prep, .rezdm_4par, c("drift", "bound", "ndt", "zr", "s"),
+                     n_trials = rep(prep$data$vint2, each = prep$ndraws))
 }
