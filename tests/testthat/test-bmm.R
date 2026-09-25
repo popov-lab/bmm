@@ -117,3 +117,44 @@ test_that("Available models produce expected errors", {
     )
   }
 })
+
+test_that("bmm() starts the step-size search at the package default unless the user sets it", {
+  withr::local_options(bmm.step_size = 0.02)
+  dat <- oberauer_lin_2017
+  formula <- bmf(c ~ 1 + (1 | ID), kappa ~ 1 + (1 | ID))
+  mock <- function(...) {
+    bmm(formula, dat, sdm("dev_rad"), backend = "mock", mock_fit = 1, rename = FALSE, ...)
+  }
+  expect_equal(mock()$stan_args$control, list(step_size = 0.02))
+  expect_equal(
+    mock(control = list(adapt_delta = 0.95))$stan_args$control,
+    list(adapt_delta = 0.95, step_size = 0.02)
+  )
+  expect_equal(mock(control = list(step_size = 0.5))$stan_args$control, list(step_size = 0.5))
+  expect_equal(mock(threads = brms::threading(2))$stan_args$control, list(step_size = 0.02))
+  # only the sampler has a step size; cmdstanr's other methods reject the argument
+  expect_null(mock(algorithm = "meanfield")$stan_args$control)
+
+  withr::local_options(bmm.step_size = FALSE)
+  expect_null(mock()$stan_args$control)
+})
+
+test_that("bmm() builds the default prior and the inits from the data2 brm() gets", {
+  dat <- oberauer_lin_2017
+  ids <- levels(factor(dat$ID))
+  A <- diag(length(ids))
+  dimnames(A) <- list(ids, ids)
+  formula <- bmf(kappa ~ 1 + (1 | gr(ID, cov = A)), thetat ~ 1)
+  mock <- function() {
+    bmm(formula, dat, mixture2p("dev_rad"),
+      data2 = list(A = A), backend = "mock", mock_fit = 1, rename = FALSE
+    )
+  }
+  expect_true(is.function(mock()$stan_args$init))
+  expect_true("sd_1" %in% names(mock()$stan_args$init()))
+  expect_match(stancode(formula, dat, mixture2p("dev_rad"), data2 = list(A = A)), "Lcov_1")
+  expect_s3_class(default_prior(formula, dat, mixture2p("dev_rad"), data2 = list(A = A)), "brmsprior")
+
+  withr::local_options(bmm.default_priors = FALSE)
+  expect_true(is.function(mock()$stan_args$init))
+})

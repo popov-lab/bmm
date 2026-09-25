@@ -10,7 +10,7 @@ install_and_load_bmm_version <- function(version) {
   path <- paste0(.libPaths()[1], "/bmm-", version)
   if (!dir.exists(path) || length(list.files(path)) == 0 || length(list.files(paste0(path, "/bmm"))) == 0) {
     dir.create(path)
-    remotes::install_github(paste0("venpopov/bmm@",version), lib=path)
+    remotes::install_github(paste0("popov-lab/bmm@",version), lib=path)
   }
   library(bmm, lib.loc=path)
 }

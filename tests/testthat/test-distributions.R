@@ -723,6 +723,26 @@ test_that("pcswald and qcswald handle extreme parameters", {
   expect_true(q_small > 0.3 && q_small < 0.5)
 })
 
+test_that("dcswald error-response likelihood stays finite in the upper tail (#376)", {
+  # The simple version routes response = 0 through the shifted-Wald survival.
+  # The old naive log(1 - exp(cdf)) cancelled to NaN/-Inf for late RTs.
+  ll <- dcswald(c(5, 10, 20, 40),
+    response = 0, drift = 2, bound = 1, ndt = 0.3, version = "simple"
+  )
+  expect_true(all(is.finite(ll)))
+})
+
+test_that("dcswald error-response survival equals 1 - CDF in mid-range (#376)", {
+  rt <- c(0.4, 0.6, 0.9, 1.3)
+  ll_error <- dcswald(rt,
+    response = 0, drift = 2, bound = 1, ndt = 0.3, version = "simple"
+  )
+  cdf <- pcswald(rt,
+    response = 1, drift = 2, bound = 1, ndt = 0.3, version = "simple"
+  )
+  expect_equal(ll_error, log(1 - cdf))
+})
+
 test_that("rm3 works without providing b parameter", {
   model <- m3(
     resp_cats = c("corr", "other", "npl"),
@@ -1009,6 +1029,22 @@ test_that("dezdm validates parameters correctly", {
     "n_trials must be larger than 2"
   )
 
+  # the logit-scale binomial would return a finite density for fractional counts
+  expect_error(
+    dezdm(
+      mean_rt = 0.5, var_rt = 0.02, n_upper = 80.5, n_trials = 100,
+      drift = 2, bound = 1.5, ndt = 0.3
+    ),
+    "must be whole numbers"
+  )
+  expect_error(
+    dezdm(
+      mean_rt = 0.5, var_rt = 0.02, n_upper = 80, n_trials = 100.5,
+      drift = 2, bound = 1.5, ndt = 0.3
+    ),
+    "must be whole numbers"
+  )
+
   # version must be valid
   expect_error(
     dezdm(
@@ -1036,6 +1072,15 @@ test_that("dezdm validates parameters correctly", {
     ),
     "zr must be between 0 and 1"
   )
+})
+
+test_that("rezdm 4par handles cells with fewer than 2 responses at a boundary", {
+  withr::local_seed(1)
+  res <- rezdm(n = 200, n_trials = 3, drift = 0, bound = 1, ndt = 0.3,
+               version = "4par")
+  expect_identical(is.na(res$mean_rt_upper), res$n_upper < 2)
+  expect_identical(is.na(res$var_rt_upper), res$n_upper < 2)
+  expect_identical(is.na(res$mean_rt_lower), res$n_trials - res$n_upper < 2)
 })
 
 test_that("rezdm validates parameters correctly", {
@@ -1262,4 +1307,330 @@ test_that("dezdm 3par handles varying n_trials correctly", {
 
   expect_length(ll_vec, 3)
   expect_true(all(is.finite(ll_vec)))
+})
+
+
+# Tests for the ezdm decision-time cumulants (issue #407) ----------------------
+
+# Reference values from local/ezdm/k34_derivation.py: the cumulants of the
+# boundary-conditional first-passage time, evaluated at 60+ digits from the
+# closed forms with enough guard digits for the cancellation, and cross-checked
+# against numerical differentiation of the CGF itself (agreement 7e-59).
+ezdm_cumulant_references <- function() {
+  # read.csv rather than a tribble: tibble is not a declared dependency, and the
+  # 17-digit decimals round-trip the doubles exactly
+  ref <- utils::read.csv(text = "drift,bound,zr,s,boundary,MDT,VRT,k3,k4
+0,1.5,0.5,1.0,upper,0.5625,0.2109375,0.18984375,0.25934012276785714
+1e-08,1.5,0.5,1.0,upper,0.56249999999999999,0.21093749999999999,0.18984374999999999,0.25934012276785712
+0.01,1.0,0.5,1.0,upper,0.24999791668749979,0.041665833345981972,0.016666160724536864,0.01011863757652396
+0.2,1.5,0.5,1.0,upper,0.5583188760874424,0.20719186958160496,0.1847501123616437,0.25009358517694253
+0.5,1.5,0.5,1.0,upper,0.53753609752617892,0.18908944624838941,0.16079771187077391,0.2077761272089794
+2.0,1.0,0.5,1.0,upper,0.19039853898894122,0.021351238396358676,0.0060181161652498743,0.0025955878267946837
+5.0,3.0,0.5,1.4,upper,0.29971538162917291,0.023326995904847908,0.0053841925909205833,0.0020413082600528851
+100.0,1.5,0.5,1.0,upper,0.0075,7.5e-7,2.25e-10,1.125e-13
+0.05,1.5,0.8,1.0,upper,0.2698340611020102,0.13266229314104025,0.14203028421087174,0.21614906104371065
+0.05,1.5,0.8,1.0,lower,0.71971935057529668,0.22439914724951283,0.19251972387929096,0.2597655971356454
+1.0,1.5,0.8,1.0,upper,0.21774203644294689,0.08200902526658194,0.071383919789698674,0.089504207727222578
+1.0,1.5,0.8,1.0,lower,0.62736556037724539,0.15310222810508356,0.10517772494355196,0.11488864600247718
+2.0,0.5,0.95,1.4,upper,0.004013234648407409,0.0001250812152839004,8.439155091234556e-6,7.9963594687025653e-7
+2.0,0.5,0.95,1.4,lower,0.041690711753955124,0.0006885741617546384,3.252941531017657e-5,2.4237919043289123e-6
+20.0,3.0,0.6,1.0,upper,0.060000000000000003,0.00015000000000000001,1.1250000000000001e-6,1.4062500000000001e-8
+1500.0,1.0,0.6,1.0,upper,0.00026666666666666668,1.1851851851851853e-10,1.580246913580247e-16,3.5116598079561044e-22")
+  ref$b <- ifelse(ref$boundary == "upper", ref$zr, 1 - ref$zr) * ref$bound
+  ref
+}
+
+test_that(".ezdm_cumulants matches high-precision references in both branches", {
+  ref <- ezdm_cumulant_references()
+  got <- .ezdm_cumulants(ref$b, ref$bound, ref$drift^2 / ref$s^4, ref$s)
+
+  # row-wise ratios: expect_equal() pools its tolerance over the vector, and the
+  # references span 20 orders of magnitude
+  for (moment in c("MDT", "VRT", "k3", "k4")) {
+    expect_equal(got[[moment]] / ref[[moment]], rep(1, nrow(ref)), tolerance = 1e-10, info = moment)
+  }
+})
+
+test_that(".ezdm_cumulants is continuous across the series/closed-form seam", {
+  for (bound in c(0.8, 1.5, 3)) {
+    for (zr in c(0.5, 0.7, 0.9)) {
+      w_seam <- (0.7 / bound)^2
+      below <- .ezdm_cumulants(zr * bound, bound, w_seam * (1 - 1e-12), 1)
+      above <- .ezdm_cumulants(zr * bound, bound, w_seam * (1 + 1e-12), 1)
+      expect_lt(max(abs(unlist(above) / unlist(below) - 1)), 1e-9)
+    }
+  }
+})
+
+test_that(".ezdm_cumulants reproduces the zero-drift limits", {
+  # k_n(w = 0) = (-1)^n (2/s^2)^n a_n n! (b^2n - b0^2n); for the symmetric start
+  # point these collapse to the 3par values below
+  a <- 1.3
+  zero_drift <- .ezdm_cumulants(a / 2, a, 0, 1)
+  expect_equal(zero_drift$MDT, a^2 / 4)
+  expect_equal(zero_drift$VRT, a^4 / 24)
+  expect_equal(zero_drift$k3, a^6 / 60)
+  expect_equal(zero_drift$k4, 17 * a^8 / 1680)
+
+  # excess kurtosis 17 * 576 / 1680 at zero drift, i.e. kurtosis 8.83
+  expect_equal(zero_drift$k4 / zero_drift$VRT^2, 17 * 576 / 1680)
+})
+
+test_that(".ezdm_cumulants reproduces the 4par zero-drift limits", {
+  bound <- 1.6
+  zr <- 0.7
+  z <- bound / 2
+  x0 <- zr * bound - z
+  zero_drift <- .ezdm_cumulants(c(z + x0, z - x0), bound, 0, 1)
+
+  expect_equal(
+    zero_drift$MDT,
+    c(4 * z^2 - (z + x0)^2, 4 * z^2 - (z - x0)^2) / 3
+  )
+  expect_equal(
+    zero_drift$VRT,
+    c(32 * z^4 - 2 * (z + x0)^4, 32 * z^4 - 2 * (z - x0)^4) / 45
+  )
+})
+
+test_that(".ezdm_cumulants agrees with the eigenfunction series of the first-passage density", {
+  # A referee that shares nothing with the log-sinh CGF: the large-time series
+  # f(t) ~ sum_k k sin(k pi x / a) exp(-c_k t), c_k = v^2 / 2 + k^2 pi^2 / (2 a^2),
+  # for s = 1 and x the distance to the boundary that is hit, integrated term by
+  # term (int t^m exp(-c t) dt = m! / c^(m + 1)). The m = 0 sum converges like
+  # 1 / k, so sum sin(k phi) / k = (pi - phi) / 2 is split off.
+  eigen_cumulants <- function(x, a, v, terms = 4e5) {
+    k <- seq_len(terms)
+    phi <- pi * x / a
+    beta_sq <- (v * a / pi)^2
+    sin_k <- sin(k * phi)
+    c_k <- v^2 / 2 + k^2 * pi^2 / (2 * a^2)
+    mass <- 2 * a^2 / pi^2 *
+      ((pi - phi) / 2 - beta_sq * sum(sin_k / (k * (k^2 + beta_sq))))
+    mu <- vapply(1:4, \(m) factorial(m) * sum(k * sin_k / c_k^(m + 1)), numeric(1)) / mass
+    c(
+      MDT = mu[1],
+      VRT = mu[2] - mu[1]^2,
+      k3 = mu[3] - 3 * mu[2] * mu[1] + 2 * mu[1]^3,
+      k4 = mu[4] - 4 * mu[3] * mu[1] - 3 * mu[2]^2 + 12 * mu[2] * mu[1]^2 - 6 * mu[1]^4
+    )
+  }
+
+  # series branch (bound * |drift| / s^2 = 0.42), zero drift, and the closed
+  # forms at s != 1 (3.28); (drift, bound, s) is (drift / s, bound / s, 1)
+  cells <- data.frame(drift = c(0.3, 0, -1.5), bound = 1.4, s = c(1, 1, 0.8))
+  zr <- 0.65
+  for (i in seq_len(nrow(cells))) {
+    drift <- cells$drift[i]
+    bound <- cells$bound[i]
+    s <- cells$s[i]
+    got <- .ezdm_cumulants(c(zr, 1 - zr) * bound, bound, drift^2 / s^4, s)
+    for (side in 1:2) {
+      hit_distance <- c(1 - zr, zr)[side] * bound
+      expected <- eigen_cumulants(hit_distance / s, bound / s, drift / s)
+      # as ratios, so an error in k4 alone is not pooled with the larger MDT
+      expect_equal(
+        vapply(got, `[`, numeric(1), side) / expected, c(MDT = 1, VRT = 1, k3 = 1, k4 = 1),
+        tolerance = 1e-7
+      )
+    }
+  }
+})
+
+test_that(".ezdm_cumulants stays finite at extreme drift", {
+  # cosh(t)/sinh(t) is NaN above t = 710 and t^4 * csch^2(t) is Inf * 0 there;
+  # the old .ezdm_moments_4par() returned NaN for every moment at drift = 1500
+  extreme <- .ezdm_cumulants(0.6, 1, c(0, 1e-300, 1e-8, 1, 1e6, 1e12)^2, 1)
+  expect_true(all(is.finite(unlist(extreme))))
+
+  moments <- .ezdm_moments_4par(drift = 1500, bound = 1, zr = 0.6, s = 1)
+  expect_true(all(is.finite(unlist(moments))))
+  expect_true(all(is.finite(unlist(.ezdm_moments_3par(1500, 1, 1)))))
+})
+
+test_that(".ez_rt_terms keeps a positive conditional variance across the ezdm grid", {
+  # n = 2 is the smallest count the 4par likelihood admits at one boundary
+  grid <- expand.grid(
+    drift = 10^seq(-3, 2, length.out = 25), bound = c(0.5, 1, 2, 4),
+    zr = c(0.5, 0.7, 0.9), s = c(0.3, 1, 3), n = c(2, 3, 5, 10, 50, 200, 1000)
+  )
+  moments <- .ezdm_cumulants(
+    grid$zr * grid$bound, grid$bound, grid$drift^2 / grid$s^4, grid$s
+  )
+  rt <- .ez_rt_terms(moments$VRT, moments$k3, moments$k4, grid$n)
+
+  ratio <- rt$sd^2 / (moments$VRT / grid$n)
+  expect_true(all(is.finite(ratio)))
+  # the conditional sd never drops far below the marginal one: corr^2 < 0.7
+  expect_gt(min(ratio), 0.3)
+  expect_lte(max(ratio), 1)
+})
+
+test_that(".ez_rt_terms reduces to the independent normal and chi-square without skew", {
+  rt <- .ez_rt_terms(VRT = 0.3, k3 = 0, k4 = 0, n_trials = 25)
+
+  expect_equal(rt$shape, (25 - 1) / 2)
+  expect_equal(rt$rate, (25 - 1) / (2 * 0.3))
+  expect_equal(rt$slope, 0)
+  expect_equal(rt$sd, sqrt(0.3 / 25))
+})
+
+test_that(".ez_rt_terms reproduces the exact moments of mean_rt and var_rt", {
+  # Var(sample variance) = k4 / n + 2 VRT^2 / (n - 1) and
+  # Cov(sample mean, sample variance) = k3 / n, for any distribution
+  n <- c(2, 5, 25, 400)
+  moments <- .ezdm_moments_4par(drift = 1.3, bound = 1.4, zr = 0.7, s = 1)
+  for (side in c("upper", "lower")) {
+    VRT <- moments[[paste0("vrt_", side)]]
+    k3 <- moments[[paste0("k3_", side)]]
+    k4 <- moments[[paste0("k4_", side)]]
+    rt <- .ez_rt_terms(VRT, k3, k4, n)
+    var_of_var <- rt$shape / rt$rate^2
+
+    expect_equal(rt$shape / rt$rate, rep(VRT, 4))
+    expect_equal(var_of_var, k4 / n + 2 * VRT^2 / (n - 1))
+    expect_equal(rt$slope * var_of_var, k3 / n)
+    expect_equal(rt$sd^2 + rt$slope^2 * var_of_var, VRT / n)
+  }
+})
+
+test_that(".ez_rt_terms matches the sampling moments of simulated diffusion summaries", {
+  # a referee that shares no formula with bmm: the empirical moments of the
+  # mean and variance of n decision times drawn by rtdists
+  skip_on_cran()
+  skip_if_not_installed("rtdists")
+  withr::local_seed(407)
+
+  n <- 10
+  drift <- 1.3
+  bound <- 1.4
+  decision_times <- matrix(
+    rtdists::rdiffusion(n * 1e5, a = bound, v = drift, t0 = 0, z = bound / 2)$rt,
+    nrow = n
+  )
+  mean_rt <- colMeans(decision_times)
+  var_rt <- apply(decision_times, 2, stats::var)
+
+  moments <- .ezdm_moments_3par(drift, bound, 1)
+  rt <- .ez_rt_terms(moments$VRT, moments$k3, moments$k4, n)
+  var_of_var <- rt$shape / rt$rate^2
+
+  # Monte Carlo error is about 1%; the pre-#407 terms miss var(var_rt) by 3.6x
+  # and cov(mean_rt, var_rt) entirely. Compared as ratios, because
+  # expect_equal() treats `tolerance` as absolute when the target is smaller
+  # than it, and these moments are ~0.005
+  expect_equal(var_of_var / stats::var(var_rt), 1, tolerance = 0.05)
+  expect_equal(rt$slope * var_of_var / stats::cov(mean_rt, var_rt), 1, tolerance = 0.05)
+  expect_equal((rt$sd^2 + rt$slope^2 * var_of_var) / stats::var(mean_rt), 1, tolerance = 0.05)
+})
+
+test_that("dezdm 4par uses a boundary's RT summaries only from two responses on", {
+  lpdf <- function(n_upper, mean_rt, var_rt) {
+    dezdm(
+      mean_rt = mean_rt, var_rt = var_rt, n_upper = n_upper, n_trials = 30,
+      drift = 1, bound = 1.5, ndt = 0.25, zr = 0.6, version = "4par"
+    )
+  }
+
+  expect_equal(lpdf(1, c(NA, 0.8), c(NA, 0.1)), lpdf(1, c(0.7, 0.8), c(0.05, 0.1)))
+  expect_equal(lpdf(29, c(0.7, NA), c(0.05, NA)), lpdf(29, c(0.7, 0.8), c(0.05, 0.1)))
+  expect_true(is.finite(lpdf(1, c(NA, 0.8), c(NA, 0.1))))
+  expect_true(is.finite(lpdf(2, c(0.7, 0.8), c(0.05, 0.1))))
+  expect_false(lpdf(2, c(0.7, 0.8), c(0.05, 0.1)) == lpdf(2, c(0.9, 0.8), c(0.05, 0.1)))
+})
+
+test_that(".ezdm_pc is stable in both drift directions", {
+  # the old exp(2 k z) form returned NaN from |drift| * bound / s^2 ~ 710 at
+  # negative drift
+  drift <- c(-1500, -400, -1, 0, 1, 400, 1500)
+  pC <- .ezdm_moments_4par(drift = drift, bound = 1, zr = 0.6, s = 1)$pC
+
+  expect_true(all(is.finite(pC)))
+  expect_true(all(pC >= 0 & pC <= 1))
+  expect_equal(pC[drift == 0], 0.6)
+  expect_true(all(diff(pC) >= 0))
+
+  # 3par is the same function at zr = 0.5
+  expect_equal(
+    .ezdm_moments_3par(drift, 1, 1)$pC,
+    .ezdm_moments_4par(drift, bound = 1, zr = 0.5, s = 1)$pC
+  )
+})
+
+test_that(".ezdm_pc keeps its slope in drift through zero", {
+  # a constant b / b0 at k = 0 has the right value but no gradient, which is
+  # what a sampler started at drift = 0 would see; d pC / d k = r (b0 - b) there
+  b <- 0.45
+  b0 <- 1.5
+  h <- 1e-7
+  slope <- (.ezdm_pc(b, b0, h) - .ezdm_pc(b, b0, -h)) / (2 * h)
+  expect_equal(slope / (b / b0 * (b0 - b)), 1, tolerance = 1e-6)
+  expect_equal(.ezdm_pc(b, b0, 0), b / b0)
+
+  # continuous across the switch between the series and the expm1 ratio
+  k_switch <- 1e-4 / (2 * b0)
+  around <- .ezdm_pc(b, b0, c(-1, -1, 1, 1) * k_switch * (1 + c(1, -1, -1, 1) * 1e-9))
+  expect_equal(around[1] / around[2], 1, tolerance = 1e-12)
+  expect_equal(around[3] / around[4], 1, tolerance = 1e-12)
+
+  # negative drift mirrors positive drift at the mirrored start point
+  expect_equal(.ezdm_pc(b, b0, -1.3), 1 - .ezdm_pc(b0 - b, b0, 1.3))
+})
+
+test_that("the 3par density takes its binomial on the logit scale drift * bound / s^2", {
+  # the identity the Stan likelihood and .dezdm_3par() both rely on
+  drift <- c(-3, -0.4, 0, 0.7, 2.5)
+  bound <- c(0.6, 1.2, 2, 1.5, 0.9)
+  s <- c(1, 0.7, 1.3, 2, 1)
+  expect_equal(stats::qlogis(.ezdm_moments_3par(drift, bound, s)$pC), drift * bound / s^2)
+
+  # and the density agrees with the probability-scale binomial where that is exact
+  moments <- .ezdm_moments_3par(1.2, 1.5, 1)
+  with_logit <- dezdm(0.6, 0.05, n_upper = 40, n_trials = 50, drift = 1.2, bound = 1.5, ndt = 0.25)
+  rt <- .ez_rt_terms(moments$VRT, moments$k3, moments$k4, 50)
+  with_prob <- stats::dbinom(40, 50, moments$pC, log = TRUE) +
+    stats::dgamma(0.05, rt$shape, rt$rate, log = TRUE) +
+    stats::dnorm(0.6, 0.25 + moments$MDT + rt$slope * (0.05 - moments$VRT), rt$sd, log = TRUE)
+  expect_equal(with_logit, with_prob)
+
+  # pC rounds to 1 here, and the old form returned -Inf
+  expect_true(is.finite(dezdm(0.3, 1e-4, n_upper = 49, n_trials = 50, drift = 60, bound = 1.5, ndt = 0.25)))
+})
+
+test_that("the 4par density is the same when drift, zr and the boundaries are mirrored", {
+  # log(1 - pC) taken of a pC that had rounded to 1 broke this from
+  # |drift| * bound / s^2 of about 18 (drift = 10 here is 31), and returned -Inf
+  # on one side only from about 37
+  grid <- expand.grid(
+    drift = c(-25, -10, -5, -1.2, -0.3, 0.3, 1.2, 5, 10, 25), zr = c(0.2, 0.7),
+    n_upper = c(0, 1, 59, 60)
+  )
+  moments <- .ezdm_moments_4par(grid$drift, 1.5, grid$zr, 0.7)
+  mean_rt <- 0.25 + cbind(moments$mdt_upper * 1.03, moments$mdt_lower * 0.97)
+  var_rt <- cbind(moments$vrt_upper * 0.9, moments$vrt_lower * 1.2)
+
+  as_coded <- dezdm(mean_rt, var_rt, grid$n_upper, 60,
+    drift = grid$drift, bound = 1.5, ndt = 0.25, zr = grid$zr, s = 0.7, version = "4par"
+  )
+  mirrored <- dezdm(mean_rt[, 2:1], var_rt[, 2:1], 60 - grid$n_upper, 60,
+    drift = -grid$drift, bound = 1.5, ndt = 0.25, zr = 1 - grid$zr, s = 0.7, version = "4par"
+  )
+
+  expect_true(all(is.finite(as_coded)))
+  expect_lt(max(abs(mirrored / as_coded - 1)), 1e-11)
+})
+
+test_that(".ezdm_logit_pc is the logit of .ezdm_pc and the 3par logit at zr = 0.5", {
+  bound <- 1.5
+  k <- c(-40, -20, -5, 5, 20, 40) / bound
+  expect_lt(max(abs(.ezdm_logit_pc(bound / 2, bound / 2, k) / (k * bound) - 1)), 1e-13)
+
+  # where pC is exact, on both sides of the switch between the series and the
+  # closed form
+  k <- c(-3, -1e-3, -1e-6, 0, 1e-6, 1e-3, 3)
+  logit <- .ezdm_logit_pc(0.45, bound - 0.45, k)
+  expect_lt(max(abs(logit / stats::qlogis(.ezdm_pc(0.45, bound, k)) - 1)), 1e-13)
+
+  # pC rounds to 1 here and qlogis() of it is Inf
+  expect_equal(.ezdm_logit_pc(0.45, bound - 0.45, 30), 2 * 30 * 0.45)
 })

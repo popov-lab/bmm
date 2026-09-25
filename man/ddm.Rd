@@ -11,7 +11,13 @@ ddm(rt, response, links = NULL, ...)
 
 \item{response}{Name of the response variable coding the response numerically (0 = lower response / incorrect, 1 = upper response / correct)}
 
-\item{links}{A list of links for the parameters.}
+\item{links}{A named list of links for the parameters, e.g.
+\code{links = list(bound = "softplus")}. For positive parameters
+(e.g. \code{bound}, \code{ndt}), "softplus" is available as an alternative to the
+default "log" link that grows linearly for large values and avoids the
+numerical blow-up of \code{exp()}. A name that is not a parameter of the model
+is an error, and a link that allows values the default link excludes
+(e.g. "identity" for a positive parameter) is a warning.}
 
 \item{...}{used internally for testing, ignore it}
 }
@@ -61,21 +67,25 @@ Diffusion Decision Model
 \itemize{
 \item \code{main}: cauchy(0,1)
 \item \code{effects}: normal(0,0.5)
+\item \code{sd}: exponential(1)
 }
 \item \code{bound}:
 \itemize{
 \item \code{main}: normal(0,0.5)
 \item \code{effects}: normal(0,0.5)
+\item \code{sd}: exponential(2)
 }
 \item \code{ndt}:
 \itemize{
 \item \code{main}: normal(-1.5,0.5)
 \item \code{effects}: normal(0,0.3)
+\item \code{sd}: exponential(2)
 }
 \item \code{zr}:
 \itemize{
 \item \code{main}: normal(0,0.5)
 \item \code{effects}: normal(0,0.3)
+\item \code{sd}: exponential(2)
 }
 }
 }

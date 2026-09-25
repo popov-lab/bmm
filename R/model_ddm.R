@@ -17,10 +17,10 @@
     mu = 0
   ),
   priors = list(
-    drift = list(main = "cauchy(0,1)", effects = "normal(0,0.5)"),
-    bound = list(main = "normal(0,0.5)", effects = "normal(0,0.5)"),
-    ndt   = list(main = "normal(-1.5,0.5)", effects = "normal(0,0.3)"),
-    zr    = list(main = "normal(0,0.5)", effects = "normal(0,0.3)")
+    drift = list(main = "cauchy(0,1)", effects = "normal(0,0.5)", sd = "exponential(1)"),
+    bound = list(main = "normal(0,0.5)", effects = "normal(0,0.5)", sd = "exponential(2)"),
+    ndt   = list(main = "normal(-1.5,0.5)", effects = "normal(0,0.3)", sd = "exponential(2)"),
+    zr    = list(main = "normal(0,0.5)", effects = "normal(0,0.3)", sd = "exponential(2)")
   ),
   init_ranges = list(
     mu = c(-0.1,0.1),
@@ -53,13 +53,12 @@
       links = .ddm_defaults[["links"]],
       fixed_parameters = .ddm_defaults[["fixed_parameters"]],
       default_priors = .ddm_defaults[["priors"]],
-      init_ranges = .ddm_defaults[["init_ranges"]],
-      void_mu = TRUE
+      init_ranges = .ddm_defaults[["init_ranges"]]
     ),
     class = c("bmmodel", "ddm"),
     call = call
   )
-  out$links[names(links)] <- links
+  out <- set_links(out, links)
   out
 }
 # user facing alias
@@ -71,7 +70,13 @@
 #' @details `r model_info(.model_ddm())`
 #' @param rt Name of the reaction time variable coding reaction time in seconds in the data.
 #' @param response Name of the response variable coding the response numerically (0 = lower response / incorrect, 1 = upper response / correct)
-#' @param links A list of links for the parameters.
+#' @param links A named list of links for the parameters, e.g.
+#'   `links = list(bound = "softplus")`. For positive parameters
+#'   (e.g. `bound`, `ndt`), "softplus" is available as an alternative to the
+#'   default "log" link that grows linearly for large values and avoids the
+#'   numerical blow-up of `exp()`. A name that is not a parameter of the model
+#'   is an error, and a link that allows values the default link excludes
+#'   (e.g. "identity" for a positive parameter) is a warning.
 #' @section Default behavior:
 #' By default, `zr` is fixed at 0. If you want to estimate `zr`, add a formula
 #' for `zr` in your `bmf()` call.
@@ -83,7 +88,7 @@
 #' # Simulate data for one subject using rddm
 #' set.seed(123)
 #' n_trials <- 500
-#' 
+#'
 #' # Simulate DDM data with fixed parameters
 #' sim_data <- rddm(
 #'   n = n_trials,
@@ -92,23 +97,23 @@
 #'   ndt = 0.3,      # non-decision time
 #'   zr = 0.5        # relative starting point
 #' )
-#' 
+#'
 #' # Prepare data frame
 #' dat <- data.frame(
 #'   rt = sim_data$rt,
 #'   response = sim_data$response
 #' )
-#' 
+#'
 #' # Define formula (intercept-only model)
 #' ff <- bmmformula(
 #'   drift ~ 1,
 #'   bound ~ 1,
 #'   ndt ~ 1
 #' )
-#' 
+#'
 #' # Specify the DDM model
 #' model <- ddm(rt = "rt", response = "response")
-#' 
+#'
 #' # Fit the model
 #' fit <- bmm(
 #'   formula = ff,
@@ -118,15 +123,10 @@
 #'   iter = 1000,
 #'   backend = "cmdstanr"
 #' )
-#' 
+#'
 #' # Check parameter recovery
 #' summary(fit)
 ddm <- function(rt, response, links = NULL, ...) {
-  stopif(
-    !requireNamespace("cmdstanr", quietly = TRUE),
-    'The "cmdstanr" package is required for this functionality'
-  )
-
   call <- match.call()
   stop_missing_args()
   .model_ddm(rt = rt, response = response,
@@ -307,4 +307,18 @@ posterior_predict_ddm <- function(i, prep, ...) {
   } else {
     out[["rt"]]
   }
+}
+
+#############################################################################!
+# PP_CHECK OBSERVABLES                                                    ####
+#############################################################################!
+
+#' @export
+pp_observables.ddm <- function(model) {
+  .pp_spec_rt_response()
+}
+
+#' @export
+pp_simulate.ddm <- function(model, prep) {
+  .pp_simulate_joint(prep, rddm, c("drift", "bound", "ndt", "zr"))
 }

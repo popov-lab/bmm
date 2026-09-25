@@ -85,14 +85,32 @@ test_that("try_read_bmmfit works", {
   file <- tempfile()
   mock_fit$file <- paste0(file, ".rds")
   saveRDS(mock_fit, paste0(file, ".rds"))
-  expect_equal(try_read_bmmfit(file, FALSE), mock_fit,
+  expect_equal(try_read_bmmfit(paste0(file, ".rds")), mock_fit,
     ignore_function_env = TRUE,
     ignore_formula_env = TRUE
   )
 
   x <- 1
   saveRDS(x, paste0(file, ".rds"))
-  expect_error(try_read_bmmfit(file, FALSE), "not of class 'bmmfit'")
+  expect_error(try_read_bmmfit(paste0(file, ".rds")), "not of class 'bmmfit'")
+})
+
+test_that("validate_file_refit normalizes the user-facing values", {
+  expect_equal(validate_file_refit(FALSE), "never")
+  expect_equal(validate_file_refit(TRUE), "always")
+  expect_equal(validate_file_refit("never"), "never")
+  expect_equal(validate_file_refit("Always"), "always")
+  expect_equal(validate_file_refit("On_Change"), "on_change")
+  expect_error(validate_file_refit("sometimes"), "invalid option")
+  expect_error(validate_file_refit(1), "invalid option")
+
+  # a logical that is not a single TRUE/FALSE must error rather than degrade to
+  # "never", which would silently return a stale fit
+  expect_error(validate_file_refit(NA), "invalid option")
+  expect_error(validate_file_refit(c(TRUE, TRUE)), "invalid option")
+  expect_error(validate_file_refit(logical(0)), "invalid option")
+  expect_error(validate_file_refit(NA_character_), "invalid option")
+  expect_error(validate_file_refit(character(0)), "invalid option")
 })
 
 test_that("try_save_bmmfit works", {
@@ -118,6 +136,197 @@ test_that("try_save_bmmfit works", {
     file = file, file_refit = TRUE
   )
   expect_error(expect_equal(mock_fit, mock_fit3))
+
+  # a mixed-case "always" must refit too, not silently read the cache
+  mock_fit4 <- bmm(bmf(c ~ 1, kappa ~ 1), oberauer_lin_2017, sdm("dev_rad"),
+    backend = "mock", mock_fit = 4, rename = F,
+    file = file, file_refit = "Always"
+  )
+  expect_equal(mock_fit4$fit, 4)
+})
+
+# `mock_fit` doubles as the identity of the fit: the cached object carries the
+# value it was fitted with, so a returned fit whose $fit differs from the value
+# passed to the current call is the cached one
+test_that('file_refit = "on_change" returns the cached fit while nothing changes', {
+  withr::local_options(bmm.sort_data = FALSE)
+  file <- tempfile()
+  cached <- bmm(bmf(c ~ 1, kappa ~ 1), oberauer_lin_2017, sdm("dev_rad"),
+    backend = "mock", mock_fit = 1, rename = F,
+    file = file, file_refit = "on_change"
+  )
+  expect_equal(cached$fit, 1)
+
+  same <- bmm(bmf(c ~ 1, kappa ~ 1), oberauer_lin_2017, sdm("dev_rad"),
+    backend = "mock", mock_fit = 2, rename = F,
+    file = file, file_refit = "on_change"
+  )
+  expect_equal(same$fit, 1)
+  expect_equal(same$file, paste0(file, ".rds"))
+})
+
+test_that('file_refit = "on_change" refits when the model changes', {
+  withr::local_options(bmm.sort_data = FALSE)
+  fit_cache <- function(formula, data, ..., file, mock_fit) {
+    bmm(formula, data, sdm("dev_rad"),
+      backend = "mock", mock_fit = mock_fit, rename = F,
+      file = file, file_refit = "on_change", ...
+    )
+  }
+  data <- oberauer_lin_2017
+  ff <- bmf(c ~ 1, kappa ~ 1)
+
+  file <- tempfile()
+  fit_cache(ff, data, file = file, mock_fit = 1)
+  expect_equal(
+    fit_cache(bmf(c ~ 0 + set_size, kappa ~ 1), data, file = file, mock_fit = 2)$fit,
+    2
+  )
+
+  # a row subset leaves the Stan code untouched and is seen through sdata alone
+  file <- tempfile()
+  fit_cache(ff, data, file = file, mock_fit = 1)
+  expect_equal(fit_cache(ff, data[1:100, ], file = file, mock_fit = 3)$fit, 3)
+
+  # a prior change is the mirror case: identical sdata, different Stan code
+  file <- tempfile()
+  fit_cache(ff, data, file = file, mock_fit = 1)
+  expect_equal(
+    fit_cache(ff, data,
+      file = file, mock_fit = 4,
+      prior = brms::set_prior("normal(0, 0.1)", class = "Intercept", dpar = "kappa")
+    )$fit,
+    4
+  )
+
+  # renaming factor levels changes neither the Stan code nor the Stan data, so
+  # only the data handed to brms::brmsfit_needs_refit() can catch it
+  data$set_size <- factor(data$set_size)
+  renamed <- data
+  levels(renamed$set_size) <- paste0("ss", levels(renamed$set_size))
+  ff_ss <- bmf(c ~ 0 + set_size, kappa ~ 1)
+  file <- tempfile()
+  fit_cache(ff_ss, data, file = file, mock_fit = 1)
+  expect_equal(fit_cache(ff_ss, renamed, file = file, mock_fit = 5)$fit, 5)
+
+  file <- tempfile()
+  fit_cache(ff, data, file = file, mock_fit = 1)
+  expect_equal(
+    fit_cache(ff, data, file = file, mock_fit = 6, algorithm = "meanfield")$fit,
+    6
+  )
+
+  # threading is the bmm-specific hazard brms does not have: a loop = FALSE
+  # likelihood chunk is configured for the threading spec, so a cache hit across
+  # a change of `threads` would return a fit whose likelihood is sliced
+  # differently from the one the current call would compile
+  file <- tempfile()
+  fit_cache(ff, data, file = file, mock_fit = 1)
+  expect_equal(fit_cache(ff, data, file = file, mock_fit = 7, threads = 2)$fit, 7)
+
+  file <- tempfile()
+  fit_cache(ff, data, file = file, mock_fit = 1, threads = 2)
+  expect_equal(fit_cache(ff, data, file = file, mock_fit = 8)$fit, 8)
+})
+
+test_that('file_refit = "on_change" falls back when the cached fit has no algorithm', {
+  withr::local_options(bmm.sort_data = FALSE)
+  fit_cache <- function(mock_fit) {
+    bmm(bmf(c ~ 1, kappa ~ 1), oberauer_lin_2017, sdm("dev_rad"),
+      backend = "mock", mock_fit = mock_fit, rename = F,
+      file = file, file_refit = "on_change"
+    )
+  }
+  file <- tempfile()
+  cached <- fit_cache(1)
+
+  # brms compares the algorithm under a bare stopifnot(!is.null(fit$algorithm)),
+  # so without the guard this errors instead of using the other three channels
+  cached$algorithm <- NULL
+  saveRDS(cached, paste0(file, ".rds"))
+  expect_equal(fit_cache(2)$fit, 1)
+})
+
+test_that('file_refit = "on_change" refits a cached fit that cannot be restructured', {
+  withr::local_options(bmm.sort_data = FALSE)
+  fit_cache <- function(mock_fit) {
+    bmm(bmf(c ~ 1, kappa ~ 1), oberauer_lin_2017, sdm("dev_rad"),
+      backend = "mock", mock_fit = mock_fit, rename = F,
+      file = file, file_refit = "on_change"
+    )
+  }
+  file <- tempfile()
+  cached <- fit_cache(1)
+
+  # a pre-0.3.0 fit whose family carries no environment is what restructure()
+  # gives up on; "on_change" must do the refit it asks for rather than abort
+  cached$version$bmm_restructure <- NULL
+  cached$version$bmm <- as.package_version("0.2.1")
+  cached$family$env <- NULL
+  saveRDS(cached, paste0(file, ".rds"))
+  expect_error(restructure(readRDS(paste0(file, ".rds"))), "Unable to restructure")
+  expect_equal(fit_cache(2)$fit, 2)
+})
+
+test_that('file_refit = "on_change" rejects a cached file that is not a bmmfit', {
+  withr::local_options(bmm.sort_data = FALSE)
+  file <- tempfile()
+  saveRDS(1, paste0(file, ".rds"))
+  expect_error(
+    bmm(bmf(c ~ 1, kappa ~ 1), oberauer_lin_2017, sdm("dev_rad"),
+      backend = "mock", mock_fit = 1, rename = F,
+      file = file, file_refit = "on_change"
+    ),
+    "not of class 'bmmfit'"
+  )
+})
+
+test_that('file_refit = "on_change" reports why it refits at silent = 0', {
+  withr::local_options(bmm.sort_data = FALSE)
+  file <- tempfile()
+  suppressMessages(bmm(bmf(c ~ 1, kappa ~ 1), oberauer_lin_2017, sdm("dev_rad"),
+    backend = "mock", mock_fit = 1, rename = F,
+    file = file, file_refit = "on_change"
+  ))
+  expect_message(
+    bmm(bmf(c ~ 1, kappa ~ 1), oberauer_lin_2017, sdm("dev_rad"),
+      backend = "mock", mock_fit = 2, rename = F, silent = 0,
+      file = file, file_refit = "on_change",
+      prior = brms::set_prior("normal(0, 0.1)", class = "Intercept", dpar = "kappa")
+    ),
+    "Stan code has changed"
+  )
+})
+
+test_that('bmm_options() accepts and applies file_refit = "on_change"', {
+  withr::local_options(bmm.sort_data = FALSE)
+  old_op <- suppressMessages(bmm_options(file_refit = "on_change"))
+  withr::defer(options(old_op))
+  expect_equal(getOption("bmm.file_refit"), "on_change")
+  expect_error(suppressMessages(bmm_options(file_refit = "sometimes")), "invalid option")
+
+  file <- tempfile()
+  bmm(bmf(c ~ 1, kappa ~ 1), oberauer_lin_2017, sdm("dev_rad"),
+    backend = "mock", mock_fit = 1, rename = F, file = file
+  )
+  same <- bmm(bmf(c ~ 1, kappa ~ 1), oberauer_lin_2017, sdm("dev_rad"),
+    backend = "mock", mock_fit = 2, rename = F, file = file
+  )
+  expect_equal(same$fit, 1)
+  changed <- bmm(bmf(c ~ 0 + set_size, kappa ~ 1), oberauer_lin_2017, sdm("dev_rad"),
+    backend = "mock", mock_fit = 3, rename = F, file = file
+  )
+  expect_equal(changed$fit, 3)
+
+  # bmm_options() stores the value as given rather than the normalized string,
+  # so the logical forms have to survive the round trip through bmm() as well
+  logical_op <- suppressMessages(bmm_options(file_refit = TRUE))
+  withr::defer(options(logical_op))
+  expect_true(getOption("bmm.file_refit"))
+  refit <- bmm(bmf(c ~ 1, kappa ~ 1), oberauer_lin_2017, sdm("dev_rad"),
+    backend = "mock", mock_fit = 4, rename = F, file = file
+  )
+  expect_equal(refit$fit, 4)
 })
 
 test_that("is_namedlist works", {
@@ -267,9 +476,62 @@ test_that("softmax and softmaxinv work with example from documentation", {
   expect_equal(recovered, 5:7, tolerance = 1e-10)
 })
 
-test_that("uses_threading detects threading requests", {
-  expect_false(bmm:::uses_threading(NULL))
-  expect_false(bmm:::uses_threading(brms::threading(NULL)))
-  expect_true(bmm:::uses_threading(brms::threading(2)))
-  expect_true(bmm:::uses_threading(2))
+test_that("configure_control() adds the starting step size under the user's control list", {
+  withr::local_options(bmm.step_size = 0.1)
+  expect_equal(configure_control(NULL, "cmdstanr"), list(step_size = 0.1))
+  expect_equal(
+    configure_control(list(adapt_delta = 0.95), "cmdstanr"),
+    list(adapt_delta = 0.95, step_size = 0.1)
+  )
+  # the user's own value wins under either spelling, renamed to the backend's
+  expect_equal(configure_control(list(step_size = 0.5), "cmdstanr"), list(step_size = 0.5))
+  expect_equal(configure_control(list(stepsize = 0.5), "cmdstanr"), list(step_size = 0.5))
+  # rstan spells the argument without the underscore
+  expect_equal(configure_control(NULL, "rstan"), list(stepsize = 0.1))
+  expect_equal(configure_control(list(stepsize = 0.5), "rstan"), list(stepsize = 0.5))
+  expect_equal(
+    configure_control(list(adapt_delta = 0.9, step_size = 0.5), "rstan"),
+    list(adapt_delta = 0.9, stepsize = 0.5)
+  )
+  # both spellings in one list would become two identical keys; the first wins
+  expect_equal(
+    configure_control(list(step_size = 0.5, stepsize = 0.2), "rstan"),
+    list(stepsize = 0.5)
+  )
+  # only the sampler has a step size
+  for (algorithm in c("meanfield", "fullrank", "pathfinder", "laplace", "fixed_param")) {
+    expect_null(configure_control(NULL, "cmdstanr", algorithm), label = algorithm)
+  }
+  expect_equal(configure_control(list(adapt_delta = 0.9), "cmdstanr", "meanfield"), list(adapt_delta = 0.9))
+
+  withr::local_options(bmm.step_size = 0.02)
+  expect_equal(configure_control(NULL, "cmdstanr"), list(step_size = 0.02))
+
+  withr::local_options(bmm.step_size = FALSE)
+  expect_null(configure_control(NULL, "cmdstanr"))
+  expect_equal(configure_control(list(adapt_delta = 0.95), "cmdstanr"), list(adapt_delta = 0.95))
+})
+
+test_that("fit_frame_args() keeps the fit's frame arguments unless the call replaces them", {
+  data <- structure(data.frame(y = 1), knots = list(x = 1:3))
+  fit <- list(data = data, data2 = list(A = 1))
+  expect_equal(fit_frame_args(fit), list(data2 = list(A = 1), knots = list(x = 1:3), drop_unused_levels = TRUE))
+  replaced <- fit_frame_args(fit, list(data2 = list(A = 2), drop_unused_levels = FALSE, iter = 10))
+  expect_equal(replaced, list(data2 = list(A = 2), knots = list(x = 1:3), drop_unused_levels = FALSE))
+})
+
+test_that("bmm_options(step_size = ) validates and applies the option", {
+  withr::defer(suppressMessages(bmm_options(reset_options = TRUE)))
+  expect_error(bmm_options(step_size = -1), "step_size")
+  expect_error(bmm_options(step_size = "a"), "step_size")
+  expect_error(bmm_options(step_size = c(0.1, 0.2)), "step_size")
+  expect_error(bmm_options(step_size = Inf), "step_size")
+  # NA raises R's own error in the condition, which ends the block, so it goes last
+  expect_error(bmm_options(step_size = NA_real_), "step_size")
+  expect_message(bmm_options(step_size = 0.3), "step_size = 0.3")
+  expect_equal(getOption("bmm.step_size"), 0.3)
+  suppressMessages(bmm_options(step_size = FALSE))
+  expect_false(getOption("bmm.step_size"))
+  suppressMessages(bmm_options(reset_options = TRUE))
+  expect_equal(getOption("bmm.step_size"), 0.01)
 })

@@ -86,6 +86,52 @@ configure_options <- function(opts, env = parent.frame()) {
   opts[not_in(names(opts), exclude_args)]
 }
 
+# Stan starts its step-size search at 1; the hierarchical models bmm fits adapt
+# to step sizes near 0.01 or below, and the oversized trial steps of that search
+# saturate the correlation transform and overflow exp(kappa), printing the
+# exceptions users read as failures. Starting lower removes those steps without
+# changing where adaptation ends. cmdstanr spells the argument step_size, rstan
+# stepsize; a user value under either spelling wins and is renamed to the
+# backend's. Only the sampler has a step size, and brms hands cmdstanr's
+# variational(), pathfinder() and laplace() the whole control list, which they
+# reject when it names an argument they lack
+configure_control <- function(control, backend, algorithm = "sampling") {
+  if (!identical(algorithm, "sampling")) {
+    return(control)
+  }
+  key <- if (identical(backend, "rstan")) "stepsize" else "step_size"
+  is_user_step <- names(control) %in% c("step_size", "stepsize")
+  if (any(is_user_step)) {
+    names(control)[is_user_step] <- key
+    return(control[!duplicated(names(control))])
+  }
+  step_size <- getOption("bmm.step_size", 0.01)
+  if (isFALSE(step_size)) {
+    return(control)
+  }
+  c(control, stats::setNames(list(step_size), key))
+}
+
+# The arguments of brm() besides formula, data and prior that shape the model
+# frame. Without them, asking brms about the model before the fit (its default
+# priors, its Stan code) fails or describes a different model
+brms_frame_args <- function(args) {
+  args[intersect(names(args), c("data2", "knots", "drop_unused_levels"))]
+}
+
+# brms::update.brmsfit() keeps the fit's own frame arguments unless the call
+# replaces them
+fit_frame_args <- function(fit, dots = list()) {
+  args <- list(
+    data2 = fit$data2,
+    knots = attr(fit$data, "knots", exact = TRUE),
+    drop_unused_levels = attr(fit$data, "drop_unused_levels", exact = TRUE) %||% TRUE
+  )
+  replaced <- brms_frame_args(dots)
+  args[names(replaced)] <- replaced
+  args
+}
+
 # check if a value is not in a vector
 not_in <- function(value, vector) {
   !(value %in% vector)
@@ -112,17 +158,48 @@ glue_lf <- function(..., env.frame = -1) {
   brms::lf(stats::as.formula(glue(..., .envir = sys.frame(env.frame))))
 }
 
-# function to ensure that if the user wants to overwrite an argument (such as
-# init), they can. args$prior is NULL by default or is a user-provided prior
-# any argument in args$dots is potentially overwrite a default argument in config_args
+# args$prior is NULL by default or is the combined default and user-provided
+# prior; args$dots holds whatever the user passed to bmm() and so overwrites the
+# configured default for any argument (such as init) they named themselves
 combine_args <- function(args) {
   config_args <- args$config_args
   dots <- args$dots
   stopif("family" %in% names(dots), "Unsupported argument 'family'. Use the model argument instead.")
   config_args$prior <- args$prior %||% config_args$prior
-  config_args$init <- args$init %||% config_args$init
   config_args[names(dots)] <- dots
   c(config_args, args$opts)
+}
+
+local_brms_threads <- function(dots) {
+  # brms reads an explicit threads = NULL as "threading off", so it has to
+  # override a global brms.threads here too, the way update.bmmfit() does it.
+  # Testing only for a non-NULL value left the option standing while brms
+  # generated serial code ("Identifier 'start' not in scope")
+  if ("threads" %in% names(dots)) {
+    threads <- dots$threads %||% brms::threading(NULL)
+    if (is.numeric(threads)) {
+      threads <- brms::threading(threads)
+    }
+    withr::local_options(
+      brms.threads = threads,
+      .local_envir = parent.frame()
+    )
+  }
+  invisible(NULL)
+}
+
+# brms slices the response per thread but pastes a custom family's `vars` in
+# unsliced, and it emits sliced Stan code only when it will really thread:
+# threading(force = TRUE) compiles with threads but keeps the serial likelihood.
+# A model that slices its own likelihood chunk or `vars` therefore has to apply
+# the same test brms does in use_threading(threads, force = FALSE)
+brms_slices_likelihood <- function() {
+  threads <- getOption("brms.threads", NULL)
+  # brms also accepts a bare number for this option
+  if (is.numeric(threads)) {
+    threads <- brms::threading(threads)
+  }
+  is.list(threads) && isTRUE(threads$threads > 0) && !isTRUE(threads$force)
 }
 
 ############################
@@ -200,7 +277,7 @@ install_and_load_bmm_version <- function(version, path) {
   if (!dir.exists(path) || length(list.files(path)) == 0 ||
     length(list.files(file.path(path, "bmm"))) == 0) {
     dir.create(path)
-    remotes::install_github(paste0("venpopov/bmm@", version), lib = path)
+    remotes::install_github(paste0("popov-lab/bmm@", version), lib = path)
   }
   library(bmm, lib.loc = path)
 }
@@ -292,10 +369,7 @@ stop_quietly <- function() {
 # ordered by the predictors, and if not, it suggests to the user to sort the data
 order_data_query <- function(model, data, formula) {
   sort_data <- getOption("bmm.sort_data", "check")
-  dpars <- names(formula)
-  predictors <- rhs_vars(formula)
-  predictors <- predictors[not_in(predictors, dpars)]
-  predictors <- predictors[predictors %in% colnames(data)]
+  predictors <- data_predictor_vars(data, formula)
 
   if (length(predictors) == 0) {
     return(data)
@@ -371,6 +445,13 @@ order_data_query <- function(model, data, formula) {
     message(caution_msg)
   }
   data
+}
+
+data_predictor_vars <- function(data, formula) {
+  dpars <- names(formula)
+  predictors <- rhs_vars(formula)
+  predictors <- predictors[not_in(predictors, dpars)]
+  predictors[predictors %in% colnames(data)]
 }
 
 # when called from another function, it will return a vector of arguments that are
@@ -467,8 +548,21 @@ identical.formula <- function(x, y, ...) {
 #'  printed in color. **Default: TRUE**
 #' @param reset_options logical. If TRUE, the options will be reset to their
 #'   default values **Default: FALSE**
-#' @param file_refit logical. If TRUE, bmm() will refit the model even if the
-#'  file argument is specified. **Default: FALSE**
+#' @param file_refit logical or character. Controls when `bmm()` re-uses a fit
+#'  saved via its `file` argument. `TRUE` or "always" always refits, `FALSE` or
+#'  "never" always re-uses the saved fit, and "on_change" re-uses it only while
+#'  the Stan code and data are unchanged. See [bmm()] for details. **Default:
+#'  FALSE**
+#' @param step_size numeric or `FALSE`. The step size at which `bmm()` and
+#'  `update()` start Stan's step-size search, passed as
+#'  `control = list(step_size = )` (`stepsize` for the rstan backend). Stan's
+#'  own starting value of 1 is far above the step sizes the hierarchical
+#'  models in bmm adapt to, and the oversized trial steps of the search print
+#'  `lkj_corr_cholesky_lpdf` and `von_mises_lpdf` exceptions at the start of
+#'  warmup. The adapted step size and the posterior do not depend on the
+#'  starting value. `FALSE` leaves the starting step size to Stan; a
+#'  `step_size` (or `stepsize`) in the `control` list of `bmm()` always wins.
+#'  **Default: 0.01**
 #' @details The `bmm_options` function is used to view or change the current bmm
 #'   options. If no arguments are provided, the function will return the current
 #'   options. If arguments are provided, the function will change the options
@@ -507,8 +601,14 @@ identical.formula <- function(x, y, ...) {
 #' bmm_options(reset_options = TRUE)
 #' @export
 bmm_options <- function(sort_data, parallel, default_priors, silent,
-                        color_summary, file_refit, reset_options = FALSE) {
+                        color_summary, file_refit, step_size, reset_options = FALSE) {
   opts <- ls()
+  stopif(
+    !missing(step_size) && !isFALSE(step_size) &&
+      !(is.numeric(step_size) && length(step_size) == 1 && is.finite(step_size) && step_size > 0),
+    "step_size must be a single positive number, or FALSE to leave the starting \\
+    step size to Stan"
+  )
   stopif(
     !missing(sort_data) && sort_data != "check" && !is.logical(sort_data),
     "sort_data must be one of TRUE, FALSE, or 'check'"
@@ -529,10 +629,9 @@ bmm_options <- function(sort_data, parallel, default_priors, silent,
     !missing(color_summary) && !is.logical(color_summary),
     "color_summary must be either TRUE or FALSE"
   )
-  stopif(
-    !missing(file_refit) && !is.logical(file_refit),
-    "file_refit must be either TRUE or FALSE"
-  )
+  if (!missing(file_refit)) {
+    validate_file_refit(file_refit)
+  }
 
   # set default options if function is called for the first time or if reset_options is TRUE
   if (reset_options) {
@@ -542,7 +641,8 @@ bmm_options <- function(sort_data, parallel, default_priors, silent,
       bmm.default_priors = TRUE,
       bmm.silent = 1,
       bmm.color_summary = TRUE,
-      bmm.file_refit = FALSE
+      bmm.file_refit = FALSE,
+      bmm.step_size = 0.01
     )
   }
 
@@ -563,6 +663,7 @@ bmm_options <- function(sort_data, parallel, default_priors, silent,
       "\n  default_priors = ", getOption("bmm.default_priors"),
       "\n  silent = ", getOption("bmm.silent"),
       "\n  file_refit = ", getOption("bmm.file_refit"),
+      "\n  step_size = ", getOption("bmm.step_size"),
       "\n  color_summary = ", getOption("bmm.color_summary"), "\n"
     )),
     "For more information on these options or how to change them, see help(bmm_options).\n"
@@ -678,7 +779,7 @@ deprecated_args <- function(...) {
     'The "model_type" argument was deprecated on Feb 3, 2024. Either:
          - See ?bmm for the new usage;
          - or install the old version of the package with:
-           devtools::install_github("venpopov/bmm@v0.0.1")'
+           devtools::install_github("popov-lab/bmm@v0.0.1")'
   )
   warnif(
     "parallel" %in% names(dots),
@@ -687,25 +788,27 @@ deprecated_args <- function(...) {
   )
 }
 
-try_read_bmmfit <- function(file, file_refit) {
-  if (is.character(file_refit)) {
-    stopif(
-      !tolower(file_refit) %in% c("never", "always", "on_change"),
-      'You have provided an invalid option for the file_refit argument.
-      Valid options are: "never" or "always"
-      The "on_change" option available in brms is not yet implemented'
-    )
-
-    warnif(
-      tolower(file_refit) == "on_change",
-      'The "on_change" option for the file_refit argument available in brms,
-      is currently not implemented for bmm.
-      To avoid overwriting an already saved bmmfit object, file_refit was set to "never".'
-    )
-    file_refit <- ifelse(file_refit == "always", TRUE, FALSE)
+# normalize the user-facing file_refit values to the three strings the rest of
+# the package branches on. Called from the exported surfaces bmm() and
+# bmm_options()
+validate_file_refit <- function(file_refit) {
+  # only a scalar non-NA logical is the TRUE/FALSE shorthand; NA, logical(0) and
+  # multi-element logicals fall through to the character branch, where tolower()
+  # keeps them out of the valid set and stopif() reports them
+  if (is.logical(file_refit) && length(file_refit) == 1L && !is.na(file_refit)) {
+    return(if (file_refit) "always" else "never")
   }
-  file <- check_rds_file(file)
-  if (is.null(file) || file_refit) {
+  file_refit <- tolower(file_refit)
+  stopif(
+    !isTRUE(file_refit %in% c("never", "always", "on_change")),
+    'You have provided an invalid option for the file_refit argument.
+    Valid options are: TRUE, FALSE, "never", "always" or "on_change"'
+  )
+  file_refit
+}
+
+try_read_bmmfit <- function(file) {
+  if (is.null(file)) {
     return(NULL)
   }
   dir <- try(fs::dir_create(dirname(file)))
@@ -719,6 +822,31 @@ try_read_bmmfit <- function(file, file_refit) {
   stopif(!is_bmmfit(out), "Object loaded via 'file' is not of class 'bmmfit'.")
   out$file <- file
   out
+}
+
+# the cached fit is compared against the Stan code and data that the current
+# call would compile, which is why this can only run once fit_args exist. The
+# `object`/`formula` swap is the same one standata.bmmformula() uses to turn
+# bmm's fit_args into a brms call
+bmmfit_needs_refit <- function(fit, fit_args, silent) {
+  fit_args$object <- fit_args$formula
+  fit_args$formula <- NULL
+  brms::brmsfit_needs_refit(
+    fit,
+    sdata = brms::do_call(brms::standata, fit_args),
+    scode = brms::do_call(brms::stancode, fit_args),
+    data = fit_args$data,
+    # a NULL algorithm skips the channel; brms compares it against the cached
+    # fit's own field under a bare stopifnot(), so a fit saved without one would
+    # otherwise abort with a raw error instead of falling back to the other
+    # three channels
+    algorithm = if (is.null(fit$algorithm)) {
+      NULL
+    } else {
+      fit_args$algorithm %||% getOption("brms.algorithm", "sampling")
+    },
+    silent = silent
+  )
 }
 
 try_save_bmmfit <- function(object, file, compress) {

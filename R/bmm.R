@@ -45,13 +45,33 @@
 #' @param file_compress Logical or a character string, specifying one of the
 #'   compression algorithms supported by [saveRDS] when saving
 #'   the fitted model object.
-#' @param file_refit Logical or character string. Modifies when the fit stored via the `file` argument is
-#'   re-used. Can be set globally for the current R session via the
-#'   `"bmm.file_refit"` option (see [options]). If `TRUE` or "always", the
-#'   model is fitted again. If `FALSE` or "never" (the default), the model saved under the name specified in `file`
-#'   will be re-used. Note that unlike in `brms`, there is no "on_change" option
+#' @param file_refit Logical or character string. Modifies when the fit stored
+#'   via the `file` argument is re-used. Can be set globally for the current R
+#'   session via the `"bmm.file_refit"` option (see [options]). If `TRUE` or
+#'   "always", the model is fitted again. If `FALSE` or "never" (the default),
+#'   the model saved under the name specified in `file` will be re-used. If
+#'   "on_change", the saved model is re-used only if the Stan code, the Stan
+#'   data, the factor levels of the model variables and the algorithm are
+#'   unchanged; otherwise the model is fitted again. Because that comparison
+#'   needs the Stan code and data of the current call, "on_change" runs the
+#'   full bmm configuration pipeline, [standata()][standata.bmmformula()] and
+#'   [stancode()][stancode.bmmformula()] even when the cached fit is returned:
+#'   about 0.4 s rather than 0.02 s for an **sdm** model of `oberauer_lin_2017`,
+#'   much cheaper than compiling and sampling, but not free. Only the four
+#'   things listed above are compared, so sampler settings do **not** force a
+#'   refit -- in particular `control = list(adapt_delta = )`, `iter`, `warmup`,
+#'   `chains`, `seed`, `init` and `save_pars`. Raising `adapt_delta` after
+#'   divergent transitions, or rerunning with `save_pars(all = TRUE)` for
+#'   `loo()`, therefore returns the cached fit unchanged; delete the file or
+#'   pass `file_refit = "always"` for those. Because the row order of the data
+#'   reaches the Stan data, `"on_change"` is most predictable with
+#'   `sort_data` fixed to `TRUE` or `FALSE` (globally via
+#'   `options(bmm.sort_data = )`): under the default `"check"`, answering the
+#'   interactive prompt differently than last time forces a refit.
 #' @param ... Further arguments passed to [brms::brm()] or Stan. See the
-#'   description of [brms::brm()] for more details
+#'   description of [brms::brm()] for more details. Unless `control` names a
+#'   `step_size` (`stepsize` for the rstan backend), bmm adds the starting step
+#'   size set in [bmm_options()] to it; the other entries of `control` are kept.
 #'
 #' @details # Supported Models
 #'
@@ -109,11 +129,19 @@ bmm <- function(formula, data, model,
                 file_refit = getOption("bmm.file_refit", FALSE), ...) {
   deprecated_args(...)
   dots <- list(...)
+  local_brms_threads(dots)
+  file <- check_rds_file(file)
+  file_refit <- validate_file_refit(file_refit)
 
-  # check if the model has been previously fit and return it if requested
-  x <- try_read_bmmfit(file, file_refit)
-  if (!is.null(x)) {
-    return(x)
+  # check if the model has been previously fit and return it if requested.
+  # "on_change" cannot be answered here -- it needs the Stan code and data that
+  # only exist further down -- so it is checked where brms checks it, after
+  # code and data generation and before compilation
+  if (file_refit == "never") {
+    x <- try_read_bmmfit(file)
+    if (!is.null(x)) {
+      return(x)
+    }
   }
 
   # set temporary global options and return modified arguments for brms
@@ -141,13 +169,34 @@ bmm <- function(formula, data, model,
   config_args <- configure_model(model, data, formula)
 
   # configure the default prior and combine with user-specified prior
-  prior <- configure_prior(model, data, config_args$formula, prior)
+  frame_args <- brms_frame_args(dots)
+  prior <- brms::do_call(configure_prior, c(list(model, data, config_args$formula, prior), frame_args))
 
-  # configure initial values if necessary
-  config_args$init <- create_initfun(model, data, config_args$formula)
+  # configure initial values; the prior decides which parameters exist
+  config_args$init <- brms::do_call(
+    create_initfun, c(list(model, data, config_args$formula, prior), frame_args)
+  )
 
   # estimate the model
   fit_args <- combine_args(nlist(config_args, opts, dots, prior))
+  fit_args$control <- configure_control(
+    fit_args$control,
+    opts$backend %||% getOption("brms.backend", "rstan"),
+    fit_args$algorithm %||% getOption("brms.algorithm", "sampling")
+  )
+
+  if (file_refit == "on_change") {
+    x <- try_read_bmmfit(file)
+    if (!is.null(x)) {
+      # a cached fit too old for restructure() to bring forward is precisely one
+      # "on_change" should replace, so its error refits rather than aborting
+      x <- try(restructure(x), silent = TRUE)
+      if (!is_try_error(x) && !bmmfit_needs_refit(x, fit_args, silent)) {
+        return(x)
+      }
+    }
+  }
+
   fit <- brms::do_call(brms::brm, fit_args)
 
   # model post-processing

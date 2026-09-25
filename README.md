@@ -9,8 +9,8 @@
 status](https://www.r-pkg.org/badges/version/bmm)](https://CRAN.R-project.org/package=bmm)
 [![bmm status
 badge](https://popov-lab.r-universe.dev/badges/bmm)](https://popov-lab.r-universe.dev/bmm)
-[![R-CMD-check](https://github.com/venpopov/bmm/actions/workflows/R-CMD-check.yaml/badge.svg)](https://github.com/venpopov/bmm/actions/workflows/R-CMD-check.yaml)
-[![test-coverage](https://github.com/venpopov/bmm/actions/workflows/test-coverage.yaml/badge.svg)](https://github.com/venpopov/bmm/actions/workflows/test-coverage.yaml)
+[![R-CMD-check](https://github.com/popov-lab/bmm/actions/workflows/R-CMD-check.yaml/badge.svg)](https://github.com/popov-lab/bmm/actions/workflows/R-CMD-check.yaml)
+[![test-coverage](https://github.com/popov-lab/bmm/actions/workflows/test-coverage.yaml/badge.svg)](https://github.com/popov-lab/bmm/actions/workflows/test-coverage.yaml)
 [![downloads](https://cranlogs.r-pkg.org/badges/bmm)](https://cran.r-project.org/package=bmm)
 [![Dependencies](https://img.shields.io/badge/dependencies-9/16-orange?style=flat)](#)
 <!-- badges: end -->
@@ -63,9 +63,7 @@ install the dependencies. If you are already using `brms`, you can skip
 this step.
 
 <details>
-
 <summary>
-
 <b> Install dependencies</b>
 </summary>
 
@@ -86,9 +84,7 @@ this step.
 package or a specific version of the package from GitHub:
 
 <details>
-
 <summary>
-
 <b>Install the latest development version of bmm</b>
 </summary>
 
@@ -98,15 +94,18 @@ package or a specific version of the package from GitHub:
 if (!requireNamespace("remotes")) {
   install.packages("remotes")
 }
-remotes::install_github("venpopov/bmm")
+remotes::install_github("popov-lab/bmm", upgrade = "never")
 ```
 
+`upgrade = "never"` keeps `remotes` from updating the packages `bmm`
+depends on. Updating `Rcpp`, `StanHeaders` or `RcppParallel` underneath
+an installed `rstan` can leave `rstan` unable to load, in particular on
+Windows, and `brms` needs `rstan` to store the results of every fit,
+also with the `cmdstanr` backend.
+
 </details>
-
 <details>
-
 <summary>
-
 <b>Install the 0.0.1 version of bmm (if following version 6 of the
 tutorial paper on OSF)</b>
 </summary>
@@ -122,7 +121,7 @@ the 0.0.1 version of the bmm package with:
 if (!requireNamespace("remotes")) {
   install.packages("remotes")
 }
-remotes::install_github("venpopov/bmm@v0.0.1")
+remotes::install_github("popov-lab/bmm@v0.0.1", upgrade = "never")
 ```
 
 </details>
@@ -159,7 +158,7 @@ fact, we are already working on implementing additional models, such as:
 If you have suggestions for models that should be added to the package
 or additional functionality that would improve the usability of the
 pacakge, feel free to create an
-[issue](https://github.com/venpopov/bmm/issues). Ideally this should
+[issue](https://github.com/popov-lab/bmm/issues). Ideally this should
 describe the model, point towards literature that gives details on the
 model, and if possible link to code that has already implemented the
 model.
@@ -330,7 +329,7 @@ Should be interested in contributing a model to the `bmm` package, you
 should first look into the [Developer
 Notes](https://venpopov.com/bmm/dev/dev-notes/index.html) as well as the
 [Contributor
-Guidelines](https://github.com/venpopov/bmm/blob/develop/.github/CONTRIBUTING.md).
+Guidelines](https://github.com/popov-lab/bmm/blob/develop/.github/CONTRIBUTING.md).
 These give a more in depth description of the package architecture, the
 steps necessary to add your own model to the package, and how
 contributions will be acknowledged.
