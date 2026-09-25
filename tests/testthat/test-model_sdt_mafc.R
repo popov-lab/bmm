@@ -337,3 +337,80 @@ test_that("sdt_mafc default_prior returns a valid prior object", {
   prior <- default_prior(bmf(d ~ 1), data = dat, model = model)
   expect_s3_class(prior, "brmsprior")
 })
+
+
+############################################################################# !
+# R <-> STAN QUADRATURE AND BRANCH CONTRACT                              ####
+############################################################################# !
+
+test_that("the Stan quadrature tables are the R tables, digit for digit", {
+  # .mafc_pc_r and mafc_pc() integrate with the same nodes and weights, but the
+  # 208 numbers are typed out twice. Nothing else in the suite reads the Stan
+  # chunk, so corrupting one digit of a weight would leave every test green
+  # while shifting every normal-noise and logistic m-AFC likelihood. Text-level,
+  # as in test-model_cswald.R, so it costs no compilation.
+  sc_path <- system.file("stan_chunks", package = "bmm")
+  tdata <- read_lines2(file.path(sc_path, "sdt_mafc_tdata.stan"))
+  decls <- regmatches(
+    tdata,
+    gregexpr("vector\\[[0-9]+\\] [a-z_]+ = to_vector\\(\\{[^}]*\\}\\)", tdata)
+  )[[1]]
+  stan_dim <- as.integer(sub("vector\\[([0-9]+)\\].*", "\\1", decls))
+  stan_tab <- lapply(decls, function(decl) {
+    as.numeric(regmatches(decl, gregexpr("-?[0-9][.][0-9]+e[+-][0-9]+", decl))[[1]])
+  })
+  names(stan_tab) <- names(stan_dim) <- sub(".*\\] ([a-z_]+) = .*", "\\1", decls)
+
+  r_tab <- list(gh_nodes = .mafc_gh_nodes, gh_weights = .mafc_gh_weights,
+                gl_nodes = .mafc_gl_nodes, gl_weights = .mafc_gl_weights)
+  expected_n <- c(gh_nodes = 40L, gh_weights = 40L, gl_nodes = 64L, gl_weights = 64L)
+
+  expect_named(stan_tab, names(r_tab))
+  for (nm in names(r_tab)) {
+    expect_length(r_tab[[nm]], expected_n[[nm]])
+    expect_length(stan_tab[[nm]], expected_n[[nm]])
+    expect_equal(stan_dim[[nm]], expected_n[[nm]], info = nm)
+    expect_equal(stan_tab[[nm]], r_tab[[nm]], tolerance = 0, info = nm)
+  }
+
+  # The family is loop = TRUE, so a table declared in mafc_pc() is rebuilt per
+  # row per gradient: ~22% more time per leapfrog step.
+  expect_false(grepl("to_vector({", read_lines2(file.path(sc_path, "sdt_mafc_funs.stan")),
+                     fixed = TRUE))
+})
+
+test_that("the Stan mafc_pc branches match the registry order", {
+  # The R side dispatches by position in .sdt_dists; mafc_pc() hardcodes the
+  # integers. Swapping two branches in the chunk would leave every test green
+  # while turning every dist = "gumbel_max" fit into a gumbel_min model.
+  pc <- read_lines2(file.path(system.file("stan_chunks", package = "bmm"),
+                              "sdt_mafc_funs.stan"))
+  pc <- sub("(?s)\n\\}.*", "", sub("(?s).*real mafc_pc\\(", "", pc, perl = TRUE),
+            perl = TRUE)
+  pc <- gsub("[[:space:]]+", " ", gsub("//[^\n]*", "", pc))
+
+  expect_equal(names(.sdt_dists),
+               c("normal", "gumbel_min", "gumbel_max", "logistic"))
+
+  closed_form <- c(
+    normal     = "{ if (m == 2) return Phi(d / sqrt(2.0));",
+    gumbel_min = "return exp(lgamma(1 + exp(-d)) + lgamma(m) - lgamma(m + exp(-d)));",
+    gumbel_max = "return 1.0 / (1 + (m - 1) * exp(-d));"
+  )
+  for (nm in names(closed_form)) {
+    expect_match(pc,
+                 paste0("dist_type == ", which(names(.sdt_dists) == nm), ") ",
+                        closed_form[[nm]]),
+                 fixed = TRUE, info = nm)
+  }
+
+  # logistic is the fallthrough, so it must not appear as a guard at all
+  guards <- as.integer(gsub("\\D", "", regmatches(pc, gregexpr("dist_type == [0-9]+", pc))[[1]]))
+  expect_equal(sort(guards), c(1L, 2L, 3L))
+  expect_false(which(names(.sdt_dists) == "logistic") %in% guards)
+  expect_match(
+    pc,
+    "gl_weights[i] * pow(sdt_cumprob(sdt_quantile(gl_nodes[i], dist_type) + d, dist_type), m - 1)",
+    fixed = TRUE
+  )
+})
