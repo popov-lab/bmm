@@ -370,6 +370,15 @@ test_that(".rdm_stan_code generates sp>0 Stan for custom version", {
 # Model configuration tests
 # -----------------------------------------------------------------------------
 
+# std_normal_lccdf(z) is -Inf from z = 8.26 with an infinite partial on Stan
+# Math 5.3 (rstan / StanHeaders 2.39), which made a loser's survival NaN from
+# t = 4 s at drift 5; the chunk spells every upper tail as std_normal_lcdf(-z)
+test_that("the rdm Stan chunk never calls std_normal_lccdf", {
+  chunk <- read_lines2(system.file("stan_chunks", "rdm_functions.stan", package = "bmm"))
+  expect_false(grepl("std_normal_lccdf", chunk, fixed = TRUE))
+  expect_true(grepl("std_normal_lcdf(", chunk, fixed = TRUE))
+})
+
 test_that("configure_model.rdm_simple returns correct components", {
   model <- rdm(rt = "rt", response = "response", n_choices = 2)
   dat <- data.frame(rt = c(0.5, 0.6), response = c(1, 2))
