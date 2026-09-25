@@ -60,8 +60,20 @@
     class = c("bmmodel", "sdt", "sdt_yn"),
     call = call
   )
-  out$links[names(links)] <- links
+  out <- set_links(out, links)
   out
+}
+
+# `sdratio` is fixed at 0, and that 0 is read on whatever link the model
+# carries: only log maps it to the equal-variance ratio of 1. Every other link
+# bmm offers turns it into a different ratio -- identity, sqrt, log1p and
+# tan_half into 0, which makes eta infinite on every signal row, and softplus,
+# logm1, logit, probit, cloglog into a finite ratio the user never asked for,
+# which samples to completion and is wrong. `d` and `criterion` fix nothing, so
+# their links stay settable.
+#' @exportS3Method
+settable_links.sdt_yn <- function(model) {
+  c("d", "criterion")
 }
 
 
@@ -90,9 +102,12 @@
 #'     \item "logistic": logistic SDT, \eqn{1 / (1 + \exp(-x))}
 #'   }
 #' @param links A named list of link functions for the parameters, one entry
-#'   per parameter you want to change. `sdratio` keeps its log link: it is
-#'   fixed on the link scale, so an identity link would set the SD ratio itself
-#'   to 0 and divide the signal trials by zero.
+#'   per parameter you want to change, e.g. `links = list(d = "log")`. Only `d`
+#'   and `criterion` can be set. `sdratio` keeps its log link, because the
+#'   model's default of an equal-variance SD ratio is stored as the 0 that the
+#'   log link maps to 1; read on any other link that same 0 is a different
+#'   ratio, and on an identity link it is a ratio of zero that makes the signal
+#'   trials' evidence infinite.
 #' @param ... used internally for testing, ignore it
 #' @return An object of class `bmmodel`
 #'
@@ -288,26 +303,6 @@ sdt_yn <- function(response, stimulus, n_trials,
   call <- match.call()
   stop_missing_args()
   dist <- match.arg(dist)
-
-  # the assignment that applies these is indexed by name, so an unnamed or
-  # duplicated entry is dropped and an unmatched name is appended -- in every
-  # case the intended link is lost and only print() shows anything odd
-  valid_links <- names(.model_sdt_yn()$links)
-  links <- as.list(links)
-  stopif(length(names(links)) != length(links) ||
-           !all(nzchar(names(links))) || anyDuplicated(names(links)),
-         "links must be a list with one unique name per entry. \\
-         sdt_yn() takes links for {collapse_comma(valid_links)}")
-  stopif(!all(names(links) %in% valid_links),
-         "Unrecognized link target(s): \\
-         {collapse_comma(setdiff(names(links), valid_links))}. \\
-         sdt_yn() takes links for {collapse_comma(valid_links)}")
-  # sdratio is fixed on the link scale, so dropping the log link pins the ratio
-  # itself to 0 and every signal trial is divided by zero
-  stopif(identical(links$sdratio, "identity"),
-         "sdratio cannot take an identity link: it is fixed at 0 on the link \\
-         scale, so an identity link sets the SD ratio itself to 0 and divides \\
-         the signal trials by zero. Give sdratio a formula to estimate it.")
 
   .model_sdt_yn(response = response, stimulus = stimulus,
                 n_trials = n_trials, dist = dist,

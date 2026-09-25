@@ -37,9 +37,12 @@ given here by its cumulative distribution function. One of:
 }}
 
 \item{links}{A named list of link functions for the parameters, one entry
-per parameter you want to change. \code{sdratio} keeps its log link: it is
-fixed on the link scale, so an identity link would set the SD ratio itself
-to 0 and divide the signal trials by zero.}
+per parameter you want to change, e.g. \code{links = list(d = "log")}. Only \code{d}
+and \code{criterion} can be set. \code{sdratio} keeps its log link, because the
+model's default of an equal-variance SD ratio is stored as the 0 that the
+log link maps to 1; read on any other link that same 0 is a different
+ratio, and on an identity link it is a ratio of zero that makes the signal
+trials' evidence infinite.}
 
 \item{...}{used internally for testing, ignore it}
 }
