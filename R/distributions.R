@@ -1098,6 +1098,52 @@ log_diff_exp <- function(a, b) {
   a + log1m_exp(b - a)
 }
 
+# E[T] = int_0^inf S(t) dt for a non-negative T, evaluated deterministically so
+# that two calls on the same draws return the same number. The substitution
+# u = log(t) turns a race survivor, which decays over several orders of
+# magnitude in t, into an integrand S(e^u) e^u that a uniform grid in u
+# resolves. `log_surv` takes the grid times and returns a draws x grid matrix of
+# log survivors, so every racing model can share the integrator. Below `t_lo`
+# the survivor is 1 to the caller's chosen tolerance, so that stretch
+# contributes t_lo exactly.
+race_expected_time <- function(log_surv, t_lo, t_hi, n_grid = 1024L) {
+  u <- seq(log(t_lo), log(t_hi), length.out = n_grid)
+  integrand <- exp(sweep(log_surv(exp(u)), 2, u, `+`))
+  du <- u[2] - u[1]
+  edge <- (integrand[, 1] + integrand[, n_grid]) / 2
+  t_lo + du * (rowSums(integrand) - edge)
+}
+
+# log S(t) for a lognormal, as a draws x length(t) matrix from draw-length
+# `meanlog`/`sdlog` vectors
+lnorm_log_surv <- function(t, meanlog, sdlog) {
+  matrix(
+    stats::plnorm(rep(t, each = length(meanlog)), meanlog = meanlog,
+                  sdlog = sdlog, lower.tail = FALSE, log.p = TRUE),
+    nrow = length(meanlog)
+  )
+}
+
+# The minimum of n i.i.d. finishing times has survivor S(t)^n, so one uniform
+# inverts a whole group of identical accumulators; drawing the n copies and
+# taking their minimum spends n times as many variates on the same
+# distribution. `m`, `s` and `counts` are row-per-trial matrices, so per-trial
+# parameters and per-trial accumulator counts need no loop over trials.
+lnr_race <- function(m, s, counts) {
+  ft <- matrix(Inf, nrow(m), ncol(m))
+  for (j in seq_len(ncol(m))) {
+    active <- counts[, j] > 0
+    if (!any(active)) next
+    surv <- stats::runif(sum(active))^(1 / counts[active, j])
+    ft[active, j] <- stats::qlnorm(surv, meanlog = m[active, j],
+                                   sdlog = s[active, j], lower.tail = FALSE)
+  }
+  list(
+    rt = matrixStats::rowMins(ft),
+    response = max.col(-ft, ties.method = "first")
+  )
+}
+
 .pwald <- function(rt, drift, bound, s, lower.tail = TRUE, log.p = TRUE) {
   z1 <- (drift * rt - bound) / (s * sqrt(rt))
   z2 <- -(drift * rt + bound) / (s * sqrt(rt))
@@ -1149,13 +1195,16 @@ log_diff_exp <- function(a, b) {
 #'
 #' @name lnr_dist
 #'
-#' @param rt Numeric vector of response times in seconds.
+#' @param rt Numeric vector of response times in seconds. A response time at or
+#'   below `ndt` lies outside the support, so the density there is 0 (`-Inf`
+#'   with `log = TRUE`); `NA` propagates.
 #' @param response Integer vector of responses (1:K, where K is the number of
-#'   alternatives).
+#'   alternatives), of the same length as `rt` (or `q`).
 #' @param m Numeric vector of meanlog parameters (one per accumulator).
 #' @param s Numeric vector of sdlog parameters (one per accumulator, or a
 #'   single value shared across all accumulators).
-#' @param ndt Non-decision time in seconds.
+#' @param ndt Non-decision time in seconds, a single value or one per response
+#'   time.
 #' @param n Number of samples to generate.
 #' @param log Logical; if `TRUE`, values are returned on the log scale.
 #' @param q Numeric vector of quantiles (response times).
@@ -1163,6 +1212,15 @@ log_diff_exp <- function(a, b) {
 #' @param log.p Logical; if `TRUE`, probabilities are given as log(p).
 #'
 #' @param p Numeric vector of probabilities.
+#'
+#' @details
+#' `plnr()` returns the marginal RT distribution function when `response` is
+#' omitted, and the defective distribution function P(RT <= q, response = r)
+#' when it is given; the defective values over all K responses sum to the
+#' marginal one, and at large `q` each converges to the probability of that
+#' response. The defective case has no closed form and is integrated
+#' numerically, so it is slower than the marginal one. `qlnr()` inverts the
+#' marginal distribution function only.
 #'
 #' @return
 #'   - `dlnr()` returns a numeric vector of (log-)densities.
@@ -1183,7 +1241,7 @@ log_diff_exp <- function(a, b) {
 #' hist(dat$rt)
 #' @export
 dlnr <- function(rt, response, m, s, ndt, log = FALSE) {
-  validate_lnr_parameters(s, ndt)
+  validate_lnr_parameters(s, ndt, length(m), length(rt))
   stopif(
     !is.numeric(response) || anyNA(response),
     "response must contain integers in 1:{length(m)}."
@@ -1194,18 +1252,19 @@ dlnr <- function(rt, response, m, s, ndt, log = FALSE) {
     "response must contain integers in 1:{length(m)}."
   )
   stopif(
-    any(rt - ndt <= 0),
-    "Some reaction times are smaller than the non-decision time. \\
-    You need to specify a non-decision time 'ndt' smaller than \\
-    the shortest reaction time."
+    length(response) != length(rt),
+    "response has {length(response)} entries but rt has {length(rt)}."
   )
   .dlnr(rt, response, m, s, ndt, log)
 }
 
+# A response time at or below the non-decision time is outside the support, so
+# the density is 0 there, the way every stats::d*() reports an impossible value
 .dlnr <- function(rt, response, m, s, ndt, log) {
   K <- length(m)
   if (length(s) == 1) s <- rep(s, K)
   t <- rt - ndt
+  t[!is.na(t) & t <= 0] <- NA_real_
 
   log_lik <- stats::dlnorm(t, meanlog = m[response], sdlog = s[response],
                            log = TRUE)
@@ -1218,34 +1277,39 @@ dlnr <- function(rt, response, m, s, ndt, log = FALSE) {
                     lower.tail = FALSE, log.p = TRUE)
   }
 
+  log_lik[is.na(log_lik) & !is.na(rt)] <- -Inf
   if (log) log_lik else exp(log_lik)
 }
 
 #' @rdname lnr_dist
 #' @export
 rlnr <- function(n, m, s, ndt) {
-  validate_lnr_parameters(s, ndt)
+  validate_lnr_parameters(s, ndt, length(m), 1L)
   .rlnr(n, m, s, ndt)
 }
 
 .rlnr <- function(n, m, s, ndt) {
+  if (n == 0) {
+    return(data.frame(rt = numeric(0), response = integer(0)))
+  }
   K <- length(m)
   if (length(s) == 1) s <- rep(s, K)
-  ft <- matrix(stats::rlnorm(n * K, meanlog = rep(m, each = n),
-                              sdlog = rep(s, each = n)), nrow = n, ncol = K)
-  winner <- apply(ft, 1, which.min)
-  data.frame(rt = apply(ft, 1, min) + ndt, response = winner)
+  race <- lnr_race(
+    m = matrix(m, n, K, byrow = TRUE),
+    s = matrix(s, n, K, byrow = TRUE),
+    counts = matrix(1L, n, K)
+  )
+  data.frame(rt = race$rt + ndt, response = race$response)
 }
 
 #' @rdname lnr_dist
 #' @export
 plnr <- function(q, response, m, s, ndt, lower.tail = TRUE, log.p = FALSE) {
-  validate_lnr_parameters(s, ndt)
+  validate_lnr_parameters(s, ndt, length(m), length(q))
   K <- length(m)
   if (length(s) == 1) s <- rep(s, K)
   t <- q - ndt
 
-  # no closed form for response-specific CDF; marginal CDF has one
   if (missing(response)) {
     log_surv <- numeric(length(t))
     for (j in seq_len(K)) {
@@ -1257,17 +1321,45 @@ plnr <- function(q, response, m, s, ndt, lower.tail = TRUE, log.p = FALSE) {
     # whole value once exp(log_surv) rounds below the resolution of 1
     log_p <- if (lower.tail) log1m_exp(log_surv) else log_surv
   } else {
-    stop2("Response-specific CDF for the LNR is not yet implemented. \\
-           Omit the 'response' argument to get the marginal RT CDF.")
+    stopif(
+      !length(response) %in% c(1L, length(q)),
+      "response has {length(response)} entries but q has {length(q)}."
+    )
+    stopif(
+      any(response < 1) || any(response > K) || any(response != round(response)),
+      "response must contain integers in 1:{K}."
+    )
+    log_p <- .plnr_defective(t, rep_len(response, length(t)), m, s, ndt)
+    if (!lower.tail) log_p <- log1m_exp(log_p)
   }
 
   if (log.p) log_p else exp(log_p)
 }
 
+# P(RT <= q, response = r) has no closed form: the winner's density is weighted
+# by the losers' survivors, which do not factor out of the integral. The
+# integration runs in log decision time and is bracketed by the extreme
+# quantiles of the accumulators themselves; over an open or very wide interval
+# integrate() samples past the decade that holds the mass and returns zero.
+.plnr_defective <- function(t, response, m, s, ndt) {
+  u_lo <- log(stats::qlnorm(1e-14, min(m), max(s)))
+  u_cap <- log(stats::qlnorm(1e-14, max(m), max(s), lower.tail = FALSE))
+  vapply(seq_along(t), function(i) {
+    if (is.na(t[i])) return(NA_real_)
+    if (t[i] <= 0) return(-Inf)
+    log(stats::integrate(
+      function(u) .dlnr(exp(u) + ndt, response[i], m, s, ndt, log = FALSE) *
+        exp(u),
+      lower = u_lo, upper = min(log(t[i]), u_cap),
+      rel.tol = .Machine$double.eps^0.5
+    )$value)
+  }, numeric(1))
+}
+
 #' @rdname lnr_dist
 #' @export
 qlnr <- function(p, m, s, ndt, lower.tail = TRUE, log.p = FALSE) {
-  validate_lnr_parameters(s, ndt)
+  validate_lnr_parameters(s, ndt, length(m), 1L)
   K <- length(m)
   if (length(s) == 1) s <- rep(s, K)
   if (log.p) p <- exp(p)
@@ -1292,7 +1384,7 @@ qlnr <- function(p, m, s, ndt, lower.tail = TRUE, log.p = FALSE) {
   }, numeric(1))
 }
 
-validate_lnr_parameters <- function(s, ndt) {
+validate_lnr_parameters <- function(s, ndt, n_acc, n_obs) {
   stopif(
     any(!is.finite(s)) || any(s <= 0),
     "s (sdlog) must be finite and positive."
@@ -1300,6 +1392,16 @@ validate_lnr_parameters <- function(s, ndt) {
   stopif(
     any(!is.finite(ndt)) || any(ndt < 0),
     "ndt (non-decision time) must be finite and non-negative."
+  )
+  # silent recycling of a mis-sized s pairs meanlogs with the wrong sdlogs
+  stopif(
+    !length(s) %in% c(1L, n_acc),
+    "s has {length(s)} entries but the race has {n_acc} accumulators; \\
+    pass one sdlog or one per accumulator."
+  )
+  stopif(
+    !length(ndt) %in% c(1L, n_obs),
+    "ndt has {length(ndt)} entries but there are {n_obs} response times."
   )
 }
 

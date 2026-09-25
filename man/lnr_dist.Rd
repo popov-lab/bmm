@@ -17,17 +17,20 @@ plnr(q, response, m, s, ndt, lower.tail = TRUE, log.p = FALSE)
 qlnr(p, m, s, ndt, lower.tail = TRUE, log.p = FALSE)
 }
 \arguments{
-\item{rt}{Numeric vector of response times in seconds.}
+\item{rt}{Numeric vector of response times in seconds. A response time at or
+below \code{ndt} lies outside the support, so the density there is 0 (\code{-Inf}
+with \code{log = TRUE}); \code{NA} propagates.}
 
 \item{response}{Integer vector of responses (1:K, where K is the number of
-alternatives).}
+alternatives), of the same length as \code{rt} (or \code{q}).}
 
 \item{m}{Numeric vector of meanlog parameters (one per accumulator).}
 
 \item{s}{Numeric vector of sdlog parameters (one per accumulator, or a
 single value shared across all accumulators).}
 
-\item{ndt}{Non-decision time in seconds.}
+\item{ndt}{Non-decision time in seconds, a single value or one per response
+time.}
 
 \item{log}{Logical; if \code{TRUE}, values are returned on the log scale.}
 
@@ -55,6 +58,15 @@ functions for the Log-Normal Race Model. The LNR (Rouder et al., 2015) is
 a K-accumulator race model where each accumulator's finishing time follows
 a lognormal distribution. The first accumulator to finish determines both
 the response and the response time.
+}
+\details{
+\code{plnr()} returns the marginal RT distribution function when \code{response} is
+omitted, and the defective distribution function P(RT <= q, response = r)
+when it is given; the defective values over all K responses sum to the
+marginal one, and at large \code{q} each converges to the probability of that
+response. The defective case has no closed form and is integrated
+numerically, so it is slower than the marginal one. \code{qlnr()} inverts the
+marginal distribution function only.
 }
 \examples{
 dat <- rlnr(n = 1000, m = c(-1, 0), s = c(1, 1), ndt = 0.2)
