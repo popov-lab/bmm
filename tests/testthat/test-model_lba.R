@@ -307,24 +307,27 @@ test_that("LBA generated Stan code uses vectorized custom likelihoods", {
   ))
 })
 
-test_that("a threading request switches the vectorized family to sliced vars", {
+test_that("the vectorized family slices its vars only where brms really threads", {
   dat <- rlba(n = 20, drift = c(3, 1.5), gap = 0.5, sp = 0.5, ndt = 0.2)
   model <- lba(rt = "rt", response = "response", n_choices = 2)
   formula <- bmf(driftc ~ 1, drifte ~ 1, gap ~ 1, sp ~ 1, ndt ~ 1)
   model <- check_model(model, dat, formula)
   dat <- check_data(model, dat, formula)
+  family_vars <- function() configure_model(model, dat, formula)$formula$family$vars
 
-  # reduce_sum slices Y but passes vars through whole, so the vectorized
-  # family must slice the vint columns itself when threading is requested
-  config <- configure_model(model, dat, formula)
-  expect_equal(config$formula$family$vars, c("vint1", "vint2", "vint3"))
+  expect_equal(family_vars(), c("vint1", "vint2", "vint3"))
 
-  attr(model, "threads") <- TRUE
-  config <- configure_model(model, dat, formula)
-  expect_equal(
-    config$formula$family$vars,
-    c("vint1[start:end]", "vint2[start:end]", "vint3[start:end]")
-  )
+  withr::with_options(list(brms.threads = brms::threading(2)), {
+    expect_equal(family_vars(), paste0("vint", 1:3, "[start:end]"))
+  })
+  # brms compiles threading(force = TRUE) with threads but emits the serial
+  # likelihood, where start/end do not exist
+  withr::with_options(list(brms.threads = brms::threading(2, force = TRUE)), {
+    expect_equal(family_vars(), c("vint1", "vint2", "vint3"))
+  })
+  withr::with_options(list(brms.threads = brms::threading(NULL)), {
+    expect_equal(family_vars(), c("vint1", "vint2", "vint3"))
+  })
 })
 
 test_that("the custom version slices every vint column when threading", {
@@ -336,7 +339,7 @@ test_that("the custom version slices every vint column when threading", {
   model <- check_model(model, dat, formula)
   dat <- check_data(model, dat, formula)
 
-  attr(model, "threads") <- TRUE
+  withr::local_options(brms.threads = brms::threading(2))
   config <- configure_model(model, dat, formula)
   expect_equal(config$formula$family$vars, paste0("vint", 1:4, "[start:end]"))
 })
@@ -347,13 +350,13 @@ test_that("stancode emits thread-safe slicing when threads is passed", {
   dat <- rlba(n = 100, drift = c(3, 1.5), gap = 0.5, sp = 0.5, ndt = 0.2)
   model <- lba(rt = "rt", response = "response", n_choices = 2)
   formula <- bmf(driftc ~ 1, drifte ~ 1, gap ~ 1, sp ~ 1, ndt ~ 1)
+  serial_call <- paste0(
+    "lba_normal_simple_lpdf(Y | mu, driftc, drifte, gap, sp, ndt, ",
+    "s, vint1, vint2, vint3);"
+  )
 
   code <- stancode(formula, dat, model = model, backend = "cmdstanr")
-  expect_true(grepl(
-    paste0("lba_normal_simple_lpdf(Y | mu, driftc, drifte, gap, sp, ndt, ",
-           "s, vint1, vint2, vint3);"),
-    code, fixed = TRUE
-  ))
+  expect_true(grepl(serial_call, code, fixed = TRUE))
 
   threaded <- stancode(formula, dat, model = model, backend = "cmdstanr",
                        threads = brms::threading(2))
@@ -364,6 +367,19 @@ test_that("stancode emits thread-safe slicing when threads is passed", {
     threaded, fixed = TRUE
   ))
   expect_true(grepl("reduce_sum", threaded))
+
+  # force = TRUE: brms keeps the serial likelihood, so sliced vars would
+  # reference an undefined start/end and the model would not compile
+  forced <- stancode(formula, dat, model = model, backend = "cmdstanr",
+                     threads = brms::threading(2, force = TRUE))
+  expect_true(grepl(serial_call, forced, fixed = TRUE))
+  expect_false(grepl("start:end", forced, fixed = TRUE))
+
+  # an explicit threads = NULL overrides a global option, as in brms
+  withr::local_options(brms.threads = brms::threading(2))
+  unthreaded <- stancode(formula, dat, model = model, backend = "cmdstanr",
+                         threads = NULL)
+  expect_true(grepl(serial_call, unthreaded, fixed = TRUE))
 })
 
 

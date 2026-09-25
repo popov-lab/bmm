@@ -540,19 +540,14 @@ bmf2bf.lba_custom <- function(model, formula) {
 }
 
 # The vint() columns hold the winning category and the per-category
-# accumulator counts, one value per observation, in the order the Stan
-# signature expects. Under brms within-chain threading a loop = FALSE family
-# must slice them itself: reduce_sum slices Y inside partial_log_lik but
-# passes custom family `vars` through whole, so a bare "vint1" would pair each
-# slice's response times with the top of the data -- silently wrong results.
-# brms only defines start/end inside the threaded partial_log_lik, so the
-# thread-safe sliced form cannot be emitted without threading (it would not
-# compile). bmm() records the threading request as attr(model, "threads")
-# before configure_model runs; when the attribute is absent (e.g. direct calls
-# in tests) the unthreaded form is the safe default.
-.lba_family_vars <- function(model, n_cats) {
+# accumulator counts. brms slices Y per thread but pastes a custom family's
+# `vars` in whole, so under real threading the columns are sliced here;
+# start/end only exist inside partial_log_lik, which is why the slicing follows
+# brms_slices_likelihood() rather than the threads argument (threading(force =
+# TRUE) compiles threaded but keeps the serial likelihood)
+.lba_family_vars <- function(n_cats) {
   vars <- paste0("vint", seq_len(n_cats + 1))
-  if (isTRUE(attr(model, "threads"))) paste0(vars, "[start:end]") else vars
+  if (brms_slices_likelihood()) paste0(vars, "[start:end]") else vars
 }
 
 #' @export
@@ -578,7 +573,7 @@ configure_model.lba_simple <- function(model, data, formula) {
     ub = rep(NA, length(dpars)),
     lb = rep(NA, length(dpars)),
     type = "real",
-    vars = .lba_family_vars(model, length(cat_names)),
+    vars = .lba_family_vars(length(cat_names)),
     loop = FALSE,
     log_lik = log_lik_lba_simple,
     posterior_predict = posterior_predict_lba_simple,
@@ -616,7 +611,7 @@ configure_model.lba_custom <- function(model, data, formula) {
     ub = rep(NA, length(dpars)),
     lb = rep(NA, length(dpars)),
     type = "real",
-    vars = .lba_family_vars(model, n_cats),
+    vars = .lba_family_vars(n_cats),
     loop = FALSE,
     log_lik = log_lik_lba_custom,
     posterior_predict = posterior_predict_lba_custom,
