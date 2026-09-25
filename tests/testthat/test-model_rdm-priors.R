@@ -32,7 +32,7 @@ test_that("custom version inherits the same sd rates for its accumulator paramet
 test_that("a hierarchical mock fit reports the sd default priors in report_priors() and fit$prior", {
   skip_on_cran()
 
-  set.seed(1)
+  withr::local_seed(1)
   dat <- do.call(rbind, lapply(1:5, function(i) {
     d <- rrdm(n = 30, drift = c(3, 1.5), gap = 1, ndt = 0.2)
     d$id <- i

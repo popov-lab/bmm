@@ -500,6 +500,15 @@ test_that(".rdm_stan_code chains the winner branches for 4 categories", {
   expect_equal(lengths(regmatches(code, gregexpr("if (reps", code, fixed = TRUE))), 4)
 })
 
+test_that(".rdm_stan_code assigns the winner unconditionally for one category", {
+  code <- .rdm_stan_code("rdm_custom", "corr", start_var = FALSE)
+  expect_match(code, "    lp = log(n1[i]) + swald_lpdf(rt[i] | corr[i]", fixed = TRUE)
+  expect_false(grepl("if lp", code, fixed = TRUE))
+  dat <- data.frame(rt = c(0.5, 0.6), resp = c("corr", "corr"))
+  model <- rdm(rt = "rt", response = "resp", version = "custom")
+  expect_no_error(stancode(bmf(corr ~ 1, gap ~ 1, ndt ~ 1), dat, model, backend = "cmdstanr"))
+})
+
 test_that(".rdm_stan_code generates the start-point race for the custom version", {
   cats <- c("target", "lure", "npl")
   code <- .rdm_stan_code("rdm_custom", cats, start_var = TRUE)
@@ -518,6 +527,10 @@ test_that("the rdm Stan chunk never calls std_normal_lccdf", {
   chunk <- read_lines2(system.file("stan_chunks", "rdm_functions.stan", package = "bmm"))
   expect_false(grepl("std_normal_lccdf", chunk, fixed = TRUE))
   expect_true(grepl("std_normal_lcdf(", chunk, fixed = TRUE))
+  # both sides switch to the midpoint plain Wald at the same ratio
+  ratios <- regmatches(chunk, gregexpr("A < [0-9.e-]+ \\* s \\* st", chunk))[[1]]
+  expect_equal(as.numeric(sub("A < ([0-9.e-]+) .*", "\\1", ratios)),
+               rep(.rdm_midpoint_ratio, 2))
 })
 
 test_that("configure_model.rdm_simple returns correct components", {

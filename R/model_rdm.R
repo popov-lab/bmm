@@ -47,9 +47,9 @@
   !identical(model$fixed_parameters$sp, .rdm_sp_off)
 }
 
-# Compose the spec for one version. Drift parameters precede the shared block:
-# downstream code recovers accumulator names via
-# setdiff(names(parameters), c("gap", "ndt", "s", "sp")), which relies on order.
+# Compose the spec for one version. The posterior methods recover the
+# accumulator names from the family's dpars (everything but mu, gap, ndt, s,
+# sp), in the order check_data() numbered the .rdm_n* count columns.
 .rdm_model_spec <- function(version) {
   fixed_parameters <- list(mu = 0, s = 0, sp = .rdm_sp_off)
 
@@ -342,7 +342,7 @@ check_model.rdm_custom <- function(model, data = NULL, formula = NULL) {
     )
 
     for (p in cat_pars) {
-      model$parameters[[p]] <- paste0(.rdm_drift_spec$desc, " for '", p, "' accumulator")
+      model$parameters[[p]] <- glue("{.rdm_drift_spec$desc} for '{p}' accumulator")
       if (is.null(model$links[[p]])) model$links[[p]] <- .rdm_drift_spec$link
       if (is.null(model$default_priors[[p]])) {
         model$default_priors[[p]] <- .rdm_drift_spec$priors$drifte
@@ -498,7 +498,7 @@ check_data.rdm_custom <- function(model, data, formula) {
     in the data."
   )
 
-  data$.rdm_cat <- setNames(seq_along(cat_names), cat_names)[data[, response_var]]
+  data$.rdm_cat <- unname(stats::setNames(seq_along(cat_names), cat_names)[data[, response_var]])
 
   if (is.null(num_alt)) {
     for (i in seq_along(cat_names)) {
@@ -652,7 +652,7 @@ bmf2bf.rdm_custom <- function(model, formula) {
     per_cat("    int reps{j} = (response[i] == {j}) ? n{j}[i] - 1 : n{j}[i];", j)
   }, character(1))
   winner <- vapply(seq_len(n_cats), function(j) {
-    head <- if (j == 1) "    if" else if (j < n_cats) "    else if" else "    else"
+    head <- if (n_cats == 1) "   " else if (j == 1) "    if" else if (j < n_cats) "    else if" else "    else"
     cond <- if (j < n_cats) glue(" (response[i] == {j})") else ""
     per_cat(paste0(head, cond, " lp = log(n{j}[i]) + ", pdf, ";"), j)
   }, character(1))
@@ -703,8 +703,8 @@ configure_model.rdm_simple <- function(model, data, formula) {
     links = c("identity", model$links$driftc, model$links$drifte,
               model$links$gap, model$links$ndt, model$links$s,
               model$links$sp),
-    ub = rep(NA, 7),
-    lb = c(NA, 0, 0, 0, 0, 0, 0),
+    ub = rep(NA, length(cat_names) + 5),
+    lb = c(NA, rep(0, length(cat_names) + 4)),
     type = "real",
     vars = .rdm_family_vars(length(cat_names)),
     loop = FALSE,

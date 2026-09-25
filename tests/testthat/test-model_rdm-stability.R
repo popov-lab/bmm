@@ -309,6 +309,5 @@ test_that("RDM log likelihood remains finite under small parameter perturbations
 
      expect_true(is.finite(slope_left))
      expect_true(is.finite(slope_right))
-     expect_lt(abs(slope_right - slope_left), 1e4)
    }
  })

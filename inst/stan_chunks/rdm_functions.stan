@@ -40,9 +40,7 @@ real rdm_log_Phi_diff(real a, real b) {
   if (a >= 0) return swald_log_diff_exp(rdm_log_Phi(-a), rdm_log_Phi(-b));
   if (b <= 0) return swald_log_diff_exp(rdm_log_Phi(b), rdm_log_Phi(a));
   // the straddling case has both probabilities O(1) and is exact directly;
-  // closer than 1e-8 the subtraction loses digits and the midpoint density,
-  // exact to second order in b - a, is the better form
-  if (b - a < 1e-8) return log(b - a) + std_normal_lpdf(0.5 * (a + b));
+  // the callers keep b - a >= 1e-4 (the midpoint fallback takes over below)
   return log(Phi(b) - Phi(a));
 }
 
