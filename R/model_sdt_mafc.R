@@ -48,8 +48,7 @@
     class = c("bmmodel", "sdt", "sdt_mafc"),
     call = call
   )
-  out$links[names(links)] <- links
-  out
+  set_links(out, links)
 }
 
 
