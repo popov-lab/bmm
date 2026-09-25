@@ -120,6 +120,7 @@ test_that("dist='normal' adds sdratio (fixed to 0); gumbel_min does not", {
   expect_true("sdratio" %in% names(normal$parameters))
   expect_equal(normal$fixed_parameters$sdratio, 0)
   expect_true("sdratio" %in% names(normal$init_ranges))
+  expect_equal(normal$default_priors$sdratio$sd, "exponential(2)")
 
   gumbel <- sdt_ranking(ranks4, m = 4, dist = "gumbel_min")
   expect_false("sdratio" %in% names(gumbel$parameters))
@@ -127,6 +128,7 @@ test_that("dist='normal' adds sdratio (fixed to 0); gumbel_min does not", {
 
 test_that("sdt_ranking has init_ranges with d (no mu)", {
   model <- sdt_ranking(ranks4, m = 4)
+  expect_equal(model$default_priors$d$sd, "exponential(1)")
   expect_length(model$init_ranges$d, 2)
   expect_true(model$init_ranges$d[1] < model$init_ranges$d[2])
   expect_false("mu" %in% names(model$init_ranges))
