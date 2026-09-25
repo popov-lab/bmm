@@ -359,9 +359,10 @@ validate_links <- function(links, model) {
     stopif(
       length(fixed) > 0,
       "The link of {collapse_comma(fixed)} cannot be changed in {model_name}(): \\
-       the model builds its likelihood from {summarise_links(defaults[fixed])}, \\
-       so another link would reach print(), the initial values and the prior \\
-       scale but not the sampler. {settable_str}"
+       the model is written around {summarise_links(defaults[fixed])} -- its \\
+       likelihood, the values it fixes, or both are expressed on that scale -- \\
+       so another link would not give the parameter the meaning \\
+       {model_name}() documents for it. {settable_str}"
     )
   }
 
@@ -437,6 +438,9 @@ response_annotations <- function(model) {
   }
   if (inherits(model, "m3")) {
     return(list(resp_cats = "counts per response category"))
+  }
+  if (inherits(model, "sdt_yn")) {
+    return(list(response = "count of 'old'/'signal' responses per cell"))
   }
   list()
 }

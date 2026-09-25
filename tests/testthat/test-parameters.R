@@ -171,6 +171,18 @@ test_that("print.bmmodel() annotates aggregated ezdm response variables", {
   )))
 })
 
+test_that("print.bmmodel() annotates aggregated sdt_yn response counts", {
+  m <- sdt_yn(response = "n_old", stimulus = "stim", n_trials = "nt")
+  out <- capture.output(print(m))
+
+  expect_true(any(grepl(
+    "response = n_old (count of 'old'/'signal' responses per cell)",
+    out,
+    fixed = TRUE
+  )))
+  expect_true(any(grepl("Fixed:.*sdratio = 0", out)))
+})
+
 test_that("print.bmmodel() lists vector-valued response variables", {
   m <- m3(
     resp_cats = c("corr", "other", "npl"),

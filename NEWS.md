@@ -1,5 +1,11 @@
 # bmm (development version)
 
+### New models
+* Add **Yes/No Signal Detection Theory** (`sdt_yn`) for detection and old/new recognition tasks with aggregated response counts. It estimates sensitivity (`d`) and response bias (`criterion`), and optionally the unequal-variance ratio (`sdratio`). Also adds `dsdt_yn()`, `rsdt_yn()`, `sdt_d()` and `sdt_criterion()`. See `?sdt_yn` for the parameters, links, default priors and the designs that identify `sdratio`. Thanks to @GidonFrischkorn
+
+### New datasets
+* Add **`broeder_schuetz_2009_e3`**, binary old/new recognition data from Broeder & Schuetz (2009, Exp. 3), with five base-rate conditions from 40 subjects. See `?broeder_schuetz_2009_e3`.
+
 ### New features
 * `bmm(file_refit = "on_change")` is now implemented and no longer warns and falls back to `"never"`. The cached fit saved under `file` is returned only while the Stan code, the Stan data, the factor levels of the model variables and the algorithm are unchanged; any change refits. The comparison happens where `brms` makes it — after the bmm configuration pipeline has produced the Stan code and data, before compilation — so a cache hit costs one run of the pipeline plus `standata()` and `stancode()`: about 0.4 s rather than 0.02 s for an **sdm** model of `oberauer_lin_2017`, far less than compiling and sampling but not free. As in `brms`, only those four things are compared, so sampler settings do not force a refit — `control = list(adapt_delta = )` in particular, and also `iter`, `warmup`, `chains`, `seed`, `init` and `save_pars`: rerunning with a higher `adapt_delta` after divergent transitions, or with `save_pars(all = TRUE)` for `loo()`, returns the cached fit unchanged (#411).
 * `bmm_options(file_refit = )` accepts the same values as `bmm()`. It previously required a logical, so the string forms could be set only through `options(bmm.file_refit = )` (#411).

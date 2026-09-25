@@ -458,6 +458,14 @@ test_that("every model ships an sd default on the link scale of each parameter",
   pr <- default_prior(rt_formula, ez_data, ezdm("mean_rt", "var_rt", "n_upper", "n_trials", version = "3par"))
   expect_equal(sd_default(pr, "drift"), "exponential(1)")
   for (par in c("bound", "ndt")) expect_equal(sd_default(pr, par), "exponential(2)")
+
+  pr <- default_prior(
+    bmf(d ~ 1 + (1 | id), criterion ~ 0 + condition + (1 | id), sdratio ~ 1 + (1 | id)),
+    broeder_schuetz_2009_e3,
+    sdt_yn(response = "n_old", stimulus = "stimulus", n_trials = "n_trials")
+  )
+  expect_equal(sd_default(pr, "d"), "exponential(1)")
+  for (par in c("criterion", "sdratio")) expect_equal(sd_default(pr, par), "exponential(2)")
 })
 
 test_that("a freed mu / mu1 gets regularizing main, effects and sd priors on the tan_half scale", {
@@ -550,4 +558,15 @@ test_that("default priors work when there are non-linear transformations of defa
   )
   expect_true(!("c" %in% dp$dpar))
   expect_true("nlc" %in% dp$nlpar)
+})
+
+test_that("sdt_yn emits an sd prior only for parameters with random effects", {
+  data <- broeder_schuetz_2009_e3
+  model <- sdt_yn(response = "n_old", stimulus = "stimulus", n_trials = "n_trials")
+
+  # default_prior() alone does not validate a prior against the model, so the
+  # no-random-effects case is only provable through a fit
+  formula_fixed <- bmf(d ~ 1, criterion ~ 0 + condition, sdratio ~ 1)
+  fit <- bmm(formula_fixed, data, model, backend = "mock", mock_fit = 1, rename = FALSE)
+  expect_false(any(fit$prior$class == "sd"))
 })
