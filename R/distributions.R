@@ -2515,41 +2515,55 @@ rsdt_yn <- function(n, n_trials, stimulus, d, criterion,
 
 
 # R-side logit P(correct) for m-AFC, mirroring the Stan mafc_logit_pc function.
-# The binomial is evaluated on the logit scale because P(correct) rounds to 1 as
-# soon as its complement falls below the double epsilon, at which point the
-# density stops responding to d'. gumbel_max's logit is analytic; the two
-# quadrature branches accumulate the complement 1 - P(correct), whose terms are
-# all positive, so the small quantity keeps its relative precision.
+# The binomial is taken on the logit scale because P(correct) rounds to 1 once
+# its complement falls under the double epsilon, at which point the density
+# stops responding to d'. Each branch therefore reads log P(correct) and
+# log(1 - P(correct)) off whichever side still resolves it and subtracts.
 .mafc_logit_pc_r <- function(d, m, dist = "normal") {
   if (dist == "gumbel_max") {
     return(d - log(m - 1))
-  }
-  if (dist == "gumbel_min") {
-    log_pc <- pmin(lgamma(1 + exp(-d)) + lgamma(m) - lgamma(m + exp(-d)), 0)
-    return(log_pc - log1m_exp(log_pc))
   }
 
   n <- max(length(d), length(m))
   d <- rep_len(d, n)
   m <- rep_len(m, n)
-  lcdf <- .sdt_dists[[dist]]$lcdf
+
+  if (dist == "gumbel_min") {
+    # Gamma(1 + e) Gamma(m) / Gamma(m + e) telescopes to prod(k / (k + e)), and
+    # log1p still resolves the tiny e = exp(-d') at which the difference of
+    # lgammas has cancelled to zero. Off the telescoped form this branch dies
+    # at the same d' as the probability scale it was meant to rescue.
+    k <- seq_len(max(m) - 1)
+    log_pc <- -colSums(log1p(outer(1 / k, exp(-d))) * outer(k, m, "<"))
+    return(log_pc - log(-expm1(log_pc)))
+  }
 
   if (dist == "normal") {
-    out <- lcdf(d / sqrt(2)) - .sdt_dists$normal$lccdf(d / sqrt(2))
+    # 2-AFC has the closed form Phi(d'/sqrt(2)), whose logit is exact at any d'
+    out <- .sdt_log_cdf(d / sqrt(2), dist) - .sdt_log_cdf(-d / sqrt(2), dist)
     quad <- m != 2L
     if (any(quad)) {
-      log_cdf <- lcdf(outer(.mafc_gh_nodes, d[quad], "+")) *
-        rep(m[quad] - 1, each = length(.mafc_gh_nodes))
-      q <- pmin(colSums(.mafc_gh_weights * -expm1(log_cdf)), 1)
-      out[quad] <- log1p(-q) - log(q)
+      out[quad] <- .mafc_logit_quad(d[quad], m[quad], dist,
+                                    .mafc_gh_nodes, .mafc_gh_weights)
     }
     return(out)
   }
 
-  log_cdf <- lcdf(outer(.sdt_dists[[dist]]$qf(.mafc_gl_nodes), d, "+")) *
-    rep(m - 1, each = length(.mafc_gl_nodes))
-  q <- pmin(colSums(.mafc_gl_weights * -expm1(log_cdf)), 1)
-  log1p(-q) - log(q)
+  .mafc_logit_quad(d, m, dist, .sdt_dists[[dist]]$qf(.mafc_gl_nodes),
+                   .mafc_gl_weights)
+}
+
+
+# One sweep of the quadrature nodes yields both sides of the logit: the
+# log-sum-exp keeps its relative precision as P(correct) -> 0, the sum of
+# complements -- every term positive, so nothing cancels -- as P(correct) -> 1.
+# Reading either side off the other is what loses the far tail.
+.mafc_logit_quad <- function(d, m, dist, nodes, weights) {
+  log_cdf <- .sdt_log_cdf(outer(nodes, d, "+"), dist) *
+    rep(m - 1, each = length(nodes))
+  # the weights sum to 1 only to rounding, so the complement can land above it
+  matrixStats::colLogSumExps(log(weights) + log_cdf) -
+    log(pmin(colSums(weights * -expm1(log_cdf)), 1))
 }
 
 
