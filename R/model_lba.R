@@ -153,8 +153,15 @@
     call = call
   )
 
-  out$links[names(links)] <- links
-  out
+  set_links(out, links)
+}
+
+# The custom version learns its accumulator names from the formula, so at
+# construction there is no vocabulary to validate a links argument against;
+# check_model.lba_custom does it once the categories are known
+#' @exportS3Method
+settable_links.lba_custom <- function(model) {
+  NULL
 }
 
 #' @title `r .model_lba()$name`
@@ -291,6 +298,14 @@ check_model.lba_custom <- function(model, data = NULL, formula = NULL) {
       "Category names cannot contain underscores because brms rejects them as \\
       distributional parameters: {collapse_comma(bad_underscore_names)}. \\
       Please rename the affected response categories."
+    )
+
+    known <- c(cat_pars, "gap", "sp", "ndt", "s")
+    unknown <- setdiff(names(model$links), known)
+    stopif(
+      length(unknown) > 0,
+      "Unrecognized link target(s): {collapse_comma(unknown)}. \\
+      lba() takes links for {collapse_comma(known)}"
     )
 
     drift <- .lba_dist_specs[[model$distribution]]$drift

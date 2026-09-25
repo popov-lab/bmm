@@ -51,6 +51,39 @@ test_that("lba accepts custom links", {
   expect_equal(model$links$drifte, "identity")
 })
 
+test_that("lba refuses a link for a parameter it does not have", {
+  expect_error(
+    lba(rt = "rt", response = "response", n_choices = 2,
+        links = list(typo = "log")),
+    "Unrecognized link target\\(s\\): 'typo'"
+  )
+  expect_warning(
+    model <- lba(rt = "rt", response = "response", n_choices = 2,
+                 links = list(drifc = "log")),
+    "'drifc' read as 'driftc'"
+  )
+  expect_equal(model$links$driftc, "log")
+  expect_false("drifc" %in% names(model$links))
+})
+
+test_that("the custom version validates link targets once the formula names them", {
+  model <- lba(rt = "rt", response = "response", version = "custom",
+               links = list(fast = "log"))
+  formula <- bmf(fast ~ 1, slow ~ 1, gap ~ 1, sp ~ 1, ndt ~ 1)
+  model <- check_model(model, data = NULL, formula = formula)
+  expect_equal(model$links$fast, "log")
+  expect_equal(model$links$slow, "identity")
+  # a second pass over the checked model must accept the category links
+  expect_equal(check_model(model, data = NULL, formula = formula)$links, model$links)
+
+  model <- lba(rt = "rt", response = "response", version = "custom",
+               links = list(typo = "log"))
+  expect_error(
+    check_model(model, data = NULL, formula = formula),
+    "Unrecognized link target\\(s\\): 'typo'"
+  )
+})
+
 test_that("lba errors on invalid n_choices", {
   expect_error(lba(rt = "rt", response = "response", n_choices = 1))
   expect_error(lba(rt = "rt", response = "response", n_choices = 2.5))
