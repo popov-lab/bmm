@@ -482,6 +482,19 @@ test_that("every model ships an sd default on the link scale of each parameter",
   )
   expect_equal(sd_default(pr, "d"), "exponential(1)")
   expect_equal(sd_default(pr, "sdratio"), "exponential(2)")
+
+  rating_data <- data.frame(
+    r1 = 5, r2 = 8, r3 = 12, r4 = 15, stimulus = rep(0:1, 10),
+    id = factor(rep(1:10, each = 2))
+  )
+  rating_formula <- bmf(d ~ 1 + (1 | id), criterion ~ 1 + (1 | id),
+                        spacing ~ 1 + (1 | id), sdratio ~ 1 + (1 | id))
+  pr <- default_prior(rating_formula, rating_data,
+                      sdt_rating(response = paste0("r", 1:4), stimulus = "stimulus"))
+  expect_equal(sd_default(pr, "d"), "exponential(1)")
+  for (par in c("criterion", "spacing", "sdratio")) {
+    expect_equal(sd_default(pr, par), "exponential(2)")
+  }
 })
 
 test_that("a freed mu / mu1 gets regularizing main, effects and sd priors on the tan_half scale", {

@@ -119,6 +119,17 @@ test_that("sdt_rating refuses a link on sdratio or a threshold parameter", {
   expect_error(check_links(model), "link of 'spacing' cannot be changed")
 })
 
+test_that("sdt_rating gives every parameter an sd default prior", {
+  for (tt in c("parsimonious", "log_distance", "softmax")) {
+    model <- sdt_rating(paste0("r", 1:5), "stimulus", threshold_type = tt)
+    sds <- vapply(model$default_priors, function(p) p$sd %||% NA_character_,
+                  character(1))
+    expect_false(anyNA(sds), info = tt)
+    expect_equal(sds[["d"]], "exponential(1)", info = tt)
+    expect_true(all(sds[setdiff(names(sds), "d")] == "exponential(2)"), info = tt)
+  }
+})
+
 test_that("sdt_rating supplies init_ranges for every estimated parameter", {
   # create_initfun() looks up init_ranges per parameter; a missing entry yields
   # NA inits, and the flexible threshold types reject brms' default random init.
