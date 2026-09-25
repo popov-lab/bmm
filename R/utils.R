@@ -874,6 +874,27 @@ check_rds_file <- function(file) {
   if (!is.null(l)) l else r
 }
 
+# Identifiers a model cannot use for a parameter of a generated Stan program.
+# The list was measured, not copied: each candidate was made a response
+# category of an lnr_custom model and the generated program handed to stanc
+# 2.40 with the guard switched off. Stan's keywords are there, and so are the
+# three names the surrounding code declares -- brms calls the response Y and
+# writes a `lprior` accumulator, and bmm's per-row likelihood declares N.
+# Several C++ keywords that Stan documents as reserved (class, new, template,
+# ...) are accepted by stanc and are deliberately absent. Stan is
+# case-sensitive, so the comparison against this list has to be too.
+.stan_reserved <- c(
+  "array", "auto", "break", "cholesky_factor_corr", "cholesky_factor_cov",
+  "complex", "continue", "corr_matrix", "cov_matrix", "data", "else",
+  "false", "fatal_error", "for", "functions", "generated", "if", "in", "int",
+  "lower", "matrix", "model", "multiplier", "offset", "ordered",
+  "parameters", "positive_ordered", "print", "profile", "quantities", "real",
+  "reject", "repeat", "return", "row_vector", "simplex", "static", "struct",
+  "target", "then", "transformed", "true", "tuple", "typedef", "unit_vector",
+  "until", "upper", "vector", "void", "while",
+  "N", "Y", "lprior"
+)
+
 # like unlist, but keeps the final outcome a list of all
 # elements of nested lists. Only works 1-level deep
 unnest_list <- function(list_of_lists) {

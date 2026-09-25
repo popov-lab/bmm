@@ -1,6 +1,6 @@
 # =============================================================================
 # Tests for rdm model (model-specific tests)
-# Distribution function tests are in test-distributions.R
+# The rdm distribution functions are tested at the bottom of this file
 # =============================================================================
 
 # -----------------------------------------------------------------------------
@@ -207,6 +207,20 @@ test_that("check_data.rdm_simple handles factor responses", {
   expect_equal(result$.rdm_cat, c(1L, 2L))
 })
 
+test_that("check_data.rdm_simple names the coding for a labelled response", {
+  model <- rdm(rt = "rt", response = "response", n_choices = 2)
+  dat <- data.frame(rt = c(0.5, 0.6), response = factor(c("yes", "no")))
+  expect_error(check_data(model, dat, bmf(driftc ~ 1)),
+               "1 = correct")
+  expect_error(check_data(model, dat, bmf(driftc ~ 1)),
+               "'yes', 'no'")
+  expect_error(
+    check_data(model, transform(dat, response = as.character(response)),
+               bmf(driftc ~ 1)),
+    "non-numeric label"
+  )
+})
+
 test_that("check_data.rdm returns a data.frame", {
   model <- rdm(rt = "rt", response = "response", n_choices = 2)
   dat <- data.frame(rt = c(0.5, 0.6), response = c(1, 2))
@@ -271,6 +285,60 @@ test_that("check_data.rdm_custom errors on non-character responses", {
   expect_error(check_data(model, dat, f), "character labels")
 })
 
+# A count of zero, a negative count or a fraction reaches the Stan likelihood as
+# log(n[response]) = -Inf / NaN, which ends the chain with no usable message
+custom_counts_model <- function(accumulators) {
+  model <- rdm(rt = "rt", response = "resp", version = "custom",
+               accumulators = accumulators)
+  check_model(model, formula = bmf(corr ~ 1, err ~ 1, ndt ~ 1))
+}
+
+test_that("check_data.rdm_custom refuses constant counts that are not positive integers", {
+  f <- bmf(corr ~ 1, err ~ 1, ndt ~ 1)
+  dat <- data.frame(rt = c(0.5, 0.6), resp = c("corr", "err"))
+
+  expect_error(
+    check_data(custom_counts_model(c(corr = 0, err = 2)), dat, f),
+    "corr = 0"
+  )
+  expect_error(
+    check_data(custom_counts_model(c(corr = -1, err = 2.5)), dat, f),
+    "err = 2.5"
+  )
+  expect_error(
+    check_data(custom_counts_model(c(corr = 1, err = Inf)), dat, f),
+    "positive integer"
+  )
+  expect_error(
+    check_data(custom_counts_model(list(corr = 1, err = 2)), dat, f),
+    "must be NULL, a named numeric vector"
+  )
+  ok <- check_data(custom_counts_model(c(corr = 1, err = 2)), dat, f)
+  expect_equal(ok$.rdm_n2, c(2L, 2L))
+})
+
+test_that("check_data.rdm_custom validates the values of an accumulators column", {
+  f <- bmf(corr ~ 1, err ~ 1, ndt ~ 1)
+  model <- custom_counts_model(c(corr = "nc", err = "ne"))
+  dat <- data.frame(rt = c(0.5, 0.6, 0.7), resp = c("corr", "err", "corr"),
+                    nc = c(1L, 1L, 1L), ne = c(2L, 2L, 2L))
+
+  expect_error(check_data(model, transform(dat, ne = c(2, 2.5, 2)), f),
+               "'ne' must contain integers >= 0")
+  expect_error(check_data(model, transform(dat, nc = c(1, -1, 1)), f),
+               "'nc' must contain integers >= 0")
+  expect_error(check_data(model, transform(dat, nc = c(1, NA, 1)), f),
+               "'nc' contains NA or non-finite")
+  expect_error(check_data(model, transform(dat, nc = c("a", "b", "c")), f),
+               "'nc' must be numeric")
+
+  # a category may sit a trial out; only the winner needs an accumulator
+  loser_out <- check_data(model, transform(dat, ne = c(0L, 2L, 0L)), f)
+  expect_equal(loser_out$.rdm_n2, c(0L, 2L, 0L))
+  expect_error(check_data(model, transform(dat, nc = c(1L, 1L, 0L)), f),
+               "'corr' wins on trials where accumulators")
+})
+
 # -----------------------------------------------------------------------------
 # check_model tests (custom version)
 # -----------------------------------------------------------------------------
@@ -293,6 +361,48 @@ test_that("check_model.rdm_custom errors on Stan reserved words", {
   expect_error(check_model(model, formula = f), "Stan reserved words")
 })
 
+# .stan_reserved is the measured list: every candidate was handed to stanc as a
+# category of a generated program. `N`, `Y` and `lprior` are names the
+# surrounding brms/bmm code declares, and `Intercept` collides with the
+# `real Intercept` brms writes for the response's own intercept ("Identifier
+# "Intercept" is already in use", stanc 2.40, measured on this family). `log` is
+# only a function name and stanc accepts a vector argument that shadows it.
+test_that("check_model.rdm_custom refuses the names the program already uses", {
+  model <- rdm(rt = "rt", response = "resp", version = "custom")
+  refused <- function(name) {
+    f <- bmf(corr ~ 1, gap ~ 1, ndt ~ 1)
+    f[[name]] <- stats::as.formula(paste(name, "~ 1"))
+    check_model(model, formula = f)
+  }
+  for (name in c("N", "Y", "lprior", "Intercept")) {
+    expect_error(refused(name), "reserved", info = name)
+  }
+  expect_error(refused("mu"), "reserved internal parameter names")
+  expect_silent(refused("log"))
+
+  # Stan is case-sensitive and so is the comparison: stanc 2.40 accepts every
+  # one of these as a category of the generated program (measured), and a
+  # case-folded comparison against .stan_reserved would refuse them all
+  for (name in c("Real", "Data", "Vector", "y", "Lprior", "Target")) {
+    expect_silent(refused(name))
+  }
+  expect_error(refused("real"), "Stan reserved words")
+})
+
+# gap, ndt, s and sp are consumed as the model's own parameters before the
+# category names are read, so a response level of that name can only ever be
+# reported as missing from the formula
+test_that("check_data.rdm_custom refuses a response level named after a parameter", {
+  f <- bmf(corr ~ 1, err ~ 1, ndt ~ 1)
+  model <- check_model(rdm(rt = "rt", response = "resp", version = "custom"),
+                       formula = f)
+  for (level in c("ndt", "s", "sp", "mu", "Intercept")) {
+    dat <- data.frame(rt = c(0.5, 0.6), resp = c("corr", level))
+    expect_error(check_data(model, dat, f),
+                 "Response levels cannot use reserved", info = level)
+  }
+})
+
 test_that("check_model.rdm_custom errors on category names ending in numbers", {
   model <- rdm(rt = "rt", response = "resp", version = "custom")
   f <- bmf(correct ~ 1, error1 ~ 1, gap ~ 1, ndt ~ 1)
@@ -303,6 +413,32 @@ test_that("check_model.rdm_custom errors on category names containing underscore
   model <- rdm(rt = "rt", response = "resp", version = "custom")
   f <- bmf(correct ~ 1, error_a ~ 1, gap ~ 1, ndt ~ 1)
   expect_error(check_model(model, data = NULL, formula = f), "cannot contain underscores")
+})
+
+# -----------------------------------------------------------------------------
+# check_formula tests
+# -----------------------------------------------------------------------------
+
+test_that("check_formula.rdm warns only where s has an intercept", {
+  model <- rdm(rt = "rt", response = "response", n_choices = 2)
+  dat <- data.frame(rt = rep(c(0.5, 0.6), 5), response = rep(c(1, 2), 5),
+                    cond = rep(c("a", "b"), 5))
+  warns <- function(f) {
+    checked <- suppressMessages(check_model(model, data = dat, formula = f))
+    suppressMessages(check_formula(checked, dat, f))
+  }
+
+  expect_warning(warns(bmf(driftc ~ 1, drifte ~ 1, gap ~ 1, ndt ~ 1, s ~ 1)),
+                 "only their ratios are identified")
+  expect_warning(warns(bmf(driftc ~ 1, drifte ~ 1, gap ~ 1, ndt ~ 1, s ~ cond)),
+                 "scale")
+  expect_no_warning(
+    warns(bmf(driftc ~ 1, drifte ~ 1, gap ~ 1, ndt ~ 1, s ~ 0 + cond))
+  )
+  expect_no_warning(warns(bmf(driftc ~ 1, drifte ~ 1, gap ~ 1, ndt ~ 1)))
+  expect_no_warning(
+    warns(bmf(driftc ~ 1, drifte ~ 1, gap ~ 1, ndt ~ 1, s = log(0.9)))
+  )
 })
 
 # -----------------------------------------------------------------------------
@@ -713,6 +849,132 @@ test_that("rdm simple with sp estimated runs with mock backend", {
   expect_no_error(
     bmm(f, dat, model, backend = "mock", mock_fit = 1, rename = FALSE)
   )
+})
+
+# -----------------------------------------------------------------------------
+# Post-processing tests
+# -----------------------------------------------------------------------------
+
+# three draws that differ in every parameter, and three observations that differ
+# in how many error accumulators race
+rdm_epred_prep <- function() {
+  structure(
+    list(
+      ndraws = 3L, nobs = 3L,
+      data = list(Y = c(0.6, 0.7, 0.8), vint1 = c(1L, 2L, 1L),
+                  vint2 = c(1L, 1L, 1L), vint3 = c(1L, 2L, 3L)),
+      dpars = list(
+        driftc = c(3, 2.5, 4), drifte = c(1.5, 1.2, 2),
+        gap = c(0.8, 1.2, 0.6), ndt = c(0.2, 0.15, 0.25),
+        s = c(1, 0.9, 1.1), sp = c(1e-10, 0.3, 0.2)
+      ),
+      family = list(dpars = c("mu", "driftc", "drifte", "gap", "ndt", "s", "sp"))
+    ),
+    class = "brmsprep"
+  )
+}
+
+test_that("posterior_epred for rdm is deterministic and integrates the race", {
+  withr::local_seed(7)
+  prep <- rdm_epred_prep()
+  epred <- posterior_epred_rdm_simple(prep)
+  expect_identical(epred, posterior_epred_rdm_simple(prep))
+
+  n_mc <- 1e5
+  for (i in 1:3) {
+    for (k in 1:3) {
+      race <- .rdm_race(
+        drift = matrix(c(prep$dpars$driftc[k], prep$dpars$drifte[k]), n_mc, 2,
+                       byrow = TRUE),
+        gap = rep(prep$dpars$gap[k], n_mc), A = rep(prep$dpars$sp[k], n_mc),
+        s = rep(prep$dpars$s[k], n_mc),
+        counts = matrix(c(prep$data$vint2[i], prep$data$vint3[i]), n_mc, 2,
+                        byrow = TRUE)
+      )
+      mc <- mean(race$rt) + prep$dpars$ndt[k]
+      se <- stats::sd(race$rt) / sqrt(n_mc)
+      expect_lt(abs(epred[k, i] - mc), 4 * se)
+    }
+  }
+})
+
+# The fake prep above carries every parameter as a draw-length vector; on a real
+# fit brms stores the fixed s and sp as scalars, which only this path grows to
+# ndraws. posterior_epred() picks a random subset of draws unless draw_ids is
+# given, so the determinism is pinned at fixed draw_ids.
+test_that("posterior_epred for rdm recovers the mean RT of a fitted model", {
+  path <- test_path("assets", "bmmfit_rdm_ppcheck.rds")
+  skip_if_not(file.exists(path), "fixture not available")
+  fit <- readRDS(path)
+
+  epred <- brms::posterior_epred(fit, draw_ids = 1:20)
+  expect_identical(epred, brms::posterior_epred(fit, draw_ids = 1:20))
+  expect_identical(dim(epred), c(20L, nrow(fit$data)))
+  expect_lt(abs(mean(epred) - mean(fit$data$rt)), 0.02)
+})
+
+# The winner of a K = 3 simple race is "some error accumulator", which is
+# log(K - 1) above one named accumulator winning. Constant in the parameters, so
+# posteriors are unaffected, but loo() and waic() are shifted by it; pinned here
+# so that a change of convention is deliberate (see ?rdm)
+test_that("log_lik for the simple version carries the category constant", {
+  prep <- structure(
+    list(
+      ndraws = 1L,
+      data = list(Y = c(0.6, 0.7), vint1 = c(1L, 2L),
+                  vint2 = c(1L, 1L), vint3 = c(2L, 2L)),
+      dpars = list(driftc = 3, drifte = 1.5, gap = 0.9, ndt = 0.2, s = 1,
+                   sp = 0.25),
+      family = list(dpars = c("mu", "driftc", "drifte", "gap", "ndt", "s", "sp"))
+    ),
+    class = "brmsprep"
+  )
+  per_accumulator <- function(i, response) {
+    drdm(prep$data$Y[i], response,
+         drift = c(prep$dpars$driftc, rep(prep$dpars$drifte, 2)),
+         gap = prep$dpars$gap, ndt = prep$dpars$ndt, s = prep$dpars$s,
+         sp = prep$dpars$sp, log = TRUE)
+  }
+  ll <- vapply(1:2, .rdm_log_lik, numeric(1), prep = prep,
+               cat_names = c("driftc", "drifte"), n_cats = 2)
+  expect_equal(ll[1] - per_accumulator(1, 1), 0, tolerance = 1e-12)
+  expect_equal(ll[2] - per_accumulator(2, 2), log(2), tolerance = 1e-12)
+  expect_equal(per_accumulator(2, 2), per_accumulator(2, 3), tolerance = 1e-12)
+})
+
+# .rdm_race() is what pp_simulate.rdm() and posterior_predict() both draw from,
+# so its joint law over (response, rt) is the one the pp_check panels show. A
+# simulator that drew the response from the marginal choice probabilities would
+# match both margins and fail here.
+test_that(".rdm_race() reproduces the joint law of drdm()", {
+  withr::local_seed(11)
+  drift <- c(3, 1.4)
+  counts <- c(1L, 2L)
+  gap <- 1
+  sp <- 0.25
+  ndt <- 0.2
+  n <- 2e5
+  race <- .rdm_race(
+    drift = matrix(drift, n, 2, byrow = TRUE), gap = rep(gap, n),
+    A = rep(sp, n), s = rep(1, n),
+    counts = matrix(counts, n, 2, byrow = TRUE)
+  )
+  rt <- race$rt + ndt
+  cut <- stats::median(rt)
+
+  for (j in 1:2) {
+    density_j <- function(t) {
+      exp(.rdm_race_lpdf(
+        t = t - ndt, response = rep(j, length(t)),
+        drift = matrix(drift, length(t), 2, byrow = TRUE),
+        counts = matrix(counts, length(t), 2, byrow = TRUE),
+        gap = rep(gap, length(t)), A = rep(sp, length(t)), s = rep(1, length(t))
+      ))
+    }
+    p_sim <- mean(race$response == j & rt < cut)
+    p_exact <- stats::integrate(density_j, ndt, cut, rel.tol = 1e-10)$value
+    expect_lt(abs(p_sim - p_exact) / sqrt(p_sim * (1 - p_sim) / n), 4)
+  }
 })
 
 # -----------------------------------------------------------------------------

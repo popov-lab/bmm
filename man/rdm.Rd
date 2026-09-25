@@ -153,6 +153,19 @@ constant on the log link, e.g. \code{bmf(..., sp = log(0.3))}, which is honoured
 as a start point uniform on \verb{[0, 0.3]} by the sampler and by \code{log_lik()},
 \code{posterior_predict()}, \code{posterior_epred()} and \code{pp_check()} alike.
 }
+
+\subsection{Likelihood convention}{
+
+\code{log_lik()}, and therefore \code{loo()} and \code{waic()}, use the likelihood of the
+\emph{category} that was observed, not of one named accumulator: the winner's
+density carries \code{log(n_j)} for a category raced by \code{n_j} identical
+accumulators. For \code{version = "simple"} the error category holds all K - 1
+error accumulators, so every error trial sits log(K - 1) above a
+per-response likelihood. That term does not depend on any parameter, so
+posteriors and predictions are unaffected, but \code{loo()} and \code{waic()} values
+are shifted by it and are not comparable with a \code{version = "custom"} fit,
+which names each accumulator, or with another package that does.
+}
 }
 \note{
 Both versions describe the same response type (a categorical winner in

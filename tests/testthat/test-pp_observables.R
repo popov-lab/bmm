@@ -19,7 +19,9 @@ registered_models <- list(
   cswald(rt = "rt", response = "resp", version = "crisk"),
   ezdm(mean_rt = "mrt", var_rt = "vrt", n_upper = "nu", n_trials = "nt"),
   ezdm(mean_rt = c("mu", "ml"), var_rt = c("vu", "vl"), n_upper = "nu",
-       n_trials = "nt", version = "4par")
+       n_trials = "nt", version = "4par"),
+  rdm(rt = "rt", response = "resp", n_choices = 3),
+  rdm(rt = "rt", response = "resp", version = "custom")
 )
 
 test_that("declared observables name real standata slots", {
@@ -36,10 +38,14 @@ test_that("declared observables name real standata slots", {
               var_rt = c("var_rt_upper", "var_rt_lower"),
               n_upper = "n_upper", n_trials = "n_trials", version = "4par"),
          rezdm(5, n_trials = 40, drift = 0.3, bound = 1.2, ndt = 0.3,
-               version = "4par"))
+               version = "4par")),
+    list(rdm(rt = "rt", response = "response", n_choices = 3),
+         rrdm(20, drift = c(3, 1.4, 1.4), gap = 1, ndt = 0.3),
+         bmf(driftc ~ 1, drifte ~ 1, gap ~ 1, ndt ~ 1))
   )
   for (case in cases) {
-    slots <- names(suppressMessages(standata(bmf(drift ~ 1), case[[2]], case[[1]])))
+    form <- if (length(case) > 2L) case[[3L]] else bmf(drift ~ 1)
+    slots <- names(suppressMessages(standata(form, case[[2]], case[[1]])))
     expect_true(all(pp_observables(case[[1]])$observed %in% slots))
   }
 })
@@ -85,7 +91,7 @@ test_that("every registered compute closure is elementwise", {
       expected[[key]] <- .pp_expand_data(compute(observed), n_draws)
     }
   }
-  expect_length(actual, 17L)
+  expect_length(actual, 21L)
   expect_equal(actual, expected)
 })
 
@@ -138,6 +144,28 @@ test_that("cswald simple doubles the bound of the two-boundary generator", {
                                    s = 1))
   ))
   expect_identical(simple, crisk)
+})
+
+# The counts come from the vint columns, one value per observation, so a
+# per-observation expansion that recycled draw-major would race the wrong number
+# of accumulators for most cells: here observation 1 has a single error
+# accumulator and observation 2 has four, which changes P(correct) sharply.
+test_that("pp_simulate.rdm() races the per-observation accumulator counts", {
+  prep <- fake_prep(200L, 2L, dpars = list(
+    driftc = 2, drifte = 2, gap = 1, ndt = 0.2, s = 1, sp = 1e-10
+  ), data = list(vint1 = c(1L, 1L), vint2 = c(1L, 1L), vint3 = c(1L, 4L)))
+  prep$family <- list(dpars = c("mu", "driftc", "drifte", "gap", "ndt", "s",
+                               "sp"))
+  sims <- withr::with_seed(5, pp_simulate(
+    rdm(rt = "rt", response = "r", n_choices = 2), prep
+  ))
+
+  expect_identical(dim(sims$rt), c(200L, 2L))
+  expect_identical(dim(sims$response), c(200L, 2L))
+  expect_true(all(sims$rt > 0.2))
+  # equal drifts: 1 vs 1 accumulator is a coin flip, 1 vs 4 is won 1 time in 5
+  expect_lt(abs(mean(sims$response[, 1] == 1L) - 0.5), 0.1)
+  expect_lt(abs(mean(sims$response[, 2] == 1L) - 0.2), 0.1)
 })
 
 test_that("pp_simulate() for ezdm respects per-observation trial counts", {

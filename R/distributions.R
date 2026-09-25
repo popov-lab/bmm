@@ -1110,6 +1110,33 @@ log_diff_exp <- function(a, b) {
   out
 }
 
+# E[T] = int_0^inf S(t) dt for a non-negative T, evaluated deterministically so
+# that two calls on the same draws return the same number. The substitution
+# u = log(t) turns a race survivor, which decays over several orders of
+# magnitude in t, into an integrand S(e^u) e^u that a uniform grid in u
+# resolves. `log_surv` takes the grid times and returns a draws x grid matrix of
+# log survivors, so every racing model can share the integrator. Below `t_lo`
+# the survivor is 1 to the caller's chosen tolerance, so that stretch
+# contributes t_lo exactly.
+race_expected_time <- function(log_surv, t_lo, t_hi, n_grid = 1024L) {
+  u <- seq(log(t_lo), log(t_hi), length.out = n_grid)
+  integrand <- exp(sweep(log_surv(exp(u)), 2, u, `+`))
+  du <- u[2] - u[1]
+  edge <- (integrand[, 1] + integrand[, n_grid]) / 2
+  t_lo + du * (rowSums(integrand) - edge)
+}
+
+# log S(t) for one Wald accumulator with a start point uniform on [0, A], as a
+# draws x length(t) matrix from draw-length parameter vectors
+wald_log_surv <- function(t, drift, gap, A, s) {
+  n_draws <- length(drift)
+  matrix(
+    .pwald_full(rep(t, each = n_draws), drift = drift, bound = gap + A, A = A,
+                s = s, lower.tail = FALSE, log.p = TRUE),
+    nrow = n_draws
+  )
+}
+
 .pwald <- function(rt, drift, bound, s, lower.tail = TRUE, log.p = TRUE) {
   z1 <- (drift * rt - bound) / (s * sqrt(rt))
   z2 <- -(drift * rt + bound) / (s * sqrt(rt))

@@ -132,9 +132,12 @@ recovery_cases <- list(
   ),
   simple_4choice_free_sp = list(
     data = simple_4choice_data,
-    formula = bmf(driftc ~ 1, drifte ~ 1, gap ~ 1, ndt ~ 1, s ~ 1, sp ~ 1),
+    # s is fixed to the value the data were simulated with: freeing it with an
+    # intercept opens the (drift, gap, sp, s) scale ray, along which the
+    # likelihood is exactly flat, so nothing on it could be recovered
+    formula = bmf(driftc ~ 1, drifte ~ 1, gap ~ 1, ndt ~ 1, s = log(0.9), sp ~ 1),
     model = rdm(rt = "rt", response = "response", n_choices = 4),
-    truth = c(driftc = 3.0, drifte = 1.3, gap = 1.0, ndt = 0.22, s = 0.9, sp = 0.04)
+    truth = c(driftc = 3.0, drifte = 1.3, gap = 1.0, ndt = 0.22, sp = 0.04)
   ),
   custom_fixed = list(
     data = custom_fixed_data,
@@ -149,14 +152,16 @@ recovery_cases <- list(
   ),
   custom_free_sp = list(
     data = custom_free_data,
-    formula = bmf(corr ~ 1, lure ~ 1, npl ~ 1, gap ~ 1, ndt ~ 1, s ~ 1, sp ~ 1),
+    formula = bmf(corr ~ 1, lure ~ 1, npl ~ 1, gap ~ 1, ndt ~ 1,
+                  s = log(0.95), sp ~ 1),
     model = rdm(
       rt = "rt",
       response = "response",
       version = "custom",
       accumulators = c(corr = 1, lure = 2, npl = 2)
     ),
-    truth = c(corr = 2.8, lure = 1.9, npl = 1.2, gap = 1.05, ndt = 0.24, s = 0.95, sp = 0.03)
+    truth = c(corr = 2.8, lure = 1.9, npl = 1.2, gap = 1.05, ndt = 0.24,
+              sp = 0.03)
   )
 )
 

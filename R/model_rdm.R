@@ -81,12 +81,12 @@
   )
 }
 
-.rdm_stan_reserved <- c(
-  "int", "real", "vector", "matrix", "array", "if", "else", "for", "while",
-  "return", "void", "data", "model", "target", "print", "reject", "log",
-  "exp", "lower", "upper", "in", "functions", "generated", "transformed",
-  "parameters"
-)
+# Names the generated program already gives something else. The model's own
+# dpars are there, and so is `Intercept`: brms declares `real Intercept` for the
+# response's intercept, which collides with the `vector[N] Intercept` a category
+# of that name would declare ("Identifier "Intercept" is already in use", stanc
+# 2.40). Unlike .stan_reserved these are bmm's and brms's own names, not Stan's.
+.rdm_reserved_dpars <- c("mu", "gap", "ndt", "s", "sp", "intercept")
 
 .model_rdm <- function(
     rt = NULL,
@@ -201,6 +201,18 @@ settable_link_functions.rdm <- function(model) {
 #' as a start point uniform on `[0, 0.3]` by the sampler and by `log_lik()`,
 #' `posterior_predict()`, `posterior_epred()` and `pp_check()` alike.
 #'
+#' ## Likelihood convention
+#'
+#' `log_lik()`, and therefore `loo()` and `waic()`, use the likelihood of the
+#' *category* that was observed, not of one named accumulator: the winner's
+#' density carries `log(n_j)` for a category raced by `n_j` identical
+#' accumulators. For `version = "simple"` the error category holds all K - 1
+#' error accumulators, so every error trial sits log(K - 1) above a
+#' per-response likelihood. That term does not depend on any parameter, so
+#' posteriors and predictions are unaffected, but `loo()` and `waic()` values
+#' are shifted by it and are not comparable with a `version = "custom"` fit,
+#' which names each accumulator, or with another package that does.
+#'
 #' @note Both versions describe the same response type (a categorical winner in
 #'   a choice-RT race), so they live in one constructor rather than separate
 #'   model functions: `"simple"` is an accuracy-coded convenience layer (correct
@@ -271,7 +283,14 @@ check_model.rdm_custom <- function(model, data = NULL, formula = NULL) {
       "Custom version requires at least one accumulator parameter in the formula."
     )
 
-    bad_names <- intersect(tolower(cat_pars), .rdm_stan_reserved)
+    bad_internal_names <- cat_pars[tolower(cat_pars) %in% .rdm_reserved_dpars]
+    stopif(
+      length(bad_internal_names) > 0,
+      "Category names cannot use reserved internal parameter names: \\
+      {collapse_comma(bad_internal_names)}."
+    )
+
+    bad_names <- intersect(cat_pars, .stan_reserved)
     stopif(
       length(bad_names) > 0,
       "Category names cannot be Stan reserved words: {collapse_comma(bad_names)}. \\
@@ -377,10 +396,19 @@ check_data.rdm_simple <- function(model, data, formula) {
   response_var <- model$resp_vars$response
   n_alt <- model$other_vars$n_choices
 
-  if (is.factor(data[, response_var])) {
-    data[, response_var] <- as.integer(as.character(data[, response_var]))
-  } else if (is.character(data[, response_var])) {
-    data[, response_var] <- as.integer(data[, response_var])
+  if (is.factor(data[, response_var]) || is.character(data[, response_var])) {
+    labels <- as.character(data[, response_var])
+    coded <- suppressWarnings(as.integer(labels))
+    # as.integer() turns a label that is not a number into NA, and every check
+    # below then compares against NA rather than refusing the label
+    stopif(
+      anyNA(coded),
+      "The response variable '{response_var}' must be integer-coded 1:{n_alt} \\
+      (1 = correct, 2:{n_alt} = errors) for version 'simple', but contains the \\
+      non-numeric label(s) {collapse_comma(unique(labels[is.na(coded)]))}. Use \\
+      version 'custom' for named response categories."
+    )
+    data[, response_var] <- coded
   }
 
   stopif(
@@ -421,6 +449,14 @@ check_data.rdm_custom <- function(model, data, formula) {
   )
 
   data_levels <- unique(data[, response_var])
+  # a level named after one of the model's own parameters cannot have reached the
+  # formula as a category, so it would otherwise be reported as unspecified
+  bad_levels <- data_levels[tolower(data_levels) %in% .rdm_reserved_dpars]
+  stopif(
+    length(bad_levels) > 0,
+    "Response levels cannot use reserved internal parameter names: \\
+    {collapse_comma(bad_levels)}."
+  )
   missing_in_formula <- setdiff(data_levels, cat_names)
   missing_in_data <- setdiff(cat_names, data_levels)
   stopif(
@@ -446,8 +482,16 @@ check_data.rdm_custom <- function(model, data, formula) {
       "accumulators must have names matching formula categories: \\
       {collapse_comma(cat_names)}"
     )
+    counts <- num_alt[cat_names]
+    invalid <- counts[!is.finite(counts) | counts < 1 | counts != round(counts)]
+    stopif(
+      length(invalid) > 0,
+      "accumulators must contain a positive integer for each formula category. \\
+      Invalid value(s): \\
+      {collapse_comma(glue('{names(invalid)} = {invalid}'))}"
+    )
     for (i in seq_along(cat_names)) {
-      data[[paste0(".rdm_n", i)]] <- as.integer(num_alt[cat_names[i]])
+      data[[paste0(".rdm_n", i)]] <- as.integer(counts[[i]])
     }
   } else if (is.character(num_alt)) {
     stopif(
@@ -461,13 +505,70 @@ check_data.rdm_custom <- function(model, data, formula) {
       "accumulators columns {collapse_comma(missing_cols)} not found \\
       in the data."
     )
+    # a trial-varying count may be zero for a category that sits that trial out
+    # -- the likelihood and the simulator both skip it -- but never fractional
+    # or negative, which Stan would turn into a NaN target
     for (i in seq_along(cat_names)) {
-      data[[paste0(".rdm_n", i)]] <- as.integer(data[, num_alt[cat_names[i]]])
+      col_name <- num_alt[cat_names[i]]
+      col_vals <- data[, col_name]
+      stopif(
+        !is.numeric(col_vals),
+        "accumulators column '{col_name}' must be numeric."
+      )
+      stopif(
+        anyNA(col_vals) || any(!is.finite(col_vals)),
+        "accumulators column '{col_name}' contains NA or non-finite values."
+      )
+      stopif(
+        any(col_vals < 0 | col_vals != round(col_vals)),
+        "accumulators column '{col_name}' must contain integers >= 0."
+      )
+      data[[paste0(".rdm_n", i)]] <- as.integer(col_vals)
     }
+  } else {
+    stop2(
+      "accumulators must be NULL, a named numeric vector of positive integers, \\
+      or a named character vector of column names."
+    )
   }
+
+  # the Stan likelihood opens with log(n[response]); a winner with no
+  # accumulator makes that -Inf and the chain dies with no usable message
+  per_trial <- as.matrix(data[paste0(".rdm_n", seq_along(cat_names))])
+  won <- per_trial[cbind(seq_len(nrow(data)), data$.rdm_cat)]
+  empty_winners <- unique(cat_names[data$.rdm_cat[won < 1L]])
+  stopif(
+    length(empty_winners) > 0,
+    "Category {collapse_comma(empty_winners)} wins on trials where accumulators \\
+    gives it no accumulator. A category that can be chosen needs at least one \\
+    accumulator on every trial where it wins."
+  )
 
   model$other_vars$n_choices <- n_cats
   NextMethod("check_data")
+}
+
+############################################################################# !
+# CHECK_FORMULA S3 methods                                               ####
+############################################################################# !
+
+# Scaling drift, gap, sp and s by a common factor leaves the likelihood exactly
+# unchanged, so an intercept for s slides along that ray together with the
+# drifts and the thresholds and none of them is identified. Contrasts of s are
+# identified, because the reference cell pins the scale.
+#' @export
+check_formula.rdm <- function(model, data, formula) {
+  s_form <- formula[["s"]]
+  warnif(
+    is_formula(s_form) && !is_constant(s_form) && has_intercept(s_form),
+    "The formula for 's' has an intercept, so 's' is estimated on the same \\
+    scale as the drift rates, 'gap' and 'sp': multiplying all of them by a \\
+    common factor leaves the likelihood unchanged, so only their ratios are \\
+    identified. Either fix 's' (the default, or to another value with \\
+    s = log(0.9) in bmf()) or suppress the intercept to estimate contrasts of \\
+    's' only, as in s ~ 0 + condition."
+  )
+  NextMethod("check_formula")
 }
 
 ############################################################################# !
@@ -668,39 +769,42 @@ configure_model.rdm_custom <- function(model, data, formula) {
   race$rt + d$ndt
 }
 
+# E[RT] = ndt + int_0^inf prod_j S_j(t)^n_j dt. A Monte-Carlo estimate of this
+# integral moved by several percent between two calls on the same draws, which
+# reached the user as noise on conditional_effects(); the grid is deterministic.
 .rdm_posterior_epred <- function(prep, cat_names, n_cats, ...) {
-  n_obs <- prep$nobs
-  n_draws <- prep$ndraws
-  n_sim <- 100L
+  epred <- matrix(NA_real_, nrow = prep$ndraws, ncol = prep$nobs)
+  for (i in seq_len(prep$nobs)) {
+    d <- .rdm_draw_pars(i, prep, cat_names, n_cats)
+    # the counts belong to the observation, not the draw, so every row is the
+    # same and the first one names the categories that race at all
+    racing <- which(d$counts[1, ] > 0)
 
-  epred <- matrix(NA_real_, nrow = n_draws, ncol = n_obs)
-  for (i in seq_len(n_obs)) {
-    gap <- brms::get_dpar(prep, "gap", i = i)
-    ndt <- brms::get_dpar(prep, "ndt", i = i)
-    s <- brms::get_dpar(prep, "s", i = i)
-    sp <- brms::get_dpar(prep, "sp", i = i)
-    drift <- lapply(cat_names, function(p) brms::get_dpar(prep, p, i = i))
-    n_cat <- vapply(
-      seq_len(n_cats),
-      function(j) prep$data[[paste0("vint", j + 1)]][i],
-      integer(1)
+    log_surv <- function(t) {
+      out <- matrix(0, prep$ndraws, length(t))
+      for (j in racing) {
+        out <- out + d$counts[, j] *
+          wald_log_surv(t, d$drift[, j], d$gap, d$sp, d$s)
+      }
+      out
+    }
+
+    # the race is over once the slowest single accumulator is, so the plain
+    # Wald bound S(t) <= Phi((b - v t) / (s sqrt t)) on the smallest drift and
+    # the full distance b = gap + sp sets t_hi where it falls below 1e-12;
+    # t_lo is where the fastest accumulator's CDF, at the shortest distance
+    # gap, is still that small, so the survivor is 1 below it
+    v_lo <- matrixStats::rowMins(d$drift[, racing, drop = FALSE])
+    v_hi <- matrixStats::rowMaxs(d$drift[, racing, drop = FALSE])
+    root <- 7.1 * d$s
+    t_hi <- max(((root + sqrt(root^2 + 4 * v_lo * (d$gap + d$sp))) /
+                   (2 * v_lo))^2)
+    t_lo <- max(
+      min(((sqrt(root^2 + 4 * v_hi * d$gap) - root) / (2 * v_hi))^2),
+      t_hi * 1e-12
     )
 
-    b_m <- matrix(gap + sp, n_draws, n_sim)
-    s_m <- matrix(s, n_draws, n_sim)
-    min_ft <- matrix(Inf, n_draws, n_sim)
-    for (j in seq_len(n_cats)) {
-      if (n_cat[j] == 0) next
-      dj <- matrix(drift[[j]], n_draws, n_sim)
-      for (k in seq_len(n_cat[j])) {
-        bound <- b_m - matrix(stats::runif(n_draws * n_sim), n_draws, n_sim) *
-          matrix(sp, n_draws, n_sim)
-        ft <- .rwald_ig(n_draws * n_sim, drift = dj, bound = bound, s = s_m)
-        dim(ft) <- c(n_draws, n_sim)
-        min_ft <- pmin(min_ft, ft)
-      }
-    }
-    epred[, i] <- rowMeans(min_ft) + ndt
+    epred[, i] <- d$ndt + race_expected_time(log_surv, t_lo, t_hi)
   }
   epred
 }
@@ -740,4 +844,55 @@ posterior_epred_rdm_custom <- function(prep, ...) {
   )
   .rdm_posterior_epred(prep, cat_names = cat_names,
                        n_cats = length(cat_names), ...)
+}
+
+############################################################################# !
+# PP_CHECK OBSERVABLES                                                    ####
+############################################################################# !
+
+# brms::posterior_predict() returns one matrix, so the winning category rides
+# along as a second observable here instead. vint1 is the category code that
+# check_data() wrote, in the order of the family's accumulator dpars.
+#' @export
+pp_observables.rdm <- function(model) {
+  cats <- model$other_vars$resp_cats %||% c("correct", "error")
+  coding <- collapse_comma(glue("{seq_along(cats)} = {cats}"))
+  list(
+    observed = c(rt = "Y", response = "vint1"),
+    checks = list(
+      rt = .pp_observable(function(d) d$rt, label = "Response time"),
+      response = .pp_observable(
+        function(d) d$response,
+        label = glue("Response category ({coding})"),
+        type = "bars"
+      )
+    )
+  )
+}
+
+# One method for both versions: the accumulator dpars carry their own order, so
+# nothing here depends on whether they came from n_choices or from the formula.
+# rt and response come out of ONE race, so that a fast trial is a fast trial of
+# the accumulator that actually won it.
+#' @export
+pp_simulate.rdm <- function(model, prep) {
+  cat_names <- setdiff(prep$family$dpars, c("mu", "gap", "ndt", "s", "sp"))
+  n_cats <- length(cat_names)
+  n_row <- prep$ndraws * prep$nobs
+
+  race <- .rdm_race(
+    drift = matrix(vapply(cat_names, .pp_dpar_vector, numeric(n_row),
+                          prep = prep), nrow = n_row),
+    gap = .pp_dpar_vector(prep, "gap"),
+    A = .pp_dpar_vector(prep, "sp"),
+    s = .pp_dpar_vector(prep, "s"),
+    counts = matrix(vapply(seq_len(n_cats), function(j) {
+      rep(prep$data[[paste0("vint", j + 1)]], each = prep$ndraws)
+    }, integer(n_row)), nrow = n_row)
+  )
+
+  list(
+    rt = matrix(race$rt + .pp_dpar_vector(prep, "ndt"), nrow = prep$ndraws),
+    response = matrix(race$response, nrow = prep$ndraws)
+  )
 }

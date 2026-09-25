@@ -254,6 +254,37 @@ test_that("pp_check(resp_var) simulates cswald RTs on the fitted scale", {
   expect_lt(abs(mean(sims$response) - mean(fit$data$response)), 0.15)
 })
 
+test_that("pp_check(resp_var) works for the rdm model", {
+  fit <- load_ppcheck_fit("bmmfit_rdm_ppcheck.rds")
+  p <- pp_check(fit, resp_var = "rt", ndraws = 5)
+  expect_s3_class(p, "ggplot")
+  expect_equal(p$data$value[p$data$is_y_label == "italic(y)"], fit$data$rt)
+
+  resp <- pp_check(fit, resp_var = "response", ndraws = 5)
+  expect_s3_class(resp, "ggplot")
+  expect_s3_class(pp_check(fit, resp_var = "all", ndraws = 5),
+                  "bayesplot_grid")
+  expect_equal(pp_check_vars(fit)$resp_var, c("rt", "response"))
+})
+
+# posterior_predict() returns RTs only, so the joint law of (rt, response) is
+# visible only through pp_simulate(); on a real fit the simulated categories must
+# reproduce the observed accuracy, not just the RT distribution
+test_that("pp_check(resp_var) simulates rdm rt and response jointly", {
+  fit <- load_ppcheck_fit("bmmfit_rdm_ppcheck.rds")
+  prep <- brms::prepare_predictions(fit, ndraws = 50)
+  sims <- withr::with_seed(2, pp_simulate(fit$bmm$model, prep))
+
+  expect_identical(dim(sims$rt), c(50L, nrow(fit$data)))
+  expect_true(all(sims$rt > 0))
+  expect_lt(abs(median(sims$rt) - median(fit$data$rt)), 0.1)
+  observed_correct <- mean(prep$data$vint1 == 1L)
+  expect_lt(abs(mean(sims$response == 1L) - observed_correct), 0.1)
+  # the winner is fast for the accumulator that won it, so the two categories
+  # differ in their RT distribution within the same simulation
+  expect_gt(mean(sims$rt[sims$response == 2L]), mean(sims$rt[sims$response == 1L]))
+})
+
 test_that("pp_check(resp_var) works for the 3par ezdm model", {
   fit <- load_ppcheck_fit("bmmfit_ezdm3_ppcheck.rds")
   p <- pp_check(fit, resp_var = "mean_pc", ndraws = 5)
