@@ -745,15 +745,17 @@ configure_model.lnr_custom <- function(model, data, formula) {
 
 # The per-draw parameters of one observation as the row-per-draw matrices
 # lnr_race() and the survivor integrator take. get_dpar() returns a scalar for a
-# dpar brms stores fixed (s under `s = 0`), so every vector is grown to ndraws.
+# dpar brms stores fixed (s under `s = 0`), so every vector is grown to ndraws,
+# and the meanlogs go through matrix() because vapply() returns a bare vector
+# when there is a single draw.
 .lnr_draw_pars <- function(i, prep, cat_names, n_cats) {
   n_draws <- prep$ndraws
   list(
     ndt = rep_len(brms::get_dpar(prep, "ndt", i = i), n_draws),
     s = rep_len(brms::get_dpar(prep, "s", i = i), n_draws),
-    m = vapply(cat_names, function(p) {
+    m = matrix(vapply(cat_names, function(p) {
       rep_len(brms::get_dpar(prep, p, i = i), n_draws)
-    }, numeric(n_draws)),
+    }, numeric(n_draws)), nrow = n_draws),
     counts = vapply(
       seq_len(n_cats),
       function(j) prep$data[[paste0("vint", j + 1)]][i],
@@ -872,11 +874,12 @@ pp_simulate.lnr <- function(model, prep) {
   n_row <- prep$ndraws * prep$nobs
 
   race <- lnr_race(
-    m = vapply(cat_names, .pp_dpar_vector, numeric(n_row), prep = prep),
+    m = matrix(vapply(cat_names, .pp_dpar_vector, numeric(n_row), prep = prep),
+               nrow = n_row),
     s = matrix(.pp_dpar_vector(prep, "s"), n_row, n_cats),
-    counts = vapply(seq_len(n_cats), function(j) {
+    counts = matrix(vapply(seq_len(n_cats), function(j) {
       rep(prep$data[[paste0("vint", j + 1)]], each = prep$ndraws)
-    }, integer(n_row))
+    }, integer(n_row)), nrow = n_row)
   )
 
   list(

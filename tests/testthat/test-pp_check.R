@@ -254,6 +254,76 @@ test_that("pp_check(resp_var) simulates cswald RTs on the fitted scale", {
   expect_lt(abs(mean(sims$response) - mean(fit$data$response)), 0.15)
 })
 
+test_that("pp_check(resp_var) works for the lnr model", {
+  fit <- load_ppcheck_fit("bmmfit_lnr_ppcheck.rds")
+
+  expect_equal(pp_check_vars(fit)$resp_var, c("rt", "response"))
+  expect_equal(pp_check_vars(fit)$default_type, c("dens_overlay", "bars"))
+  expect_true(pp_check_vars(fit)$default[1])
+
+  p <- pp_check(fit, resp_var = "rt", ndraws = 5)
+  expect_s3_class(p, "ggplot")
+  expect_equal(p$data$value[p$data$is_y_label == "italic(y)"], fit$data$rt)
+
+  expect_s3_class(pp_check(fit, resp_var = "response", type = "bars",
+                           ndraws = 5), "ggplot")
+  expect_s3_class(pp_check(fit, resp_var = "all", group = "cond", ndraws = 5),
+                  "bayesplot_grid")
+})
+
+# the winner and the finishing time come out of one race, so simulating them
+# separately would keep both margins and destroy their dependence. Every draw
+# is the same posterior draw, so the simulated pairs are i.i.d. from one
+# parameter set and can be compared with the defective CDF plnr() computes
+test_that("pp_simulate.lnr draws the response time and the winner jointly", {
+  fit <- load_ppcheck_fit("bmmfit_lnr_ppcheck.rds")
+  prep <- brms::prepare_predictions(fit, draw_ids = rep(1L, 200L))
+  sims <- pp_simulate(fit$bmm$model, prep)
+
+  expect_identical(dim(sims$rt), c(200L, nrow(fit$data)))
+  expect_identical(dim(sims$response), c(200L, nrow(fit$data)))
+  expect_true(all(sims$response %in% 1:2))
+
+  easy <- which(fit$data$cond == "easy")
+  m <- c(brms::get_dpar(prep, "correct", i = easy[1])[1],
+         brms::get_dpar(prep, "error", i = easy[1])[1])
+  sdlog <- brms::get_dpar(prep, "s", i = easy[1])[1]
+  ndt <- brms::get_dpar(prep, "ndt", i = easy[1])[1]
+  # vint3 error accumulators share the error meanlog, so the race is over
+  # 1 correct and n_error identical error accumulators
+  n_error <- prep$data$vint3[easy[1]]
+  race_m <- c(m[1], rep(m[2], n_error))
+
+  rt <- as.vector(sims$rt[, easy])
+  response <- as.vector(sims$response[, easy])
+  n <- length(rt)
+  q <- stats::median(rt)
+
+  joint <- mean(response == 1 & rt <= q)
+  expected <- plnr(q, response = 1, m = race_m, s = sdlog, ndt = ndt)
+  expect_lt(abs(joint - expected), 4 * sqrt(0.25 / n))
+
+  # the independent mutant keeps both margins but not the pair
+  independent <- mean(response == 1) * mean(rt <= q)
+  expect_gt(abs(independent - expected), 8 * sqrt(0.25 / n))
+})
+
+test_that("posterior_epred.lnr is deterministic and equals the race mean", {
+  fit <- load_ppcheck_fit("bmmfit_lnr_ppcheck.rds")
+  ids <- 1:20
+
+  epred <- brms::posterior_epred(fit, draw_ids = ids)
+  expect_identical(epred, brms::posterior_epred(fit, draw_ids = ids))
+
+  prep <- brms::prepare_predictions(fit, draw_ids = rep(1L, 4000L))
+  sims <- pp_simulate(fit$bmm$model, prep)
+  one <- brms::posterior_epred(fit, draw_ids = 1L)[1, ]
+  for (i in c(1L, nrow(fit$data))) {
+    expect_lt(abs(one[i] - mean(sims$rt[, i])),
+              4 * stats::sd(sims$rt[, i]) / sqrt(4000))
+  }
+})
+
 test_that("pp_check(resp_var) works for the 3par ezdm model", {
   fit <- load_ppcheck_fit("bmmfit_ezdm3_ppcheck.rds")
   p <- pp_check(fit, resp_var = "mean_pc", ndraws = 5)
