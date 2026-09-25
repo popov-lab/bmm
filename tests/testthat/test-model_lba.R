@@ -584,7 +584,7 @@ test_that("plba is monotonically increasing", {
 
 test_that("dlba matches rtdists for normal distribution", {
   skip_if_not_installed("rtdists")
-  set.seed(42)
+  withr::local_seed(42)
   # rtdists: A = 0.5, b = 1 -> sp = A = 0.5, gap = b - A = 0.5
   ref <- rtdists::rLBA(5, A = 0.5, b = 1, t0 = 0.3,
                        mean_v = c(3, 1.5), sd_v = c(1, 1),
@@ -599,7 +599,7 @@ test_that("dlba matches rtdists for normal distribution", {
 
 test_that("dlba matches rtdists for gamma distribution", {
   skip_if_not_installed("rtdists")
-  set.seed(42)
+  withr::local_seed(42)
   ref <- rtdists::rLBA(5, A = 0.5, b = 1, t0 = 0.3,
                        shape_v = c(2, 3), rate_v = c(1, 1),
                        distribution = "gamma")
@@ -614,7 +614,7 @@ test_that("dlba matches rtdists for gamma distribution", {
 
 test_that("dlba matches rtdists for lognormal distribution", {
   skip_if_not_installed("rtdists")
-  set.seed(42)
+  withr::local_seed(42)
   ref <- rtdists::rLBA(5, A = 0.5, b = 1, t0 = 0.3,
                        meanlog_v = c(0.5, 0.3), sdlog_v = c(1, 1),
                        distribution = "lnorm")
@@ -636,4 +636,257 @@ test_that("validate_lba_parameters catches invalid inputs", {
                     ndt = -1))
   expect_error(dlba(0.5, 1, drift = c(3, 1.5), gap = 0.5, sp = 0.3,
                     ndt = 0.2, s = 0))
+})
+
+
+# -----------------------------------------------------------------------------
+# Density / rlba / pp_simulate joint-distribution consistency (Stage 3)
+# -----------------------------------------------------------------------------
+
+test_that("dlba integrates to 1 over rt and responses for every distribution", {
+  gap <- 0.5; sp <- 0.3; ndt <- 0.2
+  cases <- list(
+    list(distribution = "normal", drift = c(3, 1.5)),
+    list(distribution = "normal", drift = c(-0.5, 2)),
+    list(distribution = "gamma", drift = c(2, 3)),
+    list(distribution = "lognormal", drift = c(0.5, 0.3)),
+    list(distribution = "lognormal", drift = c(-0.5, 0.3)),
+    list(distribution = "frechet", drift = c(2, 3))
+  )
+  for (case in cases) {
+    K <- length(case$drift)
+    total <- sum(vapply(seq_len(K), function(resp) {
+      stats::integrate(function(rt) {
+        dlba(rt, resp, drift = case$drift, gap = gap, sp = sp, ndt = ndt,
+             distribution = case$distribution)
+      }, lower = ndt, upper = Inf, rel.tol = 1e-9, subdivisions = 500L)$value
+    }, numeric(1)))
+    expect_equal(total, 1, tolerance = 1e-6, label = case$distribution)
+  }
+})
+
+test_that("rlba reproduces its own choice probability", {
+  withr::local_seed(123)
+  n <- 20000
+  drift <- c(3, 1.5); gap <- 0.5; sp <- 0.5; ndt <- 0.2
+  dat <- rlba(n, drift = drift, gap = gap, sp = sp, ndt = ndt)
+  p_hat <- mean(dat$response == 2)
+  p_true <- stats::integrate(
+    function(rt) dlba(rt, 2, drift = drift, gap = gap, sp = sp, ndt = ndt),
+    lower = ndt, upper = Inf, rel.tol = 1e-10
+  )$value
+  se <- sqrt(p_true * (1 - p_true) / n)
+  expect_lt(abs(p_hat - p_true), 4 * se)
+})
+
+test_that("pp_simulate() draws rt and response jointly for the simple version", {
+  withr::local_seed(11)
+  n_draws <- 20000
+  driftc <- 3; drifte <- 1.5; gap <- 0.5; sp <- 0.5; ndt <- 0.2
+  prep <- lba_fake_prep("normal", driftc = driftc, drifte = drifte,
+                        sp = rep(sp, n_draws), gap = gap, ndt = ndt)
+  model <- lba(rt = "rt", response = "response", n_choices = 2)
+  sims <- pp_simulate(model, prep)
+
+  drift <- c(driftc, drifte)
+  p_resp2 <- mean(sims$response == 2)
+  p_fast <- mean(sims$rt < 0.5)
+  p_joint <- mean(sims$response == 2 & sims$rt < 0.5)
+
+  int_resp2 <- stats::integrate(
+    function(rt) dlba(rt, 2, drift = drift, gap = gap, sp = sp, ndt = ndt),
+    ndt, Inf, rel.tol = 1e-10
+  )$value
+  int_fast <- sum(vapply(1:2, function(r) {
+    stats::integrate(
+      function(rt) dlba(rt, r, drift = drift, gap = gap, sp = sp, ndt = ndt),
+      ndt, 0.5, rel.tol = 1e-10
+    )$value
+  }, numeric(1)))
+  int_joint <- stats::integrate(
+    function(rt) dlba(rt, 2, drift = drift, gap = gap, sp = sp, ndt = ndt),
+    ndt, 0.5, rel.tol = 1e-10
+  )$value
+
+  se <- function(p) sqrt(p * (1 - p) / n_draws)
+  expect_lt(abs(p_resp2 - int_resp2), 4 * se(int_resp2))
+  expect_lt(abs(p_fast - int_fast), 4 * se(int_fast))
+  expect_lt(abs(p_joint - int_joint), 4 * se(int_joint))
+})
+
+test_that("pp_simulate() draws rt and response jointly for the custom version", {
+  withr::local_seed(12)
+  n_draws <- 20000
+  va <- 2; vb <- 1.2; gap <- 0.5; sp <- 0.5; ndt <- 0.2
+  model <- check_model(
+    lba(rt = "rt", response = "response", version = "custom",
+        accumulators = c(a = 1, b = 2)),
+    NULL, bmf(a ~ 1, b ~ 1, gap ~ 1, sp ~ 1, ndt ~ 1)
+  )
+  prep <- structure(
+    list(
+      ndraws = n_draws, nobs = 1L,
+      dpars = list(
+        a = matrix(va, n_draws, 1), b = matrix(vb, n_draws, 1),
+        gap = matrix(gap, n_draws, 1), sp = matrix(sp, n_draws, 1),
+        ndt = matrix(ndt, n_draws, 1), s = matrix(1, n_draws, 1)
+      ),
+      data = list(vint2 = 1L, vint3 = 2L)
+    ),
+    class = "brmsprep"
+  )
+  sims <- pp_simulate(model, prep)
+  p_b <- mean(sims$response == 2)
+
+  drift <- c(va, vb, vb)
+  int_b <- sum(vapply(2:3, function(r) {
+    stats::integrate(
+      function(rt) dlba(rt, r, drift = drift, gap = gap, sp = sp, ndt = ndt),
+      ndt, Inf, rel.tol = 1e-10
+    )$value
+  }, numeric(1)))
+  se <- sqrt(int_b * (1 - int_b) / n_draws)
+  expect_lt(abs(p_b - int_b), 4 * se)
+})
+
+
+# -----------------------------------------------------------------------------
+# race_mean_decision_time() (deterministic posterior_epred integral)
+# -----------------------------------------------------------------------------
+
+test_that("race_mean_decision_time recovers the exact mean of an exponential race", {
+  log_survivor <- function(t) -t
+  mean_dt <- race_mean_decision_time(log_survivor, n_draws = 1)
+  expect_equal(mean_dt, 1, tolerance = 1e-4)
+})
+
+test_that("race_mean_decision_time is deterministic across identical calls", {
+  log_survivor <- function(t) -t
+  a <- race_mean_decision_time(log_survivor, n_draws = 1)
+  b <- race_mean_decision_time(log_survivor, n_draws = 1)
+  expect_identical(a, b)
+})
+
+test_that("race_mean_decision_time is insensitive to t_max for a heavy-tailed normal race", {
+  drift <- c(3, 1.5); b <- 1; A <- 0.5; s <- 1
+  log_survivor <- function(t) {
+    .lba_lsurv_single(t, drift[1], b, A, s, "normal") +
+      .lba_lsurv_single(t, drift[2], b, A, s, "normal")
+  }
+  m1 <- race_mean_decision_time(log_survivor, n_draws = 1, t_max = 1e4)
+  m2 <- race_mean_decision_time(log_survivor, n_draws = 1, t_max = 1e7)
+  expect_lt(abs(m1 - m2), 1e-6)
+})
+
+
+# -----------------------------------------------------------------------------
+# log_lik category-level convention (log(n[win]) for an error response)
+# -----------------------------------------------------------------------------
+
+test_that("log_lik_lba_simple adds log(n_win) for a category with several accumulators", {
+  prep <- lba_fake_prep("normal", driftc = 3, drifte = 1.5, sp = 0.5,
+                        rt = 0.6, response = 2L)
+  prep$data$vint3 <- 2L
+
+  ll <- log_lik_lba_simple(1L, prep)
+  ref <- dlba(0.6, 2, drift = c(3, 1.5, 1.5), gap = 0.5, sp = 0.5, ndt = 0.2,
+             log = TRUE) + log(2)
+  expect_equal(ll, ref, tolerance = 1e-10)
+})
+
+test_that("log_lik_lba_simple carries no log(n) term for a correct response", {
+  prep <- lba_fake_prep("normal", driftc = 3, drifte = 1.5, sp = 0.5,
+                        rt = 0.6, response = 1L)
+  prep$data$vint3 <- 2L
+
+  ll <- log_lik_lba_simple(1L, prep)
+  ref <- dlba(0.6, 1, drift = c(3, 1.5, 1.5), gap = 0.5, sp = 0.5, ndt = 0.2,
+             log = TRUE)
+  expect_equal(ll, ref, tolerance = 1e-10)
+})
+
+
+# -----------------------------------------------------------------------------
+# check_data error messages (Stage 3)
+# -----------------------------------------------------------------------------
+
+test_that("check_data.lba_simple names the integer-coded convention on factor labels", {
+  dat <- data.frame(rt = c(0.5, 0.6, 0.7),
+                    response = factor(c("correct", "error", "correct")))
+  model <- lba(rt = "rt", response = "response", n_choices = 2)
+  expect_error(check_data(model, dat, bmf(driftc ~ 1)), "integer-coded")
+})
+
+test_that("check_data.lba_custom errors when a response category has zero accumulators on a trial", {
+  dat <- data.frame(rt = c(0.5, 0.6, 0.7), response = c("b", "a", "b"),
+                    n_a = c(1L, 1L, 1L), n_b = c(0L, 1L, 1L))
+  model <- lba(rt = "rt", response = "response", version = "custom",
+               accumulators = c(a = "n_a", b = "n_b"))
+  formula <- bmf(a ~ 1, b ~ 1, gap ~ 1, sp ~ 1, ndt ~ 1)
+  model <- check_model(model, dat, formula)
+  expect_error(check_data(model, dat, formula), "no accumulator")
+})
+
+
+# -----------------------------------------------------------------------------
+# check_model.lba warns when the formula frees the unidentified scale s
+# -----------------------------------------------------------------------------
+
+test_that("check_model.lba warns iff the formula estimates s", {
+  model <- lba(rt = "rt", response = "response", n_choices = 2)
+  free_s <- bmf(driftc ~ 1, drifte ~ 1, gap ~ 1, sp ~ 1, ndt ~ 1, s ~ 1)
+  fixed_s <- bmf(driftc ~ 1, drifte ~ 1, gap ~ 1, sp ~ 1, ndt ~ 1, s = 1)
+  no_s <- bmf(driftc ~ 1, drifte ~ 1, gap ~ 1, sp ~ 1, ndt ~ 1)
+
+  expect_warning(check_model(model, NULL, free_s), "cannot identify")
+  expect_no_warning(check_model(model, NULL, fixed_s))
+  expect_no_warning(check_model(model, NULL, no_s))
+})
+
+
+# -----------------------------------------------------------------------------
+# dlba() input validation and per-trial vector recycling (Stage 3)
+# -----------------------------------------------------------------------------
+
+test_that("dlba errors when response has neither length 1 nor the length of rt", {
+  expect_error(
+    dlba(c(0.5, 0.6, 0.7), c(1, 2), drift = c(3, 1.5), gap = 0.5, sp = 0.5, ndt = 0.2),
+    "length 1 or the length of rt"
+  )
+})
+
+test_that("dlba errors when response indexes an accumulator that does not exist", {
+  expect_error(
+    dlba(0.5, 3, drift = c(3, 1.5), gap = 0.5, sp = 0.5, ndt = 0.2),
+    "index the accumulators"
+  )
+})
+
+test_that("dlba returns NA for an NA response time and a finite value elsewhere", {
+  d <- dlba(c(0.5, NA), 1, drift = c(3, 1.5), gap = 0.5, sp = 0.5, ndt = 0.2)
+  expect_true(is.finite(d[1]))
+  expect_true(is.na(d[2]))
+})
+
+test_that("dlba recycles a per-trial gap vector like two separate scalar calls", {
+  combined <- dlba(c(0.5, 0.6), 1, drift = c(3, 1.5), gap = c(0.5, 0.6),
+                   sp = 0.5, ndt = 0.2)
+  separate <- c(
+    dlba(0.5, 1, drift = c(3, 1.5), gap = 0.5, sp = 0.5, ndt = 0.2),
+    dlba(0.6, 1, drift = c(3, 1.5), gap = 0.6, sp = 0.5, ndt = 0.2)
+  )
+  expect_equal(combined, separate)
+})
+
+test_that("dlba accepts an unrestricted lognormal meanlog and rejects a non-positive gamma shape", {
+  expect_gt(
+    dlba(0.5, 1, drift = c(-0.5, 0.3), gap = 0.5, sp = 0.5, ndt = 0.2,
+         distribution = "lognormal"),
+    0
+  )
+  expect_error(
+    dlba(0.5, 1, drift = c(-1, 2), gap = 0.5, sp = 0.5, ndt = 0.2,
+         distribution = "gamma"),
+    "positive"
+  )
 })
