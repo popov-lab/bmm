@@ -157,8 +157,17 @@
     class = c("bmmodel", "sdt", "sdt_rating"),
     call = call
   )
-  out$links[names(links)] <- links
-  out
+  set_links(out, links)
+}
+
+# `sdratio` is fixed at 0 and read as a log SD ratio (the Stan code takes its
+# exp()), and every threshold parameter is read the same way, so neither
+# survives a change of link: it would rescale the fixed value and stack a
+# second transformation on the exp(). `d` and `criterion` fix nothing, so
+# their links stay settable, as in sdt_yn.
+#' @exportS3Method
+settable_links.sdt_rating <- function(model) {
+  c("d", "criterion")
 }
 
 

@@ -98,6 +98,27 @@ test_that("sdt_rating model accepts custom links", {
   expect_equal(model$links$criterion, "identity")
 })
 
+test_that("sdt_rating refuses a link on sdratio or a threshold parameter", {
+  # sdratio and the thresholds are read through exp() in Stan, and sdratio is
+  # additionally fixed at 0, so neither survives a change of link
+  model <- sdt_rating(c("r1", "r2", "r3", "r4"), "stimulus")
+  expect_equal(settable_links(model), c("d", "criterion"))
+  for (par in c("sdratio", "spacing")) {
+    expect_error(
+      sdt_rating(c("r1", "r2", "r3", "r4"), "stimulus",
+                 links = stats::setNames(list("log"), par)),
+      paste0("link of '", par, "' cannot be changed")
+    )
+  }
+  expect_error(
+    sdt_rating(c("r1", "r2", "r3", "r4"), "stimulus",
+               links = list(sensitivity = "log")),
+    "Unrecognized link target"
+  )
+  model$links$spacing <- "log"
+  expect_error(check_links(model), "link of 'spacing' cannot be changed")
+})
+
 test_that("sdt_rating supplies init_ranges for every estimated parameter", {
   # create_initfun() looks up init_ranges per parameter; a missing entry yields
   # NA inits, and the flexible threshold types reject brms' default random init.
