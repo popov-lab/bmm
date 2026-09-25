@@ -839,6 +839,7 @@ test_that("ezdm_summary_stats() warns and degrades to an accuracy-neutral correc
   expect_equal(result$n_upper, round(198 * (1 - result$contaminant_prop)))
   expect_equal(result$n_trials, round(200 * (1 - result$contaminant_prop)))
   expect_lte(result$n_upper, result$n_trials)
+  expect_type(result$n_upper, "integer")
 })
 
 test_that("ezdm_summary_stats() warns and degrades to an accuracy-neutral correction below the floor", {
@@ -905,6 +906,7 @@ test_that("ezdm_summary_stats() rounds n_upper rather than truncating it", {
   expect_equal(result$contaminant_prop, 0.2)
   expect_equal(result$n_upper, 147L)
   expect_equal(result$n_trials, 147L)
+  expect_type(result$n_upper, "integer")
 })
 
 test_that("ezdm_summary_stats() 4par consumes both boundary proportions", {

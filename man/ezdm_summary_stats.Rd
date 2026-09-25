@@ -115,8 +115,8 @@ boundaries at \code{guess_rate}; a cell whose observed accuracy lies outside
 \verb{[guess_rate * p, 1 - p * (1 - guess_rate)]} for an estimated proportion
 \code{p} cannot have arisen that way, so the contaminants are removed
 proportionally from both boundaries instead, leaving the observed accuracy
-unchanged, and a warning is issued. For \code{version = "4par"} each boundary
-is corrected by its own estimate.
+unchanged apart from rounding, and a warning is issued. For
+\code{version = "4par"} each boundary is corrected by its own estimate.
 
 This function is designed to work with \code{\link[dplyr:group_by]{dplyr::group_by()}} and
 \code{\link[dplyr:reframe]{dplyr::reframe()}} for grouped operations.

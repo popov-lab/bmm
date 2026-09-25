@@ -419,8 +419,8 @@ has_nonconsecutive_duplicates <- function(vec) {
 #'   `[guess_rate * p, 1 - p * (1 - guess_rate)]` for an estimated proportion
 #'   `p` cannot have arisen that way, so the contaminants are removed
 #'   proportionally from both boundaries instead, leaving the observed accuracy
-#'   unchanged, and a warning is issued. For `version = "4par"` each boundary
-#'   is corrected by its own estimate.
+#'   unchanged apart from rounding, and a warning is issued. For
+#'   `version = "4par"` each boundary is corrected by its own estimate.
 #'
 #'   This function is designed to work with [dplyr::group_by()] and
 #'   [dplyr::reframe()] for grouped operations.
@@ -568,9 +568,9 @@ ezdm_summary_stats <- function(
        contaminant proportion of {round(contaminant_prop, 3)} and a guess \\
        rate of {guess_rate} can produce. The correction is degraded for this \\
        cell: the contaminants are removed proportionally from both \\
-       boundaries, which leaves the observed accuracy as it was. Check that \\
-       guess_rate matches the task, or that the contaminant reaction times \\
-       are distinguishable from the cognitive ones."
+       boundaries, which preserves the observed accuracy up to rounding. \\
+       Check that guess_rate matches the task, or that the contaminant \\
+       reaction times are distinguishable from the cognitive ones."
     )
     return(list(
       n_upper = as.integer(round(n_upper * (1 - contaminant_prop))),
