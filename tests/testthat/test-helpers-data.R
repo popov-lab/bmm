@@ -166,8 +166,18 @@ test_that("check_data() returns a data.frame()", {
       n_trials = "n_trials", rt = "rt", response = "response",
       n_choices = 2
     )
+    # one response column has to satisfy every model at once, so it is the
+    # constant 0/1-compatible value; lnr then warns that the option nobody
+    # chose is still estimated, which is correct and not what this test checks
     expect_s3_class(
-      check_data(model, test_data, bmf(kappa ~ 1)),
+      withCallingHandlers(
+        check_data(model, test_data, bmf(kappa ~ 1)),
+        warning = function(w) {
+          if (grepl("never occur", conditionMessage(w))) {
+            invokeRestart("muffleWarning")
+          }
+        }
+      ),
       "data.frame"
     )
   }
