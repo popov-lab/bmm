@@ -12,8 +12,11 @@
       "the d_a that sdt_yn reports under unequal variance)"
     )
   )
+  # m-AFC has no bias parameter, so d absorbs every difference between
+  # subjects; the rate follows sdt_yn's d, whose between-subject SD on
+  # broeder_schuetz_2009_e3 is ~0.6, above the 0.35 median of rate 2.
   default_priors <- list(
-    d = list(main = "normal(1, 1)", effects = "normal(0, 0.5)")
+    d = list(main = "normal(1, 1)", effects = "normal(0, 0.5)", sd = "exponential(1)")
   )
   requirements <- glue(
     "Provide pre-aggregated accuracy data with the following columns:", "\n\n",
