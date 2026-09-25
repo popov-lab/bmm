@@ -70,6 +70,21 @@ test_that("rdm rejects unsupported custom links during model checks", {
   )
 })
 
+test_that("report_priors() does not report the technical mu of the rdm family", {
+  skip_on_cran()
+
+  dat <- rrdm(n = 100, drift = c(3, 1.5), gap = 1, ndt = 0.2)
+  fit <- bmm(
+    bmf(driftc ~ 1, drifte ~ 1, gap ~ 1, ndt ~ 1), dat,
+    rdm(rt = "rt", response = "response", n_choices = 2),
+    backend = "mock", mock_fit = 1, rename = FALSE
+  )
+
+  out <- report_priors(fit)
+  expect_false("mu" %in% out$parameter)
+  expect_true(all(c("driftc", "drifte", "gap", "ndt") %in% out$parameter))
+})
+
 test_that("rdm errors on invalid n_choices", {
   expect_error(rdm(rt = "rt", response = "response", n_choices = 1))
   expect_error(rdm(rt = "rt", response = "response", n_choices = 2.5))
