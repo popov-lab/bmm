@@ -1148,3 +1148,254 @@ test_that("validate_rdm_parameters catches invalid inputs", {
                     sp = -0.1))
   expect_error(drdm(0.5, 1, drift = c(3, 1.5), gap = 1, ndt = -1))
 })
+
+# -----------------------------------------------------------------------------
+# Stage 4 numerics: R vs Stan parity, integration and inversion identities
+# -----------------------------------------------------------------------------
+
+# Extends "drdm() integrates to one over responses and time when s != 1" to a
+# shrinking start-point range: every sp below crosses the midpoint switch
+# (A* = 1e-4 * s * sqrt(t), see .dwald_full()) somewhere inside [0.2, Inf), so
+# a value discontinuity introduced there would still break normalization.
+test_that("drdm() integrates to one across a shrinking start-point range", {
+  density <- function(rt, response, sp) {
+    vapply(rt, function(x) {
+      drdm(x, response, drift = c(3, 1.5), gap = 0.7, sp = sp, ndt = 0.2)
+    }, numeric(1))
+  }
+  for (sp in c(1e-6, 1e-3, 0.05)) {
+    total <- sum(vapply(1:2, function(response) {
+      stats::integrate(density, 0.2, Inf, response = response, sp = sp,
+                       rel.tol = 1e-9)$value
+    }, numeric(1)))
+    expect_equal(total, 1, tolerance = 1e-6)
+  }
+})
+
+# A start-point range of 1e-12 is smaller than any sp a user would fit but is
+# not exactly zero, so it must still take the small-A midpoint branch to
+# numerical precision; a regression in that branch's cutoff would show up
+# here first.
+test_that("drdm(sp = 1e-12) matches drdm(sp = 0) to 1e-10", {
+  rt <- c(0.3, 0.55, 0.9, 1.6)
+  response <- c(1L, 2L, 1L, 2L)
+  d0 <- drdm(rt, response, drift = c(3, 1.5), gap = 0.8, ndt = 0.2, sp = 0,
+             log = TRUE)
+  d_tiny <- drdm(rt, response, drift = c(3, 1.5), gap = 0.8, ndt = 0.2,
+                 sp = 1e-12, log = TRUE)
+  expect_equal(d_tiny, d0, tolerance = 1e-10)
+})
+
+# .rdm_race() is checked against drdm() directly elsewhere; this exercises the
+# user-facing rrdm()/qrdm() pair instead, so a bug introduced only in the ndt
+# shift or the response coding applied after .rdm_race() returns (both are
+# rrdm()-only code) would still be caught. The quantile tolerance is the
+# order-statistic delta-method SE, sqrt(p(1-p)/n) / f(q), with f(q) the
+# marginal RT density (summed over responses) at the theoretical quantile.
+test_that("rrdm() reproduces drdm()'s choice probabilities and RT quantiles", {
+  withr::local_seed(23)
+  drift <- c(3, 1.5, 1)
+  gap <- 0.8
+  sp <- 0.3
+  ndt <- 0.2
+  s <- 0.9
+  n <- 2e5
+  dat <- rrdm(n, drift = drift, gap = gap, sp = sp, ndt = ndt, s = s)
+
+  for (j in seq_along(drift)) {
+    p_sim <- mean(dat$response == j)
+    se_p <- sqrt(p_sim * (1 - p_sim) / n)
+    p_exact <- stats::integrate(function(rt) {
+      vapply(rt, function(x) {
+        drdm(x, j, drift = drift, gap = gap, sp = sp, ndt = ndt, s = s)
+      }, numeric(1))
+    }, ndt, Inf, rel.tol = 1e-8)$value
+    expect_lt(abs(p_sim - p_exact), 4 * se_p)
+  }
+
+  probs <- c(0.1, 0.5, 0.9)
+  q_theory <- qrdm(probs, drift = drift, gap = gap, sp = sp, ndt = ndt, s = s)
+  q_sim <- stats::quantile(dat$rt, probs = probs, type = 7, names = FALSE)
+  f_at_q <- vapply(seq_along(probs), function(k) {
+    sum(vapply(seq_along(drift), function(j) {
+      drdm(q_theory[k], j, drift = drift, gap = gap, sp = sp, ndt = ndt, s = s)
+    }, numeric(1)))
+  }, numeric(1))
+  se_q <- sqrt(probs * (1 - probs) / n) / f_at_q
+  expect_lt(max(abs(q_sim - q_theory) / se_q), 4)
+})
+
+# prdm() is assembled from .pwald_full()'s survival antiderivative directly
+# (Tillman et al.'s Appendix A), never from drdm(); this checks the two
+# constructions agree by independent numerical integration.
+test_that("prdm() equals drdm() integrated and summed over responses", {
+  drift <- c(2.5, 1.3)
+  gap <- 0.9
+  sp <- 0.25
+  ndt <- 0.15
+  s <- 0.8
+  for (q in c(0.4, 0.9, 2.0)) {
+    direct <- sum(vapply(seq_along(drift), function(j) {
+      stats::integrate(function(rt) {
+        vapply(rt, function(x) {
+          drdm(x, j, drift = drift, gap = gap, sp = sp, ndt = ndt, s = s)
+        }, numeric(1))
+      }, ndt, q, rel.tol = 1e-10)$value
+    }, numeric(1)))
+    expect_equal(
+      prdm(q, drift = drift, gap = gap, sp = sp, ndt = ndt, s = s),
+      direct, tolerance = 1e-7
+    )
+  }
+})
+
+test_that("qrdm(prdm(q)) recovers q", {
+  drift <- c(2.5, 1.3)
+  gap <- 0.9
+  sp <- 0.25
+  ndt <- 0.15
+  s <- 0.8
+  for (q in c(0.4, 0.9, 2.0)) {
+    p <- prdm(q, drift = drift, gap = gap, sp = sp, ndt = ndt, s = s)
+    q_back <- qrdm(p, drift = drift, gap = gap, sp = sp, ndt = ndt, s = s)
+    expect_equal(q_back, q, tolerance = 1e-6)
+  }
+})
+
+# Protects rdm_log_pdf()/rdm_log_surv() in inst/stan_chunks/rdm_functions.stan
+# against the same log-space quadrature reference used for R's
+# .dwald_full()/.pwald_full(); the reference functions are copied in (not
+# sourced) because local/ is gitignored. cmdstanr::expose_functions() does not
+# build on this machine, so a fixed_param generated-quantities program
+# evaluates the compiled package chunk directly (see test-model_rdm-stability.R's
+# header note and local/rdm_stan_grid.R for the full-size version of this grid).
+# Mutant (applied locally, not left in the tree): flipping the sign of the
+# "2 * drift * b / s2" term in rdm_log_surv's lEb left the density grid
+# unaffected (lEb only feeds the survivor: max rel error 4.9e-10, unchanged)
+# but broke the survival grid from max rel error 2.5e-10 to 0.53, far past the
+# 1e-7 gate below.
+test_that("Stan rdm_log_pdf()/rdm_log_surv() match the quadrature reference on a grid", {
+  skip_on_cran()
+  skip_if_not_installed("cmdstanr")
+
+  lse <- function(a, b) {
+    m <- pmax(a, b)
+    out <- m + log(exp(a - m) + exp(b - m))
+    out[is.infinite(m) & m < 0] <- -Inf
+    out
+  }
+  lde <- function(a, b) {
+    d <- b - a
+    out <- ifelse(d > -0.6931472, a + log(-expm1(d)), a + log1p(-exp(d)))
+    out[a <= b] <- -Inf
+    out
+  }
+  log1mexp <- function(x) ifelse(x > -0.6931472, log(-expm1(x)), log1p(-exp(x)))
+  lwald <- function(t, u, v, s) {
+    log(u) - 0.5 * (log(2 * pi) + 2 * log(s) + 3 * log(t)) - (u - v * t)^2 / (2 * s^2 * t)
+  }
+  lwald_cdf <- function(t, u, v, s) {
+    z1 <- (v * t - u) / (s * sqrt(t))
+    z2 <- -(v * t + u) / (s * sqrt(t))
+    lse(stats::pnorm(z1, log.p = TRUE), 2 * u * v / s^2 + stats::pnorm(z2, log.p = TRUE))
+  }
+  lwald_surv <- function(t, u, v, s) {
+    z1 <- (v * t - u) / (s * sqrt(t))
+    z2 <- -(v * t + u) / (s * sqrt(t))
+    lc <- lwald_cdf(t, u, v, s)
+    ifelse(
+      lc < log(0.5), log1mexp(lc),
+      lde(stats::pnorm(-z1, log.p = TRUE), 2 * u * v / s^2 + stats::pnorm(z2, log.p = TRUE))
+    )
+  }
+  simpson_log <- function(lf, lo, hi, n = 4001L) {
+    u <- seq(lo, hi, length.out = n)
+    y <- lf(u)
+    y[!is.finite(y)] <- -Inf
+    m <- max(y)
+    if (!is.finite(m)) return(-Inf)
+    w <- c(1, rep(c(4, 2), (n - 3) / 2), 4, 1)
+    h <- (hi - lo) / (n - 1)
+    m + log(sum(w * exp(y - m)) * h / 3)
+  }
+  int_log <- function(lf, lo, hi) {
+    y <- lf(seq(lo, hi, length.out = 401))
+    y[!is.finite(y)] <- -Inf
+    m <- max(y)
+    if (!is.finite(m)) return(-Inf)
+    from_lo <- y[1] >= y[length(y)]
+    g <- function(x) {
+      u <- if (from_lo) lo + exp(x) else hi - exp(x)
+      z <- exp(lf(u) - m + x)
+      z[!is.finite(z)] <- 0
+      z
+    }
+    r <- tryCatch(
+      stats::integrate(g, -60, log(hi - lo), rel.tol = 1e-12, abs.tol = 0,
+                       subdivisions = 5000L, stop.on.error = FALSE),
+      error = function(e) NULL
+    )
+    if (is.null(r) || r$message != "OK" || !is.finite(r$value) || r$value <= 0) {
+      return(simpson_log(lf, lo, hi))
+    }
+    m + log(r$value)
+  }
+  ref_lpdf <- function(t, v, gap, A, s) {
+    if (A == 0) return(lwald(t, gap, v, s))
+    int_log(function(u) lwald(t, u, v, s), gap, gap + A) - log(A)
+  }
+  ref_lsurv <- function(t, v, gap, A, s) {
+    if (A == 0) return(lwald_surv(t, gap, v, s))
+    logC <- int_log(function(u) lwald_cdf(t, u, v, s), gap, gap + A) - log(A)
+    if (is.finite(logC) && logC < log(0.5)) return(log1mexp(logC))
+    int_log(function(u) lwald_surv(t, u, v, s), gap, gap + A) - log(A)
+  }
+
+  grid <- expand.grid(
+    t = c(1e-4, 1e-2, 0.3, 2, 20),
+    drift = c(0.5, 3, 8),
+    A = c(0, 1e-5, 1e-3, 0.3, 1),
+    s = c(0.5, 1, 1.5)
+  )
+  grid$gap <- 1
+  n_grid <- nrow(grid)
+
+  sc <- system.file("stan_chunks", package = "bmm")
+  funs <- paste(
+    read_lines2(file.path(sc, "cswald_helper_functions.stan")),
+    read_lines2(file.path(sc, "rdm_functions.stan")),
+    sep = "\n"
+  )
+  code <- paste0(
+    "functions {\n", funs, "\n}\n",
+    "data { int G; vector[G] t; vector[G] v; vector[G] gap; vector[G] A; vector[G] s; }\n",
+    "generated quantities {\n  vector[G] ld; vector[G] ls;\n",
+    "  for (i in 1:G) {\n",
+    "    if (A[i] == 0) { ld[i] = swald_lpdf(t[i] | v[i], gap[i], 0, s[i]);",
+    " ls[i] = swald_lccdf(t[i] | v[i], gap[i], 0, s[i]); }\n",
+    "    else { ld[i] = rdm_log_pdf(t[i], v[i], gap[i], A[i], s[i]);",
+    " ls[i] = rdm_log_surv(t[i], v[i], gap[i], A[i], s[i]); }\n",
+    "  }\n}\n"
+  )
+  # one compiled program for this test file
+  mod <- cmdstanr::cmdstan_model(cmdstanr::write_stan_file(code), quiet = TRUE)
+  fit <- mod$sample(
+    data = list(G = n_grid, t = grid$t, v = grid$drift, gap = grid$gap,
+               A = grid$A, s = grid$s),
+    fixed_param = TRUE, chains = 1, iter_sampling = 1, iter_warmup = 0,
+    refresh = 0, show_messages = FALSE, seed = 1, sig_figs = 18
+  )
+  draws <- posterior::as_draws_matrix(fit$draws())
+  nm <- colnames(draws)
+  draws <- as.numeric(draws[1, ])
+  ld <- draws[match(paste0("ld[", seq_len(n_grid), "]"), nm)]
+  ls <- draws[match(paste0("ls[", seq_len(n_grid), "]"), nm)]
+
+  ref_d <- mapply(ref_lpdf, grid$t, grid$drift, grid$gap, grid$A, grid$s)
+  ref_s <- mapply(ref_lsurv, grid$t, grid$drift, grid$gap, grid$A, grid$s)
+
+  expect_true(all(is.finite(ld)))
+  expect_true(all(is.finite(ls)))
+  expect_lt(max(abs(ld - ref_d) / pmax(1, abs(ref_d))), 1e-7)
+  expect_lt(max(abs(ls - ref_s) / pmax(1, abs(ref_s))), 1e-7)
+})

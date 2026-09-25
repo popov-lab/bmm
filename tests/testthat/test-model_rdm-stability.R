@@ -171,7 +171,9 @@
        sp = row$sp
      )
 
-     expect_equal(stan_val, r_val, tolerance = 1e-6)
+     # measured max |R - Stan| over these scenarios is ~1e-14 (Stage 4); 1e-8
+     # keeps headroom while still catching anything but rounding-level drift
+     expect_equal(stan_val, r_val, tolerance = 1e-8)
    }
  })
 
@@ -241,7 +243,9 @@
        sp = scenario$sp
      )
 
-     expect_equal(stan_val, r_val, tolerance = 1e-6)
+     # measured max |R - Stan| over these scenarios is ~1e-14 (Stage 4); 1e-8
+     # keeps headroom while still catching anything but rounding-level drift
+     expect_equal(stan_val, r_val, tolerance = 1e-8)
    }
  })
 
