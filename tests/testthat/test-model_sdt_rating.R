@@ -120,13 +120,20 @@ test_that("sdt_rating refuses a link on sdratio or a threshold parameter", {
 })
 
 test_that("sdt_rating gives every parameter an sd default prior", {
-  for (tt in c("parsimonious", "log_distance", "softmax")) {
-    model <- sdt_rating(paste0("r", 1:5), "stimulus", threshold_type = tt)
-    sds <- vapply(model$default_priors, function(p) p$sd %||% NA_character_,
-                  character(1))
-    expect_false(anyNA(sds), info = tt)
-    expect_equal(sds[["d"]], "exponential(1)", info = tt)
-    expect_true(all(sds[setdiff(names(sds), "d")] == "exponential(2)"), info = tt)
+  # Ro and Rn are logit-scale probabilities, so they join d at rate 1;
+  # everything else is a log-scale quantity and takes rate 2
+  rate1 <- c("d", "Ro", "Rn")
+  for (v in names(bmm:::.sdt_rating_variants)) {
+    for (tt in c("parsimonious", "log_distance", "softmax")) {
+      model <- sdt_rating(paste0("r", 1:5), "stimulus",
+                          threshold_type = tt, version = v)
+      sds <- vapply(model$default_priors, function(p) p$sd %||% NA_character_,
+                    character(1))
+      info <- paste(v, tt)
+      expect_false(anyNA(sds), info = info)
+      expect_true(all(sds[intersect(names(sds), rate1)] == "exponential(1)"), info = info)
+      expect_true(all(sds[setdiff(names(sds), rate1)] == "exponential(2)"), info = info)
+    }
   }
 })
 

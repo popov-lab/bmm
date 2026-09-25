@@ -108,9 +108,13 @@
                 "new item is recall-rejected, loading the most-confident ",
                 "'noise' category")
     ),
+    # Ro and Rn are probabilities on a logit scale, which is the mixing-weight
+    # case the package's sd rule assigns rate 1: an individual then sits
+    # between p = .12 and p = .89 around a group value of .5 at the 95%
+    # quantile, where rate 2 would hold them inside [.26, .74].
     default_priors = list(
-      Ro = list(main = "normal(0, 1)", effects = "normal(0, 0.5)"),
-      Rn = list(main = "normal(0, 1)", effects = "normal(0, 0.5)")
+      Ro = list(main = "normal(0, 1)", effects = "normal(0, 0.5)", sd = "exponential(1)"),
+      Rn = list(main = "normal(0, 1)", effects = "normal(0, 0.5)", sd = "exponential(1)")
     ),
     links = list(Ro = "identity", Rn = "identity"),
     init_ranges = list(Ro = c(-0.5, 0.5), Rn = c(-0.5, 0.5)),
@@ -134,8 +138,11 @@
     # (Maniscalco & Lau, 2014; Fleming, 2017). Both sensitivities share one
     # scale (d', or d_a when sdratio is estimated), so the ratio is invariant to
     # sdratio.
+    # logmratio is a log ratio, so its sd rate follows sdratio's 2 rather than
+    # d's 1: an individual's M-ratio then stays within a factor of about 2.8
+    # of the group value at the 95% quantile.
     default_priors = list(
-      logmratio = list(main = "normal(0, 0.5)", effects = "normal(0, 0.3)")
+      logmratio = list(main = "normal(0, 0.5)", effects = "normal(0, 0.3)", sd = "exponential(2)")
     ),
     links = list(logmratio = "identity"),
     init_ranges = list(logmratio = c(-0.3, 0.3)),
