@@ -96,41 +96,49 @@ Use aggregate_sdt_cdp_data() to build these columns from long-format (trial-leve
 \itemize{
 \item \code{main}: normal(1, 1)
 \item \code{effects}: normal(0, 0.5)
+\item \code{sd}: exponential(1)
 }
 \item \code{drec}:
 \itemize{
 \item \code{main}: normal(1, 1)
 \item \code{effects}: normal(0, 0.5)
+\item \code{sd}: exponential(1)
 }
 \item \code{criterion}:
 \itemize{
 \item \code{main}: normal(0, 1.5)
 \item \code{effects}: normal(0, 0.5)
+\item \code{sd}: exponential(2)
 }
 \item \code{spacing}:
 \itemize{
 \item \code{main}: normal(0, 0.5)
 \item \code{effects}: normal(0, 0.3)
+\item \code{sd}: exponential(2)
 }
 \item \code{rcrit}:
 \itemize{
 \item \code{main}: normal(0, 1)
 \item \code{effects}: normal(0, 0.5)
+\item \code{sd}: exponential(2)
 }
 \item \code{sigmar}:
 \itemize{
 \item \code{main}: normal(0, 0.5)
 \item \code{effects}: normal(0, 0.3)
+\item \code{sd}: exponential(2)
 }
 \item \code{rho}:
 \itemize{
 \item \code{main}: normal(0, 0.5)
 \item \code{effects}: normal(0, 0.3)
+\item \code{sd}: exponential(2)
 }
 \item \code{kcrit}:
 \itemize{
 \item \code{main}: normal(0, 1)
 \item \code{effects}: normal(0, 0.5)
+\item \code{sd}: exponential(2)
 }
 }
 }

@@ -62,18 +62,24 @@
       )
     )
   )
+  # sd rates as elsewhere in the SDT family: rate 1 for the two sensitivities,
+  # rate 2 for the criteria and for the parameters Stan reads through a
+  # transformation (exp(sigmar), tanh(rho)). The 50 per-subject generating
+  # values in local/subject_level_parameter.csv put the between-subject SD of
+  # dfam, drec, criterion and rcrit near 0.30 and of sigmar near 0.14, all
+  # under the corresponding prior median; see local/sdt_sd_priors/.
   default_priors <- c(
     list(
-      dfam = list(main = "normal(1, 1)", effects = "normal(0, 0.5)"),
-      drec = list(main = "normal(1, 1)", effects = "normal(0, 0.5)"),
-      criterion = list(main = "normal(0, 1.5)", effects = "normal(0, 0.5)")
+      dfam = list(main = "normal(1, 1)", effects = "normal(0, 0.5)", sd = "exponential(1)"),
+      drec = list(main = "normal(1, 1)", effects = "normal(0, 0.5)", sd = "exponential(1)"),
+      criterion = list(main = "normal(0, 1.5)", effects = "normal(0, 0.5)", sd = "exponential(2)")
     ),
     thr_parts$default_priors,
     list(
-      rcrit = list(main = "normal(0, 1)", effects = "normal(0, 0.5)"),
-      sigmar = list(main = "normal(0, 0.5)", effects = "normal(0, 0.3)"),
-      rho = list(main = "normal(0, 0.5)", effects = "normal(0, 0.3)"),
-      kcrit = list(main = "normal(0, 1)", effects = "normal(0, 0.5)")
+      rcrit = list(main = "normal(0, 1)", effects = "normal(0, 0.5)", sd = "exponential(2)"),
+      sigmar = list(main = "normal(0, 0.5)", effects = "normal(0, 0.3)", sd = "exponential(2)"),
+      rho = list(main = "normal(0, 0.5)", effects = "normal(0, 0.3)", sd = "exponential(2)"),
+      kcrit = list(main = "normal(0, 1)", effects = "normal(0, 0.5)", sd = "exponential(2)")
     )
   )
   param_links <- c(

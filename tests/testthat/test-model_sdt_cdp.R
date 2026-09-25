@@ -61,6 +61,18 @@ test_that("sdt_cdp refuses a link on a fixed or transformed parameter", {
   expect_error(check_links(m), "link of 'rho' cannot be changed")
 })
 
+test_that("sdt_cdp gives every parameter an sd default prior", {
+  rate1 <- c("dfam", "drec")
+  for (tt in c("parsimonious", "log_distance")) {
+    m <- sdt_cdp(stimulus = "s", n_new = 3, n_old = 3, threshold_type = tt)
+    sds <- vapply(m$default_priors, function(p) p$sd %||% NA_character_,
+                  character(1))
+    expect_false(anyNA(sds), info = tt)
+    expect_true(all(sds[rate1] == "exponential(1)"), info = tt)
+    expect_true(all(sds[setdiff(names(sds), rate1)] == "exponential(2)"), info = tt)
+  }
+})
+
 test_that("sdt_cdp only supports dist = 'normal'", {
   expect_error(
     sdt_cdp(stimulus = "s", n_new = 3, n_old = 3, dist = "logistic"),
