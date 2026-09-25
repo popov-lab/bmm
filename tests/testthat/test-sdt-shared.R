@@ -69,9 +69,12 @@ test_that("the m-AFC closed forms sit on the right extreme-value branch", {
 })
 
 test_that("the sdratio prior stays inside the calibrated quadrature range", {
-  # .ranking_gh_n() is calibrated over sdratio in [0.5, 2.0]. If the default
-  # prior is ever widened past that, the sampler will visit ratios the
-  # quadrature was never verified for, so the two must be changed together.
+  # Two reasons the default must stay inside [0.5, 2.0]. Empirically, Mickes
+  # et al. (2007) report subject ratios between 0.85 and 1.82 and the
+  # broeder_schuetz_2009_e3 fit gives 1.46 [1.25, 1.72], so ratios past 2 are
+  # not observed. Numerically, .ranking_gh_n() is calibrated over that same
+  # interval, so a widened prior would send the sampler to ratios the
+  # quadrature was never verified for.
   models <- list(sdt_yn("n_old", "stimulus", "n_trials"),
                  sdt_ranking(paste0("rank", 1:4), m = 4, dist = "normal"))
   for (model in models) {
@@ -170,6 +173,93 @@ test_that("sdt_d validates input", {
   expect_error(sdt_d(0, 0.5), "between 0 and 1")
   expect_error(sdt_d(1, 0.5), "between 0 and 1")
   expect_error(sdt_d(0.5, 0), "between 0 and 1")
+})
+
+
+############################################################################# !
+# SHARED FORMULA CHECKS                                                    ####
+############################################################################# !
+
+sdt_stim_data <- function() {
+  data.frame(
+    n_old = c(10, 40, 15, 35),
+    stimulus = c(0L, 1L, 0L, 1L),
+    n_trials = c(50, 50, 50, 50),
+    condition = c("A", "A", "B", "B"),
+    id = c(1, 1, 2, 2)
+  )
+}
+
+# check_model() must run first, or add_missing_parameters() overwrites a formula
+# the user gave a fixed parameter: on a raw model `sdratio ~ stimulus` comes back
+# as `sdratio ~ 1` and a direct check_formula() call tests nothing
+sdt_check_formula <- function(formula, data = sdt_stim_data(),
+                              model = sdt_yn("n_old", "stimulus",
+                                             "n_trials")) {
+  model <- check_model(model, data, formula)
+  check_formula(model, data, formula)
+}
+
+test_that("a stimulus term on a parameter formula is refused", {
+  # the likelihood already consumes stimulus to set each row's role, so the term
+  # is confounded with the parameter's own intercept -- profiled flat to 6e-11
+  expect_error(
+    sdt_check_formula(bmf(d ~ stimulus, criterion ~ 1)),
+    "'d'.*uses the stimulus variable 'stimulus'"
+  )
+  expect_error(
+    sdt_check_formula(bmf(d ~ 1, criterion ~ stimulus)),
+    "'criterion'.*uses the stimulus variable"
+  )
+  expect_error(
+    sdt_check_formula(bmf(d ~ 1, criterion ~ 1, sdratio ~ stimulus)),
+    "'sdratio'.*uses the stimulus variable"
+  )
+  # both offenders are named, not just the first
+  expect_error(
+    sdt_check_formula(bmf(d ~ stimulus, criterion ~ stimulus)),
+    "'d', 'criterion'"
+  )
+})
+
+test_that("a stimulus grouping factor is refused with the same message", {
+  # rhs_vars() reports random-effect grouping variables, and a random intercept
+  # per stimulus level is the same confound as a fixed effect
+  expect_error(
+    sdt_check_formula(bmf(d ~ 1 + (1 | stimulus), criterion ~ 1)),
+    "as a predictor or as a grouping factor"
+  )
+})
+
+test_that("the stimulus check leaves legitimate predictors alone", {
+  expect_no_error(
+    sdt_check_formula(bmf(d ~ condition, criterion ~ 1 + (1 | id)))
+  )
+  # neither the confound check nor the all-intercept sdratio heuristic applies
+  # to a design with a real predictor
+  expect_no_warning(
+    sdt_check_formula(bmf(d ~ condition, criterion ~ 1 + (1 | id)))
+  )
+  # and it fires through the full pipeline, not only on a direct call
+  expect_error(
+    bmm(bmf(d ~ stimulus, criterion ~ 1), sdt_stim_data(),
+        sdt_yn("n_old", "stimulus", "n_trials"),
+        backend = "mock", mock_fit = 1, rename = FALSE),
+    "uses the stimulus variable"
+  )
+})
+
+test_that("a format without a stimulus other-var skips the confound check", {
+  # sdt_mafc and sdt_ranking have no stimulus other-var, and check_formula.sdt
+  # must fall through to NextMethod() instead of failing on a NULL stim_var
+  model <- structure(
+    list(name = "stub", parameters = list(par1 = ""),
+         resp_vars = list(response = "n_old"),
+         other_vars = list(stimulus = NULL)),
+    class = c("bmmodel", "sdt", "stub")
+  )
+  formula <- bmf(par1 ~ 1)
+  expect_identical(check_formula(model, sdt_stim_data(), formula), formula)
 })
 
 
