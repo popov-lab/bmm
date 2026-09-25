@@ -1252,13 +1252,15 @@ plnr <- function(q, response, m, s, ndt, lower.tail = TRUE, log.p = FALSE) {
       log_surv <- log_surv + stats::plnorm(t, meanlog = m[j], sdlog = s[j],
                                             lower.tail = FALSE, log.p = TRUE)
     }
-    log_p <- log1p(-exp(log_surv))
+    # the survivor is the quantity with a closed form, so the upper tail is
+    # returned as it stands: routing it through the CDF and back loses the
+    # whole value once exp(log_surv) rounds below the resolution of 1
+    log_p <- if (lower.tail) log1m_exp(log_surv) else log_surv
   } else {
     stop2("Response-specific CDF for the LNR is not yet implemented. \\
            Omit the 'response' argument to get the marginal RT CDF.")
   }
 
-  if (!lower.tail) log_p <- log1p(-exp(log_p))
   if (log.p) log_p else exp(log_p)
 }
 

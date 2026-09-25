@@ -169,6 +169,23 @@ test_that("plnr and qlnr are internally consistent", {
   )
 })
 
+test_that("plnr keeps the upper tail where the lower tail has rounded to one", {
+  m <- c(-1, 0)
+  s <- c(1, 1)
+  ndt <- 0.2
+  q <- c(10, 100, 500, 5000)
+
+  direct <- vapply(q, function(qi) {
+    sum(stats::plnorm(qi - ndt, meanlog = m, sdlog = s,
+                      lower.tail = FALSE, log.p = TRUE))
+  }, numeric(1))
+
+  expect_equal(
+    plnr(q, m = m, s = s, ndt = ndt, lower.tail = FALSE, log.p = TRUE),
+    direct
+  )
+})
+
 test_that("dm3 requires custom act_funs to be specified", {
   model <- m3(
     resp_cats = c("corr", "other", "dist", "npl"),
