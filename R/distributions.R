@@ -2514,6 +2514,55 @@ rsdt_yn <- function(n, n_trials, stimulus, d, criterion,
 }
 
 
+# R-side logit P(correct) for m-AFC, mirroring the Stan mafc_logit_pc function.
+# The binomial is evaluated on the logit scale because P(correct) rounds to 1 as
+# soon as its complement falls below the double epsilon, at which point the
+# density stops responding to d'. gumbel_max's logit is analytic; the two
+# quadrature branches accumulate the complement 1 - P(correct), whose terms are
+# all positive, so the small quantity keeps its relative precision.
+.mafc_logit_pc_r <- function(d, m, dist = "normal") {
+  if (dist == "gumbel_max") {
+    return(d - log(m - 1))
+  }
+  if (dist == "gumbel_min") {
+    log_pc <- pmin(lgamma(1 + exp(-d)) + lgamma(m) - lgamma(m + exp(-d)), 0)
+    return(log_pc - log1m_exp(log_pc))
+  }
+
+  n <- max(length(d), length(m))
+  d <- rep_len(d, n)
+  m <- rep_len(m, n)
+  lcdf <- .sdt_dists[[dist]]$lcdf
+
+  if (dist == "normal") {
+    out <- lcdf(d / sqrt(2)) - .sdt_dists$normal$lccdf(d / sqrt(2))
+    quad <- m != 2L
+    if (any(quad)) {
+      log_cdf <- lcdf(outer(.mafc_gh_nodes, d[quad], "+")) *
+        rep(m[quad] - 1, each = length(.mafc_gh_nodes))
+      q <- pmin(colSums(.mafc_gh_weights * -expm1(log_cdf)), 1)
+      out[quad] <- log1p(-q) - log(q)
+    }
+    return(out)
+  }
+
+  log_cdf <- lcdf(outer(.sdt_dists[[dist]]$qf(.mafc_gl_nodes), d, "+")) *
+    rep(m - 1, each = length(.mafc_gl_nodes))
+  q <- pmin(colSums(.mafc_gl_weights * -expm1(log_cdf)), 1)
+  log1p(-q) - log(q)
+}
+
+
+# Binomial log-density from the logit of the success probability. A cell with no
+# successes (or no failures) contributes nothing even where the corresponding
+# log-probability underflows, but 0 * -Inf is NaN, so those terms are dropped.
+.dbinom_logit <- function(n_correct, n_trials, logit_p) {
+  lchoose(n_trials, n_correct) -
+    ifelse(n_correct == 0, 0, n_correct * .log1p_exp(-logit_p)) -
+    ifelse(n_correct == n_trials, 0, (n_trials - n_correct) * .log1p_exp(logit_p))
+}
+
+
 #' @title Distribution functions for m-AFC SDT
 #'
 #' @description Density and random generation for m-alternative forced choice
@@ -2567,8 +2616,10 @@ dsdt_mafc <- function(n_correct, n_trials, m, d,
   stopif(any(n_correct < 0), "n_correct must be non-negative")
   stopif(any(n_correct > n_trials), "n_correct must not exceed n_trials")
 
-  pc <- .mafc_pc_r(rep_len(d, n), rep_len(as.integer(m), n), dist)
-  stats::dbinom(n_correct, n_trials, pc, log = log)
+  out <- .dbinom_logit(n_correct, n_trials,
+                       .mafc_logit_pc_r(rep_len(d, n),
+                                        rep_len(as.integer(m), n), dist))
+  if (log) out else exp(out)
 }
 
 

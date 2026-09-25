@@ -305,7 +305,7 @@ test_that("sdt_mafc produces valid stancode including its custom functions", {
   model <- sdt_mafc("n_correct", "n_trials", m = 4)
   code <- stancode(bmf(d ~ 1), data = dat, model = model)
   expect_true(grepl("sdt_mafc", code))
-  expect_true(grepl("mafc_pc", code))
+  expect_true(grepl("mafc_logit_pc", code))
   expect_true(grepl("sdt_quantile", code))
 })
 
@@ -401,17 +401,19 @@ test_that("the Stan mafc_pc branches match the registry order", {
   # while turning every dist = "gumbel_max" fit into a gumbel_min model.
   pc <- read_lines2(file.path(system.file("stan_chunks", package = "bmm"),
                               "sdt_mafc_funs.stan"))
-  pc <- sub("(?s)\n\\}.*", "", sub("(?s).*real mafc_pc\\(", "", pc, perl = TRUE),
-            perl = TRUE)
+  pc <- sub("(?s)\n\\}.*", "",
+             sub("(?s).*real mafc_logit_pc\\(", "", pc, perl = TRUE), perl = TRUE)
   pc <- gsub("[[:space:]]+", " ", gsub("//[^\n]*", "", pc))
 
   expect_equal(names(.sdt_dists),
                c("normal", "gumbel_min", "gumbel_max", "logistic"))
 
   closed_form <- c(
-    normal     = "{ if (m == 2) return Phi(d / sqrt(2.0));",
-    gumbel_min = "return exp(lgamma(1 + exp(-d)) + lgamma(m) - lgamma(m + exp(-d)));",
-    gumbel_max = "return 1.0 / (1 + (m - 1) * exp(-d));"
+    normal     = paste("{ if (m == 2) return sdt_log_cumprob(d / sqrt(2.0), dist_type)",
+                       "- sdt_log_one_minus_cumprob(d / sqrt(2.0), dist_type);"),
+    gumbel_min = paste("{ real log_pc = fmin(lgamma(1 + exp(-d)) + lgamma(m)",
+                       "- lgamma(m + exp(-d)), 0); return log_pc - log1m_exp(log_pc); }"),
+    gumbel_max = "return d - log(m - 1);"
   )
   for (nm in names(closed_form)) {
     expect_match(pc,
@@ -424,9 +426,70 @@ test_that("the Stan mafc_pc branches match the registry order", {
   guards <- as.integer(gsub("\\D", "", regmatches(pc, gregexpr("dist_type == [0-9]+", pc))[[1]]))
   expect_equal(sort(guards), c(1L, 2L, 3L))
   expect_false(which(names(.sdt_dists) == "logistic") %in% guards)
+  # both quadrature branches accumulate the complement, so both are pinned
   expect_match(
     pc,
-    "gl_weights[i] * pow(sdt_cumprob(sdt_quantile(gl_nodes[i], dist_type) + d, dist_type), m - 1)",
+    "q += gh_weights[i] * (-expm1((m - 1) * sdt_log_cumprob(gh_nodes[i] + d, dist_type)));",
     fixed = TRUE
   )
+  expect_match(
+    pc,
+    paste("q += gl_weights[i] * (-expm1((m - 1) * sdt_log_cumprob(sdt_quantile(",
+          "gl_nodes[i], dist_type) + d, dist_type)));", sep = ""),
+    fixed = TRUE
+  )
+})
+
+
+test_that("the m-AFC logit hits chance and the gumbel_max closed form", {
+  for (di in c("normal", "logistic", "gumbel_min", "gumbel_max")) {
+    for (m in c(2L, 3L, 4L, 8L)) {
+      expect_equal(.mafc_logit_pc_r(0, m, di), -log(m - 1), tolerance = 1e-7,
+                   info = paste(di, "m =", m))
+    }
+  }
+  # the softmax logit is d' - log(m - 1) with nothing to cancel, so it holds at
+  # any d', including where P(correct) itself is 1 to the last bit
+  for (m in c(2L, 3L, 4L, 8L)) {
+    for (d in c(0, 1, 5, 40, 200)) {
+      expect_equal(.mafc_logit_pc_r(d, m, "gumbel_max"), d - log(m - 1),
+                   tolerance = 1e-12, info = paste("m =", m, "d =", d))
+    }
+  }
+})
+
+test_that(".mafc_logit_pc_r agrees with .mafc_pc_r while both scales are exact", {
+  # the two are separate code paths (probability scale vs complement), so this
+  # is what ties them together where the probability scale is still trustworthy
+  for (di in c("normal", "logistic", "gumbel_min", "gumbel_max")) {
+    for (m in c(2L, 3L, 4L, 8L, 16L)) {
+      d <- c(-1, 0, 0.5, 1, 2, 3)
+      expect_equal(.mafc_logit_pc_r(d, m, di), stats::qlogis(.mafc_pc_r(d, m, di)),
+                   tolerance = 1e-9, info = paste(di, "m =", m))
+    }
+  }
+})
+
+test_that("the m-AFC density keeps responding to d' where P(correct) rounds to 1", {
+  # binomial_lpmf on a natural-scale P(correct) stops seeing d' as soon as the
+  # complement drops below the double epsilon. Measured at y = 90 of 100 trials
+  # and m = 4: the normal branch was constant at -312.04 from d' = 12 (correct
+  # value -349.24) and gumbel_min, gumbel_max and logistic returned -Inf from
+  # d' = 37, 38 and 40. A log link on d puts that region within reach.
+  for (di in c("normal", "logistic", "gumbel_min", "gumbel_max")) {
+    ld <- vapply(c(12, 16, 20, 25, 30), function(dd)
+      dsdt_mafc(90, 100, m = 4, d = dd, dist = di, log = TRUE), numeric(1))
+    expect_true(all(is.finite(ld)), info = di)
+    expect_true(all(diff(ld) < 0), info = di)
+  }
+  # the two branches whose logit has no quadrature limit reach arbitrarily far
+  for (di in c("gumbel_max", "logistic")) {
+    ld <- vapply(c(40, 60, 100, 200), function(dd)
+      dsdt_mafc(90, 100, m = 4, d = dd, dist = di, log = TRUE), numeric(1))
+    expect_true(all(is.finite(ld)), info = di)
+    expect_true(all(diff(ld) < 0), info = di)
+  }
+  # a cell with no errors, or nothing but errors, is a probability and not NaN
+  expect_equal(dsdt_mafc(100, 100, m = 4, d = 200), 1, tolerance = 1e-12)
+  expect_equal(dsdt_mafc(0, 100, m = 4, d = -200), 1, tolerance = 1e-12)
 })
