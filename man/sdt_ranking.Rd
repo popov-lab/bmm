@@ -70,6 +70,7 @@ No stimulus column needed (all trials include exactly one target)
 \itemize{
 \item \code{main}: normal(1, 1)
 \item \code{effects}: normal(0, 0.5)
+\item \code{sd}: exponential(1)
 }
 }
 }

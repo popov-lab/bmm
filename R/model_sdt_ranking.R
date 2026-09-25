@@ -12,8 +12,14 @@
       "distributions in units of their root-mean-square SD"
     )
   )
+  # The sd rates match sdt_yn, so d and sdratio shrink the same way whichever
+  # SDT model the same subjects are fitted with. Rate 1 for d: its
+  # between-subject SD is 0.30 [0.24, 0.37] on meyer_grant_jakob_2025 and ~0.6
+  # for sdt_yn on broeder_schuetz_2009_e3, and only rate 1's median (0.69)
+  # covers the larger of the two. Rate 2 for sdratio, whose between-subject SD
+  # is 0.06 [0.00, 0.12] here and ~0.2 there. See local/sdt_sd_priors/.
   default_priors <- list(
-    d = list(main = "normal(1, 1)", effects = "normal(0, 0.5)")
+    d = list(main = "normal(1, 1)", effects = "normal(0, 0.5)", sd = "exponential(1)")
   )
   param_links <- list(d = "identity")
   fixed_pars <- list()
@@ -32,7 +38,7 @@
     # the prior inside the interval the Gauss-Hermite ladder is calibrated over
     # (see .ranking_gh_n).
     default_priors$sdratio <- list(
-      main = "normal(0, 0.3)", effects = "normal(0, 0.15)"
+      main = "normal(0, 0.3)", effects = "normal(0, 0.15)", sd = "exponential(2)"
     )
     param_links$sdratio <- "identity"
     fixed_pars$sdratio <- 0
@@ -73,8 +79,17 @@
     class = c("bmmodel", "sdt", "sdt_ranking"),
     call = call
   )
-  out$links[names(links)] <- links
-  out
+  set_links(out, links)
+}
+
+# `sdratio` is the log SD ratio itself -- the Stan code reads exp(sdratio) --
+# and it is fixed at 0, which means equal variance only while the link is
+# identity. Any other link both rescales the fixed value and applies a second
+# transformation on top of the exp(), so the model would sample a ratio the
+# user never asked for. `d` fixes nothing, so its link stays settable.
+#' @exportS3Method
+settable_links.sdt_ranking <- function(model) {
+  "d"
 }
 
 

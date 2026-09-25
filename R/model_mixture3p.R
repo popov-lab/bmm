@@ -61,8 +61,15 @@
     class = c("bmmodel", "circular", "non_targets", "mixture3p"),
     call = call
   )
-  out$links[names(links)] <- links
+  out <- set_links(out, links)
   out
+}
+
+# the links come from the brms::mixture() of von Mises components that
+# configure_model.mixture3p builds, not from this list
+#' @exportS3Method
+settable_links.mixture3p <- function(model) {
+  character(0)
 }
 
 

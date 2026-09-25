@@ -98,6 +98,45 @@ test_that("sdt_rating model accepts custom links", {
   expect_equal(model$links$criterion, "identity")
 })
 
+test_that("sdt_rating refuses a link on sdratio or a threshold parameter", {
+  # sdratio and the thresholds are read through exp() in Stan, and sdratio is
+  # additionally fixed at 0, so neither survives a change of link
+  model <- sdt_rating(c("r1", "r2", "r3", "r4"), "stimulus")
+  expect_equal(settable_links(model), c("d", "criterion"))
+  for (par in c("sdratio", "spacing")) {
+    expect_error(
+      sdt_rating(c("r1", "r2", "r3", "r4"), "stimulus",
+                 links = stats::setNames(list("log"), par)),
+      paste0("link of '", par, "' cannot be changed")
+    )
+  }
+  expect_error(
+    sdt_rating(c("r1", "r2", "r3", "r4"), "stimulus",
+               links = list(sensitivity = "log")),
+    "Unrecognized link target"
+  )
+  model$links$spacing <- "log"
+  expect_error(check_links(model), "link of 'spacing' cannot be changed")
+})
+
+test_that("sdt_rating gives every parameter an sd default prior", {
+  # Ro and Rn are logit-scale probabilities, so they join d at rate 1;
+  # everything else is a log-scale quantity and takes rate 2
+  rate1 <- c("d", "Ro", "Rn")
+  for (v in names(bmm:::.sdt_rating_variants)) {
+    for (tt in c("parsimonious", "log_distance", "softmax")) {
+      model <- sdt_rating(paste0("r", 1:5), "stimulus",
+                          threshold_type = tt, version = v)
+      sds <- vapply(model$default_priors, function(p) p$sd %||% NA_character_,
+                    character(1))
+      info <- paste(v, tt)
+      expect_false(anyNA(sds), info = info)
+      expect_true(all(sds[intersect(names(sds), rate1)] == "exponential(1)"), info = info)
+      expect_true(all(sds[setdiff(names(sds), rate1)] == "exponential(2)"), info = info)
+    }
+  }
+})
+
 test_that("sdt_rating supplies init_ranges for every estimated parameter", {
   # create_initfun() looks up init_ranges per parameter; a missing entry yields
   # NA inits, and the flexible threshold types reject brms' default random init.

@@ -32,29 +32,29 @@ rsdt_yn(
 
 \item{n_trials}{Integer vector. Total number of trials per cell.}
 
-\item{stimulus}{Integer vector (0/1). Stimulus type: 0 = noise, 1 = signal.}
+\item{stimulus}{Numeric or logical vector (0/1). Stimulus type: 0 = noise, 1 = signal.}
 
 \item{d}{Numeric. Sensitivity: \eqn{d'} when \code{sdratio} is 1, and otherwise
-the balanced index \eqn{d_a} (see \code{\link[=sdt_yn]{sdt_yn()}}). The separation between the
-distributions in noise units is \code{d * sqrt((1 + sdratio^2) / 2)}.}
+the balanced index \eqn{d_a}, the separation between the two distributions
+divided by the root-mean-square of their SDs (see \code{\link[=sdt_yn]{sdt_yn()}}). The
+separation in noise units is \code{d * sqrt((1 + sdratio^2) / 2)}.}
 
 \item{criterion}{Numeric. Response bias (decision boundary location), on the
-noise-standardized axis.}
+noise-standardized axis, i.e. in units of the noise distribution's SD.}
 
 \item{sdratio}{Numeric. Ratio of signal to noise standard deviations
-(default 1, i.e., equal variance). Must be positive. Note that this is the
-natural scale: the \code{sdratio} parameter of \code{\link[=sdt_yn]{sdt_yn()}} is sampled on the log
-scale, so it corresponds to \code{log(sdratio)} here.}
+(default 1, i.e., equal variance). Must be positive, and is on the
+\strong{natural} scale — see the section below before reusing a fitted value.}
 
 \item{dist}{Character. The distribution assumed for the latent evidence,
 given here by its cumulative distribution function:
 \itemize{
 \item "normal" (default): Gaussian, \eqn{\Phi(x)}
-\item "gumbel_min": smallest extreme value, \eqn{1 - \exp(-\exp(x))}
+\item "gumbel_min": smallest extreme value, \eqn{1 - \exp(-\exp(x))}{1 - exp(-exp(x))}
 (the complementary log-log distribution)
-\item "gumbel_max": largest extreme value, \eqn{\exp(-\exp(-x))}
+\item "gumbel_max": largest extreme value, \eqn{\exp(-\exp(-x))}{exp(-exp(-x))}
 (the log-log distribution, as in \code{evd::pgumbel})
-\item "logistic": \eqn{1 / (1 + \exp(-x))}
+\item "logistic": \eqn{1 / (1 + \exp(-x))}{1 / (1 + exp(-x))}
 }}
 
 \item{log}{Logical. If \code{TRUE}, returns log-density (default \code{FALSE}).}
@@ -72,6 +72,17 @@ Density and random generation for the yes/no signal detection
 theory model, where the response is the number of "old"/"signal" responses
 out of a fixed number of trials (a binomial likelihood).
 }
+\section{Parameter scales}{
+
+As everywhere in \code{bmm}, these functions take their arguments on the
+\strong{natural} scale, while the parameters \code{\link[=sdt_yn]{sdt_yn()}} \emph{estimates} are on their
+link scale. \code{d} and \code{criterion} have identity links and carry across
+unchanged, but \code{sdratio} has a log link: a fitted \code{sdratio} of 0.375 is a
+ratio of \code{exp(0.375) = 1.455}, and passing \code{0.375} here instead asks for a
+signal distribution 2.7 times narrower than the noise. That is a legal
+value and raises no error, so exponentiate first.
+}
+
 \examples{
 # Density of yes/no SDT data
 dsdt_yn(n_old = 80, n_trials = 100, stimulus = 1,
@@ -81,6 +92,11 @@ dsdt_yn(n_old = 80, n_trials = 100, stimulus = 1,
 dsdt_yn(n_old = c(30, 80), n_trials = c(100, 100),
         stimulus = c(0, 1), d = 1.5, criterion = 0.2,
         log = TRUE)
+
+# Unequal variance from a fitted model: sdt_yn() reports sdratio on its log
+# link, so exponentiate before passing it here
+dsdt_yn(n_old = 80, n_trials = 100, stimulus = 1,
+        d = 1.5, criterion = 0.2, sdratio = exp(0.375))
 # Generate yes/no SDT data for a design
 dat <- expand.grid(id = 1:20, stimulus = c(0L, 1L))
 dat$n_trials <- 100L
