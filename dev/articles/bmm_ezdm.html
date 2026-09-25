@@ -155,6 +155,49 @@ T_{er} = MRT - \frac{a}{2v} \cdot \frac{1 - e^{-\frac{va}{s^2}}}{1 + e^{-\frac{v
 <li>Leverage the full power of the <code>brms</code> modeling framework</li>
 </ul>
 </div>
+<div class="section level3" number="1.5">
+<h3 id="the-sampling-distribution-of-the-summary-statistics">
+<span class="header-section-number">1.5</span> The sampling distribution of the summary statistics<a class="anchor" aria-label="anchor" href="#the-sampling-distribution-of-the-summary-statistics"></a>
+</h3>
+<p>Because the summary statistics <em>are</em> the data, the likelihood is a statement
+about how they vary from one sample of trials to the next. The number of
+upper-boundary responses is binomial. The mean and the variance of the response
+times are the sample mean and sample variance of <span class="math inline">\(n\)</span> decision times, and their
+joint sampling distribution is what the model needs.</p>
+<p>It is tempting to treat them the way one would for normally distributed data:
+<span class="math inline">\(\overline{\mathrm{RT}}\)</span> normal around the predicted mean with variance
+<span class="math inline">\(\mathrm{VRT}/n\)</span>, <span class="math inline">\(s^2\)</span> scaled chi-square, and the two independent. All three
+parts of that hold only if the response times themselves are normal, and
+diffusion decision times are conspicuously right-skewed. With a symmetric
+starting point their kurtosis is 8.8 at zero drift and falls towards 3 as drift
+grows. This inflates the sampling variance of <span class="math inline">\(s^2\)</span> by a factor of about 3.8
+with 100 trials per cell and 3.5 to 3.6 with 10 (less at accuracies above .95; with an
+asymmetric starting point it is more at the boundary nearer the starting point,
+up to 5.7 for a relative starting point between .3 and .7, and less at the
+other), and the skew makes the mean and the variance correlate at about 0.7. A likelihood that ignores both treats each cell as more
+informative than it is, and the resulting posteriors are too narrow — the
+credible intervals are not wrong about where the parameter is, but about how
+sure one should be.</p>
+<p><code>bmm</code> therefore matches the first four cumulants of the first-passage time
+distribution. Writing <span class="math inline">\(\kappa_3\)</span> and <span class="math inline">\(\kappa_4\)</span> for its third and fourth
+cumulants and
+<span class="math inline">\(W = \kappa_4 / n + 2\,\mathrm{VRT}^2 / (n - 1)\)</span> for the exact variance of a
+sample variance, the observed variance follows
+<span class="math inline">\(\mathrm{Gamma}(\mathrm{VRT}^2 / W,\ \mathrm{VRT} / W)\)</span> and the observed mean is
+normal <em>conditional on it</em>, centred at
+<span class="math inline">\(\mathrm{ndt} + \mathrm{MDT} + (\kappa_3 / n)\,W^{-1}(s^2 - \mathrm{VRT})\)</span>. Both
+reduce to the familiar normal and chi-square terms when <span class="math inline">\(\kappa_3\)</span> and
+<span class="math inline">\(\kappa_4\)</span> vanish, so nothing is lost when the decision times happen to be
+symmetric.</p>
+<p>One consequence is worth keeping in mind when designing a study: with a
+symmetric starting point the decision time does not depend on which boundary was
+reached, so all <span class="math inline">\(n\)</span> trials in a cell inform one set of moments. With a free
+starting point they do differ, which is why the 4-parameter version needs the
+summaries split by boundary — and why a boundary reached fewer than twice in a
+cell has no variance to contribute. In <code><a href="../reference/ezdm_dist.html">dezdm()</a></code> such a cell still contributes
+through the response counts; a <code><a href="../reference/bmm.html">bmm()</a></code> fit currently drops it, because the
+missing summaries are coded as <code>NA</code>.</p>
+</div>
 </div>
 <div class="section level2" number="2">
 <h2 id="parametrization-in-the-bmm-package">
@@ -549,12 +592,12 @@ T_{er} = MRT - \frac{a}{2v} \cdot \frac{1 - e^{-\frac{va}{s^2}}}{1 + e^{-\frac{v
 <span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/utils/head.html" class="external-link">head</a></span><span class="op">(</span><span class="va">sim_data</span><span class="op">)</span></span>
 <span><span class="co">#&gt;     mean_rt     var_rt n_upper n_trials subject condition</span></span>
-<span><span class="co">#&gt; 1 0.5821563 0.03227199      99      100       1      easy</span></span>
-<span><span class="co">#&gt; 2 0.7580137 0.09254939      95      100       1      hard</span></span>
-<span><span class="co">#&gt; 3 0.5170452 0.01770436     100      100       2      easy</span></span>
-<span><span class="co">#&gt; 4 0.7777224 0.16780351      85      100       2      hard</span></span>
-<span><span class="co">#&gt; 5 0.4981635 0.02285722      97      100       3      easy</span></span>
-<span><span class="co">#&gt; 6 0.6836707 0.06894347      93      100       3      hard</span></span></code></pre></div>
+<span><span class="co">#&gt; 1 0.5849755 0.02704076      96      100       1      easy</span></span>
+<span><span class="co">#&gt; 2 0.7349579 0.05481245      89      100       1      hard</span></span>
+<span><span class="co">#&gt; 3 0.5064378 0.01015706     100      100       2      easy</span></span>
+<span><span class="co">#&gt; 4 0.6327151 0.07406956      91      100       2      hard</span></span>
+<span><span class="co">#&gt; 5 0.5354869 0.01897598      98      100       3      easy</span></span>
+<span><span class="co">#&gt; 6 0.6624182 0.07254991      85      100       3      hard</span></span></code></pre></div>
 </div>
 <div class="section level3" number="5.2">
 <h3 id="specifying-the-formula">
@@ -610,7 +653,7 @@ T_{er} = MRT - \frac{a}{2v} \cdot \frac{1 - e^{-\frac{va}{s^2}}}{1 + e^{-\frac{v
               n_upper = "n_upper",
               n_trials = "n_trials",
               version = "3par") 
-<span style="color: #AF5FFF;">  Links: </span>drift = log; bound = log; ndt = log; s = log 
+<span style="color: #AF5FFF;">  Links: </span>drift = identity; bound = log; ndt = log; s = log 
 <span style="color: #AF5FFF;">Formula: </span>drift ~ 0 + condition
          bound ~ 1
          ndt ~ 1
@@ -621,10 +664,10 @@ T_{er} = MRT - \frac{a}{2v} \cdot \frac{1 - e^{-\frac{va}{s^2}}}{1 + e^{-\frac{v
 
 <span style="color: #00BB00;">Regression Coefficients:
 </span>                    Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS
-bound_Intercept         0.43      0.01     0.41     0.45 1.00     1028     1329
-ndt_Intercept          -1.26      0.02    -1.30    -1.23 1.00     1487     1256
-drift_conditioneasy     1.12      0.01     1.09     1.14 1.00     1455     1466
-drift_conditionhard     0.38      0.02     0.34     0.43 1.00     1145     1217
+bound_Intercept         0.43      0.01     0.41     0.46 1.00     1231     1134
+ndt_Intercept          -1.29      0.02    -1.33    -1.25 1.00     1230     1195
+drift_conditioneasy     2.74      0.06     2.63     2.85 1.00     1358     1196
+drift_conditionhard     1.37      0.04     1.29     1.44 1.00     1424     1365
 
 <span style="color: #00BB00;">Constant Parameters:
 </span>                Value
@@ -641,13 +684,13 @@ scale reduction factor on split chains (at convergence, Rhat = 1).
 <span></span>
 <span><span class="co"># Transform to natural scale</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/cat.html" class="external-link">cat</a></span><span class="op">(</span><span class="st">"Drift rate (easy):"</span>, <span class="fu"><a href="https://rdrr.io/r/base/Log.html" class="external-link">exp</a></span><span class="op">(</span><span class="va">fixef_est</span><span class="op">[</span><span class="st">"drift_conditioneasy"</span>, <span class="st">"Estimate"</span><span class="op">]</span><span class="op">)</span>, <span class="st">"\n"</span><span class="op">)</span></span>
-<span><span class="co">#&gt; Drift rate (easy): 3.060362</span></span>
+<span><span class="co">#&gt; Drift rate (easy): 15.42381</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/cat.html" class="external-link">cat</a></span><span class="op">(</span><span class="st">"Drift rate (hard):"</span>, <span class="fu"><a href="https://rdrr.io/r/base/Log.html" class="external-link">exp</a></span><span class="op">(</span><span class="va">fixef_est</span><span class="op">[</span><span class="st">"drift_conditionhard"</span>, <span class="st">"Estimate"</span><span class="op">]</span><span class="op">)</span>, <span class="st">"\n"</span><span class="op">)</span></span>
-<span><span class="co">#&gt; Drift rate (hard): 1.467012</span></span>
+<span><span class="co">#&gt; Drift rate (hard): 3.92211</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/cat.html" class="external-link">cat</a></span><span class="op">(</span><span class="st">"Boundary:"</span>, <span class="fu"><a href="https://rdrr.io/r/base/Log.html" class="external-link">exp</a></span><span class="op">(</span><span class="va">fixef_est</span><span class="op">[</span><span class="st">"bound_Intercept"</span>, <span class="st">"Estimate"</span><span class="op">]</span><span class="op">)</span>, <span class="st">"\n"</span><span class="op">)</span></span>
-<span><span class="co">#&gt; Boundary: 1.534783</span></span>
+<span><span class="co">#&gt; Boundary: 1.543554</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/cat.html" class="external-link">cat</a></span><span class="op">(</span><span class="st">"Non-decision time:"</span>, <span class="fu"><a href="https://rdrr.io/r/base/Log.html" class="external-link">exp</a></span><span class="op">(</span><span class="va">fixef_est</span><span class="op">[</span><span class="st">"ndt_Intercept"</span>, <span class="st">"Estimate"</span><span class="op">]</span><span class="op">)</span>, <span class="st">"\n"</span><span class="op">)</span></span>
-<span><span class="co">#&gt; Non-decision time: 0.2827719</span></span></code></pre></div>
+<span><span class="co">#&gt; Non-decision time: 0.2750842</span></span></code></pre></div>
 <p>As you can see, these match the generating values well:</p>
 <div class="sourceCode" id="cb13"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/base/print.html" class="external-link">print</a></span><span class="op">(</span><span class="va">true_params</span><span class="op">)</span></span>
@@ -721,7 +764,7 @@ scale reduction factor on split chains (at convergence, Rhat = 1).
 <span><span class="fu">brms</span><span class="fu">::</span><span class="fu"><a href="https://paulbuerkner.com/brms/reference/hypothesis.brmsfit.html" class="external-link">hypothesis</a></span><span class="op">(</span><span class="va">fit</span>, <span class="st">"exp(drift_conditioneasy) &gt; exp(drift_conditionhard)"</span><span class="op">)</span></span>
 <span><span class="co">#&gt; Hypothesis Tests for class b:</span></span>
 <span><span class="co">#&gt;                 Hypothesis Estimate Est.Error CI.Lower CI.Upper Evid.Ratio</span></span>
-<span><span class="co">#&gt; 1 (exp(drift_condit... &gt; 0     1.59      0.04     1.52     1.66        Inf</span></span>
+<span><span class="co">#&gt; 1 (exp(drift_condit... &gt; 0    11.52      0.88    10.14    13.05        Inf</span></span>
 <span><span class="co">#&gt;   Post.Prob Star</span></span>
 <span><span class="co">#&gt; 1         1    *</span></span>
 <span><span class="co">#&gt; ---</span></span>

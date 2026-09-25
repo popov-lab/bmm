@@ -116,6 +116,55 @@ package implements this Bayesian approach, allowing researchers to:
 - Compare conditions using Bayesian hypothesis testing
 - Leverage the full power of the `brms` modeling framework
 
+### 1.5 The sampling distribution of the summary statistics
+
+Because the summary statistics *are* the data, the likelihood is a
+statement about how they vary from one sample of trials to the next. The
+number of upper-boundary responses is binomial. The mean and the
+variance of the response times are the sample mean and sample variance
+of \\n\\ decision times, and their joint sampling distribution is what
+the model needs.
+
+It is tempting to treat them the way one would for normally distributed
+data: \\\overline{\mathrm{RT}}\\ normal around the predicted mean with
+variance \\\mathrm{VRT}/n\\, \\s^2\\ scaled chi-square, and the two
+independent. All three parts of that hold only if the response times
+themselves are normal, and diffusion decision times are conspicuously
+right-skewed. With a symmetric starting point their kurtosis is 8.8 at
+zero drift and falls towards 3 as drift grows. This inflates the
+sampling variance of \\s^2\\ by a factor of about 3.8 with 100 trials
+per cell and 3.5 to 3.6 with 10 (less at accuracies above .95; with an
+asymmetric starting point it is more at the boundary nearer the starting
+point, up to 5.7 for a relative starting point between .3 and .7, and
+less at the other), and the skew makes the mean and the variance
+correlate at about 0.7. A likelihood that ignores both treats each cell
+as more informative than it is, and the resulting posteriors are too
+narrow — the credible intervals are not wrong about where the parameter
+is, but about how sure one should be.
+
+`bmm` therefore matches the first four cumulants of the first-passage
+time distribution. Writing \\\kappa_3\\ and \\\kappa_4\\ for its third
+and fourth cumulants and \\W = \kappa_4 / n + 2\\\mathrm{VRT}^2 / (n -
+1)\\ for the exact variance of a sample variance, the observed variance
+follows \\\mathrm{Gamma}(\mathrm{VRT}^2 / W,\\ \mathrm{VRT} / W)\\ and
+the observed mean is normal *conditional on it*, centred at
+\\\mathrm{ndt} + \mathrm{MDT} + (\kappa_3 / n)\\W^{-1}(s^2 -
+\mathrm{VRT})\\. Both reduce to the familiar normal and chi-square terms
+when \\\kappa_3\\ and \\\kappa_4\\ vanish, so nothing is lost when the
+decision times happen to be symmetric.
+
+One consequence is worth keeping in mind when designing a study: with a
+symmetric starting point the decision time does not depend on which
+boundary was reached, so all \\n\\ trials in a cell inform one set of
+moments. With a free starting point they do differ, which is why the
+4-parameter version needs the summaries split by boundary — and why a
+boundary reached fewer than twice in a cell has no variance to
+contribute. In
+[`dezdm()`](https://venpopov.com/bmm/dev/reference/ezdm_dist.md) such a
+cell still contributes through the response counts; a
+[`bmm()`](https://venpopov.com/bmm/dev/reference/bmm.md) fit currently
+drops it, because the missing summaries are coded as `NA`.
+
 ## 2 Parametrization in the `bmm` package
 
 The `bmm` package implements two versions of the EZ-diffusion model:
@@ -467,12 +516,12 @@ sim_data$condition <- factor(sim_data$condition, levels = c("easy", "hard"))
 
 head(sim_data)
 #>     mean_rt     var_rt n_upper n_trials subject condition
-#> 1 0.5821563 0.03227199      99      100       1      easy
-#> 2 0.7580137 0.09254939      95      100       1      hard
-#> 3 0.5170452 0.01770436     100      100       2      easy
-#> 4 0.7777224 0.16780351      85      100       2      hard
-#> 5 0.4981635 0.02285722      97      100       3      easy
-#> 6 0.6836707 0.06894347      93      100       3      hard
+#> 1 0.5849755 0.02704076      96      100       1      easy
+#> 2 0.7349579 0.05481245      89      100       1      hard
+#> 3 0.5064378 0.01015706     100      100       2      easy
+#> 4 0.6327151 0.07406956      91      100       2      hard
+#> 5 0.5354869 0.01897598      98      100       3      easy
+#> 6 0.6624182 0.07254991      85      100       3      hard
 ```
 
 ### 5.2 Specifying the formula
@@ -543,7 +592,7 @@ Loading required namespace: rstan
               n_upper = "n_upper",
               n_trials = "n_trials",
               version = "3par") 
-  Links: drift = log; bound = log; ndt = log; s = log 
+  Links: drift = identity; bound = log; ndt = log; s = log 
 Formula: drift ~ 0 + condition
          bound ~ 1
          ndt ~ 1
@@ -554,10 +603,10 @@ Formula: drift ~ 0 + condition
 
 Regression Coefficients:
                     Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS
-bound_Intercept         0.43      0.01     0.41     0.45 1.00     1028     1329
-ndt_Intercept          -1.26      0.02    -1.30    -1.23 1.00     1487     1256
-drift_conditioneasy     1.12      0.01     1.09     1.14 1.00     1455     1466
-drift_conditionhard     0.38      0.02     0.34     0.43 1.00     1145     1217
+bound_Intercept         0.43      0.01     0.41     0.46 1.00     1231     1134
+ndt_Intercept          -1.29      0.02    -1.33    -1.25 1.00     1230     1195
+drift_conditioneasy     2.74      0.06     2.63     2.85 1.00     1358     1196
+drift_conditionhard     1.37      0.04     1.29     1.44 1.00     1424     1365
 
 Constant Parameters:
                 Value
@@ -578,13 +627,13 @@ fixef_est <- brms::fixef(fit)
 
 # Transform to natural scale
 cat("Drift rate (easy):", exp(fixef_est["drift_conditioneasy", "Estimate"]), "\n")
-#> Drift rate (easy): 3.060362
+#> Drift rate (easy): 15.42381
 cat("Drift rate (hard):", exp(fixef_est["drift_conditionhard", "Estimate"]), "\n")
-#> Drift rate (hard): 1.467012
+#> Drift rate (hard): 3.92211
 cat("Boundary:", exp(fixef_est["bound_Intercept", "Estimate"]), "\n")
-#> Boundary: 1.534783
+#> Boundary: 1.543554
 cat("Non-decision time:", exp(fixef_est["ndt_Intercept", "Estimate"]), "\n")
-#> Non-decision time: 0.2827719
+#> Non-decision time: 0.2750842
 ```
 
 As you can see, these match the generating values well:
@@ -681,7 +730,7 @@ conditions:
 brms::hypothesis(fit, "exp(drift_conditioneasy) > exp(drift_conditionhard)")
 #> Hypothesis Tests for class b:
 #>                 Hypothesis Estimate Est.Error CI.Lower CI.Upper Evid.Ratio
-#> 1 (exp(drift_condit... > 0     1.59      0.04     1.52     1.66        Inf
+#> 1 (exp(drift_condit... > 0    11.52      0.88    10.14    13.05        Inf
 #>   Post.Prob Star
 #> 1         1    *
 #> ---

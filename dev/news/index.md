@@ -244,6 +244,35 @@
   Stan estimated `kappa` freely, and `update(fit, bmf(..., mu = 0.5))`
   one that reported `mu = 0.5` while Stan kept `mu` at the original
   value — all three with no error or warning.
+- The **ezdm** likelihood no longer assumes that reaction times are
+  normally distributed. Because response times are right-skewed, it
+  treated each cell as more informative than it is, and posteriors,
+  especially for `bound`, came out too narrow. Existing **ezdm** fits
+  are not reproduced: in our simulations, credible intervals for
+  subject-level `bound` estimates widen by 20% to 75%, and fitting takes
+  longer (see
+  [`?ezdm_dist`](https://venpopov.com/bmm/dev/reference/ezdm_dist.md)).
+  A fit cached with `bmm(file = )` is reused unless
+  `file_refit = "on_change"`.
+  [`rezdm()`](https://venpopov.com/bmm/dev/reference/ezdm_dist.md) no
+  longer truncates `mean_rt` at `ndt`, so with very few trials it can
+  return `mean_rt <= 0`, which
+  [`bmm()`](https://venpopov.com/bmm/dev/reference/bmm.md) rejects
+  ([\#407](https://github.com/popov-lab/bmm/issues/407)).
+- Fix numerical failures in **ezdm**. With large drift rates, the
+  4-parameter model returned `NaN` in
+  [`dezdm()`](https://venpopov.com/bmm/dev/reference/ezdm_dist.md),
+  [`rezdm()`](https://venpopov.com/bmm/dev/reference/ezdm_dist.md),
+  `log_lik()` and
+  [`pp_check()`](https://venpopov.com/bmm/dev/reference/pp_check.bmmfit.md),
+  and both models could return a log-likelihood of `-Inf` when the
+  predicted accuracy was very close to 1 but a cell contained errors.
+  Near zero drift, the likelihood jumped where the code switched between
+  formulas, and the response counts said nothing about the direction of
+  drift.
+  [`dezdm()`](https://venpopov.com/bmm/dev/reference/ezdm_dist.md) now
+  rejects counts that are not whole numbers
+  ([\#407](https://github.com/popov-lab/bmm/issues/407)).
 - The mixing weights `thetat` (**mixture2p**) and `thetat`/`thetant`
   (**mixture3p**) had no `effects` prior, so any regression coefficient
   on them was flat. They now get `normal(0, 0.5)` on the logit/softmax
