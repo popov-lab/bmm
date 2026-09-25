@@ -538,12 +538,29 @@ test_that("a threading request switches the vectorized family to sliced vars", {
   config <- configure_model(model, dat, formula)
   expect_equal(config$formula$family$vars, c("vint1", "vint2", "vint3"))
 
-  attr(model, "threads") <- TRUE
-  config <- configure_model(model, dat, formula)
-  expect_equal(
-    config$formula$family$vars,
-    c("vint1[start:end]", "vint2[start:end]", "vint3[start:end]")
-  )
+  withr::with_options(list(brms.threads = brms::threading(2)), {
+    expect_equal(
+      configure_model(model, dat, formula)$formula$family$vars,
+      c("vint1[start:end]", "vint2[start:end]", "vint3[start:end]")
+    )
+  })
+
+  # force = TRUE tells brms to compile with threading but leave the generated
+  # code alone, so start/end are never defined and slicing would not compile
+  withr::with_options(list(brms.threads = brms::threading(2, force = TRUE)), {
+    expect_equal(
+      configure_model(model, dat, formula)$formula$family$vars,
+      c("vint1", "vint2", "vint3")
+    )
+  })
+
+  # brms accepts a bare number for the option
+  withr::with_options(list(brms.threads = 2), {
+    expect_equal(
+      configure_model(model, dat, formula)$formula$family$vars,
+      c("vint1[start:end]", "vint2[start:end]", "vint3[start:end]")
+    )
+  })
 })
 
 test_that("the custom version slices every vint column when threading", {
@@ -559,12 +576,17 @@ test_that("the custom version slices every vint column when threading", {
   model <- check_model(model, dat, formula)
   dat <- check_data(model, dat, formula)
 
-  attr(model, "threads") <- TRUE
-  config <- configure_model(model, dat, formula)
   expect_equal(
-    config$formula$family$vars,
-    paste0("vint", 1:4, "[start:end]")
+    configure_model(model, dat, formula)$formula$family$vars,
+    paste0("vint", 1:4)
   )
+
+  withr::with_options(list(brms.threads = brms::threading(2)), {
+    expect_equal(
+      configure_model(model, dat, formula)$formula$family$vars,
+      paste0("vint", 1:4, "[start:end]")
+    )
+  })
 })
 
 test_that("stancode emits thread-safe slicing when threads is passed", {
@@ -588,6 +610,15 @@ test_that("stancode emits thread-safe slicing when threads is passed", {
     sc_threaded, fixed = TRUE
   ))
   expect_true(grepl("reduce_sum", sc_threaded))
+
+  # force = TRUE compiles with threads but keeps the serial likelihood, so the
+  # sliced form would reference a start/end that the program never declares
+  sc_forced <- stancode(formula, dat, model = model, backend = "cmdstanr",
+                        threads = brms::threading(2, force = TRUE))
+  expect_true(grepl(
+    "lnr_simple_lpdf(Y | mu, correct, error, ndt, s, vint1, vint2, vint3);",
+    sc_forced, fixed = TRUE
+  ))
 })
 
 # -----------------------------------------------------------------------------
