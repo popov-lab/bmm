@@ -206,7 +206,8 @@ configure_model.sdt_mafc <- function(model, data, formula) {
     loop = TRUE,
     log_lik = log_lik_sdt_mafc,
     posterior_predict = posterior_predict_sdt_mafc,
-    vars = c("vint1[n]", "vint2[n]", "trials[n]")
+    vars = c("vint1[n]", "vint2[n]", "trials[n]",
+             "gh_nodes", "gh_weights", "gl_nodes", "gl_weights")
   )
 
   sc_path <- system.file("stan_chunks", package = "bmm")
@@ -215,7 +216,15 @@ configure_model.sdt_mafc <- function(model, data, formula) {
     read_lines2(paste0(sc_path, "/sdt_mafc_funs.stan")),
     sep = "\n"
   )
-  stanvars <- brms::stanvar(scode = stan_funs, block = "functions")
+  # reduce_sum's partial log-likelihood gets its own scope, so the tables have
+  # to be threaded through its signature as well
+  quad_pll_args <- if (brms_slices_likelihood()) {
+    paste0("data vector gh_nodes, data vector gh_weights, ",
+           "data vector gl_nodes, data vector gl_weights")
+  }
+  stanvars <- brms::stanvar(scode = stan_funs, block = "functions") +
+    brms::stanvar(scode = read_lines2(paste0(sc_path, "/sdt_mafc_tdata.stan")),
+                  block = "tdata", pll_args = quad_pll_args)
 
   nlist(formula, data, stanvars)
 }
