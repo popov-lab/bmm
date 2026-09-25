@@ -42,3 +42,30 @@
     real out = -log_sum_exp(fn)+log(m);
     return(out);
   }
+
+  real sdm_simple_run_ldenom(vector c, vector kappa, matrix CN,
+                             int G_runs, array[] int run_start,
+                             array[] int run_count) {
+    real out = 0;
+    for (g in 1:G_runs) {
+      int n = run_start[g];
+      real z = sdm_simple_ldenom_chquad_adaptive(c[n], kappa[n], CN);
+      out += run_count[g] * z;
+    }
+    return(out);
+  }
+
+  real sdm_simple_run_ldenom_slice(vector c, vector kappa, matrix CN,
+                                   int start, int end, int G_runs,
+                                   array[] int run_start,
+                                   array[] int run_count) {
+    real out = 0;
+    for (g in 1:G_runs) {
+      if (run_start[g] >= start && run_start[g] <= end) {
+        int n = run_start[g] - start + 1;
+        real z = sdm_simple_ldenom_chquad_adaptive(c[n], kappa[n], CN);
+        out += run_count[g] * z;
+      }
+    }
+    return(out);
+  }

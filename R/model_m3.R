@@ -15,12 +15,12 @@
     ),
     priors = list(
       simple = list(
-        a = list(main = "normal(1,0.5)", effects = "normal(0,0.5)"),
-        c = list(main = "normal(1.5,0.5)", effects = "normal(0,0.5)")
+        a = list(main = "normal(0,1)", effects = "normal(0,0.5)", sd = "exponential(1)"),
+        c = list(main = "normal(3,1)", effects = "normal(0,0.5)", sd = "exponential(1)")
       ),
       softmax = list(
-        a = list(main = "normal(2,1)", effects = "normal(0,0.5)"),
-        c = list(main = "normal(3,1)", effects = "normal(0,2)")
+        a = list(main = "normal(3,1)", effects = "normal(0,0.5)", sd = "exponential(1)"),
+        c = list(main = "normal(3,1)", effects = "normal(0,0.5)", sd = "exponential(1)")
       )
     )
   ),
@@ -36,14 +36,14 @@
     ),
     priors = list(
       simple = list(
-        a = list(main = "normal(1,0.5)", effects = "normal(0,.5)"),
-        c = list(main = "normal(1.5,0.5)", effects = "normal(0,.5)"),
-        f = list(main = "logistic(0,1)", effects = "normal(0,1)")
+        a = list(main = "normal(0,1)", effects = "normal(0,0.5)", sd = "exponential(1)"),
+        c = list(main = "normal(3,1)", effects = "normal(0,0.5)", sd = "exponential(1)"),
+        f = list(main = "logistic(0,1)", effects = "normal(0,1)", sd = "exponential(1)")
       ),
       softmax = list(
-        a = list(main = "normal(3,1)", effects = "normal(0,0.5)"),
-        c = list(main = "normal(3,1)", effects = "normal(0,2)"),
-        f = list(main = "logistic(0,1)", effects = "normal(0,1)")
+        a = list(main = "normal(3,1)", effects = "normal(0,0.5)", sd = "exponential(1)"),
+        c = list(main = "normal(3,1)", effects = "normal(0,0.5)", sd = "exponential(1)"),
+        f = list(main = "logistic(0,1)", effects = "normal(0,1)", sd = "exponential(1)")
       )
     )
   )
@@ -80,16 +80,36 @@
         b = if (choice_rule == "softmax") 0 else 0.1
       ),
       links = .m3_version_table[[version]][["links"]][[choice_rule]],
-      default_priors = .m3_version_table[[version]][["priors"]][[choice_rule]],
-      void_mu = FALSE
+      default_priors = .m3_version_table[[version]][["priors"]][[choice_rule]]
     ),
     class = c("bmmodel", "m3", paste0("m3_", version)),
     call = call
   )
 
-  out$links[names(links)] <- links
+  out <- set_links(out, links)
   out$default_priors[names(default_priors)] <- default_priors
   out
+}
+
+# the parameters of a custom m3 are the activation sources of the user's
+# formula, so there is no set of names to check a link target against
+# (check_model.m3_custom refuses a parameter left without a link). The ss and
+# cs versions build their activation functions from the version table, so their
+# parameters are known here. The custom branch is defensive rather than
+# load-bearing: a custom m3 has no links at construction, so names() is already
+# NULL, and check_links() never runs on one because set_links() stored no
+# attribute.
+#' @exportS3Method
+settable_links.m3 <- function(model) {
+  if (model$version == "custom") NULL else names(model$links)
+}
+
+# m3 is the one model that applies its links itself, by substituting the
+# inverse link into the activation formulas (apply_links -> inv_link), so the
+# links it can honour are inv_link()'s, not the ones a brms family can emit
+#' @exportS3Method
+settable_link_functions.m3 <- function(model) {
+  eval(formals(inv_link)$link)
 }
 
 
@@ -234,17 +254,19 @@ check_model.m3_custom <- function(model, data = NULL, formula = NULL) {
   additional_priors <- lapply(missing_priors, function(m) {
     if (model$other_vars$choice_rule == "simple") {
       switch(model$links[[m]],
-             log = list(main = "normal(1, 1)", effects = "normal(0, 0.5)"),
-             identity = list(main = "normal(10, 4)", effects = "normal(0, 1)"),
-             logit = list(main = "logistic(0, 1)", effects = "normal(0, 0.5)"),
-             stop2("Invalid link function provided! Please use one of the following link functions: identity, log, logit")
+             log = list(main = "normal(1, 1)", effects = "normal(0, 0.5)", sd = "exponential(1)"),
+             softplus = list(main = "normal(2, 1)", effects = "normal(0, 0.5)", sd = "exponential(1)"),
+             identity = list(main = "normal(10, 4)", effects = "normal(0, 0.5)", sd = "exponential(1)"),
+             logit = list(main = "logistic(0, 1)", effects = "normal(0, 0.5)", sd = "exponential(1)"),
+             stop2("Invalid link function provided! Please use one of the following link functions: identity, log, softplus, logit")
       )
     } else if (model$other_vars$choice_rule == "softmax") {
       switch(model$links[[m]],
-             log = list(main = "normal(0, 1)", effects = "normal(0, 0.5)"),
-             identity = list(main = "normal(1, 1)", effects = "normal(0, 1)"),
-             logit = list(main = "logistic(0, 1)", effects = "normal(0, 0.5)"),
-             stop2("Invalid link function provided! Please use one of the following link functions: identity, log, logit")
+             log = list(main = "normal(0, 1)", effects = "normal(0, 0.5)", sd = "exponential(1)"),
+             softplus = list(main = "normal(1, 1)", effects = "normal(0, 0.5)", sd = "exponential(1)"),
+             identity = list(main = "normal(3, 1)", effects = "normal(0, 0.5)", sd = "exponential(1)"),
+             logit = list(main = "logistic(0, 1)", effects = "normal(0, 0.5)", sd = "exponential(1)"),
+             stop2("Invalid link function provided! Please use one of the following link functions: identity, log, softplus, logit")
       )
     }
   })
@@ -412,15 +434,16 @@ configure_model.m3 <- function(model, data, formula) {
   formula$family$cats <- model$resp_vars$resp_cats
   formula$family$dpars <- paste0("mu", model$resp_vars$resp_cats)
 
-  # set initial values to be set to zero if the choice rule is "simple" and "identity"
-  # link functions are used
-  if(model$other_vars$choice_rule == "simple" && any(model$links == "identity")){
-    init <- 0
-  } else {
-    init <- NULL
-  }
+  nlist(formula, data)
+}
 
-  nlist(formula, data, init)
+#' @export
+create_initfun.m3 <- function(model, data, formula, prior = NULL, ...) {
+  # the "simple" choice rule with an identity link samples stably only from zero
+  if (model$other_vars$choice_rule == "simple" && any(model$links == "identity")) {
+    return(0)
+  }
+  NextMethod()
 }
 
 

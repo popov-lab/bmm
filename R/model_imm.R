@@ -42,13 +42,20 @@
       ),
       fixed_parameters = list(mu1 = 0, mu2 = 0, kappa2 = -100),
       default_priors = list(
-        mu1 = list(main = "student_t(1, 0, 1)"),
-        kappa = list(main = "normal(2, 1)", effects = "normal(0, 1)"),
-        a = list(main = "normal(0, 1)", effects = "normal(0, 1)"),
-        c = list(main = "normal(0, 1)", effects = "normal(0, 1)"),
-        s = list(main = "normal(0, 1)", effects = "normal(0, 1)")
+        mu1 = list(main = "normal(0, 0.5)", effects = "normal(0, 0.25)", sd = "exponential(4)"),
+        kappa = list(main = "normal(2, 1)", effects = "normal(0, 1)", sd = "exponential(1)"),
+        a = list(main = "normal(0, 1)", effects = "normal(0, 1)", sd = "exponential(1)"),
+        c = list(main = "normal(0, 1)", effects = "normal(0, 1)", sd = "exponential(1)"),
+        s = list(main = "normal(0, 1)", effects = "normal(0, 1)", sd = "exponential(1)")
       ),
-      void_mu = FALSE
+      # central 50% of the main default prior on the native scale
+      init_ranges = list(
+        mu1 = c(-0.65, 0.65),
+        kappa = c(3.8, 15),
+        a = c(0.51, 2),
+        c = c(0.51, 2),
+        s = c(0.51, 2)
+      )
     ),
     # attributes
     regex = regex,
@@ -62,15 +69,25 @@
     out$parameters$s <- NULL
     out$links$s <- NULL
     out$default_priors$s <- NULL
+    out$init_ranges$s <- NULL
     attributes(out)$regex_vars <- c("nt_features")
   } else if (version == "bsc") {
     out$parameters$a <- NULL
     out$links$a <- NULL
     out$default_priors$a <- NULL
+    out$init_ranges$a <- NULL
   }
 
-  out$links[names(links)] <- links
+  out <- set_links(out, links)
   out
+}
+
+# the mixture weights are built from exp(c), exp(a) and exp(-s * d) in the
+# non-linear formulas of configure_model.imm_*, and mu1/kappa from the von
+# Mises components, so none of the links in this list is read at fit time
+#' @exportS3Method
+settable_links.imm <- function(model) {
+  character(0)
 }
 
 # user facing alias

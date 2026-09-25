@@ -95,6 +95,91 @@ test_that("use_model_template() prevents duplicate models", {
   }
 })
 
+test_that("use_model_template() generates a flat-defaults unversioned scaffold", {
+  skip_on_cran()
+  out <- paste(
+    capture.output(use_model_template("tmpl_unver", testing = TRUE)),
+    collapse = "\n"
+  )
+  expect_match(out, ".tmpl_unver_defaults <- list(", fixed = TRUE)
+  expect_match(out, 'parameters = .tmpl_unver_defaults[["parameters"]]', fixed = TRUE)
+  expect_match(out, 'init_ranges = .tmpl_unver_defaults[["init_ranges"]]', fixed = TRUE)
+  expect_match(out, 'main = "normal(0, 1)", effects = "normal(0, 0.5)"', fixed = TRUE)
+  expect_false(grepl("_version_table", out, fixed = TRUE))
+  expect_false(grepl("match.arg", out, fixed = TRUE))
+  expect_false(grepl("void_mu", out, fixed = TRUE))
+  expect_no_error(parse(text = out))
+})
+
+test_that("use_model_template() generates a version-table versioned scaffold", {
+  skip_on_cran()
+  out <- paste(
+    capture.output(
+      use_model_template("tmpl_ver", versions = c("simple", "full"), testing = TRUE)
+    ),
+    collapse = "\n"
+  )
+  expect_match(out, ".tmpl_ver_version_table <- list(", fixed = TRUE)
+  expect_match(out, "simple = list(", fixed = TRUE)
+  expect_match(out, "full = list(", fixed = TRUE)
+  expect_match(out, "version = c('simple', 'full')", fixed = TRUE)
+  expect_match(out, "version <- match.arg(version)", fixed = TRUE)
+  expect_match(out, 'parameters = .tmpl_ver_version_table[[version]][["parameters"]]', fixed = TRUE)
+  expect_match(out, 'paste0("tmpl_ver_", version)', fixed = TRUE)
+  expect_false(grepl("void_mu", out, fixed = TRUE))
+  expect_no_error(parse(text = out))
+})
+
+test_that("use_model_template() composes a custom family with versions", {
+  skip_on_cran()
+  out <- paste(
+    capture.output(
+      use_model_template(
+        "tmpl_cf",
+        versions = c("a", "b"),
+        custom_family = TRUE,
+        stanvar_blocks = c("functions", "likelihood"),
+        testing = TRUE
+      )
+    ),
+    collapse = "\n"
+  )
+  expect_match(out, "custom_family(", fixed = TRUE)
+  expect_match(out, "_version_table", fixed = TRUE)
+  expect_match(out, "match.arg", fixed = TRUE)
+  expect_match(out, "stanvar(", fixed = TRUE)
+  expect_no_error(parse(text = out))
+})
+
+test_that("generated template code constructs a valid bmmodel", {
+  skip_on_cran()
+  gen_env <- function(name, ...) {
+    txt <- paste(
+      capture.output(use_model_template(name, testing = TRUE, ...)),
+      collapse = "\n"
+    )
+    env <- new.env(parent = asNamespace("bmm"))
+    eval(parse(text = txt), envir = env)
+    env
+  }
+
+  unver <- gen_env("tmpl_build_unver")
+  model_u <- unver$.model_tmpl_build_unver(resp_var1 = "y", links = list(par1 = "log"))
+  expect_equal(class(model_u), c("bmmodel", "tmpl_build_unver"))
+  expect_equal(model_u$version, "NA")
+  expect_equal(model_u$links$par1, "log")
+  expect_false("void_mu" %in% names(model_u))
+
+  ver <- gen_env("tmpl_build_ver", versions = c("simple", "full"))
+  model_v <- ver$.model_tmpl_build_ver(resp_var1 = "y", version = "full")
+  expect_equal(class(model_v), c("bmmodel", "tmpl_build_ver", "tmpl_build_ver_full"))
+  expect_equal(model_v$version, "full")
+  expect_error(
+    ver$tmpl_build_ver("y", "a", "b", version = "nope"),
+    "should be one of"
+  )
+})
+
 test_that("stancode() works with brmsformula", {
   ff <- brms::bf(count ~ zAge + zBase * Trt + (1 | patient))
   sd <- stancode(ff, data = brms::epilepsy, family = poisson())
@@ -310,9 +395,40 @@ test_that("errors on missing dims where required", {
   expect_error(parse_parameters_line("corr_matrix Omega;"), "Missing dimensions")
 })
 
-test_that("errors on unknown base type or missing name", {
-  expect_error(parse_parameters_line("weird_type[3] x;"), "Unknown or unsupported")
+test_that("errors on a missing name", {
   expect_error(parse_parameters_line("real<lower=0>;"), "Missing parameter name")
+})
+
+test_that("a declaration of an unmodelled type is named but left without a type", {
+  # legal Stan that this parser does not model, plus a type Stan does not have
+  declarations <- c(
+    "sum_to_zero_vector[K] beta;", "complex z;", "complex_vector[N] cv;",
+    "tuple(real, vector[N]) tv;", "weird_type[3] x;"
+  )
+  for (declaration in declarations) {
+    out <- parse_parameters_line(declaration)
+    expect_identical(out$type, NA_character_)
+    expect_identical(out$types, NA_character_)
+    expect_identical(out$dims, NA_character_)
+    expect_null(out$bounds)
+  }
+  expect_identical(
+    vapply(lapply(declarations, parse_parameters_line), `[[`, character(1), "name"),
+    c("beta", "z", "cv", "tv", "x")
+  )
+})
+
+test_that("one unmodelled declaration does not cost the rest of the block", {
+  block <- "
+    vector[K] b_kappa;
+    sum_to_zero_vector[K] beta;
+    real<lower=0> sd_1;
+  "
+  res <- extract_parameter_dimensions(block)
+
+  expect_identical(names(res), c("b_kappa", "beta", "sd_1"))
+  expect_identical(res$b_kappa$dims, "K")
+  expect_identical(res$sd_1$bounds$lower, "0")
 })
 
 test_that("empty/comment-only lines error out clearly", {
@@ -371,6 +487,23 @@ test_that("strips trailing comments but keeps code", {
   expect_identical(res$p$bounds$upper, "1")
   expect_identical(res$r$type, "row_vector")
   expect_identical(res$r$dims, "J")
+})
+
+test_that("a size that indexes a data array keeps its brackets", {
+  mo <- parse_parameters_line("simplex[Jmo_c[1]] simo_c_1;")
+  expect_identical(mo$name, "simo_c_1")
+  expect_identical(mo$type, "simplex")
+  expect_identical(mo$dims, "Jmo_c[1]")
+
+  s <- parse_parameters_line("vector[knots_kappa_1[1]] zs_kappa_1_1;")
+  expect_identical(s$name, "zs_kappa_1_1")
+  expect_identical(s$dims, "knots_kappa_1[1]")
+
+  nested <- parse_parameters_line("array[J[1], N] matrix<lower=0>[M[2], K] A;")
+  expect_identical(nested$name, "A")
+  expect_identical(nested$dims, c("J[1]", "N", "M[2]", "K"))
+  expect_identical(nested$types, c("array", "matrix"))
+  expect_identical(nested$bounds$lower, "0")
 })
 
 test_that("robust to Windows-style CRLF line endings", {

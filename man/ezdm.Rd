@@ -15,7 +15,13 @@ ezdm(mean_rt, var_rt, n_upper, n_trials, links = NULL, version = "3par", ...)
 
 \item{n_trials}{The name of the variable coding the number of trials that was used to calculated the aggregated statistics.}
 
-\item{links}{A list of links for the parameters.}
+\item{links}{A named list of links for the parameters, e.g.
+\code{links = list(bound = "softplus")}. For positive parameters
+(e.g. \code{bound}, \code{ndt}), "softplus" is available as an alternative to the
+default "log" link that grows linearly for large values and avoids the
+numerical blow-up of \code{exp()}. A name that is not a parameter of the model
+is an error, and a link that allows values the default link excludes
+(e.g. "identity" for a positive parameter) is a warning.}
 
 \item{version}{A character label for the version of the model. There is a three-parameter version
 (version = "3par") of the \code{ezdm} that fixes the relative starting point \code{zr} to 0.5, and a
@@ -78,26 +84,31 @@ Provide aggregated statistics for each subject and condition that model paramete
 \itemize{
 \item \code{main}: cauchy(0,1)
 \item \code{effects}: normal(0,0.5)
+\item \code{sd}: exponential(1)
 }
 \item \code{bound}:
 \itemize{
 \item \code{main}: normal(0,0.5)
 \item \code{effects}: normal(0,0.5)
+\item \code{sd}: exponential(2)
 }
 \item \code{ndt}:
 \itemize{
 \item \code{main}: normal(-1.5,0.5)
 \item \code{effects}: normal(0,0.3)
+\item \code{sd}: exponential(2)
 }
 \item \code{zr}:
 \itemize{
 \item \code{main}: normal(0,0.5)
 \item \code{effects}: normal(0,0.3)
+\item \code{sd}: exponential(2)
 }
 \item \code{s}:
 \itemize{
 \item \code{main}: normal(0,1)
 \item \code{effects}: normal(0,0.3)
+\item \code{sd}: exponential(2)
 }
 }
 }
