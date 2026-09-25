@@ -658,6 +658,7 @@ test_that("the sdt_yn sensitivity name is guarded against a data-column clash", 
     n_old = c(10, 40), stimulus = c(0L, 1L), n_trials = c(50, 50),
     d = c(1, 2)
   )
+  # the #378 warning is raised in check_formula.bmmodel and does not depend on fixed_parameters
   expect_warning(
     check_formula(model, dat, bmf(d ~ d, criterion ~ 1)),
     "used both as a predicted parameter and as a column"

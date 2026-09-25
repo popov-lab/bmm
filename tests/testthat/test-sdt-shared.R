@@ -154,9 +154,13 @@ test_that("a stimulus grouping factor is refused with the same message", {
 })
 
 test_that("the stimulus check leaves legitimate predictors alone", {
-  expect_error(
-    sdt_check_formula(bmf(d ~ condition, criterion ~ 1 + (1 | id))),
-    NA
+  expect_no_error(
+    sdt_check_formula(bmf(d ~ condition, criterion ~ 1 + (1 | id)))
+  )
+  # neither the confound check nor the all-intercept sdratio heuristic applies
+  # to a design with a real predictor
+  expect_no_warning(
+    sdt_check_formula(bmf(d ~ condition, criterion ~ 1 + (1 | id)))
   )
   # and it fires through the full pipeline, not only on a direct call
   expect_error(
@@ -165,6 +169,19 @@ test_that("the stimulus check leaves legitimate predictors alone", {
         backend = "mock", mock_fit = 1, rename = FALSE),
     "uses the stimulus variable"
   )
+})
+
+test_that("a format without a stimulus other-var skips the confound check", {
+  # sdt_mafc and sdt_ranking have no stimulus other-var, and check_formula.sdt
+  # must fall through to NextMethod() instead of failing on a NULL stim_var
+  model <- structure(
+    list(name = "stub", parameters = list(par1 = ""),
+         resp_vars = list(response = "n_old"),
+         other_vars = list(stimulus = NULL)),
+    class = c("bmmodel", "sdt", "stub")
+  )
+  formula <- bmf(par1 ~ 1)
+  expect_identical(check_formula(model, sdt_stim_data(), formula), formula)
 })
 
 
