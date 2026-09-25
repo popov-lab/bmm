@@ -18,22 +18,29 @@ sdt_yn(
 count of "old"/"signal" responses for each cell.}
 
 \item{stimulus}{The name of the variable in the dataset coding the stimulus
-type. Stimuli should be coded as 0 (noise/new) and 1 (signal/old).}
+type: 0 (noise/new) and 1 (signal/old). Logical, and factor or character
+columns holding "0"/"1", are coerced automatically; anything else (e.g.
+"noise"/"signal" labels) must be recoded by hand, since bmm cannot guess
+which level is the signal. \code{\link[=dsdt_yn]{dsdt_yn()}} and \code{\link[=rsdt_yn]{rsdt_yn()}} take the same
+column but are stricter, accepting only numeric or logical input.}
 
 \item{n_trials}{The name of the variable in the dataset containing the
 total number of trials for each cell. It may differ from cell to cell.
-Trial-level data also works: keep one row per trial, with \code{response}
-0 or 1 and a column of \code{1}s for \code{n_trials}.}
+Trial-level data also works: keep one row per trial, with the column
+named by \code{response} holding 0 or 1 and the column named by \code{n_trials}
+holding \code{1}s.}
 
 \item{dist}{The noise distribution assumed for the latent evidence variable,
 given here by its cumulative distribution function. One of:
 \itemize{
 \item "normal" (default): Gaussian SDT, \eqn{\Phi(x)}
 \item "gumbel_min": smallest-extreme-value SDT,
-\eqn{1 - \exp(-\exp(x))} (complementary log-log)
-\item "gumbel_max": largest-extreme-value SDT, \eqn{\exp(-\exp(-x))}
+\eqn{1 - \exp(-\exp(x))}{1 - exp(-exp(x))} (complementary log-log)
+\item "gumbel_max": largest-extreme-value SDT,
+\eqn{\exp(-\exp(-x))}{exp(-exp(-x))}
 (log-log, as in \code{evd::pgumbel})
-\item "logistic": logistic SDT, \eqn{1 / (1 + \exp(-x))}
+\item "logistic": logistic SDT,
+\eqn{1 / (1 + \exp(-x))}{1 / (1 + exp(-x))}
 }}
 
 \item{links}{A named list of link functions for the parameters, one entry
@@ -77,7 +84,7 @@ Provide pre-aggregated data with the following columns:
 \itemize{
 \item \code{d}: d_a sensitivity (= d' when sdratio is fixed): the distance between the signal and noise distributions in units of their root-mean-square SD
 \item \code{criterion}: Response bias: location of decision boundary
-\item \code{sdratio}: SD ratio signal/noise, log link (0 = equal SDs): the parameter is the ratio itself, so exp() a value reported on this scale to read it
+\item \code{sdratio}: SD ratio signal/noise, log link (0 = equal SDs): summary() prints the log of this ratio, not the ratio itself, so exp() a posterior value to read it
 }
 \item \strong{Fixed parameters:}
 \itemize{
@@ -118,13 +125,13 @@ When the signal and noise distributions have different widths, their
 separation only becomes dimensionless after choosing an SD to divide by.
 \code{bmm} then reports \eqn{d_a}, the separation divided by the root-mean-square
 of the two SDs:
-\deqn{d_a = \sqrt{2}\,\delta / \sqrt{1 + r^2},}
+\deqn{d_a = \sqrt{2}\,\delta / \sqrt{1 + r^2},}{d_a = sqrt(2) * delta / sqrt(1 + r^2),}
 where \eqn{\delta} is the separation in noise-SD units and
 \eqn{r} is the SD ratio, \code{exp(sdratio)}. This weights the two
 distributions equally, and it is the measure Simpson and Fitter (1973),
 Macmillan and Creelman (2005), and Mickes et al. (2007) recommend under
 unequal variance. The classical noise-standardized index is
-\eqn{d_N = \delta = d_a \sqrt{(1 + r^2)/2}}, so a published \eqn{d'} from an
+\eqn{d_N = \delta = d_a \sqrt{(1 + r^2)/2}}{d_N = delta = d_a * sqrt((1 + r^2)/2)}, so a published \eqn{d'} from an
 unequal-variance analysis is larger than \code{d} when \eqn{r > 1}: by 13\% at
 \eqn{r = 1.25} and by 33\% at \eqn{r = 1.6}.
 
@@ -142,7 +149,7 @@ root-mean-square SD units) and \code{criterion} (in noise-SD units) are on
 different scales, and a ratio such as \code{criterion / d} mixes them.
 
 \strong{Extreme-value distributions.} For \code{dist = "normal"}, \eqn{d_a} is also the
-AUC-equivalent index, \eqn{d_a = \sqrt{2}\,\Phi^{-1}(\mathrm{AUC})}, so it
+AUC-equivalent index, \eqn{d_a = \sqrt{2}\,\Phi^{-1}(\mathrm{AUC})}{d_a = sqrt(2) * Phi^-1(AUC)}, so it
 carries the same information as 2AFC accuracy. For \code{"gumbel_min"} and
 \code{"gumbel_max"} that identity holds only under equal variance. With \code{sdratio}
 estimated, \eqn{d_a} keeps its balanced geometry but drifts away from the
@@ -169,7 +176,11 @@ what is missing, and it need not sit on \code{criterion}: a sensitivity
 manipulation (\code{d ~ 0 + condition}, a study-time or strength manipulation with
 bias held constant) identifies \code{sdratio} just as a criterion manipulation
 does, and so does between-subject variation entering through a random effect
-such as \code{criterion ~ 1 + (1 | id)}.
+such as \code{criterion ~ 1 + (1 | id)} — though, like any predictor, only in
+proportion to how far it actually moves the operating point: a random
+effect with little between-subject spread carries little information and
+will not trigger the warning above, because that warning counts formula
+terms, not how much they move the design.
 
 A criterion manipulation is still the cleanest design, because it traces the
 ROC at fixed sensitivity: give \code{criterion} a predictor that shifts the
@@ -200,6 +211,14 @@ so they carry across unchanged.
 The \strong{zROC slope} reported in the recognition-memory literature is the
 reciprocal of that ratio, \code{1 / exp(sdratio)}, so a \code{sdratio} posterior mean
 of 0.375 is a zROC slope of 0.69.
+
+The same log link applies going the other way: a constant you supply
+yourself, whether as \code{bmf(sdratio = )} or through a hand-written
+\code{brms::set_prior(..., dpar = "sdratio")}, is read on it too.
+\code{bmf(sdratio = 1)} does not fix a ratio of 1 — it fixes \code{exp(1) = 2.72},
+and \code{bmm()} raises no warning; a fixed ratio of 1.25 needs
+\code{bmf(sdratio = log(1.25))}. \code{default_prior()}'s \code{normal(0, 0.5)} for
+\code{sdratio} is on the same scale, unannotated.
 }
 
 \section{Terms used on this page}{

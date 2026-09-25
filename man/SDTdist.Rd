@@ -27,11 +27,11 @@ sdt_criterion(
 given here by its cumulative distribution function:
 \itemize{
 \item "normal" (default): Gaussian, \eqn{\Phi(x)}
-\item "gumbel_min": smallest extreme value, \eqn{1 - \exp(-\exp(x))}
+\item "gumbel_min": smallest extreme value, \eqn{1 - \exp(-\exp(x))}{1 - exp(-exp(x))}
 (the complementary log-log distribution)
-\item "gumbel_max": largest extreme value, \eqn{\exp(-\exp(-x))}
+\item "gumbel_max": largest extreme value, \eqn{\exp(-\exp(-x))}{exp(-exp(-x))}
 (the log-log distribution, as in \code{evd::pgumbel})
-\item "logistic": \eqn{1 / (1 + \exp(-x))}
+\item "logistic": \eqn{1 / (1 + \exp(-x))}{1 / (1 + exp(-x))}
 }}
 }
 \value{
@@ -40,7 +40,7 @@ distributions on the latent evidence axis, obtained by inverting the
 decision rule "respond old when the evidence exceeds the criterion":
 \eqn{Q(1 - FA) - Q(1 - H)}, where \eqn{Q} is the quantile function of
 \code{dist}. For \code{dist = "normal"} this reduces to the familiar
-\eqn{d' = \Phi^{-1}(H) - \Phi^{-1}(FA)}. Because one operating point implies
+\eqn{d' = \Phi^{-1}(H) - \Phi^{-1}(FA)}{d' = Phi^-1(H) - Phi^-1(FA)}. Because one operating point implies
 equal variance, this matches the \code{d} parameter of \code{\link[=sdt_yn]{sdt_yn()}} whenever
 \code{sdratio} is at its default.
 
@@ -48,7 +48,7 @@ equal variance, this matches the \code{d} parameter of \code{\link[=sdt_yn]{sdt_
 centred, noise-standardized evidence axis used by \code{\link[=sdt_yn]{sdt_yn()}}, where the
 noise and signal distributions sit at -d'/2 and +d'/2:
 \eqn{(Q(1 - FA) + Q(1 - H)) / 2}. For \code{dist = "normal"} this reduces to
-the familiar \eqn{-(\Phi^{-1}(H) + \Phi^{-1}(FA)) / 2}.
+the familiar \eqn{-(\Phi^{-1}(H) + \Phi^{-1}(FA)) / 2}{-(Phi^-1(H) + Phi^-1(FA)) / 2}.
 }
 \description{
 Compute sensitivity and criterion from hit and false alarm

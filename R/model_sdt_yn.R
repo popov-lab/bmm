@@ -12,8 +12,9 @@
     ),
     criterion = "Response bias: location of decision boundary",
     sdratio = paste0(
-      "SD ratio signal/noise, log link (0 = equal SDs): the parameter is the ",
-      "ratio itself, so exp() a value reported on this scale to read it"
+      "SD ratio signal/noise, log link (0 = equal SDs): summary() prints the ",
+      "log of this ratio, not the ratio itself, so exp() a posterior value ",
+      "to read it"
     )
   )
   # d is d_a, and the noise-standardized separation is d * sqrt((1 + r^2) / 2).
@@ -67,10 +68,13 @@
 # `sdratio` is fixed at 0, and that 0 is read on whatever link the model
 # carries: only log maps it to the equal-variance ratio of 1. Every other link
 # bmm offers turns it into a different ratio -- identity, sqrt, log1p and
-# tan_half into 0, which makes eta infinite on every signal row, and softplus,
+# tan_half into 0, which makes eta infinite on every signal row; softplus,
 # logm1, logit, probit, cloglog into a finite ratio the user never asked for,
-# which samples to completion and is wrong. `d` and `criterion` fix nothing, so
-# their links stay settable.
+# which samples to completion and is wrong; and inverse into an infinite
+# ratio, which makes eta NaN (Inf/Inf) rather than Inf -- worse than the other
+# two failure modes, because a NaN poisons the adjoint of every shared
+# parameter instead of just killing one row's likelihood. `d` and `criterion`
+# fix nothing, so their links stay settable.
 #' @exportS3Method
 settable_links.sdt_yn <- function(model) {
   c("d", "criterion")
@@ -86,20 +90,27 @@ settable_links.sdt_yn <- function(model) {
 #' @param response The name of the variable in the dataset containing the
 #'   count of "old"/"signal" responses for each cell.
 #' @param stimulus The name of the variable in the dataset coding the stimulus
-#'   type. Stimuli should be coded as 0 (noise/new) and 1 (signal/old).
+#'   type: 0 (noise/new) and 1 (signal/old). Logical, and factor or character
+#'   columns holding "0"/"1", are coerced automatically; anything else (e.g.
+#'   "noise"/"signal" labels) must be recoded by hand, since bmm cannot guess
+#'   which level is the signal. [dsdt_yn()] and [rsdt_yn()] take the same
+#'   column but are stricter, accepting only numeric or logical input.
 #' @param n_trials The name of the variable in the dataset containing the
 #'   total number of trials for each cell. It may differ from cell to cell.
-#'   Trial-level data also works: keep one row per trial, with `response`
-#'   0 or 1 and a column of `1`s for `n_trials`.
+#'   Trial-level data also works: keep one row per trial, with the column
+#'   named by `response` holding 0 or 1 and the column named by `n_trials`
+#'   holding `1`s.
 #' @param dist The noise distribution assumed for the latent evidence variable,
 #'   given here by its cumulative distribution function. One of:
 #'   \itemize{
 #'     \item "normal" (default): Gaussian SDT, \eqn{\Phi(x)}
 #'     \item "gumbel_min": smallest-extreme-value SDT,
-#'       \eqn{1 - \exp(-\exp(x))} (complementary log-log)
-#'     \item "gumbel_max": largest-extreme-value SDT, \eqn{\exp(-\exp(-x))}
+#'       \eqn{1 - \exp(-\exp(x))}{1 - exp(-exp(x))} (complementary log-log)
+#'     \item "gumbel_max": largest-extreme-value SDT,
+#'       \eqn{\exp(-\exp(-x))}{exp(-exp(-x))}
 #'       (log-log, as in \code{evd::pgumbel})
-#'     \item "logistic": logistic SDT, \eqn{1 / (1 + \exp(-x))}
+#'     \item "logistic": logistic SDT,
+#'       \eqn{1 / (1 + \exp(-x))}{1 / (1 + exp(-x))}
 #'   }
 #' @param links A named list of link functions for the parameters, one entry
 #'   per parameter you want to change, e.g. `links = list(d = "log")`. Only `d`
@@ -121,13 +132,13 @@ settable_links.sdt_yn <- function(model) {
 #' separation only becomes dimensionless after choosing an SD to divide by.
 #' `bmm` then reports \eqn{d_a}, the separation divided by the root-mean-square
 #' of the two SDs:
-#' \deqn{d_a = \sqrt{2}\,\delta / \sqrt{1 + r^2},}
+#' \deqn{d_a = \sqrt{2}\,\delta / \sqrt{1 + r^2},}{d_a = sqrt(2) * delta / sqrt(1 + r^2),}
 #' where \eqn{\delta} is the separation in noise-SD units and
 #' \eqn{r} is the SD ratio, `exp(sdratio)`. This weights the two
 #' distributions equally, and it is the measure Simpson and Fitter (1973),
 #' Macmillan and Creelman (2005), and Mickes et al. (2007) recommend under
 #' unequal variance. The classical noise-standardized index is
-#' \eqn{d_N = \delta = d_a \sqrt{(1 + r^2)/2}}, so a published \eqn{d'} from an
+#' \eqn{d_N = \delta = d_a \sqrt{(1 + r^2)/2}}{d_N = delta = d_a * sqrt((1 + r^2)/2)}, so a published \eqn{d'} from an
 #' unequal-variance analysis is larger than `d` when \eqn{r > 1}: by 13% at
 #' \eqn{r = 1.25} and by 33% at \eqn{r = 1.6}.
 #'
@@ -145,7 +156,7 @@ settable_links.sdt_yn <- function(model) {
 #' different scales, and a ratio such as `criterion / d` mixes them.
 #'
 #' **Extreme-value distributions.** For `dist = "normal"`, \eqn{d_a} is also the
-#' AUC-equivalent index, \eqn{d_a = \sqrt{2}\,\Phi^{-1}(\mathrm{AUC})}, so it
+#' AUC-equivalent index, \eqn{d_a = \sqrt{2}\,\Phi^{-1}(\mathrm{AUC})}{d_a = sqrt(2) * Phi^-1(AUC)}, so it
 #' carries the same information as 2AFC accuracy. For `"gumbel_min"` and
 #' `"gumbel_max"` that identity holds only under equal variance. With `sdratio`
 #' estimated, \eqn{d_a} keeps its balanced geometry but drifts away from the
@@ -170,7 +181,11 @@ settable_links.sdt_yn <- function(model) {
 #' manipulation (`d ~ 0 + condition`, a study-time or strength manipulation with
 #' bias held constant) identifies `sdratio` just as a criterion manipulation
 #' does, and so does between-subject variation entering through a random effect
-#' such as `criterion ~ 1 + (1 | id)`.
+#' such as `criterion ~ 1 + (1 | id)` — though, like any predictor, only in
+#' proportion to how far it actually moves the operating point: a random
+#' effect with little between-subject spread carries little information and
+#' will not trigger the warning above, because that warning counts formula
+#' terms, not how much they move the design.
 #'
 #' A criterion manipulation is still the cleanest design, because it traces the
 #' ROC at fixed sensitivity: give `criterion` a predictor that shifts the
@@ -200,6 +215,14 @@ settable_links.sdt_yn <- function(model) {
 #' The **zROC slope** reported in the recognition-memory literature is the
 #' reciprocal of that ratio, `1 / exp(sdratio)`, so a `sdratio` posterior mean
 #' of 0.375 is a zROC slope of 0.69.
+#'
+#' The same log link applies going the other way: a constant you supply
+#' yourself, whether as `bmf(sdratio = )` or through a hand-written
+#' `brms::set_prior(..., dpar = "sdratio")`, is read on it too.
+#' `bmf(sdratio = 1)` does not fix a ratio of 1 — it fixes `exp(1) = 2.72`,
+#' and `bmm()` raises no warning; a fixed ratio of 1.25 needs
+#' `bmf(sdratio = log(1.25))`. `default_prior()`'s `normal(0, 0.5)` for
+#' `sdratio` is on the same scale, unannotated.
 #'
 #' @section Terms used on this page:
 #' \itemize{

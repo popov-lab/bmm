@@ -2223,11 +2223,11 @@ neg_loglik <- function(x, params, distribution, weights = NULL) {
 #'   given here by its cumulative distribution function:
 #'   \itemize{
 #'     \item "normal" (default): Gaussian, \eqn{\Phi(x)}
-#'     \item "gumbel_min": smallest extreme value, \eqn{1 - \exp(-\exp(x))}
+#'     \item "gumbel_min": smallest extreme value, \eqn{1 - \exp(-\exp(x))}{1 - exp(-exp(x))}
 #'       (the complementary log-log distribution)
-#'     \item "gumbel_max": largest extreme value, \eqn{\exp(-\exp(-x))}
+#'     \item "gumbel_max": largest extreme value, \eqn{\exp(-\exp(-x))}{exp(-exp(-x))}
 #'       (the log-log distribution, as in \code{evd::pgumbel})
-#'     \item "logistic": \eqn{1 / (1 + \exp(-x))}
+#'     \item "logistic": \eqn{1 / (1 + \exp(-x))}{1 / (1 + exp(-x))}
 #'   }
 #'
 #' @seealso [sdt_yn()], whose `d` and `criterion` parameters these two functions
@@ -2249,7 +2249,7 @@ NULL
 #'   decision rule "respond old when the evidence exceeds the criterion":
 #'   \eqn{Q(1 - FA) - Q(1 - H)}, where \eqn{Q} is the quantile function of
 #'   `dist`. For `dist = "normal"` this reduces to the familiar
-#'   \eqn{d' = \Phi^{-1}(H) - \Phi^{-1}(FA)}. Because one operating point implies
+#'   \eqn{d' = \Phi^{-1}(H) - \Phi^{-1}(FA)}{d' = Phi^-1(H) - Phi^-1(FA)}. Because one operating point implies
 #'   equal variance, this matches the `d` parameter of [sdt_yn()] whenever
 #'   `sdratio` is at its default.
 #' @export
@@ -2274,7 +2274,7 @@ sdt_d <- function(hit_rate, fa_rate,
 #'   centred, noise-standardized evidence axis used by [sdt_yn()], where the
 #'   noise and signal distributions sit at -d'/2 and +d'/2:
 #'   \eqn{(Q(1 - FA) + Q(1 - H)) / 2}. For `dist = "normal"` this reduces to
-#'   the familiar \eqn{-(\Phi^{-1}(H) + \Phi^{-1}(FA)) / 2}.
+#'   the familiar \eqn{-(\Phi^{-1}(H) + \Phi^{-1}(FA)) / 2}{-(Phi^-1(H) + Phi^-1(FA)) / 2}.
 #' @export
 #' @examples
 #' # Compute criterion from hit and false alarm rates
@@ -2303,7 +2303,7 @@ sdt_criterion <- function(hit_rate, fa_rate,
 #'
 #' @param n_old Integer vector. Number of "old"/"signal" responses.
 #' @param n_trials Integer vector. Total number of trials per cell.
-#' @param stimulus Integer vector (0/1). Stimulus type: 0 = noise, 1 = signal.
+#' @param stimulus Numeric or logical vector (0/1). Stimulus type: 0 = noise, 1 = signal.
 #' @param d Numeric. Sensitivity: \eqn{d'} when `sdratio` is 1, and otherwise
 #'   the balanced index \eqn{d_a}, the separation between the two distributions
 #'   divided by the root-mean-square of their SDs (see [sdt_yn()]). The

@@ -32,7 +32,7 @@ rsdt_yn(
 
 \item{n_trials}{Integer vector. Total number of trials per cell.}
 
-\item{stimulus}{Integer vector (0/1). Stimulus type: 0 = noise, 1 = signal.}
+\item{stimulus}{Numeric or logical vector (0/1). Stimulus type: 0 = noise, 1 = signal.}
 
 \item{d}{Numeric. Sensitivity: \eqn{d'} when \code{sdratio} is 1, and otherwise
 the balanced index \eqn{d_a}, the separation between the two distributions
@@ -50,11 +50,11 @@ noise-standardized axis, i.e. in units of the noise distribution's SD.}
 given here by its cumulative distribution function:
 \itemize{
 \item "normal" (default): Gaussian, \eqn{\Phi(x)}
-\item "gumbel_min": smallest extreme value, \eqn{1 - \exp(-\exp(x))}
+\item "gumbel_min": smallest extreme value, \eqn{1 - \exp(-\exp(x))}{1 - exp(-exp(x))}
 (the complementary log-log distribution)
-\item "gumbel_max": largest extreme value, \eqn{\exp(-\exp(-x))}
+\item "gumbel_max": largest extreme value, \eqn{\exp(-\exp(-x))}{exp(-exp(-x))}
 (the log-log distribution, as in \code{evd::pgumbel})
-\item "logistic": \eqn{1 / (1 + \exp(-x))}
+\item "logistic": \eqn{1 / (1 + \exp(-x))}{1 / (1 + exp(-x))}
 }}
 
 \item{log}{Logical. If \code{TRUE}, returns log-density (default \code{FALSE}).}
