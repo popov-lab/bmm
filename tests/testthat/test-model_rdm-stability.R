@@ -34,6 +34,12 @@
    log_lik
  }
 
+ # rstan (StanHeaders 2.39.1, Stan Math 5.3) is kept in Suggests for this file
+ # alone: it is the only channel here that exercises the older Stan Math that
+ # rstan users run, where std_normal_lccdf() is -Inf from z = 8.26 while
+ # CmdStan 2.40 (Stan Math 5.4) has it exact. cmdstanr::expose_functions() does
+ # not build on this machine (TBB symbol mismatch), so the cmdstanr checks use
+ # fixed_param generated-quantities programs instead (test-model_rdm.R).
  .rdm_expose_stan_functions <- local({
    cache <- new.env(parent = emptyenv())
 
