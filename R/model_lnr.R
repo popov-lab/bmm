@@ -25,8 +25,8 @@
   ),
   links = list(ndt = "log", s = "log"),
   priors = list(
-    ndt = list(main = "normal(-2, 0.3)", effects = "normal(0, 0.3)"),
-    s = list(main = "normal(0, 0.3)", effects = "normal(0, 0.2)")
+    ndt = list(main = "normal(-1.5, 0.5)", effects = "normal(0, 0.3)"),
+    s = list(main = "normal(0, 0.5)", effects = "normal(0, 0.2)")
   ),
   inits = list(mu = c(-0.5, 0.5), ndt = c(0.025, 0.05), s = c(0.8, 1.2))
 )
@@ -35,7 +35,7 @@
 # block: downstream code recovers accumulator names via
 # setdiff(names(parameters), c("ndt", "s")), which relies on order.
 .lnr_model_spec <- function(version) {
-  fixed_parameters <- list(mu = 0, s = 0)
+  fixed_parameters <- list(mu = 0)
 
   if (version == "custom") {
     return(nlist(
@@ -64,14 +64,6 @@
     init_ranges = c(.lnr_shared$inits, .lnr_meanlog_spec$inits)
   )
 }
-
-# Stan reserved words that cannot be used as category names
-.stan_reserved <- c(
-  "int", "real", "vector", "matrix", "array", "if", "else", "for", "while",
-  "return", "void", "data", "model", "target", "print", "reject", "log",
-  "exp", "lower", "upper", "in", "functions", "generated", "transformed",
-  "parameters"
-)
 
 .lnr_reserved_dpars <- c("mu", "ndt", "s")
 
@@ -138,7 +130,8 @@ settable_links.lnr <- function(model) {
 #'   automatically. For the `"custom"` version, responses should be character
 #'   or factor labels matching the accumulator names in the formula. Category
 #'   names must not use reserved internal parameter names such as `"mu"`,
-#'   `"ndt"`, or `"s"`.
+#'   `"ndt"`, or `"s"`, must not contain an underscore and must not end in a
+#'   number.
 #' @param n_choices An integer specifying the total number of response
 #'   alternatives (K >= 2). Required for `version = "simple"`. Not used for
 #'   `version = "custom"` (inferred from the formula).
@@ -154,15 +147,16 @@ settable_links.lnr <- function(model) {
 #'   \itemize{
 #'     \item `"simple"` (default): Two meanlog parameters — `correct` for the
 #'       correct accumulator (response = 1) and `error` for all error
-#'       accumulators. The sdlog parameter `s` is shared and fixed by default
-#'       (s = 1). This covers the common case where interest is in the speed
-#'       of correct vs. error processing.
+#'       accumulators, plus one sdlog `s` shared by all of them. This covers
+#'       the common case where interest is in the speed of correct vs. error
+#'       processing.
 #'     \item `"custom"`: Per-category meanlog parameters. Response categories
 #'       are defined by the formula LHS names (e.g., `correct ~ 1, other ~ 1,
 #'       npl ~ 1`). The response column must contain character labels matching
 #'       these names. Category names must not be `"mu"`, `"ndt"`, `"s"`,
-#'       Stan reserved words, or names ending in a number. Supports
-#'       per-category `accumulators`.
+#'       Stan reserved words, names containing an underscore, or names ending
+#'       in a number, because `brms` and `Stan` use them as identifiers of
+#'       their own. Supports per-category `accumulators`.
 #'   }
 #' @param links A named list of link functions for the model parameters.
 #'   For `"simple"`: parameters are `correct`, `error`, `ndt`, and `s`.
@@ -170,6 +164,41 @@ settable_links.lnr <- function(model) {
 #'   `ndt` and `s`. For `"custom"`: category parameters default to "identity".
 #' @param ... Additional arguments passed internally (for testing purposes).
 #' @return An object of class `bmmodel`
+#' @section Default behavior:
+#' All four parameters are estimated. `s` is the sdlog shared by the
+#' accumulators; it is not a scale constraint, because finishing times are
+#' observed in seconds and the likelihood is not invariant to rescaling them.
+#' Fixing it costs accuracy: on 2000 trials simulated with sdlog = 0.5, holding
+#' it at 1 pushed `ndt` onto the fastest observed response time and left the
+#' 95% credible intervals of `correct`, `error` and `ndt` all clear of their
+#' true values. To fix it anyway — for instance to reproduce a published fit
+#' that did — write `s = 0` in `bmf()`. The constant is read on the parameter's
+#' own link scale, so `s = 0` means sdlog = 1.
+#' @section Default priors:
+#' `s` has `normal(0, 0.5)` on the log link, a median sdlog of 1 with a 95%
+#' interval of roughly 0.37 to 2.7. That covers the values simulated data are
+#' fitted at without contributing measurably to the posterior at realistic
+#' trial counts, and is tighter than the `normal(0, 1)` that `EMC2` puts on the
+#' same quantity.
+#'
+#' `ndt` has `normal(-1.5, 0.5)` on the log link, the prior the **ddm** model
+#' uses, rather than the tighter one the two-boundary response-time models in
+#' `bmm` were first tuned with: multi-alternative choice tasks carry longer
+#' non-decision times than those models were calibrated on, and a prior whose
+#' upper bound sits below the true value drags the meanlogs with it.
+#'
+#' The group-level standard deviations get one rate per kind of parameter
+#' rather than one per model, shared with the other racing models, so that the
+#' same quantity is given the same prior wherever it appears.
+#' @section Likelihood and `loo()`:
+#' For `version = "simple"` the likelihood is the probability of the *category*
+#' that was observed, not of one named accumulator: an error trial contributes
+#' the density of "some error accumulator won", which for K alternatives adds
+#' log(K - 1) per error trial relative to a per-accumulator likelihood. The
+#' term does not depend on any parameter, so posteriors are unaffected, but
+#' `loo()` and `waic()` values are shifted by that constant and are not
+#' comparable with a `version = "custom"` fit, which names each accumulator, or
+#' with another package that does.
 #' @note Both versions describe the same response type (a categorical winner in
 #'   a choice-RT race), so they live in one constructor rather than separate
 #'   model functions: `"simple"` is an accuracy-coded convenience layer (correct
@@ -182,8 +211,12 @@ settable_links.lnr <- function(model) {
 #' # simple version with 2 alternatives
 #' dat <- rlnr(n = 500, m = c(-1, 0), s = c(1, 1), ndt = 0.2)
 #' model <- lnr(rt = "rt", response = "response", n_choices = 2)
-#' formula <- bmf(correct ~ 1, error ~ 1, ndt ~ 1)
+#' formula <- bmf(correct ~ 1, error ~ 1, ndt ~ 1, s ~ 1)
 #' fit <- bmm(formula, dat, model, cores = 4, backend = "cmdstanr")
+#'
+#' # hold the sdlog at 1 instead of estimating it (s = 0 on the log link)
+#' fit_fixed <- bmm(bmf(correct ~ 1, error ~ 1, ndt ~ 1, s = 0), dat, model,
+#'                  cores = 4, backend = "cmdstanr")
 #'
 #' # custom version with named categories
 #' model2 <- lnr(rt = "rt", response = "resp", version = "custom",
@@ -255,7 +288,7 @@ check_model.lnr_custom <- function(model, data = NULL, formula = NULL) {
       "Category names cannot use reserved internal parameter names: {collapse_comma(bad_internal_names)}."
     )
 
-    bad_names <- intersect(tolower(cat_pars), .stan_reserved)
+    bad_names <- intersect(cat_pars, .stan_reserved)
     stopif(
       length(bad_names) > 0,
       "Category names cannot be Stan reserved words: {collapse_comma(bad_names)}. \\
@@ -318,8 +351,10 @@ check_data.lnr <- function(model, data, formula) {
 
   if (typeof(data[, rt_var]) %in% c("double", "integer")) {
     stopif(
-      any(data[, rt_var] < 0),
-      "Some reaction times are lower than zero, please check your data."
+      any(data[, rt_var] <= 0),
+      "Some reaction times are zero or negative, please check your data. \\
+      The likelihood is zero for a response time that is not strictly \\
+      greater than the non-decision time."
     )
     warnif(
       any(data[, rt_var] > 10),
@@ -361,10 +396,19 @@ check_data.lnr_simple <- function(model, data, formula) {
   response_var <- model$resp_vars$response
   n_alt <- model$other_vars$n_choices
 
-  if (is.factor(data[, response_var])) {
-    data[, response_var] <- as.integer(as.character(data[, response_var]))
-  } else if (is.character(data[, response_var])) {
-    data[, response_var] <- as.integer(data[, response_var])
+  if (is.factor(data[, response_var]) || is.character(data[, response_var])) {
+    labels <- as.character(data[, response_var])
+    coded <- suppressWarnings(as.integer(labels))
+    # as.integer() turns a label that is not a number into NA, and every check
+    # below then compares against NA rather than refusing the label
+    stopif(
+      anyNA(coded),
+      "The response variable '{response_var}' must be integer-coded 1:{n_alt} \\
+      for version 'simple', but contains the non-numeric \\
+      label(s) {collapse_comma(unique(labels[is.na(coded)]))}. Use \\
+      version 'custom' for named response categories."
+    )
+    data[, response_var] <- coded
   }
 
   stopif(
@@ -379,6 +423,14 @@ check_data.lnr_simple <- function(model, data, formula) {
     "The response variable '{response_var}' must contain integers in 1:{n_alt}."
   )
   data[, response_var] <- as.integer(data[, response_var])
+
+  never_chosen <- setdiff(seq_len(n_alt), unique(data[, response_var]))
+  warnif(
+    length(never_chosen) > 0,
+    "Response option(s) {collapse_comma(never_chosen)} never occur in \\
+    '{response_var}'. The model still estimates a meanlog for them, informed \\
+    only by the trials they lost."
+  )
 
   data$.lnr_cat <- ifelse(data[, response_var] == 1L, 1L, 2L)
   data$.lnr_n1 <- 1L
@@ -691,57 +743,61 @@ configure_model.lnr_custom <- function(model, data, formula) {
   log_lik
 }
 
-.lnr_posterior_predict <- function(i, prep, cat_names, n_cats, ...) {
-  ndt <- brms::get_dpar(prep, "ndt", i = i)
-  s <- brms::get_dpar(prep, "s", i = i)
-  n_draws <- length(ndt)
-  m <- lapply(cat_names, function(p) brms::get_dpar(prep, p, i = i))
-  n_cat <- vapply(
-    seq_len(n_cats),
-    function(j) prep$data[[paste0("vint", j + 1)]][i],
-    integer(1)
-  )
-
-  min_ft <- rep(Inf, n_draws)
-  for (j in seq_len(n_cats)) {
-    if (n_cat[j] == 0) next
-    for (k in seq_len(n_cat[j])) {
-      min_ft <- pmin(
-        min_ft, stats::rlnorm(n_draws, meanlog = m[[j]], sdlog = s)
-      )
-    }
-  }
-  min_ft + ndt
-}
-
-.lnr_posterior_epred <- function(prep, cat_names, n_cats, ...) {
-  n_obs <- prep$nobs
+# The per-draw parameters of one observation as the row-per-draw matrices
+# lnr_race() and the survivor integrator take. get_dpar() returns a scalar for a
+# dpar brms stores fixed (s under `s = 0`), so every vector is grown to ndraws.
+.lnr_draw_pars <- function(i, prep, cat_names, n_cats) {
   n_draws <- prep$ndraws
-  n_sim <- 100L
-
-  epred <- matrix(NA_real_, nrow = n_draws, ncol = n_obs)
-  for (i in seq_len(n_obs)) {
-    ndt <- brms::get_dpar(prep, "ndt", i = i)
-    s <- brms::get_dpar(prep, "s", i = i)
-    m <- lapply(cat_names, function(p) brms::get_dpar(prep, p, i = i))
-    n_cat <- vapply(
+  list(
+    ndt = rep_len(brms::get_dpar(prep, "ndt", i = i), n_draws),
+    s = rep_len(brms::get_dpar(prep, "s", i = i), n_draws),
+    m = vapply(cat_names, function(p) {
+      rep_len(brms::get_dpar(prep, p, i = i), n_draws)
+    }, numeric(n_draws)),
+    counts = vapply(
       seq_len(n_cats),
       function(j) prep$data[[paste0("vint", j + 1)]][i],
       integer(1)
     )
+  )
+}
 
-    s_m <- matrix(s, n_draws, n_sim)
-    min_ft <- matrix(Inf, n_draws, n_sim)
-    for (j in seq_len(n_cats)) {
-      if (n_cat[j] == 0) next
-      mj <- matrix(m[[j]], n_draws, n_sim)
-      for (k in seq_len(n_cat[j])) {
-        ft <- stats::rlnorm(n_draws * n_sim, meanlog = mj, sdlog = s_m)
-        dim(ft) <- c(n_draws, n_sim)
-        min_ft <- pmin(min_ft, ft)
+.lnr_posterior_predict <- function(i, prep, cat_names, n_cats, ...) {
+  d <- .lnr_draw_pars(i, prep, cat_names, n_cats)
+  race <- lnr_race(
+    m = d$m,
+    s = matrix(d$s, prep$ndraws, n_cats),
+    counts = matrix(d$counts, prep$ndraws, n_cats, byrow = TRUE)
+  )
+  race$rt + d$ndt
+}
+
+# E[RT] = ndt + int_0^inf prod_j S_j(t)^n_j dt. A Monte-Carlo estimate of this
+# integral moved by several percent between two calls on the same draws, which
+# reached the user as noise on conditional_effects(); the grid is deterministic.
+.lnr_posterior_epred <- function(prep, cat_names, n_cats, ...) {
+  epred <- matrix(NA_real_, nrow = prep$ndraws, ncol = prep$nobs)
+  for (i in seq_len(prep$nobs)) {
+    d <- .lnr_draw_pars(i, prep, cat_names, n_cats)
+    racing <- which(d$counts > 0)
+
+    log_surv <- function(t) {
+      out <- matrix(0, prep$ndraws, length(t))
+      for (j in racing) {
+        out <- out + d$counts[j] * lnorm_log_surv(t, d$m[, j], d$s)
       }
+      out
     }
-    epred[, i] <- rowMeans(min_ft) + ndt
+
+    # the race is over once the slowest single accumulator is, and it has
+    # barely started before the fastest one could finish, so the two extreme
+    # meanlogs bracket the product survivor for every draw
+    m_lo <- matrixStats::rowMins(d$m[, racing, drop = FALSE])
+    m_hi <- matrixStats::rowMaxs(d$m[, racing, drop = FALSE])
+    t_hi <- max(stats::qlnorm(1e-12, m_hi, d$s, lower.tail = FALSE))
+    t_lo <- max(min(stats::qlnorm(1e-12, m_lo, d$s)), t_hi * 1e-12)
+
+    epred[, i] <- d$ndt + race_expected_time(log_surv, t_lo, t_hi)
   }
   epred
 }
@@ -781,4 +837,50 @@ posterior_epred_lnr_custom <- function(prep, ...) {
   )
   .lnr_posterior_epred(prep, cat_names = cat_names,
                        n_cats = length(cat_names), ...)
+}
+
+############################################################################# !
+# PP_CHECK OBSERVABLES                                                    ####
+############################################################################# !
+
+# brms::posterior_predict() returns one matrix, so the winning category rides
+# along as a second observable here instead. vint1 is the category code that
+# check_data() wrote, in the order of the family's accumulator dpars.
+#' @export
+pp_observables.lnr <- function(model) {
+  cats <- model$other_vars$resp_cats %||% c("correct", "error")
+  coding <- collapse_comma(glue("{seq_along(cats)} = {cats}"))
+  list(
+    observed = c(rt = "Y", response = "vint1"),
+    checks = list(
+      rt = .pp_observable(function(d) d$rt, label = "Response time"),
+      response = .pp_observable(
+        function(d) d$response,
+        label = glue("Response category ({coding})"),
+        type = "bars"
+      )
+    )
+  )
+}
+
+# One method for both versions: the accumulator dpars carry their own order, so
+# nothing here depends on whether they came from n_choices or from the formula
+#' @export
+pp_simulate.lnr <- function(model, prep) {
+  cat_names <- setdiff(prep$family$dpars, c("mu", "ndt", "s"))
+  n_cats <- length(cat_names)
+  n_row <- prep$ndraws * prep$nobs
+
+  race <- lnr_race(
+    m = vapply(cat_names, .pp_dpar_vector, numeric(n_row), prep = prep),
+    s = matrix(.pp_dpar_vector(prep, "s"), n_row, n_cats),
+    counts = vapply(seq_len(n_cats), function(j) {
+      rep(prep$data[[paste0("vint", j + 1)]], each = prep$ndraws)
+    }, integer(n_row))
+  )
+
+  list(
+    rt = matrix(race$rt + .pp_dpar_vector(prep, "ndt"), nrow = prep$ndraws),
+    response = matrix(race$response, nrow = prep$ndraws)
+  )
 }

@@ -25,7 +25,8 @@ Factor and character-digit responses are accepted and converted
 automatically. For the \code{"custom"} version, responses should be character
 or factor labels matching the accumulator names in the formula. Category
 names must not use reserved internal parameter names such as \code{"mu"},
-\code{"ndt"}, or \code{"s"}.}
+\code{"ndt"}, or \code{"s"}, must not contain an underscore and must not end in a
+number.}
 
 \item{n_choices}{An integer specifying the total number of response
 alternatives (K >= 2). Required for \code{version = "simple"}. Not used for
@@ -36,14 +37,15 @@ to use. Options are:
 \itemize{
 \item \code{"simple"} (default): Two meanlog parameters — \code{correct} for the
 correct accumulator (response = 1) and \code{error} for all error
-accumulators. The sdlog parameter \code{s} is shared and fixed by default
-(s = 1). This covers the common case where interest is in the speed
-of correct vs. error processing.
+accumulators, plus one sdlog \code{s} shared by all of them. This covers
+the common case where interest is in the speed of correct vs. error
+processing.
 \item \code{"custom"}: Per-category meanlog parameters. Response categories
 are defined by the formula LHS names (e.g., \verb{correct ~ 1, other ~ 1, npl ~ 1}). The response column must contain character labels matching
 these names. Category names must not be \code{"mu"}, \code{"ndt"}, \code{"s"},
-Stan reserved words, or names ending in a number. Supports
-per-category \code{accumulators}.
+Stan reserved words, names containing an underscore, or names ending
+in a number, because \code{brms} and \code{Stan} use them as identifiers of
+their own. Supports per-category \code{accumulators}.
 }}
 
 \item{accumulators}{For \code{version = "custom"} only. A named vector
@@ -98,7 +100,6 @@ Psychometric Properties. Psychometrika, 80(2), 491-513. https://doi.org/10.1007/
 \item \strong{Fixed parameters:}
 \itemize{
 \item \code{mu} = 0
-\item \code{s} = 0
 }
 \item \strong{Default parameter links:}
 \itemize{
@@ -118,12 +119,12 @@ Psychometric Properties. Psychometrika, 80(2), 491-513. https://doi.org/10.1007/
 }
 \item \code{ndt}:
 \itemize{
-\item \code{main}: normal(-2, 0.3)
+\item \code{main}: normal(-1.5, 0.5)
 \item \code{effects}: normal(0, 0.3)
 }
 \item \code{s}:
 \itemize{
-\item \code{main}: normal(0, 0.3)
+\item \code{main}: normal(0, 0.5)
 \item \code{effects}: normal(0, 0.2)
 }
 }
@@ -135,13 +136,61 @@ a choice-RT race), so they live in one constructor rather than separate
 model functions: \code{"simple"} is an accuracy-coded convenience layer (correct
 vs. error) over the general per-accumulator case handled by \code{"custom"}.
 }
+\section{Default behavior}{
+
+All four parameters are estimated. \code{s} is the sdlog shared by the
+accumulators; it is not a scale constraint, because finishing times are
+observed in seconds and the likelihood is not invariant to rescaling them.
+Fixing it costs accuracy: on 2000 trials simulated with sdlog = 0.5, holding
+it at 1 pushed \code{ndt} onto the fastest observed response time and left the
+95\% credible intervals of \code{correct}, \code{error} and \code{ndt} all clear of their
+true values. To fix it anyway — for instance to reproduce a published fit
+that did — write \code{s = 0} in \code{bmf()}. The constant is read on the parameter's
+own link scale, so \code{s = 0} means sdlog = 1.
+}
+
+\section{Default priors}{
+
+\code{s} has \code{normal(0, 0.5)} on the log link, a median sdlog of 1 with a 95\%
+interval of roughly 0.37 to 2.7. That covers the values simulated data are
+fitted at without contributing measurably to the posterior at realistic
+trial counts, and is tighter than the \code{normal(0, 1)} that \code{EMC2} puts on the
+same quantity.
+
+\code{ndt} has \code{normal(-1.5, 0.5)} on the log link, the prior the \strong{ddm} model
+uses, rather than the tighter one the two-boundary response-time models in
+\code{bmm} were first tuned with: multi-alternative choice tasks carry longer
+non-decision times than those models were calibrated on, and a prior whose
+upper bound sits below the true value drags the meanlogs with it.
+
+The group-level standard deviations get one rate per kind of parameter
+rather than one per model, shared with the other racing models, so that the
+same quantity is given the same prior wherever it appears.
+}
+
+\section{Likelihood and \code{loo()}}{
+
+For \code{version = "simple"} the likelihood is the probability of the \emph{category}
+that was observed, not of one named accumulator: an error trial contributes
+the density of "some error accumulator won", which for K alternatives adds
+log(K - 1) per error trial relative to a per-accumulator likelihood. The
+term does not depend on any parameter, so posteriors are unaffected, but
+\code{loo()} and \code{waic()} values are shifted by that constant and are not
+comparable with a \code{version = "custom"} fit, which names each accumulator, or
+with another package that does.
+}
+
 \examples{
 \dontshow{if (isTRUE(Sys.getenv("BMM_EXAMPLES"))) withAutoprint(\{ # examplesIf}
 # simple version with 2 alternatives
 dat <- rlnr(n = 500, m = c(-1, 0), s = c(1, 1), ndt = 0.2)
 model <- lnr(rt = "rt", response = "response", n_choices = 2)
-formula <- bmf(correct ~ 1, error ~ 1, ndt ~ 1)
+formula <- bmf(correct ~ 1, error ~ 1, ndt ~ 1, s ~ 1)
 fit <- bmm(formula, dat, model, cores = 4, backend = "cmdstanr")
+
+# hold the sdlog at 1 instead of estimating it (s = 0 on the log link)
+fit_fixed <- bmm(bmf(correct ~ 1, error ~ 1, ndt ~ 1, s = 0), dat, model,
+                 cores = 4, backend = "cmdstanr")
 
 # custom version with named categories
 model2 <- lnr(rt = "rt", response = "resp", version = "custom",

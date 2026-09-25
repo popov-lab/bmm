@@ -157,7 +157,40 @@ test_that("check_data.lnr errors when RT contains negative values", {
 
   expect_error(
     check_data(model, dat, bmf(correct ~ 1)),
-    "reaction times are lower than zero"
+    "reaction times are zero or negative"
+  )
+})
+
+test_that("check_data.lnr rejects a response time of exactly zero", {
+  model <- lnr(rt = "rt", response = "response", n_choices = 2)
+  dat <- data.frame(rt = c(0, 0.6, 0.8), response = c(1, 1, 2))
+
+  expect_error(
+    check_data(model, dat, bmf(correct ~ 1)),
+    "reaction times are zero or negative"
+  )
+})
+
+test_that("check_data.lnr_simple names a non-numeric response label", {
+  model <- lnr(rt = "rt", response = "response", n_choices = 2)
+  dat <- data.frame(
+    rt = c(0.5, 0.6, 0.8),
+    response = factor(c("correct", "error", "correct"))
+  )
+
+  expect_error(
+    check_data(model, dat, bmf(correct ~ 1)),
+    "non-numeric label\\(s\\) 'correct', 'error'"
+  )
+})
+
+test_that("check_data.lnr_simple warns about a response option nobody chose", {
+  model <- lnr(rt = "rt", response = "response", n_choices = 3)
+  dat <- data.frame(rt = runif(20, 0.4, 1.5), response = rep(c(1L, 2L), 10))
+
+  expect_warning(
+    check_data(model, dat, bmf(correct ~ 1)),
+    "Response option.*never occur"
   )
 })
 
@@ -737,8 +770,11 @@ test_that("lnr simple version runs with mock backend (2-choice)", {
   model <- lnr(rt = "rt", response = "response", n_choices = 2)
   formula <- bmf(correct ~ 1, error ~ 1, ndt ~ 1)
 
-  expect_silent(
-    bmm(formula, dat, model, backend = "mock", mock = 1, rename = FALSE)
+  # s is estimated by default, so bmm() reports the intercept-only formula it
+  # adds for it; any other output would still fail the expectation
+  expect_message(
+    bmm(formula, dat, model, backend = "mock", mock_fit = 1, rename = FALSE),
+    "No formula for parameter s"
   )
 })
 
@@ -749,8 +785,11 @@ test_that("lnr simple version runs with mock backend (4-choice)", {
   model <- lnr(rt = "rt", response = "response", n_choices = 4)
   formula <- bmf(correct ~ 1, error ~ 1, ndt ~ 1)
 
-  expect_silent(
-    bmm(formula, dat, model, backend = "mock", mock = 1, rename = FALSE)
+  # s is estimated by default, so bmm() reports the intercept-only formula it
+  # adds for it; any other output would still fail the expectation
+  expect_message(
+    bmm(formula, dat, model, backend = "mock", mock_fit = 1, rename = FALSE),
+    "No formula for parameter s"
   )
 })
 
@@ -762,8 +801,11 @@ test_that("lnr simple with predictors runs with mock backend", {
   model <- lnr(rt = "rt", response = "response", n_choices = 2)
   formula <- bmf(correct ~ condition, error ~ 1, ndt ~ 1)
 
-  expect_silent(
-    bmm(formula, dat, model, backend = "mock", mock = 1, rename = FALSE)
+  # s is estimated by default, so bmm() reports the intercept-only formula it
+  # adds for it; any other output would still fail the expectation
+  expect_message(
+    bmm(formula, dat, model, backend = "mock", mock_fit = 1, rename = FALSE),
+    "No formula for parameter s"
   )
 })
 
@@ -777,8 +819,11 @@ test_that("lnr custom version runs with mock backend", {
   model <- lnr(rt = "rt", response = "resp", version = "custom")
   formula <- bmf(fast ~ 1, medium ~ 1, slow ~ 1, ndt ~ 1)
 
-  expect_silent(
-    bmm(formula, dat, model, backend = "mock", mock = 1, rename = FALSE)
+  # s is estimated by default, so bmm() reports the intercept-only formula it
+  # adds for it; any other output would still fail the expectation
+  expect_message(
+    bmm(formula, dat, model, backend = "mock", mock_fit = 1, rename = FALSE),
+    "No formula for parameter s"
   )
 })
 
@@ -793,8 +838,11 @@ test_that("lnr custom with accumulators runs with mock backend", {
                accumulators = c(correct = 1, other = 3, npl = 5))
   formula <- bmf(correct ~ 1, other ~ 1, npl ~ 1, ndt ~ 1)
 
-  expect_silent(
-    bmm(formula, dat, model, backend = "mock", mock = 1, rename = FALSE)
+  # s is estimated by default, so bmm() reports the intercept-only formula it
+  # adds for it; any other output would still fail the expectation
+  expect_message(
+    bmm(formula, dat, model, backend = "mock", mock_fit = 1, rename = FALSE),
+    "No formula for parameter s"
   )
 })
 
@@ -809,7 +857,10 @@ test_that("lnr custom with predictors runs with mock backend", {
   model <- lnr(rt = "rt", response = "resp", version = "custom")
   formula <- bmf(old ~ condition, new ~ 1, ndt ~ 1)
 
-  expect_silent(
-    bmm(formula, dat, model, backend = "mock", mock = 1, rename = FALSE)
+  # s is estimated by default, so bmm() reports the intercept-only formula it
+  # adds for it; any other output would still fail the expectation
+  expect_message(
+    bmm(formula, dat, model, backend = "mock", mock_fit = 1, rename = FALSE),
+    "No formula for parameter s"
   )
 })
