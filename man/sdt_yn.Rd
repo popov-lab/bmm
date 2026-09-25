@@ -100,16 +100,19 @@ Provide pre-aggregated data with the following columns:
 \itemize{
 \item \code{main}: normal(1, 1)
 \item \code{effects}: normal(0, 0.5)
+\item \code{sd}: exponential(1)
 }
 \item \code{criterion}:
 \itemize{
 \item \code{main}: normal(0, 1.5)
 \item \code{effects}: normal(0, 0.5)
+\item \code{sd}: exponential(2)
 }
 \item \code{sdratio}:
 \itemize{
 \item \code{main}: normal(0, 0.5)
 \item \code{effects}: normal(0, 0.3)
+\item \code{sd}: exponential(2)
 }
 }
 }
@@ -239,9 +242,10 @@ one point of an ROC curve. One condition gives one operating point.
 probability that a random signal trial yields more evidence than a
 random noise trial. Obtain it from the posterior with
 \code{pnorm(d / sqrt(2))} for \code{dist = "normal"}.
-\item \code{main} / \code{effects} — the keys of the default priors shown in the
-model description above: \code{main} is the prior on the intercept,
-\code{effects} the prior on regression coefficients.
+\item \code{main} / \code{effects} / \code{sd} — the keys of the default priors shown in
+the model description above: \code{main} is the prior on the intercept,
+\code{effects} the prior on regression coefficients, and \code{sd} the prior on
+the standard deviations of the parameter's random effects.
 }
 }
 

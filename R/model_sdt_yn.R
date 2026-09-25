@@ -20,10 +20,15 @@
   # d is d_a, and the noise-standardized separation is d * sqrt((1 + r^2) / 2).
   # Over plausible SD ratios, r in [0.56, 1.80], that factor runs from
   # 0.81 to 1.46, which normal(1, 1) is wide enough to absorb on either scale.
+  # sd rates track between-subject SDs fitted on broeder_schuetz_2009_e3 (40
+  # subjects): d ~0.6, criterion ~0.15, sdratio ~0.2. Rate 2's median (0.35)
+  # sits below d's SD, so d takes rate 1; criterion's small value reflects
+  # its condition predictor absorbing most bias variation, so it and
+  # sdratio take rate 2 rather than 4.
   default_priors <- list(
-    d = list(main = "normal(1, 1)", effects = "normal(0, 0.5)"),
-    criterion = list(main = "normal(0, 1.5)", effects = "normal(0, 0.5)"),
-    sdratio = list(main = "normal(0, 0.5)", effects = "normal(0, 0.3)")
+    d = list(main = "normal(1, 1)", effects = "normal(0, 0.5)", sd = "exponential(1)"),
+    criterion = list(main = "normal(0, 1.5)", effects = "normal(0, 0.5)", sd = "exponential(2)"),
+    sdratio = list(main = "normal(0, 0.5)", effects = "normal(0, 0.3)", sd = "exponential(2)")
   )
   requirements <- glue(
     "Provide pre-aggregated data with the following columns:", "\n\n",
@@ -241,9 +246,10 @@ settable_links.sdt_yn <- function(model) {
 #'     probability that a random signal trial yields more evidence than a
 #'     random noise trial. Obtain it from the posterior with
 #'     `pnorm(d / sqrt(2))` for `dist = "normal"`.
-#'   \item `main` / `effects` — the keys of the default priors shown in the
-#'     model description above: `main` is the prior on the intercept,
-#'     `effects` the prior on regression coefficients.
+#'   \item `main` / `effects` / `sd` — the keys of the default priors shown in
+#'     the model description above: `main` is the prior on the intercept,
+#'     `effects` the prior on regression coefficients, and `sd` the prior on
+#'     the standard deviations of the parameter's random effects.
 #' }
 #'
 #' @seealso [sdt_d()] and [sdt_criterion()] compute the `d` and `criterion` of
