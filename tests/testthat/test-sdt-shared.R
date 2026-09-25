@@ -34,20 +34,30 @@ test_that("every dist argument offers exactly the registry's distributions", {
   }
 })
 
-test_that("the m-AFC closed forms sit on the right extreme-value branch", {
-  # taking the max of largest-extreme-value variates is what yields the softmax;
-  # the smallest-extreme-value case is the Gamma ratio. Swapping these fits the
-  # mirror model, and the two agree at m = 2, so check m > 2.
-  for (m in c(4L, 8L)) {
-    expect_equal(bmm:::.mafc_pc_r(1.2, m, "gumbel_max"),
-                 1 / (1 + (m - 1) * exp(-1.2)), info = paste("m =", m))
-    expect_equal(
-      bmm:::.mafc_pc_r(1.2, m, "gumbel_min"),
-      exp(lgamma(1 + exp(-1.2)) + lgamma(m) - lgamma(m + exp(-1.2))),
-      info = paste("m =", m)
-    )
-    expect_false(isTRUE(all.equal(bmm:::.mafc_pc_r(1.2, m, "gumbel_min"),
-                                  bmm:::.mafc_pc_r(1.2, m, "gumbel_max"))))
+test_that("the m-AFC probabilities agree with the registry's own cdf", {
+  # P(correct) is the probability the signal variate beats m - 1 distractors,
+  # int f(x - d) F(x)^(m - 1) dx, so a closed form is only right if it agrees
+  # with the cdf the rest of the model uses. Taking the density off that same
+  # cdf by central difference keeps the check independent of every branch of
+  # .mafc_pc_r(): a swapped gumbel label and a self-consistent but mis-scaled
+  # exponent both survive a comparison against the formula itself. gumbel_min
+  # and gumbel_max coincide at m = 2, which is why the grid goes past it.
+  # 1e-7 is the implementation's side: its 40-point Gauss-Hermite normal branch
+  # sits 4.5e-8 from the integral at m = 8, d = 0, every other cell below 2e-10.
+  pc_integral <- function(d, m, dist) {
+    cdf <- bmm:::.sdt_dists[[dist]]$cdf
+    dens <- function(x) (cdf(x + 1e-5) - cdf(x - 1e-5)) / 2e-5
+    stats::integrate(function(x) dens(x - d) * cdf(x)^(m - 1),
+                     -Inf, Inf, rel.tol = 1e-10)$value
+  }
+  for (dist in names(bmm:::.sdt_dists)) {
+    for (m in c(2L, 3L, 5L, 8L)) {
+      for (d in c(0, 0.8, 2)) {
+        expect_equal(bmm:::.mafc_pc_r(d, m, dist), pc_integral(d, m, dist),
+                     tolerance = 1e-7,
+                     info = paste(dist, "m =", m, "d =", d))
+      }
+    }
   }
 })
 
