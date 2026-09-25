@@ -1,5 +1,27 @@
+// Frechet drift d ~ Frechet(shape v, scale s), log F(u) = -(u / s)^-v. The
+// survivor is spelled through this closed form and log1m_exp, never through
+// frechet_lccdf, whose log1m(exp(.)) form is -Inf with an infinite partial
+// once (s / u)^v < 5e-17 (u / s = 113 at shape 8).
+//
+// M has no closed form and is integrated by 16-point Gauss-Legendre in log
+// space. Measured against adaptive quadrature: within 1e-6 nats for
+// A / gap <= 6, 6e-5 at A / gap = 10, 8.7e-3 at 40, 0.84 nats at gap = 1e-3
+// with A = 2; the default priors put A / gap near 0.6. The survivor inherits
+// that error multiplied by (u / s)^-2v, so for slow responses (b / t well
+// below s) it is off by whole nats where its value is already below -100.
+
 real lba_frechet_log_F(real x, real v, real s) {
   return -pow(x / s, -v);
+}
+
+// log(F(hi) - F(lo)), from the upper tail once F(lo) > 1/2
+real lba_frechet_log_dF(real lo, real hi, real v, real s) {
+  real lF_lo = lba_frechet_log_F(lo, v, s);
+  real lF_hi = lba_frechet_log_F(hi, v, s);
+  if (lF_lo > -0.6931471805599453) {
+    return log_diff_exp(log1m_exp(lF_lo), log1m_exp(lF_hi));
+  }
+  return log_diff_exp(lF_hi, lF_lo);
 }
 
 real lba_frechet_log_M(real t, real v, real b, real A, real s) {
@@ -40,16 +62,9 @@ real lba_frechet_single_lpdf(real t, real v, real b, real A, real s) {
 
 // Single-accumulator log-survival for LBA with Frechet drift
 real lba_frechet_single_lccdf(real t, real v, real b, real A, real s) {
-  real log_M = lba_frechet_log_M(t, v, b, A, s);
-  real hi = b / t;
   real lo = (b - A) / t;
-  real log_u = log_diff_exp(
-    log(b) + lba_frechet_log_F(hi, v, s),
-    log(b - A) + lba_frechet_log_F(lo, v, s)
-  );
-  // survival numerator (u - t*M) in log space: log_diff_exp is exact where
-  // log_u > log(t) + log_M; the cancellation tail (survival numerically 0) floors
-  // to the same penalty as lba_log_clip (log(1e-300)).
-  real log_tM = log(t) + log_M;
-  return (log_u > log_tM ? log_diff_exp(log_u, log_tM) : log(1e-300)) - log(A);
+  real hi = b / t;
+  real log_tM = log(t) + lba_frechet_log_M(t, v, b, A, s);
+  real log_u = log_sum_exp(log(A) + lba_frechet_log_F(lo, v, s), log(b) + lba_frechet_log_dF(lo, hi, v, s));
+  return (log_u > log_tM ? log_diff_exp(log_u, log_tM) : lba_log_floor()) - log(A);
 }
