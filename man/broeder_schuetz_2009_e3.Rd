@@ -34,11 +34,12 @@ Binary old/new recognition data from 40 subjects, aggregated to response
 counts. Each subject was tested under five base-rate conditions: the
 proportion of old items shifts the decision criterion from conservative
 (\code{br1}) to liberal (\code{br5}) while leaving sensitivity unchanged, tracing a
-five-point binary ROC per subject. This criterion variation is what makes the
-unequal-variance ratio (\code{sdratio}) of \code{\link[=sdt_yn]{sdt_yn()}} identifiable: a single
-condition yields only one hit/false-alarm pair and cannot separate a wider
-signal distribution from a larger d'. Counts were digitised from the
-frequencies reported in the original article.
+five-point binary ROC per subject. That is the cleanest design for estimating
+the unequal-variance ratio (\code{sdratio}) of \code{\link[=sdt_yn]{sdt_yn()}}, which needs more than
+one operating point: a single condition with no other varying predictor yields
+only one hit/false-alarm pair and cannot separate a wider signal distribution
+from a larger d'. Counts were digitised from the frequencies reported in the
+original article.
 }
 \examples{
 \dontrun{

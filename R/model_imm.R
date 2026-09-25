@@ -78,8 +78,16 @@
     out$init_ranges$a <- NULL
   }
 
-  out$links[names(links)] <- links
+  out <- set_links(out, links)
   out
+}
+
+# the mixture weights are built from exp(c), exp(a) and exp(-s * d) in the
+# non-linear formulas of configure_model.imm_*, and mu1/kappa from the von
+# Mises components, so none of the links in this list is read at fit time
+#' @exportS3Method
+settable_links.imm <- function(model) {
+  character(0)
 }
 
 # user facing alias

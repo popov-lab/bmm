@@ -89,7 +89,7 @@
     call = call
   )
   if (!is.null(version)) class(out) <- c(class(out), paste0("ezdm_", version))
-  out$links[names(links)] <- links
+  out <- set_links(out, links)
   out
 }
 # user facing alias
@@ -103,10 +103,13 @@
 #' @param var_rt The names of the variable or variables (for 4par version) coding the variance of the reaction time in seconds in the data
 #' @param n_upper The name of the variable coding the number of responses that hit the upper response threshold (typically the number of correct responses) in the data.
 #' @param n_trials The name of the variable coding the number of trials that was used to calculated the aggregated statistics.
-#' @param links A list of links for the parameters. For positive parameters
+#' @param links A named list of links for the parameters, e.g.
+#'   `links = list(bound = "softplus")`. For positive parameters
 #'   (e.g. `bound`, `ndt`), "softplus" is available as an alternative to the
 #'   default "log" link that grows linearly for large values and avoids the
-#'   numerical blow-up of `exp()`.
+#'   numerical blow-up of `exp()`. A name that is not a parameter of the model
+#'   is an error, and a link that allows values the default link excludes
+#'   (e.g. "identity" for a positive parameter) is a warning.
 #' @param version A character label for the version of the model. There is a three-parameter version
 #'   (version = "3par") of the `ezdm` that fixes the relative starting point `zr` to 0.5, and a
 #'   four parameter version (version = "4par"), that allows to freely estimate the starting point.
@@ -292,6 +295,17 @@ bmf2bf.ezdm_4par <- function(model, formula) {
 # CONFIGURE_MODEL S3 METHODS                                             ####
 ############################################################################# !
 
+# Stan functions of one ezdm version. The order matters: each chunk defines what
+# the next one calls.
+.ezdm_stan_functions <- function(version) {
+  chunks <- c(
+    "ezdm_series.stan", "ezdm_cumulants.stan",
+    paste0("ezdm_", version, "_functions.stan")
+  )
+  sc_path <- system.file("stan_chunks", package = "bmm")
+  paste(vapply(file.path(sc_path, chunks), read_lines2, character(1)), collapse = "\n")
+}
+
 #' @export
 configure_model.ezdm_3par <- function(model, data, formula) {
   # construct brms formula from the bmm formula
@@ -313,9 +327,7 @@ configure_model.ezdm_3par <- function(model, data, formula) {
   )
 
   # prepare initial stanvars to pass to brms, model formula and priors
-  sc_path <- system.file("stan_chunks", package = "bmm")
-  stan_functions <- read_lines2(paste0(sc_path, "/ezdm_3par_functions.stan"))
-  stanvars <- brms::stanvar(scode = stan_functions, block = "functions")
+  stanvars <- brms::stanvar(scode = .ezdm_stan_functions("3par"), block = "functions")
 
   # return the list
   nlist(formula, data, stanvars)
@@ -373,9 +385,7 @@ configure_model.ezdm_4par <- function(model, data, formula) {
   )
 
   # prepare initial stanvars to pass to brms, model formula and priors
-  sc_path <- system.file("stan_chunks", package = "bmm")
-  stan_functions <- read_lines2(paste0(sc_path, "/ezdm_4par_functions.stan"))
-  stanvars <- brms::stanvar(scode = stan_functions, block = "functions")
+  stanvars <- brms::stanvar(scode = .ezdm_stan_functions("4par"), block = "functions")
 
   # return the list
   nlist(formula, data, stanvars)

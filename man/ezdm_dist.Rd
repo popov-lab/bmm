@@ -74,6 +74,56 @@ Model. The model operates on aggregated data: mean
 reaction time, variance of reaction time, and number of responses to the
 upper boundary.
 }
+\details{
+The number of upper-boundary responses is binomial. The two RT
+summaries follow the joint sampling distribution of the mean and the
+variance of \code{n} independent decision times, matched to the exact first four
+cumulants of the first-passage time. Writing \eqn{\mathrm{MDT}} and
+\eqn{\mathrm{VRT}} for its mean and variance and \eqn{\kappa_3},
+\eqn{\kappa_4} for its third and fourth cumulants, and
+\eqn{W = \kappa_4 / n + 2\,\mathrm{VRT}^2 / (n - 1)} for the exact variance
+of the sample variance,
+\deqn{\mathrm{var\_rt} \sim \mathrm{Gamma}(\mathrm{VRT}^2 / W, \mathrm{VRT} / W),}
+\deqn{\mathrm{mean\_rt} \mid \mathrm{var\_rt} \sim N\left(\mathrm{ndt} + \mathrm{MDT} + \frac{\kappa_3 / n}{W}(\mathrm{var\_rt} - \mathrm{VRT}),\ \sqrt{\mathrm{VRT} / n - (\kappa_3 / n)^2 / W}\right),}
+so that \eqn{\mathrm{Var}(\mathrm{mean\_rt}) = \mathrm{VRT} / n} and
+\eqn{\mathrm{Cov}(\mathrm{mean\_rt}, \mathrm{var\_rt}) = \kappa_3 / n} are
+exact. Decision times are right-skewed (with a symmetric start point their
+kurtosis is 8.8 at zero drift and falls towards 3 as drift grows), so the
+older form that assumes normal reaction times — independent normal and
+scaled chi-square
+\eqn{\mathrm{Gamma}((n - 1)/2, (n - 1)/(2\,\mathrm{VRT}))} terms —
+understates the sampling variance of \code{var_rt} by a factor of
+\eqn{1 + (\mathrm{kurtosis} - 3)(n - 1)/(2n)}: about 3.8 with 100 trials
+per cell and 3.5 to 3.6 with 10, less at accuracies above .95. With an
+asymmetric start point in version \code{"4par"} it is more at the boundary
+nearer the start point (up to 5.7 for \code{zr} between .3 and .7) and less at
+the other. It also ignores a correlation of about 0.7 between the
+two statistics, making posteriors too narrow. The terms above reduce to it when \eqn{\kappa_3 = \kappa_4 = 0}.
+
+For version \code{"3par"} the start point is symmetric, so the decision time is
+independent of which boundary is hit and all \code{n_trials} responses inform
+one set of cumulants. For version \code{"4par"} the two boundaries have
+different decision-time distributions, so each is given its own summaries
+and its own response count. A boundary reached fewer than twice has no
+sample variance; in \code{dezdm()} it contributes only through the binomial
+term, but \code{bmm()} currently drops such cells, because \code{rezdm()} and
+\code{ezdm_summary_stats()} code their missing summaries as \code{NA} and \code{brms}
+excludes rows with missing values. The per-boundary formulas condition on
+the realised counts, which are themselves random.
+
+The two additional cumulants cost sampling time. In two simulated designs
+(30 subjects with 200 or 250 trials, 3 seeds each, one machine) a gradient
+of the whole model took 1.3 times as long as with the older form for
+version \code{"3par"} and 1.9 times for version \code{"4par"}. The likelihood alone
+took 1.5 to 2.0 and 1.7 to 2.5 times as long, most where accuracy is near
+chance, so the ratio grows with the number of cells.
+
+Simulated \code{mean_rt} is not truncated at \code{ndt}. When a summary rests on few
+responses (a handful of trials in version \code{"3par"}, or a rarely reached
+boundary in version \code{"4par"}, whatever \code{n_trials} is), \code{rezdm()} can
+return \code{mean_rt} below \code{ndt} or even \code{mean_rt <= 0}, which \code{bmm()}
+rejects; drop those rows before fitting.
+}
 \examples{
 # 3-parameter version (single observation)
 dezdm(

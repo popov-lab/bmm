@@ -81,6 +81,7 @@ No stimulus column needed (each trial has exactly one signal alternative)
 \itemize{
 \item \code{main}: normal(1, 1)
 \item \code{effects}: normal(0, 0.5)
+\item \code{sd}: exponential(1)
 }
 }
 }
