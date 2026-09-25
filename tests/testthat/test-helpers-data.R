@@ -754,6 +754,228 @@ test_that("ezdm_summary_stats() works with dplyr::reframe()", {
 })
 
 ############################################################################# !
+# ezdm_summary_stats CONTAMINANT-FREE COUNT TESTS                         ####
+############################################################################# !
+
+# tight cognitive bulk + responses spread over the whole contaminant range, so
+# the EM finds a contaminant proportion without any RNG in the test
+.contaminated_rt <- function(n_clean, n_contam) {
+  c(
+    seq(0.50, 0.60, length.out = n_clean),
+    seq(0.10, 4.00, length.out = n_contam)
+  )
+}
+
+test_that("ezdm_summary_stats() removes the estimated contaminants from the counts", {
+  rt <- .contaminated_rt(170, 30)
+  response <- rep(c(1L, 1L, 1L, 0L), length.out = 200)
+
+  result <- ezdm_summary_stats(rt, response, contaminant_bound = c(0.1, 4))
+
+  expect_gt(result$contaminant_prop, 0)
+  expect_lt(result$n_trials, length(rt))
+  expect_lt(result$n_upper, sum(response))
+  expect_equal(result$n_trials, round(200 * (1 - result$contaminant_prop)))
+  expect_equal(
+    result$n_upper,
+    round(sum(response) - 200 * result$contaminant_prop * 0.5)
+  )
+  expect_lte(result$n_upper, result$n_trials)
+})
+
+test_that("ezdm_summary_stats() keeps the raw counts without a contaminant proportion", {
+  rt <- .contaminated_rt(170, 30)
+  response <- rep(c(1L, 1L, 1L, 0L), length.out = 200)
+
+  simple <- ezdm_summary_stats(rt, response, method = "simple")
+  robust <- ezdm_summary_stats(rt, response, method = "robust")
+
+  expect_true(is.na(simple$contaminant_prop))
+  expect_equal(simple$n_trials, length(rt))
+  expect_equal(simple$n_upper, sum(response))
+  expect_equal(robust$n_trials, length(rt))
+  expect_equal(robust$n_upper, sum(response))
+})
+
+test_that("ezdm_summary_stats() guess_rate moves n_upper but not n_trials", {
+  rt <- .contaminated_rt(170, 30)
+  response <- rep(c(1L, 1L, 1L, 0L), length.out = 200)
+
+  none <- ezdm_summary_stats(rt, response, contaminant_bound = c(0.1, 4),
+                             guess_rate = 0)
+  half <- ezdm_summary_stats(rt, response, contaminant_bound = c(0.1, 4),
+                             guess_rate = 0.5)
+
+  expect_equal(none$n_upper, sum(response))
+  expect_lt(half$n_upper, none$n_upper)
+  expect_equal(none$n_trials, half$n_trials)
+})
+
+test_that("ezdm_summary_stats() validates guess_rate", {
+  rt <- .contaminated_rt(90, 10)
+  response <- rep(c(1L, 0L), length.out = 100)
+
+  expect_error(ezdm_summary_stats(rt, response, guess_rate = -0.1),
+    "guess_rate must be a single number between 0 and 1")
+  expect_error(ezdm_summary_stats(rt, response, guess_rate = 1.5),
+    "guess_rate must be a single number between 0 and 1")
+  expect_error(ezdm_summary_stats(rt, response, guess_rate = c(0.2, 0.5)),
+    "guess_rate must be a single number between 0 and 1")
+})
+
+test_that("ezdm_summary_stats() warns and keeps raw counts above the accuracy ceiling", {
+  rt <- .contaminated_rt(170, 30)
+  response <- c(rep(1L, 198), rep(0L, 2))
+
+  expect_warning(
+    result <- ezdm_summary_stats(rt, response, contaminant_bound = c(0.1, 4)),
+    "Observed accuracy \\(0.99\\) lies outside"
+  )
+  expect_equal(result$n_upper, 198L)
+  expect_equal(result$n_trials, 200L)
+  expect_gt(result$contaminant_prop, 0)
+})
+
+test_that("ezdm_summary_stats() warns and keeps raw counts below the accuracy floor", {
+  rt <- .contaminated_rt(170, 30)
+  response <- c(rep(1L, 2), rep(0L, 198))
+
+  expect_warning(
+    result <- ezdm_summary_stats(rt, response, contaminant_bound = c(0.1, 4)),
+    "Observed accuracy \\(0.01\\) lies outside"
+  )
+  expect_equal(result$n_upper, 2L)
+  expect_equal(result$n_trials, 200L)
+})
+
+test_that("ezdm_summary_stats() corrects a cell that sits exactly on the ceiling", {
+  # accuracy 0.90 with a contaminant proportion clipped to exactly 0.2 and a
+  # guess rate of 0.5 is the boundary case: every non-contaminant response was
+  # correct, which is consistent, so the counts are corrected rather than
+  # refused. Only accuracy strictly above the ceiling is impossible.
+  rt <- .contaminated_rt(152, 48)
+  response <- c(rep(1L, 180), rep(0L, 20))
+
+  result <- suppressWarnings(ezdm_summary_stats(
+    rt, response, contaminant_bound = c(0.1, 4), max_contaminant = 0.2
+  ))
+
+  expect_equal(result$contaminant_prop, 0.2)
+  expect_equal(result$n_upper, 160L)
+  expect_equal(result$n_trials, 160L)
+  expect_no_warning(.contaminant_free_counts(180L, 200L, 0.2, 0.5))
+  expect_no_warning(.contaminant_free_counts(20L, 200L, 0.2, 0.5))
+})
+
+test_that("ezdm_summary_stats() rounding keeps n_upper <= n_trials at the ceiling", {
+  # 197 trials, 177 correct, EM clipped to max_contaminant: the clean counts are
+  # 157.3 and 157.6, a third of a count apart, so only a monotone rounding of
+  # both keeps the constraint
+  rt <- .contaminated_rt(150, 47)
+  response <- c(rep(1L, 177), rep(0L, 20))
+
+  result <- suppressWarnings(ezdm_summary_stats(
+    rt, response, contaminant_bound = c(0.1, 4), max_contaminant = 0.2
+  ))
+
+  expect_equal(result$contaminant_prop, 0.2)
+  expect_lte(result$n_upper, result$n_trials)
+  expect_equal(result$n_upper, 157L)
+  expect_equal(result$n_trials, 158L)
+})
+
+test_that("ezdm_summary_stats() 4par consumes both boundary proportions", {
+  rt <- c(
+    .contaminated_rt(100, 10),
+    seq(0.70, 0.80, length.out = 60), seq(0.10, 4.00, length.out = 30)
+  )
+  response <- c(rep(1L, 110), rep(0L, 90))
+
+  result <- ezdm_summary_stats(rt, response, version = "4par",
+                               contaminant_bound = c(0.1, 4))
+
+  expect_gt(result$contaminant_prop_upper, 0)
+  expect_gt(result$contaminant_prop_lower, 0)
+  expect_false(isTRUE(all.equal(result$contaminant_prop_upper,
+                                result$contaminant_prop_lower)))
+  expect_equal(result$n_upper, round(110 * (1 - result$contaminant_prop_upper)))
+  expect_equal(
+    result$n_trials - result$n_upper,
+    round(90 * (1 - result$contaminant_prop_lower))
+  )
+  expect_lte(result$n_upper, result$n_trials)
+})
+
+test_that("ezdm_summary_stats() 4par keeps n_upper <= n_trials with a near-empty boundary", {
+  rt <- c(
+    .contaminated_rt(160, 37),
+    c(0.55, 0.58, 0.62)
+  )
+  response <- c(rep(1L, 197), rep(0L, 3))
+
+  result <- ezdm_summary_stats(rt, response, version = "4par",
+                               contaminant_bound = c(0.1, 4))
+
+  expect_true(is.na(result$contaminant_prop_lower))
+  expect_lte(result$n_upper, result$n_trials)
+  expect_equal(result$n_trials - result$n_upper, 3L)
+})
+
+test_that("ezdm_summary_stats() 4par correction can take a boundary below two responses", {
+  rt <- c(
+    .contaminated_rt(150, 44),
+    c(0.52, 0.55, 3.60, 3.90, 0.11, 3.99)
+  )
+  response <- c(rep(1L, 194), rep(0L, 6))
+
+  result <- suppressWarnings(ezdm_summary_stats(
+    rt, response, version = "4par", contaminant_bound = c(0.1, 4),
+    min_trials = 2, max_contaminant = 0.9
+  ))
+
+  # the Stan likelihood gates the lower RT terms on this count, not on whether
+  # the lower moments are NA, so the two can disagree after the correction
+  expect_equal(result$n_trials - result$n_upper, 1L)
+  expect_lt(result$n_trials - result$n_upper, 2)
+  expect_false(is.na(result$mean_rt_lower))
+  expect_lte(result$n_upper, result$n_trials)
+})
+
+test_that("ezdm_summary_stats() is deterministic across repeated calls", {
+  rt <- .contaminated_rt(170, 30)
+  response <- rep(c(1L, 1L, 1L, 0L), length.out = 200)
+
+  three_par <- replicate(
+    3, ezdm_summary_stats(rt, response, contaminant_bound = c(0.1, 4)),
+    simplify = FALSE
+  )
+  four_par <- replicate(
+    3,
+    ezdm_summary_stats(rt, response, version = "4par",
+                       contaminant_bound = c(0.1, 4)),
+    simplify = FALSE
+  )
+
+  expect_equal(three_par[[2]], three_par[[1]])
+  expect_equal(three_par[[3]], three_par[[1]])
+  expect_equal(four_par[[2]], four_par[[1]])
+  expect_equal(four_par[[3]], four_par[[1]])
+})
+
+test_that("ezdm_summary_stats() counts pass check_data() unchanged", {
+  rt <- .contaminated_rt(170, 30)
+  response <- rep(c(1L, 1L, 1L, 0L), length.out = 200)
+  dat <- ezdm_summary_stats(rt, response, contaminant_bound = c(0.1, 4))
+
+  expect_silent(check_data(
+    ezdm(mean_rt = "mean_rt", var_rt = "var_rt", n_upper = "n_upper",
+         n_trials = "n_trials"),
+    dat,
+    bmf(drift ~ 1, bound ~ 1, ndt ~ 1)
+  ))
+})
+
+############################################################################# !
 # adjust_ezdm_accuracy TESTS                                              ####
 ############################################################################# !
 
