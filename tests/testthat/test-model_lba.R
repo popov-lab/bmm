@@ -507,6 +507,58 @@ test_that("report_priors() omits the technical mu of the LBA family", {
 
 
 # -----------------------------------------------------------------------------
+# Posterior methods (brms contract: every draw of one observation in one call)
+# -----------------------------------------------------------------------------
+
+# A brmsprep with ndraws draws for one 2-choice observation whose starting
+# point sits on both sides of the A ~ 0 branch of every kernel
+lba_fake_prep <- function(distribution, driftc, drifte, sp, rt = 0.6,
+                          response = 2L, gap = 0.5, ndt = 0.2, s = 1) {
+  ndraws <- length(sp)
+  structure(
+    list(
+      ndraws = ndraws, nobs = 1L,
+      dpars = list(
+        driftc = matrix(driftc, ndraws, 1), drifte = matrix(drifte, ndraws, 1),
+        gap = matrix(gap, ndraws, 1), sp = matrix(sp, ndraws, 1),
+        ndt = matrix(ndt, ndraws, 1), s = matrix(s, ndraws, 1)
+      ),
+      data = list(Y = rt, vint1 = response, vint2 = 1L, vint3 = 1L),
+      family = list(name = paste0("lba_", distribution, "_simple"),
+                    dpars = c("mu", "driftc", "drifte", "gap", "sp", "ndt", "s"))
+    ),
+    class = "brmsprep"
+  )
+}
+
+test_that("log_lik evaluates all draws of an observation in one call", {
+  drifts <- list(normal = c(3, 1.5), gamma = c(2, 3), frechet = c(2, 3),
+                 lognormal = c(0.5, 0.3))
+  sp <- c(1e-12, 0.3, 0.5)
+  for (dist in names(drifts)) {
+    d <- drifts[[dist]]
+    prep <- lba_fake_prep(dist, driftc = d[1] + c(0, 0.2, -0.2),
+                          drifte = d[2] + c(0, 0.1, -0.1), sp = sp)
+    ll <- log_lik_lba_simple(1L, prep)
+    expect_length(ll, 3)
+    one_at_a_time <- vapply(1:3, function(k) {
+      dlba(0.6, 2L, drift = c(d[1] + c(0, 0.2, -0.2)[k], d[2] + c(0, 0.1, -0.1)[k]),
+           gap = 0.5, sp = sp[k], ndt = 0.2, distribution = dist, log = TRUE)
+    }, numeric(1))
+    expect_equal(ll, one_at_a_time, tolerance = 1e-10, info = dist)
+  }
+})
+
+test_that("log_lik returns -Inf for draws whose ndt exceeds the response time", {
+  prep <- lba_fake_prep("normal", driftc = 3, drifte = 1.5, sp = c(0.3, 0.3),
+                        ndt = c(0.2, 0.7))
+  ll <- log_lik_lba_simple(1L, prep)
+  expect_true(is.finite(ll[1]))
+  expect_equal(ll[2], -Inf)
+})
+
+
+# -----------------------------------------------------------------------------
 # Distribution function tests (dlba/rlba/plba use gap+sp interface)
 # -----------------------------------------------------------------------------
 

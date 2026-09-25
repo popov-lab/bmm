@@ -2277,24 +2277,35 @@ qlba <- function(p, drift, gap, sp, ndt, s = 1,
 
 
 .dlba_single <- function(t, v, b, A, s, distribution, log = FALSE) {
+  args <- .lba_recycle(t, v, b, A, s)
   pdf_val <- switch(distribution,
-    normal = .dlba_normal_single(t, v, b, A, s),
-    gamma = .dlba_gamma_single(t, v, b, A, s),
-    frechet = .dlba_frechet_single(t, v, b, A, s),
-    lognormal = .dlba_lognormal_single(t, v, b, A, s)
+    normal = do.call(.dlba_normal_single, unname(args)),
+    gamma = do.call(.dlba_gamma_single, unname(args)),
+    frechet = do.call(.dlba_frechet_single, unname(args)),
+    lognormal = do.call(.dlba_lognormal_single, unname(args))
   )
   pdf_val <- pmax(pdf_val, 0)
   if (log) log(pdf_val) else pdf_val
 }
 
 .plba_single <- function(t, v, b, A, s, distribution) {
+  args <- .lba_recycle(t, v, b, A, s)
   cdf_val <- switch(distribution,
-    normal = .plba_normal_single(t, v, b, A, s),
-    gamma = .plba_gamma_single(t, v, b, A, s),
-    frechet = .plba_frechet_single(t, v, b, A, s),
-    lognormal = .plba_lognormal_single(t, v, b, A, s)
+    normal = do.call(.plba_normal_single, unname(args)),
+    gamma = do.call(.plba_gamma_single, unname(args)),
+    frechet = do.call(.plba_frechet_single, unname(args)),
+    lognormal = do.call(.plba_lognormal_single, unname(args))
   )
   pmin(pmax(cdf_val, 0), 1)
+}
+
+# The kernels below take equal-length vectors and select the A ~ 0 limit by
+# mask, so one call evaluates every posterior draw of an observation (the
+# brms log_lik contract) as well as one trial at a time
+.lba_recycle <- function(t, v, b, A, s) {
+  n <- max(length(t), length(v), length(b), length(A), length(s))
+  list(t = rep_len(t, n), v = rep_len(v, n), b = rep_len(b, n),
+       A = rep_len(A, n), s = rep_len(s, n))
 }
 
 
@@ -2314,62 +2325,82 @@ qlba <- function(p, drift, gap, sp, ndt, s = 1,
 
 .dlba_normal_single <- function(t, v, b, A, s) {
   denom <- stats::pnorm(v / s)
-  if (A < 1e-10) {
-    (b / (t^2 * s)) * stats::dnorm((b / t - v) / s) / denom
-  } else {
-    z1 <- (b - A - t * v) / (t * s)
-    z2 <- (b - t * v) / (t * s)
-    (1 / (A * denom)) * (
-      -v * stats::pnorm(z1) + s * stats::dnorm(z1) +
-       v * stats::pnorm(z2) - s * stats::dnorm(z2)
+  out <- numeric(length(t))
+  i <- A < 1e-10
+  if (any(i)) {
+    out[i] <- (b[i] / (t[i]^2 * s[i])) * stats::dnorm((b[i] / t[i] - v[i]) / s[i]) / denom[i]
+  }
+  i <- !i
+  if (any(i)) {
+    z1 <- (b[i] - A[i] - t[i] * v[i]) / (t[i] * s[i])
+    z2 <- (b[i] - t[i] * v[i]) / (t[i] * s[i])
+    out[i] <- (1 / (A[i] * denom[i])) * (
+      -v[i] * stats::pnorm(z1) + s[i] * stats::dnorm(z1) +
+        v[i] * stats::pnorm(z2) - s[i] * stats::dnorm(z2)
     )
   }
+  out
 }
 
 .plba_normal_single <- function(t, v, b, A, s) {
   denom <- stats::pnorm(v / s)
-  if (A < 1e-10) {
-    stats::pnorm((v * t - b) / (s * t)) / denom
-  } else {
-    z1 <- (b - A - t * v) / (t * s)
-    z2 <- (b - t * v) / (t * s)
-    (1 + (1 / A) * (
-      (b - A - t * v) * stats::pnorm(z1) + t * s * stats::dnorm(z1) -
-      (b - t * v) * stats::pnorm(z2) - t * s * stats::dnorm(z2)
-    )) / denom
+  out <- numeric(length(t))
+  i <- A < 1e-10
+  if (any(i)) {
+    out[i] <- stats::pnorm((v[i] * t[i] - b[i]) / (s[i] * t[i])) / denom[i]
   }
+  i <- !i
+  if (any(i)) {
+    z1 <- (b[i] - A[i] - t[i] * v[i]) / (t[i] * s[i])
+    z2 <- (b[i] - t[i] * v[i]) / (t[i] * s[i])
+    out[i] <- (1 + (1 / A[i]) * (
+      (b[i] - A[i] - t[i] * v[i]) * stats::pnorm(z1) + t[i] * s[i] * stats::dnorm(z1) -
+        (b[i] - t[i] * v[i]) * stats::pnorm(z2) - t[i] * s[i] * stats::dnorm(z2)
+    )) / denom[i]
+  }
+  out
 }
 
 
 .dlba_gamma_single <- function(t, shape, b, A, rate) {
-  if (A < 1e-10) {
-    (b / t^2) * stats::dgamma(b / t, shape = shape, rate = rate)
-  } else {
-    upper <- b / t
-    lower <- (b - A) / t
-    (shape / (rate * A)) * (
-      stats::pgamma(upper, shape = shape + 1, rate = rate) -
-      stats::pgamma(lower, shape = shape + 1, rate = rate)
+  out <- numeric(length(t))
+  i <- A < 1e-10
+  if (any(i)) {
+    out[i] <- (b[i] / t[i]^2) * stats::dgamma(b[i] / t[i], shape = shape[i], rate = rate[i])
+  }
+  i <- !i
+  if (any(i)) {
+    upper <- b[i] / t[i]
+    lower <- (b[i] - A[i]) / t[i]
+    out[i] <- (shape[i] / (rate[i] * A[i])) * (
+      stats::pgamma(upper, shape = shape[i] + 1, rate = rate[i]) -
+        stats::pgamma(lower, shape = shape[i] + 1, rate = rate[i])
     )
   }
+  out
 }
 
 .plba_gamma_single <- function(t, shape, b, A, rate) {
-  if (A < 1e-10) {
-    stats::pgamma(b / t, shape = shape, rate = rate, lower.tail = FALSE)
-  } else {
-    upper <- b / t
-    lower <- (b - A) / t
-    M_t <- (shape / rate) * (
-      stats::pgamma(upper, shape = shape + 1, rate = rate) -
-      stats::pgamma(lower, shape = shape + 1, rate = rate)
+  out <- numeric(length(t))
+  i <- A < 1e-10
+  if (any(i)) {
+    out[i] <- stats::pgamma(b[i] / t[i], shape = shape[i], rate = rate[i], lower.tail = FALSE)
+  }
+  i <- !i
+  if (any(i)) {
+    upper <- b[i] / t[i]
+    lower <- (b[i] - A[i]) / t[i]
+    M_t <- (shape[i] / rate[i]) * (
+      stats::pgamma(upper, shape = shape[i] + 1, rate = rate[i]) -
+        stats::pgamma(lower, shape = shape[i] + 1, rate = rate[i])
     )
-    1 + (1 / A) * (
-      t * M_t -
-      b * stats::pgamma(upper, shape = shape, rate = rate) +
-      (b - A) * stats::pgamma(lower, shape = shape, rate = rate)
+    out[i] <- 1 + (1 / A[i]) * (
+      t[i] * M_t -
+        b[i] * stats::pgamma(upper, shape = shape[i], rate = rate[i]) +
+        (b[i] - A[i]) * stats::pgamma(lower, shape = shape[i], rate = rate[i])
     )
   }
+  out
 }
 
 
@@ -2386,71 +2417,91 @@ qlba <- function(p, drift, gap, sp, ndt, s = 1,
   exp(-(x / scale)^(-shape))
 }
 
-.dlba_frechet_single <- function(t, shape, b, A, scale) {
-  if (A < 1e-10) {
-    (b / t^2) * .dfrechet(b / t, shape, scale)
-  } else {
-    lower <- (b - A) / t
-    upper <- b / t
-    M_t <- stats::integrate(
+# The truncated first moment of a Frechet drift has no closed form; each
+# element is integrated on its own, skipping undefined decision times
+.lba_frechet_M <- function(t, shape, b, A, scale) {
+  mapply(function(lower, upper, shape, scale) {
+    stats::integrate(
       function(u) u * .dfrechet(u, shape, scale),
       lower = lower, upper = upper
     )$value
-    M_t / A
+  }, (b - A) / t, b / t, shape, scale)
+}
+
+.dlba_frechet_single <- function(t, shape, b, A, scale) {
+  out <- rep(NA_real_, length(t))
+  i <- A < 1e-10 & !is.na(t)
+  if (any(i)) {
+    out[i] <- (b[i] / t[i]^2) * .dfrechet(b[i] / t[i], shape[i], scale[i])
   }
+  i <- A >= 1e-10 & !is.na(t)
+  if (any(i)) {
+    out[i] <- .lba_frechet_M(t[i], shape[i], b[i], A[i], scale[i]) / A[i]
+  }
+  out
 }
 
 .plba_frechet_single <- function(t, shape, b, A, scale) {
-  if (A < 1e-10) {
-    1 - .pfrechet(b / t, shape, scale)
-  } else {
-    lower <- (b - A) / t
-    upper <- b / t
-    M_t <- stats::integrate(
-      function(u) u * .dfrechet(u, shape, scale),
-      lower = lower, upper = upper
-    )$value
-    1 + (1 / A) * (
-      t * M_t -
-      b * .pfrechet(upper, shape, scale) +
-      (b - A) * .pfrechet(lower, shape, scale)
+  out <- rep(NA_real_, length(t))
+  i <- A < 1e-10 & !is.na(t)
+  if (any(i)) {
+    out[i] <- 1 - .pfrechet(b[i] / t[i], shape[i], scale[i])
+  }
+  i <- A >= 1e-10 & !is.na(t)
+  if (any(i)) {
+    upper <- b[i] / t[i]
+    lower <- (b[i] - A[i]) / t[i]
+    out[i] <- 1 + (1 / A[i]) * (
+      t[i] * .lba_frechet_M(t[i], shape[i], b[i], A[i], scale[i]) -
+        b[i] * .pfrechet(upper, shape[i], scale[i]) +
+        (b[i] - A[i]) * .pfrechet(lower, shape[i], scale[i])
     )
   }
+  out
 }
 
 
 .dlba_lognormal_single <- function(t, meanlog, b, A, sdlog) {
-  if (A < 1e-10) {
-    (b / t^2) * stats::dlnorm(b / t, meanlog = meanlog, sdlog = sdlog)
-  } else {
-    upper <- b / t
-    lower <- (b - A) / t
-    mu_s2 <- exp(meanlog + sdlog^2 / 2)
-    M_t <- mu_s2 * (
-      stats::pnorm((log(upper) - meanlog - sdlog^2) / sdlog) -
-      stats::pnorm((log(lower) - meanlog - sdlog^2) / sdlog)
-    )
-    M_t / A
+  out <- numeric(length(t))
+  i <- A < 1e-10
+  if (any(i)) {
+    out[i] <- (b[i] / t[i]^2) * stats::dlnorm(b[i] / t[i], meanlog = meanlog[i], sdlog = sdlog[i])
   }
+  i <- !i
+  if (any(i)) {
+    upper <- b[i] / t[i]
+    lower <- (b[i] - A[i]) / t[i]
+    mu_s2 <- exp(meanlog[i] + sdlog[i]^2 / 2)
+    out[i] <- mu_s2 * (
+      stats::pnorm((log(upper) - meanlog[i] - sdlog[i]^2) / sdlog[i]) -
+        stats::pnorm((log(lower) - meanlog[i] - sdlog[i]^2) / sdlog[i])
+    ) / A[i]
+  }
+  out
 }
 
 .plba_lognormal_single <- function(t, meanlog, b, A, sdlog) {
-  if (A < 1e-10) {
-    stats::plnorm(b / t, meanlog = meanlog, sdlog = sdlog, lower.tail = FALSE)
-  } else {
-    upper <- b / t
-    lower <- (b - A) / t
-    mu_s2 <- exp(meanlog + sdlog^2 / 2)
+  out <- numeric(length(t))
+  i <- A < 1e-10
+  if (any(i)) {
+    out[i] <- stats::plnorm(b[i] / t[i], meanlog = meanlog[i], sdlog = sdlog[i], lower.tail = FALSE)
+  }
+  i <- !i
+  if (any(i)) {
+    upper <- b[i] / t[i]
+    lower <- (b[i] - A[i]) / t[i]
+    mu_s2 <- exp(meanlog[i] + sdlog[i]^2 / 2)
     M_t <- mu_s2 * (
-      stats::pnorm((log(upper) - meanlog - sdlog^2) / sdlog) -
-      stats::pnorm((log(lower) - meanlog - sdlog^2) / sdlog)
+      stats::pnorm((log(upper) - meanlog[i] - sdlog[i]^2) / sdlog[i]) -
+        stats::pnorm((log(lower) - meanlog[i] - sdlog[i]^2) / sdlog[i])
     )
-    1 + (1 / A) * (
-      t * M_t -
-      b * stats::plnorm(upper, meanlog = meanlog, sdlog = sdlog) +
-      (b - A) * stats::plnorm(lower, meanlog = meanlog, sdlog = sdlog)
+    out[i] <- 1 + (1 / A[i]) * (
+      t[i] * M_t -
+        b[i] * stats::plnorm(upper, meanlog = meanlog[i], sdlog = sdlog[i]) +
+        (b[i] - A[i]) * stats::plnorm(lower, meanlog = meanlog[i], sdlog = sdlog[i])
     )
   }
+  out
 }
 
 
