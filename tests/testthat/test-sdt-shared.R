@@ -29,7 +29,8 @@ test_that("every dist argument offers exactly the registry's distributions", {
   # signature that drifts out of step with it becomes an off-by-one
   fns <- list(sdt_yn, dsdt_yn, rsdt_yn, sdt_d, sdt_criterion,
               sdt_mafc, dsdt_mafc, rsdt_mafc,
-              sdt_rating, dsdt_rating, rsdt_rating)
+              sdt_rating, dsdt_rating, rsdt_rating,
+              dsdt_dpsdt, rsdt_dpsdt, dsdt_metad, rsdt_metad)
   for (f in fns) {
     expect_equal(eval(formals(f)$dist), names(bmm:::.sdt_dists))
   }
