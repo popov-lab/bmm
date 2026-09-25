@@ -111,34 +111,44 @@ Bulletin & Review, 27, 911-936. https://doi.org/10.3758/s13423-020-01719-6
 \itemize{
 \item \code{main}: normal(1, 0.5)
 \item \code{effects}: normal(0, 0.3)
+\item \code{sd}: exponential(2)
 }
 \item \code{drifte}:
 \itemize{
 \item \code{main}: normal(0.5, 0.5)
 \item \code{effects}: normal(0, 0.3)
+\item \code{sd}: exponential(2)
 }
 \item \code{gap}:
 \itemize{
 \item \code{main}: normal(0, 0.3)
 \item \code{effects}: normal(0, 0.3)
+\item \code{sd}: exponential(2)
 }
 \item \code{ndt}:
 \itemize{
-\item \code{main}: normal(-2, 0.3)
+\item \code{main}: normal(-1.5, 0.5)
 \item \code{effects}: normal(0, 0.3)
+\item \code{sd}: exponential(4)
 }
 \item \code{s}:
 \itemize{
 \item \code{main}: normal(0, 0.3)
 \item \code{effects}: normal(0, 0.2)
+\item \code{sd}: exponential(4)
 }
 \item \code{sp}:
 \itemize{
 \item \code{main}: normal(-1, 0.5)
 \item \code{effects}: normal(0, 0.3)
+\item \code{sd}: exponential(2)
 }
 }
 }
+
+The fixed-parameter values above are on the log link: \code{s = 0} is a
+diffusion constant of 1, and \code{sp = -100} is a starting-point range of
+essentially 0, i.e. no start-point variability.
 
 \subsection{Start-point variability (\code{sp})}{
 
@@ -173,6 +183,37 @@ a choice-RT race), so they live in one constructor rather than separate
 model functions: \code{"simple"} is an accuracy-coded convenience layer (correct
 vs. error) over the general per-accumulator case handled by \code{"custom"}.
 }
+\section{Default priors}{
+
+\code{driftc}/\code{drifte} get \code{normal(1, 0.5)}/\code{normal(0.5, 0.5)}, and \code{gap}/\code{sp}
+get \code{normal(0, 0.3)}/\code{normal(-1, 0.5)}, all on the log link.
+
+\code{ndt} has \code{normal(-1.5, 0.5)} on the log link, the prior the \strong{ddm} model
+uses, rather than an earlier \code{normal(-2, 0.3)} whose 95\% interval put
+\code{ndt} below 0.244 s and gave P(ndt > 0.3 s) = 0.004, too tight for
+multi-alternative choice tasks.
+
+The group-level standard deviations get one rate per kind of parameter
+rather than one per model, shared with the \strong{lnr} and \strong{lba} models: a
+drift rate gets \code{exponential(2)} (median 0.35 on the log link, i.e. a
+between-subject ratio around 1.4), \code{ndt} and \code{s} get \code{exponential(4)}
+(median 0.17), and \code{gap}/\code{sp} get \code{exponential(2)}. These rates come from
+hierarchical fits of simulated multi-subject data for the racing models
+(drift/\code{ndt}/\code{s} anchored on the \strong{lnr} recovery, \code{gap}/\code{sp} reused from
+the \strong{lba} model).
+}
+
+\section{Identifiability of \code{s}}{
+
+The likelihood is invariant to scaling every drift rate, \code{gap}, \code{sp} and
+\code{s} by the same positive constant, so only their ratios are identified.
+\code{s} is fixed to 1 by default (\code{s = 0} on the log link) to pin that scale.
+Freeing \code{s} with an intercept estimates that scale ray rather than a new
+quantity, and \code{check_formula()} warns when a formula does so; write
+\code{s ~ 0 + condition} instead to estimate contrasts of \code{s} without freeing
+the scale.
+}
+
 \examples{
 \dontshow{if (isTRUE(Sys.getenv("BMM_EXAMPLES"))) withAutoprint(\{ # examplesIf}
 # simple version with 2 alternatives

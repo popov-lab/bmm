@@ -9,8 +9,8 @@
   desc = "drift rate",
   link = "log",
   priors = list(
-    driftc = list(main = "normal(1, 0.5)", effects = "normal(0, 0.3)"),
-    drifte = list(main = "normal(0.5, 0.5)", effects = "normal(0, 0.3)")
+    driftc = list(main = "normal(1, 0.5)", effects = "normal(0, 0.3)", sd = "exponential(2)"),
+    drifte = list(main = "normal(0.5, 0.5)", effects = "normal(0, 0.3)", sd = "exponential(2)")
   ),
   inits = list(driftc = c(2, 4), drifte = c(1, 2.5))
 )
@@ -25,10 +25,10 @@
   ),
   links = list(gap = "log", ndt = "log", s = "log", sp = "log"),
   priors = list(
-    gap = list(main = "normal(0, 0.3)", effects = "normal(0, 0.3)"),
-    ndt = list(main = "normal(-2, 0.3)", effects = "normal(0, 0.3)"),
-    s = list(main = "normal(0, 0.3)", effects = "normal(0, 0.2)"),
-    sp = list(main = "normal(-1, 0.5)", effects = "normal(0, 0.3)")
+    gap = list(main = "normal(0, 0.3)", effects = "normal(0, 0.3)", sd = "exponential(2)"),
+    ndt = list(main = "normal(-1.5, 0.5)", effects = "normal(0, 0.3)", sd = "exponential(4)"),
+    s = list(main = "normal(0, 0.3)", effects = "normal(0, 0.2)", sd = "exponential(4)"),
+    sp = list(main = "normal(-1, 0.5)", effects = "normal(0, 0.3)", sd = "exponential(2)")
   ),
   inits = list(
     mu = c(-0.5, 0.5), gap = c(0.8, 1.2), ndt = c(0.01, 0.05),
@@ -150,6 +150,10 @@ settable_link_functions.rdm <- function(model) {
 #' @title `r .model_rdm()$name`
 #' @name rdm
 #' @details `r model_info(.model_rdm())`
+#'
+#' The fixed-parameter values above are on the log link: `s = 0` is a
+#' diffusion constant of 1, and `sp = -100` is a starting-point range of
+#' essentially 0, i.e. no start-point variability.
 #' @param rt The name of the variable in the dataset containing the response
 #'   times. Response times should be coded in seconds (not milliseconds).
 #' @param response The name of the variable in the dataset containing the
@@ -212,7 +216,31 @@ settable_link_functions.rdm <- function(model) {
 #' posteriors and predictions are unaffected, but `loo()` and `waic()` values
 #' are shifted by it and are not comparable with a `version = "custom"` fit,
 #' which names each accumulator, or with another package that does.
+#' @section Default priors:
+#' `driftc`/`drifte` get `normal(1, 0.5)`/`normal(0.5, 0.5)`, and `gap`/`sp`
+#' get `normal(0, 0.3)`/`normal(-1, 0.5)`, all on the log link.
 #'
+#' `ndt` has `normal(-1.5, 0.5)` on the log link, the prior the **ddm** model
+#' uses, rather than an earlier `normal(-2, 0.3)` whose 95% interval put
+#' `ndt` below 0.244 s and gave P(ndt > 0.3 s) = 0.004, too tight for
+#' multi-alternative choice tasks.
+#'
+#' The group-level standard deviations get one rate per kind of parameter
+#' rather than one per model, shared with the **lnr** and **lba** models: a
+#' drift rate gets `exponential(2)` (median 0.35 on the log link, i.e. a
+#' between-subject ratio around 1.4), `ndt` and `s` get `exponential(4)`
+#' (median 0.17), and `gap`/`sp` get `exponential(2)`. These rates come from
+#' hierarchical fits of simulated multi-subject data for the racing models
+#' (drift/`ndt`/`s` anchored on the **lnr** recovery, `gap`/`sp` reused from
+#' the **lba** model).
+#' @section Identifiability of `s`:
+#' The likelihood is invariant to scaling every drift rate, `gap`, `sp` and
+#' `s` by the same positive constant, so only their ratios are identified.
+#' `s` is fixed to 1 by default (`s = 0` on the log link) to pin that scale.
+#' Freeing `s` with an intercept estimates that scale ray rather than a new
+#' quantity, and `check_formula()` warns when a formula does so; write
+#' `s ~ 0 + condition` instead to estimate contrasts of `s` without freeing
+#' the scale.
 #' @note Both versions describe the same response type (a categorical winner in
 #'   a choice-RT race), so they live in one constructor rather than separate
 #'   model functions: `"simple"` is an accuracy-coded convenience layer (correct
