@@ -61,14 +61,17 @@ test_that("the m-AFC probabilities agree with the registry's own cdf", {
   }
 })
 
-test_that("the default sdratio prior covers the empirical recognition range", {
-  # Mickes et al. (2007) report subject ratios between 0.85 and 1.82, and the
-  # broeder_schuetz_2009_e3 fit gives 1.46 [1.25, 1.72]. Ratios past 2 are not
-  # observed, so a prior that spends much of its mass there is not merely
-  # uninformative about the task, it is wrong about it.
+test_that("the default sdratio prior brackets the group-level estimates", {
+  # two group-level SD ratios are on record: Mickes et al. (2007) Table 1
+  # averages sd(lure)/sd(target) = 0.79 over their 13 retained subjects, i.e.
+  # 1.26 signal over noise, and the broeder_schuetz_2009_e3 posterior gives
+  # 1.46 [1.25, 1.71]. The prior has to reach past the widest ratio those
+  # support and still keep its mass off ratios above 2, which recognition does
+  # not produce -- one-sided, "covers the empirical range" cannot fail.
   main <- sdt_yn("n_old", "stimulus", "n_trials")$default_priors$sdratio$main
   sd <- as.numeric(sub("normal\\(0, ([0-9.]+)\\)", "\\1", main))
   expect_true(is.finite(sd), info = main)
+  expect_gt(exp(qnorm(0.975, 0, sd)), 1.71)
   expect_gt(diff(pnorm(log(c(0.5, 2)), 0, sd)), 0.95)
 })
 
