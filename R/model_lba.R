@@ -8,8 +8,8 @@
       desc = "mean drift rate",
       link = "identity",
       priors = list(
-        driftc = list(main = "normal(3, 1)", effects = "normal(0, 0.5)"),
-        drifte = list(main = "normal(1, 1)", effects = "normal(0, 0.5)")
+        driftc = list(main = "normal(3, 1)", effects = "normal(0, 0.5)", sd = "exponential(1)"),
+        drifte = list(main = "normal(1, 1)", effects = "normal(0, 0.5)", sd = "exponential(1)")
       ),
       inits = list(driftc = c(2, 4), drifte = c(0.5, 2))
     )
@@ -20,8 +20,8 @@
       desc = "drift rate (gamma shape)",
       link = "log",
       priors = list(
-        driftc = list(main = "normal(1, 0.5)", effects = "normal(0, 0.3)"),
-        drifte = list(main = "normal(0.5, 0.5)", effects = "normal(0, 0.3)")
+        driftc = list(main = "normal(1, 0.5)", effects = "normal(0, 0.3)", sd = "exponential(2)"),
+        drifte = list(main = "normal(0.5, 0.5)", effects = "normal(0, 0.3)", sd = "exponential(2)")
       ),
       inits = list(driftc = c(1.5, 3), drifte = c(0.8, 2))
     )
@@ -32,8 +32,8 @@
       desc = "drift rate (Frechet shape)",
       link = "log",
       priors = list(
-        driftc = list(main = "normal(1, 0.5)", effects = "normal(0, 0.3)"),
-        drifte = list(main = "normal(0.5, 0.5)", effects = "normal(0, 0.3)")
+        driftc = list(main = "normal(1, 0.5)", effects = "normal(0, 0.3)", sd = "exponential(2)"),
+        drifte = list(main = "normal(0.5, 0.5)", effects = "normal(0, 0.3)", sd = "exponential(2)")
       ),
       inits = list(driftc = c(1.5, 3), drifte = c(0.8, 2))
     )
@@ -44,8 +44,8 @@
       desc = "drift rate (meanlog)",
       link = "identity",
       priors = list(
-        driftc = list(main = "normal(0.5, 0.5)", effects = "normal(0, 0.3)"),
-        drifte = list(main = "normal(0, 0.5)", effects = "normal(0, 0.3)")
+        driftc = list(main = "normal(0.5, 0.5)", effects = "normal(0, 0.3)", sd = "exponential(2)"),
+        drifte = list(main = "normal(0, 0.5)", effects = "normal(0, 0.3)", sd = "exponential(2)")
       ),
       inits = list(driftc = c(0.2, 0.8), drifte = c(-0.3, 0.3))
     )
@@ -62,10 +62,10 @@
   ),
   links = list(gap = "log", sp = "log", ndt = "log", s = "log"),
   priors = list(
-    gap = list(main = "normal(-0.5, 0.5)", effects = "normal(0, 0.3)"),
-    sp = list(main = "normal(-1, 0.5)", effects = "normal(0, 0.3)"),
-    ndt = list(main = "normal(-2, 0.3)", effects = "normal(0, 0.3)"),
-    s = list(main = "normal(0, 0.3)", effects = "normal(0, 0.2)")
+    gap = list(main = "normal(-0.5, 0.5)", effects = "normal(0, 0.3)", sd = "exponential(2)"),
+    sp = list(main = "normal(-1, 0.5)", effects = "normal(0, 0.3)", sd = "exponential(2)"),
+    ndt = list(main = "normal(-1.5, 0.5)", effects = "normal(0, 0.3)", sd = "exponential(2)"),
+    s = list(main = "normal(0, 0.3)", effects = "normal(0, 0.2)", sd = "exponential(2)")
   ),
   inits = list(
     mu = c(-0.5, 0.5), gap = c(0.3, 0.8), sp = c(0.2, 0.5),
@@ -106,11 +106,14 @@
   )
 }
 
+# Stan keywords and the names the generated model already uses (mu, Y, N, the
+# shared parameters); one copy per racing model until a shared helper lands
 .stan_reserved <- c(
   "int", "real", "vector", "matrix", "array", "if", "else", "for", "while",
   "return", "void", "data", "model", "target", "print", "reject", "log",
   "exp", "lower", "upper", "in", "functions", "generated", "transformed",
-  "parameters"
+  "parameters", "break", "continue", "true", "false", "profile", "offset",
+  "multiplier", "mu", "y", "n"
 )
 
 .model_lba <- function(
@@ -330,9 +333,7 @@ check_model.lba_custom <- function(model, data = NULL, formula = NULL) {
       model$parameters[[p]] <- paste0(drift$desc, " for '", p, "' accumulator")
       if (is.null(model$links[[p]])) model$links[[p]] <- drift$link
       if (is.null(model$default_priors[[p]])) {
-        model$default_priors[[p]] <- list(
-          main = drift$priors$driftc$main, effects = "normal(0, 0.3)"
-        )
+        model$default_priors[[p]] <- drift$priors$driftc
       }
       if (is.null(model$init_ranges[[p]])) {
         model$init_ranges[[p]] <- drift$inits$driftc
