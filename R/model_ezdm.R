@@ -430,14 +430,15 @@ posterior_predict_ezdm_4par <- function(i, prep, ...) {
 # PP_CHECK OBSERVABLES                                                    ####
 ############################################################################# !
 
-# mean_pc rather than raw n_upper: n_trials varies across cells, so counts
-# are not comparable between observations while proportions are.
-
-# each ezdm observation is one design cell, so nobs is small by construction
-# and a density overlay of a handful of points is uninformative; "intervals"
-# shows each cell's observed statistic against its own predictive interval
-.pp_ezdm_observable <- function(compute, label) {
-  .pp_observable(compute, label, type = "intervals")
+# Each ezdm observation is one design cell, and the checks compare the
+# distribution of a statistic across cells, as the ddm checks do across trials;
+# type = "intervals" gives the per-cell view instead. mean_pc rather than raw
+# n_upper: n_trials varies across cells, so counts are not comparable between
+# observations while proportions are. A proportion is binned rather than
+# smoothed because it is bounded and takes n_trials + 1 values only.
+.pp_ezdm_accuracy <- function() {
+  .pp_observable(function(d) d$n_upper / d$n_trials,
+                 label = "Proportion of upper responses", type = "bars_binned")
 }
 
 #' @export
@@ -446,12 +447,11 @@ pp_observables.ezdm_3par <- function(model) {
     observed = c(mean_rt = "Y", var_rt = "vreal1", n_upper = "vint1",
                  n_trials = "trials"),
     checks = list(
-      mean_rt = .pp_ezdm_observable(function(d) d$mean_rt,
-                                    label = "Mean response time"),
-      var_rt = .pp_ezdm_observable(function(d) d$var_rt,
-                                   label = "Response time variance"),
-      mean_pc = .pp_ezdm_observable(function(d) d$n_upper / d$n_trials,
-                                    label = "Proportion of upper responses")
+      mean_rt = .pp_observable(function(d) d$mean_rt,
+                               label = "Mean response time"),
+      var_rt = .pp_observable(function(d) d$var_rt,
+                              label = "Response time variance"),
+      mean_pc = .pp_ezdm_accuracy()
     )
   )
 }
@@ -469,16 +469,15 @@ pp_observables.ezdm_4par <- function(model) {
                  var_rt_upper = "vreal2", var_rt_lower = "vreal3",
                  n_upper = "vint1", n_trials = "vint2"),
     checks = list(
-      mean_rt_upper = .pp_ezdm_observable(function(d) d$mean_rt_upper,
-                                          label = "Mean RT (upper responses)"),
-      mean_rt_lower = .pp_ezdm_observable(function(d) d$mean_rt_lower,
-                                          label = "Mean RT (lower responses)"),
-      var_rt_upper = .pp_ezdm_observable(function(d) d$var_rt_upper,
-                                         label = "RT variance (upper responses)"),
-      var_rt_lower = .pp_ezdm_observable(function(d) d$var_rt_lower,
-                                         label = "RT variance (lower responses)"),
-      mean_pc = .pp_ezdm_observable(function(d) d$n_upper / d$n_trials,
-                                    label = "Proportion of upper responses")
+      mean_rt_upper = .pp_observable(function(d) d$mean_rt_upper,
+                                     label = "Mean RT (upper responses)"),
+      mean_rt_lower = .pp_observable(function(d) d$mean_rt_lower,
+                                     label = "Mean RT (lower responses)"),
+      var_rt_upper = .pp_observable(function(d) d$var_rt_upper,
+                                    label = "RT variance (upper responses)"),
+      var_rt_lower = .pp_observable(function(d) d$var_rt_lower,
+                                    label = "RT variance (lower responses)"),
+      mean_pc = .pp_ezdm_accuracy()
     )
   )
 }

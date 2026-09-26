@@ -619,11 +619,13 @@ The EZ-diffusion likelihood constrains three statistics per cell — the mean RT
 pp_check_vars(fit)
 ```
 
-The `mean_pc` check is the proportion of correct responses (`n_upper / n_trials`), which stays comparable across cells even when the number of trials differs. With `resp_var = "all"` all checks are drawn from one shared joint simulation:
+The `mean_pc` check is the proportion of correct responses (`n_upper / n_trials`), which stays comparable across cells even when the number of trials differs. With `resp_var = "all"` all checks are drawn from one shared joint simulation. Each panel compares how a statistic is distributed across all cells: the RT panels overlay the density of the observed statistic (dark line) on the densities of the simulated datasets, and the accuracy panel is a histogram of the observed proportions (bars) with the predicted number of cells per bin (points with 90% intervals):
 
 ```{r, message=FALSE, warning=FALSE, fig.width=7, fig.height=5}
 pp_check(fit, resp_var = "all", ndraws = 50)
 ```
+
+The observed mean RTs are spread more evenly than the simulated ones, which cluster around one value per condition. The data were simulated with subject-level variation in all three parameters, which this model omits; the model with [random effects](#adding-random-effects) below includes it. To compare each cell with its own predictive interval instead, select a single check with `type = "intervals"`, e.g. `pp_check(fit, resp_var = "mean_rt", type = "intervals")`.
 
 # Comparing conditions
 

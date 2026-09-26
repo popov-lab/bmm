@@ -25,7 +25,8 @@ Multinomial models produce a response proportion profile regardless of
 the value supplied. With \code{resp_var}, \code{type = "bars_binned"} is also
 available: it bins a continuous statistic like a histogram, with bars for
 the observed number of observations per bin and points with intervals
-for the predicted number.}
+for the predicted number. It is the default for the \code{\link[=ezdm]{ezdm()}} accuracy
+check.}
 
 \item{ndraws}{Integer. Number of posterior draws. Defaults to \code{100} for
 multinomial models and \code{10} when \code{resp_var} is specified; otherwise

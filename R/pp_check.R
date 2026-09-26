@@ -43,7 +43,8 @@
 #'   the value supplied. With `resp_var`, `type = "bars_binned"` is also
 #'   available: it bins a continuous statistic like a histogram, with bars for
 #'   the observed number of observations per bin and points with intervals
-#'   for the predicted number.
+#'   for the predicted number. It is the default for the [ezdm()] accuracy
+#'   check.
 #' @param ndraws Integer. Number of posterior draws. Defaults to `100` for
 #'   multinomial models and `10` when `resp_var` is specified; otherwise
 #'   passed to [brms::pp_check()].

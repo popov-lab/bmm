@@ -256,15 +256,18 @@ test_that("pp_check(resp_var) simulates cswald RTs on the fitted scale", {
 
 test_that("pp_check(resp_var) works for the 3par ezdm model", {
   fit <- load_ppcheck_fit("bmmfit_ezdm3_ppcheck.rds")
-  p <- pp_check(fit, resp_var = "mean_pc", ndraws = 5)
+  p <- pp_check(fit, resp_var = "mean_pc", type = "intervals", ndraws = 5)
   expect_s3_class(p, "ggplot")
   expect_equal(p$data$y_obs, fit$data$n_upper / fit$data$n_trials)
   expect_s3_class(pp_check(fit, resp_var = "var_rt", ndraws = 5), "ggplot")
 })
 
-test_that("the ezdm checks default to per-cell intervals", {
+test_that("the ezdm checks show each statistic's distribution across cells", {
   fit <- load_ppcheck_fit("bmmfit_ezdm3_ppcheck.rds")
-  expect_true(all(pp_check_vars(fit)$default_type == "intervals"))
+  expect_identical(pp_check_vars(fit)$default_type,
+                   c("dens_overlay", "dens_overlay", "bars_binned"))
+  p <- pp_check(fit, resp_var = "mean_pc", ndraws = 5)
+  expect_equal(sum(p$data$y_obs), nrow(fit$data))
   p <- pp_check(fit, resp_var = "mean_pc", group = "n_trials", ndraws = 5)
   expect_s3_class(p$facet, "FacetWrap")
 })
@@ -297,6 +300,15 @@ test_that("pp_check(resp_var) retains every defined observation at any ndraws", 
 test_that("pp_check(resp_var = 'all') panels share one set of observations", {
   fit <- load_ppcheck_fit("bmmfit_ezdm4_ppcheck.rds")
   p <- suppressWarnings(pp_check(fit, resp_var = "all", ndraws = 50))
-  n_rows <- vapply(p$bayesplots, function(panel) nrow(panel$data), integer(1))
+  is_density <- vapply(p$bayesplots, function(panel) {
+    "is_y" %in% names(panel$data)
+  }, logical(1))
+  n_observed <- vapply(p$bayesplots, function(panel) {
+    if ("is_y" %in% names(panel$data)) sum(panel$data$is_y) else sum(panel$data$y_obs)
+  }, numeric(1))
+  expect_identical(n_observed, rep(n_observed[[1L]], length(n_observed)))
+  # rows of a density panel are observations x (retained draws + 1)
+  n_rows <- vapply(p$bayesplots[is_density], function(panel) nrow(panel$data),
+                   integer(1))
   expect_identical(n_rows, rep(n_rows[[1L]], length(n_rows)))
 })
