@@ -275,24 +275,26 @@ pp_check_vars <- function(fit) {
   data$upper <- breaks[data$x + 1L]
   data$x <- (data$lower + data$upper) / 2
 
+  # y and yrep take the colours of the density panels they share a
+  # resp_var = "all" grid with: y dark, yrep light, both keyed as lines. The
+  # bars are unfilled so that the intervals beneath them stay visible.
   scheme <- bayesplot::color_scheme_get()
   ggplot2::ggplot(data, ggplot2::aes(x = .data$x)) +
-    ggplot2::geom_rect(
-      ggplot2::aes(xmin = .data$lower, xmax = .data$upper, ymin = 0,
-                   ymax = .data$y_obs, fill = "y"),
-      colour = scheme$light_highlight
-    ) +
     ggplot2::geom_pointrange(
       ggplot2::aes(y = .data$m, ymin = .data$l, ymax = .data$h,
                    colour = "yrep"),
-      size = 0.5, linewidth = 1
+      size = 0.5, linewidth = 1, key_glyph = "path"
     ) +
-    ggplot2::scale_fill_manual(NULL, values = c(y = scheme$light),
-                               labels = expression(italic(y)),
-                               guide = ggplot2::guide_legend(order = 1)) +
-    ggplot2::scale_colour_manual(NULL, values = c(yrep = scheme$dark),
-                                 labels = expression(italic(y)[rep]),
-                                 guide = ggplot2::guide_legend(order = 2)) +
+    ggplot2::geom_rect(
+      ggplot2::aes(xmin = .data$lower, xmax = .data$upper, ymin = 0,
+                   ymax = .data$y_obs, colour = "y"),
+      fill = NA, linewidth = 0.8, key_glyph = "path"
+    ) +
+    ggplot2::scale_colour_manual(
+      NULL, breaks = c("y", "yrep"),
+      values = c(y = scheme$dark_highlight, yrep = scheme$light_highlight),
+      labels = c(expression(italic(y)), expression(italic(y)[rep]))
+    ) +
     ggplot2::scale_y_continuous(expand = ggplot2::expansion(mult = c(0, 0.05))) +
     ggplot2::labs(x = NULL, y = if (freq) "Count" else "Proportion") +
     bayesplot::bayesplot_theme_get()
