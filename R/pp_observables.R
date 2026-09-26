@@ -46,7 +46,8 @@
 #'   to [brms::pp_check()], or a list with elements `observed` (a named
 #'   character vector mapping observable names to brms standata slots) and
 #'   `checks` (a named list of check definitions, each with a `compute`
-#'   closure, a `label` and a default bayesplot `type`). `pp_simulate()`
+#'   closure, a `label` and a default plot `type`: a bayesplot `ppc_*` type
+#'   or bmm's `"bars_binned"`). `pp_simulate()`
 #'   returns a named list of `ndraws` x `nobs` matrices, one per simulated
 #'   observable.
 #' @keywords internal developer
@@ -237,6 +238,64 @@ pp_check_vars <- function(fit) {
     args$group <- group_vec
   }
   do.call(ppc_fun, args) + ggplot2::labs(subtitle = check$label)
+}
+
+# bmm's own plot type (see .ppc_fun()): ppc_bars() for a continuous statistic.
+# bayesplot requires whole numbers there, so the statistic is binned and
+# bayesplot counts the bins; the bars are then drawn on the statistic's scale
+# instead of at bin indices.
+.ppc_bars_binned <- function(y, yrep, ..., breaks = NULL, prob = 0.9,
+                             freq = TRUE) {
+  .pp_binned_bars(y, yrep, group = NULL, breaks, prob, freq)
+}
+
+.ppc_bars_binned_grouped <- function(y, yrep, group, ..., breaks = NULL,
+                                     facet_args = list(), prob = 0.9,
+                                     freq = TRUE) {
+  facet_args$facets <- "group"
+  facet_args$scales <- facet_args$scales %||% "free"
+  .pp_binned_bars(y, yrep, group, breaks, prob, freq) +
+    do.call(ggplot2::facet_wrap, facet_args)
+}
+
+# The default breaks span y and yrep together, so predicted mass outside the
+# observed range gets a bin. User breaks that miss a value would put it in
+# bin 0 or K + 1 and silently drop it from the plot.
+.pp_binned_bars <- function(y, yrep, group, breaks, prob, freq) {
+  values <- c(y, yrep)
+  breaks <- breaks %||% pretty(range(values), n = ceiling(log2(length(y)) + 1))
+  stopif(min(values) < min(breaks) || max(values) > max(breaks),
+         "'breaks' must cover the observed and predicted values \\
+          ({signif(min(values), 3)} to {signif(max(values), 3)}).")
+  bin <- function(x) findInterval(x, breaks, rightmost.closed = TRUE)
+
+  data <- bayesplot::ppc_bars_data(bin(y), matrix(bin(yrep), nrow = nrow(yrep)),
+                                   group = group, prob = prob, freq = freq)
+  data$lower <- breaks[data$x]
+  data$upper <- breaks[data$x + 1L]
+  data$x <- (data$lower + data$upper) / 2
+
+  scheme <- bayesplot::color_scheme_get()
+  ggplot2::ggplot(data, ggplot2::aes(x = .data$x)) +
+    ggplot2::geom_rect(
+      ggplot2::aes(xmin = .data$lower, xmax = .data$upper, ymin = 0,
+                   ymax = .data$y_obs, fill = "y"),
+      colour = scheme$light_highlight
+    ) +
+    ggplot2::geom_pointrange(
+      ggplot2::aes(y = .data$m, ymin = .data$l, ymax = .data$h,
+                   colour = "yrep"),
+      size = 0.5, linewidth = 1
+    ) +
+    ggplot2::scale_fill_manual(NULL, values = c(y = scheme$light),
+                               labels = expression(italic(y)),
+                               guide = ggplot2::guide_legend(order = 1)) +
+    ggplot2::scale_colour_manual(NULL, values = c(yrep = scheme$dark),
+                                 labels = expression(italic(y)[rep]),
+                                 guide = ggplot2::guide_legend(order = 2)) +
+    ggplot2::scale_y_continuous(expand = ggplot2::expansion(mult = c(0, 0.05))) +
+    ggplot2::labs(x = NULL, y = if (freq) "Count" else "Proportion") +
+    bayesplot::bayesplot_theme_get()
 }
 
 # response is 0/1, so the sign flip is (2 * response - 1): sign(response)

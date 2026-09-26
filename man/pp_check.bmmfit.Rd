@@ -22,7 +22,10 @@
 \code{resp_var} is specified. When \code{group} is specified, the grouped variant
 (e.g., \code{"dens_overlay_grouped"}) is auto-selected if available.
 Multinomial models produce a response proportion profile regardless of
-the value supplied.}
+the value supplied. With \code{resp_var}, \code{type = "bars_binned"} is also
+available: it bins a continuous statistic like a histogram, with bars for
+the observed number of observations per bin and points with intervals
+for the predicted number.}
 
 \item{ndraws}{Integer. Number of posterior draws. Defaults to \code{100} for
 multinomial models and \code{10} when \code{resp_var} is specified; otherwise
@@ -47,8 +50,11 @@ response times are both signed by the response.}
 \code{\link[brms:posterior_predict]{brms::posterior_predict()}} (\code{probs}, a numeric vector of length 2 with
 default \code{c(0.025, 0.975)}, sets the credible interval). With \code{resp_var},
 \code{draw_ids} and \code{re_formula} go to \code{\link[brms:prepare_predictions]{brms::prepare_predictions()}} and the
-rest to the \verb{bayesplot::ppc_*} function. \code{re_formula = NA} predicts at
-the population level on every path.}
+rest to the \verb{bayesplot::ppc_*} function. \code{type = "bars_binned"} takes
+\code{breaks} (bin edges that cover the observed and predicted values), \code{prob}
+(interval width, default \code{0.9}) and \code{freq} (\code{FALSE} for proportions
+instead of counts). \code{re_formula = NA} predicts at the population level on
+every path.}
 }
 \value{
 For multinomial models or when \code{resp_var} is specified, a \code{ggplot2}

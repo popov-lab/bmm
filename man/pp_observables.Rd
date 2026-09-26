@@ -19,7 +19,8 @@ pp_simulate(model, prep)
 to \code{\link[brms:pp_check]{brms::pp_check()}}, or a list with elements \code{observed} (a named
 character vector mapping observable names to brms standata slots) and
 \code{checks} (a named list of check definitions, each with a \code{compute}
-closure, a \code{label} and a default bayesplot \code{type}). \code{pp_simulate()}
+closure, a \code{label} and a default plot \code{type}: a bayesplot \verb{ppc_*} type
+or bmm's \code{"bars_binned"}). \code{pp_simulate()}
 returns a named list of \code{ndraws} x \code{nobs} matrices, one per simulated
 observable.
 }
