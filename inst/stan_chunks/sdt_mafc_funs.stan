@@ -18,6 +18,14 @@
 // every term positive, so nothing cancels -- as P(correct) -> 1. Reading
 // either side off the other loses the opposite tail.
 //
+// The range that buys is not the range it responds over: against a 1024-point
+// Gauss-Hermite reference at m = 4, the normal branch is accurate to about
+// d' = 20 (relative error 7.0e-07; 8.0e-03 at 25, 4.5e-02 from 30 on) while it
+// keeps decreasing out to d' = 48. Beyond 20 it is therefore a slightly wrong
+// gradient rather than a right one -- still the better trade, because what it
+// replaces is a flat plateau from d' = 12 with no gradient at all, which a
+// sampler random-walks through instead of rejecting.
+//
 // The quadrature tables are passed in from transformed data
 // (sdt_mafc_tdata.stan); the family loops over rows, so building them here
 // would rebuild 208 doubles per row per gradient evaluation.

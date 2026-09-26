@@ -215,7 +215,8 @@ test_that("dsdt_mafc validates input", {
 
 test_that("m-AFC probability correct equals chance (1/m) at d' = 0", {
   # 1e-7 is set by one cell, normal at m = 8, where the 40-point Gauss-Hermite
-  # rule sits 4.5e-8 from 1/m; the other fifteen are all below 5e-14. A
+  # rule sits 4.5e-8 from 1/m *relative* (5.7e-9 absolute, which is the measure
+  # the sibling logit test quotes); the other fifteen are all below 5e-14. A
   # tolerance loose enough for the whole grid would let that rule degrade by
   # two orders of magnitude unnoticed.
   for (di in c("normal", "logistic", "gumbel_min", "gumbel_max")) {
@@ -495,7 +496,13 @@ test_that("the quadrature tables reach sdt_mafc_lpmf in its declared order", {
 
 test_that("the m-AFC logit is chance at d' = 0 and analytic for gumbel_max", {
   # 1e-7 is set by one cell, normal at m = 8, where the 40-point Gauss-Hermite
-  # rule sits 5.2e-8 from -log(m - 1); the other fifteen are all below 6e-14.
+  # rule sits 5.2e-8 from -log(m - 1) *absolute* (2.7e-8 relative, which is the
+  # measure the sibling probability test quotes); the other fifteen are all
+  # below 6e-14. The four m = 2 cells are weaker than they look: -log(m - 1) is
+  # exactly 0 there, so expect_equal() drops to an absolute comparison and they
+  # assert only |x| < 1e-7, where three of the four are 0 by construction. The
+  # agreement test below is immune because expect_lt() on an explicit
+  # max(abs(...)) names the measure instead of inferring it from the target.
   for (di in c("normal", "logistic", "gumbel_min", "gumbel_max")) {
     for (m in c(2L, 3L, 4L, 8L)) {
       expect_equal(.mafc_logit_pc_r(0, m, di), -log(m - 1), tolerance = 1e-7,
