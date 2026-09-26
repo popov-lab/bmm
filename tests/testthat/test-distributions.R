@@ -104,6 +104,7 @@ test_that("rejection_sampling errors instead of looping forever", {
   expect_error(rejection_sampling(5, stats::dunif, Inf, stats::runif), "max_f")
   expect_error(rsdm(5, mu = NA), "NA")
   expect_error(rejection_sampling(5, function(x) 0 * x, 1, stats::runif), "accepted")
+  expect_error(rejection_sampling(5, function(x) rep(1, length(x)), 1, function(n) rep(NA_real_, n)), "NA")
 })
 
 test_that("conversion between sdm parametrizations works", {

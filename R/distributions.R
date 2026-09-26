@@ -61,7 +61,7 @@ rejection_sampling <- function(n, f, max_f, proposal_fun, ...) {
     idx <- rep(pending, each = ceiling(max(n, 256) / length(pending)))
     x <- proposal_fun(length(idx))
     fx <- do.call(f, c(list(x), replace(dots, per_draw, lapply(dots[per_draw], `[`, idx))))
-    stopif(anyNA(fx), "The target density returned NA; check the parameter values.")
+    stopif(anyNA(x) || anyNA(fx), "The proposals or the target density contain NA; check the parameter values.")
     hit <- which(stats::runif(length(idx)) * max_f[idx] < fx)
     first <- hit[!duplicated(idx[hit])]
     out[idx[first]] <- x[first]
@@ -370,6 +370,7 @@ rmixture2p <- function(n, mu = 0, kappa = 5, p_mem = 0.6) {
   stopif(isTRUE(any(p_mem < 0)), "p_mem must be larger than zero.")
   stopif(isTRUE(any(p_mem > 1)), "p_mem must be smaller than one.")
 
+  # the density peaks at x = mu; x of length n gives one bound per draw
   rejection_sampling(
     n = n,
     f = dmixture2p,
