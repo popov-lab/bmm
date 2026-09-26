@@ -38,6 +38,75 @@ test_that("rsdm returns values between -pi and pi", {
   expect_true(all(res >= -pi) && all(res <= pi))
 })
 
+test_that("rsdm draws each value from its own parameter values", {
+  withr::local_seed(445)
+  n <- 20000
+  group <- sample(rep(1:2, n / 2))
+  pars <- data.frame(mu = c(0, 2), c = c(1, 10), kappa = c(2, 30))
+  y <- rsdm(n, pars$mu[group], pars$c[group], pars$kappa[group])
+
+  for (g in 1:2) {
+    err <- y[group == g] - pars$mu[g]
+    ref_cos <- integrate(function(x) cos(x) * dsdm(x, 0, pars$c[g], pars$kappa[g]), -pi, pi)$value
+    expect_lt(abs(mean(cos(err)) - ref_cos), 5 * sd(cos(err)) / sqrt(length(err)))
+    expect_lt(abs(mean(sin(err))), 5 * sd(sin(err)) / sqrt(length(err)))
+  }
+})
+
+test_that("rsdm recycles parameters to n", {
+  draw <- function(...) withr::with_seed(445, rsdm(10, ...))
+  expect_identical(
+    draw(mu = c(0, 2), c = c(2, 10), kappa = c(3, 30)),
+    draw(mu = rep_len(c(0, 2), 10), c = rep_len(c(2, 10), 10), kappa = rep_len(c(3, 30), 10))
+  )
+})
+
+test_that("rsdm returns finite draws when the density peak overflows", {
+  withr::local_seed(445)
+  y <- rsdm(10, c = 100, kappa = 400)
+  expect_true(all(is.finite(y)))
+  expect_lt(max(abs(y)), 0.05)
+})
+
+test_that("rejection_sampling takes arguments of length n per draw", {
+  withr::local_seed(445)
+  n <- 20000
+  group <- sample(rep(1:2, n / 2))
+  shape <- c(1, 9)
+  # Beta(shape, 1): density shape * x^(shape - 1) peaks at shape, mean shape / (shape + 1)
+  y <- rejection_sampling(
+    n,
+    f = function(x, group, shape) shape[group] * x^(shape[group] - 1),
+    max_f = shape[group],
+    proposal_fun = stats::runif,
+    group = group, shape = shape
+  )
+
+  for (g in 1:2) {
+    yg <- y[group == g]
+    expect_lt(abs(mean(yg) - shape[g] / (shape[g] + 1)), 5 * sd(yg) / sqrt(length(yg)))
+  }
+
+  # with n = 1 every argument belongs to the single draw and is passed whole
+  expect_length(rejection_sampling(1, function(x, g) g(x), 1, stats::runif, g = stats::dunif), 1)
+})
+
+test_that("rejection_sampling validates n and max_f", {
+  expect_error(rejection_sampling(2.5, stats::dunif, 1, stats::runif), "whole number")
+  expect_error(rejection_sampling(5, stats::dunif, 0, stats::runif), "max_f")
+  expect_error(rejection_sampling(5, stats::dunif, c(1, 2), stats::runif), "max_f")
+})
+
+test_that("rejection_sampling errors instead of looping forever", {
+  # a regression here hangs; fail the test instead of timing out the CI job
+  setTimeLimit(elapsed = 20, transient = TRUE)
+  withr::defer(setTimeLimit(elapsed = Inf))
+  expect_error(rejection_sampling(5, stats::dunif, Inf, stats::runif), "max_f")
+  expect_error(rsdm(5, mu = NA), "NA")
+  expect_error(rejection_sampling(5, function(x) 0 * x, 1, stats::runif), "accepted")
+  expect_error(rejection_sampling(5, function(x) rep(1, length(x)), 1, function(n) rep(NA_real_, n)), "NA")
+})
+
 test_that("conversion between sdm parametrizations works", {
   kappa <- rnorm(100, 5, 1)
   c_b <- rnorm(100, 5, 1)
@@ -92,6 +161,29 @@ test_that("rmixture2p returns values between -pi and pi", {
     p_mem = runif(1, min = 0, max = 1)
   )
   expect_true(all(res >= -pi) && all(res <= pi))
+})
+
+test_that("rmixture2p draws each value from its own parameter values", {
+  withr::local_seed(445)
+  n <- 20000
+  group <- sample(rep(1:2, n / 2))
+  pars <- data.frame(mu = c(0, 2), kappa = c(2, 30), p_mem = c(0.5, 0.9))
+  y <- rmixture2p(n, pars$mu[group], pars$kappa[group], pars$p_mem[group])
+
+  for (g in 1:2) {
+    err <- y[group == g] - pars$mu[g]
+    ref_cos <- pars$p_mem[g] * besselI(pars$kappa[g], 1, TRUE) / besselI(pars$kappa[g], 0, TRUE)
+    expect_lt(abs(mean(cos(err)) - ref_cos), 5 * sd(cos(err)) / sqrt(length(err)))
+    expect_lt(abs(mean(sin(err))), 5 * sd(sin(err)) / sqrt(length(err)))
+  }
+})
+
+test_that("rmixture2p recycles parameters to n", {
+  draw <- function(...) withr::with_seed(445, rmixture2p(10, ...))
+  expect_identical(
+    draw(mu = c(0, 2), kappa = c(2, 30), p_mem = c(0.5, 0.9)),
+    draw(mu = rep_len(c(0, 2), 10), kappa = rep_len(c(2, 30), 10), p_mem = rep_len(c(0.5, 0.9), 10))
+  )
 })
 
 test_that("rmixture3p returns values between -pi and pi", {
