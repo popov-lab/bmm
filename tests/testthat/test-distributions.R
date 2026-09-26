@@ -41,7 +41,7 @@ test_that("rsdm returns values between -pi and pi", {
 test_that("rsdm draws each value from its own parameter values", {
   withr::local_seed(445)
   n <- 20000
-  group <- rep(1:2, n / 2)
+  group <- sample(rep(1:2, n / 2))
   pars <- data.frame(mu = c(0, 2), c = c(1, 10), kappa = c(2, 30))
   y <- rsdm(n, pars$mu[group], pars$c[group], pars$kappa[group])
 
@@ -71,7 +71,7 @@ test_that("rsdm returns finite draws when the density peak overflows", {
 test_that("rejection_sampling takes arguments of length n per draw", {
   withr::local_seed(445)
   n <- 20000
-  group <- rep(1:2, n / 2)
+  group <- sample(rep(1:2, n / 2))
   shape <- c(1, 9)
   # Beta(shape, 1): density shape * x^(shape - 1) peaks at shape, mean shape / (shape + 1)
   y <- rejection_sampling(
@@ -91,7 +91,16 @@ test_that("rejection_sampling takes arguments of length n per draw", {
   expect_length(rejection_sampling(1, function(x, g) g(x), 1, stats::runif, g = stats::dunif), 1)
 })
 
+test_that("rejection_sampling validates n and max_f", {
+  expect_error(rejection_sampling(2.5, stats::dunif, 1, stats::runif), "whole number")
+  expect_error(rejection_sampling(5, stats::dunif, 0, stats::runif), "max_f")
+  expect_error(rejection_sampling(5, stats::dunif, c(1, 2), stats::runif), "max_f")
+})
+
 test_that("rejection_sampling errors instead of looping forever", {
+  # a regression here hangs; fail the test instead of timing out the CI job
+  setTimeLimit(elapsed = 20, transient = TRUE)
+  withr::defer(setTimeLimit(elapsed = Inf))
   expect_error(rejection_sampling(5, stats::dunif, Inf, stats::runif), "max_f")
   expect_error(rsdm(5, mu = NA), "NA")
   expect_error(rejection_sampling(5, function(x) 0 * x, 1, stats::runif), "accepted")
@@ -156,7 +165,7 @@ test_that("rmixture2p returns values between -pi and pi", {
 test_that("rmixture2p draws each value from its own parameter values", {
   withr::local_seed(445)
   n <- 20000
-  group <- rep(1:2, n / 2)
+  group <- sample(rep(1:2, n / 2))
   pars <- data.frame(mu = c(0, 2), kappa = c(2, 30), p_mem = c(0.5, 0.9))
   y <- rmixture2p(n, pars$mu[group], pars$kappa[group], pars$p_mem[group])
 
