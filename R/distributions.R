@@ -6,16 +6,20 @@
 #' the envelope `max_f[i]`.
 #'
 #' @param n Integer. The number of samples to generate.
-#' @param f Function. The target density function from which to sample, up to
-#'   a constant. Its first argument takes a vector of proposals; it must be
-#'   vectorized over that vector and over the per-draw arguments in `...`.
+#' @param f Function. The target density divided by the proposal density, up to
+#'   a constant; with a uniform proposal, the target density itself. Its first
+#'   argument takes a vector of proposals, generally not of length `n`; `f` must
+#'   be vectorized over it and over the per-draw arguments in `...`.
 #' @param max_f Numeric. A finite upper bound of `f`, either a single value or
-#'   one value per draw (length `n`).
+#'   one value per draw (length `n`). A bound below the maximum of `f` biases
+#'   the draws without a warning.
 #' @param proposal_fun Function. A function that generates samples from the proposal distribution.
 #' @param ... Additional arguments to be passed to the target density function
-#'   `f`. Arguments of length `n` are taken per draw, so draw `i` uses their
-#'   `i`-th elements. Arguments of any other length are passed whole to every
-#'   call of `f`; recycle them with `rep_len(x, n)` to use them per draw.
+#'   `f`. With `n > 1`, arguments of length `n` are taken per draw, so draw `i`
+#'   uses their `i`-th elements. Arguments of any other length are passed whole
+#'   to every call of `f`; recycle them with `rep_len(x, n)` to use them per
+#'   draw. Pass constants whose length may equal `n`, such as a lookup table,
+#'   through the closure of `f` instead of `...`.
 #'
 #' @return A numeric vector of length `n` containing samples from the target distribution.
 #' @export
@@ -46,10 +50,11 @@ rejection_sampling <- function(n, f, max_f, proposal_fun, ...) {
   )
 
   dots <- list(...)
-  per_draw <- lengths(dots) == n
+  per_draw <- n > 1 & lengths(dots) == n
   max_f <- rep_len(max_f, n)
   out <- rep(NA_real_, n)
   pending <- seq_len(n)
+  misses <- 0
   while (length(pending) > 0) {
     # several proposals per pending draw keep the number of rounds, each with
     # its fixed R overhead, low when n is small or only a few draws remain
@@ -61,9 +66,17 @@ rejection_sampling <- function(n, f, max_f, proposal_fun, ...) {
     first <- hit[!duplicated(idx[hit])]
     out[idx[first]] <- x[first]
     pending <- which(is.na(out))
+    # a draw that no proposal can reach, e.g. where f is 0, would loop forever;
+    # 1e7 proposals without an acceptance mean a rate too low to be usable
+    misses <- if (length(first) > 0) 0 else misses + length(idx)
+    stopif(misses > 1e7, "No proposal was accepted in 1e7 tries; check f, max_f and proposal_fun.")
   }
   out
 }
+
+# a single value is passed to rejection_sampling() whole rather than repeated
+# for every draw, so that f computes what depends on it (e.g. besselI) once
+.recycle_draws <- function(x, n) if (length(x) == 1) x else rep_len(x, n)
 
 #' @title Distribution functions for the Signal Discrimination Model (SDM)
 #'
@@ -249,7 +262,7 @@ rsdm <- function(n, mu = 0, c = 3, kappa = 3.5, parametrization = "sqrtexp") {
     },
     max_f = 1,
     proposal_fun = function(n) stats::runif(n, -pi, pi),
-    mu = rep_len(mu, n), c = rep_len(c, n), kappa = rep_len(kappa, n)
+    mu = .recycle_draws(mu, n), c = .recycle_draws(c, n), kappa = .recycle_draws(kappa, n)
   )
 }
 
@@ -359,12 +372,10 @@ rmixture2p <- function(n, mu = 0, kappa = 5, p_mem = 0.6) {
 
   rejection_sampling(
     n = n,
-    f = function(x, mu, kappa, p_mem) {
-      dmixture2p(x, mu, kappa, p_mem) / dmixture2p(mu, mu, kappa, p_mem)
-    },
-    max_f = 1,
+    f = dmixture2p,
+    max_f = dmixture2p(rep_len(mu, n), rep_len(mu, n), .recycle_draws(kappa, n), .recycle_draws(p_mem, n)),
     proposal_fun = function(n) stats::runif(n, -pi, pi),
-    mu = rep_len(mu, n), kappa = rep_len(kappa, n), p_mem = rep_len(p_mem, n)
+    mu = .recycle_draws(mu, n), kappa = .recycle_draws(kappa, n), p_mem = .recycle_draws(p_mem, n)
   )
 }
 

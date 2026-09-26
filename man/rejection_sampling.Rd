@@ -9,19 +9,23 @@ rejection_sampling(n, f, max_f, proposal_fun, ...)
 \arguments{
 \item{n}{Integer. The number of samples to generate.}
 
-\item{f}{Function. The target density function from which to sample, up to
-a constant. Its first argument takes a vector of proposals; it must be
-vectorized over that vector and over the per-draw arguments in \code{...}.}
+\item{f}{Function. The target density divided by the proposal density, up to
+a constant; with a uniform proposal, the target density itself. Its first
+argument takes a vector of proposals, generally not of length \code{n}; \code{f} must
+be vectorized over it and over the per-draw arguments in \code{...}.}
 
 \item{max_f}{Numeric. A finite upper bound of \code{f}, either a single value or
-one value per draw (length \code{n}).}
+one value per draw (length \code{n}). A bound below the maximum of \code{f} biases
+the draws without a warning.}
 
 \item{proposal_fun}{Function. A function that generates samples from the proposal distribution.}
 
 \item{...}{Additional arguments to be passed to the target density function
-\code{f}. Arguments of length \code{n} are taken per draw, so draw \code{i} uses their
-\code{i}-th elements. Arguments of any other length are passed whole to every
-call of \code{f}; recycle them with \code{rep_len(x, n)} to use them per draw.}
+\code{f}. With \code{n > 1}, arguments of length \code{n} are taken per draw, so draw \code{i}
+uses their \code{i}-th elements. Arguments of any other length are passed whole
+to every call of \code{f}; recycle them with \code{rep_len(x, n)} to use them per
+draw. Pass constants whose length may equal \code{n}, such as a lookup table,
+through the closure of \code{f} instead of \code{...}.}
 }
 \value{
 A numeric vector of length \code{n} containing samples from the target distribution.

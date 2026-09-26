@@ -86,11 +86,15 @@ test_that("rejection_sampling takes arguments of length n per draw", {
     yg <- y[group == g]
     expect_lt(abs(mean(yg) - shape[g] / (shape[g] + 1)), 5 * sd(yg) / sqrt(length(yg)))
   }
+
+  # with n = 1 every argument belongs to the single draw and is passed whole
+  expect_length(rejection_sampling(1, function(x, g) g(x), 1, stats::runif, g = stats::dunif), 1)
 })
 
 test_that("rejection_sampling errors instead of looping forever", {
   expect_error(rejection_sampling(5, stats::dunif, Inf, stats::runif), "max_f")
   expect_error(rsdm(5, mu = NA), "NA")
+  expect_error(rejection_sampling(5, function(x) 0 * x, 1, stats::runif), "accepted")
 })
 
 test_that("conversion between sdm parametrizations works", {
