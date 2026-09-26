@@ -40,7 +40,11 @@
 #'   `resp_var` is specified. When `group` is specified, the grouped variant
 #'   (e.g., `"dens_overlay_grouped"`) is auto-selected if available.
 #'   Multinomial models produce a response proportion profile regardless of
-#'   the value supplied.
+#'   the value supplied. With `resp_var`, `type = "bars_binned"` is also
+#'   available: it bins a continuous statistic like a histogram, with bars for
+#'   the observed number of observations per bin and points with intervals
+#'   for the predicted number. It is the default for the [ezdm()] accuracy
+#'   check.
 #' @param ndraws Integer. Number of posterior draws. Defaults to `100` for
 #'   multinomial models and `10` when `resp_var` is specified; otherwise
 #'   passed to [brms::pp_check()].
@@ -61,8 +65,11 @@
 #'   [brms::posterior_predict()] (`probs`, a numeric vector of length 2 with
 #'   default `c(0.025, 0.975)`, sets the credible interval). With `resp_var`,
 #'   `draw_ids` and `re_formula` go to [brms::prepare_predictions()] and the
-#'   rest to the `bayesplot::ppc_*` function. `re_formula = NA` predicts at
-#'   the population level on every path.
+#'   rest to the `bayesplot::ppc_*` function. `type = "bars_binned"` takes
+#'   `breaks` (bin edges that cover the observed and predicted values), `prob`
+#'   (interval width, default `0.9`) and `freq` (`FALSE` for proportions
+#'   instead of counts). `re_formula = NA` predicts at the population level on
+#'   every path.
 #' @return For multinomial models or when `resp_var` is specified, a `ggplot2`
 #'   object (a `bayesplot_grid` for `resp_var = "all"`). For other models, the
 #'   result of [brms::pp_check()].
@@ -123,11 +130,19 @@ pp_check.bmmfit <- function(object, type = NULL, ndraws = NULL,
 }
 
 
+# the bmm types are reachable only through resp_var: without it, brms resolves
+# 'type' itself. as.character() because a numeric switch() selects by position.
 .ppc_fun <- function(type) {
-  name <- paste0("ppc_", type)
-  if (name %in% as.character(bayesplot::available_ppc(""))) {
-    get(name, asNamespace("bayesplot"))
-  }
+  switch(as.character(type),
+    bars_binned = .ppc_bars_binned,
+    bars_binned_grouped = .ppc_bars_binned_grouped,
+    {
+      name <- paste0("ppc_", type)
+      if (name %in% as.character(bayesplot::available_ppc(""))) {
+        get(name, asNamespace("bayesplot"))
+      }
+    }
+  )
 }
 
 

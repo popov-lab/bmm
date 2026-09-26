@@ -288,6 +288,56 @@ test_that(".pp_resolve_type() resolves the check's default and validates it", {
   expect_null(resolved)
 })
 
+test_that(".pp_resolve_type() resolves bmm's bars_binned type and its grouped variant", {
+  check <- .pp_observable(function(d) d$x, label = "X", type = "bars_binned")
+  expect_identical(.pp_resolve_type(NULL, check, NULL), "bars_binned")
+  expect_identical(.pp_resolve_type(NULL, check, "cond"), "bars_binned_grouped")
+  expect_error(.pp_resolve_type(1, check, NULL), "not a supported")
+})
+
+test_that(".ppc_bars_binned() counts observations per bin on the statistic's scale", {
+  y <- c(0.1, 0.25, 0.3, 0.6, 1)
+  p <- .ppc_bars_binned(y, rbind(y, y, y), breaks = c(0, 0.25, 0.5, 0.75, 1))
+  expect_equal(p$data$x, c(0.125, 0.375, 0.625, 0.875))
+  expect_equal(p$data$y_obs, c(1, 2, 1, 1))
+  expect_equal(unname(p$data$m), p$data$y_obs)
+  expect_no_error(ggplot2::ggplot_build(p))
+})
+
+test_that(".ppc_bars_binned() gives predicted values outside the observed range a bin", {
+  y <- c(0.6, 0.7, 0.7)
+  yrep <- rbind(c(0.1, 0.7, 0.7), c(0.1, 0.6, 0.7))
+  p <- .ppc_bars_binned(y, yrep)
+  low <- p$data[p$data$lower <= 0.1 & p$data$upper > 0.1, ]
+  expect_equal(nrow(low), 1L)
+  expect_equal(low$y_obs, 0)
+  expect_equal(unname(low$m), 1)
+})
+
+test_that(".ppc_bars_binned() plots a statistic without spread", {
+  p <- .ppc_bars_binned(rep(1, 4), matrix(1, nrow = 3, ncol = 4))
+  expect_equal(p$data$y_obs, 4)
+  expect_no_error(ggplot2::ggplot_build(p))
+})
+
+test_that(".ppc_bars_binned() rejects breaks that do not cover the values", {
+  y <- c(0.1, 0.6)
+  expect_error(.ppc_bars_binned(y, rbind(y), breaks = c(0.2, 0.5, 1)),
+               "must cover")
+})
+
+test_that(".ppc_bars_binned_grouped() counts per group and facets", {
+  y <- c(0.1, 0.2, 0.6, 0.9)
+  p <- .ppc_bars_binned_grouped(y, rbind(y, y), group = c("a", "a", "b", "b"),
+                                breaks = c(0, 0.5, 1))
+  expect_s3_class(p$facet, "FacetWrap")
+  counts <- p$data[p$data$y_obs > 0, ]
+  expect_equal(as.character(counts$group), c("a", "b"))
+  expect_equal(counts$x, c(0.25, 0.75))
+  expect_equal(counts$y_obs, c(2, 2))
+  expect_no_error(ggplot2::ggplot_build(p))
+})
+
 # the fake fit carries no draws, so prepare_predictions() would fail: reaching
 # the type error proves 'type' is validated before anything is simulated
 test_that("pp_check() rejects an unknown type before simulating", {
