@@ -2534,7 +2534,12 @@ rsdt_yn <- function(n, n_trials, stimulus, d, criterion,
     # lgammas has cancelled to zero. Off the telescoped form this branch dies
     # at the same d' as the probability scale it was meant to rescue.
     k <- seq_len(max(m) - 1)
-    log_pc <- -colSums(log1p(outer(1 / k, exp(-d))) * outer(k, m, "<"))
+    terms <- log1p(outer(1 / k, exp(-d)))
+    # e = exp(-d') overflows below d' = -709.78, so a masked cell multiplied by
+    # zero would be NaN and would poison its column. Its unmasked neighbours
+    # must keep the Inf: the column belongs at -Inf, not at a clamped value.
+    terms[outer(k, m, ">=")] <- 0
+    log_pc <- -colSums(terms)
     return(log_pc - log(-expm1(log_pc)))
   }
 
@@ -2653,6 +2658,12 @@ rsdt_mafc <- function(n, n_trials, m, d,
   stopif(any(m < 2), "m must be an integer >= 2")
   stopif(any(n_trials < 1), "n_trials must be positive")
 
-  pc <- .mafc_pc_r(rep_len(d, n), rep_len(as.integer(m), n), dist)
-  stats::rbinom(n, n_trials, pc)
+  # the logit is the scale dsdt_mafc() evaluates on, and plogis() cannot leave
+  # [0, 1]; .mafc_pc_r() can, and does -- its gumbel_min lgamma difference has
+  # cancelled by d' = -34, returning 7.9e13 at -36.4 (rbinom gives NA) and
+  # exactly 1 from -40, where the model puts P(correct) near 4e-18
+  stats::rbinom(n, n_trials,
+                stats::plogis(.mafc_logit_pc_r(rep_len(d, n),
+                                               rep_len(as.integer(m), n),
+                                               dist)))
 }

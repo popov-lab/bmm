@@ -174,6 +174,17 @@ test_that("rsdt_mafc validates input", {
   expect_error(rsdt_mafc(2, 100, m = 1, d = 1), "m must be")
 })
 
+test_that("rsdt_mafc stays inside the binomial's domain in the far tail", {
+  # sampled off the probability scale these two cells are the two ways the
+  # gumbel_min Gamma ratio fails: at d' = -36.4 it has cancelled to 7.9e13,
+  # which rbinom() answers with NA, and from d' = -40 it returns exactly 1,
+  # which is silent and simulates all-correct where P(correct) is near 4e-18.
+  expect_equal(rsdt_mafc(5, 100L, m = 2L, d = -36.4, dist = "gumbel_min"),
+               rep(0L, 5))
+  expect_equal(rsdt_mafc(5, 100L, m = 2L, d = -40, dist = "gumbel_min"),
+               rep(0L, 5))
+})
+
 test_that("dsdt_mafc recycles parameters across observations", {
   dens <- dsdt_mafc(n_correct = c(60, 80), n_trials = 100,
                  d = c(1, 2), m = c(4, 4))
@@ -563,4 +574,22 @@ test_that("the gumbel_min logit outlives its Gamma ratio", {
                                    lgamma(4 + exp(-d)))),
                  tolerance = 1e-10, info = paste("d =", d))
   }
+})
+
+test_that("the gumbel_min logit is -Inf, not NaN, once exp(-d') overflows", {
+  # e = exp(-d') is Inf below d' = -709.78, so a cell zeroed by multiplication
+  # would be 0 * Inf, and the NaN would poison its column's sum. Only a column
+  # whose m is below max(m) carries such cells, which is why a single m never
+  # showed it. The unmasked Inf has to survive: -Inf is the right answer.
+  expect_equal(.mafc_logit_pc_r(-800, 4L, "gumbel_min"), -Inf)
+  expect_equal(.mafc_logit_pc_r(c(-800, -800), c(2L, 8L), "gumbel_min"),
+               c(-Inf, -Inf))
+  # and zeroing by index must not shift which k a column keeps
+  d <- c(0.3, 1.1, 2.2)
+  mm <- c(2L, 4L, 6L)
+  expect_equal(.mafc_logit_pc_r(d, mm, "gumbel_min"),
+               vapply(seq_along(d), function(i) {
+                 .mafc_logit_pc_r(d[i], mm[i], "gumbel_min")
+               }, numeric(1)),
+               tolerance = 1e-12)
 })
