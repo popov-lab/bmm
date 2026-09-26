@@ -21,7 +21,9 @@ test_that("sdm posterior_predict draws each prediction from its own posterior dr
     mean(cos(yrep[cells$draw[j], set_size == cells$set_size[j]]))
   }, numeric(1))
 
+  # the slope's seed-to-seed SD is about 0.1 and pooled or mispaired samplers
+  # stay below 0.4, so bounds 4 SD from 1 survive changes in RNG use
   slope <- stats::coef(stats::lm(obs ~ ref + set_size, cells))[["ref"]]
-  expect_gt(slope, 0.75)
-  expect_lt(slope, 1.25)
+  expect_gt(slope, 0.6)
+  expect_lt(slope, 1.4)
 })
