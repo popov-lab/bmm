@@ -1,12 +1,21 @@
 #' Rejection Sampling
 #'
 #' Performs rejection sampling to generate samples from a target distribution.
+#' Each draw can come from its own target: draw `i` is sampled from `f`
+#' evaluated at the `i`-th element of every per-draw argument in `...`, under
+#' the envelope `max_f[i]`.
 #'
 #' @param n Integer. The number of samples to generate.
-#' @param f Function. The target density function from which to sample.
-#' @param max_f Numeric. The maximum value of the target density function `f`.
+#' @param f Function. The target density function from which to sample, up to
+#'   a constant. Its first argument takes a vector of proposals; it must be
+#'   vectorized over that vector and over the per-draw arguments in `...`.
+#' @param max_f Numeric. A finite upper bound of `f`, either a single value or
+#'   one value per draw (length `n`).
 #' @param proposal_fun Function. A function that generates samples from the proposal distribution.
-#' @param ... Additional arguments to be passed to the target density function `f`.
+#' @param ... Additional arguments to be passed to the target density function
+#'   `f`. Arguments of length `n` are taken per draw, so draw `i` uses their
+#'   `i`-th elements. Arguments of any other length are passed whole to every
+#'   call of `f`; recycle them with `rep_len(x, n)` to use them per draw.
 #'
 #' @return A numeric vector of length `n` containing samples from the target distribution.
 #' @export
@@ -18,21 +27,42 @@
 #' samples <- rejection_sampling(10000, target_density, max_f = target_density(0), proposal)
 #' hist(samples, freq = FALSE)
 #' curve(target_density, col = "red", add = TRUE)
+#'
+#' # one location per draw
+#' mu <- rep(c(0, 2), 5000)
+#' samples <- rejection_sampling(
+#'   10000, brms::dvon_mises, max_f = brms::dvon_mises(0, 0, 10), proposal,
+#'   mu = mu, kappa = 10
+#' )
+#' tapply(samples, mu, mean)
 rejection_sampling <- function(n, f, max_f, proposal_fun, ...) {
-  stopifnot(is.numeric(n), length(n) == 1, n > 0)
-  stopifnot(is.numeric(max_f), length(max_f) == 1 | length(max_f) == n, max_f > 0)
+  stopif(
+    !is.numeric(n) || length(n) != 1 || !isTRUE(n >= 1 && n %% 1 == 0),
+    "n must be a single positive whole number."
+  )
+  stopif(
+    !is.numeric(max_f) || !length(max_f) %in% c(1, n) || !all(is.finite(max_f) & max_f > 0),
+    "max_f must be finite and positive, with one value or one value per draw."
+  )
 
-  inner <- function(n, f, max_f, proposal_fun, ..., acc = c()) {
-    if (length(acc) > n) {
-      return(acc[seq_len(n)])
-    }
-    x <- proposal_fun(n)
-    y <- stats::runif(n) * max_f
-    accept <- y < f(x, ...)
-    inner(n, f, max_f, proposal_fun, ..., acc = c(acc, x[accept]))
+  dots <- list(...)
+  per_draw <- lengths(dots) == n
+  max_f <- rep_len(max_f, n)
+  out <- rep(NA_real_, n)
+  pending <- seq_len(n)
+  while (length(pending) > 0) {
+    # several proposals per pending draw keep the number of rounds, each with
+    # its fixed R overhead, low when n is small or only a few draws remain
+    idx <- rep(pending, each = ceiling(max(n, 256) / length(pending)))
+    x <- proposal_fun(length(idx))
+    fx <- do.call(f, c(list(x), replace(dots, per_draw, lapply(dots[per_draw], `[`, idx))))
+    stopif(anyNA(fx), "The target density returned NA; check the parameter values.")
+    hit <- which(stats::runif(length(idx)) * max_f[idx] < fx)
+    first <- hit[!duplicated(idx[hit])]
+    out[idx[first]] <- x[first]
+    pending <- which(is.na(out))
   }
-
-  inner(n, f, max_f, proposal_fun, ...)
+  out
 }
 
 #' @title Distribution functions for the Signal Discrimination Model (SDM)
@@ -210,11 +240,16 @@ rsdm <- function(n, mu = 0, c = 3, kappa = 3.5, parametrization = "sqrtexp") {
     stop2("Parametrization must be one of 'bessel' or 'sqrtexp'")
   )
 
+  # compare to the peak on the log scale: the unnormalized density itself
+  # overflows for large c and kappa (exp(798) at c = 100, kappa = 400)
   rejection_sampling(
     n = n,
-    f = function(x) .dsdm_numer(x, mu, c, kappa),
-    max_f = .dsdm_numer(0, 0, c, kappa),
-    proposal_fun = function(n) stats::runif(n, -pi, pi)
+    f = function(x, mu, c, kappa) {
+      exp(.dsdm_numer(x, mu, c, kappa, log = TRUE) - .dsdm_numer(mu, mu, c, kappa, log = TRUE))
+    },
+    max_f = 1,
+    proposal_fun = function(n) stats::runif(n, -pi, pi),
+    mu = rep_len(mu, n), c = rep_len(c, n), kappa = rep_len(kappa, n)
   )
 }
 
@@ -324,9 +359,12 @@ rmixture2p <- function(n, mu = 0, kappa = 5, p_mem = 0.6) {
 
   rejection_sampling(
     n = n,
-    f = function(x) dmixture2p(x, mu, kappa, p_mem),
-    max_f = dmixture2p(0, 0, kappa, p_mem),
-    proposal_fun = function(n) stats::runif(n, -pi, pi)
+    f = function(x, mu, kappa, p_mem) {
+      dmixture2p(x, mu, kappa, p_mem) / dmixture2p(mu, mu, kappa, p_mem)
+    },
+    max_f = 1,
+    proposal_fun = function(n) stats::runif(n, -pi, pi),
+    mu = rep_len(mu, n), kappa = rep_len(kappa, n), p_mem = rep_len(p_mem, n)
   )
 }
 
