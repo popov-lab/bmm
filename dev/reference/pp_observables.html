@@ -79,7 +79,8 @@ observables jointly from the posterior predictive distribution.</p>
 to <code><a href="https://mc-stan.org/bayesplot/reference/pp_check.html" class="external-link">brms::pp_check()</a></code>, or a list with elements <code>observed</code> (a named
 character vector mapping observable names to brms standata slots) and
 <code>checks</code> (a named list of check definitions, each with a <code>compute</code>
-closure, a <code>label</code> and a default bayesplot <code>type</code>). <code>pp_simulate()</code>
+closure, a <code>label</code> and a default plot <code>type</code>: a bayesplot <code>ppc_*</code> type
+or bmm's <code>"bars_binned"</code>). <code>pp_simulate()</code>
 returns a named list of <code>ndraws</code> x <code>nobs</code> matrices, one per simulated
 observable.</p>
     </div>

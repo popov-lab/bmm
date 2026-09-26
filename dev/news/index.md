@@ -391,9 +391,11 @@ CRAN release: 2026-09-16
   uses by default, and the brms standata slots it reads; model authors
   declare observables via the
   [`pp_observables()`](https://venpopov.com/bmm/dev/reference/pp_observables.md)/[`pp_simulate()`](https://venpopov.com/bmm/dev/reference/pp_observables.md)
-  S3 generics. The **ezdm** checks default to `type = "intervals"`,
-  since each observation is one design cell and a density overlay of a
-  handful of summary statistics is uninformative. Where an observable is
+  S3 generics. The **ezdm** checks show how each statistic is
+  distributed across design cells: density overlays for the RT
+  statistics and a histogram for the proportion of upper responses (the
+  new `type = "bars_binned"`); `type = "intervals"` compares each cell
+  with its own predictive interval instead. Where an observable is
   undefined for some cells (an **ezdm** boundary reached by fewer than
   two responses), observations are dropped only when the *observed*
   value is undefined; undefined *simulated* values are absorbed by

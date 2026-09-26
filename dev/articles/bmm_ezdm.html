@@ -743,13 +743,14 @@ scale reduction factor on split chains (at convergence, Rhat = 1).
 <div class="sourceCode" id="cb15"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="../reference/pp_check_vars.html">pp_check_vars</a></span><span class="op">(</span><span class="va">fit</span><span class="op">)</span></span>
 <span><span class="co">#&gt;   resp_var                         label default_type          slot default</span></span>
-<span><span class="co">#&gt; 1  mean_rt            Mean response time    intervals             Y    TRUE</span></span>
-<span><span class="co">#&gt; 2   var_rt        Response time variance    intervals        vreal1   FALSE</span></span>
-<span><span class="co">#&gt; 3  mean_pc Proportion of upper responses    intervals vint1, trials   FALSE</span></span></code></pre></div>
-<p>The <code>mean_pc</code> check is the proportion of correct responses (<code>n_upper / n_trials</code>), which stays comparable across cells even when the number of trials differs. With <code>resp_var = "all"</code> all checks are drawn from one shared joint simulation:</p>
+<span><span class="co">#&gt; 1  mean_rt            Mean response time dens_overlay             Y    TRUE</span></span>
+<span><span class="co">#&gt; 2   var_rt        Response time variance dens_overlay        vreal1   FALSE</span></span>
+<span><span class="co">#&gt; 3  mean_pc Proportion of upper responses  bars_binned vint1, trials   FALSE</span></span></code></pre></div>
+<p>The <code>mean_pc</code> check is the proportion of correct responses (<code>n_upper / n_trials</code>), which stays comparable across cells even when the number of trials differs. With <code>resp_var = "all"</code> all checks are drawn from one shared joint simulation. Each panel compares how a statistic is distributed across all cells: the RT panels overlay the density of the observed statistic (dark line) on the densities of the simulated datasets, and the accuracy panel is a histogram of the observed proportions (bars) with the predicted number of cells per bin (points with 90% intervals):</p>
 <div class="sourceCode" id="cb16"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="../reference/pp_check.bmmfit.html">pp_check</a></span><span class="op">(</span><span class="va">fit</span>, resp_var <span class="op">=</span> <span class="st">"all"</span>, ndraws <span class="op">=</span> <span class="fl">50</span><span class="op">)</span></span></code></pre></div>
 <p><img src="bmm_ezdm_files/figure-html/unnamed-chunk-12-1.jpeg" alt="" width="80%" style="display: block; margin: auto;"></p>
+<p>The observed mean RTs are spread more evenly than the simulated ones, which cluster around one value per condition. The data were simulated with subject-level variation in all three parameters, which this model omits; the model with <a href="#adding-random-effects">random effects</a> below includes it. To compare each cell with its own predictive interval instead, select a single check with <code>type = "intervals"</code>, e.g. <code>pp_check(fit, resp_var = "mean_rt", type = "intervals")</code>.</p>
 </div>
 <div class="section level2" number="7">
 <h2 id="comparing-conditions">

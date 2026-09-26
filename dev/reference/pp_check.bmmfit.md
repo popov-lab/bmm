@@ -35,7 +35,13 @@ pp_check(
   `resp_var` is specified. When `group` is specified, the grouped
   variant (e.g., `"dens_overlay_grouped"`) is auto-selected if
   available. Multinomial models produce a response proportion profile
-  regardless of the value supplied.
+  regardless of the value supplied. With `resp_var`,
+  `type = "bars_binned"` is also available: it bins a continuous
+  statistic like a histogram, with bars for the observed number of
+  observations per bin and points with intervals for the predicted
+  number. It is the default for the
+  [`ezdm()`](https://venpopov.com/bmm/dev/reference/ezdm.md) accuracy
+  check.
 
 - ndraws:
 
@@ -76,8 +82,11 @@ pp_check(
   sets the credible interval). With `resp_var`, `draw_ids` and
   `re_formula` go to
   [`brms::prepare_predictions()`](https://paulbuerkner.com/brms/reference/prepare_predictions.html)
-  and the rest to the `bayesplot::ppc_*` function. `re_formula = NA`
-  predicts at the population level on every path.
+  and the rest to the `bayesplot::ppc_*` function.
+  `type = "bars_binned"` takes `breaks` (bin edges that cover the
+  observed and predicted values), `prob` (interval width, default `0.9`)
+  and `freq` (`FALSE` for proportions instead of counts).
+  `re_formula = NA` predicts at the population level on every path.
 
 ## Value
 

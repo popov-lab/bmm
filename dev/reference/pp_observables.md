@@ -34,8 +34,9 @@ pp_simulate(model, prep)
 or a list with elements `observed` (a named character vector mapping
 observable names to brms standata slots) and `checks` (a named list of
 check definitions, each with a `compute` closure, a `label` and a
-default bayesplot `type`). `pp_simulate()` returns a named list of
-`ndraws` x `nobs` matrices, one per simulated observable.
+default plot `type`: a bayesplot `ppc_*` type or bmm's `"bars_binned"`).
+`pp_simulate()` returns a named list of `ndraws` x `nobs` matrices, one
+per simulated observable.
 
 ## Details
 

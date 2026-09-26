@@ -702,15 +702,20 @@ lists the available checks:
 
 pp_check_vars(fit)
 #>   resp_var                         label default_type          slot default
-#> 1  mean_rt            Mean response time    intervals             Y    TRUE
-#> 2   var_rt        Response time variance    intervals        vreal1   FALSE
-#> 3  mean_pc Proportion of upper responses    intervals vint1, trials   FALSE
+#> 1  mean_rt            Mean response time dens_overlay             Y    TRUE
+#> 2   var_rt        Response time variance dens_overlay        vreal1   FALSE
+#> 3  mean_pc Proportion of upper responses  bars_binned vint1, trials   FALSE
 ```
 
 The `mean_pc` check is the proportion of correct responses
 (`n_upper / n_trials`), which stays comparable across cells even when
 the number of trials differs. With `resp_var = "all"` all checks are
-drawn from one shared joint simulation:
+drawn from one shared joint simulation. Each panel compares how a
+statistic is distributed across all cells: the RT panels overlay the
+density of the observed statistic (dark line) on the densities of the
+simulated datasets, and the accuracy panel is a histogram of the
+observed proportions (bars) with the predicted number of cells per bin
+(points with 90% intervals):
 
 ``` r
 
@@ -718,6 +723,14 @@ pp_check(fit, resp_var = "all", ndraws = 50)
 ```
 
 ![](bmm_ezdm_files/figure-html/unnamed-chunk-12-1.jpeg)
+
+The observed mean RTs are spread more evenly than the simulated ones,
+which cluster around one value per condition. The data were simulated
+with subject-level variation in all three parameters, which this model
+omits; the model with [random effects](#adding-random-effects) below
+includes it. To compare each cell with its own predictive interval
+instead, select a single check with `type = "intervals"`,
+e.g. `pp_check(fit, resp_var = "mean_rt", type = "intervals")`.
 
 ## 7 Comparing conditions
 

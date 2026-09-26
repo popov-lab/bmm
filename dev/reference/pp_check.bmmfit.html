@@ -81,7 +81,11 @@ model-specific visualisation instead.</p>
 <code>resp_var</code> is specified. When <code>group</code> is specified, the grouped variant
 (e.g., <code>"dens_overlay_grouped"</code>) is auto-selected if available.
 Multinomial models produce a response proportion profile regardless of
-the value supplied.</p></dd>
+the value supplied. With <code>resp_var</code>, <code>type = "bars_binned"</code> is also
+available: it bins a continuous statistic like a histogram, with bars for
+the observed number of observations per bin and points with intervals
+for the predicted number. It is the default for the <code><a href="ezdm.html">ezdm()</a></code> accuracy
+check.</p></dd>
 
 
 <dt id="arg-ndraws">ndraws<a class="anchor" aria-label="anchor" href="#arg-ndraws"></a></dt>
@@ -114,8 +118,11 @@ response times are both signed by the response.</p></dd>
 <code><a href="https://mc-stan.org/rstantools/reference/posterior_predict.html" class="external-link">brms::posterior_predict()</a></code> (<code>probs</code>, a numeric vector of length 2 with
 default <code>c(0.025, 0.975)</code>, sets the credible interval). With <code>resp_var</code>,
 <code>draw_ids</code> and <code>re_formula</code> go to <code><a href="https://paulbuerkner.com/brms/reference/prepare_predictions.html" class="external-link">brms::prepare_predictions()</a></code> and the
-rest to the <code>bayesplot::ppc_*</code> function. <code>re_formula = NA</code> predicts at
-the population level on every path.</p></dd>
+rest to the <code>bayesplot::ppc_*</code> function. <code>type = "bars_binned"</code> takes
+<code>breaks</code> (bin edges that cover the observed and predicted values), <code>prob</code>
+(interval width, default <code>0.9</code>) and <code>freq</code> (<code>FALSE</code> for proportions
+instead of counts). <code>re_formula = NA</code> predicts at the population level on
+every path.</p></dd>
 
 </dl></div>
     <div class="section level2">
