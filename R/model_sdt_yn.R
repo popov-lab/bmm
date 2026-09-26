@@ -31,7 +31,18 @@
   default_priors <- list(
     d = list(main = "normal(1, 1)", effects = "normal(0, 0.5)", sd = "exponential(1)"),
     criterion = list(main = "normal(0, 1.5)", effects = "normal(0, 0.5)", sd = "exponential(2)"),
-    sdratio = list(main = "normal(0, 0.5)", effects = "normal(0, 0.3)", sd = "exponential(2)")
+    # sdratio is on the log scale, so normal(0, 0.3) puts 95% of the prior on
+    # ratios in [0.56, 1.80] and next to nothing above 2, which recognition
+    # does not produce. Both group-level estimates in hand sit inside that:
+    # Mickes et al. (2007) Table 1 averages sd(lure)/sd(target) = 0.79 over
+    # their 13 retained subjects, i.e. 1.26 signal over noise, and the
+    # broeder_schuetz_2009_e3 fit puts the group intercept at 1.46 [1.25, 1.71].
+    # Their subject-to-subject spread is the sd prior's business, not this
+    # one's. 0.3 is 3.7 times that fit's posterior SD of 0.081, so the prior
+    # regularizes without standing in for the data. effects keeps the
+    # intercept's scale because nothing read here bounds how far a condition
+    # moves the ratio -- that fit estimated sdratio ~ 1.
+    sdratio = list(main = "normal(0, 0.3)", effects = "normal(0, 0.3)", sd = "exponential(2)")
   )
   requirements <- glue(
     "Provide pre-aggregated data with the following columns:", "\n\n",
@@ -230,7 +241,7 @@ settable_links.sdt_yn <- function(model) {
 #' `bmf(sdratio = 1)` does not fix a ratio of 1 — it fixes `exp(1) = 2.72`,
 #' and `bmm()` raises no warning; a fixed ratio of 1.25 needs
 #' `bmf(sdratio = log(1.25))`. Both `sdratio` defaults `default_prior()`
-#' reports — `normal(0, 0.5)` on the intercept and `exponential(2)` on the
+#' reports — `normal(0, 0.3)` on the intercept and `exponential(2)` on the
 #' random-effect SDs — are on that same scale, unannotated.
 #'
 #' @section Terms used on this page:
