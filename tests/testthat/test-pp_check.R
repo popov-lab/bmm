@@ -316,17 +316,6 @@ test_that("pp_check(resp_var = 'all') panels share one set of observations", {
 
 # Sparse 4par boundaries (#430) -------------------------------------------------
 
-# every warning rather than the first matching one, so that an expected
-# "Dropped" warning is found among the draw-level ones
-collect_warnings <- function(expr) {
-  warnings <- character()
-  value <- withCallingHandlers(expr, warning = function(w) {
-    warnings <<- c(warnings, conditionMessage(w))
-    invokeRestart("muffleWarning")
-  })
-  list(value = value, warnings = warnings)
-}
-
 # The fixture's draws on its own data with five cells made sparse. Rows 1-3
 # lose the lower summaries (no lower response, one, then enough responses but
 # no summaries, the min_trials case), rows 4-5 the upper ones (one upper

@@ -237,17 +237,6 @@ ezdm4_model <- function() {
 
 ezdm4_formula <- bmf(drift ~ 1, bound ~ 1, ndt ~ 1, zr ~ 1)
 
-# every warning rather than the first matching one: the contract is exactly
-# one warning, and a second one (brms dropping rows) is the bug itself
-collect_warnings <- function(expr) {
-  warnings <- character()
-  value <- withCallingHandlers(expr, warning = function(w) {
-    warnings <<- c(warnings, conditionMessage(w))
-    invokeRestart("muffleWarning")
-  })
-  list(value = value, warnings = warnings)
-}
-
 test_that("ezdm 4par keeps the cells of a boundary below two responses (#430)", {
   dat <- withr::with_seed(1, rezdm(
     30, n_trials = 40, drift = 3, bound = 1.5, ndt = 0.25, zr = 0.6,
