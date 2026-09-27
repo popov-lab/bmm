@@ -66,8 +66,13 @@ pp_check(
   [`pp_check_vars()`](https://venpopov.com/bmm/dev/reference/pp_check_vars.md)
   for the options of a fitted model. The default `NULL` checks the
   primary response via
-  [`brms::pp_check()`](https://mc-stan.org/bayesplot/reference/pp_check.html).
-  For the RT models, passing `negative_rt = TRUE` (a
+  [`brms::pp_check()`](https://mc-stan.org/bayesplot/reference/pp_check.html),
+  except for an `ezdm(version = "4par")` fit in which some cells have no
+  usable summaries at the upper boundary: the primary response,
+  `mean_rt_upper`, holds placeholders there, so `NULL` means
+  `resp_var = "mean_rt_upper"`, which leaves those cells out but takes
+  neither `newdata` nor the `loo_*` types. For the RT models, passing
+  `negative_rt = TRUE` (a
   [`brms::posterior_predict()`](https://mc-stan.org/rstantools/reference/posterior_predict.html)
   argument) is redirected to `resp_var = "signed_rt"`, so that observed
   and predicted response times are both signed by the response.
@@ -90,9 +95,11 @@ pp_check(
 
 ## Value
 
-For multinomial models or when `resp_var` is specified, a `ggplot2`
-object (a `bayesplot_grid` for `resp_var = "all"`). For other models,
-the result of
+For multinomial models, for a 4-parameter
+[`ezdm()`](https://venpopov.com/bmm/dev/reference/ezdm.md) fit with
+placeholders in `mean_rt_upper`, or when `resp_var` is specified, a
+`ggplot2` object (a `bayesplot_grid` for `resp_var = "all"`). For other
+models, the result of
 [`brms::pp_check()`](https://mc-stan.org/bayesplot/reference/pp_check.html).
 
 ## Details

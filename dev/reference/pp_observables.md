@@ -32,9 +32,10 @@ pp_simulate(model, prep)
 `pp_observables()` returns `NULL` for a model that delegates fully to
 [`brms::pp_check()`](https://mc-stan.org/bayesplot/reference/pp_check.html),
 or a list with elements `observed` (a named character vector mapping
-observable names to brms standata slots) and `checks` (a named list of
+observable names to brms standata slots), `checks` (a named list of
 check definitions, each with a `compute` closure, a `label` and a
-default plot `type`: a bayesplot `ppc_*` type or bmm's `"bars_binned"`).
+default plot `type`: a bayesplot `ppc_*` type or bmm's `"bars_binned"`)
+and, optionally, `defaults` and `y_placeholders` (see Details).
 `pp_simulate()` returns a named list of `ndraws` x `nobs` matrices, one
 per simulated observable.
 
@@ -51,6 +52,19 @@ A `pp_observables()` method returns `list(observed, checks)`:
   named list keyed by `names(observed)` and must be elementwise, so the
   identical closure produces `y` from length-N vectors and `yrep` from
   ndraws x N matrices.
+
+Two optional elements serve observed data that holds placeholders rather
+than observations, such as the summaries of an unused
+[`ezdm()`](https://venpopov.com/bmm/dev/reference/ezdm.md) boundary:
+
+- `defaults`: named vector giving, for observables whose slot a fit
+  saved by an older bmm version lacks, the value to use for every
+  observation.
+
+- `y_placeholders`: a function of the fit's data that returns `TRUE` if
+  the `"Y"` slot holds placeholders. brms would plot them as data, so
+  [`pp_check.bmmfit()`](https://venpopov.com/bmm/dev/reference/pp_check.bmmfit.md)
+  without `resp_var` then checks the observable mapped to `"Y"` itself.
 
 A `pp_simulate()` method returns a named list of ndraws x nobs matrices
 drawn jointly, typically through the internal `.pp_simulate_joint()`

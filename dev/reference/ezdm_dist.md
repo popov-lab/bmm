@@ -130,14 +130,16 @@ is independent of which boundary is hit and all `n_trials` responses
 inform one set of cumulants. For version `"4par"` the two boundaries
 have different decision-time distributions, so each is given its own
 summaries and its own response count. A boundary reached fewer than
-twice has no sample variance; in `dezdm()` it contributes only through
-the binomial term, but
-[`bmm()`](https://venpopov.com/bmm/dev/reference/bmm.md) currently drops
-such cells, because `rezdm()` and
+twice has no sample variance, and one whose summaries are `NA` has
+nothing to evaluate; `dezdm()` lets either contribute only through the
+binomial term. `rezdm()` and
 [`ezdm_summary_stats()`](https://venpopov.com/bmm/dev/reference/ezdm_summary_stats.md)
-code their missing summaries as `NA` and `brms` excludes rows with
-missing values. The per-boundary formulas condition on the realised
-counts, which are themselves random.
+code such summaries as `NA`, and
+[`bmm()`](https://venpopov.com/bmm/dev/reference/bmm.md) keeps these
+cells: it replaces the summaries of such a boundary with a placeholder
+that the likelihood never reads, so the response counts still inform the
+fit. The per-boundary formulas condition on the realised counts, which
+are themselves random.
 
 The two additional cumulants cost sampling time. In two simulated
 designs (30 subjects with 200 or 250 trials, 3 seeds each, one machine)

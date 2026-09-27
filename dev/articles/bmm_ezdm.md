@@ -159,11 +159,14 @@ boundary was reached, so all \\n\\ trials in a cell inform one set of
 moments. With a free starting point they do differ, which is why the
 4-parameter version needs the summaries split by boundary — and why a
 boundary reached fewer than twice in a cell has no variance to
-contribute. In
-[`dezdm()`](https://venpopov.com/bmm/dev/reference/ezdm_dist.md) such a
-cell still contributes through the response counts; a
-[`bmm()`](https://venpopov.com/bmm/dev/reference/bmm.md) fit currently
-drops it, because the missing summaries are coded as `NA`.
+contribute. Such a cell still contributes through the response counts,
+and so does a cell whose summaries at one boundary are missing, as
+[`ezdm_summary_stats()`](https://venpopov.com/bmm/dev/reference/ezdm_summary_stats.md)
+returns them for a boundary reached fewer than `min_trials` times.
+[`bmm()`](https://venpopov.com/bmm/dev/reference/bmm.md) keeps these
+cells and warns how many there are. Dropping them instead would remove
+exactly the cells with the most extreme accuracy, and with them
+information about drift and starting point.
 
 ## 2 Parametrization in the `bmm` package
 

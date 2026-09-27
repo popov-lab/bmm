@@ -141,7 +141,22 @@ four parameter version (version = "4par"), that allows to freely estimate the st
 <li><p><code>effects</code>: normal(0,0.3)</p></li>
 <li><p><code>sd</code>: exponential(2)</p></li>
 </ul></li>
-</ul></li>
+</ul><p>In version "4par", a boundary reached fewer than twice, or without RT
+summaries (<code>NA</code>), enters the model through the response counts only.
+<code><a href="bmm.html">bmm()</a></code> adds two columns to the data, <code>rt_used_upper</code> and
+<code>rt_used_lower</code>, which it sets to 0 for such a boundary and to 1
+otherwise, and replaces the summaries of such a boundary with a
+placeholder the likelihood never reads. A 0 already in these columns is
+kept, so that <code><a href="https://rdrr.io/r/stats/update.html" class="external-link">update()</a></code> does not read the placeholders in <code>fit$data</code> as
+data.</p>
+<p><code>newdata</code> passed to <code>log_lik()</code>, <code><a href="https://rdrr.io/r/stats/predict.html" class="external-link">predict()</a></code> or <code>posterior_predict()</code>
+needs these columns too. Rows of <code>fit$data</code> have them. For raw data, set
+both to 1: a boundary reached fewer than twice or with <code>NA</code> summaries is
+then still left out of the likelihood. brms functions that compare the
+response with predictions, <code>predictive_error()</code> and
+<code>residuals(method = "posterior_predict")</code>, read the placeholders as data
+in cells whose <code>rt_used_upper</code> is 0, so leave those cells out first, for
+example with <code>newdata = subset(fit$data, rt_used_upper == 1)</code>.</p></li>
 </ul></div>
 
     <div class="section level2">

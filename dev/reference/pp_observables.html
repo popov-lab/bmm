@@ -77,12 +77,12 @@ observables jointly from the posterior predictive distribution.</p>
     <h2 id="value">Value<a class="anchor" aria-label="anchor" href="#value"></a></h2>
     <p><code>pp_observables()</code> returns <code>NULL</code> for a model that delegates fully
 to <code><a href="https://mc-stan.org/bayesplot/reference/pp_check.html" class="external-link">brms::pp_check()</a></code>, or a list with elements <code>observed</code> (a named
-character vector mapping observable names to brms standata slots) and
+character vector mapping observable names to brms standata slots),
 <code>checks</code> (a named list of check definitions, each with a <code>compute</code>
 closure, a <code>label</code> and a default plot <code>type</code>: a bayesplot <code>ppc_*</code> type
-or bmm's <code>"bars_binned"</code>). <code>pp_simulate()</code>
-returns a named list of <code>ndraws</code> x <code>nobs</code> matrices, one per simulated
-observable.</p>
+or bmm's <code>"bars_binned"</code>) and, optionally, <code>defaults</code> and
+<code>y_placeholders</code> (see Details). <code>pp_simulate()</code> returns a named list of
+<code>ndraws</code> x <code>nobs</code> matrices, one per simulated observable.</p>
     </div>
     <div class="section level2">
     <h2 id="details">Details<a class="anchor" aria-label="anchor" href="#details"></a></h2>
@@ -93,6 +93,13 @@ The observable mapped to <code>"Y"</code> is the default check.</p></li>
 constructor. Each <code>compute</code> closure receives a named list keyed by
 <code>names(observed)</code> and must be elementwise, so the identical closure
 produces <code>y</code> from length-N vectors and <code>yrep</code> from ndraws x N matrices.</p></li>
+</ul><p>Two optional elements serve observed data that holds placeholders rather
+than observations, such as the summaries of an unused <code><a href="ezdm.html">ezdm()</a></code> boundary:</p><ul><li><p><code>defaults</code>: named vector giving, for observables whose slot a fit saved
+by an older bmm version lacks, the value to use for every observation.</p></li>
+<li><p><code>y_placeholders</code>: a function of the fit's data that returns <code>TRUE</code> if
+the <code>"Y"</code> slot holds placeholders. brms would plot them as data, so
+<code><a href="pp_check.bmmfit.html">pp_check.bmmfit()</a></code> without <code>resp_var</code> then checks the observable mapped
+to <code>"Y"</code> itself.</p></li>
 </ul><p>A <code>pp_simulate()</code> method returns a named list of ndraws x nobs matrices
 drawn jointly, typically through the internal <code>.pp_simulate_joint()</code> helper
 around the model's <code>r*()</code> function. Simulating observables independently

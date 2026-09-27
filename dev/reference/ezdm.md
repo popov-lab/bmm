@@ -170,6 +170,27 @@ An object of class `bmmodel`
 
     - `sd`: exponential(2)
 
+  In version "4par", a boundary reached fewer than twice, or without RT
+  summaries (`NA`), enters the model through the response counts only.
+  [`bmm()`](https://venpopov.com/bmm/dev/reference/bmm.md) adds two
+  columns to the data, `rt_used_upper` and `rt_used_lower`, which it
+  sets to 0 for such a boundary and to 1 otherwise, and replaces the
+  summaries of such a boundary with a placeholder the likelihood never
+  reads. A 0 already in these columns is kept, so that
+  [`update()`](https://rdrr.io/r/stats/update.html) does not read the
+  placeholders in `fit$data` as data.
+
+  `newdata` passed to `log_lik()`,
+  [`predict()`](https://rdrr.io/r/stats/predict.html) or
+  `posterior_predict()` needs these columns too. Rows of `fit$data` have
+  them. For raw data, set both to 1: a boundary reached fewer than twice
+  or with `NA` summaries is then still left out of the likelihood. brms
+  functions that compare the response with predictions,
+  `predictive_error()` and `residuals(method = "posterior_predict")`,
+  read the placeholders as data in cells whose `rt_used_upper` is 0, so
+  leave those cells out first, for example with
+  `newdata = subset(fit$data, rt_used_upper == 1)`.
+
 ## Examples
 
 ``` r

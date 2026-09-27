@@ -266,6 +266,23 @@
   Stan estimated `kappa` freely, and `update(fit, bmf(..., mu = 0.5))`
   one that reported `mu = 0.5` while Stan kept `mu` at the original
   value — all three with no error or warning.
+- `ezdm(version = "4par")` no longer drops cells in which a boundary was
+  reached fewer than twice or has no RT summaries. `brms` excluded the
+  whole row, response counts included, so the cells with the most
+  extreme accuracy were missing.
+  [`bmm()`](https://venpopov.com/bmm/dev/reference/bmm.md) now keeps
+  them and warns how many there are; refit such models. `newdata` for
+  `log_lik()` or [`predict()`](https://rdrr.io/r/stats/predict.html) now
+  needs the columns `rt_used_upper` and `rt_used_lower`, as in
+  `fit$data`. Where some cells have no usable RT summaries at the upper
+  boundary,
+  [`pp_check()`](https://venpopov.com/bmm/dev/reference/pp_check.bmmfit.md)
+  without `resp_var` leaves those cells out and no longer accepts
+  `newdata` or the `loo_*` types
+  ([\#430](https://github.com/popov-lab/bmm/issues/430)).
+- `dezdm(version = "4par")` now returns the density without a boundary’s
+  response-time terms where that boundary’s summaries are `NA`, instead
+  of `NA` ([\#430](https://github.com/popov-lab/bmm/issues/430)).
 - `ezdm_summary_stats(method = "mixture")` now returns `n_upper` and
   `n_trials` for the responses its `mean_rt`/`var_rt` are based on. It
   previously returned the raw counts beside cleaned moments, so every

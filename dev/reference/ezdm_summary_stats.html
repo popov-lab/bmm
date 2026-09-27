@@ -123,11 +123,13 @@ Examples: c(0.1, 3.0), c("min", "max"), c(0.1, "max"), c("min", 3.0)</p></dd>
 
 
 <dt id="arg-min-trials">min_trials<a class="anchor" aria-label="anchor" href="#arg-min-trials"></a></dt>
-<dd><p>Integer. Minimum number of trials required for fitting.
-Returns NA if fewer trials are available. Compared against the total
-number of trials for <code>version = "3par"</code> and against each boundary's own
-count for <code>version = "4par"</code>, so the two versions can disagree about
-whether the same cell is corrected. Default is 10</p></dd>
+<dd><p>Integer. Minimum number of trials required for the RT
+summaries, which are NA with fewer. Compared against the total number of
+trials for <code>version = "3par"</code> and against each boundary's own count for
+<code>version = "4par"</code>, so the two versions can disagree about whether the
+same cell is corrected. For <code>version = "4par"</code>, <code><a href="bmm.html">bmm()</a></code> still fits a cell
+whose summaries at one or both boundaries are NA, through its response
+counts. Default is 10</p></dd>
 
 
 <dt id="arg-init-contaminant">init_contaminant<a class="anchor" aria-label="anchor" href="#arg-init-contaminant"></a></dt>

@@ -86,11 +86,14 @@ ezdm_summary_stats(
 
 - min_trials:
 
-  Integer. Minimum number of trials required for fitting. Returns NA if
-  fewer trials are available. Compared against the total number of
-  trials for `version = "3par"` and against each boundary's own count
-  for `version = "4par"`, so the two versions can disagree about whether
-  the same cell is corrected. Default is 10
+  Integer. Minimum number of trials required for the RT summaries, which
+  are NA with fewer. Compared against the total number of trials for
+  `version = "3par"` and against each boundary's own count for
+  `version = "4par"`, so the two versions can disagree about whether the
+  same cell is corrected. For `version = "4par"`,
+  [`bmm()`](https://venpopov.com/bmm/dev/reference/bmm.md) still fits a
+  cell whose summaries at one or both boundaries are NA, through its
+  response counts. Default is 10
 
 - init_contaminant:
 

@@ -178,11 +178,13 @@ independent of which boundary is hit and all <code>n_trials</code> responses inf
 one set of cumulants. For version <code>"4par"</code> the two boundaries have
 different decision-time distributions, so each is given its own summaries
 and its own response count. A boundary reached fewer than twice has no
-sample variance; in <code>dezdm()</code> it contributes only through the binomial
-term, but <code><a href="bmm.html">bmm()</a></code> currently drops such cells, because <code>rezdm()</code> and
-<code><a href="ezdm_summary_stats.html">ezdm_summary_stats()</a></code> code their missing summaries as <code>NA</code> and <code>brms</code>
-excludes rows with missing values. The per-boundary formulas condition on
-the realised counts, which are themselves random.</p>
+sample variance, and one whose summaries are <code>NA</code> has nothing to evaluate;
+<code>dezdm()</code> lets either contribute only through the binomial term.
+<code>rezdm()</code> and <code><a href="ezdm_summary_stats.html">ezdm_summary_stats()</a></code> code such summaries as <code>NA</code>, and
+<code><a href="bmm.html">bmm()</a></code> keeps these cells: it replaces the summaries of such a boundary
+with a placeholder that the likelihood never reads, so the response
+counts still inform the fit. The per-boundary formulas condition on the
+realised counts, which are themselves random.</p>
 <p>The two additional cumulants cost sampling time. In two simulated designs
 (30 subjects with 200 or 250 trials, 3 seeds each, one machine) a gradient
 of the whole model took 1.3 times as long as with the older form for
