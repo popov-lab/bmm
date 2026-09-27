@@ -313,3 +313,35 @@ setup_verdict <- function(x) {
   }
   glue("{n_fail} checks failed. Fix them from the top, then run bmm_setup() again.")
 }
+
+# texts of failures that bmm_setup() can diagnose; each one was provoked on a
+# broken machine or read from the installed sources of brms, cmdstanr, inline
+setup_error_patterns <- c(
+  "CmdStan path has not been set",
+  "Please install the '(cmdstanr|rstan)' package",
+  "error occurr?ed during compilation",
+  "Compilation ERROR",
+  "check_cmdstan_toolchain",
+  "required package .(rstan|StanHeaders).",
+  "loadNamespace\\(\\) for .(rstan|StanHeaders|cmdstanr|RcppParallel).",
+  # rstan 2.32 reports any failed compilation this way
+  'sink\\(type = "output"\\) invalid connection'
+)
+
+is_setup_error <- function(e) {
+  text <- paste(paste(deparse(conditionCall(e)), collapse = " "), conditionMessage(e))
+  any(vapply(setup_error_patterns, grepl, logical(1), x = text))
+}
+
+# re-signals the same condition, so its class and call survive and handlers
+# further up see only the longer message
+add_setup_hint <- function(e) {
+  if (is_setup_error(e)) {
+    e$message <- paste0(
+      e$message, "\n\nThis error can come from the C++ toolchain or the Stan backend. ",
+      "Run bmm_setup() to check both; if it finds nothing, please report the error ",
+      "at https://github.com/popov-lab/bmm/issues."
+    )
+    stop(e)
+  }
+}

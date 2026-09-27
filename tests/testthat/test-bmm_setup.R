@@ -266,6 +266,76 @@ test_that("print() shows the last messages of a failed smoke test", {
   expect_true(any(grepl("make: /nonexistent/clang++: No such file or directory", out, fixed = TRUE)))
 })
 
+# verbatim texts, provoked on macOS in throwaway processes (local/431_bmm_setup/error_texts.md)
+setup_error_texts <- list(
+  cmdstan_missing = simpleError("CmdStan path has not been set yet. See ?set_cmdstan_path."),
+  cmdstanr_missing = simpleError("Please install the 'cmdstanr' package.", quote(require_package("cmdstanr"))),
+  cmdstanr_compiler = simpleError("An error occured during compilation! See the message above for more information."),
+  rstan_compiler = simpleError("invalid connection", quote(sink(type = "output"))),
+  rstan_after_cmdstanr_fit = simpleError("unable to load required package ‘rstan’", quote(.requirePackage(package))),
+  rstan_on_load = simpleError(paste(
+    ".onLoad failed in loadNamespace() for 'rstan', details:",
+    "  call: fun(libname, pkgname)",
+    "  error: unable to load shared object '/fake/rstan.so'",
+    sep = "\n"
+  )),
+  cmdstan_toolchain = simpleError(paste(
+    "A suitable C++ compiler was not found. Please install the command line tools for Mac with",
+    "'xcode-select --install' or install Xcode from the app store. Then restart R and run",
+    "cmdstanr::check_cmdstan_toolchain()."
+  )),
+  rstan_compile_code = simpleError("Compilation ERROR, function(s)/method(s) not created!")
+)
+
+other_error_texts <- list(
+  prior = simpleError(paste(
+    "The following priors do not correspond to any model parameter: ",
+    "b_doesnotexist ~ normal(0, 1)",
+    "Function 'default_prior' might be helpful to you.",
+    sep = "\n"
+  ), quote(.validate_prior(prior, bframe = bframe, sample_prior = sample_prior))),
+  data = simpleError("The response variable 'y' is not present in the data."),
+  init = simpleError("Assertion on 'init' failed: File does not exist: 'abc'.", quote(validate_init(self$init, num_inits))),
+  connection_elsewhere = simpleError("invalid connection", quote(readLines(con))),
+  sampling = simpleError("Fitting failed. Unable to retrieve the draws.")
+)
+
+test_that("is_setup_error() recognises toolchain and backend failures", {
+  for (name in names(setup_error_texts)) {
+    expect_true(is_setup_error(setup_error_texts[[name]]), label = name)
+  }
+})
+
+test_that("is_setup_error() leaves prior, data, init and sampling errors alone", {
+  for (name in names(other_error_texts)) {
+    expect_false(is_setup_error(other_error_texts[[name]]), label = name)
+  }
+})
+
+mock_bmm_error <- function(condition) {
+  bmm(
+    bmf(kappa ~ 1, thetat ~ 1), data.frame(y = c(-0.5, 0, 0.5)), mixture2p(resp_error = "y"),
+    backend = "mock", mock_fit = function() stop(condition), rename = FALSE
+  )
+}
+
+test_that("bmm() points a toolchain failure to bmm_setup() and keeps the error's class", {
+  classed <- setup_error_texts$cmdstanr_missing
+  class(classed) <- c("brms_error", class(classed))
+  err <- expect_error(mock_bmm_error(classed), class = "brms_error")
+
+  expect_match(conditionMessage(err), "^Please install the 'cmdstanr' package\\.")
+  expect_match(conditionMessage(err), "Run bmm_setup()", fixed = TRUE)
+  expect_match(conditionMessage(err), "https://github.com/popov-lab/bmm/issues", fixed = TRUE)
+})
+
+test_that("bmm() passes other errors from brm() through unchanged", {
+  original <- other_error_texts$prior
+  err <- expect_error(mock_bmm_error(original))
+
+  expect_identical(conditionMessage(err), conditionMessage(original))
+})
+
 test_that("a real machine check without a smoke test finds no failure", {
   skip_on_cran()
   skip_if_not_installed("cmdstanr")

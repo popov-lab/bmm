@@ -191,7 +191,10 @@ bmm <- function(formula, data, model,
     }
   }
 
-  fit <- brms::do_call(brms::brm, fit_args)
+  fit <- withCallingHandlers(
+    brms::do_call(brms::brm, fit_args),
+    error = add_setup_hint
+  )
 
   # model post-processing
   fit <- postprocess_brm(
