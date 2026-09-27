@@ -1177,4 +1177,9 @@ test_that("log_lik() of an ezdm 4par fit never reads a placeholder", {
     )
     expect_equal(new_ll[[1]][, i], reference, info = paste("row", i))
   }
+
+  # ?ezdm's recipe for raw newdata: both indicators set to 1 leave the choice
+  # to the count and NA gates, which reach what check_data() decided
+  raw <- transform(sparse, rt_used_upper = 1L, rt_used_lower = 1L)
+  expect_identical(brms::log_lik(fit, newdata = raw), brms::log_lik(fit))
 })
