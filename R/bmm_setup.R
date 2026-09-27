@@ -224,6 +224,9 @@ probe_build_tools <- function() {
     return(NA)
   }
   withr::local_options(buildtools.check = NULL, pkgbuild.has_compiler = NULL)
+  # rstan leaves its compile flags in the session environment; they force a
+  # C++ header into pkgbuild's C test file and fail an intact toolchain
+  withr::local_envvar(PKG_CPPFLAGS = NA, PKG_LIBS = NA, USE_CXX17 = NA)
   utils::capture.output(found <- suppressMessages(pkgbuild::has_build_tools(debug = TRUE)))
   found
 }
@@ -258,6 +261,7 @@ probe_cmdstan_toolchain <- function() {
 # cmdstanr draws the sampler seed from R's generator; restoring it leaves the
 # user's random stream where it was
 probe_smoke_test <- function(backend) {
+  withr::local_envvar(PKG_CPPFLAGS = NA, PKG_LIBS = NA, USE_CXX17 = NA)
   seconds <- system.time(
     fit <- capture_check_conditions(withr::with_preserve_seed(bmm(
       bmmformula(kappa ~ 1, thetat ~ 1),

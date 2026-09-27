@@ -357,6 +357,26 @@ test_that("bmm() passes other errors from brm() through unchanged", {
   expect_identical(conditionMessage(err), conditionMessage(original))
 })
 
+test_that("the toolchain probe ignores the compile flags rstan leaves behind", {
+  skip_on_cran()
+  skip_if_not_installed("pkgbuild")
+  withr::local_envvar(PKG_CPPFLAGS = "-include nonexistent_header.hpp")
+  expect_true(probe_build_tools())
+})
+
+test_that("probe_smoke_test() restores PKG_CPPFLAGS, PKG_LIBS and USE_CXX17 a user had set", {
+  withr::local_envvar(PKG_CPPFLAGS = "-Ikeepme", PKG_LIBS = "-lkeepme", USE_CXX17 = "keepme")
+  local_mocked_bindings(bmm = function(...) {
+    Sys.setenv(PKG_CPPFLAGS = "-Irstan", PKG_LIBS = "-lrstan", USE_CXX17 = "1")
+    stop("smoke ran")
+  })
+  probe_smoke_test("cmdstanr")
+
+  expect_equal(Sys.getenv("PKG_CPPFLAGS"), "-Ikeepme")
+  expect_equal(Sys.getenv("PKG_LIBS"), "-lkeepme")
+  expect_equal(Sys.getenv("USE_CXX17"), "keepme")
+})
+
 test_that("a real machine check without a smoke test finds no failure", {
   skip_on_cran()
   skip_if_not_installed("cmdstanr")
