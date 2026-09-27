@@ -166,6 +166,31 @@ test_that("pp_simulate.ezdm_4par() emits NA where a boundary has < 2 responses",
   expect_identical(is.na(sims$mean_rt_lower), (3L - sims$n_upper) < 2)
 })
 
+# the placeholders check_data() writes into an unused boundary are finite, so
+# the checks read the indicator to leave them out (#430)
+test_that("the 4par RT checks are undefined where the boundary is unused", {
+  spec <- pp_observables(ezdm(
+    mean_rt = c("mu", "ml"), var_rt = c("vu", "vl"), n_upper = "nu",
+    n_trials = "nt", version = "4par"
+  ))
+  expect_identical(
+    unname(spec$observed[c("rt_used_upper", "rt_used_lower")]),
+    c("vint3", "vint4")
+  )
+
+  d <- list(
+    mean_rt_upper = c(0.5, -1, 0.6), mean_rt_lower = c(-1, 0.7, 0.8),
+    var_rt_upper = c(0.02, -1, 0.03), var_rt_lower = c(-1, 0.04, 0.05),
+    n_upper = c(20, 1, 10), n_trials = c(20, 20, 20),
+    rt_used_upper = c(1L, 0L, 1L), rt_used_lower = c(0L, 1L, 1L)
+  )
+  expect_equal(spec$checks$mean_rt_upper$compute(d), c(0.5, NA, 0.6))
+  expect_equal(spec$checks$var_rt_upper$compute(d), c(0.02, NA, 0.03))
+  expect_equal(spec$checks$mean_rt_lower$compute(d), c(NA, 0.7, 0.8))
+  expect_equal(spec$checks$var_rt_lower$compute(d), c(NA, 0.04, 0.05))
+  expect_equal(spec$checks$mean_pc$compute(d), d$n_upper / d$n_trials)
+})
+
 two_checks <- list(
   a = .pp_observable(function(d) d$a, label = "A"),
   b = .pp_observable(function(d) d$b, label = "B")

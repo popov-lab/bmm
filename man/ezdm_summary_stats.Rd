@@ -60,11 +60,13 @@ or the special strings "min" and "max" to use data-driven bounds (default):
 The buffer extends data-driven bounds to ensure conservative estimates.
 Examples: c(0.1, 3.0), c("min", "max"), c(0.1, "max"), c("min", 3.0)}
 
-\item{min_trials}{Integer. Minimum number of trials required for fitting.
-Returns NA if fewer trials are available. Compared against the total
-number of trials for \code{version = "3par"} and against each boundary's own
-count for \code{version = "4par"}, so the two versions can disagree about
-whether the same cell is corrected. Default is 10}
+\item{min_trials}{Integer. Minimum number of trials required for the RT
+summaries, which are NA with fewer. Compared against the total number of
+trials for \code{version = "3par"} and against each boundary's own count for
+\code{version = "4par"}, so the two versions can disagree about whether the
+same cell is corrected. For \code{version = "4par"}, \code{\link[=bmm]{bmm()}} still fits a cell
+whose summaries at one or both boundaries are NA, through its response
+counts. Default is 10}
 
 \item{init_contaminant}{Numeric. Initial proportion of contaminants for EM
 algorithm. Default is 0.05}

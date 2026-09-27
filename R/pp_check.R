@@ -56,8 +56,12 @@
 #'   the name of the observable to check, or `"all"` for a panel of all
 #'   available checks built from one shared simulation. See [pp_check_vars()]
 #'   for the options of a fitted model. The default `NULL` checks the primary
-#'   response via [brms::pp_check()]. For the RT models, passing
-#'   `negative_rt = TRUE` (a [brms::posterior_predict()] argument) is
+#'   response via [brms::pp_check()], except for an `ezdm(version = "4par")`
+#'   fit in which some cells have no usable summaries at the upper boundary:
+#'   the primary response, `mean_rt_upper`, holds placeholders there, so
+#'   `NULL` means `resp_var = "mean_rt_upper"`, which leaves those cells out
+#'   but takes neither `newdata` nor the `loo_*` types. For the RT models,
+#'   passing `negative_rt = TRUE` (a [brms::posterior_predict()] argument) is
 #'   redirected to `resp_var = "signed_rt"`, so that observed and predicted
 #'   response times are both signed by the response.
 #' @param ... Additional arguments. Without `resp_var`, forwarded to
@@ -70,9 +74,10 @@
 #'   (interval width, default `0.9`) and `freq` (`FALSE` for proportions
 #'   instead of counts). `re_formula = NA` predicts at the population level on
 #'   every path.
-#' @return For multinomial models or when `resp_var` is specified, a `ggplot2`
-#'   object (a `bayesplot_grid` for `resp_var = "all"`). For other models, the
-#'   result of [brms::pp_check()].
+#' @return For multinomial models, for a 4-parameter [ezdm()] fit with
+#'   placeholders in `mean_rt_upper`, or when `resp_var` is specified, a
+#'   `ggplot2` object (a `bayesplot_grid` for `resp_var = "all"`). For other
+#'   models, the result of [brms::pp_check()].
 #' @seealso [brms::pp_check()], [pp_check_vars()]
 #' @aliases pp_check
 #' @importFrom brms pp_check
@@ -95,6 +100,17 @@ pp_check.bmmfit <- function(object, type = NULL, ndraws = NULL,
     resp_var <- "signed_rt"
   }
 
+  if (is.null(resp_var) && !is.null(spec$y_placeholders) &&
+      isTRUE(spec$y_placeholders(object$data))) {
+    resp_var <- names(spec$observed)[spec$observed == "Y"]
+    # refused here, where the reason is known: the checks below would name a
+    # resp_var the user never passed
+    stopif(!is.null(dots$newdata) || grepl("^loo_", type %||% ""),
+           "This {object$bmm$model$name} fit has cells without an observed \\
+            '{resp_var}', so pp_check() checks '{resp_var}' itself, leaving \\
+            those cells out, and does not take 'newdata' or the 'loo_*' types.")
+  }
+
   if (!is.null(resp_var)) {
     stopif(is.null(spec),
            "'resp_var' is not supported for the {object$bmm$model$name}: \\
@@ -108,7 +124,7 @@ pp_check.bmmfit <- function(object, type = NULL, ndraws = NULL,
              !group %in% names(object$data)),
            "'group' must name a column of the model data.")
     stopif(!is.null(dots$newdata),
-           "'newdata' is not supported when 'resp_var' is specified.")
+           "'newdata' is not supported for the '{resp_var}' check.")
     dots$negative_rt <- NULL
     type <- .pp_resolve_type(type, spec$checks[[resp_var]], group)
     return(.pp_check_observable(object, spec, resp_var, type, ndraws, group,

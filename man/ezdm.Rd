@@ -111,6 +111,24 @@ Provide aggregated statistics for each subject and condition that model paramete
 \item \code{sd}: exponential(2)
 }
 }
+
+In version "4par", a boundary reached fewer than twice, or without RT
+summaries (\code{NA}), enters the model through the response counts only.
+\code{bmm()} adds two columns to the data, \code{rt_used_upper} and
+\code{rt_used_lower}, which it sets to 0 for such a boundary and to 1
+otherwise, and replaces the summaries of such a boundary with a
+placeholder the likelihood never reads. A 0 already in these columns is
+kept, so that \code{update()} does not read the placeholders in \code{fit$data} as
+data.
+
+\code{newdata} passed to \code{log_lik()}, \code{predict()} or \code{posterior_predict()}
+needs these columns too. Rows of \code{fit$data} have them. For raw data, set
+both to 1: a boundary reached fewer than twice or with \code{NA} summaries is
+then still left out of the likelihood. brms functions that compare the
+response with predictions, \code{predictive_error()} and
+\code{residuals(method = "posterior_predict")}, read the placeholders as data
+in cells whose \code{rt_used_upper} is 0, so leave those cells out first, for
+example with \code{newdata = subset(fit$data, rt_used_upper == 1)}.
 }
 }
 \examples{
