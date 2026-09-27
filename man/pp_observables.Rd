@@ -17,12 +17,12 @@ pp_simulate(model, prep)
 \value{
 \code{pp_observables()} returns \code{NULL} for a model that delegates fully
 to \code{\link[brms:pp_check]{brms::pp_check()}}, or a list with elements \code{observed} (a named
-character vector mapping observable names to brms standata slots) and
+character vector mapping observable names to brms standata slots),
 \code{checks} (a named list of check definitions, each with a \code{compute}
 closure, a \code{label} and a default plot \code{type}: a bayesplot \verb{ppc_*} type
-or bmm's \code{"bars_binned"}). \code{pp_simulate()}
-returns a named list of \code{ndraws} x \code{nobs} matrices, one per simulated
-observable.
+or bmm's \code{"bars_binned"}) and, optionally, \code{defaults} and
+\code{y_placeholders} (see Details). \code{pp_simulate()} returns a named list of
+\code{ndraws} x \code{nobs} matrices, one per simulated observable.
 }
 \description{
 \code{pp_observables()} returns the model's observable declaration used by

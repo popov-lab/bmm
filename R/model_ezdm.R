@@ -549,7 +549,9 @@ pp_observables.ezdm_4par <- function(model) {
                  n_upper = "vint1", n_trials = "vint2",
                  rt_used_upper = "vint3", rt_used_lower = "vint4"),
     defaults = c(rt_used_upper = 1L, rt_used_lower = 1L),
-    y_placeholders = function(data) any(data$rt_used_upper == 0, na.rm = TRUE),
+    y_placeholders = function(data) {
+      any(data[[.EZDM_RT_USED[1]]] == 0, na.rm = TRUE)
+    },
     checks = list(
       mean_rt_upper = .pp_observable(
         function(d) .pp_ezdm_boundary(d$mean_rt_upper, d$rt_used_upper),

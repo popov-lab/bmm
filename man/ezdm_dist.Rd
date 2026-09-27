@@ -110,8 +110,8 @@ sample variance, and one whose summaries are \code{NA} has nothing to evaluate;
 \code{rezdm()} and \code{ezdm_summary_stats()} code such summaries as \code{NA}, and
 \code{bmm()} keeps these cells: it replaces the summaries of such a boundary
 with a placeholder that the likelihood never reads, so the response
-counts still inform the fit. The per-boundary formulas condition on the realised
-counts, which are themselves random.
+counts still inform the fit. The per-boundary formulas condition on the
+realised counts, which are themselves random.
 
 The two additional cumulants cost sampling time. In two simulated designs
 (30 subjects with 200 or 250 trials, 3 seeds each, one machine) a gradient

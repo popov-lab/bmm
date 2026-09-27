@@ -46,8 +46,7 @@ fit in which some cells have no usable summaries at the upper boundary:
 the primary response, \code{mean_rt_upper}, holds placeholders there, so
 \code{NULL} means \code{resp_var = "mean_rt_upper"}, which leaves those cells out
 but takes neither \code{newdata} nor the \verb{loo_*} types. For the RT models,
-passing
-\code{negative_rt = TRUE} (a \code{\link[brms:posterior_predict]{brms::posterior_predict()}} argument) is
+passing \code{negative_rt = TRUE} (a \code{\link[brms:posterior_predict]{brms::posterior_predict()}} argument) is
 redirected to \code{resp_var = "signed_rt"}, so that observed and predicted
 response times are both signed by the response.}
 
@@ -63,9 +62,10 @@ instead of counts). \code{re_formula = NA} predicts at the population level on
 every path.}
 }
 \value{
-For multinomial models, a 4-parameter \code{\link[=ezdm]{ezdm()}} with placeholders
-in \code{mean_rt_upper}, or when \code{resp_var} is specified, a \code{ggplot2} object (a \code{bayesplot_grid} for
-\code{resp_var = "all"}). For other models, the result of \code{\link[brms:pp_check]{brms::pp_check()}}.
+For multinomial models, for a 4-parameter \code{\link[=ezdm]{ezdm()}} fit with
+placeholders in \code{mean_rt_upper}, or when \code{resp_var} is specified, a
+\code{ggplot2} object (a \code{bayesplot_grid} for \code{resp_var = "all"}). For other
+models, the result of \code{\link[brms:pp_check]{brms::pp_check()}}.
 }
 \description{
 For models where brms provides \code{pp_check} support, this method delegates to

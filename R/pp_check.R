@@ -61,8 +61,7 @@
 #'   the primary response, `mean_rt_upper`, holds placeholders there, so
 #'   `NULL` means `resp_var = "mean_rt_upper"`, which leaves those cells out
 #'   but takes neither `newdata` nor the `loo_*` types. For the RT models,
-#'   passing
-#'   `negative_rt = TRUE` (a [brms::posterior_predict()] argument) is
+#'   passing `negative_rt = TRUE` (a [brms::posterior_predict()] argument) is
 #'   redirected to `resp_var = "signed_rt"`, so that observed and predicted
 #'   response times are both signed by the response.
 #' @param ... Additional arguments. Without `resp_var`, forwarded to
@@ -75,9 +74,10 @@
 #'   (interval width, default `0.9`) and `freq` (`FALSE` for proportions
 #'   instead of counts). `re_formula = NA` predicts at the population level on
 #'   every path.
-#' @return For multinomial models, a 4-parameter [ezdm()] with placeholders
-#'   in `mean_rt_upper`, or when `resp_var` is specified, a `ggplot2` object (a `bayesplot_grid` for
-#'   `resp_var = "all"`). For other models, the result of [brms::pp_check()].
+#' @return For multinomial models, for a 4-parameter [ezdm()] fit with
+#'   placeholders in `mean_rt_upper`, or when `resp_var` is specified, a
+#'   `ggplot2` object (a `bayesplot_grid` for `resp_var = "all"`). For other
+#'   models, the result of [brms::pp_check()].
 #' @seealso [brms::pp_check()], [pp_check_vars()]
 #' @aliases pp_check
 #' @importFrom brms pp_check

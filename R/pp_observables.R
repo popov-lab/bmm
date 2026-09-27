@@ -53,12 +53,12 @@
 #' @param prep A `brmsprep` object from [brms::prepare_predictions()].
 #' @return `pp_observables()` returns `NULL` for a model that delegates fully
 #'   to [brms::pp_check()], or a list with elements `observed` (a named
-#'   character vector mapping observable names to brms standata slots) and
+#'   character vector mapping observable names to brms standata slots),
 #'   `checks` (a named list of check definitions, each with a `compute`
 #'   closure, a `label` and a default plot `type`: a bayesplot `ppc_*` type
-#'   or bmm's `"bars_binned"`). `pp_simulate()`
-#'   returns a named list of `ndraws` x `nobs` matrices, one per simulated
-#'   observable.
+#'   or bmm's `"bars_binned"`) and, optionally, `defaults` and
+#'   `y_placeholders` (see Details). `pp_simulate()` returns a named list of
+#'   `ndraws` x `nobs` matrices, one per simulated observable.
 #' @keywords internal developer
 #' @export
 pp_observables <- function(model) {
