@@ -13,7 +13,7 @@ Fit computational and measurement models using full Bayesian inference. The pack
 Useful links:
 \itemize{
   \item \url{https://github.com/popov-lab/bmm}
-  \item \url{https://venpopov.com/bmm/}
+  \item \url{https://popov-lab.github.io/bmm/}
   \item Report bugs at \url{https://github.com/popov-lab/bmm/issues}
 }
 
