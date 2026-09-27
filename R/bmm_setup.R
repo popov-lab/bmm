@@ -342,7 +342,9 @@ setup_error_patterns <- c(
   "check_cmdstan_toolchain",
   # the call and the package name read the same in every language R speaks
   "requirePackage\\(package\\).*.(rstan|StanHeaders).",
-  "loadNamespace\\(\\).*.(rstan|StanHeaders|cmdstanr|RcppParallel).",
+  "loadNamespace\\(.*.(rstan|StanHeaders|cmdstanr|RcppParallel).",
+  # a corrupt shared object is raised by dyn.load(), unwrapped, from loadNamespace()
+  "dyn\\.load\\(.*[/\\\\](rstan|StanHeaders|RcppParallel)[/\\\\]libs[/\\\\]",
   # rstan 2.32 reports any failed compilation as an invalid connection here
   'sink\\(type = "output"\\)'
 )

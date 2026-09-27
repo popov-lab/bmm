@@ -314,7 +314,17 @@ setup_error_texts <- list(
     "kann benötigtes Paket ‘rstan’ nicht laden", quote(.requirePackage(package))
   ),
   rstan_on_load_german = simpleError(".onLoad in loadNamespace() für 'rstan' fehlgeschlagen"),
-  rstan_compiler_german = simpleError("ungültige Verbindung", quote(sink(type = "output")))
+  rstan_compiler_german = simpleError("ungültige Verbindung", quote(sink(type = "output"))),
+  rstan_removed = simpleError("there is no package called ‘rstan’", quote(loadNamespace(x))),
+  rstan_removed_german = simpleError("es gibt kein Paket namens ‘rstan’", quote(loadNamespace(x))),
+  rstan_shared_object_broken = simpleError(
+    "unable to load shared object '/Library/Frameworks/R.framework/Versions/4.6/Resources/library/rstan/libs/rstan.so': dlopen(...)",
+    quote(dyn.load(file, DLLpath = DLLpath, ...))
+  ),
+  rstan_stanheaders_version = simpleError(
+    "namespace ‘StanHeaders’ 2.26.28 is already loaded, but >= 2.32.0 is required",
+    quote(loadNamespace(j <- i[[1L]], c(lib.loc, .libPaths()), versionCheck = vI[[j]]))
+  )
 )
 
 other_error_texts <- list(
