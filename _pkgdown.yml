@@ -35,6 +35,7 @@ reference:
     - "bmm-package"
     - "supported_models"
     - "bmm_options"
+    - "bmm_setup"
   - title: "Fitting models"
     desc: "Main functions for model fitting"
   - contents:
