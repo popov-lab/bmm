@@ -368,6 +368,18 @@ test_that("pp_check() without resp_var leaves the placeholders of a 4par fit out
   expect_false(any(y == -1))
 })
 
+# the user passed no resp_var, so the refusal must not be phrased as if they had
+test_that("pp_check() without resp_var says why a 4par fit with upper placeholders refuses newdata", {
+  fit <- sparse_ezdm4_fit()$fit
+  why <- "cells without an observed 'mean_rt_upper'"
+  expect_error(pp_check(fit, newdata = fit$data, ndraws = 5), why, fixed = TRUE)
+  expect_error(pp_check(fit, type = "loo_pit_overlay", ndraws = 5), why,
+               fixed = TRUE)
+  expect_error(pp_check(fit, resp_var = "mean_rt_upper", newdata = fit$data),
+               "'newdata' is not supported for the 'mean_rt_upper' check",
+               fixed = TRUE)
+})
+
 # placeholders at the lower boundary leave Y an observation in every cell, so
 # the default stays with brms and keeps what only brms offers
 test_that("pp_check() without resp_var plots every cell of a 4par fit with lower placeholders only", {

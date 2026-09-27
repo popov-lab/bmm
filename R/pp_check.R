@@ -103,6 +103,12 @@ pp_check.bmmfit <- function(object, type = NULL, ndraws = NULL,
   if (is.null(resp_var) && !is.null(spec$y_placeholders) &&
       isTRUE(spec$y_placeholders(object$data))) {
     resp_var <- names(spec$observed)[spec$observed == "Y"]
+    # refused here, where the reason is known: the checks below would name a
+    # resp_var the user never passed
+    stopif(!is.null(dots$newdata) || grepl("^loo_", type %||% ""),
+           "This {object$bmm$model$name} fit has cells without an observed \\
+            '{resp_var}', so pp_check() checks '{resp_var}' itself, leaving \\
+            those cells out, and does not take 'newdata' or the 'loo_*' types.")
   }
 
   if (!is.null(resp_var)) {
