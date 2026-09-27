@@ -277,6 +277,13 @@ test_that("a subset of the report still prints", {
   expect_no_error(capture.output(print(head(report, 3), color = FALSE)))
 })
 
+test_that("a column subset of the report falls back to data.frame printing", {
+  local_machine(smoke = smoke_must_not_run)
+  report <- bmm_setup(smoke_test = FALSE, backend = "cmdstanr")
+
+  expect_no_error(capture.output(print(report[, c("check", "status")])))
+})
+
 test_that("print() shows the last messages of a failed smoke test", {
   local_machine(smoke = function(backend) {
     list(

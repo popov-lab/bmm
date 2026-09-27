@@ -281,6 +281,9 @@ probe_smoke_test <- function(backend) {
 
 #' @export
 print.bmm_setup <- function(x, color = getOption("bmm.color_summary", TRUE), ...) {
+  if (is.null(attr(x, "os")) || !all(c("check", "status", "detail", "fix") %in% names(x))) {
+    return(NextMethod())
+  }
   withr::local_options(bmm.color_summary = color)
   os <- c(windows = "Windows", macos = "macOS", linux = "Linux")[[attr(x, "os")]]
   cat(glue("bmm setup check ({os}, R {attr(x, 'r_version')})"), "\n\n", sep = "")
