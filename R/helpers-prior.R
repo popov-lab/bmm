@@ -207,14 +207,10 @@ prior_provenance <- function(fit) {
   model <- fit$bmm$model
   defaults <- suppressWarnings(suppressMessages({
     # reconstruct from the post-pipeline formula and model frame stored on the
-    # fit instead of re-running the data pipeline: brms drops raw response
-    # columns from the model frame for some models (e.g. m3), so check_data
-    # cannot be re-run there; it is still tried because it restores helper
+    # fit instead of re-running the data pipeline; the frame first has to be
+    # turned back into data check_data() accepts, which also restores the helper
     # columns that model-specific configure_prior methods inspect (ss_numeric)
-    data <- tryCatch(
-      check_data(model, fit$data, fit$bmm$user_formula),
-      error = function(e) fit$data
-    )
+    data <- check_stored_data(model, fit$data, fit$bmm$user_formula)
     frame_args <- fit_frame_args(fit)
     combine_prior(
       brms::do_call(brms::default_prior, c(list(fit$formula, data = fit$data), frame_args)),
