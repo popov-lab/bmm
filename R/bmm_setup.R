@@ -186,9 +186,9 @@ smoke_check <- function(report, chosen, smoke_test) {
   structure(
     setup_row(
       "Smoke test", "fail", strsplit(smoke$error, "\n", fixed = TRUE)[[1]][1],
-      "look for a compiler set in ~/.R/Makevars or in the CXX or CXX17 environment variables; \\
-      if there is none, please report this at https://github.com/popov-lab/bmm/issues, with \\
-      the output of bmm_setup()"
+      glue("look for a compiler set in ~/.R/Makevars or in the CXX or CXX17 environment \\
+      variables; if there is none, please report this at \\
+      https://github.com/popov-lab/bmm/issues, with the output of bmm_setup()")
     ),
     output = smoke$output
   )

@@ -143,6 +143,15 @@ test_that("a failing smoke test reports the first line of its error and where to
   expect_equal(smoke$detail, "Stan program failed to compile")
   expect_match(smoke$fix, "~/.R/Makevars", fixed = TRUE)
   expect_match(smoke$fix, "https://github.com/popov-lab/bmm/issues", fixed = TRUE)
+  expect_no_match(smoke$fix, "\\\\")
+  expect_equal(
+    smoke$fix,
+    paste(
+      "look for a compiler set in ~/.R/Makevars or in the CXX or CXX17 environment",
+      "variables; if there is none, please report this at",
+      "https://github.com/popov-lab/bmm/issues, with the output of bmm_setup()"
+    )
+  )
 })
 
 test_that("smoke_test = FALSE skips the fit", {
