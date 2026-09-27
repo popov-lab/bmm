@@ -12,7 +12,7 @@ badge](https://popov-lab.r-universe.dev/badges/bmm)](https://popov-lab.r-univers
 [![R-CMD-check](https://github.com/popov-lab/bmm/actions/workflows/R-CMD-check.yaml/badge.svg)](https://github.com/popov-lab/bmm/actions/workflows/R-CMD-check.yaml)
 [![test-coverage](https://github.com/popov-lab/bmm/actions/workflows/test-coverage.yaml/badge.svg)](https://github.com/popov-lab/bmm/actions/workflows/test-coverage.yaml)
 [![downloads](https://cranlogs.r-pkg.org/badges/bmm)](https://cran.r-project.org/package=bmm)
-[![Dependencies](https://img.shields.io/badge/dependencies-9/16-orange?style=flat)](#)
+[![Dependencies](https://img.shields.io/badge/dependencies-12/19-orange?style=flat)](#)
 <!-- badges: end -->
 
 ## Overview
@@ -148,6 +148,10 @@ working memory research and evidence accumulation models, such as:
 
 - The Multinomial / Memory Measurement Model
 
+**Perception & Recognition Memory**
+
+- Signal Detection Theory (Yes/No)
+
 However, the `bmm` package is setup to provide the foundation for the
 implementation of a broad range of cognitive measurement models. In
 fact, we are already working on implementing additional models, such as:
@@ -178,6 +182,7 @@ bmm::supported_models()
 #> -  mixture2p(resp_error) 
 #> -  mixture3p(resp_error, nt_features, set_size, regex) 
 #> -  sdm(resp_error, version) 
+#> -  sdt_yn(response, stimulus, n_trials, dist, links) 
 #> 
 #> Type  ?modelname  to get information about a specific model, e.g.  ?imm
 ```

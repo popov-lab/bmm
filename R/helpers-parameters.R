@@ -962,7 +962,7 @@ native_transform.non_targets <- function(model, linpred, data, ...) {
     '{x$bmm$model$name}' are declared by the model but do not appear in the fitted \\
     formula, so they cannot be predicted. This usually means a parameter name \\
     collides with a data column or with another parameter's formula. Please report \\
-    this at https://github.com/venpopov/bmm/issues"
+    this at https://github.com/popov-lab/bmm/issues"
   )
   if (length(unresolved) > 0) {
     warning2(
