@@ -35,6 +35,8 @@
 * `update()` now configures the likelihood for the threading spec that will actually be used. `brms::update.brmsfit` falls back to the original fit's `threads` when the argument is not passed, but bmm only inspected the new request, so updating a threaded fit without repeating `threads` emitted the serial likelihood chunk into threaded Stan code — for the **sdm** model a compile error (`Identifier 'COSN' not in scope`), and for any `loop = FALSE` custom family a silently mis-sliced likelihood. The fallback follows brms in distinguishing an absent `threads` argument from an explicit `threads = NULL`, which turns threading off.
 * `update()` no longer lets a global `options(brms.threads = )` reach the likelihood configuration. Updating an unthreaded fit under a session-wide threading option emitted the sliced likelihood chunk while brms generated serial Stan code (`Identifier 'start' not in scope`); the spec of the fit being updated now always wins, as it does in brms.
 * `update()` now re-resolves every parameter whose constant the new formula changes. `update()` never called `check_model()`, so the constant was never resolved again and the original fit's prior overrode the freshly configured one: `update(fit, bmf(..., mu ~ 1))` returned a model in which `mu` was still pinned, `update(fit, bmf(..., kappa = 5))` one that reported `kappa = 5` while Stan estimated `kappa` freely, and `update(fit, bmf(..., mu = 0.5))` one that reported `mu = 0.5` while Stan kept `mu` at the original value — all three with no error or warning.
+* `ezdm(version = "4par")` no longer drops cells in which a boundary was reached fewer than twice or has no RT summaries. `brms` excluded the whole row, response counts included, so the cells with the most extreme accuracy were missing. `bmm()` now keeps them and warns how many there are; refit such models. `newdata` for `log_lik()` or `predict()` now needs the columns `rt_used_upper` and `rt_used_lower`, as in `fit$data`. Where some cells have no usable RT summaries at the upper boundary, `pp_check()` without `resp_var` leaves those cells out and no longer accepts `newdata` or the `loo_*` types (#430).
+* `dezdm(version = "4par")` now returns the density without a boundary's response-time terms where that boundary's summaries are `NA`, instead of `NA` (#430).
 * `ezdm_summary_stats(method = "mixture")` now returns `n_upper` and `n_trials` for the responses its `mean_rt`/`var_rt` are based on. It previously returned the raw counts beside cleaned moments, so every cell told **ezdm** it rested on more responses than it had and its posterior came out too narrow. Summary statistics change and fits are not reproduced; recompute them and refit. Use `guess_rate` to set the accuracy expected of a contaminant response (`version = "3par"` only). A cell whose accuracy `guess_rate` cannot explain is corrected without it, and warns. `adjust_ezdm_accuracy()` is deprecated — applying it now removes the same contaminants twice (#423).
 * The **ezdm** likelihood no longer assumes that reaction times are normally distributed. Because response times are right-skewed, it treated each cell as more informative than it is, and posteriors, especially for `bound`, came out too narrow. Existing **ezdm** fits are not reproduced: in our simulations, credible intervals for subject-level `bound` estimates widen by 20% to 75%, and fitting takes longer (see `?ezdm_dist`). A fit cached with `bmm(file = )` is reused unless `file_refit = "on_change"`. `rezdm()` no longer truncates `mean_rt` at `ndt`, so with very few trials it can return `mean_rt <= 0`, which `bmm()` rejects (#407).
 * Fix numerical failures in **ezdm**. With large drift rates, the 4-parameter model returned `NaN` in `dezdm()`, `rezdm()`, `log_lik()` and `pp_check()`, and both models could return a log-likelihood of `-Inf` when the predicted accuracy was very close to 1 but a cell contained errors. Near zero drift, the likelihood jumped where the code switched between formulas, and the response counts said nothing about the direction of drift. `dezdm()` now rejects counts that are not whole numbers (#407).
@@ -46,6 +48,7 @@
 * `update()` without `newdata` no longer fails for **m3** fits (*The response variable(s) corr, other, dist, npl missing in the data*) or for **mixture3p** and **imm** fits whose formulas do not use `set_size` (*The set_size variable 'set_size' must be either a variable in your data or a single numeric value*), and no longer warns for **sdt_yn** fits that the reserved column `dist_type` will be overwritten (#429).
 
 ### Other changes
+* bmm's own links now point at popov-lab.github.io/bmm instead of venpopov.com/bmm, which currently redirects to the new address. Update bookmarks when convenient (#433).
 * The **cswald** likelihood now evaluates all observations in one call instead of one at a time. This makes fitting faster, improves the accuracy of the gradients the sampler uses, and adds support for within-chain parallelization: `bmm(..., threads = 2)` now works for **cswald** as it does for **sdm**. The posterior is unchanged (#387).
 
 # bmm 1.3.2
@@ -107,10 +110,10 @@
 * New function **create_initfun()** creates initialization functions for models that benefit from or require initial values for MCMC sampling (#285).
 
 ### Documentation
-* New online [article](https://venpopov.com/bmm/dev/articles/bmm_ddm.html) to accompany the **ddm** model
-* New online [article](https://venpopov.com/bmm/dev/articles/bmm_ezdm.html) to accompany the **ezdm** model
-* New online [article](https://venpopov.com/bmm/dev/articles/bmm_cswald.html) to accompany the **cswald** model
-* New online [article](https://venpopov.com/bmm/dev/articles/bmm_rt_contamination.html) on pre-processing and contamination detection for reaction time data
+* New online [article](https://popov-lab.github.io/bmm/dev/articles/bmm_ddm.html) to accompany the **ddm** model
+* New online [article](https://popov-lab.github.io/bmm/dev/articles/bmm_ezdm.html) to accompany the **ezdm** model
+* New online [article](https://popov-lab.github.io/bmm/dev/articles/bmm_cswald.html) to accompany the **cswald** model
+* New online [article](https://popov-lab.github.io/bmm/dev/articles/bmm_rt_contamination.html) on pre-processing and contamination detection for reaction time data
 
 ### Other changes
 * Improved **rm3()** random generation function for the M3 model (#279).
@@ -120,7 +123,7 @@
 # bmm 1.2.0
 
 ### New models
-* Add the Memory Measurement Model (Oberauer & Lewandowsky, 2019) and its generalization as the Multinomial Measurement Model for categorical decision tasks as new model class **m3** with three versions: simple span (**ss**), complex span (**cs**), and **custom**. For details, see the [article](https://venpopov.com/bmm/articles/bmm_m3.html) on the `bmm` website (#237). Thanks to @GidonFrischkorn and @chenyu-psy
+* Add the Memory Measurement Model (Oberauer & Lewandowsky, 2019) and its generalization as the Multinomial Measurement Model for categorical decision tasks as new model class **m3** with three versions: simple span (**ss**), complex span (**cs**), and **custom**. For details, see the [article](https://popov-lab.github.io/bmm/articles/bmm_m3.html) on the `bmm` website (#237). Thanks to @GidonFrischkorn and @chenyu-psy
 
 ### New features
 * Updates to the `bmf2bf` S3 methods for more flexible translation of `bmmformulas` into `brmsformulas` (#227).
@@ -135,8 +138,8 @@
 * Improve error messages when attempting to construct bmmformulas without a left-hand-side variable
 
 ### Documentation
-* Add documentation to the [continuous reproduction task](https://venpopov.com/bmm/articles/bmm_vwm_crt.html) article for pre-processing half-circular stimulus spaces when using `bmmodels` of the `circular` model class (#229, #233).
-* New online [article](https://venpopov.com/bmm/articles/bmm_m3.html) to accompany the m3 model
+* Add documentation to the [continuous reproduction task](https://popov-lab.github.io/bmm/articles/bmm_vwm_crt.html) article for pre-processing half-circular stimulus spaces when using `bmmodels` of the `circular` model class (#229, #233).
+* New online [article](https://popov-lab.github.io/bmm/articles/bmm_m3.html) to accompany the m3 model
 
 ### Other changes
 * vectorize `k2sd()` function for improved performance
@@ -178,7 +181,7 @@ First version of the package on published on CRAN!
 * various updates to the documentation and data sets
 
 ### Documentation
-* two new online articles that [introduce the **bmmformula** syntax](https://venpopov.com/bmm/articles/bmm_bmmformula.html) and explain [how to extract information from **bmmodels**](https://venpopov.com/bmm/articles/bmm_extract_info.html) such as the generated Stan code and Stan data for each model
+* two new online articles that [introduce the **bmmformula** syntax](https://popov-lab.github.io/bmm/articles/bmm_bmmformula.html) and explain [how to extract information from **bmmodels**](https://popov-lab.github.io/bmm/articles/bmm_extract_info.html) such as the generated Stan code and Stan data for each model
 
 ### Bug fixes
 * fix a bug preventing the **sort_data** check from being executed (#72)
@@ -264,9 +267,9 @@ to zero for scaling and as of now cannot be predicted by independent variables b
 
 ### Documentation
 
-* Website for the development version of the package is now available at https://venpopov.com/bmm/dev/ (#18)
-* Add articles for each model to the website at https://venpopov.com/bmm/dev/articles/
-* Add a detailed developer's guide to the website at https://venpopov.com/bmm/dev/dev-notes (#21)
+* Website for the development version of the package is now available at https://popov-lab.github.io/bmm/dev/ (#18)
+* Add articles for each model to the website at https://popov-lab.github.io/bmm/dev/articles/
+* Add a detailed developer's guide to the website at https://popov-lab.github.io/bmm/dev/dev-notes (#21)
 * Improve README with more detailed information about the package's goals and its models (#21)
 
 ### Other changes

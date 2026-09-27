@@ -533,6 +533,22 @@ test_that("ezdm_summary_stats() 4par handles all correct or all errors", {
   expect_false(is.na(result2$mean_rt_lower))
 })
 
+# check_data() turns these NAs into placeholders for bmm(); the summaries
+# themselves keep coding a boundary without summaries as NA (#430)
+test_that("ezdm_summary_stats() 4par codes a boundary below min_trials as NA", {
+  rt <- withr::with_seed(1, rgamma(100, shape = 5, rate = 10) + 0.3)
+  response <- rep(c(1, 0), c(95, 5))
+
+  result <- ezdm_summary_stats(rt, response, version = "4par",
+                               method = "simple", min_trials = 10)
+
+  expect_equal(result$n_trials - result$n_upper, 5)
+  expect_true(is.na(result$mean_rt_lower))
+  expect_true(is.na(result$var_rt_lower))
+  expect_false(is.na(result$mean_rt_upper))
+  expect_false(is.na(result$var_rt_upper))
+})
+
 test_that("ezdm_summary_stats() validates contaminant_bound", {
   rt <- rgamma(100, shape = 5, rate = 10) + 0.3
   response <- rbinom(100, 1, 0.8)

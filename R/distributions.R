@@ -96,7 +96,7 @@ rejection_sampling <- function(n, f, max_f, proposal_fun, ...) {
 #' @param kappa Vector of precision values
 #' @param log Logical; if `TRUE`, values are returned on the log scale.
 #' @param parametrization Character; either `"bessel"` or `"sqrtexp"`
-#'   (default). See [the online article](https://venpopov.com/bmm/articles/bmm_sdm_simple.html) for details on the
+#'   (default). See [the online article](https://popov-lab.github.io/bmm/articles/bmm_sdm_simple.html) for details on the
 #'   parameterization.
 #' @param log.p Logical; if `TRUE`, probabilities are returned on the log
 #'   scale.
@@ -116,7 +116,7 @@ rejection_sampling <- function(n, f, max_f, proposal_fun, ...) {
 #'
 #' @details **Parametrization**
 #'
-#' See [the online article](https://venpopov.com/bmm/articles/bmm_sdm_simple.html) for details on the parameterization.
+#' See [the online article](https://popov-lab.github.io/bmm/articles/bmm_sdm_simple.html) for details on the parameterization.
 #' Oberauer (2023) introduced the SDM with the bessel parametrization. The
 #' sqrtexp parametrization is the default in the `bmm` package for
 #' numerical stability and efficiency. The two parametrizations are related by
@@ -1267,11 +1267,13 @@ times_nonzero <- function(count, log_prob) {
 #'   one set of cumulants. For version `"4par"` the two boundaries have
 #'   different decision-time distributions, so each is given its own summaries
 #'   and its own response count. A boundary reached fewer than twice has no
-#'   sample variance; in `dezdm()` it contributes only through the binomial
-#'   term, but `bmm()` currently drops such cells, because `rezdm()` and
-#'   `ezdm_summary_stats()` code their missing summaries as `NA` and `brms`
-#'   excludes rows with missing values. The per-boundary formulas condition on
-#'   the realised counts, which are themselves random.
+#'   sample variance, and one whose summaries are `NA` has nothing to evaluate;
+#'   `dezdm()` lets either contribute only through the binomial term.
+#'   `rezdm()` and `ezdm_summary_stats()` code such summaries as `NA`, and
+#'   `bmm()` keeps these cells: it replaces the summaries of such a boundary
+#'   with a placeholder that the likelihood never reads, so the response
+#'   counts still inform the fit. The per-boundary formulas condition on the
+#'   realised counts, which are themselves random.
 #'
 #'   The two additional cumulants cost sampling time. In two simulated designs
 #'   (30 subjects with 200 or 250 trials, 3 seeds each, one machine) a gradient
@@ -1484,8 +1486,9 @@ rezdm <- function(n, n_trials, drift, bound, ndt, zr = 0.5, s = 1,
     .ezdm_logit_pc(b_upper, b_lower, rep_len(drift / s^2, n))
   )
 
-  # a boundary with fewer than two responses has no sample variance and
-  # contributes only through the binomial term
+  # a boundary with fewer than two responses has no sample variance, and one
+  # with NA summaries has nothing to evaluate; either contributes only through
+  # the binomial term
   boundary_ll <- function(valid, mean_rt, var_rt, n_boundary, MDT, VRT, k3, k4) {
     rt <- .ez_rt_terms(VRT[valid], k3[valid], k4[valid], n_boundary[valid])
     stats::dgamma(var_rt[valid], shape = rt$shape, rate = rt$rate, log = TRUE) +
@@ -1495,7 +1498,7 @@ rezdm <- function(n, n_trials, drift, bound, ndt, zr = 0.5, s = 1,
       )
   }
 
-  upper_valid <- n_upper >= 2
+  upper_valid <- n_upper >= 2 & !is.na(mean_rt_upper) & !is.na(var_rt_upper)
   if (any(upper_valid)) {
     ll[upper_valid] <- ll[upper_valid] + boundary_ll(
       upper_valid, mean_rt_upper, var_rt_upper, n_upper,
@@ -1503,7 +1506,7 @@ rezdm <- function(n, n_trials, drift, bound, ndt, zr = 0.5, s = 1,
     )
   }
 
-  lower_valid <- n_lower >= 2
+  lower_valid <- n_lower >= 2 & !is.na(mean_rt_lower) & !is.na(var_rt_lower)
   if (any(lower_valid)) {
     ll[lower_valid] <- ll[lower_valid] + boundary_ll(
       lower_valid, mean_rt_lower, var_rt_lower, n_lower,
