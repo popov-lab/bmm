@@ -116,6 +116,10 @@ working memory research and evidence accumulation models, such as:
 
 - The Multinomial / Memory Measurement Model
 
+**Perception & Recognition Memory**
+
+- Signal Detection Theory (Yes/No)
+
 However, the `bmm` package is setup to provide the foundation for the
 implementation of a broad range of cognitive measurement models. In
 fact, we are already working on implementing additional models, such as:
@@ -147,6 +151,7 @@ bmm::supported_models()
 #> -  mixture2p(resp_error) 
 #> -  mixture3p(resp_error, nt_features, set_size, regex) 
 #> -  sdm(resp_error, version) 
+#> -  sdt_yn(response, stimulus, n_trials, dist, links) 
 #> 
 #> Type  ?modelname  to get information about a specific model, e.g.  ?imm
 ```
@@ -154,8 +159,8 @@ bmm::supported_models()
 ## Fitting models using `bmm`
 
 The core function of the `bmm` package is the
-[`bmm()`](https://venpopov.com/bmm/dev/reference/bmm.md) function. This
-function takes:
+[`bmm()`](https://popov-lab.github.io/bmm/dev/reference/bmm.md)
+function. This function takes:
 
 1.  a *linear model formula* specifying how parameters of the model
     should vary as a function of experimental conditions
@@ -180,7 +185,7 @@ with the package and we will show how to fit the Interference
 Measurement Model to this data. If you want a detailed description of
 this model and and in depth explanation of the parameters estimated in
 the model, please have a look at [the IMM
-article](https://venpopov.com/bmm/articles/bmm_imm.html).
+article](https://popov-lab.github.io/bmm/articles/bmm_imm.html).
 
 ``` r
 
@@ -214,9 +219,10 @@ brms::pp_check(fit)
 
 You can have a look at examples for how to fit all currently implemented
 models by reading the vignettes for each model [here for the released
-version of the package](https://venpopov.com/bmm/articles/index.html) or
-[here for the development
-version](https://venpopov.com/bmm/dev/articles/index.html).
+version of the
+package](https://popov-lab.github.io/bmm/articles/index.html) or [here
+for the development
+version](https://popov-lab.github.io/bmm/dev/articles/index.html).
 
 ## Exploring measurement models
 
@@ -280,14 +286,15 @@ face challenges in writing their own STAN code to implement such models
 themselves can still use these models in almost any experimental design.
 
 Under the hood, the main
-[`bmm()`](https://venpopov.com/bmm/dev/reference/bmm.md) function will
-then call the appropriate functions for the specified model and will
-perform several steps:
+[`bmm()`](https://popov-lab.github.io/bmm/dev/reference/bmm.md) function
+will then call the appropriate functions for the specified model and
+will perform several steps:
 
 1.  Configure the sampler (e.g., set up prallelization & additional
     settings)
 2.  Check the information passed to the
-    [`bmm()`](https://venpopov.com/bmm/dev/reference/bmm.md) function:
+    [`bmm()`](https://popov-lab.github.io/bmm/dev/reference/bmm.md)
+    function:
     - if the model is installed and all required arguments were provided
     - if a valid formula was passed
     - if the data contains all necessary variables
@@ -304,8 +311,8 @@ This process is illustrated in the Figure below:
 
 Should be interested in contributing a model to the `bmm` package, you
 should first look into the [Developer
-Notes](https://venpopov.com/bmm/dev/dev-notes/index.html) as well as the
-[Contributor
+Notes](https://popov-lab.github.io/bmm/dev/dev-notes/index.html) as well
+as the [Contributor
 Guidelines](https://github.com/popov-lab/bmm/blob/develop/.github/CONTRIBUTING.md).
 These give a more in depth description of the package architecture, the
 steps necessary to add your own model to the package, and how

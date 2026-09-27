@@ -22,7 +22,7 @@ parameters(x, ...)
 
   A `bmmodel` object (e.g., `sdm(resp_error = "y")`) or a `bmmfit`
   object (a fitted model returned by
-  [`bmm`](https://venpopov.com/bmm/dev/reference/bmm.md)).
+  [`bmm`](https://popov-lab.github.io/bmm/dev/reference/bmm.md)).
 
 - ...:
 

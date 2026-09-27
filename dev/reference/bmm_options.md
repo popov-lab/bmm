@@ -24,17 +24,17 @@ bmm_options(
   logical. If TRUE, the data will be sorted by the predictors. If FALSE,
   the data will not be sorted, but sampling will be slower. If "check"
   (the default),
-  [`bmm()`](https://venpopov.com/bmm/dev/reference/bmm.md) will check if
-  the data is sorted, and ask you via a console prompt if it should be
-  sorted. **Default: "check"**
+  [`bmm()`](https://popov-lab.github.io/bmm/dev/reference/bmm.md) will
+  check if the data is sorted, and ask you via a console prompt if it
+  should be sorted. **Default: "check"**
 
 - parallel:
 
   logical. If TRUE, chains will be run in parallel. If FALSE, chains
   will be run sequentially. You can also set these value for each model
   separately via the argument `parallel` in
-  [`bmm()`](https://venpopov.com/bmm/dev/reference/bmm.md). **Default:
-  FALSE**
+  [`bmm()`](https://popov-lab.github.io/bmm/dev/reference/bmm.md).
+  **Default: FALSE**
 
 - default_priors:
 
@@ -56,17 +56,18 @@ bmm_options(
 - file_refit:
 
   logical or character. Controls when
-  [`bmm()`](https://venpopov.com/bmm/dev/reference/bmm.md) re-uses a fit
-  saved via its `file` argument. `TRUE` or "always" always refits,
-  `FALSE` or "never" always re-uses the saved fit, and "on_change"
-  re-uses it only while the Stan code and data are unchanged. See
-  [`bmm()`](https://venpopov.com/bmm/dev/reference/bmm.md) for details.
-  **Default: FALSE**
+  [`bmm()`](https://popov-lab.github.io/bmm/dev/reference/bmm.md)
+  re-uses a fit saved via its `file` argument. `TRUE` or "always" always
+  refits, `FALSE` or "never" always re-uses the saved fit, and
+  "on_change" re-uses it only while the Stan code and data are
+  unchanged. See
+  [`bmm()`](https://popov-lab.github.io/bmm/dev/reference/bmm.md) for
+  details. **Default: FALSE**
 
 - step_size:
 
   numeric or `FALSE`. The step size at which
-  [`bmm()`](https://venpopov.com/bmm/dev/reference/bmm.md) and
+  [`bmm()`](https://popov-lab.github.io/bmm/dev/reference/bmm.md) and
   [`update()`](https://rdrr.io/r/stats/update.html) start Stan's
   step-size search, passed as `control = list(step_size = )` (`stepsize`
   for the rstan backend). Stan's own starting value of 1 is far above
@@ -76,8 +77,8 @@ bmm_options(
   size and the posterior do not depend on the starting value. `FALSE`
   leaves the starting step size to Stan; a `step_size` (or `stepsize`)
   in the `control` list of
-  [`bmm()`](https://venpopov.com/bmm/dev/reference/bmm.md) always wins.
-  **Default: 0.01**
+  [`bmm()`](https://popov-lab.github.io/bmm/dev/reference/bmm.md) always
+  wins. **Default: 0.01**
 
 - reset_options:
 
@@ -97,9 +98,9 @@ current options. If arguments are provided, the function will change the
 options and return the old options invisibly. If you provide only some
 of the arguments, the other options will not be changed. The options are
 stored in the global options list and will be used by
-[`bmm()`](https://venpopov.com/bmm/dev/reference/bmm.md) and other
-functions in the `bmm` package. Each of these options can also be set
-manually using the built-in
+[`bmm()`](https://popov-lab.github.io/bmm/dev/reference/bmm.md) and
+other functions in the `bmm` package. Each of these options can also be
+set manually using the built-in
 [`options()`](https://rdrr.io/r/base/options.html) function, by setting
 the `bmm.sort_data`, `bmm.default_priors`, and `bmm.silent` options.
 

@@ -21,7 +21,7 @@ emm_basis(object, trms, xlev, grid, ..., dpar = NULL, nlpar = NULL)
 - object:
 
   A bmmfit object (created by
-  [`bmm()`](https://venpopov.com/bmm/dev/reference/bmm.md))
+  [`bmm()`](https://popov-lab.github.io/bmm/dev/reference/bmm.md))
 
 - ...:
 
@@ -55,7 +55,7 @@ bmm models use two types of parameters internally in brms:
   `custom_family(dpars = ...)` (e.g., SDM, EZDM)
 
 - **Non-linear parameters (`nlpar`)**: Used in models with
-  [`bmf2bf()`](https://venpopov.com/bmm/dev/reference/bmf2bf.md) +
+  [`bmf2bf()`](https://popov-lab.github.io/bmm/dev/reference/bmf2bf.md) +
   `nlf()` (e.g., mixture2p, mixture3p, IMM, M3)
 
 Users should not need to know this distinction. These methods intercept

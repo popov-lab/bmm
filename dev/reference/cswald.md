@@ -151,9 +151,10 @@ An object of class `bmmodel`
 
 ## See also
 
-[`dcswald()`](https://venpopov.com/bmm/dev/reference/cswald_dist.md) and
-[`rcswald()`](https://venpopov.com/bmm/dev/reference/cswald_dist.md) for
-the density and random generation functions.
+[`dcswald()`](https://popov-lab.github.io/bmm/dev/reference/cswald_dist.md)
+and
+[`rcswald()`](https://popov-lab.github.io/bmm/dev/reference/cswald_dist.md)
+for the density and random generation functions.
 
 ## Examples
 

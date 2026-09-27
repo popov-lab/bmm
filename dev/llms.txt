@@ -116,6 +116,10 @@ working memory research and evidence accumulation models, such as:
 
 - The Multinomial / Memory Measurement Model
 
+**Perception & Recognition Memory**
+
+- Signal Detection Theory (Yes/No)
+
 However, the `bmm` package is setup to provide the foundation for the
 implementation of a broad range of cognitive measurement models. In
 fact, we are already working on implementing additional models, such as:
@@ -147,6 +151,7 @@ bmm::supported_models()
 #> -  mixture2p(resp_error) 
 #> -  mixture3p(resp_error, nt_features, set_size, regex) 
 #> -  sdm(resp_error, version) 
+#> -  sdt_yn(response, stimulus, n_trials, dist, links) 
 #> 
 #> Type  ?modelname  to get information about a specific model, e.g.  ?imm
 ```
@@ -154,8 +159,8 @@ bmm::supported_models()
 ## Fitting models using `bmm`
 
 The core function of the `bmm` package is the
-[`bmm()`](https://venpopov.com/bmm/dev/reference/bmm.md) function. This
-function takes:
+[`bmm()`](https://popov-lab.github.io/bmm/dev/reference/bmm.md)
+function. This function takes:
 
 1.  a *linear model formula* specifying how parameters of the model
     should vary as a function of experimental conditions
@@ -180,7 +185,7 @@ with the package and we will show how to fit the Interference
 Measurement Model to this data. If you want a detailed description of
 this model and and in depth explanation of the parameters estimated in
 the model, please have a look at [the IMM
-article](https://venpopov.com/bmm/articles/bmm_imm.html).
+article](https://popov-lab.github.io/bmm/articles/bmm_imm.html).
 
 ``` r
 
@@ -214,9 +219,10 @@ brms::pp_check(fit)
 
 You can have a look at examples for how to fit all currently implemented
 models by reading the vignettes for each model [here for the released
-version of the package](https://venpopov.com/bmm/articles/index.html) or
-[here for the development
-version](https://venpopov.com/bmm/dev/articles/index.html).
+version of the
+package](https://popov-lab.github.io/bmm/articles/index.html) or [here
+for the development
+version](https://popov-lab.github.io/bmm/dev/articles/index.html).
 
 ## Exploring measurement models
 
@@ -280,14 +286,15 @@ face challenges in writing their own STAN code to implement such models
 themselves can still use these models in almost any experimental design.
 
 Under the hood, the main
-[`bmm()`](https://venpopov.com/bmm/dev/reference/bmm.md) function will
-then call the appropriate functions for the specified model and will
-perform several steps:
+[`bmm()`](https://popov-lab.github.io/bmm/dev/reference/bmm.md) function
+will then call the appropriate functions for the specified model and
+will perform several steps:
 
 1.  Configure the sampler (e.g., set up prallelization & additional
     settings)
 2.  Check the information passed to the
-    [`bmm()`](https://venpopov.com/bmm/dev/reference/bmm.md) function:
+    [`bmm()`](https://popov-lab.github.io/bmm/dev/reference/bmm.md)
+    function:
     - if the model is installed and all required arguments were provided
     - if a valid formula was passed
     - if the data contains all necessary variables
@@ -304,8 +311,8 @@ This process is illustrated in the Figure below:
 
 Should be interested in contributing a model to the `bmm` package, you
 should first look into the [Developer
-Notes](https://venpopov.com/bmm/dev/dev-notes/index.html) as well as the
-[Contributor
+Notes](https://popov-lab.github.io/bmm/dev/dev-notes/index.html) as well
+as the [Contributor
 Guidelines](https://github.com/popov-lab/bmm/blob/develop/.github/CONTRIBUTING.md).
 These give a more in depth description of the package architecture, the
 steps necessary to add your own model to the package, and how
@@ -317,46 +324,47 @@ contributions will be acknowledged.
 
 These pages provide a summary of the functionality available in bmm
 
-- [`bmm-package`](https://venpopov.com/bmm/dev/reference/bmm-package.md)
+- [`bmm-package`](https://popov-lab.github.io/bmm/dev/reference/bmm-package.md)
   : Easy and Accesible Bayesian Measurement Models Using 'brms'
 
-- [`supported_models()`](https://venpopov.com/bmm/dev/reference/supported_models.md)
+- [`supported_models()`](https://popov-lab.github.io/bmm/dev/reference/supported_models.md)
   :
 
   Measurement models available in `bmm`
 
-- [`bmm_options()`](https://venpopov.com/bmm/dev/reference/bmm_options.md)
+- [`bmm_options()`](https://popov-lab.github.io/bmm/dev/reference/bmm_options.md)
   : View or change global bmm options
 
 ## Fitting models
 
 Main functions for model fitting
 
-- [`bmm()`](https://venpopov.com/bmm/dev/reference/bmm.md)
-  [`fit_model()`](https://venpopov.com/bmm/dev/reference/bmm.md) : Fit
-  Bayesian Measurement Models
+- [`bmm()`](https://popov-lab.github.io/bmm/dev/reference/bmm.md)
+  [`fit_model()`](https://popov-lab.github.io/bmm/dev/reference/bmm.md)
+  : Fit Bayesian Measurement Models
 
-- [`bmmformula()`](https://venpopov.com/bmm/dev/reference/bmmformula.md)
-  [`bmf()`](https://venpopov.com/bmm/dev/reference/bmmformula.md) :
+- [`bmmformula()`](https://popov-lab.github.io/bmm/dev/reference/bmmformula.md)
+  [`bmf()`](https://popov-lab.github.io/bmm/dev/reference/bmmformula.md)
+  :
 
   Create formula for predicting parameters of a `bmmodel`
 
-- [`update(`*`<bmmfit>`*`)`](https://venpopov.com/bmm/dev/reference/update.bmmfit.md)
+- [`update(`*`<bmmfit>`*`)`](https://popov-lab.github.io/bmm/dev/reference/update.bmmfit.md)
   : Update a bmm model
 
-- [`summary(`*`<bmmfit>`*`)`](https://venpopov.com/bmm/dev/reference/summary.bmmfit.md)
+- [`summary(`*`<bmmfit>`*`)`](https://popov-lab.github.io/bmm/dev/reference/summary.bmmfit.md)
   :
 
   Create a summary of a fitted model represented by a `bmmfit` object
 
-- [`conditional_effects(`*`<bmmfit>`*`)`](https://venpopov.com/bmm/dev/reference/conditional_effects.bmmfit.md)
+- [`conditional_effects(`*`<bmmfit>`*`)`](https://popov-lab.github.io/bmm/dev/reference/conditional_effects.bmmfit.md)
   : Conditional Effects for BMM Models
 
-- [`recover_data(`*`<bmmfit>`*`)`](https://venpopov.com/bmm/dev/reference/emmeans-bmmfit.md)
-  [`emm_basis(`*`<bmmfit>`*`)`](https://venpopov.com/bmm/dev/reference/emmeans-bmmfit.md)
+- [`recover_data(`*`<bmmfit>`*`)`](https://popov-lab.github.io/bmm/dev/reference/emmeans-bmmfit.md)
+  [`emm_basis(`*`<bmmfit>`*`)`](https://popov-lab.github.io/bmm/dev/reference/emmeans-bmmfit.md)
   : emmeans support for bmmfit objects
 
-- [`pp_check(`*`<bmmfit>`*`)`](https://venpopov.com/bmm/dev/reference/pp_check.bmmfit.md)
+- [`pp_check(`*`<bmmfit>`*`)`](https://popov-lab.github.io/bmm/dev/reference/pp_check.bmmfit.md)
   : Posterior predictive check for bmmfit objects
 
 ## Extract model information
@@ -364,244 +372,248 @@ Main functions for model fitting
 Utility functions for extracting default priors, generate stan code,
 stan data, etc.
 
-- [`bmm_data_check()`](https://venpopov.com/bmm/dev/reference/bmm_data_check.md)
+- [`bmm_data_check()`](https://popov-lab.github.io/bmm/dev/reference/bmm_data_check.md)
   : Human-readable pre-fit data report for bmm models
 
-- [`default_prior(`*`<bmmformula>`*`)`](https://venpopov.com/bmm/dev/reference/default_prior.bmmformula.md)
+- [`default_prior(`*`<bmmformula>`*`)`](https://popov-lab.github.io/bmm/dev/reference/default_prior.bmmformula.md)
   : Get Default priors for Measurement Models specified in BMM
 
-- [`extract_parameter_dimensions()`](https://venpopov.com/bmm/dev/reference/extract_parameter_dimensions.md)
+- [`extract_parameter_dimensions()`](https://popov-lab.github.io/bmm/dev/reference/extract_parameter_dimensions.md)
   : Extract dimension from parameters in STAN parameter block
 
-- [`extract_stan_blocks()`](https://venpopov.com/bmm/dev/reference/extract_stan_blocks.md)
+- [`extract_stan_blocks()`](https://popov-lab.github.io/bmm/dev/reference/extract_stan_blocks.md)
   : Extract code from different STAN program blocks
 
-- [`fit_info()`](https://venpopov.com/bmm/dev/reference/fit_info.md) :
-  Extract information from a brmsfit object
+- [`fit_info()`](https://popov-lab.github.io/bmm/dev/reference/fit_info.md)
+  : Extract information from a brmsfit object
 
-- [`native_parameters()`](https://venpopov.com/bmm/dev/reference/native_parameters.md)
+- [`native_parameters()`](https://popov-lab.github.io/bmm/dev/reference/native_parameters.md)
   : Posterior draws of model parameters on the native scale
 
-- [`pp_check_vars()`](https://venpopov.com/bmm/dev/reference/pp_check_vars.md)
+- [`pp_check_vars()`](https://popov-lab.github.io/bmm/dev/reference/pp_check_vars.md)
   : List the posterior predictive checks available for a model fit
 
-- [`report_priors()`](https://venpopov.com/bmm/dev/reference/report_priors.md)
+- [`report_priors()`](https://popov-lab.github.io/bmm/dev/reference/report_priors.md)
   : Report the priors used in a fitted bmm model
 
-- [`stancode(`*`<bmmformula>`*`)`](https://venpopov.com/bmm/dev/reference/stancode.bmmformula.md)
+- [`stancode(`*`<bmmformula>`*`)`](https://popov-lab.github.io/bmm/dev/reference/stancode.bmmformula.md)
   : Generate Stan code for bmm models
 
-- [`standata(`*`<bmmformula>`*`)`](https://venpopov.com/bmm/dev/reference/standata.bmmformula.md)
+- [`standata(`*`<bmmformula>`*`)`](https://popov-lab.github.io/bmm/dev/reference/standata.bmmformula.md)
   :
 
   Stan data for `bmm` models
 
-- [`parameters()`](https://venpopov.com/bmm/dev/reference/parameters.md)
+- [`parameters()`](https://popov-lab.github.io/bmm/dev/reference/parameters.md)
   : Get parameter information for a bmm model
 
 ## Specifying models
 
 Functions for specifying which model to fit
 
-- [`cswald()`](https://venpopov.com/bmm/dev/reference/cswald.md) :
-  Censored-Shifted Wald Model
-- [`ddm()`](https://venpopov.com/bmm/dev/reference/ddm.md) : Diffusion
-  Decision Model
-- [`ezdm()`](https://venpopov.com/bmm/dev/reference/ezdm.md) :
+- [`cswald()`](https://popov-lab.github.io/bmm/dev/reference/cswald.md)
+  : Censored-Shifted Wald Model
+- [`ddm()`](https://popov-lab.github.io/bmm/dev/reference/ddm.md) :
+  Diffusion Decision Model
+- [`ezdm()`](https://popov-lab.github.io/bmm/dev/reference/ezdm.md) :
   EZ-Diffusion Model
-- [`imm()`](https://venpopov.com/bmm/dev/reference/imm.md)
-  [`IMMfull()`](https://venpopov.com/bmm/dev/reference/imm.md)
-  [`IMMbsc()`](https://venpopov.com/bmm/dev/reference/imm.md)
-  [`IMMabc()`](https://venpopov.com/bmm/dev/reference/imm.md) :
+- [`imm()`](https://popov-lab.github.io/bmm/dev/reference/imm.md)
+  [`IMMfull()`](https://popov-lab.github.io/bmm/dev/reference/imm.md)
+  [`IMMbsc()`](https://popov-lab.github.io/bmm/dev/reference/imm.md)
+  [`IMMabc()`](https://popov-lab.github.io/bmm/dev/reference/imm.md) :
   Interference measurement model by Oberauer and Lin (2017).
-- [`m3()`](https://venpopov.com/bmm/dev/reference/m3.md) : The
+- [`m3()`](https://popov-lab.github.io/bmm/dev/reference/m3.md) : The
   Multinomial / Memory Measurement Model
-- [`mixture2p()`](https://venpopov.com/bmm/dev/reference/mixture2p.md) :
-  Two-parameter mixture model by Zhang and Luck (2008).
-- [`mixture3p()`](https://venpopov.com/bmm/dev/reference/mixture3p.md) :
-  Three-parameter mixture model by Bays et al (2009).
-- [`sdm()`](https://venpopov.com/bmm/dev/reference/sdm.md)
-  [`sdmSimple()`](https://venpopov.com/bmm/dev/reference/sdm.md) :
-  Signal Discrimination Model (SDM) by Oberauer (2023)
-- [`sdt_yn()`](https://venpopov.com/bmm/dev/reference/sdt_yn.md) :
-  Yes/No Signal Detection Theory Model
+- [`mixture2p()`](https://popov-lab.github.io/bmm/dev/reference/mixture2p.md)
+  : Two-parameter mixture model by Zhang and Luck (2008).
+- [`mixture3p()`](https://popov-lab.github.io/bmm/dev/reference/mixture3p.md)
+  : Three-parameter mixture model by Bays et al (2009).
+- [`sdm()`](https://popov-lab.github.io/bmm/dev/reference/sdm.md)
+  [`sdmSimple()`](https://popov-lab.github.io/bmm/dev/reference/sdm.md)
+  : Signal Discrimination Model (SDM) by Oberauer (2023)
+- [`sdt_yn()`](https://popov-lab.github.io/bmm/dev/reference/sdt_yn.md)
+  : Yes/No Signal Detection Theory Model
 
 ## Distributions
 
 Functions for special distributions
 
-- [`dimm()`](https://venpopov.com/bmm/dev/reference/IMMdist.md)
-  [`pimm()`](https://venpopov.com/bmm/dev/reference/IMMdist.md)
-  [`qimm()`](https://venpopov.com/bmm/dev/reference/IMMdist.md)
-  [`rimm()`](https://venpopov.com/bmm/dev/reference/IMMdist.md) :
+- [`dimm()`](https://popov-lab.github.io/bmm/dev/reference/IMMdist.md)
+  [`pimm()`](https://popov-lab.github.io/bmm/dev/reference/IMMdist.md)
+  [`qimm()`](https://popov-lab.github.io/bmm/dev/reference/IMMdist.md)
+  [`rimm()`](https://popov-lab.github.io/bmm/dev/reference/IMMdist.md) :
   Distribution functions for the Interference Measurement Model (IMM)
 
-- [`dsdm()`](https://venpopov.com/bmm/dev/reference/SDMdist.md)
-  [`psdm()`](https://venpopov.com/bmm/dev/reference/SDMdist.md)
-  [`qsdm()`](https://venpopov.com/bmm/dev/reference/SDMdist.md)
-  [`rsdm()`](https://venpopov.com/bmm/dev/reference/SDMdist.md) :
+- [`dsdm()`](https://popov-lab.github.io/bmm/dev/reference/SDMdist.md)
+  [`psdm()`](https://popov-lab.github.io/bmm/dev/reference/SDMdist.md)
+  [`qsdm()`](https://popov-lab.github.io/bmm/dev/reference/SDMdist.md)
+  [`rsdm()`](https://popov-lab.github.io/bmm/dev/reference/SDMdist.md) :
   Distribution functions for the Signal Discrimination Model (SDM)
 
-- [`sdt_d()`](https://venpopov.com/bmm/dev/reference/SDTdist.md)
-  [`sdt_criterion()`](https://venpopov.com/bmm/dev/reference/SDTdist.md)
+- [`sdt_d()`](https://popov-lab.github.io/bmm/dev/reference/SDTdist.md)
+  [`sdt_criterion()`](https://popov-lab.github.io/bmm/dev/reference/SDTdist.md)
   : Utility functions for Signal Detection Theory
 
-- [`dcswald()`](https://venpopov.com/bmm/dev/reference/cswald_dist.md)
-  [`rcswald()`](https://venpopov.com/bmm/dev/reference/cswald_dist.md)
-  [`pcswald()`](https://venpopov.com/bmm/dev/reference/cswald_dist.md)
-  [`qcswald()`](https://venpopov.com/bmm/dev/reference/cswald_dist.md) :
+- [`dcswald()`](https://popov-lab.github.io/bmm/dev/reference/cswald_dist.md)
+  [`rcswald()`](https://popov-lab.github.io/bmm/dev/reference/cswald_dist.md)
+  [`pcswald()`](https://popov-lab.github.io/bmm/dev/reference/cswald_dist.md)
+  [`qcswald()`](https://popov-lab.github.io/bmm/dev/reference/cswald_dist.md)
+  :
 
   Distribution functions for the censored shifted Wald model (`cswald`)
 
-- [`dddm()`](https://venpopov.com/bmm/dev/reference/ddm_dist.md)
-  [`rddm()`](https://venpopov.com/bmm/dev/reference/ddm_dist.md) :
+- [`dddm()`](https://popov-lab.github.io/bmm/dev/reference/ddm_dist.md)
+  [`rddm()`](https://popov-lab.github.io/bmm/dev/reference/ddm_dist.md)
+  :
 
   Distribution function for the Diffusion Decision Model (`ddm`)
 
-- [`dezdm()`](https://venpopov.com/bmm/dev/reference/ezdm_dist.md)
-  [`rezdm()`](https://venpopov.com/bmm/dev/reference/ezdm_dist.md) :
-  Distribution functions for the EZ-Diffusion Model (ezdm)
+- [`dezdm()`](https://popov-lab.github.io/bmm/dev/reference/ezdm_dist.md)
+  [`rezdm()`](https://popov-lab.github.io/bmm/dev/reference/ezdm_dist.md)
+  : Distribution functions for the EZ-Diffusion Model (ezdm)
 
-- [`dm3()`](https://venpopov.com/bmm/dev/reference/m3dist.md)
-  [`rm3()`](https://venpopov.com/bmm/dev/reference/m3dist.md) :
+- [`dm3()`](https://popov-lab.github.io/bmm/dev/reference/m3dist.md)
+  [`rm3()`](https://popov-lab.github.io/bmm/dev/reference/m3dist.md) :
   Distribution functions for the Memory Measurement Model (M3)
 
-- [`dmixture2p()`](https://venpopov.com/bmm/dev/reference/mixture2p_dist.md)
-  [`pmixture2p()`](https://venpopov.com/bmm/dev/reference/mixture2p_dist.md)
-  [`qmixture2p()`](https://venpopov.com/bmm/dev/reference/mixture2p_dist.md)
-  [`rmixture2p()`](https://venpopov.com/bmm/dev/reference/mixture2p_dist.md)
+- [`dmixture2p()`](https://popov-lab.github.io/bmm/dev/reference/mixture2p_dist.md)
+  [`pmixture2p()`](https://popov-lab.github.io/bmm/dev/reference/mixture2p_dist.md)
+  [`qmixture2p()`](https://popov-lab.github.io/bmm/dev/reference/mixture2p_dist.md)
+  [`rmixture2p()`](https://popov-lab.github.io/bmm/dev/reference/mixture2p_dist.md)
   : Distribution functions for the two-parameter mixture model
   (mixture2p)
 
-- [`dmixture3p()`](https://venpopov.com/bmm/dev/reference/mixture3p_dist.md)
-  [`pmixture3p()`](https://venpopov.com/bmm/dev/reference/mixture3p_dist.md)
-  [`qmixture3p()`](https://venpopov.com/bmm/dev/reference/mixture3p_dist.md)
-  [`rmixture3p()`](https://venpopov.com/bmm/dev/reference/mixture3p_dist.md)
+- [`dmixture3p()`](https://popov-lab.github.io/bmm/dev/reference/mixture3p_dist.md)
+  [`pmixture3p()`](https://popov-lab.github.io/bmm/dev/reference/mixture3p_dist.md)
+  [`qmixture3p()`](https://popov-lab.github.io/bmm/dev/reference/mixture3p_dist.md)
+  [`rmixture3p()`](https://popov-lab.github.io/bmm/dev/reference/mixture3p_dist.md)
   : Distribution functions for the three-parameter mixture model
   (mixture3p)
 
-- [`rejection_sampling()`](https://venpopov.com/bmm/dev/reference/rejection_sampling.md)
+- [`rejection_sampling()`](https://popov-lab.github.io/bmm/dev/reference/rejection_sampling.md)
   : Rejection Sampling
 
-- [`dsdt_yn()`](https://venpopov.com/bmm/dev/reference/sdt_yn_dist.md)
-  [`rsdt_yn()`](https://venpopov.com/bmm/dev/reference/sdt_yn_dist.md) :
-  Distribution functions for Yes/No SDT
+- [`dsdt_yn()`](https://popov-lab.github.io/bmm/dev/reference/sdt_yn_dist.md)
+  [`rsdt_yn()`](https://popov-lab.github.io/bmm/dev/reference/sdt_yn_dist.md)
+  : Distribution functions for Yes/No SDT
 
 ## Data, model and parameter transformations
 
 Utility functions for transforming data and parameters
 
-- [`adjust_ezdm_accuracy()`](https://venpopov.com/bmm/dev/reference/adjust_ezdm_accuracy.md)
+- [`adjust_ezdm_accuracy()`](https://popov-lab.github.io/bmm/dev/reference/adjust_ezdm_accuracy.md)
   : Adjust Accuracy Counts for Contamination (deprecated)
 
-- [`c_sqrtexp2bessel()`](https://venpopov.com/bmm/dev/reference/c_parametrizations.md)
-  [`c_bessel2sqrtexp()`](https://venpopov.com/bmm/dev/reference/c_parametrizations.md)
+- [`c_sqrtexp2bessel()`](https://popov-lab.github.io/bmm/dev/reference/c_parametrizations.md)
+  [`c_bessel2sqrtexp()`](https://popov-lab.github.io/bmm/dev/reference/c_parametrizations.md)
   : Convert between parametrizations of the c parameter of the SDM
   distribution
 
-- [`calc_error_relative_to_nontargets()`](https://venpopov.com/bmm/dev/reference/calc_error_relative_to_nontargets.md)
+- [`calc_error_relative_to_nontargets()`](https://popov-lab.github.io/bmm/dev/reference/calc_error_relative_to_nontargets.md)
   : Calculate response error relative to non-target values
 
-- [`deg2rad()`](https://venpopov.com/bmm/dev/reference/circle_transform.md)
-  [`rad2deg()`](https://venpopov.com/bmm/dev/reference/circle_transform.md)
+- [`deg2rad()`](https://popov-lab.github.io/bmm/dev/reference/circle_transform.md)
+  [`rad2deg()`](https://popov-lab.github.io/bmm/dev/reference/circle_transform.md)
   : Convert degrees to radians or radians to degrees.
 
-- [`construct_m3_act_funs()`](https://venpopov.com/bmm/dev/reference/construct_m3_act_funs.md)
+- [`construct_m3_act_funs()`](https://popov-lab.github.io/bmm/dev/reference/construct_m3_act_funs.md)
   : Get Activation Functions for different M3 versions
 
-- [`ezdm_summary_stats()`](https://venpopov.com/bmm/dev/reference/ezdm_summary_stats.md)
+- [`ezdm_summary_stats()`](https://popov-lab.github.io/bmm/dev/reference/ezdm_summary_stats.md)
   : Compute Robust Summary Statistics for EZ-Diffusion Model
 
-- [`flag_contaminant_rts()`](https://venpopov.com/bmm/dev/reference/flag_contaminant_rts.md)
+- [`flag_contaminant_rts()`](https://popov-lab.github.io/bmm/dev/reference/flag_contaminant_rts.md)
   : Flag contaminant reaction times using mixture modeling
 
-- [`k2sd()`](https://venpopov.com/bmm/dev/reference/k2sd.md) : Transform
-  kappa of the von Mises distribution to the circular standard deviation
+- [`k2sd()`](https://popov-lab.github.io/bmm/dev/reference/k2sd.md) :
+  Transform kappa of the von Mises distribution to the circular standard
+  deviation
 
-- [`restructure(`*`<bmmfit>`*`)`](https://venpopov.com/bmm/dev/reference/restructure.bmmfit.md)
+- [`restructure(`*`<bmmfit>`*`)`](https://popov-lab.github.io/bmm/dev/reference/restructure.bmmfit.md)
   :
 
   Restructure Old `bmmfit` Objects
 
-- [`softmax()`](https://venpopov.com/bmm/dev/reference/softmax.md)
-  [`softmaxinv()`](https://venpopov.com/bmm/dev/reference/softmax.md) :
-  Softmax function and its inverse
+- [`softmax()`](https://popov-lab.github.io/bmm/dev/reference/softmax.md)
+  [`softmaxinv()`](https://popov-lab.github.io/bmm/dev/reference/softmax.md)
+  : Softmax function and its inverse
 
-- [`validate_fast_guesses()`](https://venpopov.com/bmm/dev/reference/validate_fast_guesses.md)
+- [`validate_fast_guesses()`](https://popov-lab.github.io/bmm/dev/reference/validate_fast_guesses.md)
   : Test if fast contaminants show random guessing behavior
 
-- [`wrap()`](https://venpopov.com/bmm/dev/reference/wrap.md) : Wrap
-  angles that extend beyond (-pi;pi)
+- [`wrap()`](https://popov-lab.github.io/bmm/dev/reference/wrap.md) :
+  Wrap angles that extend beyond (-pi;pi)
 
 ## Datasets
 
 Available datasets for fitting the models
 
-- [`broeder_schuetz_2009_e3`](https://venpopov.com/bmm/dev/reference/broeder_schuetz_2009_e3.md)
+- [`broeder_schuetz_2009_e3`](https://popov-lab.github.io/bmm/dev/reference/broeder_schuetz_2009_e3.md)
   : Recognition ROC data from Broeder & Schuetz (2009, Experiment 3)
-- [`data_color_judgement_task`](https://venpopov.com/bmm/dev/reference/data_color_judgement_task.md)
+- [`data_color_judgement_task`](https://popov-lab.github.io/bmm/dev/reference/data_color_judgement_task.md)
   : Example Data from a Color Judgement Task
-- [`oberauer_lewandowsky_2019_e1`](https://venpopov.com/bmm/dev/reference/oberauer_lewandowsky_2019_e1.md)
+- [`oberauer_lewandowsky_2019_e1`](https://popov-lab.github.io/bmm/dev/reference/oberauer_lewandowsky_2019_e1.md)
   : Data from Experiment 1 reported by Oberauer & Lewandowsky (2019)
-- [`oberauer_lin_2017`](https://venpopov.com/bmm/dev/reference/oberauer_lin_2017.md)
+- [`oberauer_lin_2017`](https://popov-lab.github.io/bmm/dev/reference/oberauer_lin_2017.md)
   : Data from Experiment 1 reported by Oberauer & Lin (2017)
-- [`zhang_luck_2008`](https://venpopov.com/bmm/dev/reference/zhang_luck_2008.md)
+- [`zhang_luck_2008`](https://popov-lab.github.io/bmm/dev/reference/zhang_luck_2008.md)
   : Data from Experiment 2 reported by Zhang & Luck (2008)
 
 ## Developers’ corner
 
 Functions to assist in developing new models
 
-- [`apply_links()`](https://venpopov.com/bmm/dev/reference/apply_links.md)
+- [`apply_links()`](https://popov-lab.github.io/bmm/dev/reference/apply_links.md)
   : Apply link functions for parameters in a formula or bmmformula
 
-- [`bmf2bf()`](https://venpopov.com/bmm/dev/reference/bmf2bf.md) :
+- [`bmf2bf()`](https://popov-lab.github.io/bmm/dev/reference/bmf2bf.md)
+  :
 
   Convert `bmmformula` objects to `brmsformula` objects
 
-- [`check_data()`](https://venpopov.com/bmm/dev/reference/check_data.md)
+- [`check_data()`](https://popov-lab.github.io/bmm/dev/reference/check_data.md)
   : Generic S3 method for checking data based on model type
 
-- [`check_formula()`](https://venpopov.com/bmm/dev/reference/check_formula.md)
+- [`check_formula()`](https://popov-lab.github.io/bmm/dev/reference/check_formula.md)
   : Generic S3 method for checking if the formula is valid for the
   specified model
 
-- [`check_model()`](https://venpopov.com/bmm/dev/reference/check_model.md)
+- [`check_model()`](https://popov-lab.github.io/bmm/dev/reference/check_model.md)
   : Generic S3 method for checking if the model is supported and model
   preprocessing
 
-- [`configure_model()`](https://venpopov.com/bmm/dev/reference/configure_model.md)
+- [`configure_model()`](https://popov-lab.github.io/bmm/dev/reference/configure_model.md)
   : Generic S3 method for configuring the model to be fit by brms
 
-- [`configure_prior()`](https://venpopov.com/bmm/dev/reference/configure_prior.md)
+- [`configure_prior()`](https://popov-lab.github.io/bmm/dev/reference/configure_prior.md)
   : Generic S3 method for configuring the default prior for a bmmodel
 
-- [`create_initfun()`](https://venpopov.com/bmm/dev/reference/create_initfun.md)
+- [`create_initfun()`](https://popov-lab.github.io/bmm/dev/reference/create_initfun.md)
   : Generic S3 method for creating an initial values function
 
-- [`data_check_finding()`](https://venpopov.com/bmm/dev/reference/data_check_finding.md)
+- [`data_check_finding()`](https://popov-lab.github.io/bmm/dev/reference/data_check_finding.md)
   : Construct a single finding for a pre-fit data report
 
-- [`data_check_findings()`](https://venpopov.com/bmm/dev/reference/data_check_findings.md)
+- [`data_check_findings()`](https://popov-lab.github.io/bmm/dev/reference/data_check_findings.md)
   : Generic S3 method for model-specific pre-fit data findings
 
-- [`native_transform()`](https://venpopov.com/bmm/dev/reference/native_transform.md)
+- [`native_transform()`](https://popov-lab.github.io/bmm/dev/reference/native_transform.md)
   : Transform parameter draws from the sampling scale to the native
   scale
 
-- [`postprocess_brm()`](https://venpopov.com/bmm/dev/reference/postprocess_brm.md)
+- [`postprocess_brm()`](https://popov-lab.github.io/bmm/dev/reference/postprocess_brm.md)
   : Generic S3 method for postprocessing the fitted brm model
 
-- [`pp_observables()`](https://venpopov.com/bmm/dev/reference/pp_observables.md)
-  [`pp_simulate()`](https://venpopov.com/bmm/dev/reference/pp_observables.md)
+- [`pp_observables()`](https://popov-lab.github.io/bmm/dev/reference/pp_observables.md)
+  [`pp_simulate()`](https://popov-lab.github.io/bmm/dev/reference/pp_observables.md)
   : Declare the observables of a bmm model for posterior predictive
   checks
 
-- [`revert_postprocess_brm()`](https://venpopov.com/bmm/dev/reference/revert_postprocess_brm.md)
+- [`revert_postprocess_brm()`](https://popov-lab.github.io/bmm/dev/reference/revert_postprocess_brm.md)
   : Generic S3 method for reverting any postprocessing of the fitted brm
   model
 
-- [`use_model_template()`](https://venpopov.com/bmm/dev/reference/use_model_template.md)
+- [`use_model_template()`](https://popov-lab.github.io/bmm/dev/reference/use_model_template.md)
   : Create a file with a template for adding a new model (for
   developers)
 
@@ -612,22 +624,22 @@ Functions to assist in developing new models
 Guides to using various features of the **bmm** package
 
 - [Introduction to the bmmformula
-  syntax](https://venpopov.com/bmm/dev/articles/bmm_bmmformula.md):
+  syntax](https://popov-lab.github.io/bmm/dev/articles/bmm_bmmformula.md):
 - [Extracting default priors, the generated Stan code and Stan
-  data](https://venpopov.com/bmm/dev/articles/bmm_extract_info.md):
+  data](https://popov-lab.github.io/bmm/dev/articles/bmm_extract_info.md):
 
 ### Continuous reproduction tasks
 
 Fitting models to continuous reproduction tasks
 
 - [Continuous reproduction tasks
-  (CRT)](https://venpopov.com/bmm/dev/articles/bmm_vwm_crt.md):
+  (CRT)](https://popov-lab.github.io/bmm/dev/articles/bmm_vwm_crt.md):
 - [Mixture models for visual working
-  memory](https://venpopov.com/bmm/dev/articles/bmm_mixture_models.md):
+  memory](https://popov-lab.github.io/bmm/dev/articles/bmm_mixture_models.md):
 - [The Interference Measurement Model
-  (IMM)](https://venpopov.com/bmm/dev/articles/bmm_imm.md):
+  (IMM)](https://popov-lab.github.io/bmm/dev/articles/bmm_imm.md):
 - [The Signal Discrimination Model
-  (SDM)](https://venpopov.com/bmm/dev/articles/bmm_sdm_simple.md):
+  (SDM)](https://popov-lab.github.io/bmm/dev/articles/bmm_sdm_simple.md):
 
 ### Categorical decision tasks
 
@@ -635,17 +647,17 @@ Fitting models to categorical decision tasks (e.g. cued or free recall,
 n-AFC, etc)
 
 - [The Multinomial / Memory Measurement Model
-  (M3)](https://venpopov.com/bmm/dev/articles/bmm_m3.md):
+  (M3)](https://popov-lab.github.io/bmm/dev/articles/bmm_m3.md):
 
 ### Evidence accumulation models
 
 Fitting evidence accumulation models to response time and choice data
 
 - [The EZ-Diffusion Model
-  (EZDM)](https://venpopov.com/bmm/dev/articles/bmm_ezdm.md):
+  (EZDM)](https://popov-lab.github.io/bmm/dev/articles/bmm_ezdm.md):
 - [The Censored Shifted Wald Model
-  (cswald)](https://venpopov.com/bmm/dev/articles/bmm_cswald.md):
+  (cswald)](https://popov-lab.github.io/bmm/dev/articles/bmm_cswald.md):
 - [The Diffusion Decision Model
-  (ddm)](https://venpopov.com/bmm/dev/articles/bmm_ddm.md):
+  (ddm)](https://popov-lab.github.io/bmm/dev/articles/bmm_ddm.md):
 - [Handling RT Contamination in Evidence Accumulation
-  Models](https://venpopov.com/bmm/dev/articles/bmm_rt_contamination.md):
+  Models](https://popov-lab.github.io/bmm/dev/articles/bmm_rt_contamination.md):

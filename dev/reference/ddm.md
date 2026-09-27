@@ -126,7 +126,8 @@ An object of class `bmmodel`
 
 By default, `zr` is fixed at 0. If you want to estimate `zr`, add a
 formula for `zr` in your
-[`bmf()`](https://venpopov.com/bmm/dev/reference/bmmformula.md) call.
+[`bmf()`](https://popov-lab.github.io/bmm/dev/reference/bmmformula.md)
+call.
 
 ## Examples
 

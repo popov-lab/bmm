@@ -2,7 +2,7 @@
 
 Applies a `bmmodel`'s inverse link functions to posterior draws of its
 parameters. This is the extension point used by
-[`native_parameters()`](https://venpopov.com/bmm/dev/reference/native_parameters.md):
+[`native_parameters()`](https://popov-lab.github.io/bmm/dev/reference/native_parameters.md):
 the transformation is a property of the *model*, not of an individual
 parameter, because some models map several parameters jointly (e.g.
 mixture weights through a softmax).
@@ -67,7 +67,7 @@ native_transform(model, linpred, data, ...)
 A named list of matrices on the native scale. A method **must** return
 one element for every name it was given and preserve each matrix's
 dimensions;
-[`native_parameters()`](https://venpopov.com/bmm/dev/reference/native_parameters.md)
+[`native_parameters()`](https://popov-lab.github.io/bmm/dev/reference/native_parameters.md)
 checks both and errors, naming the model, if either is broken. The order
 of the list is free.
 
@@ -93,4 +93,4 @@ method in the chain, which does not error and does not warn.
 
 ## See also
 
-[`native_parameters()`](https://venpopov.com/bmm/dev/reference/native_parameters.md)
+[`native_parameters()`](https://popov-lab.github.io/bmm/dev/reference/native_parameters.md)

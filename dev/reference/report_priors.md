@@ -16,7 +16,7 @@ report_priors(fit, format = "table")
 - fit:
 
   A `bmmfit` object returned by
-  [`bmm()`](https://venpopov.com/bmm/dev/reference/bmm.md)
+  [`bmm()`](https://popov-lab.github.io/bmm/dev/reference/bmm.md)
 
 - format:
 
@@ -71,14 +71,14 @@ family), and the mixture-weight reference component `theta2`, which brms
 lists with a default prior although the sampler holds it at zero. Fixed
 parameters the model does declare are reported, since the user can
 estimate them: `mu` for
-[`sdm()`](https://venpopov.com/bmm/dev/reference/sdm.md), `mu1` for the
-circular mixture models, `zr` for
-[`ddm()`](https://venpopov.com/bmm/dev/reference/ddm.md).
+[`sdm()`](https://popov-lab.github.io/bmm/dev/reference/sdm.md), `mu1`
+for the circular mixture models, `zr` for
+[`ddm()`](https://popov-lab.github.io/bmm/dev/reference/ddm.md).
 
 ## See also
 
-[`default_prior()`](https://venpopov.com/bmm/dev/reference/default_prior.bmmformula.md),
-[`parameters()`](https://venpopov.com/bmm/dev/reference/parameters.md)
+[`default_prior()`](https://popov-lab.github.io/bmm/dev/reference/default_prior.bmmformula.md),
+[`parameters()`](https://popov-lab.github.io/bmm/dev/reference/parameters.md)
 
 ## Examples
 

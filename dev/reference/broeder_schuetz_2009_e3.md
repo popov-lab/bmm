@@ -6,9 +6,9 @@ proportion of old items shifts the decision criterion from conservative
 (`br1`) to liberal (`br5`) while leaving sensitivity unchanged, tracing
 a five-point binary ROC per subject. That is the cleanest design for
 estimating the unequal-variance ratio (`sdratio`) of
-[`sdt_yn()`](https://venpopov.com/bmm/dev/reference/sdt_yn.md), which
-needs more than one operating point: a single condition with no other
-varying predictor yields only one hit/false-alarm pair and cannot
+[`sdt_yn()`](https://popov-lab.github.io/bmm/dev/reference/sdt_yn.md),
+which needs more than one operating point: a single condition with no
+other varying predictor yields only one hit/false-alarm pair and cannot
 separate a wider signal distribution from a larger d'. Counts were
 digitised from the frequencies reported in the original article.
 

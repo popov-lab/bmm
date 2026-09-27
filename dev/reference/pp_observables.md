@@ -1,7 +1,7 @@
 # Declare the observables of a bmm model for posterior predictive checks
 
 `pp_observables()` returns the model's observable declaration used by
-[`pp_check.bmmfit()`](https://venpopov.com/bmm/dev/reference/pp_check.bmmfit.md)
+[`pp_check.bmmfit()`](https://popov-lab.github.io/bmm/dev/reference/pp_check.bmmfit.md)
 when `resp_var` is specified, or `NULL` for models that delegate fully
 to
 [`brms::pp_check()`](https://mc-stan.org/bayesplot/reference/pp_check.html).
@@ -55,7 +55,8 @@ A `pp_observables()` method returns `list(observed, checks)`:
 
 Two optional elements serve observed data that holds placeholders rather
 than observations, such as the summaries of an unused
-[`ezdm()`](https://venpopov.com/bmm/dev/reference/ezdm.md) boundary:
+[`ezdm()`](https://popov-lab.github.io/bmm/dev/reference/ezdm.md)
+boundary:
 
 - `defaults`: named vector giving, for observables whose slot a fit
   saved by an older bmm version lacks, the value to use for every
@@ -63,7 +64,7 @@ than observations, such as the summaries of an unused
 
 - `y_placeholders`: a function of the fit's data that returns `TRUE` if
   the `"Y"` slot holds placeholders. brms would plot them as data, so
-  [`pp_check.bmmfit()`](https://venpopov.com/bmm/dev/reference/pp_check.bmmfit.md)
+  [`pp_check.bmmfit()`](https://popov-lab.github.io/bmm/dev/reference/pp_check.bmmfit.md)
   without `resp_var` then checks the observable mapped to `"Y"` itself.
 
 A `pp_simulate()` method returns a named list of ndraws x nobs matrices

@@ -17,7 +17,7 @@ Useful links:
 
 - <https://github.com/popov-lab/bmm>
 
-- <https://venpopov.com/bmm/>
+- <https://popov-lab.github.io/bmm/>
 
 - Report bugs at <https://github.com/popov-lab/bmm/issues>
 

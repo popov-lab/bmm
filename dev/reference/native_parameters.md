@@ -33,7 +33,7 @@ native_parameters(
 - x:
 
   A `bmmfit` object returned by
-  [`bmm()`](https://venpopov.com/bmm/dev/reference/bmm.md).
+  [`bmm()`](https://popov-lab.github.io/bmm/dev/reference/bmm.md).
 
 - newdata:
 
@@ -108,7 +108,7 @@ the median and the credible interval of a native-scale parameter are
 exact while its mean is not the inverse link of the linear predictor's
 mean. This function transforms the draws and only then summarises, which
 is why `summary = TRUE` is not the same as transforming the output of
-[`summary.bmmfit()`](https://venpopov.com/bmm/dev/reference/summary.bmmfit.md).
+[`summary.bmmfit()`](https://popov-lab.github.io/bmm/dev/reference/summary.bmmfit.md).
 
 The same order is what makes `summary = TRUE` correct for the mixture
 weights, whose softmax is not an elementwise map at all: summarising the
@@ -146,7 +146,7 @@ deviations typical for working memory data.
 Parameters fixed to a constant are returned at that constant,
 transformed to the native scale. Because `bmm` fixes parameters on the
 *link* scale, the native value can differ from the value shown by
-[`parameters()`](https://venpopov.com/bmm/dev/reference/parameters.md):
+[`parameters()`](https://popov-lab.github.io/bmm/dev/reference/parameters.md):
 the `ddm` relative starting point `zr` is fixed at `0` under a `logit`
 link and is therefore reported as `0.5`, and the `ezdm` and `cswald`
 diffusion constant `s` is fixed at `0` under a `log` link and is
@@ -200,9 +200,9 @@ filled from the first row of the model data rather than recomputed, and
 
 ## See also
 
-[`parameters()`](https://venpopov.com/bmm/dev/reference/parameters.md),
-[`native_transform()`](https://venpopov.com/bmm/dev/reference/native_transform.md),
-[`conditional_effects.bmmfit()`](https://venpopov.com/bmm/dev/reference/conditional_effects.bmmfit.md)
+[`parameters()`](https://popov-lab.github.io/bmm/dev/reference/parameters.md),
+[`native_transform()`](https://popov-lab.github.io/bmm/dev/reference/native_transform.md),
+[`conditional_effects.bmmfit()`](https://popov-lab.github.io/bmm/dev/reference/conditional_effects.bmmfit.md)
 
 ## Examples
 

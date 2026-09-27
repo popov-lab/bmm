@@ -25,7 +25,7 @@ conditional_effects(x, par = NULL, scale = c("native", "sampling"), ...)
 - x:
 
   A bmmfit object (created by
-  [`bmm()`](https://venpopov.com/bmm/dev/reference/bmm.md))
+  [`bmm()`](https://popov-lab.github.io/bmm/dev/reference/bmm.md))
 
 - par:
 

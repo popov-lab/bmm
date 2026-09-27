@@ -21,10 +21,10 @@ The DDM is ideal when:
 
 The `bmm` package provides a single DDM specification with a default
 fixed starting point. If you include a formula for `zr` in your
-[`bmf()`](https://venpopov.com/bmm/dev/reference/bmmformula.md) call,
-the starting point becomes a freely estimated parameter. Trial-to-Trial
-variability parameters of the DDM are currently not supported, due to
-feasibility for Bayesian hierarchical estimation.
+[`bmf()`](https://popov-lab.github.io/bmm/dev/reference/bmmformula.md)
+call, the starting point becomes a freely estimated parameter.
+Trial-to-Trial variability parameters of the DDM are currently not
+supported, due to feasibility for Bayesian hierarchical estimation.
 
 ## 2 Theoretical Background
 
@@ -430,7 +430,7 @@ plot(loo_free_zr)
 
 The DDM is a joint model of response times *and* responses, so an
 adequate model has to reproduce both.
-[`pp_check()`](https://venpopov.com/bmm/dev/reference/pp_check.bmmfit.md)
+[`pp_check()`](https://popov-lab.github.io/bmm/dev/reference/pp_check.bmmfit.md)
 checks the RT distribution by default; the `resp_var` argument selects
 the other observables of the likelihood (see `pp_check_vars(fit)` for
 the options):

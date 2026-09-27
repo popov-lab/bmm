@@ -1,11 +1,11 @@
 # Adjust Accuracy Counts for Contamination (deprecated)
 
 **Deprecated.**
-[`ezdm_summary_stats()`](https://venpopov.com/bmm/dev/reference/ezdm_summary_stats.md)
+[`ezdm_summary_stats()`](https://popov-lab.github.io/bmm/dev/reference/ezdm_summary_stats.md)
 now returns contaminant-free `n_upper` and `n_trials`, so this second
 step is no longer needed; applying it corrects the same cell twice. Set
 the guess rate with the `guess_rate` argument of
-[`ezdm_summary_stats()`](https://venpopov.com/bmm/dev/reference/ezdm_summary_stats.md)
+[`ezdm_summary_stats()`](https://popov-lab.github.io/bmm/dev/reference/ezdm_summary_stats.md)
 instead.
 
 Adjusts accuracy counts (`n_upper`, `n_trials`) by removing estimated
@@ -33,7 +33,7 @@ adjust_ezdm_accuracy(n_upper, n_trials, contaminant_prop, guess_rate = 0.5)
 
   Numeric. Estimated proportion of contaminant trials (e.g., from the
   `contaminant_prop` column of
-  [`ezdm_summary_stats()`](https://venpopov.com/bmm/dev/reference/ezdm_summary_stats.md)).
+  [`ezdm_summary_stats()`](https://popov-lab.github.io/bmm/dev/reference/ezdm_summary_stats.md)).
 
 - guess_rate:
 
@@ -55,7 +55,7 @@ unless a seed is set by the user.
 
 ## See also
 
-[`ezdm_summary_stats()`](https://venpopov.com/bmm/dev/reference/ezdm_summary_stats.md)
+[`ezdm_summary_stats()`](https://popov-lab.github.io/bmm/dev/reference/ezdm_summary_stats.md)
 for computing the summary statistics and contamination proportions
 
 ## Examples

@@ -128,7 +128,7 @@ Evidence categories follow Jeffreys (1961) scale:
 
 **Note**: This function can be used as a standalone validation step
 after obtaining contamination probabilities from
-[`flag_contaminant_rts()`](https://venpopov.com/bmm/dev/reference/flag_contaminant_rts.md).
+[`flag_contaminant_rts()`](https://popov-lab.github.io/bmm/dev/reference/flag_contaminant_rts.md).
 
 ## References
 
@@ -137,7 +137,7 @@ Press.
 
 ## See also
 
-[`flag_contaminant_rts()`](https://venpopov.com/bmm/dev/reference/flag_contaminant_rts.md)
+[`flag_contaminant_rts()`](https://popov-lab.github.io/bmm/dev/reference/flag_contaminant_rts.md)
 for obtaining contamination probabilities
 
 ## Examples

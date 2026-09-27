@@ -91,9 +91,9 @@ ezdm_summary_stats(
   `version = "3par"` and against each boundary's own count for
   `version = "4par"`, so the two versions can disagree about whether the
   same cell is corrected. For `version = "4par"`,
-  [`bmm()`](https://venpopov.com/bmm/dev/reference/bmm.md) still fits a
-  cell whose summaries at one or both boundaries are NA, through its
-  response counts. Default is 10
+  [`bmm()`](https://popov-lab.github.io/bmm/dev/reference/bmm.md) still
+  fits a cell whose summaries at one or both boundaries are NA, through
+  its response counts. Default is 10
 
 - init_contaminant:
 
@@ -163,10 +163,10 @@ for grouped operations.
 
 ## See also
 
-[`flag_contaminant_rts()`](https://venpopov.com/bmm/dev/reference/flag_contaminant_rts.md)
+[`flag_contaminant_rts()`](https://popov-lab.github.io/bmm/dev/reference/flag_contaminant_rts.md)
 for trial-level contamination probabilities,
-[`ezdm()`](https://venpopov.com/bmm/dev/reference/ezdm.md) for fitting
-the EZ-Diffusion Model
+[`ezdm()`](https://popov-lab.github.io/bmm/dev/reference/ezdm.md) for
+fitting the EZ-Diffusion Model
 
 ## Examples
 

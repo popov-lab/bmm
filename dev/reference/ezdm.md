@@ -172,8 +172,8 @@ An object of class `bmmodel`
 
   In version "4par", a boundary reached fewer than twice, or without RT
   summaries (`NA`), enters the model through the response counts only.
-  [`bmm()`](https://venpopov.com/bmm/dev/reference/bmm.md) adds two
-  columns to the data, `rt_used_upper` and `rt_used_lower`, which it
+  [`bmm()`](https://popov-lab.github.io/bmm/dev/reference/bmm.md) adds
+  two columns to the data, `rt_used_upper` and `rt_used_lower`, which it
   sets to 0 for such a boundary and to 1 otherwise, and replaces the
   summaries of such a boundary with a placeholder the likelihood never
   reads. A 0 already in these columns is kept, so that

@@ -1,9 +1,9 @@
 # Construct a single finding for a pre-fit data report
 
 Builds one finding in the shape
-[`bmm_data_check()`](https://venpopov.com/bmm/dev/reference/bmm_data_check.md)
+[`bmm_data_check()`](https://popov-lab.github.io/bmm/dev/reference/bmm_data_check.md)
 expects. Use it inside
-[`data_check_findings()`](https://venpopov.com/bmm/dev/reference/data_check_findings.md)
+[`data_check_findings()`](https://popov-lab.github.io/bmm/dev/reference/data_check_findings.md)
 methods rather than assembling the list by hand, so that an unrecognized
 severity is caught where it is written instead of being silently printed
 as a note.
@@ -33,5 +33,5 @@ A list with elements `severity` and `message`
 
 ## See also
 
-[`data_check_findings()`](https://venpopov.com/bmm/dev/reference/data_check_findings.md),
-[`bmm_data_check()`](https://venpopov.com/bmm/dev/reference/bmm_data_check.md)
+[`data_check_findings()`](https://popov-lab.github.io/bmm/dev/reference/data_check_findings.md),
+[`bmm_data_check()`](https://popov-lab.github.io/bmm/dev/reference/bmm_data_check.md)

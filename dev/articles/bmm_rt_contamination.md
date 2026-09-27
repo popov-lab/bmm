@@ -24,8 +24,8 @@ one for each type of model it supports:
 
 | Model | Data type | Function | Role |
 |----|----|----|----|
-| EZDM | Aggregated stats | [`ezdm_summary_stats()`](https://venpopov.com/bmm/dev/reference/ezdm_summary_stats.md) | Required during aggregation |
-| DDM / csWald | Trial-level | [`flag_contaminant_rts()`](https://venpopov.com/bmm/dev/reference/flag_contaminant_rts.md) | Optional preprocessing |
+| EZDM | Aggregated stats | [`ezdm_summary_stats()`](https://popov-lab.github.io/bmm/dev/reference/ezdm_summary_stats.md) | Required during aggregation |
+| DDM / csWald | Trial-level | [`flag_contaminant_rts()`](https://popov-lab.github.io/bmm/dev/reference/flag_contaminant_rts.md) | Optional preprocessing |
 
 Both fit a mixture model via the EM algorithm, separating cognitive RTs
 from a uniform contaminant distribution (Ratcliff and Tuerlinckx 2002):
@@ -65,7 +65,7 @@ my_data |>
 
 As an example, we use data from Ratcliff and Rouder (1998), available in
 the `rtdists` package. First we show how the
-[`ezdm_summary_stats()`](https://venpopov.com/bmm/dev/reference/ezdm_summary_stats.md)
+[`ezdm_summary_stats()`](https://popov-lab.github.io/bmm/dev/reference/ezdm_summary_stats.md)
 method options work on a single participant’s data from the accuracy
 instruction condition in this data. The histogram below shows a long
 tail of slow RTs, which are likely contaminants:
@@ -154,7 +154,8 @@ conditions with `ezdm_summary_stats(method = "mixture")`, then fit the
 EZDM to those summary stats. The returned `n_upper` and `n_trials`
 already exclude the estimated contaminants, so they describe the same
 responses as the returned `mean_rt` and `var_rt`, and you can pass them
-to [`ezdm()`](https://venpopov.com/bmm/dev/reference/ezdm.md) unchanged.
+to [`ezdm()`](https://popov-lab.github.io/bmm/dev/reference/ezdm.md)
+unchanged.
 
 ``` r
 
@@ -201,7 +202,7 @@ a cell of ten trials, the default `min_trials`.
 
 DDM and csWald work with individual trials, so contamination handling is
 optional.
-[`flag_contaminant_rts()`](https://venpopov.com/bmm/dev/reference/flag_contaminant_rts.md)
+[`flag_contaminant_rts()`](https://popov-lab.github.io/bmm/dev/reference/flag_contaminant_rts.md)
 implements the same mixture modelling approach as
 `ezdm_summary_stats(method = "mixture")` and returns a contamination
 probability for each trial; You can use these probabilities in various
@@ -320,7 +321,7 @@ fit <- bmm(
 
 In 2AFC tasks, if fast contaminants are truly random guesses, their
 accuracy should be around 50%. The helper function
-[`validate_fast_guesses()`](https://venpopov.com/bmm/dev/reference/validate_fast_guesses.md)
+[`validate_fast_guesses()`](https://popov-lab.github.io/bmm/dev/reference/validate_fast_guesses.md)
 checks this with a Bayesian Beta-Binomial test (Savage-Dickey Bayes
 Factor):
 
@@ -502,13 +503,13 @@ implausible RTs are filtered beforehand.
 The ex-Gaussian distribution is a safe starting point. Try log-normal if
 you have heavy tails, or inverse Gaussian if you want a closer match to
 the Wiener process. See
-[`?ezdm_summary_stats`](https://venpopov.com/bmm/dev/reference/ezdm_summary_stats.md)
+[`?ezdm_summary_stats`](https://popov-lab.github.io/bmm/dev/reference/ezdm_summary_stats.md)
 for details.
 
 Check convergence with `attr(result, "diagnostics")$converged`. When the
 EM fails to converge, it usually means too few trials or bounds that do
 not fit the data well.
-[`ezdm_summary_stats()`](https://venpopov.com/bmm/dev/reference/ezdm_summary_stats.md)
+[`ezdm_summary_stats()`](https://popov-lab.github.io/bmm/dev/reference/ezdm_summary_stats.md)
 falls back to simple moments in that case.
 
 If estimated contamination rates exceed 20%, first check that RTs are in

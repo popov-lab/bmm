@@ -328,7 +328,7 @@ ggplot(dat, aes(x = rt, fill = factor(response))) +
 ### 4.4 Specifying the Model
 
 First, specify the model using
-[`cswald()`](https://venpopov.com/bmm/dev/reference/cswald.md):
+[`cswald()`](https://popov-lab.github.io/bmm/dev/reference/cswald.md):
 
 ``` r
 
@@ -545,7 +545,7 @@ cat("True SD (log scale):", drift_sd, "\n")
 ### 4.8 Model Diagnostics
 
 Check posterior predictive distributions. By default
-[`pp_check()`](https://venpopov.com/bmm/dev/reference/pp_check.bmmfit.md)
+[`pp_check()`](https://popov-lab.github.io/bmm/dev/reference/pp_check.bmmfit.md)
 shows the response time distribution; `resp_var = "response"` checks the
 response proportions and `resp_var = "signed_rt"` both jointly (see
 `pp_check_vars(fit)` for all options):

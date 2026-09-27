@@ -4,8 +4,8 @@ Compute sensitivity and criterion from hit and false alarm rates for
 different SDT distribution families. A single (hit, false alarm) pair
 cannot identify the signal-to-noise SD ratio, so both quantities are the
 equal-variance values; see
-[`sdt_yn()`](https://venpopov.com/bmm/dev/reference/sdt_yn.md) for the
-unequal-variance model.
+[`sdt_yn()`](https://popov-lab.github.io/bmm/dev/reference/sdt_yn.md)
+for the unequal-variance model.
 
 ## Usage
 
@@ -58,15 +58,15 @@ Q(1 - H)\\, where \\Q\\ is the quantile function of `dist`. For
 `dist = "normal"` this reduces to the familiar \\d' = \Phi^{-1}(H) -
 \Phi^{-1}(FA)\\. Because one operating point implies equal variance,
 this matches the `d` parameter of
-[`sdt_yn()`](https://venpopov.com/bmm/dev/reference/sdt_yn.md) whenever
-`sdratio` is at its default.
+[`sdt_yn()`](https://popov-lab.github.io/bmm/dev/reference/sdt_yn.md)
+whenever `sdratio` is at its default.
 
 `sdt_criterion` returns the criterion (response bias) on the centred,
 noise-standardized evidence axis used by
-[`sdt_yn()`](https://venpopov.com/bmm/dev/reference/sdt_yn.md), where
-the noise and signal distributions sit at -d'/2 and +d'/2: \\(Q(1 -
-FA) + Q(1 - H)) / 2\\. For `dist = "normal"` this reduces to the
-familiar \\-(\Phi^{-1}(H) + \Phi^{-1}(FA)) / 2\\.
+[`sdt_yn()`](https://popov-lab.github.io/bmm/dev/reference/sdt_yn.md),
+where the noise and signal distributions sit at -d'/2 and +d'/2:
+\\(Q(1 - FA) + Q(1 - H)) / 2\\. For `dist = "normal"` this reduces to
+the familiar \\-(\Phi^{-1}(H) + \Phi^{-1}(FA)) / 2\\.
 
 ## References
 
@@ -75,11 +75,11 @@ psychophysics*. Wiley.
 
 ## See also
 
-[`sdt_yn()`](https://venpopov.com/bmm/dev/reference/sdt_yn.md), whose
-`d` and `criterion` parameters these two functions compute in closed
-form from observed rates: `sdt_d()` returns the same quantity as the `d`
-parameter and `sdt_criterion()` the same quantity as `criterion`, on the
-same axis, whenever `sdratio` is at its default.
+[`sdt_yn()`](https://popov-lab.github.io/bmm/dev/reference/sdt_yn.md),
+whose `d` and `criterion` parameters these two functions compute in
+closed form from observed rates: `sdt_d()` returns the same quantity as
+the `d` parameter and `sdt_criterion()` the same quantity as
+`criterion`, on the same axis, whenever `sdratio` is at its default.
 
 ## Examples
 

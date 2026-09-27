@@ -5,7 +5,7 @@
       fontURL: "https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/output/chtml/fonts/woff-v2"
     }
   };
-</script><script src="../deps/jquery-3.6.0/jquery-3.6.0.min.js"></script><meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no"><link href="../deps/bootstrap-5.3.8/bootstrap.min.css" rel="stylesheet"><script src="../deps/bootstrap-5.3.8/bootstrap.bundle.min.js"></script><link href="../deps/font-awesome-6.5.2/css/all.min.css" rel="stylesheet"><link href="../deps/font-awesome-6.5.2/css/v4-shims.min.css" rel="stylesheet"><script src="../deps/headroom-0.11.0/headroom.min.js"></script><script src="../deps/headroom-0.11.0/jQuery.headroom.min.js"></script><script src="../deps/bootstrap-toc-1.0.1/bootstrap-toc.min.js"></script><script src="../deps/clipboard.js-2.0.11/clipboard.min.js"></script><script src="../deps/search-1.0.0/autocomplete.jquery.min.js"></script><script src="../deps/search-1.0.0/fuse.min.js"></script><script src="../deps/search-1.0.0/mark.min.js"></script><!-- pkgdown --><script src="../pkgdown.js"></script><meta property="og:title" content="Changelog"><meta property="og:image" content="https://venpopov.com/bmm/logo.png"><meta name="robots" content="noindex"></head><body>
+</script><script src="../deps/jquery-3.6.0/jquery-3.6.0.min.js"></script><meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no"><link href="../deps/bootstrap-5.3.8/bootstrap.min.css" rel="stylesheet"><script src="../deps/bootstrap-5.3.8/bootstrap.bundle.min.js"></script><link href="../deps/font-awesome-6.5.2/css/all.min.css" rel="stylesheet"><link href="../deps/font-awesome-6.5.2/css/v4-shims.min.css" rel="stylesheet"><script src="../deps/headroom-0.11.0/headroom.min.js"></script><script src="../deps/headroom-0.11.0/jQuery.headroom.min.js"></script><script src="../deps/bootstrap-toc-1.0.1/bootstrap-toc.min.js"></script><script src="../deps/clipboard.js-2.0.11/clipboard.min.js"></script><script src="../deps/search-1.0.0/autocomplete.jquery.min.js"></script><script src="../deps/search-1.0.0/fuse.min.js"></script><script src="../deps/search-1.0.0/mark.min.js"></script><!-- pkgdown --><script src="../pkgdown.js"></script><meta property="og:title" content="Changelog"><meta property="og:image" content="https://popov-lab.github.io/bmm/logo.png"><meta name="robots" content="noindex"></head><body>
     <a href="#main" class="visually-hidden-focusable">Skip to contents</a>
 
 
@@ -24,8 +24,8 @@
       <ul class="navbar-nav me-auto"><li class="nav-item"><a class="nav-link" href="../reference/index.html">Functions</a></li>
 <li class="nav-item"><a class="nav-link" href="../articles/index.html">Articles</a></li>
 <li class="active nav-item"><a class="nav-link" href="../news/index.html">Changelog</a></li>
-<li class="nav-item"><a class="nav-link" href="https://venpopov.com/bmm/dev-notes/index.html">Develop</a></li>
-<li class="nav-item"><a class="nav-link" href="https://venpopov.com/bmm/parameter-recovery/index.html">Parameter recovery</a></li>
+<li class="nav-item"><a class="nav-link" href="https://popov-lab.github.io/bmm/dev-notes/index.html">Develop</a></li>
+<li class="nav-item"><a class="nav-link" href="https://popov-lab.github.io/bmm/parameter-recovery/index.html">Parameter recovery</a></li>
       </ul><ul class="navbar-nav"><li class="nav-item"><form class="form-inline" role="search">
  <input class="form-control" type="search" name="search-input" id="search-input" autocomplete="off" aria-label="Search site" placeholder="Search for" data-search-index="../search.json"></form></li>
 <li class="nav-item"><a class="external-link nav-link" href="https://github.com/popov-lab/bmm/" aria-label="GitHub"><span class="fa fab fa-github fa-lg"></span></a></li>
@@ -113,7 +113,8 @@
 </ul></div>
 <div class="section level4">
 <h4 id="other-changes-development-version">Other changes<a class="anchor" aria-label="anchor" href="#other-changes-development-version"></a></h4>
-<ul><li>The <strong>cswald</strong> likelihood now evaluates all observations in one call instead of one at a time. This makes fitting faster, improves the accuracy of the gradients the sampler uses, and adds support for within-chain parallelization: <code>bmm(..., threads = 2)</code> now works for <strong>cswald</strong> as it does for <strong>sdm</strong>. The posterior is unchanged (<a href="https://github.com/popov-lab/bmm/issues/387" class="external-link">#387</a>).</li>
+<ul><li>bmm’s own links now point at popov-lab.github.io/bmm instead of venpopov.com/bmm, which currently redirects to the new address. Update bookmarks when convenient (<a href="https://github.com/popov-lab/bmm/issues/433" class="external-link">#433</a>).</li>
+<li>The <strong>cswald</strong> likelihood now evaluates all observations in one call instead of one at a time. This makes fitting faster, improves the accuracy of the gradients the sampler uses, and adds support for within-chain parallelization: <code>bmm(..., threads = 2)</code> now works for <strong>cswald</strong> as it does for <strong>sdm</strong>. The posterior is unchanged (<a href="https://github.com/popov-lab/bmm/issues/387" class="external-link">#387</a>).</li>
 </ul></div>
 </div>
     <div class="section level2">
@@ -194,10 +195,10 @@
 </ul></div>
 <div class="section level4">
 <h4 id="documentation-1-3-0">Documentation<a class="anchor" aria-label="anchor" href="#documentation-1-3-0"></a></h4>
-<ul><li>New online <a href="https://venpopov.com/bmm/dev/articles/bmm_ddm.html">article</a> to accompany the <strong>ddm</strong> model</li>
-<li>New online <a href="https://venpopov.com/bmm/dev/articles/bmm_ezdm.html">article</a> to accompany the <strong>ezdm</strong> model</li>
-<li>New online <a href="https://venpopov.com/bmm/dev/articles/bmm_cswald.html">article</a> to accompany the <strong>cswald</strong> model</li>
-<li>New online <a href="https://venpopov.com/bmm/dev/articles/bmm_rt_contamination.html">article</a> on pre-processing and contamination detection for reaction time data</li>
+<ul><li>New online <a href="https://popov-lab.github.io/bmm/dev/articles/bmm_ddm.html">article</a> to accompany the <strong>ddm</strong> model</li>
+<li>New online <a href="https://popov-lab.github.io/bmm/dev/articles/bmm_ezdm.html">article</a> to accompany the <strong>ezdm</strong> model</li>
+<li>New online <a href="https://popov-lab.github.io/bmm/dev/articles/bmm_cswald.html">article</a> to accompany the <strong>cswald</strong> model</li>
+<li>New online <a href="https://popov-lab.github.io/bmm/dev/articles/bmm_rt_contamination.html">article</a> on pre-processing and contamination detection for reaction time data</li>
 </ul></div>
 <div class="section level4">
 <h4 id="other-changes-1-3-0">Other changes<a class="anchor" aria-label="anchor" href="#other-changes-1-3-0"></a></h4>
@@ -210,7 +211,7 @@
 <h2 class="pkg-version" data-toc-text="1.2.0" id="bmm-120">bmm 1.2.0<a class="anchor" aria-label="anchor" href="#bmm-120"></a></h2><p class="text-muted">CRAN release: 2025-07-24</p>
 <div class="section level4">
 <h4 id="new-models-1-2-0">New models<a class="anchor" aria-label="anchor" href="#new-models-1-2-0"></a></h4>
-<ul><li>Add the Memory Measurement Model (Oberauer &amp; Lewandowsky, 2019) and its generalization as the Multinomial Measurement Model for categorical decision tasks as new model class <strong>m3</strong> with three versions: simple span (<strong>ss</strong>), complex span (<strong>cs</strong>), and <strong>custom</strong>. For details, see the <a href="https://venpopov.com/bmm/articles/bmm_m3.html">article</a> on the <code>bmm</code> website (<a href="https://github.com/popov-lab/bmm/issues/237" class="external-link">#237</a>). Thanks to <a href="https://github.com/GidonFrischkorn" class="external-link">@GidonFrischkorn</a> and <a href="https://github.com/chenyu-psy" class="external-link">@chenyu-psy</a></li>
+<ul><li>Add the Memory Measurement Model (Oberauer &amp; Lewandowsky, 2019) and its generalization as the Multinomial Measurement Model for categorical decision tasks as new model class <strong>m3</strong> with three versions: simple span (<strong>ss</strong>), complex span (<strong>cs</strong>), and <strong>custom</strong>. For details, see the <a href="https://popov-lab.github.io/bmm/articles/bmm_m3.html">article</a> on the <code>bmm</code> website (<a href="https://github.com/popov-lab/bmm/issues/237" class="external-link">#237</a>). Thanks to <a href="https://github.com/GidonFrischkorn" class="external-link">@GidonFrischkorn</a> and <a href="https://github.com/chenyu-psy" class="external-link">@chenyu-psy</a></li>
 </ul></div>
 <div class="section level4">
 <h4 id="new-features-1-2-0">New features<a class="anchor" aria-label="anchor" href="#new-features-1-2-0"></a></h4>
@@ -229,8 +230,8 @@
 </ul></div>
 <div class="section level4">
 <h4 id="documentation-1-2-0">Documentation<a class="anchor" aria-label="anchor" href="#documentation-1-2-0"></a></h4>
-<ul><li>Add documentation to the <a href="https://venpopov.com/bmm/articles/bmm_vwm_crt.html">continuous reproduction task</a> article for pre-processing half-circular stimulus spaces when using <code>bmmodels</code> of the <code>circular</code> model class (<a href="https://github.com/popov-lab/bmm/issues/229" class="external-link">#229</a>, <a href="https://github.com/popov-lab/bmm/issues/233" class="external-link">#233</a>).</li>
-<li>New online <a href="https://venpopov.com/bmm/articles/bmm_m3.html">article</a> to accompany the m3 model</li>
+<ul><li>Add documentation to the <a href="https://popov-lab.github.io/bmm/articles/bmm_vwm_crt.html">continuous reproduction task</a> article for pre-processing half-circular stimulus spaces when using <code>bmmodels</code> of the <code>circular</code> model class (<a href="https://github.com/popov-lab/bmm/issues/229" class="external-link">#229</a>, <a href="https://github.com/popov-lab/bmm/issues/233" class="external-link">#233</a>).</li>
+<li>New online <a href="https://popov-lab.github.io/bmm/articles/bmm_m3.html">article</a> to accompany the m3 model</li>
 </ul></div>
 <div class="section level4">
 <h4 id="other-changes-1-2-0">Other changes<a class="anchor" aria-label="anchor" href="#other-changes-1-2-0"></a></h4>
@@ -282,7 +283,7 @@
 </ul></div>
 <div class="section level4">
 <h4 id="documentation-0-5-0">Documentation<a class="anchor" aria-label="anchor" href="#documentation-0-5-0"></a></h4>
-<ul><li>two new online articles that <a href="https://venpopov.com/bmm/articles/bmm_bmmformula.html">introduce the <strong>bmmformula</strong> syntax</a> and explain <a href="https://venpopov.com/bmm/articles/bmm_extract_info.html">how to extract information from <strong>bmmodels</strong></a> such as the generated Stan code and Stan data for each model</li>
+<ul><li>two new online articles that <a href="https://popov-lab.github.io/bmm/articles/bmm_bmmformula.html">introduce the <strong>bmmformula</strong> syntax</a> and explain <a href="https://popov-lab.github.io/bmm/articles/bmm_extract_info.html">how to extract information from <strong>bmmodels</strong></a> such as the generated Stan code and Stan data for each model</li>
 </ul></div>
 <div class="section level4">
 <h4 id="bug-fixes-0-5-0">Bug fixes<a class="anchor" aria-label="anchor" href="#bug-fixes-0-5-0"></a></h4>
@@ -384,10 +385,10 @@
 </ul></div>
 <div class="section level4">
 <h4 id="documentation-0-2-0">Documentation<a class="anchor" aria-label="anchor" href="#documentation-0-2-0"></a></h4>
-<ul><li>Website for the development version of the package is now available at <a href="https://venpopov.com/bmm/dev/" class="uri">https://venpopov.com/bmm/dev/</a> (<a href="https://github.com/popov-lab/bmm/issues/18" class="external-link">#18</a>)</li>
-<li>Add articles for each model to the website at <a href="https://venpopov.com/bmm/dev/articles/" class="uri">https://venpopov.com/bmm/dev/articles/</a>
+<ul><li>Website for the development version of the package is now available at <a href="https://popov-lab.github.io/bmm/dev/" class="uri">https://popov-lab.github.io/bmm/dev/</a> (<a href="https://github.com/popov-lab/bmm/issues/18" class="external-link">#18</a>)</li>
+<li>Add articles for each model to the website at <a href="https://popov-lab.github.io/bmm/dev/articles/" class="uri">https://popov-lab.github.io/bmm/dev/articles/</a>
 </li>
-<li>Add a detailed developer’s guide to the website at <a href="https://venpopov.com/bmm/dev/dev-notes" class="uri">https://venpopov.com/bmm/dev/dev-notes</a> (<a href="https://github.com/popov-lab/bmm/issues/21" class="external-link">#21</a>)</li>
+<li>Add a detailed developer’s guide to the website at <a href="https://popov-lab.github.io/bmm/dev/dev-notes" class="uri">https://popov-lab.github.io/bmm/dev/dev-notes</a> (<a href="https://github.com/popov-lab/bmm/issues/21" class="external-link">#21</a>)</li>
 <li>Improve README with more detailed information about the package’s goals and its models (<a href="https://github.com/popov-lab/bmm/issues/21" class="external-link">#21</a>)</li>
 </ul></div>
 <div class="section level4">

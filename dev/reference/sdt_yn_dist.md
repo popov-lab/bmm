@@ -48,8 +48,8 @@ rsdt_yn(
   Numeric. Sensitivity: \\d'\\ when `sdratio` is 1, and otherwise the
   balanced index \\d_a\\, the separation between the two distributions
   divided by the root-mean-square of their SDs (see
-  [`sdt_yn()`](https://venpopov.com/bmm/dev/reference/sdt_yn.md)). The
-  separation in noise units is `d * sqrt((1 + sdratio^2) / 2)`.
+  [`sdt_yn()`](https://popov-lab.github.io/bmm/dev/reference/sdt_yn.md)).
+  The separation in noise units is `d * sqrt((1 + sdratio^2) / 2)`.
 
 - criterion:
 
@@ -97,7 +97,7 @@ per observation.
 
 As everywhere in `bmm`, these functions take their arguments on the
 **natural** scale, while the parameters
-[`sdt_yn()`](https://venpopov.com/bmm/dev/reference/sdt_yn.md)
+[`sdt_yn()`](https://popov-lab.github.io/bmm/dev/reference/sdt_yn.md)
 *estimates* are on their link scale. `d` and `criterion` have identity
 links and carry across unchanged, but `sdratio` has a log link: a fitted
 `sdratio` of 0.375 is a ratio of `exp(0.375) = 1.455`, and passing

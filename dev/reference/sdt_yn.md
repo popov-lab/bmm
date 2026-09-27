@@ -31,9 +31,9 @@ sdt_yn(
   columns holding "0"/"1", are coerced automatically; anything else
   (e.g. "noise"/"signal" labels) must be recoded by hand, since bmm
   cannot guess which level is the signal.
-  [`dsdt_yn()`](https://venpopov.com/bmm/dev/reference/sdt_yn_dist.md)
+  [`dsdt_yn()`](https://popov-lab.github.io/bmm/dev/reference/sdt_yn_dist.md)
   and
-  [`rsdt_yn()`](https://venpopov.com/bmm/dev/reference/sdt_yn_dist.md)
+  [`rsdt_yn()`](https://popov-lab.github.io/bmm/dev/reference/sdt_yn_dist.md)
   take the same column but are stricter, accepting only numeric or
   logical input.
 
@@ -196,8 +196,8 @@ larger), so compare such fits on the AUC rather than on `d`.
 
 Because `d` is a short name, a column called `d` in your data that is
 also used as a predictor will collide with this parameter;
-[`bmm()`](https://venpopov.com/bmm/dev/reference/bmm.md) warns when that
-happens.
+[`bmm()`](https://popov-lab.github.io/bmm/dev/reference/bmm.md) warns
+when that happens.
 
 ## Identifying `sdratio`
 
@@ -207,8 +207,8 @@ when every parameter is intercept-only with no random effects,
 `sdratio ~ 1` returns its prior and `d` is pulled along the resulting
 ridge: sampling converges, `Rhat` is fine, and the profile likelihood
 over `sdratio` is flat to 1e-12.
-[`bmm()`](https://venpopov.com/bmm/dev/reference/bmm.md) warns for that
-one design, which is the only shape that provably cannot work.
+[`bmm()`](https://popov-lab.github.io/bmm/dev/reference/bmm.md) warns
+for that one design, which is the only shape that provably cannot work.
 
 Any linear predictor that moves the operating point along the ROC
 supplies what is missing, and it need not sit on `criterion`: a
@@ -226,18 +226,19 @@ A criterion manipulation is still the cleanest design, because it traces
 the ROC at fixed sensitivity: give `criterion` a predictor that shifts
 the decision boundary — a base-rate, payoff, or confidence manipulation
 — as in `criterion ~ 0 + condition`; see
-[broeder_schuetz_2009_e3](https://venpopov.com/bmm/dev/reference/broeder_schuetz_2009_e3.md).
+[broeder_schuetz_2009_e3](https://popov-lab.github.io/bmm/dev/reference/broeder_schuetz_2009_e3.md).
 Leaving `sdratio` at its default is always identified.
 
-## Reading `sdratio` and carrying it to [`dsdt_yn()`](https://venpopov.com/bmm/dev/reference/sdt_yn_dist.md)/[`rsdt_yn()`](https://venpopov.com/bmm/dev/reference/sdt_yn_dist.md)
+## Reading `sdratio` and carrying it to [`dsdt_yn()`](https://popov-lab.github.io/bmm/dev/reference/sdt_yn_dist.md)/[`rsdt_yn()`](https://popov-lab.github.io/bmm/dev/reference/sdt_yn_dist.md)
 
 As in every `bmm` model, the parameters the model *estimates* are on
 their link scale, while the distribution functions take their arguments
 on the *natural* scale. `sdratio` has a log link, so
 [`summary()`](https://rdrr.io/r/base/summary.html) reports \\\log r\\
 whereas
-[`dsdt_yn()`](https://venpopov.com/bmm/dev/reference/sdt_yn_dist.md) and
-[`rsdt_yn()`](https://venpopov.com/bmm/dev/reference/sdt_yn_dist.md)
+[`dsdt_yn()`](https://popov-lab.github.io/bmm/dev/reference/sdt_yn_dist.md)
+and
+[`rsdt_yn()`](https://popov-lab.github.io/bmm/dev/reference/sdt_yn_dist.md)
 expect the ratio \\r\\ itself (their default is 1, equal variance).
 Exponentiate before carrying a posterior value across:
 
@@ -245,7 +246,7 @@ Exponentiate before carrying a posterior value across:
 
 A posterior mean of `sdratio = 0.22` is a ratio of `exp(0.22) = 1.25`.
 Passing `0.22` straight to
-[`rsdt_yn()`](https://venpopov.com/bmm/dev/reference/sdt_yn_dist.md)
+[`rsdt_yn()`](https://popov-lab.github.io/bmm/dev/reference/sdt_yn_dist.md)
 instead asks for a signal distribution 4.5 times *narrower* than the
 noise — a legal value that raises no error, and the one mistake worth
 checking for in a posterior predictive check written by hand. `d` and
@@ -259,10 +260,10 @@ The same log link applies going the other way: a constant you supply
 yourself, whether as `bmf(sdratio = )` or through a hand-written
 `brms::set_prior(..., dpar = "sdratio")`, is read on it too.
 `bmf(sdratio = 1)` does not fix a ratio of 1 — it fixes `exp(1) = 2.72`,
-and [`bmm()`](https://venpopov.com/bmm/dev/reference/bmm.md) raises no
-warning; a fixed ratio of 1.25 needs `bmf(sdratio = log(1.25))`. Both
-`sdratio` defaults
-[`default_prior()`](https://venpopov.com/bmm/dev/reference/default_prior.bmmformula.md)
+and [`bmm()`](https://popov-lab.github.io/bmm/dev/reference/bmm.md)
+raises no warning; a fixed ratio of 1.25 needs
+`bmf(sdratio = log(1.25))`. Both `sdratio` defaults
+[`default_prior()`](https://popov-lab.github.io/bmm/dev/reference/default_prior.bmmformula.md)
 reports — `normal(0, 0.5)` on the intercept and `exponential(2)` on the
 random-effect SDs — are on that same scale, unannotated.
 
@@ -316,8 +317,9 @@ unequal-variance signal detection model of recognition memory.
 
 ## See also
 
-[`sdt_d()`](https://venpopov.com/bmm/dev/reference/SDTdist.md) and
-[`sdt_criterion()`](https://venpopov.com/bmm/dev/reference/SDTdist.md)
+[`sdt_d()`](https://popov-lab.github.io/bmm/dev/reference/SDTdist.md)
+and
+[`sdt_criterion()`](https://popov-lab.github.io/bmm/dev/reference/SDTdist.md)
 compute the `d` and `criterion` of this model in closed form from a
 single pair of observed hit and false-alarm rates, without fitting: use
 them for a quick check of a fitted value, and this model when you need a

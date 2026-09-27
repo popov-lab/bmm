@@ -161,11 +161,11 @@ moments. With a free starting point they do differ, which is why the
 boundary reached fewer than twice in a cell has no variance to
 contribute. Such a cell still contributes through the response counts,
 and so does a cell whose summaries at one boundary are missing, as
-[`ezdm_summary_stats()`](https://venpopov.com/bmm/dev/reference/ezdm_summary_stats.md)
+[`ezdm_summary_stats()`](https://popov-lab.github.io/bmm/dev/reference/ezdm_summary_stats.md)
 returns them for a boundary reached fewer than `min_trials` times.
-[`bmm()`](https://venpopov.com/bmm/dev/reference/bmm.md) keeps these
-cells and warns how many there are. Dropping them instead would remove
-exactly the cells with the most extreme accuracy, and with them
+[`bmm()`](https://popov-lab.github.io/bmm/dev/reference/bmm.md) keeps
+these cells and warns how many there are. Dropping them instead would
+remove exactly the cells with the most extreme accuracy, and with them
 information about drift and starting point.
 
 ## 2 Parametrization in the `bmm` package
@@ -223,7 +223,7 @@ lower boundary (error) responses
 ## 4 Preparing data with `ezdm_summary_stats()`
 
 The `bmm` package provides the
-[`ezdm_summary_stats()`](https://venpopov.com/bmm/dev/reference/ezdm_summary_stats.md)
+[`ezdm_summary_stats()`](https://popov-lab.github.io/bmm/dev/reference/ezdm_summary_stats.md)
 function to compute the required aggregated statistics from trial-level
 RT data in the correct format. RT contaminants (fast guesses, lapses,
 attentional failures) can severely distort mean and variance estimates,
@@ -466,7 +466,7 @@ library(bmm)
 
 For illustration, we will generate simulated data with known parameters
 using the
-[`rezdm()`](https://venpopov.com/bmm/dev/reference/ezdm_dist.md)
+[`rezdm()`](https://popov-lab.github.io/bmm/dev/reference/ezdm_dist.md)
 function. As for all other models, `bmm` provides a density and random
 generation function for all implemented models. In the case of the
 `ezdm` there is no single dependent variable for the density function,
@@ -531,8 +531,9 @@ head(sim_data)
 ### 5.2 Specifying the formula
 
 Next, we specify the model formula using
-[`bmmformula()`](https://venpopov.com/bmm/dev/reference/bmmformula.md)
-(or [`bmf()`](https://venpopov.com/bmm/dev/reference/bmmformula.md)).
+[`bmmformula()`](https://popov-lab.github.io/bmm/dev/reference/bmmformula.md)
+(or
+[`bmf()`](https://popov-lab.github.io/bmm/dev/reference/bmmformula.md)).
 For this example, we want to estimate separate drift rates for each
 condition while keeping boundary and non-decision time constant:
 
@@ -567,7 +568,7 @@ As for all other `bmmodel` this provides the necessary information for
 ### 5.4 Fitting the model
 
 Now we can fit the model using
-[`bmm()`](https://venpopov.com/bmm/dev/reference/bmm.md):
+[`bmm()`](https://popov-lab.github.io/bmm/dev/reference/bmm.md):
 
 ``` r
 
@@ -695,10 +696,10 @@ draws |>
 The EZ-diffusion likelihood constrains three statistics per cell — the
 mean RT, the RT variance, and the number of upper-boundary (correct)
 responses — but by default
-[`pp_check()`](https://venpopov.com/bmm/dev/reference/pp_check.bmmfit.md)
+[`pp_check()`](https://popov-lab.github.io/bmm/dev/reference/pp_check.bmmfit.md)
 only shows the mean RT. The `resp_var` argument selects the other
 observables of the likelihood;
-[`pp_check_vars()`](https://venpopov.com/bmm/dev/reference/pp_check_vars.md)
+[`pp_check_vars()`](https://popov-lab.github.io/bmm/dev/reference/pp_check_vars.md)
 lists the available checks:
 
 ``` r

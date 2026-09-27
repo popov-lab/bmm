@@ -94,9 +94,9 @@ them with `attr(result, "diagnostics")`.
 
 ## See also
 
-[`ezdm_summary_stats()`](https://venpopov.com/bmm/dev/reference/ezdm_summary_stats.md)
+[`ezdm_summary_stats()`](https://popov-lab.github.io/bmm/dev/reference/ezdm_summary_stats.md)
 for aggregated RT statistics with contamination handling,
-[`validate_fast_guesses()`](https://venpopov.com/bmm/dev/reference/validate_fast_guesses.md)
+[`validate_fast_guesses()`](https://popov-lab.github.io/bmm/dev/reference/validate_fast_guesses.md)
 for testing whether flagged contaminants show random guessing behavior
 
 ## Examples
