@@ -12,7 +12,7 @@ badge](https://popov-lab.r-universe.dev/badges/bmm)](https://popov-lab.r-univers
 [![R-CMD-check](https://github.com/popov-lab/bmm/actions/workflows/R-CMD-check.yaml/badge.svg)](https://github.com/popov-lab/bmm/actions/workflows/R-CMD-check.yaml)
 [![test-coverage](https://github.com/popov-lab/bmm/actions/workflows/test-coverage.yaml/badge.svg)](https://github.com/popov-lab/bmm/actions/workflows/test-coverage.yaml)
 [![downloads](https://cranlogs.r-pkg.org/badges/bmm)](https://cran.r-project.org/package=bmm)
-[![Dependencies](https://img.shields.io/badge/dependencies-9/16-orange?style=flat)](#)
+[![Dependencies](https://img.shields.io/badge/dependencies-12/19-orange?style=flat)](#)
 <!-- badges: end -->
 
 ## Overview
@@ -148,6 +148,10 @@ working memory research and evidence accumulation models, such as:
 
 - The Multinomial / Memory Measurement Model
 
+**Perception & Recognition Memory**
+
+- Signal Detection Theory (Yes/No)
+
 However, the `bmm` package is setup to provide the foundation for the
 implementation of a broad range of cognitive measurement models. In
 fact, we are already working on implementing additional models, such as:
@@ -178,6 +182,7 @@ bmm::supported_models()
 #> -  mixture2p(resp_error) 
 #> -  mixture3p(resp_error, nt_features, set_size, regex) 
 #> -  sdm(resp_error, version) 
+#> -  sdt_yn(response, stimulus, n_trials, dist, links) 
 #> 
 #> Type  ?modelname  to get information about a specific model, e.g.  ?imm
 ```
@@ -209,7 +214,7 @@ with the package and we will show how to fit the Interference
 Measurement Model to this data. If you want a detailed description of
 this model and and in depth explanation of the parameters estimated in
 the model, please have a look at [the IMM
-article](https://venpopov.com/bmm/articles/bmm_imm.html).
+article](https://popov-lab.github.io/bmm/articles/bmm_imm.html).
 
 ``` r
 library(bmm)
@@ -241,9 +246,10 @@ brms::pp_check(fit)
 
 You can have a look at examples for how to fit all currently implemented
 models by reading the vignettes for each model [here for the released
-version of the package](https://venpopov.com/bmm/articles/index.html) or
-[here for the development
-version](https://venpopov.com/bmm/dev/articles/index.html).
+version of the
+package](https://popov-lab.github.io/bmm/articles/index.html) or [here
+for the development
+version](https://popov-lab.github.io/bmm/dev/articles/index.html).
 
 ## Exploring measurement models
 
@@ -327,8 +333,8 @@ This process is illustrated in the Figure below:
 
 Should be interested in contributing a model to the `bmm` package, you
 should first look into the [Developer
-Notes](https://venpopov.com/bmm/dev/dev-notes/index.html) as well as the
-[Contributor
+Notes](https://popov-lab.github.io/bmm/dev/dev-notes/index.html) as well
+as the [Contributor
 Guidelines](https://github.com/popov-lab/bmm/blob/develop/.github/CONTRIBUTING.md).
 These give a more in depth description of the package architecture, the
 steps necessary to add your own model to the package, and how

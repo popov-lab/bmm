@@ -47,6 +47,7 @@
 * `update()` without `newdata` no longer fails for **m3** fits (*The response variable(s) corr, other, dist, npl missing in the data*) or for **mixture3p** and **imm** fits whose formulas do not use `set_size` (*The set_size variable 'set_size' must be either a variable in your data or a single numeric value*), and no longer warns for **sdt_yn** fits that the reserved column `dist_type` will be overwritten (#429).
 
 ### Other changes
+* bmm's own links now point at popov-lab.github.io/bmm instead of venpopov.com/bmm, which currently redirects to the new address. Update bookmarks when convenient (#433).
 * The **cswald** likelihood now evaluates all observations in one call instead of one at a time. This makes fitting faster, improves the accuracy of the gradients the sampler uses, and adds support for within-chain parallelization: `bmm(..., threads = 2)` now works for **cswald** as it does for **sdm**. The posterior is unchanged (#387).
 
 # bmm 1.3.2
@@ -108,10 +109,10 @@
 * New function **create_initfun()** creates initialization functions for models that benefit from or require initial values for MCMC sampling (#285).
 
 ### Documentation
-* New online [article](https://venpopov.com/bmm/dev/articles/bmm_ddm.html) to accompany the **ddm** model
-* New online [article](https://venpopov.com/bmm/dev/articles/bmm_ezdm.html) to accompany the **ezdm** model
-* New online [article](https://venpopov.com/bmm/dev/articles/bmm_cswald.html) to accompany the **cswald** model
-* New online [article](https://venpopov.com/bmm/dev/articles/bmm_rt_contamination.html) on pre-processing and contamination detection for reaction time data
+* New online [article](https://popov-lab.github.io/bmm/dev/articles/bmm_ddm.html) to accompany the **ddm** model
+* New online [article](https://popov-lab.github.io/bmm/dev/articles/bmm_ezdm.html) to accompany the **ezdm** model
+* New online [article](https://popov-lab.github.io/bmm/dev/articles/bmm_cswald.html) to accompany the **cswald** model
+* New online [article](https://popov-lab.github.io/bmm/dev/articles/bmm_rt_contamination.html) on pre-processing and contamination detection for reaction time data
 
 ### Other changes
 * Improved **rm3()** random generation function for the M3 model (#279).
@@ -121,7 +122,7 @@
 # bmm 1.2.0
 
 ### New models
-* Add the Memory Measurement Model (Oberauer & Lewandowsky, 2019) and its generalization as the Multinomial Measurement Model for categorical decision tasks as new model class **m3** with three versions: simple span (**ss**), complex span (**cs**), and **custom**. For details, see the [article](https://venpopov.com/bmm/articles/bmm_m3.html) on the `bmm` website (#237). Thanks to @GidonFrischkorn and @chenyu-psy
+* Add the Memory Measurement Model (Oberauer & Lewandowsky, 2019) and its generalization as the Multinomial Measurement Model for categorical decision tasks as new model class **m3** with three versions: simple span (**ss**), complex span (**cs**), and **custom**. For details, see the [article](https://popov-lab.github.io/bmm/articles/bmm_m3.html) on the `bmm` website (#237). Thanks to @GidonFrischkorn and @chenyu-psy
 
 ### New features
 * Updates to the `bmf2bf` S3 methods for more flexible translation of `bmmformulas` into `brmsformulas` (#227).
@@ -136,8 +137,8 @@
 * Improve error messages when attempting to construct bmmformulas without a left-hand-side variable
 
 ### Documentation
-* Add documentation to the [continuous reproduction task](https://venpopov.com/bmm/articles/bmm_vwm_crt.html) article for pre-processing half-circular stimulus spaces when using `bmmodels` of the `circular` model class (#229, #233).
-* New online [article](https://venpopov.com/bmm/articles/bmm_m3.html) to accompany the m3 model
+* Add documentation to the [continuous reproduction task](https://popov-lab.github.io/bmm/articles/bmm_vwm_crt.html) article for pre-processing half-circular stimulus spaces when using `bmmodels` of the `circular` model class (#229, #233).
+* New online [article](https://popov-lab.github.io/bmm/articles/bmm_m3.html) to accompany the m3 model
 
 ### Other changes
 * vectorize `k2sd()` function for improved performance
@@ -179,7 +180,7 @@ First version of the package on published on CRAN!
 * various updates to the documentation and data sets
 
 ### Documentation
-* two new online articles that [introduce the **bmmformula** syntax](https://venpopov.com/bmm/articles/bmm_bmmformula.html) and explain [how to extract information from **bmmodels**](https://venpopov.com/bmm/articles/bmm_extract_info.html) such as the generated Stan code and Stan data for each model
+* two new online articles that [introduce the **bmmformula** syntax](https://popov-lab.github.io/bmm/articles/bmm_bmmformula.html) and explain [how to extract information from **bmmodels**](https://popov-lab.github.io/bmm/articles/bmm_extract_info.html) such as the generated Stan code and Stan data for each model
 
 ### Bug fixes
 * fix a bug preventing the **sort_data** check from being executed (#72)
@@ -265,9 +266,9 @@ to zero for scaling and as of now cannot be predicted by independent variables b
 
 ### Documentation
 
-* Website for the development version of the package is now available at https://venpopov.com/bmm/dev/ (#18)
-* Add articles for each model to the website at https://venpopov.com/bmm/dev/articles/
-* Add a detailed developer's guide to the website at https://venpopov.com/bmm/dev/dev-notes (#21)
+* Website for the development version of the package is now available at https://popov-lab.github.io/bmm/dev/ (#18)
+* Add articles for each model to the website at https://popov-lab.github.io/bmm/dev/articles/
+* Add a detailed developer's guide to the website at https://popov-lab.github.io/bmm/dev/dev-notes (#21)
 * Improve README with more detailed information about the package's goals and its models (#21)
 
 ### Other changes
