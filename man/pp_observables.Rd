@@ -42,6 +42,16 @@ constructor. Each \code{compute} closure receives a named list keyed by
 produces \code{y} from length-N vectors and \code{yrep} from ndraws x N matrices.
 }
 
+Two optional elements serve observed data that holds placeholders rather
+than observations, such as the summaries of an unused \code{\link[=ezdm]{ezdm()}} boundary:
+\itemize{
+\item \code{defaults}: named vector giving, for observables whose slot a fit saved
+by an older bmm version lacks, the value to use for every observation.
+\item \code{y_placeholders}: \code{TRUE} if the \code{"Y"} slot can hold placeholders. brms
+would plot them as data, so \code{\link[=pp_check.bmmfit]{pp_check.bmmfit()}} without \code{resp_var} then
+checks the observable mapped to \code{"Y"} itself.
+}
+
 A \code{pp_simulate()} method returns a named list of ndraws x nobs matrices
 drawn jointly, typically through the internal \code{.pp_simulate_joint()} helper
 around the model's \verb{r*()} function. Simulating observables independently

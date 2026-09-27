@@ -312,3 +312,101 @@ test_that("pp_check(resp_var = 'all') panels share one set of observations", {
                    integer(1))
   expect_identical(n_rows, rep(n_rows[[1L]], length(n_rows)))
 })
+
+
+# Sparse 4par boundaries (#430) -------------------------------------------------
+
+# every warning rather than the first matching one, so that an expected
+# "Dropped" warning is found among the draw-level ones
+collect_warnings <- function(expr) {
+  warnings <- character()
+  value <- withCallingHandlers(expr, warning = function(w) {
+    warnings <<- c(warnings, conditionMessage(w))
+    invokeRestart("muffleWarning")
+  })
+  list(value = value, warnings = warnings)
+}
+
+# The fixture's draws on its own data with five cells made sparse. Rows 1-3
+# lose the lower summaries (no lower response, one, then enough responses but
+# no summaries, the min_trials case), rows 4-5 the upper ones (one upper
+# response, then no summaries). Every parameter is intercept-only, so the
+# draws do not depend on the data.
+sparse_ezdm4_fit <- function() {
+  old <- load_ppcheck_fit("bmmfit_ezdm4_ppcheck.rds")
+  data <- old$data
+  data$n_upper[1:2] <- as.integer(data$n_trials[1:2] - c(0, 1))
+  data$n_upper[4] <- 1L
+  data[1:3, c("mean_rt_lower", "var_rt_lower")] <- NA
+  data[4:5, c("mean_rt_upper", "var_rt_upper")] <- NA
+  fit <- suppressWarnings(suppressMessages(bmm(
+    old$bmm$user_formula, data, old$bmm$model,
+    backend = "mock", mock_fit = old$fit, rename = FALSE
+  )))
+  rows <- seq_len(nrow(data))
+  list(fit = fit, data = data, used_upper = !rows %in% 4:5,
+       used_lower = !rows %in% 1:3)
+}
+
+test_that("pp_check(resp_var) leaves the unused 4par boundaries out", {
+  sparse <- sparse_ezdm4_fit()
+  rt_checks <- c("mean_rt_lower", "var_rt_lower", "mean_rt_upper", "var_rt_upper")
+  for (resp_var in rt_checks) {
+    used <- if (endsWith(resp_var, "lower")) sparse$used_lower else sparse$used_upper
+    out <- collect_warnings(pp_check(sparse$fit, resp_var = resp_var, ndraws = 5))
+    dropped <- paste("Dropped", sum(!used), "of 10 observations")
+    expect_true(any(grepl(dropped, out$warnings, fixed = TRUE)), info = resp_var)
+    y <- out$value$data$value[out$value$data$is_y_label == "italic(y)"]
+    expect_equal(y, sparse$data[[resp_var]][used], info = resp_var)
+    expect_false(any(y == -1), info = resp_var)
+  }
+
+  out <- collect_warnings(pp_check(sparse$fit, resp_var = "all", ndraws = 5))
+  expect_s3_class(out$value, "bayesplot_grid")
+  expect_true(any(grepl("Dropped 5 of 10 observations", out$warnings, fixed = TRUE)))
+})
+
+# brms would plot its Y, the upper mean RT, placeholders included
+test_that("pp_check() without resp_var leaves the placeholders of a 4par fit out", {
+  sparse <- sparse_ezdm4_fit()
+  p <- suppressWarnings(pp_check(sparse$fit, ndraws = 5))
+  expect_s3_class(p, "ggplot")
+  y <- p$data$value[p$data$is_y_label == "italic(y)"]
+  expect_equal(y, sparse$data$mean_rt_upper[sparse$used_upper])
+  expect_false(any(y == -1))
+})
+
+test_that("pp_check() still checks a 4par fit saved without RT indicators", {
+  fit <- load_ppcheck_fit("bmmfit_ezdm4_ppcheck.rds")
+  expect_false("vint3" %in% names(brms::standata(fit)))
+
+  p <- suppressWarnings(pp_check(fit, ndraws = 5))
+  expect_s3_class(p, "ggplot")
+  expect_equal(p$data$value[p$data$is_y_label == "italic(y)"],
+               fit$data$mean_rt_upper)
+
+  p <- suppressWarnings(pp_check(fit, resp_var = "var_rt_upper", ndraws = 5))
+  expect_equal(p$data$value[p$data$is_y_label == "italic(y)"],
+               fit$data$var_rt_upper)
+})
+
+# only the ezdm 4par default leaves brms; the other models with declared
+# observables must still plot exactly what brms plots
+test_that("pp_check() without resp_var still delegates to brms for the other RT models", {
+  brms_method <- getS3method("pp_check", "brmsfit", envir = asNamespace("brms"))
+  for (name in c("bmmfit_ezdm3_ppcheck.rds", "bmmfit_ddm_ppcheck.rds")) {
+    fit <- load_ppcheck_fit(name)
+    withr::with_seed(1, mine <- pp_check(fit, ndraws = 5))
+    withr::with_seed(1, theirs <- brms_method(fit, type = "dens_overlay", ndraws = 5))
+    expect_equal(mine$data, theirs$data, info = name)
+  }
+})
+
+test_that("pp_check_vars() lists the same checks for a 4par fit with indicators", {
+  vars <- pp_check_vars(sparse_ezdm4_fit()$fit)
+  expect_identical(
+    vars$resp_var,
+    c("mean_rt_upper", "mean_rt_lower", "var_rt_upper", "var_rt_lower", "mean_pc")
+  )
+  expect_identical(vars$default, c(TRUE, FALSE, FALSE, FALSE, FALSE))
+})

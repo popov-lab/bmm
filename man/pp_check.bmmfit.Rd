@@ -41,7 +41,11 @@ if available. For multinomial models, facets by the named predictor.}
 the name of the observable to check, or \code{"all"} for a panel of all
 available checks built from one shared simulation. See \code{\link[=pp_check_vars]{pp_check_vars()}}
 for the options of a fitted model. The default \code{NULL} checks the primary
-response via \code{\link[brms:pp_check]{brms::pp_check()}}. For the RT models, passing
+response via \code{\link[brms:pp_check]{brms::pp_check()}}, except for \code{ezdm(version = "4par")}:
+there the primary response, \code{mean_rt_upper}, holds placeholders where
+the upper boundary has no usable summaries, so \code{NULL} means
+\code{resp_var = "mean_rt_upper"}, which leaves those cells out. For the RT
+models, passing
 \code{negative_rt = TRUE} (a \code{\link[brms:posterior_predict]{brms::posterior_predict()}} argument) is
 redirected to \code{resp_var = "signed_rt"}, so that observed and predicted
 response times are both signed by the response.}
@@ -58,9 +62,9 @@ instead of counts). \code{re_formula = NA} predicts at the population level on
 every path.}
 }
 \value{
-For multinomial models or when \code{resp_var} is specified, a \code{ggplot2}
-object (a \code{bayesplot_grid} for \code{resp_var = "all"}). For other models, the
-result of \code{\link[brms:pp_check]{brms::pp_check()}}.
+For multinomial models, the 4-parameter \code{\link[=ezdm]{ezdm()}}, or when
+\code{resp_var} is specified, a \code{ggplot2} object (a \code{bayesplot_grid} for
+\code{resp_var = "all"}). For other models, the result of \code{\link[brms:pp_check]{brms::pp_check()}}.
 }
 \description{
 For models where brms provides \code{pp_check} support, this method delegates to
