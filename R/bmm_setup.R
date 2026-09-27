@@ -1,16 +1,27 @@
 #' @title Check whether this machine can fit bmm models
-#' @description Fitting a model with [bmm()] needs a C++ toolchain and a Stan
-#'   backend: `cmdstanr` with CmdStan, or `rstan`. It also needs `rstan` to
+#' @description Fitting a model with [bmm()] needs a C++ toolchain (a compiler
+#'   and `make`) and a Stan backend, the software that turns the model into a
+#'   program and samples from it. There are two backends: the R package
+#'   `cmdstanr`, which runs CmdStan, a separate program installed with
+#'   `cmdstanr::install_cmdstan()`; and the R package `rstan`. `rstan` must
 #'   load with either backend, because `brms` uses it to store every fit.
 #'   `bmm_setup()` checks each of these, prints whether it passed, and gives
 #'   one fix for every check that failed. It does not install or change
 #'   anything.
 #'
+#'   Two checks concern the toolchain. "C++ toolchain" lets R compile a small
+#'   test file; "CmdStan toolchain" is `cmdstanr`'s own check, which only looks
+#'   for `make` and a compiler on the `PATH`. The second can pass while the
+#'   first fails, e.g. on a Mac whose command line tools are missing, and the
+#'   first is the one that decides.
+#'
 #'   With `smoke_test = TRUE`, it finally compiles and samples a small
-#'   **mixture2p** model through [bmm()], on the backend [bmm()] will use.
-#'   This is the only check that shows the whole chain works. On an Apple
-#'   Silicon Mac it takes about 10 seconds with `cmdstanr` and 45 seconds with
-#'   `rstan`, and it is skipped when a check it needs has failed.
+#'   two-parameter mixture model ([mixture2p()]) through [bmm()], on the
+#'   backend [bmm()] will use. This is the only check that shows the whole
+#'   chain works. On an Apple Silicon Mac it takes about 10 seconds with
+#'   `cmdstanr` and 45 seconds with `rstan`, and it is skipped when a check it
+#'   needs has failed. Once every check passes, rerun the [bmm()] call that
+#'   failed.
 #'
 #' @param smoke_test Logical. Compile and sample a small test model? Defaults
 #'   to `TRUE`.
@@ -70,9 +81,9 @@ toolchain_check <- function(fixes) {
     return(setup_row("C++ toolchain", "skip", "not checked: needs the pkgbuild package"))
   }
   if (found) {
-    return(setup_row("C++ toolchain", "pass", "compiler and make found"))
+    return(setup_row("C++ toolchain", "pass", "R compiled a small test file"))
   }
-  setup_row("C++ toolchain", "fail", "no working C++ compiler or make found", fixes$toolchain)
+  setup_row("C++ toolchain", "fail", "R could not compile a small test file", fixes$toolchain)
 }
 
 cmdstanr_checks <- function(chosen, fixes) {
@@ -84,7 +95,7 @@ cmdstanr_checks <- function(chosen, fixes) {
     }
     # cmdstanr 0.9.0 cannot load when CMDSTAN names a directory without
     # CmdStan, and brms then asks to install cmdstanr
-    fix <- if (nzchar(Sys.getenv("CMDSTAN"))) {
+    fix <- if (cmdstanr$error != "not installed" && nzchar(Sys.getenv("CMDSTAN"))) {
       glue("point the CMDSTAN environment variable to a CmdStan installation, or unset it \\
       (it is '{Sys.getenv('CMDSTAN')}')")
     } else {
@@ -102,7 +113,7 @@ cmdstanr_checks <- function(chosen, fixes) {
       setup_row("CmdStan", "pass", version)
     },
     if (is.null(toolchain_error)) {
-      setup_row("CmdStan toolchain", "pass", "compiler and make found")
+      setup_row("CmdStan toolchain", "pass", "make and a C++ compiler are on the PATH")
     } else {
       setup_row("CmdStan toolchain", "fail", toolchain_error, fixes$toolchain)
     }
@@ -142,14 +153,14 @@ backend_reason <- function(backend, chosen, from_option) {
 }
 
 backend_check <- function(report, chosen, reason) {
-  detail <- glue("bmm() will use {chosen} ({reason})")
+  detail <- if (reason == "requested") glue("{chosen} (requested)") else glue("bmm() will use {chosen} ({reason})")
   if (backend_works(report, chosen)) {
     return(setup_row("Backend", "pass", detail))
   }
   fix <- if (chosen == "cmdstanr" && backend_works(report, "rstan")) {
     'fix the failures above, or switch to rstan with options(brms.backend = "rstan")'
   } else {
-    "fix the failures above"
+    "nothing separate; this passes once the failures above are fixed"
   }
   setup_row("Backend", "fail", detail, fix)
 }
@@ -175,7 +186,9 @@ smoke_check <- function(report, chosen, smoke_test) {
   structure(
     setup_row(
       "Smoke test", "fail", strsplit(smoke$error, "\n", fixed = TRUE)[[1]][1],
-      "please report this at https://github.com/popov-lab/bmm/issues, with the output of bmm_setup()"
+      "look for a compiler set in ~/.R/Makevars or in the CXX or CXX17 environment variables; \\
+      if there is none, please report this at https://github.com/popov-lab/bmm/issues, with \\
+      the output of bmm_setup()"
     ),
     output = smoke$output
   )
@@ -210,7 +223,7 @@ probe_build_tools <- function() {
   if (!requireNamespace("pkgbuild", quietly = TRUE)) {
     return(NA)
   }
-  withr::local_options(buildtools.check = NULL)
+  withr::local_options(buildtools.check = NULL, pkgbuild.has_compiler = NULL)
   utils::capture.output(found <- suppressMessages(pkgbuild::has_build_tools(debug = TRUE)))
   found
 }
@@ -297,7 +310,7 @@ print_setup_row <- function(status, check, detail) {
 setup_verdict <- function(x) {
   n_fail <- sum(x$status == "fail")
   backend <- attr(x, "backend")
-  if (x$status[x$check == "Smoke test"] == "pass") {
+  if (isTRUE(any(x$status[x$check == "Smoke test"] == "pass"))) {
     ready <- glue("bmm can fit models with {backend} on this machine.")
     if (n_fail == 0) {
       return(ready)
@@ -309,9 +322,9 @@ setup_verdict <- function(x) {
     return("No check failed; run bmm_setup() to compile and sample a test model too.")
   }
   if (n_fail == 1) {
-    return("1 check failed. Fix it, then run bmm_setup() again.")
+    return("1 check failed. Fix it, restart R, and run bmm_setup() again.")
   }
-  glue("{n_fail} checks failed. Fix them from the top, then run bmm_setup() again.")
+  glue("{n_fail} checks failed. Fix them from the top, restart R, and run bmm_setup() again.")
 }
 
 # texts of failures that bmm_setup() can diagnose; each one was provoked on a
@@ -322,10 +335,11 @@ setup_error_patterns <- c(
   "error occurr?ed during compilation",
   "Compilation ERROR",
   "check_cmdstan_toolchain",
-  "required package .(rstan|StanHeaders).",
-  "loadNamespace\\(\\) for .(rstan|StanHeaders|cmdstanr|RcppParallel).",
-  # rstan 2.32 reports any failed compilation this way
-  'sink\\(type = "output"\\) invalid connection'
+  # the call and the package name read the same in every language R speaks
+  "requirePackage\\(package\\).*.(rstan|StanHeaders).",
+  "loadNamespace\\(\\).*.(rstan|StanHeaders|cmdstanr|RcppParallel).",
+  # rstan 2.32 reports any failed compilation as an invalid connection here
+  'sink\\(type = "output"\\)'
 )
 
 is_setup_error <- function(e) {
@@ -338,8 +352,8 @@ is_setup_error <- function(e) {
 add_setup_hint <- function(e) {
   if (is_setup_error(e)) {
     e$message <- paste0(
-      e$message, "\n\nThis error can come from the C++ toolchain or the Stan backend. ",
-      "Run bmm_setup() to check both; if it finds nothing, please report the error ",
+      e$message, "\n\nThis error can come from the C++ toolchain, the Stan backend, or the Stan code ",
+      "bmm generates. Run bmm_setup() to check the first two; if it finds nothing, please report the error ",
       "at https://github.com/popov-lab/bmm/issues."
     )
     stop(e)

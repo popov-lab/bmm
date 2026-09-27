@@ -141,6 +141,7 @@ test_that("a failing smoke test reports the first line of its error and where to
 
   expect_equal(smoke$status, "fail")
   expect_equal(smoke$detail, "Stan program failed to compile")
+  expect_match(smoke$fix, "~/.R/Makevars", fixed = TRUE)
   expect_match(smoke$fix, "https://github.com/popov-lab/bmm/issues", fixed = TRUE)
 })
 
@@ -252,6 +253,21 @@ test_that("a cmdstanr that fails to load under a CMDSTAN variable points to the 
   expect_no_match(row_of(report, "cmdstanr")$fix, "r-universe", fixed = TRUE)
 })
 
+test_that("a missing cmdstanr is installed, whatever CMDSTAN says", {
+  withr::local_envvar(CMDSTAN = "/path/without/cmdstan")
+  local_machine(cmdstanr = not_installed, smoke = smoke_must_not_run)
+  report <- bmm_setup(backend = "cmdstanr")
+
+  expect_match(row_of(report, "cmdstanr")$fix, "r-universe", fixed = TRUE)
+})
+
+test_that("a subset of the report still prints", {
+  local_machine(smoke = smoke_must_not_run)
+  report <- bmm_setup(smoke_test = FALSE, backend = "cmdstanr")
+
+  expect_no_error(capture.output(print(head(report, 3), color = FALSE)))
+})
+
 test_that("print() shows the last messages of a failed smoke test", {
   local_machine(smoke = function(backend) {
     list(
@@ -284,7 +300,12 @@ setup_error_texts <- list(
     "'xcode-select --install' or install Xcode from the app store. Then restart R and run",
     "cmdstanr::check_cmdstan_toolchain()."
   )),
-  rstan_compile_code = simpleError("Compilation ERROR, function(s)/method(s) not created!")
+  rstan_compile_code = simpleError("Compilation ERROR, function(s)/method(s) not created!"),
+  rstan_after_cmdstanr_fit_german = simpleError(
+    "kann benötigtes Paket ‘rstan’ nicht laden", quote(.requirePackage(package))
+  ),
+  rstan_on_load_german = simpleError(".onLoad in loadNamespace() für 'rstan' fehlgeschlagen"),
+  rstan_compiler_german = simpleError("ungültige Verbindung", quote(sink(type = "output")))
 )
 
 other_error_texts <- list(

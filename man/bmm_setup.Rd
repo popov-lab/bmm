@@ -21,17 +21,29 @@ columns \code{check}, \code{status} (\code{"pass"}, \code{"fail"} or \code{"skip
 \code{fix} (\code{NA} unless the check failed). It prints as a report.
 }
 \description{
-Fitting a model with \code{\link[=bmm]{bmm()}} needs a C++ toolchain and a Stan
-backend: \code{cmdstanr} with CmdStan, or \code{rstan}. It also needs \code{rstan} to
+Fitting a model with \code{\link[=bmm]{bmm()}} needs a C++ toolchain (a compiler
+and \code{make}) and a Stan backend, the software that turns the model into a
+program and samples from it. There are two backends: the R package
+\code{cmdstanr}, which runs CmdStan, a separate program installed with
+\code{cmdstanr::install_cmdstan()}; and the R package \code{rstan}. \code{rstan} must
 load with either backend, because \code{brms} uses it to store every fit.
 \code{bmm_setup()} checks each of these, prints whether it passed, and gives
 one fix for every check that failed. It does not install or change
 anything.
 
+Two checks concern the toolchain. "C++ toolchain" lets R compile a small
+test file; "CmdStan toolchain" is \code{cmdstanr}'s own check, which only looks
+for \code{make} and a compiler on the \code{PATH}. The second can pass while the
+first fails, e.g. on a Mac whose command line tools are missing, and the
+first is the one that decides.
+
 With \code{smoke_test = TRUE}, it finally compiles and samples a small
-\strong{mixture2p} model through \code{\link[=bmm]{bmm()}}, on the backend \code{\link[=bmm]{bmm()}} will use.
-That takes a minute or two and is the only check that shows the whole
-chain works. It is skipped when a check it needs has failed.
+two-parameter mixture model (\code{\link[=mixture2p]{mixture2p()}}) through \code{\link[=bmm]{bmm()}}, on the
+backend \code{\link[=bmm]{bmm()}} will use. This is the only check that shows the whole
+chain works. On an Apple Silicon Mac it takes about 10 seconds with
+\code{cmdstanr} and 45 seconds with \code{rstan}, and it is skipped when a check it
+needs has failed. Once every check passes, rerun the \code{\link[=bmm]{bmm()}} call that
+failed.
 }
 \examples{
 \dontshow{if (interactive()) withAutoprint(\{ # examplesIf}
