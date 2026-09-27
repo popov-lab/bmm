@@ -15,6 +15,9 @@ These pages provide a summary of the functionality available in bmm
 - [`bmm_options()`](https://popov-lab.github.io/bmm/dev/reference/bmm_options.md)
   : View or change global bmm options
 
+- [`bmm_setup()`](https://popov-lab.github.io/bmm/dev/reference/bmm_setup.md)
+  : Check whether this machine can fit bmm models
+
 ## Fitting models
 
 Main functions for model fitting

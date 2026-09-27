@@ -28,6 +28,18 @@
 
 #### New features
 
+- New function
+  [`bmm_setup()`](https://popov-lab.github.io/bmm/dev/reference/bmm_setup.md)
+  checks whether your machine can fit models: the C++ toolchain,
+  `cmdstanr` with CmdStan, `rstan`, and the backend
+  [`bmm()`](https://popov-lab.github.io/bmm/dev/reference/bmm.md) will
+  use. It then compiles and samples a small test model and gives one fix
+  for every check that failed. When
+  [`bmm()`](https://popov-lab.github.io/bmm/dev/reference/bmm.md) fails
+  because the compiler or the Stan backend is missing or broken, the
+  error now points to
+  [`bmm_setup()`](https://popov-lab.github.io/bmm/dev/reference/bmm_setup.md)
+  ([\#431](https://github.com/popov-lab/bmm/issues/431)).
 - `bmm(file_refit = "on_change")` is now implemented and no longer warns
   and falls back to `"never"`. The cached fit saved under `file` is
   returned only while the Stan code, the Stan data, the factor levels of

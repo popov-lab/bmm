@@ -122,7 +122,13 @@
 <span>  <span class="fu"><a href="https://rdrr.io/r/utils/install.packages.html" class="external-link">install.packages</a></span><span class="op">(</span><span class="st">"remotes"</span><span class="op">)</span></span>
 <span><span class="op">}</span></span>
 <span><span class="fu">remotes</span><span class="fu">::</span><span class="fu"><a href="https://remotes.r-lib.org/reference/install_github.html" class="external-link">install_github</a></span><span class="op">(</span><span class="st">"popov-lab/bmm@v0.0.1"</span>, upgrade <span class="op">=</span> <span class="st">"never"</span><span class="op">)</span></span></code></pre></div>
-</details>
+</details><div class="section level3">
+<h3 id="check-your-installation">Check your installation<a class="anchor" aria-label="anchor" href="#check-your-installation"></a>
+</h3>
+<p>To find out whether your machine can fit models, run <code><a href="reference/bmm_setup.html">bmm_setup()</a></code>. It checks the C++ toolchain, <code>cmdstanr</code> with CmdStan, and <code>rstan</code>, compiles and samples a small test model, and prints one fix for every check that failed. It installs nothing itself. If your first <code><a href="reference/bmm.html">bmm()</a></code> call fails while compiling or loading the Stan backend, the error message points you there as well.</p>
+<div class="sourceCode" id="cb4"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="fu">bmm</span><span class="fu">::</span><span class="fu"><a href="reference/bmm_setup.html">bmm_setup</a></span><span class="op">(</span><span class="op">)</span></span></code></pre></div>
+</div>
 </div>
 <div class="section level2">
 <h2 id="available-models">Available models<a class="anchor" aria-label="anchor" href="#available-models"></a>
@@ -156,7 +162,7 @@
 </ul>
 <p>If you have suggestions for models that should be added to the package or additional functionality that would improve the usability of the pacakge, feel free to create an <a href="https://github.com/popov-lab/bmm/issues" class="external-link">issue</a>. Ideally this should describe the model, point towards literature that gives details on the model, and if possible link to code that has already implemented the model.</p>
 <p>Given the dynamic nature the <code>bmm</code> package is currently in, you can always view the latest list of supported models by running:</p>
-<div class="sourceCode" id="cb4"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb5"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu">bmm</span><span class="fu">::</span><span class="fu"><a href="reference/supported_models.html">supported_models</a></span><span class="op">(</span><span class="op">)</span></span>
 <span><span class="co">#&gt; The following models are supported:</span></span>
 <span><span class="co">#&gt; </span></span>
@@ -184,10 +190,10 @@
 <li>the <em>model object</em> defining the model that should be fit</li>
 </ol>
 <p>You can get more detailed information on the models implemented in <code>bmm</code> by invoking the documentation of each model typing <code>?bmmodel</code> into your console. For example, calling the information on Interference Measurement Model <code>imm</code> would look like this:</p>
-<div class="sourceCode" id="cb5"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb6"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="op">?</span><span class="va">imm</span></span></code></pre></div>
 <p>A complete call to fit a model using <code>bmm</code> could look like this. For this example, we are using the <code>oberauer_lin_2017</code> data that is provided with the package and we will show how to fit the Interference Measurement Model to this data. If you want a detailed description of this model and and in depth explanation of the parameters estimated in the model, please have a look at <a href="https://popov-lab.github.io/bmm/articles/bmm_imm.html">the IMM article</a>.</p>
-<div class="sourceCode" id="cb6"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb7"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://github.com/popov-lab/bmm" class="external-link">bmm</a></span><span class="op">)</span></span>
 <span></span>
 <span><span class="va">formula</span> <span class="op">&lt;-</span> <span class="fu"><a href="reference/bmmformula.html">bmmformula</a></span><span class="op">(</span><span class="va">c</span> <span class="op">~</span> <span class="fl">0</span> <span class="op">+</span> <span class="va">set_size</span>,</span>
@@ -202,7 +208,7 @@
 <span></span>
 <span><span class="va">fit</span> <span class="op">&lt;-</span> <span class="fu"><a href="reference/bmm.html">bmm</a></span><span class="op">(</span>formula <span class="op">=</span> <span class="va">formula</span>, data <span class="op">=</span> <span class="va">data</span>, model <span class="op">=</span> <span class="va">model</span><span class="op">)</span></span></code></pre></div>
 <p>Using this call, the <code>fit</code> object will save all the information about the fitted model. As <code>bmm</code> calls <code>brms</code> to fit the models, these objects can be handled the same way a normal <code>brmsfit</code> object is handled:</p>
-<div class="sourceCode" id="cb7"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb8"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="co"># print summary</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/summary.html" class="external-link">summary</a></span><span class="op">(</span><span class="va">fit</span><span class="op">)</span></span>
 <span></span>
@@ -215,7 +221,7 @@
 </h2>
 <p>To aid users in improving their intuition about what different models predict for observed data given a certain parameter set, the <code>bmm</code> package also includes density and random generation function for all implemented models.</p>
 <p>These function provide an easy way to see what a model predicts for data given a certain set of parameters. For example you can easily plot the probability density function of the data for the Interference Measurement model using the <code>dimm</code> function. In similar fashion the random generation function included for each model, generates random data based on a set of data generating parameters. For the IMM, you can use <code>rimm</code> to generate data given a set of parameters. Here is an example of how to use these functions. We are ploting a histogram of randomly generated data from the IMM with a setsize of four, and overlaying the probability density function of the model:</p>
-<div class="sourceCode" id="cb8"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb9"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://github.com/popov-lab/bmm" class="external-link">bmm</a></span><span class="op">)</span></span>
 <span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://ggplot2.tidyverse.org" class="external-link">ggplot2</a></span><span class="op">)</span></span>
 <span></span>

@@ -94,6 +94,22 @@ if (!requireNamespace("remotes")) {
 remotes::install_github("popov-lab/bmm@v0.0.1", upgrade = "never")
 ```
 
+### Check your installation
+
+To find out whether your machine can fit models, run
+[`bmm_setup()`](https://popov-lab.github.io/bmm/dev/reference/bmm_setup.md).
+It checks the C++ toolchain, `cmdstanr` with CmdStan, and `rstan`,
+compiles and samples a small test model, and prints one fix for every
+check that failed. It installs nothing itself. If your first
+[`bmm()`](https://popov-lab.github.io/bmm/dev/reference/bmm.md) call
+fails while compiling or loading the Stan backend, the error message
+points you there as well.
+
+``` r
+
+bmm::bmm_setup()
+```
+
 ## Available models
 
 Currently the `bmm` package implements models used in the domain of
