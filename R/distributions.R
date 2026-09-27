@@ -1,12 +1,25 @@
 #' Rejection Sampling
 #'
 #' Performs rejection sampling to generate samples from a target distribution.
+#' Each draw can come from its own target: draw `i` is sampled from `f`
+#' evaluated at the `i`-th element of every per-draw argument in `...`, under
+#' the envelope `max_f[i]`.
 #'
 #' @param n Integer. The number of samples to generate.
-#' @param f Function. The target density function from which to sample.
-#' @param max_f Numeric. The maximum value of the target density function `f`.
+#' @param f Function. The target density divided by the proposal density, up to
+#'   a constant; with a uniform proposal, the target density itself. Its first
+#'   argument takes a vector of proposals, generally not of length `n`; `f` must
+#'   be vectorized over it and over the per-draw arguments in `...`.
+#' @param max_f Numeric. A finite upper bound of `f`, either a single value or
+#'   one value per draw (length `n`). A bound below the maximum of `f` biases
+#'   the draws without a warning.
 #' @param proposal_fun Function. A function that generates samples from the proposal distribution.
-#' @param ... Additional arguments to be passed to the target density function `f`.
+#' @param ... Additional arguments to be passed to the target density function
+#'   `f`. With `n > 1`, arguments of length `n` are taken per draw, so draw `i`
+#'   uses their `i`-th elements. Arguments of any other length are passed whole
+#'   to every call of `f`; recycle them with `rep_len(x, n)` to use them per
+#'   draw. Pass constants whose length may equal `n`, such as a lookup table,
+#'   through the closure of `f` instead of `...`.
 #'
 #' @return A numeric vector of length `n` containing samples from the target distribution.
 #' @export
@@ -18,22 +31,52 @@
 #' samples <- rejection_sampling(10000, target_density, max_f = target_density(0), proposal)
 #' hist(samples, freq = FALSE)
 #' curve(target_density, col = "red", add = TRUE)
+#'
+#' # one location per draw
+#' mu <- rep(c(0, 2), 5000)
+#' samples <- rejection_sampling(
+#'   10000, brms::dvon_mises, max_f = brms::dvon_mises(0, 0, 10), proposal,
+#'   mu = mu, kappa = 10
+#' )
+#' tapply(samples, mu, mean)
 rejection_sampling <- function(n, f, max_f, proposal_fun, ...) {
-  stopifnot(is.numeric(n), length(n) == 1, n > 0)
-  stopifnot(is.numeric(max_f), length(max_f) == 1 | length(max_f) == n, max_f > 0)
+  stopif(
+    !is.numeric(n) || length(n) != 1 || !isTRUE(n >= 1 && n %% 1 == 0),
+    "n must be a single positive whole number."
+  )
+  stopif(
+    !is.numeric(max_f) || !length(max_f) %in% c(1, n) || !all(is.finite(max_f) & max_f > 0),
+    "max_f must be finite and positive, with one value or one value per draw."
+  )
 
-  inner <- function(n, f, max_f, proposal_fun, ..., acc = c()) {
-    if (length(acc) > n) {
-      return(acc[seq_len(n)])
-    }
-    x <- proposal_fun(n)
-    y <- stats::runif(n) * max_f
-    accept <- y < f(x, ...)
-    inner(n, f, max_f, proposal_fun, ..., acc = c(acc, x[accept]))
+  dots <- list(...)
+  per_draw <- n > 1 & lengths(dots) == n
+  max_f <- rep_len(max_f, n)
+  out <- rep(NA_real_, n)
+  pending <- seq_len(n)
+  misses <- 0
+  while (length(pending) > 0) {
+    # several proposals per pending draw keep the number of rounds, each with
+    # its fixed R overhead, low when n is small or only a few draws remain
+    idx <- rep(pending, each = ceiling(max(n, 256) / length(pending)))
+    x <- proposal_fun(length(idx))
+    fx <- do.call(f, c(list(x), replace(dots, per_draw, lapply(dots[per_draw], `[`, idx))))
+    stopif(anyNA(x) || anyNA(fx), "The proposals or the target density contain NA; check the parameter values.")
+    hit <- which(stats::runif(length(idx)) * max_f[idx] < fx)
+    first <- hit[!duplicated(idx[hit])]
+    out[idx[first]] <- x[first]
+    pending <- which(is.na(out))
+    # a draw that no proposal can reach, e.g. where f is 0, would loop forever;
+    # 1e7 proposals without an acceptance mean a rate too low to be usable
+    misses <- if (length(first) > 0) 0 else misses + length(idx)
+    stopif(misses > 1e7, "No proposal was accepted in 1e7 tries; check f, max_f and proposal_fun.")
   }
-
-  inner(n, f, max_f, proposal_fun, ...)
+  out
 }
+
+# a single value is passed to rejection_sampling() whole rather than repeated
+# for every draw, so that f computes what depends on it (e.g. besselI) once
+.recycle_draws <- function(x, n) if (length(x) == 1) x else rep_len(x, n)
 
 #' @title Distribution functions for the Signal Discrimination Model (SDM)
 #'
@@ -210,11 +253,16 @@ rsdm <- function(n, mu = 0, c = 3, kappa = 3.5, parametrization = "sqrtexp") {
     stop2("Parametrization must be one of 'bessel' or 'sqrtexp'")
   )
 
+  # compare to the peak on the log scale: the unnormalized density itself
+  # overflows for large c and kappa (exp(798) at c = 100, kappa = 400)
   rejection_sampling(
     n = n,
-    f = function(x) .dsdm_numer(x, mu, c, kappa),
-    max_f = .dsdm_numer(0, 0, c, kappa),
-    proposal_fun = function(n) stats::runif(n, -pi, pi)
+    f = function(x, mu, c, kappa) {
+      exp(.dsdm_numer(x, mu, c, kappa, log = TRUE) - .dsdm_numer(mu, mu, c, kappa, log = TRUE))
+    },
+    max_f = 1,
+    proposal_fun = function(n) stats::runif(n, -pi, pi),
+    mu = .recycle_draws(mu, n), c = .recycle_draws(c, n), kappa = .recycle_draws(kappa, n)
   )
 }
 
@@ -322,11 +370,13 @@ rmixture2p <- function(n, mu = 0, kappa = 5, p_mem = 0.6) {
   stopif(isTRUE(any(p_mem < 0)), "p_mem must be larger than zero.")
   stopif(isTRUE(any(p_mem > 1)), "p_mem must be smaller than one.")
 
+  # the density peaks at x = mu; x of length n gives one bound per draw
   rejection_sampling(
     n = n,
-    f = function(x) dmixture2p(x, mu, kappa, p_mem),
-    max_f = dmixture2p(0, 0, kappa, p_mem),
-    proposal_fun = function(n) stats::runif(n, -pi, pi)
+    f = dmixture2p,
+    max_f = dmixture2p(rep_len(mu, n), rep_len(mu, n), .recycle_draws(kappa, n), .recycle_draws(p_mem, n)),
+    proposal_fun = function(n) stats::runif(n, -pi, pi),
+    mu = .recycle_draws(mu, n), kappa = .recycle_draws(kappa, n), p_mem = .recycle_draws(p_mem, n)
   )
 }
 
