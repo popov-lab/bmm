@@ -2590,7 +2590,7 @@ rsdt_yn <- function(n, n_trials, stimulus, d, criterion,
     terms <- log1p(outer(1 / k, exp(-d)))
     # e = exp(-d') overflows below d' = -709.78, so a masked cell multiplied by
     # zero would be NaN and would poison its column. Its unmasked neighbours
-    # must keep the Inf: the column belongs at -Inf, not at a clamped value.
+    # keep the Inf, so the column comes out -Inf, as it does in Stan.
     terms[outer(k, m, ">=")] <- 0
     log_pc <- -colSums(terms)
     return(log_pc - log(-expm1(log_pc)))

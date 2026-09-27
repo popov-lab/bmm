@@ -18,13 +18,14 @@
 // every term positive, so nothing cancels -- as P(correct) -> 1. Reading
 // either side off the other loses the opposite tail.
 //
-// The range that buys is not the range it responds over: against a 1024-point
-// Gauss-Hermite reference at m = 4, the normal branch is accurate to about
-// d' = 20 (relative error 7.0e-07; 8.0e-03 at 25, 4.5e-02 from 30 on) while it
-// keeps decreasing out to d' = 48. Beyond 20 it is therefore a slightly wrong
-// gradient rather than a right one -- still the better trade, because what it
-// replaces is a flat plateau from d' = 12 with no gradient at all, which a
-// sampler random-walks through instead of rejecting.
+// The range that buys is not the range it responds over. Against adaptive
+// integration of log(1 - P(correct)) at m = 4, the normal branch's logit is
+// accurate to about d' = 20 (relative error 4.9e-07; 3.2e-04 at 22, 1.0e-02 at
+// 25, 5.8e-02 at 30, 2.7e-01 at 48), and it is Inf from d' = 48.25. Past 20 its
+// slope is too steep (1.24 times the true slope at 30, 1.52 at 47.5) but keeps
+// the right sign -- still the better trade, because what it replaces is a flat
+// plateau from d' = 12 with no gradient at all, which a sampler random-walks
+// through instead of rejecting.
 //
 // The quadrature tables are passed in from transformed data
 // (sdt_mafc_tdata.stan); the family loops over rows, so building them here
