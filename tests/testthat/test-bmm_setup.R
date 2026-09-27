@@ -1,0 +1,291 @@
+local_machine <- function(build_tools = TRUE,
+                          cmdstanr = list(version = "0.9.0", error = NULL),
+                          cmdstan = "2.40.0",
+                          cmdstan_toolchain = NULL,
+                          rstan = list(version = "2.32.7", error = NULL),
+                          smoke = function(backend) list(error = NULL, seconds = 42),
+                          os = "macos",
+                          env = parent.frame()) {
+  local_mocked_bindings(
+    probe_build_tools = function() build_tools,
+    probe_package = function(pkg) switch(pkg, cmdstanr = cmdstanr, rstan = rstan),
+    probe_cmdstan_version = function() cmdstan,
+    probe_cmdstan_toolchain = function() cmdstan_toolchain,
+    probe_smoke_test = smoke,
+    probe_os = function() os,
+    .env = env
+  )
+}
+
+not_installed <- list(version = NULL, error = "not installed")
+smoke_must_not_run <- function(backend) stop("the smoke test ran")
+
+row_of <- function(report, check) report[report$check == check, ]
+
+test_that("a working machine passes every check and has no fixes", {
+  local_machine()
+  report <- suppressMessages(bmm_setup(backend = "cmdstanr"))
+
+  expect_s3_class(report, "bmm_setup")
+  expect_named(report, c("check", "status", "detail", "fix"))
+  expect_equal(
+    report$check,
+    c("C++ toolchain", "cmdstanr", "CmdStan", "CmdStan toolchain", "rstan", "Backend", "Smoke test")
+  )
+  expect_equal(unique(report$status), "pass")
+  expect_true(all(is.na(report$fix)))
+})
+
+test_that("the smoke test runs on the backend bmm() will use and reports its duration", {
+  used <- NULL
+  local_machine(smoke = function(backend) {
+    used <<- backend
+    list(error = NULL, seconds = 42.3)
+  })
+
+  report <- suppressMessages(bmm_setup(backend = "rstan"))
+
+  expect_equal(used, "rstan")
+  expect_match(row_of(report, "Smoke test")$detail, "42 s")
+  expect_match(row_of(report, "Backend")$detail, "rstan")
+})
+
+test_that("the smoke test announces how long it takes before it starts", {
+  local_machine()
+  expect_message(bmm_setup(backend = "cmdstanr"), "small test model")
+})
+
+test_that("a missing C++ toolchain fails both backends and offers no switch", {
+  local_machine(build_tools = FALSE, smoke = smoke_must_not_run)
+
+  for (backend in c("cmdstanr", "rstan")) {
+    report <- bmm_setup(backend = backend)
+    expect_equal(row_of(report, "C++ toolchain")$status, "fail")
+    expect_match(row_of(report, "C++ toolchain")$fix, "xcode-select --install", fixed = TRUE)
+    expect_equal(row_of(report, "Backend")$status, "fail")
+    expect_no_match(row_of(report, "Backend")$fix, "brms.backend", fixed = TRUE)
+    expect_equal(row_of(report, "Smoke test")$status, "skip")
+  }
+})
+
+test_that("without pkgbuild the toolchain check is skipped, not failed", {
+  local_machine(build_tools = NA)
+  report <- suppressMessages(bmm_setup(backend = "rstan"))
+
+  expect_equal(row_of(report, "C++ toolchain")$status, "skip")
+  expect_match(row_of(report, "C++ toolchain")$detail, "pkgbuild")
+  expect_equal(row_of(report, "Backend")$status, "pass")
+})
+
+test_that("a missing cmdstanr is optional with rstan and fatal with cmdstanr", {
+  local_machine(cmdstanr = not_installed, cmdstan = stop("not reached"))
+
+  with_rstan <- suppressMessages(bmm_setup(backend = "rstan"))
+  expect_equal(
+    with_rstan$status,
+    c("pass", "skip", "skip", "skip", "pass", "pass", "pass")
+  )
+  expect_true(all(is.na(with_rstan$fix)))
+
+  local_mocked_bindings(probe_smoke_test = smoke_must_not_run)
+  with_cmdstanr <- bmm_setup(backend = "cmdstanr")
+  expect_equal(row_of(with_cmdstanr, "cmdstanr")$status, "fail")
+  expect_match(row_of(with_cmdstanr, "cmdstanr")$fix, "https://stan-dev.r-universe.dev", fixed = TRUE)
+  expect_equal(row_of(with_cmdstanr, "CmdStan")$status, "skip")
+  expect_equal(row_of(with_cmdstanr, "Backend")$status, "fail")
+  expect_equal(row_of(with_cmdstanr, "Smoke test")$status, "skip")
+})
+
+test_that("a missing CmdStan fails the cmdstanr backend and offers rstan instead", {
+  local_machine(cmdstan = NULL, smoke = smoke_must_not_run)
+  report <- bmm_setup(backend = "cmdstanr")
+
+  expect_equal(row_of(report, "CmdStan")$status, "fail")
+  expect_match(row_of(report, "CmdStan")$fix, "cmdstanr::install_cmdstan()", fixed = TRUE)
+  expect_equal(row_of(report, "Backend")$status, "fail")
+  expect_match(row_of(report, "Backend")$fix, 'options(brms.backend = "rstan")', fixed = TRUE)
+  expect_equal(row_of(report, "Smoke test")$status, "skip")
+})
+
+test_that("a failing CmdStan toolchain check reports cmdstanr's reason", {
+  reason <- "A C++ compiler was not found. Please install the command line tools."
+  local_machine(cmdstan_toolchain = reason, smoke = smoke_must_not_run)
+  report <- bmm_setup(backend = "cmdstanr")
+
+  expect_equal(row_of(report, "CmdStan toolchain")$status, "fail")
+  expect_match(row_of(report, "CmdStan toolchain")$detail, "C++ compiler was not found", fixed = TRUE)
+  expect_match(row_of(report, "CmdStan toolchain")$fix, "xcode-select --install", fixed = TRUE)
+  expect_equal(row_of(report, "Backend")$status, "fail")
+})
+
+test_that("a broken rstan fails both backends, because brms needs it after every fit", {
+  broken <- list(version = NULL, error = "package or namespace load failed for 'rstan'")
+  local_machine(rstan = broken, smoke = smoke_must_not_run)
+
+  for (backend in c("cmdstanr", "rstan")) {
+    report <- bmm_setup(backend = backend)
+    expect_equal(row_of(report, "rstan")$status, "fail")
+    expect_match(row_of(report, "rstan")$fix, 'remove.packages(c("rstan", "StanHeaders"))', fixed = TRUE)
+    expect_equal(row_of(report, "Backend")$status, "fail")
+    expect_no_match(row_of(report, "Backend")$fix, "brms.backend", fixed = TRUE)
+    expect_equal(row_of(report, "Smoke test")$status, "skip")
+  }
+})
+
+test_that("a failing smoke test reports the first line of its error and where to report it", {
+  local_machine(smoke = function(backend) {
+    list(error = "Stan program failed to compile\nline 2 of the compiler output", seconds = 3)
+  })
+  report <- suppressMessages(bmm_setup(backend = "cmdstanr"))
+  smoke <- row_of(report, "Smoke test")
+
+  expect_equal(smoke$status, "fail")
+  expect_equal(smoke$detail, "Stan program failed to compile")
+  expect_match(smoke$fix, "https://github.com/popov-lab/bmm/issues", fixed = TRUE)
+})
+
+test_that("smoke_test = FALSE skips the fit", {
+  local_machine(smoke = smoke_must_not_run)
+  report <- expect_silent(bmm_setup(smoke_test = FALSE, backend = "cmdstanr"))
+
+  expect_equal(row_of(report, "Smoke test")$status, "skip")
+  expect_true(is.na(row_of(report, "Smoke test")$fix))
+})
+
+test_that("backend = NULL checks the backend bmm() would choose", {
+  withr::local_options(brms.backend = NULL)
+  local_machine(smoke = smoke_must_not_run)
+  report <- bmm_setup(smoke_test = FALSE, backend = NULL)
+
+  chosen <- if (requireNamespace("cmdstanr", quietly = TRUE)) "cmdstanr" else "rstan"
+  expect_equal(attr(report, "backend"), chosen)
+  expect_match(row_of(report, "Backend")$detail, chosen)
+})
+
+test_that("the default backend is the brms.backend option", {
+  withr::local_options(brms.backend = "rstan")
+  local_machine(smoke = smoke_must_not_run)
+
+  expect_equal(attr(bmm_setup(smoke_test = FALSE), "backend"), "rstan")
+})
+
+test_that("bmm_setup() validates its arguments", {
+  expect_error(bmm_setup(smoke_test = "yes"), "smoke_test")
+  expect_error(bmm_setup(smoke_test = NA), "smoke_test")
+  expect_error(bmm_setup(backend = "stan"), "should be one of")
+})
+
+test_that("the toolchain fix names the right tools for each operating system", {
+  windows <- setup_fixes("windows", numeric_version("4.6.1"))
+  macos <- setup_fixes("macos", numeric_version("4.6.1"))
+  linux <- setup_fixes("linux", numeric_version("4.6.1"))
+
+  expect_match(windows$toolchain, "Rtools", fixed = TRUE)
+  expect_match(windows$toolchain, "R 4.6", fixed = TRUE)
+  expect_match(windows$toolchain, "https://cran.r-project.org/bin/windows/Rtools/", fixed = TRUE)
+  expect_match(macos$toolchain, "xcode-select --install", fixed = TRUE)
+  expect_match(linux$toolchain, "build-essential", fixed = TRUE)
+  expect_equal(length(unique(c(windows$toolchain, macos$toolchain, linux$toolchain))), 3)
+
+  for (fix in c("cmdstanr", "cmdstan", "rstan")) {
+    expect_equal(windows[[fix]], macos[[fix]])
+    expect_equal(macos[[fix]], linux[[fix]])
+  }
+})
+
+test_that("the report uses the fixes of the machine's operating system", {
+  local_machine(build_tools = FALSE, os = "linux", smoke = smoke_must_not_run)
+  report <- bmm_setup(backend = "rstan")
+
+  expect_match(row_of(report, "C++ toolchain")$fix, "build-essential", fixed = TRUE)
+})
+
+test_that("print() shows one line per check and a fix under each failure only", {
+  local_machine(cmdstan = NULL, smoke = smoke_must_not_run)
+  report <- bmm_setup(backend = "cmdstanr")
+  out <- capture.output(print(report, color = FALSE))
+
+  expect_length(grep("^(PASS|FAIL|SKIP) ", out), 7)
+  expect_length(grep("^FAIL ", out), 2)
+  fixes <- grep("^ +Fix: ", out)
+  expect_length(fixes, 2)
+  expect_match(out[fixes - 1], "^FAIL ")
+  expect_match(out[grep("^FAIL +CmdStan ", out) + 1], "install_cmdstan", fixed = TRUE)
+  expect_match(out[length(out)], "2 checks failed")
+})
+
+test_that("print() says bmm is ready when everything passes", {
+  local_machine()
+  report <- suppressMessages(bmm_setup(backend = "cmdstanr"))
+  out <- capture.output(print(report, color = FALSE))
+
+  expect_match(out[1], "macOS")
+  expect_match(out[length(out)], "can fit models with cmdstanr")
+})
+
+test_that("print() says which failures do not matter once the smoke test passed", {
+  local_machine(cmdstan = NULL)
+  report <- suppressMessages(bmm_setup(backend = "rstan"))
+  out <- capture.output(print(report, color = FALSE))
+
+  expect_equal(row_of(report, "CmdStan")$status, "fail")
+  expect_match(out[length(out) - 1], "can fit models with rstan")
+  expect_match(out[length(out)], "only for the cmdstanr backend")
+})
+
+test_that("print() without a smoke test does not claim bmm can fit models", {
+  local_machine(smoke = smoke_must_not_run)
+  report <- bmm_setup(smoke_test = FALSE, backend = "cmdstanr")
+  out <- capture.output(print(report, color = FALSE))
+
+  expect_no_match(out[length(out)], "can fit models")
+  expect_match(out[length(out)], "run bmm_setup() to compile", fixed = TRUE)
+})
+
+test_that("a cmdstanr that fails to load under a CMDSTAN variable points to the variable", {
+  withr::local_envvar(CMDSTAN = "/path/without/cmdstan")
+  broken <- list(version = NULL, error = ".onLoad failed in loadNamespace() for 'cmdstanr'")
+  local_machine(cmdstanr = broken, smoke = smoke_must_not_run)
+  report <- bmm_setup(backend = "cmdstanr")
+
+  expect_match(row_of(report, "cmdstanr")$fix, "/path/without/cmdstan", fixed = TRUE)
+  expect_no_match(row_of(report, "cmdstanr")$fix, "r-universe", fixed = TRUE)
+})
+
+test_that("print() shows the last messages of a failed smoke test", {
+  local_machine(smoke = function(backend) {
+    list(
+      error = "An error occured during compilation! See the message above for more information.",
+      seconds = 2,
+      output = c("Compiling Stan program...", "make: /nonexistent/clang++: No such file or directory")
+    )
+  })
+  report <- suppressMessages(bmm_setup(backend = "cmdstanr"))
+  out <- capture.output(print(report, color = FALSE))
+
+  expect_true(any(grepl("make: /nonexistent/clang++: No such file or directory", out, fixed = TRUE)))
+})
+
+test_that("a real machine check without a smoke test finds no failure", {
+  skip_on_cran()
+  skip_if_not_installed("cmdstanr")
+  skip_if(is.null(cmdstanr::cmdstan_version(error_on_NA = FALSE)))
+
+  report <- bmm_setup(smoke_test = FALSE, backend = "cmdstanr")
+  expect_false(
+    any(report$status == "fail"),
+    info = paste(capture.output(print(report, color = FALSE)), collapse = "\n")
+  )
+})
+
+test_that("a real smoke test compiles and samples", {
+  skip_on_cran()
+  skip_if_not_installed("cmdstanr")
+  skip_if(is.null(cmdstanr::cmdstan_version(error_on_NA = FALSE)))
+
+  report <- suppressMessages(bmm_setup(backend = "cmdstanr"))
+  expect_equal(
+    row_of(report, "Smoke test")$status, "pass",
+    info = paste(capture.output(print(report, color = FALSE)), collapse = "\n")
+  )
+})
