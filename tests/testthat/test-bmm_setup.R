@@ -179,6 +179,41 @@ test_that("the default backend is the brms.backend option", {
   expect_equal(attr(bmm_setup(smoke_test = FALSE), "backend"), "rstan")
 })
 
+test_that("the Backend detail names why each backend was chosen", {
+  local_machine(smoke = smoke_must_not_run)
+
+  withr::with_options(list(brms.backend = "rstan"), {
+    option_only <- bmm_setup(smoke_test = FALSE)
+    expect_equal(
+      row_of(option_only, "Backend")$detail,
+      "bmm() will use rstan (set by options(brms.backend))"
+    )
+
+    option_and_explicit <- bmm_setup(smoke_test = FALSE, backend = "cmdstanr")
+    expect_equal(row_of(option_and_explicit, "Backend")$detail, "cmdstanr (requested)")
+
+    option_and_null <- bmm_setup(smoke_test = FALSE, backend = NULL)
+    expect_equal(
+      row_of(option_and_null, "Backend")$detail,
+      "bmm() will use cmdstanr (the cmdstanr package is installed)"
+    )
+  })
+
+  withr::local_options(brms.backend = NULL)
+  neither <- bmm_setup(smoke_test = FALSE)
+  expect_equal(
+    row_of(neither, "Backend")$detail,
+    "bmm() will use cmdstanr (the cmdstanr package is installed)"
+  )
+})
+
+test_that("probe_package() reports a package that is not installed", {
+  result <- probe_package("nonexistentpkgxyz")
+
+  expect_equal(result$error, "not installed")
+  expect_null(result$version)
+})
+
 test_that("bmm_setup() validates its arguments", {
   expect_error(bmm_setup(smoke_test = "yes"), "smoke_test")
   expect_error(bmm_setup(smoke_test = NA), "smoke_test")
