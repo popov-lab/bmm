@@ -312,12 +312,14 @@ check_data.ezdm <- function(model, data, formula) {
 # twice, as a sample variance needs two responses, and summarised. A row with a
 # missing count stays NA, and brms drops it. update() re-checks fit$data, whose
 # unused boundaries hold placeholders by then, so an indicator from an earlier
-# pass keeps them unused.
+# pass keeps them unused. A missing indicator is not decided yet: brms dropped
+# such rows before fitting, so they are raw cells appended to fit$data.
 .ezdm_rt_used <- function(data, mean_rt, var_rt, n_upper, n_trials) {
   used <- cbind(n_upper, n_trials - n_upper) >= 2 &
     !is.na(as.matrix(data[mean_rt])) & !is.na(as.matrix(data[var_rt]))
   earlier <- .EZDM_RT_USED %in% names(data)
-  used[, earlier] <- used[, earlier] & as.matrix(data[.EZDM_RT_USED[earlier]]) == 1
+  previous <- as.matrix(data[.EZDM_RT_USED[earlier]])
+  used[, earlier] <- used[, earlier] & (is.na(previous) | previous == 1)
   used[is.na(n_upper) | is.na(n_trials), ] <- NA
   unname(used)
 }

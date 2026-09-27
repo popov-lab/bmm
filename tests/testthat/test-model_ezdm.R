@@ -362,12 +362,45 @@ test_that("check_data() on its own 4par output changes nothing", {
   d2 <- suppressWarnings(check_data(model, d1, ezdm4_formula))
   expect_identical(d2, d1)
 
+  # rows appended to fit$data have no indicators yet and are decided from
+  # their counts and summaries, as in the first pass
+  appended <- rbind(d1, transform(d0, rt_used_upper = NA, rt_used_lower = NA))
+  d3 <- suppressWarnings(check_data(model, appended, ezdm4_formula))
+  for (col in names(d1)) {
+    expect_identical(d3[[col]], rep(d1[[col]], 2), info = col)
+  }
+
   switched_off <- suppressWarnings(check_data(
     model, transform(d0[1, ], rt_used_upper = 0L), ezdm4_formula
   ))
   expect_identical(switched_off$rt_used_upper, 0L)
   expect_identical(switched_off$mean_rt_upper, -1)
   expect_identical(switched_off$var_rt_upper, -1)
+})
+
+# update(fit, newdata = dplyr::bind_rows(fit$data, new_cells)) is the natural
+# way to add cells, and it leaves their indicators NA
+test_that("standata() keeps raw 4par cells appended to fit$data", {
+  skip_on_cran()
+  skip_if_not_installed("dplyr")
+  d0 <- data.frame(
+    mean_rt_upper = c(0.50, NA, 0.48, NA),
+    mean_rt_lower = c(0.60, 0.61, NA, 0.58),
+    var_rt_upper = c(0.020, NA, 0.018, NA),
+    var_rt_lower = c(0.030, 0.029, NA, 0.028),
+    n_upper = c(30L, 1L, 45L, 20L),
+    n_trials = 50L
+  )
+  model <- ezdm4_model()
+  fit <- suppressWarnings(bmm(ezdm4_formula, d0, model, backend = "mock",
+                              mock_fit = 1, rename = FALSE))
+
+  out <- collect_warnings(
+    standata(ezdm4_formula, dplyr::bind_rows(fit$data, d0), model)
+  )
+  expect_identical(out$value$N, 8L)
+  expect_length(out$warnings, 1L)
+  expect_match(out$warnings, "6 of 8 cells", fixed = TRUE)
 })
 
 test_that("ezdm works with mock backend - 3par version", {
