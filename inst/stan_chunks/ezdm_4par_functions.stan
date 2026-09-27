@@ -7,10 +7,12 @@
   // sets come from one function evaluated at the distance from the start point
   // to the far boundary: zr * bound above, (1 - zr) * bound below.
   //
-  // A boundary with fewer than two responses has no sample variance and
-  // contributes only through the binomial term. bmm() rarely gets here: brms
-  // drops rows whose summaries are NA, which is how rezdm() and
-  // ezdm_summary_stats() code such a boundary.
+  // A boundary contributes its RT terms only where its indicator (rt_upper,
+  // rt_lower) is 1 and it was reached at least twice. check_data() sets the
+  // indicator to 0 for a boundary reached fewer than twice, which has no sample
+  // variance, and for one without summaries, and fills its summaries with a
+  // placeholder that is never read here. Such a boundary contributes only
+  // through the binomial term.
   //
   // Every ezdm_ function called here is defined in ezdm_cumulants.stan or
   // ezdm_series.stan, which are assembled before this file; the header of the
@@ -19,8 +21,11 @@
   // mu is a dummy dpar required by brms and is not used.
   real ezdm_4par_lpdf(real mrt_upper, real mu, real drift, real bound, real ndt,
                       real zr, real s, real mrt_lower, real vrt_upper,
-                      real vrt_lower, int hits, int trials) {
+                      real vrt_lower, int hits, int trials, int rt_upper,
+                      int rt_lower) {
     int misses = trials - hits;
+    int use_upper = rt_upper && hits >= 2;
+    int use_lower = rt_lower && misses >= 2;
     real s_sq = square(s);
     real k = drift / s_sq;
     real b_upper = zr * bound;
@@ -29,7 +34,7 @@
     // the logit of the EZ proportion correct for a free start point; at
     // zr = 0.5 it is drift bound / s^2, the 3par one
     real lp = binomial_logit_lpmf(hits | trials, ezdm_logit_pc(b_upper, b_lower, k));
-    if (hits < 2 && misses < 2) {
+    if (!use_upper && !use_lower) {
       return lp;
     }
 
@@ -62,11 +67,11 @@
       b0_d4 = ezdm_cgf_d4(p0, q0, t0);
     }
 
-    if (hits >= 2) {
+    if (use_upper) {
       lp += ezdm_boundary_lpdf(mrt_upper | vrt_upper, hits, ndt, b_upper, w,
                                s_sq, series, b0_d1, b0_d2, b0_d3, b0_d4);
     }
-    if (misses >= 2) {
+    if (use_lower) {
       lp += ezdm_boundary_lpdf(mrt_lower | vrt_lower, misses, ndt, b_lower, w,
                                s_sq, series, b0_d1, b0_d2, b0_d3, b0_d4);
     }

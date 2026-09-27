@@ -1166,6 +1166,57 @@ test_that("dezdm 4par handles edge cases with few responses at boundary", {
   expect_true(is.finite(ll))
 })
 
+# Changing a count to make a boundary sparse would change the binomial term
+# too, so the reference keeps the counts and assembles the density from its
+# parts: the binomial from the Wiener absorption probability, written out
+# here, and each boundary's RT terms from the sampling distribution given in
+# ?ezdm_dist, fed with the cumulants that the tests further down check against
+# high-precision references. What is under test is which terms dezdm() adds;
+# the first row, with every summary present, checks the reference itself.
+test_that("dezdm 4par leaves out the RT terms of a boundary without summaries (#430)", {
+  drift <- 1.2
+  bound <- 1.4
+  ndt <- 0.3
+  zr <- 0.6
+  n_upper <- 18
+  n_trials <- 30
+  moments <- .ezdm_moments_4par(drift, bound, zr, 1)
+  mean_rt <- ndt + c(moments$mdt_upper * 1.03, moments$mdt_lower * 0.97)
+  var_rt <- c(moments$vrt_upper * 1.1, moments$vrt_lower * 0.9)
+
+  p_upper <- (1 - exp(-2 * drift * zr * bound)) / (1 - exp(-2 * drift * bound))
+  binomial <- stats::dbinom(n_upper, n_trials, p_upper, log = TRUE)
+  rt_terms <- function(mean_rt, var_rt, n, mdt, vrt, k3, k4) {
+    W <- k4 / n + 2 * vrt^2 / (n - 1)
+    stats::dgamma(var_rt, shape = vrt^2 / W, rate = vrt / W, log = TRUE) +
+      stats::dnorm(mean_rt, mean = ndt + mdt + k3 / n / W * (var_rt - vrt),
+                   sd = sqrt(vrt / n - (k3 / n)^2 / W), log = TRUE)
+  }
+  upper <- rt_terms(mean_rt[1], var_rt[1], n_upper, moments$mdt_upper,
+                    moments$vrt_upper, moments$k3_upper, moments$k4_upper)
+  lower <- rt_terms(mean_rt[2], var_rt[2], n_trials - n_upper,
+                    moments$mdt_lower, moments$vrt_lower, moments$k3_lower,
+                    moments$k4_lower)
+
+  # rows: all present; no upper summaries; no lower summaries; none; a lower
+  # variance without its mean; a lower mean without its variance
+  mean_rt_obs <- matrix(c(
+    mean_rt, NA, mean_rt[2], mean_rt[1], NA, NA, NA,
+    mean_rt[1], NA, mean_rt
+  ), ncol = 2, byrow = TRUE)
+  var_rt_obs <- matrix(c(
+    var_rt, NA, var_rt[2], var_rt[1], NA, NA, NA,
+    var_rt, var_rt[1], NA
+  ), ncol = 2, byrow = TRUE)
+  ll <- dezdm(mean_rt_obs, var_rt_obs, n_upper, n_trials, drift = drift,
+              bound = bound, ndt = ndt, zr = zr, version = "4par")
+
+  expect_equal(
+    ll, binomial + c(upper + lower, lower, upper, 0, upper, upper),
+    tolerance = 1e-10
+  )
+})
+
 test_that("generated data from rezdm has reasonable density under dezdm", {
   # generate data from known parameters
   set.seed(123)

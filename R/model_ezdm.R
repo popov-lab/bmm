@@ -211,29 +211,6 @@ check_data.ezdm <- function(model, data, formula) {
     "The following required variables are missing from the data: {collapse_comma(missing_vars)}"
   )
 
-  # check that mean RT values are plausible (warn if likely in milliseconds)
-  # typical RTs in seconds are 0.2-3s; values > 10 suggest milliseconds
-  mean_rt_values <- unlist(data[mean_rt])
-  warnif(
-    any(mean_rt_values > 10, na.rm = TRUE),
-    "Some mean RT values are greater than 10. If your reaction times are in
-    milliseconds, please convert them to seconds before fitting the model.
-    The model assumes reaction times are measured in seconds."
-  )
-
-  # check that mean RT values are positive
-  stopif(
-    any(mean_rt_values <= 0, na.rm = TRUE),
-    "Mean RT values must be positive. Found non-positive values in the data."
-  )
-
-  # check that variance values are positive
-  var_rt_values <- unlist(data[var_rt])
-  stopif(
-    any(var_rt_values <= 0, na.rm = TRUE),
-    "Variance of RT must be positive. Found non-positive values in the data."
-  )
-
   # check that n_trials is a positive integer
   n_trials_values <- data[[n_trials]]
   stopif(
@@ -262,8 +239,74 @@ check_data.ezdm <- function(model, data, formula) {
     "Number of upper boundary responses (n_upper) cannot exceed total trials (n_trials)."
   )
 
+  # the summaries of a 4par boundary the likelihood does not use can be
+  # anything, or missing, so only the used ones are validated
+  rt_used <- TRUE
+  if (model$version == "4par") {
+    rt_used <- .ezdm_rt_used(data, mean_rt, var_rt, n_upper_values, n_trials_values)
+  }
+
+  # check that mean RT values are plausible (warn if likely in milliseconds)
+  # typical RTs in seconds are 0.2-3s; values > 10 suggest milliseconds
+  mean_rt_values <- as.matrix(data[mean_rt])[rt_used %in% TRUE]
+  warnif(
+    any(mean_rt_values > 10, na.rm = TRUE),
+    "Some mean RT values are greater than 10. If your reaction times are in
+    milliseconds, please convert them to seconds before fitting the model.
+    The model assumes reaction times are measured in seconds."
+  )
+
+  # check that mean RT values are positive
+  stopif(
+    any(mean_rt_values <= 0, na.rm = TRUE),
+    "Mean RT values must be positive. Found non-positive values in the data."
+  )
+
+  # check that variance values are positive
+  var_rt_values <- as.matrix(data[var_rt])[rt_used %in% TRUE]
+  stopif(
+    any(var_rt_values <= 0, na.rm = TRUE),
+    "Variance of RT must be positive. Found non-positive values in the data."
+  )
+
+  if (model$version == "4par") {
+    # brms drops every row holding an NA, response counts included (#430), so
+    # an unused boundary gets a placeholder instead. -1 rather than a plausible
+    # value: the likelihood reads the indicator, never the placeholder, and a
+    # negative variance would make it fail loudly if it ever did.
+    unused <- !is.na(rt_used) & !rt_used
+    for (k in 1:2) {
+      data[[mean_rt[k]]][unused[, k]] <- -1
+      data[[var_rt[k]]][unused[, k]] <- -1
+    }
+    data[.EZDM_RT_USED] <- list(as.integer(rt_used[, 1]), as.integer(rt_used[, 2]))
+    n_sparse <- sum(rowSums(unused) > 0)
+    warnif(
+      n_sparse > 0,
+      "{n_sparse} of {nrow(data)} cells have fewer than two responses, or no \\
+      RT summaries, at one or both boundaries. Such a boundary enters the \\
+      model through the response counts only."
+    )
+  }
+
   NextMethod("check_data")
 }
+
+# The 4par boundaries whose RT summaries enter the likelihood: reached at least
+# twice, as a sample variance needs two responses, and summarised. A row with a
+# missing count stays NA, and brms drops it. update() re-checks fit$data, whose
+# unused boundaries hold placeholders by then, so an indicator from an earlier
+# pass keeps them unused.
+.ezdm_rt_used <- function(data, mean_rt, var_rt, n_upper, n_trials) {
+  used <- cbind(n_upper, n_trials - n_upper) >= 2 &
+    !is.na(as.matrix(data[mean_rt])) & !is.na(as.matrix(data[var_rt]))
+  earlier <- .EZDM_RT_USED %in% names(data)
+  used[, earlier] <- used[, earlier] & as.matrix(data[.EZDM_RT_USED[earlier]]) == 1
+  used[is.na(n_upper) | is.na(n_trials), ] <- NA
+  unname(used)
+}
+
+.EZDM_RT_USED <- c("rt_used_upper", "rt_used_lower")
 
 ############################################################################# !
 # Convert bmmformula to brmsformla methods                               ####
@@ -288,7 +331,10 @@ bmf2bf.ezdm_4par <- function(model, formula) {
   n_upper <- model$resp_vars$n_upper
   n_trials <- model$other_vars$n_trials
 
-  brms::bf(glue::glue("{mean_rt[1]} | vreal({mean_rt[2]}, {var_rt[1]}, {var_rt[2]}) + vint({n_upper}, {n_trials}) ~ 1"))
+  brms::bf(glue::glue(
+    "{mean_rt[1]} | vreal({mean_rt[2]}, {var_rt[1]}, {var_rt[2]}) + ",
+    "vint({n_upper}, {n_trials}, {.EZDM_RT_USED[1]}, {.EZDM_RT_USED[2]}) ~ 1"
+  ))
 }
 
 ############################################################################# !
@@ -381,7 +427,8 @@ configure_model.ezdm_4par <- function(model, data, formula) {
     log_lik = log_lik_ezdm_4par,
     posterior_predict = posterior_predict_ezdm_4par,
     loop = TRUE, # is the likelihood vectorized
-    vars = c("vreal1[n]", "vreal2[n]", "vreal3[n]", "vint1[n]", "vint2[n]")
+    vars = c("vreal1[n]", "vreal2[n]", "vreal3[n]", "vint1[n]", "vint2[n]",
+             "vint3[n]", "vint4[n]")
   )
 
   # prepare initial stanvars to pass to brms, model formula and priors
@@ -393,13 +440,15 @@ configure_model.ezdm_4par <- function(model, data, formula) {
 
 
 log_lik_ezdm_4par <- function(i, prep) {
-  # compute log-likelihood using dezdm (vectorized over posterior samples)
   # based on bmf2bf.ezdm_4par formula:
   # Y = mean_rt_upper, vreal1 = mean_rt_lower
   # vreal2 = var_rt_upper, vreal3 = var_rt_lower
+  # vint3, vint4 = whether the upper, lower summaries are used; where they are
+  # not, they hold placeholders, and NA tells dezdm() to leave them out
+  used <- c(prep$data$vint3[i], prep$data$vint4[i]) == 1
   dezdm(
-    mean_rt = c(prep$data$Y[i], prep$data$vreal1[i]),
-    var_rt = c(prep$data$vreal2[i], prep$data$vreal3[i]),
+    mean_rt = ifelse(used, c(prep$data$Y[i], prep$data$vreal1[i]), NA),
+    var_rt = ifelse(used, c(prep$data$vreal2[i], prep$data$vreal3[i]), NA),
     n_upper = prep$data$vint1[i],
     n_trials = prep$data$vint2[i],
     drift = brms::get_dpar(prep, "drift", i = i),
@@ -462,21 +511,43 @@ pp_simulate.ezdm_3par <- function(model, prep) {
                      n_trials = rep(prep$data$trials, each = prep$ndraws))
 }
 
+# The summaries of a boundary check_data() found unused are placeholders
+# (#430), so the RT checks turn them into NA, which the reduction drops.
+# Multiplying by 1 or NA leaves the other values exact and yrep a matrix. The
+# simulated summaries are masked by the observed indicator too, but only in
+# cells whose observed value is dropped anyway.
+.pp_ezdm_boundary <- function(x, used) {
+  x * ifelse(used == 0, NA, 1)
+}
+
+# a fit saved before the indicators existed has no placeholders either, so its
+# indicators default to 1
 #' @export
 pp_observables.ezdm_4par <- function(model) {
   list(
     observed = c(mean_rt_upper = "Y", mean_rt_lower = "vreal1",
                  var_rt_upper = "vreal2", var_rt_lower = "vreal3",
-                 n_upper = "vint1", n_trials = "vint2"),
+                 n_upper = "vint1", n_trials = "vint2",
+                 rt_used_upper = "vint3", rt_used_lower = "vint4"),
+    defaults = c(rt_used_upper = 1L, rt_used_lower = 1L),
+    y_placeholders = TRUE,
     checks = list(
-      mean_rt_upper = .pp_observable(function(d) d$mean_rt_upper,
-                                     label = "Mean RT (upper responses)"),
-      mean_rt_lower = .pp_observable(function(d) d$mean_rt_lower,
-                                     label = "Mean RT (lower responses)"),
-      var_rt_upper = .pp_observable(function(d) d$var_rt_upper,
-                                    label = "RT variance (upper responses)"),
-      var_rt_lower = .pp_observable(function(d) d$var_rt_lower,
-                                    label = "RT variance (lower responses)"),
+      mean_rt_upper = .pp_observable(
+        function(d) .pp_ezdm_boundary(d$mean_rt_upper, d$rt_used_upper),
+        label = "Mean RT (upper responses)"
+      ),
+      mean_rt_lower = .pp_observable(
+        function(d) .pp_ezdm_boundary(d$mean_rt_lower, d$rt_used_lower),
+        label = "Mean RT (lower responses)"
+      ),
+      var_rt_upper = .pp_observable(
+        function(d) .pp_ezdm_boundary(d$var_rt_upper, d$rt_used_upper),
+        label = "RT variance (upper responses)"
+      ),
+      var_rt_lower = .pp_observable(
+        function(d) .pp_ezdm_boundary(d$var_rt_lower, d$rt_used_lower),
+        label = "RT variance (lower responses)"
+      ),
       mean_pc = .pp_ezdm_accuracy()
     )
   )
