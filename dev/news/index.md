@@ -332,6 +332,14 @@
   (`Identifier 'start' not in scope`) for the **sdm** and **cswald**
   models. `threads = NULL` now turns parallelization off, as it does in
   `brms`.
+- [`update()`](https://rdrr.io/r/stats/update.html) without `newdata` no
+  longer fails for **m3** fits (*The response variable(s) corr, other,
+  dist, npl missing in the data*) or for **mixture3p** and **imm** fits
+  whose formulas do not use `set_size` (*The set_size variable
+  ‘set_size’ must be either a variable in your data or a single numeric
+  value*), and no longer warns for **sdt_yn** fits that the reserved
+  column `dist_type` will be overwritten
+  ([\#429](https://github.com/popov-lab/bmm/issues/429)).
 
 #### Other changes
 
