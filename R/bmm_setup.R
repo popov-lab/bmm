@@ -262,6 +262,7 @@ probe_cmdstan_toolchain <- function() {
 # user's random stream where it was
 probe_smoke_test <- function(backend) {
   withr::local_envvar(PKG_CPPFLAGS = NA, PKG_LIBS = NA, USE_CXX17 = NA)
+  withr::local_options(try.outFile = nullfile())
   seconds <- system.time(
     fit <- capture_check_conditions(withr::with_preserve_seed(bmm(
       bmmformula(kappa ~ 1, thetat ~ 1),
