@@ -47,7 +47,7 @@
 * `update()` without `newdata` no longer fails for **m3** fits (*The response variable(s) corr, other, dist, npl missing in the data*) or for **mixture3p** and **imm** fits whose formulas do not use `set_size` (*The set_size variable 'set_size' must be either a variable in your data or a single numeric value*), and no longer warns for **sdt_yn** fits that the reserved column `dist_type` will be overwritten (#429).
 
 ### Other changes
-* bmm's own links now point at popov-lab.github.io/bmm instead of venpopov.com/bmm, which currently redirects there. Update bookmarks to the new address when convenient (#433).
+* bmm's own links now point at popov-lab.github.io/bmm instead of venpopov.com/bmm, which currently redirects to the new address. Update bookmarks when convenient (#433).
 * The **cswald** likelihood now evaluates all observations in one call instead of one at a time. This makes fitting faster, improves the accuracy of the gradients the sampler uses, and adds support for within-chain parallelization: `bmm(..., threads = 2)` now works for **cswald** as it does for **sdm**. The posterior is unchanged (#387).
 
 # bmm 1.3.2
