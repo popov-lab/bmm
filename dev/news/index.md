@@ -332,6 +332,27 @@
   (`Identifier 'start' not in scope`) for the **sdm** and **cswald**
   models. `threads = NULL` now turns parallelization off, as it does in
   `brms`.
+- [`rsdm()`](https://venpopov.com/bmm/dev/reference/SDMdist.md) and
+  [`rmixture2p()`](https://venpopov.com/bmm/dev/reference/mixture2p_dist.md)
+  now draw each value from its own parameter values when a parameter has
+  one value per draw. Before, every value came from the mix of all
+  parameter values, so `posterior_predict()` and
+  [`pp_check()`](https://venpopov.com/bmm/dev/reference/pp_check.bmmfit.md)
+  for **sdm** fits were too wide. Fits are unaffected; rerun
+  `posterior_predict()` or
+  [`pp_check()`](https://venpopov.com/bmm/dev/reference/pp_check.bmmfit.md).
+  [`rsdm()`](https://venpopov.com/bmm/dev/reference/SDMdist.md) no
+  longer fails for large `c` and `kappa`, and
+  [`rmixture2p()`](https://venpopov.com/bmm/dev/reference/mixture2p_dist.md)
+  accepts vectors of `kappa` and `p_mem`.
+  [`rejection_sampling()`](https://venpopov.com/bmm/dev/reference/rejection_sampling.md)
+  takes arguments of length `n` in `...` per draw and requires a
+  whole-number `n`. The same seed now gives different draws from
+  [`rsdm()`](https://venpopov.com/bmm/dev/reference/SDMdist.md),
+  [`rmixture2p()`](https://venpopov.com/bmm/dev/reference/mixture2p_dist.md),
+  [`rmixture3p()`](https://venpopov.com/bmm/dev/reference/mixture3p_dist.md)
+  and [`rimm()`](https://venpopov.com/bmm/dev/reference/IMMdist.md)
+  ([\#445](https://github.com/popov-lab/bmm/issues/445)).
 - [`update()`](https://rdrr.io/r/stats/update.html) without `newdata` no
   longer fails for **m3** fits (*The response variable(s) corr, other,
   dist, npl missing in the data*) or for **mixture3p** and **imm** fits
