@@ -190,9 +190,12 @@ symmetric starting point the decision time does not depend on which boundary was
 reached, so all $n$ trials in a cell inform one set of moments. With a free
 starting point they do differ, which is why the 4-parameter version needs the
 summaries split by boundary — and why a boundary reached fewer than twice in a
-cell has no variance to contribute. In `dezdm()` such a cell still contributes
-through the response counts; a `bmm()` fit currently drops it, because the
-missing summaries are coded as `NA`.
+cell has no variance to contribute. Such a cell still contributes through the
+response counts, and so does a cell whose summaries at one boundary are
+missing, as `ezdm_summary_stats()` returns them for a boundary reached fewer
+than `min_trials` times. `bmm()` keeps these cells and warns how many there
+are. Dropping them instead would remove exactly the cells with the most
+extreme accuracy, and with them information about drift and starting point.
 
 # Parametrization in the `bmm` package
 

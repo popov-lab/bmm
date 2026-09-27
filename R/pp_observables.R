@@ -24,6 +24,15 @@
 #'   `names(observed)` and must be elementwise, so the identical closure
 #'   produces `y` from length-N vectors and `yrep` from ndraws x N matrices.
 #'
+#' Two optional elements serve observed data that holds placeholders rather
+#' than observations, such as the summaries of an unused [ezdm()] boundary:
+#' * `defaults`: named vector giving, for observables whose slot a fit saved
+#'   by an older bmm version lacks, the value to use for every observation.
+#' * `y_placeholders`: a function of the fit's data that returns `TRUE` if
+#'   the `"Y"` slot holds placeholders. brms would plot them as data, so
+#'   [pp_check.bmmfit()] without `resp_var` then checks the observable mapped
+#'   to `"Y"` itself.
+#'
 #' A `pp_simulate()` method returns a named list of ndraws x nobs matrices
 #' drawn jointly, typically through the internal `.pp_simulate_joint()` helper
 #' around the model's `r*()` function. Simulating observables independently
@@ -44,12 +53,12 @@
 #' @param prep A `brmsprep` object from [brms::prepare_predictions()].
 #' @return `pp_observables()` returns `NULL` for a model that delegates fully
 #'   to [brms::pp_check()], or a list with elements `observed` (a named
-#'   character vector mapping observable names to brms standata slots) and
+#'   character vector mapping observable names to brms standata slots),
 #'   `checks` (a named list of check definitions, each with a `compute`
 #'   closure, a `label` and a default plot `type`: a bayesplot `ppc_*` type
-#'   or bmm's `"bars_binned"`). `pp_simulate()`
-#'   returns a named list of `ndraws` x `nobs` matrices, one per simulated
-#'   observable.
+#'   or bmm's `"bars_binned"`) and, optionally, `defaults` and
+#'   `y_placeholders` (see Details). `pp_simulate()` returns a named list of
+#'   `ndraws` x `nobs` matrices, one per simulated observable.
 #' @keywords internal developer
 #' @export
 pp_observables <- function(model) {
@@ -163,6 +172,10 @@ pp_check_vars <- function(fit) {
                                     re_formula = dots$re_formula)
 
   observed <- lapply(spec$observed, function(slot) prep$data[[slot]])
+  # a fit saved before its model declared a slot lacks it in the data
+  for (nm in names(spec$defaults)) {
+    observed[[nm]] <- observed[[nm]] %||% rep(spec$defaults[[nm]], prep$nobs)
+  }
   yrep_inputs <- lapply(observed, .pp_expand_data, ndraws = prep$ndraws)
   sims <- pp_simulate(object$bmm$model, prep)
   sims <- sims[intersect(names(sims), names(spec$observed))]
