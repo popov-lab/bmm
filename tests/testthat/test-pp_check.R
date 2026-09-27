@@ -316,24 +316,27 @@ test_that("pp_check(resp_var = 'all') panels share one set of observations", {
 
 # Sparse 4par boundaries (#430) -------------------------------------------------
 
-# The fixture's draws on its own data with five cells made sparse. Rows 1-3
-# lose the lower summaries (no lower response, one, then enough responses but
-# no summaries, the min_trials case), rows 4-5 the upper ones (one upper
-# response, then no summaries). Every parameter is intercept-only, so the
-# draws do not depend on the data.
-sparse_ezdm4_fit <- function() {
+# The fixture's draws on a modified copy of its data. Every parameter is
+# intercept-only, so the draws do not depend on the data.
+mock_ezdm4_fit <- function(data) {
   old <- load_ppcheck_fit("bmmfit_ezdm4_ppcheck.rds")
-  data <- old$data
+  suppressWarnings(suppressMessages(bmm(
+    old$bmm$user_formula, data, old$bmm$model,
+    backend = "mock", mock_fit = old$fit, rename = FALSE
+  )))
+}
+
+# Five cells made sparse. Rows 1-3 lose the lower summaries (no lower
+# response, one, then enough responses but no summaries, the min_trials case),
+# rows 4-5 the upper ones (one upper response, then no summaries).
+sparse_ezdm4_fit <- function() {
+  data <- load_ppcheck_fit("bmmfit_ezdm4_ppcheck.rds")$data
   data$n_upper[1:2] <- as.integer(data$n_trials[1:2] - c(0, 1))
   data$n_upper[4] <- 1L
   data[1:3, c("mean_rt_lower", "var_rt_lower")] <- NA
   data[4:5, c("mean_rt_upper", "var_rt_upper")] <- NA
-  fit <- suppressWarnings(suppressMessages(bmm(
-    old$bmm$user_formula, data, old$bmm$model,
-    backend = "mock", mock_fit = old$fit, rename = FALSE
-  )))
   rows <- seq_len(nrow(data))
-  list(fit = fit, data = data, used_upper = !rows %in% 4:5,
+  list(fit = mock_ezdm4_fit(data), data = data, used_upper = !rows %in% 4:5,
        used_lower = !rows %in% 1:3)
 }
 
@@ -363,6 +366,21 @@ test_that("pp_check() without resp_var leaves the placeholders of a 4par fit out
   y <- p$data$value[p$data$is_y_label == "italic(y)"]
   expect_equal(y, sparse$data$mean_rt_upper[sparse$used_upper])
   expect_false(any(y == -1))
+})
+
+# placeholders at the lower boundary leave Y an observation in every cell, so
+# the default stays with brms and keeps what only brms offers
+test_that("pp_check() without resp_var plots every cell of a 4par fit with lower placeholders only", {
+  data <- load_ppcheck_fit("bmmfit_ezdm4_ppcheck.rds")$data
+  data[1:3, c("mean_rt_lower", "var_rt_lower")] <- NA
+  fit <- mock_ezdm4_fit(data)
+  expect_identical(fit$data$rt_used_lower[1:3], rep(0L, 3))
+  expect_true(all(fit$data$rt_used_upper == 1L))
+
+  p <- pp_check(fit, ndraws = 5)
+  expect_equal(p$data$value[p$data$is_y_label == "italic(y)"],
+               data$mean_rt_upper)
+  expect_s3_class(pp_check(fit, newdata = fit$data, ndraws = 5), "ggplot")
 })
 
 test_that("pp_check() still checks a 4par fit saved without RT indicators", {
