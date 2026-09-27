@@ -433,6 +433,19 @@ test_that("a set_size rebuilt for check_data() stays out of the model frame", {
   }
 })
 
+test_that("every column a revert method rebuilds is dropped again", {
+  skip_on_cran()
+  case <- stored_frame_cases()$mixture3p
+  fit <- stored_frame_fit(case)
+  local_mocked_s3_method("revert_check_data", "circular", function(model, data) {
+    data$extra <- 1
+    attr(data, "rebuilt") <- c(attr(data, "rebuilt"), "extra")
+    NextMethod("revert_check_data")
+  })
+  data <- check_stored_data(case$model, fit$data, fit$bmm$user_formula)
+  expect_false(any(c("set_size", "extra") %in% colnames(data)))
+})
+
 test_that("a user column named LureIdx<n> does not shift the rebuilt set size", {
   skip_on_cran()
   case <- stored_frame_cases()$mixture3p

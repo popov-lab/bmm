@@ -241,7 +241,10 @@ check_stored_data <- function(model, data, formula) {
 # Dispatch runs general to specific, so every method chains with NextMethod():
 # without it a method on a domain class silently shadows one on a model class
 # below it, which is how the sdt_yn symptom would come back the moment the SDT
-# stack adds a shared method on `sdt`
+# stack adds a shared method on `sdt`. Because methods chain, a method that
+# rebuilds a column appends its name to the "rebuilt" attribute rather than
+# assigning it -- an assignment would erase a name an earlier method in the
+# chain recorded, and that column would then reach the model frame
 revert_check_data <- function(model, data) {
   UseMethod("revert_check_data")
 }
@@ -281,7 +284,7 @@ revert_check_data.non_targets <- function(model, data) {
     data[[set_size]] <- 1 + rowSums(
       data[paste0("LureIdx", seq_along(model$other_vars$nt_features))]
     )
-    attr(data, "rebuilt") <- set_size
+    attr(data, "rebuilt") <- c(attr(data, "rebuilt"), set_size)
   }
   NextMethod("revert_check_data")
 }
