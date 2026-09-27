@@ -296,6 +296,23 @@ test_that("check_data() marks unused 4par boundaries and fills them with -1", {
   expect_identical(d1$n_trials, d0$n_trials)
   expect_length(out$warnings, 1L)
   expect_match(out$warnings, "4 of 7 cells", fixed = TRUE)
+
+  # the placeholder check_data() writes, not a transcribed one, must make the
+  # density non-finite if a gate ever let it through (row 4: 5 upper responses)
+  expect_identical(
+    dezdm(c(d1$mean_rt_upper[4], 0.58), c(d1$var_rt_upper[4], 0.028),
+          n_upper = 5, n_trials = 50, drift = 1, bound = 1.5, ndt = 0.25,
+          zr = 0.5, version = "4par"),
+    -Inf
+  )
+})
+
+test_that("check_data() refuses reserved 4par indicator columns with other values", {
+  d0 <- data.frame(
+    mean_rt_upper = 0.5, mean_rt_lower = 0.6, var_rt_upper = 0.02,
+    var_rt_lower = 0.03, n_upper = 30L, n_trials = 50L, rt_used_upper = "yes"
+  )
+  expect_error(check_data(ezdm4_model(), d0, ezdm4_formula), "reserved")
 })
 
 # an unused boundary's summaries are never read, so implausible values there
@@ -1080,7 +1097,9 @@ test_that("log_lik() of an ezdm 4par fit never reads a placeholder", {
   path <- test_path("assets", "bmmfit_ezdm4_ppcheck.rds")
   skip_if_not(file.exists(path), "fixture not available (excluded by .Rbuildignore)")
   old <- readRDS(path)
-  placeholders <- c(-1, 0, 1e300)
+  # a placeholder that is read gives -Inf for -1 and 0 alike, so a plausible
+  # RT is needed for the comparison across placeholders to see a read
+  placeholders <- c(-1, 0, 0.3, 1e300)
 
   # a fit saved before #430 has no indicators, and its stored log_lik closure
   # calls the dezdm() of the loaded bmm, whose count must keep a boundary

@@ -47,9 +47,10 @@ than observations, such as the summaries of an unused \code{\link[=ezdm]{ezdm()}
 \itemize{
 \item \code{defaults}: named vector giving, for observables whose slot a fit saved
 by an older bmm version lacks, the value to use for every observation.
-\item \code{y_placeholders}: \code{TRUE} if the \code{"Y"} slot can hold placeholders. brms
-would plot them as data, so \code{\link[=pp_check.bmmfit]{pp_check.bmmfit()}} without \code{resp_var} then
-checks the observable mapped to \code{"Y"} itself.
+\item \code{y_placeholders}: a function of the fit's data that returns \code{TRUE} if
+the \code{"Y"} slot holds placeholders. brms would plot them as data, so
+\code{\link[=pp_check.bmmfit]{pp_check.bmmfit()}} without \code{resp_var} then checks the observable mapped
+to \code{"Y"} itself.
 }
 
 A \code{pp_simulate()} method returns a named list of ndraws x nobs matrices

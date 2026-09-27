@@ -56,11 +56,12 @@
 #'   the name of the observable to check, or `"all"` for a panel of all
 #'   available checks built from one shared simulation. See [pp_check_vars()]
 #'   for the options of a fitted model. The default `NULL` checks the primary
-#'   response via [brms::pp_check()], except for `ezdm(version = "4par")`:
-#'   there the primary response, `mean_rt_upper`, holds placeholders where
-#'   the upper boundary has no usable summaries, so `NULL` means
-#'   `resp_var = "mean_rt_upper"`, which leaves those cells out. For the RT
-#'   models, passing
+#'   response via [brms::pp_check()], except for an `ezdm(version = "4par")`
+#'   fit in which some cells have no usable summaries at the upper boundary:
+#'   the primary response, `mean_rt_upper`, holds placeholders there, so
+#'   `NULL` means `resp_var = "mean_rt_upper"`, which leaves those cells out
+#'   but takes neither `newdata` nor the `loo_*` types. For the RT models,
+#'   passing
 #'   `negative_rt = TRUE` (a [brms::posterior_predict()] argument) is
 #'   redirected to `resp_var = "signed_rt"`, so that observed and predicted
 #'   response times are both signed by the response.
@@ -74,8 +75,8 @@
 #'   (interval width, default `0.9`) and `freq` (`FALSE` for proportions
 #'   instead of counts). `re_formula = NA` predicts at the population level on
 #'   every path.
-#' @return For multinomial models, the 4-parameter [ezdm()], or when
-#'   `resp_var` is specified, a `ggplot2` object (a `bayesplot_grid` for
+#' @return For multinomial models, a 4-parameter [ezdm()] with placeholders
+#'   in `mean_rt_upper`, or when `resp_var` is specified, a `ggplot2` object (a `bayesplot_grid` for
 #'   `resp_var = "all"`). For other models, the result of [brms::pp_check()].
 #' @seealso [brms::pp_check()], [pp_check_vars()]
 #' @aliases pp_check
@@ -99,7 +100,8 @@ pp_check.bmmfit <- function(object, type = NULL, ndraws = NULL,
     resp_var <- "signed_rt"
   }
 
-  if (is.null(resp_var) && isTRUE(spec$y_placeholders)) {
+  if (is.null(resp_var) && !is.null(spec$y_placeholders) &&
+      isTRUE(spec$y_placeholders(object$data))) {
     resp_var <- names(spec$observed)[spec$observed == "Y"]
   }
 

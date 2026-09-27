@@ -111,6 +111,14 @@ Provide aggregated statistics for each subject and condition that model paramete
 \item \code{sd}: exponential(2)
 }
 }
+
+In version "4par", a boundary reached fewer than twice, or without RT
+summaries (\code{NA}), enters the model through the response counts only.
+\code{bmm()} marks such boundaries in two columns it adds to the data,
+\code{rt_used_upper} and \code{rt_used_lower}, and replaces their summaries with a
+placeholder the likelihood never reads. \code{newdata} passed to \code{log_lik()},
+\code{predict()} or \code{posterior_predict()} needs these columns too; rows of
+\code{fit$data} have them.
 }
 }
 \examples{

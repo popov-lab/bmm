@@ -28,9 +28,10 @@
 #' than observations, such as the summaries of an unused [ezdm()] boundary:
 #' * `defaults`: named vector giving, for observables whose slot a fit saved
 #'   by an older bmm version lacks, the value to use for every observation.
-#' * `y_placeholders`: `TRUE` if the `"Y"` slot can hold placeholders. brms
-#'   would plot them as data, so [pp_check.bmmfit()] without `resp_var` then
-#'   checks the observable mapped to `"Y"` itself.
+#' * `y_placeholders`: a function of the fit's data that returns `TRUE` if
+#'   the `"Y"` slot holds placeholders. brms would plot them as data, so
+#'   [pp_check.bmmfit()] without `resp_var` then checks the observable mapped
+#'   to `"Y"` itself.
 #'
 #' A `pp_simulate()` method returns a named list of ndraws x nobs matrices
 #' drawn jointly, typically through the internal `.pp_simulate_joint()` helper

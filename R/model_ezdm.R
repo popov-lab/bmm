@@ -99,6 +99,14 @@
 #' @title `r .model_ezdm()$name`
 #' @name ezdm
 #' @details `r model_info(.model_ezdm(version = "4par"))`
+#'
+#'   In version "4par", a boundary reached fewer than twice, or without RT
+#'   summaries (`NA`), enters the model through the response counts only.
+#'   `bmm()` marks such boundaries in two columns it adds to the data,
+#'   `rt_used_upper` and `rt_used_lower`, and replaces their summaries with a
+#'   placeholder the likelihood never reads. `newdata` passed to `log_lik()`,
+#'   `predict()` or `posterior_predict()` needs these columns too; rows of
+#'   `fit$data` have them.
 #' @param mean_rt The names of the variable or variables (for 4par version) coding the mean reaction time in seconds in the data.
 #' @param var_rt The names of the variable or variables (for 4par version) coding the variance of the reaction time in seconds in the data
 #' @param n_upper The name of the variable coding the number of responses that hit the upper response threshold (typically the number of correct responses) in the data.
@@ -241,9 +249,17 @@ check_data.ezdm <- function(model, data, formula) {
 
   # the summaries of a 4par boundary the likelihood does not use can be
   # anything, or missing, so only the used ones are validated
-  rt_used <- TRUE
-  if (model$version == "4par") {
-    rt_used <- .ezdm_rt_used(data, mean_rt, var_rt, n_upper_values, n_trials_values)
+  earlier <- intersect(.EZDM_RT_USED, names(data))
+  stopif(
+    model$version == "4par" && !all(unlist(data[earlier]) %in% c(0, 1, NA)),
+    "The columns {collapse_comma(earlier)} are reserved for the ezdm 4par \\
+    indicators of which boundaries have usable RT summaries and may hold \\
+    only 0, 1 or NA. Rename them in your data."
+  )
+  rt_used <- if (model$version == "4par") {
+    .ezdm_rt_used(data, mean_rt, var_rt, n_upper_values, n_trials_values)
+  } else {
+    TRUE
   }
 
   # check that mean RT values are plausible (warn if likely in milliseconds)
@@ -530,7 +546,7 @@ pp_observables.ezdm_4par <- function(model) {
                  n_upper = "vint1", n_trials = "vint2",
                  rt_used_upper = "vint3", rt_used_lower = "vint4"),
     defaults = c(rt_used_upper = 1L, rt_used_lower = 1L),
-    y_placeholders = TRUE,
+    y_placeholders = function(data) any(data$rt_used_upper == 0, na.rm = TRUE),
     checks = list(
       mean_rt_upper = .pp_observable(
         function(d) .pp_ezdm_boundary(d$mean_rt_upper, d$rt_used_upper),

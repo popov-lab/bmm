@@ -388,6 +388,10 @@ test_that("pp_check() still checks a 4par fit saved without RT indicators", {
   p <- suppressWarnings(pp_check(fit, resp_var = "var_rt_upper", ndraws = 5))
   expect_equal(p$data$value[p$data$is_y_label == "italic(y)"],
                fit$data$var_rt_upper)
+
+  # without placeholders in Y there is nothing to leave out, so the default
+  # stays with brms and keeps what only brms offers, such as newdata
+  expect_s3_class(pp_check(fit, newdata = fit$data, ndraws = 5), "ggplot")
 })
 
 # only the ezdm 4par default leaves brms; the other models with declared

@@ -24,8 +24,8 @@
                       real vrt_lower, int hits, int trials, int rt_upper,
                       int rt_lower) {
     int misses = trials - hits;
-    int use_upper = rt_upper && hits >= 2;
-    int use_lower = rt_lower && misses >= 2;
+    int use_upper = rt_upper == 1 && hits >= 2;
+    int use_lower = rt_lower == 1 && misses >= 2;
     real s_sq = square(s);
     real k = drift / s_sq;
     real b_upper = zr * bound;

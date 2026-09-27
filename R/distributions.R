@@ -1220,9 +1220,9 @@ times_nonzero <- function(count, log_prob) {
 #'   sample variance, and one whose summaries are `NA` has nothing to evaluate;
 #'   `dezdm()` lets either contribute only through the binomial term.
 #'   `rezdm()` and `ezdm_summary_stats()` code such summaries as `NA`, and
-#'   `bmm()` keeps these cells: it replaces the missing summaries with a
-#'   placeholder that the likelihood never reads, so the response counts still
-#'   inform the fit. The per-boundary formulas condition on the realised
+#'   `bmm()` keeps these cells: it replaces the summaries of such a boundary
+#'   with a placeholder that the likelihood never reads, so the response
+#'   counts still inform the fit. The per-boundary formulas condition on the realised
 #'   counts, which are themselves random.
 #'
 #'   The two additional cumulants cost sampling time. In two simulated designs

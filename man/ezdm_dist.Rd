@@ -108,9 +108,9 @@ and its own response count. A boundary reached fewer than twice has no
 sample variance, and one whose summaries are \code{NA} has nothing to evaluate;
 \code{dezdm()} lets either contribute only through the binomial term.
 \code{rezdm()} and \code{ezdm_summary_stats()} code such summaries as \code{NA}, and
-\code{bmm()} keeps these cells: it replaces the missing summaries with a
-placeholder that the likelihood never reads, so the response counts still
-inform the fit. The per-boundary formulas condition on the realised
+\code{bmm()} keeps these cells: it replaces the summaries of such a boundary
+with a placeholder that the likelihood never reads, so the response
+counts still inform the fit. The per-boundary formulas condition on the realised
 counts, which are themselves random.
 
 The two additional cumulants cost sampling time. In two simulated designs
