@@ -300,7 +300,9 @@ m3_fixture <- function() {
 # one mock-fittable (model, formula, data) per model, each chosen so that the
 # stored model frame is the hard case: m3 with a category that has zero options
 # in some rows and with generated option columns, and the two non-target models
-# with a formula that leaves brms no reason to keep the set_size column
+# with a formula that leaves brms no reason to keep the set_size column;
+# mixture3p_set_size covers the opposite case, where the formula names set_size
+# directly and brms keeps the real column instead
 stored_frame_cases <- function() {
   rt_data <- data.frame(
     rt = rep(c(0.6, 0.8, 1.1, 0.7), 5),
@@ -363,6 +365,10 @@ stored_frame_cases <- function() {
       model = mixture3p("dev_rad", nt_features = nt_features, set_size = "set_size"),
       formula = bmf(kappa ~ 1, thetat ~ 1, thetant ~ 1), data = lin_2017
     ),
+    mixture3p_set_size = list(
+      model = mixture3p("dev_rad", nt_features = nt_features, set_size = "set_size"),
+      formula = bmf(kappa ~ 1, thetat ~ 1, thetant ~ 0 + set_size), data = lin_2017
+    ),
     sdm = list(
       model = sdm("dev_rad"), formula = bmf(c ~ 1, kappa ~ 1),
       data = lin_2017
@@ -387,7 +393,12 @@ test_that("every supported model has a stored-frame case", {
   covered <- unlist(lapply(stored_frame_cases(), function(case) {
     intersect(class(case$model), supported_models(print_call = FALSE))
   }))
-  expect_setequal(covered, supported_models(print_call = FALSE))
+  uncovered <- setdiff(supported_models(print_call = FALSE), covered)
+  expect(length(uncovered) == 0, glue::glue(
+    "No stored-frame case for {collapse_comma(uncovered)}. Add one to stored_frame_cases(); ",
+    "a model whose check_data() consumes or creates columns also needs a ",
+    "revert_check_data() method in R/update.R"
+  ))
 })
 
 test_that("update.bmmfit needs no newdata for a model that packs its response", {
@@ -418,6 +429,19 @@ for (case_name in names(stored_frame_cases())) {
     )
     expect_false(any(grepl("reserved", warned)))
     expect_equal(brms::standata(fit, newdata = data), brms::standata(fit))
+
+    model <- fit$bmm$model
+    configured <- function(data) suppressWarnings(suppressMessages({
+      config <- configure_model(model, data, check_formula(model, data, fit$bmm$user_formula))
+      list(
+        standata = brms::make_standata(config$formula, config$data, stanvars = config$stanvars),
+        prior = configure_prior(model, data, config$formula, user_prior = NULL)
+      )
+    }))
+    expect_equal(
+      configured(data),
+      configured(suppressWarnings(check_data(model, case$data, fit$bmm$user_formula)))
+    )
   })
 }
 
