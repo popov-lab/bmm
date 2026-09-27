@@ -297,11 +297,12 @@ check_data.ezdm <- function(model, data, formula) {
     }
     data[.EZDM_RT_USED] <- list(as.integer(rt_used[, 1]), as.integer(rt_used[, 2]))
     n_sparse <- sum(rowSums(unused) > 0)
+    # out of the cells brms keeps: a row with a missing count is dropped
     warnif(
       n_sparse > 0,
-      "{n_sparse} of {nrow(data)} cells have fewer than two responses, or no \\
-      RT summaries, at one or both boundaries. Such a boundary enters the \\
-      model through the response counts only."
+      "{n_sparse} of {sum(!is.na(rt_used[, 1]))} cells have fewer than two \\
+      responses, or no RT summaries, at one or both boundaries. Such a \\
+      boundary enters the model through the response counts only."
     )
   }
 

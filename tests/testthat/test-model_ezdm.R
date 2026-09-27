@@ -260,31 +260,34 @@ test_that("ezdm 4par keeps the cells of a boundary below two responses (#430)", 
 # rows: both boundaries used; no lower responses; one lower response with a
 # mean but no variance (what ezdm_summary_stats() can return after its
 # correction); enough upper responses but no upper summaries (min_trials);
-# n_upper missing; no upper responses; n_trials missing
+# n_upper missing; no upper responses; n_trials missing; too few responses at
+# either boundary for summaries (min_trials), so both are unused
 test_that("check_data() marks unused 4par boundaries and fills them with -1", {
   d0 <- data.frame(
-    mean_rt_upper = c(0.50, 0.52, 0.48, NA, 0.51, NA, 0.49),
-    mean_rt_lower = c(0.60, NA, 0.62, 0.58, NA, 0.61, 0.57),
-    var_rt_upper = c(0.020, 0.022, 0.018, NA, 0.021, NA, 0.019),
-    var_rt_lower = c(0.030, NA, NA, 0.028, 0.031, 0.032, 0.027),
-    n_upper = c(30L, 50L, 49L, 5L, NA, 0L, 30L),
-    n_trials = c(50L, 50L, 50L, 50L, 50L, 50L, NA)
+    mean_rt_upper = c(0.50, 0.52, 0.48, NA, 0.51, NA, 0.49, NA),
+    mean_rt_lower = c(0.60, NA, 0.62, 0.58, NA, 0.61, 0.57, NA),
+    var_rt_upper = c(0.020, 0.022, 0.018, NA, 0.021, NA, 0.019, NA),
+    var_rt_lower = c(0.030, NA, NA, 0.028, 0.031, 0.032, 0.027, NA),
+    n_upper = c(30L, 50L, 49L, 5L, NA, 0L, 30L, 5L),
+    n_trials = c(50L, 50L, 50L, 50L, 50L, 50L, NA, 12L)
   )
 
   out <- collect_warnings(check_data(ezdm4_model(), d0, ezdm4_formula))
   d1 <- out$value
 
   expect_identical(names(d1), c(names(d0), "rt_used_upper", "rt_used_lower"))
-  expect_identical(d1$rt_used_upper, c(1L, 1L, 1L, 0L, NA, 0L, NA))
-  expect_identical(d1$rt_used_lower, c(1L, 0L, 0L, 1L, NA, 1L, NA))
-  expect_identical(d1$mean_rt_upper, c(0.50, 0.52, 0.48, -1, 0.51, -1, 0.49))
-  expect_identical(d1$var_rt_upper, c(0.020, 0.022, 0.018, -1, 0.021, -1, 0.019))
-  expect_identical(d1$mean_rt_lower, c(0.60, -1, -1, 0.58, NA, 0.61, 0.57))
-  expect_identical(d1$var_rt_lower, c(0.030, -1, -1, 0.028, 0.031, 0.032, 0.027))
+  expect_identical(d1$rt_used_upper, c(1L, 1L, 1L, 0L, NA, 0L, NA, 0L))
+  expect_identical(d1$rt_used_lower, c(1L, 0L, 0L, 1L, NA, 1L, NA, 0L))
+  expect_identical(d1$mean_rt_upper, c(0.50, 0.52, 0.48, -1, 0.51, -1, 0.49, -1))
+  expect_identical(d1$var_rt_upper, c(0.020, 0.022, 0.018, -1, 0.021, -1, 0.019, -1))
+  expect_identical(d1$mean_rt_lower, c(0.60, -1, -1, 0.58, NA, 0.61, 0.57, -1))
+  expect_identical(d1$var_rt_lower, c(0.030, -1, -1, 0.028, 0.031, 0.032, 0.027, -1))
   expect_identical(d1$n_upper, d0$n_upper)
   expect_identical(d1$n_trials, d0$n_trials)
+  # cells, not boundaries, out of the cells brms keeps: rows 5 and 7 have a
+  # missing count and are dropped
   expect_length(out$warnings, 1L)
-  expect_match(out$warnings, "4 of 7 cells", fixed = TRUE)
+  expect_match(out$warnings, "5 of 6 cells", fixed = TRUE)
 
   # the placeholder check_data() writes, not a transcribed one, must make the
   # density non-finite if a gate ever let it through (row 4: 5 upper responses)
