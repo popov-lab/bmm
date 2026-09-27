@@ -324,6 +324,10 @@ stored_frame_cases <- function() {
     c ~ 1, a ~ 1, d ~ 1
   )
   m3_links <- list(c = "log", a = "log", d = "log")
+  mafc_data <- data.frame(
+    n_correct = c(80, 55, 78, 60, 85, 52, 81, 58), n_trials = 100,
+    n_afc = rep(c(2, 4), 4), cond = factor(rep(c("a", "b"), each = 4))
+  )
 
   list(
     cswald = list(
@@ -376,6 +380,18 @@ stored_frame_cases <- function() {
     sdt_yn = list(
       model = sdt_yn(response = "n_old", stimulus = "stimulus", n_trials = "n_trials"),
       formula = bmf(d ~ 1, criterion ~ 1, sdratio ~ 1), data = broeder_schuetz_2009_e3
+    ),
+    sdt_mafc = list(
+      model = sdt_mafc("n_correct", "n_trials", m = 4),
+      formula = bmf(d ~ 1 + cond), data = mafc_data
+    ),
+    sdt_mafc_m_column = list(
+      model = sdt_mafc("n_correct", "n_trials", m = "n_afc"),
+      formula = bmf(d ~ 1 + cond), data = mafc_data
+    ),
+    sdt_mafc_m_predictor = list(
+      model = sdt_mafc("n_correct", "n_trials", m = "n_afc"),
+      formula = bmf(d ~ 1 + n_afc), data = mafc_data
     )
   )
 }
@@ -455,6 +471,16 @@ test_that("a set_size rebuilt for check_data() stays out of the model frame", {
       check_stored_data(case$model, fit$data, fit$bmm$user_formula)
     ))
   }
+})
+
+test_that("an m column rebuilt for check_data() stays out of the model frame", {
+  skip_on_cran()
+  case <- stored_frame_cases()$sdt_mafc_m_column
+  fit <- stored_frame_fit(case)
+  expect_false("n_afc" %in% colnames(fit$data))
+  data <- check_stored_data(case$model, fit$data, fit$bmm$user_formula)
+  expect_false("n_afc" %in% colnames(data))
+  expect_equal(data$m_afc, as.integer(case$data$n_afc))
 })
 
 test_that("every column a revert method rebuilds is dropped again", {
