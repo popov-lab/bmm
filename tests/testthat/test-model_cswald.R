@@ -599,6 +599,15 @@ test_that("the vectorized cswald likelihood matches the scalar and R versions", 
         version = version, log = TRUE
       ))
     )
+    # lp_scalar above only exercises the scalar Stan overload; brms compiles the
+    # vectorized (loop = FALSE) one, so its total needs its own check at this boundary
+    expect_equal(
+      as.numeric(edge_fit$draws("lp_vector", format = "draws_matrix")[1, 1]),
+      sum(with(edge, .dcswald(rt, dec, drift, bound, ndt, zr, s,
+        version = version, log = TRUE
+      ))),
+      tolerance = 1e-10
+    )
   }
 })
 
