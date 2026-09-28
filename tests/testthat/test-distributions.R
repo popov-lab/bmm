@@ -912,6 +912,17 @@ test_that("dm3 works with full bmmformula", {
   expect_length(dens, 1)
 })
 
+test_that("dm3 matches activations and num_options by category, not by position", {
+  model <- m3(resp_cats = c("corr", "other", "npl"), num_options = c(1, 4, 5), choice_rule = "simple")
+  pars <- c(a = 1, b = 0.1, c = 2)
+  expected <- dm3(c(20, 10, 10), pars, model, bmf(corr ~ b + a + c, other ~ b + a, npl ~ b))
+  expect_equal(dm3(c(20, 10, 10), pars, model, bmf(npl ~ b, other ~ b + a, corr ~ b + a + c)), expected)
+
+  model$other_vars$num_options <- c(npl = 5, corr = 1, other = 4)
+  expect_equal(dm3(c(20, 10, 10), pars, model, bmf(corr ~ b + a + c, other ~ b + a, npl ~ b)), expected)
+  expect_error(dm3(c(20, 10, 10), pars, model, bmf(corr ~ b + a + c, npl ~ b)), "'other'")
+})
+
 test_that("rm3 errors when full formula has no activation functions", {
   model <- m3(
     resp_cats = c("corr", "other", "npl"),
