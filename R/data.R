@@ -161,7 +161,8 @@
 #' @format ## `meyer_grant_jakob_2025`
 #' A data frame with 180 rows (60 subjects x set sizes 3, 4, 5) and 7 columns:
 #' \describe{
-#'   \item{id}{Factor uniquely identifying each subject}
+#'   \item{id}{Factor with sequential codes `s01`--`s60` assigned by bmm; the
+#'   original participant identifiers are not shipped}
 #'   \item{set_size}{Integer number of ranked items on the trial (3, 4, or 5)}
 #'   \item{rank1, rank2, rank3, rank4, rank5}{Integer number of trials in which
 #'   the target received that rank (rank1 = most likely target). Columns beyond
@@ -170,7 +171,7 @@
 #' @keywords dataset
 #' @source Meyer-Grant, C. G., & Jakob, M. (2025). Ranking tasks in recognition
 #'   memory: A direct test of the two-high-threshold contrast model.
-#'   \emph{Journal of Experimental Psychology: General}, 154, 1445--1455.
+#'   \emph{Journal of Experimental Psychology: General}, 154(5), 1445--1455.
 #'   \doi{10.1037/xge0001700}. Data on OSF: \url{https://osf.io/gtzu7/}.
 #' @examples
 #' \dontrun{
