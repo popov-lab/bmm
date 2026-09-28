@@ -257,7 +257,7 @@ revert_check_data.default <- function(model, data) {
 #' @exportS3Method
 revert_check_data.m3 <- function(model, data) {
   resp_cats <- model$resp_vars$resp_cats
-  num_options <- model$other_vars$num_options
+  num_options <- m3_num_options(model)
   data[resp_cats] <- as.data.frame(data$Y[, resp_cats, drop = FALSE])
   if (is.numeric(num_options)) {
     for (var in names(num_options)) {

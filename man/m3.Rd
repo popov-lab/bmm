@@ -14,7 +14,11 @@ response categories used for the M3.}
 of candidates in the respective response categories are constant across all conditions
 in the experiment. Or a vector specifying the variable names that contain the number of
 candidates in each response category. The order of these variables should be in the
-same order as the names of the response categories passed to \code{resp_cats}}
+same order as the names of the response categories passed to \code{resp_cats}. Numbers
+named after the response categories, e.g. \code{c(corr = 1, other = 4)}, are matched to
+the categories by name. Numbers without names, or with other names, are taken in
+the order of \code{resp_cats}, and other names become the names of the columns
+bmm adds to the data.}
 
 \item{choice_rule}{The choice rule that should be used for the M3. The options are "softmax"
 or "simple". The "softmax" option implements the softmax normalization of activation into
