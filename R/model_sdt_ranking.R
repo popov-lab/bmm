@@ -290,7 +290,9 @@ bmf2bf.sdt_ranking <- function(model, formula) {
   # the distribution id selects the kernel in both the Stan function and the
   # R companion.
   sdratio_arg <- if ("sdratio" %in% names(model$parameters)) "sdratio" else "0"
-  args <- paste("max_rank", "d", sdratio_arg,
+  # d reaches the kernel on the natural scale, so a non-identity link is
+  # inverted here, as apply_links() does for m3
+  args <- paste("max_rank", deparse(inv_link("d", model$links$d)), sdratio_arg,
                 .sdt_dist_id(model$other_vars$dist), sep = ", ")
 
   bform <- brms::bf(

@@ -525,6 +525,14 @@ test_that("bmf2bf.sdt_ranking builds a multinomial non-linear formula", {
   }, logical(1))))
 })
 
+test_that("a link on d is inverted inside the ranking formula", {
+  bf <- bmf2bf(sdt_ranking(ranks4, m = 4, links = list(d = "log")), bmf(d ~ 1))
+  expect_match(deparse(bf$formula, width.cutoff = 500), "exp(d)", fixed = TRUE)
+  expect_match(deparse(bf$pforms[[1]], width.cutoff = 500), "exp(d)", fixed = TRUE)
+  bf <- bmf2bf(sdt_ranking(ranks4, m = 4), bmf(d ~ 1))
+  expect_false(grepl("exp(d)", deparse(bf$formula, width.cutoff = 500), fixed = TRUE))
+})
+
 
 ############################################################################# !
 # STAN CODE GENERATION TESTS                                              ####
