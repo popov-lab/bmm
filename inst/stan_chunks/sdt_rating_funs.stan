@@ -170,8 +170,15 @@ real sdt_rating_logmu_cat(int cat, vector thresholds,
     );
   }
 
-  return log_diff_exp(
-    sdt_log_cumprob((thresholds[cat] - shift) / scale, dist_type),
-    sdt_log_cumprob((thresholds[cat - 1] - shift) / scale, dist_type)
-  );
+  // an interval above 0 is the difference of two upper tails: there both log
+  // cdf values round to 0 (gumbel_min from eta ~ 6.6), and their difference to
+  // -Inf, for a category that still has mass
+  real eta_lo = (thresholds[cat - 1] - shift) / scale;
+  real eta_hi = (thresholds[cat] - shift) / scale;
+  if (eta_lo > 0) {
+    return log_diff_exp(sdt_log_one_minus_cumprob(eta_lo, dist_type),
+                        sdt_log_one_minus_cumprob(eta_hi, dist_type));
+  }
+  return log_diff_exp(sdt_log_cumprob(eta_hi, dist_type),
+                      sdt_log_cumprob(eta_lo, dist_type));
 }

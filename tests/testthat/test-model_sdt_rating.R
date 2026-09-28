@@ -549,6 +549,82 @@ test_that("sdt_rating handles predictors on d", {
 })
 
 
+# The Stan kernels run through a fixed_param generated-quantities program, as
+# the ranking parity tests do. sig_figs = 17 round-trips a double. Every row
+# builds K = 6 thresholds with its own builder and returns one category's log
+# probability, so both the builders and the kernel meet their R counterparts.
+rating_stan_logmu <- function(grid, deltas) {
+  sc <- system.file("stan_chunks", package = "bmm")
+  funs <- paste(read_lines2(file.path(sc, "sdt_dist_funs.stan")),
+                read_lines2(file.path(sc, "sdt_rating_funs.stan")), sep = "\n")
+  program <- paste0(
+    "functions {\n", funs, "\n}\n",
+    "data {\n  int N; int K; array[N] int cat; array[N] int thresh;\n",
+    "  vector[N] criterion; vector[N] spacing; array[N, K - 2] real deltas;\n",
+    "  vector[N] d; vector[N] sdratio; vector[N] stimulus; array[N] int dist;\n}\n",
+    "generated quantities {\n  vector[N] lp;\n  for (i in 1:N) {\n",
+    "    vector[K - 1] thr = sdt_make_thresholds_rating(criterion[i], spacing[i],\n",
+    "      deltas[i], K, thresh[i]);\n",
+    "    lp[i] = sdt_rating_logmu_cat(cat[i], thr, d[i], sdratio[i], stimulus[i], dist[i]);\n",
+    "  }\n}\n"
+  )
+  data <- c(list(N = nrow(grid), K = 6L, deltas = deltas),
+            as.list(grid[c("cat", "thresh", "criterion", "spacing", "d",
+                           "sdratio", "stimulus", "dist")]))
+  fit <- cmdstanr::cmdstan_model(cmdstanr::write_stan_file(program))$sample(
+    data = data, fixed_param = TRUE, chains = 1, iter_sampling = 1,
+    iter_warmup = 0, refresh = 0, show_messages = FALSE, sig_figs = 17
+  )
+  csv <- utils::read.csv(fit$output_files()[1], comment.char = "#",
+                         check.names = FALSE)
+  as.numeric(csv[1, paste0("lp.", seq_len(nrow(grid)))])
+}
+
+test_that("the Stan rating kernel matches its R counterpart in both tails", {
+  skip_on_cran()
+  skip_if_not_installed("cmdstanr")
+  skip_if(is.null(cmdstanr::cmdstan_version(error_on_NA = FALSE)))
+
+  # criterion = 12 puts every threshold far into the upper tail, where the log
+  # cdf of both bounds of an interval rounds to 0; -12 does the same below
+  grid <- expand.grid(cat = 1:6, thresh = seq_along(bmm:::.sdt_threshold_types),
+                      criterion = c(-12, -0.5, 0.3, 12), spacing = c(-0.5, 0.1),
+                      d = c(0, 2), sdratio = c(-0.6, 0, 0.9),
+                      stimulus = c(0, 1), dist = seq_along(bmm:::.sdt_dists))
+  deltas <- matrix(seq(-0.6, 0.6, length.out = 4), nrow(grid), 4, byrow = TRUE)
+  stan <- rating_stan_logmu(grid, deltas)
+
+  r <- vapply(seq_len(nrow(grid)), function(i) {
+    g <- grid[i, ]
+    type <- bmm:::.sdt_threshold_types[g$thresh]
+    n_deltas <- if (type == "softmax") 3L else 4L
+    thr <- bmm:::.sdt_make_thresholds(
+      g$criterion, 6L, type, g$spacing,
+      if (type %in% c("log_distance", "log_ratio", "softmax")) deltas[1, seq_len(n_deltas)]
+    )
+    bmm:::.sdt_category_log_probs(thr, g$d, exp(g$sdratio), g$stimulus,
+                                  names(bmm:::.sdt_dists)[g$dist])[g$cat]
+  }, numeric(1))
+
+  expect_true(all(is.finite(stan)))
+  expect_equal(stan, r, tolerance = 1e-10)
+})
+
+test_that("an upper-tail rating category keeps its mass", {
+  # under gumbel_min the log cdf rounds to 0 from eta ~ 6.6, so an interval
+  # taken as the difference of two log cdfs came out -Inf. Its survival
+  # function exp(-exp(x)) gives the interval's mass in closed form.
+  lo <- c(4, 7.5, 12)
+  hi <- lo + 0.5
+  expected <- -exp(lo) + log1m_exp(exp(lo) - exp(hi))
+  got <- vapply(seq_along(lo), function(i) {
+    bmm:::.sdt_category_log_probs(c(lo[i] - 1, lo[i], hi[i]), 0, 1, 0,
+                                  "gumbel_min")[3]
+  }, numeric(1))
+  expect_equal(got, expected, tolerance = 1e-12)
+})
+
+
 ############################################################################# !
 # UV-SDT TESTS (sdratio overridable fixed parameter)                     ####
 ############################################################################# !

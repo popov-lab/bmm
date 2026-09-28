@@ -2951,7 +2951,7 @@ rsdt_ranking <- function(n, n_trials, m, d, sdratio = 1,
 }
 
 
-# Category probabilities from thresholds: F(thresholds) differenced into K
+# Category log-probabilities from thresholds: the noise cdf differenced into K
 # interval masses. `d` is d_a, so the separation in noise units is
 # d * .sdt_rms_scale(sdratio); the thresholds are NOT rescaled, they stay on the
 # noise-standardized axis. sdratio is the signal/noise SD ratio on the natural
@@ -2960,7 +2960,12 @@ rsdt_ranking <- function(n, n_trials, m, d, sdratio = 1,
 # thresholds may be an n-by-(K-1) matrix (or a vector, recycled across rows)
 # and d/sdratio/stimulus vectors. Returns an n-by-K matrix, or a length-K
 # vector when all inputs describe a single observation.
-.sdt_category_probs <- function(thresholds, d, sdratio, stimulus, dist) {
+#
+# An interval above 0 is taken as the difference of two upper tails and one
+# below it as the difference of two lower tails, as in Stan: on the other side
+# both cdf values round to the same number, which returned -Inf, or a clamped
+# probability, for a category that still has mass.
+.sdt_category_log_probs <- function(thresholds, d, sdratio, stimulus, dist) {
   thr <- rbind(thresholds)
   dimnames(thr) <- NULL
   n <- max(nrow(thr), length(d), length(sdratio), length(stimulus))
@@ -2970,12 +2975,23 @@ rsdt_ranking <- function(n, n_trials, m, d, sdratio = 1,
 
   shift <- rep_len(d, n) * .sdt_rms_scale(sdratio) / 2 * (2 * stimulus - 1)
   scale <- ifelse(stimulus == 1, sdratio, 1)
-  cum_p <- .sdt_cdf((thr - shift) / scale, dist)
+  eta <- (thr - shift) / scale
+  lower <- cbind(-Inf, eta)
+  upper <- cbind(eta, Inf)
 
-  probs <- cbind(cum_p, 1) - cbind(0, cum_p)
-  probs <- pmax(probs, .Machine$double.eps)
-  probs <- probs / rowSums(probs)
-  if (n == 1L && !is.matrix(thresholds)) probs[1L, ] else probs
+  out <- matrix(NA_real_, n, ncol(lower))
+  above <- lower > 0
+  out[above] <- log_diff_exp(.sdt_log_ccdf(lower[above], dist),
+                             .sdt_log_ccdf(upper[above], dist))
+  out[!above] <- log_diff_exp(.sdt_log_cdf(upper[!above], dist),
+                              .sdt_log_cdf(lower[!above], dist))
+  # -Inf minus -Inf: an interval so far out that both bounds underflow
+  out[is.nan(out)] <- -Inf
+  if (n == 1L && !is.matrix(thresholds)) out[1L, ] else out
+}
+
+.sdt_category_probs <- function(thresholds, d, sdratio, stimulus, dist) {
+  exp(.sdt_category_log_probs(thresholds, d, sdratio, stimulus, dist))
 }
 
 
@@ -3155,10 +3171,11 @@ dsdt_rating <- function(counts, stimulus, d, thresholds,
   stopif(any(!stimulus %in% c(0L, 1L)),
          "stimulus must be 0 (noise) or 1 (signal)")
 
-  probs <- rbind(.sdt_category_probs(thr, rep_len(d, n),
-                                     rep_len(sdratio, n), stimulus, dist))
+  log_probs <- rbind(.sdt_category_log_probs(thr, rep_len(d, n),
+                                             rep_len(sdratio, n), stimulus,
+                                             dist))
   log_dens <- lgamma(rowSums(counts) + 1) - rowSums(lgamma(counts + 1)) +
-    rowSums(counts * log(probs))
+    rowSums(ifelse(counts == 0, 0, counts * log_probs))
   if (log) log_dens else exp(log_dens)
 }
 

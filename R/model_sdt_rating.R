@@ -492,9 +492,8 @@ sdt_rating_logmu <- function(cat, K, dist, thresh, d, criterion, spacing,
   }
 
   thr <- .sdt_make_thresholds(criterion, K, thresh_name, spacing, deltas)
-  probs <- rbind(.sdt_category_probs(rbind(thr), d, exp(sdratio),
-                                     stimulus, dist_name))
-  out <- log(probs[, cat])
+  out <- rbind(.sdt_category_log_probs(rbind(thr), d, exp(sdratio),
+                                       stimulus, dist_name))[, cat]
 
   if (!is.null(shape)) dim(out) <- shape
   out
