@@ -295,6 +295,20 @@ revert_check_data.sdt_yn <- function(model, data) {
   NextMethod("revert_check_data")
 }
 
+#' @exportS3Method
+revert_check_data.sdt_mafc <- function(model, data) {
+  m <- model$other_vars$m
+  # brms keeps a set-size column named by `m` only when a formula predicts
+  # something with it; m_afc is check_data()'s integer copy of that column
+  if (is.character(m) && not_in(m, colnames(data))) {
+    data[[m]] <- data$m_afc
+    attr(data, "rebuilt") <- c(attr(data, "rebuilt"), m)
+  }
+  data$m_afc <- NULL
+  data$dist_type <- NULL
+  NextMethod("revert_check_data")
+}
+
 # brms::update.brmsfit() merges the fit's stored control key by key with the one
 # the call names, and keeps none of it when backend or algorithm changes.
 # update.bmmfit() always names a control, so the rule is applied here. rstan fits

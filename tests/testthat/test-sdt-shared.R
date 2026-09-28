@@ -27,10 +27,55 @@ test_that("gumbel labels follow the extreme-value convention", {
 test_that("every dist argument offers exactly the registry's distributions", {
   # the registry order defines the dist_type integer passed to Stan, so a
   # signature that drifts out of step with it becomes an off-by-one
-  fns <- list(sdt_yn, dsdt_yn, rsdt_yn, sdt_d, sdt_criterion)
+  fns <- list(sdt_yn, dsdt_yn, rsdt_yn, sdt_d, sdt_criterion,
+              sdt_mafc, dsdt_mafc, rsdt_mafc)
   for (f in fns) {
     expect_equal(eval(formals(f)$dist), names(bmm:::.sdt_dists))
   }
+})
+
+test_that("the m-AFC probabilities agree with the registry's own cdf", {
+  # P(correct) is the probability the signal variate beats m - 1 distractors,
+  # int f(x - d) F(x)^(m - 1) dx, so a closed form is only right if it agrees
+  # with the cdf the rest of the model uses. Taking the density off that same
+  # cdf by central difference ties each branch of .mafc_pc_r() to the registry
+  # entry it claims: relabelling gumbel_min and gumbel_max leaves every block
+  # in test-model_sdt_mafc.R green, because its closed-form tests restate the
+  # formula the implementation already uses, and fails here. gumbel_min and
+  # gumbel_max coincide at m = 2, which is why the grid goes past it.
+  # 1e-7 is the implementation's side: the 40-point Gauss-Hermite normal branch
+  # sits 4.5e-8 from the integral at m = 8, d = 0, which is the rule's own
+  # error and not the central difference's (h = 1e-6 and an exact density both
+  # give 4.5e-8); every other cell stays below 7e-9.
+  pc_integral <- function(d, m, dist) {
+    cdf <- bmm:::.sdt_dists[[dist]]$cdf
+    dens <- function(x) (cdf(x + 1e-5) - cdf(x - 1e-5)) / 2e-5
+    stats::integrate(function(x) dens(x - d) * cdf(x)^(m - 1),
+                     -Inf, Inf, rel.tol = 1e-10)$value
+  }
+  for (dist in names(bmm:::.sdt_dists)) {
+    for (m in c(2L, 3L, 5L, 8L)) {
+      for (d in c(0, 0.8, 2)) {
+        expect_equal(bmm:::.mafc_pc_r(d, m, dist), pc_integral(d, m, dist),
+                     tolerance = 1e-7,
+                     info = paste(dist, "m =", m, "d =", d))
+      }
+    }
+  }
+})
+
+test_that("the default sdratio prior brackets the group-level estimates", {
+  # two group-level SD ratios are on record: Mickes et al. (2007) Table 1
+  # averages sd(lure)/sd(target) = 0.79 over their 13 retained subjects, i.e.
+  # 1.26 signal over noise, and the broeder_schuetz_2009_e3 posterior gives
+  # 1.46 [1.25, 1.71]. The prior has to reach past the widest ratio those
+  # support and still keep its mass off ratios above 2, which recognition does
+  # not produce -- one-sided, "covers the empirical range" cannot fail.
+  main <- sdt_yn("n_old", "stimulus", "n_trials")$default_priors$sdratio$main
+  sd <- as.numeric(sub("normal\\(0, ([0-9.]+)\\)", "\\1", main))
+  expect_true(is.finite(sd), info = main)
+  expect_gt(exp(qnorm(0.975, 0, sd)), 1.71)
+  expect_gt(diff(pnorm(log(c(0.5, 2)), 0, sd)), 0.95)
 })
 
 test_that("quantile functions invert their cdfs", {

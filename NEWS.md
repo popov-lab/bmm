@@ -2,6 +2,7 @@
 
 ### New models
 * Add **Yes/No Signal Detection Theory** (`sdt_yn`) for detection and old/new recognition tasks with aggregated response counts. It estimates sensitivity (`d`) and response bias (`criterion`), and optionally the unequal-variance ratio (`sdratio`). Also adds `dsdt_yn()`, `rsdt_yn()`, `sdt_d()` and `sdt_criterion()`. See `?sdt_yn` for the parameters, links, default priors and the designs that identify `sdratio`. Thanks to @GidonFrischkorn
+* Add **m-Alternative Forced Choice Signal Detection Theory** (`sdt_mafc`) for accuracy-only m-AFC tasks, where one of `m` alternatives carries the signal (DeCarlo, 2012). It estimates sensitivity (`d`) from response counts and has no bias parameter. `m` may be a constant or the name of a data column, so trials with different numbers of alternatives can be fit jointly. Also adds `dsdt_mafc()` and `rsdt_mafc()`. See `?sdt_mafc` for the parameters, the noise distributions, the default priors and how `d` relates to the sensitivity `sdt_yn()` reports. Thanks to @GidonFrischkorn
 
 ### New datasets
 * Add **`broeder_schuetz_2009_e3`**, binary old/new recognition data from Broeder & Schuetz (2009, Exp. 3), with five base-rate conditions from 40 subjects. See `?broeder_schuetz_2009_e3`.
