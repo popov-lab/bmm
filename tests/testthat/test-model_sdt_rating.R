@@ -12,20 +12,20 @@ test_that("sdt_rating model can be created with vector response", {
   expect_equal(model$other_vars$n_ratings, 4L)
 })
 
-test_that("sdt_rating model infers n_ratings from response length", {
+test_that("sdt_rating takes the number of categories from the response columns", {
   model <- sdt_rating(c("r1", "r2", "r3", "r4", "r5", "r6"), "stimulus")
   expect_equal(model$other_vars$n_ratings, 6L)
 })
 
-test_that("sdt_rating model rejects mismatched n_ratings", {
-  expect_error(
-    sdt_rating(c("r1", "r2", "r3", "r4"), "stimulus", n_ratings = 6),
-    "must match"
-  )
+test_that("sdt_rating model rejects fewer than 3 response columns", {
+  expect_error(sdt_rating(c("r1", "r2"), "stimulus"), "more than 2")
+  expect_error(sdt_rating("rating", "stimulus"), "more than 2")
 })
 
-test_that("sdt_rating model rejects n_ratings <= 2", {
-  expect_error(sdt_rating(c("r1", "r2"), "stimulus"), "n_ratings > 2")
+test_that("sdt_rating refuses column names brms cannot turn into parameters", {
+  expect_error(sdt_rating(paste0("conf_", 1:4), "stimulus"),
+               "must not contain '.' or '_'")
+  expect_error(sdt_rating(c("r1", "r.2", "r3"), "stimulus"), "'r.2'")
 })
 
 test_that("sdt_rating model has parsimonious threshold params by default", {
@@ -228,6 +228,17 @@ test_that("sdt_rating check_data rejects negative counts", {
   expect_error(check_data(model, invalid_data, formula), "non-negative")
 })
 
+test_that("sdt_rating check_data refuses an NA or constant stimulus", {
+  model <- sdt_rating(c("r1", "r2", "r3", "r4"), "stimulus")
+  formula <- bmf(d ~ 1, criterion ~ 1, spacing ~ 1)
+  counts <- data.frame(r1 = c(10, 5), r2 = c(20, 10), r3 = c(15, 30), r4 = c(5, 55))
+
+  expect_error(check_data(model, cbind(counts, stimulus = c(0L, NA)), formula),
+               "1 of 2 values are NA")
+  expect_error(check_data(model, cbind(counts, stimulus = c(1L, 1L)), formula),
+               "stimulus")
+})
+
 test_that("sdt_rating check_data validates stimulus coding", {
   model <- sdt_rating(c("r1", "r2", "r3", "r4"), "stimulus")
   formula <- bmf(d ~ 1, criterion ~ 1, spacing ~ 1)
@@ -319,6 +330,11 @@ test_that("dsdt_rating validates inputs", {
                 d = 1.5, thresholds = c(-0.5, 0, 0.5)),
     "K - 1"
   )
+  expect_error(
+    dsdt_rating(counts = c(NA, 20, 30, 40), stimulus = 1,
+                d = 1.5, thresholds = c(-0.5, 0, 0.5)),
+    "must not contain NA"
+  )
 })
 
 test_that("dsdt_rating works for all distributions", {
@@ -395,10 +411,10 @@ test_that("sdt_rating_logmu is vectorized and preserves the draw shape", {
   expect_equal(as.vector(out), ref, tolerance = 1e-12)
 })
 
-test_that("log_ratio requires n_ratings >= 4", {
+test_that("log_ratio requires at least 4 rating categories", {
   expect_error(sdt_rating(c("r1", "r2", "r3"), "stimulus",
                           threshold_type = "log_ratio"),
-               "n_ratings >= 4")
+               "at least 4 rating categories")
 })
 
 test_that("K = 3 softmax reduces to a single symmetric interval", {

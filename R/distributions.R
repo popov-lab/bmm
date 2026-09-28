@@ -3144,6 +3144,7 @@ dsdt_rating <- function(counts, stimulus, d, thresholds,
   thr <- rbind(thresholds)
   stopif(ncol(thr) != K - 1,
          "thresholds must have length K - 1 = {K - 1}")
+  stopif(anyNA(counts), "counts must not contain NA")
   stopif(any(counts < 0), "counts must be non-negative")
 
   n <- max(nrow(counts), length(d), length(sdratio), length(stimulus))

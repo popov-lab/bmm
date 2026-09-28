@@ -15,7 +15,7 @@
 # exp(spacing) and exp(delta) -- so its sd default follows sdratio's rate 2
 # rather than d's rate 1: at rate 2 an individual's spacing stays within a
 # factor of about 2.8 of the group value at the 95% quantile, at rate 1 within
-# a factor of 8 (see local/sdt_sd_priors/).
+# a factor of 8.
 .sdt_threshold_parameter_parts <- function(n_ratings, threshold_type) {
   parameters <- list()
   default_priors <- list()
@@ -80,12 +80,11 @@
 ############################################################################# !
 
 .model_sdt_rating <- function(response = NULL, stimulus = NULL,
-                              dist = "normal", n_ratings = NULL,
+                              dist = "normal",
                               threshold_type = "parsimonious",
                               links = NULL, call = NULL, ...) {
-  if (is.null(n_ratings) && length(response) > 1) {
-    n_ratings <- length(response)
-  }
+  # one count column per category, so the columns fix the number of categories
+  n_ratings <- length(response)
 
   parameters <- list(
     d = paste0(
@@ -101,8 +100,8 @@
   # sd rates as in sdt_yn, so the same subjects shrink the same way whichever
   # SDT model they are fitted with: rate 1 for the sensitivity d, whose
   # between-subject SD is ~0.6 on broeder_schuetz_2009_e3 and 0.30 on
-  # meyer_grant_jakob_2025, and rate 2 for criterion (~0.15 there, 0.29 in the
-  # 50-subject cdp values in local/) and for the log-scale sdratio.
+  # meyer_grant_jakob_2025, and rate 2 for criterion (~0.15 there) and for the
+  # log-scale sdratio.
   default_priors <- list(
     d = list(main = "normal(1, 1)", effects = "normal(0, 0.5)", sd = "exponential(1)"),
     criterion = list(main = "normal(0, 1.5)", effects = "normal(0, 0.5)", sd = "exponential(2)")
@@ -118,10 +117,9 @@
     "Log SD ratio: the log of the signal-to-noise standard deviation ratio, ",
     "so exp(sdratio) is the ratio itself and 0 means equal variance"
   )
-  # Matches sdt_yn and sdt_ranking: on the log scale, normal(0, 0.3) covers
-  # ratios in [0.56, 1.80] at 95%, spanning the empirical recognition range.
+  # Identical to sdt_yn's, whose comment gives the empirical grounds.
   default_priors$sdratio <- list(
-    main = "normal(0, 0.3)", effects = "normal(0, 0.15)", sd = "exponential(2)"
+    main = "normal(0, 0.3)", effects = "normal(0, 0.3)", sd = "exponential(2)"
   )
   param_links$sdratio <- "identity"
 
@@ -208,8 +206,6 @@ settable_links.sdt_rating <- function(model) {
 #'   "definitely signal".
 #' @param stimulus The name of the variable coding the stimulus type.
 #'   Must be coded as 0 (noise/new) and 1 (signal/old).
-#' @param n_ratings Integer. Number of response categories. When `response`
-#'   is a character vector, defaults to its length. Must be > 2.
 #' @param dist The distribution assumed for the latent evidence, given here by
 #'   its cumulative distribution function. One of:
 #'   \itemize{
@@ -281,7 +277,6 @@ settable_links.sdt_rating <- function(model) {
 #' )
 #' }
 sdt_rating <- function(response, stimulus,
-                       n_ratings = NULL,
                        dist = c("normal", "gumbel_min", "gumbel_max", "logistic"),
                        threshold_type = c("parsimonious", "equidistant",
                                           "log_distance", "log_ratio",
@@ -292,24 +287,18 @@ sdt_rating <- function(response, stimulus,
   dist <- match.arg(dist)
   threshold_type <- match.arg(threshold_type)
 
-  if (length(response) > 1 && is.null(n_ratings)) {
-    n_ratings <- length(response)
-  }
-
-  stopif(is.null(n_ratings) || n_ratings <= 2,
-         "Rating models require n_ratings > 2 (or pass a response vector with > 2 columns)")
-
-  stopif(threshold_type == "log_ratio" && n_ratings < 4,
-         "log_ratio thresholds require n_ratings >= 4 (the anchor ratio needs an interval above the criterion)")
-
-  if (length(response) > 1) {
-    stopif(n_ratings != length(response),
-           "n_ratings ({n_ratings}) must match the number of response columns ({length(response)})")
-  }
+  stopif(length(response) <= 2,
+         "response must name more than 2 rating-count columns, one per category")
+  # each column name becomes part of a brms parameter name (mu<column>)
+  unusable <- response[grepl("[._]", response)]
+  stopif(length(unusable) > 0,
+         "Response column names must not contain '.' or '_', because brms \\
+         builds a parameter name from each of them. Rename {collapse_comma(unusable)}")
+  stopif(threshold_type == "log_ratio" && length(response) < 4,
+         "log_ratio thresholds require at least 4 rating categories (the anchor ratio needs an interval above the criterion)")
 
   .model_sdt_rating(response = response, stimulus = stimulus,
-                    dist = dist, n_ratings = n_ratings,
-                    threshold_type = threshold_type,
+                    dist = dist, threshold_type = threshold_type,
                     links = links, call = call, ...)
 }
 
@@ -321,11 +310,7 @@ sdt_rating <- function(response, stimulus,
 #' @export
 check_data.sdt_rating <- function(model, data, formula) {
   stim_var <- model$other_vars$stimulus
-  stopif(!stim_var %in% colnames(data),
-         "Stimulus variable '{stim_var}' missing in the data")
-  stim_vals <- data[[stim_var]]
-  stopif(!is.numeric(stim_vals) || !all(stim_vals %in% c(0, 1)),
-         "Stimulus variable '{stim_var}' must be coded as 0 (noise) and 1 (signal)")
+  data[[stim_var]] <- .validate_sdt_stimulus(data, stim_var)
 
   resp_cols <- model$resp_vars$response
   .validate_sdt_count_cols(data, resp_cols)

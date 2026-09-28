@@ -7,7 +7,6 @@
 sdt_rating(
   response,
   stimulus,
-  n_ratings = NULL,
   dist = c("normal", "gumbel_min", "gumbel_max", "logistic"),
   threshold_type = c("parsimonious", "equidistant", "log_distance", "log_ratio",
     "softmax"),
@@ -22,9 +21,6 @@ counts per rating category, ordered from "definitely noise" to
 
 \item{stimulus}{The name of the variable coding the stimulus type.
 Must be coded as 0 (noise/new) and 1 (signal/old).}
-
-\item{n_ratings}{Integer. Number of response categories. When \code{response}
-is a character vector, defaults to its length. Must be > 2.}
 
 \item{dist}{The distribution assumed for the latent evidence, given here by
 its cumulative distribution function. One of:
@@ -120,7 +116,7 @@ Categories should be ordered: 1 = 'definitely noise' to K = 'definitely signal'
 \item \code{sdratio}:
 \itemize{
 \item \code{main}: normal(0, 0.3)
-\item \code{effects}: normal(0, 0.15)
+\item \code{effects}: normal(0, 0.3)
 \item \code{sd}: exponential(2)
 }
 }

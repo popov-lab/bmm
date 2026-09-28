@@ -105,7 +105,9 @@ test_that("sdratio priors agree across the SDT models", {
   yn <- sdt_yn("n_old", "stimulus", "n_trials")$default_priors$sdratio
   rk <- sdt_ranking(paste0("rank", 1:4), m = 4,
                     dist = "normal")$default_priors$sdratio
+  rt <- sdt_rating(paste0("r", 1:4), "stimulus")$default_priors$sdratio
   expect_identical(yn, rk)
+  expect_identical(yn, rt)
 })
 
 test_that("quantile functions invert their cdfs", {
