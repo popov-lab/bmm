@@ -178,7 +178,7 @@ rows <- lapply(sdt_models, function(m) {
     `Response format` = m$format,
     Model = model,
     `dist` = paste(eval(f$dist), collapse = ", "),
-    `Unequal variance` = m$uv,
+    `Unequal-variance parameter` = m$uv,
     check.names = FALSE
   )
 })
@@ -262,8 +262,9 @@ model <- sdt_yn(
 ```
 
 If your data has one row per trial instead of counts, you can pass it as is:
-the column named in `response` then holds `0` or `1`, and the column named in
-`n_trials` holds `1` on every row. We leave `dist` at its default, `"normal"`.
+the column named in `response` then holds `0` or `1`, the column named in
+`n_trials` holds `1` on every row, and `stimulus` codes the item of that
+trial as before. We leave `dist` at its default, `"normal"`.
 
 The model has two parameters. `d` is the sensitivity: the distance between
 the evidence distributions of old and new items. `criterion` is the response
@@ -296,11 +297,14 @@ explains the syntax in full, including how to fix a parameter to a constant.
 ## The fit
 
 `bmm()` takes the formula, the data and the model. Its `file` argument caches
-the fit on disk, which is how this page avoids refitting the model every time
-it is built; delete the file to refit. Everything else goes to `brms::brm()`,
-so you can set the number of chains, cores and iterations as you would there.
-The defaults are 4 chains of 2000 iterations, the first 1000 of each as
-warmup, which gives 4000 posterior draws:
+the fit on disk, in a folder that must already exist; this is how this page
+avoids refitting the model every time it is built, and deleting the file
+forces a refit. Everything else goes to `brms::brm()`, so you can set the
+number of chains, cores and iterations as you would there. A chain is one run
+of the sampler. Its first iterations, the warmup, tune the sampler and are
+discarded; the remaining iterations are the posterior draws from which every
+estimate below is computed. The defaults are 4 chains of 2000 iterations,
+the first 1000 of each as warmup, which gives 4000 posterior draws:
 
 ```{r fit, results = "hide", message = FALSE}
 fit <- bmm(
@@ -322,22 +326,27 @@ convergence diagnostics you know from `brms`:
 summary(fit)
 ```
 
-The first block gives the standard deviations of the participant-level
-effects. The second block gives the population-level estimates: `d_Intercept`
-is the sensitivity averaged over participants, and the five `criterion`
-coefficients are the criteria of the base-rate conditions. Both parameters
-use an identity link here, so the estimates are on the natural scale of the
-model. `l-95% CI` and `u-95% CI` are the bounds of the 95% credible interval.
-The last block lists `sdratio` at its fixed value of 0; the parameter is on
-a log scale, so 0 means a ratio of 1, that is, equal variances. In the summary
-above, the criterion decreases from `br1` to `br5`. That is, participants say
-"old" more readily the more old items they expect, which is what the
-manipulation was meant to do, while sensitivity is one number for all
-conditions because we modeled it that way.
+Each row is named after a parameter and the predictor it belongs to. The
+first block, headed "Multilevel Hyperparameters", gives the standard
+deviations of the participant-level effects. The second block gives the
+population-level estimates: `d_Intercept` is the sensitivity averaged over
+participants, and the five `criterion` coefficients are the criteria of the
+base-rate conditions. Both parameters use an identity link here, so the
+estimates are on the natural scale of the model. `Estimate` is the posterior
+mean, `Est.Error` the posterior standard deviation, and `l-95% CI` and
+`u-95% CI` bound the 95% credible interval, the range that holds the
+parameter with 95% probability given the data and the priors. The last block
+lists `sdratio` at its fixed value of 0, which the `Formula` block shows as
+`sdratio = 0`; the parameter is on a log scale, so 0 means a ratio of 1, that
+is, equal variances. In the summary above, the criterion decreases from `br1`
+to `br5`. That is, participants say "old" more readily the more old items
+they expect, which is what the manipulation was meant to do, while
+sensitivity is one number for all conditions because we modeled it that way.
 
 Before you interpret an estimate, check that every `Rhat` is below 1.01 and
 that `Bulk_ESS` and `Tail_ESS`, the effective sample sizes, are above 400. If
-they are not, raise `iter` or look at the
+they are not, raise the number of iterations, for example with
+`bmm(..., iter = 4000)`, or look at the
 [Stan guidance on runtime warnings](https://mc-stan.org/misc/warnings.html).
 
 A posterior predictive check compares the observed counts with counts

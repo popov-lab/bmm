@@ -161,19 +161,21 @@ remotes::install_github("popov-lab/bmm@v0.0.1", upgrade = "never")
 ## Fit your first model
 
 A fit takes three things: a model object that names the columns of your
-data, a formula for each parameter, and the data. Here we fit a yes/no
-signal detection model to the recognition data of Broeder and Schuetz
-(2009) that ships with the package. Its two parameters are the
-sensitivity `d` and the response `criterion`. The data has five
-conditions that varied the proportion of old items, so we estimate one
-criterion per condition (`0 + condition`), and we let both parameters
-vary between participants (`(1 | id)`):
+data, a formula for each parameter written with `bmf()` (short for
+`bmmformula()`), and the data. Here we fit a yes/no signal detection
+model to the recognition data of Broeder and Schuetz (2009) that ships
+with the package. Its two parameters are the sensitivity `d` and the
+response `criterion`. The data has five conditions that varied the
+proportion of old items, so we estimate one criterion per condition
+(`0 + condition`), and we let both parameters vary between participants
+(`(1 | id)`):
 
 ``` r
 library(bmm)
 
-# n_old counts the "old" responses per participant, condition and stimulus
-# type; stimulus is 1 for old items and 0 for new items
+# one row per participant, condition and stimulus type: n_old counts the
+# "old" responses in that cell, n_trials the items shown, and stimulus is 1
+# for old items and 0 for new items
 model <- sdt_yn(
   response = "n_old",
   stimulus = "stimulus",
