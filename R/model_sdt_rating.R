@@ -178,6 +178,14 @@ settable_links.sdt_rating <- function(model) {
   c("d", "criterion")
 }
 
+# the links are applied by substituting the inverse link into the multinomial
+# formula (.sdt_rating_logmu_args), so the model can honour inv_link()'s links,
+# not every link a brms family can emit
+#' @exportS3Method
+settable_link_functions.sdt_rating <- function(model) {
+  eval(formals(inv_link)$link)
+}
+
 
 #' @title Confidence Rating Signal Detection Theory Model
 #' @name sdt_rating
@@ -231,7 +239,12 @@ settable_links.sdt_rating <- function(model) {
 #'       the average interval size, while softmax-transformed delta parameters
 #'       allocate interval widths smoothly across the scale.
 #'   }
-#' @param links A named list of link functions for the parameters.
+#' @param links A named list of link functions for the parameters, e.g.
+#'   `links = list(d = "log")`. Only `d` and `criterion` can be set, to
+#'   `"identity"`, `"log"`, `"softplus"`, `"logit"` or `"probit"`. `sdratio`
+#'   and the threshold parameters keep their identity links, because the model
+#'   reads each of them through `exp()` and fixes `sdratio` at 0 for equal
+#'   variance.
 #' @param ... used internally for testing, ignore it
 #' @return An object of class `bmmodel`
 #' @references
@@ -351,9 +364,12 @@ check_data.sdt_rating <- function(model, data, formula) {
 # (threshold types without spacing ignore it).
 .sdt_rating_logmu_args <- function(model) {
   has_spacing <- "spacing" %in% names(model$parameters)
+  # d and criterion reach the kernel on the natural scale, so a non-identity
+  # link is inverted here, as apply_links() does for m3
   c(model$other_vars$n_ratings, .sdt_dist_id(model$other_vars$dist),
     match(model$other_vars$threshold_type, .sdt_threshold_types),
-    "d", "criterion",
+    deparse(inv_link("d", model$links$d)),
+    deparse(inv_link("criterion", model$links$criterion)),
     if (has_spacing) "spacing" else "0", "sdratio",
     model$other_vars$stimulus, .sdt_threshold_delta_names(model))
 }

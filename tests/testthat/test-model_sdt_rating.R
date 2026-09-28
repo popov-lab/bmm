@@ -119,6 +119,13 @@ test_that("sdt_rating refuses a link on sdratio or a threshold parameter", {
   expect_error(check_links(model), "link of 'spacing' cannot be changed")
 })
 
+test_that("sdt_rating offers only the links it can invert in its formula", {
+  expect_error(
+    sdt_rating(c("r1", "r2", "r3", "r4"), "stimulus", links = list(d = "sqrt")),
+    "Unknown link function"
+  )
+})
+
 test_that("sdt_rating gives every parameter an sd default prior", {
   for (tt in c("parsimonious", "log_distance", "softmax")) {
     model <- sdt_rating(paste0("r", 1:5), "stimulus", threshold_type = tt)
@@ -433,6 +440,34 @@ test_that("K = 3 softmax reduces to a single symmetric interval", {
 ############################################################################# !
 # FORMULA CONSTRUCTION TESTS                                              ####
 ############################################################################# !
+
+test_that("bmf2bf maps every rating category to its own logit", {
+  # names that do not sort in category order, so a mapping by name or by sorted
+  # position would show up as a shifted category index
+  cats <- c("surenew", "new", "old", "sureold")
+  bf <- bmf2bf(sdt_rating(cats, "stimulus"), bmf(d ~ 1))
+  expect_match(deparse(bf$formula, width.cutoff = 500),
+               "sdt_rating_logmu(1, 4,", fixed = TRUE)
+  for (k in 2:4) {
+    pform <- deparse(bf$pforms[[paste0("mu", cats[k])]], width.cutoff = 500)
+    expect_match(pform, paste0("sdt_rating_logmu(", k, ", 4,"), fixed = TRUE)
+  }
+})
+
+test_that("a link on d or criterion is inverted inside the rating formula", {
+  # the multinomial family has no link of its own for d and criterion, so a
+  # link the user sets reaches the kernel only through the formula
+  bf <- bmf2bf(sdt_rating(paste0("r", 1:4), "stimulus",
+                          links = list(d = "log", criterion = "softplus")),
+               bmf(d ~ 1))
+  for (f in c(list(bf$formula), bf$pforms[paste0("mur", 2:4)])) {
+    txt <- paste(deparse(f, width.cutoff = 500), collapse = "")
+    expect_match(txt, "exp(d)", fixed = TRUE)
+    expect_match(txt, "log1p_exp(criterion)", fixed = TRUE)
+  }
+  bf <- bmf2bf(sdt_rating(paste0("r", 1:4), "stimulus"), bmf(d ~ 1))
+  expect_false(grepl("exp(d)", deparse(bf$formula, width.cutoff = 500), fixed = TRUE))
+})
 
 test_that("sdt_rating produces valid stancode with parsimonious thresholds", {
   dat <- sim_rating(3, 50, d = 1.5, criterion = 0, n_ratings = 4,

@@ -49,7 +49,12 @@ the average interval size, while softmax-transformed delta parameters
 allocate interval widths smoothly across the scale.
 }}
 
-\item{links}{A named list of link functions for the parameters.}
+\item{links}{A named list of link functions for the parameters, e.g.
+\code{links = list(d = "log")}. Only \code{d} and \code{criterion} can be set, to
+\code{"identity"}, \code{"log"}, \code{"softplus"}, \code{"logit"} or \code{"probit"}. \code{sdratio}
+and the threshold parameters keep their identity links, because the model
+reads each of them through \code{exp()} and fixes \code{sdratio} at 0 for equal
+variance.}
 
 \item{...}{used internally for testing, ignore it}
 }
