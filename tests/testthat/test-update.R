@@ -328,6 +328,7 @@ stored_frame_cases <- function() {
     n_correct = c(80, 55, 78, 60, 85, 52, 81, 58), n_trials = 100,
     n_afc = rep(c(2, 4), 4), cond = factor(rep(c("a", "b"), each = 4))
   )
+  ranking_data <- meyer_grant_jakob_2025[as.integer(meyer_grant_jakob_2025$id) <= 4, ]
 
   list(
     cswald = list(
@@ -392,6 +393,18 @@ stored_frame_cases <- function() {
     sdt_mafc_m_predictor = list(
       model = sdt_mafc("n_correct", "n_trials", m = "n_afc"),
       formula = bmf(d ~ 1 + n_afc), data = mafc_data
+    ),
+    sdt_ranking = list(
+      model = sdt_ranking(paste0("rank", 1:5), m = 5),
+      formula = bmf(d ~ 1), data = ranking_data[ranking_data$set_size == 5, ]
+    ),
+    sdt_ranking_m_column = list(
+      model = sdt_ranking(paste0("rank", 1:5), m = "set_size", dist = "normal"),
+      formula = bmf(d ~ 1, sdratio ~ 1), data = ranking_data
+    ),
+    sdt_ranking_m_predictor = list(
+      model = sdt_ranking(paste0("rank", 1:5), m = "set_size"),
+      formula = bmf(d ~ 1 + set_size), data = ranking_data
     )
   )
 }
@@ -481,6 +494,14 @@ test_that("an m column rebuilt for check_data() stays out of the model frame", {
   data <- check_stored_data(case$model, fit$data, fit$bmm$user_formula)
   expect_false("n_afc" %in% colnames(data))
   expect_equal(data$m_afc, as.integer(case$data$n_afc))
+
+  case <- stored_frame_cases()$sdt_ranking_m_column
+  fit <- stored_frame_fit(case)
+  expect_false("set_size" %in% colnames(fit$data))
+  data <- check_stored_data(case$model, fit$data, fit$bmm$user_formula)
+  expect_false("set_size" %in% colnames(data))
+  expect_equal(data$max_rank, as.numeric(case$data$set_size))
+  expect_equal(unname(data$Y), unname(as.matrix(case$data[paste0("rank", 1:5)])))
 })
 
 test_that("every column a revert method rebuilds is dropped again", {

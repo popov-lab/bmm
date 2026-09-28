@@ -309,6 +309,23 @@ revert_check_data.sdt_mafc <- function(model, data) {
   NextMethod("revert_check_data")
 }
 
+#' @exportS3Method
+revert_check_data.sdt_ranking <- function(model, data) {
+  resp_cols <- model$resp_vars$response
+  m <- model$other_vars$m
+  data[resp_cols] <- as.data.frame(unclass(data$Y)[, resp_cols, drop = FALSE])
+  # max_rank is check_data()'s numeric copy of the set-size column, which brms
+  # keeps only when a formula predicts something with it
+  if (is.character(m) && not_in(m, colnames(data))) {
+    data[[m]] <- data$max_rank
+    attr(data, "rebuilt") <- c(attr(data, "rebuilt"), m)
+  }
+  data$Y <- NULL
+  data$nTrials <- NULL
+  data$max_rank <- NULL
+  NextMethod("revert_check_data")
+}
+
 # brms::update.brmsfit() merges the fit's stored control key by key with the one
 # the call names, and keeps none of it when backend or algorithm changes.
 # update.bmmfit() always names a control, so the rule is applied here. rstan fits
