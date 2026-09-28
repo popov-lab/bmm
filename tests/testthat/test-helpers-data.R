@@ -143,7 +143,7 @@ test_that("check_var_set_size rejects invalid input", {
 })
 
 test_that("check_data() returns a data.frame()", {
-  # sdt_rating needs one response column per rating category plus n_ratings, so
+  # sdt_rating needs one response column per rating category, so
   # it cannot be exercised with the shared single `response` column used here; it
   # is covered with proper count data in test-model_sdt_rating.R.
   model_names <- setdiff(supported_models(print_call = FALSE), "sdt_rating")
