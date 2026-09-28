@@ -86,10 +86,18 @@
 # and it is fixed at 0, which means equal variance only while the link is
 # identity. Any other link both rescales the fixed value and applies a second
 # transformation on top of the exp(), so the model would sample a ratio the
-# user never asked for. `d` fixes nothing, so its link stays settable.
+# user never asked for.
+#
+# `d` is settable only for gumbel_min, whose closed-form kernel is exact far
+# beyond any plausible d. The Gaussian quadrature's nodes stop short of the
+# last rank's integrand peak once d is large: at equal variance and set sizes
+# up to 8 the Stan kernel is off by several nats at d = 15 and returns -Inf
+# from d = 30. Under the identity link the normal(1, 1) prior never gets
+# there, but under a log link it puts 4.4% of its mass above d = 15 and 0.8%
+# above d = 30.
 #' @exportS3Method
 settable_links.sdt_ranking <- function(model) {
-  "d"
+  if (model$other_vars$dist == "gumbel_min") "d" else character(0)
 }
 
 
@@ -155,7 +163,11 @@ settable_links.sdt_ranking <- function(model) {
 #'     \item "normal": Gaussian, \eqn{\Phi(x)} (supports unequal variance via
 #'       `sdratio`)
 #'   }
-#' @param links A named list of link functions for the parameters.
+#' @param links A named list of link functions for the parameters. Only the
+#'   link of `d` can be changed, and only for `dist = "gumbel_min"`: with
+#'   `dist = "normal"` the quadrature loses accuracy at the large `d` a
+#'   log link reaches, so `d` keeps the identity link. `sdratio` always
+#'   keeps the identity link.
 #' @param ... used internally for testing, ignore it
 #' @return An object of class `bmmodel`
 #' @references

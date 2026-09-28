@@ -53,14 +53,23 @@ test_that("sdt_ranking has correct links and accepts custom links", {
 
 test_that("sdt_ranking refuses any link on sdratio, and any unknown target", {
   # Stan reads exp(sdratio), and the fixed 0 means equal variance only on the
-  # identity link, so sdratio cannot be relinked; d can.
-  expect_equal(settable_links(sdt_ranking(ranks4, m = 4, dist = "normal")), "d")
+  # identity link, so sdratio cannot be relinked. d can, but only for
+  # gumbel_min: the Gaussian quadrature fails at the d a log link reaches.
+  expect_equal(settable_links(sdt_ranking(ranks4, m = 4)), "d")
+  expect_equal(settable_links(sdt_ranking(ranks4, m = 4, dist = "normal")),
+               character(0))
   for (link in c("log", "softplus", "logit")) {
     expect_error(
       sdt_ranking(ranks4, m = 4, dist = "normal", links = list(sdratio = link)),
       "link of 'sdratio' cannot be changed"
     )
+    expect_error(
+      sdt_ranking(ranks4, m = 4, dist = "normal", links = list(d = link)),
+      "link of 'd' cannot be changed"
+    )
   }
+  expect_silent(sdt_ranking(ranks4, m = 4, dist = "normal",
+                            links = list(d = "identity")))
   expect_silent(sdt_ranking(ranks4, m = 4, dist = "normal",
                             links = list(sdratio = "identity")))
   expect_error(
