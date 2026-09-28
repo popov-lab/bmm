@@ -427,7 +427,7 @@ stored_frame_cases <- function() {
     ),
     sdt_rating_deltas = list(
       model = sdt_rating(paste0("r", 1:5), "stimulus", threshold_type = "log_distance"),
-      formula = bmf(d ~ 1, criterion ~ 1, delta1 ~ 1, delta2 ~ 1, delta4 ~ 1),
+      formula = bmf(d ~ 1, criterion ~ 1, delta1 ~ 1, delta2 ~ 1, delta3 ~ 1),
       data = rating_data
     )
   )

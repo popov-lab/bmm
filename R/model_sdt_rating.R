@@ -9,17 +9,21 @@
                           "log_ratio", "softmax")
 
 # Parameter spec for one threshold parameterization. parsimonious/equidistant
-# need a single spacing; log_distance/log_ratio need K-2 distance deltas;
-# softmax needs spacing plus K-3 allocation deltas.
+# need a single spacing; log_distance/log_ratio need K-2 interval deltas, named
+# in interval order (delta_i lies between thresholds i and i + 1); softmax needs
+# spacing plus K-3 allocation deltas.
 # Every threshold parameter is a log-scale quantity -- the Stan builders read
 # exp(spacing) and exp(delta) -- so its sd default follows sdratio's rate 2
 # rather than d's rate 1: at rate 2 an individual's spacing stays within a
-# factor of about 2.8 of the group value at the 95% quantile, at rate 1 within
-# a factor of 8.
+# factor of about 2.8 of the group value at the one-sided 95% quantile (90%
+# central), at rate 1 within a factor of 8.
 .sdt_threshold_parameter_parts <- function(n_ratings, threshold_type) {
   parameters <- list()
   default_priors <- list()
   param_links <- list()
+  delta_prior <- list(
+    main = "normal(0, 1)", effects = "normal(0, 0.5)", sd = "exponential(2)"
+  )
 
   if (threshold_type %in% c("equidistant", "parsimonious")) {
     parameters$spacing <- paste0(
@@ -30,18 +34,21 @@
       main = "normal(0, 0.5)", effects = "normal(0, 0.3)", sd = "exponential(2)"
     )
     param_links$spacing <- "identity"
-  } else if (threshold_type %in% c("log_distance", "log_ratio")) {
-    n_deltas <- n_ratings - 2L
-    # skip the same middle threshold as the builders ((K - 1) %/% 2 + 1), so
-    # the delta labels name the threshold they control for odd K
-    mid <- (n_ratings - 1L) %/% 2L + 1L
-    for (i in seq_len(n_deltas)) {
-      idx <- if (i < mid) i else i + 1L
-      pname <- paste0("delta", idx)
-      parameters[[pname]] <- glue("Threshold parameter for threshold {idx}")
-      default_priors[[pname]] <- list(
-        main = "normal(0, 1)", effects = "normal(0, 0.5)", sd = "exponential(2)"
+  } else if (threshold_type == "log_distance") {
+    for (i in seq_len(n_ratings - 2L)) {
+      pname <- paste0("delta", i)
+      parameters[[pname]] <- glue(
+        "Log width of the interval between thresholds {i} and {i + 1}"
       )
+      default_priors[[pname]] <- delta_prior
+      param_links[[pname]] <- "identity"
+    }
+  } else if (threshold_type == "log_ratio") {
+    labels <- .sdt_log_ratio_delta_labels(n_ratings)
+    for (i in seq_along(labels)) {
+      pname <- paste0("delta", i)
+      parameters[[pname]] <- labels[i]
+      default_priors[[pname]] <- delta_prior
       param_links[[pname]] <- "identity"
     }
   } else if (threshold_type == "softmax") {
@@ -58,16 +65,41 @@
     for (i in seq_len(n_deltas)) {
       pname <- paste0("delta", i)
       parameters[[pname]] <- glue(
-        "Softmax threshold allocation parameter for interval {i}"
+        "Softmax threshold allocation parameter for interval {i}, relative ",
+        "to the last interval"
       )
-      default_priors[[pname]] <- list(
-        main = "normal(0, 1)", effects = "normal(0, 0.5)", sd = "exponential(2)"
-      )
+      default_priors[[pname]] <- delta_prior
       param_links[[pname]] <- "identity"
     }
   }
 
   nlist(parameters, default_priors, param_links)
+}
+
+# The log_ratio deltas are not exchangeable (see .sdt_log_ratio_widths()), so
+# each label names the role its interval plays.
+.sdt_log_ratio_delta_labels <- function(n_ratings) {
+  n_gaps <- n_ratings - 2L
+  labels <- character(n_gaps)
+  if (n_ratings %% 2L == 0L) {
+    m <- n_ratings %/% 2L
+    labels[m] <- "Log spread: width of the interval just above the criterion"
+    labels[m - 1L] <- paste0(
+      "Log ratio of the interval just below the criterion to the spread above it"
+    )
+    first <- c(rep(m - 1L, max(0L, m - 2L)), rep(m, max(0L, n_gaps - m)))
+    rest <- setdiff(seq_len(n_gaps), c(m - 1L, m))
+  } else {
+    g <- (n_ratings - 1L) %/% 2L
+    labels[g] <- "Log spread: width of the middle category, centred on the criterion"
+    labels[c(g - 1L, g + 1L)] <- glue(
+      "Log ratio of interval {c(g - 1L, g + 1L)} to the middle category"
+    )
+    rest <- setdiff(seq_len(n_gaps), c(g - 1L, g, g + 1L))
+    first <- ifelse(rest < g, g - 1L, g + 1L)
+  }
+  labels[rest] <- glue("Log ratio of interval {rest} to interval {first}")
+  labels
 }
 
 .sdt_threshold_delta_names <- function(object) {
@@ -93,8 +125,9 @@
       "distributions in units of their root-mean-square SD"
     ),
     criterion = paste0(
-      "Response bias: location of the decision boundary on the ",
-      "noise-standardized axis"
+      "Response bias, on the noise-standardized axis: the middle threshold ",
+      "(the old/new boundary) for an even number of categories, the centre ",
+      "of the middle category for an odd number"
     )
   )
   # sd rates as in sdt_yn, so the same subjects shrink the same way whichever
@@ -209,6 +242,23 @@ settable_link_functions.sdt_rating <- function(model) {
 #' The `criterion` and the confidence thresholds are **not** rescaled. They stay
 #' on the noise-standardized axis, so under unequal variance they and `d` are
 #' in different units.
+#'
+#' @section Where `criterion` sits:
+#' Every `threshold_type` places `criterion` the same way. With an even number
+#' of categories K it is the middle threshold, the boundary between the K/2
+#' "noise" categories and the K/2 "signal" categories. With an odd number there
+#' is no such boundary -- the middle category straddles it -- so `criterion` is
+#' the centre of that category, and the two thresholds around it sit half an
+#' interval below and above. A shift in `criterion` therefore moves the whole
+#' threshold set, and the threshold parameters (`spacing`, `delta`) describe
+#' its shape around that point.
+#'
+#' @section Identifying `sdratio`:
+#' Unlike [sdt_yn()], a rating design identifies `sdratio` from a single
+#' condition: the K - 1 thresholds give K - 1 operating points per condition,
+#' which trace the zROC whose slope is `1 / exp(sdratio)`. `sdratio ~ 1` on a
+#' one-condition dataset with K >= 3 categories is a legitimate fit; the
+#' identification caveats on the [sdt_yn()] page do not carry over.
 #' @param response A character vector of K column names containing response
 #'   counts per rating category, ordered from "definitely noise" to
 #'   "definitely signal".
@@ -230,14 +280,21 @@ settable_link_functions.sdt_rating <- function(model) {
 #'       Thresholds follow logit-spaced canonical positions (Selker et al.,
 #'       2019).
 #'     \item "equidistant": 2 parameters (criterion + spacing). Thresholds
-#'       are equally spaced around criterion.
-#'     \item "log_distance": K-2 parameters. Each threshold distance is
-#'       exp(delta), guaranteeing ordering (Paulewicz & Blaut, 2022).
-#'     \item "log_ratio": K-2 parameters. Threshold distances as ratios
-#'       (Paulewicz & Blaut, 2022).
-#'     \item "softmax": K-2 parameters. A shared spacing parameter controls
-#'       the average interval size, while softmax-transformed delta parameters
-#'       allocate interval widths smoothly across the scale.
+#'       are equally spaced, exp(spacing) apart.
+#'     \item "log_distance": K-2 parameters. `delta<i>` is the log width of
+#'       the interval between thresholds i and i + 1, so the intervals are
+#'       free and the ordering is guaranteed (Paulewicz & Blaut, 2022).
+#'     \item "log_ratio": K-2 parameters (Paulewicz & Blaut, 2022; the odd-K
+#'       form is bmm's). One interval is the spread, `exp(delta)`: for even K
+#'       the interval just above `criterion`, for odd K the middle category.
+#'       The first interval on the other side (even K) or on each side (odd K)
+#'       is a ratio times the spread, and every further interval a ratio
+#'       times the first interval on its side. The deltas are therefore not
+#'       exchangeable; `model$parameters` names the role of each.
+#'     \item "softmax": K-2 parameters. A shared spacing parameter sets the
+#'       mean interval width, exp(spacing), while K-3 delta parameters share
+#'       the total width out over the intervals through a softmax (each delta
+#'       is the log ratio of its interval to the last one).
 #'   }
 #' @param links A named list of link functions for the parameters, e.g.
 #'   `links = list(d = "log")`. Only `d` and `criterion` can be set, to

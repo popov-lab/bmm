@@ -39,14 +39,21 @@ its cumulative distribution function. One of:
 Thresholds follow logit-spaced canonical positions (Selker et al.,
 2019).
 \item "equidistant": 2 parameters (criterion + spacing). Thresholds
-are equally spaced around criterion.
-\item "log_distance": K-2 parameters. Each threshold distance is
-exp(delta), guaranteeing ordering (Paulewicz & Blaut, 2022).
-\item "log_ratio": K-2 parameters. Threshold distances as ratios
-(Paulewicz & Blaut, 2022).
-\item "softmax": K-2 parameters. A shared spacing parameter controls
-the average interval size, while softmax-transformed delta parameters
-allocate interval widths smoothly across the scale.
+are equally spaced, exp(spacing) apart.
+\item "log_distance": K-2 parameters. \verb{delta<i>} is the log width of
+the interval between thresholds i and i + 1, so the intervals are
+free and the ordering is guaranteed (Paulewicz & Blaut, 2022).
+\item "log_ratio": K-2 parameters (Paulewicz & Blaut, 2022; the odd-K
+form is bmm's). One interval is the spread, \code{exp(delta)}: for even K
+the interval just above \code{criterion}, for odd K the middle category.
+The first interval on the other side (even K) or on each side (odd K)
+is a ratio times the spread, and every further interval a ratio
+times the first interval on its side. The deltas are therefore not
+exchangeable; \code{model$parameters} names the role of each.
+\item "softmax": K-2 parameters. A shared spacing parameter sets the
+mean interval width, exp(spacing), while K-3 delta parameters share
+the total width out over the intervals through a softmax (each delta
+is the log ratio of its interval to the last one).
 }}
 
 \item{links}{A named list of link functions for the parameters, e.g.
@@ -86,7 +93,7 @@ Categories should be ordered: 1 = 'definitely noise' to K = 'definitely signal'
 \item \strong{Parameters:}
 \itemize{
 \item \code{d}: Sensitivity: d' under equal variance (the default). When sdratio is estimated, d is d_a, the distance between the signal and noise distributions in units of their root-mean-square SD
-\item \code{criterion}: Response bias: location of the decision boundary on the noise-standardized axis
+\item \code{criterion}: Response bias, on the noise-standardized axis: the middle threshold (the old/new boundary) for an even number of categories, the centre of the middle category for an odd number
 \item \code{spacing}: Threshold spacing: controls distance between adjacent thresholds (exp(spacing) ensures positive spacing)
 \item \code{sdratio}: Log SD ratio: the log of the signal-to-noise standard deviation ratio, so exp(sdratio) is the ratio itself and 0 means equal variance
 }
@@ -146,6 +153,27 @@ AUC-equivalent index once \code{sdratio} is estimated.
 The \code{criterion} and the confidence thresholds are \strong{not} rescaled. They stay
 on the noise-standardized axis, so under unequal variance they and \code{d} are
 in different units.
+}
+
+\section{Where \code{criterion} sits}{
+
+Every \code{threshold_type} places \code{criterion} the same way. With an even number
+of categories K it is the middle threshold, the boundary between the K/2
+"noise" categories and the K/2 "signal" categories. With an odd number there
+is no such boundary -- the middle category straddles it -- so \code{criterion} is
+the centre of that category, and the two thresholds around it sit half an
+interval below and above. A shift in \code{criterion} therefore moves the whole
+threshold set, and the threshold parameters (\code{spacing}, \code{delta}) describe
+its shape around that point.
+}
+
+\section{Identifying \code{sdratio}}{
+
+Unlike \code{\link[=sdt_yn]{sdt_yn()}}, a rating design identifies \code{sdratio} from a single
+condition: the K - 1 thresholds give K - 1 operating points per condition,
+which trace the zROC whose slope is \code{1 / exp(sdratio)}. \code{sdratio ~ 1} on a
+one-condition dataset with K >= 3 categories is a legitimate fit; the
+identification caveats on the \code{\link[=sdt_yn]{sdt_yn()}} page do not carry over.
 }
 
 \examples{

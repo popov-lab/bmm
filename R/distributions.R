@@ -2995,36 +2995,73 @@ rsdt_ranking <- function(n, n_trials, m, d, sdratio = 1,
 }
 
 
-# Assemble ordered thresholds from per-draw interval widths anchored at the
-# middle threshold: inc[, j] is the width of the interval between threshold j
-# and threshold j + 1. Returns an n-by-K1 matrix.
-.sdt_assemble_thresholds <- function(criterion, inc, mid, K1) {
+# Place K - 1 ordered thresholds from their K - 2 adjacent interval widths:
+# inc[, j] is the width of the interval between threshold j and threshold
+# j + 1. With an even number of categories the criterion is the middle
+# threshold (the old/new boundary). With an odd number there is no such
+# boundary -- the middle category straddles it -- so the criterion is the
+# centre of that category and the two thresholds around it sit half an
+# interval away. Returns an n-by-(K - 1) matrix. The Stan counterpart is
+# sdt_place_thresholds_rating() in sdt_rating_funs.stan.
+.sdt_assemble_thresholds <- function(criterion, inc, n_ratings) {
+  K1 <- n_ratings - 1L
   thr <- matrix(0, length(criterion), K1)
-  thr[, mid] <- criterion
-  if (mid < K1) {
-    thr[, (mid + 1L):K1] <- criterion +
-      matrixStats::rowCumsums(inc[, mid:(K1 - 1L), drop = FALSE])
+  if (n_ratings %% 2L == 0L) {
+    lo <- hi <- n_ratings %/% 2L
+    thr[, lo] <- criterion
+  } else {
+    lo <- (n_ratings - 1L) %/% 2L
+    hi <- lo + 1L
+    thr[, lo] <- criterion - inc[, lo] / 2
+    thr[, hi] <- criterion + inc[, lo] / 2
   }
-  if (mid > 1L) {
-    thr[, (mid - 1L):1L] <- criterion -
-      matrixStats::rowCumsums(inc[, (mid - 1L):1L, drop = FALSE])
+  if (hi < K1) {
+    thr[, (hi + 1L):K1] <- thr[, hi] +
+      matrixStats::rowCumsums(inc[, hi:(K1 - 1L), drop = FALSE])
+  }
+  if (lo > 1L) {
+    thr[, (lo - 1L):1L] <- thr[, lo] -
+      matrixStats::rowCumsums(inc[, (lo - 1L):1L, drop = FALSE])
   }
   thr
 }
 
+# Interval widths of the log_ratio parameterization (Paulewicz & Blaut, 2022,
+# for even K; the odd-K form is bmm's). One interval is the spread, exp(delta):
+# for even K the one just above the middle threshold, for odd K the middle
+# category itself. The first interval on the other side (even K) or on each
+# side (odd K) is a ratio times the spread, and every further interval is a
+# ratio times the first interval on its side, so the deltas are not
+# exchangeable. deltas is an n-by-(K - 2) matrix.
+.sdt_log_ratio_widths <- function(deltas, n_ratings) {
+  G <- n_ratings - 2L
+  inc <- exp(deltas)
+  if (n_ratings %% 2L == 0L) {
+    m <- n_ratings %/% 2L
+    inc[, m - 1L] <- inc[, m - 1L] * inc[, m]
+    if (m + 1L <= G) inc[, (m + 1L):G] <- inc[, (m + 1L):G, drop = FALSE] * inc[, m]
+    if (m - 2L >= 1L) inc[, 1L:(m - 2L)] <- inc[, 1L:(m - 2L), drop = FALSE] * inc[, m - 1L]
+  } else {
+    g <- (n_ratings - 1L) %/% 2L
+    inc[, g + 1L] <- inc[, g + 1L] * inc[, g]
+    inc[, g - 1L] <- inc[, g - 1L] * inc[, g]
+    if (g + 2L <= G) inc[, (g + 2L):G] <- inc[, (g + 2L):G, drop = FALSE] * inc[, g + 1L]
+    if (g - 2L >= 1L) inc[, 1L:(g - 2L)] <- inc[, 1L:(g - 2L), drop = FALSE] * inc[, g - 1L]
+  }
+  inc
+}
+
 # Build K-1 ordered thresholds from criterion plus a parameterization-specific
 # canonical spread. parsimonious/equidistant use exp(spacing) steps; the log_*
-# and softmax types place thresholds from positive distance/ratio deltas so the
+# and softmax types place thresholds from positive interval widths so the
 # ordering is guaranteed. Vectorized over draws: criterion/spacing may be
 # vectors and deltas an n-by-nd matrix (a vector describes a single draw).
 # Returns an n-by-(K-1) matrix, or a length-(K-1) vector for a single draw.
-# The middle index must match the Stan builders in sdt_rating_funs.stan
-# ((K_full - 1) %/% 2 + 1) so R-side prediction reproduces the likelihood for
-# odd K; identical for even K.
+# Where the criterion sits is the same for every type and is decided by
+# .sdt_assemble_thresholds(); the two closed forms below agree with it.
 .sdt_make_thresholds <- function(criterion, n_ratings, threshold_type,
                                  spacing = NULL, deltas = NULL) {
   K1 <- n_ratings - 1L
-  mid <- (n_ratings - 1L) %/% 2L + 1L
 
   n <- max(length(criterion), length(spacing),
            if (is.matrix(deltas)) nrow(deltas) else 0L)
@@ -3041,7 +3078,7 @@ rsdt_ranking <- function(n, n_trials, m, d, sdratio = 1,
   if (threshold_type %in% c("equidistant", "parsimonious")) {
     stopif(is.null(spacing), "spacing is required for {threshold_type} thresholds")
     canonical <- if (threshold_type == "equidistant") {
-      seq_len(K1) - mid
+      seq_len(K1) - n_ratings / 2
     } else {
       log(seq_len(K1) / (n_ratings - seq_len(K1)))
     }
@@ -3059,7 +3096,7 @@ rsdt_ranking <- function(n, n_trials, m, d, sdratio = 1,
 
     expl <- cbind(exp(deltas), 1)
     inc <- expl / rowSums(expl) * (n_ratings - 2L) * exp(spacing)
-    thr <- .sdt_assemble_thresholds(criterion, inc, mid, K1)
+    thr <- .sdt_assemble_thresholds(criterion, inc, n_ratings)
   } else if (threshold_type == "log_ratio") {
     stopif(is.null(deltas), "deltas is required for log_ratio thresholds")
     n_deltas <- n_ratings - 2L
@@ -3067,30 +3104,15 @@ rsdt_ranking <- function(n, n_trials, m, d, sdratio = 1,
            "deltas must have length n_ratings - 2 = {n_deltas}")
     stopif(n_ratings < 4L, "log_ratio thresholds require n_ratings >= 4")
 
-    # interval mid is the anchor spread; intervals above scale by it, the
-    # first interval below sets the below spread, and further intervals below
-    # scale by that (Paulewicz & Blaut, 2022)
-    inc <- exp(deltas)
-    spread_above <- inc[, mid]
-    if (mid + 1L <= K1 - 1L) {
-      inc[, (mid + 1L):(K1 - 1L)] <-
-        inc[, (mid + 1L):(K1 - 1L), drop = FALSE] * spread_above
-    }
-    if (mid > 1L) {
-      spread_below <- inc[, mid - 1L] * spread_above
-      inc[, mid - 1L] <- spread_below
-      if (mid - 2L >= 1L) {
-        inc[, 1L:(mid - 2L)] <- inc[, 1L:(mid - 2L), drop = FALSE] * spread_below
-      }
-    }
-    thr <- .sdt_assemble_thresholds(criterion, inc, mid, K1)
+    thr <- .sdt_assemble_thresholds(criterion, .sdt_log_ratio_widths(deltas, n_ratings),
+                                    n_ratings)
   } else {
     stopif(is.null(deltas), "deltas is required for log_distance thresholds")
     n_deltas <- n_ratings - 2L
     stopif(ncol(deltas) != n_deltas,
            "deltas must have length n_ratings - 2 = {n_deltas}")
 
-    thr <- .sdt_assemble_thresholds(criterion, exp(deltas), mid, K1)
+    thr <- .sdt_assemble_thresholds(criterion, exp(deltas), n_ratings)
   }
 
   if (n == 1L) thr[1L, ] else thr
