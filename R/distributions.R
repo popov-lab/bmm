@@ -2856,6 +2856,14 @@ rsdt_mafc <- function(n, n_trials, m, d,
 #'   with a smaller set size have structural zeros in the surplus columns,
 #'   matching the wide format [sdt_ranking()] expects.
 #'
+#' @section Parameter scales:
+#' These functions take `sdratio` as the ratio itself, while [sdt_ranking()]
+#' estimates its logarithm (0 = equal variance): a fitted `sdratio` of 0.375 is
+#' a ratio of `exp(0.375) = 1.455`, and passing `0.375` here instead asks for a
+#' signal distribution 2.7 times narrower than the noise. That is a legal
+#' value and raises no error, so exponentiate first. `d` carries across
+#' unchanged.
+#'
 #' @references
 #' Meyer-Grant, C. G., Kellen, D., Harding, S. M., & Singmann, H. (2026).
 #'   Extreme-value signal detection theory for recognition memory: The
