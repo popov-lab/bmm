@@ -2773,9 +2773,15 @@ rsdt_mafc <- function(n, n_trials, m, d,
 .ranking_prob_r <- function(d, rank_pos, m, dist = "gumbel_min",
                             sdratio = 0) {
   if (dist == "gumbel_min") {
-    e_neg_g <- exp(-d)
-    log_p <- -d + lgamma(m) + lgamma(rank_pos - 1 + e_neg_g) -
-             lgamma(rank_pos) - lgamma(m + e_neg_g)
+    # the gamma ratio of sdt_ranking_logp() telescoped into
+    # -d + lgamma(m) - lgamma(k) - sum_{j = k-1}^{m-1} log(j + exp(-d)), whose
+    # j = 0 term cancels the -d; as a difference of lgammas it sums to m, not
+    # 1, at d = -40. log(j + exp(-d)) is taken off whichever term dominates, so
+    # it survives d < -709, where exp(-d) overflows
+    log_p <- lgamma(m) - lgamma(rank_pos) - if (rank_pos > 1) d else 0
+    for (j in seq(max(rank_pos - 1, 1), length.out = m - max(rank_pos - 1, 1))) {
+      log_p <- log_p - (pmax(log(j), -d) + log1p(exp(-abs(log(j) + d))))
+    }
     exp(log_p)
   } else {
     n <- max(length(d), length(sdratio))

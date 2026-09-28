@@ -265,6 +265,108 @@ test_that("sdt_ranking_logmu R companion matches .ranking_all_probs_r and masks"
   }
 })
 
+test_that("the gumbel_min rank probabilities stay a distribution far out in d", {
+  # the untelescoped lgamma difference sums to m, not 1, at d = -40
+  for (m in c(3L, 5L, 8L)) {
+    for (d in c(-40, -30, 0, 30, 40)) {
+      p <- vapply(seq_len(m), function(k) {
+        bmm:::.ranking_prob_r(d, k, m, "gumbel_min")
+      }, numeric(1))
+      expect_true(all(p >= 0 & p <= 1), info = paste("m =", m, "d =", d))
+      expect_equal(sum(p), 1, tolerance = 1e-12,
+                   info = paste("m =", m, "d =", d))
+    }
+  }
+})
+
+test_that("the telescoped gumbel_min form is the gamma ratio of Meyer-Grant et al.", {
+  gamma_ratio <- function(d, k, m) {
+    e <- exp(-d)
+    exp(-d + lgamma(m) + lgamma(k - 1 + e) - lgamma(k) - lgamma(m + e))
+  }
+  d <- c(-5, -1, 0, 0.7, 2, 6)
+  for (m in c(2L, 4L, 7L)) {
+    for (k in seq_len(m)) {
+      expect_equal(bmm:::.ranking_prob_r(d, k, m, "gumbel_min"),
+                   gamma_ratio(d, k, m), tolerance = 1e-12,
+                   info = paste("m =", m, "rank =", k))
+    }
+  }
+})
+
+# The Stan kernels run through a fixed_param generated-quantities program, as
+# the ezdm parity tests do (expose_functions() links RcppParallel's libtbb and
+# fails inside the suite). sig_figs = 17 round-trips a double.
+ranking_stan_logmu <- function(grid, max_m) {
+  sc <- system.file("stan_chunks", package = "bmm")
+  funs <- paste(
+    read_lines2(file.path(sc, "sdt_dist_funs.stan")),
+    bmm:::.ranking_fill_quadrature(
+      read_lines2(file.path(sc, "sdt_ranking_funs.stan")),
+      max_m = max_m, free_sdratio = TRUE
+    ),
+    sep = "\n"
+  )
+  program <- paste0(
+    "functions {\n", funs, "\n}\n",
+    "data {\n  int<lower=1> N; array[N] int cat; vector[N] max_rank;\n",
+    "  vector[N] d; vector[N] sdratio; array[N] int dist;\n}\n",
+    "generated quantities {\n  vector[N] lp;\n  for (i in 1:N) {\n",
+    "    lp[i] = sdt_ranking_logmu(cat[i], max_rank[i], d[i], sdratio[i], dist[i]);\n",
+    "  }\n}\n"
+  )
+  fit <- cmdstanr::cmdstan_model(cmdstanr::write_stan_file(program))$sample(
+    data = c(list(N = nrow(grid)), as.list(grid)), fixed_param = TRUE,
+    chains = 1, iter_sampling = 1, iter_warmup = 0, refresh = 0,
+    show_messages = FALSE, sig_figs = 17
+  )
+  csv <- utils::read.csv(fit$output_files()[1], comment.char = "#",
+                         check.names = FALSE)
+  as.numeric(csv[1, paste0("lp.", seq_len(nrow(grid)))])
+}
+
+test_that("the Stan ranking kernels match their R counterparts", {
+  skip_on_cran()
+  skip_if_not_installed("cmdstanr")
+  skip_if(is.null(cmdstanr::cmdstan_version(error_on_NA = FALSE)))
+
+  max_m <- 5L
+  cells <- expand.grid(m = 2:max_m, d = c(-10, -3, 0, 1.3, 4, 10, 30),
+                       sdratio = log(c(0.5, 1, 1.8)), dist = 1:2)
+  # d = 10 already sits past a tenth of the default prior under a log link;
+  # beyond it the Gaussian branch's probability-space sum underflows. The
+  # Gumbel branch keeps the lgamma form in Stan, exact to 1e-10 from d = -10
+  cells <- cells[cells$dist == 2 | abs(cells$d) <= 10, ]
+  grid <- do.call(rbind, lapply(seq_len(nrow(cells)), function(i) {
+    data.frame(cells[rep(i, cells$m[i] + 1), ], cat = seq_len(cells$m[i] + 1))
+  }))
+  grid$sdratio[grid$dist == 2] <- 0
+
+  # the Gaussian reference is the textbook log-space integrand on the nodes
+  # Stan was given, so what remains is the kernel, not the quadrature rule
+  gh <- bmm:::.gh_rule(bmm:::.ranking_gh_n(max_m, TRUE))
+  r_logmu <- vapply(seq_len(nrow(grid)), function(i) {
+    g <- grid[i, ]
+    if (g$cat > g$m) return(-100)
+    if (g$dist == 2) {
+      return(log(bmm:::.ranking_prob_r(g$d, g$cat, g$m, "gumbel_min")))
+    }
+    r <- exp(g$sdratio)
+    eta <- g$d * sqrt((1 + r^2) / 2) + r * gh$nodes
+    lchoose(g$m - 1, g$cat - 1) + matrixStats::logSumExp(
+      log(gh$weights) + (g$m - g$cat) * pnorm(eta, log.p = TRUE) +
+        (g$cat - 1) * pnorm(eta, lower.tail = FALSE, log.p = TRUE))
+  }, numeric(1))
+
+  stan_logmu <- ranking_stan_logmu(
+    data.frame(cat = grid$cat, max_rank = grid$m, d = grid$d,
+               sdratio = grid$sdratio, dist = grid$dist),
+    max_m
+  )
+  expect_true(all(is.finite(stan_logmu)))
+  expect_lt(max(abs(stan_logmu - r_logmu)), 1e-10)
+})
+
 test_that("sdt_ranking_logmu preserves the draws-by-observation shape", {
   d <- matrix(c(1, 1.5, 0.5, 2), nrow = 2)
   out <- sdt_ranking_logmu(1L, c(4, 4), d, dist = 2L)
