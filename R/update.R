@@ -127,7 +127,7 @@ update.bmmfit <- function(object, formula., newdata = NULL, recompile = NULL,
   )]
 
   if (is.null(newdata)) {
-    data <- check_data(model, olddata, user_formula)
+    data <- check_stored_data(model, olddata, user_formula)
     attr(data, "data_name") <- attr(olddata, "data_name")
   } else {
     data <- check_data(model, newdata, user_formula)
@@ -212,6 +212,101 @@ update.bmmfit <- function(object, formula., newdata = NULL, recompile = NULL,
     return(object)
   }
   try_save_bmmfit(object, save_file, compress = save_compress)
+}
+
+# `object$data` is brms's model frame, not the data the user passed to bmm():
+# check_data() has already run on it once, and brms keeps only the variables the
+# fitted formula references. Running check_data() on it again therefore fails
+# for any model whose check_data() consumes or generates columns, so the frame
+# is first turned back into something check_data() accepts. A column that can
+# only be rebuilt, not recovered, is named in the "rebuilt" attribute and
+# dropped again afterwards: it stands in for the user's column while the checks
+# run and must not reach the model frame, where a new formula could pick it up
+# as a predictor of the wrong type. Dropping it also leaves the column NULL for
+# the configure_prior methods of the non-target models, which read it to decide
+# whether set size 1 needs a constant prior. That is inert only because a column
+# gets rebuilt exactly when no formula names it, and the constraint helpers
+# return NULL in that case
+check_stored_data <- function(model, data, formula) {
+  stored <- revert_check_data(model, data)
+  rebuilt <- attr(stored, "rebuilt")
+  attr(stored, "rebuilt") <- NULL
+  data <- check_data(model, stored, formula)
+  for (var in rebuilt) {
+    data[[var]] <- NULL
+  }
+  data
+}
+
+# Dispatch runs general to specific, so every method chains with NextMethod():
+# without it a method on a domain class silently shadows one on a model class
+# below it, which is how the sdt_yn symptom would come back the moment the SDT
+# stack adds a shared method on `sdt`. Because methods chain, a method that
+# rebuilds a column appends its name to the "rebuilt" attribute rather than
+# assigning it -- an assignment would erase a name an earlier method in the
+# chain recorded, and that column would then reach the model frame
+revert_check_data <- function(model, data) {
+  UseMethod("revert_check_data")
+}
+
+#' @exportS3Method
+revert_check_data.default <- function(model, data) {
+  data
+}
+
+#' @exportS3Method
+revert_check_data.m3 <- function(model, data) {
+  resp_cats <- model$resp_vars$resp_cats
+  num_options <- model$other_vars$num_options
+  data[resp_cats] <- as.data.frame(data$Y[, resp_cats, drop = FALSE])
+  if (is.numeric(num_options)) {
+    for (var in names(num_options)) {
+      data[[var]] <- NULL
+    }
+  } else {
+    # check_data() turned a zero option count into 0.0001, so the Idx_ columns
+    # are the only record left of which category a row offered no options for
+    data[num_options][as.matrix(data[paste0("Idx_", resp_cats)]) == 0] <- 0
+  }
+  NextMethod("revert_check_data")
+}
+
+#' @exportS3Method
+revert_check_data.non_targets <- function(model, data) {
+  set_size <- model$other_vars$set_size
+  # brms keeps the set_size column only when a formula predicts something with
+  # it; LureIdx1..n is the step function check_data() built from it, so its row
+  # sums give the set size of each row back, as .np_lure_free_rows() also does.
+  # The names come from nt_features rather than from a pattern match, because a
+  # user column called LureIdx9 that a formula kept would be summed in too and
+  # the set sizes it shifts are legal integers that nothing downstream rejects
+  if (is.character(set_size) && not_in(set_size, colnames(data))) {
+    data[[set_size]] <- 1 + rowSums(
+      data[paste0("LureIdx", seq_along(model$other_vars$nt_features))]
+    )
+    attr(data, "rebuilt") <- c(attr(data, "rebuilt"), set_size)
+  }
+  NextMethod("revert_check_data")
+}
+
+#' @exportS3Method
+revert_check_data.sdt_yn <- function(model, data) {
+  data$dist_type <- NULL
+  NextMethod("revert_check_data")
+}
+
+#' @exportS3Method
+revert_check_data.sdt_mafc <- function(model, data) {
+  m <- model$other_vars$m
+  # brms keeps a set-size column named by `m` only when a formula predicts
+  # something with it; m_afc is check_data()'s integer copy of that column
+  if (is.character(m) && not_in(m, colnames(data))) {
+    data[[m]] <- data$m_afc
+    attr(data, "rebuilt") <- c(attr(data, "rebuilt"), m)
+  }
+  data$m_afc <- NULL
+  data$dist_type <- NULL
+  NextMethod("revert_check_data")
 }
 
 # brms::update.brmsfit() merges the fit's stored control key by key with the one

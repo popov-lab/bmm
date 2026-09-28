@@ -24,6 +24,15 @@
 #'   `names(observed)` and must be elementwise, so the identical closure
 #'   produces `y` from length-N vectors and `yrep` from ndraws x N matrices.
 #'
+#' Two optional elements serve observed data that holds placeholders rather
+#' than observations, such as the summaries of an unused [ezdm()] boundary:
+#' * `defaults`: named vector giving, for observables whose slot a fit saved
+#'   by an older bmm version lacks, the value to use for every observation.
+#' * `y_placeholders`: a function of the fit's data that returns `TRUE` if
+#'   the `"Y"` slot holds placeholders. brms would plot them as data, so
+#'   [pp_check.bmmfit()] without `resp_var` then checks the observable mapped
+#'   to `"Y"` itself.
+#'
 #' A `pp_simulate()` method returns a named list of ndraws x nobs matrices
 #' drawn jointly, typically through the internal `.pp_simulate_joint()` helper
 #' around the model's `r*()` function. Simulating observables independently
@@ -44,11 +53,12 @@
 #' @param prep A `brmsprep` object from [brms::prepare_predictions()].
 #' @return `pp_observables()` returns `NULL` for a model that delegates fully
 #'   to [brms::pp_check()], or a list with elements `observed` (a named
-#'   character vector mapping observable names to brms standata slots) and
+#'   character vector mapping observable names to brms standata slots),
 #'   `checks` (a named list of check definitions, each with a `compute`
-#'   closure, a `label` and a default bayesplot `type`). `pp_simulate()`
-#'   returns a named list of `ndraws` x `nobs` matrices, one per simulated
-#'   observable.
+#'   closure, a `label` and a default plot `type`: a bayesplot `ppc_*` type
+#'   or bmm's `"bars_binned"`) and, optionally, `defaults` and
+#'   `y_placeholders` (see Details). `pp_simulate()` returns a named list of
+#'   `ndraws` x `nobs` matrices, one per simulated observable.
 #' @keywords internal developer
 #' @export
 pp_observables <- function(model) {
@@ -162,6 +172,10 @@ pp_check_vars <- function(fit) {
                                     re_formula = dots$re_formula)
 
   observed <- lapply(spec$observed, function(slot) prep$data[[slot]])
+  # a fit saved before its model declared a slot lacks it in the data
+  for (nm in names(spec$defaults)) {
+    observed[[nm]] <- observed[[nm]] %||% rep(spec$defaults[[nm]], prep$nobs)
+  }
   yrep_inputs <- lapply(observed, .pp_expand_data, ndraws = prep$ndraws)
   sims <- pp_simulate(object$bmm$model, prep)
   sims <- sims[intersect(names(sims), names(spec$observed))]
@@ -237,6 +251,66 @@ pp_check_vars <- function(fit) {
     args$group <- group_vec
   }
   do.call(ppc_fun, args) + ggplot2::labs(subtitle = check$label)
+}
+
+# bmm's own plot type (see .ppc_fun()): ppc_bars() for a continuous statistic.
+# bayesplot requires whole numbers there, so the statistic is binned and
+# bayesplot counts the bins; the bars are then drawn on the statistic's scale
+# instead of at bin indices.
+.ppc_bars_binned <- function(y, yrep, ..., breaks = NULL, prob = 0.9,
+                             freq = TRUE) {
+  .pp_binned_bars(y, yrep, group = NULL, breaks, prob, freq)
+}
+
+.ppc_bars_binned_grouped <- function(y, yrep, group, ..., breaks = NULL,
+                                     facet_args = list(), prob = 0.9,
+                                     freq = TRUE) {
+  facet_args$facets <- "group"
+  facet_args$scales <- facet_args$scales %||% "free"
+  .pp_binned_bars(y, yrep, group, breaks, prob, freq) +
+    do.call(ggplot2::facet_wrap, facet_args)
+}
+
+# The default breaks span y and yrep together, so predicted mass outside the
+# observed range gets a bin. User breaks that miss a value would put it in
+# bin 0 or K + 1 and silently drop it from the plot.
+.pp_binned_bars <- function(y, yrep, group, breaks, prob, freq) {
+  values <- c(y, yrep)
+  breaks <- breaks %||% pretty(range(values), n = ceiling(log2(length(y)) + 1))
+  stopif(min(values) < min(breaks) || max(values) > max(breaks),
+         "'breaks' must cover the observed and predicted values \\
+          ({signif(min(values), 3)} to {signif(max(values), 3)}).")
+  bin <- function(x) findInterval(x, breaks, rightmost.closed = TRUE)
+
+  data <- bayesplot::ppc_bars_data(bin(y), matrix(bin(yrep), nrow = nrow(yrep)),
+                                   group = group, prob = prob, freq = freq)
+  data$lower <- breaks[data$x]
+  data$upper <- breaks[data$x + 1L]
+  data$x <- (data$lower + data$upper) / 2
+
+  # y and yrep take the colours of the density panels they share a
+  # resp_var = "all" grid with: y dark, yrep light, both keyed as lines. The
+  # bars are unfilled so that the intervals beneath them stay visible.
+  scheme <- bayesplot::color_scheme_get()
+  ggplot2::ggplot(data, ggplot2::aes(x = .data$x)) +
+    ggplot2::geom_pointrange(
+      ggplot2::aes(y = .data$m, ymin = .data$l, ymax = .data$h,
+                   colour = "yrep"),
+      size = 0.5, linewidth = 1, key_glyph = "path"
+    ) +
+    ggplot2::geom_rect(
+      ggplot2::aes(xmin = .data$lower, xmax = .data$upper, ymin = 0,
+                   ymax = .data$y_obs, colour = "y"),
+      fill = NA, linewidth = 0.8, key_glyph = "path"
+    ) +
+    ggplot2::scale_colour_manual(
+      NULL, breaks = c("y", "yrep"),
+      values = c(y = scheme$dark_highlight, yrep = scheme$light_highlight),
+      labels = c(expression(italic(y)), expression(italic(y)[rep]))
+    ) +
+    ggplot2::scale_y_continuous(expand = ggplot2::expansion(mult = c(0, 0.05))) +
+    ggplot2::labs(x = NULL, y = if (freq) "Count" else "Proportion") +
+    bayesplot::bayesplot_theme_get()
 }
 
 # response is 0/1, so the sign flip is (2 * response - 1): sign(response)
