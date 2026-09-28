@@ -496,6 +496,17 @@ test_that("report_priors() reconstructs the defaults of a fit that needs data2",
   expect_equal(report$source[report$class == "sd"], "bmm default")
 })
 
+test_that("report_priors() still reports a fit whose stored frame fails check_data()", {
+  lin <- oberauer_lin_2017[oberauer_lin_2017$ID %in% 1:2, ]
+  lin$dev_rad[lin$set_size == "8"] <- NA
+  fit <- suppressWarnings(suppressMessages(bmm(
+    bmf(kappa ~ 1, thetat ~ 1, thetant ~ 1), lin,
+    mixture3p("dev_rad", nt_features = paste0("col_nt", 1:7), set_size = "set_size"),
+    backend = "mock", mock_fit = 1, rename = FALSE
+  )))
+  expect_warning(report_priors(fit), "could not be checked again")
+})
+
 test_that("subsetting a report returns a plain data.frame that still prints", {
   skip_on_cran()
   path <- test_path("assets/bmmfit_example1.rds")

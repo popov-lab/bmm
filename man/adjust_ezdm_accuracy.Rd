@@ -2,7 +2,7 @@
 % Please edit documentation in R/helpers-data.R
 \name{adjust_ezdm_accuracy}
 \alias{adjust_ezdm_accuracy}
-\title{Adjust Accuracy Counts for Contamination}
+\title{Adjust Accuracy Counts for Contamination (deprecated)}
 \usage{
 adjust_ezdm_accuracy(n_upper, n_trials, contaminant_prop, guess_rate = 0.5)
 }
@@ -23,6 +23,11 @@ A 1-row \code{data.frame} with columns \code{n_upper_adj} and \code{n_trials_adj
 counts unchanged.
 }
 \description{
+\strong{Deprecated.} \code{\link[=ezdm_summary_stats]{ezdm_summary_stats()}} now returns
+contaminant-free \code{n_upper} and \code{n_trials}, so this second step is no
+longer needed; applying it corrects the same cell twice. Set the guess
+rate with the \code{guess_rate} argument of \code{\link[=ezdm_summary_stats]{ezdm_summary_stats()}} instead.
+
 Adjusts accuracy counts (\code{n_upper}, \code{n_trials}) by removing
 estimated contaminant trials using binomial sampling. Contaminant trials
 are assumed to produce correct responses at a fixed guess rate (e.g., 0.5
@@ -35,16 +40,11 @@ counts. Because of the stochastic sampling, results will vary across
 calls unless a seed is set by the user.
 }
 \examples{
-# Adjust accuracy for estimated 10\% contamination
+# Deprecated. ezdm_summary_stats() returns contaminant-free counts already:
 set.seed(42)
-adjust_ezdm_accuracy(n_upper = 80, n_trials = 100, contaminant_prop = 0.1)
-
-# In a pipeline with ezdm_summary_stats
-# library(dplyr)
-# mydata |>
-#   group_by(subject) |>
-#   reframe(ezdm_summary_stats(rt, response)) |>
-#   mutate(adjust_ezdm_accuracy(n_upper, n_trials, contaminant_prop))
+rt <- c(rnorm(80, 0.55, 0.05), runif(20, 0.1, 4))
+response <- c(rbinom(80, 1, 0.85), rbinom(20, 1, 0.5))
+ezdm_summary_stats(rt, response, contaminant_bound = c(0.1, 4))
 
 }
 \seealso{

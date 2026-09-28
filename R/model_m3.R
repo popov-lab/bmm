@@ -133,7 +133,11 @@ settable_link_functions.m3 <- function(model) {
 #'   of candidates in the respective response categories are constant across all conditions
 #'   in the experiment. Or a vector specifying the variable names that contain the number of
 #'   candidates in each response category. The order of these variables should be in the
-#'   same order as the names of the response categories passed to `resp_cats`
+#'   same order as the names of the response categories passed to `resp_cats`. Numbers
+#'   named after the response categories, e.g. `c(corr = 1, other = 4)`, are matched to
+#'   the categories by name. Numbers without names, or with other names, are taken in
+#'   the order of `resp_cats`, and other names become the names of the columns
+#'   bmm adds to the data.
 #' @param choice_rule The choice rule that should be used for the M3. The options are "softmax"
 #'   or "simple". The "softmax" option implements the softmax normalization of activation into
 #'   probabilities for choosing the different response categories. The "simple" option implements
@@ -213,6 +217,22 @@ m3 <- function(resp_cats, num_options, choice_rule = "softmax", version = "custo
     length(num_options) != length(resp_cats),
     "The option variables should have the same length as the response variables."
   )
+  stopif(
+    is.character(num_options) && any(num_options %in% resp_cats),
+    "The number of options cannot be read from a response category column: \\
+    {collapse_comma(intersect(num_options, resp_cats))}"
+  )
+  opt_names <- names(num_options)
+  stopif(
+    is.numeric(num_options) && !is.null(opt_names) &&
+      (anyNA(opt_names) || any(opt_names == "") || anyDuplicated(opt_names) > 0),
+    "Name either all elements of `num_options` or none, and use each name only once."
+  )
+  stopif(
+    is.numeric(num_options) && any(opt_names %in% resp_cats) && !setequal(opt_names, resp_cats),
+    "If `num_options` is named after the response categories, it needs one element for each of \\
+    {collapse_comma(resp_cats)}"
+  )
 
   .model_m3(
     resp_cats = resp_cats, num_options = num_options,
@@ -279,10 +299,25 @@ check_model.m3_custom <- function(model, data = NULL, formula = NULL) {
 # CHECK_data S3 methods                                                  ####
 ############################################################################# !
 
+# Counts named after the response categories are labels, not column names: they
+# are matched to the categories by name and stored under the same internal
+# column names as unnamed counts. Used as column names they multiplied each
+# category's activation by itself (#449). Fits from before the fix still carry
+# those names in their stored model, so every reader goes through this helper
+# rather than the constructor renaming them once
+m3_num_options <- function(model) {
+  num_options <- model$other_vars$num_options
+  resp_cats <- model$resp_vars$resp_cats
+  if (is.numeric(num_options) && setequal(names(num_options), resp_cats)) {
+    num_options <- stats::setNames(num_options[resp_cats], paste0("n_opt_", resp_cats))
+  }
+  num_options
+}
+
 #' @export
 check_data.m3 <- function(model, data, formula) {
   resp_name <- model$resp_vars$resp_cats
-  n_opt_vect <- model$other_vars$num_options
+  n_opt_vect <- m3_num_options(model)
   col_names <- colnames(data)
 
   missing_variables <- setdiff(resp_name, col_names)
@@ -303,9 +338,19 @@ check_data.m3 <- function(model, data, formula) {
   } else if (is.numeric(n_opt_vect)) {
     # n_opt_vect is the *number* of options for each response variable
     opt_vars <- names(n_opt_vect)
+    # the counts become data columns under these names, and the activation
+    # formulas refer to them by name, so any name already in use is taken to
+    # mean the existing column or parameter instead of the count
+    taken <- c(
+      col_names, "Y", "nTrials", paste0("Idx_", resp_name),
+      names(formula), names(model$parameters), names(model$fixed_parameters)
+    )
+    clashes <- intersect(opt_vars, taken)
     stopif(
-      any(opt_vars %in% names(data)),
-      "One of the variables {paste0(opt_vars, collapse = ', ')} already exists in the data. Give explicit names to your num_options vector"
+      length(clashes) > 0,
+      "The column name(s) {collapse_comma(clashes)} that `num_options` would be stored under are \\
+      already taken by a data column or a model parameter. Give the numbers names that are \\
+      not taken yet."
     )
     data[opt_vars] <- rep(n_opt_vect, each = nrow(data))
   } else {
@@ -372,12 +417,8 @@ check_formula.m3_custom <- function(model, data, formula) {
 ############################################################################# !
 #' @export
 bmf2bf.m3 <- function(model, formula) {
-  # retrieve required response arguments
-  if (is.character(model$other_vars$num_options)) {
-    options_vars <- model$other_vars$num_options
-  } else {
-    options_vars <- names(model$other_vars$num_options)
-  }
+  num_options <- m3_num_options(model)
+  options_vars <- if (is.character(num_options)) num_options else names(num_options)
   resp_cats <- model$resp_vars$resp_cats
   n_opt_idx_vars <- paste0("Idx_", resp_cats)
   names(n_opt_idx_vars) <- resp_cats

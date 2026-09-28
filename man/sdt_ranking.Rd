@@ -26,7 +26,11 @@ gamma-function ratios.
 \code{sdratio})
 }}
 
-\item{links}{A named list of link functions for the parameters.}
+\item{links}{A named list of link functions for the parameters. Only the
+link of \code{d} can be changed, and only for \code{dist = "gumbel_min"}: with
+\code{dist = "normal"} the quadrature loses accuracy at the large \code{d} a
+log link reaches, so \code{d} keeps the identity link. \code{sdratio} always
+keeps the identity link.}
 
 \item{...}{used internally for testing, ignore it}
 }

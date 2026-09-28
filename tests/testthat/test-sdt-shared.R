@@ -51,38 +51,53 @@ test_that("a two-category rating reduces to the binary likelihood", {
   }
 })
 
-test_that("the m-AFC closed forms sit on the right extreme-value branch", {
-  # taking the max of largest-extreme-value variates is what yields the softmax;
-  # the smallest-extreme-value case is the Gamma ratio. Swapping these fits the
-  # mirror model, and the two agree at m = 2, so check m > 2.
-  for (m in c(4L, 8L)) {
-    expect_equal(bmm:::.mafc_pc_r(1.2, m, "gumbel_max"),
-                 1 / (1 + (m - 1) * exp(-1.2)), info = paste("m =", m))
-    expect_equal(
-      bmm:::.mafc_pc_r(1.2, m, "gumbel_min"),
-      exp(lgamma(1 + exp(-1.2)) + lgamma(m) - lgamma(m + exp(-1.2))),
-      info = paste("m =", m)
-    )
-    expect_false(isTRUE(all.equal(bmm:::.mafc_pc_r(1.2, m, "gumbel_min"),
-                                  bmm:::.mafc_pc_r(1.2, m, "gumbel_max"))))
+test_that("the m-AFC probabilities agree with the registry's own cdf", {
+  # P(correct) is the probability the signal variate beats m - 1 distractors,
+  # int f(x - d) F(x)^(m - 1) dx, so a closed form is only right if it agrees
+  # with the cdf the rest of the model uses. Taking the density off that same
+  # cdf by central difference ties each branch of .mafc_pc_r() to the registry
+  # entry it claims: relabelling gumbel_min and gumbel_max leaves every block
+  # in test-model_sdt_mafc.R green, because its closed-form tests restate the
+  # formula the implementation already uses, and fails here. gumbel_min and
+  # gumbel_max coincide at m = 2, which is why the grid goes past it.
+  # 1e-7 is the implementation's side: the 40-point Gauss-Hermite normal branch
+  # sits 4.5e-8 from the integral at m = 8, d = 0, which is the rule's own
+  # error and not the central difference's (h = 1e-6 and an exact density both
+  # give 4.5e-8); every other cell stays below 7e-9.
+  pc_integral <- function(d, m, dist) {
+    cdf <- bmm:::.sdt_dists[[dist]]$cdf
+    dens <- function(x) (cdf(x + 1e-5) - cdf(x - 1e-5)) / 2e-5
+    stats::integrate(function(x) dens(x - d) * cdf(x)^(m - 1),
+                     -Inf, Inf, rel.tol = 1e-10)$value
+  }
+  for (dist in names(bmm:::.sdt_dists)) {
+    for (m in c(2L, 3L, 5L, 8L)) {
+      for (d in c(0, 0.8, 2)) {
+        expect_equal(bmm:::.mafc_pc_r(d, m, dist), pc_integral(d, m, dist),
+                     tolerance = 1e-7,
+                     info = paste(dist, "m =", m, "d =", d))
+      }
+    }
   }
 })
 
-test_that("the sdratio prior stays inside the calibrated quadrature range", {
-  # Two reasons the default must stay inside [0.5, 2.0]. Empirically, Mickes
-  # et al. (2007) report subject ratios between 0.85 and 1.82 and the
-  # broeder_schuetz_2009_e3 fit gives 1.46 [1.25, 1.72], so ratios past 2 are
-  # not observed. Numerically, .ranking_gh_n() is calibrated over that same
-  # interval, so a widened prior would send the sampler to ratios the
-  # quadrature was never verified for.
+test_that("the default sdratio prior brackets the group-level estimates", {
+  # two group-level SD ratios are on record: Mickes et al. (2007) Table 1
+  # averages sd(lure)/sd(target) = 0.79 over their 13 retained subjects, i.e.
+  # 1.26 signal over noise, and the broeder_schuetz_2009_e3 posterior gives
+  # 1.46 [1.25, 1.71]. The prior has to reach past the widest ratio those
+  # support and still keep its mass off ratios above 2, which recognition does
+  # not produce -- one-sided, "covers the empirical range" cannot fail. The
+  # upper bound matters twice for ranking: .ranking_gh_n() is calibrated over
+  # ratios in [0.5, 2.0].
   models <- list(sdt_yn("n_old", "stimulus", "n_trials"),
                  sdt_ranking(paste0("rank", 1:4), m = 4, dist = "normal"))
   for (model in models) {
     main <- model$default_priors$sdratio$main
     sd <- as.numeric(sub("normal\\(0, ([0-9.]+)\\)", "\\1", main))
     expect_true(is.finite(sd), info = main)
-    covered <- diff(pnorm(log(c(0.5, 2)), 0, sd))
-    expect_gt(covered, 0.95)
+    expect_gt(exp(qnorm(0.975, 0, sd)), 1.71)
+    expect_gt(diff(pnorm(log(c(0.5, 2)), 0, sd)), 0.95)
   }
 })
 

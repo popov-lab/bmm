@@ -17,11 +17,12 @@ pp_simulate(model, prep)
 \value{
 \code{pp_observables()} returns \code{NULL} for a model that delegates fully
 to \code{\link[brms:pp_check]{brms::pp_check()}}, or a list with elements \code{observed} (a named
-character vector mapping observable names to brms standata slots) and
+character vector mapping observable names to brms standata slots),
 \code{checks} (a named list of check definitions, each with a \code{compute}
-closure, a \code{label} and a default bayesplot \code{type}). \code{pp_simulate()}
-returns a named list of \code{ndraws} x \code{nobs} matrices, one per simulated
-observable.
+closure, a \code{label} and a default plot \code{type}: a bayesplot \verb{ppc_*} type
+or bmm's \code{"bars_binned"}) and, optionally, \code{defaults} and
+\code{y_placeholders} (see Details). \code{pp_simulate()} returns a named list of
+\code{ndraws} x \code{nobs} matrices, one per simulated observable.
 }
 \description{
 \code{pp_observables()} returns the model's observable declaration used by
@@ -39,6 +40,17 @@ The observable mapped to \code{"Y"} is the default check.
 constructor. Each \code{compute} closure receives a named list keyed by
 \code{names(observed)} and must be elementwise, so the identical closure
 produces \code{y} from length-N vectors and \code{yrep} from ndraws x N matrices.
+}
+
+Two optional elements serve observed data that holds placeholders rather
+than observations, such as the summaries of an unused \code{\link[=ezdm]{ezdm()}} boundary:
+\itemize{
+\item \code{defaults}: named vector giving, for observables whose slot a fit saved
+by an older bmm version lacks, the value to use for every observation.
+\item \code{y_placeholders}: a function of the fit's data that returns \code{TRUE} if
+the \code{"Y"} slot holds placeholders. brms would plot them as data, so
+\code{\link[=pp_check.bmmfit]{pp_check.bmmfit()}} without \code{resp_var} then checks the observable mapped
+to \code{"Y"} itself.
 }
 
 A \code{pp_simulate()} method returns a named list of ndraws x nobs matrices

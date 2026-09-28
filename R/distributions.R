@@ -1,12 +1,25 @@
 #' Rejection Sampling
 #'
 #' Performs rejection sampling to generate samples from a target distribution.
+#' Each draw can come from its own target: draw `i` is sampled from `f`
+#' evaluated at the `i`-th element of every per-draw argument in `...`, under
+#' the envelope `max_f[i]`.
 #'
 #' @param n Integer. The number of samples to generate.
-#' @param f Function. The target density function from which to sample.
-#' @param max_f Numeric. The maximum value of the target density function `f`.
+#' @param f Function. The target density divided by the proposal density, up to
+#'   a constant; with a uniform proposal, the target density itself. Its first
+#'   argument takes a vector of proposals, generally not of length `n`; `f` must
+#'   be vectorized over it and over the per-draw arguments in `...`.
+#' @param max_f Numeric. A finite upper bound of `f`, either a single value or
+#'   one value per draw (length `n`). A bound below the maximum of `f` biases
+#'   the draws without a warning.
 #' @param proposal_fun Function. A function that generates samples from the proposal distribution.
-#' @param ... Additional arguments to be passed to the target density function `f`.
+#' @param ... Additional arguments to be passed to the target density function
+#'   `f`. With `n > 1`, arguments of length `n` are taken per draw, so draw `i`
+#'   uses their `i`-th elements. Arguments of any other length are passed whole
+#'   to every call of `f`; recycle them with `rep_len(x, n)` to use them per
+#'   draw. Pass constants whose length may equal `n`, such as a lookup table,
+#'   through the closure of `f` instead of `...`.
 #'
 #' @return A numeric vector of length `n` containing samples from the target distribution.
 #' @export
@@ -18,22 +31,52 @@
 #' samples <- rejection_sampling(10000, target_density, max_f = target_density(0), proposal)
 #' hist(samples, freq = FALSE)
 #' curve(target_density, col = "red", add = TRUE)
+#'
+#' # one location per draw
+#' mu <- rep(c(0, 2), 5000)
+#' samples <- rejection_sampling(
+#'   10000, brms::dvon_mises, max_f = brms::dvon_mises(0, 0, 10), proposal,
+#'   mu = mu, kappa = 10
+#' )
+#' tapply(samples, mu, mean)
 rejection_sampling <- function(n, f, max_f, proposal_fun, ...) {
-  stopifnot(is.numeric(n), length(n) == 1, n > 0)
-  stopifnot(is.numeric(max_f), length(max_f) == 1 | length(max_f) == n, max_f > 0)
+  stopif(
+    !is.numeric(n) || length(n) != 1 || !isTRUE(n >= 1 && n %% 1 == 0),
+    "n must be a single positive whole number."
+  )
+  stopif(
+    !is.numeric(max_f) || !length(max_f) %in% c(1, n) || !all(is.finite(max_f) & max_f > 0),
+    "max_f must be finite and positive, with one value or one value per draw."
+  )
 
-  inner <- function(n, f, max_f, proposal_fun, ..., acc = c()) {
-    if (length(acc) > n) {
-      return(acc[seq_len(n)])
-    }
-    x <- proposal_fun(n)
-    y <- stats::runif(n) * max_f
-    accept <- y < f(x, ...)
-    inner(n, f, max_f, proposal_fun, ..., acc = c(acc, x[accept]))
+  dots <- list(...)
+  per_draw <- n > 1 & lengths(dots) == n
+  max_f <- rep_len(max_f, n)
+  out <- rep(NA_real_, n)
+  pending <- seq_len(n)
+  misses <- 0
+  while (length(pending) > 0) {
+    # several proposals per pending draw keep the number of rounds, each with
+    # its fixed R overhead, low when n is small or only a few draws remain
+    idx <- rep(pending, each = ceiling(max(n, 256) / length(pending)))
+    x <- proposal_fun(length(idx))
+    fx <- do.call(f, c(list(x), replace(dots, per_draw, lapply(dots[per_draw], `[`, idx))))
+    stopif(anyNA(x) || anyNA(fx), "The proposals or the target density contain NA; check the parameter values.")
+    hit <- which(stats::runif(length(idx)) * max_f[idx] < fx)
+    first <- hit[!duplicated(idx[hit])]
+    out[idx[first]] <- x[first]
+    pending <- which(is.na(out))
+    # a draw that no proposal can reach, e.g. where f is 0, would loop forever;
+    # 1e7 proposals without an acceptance mean a rate too low to be usable
+    misses <- if (length(first) > 0) 0 else misses + length(idx)
+    stopif(misses > 1e7, "No proposal was accepted in 1e7 tries; check f, max_f and proposal_fun.")
   }
-
-  inner(n, f, max_f, proposal_fun, ...)
+  out
 }
+
+# a single value is passed to rejection_sampling() whole rather than repeated
+# for every draw, so that f computes what depends on it (e.g. besselI) once
+.recycle_draws <- function(x, n) if (length(x) == 1) x else rep_len(x, n)
 
 #' @title Distribution functions for the Signal Discrimination Model (SDM)
 #'
@@ -53,7 +96,7 @@ rejection_sampling <- function(n, f, max_f, proposal_fun, ...) {
 #' @param kappa Vector of precision values
 #' @param log Logical; if `TRUE`, values are returned on the log scale.
 #' @param parametrization Character; either `"bessel"` or `"sqrtexp"`
-#'   (default). See [the online article](https://venpopov.com/bmm/articles/bmm_sdm_simple.html) for details on the
+#'   (default). See [the online article](https://popov-lab.github.io/bmm/articles/bmm_sdm_simple.html) for details on the
 #'   parameterization.
 #' @param log.p Logical; if `TRUE`, probabilities are returned on the log
 #'   scale.
@@ -73,7 +116,7 @@ rejection_sampling <- function(n, f, max_f, proposal_fun, ...) {
 #'
 #' @details **Parametrization**
 #'
-#' See [the online article](https://venpopov.com/bmm/articles/bmm_sdm_simple.html) for details on the parameterization.
+#' See [the online article](https://popov-lab.github.io/bmm/articles/bmm_sdm_simple.html) for details on the parameterization.
 #' Oberauer (2023) introduced the SDM with the bessel parametrization. The
 #' sqrtexp parametrization is the default in the `bmm` package for
 #' numerical stability and efficiency. The two parametrizations are related by
@@ -210,11 +253,16 @@ rsdm <- function(n, mu = 0, c = 3, kappa = 3.5, parametrization = "sqrtexp") {
     stop2("Parametrization must be one of 'bessel' or 'sqrtexp'")
   )
 
+  # compare to the peak on the log scale: the unnormalized density itself
+  # overflows for large c and kappa (exp(798) at c = 100, kappa = 400)
   rejection_sampling(
     n = n,
-    f = function(x) .dsdm_numer(x, mu, c, kappa),
-    max_f = .dsdm_numer(0, 0, c, kappa),
-    proposal_fun = function(n) stats::runif(n, -pi, pi)
+    f = function(x, mu, c, kappa) {
+      exp(.dsdm_numer(x, mu, c, kappa, log = TRUE) - .dsdm_numer(mu, mu, c, kappa, log = TRUE))
+    },
+    max_f = 1,
+    proposal_fun = function(n) stats::runif(n, -pi, pi),
+    mu = .recycle_draws(mu, n), c = .recycle_draws(c, n), kappa = .recycle_draws(kappa, n)
   )
 }
 
@@ -322,11 +370,13 @@ rmixture2p <- function(n, mu = 0, kappa = 5, p_mem = 0.6) {
   stopif(isTRUE(any(p_mem < 0)), "p_mem must be larger than zero.")
   stopif(isTRUE(any(p_mem > 1)), "p_mem must be smaller than one.")
 
+  # the density peaks at x = mu; x of length n gives one bound per draw
   rejection_sampling(
     n = n,
-    f = function(x) dmixture2p(x, mu, kappa, p_mem),
-    max_f = dmixture2p(0, 0, kappa, p_mem),
-    proposal_fun = function(n) stats::runif(n, -pi, pi)
+    f = dmixture2p,
+    max_f = dmixture2p(rep_len(mu, n), rep_len(mu, n), .recycle_draws(kappa, n), .recycle_draws(p_mem, n)),
+    proposal_fun = function(n) stats::runif(n, -pi, pi),
+    mu = .recycle_draws(mu, n), kappa = .recycle_draws(kappa, n), p_mem = .recycle_draws(p_mem, n)
   )
 }
 
@@ -719,8 +769,17 @@ rm3 <- function(n, size, pars, m3_model, act_funs = NULL, unpack = FALSE,
     )
 
     acts <- sapply(act_funs, function(pform) eval(pform[[length(pform)]], envir = as.list(pars)))
+    # act_funs come in the order of the formula, but num_options and the counts
+    # in x follow resp_cats, and the arithmetic below matches them by position
+    resp_cats <- m3_model$resp_vars$resp_cats
+    missing_cats <- setdiff(resp_cats, names(acts))
+    stopif(
+      length(missing_cats) > 0,
+      "No activation formula found for the response categories: {collapse_comma(missing_cats)}"
+    )
+    acts <- acts[resp_cats]
 
-    num_options <- m3_model$other_vars$num_options
+    num_options <- m3_num_options(m3_model)
     choice_rule <- tolower(m3_model$other_vars$choice_rule)
     if (choice_rule == "softmax") acts <- exp(acts)
     acts <- acts * num_options
@@ -1217,11 +1276,13 @@ times_nonzero <- function(count, log_prob) {
 #'   one set of cumulants. For version `"4par"` the two boundaries have
 #'   different decision-time distributions, so each is given its own summaries
 #'   and its own response count. A boundary reached fewer than twice has no
-#'   sample variance; in `dezdm()` it contributes only through the binomial
-#'   term, but `bmm()` currently drops such cells, because `rezdm()` and
-#'   `ezdm_summary_stats()` code their missing summaries as `NA` and `brms`
-#'   excludes rows with missing values. The per-boundary formulas condition on
-#'   the realised counts, which are themselves random.
+#'   sample variance, and one whose summaries are `NA` has nothing to evaluate;
+#'   `dezdm()` lets either contribute only through the binomial term.
+#'   `rezdm()` and `ezdm_summary_stats()` code such summaries as `NA`, and
+#'   `bmm()` keeps these cells: it replaces the summaries of such a boundary
+#'   with a placeholder that the likelihood never reads, so the response
+#'   counts still inform the fit. The per-boundary formulas condition on the
+#'   realised counts, which are themselves random.
 #'
 #'   The two additional cumulants cost sampling time. In two simulated designs
 #'   (30 subjects with 200 or 250 trials, 3 seeds each, one machine) a gradient
@@ -1434,8 +1495,9 @@ rezdm <- function(n, n_trials, drift, bound, ndt, zr = 0.5, s = 1,
     .ezdm_logit_pc(b_upper, b_lower, rep_len(drift / s^2, n))
   )
 
-  # a boundary with fewer than two responses has no sample variance and
-  # contributes only through the binomial term
+  # a boundary with fewer than two responses has no sample variance, and one
+  # with NA summaries has nothing to evaluate; either contributes only through
+  # the binomial term
   boundary_ll <- function(valid, mean_rt, var_rt, n_boundary, MDT, VRT, k3, k4) {
     rt <- .ez_rt_terms(VRT[valid], k3[valid], k4[valid], n_boundary[valid])
     stats::dgamma(var_rt[valid], shape = rt$shape, rate = rt$rate, log = TRUE) +
@@ -1445,7 +1507,7 @@ rezdm <- function(n, n_trials, drift, bound, ndt, zr = 0.5, s = 1,
       )
   }
 
-  upper_valid <- n_upper >= 2
+  upper_valid <- n_upper >= 2 & !is.na(mean_rt_upper) & !is.na(var_rt_upper)
   if (any(upper_valid)) {
     ll[upper_valid] <- ll[upper_valid] + boundary_ll(
       upper_valid, mean_rt_upper, var_rt_upper, n_upper,
@@ -1453,7 +1515,7 @@ rezdm <- function(n, n_trials, drift, bound, ndt, zr = 0.5, s = 1,
     )
   }
 
-  lower_valid <- n_lower >= 2
+  lower_valid <- n_lower >= 2 & !is.na(mean_rt_lower) & !is.na(var_rt_lower)
   if (any(lower_valid)) {
     ll[lower_valid] <- ll[lower_valid] + boundary_ll(
       lower_valid, mean_rt_lower, var_rt_lower, n_lower,
@@ -2513,6 +2575,382 @@ rsdt_yn <- function(n, n_trials, stimulus, d, criterion,
 }
 
 
+# R-side logit P(correct) for m-AFC, mirroring the Stan mafc_logit_pc function.
+# The binomial is taken on the logit scale because P(correct) rounds to 1 once
+# its complement falls under the double epsilon, at which point the density
+# stops responding to d'. Each branch therefore reads log P(correct) and
+# log(1 - P(correct)) off whichever side still resolves it and subtracts.
+.mafc_logit_pc_r <- function(d, m, dist = "normal") {
+  if (dist == "gumbel_max") {
+    return(d - log(m - 1))
+  }
+
+  n <- max(length(d), length(m))
+  d <- rep_len(d, n)
+  m <- rep_len(m, n)
+
+  if (dist == "gumbel_min") {
+    # Gamma(1 + e) Gamma(m) / Gamma(m + e) telescopes to prod(k / (k + e)), and
+    # log1p still resolves the tiny e = exp(-d') at which the difference of
+    # lgammas has cancelled to zero. Off the telescoped form this branch dies
+    # at the same d' as the probability scale it was meant to rescue.
+    k <- seq_len(max(m) - 1)
+    terms <- log1p(outer(1 / k, exp(-d)))
+    # e = exp(-d') overflows below d' = -709.78, so a masked cell multiplied by
+    # zero would be NaN and would poison its column. Its unmasked neighbours
+    # keep the Inf, so the column comes out -Inf, as it does in Stan.
+    terms[outer(k, m, ">=")] <- 0
+    log_pc <- -colSums(terms)
+    return(log_pc - log(-expm1(log_pc)))
+  }
+
+  if (dist == "normal") {
+    # 2-AFC has the closed form Phi(d'/sqrt(2)), whose logit is exact at any d'
+    out <- .sdt_log_cdf(d / sqrt(2), dist) - .sdt_log_cdf(-d / sqrt(2), dist)
+    quad <- m != 2L
+    if (any(quad)) {
+      out[quad] <- .mafc_logit_quad(d[quad], m[quad], dist,
+                                    .mafc_gh_nodes, .mafc_gh_weights)
+    }
+    return(out)
+  }
+
+  .mafc_logit_quad(d, m, dist, .sdt_dists[[dist]]$qf(.mafc_gl_nodes),
+                   .mafc_gl_weights)
+}
+
+
+# One sweep of the quadrature nodes yields both sides of the logit: the
+# log-sum-exp keeps its relative precision as P(correct) -> 0, the sum of
+# complements -- every term positive, so nothing cancels -- as P(correct) -> 1.
+# Reading either side off the other is what loses the far tail.
+.mafc_logit_quad <- function(d, m, dist, nodes, weights) {
+  log_cdf <- .sdt_log_cdf(outer(nodes, d, "+"), dist) *
+    rep(m - 1, each = length(nodes))
+  # the weights sum to 1 only to rounding, so the complement can land above it
+  matrixStats::colLogSumExps(log(weights) + log_cdf) -
+    log(pmin(colSums(weights * -expm1(log_cdf)), 1))
+}
+
+
+# Binomial log-density from the logit of the success probability. A cell with no
+# successes (or no failures) contributes nothing even where the corresponding
+# log-probability underflows, but 0 * -Inf is NaN, so those terms are dropped.
+.dbinom_logit <- function(n_correct, n_trials, logit_p) {
+  lchoose(n_trials, n_correct) -
+    ifelse(n_correct == 0, 0, n_correct * .log1p_exp(-logit_p)) -
+    ifelse(n_correct == n_trials, 0, (n_trials - n_correct) * .log1p_exp(logit_p))
+}
+
+
+#' @title Distribution functions for m-AFC SDT
+#'
+#' @description Density and random generation for m-alternative forced choice
+#'   signal detection theory (DeCarlo, 2012). Models accuracy in tasks where
+#'   one of `m` alternatives contains the signal. Only the `d` parameter
+#'   is estimated (no criterion). All arguments are recycled to the length of
+#'   the longest one, so passing vectors of `d`, `m`, or `n_trials`
+#'   generates (or evaluates) one observation per element.
+#'
+#' @name sdt_mafc_dist
+#'
+#' @param n_correct Integer vector. Number of correct responses.
+#' @param n_trials Integer vector. Total number of trials per observation.
+#' @param m Integer vector. Number of alternatives per observation. Must be
+#'   at least 2.
+#' @param d Numeric vector. Sensitivity \eqn{d'}: the distance between the
+#'   signal and distractor distributions in SD units. m-AFC assumes a common
+#'   scale for the two distributions, so this is also the balanced index
+#'   \eqn{d_a} that [sdt_yn()] reports.
+#' @inheritParams SDTdist
+#' @param log Logical. If `TRUE`, returns log-density (default `FALSE`).
+#' @param n Integer. Number of observations to generate. `n_trials`, `m`, and
+#'   `d` are recycled to this length.
+#'
+#' @return `dsdt_mafc` returns the (log-)density (binomial probability).
+#'   `rsdt_mafc` returns an integer vector with the number of correct
+#'   responses per observation.
+#'
+#' @references
+#' DeCarlo, L. T. (2012). On a signal detection approach to m-alternative
+#'   forced choice with bias, with maximum likelihood and Bayesian approaches
+#'   to estimation. \emph{Journal of Mathematical Psychology}, \emph{56}(3),
+#'   196--207. \doi{10.1016/j.jmp.2012.02.004}
+#'
+#' @keywords distribution
+#' @export
+#' @examples
+#' # 4-AFC density
+#' dsdt_mafc(n_correct = 80, n_trials = 100, m = 4, d = 1.5)
+dsdt_mafc <- function(n_correct, n_trials, m, d,
+                      dist = c("normal", "gumbel_min", "gumbel_max",
+                               "logistic"),
+                      log = FALSE) {
+  dist <- match.arg(dist)
+  stopif(any(m < 2), "m must be an integer >= 2")
+
+  n <- max(lengths(list(n_correct, n_trials, m, d)))
+  n_correct <- rep_len(n_correct, n)
+  n_trials <- rep_len(n_trials, n)
+
+  stopif(any(n_correct < 0), "n_correct must be non-negative")
+  stopif(any(n_correct > n_trials), "n_correct must not exceed n_trials")
+
+  out <- .dbinom_logit(n_correct, n_trials,
+                       .mafc_logit_pc_r(rep_len(d, n),
+                                        rep_len(as.integer(m), n), dist))
+  if (log) out else exp(out)
+}
+
+
+#' @rdname sdt_mafc_dist
+#' @export
+#' @examples
+#' # Generate 4-AFC data for 20 subjects with varying sensitivity
+#' dat <- data.frame(id = 1:20, n_trials = 200L)
+#' dat$n_correct <- rsdt_mafc(nrow(dat), dat$n_trials, m = 4,
+#'                            d = rnorm(20, 1.5, 0.4))
+#' head(dat)
+rsdt_mafc <- function(n, n_trials, m, d,
+                      dist = c("normal", "gumbel_min", "gumbel_max",
+                               "logistic")) {
+  dist <- match.arg(dist)
+  stopif(length(n) != 1 || n < 1, "n must be a single positive integer")
+  stopif(any(m < 2), "m must be an integer >= 2")
+  stopif(any(n_trials < 1), "n_trials must be positive")
+
+  # the logit is the scale dsdt_mafc() evaluates on, and plogis() cannot leave
+  # [0, 1]; .mafc_pc_r() can, and does -- its gumbel_min lgamma difference has
+  # cancelled by d' = -34, returning 7.9e13 at -36.4 (rbinom gives NA) and
+  # exactly 1 from -40, where the model puts P(correct) near 4e-18
+  stats::rbinom(n, n_trials,
+                stats::plogis(.mafc_logit_pc_r(rep_len(d, n),
+                                               rep_len(as.integer(m), n),
+                                               dist)))
+}
+
+
+# Gauss-Hermite rule for the probabilists' weight (the standard normal density),
+# built by Golub-Welsch on the Hermite Jacobi matrix so that any node count is
+# available without shipping hand-copied constants. Cached, because the
+# eigendecomposition is far too slow to repeat inside a likelihood.
+.gh_cache <- new.env(parent = emptyenv())
+
+.gh_rule <- function(n) {
+  key <- as.character(n)
+  cached <- .gh_cache[[key]]
+  if (!is.null(cached)) return(cached)
+  i <- seq_len(n - 1L)
+  jacobi <- matrix(0, n, n)
+  jacobi[cbind(i, i + 1L)] <- sqrt(i)
+  jacobi[cbind(i + 1L, i)] <- sqrt(i)
+  e <- eigen(jacobi, symmetric = TRUE)
+  ord <- order(e$values)
+  out <- list(nodes = e$values[ord], weights = (e$vectors[1, ord])^2)
+  .gh_cache[[key]] <- out
+  out
+}
+
+# How many nodes the ranking quadrature needs. The integrand gets harder in both
+# the set size (the CDF power concentrates the mass in a tail) and the SD ratio
+# (a wider signal distribution pushes it further out), and Gauss-Hermite
+# converges fast but NON-uniformly, so a single fixed count is either wasteful
+# or wrong. Counts were calibrated against adaptive quadrature over
+# d_a in [0.3, 3.5]: the equal-variance ladder holds max error below 1e-8, and
+# the free-sdratio ladder below 1e-6 across sdratio in [0.5, 2.0]. That interval
+# is chosen to match the default normal(0, 0.3) prior on log sdratio, 97.9% of
+# which falls inside it -- the wider normal(0, 0.5) this replaced left one prior
+# draw in six outside the range the quadrature was verified over. The free
+# ladder stays below 1e-6 through m = 9 (8.2e-7) and reaches 3.1e-6 at m = 10;
+# check_data warns above m = 8, which is conservative by one.
+.ranking_gh_n <- function(max_m, free_sdratio) {
+  if (free_sdratio) {
+    counts <- c(32L, 48L, 64L, 80L, 96L, 128L)
+    breaks <- c(2, 3, 4, 5, 6)
+  } else {
+    counts <- c(20L, 24L, 32L, 40L, 48L, 64L, 80L, 96L, 128L)
+    breaks <- c(2, 3, 4, 6, 8, 10, 12, 16)
+  }
+  counts[findInterval(max_m, breaks, left.open = TRUE) + 1L]
+}
+
+# Rank probability P(target rank = rank_pos | set size m). Mirrors the Stan
+# sdt_ranking_logp / sdt_ranking_uv_logp kernels; shared by the density,
+# generator, and the sdt_ranking_logmu R companion. Vectorized over d and
+# sdratio (log SD ratio) for a scalar rank_pos and m; the rep(each =) factor
+# aligns per-draw d with the column-major nodes-by-draws matrix.
+.ranking_prob_r <- function(d, rank_pos, m, dist = "gumbel_min",
+                            sdratio = 0) {
+  if (dist == "gumbel_min") {
+    # the gamma ratio of sdt_ranking_logp() telescoped into
+    # -d + lgamma(m) - lgamma(k) - sum_{j = k-1}^{m-1} log(j + exp(-d)), whose
+    # j = 0 term cancels the -d; as a difference of lgammas it sums to m, not
+    # 1, at d = -40. log(j + exp(-d)) is taken off whichever term dominates, so
+    # it survives d < -709, where exp(-d) overflows
+    log_p <- lgamma(m) - lgamma(rank_pos) - if (rank_pos > 1) d else 0
+    for (j in seq(max(rank_pos - 1, 1), length.out = m - max(rank_pos - 1, 1))) {
+      log_p <- log_p - (pmax(log(j), -d) + log1p(exp(-abs(log(j) + d))))
+    }
+    exp(log_p)
+  } else {
+    n <- max(length(d), length(sdratio))
+    sigma <- rep_len(exp(sdratio), n)
+    # `d` is d_a; the separation in noise-SD units is d * the RMS scale, so the
+    # equal-variance case (sigma = 1) leaves eta untouched.
+    #
+    # Deliberately the free-sdratio ladder regardless of the sdratio values:
+    # this kernel serves log_lik/posterior_epred and the d*/r* functions, where
+    # accuracy matters and speed does not, and a count inferred from the values
+    # would make the result depend on how calls are batched (a vector holding
+    # one exact zero would quadrature differently from that element alone).
+    # configure_model() may compile Stan with the cheaper equal-variance ladder;
+    # both sit inside the calibrated tolerance, so the two agree to ~1e-9.
+    gh <- .gh_rule(.ranking_gh_n(m, free_sdratio = TRUE))
+    delta <- rep_len(d, n) * .sdt_rms_scale(sigma)
+    eta <- outer(gh$nodes, sigma) + rep(delta, each = length(gh$nodes))
+    log_terms <- log(gh$weights) +
+      (m - rank_pos) * stats::pnorm(eta, log.p = TRUE) +
+      (rank_pos - 1) * stats::pnorm(eta, lower.tail = FALSE, log.p = TRUE)
+    exp(lchoose(m - 1, rank_pos - 1) + matrixStats::colLogSumExps(log_terms))
+  }
+}
+
+# All rank probabilities (ranks 1..m), normalized. Returns a length-m vector
+# for scalar input and an observations-by-m matrix for vectorized input.
+.ranking_all_probs_r <- function(d, m, dist = "gumbel_min",
+                                 sdratio = 0) {
+  n <- max(length(d), length(sdratio))
+  probs <- vapply(seq_len(m), function(r) {
+    .ranking_prob_r(rep_len(d, n), r, m, dist, rep_len(sdratio, n))
+  }, numeric(n))
+  if (n == 1) probs / sum(probs) else probs / rowSums(probs)
+}
+
+
+#' @title Distribution functions for Ranking SDT
+#'
+#' @description Density and random generation for ranking signal detection
+#'   theory (Meyer-Grant et al., 2026). Models rank ordering of m items by
+#'   perceived strength. Only `d` is estimated (no criterion or stimulus
+#'   column). Supports Gumbel-min (closed form) and Gaussian UV-SDT
+#'   (numerical integration).
+#'
+#' @name sdt_ranking_dist
+#'
+#' @param counts Integer matrix with one row per observation and one rank-count
+#'   column per rank position (1 = most likely target), or a vector for a
+#'   single observation. Columns beyond a row's set size `m` must be 0.
+#' @param d Numeric vector. Sensitivity: the distance between the target and
+#'   lure distributions. It is \eqn{d'} when `sdratio` is 1 and, for
+#'   `dist = "gumbel_min"`, the \eqn{g'} of Meyer-Grant et al. (2026). With
+#'   another `sdratio` it is the balanced index \eqn{d_a} that [sdt_yn()]
+#'   reports (in root-mean-square SD units).
+#' @param m Integer vector. Number of ranked items per observation. Must be
+#'   at least 2 and no larger than the number of count columns.
+#' @param sdratio Numeric vector. Ratio of signal to noise standard deviations
+#'   (default 1, i.e., equal variance). Must be positive. Only used when
+#'   `dist = "normal"`.
+#' @param dist Character. The distribution assumed for the latent evidence:
+#'   "gumbel_min" (default), the smallest extreme value distribution with
+#'   cumulative distribution function \eqn{1 - \exp(-\exp(x))}, evaluated in
+#'   closed form; or "normal", Gaussian UV-SDT by numerical integration.
+#' @param log Logical. If `TRUE`, returns log-density (default `FALSE`).
+#' @param n Integer. Number of observations to generate. `n_trials`, `m`,
+#'   `d`, and `sdratio` are recycled to this length.
+#' @param n_trials Integer vector. Number of ranking trials per observation.
+#'
+#' @return `dsdt_ranking` returns the (log-)density (multinomial probability).
+#'   `rsdt_ranking` returns an integer matrix with one row per observation and
+#'   one rank-count column per rank position (`rank1` ... `rank max(m)`); rows
+#'   with a smaller set size have structural zeros in the surplus columns,
+#'   matching the wide format [sdt_ranking()] expects.
+#'
+#' @section Parameter scales:
+#' These functions take `sdratio` as the ratio itself, while [sdt_ranking()]
+#' estimates its logarithm (0 = equal variance): a fitted `sdratio` of 0.375 is
+#' a ratio of `exp(0.375) = 1.455`, and passing `0.375` here instead asks for a
+#' signal distribution 2.7 times narrower than the noise. That is a legal
+#' value and raises no error, so exponentiate first. `d` carries across
+#' unchanged.
+#'
+#' @references
+#' Meyer-Grant, C. G., Kellen, D., Harding, S. M., & Singmann, H. (2026).
+#'   Extreme-value signal detection theory for recognition memory: The
+#'   parametric road not taken. \emph{Psychological Review}. Advance online
+#'   publication. \doi{10.1037/rev0000615}
+#'
+#' @keywords distribution
+#' @export
+#' @examples
+#' # Gumbel-min ranking density
+#' dsdt_ranking(counts = c(40, 30, 20, 10), m = 4, d = 1.0)
+dsdt_ranking <- function(counts, m, d, sdratio = 1,
+                         dist = c("gumbel_min", "normal"),
+                         log = FALSE) {
+  dist <- match.arg(dist)
+  stopif(any(sdratio <= 0), "sdratio must be positive")
+  counts <- rbind(counts)
+  n <- nrow(counts)
+  m <- rep_len(as.integer(m), n)
+  d <- rep_len(d, n)
+  sdratio <- rep_len(sdratio, n)
+
+  stopif(any(m < 2), "m must be an integer >= 2")
+  stopif(any(m > ncol(counts)),
+         "m must not exceed the number of count columns")
+  stopif(anyNA(counts), "counts must not contain NA")
+  stopif(any(counts < 0), "counts must be non-negative")
+  stopif(any(counts[col(counts) > m] != 0),
+         "Count columns beyond the row's set size (m) must be 0")
+
+  log_dens <- numeric(n)
+  for (m_i in unique(m)) {
+    idx <- which(m == m_i)
+    probs <- rbind(.ranking_all_probs_r(d[idx], m_i, dist,
+                                        log(sdratio[idx])))
+    cnt <- counts[idx, seq_len(m_i), drop = FALSE]
+    log_dens[idx] <- lgamma(rowSums(cnt) + 1) - rowSums(lgamma(cnt + 1)) +
+      rowSums(cnt * log(probs))
+  }
+  if (log) log_dens else exp(log_dens)
+}
+
+
+#' @rdname sdt_ranking_dist
+#' @export
+#' @examples
+#' # Generate ranking data (m=4, Gumbel-min) for 10 subjects
+#' dat <- data.frame(id = 1:10, set_size = 4L)
+#' dat <- cbind(dat, rsdt_ranking(10, 100, m = 4, d = 1.0))
+#' head(dat)
+rsdt_ranking <- function(n, n_trials, m, d, sdratio = 1,
+                         dist = c("gumbel_min", "normal")) {
+  dist <- match.arg(dist)
+  stopif(length(n) != 1 || n < 1, "n must be a single positive integer")
+  stopif(any(n_trials < 1), "n_trials must be positive")
+  stopif(any(m < 2), "m must be an integer >= 2")
+  stopif(any(sdratio <= 0), "sdratio must be positive")
+
+  n_trials <- rep_len(as.integer(n_trials), n)
+  m <- rep_len(as.integer(m), n)
+  d <- rep_len(d, n)
+  sdratio <- rep_len(sdratio, n)
+
+  counts <- matrix(0L, n, max(m),
+                   dimnames = list(NULL, paste0("rank", seq_len(max(m)))))
+  for (m_i in unique(m)) {
+    idx <- which(m == m_i)
+    probs <- rbind(.ranking_all_probs_r(d[idx], m_i, dist,
+                                        log(sdratio[idx])))
+    for (k in seq_along(idx)) {
+      counts[idx[k], seq_len(m_i)] <-
+        as.integer(stats::rmultinom(1, n_trials[idx[k]], probs[k, ]))
+    }
+  }
+  counts
+}
+
+
 # Category probabilities from thresholds: F(thresholds) differenced into K
 # interval masses. `d` is d_a, so the separation in noise units is
 # d * .sdt_rms_scale(sdratio); the thresholds are NOT rescaled, they stay on the
@@ -2752,290 +3190,6 @@ rsdt_rating <- function(n, n_trials, stimulus, d, thresholds,
   counts <- matrix(0L, n, K, dimnames = list(NULL, paste0("r", seq_len(K))))
   for (i in seq_len(n)) {
     counts[i, ] <- as.integer(stats::rmultinom(1, n_trials[i], probs[i, ]))
-  }
-  counts
-}
-
-
-#' @title Distribution functions for m-AFC SDT
-#'
-#' @description Density and random generation for m-alternative forced choice
-#'   signal detection theory (DeCarlo, 2012). Models accuracy in tasks where
-#'   one of `m` alternatives contains the signal. Only the `d` parameter
-#'   is estimated (no criterion). All arguments are recycled to the length of
-#'   the longest one, so passing vectors of `d`, `m`, or `n_trials`
-#'   generates (or evaluates) one observation per element.
-#'
-#' @name sdt_mafc_dist
-#'
-#' @param n_correct Integer vector. Number of correct responses.
-#' @param n_trials Integer vector. Total number of trials per observation.
-#' @param m Integer vector. Number of alternatives per observation. Must be
-#'   at least 2.
-#' @param d Numeric vector. Sensitivity \eqn{d'}: the distance between the
-#'   signal and distractor distributions in SD units. m-AFC assumes a common
-#'   scale for the two distributions, so this is also the balanced index
-#'   \eqn{d_a} that [sdt_yn()] reports.
-#' @inheritParams SDTdist
-#' @param log Logical. If `TRUE`, returns log-density (default `FALSE`).
-#' @param n Integer. Number of observations to generate. `n_trials`, `m`, and
-#'   `d` are recycled to this length.
-#'
-#' @return `dsdt_mafc` returns the (log-)density (binomial probability).
-#'   `rsdt_mafc` returns an integer vector with the number of correct
-#'   responses per observation.
-#'
-#' @references
-#' DeCarlo, L. T. (2012). On a signal detection approach to m-alternative
-#'   forced choice with bias, with maximum likelihood and Bayesian approaches
-#'   to estimation. \emph{Journal of Mathematical Psychology}, \emph{56}(3),
-#'   196--207. \doi{10.1016/j.jmp.2012.02.004}
-#'
-#' @keywords distribution
-#' @export
-#' @examples
-#' # 4-AFC density
-#' dsdt_mafc(n_correct = 80, n_trials = 100, m = 4, d = 1.5)
-dsdt_mafc <- function(n_correct, n_trials, m, d,
-                      dist = c("normal", "gumbel_min", "gumbel_max",
-                               "logistic"),
-                      log = FALSE) {
-  dist <- match.arg(dist)
-  stopif(any(m < 2), "m must be an integer >= 2")
-
-  n <- max(lengths(list(n_correct, n_trials, m, d)))
-  n_correct <- rep_len(n_correct, n)
-  n_trials <- rep_len(n_trials, n)
-
-  stopif(any(n_correct < 0), "n_correct must be non-negative")
-  stopif(any(n_correct > n_trials), "n_correct must not exceed n_trials")
-
-  pc <- .mafc_pc_r(rep_len(d, n), rep_len(as.integer(m), n), dist)
-  stats::dbinom(n_correct, n_trials, pc, log = log)
-}
-
-
-#' @rdname sdt_mafc_dist
-#' @export
-#' @examples
-#' # Generate 4-AFC data for 20 subjects with varying sensitivity
-#' dat <- data.frame(id = 1:20, n_trials = 200L)
-#' dat$n_correct <- rsdt_mafc(nrow(dat), dat$n_trials, m = 4,
-#'                            d = rnorm(20, 1.5, 0.4))
-#' head(dat)
-rsdt_mafc <- function(n, n_trials, m, d,
-                      dist = c("normal", "gumbel_min", "gumbel_max",
-                               "logistic")) {
-  dist <- match.arg(dist)
-  stopif(length(n) != 1 || n < 1, "n must be a single positive integer")
-  stopif(any(m < 2), "m must be an integer >= 2")
-  stopif(any(n_trials < 1), "n_trials must be positive")
-
-  pc <- .mafc_pc_r(rep_len(d, n), rep_len(as.integer(m), n), dist)
-  stats::rbinom(n, n_trials, pc)
-}
-
-
-# Gauss-Hermite rule for the probabilists' weight (the standard normal density),
-# built by Golub-Welsch on the Hermite Jacobi matrix so that any node count is
-# available without shipping hand-copied constants. Cached, because the
-# eigendecomposition is far too slow to repeat inside a likelihood.
-.gh_cache <- new.env(parent = emptyenv())
-
-.gh_rule <- function(n) {
-  key <- as.character(n)
-  cached <- .gh_cache[[key]]
-  if (!is.null(cached)) return(cached)
-  i <- seq_len(n - 1L)
-  jacobi <- matrix(0, n, n)
-  jacobi[cbind(i, i + 1L)] <- sqrt(i)
-  jacobi[cbind(i + 1L, i)] <- sqrt(i)
-  e <- eigen(jacobi, symmetric = TRUE)
-  ord <- order(e$values)
-  out <- list(nodes = e$values[ord], weights = (e$vectors[1, ord])^2)
-  .gh_cache[[key]] <- out
-  out
-}
-
-# How many nodes the ranking quadrature needs. The integrand gets harder in both
-# the set size (the CDF power concentrates the mass in a tail) and the SD ratio
-# (a wider signal distribution pushes it further out), and Gauss-Hermite
-# converges fast but NON-uniformly, so a single fixed count is either wasteful
-# or wrong. Counts were calibrated against adaptive quadrature over
-# d_a in [0.3, 3.5]: the equal-variance ladder holds max error below 1e-8, and
-# the free-sdratio ladder below 1e-6 across sdratio in [0.5, 2.0]. That interval
-# is chosen to match the default normal(0, 0.3) prior on log sdratio, 97.9% of
-# which falls inside it -- the wider normal(0, 0.5) this replaced left one prior
-# draw in six outside the range the quadrature was verified over. Beyond m = 8
-# with a free sdratio even 128 nodes miss the 1e-6 target; check_data warns.
-.ranking_gh_n <- function(max_m, free_sdratio) {
-  if (free_sdratio) {
-    counts <- c(32L, 48L, 64L, 80L, 96L, 128L)
-    breaks <- c(2, 3, 4, 5, 6)
-  } else {
-    counts <- c(20L, 24L, 32L, 40L, 48L, 64L, 80L, 96L, 128L)
-    breaks <- c(2, 3, 4, 6, 8, 10, 12, 16)
-  }
-  counts[findInterval(max_m, breaks, left.open = TRUE) + 1L]
-}
-
-# Rank probability P(target rank = rank_pos | set size m). Mirrors the Stan
-# sdt_ranking_logp / sdt_ranking_uv_logp kernels; shared by the density,
-# generator, and the sdt_ranking_logmu R companion. Vectorized over d and
-# sdratio (log SD ratio) for a scalar rank_pos and m; the rep(each =) factor
-# aligns per-draw d with the column-major nodes-by-draws matrix.
-.ranking_prob_r <- function(d, rank_pos, m, dist = "gumbel_min",
-                            sdratio = 0) {
-  if (dist == "gumbel_min") {
-    e_neg_g <- exp(-d)
-    log_p <- -d + lgamma(m) + lgamma(rank_pos - 1 + e_neg_g) -
-             lgamma(rank_pos) - lgamma(m + e_neg_g)
-    exp(log_p)
-  } else {
-    n <- max(length(d), length(sdratio))
-    sigma <- rep_len(exp(sdratio), n)
-    # `d` is d_a; the separation in noise-SD units is d * the RMS scale, so the
-    # equal-variance case (sigma = 1) leaves eta untouched.
-    #
-    # Deliberately the free-sdratio ladder regardless of the sdratio values:
-    # this kernel serves log_lik/posterior_epred and the d*/r* functions, where
-    # accuracy matters and speed does not, and a count inferred from the values
-    # would make the result depend on how calls are batched (a vector holding
-    # one exact zero would quadrature differently from that element alone).
-    # configure_model() may compile Stan with the cheaper equal-variance ladder;
-    # both sit inside the calibrated tolerance, so the two agree to ~1e-9.
-    gh <- .gh_rule(.ranking_gh_n(m, free_sdratio = TRUE))
-    delta <- rep_len(d, n) * .sdt_rms_scale(sigma)
-    eta <- outer(gh$nodes, sigma) + rep(delta, each = length(gh$nodes))
-    log_terms <- log(gh$weights) +
-      (m - rank_pos) * stats::pnorm(eta, log.p = TRUE) +
-      (rank_pos - 1) * stats::pnorm(eta, lower.tail = FALSE, log.p = TRUE)
-    exp(lchoose(m - 1, rank_pos - 1) + matrixStats::colLogSumExps(log_terms))
-  }
-}
-
-# All rank probabilities (ranks 1..m), normalized. Returns a length-m vector
-# for scalar input and an observations-by-m matrix for vectorized input.
-.ranking_all_probs_r <- function(d, m, dist = "gumbel_min",
-                                 sdratio = 0) {
-  n <- max(length(d), length(sdratio))
-  probs <- vapply(seq_len(m), function(r) {
-    .ranking_prob_r(rep_len(d, n), r, m, dist, rep_len(sdratio, n))
-  }, numeric(n))
-  if (n == 1) probs / sum(probs) else probs / rowSums(probs)
-}
-
-
-#' @title Distribution functions for Ranking SDT
-#'
-#' @description Density and random generation for ranking signal detection
-#'   theory (Meyer-Grant et al., 2026). Models rank ordering of m items by
-#'   perceived strength. Only `d` is estimated (no criterion or stimulus
-#'   column). Supports Gumbel-min (closed form) and Gaussian UV-SDT
-#'   (numerical integration).
-#'
-#' @name sdt_ranking_dist
-#'
-#' @param counts Integer matrix with one row per observation and one rank-count
-#'   column per rank position (1 = most likely target), or a vector for a
-#'   single observation. Columns beyond a row's set size `m` must be 0.
-#' @param d Numeric vector. Sensitivity: the distance between the target and
-#'   lure distributions. It is \eqn{d'} when `sdratio` is 1 and, for
-#'   `dist = "gumbel_min"`, the \eqn{g'} of Meyer-Grant et al. (2026). With
-#'   another `sdratio` it is the balanced index \eqn{d_a} that [sdt_yn()]
-#'   reports (in root-mean-square SD units).
-#' @param m Integer vector. Number of ranked items per observation. Must be
-#'   at least 2 and no larger than the number of count columns.
-#' @param sdratio Numeric vector. Ratio of signal to noise standard deviations
-#'   (default 1, i.e., equal variance). Must be positive. Only used when
-#'   `dist = "normal"`.
-#' @param dist Character. The distribution assumed for the latent evidence:
-#'   "gumbel_min" (default), the smallest extreme value distribution with
-#'   cumulative distribution function \eqn{1 - \exp(-\exp(x))}, evaluated in
-#'   closed form; or "normal", Gaussian UV-SDT by numerical integration.
-#' @param log Logical. If `TRUE`, returns log-density (default `FALSE`).
-#' @param n Integer. Number of observations to generate. `n_trials`, `m`,
-#'   `d`, and `sdratio` are recycled to this length.
-#' @param n_trials Integer vector. Number of ranking trials per observation.
-#'
-#' @return `dsdt_ranking` returns the (log-)density (multinomial probability).
-#'   `rsdt_ranking` returns an integer matrix with one row per observation and
-#'   one rank-count column per rank position (`rank1` ... `rank max(m)`); rows
-#'   with a smaller set size have structural zeros in the surplus columns,
-#'   matching the wide format [sdt_ranking()] expects.
-#'
-#' @references
-#' Meyer-Grant, C. G., Kellen, D., Harding, S. M., & Singmann, H. (2026).
-#'   Extreme-value signal detection theory for recognition memory: The
-#'   parametric road not taken. \emph{Psychological Review}. Advance online
-#'   publication. \doi{10.1037/rev0000615}
-#'
-#' @keywords distribution
-#' @export
-#' @examples
-#' # Gumbel-min ranking density
-#' dsdt_ranking(counts = c(40, 30, 20, 10), m = 4, d = 1.0)
-dsdt_ranking <- function(counts, m, d, sdratio = 1,
-                         dist = c("gumbel_min", "normal"),
-                         log = FALSE) {
-  dist <- match.arg(dist)
-  stopif(any(sdratio <= 0), "sdratio must be positive")
-  counts <- rbind(counts)
-  n <- nrow(counts)
-  m <- rep_len(as.integer(m), n)
-  d <- rep_len(d, n)
-  sdratio <- rep_len(sdratio, n)
-
-  stopif(any(m < 2), "m must be an integer >= 2")
-  stopif(any(m > ncol(counts)),
-         "m must not exceed the number of count columns")
-  stopif(any(counts < 0), "counts must be non-negative")
-  stopif(any(counts[col(counts) > m] != 0),
-         "Count columns beyond the row's set size (m) must be 0")
-
-  log_dens <- numeric(n)
-  for (m_i in unique(m)) {
-    idx <- which(m == m_i)
-    probs <- rbind(.ranking_all_probs_r(d[idx], m_i, dist,
-                                        log(sdratio[idx])))
-    cnt <- counts[idx, seq_len(m_i), drop = FALSE]
-    log_dens[idx] <- lgamma(rowSums(cnt) + 1) - rowSums(lgamma(cnt + 1)) +
-      rowSums(cnt * log(probs))
-  }
-  if (log) log_dens else exp(log_dens)
-}
-
-
-#' @rdname sdt_ranking_dist
-#' @export
-#' @examples
-#' # Generate ranking data (m=4, Gumbel-min) for 10 subjects
-#' dat <- data.frame(id = 1:10, set_size = 4L)
-#' dat <- cbind(dat, rsdt_ranking(10, 100, m = 4, d = 1.0))
-#' head(dat)
-rsdt_ranking <- function(n, n_trials, m, d, sdratio = 1,
-                         dist = c("gumbel_min", "normal")) {
-  dist <- match.arg(dist)
-  stopif(length(n) != 1 || n < 1, "n must be a single positive integer")
-  stopif(any(n_trials < 1), "n_trials must be positive")
-  stopif(any(m < 2), "m must be an integer >= 2")
-  stopif(any(sdratio <= 0), "sdratio must be positive")
-
-  n_trials <- rep_len(as.integer(n_trials), n)
-  m <- rep_len(as.integer(m), n)
-  d <- rep_len(d, n)
-  sdratio <- rep_len(sdratio, n)
-
-  counts <- matrix(0L, n, max(m),
-                   dimnames = list(NULL, paste0("rank", seq_len(max(m)))))
-  for (m_i in unique(m)) {
-    idx <- which(m == m_i)
-    probs <- rbind(.ranking_all_probs_r(d[idx], m_i, dist,
-                                        log(sdratio[idx])))
-    for (k in seq_along(idx)) {
-      counts[idx[k], seq_len(m_i)] <-
-        as.integer(stats::rmultinom(1, n_trials[idx[k]], probs[k, ]))
-    }
   }
   counts
 }
