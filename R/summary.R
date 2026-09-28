@@ -138,7 +138,7 @@ select_pars <- function(x) {
 # select rows of another parameter such as "kappa_Intercept" (#379). Plain
 # data.frame subsetting with drop = FALSE also keeps a single fixed-effect row
 # intact, which broke the old sapply+apply approach for single-coefficient
-# models such as gumbel-min sdt_ranking (dprime ~ 1) (#369).
+# models such as gumbel-min sdt_ranking (d ~ 1) (#369).
 .summary_fixed_rows <- function(fixed, pars) {
   fixed[sub("_.*$", "", rownames(fixed)) %in% pars, , drop = FALSE]
 }

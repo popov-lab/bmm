@@ -475,6 +475,13 @@ test_that("every model ships an sd default on the link scale of each parameter",
     sdt_mafc(response = "n_correct", n_trials = "n_trials", m = 4)
   )
   expect_equal(sd_default(pr, "d"), "exponential(1)")
+
+  pr <- default_prior(
+    bmf(d ~ 1 + (1 | id), sdratio ~ 1 + (1 | id)), meyer_grant_jakob_2025,
+    sdt_ranking(response = paste0("rank", 1:5), m = "set_size", dist = "normal")
+  )
+  expect_equal(sd_default(pr, "d"), "exponential(1)")
+  expect_equal(sd_default(pr, "sdratio"), "exponential(2)")
 })
 
 test_that("a freed mu / mu1 gets regularizing main, effects and sd priors on the tan_half scale", {
