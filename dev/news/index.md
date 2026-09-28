@@ -415,6 +415,23 @@
   value*), and no longer warns for **sdt_yn** fits that the reserved
   column `dist_type` will be overwritten
   ([\#429](https://github.com/popov-lab/bmm/issues/429)).
+- **m3** no longer ignores `num_options` when its numbers are named
+  after the response categories, as in
+  `num_options = c(corr = 1, other = 4, dist = 5, npl = 5)`. Each
+  category’s activation was combined with itself instead of its number
+  of options, with no error or warning. Such names are now matched to
+  the categories, in any order; names already used by a data column or a
+  parameter are an error. If `fit$formula$formula` shows a category
+  twice, as in `log(corr * corr)`, refit the model, e.g. with
+  `update(fit)` ([\#449](https://github.com/popov-lab/bmm/issues/449)).
+- [`dm3()`](https://popov-lab.github.io/bmm/dev/reference/m3dist.md) and
+  [`rm3()`](https://popov-lab.github.io/bmm/dev/reference/m3dist.md) no
+  longer mix up the response categories when the activation formulas are
+  not listed in the order of `resp_cats`. Each number of options was
+  applied to whichever activation stood at its position, so densities
+  and simulated counts were wrong; rerun such calls. Fitting with
+  [`bmm()`](https://popov-lab.github.io/bmm/dev/reference/bmm.md) was
+  not affected.
 
 #### Other changes
 

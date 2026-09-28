@@ -76,7 +76,11 @@ response categories used for the M3.</p></dd>
 of candidates in the respective response categories are constant across all conditions
 in the experiment. Or a vector specifying the variable names that contain the number of
 candidates in each response category. The order of these variables should be in the
-same order as the names of the response categories passed to <code>resp_cats</code></p></dd>
+same order as the names of the response categories passed to <code>resp_cats</code>. Numbers
+named after the response categories, e.g. <code>c(corr = 1, other = 4)</code>, are matched to
+the categories by name. Numbers without names, or with other names, are taken in
+the order of <code>resp_cats</code>, and other names become the names of the columns
+bmm adds to the data.</p></dd>
 
 
 <dt id="arg-choice-rule">choice_rule<a class="anchor" aria-label="anchor" href="#arg-choice-rule"></a></dt>
