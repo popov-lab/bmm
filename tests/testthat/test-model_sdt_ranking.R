@@ -239,6 +239,55 @@ test_that("the quadrature ladder grows with set size and with a free sdratio", {
   }
 })
 
+test_that("the free-sdratio ladder is accurate where the fixed one is not", {
+  # The reference shares nothing with Gauss-Hermite: adaptive quadrature in a
+  # peak-shifted log space, integrated on each side of the peak.
+  log_integrand <- function(x, k, m, d, sigma) {
+    eta <- d * sqrt((1 + sigma^2) / 2) + sigma * x
+    dnorm(x, log = TRUE) + (m - k) * pnorm(eta, log.p = TRUE) +
+      (k - 1) * pnorm(eta, lower.tail = FALSE, log.p = TRUE)
+  }
+  ref_logp <- function(k, m, d, sigma) {
+    f <- function(x) log_integrand(x, k, m, d, sigma)
+    peak <- optimize(f, c(-200, 200), maximum = TRUE, tol = 1e-10)
+    x0 <- peak$maximum
+    f0 <- peak$objective
+    g <- function(x) {
+      v <- exp(f(x) - f0)
+      v[!is.finite(v)] <- 0
+      v
+    }
+    left <- integrate(g, -Inf, x0, rel.tol = 1e-12, abs.tol = 0,
+                      subdivisions = 2000L)
+    right <- integrate(g, x0, Inf, rel.tol = 1e-12, abs.tol = 0,
+                       subdivisions = 2000L)
+    lchoose(m - 1, k - 1) + f0 + log(left$value + right$value)
+  }
+  # R only evaluates the free ladder, so the fixed one is rebuilt here to show
+  # that the node count, not the kernel, is what makes the free one accurate
+  fixed_ladder_prob <- function(d, rank_pos, m, sigma) {
+    gh <- bmm:::.gh_rule(bmm:::.ranking_gh_n(m, FALSE))
+    eta <- gh$nodes * sigma + d * bmm:::.sdt_rms_scale(sigma)
+    log_terms <- log(gh$weights) +
+      (m - rank_pos) * pnorm(eta, log.p = TRUE) +
+      (rank_pos - 1) * pnorm(eta, lower.tail = FALSE, log.p = TRUE)
+    exp(lchoose(m - 1, rank_pos - 1) + matrixStats::logSumExp(log_terms))
+  }
+
+  d <- 1.4
+  sigma <- 2
+  for (m in c(4L, 8L)) {
+    for (k in seq_len(m)) {
+      ref <- exp(ref_logp(k, m, d, sigma))
+      info <- paste("m =", m, "k =", k)
+      p_free <- bmm:::.ranking_prob_r(d, k, m, "normal", log(sigma))
+      expect_lt(abs(p_free - ref), 1e-6, label = info)
+      p_fixed <- fixed_ladder_prob(d, k, m, sigma)
+      expect_false(abs(p_fixed - ref) < 1e-6, info = info)
+    }
+  }
+})
+
 test_that("the generated Gauss-Hermite rule integrates the normal exactly", {
   # a rule with n nodes is exact for polynomials up to degree 2n-1; check the
   # moments of the standard normal, which is what the weights must reproduce
@@ -515,6 +564,14 @@ test_that("check_data errors when set size exceeds the number of rank columns", 
                "number of rank columns")
 })
 
+test_that("NA rank counts beyond a row's set size are structural zeros", {
+  dat <- data.frame(id = 1, set_size = 3L,
+                    rank1 = 30, rank2 = 15, rank3 = 5, rank4 = NA, rank5 = NA)
+  out <- check_data(sdt_ranking(ranks5, m = "set_size"), dat, bmf(d ~ 1))
+  expect_equal(unname(out$Y[1, ]), c(30, 15, 5, 0, 0))
+  expect_equal(out$nTrials, 50)
+})
+
 
 ############################################################################# !
 # FORMULA CONSTRUCTION TESTS                                              ####
@@ -532,6 +589,17 @@ test_that("bmf2bf.sdt_ranking builds a multinomial non-linear formula", {
   expect_true(all(vapply(paste0("mu", ranks4[-1]), function(p) {
     any(grepl(p, names(bf$pforms), fixed = TRUE))
   }, logical(1))))
+})
+
+test_that("bmf2bf maps every rank category to its own logit", {
+  bf <- bmf2bf(sdt_ranking(ranks4, m = 4), bmf(d ~ 1))
+  expect_match(deparse(bf$formula, width.cutoff = 500),
+               "sdt_ranking_logmu(1, max_rank,", fixed = TRUE)
+  for (k in 2:4) {
+    pform <- deparse(bf$pforms[[paste0("mu", ranks4[k])]], width.cutoff = 500)
+    expect_match(pform, paste0("sdt_ranking_logmu(", k, ", max_rank,"),
+                 fixed = TRUE)
+  }
 })
 
 test_that("a link on d is inverted inside the ranking formula", {
