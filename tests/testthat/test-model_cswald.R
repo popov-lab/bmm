@@ -561,7 +561,8 @@ test_that("the vectorized cswald likelihood matches the scalar and R versions", 
 
   for (version in c("simple", "crisk")) {
     sdata <- cswald_parity_data()
-    fit <- compile_cswald_parity_model(version)$sample(
+    model <- compile_cswald_parity_model(version)
+    fit <- model$sample(
       data = sdata, chains = 1, iter_sampling = 1, fixed_param = TRUE,
       refresh = 0, show_messages = FALSE, sig_figs = 18, seed = 1
     )
@@ -579,6 +580,55 @@ test_that("the vectorized cswald likelihood matches the scalar and R versions", 
     # elements, so one bad element next to 229 good ones passes. The floor here
     # is Stan's Phi(), accurate to ~1e-10 absolute against a 60-digit reference
     expect_lt(max(abs(lp_scalar - lp_r)), 1e-8)
+
+    # rt at and below ndt, for both responses (#453). Kept apart from the data
+    # above because a single -Inf would hide every other element of lp_vector;
+    # the preserved seed keeps the draw order the comment above measures
+    edge <- list(
+      N = 4, rt = rep(1.6, 4), dec = c(0L, 1L, 0L, 1L), mu = rep(0, 4),
+      drift = rep(2, 4), bound = rep(1.5, 4), ndt = c(1.6, 1.6, 1.7, 1.7),
+      s = rep(1, 4), zr = rep(0.5, 4)
+    )
+    edge_fit <- withr::with_preserve_seed(model$sample(
+      data = edge, chains = 1, iter_sampling = 1, fixed_param = TRUE,
+      refresh = 0, show_messages = FALSE, seed = 1
+    ))
+    expect_identical(
+      as.numeric(edge_fit$draws("lp_scalar", format = "draws_matrix")[1, ]),
+      with(edge, .dcswald(rt, dec, drift, bound, ndt, zr, s,
+        version = version, log = TRUE
+      ))
+    )
+  }
+})
+
+test_that("the R cswald likelihood is 0 or -Inf where rt <= ndt, not NaN (#453)", {
+  # held-out data in kfold() or loo::elpd() can place ndt draws at or above an
+  # RT that the fit never saw; the first draw keeps rt inside the support
+  lik <- function(version, response) {
+    .dcswald(
+      rt = 1.6, response = response, drift = 2, bound = 1.5,
+      ndt = c(1.0, 1.6, 1.7), zr = 0.5, s = 1, version = version, log = TRUE
+    )
+  }
+  inside <- function(version, response) {
+    .dcswald(
+      rt = 1.6, response = response, drift = 2, bound = 1.5,
+      ndt = 1.0, zr = 0.5, s = 1, version = version, log = TRUE
+    )
+  }
+
+  for (version in c("simple", "crisk")) {
+    for (response in 0:1) {
+      ll <- expect_silent(lik(version, response))
+      expect_equal(ll[1], inside(version, response))
+      # a censored simple-version error only says the correct response had not
+      # arrived by rt, which is certain before ndt: survival 1, as in swald_lccdf
+      expect_identical(
+        ll[2:3],
+        rep(if (version == "simple" && response == 0) 0 else -Inf, 2)
+      )
+    }
   }
 })
 
