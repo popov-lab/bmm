@@ -20,11 +20,12 @@ badge](https://popov-lab.r-universe.dev/badges/bmm)](https://popov-lab.r-univers
 
 `bmm` fits cognitive measurement models to behavioral data. You write a
 `brms` formula for each parameter of the model, and `bmm` translates the
-measurement model into a distribution that `brms` and Stan can sample
-from. The result is a hierarchical Bayesian estimate of the parameters
-that describe the cognitive processes behind the data, such as memory
-precision, the rate of guessing, or the sensitivity in a recognition
-task, in the same formula interface you already use for regression.
+measurement model into a distribution that `brms` can pass to Stan, the
+sampler behind it. The result is a hierarchical Bayesian estimate of the
+parameters that describe the cognitive processes behind the data, such
+as memory precision, the rate of guessing, or the sensitivity in a
+recognition task, in the same formula interface you already use for
+regression.
 
 The [documentation website](https://popov-lab.github.io/bmm/) has a [Get
 started](https://popov-lab.github.io/bmm/articles/bmm.html) page and one
@@ -33,7 +34,7 @@ article per model family. This page gives you the short version.
 ## Which model for your task
 
 You arrive with data from a task, so this is how the models are
-organised. The lists below come from the installed package, so they show
+organized. The lists below are generated from the package, so they show
 the models of the version this page was built from.
 
 **Continuous reproduction.** Participants reproduce a color, an
@@ -51,20 +52,22 @@ article](https://popov-lab.github.io/bmm/articles/bmm_vwm_crt.html).
   Discrimination Model (SDM) by Oberauer (2023)
 
 **Categorical recall and n-AFC decisions.** Participants choose one
-response from a set of categories, for example the correct item, an item
-from another position, or an item that was not studied. See the [M3
+response from a set of categories (n-alternative forced choice), for
+example the correct item, an item from another position, or an item that
+was not studied. See the [M3
 article](https://popov-lab.github.io/bmm/articles/bmm_m3.html).
 
 - [`m3()`](https://popov-lab.github.io/bmm/reference/m3.html): The
   Multinomial / Memory Measurement Model
 
-**Detection, recognition and confidence judgements.** Participants
-decide whether a signal was present or an item was studied, rate their
+**Detection, recognition and confidence judgments.** Participants decide
+whether a signal was present or an item was studied, rate their
 confidence, pick the target among several alternatives, or rank the
-alternatives. One signal detection model per response format; the [Get
-started](https://popov-lab.github.io/bmm/articles/bmm.html#detection-recognition-and-confidence-judgements)
-page has a table of the response formats and noise distributions each
-model covers.
+alternatives. One signal detection model per response format, each fit
+to response counts per participant and condition. The [Get
+started](https://popov-lab.github.io/bmm/articles/bmm.html#detection-recognition-and-confidence-judgments)
+page has a table of the response formats and the noise distributions
+each model offers.
 
 - [`sdt_mafc()`](https://popov-lab.github.io/bmm/reference/sdt_mafc.html):
   Signal Detection Theory (m-AFC)
@@ -104,9 +107,9 @@ The released version is on CRAN:
 install.packages("bmm")
 ```
 
-Fitting a model needs a C++ compiler and a Stan backend (`cmdstanr` or
-`rstan`). Run `bmm_setup()` to check both. It prints one fix for every
-check that failed and installs nothing itself:
+Fitting a model needs a C++ compiler and a Stan backend, `cmdstanr` or
+`rstan`; we recommend `cmdstanr`. Run `bmm_setup()` to check both. It
+prints one fix for every check that failed and installs nothing itself:
 
 ``` r
 bmm::bmm_setup()
@@ -136,7 +139,7 @@ also with the `cmdstanr` backend.
 <details>
 <summary>
 <b>Install the 0.0.1 version of bmm (if following version 6 of the
-tutorial paper on OSF)</b>
+tutorial paper on the Open Science Framework)</b>
 </summary>
 
 </br>
@@ -160,12 +163,17 @@ remotes::install_github("popov-lab/bmm@v0.0.1", upgrade = "never")
 A fit takes three things: a model object that names the columns of your
 data, a formula for each parameter, and the data. Here we fit a yes/no
 signal detection model to the recognition data of Broeder and Schuetz
-(2009) that ships with the package, with one response criterion per
-base-rate condition and participant-level variation in both parameters:
+(2009) that ships with the package. Its two parameters are the
+sensitivity `d` and the response `criterion`. The data has five
+conditions that varied the proportion of old items, so we estimate one
+criterion per condition (`0 + condition`), and we let both parameters
+vary between participants (`(1 | id)`):
 
 ``` r
 library(bmm)
 
+# n_old counts the "old" responses per participant, condition and stimulus
+# type; stimulus is 1 for old items and 0 for new items
 model <- sdt_yn(
   response = "n_old",
   stimulus = "stimulus",
@@ -182,10 +190,11 @@ fit <- bmm(formula, data = broeder_schuetz_2009_e3, model = model)
 summary(fit)
 ```
 
-The fit is a `brmsfit` with extras, so `summary()`, `pp_check()` and the
-rest of the `brms` toolbox work as usual. The [Get
+The fit is a `brms` fit with extras, so `summary()`, posterior
+predictive checks with `pp_check()` and the rest of the `brms` toolbox
+work as usual. The [Get
 started](https://popov-lab.github.io/bmm/articles/bmm.html) page walks
-through this example line by line.
+through this example line by line, including how to read the summary.
 
 ## Learn more
 
