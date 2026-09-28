@@ -68,19 +68,19 @@ test_that("print.bmmsummary handles a single regression coefficient row (#369)",
 })
 
 test_that(".summary_fixed_rows keeps a single fixed-effect row", {
-  # gumbel-min sdt_ranking has one population coefficient (dprime_Intercept) but
-  # two printed parameters (dprime, sdratio); the old sapply+apply errored here.
-  one_row <- data.frame(Estimate = 0.6, Rhat = 1, row.names = "dprime_Intercept")
-  out <- .summary_fixed_rows(one_row, c("dprime", "sdratio"))
+  # gumbel-min sdt_ranking has one population coefficient (d_Intercept) but
+  # two printed parameters (d, sdratio); the old sapply+apply errored here.
+  one_row <- data.frame(Estimate = 0.6, Rhat = 1, row.names = "d_Intercept")
+  out <- .summary_fixed_rows(one_row, c("d", "sdratio"))
   expect_s3_class(out, "data.frame")
-  expect_identical(rownames(out), "dprime_Intercept")
+  expect_identical(rownames(out), "d_Intercept")
 })
 
 test_that(".summary_fixed_rows selects all rows matching the printed parameters", {
   fixed <- data.frame(
     Estimate = 1:3, Rhat = c(1, NA, 1),
-    row.names = c("dprime_Intercept", "sdratio_Intercept", "nuisance_Intercept")
+    row.names = c("d_Intercept", "sdratio_Intercept", "nuisance_Intercept")
   )
-  out <- .summary_fixed_rows(fixed, c("dprime", "sdratio"))
-  expect_identical(sort(rownames(out)), c("dprime_Intercept", "sdratio_Intercept"))
+  out <- .summary_fixed_rows(fixed, c("d", "sdratio"))
+  expect_identical(sort(rownames(out)), c("d_Intercept", "sdratio_Intercept"))
 })

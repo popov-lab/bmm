@@ -70,12 +70,25 @@ test_that("the default sdratio prior brackets the group-level estimates", {
   # 1.26 signal over noise, and the broeder_schuetz_2009_e3 posterior gives
   # 1.46 [1.25, 1.71]. The prior has to reach past the widest ratio those
   # support and still keep its mass off ratios above 2, which recognition does
-  # not produce -- one-sided, "covers the empirical range" cannot fail.
-  main <- sdt_yn("n_old", "stimulus", "n_trials")$default_priors$sdratio$main
-  sd <- as.numeric(sub("normal\\(0, ([0-9.]+)\\)", "\\1", main))
-  expect_true(is.finite(sd), info = main)
-  expect_gt(exp(qnorm(0.975, 0, sd)), 1.71)
-  expect_gt(diff(pnorm(log(c(0.5, 2)), 0, sd)), 0.95)
+  # not produce -- one-sided, "covers the empirical range" cannot fail. The
+  # upper bound matters twice for ranking: .ranking_gh_n() is calibrated over
+  # ratios in [0.5, 2.0].
+  models <- list(sdt_yn("n_old", "stimulus", "n_trials"),
+                 sdt_ranking(paste0("rank", 1:4), m = 4, dist = "normal"))
+  for (model in models) {
+    main <- model$default_priors$sdratio$main
+    sd <- as.numeric(sub("normal\\(0, ([0-9.]+)\\)", "\\1", main))
+    expect_true(is.finite(sd), info = main)
+    expect_gt(exp(qnorm(0.975, 0, sd)), 1.71)
+    expect_gt(diff(pnorm(log(c(0.5, 2)), 0, sd)), 0.95)
+  }
+})
+
+test_that("sdratio priors agree across the SDT models", {
+  yn <- sdt_yn("n_old", "stimulus", "n_trials")$default_priors$sdratio
+  rk <- sdt_ranking(paste0("rank", 1:4), m = 4,
+                    dist = "normal")$default_priors$sdratio
+  expect_identical(yn, rk)
 })
 
 test_that("quantile functions invert their cdfs", {
