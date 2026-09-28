@@ -180,6 +180,8 @@ The following models are supported:
 
 - sdt_mafc(response, n_trials, m, dist, links)
 
+- sdt_ranking(response, m, dist, links)
+
 - sdt_yn(response, stimulus, n_trials, dist, links)
 
 Type ?modelname to get information about a specific model, e.g. ?imm

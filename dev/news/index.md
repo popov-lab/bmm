@@ -34,6 +34,20 @@
   [`sdt_yn()`](https://popov-lab.github.io/bmm/dev/reference/sdt_yn.md)
   reports. Thanks to
   [@GidonFrischkorn](https://github.com/GidonFrischkorn)
+- Add **Ranking Signal Detection Theory** (`sdt_ranking`) for tasks
+  where observers rank `m` items, one of them a studied target, by how
+  strongly they recognise them (Meyer-Grant et al., 2026). It estimates
+  sensitivity (`d`) from the target’s rank counts, with Gumbel
+  (`"gumbel_min"`) or Gaussian (`"normal"`) noise. `m` may be a constant
+  or the name of a data column, so trials with different set sizes can
+  be fit jointly. Also adds
+  [`dsdt_ranking()`](https://popov-lab.github.io/bmm/dev/reference/sdt_ranking_dist.md)
+  and
+  [`rsdt_ranking()`](https://popov-lab.github.io/bmm/dev/reference/sdt_ranking_dist.md).
+  See
+  [`?sdt_ranking`](https://popov-lab.github.io/bmm/dev/reference/sdt_ranking.md)
+  for the parameters, the response format and the default priors. Thanks
+  to [@GidonFrischkorn](https://github.com/GidonFrischkorn)
 
 #### New datasets
 
@@ -41,6 +55,10 @@
   from Broeder & Schuetz (2009, Exp. 3), with five base-rate conditions
   from 40 subjects. See
   [`?broeder_schuetz_2009_e3`](https://popov-lab.github.io/bmm/dev/reference/broeder_schuetz_2009_e3.md).
+- Add **`meyer_grant_jakob_2025`**, ranking data from Meyer-Grant &
+  Jakob (2025): 60 subjects ranking 3, 4 or 5 faces, aggregated to the
+  target’s rank counts per subject and set size. See
+  [`?meyer_grant_jakob_2025`](https://popov-lab.github.io/bmm/dev/reference/meyer_grant_jakob_2025.md).
 
 #### New features
 
