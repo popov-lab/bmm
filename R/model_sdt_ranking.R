@@ -17,7 +17,7 @@
   # between-subject SD is 0.30 [0.24, 0.37] on meyer_grant_jakob_2025 and ~0.6
   # for sdt_yn on broeder_schuetz_2009_e3, and only rate 1's median (0.69)
   # covers the larger of the two. Rate 2 for sdratio, whose between-subject SD
-  # is 0.06 [0.00, 0.12] here and ~0.2 there. See local/sdt_sd_priors/.
+  # is 0.06 [0.00, 0.12] here and ~0.2 there.
   default_priors <- list(
     d = list(main = "normal(1, 1)", effects = "normal(0, 0.5)", sd = "exponential(1)")
   )
@@ -26,19 +26,19 @@
   init_ranges <- list(d = c(0.5, 1.5))
 
   # Gaussian ranking carries sdratio as an overridable fixed parameter (fixed to
-  # 0 = equal variance, sampled when the user adds sdratio ~ ...), mirroring the
-  # rating and binary SDT models.
+  # 0 = equal variance, sampled when the user adds sdratio ~ ...), as sdt_yn
+  # does.
   if (dist == "normal") {
     parameters$sdratio <- paste0(
       "Log SD ratio: log ratio of signal to noise standard deviations ",
       "(exp(sdratio) is the ratio, 0 = equal variance)"
     )
-    # Matches sdt_yn: on the log scale, normal(0, 0.3) covers ratios in
-    # [0.56, 1.80] at 95%, which spans the empirical recognition range and keeps
-    # the prior inside the interval the Gauss-Hermite ladder is calibrated over
-    # (see .ranking_gh_n).
+    # Identical to sdt_yn's, whose comment gives the empirical grounds. For
+    # ranking the prior also has to stay inside the ratios [0.5, 2.0] that the
+    # Gauss-Hermite ladder is calibrated over (see .ranking_gh_n): normal(0, 0.3)
+    # puts 97.9% of its mass there.
     default_priors$sdratio <- list(
-      main = "normal(0, 0.3)", effects = "normal(0, 0.15)", sd = "exponential(2)"
+      main = "normal(0, 0.3)", effects = "normal(0, 0.3)", sd = "exponential(2)"
     )
     param_links$sdratio <- "identity"
     fixed_pars$sdratio <- 0
