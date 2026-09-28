@@ -769,8 +769,17 @@ rm3 <- function(n, size, pars, m3_model, act_funs = NULL, unpack = FALSE,
     )
 
     acts <- sapply(act_funs, function(pform) eval(pform[[length(pform)]], envir = as.list(pars)))
+    # act_funs come in the order of the formula, but num_options and the counts
+    # in x follow resp_cats, and the arithmetic below matches them by position
+    resp_cats <- m3_model$resp_vars$resp_cats
+    missing_cats <- setdiff(resp_cats, names(acts))
+    stopif(
+      length(missing_cats) > 0,
+      "No activation formula found for the response categories: {collapse_comma(missing_cats)}"
+    )
+    acts <- acts[resp_cats]
 
-    num_options <- m3_model$other_vars$num_options
+    num_options <- m3_num_options(m3_model)
     choice_rule <- tolower(m3_model$other_vars$choice_rule)
     if (choice_rule == "softmax") acts <- exp(acts)
     acts <- acts * num_options
