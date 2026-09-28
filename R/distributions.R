@@ -2752,8 +2752,9 @@ rsdt_mafc <- function(n, n_trials, m, d,
 # the free-sdratio ladder below 1e-6 across sdratio in [0.5, 2.0]. That interval
 # is chosen to match the default normal(0, 0.3) prior on log sdratio, 97.9% of
 # which falls inside it -- the wider normal(0, 0.5) this replaced left one prior
-# draw in six outside the range the quadrature was verified over. Beyond m = 8
-# with a free sdratio even 128 nodes miss the 1e-6 target; check_data warns.
+# draw in six outside the range the quadrature was verified over. The free
+# ladder stays below 1e-6 through m = 9 (8.2e-7) and reaches 3.1e-6 at m = 10;
+# check_data warns above m = 8, which is conservative by one.
 .ranking_gh_n <- function(max_m, free_sdratio) {
   if (free_sdratio) {
     counts <- c(32L, 48L, 64L, 80L, 96L, 128L)
@@ -2889,6 +2890,7 @@ dsdt_ranking <- function(counts, m, d, sdratio = 1,
   stopif(any(m < 2), "m must be an integer >= 2")
   stopif(any(m > ncol(counts)),
          "m must not exceed the number of count columns")
+  stopif(anyNA(counts), "counts must not contain NA")
   stopif(any(counts < 0), "counts must be non-negative")
   stopif(any(counts[col(counts) > m] != 0),
          "Count columns beyond the row's set size (m) must be 0")

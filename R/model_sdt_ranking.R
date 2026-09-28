@@ -236,6 +236,8 @@ check_data.sdt_ranking <- function(model, data, formula) {
   .validate_sdt_count_cols(data, resp_cols)
 
   max_rank <- .sdt_resolve_set_size(model$other_vars$m, data)
+  stopif(anyNA(max_rank),
+         "Set-size column '{model$other_vars$m}' must not contain NA")
   n_ranks <- length(resp_cols)
   stopif(any(max_rank > n_ranks, na.rm = TRUE),
          "Set size must not exceed the number of rank columns ({n_ranks})")
