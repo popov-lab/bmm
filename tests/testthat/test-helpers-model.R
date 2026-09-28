@@ -3,6 +3,62 @@ test_that("supported_models() returns a non-empty character vector", {
   expect_gt(length(supported_models(print_call = FALSE)), 0)
 })
 
+test_that("model_registry() lists every supported model once, grouped in lookup order", {
+  registry <- model_registry()
+  expect_setequal(registry$model, supported_models(print_call = FALSE))
+  expect_false(any(duplicated(registry$model)))
+  expect_false(any(grepl("\\.$", registry$name)))
+  expect_equal(
+    unique(registry$group),
+    intersect(unique(unname(model_groups)), registry$group)
+  )
+  expect_equal(registry$group[registry$model == "imm"], "Continuous reproduction")
+  expect_equal(registry$group[registry$model == "sdt_yn"], "Detection, recognition and confidence judgements")
+  expect_equal(registry$group[registry$model == "ddm"], "Choices and response times")
+})
+
+test_that("model_group() keeps an unknown domain as its own group", {
+  expect_equal(
+    model_group(c("Visual working memory", "Brand new domain", "")),
+    c("Continuous reproduction", "Brand new domain", "Other models")
+  )
+})
+
+test_that("format_model_list() appends unknown groups after the known ones and strips the period", {
+  extra <- data.frame(
+    model = "foo", name = "Foo model", domain = "Foo tasks",
+    group = model_group("Foo tasks")
+  )
+  registry <- rbind(model_registry(), extra)
+  txt <- format_model_list(registry, "text")
+  expect_gt(which(txt == "Foo tasks"), which(txt == "Choices and response times"))
+  expect_true("- foo(): Foo model" %in% txt)
+  md <- format_model_list(registry, "md", headers = FALSE)
+  expect_false(any(grepl("^\\*\\*", md)))
+  expect_true(any(grepl("^- \\[`imm\\(\\)`\\]\\(https://popov-lab.github.io/bmm/reference/imm.html\\)", md)))
+})
+
+test_that("supported_models() prints every model exactly once, without arguments", {
+  out <- as.character(supported_models())
+  for (m in supported_models(print_call = FALSE)) {
+    hits <- gregexpr(glue::glue("- {m}\\(\\): "), out)[[1]]
+    expect_length(hits[hits > 0], 1)
+  }
+  expect_match(out, "Continuous reproduction")
+  expect_match(out, "Type  \\?modelname")
+  expect_no_match(out, "resp_error")
+})
+
+test_that("print_pretty_models_md(group = ) lists one group without headers", {
+  out <- capture.output(print_pretty_models_md(group = "Continuous reproduction"))
+  expect_true(any(grepl("`imm()`", out, fixed = TRUE)))
+  expect_false(any(grepl("`ddm()`", out, fixed = TRUE)))
+  expect_false(any(grepl("**", out, fixed = TRUE)))
+  all_groups <- capture.output(print_pretty_models_md())
+  expect_true(any(grepl("**Choices and response times**", all_groups, fixed = TRUE)))
+  expect_error(print_pretty_models_md(group = "nope"), "Unknown model group")
+})
+
 test_that("get_model() returns the correct function", {
   expect_equal(get_model("mixture2p"), .model_mixture2p)
 })

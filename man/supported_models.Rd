@@ -7,17 +7,25 @@
 supported_models(print_call = TRUE)
 }
 \arguments{
-\item{print_call}{Logical; If TRUE (default), the function will print
-information about how each model function should be called and its required
-arguments. If FALSE, the function will return a character vector with the
-names of the available models}
+\item{print_call}{Logical; If TRUE (default), the function prints the models
+grouped by the task they are meant for, one line per model with its
+constructor and full name. If FALSE, the function returns a character
+vector with the names of the available models.}
 }
 \value{
-A character vector of measurement models available in \code{bmm}
+If \code{print_call = FALSE}, a character vector of model names.
+Otherwise an object of class \code{message} listing the models by group.
 }
 \description{
 Measurement models available in \code{bmm}
 }
+\details{
+The groups are: continuous reproduction; categorical recall and
+n-AFC decisions; detection, recognition and confidence judgements; choices
+and response times. Type \code{?modelname} (for example \code{?imm}) for the
+arguments of a model.
+}
 \examples{
 supported_models()
+supported_models(print_call = FALSE)
 }
