@@ -73,6 +73,13 @@ test_that("sdt_ranking refuses any link on sdratio, and any unknown target", {
   expect_error(check_links(model), "link of 'sdratio' cannot be changed")
 })
 
+test_that("sdt_ranking warns when it truncates a non-integer m", {
+  expect_warning(m <- sdt_ranking(ranks4, m = 4.6)$other_vars$m, "truncated")
+  expect_identical(m, 4L)
+  expect_error(sdt_ranking(ranks4, m = NA_real_), "m must be")
+  expect_error(sdt_ranking(ranks4, m = Inf), "m must be")
+})
+
 test_that("sdt_ranking requires a valid m", {
   expect_error(sdt_ranking(ranks4, m = 1), "m must be")
   expect_error(sdt_ranking(ranks4, m = c(3, 4)), "m must be")
@@ -266,9 +273,10 @@ test_that("sdt_ranking_logmu R companion matches .ranking_all_probs_r and masks"
 })
 
 test_that("the gumbel_min rank probabilities stay a distribution far out in d", {
-  # the untelescoped lgamma difference sums to m, not 1, at d = -40
+  # the untelescoped lgamma difference sums to m, not 1, at d = -40, and a
+  # plain log(j + exp(-d)) overflows once d < -709
   for (m in c(3L, 5L, 8L)) {
-    for (d in c(-40, -30, 0, 30, 40)) {
+    for (d in c(-800, -40, -30, 0, 30, 40, 800)) {
       p <- vapply(seq_len(m), function(k) {
         bmm:::.ranking_prob_r(d, k, m, "gumbel_min")
       }, numeric(1))

@@ -196,10 +196,13 @@ sdt_ranking <- function(response, m,
   stop_missing_args()
   dist <- match.arg(dist)
 
-  stopif(!((is.numeric(m) && length(m) == 1 && m >= 2) ||
+  stopif(!((is.numeric(m) && length(m) == 1 && is.finite(m) && m >= 2) ||
            (is.character(m) && length(m) == 1)),
          "m must be a single integer >= 2, or the name of a set-size column in the data")
-  if (is.numeric(m)) m <- as.integer(m)
+  if (is.numeric(m)) {
+    warnif(m != trunc(m), "m should be an integer value; {m} was truncated to {as.integer(m)}")
+    m <- as.integer(m)
+  }
 
   stopif(length(response) < 2,
          "response must name at least 2 rank-count columns")
