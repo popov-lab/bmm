@@ -170,8 +170,8 @@
 #' @keywords dataset
 #' @source Meyer-Grant, C. G., & Jakob, M. (2025). Ranking tasks in recognition
 #'   memory: A direct test of the two-high-threshold contrast model.
-#'   \emph{Journal of Experimental Psychology: General}. Advance online
-#'   publication. Data on OSF: \url{https://osf.io/gtzu7/} (CC-BY 4.0).
+#'   \emph{Journal of Experimental Psychology: General}, 154, 1445--1455.
+#'   \doi{10.1037/xge0001700}. Data on OSF: \url{https://osf.io/gtzu7/}.
 #' @examples
 #' \dontrun{
 #' # Ranking SDT with set size varying per row: pass the set-size column to `m`
