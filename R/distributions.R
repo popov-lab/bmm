@@ -1149,9 +1149,9 @@ validate_cswald_parameters <- function(drift, bound, ndt, zr, s) {
 }
 
 
-# NaN for rt <= 0 here; callers that reach that range must guard first, as
-# .dcswald() does — the placeholder value differs by caller, so the guard
-# cannot live here
+# NaN (or NA, for rt < 0) here; .dcswald() guards by substituting a
+# placeholder rt before calling in and overwriting the result by
+# version/response afterward, rather than guarding rt <= 0 in here directly
 .dwald <- function(rt, drift, bound, s, log = TRUE) {
   log_d <- log(bound) - 0.5 * log(2 * pi * rt^3) - log(s) -
     (bound - drift * rt)^2 / (2 * s^2 * rt)
@@ -1180,9 +1180,9 @@ times_nonzero <- function(count, log_prob) {
   ifelse(count == 0, 0, count * rep_len(log_prob, n))
 }
 
-# NaN for rt <= 0 here; callers that reach that range must guard first, as
-# .dcswald() does — the placeholder value differs by caller, so the guard
-# cannot live here
+# NaN (or NA, for rt < 0) here; .dcswald() guards by substituting a
+# placeholder rt before calling in and overwriting the result by
+# version/response afterward, rather than guarding rt <= 0 in here directly
 .pwald <- function(rt, drift, bound, s, lower.tail = TRUE, log.p = TRUE) {
   z1 <- (drift * rt - bound) / (s * sqrt(rt))
   z2 <- -(drift * rt + bound) / (s * sqrt(rt))
