@@ -13,7 +13,7 @@ test_that("model_registry() lists every supported model once, grouped in lookup 
     intersect(unique(unname(model_groups)), registry$group)
   )
   expect_equal(registry$group[registry$model == "imm"], "Continuous reproduction")
-  expect_equal(registry$group[registry$model == "sdt_yn"], "Detection, recognition and confidence judgements")
+  expect_equal(registry$group[registry$model == "sdt_yn"], "Detection, recognition and confidence judgments")
   expect_equal(registry$group[registry$model == "ddm"], "Choices and response times")
 })
 

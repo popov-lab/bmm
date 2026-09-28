@@ -483,8 +483,8 @@ print.bmmodel <- function(x, ...) {
 model_groups <- c(
   "Visual working memory" = "Continuous reproduction",
   "Working Memory (categorical), Categorical Decision Making" = "Categorical recall and n-AFC decisions",
-  "Perception & Recognition Memory" = "Detection, recognition and confidence judgements",
-  "Recognition Memory" = "Detection, recognition and confidence judgements",
+  "Perception & Recognition Memory" = "Detection, recognition and confidence judgments",
+  "Recognition Memory" = "Detection, recognition and confidence judgments",
   "Decision Making / Response times" = "Choices and response times"
 )
 
@@ -508,23 +508,19 @@ model_registry <- function(models = supported_models(print_call = FALSE)) {
   registry[order(match(registry$group, group_levels), registry$model), ]
 }
 
-format_model_list <- function(registry, style = c("text", "md"), headers = TRUE) {
-  style <- match.arg(style)
+format_model_list <- function(registry, style = "text", headers = TRUE) {
   reference <- "https://popov-lab.github.io/bmm/reference/"
-  lines <- character()
-  for (group in unique(registry$group)) {
+  blocks <- lapply(unique(registry$group), function(group) {
     rows <- registry[registry$group == group, ]
-    if (headers) {
-      lines <- c(lines, if (style == "md") glue("**{group}**") else group, "")
-    }
+    header <- if (!headers) NULL else if (style == "md") glue("**{group}**") else group
     items <- if (style == "md") {
       glue("- [`{rows$model}()`]({reference}{rows$model}.html): {rows$name}")
     } else {
       glue("- {rows$model}(): {rows$name}")
     }
-    lines <- c(lines, items, "")
-  }
-  lines
+    c(header, if (headers) "", items, "")
+  })
+  unlist(blocks)
 }
 
 #' Measurement models available in `bmm`
@@ -534,7 +530,7 @@ format_model_list <- function(registry, style = c("text", "md"), headers = TRUE)
 #'   constructor and full name. If FALSE, the function returns a character
 #'   vector with the names of the available models.
 #' @details The groups are: continuous reproduction; categorical recall and
-#'   n-AFC decisions; detection, recognition and confidence judgements; choices
+#'   n-AFC decisions; detection, recognition and confidence judgments; choices
 #'   and response times. Type `?modelname` (for example `?imm`) for the
 #'   arguments of a model.
 #' @return If `print_call = FALSE`, a character vector of model names.

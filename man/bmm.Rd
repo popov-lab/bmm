@@ -135,7 +135,7 @@ Categorical recall and n-AFC decisions
 \item m3(): The Multinomial / Memory Measurement Model
 }
 
-Detection, recognition and confidence judgements
+Detection, recognition and confidence judgments
 \itemize{
 \item sdt_mafc(): Signal Detection Theory (m-AFC)
 \item sdt_ranking(): Signal Detection Theory (Ranking)
