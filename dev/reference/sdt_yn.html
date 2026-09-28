@@ -149,7 +149,7 @@ trials' evidence infinite.</p></dd>
 <li><p><code>effects</code>: normal(0, 0.5)</p></li>
 <li><p><code>sd</code>: exponential(2)</p></li>
 </ul></li>
-<li><p><code>sdratio</code>:</p><ul><li><p><code>main</code>: normal(0, 0.5)</p></li>
+<li><p><code>sdratio</code>:</p><ul><li><p><code>main</code>: normal(0, 0.3)</p></li>
 <li><p><code>effects</code>: normal(0, 0.3)</p></li>
 <li><p><code>sd</code>: exponential(2)</p></li>
 </ul></li>
@@ -251,7 +251,7 @@ yourself, whether as <code>bmf(sdratio = )</code> or through a hand-written
 <code>bmf(sdratio = 1)</code> does not fix a ratio of 1 — it fixes <code>exp(1) = 2.72</code>,
 and <code><a href="bmm.html">bmm()</a></code> raises no warning; a fixed ratio of 1.25 needs
 <code>bmf(sdratio = log(1.25))</code>. Both <code>sdratio</code> defaults <code><a href="default_prior.bmmformula.html">default_prior()</a></code>
-reports — <code>normal(0, 0.5)</code> on the intercept and <code>exponential(2)</code> on the
+reports — <code>normal(0, 0.3)</code> on the intercept and <code>exponential(2)</code> on the
 random-effect SDs — are on that same scale, unannotated.</p>
     </div>
     <div class="section level2">

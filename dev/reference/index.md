@@ -114,6 +114,8 @@ Functions for specifying which model to fit
 - [`sdm()`](https://popov-lab.github.io/bmm/dev/reference/sdm.md)
   [`sdmSimple()`](https://popov-lab.github.io/bmm/dev/reference/sdm.md)
   : Signal Discrimination Model (SDM) by Oberauer (2023)
+- [`sdt_mafc()`](https://popov-lab.github.io/bmm/dev/reference/sdt_mafc.md)
+  : m-Alternative Forced Choice Signal Detection Theory Model
 - [`sdt_yn()`](https://popov-lab.github.io/bmm/dev/reference/sdt_yn.md)
   : Yes/No Signal Detection Theory Model
 
@@ -175,6 +177,10 @@ Functions for special distributions
 
 - [`rejection_sampling()`](https://popov-lab.github.io/bmm/dev/reference/rejection_sampling.md)
   : Rejection Sampling
+
+- [`dsdt_mafc()`](https://popov-lab.github.io/bmm/dev/reference/sdt_mafc_dist.md)
+  [`rsdt_mafc()`](https://popov-lab.github.io/bmm/dev/reference/sdt_mafc_dist.md)
+  : Distribution functions for m-AFC SDT
 
 - [`dsdt_yn()`](https://popov-lab.github.io/bmm/dev/reference/sdt_yn_dist.md)
   [`rsdt_yn()`](https://popov-lab.github.io/bmm/dev/reference/sdt_yn_dist.md)

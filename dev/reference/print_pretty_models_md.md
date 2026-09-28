@@ -36,6 +36,7 @@ print_pretty_models_md()
 #> 
 #> **Perception & Recognition Memory**
 #> 
+#> * Signal Detection Theory (m-AFC) 
 #> * Signal Detection Theory (Yes/No) 
 #> 
 ```

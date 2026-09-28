@@ -146,7 +146,7 @@ An object of class `bmmodel`
 
   - `sdratio`:
 
-    - `main`: normal(0, 0.5)
+    - `main`: normal(0, 0.3)
 
     - `effects`: normal(0, 0.3)
 
@@ -264,7 +264,7 @@ and [`bmm()`](https://popov-lab.github.io/bmm/dev/reference/bmm.md)
 raises no warning; a fixed ratio of 1.25 needs
 `bmf(sdratio = log(1.25))`. Both `sdratio` defaults
 [`default_prior()`](https://popov-lab.github.io/bmm/dev/reference/default_prior.bmmformula.md)
-reports — `normal(0, 0.5)` on the intercept and `exponential(2)` on the
+reports — `normal(0, 0.3)` on the intercept and `exponential(2)` on the
 random-effect SDs — are on that same scale, unannotated.
 
 ## Terms used on this page

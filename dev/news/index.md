@@ -18,6 +18,22 @@
   for the parameters, links, default priors and the designs that
   identify `sdratio`. Thanks to
   [@GidonFrischkorn](https://github.com/GidonFrischkorn)
+- Add **m-Alternative Forced Choice Signal Detection Theory**
+  (`sdt_mafc`) for accuracy-only m-AFC tasks, where one of `m`
+  alternatives carries the signal (DeCarlo, 2012). It estimates
+  sensitivity (`d`) from response counts and has no bias parameter. `m`
+  may be a constant or the name of a data column, so trials with
+  different numbers of alternatives can be fit jointly. Also adds
+  [`dsdt_mafc()`](https://popov-lab.github.io/bmm/dev/reference/sdt_mafc_dist.md)
+  and
+  [`rsdt_mafc()`](https://popov-lab.github.io/bmm/dev/reference/sdt_mafc_dist.md).
+  See
+  [`?sdt_mafc`](https://popov-lab.github.io/bmm/dev/reference/sdt_mafc.md)
+  for the parameters, the noise distributions, the default priors and
+  how `d` relates to the sensitivity
+  [`sdt_yn()`](https://popov-lab.github.io/bmm/dev/reference/sdt_yn.md)
+  reports. Thanks to
+  [@GidonFrischkorn](https://github.com/GidonFrischkorn)
 
 #### New datasets
 
