@@ -94,6 +94,31 @@ vary \code{d}/\code{sdratio} produce distinct density panels (faceted). For
 \code{sdt_mafc}/\code{sdt_ranking} the set size is likewise collapsed unless it predicts
 \code{d}. Use \code{collapse} to override the auto-detection.
 }
+\examples{
+\dontrun{
+# Three base-rate conditions shift the criterion, which identifies sdratio
+dat <- expand.grid(id = 1:20, stimulus = c(0L, 1L),
+                   condition = c("liberal", "neutral", "strict"))
+dat$n_trials <- 100L
+criteria <- c(liberal = -0.5, neutral = 0, strict = 0.5)
+dat$n_old <- rsdt_yn(nrow(dat), dat$n_trials, dat$stimulus, d = 1.5,
+                     criterion = criteria[as.character(dat$condition)],
+                     sdratio = 1.3)
+
+fit <- bmm(
+  formula = bmf(d ~ 1, criterion ~ 0 + condition, sdratio ~ 1),
+  data = dat,
+  model = sdt_yn(response = "n_old", stimulus = "stimulus",
+                 n_trials = "n_trials"),
+  cores = 4,
+  backend = "cmdstanr"
+)
+
+latent <- latent_sdt(fit)
+latent
+plot(latent)
+}
+}
 \seealso{
 \code{\link[=roc_sdt]{roc_sdt()}}, \code{\link[=plot.bmm_sdt_latent]{plot.bmm_sdt_latent()}}
 }

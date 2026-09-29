@@ -145,6 +145,31 @@
 #'   credible band at a fixed false-alarm rate.
 #'
 #' @seealso [auc_sdt()], [roc_observed()], [plot.bmm_sdt_roc()]
+#' @examples
+#' \dontrun{
+#' # Three base-rate conditions shift the criterion, which identifies sdratio
+#' dat <- expand.grid(id = 1:20, stimulus = c(0L, 1L),
+#'                    condition = c("liberal", "neutral", "strict"))
+#' dat$n_trials <- 100L
+#' criteria <- c(liberal = -0.5, neutral = 0, strict = 0.5)
+#' dat$n_old <- rsdt_yn(nrow(dat), dat$n_trials, dat$stimulus, d = 1.5,
+#'                      criterion = criteria[as.character(dat$condition)],
+#'                      sdratio = 1.3)
+#'
+#' fit <- bmm(
+#'   formula = bmf(d ~ 1, criterion ~ 0 + condition, sdratio ~ 1),
+#'   data = dat,
+#'   model = sdt_yn(response = "n_old", stimulus = "stimulus",
+#'                  n_trials = "n_trials"),
+#'   cores = 4,
+#'   backend = "cmdstanr"
+#' )
+#'
+#' roc <- roc_sdt(fit)
+#' roc
+#' plot(roc, observed = roc_observed(fit))
+#' plot(roc, observed = roc_observed(fit), scale = "quantile")
+#' }
 #' @export
 roc_sdt <- function(fit, conditions = NULL, n_points = 100,
                     probs = c(0.025, 0.975), criterion_points = NULL, ...) {
@@ -658,6 +683,31 @@ print.bmm_sdt_roc <- function(x, ...) {
 #'   `"binary"`; rating results also carry `n_ratings`.
 #'
 #' @seealso [roc_sdt()], [plot.bmm_sdt_roc()]
+#' @examples
+#' \dontrun{
+#' # Three base-rate conditions shift the criterion, which identifies sdratio
+#' dat <- expand.grid(id = 1:20, stimulus = c(0L, 1L),
+#'                    condition = c("liberal", "neutral", "strict"))
+#' dat$n_trials <- 100L
+#' criteria <- c(liberal = -0.5, neutral = 0, strict = 0.5)
+#' dat$n_old <- rsdt_yn(nrow(dat), dat$n_trials, dat$stimulus, d = 1.5,
+#'                      criterion = criteria[as.character(dat$condition)],
+#'                      sdratio = 1.3)
+#'
+#' fit <- bmm(
+#'   formula = bmf(d ~ 1, criterion ~ 0 + condition, sdratio ~ 1),
+#'   data = dat,
+#'   model = sdt_yn(response = "n_old", stimulus = "stimulus",
+#'                  n_trials = "n_trials"),
+#'   cores = 4,
+#'   backend = "cmdstanr"
+#' )
+#'
+#' # One point per base-rate condition, from the response counts
+#' obs <- roc_observed(fit)
+#' obs
+#' plot(roc_sdt(fit), observed = obs)
+#' }
 #' @export
 roc_observed <- function(fit, conditions = NULL) {
   stopif(!inherits(fit, "bmmfit"),
@@ -807,6 +857,30 @@ roc_observed <- function(fit, conditions = NULL) {
 #'   (the conditions of the density panels).
 #'
 #' @seealso [roc_sdt()], [plot.bmm_sdt_latent()]
+#' @examples
+#' \dontrun{
+#' # Three base-rate conditions shift the criterion, which identifies sdratio
+#' dat <- expand.grid(id = 1:20, stimulus = c(0L, 1L),
+#'                    condition = c("liberal", "neutral", "strict"))
+#' dat$n_trials <- 100L
+#' criteria <- c(liberal = -0.5, neutral = 0, strict = 0.5)
+#' dat$n_old <- rsdt_yn(nrow(dat), dat$n_trials, dat$stimulus, d = 1.5,
+#'                      criterion = criteria[as.character(dat$condition)],
+#'                      sdratio = 1.3)
+#'
+#' fit <- bmm(
+#'   formula = bmf(d ~ 1, criterion ~ 0 + condition, sdratio ~ 1),
+#'   data = dat,
+#'   model = sdt_yn(response = "n_old", stimulus = "stimulus",
+#'                  n_trials = "n_trials"),
+#'   cores = 4,
+#'   backend = "cmdstanr"
+#' )
+#'
+#' latent <- latent_sdt(fit)
+#' latent
+#' plot(latent)
+#' }
 #' @export
 latent_sdt <- function(fit, conditions = NULL, n_grid = 200,
                        probs = c(0.025, 0.975), collapse = NULL,
@@ -1011,6 +1085,23 @@ print.bmm_sdt_latent <- function(x, ...) {
 #'   object also carries `probs`, `model_class`, `dist` and `conditions`.
 #'
 #' @seealso [latent_sdt()], [roc_sdt()]
+#' @examples
+#' \dontrun{
+#' dat <- expand.grid(id = 1:20, stimulus = c(0L, 1L))
+#' dat <- cbind(dat, rsdt_rating(nrow(dat), 200, dat$stimulus, d = 1.5,
+#'                               thresholds = c(-0.5, 0, 0.5), sdratio = 1.3))
+#'
+#' fit <- bmm(
+#'   formula = bmf(d ~ 1, criterion ~ 1, spacing ~ 1, sdratio ~ 1),
+#'   data = dat,
+#'   model = sdt_rating(response = c("r1", "r2", "r3", "r4"),
+#'                      stimulus = "stimulus"),
+#'   cores = 4,
+#'   backend = "cmdstanr"
+#' )
+#'
+#' sdt_thresholds(fit)
+#' }
 #' @export
 sdt_thresholds <- function(fit, conditions = NULL, probs = c(0.025, 0.975), ...) {
   .sdt_check_args(fit, conditions, probs, ...)
@@ -1099,6 +1190,30 @@ print.bmm_sdt_thresholds <- function(x, ...) {
 #'   \eqn{AUC = \mathrm{logistic}(g')}.
 #'
 #' @seealso [roc_sdt()], [plot.bmm_sdt_auc()]
+#' @examples
+#' \dontrun{
+#' # Three base-rate conditions shift the criterion, which identifies sdratio
+#' dat <- expand.grid(id = 1:20, stimulus = c(0L, 1L),
+#'                    condition = c("liberal", "neutral", "strict"))
+#' dat$n_trials <- 100L
+#' criteria <- c(liberal = -0.5, neutral = 0, strict = 0.5)
+#' dat$n_old <- rsdt_yn(nrow(dat), dat$n_trials, dat$stimulus, d = 1.5,
+#'                      criterion = criteria[as.character(dat$condition)],
+#'                      sdratio = 1.3)
+#'
+#' fit <- bmm(
+#'   formula = bmf(d ~ 1, criterion ~ 0 + condition, sdratio ~ 1),
+#'   data = dat,
+#'   model = sdt_yn(response = "n_old", stimulus = "stimulus",
+#'                  n_trials = "n_trials"),
+#'   cores = 4,
+#'   backend = "cmdstanr"
+#' )
+#'
+#' auc <- auc_sdt(fit)
+#' auc
+#' plot(auc)
+#' }
 #' @export
 auc_sdt <- function(fit, conditions = NULL, probs = c(0.025, 0.975),
                     criterion_points = NULL, ...) {
@@ -1300,6 +1415,30 @@ print.bmm_sdt_auc <- function(x, ...) {
 #'   and `probs`, `model_class`, `dist` and `conditions` attributes.
 #'
 #' @seealso [auc_sdt()], [roc_sdt()], [latent_sdt()]
+#' @examples
+#' \dontrun{
+#' # Three base-rate conditions shift the criterion, which identifies sdratio
+#' dat <- expand.grid(id = 1:20, stimulus = c(0L, 1L),
+#'                    condition = c("liberal", "neutral", "strict"))
+#' dat$n_trials <- 100L
+#' criteria <- c(liberal = -0.5, neutral = 0, strict = 0.5)
+#' dat$n_old <- rsdt_yn(nrow(dat), dat$n_trials, dat$stimulus, d = 1.5,
+#'                      criterion = criteria[as.character(dat$condition)],
+#'                      sdratio = 1.3)
+#'
+#' fit <- bmm(
+#'   formula = bmf(d ~ 1, criterion ~ 0 + condition, sdratio ~ 1),
+#'   data = dat,
+#'   model = sdt_yn(response = "n_old", stimulus = "stimulus",
+#'                  n_trials = "n_trials"),
+#'   cores = 4,
+#'   backend = "cmdstanr"
+#' )
+#'
+#' # d_a (the fitted d), d_N and d_S, converted draw by draw
+#' sdt_sensitivity(fit)
+#' sdt_sensitivity(fit, measure = "dn", draw_ids = 1:500)
+#' }
 #' @export
 sdt_sensitivity <- function(fit, measure = c("da", "dn", "ds"),
                             conditions = NULL, probs = c(0.025, 0.975), ...) {

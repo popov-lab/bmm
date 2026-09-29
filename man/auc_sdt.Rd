@@ -61,6 +61,31 @@ Analytical formulas (equal variance, where \eqn{d_a = d'}): normal
 EV-SDT \eqn{AUC = \Phi(d'/\sqrt{2})}; Gumbel-min and Gumbel-max EV-SDT
 \eqn{AUC = \mathrm{logistic}(g')}.
 }
+\examples{
+\dontrun{
+# Three base-rate conditions shift the criterion, which identifies sdratio
+dat <- expand.grid(id = 1:20, stimulus = c(0L, 1L),
+                   condition = c("liberal", "neutral", "strict"))
+dat$n_trials <- 100L
+criteria <- c(liberal = -0.5, neutral = 0, strict = 0.5)
+dat$n_old <- rsdt_yn(nrow(dat), dat$n_trials, dat$stimulus, d = 1.5,
+                     criterion = criteria[as.character(dat$condition)],
+                     sdratio = 1.3)
+
+fit <- bmm(
+  formula = bmf(d ~ 1, criterion ~ 0 + condition, sdratio ~ 1),
+  data = dat,
+  model = sdt_yn(response = "n_old", stimulus = "stimulus",
+                 n_trials = "n_trials"),
+  cores = 4,
+  backend = "cmdstanr"
+)
+
+auc <- auc_sdt(fit)
+auc
+plot(auc)
+}
+}
 \seealso{
 \code{\link[=roc_sdt]{roc_sdt()}}, \code{\link[=plot.bmm_sdt_auc]{plot.bmm_sdt_auc()}}
 }

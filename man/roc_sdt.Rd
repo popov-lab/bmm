@@ -79,6 +79,32 @@ model-implied curve is traced over a virtual cut from the posterior of
 thresholds attached as the \code{points} attribute (labelled \code{t1}..\code{t(K-1)}) so
 they fall on the curve.
 }
+\examples{
+\dontrun{
+# Three base-rate conditions shift the criterion, which identifies sdratio
+dat <- expand.grid(id = 1:20, stimulus = c(0L, 1L),
+                   condition = c("liberal", "neutral", "strict"))
+dat$n_trials <- 100L
+criteria <- c(liberal = -0.5, neutral = 0, strict = 0.5)
+dat$n_old <- rsdt_yn(nrow(dat), dat$n_trials, dat$stimulus, d = 1.5,
+                     criterion = criteria[as.character(dat$condition)],
+                     sdratio = 1.3)
+
+fit <- bmm(
+  formula = bmf(d ~ 1, criterion ~ 0 + condition, sdratio ~ 1),
+  data = dat,
+  model = sdt_yn(response = "n_old", stimulus = "stimulus",
+                 n_trials = "n_trials"),
+  cores = 4,
+  backend = "cmdstanr"
+)
+
+roc <- roc_sdt(fit)
+roc
+plot(roc, observed = roc_observed(fit))
+plot(roc, observed = roc_observed(fit), scale = "quantile")
+}
+}
 \seealso{
 \code{\link[=auc_sdt]{auc_sdt()}}, \code{\link[=roc_observed]{roc_observed()}}, \code{\link[=plot.bmm_sdt_roc]{plot.bmm_sdt_roc()}}
 }
