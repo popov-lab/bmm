@@ -267,25 +267,31 @@ roc_sdt <- function(fit, conditions = NULL, n_points = 100,
 }
 
 
-# posterior_linpred for one parameter, with conditions overriding the first data
-# row so every formula variable is present. The parameters are nlpars for the
-# multinomial models (rating, ranking) and dpars for the custom-family models
-# (binary, mafc); which applies is derived from the model class so callers
-# never need to know.
-.sdt_linpred <- function(fit, param, conditions, ...) {
+# Posterior draws of one parameter on the scale the likelihood reads it, with
+# conditions overriding the first data row so every formula variable is
+# present. The parameters are nlpars for the multinomial models (rating,
+# ranking) and dpars for the custom-family models (binary, mafc); which applies
+# is derived from the model class so callers never need to know. d and
+# criterion reach the kernels through the model's inverse link, so they get it
+# here too; sdratio and the threshold parameters stay on the log scale that
+# the SDT helpers exponentiate themselves.
+.sdt_par_draws <- function(fit, param, conditions, ...) {
   newdata <- fit$data[rep(1L, max(1L, nrow(conditions))), , drop = FALSE]
   rownames(newdata) <- NULL
   if (ncol(conditions) > 0L) {
     cols <- intersect(names(conditions), names(newdata))
     newdata[cols] <- conditions[cols]
   }
-  if (inherits(fit$bmm$model, c("sdt_rating", "sdt_ranking"))) {
+  model <- fit$bmm$model
+  linpred <- if (inherits(model, c("sdt_rating", "sdt_ranking"))) {
     brms::posterior_linpred(fit, nlpar = param, newdata = newdata,
                             re_formula = NA, allow_new_levels = TRUE, ...)
   } else {
     brms::posterior_linpred(fit, dpar = param, newdata = newdata,
                             re_formula = NA, allow_new_levels = TRUE, ...)
   }
+  if (!param %in% c("d", "criterion")) return(linpred)
+  link_transform(linpred, model$links[[param]], inverse = TRUE)
 }
 
 
@@ -295,9 +301,9 @@ roc_sdt <- function(fit, conditions = NULL, n_points = 100,
 # in noise-SD units, which equals d_a itself under equal variance. Every
 # analysis function builds on these three matrices (draws x conditions).
 .sdt_latent_geometry <- function(fit, conditions, has_sdratio, ...) {
-  d <- .sdt_linpred(fit, "d", conditions, ...)
+  d <- .sdt_par_draws(fit, "d", conditions, ...)
   sdratio <- if (has_sdratio) {
-    exp(.sdt_linpred(fit, "sdratio", conditions, ...))
+    exp(.sdt_par_draws(fit, "sdratio", conditions, ...))
   } else {
     matrix(1, nrow = nrow(d), ncol = ncol(d))
   }
@@ -314,13 +320,13 @@ roc_sdt <- function(fit, conditions = NULL, n_points = 100,
 .sdt_rating_thresholds <- function(fit, model, conditions, ...) {
   n_ratings      <- model$other_vars$n_ratings
   threshold_type <- model$other_vars$threshold_type
-  crit    <- .sdt_linpred(fit, "criterion", conditions, ...)
+  crit    <- .sdt_par_draws(fit, "criterion", conditions, ...)
   spacing <- if ("spacing" %in% names(model$parameters)) {
-    .sdt_linpred(fit, "spacing", conditions, ...)
+    .sdt_par_draws(fit, "spacing", conditions, ...)
   }
-  delta_names <- grep("^delta", names(model$parameters), value = TRUE)
+  delta_names <- .sdt_threshold_delta_names(model)
   delta_mats  <- lapply(stats::setNames(delta_names, delta_names),
-                        function(nm) .sdt_linpred(fit, nm, conditions, ...))
+                        function(nm) .sdt_par_draws(fit, nm, conditions, ...))
 
   lapply(seq_len(ncol(crit)), function(l_i) {
     deltas <- if (length(delta_mats)) {
@@ -417,7 +423,7 @@ roc_sdt <- function(fit, conditions = NULL, n_points = 100,
   n_pt <- max(1L, nrow(point_cond))
 
   geom     <- .sdt_latent_geometry(fit, point_cond, has_sdratio, ...)
-  crit_mat <- .sdt_linpred(fit, "criterion", point_cond, ...)
+  crit_mat <- .sdt_par_draws(fit, "criterion", point_cond, ...)
 
   rows <- vector("list", n_pt)
   for (c_i in seq_len(n_pt)) {
@@ -731,7 +737,7 @@ latent_sdt <- function(fit, conditions = NULL, n_grid = 200,
   # Boundary positions are evaluated over the density x boundary combinations so
   # that each density panel can carry all its criteria/thresholds.
   if (has_criterion) {
-    crit_line <- .sdt_linpred(fit, "criterion", line_cond, ...)
+    crit_line <- .sdt_par_draws(fit, "criterion", line_cond, ...)
     thr_list  <- if (is_rating) {
       .sdt_rating_thresholds(fit, model, line_cond, ...)
     }
@@ -1007,7 +1013,7 @@ auc_sdt <- function(fit, conditions = NULL, probs = c(0.025, 0.975),
 
   if (use_analytical) {
     auc_fn <- if (dist == "normal") function(d) stats::pnorm(d / sqrt(2)) else stats::plogis
-    d_mat <- .sdt_linpred(fit, "d", conditions, ...)
+    d_mat <- .sdt_par_draws(fit, "d", conditions, ...)
     n_draws <- nrow(d_mat)
     result <- vector("list", ncol(d_mat))
     for (c_i in seq_len(ncol(d_mat))) {

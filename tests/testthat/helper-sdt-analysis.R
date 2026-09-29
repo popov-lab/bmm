@@ -16,8 +16,9 @@ mock_linpred_factory <- function(draws) {
   }
 }
 
-fake_binary_fit <- function(uv = FALSE, multi = FALSE) {
-  model <- sdt_yn(response = "n_old", stimulus = "stimulus", n_trials = "n_trials")
+fake_binary_fit <- function(uv = FALSE, multi = FALSE, links = NULL) {
+  model <- sdt_yn(response = "n_old", stimulus = "stimulus", n_trials = "n_trials",
+                  links = links)
   if (uv) model$fixed_parameters$sdratio <- NULL
 
   if (multi) {
@@ -39,10 +40,10 @@ fake_binary_fit <- function(uv = FALSE, multi = FALSE) {
 }
 
 fake_rating_fit <- function(uv = FALSE, threshold_type = "parsimonious",
-                            n_ratings = 6L) {
+                            n_ratings = 6L, links = NULL) {
   resp <- paste0("r", seq_len(n_ratings))
   model <- sdt_rating(response = resp, stimulus = "stimulus",
-                      threshold_type = threshold_type)
+                      threshold_type = threshold_type, links = links)
   if (uv) model$fixed_parameters$sdratio <- NULL
 
   Yn <- c(30, 25, 20, 13, 8, 4)
