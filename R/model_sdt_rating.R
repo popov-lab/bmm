@@ -9,22 +9,21 @@
                           "log_ratio", "softmax")
 
 # Parameter spec for one threshold parameterization. parsimonious/equidistant
-# need a single spacing; log_distance/log_ratio need K-2 distance deltas;
-# softmax needs spacing plus K-3 allocation deltas. `anchor` is the threshold
-# index that carries no delta (it sits at the criterion); it defaults to the
-# same middle threshold the builders skip ((K - 1) %/% 2 + 1, so delta labels
-# name the threshold they control for odd K); sdt_cdp passes its old/new
-# boundary (n_new) instead.
+# need a single spacing; log_distance/log_ratio need K-2 interval deltas, named
+# in interval order (delta_i lies between thresholds i and i + 1); softmax needs
+# spacing plus K-3 allocation deltas.
 # Every threshold parameter is a log-scale quantity -- the Stan builders read
 # exp(spacing) and exp(delta) -- so its sd default follows sdratio's rate 2
 # rather than d's rate 1: at rate 2 an individual's spacing stays within a
-# factor of about 2.8 of the group value at the 95% quantile, at rate 1 within
-# a factor of 8 (see local/sdt_sd_priors/).
-.sdt_threshold_parameter_parts <- function(n_ratings, threshold_type,
-                                           anchor = (n_ratings - 1L) %/% 2L + 1L) {
+# factor of about 2.8 of the group value at the one-sided 95% quantile (90%
+# central), at rate 1 within a factor of 8.
+.sdt_threshold_parameter_parts <- function(n_ratings, threshold_type) {
   parameters <- list()
   default_priors <- list()
   param_links <- list()
+  delta_prior <- list(
+    main = "normal(0, 1)", effects = "normal(0, 0.5)", sd = "exponential(2)"
+  )
 
   if (threshold_type %in% c("equidistant", "parsimonious")) {
     parameters$spacing <- paste0(
@@ -35,15 +34,21 @@
       main = "normal(0, 0.5)", effects = "normal(0, 0.3)", sd = "exponential(2)"
     )
     param_links$spacing <- "identity"
-  } else if (threshold_type %in% c("log_distance", "log_ratio")) {
-    n_deltas <- n_ratings - 2L
-    for (i in seq_len(n_deltas)) {
-      idx <- if (i < anchor) i else i + 1L
-      pname <- paste0("delta", idx)
-      parameters[[pname]] <- glue("Threshold parameter for threshold {idx}")
-      default_priors[[pname]] <- list(
-        main = "normal(0, 1)", effects = "normal(0, 0.5)", sd = "exponential(2)"
+  } else if (threshold_type == "log_distance") {
+    for (i in seq_len(n_ratings - 2L)) {
+      pname <- paste0("delta", i)
+      parameters[[pname]] <- glue(
+        "Log width of the interval between thresholds {i} and {i + 1}"
       )
+      default_priors[[pname]] <- delta_prior
+      param_links[[pname]] <- "identity"
+    }
+  } else if (threshold_type == "log_ratio") {
+    labels <- .sdt_log_ratio_delta_labels(n_ratings)
+    for (i in seq_along(labels)) {
+      pname <- paste0("delta", i)
+      parameters[[pname]] <- labels[i]
+      default_priors[[pname]] <- delta_prior
       param_links[[pname]] <- "identity"
     }
   } else if (threshold_type == "softmax") {
@@ -60,16 +65,41 @@
     for (i in seq_len(n_deltas)) {
       pname <- paste0("delta", i)
       parameters[[pname]] <- glue(
-        "Softmax threshold allocation parameter for interval {i}"
+        "Softmax threshold allocation parameter for interval {i}, relative ",
+        "to the last interval"
       )
-      default_priors[[pname]] <- list(
-        main = "normal(0, 1)", effects = "normal(0, 0.5)", sd = "exponential(2)"
-      )
+      default_priors[[pname]] <- delta_prior
       param_links[[pname]] <- "identity"
     }
   }
 
   nlist(parameters, default_priors, param_links)
+}
+
+# The log_ratio deltas are not exchangeable (see .sdt_log_ratio_widths()), so
+# each label names the role its interval plays.
+.sdt_log_ratio_delta_labels <- function(n_ratings) {
+  n_gaps <- n_ratings - 2L
+  labels <- character(n_gaps)
+  if (n_ratings %% 2L == 0L) {
+    m <- n_ratings %/% 2L
+    labels[m] <- "Log spread: width of the interval just above the criterion"
+    labels[m - 1L] <- paste0(
+      "Log ratio of the interval just below the criterion to the spread above it"
+    )
+    first <- c(rep(m - 1L, max(0L, m - 2L)), rep(m, max(0L, n_gaps - m)))
+    rest <- setdiff(seq_len(n_gaps), c(m - 1L, m))
+  } else {
+    g <- (n_ratings - 1L) %/% 2L
+    labels[g] <- "Log spread: width of the middle category, centred on the criterion"
+    labels[c(g - 1L, g + 1L)] <- glue(
+      "Log ratio of interval {c(g - 1L, g + 1L)} to the middle category"
+    )
+    rest <- setdiff(seq_len(n_gaps), c(g - 1L, g, g + 1L))
+    first <- ifelse(rest < g, g - 1L, g + 1L)
+  }
+  labels[rest] <- glue("Log ratio of interval {rest} to interval {first}")
+  labels
 }
 
 .sdt_threshold_delta_names <- function(object) {
@@ -99,7 +129,11 @@
     extra_params = character(0),
     logmu_fun = "sdt_rating_logmu",
     logmu_cat_call = "sdt_rating_logmu_cat(cat, thr, d, sdratio, stimulus, dist_type)",
-    stan_chunk = "sdt_rating_funs.stan"
+    stan_chunk = "sdt_rating_funs.stan",
+    citation = glue(
+      "Green, D. M., & Swets, J. A. (1966). Signal detection theory ",
+      "and psychophysics. Wiley."
+    )
   ),
   dpsdt = list(
     parameters = list(
@@ -125,7 +159,13 @@
     extra_params = c("Ro", "Rn"),
     logmu_fun = "sdt_dpsdt_logmu",
     logmu_cat_call = "sdt_dpsdt_logmu_cat(cat, thr, d, sdratio, stimulus, dist_type, Ro, Rn)",
-    stan_chunk = "sdt_dpsdt_funs.stan"
+    stan_chunk = "sdt_dpsdt_funs.stan",
+    citation = glue(
+      "Yonelinas, A. P. (1994). Receiver-operating characteristics in ",
+      "recognition memory: Evidence for a dual-process model. Journal of ",
+      "Experimental Psychology: Learning, Memory, and Cognition, 20(6), ",
+      "1341-1354. https://doi.org/10.1037/0278-7393.20.6.1341"
+    )
   ),
   metad = list(
     parameters = list(
@@ -152,18 +192,23 @@
     extra_params = "logmratio",
     logmu_fun = "sdt_metad_logmu",
     logmu_cat_call = "sdt_metad_logmu_cat(cat, thr, d, exp(logmratio) * d, sdratio, stimulus, dist_type)",
-    stan_chunk = "sdt_metad_funs.stan"
+    stan_chunk = "sdt_metad_funs.stan",
+    citation = glue(
+      "Maniscalco, B., & Lau, H. (2012). A signal detection theoretic ",
+      "approach for estimating metacognitive sensitivity from confidence ",
+      "ratings. Consciousness and Cognition, 21(1), 422-430. ",
+      "https://doi.org/10.1016/j.concog.2011.09.021"
+    )
   )
 )
 
 .model_sdt_rating <- function(response = NULL, stimulus = NULL,
-                              dist = "normal", n_ratings = NULL,
+                              dist = "normal",
                               threshold_type = "parsimonious",
                               version = "standard",
                               links = NULL, call = NULL, ...) {
-  if (is.null(n_ratings) && length(response) > 1) {
-    n_ratings <- length(response)
-  }
+  # one count column per category, so the columns fix the number of categories
+  n_ratings <- length(response)
 
   parameters <- list(
     d = paste0(
@@ -172,15 +217,16 @@
       "distributions in units of their root-mean-square SD"
     ),
     criterion = paste0(
-      "Response bias: location of the decision boundary on the ",
-      "noise-standardized axis"
+      "Response bias, on the noise-standardized axis: the middle threshold ",
+      "(the old/new boundary) for an even number of categories, the centre ",
+      "of the middle category for an odd number"
     )
   )
   # sd rates as in sdt_yn, so the same subjects shrink the same way whichever
   # SDT model they are fitted with: rate 1 for the sensitivity d, whose
   # between-subject SD is ~0.6 on broeder_schuetz_2009_e3 and 0.30 on
-  # meyer_grant_jakob_2025, and rate 2 for criterion (~0.15 there, 0.29 in the
-  # 50-subject cdp values in local/) and for the log-scale sdratio.
+  # meyer_grant_jakob_2025, and rate 2 for criterion (~0.15 there) and for the
+  # log-scale sdratio.
   default_priors <- list(
     d = list(main = "normal(1, 1)", effects = "normal(0, 0.5)", sd = "exponential(1)"),
     criterion = list(main = "normal(0, 1.5)", effects = "normal(0, 0.5)", sd = "exponential(2)")
@@ -196,10 +242,9 @@
     "Log SD ratio: the log of the signal-to-noise standard deviation ratio, ",
     "so exp(sdratio) is the ratio itself and 0 means equal variance"
   )
-  # Matches sdt_yn and sdt_ranking: on the log scale, normal(0, 0.3) covers
-  # ratios in [0.56, 1.80] at 95%, spanning the empirical recognition range.
+  # Identical to sdt_yn's, whose comment gives the empirical grounds.
   default_priors$sdratio <- list(
-    main = "normal(0, 0.3)", effects = "normal(0, 0.15)", sd = "exponential(2)"
+    main = "normal(0, 0.3)", effects = "normal(0, 0.3)", sd = "exponential(2)"
   )
   param_links$sdratio <- "identity"
 
@@ -237,10 +282,7 @@
       domain = "Perception & Recognition Memory",
       task = "Signal/Noise or Old/New Recognition",
       name = "Signal Detection Theory (Confidence Rating)",
-      citation = glue(
-        "Green, D. M., & Swets, J. A. (1966). Signal detection theory ",
-        "and psychophysics. Wiley."
-      ),
+      citation = variant$citation,
       version = version,
       requirements = requirements,
       parameters = parameters,
@@ -263,6 +305,14 @@
 #' @exportS3Method
 settable_links.sdt_rating <- function(model) {
   c("d", "criterion")
+}
+
+# the links are applied by substituting the inverse link into the multinomial
+# formula (.sdt_rating_logmu_args), so the model can honour inv_link()'s links,
+# not every link a brms family can emit
+#' @exportS3Method
+settable_link_functions.sdt_rating <- function(model) {
+  eval(formals(inv_link)$link)
 }
 
 
@@ -299,6 +349,9 @@ settable_links.sdt_rating <- function(model) {
 #' `logmratio = 0`, which recovers `standard`. Type-1 and type-2 sensitivity
 #' share one scale (\eqn{d'}, or \eqn{d_a} when `sdratio` is estimated), so the
 #' M-ratio is unaffected by `sdratio`.
+#' The type-1 boundary is `criterion`, the middle threshold, so this version
+#' needs an even number of rating categories: with an odd number the middle
+#' category straddles the boundary (see "Where `criterion` sits").
 #' Extract the M-ratio posterior with [mratio()].
 #' `r model_info(.model_sdt_rating(version = "metad"))`
 #'
@@ -324,13 +377,30 @@ settable_links.sdt_rating <- function(model) {
 #' The `dpsdt` and `metad` versions inherit the same convention: `d` there
 #' describes the familiarity (type-1) distributions, and meta-d' is scaled the
 #' same way, which leaves the M-ratio invariant to `sdratio`.
+#'
+#' @section Where `criterion` sits:
+#' Every `threshold_type` places `criterion` the same way. With an even number
+#' of categories K it is the middle threshold, the boundary between the K/2
+#' "noise" categories and the K/2 "signal" categories. With an odd number there
+#' is no such boundary -- the middle category straddles it -- so `criterion` is
+#' the centre of that category, and the two thresholds around it sit half an
+#' interval below and above. A shift in `criterion` therefore moves the whole
+#' threshold set, and the threshold parameters (`spacing`, `delta`) describe
+#' its shape around that point.
+#'
+#' @section Identifying `sdratio`:
+#' Unlike [sdt_yn()], a rating design identifies `sdratio` from a single
+#' condition: the K - 1 thresholds give K - 1 operating points per condition,
+#' which trace the ROC; under `dist = "normal"` its z-transform is a line with
+#' slope `1 / exp(sdratio)`. `sdratio ~ 1` on a one-condition dataset is
+#' identified from K = 3 categories, where it uses every degree of freedom
+#' (the fit is saturated), and leaves the zROC testable from K = 4; the
+#' identification caveats on the [sdt_yn()] page do not carry over.
 #' @param response A character vector of K column names containing response
 #'   counts per rating category, ordered from "definitely noise" to
 #'   "definitely signal".
 #' @param stimulus The name of the variable coding the stimulus type.
 #'   Must be coded as 0 (noise/new) and 1 (signal/old).
-#' @param n_ratings Integer. Number of response categories. When `response`
-#'   is a character vector, defaults to its length. Must be > 2.
 #' @param dist The distribution assumed for the latent evidence, given here by
 #'   its cumulative distribution function. One of:
 #'   \itemize{
@@ -347,14 +417,21 @@ settable_links.sdt_rating <- function(model) {
 #'       Thresholds follow logit-spaced canonical positions (Selker et al.,
 #'       2019).
 #'     \item "equidistant": 2 parameters (criterion + spacing). Thresholds
-#'       are equally spaced around criterion.
-#'     \item "log_distance": K-2 parameters. Each threshold distance is
-#'       exp(delta), guaranteeing ordering (Paulewicz & Blaut, 2022).
-#'     \item "log_ratio": K-2 parameters. Threshold distances as ratios
-#'       (Paulewicz & Blaut, 2022).
-#'     \item "softmax": K-2 parameters. A shared spacing parameter controls
-#'       the average interval size, while softmax-transformed delta parameters
-#'       allocate interval widths smoothly across the scale.
+#'       are equally spaced, exp(spacing) apart.
+#'     \item "log_distance": K-2 parameters. `delta<i>` is the log width of
+#'       the interval between thresholds i and i + 1, so the intervals are
+#'       free and the ordering is guaranteed (Paulewicz & Blaut, 2022).
+#'     \item "log_ratio": K-2 parameters (Paulewicz & Blaut, 2022; the odd-K
+#'       form is bmm's). One interval is the spread, `exp(delta)`: for even K
+#'       the interval just above `criterion`, for odd K the middle category.
+#'       The first interval on the other side (even K) or on each side (odd K)
+#'       is a ratio times the spread, and every further interval a ratio
+#'       times the first interval on its side. The deltas are therefore not
+#'       exchangeable; `model$parameters` names the role of each.
+#'     \item "softmax": K-2 parameters. A shared spacing parameter sets the
+#'       mean interval width, exp(spacing), while K-3 delta parameters share
+#'       the total width out over the intervals through a softmax (each delta
+#'       is the log ratio of its interval to the last one).
 #'   }
 #' @param version Character. The latent-process version of the rating model.
 #'   One of `"standard"` (default, a single familiarity SDT process),
@@ -362,7 +439,13 @@ settable_links.sdt_rating <- function(model) {
 #'   `"metad"` (meta-d' with a metacognitive efficiency parameter `logmratio`,
 #'   the log M-ratio). All three use the same confidence-rating response
 #'   interface. See Details.
-#' @param links A named list of link functions for the parameters.
+#' @param links A named list of link functions for the parameters, e.g.
+#'   `links = list(d = "log")`. Only `d` and `criterion` can be set, to
+#'   `"identity"`, `"log"`, `"softplus"`, `"logit"` or `"probit"`. `sdratio`
+#'   and the threshold parameters keep their identity links, because the model
+#'   reads each of them through `exp()` and fixes `sdratio` at 0 for equal
+#'   variance. The same holds for `Ro` and `Rn`, read through `inv_logit()`
+#'   and fixed off by default, and for `logmratio`, read through `exp()`.
 #' @param ... used internally for testing, ignore it
 #' @return An object of class `bmmodel`
 #' @references
@@ -437,7 +520,6 @@ settable_links.sdt_rating <- function(model) {
 #' mratio(fit_md) # posterior M-ratio (meta-d'/d')
 #' }
 sdt_rating <- function(response, stimulus,
-                       n_ratings = NULL,
                        dist = c("normal", "gumbel_min", "gumbel_max", "logistic"),
                        threshold_type = c("parsimonious", "equidistant",
                                           "log_distance", "log_ratio",
@@ -450,24 +532,24 @@ sdt_rating <- function(response, stimulus,
   threshold_type <- match.arg(threshold_type)
   version <- match.arg(version)
 
-  if (length(response) > 1 && is.null(n_ratings)) {
-    n_ratings <- length(response)
-  }
-
-  stopif(is.null(n_ratings) || n_ratings <= 2,
-         "Rating models require n_ratings > 2 (or pass a response vector with > 2 columns)")
-
-  stopif(threshold_type == "log_ratio" && n_ratings < 4,
-         "log_ratio thresholds require n_ratings >= 4 (the anchor ratio needs an interval above the criterion)")
-
-  if (length(response) > 1) {
-    stopif(n_ratings != length(response),
-           "n_ratings ({n_ratings}) must match the number of response columns ({length(response)})")
-  }
+  stopif(length(response) <= 2,
+         "response must name more than 2 rating-count columns, one per category")
+  # each column name becomes part of a brms parameter name (mu<column>)
+  unusable <- response[grepl("[._]", response)]
+  stopif(length(unusable) > 0,
+         "Response column names must not contain '.' or '_', because brms \\
+         builds a parameter name from each of them. Rename {collapse_comma(unusable)}")
+  stopif(threshold_type == "log_ratio" && length(response) < 4,
+         "log_ratio thresholds require at least 4 rating categories (the anchor ratio needs an interval above the criterion)")
+  stopif(version == "metad" && length(response) %% 2L != 0L,
+         "version = 'metad' needs an even number of rating categories: \\
+         meta-d' splits the scale at the old/new boundary, which an odd \\
+         number of categories does not have (the middle category straddles \\
+         it). response names {length(response)} columns")
 
   .model_sdt_rating(response = response, stimulus = stimulus,
-                    dist = dist, n_ratings = n_ratings,
-                    threshold_type = threshold_type, version = version,
+                    dist = dist, threshold_type = threshold_type,
+                    version = version,
                     links = links, call = call, ...)
 }
 
@@ -479,11 +561,7 @@ sdt_rating <- function(response, stimulus,
 #' @export
 check_data.sdt_rating <- function(model, data, formula) {
   stim_var <- model$other_vars$stimulus
-  stopif(!stim_var %in% colnames(data),
-         "Stimulus variable '{stim_var}' missing in the data")
-  stim_vals <- data[[stim_var]]
-  stopif(!is.numeric(stim_vals) || !all(stim_vals %in% c(0, 1)),
-         "Stimulus variable '{stim_var}' must be coded as 0 (noise) and 1 (signal)")
+  data[[stim_var]] <- .validate_sdt_stimulus(data, stim_var)
 
   resp_cols <- model$resp_vars$response
   .validate_sdt_count_cols(data, resp_cols)
@@ -532,9 +610,12 @@ check_data.sdt_rating <- function(model, data, formula) {
 # (threshold types without spacing ignore it).
 .sdt_rating_logmu_args <- function(model) {
   has_spacing <- "spacing" %in% names(model$parameters)
+  # d and criterion reach the kernel on the natural scale, so a non-identity
+  # link is inverted here, as apply_links() does for m3
   c(model$other_vars$n_ratings, .sdt_dist_id(model$other_vars$dist),
     match(model$other_vars$threshold_type, .sdt_threshold_types),
-    "d", "criterion",
+    deparse(inv_link("d", model$links$d)),
+    deparse(inv_link("criterion", model$links$criterion)),
     if (has_spacing) "spacing" else "0", "sdratio",
     .sdt_rating_variant(model)$extra_params,
     model$other_vars$stimulus, .sdt_threshold_delta_names(model))
@@ -668,9 +749,8 @@ sdt_rating_logmu <- function(cat, K, dist, thresh, d, criterion, spacing,
   }
 
   thr <- .sdt_make_thresholds(criterion, K, thresh_name, spacing, deltas)
-  probs <- rbind(.sdt_category_probs(rbind(thr), d, exp(sdratio),
-                                     stimulus, dist_name))
-  out <- log(probs[, cat])
+  out <- rbind(.sdt_category_log_probs(rbind(thr), d, exp(sdratio),
+                                       stimulus, dist_name))[, cat]
 
   if (!is.null(shape)) dim(out) <- shape
   out
@@ -698,11 +778,8 @@ sdt_dpsdt_logmu <- function(cat, K, dist, thresh, d, criterion, spacing,
   }
 
   thr <- .sdt_make_thresholds(criterion, K, thresh_name, spacing, deltas)
-  probs <- rbind(.sdt_dpsdt_category_probs(rbind(thr), d, exp(sdratio),
-                                           stimulus, dist_name,
-                                           stats::plogis(Ro),
-                                           stats::plogis(Rn)))
-  out <- log(probs[, cat])
+  out <- rbind(.sdt_dpsdt_category_log_probs(rbind(thr), d, exp(sdratio),
+                                             stimulus, dist_name, Ro, Rn))[, cat]
 
   if (!is.null(shape)) dim(out) <- shape
   out
@@ -730,9 +807,8 @@ sdt_metad_logmu <- function(cat, K, dist, thresh, d, criterion, spacing,
   }
 
   thr <- .sdt_make_thresholds(criterion, K, thresh_name, spacing, deltas)
-  probs <- rbind(.sdt_metad_category_probs(rbind(thr), d, metad, stimulus,
-                                           exp(sdratio), dist_name))
-  out <- log(probs[, cat])
+  out <- rbind(.sdt_metad_category_log_probs(rbind(thr), d, exp(sdratio),
+                                             stimulus, dist_name, metad))[, cat]
 
   if (!is.null(shape)) dim(out) <- shape
   out

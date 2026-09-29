@@ -61,6 +61,16 @@ perceived strength. Only \code{d} is estimated (no criterion or stimulus
 column). Supports Gumbel-min (closed form) and Gaussian UV-SDT
 (numerical integration).
 }
+\section{Parameter scales}{
+
+These functions take \code{sdratio} as the ratio itself, while \code{\link[=sdt_ranking]{sdt_ranking()}}
+estimates its logarithm (0 = equal variance): a fitted \code{sdratio} of 0.375 is
+a ratio of \code{exp(0.375) = 1.455}, and passing \code{0.375} here instead asks for a
+signal distribution 2.7 times narrower than the noise. That is a legal
+value and raises no error, so exponentiate first. \code{d} carries across
+unchanged.
+}
+
 \examples{
 # Gumbel-min ranking density
 dsdt_ranking(counts = c(40, 30, 20, 10), m = 4, d = 1.0)

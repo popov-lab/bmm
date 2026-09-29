@@ -44,7 +44,7 @@ A data frame of class \code{"bmm_sdt_roc"} with columns \code{FA}, \code{Hit},
 attribute (\code{FA}, \code{Hit_mean}, \code{Hit_lower}, \code{Hit_upper}) with the smooth
 model-implied curve, and a \code{points} attribute with the model-implied
 operating points: one per criterion level for binary multi-criteria fits,
-or the K-1 confidence thresholds (labelled \code{c1}..\code{c(K-1)}) for rating fits.
+or the K-1 confidence thresholds (labelled \code{t1}..\code{t(K-1)}) for rating fits.
 }
 \description{
 Computes the receiver operating characteristic (ROC) curve implied by the
@@ -66,7 +66,7 @@ For \strong{rating} models the K-1 confidence thresholds define K-1 empirical RO
 points per posterior draw (returned as the data frame). The smooth
 model-implied curve is traced over a virtual cut from the posterior of
 \code{d} (and \code{sdratio}) and attached as the \code{summary} attribute, with the K-1
-thresholds attached as the \code{points} attribute (labelled \code{c1}..\code{c(K-1)}) so
+thresholds attached as the \code{points} attribute (labelled \code{t1}..\code{t(K-1)}) so
 they fall on the curve.
 }
 \seealso{

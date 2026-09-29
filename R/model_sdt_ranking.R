@@ -17,7 +17,7 @@
   # between-subject SD is 0.30 [0.24, 0.37] on meyer_grant_jakob_2025 and ~0.6
   # for sdt_yn on broeder_schuetz_2009_e3, and only rate 1's median (0.69)
   # covers the larger of the two. Rate 2 for sdratio, whose between-subject SD
-  # is 0.06 [0.00, 0.12] here and ~0.2 there. See local/sdt_sd_priors/.
+  # is 0.06 [0.00, 0.12] here and ~0.2 there.
   default_priors <- list(
     d = list(main = "normal(1, 1)", effects = "normal(0, 0.5)", sd = "exponential(1)")
   )
@@ -26,19 +26,19 @@
   init_ranges <- list(d = c(0.5, 1.5))
 
   # Gaussian ranking carries sdratio as an overridable fixed parameter (fixed to
-  # 0 = equal variance, sampled when the user adds sdratio ~ ...), mirroring the
-  # rating and binary SDT models.
+  # 0 = equal variance, sampled when the user adds sdratio ~ ...), as sdt_yn
+  # does.
   if (dist == "normal") {
     parameters$sdratio <- paste0(
       "Log SD ratio: log ratio of signal to noise standard deviations ",
       "(exp(sdratio) is the ratio, 0 = equal variance)"
     )
-    # Matches sdt_yn: on the log scale, normal(0, 0.3) covers ratios in
-    # [0.56, 1.80] at 95%, which spans the empirical recognition range and keeps
-    # the prior inside the interval the Gauss-Hermite ladder is calibrated over
-    # (see .ranking_gh_n).
+    # Identical to sdt_yn's, whose comment gives the empirical grounds. For
+    # ranking the prior also has to stay inside the ratios [0.5, 2.0] that the
+    # Gauss-Hermite ladder is calibrated over (see .ranking_gh_n): normal(0, 0.3)
+    # puts 97.9% of its mass there.
     default_priors$sdratio <- list(
-      main = "normal(0, 0.3)", effects = "normal(0, 0.15)", sd = "exponential(2)"
+      main = "normal(0, 0.3)", effects = "normal(0, 0.3)", sd = "exponential(2)"
     )
     param_links$sdratio <- "identity"
     fixed_pars$sdratio <- 0
@@ -86,10 +86,18 @@
 # and it is fixed at 0, which means equal variance only while the link is
 # identity. Any other link both rescales the fixed value and applies a second
 # transformation on top of the exp(), so the model would sample a ratio the
-# user never asked for. `d` fixes nothing, so its link stays settable.
+# user never asked for.
+#
+# `d` is settable only for gumbel_min, whose closed-form kernel is exact far
+# beyond any plausible d. The Gaussian quadrature's nodes stop short of the
+# last rank's integrand peak once d is large: at equal variance and set sizes
+# up to 8 the Stan kernel is off by several nats at d = 15 and returns -Inf
+# from d = 30. Under the identity link the normal(1, 1) prior never gets
+# there, but under a log link it puts 4.4% of its mass above d = 15 and 0.8%
+# above d = 30.
 #' @exportS3Method
 settable_links.sdt_ranking <- function(model) {
-  "d"
+  if (model$other_vars$dist == "gumbel_min") "d" else character(0)
 }
 
 
@@ -155,7 +163,11 @@ settable_links.sdt_ranking <- function(model) {
 #'     \item "normal": Gaussian, \eqn{\Phi(x)} (supports unequal variance via
 #'       `sdratio`)
 #'   }
-#' @param links A named list of link functions for the parameters.
+#' @param links A named list of link functions for the parameters. Only the
+#'   link of `d` can be changed, and only for `dist = "gumbel_min"`: with
+#'   `dist = "normal"` the quadrature loses accuracy at the large `d` a
+#'   log link reaches, so `d` keeps the identity link. `sdratio` always
+#'   keeps the identity link.
 #' @param ... used internally for testing, ignore it
 #' @return An object of class `bmmodel`
 #' @references
@@ -196,10 +208,13 @@ sdt_ranking <- function(response, m,
   stop_missing_args()
   dist <- match.arg(dist)
 
-  stopif(!((is.numeric(m) && length(m) == 1 && m >= 2) ||
+  stopif(!((is.numeric(m) && length(m) == 1 && is.finite(m) && m >= 2) ||
            (is.character(m) && length(m) == 1)),
          "m must be a single integer >= 2, or the name of a set-size column in the data")
-  if (is.numeric(m)) m <- as.integer(m)
+  if (is.numeric(m)) {
+    warnif(m != trunc(m), "m should be an integer value; {m} was truncated to {as.integer(m)}")
+    m <- as.integer(m)
+  }
 
   stopif(length(response) < 2,
          "response must name at least 2 rank-count columns")
@@ -221,6 +236,8 @@ check_data.sdt_ranking <- function(model, data, formula) {
   .validate_sdt_count_cols(data, resp_cols)
 
   max_rank <- .sdt_resolve_set_size(model$other_vars$m, data)
+  stopif(anyNA(max_rank),
+         "Set-size column '{model$other_vars$m}' must not contain NA")
   n_ranks <- length(resp_cols)
   stopif(any(max_rank > n_ranks, na.rm = TRUE),
          "Set size must not exceed the number of rank columns ({n_ranks})")
@@ -287,7 +304,9 @@ bmf2bf.sdt_ranking <- function(model, formula) {
   # the distribution id selects the kernel in both the Stan function and the
   # R companion.
   sdratio_arg <- if ("sdratio" %in% names(model$parameters)) "sdratio" else "0"
-  args <- paste("max_rank", "d", sdratio_arg,
+  # d reaches the kernel on the natural scale, so a non-identity link is
+  # inverted here, as apply_links() does for m3
+  args <- paste("max_rank", deparse(inv_link("d", model$links$d)), sdratio_arg,
                 .sdt_dist_id(model$other_vars$dist), sep = ", ")
 
   bform <- brms::bf(

@@ -28,7 +28,7 @@
 #' points per posterior draw (returned as the data frame). The smooth
 #' model-implied curve is traced over a virtual cut from the posterior of
 #' `d` (and `sdratio`) and attached as the `summary` attribute, with the K-1
-#' thresholds attached as the `points` attribute (labelled `c1`..`c(K-1)`) so
+#' thresholds attached as the `points` attribute (labelled `t1`..`t(K-1)`) so
 #' they fall on the curve.
 #'
 #' @param fit A `bmmfit` object returned by [bmm()] from an SDT model.
@@ -55,7 +55,7 @@
 #'   attribute (`FA`, `Hit_mean`, `Hit_lower`, `Hit_upper`) with the smooth
 #'   model-implied curve, and a `points` attribute with the model-implied
 #'   operating points: one per criterion level for binary multi-criteria fits,
-#'   or the K-1 confidence thresholds (labelled `c1`..`c(K-1)`) for rating fits.
+#'   or the K-1 confidence thresholds (labelled `t1`..`t(K-1)`) for rating fits.
 #'
 #' @seealso [auc_sdt()], [roc_observed()], [plot.bmm_sdt_roc()]
 #' @export
@@ -269,25 +269,31 @@ roc_sdt <- function(fit, conditions = NULL, n_points = 100,
 }
 
 
-# posterior_linpred for one parameter, with conditions overriding the first data
-# row so every formula variable is present. The parameters are nlpars for the
-# multinomial models (rating, ranking) and dpars for the custom-family models
-# (binary, mafc); which applies is derived from the model class so callers
-# never need to know.
-.sdt_linpred <- function(fit, param, conditions, ...) {
+# Posterior draws of one parameter on the scale the likelihood reads it, with
+# conditions overriding the first data row so every formula variable is
+# present. The parameters are nlpars for the multinomial models (rating,
+# ranking) and dpars for the custom-family models (binary, mafc); which applies
+# is derived from the model class so callers never need to know. d and
+# criterion reach the kernels through the model's inverse link, so they get it
+# here too; sdratio and the threshold parameters stay on the log scale that
+# the SDT helpers exponentiate themselves.
+.sdt_par_draws <- function(fit, param, conditions, ...) {
   newdata <- fit$data[rep(1L, max(1L, nrow(conditions))), , drop = FALSE]
   rownames(newdata) <- NULL
   if (ncol(conditions) > 0L) {
     cols <- intersect(names(conditions), names(newdata))
     newdata[cols] <- conditions[cols]
   }
-  if (inherits(fit$bmm$model, c("sdt_rating", "sdt_ranking"))) {
+  model <- fit$bmm$model
+  linpred <- if (inherits(model, c("sdt_rating", "sdt_ranking"))) {
     brms::posterior_linpred(fit, nlpar = param, newdata = newdata,
                             re_formula = NA, allow_new_levels = TRUE, ...)
   } else {
     brms::posterior_linpred(fit, dpar = param, newdata = newdata,
                             re_formula = NA, allow_new_levels = TRUE, ...)
   }
+  if (!param %in% c("d", "criterion")) return(linpred)
+  link_transform(linpred, model$links[[param]], inverse = TRUE)
 }
 
 
@@ -297,9 +303,9 @@ roc_sdt <- function(fit, conditions = NULL, n_points = 100,
 # in noise-SD units, which equals d_a itself under equal variance. Every
 # analysis function builds on these three matrices (draws x conditions).
 .sdt_latent_geometry <- function(fit, conditions, has_sdratio, ...) {
-  d <- .sdt_linpred(fit, "d", conditions, ...)
+  d <- .sdt_par_draws(fit, "d", conditions, ...)
   sdratio <- if (has_sdratio) {
-    exp(.sdt_linpred(fit, "sdratio", conditions, ...))
+    exp(.sdt_par_draws(fit, "sdratio", conditions, ...))
   } else {
     matrix(1, nrow = nrow(d), ncol = ncol(d))
   }
@@ -316,13 +322,13 @@ roc_sdt <- function(fit, conditions = NULL, n_points = 100,
 .sdt_rating_thresholds <- function(fit, model, conditions, ...) {
   n_ratings      <- model$other_vars$n_ratings
   threshold_type <- model$other_vars$threshold_type
-  crit    <- .sdt_linpred(fit, "criterion", conditions, ...)
+  crit    <- .sdt_par_draws(fit, "criterion", conditions, ...)
   spacing <- if ("spacing" %in% names(model$parameters)) {
-    .sdt_linpred(fit, "spacing", conditions, ...)
+    .sdt_par_draws(fit, "spacing", conditions, ...)
   }
-  delta_names <- grep("^delta", names(model$parameters), value = TRUE)
+  delta_names <- .sdt_threshold_delta_names(model)
   delta_mats  <- lapply(stats::setNames(delta_names, delta_names),
-                        function(nm) .sdt_linpred(fit, nm, conditions, ...))
+                        function(nm) .sdt_par_draws(fit, nm, conditions, ...))
 
   lapply(seq_len(ncol(crit)), function(l_i) {
     deltas <- if (length(delta_mats)) {
@@ -349,13 +355,13 @@ roc_sdt <- function(fit, conditions = NULL, n_points = 100,
 
   version <- model$version %||% "standard"
   if (version == "dpsdt") {
-    mats <- list(Ro = stats::plogis(.sdt_linpred(fit, "Ro", panel_cond, ...)),
-                 Rn = stats::plogis(.sdt_linpred(fit, "Rn", panel_cond, ...)))
+    mats <- list(Ro = stats::plogis(.sdt_par_draws(fit, "Ro", panel_cond, ...)),
+                 Rn = stats::plogis(.sdt_par_draws(fit, "Rn", panel_cond, ...)))
     return(do.call(rbind, Map(summarise, names(mats), mats)))
   }
   if (version == "metad") {
-    mratio <- exp(.sdt_linpred(fit, "logmratio", panel_cond, ...))
-    d <- .sdt_linpred(fit, "d", panel_cond, ...)
+    mratio <- exp(.sdt_par_draws(fit, "logmratio", panel_cond, ...))
+    d <- .sdt_par_draws(fit, "d", panel_cond, ...)
     return(do.call(rbind, Map(summarise, c("mratio", "metad"),
                               list(mratio, mratio * d))))
   }
@@ -447,7 +453,7 @@ roc_sdt <- function(fit, conditions = NULL, n_points = 100,
   n_pt <- max(1L, nrow(point_cond))
 
   geom     <- .sdt_latent_geometry(fit, point_cond, has_sdratio, ...)
-  crit_mat <- .sdt_linpred(fit, "criterion", point_cond, ...)
+  crit_mat <- .sdt_par_draws(fit, "criterion", point_cond, ...)
 
   rows <- vector("list", n_pt)
   for (c_i in seq_len(n_pt)) {
@@ -468,16 +474,16 @@ roc_sdt <- function(fit, conditions = NULL, n_points = 100,
 
 # Category probabilities for the active rating SDT version, so roc_sdt() traces
 # the dual-process / meta-d' operating points rather than the familiarity-only
-# curve. `pars` carries the per-draw recollection (Ro/Rn, already on the
-# probability scale) or metacognitive (metad) values; standard ignores it. `d`
-# is d_a throughout, and each kernel converts it to noise-SD units itself.
+# curve. `pars` carries the per-draw recollection (Ro/Rn, on the model's logit
+# scale) or metacognitive (metad) values; standard ignores it. `d` is d_a
+# throughout, and each kernel converts it to noise-SD units itself.
 .sdt_version_category_probs <- function(model, thresholds, d, sdratio,
                                         stimulus, dist, pars = list()) {
   switch(model$version,
     dpsdt = .sdt_dpsdt_category_probs(thresholds, d, sdratio, stimulus,
                                       dist, pars$Ro, pars$Rn),
-    metad = .sdt_metad_category_probs(thresholds, d, pars$metad, stimulus,
-                                      sdratio, dist),
+    metad = .sdt_metad_category_probs(thresholds, d, sdratio, stimulus,
+                                      dist, pars$metad),
     .sdt_category_probs(thresholds, d, sdratio, stimulus, dist)
   )
 }
@@ -486,7 +492,7 @@ roc_sdt <- function(fit, conditions = NULL, n_points = 100,
 # ROC for rating SDT models. Returns three pieces (like .roc_sdt_yn): the
 # discrete K+1-point ROC per draw (`curve`, also used by the numerical AUC), the
 # smooth model-implied curve swept over a virtual cut (`summary`), and the K-1
-# threshold operating points with a credible band (`points`, labelled c1..cK-1).
+# threshold operating points with a credible band (`points`, labelled t1..tK-1).
 # The smooth curve uses the rating model's own probability map -- FA = 1 - cdf(t
 # + sep/2), Hit = 1 - cdf((t - sep/2) / sdratio), where sep is the separation in
 # noise-SD units -- the continuous envelope of the discrete points, so the
@@ -508,16 +514,16 @@ roc_sdt <- function(fit, conditions = NULL, n_points = 100,
 
   ro_mat <- rn_mat <- metad_mat <- NULL
   if (model$version == "dpsdt") {
-    ro_mat <- stats::plogis(.sdt_linpred(fit, "Ro", conditions, ...))
-    rn_mat <- stats::plogis(.sdt_linpred(fit, "Rn", conditions, ...))
+    ro_mat <- .sdt_par_draws(fit, "Ro", conditions, ...)
+    rn_mat <- .sdt_par_draws(fit, "Rn", conditions, ...)
   } else if (model$version == "metad") {
     # meta-d = exp(log M-ratio) * d, both on the d_a scale, so the kernels can
     # apply the same root-mean-square conversion to each
-    metad_mat <- exp(.sdt_linpred(fit, "logmratio", conditions, ...)) * geom$d
+    metad_mat <- exp(.sdt_par_draws(fit, "logmratio", conditions, ...)) * geom$d
   }
 
   fa_grid       <- seq(0.001, 0.999, length.out = n_points)
-  thr_levels    <- paste0("c", seq_len(K1))
+  thr_levels    <- paste0("t", seq_len(K1))
   cond_has_cols <- ncol(conditions) > 0L
   curve_list   <- vector("list", n_cond)
   summary_list <- vector("list", n_cond)
@@ -556,8 +562,8 @@ roc_sdt <- function(fit, conditions = NULL, n_points = 100,
     # Dual-process recollection lifts the smooth curve off the familiarity ROC:
     # Ro adds a Hit-axis intercept, Rn scales false alarms toward the new end.
     if (model$version == "dpsdt") {
-      ro_vec  <- ro_mat[, c_i]
-      rn_vec  <- rn_mat[, c_i]
+      ro_vec  <- stats::plogis(ro_mat[, c_i])
+      rn_vec  <- stats::plogis(rn_mat[, c_i])
       fa_mat  <- (1 - rn_vec) * fa_mat
       hit_mat <- ro_vec + (1 - ro_vec) * hit_mat
     }
@@ -805,7 +811,7 @@ latent_sdt <- function(fit, conditions = NULL, n_grid = 200,
   # Boundary positions are evaluated over the density x boundary combinations so
   # that each density panel can carry all its criteria/thresholds.
   if (has_criterion) {
-    crit_line <- .sdt_linpred(fit, "criterion", line_cond, ...)
+    crit_line <- .sdt_par_draws(fit, "criterion", line_cond, ...)
     thr_list  <- if (is_rating) {
       .sdt_rating_thresholds(fit, model, line_cond, ...)
     }
@@ -1080,8 +1086,8 @@ mratio <- function(fit, conditions = NULL, probs = c(0.025, 0.975), ...) {
   conditions <- .sdt_resolve_conditions(fit, conditions)
   cond_rows  <- .sdt_unique_subset(conditions, names(conditions))
 
-  mratio_mat <- exp(.sdt_linpred(fit, "logmratio", cond_rows, ...))
-  d_mat      <- .sdt_linpred(fit, "d", cond_rows, ...)
+  mratio_mat <- exp(.sdt_par_draws(fit, "logmratio", cond_rows, ...))
+  d_mat      <- .sdt_par_draws(fit, "d", cond_rows, ...)
   mats       <- list(mratio = mratio_mat, metad = mratio_mat * d_mat)
 
   draws_list   <- vector("list", ncol(mratio_mat))
@@ -1181,7 +1187,7 @@ auc_sdt <- function(fit, conditions = NULL, probs = c(0.025, 0.975),
 
   if (use_analytical) {
     auc_fn <- if (dist == "normal") function(d) stats::pnorm(d / sqrt(2)) else stats::plogis
-    d_mat <- .sdt_linpred(fit, "d", conditions, ...)
+    d_mat <- .sdt_par_draws(fit, "d", conditions, ...)
     n_draws <- nrow(d_mat)
     result <- vector("list", ncol(d_mat))
     for (c_i in seq_len(ncol(d_mat))) {

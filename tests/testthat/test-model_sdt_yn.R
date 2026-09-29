@@ -819,19 +819,27 @@ test_that("the Stan dist_type branches match the registry order", {
     sub("(?s)\n\\}.*", "",
         sub(paste0("(?s).*real ", fun, "\\("), "", sc, perl = TRUE), perl = TRUE)
   }
-  log_cdf <- c("std_normal_lcdf\\(eta\\)", "log1m_exp\\(-exp\\(eta\\)\\)",
-               "-exp\\(-eta\\)", "-log1p_exp\\(-eta\\)")
-  log_ccdf <- c("std_normal_lcdf\\(-eta\\)", "-exp\\(eta\\)",
-                "log1m_exp\\(-exp\\(-eta\\)\\)", "-eta - log1p_exp\\(-eta\\)")
+  branches <- list(
+    sdt_cumprob = c("Phi\\(eta\\)", "1 - exp\\(-exp\\(eta\\)\\)",
+                    "exp\\(-exp\\(-eta\\)\\)", "inv_logit\\(eta\\)"),
+    sdt_log_cumprob = c("std_normal_lcdf\\(eta\\)",
+                        "log1m_exp\\(-exp\\(eta\\)\\)",
+                        "-exp\\(-eta\\)", "-log1p_exp\\(-eta\\)"),
+    sdt_log_one_minus_cumprob = c("std_normal_lcdf\\(-eta\\)", "-exp\\(eta\\)",
+                                  "log1m_exp\\(-exp\\(-eta\\)\\)",
+                                  "-eta - log1p_exp\\(-eta\\)"),
+    sdt_quantile = c("inv_Phi\\(u\\)", "log\\(-log1m\\(u\\)\\)",
+                     "-log\\(-log\\(u\\)\\)", "logit\\(u\\)")
+  )
 
   expect_equal(names(.sdt_dists),
                c("normal", "gumbel_min", "gumbel_max", "logistic"))
-  for (i in seq_along(.sdt_dists)) {
-    expect_match(dispatcher("sdt_log_cumprob"),
-                 paste0("dist_type == ", i, "\\) return ", log_cdf[i]),
-                 info = names(.sdt_dists)[i])
-    expect_match(dispatcher("sdt_log_one_minus_cumprob"),
-                 paste0("dist_type == ", i, "\\) return ", log_ccdf[i]),
-                 info = names(.sdt_dists)[i])
+  for (fun in names(branches)) {
+    for (i in seq_along(.sdt_dists)) {
+      expect_match(dispatcher(fun),
+                   paste0("dist_type == ", i, "\\) return ",
+                          branches[[fun]][i]),
+                   info = paste(fun, names(.sdt_dists)[i]))
+    }
   }
 })

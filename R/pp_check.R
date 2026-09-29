@@ -40,7 +40,11 @@
 #'   `resp_var` is specified. When `group` is specified, the grouped variant
 #'   (e.g., `"dens_overlay_grouped"`) is auto-selected if available.
 #'   Multinomial models produce a response proportion profile regardless of
-#'   the value supplied.
+#'   the value supplied. With `resp_var`, `type = "bars_binned"` is also
+#'   available: it bins a continuous statistic like a histogram, with bars for
+#'   the observed number of observations per bin and points with intervals
+#'   for the predicted number. It is the default for the [ezdm()] accuracy
+#'   check.
 #' @param ndraws Integer. Number of posterior draws. Defaults to `100` for
 #'   multinomial models and `10` when `resp_var` is specified; otherwise
 #'   passed to [brms::pp_check()].
@@ -62,8 +66,12 @@
 #'   the name of the observable to check, or `"all"` for a panel of all
 #'   available checks built from one shared simulation. See [pp_check_vars()]
 #'   for the options of a fitted model. The default `NULL` checks the primary
-#'   response via [brms::pp_check()]. For the RT models, passing
-#'   `negative_rt = TRUE` (a [brms::posterior_predict()] argument) is
+#'   response via [brms::pp_check()], except for an `ezdm(version = "4par")`
+#'   fit in which some cells have no usable summaries at the upper boundary:
+#'   the primary response, `mean_rt_upper`, holds placeholders there, so
+#'   `NULL` means `resp_var = "mean_rt_upper"`, which leaves those cells out
+#'   but takes neither `newdata` nor the `loo_*` types. For the RT models,
+#'   passing `negative_rt = TRUE` (a [brms::posterior_predict()] argument) is
 #'   redirected to `resp_var = "signed_rt"`, so that observed and predicted
 #'   response times are both signed by the response.
 #' @param ... Additional arguments. Without `resp_var`, forwarded to
@@ -71,11 +79,15 @@
 #'   [brms::posterior_predict()] (`probs`, a numeric vector of length 2 with
 #'   default `c(0.025, 0.975)`, sets the credible interval). With `resp_var`,
 #'   `draw_ids` and `re_formula` go to [brms::prepare_predictions()] and the
-#'   rest to the `bayesplot::ppc_*` function. `re_formula = NA` predicts at
-#'   the population level on every path.
-#' @return For multinomial models or when `resp_var` is specified, a `ggplot2`
-#'   object (a `bayesplot_grid` for `resp_var = "all"`). For other models, the
-#'   result of [brms::pp_check()].
+#'   rest to the `bayesplot::ppc_*` function. `type = "bars_binned"` takes
+#'   `breaks` (bin edges that cover the observed and predicted values), `prob`
+#'   (interval width, default `0.9`) and `freq` (`FALSE` for proportions
+#'   instead of counts). `re_formula = NA` predicts at the population level on
+#'   every path.
+#' @return For multinomial models, for a 4-parameter [ezdm()] fit with
+#'   placeholders in `mean_rt_upper`, or when `resp_var` is specified, a
+#'   `ggplot2` object (a `bayesplot_grid` for `resp_var = "all"`). For other
+#'   models, the result of [brms::pp_check()].
 #' @seealso [brms::pp_check()], [pp_check_vars()]
 #' @aliases pp_check
 #' @importFrom brms pp_check
@@ -98,6 +110,17 @@ pp_check.bmmfit <- function(object, type = NULL, ndraws = NULL,
     resp_var <- "signed_rt"
   }
 
+  if (is.null(resp_var) && !is.null(spec$y_placeholders) &&
+      isTRUE(spec$y_placeholders(object$data))) {
+    resp_var <- names(spec$observed)[spec$observed == "Y"]
+    # refused here, where the reason is known: the checks below would name a
+    # resp_var the user never passed
+    stopif(!is.null(dots$newdata) || grepl("^loo_", type %||% ""),
+           "This {object$bmm$model$name} fit has cells without an observed \\
+            '{resp_var}', so pp_check() checks '{resp_var}' itself, leaving \\
+            those cells out, and does not take 'newdata' or the 'loo_*' types.")
+  }
+
   if (!is.null(resp_var)) {
     stopif(is.null(spec),
            "'resp_var' is not supported for the {object$bmm$model$name}: \\
@@ -111,7 +134,7 @@ pp_check.bmmfit <- function(object, type = NULL, ndraws = NULL,
              !group %in% names(object$data)),
            "'group' must name a column of the model data.")
     stopif(!is.null(dots$newdata),
-           "'newdata' is not supported when 'resp_var' is specified.")
+           "'newdata' is not supported for the '{resp_var}' check.")
     dots$negative_rt <- NULL
     type <- .pp_resolve_type(type, spec$checks[[resp_var]], group)
     return(.pp_check_observable(object, spec, resp_var, type, ndraws, group,
@@ -120,6 +143,7 @@ pp_check.bmmfit <- function(object, type = NULL, ndraws = NULL,
 
   if (identical(family(object)$family, "multinomial")) {
     group <- .pp_check_resolve_group(object, group)
+    object <- .pp_check_restore_set_size(object, group)
     return(.pp_check_multinomial(object, type = type, ndraws = ndraws %||% 100L,
                                  group = group, ...))
   }
@@ -134,11 +158,19 @@ pp_check.bmmfit <- function(object, type = NULL, ndraws = NULL,
 }
 
 
+# the bmm types are reachable only through resp_var: without it, brms resolves
+# 'type' itself. as.character() because a numeric switch() selects by position.
 .ppc_fun <- function(type) {
-  name <- paste0("ppc_", type)
-  if (name %in% as.character(bayesplot::available_ppc(""))) {
-    get(name, asNamespace("bayesplot"))
-  }
+  switch(as.character(type),
+    bars_binned = .ppc_bars_binned,
+    bars_binned_grouped = .ppc_bars_binned_grouped,
+    {
+      name <- paste0("ppc_", type)
+      if (name %in% as.character(bayesplot::available_ppc(""))) {
+        get(name, asNamespace("bayesplot"))
+      }
+    }
+  )
 }
 
 
@@ -154,6 +186,20 @@ pp_check.bmmfit <- function(object, type = NULL, ndraws = NULL,
     return(object$bmm$model$other_vars$stimulus)
   }
   group
+}
+
+
+# brms keeps only the derived max_rank column of an sdt_ranking fit, not the
+# set-size column the user passed as m, so grouping by that column found
+# nothing to facet by
+.pp_check_restore_set_size <- function(object, group) {
+  m <- object$bmm$model$other_vars$m
+  if (!inherits(object$bmm$model, "sdt_ranking") || !identical(group, m) ||
+      m %in% names(object$data)) {
+    return(object)
+  }
+  object$data[[m]] <- object$data$max_rank
+  object
 }
 
 

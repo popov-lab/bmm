@@ -107,13 +107,14 @@ test_that(".cdp_make_thresholds anchors the old/new boundary at criterion", {
 })
 
 test_that(".cdp_make_thresholds log_distance builds cumulative log-distances", {
-  # symmetric 3/3: anchor at thr[3]; distances are exp(delta) away from criterion
-  d <- log(c(0.8, 0.6, 0.6, 0.8))   # delta1, delta2, delta4, delta5
+  # symmetric 3/3: anchor at thr[3]; delta_i is the log width of the interval
+  # between thresholds i and i + 1, as in sdt_rating
+  d <- log(c(0.8, 0.6, 0.6, 0.8))   # delta1 ... delta4
   thr <- .cdp_make_thresholds(0.5, 0, 3, 3, "log_distance", deltas = d)
   expect_length(thr, 5)
   expect_equal(thr[3], 0.5)
-  expect_equal(thr[4] - thr[3], 0.6)   # exp(delta4)
-  expect_equal(thr[5] - thr[4], 0.8)   # exp(delta5)
+  expect_equal(thr[4] - thr[3], 0.6)   # exp(delta3)
+  expect_equal(thr[5] - thr[4], 0.8)   # exp(delta4)
   expect_equal(thr[3] - thr[2], 0.6)   # exp(delta2)
   expect_equal(thr[2] - thr[1], 0.8)   # exp(delta1)
   expect_true(!is.unsorted(thr))
@@ -155,15 +156,13 @@ test_that(".cdp_make_thresholds vectorizes over draws", {
   }
 })
 
-test_that("sdt_cdp log_distance declares per-distance deltas and no spacing", {
+test_that("sdt_cdp log_distance names its deltas in interval order and has no spacing", {
   m <- sdt_cdp(stimulus = "stimulus", n_new = 3, n_old = 3,
                threshold_type = "log_distance")
-  expect_true(all(c("delta1", "delta2", "delta4", "delta5") %in%
-                    names(m$parameters)))
-  expect_false("delta3" %in% names(m$parameters))
+  deltas <- paste0("delta", 1:4)
+  expect_equal(.sdt_threshold_delta_names(m), deltas)
   expect_false("spacing" %in% names(m$parameters))
-  expect_true(all(c("delta1", "delta2", "delta4", "delta5") %in%
-                    names(m$init_ranges)))
+  expect_true(all(deltas %in% names(m$init_ranges)))
 })
 
 test_that("sdt_cdp log_distance integrates with the pipeline via mock backend", {
@@ -174,7 +173,7 @@ test_that("sdt_cdp log_distance integrates with the pipeline via mock backend", 
                threshold_type = "log_distance")
   expect_silent(
     bmm(bmf(dfam ~ 1, drec ~ 1, criterion ~ 1, rcrit ~ 1,
-            delta1 ~ 1, delta2 ~ 1, delta4 ~ 1, delta5 ~ 1),
+            delta1 ~ 1, delta2 ~ 1, delta3 ~ 1, delta4 ~ 1),
         dat, m, backend = "mock", mock_fit = 1, rename = FALSE)
   )
 })
@@ -184,7 +183,7 @@ test_that(".sdt_cdp_logmu_stan generates a log_distance wrapper with delta args"
                threshold_type = "log_distance")
   sc <- .sdt_cdp_logmu_stan(m)
   expect_true(grepl("real sdt_cdp_logmu", sc))
-  expect_true(grepl("real delta1.*real delta2.*real delta4.*real delta5", sc))
+  expect_true(grepl("real delta1.*real delta2.*real delta3.*real delta4", sc))
   expect_true(grepl("array\\[4\\] real deltas", sc))
   expect_true(grepl("cdp_make_thresholds\\(criterion, spacing, deltas", sc))
 })

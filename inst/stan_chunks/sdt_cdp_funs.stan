@@ -91,8 +91,8 @@ real cdp_guess_mass(real mu_F, real mu_R, real sd_R, real corr,
 // boundary (between bin n_new and bin n_new + 1) sits at `criterion`, with
 // n_new - 1 thresholds below and n_old - 1 above. Reduces to the symmetric
 // centred construction when n_new == n_old. thresh_type: 1 = parsimonious
-// (Selker et al., 2019), 2 = equidistant, 3 = log_distance (free cumulative
-// log-distances; `deltas` has length K_full - 2, anchor index n_new carries none).
+// (Selker et al., 2019), 2 = equidistant, 3 = log_distance (free log widths;
+// deltas[j] is the interval between thresholds j and j + 1, as in sdt_rating).
 vector cdp_make_thresholds(real criterion, real spacing, array[] real deltas,
                            int n_new, int n_old, int thresh_type) {
   int K_full = n_new + n_old;

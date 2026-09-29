@@ -12,20 +12,20 @@ test_that("sdt_rating model can be created with vector response", {
   expect_equal(model$other_vars$n_ratings, 4L)
 })
 
-test_that("sdt_rating model infers n_ratings from response length", {
+test_that("sdt_rating takes the number of categories from the response columns", {
   model <- sdt_rating(c("r1", "r2", "r3", "r4", "r5", "r6"), "stimulus")
   expect_equal(model$other_vars$n_ratings, 6L)
 })
 
-test_that("sdt_rating model rejects mismatched n_ratings", {
-  expect_error(
-    sdt_rating(c("r1", "r2", "r3", "r4"), "stimulus", n_ratings = 6),
-    "must match"
-  )
+test_that("sdt_rating model rejects fewer than 3 response columns", {
+  expect_error(sdt_rating(c("r1", "r2"), "stimulus"), "more than 2")
+  expect_error(sdt_rating("rating", "stimulus"), "more than 2")
 })
 
-test_that("sdt_rating model rejects n_ratings <= 2", {
-  expect_error(sdt_rating(c("r1", "r2"), "stimulus"), "n_ratings > 2")
+test_that("sdt_rating refuses column names brms cannot turn into parameters", {
+  expect_error(sdt_rating(paste0("conf_", 1:4), "stimulus"),
+               "must not contain '.' or '_'")
+  expect_error(sdt_rating(c("r1", "r.2", "r3"), "stimulus"), "'r.2'")
 })
 
 test_that("sdt_rating model has parsimonious threshold params by default", {
@@ -39,9 +39,8 @@ test_that("sdt_rating model has parsimonious threshold params by default", {
 test_that("sdt_rating model has log_distance threshold params", {
   model <- sdt_rating(c("r1", "r2", "r3", "r4"), "stimulus",
                       threshold_type = "log_distance")
-  expect_true("delta1" %in% names(model$parameters))
-  expect_true("delta3" %in% names(model$parameters))
-  expect_false("delta2" %in% names(model$parameters))
+  expect_true(all(c("delta1", "delta2") %in% names(model$parameters)))
+  expect_false("delta3" %in% names(model$parameters))
   expect_false("spacing" %in% names(model$parameters))
 })
 
@@ -69,11 +68,13 @@ test_that("sdt_rating model stores all distribution options", {
 test_that("sdt_rating model has log_ratio threshold params", {
   model <- sdt_rating(c("r1", "r2", "r3", "r4"), "stimulus",
                       threshold_type = "log_ratio")
-  expect_true("delta1" %in% names(model$parameters))
-  expect_true("delta3" %in% names(model$parameters))
+  expect_true(all(c("delta1", "delta2") %in% names(model$parameters)))
   expect_true("criterion" %in% names(model$parameters))
   expect_false("spacing" %in% names(model$parameters))
-  expect_false("delta2" %in% names(model$parameters))
+  expect_false("delta3" %in% names(model$parameters))
+  # the roles differ, so the labels must say which delta is the spread
+  expect_match(model$parameters$delta2, "spread")
+  expect_match(model$parameters$delta1, "ratio")
 })
 
 test_that("sdt_rating model has softmax threshold params", {
@@ -119,13 +120,20 @@ test_that("sdt_rating refuses a link on sdratio or a threshold parameter", {
   expect_error(check_links(model), "link of 'spacing' cannot be changed")
 })
 
+test_that("sdt_rating offers only the links it can invert in its formula", {
+  expect_error(
+    sdt_rating(c("r1", "r2", "r3", "r4"), "stimulus", links = list(d = "sqrt")),
+    "Unknown link function"
+  )
+})
+
 test_that("sdt_rating gives every parameter an sd default prior", {
   # Ro and Rn are logit-scale probabilities, so they join d at rate 1;
   # everything else is a log-scale quantity and takes rate 2
   rate1 <- c("d", "Ro", "Rn")
   for (v in names(bmm:::.sdt_rating_variants)) {
     for (tt in c("parsimonious", "log_distance", "softmax")) {
-      model <- sdt_rating(paste0("r", 1:5), "stimulus",
+      model <- sdt_rating(paste0("r", 1:6), "stimulus",
                           threshold_type = tt, version = v)
       sds <- vapply(model$default_priors, function(p) p$sd %||% NA_character_,
                     character(1))
@@ -154,31 +162,72 @@ test_that("sdt_rating supplies init_ranges for every estimated parameter", {
   }
 })
 
-test_that(".sdt_make_thresholds mid matches the Stan builders for odd and even K", {
-  # Regression: the R companion's middle-threshold index must equal the Stan
-  # builders' ((K-1) %/% 2 + 1) so prediction reproduces the likelihood. The two
-  # diverged for odd K (R used K %/% 2), shifting equidistant/anchored thresholds.
-  for (K in 4:7) {
-    mid <- (K - 1L) %/% 2L + 1L
-    for (tt in c("log_distance", "log_ratio", "softmax")) {
+test_that("every threshold type places criterion the same way for odd and even K", {
+  # even K: criterion is the middle threshold; odd K: the centre of the middle
+  # category, with the two thresholds around it half an interval away. The R
+  # builder must agree with sdt_place_thresholds_rating() in Stan (parity test
+  # below), and the two closed forms (parsimonious, equidistant) with both.
+  for (K in 3:8) {
+    for (tt in c("parsimonious", "equidistant", "log_distance", "log_ratio", "softmax")) {
+      if (tt == "log_ratio" && K < 4) next
       nd <- if (tt == "softmax") max(0L, K - 3L) else K - 2L
       deltas <- if (nd > 0) seq(0.1, 0.3, length.out = nd) else NULL
       thr <- .sdt_make_thresholds(0.3, K, tt, spacing = 0.2, deltas = deltas)
-      expect_equal(thr[mid], 0.3, info = paste(tt, "K =", K))    # criterion sits at mid
       expect_false(is.unsorted(thr), info = paste(tt, "K =", K))
+      if (K %% 2 == 0) {
+        expect_equal(thr[K / 2], 0.3, info = paste(tt, "K =", K))
+      } else {
+        g <- (K - 1) / 2
+        expect_equal((thr[g] + thr[g + 1]) / 2, 0.3, info = paste(tt, "K =", K))
+      }
     }
   }
-  # equidistant closed form criterion + (k - mid) * exp(spacing); odd K was the bug
-  expect_equal(.sdt_make_thresholds(0, 5L, "equidistant", spacing = 0), c(-2, -1, 0, 1))
-  expect_equal(.sdt_make_thresholds(0, 7L, "equidistant", spacing = 0), c(-3, -2, -1, 0, 1, 2))
+  expect_equal(.sdt_make_thresholds(0, 5L, "equidistant", spacing = 0), c(-1.5, -0.5, 0.5, 1.5))
+  expect_equal(.sdt_make_thresholds(0, 7L, "equidistant", spacing = 0), seq(-2.5, 2.5))
   expect_equal(.sdt_make_thresholds(0, 6L, "equidistant", spacing = 0), c(-2, -1, 0, 1, 2))
+  # with equal intervals the anchored types coincide with equidistant
+  for (K in 5:6) {
+    expect_equal(.sdt_make_thresholds(0, K, "log_distance", deltas = rep(0, K - 2)),
+                 .sdt_make_thresholds(0, K, "equidistant", spacing = 0))
+    expect_equal(.sdt_make_thresholds(0, K, "log_ratio", deltas = rep(0, K - 2)),
+                 .sdt_make_thresholds(0, K, "equidistant", spacing = 0))
+    expect_equal(.sdt_make_thresholds(0, K, "softmax", spacing = 0, deltas = rep(0, K - 3)),
+                 .sdt_make_thresholds(0, K, "equidistant", spacing = 0))
+  }
 })
 
-test_that("odd-K delta labels skip the same middle threshold as the builders", {
-  model <- sdt_rating(paste0("r", 1:5), "stimulus",
-                      threshold_type = "log_distance")
-  expect_true(all(c("delta1", "delta2", "delta4") %in% names(model$parameters)))
-  expect_false("delta3" %in% names(model$parameters))
+test_that("log_ratio deltas act as spread and ratios, in interval order", {
+  # even K = 6: delta3 is the spread (interval above the criterion threshold),
+  # delta2 the ratio of the interval below to it, delta1 and delta4 ratios to
+  # the first interval on their side
+  gaps <- function(thr) diff(thr)
+  expect_equal(gaps(.sdt_make_thresholds(0, 6L, "log_ratio", deltas = c(0, 0, 1, 0))),
+               rep(exp(1), 4))
+  expect_equal(gaps(.sdt_make_thresholds(0, 6L, "log_ratio", deltas = c(0, 1, 0, 0))),
+               c(exp(1), exp(1), 1, 1))
+  expect_equal(gaps(.sdt_make_thresholds(0, 6L, "log_ratio", deltas = c(1, 0, 0, 0))),
+               c(exp(1), 1, 1, 1))
+  # odd K = 5: delta2 is the middle category, delta1 and delta3 ratios to it
+  expect_equal(gaps(.sdt_make_thresholds(0, 5L, "log_ratio", deltas = c(0, 1, 0))),
+               rep(exp(1), 3))
+  expect_equal(gaps(.sdt_make_thresholds(0, 5L, "log_ratio", deltas = c(0, 0, 1))),
+               c(1, 1, exp(1)))
+  # odd K = 7: delta3 is the middle category, delta2 and delta4 ratios to it,
+  # delta1 and delta5 ratios to the first interval on their side
+  expect_equal(gaps(.sdt_make_thresholds(0, 7L, "log_ratio", deltas = c(1, 0, 0, 0, 0))),
+               c(exp(1), 1, 1, 1, 1))
+  expect_equal(gaps(.sdt_make_thresholds(0, 7L, "log_ratio", deltas = c(0, 1, 0, 0, 0))),
+               c(exp(1), exp(1), 1, 1, 1))
+  expect_equal(gaps(.sdt_make_thresholds(0, 7L, "log_ratio", deltas = c(0, 0, 0, 1, 0))),
+               c(1, 1, 1, exp(1), exp(1)))
+})
+
+test_that("deltas are named in interval order", {
+  for (tt in c("log_distance", "log_ratio")) {
+    model <- sdt_rating(paste0("r", 1:5), "stimulus", threshold_type = tt)
+    expect_equal(grep("^delta", names(model$parameters), value = TRUE),
+                 paste0("delta", 1:3), info = tt)
+  }
 })
 
 ############################################################################# !
@@ -233,6 +282,17 @@ test_that("sdt_rating check_data rejects negative counts", {
     stimulus = c(0L, 1L)
   )
   expect_error(check_data(model, invalid_data, formula), "non-negative")
+})
+
+test_that("sdt_rating check_data refuses an NA or constant stimulus", {
+  model <- sdt_rating(c("r1", "r2", "r3", "r4"), "stimulus")
+  formula <- bmf(d ~ 1, criterion ~ 1, spacing ~ 1)
+  counts <- data.frame(r1 = c(10, 5), r2 = c(20, 10), r3 = c(15, 30), r4 = c(5, 55))
+
+  expect_error(check_data(model, cbind(counts, stimulus = c(0L, NA)), formula),
+               "1 of 2 values are NA")
+  expect_error(check_data(model, cbind(counts, stimulus = c(1L, 1L)), formula),
+               "stimulus")
 })
 
 test_that("sdt_rating check_data validates stimulus coding", {
@@ -326,6 +386,11 @@ test_that("dsdt_rating validates inputs", {
                 d = 1.5, thresholds = c(-0.5, 0, 0.5)),
     "K - 1"
   )
+  expect_error(
+    dsdt_rating(counts = c(NA, 20, 30, 40), stimulus = 1,
+                d = 1.5, thresholds = c(-0.5, 0, 0.5)),
+    "must not contain NA"
+  )
 })
 
 test_that("dsdt_rating works for all distributions", {
@@ -402,15 +467,15 @@ test_that("sdt_rating_logmu is vectorized and preserves the draw shape", {
   expect_equal(as.vector(out), ref, tolerance = 1e-12)
 })
 
-test_that("log_ratio requires n_ratings >= 4", {
+test_that("log_ratio requires at least 4 rating categories", {
   expect_error(sdt_rating(c("r1", "r2", "r3"), "stimulus",
                           threshold_type = "log_ratio"),
-               "n_ratings >= 4")
+               "at least 4 rating categories")
 })
 
-test_that("K = 3 softmax reduces to a single symmetric interval", {
+test_that("K = 3 softmax reduces to a single interval centred on criterion", {
   thr <- bmm:::.sdt_make_thresholds(0.1, 3L, "softmax", spacing = 0.2)
-  expect_equal(thr, c(0.1 - exp(0.2), 0.1), tolerance = 1e-12)
+  expect_equal(thr, 0.1 + c(-0.5, 0.5) * exp(0.2), tolerance = 1e-12)
 
   dat <- sim_rating(3, 50, d = 1.2, criterion = 0, n_ratings = 3,
                     spacing = 0.2, threshold_type = "softmax")
@@ -424,6 +489,34 @@ test_that("K = 3 softmax reduces to a single symmetric interval", {
 ############################################################################# !
 # FORMULA CONSTRUCTION TESTS                                              ####
 ############################################################################# !
+
+test_that("bmf2bf maps every rating category to its own logit", {
+  # names that do not sort in category order, so a mapping by name or by sorted
+  # position would show up as a shifted category index
+  cats <- c("surenew", "new", "old", "sureold")
+  bf <- bmf2bf(sdt_rating(cats, "stimulus"), bmf(d ~ 1))
+  expect_match(deparse(bf$formula, width.cutoff = 500),
+               "sdt_rating_logmu(1, 4,", fixed = TRUE)
+  for (k in 2:4) {
+    pform <- deparse(bf$pforms[[paste0("mu", cats[k])]], width.cutoff = 500)
+    expect_match(pform, paste0("sdt_rating_logmu(", k, ", 4,"), fixed = TRUE)
+  }
+})
+
+test_that("a link on d or criterion is inverted inside the rating formula", {
+  # the multinomial family has no link of its own for d and criterion, so a
+  # link the user sets reaches the kernel only through the formula
+  bf <- bmf2bf(sdt_rating(paste0("r", 1:4), "stimulus",
+                          links = list(d = "log", criterion = "softplus")),
+               bmf(d ~ 1))
+  for (f in c(list(bf$formula), bf$pforms[paste0("mur", 2:4)])) {
+    txt <- paste(deparse(f, width.cutoff = 500), collapse = "")
+    expect_match(txt, "exp(d)", fixed = TRUE)
+    expect_match(txt, "log1p_exp(criterion)", fixed = TRUE)
+  }
+  bf <- bmf2bf(sdt_rating(paste0("r", 1:4), "stimulus"), bmf(d ~ 1))
+  expect_false(grepl("exp(d)", deparse(bf$formula, width.cutoff = 500), fixed = TRUE))
+})
 
 test_that("sdt_rating produces valid stancode with parsimonious thresholds", {
   dat <- sim_rating(3, 50, d = 1.5, criterion = 0, n_ratings = 4,
@@ -454,7 +547,7 @@ test_that("sdt_rating produces valid stancode with log_distance thresholds", {
                     deltas = c(0.5, 0.5), threshold_type = "log_distance")
   model <- sdt_rating(c("r1", "r2", "r3", "r4"), "stimulus",
                       threshold_type = "log_distance")
-  formula <- bmf(d ~ 1, criterion ~ 1, delta1 ~ 1, delta3 ~ 1)
+  formula <- bmf(d ~ 1, criterion ~ 1, delta1 ~ 1, delta2 ~ 1)
   code <- stancode(formula, data = dat, model = model)
   expect_true(nchar(code) > 0)
   expect_true(grepl("sdt_rating_logmu", code, fixed = TRUE))
@@ -466,7 +559,7 @@ test_that("sdt_rating produces valid stancode with log_ratio thresholds", {
                     deltas = c(0, 0), threshold_type = "log_ratio")
   model <- sdt_rating(c("r1", "r2", "r3", "r4"), "stimulus",
                       threshold_type = "log_ratio")
-  formula <- bmf(d ~ 1, criterion ~ 1, delta1 ~ 1, delta3 ~ 1)
+  formula <- bmf(d ~ 1, criterion ~ 1, delta1 ~ 1, delta2 ~ 1)
   code <- stancode(formula, data = dat, model = model)
   expect_true(nchar(code) > 0)
   expect_true(grepl("sdt_thresholds_log_ratio_rating", code, fixed = TRUE))
@@ -505,6 +598,86 @@ test_that("sdt_rating handles predictors on d", {
 })
 
 
+# The Stan kernels run through a fixed_param generated-quantities program, as
+# the ranking parity tests do. sig_figs = 17 round-trips a double. Every row
+# builds K thresholds with its own builder and returns one category's log
+# probability, so both the builders and the kernel meet their R counterparts.
+rating_stan_logmu <- function(grid, deltas, K) {
+  sc <- system.file("stan_chunks", package = "bmm")
+  funs <- paste(read_lines2(file.path(sc, "sdt_dist_funs.stan")),
+                read_lines2(file.path(sc, "sdt_rating_funs.stan")), sep = "\n")
+  program <- paste0(
+    "functions {\n", funs, "\n}\n",
+    "data {\n  int N; int K; array[N] int cat; array[N] int thresh;\n",
+    "  vector[N] criterion; vector[N] spacing; array[N, K - 2] real deltas;\n",
+    "  vector[N] d; vector[N] sdratio; vector[N] stimulus; array[N] int dist;\n}\n",
+    "generated quantities {\n  vector[N] lp;\n  for (i in 1:N) {\n",
+    "    vector[K - 1] thr = sdt_make_thresholds_rating(criterion[i], spacing[i],\n",
+    "      deltas[i], K, thresh[i]);\n",
+    "    lp[i] = sdt_rating_logmu_cat(cat[i], thr, d[i], sdratio[i], stimulus[i], dist[i]);\n",
+    "  }\n}\n"
+  )
+  data <- c(list(N = nrow(grid), K = K, deltas = deltas),
+            as.list(grid[c("cat", "thresh", "criterion", "spacing", "d",
+                           "sdratio", "stimulus", "dist")]))
+  fit <- cmdstanr::cmdstan_model(cmdstanr::write_stan_file(program))$sample(
+    data = data, fixed_param = TRUE, chains = 1, iter_sampling = 1,
+    iter_warmup = 0, refresh = 0, show_messages = FALSE, sig_figs = 17
+  )
+  csv <- utils::read.csv(fit$output_files()[1], comment.char = "#",
+                         check.names = FALSE)
+  as.numeric(csv[1, paste0("lp.", seq_len(nrow(grid)))])
+}
+
+test_that("the Stan rating kernel matches its R counterpart in both tails", {
+  skip_on_cran()
+  skip_if_not_installed("cmdstanr")
+  skip_if(is.null(cmdstanr::cmdstan_version(error_on_NA = FALSE)))
+
+  # criterion = 12 puts every threshold far into the upper tail, where the log
+  # cdf of both bounds of an interval rounds to 0; -12 does the same below.
+  # K = 5 and K = 6 exercise the odd and even placement of the criterion; K = 7
+  # is the smallest odd K with log_ratio intervals beyond the first on each side.
+  for (K in c(5L, 6L, 7L)) {
+    grid <- expand.grid(cat = seq_len(K), thresh = seq_along(bmm:::.sdt_threshold_types),
+                        criterion = c(-12, -0.5, 0.3, 12), spacing = c(-0.5, 0.1),
+                        d = c(0, 2), sdratio = c(-0.6, 0, 0.9),
+                        stimulus = c(0, 1), dist = seq_along(bmm:::.sdt_dists))
+    deltas <- matrix(seq(-0.6, 0.6, length.out = K - 2L), nrow(grid), K - 2L, byrow = TRUE)
+    stan <- rating_stan_logmu(grid, deltas, K)
+
+    r <- vapply(seq_len(nrow(grid)), function(i) {
+      g <- grid[i, ]
+      type <- bmm:::.sdt_threshold_types[g$thresh]
+      n_deltas <- if (type == "softmax") K - 3L else K - 2L
+      thr <- bmm:::.sdt_make_thresholds(
+        g$criterion, K, type, g$spacing,
+        if (type %in% c("log_distance", "log_ratio", "softmax")) deltas[1, seq_len(n_deltas)]
+      )
+      bmm:::.sdt_category_log_probs(thr, g$d, exp(g$sdratio), g$stimulus,
+                                    names(bmm:::.sdt_dists)[g$dist])[g$cat]
+    }, numeric(1))
+
+    expect_true(all(is.finite(stan)), info = paste("K =", K))
+    expect_equal(stan, r, tolerance = 1e-10, info = paste("K =", K))
+  }
+})
+
+test_that("an upper-tail rating category keeps its mass", {
+  # under gumbel_min the log cdf rounds to 0 from eta ~ 6.6, so an interval
+  # taken as the difference of two log cdfs came out -Inf. Its survival
+  # function exp(-exp(x)) gives the interval's mass in closed form.
+  lo <- c(4, 7.5, 12)
+  hi <- lo + 0.5
+  expected <- -exp(lo) + log1m_exp(exp(lo) - exp(hi))
+  got <- vapply(seq_along(lo), function(i) {
+    bmm:::.sdt_category_log_probs(c(lo[i] - 1, lo[i], hi[i]), 0, 1, 0,
+                                  "gumbel_min")[3]
+  }, numeric(1))
+  expect_equal(got, expected, tolerance = 1e-12)
+})
+
+
 ############################################################################# !
 # UV-SDT TESTS (sdratio overridable fixed parameter)                     ####
 ############################################################################# !
@@ -526,7 +699,7 @@ test_that("sdt_rating UV-SDT with log_distance thresholds produces valid stancod
                     sdratio = 1.3)
   model <- sdt_rating(c("r1", "r2", "r3", "r4"), "stimulus",
                       threshold_type = "log_distance")
-  formula <- bmf(d ~ 1, criterion ~ 1, delta1 ~ 1, delta3 ~ 1,
+  formula <- bmf(d ~ 1, criterion ~ 1, delta1 ~ 1, delta2 ~ 1,
                  sdratio ~ 1)
   code <- stancode(formula, data = dat, model = model)
   expect_true(nchar(code) > 0)
@@ -568,7 +741,7 @@ test_that("sdt_rating log_distance integrates with the bmm pipeline via mock bac
   model <- sdt_rating(c("r1", "r2", "r3", "r4"), "stimulus",
                       threshold_type = "log_distance")
   expect_silent(
-    bmm(bmf(d ~ 1, criterion ~ 1, delta1 ~ 1, delta3 ~ 1),
+    bmm(bmf(d ~ 1, criterion ~ 1, delta1 ~ 1, delta2 ~ 1),
         dat, model, backend = "mock", mock_fit = 1, rename = FALSE)
   )
 })
@@ -607,7 +780,7 @@ test_that("sdt_rating log_distance fits with finite likelihood at K=6 (real fit)
                     threshold_type = "log_distance")
   model <- sdt_rating(paste0("r", 1:6), "stimulus", threshold_type = "log_distance")
   fit <- bmm(bmf(d ~ 1, criterion ~ 1, delta1 ~ 1, delta2 ~ 1,
-                 delta4 ~ 1, delta5 ~ 1),
+                 delta3 ~ 1, delta4 ~ 1),
              dat, model, backend = "cmdstanr", chains = 1, iter = 300, warmup = 150,
              refresh = 0, silent = 2)
 

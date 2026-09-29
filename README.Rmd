@@ -10,6 +10,9 @@ knitr::opts_chunk$set(
   out.width = "100%"
 )
 set.seed(1152)
+desc <- read.dcf("DESCRIPTION")[1, ]
+n_imports <- length(strsplit(desc[["Imports"]], ",")[[1]])
+n_suggests <- length(strsplit(desc[["Suggests"]], ",")[[1]])
 ```
 # bmm   
 
@@ -19,7 +22,7 @@ set.seed(1152)
 [![R-CMD-check](https://github.com/popov-lab/bmm/actions/workflows/R-CMD-check.yaml/badge.svg)](https://github.com/popov-lab/bmm/actions/workflows/R-CMD-check.yaml)
 [![test-coverage](https://github.com/popov-lab/bmm/actions/workflows/test-coverage.yaml/badge.svg)](https://github.com/popov-lab/bmm/actions/workflows/test-coverage.yaml)
 [![downloads](https://cranlogs.r-pkg.org/badges/bmm)](https://cran.r-project.org/package=bmm)
-[![Dependencies](https://img.shields.io/badge/dependencies-9/16-orange?style=flat)](#)
+[![Dependencies](https://img.shields.io/badge/dependencies-`r n_imports`/`r n_suggests`-orange?style=flat)](#)
 <!-- badges: end -->
 
 ## Overview
@@ -118,6 +121,18 @@ remotes::install_github("popov-lab/bmm@v0.0.1", upgrade = "never")
 
 </details>
 
+### Check your installation
+
+To find out whether your machine can fit models, run `bmm_setup()`. It
+checks the C++ toolchain, `cmdstanr` with CmdStan, and `rstan`, compiles and
+samples a small test model, and prints one fix for every check that failed.
+It installs nothing itself. If your first `bmm()` call fails while compiling
+or loading the Stan backend, the error message points you there as well.
+
+``` r
+bmm::bmm_setup()
+```
+
 ## Available models
 
 Currently the `bmm` package implements models used in the domain of
@@ -171,7 +186,7 @@ A complete call to fit a model using `bmm` could look like this. For this exampl
 we are using the `oberauer_lin_2017` data that is provided with the package and we 
 will show how to fit the Interference Measurement Model to this data. 
 If you want a detailed description of this model and and in depth explanation of the parameters 
-estimated in the model, please have a look at [the IMM article](https://venpopov.com/bmm/articles/bmm_imm.html).
+estimated in the model, please have a look at [the IMM article](https://popov-lab.github.io/bmm/articles/bmm_imm.html).
 
 ``` r
 library(bmm)
@@ -203,8 +218,8 @@ brms::pp_check(fit)
 
 You can have a look at examples for how to fit all currently implemented models
 by reading the vignettes for each model [here for the released version of the
-package](https://venpopov.com/bmm/articles/index.html) or [here for the
-development version](https://venpopov.com/bmm/dev/articles/index.html).
+package](https://popov-lab.github.io/bmm/articles/index.html) or [here for the
+development version](https://popov-lab.github.io/bmm/dev/articles/index.html).
 
 ## Exploring measurement models
 
@@ -285,7 +300,7 @@ knitr::include_graphics("man/figures/README-fitModel_process.png")
 ## Contributing to the `bmm` package
 
 Should be interested in contributing a model to the `bmm` package, you should
-first look into the [Developer Notes](https://venpopov.com/bmm/dev/dev-notes/index.html) 
+first look into the [Developer Notes](https://popov-lab.github.io/bmm/dev/dev-notes/index.html) 
 as well as the [Contributor Guidelines](https://github.com/popov-lab/bmm/blob/develop/.github/CONTRIBUTING.md). 
 These give a more in depth description of the package architecture, the steps necessary to
 add your own model to the package, and how contributions will be acknowledged.

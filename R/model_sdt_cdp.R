@@ -22,14 +22,10 @@
   thresh_type_int <- match(threshold_type, .sdt_threshold_types)
 
   # Threshold parameters are either a single `spacing` (parsimonious/equidistant)
-  # or per-distance `deltaN` (log_distance), with the anchor at the old/new
-  # boundary n_new. They must be declared here so configure_prior/create_initfun
-  # see them.
-  thr_parts <- .sdt_threshold_parameter_parts(
-    n_ratings = n_new + n_old,
-    threshold_type = threshold_type,
-    anchor = n_new
-  )
+  # or the K - 2 interval widths `deltaN` (log_distance), named in interval
+  # order as in sdt_rating. They must be declared here so
+  # configure_prior/create_initfun see them.
+  thr_parts <- .sdt_threshold_parameter_parts(n_new + n_old, threshold_type)
 
   parameters <- c(
     list(
@@ -212,8 +208,9 @@ settable_links.sdt_cdp <- function(model) {
 #'   axis: `"parsimonious"` (default) and `"equidistant"` use a single `spacing`
 #'   parameter; `"log_distance"` (Paulewicz & Blaut, 2022) estimates the
 #'   `n_new + n_old - 2` distances between adjacent thresholds freely, each as a
-#'   `deltaN` parameter on the log scale (the distance leading into threshold
-#'   `N` from the old/new boundary).
+#'   `deltaN` parameter on the log scale (the log width of the interval between
+#'   thresholds `N` and `N + 1`, as in [sdt_rating()]). `criterion` stays on the
+#'   old/new boundary, threshold `n_new`.
 #' @param links A named list of link functions for the parameters.
 #' @param ... used internally for testing, ignore it
 #' @return An object of class `bmmodel`

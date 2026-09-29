@@ -54,6 +54,13 @@
   set_links(out, links)
 }
 
+# m-AFC has no fixed or scaling link -- `d` is the model's only parameter, so
+# it is also its only settable one.
+#' @exportS3Method
+settable_links.sdt_mafc <- function(model) {
+  "d"
+}
+
 
 #' @title m-Alternative Forced Choice Signal Detection Theory Model
 #' @name sdt_mafc
@@ -141,10 +148,13 @@ sdt_mafc <- function(response, n_trials, m,
   stop_missing_args()
   dist <- match.arg(dist)
 
-  stopif(!((is.numeric(m) && length(m) == 1 && m >= 2) ||
+  stopif(!((is.numeric(m) && length(m) == 1 && is.finite(m) && m >= 2) ||
            (is.character(m) && length(m) == 1)),
          "m must be a single integer >= 2, or the name of a set-size column in the data")
-  if (is.numeric(m)) m <- as.integer(m)
+  if (is.numeric(m)) {
+    warnif(m != trunc(m), "m should be an integer value; {m} was truncated to {as.integer(m)}")
+    m <- as.integer(m)
+  }
 
   .model_sdt_mafc(response = response, n_trials = n_trials,
                   m = m, dist = dist,
@@ -206,7 +216,8 @@ configure_model.sdt_mafc <- function(model, data, formula) {
     loop = TRUE,
     log_lik = log_lik_sdt_mafc,
     posterior_predict = posterior_predict_sdt_mafc,
-    vars = c("vint1[n]", "vint2[n]", "trials[n]")
+    vars = c("vint1[n]", "vint2[n]", "trials[n]",
+             "gh_nodes", "gh_weights", "gl_nodes", "gl_weights")
   )
 
   sc_path <- system.file("stan_chunks", package = "bmm")
@@ -215,7 +226,15 @@ configure_model.sdt_mafc <- function(model, data, formula) {
     read_lines2(paste0(sc_path, "/sdt_mafc_funs.stan")),
     sep = "\n"
   )
-  stanvars <- brms::stanvar(scode = stan_funs, block = "functions")
+  # reduce_sum's partial log-likelihood gets its own scope, so the tables have
+  # to be threaded through its signature as well
+  quad_pll_args <- if (brms_slices_likelihood()) {
+    paste0("data vector gh_nodes, data vector gh_weights, ",
+           "data vector gl_nodes, data vector gl_weights")
+  }
+  stanvars <- brms::stanvar(scode = stan_funs, block = "functions") +
+    brms::stanvar(scode = read_lines2(paste0(sc_path, "/sdt_mafc_tdata.stan")),
+                  block = "tdata", pll_args = quad_pll_args)
 
   nlist(formula, data, stanvars)
 }

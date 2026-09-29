@@ -9,6 +9,12 @@
 
 // Gumbel-min ranking: closed form via gamma-function ratios.
 // Meyer-Grant et al. (2026), based on extreme-value (min) order statistics.
+// The lgamma difference cancels once exp(-d) is large: measured on the
+// compiled kernel, log p is off by up to 2.8e-6 at d = -20 and 0.11 at
+// d = -30 (m <= 8; R's lgamma gives 5e-2 there), which the default prior
+// never reaches. The R companion .ranking_prob_r() telescopes the ratio
+// instead, because the d*/r* functions take any d; the fitted range is left on
+// the four lgamma calls, since a telescoped loop costs O(m) per rank.
 //   cat:      rank position (1 = most likely target, max_rank = least)
 //   max_rank: number of ranked items (m) on this row
 //   d:   sensitivity as d_a; for the Gumbel branch it is the equal-variance
@@ -43,9 +49,12 @@ real sdt_ranking_uv_logp(int cat, real max_rank, real d, real sdratio) {
     real eta = d * sdt_rms_scale(sigma) + sigma * gh_nodes[i];
     // Probability-space formulation: avoids log-CDF underflow (→ -Inf) and the
     // 0 * Inf = NaN that arises when multiplying a zero coefficient by a -Inf
-    // log-CDF. Boundary guards use 1.0 so pow(1, 0) = 1.
-    real cdf  = (max_rank > cat) ? Phi(eta)         : 1.0;
-    real ccdf = (cat > 1)        ? (1.0 - Phi(eta)) : 1.0;
+    // log-CDF. Boundary guards use 1.0 so pow(1, 0) = 1. The upper tail is
+    // Phi(-eta), not 1 - Phi(eta), which loses its relative precision long
+    // before Phi rounds to 1 (log p off by 1.8e-5 at d = 10 for sigma = 0.5,
+    // m = 2; 2.3e-6 at sigma = 1).
+    real cdf  = (max_rank > cat) ? Phi(eta)  : 1.0;
+    real ccdf = (cat > 1)        ? Phi(-eta) : 1.0;
     p += gh_weights[i] * pow(cdf, max_rank - cat) * pow(ccdf, cat - 1);
   }
 

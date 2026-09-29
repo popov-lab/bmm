@@ -34,8 +34,9 @@ the threshold parameters.}
 axis: \code{"parsimonious"} (default) and \code{"equidistant"} use a single \code{spacing}
 parameter; \code{"log_distance"} (Paulewicz & Blaut, 2022) estimates the
 \code{n_new + n_old - 2} distances between adjacent thresholds freely, each as a
-\code{deltaN} parameter on the log scale (the distance leading into threshold
-\code{N} from the old/new boundary).}
+\code{deltaN} parameter on the log scale (the log width of the interval between
+thresholds \code{N} and \code{N + 1}, as in \code{\link[=sdt_rating]{sdt_rating()}}). \code{criterion} stays on the
+old/new boundary, threshold \code{n_new}.}
 
 \item{links}{A named list of link functions for the parameters.}
 
