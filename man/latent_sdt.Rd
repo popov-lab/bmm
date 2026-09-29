@@ -41,7 +41,10 @@ distractor samples (one curve per set size) -- the "effective competitor"
 the target must beat -- which shifts rightward as \code{m} grows and visualises
 why accuracy falls with set size. Ignored for \code{sdt_yn}/\code{sdt_rating}.}
 
-\item{...}{Additional arguments passed to \code{\link[brms:posterior_linpred]{brms::posterior_linpred()}}.}
+\item{...}{Additional arguments passed to \code{\link[brms:posterior_linpred]{brms::posterior_linpred()}}, such as
+\code{draw_ids} to use a subset of the posterior draws. \code{ndraws} is refused:
+each parameter is drawn by its own call, so random subsets would not match
+across parameters.}
 }
 \value{
 A data frame of class \code{"bmm_sdt_latent"} with columns \code{x} (the

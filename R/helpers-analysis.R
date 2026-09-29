@@ -60,7 +60,10 @@
 #'   on one curve. Pass a character vector of column names to force that
 #'   classification, or `FALSE` to disable it (one separate curve per predictor
 #'   combination). Ignored for rating models.
-#' @param ... Additional arguments passed to [brms::posterior_linpred()].
+#' @param ... Additional arguments passed to [brms::posterior_linpred()], such as
+#'   `draw_ids` to use a subset of the posterior draws. `ndraws` is refused:
+#'   each parameter is drawn by its own call, so random subsets would not match
+#'   across parameters.
 #'
 #' @return A data frame of class `"bmm_sdt_roc"` with columns `FA`, `Hit`,
 #'   `.draw`, and any condition columns. The object carries a `summary`
@@ -75,6 +78,17 @@ roc_sdt <- function(fit, conditions = NULL, n_points = 100,
                     probs = c(0.025, 0.975), criterion_points = NULL, ...) {
   stopif(!inherits(fit, "bmmfit"),
          "fit must be a bmmfit object returned by bmm()")
+  stopif("ndraws" %in% names(list(...)),
+         "Pass draw_ids rather than ndraws: each parameter is drawn by its own
+          call, so ndraws would pair values from different posterior draws.")
+  stopif(!is.null(conditions) && !is.data.frame(conditions),
+         "conditions must be a data frame of predictor values.")
+  stopif(!all(names(conditions) %in% names(fit$data)),
+         "conditions has columns that are not in the data:
+          {collapse_comma(setdiff(names(conditions), names(fit$data)))}")
+  stopif(!is.numeric(probs) || length(probs) != 2L || anyNA(probs) ||
+           any(probs < 0 | probs > 1) || probs[1L] >= probs[2L],
+         "probs must be two increasing probabilities between 0 and 1.")
   model <- fit$bmm$model
   stopif(!inherits(model, "sdt"),
          "roc_sdt() is only available for SDT models")
@@ -588,6 +602,11 @@ print.bmm_sdt_roc <- function(x, ...) {
 roc_observed <- function(fit, conditions = NULL) {
   stopif(!inherits(fit, "bmmfit"),
          "fit must be a bmmfit object returned by bmm()")
+  stopif(!is.null(conditions) && !is.character(conditions),
+         "roc_observed() takes conditions as a character vector of column names.")
+  stopif(!all(conditions %in% names(fit$data)),
+         "conditions names columns that are not in the data:
+          {collapse_comma(setdiff(conditions, names(fit$data)))}")
   model <- fit$bmm$model
   stopif(!inherits(model, "sdt"),
          "roc_observed() is only available for SDT models")
@@ -730,6 +749,17 @@ latent_sdt <- function(fit, conditions = NULL, n_grid = 200,
                        show_competitors = FALSE, ...) {
   stopif(!inherits(fit, "bmmfit"),
          "fit must be a bmmfit object returned by bmm()")
+  stopif("ndraws" %in% names(list(...)),
+         "Pass draw_ids rather than ndraws: each parameter is drawn by its own
+          call, so ndraws would pair values from different posterior draws.")
+  stopif(!is.null(conditions) && !is.data.frame(conditions),
+         "conditions must be a data frame of predictor values.")
+  stopif(!all(names(conditions) %in% names(fit$data)),
+         "conditions has columns that are not in the data:
+          {collapse_comma(setdiff(names(conditions), names(fit$data)))}")
+  stopif(!is.numeric(probs) || length(probs) != 2L || anyNA(probs) ||
+           any(probs < 0 | probs > 1) || probs[1L] >= probs[2L],
+         "probs must be two increasing probabilities between 0 and 1.")
   model <- fit$bmm$model
   stopif(!inherits(model, "sdt"),
          "latent_sdt() is only available for SDT models")
@@ -928,6 +958,17 @@ print.bmm_sdt_latent <- function(x, ...) {
 sdt_thresholds <- function(fit, conditions = NULL, probs = c(0.025, 0.975), ...) {
   stopif(!inherits(fit, "bmmfit"),
          "fit must be a bmmfit object returned by bmm()")
+  stopif("ndraws" %in% names(list(...)),
+         "Pass draw_ids rather than ndraws: each parameter is drawn by its own
+          call, so ndraws would pair values from different posterior draws.")
+  stopif(!is.null(conditions) && !is.data.frame(conditions),
+         "conditions must be a data frame of predictor values.")
+  stopif(!all(names(conditions) %in% names(fit$data)),
+         "conditions has columns that are not in the data:
+          {collapse_comma(setdiff(names(conditions), names(fit$data)))}")
+  stopif(!is.numeric(probs) || length(probs) != 2L || anyNA(probs) ||
+           any(probs < 0 | probs > 1) || probs[1L] >= probs[2L],
+         "probs must be two increasing probabilities between 0 and 1.")
   model <- fit$bmm$model
   stopif(!inherits(model, "sdt_rating"),
          "sdt_thresholds() is only available for rating SDT models (sdt_rating)")
@@ -1016,6 +1057,17 @@ auc_sdt <- function(fit, conditions = NULL, probs = c(0.025, 0.975),
                     criterion_points = NULL, ...) {
   stopif(!inherits(fit, "bmmfit"),
          "fit must be a bmmfit object returned by bmm()")
+  stopif("ndraws" %in% names(list(...)),
+         "Pass draw_ids rather than ndraws: each parameter is drawn by its own
+          call, so ndraws would pair values from different posterior draws.")
+  stopif(!is.null(conditions) && !is.data.frame(conditions),
+         "conditions must be a data frame of predictor values.")
+  stopif(!all(names(conditions) %in% names(fit$data)),
+         "conditions has columns that are not in the data:
+          {collapse_comma(setdiff(names(conditions), names(fit$data)))}")
+  stopif(!is.numeric(probs) || length(probs) != 2L || anyNA(probs) ||
+           any(probs < 0 | probs > 1) || probs[1L] >= probs[2L],
+         "probs must be two increasing probabilities between 0 and 1.")
   model <- fit$bmm$model
   stopif(!inherits(model, "sdt"),
          "auc_sdt() is only available for SDT models")
@@ -1212,6 +1264,17 @@ sdt_sensitivity <- function(fit, measure = c("da", "dn", "ds"),
                             conditions = NULL, probs = c(0.025, 0.975), ...) {
   stopif(!inherits(fit, "bmmfit"),
          "fit must be a bmmfit object returned by bmm()")
+  stopif("ndraws" %in% names(list(...)),
+         "Pass draw_ids rather than ndraws: each parameter is drawn by its own
+          call, so ndraws would pair values from different posterior draws.")
+  stopif(!is.null(conditions) && !is.data.frame(conditions),
+         "conditions must be a data frame of predictor values.")
+  stopif(!all(names(conditions) %in% names(fit$data)),
+         "conditions has columns that are not in the data:
+          {collapse_comma(setdiff(names(conditions), names(fit$data)))}")
+  stopif(!is.numeric(probs) || length(probs) != 2L || anyNA(probs) ||
+           any(probs < 0 | probs > 1) || probs[1L] >= probs[2L],
+         "probs must be two increasing probabilities between 0 and 1.")
   measure <- match.arg(measure, several.ok = TRUE)
   model <- fit$bmm$model
   stopif(!inherits(model, "sdt"),

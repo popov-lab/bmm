@@ -76,6 +76,95 @@ test_that("nested interaction groupings (id:session) are excluded from condition
   expect_false(any(c("id", "session", "id:session") %in% names(conditions)))
 })
 
+sdt_entry_calls <- function(fit_binary, fit_rating) {
+  list(
+    roc_sdt         = function(...) roc_sdt(fit_binary, ...),
+    auc_sdt         = function(...) auc_sdt(fit_binary, ...),
+    latent_sdt      = function(...) latent_sdt(fit_binary, ...),
+    sdt_sensitivity = function(...) sdt_sensitivity(fit_binary, ...),
+    sdt_thresholds  = function(...) sdt_thresholds(fit_rating, ...)
+  )
+}
+
+test_that("ndraws is refused before any posterior draw is taken", {
+  n_calls <- 0L
+  local_mocked_bindings(
+    posterior_linpred = function(...) {
+      n_calls <<- n_calls + 1L
+      stop("posterior_linpred should not be reached")
+    },
+    ranef = function(...) list(),
+    variables = function(...) c("b_d_Intercept", "b_sdratio_Intercept"),
+    .package = "brms"
+  )
+  calls <- sdt_entry_calls(fake_binary_fit(uv = TRUE), fake_rating_fit(uv = TRUE))
+  for (nm in names(calls)) {
+    expect_error(calls[[nm]](ndraws = 10), "draw_ids", info = nm)
+  }
+  expect_identical(n_calls, 0L)
+})
+
+test_that("draw_ids reaches every posterior_linpred call unchanged", {
+  seen <- list()
+  base <- mock_linpred_factory(list(d = 1.5, criterion = 0, spacing = 0,
+                                    sdratio = 0.3))
+  local_mocked_bindings(
+    posterior_linpred = function(object, ..., draw_ids = NULL) {
+      seen[[length(seen) + 1L]] <<- draw_ids
+      base(object, ...)
+    },
+    ranef = function(...) list(),
+    variables = function(...) c("b_d_Intercept", "b_sdratio_Intercept"),
+    .package = "brms"
+  )
+  sdt_sensitivity(fake_binary_fit(uv = TRUE), draw_ids = 1:5)
+  roc_sdt(fake_rating_fit(uv = TRUE), draw_ids = 1:5)
+  expect_gt(length(seen), 4L)
+  for (ids in seen) expect_identical(ids, 1:5)
+})
+
+test_that("conditions must be a data frame of columns in the data", {
+  local_mocked_bindings(
+    posterior_linpred = mock_linpred_factory(list(d = 1.5, criterion = 0, spacing = 0)),
+    ranef = function(...) list(),
+    variables = function(...) c("b_d_Intercept", "b_sdratio_Intercept"),
+    .package = "brms"
+  )
+  calls <- sdt_entry_calls(fake_binary_fit(), fake_rating_fit())
+  for (nm in names(calls)) {
+    expect_error(calls[[nm]](conditions = "stimulus"), "must be a data frame",
+                 info = nm)
+    expect_error(calls[[nm]](conditions = data.frame(base_rate = "br1")),
+                 "not in the data:\\s+'base_rate'", info = nm)
+  }
+})
+
+test_that("roc_observed() takes conditions as names of data columns", {
+  fit <- fake_binary_fit(multi = TRUE)
+  expect_error(roc_observed(fit, conditions = data.frame(condition = "br1")),
+               "character vector")
+  expect_error(roc_observed(fit, conditions = "base_rate"),
+               "not in the data:\\s+'base_rate'")
+  expect_equal(nrow(roc_observed(fit, conditions = "condition")), 5L)
+})
+
+test_that("probs must be two increasing probabilities", {
+  local_mocked_bindings(
+    posterior_linpred = mock_linpred_factory(list(d = 1.5, criterion = 0, spacing = 0)),
+    ranef = function(...) list(),
+    variables = function(...) c("b_d_Intercept", "b_sdratio_Intercept"),
+    .package = "brms"
+  )
+  calls <- sdt_entry_calls(fake_binary_fit(), fake_rating_fit())
+  bad <- list(c(0.975, 0.025), 0.5, c(-0.1, 0.9), "a", c(0.1, NA))
+  for (nm in names(calls)) {
+    for (p in bad) {
+      expect_error(calls[[nm]](probs = p), "probs must be",
+                   info = paste(nm, deparse(p)))
+    }
+  }
+})
+
 
 ############################################################################# !
 # RATING ROC MATH (pure helpers, no fit)                                 ####
