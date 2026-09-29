@@ -936,6 +936,10 @@ dcswald <- function(rt, response, drift, bound, ndt, zr = 0.5, s = 1,
 
 .dcswald <- function(rt, response, drift, bound, ndt, zr, s, version, log) {
   rt_shifted <- rt - ndt
+  # log_lik() on held-out data can meet ndt draws at or above rt. The Wald terms
+  # return NaN there, so they are evaluated at a placeholder and overwritten
+  started <- rt_shifted > 0
+  rt_shifted[!started] <- 1
 
   if (version == "simple") {
     log_ll <- .pwald(rt_shifted, drift = drift, bound = bound, s = s, lower.tail = FALSE, log.p = TRUE)
@@ -948,6 +952,11 @@ dcswald <- function(rt, response, drift, bound, ndt, zr = 0.5, s = 1,
   }
 
   log_ll[response == 1] <- ll1[response == 1]
+
+  # mirrors swald_lpdf and swald_lccdf: no density before ndt, but a censored
+  # simple-version error there is certain, since no response can have arrived
+  log_ll[!started] <- -Inf
+  if (version == "simple") log_ll[!started & response == 0] <- 0
 
   if (log) log_ll else exp(log_ll)
 }
@@ -1140,6 +1149,9 @@ validate_cswald_parameters <- function(drift, bound, ndt, zr, s) {
 }
 
 
+# NaN (or NA, for rt < 0) here; .dcswald() guards by substituting a
+# placeholder rt before calling in and overwriting the result by
+# version/response afterward, rather than guarding rt <= 0 in here directly
 .dwald <- function(rt, drift, bound, s, log = TRUE) {
   log_d <- log(bound) - 0.5 * log(2 * pi * rt^3) - log(s) -
     (bound - drift * rt)^2 / (2 * s^2 * rt)
@@ -1168,6 +1180,9 @@ times_nonzero <- function(count, log_prob) {
   ifelse(count == 0, 0, count * rep_len(log_prob, n))
 }
 
+# NaN (or NA, for rt < 0) here; .dcswald() guards by substituting a
+# placeholder rt before calling in and overwriting the result by
+# version/response afterward, rather than guarding rt <= 0 in here directly
 .pwald <- function(rt, drift, bound, s, lower.tail = TRUE, log.p = TRUE) {
   z1 <- (drift * rt - bound) / (s * sqrt(rt))
   z2 <- -(drift * rt + bound) / (s * sqrt(rt))
