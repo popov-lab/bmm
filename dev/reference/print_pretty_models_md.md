@@ -38,6 +38,7 @@ print_pretty_models_md()
 #> 
 #> * Signal Detection Theory (m-AFC) 
 #> * Signal Detection Theory (Ranking) 
+#> * Signal Detection Theory (Confidence Rating) 
 #> * Signal Detection Theory (Yes/No) 
 #> 
 ```

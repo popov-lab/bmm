@@ -48,6 +48,23 @@
   [`?sdt_ranking`](https://popov-lab.github.io/bmm/dev/reference/sdt_ranking.md)
   for the parameters, the response format and the default priors. Thanks
   to [@GidonFrischkorn](https://github.com/GidonFrischkorn)
+- Add **Confidence Rating Signal Detection Theory** (`sdt_rating`) for
+  old/new recognition and detection tasks with ordered confidence
+  ratings, aggregated to counts per rating category. It estimates
+  sensitivity (`d`), response bias (`criterion`) and the confidence
+  thresholds, and optionally the unequal-variance ratio (`sdratio`);
+  `threshold_type` chooses how the thresholds are parameterized. Also
+  adds
+  [`dsdt_rating()`](https://popov-lab.github.io/bmm/dev/reference/sdt_rating_dist.md)
+  and
+  [`rsdt_rating()`](https://popov-lab.github.io/bmm/dev/reference/sdt_rating_dist.md).
+  See
+  [`?sdt_rating`](https://popov-lab.github.io/bmm/dev/reference/sdt_rating.md)
+  for the parameters, the threshold types, the default priors and how
+  `d` relates to the sensitivity
+  [`sdt_yn()`](https://popov-lab.github.io/bmm/dev/reference/sdt_yn.md)
+  reports. Thanks to
+  [@GidonFrischkorn](https://github.com/GidonFrischkorn)
 
 #### New datasets
 

@@ -454,6 +454,8 @@ Functions for specifying which model to fit
   : m-Alternative Forced Choice Signal Detection Theory Model
 - [`sdt_ranking()`](https://popov-lab.github.io/bmm/dev/reference/sdt_ranking.md)
   : Ranking Signal Detection Theory Model
+- [`sdt_rating()`](https://popov-lab.github.io/bmm/dev/reference/sdt_rating.md)
+  : Confidence Rating Signal Detection Theory Model
 - [`sdt_yn()`](https://popov-lab.github.io/bmm/dev/reference/sdt_yn.md)
   : Yes/No Signal Detection Theory Model
 
@@ -523,6 +525,10 @@ Functions for special distributions
 - [`dsdt_ranking()`](https://popov-lab.github.io/bmm/dev/reference/sdt_ranking_dist.md)
   [`rsdt_ranking()`](https://popov-lab.github.io/bmm/dev/reference/sdt_ranking_dist.md)
   : Distribution functions for Ranking SDT
+
+- [`dsdt_rating()`](https://popov-lab.github.io/bmm/dev/reference/sdt_rating_dist.md)
+  [`rsdt_rating()`](https://popov-lab.github.io/bmm/dev/reference/sdt_rating_dist.md)
+  : Distribution functions for Confidence Rating SDT
 
 - [`dsdt_yn()`](https://popov-lab.github.io/bmm/dev/reference/sdt_yn_dist.md)
   [`rsdt_yn()`](https://popov-lab.github.io/bmm/dev/reference/sdt_yn_dist.md)
