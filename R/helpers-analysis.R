@@ -47,15 +47,18 @@
 
 # The argument checks of the exported SDT functions, called first in each, as
 # stop_missing_args() is. brms subsamples ndraws anew in every
-# posterior_linpred() call, and an abbreviation of it or the deprecated
-# nsamples reaches it too. Allowed condition columns are the default ones, so
-# validation and .sdt_resolve_conditions() cannot disagree.
+# posterior_linpred() call, and an abbreviation of it or of the deprecated
+# nsamples reaches it too (prepare_predictions() matches nsamples partially).
+# Allowed condition columns are the default ones, so validation and
+# .sdt_resolve_conditions() cannot disagree; a non-SDT fit skips that check so
+# that each function's model-class error is the one it reports.
 .sdt_check_args <- function(fit, conditions, probs, ...) {
   stopif(!inherits(fit, "bmmfit"),
          "fit must be a bmmfit object returned by bmm()")
   dot_names <- as.character(...names())
   subsample <- dot_names[!is.na(dot_names) & nzchar(dot_names) &
-                           (startsWith("ndraws", dot_names) | dot_names == "nsamples")]
+                           (startsWith("ndraws", dot_names) |
+                              startsWith("nsamples", dot_names))]
   stopif(length(subsample) > 0L,
          "Pass draw_ids rather than {collapse_comma(subsample)}: each parameter is \\
           drawn by its own call, so ndraws would pair values from different \\
@@ -65,7 +68,7 @@
   stopif(!all(names(conditions) %in% names(fit$data)),
          "conditions has columns that are not in the data: \\
           {collapse_comma(setdiff(names(conditions), names(fit$data)))}")
-  if (!is.null(conditions)) {
+  if (!is.null(conditions) && inherits(fit$bmm$model, "sdt")) {
     not_predictors <- setdiff(names(conditions), names(.sdt_resolve_conditions(fit, NULL)))
     stopif(length(not_predictors) > 0L,
            "conditions has columns that are not population-level predictors: \\

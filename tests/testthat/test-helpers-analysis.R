@@ -144,7 +144,7 @@ sdt_entry_calls <- function(fit_binary, fit_rating) {
   )
 }
 
-test_that("ndraws, its abbreviations and nsamples are refused before any posterior draw", {
+test_that("ndraws, nsamples and their abbreviations are refused before any posterior draw", {
   n_calls <- 0L
   local_mocked_bindings(
     posterior_linpred = function(...) {
@@ -157,7 +157,7 @@ test_that("ndraws, its abbreviations and nsamples are refused before any posteri
   )
   calls <- sdt_entry_calls(fake_binary_fit(uv = TRUE), fake_rating_fit(uv = TRUE))
   for (nm in names(calls)) {
-    for (arg in c("ndraws", "ndraw", "nd", "nsamples")) {
+    for (arg in c("ndraws", "ndraw", "nd", "nsamples", "nsample", "ns")) {
       expect_error(do.call(calls[[nm]], stats::setNames(list(10), arg)), "draw_ids",
                    info = paste(nm, arg))
     }
@@ -216,6 +216,21 @@ test_that("conditions columns must be population-level predictors", {
                           bmf(d ~ cond + (cond | id), criterion ~ 1))
   expect_error(sdt_sensitivity(fit, conditions = data.frame(cond = "A", id = 1:2)),
                "not population-level predictors: 'id'")
+})
+
+test_that("a non-SDT fit with conditions gets the model-class error", {
+  fit <- structure(
+    list(data = data.frame(dev_rad = 0.1, set_size = 2L),
+         bmm = list(model = structure(list(resp_vars = list(resp_error = "dev_rad")),
+                                      class = c("bmmodel", "sdm")),
+                    user_formula = bmf(kappa ~ set_size))),
+    class = c("bmmfit", "brmsfit")
+  )
+  calls <- sdt_entry_calls(fit, fit)
+  for (nm in names(calls)) {
+    expect_error(calls[[nm]](conditions = data.frame(dev_rad = 0.1)),
+                 "only available for", info = nm)
+  }
 })
 
 test_that("tibbles, factor columns and draw_ids pass the argument checks", {
