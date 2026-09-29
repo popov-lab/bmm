@@ -1,4 +1,4 @@
-url: https://venpopov.com/bmm/
+url: https://popov-lab.github.io/bmm/
 template:
   bootstrap: 5
   math-rendering: mathjax
@@ -21,10 +21,10 @@ navbar:
         href: news/index.html
      develop:
         text: Develop
-        href: https://venpopov.com/bmm/dev-notes/index.html
+        href: https://popov-lab.github.io/bmm/dev-notes/index.html
      parameter_recovery:
         text: Parameter recovery
-        href: https://venpopov.com/bmm/parameter-recovery/index.html
+        href: https://popov-lab.github.io/bmm/parameter-recovery/index.html
 
 
 
@@ -35,6 +35,7 @@ reference:
     - "bmm-package"
     - "supported_models"
     - "bmm_options"
+    - "bmm_setup"
   - title: "Fitting models"
     desc: "Main functions for model fitting"
   - contents:

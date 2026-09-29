@@ -205,16 +205,24 @@ prior_provenance <- function(fit) {
   # correctly because its flat rows can never match a non-empty default
   withr::local_options(bmm.default_priors = TRUE)
   model <- fit$bmm$model
+  # the stored frame has to be turned back into data check_data() accepts, which
+  # also restores helper columns model-specific configure_prior methods inspect
+  # (ss_numeric). It lacks the rows brms dropped for missing values, so a check
+  # over the whole data can fail on it for a fit that sampled, and that must not
+  # stop the report
+  data <- tryCatch(
+    suppressWarnings(suppressMessages(check_stored_data(model, fit$data, fit$bmm$user_formula))),
+    error = function(e) {
+      warning2(
+        "The data of this fit could not be checked again, so priors that bmm \\
+        sets from the data may be reported as user priors: {conditionMessage(e)}"
+      )
+      fit$data
+    }
+  )
   defaults <- suppressWarnings(suppressMessages({
     # reconstruct from the post-pipeline formula and model frame stored on the
-    # fit instead of re-running the data pipeline: brms drops raw response
-    # columns from the model frame for some models (e.g. m3), so check_data
-    # cannot be re-run there; it is still tried because it restores helper
-    # columns that model-specific configure_prior methods inspect (ss_numeric)
-    data <- tryCatch(
-      check_data(model, fit$data, fit$bmm$user_formula),
-      error = function(e) fit$data
-    )
+    # fit instead of re-running the data pipeline
     frame_args <- fit_frame_args(fit)
     combine_prior(
       brms::do_call(brms::default_prior, c(list(fit$formula, data = fit$data), frame_args)),
