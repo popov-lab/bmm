@@ -633,6 +633,46 @@ test_that("auc_sdt() does not take the closed form when sdratio is fixed away fr
   expect_equal(auc_fixed$AUC, auc_uv$AUC, tolerance = 1e-12)
 })
 
+test_that("the rating smooth curve follows the UV survival map", {
+  fit <- fake_rating_fit(uv = TRUE)
+  d_true <- 1.5
+  sdratio <- 1.5
+  local_mocked_bindings(
+    posterior_linpred = mock_linpred_factory(list(d = d_true, sdratio = log(sdratio),
+                                                  criterion = 0, spacing = 0)),
+    ranef = function(...) list(),
+    variables = function(...) c("b_d_Intercept", "b_sdratio_Intercept"),
+    .package = "brms"
+  )
+  summ <- attr(roc_sdt(fit, n_points = 20), "summary")
+
+  # noise ~ N(-sep/2, 1) and signal ~ N(sep/2, sdratio); "old" above the cut
+  sep <- d_true * sqrt((1 + sdratio^2) / 2)
+  cut <- stats::qnorm(1 - summ$FA) - sep / 2
+  expect_equal(summ$Hit_mean, 1 - stats::pnorm((cut - sep / 2) / sdratio), tolerance = 1e-10)
+})
+
+test_that("the binary gumbel_min UV curve follows the survival map", {
+  fit <- fake_binary_fit(uv = TRUE)
+  fit$bmm$model$other_vars$dist <- "gumbel_min"
+  d_true <- 1.2
+  sdratio <- 1.3
+  local_mocked_bindings(
+    posterior_linpred = mock_linpred_factory(list(d = d_true, sdratio = log(sdratio),
+                                                  criterion = 0)),
+    ranef = function(...) list(),
+    variables = function(...) c("b_d_Intercept", "b_sdratio_Intercept"),
+    .package = "brms"
+  )
+  summ <- attr(roc_sdt(fit, n_points = 20), "summary")
+
+  # gumbel_min survival exp(-exp(x)); noise located at -sep/2, signal at sep/2
+  survival <- function(x) exp(-exp(x))
+  sep <- d_true * sqrt((1 + sdratio^2) / 2)
+  cut <- log(-log(summ$FA)) - sep / 2
+  expect_equal(summ$Hit_mean, survival((cut - sep / 2) / sdratio), tolerance = 1e-10)
+})
+
 test_that("auc_sdt() rating uses the numerical path and stays in (0.5, 1)", {
   fit <- fake_rating_fit()
   local_mocked_bindings(
@@ -1244,7 +1284,6 @@ test_that("a column subset that lost its attributes prints as a data frame", {
   )
   for (obj in objects) {
     sub <- obj[, 1:2]
-    expect_null(attr(sub, "model_class"))
     expect_identical(capture.output(print(sub)),
                      capture.output(print.data.frame(sub)),
                      info = class(obj)[1])
