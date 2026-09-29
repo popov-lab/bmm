@@ -1172,6 +1172,8 @@ auc_sdt <- function(fit, conditions = NULL, probs = c(0.025, 0.975),
          "AUC is not defined for the m-AFC SDT model: it has no response criterion.")
   stopif(inherits(model, "sdt_ranking"),
          "AUC is not defined for the ranking SDT model: it has no response criterion.")
+  stopif(inherits(model, "sdt_cdp"),
+         "auc_sdt() is not yet available for the continuous dual-process (sdt_cdp) model.")
 
   dist        <- model$other_vars$dist
   is_rating   <- inherits(model, "sdt_rating")
