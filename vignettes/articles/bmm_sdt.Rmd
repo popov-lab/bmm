@@ -824,7 +824,7 @@ For a rating model the K-1 thresholds define K-1 ROC points per posterior draw.
 `roc_sdt()` returns those points together with the smooth model-implied ROC curve
 traced from the posterior of `d` (and `sdratio`); `plot()` shows that curve
 as a credible-band ribbon with the K-1 thresholds overlaid as colour-coded
-operating points (`c1`..`c(K-1)`) carrying crosshair credible intervals — the same
+operating points (`t1`..`t(K-1)`) carrying crosshair credible intervals — the same
 display as the binary ROC. `roc_observed()` gives the empirical points from the
 pooled counts. The quantile axis (`scale = "quantile"`) works here too.
 
@@ -860,10 +860,13 @@ two parameters cannot reproduce the full rating profile.
 
 ## Improving fit with flexible thresholds
 
-The `"log_ratio"` parameterization frees the spacing with K-2 `delta` parameters
-(for a 6-point scale: `delta1`, `delta2`, `delta4`, `delta5`; `delta3` is the
-reference midpoint), so the thresholds can sit wherever the data require. Refit
-with it and re-run the same check:
+The `"log_ratio"` parameterization frees the spacing with K-2 `delta` parameters,
+so the thresholds can sit wherever the data require. For a 6-point scale they are
+`delta1` … `delta4`, one per interval between adjacent thresholds: `delta3` is the
+log width of the interval just above the criterion, and each of the others is the
+log ratio of an interval to its neighbour nearer the criterion (printing the model
+object lists what each `delta` measures). Refit with it and re-run the same
+check:
 
 ```{r}
 model_lr <- sdt_rating(response = paste0("r", 1:6), stimulus = "stimulus",
@@ -871,7 +874,7 @@ model_lr <- sdt_rating(response = paste0("r", 1:6), stimulus = "stimulus",
 
 fit_rating_lr <- bmm(
   formula = bmf(d ~ 1 + (1 | id), criterion ~ 1 + (1 | id),
-                delta1 ~ 1, delta2 ~ 1, delta4 ~ 1, delta5 ~ 1,
+                delta1 ~ 1, delta2 ~ 1, delta3 ~ 1, delta4 ~ 1,
                 sdratio ~ 1),
   data = rating_data,
   model = model_lr,
@@ -934,8 +937,10 @@ In an m-alternative forced-choice task the observer picks the target among `m`
 alternatives; the data are counts of correct responses. There is no criterion and
 no stimulus column — accuracy alone identifies `d` [@DeCarlo_2012]. A correct
 response occurs when the target's evidence exceeds that of all $m-1$ distractors;
-`d` is $d'$, the target--distractor separation, and stays on the same scale as
-the `d` of `sdt_yn()`, including its $d_a$ when `sdratio` is estimated: for $m = 2$ the Gaussian model has the closed form
+`d` is $d'$, the target--distractor separation. `sdt_mafc()` has no `sdratio`,
+and its `d` is on the same scale as the `d` of `sdt_yn()`, including the $d_a$
+that `sdt_yn()` reports once its `sdratio` is estimated (exactly so for Gaussian
+noise; see `?sdt_mafc`). For $m = 2$ the Gaussian model has the closed form
 $\Phi(d/\sqrt{2})$, and for $m \geq 3$ the Gaussian and logistic models evaluate
 the accuracy by quadrature while both Gumbel models stay in closed form. The set size `m` may be a constant or a data column (for mixed set
 sizes).

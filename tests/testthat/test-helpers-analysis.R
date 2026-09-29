@@ -254,7 +254,7 @@ test_that("roc_sdt() rating attaches a smooth implied curve + threshold points",
 
   expect_equal(nrow(pts), 5L)
   expect_s3_class(pts$threshold, "factor")
-  expect_equal(levels(pts$threshold), paste0("c", 1:5))
+  expect_equal(levels(pts$threshold), paste0("t", 1:5))
   expect_true(all(c("FA_mean", "FA_lower", "FA_upper",
                     "Hit_mean", "Hit_lower", "Hit_upper") %in% names(pts)))
 })
@@ -658,6 +658,78 @@ test_that("sdt_thresholds() summary matches latent_sdt() lines across parameteri
     expect_equal(summ$position, lines$position, info = info)
     expect_true(all(diff(summ$position) > 0), info = info)
   }
+})
+
+
+test_that("sdt_thresholds() places criterion by the rating model's rule", {
+  # even K: criterion is the middle threshold; odd K: the centre of the middle
+  # category, whatever the threshold_type
+  for (tt in c("parsimonious", "equidistant", "softmax", "log_ratio", "log_distance")) {
+    for (K in 5:6) {
+      fit  <- fake_rating_fit(threshold_type = tt, n_ratings = K)
+      pars <- names(fit$bmm$model$parameters)
+      draws <- list(d = 1.5, criterion = 0.2)
+      if ("spacing" %in% pars) draws$spacing <- -0.4
+      deltas <- grep("^delta", pars, value = TRUE)
+      draws[deltas] <- as.list(seq(-0.3, 0.3, length.out = length(deltas)))
+
+      local_mocked_bindings(
+        posterior_linpred = mock_linpred_factory(draws),
+        ranef = function(...) list(),
+        variables = function(...) character(0),
+        .package = "brms"
+      )
+      pos <- attr(sdt_thresholds(fit), "summary")$position
+      centre <- if (K %% 2L == 0L) pos[K / 2] else mean(pos[(K - 1) / 2 + 0:1])
+      expect_equal(centre, 0.2, info = paste(tt, K))
+    }
+  }
+})
+
+
+############################################################################# !
+# LINKS                                                                  ####
+############################################################################# !
+
+# The kernels receive d and criterion through the model's inverse link, so the
+# post-processing must read them on that scale too, not as linear predictors.
+
+test_that("rating post-processing applies the links on d and criterion", {
+  fit <- fake_rating_fit(uv = TRUE, links = list(d = "log", criterion = "softplus"))
+  local_mocked_bindings(
+    posterior_linpred = mock_linpred_factory(list(
+      d = log(1.5), criterion = log(expm1(0.2)), spacing = 0, sdratio = 0
+    )),
+    ranef = function(...) list(),
+    variables = function(...) character(0),
+    .package = "brms"
+  )
+  da <- attr(sdt_sensitivity(fit, measure = "da"), "summary")$mean
+  expect_equal(da, 1.5)
+
+  pos <- attr(sdt_thresholds(fit), "summary")$position
+  expect_equal(pos, .sdt_make_thresholds(0.2, 6L, "parsimonious", spacing = 0))
+
+  pts <- attr(roc_sdt(fit, n_points = 10), "points")
+  fa  <- 1 - cumsum(.sdt_category_probs(pos, 1.5, 1, 0L, "normal"))[1:5]
+  expect_equal(pts$FA_mean, fa)
+})
+
+test_that("binary post-processing applies the links on d and criterion", {
+  fit <- fake_binary_fit(links = list(d = "log", criterion = "softplus"))
+  local_mocked_bindings(
+    posterior_linpred = mock_linpred_factory(list(
+      d = log(1.5), criterion = log(expm1(0.2))
+    )),
+    ranef = function(...) list(),
+    variables = function(...) character(0),
+    .package = "brms"
+  )
+  auc <- attr(auc_sdt(fit), "summary")$AUC_mean
+  expect_equal(auc, stats::pnorm(1.5 / sqrt(2)))
+
+  lines <- attr(latent_sdt(fit, n_grid = 20L), "lines")
+  expect_equal(lines$position, 0.2)
 })
 
 

@@ -22,7 +22,7 @@ utils::globalVariables(c(
 #' crosshair error bars (uncertainty in both directions). For **binary**
 #' multi-criteria fits the points are the several criterion levels; for
 #' **rating** models they are the K-1 confidence thresholds (labelled
-#' `c1`..`c(K-1)`). Pass `observed` to overlay empirical points from
+#' `t1`..`t(K-1)`). Pass `observed` to overlay empirical points from
 #' [roc_observed()].
 #'
 #' With `scale = "quantile"` (or its alias `scale = "z"`) the rates are read on
@@ -125,7 +125,7 @@ plot.bmm_sdt_roc <- function(x, observed = NULL, condition_col = NULL,
 # Unified ROC drawing for binary and rating fits: both carry a `summary` (smooth
 # implied curve) and `points` (operating points) attribute. The curve is drawn
 # as a ribbon + line; the points get crosshair error bars and are coloured by
-# `threshold` (rating: c1..cK-1) or, for binary, the single criterion-level
+# `threshold` (rating: t1..tK-1) or, for binary, the single criterion-level
 # column. Operating points fall on the curve because both are derived from the
 # same probability map in roc_sdt().
 .plot_roc_curve <- function(p, x, colour_col, ribbon_alpha, point_size,

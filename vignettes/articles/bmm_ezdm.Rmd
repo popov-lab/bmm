@@ -190,9 +190,12 @@ symmetric starting point the decision time does not depend on which boundary was
 reached, so all $n$ trials in a cell inform one set of moments. With a free
 starting point they do differ, which is why the 4-parameter version needs the
 summaries split by boundary — and why a boundary reached fewer than twice in a
-cell has no variance to contribute. In `dezdm()` such a cell still contributes
-through the response counts; a `bmm()` fit currently drops it, because the
-missing summaries are coded as `NA`.
+cell has no variance to contribute. Such a cell still contributes through the
+response counts, and so does a cell whose summaries at one boundary are
+missing, as `ezdm_summary_stats()` returns them for a boundary reached fewer
+than `min_trials` times. `bmm()` keeps these cells and warns how many there
+are. Dropping them instead would remove exactly the cells with the most
+extreme accuracy, and with them information about drift and starting point.
 
 # Parametrization in the `bmm` package
 
@@ -336,27 +339,25 @@ print(comparison)
 
 The mixture method identifies contaminants and provides more accurate moment estimates.
 
-## Accuracy Adjustment
+## Accuracy and Trial Counts
 
-When using the mixture method, the `adjust_ezdm_accuracy()` function can adjust accuracy counts by removing estimated contaminants. This assumes contaminants are random guesses (50% accuracy by default) and is applied as a separate step after computing summary statistics:
+The mixture method also corrects `n_upper` and `n_trials`, so that the counts describe the responses the moments were computed from. The `simple` and `robust` methods estimate no contaminant proportion and return the raw counts:
 
 ```{r accuracy-adjustment}
-summary_no_adjust <- ezdm_summary_stats(
-  trials_contaminated$rt, trials_contaminated$correct, version = "3par"
+summary_raw <- ezdm_summary_stats(
+  trials_contaminated$rt, trials_contaminated$correct,
+  method = "simple", version = "3par"
 )
 
-summary_adjust <- ezdm_summary_stats(
-  trials_contaminated$rt, trials_contaminated$correct, version = "3par"
-) |>
-  mutate(adjust_ezdm_accuracy(n_upper, n_trials, contaminant_prop))
-
-cat("Unadjusted accuracy:",
-    round(summary_no_adjust$n_upper / summary_no_adjust$n_trials, 3), "\n")
-cat("Adjusted accuracy:",
-    round(summary_adjust$n_upper_adj / summary_adjust$n_trials_adj, 3), "\n")
+cat("Raw counts:", summary_raw$n_upper, "of", summary_raw$n_trials,
+    "- accuracy", round(summary_raw$n_upper / summary_raw$n_trials, 3), "\n")
+cat("Contaminant-free:", summary_mixture$n_upper, "of", summary_mixture$n_trials,
+    "- accuracy", round(summary_mixture$n_upper / summary_mixture$n_trials, 3), "\n")
 cat("True accuracy (no contaminants):",
     round(mean(trials_clean$response == "upper"), 3), "\n")
 ```
+
+Splitting the estimated contaminants between the two boundaries needs an assumption about how accurate a contaminant response is. The `guess_rate` argument carries it and defaults to 0.5, the chance level of a two-choice task. The 4-parameter version estimates contamination per boundary and ignores it.
 
 ## Working with the 4-Parameter Version
 
@@ -621,11 +622,13 @@ The EZ-diffusion likelihood constrains three statistics per cell — the mean RT
 pp_check_vars(fit)
 ```
 
-The `mean_pc` check is the proportion of correct responses (`n_upper / n_trials`), which stays comparable across cells even when the number of trials differs. With `resp_var = "all"` all checks are drawn from one shared joint simulation:
+The `mean_pc` check is the proportion of correct responses (`n_upper / n_trials`), which stays comparable across cells even when the number of trials differs. With `resp_var = "all"` all checks are drawn from one shared joint simulation. Each panel compares how a statistic is distributed across all cells: the RT panels overlay the density of the observed statistic (dark line) on the densities of the simulated datasets, and the accuracy panel is a histogram of the observed proportions (bars) with the predicted number of cells per bin (points with 90% intervals):
 
 ```{r, message=FALSE, warning=FALSE, fig.width=7, fig.height=5}
 pp_check(fit, resp_var = "all", ndraws = 50)
 ```
+
+The observed mean RTs are spread more evenly than the simulated ones, which cluster around one value per condition. The data were simulated with subject-level variation in all three parameters, which this model omits; the model with [random effects](#adding-random-effects) below includes it. To compare each cell with its own predictive interval instead, select a single check with `type = "intervals"`, e.g. `pp_check(fit, resp_var = "mean_rt", type = "intervals")`.
 
 # Comparing conditions
 
