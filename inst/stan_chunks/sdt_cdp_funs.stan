@@ -16,30 +16,67 @@
 // Normal noise only: the bivariate-normal CDF needed for the Remember/Know split
 // is exact and differentiable via Owen's T (owens_t is a Stan primitive).
 
-// Bivariate standard-normal CDF P(Z1 <= z1, Z2 <= z2) with correlation rho,
-// via Owen's T (Owen, 1956). z1, z2 are finite (infinite strength bounds are
-// handled by the caller); exact zeros are nudged to avoid the z in the
-// denominator of the Owen's-T argument.
-real cdp_Phi2(real z1, real z2, real rho) {
-  real h = z1;
-  real k = z2;
-  if (h == 0 && k == 0) return 0.25 + asin(rho) / (2 * pi());
-  if (abs(h) < 1e-10) h = h >= 0 ? 1e-10 : -1e-10;
-  if (abs(k) < 1e-10) k = k >= 0 ? 1e-10 : -1e-10;
-  real denom = sqrt((1 + rho) * (1 - rho));
-  real a1 = (k / h - rho) / denom;
-  real a2 = (h / k - rho) / denom;
-  real prod = h * k;
-  real delta = (prod < 0 || (prod == 0 && (h + k) < 0)) ? 1 : 0;
-  return 0.5 * (Phi(h) + Phi(k) - delta) - owens_t(h, a1) - owens_t(k, a2);
+// Bivariate standard-normal CDF P(Z1 <= h, Z2 <= k) with correlation r, via
+// Owen's T (Owen, 1956). Where h and k have opposite signs the constant term
+// 0.5 * (Phi(h) + Phi(k) - 1) is written with the complementary Phi of the
+// positive argument, so it does not round away with 1 - Phi. Exact zeros are
+// nudged to avoid the argument in the denominator of the Owen's T argument.
+real cdp_Phi2(real h, real k, real r) {
+  if (h == negative_infinity() || k == negative_infinity()) return 0;
+  if (h == positive_infinity()) return Phi(k);
+  if (k == positive_infinity()) return Phi(h);
+  if (h == 0 && k == 0) return 0.25 + asin(r) / (2 * pi());
+  real x = abs(h) < 1e-10 ? (h >= 0 ? 1e-10 : -1e-10) : h;
+  real y = abs(k) < 1e-10 ? (k >= 0 ? 1e-10 : -1e-10) : k;
+  real denom = sqrt((1 + r) * (1 - r));
+  real base;
+  if (x < 0 && y > 0) {
+    base = 0.5 * (Phi(x) - Phi(-y));
+  } else if (y < 0 && x > 0) {
+    base = 0.5 * (Phi(y) - Phi(-x));
+  } else {
+    base = 0.5 * (Phi(x) + Phi(y));
+  }
+  return base - owens_t(x, (y / x - r) / denom) - owens_t(y, (x / y - r) / denom);
 }
 
-// Mass of the guess region for one strength bin: P(R < rcrit, F < kcrit,
-// c_lo < F + R < c_hi). No closed form (a strength band clips the F < kcrit,
-// R < rcrit quadrant on the diagonal), so integrate over R with F | R normal.
-// 20-point Gauss-Legendre on (-inf, rcrit] via the t/(1-t) map.
-real cdp_guess_mass(real mu_F, real mu_R, real sd_R, real corr,
-                    real c_lo, real c_hi, real rcrit, real kcrit) {
+// P(lo < Z < hi) for a standard normal Z, taken from the tail the interval
+// lies in so an interval far above 0 does not cancel as 1 - 1.
+real cdp_Phi_interval(real lo, real hi) {
+  if (hi <= lo) return 0;
+  if (lo > 0) return Phi(-lo) - Phi(-hi);
+  return Phi(hi) - Phi(lo);
+}
+
+// P(a < X < b, Y < k) (above = 0) or P(a < X < b, Y > k) (above = 1) for a
+// standard bivariate normal with correlation r. Y > k is evaluated as
+// -Y < -k, and a band above 0 as its mirror image below 0, so both CDF
+// values sit on the small side of the distribution.
+real cdp_rect(real a, real b, real k, real r, int above) {
+  real kk = above == 1 ? -k : k;
+  real rr = above == 1 ? -r : r;
+  real lo = a;
+  real hi = b;
+  if (a > 0) {
+    lo = -b;
+    hi = -a;
+    rr = -rr;
+  }
+  return cdp_Phi2(hi, kk, rr) - cdp_Phi2(lo, kk, rr);
+}
+
+// Mass of an old-response region inside the strength bin (c_lo, c_hi),
+// integrated over the strength S on the bin itself, with R | S = s normal
+// (mean mu_R + beta * (s - mu_S), SD sd_c):
+//   region 1, Guess:          s - kcrit < R < rcrit  (R < rcrit and F < kcrit)
+//   region 2, Know-not-Guess: R < min(rcrit, s - kcrit)
+// Guess needs S < rcrit + kcrit, so its range is finite. The range is clipped
+// to where the strength density matters, split where the conditional
+// probability steps (its conditional mean crosses rcrit or s - kcrit, and at
+// rcrit + kcrit), and each segment is cut into pieces of at most one strength
+// SD, each on 20 Gauss-Legendre nodes.
+real cdp_region_mass(int region, real c_lo, real c_hi, real mu_S, real sigma_S,
+                     real mu_R, real beta, real sd_c, real rcrit, real kcrit) {
   int N_GL = 20;
   vector[N_GL] gl_nodes = to_vector({
     -9.9312859918509492e-01, -9.6397192727791379e-01,
@@ -64,27 +101,41 @@ real cdp_guess_mass(real mu_F, real mu_R, real sd_R, real corr,
     8.3276741576704749e-02, 6.2672048334109064e-02,
     4.0601429800386941e-02, 1.7614007139152118e-02});
 
-  real cond_sd = sqrt(fmax(1 - corr * corr, 1e-12));
-  real result = 0;
-  for (i in 1:N_GL) {
-    real t = 0.5 * (gl_nodes[i] + 1);
-    real y = t / (1 - t);
-    real R = rcrit - y;                       // maps t in (0,1) to R in (-inf, rcrit]
-    real jac = 1 / square(1 - t);
-    real cond_mean = mu_F + corr * (R - mu_R) / sd_R;   // E[F | R], sd_F = 1
-    real f_lo = c_lo == negative_infinity() ? negative_infinity() : c_lo - R;
-    real f_hi = fmin(c_hi == positive_infinity() ? positive_infinity() : c_hi - R,
-                     kcrit);
-    real mass_f = 0;
-    if (f_hi > f_lo) {
-      real u_hi = f_hi == positive_infinity() ? 1.0 : Phi((f_hi - cond_mean) / cond_sd);
-      real u_lo = f_lo == negative_infinity() ? 0.0 : Phi((f_lo - cond_mean) / cond_sd);
-      mass_f = u_hi - u_lo;
-    }
-    real pdf_R = exp(normal_lpdf(R | mu_R, sd_R));
-    result += gl_weights[i] * jac * pdf_R * mass_f;
+  real hi = region == 1 ? fmin(c_hi, rcrit + kcrit) : c_hi;
+  hi = fmin(hi, fmax(mu_S + 12 * sigma_S, c_lo + 4 * sigma_S));
+  real lo = fmax(c_lo, fmin(mu_S - 12 * sigma_S, hi - 4 * sigma_S));
+  if (hi <= lo) return 0;
+
+  vector[3] cand;
+  cand[1] = beta != 0 ? mu_S + (rcrit - mu_R) / beta : hi;
+  cand[2] = beta != 1 ? (mu_R - beta * mu_S + kcrit) / (1 - beta) : hi;
+  cand[3] = rcrit + kcrit;
+  for (c in 1:3) {
+    if (!(cand[c] > lo && cand[c] < hi)) cand[c] = hi;
   }
-  return fmax(0.5 * result, 1e-20);
+  vector[5] edges = append_row(append_row(lo, sort_asc(cand)), hi);
+
+  real total = 0;
+  for (e in 1:4) {
+    real len = edges[e + 1] - edges[e];
+    if (len > 0) {
+      int np = 1;
+      while (np * sigma_S < len) np += 1;
+      real half = 0.5 * len / np;
+      for (p in 1:np) {
+        real mid = edges[e] + (2 * p - 1) * half;
+        for (i in 1:N_GL) {
+          real s = mid + half * gl_nodes[i];
+          real m = mu_R + beta * (s - mu_S);
+          real pc = region == 1
+                    ? cdp_Phi_interval((s - kcrit - m) / sd_c, (rcrit - m) / sd_c)
+                    : Phi((fmin(rcrit, s - kcrit) - m) / sd_c);
+          total += gl_weights[i] * half * exp(normal_lpdf(s | mu_S, sigma_S)) * pc;
+        }
+      }
+    }
+  }
+  return total;
 }
 
 // Confidence thresholds on the strength axis S = F + R, anchored so the old/new
@@ -150,26 +201,35 @@ real cdp_category_prob(int cat, vector thresholds,
   real corr = tanh(rho);
   real mu_S = mu_F + mu_R;
   real sigma_S = sqrt(square(sd_R + corr) + (1 - square(corr)));
-  real rho_RS = (sd_R + corr) / sigma_S;
-  real hcrit = (rcrit - mu_R) / sd_R;
+  real z_lo = (c_lo - mu_S) / sigma_S;
+  real z_hi = (c_hi - mu_S) / sigma_S;
 
-  real z_lo = c_lo == negative_infinity() ? negative_infinity() : (c_lo - mu_S) / sigma_S;
-  real z_hi = c_hi == positive_infinity() ? positive_infinity() : (c_hi - mu_S) / sigma_S;
-  real p_bin = (z_hi == positive_infinity() ? 1.0 : Phi(z_hi))
-             - (z_lo == negative_infinity() ? 0.0 : Phi(z_lo));
-
-  if (type == 1) return fmax(p_bin, 1e-20);
-
-  real k_hi = z_hi == positive_infinity() ? Phi(hcrit) : cdp_Phi2(hcrit, z_hi, rho_RS);
-  real k_lo = z_lo == negative_infinity() ? 0.0 : cdp_Phi2(hcrit, z_lo, rho_RS);
-  real p_know_total = k_hi - k_lo;
-
-  if (type == 4) return fmax(p_bin - p_know_total, 1e-20);
-  if (has_guess == 0) return fmax(p_know_total, 1e-20);
-
-  real p_guess = cdp_guess_mass(mu_F, mu_R, sd_R, corr, c_lo, c_hi, rcrit, kcrit);
-  if (type == 2) return fmax(p_guess, 1e-20);
-  return fmax(p_know_total - p_guess, 1e-20);
+  real p;
+  if (type == 1) {
+    p = cdp_Phi_interval(z_lo, z_hi);
+  } else if (type == 4 || has_guess == 0) {
+    // the smaller of Remember and Know comes from its own rectangle, the
+    // larger as the rest of the bin, so neither is a difference of two
+    // nearly equal numbers
+    real rho_RS = (sd_R + corr) / sigma_S;
+    real hcrit = (rcrit - mu_R) / sd_R;
+    real rem = cdp_rect(z_lo, z_hi, hcrit, rho_RS, 1);
+    real kn = cdp_rect(z_lo, z_hi, hcrit, rho_RS, 0);
+    if (rem <= kn) {
+      kn = cdp_Phi_interval(z_lo, z_hi) - rem;
+    } else {
+      rem = cdp_Phi_interval(z_lo, z_hi) - kn;
+    }
+    p = type == 4 ? rem : kn;
+  } else {
+    real beta = sd_R * (corr + sd_R) / square(sigma_S);
+    real sd_c = sd_R * sqrt(fmax(1 - square(corr), 1e-12)) / sigma_S;
+    p = cdp_region_mass(type == 2 ? 1 : 2, c_lo, c_hi, mu_S, sigma_S, mu_R,
+                        beta, sd_c, rcrit, kcrit);
+  }
+  // an empty region (e.g. Guess in a bin above rcrit + kcrit) has mass 0;
+  // the floor keeps its logit finite, so a zero count there adds 0, not NaN
+  return fmax(p, 1e-300);
 }
 
 // The category logit `sdt_cdp_logmu` is code-generated per model by

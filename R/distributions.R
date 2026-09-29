@@ -3577,30 +3577,29 @@ rsdt_rating <- function(n, n_trials, stimulus, d, thresholds,
   4.0601429800386941e-02, 1.7614007139152118e-02
 )
 
-# Bivariate standard-normal CDF P(Z1 <= z1, Z2 <= z2) with correlation rho.
-# Genz (2004) asin-substitution + 20-point Gauss-Legendre: dependency-free and
-# matches the Stan owens_t-based cdp_Phi2 to ~1e-7 (well inside the parity
-# tolerance), so R-side prediction reproduces the likelihood. Vectorized over
-# recycled z1/z2/rho; infinite bounds and rho ~ 0 reduce to closed forms (the
-# quadrature produces NaN there and is overwritten).
+# Bivariate standard-normal CDF P(Z1 <= z1, Z2 <= z2) with correlation rho,
+# from mvtnorm's TVPACK (Genz's bivariate algorithm), which keeps its accuracy
+# at |rho| near 1 where the strength-recollection correlation lives once
+# sigmar is large. It shares no code with the Stan side's Owen's T, so the
+# R companion is also an independent check of the Stan kernel. Vectorized over
+# recycled z1/z2/rho; infinite bounds reduce to closed forms.
 .cdp_phi2 <- function(z1, z2, rho) {
   n <- max(length(z1), length(z2), length(rho))
   z1 <- rep_len(z1, n)
   z2 <- rep_len(z2, n)
   rho <- rep_len(rho, n)
-
-  asr <- asin(rho)
-  sn <- sin(outer(asr / 2, .cdp_gl20_nodes + 1))
-  vals <- exp((z1 * z2 * sn - (z1 * z1 + z2 * z2) / 2) / (1 - sn * sn))
-  out <- stats::pnorm(z1) * stats::pnorm(z2) +
-    as.vector(vals %*% .cdp_gl20_weights) * asr / (4 * pi)
-
-  small <- abs(rho) < 1e-12
-  if (any(small)) out[small] <- (stats::pnorm(z1) * stats::pnorm(z2))[small]
+  out <- numeric(n)
+  fin <- is.finite(z1) & is.finite(z2)
+  out[fin] <- vapply(which(fin), function(i) {
+    as.numeric(mvtnorm::pmvnorm(
+      upper = c(z1[i], z2[i]), corr = matrix(c(1, rho[i], rho[i], 1), 2),
+      algorithm = mvtnorm::TVPACK()
+    ))
+  }, numeric(1))
   i2 <- is.infinite(z2)
-  if (any(i2)) out[i2] <- ifelse(z2[i2] < 0, 0, stats::pnorm(z1[i2]))
+  out[i2] <- ifelse(z2[i2] < 0, 0, stats::pnorm(z1[i2]))
   i1 <- is.infinite(z1)
-  if (any(i1)) out[i1] <- ifelse(z1[i1] < 0, 0, stats::pnorm(z2[i1]))
+  out[i1] <- ifelse(z1[i1] < 0, 0, stats::pnorm(z2[i1]))
   out
 }
 
@@ -3661,27 +3660,77 @@ rsdt_rating <- function(n, n_trials, stimulus, d, thresholds,
   if (n == 1L) thr[1L, ] else thr
 }
 
-# Guess-region mass for one strength bin: P(R < rcrit, F < kcrit, c_lo < S < c_hi)
-# with F | R normal (accounts for corr = tanh(rho)). Mirrors Stan cdp_guess_mass.
-# Vectorized over observations: all arguments are length-n vectors (c_lo/c_hi
-# may contain +-Inf per row); the quadrature runs on n-by-20 matrices.
-.cdp_guess_mass_r <- function(mu_F, mu_R, sd_R, corr, c_lo, c_hi, rcrit, kcrit) {
-  t <- 0.5 * (.cdp_gl20_nodes + 1)
-  y <- t / (1 - t)
-  R <- outer(rcrit, y, `-`)
-  cond_sd <- sqrt(pmax(1 - corr * corr, 1e-12))
-  cond_mean <- mu_F + corr * (R - mu_R) / sd_R
-  f_lo <- c_lo - R
-  f_hi <- pmin(c_hi - R, kcrit)
-  mass_f <- pmax(stats::pnorm((f_hi - cond_mean) / cond_sd) -
-                   stats::pnorm((f_lo - cond_mean) / cond_sd), 0)
-  w <- 0.5 * .cdp_gl20_weights / (1 - t)^2
-  pmax(as.vector((stats::dnorm(R, mu_R, sd_R) * mass_f) %*% w), 1e-20)
+# P(lo < Z < hi) for a standard normal Z, from the tail the interval lies in.
+# Mirrors Stan cdp_Phi_interval; keeps the dimensions of lo.
+.cdp_Phi_interval <- function(lo, hi) {
+  out <- ifelse(lo > 0, stats::pnorm(-lo) - stats::pnorm(-hi),
+                stats::pnorm(hi) - stats::pnorm(lo))
+  out[hi <= lo] <- 0
+  out
+}
+
+# P(a < X < b, Y < k), or Y > k when upper, for a standard bivariate normal
+# with correlation r, evaluated on the small side of both axes. Mirrors Stan
+# cdp_rect.
+.cdp_rect <- function(a, b, k, r, upper) {
+  if (upper) {
+    k <- -k
+    r <- -r
+  }
+  flip <- a > 0
+  lo <- ifelse(flip, -b, a)
+  hi <- ifelse(flip, -a, b)
+  r <- ifelse(flip, -r, r)
+  .cdp_phi2(hi, k, r) - .cdp_phi2(lo, k, r)
+}
+
+# Guess (guess = TRUE) or Know-not-Guess mass inside the strength bin
+# (c_lo, c_hi), integrated over the strength on the bin with R | S normal.
+# Mirrors Stan cdp_region_mass: the same clipping, breakpoints and pieces of at
+# most one strength SD on 20 Gauss-Legendre nodes, vectorized over observations
+# by looping over piece indices.
+.cdp_region_mass_r <- function(guess, c_lo, c_hi, mu_S, sigma_S, mu_R, beta,
+                               sd_c, rcrit, kcrit) {
+  hi <- if (guess) pmin(c_hi, rcrit + kcrit) else c_hi
+  hi <- pmin(hi, pmax(mu_S + 12 * sigma_S, c_lo + 4 * sigma_S))
+  lo <- pmax(c_lo, pmin(mu_S - 12 * sigma_S, hi - 4 * sigma_S))
+
+  cand <- cbind(ifelse(beta != 0, mu_S + (rcrit - mu_R) / beta, hi),
+                ifelse(beta != 1, (mu_R - beta * mu_S + kcrit) / (1 - beta), hi),
+                rcrit + kcrit)
+  cand[!(cand > lo & cand < hi)] <- rep(hi, 3)[!(cand > lo & cand < hi)]
+  c_min <- pmin(cand[, 1], cand[, 2], cand[, 3])
+  c_max <- pmax(cand[, 1], cand[, 2], cand[, 3])
+  c_mid <- pmax(pmin(cand[, 1], cand[, 2]), pmin(pmax(cand[, 1], cand[, 2]), cand[, 3]))
+  edges <- cbind(lo, c_min, c_mid, c_max, hi)
+
+  total <- numeric(length(lo))
+  for (e in 1:4) {
+    len <- edges[, e + 1] - edges[, e]
+    len[!(len > 0)] <- 0
+    np <- pmax(1, ceiling(len / sigma_S))
+    for (j in seq_len(max(np))) {
+      act <- which(j <= np & len > 0)
+      if (!length(act)) next
+      half <- 0.5 * len[act] / np[act]
+      s <- edges[act, e] + (2 * j - 1) * half + outer(half, .cdp_gl20_nodes)
+      m <- mu_R[act] + beta[act] * (s - mu_S[act])
+      pc <- if (guess) {
+        .cdp_Phi_interval((s - kcrit[act] - m) / sd_c[act], (rcrit[act] - m) / sd_c[act])
+      } else {
+        stats::pnorm((pmin(s - kcrit[act], rcrit[act]) - m) / sd_c[act])
+      }
+      dens <- stats::dnorm(s, mu_S[act], sigma_S[act])
+      total[act] <- total[act] + half * as.vector((dens * pc) %*% .cdp_gl20_weights)
+    }
+  }
+  total[!(hi > lo)] <- 0
+  total
 }
 
 # CDP probability of a single response category, vectorized over observations.
-# Mirrors Stan cdp_category_prob one-to-one (same branching, same 1e-20 floor,
-# no normalization -- softmax absorbs the shared constant): for a fixed
+# Mirrors Stan cdp_category_prob (same branching, same 1e-300 floor, no
+# normalization -- softmax absorbs the shared constant): for a fixed
 # category the judgment type and strength bin are constants, so all n
 # observations vectorize. thresholds is an n-by-(K-1) matrix (or a vector for
 # a shared single draw); the parameters are recycled to n.
@@ -3718,18 +3767,23 @@ rsdt_rating <- function(n, n_trials, stimulus, d, thresholds,
   c_hi <- if (global_k == K_full) rep(Inf, n) else thr[, global_k]
   z_lo <- (c_lo - mu_S) / sigma_S
   z_hi <- (c_hi - mu_S) / sigma_S
-  p_bin <- stats::pnorm(z_hi) - stats::pnorm(z_lo)
-  if (type == 1L) return(pmax(p_bin, 1e-20))
 
-  rho_RS <- (sd_R + corr) / sigma_S
-  hcrit <- (rep_len(rcrit, n) - mu_R) / sd_R
-  p_know <- .cdp_phi2(hcrit, z_hi, rho_RS) - .cdp_phi2(hcrit, z_lo, rho_RS)
-  if (type == 4L) return(pmax(p_bin - p_know, 1e-20))
-  if (!has_guess) return(pmax(p_know, 1e-20))
-
-  p_guess <- .cdp_guess_mass_r(mu_F, mu_R, sd_R, corr, c_lo, c_hi,
-                               rep_len(rcrit, n), rep_len(kcrit, n))
-  if (type == 2L) p_guess else pmax(p_know - p_guess, 1e-20)
+  p <- if (type == 1L) {
+    .cdp_Phi_interval(z_lo, z_hi)
+  } else if (type == 4L || !has_guess) {
+    rho_RS <- (sd_R + corr) / sigma_S
+    hcrit <- (rep_len(rcrit, n) - mu_R) / sd_R
+    rem <- .cdp_rect(z_lo, z_hi, hcrit, rho_RS, TRUE)
+    kn <- .cdp_rect(z_lo, z_hi, hcrit, rho_RS, FALSE)
+    p_bin <- .cdp_Phi_interval(z_lo, z_hi)
+    if (type == 4L) ifelse(rem <= kn, rem, p_bin - kn) else ifelse(rem <= kn, p_bin - rem, kn)
+  } else {
+    .cdp_region_mass_r(type == 2L, c_lo, c_hi, mu_S, sigma_S, mu_R,
+                       sd_R * (corr + sd_R) / sigma_S^2,
+                       sd_R * sqrt(pmax(1 - corr^2, 1e-12)) / sigma_S,
+                       rep_len(rcrit, n), rep_len(kcrit, n))
+  }
+  pmax(p, 1e-300)
 }
 
 # CDP category probabilities in the canonical order

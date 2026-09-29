@@ -539,3 +539,142 @@ test_that("freeing rho and sigmar adds them to the stancode", {
   expect_true(grepl("rho", sc))
   expect_true(grepl("sigmar", sc))
 })
+
+############################################################################# !
+# KERNEL ACCURACY: independent reference and Stan parity                  ####
+############################################################################# !
+
+# A grid of category cells out to the tails: strength bins far above and below
+# both means, a Remember criterion inside and far beyond the recollection
+# distribution, strong positive and negative F-R correlation, R/K and R/K/G.
+cdp_kernel_grid <- function() {
+  pars <- expand.grid(criterion = c(-5, 0, 5), stimulus = c(0, 1),
+                      rho = c(-1.5, 1.5), rcrit = c(0.9, 5), has_guess = 0:1)
+  pars$sigmar <- rep_len(c(0, 0.7, -0.5), nrow(pars))
+  pars$kcrit <- ifelse(pars$has_guess == 1, 0.5, -100)
+  n_cat <- ifelse(pars$has_guess == 1, 12L, 9L)
+  cells <- pars[rep(seq_len(nrow(pars)), n_cat), ]
+  cells$cat <- unlist(lapply(n_cat, seq_len))
+  cells$dfam <- 0.8
+  cells$drec <- 1.0
+  rownames(cells) <- NULL
+  cells
+}
+
+cdp_kernel_r <- function(cells) {
+  vapply(seq_len(nrow(cells)), function(i) {
+    g <- cells[i, ]
+    log(.sdt_cdp_category_prob(
+      g$cat, .cdp_make_thresholds(g$criterion, 0, 3, 3, "equidistant"),
+      g$dfam, g$drec, g$sigmar, g$rho, g$rcrit, g$kcrit, g$stimulus, 3, 3,
+      g$has_guess == 1
+    ))
+  }, numeric(1))
+}
+
+# log P(S in the cell's bin, R and F in its region), integrated over R with
+# stats::integrate() and F | R normal: shares no code with Owen's T, TVPACK or
+# the kernels' Gauss-Legendre band quadrature
+cdp_kernel_reference <- function(g) {
+  thr <- g$criterion + (1:5 - 3)
+  if (g$cat <= 3) {
+    type <- 1L
+    k <- g$cat
+  } else {
+    block <- (g$cat - 4L) %/% 3L
+    type <- if (g$has_guess == 1) block + 2L else block + 3L
+    k <- 3L + g$cat - 3L - 3L * block
+  }
+  c_lo <- c(-Inf, thr)[k]
+  c_hi <- c(thr, Inf)[k]
+  r_lo <- if (type == 4L) g$rcrit else -Inf
+  r_hi <- if (type %in% 2:3) g$rcrit else Inf
+  f_lo <- if (type == 3L && g$has_guess == 1) g$kcrit else -Inf
+  f_hi <- if (type == 2L) g$kcrit else Inf
+  old <- g$stimulus == 1
+  mu_F <- if (old) g$dfam else 0
+  mu_R <- if (old) g$drec else 0
+  sd_R <- if (old) exp(g$sigmar) else 1
+  corr <- tanh(g$rho)
+  log_f <- function(r) {
+    m <- mu_F + corr * (r - mu_R) / sd_R
+    s <- sqrt(1 - corr^2)
+    lo <- (pmax(c_lo - r, f_lo) - m) / s
+    hi <- (pmin(c_hi - r, f_hi) - m) / s
+    band <- ifelse(lo > 0,
+                   stats::pnorm(-lo) - stats::pnorm(-hi),
+                   stats::pnorm(hi) - stats::pnorm(lo))
+    stats::dnorm(r, mu_R, sd_R, log = TRUE) + log(pmax(band, 0))
+  }
+  grid <- seq(max(r_lo, mu_R - 40 * sd_R), min(r_hi, mu_R + 40 * sd_R),
+              length.out = 4001)
+  lg <- log_f(grid)
+  if (!any(is.finite(lg))) return(-Inf)
+  top <- max(lg)
+  keep <- range(which(lg > top - 60))
+  br <- seq(grid[max(1, keep[1] - 1)], grid[min(4001, keep[2] + 1)],
+            length.out = 21)
+  top + log(sum(vapply(1:20, function(j) {
+    stats::integrate(function(r) exp(log_f(r) - top), br[j], br[j + 1],
+                     rel.tol = 1e-10, abs.tol = 0)$value
+  }, numeric(1))))
+}
+
+test_that("the R cdp kernel matches an independent reference in both tails", {
+  cells <- cdp_kernel_grid()
+  ref <- vapply(seq_len(nrow(cells)), function(i) {
+    cdp_kernel_reference(cells[i, ])
+  }, numeric(1))
+  r <- cdp_kernel_r(cells)
+  # down to log p = -30 the kernel resolves the category mass; the old Guess
+  # quadrature was off by up to 43 nats at log p near -3 on this grid
+  ok <- ref > -30
+  expect_gt(sum(ok & ref < -15), 20)
+  expect_lt(max(abs(r - ref)[ok]), 1e-5)
+})
+
+cdp_kernel_stan <- function(cells) {
+  program <- paste0(
+    "functions {\n",
+    read_lines2(system.file("stan_chunks", "sdt_cdp_funs.stan", package = "bmm")),
+    "\n}\n",
+    "data { int N; array[N] int cat; array[N] int has_guess;\n",
+    "  vector[N] criterion; vector[N] dfam; vector[N] drec; vector[N] sigmar;\n",
+    "  vector[N] rho; vector[N] rcrit; vector[N] kcrit; vector[N] stimulus; }\n",
+    "generated quantities { vector[N] lp;\n",
+    "  for (i in 1:N) {\n",
+    "    array[0] real deltas;\n",
+    "    vector[5] thr = cdp_make_thresholds(criterion[i], 0, deltas, 3, 3, 2);\n",
+    "    lp[i] = log(cdp_category_prob(cat[i], thr, dfam[i], drec[i], sigmar[i],\n",
+    "      rho[i], rcrit[i], kcrit[i], stimulus[i], 3, 3, has_guess[i]));\n",
+    "  }\n}\n"
+  )
+  data <- c(list(N = nrow(cells)),
+            as.list(cells[c("cat", "has_guess", "criterion", "dfam", "drec",
+                            "sigmar", "rho", "rcrit", "kcrit", "stimulus")]))
+  fit <- cmdstanr::cmdstan_model(cmdstanr::write_stan_file(program))$sample(
+    data = data, fixed_param = TRUE, chains = 1, iter_sampling = 1,
+    iter_warmup = 0, refresh = 0, show_messages = FALSE, sig_figs = 18
+  )
+  csv <- utils::read.csv(fit$output_files()[1], comment.char = "#",
+                         check.names = FALSE)
+  as.numeric(csv[1, paste0("lp.", seq_len(nrow(cells)))])
+}
+
+test_that("the Stan cdp kernel matches the R kernel in both tails", {
+  skip_on_cran()
+  skip_if_not_installed("cmdstanr")
+  skip_if(is.null(cmdstanr::cmdstan_version(error_on_NA = FALSE)))
+
+  cells <- cdp_kernel_grid()
+  stan <- cdp_kernel_stan(cells)
+  r <- cdp_kernel_r(cells)
+  # Stan's Owen's T and R's TVPACK share no code; they agree to 2e-9 above
+  # log p = -15 and to 2.6e-4 down to -30 over a 15,876-cell grid, where the
+  # Owen's T constant term starts to cancel
+  body <- r > -15
+  tail <- r > -30 & !body
+  expect_gt(sum(tail), 20)
+  expect_lt(max(abs(stan - r)[body]), 1e-8)
+  expect_lt(max(abs(stan - r)[tail]), 1e-3)
+})
