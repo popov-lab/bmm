@@ -580,6 +580,10 @@ supported_models <- function(print_call = TRUE) {
 print_pretty_models_md <- function(group = NULL) {
   registry <- model_registry()
   stopif(
+    !is.null(group) && length(group) == 0,
+    "`group` must not be empty; omit it to print all groups."
+  )
+  stopif(
     !all(group %in% registry$group),
     "Unknown model group(s): {collapse_comma(setdiff(group, registry$group))}"
   )

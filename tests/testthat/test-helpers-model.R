@@ -57,6 +57,7 @@ test_that("print_pretty_models_md(group = ) lists one group without headers", {
   all_groups <- capture.output(print_pretty_models_md())
   expect_true(any(grepl("**Choices and response times**", all_groups, fixed = TRUE)))
   expect_error(print_pretty_models_md(group = "nope"), "Unknown model group")
+  expect_error(print_pretty_models_md(group = character(0)), "must not be empty")
 })
 
 test_that("get_model() returns the correct function", {

@@ -162,7 +162,7 @@ sdt_models <- list(
        uv = "none"),
   list(format = "ranking", model = "sdt_ranking",
        uv = "`sdratio` (normal noise only)"),
-  list(format = "old/new confidence with remember/know judgements",
+  list(format = "old/new confidence with remember/know judgments",
        model = "sdt_cdp", uv = "`sigmar` (recollection)")
 )
 available <- supported_models(print_call = FALSE)
@@ -297,9 +297,9 @@ explains the syntax in full, including how to fix a parameter to a constant.
 ## The fit
 
 `bmm()` takes the formula, the data and the model. Its `file` argument caches
-the fit on disk, in a folder that must already exist; this is how this page
-avoids refitting the model every time it is built, and deleting the file
-forces a refit. Everything else goes to `brms::brm()`, so you can set the
+the fit on disk, creating the folder if it does not exist; this is how this
+page avoids refitting the model every time it is built, and deleting the
+file forces a refit. Everything else goes to `brms::brm()`, so you can set the
 number of chains, cores and iterations as you would there. A chain is one run
 of the sampler. Its first iterations, the warmup, tune the sampler and are
 discarded; the remaining iterations are the posterior draws from which every
