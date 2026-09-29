@@ -76,7 +76,9 @@ Density and random generation for the meta-d' model
 (Maniscalco & Lau, 2012). Confidence thresholds are placed using the
 metacognitive sensitivity \code{metad}, then rescaled so the total "old"/"new"
 response rates match what type-1 \code{d} predicts. These are the simulation
-counterparts of the \code{metad} version of \code{\link[=sdt_rating]{sdt_rating()}}.
+counterparts of the \code{metad} version of \code{\link[=sdt_rating]{sdt_rating()}}. The old/new
+boundary is the middle threshold, so the number of rating categories must
+be even (an odd number of \code{thresholds}).
 }
 \examples{
 # Density for a single observation (K=4) with imperfect metacognition

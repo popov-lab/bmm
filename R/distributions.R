@@ -1157,6 +1157,13 @@ log_diff_exp <- function(a, b) {
   a + log1m_exp(b - a)
 }
 
+# elementwise over two vectors; two -Inf terms give -Inf, not the NaN of
+# -Inf - -Inf
+log_sum_exp <- function(a, b) {
+  m <- pmax(a, b)
+  ifelse(m == -Inf, -Inf, m + log1p(exp(-abs(a - b))))
+}
+
 # count * log_prob, treating a zero count as contributing nothing even when the
 # log probability is -Inf. The R counterpart of the `if (y > 0)` guards Stan
 # likelihoods use to keep 0 * -Inf from becoming NaN. Both arguments are
@@ -2698,6 +2705,7 @@ dsdt_dpsdt <- function(counts, stimulus, d, thresholds, Ro, Rn,
   thr <- rbind(thresholds)
   stopif(ncol(thr) != K - 1,
          "thresholds must have length K - 1 = {K - 1}")
+  stopif(anyNA(counts), "counts must not contain NA")
   stopif(any(counts < 0), "counts must be non-negative")
   stopif(any(Ro < 0 | Ro > 1), "Ro must be a probability in [0, 1]")
   stopif(any(Rn < 0 | Rn > 1), "Rn must be a probability in [0, 1]")
@@ -2711,11 +2719,12 @@ dsdt_dpsdt <- function(counts, stimulus, d, thresholds, Ro, Rn,
   stopif(any(!stimulus %in% c(0L, 1L)),
          "stimulus must be 0 (noise) or 1 (signal)")
 
-  probs <- rbind(.sdt_dpsdt_category_probs(thr, rep_len(d, n),
-                                           rep_len(sdratio, n), stimulus, dist,
-                                           rep_len(Ro, n), rep_len(Rn, n)))
+  log_probs <- rbind(.sdt_dpsdt_category_log_probs(
+    thr, rep_len(d, n), rep_len(sdratio, n), stimulus, dist,
+    stats::qlogis(rep_len(Ro, n)), stats::qlogis(rep_len(Rn, n))
+  ))
   log_dens <- lgamma(rowSums(counts) + 1) - rowSums(lgamma(counts + 1)) +
-    rowSums(counts * log(probs))
+    rowSums(ifelse(counts == 0, 0, counts * log_probs))
   if (log) log_dens else exp(log_dens)
 }
 
@@ -2747,7 +2756,8 @@ rsdt_dpsdt <- function(n, n_trials, stimulus, d, thresholds, Ro, Rn,
                                            rep_len(d, n),
                                            rep_len(sdratio, n),
                                            rep_len(stimulus, n), dist,
-                                           rep_len(Ro, n), rep_len(Rn, n)))
+                                           stats::qlogis(rep_len(Ro, n)),
+                                           stats::qlogis(rep_len(Rn, n))))
 
   K <- ncol(probs)
   counts <- matrix(0L, n, K, dimnames = list(NULL, paste0("r", seq_len(K))))
@@ -2764,7 +2774,9 @@ rsdt_dpsdt <- function(n, n_trials, stimulus, d, thresholds, Ro, Rn,
 #'   (Maniscalco & Lau, 2012). Confidence thresholds are placed using the
 #'   metacognitive sensitivity `metad`, then rescaled so the total "old"/"new"
 #'   response rates match what type-1 `d` predicts. These are the simulation
-#'   counterparts of the `metad` version of [sdt_rating()].
+#'   counterparts of the `metad` version of [sdt_rating()]. The old/new
+#'   boundary is the middle threshold, so the number of rating categories must
+#'   be even (an odd number of `thresholds`).
 #'
 #' @name sdt_metad_dist
 #'
@@ -2804,6 +2816,10 @@ dsdt_metad <- function(counts, stimulus, d, thresholds, metad,
   thr <- rbind(thresholds)
   stopif(ncol(thr) != K - 1,
          "thresholds must have length K - 1 = {K - 1}")
+  stopif(K %% 2L != 0L,
+         "meta-d' needs an even number of rating categories, one old/new \\
+         boundary with confidence levels on either side; counts has {K}")
+  stopif(anyNA(counts), "counts must not contain NA")
   stopif(any(counts < 0), "counts must be non-negative")
 
   n <- max(nrow(counts), length(d), length(metad), length(sdratio),
@@ -2815,11 +2831,11 @@ dsdt_metad <- function(counts, stimulus, d, thresholds, metad,
   stopif(any(!stimulus %in% c(0L, 1L)),
          "stimulus must be 0 (noise) or 1 (signal)")
 
-  probs <- rbind(.sdt_metad_category_probs(thr, rep_len(d, n),
-                                           rep_len(metad, n), stimulus,
-                                           rep_len(sdratio, n), dist))
+  log_probs <- rbind(.sdt_metad_category_log_probs(
+    thr, rep_len(d, n), rep_len(sdratio, n), stimulus, dist, rep_len(metad, n)
+  ))
   log_dens <- lgamma(rowSums(counts) + 1) - rowSums(lgamma(counts + 1)) +
-    rowSums(counts * log(probs))
+    rowSums(ifelse(counts == 0, 0, counts * log_probs))
   if (log) log_dens else exp(log_dens)
 }
 
@@ -2842,13 +2858,17 @@ rsdt_metad <- function(n, n_trials, stimulus, d, thresholds, metad,
   stopif(any(!stimulus %in% c(0L, 1L)),
          "stimulus must be 0 (noise) or 1 (signal)")
   stopif(any(sdratio <= 0), "sdratio must be positive")
+  stopif(ncol(rbind(thresholds)) %% 2L != 1L,
+         "meta-d' needs an even number of rating categories, one old/new \\
+         boundary with confidence levels on either side, so an odd number \\
+         of thresholds")
 
   n_trials <- rep_len(as.integer(n_trials), n)
   probs <- rbind(.sdt_metad_category_probs(rbind(thresholds),
                                            rep_len(d, n),
-                                           rep_len(metad, n),
-                                           rep_len(stimulus, n),
-                                           rep_len(sdratio, n), dist))
+                                           rep_len(sdratio, n),
+                                           rep_len(stimulus, n), dist,
+                                           rep_len(metad, n)))
 
   K <- ncol(probs)
   counts <- matrix(0L, n, K, dimnames = list(NULL, paste0("r", seq_len(K))))
@@ -3211,73 +3231,78 @@ rsdt_ranking <- function(n, n_trials, m, d, sdratio = 1,
 }
 
 
-# Dual-process category probabilities (Yonelinas, 1994): recollection adds mass
-# to the most-confident category -- old items recollected as old (Ro) load the
-# top category, new items recall-rejected (Rn) load the bottom one -- on top of
-# the familiarity SDT probabilities. Ro/Rn are probabilities here; the model
-# entry points map inv_logit(linear) before calling, and fix them near 0 to
-# recover standard SDT. `d` is the familiarity distributions' d_a: recollection
-# is a separate threshold process, so the d_a scaling belongs to the familiarity
-# SDT process alone and is applied by .sdt_category_probs() below.
-# Vectorized over observations like .sdt_category_probs:
-# thresholds may be an n-by-(K-1) matrix and the parameters vectors.
-.sdt_dpsdt_category_probs <- function(thresholds, d, sdratio, stimulus,
-                                      dist, Ro, Rn) {
-  probs <- rbind(.sdt_category_probs(thresholds, d, sdratio, stimulus,
-                                     dist))
-  n <- nrow(probs)
-  K <- ncol(probs)
+# Dual-process category log-probabilities (Yonelinas, 1994): recollection adds
+# mass to the most-confident category -- old items recollected as old (Ro) load
+# the top category, new items recall-rejected (Rn) the bottom one -- on top of
+# the familiarity SDT probabilities. Ro/Rn are on the logit scale, as in the
+# model and in sdt_dpsdt_logmu_cat(), so a recollection probability near 1
+# keeps its complement; the model's default of -100 is numerically 0. `d` is the
+# familiarity distributions' d_a: recollection is a separate threshold process,
+# so the d_a scaling belongs to the familiarity process alone. Vectorized like
+# .sdt_category_log_probs().
+.sdt_dpsdt_category_log_probs <- function(thresholds, d, sdratio, stimulus,
+                                          dist, Ro, Rn) {
+  out <- rbind(.sdt_category_log_probs(thresholds, d, sdratio, stimulus, dist))
+  n <- nrow(out)
   stimulus <- rep_len(stimulus, n)
+  rec <- ifelse(stimulus == 1, rep_len(Ro, n), rep_len(Rn, n))
 
-  rec    <- ifelse(stimulus == 1, rep_len(Ro, n), rep_len(Rn, n))
-  loaded <- cbind(seq_len(n), ifelse(stimulus == 1, K, 1L))
-  probs <- (1 - rec) * probs
-  probs[loaded] <- probs[loaded] + rec
+  out <- out + stats::plogis(rec, lower.tail = FALSE, log.p = TRUE)
+  loaded <- cbind(seq_len(n), ifelse(stimulus == 1, ncol(out), 1L))
+  out[loaded] <- log_sum_exp(out[loaded], stats::plogis(rec, log.p = TRUE))
+  if (n == 1L && !is.matrix(thresholds)) out[1L, ] else out
+}
 
-  probs <- pmax(probs, .Machine$double.eps)
-  probs <- probs / rowSums(probs)
-  if (n == 1L && !is.matrix(thresholds)) probs[1L, ] else probs
+.sdt_dpsdt_category_probs <- function(thresholds, d, sdratio, stimulus, dist,
+                                      Ro, Rn) {
+  exp(.sdt_dpsdt_category_log_probs(thresholds, d, sdratio, stimulus, dist,
+                                    Ro, Rn))
 }
 
 
-# Meta-d' category probabilities (Maniscalco & Lau, 2012): confidence thresholds
-# are read off the metacognitive sensitivity metad, then each side of the central
-# criterion is rescaled so the summed "old"/"new" mass still matches what the
-# type-1 sensitivity d implies. mid uses the Stan central-threshold index so the
-# R-side prediction reproduces the likelihood for odd K. Both d and metad are
-# d_a indices, and .sdt_rms_scale() converts both to noise-SD units: a shared
-# factor leaves the M-ratio metad/d unchanged and keeps the metad = d reduction
-# to standard rating SDT exact under unequal variance. Vectorized over
-# observations like .sdt_category_probs.
-.sdt_metad_category_probs <- function(thresholds, d, metad, stimulus,
-                                      sdratio, dist) {
+# Meta-d' category log-probabilities (Maniscalco & Lau, 2012): the confidence
+# thresholds are read off the metacognitive sensitivity metad, then each side of
+# the criterion is rescaled so its summed mass matches what the type-1 d
+# implies. The criterion is threshold K/2, the old/new boundary, which only an
+# even K has; sdt_rating() refuses the metad version at odd K. Each side's
+# normaliser is a ratio of two lower tails ("new" side) or two upper tails
+# ("old" side), taken in log space as in sdt_metad_logmu_cat(). Both d and metad
+# are d_a indices converted by the same root-mean-square factor, which leaves
+# the M-ratio metad/d unchanged and keeps the metad = d reduction to standard
+# rating SDT exact under unequal variance. Vectorized like
+# .sdt_category_log_probs().
+.sdt_metad_category_log_probs <- function(thresholds, d, sdratio, stimulus,
+                                          dist, metad) {
   thr <- rbind(thresholds)
   dimnames(thr) <- NULL
   n <- max(nrow(thr), length(d), length(metad), length(sdratio),
            length(stimulus))
   if (nrow(thr) != n) thr <- thr[rep_len(seq_len(nrow(thr)), n), , drop = FALSE]
   K <- ncol(thr) + 1L
-  mid <- (K - 1L) %/% 2L + 1L
+  mid <- K %/% 2L
   stimulus <- rep_len(stimulus, n)
   sdratio <- rep_len(sdratio, n)
+  metad <- rep_len(metad, n)
 
-  rms <- .sdt_rms_scale(sdratio)
-  d_shift <- rep_len(d, n) * rms / 2 * (2 * stimulus - 1)
-  metad_shift <- rep_len(metad, n) * rms / 2 * (2 * stimulus - 1)
+  half_rms <- .sdt_rms_scale(sdratio) / 2 * (2 * stimulus - 1)
   scale <- ifelse(stimulus == 1, sdratio, 1)
+  eta_d <- (thr[, mid] - rep_len(d, n) * half_rms) / scale
+  eta_metad <- (thr[, mid] - metad * half_rms) / scale
+  log_norm <- cbind(
+    matrix(.sdt_log_cdf(eta_d, dist) - .sdt_log_cdf(eta_metad, dist), n, mid),
+    matrix(.sdt_log_ccdf(eta_d, dist) - .sdt_log_ccdf(eta_metad, dist), n,
+           K - mid)
+  )
 
-  cum_p_metad <- .sdt_cdf((thr - metad_shift) / scale, dist)
-  raw_probs <- cbind(cum_p_metad, 1) - cbind(0, cum_p_metad)
+  out <- rbind(.sdt_category_log_probs(thr, metad, sdratio, stimulus, dist)) +
+    log_norm
+  if (n == 1L && !is.matrix(thresholds)) out[1L, ] else out
+}
 
-  crit <- thr[, mid]
-  cdf_d <- .sdt_cdf((crit - d_shift) / scale, dist)
-  cdf_metad <- .sdt_cdf((crit - metad_shift) / scale, dist)
-  norm <- cbind(matrix(cdf_d / cdf_metad, n, mid),
-                matrix((1 - cdf_d) / (1 - cdf_metad), n, K - mid))
-
-  probs <- pmax(raw_probs * norm, .Machine$double.eps)
-  probs <- probs / rowSums(probs)
-  if (n == 1L && !is.matrix(thresholds)) probs[1L, ] else probs
+.sdt_metad_category_probs <- function(thresholds, d, sdratio, stimulus, dist,
+                                      metad) {
+  exp(.sdt_metad_category_log_probs(thresholds, d, sdratio, stimulus, dist,
+                                    metad))
 }
 
 

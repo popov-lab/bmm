@@ -133,7 +133,7 @@ test_that("sdt_rating gives every parameter an sd default prior", {
   rate1 <- c("d", "Ro", "Rn")
   for (v in names(bmm:::.sdt_rating_variants)) {
     for (tt in c("parsimonious", "log_distance", "softmax")) {
-      model <- sdt_rating(paste0("r", 1:5), "stimulus",
+      model <- sdt_rating(paste0("r", 1:6), "stimulus",
                           threshold_type = tt, version = v)
       sds <- vapply(model$default_priors, function(p) p$sd %||% NA_character_,
                     character(1))

@@ -129,7 +129,11 @@
     extra_params = character(0),
     logmu_fun = "sdt_rating_logmu",
     logmu_cat_call = "sdt_rating_logmu_cat(cat, thr, d, sdratio, stimulus, dist_type)",
-    stan_chunk = "sdt_rating_funs.stan"
+    stan_chunk = "sdt_rating_funs.stan",
+    citation = glue(
+      "Green, D. M., & Swets, J. A. (1966). Signal detection theory ",
+      "and psychophysics. Wiley."
+    )
   ),
   dpsdt = list(
     parameters = list(
@@ -155,7 +159,13 @@
     extra_params = c("Ro", "Rn"),
     logmu_fun = "sdt_dpsdt_logmu",
     logmu_cat_call = "sdt_dpsdt_logmu_cat(cat, thr, d, sdratio, stimulus, dist_type, Ro, Rn)",
-    stan_chunk = "sdt_dpsdt_funs.stan"
+    stan_chunk = "sdt_dpsdt_funs.stan",
+    citation = glue(
+      "Yonelinas, A. P. (1994). Receiver-operating characteristics in ",
+      "recognition memory: Evidence for a dual-process model. Journal of ",
+      "Experimental Psychology: Learning, Memory, and Cognition, 20(6), ",
+      "1341-1354. https://doi.org/10.1037/0278-7393.20.6.1341"
+    )
   ),
   metad = list(
     parameters = list(
@@ -182,7 +192,13 @@
     extra_params = "logmratio",
     logmu_fun = "sdt_metad_logmu",
     logmu_cat_call = "sdt_metad_logmu_cat(cat, thr, d, exp(logmratio) * d, sdratio, stimulus, dist_type)",
-    stan_chunk = "sdt_metad_funs.stan"
+    stan_chunk = "sdt_metad_funs.stan",
+    citation = glue(
+      "Maniscalco, B., & Lau, H. (2012). A signal detection theoretic ",
+      "approach for estimating metacognitive sensitivity from confidence ",
+      "ratings. Consciousness and Cognition, 21(1), 422-430. ",
+      "https://doi.org/10.1016/j.concog.2011.09.021"
+    )
   )
 )
 
@@ -266,10 +282,7 @@
       domain = "Perception & Recognition Memory",
       task = "Signal/Noise or Old/New Recognition",
       name = "Signal Detection Theory (Confidence Rating)",
-      citation = glue(
-        "Green, D. M., & Swets, J. A. (1966). Signal detection theory ",
-        "and psychophysics. Wiley."
-      ),
+      citation = variant$citation,
       version = version,
       requirements = requirements,
       parameters = parameters,
@@ -336,6 +349,9 @@ settable_link_functions.sdt_rating <- function(model) {
 #' `logmratio = 0`, which recovers `standard`. Type-1 and type-2 sensitivity
 #' share one scale (\eqn{d'}, or \eqn{d_a} when `sdratio` is estimated), so the
 #' M-ratio is unaffected by `sdratio`.
+#' The type-1 boundary is `criterion`, the middle threshold, so this version
+#' needs an even number of rating categories: with an odd number the middle
+#' category straddles the boundary (see "Where `criterion` sits").
 #' Extract the M-ratio posterior with [mratio()].
 #' `r model_info(.model_sdt_rating(version = "metad"))`
 #'
@@ -525,6 +541,11 @@ sdt_rating <- function(response, stimulus,
          builds a parameter name from each of them. Rename {collapse_comma(unusable)}")
   stopif(threshold_type == "log_ratio" && length(response) < 4,
          "log_ratio thresholds require at least 4 rating categories (the anchor ratio needs an interval above the criterion)")
+  stopif(version == "metad" && length(response) %% 2L != 0L,
+         "version = 'metad' needs an even number of rating categories: \\
+         meta-d' splits the scale at the old/new boundary, which an odd \\
+         number of categories does not have (the middle category straddles \\
+         it). response names {length(response)} columns")
 
   .model_sdt_rating(response = response, stimulus = stimulus,
                     dist = dist, threshold_type = threshold_type,
@@ -757,11 +778,8 @@ sdt_dpsdt_logmu <- function(cat, K, dist, thresh, d, criterion, spacing,
   }
 
   thr <- .sdt_make_thresholds(criterion, K, thresh_name, spacing, deltas)
-  probs <- rbind(.sdt_dpsdt_category_probs(rbind(thr), d, exp(sdratio),
-                                           stimulus, dist_name,
-                                           stats::plogis(Ro),
-                                           stats::plogis(Rn)))
-  out <- log(probs[, cat])
+  out <- rbind(.sdt_dpsdt_category_log_probs(rbind(thr), d, exp(sdratio),
+                                             stimulus, dist_name, Ro, Rn))[, cat]
 
   if (!is.null(shape)) dim(out) <- shape
   out
@@ -789,9 +807,8 @@ sdt_metad_logmu <- function(cat, K, dist, thresh, d, criterion, spacing,
   }
 
   thr <- .sdt_make_thresholds(criterion, K, thresh_name, spacing, deltas)
-  probs <- rbind(.sdt_metad_category_probs(rbind(thr), d, metad, stimulus,
-                                           exp(sdratio), dist_name))
-  out <- log(probs[, cat])
+  out <- rbind(.sdt_metad_category_log_probs(rbind(thr), d, exp(sdratio),
+                                             stimulus, dist_name, metad))[, cat]
 
   if (!is.null(shape)) dim(out) <- shape
   out

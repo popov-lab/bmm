@@ -715,6 +715,22 @@ test_that("rating post-processing applies the links on d and criterion", {
   expect_equal(pts$FA_mean, fa)
 })
 
+test_that("mratio() reads d through its link for meta-d'", {
+  fit <- fake_rating_fit(version = "metad", links = list(d = "log"))
+  local_mocked_bindings(
+    posterior_linpred = mock_linpred_factory(
+      list(d = log(1.6), criterion = 0, spacing = 0, logmratio = log(0.75))),
+    ranef = function(...) list(),
+    variables = function(...) character(0),
+    .package = "brms"
+  )
+  mr <- mratio(fit)
+  expect_equal(mr$mean[mr$parameter == "metad"], 0.75 * 1.6, tolerance = 1e-6)
+  extra <- attr(latent_sdt(fit), "extra")
+  expect_equal(extra$mean[extra$parameter == "metad"], 0.75 * 1.6,
+               tolerance = 1e-6)
+})
+
 test_that("binary post-processing applies the links on d and criterion", {
   fit <- fake_binary_fit(links = list(d = "log", criterion = "softplus"))
   local_mocked_bindings(

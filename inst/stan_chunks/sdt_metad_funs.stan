@@ -1,8 +1,10 @@
 // Meta-d' SDT (Maniscalco & Lau, 2012) category log-probability for the
 // multinomial family. Requires sdt_rating_logmu_cat() from sdt_rating_funs.stan
 // and the noise-CDF dispatch from sdt_dist_funs.stan. Confidence thresholds are
-// read off the metacognitive sensitivity metad; each side of the central
-// criterion is rescaled so the summed "old"/"new" mass matches type-1 d.
+// read off the metacognitive sensitivity metad; each side of the criterion is
+// rescaled so the summed "old"/"new" mass matches type-1 d. The criterion is
+// threshold K/2, the old/new boundary, which only an even K has; sdt_rating()
+// refuses the metad version at odd K.
 // metad = d makes log_norm = 0 and recovers the standard rating likelihood.
 // Both sensitivities are d_a indices and both are converted to noise-SD units
 // by the same sdt_rms_scale() factor, which leaves the M-ratio meta-d/d
@@ -11,7 +13,7 @@ real sdt_metad_logmu_cat(int cat, vector thresholds,
                          real d, real metad, real sdratio, real stimulus,
                          int dist_type) {
   int K_full = num_elements(thresholds) + 1;
-  int mid = (K_full - 1) %/% 2 + 1;
+  int mid = K_full %/% 2;
   real sigma = exp(sdratio);
   real rms = sdt_rms_scale(sigma);
   real scale = stimulus > 0.5 ? sigma : 1.0;

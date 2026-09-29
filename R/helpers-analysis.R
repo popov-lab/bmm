@@ -472,16 +472,16 @@ roc_sdt <- function(fit, conditions = NULL, n_points = 100,
 
 # Category probabilities for the active rating SDT version, so roc_sdt() traces
 # the dual-process / meta-d' operating points rather than the familiarity-only
-# curve. `pars` carries the per-draw recollection (Ro/Rn, already on the
-# probability scale) or metacognitive (metad) values; standard ignores it. `d`
-# is d_a throughout, and each kernel converts it to noise-SD units itself.
+# curve. `pars` carries the per-draw recollection (Ro/Rn, on the model's logit
+# scale) or metacognitive (metad) values; standard ignores it. `d` is d_a
+# throughout, and each kernel converts it to noise-SD units itself.
 .sdt_version_category_probs <- function(model, thresholds, d, sdratio,
                                         stimulus, dist, pars = list()) {
   switch(model$version,
     dpsdt = .sdt_dpsdt_category_probs(thresholds, d, sdratio, stimulus,
                                       dist, pars$Ro, pars$Rn),
-    metad = .sdt_metad_category_probs(thresholds, d, pars$metad, stimulus,
-                                      sdratio, dist),
+    metad = .sdt_metad_category_probs(thresholds, d, sdratio, stimulus,
+                                      dist, pars$metad),
     .sdt_category_probs(thresholds, d, sdratio, stimulus, dist)
   )
 }
@@ -512,8 +512,8 @@ roc_sdt <- function(fit, conditions = NULL, n_points = 100,
 
   ro_mat <- rn_mat <- metad_mat <- NULL
   if (model$version == "dpsdt") {
-    ro_mat <- stats::plogis(.sdt_par_draws(fit, "Ro", conditions, ...))
-    rn_mat <- stats::plogis(.sdt_par_draws(fit, "Rn", conditions, ...))
+    ro_mat <- .sdt_par_draws(fit, "Ro", conditions, ...)
+    rn_mat <- .sdt_par_draws(fit, "Rn", conditions, ...)
   } else if (model$version == "metad") {
     # meta-d = exp(log M-ratio) * d, both on the d_a scale, so the kernels can
     # apply the same root-mean-square conversion to each
@@ -560,8 +560,8 @@ roc_sdt <- function(fit, conditions = NULL, n_points = 100,
     # Dual-process recollection lifts the smooth curve off the familiarity ROC:
     # Ro adds a Hit-axis intercept, Rn scales false alarms toward the new end.
     if (model$version == "dpsdt") {
-      ro_vec  <- ro_mat[, c_i]
-      rn_vec  <- rn_mat[, c_i]
+      ro_vec  <- stats::plogis(ro_mat[, c_i])
+      rn_vec  <- stats::plogis(rn_mat[, c_i])
       fa_mat  <- (1 - rn_vec) * fa_mat
       hit_mat <- ro_vec + (1 - ro_vec) * hit_mat
     }

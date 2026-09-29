@@ -58,6 +58,47 @@ test_that("recollection is freed from fixed_parameters via the formula", {
                "sdratio")
 })
 
+test_that("the metad version refuses an odd number of rating categories", {
+  # at odd K the criterion is the centre of the middle category, so there is no
+  # old/new boundary for the type-1 normalisation to split at
+  expect_error(sdt_rating(paste0("r", 1:5), "stimulus", version = "metad"),
+               "even number of rating categories")
+  thr5 <- c(-1, -0.3, 0.3, 1)
+  expect_error(dsdt_metad(c(5, 15, 25, 30, 25), 1L, 1.5, thr5, metad = 1),
+               "even number of rating categories")
+  expect_error(rsdt_metad(2, 50, 1L, 1.5, thr5, metad = 1),
+               "even number of rating categories")
+  expect_s3_class(sdt_rating(paste0("r", 1:5), "stimulus", version = "dpsdt"),
+                  "sdt_rating_dpsdt")
+})
+
+test_that("Ro, Rn and logmratio keep their identity links", {
+  for (par in c("Ro", "Rn")) {
+    expect_error(
+      sdt_rating(paste0("r", 1:4), "stimulus", version = "dpsdt",
+                 links = stats::setNames(list("log"), par)),
+      paste0("link of '", par, "' cannot be changed")
+    )
+  }
+  expect_error(
+    sdt_rating(paste0("r", 1:4), "stimulus", version = "metad",
+               links = list(logmratio = "log")),
+    "link of 'logmratio' cannot be changed"
+  )
+})
+
+test_that("a link on d reaches the dpsdt and metad kernels through the formula", {
+  for (v in c("dpsdt", "metad")) {
+    bf <- bmf2bf(sdt_rating(paste0("r", 1:4), "stimulus", version = v,
+                            links = list(d = "log")), bmf(d ~ 1))
+    for (f in c(list(bf$formula), bf$pforms[paste0("mur", 2:4)])) {
+      txt <- paste(deparse(f, width.cutoff = 500), collapse = "")
+      expect_match(txt, paste0("sdt_", v, "_logmu"), fixed = TRUE)
+      expect_match(txt, "exp(d)", fixed = TRUE)
+    }
+  }
+})
+
 ############################################################################# !
 # CATEGORY PROBABILITIES: REDUCTION IDENTITIES & STRUCTURE               ####
 ############################################################################# !
@@ -67,17 +108,76 @@ test_that("dpsdt with no recollection reduces to the standard category probs", {
   for (stim in c(0L, 1L)) {
     base <- bmm:::.sdt_category_probs(thr, 1.4, 1.2, stim, "normal")
     off  <- bmm:::.sdt_dpsdt_category_probs(thr, 1.4, 1.2, stim, "normal",
-                                            plogis(-100), plogis(-100))
+                                            -100, -100)
     expect_equal(off, base, tolerance = 1e-12)
   }
 })
 
 test_that("metad equal to d reduces to the standard category probs", {
-  thr <- bmm:::.sdt_make_thresholds(0, 5, "parsimonious", spacing = 0.3)
+  thr <- bmm:::.sdt_make_thresholds(0, 6, "parsimonious", spacing = 0.3)
   for (stim in c(0L, 1L)) {
     base <- bmm:::.sdt_category_probs(thr, 1.4, 1.2, stim, "normal")
-    md   <- bmm:::.sdt_metad_category_probs(thr, 1.4, 1.4, stim, 1.2, "normal")
+    md   <- bmm:::.sdt_metad_category_probs(thr, 1.4, 1.2, stim, "normal", 1.4)
     expect_equal(md, base, tolerance = 1e-12)
+  }
+})
+
+test_that("metad holds each side of the criterion to the type-1 rate", {
+  # the old/new boundary is criterion itself (threshold K/2), whatever the
+  # threshold type, so the "new" side carries F((criterion - shift) / scale)
+  sr <- 1.3
+  d <- 1.5
+  crit <- 0.4
+  shift <- d * bmm:::.sdt_rms_scale(sr) / 2
+  for (tt in c("parsimonious", "log_distance", "softmax")) {
+    thr <- bmm:::.sdt_make_thresholds(crit, 6L, tt, spacing = 0.2,
+                                      deltas = if (tt == "softmax") c(0.3, -0.2, 0.1)
+                                               else c(-0.4, 0.2, 0.1, 0.5))
+    ps <- bmm:::.sdt_metad_category_probs(thr, d, sr, 1L, "normal", 0.7)
+    pn <- bmm:::.sdt_metad_category_probs(thr, d, sr, 0L, "normal", 0.7)
+    expect_equal(sum(ps[1:3]), pnorm((crit - shift) / sr), tolerance = 1e-12,
+                 info = tt)
+    expect_equal(sum(pn[1:3]), pnorm(crit + shift), tolerance = 1e-12, info = tt)
+  }
+})
+
+# Largest elementwise error relative to max(1, |y|): expect_equal()'s tolerance
+# is relative to the mean over the whole vector, which a -1e6 log probability
+# would dominate. Matching infinities count as equal.
+max_rel_err <- function(x, y) {
+  keep <- !(is.infinite(x) & x == y)
+  max(0, abs(x - y)[keep] / pmax(1, abs(y[keep])))
+}
+
+test_that("dpsdt and metad keep their category mass in both tails", {
+  # criterion = -12 or 12 puts every threshold far into one tail, where the
+  # probability scale rounds the outer categories to 0 and the old kernels
+  # clamped them to the double epsilon
+  for (crit in c(-12, 12)) {
+    for (dist in names(bmm:::.sdt_dists)) {
+      for (stim in 0:1) {
+        thr <- bmm:::.sdt_make_thresholds(crit, 6L, "equidistant", spacing = 0)
+        base <- bmm:::.sdt_category_log_probs(thr, 1.5, 1.2, stim, dist)
+        # recollection exactly off: the model's default of -100 floors the
+        # loaded category at log p = -100, above a far-tail familiarity mass
+        dp_off <- bmm:::.sdt_dpsdt_category_log_probs(thr, 1.5, 1.2, stim, dist,
+                                                      -Inf, -Inf)
+        md_ideal <- bmm:::.sdt_metad_category_log_probs(thr, 1.5, 1.2, stim,
+                                                        dist, 1.5)
+        info <- paste(crit, dist, stim)
+        expect_lt(max_rel_err(dp_off, base), 1e-12, label = info)
+        expect_lt(max_rel_err(md_ideal, base), 1e-12, label = info)
+
+        dp <- bmm:::.sdt_dpsdt_category_log_probs(thr, 1.5, 1.2, stim, dist,
+                                                  0.5, -0.5)
+        md <- bmm:::.sdt_metad_category_log_probs(thr, 1.5, 1.2, stim, dist,
+                                                  0.8)
+        expect_equal(matrixStats::logSumExp(dp), 0, tolerance = 1e-10,
+                     info = info)
+        expect_equal(matrixStats::logSumExp(md[is.finite(md)]), 0,
+                     tolerance = 1e-10, info = info)
+      }
+    }
   }
 })
 
@@ -88,19 +188,22 @@ test_that("dpsdt category probs match an independent hand computation (K=4)", {
   base_s <- diff(c(0, pnorm(thr - d / 2), 1))            # signal, sr = 1
   hand_s <- (1 - Ro) * base_s
   hand_s[4] <- hand_s[4] + Ro
-  got_s <- bmm:::.sdt_dpsdt_category_probs(thr, d, 1, 1L, "normal", Ro, 0)
-  expect_equal(got_s, hand_s / sum(hand_s), tolerance = 1e-12)
+  got_s <- bmm:::.sdt_dpsdt_category_probs(thr, d, 1, 1L, "normal",
+                                           qlogis(Ro), -Inf)
+  expect_equal(got_s, hand_s, tolerance = 1e-12)
 })
 
 test_that("recollection moves mass to the most-confident category and sums to 1", {
   thr <- bmm:::.sdt_make_thresholds(0, 5, "parsimonious", spacing = 0.3)
   base_s <- bmm:::.sdt_category_probs(thr, 1.4, 1, 1L, "normal")
-  ps     <- bmm:::.sdt_dpsdt_category_probs(thr, 1.4, 1, 1L, "normal", 0.4, 0)
+  ps     <- bmm:::.sdt_dpsdt_category_probs(thr, 1.4, 1, 1L, "normal",
+                                           qlogis(0.4), -Inf)
   expect_gt(ps[5], base_s[5])
   expect_equal(sum(ps), 1, tolerance = 1e-12)
 
   base_n <- bmm:::.sdt_category_probs(thr, 1.4, 1, 0L, "normal")
-  pn     <- bmm:::.sdt_dpsdt_category_probs(thr, 1.4, 1, 0L, "normal", 0, 0.4)
+  pn     <- bmm:::.sdt_dpsdt_category_probs(thr, 1.4, 1, 0L, "normal",
+                                           -Inf, qlogis(0.4))
   expect_gt(pn[1], base_n[1])
 })
 
@@ -134,11 +237,12 @@ test_that("dsdt_dpsdt / dsdt_metad return finite densities and validate inputs",
 
 test_that("dsdt version densities match dmultinom and vectorize over rows", {
   thr <- c(-0.5, 0, 0.5)
-  p_dp <- bmm:::.sdt_dpsdt_category_probs(thr, 1.5, 1, 1L, "normal", 0.3, 0)
+  p_dp <- bmm:::.sdt_dpsdt_category_probs(thr, 1.5, 1, 1L, "normal",
+                                          qlogis(0.3), -Inf)
   expect_equal(dsdt_dpsdt(c(2, 8, 20, 70), 1L, 1.5, thr, Ro = 0.3, Rn = 0),
                dmultinom(c(2, 8, 20, 70), prob = p_dp), tolerance = 1e-12)
 
-  p_md <- bmm:::.sdt_metad_category_probs(thr, 1.5, 1.0, 1L, 1, "normal")
+  p_md <- bmm:::.sdt_metad_category_probs(thr, 1.5, 1, 1L, "normal", 1.0)
   expect_equal(dsdt_metad(c(5, 15, 25, 55), 1L, 1.5, thr, metad = 1.0),
                dmultinom(c(5, 15, 25, 55), prob = p_md), tolerance = 1e-12)
 
@@ -158,17 +262,17 @@ test_that("version category probs vectorized path matches per-draw evaluation", 
   md <- c(1.0, 0.6, 1.4)
   for (stim in c(0L, 1L)) {
     vec_dp <- bmm:::.sdt_dpsdt_category_probs(thr, dp, sr, stim, "normal",
-                                              ro, rn)
+                                              qlogis(ro), qlogis(rn))
     ref_dp <- t(vapply(1:3, function(i) {
       bmm:::.sdt_dpsdt_category_probs(thr[i, ], dp[i], sr[i], stim, "normal",
-                                      ro[i], rn[i])
+                                      qlogis(ro[i]), qlogis(rn[i]))
     }, numeric(4)))
     expect_equal(vec_dp, ref_dp, tolerance = 1e-12, info = paste("dpsdt", stim))
 
-    vec_md <- bmm:::.sdt_metad_category_probs(thr, dp, md, stim, sr, "normal")
+    vec_md <- bmm:::.sdt_metad_category_probs(thr, dp, sr, stim, "normal", md)
     ref_md <- t(vapply(1:3, function(i) {
-      bmm:::.sdt_metad_category_probs(thr[i, ], dp[i], md[i], stim, sr[i],
-                                      "normal")
+      bmm:::.sdt_metad_category_probs(thr[i, ], dp[i], sr[i], stim, "normal",
+                                      md[i])
     }, numeric(4)))
     expect_equal(vec_md, ref_md, tolerance = 1e-12, info = paste("metad", stim))
   }
@@ -207,16 +311,85 @@ test_that("the generated Stan wrapper carries the version-specific call", {
 })
 
 test_that("metad R companion with logmratio = 0 reduces to the standard model", {
-  mm  <- sdt_rating(paste0("r", 1:5), "stimulus", version = "metad")
-  std <- sdt_rating(paste0("r", 1:5), "stimulus")
-  args <- list(K = 5L, dist = 1L, thresh = 1L, d = matrix(1.4),
+  args <- list(K = 6L, dist = 1L, thresh = 1L, d = matrix(1.4),
                criterion = matrix(0), spacing = matrix(0.3),
                sdratio = matrix(0), stimulus = matrix(1))
-  for (k in 1:5) {
+  for (k in 1:6) {
     md_k <- do.call(sdt_metad_logmu, c(list(cat = k), args, list(logmratio = matrix(0))))
     st_k <- do.call(sdt_rating_logmu, c(list(cat = k), args))
     expect_equal(as.numeric(md_k), as.numeric(st_k), tolerance = 1e-12)
   }
+})
+
+
+# The Stan kernels run through a fixed_param generated-quantities program, as
+# the rating parity test in test-model_sdt_rating.R does. sig_figs = 17
+# round-trips a double.
+versions_stan_logmu <- function(grid, deltas) {
+  sc <- system.file("stan_chunks", package = "bmm")
+  chunks <- c("sdt_dist_funs.stan", "sdt_rating_funs.stan",
+              "sdt_dpsdt_funs.stan", "sdt_metad_funs.stan")
+  funs <- paste(vapply(file.path(sc, chunks), read_lines2, character(1)),
+                collapse = "\n")
+  program <- paste0(
+    "functions {\n", funs, "\n}\n",
+    "data {\n  int N; int K; array[N] int cat; array[N, K - 2] real deltas;\n",
+    "  vector[N] criterion; vector[N] d; vector[N] sdratio; vector[N] stimulus;\n",
+    "  array[N] int dist; vector[N] Ro; vector[N] Rn; vector[N] metad;\n}\n",
+    "generated quantities {\n  vector[N] dp; vector[N] md;\n  for (i in 1:N) {\n",
+    "    vector[K - 1] thr = sdt_make_thresholds_rating(criterion[i], 0,\n",
+    "      deltas[i], K, 3);\n",
+    "    dp[i] = sdt_dpsdt_logmu_cat(cat[i], thr, d[i], sdratio[i], stimulus[i],\n",
+    "      dist[i], Ro[i], Rn[i]);\n",
+    "    md[i] = sdt_metad_logmu_cat(cat[i], thr, d[i], metad[i], sdratio[i],\n",
+    "      stimulus[i], dist[i]);\n",
+    "  }\n}\n"
+  )
+  data <- c(list(N = nrow(grid), K = 6L, deltas = deltas),
+            as.list(grid[c("cat", "criterion", "d", "sdratio", "stimulus",
+                           "dist", "Ro", "Rn", "metad")]))
+  fit <- cmdstanr::cmdstan_model(cmdstanr::write_stan_file(program))$sample(
+    data = data, fixed_param = TRUE, chains = 1, iter_sampling = 1,
+    iter_warmup = 0, refresh = 0, show_messages = FALSE, sig_figs = 17
+  )
+  csv <- utils::read.csv(fit$output_files()[1], comment.char = "#",
+                         check.names = FALSE)
+  idx <- seq_len(nrow(grid))
+  list(dp = as.numeric(csv[1, paste0("dp.", idx)]),
+       md = as.numeric(csv[1, paste0("md.", idx)]))
+}
+
+test_that("the Stan dpsdt and metad kernels match their R counterparts in both tails", {
+  skip_on_cran()
+  skip_if_not_installed("cmdstanr")
+  skip_if(is.null(cmdstanr::cmdstan_version(error_on_NA = FALSE)))
+
+  grid <- expand.grid(cat = 1:6, criterion = c(-12, -0.5, 0.3, 12),
+                      sdratio = c(-0.6, 0, 0.9), stimulus = c(0, 1),
+                      dist = seq_along(bmm:::.sdt_dists))
+  n <- nrow(grid)
+  grid$d <- rep_len(c(0.4, 1.3, 2.5), n)
+  grid$Ro <- rep_len(c(-100, -1.2, 0.4, 3), n)
+  grid$Rn <- rep_len(c(-100, 0.8, -2.5), n)
+  grid$metad <- rep_len(c(0.2, 1.1, 2.9, 0.7, 1.8), n)
+  deltas <- matrix(c(-0.6, 0.2, -0.1, 0.5), n, 4, byrow = TRUE)
+  stan <- versions_stan_logmu(grid, deltas)
+
+  r <- t(vapply(seq_len(n), function(i) {
+    g <- grid[i, ]
+    thr <- bmm:::.sdt_make_thresholds(g$criterion, 6L, "log_distance",
+                                      deltas = deltas[1, ])
+    dist <- names(bmm:::.sdt_dists)[g$dist]
+    c(bmm:::.sdt_dpsdt_category_log_probs(thr, g$d, exp(g$sdratio), g$stimulus,
+                                          dist, g$Ro, g$Rn)[g$cat],
+      bmm:::.sdt_metad_category_log_probs(thr, g$d, exp(g$sdratio), g$stimulus,
+                                          dist, g$metad)[g$cat])
+  }, numeric(2)))
+
+  expect_true(all(is.finite(stan$dp)))
+  expect_true(all(is.finite(stan$md)))
+  expect_lt(max_rel_err(stan$dp, r[, 1]), 1e-10)
+  expect_lt(max_rel_err(stan$md, r[, 2]), 1e-10)
 })
 
 ############################################################################# !

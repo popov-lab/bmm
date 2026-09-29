@@ -165,7 +165,7 @@ recollection, so it is not the discriminability of that mixture.
 \item \strong{Name:} Signal Detection Theory (Confidence Rating)
 \item \strong{Citation:}
 \itemize{
-\item Green, D. M., & Swets, J. A. (1966). Signal detection theory and psychophysics. Wiley.
+\item Yonelinas, A. P. (1994). Receiver-operating characteristics in recognition memory: Evidence for a dual-process model. Journal of Experimental Psychology: Learning, Memory, and Cognition, 20(6), 1341-1354. https://doi.org/10.1037/0278-7393.20.6.1341
 }
 \item \strong{Version:} dpsdt
 \item \strong{Requirements:}
@@ -253,6 +253,9 @@ and anchors the ideal point (meta-d' = \code{d}, perfect metacognition) at
 \code{logmratio = 0}, which recovers \code{standard}. Type-1 and type-2 sensitivity
 share one scale (\eqn{d'}, or \eqn{d_a} when \code{sdratio} is estimated), so the
 M-ratio is unaffected by \code{sdratio}.
+The type-1 boundary is \code{criterion}, the middle threshold, so this version
+needs an even number of rating categories: with an odd number the middle
+category straddles the boundary (see "Where \code{criterion} sits").
 Extract the M-ratio posterior with \code{\link[=mratio]{mratio()}}.
 \itemize{
 \item \strong{Domain:} Perception & Recognition Memory
@@ -260,7 +263,7 @@ Extract the M-ratio posterior with \code{\link[=mratio]{mratio()}}.
 \item \strong{Name:} Signal Detection Theory (Confidence Rating)
 \item \strong{Citation:}
 \itemize{
-\item Green, D. M., & Swets, J. A. (1966). Signal detection theory and psychophysics. Wiley.
+\item Maniscalco, B., & Lau, H. (2012). A signal detection theoretic approach for estimating metacognitive sensitivity from confidence ratings. Consciousness and Cognition, 21(1), 422-430. https://doi.org/10.1016/j.concog.2011.09.021
 }
 \item \strong{Version:} metad
 \item \strong{Requirements:}
