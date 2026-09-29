@@ -219,7 +219,8 @@ settable_link_functions.sdt_cdp <- function(model) {
 #'   old/new boundary, threshold `n_new`.
 #' @param links A named list of link functions for the parameters, e.g.
 #'   `links = list(drec = "log")`. Only `dfam`, `drec`, `criterion` and `rcrit`
-#'   can be set, to one of the links [inv_link()] can invert. `sigmar`, `rho`,
+#'   can be set, to `"log"`, `"softplus"`, `"logit"`, `"probit"` or
+#'   `"identity"`, the links the model can invert inside its formula. `sigmar`, `rho`,
 #'   `kcrit` and the threshold parameters keep their identity links, because
 #'   their fixed values and the model's own transformations (`exp()`, `tanh()`)
 #'   assume it.

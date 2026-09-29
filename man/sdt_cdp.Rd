@@ -40,7 +40,8 @@ old/new boundary, threshold \code{n_new}.}
 
 \item{links}{A named list of link functions for the parameters, e.g.
 \code{links = list(drec = "log")}. Only \code{dfam}, \code{drec}, \code{criterion} and \code{rcrit}
-can be set, to one of the links \code{\link[=inv_link]{inv_link()}} can invert. \code{sigmar}, \code{rho},
+can be set, to \code{"log"}, \code{"softplus"}, \code{"logit"}, \code{"probit"} or
+\code{"identity"}, the links the model can invert inside its formula. \code{sigmar}, \code{rho},
 \code{kcrit} and the threshold parameters keep their identity links, because
 their fixed values and the model's own transformations (\code{exp()}, \code{tanh()})
 assume it.}
