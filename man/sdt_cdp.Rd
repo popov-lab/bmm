@@ -78,8 +78,8 @@ Use aggregate_sdt_cdp_data() to build these columns from long-format (trial-leve
 \itemize{
 \item \strong{Parameters:}
 \itemize{
-\item \code{dfam}: Familiarity sensitivity: target mean on the familiarity axis, in lure-SD units, like d' in the other SDT models under equal variance (not their d_a) -- the old/new decision is read off the aggregate strength F + R
-\item \code{drec}: Recollection sensitivity: target mean on the recollection axis, in lure-SD units (the target SD is exp(sigmar))
+\item \code{dfam}: Familiarity sensitivity: target mean on the familiarity axis, in lure-SD units (d' on that axis, where targets and lures share SD 1)
+\item \code{drec}: Recollection sensitivity: target mean on the recollection axis, in lure-SD units. The target SD is exp(sigmar), so once sigmar is estimated drec is not the d_a the other SDT models report as d
 \item \code{criterion}: Response bias: old/new boundary on the strength (F+R) axis
 \item \code{spacing}: Threshold spacing: controls distance between adjacent thresholds (exp(spacing) ensures positive spacing)
 \item \code{rcrit}: Remember criterion: threshold on the recollection axis
@@ -186,10 +186,34 @@ separately through brms syntax such as \code{(1 |p| id)} on any parameter.
 \item \code{kcrit ~ 1} estimates the Know/Guess criterion (requires \code{"guess"}
 judgments in the data).
 }
+}
+\section{Sensitivity scales}{
+
+\code{dfam} and \code{drec} are the target means \eqn{\mu_F} and \eqn{\mu_R} of
+Wixted and Mickes (2010), each in units of the lure SD on its own axis, so
+estimates can be compared with the values they report. On the familiarity
+axis targets and lures both have SD 1, and \code{dfam} is \eqn{d'} there.
+On the recollection axis the target SD is \code{exp(sigmar)}, so \code{drec} is
+standardized by the lure SD alone. With \code{sigmar} fixed at 0 it is
+\eqn{d'} as well; with \code{sigmar} estimated it is not the balanced index
+\eqn{d_a} that \code{\link[=sdt_yn]{sdt_yn()}} and \code{\link[=sdt_rating]{sdt_rating()}} report as \code{d}.
+
+This matters when \code{drec} is compared across conditions whose \code{sigmar}
+differs: a difference in the recollection SD alone can then appear as a
+credible difference in \code{drec}, the problem the sensitivity section of
+\code{\link[=sdt_yn]{sdt_yn()}} describes for \eqn{d'}. To compare such conditions, compute the
+balanced recollection sensitivity from the posterior draws as
+\code{drec / sqrt((1 + exp(2 * sigmar)) / 2)}, or give \code{sigmar} the same formula
+in every condition being compared.
+
+Neither \code{dfam} nor \code{drec} is the discriminability of the old/new decision,
+which is read off the aggregate strength \eqn{F + R} and depends on both
+sensitivities, on \code{sigmar} and on \code{rho}.
 
 When no Remember/Know split is available (confidence ratings only), use
 \code{\link[=sdt_rating]{sdt_rating()}} instead.
 }
+
 \examples{
 \dontrun{
 # Simulate a Remember/Know data set (3 new + 3 old confidence levels) for

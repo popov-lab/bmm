@@ -31,13 +31,12 @@
     list(
       dfam = paste0(
         "Familiarity sensitivity: target mean on the familiarity axis, in ",
-        "lure-SD units, like d' in the other SDT models under equal variance ",
-        "(not their d_a) -- the old/new decision is read off the aggregate ",
-        "strength F + R"
+        "lure-SD units (d' on that axis, where targets and lures share SD 1)"
       ),
       drec = paste0(
         "Recollection sensitivity: target mean on the recollection axis, in ",
-        "lure-SD units (the target SD is exp(sigmar))"
+        "lure-SD units. The target SD is exp(sigmar), so once sigmar is ",
+        "estimated drec is not the d_a the other SDT models report as d"
       ),
       criterion = "Response bias: old/new boundary on the strength (F+R) axis"
     ),
@@ -196,6 +195,28 @@ settable_link_functions.sdt_cdp <- function(model) {
 #'   \item `kcrit ~ 1` estimates the Know/Guess criterion (requires `"guess"`
 #'     judgments in the data).
 #' }
+#'
+#' @section Sensitivity scales:
+#' `dfam` and `drec` are the target means \eqn{\mu_F} and \eqn{\mu_R} of
+#' Wixted and Mickes (2010), each in units of the lure SD on its own axis, so
+#' estimates can be compared with the values they report. On the familiarity
+#' axis targets and lures both have SD 1, and `dfam` is \eqn{d'} there.
+#' On the recollection axis the target SD is `exp(sigmar)`, so `drec` is
+#' standardized by the lure SD alone. With `sigmar` fixed at 0 it is
+#' \eqn{d'} as well; with `sigmar` estimated it is not the balanced index
+#' \eqn{d_a} that [sdt_yn()] and [sdt_rating()] report as `d`.
+#'
+#' This matters when `drec` is compared across conditions whose `sigmar`
+#' differs: a difference in the recollection SD alone can then appear as a
+#' credible difference in `drec`, the problem the sensitivity section of
+#' [sdt_yn()] describes for \eqn{d'}. To compare such conditions, compute the
+#' balanced recollection sensitivity from the posterior draws as
+#' `drec / sqrt((1 + exp(2 * sigmar)) / 2)`, or give `sigmar` the same formula
+#' in every condition being compared.
+#'
+#' Neither `dfam` nor `drec` is the discriminability of the old/new decision,
+#' which is read off the aggregate strength \eqn{F + R} and depends on both
+#' sensitivities, on `sigmar` and on `rho`.
 #'
 #' When no Remember/Know split is available (confidence ratings only), use
 #' [sdt_rating()] instead.
