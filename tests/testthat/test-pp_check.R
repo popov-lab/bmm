@@ -169,6 +169,14 @@ test_that(".pp_check_resolve_group() leaves non-rating multinomial ungrouped", {
   expect_null(.pp_check_resolve_group(fit, NULL))
 })
 
+test_that(".pp_check_restore_set_size() lets sdt_ranking facet by its m column", {
+  fit <- fake_ranking_fit()
+  fit$bmm$model$other_vars$m <- "set_size"
+  fit$data$max_rank <- 3
+  expect_equal(.pp_check_restore_set_size(fit, "set_size")$data$set_size, 3)
+  expect_identical(.pp_check_restore_set_size(fit, "id"), fit)
+})
+
 # Multi-observable checks: pp_check(fit, resp_var = ...) (#401)
 
 load_ppcheck_fit <- function(name) {
