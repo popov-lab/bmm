@@ -450,6 +450,17 @@
   and simulated counts were wrong; rerun such calls. Fitting with
   [`bmm()`](https://popov-lab.github.io/bmm/dev/reference/bmm.md) was
   not affected.
+- `log_lik()` for **cswald** fits no longer returns `NaN` for a
+  posterior draw whose `ndt` is at or above an observation’s RT, which
+  happens with `newdata` such as held-out folds. Such draws now give
+  `-Inf`, or `0` for errors in the `"simple"` version, matching the
+  likelihood the model was fitted with. `kfold()` and
+  [`loo::elpd()`](https://mc-stan.org/loo/reference/elpd.html) no longer
+  break on the common case of a few such draws; an observation whose RT
+  is below every posterior draw of `ndt` can still return a non-finite
+  estimate, which reports a real mismatch with the data, not this bug.
+  Rerun affected computations
+  ([\#453](https://github.com/popov-lab/bmm/issues/453)).
 
 #### Other changes
 
