@@ -39,19 +39,20 @@ and any condition columns, plus a \code{summary} attribute (\code{AUC_mean},
 }
 \description{
 Computes the posterior area under the ROC curve (AUC). For Gaussian and
-Gumbel-min equal-variance binary SDT the AUC is available in closed form from
-the \code{d} draws; otherwise it is obtained by trapezoidal integration of
-the ROC points from \code{\link[=roc_sdt]{roc_sdt()}}. The returned AUC is always the area under
-the full curve (for binary multi-criteria fits this is one value per curve,
-not the trapezoid of the discrete operating points).
+Gumbel (min or max) equal-variance binary SDT the AUC is available in
+closed form from the \code{d} draws; otherwise it is obtained by trapezoidal
+integration of the ROC points from \code{\link[=roc_sdt]{roc_sdt()}}. The returned AUC is always
+the area under the full curve (for binary multi-criteria fits this is one
+value per curve, not the trapezoid of the discrete operating points).
 }
 \details{
-The closed form is used only when \code{sdratio} is fixed, where \code{d} (which is
-\eqn{d_a}) equals \eqn{d'}; every unequal-variance fit takes the numerical
-route, so the AUC is invariant to the sensitivity parameterization.
+The closed form is used only when \code{sdratio} is fixed at 0, where \code{d}
+(which is \eqn{d_a}) equals \eqn{d'}; every fit with \code{sdratio} estimated or
+fixed away from 0 takes the numerical route, so the AUC is invariant to the
+sensitivity parameterization.
 
 Analytical formulas (equal variance, where \eqn{d_a = d'}): normal
-EV-SDT \eqn{AUC = \Phi(d'/\sqrt{2})}; Gumbel-min EV-SDT
+EV-SDT \eqn{AUC = \Phi(d'/\sqrt{2})}; Gumbel-min and Gumbel-max EV-SDT
 \eqn{AUC = \mathrm{logistic}(g')}.
 }
 \seealso{

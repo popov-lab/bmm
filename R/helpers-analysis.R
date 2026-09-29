@@ -279,6 +279,16 @@ roc_sdt <- function(fit, conditions = NULL, n_points = 100,
 }
 
 
+# Whether sdratio is 1 on the natural scale: absent, or fixed at 0 on its log
+# scale. Model-only, because brms::variables() lists sdratio on every real fit
+# (bmm fixes it through a constant prior), and a user-fixed non-zero value
+# breaks d = d' just as an estimated one does.
+.sdt_unit_sdratio <- function(model) {
+  !"sdratio" %in% names(model$parameters) ||
+    isTRUE(model$fixed_parameters$sdratio == 0)
+}
+
+
 # Posterior draws of one parameter on the scale the likelihood reads it, with
 # conditions overriding the first data row so every formula variable is
 # present. The parameters are nlpars for the multinomial models (rating,
@@ -975,15 +985,16 @@ print.bmm_sdt_thresholds <- function(x, ...) {
 #' Area under the ROC curve from a fitted SDT model
 #'
 #' Computes the posterior area under the ROC curve (AUC). For Gaussian and
-#' Gumbel-min equal-variance binary SDT the AUC is available in closed form from
-#' the `d` draws; otherwise it is obtained by trapezoidal integration of
-#' the ROC points from [roc_sdt()]. The returned AUC is always the area under
-#' the full curve (for binary multi-criteria fits this is one value per curve,
-#' not the trapezoid of the discrete operating points).
+#' Gumbel (min or max) equal-variance binary SDT the AUC is available in
+#' closed form from the `d` draws; otherwise it is obtained by trapezoidal
+#' integration of the ROC points from [roc_sdt()]. The returned AUC is always
+#' the area under the full curve (for binary multi-criteria fits this is one
+#' value per curve, not the trapezoid of the discrete operating points).
 #'
-#' The closed form is used only when `sdratio` is fixed, where `d` (which is
-#' \eqn{d_a}) equals \eqn{d'}; every unequal-variance fit takes the numerical
-#' route, so the AUC is invariant to the sensitivity parameterization.
+#' The closed form is used only when `sdratio` is fixed at 0, where `d`
+#' (which is \eqn{d_a}) equals \eqn{d'}; every fit with `sdratio` estimated or
+#' fixed away from 0 takes the numerical route, so the AUC is invariant to the
+#' sensitivity parameterization.
 #'
 #' @inheritParams roc_sdt
 #' @param probs Numeric vector of length 2. Quantiles for the credible interval
@@ -994,7 +1005,7 @@ print.bmm_sdt_thresholds <- function(x, ...) {
 #'   `AUC_lower`, `AUC_upper`).
 #'
 #' @details Analytical formulas (equal variance, where \eqn{d_a = d'}): normal
-#'   EV-SDT \eqn{AUC = \Phi(d'/\sqrt{2})}; Gumbel-min EV-SDT
+#'   EV-SDT \eqn{AUC = \Phi(d'/\sqrt{2})}; Gumbel-min and Gumbel-max EV-SDT
 #'   \eqn{AUC = \mathrm{logistic}(g')}.
 #'
 #' @seealso [roc_sdt()], [plot.bmm_sdt_auc()]
@@ -1013,7 +1024,6 @@ auc_sdt <- function(fit, conditions = NULL, probs = c(0.025, 0.975),
 
   dist        <- model$other_vars$dist
   is_rating   <- inherits(model, "sdt_rating")
-  has_sdratio <- .sdt_has_estimated_sdratio(model, fit)
   conditions  <- .sdt_resolve_conditions(fit, conditions)
 
   if (!is_rating) {
@@ -1021,7 +1031,8 @@ auc_sdt <- function(fit, conditions = NULL, probs = c(0.025, 0.975),
     conditions <- .sdt_unique_subset(conditions, dims$curves)
   }
 
-  use_analytical <- !is_rating && !has_sdratio && dist %in% c("normal", "gumbel_min")
+  use_analytical <- !is_rating && .sdt_unit_sdratio(model) &&
+    dist %in% c("normal", "gumbel_min", "gumbel_max")
 
   if (use_analytical) {
     auc_fn <- if (dist == "normal") function(d) stats::pnorm(d / sqrt(2)) else stats::plogis
@@ -1130,8 +1141,8 @@ print.bmm_sdt_auc <- function(x, ...) {
 #'       d_S = d_a \sqrt{(1 + \sigma_S^2)/2} \,/\, \sigma_S.}
 #'
 #' All three coincide when `sdratio` is 0 (equal variance), which is the case
-#' for [sdt_mafc()] and for any fit that does not give `sdratio` a formula. The
-#' conversion is applied draw by draw, so the returned intervals propagate the
+#' for [sdt_mafc()] and for any fit that leaves `sdratio` at its default of 0.
+#' The conversion is applied draw by draw, so the returned intervals propagate the
 #' joint posterior uncertainty in `d` and `sdratio` rather than combining
 #' point estimates.
 #'
@@ -1226,12 +1237,12 @@ print.bmm_sdt_sensitivity <- function(x, ...) {
 
 
 # `d` reads as d' in the coefficient table, which it only is while sdratio is
-# fixed
+# fixed at 0
 #' @export
 summary_notes.sdt <- function(model, x) {
-  if (!.sdt_has_estimated_sdratio(model)) return(NULL)
+  if (.sdt_unit_sdratio(model)) return(NULL)
   paste(
-    "Note: sdratio is estimated, so d is d_a (root-mean-square SD units),",
+    "Note: sdratio is not 0, so d is d_a (root-mean-square SD units),",
     "not the noise-standardized d'.\n      sdt_sensitivity() converts it",
     "to d' (noise SD) and d_S (signal SD)."
   )

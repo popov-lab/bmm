@@ -62,8 +62,8 @@ The estimated parameter is \eqn{d_a}, hence
       d_S = d_a \sqrt{(1 + \sigma_S^2)/2} \,/\, \sigma_S.}
 
 All three coincide when \code{sdratio} is 0 (equal variance), which is the case
-for \code{\link[=sdt_mafc]{sdt_mafc()}} and for any fit that does not give \code{sdratio} a formula. The
-conversion is applied draw by draw, so the returned intervals propagate the
+for \code{\link[=sdt_mafc]{sdt_mafc()}} and for any fit that leaves \code{sdratio} at its default of 0.
+The conversion is applied draw by draw, so the returned intervals propagate the
 joint posterior uncertainty in \code{d} and \code{sdratio} rather than combining
 point estimates.
 

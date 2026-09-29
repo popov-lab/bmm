@@ -171,6 +171,26 @@ test_that(".sdt_has_estimated_sdratio cross-checks brms::variables", {
   expect_true(.sdt_has_estimated_sdratio(m_ev, fit))
 })
 
+test_that(".sdt_unit_sdratio is model-only and keys off the natural-scale value", {
+  m_ev <- sdt_yn(response = "n_old", stimulus = "stimulus", n_trials = "n_trials")
+  expect_true(.sdt_unit_sdratio(m_ev))
+
+  m_fixed_int <- m_ev
+  m_fixed_int$fixed_parameters$sdratio <- 0L
+  expect_true(.sdt_unit_sdratio(m_fixed_int))
+
+  m_fixed <- m_ev
+  m_fixed$fixed_parameters$sdratio <- 0.3
+  expect_false(.sdt_unit_sdratio(m_fixed))
+
+  m_uv <- m_ev
+  m_uv$fixed_parameters$sdratio <- NULL
+  expect_false(.sdt_unit_sdratio(m_uv))
+
+  expect_true(.sdt_unit_sdratio(fake_mafc_fit()$bmm$model))
+  expect_true(.sdt_unit_sdratio(fake_ranking_fit()$bmm$model))
+})
+
 
 ############################################################################# !
 # ROC — BINARY                                                           ####
@@ -378,14 +398,53 @@ test_that("auc_sdt() binary normal EV uses the analytical Phi(d/sqrt(2))", {
   fit <- fake_binary_fit()
   dpr <- 1.5
   local_mocked_bindings(
+    # A real EV fit's sdratio is fixed at 0 via a constant prior, not omitted,
+    # so brms::variables() lists it just like any other parameter.
     posterior_linpred = mock_linpred_factory(list(d = dpr, criterion = 0)),
     ranef = function(...) list(),
-    variables = function(...) c("b_d_Intercept"),
+    variables = function(...) c("b_d_Intercept", "b_criterion_Intercept",
+                                "b_sdratio_Intercept"),
     .package = "brms"
   )
   auc <- auc_sdt(fit)
   expect_s3_class(auc, "bmm_sdt_auc")
   expect_equal(mean(auc$AUC), stats::pnorm(dpr / sqrt(2)), tolerance = 1e-10)
+})
+
+test_that("auc_sdt() binary gumbel_max EV uses the analytical plogis(d)", {
+  fit <- fake_binary_fit()
+  fit$bmm$model$other_vars$dist <- "gumbel_max"
+  dpr <- 0.8
+  local_mocked_bindings(
+    posterior_linpred = mock_linpred_factory(list(d = dpr, criterion = 0)),
+    ranef = function(...) list(),
+    variables = function(...) c("b_d_Intercept", "b_criterion_Intercept",
+                                "b_sdratio_Intercept"),
+    .package = "brms"
+  )
+  auc <- auc_sdt(fit)
+  expect_equal(mean(auc$AUC), stats::plogis(dpr), tolerance = 1e-10)
+})
+
+test_that("auc_sdt() does not take the closed form when sdratio is fixed away from 0", {
+  fit_fixed <- fake_binary_fit()
+  fit_fixed$bmm$model$fixed_parameters$sdratio <- 0.3
+  fit_uv <- fake_binary_fit(uv = TRUE)
+  dpr <- 1.5
+  local_mocked_bindings(
+    posterior_linpred = mock_linpred_factory(list(d = dpr, criterion = 0,
+                                                  sdratio = 0.3)),
+    ranef = function(...) list(),
+    variables = function(...) c("b_d_Intercept", "b_criterion_Intercept",
+                                "b_sdratio_Intercept"),
+    .package = "brms"
+  )
+  auc_fixed <- auc_sdt(fit_fixed)
+  auc_uv    <- auc_sdt(fit_uv)
+  closed    <- stats::pnorm(dpr / sqrt(2))
+
+  expect_true(all(abs(auc_fixed$AUC - closed) > 1e-6))
+  expect_equal(auc_fixed$AUC, auc_uv$AUC, tolerance = 1e-12)
 })
 
 test_that("auc_sdt() rating uses the numerical path and stays in (0.5, 1)", {
@@ -855,4 +914,23 @@ test_that("sdt_sensitivity() print method labels the three scales", {
     .package = "brms"
   )
   expect_output(print(sdt_sensitivity(fit)), "SDT sensitivity")
+})
+
+
+############################################################################# !
+# SUMMARY NOTES                                                          ####
+############################################################################# !
+
+test_that("summary_notes.sdt() fires whenever sdratio departs from 0, not just when estimated", {
+  m_ev <- fake_binary_fit()$bmm$model
+  expect_null(summary_notes(m_ev, NULL))
+
+  m_fixed <- m_ev
+  m_fixed$fixed_parameters$sdratio <- 0.3
+  expect_match(summary_notes(m_fixed, NULL), "d_a")
+
+  m_uv <- fake_binary_fit(uv = TRUE)$bmm$model
+  expect_match(summary_notes(m_uv, NULL), "d_a")
+
+  expect_null(summary_notes(fake_mafc_fit()$bmm$model, NULL))
 })
