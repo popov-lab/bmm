@@ -303,6 +303,15 @@ m3_fixture <- function() {
 # with a formula that leaves brms no reason to keep the set_size column;
 # mixture3p_set_size covers the opposite case, where the formula names set_size
 # directly and brms keeps the real column instead
+cdp_data <- function(guess, prefix = "rk") {
+  cols <- .sdt_cdp_response_cols(2, 2, guess, prefix)
+  counts <- matrix(c(30L, 20L, 5L, 7L, 9L, 11L, 4L, 14L), 12, 8, byrow = TRUE)
+  cbind(
+    data.frame(stimulus = rep(0:1, 6), id = factor(rep(1:6, each = 2))),
+    stats::setNames(as.data.frame(counts[, seq_along(cols)]), cols)
+  )
+}
+
 stored_frame_cases <- function() {
   rt_data <- data.frame(
     rt = rep(c(0.6, 0.8, 1.1, 0.7), 5),
@@ -434,6 +443,21 @@ stored_frame_cases <- function() {
       model = sdt_rating(paste0("r", 1:5), "stimulus", version = "dpsdt"),
       formula = bmf(d ~ 1 + (1 | id), criterion ~ 1, spacing ~ 1, Ro ~ 1),
       data = rating_data
+    ),
+    # a column prefix and the Know/Guess split, which check_data() infers from
+    # the guess columns alone
+    sdt_cdp = list(
+      model = sdt_cdp("rk", "stimulus", n_new = 2, n_old = 2),
+      formula = bmf(dfam ~ 1 + (1 | id), drec ~ 1, criterion ~ 1, spacing ~ 1,
+                    rcrit ~ 1, kcrit ~ 1),
+      data = cdp_data(guess = TRUE)
+    ),
+    sdt_cdp_deltas = list(
+      model = sdt_cdp(stimulus = "stimulus", n_new = 2, n_old = 2,
+                      threshold_type = "log_distance"),
+      formula = bmf(dfam ~ 1, drec ~ 1, criterion ~ 1, rcrit ~ 1, sigmar ~ 1,
+                    delta1 ~ 1, delta2 ~ 1),
+      data = cdp_data(guess = FALSE, prefix = "")
     ),
     # meta-d' needs an even number of categories
     sdt_rating_metad = list(
