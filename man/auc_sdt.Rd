@@ -41,9 +41,11 @@ and any condition columns, plus a \code{summary} attribute (\code{AUC_mean},
 Computes the posterior area under the ROC curve (AUC). For Gaussian and
 Gumbel (min or max) equal-variance binary SDT the AUC is available in
 closed form from the \code{d} draws; otherwise it is obtained by trapezoidal
-integration of the ROC points from \code{\link[=roc_sdt]{roc_sdt()}}. The returned AUC is always
-the area under the full curve (for binary multi-criteria fits this is one
-value per curve, not the trapezoid of the discrete operating points).
+integration of the model-implied curve (for rating fits, the curve swept
+from the posterior of \code{d} and \code{sdratio}). The returned AUC is always the
+area under the full curve, not the trapezoid of the discrete operating
+points or the K-1 rating thresholds; for binary multi-criteria fits it is
+one value per curve.
 }
 \details{
 The closed form is used only when \code{sdratio} is fixed at 0, where \code{d}

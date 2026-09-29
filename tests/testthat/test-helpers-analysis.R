@@ -459,6 +459,76 @@ test_that("auc_sdt() rating uses the numerical path and stays in (0.5, 1)", {
   expect_true(all(auc$AUC > 0.5 & auc$AUC < 1))
 })
 
+test_that("auc_sdt() rating EV matches the closed-form Phi(d_a/sqrt(2)) oracle", {
+  fit <- fake_rating_fit()
+  d_true <- 1.5
+  local_mocked_bindings(
+    posterior_linpred = mock_linpred_factory(list(d = d_true, sdratio = 0,
+                                                  criterion = 0, spacing = 0)),
+    ranef = function(...) list(),
+    variables = function(...) c("b_d_Intercept", "b_sdratio_Intercept"),
+    .package = "brms"
+  )
+  auc <- auc_sdt(fit)
+  expect_equal(mean(auc$AUC), stats::pnorm(d_true / sqrt(2)), tolerance = 1e-3)
+})
+
+test_that("auc_sdt() rating UV (positive sdratio) matches the Phi(d_a/sqrt(2)) oracle", {
+  fit <- fake_rating_fit(uv = TRUE)
+  d_true <- 1.5
+  local_mocked_bindings(
+    posterior_linpred = mock_linpred_factory(list(d = d_true, sdratio = log(1.35),
+                                                  criterion = 0, spacing = 0)),
+    ranef = function(...) list(),
+    variables = function(...) c("b_d_Intercept", "b_sdratio_Intercept"),
+    .package = "brms"
+  )
+  auc <- auc_sdt(fit)
+  expect_equal(mean(auc$AUC), stats::pnorm(d_true / sqrt(2)), tolerance = 1e-3)
+})
+
+test_that("auc_sdt() rating UV (negative sdratio) matches the Phi(d_a/sqrt(2)) oracle", {
+  fit <- fake_rating_fit(uv = TRUE)
+  d_true <- 1.5
+  local_mocked_bindings(
+    posterior_linpred = mock_linpred_factory(list(d = d_true, sdratio = -0.5,
+                                                  criterion = 0, spacing = 0)),
+    ranef = function(...) list(),
+    variables = function(...) c("b_d_Intercept", "b_sdratio_Intercept"),
+    .package = "brms"
+  )
+  auc <- auc_sdt(fit)
+  expect_equal(mean(auc$AUC), stats::pnorm(d_true / sqrt(2)), tolerance = 1e-3)
+})
+
+test_that("auc_sdt() rating gumbel_max UV matches an independent stats::integrate() oracle", {
+  fit <- fake_rating_fit(uv = TRUE)
+  fit$bmm$model$other_vars$dist <- "gumbel_max"
+  d_true <- 1.2
+  sdratio_log <- 0.2
+  local_mocked_bindings(
+    posterior_linpred = mock_linpred_factory(list(d = d_true, sdratio = sdratio_log,
+                                                  criterion = 0, spacing = 0)),
+    ranef = function(...) list(),
+    variables = function(...) c("b_d_Intercept", "b_sdratio_Intercept"),
+    .package = "brms"
+  )
+  auc <- auc_sdt(fit)
+
+  sdratio <- exp(sdratio_log)
+  sep <- d_true * sqrt((1 + sdratio^2) / 2)
+  gumbel_max_cdf <- function(x) exp(-exp(-x))
+  gumbel_max_qf  <- function(p) -log(-log(p))
+  hit_of_fa <- function(fa) {
+    t <- gumbel_max_qf(1 - fa) - sep / 2
+    1 - gumbel_max_cdf((t - sep / 2) / sdratio)
+  }
+  oracle <- stats::integrate(hit_of_fa, lower = 1e-8, upper = 1 - 1e-8,
+                             rel.tol = 1e-10, subdivisions = 1000L)$value
+
+  expect_equal(mean(auc$AUC), oracle, tolerance = 1e-3)
+})
+
 
 ############################################################################# !
 # OBSERVED ROC                                                           ####

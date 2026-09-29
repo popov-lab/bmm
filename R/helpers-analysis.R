@@ -987,9 +987,11 @@ print.bmm_sdt_thresholds <- function(x, ...) {
 #' Computes the posterior area under the ROC curve (AUC). For Gaussian and
 #' Gumbel (min or max) equal-variance binary SDT the AUC is available in
 #' closed form from the `d` draws; otherwise it is obtained by trapezoidal
-#' integration of the ROC points from [roc_sdt()]. The returned AUC is always
-#' the area under the full curve (for binary multi-criteria fits this is one
-#' value per curve, not the trapezoid of the discrete operating points).
+#' integration of the model-implied curve (for rating fits, the curve swept
+#' from the posterior of `d` and `sdratio`). The returned AUC is always the
+#' area under the full curve, not the trapezoid of the discrete operating
+#' points or the K-1 rating thresholds; for binary multi-criteria fits it is
+#' one value per curve.
 #'
 #' The closed form is used only when `sdratio` is fixed at 0, where `d`
 #' (which is \eqn{d_a}) equals \eqn{d'}; every fit with `sdratio` estimated or
@@ -1044,6 +1046,9 @@ auc_sdt <- function(fit, conditions = NULL, probs = c(0.025, 0.975),
       result[[c_i]] <- .sdt_bind_cond(df, conditions[c_i, , drop = FALSE])
     }
     auc_data <- do.call(rbind, result)
+  } else if (is_rating) {
+    has_sdratio <- .sdt_has_estimated_sdratio(model, fit)
+    auc_data <- .auc_sdt_rating_swept(fit, conditions, has_sdratio, dist, ...)
   } else {
     auc_data <- .auc_sdt_numerical(fit, conditions, probs, criterion_points, ...)
   }
@@ -1056,6 +1061,35 @@ auc_sdt <- function(fit, conditions = NULL, probs = c(0.025, 0.975),
     dist        = dist,
     conditions  = conditions
   )
+}
+
+
+# Area under the swept model curve, the map of .roc_sdt_rating()'s `summary`.
+# FA and Hit increase along t_grid, hence the (0, ..., 1) endpoints. A trapezoid
+# on a concave ROC is biased low; 1000 nodes keep that below 1e-4.
+.sdt_auc_swept <- function(sep, sdratio, dist, n_points = 1000L) {
+  cdf <- .sdt_dists[[dist]]$cdf
+  qf  <- .sdt_dists[[dist]]$qf
+  t_grid <- qf(1 - seq(0.001, 0.999, length.out = n_points)) - mean(sep) / 2
+  fa  <- cbind(0, 1 - cdf(outer(sep / 2, t_grid, "+")), 1)
+  hit <- cbind(0, 1 - cdf(sweep(outer(-sep / 2, t_grid, "+"), 1L, sdratio, "/")), 1)
+  rowSums((fa[, -1L, drop = FALSE] - fa[, -ncol(fa), drop = FALSE]) *
+          (hit[, -1L, drop = FALSE] + hit[, -ncol(hit), drop = FALSE])) / 2
+}
+
+
+# roc_sdt()'s rating curve is the polygon through the K-1 thresholds, which
+# lies inside the model ROC, so rating AUC integrates the swept curve instead.
+.auc_sdt_rating_swept <- function(fit, conditions, has_sdratio, dist, ...) {
+  geom <- .sdt_latent_geometry(fit, conditions, has_sdratio, ...)
+  n_draws <- nrow(geom$d)
+  result <- vector("list", ncol(geom$d))
+  for (c_i in seq_len(ncol(geom$d))) {
+    auc <- .sdt_auc_swept(geom$sep[, c_i], geom$sdratio[, c_i], dist)
+    df <- data.frame(AUC = auc, .draw = seq_len(n_draws))
+    result[[c_i]] <- .sdt_bind_cond(df, conditions[c_i, , drop = FALSE])
+  }
+  do.call(rbind, result)
 }
 
 

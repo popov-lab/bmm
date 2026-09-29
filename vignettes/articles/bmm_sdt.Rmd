@@ -663,11 +663,12 @@ the observed points. A curvilinear ROC that is asymmetric about the minor
 diagonal is the signature of unequal variance (`sdratio > 1`).
 
 `auc_sdt()` returns the posterior area under the curve. For *equal-variance*
-Gaussian and Gumbel-min fits it uses the closed forms $\Phi(d'/\sqrt{2})$ and
-$\mathrm{logistic}(g')$ respectively; every other case — unequal variance, the
-logistic distribution, and all rating fits — is integrated numerically. The
-returned AUC is always the area under the full curve (one value per curve, not
-the area spanned by the discrete points).
+binary fits it uses the closed forms $\Phi(d'/\sqrt{2})$ (Gaussian) and
+$\mathrm{logistic}(g')$ (Gumbel-min and Gumbel-max); every other case — unequal
+variance, the logistic distribution, and all rating fits — is integrated
+numerically over the model-implied curve. The returned AUC is always the area
+under the full curve (one value per curve, not the area spanned by the discrete
+points).
 
 ```{r}
 auc <- auc_sdt(fit_uv)
