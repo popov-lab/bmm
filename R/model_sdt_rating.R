@@ -256,8 +256,10 @@ settable_link_functions.sdt_rating <- function(model) {
 #' @section Identifying `sdratio`:
 #' Unlike [sdt_yn()], a rating design identifies `sdratio` from a single
 #' condition: the K - 1 thresholds give K - 1 operating points per condition,
-#' which trace the zROC whose slope is `1 / exp(sdratio)`. `sdratio ~ 1` on a
-#' one-condition dataset with K >= 3 categories is a legitimate fit; the
+#' which trace the ROC; under `dist = "normal"` its z-transform is a line with
+#' slope `1 / exp(sdratio)`. `sdratio ~ 1` on a one-condition dataset is
+#' identified from K = 3 categories, where it uses every degree of freedom
+#' (the fit is saturated), and leaves the zROC testable from K = 4; the
 #' identification caveats on the [sdt_yn()] page do not carry over.
 #' @param response A character vector of K column names containing response
 #'   counts per rating category, ordered from "definitely noise" to
