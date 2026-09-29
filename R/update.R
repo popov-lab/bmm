@@ -326,6 +326,15 @@ revert_check_data.sdt_ranking <- function(model, data) {
   NextMethod("revert_check_data")
 }
 
+#' @exportS3Method
+revert_check_data.sdt_rating <- function(model, data) {
+  resp_cols <- model$resp_vars$response
+  data[resp_cols] <- as.data.frame(unclass(data$Y)[, resp_cols, drop = FALSE])
+  data$Y <- NULL
+  data$nTrials <- NULL
+  NextMethod("revert_check_data")
+}
+
 # brms::update.brmsfit() merges the fit's stored control key by key with the one
 # the call names, and keeps none of it when backend or algorithm changes.
 # update.bmmfit() always names a control, so the rule is applied here. rstan fits

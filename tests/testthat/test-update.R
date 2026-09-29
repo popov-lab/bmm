@@ -329,6 +329,12 @@ stored_frame_cases <- function() {
     n_afc = rep(c(2, 4), 4), cond = factor(rep(c("a", "b"), each = 4))
   )
   ranking_data <- meyer_grant_jakob_2025[as.integer(meyer_grant_jakob_2025$id) <= 4, ]
+  rating_data <- data.frame(
+    stimulus = rep(c(0L, 1L), 4), id = factor(rep(1:4, each = 2)),
+    r1 = c(30, 8, 26, 10, 33, 6, 28, 9), r2 = c(25, 12, 27, 14, 22, 11, 24, 13),
+    r3 = c(20, 15, 21, 16, 19, 17, 22, 15), r4 = c(15, 25, 16, 22, 17, 28, 14, 26),
+    r5 = c(10, 40, 10, 38, 9, 38, 12, 37)
+  )
 
   list(
     cswald = list(
@@ -413,6 +419,16 @@ stored_frame_cases <- function() {
     sdt_ranking_m_predictor = list(
       model = sdt_ranking(paste0("rank", 1:5), m = "set_size"),
       formula = bmf(d ~ 1 + set_size), data = ranking_data
+    ),
+    sdt_rating = list(
+      model = sdt_rating(paste0("r", 1:5), "stimulus"),
+      formula = bmf(d ~ 1 + (1 | id), criterion ~ 1, spacing ~ 1, sdratio ~ 1),
+      data = rating_data
+    ),
+    sdt_rating_deltas = list(
+      model = sdt_rating(paste0("r", 1:5), "stimulus", threshold_type = "log_distance"),
+      formula = bmf(d ~ 1, criterion ~ 1, delta1 ~ 1, delta2 ~ 1, delta3 ~ 1),
+      data = rating_data
     )
   )
 }
