@@ -143,6 +143,7 @@ pp_check.bmmfit <- function(object, type = NULL, ndraws = NULL,
 
   if (identical(family(object)$family, "multinomial")) {
     group <- .pp_check_resolve_group(object, group)
+    object <- .pp_check_restore_set_size(object, group)
     return(.pp_check_multinomial(object, type = type, ndraws = ndraws %||% 100L,
                                  group = group, ...))
   }
@@ -185,6 +186,20 @@ pp_check.bmmfit <- function(object, type = NULL, ndraws = NULL,
     return(object$bmm$model$other_vars$stimulus)
   }
   group
+}
+
+
+# brms keeps only the derived max_rank column of an sdt_ranking fit, not the
+# set-size column the user passed as m, so grouping by that column found
+# nothing to facet by
+.pp_check_restore_set_size <- function(object, group) {
+  m <- object$bmm$model$other_vars$m
+  if (!inherits(object$bmm$model, "sdt_ranking") || !identical(group, m) ||
+      m %in% names(object$data)) {
+    return(object)
+  }
+  object$data[[m]] <- object$data$max_rank
+  object
 }
 
 
