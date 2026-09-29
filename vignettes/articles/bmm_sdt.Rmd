@@ -341,6 +341,13 @@ rule it entails has been found empirically inadequate [@MeyerGrant_2026;
 @Robinson_2023]. It is kept for the rare opposite-asymmetry case and for
 non-recognition tasks, not as a co-equal recognition model.
 
+All four distributions enter the model in their standard form, with scale 1.
+For the normal that scale is the SD, so `d` and `criterion` are in noise-SD
+units. The standard logistic and Gumbel distributions have SDs of
+$\pi/\sqrt{3}$ and $\pi/\sqrt{6}$, so under these distributions `d` and
+`criterion` are in noise-scale units instead. The package output labels this
+unit "noise SD" for all four.
+
 ## How the distribution shapes the ROC
 
 Under the extreme-value model the signal and noise distributions are *skewed*
@@ -687,7 +694,7 @@ z-ROC, and `scale = "z"` is accepted as an alias), `logit` for the logistic, and
 `loglog`/`cloglog` for the Gumbel distributions. On this axis the model ROC is
 a straight line for every noise distribution, with slope
 $1/\exp(\mathtt{sdratio})$ and intercept
-$\delta/\exp(\mathtt{sdratio})$, where $\delta$ is the separation in noise-SD
+$\delta/\exp(\mathtt{sdratio})$, where $\delta$ is the separation in noise-scale
 units (the $d_N$ that `sdt_sensitivity()` reports, not the fitted `d`), so
 a slope below 1 is the visual signature of unequal variance and observed points
 that bow away from a straight line flag misfit. (The $(0,0)$ and
