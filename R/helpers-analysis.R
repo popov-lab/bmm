@@ -1149,8 +1149,12 @@ auc_sdt <- function(fit, conditions = NULL, probs = c(0.025, 0.975),
 
 
 # Area under the swept model curve, the map of .roc_sdt_rating()'s `summary`.
-# FA and Hit increase along t_grid, hence the (0, ..., 1) endpoints. A trapezoid
-# on a concave ROC is biased low; 1000 nodes keep that below 1e-4.
+# FA and Hit increase along t_grid, hence the (0, ..., 1) endpoints. Against
+# integrate(), the error is at most 5e-4 when every draw has the same sep: the
+# grid starts at FA = 0.001, and the straight first segment from (0, 0) loses
+# up to 0.001 / 2 once Hit is near 1 there (sep >= 4). On real rating fits it
+# was at most 1.1e-4. The grid is placed by mean(sep), so a wide sep spread
+# across draws costs more (3e-2 for gumbel_min with sep from 0.2 to 8).
 .sdt_auc_swept <- function(sep, sdratio, dist, n_points = 1000L) {
   cdf <- .sdt_dists[[dist]]$cdf
   qf  <- .sdt_dists[[dist]]$qf
@@ -1362,7 +1366,7 @@ print.bmm_sdt_sensitivity <- function(x, ...) {
 summary_notes.sdt <- function(model, x) {
   if (.sdt_unit_sdratio(model)) return(NULL)
   paste(
-    "Note: sdratio is not 0, so d is d_a (root-mean-square SD units),",
+    "Note: sdratio is not fixed at 0, so d is d_a (root-mean-square SD units),",
     "not the noise-standardized d'.\n      sdt_sensitivity() converts it",
     "to d' (noise SD) and d_S (signal SD)."
   )

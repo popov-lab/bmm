@@ -679,18 +679,18 @@ attr(auc, "summary")
 ## Quantile-transformed ROC and latent distributions
 
 Passing `scale = "quantile"` to the ROC `plot()` method reads the rates on the
-noise distribution's quantile axis — the inverse CDF of the fitted noise
-distribution applied to each rate ($\Phi^{-1}(\text{rate})$ for the Gaussian
-model). The axis label names the transform: `z` for the normal (the classic
+noise distribution's quantile axis via the transform $-q(1 - \text{rate})$,
+where $q$ is the inverse CDF of the fitted noise distribution
+($\Phi^{-1}(\text{rate})$ for the Gaussian model). The axis label names the
+transform: `z` for the normal (the classic
 z-ROC, and `scale = "z"` is accepted as an alias), `logit` for the logistic, and
-`loglog`/`cloglog` for the Gumbel distributions. On this axis the symmetric
-(normal/logistic) model ROC is a straight line whose slope is
-$1/\exp(\mathtt{sdratio})$ and whose intercept is
+`loglog`/`cloglog` for the Gumbel distributions. On this axis the model ROC is
+a straight line for every noise distribution, with slope
+$1/\exp(\mathtt{sdratio})$ and intercept
 $\delta/\exp(\mathtt{sdratio})$, where $\delta$ is the separation in noise-SD
 units (the $d_N$ that `sdt_sensitivity()` reports, not the fitted `d`), so
 a slope below 1 is the visual signature of unequal variance and observed points
-that bow away from a straight line flag misfit. (The Gumbel ROC is curved on this
-axis; its natural linearising transform is the log-log power-ROC. The $(0,0)$ and
+that bow away from a straight line flag misfit. (The $(0,0)$ and
 $(1,1)$ endpoints map to infinity and are dropped.)
 
 ```{r}

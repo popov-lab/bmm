@@ -2173,8 +2173,8 @@ neg_loglik <- function(x, params, distribution, weights = NULL) {
 
 # SDT distribution registry: single source of truth for all CDF/quantile logic
 # Each entry: cdf, qf (quantile function), pdf (density, the derivative of cdf),
-# lcdf/lccdf (log CDF and log complementary CDF), and qf_label (axis label for
-# the inverse-CDF transformed ROC). The lcdf/lccdf entries mirror the Stan
+# lcdf/lccdf (log CDF and log complementary CDF), and qf_label (axis label of
+# the ROC's quantile scale). The lcdf/lccdf entries mirror the Stan
 # dispatchers in inst/stan_chunks/sdt_dist_funs.stan branch for branch, so the
 # two implementations can be read side by side.
 #
@@ -2182,10 +2182,14 @@ neg_loglik <- function(x, params, distribution, weights = NULL) {
 # reordering entries changes the R <-> Stan contract.
 #
 # gumbel_min / gumbel_max follow the extreme-value convention: gumbel_min is
-# the smallest-extreme-value (cloglog) distribution, gumbel_max the largest
-# (loglog, i.e. evd::pgumbel). Taking the max of gumbel_max variates is what
+# the smallest-extreme-value distribution (cloglog link), gumbel_max the largest
+# (loglog link, i.e. evd::pgumbel). Taking the max of gumbel_max variates is what
 # yields the m-AFC softmax; the ranking Gamma-ratio kernel is the gumbel_min
 # result. Swapping these labels silently fits the mirror model.
+#
+# The ROC's quantile scale applies -qf(1 - p), not qf(p), so that the model ROC
+# is straight for the asymmetric Gumbels too. For gumbel_min that transform is
+# -log(-log(p)), the loglog, so each Gumbel's qf_label is the other's link name.
 .sdt_dists <- list(
   normal = list(
     cdf = pnorm,
