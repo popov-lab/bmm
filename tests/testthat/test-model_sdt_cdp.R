@@ -678,3 +678,41 @@ test_that("the Stan cdp kernel matches the R kernel in both tails", {
   expect_lt(max(abs(stan - r)[body]), 1e-8)
   expect_lt(max(abs(stan - r)[tail]), 1e-3)
 })
+
+test_that("the Stan cdp likelihood has a finite gradient with an unbounded top bin", {
+  # the parity test compares values only; an infinite bin bound that reaches
+  # Phi() as a function of the parameters gives a NaN gradient (zero density
+  # times an infinite adjoint) while every value stays right
+  skip_on_cran()
+  skip_if_not_installed("cmdstanr")
+  skip_if(is.null(cmdstanr::cmdstan_version(error_on_NA = FALSE)))
+
+  program <- paste0(
+    "functions {\n",
+    read_lines2(system.file("stan_chunks", "sdt_cdp_funs.stan", package = "bmm")),
+    "\n}\n",
+    "data { array[2, 11] int y; }\n",
+    "parameters { real dfam; real drec; real criterion; real spacing;\n",
+    "  real rcrit; real sigmar; }\n",
+    "model {\n",
+    "  array[0] real deltas;\n",
+    "  vector[5] thr = cdp_make_thresholds(criterion, spacing, deltas, 1, 5, 1);\n",
+    "  for (s in 1:2) {\n",
+    "    vector[11] lp;\n",
+    "    for (c in 1:11) lp[c] = log(cdp_category_prob(c, thr, dfam, drec,\n",
+    "      sigmar, 0, rcrit, -100, s - 1, 1, 5, 0));\n",
+    "    y[s] ~ multinomial_logit(lp);\n",
+    "  }\n}\n"
+  )
+  # Rotello et al. (2005) neutral condition, as in the dual-process article
+  y <- rbind(c(745, 199, 124, 84, 45, 13, 46, 29, 47, 51, 55),
+             c(290, 122, 106, 101, 92, 59, 26, 38, 61, 109, 433))
+  model <- cmdstanr::cmdstan_model(cmdstanr::write_stan_file(program))
+  inits <- list(dfam = 0.8, drec = 0.8, criterion = 0.1, spacing = -0.4,
+                rcrit = 0.9, sigmar = 0.4)
+  diag <- suppressMessages(model$diagnose(data = list(y = y), init = list(inits)))
+  grad <- diag$gradients()
+  expect_equal(nrow(grad), length(inits))
+  expect_true(all(is.finite(grad$model)))
+  expect_lt(max(abs(grad$error)), 1e-5)
+})

@@ -41,11 +41,15 @@ real cdp_Phi2(real h, real k, real r) {
 }
 
 // P(lo < Z < hi) for a standard normal Z, taken from the tail the interval
-// lies in so an interval far above 0 does not cancel as 1 - 1.
+// lies in so an interval far above 0 does not cancel as 1 - 1. Infinite
+// bounds never reach Phi(): its zero density times an infinite adjoint would
+// make the gradient NaN.
 real cdp_Phi_interval(real lo, real hi) {
   if (hi <= lo) return 0;
-  if (lo > 0) return Phi(-lo) - Phi(-hi);
-  return Phi(hi) - Phi(lo);
+  if (lo > 0) {
+    return is_inf(hi) ? Phi(-lo) : Phi(-lo) - Phi(-hi);
+  }
+  return (is_inf(hi) ? 1 : Phi(hi)) - (is_inf(lo) ? 0 : Phi(lo));
 }
 
 // P(a < X < b, Y < k) (above = 0) or P(a < X < b, Y > k) (above = 1) for a
@@ -201,8 +205,10 @@ real cdp_category_prob(int cat, vector thresholds,
   real corr = tanh(rho);
   real mu_S = mu_F + mu_R;
   real sigma_S = sqrt(square(sd_R + corr) + (1 - square(corr)));
-  real z_lo = (c_lo - mu_S) / sigma_S;
-  real z_hi = (c_hi - mu_S) / sigma_S;
+  // the outer bins' infinite bounds stay constants: derived from mu_S and
+  // sigma_S they would carry infinite partials into the gradient
+  real z_lo = is_inf(c_lo) ? negative_infinity() : (c_lo - mu_S) / sigma_S;
+  real z_hi = is_inf(c_hi) ? positive_infinity() : (c_hi - mu_S) / sigma_S;
 
   real p;
   if (type == 1) {
