@@ -33,6 +33,49 @@ test_that("roc_sdt errors for a non-SDT model", {
   expect_error(roc_sdt(fake), "only available for SDT")
 })
 
+test_that("model-implied functions work when fit has no group-level effects", {
+  fit_binary <- fake_binary_fit()
+  fit_rating <- fake_rating_fit()
+  local_mocked_bindings(
+    ranef = function(...) stop("The model does not contain group-level effects."),
+    posterior_linpred = mock_linpred_factory(list(d = 1.5, criterion = 0, spacing = 0)),
+    variables = function(...) c("b_d_Intercept", "b_criterion_Intercept"),
+    .package = "brms"
+  )
+  expect_no_error(roc_sdt(fit_binary))
+  expect_no_error(auc_sdt(fit_binary))
+  expect_no_error(latent_sdt(fit_binary))
+  expect_no_error(sdt_sensitivity(fit_binary))
+  expect_no_error(sdt_thresholds(fit_rating))
+})
+
+test_that("nested interaction groupings (id:session) are excluded from conditions", {
+  data <- data.frame(
+    stimulus = c(0, 1), n_old = c(20L, 80L), n_trials = 100L, dist_type = 1L,
+    id = c(1L, 2L), session = c(1L, 1L)
+  )
+  data$`id:session` <- c("1_1", "2_1")
+  fit <- structure(
+    list(
+      data = data,
+      bmm = list(
+        model = sdt_yn(response = "n_old", stimulus = "stimulus", n_trials = "n_trials"),
+        user_formula = bmf(d ~ 1, criterion ~ 1)
+      )
+    ),
+    class = c("bmmfit", "brmsfit")
+  )
+  local_mocked_bindings(
+    ranef = function(...) list(`id:session` = array(0, dim = c(2, 1, 1))),
+    posterior_linpred = mock_linpred_factory(list(d = 1.5, criterion = 0)),
+    variables = function(...) c("b_d_Intercept", "b_criterion_Intercept"),
+    .package = "brms"
+  )
+  conditions <- .sdt_resolve_conditions(fit, NULL)
+  expect_equal(nrow(conditions), 1L)
+  expect_false(any(c("id", "session", "id:session") %in% names(conditions)))
+})
+
 
 ############################################################################# !
 # RATING ROC MATH (pure helpers, no fit)                                 ####

@@ -5,6 +5,18 @@
 
 
 ############################################################################# !
+# GROUPING VARIABLES                                                     ####
+############################################################################# !
+
+# brms::ranef() errors on a fit without group-level terms. An interaction
+# grouping "id:session" is both a column of fit$data and a pair of columns.
+.group_vars <- function(fit) {
+  groups <- as.character(tryCatch(names(brms::ranef(fit)), error = function(e) NULL))
+  unique(c(groups, unlist(strsplit(groups, ":", fixed = TRUE))))
+}
+
+
+############################################################################# !
 # ROC CURVES                                                             ####
 ############################################################################# !
 
@@ -117,7 +129,7 @@ roc_sdt <- function(fit, conditions = NULL, n_points = 100,
     model$other_vars$stimulus,
     model$other_vars$n_trials,
     "Y", "nTrials", "dist_type", "m_afc", "max_rank",
-    names(brms::ranef(fit))
+    .group_vars(fit)
   ))
   pred_cols <- setdiff(names(data), exclude)
 
@@ -131,7 +143,7 @@ roc_sdt <- function(fit, conditions = NULL, n_points = 100,
 .sdt_stripped_preds <- function(fit) {
   uf <- fit$bmm$user_formula
   preds <- if (inherits(uf, "bmmformula")) rhs_vars(uf, collapse = FALSE) else list()
-  re_vars <- tryCatch(names(brms::ranef(fit)), error = function(e) character(0))
+  re_vars <- .group_vars(fit)
   lapply(preds, function(v) setdiff(v %||% character(0), re_vars))
 }
 
