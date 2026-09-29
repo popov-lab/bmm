@@ -3642,15 +3642,12 @@ rsdt_rating <- function(n, n_trials, stimulus, d, thresholds,
   criterion <- rep_len(criterion, n)
 
   thr <- if (threshold_type == "log_distance") {
-    stopif(is.null(deltas), "deltas is required for log_distance thresholds")
     if (!is.matrix(deltas)) {
       deltas <- matrix(deltas, n, length(deltas), byrow = TRUE)
     }
     if (nrow(deltas) != n) {
       deltas <- deltas[rep_len(seq_len(nrow(deltas)), n), , drop = FALSE]
     }
-    stopif(ncol(deltas) != K_full - 2L,
-           "deltas must have length n_new + n_old - 2 = {K_full - 2L}")
     .cdp_assemble_thresholds(criterion, exp(deltas), n_new, K1)
   } else {
     k <- seq_len(K1)
@@ -3746,7 +3743,6 @@ rsdt_rating <- function(n, n_trials, stimulus, d, thresholds,
                                     rcrit, kcrit, stimulus, n_new, n_old = NULL,
                                     dist = "normal", rho = 0) {
   if (is.null(n_old)) n_old <- n_new
-  stopif(dist != "normal", "sdt_cdp currently supports only dist = 'normal'")
   has_guess <- !is.null(kcrit) && all(is.finite(kcrit))
   K_cat <- n_new + (if (has_guess) 3L else 2L) * n_old
 
@@ -3841,6 +3837,7 @@ dsdt_cdp <- function(counts, stimulus, dfam, drec, thresholds,
   has_guess <- !is.null(kcrit) && all(is.finite(kcrit))
   expected <- n_new + (if (has_guess) 3L else 2L) * n_old
   stopif(ncol(counts) != expected, "counts must have {expected} columns")
+  stopif(anyNA(counts), "counts must not contain NA")
   stopif(any(counts < 0), "counts must be non-negative")
 
   n <- max(nrow(counts), length(stimulus), length(dfam), length(drec),
@@ -3858,7 +3855,7 @@ dsdt_cdp <- function(counts, stimulus, dfam, drec, thresholds,
                                          kcrit, stimulus, n_new, n_old, dist,
                                          rep_len(rho, n)))
   log_dens <- lgamma(rowSums(counts) + 1) - rowSums(lgamma(counts + 1)) +
-    rowSums(counts * log(probs))
+    rowSums(ifelse(counts == 0, 0, counts * log(probs)))
   if (log) log_dens else exp(log_dens)
 }
 

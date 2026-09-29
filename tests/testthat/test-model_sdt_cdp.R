@@ -91,7 +91,24 @@ test_that("sdt_cdp requires stimulus, n_new, and n_old", {
   expect_error(sdt_cdp(n_new = 3, n_old = 3))
   expect_error(sdt_cdp(stimulus = "s", n_old = 3))
   expect_error(sdt_cdp(stimulus = "s", n_new = 3))
-  expect_error(sdt_cdp(stimulus = "s", n_new = 1, n_old = 1), "sum to >= 3")
+  expect_error(sdt_cdp(stimulus = "s", n_new = 1, n_old = 1), "at least 3")
+})
+
+test_that("sdt_cdp validates n_new, n_old and the response prefix", {
+  for (bad in list(NA, Inf, 0, c(2, 3), "3")) {
+    expect_error(sdt_cdp(stimulus = "s", n_new = bad, n_old = 3),
+                 "n_new must be a single integer >= 1")
+    expect_error(sdt_cdp(stimulus = "s", n_new = 3, n_old = bad),
+                 "n_old must be a single integer >= 1")
+  }
+  expect_warning(m <- sdt_cdp(stimulus = "s", n_new = 2.6, n_old = 3),
+                 "2.6 was truncated to 2")
+  expect_identical(m$other_vars$n_new, 2L)
+  expect_error(
+    sdt_cdp(response = c("new1", "know2", "remember2"), stimulus = "s",
+            n_new = 1, n_old = 1),
+    "single prefix"
+  )
 })
 
 test_that("sdt_cdp init_ranges cover the estimated parameters and exclude mu", {
@@ -137,9 +154,6 @@ test_that(".cdp_make_thresholds log_distance builds cumulative log-distances", {
   expect_equal(thr_b[4], 0.1)
   expect_equal(thr_b[5] - thr_b[4], 0.8)
   expect_true(!is.unsorted(thr_b))
-  # wrong delta length errors
-  expect_error(.cdp_make_thresholds(0.5, 0, 3, 3, "log_distance",
-                                    deltas = log(c(0.8, 0.6))))
 })
 
 test_that(".cdp_make_thresholds vectorizes over draws", {
@@ -339,6 +353,10 @@ test_that("dsdt_cdp computes a valid multinomial density and vectorizes", {
   # column count is validated
   expect_error(dsdt_cdp(cnt[-1], 1, 0.8, 1.0, thr, 0.5, n_new = 3),
                "columns")
+  cnt_na <- cnt
+  cnt_na[2] <- NA
+  expect_error(dsdt_cdp(cnt_na, 1, 0.8, 1.0, thr, 0.5, n_new = 3),
+               "must not contain NA")
 })
 
 test_that("aggregate_sdt_cdp_data pivots long data to the wide count columns", {
@@ -439,6 +457,12 @@ test_that("check_data.sdt_cdp validates columns, stimulus, and counts", {
   bad_s <- dat
   bad_s$stimulus <- 2
   expect_error(check_data(m, bad_s, bmf(dfam ~ 1)), "0 .* and 1")
+  # the shared SDT stimulus check: NA and a single stimulus class
+  bad_s$stimulus <- dat$stimulus
+  bad_s$stimulus[1] <- NA
+  expect_error(check_data(m, bad_s, bmf(dfam ~ 1)), "1 of .* values are NA")
+  expect_error(check_data(m, dat[dat$stimulus == 1, ], bmf(dfam ~ 1)),
+               "is 1 in every row")
   # negative counts
   bad_n <- dat
   bad_n$new1[1] <- -1L

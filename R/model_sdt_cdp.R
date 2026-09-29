@@ -58,12 +58,10 @@
       )
     )
   )
-  # sd rates as elsewhere in the SDT family: rate 1 for the two sensitivities,
-  # rate 2 for the criteria and for the parameters Stan reads through a
-  # transformation (exp(sigmar), tanh(rho)). The 50 per-subject generating
-  # values in local/subject_level_parameter.csv put the between-subject SD of
-  # dfam, drec, criterion and rcrit near 0.30 and of sigmar near 0.14, all
-  # under the corresponding prior median; see local/sdt_sd_priors/.
+  # sd rates as elsewhere in the SDT family, one per parameter meaning: rate 1
+  # for the two sensitivities, as for d, and rate 2 for the criteria and for
+  # the parameters Stan reads through a transformation (exp(sigmar), tanh(rho)),
+  # as for criterion and sdratio.
   default_priors <- c(
     list(
       dfam = list(main = "normal(1, 1)", effects = "normal(0, 0.5)", sd = "exponential(1)"),
@@ -277,8 +275,23 @@ sdt_cdp <- function(response = "", stimulus, n_new, n_old, dist = "normal",
   stopif(!identical(dist, "normal"),
          "sdt_cdp currently supports only dist = 'normal'; other noise \\
          distributions are deferred to a future release")
-  stopif(n_new < 1 || n_old < 1 || n_new + n_old < 3,
-         "n_new and n_old must be >= 1 and sum to >= 3")
+  stopif(!is.character(response) || length(response) != 1,
+         "response is a single prefix shared by the count columns (default \\
+         ''), not a vector of column names: sdt_cdp() builds the names new1, \\
+         know2, remember2, ... from n_new and n_old")
+  stopif(!is.numeric(n_new) || length(n_new) != 1 || !is.finite(n_new) || n_new < 1,
+         "n_new must be a single integer >= 1")
+  stopif(!is.numeric(n_old) || length(n_old) != 1 || !is.finite(n_old) || n_old < 1,
+         "n_old must be a single integer >= 1")
+  warnif(n_new != trunc(n_new),
+         "n_new should be an integer value; {n_new} was truncated to {as.integer(n_new)}")
+  warnif(n_old != trunc(n_old),
+         "n_old should be an integer value; {n_old} was truncated to {as.integer(n_old)}")
+  n_new <- as.integer(n_new)
+  n_old <- as.integer(n_old)
+  stopif(n_new + n_old < 3,
+         "n_new + n_old must be at least 3: with two confidence levels the \\
+         only threshold is the criterion, and nothing identifies the spacing")
 
   .model_sdt_cdp(response = response, stimulus = stimulus, n_new = n_new,
                  n_old = n_old, dist = dist, threshold_type = threshold_type,
@@ -405,11 +418,7 @@ aggregate_sdt_cdp_data <- function(data, judgment, confidence, count = NULL,
 #' @export
 check_data.sdt_cdp <- function(model, data, formula) {
   stim_var <- model$other_vars$stimulus
-  stopif(!stim_var %in% colnames(data),
-         "Stimulus variable '{stim_var}' missing in the data")
-  stim_vals <- data[[stim_var]]
-  stopif(!is.numeric(stim_vals) || !all(stim_vals %in% c(0, 1)),
-         "Stimulus variable '{stim_var}' must be coded as 0 (new/lure) and 1 (old/target)")
+  data[[stim_var]] <- .validate_sdt_stimulus(data, stim_var)
 
   n_new <- model$other_vars$n_new
   n_old <- model$other_vars$n_old
