@@ -61,6 +61,13 @@ test_that("sdt_cdp refuses a link on a fixed or transformed parameter", {
   expect_error(check_links(m), "link of 'rho' cannot be changed")
 })
 
+test_that("sdt_cdp offers only the links it can invert in its formula", {
+  expect_error(
+    sdt_cdp(stimulus = "s", n_new = 3, n_old = 3, links = list(drec = "sqrt")),
+    "Unknown link function"
+  )
+})
+
 test_that("sdt_cdp gives every parameter an sd default prior", {
   rate1 <- c("dfam", "drec")
   for (tt in c("parsimonious", "log_distance")) {
@@ -462,6 +469,31 @@ test_that("bmf2bf builds a multinomial non-linear formula with one mu per catego
   pforms <- vapply(bf$pforms, function(f) paste(deparse(f), collapse = " "),
                    character(1))
   expect_true(sum(grepl("sdt_cdp_logmu", pforms)) >= 8)
+  # each category calls the kernel with its own index
+  expect_match(deparse(bf$formula, width.cutoff = 500), "sdt_cdp_logmu(1, 3,",
+               fixed = TRUE)
+  for (k in 2:9) {
+    pform <- deparse(bf$pforms[[paste0("mucdp", k)]], width.cutoff = 500)
+    expect_match(pform, paste0("sdt_cdp_logmu(", k, ", 3,"), fixed = TRUE)
+  }
+})
+
+test_that("a link on dfam, drec, criterion or rcrit is inverted inside the cdp formula", {
+  # the multinomial family has no link of its own for these parameters, so a
+  # link the user sets reaches the kernel only through the formula
+  m <- sdt_cdp(stimulus = "stimulus", n_new = 3, n_old = 3,
+               links = list(dfam = "log", drec = "softplus",
+                            criterion = "probit", rcrit = "logit"))
+  m$other_vars$has_guess <- FALSE
+  bf <- bmf2bf(m, bmf(dfam ~ 1))
+  for (f in c(list(bf$formula), bf$pforms[paste0("mucdp", 2:9)])) {
+    txt <- paste(deparse(f, width.cutoff = 500), collapse = "")
+    expect_match(txt, "(\\d+, ){4}exp\\(dfam\\), log1p_exp\\(drec\\), Phi\\(criterion\\), spacing, inv_logit\\(rcrit\\), sigmar,")
+  }
+  m <- sdt_cdp(stimulus = "stimulus", n_new = 3, n_old = 3)
+  m$other_vars$has_guess <- FALSE
+  expect_match(deparse(bmf2bf(m, bmf(dfam ~ 1))$formula, width.cutoff = 500),
+               "(\\d+, ){4}dfam, drec, criterion, spacing, rcrit, sigmar,")
 })
 
 test_that("sdt_cdp produces multinomial stancode with the CDP functions", {

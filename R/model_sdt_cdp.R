@@ -148,6 +148,14 @@ settable_links.sdt_cdp <- function(model) {
   c("dfam", "drec", "criterion", "rcrit")
 }
 
+# the links are applied by substituting the inverse link into the multinomial
+# formula (.sdt_cdp_logmu_args), so the model can honour inv_link()'s links,
+# not every link a brms family can emit
+#' @exportS3Method
+settable_link_functions.sdt_cdp <- function(model) {
+  eval(formals(inv_link)$link)
+}
+
 
 #' @title Continuous Dual-Process Signal Detection Theory Model
 #' @name sdt_cdp
@@ -211,7 +219,12 @@ settable_links.sdt_cdp <- function(model) {
 #'   `deltaN` parameter on the log scale (the log width of the interval between
 #'   thresholds `N` and `N + 1`, as in [sdt_rating()]). `criterion` stays on the
 #'   old/new boundary, threshold `n_new`.
-#' @param links A named list of link functions for the parameters.
+#' @param links A named list of link functions for the parameters, e.g.
+#'   `links = list(drec = "log")`. Only `dfam`, `drec`, `criterion` and `rcrit`
+#'   can be set, to one of the links [inv_link()] can invert. `sigmar`, `rho`,
+#'   `kcrit` and the threshold parameters keep their identity links, because
+#'   their fixed values and the model's own transformations (`exp()`, `tanh()`)
+#'   assume it.
 #' @param ... used internally for testing, ignore it
 #' @return An object of class `bmmodel`
 #' @references
@@ -449,9 +462,14 @@ check_data.sdt_cdp <- function(model, data, formula) {
 .sdt_cdp_logmu_args <- function(model) {
   ov <- model$other_vars
   has_spacing <- "spacing" %in% names(model$parameters)
+  # the multinomial family has no link of its own for these parameters, so a
+  # non-identity link reaches the kernel only by being inverted here
+  linked <- vapply(settable_links(model), function(par) {
+    deparse(inv_link(par, model$links[[par]]))
+  }, character(1))
   c(ov$n_new, ov$n_old, ov$thresh_type_int, as.integer(ov$has_guess),
-    "dfam", "drec", "criterion",
-    if (has_spacing) "spacing" else "0", "rcrit", "sigmar", "rho",
+    linked[c("dfam", "drec", "criterion")],
+    if (has_spacing) "spacing" else "0", linked[["rcrit"]], "sigmar", "rho",
     "kcrit", ov$stimulus, .sdt_threshold_delta_names(model))
 }
 
