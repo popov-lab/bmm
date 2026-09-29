@@ -60,7 +60,7 @@ test_that("nested interaction groupings (id:session) are excluded from condition
       data = data,
       bmm = list(
         model = sdt_yn(response = "n_old", stimulus = "stimulus", n_trials = "n_trials"),
-        user_formula = bmf(d ~ 1, criterion ~ 1)
+        user_formula = bmf(d ~ 1 + (1 | id:session), criterion ~ 1)
       )
     ),
     class = c("bmmfit", "brmsfit")
@@ -74,6 +74,64 @@ test_that("nested interaction groupings (id:session) are excluded from condition
   conditions <- .sdt_resolve_conditions(fit, NULL)
   expect_equal(nrow(conditions), 1L)
   expect_false(any(c("id", "session", "id:session") %in% names(conditions)))
+})
+
+# The ranef() mocks in the next tests return the names brms gives each
+# formula, so the tests fail for a helper that reads ranef() names.
+fake_grouped_fit <- function(columns, user_formula) {
+  data <- data.frame(stimulus = c(0, 1, 0, 1), n_old = c(20L, 80L, 10L, 90L),
+                     n_trials = 100L, dist_type = 1L)
+  data[names(columns)] <- columns
+  structure(
+    list(data = data, bmm = list(
+      model = sdt_yn(response = "n_old", stimulus = "stimulus", n_trials = "n_trials"),
+      user_formula = user_formula)),
+    class = c("bmmfit", "brmsfit")
+  )
+}
+
+test_that("a predictor that is also part of an interaction grouping stays a condition", {
+  fit <- fake_grouped_fit(
+    list(cond = c("A", "A", "B", "B"), id = 1L, `id:cond` = c("1_A", "1_A", "1_B", "1_B")),
+    bmf(d ~ cond + (1 | id) + (1 | id:cond), criterion ~ cond + (1 | id))
+  )
+  local_mocked_bindings(
+    ranef = function(...) list(id = array(0, c(1, 1, 1)), `id:cond` = array(0, c(2, 1, 1))),
+    posterior_linpred = mock_linpred_factory(list(d = c(0.8, 2.4), criterion = 0)),
+    variables = function(...) c("b_d_Intercept", "b_criterion_Intercept"),
+    .package = "brms"
+  )
+  expect_named(.sdt_resolve_conditions(fit, NULL), "cond")
+  expect_identical(.sdt_stripped_preds(fit)$d, "cond")
+  expect_true("cond" %in% .resolve_pp_conditions(fit))
+  sens <- attr(sdt_sensitivity(fit, "dn"), "summary")
+  expect_equal(sens$cond, c("A", "B"))
+  expect_equal(sens$mean, c(0.8, 2.4))
+})
+
+test_that("a nested grouping (1 | id/session) keeps session when it is a predictor", {
+  fit <- fake_grouped_fit(
+    list(session = c(1L, 1L, 2L, 2L), id = 1L, `id:session` = c("1_1", "1_1", "1_2", "1_2")),
+    bmf(d ~ session + (1 | id/session), criterion ~ 1)
+  )
+  local_mocked_bindings(
+    ranef = function(...) list(id = array(0, c(1, 1, 1)), `id:session` = array(0, c(2, 1, 1))),
+    .package = "brms"
+  )
+  conditions <- .sdt_resolve_conditions(fit, NULL)
+  expect_named(conditions, "session")
+  expect_equal(nrow(conditions), 2L)
+  expect_identical(.sdt_stripped_preds(fit)$d, "session")
+})
+
+test_that("multi-membership grouping columns are not conditions", {
+  fit <- fake_grouped_fit(list(g1 = c(1L, 1L, 2L, 2L), g2 = c(2L, 2L, 1L, 1L)),
+                          bmf(d ~ 1 + (1 | mm(g1, g2)), criterion ~ 1))
+  local_mocked_bindings(ranef = function(...) list(mmg1g2 = array(0, c(2, 1, 1))),
+                        .package = "brms")
+  expect_equal(nrow(.sdt_resolve_conditions(fit, NULL)), 1L)
+  expect_length(.sdt_stripped_preds(fit)$d, 0L)
+  expect_false(any(c("g1", "g2") %in% .resolve_pp_conditions(fit)))
 })
 
 sdt_entry_calls <- function(fit_binary, fit_rating) {

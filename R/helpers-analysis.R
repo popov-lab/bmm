@@ -8,11 +8,36 @@
 # GROUPING VARIABLES                                                     ####
 ############################################################################# !
 
-# brms::ranef() errors on a fit without group-level terms. An interaction
-# grouping "id:session" is both a column of fit$data and a pair of columns.
+# Read from the formula, not from ranef() names: ranef() names mm(g1, g2) as
+# "mmg1g2" and cannot tell which parts of id:cond are also predictors. Every
+# function here predicts at re_formula = NA, so a grouping column is dropped
+# unless it is also a population-level predictor (d ~ session +
+# (1 | id/session)). brms adds interaction groupings such as "id:session" to
+# fit$data as columns of their own.
 .group_vars <- function(fit) {
-  groups <- as.character(tryCatch(names(brms::ranef(fit)), error = function(e) NULL))
-  unique(c(groups, unlist(strsplit(groups, ":", fixed = TRUE))))
+  uf <- fit$bmm$user_formula
+  grouping <- re_group_vars(uf)
+  interactions <- grep(":", names(fit$data), fixed = TRUE, value = TRUE)
+  is_grouping <- vapply(strsplit(interactions, ":", fixed = TRUE),
+                        function(parts) all(parts %in% grouping), logical(1))
+  c(setdiff(grouping, unlist(.population_vars(uf))), interactions[is_grouping])
+}
+
+# Variables outside the bar terms, per component formula.
+.population_vars <- function(formula) {
+  lapply(formula, function(f) {
+    if (!is_formula(f) || length(f) == 0) return(character(0))
+    .vars_outside_bars(f[[length(f)]])
+  })
+}
+
+.vars_outside_bars <- function(expr) {
+  if (is.name(expr)) return(as.character(expr))
+  if (!is.call(expr) || identical(expr[[1]], quote(`|`)) ||
+        identical(expr[[1]], quote(`||`))) {
+    return(character(0))
+  }
+  as.character(unique(unlist(lapply(as.list(expr)[-1], .vars_outside_bars))))
 }
 
 
@@ -159,13 +184,12 @@ roc_sdt <- function(fit, conditions = NULL, n_points = 100,
 }
 
 
-# Formula predictors per parameter, with random-effect grouping factors
-# stripped so (1 | id) is never a dimension.
+# Population-level predictors per parameter. A variable that appears in a
+# parameter's bar terms only, such as cond in d ~ 1 + (1 | id:cond), does not
+# move that parameter at re_formula = NA.
 .sdt_stripped_preds <- function(fit) {
   uf <- fit$bmm$user_formula
-  preds <- if (inherits(uf, "bmmformula")) rhs_vars(uf, collapse = FALSE) else list()
-  re_vars <- .group_vars(fit)
-  lapply(preds, function(v) setdiff(v %||% character(0), re_vars))
+  if (inherits(uf, "bmmformula")) .population_vars(uf) else list()
 }
 
 
