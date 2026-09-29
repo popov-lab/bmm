@@ -2201,7 +2201,7 @@ neg_loglik <- function(x, params, distribution, weights = NULL) {
     pdf = function(x) exp(x - exp(x)),
     lcdf = function(x) log1m_exp(-exp(x)),
     lccdf = function(x) -exp(x),
-    qf_label = "cloglog"
+    qf_label = "loglog"
   ),
   gumbel_max = list(
     cdf = function(x) exp(-exp(-x)),
@@ -2209,7 +2209,7 @@ neg_loglik <- function(x, params, distribution, weights = NULL) {
     pdf = function(x) exp(-x - exp(-x)),
     lcdf = function(x) -exp(-x),
     lccdf = function(x) log1m_exp(-exp(-x)),
-    qf_label = "loglog"
+    qf_label = "cloglog"
   ),
   logistic = list(
     cdf = plogis,

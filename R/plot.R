@@ -26,19 +26,17 @@ utils::globalVariables(c(
 #' [roc_observed()].
 #'
 #' With `scale = "quantile"` (or its alias `scale = "z"`) the rates are read on
-#' the distribution's quantile axis: `qf(rate)`, where `qf` is the inverse CDF of
-#' the fitted noise distribution, and the axis label names that transform
-#' (`z` for normal, `logit` for logistic, `loglog`/`cloglog` for the Gumbel
-#' distributions). On this axis the binary model ROC is a straight line with
-#' slope `1 / exp(sdratio)` and intercept `d * sqrt((1 + exp(sdratio)^2) / 2) /
+#' the distribution's quantile axis via the transform `-qf(1 - rate)`, where `qf`
+#' is the inverse CDF of the fitted noise distribution, and the axis label names
+#' that transform (`z` for normal, `logit` for logistic, `loglog`/`cloglog` for
+#' the Gumbel distributions). On this axis the binary model ROC is a straight
+#' line with slope `1 / exp(sdratio)` and intercept `d * sqrt((1 + exp(sdratio)^2) / 2) /
 #' exp(sdratio)` -- the separation in noise-SD units over the signal SD, since
-#' `d` is \eqn{d_a} -- so a slope
-#' below 1 is the unequal-variance signature (signal SD > noise SD), and
-#' departures of the observed points from a straight line diagnose misfit. This
-#' linearity holds for the symmetric distributions (`"normal"`, `"logistic"`);
-#' for the Gumbel distributions the transformed ROC is curved (their natural
-#' linearising transform is the log-log power-ROC). The (0,0) and (1,1)
-#' endpoints map to infinity and are dropped on the transformed scale.
+#' `d` is \eqn{d_a} -- so a slope below 1 is the unequal-variance signature
+#' (signal SD > noise SD), and departures of the observed points from a straight
+#' line diagnose misfit. This linearity holds for all four distributions. The
+#' (0,0) and (1,1) endpoints map to infinity and are dropped on the transformed
+#' scale.
 #'
 #' @param x A `"bmm_sdt_roc"` object from [roc_sdt()].
 #' @param observed Optional `"bmm_sdt_roc_observed"` object from [roc_observed()]
@@ -53,7 +51,10 @@ utils::globalVariables(c(
 #'   `0.25`).
 #' @param point_size Numeric. Size of operating-point markers (default `2.5`).
 #' @param ... Ignored.
-#' @return A `ggplot2` object.
+#' @return A `ggplot2` object. The credible band (ribbon) is the pointwise
+#'   posterior interval of the hit rate at each criterion value, plotted at
+#'   that criterion's posterior-mean false-alarm rate; it does not include
+#'   uncertainty in the false-alarm rate.
 #' @seealso [roc_sdt()], [roc_observed()], [auc_sdt()]
 #' @export
 plot.bmm_sdt_roc <- function(x, observed = NULL, condition_col = NULL,
@@ -63,7 +64,11 @@ plot.bmm_sdt_roc <- function(x, observed = NULL, condition_col = NULL,
   stopif(!requireNamespace("ggplot2", quietly = TRUE),
          "ggplot2 is required for plot.bmm_sdt_roc(). Please install it.")
   scale <- match.arg(scale)
-  qf    <- if (scale != "probability") .sdt_dists[[attr(x, "dist")]]$qf
+  # the rates are survival probabilities, so -qf(1 - p), not qf(p), is the
+  # transform that makes the Gumbel model ROC a straight line
+  qf <- if (scale != "probability") {
+    function(p) -.sdt_dists[[attr(x, "dist")]]$qf(1 - p)
+  }
 
   cond_cols <- setdiff(names(x), c("FA", "Hit", ".draw"))
   colour_col <- .roc_colour_col(condition_col, cond_cols)

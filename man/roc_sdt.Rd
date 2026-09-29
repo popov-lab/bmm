@@ -48,6 +48,11 @@ attribute (\code{FA}, \code{Hit_mean}, \code{Hit_lower}, \code{Hit_upper}) with 
 model-implied curve, and a \code{points} attribute with the model-implied
 operating points: one per criterion level for binary multi-criteria fits,
 or the K-1 confidence thresholds (labelled \code{t1}..\code{t(K-1)}) for rating fits.
+The \code{Hit_lower} and \code{Hit_upper} columns in the \code{summary} attribute are the
+pointwise posterior quantiles of the hit rate at each criterion value,
+plotted at that criterion's posterior-mean false-alarm rate; this band does
+not include uncertainty in the false-alarm rate and is narrower than a
+credible band at a fixed false-alarm rate.
 }
 \description{
 Computes the receiver operating characteristic (ROC) curve implied by the

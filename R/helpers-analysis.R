@@ -71,6 +71,11 @@
 #'   model-implied curve, and a `points` attribute with the model-implied
 #'   operating points: one per criterion level for binary multi-criteria fits,
 #'   or the K-1 confidence thresholds (labelled `t1`..`t(K-1)`) for rating fits.
+#'   The `Hit_lower` and `Hit_upper` columns in the `summary` attribute are the
+#'   pointwise posterior quantiles of the hit rate at each criterion value,
+#'   plotted at that criterion's posterior-mean false-alarm rate; this band does
+#'   not include uncertainty in the false-alarm rate and is narrower than a
+#'   credible band at a fixed false-alarm rate.
 #'
 #' @seealso [auc_sdt()], [roc_observed()], [plot.bmm_sdt_roc()]
 #' @export
