@@ -824,7 +824,7 @@ For a rating model the K-1 thresholds define K-1 ROC points per posterior draw.
 `roc_sdt()` returns those points together with the smooth model-implied ROC curve
 traced from the posterior of `d` (and `sdratio`); `plot()` shows that curve
 as a credible-band ribbon with the K-1 thresholds overlaid as colour-coded
-operating points (`c1`..`c(K-1)`) carrying crosshair credible intervals — the same
+operating points (`t1`..`t(K-1)`) carrying crosshair credible intervals — the same
 display as the binary ROC. `roc_observed()` gives the empirical points from the
 pooled counts. The quantile axis (`scale = "quantile"`) works here too.
 

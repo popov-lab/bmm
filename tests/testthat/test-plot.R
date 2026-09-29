@@ -53,7 +53,7 @@ test_that("plot.bmm_sdt_roc() draws implied curve + colored thresholds (rating)"
   pt_idx <- which(geoms == "GeomPoint")[1L]
   expect_true("threshold" %in% names(p$layers[[pt_idx]]$data))
   pt_built <- ggplot2::ggplot_build(p)$data[[pt_idx]]
-  expect_equal(length(unique(pt_built$colour)), 5L)   # c1..c5 colour-coded
+  expect_equal(length(unique(pt_built$colour)), 5L)   # t1..t5 colour-coded
 })
 
 test_that("plot.bmm_sdt_auc() returns a ggplot", {

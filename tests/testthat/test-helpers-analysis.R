@@ -254,7 +254,7 @@ test_that("roc_sdt() rating attaches a smooth implied curve + threshold points",
 
   expect_equal(nrow(pts), 5L)
   expect_s3_class(pts$threshold, "factor")
-  expect_equal(levels(pts$threshold), paste0("c", 1:5))
+  expect_equal(levels(pts$threshold), paste0("t", 1:5))
   expect_true(all(c("FA_mean", "FA_lower", "FA_upper",
                     "Hit_mean", "Hit_lower", "Hit_upper") %in% names(pts)))
 })

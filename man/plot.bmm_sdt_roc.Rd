@@ -46,7 +46,7 @@ model-implied operating points overlaid as colour-coded markers with
 crosshair error bars (uncertainty in both directions). For \strong{binary}
 multi-criteria fits the points are the several criterion levels; for
 \strong{rating} models they are the K-1 confidence thresholds (labelled
-\code{c1}..\code{c(K-1)}). Pass \code{observed} to overlay empirical points from
+\code{t1}..\code{t(K-1)}). Pass \code{observed} to overlay empirical points from
 \code{\link[=roc_observed]{roc_observed()}}.
 }
 \details{

@@ -28,7 +28,7 @@
 #' points per posterior draw (returned as the data frame). The smooth
 #' model-implied curve is traced over a virtual cut from the posterior of
 #' `d` (and `sdratio`) and attached as the `summary` attribute, with the K-1
-#' thresholds attached as the `points` attribute (labelled `c1`..`c(K-1)`) so
+#' thresholds attached as the `points` attribute (labelled `t1`..`t(K-1)`) so
 #' they fall on the curve.
 #'
 #' @param fit A `bmmfit` object returned by [bmm()] from an SDT model.
@@ -55,7 +55,7 @@
 #'   attribute (`FA`, `Hit_mean`, `Hit_lower`, `Hit_upper`) with the smooth
 #'   model-implied curve, and a `points` attribute with the model-implied
 #'   operating points: one per criterion level for binary multi-criteria fits,
-#'   or the K-1 confidence thresholds (labelled `c1`..`c(K-1)`) for rating fits.
+#'   or the K-1 confidence thresholds (labelled `t1`..`t(K-1)`) for rating fits.
 #'
 #' @seealso [auc_sdt()], [roc_observed()], [plot.bmm_sdt_roc()]
 #' @export
@@ -445,7 +445,7 @@ roc_sdt <- function(fit, conditions = NULL, n_points = 100,
 # ROC for rating SDT models. Returns three pieces (like .roc_sdt_yn): the
 # discrete K+1-point ROC per draw (`curve`, also used by the numerical AUC), the
 # smooth model-implied curve swept over a virtual cut (`summary`), and the K-1
-# threshold operating points with a credible band (`points`, labelled c1..cK-1).
+# threshold operating points with a credible band (`points`, labelled t1..tK-1).
 # The smooth curve uses the rating model's own probability map -- FA = 1 - cdf(t
 # + sep/2), Hit = 1 - cdf((t - sep/2) / sdratio), where sep is the separation in
 # noise-SD units -- the continuous envelope of the discrete points, so the
@@ -466,7 +466,7 @@ roc_sdt <- function(fit, conditions = NULL, n_points = 100,
   thr_list <- .sdt_rating_thresholds(fit, model, conditions, ...)
 
   fa_grid       <- seq(0.001, 0.999, length.out = n_points)
-  thr_levels    <- paste0("c", seq_len(K1))
+  thr_levels    <- paste0("t", seq_len(K1))
   cond_has_cols <- ncol(conditions) > 0L
   curve_list   <- vector("list", n_cond)
   summary_list <- vector("list", n_cond)
