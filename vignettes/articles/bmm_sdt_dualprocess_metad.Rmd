@@ -194,7 +194,9 @@ fit_dp <- bmm(
   backend = "cmdstanr",
   cores = 4,
   chains = 4,
-  iter = 2000,
+  iter = 7000,
+  warmup = 1000,
+  thin = 6,
   refresh = 0,
   silent = 2,
   file = "assets/bmmfit_sdt_dpsdt_vignette"
@@ -243,7 +245,9 @@ fit_uv <- bmm(
   backend = "cmdstanr",
   cores = 4,
   chains = 4,
-  iter = 2000,
+  iter = 4000,
+  warmup = 1000,
+  thin = 3,
   refresh = 0,
   silent = 2,
   file = "assets/bmmfit_sdt_dp_uv_vignette"
@@ -376,7 +380,9 @@ fit_md <- bmm(
   backend = "cmdstanr",
   cores = 4,
   chains = 4,
-  iter = 2000,
+  iter = 7000,
+  warmup = 1000,
+  thin = 6,
   refresh = 0,
   silent = 2,
   file = "assets/bmmfit_sdt_metad_pratte_vignette"
