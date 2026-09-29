@@ -144,7 +144,7 @@ sdt_entry_calls <- function(fit_binary, fit_rating) {
   )
 }
 
-test_that("ndraws is refused before any posterior draw is taken", {
+test_that("ndraws, its abbreviations and nsamples are refused before any posterior draw", {
   n_calls <- 0L
   local_mocked_bindings(
     posterior_linpred = function(...) {
@@ -157,7 +157,10 @@ test_that("ndraws is refused before any posterior draw is taken", {
   )
   calls <- sdt_entry_calls(fake_binary_fit(uv = TRUE), fake_rating_fit(uv = TRUE))
   for (nm in names(calls)) {
-    expect_error(calls[[nm]](ndraws = 10), "draw_ids", info = nm)
+    for (arg in c("ndraws", "ndraw", "nd", "nsamples")) {
+      expect_error(do.call(calls[[nm]], stats::setNames(list(10), arg)), "draw_ids",
+                   info = paste(nm, arg))
+    }
   }
   expect_identical(n_calls, 0L)
 })
@@ -194,6 +197,42 @@ test_that("conditions must be a data frame of columns in the data", {
                  info = nm)
     expect_error(calls[[nm]](conditions = data.frame(base_rate = "br1")),
                  "not in the data:\\s+'base_rate'", info = nm)
+  }
+})
+
+test_that("conditions columns must be population-level predictors", {
+  local_mocked_bindings(
+    posterior_linpred = mock_linpred_factory(list(d = 1.5, criterion = 0, spacing = 0)),
+    ranef = function(...) list(),
+    variables = function(...) c("b_d_Intercept", "b_sdratio_Intercept"),
+    .package = "brms"
+  )
+  calls <- sdt_entry_calls(fake_binary_fit(), fake_rating_fit())
+  for (nm in names(calls)) {
+    expect_error(calls[[nm]](conditions = data.frame(stimulus = 0:1)),
+                 "not population-level predictors: 'stimulus'", info = nm)
+  }
+  fit <- fake_grouped_fit(list(cond = c("A", "A", "B", "B"), id = c(1L, 2L, 1L, 2L)),
+                          bmf(d ~ cond + (cond | id), criterion ~ 1))
+  expect_error(sdt_sensitivity(fit, conditions = data.frame(cond = "A", id = 1:2)),
+               "not population-level predictors: 'id'")
+})
+
+test_that("tibbles, factor columns and draw_ids pass the argument checks", {
+  local_mocked_bindings(
+    posterior_linpred = mock_linpred_factory(list(
+      d = 1.2, criterion = c(-0.8, -0.3, 0, 0.3, 0.8), sdratio = log(1.3))),
+    ranef = function(...) list(),
+    variables = function(...) c("b_d_Intercept", "bsp_sdratio"),
+    .package = "brms"
+  )
+  fit <- fake_binary_fit(uv = TRUE, multi = TRUE)
+  tbl <- structure(data.frame(condition = factor("br2", levels = levels(fit$data$condition))),
+                   class = c("tbl_df", "tbl", "data.frame"))
+  calls <- sdt_entry_calls(fit, fake_rating_fit(uv = TRUE))
+  calls$sdt_thresholds <- NULL
+  for (nm in names(calls)) {
+    expect_no_error(calls[[nm]](conditions = tbl, draw_ids = 1:5))
   }
 })
 
