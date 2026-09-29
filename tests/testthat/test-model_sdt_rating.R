@@ -205,6 +205,14 @@ test_that("log_ratio deltas act as spread and ratios, in interval order", {
                rep(exp(1), 3))
   expect_equal(gaps(.sdt_make_thresholds(0, 5L, "log_ratio", deltas = c(0, 0, 1))),
                c(1, 1, exp(1)))
+  # odd K = 7: delta3 is the middle category, delta2 and delta4 ratios to it,
+  # delta1 and delta5 ratios to the first interval on their side
+  expect_equal(gaps(.sdt_make_thresholds(0, 7L, "log_ratio", deltas = c(1, 0, 0, 0, 0))),
+               c(exp(1), 1, 1, 1, 1))
+  expect_equal(gaps(.sdt_make_thresholds(0, 7L, "log_ratio", deltas = c(0, 1, 0, 0, 0))),
+               c(exp(1), exp(1), 1, 1, 1))
+  expect_equal(gaps(.sdt_make_thresholds(0, 7L, "log_ratio", deltas = c(0, 0, 0, 1, 0))),
+               c(1, 1, 1, exp(1), exp(1)))
 })
 
 test_that("deltas are named in interval order", {
@@ -621,8 +629,9 @@ test_that("the Stan rating kernel matches its R counterpart in both tails", {
 
   # criterion = 12 puts every threshold far into the upper tail, where the log
   # cdf of both bounds of an interval rounds to 0; -12 does the same below.
-  # K = 5 and K = 6 exercise the odd and even placement of the criterion.
-  for (K in c(5L, 6L)) {
+  # K = 5 and K = 6 exercise the odd and even placement of the criterion; K = 7
+  # is the smallest odd K with log_ratio intervals beyond the first on each side.
+  for (K in c(5L, 6L, 7L)) {
     grid <- expand.grid(cat = seq_len(K), thresh = seq_along(bmm:::.sdt_threshold_types),
                         criterion = c(-12, -0.5, 0.3, 12), spacing = c(-0.5, 0.1),
                         d = c(0, 2), sdratio = c(-0.6, 0, 0.9),
