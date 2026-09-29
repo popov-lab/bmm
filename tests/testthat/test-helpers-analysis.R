@@ -1093,3 +1093,63 @@ test_that("summary_notes.sdt() fires whenever sdratio departs from 0, not just w
 
   expect_null(summary_notes(fake_mafc_fit()$bmm$model, NULL))
 })
+
+
+############################################################################# !
+# PRINT METHOD COUNTS                                                    ####
+############################################################################# !
+
+test_that("print.bmm_sdt_roc() counts FA points per curve, not per condition", {
+  local_mocked_bindings(
+    posterior_linpred = mock_linpred_factory(list(
+      d = 1.2, criterion = c(-0.8, -0.3, 0, 0.3, 0.8), sdratio = log(1.3))),
+    ranef = function(...) list(id = array(0, dim = c(1, 1, 1))),
+    variables = function(...) c("b_d_Intercept", "b_sdratio_Intercept"),
+    .package = "brms"
+  )
+  one_curve <- capture.output(print(roc_sdt(fake_binary_fit(uv = TRUE, multi = TRUE))))
+  expect_true(any(grepl("Smooth curve: 102 FA points per draw", one_curve, fixed = TRUE)))
+  expect_false(any(grepl(" x 5 ", one_curve, fixed = TRUE)))
+
+  fit <- fake_binary_fit(uv = TRUE, multi = TRUE)
+  fit$bmm$user_formula <- bmf(d ~ 0 + condition, criterion ~ 1, sdratio ~ 1)
+  five_curves <- capture.output(print(roc_sdt(fit)))
+  expect_true(any(grepl("x 5 curves", five_curves, fixed = TRUE)))
+  expect_true(any(grepl("Smooth curve: 102 FA points per draw", five_curves, fixed = TRUE)))
+})
+
+test_that("print.bmm_sdt_roc() counts the K-1 rating thresholds", {
+  local_mocked_bindings(
+    posterior_linpred = mock_linpred_factory(list(d = 1.5, criterion = 0, spacing = 0,
+                                                  sdratio = 0)),
+    ranef = function(...) list(),
+    variables = function(...) c("b_d_Intercept", "b_sdratio_Intercept"),
+    .package = "brms"
+  )
+  out <- capture.output(print(roc_sdt(fake_rating_fit(n_ratings = 6L))))
+  expect_true(any(grepl("Rating model: 5 threshold ROC points per draw", out, fixed = TRUE)))
+})
+
+test_that("a column subset that lost its attributes prints as a data frame", {
+  local_mocked_bindings(
+    posterior_linpred = mock_linpred_factory(list(d = 1.5, criterion = 0, spacing = 0,
+                                                  sdratio = 0)),
+    ranef = function(...) list(),
+    variables = function(...) c("b_d_Intercept", "b_sdratio_Intercept"),
+    .package = "brms"
+  )
+  objects <- list(
+    roc_sdt(fake_binary_fit(), n_points = 10),
+    latent_sdt(fake_binary_fit(), n_grid = 20L),
+    auc_sdt(fake_binary_fit()),
+    sdt_thresholds(fake_rating_fit()),
+    sdt_sensitivity(fake_binary_fit())
+  )
+  for (obj in objects) {
+    sub <- obj[, 1:2]
+    expect_null(attr(sub, "model_class"))
+    expect_identical(capture.output(print(sub)),
+                     capture.output(print.data.frame(sub)),
+                     info = class(obj)[1])
+  }
+})

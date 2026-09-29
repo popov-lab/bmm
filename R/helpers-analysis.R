@@ -44,8 +44,8 @@
 #' they fall on the curve.
 #'
 #' @param fit A `bmmfit` object returned by [bmm()] from an SDT model.
-#' @param conditions Optional data frame of predictor values for which to
-#'   compute the ROC curve. Column names must match predictor variables used in
+#' @param conditions Optional data frame of predictor values at which to
+#'   evaluate the model. Column names must match predictor variables used in
 #'   the formula. If `NULL` (default), unique predictor combinations are derived
 #'   from the data.
 #' @param n_points Integer. Number of equally-spaced points on the smooth
@@ -71,6 +71,8 @@
 #'   model-implied curve, and a `points` attribute with the model-implied
 #'   operating points: one per criterion level for binary multi-criteria fits,
 #'   or the K-1 confidence thresholds (labelled `t1`..`t(K-1)`) for rating fits.
+#'   It also carries the attributes `probs`, `model_class`, `dist`,
+#'   `is_rating` and `conditions`, which the `print()` and `plot()` methods read.
 #'   The `Hit_lower` and `Hit_upper` columns in the `summary` attribute are the
 #'   pointwise posterior quantiles of the hit rate at each criterion value,
 #'   plotted at that criterion's posterior-mean false-alarm rate; this band does
@@ -555,21 +557,21 @@ roc_sdt <- function(fit, conditions = NULL, n_points = 100,
 
 #' @export
 print.bmm_sdt_roc <- function(x, ...) {
-  model_name <- utils::tail(attr(x, "model_class"), 1L) %||% "sdt"
-  n_draws    <- length(unique(x$.draw))
-  n_cond     <- max(1L, nrow(attr(x, "conditions")))
+  if (is.null(attr(x, "model_class"))) return(NextMethod())
+  model_name <- utils::tail(attr(x, "model_class"), 1L)
+  first_draw <- x[x$.draw == x$.draw[1L], setdiff(names(x), c("FA", "Hit", ".draw")),
+                  drop = FALSE]
+  n_curves  <- if (ncol(first_draw) > 0L) nrow(unique(first_draw)) else 1L
+  per_curve <- nrow(first_draw) / n_curves
 
   cat("SDT ROC curve (", model_name, ", dist = ", attr(x, "dist"), ")\n", sep = "")
-  cat("  ", n_draws, " posterior draws",
-      if (n_cond > 1L) paste0(" x ", n_cond, " conditions") else "", "\n", sep = "")
+  cat("  ", length(unique(x$.draw)), " posterior draws",
+      if (n_curves > 1L) paste0(" x ", n_curves, " curves"), "\n", sep = "")
   if (isTRUE(attr(x, "is_rating"))) {
-    cat("  Rating model: ", nrow(x) / (n_draws * n_cond) - 1L,
-        " ROC points per draw\n", sep = "")
-    cat("  ", nrow(attr(x, "points")) / n_cond, " threshold operating points",
-        " (see attr(x, 'points'))\n", sep = "")
+    cat("  Rating model: ", per_curve - 2L, " threshold ROC points per draw,",
+        " plus the (0,0) and (1,1) endpoints (see attr(x, 'points'))\n", sep = "")
   } else {
-    cat("  Smooth curve: ", nrow(x) / (n_draws * n_cond),
-        " FA points per draw\n", sep = "")
+    cat("  Smooth curve: ", per_curve, " FA points per draw\n", sep = "")
     if (!is.null(attr(x, "points"))) {
       cat("  ", nrow(attr(x, "points")), " model-implied criterion points",
           " (see attr(x, 'points'))\n", sep = "")
@@ -600,7 +602,8 @@ print.bmm_sdt_roc <- function(x, ...) {
 #'
 #' @return A data frame of class `"bmm_sdt_roc_observed"` with columns `FA`,
 #'   `Hit`, and any condition columns. Rating models additionally include the
-#'   (0,0) and (1,1) endpoints.
+#'   (0,0) and (1,1) endpoints. The attribute `model_type` is `"rating"` or
+#'   `"binary"`; rating results also carry `n_ratings`.
 #'
 #' @seealso [roc_sdt()], [plot.bmm_sdt_roc()]
 #' @export
@@ -737,7 +740,9 @@ roc_observed <- function(fit, conditions = NULL) {
 #'   only, additionally overlay the density of the maximum of the `m - 1`
 #'   distractor samples (one curve per set size) -- the "effective competitor"
 #'   the target must beat -- which shifts rightward as `m` grows and visualises
-#'   why accuracy falls with set size. Ignored for `sdt_yn`/`sdt_rating`.
+#'   why accuracy falls with set size. The overlay shows the set sizes in the
+#'   fitted data, whatever `conditions` requests. Ignored for
+#'   `sdt_yn`/`sdt_rating`.
 #'
 #' @return A data frame of class `"bmm_sdt_latent"` with columns `x` (the
 #'   evidence axis), `density`, `distribution` (`"noise"` or `"signal"`), and any
@@ -745,7 +750,9 @@ roc_observed <- function(fit, conditions = NULL) {
 #'   decision-boundary positions (columns `position`, `lower`, `upper`, `marker`,
 #'   `level`, plus condition columns), or `NULL` for the criterion-free
 #'   `sdt_mafc`/`sdt_ranking` models. When `show_competitors = TRUE`, a
-#'   `competitors` attribute holds the max-of-distractors densities.
+#'   `competitors` attribute holds the max-of-distractors densities. The object
+#'   also carries `probs`, `model_class`, `dist`, `is_rating` and `conditions`
+#'   (the conditions of the density panels).
 #'
 #' @seealso [roc_sdt()], [plot.bmm_sdt_latent()]
 #' @export
@@ -908,6 +915,7 @@ latent_sdt <- function(fit, conditions = NULL, n_grid = 200,
 
 #' @export
 print.bmm_sdt_latent <- function(x, ...) {
+  if (is.null(attr(x, "model_class"))) return(NextMethod())
   model_name <- utils::tail(attr(x, "model_class"), 1L) %||% "sdt"
   n_panel    <- max(1L, nrow(attr(x, "conditions")))
   n_grid     <- nrow(x) / (2L * n_panel)
@@ -946,6 +954,9 @@ print.bmm_sdt_latent <- function(x, ...) {
 #' depends on the model's `threshold_type`. This function returns those draws on
 #' the latent decision-variable scale together with a posterior summary, so
 #' threshold estimates are accessible without knowing the parameterization.
+#' Which threshold separates "noise" from "signal" responses depends on whether
+#' the number of categories is even or odd; see the section "Where `criterion`
+#' sits" in [sdt_rating()].
 #'
 #' @inheritParams roc_sdt
 #' @param probs Numeric vector of length 2. Lower and upper quantiles for the
@@ -956,7 +967,8 @@ print.bmm_sdt_latent <- function(x, ...) {
 #'   and any condition columns. The object carries a `summary` attribute
 #'   (`marker`, `position` posterior mean, `lower`, `upper`, plus condition
 #'   columns). The `position`/`lower`/`upper` naming matches the `lines`
-#'   attribute of [latent_sdt()], which visualises the same quantities.
+#'   attribute of [latent_sdt()], which visualises the same quantities. The
+#'   object also carries `probs`, `model_class`, `dist` and `conditions`.
 #'
 #' @seealso [latent_sdt()], [roc_sdt()]
 #' @export
@@ -1016,6 +1028,7 @@ sdt_thresholds <- function(fit, conditions = NULL, probs = c(0.025, 0.975), ...)
 
 #' @export
 print.bmm_sdt_thresholds <- function(x, ...) {
+  if (is.null(attr(x, "model_class"))) return(NextMethod())
   model_name <- utils::tail(attr(x, "model_class"), 1L) %||% "sdt"
   cat("SDT decision thresholds (", model_name, ", dist = ", attr(x, "dist"),
       ")\n", sep = "")
@@ -1050,7 +1063,8 @@ print.bmm_sdt_thresholds <- function(x, ...) {
 #'
 #' @return A data frame of class `"bmm_sdt_auc"` with columns `AUC`, `.draw`,
 #'   and any condition columns, plus a `summary` attribute (`AUC_mean`,
-#'   `AUC_lower`, `AUC_upper`).
+#'   `AUC_lower`, `AUC_upper`), `model_class`, `dist` and `conditions`
+#'   attributes.
 #'
 #' @details Analytical formulas (equal variance, where \eqn{d_a = d'}): normal
 #'   EV-SDT \eqn{AUC = \Phi(d'/\sqrt{2})}; Gumbel-min and Gumbel-max EV-SDT
@@ -1192,6 +1206,7 @@ auc_sdt <- function(fit, conditions = NULL, probs = c(0.025, 0.975),
 
 #' @export
 print.bmm_sdt_auc <- function(x, ...) {
+  if (is.null(attr(x, "model_class"))) return(NextMethod())
   model_name <- utils::tail(attr(x, "model_class"), 1L) %||% "sdt"
   cat("SDT AUC (", model_name, ", dist = ", attr(x, "dist"), ")\n", sep = "")
   print(attr(x, "summary"), digits = 3, row.names = FALSE)
@@ -1261,7 +1276,8 @@ print.bmm_sdt_auc <- function(x, ...) {
 #'
 #' @return A data frame of class `"bmm_sdt_sensitivity"` with columns `measure`,
 #'   `value`, `.draw`, and any condition columns. The object carries a `summary`
-#'   attribute (`measure`, `mean`, `lower`, `upper`, plus condition columns).
+#'   attribute (`measure`, `mean`, `lower`, `upper`, plus condition columns),
+#'   and `probs`, `model_class`, `dist` and `conditions` attributes.
 #'
 #' @seealso [auc_sdt()], [roc_sdt()], [latent_sdt()]
 #' @export
@@ -1328,6 +1344,7 @@ sdt_sensitivity <- function(fit, measure = c("da", "dn", "ds"),
 
 #' @export
 print.bmm_sdt_sensitivity <- function(x, ...) {
+  if (is.null(attr(x, "model_class"))) return(NextMethod())
   model_name <- utils::tail(attr(x, "model_class"), 1L) %||% "sdt"
   cat("SDT sensitivity (", model_name, ", dist = ", attr(x, "dist"), ")\n",
       sep = "")

@@ -19,8 +19,8 @@ sdt_sensitivity(
 (root-mean-square SD, the estimated parameter), \code{"dn"} (noise SD), and/or
 \code{"ds"} (signal SD). Defaults to all three.}
 
-\item{conditions}{Optional data frame of predictor values for which to
-compute the ROC curve. Column names must match predictor variables used in
+\item{conditions}{Optional data frame of predictor values at which to
+evaluate the model. Column names must match predictor variables used in
 the formula. If \code{NULL} (default), unique predictor combinations are derived
 from the data.}
 
@@ -35,7 +35,8 @@ across parameters.}
 \value{
 A data frame of class \code{"bmm_sdt_sensitivity"} with columns \code{measure},
 \code{value}, \code{.draw}, and any condition columns. The object carries a \code{summary}
-attribute (\code{measure}, \code{mean}, \code{lower}, \code{upper}, plus condition columns).
+attribute (\code{measure}, \code{mean}, \code{lower}, \code{upper}, plus condition columns),
+and \code{probs}, \code{model_class}, \code{dist} and \code{conditions} attributes.
 }
 \description{
 Re-expresses the posterior sensitivity of a fitted SDT model against a

@@ -9,8 +9,8 @@ sdt_thresholds(fit, conditions = NULL, probs = c(0.025, 0.975), ...)
 \arguments{
 \item{fit}{A \code{bmmfit} object returned by \code{\link[=bmm]{bmm()}} from an SDT model.}
 
-\item{conditions}{Optional data frame of predictor values for which to
-compute the ROC curve. Column names must match predictor variables used in
+\item{conditions}{Optional data frame of predictor values at which to
+evaluate the model. Column names must match predictor variables used in
 the formula. If \code{NULL} (default), unique predictor combinations are derived
 from the data.}
 
@@ -28,7 +28,8 @@ A data frame of class \code{"bmm_sdt_thresholds"} with columns \code{marker}
 and any condition columns. The object carries a \code{summary} attribute
 (\code{marker}, \code{position} posterior mean, \code{lower}, \code{upper}, plus condition
 columns). The \code{position}/\code{lower}/\code{upper} naming matches the \code{lines}
-attribute of \code{\link[=latent_sdt]{latent_sdt()}}, which visualises the same quantities.
+attribute of \code{\link[=latent_sdt]{latent_sdt()}}, which visualises the same quantities. The
+object also carries \code{probs}, \code{model_class}, \code{dist} and \code{conditions}.
 }
 \description{
 Extracts the \eqn{K-1} latent decision thresholds of a rating signal
@@ -38,6 +39,9 @@ parameters (\code{spacing} and/or \verb{delta*}), whose mapping to ordered thres
 depends on the model's \code{threshold_type}. This function returns those draws on
 the latent decision-variable scale together with a posterior summary, so
 threshold estimates are accessible without knowing the parameterization.
+Which threshold separates "noise" from "signal" responses depends on whether
+the number of categories is even or odd; see the section "Where \code{criterion}
+sits" in \code{\link[=sdt_rating]{sdt_rating()}}.
 }
 \seealso{
 \code{\link[=latent_sdt]{latent_sdt()}}, \code{\link[=roc_sdt]{roc_sdt()}}

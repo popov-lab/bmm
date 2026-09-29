@@ -16,7 +16,8 @@ models, \code{NULL} auto-detects the criterion-varying predictor(s).}
 \value{
 A data frame of class \code{"bmm_sdt_roc_observed"} with columns \code{FA},
 \code{Hit}, and any condition columns. Rating models additionally include the
-(0,0) and (1,1) endpoints.
+(0,0) and (1,1) endpoints. The attribute \code{model_type} is \code{"rating"} or
+\code{"binary"}; rating results also carry \code{n_ratings}.
 }
 \description{
 Computes empirical (observed) ROC points from the response-count data used to

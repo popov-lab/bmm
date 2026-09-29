@@ -16,8 +16,8 @@ roc_sdt(
 \arguments{
 \item{fit}{A \code{bmmfit} object returned by \code{\link[=bmm]{bmm()}} from an SDT model.}
 
-\item{conditions}{Optional data frame of predictor values for which to
-compute the ROC curve. Column names must match predictor variables used in
+\item{conditions}{Optional data frame of predictor values at which to
+evaluate the model. Column names must match predictor variables used in
 the formula. If \code{NULL} (default), unique predictor combinations are derived
 from the data.}
 
@@ -48,6 +48,8 @@ attribute (\code{FA}, \code{Hit_mean}, \code{Hit_lower}, \code{Hit_upper}) with 
 model-implied curve, and a \code{points} attribute with the model-implied
 operating points: one per criterion level for binary multi-criteria fits,
 or the K-1 confidence thresholds (labelled \code{t1}..\code{t(K-1)}) for rating fits.
+It also carries the attributes \code{probs}, \code{model_class}, \code{dist},
+\code{is_rating} and \code{conditions}, which the \code{print()} and \code{plot()} methods read.
 The \code{Hit_lower} and \code{Hit_upper} columns in the \code{summary} attribute are the
 pointwise posterior quantiles of the hit rate at each criterion value,
 plotted at that criterion's posterior-mean false-alarm rate; this band does

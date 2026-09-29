@@ -15,8 +15,8 @@ auc_sdt(
 \arguments{
 \item{fit}{A \code{bmmfit} object returned by \code{\link[=bmm]{bmm()}} from an SDT model.}
 
-\item{conditions}{Optional data frame of predictor values for which to
-compute the ROC curve. Column names must match predictor variables used in
+\item{conditions}{Optional data frame of predictor values at which to
+evaluate the model. Column names must match predictor variables used in
 the formula. If \code{NULL} (default), unique predictor combinations are derived
 from the data.}
 
@@ -38,7 +38,8 @@ across parameters.}
 \value{
 A data frame of class \code{"bmm_sdt_auc"} with columns \code{AUC}, \code{.draw},
 and any condition columns, plus a \code{summary} attribute (\code{AUC_mean},
-\code{AUC_lower}, \code{AUC_upper}).
+\code{AUC_lower}, \code{AUC_upper}), \code{model_class}, \code{dist} and \code{conditions}
+attributes.
 }
 \description{
 Computes the posterior area under the ROC curve (AUC). For Gaussian and
