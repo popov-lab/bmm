@@ -146,6 +146,15 @@ test_that(".resolve_pp_conditions() excludes infrastructure columns", {
   expect_false(any(grepl("^n_", conds)))
 })
 
+test_that(".resolve_pp_conditions() works when fit has no group-level effects", {
+  fit <- load_m3_fit()
+  local_mocked_bindings(
+    ranef = function(...) stop("The model does not contain group-level effects."),
+    .package = "brms"
+  )
+  expect_type(.resolve_pp_conditions(fit), "character")
+})
+
 
 # SDT-rating default grouping (.pp_check_resolve_group is the load-bearing seam)
 

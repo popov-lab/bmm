@@ -5,6 +5,83 @@
 
 
 ############################################################################# !
+# GROUPING VARIABLES                                                     ####
+############################################################################# !
+
+# Read from the formula, not from ranef() names: ranef() names mm(g1, g2) as
+# "mmg1g2" and cannot tell which parts of id:cond are also predictors. Every
+# function here predicts at re_formula = NA, so a grouping column is dropped
+# unless it is also a population-level predictor (d ~ session +
+# (1 | id/session)). brms adds interaction groupings such as "id:session" to
+# fit$data as columns of their own.
+.group_vars <- function(fit) {
+  uf <- fit$bmm$user_formula
+  grouping <- re_group_vars(uf)
+  interactions <- grep(":", names(fit$data), fixed = TRUE, value = TRUE)
+  is_grouping <- vapply(strsplit(interactions, ":", fixed = TRUE),
+                        function(parts) all(parts %in% grouping), logical(1))
+  c(setdiff(grouping, unlist(.population_vars(uf))), interactions[is_grouping])
+}
+
+# Variables outside the bar terms, per component formula.
+.population_vars <- function(formula) {
+  lapply(formula, function(f) {
+    if (!is_formula(f) || length(f) == 0) return(character(0))
+    .vars_outside_bars(f[[length(f)]])
+  })
+}
+
+.vars_outside_bars <- function(expr) {
+  if (is.name(expr)) return(as.character(expr))
+  if (!is.call(expr) || identical(expr[[1]], quote(`|`)) ||
+        identical(expr[[1]], quote(`||`))) {
+    return(character(0))
+  }
+  as.character(unique(unlist(lapply(as.list(expr)[-1], .vars_outside_bars))))
+}
+
+
+############################################################################# !
+# ARGUMENT CHECKS                                                        ####
+############################################################################# !
+
+# The argument checks of the exported SDT functions, called first in each, as
+# stop_missing_args() is. brms subsamples ndraws anew in every
+# posterior_linpred() call, and an abbreviation of it or of the deprecated
+# nsamples reaches it too (prepare_predictions() matches nsamples partially).
+# Allowed condition columns are the default ones, so validation and
+# .sdt_resolve_conditions() cannot disagree; a non-SDT fit skips that check so
+# that each function's model-class error is the one it reports.
+.sdt_check_args <- function(fit, conditions, probs, ...) {
+  stopif(!inherits(fit, "bmmfit"),
+         "fit must be a bmmfit object returned by bmm()")
+  dot_names <- as.character(...names())
+  subsample <- dot_names[!is.na(dot_names) & nzchar(dot_names) &
+                           (startsWith("ndraws", dot_names) |
+                              startsWith("nsamples", dot_names))]
+  stopif(length(subsample) > 0L,
+         "Pass draw_ids rather than {collapse_comma(subsample)}: each parameter is \\
+          drawn by its own call, so ndraws would pair values from different \\
+          posterior draws.")
+  stopif(!is.null(conditions) && !is.data.frame(conditions),
+         "conditions must be a data frame of predictor values.")
+  stopif(!all(names(conditions) %in% names(fit$data)),
+         "conditions has columns that are not in the data: \\
+          {collapse_comma(setdiff(names(conditions), names(fit$data)))}")
+  if (!is.null(conditions) && inherits(fit$bmm$model, "sdt")) {
+    not_predictors <- setdiff(names(conditions), names(.sdt_resolve_conditions(fit, NULL)))
+    stopif(length(not_predictors) > 0L,
+           "conditions has columns that are not population-level predictors: \\
+            {collapse_comma(not_predictors)}. Grouping and design columns cannot \\
+            be conditions, because predictions leave out group-level effects.")
+  }
+  stopif(!is.numeric(probs) || length(probs) != 2L || anyNA(probs) ||
+           any(probs < 0 | probs > 1) || probs[1L] >= probs[2L],
+         "probs must be two increasing probabilities between 0 and 1.")
+}
+
+
+############################################################################# !
 # ROC CURVES                                                             ####
 ############################################################################# !
 
@@ -32,8 +109,8 @@
 #' they fall on the curve.
 #'
 #' @param fit A `bmmfit` object returned by [bmm()] from an SDT model.
-#' @param conditions Optional data frame of predictor values for which to
-#'   compute the ROC curve. Column names must match predictor variables used in
+#' @param conditions Optional data frame of predictor values at which to
+#'   evaluate the model. Column names must match predictor variables used in
 #'   the formula. If `NULL` (default), unique predictor combinations are derived
 #'   from the data.
 #' @param n_points Integer. Number of equally-spaced points on the smooth
@@ -48,7 +125,10 @@
 #'   on one curve. Pass a character vector of column names to force that
 #'   classification, or `FALSE` to disable it (one separate curve per predictor
 #'   combination). Ignored for rating models.
-#' @param ... Additional arguments passed to [brms::posterior_linpred()].
+#' @param ... Additional arguments passed to [brms::posterior_linpred()], such as
+#'   `draw_ids` to use a subset of the posterior draws. `ndraws` is refused:
+#'   each parameter is drawn by its own call, so random subsets would not match
+#'   across parameters.
 #'
 #' @return A data frame of class `"bmm_sdt_roc"` with columns `FA`, `Hit`,
 #'   `.draw`, and any condition columns. The object carries a `summary`
@@ -56,13 +136,44 @@
 #'   model-implied curve, and a `points` attribute with the model-implied
 #'   operating points: one per criterion level for binary multi-criteria fits,
 #'   or the K-1 confidence thresholds (labelled `t1`..`t(K-1)`) for rating fits.
+#'   It also carries the attributes `probs`, `model_class`, `dist`,
+#'   `is_rating` and `conditions`, which the `print()` and `plot()` methods read.
+#'   The `Hit_lower` and `Hit_upper` columns in the `summary` attribute are the
+#'   pointwise posterior quantiles of the hit rate at each criterion value,
+#'   plotted at that criterion's posterior-mean false-alarm rate; this band does
+#'   not include uncertainty in the false-alarm rate and is narrower than a
+#'   credible band at a fixed false-alarm rate.
 #'
 #' @seealso [auc_sdt()], [roc_observed()], [plot.bmm_sdt_roc()]
+#' @examples
+#' \dontrun{
+#' # Three base-rate conditions shift the criterion, which identifies sdratio
+#' dat <- expand.grid(id = 1:20, stimulus = c(0L, 1L),
+#'                    condition = c("liberal", "neutral", "strict"))
+#' dat$n_trials <- 100L
+#' criteria <- c(liberal = -0.5, neutral = 0, strict = 0.5)
+#' dat$n_old <- rsdt_yn(nrow(dat), dat$n_trials, dat$stimulus, d = 1.5,
+#'                      criterion = criteria[as.character(dat$condition)],
+#'                      sdratio = 1.3)
+#'
+#' fit <- bmm(
+#'   formula = bmf(d ~ 1, criterion ~ 0 + condition, sdratio ~ 1),
+#'   data = dat,
+#'   model = sdt_yn(response = "n_old", stimulus = "stimulus",
+#'                  n_trials = "n_trials"),
+#'   cores = 4,
+#'   backend = "cmdstanr"
+#' )
+#'
+#' roc <- roc_sdt(fit)
+#' roc
+#' plot(roc, observed = roc_observed(fit))
+#' plot(roc, observed = roc_observed(fit), scale = "quantile")
+#' }
 #' @export
 roc_sdt <- function(fit, conditions = NULL, n_points = 100,
                     probs = c(0.025, 0.975), criterion_points = NULL, ...) {
-  stopif(!inherits(fit, "bmmfit"),
-         "fit must be a bmmfit object returned by bmm()")
+  .sdt_check_args(fit, conditions, probs, ...)
   model <- fit$bmm$model
   stopif(!inherits(model, "sdt"),
          "roc_sdt() is only available for SDT models")
@@ -117,7 +228,7 @@ roc_sdt <- function(fit, conditions = NULL, n_points = 100,
     model$other_vars$stimulus,
     model$other_vars$n_trials,
     "Y", "nTrials", "dist_type", "m_afc", "max_rank",
-    names(brms::ranef(fit))
+    .group_vars(fit)
   ))
   pred_cols <- setdiff(names(data), exclude)
 
@@ -126,13 +237,12 @@ roc_sdt <- function(fit, conditions = NULL, n_points = 100,
 }
 
 
-# Formula predictors per parameter, with random-effect grouping factors
-# stripped so (1 | id) is never a dimension.
+# Population-level predictors per parameter. A variable that appears in a
+# parameter's bar terms only, such as cond in d ~ 1 + (1 | id:cond), does not
+# move that parameter at re_formula = NA.
 .sdt_stripped_preds <- function(fit) {
   uf <- fit$bmm$user_formula
-  preds <- if (inherits(uf, "bmmformula")) rhs_vars(uf, collapse = FALSE) else list()
-  re_vars <- tryCatch(names(brms::ranef(fit)), error = function(e) character(0))
-  lapply(preds, function(v) setdiff(v %||% character(0), re_vars))
+  if (inherits(uf, "bmmformula")) .population_vars(uf) else list()
 }
 
 
@@ -264,6 +374,16 @@ roc_sdt <- function(fit, conditions = NULL, n_points = 100,
   if (is.null(fit)) return(obj_free)
   vars <- tryCatch(brms::variables(fit), error = function(e) character(0))
   obj_free || any(grepl("(^|_)b(sp)?_sdratio($|_)", vars))
+}
+
+
+# Whether sdratio is 1 on the natural scale: absent, or fixed at 0 on its log
+# scale. Model-only, because brms::variables() lists sdratio on every real fit
+# (bmm fixes it through a constant prior), and a user-fixed non-zero value
+# breaks d = d' just as an estimated one does.
+.sdt_unit_sdratio <- function(model) {
+  !"sdratio" %in% names(model$parameters) ||
+    isTRUE(model$fixed_parameters$sdratio == 0)
 }
 
 
@@ -584,21 +704,21 @@ roc_sdt <- function(fit, conditions = NULL, n_points = 100,
 
 #' @export
 print.bmm_sdt_roc <- function(x, ...) {
-  model_name <- utils::tail(attr(x, "model_class"), 1L) %||% "sdt"
-  n_draws    <- length(unique(x$.draw))
-  n_cond     <- max(1L, nrow(attr(x, "conditions")))
+  if (is.null(attr(x, "model_class"))) return(NextMethod())
+  model_name <- utils::tail(attr(x, "model_class"), 1L)
+  first_draw <- x[x$.draw == x$.draw[1L], setdiff(names(x), c("FA", "Hit", ".draw")),
+                  drop = FALSE]
+  n_curves  <- if (ncol(first_draw) > 0L) nrow(unique(first_draw)) else 1L
+  per_curve <- nrow(first_draw) / n_curves
 
   cat("SDT ROC curve (", model_name, ", dist = ", attr(x, "dist"), ")\n", sep = "")
-  cat("  ", n_draws, " posterior draws",
-      if (n_cond > 1L) paste0(" x ", n_cond, " conditions") else "", "\n", sep = "")
+  cat("  ", length(unique(x$.draw)), " posterior draws",
+      if (n_curves > 1L) paste0(" x ", n_curves, " curves"), "\n", sep = "")
   if (isTRUE(attr(x, "is_rating"))) {
-    cat("  Rating model: ", nrow(x) / (n_draws * n_cond) - 1L,
-        " ROC points per draw\n", sep = "")
-    cat("  ", nrow(attr(x, "points")) / n_cond, " threshold operating points",
-        " (see attr(x, 'points'))\n", sep = "")
+    cat("  Rating model: ", per_curve - 2L, " threshold ROC points per draw,",
+        " plus the (0,0) and (1,1) endpoints (see attr(x, 'points'))\n", sep = "")
   } else {
-    cat("  Smooth curve: ", nrow(x) / (n_draws * n_cond),
-        " FA points per draw\n", sep = "")
+    cat("  Smooth curve: ", per_curve, " FA points per draw\n", sep = "")
     if (!is.null(attr(x, "points"))) {
       cat("  ", nrow(attr(x, "points")), " model-implied criterion points",
           " (see attr(x, 'points'))\n", sep = "")
@@ -629,13 +749,44 @@ print.bmm_sdt_roc <- function(x, ...) {
 #'
 #' @return A data frame of class `"bmm_sdt_roc_observed"` with columns `FA`,
 #'   `Hit`, and any condition columns. Rating models additionally include the
-#'   (0,0) and (1,1) endpoints.
+#'   (0,0) and (1,1) endpoints. The attribute `model_type` is `"rating"` or
+#'   `"binary"`; rating results also carry `n_ratings`.
 #'
 #' @seealso [roc_sdt()], [plot.bmm_sdt_roc()]
+#' @examples
+#' \dontrun{
+#' # Three base-rate conditions shift the criterion, which identifies sdratio
+#' dat <- expand.grid(id = 1:20, stimulus = c(0L, 1L),
+#'                    condition = c("liberal", "neutral", "strict"))
+#' dat$n_trials <- 100L
+#' criteria <- c(liberal = -0.5, neutral = 0, strict = 0.5)
+#' dat$n_old <- rsdt_yn(nrow(dat), dat$n_trials, dat$stimulus, d = 1.5,
+#'                      criterion = criteria[as.character(dat$condition)],
+#'                      sdratio = 1.3)
+#'
+#' fit <- bmm(
+#'   formula = bmf(d ~ 1, criterion ~ 0 + condition, sdratio ~ 1),
+#'   data = dat,
+#'   model = sdt_yn(response = "n_old", stimulus = "stimulus",
+#'                  n_trials = "n_trials"),
+#'   cores = 4,
+#'   backend = "cmdstanr"
+#' )
+#'
+#' # One point per base-rate condition, from the response counts
+#' obs <- roc_observed(fit)
+#' obs
+#' plot(roc_sdt(fit), observed = obs)
+#' }
 #' @export
 roc_observed <- function(fit, conditions = NULL) {
   stopif(!inherits(fit, "bmmfit"),
          "fit must be a bmmfit object returned by bmm()")
+  stopif(!is.null(conditions) && !is.character(conditions),
+         "roc_observed() takes conditions as a character vector of column names.")
+  stopif(!all(conditions %in% names(fit$data)),
+         "conditions names columns that are not in the data:
+          {collapse_comma(setdiff(conditions, names(fit$data)))}")
   model <- fit$bmm$model
   stopif(!inherits(model, "sdt"),
          "roc_observed() is only available for SDT models")
@@ -761,7 +912,9 @@ roc_observed <- function(fit, conditions = NULL) {
 #'   only, additionally overlay the density of the maximum of the `m - 1`
 #'   distractor samples (one curve per set size) -- the "effective competitor"
 #'   the target must beat -- which shifts rightward as `m` grows and visualises
-#'   why accuracy falls with set size. Ignored for `sdt_yn`/`sdt_rating`.
+#'   why accuracy falls with set size. The overlay shows the set sizes in the
+#'   fitted data, whatever `conditions` requests. Ignored for
+#'   `sdt_yn`/`sdt_rating`.
 #'
 #' @return A data frame of class `"bmm_sdt_latent"` with columns `x` (the
 #'   evidence axis), `density`, `distribution` (`"noise"` or `"signal"`), and any
@@ -769,15 +922,40 @@ roc_observed <- function(fit, conditions = NULL) {
 #'   decision-boundary positions (columns `position`, `lower`, `upper`, `marker`,
 #'   `level`, plus condition columns), or `NULL` for the criterion-free
 #'   `sdt_mafc`/`sdt_ranking` models. When `show_competitors = TRUE`, a
-#'   `competitors` attribute holds the max-of-distractors densities.
+#'   `competitors` attribute holds the max-of-distractors densities. The object
+#'   also carries `probs`, `model_class`, `dist`, `is_rating` and `conditions`
+#'   (the conditions of the density panels).
 #'
 #' @seealso [roc_sdt()], [plot.bmm_sdt_latent()]
+#' @examples
+#' \dontrun{
+#' # Three base-rate conditions shift the criterion, which identifies sdratio
+#' dat <- expand.grid(id = 1:20, stimulus = c(0L, 1L),
+#'                    condition = c("liberal", "neutral", "strict"))
+#' dat$n_trials <- 100L
+#' criteria <- c(liberal = -0.5, neutral = 0, strict = 0.5)
+#' dat$n_old <- rsdt_yn(nrow(dat), dat$n_trials, dat$stimulus, d = 1.5,
+#'                      criterion = criteria[as.character(dat$condition)],
+#'                      sdratio = 1.3)
+#'
+#' fit <- bmm(
+#'   formula = bmf(d ~ 1, criterion ~ 0 + condition, sdratio ~ 1),
+#'   data = dat,
+#'   model = sdt_yn(response = "n_old", stimulus = "stimulus",
+#'                  n_trials = "n_trials"),
+#'   cores = 4,
+#'   backend = "cmdstanr"
+#' )
+#'
+#' latent <- latent_sdt(fit)
+#' latent
+#' plot(latent)
+#' }
 #' @export
 latent_sdt <- function(fit, conditions = NULL, n_grid = 200,
                        probs = c(0.025, 0.975), collapse = NULL,
                        show_competitors = FALSE, ...) {
-  stopif(!inherits(fit, "bmmfit"),
-         "fit must be a bmmfit object returned by bmm()")
+  .sdt_check_args(fit, conditions, probs, ...)
   model <- fit$bmm$model
   stopif(!inherits(model, "sdt"),
          "latent_sdt() is only available for SDT models")
@@ -922,6 +1100,7 @@ latent_sdt <- function(fit, conditions = NULL, n_grid = 200,
 
 #' @export
 print.bmm_sdt_latent <- function(x, ...) {
+  if (is.null(attr(x, "model_class"))) return(NextMethod())
   model_name <- utils::tail(attr(x, "model_class"), 1L) %||% "sdt"
   n_panel    <- max(1L, nrow(attr(x, "conditions")))
   n_grid     <- nrow(x) / (2L * n_panel)
@@ -967,6 +1146,9 @@ print.bmm_sdt_latent <- function(x, ...) {
 #' depends on the model's `threshold_type`. This function returns those draws on
 #' the latent decision-variable scale together with a posterior summary, so
 #' threshold estimates are accessible without knowing the parameterization.
+#' Which threshold separates "noise" from "signal" responses depends on whether
+#' the number of categories is even or odd; see the section "Where `criterion`
+#' sits" in [sdt_rating()].
 #'
 #' @inheritParams roc_sdt
 #' @param probs Numeric vector of length 2. Lower and upper quantiles for the
@@ -977,13 +1159,30 @@ print.bmm_sdt_latent <- function(x, ...) {
 #'   and any condition columns. The object carries a `summary` attribute
 #'   (`marker`, `position` posterior mean, `lower`, `upper`, plus condition
 #'   columns). The `position`/`lower`/`upper` naming matches the `lines`
-#'   attribute of [latent_sdt()], which visualises the same quantities.
+#'   attribute of [latent_sdt()], which visualises the same quantities. The
+#'   object also carries `probs`, `model_class`, `dist` and `conditions`.
 #'
 #' @seealso [latent_sdt()], [roc_sdt()]
+#' @examples
+#' \dontrun{
+#' dat <- expand.grid(id = 1:20, stimulus = c(0L, 1L))
+#' dat <- cbind(dat, rsdt_rating(nrow(dat), 200, dat$stimulus, d = 1.5,
+#'                               thresholds = c(-0.5, 0, 0.5), sdratio = 1.3))
+#'
+#' fit <- bmm(
+#'   formula = bmf(d ~ 1, criterion ~ 1, spacing ~ 1, sdratio ~ 1),
+#'   data = dat,
+#'   model = sdt_rating(response = c("r1", "r2", "r3", "r4"),
+#'                      stimulus = "stimulus"),
+#'   cores = 4,
+#'   backend = "cmdstanr"
+#' )
+#'
+#' sdt_thresholds(fit)
+#' }
 #' @export
 sdt_thresholds <- function(fit, conditions = NULL, probs = c(0.025, 0.975), ...) {
-  stopif(!inherits(fit, "bmmfit"),
-         "fit must be a bmmfit object returned by bmm()")
+  .sdt_check_args(fit, conditions, probs, ...)
   model <- fit$bmm$model
   stopif(!inherits(model, "sdt_rating"),
          "sdt_thresholds() is only available for rating SDT models (sdt_rating)")
@@ -1026,6 +1225,7 @@ sdt_thresholds <- function(fit, conditions = NULL, probs = c(0.025, 0.975), ...)
 
 #' @export
 print.bmm_sdt_thresholds <- function(x, ...) {
+  if (is.null(attr(x, "model_class"))) return(NextMethod())
   model_name <- utils::tail(attr(x, "model_class"), 1L) %||% "sdt"
   cat("SDT decision thresholds (", model_name, ", dist = ", attr(x, "dist"),
       ")\n", sep = "")
@@ -1133,15 +1333,18 @@ print.bmm_sdt_mratio <- function(x, ...) {
 #' Area under the ROC curve from a fitted SDT model
 #'
 #' Computes the posterior area under the ROC curve (AUC). For Gaussian and
-#' Gumbel-min equal-variance binary SDT the AUC is available in closed form from
-#' the `d` draws; otherwise it is obtained by trapezoidal integration of
-#' the ROC points from [roc_sdt()]. The returned AUC is always the area under
-#' the full curve (for binary multi-criteria fits this is one value per curve,
-#' not the trapezoid of the discrete operating points).
+#' Gumbel (min or max) equal-variance binary SDT the AUC is available in
+#' closed form from the `d` draws; otherwise it is obtained by trapezoidal
+#' integration of the model-implied curve (for rating fits, the curve swept
+#' from the posterior of `d` and `sdratio`). The returned AUC is always the
+#' area under the full curve, not the trapezoid of the discrete operating
+#' points or the K-1 rating thresholds; for binary multi-criteria fits it is
+#' one value per curve.
 #'
-#' The closed form is used only when `sdratio` is fixed, where `d` (which is
-#' \eqn{d_a}) equals \eqn{d'}; every unequal-variance fit takes the numerical
-#' route, so the AUC is invariant to the sensitivity parameterization.
+#' The closed form is used only when `sdratio` is fixed at 0, where `d`
+#' (which is \eqn{d_a}) equals \eqn{d'}; every fit with `sdratio` estimated or
+#' fixed away from 0 takes the numerical route, so the AUC is invariant to the
+#' sensitivity parameterization.
 #'
 #' @inheritParams roc_sdt
 #' @param probs Numeric vector of length 2. Quantiles for the credible interval
@@ -1149,18 +1352,42 @@ print.bmm_sdt_mratio <- function(x, ...) {
 #'
 #' @return A data frame of class `"bmm_sdt_auc"` with columns `AUC`, `.draw`,
 #'   and any condition columns, plus a `summary` attribute (`AUC_mean`,
-#'   `AUC_lower`, `AUC_upper`).
+#'   `AUC_lower`, `AUC_upper`), `model_class`, `dist` and `conditions`
+#'   attributes.
 #'
 #' @details Analytical formulas (equal variance, where \eqn{d_a = d'}): normal
-#'   EV-SDT \eqn{AUC = \Phi(d'/\sqrt{2})}; Gumbel-min EV-SDT
+#'   EV-SDT \eqn{AUC = \Phi(d'/\sqrt{2})}; Gumbel-min and Gumbel-max EV-SDT
 #'   \eqn{AUC = \mathrm{logistic}(g')}.
 #'
 #' @seealso [roc_sdt()], [plot.bmm_sdt_auc()]
+#' @examples
+#' \dontrun{
+#' # Three base-rate conditions shift the criterion, which identifies sdratio
+#' dat <- expand.grid(id = 1:20, stimulus = c(0L, 1L),
+#'                    condition = c("liberal", "neutral", "strict"))
+#' dat$n_trials <- 100L
+#' criteria <- c(liberal = -0.5, neutral = 0, strict = 0.5)
+#' dat$n_old <- rsdt_yn(nrow(dat), dat$n_trials, dat$stimulus, d = 1.5,
+#'                      criterion = criteria[as.character(dat$condition)],
+#'                      sdratio = 1.3)
+#'
+#' fit <- bmm(
+#'   formula = bmf(d ~ 1, criterion ~ 0 + condition, sdratio ~ 1),
+#'   data = dat,
+#'   model = sdt_yn(response = "n_old", stimulus = "stimulus",
+#'                  n_trials = "n_trials"),
+#'   cores = 4,
+#'   backend = "cmdstanr"
+#' )
+#'
+#' auc <- auc_sdt(fit)
+#' auc
+#' plot(auc)
+#' }
 #' @export
 auc_sdt <- function(fit, conditions = NULL, probs = c(0.025, 0.975),
                     criterion_points = NULL, ...) {
-  stopif(!inherits(fit, "bmmfit"),
-         "fit must be a bmmfit object returned by bmm()")
+  .sdt_check_args(fit, conditions, probs, ...)
   model <- fit$bmm$model
   stopif(!inherits(model, "sdt"),
          "auc_sdt() is only available for SDT models")
@@ -1171,7 +1398,6 @@ auc_sdt <- function(fit, conditions = NULL, probs = c(0.025, 0.975),
 
   dist        <- model$other_vars$dist
   is_rating   <- inherits(model, "sdt_rating")
-  has_sdratio <- .sdt_has_estimated_sdratio(model, fit)
   conditions  <- .sdt_resolve_conditions(fit, conditions)
 
   if (!is_rating) {
@@ -1179,7 +1405,8 @@ auc_sdt <- function(fit, conditions = NULL, probs = c(0.025, 0.975),
     conditions <- .sdt_unique_subset(conditions, dims$curves)
   }
 
-  use_analytical <- !is_rating && !has_sdratio && dist %in% c("normal", "gumbel_min")
+  use_analytical <- !is_rating && .sdt_unit_sdratio(model) &&
+    dist %in% c("normal", "gumbel_min", "gumbel_max")
 
   if (use_analytical) {
     auc_fn <- if (dist == "normal") function(d) stats::pnorm(d / sqrt(2)) else stats::plogis
@@ -1191,6 +1418,9 @@ auc_sdt <- function(fit, conditions = NULL, probs = c(0.025, 0.975),
       result[[c_i]] <- .sdt_bind_cond(df, conditions[c_i, , drop = FALSE])
     }
     auc_data <- do.call(rbind, result)
+  } else if (is_rating) {
+    has_sdratio <- .sdt_has_estimated_sdratio(model, fit)
+    auc_data <- .auc_sdt_rating_swept(fit, conditions, has_sdratio, dist, ...)
   } else {
     auc_data <- .auc_sdt_numerical(fit, conditions, probs, criterion_points, ...)
   }
@@ -1203,6 +1433,39 @@ auc_sdt <- function(fit, conditions = NULL, probs = c(0.025, 0.975),
     dist        = dist,
     conditions  = conditions
   )
+}
+
+
+# Area under the swept model curve, the map of .roc_sdt_rating()'s `summary`.
+# FA and Hit increase along t_grid, hence the (0, ..., 1) endpoints. Against
+# integrate(), the error is at most 5e-4 when every draw has the same sep: the
+# grid starts at FA = 0.001, and the straight first segment from (0, 0) loses
+# up to 0.001 / 2 once Hit is near 1 there (sep >= 4). On real rating fits it
+# was at most 1.1e-4. The grid is placed by mean(sep), so a wide sep spread
+# across draws costs more (3e-2 for gumbel_min with sep from 0.2 to 8).
+.sdt_auc_swept <- function(sep, sdratio, dist, n_points = 1000L) {
+  cdf <- .sdt_dists[[dist]]$cdf
+  qf  <- .sdt_dists[[dist]]$qf
+  t_grid <- qf(1 - seq(0.001, 0.999, length.out = n_points)) - mean(sep) / 2
+  fa  <- cbind(0, 1 - cdf(outer(sep / 2, t_grid, "+")), 1)
+  hit <- cbind(0, 1 - cdf(sweep(outer(-sep / 2, t_grid, "+"), 1L, sdratio, "/")), 1)
+  rowSums((fa[, -1L, drop = FALSE] - fa[, -ncol(fa), drop = FALSE]) *
+          (hit[, -1L, drop = FALSE] + hit[, -ncol(hit), drop = FALSE])) / 2
+}
+
+
+# roc_sdt()'s rating curve is the polygon through the K-1 thresholds, which
+# lies inside the model ROC, so rating AUC integrates the swept curve instead.
+.auc_sdt_rating_swept <- function(fit, conditions, has_sdratio, dist, ...) {
+  geom <- .sdt_latent_geometry(fit, conditions, has_sdratio, ...)
+  n_draws <- nrow(geom$d)
+  result <- vector("list", ncol(geom$d))
+  for (c_i in seq_len(ncol(geom$d))) {
+    auc <- .sdt_auc_swept(geom$sep[, c_i], geom$sdratio[, c_i], dist)
+    df <- data.frame(AUC = auc, .draw = seq_len(n_draws))
+    result[[c_i]] <- .sdt_bind_cond(df, conditions[c_i, , drop = FALSE])
+  }
+  do.call(rbind, result)
 }
 
 
@@ -1248,6 +1511,7 @@ auc_sdt <- function(fit, conditions = NULL, probs = c(0.025, 0.975),
 
 #' @export
 print.bmm_sdt_auc <- function(x, ...) {
+  if (is.null(attr(x, "model_class"))) return(NextMethod())
   model_name <- utils::tail(attr(x, "model_class"), 1L) %||% "sdt"
   cat("SDT AUC (", model_name, ", dist = ", attr(x, "dist"), ")\n", sep = "")
   print(attr(x, "summary"), digits = 3, row.names = FALSE)
@@ -1288,8 +1552,8 @@ print.bmm_sdt_auc <- function(x, ...) {
 #'       d_S = d_a \sqrt{(1 + \sigma_S^2)/2} \,/\, \sigma_S.}
 #'
 #' All three coincide when `sdratio` is 0 (equal variance), which is the case
-#' for [sdt_mafc()] and for any fit that does not give `sdratio` a formula. The
-#' conversion is applied draw by draw, so the returned intervals propagate the
+#' for [sdt_mafc()] and for any fit that leaves `sdratio` at its default of 0.
+#' The conversion is applied draw by draw, so the returned intervals propagate the
 #' joint posterior uncertainty in `d` and `sdratio` rather than combining
 #' point estimates.
 #'
@@ -1317,14 +1581,38 @@ print.bmm_sdt_auc <- function(x, ...) {
 #'
 #' @return A data frame of class `"bmm_sdt_sensitivity"` with columns `measure`,
 #'   `value`, `.draw`, and any condition columns. The object carries a `summary`
-#'   attribute (`measure`, `mean`, `lower`, `upper`, plus condition columns).
+#'   attribute (`measure`, `mean`, `lower`, `upper`, plus condition columns),
+#'   and `probs`, `model_class`, `dist` and `conditions` attributes.
 #'
 #' @seealso [auc_sdt()], [roc_sdt()], [latent_sdt()]
+#' @examples
+#' \dontrun{
+#' # Three base-rate conditions shift the criterion, which identifies sdratio
+#' dat <- expand.grid(id = 1:20, stimulus = c(0L, 1L),
+#'                    condition = c("liberal", "neutral", "strict"))
+#' dat$n_trials <- 100L
+#' criteria <- c(liberal = -0.5, neutral = 0, strict = 0.5)
+#' dat$n_old <- rsdt_yn(nrow(dat), dat$n_trials, dat$stimulus, d = 1.5,
+#'                      criterion = criteria[as.character(dat$condition)],
+#'                      sdratio = 1.3)
+#'
+#' fit <- bmm(
+#'   formula = bmf(d ~ 1, criterion ~ 0 + condition, sdratio ~ 1),
+#'   data = dat,
+#'   model = sdt_yn(response = "n_old", stimulus = "stimulus",
+#'                  n_trials = "n_trials"),
+#'   cores = 4,
+#'   backend = "cmdstanr"
+#' )
+#'
+#' # d_a (the fitted d), d_N and d_S, converted draw by draw
+#' sdt_sensitivity(fit)
+#' sdt_sensitivity(fit, measure = "dn", draw_ids = 1:500)
+#' }
 #' @export
 sdt_sensitivity <- function(fit, measure = c("da", "dn", "ds"),
                             conditions = NULL, probs = c(0.025, 0.975), ...) {
-  stopif(!inherits(fit, "bmmfit"),
-         "fit must be a bmmfit object returned by bmm()")
+  .sdt_check_args(fit, conditions, probs, ...)
   measure <- match.arg(measure, several.ok = TRUE)
   model <- fit$bmm$model
   stopif(!inherits(model, "sdt"),
@@ -1373,6 +1661,7 @@ sdt_sensitivity <- function(fit, measure = c("da", "dn", "ds"),
 
 #' @export
 print.bmm_sdt_sensitivity <- function(x, ...) {
+  if (is.null(attr(x, "model_class"))) return(NextMethod())
   model_name <- utils::tail(attr(x, "model_class"), 1L) %||% "sdt"
   cat("SDT sensitivity (", model_name, ", dist = ", attr(x, "dist"), ")\n",
       sep = "")
@@ -1384,12 +1673,12 @@ print.bmm_sdt_sensitivity <- function(x, ...) {
 
 
 # `d` reads as d' in the coefficient table, which it only is while sdratio is
-# fixed
+# fixed at 0
 #' @export
 summary_notes.sdt <- function(model, x) {
-  if (!.sdt_has_estimated_sdratio(model)) return(NULL)
+  if (.sdt_unit_sdratio(model)) return(NULL)
   paste(
-    "Note: sdratio is estimated, so d is d_a (root-mean-square SD units),",
+    "Note: sdratio is not fixed at 0, so d is d_a (root-mean-square SD units),",
     "not the noise-standardized d'.\n      sdt_sensitivity() converts it",
     "to d' (noise SD) and d_S (signal SD)."
   )

@@ -85,7 +85,7 @@ test_that(".summary_fixed_rows selects all rows matching the printed parameters"
   expect_identical(sort(rownames(out)), c("d_Intercept", "sdratio_Intercept"))
 })
 
-test_that("SDT summaries name d as d_a only when sdratio is estimated", {
+test_that("SDT summaries name d as d_a only when sdratio is not 0", {
   model <- sdt_yn(response = "y", stimulus = "s", n_trials = "n")
   fixed <- make_fixed(c("d_Intercept", "criterion_Intercept", "sdratio_Intercept"))
 
@@ -98,4 +98,14 @@ test_that("SDT summaries name d as d_a only when sdratio is estimated", {
                                              fixed), color = FALSE))
   expect_true(any(grepl("d is d_a", uv)))
   expect_true(any(grepl("sdt_sensitivity()", uv, fixed = TRUE)))
+})
+
+test_that("SDT summaries name d as d_a for a user-fixed non-zero sdratio too", {
+  model <- sdt_yn(response = "y", stimulus = "s", n_trials = "n")
+  model$fixed_parameters$sdratio <- 0.3
+  fixed <- make_fixed(c("d_Intercept", "criterion_Intercept"))
+
+  out <- capture.output(print(make_bmmsummary(model, bmf(d ~ 1, criterion ~ 1, sdratio = 0.3),
+                                              fixed), color = FALSE))
+  expect_true(any(grepl("d is d_a", out)))
 })

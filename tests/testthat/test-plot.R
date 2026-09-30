@@ -132,6 +132,35 @@ test_that("plot.bmm_sdt_roc(scale = 'z') returns a ggplot for a rating fit", {
   expect_s3_class(p, "ggplot")
 })
 
+test_that("the Gumbel model ROC is a straight line on the quantile scale", {
+  skip_if_not_installed("ggplot2")
+  sdratio <- log(1.4)
+  labels <- c(gumbel_min = "loglog", gumbel_max = "cloglog")
+  local_mocked_bindings(
+    posterior_linpred = mock_linpred_factory(list(d = 1.5, criterion = 0,
+                                                  sdratio = sdratio)),
+    ranef = function(...) list(),
+    variables = function(...) c("b_d_Intercept", "b_sdratio_Intercept"),
+    .package = "brms"
+  )
+  for (dist in names(labels)) {
+    fit <- fake_binary_fit(uv = TRUE)
+    fit$bmm$model$other_vars$dist <- dist
+    p <- plot(roc_sdt(fit, n_points = 50), scale = "quantile")
+    line_layer <- which(vapply(p$layers, function(l) inherits(l$geom, "GeomLine"),
+                               logical(1)))
+    curve <- ggplot2::layer_data(p, line_layer)
+    curve <- curve[is.finite(curve$x) & is.finite(curve$y), ]
+    line_fit <- stats::lm(y ~ x, data = curve)
+
+    expect_gt(nrow(curve), 40L)
+    expect_lt(max(abs(stats::residuals(line_fit))), 1e-8, label = dist)
+    expect_equal(unname(stats::coef(line_fit)[2]), 1 / exp(sdratio),
+                 tolerance = 1e-6, label = dist)
+    expect_identical(p$labels$x, paste0(labels[[dist]], "(False alarm rate)"))
+  }
+})
+
 
 ############################################################################# !
 # LATENT DISTRIBUTIONS                                                   ####

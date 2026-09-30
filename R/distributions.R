@@ -936,6 +936,10 @@ dcswald <- function(rt, response, drift, bound, ndt, zr = 0.5, s = 1,
 
 .dcswald <- function(rt, response, drift, bound, ndt, zr, s, version, log) {
   rt_shifted <- rt - ndt
+  # log_lik() on held-out data can meet ndt draws at or above rt. The Wald terms
+  # return NaN there, so they are evaluated at a placeholder and overwritten
+  started <- rt_shifted > 0
+  rt_shifted[!started] <- 1
 
   if (version == "simple") {
     log_ll <- .pwald(rt_shifted, drift = drift, bound = bound, s = s, lower.tail = FALSE, log.p = TRUE)
@@ -948,6 +952,11 @@ dcswald <- function(rt, response, drift, bound, ndt, zr = 0.5, s = 1,
   }
 
   log_ll[response == 1] <- ll1[response == 1]
+
+  # mirrors swald_lpdf and swald_lccdf: no density before ndt, but a censored
+  # simple-version error there is certain, since no response can have arrived
+  log_ll[!started] <- -Inf
+  if (version == "simple") log_ll[!started & response == 0] <- 0
 
   if (log) log_ll else exp(log_ll)
 }
@@ -1140,6 +1149,9 @@ validate_cswald_parameters <- function(drift, bound, ndt, zr, s) {
 }
 
 
+# NaN (or NA, for rt < 0) here; .dcswald() guards by substituting a
+# placeholder rt before calling in and overwriting the result by
+# version/response afterward, rather than guarding rt <= 0 in here directly
 .dwald <- function(rt, drift, bound, s, log = TRUE) {
   log_d <- log(bound) - 0.5 * log(2 * pi * rt^3) - log(s) -
     (bound - drift * rt)^2 / (2 * s^2 * rt)
@@ -1175,6 +1187,9 @@ times_nonzero <- function(count, log_prob) {
   ifelse(count == 0, 0, count * rep_len(log_prob, n))
 }
 
+# NaN (or NA, for rt < 0) here; .dcswald() guards by substituting a
+# placeholder rt before calling in and overwriting the result by
+# version/response afterward, rather than guarding rt <= 0 in here directly
 .pwald <- function(rt, drift, bound, s, lower.tail = TRUE, log.p = TRUE) {
   z1 <- (drift * rt - bound) / (s * sqrt(rt))
   z2 <- -(drift * rt + bound) / (s * sqrt(rt))
@@ -2165,8 +2180,8 @@ neg_loglik <- function(x, params, distribution, weights = NULL) {
 
 # SDT distribution registry: single source of truth for all CDF/quantile logic
 # Each entry: cdf, qf (quantile function), pdf (density, the derivative of cdf),
-# lcdf/lccdf (log CDF and log complementary CDF), and qf_label (axis label for
-# the inverse-CDF transformed ROC). The lcdf/lccdf entries mirror the Stan
+# lcdf/lccdf (log CDF and log complementary CDF), and qf_label (axis label of
+# the ROC's quantile scale). The lcdf/lccdf entries mirror the Stan
 # dispatchers in inst/stan_chunks/sdt_dist_funs.stan branch for branch, so the
 # two implementations can be read side by side.
 #
@@ -2174,10 +2189,14 @@ neg_loglik <- function(x, params, distribution, weights = NULL) {
 # reordering entries changes the R <-> Stan contract.
 #
 # gumbel_min / gumbel_max follow the extreme-value convention: gumbel_min is
-# the smallest-extreme-value (cloglog) distribution, gumbel_max the largest
-# (loglog, i.e. evd::pgumbel). Taking the max of gumbel_max variates is what
+# the smallest-extreme-value distribution (cloglog link), gumbel_max the largest
+# (loglog link, i.e. evd::pgumbel). Taking the max of gumbel_max variates is what
 # yields the m-AFC softmax; the ranking Gamma-ratio kernel is the gumbel_min
 # result. Swapping these labels silently fits the mirror model.
+#
+# The ROC's quantile scale applies -qf(1 - p), not qf(p), so that the model ROC
+# is straight for the asymmetric Gumbels too. For gumbel_min that transform is
+# -log(-log(p)), the loglog, so each Gumbel's qf_label is the other's link name.
 .sdt_dists <- list(
   normal = list(
     cdf = pnorm,
@@ -2193,7 +2212,7 @@ neg_loglik <- function(x, params, distribution, weights = NULL) {
     pdf = function(x) exp(x - exp(x)),
     lcdf = function(x) log1m_exp(-exp(x)),
     lccdf = function(x) -exp(x),
-    qf_label = "cloglog"
+    qf_label = "loglog"
   ),
   gumbel_max = list(
     cdf = function(x) exp(-exp(-x)),
@@ -2201,7 +2220,7 @@ neg_loglik <- function(x, params, distribution, weights = NULL) {
     pdf = function(x) exp(-x - exp(-x)),
     lcdf = function(x) -exp(-x),
     lccdf = function(x) log1m_exp(-exp(-x)),
-    qf_label = "loglog"
+    qf_label = "cloglog"
   ),
   logistic = list(
     cdf = plogis,

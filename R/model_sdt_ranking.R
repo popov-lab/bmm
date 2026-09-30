@@ -100,6 +100,14 @@ settable_links.sdt_ranking <- function(model) {
   if (model$other_vars$dist == "gumbel_min") "d" else character(0)
 }
 
+# the link on d is applied by substituting the inverse link into the
+# multinomial formula, so the model can honour inv_link()'s links, not every
+# link a brms family can emit
+#' @exportS3Method
+settable_link_functions.sdt_ranking <- function(model) {
+  eval(formals(inv_link)$link)
+}
+
 
 #' @title Ranking Signal Detection Theory Model
 #' @name sdt_ranking

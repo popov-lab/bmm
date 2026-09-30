@@ -80,6 +80,19 @@ test_that("sdt_ranking refuses any link on sdratio, and any unknown target", {
   model <- sdt_ranking(ranks4, m = 4, dist = "normal")
   model$links$sdratio <- "log"
   expect_error(check_links(model), "link of 'sdratio' cannot be changed")
+  model <- sdt_ranking(ranks4, m = 4, dist = "normal")
+  model$links$d <- "log"
+  expect_error(check_links(model), "link of 'd' cannot be changed")
+})
+
+test_that("sdt_ranking offers only the links it can invert in its formula", {
+  expect_error(
+    sdt_ranking(ranks4, m = 4, links = list(d = "sqrt")),
+    "Unknown link function"
+  )
+  model <- sdt_ranking(ranks4, m = 4)
+  model$links$d <- "sqrt"
+  expect_error(check_links(model), "Unknown link function")
 })
 
 test_that("sdt_ranking warns when it truncates a non-integer m", {

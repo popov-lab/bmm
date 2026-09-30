@@ -16,7 +16,8 @@ models, \code{NULL} auto-detects the criterion-varying predictor(s).}
 \value{
 A data frame of class \code{"bmm_sdt_roc_observed"} with columns \code{FA},
 \code{Hit}, and any condition columns. Rating models additionally include the
-(0,0) and (1,1) endpoints.
+(0,0) and (1,1) endpoints. The attribute \code{model_type} is \code{"rating"} or
+\code{"binary"}; rating results also carry \code{n_ratings}.
 }
 \description{
 Computes empirical (observed) ROC points from the response-count data used to
@@ -25,6 +26,32 @@ across observations within each stimulus type (and optional condition) to
 produce cumulative hit/false-alarm rates at each confidence threshold; binary
 models produce one operating point per criterion level (the empirical
 counterpart of the model-implied points from \code{\link[=roc_sdt]{roc_sdt()}}).
+}
+\examples{
+\dontrun{
+# Three base-rate conditions shift the criterion, which identifies sdratio
+dat <- expand.grid(id = 1:20, stimulus = c(0L, 1L),
+                   condition = c("liberal", "neutral", "strict"))
+dat$n_trials <- 100L
+criteria <- c(liberal = -0.5, neutral = 0, strict = 0.5)
+dat$n_old <- rsdt_yn(nrow(dat), dat$n_trials, dat$stimulus, d = 1.5,
+                     criterion = criteria[as.character(dat$condition)],
+                     sdratio = 1.3)
+
+fit <- bmm(
+  formula = bmf(d ~ 1, criterion ~ 0 + condition, sdratio ~ 1),
+  data = dat,
+  model = sdt_yn(response = "n_old", stimulus = "stimulus",
+                 n_trials = "n_trials"),
+  cores = 4,
+  backend = "cmdstanr"
+)
+
+# One point per base-rate condition, from the response counts
+obs <- roc_observed(fit)
+obs
+plot(roc_sdt(fit), observed = obs)
+}
 }
 \seealso{
 \code{\link[=roc_sdt]{roc_sdt()}}, \code{\link[=plot.bmm_sdt_roc]{plot.bmm_sdt_roc()}}
