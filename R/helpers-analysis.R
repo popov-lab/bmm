@@ -1420,7 +1420,8 @@ auc_sdt <- function(fit, conditions = NULL, probs = c(0.025, 0.975),
     auc_data <- do.call(rbind, result)
   } else if (is_rating) {
     has_sdratio <- .sdt_has_estimated_sdratio(model, fit)
-    auc_data <- .auc_sdt_rating_swept(fit, conditions, has_sdratio, dist, ...)
+    auc_data <- .auc_sdt_rating_swept(fit, model, conditions, has_sdratio,
+                                      dist, ...)
   } else {
     auc_data <- .auc_sdt_numerical(fit, conditions, probs, criterion_points, ...)
   }
@@ -1443,12 +1444,17 @@ auc_sdt <- function(fit, conditions = NULL, probs = c(0.025, 0.975),
 # up to 0.001 / 2 once Hit is near 1 there (sep >= 4). On real rating fits it
 # was at most 1.1e-4. The grid is placed by mean(sep), so a wide sep spread
 # across draws costs more (3e-2 for gumbel_min with sep from 0.2 to 8).
-.sdt_auc_swept <- function(sep, sdratio, dist, n_points = 1000L) {
+# Dual-process recollection lifts the curve as in .roc_sdt_rating(): its ends
+# move to (0, Ro) and (1 - Rn, 1), and the last column closes it at (1, 1).
+.sdt_auc_swept <- function(sep, sdratio, dist, ro = 0, rn = 0,
+                           n_points = 1000L) {
   cdf <- .sdt_dists[[dist]]$cdf
   qf  <- .sdt_dists[[dist]]$qf
   t_grid <- qf(1 - seq(0.001, 0.999, length.out = n_points)) - mean(sep) / 2
   fa  <- cbind(0, 1 - cdf(outer(sep / 2, t_grid, "+")), 1)
   hit <- cbind(0, 1 - cdf(sweep(outer(-sep / 2, t_grid, "+"), 1L, sdratio, "/")), 1)
+  fa  <- cbind((1 - rn) * fa, 1)
+  hit <- cbind(ro + (1 - ro) * hit, 1)
   rowSums((fa[, -1L, drop = FALSE] - fa[, -ncol(fa), drop = FALSE]) *
           (hit[, -1L, drop = FALSE] + hit[, -ncol(hit), drop = FALSE])) / 2
 }
@@ -1456,12 +1462,19 @@ auc_sdt <- function(fit, conditions = NULL, probs = c(0.025, 0.975),
 
 # roc_sdt()'s rating curve is the polygon through the K-1 thresholds, which
 # lies inside the model ROC, so rating AUC integrates the swept curve instead.
-.auc_sdt_rating_swept <- function(fit, conditions, has_sdratio, dist, ...) {
+.auc_sdt_rating_swept <- function(fit, model, conditions, has_sdratio, dist,
+                                  ...) {
   geom <- .sdt_latent_geometry(fit, conditions, has_sdratio, ...)
   n_draws <- nrow(geom$d)
+  ro_mat <- rn_mat <- matrix(0, n_draws, ncol(geom$d))
+  if (model$version == "dpsdt") {
+    ro_mat <- stats::plogis(.sdt_par_draws(fit, "Ro", conditions, ...))
+    rn_mat <- stats::plogis(.sdt_par_draws(fit, "Rn", conditions, ...))
+  }
   result <- vector("list", ncol(geom$d))
   for (c_i in seq_len(ncol(geom$d))) {
-    auc <- .sdt_auc_swept(geom$sep[, c_i], geom$sdratio[, c_i], dist)
+    auc <- .sdt_auc_swept(geom$sep[, c_i], geom$sdratio[, c_i], dist,
+                          ro_mat[, c_i], rn_mat[, c_i])
     df <- data.frame(AUC = auc, .draw = seq_len(n_draws))
     result[[c_i]] <- .sdt_bind_cond(df, conditions[c_i, , drop = FALSE])
   }

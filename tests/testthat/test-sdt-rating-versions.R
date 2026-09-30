@@ -418,6 +418,26 @@ test_that("roc_sdt reflects dual-process recollection (higher AUC, lifted curve)
   expect_true(all(attr(roc_dp, "points")$Hit_mean >= -1e-9))
 })
 
+test_that("auc_sdt() on a dpsdt fit integrates the recollection-lifted curve", {
+  fit <- fake_rating_fit(n_ratings = 6L, version = "dpsdt")
+  d_true <- 1.2
+  ro <- 0.4
+  rn <- 0.2
+  local_mocked_bindings(
+    posterior_linpred = mock_linpred_factory(
+      list(d = d_true, sdratio = 0, criterion = 0, spacing = 0,
+           Ro = qlogis(ro), Rn = qlogis(rn))),
+    ranef = function(...) list(),
+    variables = function(...) c("b_d_Intercept", "b_sdratio_Intercept"),
+    .package = "brms"
+  )
+  auc <- auc_sdt(fit)
+  # FA' = (1 - Rn) FA and Hit' = Ro + (1 - Ro) Hit up to FA' = 1 - Rn, then
+  # Hit' = 1, so the area follows from the familiarity AUC Phi(d / sqrt(2))
+  oracle <- (1 - rn) * (ro + (1 - ro) * stats::pnorm(d_true / sqrt(2))) + rn
+  expect_lt(abs(mean(auc$AUC) - oracle), 1e-3)
+})
+
 test_that("default dpsdt roc_sdt (recollection off) matches the standard roc", {
   fit_std <- fake_rating_fit(n_ratings = 6L)
   fit_dp  <- fake_rating_fit(n_ratings = 6L, version = "dpsdt")
