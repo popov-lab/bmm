@@ -139,6 +139,7 @@ Detection, recognition and confidence judgments
 \itemize{
 \item sdt_mafc(): Signal Detection Theory (m-AFC)
 \item sdt_ranking(): Signal Detection Theory (Ranking)
+\item sdt_rating(): Signal Detection Theory (Confidence Rating)
 \item sdt_yn(): Signal Detection Theory (Yes/No)
 }
 
