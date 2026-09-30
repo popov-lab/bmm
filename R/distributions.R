@@ -2445,6 +2445,8 @@ dsdt_yn <- function(n_old, n_trials, stimulus, d, criterion,
                     dist = c("normal", "gumbel_min", "gumbel_max", "logistic"),
                     log = FALSE) {
   dist <- match.arg(dist)
+  stopif(anyNA(n_old), "n_old must not contain NA")
+  stopif(anyNA(n_trials), "n_trials must not contain NA")
   stopif(any(n_old < 0), "n_old must be non-negative")
   stopif(any(n_trials < 1), "n_trials must be positive")
   stopif(any(n_old > n_trials), "n_old must not exceed n_trials")
@@ -2715,6 +2717,9 @@ dsdt_mafc <- function(n_correct, n_trials, m, d,
                                "logistic"),
                       log = FALSE) {
   dist <- match.arg(dist)
+  stopif(anyNA(m), "m must not contain NA")
+  stopif(anyNA(n_correct), "n_correct must not contain NA")
+  stopif(anyNA(n_trials), "n_trials must not contain NA")
   stopif(any(m < 2), "m must be an integer >= 2")
 
   n <- max(lengths(list(n_correct, n_trials, m, d)))
@@ -2919,6 +2924,7 @@ dsdt_ranking <- function(counts, m, d, sdratio = 1,
   stopif(any(sdratio <= 0), "sdratio must be positive")
   counts <- rbind(counts)
   n <- nrow(counts)
+  stopif(anyNA(m), "m must not contain NA")
   m <- rep_len(as.integer(m), n)
   d <- rep_len(d, n)
   sdratio <- rep_len(sdratio, n)
