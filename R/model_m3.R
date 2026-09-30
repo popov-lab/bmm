@@ -138,7 +138,7 @@ settable_link_functions.m3 <- function(model) {
 #'   the categories by name. Numbers without names, or with other names, are taken in
 #'   the order of `resp_cats`, and other names become the names of the columns
 #'   bmm adds to the data. Column names given category names, e.g.
-#'   `c(other = "n_other", corr = "n_corr")`, are matched by name as well.
+#'   `c(other = "n_other", corr = "n_corr")`, are matched by name as well, in any order.
 #' @param choice_rule The choice rule that should be used for the M3. The options are "softmax"
 #'   or "simple". The "softmax" option implements the softmax normalization of activation into
 #'   probabilities for choosing the different response categories. The "simple" option implements
