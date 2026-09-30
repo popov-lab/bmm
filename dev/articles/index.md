@@ -30,6 +30,13 @@ n-AFC, etc)
 - [The Multinomial / Memory Measurement Model
   (M3)](https://popov-lab.github.io/bmm/dev/articles/bmm_m3.md):
 
+### Signal detection & recognition
+
+Fitting signal detection models and analysing ROC/AUC
+
+- [Signal Detection Theory
+  models](https://popov-lab.github.io/bmm/dev/articles/bmm_sdt.md):
+
 ### Evidence accumulation models
 
 Fitting evidence accumulation models to response time and choice data

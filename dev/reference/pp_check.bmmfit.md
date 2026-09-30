@@ -56,7 +56,24 @@ pp_check(
   [`brms::pp_check()`](https://mc-stan.org/bayesplot/reference/pp_check.html);
   when specified, the grouped variant of `type` (e.g.,
   `"dens_overlay_grouped"`) is auto-selected if available. For
-  multinomial models, facets by the named predictor.
+  multinomial models, facets by the named predictor. For the
+  [`sdt_rating()`](https://popov-lab.github.io/bmm/dev/reference/sdt_rating.md)
+  model `group` defaults to the `stimulus` variable so the signal and
+  noise rating distributions are checked separately; pass `group = NA`
+  to pool them into a single profile. The
+  [`sdt_ranking()`](https://popov-lab.github.io/bmm/dev/reference/sdt_ranking.md)
+  model shows the rank positions as the categories of the proportion
+  profile; for mixed set sizes, pass the set-size column as `group` so
+  each facet has a homogeneous denominator. The custom-family models
+  [`sdt_yn()`](https://popov-lab.github.io/bmm/dev/reference/sdt_yn.md)
+  and
+  [`sdt_mafc()`](https://popov-lab.github.io/bmm/dev/reference/sdt_mafc.md)
+  delegate to
+  [`brms::pp_check()`](https://mc-stan.org/bayesplot/reference/pp_check.html);
+  for their aggregated counts an overlaid empirical CDF
+  (`type = "ecdf_overlay"`, adding `group = "stimulus"` for
+  [`sdt_yn()`](https://popov-lab.github.io/bmm/dev/reference/sdt_yn.md))
+  is usually clearer than the default bar view.
 
 - resp_var:
 

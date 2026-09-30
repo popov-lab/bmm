@@ -98,7 +98,17 @@ passed to <code><a href="https://mc-stan.org/bayesplot/reference/pp_check.html" 
 <dd><p>Character. Optional grouping variable for faceting. For
 non-multinomial models, passed to <code><a href="https://mc-stan.org/bayesplot/reference/pp_check.html" class="external-link">brms::pp_check()</a></code>; when specified, the
 grouped variant of <code>type</code> (e.g., <code>"dens_overlay_grouped"</code>) is auto-selected
-if available. For multinomial models, facets by the named predictor.</p></dd>
+if available. For multinomial models, facets by the named predictor. For
+the <code><a href="sdt_rating.html">sdt_rating()</a></code> model <code>group</code> defaults to the <code>stimulus</code> variable so the
+signal and noise rating distributions are checked separately; pass
+<code>group = NA</code> to pool them into a single profile. The <code><a href="sdt_ranking.html">sdt_ranking()</a></code> model
+shows the rank positions as the categories of the proportion profile; for
+mixed set sizes, pass the set-size column as <code>group</code> so each facet has a
+homogeneous denominator. The custom-family
+models <code><a href="sdt_yn.html">sdt_yn()</a></code> and <code><a href="sdt_mafc.html">sdt_mafc()</a></code> delegate to <code><a href="https://mc-stan.org/bayesplot/reference/pp_check.html" class="external-link">brms::pp_check()</a></code>; for
+their aggregated counts an overlaid empirical CDF (<code>type = "ecdf_overlay"</code>,
+adding <code>group = "stimulus"</code> for <code><a href="sdt_yn.html">sdt_yn()</a></code>) is usually clearer than the
+default bar view.</p></dd>
 
 
 <dt id="arg-resp-var">resp_var<a class="anchor" aria-label="anchor" href="#arg-resp-var"></a></dt>

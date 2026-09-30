@@ -91,6 +91,29 @@
   error now points to
   [`bmm_setup()`](https://popov-lab.github.io/bmm/dev/reference/bmm_setup.md)
   ([\#431](https://github.com/popov-lab/bmm/issues/431)).
+- New post-processing functions for the signal detection models:
+  [`roc_sdt()`](https://popov-lab.github.io/bmm/dev/reference/roc_sdt.md),
+  [`roc_observed()`](https://popov-lab.github.io/bmm/dev/reference/roc_observed.md)
+  and
+  [`auc_sdt()`](https://popov-lab.github.io/bmm/dev/reference/auc_sdt.md)
+  return the model-implied and observed ROC and the area under it for
+  `sdt_yn` and `sdt_rating`;
+  [`latent_sdt()`](https://popov-lab.github.io/bmm/dev/reference/latent_sdt.md)
+  the latent evidence distributions of all four models;
+  [`sdt_thresholds()`](https://popov-lab.github.io/bmm/dev/reference/sdt_thresholds.md)
+  the confidence thresholds of `sdt_rating`; and
+  [`sdt_sensitivity()`](https://popov-lab.github.io/bmm/dev/reference/sdt_sensitivity.md)
+  the sensitivity on the noise, signal or root-mean-square SD scale. All
+  but
+  [`roc_observed()`](https://popov-lab.github.io/bmm/dev/reference/roc_observed.md)
+  print a summary;
+  [`plot()`](https://rdrr.io/r/graphics/plot.default.html) draws the ROC
+  with the observed points, the AUC and the latent distributions;
+  [`summary()`](https://rdrr.io/r/base/summary.html) says when `d` is
+  *d_a*. The new article *Signal Detection Theory models* walks through
+  all four models and these functions
+  ([\#370](https://github.com/popov-lab/bmm/issues/370)). Thanks to
+  [@GidonFrischkorn](https://github.com/GidonFrischkorn)
 - `bmm(file_refit = "on_change")` is now implemented and no longer warns
   and falls back to `"never"`. The cached fit saved under `file` is
   returned only while the Stan code, the Stan data, the factor levels of

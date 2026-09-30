@@ -175,7 +175,9 @@ Macmillan and Creelman (2005), and Mickes et al. (2007) recommend under
 unequal variance. The classical noise-standardized index is
 \(d_N = \delta = d_a \sqrt{(1 + r^2)/2}\), so a published \(d'\) from an
 unequal-variance analysis is larger than <code>d</code> when \(r &gt; 1\): by 13% at
-\(r = 1.25\) and by 33% at \(r = 1.6\).</p>
+\(r = 1.25\) and by 33% at \(r = 1.6\). <code><a href="sdt_sensitivity.html">sdt_sensitivity()</a></code> returns
+\(d_N\) and the signal-standardized \(d_S\) from a fitted model, and
+<code><a href="https://rdrr.io/r/base/summary.html" class="external-link">summary()</a></code> notes when <code>d</code> is \(d_a\).</p>
 <p><code>d</code> is \(d_a\) rather than \(d_N\) because only \(d_a\) is comparable
 across conditions or subjects that differ in <code>sdratio</code>: two conditions that
 are equally discriminable can show a large, confidently estimated difference

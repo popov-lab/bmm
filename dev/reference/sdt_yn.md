@@ -171,6 +171,10 @@ variance. The classical noise-standardized index is \\d_N = \delta = d_a
 \sqrt{(1 + r^2)/2}\\, so a published \\d'\\ from an unequal-variance
 analysis is larger than `d` when \\r \> 1\\: by 13% at \\r = 1.25\\ and
 by 33% at \\r = 1.6\\.
+[`sdt_sensitivity()`](https://popov-lab.github.io/bmm/dev/reference/sdt_sensitivity.md)
+returns \\d_N\\ and the signal-standardized \\d_S\\ from a fitted model,
+and [`summary()`](https://rdrr.io/r/base/summary.html) notes when `d` is
+\\d_a\\.
 
 `d` is \\d_a\\ rather than \\d_N\\ because only \\d_a\\ is comparable
 across conditions or subjects that differ in `sdratio`: two conditions

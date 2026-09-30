@@ -386,6 +386,30 @@ Main functions for model fitting
 - [`pp_check(`*`<bmmfit>`*`)`](https://popov-lab.github.io/bmm/dev/reference/pp_check.bmmfit.md)
   : Posterior predictive check for bmmfit objects
 
+## Model evaluation & post-processing
+
+ROC/AUC, quantile-transformed ROC, and latent-distribution analysis for
+signal detection models
+
+- [`roc_sdt()`](https://popov-lab.github.io/bmm/dev/reference/roc_sdt.md)
+  : Model-implied ROC curve from a fitted SDT model
+- [`roc_observed()`](https://popov-lab.github.io/bmm/dev/reference/roc_observed.md)
+  : Observed ROC points from a fitted SDT model
+- [`auc_sdt()`](https://popov-lab.github.io/bmm/dev/reference/auc_sdt.md)
+  : Area under the ROC curve from a fitted SDT model
+- [`latent_sdt()`](https://popov-lab.github.io/bmm/dev/reference/latent_sdt.md)
+  : Model-implied latent decision-variable distributions
+- [`sdt_thresholds()`](https://popov-lab.github.io/bmm/dev/reference/sdt_thresholds.md)
+  : Latent decision thresholds from a fitted rating SDT model
+- [`sdt_sensitivity()`](https://popov-lab.github.io/bmm/dev/reference/sdt_sensitivity.md)
+  : Sensitivity on the noise, signal, or root-mean-square scale
+- [`plot(`*`<bmm_sdt_roc>`*`)`](https://popov-lab.github.io/bmm/dev/reference/plot.bmm_sdt_roc.md)
+  : Plot a model-implied SDT ROC curve
+- [`plot(`*`<bmm_sdt_auc>`*`)`](https://popov-lab.github.io/bmm/dev/reference/plot.bmm_sdt_auc.md)
+  : Plot the posterior AUC distribution from a fitted SDT model
+- [`plot(`*`<bmm_sdt_latent>`*`)`](https://popov-lab.github.io/bmm/dev/reference/plot.bmm_sdt_latent.md)
+  : Plot the latent decision-variable distributions of an SDT model
+
 ## Extract model information
 
 Utility functions for extracting default priors, generate stan code,
@@ -687,6 +711,13 @@ n-AFC, etc)
 
 - [The Multinomial / Memory Measurement Model
   (M3)](https://popov-lab.github.io/bmm/dev/articles/bmm_m3.md):
+
+### Signal detection & recognition
+
+Fitting signal detection models and analysing ROC/AUC
+
+- [Signal Detection Theory
+  models](https://popov-lab.github.io/bmm/dev/articles/bmm_sdt.md):
 
 ### Evidence accumulation models
 

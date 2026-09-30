@@ -12,6 +12,7 @@
 <url><loc>https://popov-lab.github.io/bmm/dev/articles/bmm_mixture_models.html</loc></url>
 <url><loc>https://popov-lab.github.io/bmm/dev/articles/bmm_rt_contamination.html</loc></url>
 <url><loc>https://popov-lab.github.io/bmm/dev/articles/bmm_sdm_simple.html</loc></url>
+<url><loc>https://popov-lab.github.io/bmm/dev/articles/bmm_sdt.html</loc></url>
 <url><loc>https://popov-lab.github.io/bmm/dev/articles/bmm_vwm_crt.html</loc></url>
 <url><loc>https://popov-lab.github.io/bmm/dev/articles/index.html</loc></url>
 <url><loc>https://popov-lab.github.io/bmm/dev/authors.html</loc></url>
@@ -23,6 +24,7 @@
 <url><loc>https://popov-lab.github.io/bmm/dev/reference/SDTdist.html</loc></url>
 <url><loc>https://popov-lab.github.io/bmm/dev/reference/adjust_ezdm_accuracy.html</loc></url>
 <url><loc>https://popov-lab.github.io/bmm/dev/reference/apply_links.html</loc></url>
+<url><loc>https://popov-lab.github.io/bmm/dev/reference/auc_sdt.html</loc></url>
 <url><loc>https://popov-lab.github.io/bmm/dev/reference/bmf2bf.html</loc></url>
 <url><loc>https://popov-lab.github.io/bmm/dev/reference/bmm-package.html</loc></url>
 <url><loc>https://popov-lab.github.io/bmm/dev/reference/bmm.html</loc></url>
@@ -61,6 +63,7 @@
 <url><loc>https://popov-lab.github.io/bmm/dev/reference/imm.html</loc></url>
 <url><loc>https://popov-lab.github.io/bmm/dev/reference/index.html</loc></url>
 <url><loc>https://popov-lab.github.io/bmm/dev/reference/k2sd.html</loc></url>
+<url><loc>https://popov-lab.github.io/bmm/dev/reference/latent_sdt.html</loc></url>
 <url><loc>https://popov-lab.github.io/bmm/dev/reference/m3.html</loc></url>
 <url><loc>https://popov-lab.github.io/bmm/dev/reference/m3dist.html</loc></url>
 <url><loc>https://popov-lab.github.io/bmm/dev/reference/meyer_grant_jakob_2025.html</loc></url>
@@ -73,6 +76,9 @@
 <url><loc>https://popov-lab.github.io/bmm/dev/reference/oberauer_lewandowsky_2019_e1.html</loc></url>
 <url><loc>https://popov-lab.github.io/bmm/dev/reference/oberauer_lin_2017.html</loc></url>
 <url><loc>https://popov-lab.github.io/bmm/dev/reference/parameters.html</loc></url>
+<url><loc>https://popov-lab.github.io/bmm/dev/reference/plot.bmm_sdt_auc.html</loc></url>
+<url><loc>https://popov-lab.github.io/bmm/dev/reference/plot.bmm_sdt_latent.html</loc></url>
+<url><loc>https://popov-lab.github.io/bmm/dev/reference/plot.bmm_sdt_roc.html</loc></url>
 <url><loc>https://popov-lab.github.io/bmm/dev/reference/postprocess_brm.html</loc></url>
 <url><loc>https://popov-lab.github.io/bmm/dev/reference/pp_check.bmmfit.html</loc></url>
 <url><loc>https://popov-lab.github.io/bmm/dev/reference/pp_check_vars.html</loc></url>
@@ -82,6 +88,8 @@
 <url><loc>https://popov-lab.github.io/bmm/dev/reference/report_priors.html</loc></url>
 <url><loc>https://popov-lab.github.io/bmm/dev/reference/restructure.bmmfit.html</loc></url>
 <url><loc>https://popov-lab.github.io/bmm/dev/reference/revert_postprocess_brm.html</loc></url>
+<url><loc>https://popov-lab.github.io/bmm/dev/reference/roc_observed.html</loc></url>
+<url><loc>https://popov-lab.github.io/bmm/dev/reference/roc_sdt.html</loc></url>
 <url><loc>https://popov-lab.github.io/bmm/dev/reference/sdm.html</loc></url>
 <url><loc>https://popov-lab.github.io/bmm/dev/reference/sdt_mafc.html</loc></url>
 <url><loc>https://popov-lab.github.io/bmm/dev/reference/sdt_mafc_dist.html</loc></url>
@@ -91,6 +99,8 @@
 <url><loc>https://popov-lab.github.io/bmm/dev/reference/sdt_rating.html</loc></url>
 <url><loc>https://popov-lab.github.io/bmm/dev/reference/sdt_rating_dist.html</loc></url>
 <url><loc>https://popov-lab.github.io/bmm/dev/reference/sdt_rating_logmu.html</loc></url>
+<url><loc>https://popov-lab.github.io/bmm/dev/reference/sdt_sensitivity.html</loc></url>
+<url><loc>https://popov-lab.github.io/bmm/dev/reference/sdt_thresholds.html</loc></url>
 <url><loc>https://popov-lab.github.io/bmm/dev/reference/sdt_yn.html</loc></url>
 <url><loc>https://popov-lab.github.io/bmm/dev/reference/sdt_yn_dist.html</loc></url>
 <url><loc>https://popov-lab.github.io/bmm/dev/reference/softmax.html</loc></url>
