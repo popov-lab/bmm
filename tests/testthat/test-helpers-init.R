@@ -1049,3 +1049,15 @@ test_that("sdt_yn with a softplus criterion gets a finite init list", {
   expect_no_warning(inits <- lapply(1:50, function(i) init_fun()))
   expect_true(all(is.finite(unlist(inits))))
 })
+
+test_that("a softmax range stays on the sampling scale and a single point is not drawn", {
+  # a softmax weight's range is not a (0, 1) probability, so it is not clipped
+  model <- list(
+    parameters = list(thetat = ""), init_ranges = list(thetat = c(-2, -1)),
+    links = list(thetat = "softmax")
+  )
+  init <- init_fixef_param("Intercept_thetat", "real", 1, model, list())
+  expect_true(init >= -2 && init <= -1)
+  # log(0) is -Inf: the one point log cannot represent leaves nothing to draw from
+  expect_null(representable_range(c(-1, 0), "log"))
+})
