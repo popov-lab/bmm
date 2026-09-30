@@ -110,6 +110,16 @@ check_formula.sdt <- function(model, data, formula) {
   as.integer(stim_vals)
 }
 
+# Character and factor columns would otherwise reach arithmetic and stop with
+# base-R errors that never name the column. An all-NA column is logical in R
+# but is a valid structural zero for rows with a smaller set size.
+.check_sdt_count_numeric <- function(vals, kind, name) {
+  stopif(!is.numeric(vals) && !(is.logical(vals) && all(is.na(vals))),
+    "{kind} '{name}' must be numeric (it is {class(vals)[1]}). Convert it with \\
+    as.numeric() before fitting; for a factor use \\
+    as.numeric(as.character(x)), as as.numeric(x) returns the level codes")
+}
+
 .validate_sdt_counts <- function(data, resp_var, n_trials_var) {
   required <- c(resp_var, n_trials_var)
   missing <- setdiff(required, colnames(data))
@@ -117,6 +127,8 @@ check_formula.sdt <- function(model, data, formula) {
     "Variables {collapse_comma(missing)} missing in the data")
 
   resp_vals <- data[[resp_var]]
+  .check_sdt_count_numeric(resp_vals, "Response variable", resp_var)
+  .check_sdt_count_numeric(data[[n_trials_var]], "Variable", n_trials_var)
   stopif(any(resp_vals < 0, na.rm = TRUE),
     "Response variable '{resp_var}' must contain non-negative counts")
   warnif(any(resp_vals != round(resp_vals), na.rm = TRUE),
@@ -141,6 +153,7 @@ check_formula.sdt <- function(model, data, formula) {
 
   for (col in resp_cols) {
     vals <- data[[col]]
+    .check_sdt_count_numeric(vals, "Response column", col)
     stopif(any(vals < 0, na.rm = TRUE),
       "Response column '{col}' must contain non-negative counts")
     warnif(any(vals != round(vals), na.rm = TRUE),

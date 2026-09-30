@@ -219,6 +219,40 @@ test_that("sdt_yn check_data validates required columns", {
   )
 })
 
+test_that("sdt_yn check_data refuses non-numeric count columns", {
+  model <- sdt_yn("n_old", "stimulus", "n_trials")
+  formula <- bmf(d ~ 1, criterion ~ 1)
+  dat <- data.frame(n_old = c(30, 40), stimulus = c(0L, 1L),
+                    n_trials = c(50, 50))
+
+  for (conv in list(as.character, as.factor)) {
+    bad <- dat
+    bad$n_old <- conv(bad$n_old)
+    expect_error(check_data(model, bad, formula),
+                 "Response variable 'n_old' must be numeric")
+
+    bad <- dat
+    bad$n_trials <- conv(bad$n_trials)
+    expect_error(check_data(model, bad, formula),
+                 "Variable 'n_trials' must be numeric")
+  }
+})
+
+test_that("sdt_yn check_data still only warns on non-integer counts", {
+  model <- sdt_yn("n_old", "stimulus", "n_trials")
+  dat <- data.frame(n_old = c(30.5, 40), stimulus = c(0L, 1L),
+                    n_trials = c(50, 50))
+  expect_warning(check_data(model, dat, bmf(d ~ 1, criterion ~ 1)),
+                 "should contain integer counts")
+})
+
+test_that("dsdt_yn refuses NA counts", {
+  expect_error(dsdt_yn(NA, 10, 1, d = 1, criterion = 0),
+               "n_old must not contain NA")
+  expect_error(dsdt_yn(5, NA, 1, d = 1, criterion = 0),
+               "n_trials must not contain NA")
+})
+
 test_that("sdt_yn check_data validates stimulus coding", {
   model <- sdt_yn("n_old", "stimulus", "n_trials")
   formula <- bmf(d ~ 1, criterion ~ 1)
