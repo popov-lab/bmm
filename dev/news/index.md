@@ -482,6 +482,20 @@
   parameter are an error. If `fit$formula$formula` shows a category
   twice, as in `log(corr * corr)`, refit the model, e.g. with
   `update(fit)` ([\#449](https://github.com/popov-lab/bmm/issues/449)).
+- **m3** no longer pairs column names in `num_options` with the wrong
+  response categories when they are named after the categories in
+  another order than `resp_cats`, as in
+  `num_options = c(other = "n_other", corr = "n_corr", dist = "n_dist", npl = "n_npl")`.
+  Each category silently got another category’s column. Such names are
+  now matched by name;
+  [`m3()`](https://popov-lab.github.io/bmm/dev/reference/m3.md) refuses
+  partly or repeatedly named column names and `NA` among numeric counts.
+  If `fit$formula$formula` shows the wrong column,
+  e.g. `log(other * n_corr)`, refit with
+  [`bmm()`](https://popov-lab.github.io/bmm/dev/reference/bmm.md) on
+  your original data; `update(fit)` without `newdata` stops when it
+  cannot rebuild such a fit
+  ([\#457](https://github.com/popov-lab/bmm/issues/457)).
 - [`dm3()`](https://popov-lab.github.io/bmm/dev/reference/m3dist.md) and
   [`rm3()`](https://popov-lab.github.io/bmm/dev/reference/m3dist.md) no
   longer mix up the response categories when the activation formulas are
