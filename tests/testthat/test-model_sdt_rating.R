@@ -269,6 +269,22 @@ test_that("sdt_rating check_data refuses non-numeric count columns", {
   }
 })
 
+test_that("sdt_rating check_data refuses an all-NA column as NA, not a type", {
+  model <- sdt_rating(c("r1", "r2", "r3", "r4"), "stimulus")
+  dat <- data.frame(r1 = c(10, 5), r2 = c(20, 10), r3 = c(15, 30),
+                    r4 = NA, stimulus = c(0L, 1L))
+  expect_error(check_data(model, dat, bmf(d ~ 1, criterion ~ 1, spacing ~ 1)),
+               "must not contain NA counts")
+})
+
+test_that("sdt_rating check_data still only warns on non-integer counts", {
+  model <- sdt_rating(c("r1", "r2", "r3", "r4"), "stimulus")
+  dat <- data.frame(r1 = c(10.5, 5), r2 = c(20, 10), r3 = c(15, 30),
+                    r4 = c(5, 55), stimulus = c(0L, 1L))
+  expect_warning(check_data(model, dat, bmf(d ~ 1, criterion ~ 1, spacing ~ 1)),
+                 "Response column 'r1' should contain integer counts")
+})
+
 test_that("sdt_rating check_data rejects missing response columns", {
   model <- sdt_rating(c("r1", "r2", "r3", "r4"), "stimulus")
   formula <- bmf(d ~ 1, criterion ~ 1, spacing ~ 1)

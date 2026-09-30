@@ -133,6 +133,13 @@ test_that("sdt_mafc check_data refuses non-numeric count columns", {
   }
 })
 
+test_that("sdt_mafc check_data still only warns on non-integer counts", {
+  model <- sdt_mafc("n_correct", "n_trials", m = 4)
+  dat <- data.frame(n_correct = c(70.5, 65), n_trials = c(100, 100))
+  expect_warning(check_data(model, dat, bmf(d ~ 1)),
+                 "Response variable 'n_correct' should contain integer counts")
+})
+
 test_that("dsdt_mafc refuses NA in m and the counts", {
   expect_error(dsdt_mafc(5, 10, m = NA, d = 1), "m must not contain NA")
   expect_error(dsdt_mafc(NA, 10, m = 4, d = 1),

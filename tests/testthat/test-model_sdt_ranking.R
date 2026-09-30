@@ -548,6 +548,14 @@ test_that("check_data refuses non-numeric count columns", {
   }
 })
 
+test_that("check_data still only warns on non-integer counts", {
+  model <- sdt_ranking(ranks4, m = 4)
+  dat <- data.frame(rank1 = c(40.5, 30), rank2 = c(30, 30), rank3 = c(20, 20),
+                    rank4 = c(10, 20))
+  expect_warning(check_data(model, dat, bmf(d ~ 1)),
+                 "Response column 'rank1' should contain integer counts")
+})
+
 test_that("dsdt_ranking refuses NA in m", {
   expect_error(dsdt_ranking(c(40, 30, 20, 10), m = NA, d = 1),
                "m must not contain NA")
