@@ -505,6 +505,11 @@
   estimate, which reports a real mismatch with the data, not this bug.
   Rerun affected computations
   ([\#453](https://github.com/popov-lab/bmm/issues/453)).
+- **ddm**, **ezdm** and **cswald** no longer fail before sampling when a
+  parameter gets a link that excludes values its default link allows,
+  such as a `log` or `softplus` link on `drift`
+  (`Variable 'Intercept_drift' has NA values`)
+  ([\#460](https://github.com/popov-lab/bmm/issues/460)).
 
 #### Other changes
 
