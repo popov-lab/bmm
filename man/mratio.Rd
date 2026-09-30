@@ -9,15 +9,18 @@ mratio(fit, conditions = NULL, probs = c(0.025, 0.975), ...)
 \arguments{
 \item{fit}{A \code{bmmfit} object returned by \code{\link[=bmm]{bmm()}} from an SDT model.}
 
-\item{conditions}{Optional data frame of predictor values for which to
-compute the ROC curve. Column names must match predictor variables used in
+\item{conditions}{Optional data frame of predictor values at which to
+evaluate the model. Column names must match predictor variables used in
 the formula. If \code{NULL} (default), unique predictor combinations are derived
 from the data.}
 
 \item{probs}{Numeric vector of length 2. Lower and upper quantiles for the
 credible interval (default \code{c(0.025, 0.975)}).}
 
-\item{...}{Additional arguments passed to \code{\link[brms:posterior_linpred]{brms::posterior_linpred()}}.}
+\item{...}{Additional arguments passed to \code{\link[brms:posterior_linpred]{brms::posterior_linpred()}}, such as
+\code{draw_ids} to use a subset of the posterior draws. \code{ndraws} is refused:
+each parameter is drawn by its own call, so random subsets would not match
+across parameters.}
 }
 \value{
 A data frame of class \code{"bmm_sdt_mratio"} summarising the posterior:

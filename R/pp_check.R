@@ -392,7 +392,7 @@ pp_check.bmmfit <- function(object, type = NULL, ndraws = NULL,
   data <- fit$data
   model <- fit$bmm$model
   resp_cols <- unlist(model$resp_vars)
-  re_vars <- names(brms::ranef(fit))
+  re_vars <- .group_vars(fit)
   exclude <- unique(c(resp_cols, "nTrials", re_vars))
 
   pred_cols <- setdiff(names(data), exclude)

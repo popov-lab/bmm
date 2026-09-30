@@ -16,8 +16,8 @@ roc_sdt(
 \arguments{
 \item{fit}{A \code{bmmfit} object returned by \code{\link[=bmm]{bmm()}} from an SDT model.}
 
-\item{conditions}{Optional data frame of predictor values for which to
-compute the ROC curve. Column names must match predictor variables used in
+\item{conditions}{Optional data frame of predictor values at which to
+evaluate the model. Column names must match predictor variables used in
 the formula. If \code{NULL} (default), unique predictor combinations are derived
 from the data.}
 
@@ -36,7 +36,10 @@ on one curve. Pass a character vector of column names to force that
 classification, or \code{FALSE} to disable it (one separate curve per predictor
 combination). Ignored for rating models.}
 
-\item{...}{Additional arguments passed to \code{\link[brms:posterior_linpred]{brms::posterior_linpred()}}.}
+\item{...}{Additional arguments passed to \code{\link[brms:posterior_linpred]{brms::posterior_linpred()}}, such as
+\code{draw_ids} to use a subset of the posterior draws. \code{ndraws} is refused:
+each parameter is drawn by its own call, so random subsets would not match
+across parameters.}
 }
 \value{
 A data frame of class \code{"bmm_sdt_roc"} with columns \code{FA}, \code{Hit},
@@ -45,6 +48,13 @@ attribute (\code{FA}, \code{Hit_mean}, \code{Hit_lower}, \code{Hit_upper}) with 
 model-implied curve, and a \code{points} attribute with the model-implied
 operating points: one per criterion level for binary multi-criteria fits,
 or the K-1 confidence thresholds (labelled \code{t1}..\code{t(K-1)}) for rating fits.
+It also carries the attributes \code{probs}, \code{model_class}, \code{dist},
+\code{is_rating} and \code{conditions}, which the \code{print()} and \code{plot()} methods read.
+The \code{Hit_lower} and \code{Hit_upper} columns in the \code{summary} attribute are the
+pointwise posterior quantiles of the hit rate at each criterion value,
+plotted at that criterion's posterior-mean false-alarm rate; this band does
+not include uncertainty in the false-alarm rate and is narrower than a
+credible band at a fixed false-alarm rate.
 }
 \description{
 Computes the receiver operating characteristic (ROC) curve implied by the
@@ -68,6 +78,32 @@ model-implied curve is traced over a virtual cut from the posterior of
 \code{d} (and \code{sdratio}) and attached as the \code{summary} attribute, with the K-1
 thresholds attached as the \code{points} attribute (labelled \code{t1}..\code{t(K-1)}) so
 they fall on the curve.
+}
+\examples{
+\dontrun{
+# Three base-rate conditions shift the criterion, which identifies sdratio
+dat <- expand.grid(id = 1:20, stimulus = c(0L, 1L),
+                   condition = c("liberal", "neutral", "strict"))
+dat$n_trials <- 100L
+criteria <- c(liberal = -0.5, neutral = 0, strict = 0.5)
+dat$n_old <- rsdt_yn(nrow(dat), dat$n_trials, dat$stimulus, d = 1.5,
+                     criterion = criteria[as.character(dat$condition)],
+                     sdratio = 1.3)
+
+fit <- bmm(
+  formula = bmf(d ~ 1, criterion ~ 0 + condition, sdratio ~ 1),
+  data = dat,
+  model = sdt_yn(response = "n_old", stimulus = "stimulus",
+                 n_trials = "n_trials"),
+  cores = 4,
+  backend = "cmdstanr"
+)
+
+roc <- roc_sdt(fit)
+roc
+plot(roc, observed = roc_observed(fit))
+plot(roc, observed = roc_observed(fit), scale = "quantile")
+}
 }
 \seealso{
 \code{\link[=auc_sdt]{auc_sdt()}}, \code{\link[=roc_observed]{roc_observed()}}, \code{\link[=plot.bmm_sdt_roc]{plot.bmm_sdt_roc()}}

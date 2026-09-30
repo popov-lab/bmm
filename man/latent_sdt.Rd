@@ -17,8 +17,8 @@ latent_sdt(
 \arguments{
 \item{fit}{A \code{bmmfit} object returned by \code{\link[=bmm]{bmm()}} from an SDT model.}
 
-\item{conditions}{Optional data frame of predictor values for which to
-compute the ROC curve. Column names must match predictor variables used in
+\item{conditions}{Optional data frame of predictor values at which to
+evaluate the model. Column names must match predictor variables used in
 the formula. If \code{NULL} (default), unique predictor combinations are derived
 from the data.}
 
@@ -39,9 +39,14 @@ collapse, or \code{FALSE} to facet every dimension (one panel per combination).}
 only, additionally overlay the density of the maximum of the \code{m - 1}
 distractor samples (one curve per set size) -- the "effective competitor"
 the target must beat -- which shifts rightward as \code{m} grows and visualises
-why accuracy falls with set size. Ignored for \code{sdt_yn}/\code{sdt_rating}.}
+why accuracy falls with set size. The overlay shows the set sizes in the
+fitted data, whatever \code{conditions} requests. Ignored for
+\code{sdt_yn}/\code{sdt_rating}.}
 
-\item{...}{Additional arguments passed to \code{\link[brms:posterior_linpred]{brms::posterior_linpred()}}.}
+\item{...}{Additional arguments passed to \code{\link[brms:posterior_linpred]{brms::posterior_linpred()}}, such as
+\code{draw_ids} to use a subset of the posterior draws. \code{ndraws} is refused:
+each parameter is drawn by its own call, so random subsets would not match
+across parameters.}
 }
 \value{
 A data frame of class \code{"bmm_sdt_latent"} with columns \code{x} (the
@@ -50,7 +55,9 @@ faceting (density) condition columns. A \code{lines} attribute holds the
 decision-boundary positions (columns \code{position}, \code{lower}, \code{upper}, \code{marker},
 \code{level}, plus condition columns), or \code{NULL} for the criterion-free
 \code{sdt_mafc}/\code{sdt_ranking} models. When \code{show_competitors = TRUE}, a
-\code{competitors} attribute holds the max-of-distractors densities.
+\code{competitors} attribute holds the max-of-distractors densities. The object
+also carries \code{probs}, \code{model_class}, \code{dist}, \code{is_rating} and \code{conditions}
+(the conditions of the density panels).
 }
 \description{
 Computes the noise and signal latent decision-variable densities implied by a
@@ -86,6 +93,31 @@ colour-coded, rather than shown as repeated identical panels. Predictors that
 vary \code{d}/\code{sdratio} produce distinct density panels (faceted). For
 \code{sdt_mafc}/\code{sdt_ranking} the set size is likewise collapsed unless it predicts
 \code{d}. Use \code{collapse} to override the auto-detection.
+}
+\examples{
+\dontrun{
+# Three base-rate conditions shift the criterion, which identifies sdratio
+dat <- expand.grid(id = 1:20, stimulus = c(0L, 1L),
+                   condition = c("liberal", "neutral", "strict"))
+dat$n_trials <- 100L
+criteria <- c(liberal = -0.5, neutral = 0, strict = 0.5)
+dat$n_old <- rsdt_yn(nrow(dat), dat$n_trials, dat$stimulus, d = 1.5,
+                     criterion = criteria[as.character(dat$condition)],
+                     sdratio = 1.3)
+
+fit <- bmm(
+  formula = bmf(d ~ 1, criterion ~ 0 + condition, sdratio ~ 1),
+  data = dat,
+  model = sdt_yn(response = "n_old", stimulus = "stimulus",
+                 n_trials = "n_trials"),
+  cores = 4,
+  backend = "cmdstanr"
+)
+
+latent <- latent_sdt(fit)
+latent
+plot(latent)
+}
 }
 \seealso{
 \code{\link[=roc_sdt]{roc_sdt()}}, \code{\link[=plot.bmm_sdt_latent]{plot.bmm_sdt_latent()}}

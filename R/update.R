@@ -225,8 +225,9 @@ update.bmmfit <- function(object, formula., newdata = NULL, recompile = NULL,
 # as a predictor of the wrong type. Dropping it also leaves the column NULL for
 # the configure_prior methods of the non-target models, which read it to decide
 # whether set size 1 needs a constant prior. That is inert only because a column
-# gets rebuilt exactly when no formula names it, and the constraint helpers
-# return NULL in that case
+# gets rebuilt exactly when the fitted formula does not name it, and the
+# constraint helpers then return NULL; a new formula. that names it fails in
+# brms, because the column is no longer in the data
 check_stored_data <- function(model, data, formula) {
   stored <- revert_check_data(model, data)
   rebuilt <- attr(stored, "rebuilt")

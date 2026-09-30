@@ -19,20 +19,24 @@ sdt_sensitivity(
 (root-mean-square SD, the estimated parameter), \code{"dn"} (noise SD), and/or
 \code{"ds"} (signal SD). Defaults to all three.}
 
-\item{conditions}{Optional data frame of predictor values for which to
-compute the ROC curve. Column names must match predictor variables used in
+\item{conditions}{Optional data frame of predictor values at which to
+evaluate the model. Column names must match predictor variables used in
 the formula. If \code{NULL} (default), unique predictor combinations are derived
 from the data.}
 
 \item{probs}{Numeric vector of length 2. Lower and upper quantiles for the
 credible interval (default \code{c(0.025, 0.975)}).}
 
-\item{...}{Additional arguments passed to \code{\link[brms:posterior_linpred]{brms::posterior_linpred()}}.}
+\item{...}{Additional arguments passed to \code{\link[brms:posterior_linpred]{brms::posterior_linpred()}}, such as
+\code{draw_ids} to use a subset of the posterior draws. \code{ndraws} is refused:
+each parameter is drawn by its own call, so random subsets would not match
+across parameters.}
 }
 \value{
 A data frame of class \code{"bmm_sdt_sensitivity"} with columns \code{measure},
 \code{value}, \code{.draw}, and any condition columns. The object carries a \code{summary}
-attribute (\code{measure}, \code{mean}, \code{lower}, \code{upper}, plus condition columns).
+attribute (\code{measure}, \code{mean}, \code{lower}, \code{upper}, plus condition columns),
+and \code{probs}, \code{model_class}, \code{dist} and \code{conditions} attributes.
 }
 \description{
 Re-expresses the posterior sensitivity of a fitted SDT model against a
@@ -62,8 +66,8 @@ The estimated parameter is \eqn{d_a}, hence
       d_S = d_a \sqrt{(1 + \sigma_S^2)/2} \,/\, \sigma_S.}
 
 All three coincide when \code{sdratio} is 0 (equal variance), which is the case
-for \code{\link[=sdt_mafc]{sdt_mafc()}} and for any fit that does not give \code{sdratio} a formula. The
-conversion is applied draw by draw, so the returned intervals propagate the
+for \code{\link[=sdt_mafc]{sdt_mafc()}} and for any fit that leaves \code{sdratio} at its default of 0.
+The conversion is applied draw by draw, so the returned intervals propagate the
 joint posterior uncertainty in \code{d} and \code{sdratio} rather than combining
 point estimates.
 
@@ -81,6 +85,31 @@ noise-SD axis whichever sensitivity scale you report. Under the Gumbel
 distributions with \code{sdratio} estimated, none of the three is the
 AUC-equivalent index; use \code{\link[=auc_sdt]{auc_sdt()}} to compare discriminability on the
 probability scale.
+}
+\examples{
+\dontrun{
+# Three base-rate conditions shift the criterion, which identifies sdratio
+dat <- expand.grid(id = 1:20, stimulus = c(0L, 1L),
+                   condition = c("liberal", "neutral", "strict"))
+dat$n_trials <- 100L
+criteria <- c(liberal = -0.5, neutral = 0, strict = 0.5)
+dat$n_old <- rsdt_yn(nrow(dat), dat$n_trials, dat$stimulus, d = 1.5,
+                     criterion = criteria[as.character(dat$condition)],
+                     sdratio = 1.3)
+
+fit <- bmm(
+  formula = bmf(d ~ 1, criterion ~ 0 + condition, sdratio ~ 1),
+  data = dat,
+  model = sdt_yn(response = "n_old", stimulus = "stimulus",
+                 n_trials = "n_trials"),
+  cores = 4,
+  backend = "cmdstanr"
+)
+
+# d_a (the fitted d), d_N and d_S, converted draw by draw
+sdt_sensitivity(fit)
+sdt_sensitivity(fit, measure = "dn", draw_ids = 1:500)
+}
 }
 \seealso{
 \code{\link[=auc_sdt]{auc_sdt()}}, \code{\link[=roc_sdt]{roc_sdt()}}, \code{\link[=latent_sdt]{latent_sdt()}}

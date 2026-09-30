@@ -38,7 +38,10 @@ axes (the inverse CDF of the fitted noise distribution).}
 \item{...}{Ignored.}
 }
 \value{
-A \code{ggplot2} object.
+A \code{ggplot2} object. The credible band (ribbon) is the pointwise
+posterior interval of the hit rate at each criterion value, plotted at
+that criterion's posterior-mean false-alarm rate; it does not include
+uncertainty in the false-alarm rate.
 }
 \description{
 Shows the smooth model-implied ROC as a credible-band ribbon, with the
@@ -51,18 +54,16 @@ multi-criteria fits the points are the several criterion levels; for
 }
 \details{
 With \code{scale = "quantile"} (or its alias \code{scale = "z"}) the rates are read on
-the distribution's quantile axis: \code{qf(rate)}, where \code{qf} is the inverse CDF of
-the fitted noise distribution, and the axis label names that transform
-(\code{z} for normal, \code{logit} for logistic, \code{loglog}/\code{cloglog} for the Gumbel
-distributions). On this axis the binary model ROC is a straight line with
-slope \code{1 / exp(sdratio)} and intercept \code{d * sqrt((1 + exp(sdratio)^2) / 2) / exp(sdratio)} -- the separation in noise-SD units over the signal SD, since
-\code{d} is \eqn{d_a} -- so a slope
-below 1 is the unequal-variance signature (signal SD > noise SD), and
-departures of the observed points from a straight line diagnose misfit. This
-linearity holds for the symmetric distributions (\code{"normal"}, \code{"logistic"});
-for the Gumbel distributions the transformed ROC is curved (their natural
-linearising transform is the log-log power-ROC). The (0,0) and (1,1)
-endpoints map to infinity and are dropped on the transformed scale.
+the distribution's quantile axis via the transform \code{-qf(1 - rate)}, where \code{qf}
+is the inverse CDF of the fitted noise distribution, and the axis label names
+that transform (\code{z} for normal, \code{logit} for logistic, \code{loglog}/\code{cloglog} for
+the Gumbel distributions). On this axis the binary model ROC is a straight
+line with slope \code{1 / exp(sdratio)} and intercept \code{d * sqrt((1 + exp(sdratio)^2) / 2) / exp(sdratio)} -- the separation in noise-SD units over the signal SD, since
+\code{d} is \eqn{d_a} -- so a slope below 1 is the unequal-variance signature
+(signal SD > noise SD), and departures of the observed points from a straight
+line diagnose misfit. This linearity holds for all four distributions. The
+(0,0) and (1,1) endpoints map to infinity and are dropped on the transformed
+scale.
 }
 \seealso{
 \code{\link[=roc_sdt]{roc_sdt()}}, \code{\link[=roc_observed]{roc_observed()}}, \code{\link[=auc_sdt]{auc_sdt()}}

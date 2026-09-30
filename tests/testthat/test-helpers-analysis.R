@@ -49,6 +49,256 @@ test_that("roc_sdt errors for a non-SDT model", {
   expect_error(roc_sdt(fake), "only available for SDT")
 })
 
+test_that("model-implied functions work when fit has no group-level effects", {
+  fit_binary <- fake_binary_fit()
+  fit_rating <- fake_rating_fit()
+  local_mocked_bindings(
+    ranef = function(...) stop("The model does not contain group-level effects."),
+    posterior_linpred = mock_linpred_factory(list(d = 1.5, criterion = 0, spacing = 0)),
+    variables = function(...) c("b_d_Intercept", "b_criterion_Intercept"),
+    .package = "brms"
+  )
+  expect_no_error(roc_sdt(fit_binary))
+  expect_no_error(auc_sdt(fit_binary))
+  expect_no_error(latent_sdt(fit_binary))
+  expect_no_error(sdt_sensitivity(fit_binary))
+  expect_no_error(sdt_thresholds(fit_rating))
+})
+
+test_that("nested interaction groupings (id:session) are excluded from conditions", {
+  data <- data.frame(
+    stimulus = c(0, 1), n_old = c(20L, 80L), n_trials = 100L, dist_type = 1L,
+    id = c(1L, 2L), session = c(1L, 1L)
+  )
+  data$`id:session` <- c("1_1", "2_1")
+  fit <- structure(
+    list(
+      data = data,
+      bmm = list(
+        model = sdt_yn(response = "n_old", stimulus = "stimulus", n_trials = "n_trials"),
+        user_formula = bmf(d ~ 1 + (1 | id:session), criterion ~ 1)
+      )
+    ),
+    class = c("bmmfit", "brmsfit")
+  )
+  local_mocked_bindings(
+    ranef = function(...) list(`id:session` = array(0, dim = c(2, 1, 1))),
+    posterior_linpred = mock_linpred_factory(list(d = 1.5, criterion = 0)),
+    variables = function(...) c("b_d_Intercept", "b_criterion_Intercept"),
+    .package = "brms"
+  )
+  conditions <- .sdt_resolve_conditions(fit, NULL)
+  expect_equal(nrow(conditions), 1L)
+  expect_false(any(c("id", "session", "id:session") %in% names(conditions)))
+})
+
+# The ranef() mocks in the next tests return the names brms gives each
+# formula, so the tests fail for a helper that reads ranef() names.
+fake_grouped_fit <- function(columns, user_formula) {
+  data <- data.frame(stimulus = c(0, 1, 0, 1), n_old = c(20L, 80L, 10L, 90L),
+                     n_trials = 100L, dist_type = 1L)
+  data[names(columns)] <- columns
+  structure(
+    list(data = data, bmm = list(
+      model = sdt_yn(response = "n_old", stimulus = "stimulus", n_trials = "n_trials"),
+      user_formula = user_formula)),
+    class = c("bmmfit", "brmsfit")
+  )
+}
+
+test_that("a predictor that is also part of an interaction grouping stays a condition", {
+  fit <- fake_grouped_fit(
+    list(cond = c("A", "A", "B", "B"), id = 1L, `id:cond` = c("1_A", "1_A", "1_B", "1_B")),
+    bmf(d ~ cond + (1 | id) + (1 | id:cond), criterion ~ cond + (1 | id))
+  )
+  local_mocked_bindings(
+    ranef = function(...) list(id = array(0, c(1, 1, 1)), `id:cond` = array(0, c(2, 1, 1))),
+    posterior_linpred = mock_linpred_factory(list(d = c(0.8, 2.4), criterion = 0)),
+    variables = function(...) c("b_d_Intercept", "b_criterion_Intercept"),
+    .package = "brms"
+  )
+  expect_named(.sdt_resolve_conditions(fit, NULL), "cond")
+  expect_identical(.sdt_stripped_preds(fit)$d, "cond")
+  expect_true("cond" %in% .resolve_pp_conditions(fit))
+  sens <- attr(sdt_sensitivity(fit, "dn"), "summary")
+  expect_equal(sens$cond, c("A", "B"))
+  expect_equal(sens$mean, c(0.8, 2.4))
+})
+
+test_that("a nested grouping (1 | id/session) keeps session when it is a predictor", {
+  fit <- fake_grouped_fit(
+    list(session = c(1L, 1L, 2L, 2L), id = 1L, `id:session` = c("1_1", "1_1", "1_2", "1_2")),
+    bmf(d ~ session + (1 | id/session), criterion ~ 1)
+  )
+  local_mocked_bindings(
+    ranef = function(...) list(id = array(0, c(1, 1, 1)), `id:session` = array(0, c(2, 1, 1))),
+    .package = "brms"
+  )
+  conditions <- .sdt_resolve_conditions(fit, NULL)
+  expect_named(conditions, "session")
+  expect_equal(nrow(conditions), 2L)
+  expect_identical(.sdt_stripped_preds(fit)$d, "session")
+})
+
+test_that("multi-membership grouping columns are not conditions", {
+  fit <- fake_grouped_fit(list(g1 = c(1L, 1L, 2L, 2L), g2 = c(2L, 2L, 1L, 1L)),
+                          bmf(d ~ 1 + (1 | mm(g1, g2)), criterion ~ 1))
+  local_mocked_bindings(ranef = function(...) list(mmg1g2 = array(0, c(2, 1, 1))),
+                        .package = "brms")
+  expect_equal(nrow(.sdt_resolve_conditions(fit, NULL)), 1L)
+  expect_length(.sdt_stripped_preds(fit)$d, 0L)
+  expect_false(any(c("g1", "g2") %in% .resolve_pp_conditions(fit)))
+})
+
+sdt_entry_calls <- function(fit_binary, fit_rating, fit_metad = fit_rating) {
+  list(
+    roc_sdt         = function(...) roc_sdt(fit_binary, ...),
+    auc_sdt         = function(...) auc_sdt(fit_binary, ...),
+    latent_sdt      = function(...) latent_sdt(fit_binary, ...),
+    sdt_sensitivity = function(...) sdt_sensitivity(fit_binary, ...),
+    sdt_thresholds  = function(...) sdt_thresholds(fit_rating, ...),
+    mratio          = function(...) mratio(fit_metad, ...)
+  )
+}
+
+test_that("ndraws, nsamples and their abbreviations are refused before any posterior draw", {
+  n_calls <- 0L
+  local_mocked_bindings(
+    posterior_linpred = function(...) {
+      n_calls <<- n_calls + 1L
+      stop("posterior_linpred should not be reached")
+    },
+    ranef = function(...) list(),
+    variables = function(...) c("b_d_Intercept", "b_sdratio_Intercept"),
+    .package = "brms"
+  )
+  calls <- sdt_entry_calls(fake_binary_fit(uv = TRUE), fake_rating_fit(uv = TRUE),
+                           fake_rating_fit(version = "metad"))
+  for (nm in names(calls)) {
+    for (arg in c("ndraws", "ndraw", "nd", "nsamples", "nsample", "ns")) {
+      expect_error(do.call(calls[[nm]], stats::setNames(list(10), arg)), "draw_ids",
+                   info = paste(nm, arg))
+    }
+  }
+  expect_identical(n_calls, 0L)
+})
+
+test_that("draw_ids reaches every posterior_linpred call unchanged", {
+  seen <- list()
+  base <- mock_linpred_factory(list(d = 1.5, criterion = 0, spacing = 0,
+                                    sdratio = 0.3))
+  local_mocked_bindings(
+    posterior_linpred = function(object, ..., draw_ids = NULL) {
+      seen[[length(seen) + 1L]] <<- draw_ids
+      base(object, ...)
+    },
+    ranef = function(...) list(),
+    variables = function(...) c("b_d_Intercept", "b_sdratio_Intercept"),
+    .package = "brms"
+  )
+  sdt_sensitivity(fake_binary_fit(uv = TRUE), draw_ids = 1:5)
+  roc_sdt(fake_rating_fit(uv = TRUE), draw_ids = 1:5)
+  expect_gt(length(seen), 4L)
+  for (ids in seen) expect_identical(ids, 1:5)
+})
+
+test_that("conditions must be a data frame of columns in the data", {
+  local_mocked_bindings(
+    posterior_linpred = mock_linpred_factory(list(d = 1.5, criterion = 0, spacing = 0)),
+    ranef = function(...) list(),
+    variables = function(...) c("b_d_Intercept", "b_sdratio_Intercept"),
+    .package = "brms"
+  )
+  calls <- sdt_entry_calls(fake_binary_fit(), fake_rating_fit(),
+                           fake_rating_fit(version = "metad"))
+  for (nm in names(calls)) {
+    expect_error(calls[[nm]](conditions = "stimulus"), "must be a data frame",
+                 info = nm)
+    expect_error(calls[[nm]](conditions = data.frame(base_rate = "br1")),
+                 "not in the data:\\s+'base_rate'", info = nm)
+  }
+})
+
+test_that("conditions columns must be population-level predictors", {
+  local_mocked_bindings(
+    posterior_linpred = mock_linpred_factory(list(d = 1.5, criterion = 0, spacing = 0)),
+    ranef = function(...) list(),
+    variables = function(...) c("b_d_Intercept", "b_sdratio_Intercept"),
+    .package = "brms"
+  )
+  calls <- sdt_entry_calls(fake_binary_fit(), fake_rating_fit(),
+                           fake_rating_fit(version = "metad"))
+  for (nm in names(calls)) {
+    expect_error(calls[[nm]](conditions = data.frame(stimulus = 0:1)),
+                 "not population-level predictors: 'stimulus'", info = nm)
+  }
+  fit <- fake_grouped_fit(list(cond = c("A", "A", "B", "B"), id = c(1L, 2L, 1L, 2L)),
+                          bmf(d ~ cond + (cond | id), criterion ~ 1))
+  expect_error(sdt_sensitivity(fit, conditions = data.frame(cond = "A", id = 1:2)),
+               "not population-level predictors: 'id'")
+})
+
+test_that("a non-SDT fit with conditions gets the model-class error", {
+  fit <- structure(
+    list(data = data.frame(dev_rad = 0.1, set_size = 2L),
+         bmm = list(model = structure(list(resp_vars = list(resp_error = "dev_rad")),
+                                      class = c("bmmodel", "sdm")),
+                    user_formula = bmf(kappa ~ set_size))),
+    class = c("bmmfit", "brmsfit")
+  )
+  calls <- sdt_entry_calls(fit, fit)
+  for (nm in names(calls)) {
+    expect_error(calls[[nm]](conditions = data.frame(dev_rad = 0.1)),
+                 "only available for", info = nm)
+  }
+})
+
+test_that("tibbles, factor columns and draw_ids pass the argument checks", {
+  local_mocked_bindings(
+    posterior_linpred = mock_linpred_factory(list(
+      d = 1.2, criterion = c(-0.8, -0.3, 0, 0.3, 0.8), sdratio = log(1.3))),
+    ranef = function(...) list(),
+    variables = function(...) c("b_d_Intercept", "bsp_sdratio"),
+    .package = "brms"
+  )
+  fit <- fake_binary_fit(uv = TRUE, multi = TRUE)
+  tbl <- structure(data.frame(condition = factor("br2", levels = levels(fit$data$condition))),
+                   class = c("tbl_df", "tbl", "data.frame"))
+  calls <- sdt_entry_calls(fit, fake_rating_fit(uv = TRUE))
+  calls$sdt_thresholds <- NULL
+  calls$mratio <- NULL
+  for (nm in names(calls)) {
+    expect_no_error(calls[[nm]](conditions = tbl, draw_ids = 1:5))
+  }
+})
+
+test_that("roc_observed() takes conditions as names of data columns", {
+  fit <- fake_binary_fit(multi = TRUE)
+  expect_error(roc_observed(fit, conditions = data.frame(condition = "br1")),
+               "character vector")
+  expect_error(roc_observed(fit, conditions = "base_rate"),
+               "not in the data:\\s+'base_rate'")
+  expect_equal(nrow(roc_observed(fit, conditions = "condition")), 5L)
+})
+
+test_that("probs must be two increasing probabilities", {
+  local_mocked_bindings(
+    posterior_linpred = mock_linpred_factory(list(d = 1.5, criterion = 0, spacing = 0)),
+    ranef = function(...) list(),
+    variables = function(...) c("b_d_Intercept", "b_sdratio_Intercept"),
+    .package = "brms"
+  )
+  calls <- sdt_entry_calls(fake_binary_fit(), fake_rating_fit(),
+                           fake_rating_fit(version = "metad"))
+  bad <- list(c(0.975, 0.025), 0.5, c(-0.1, 0.9), "a", c(0.1, NA))
+  for (nm in names(calls)) {
+    for (p in bad) {
+      expect_error(calls[[nm]](probs = p), "probs must be",
+                   info = paste(nm, deparse(p)))
+    }
+  }
+})
+
 
 ############################################################################# !
 # RATING ROC MATH (pure helpers, no fit)                                 ####
@@ -142,6 +392,26 @@ test_that(".sdt_has_estimated_sdratio cross-checks brms::variables", {
     .package = "brms"
   )
   expect_true(.sdt_has_estimated_sdratio(m_ev, fit))
+})
+
+test_that(".sdt_unit_sdratio is model-only and keys off the natural-scale value", {
+  m_ev <- sdt_yn(response = "n_old", stimulus = "stimulus", n_trials = "n_trials")
+  expect_true(.sdt_unit_sdratio(m_ev))
+
+  m_fixed_int <- m_ev
+  m_fixed_int$fixed_parameters$sdratio <- 0L
+  expect_true(.sdt_unit_sdratio(m_fixed_int))
+
+  m_fixed <- m_ev
+  m_fixed$fixed_parameters$sdratio <- 0.3
+  expect_false(.sdt_unit_sdratio(m_fixed))
+
+  m_uv <- m_ev
+  m_uv$fixed_parameters$sdratio <- NULL
+  expect_false(.sdt_unit_sdratio(m_uv))
+
+  expect_true(.sdt_unit_sdratio(fake_mafc_fit()$bmm$model))
+  expect_true(.sdt_unit_sdratio(fake_ranking_fit()$bmm$model))
 })
 
 
@@ -351,14 +621,93 @@ test_that("auc_sdt() binary normal EV uses the analytical Phi(d/sqrt(2))", {
   fit <- fake_binary_fit()
   dpr <- 1.5
   local_mocked_bindings(
+    # A real EV fit's sdratio is fixed at 0 via a constant prior, not omitted,
+    # so brms::variables() lists it just like any other parameter.
     posterior_linpred = mock_linpred_factory(list(d = dpr, criterion = 0)),
     ranef = function(...) list(),
-    variables = function(...) c("b_d_Intercept"),
+    variables = function(...) c("b_d_Intercept", "b_criterion_Intercept",
+                                "b_sdratio_Intercept"),
     .package = "brms"
   )
   auc <- auc_sdt(fit)
   expect_s3_class(auc, "bmm_sdt_auc")
   expect_equal(mean(auc$AUC), stats::pnorm(dpr / sqrt(2)), tolerance = 1e-10)
+})
+
+test_that("auc_sdt() binary gumbel_max EV uses the analytical plogis(d)", {
+  fit <- fake_binary_fit()
+  fit$bmm$model$other_vars$dist <- "gumbel_max"
+  dpr <- 0.8
+  local_mocked_bindings(
+    posterior_linpred = mock_linpred_factory(list(d = dpr, criterion = 0)),
+    ranef = function(...) list(),
+    variables = function(...) c("b_d_Intercept", "b_criterion_Intercept",
+                                "b_sdratio_Intercept"),
+    .package = "brms"
+  )
+  auc <- auc_sdt(fit)
+  expect_equal(mean(auc$AUC), stats::plogis(dpr), tolerance = 1e-10)
+})
+
+test_that("auc_sdt() does not take the closed form when sdratio is fixed away from 0", {
+  fit_fixed <- fake_binary_fit()
+  fit_fixed$bmm$model$fixed_parameters$sdratio <- 0.3
+  fit_uv <- fake_binary_fit(uv = TRUE)
+  dpr <- 1.5
+  local_mocked_bindings(
+    posterior_linpred = mock_linpred_factory(list(d = dpr, criterion = 0,
+                                                  sdratio = 0.3)),
+    ranef = function(...) list(),
+    variables = function(...) c("b_d_Intercept", "b_criterion_Intercept",
+                                "b_sdratio_Intercept"),
+    .package = "brms"
+  )
+  auc_fixed <- auc_sdt(fit_fixed)
+  auc_uv    <- auc_sdt(fit_uv)
+  closed    <- stats::pnorm(dpr / sqrt(2))
+
+  expect_true(all(abs(auc_fixed$AUC - closed) > 1e-6))
+  expect_equal(auc_fixed$AUC, auc_uv$AUC, tolerance = 1e-12)
+})
+
+test_that("the rating smooth curve follows the UV survival map", {
+  fit <- fake_rating_fit(uv = TRUE)
+  d_true <- 1.5
+  sdratio <- 1.5
+  local_mocked_bindings(
+    posterior_linpred = mock_linpred_factory(list(d = d_true, sdratio = log(sdratio),
+                                                  criterion = 0, spacing = 0)),
+    ranef = function(...) list(),
+    variables = function(...) c("b_d_Intercept", "b_sdratio_Intercept"),
+    .package = "brms"
+  )
+  summ <- attr(roc_sdt(fit, n_points = 20), "summary")
+
+  # noise ~ N(-sep/2, 1) and signal ~ N(sep/2, sdratio); "old" above the cut
+  sep <- d_true * sqrt((1 + sdratio^2) / 2)
+  cut <- stats::qnorm(1 - summ$FA) - sep / 2
+  expect_equal(summ$Hit_mean, 1 - stats::pnorm((cut - sep / 2) / sdratio), tolerance = 1e-10)
+})
+
+test_that("the binary gumbel_min UV curve follows the survival map", {
+  fit <- fake_binary_fit(uv = TRUE)
+  fit$bmm$model$other_vars$dist <- "gumbel_min"
+  d_true <- 1.2
+  sdratio <- 1.3
+  local_mocked_bindings(
+    posterior_linpred = mock_linpred_factory(list(d = d_true, sdratio = log(sdratio),
+                                                  criterion = 0)),
+    ranef = function(...) list(),
+    variables = function(...) c("b_d_Intercept", "b_sdratio_Intercept"),
+    .package = "brms"
+  )
+  summ <- attr(roc_sdt(fit, n_points = 20), "summary")
+
+  # gumbel_min survival exp(-exp(x)); noise located at -sep/2, signal at sep/2
+  survival <- function(x) exp(-exp(x))
+  sep <- d_true * sqrt((1 + sdratio^2) / 2)
+  cut <- log(-log(summ$FA)) - sep / 2
+  expect_equal(summ$Hit_mean, survival((cut - sep / 2) / sdratio), tolerance = 1e-10)
 })
 
 test_that("auc_sdt() rating uses the numerical path and stays in (0.5, 1)", {
@@ -371,6 +720,76 @@ test_that("auc_sdt() rating uses the numerical path and stays in (0.5, 1)", {
   )
   auc <- auc_sdt(fit)
   expect_true(all(auc$AUC > 0.5 & auc$AUC < 1))
+})
+
+test_that("auc_sdt() rating EV matches the closed-form Phi(d_a/sqrt(2)) oracle", {
+  fit <- fake_rating_fit()
+  d_true <- 1.5
+  local_mocked_bindings(
+    posterior_linpred = mock_linpred_factory(list(d = d_true, sdratio = 0,
+                                                  criterion = 0, spacing = 0)),
+    ranef = function(...) list(),
+    variables = function(...) c("b_d_Intercept", "b_sdratio_Intercept"),
+    .package = "brms"
+  )
+  auc <- auc_sdt(fit)
+  expect_equal(mean(auc$AUC), stats::pnorm(d_true / sqrt(2)), tolerance = 1e-3)
+})
+
+test_that("auc_sdt() rating UV (positive sdratio) matches the Phi(d_a/sqrt(2)) oracle", {
+  fit <- fake_rating_fit(uv = TRUE)
+  d_true <- 1.5
+  local_mocked_bindings(
+    posterior_linpred = mock_linpred_factory(list(d = d_true, sdratio = log(1.35),
+                                                  criterion = 0, spacing = 0)),
+    ranef = function(...) list(),
+    variables = function(...) c("b_d_Intercept", "b_sdratio_Intercept"),
+    .package = "brms"
+  )
+  auc <- auc_sdt(fit)
+  expect_equal(mean(auc$AUC), stats::pnorm(d_true / sqrt(2)), tolerance = 1e-3)
+})
+
+test_that("auc_sdt() rating UV (negative sdratio) matches the Phi(d_a/sqrt(2)) oracle", {
+  fit <- fake_rating_fit(uv = TRUE)
+  d_true <- 1.5
+  local_mocked_bindings(
+    posterior_linpred = mock_linpred_factory(list(d = d_true, sdratio = -0.5,
+                                                  criterion = 0, spacing = 0)),
+    ranef = function(...) list(),
+    variables = function(...) c("b_d_Intercept", "b_sdratio_Intercept"),
+    .package = "brms"
+  )
+  auc <- auc_sdt(fit)
+  expect_equal(mean(auc$AUC), stats::pnorm(d_true / sqrt(2)), tolerance = 1e-3)
+})
+
+test_that("auc_sdt() rating gumbel_max UV matches an independent stats::integrate() oracle", {
+  fit <- fake_rating_fit(uv = TRUE)
+  fit$bmm$model$other_vars$dist <- "gumbel_max"
+  d_true <- 1.2
+  sdratio_log <- 0.2
+  local_mocked_bindings(
+    posterior_linpred = mock_linpred_factory(list(d = d_true, sdratio = sdratio_log,
+                                                  criterion = 0, spacing = 0)),
+    ranef = function(...) list(),
+    variables = function(...) c("b_d_Intercept", "b_sdratio_Intercept"),
+    .package = "brms"
+  )
+  auc <- auc_sdt(fit)
+
+  sdratio <- exp(sdratio_log)
+  sep <- d_true * sqrt((1 + sdratio^2) / 2)
+  gumbel_max_cdf <- function(x) exp(-exp(-x))
+  gumbel_max_qf  <- function(p) -log(-log(p))
+  hit_of_fa <- function(fa) {
+    t <- gumbel_max_qf(1 - fa) - sep / 2
+    1 - gumbel_max_cdf((t - sep / 2) / sdratio)
+  }
+  oracle <- stats::integrate(hit_of_fa, lower = 1e-8, upper = 1 - 1e-8,
+                             rel.tol = 1e-10, subdivisions = 1000L)$value
+
+  expect_equal(mean(auc$AUC), oracle, tolerance = 1e-3)
 })
 
 
@@ -894,4 +1313,82 @@ test_that("sdt_sensitivity() print method labels the three scales", {
     .package = "brms"
   )
   expect_output(print(sdt_sensitivity(fit)), "SDT sensitivity")
+})
+
+
+############################################################################# !
+# SUMMARY NOTES                                                          ####
+############################################################################# !
+
+test_that("summary_notes.sdt() fires whenever sdratio departs from 0, not just when estimated", {
+  m_ev <- fake_binary_fit()$bmm$model
+  expect_null(summary_notes(m_ev, NULL))
+
+  m_fixed <- m_ev
+  m_fixed$fixed_parameters$sdratio <- 0.3
+  expect_match(summary_notes(m_fixed, NULL), "d_a")
+
+  m_uv <- fake_binary_fit(uv = TRUE)$bmm$model
+  expect_match(summary_notes(m_uv, NULL), "d_a")
+
+  expect_null(summary_notes(fake_mafc_fit()$bmm$model, NULL))
+})
+
+
+############################################################################# !
+# PRINT METHOD COUNTS                                                    ####
+############################################################################# !
+
+test_that("print.bmm_sdt_roc() counts FA points per curve, not per condition", {
+  local_mocked_bindings(
+    posterior_linpred = mock_linpred_factory(list(
+      d = 1.2, criterion = c(-0.8, -0.3, 0, 0.3, 0.8), sdratio = log(1.3))),
+    ranef = function(...) list(id = array(0, dim = c(1, 1, 1))),
+    variables = function(...) c("b_d_Intercept", "b_sdratio_Intercept"),
+    .package = "brms"
+  )
+  one_curve <- capture.output(print(roc_sdt(fake_binary_fit(uv = TRUE, multi = TRUE))))
+  expect_true(any(grepl("Smooth curve: 102 FA points per draw", one_curve, fixed = TRUE)))
+  expect_false(any(grepl(" x 5 ", one_curve, fixed = TRUE)))
+
+  fit <- fake_binary_fit(uv = TRUE, multi = TRUE)
+  fit$bmm$user_formula <- bmf(d ~ 0 + condition, criterion ~ 1, sdratio ~ 1)
+  five_curves <- capture.output(print(roc_sdt(fit)))
+  expect_true(any(grepl("x 5 curves", five_curves, fixed = TRUE)))
+  expect_true(any(grepl("Smooth curve: 102 FA points per draw", five_curves, fixed = TRUE)))
+})
+
+test_that("print.bmm_sdt_roc() counts the K-1 rating thresholds", {
+  local_mocked_bindings(
+    posterior_linpred = mock_linpred_factory(list(d = 1.5, criterion = 0, spacing = 0,
+                                                  sdratio = 0)),
+    ranef = function(...) list(),
+    variables = function(...) c("b_d_Intercept", "b_sdratio_Intercept"),
+    .package = "brms"
+  )
+  out <- capture.output(print(roc_sdt(fake_rating_fit(n_ratings = 6L))))
+  expect_true(any(grepl("Rating model: 5 threshold ROC points per draw", out, fixed = TRUE)))
+})
+
+test_that("a column subset that lost its attributes prints as a data frame", {
+  local_mocked_bindings(
+    posterior_linpred = mock_linpred_factory(list(d = 1.5, criterion = 0, spacing = 0,
+                                                  sdratio = 0)),
+    ranef = function(...) list(),
+    variables = function(...) c("b_d_Intercept", "b_sdratio_Intercept"),
+    .package = "brms"
+  )
+  objects <- list(
+    roc_sdt(fake_binary_fit(), n_points = 10),
+    latent_sdt(fake_binary_fit(), n_grid = 20L),
+    auc_sdt(fake_binary_fit()),
+    sdt_thresholds(fake_rating_fit()),
+    sdt_sensitivity(fake_binary_fit())
+  )
+  for (obj in objects) {
+    sub <- obj[, 1:2]
+    expect_identical(capture.output(print(sub)),
+                     capture.output(print.data.frame(sub)),
+                     info = class(obj)[1])
+  }
 })
