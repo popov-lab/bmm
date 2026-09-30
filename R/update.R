@@ -266,8 +266,18 @@ revert_check_data.m3 <- function(model, data) {
     }
   } else {
     # check_data() turned a zero option count into 0.0001, so the Idx_ columns
-    # are the only record left of which category a row offered no options for
-    data[num_options][as.matrix(data[paste0("Idx_", resp_cats)]) == 0] <- 0
+    # are the only record left of which category a row offered no options for.
+    # A fit from before #457 computed them from another category's column, and
+    # zeroing by them would rebuild a fit that is wrong in a new way
+    no_options <- as.matrix(data[paste0("Idx_", resp_cats)]) == 0
+    stopif(
+      any(no_options & as.matrix(data[num_options]) != 0.0001),
+      "The stored data of this fit pairs the option columns with the wrong response \\
+      categories (fitted before the fix for #457 with `num_options` named after the \\
+      categories in another order), so `update()` cannot rebuild it. Refit with `bmm()` \\
+      on your original data, or pass `newdata`."
+    )
+    data[num_options][no_options] <- 0
   }
   NextMethod("revert_check_data")
 }
