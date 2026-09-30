@@ -413,7 +413,7 @@ test_that("character num_options that are partly named, duplicated or incomplete
 })
 
 test_that("m3 refuses NA among numeric num_options (#457)", {
-  expect_error(m3(c("corr", "other", "npl"), num_options = c(1, NA, 3)), "num_options")
+  expect_error(m3(c("corr", "other", "npl"), num_options = c(1, NA, 3)), "missing values")
 })
 
 test_that("num_options names already taken by a column or parameter give an error", {

@@ -376,6 +376,14 @@ stored_frame_cases <- function() {
       ),
       formula = m3_formula, data = oberauer_lewandowsky_2019_e1
     ),
+    m3_char_num_options_by_category = list(
+      model = m3(
+        resp_cats = m3_cats,
+        num_options = c(other = "n_other", corr = "n_corr", npl = "n_npl", dist = "n_dist"),
+        choice_rule = "simple", links = m3_links
+      ),
+      formula = m3_formula, data = oberauer_lewandowsky_2019_e1
+    ),
     mixture2p = list(
       model = mixture2p("dev_rad"), formula = bmf(kappa ~ 1, thetat ~ 1),
       data = lin_2017

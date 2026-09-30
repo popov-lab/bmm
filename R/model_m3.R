@@ -137,8 +137,8 @@ settable_link_functions.m3 <- function(model) {
 #'   named after the response categories, e.g. `c(corr = 1, other = 4)`, are matched to
 #'   the categories by name. Numbers without names, or with other names, are taken in
 #'   the order of `resp_cats`, and other names become the names of the columns
-#'   bmm adds to the data. Column names named after the categories are matched by name
-#'   as well.
+#'   bmm adds to the data. Column names given category names, e.g.
+#'   `c(other = "n_other", corr = "n_corr")`, are matched by name as well.
 #' @param choice_rule The choice rule that should be used for the M3. The options are "softmax"
 #'   or "simple". The "softmax" option implements the softmax normalization of activation into
 #'   probabilities for choosing the different response categories. The "simple" option implements
@@ -304,9 +304,9 @@ check_model.m3_custom <- function(model, data = NULL, formula = NULL) {
 # CHECK_data S3 methods                                                  ####
 ############################################################################# !
 
-# Counts named after the response categories are labels, not column names: they
-# are matched to the categories by name and stored under the same internal
-# column names as unnamed counts. Used as column names they multiplied each
+# Counts or column names named after the response categories are labels: they
+# are matched to the categories by name, and counts are stored under the same
+# internal column names as unnamed counts. Used as column names they multiplied each
 # category's activation by itself (#449). Fits from before the fix still carry
 # those names in their stored model, so every reader goes through this helper
 # rather than the constructor renaming them once
