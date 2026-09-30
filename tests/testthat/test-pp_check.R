@@ -146,6 +146,45 @@ test_that(".resolve_pp_conditions() excludes infrastructure columns", {
   expect_false(any(grepl("^n_", conds)))
 })
 
+test_that(".resolve_pp_conditions() works when fit has no group-level effects", {
+  fit <- load_m3_fit()
+  local_mocked_bindings(
+    ranef = function(...) stop("The model does not contain group-level effects."),
+    .package = "brms"
+  )
+  expect_type(.resolve_pp_conditions(fit), "character")
+})
+
+
+# SDT-rating default grouping (.pp_check_resolve_group is the load-bearing seam)
+
+test_that(".pp_check_resolve_group() defaults to stimulus for sdt_rating", {
+  fit <- fake_multinomial_fit(c("sdt", "sdt_rating"))
+  expect_equal(.pp_check_resolve_group(fit, NULL), "stimulus")
+})
+
+test_that(".pp_check_resolve_group() treats NA as the pool-everything opt-out", {
+  fit <- fake_multinomial_fit(c("sdt", "sdt_rating"))
+  expect_null(.pp_check_resolve_group(fit, NA))
+})
+
+test_that(".pp_check_resolve_group() honours an explicit group for sdt_rating", {
+  fit <- fake_multinomial_fit(c("sdt", "sdt_rating"))
+  expect_equal(.pp_check_resolve_group(fit, "condition"), "condition")
+})
+
+test_that(".pp_check_resolve_group() leaves non-rating multinomial ungrouped", {
+  fit <- fake_multinomial_fit("m3")
+  expect_null(.pp_check_resolve_group(fit, NULL))
+})
+
+test_that(".pp_check_restore_set_size() lets sdt_ranking facet by its m column", {
+  fit <- fake_ranking_fit()
+  fit$bmm$model$other_vars$m <- "set_size"
+  fit$data$max_rank <- 3
+  expect_equal(.pp_check_restore_set_size(fit, "set_size")$data$set_size, 3)
+  expect_identical(.pp_check_restore_set_size(fit, "id"), fit)
+})
 
 # Multi-observable checks: pp_check(fit, resp_var = ...) (#401)
 
