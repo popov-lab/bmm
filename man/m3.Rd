@@ -18,7 +18,8 @@ same order as the names of the response categories passed to \code{resp_cats}. N
 named after the response categories, e.g. \code{c(corr = 1, other = 4)}, are matched to
 the categories by name. Numbers without names, or with other names, are taken in
 the order of \code{resp_cats}, and other names become the names of the columns
-bmm adds to the data.}
+bmm adds to the data. Column names given category names, e.g.
+\code{c(other = "n_other", corr = "n_corr")}, are matched by name as well, in any order.}
 
 \item{choice_rule}{The choice rule that should be used for the M3. The options are "softmax"
 or "simple". The "softmax" option implements the softmax normalization of activation into

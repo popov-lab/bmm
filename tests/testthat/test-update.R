@@ -376,6 +376,14 @@ stored_frame_cases <- function() {
       ),
       formula = m3_formula, data = oberauer_lewandowsky_2019_e1
     ),
+    m3_char_num_options_by_category = list(
+      model = m3(
+        resp_cats = m3_cats,
+        num_options = c(other = "n_other", corr = "n_corr", npl = "n_npl", dist = "n_dist"),
+        choice_rule = "simple", links = m3_links
+      ),
+      formula = m3_formula, data = oberauer_lewandowsky_2019_e1
+    ),
     mixture2p = list(
       model = mixture2p("dev_rad"), formula = bmf(kappa ~ 1, thetat ~ 1),
       data = lin_2017
@@ -537,6 +545,21 @@ test_that("an m column rebuilt for check_data() stays out of the model frame", {
   expect_false("set_size" %in% colnames(data))
   expect_equal(data$max_rank, as.numeric(case$data$set_size))
   expect_equal(unname(data$Y), unname(as.matrix(case$data[paste0("rank", 1:5)])))
+})
+
+test_that("an m3 frame whose Idx_ columns came from the wrong option columns is refused (#457)", {
+  skip_on_cran()
+  case <- stored_frame_cases()$m3_char_num_options_by_category
+  fit <- stored_frame_fit(case)
+  # before #457 each Idx_ column was computed from the option column at the same
+  # position of num_options, here (other, corr, npl, dist); zeroing the right
+  # columns by those Idx_ columns would rebuild a fit that is wrong in a new way
+  idx_cols <- paste0("Idx_", c("corr", "other", "dist", "npl"))
+  fit$data[idx_cols] <- fit$data[idx_cols[c(2, 1, 4, 3)]]
+  expect_error(
+    check_stored_data(case$model, fit$data, fit$bmm$user_formula),
+    "refit with `bmm\\(\\)`", ignore.case = TRUE
+  )
 })
 
 test_that("every column a revert method rebuilds is dropped again", {
