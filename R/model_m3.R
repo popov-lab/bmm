@@ -349,8 +349,9 @@ check_data.m3 <- function(model, data, formula) {
     stopif(
       length(clashes) > 0,
       "The column name(s) {collapse_comma(clashes)} that `num_options` would be stored under are \\
-      already taken by a data column or a model parameter. Give the numbers names that are \\
-      not taken yet."
+      already taken by a data column, a model parameter, or a column bmm creates (`Y`, `nTrials`, \\
+      `Idx_<category>`). Pass the numbers unnamed, name them after the response categories, or \\
+      choose names that are not taken."
     )
     data[opt_vars] <- rep(n_opt_vect, each = nrow(data))
   } else {
