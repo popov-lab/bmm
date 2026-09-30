@@ -168,13 +168,15 @@ init_link <- function(link) {
 # init_ranges are written for a parameter's default link, and a link set by the
 # user can exclude part of them (a softplus criterion cannot start at -0.3),
 # which link_transform() would turn into NaN. Draws are confined to the part of
-# the range the link can represent; a range it cannot represent at all is
-# dropped, and the parameter gets the default draw, as without an init_range
+# the range the link can represent. What is left of a range may be nothing or a
+# single point, which would start every chain at the same value (or at the
+# link's infinite edge, as log(0)); either is dropped, and the parameter gets
+# the default draw, as without an init_range
 representable_range <- function(init_range, link) {
   if (is.null(init_range)) {
     return(NULL)
   }
-  domain <- .link_ranges[[link %||% "identity"]] %||% c(-Inf, Inf)
+  domain <- .link_ranges[[link %||% "identity"]]
   lower <- max(init_range[1], domain[1])
   upper <- min(init_range[2], domain[2])
   if (lower >= upper) NULL else c(lower, upper)

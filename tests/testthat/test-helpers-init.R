@@ -1047,6 +1047,7 @@ test_that("sdt_yn with a softplus criterion gets a finite init list", {
   model <- sdt_yn("y", "stimulus", "n", links = list(criterion = "softplus"))
   init_fun <- configured_initfun(model, bmf(d ~ 1, criterion ~ 1), dat)
   expect_no_warning(inits <- lapply(1:50, function(i) init_fun()))
+  expect_true(all(vapply(inits, function(x) "Intercept_criterion" %in% names(x), logical(1))))
   expect_true(all(is.finite(unlist(inits))))
 })
 
