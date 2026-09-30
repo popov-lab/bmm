@@ -134,13 +134,14 @@ test_that("multi-membership grouping columns are not conditions", {
   expect_false(any(c("g1", "g2") %in% .resolve_pp_conditions(fit)))
 })
 
-sdt_entry_calls <- function(fit_binary, fit_rating) {
+sdt_entry_calls <- function(fit_binary, fit_rating, fit_metad = fit_rating) {
   list(
     roc_sdt         = function(...) roc_sdt(fit_binary, ...),
     auc_sdt         = function(...) auc_sdt(fit_binary, ...),
     latent_sdt      = function(...) latent_sdt(fit_binary, ...),
     sdt_sensitivity = function(...) sdt_sensitivity(fit_binary, ...),
-    sdt_thresholds  = function(...) sdt_thresholds(fit_rating, ...)
+    sdt_thresholds  = function(...) sdt_thresholds(fit_rating, ...),
+    mratio          = function(...) mratio(fit_metad, ...)
   )
 }
 
@@ -155,7 +156,8 @@ test_that("ndraws, nsamples and their abbreviations are refused before any poste
     variables = function(...) c("b_d_Intercept", "b_sdratio_Intercept"),
     .package = "brms"
   )
-  calls <- sdt_entry_calls(fake_binary_fit(uv = TRUE), fake_rating_fit(uv = TRUE))
+  calls <- sdt_entry_calls(fake_binary_fit(uv = TRUE), fake_rating_fit(uv = TRUE),
+                           fake_rating_fit(version = "metad"))
   for (nm in names(calls)) {
     for (arg in c("ndraws", "ndraw", "nd", "nsamples", "nsample", "ns")) {
       expect_error(do.call(calls[[nm]], stats::setNames(list(10), arg)), "draw_ids",
@@ -191,7 +193,8 @@ test_that("conditions must be a data frame of columns in the data", {
     variables = function(...) c("b_d_Intercept", "b_sdratio_Intercept"),
     .package = "brms"
   )
-  calls <- sdt_entry_calls(fake_binary_fit(), fake_rating_fit())
+  calls <- sdt_entry_calls(fake_binary_fit(), fake_rating_fit(),
+                           fake_rating_fit(version = "metad"))
   for (nm in names(calls)) {
     expect_error(calls[[nm]](conditions = "stimulus"), "must be a data frame",
                  info = nm)
@@ -207,7 +210,8 @@ test_that("conditions columns must be population-level predictors", {
     variables = function(...) c("b_d_Intercept", "b_sdratio_Intercept"),
     .package = "brms"
   )
-  calls <- sdt_entry_calls(fake_binary_fit(), fake_rating_fit())
+  calls <- sdt_entry_calls(fake_binary_fit(), fake_rating_fit(),
+                           fake_rating_fit(version = "metad"))
   for (nm in names(calls)) {
     expect_error(calls[[nm]](conditions = data.frame(stimulus = 0:1)),
                  "not population-level predictors: 'stimulus'", info = nm)
@@ -246,6 +250,7 @@ test_that("tibbles, factor columns and draw_ids pass the argument checks", {
                    class = c("tbl_df", "tbl", "data.frame"))
   calls <- sdt_entry_calls(fit, fake_rating_fit(uv = TRUE))
   calls$sdt_thresholds <- NULL
+  calls$mratio <- NULL
   for (nm in names(calls)) {
     expect_no_error(calls[[nm]](conditions = tbl, draw_ids = 1:5))
   }
@@ -267,7 +272,8 @@ test_that("probs must be two increasing probabilities", {
     variables = function(...) c("b_d_Intercept", "b_sdratio_Intercept"),
     .package = "brms"
   )
-  calls <- sdt_entry_calls(fake_binary_fit(), fake_rating_fit())
+  calls <- sdt_entry_calls(fake_binary_fit(), fake_rating_fit(),
+                           fake_rating_fit(version = "metad"))
   bad <- list(c(0.975, 0.025), 0.5, c(-0.1, 0.9), "a", c(0.1, NA))
   for (nm in names(calls)) {
     for (p in bad) {

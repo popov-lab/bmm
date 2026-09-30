@@ -1273,8 +1273,7 @@ print.bmm_sdt_thresholds <- function(x, ...) {
 #'   Consciousness}, \emph{2017}(1), nix007. \doi{10.1093/nc/nix007}
 #' @export
 mratio <- function(fit, conditions = NULL, probs = c(0.025, 0.975), ...) {
-  stopif(!inherits(fit, "bmmfit"),
-         "fit must be a bmmfit object returned by bmm()")
+  .sdt_check_args(fit, conditions, probs, ...)
   model <- fit$bmm$model
   stopif(!inherits(model, "sdt_rating") || (model$version %||% "standard") != "metad",
          "mratio() is only available for the meta-d' version of sdt_rating() (version = 'metad')")
