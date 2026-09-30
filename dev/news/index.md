@@ -466,7 +466,11 @@
   applied to whichever activation stood at its position, so densities
   and simulated counts were wrong; rerun such calls. Fitting with
   [`bmm()`](https://popov-lab.github.io/bmm/dev/reference/bmm.md) was
-  not affected.
+  not affected. The columns of
+  [`rm3()`](https://popov-lab.github.io/bmm/dev/reference/m3dist.md) and
+  the order of `x` in
+  [`dm3()`](https://popov-lab.github.io/bmm/dev/reference/m3dist.md) now
+  follow `resp_cats`.
 - `log_lik()` for **cswald** fits no longer returns `NaN` for a
   posterior draw whose `ndt` is at or above an observation’s RT, which
   happens with `newdata` such as held-out folds. Such draws now give
