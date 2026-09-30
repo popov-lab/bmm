@@ -373,6 +373,49 @@ test_that("num_options named after the response categories are matched by name (
   }
 })
 
+test_that("character num_options named after the response categories are matched by name (#457)", {
+  by_position <- c("n_corr", "n_other", "n_dist", "n_npl")
+  by_category <- c(other = "n_other", npl = "n_npl", corr = "n_corr", dist = "n_dist")
+  for (choice_rule in c("simple", "softmax")) {
+    unnamed <- m3_num_options_fit(by_position, choice_rule)
+    named <- m3_num_options_fit(by_category, choice_rule)
+    expect_equal(named$formula, unnamed$formula)
+    expect_equal(brms::standata(named), brms::standata(unnamed))
+  }
+})
+
+test_that("the ss version matches character num_options named after the categories (#457)", {
+  fit_ss <- function(num_options) {
+    bmm(
+      bmf(c ~ 1, a ~ 1),
+      oberauer_lewandowsky_2019_e1,
+      m3(
+        resp_cats = c("corr", "other", "npl"), num_options = num_options,
+        choice_rule = "simple", version = "ss"
+      ),
+      backend = "mock", mock_fit = 1, rename = FALSE
+    )
+  }
+  unnamed <- fit_ss(c("n_corr", "n_other", "n_npl"))
+  named <- fit_ss(c(npl = "n_npl", corr = "n_corr", other = "n_other"))
+  expect_equal(named$formula, unnamed$formula)
+  expect_equal(brms::standata(named), brms::standata(unnamed))
+})
+
+test_that("character num_options that are partly named, duplicated or incomplete give an error (#457)", {
+  cats <- c("corr", "other", "npl")
+  expect_error(m3(cats, num_options = c(corr = "n_corr", "n_other", "n_npl")), "all elements")
+  expect_error(m3(cats, num_options = c(k = "n_corr", k = "n_other", j = "n_npl")), "only once")
+  expect_error(
+    m3(cats, num_options = c(corr = "n_corr", other = "n_other", dist = "n_npl")),
+    "one element for each"
+  )
+})
+
+test_that("m3 refuses NA among numeric num_options (#457)", {
+  expect_error(m3(c("corr", "other", "npl"), num_options = c(1, NA, 3)), "num_options")
+})
+
 test_that("num_options names already taken by a column or parameter give an error", {
   expect_error(m3_num_options_fit(c(a = 1, b = 4, c = 5, d = 5)), "'a', 'b', 'c', 'd'")
   expect_error(m3_num_options_fit(c(nTrials = 1, k2 = 4, k3 = 5, k4 = 5)), "'nTrials'")

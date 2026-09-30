@@ -137,7 +137,8 @@ settable_link_functions.m3 <- function(model) {
 #'   named after the response categories, e.g. `c(corr = 1, other = 4)`, are matched to
 #'   the categories by name. Numbers without names, or with other names, are taken in
 #'   the order of `resp_cats`, and other names become the names of the columns
-#'   bmm adds to the data.
+#'   bmm adds to the data. Column names named after the categories are matched by name
+#'   as well.
 #' @param choice_rule The choice rule that should be used for the M3. The options are "softmax"
 #'   or "simple". The "softmax" option implements the softmax normalization of activation into
 #'   probabilities for choosing the different response categories. The "simple" option implements
@@ -222,14 +223,18 @@ m3 <- function(resp_cats, num_options, choice_rule = "softmax", version = "custo
     "The number of options cannot be read from a response category column: \\
     {collapse_comma(intersect(num_options, resp_cats))}"
   )
+  stopif(
+    is.numeric(num_options) && anyNA(num_options),
+    "`num_options` cannot contain missing values."
+  )
   opt_names <- names(num_options)
   stopif(
-    is.numeric(num_options) && !is.null(opt_names) &&
+    !is.null(opt_names) &&
       (anyNA(opt_names) || any(opt_names == "") || anyDuplicated(opt_names) > 0),
     "Name either all elements of `num_options` or none, and use each name only once."
   )
   stopif(
-    is.numeric(num_options) && any(opt_names %in% resp_cats) && !setequal(opt_names, resp_cats),
+    any(opt_names %in% resp_cats) && !setequal(opt_names, resp_cats),
     "If `num_options` is named after the response categories, it needs one element for each of \\
     {collapse_comma(resp_cats)}"
   )
@@ -308,9 +313,11 @@ check_model.m3_custom <- function(model, data = NULL, formula = NULL) {
 m3_num_options <- function(model) {
   num_options <- model$other_vars$num_options
   resp_cats <- model$resp_vars$resp_cats
-  if (is.numeric(num_options) && setequal(names(num_options), resp_cats)) {
-    num_options <- stats::setNames(num_options[resp_cats], paste0("n_opt_", resp_cats))
+  if (!setequal(names(num_options), resp_cats)) {
+    return(num_options)
   }
+  num_options <- num_options[resp_cats]
+  if (is.numeric(num_options)) names(num_options) <- paste0("n_opt_", resp_cats)
   num_options
 }
 
