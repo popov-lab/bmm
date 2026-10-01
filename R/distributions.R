@@ -3620,9 +3620,8 @@ rsdt_rating <- function(n, n_trials, stimulus, d, thresholds,
 # where the strength-recollection correlation lives once sigmar is large,
 # the quadrature loses accuracy (8e-3 at |rho| = 0.9485, hundreds of nats
 # near 0.99) and each value comes from mvtnorm's TVPACK instead. Neither
-# shares code
-# with the Stan side's Owen's T, so the R companion is also an independent
-# check of the Stan kernel. Infinite bounds reduce to closed forms.
+# shares code with the Stan side's Owen's T, so the R companion is also an
+# independent check of the Stan kernel. Infinite bounds reduce to closed forms.
 .cdp_phi2 <- function(z1, z2, rho) {
   n <- max(length(z1), length(z2), length(rho))
   z1 <- rep_len(z1, n)
@@ -3841,8 +3840,8 @@ rsdt_rating <- function(n, n_trials, stimulus, d, thresholds,
 #   new(1..n_new), [guess(1..n_old)], know(1..n_old), remember(1..n_old),
 # normalized to a proper pmf. Normal noise only: Remember/Know masses are exact
 # bivariate-normal CDFs (.cdp_phi2); Guess and Know-not-Guess masses come from
-# the 20-node band quadrature in .cdp_region_mass_r (about 1e-5 in log p above
-# log p = -30). `rho` is
+# the 20-node band quadrature in .cdp_region_mass_r (within 1e-4 in log p
+# above log p = -30: 7e-5 on the #372 review's grid). `rho` is
 # the F-R correlation on the unconstrained scale (tanh applied internally);
 # default 0 = independent CDP. Vectorized over observations like
 # .sdt_category_probs: returns an n-by-K matrix, or a length-K vector when all

@@ -133,22 +133,31 @@ real cdp_region_mass(int region, real c_lo, real c_hi, real mu_S, real sigma_S,
   real total = 0;
   for (e in 1:4) {
     real len = edges[e + 1] - edges[e];
-    // a zero-length piece between coincident breakpoints adds no mass but
-    // still carries the derivatives of its two edges, which move with
-    // different parameters; skipping it dropped that boundary term
-    int np = 1;
-    while (np * sigma_S < len) np += 1;
-    real half = 0.5 * len / np;
-    for (p in 1:np) {
-      real mid = edges[e] + (2 * p - 1) * half;
-      for (i in 1:N_GL) {
-        real s = mid + half * gl_nodes[i];
-        real m = mu_R + beta * (s - mu_S);
-        real pc = region == 1
-                  ? cdp_Phi_interval((s - kcrit - m) / sd_c, (rcrit - m) / sd_c)
-                  : Phi((fmin(rcrit, s - kcrit) - m) / sd_c);
-        total += gl_weights[i] * half * exp(normal_lpdf(s | mu_S, sigma_S)) * pc;
+    if (len > 0) {
+      int np = 1;
+      while (np * sigma_S < len) np += 1;
+      real half = 0.5 * len / np;
+      for (p in 1:np) {
+        real mid = edges[e] + (2 * p - 1) * half;
+        for (i in 1:N_GL) {
+          real s = mid + half * gl_nodes[i];
+          real m = mu_R + beta * (s - mu_S);
+          real pc = region == 1
+                    ? cdp_Phi_interval((s - kcrit - m) / sd_c, (rcrit - m) / sd_c)
+                    : Phi((fmin(rcrit, s - kcrit) - m) / sd_c);
+          total += gl_weights[i] * half * exp(normal_lpdf(s | mu_S, sigma_S)) * pc;
+        }
       }
+    } else {
+      // a zero-length piece between coincident breakpoints adds no mass but
+      // its two edges move with different parameters, so it carries the
+      // boundary term f(e) (e_b' - e_a'); one node holds it exactly, where
+      // the 20-node loop would evaluate the same point twenty times
+      real m = mu_R + beta * (edges[e] - mu_S);
+      real pc = region == 1
+                ? cdp_Phi_interval((edges[e] - kcrit - m) / sd_c, (rcrit - m) / sd_c)
+                : Phi((fmin(rcrit, edges[e] - kcrit) - m) / sd_c);
+      total += len * exp(normal_lpdf(edges[e] | mu_S, sigma_S)) * pc;
     }
   }
   return total;

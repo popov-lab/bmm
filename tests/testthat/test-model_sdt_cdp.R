@@ -865,6 +865,16 @@ test_that("dsdt_cdp, check_data and aggregate_sdt_cdp_data refuse malformed inpu
   dat <- sim_cdp_data()
   dat[1, grep("new|know|remember", colnames(dat))] <- 0L
   expect_error(check_data(m, dat, bmf(dfam ~ 1)), "no empty rows")
+  # the shared count-type rule (#461) reaches cdp through
+  # .validate_sdt_count_cols(): a non-numeric column is named, integer-valued
+  # doubles pass silently and fractional counts warn
+  dat <- sim_cdp_data()
+  dat$know4 <- as.character(dat$know4)
+  expect_error(check_data(m, dat, bmf(dfam ~ 1)), "'know4' must be numeric")
+  dat$know4 <- as.numeric(dat$know4)
+  expect_silent(check_data(m, dat, bmf(dfam ~ 1)))
+  dat$know4 <- dat$know4 + 0.5
+  expect_warning(check_data(m, dat, bmf(dfam ~ 1)), "should contain integer counts")
   # the aggregator's count and confidence checks
   long <- data.frame(
     id = 1, stimulus = 1,

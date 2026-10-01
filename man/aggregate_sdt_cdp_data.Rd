@@ -21,7 +21,8 @@ old/new scale (integer, 1 = most confident "new" to K = most confident
 levels).}
 
 \item{count}{Optional name of a column of response counts. If \code{NULL}
-(default), each row is treated as a single trial.}
+(default), each row is treated as a single trial. Non-integer counts are
+rounded with a warning; \code{NA} counts and \code{NA} confidences are refused.}
 
 \item{response}{Optional common prefix for the generated count columns
 (default \code{""}). Pass the same value to the \code{response} argument of

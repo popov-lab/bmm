@@ -366,7 +366,8 @@ sdt_cdp <- function(response = "", stimulus, n_new, n_old, dist = "normal",
 #'   "old"; "new" judgments occupy the low levels, "old" judgments the high
 #'   levels).
 #' @param count Optional name of a column of response counts. If `NULL`
-#'   (default), each row is treated as a single trial.
+#'   (default), each row is treated as a single trial. Non-integer counts are
+#'   rounded with a warning; `NA` counts and `NA` confidences are refused.
 #' @param response Optional common prefix for the generated count columns
 #'   (default `""`). Pass the same value to the `response` argument of
 #'   [sdt_cdp()].
