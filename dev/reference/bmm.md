@@ -162,31 +162,39 @@ many other useful information about the model. Use methods(class =
 
 The following models are supported:
 
-- cswald(rt, response, links, version)
+Continuous reproduction
 
-- ddm(rt, response, links)
+- imm(): Interference measurement model by Oberauer and Lin (2017)
 
-- ezdm(mean_rt, var_rt, n_upper, n_trials, links, version)
+- mixture2p(): Two-parameter mixture model by Zhang and Luck (2008)
 
-- imm(resp_error, nt_features, nt_distances, set_size, regex, version)
+- mixture3p(): Three-parameter mixture model by Bays et al (2009)
 
-- m3(resp_cats, num_options, choice_rule, version)
+- sdm(): Signal Discrimination Model (SDM) by Oberauer (2023)
 
-- mixture2p(resp_error)
+Categorical recall and n-AFC decisions
 
-- mixture3p(resp_error, nt_features, set_size, regex)
+- m3(): The Multinomial / Memory Measurement Model
 
-- sdm(resp_error, version)
+Detection, recognition and confidence judgments
 
-- sdt_cdp(response, stimulus, n_new, n_old, dist, threshold_type, links)
+- sdt_cdp(): Continuous Dual-Process Signal Detection Theory (CDP)
 
-- sdt_mafc(response, n_trials, m, dist, links)
+- sdt_mafc(): Signal Detection Theory (m-AFC)
 
-- sdt_ranking(response, m, dist, links)
+- sdt_ranking(): Signal Detection Theory (Ranking)
 
-- sdt_rating(response, stimulus, dist, threshold_type, version, links)
+- sdt_rating(): Signal Detection Theory (Confidence Rating)
 
-- sdt_yn(response, stimulus, n_trials, dist, links)
+- sdt_yn(): Signal Detection Theory (Yes/No)
+
+Choices and response times
+
+- cswald(): Censored-Shifted Wald Model
+
+- ddm(): Diffusion Decision Model
+
+- ezdm(): EZ-Diffusion Model
 
 Type ?modelname to get information about a specific model, e.g. ?imm
 

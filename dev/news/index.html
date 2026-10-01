@@ -21,7 +21,8 @@
     </button>
 
     <div id="navbar" class="collapse navbar-collapse ms-3">
-      <ul class="navbar-nav me-auto"><li class="nav-item"><a class="nav-link" href="../reference/index.html">Functions</a></li>
+      <ul class="navbar-nav me-auto"><li class="nav-item"><a class="nav-link" href="../articles/bmm.html">Get started</a></li>
+<li class="nav-item"><a class="nav-link" href="../reference/index.html">Functions</a></li>
 <li class="nav-item"><a class="nav-link" href="../articles/index.html">Articles</a></li>
 <li class="active nav-item"><a class="nav-link" href="../news/index.html">Changelog</a></li>
 <li class="nav-item"><a class="nav-link" href="https://popov-lab.github.io/bmm/dev-notes/index.html">Develop</a></li>
@@ -131,7 +132,11 @@
 </ul></div>
 <div class="section level4">
 <h4 id="other-changes-development-version">Other changes<a class="anchor" aria-label="anchor" href="#other-changes-development-version"></a></h4>
-<ul><li>bmm’s own links now point at popov-lab.github.io/bmm instead of venpopov.com/bmm, which currently redirects to the new address. Update bookmarks when convenient (<a href="https://github.com/popov-lab/bmm/issues/433" class="external-link">#433</a>).</li>
+<ul><li>
+<code><a href="../reference/supported_models.html">supported_models()</a></code> now lists the models under four task groups (continuous reproduction; categorical recall and n-AFC decisions; detection, recognition and confidence judgments; choices and response times), one line per model with its constructor and full name. The argument lists are gone from the printout; <code>?modelname</code> has them. <code>supported_models(print_call = FALSE)</code> is unchanged (<a href="https://github.com/popov-lab/bmm/issues/440" class="external-link">#440</a>).</li>
+<li>The home page of the website and the README now start from your task and list the models for each one, with links to the matching articles. The lists are generated from the package, so they stay current as models are added (<a href="https://github.com/popov-lab/bmm/issues/440" class="external-link">#440</a>).</li>
+<li>New <a href="https://popov-lab.github.io/bmm/articles/bmm.html">Get started</a> page on the website: install and check your machine with <code><a href="../reference/bmm_setup.html">bmm_setup()</a></code>, find the model for your task, including a table of the signal detection models by response format and noise distribution, and fit a first model to <code>broeder_schuetz_2009_e3</code> step by step (<a href="https://github.com/popov-lab/bmm/issues/440" class="external-link">#440</a>).</li>
+<li>bmm’s own links now point at popov-lab.github.io/bmm instead of venpopov.com/bmm, which currently redirects to the new address. Update bookmarks when convenient (<a href="https://github.com/popov-lab/bmm/issues/433" class="external-link">#433</a>).</li>
 <li>The <strong>cswald</strong> likelihood now evaluates all observations in one call instead of one at a time. This makes fitting faster, improves the accuracy of the gradients the sampler uses, and adds support for within-chain parallelization: <code>bmm(..., threads = 2)</code> now works for <strong>cswald</strong> as it does for <strong>sdm</strong>. The posterior is unchanged (<a href="https://github.com/popov-lab/bmm/issues/387" class="external-link">#387</a>).</li>
 </ul></div>
 </div>

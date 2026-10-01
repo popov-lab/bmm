@@ -23,7 +23,8 @@ backend interface to Stan."><meta property="og:image" content="https://popov-lab
     </button>
 
     <div id="navbar" class="collapse navbar-collapse ms-3">
-      <ul class="navbar-nav me-auto"><li class="active nav-item"><a class="nav-link" href="../reference/index.html">Functions</a></li>
+      <ul class="navbar-nav me-auto"><li class="nav-item"><a class="nav-link" href="../articles/bmm.html">Get started</a></li>
+<li class="active nav-item"><a class="nav-link" href="../reference/index.html">Functions</a></li>
 <li class="nav-item"><a class="nav-link" href="../articles/index.html">Articles</a></li>
 <li class="nav-item"><a class="nav-link" href="../news/index.html">Changelog</a></li>
 <li class="nav-item"><a class="nav-link" href="https://popov-lab.github.io/bmm/dev-notes/index.html">Develop</a></li>
@@ -189,19 +190,20 @@ with many other useful information about the model. Use methods(class =
     </div>
     <div class="section level2">
     <h2 id="supported-models">Supported Models<a class="anchor" aria-label="anchor" href="#supported-models"></a></h2>
-    <p>The following models are supported:</p><ul><li><p>cswald(rt, response, links, version)</p></li>
-<li><p>ddm(rt, response, links)</p></li>
-<li><p>ezdm(mean_rt, var_rt, n_upper, n_trials, links, version)</p></li>
-<li><p>imm(resp_error, nt_features, nt_distances, set_size, regex, version)</p></li>
-<li><p>m3(resp_cats, num_options, choice_rule, version)</p></li>
-<li><p>mixture2p(resp_error)</p></li>
-<li><p>mixture3p(resp_error, nt_features, set_size, regex)</p></li>
-<li><p>sdm(resp_error, version)</p></li>
-<li><p>sdt_cdp(response, stimulus, n_new, n_old, dist, threshold_type, links)</p></li>
-<li><p>sdt_mafc(response, n_trials, m, dist, links)</p></li>
-<li><p>sdt_ranking(response, m, dist, links)</p></li>
-<li><p>sdt_rating(response, stimulus, dist, threshold_type, version, links)</p></li>
-<li><p>sdt_yn(response, stimulus, n_trials, dist, links)</p></li>
+    <p>The following models are supported:</p>
+<p>Continuous reproduction</p><ul><li><p>imm(): Interference measurement model by Oberauer and Lin (2017)</p></li>
+<li><p>mixture2p(): Two-parameter mixture model by Zhang and Luck (2008)</p></li>
+<li><p>mixture3p(): Three-parameter mixture model by Bays et al (2009)</p></li>
+<li><p>sdm(): Signal Discrimination Model (SDM) by Oberauer (2023)</p></li>
+</ul><p>Categorical recall and n-AFC decisions</p><ul><li><p>m3(): The Multinomial / Memory Measurement Model</p></li>
+</ul><p>Detection, recognition and confidence judgments</p><ul><li><p>sdt_cdp(): Continuous Dual-Process Signal Detection Theory (CDP)</p></li>
+<li><p>sdt_mafc(): Signal Detection Theory (m-AFC)</p></li>
+<li><p>sdt_ranking(): Signal Detection Theory (Ranking)</p></li>
+<li><p>sdt_rating(): Signal Detection Theory (Confidence Rating)</p></li>
+<li><p>sdt_yn(): Signal Detection Theory (Yes/No)</p></li>
+</ul><p>Choices and response times</p><ul><li><p>cswald(): Censored-Shifted Wald Model</p></li>
+<li><p>ddm(): Diffusion Decision Model</p></li>
+<li><p>ezdm(): EZ-Diffusion Model</p></li>
 </ul><p>Type  ?modelname  to get information about a specific model, e.g.  ?imm</p>
     </div>
     <div class="section level2">

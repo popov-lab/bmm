@@ -21,7 +21,8 @@
     </button>
 
     <div id="navbar" class="collapse navbar-collapse ms-3">
-      <ul class="navbar-nav me-auto"><li class="active nav-item"><a class="nav-link" href="../reference/index.html">Functions</a></li>
+      <ul class="navbar-nav me-auto"><li class="nav-item"><a class="nav-link" href="../articles/bmm.html">Get started</a></li>
+<li class="active nav-item"><a class="nav-link" href="../reference/index.html">Functions</a></li>
 <li class="nav-item"><a class="nav-link" href="../articles/index.html">Articles</a></li>
 <li class="nav-item"><a class="nav-link" href="../news/index.html">Changelog</a></li>
 <li class="nav-item"><a class="nav-link" href="https://popov-lab.github.io/bmm/dev-notes/index.html">Develop</a></li>
@@ -55,15 +56,23 @@
 
 
 <dl><dt id="arg-print-call">print_call<a class="anchor" aria-label="anchor" href="#arg-print-call"></a></dt>
-<dd><p>Logical; If TRUE (default), the function will print
-information about how each model function should be called and its required
-arguments. If FALSE, the function will return a character vector with the
-names of the available models</p></dd>
+<dd><p>Logical; If TRUE (default), the function prints the models
+grouped by the task they are meant for, one line per model with its
+constructor and full name. If FALSE, the function returns a character
+vector with the names of the available models.</p></dd>
 
 </dl></div>
     <div class="section level2">
     <h2 id="value">Value<a class="anchor" aria-label="anchor" href="#value"></a></h2>
-    <p>A character vector of measurement models available in <code>bmm</code></p>
+    <p>If <code>print_call = FALSE</code>, a character vector of model names.
+Otherwise an object of class <code>message</code> listing the models by group.</p>
+    </div>
+    <div class="section level2">
+    <h2 id="details">Details<a class="anchor" aria-label="anchor" href="#details"></a></h2>
+    <p>The groups are: continuous reproduction; categorical recall and
+n-AFC decisions; detection, recognition and confidence judgments; choices
+and response times. Type <code>?modelname</code> (for example <code><a href="imm.html">?imm</a></code>) for the
+arguments of a model.</p>
     </div>
 
     <div class="section level2">
@@ -71,21 +80,36 @@ names of the available models</p></dd>
     <div class="sourceCode"><pre class="sourceCode r"><code><span class="r-in"><span><span class="fu">supported_models</span><span class="op">(</span><span class="op">)</span></span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> The following models are supported:</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> -  cswald(rt, response, links, version) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> -  ddm(rt, response, links) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> -  ezdm(mean_rt, var_rt, n_upper, n_trials, links, version) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> -  imm(resp_error, nt_features, nt_distances, set_size, regex, version) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> -  m3(resp_cats, num_options, choice_rule, version) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> -  mixture2p(resp_error) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> -  mixture3p(resp_error, nt_features, set_size, regex) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> -  sdm(resp_error, version) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> -  sdt_cdp(response, stimulus, n_new, n_old, dist, threshold_type, links) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> -  sdt_mafc(response, n_trials, m, dist, links) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> -  sdt_ranking(response, m, dist, links) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> -  sdt_rating(response, stimulus, dist, threshold_type, version, links) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> -  sdt_yn(response, stimulus, n_trials, dist, links) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Continuous reproduction</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> - imm(): Interference measurement model by Oberauer and Lin (2017)</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> - mixture2p(): Two-parameter mixture model by Zhang and Luck (2008)</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> - mixture3p(): Three-parameter mixture model by Bays et al (2009)</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> - sdm(): Signal Discrimination Model (SDM) by Oberauer (2023)</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Categorical recall and n-AFC decisions</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> - m3(): The Multinomial / Memory Measurement Model</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Detection, recognition and confidence judgments</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> - sdt_cdp(): Continuous Dual-Process Signal Detection Theory (CDP)</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> - sdt_mafc(): Signal Detection Theory (m-AFC)</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> - sdt_ranking(): Signal Detection Theory (Ranking)</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> - sdt_rating(): Signal Detection Theory (Confidence Rating)</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> - sdt_yn(): Signal Detection Theory (Yes/No)</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Choices and response times</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> - cswald(): Censored-Shifted Wald Model</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> - ddm(): Diffusion Decision Model</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> - ezdm(): EZ-Diffusion Model</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Type  ?modelname  to get information about a specific model, e.g.  ?imm </span>
+<span class="r-in"><span><span class="fu">supported_models</span><span class="op">(</span>print_call <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span></span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  [1] "cswald"      "ddm"         "ezdm"        "imm"         "m3"         </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  [6] "mixture2p"   "mixture3p"   "sdm"         "sdt_cdp"     "sdt_mafc"   </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> [11] "sdt_ranking" "sdt_rating"  "sdt_yn"     </span>
 </code></pre></div>
     </div>
   </main><aside class="col-md-3"><nav id="toc" aria-label="Table of contents"><h2>On this page</h2>

@@ -39,6 +39,7 @@
 
     <div id="navbar" class="collapse navbar-collapse ms-3">
       <ul class="navbar-nav me-auto">
+<li class="nav-item"><a class="nav-link" href="articles/bmm.html">Get started</a></li>
 <li class="nav-item"><a class="nav-link" href="reference/index.html">Functions</a></li>
 <li class="nav-item"><a class="nav-link" href="articles/index.html">Articles</a></li>
 <li class="nav-item"><a class="nav-link" href="news/index.html">Changelog</a></li>
@@ -59,217 +60,123 @@
 <div class="row">
   <main id="main" class="col-md-9"><div class="section level1">
 <div class="page-header">
-<img src="logo.png" class="logo" alt=""><h1 id="bmm">bmm<a class="anchor" aria-label="anchor" href="#bmm"></a>
+<img src="logo.png" class="logo" alt=""><h1 id="bmm-">bmm <a class="anchor" aria-label="anchor" href="#bmm-"></a>
 </h1>
 </div>
 <!-- badges: start -->
 
+<p><em>Bayesian Measurement Models for behavioral research in R</em></p>
+<p><code>bmm</code> fits cognitive measurement models to behavioral data. You write a <code>brms</code> formula for each parameter of the model, and <code>bmm</code> translates the measurement model into a distribution that <code>brms</code> can pass to Stan, the sampler behind it. The result is a hierarchical Bayesian estimate of the parameters that describe the cognitive processes behind the data, such as memory precision, the rate of guessing, or the sensitivity in a recognition task, in the same formula interface you already use for regression.</p>
+<p>The <a href="https://popov-lab.github.io/bmm/">documentation website</a> has a <a href="https://popov-lab.github.io/bmm/articles/bmm.html">Get started</a> page and one article per model family. This page gives you the short version.</p>
 <div class="section level2">
-<h2 id="overview">Overview<a class="anchor" aria-label="anchor" href="#overview"></a>
+<h2 id="which-model-for-your-task">Which model for your task<a class="anchor" aria-label="anchor" href="#which-model-for-your-task"></a>
 </h2>
-<p>The goal of the <code>bmm</code> (Bayesian Measurement Models) package is to make it easier to estimate common cognitive measurement models for behavioral research. It achieves this by combining the flexibility of the <code>brms</code> (Bayesian Regression Models using Stan) package for specifying linear model syntax with custom functions that translate cognitive measurement model into distributional families that can be estimated using Bayesian hierarchical estimation.</p>
-<p>Cognitive measurement models provide a more refined representation of the cognitive processes underlying observed behavior, because they decompose observed behavior into several theoretically meaningful parameters that each represent distinct cognitive processes. Therefore, researchers can use these models to test specific hypotheses about the cognitive processes underlying behavioral data.</p>
-</div>
-<div class="section level2">
-<h2 id="getting-started">Getting started<a class="anchor" aria-label="anchor" href="#getting-started"></a>
-</h2>
-<p>In the following sections you find more information on the <code>bmm</code> package:</p>
+<p>You arrive with data from a task, so this is how the models are organized. The lists below are generated from the package, so they show the models of the version this page was built from.</p>
+<p><strong>Continuous reproduction.</strong> Participants reproduce a color, an orientation or another continuous feature, and the response error is the dependent variable. See the <a href="https://popov-lab.github.io/bmm/articles/bmm_vwm_crt.html">continuous reproduction article</a>.</p>
 <ul>
 <li>
-<a href="#bmm">bmm</a>
+<a href="https://popov-lab.github.io/bmm/reference/imm.html"><code>imm()</code></a>: Interference measurement model by Oberauer and Lin (2017)</li>
+<li>
+<a href="https://popov-lab.github.io/bmm/reference/mixture2p.html"><code>mixture2p()</code></a>: Two-parameter mixture model by Zhang and Luck (2008)</li>
+<li>
+<a href="https://popov-lab.github.io/bmm/reference/mixture3p.html"><code>mixture3p()</code></a>: Three-parameter mixture model by Bays et al (2009)</li>
+<li>
+<a href="https://popov-lab.github.io/bmm/reference/sdm.html"><code>sdm()</code></a>: Signal Discrimination Model (SDM) by Oberauer (2023)</li>
+</ul>
+<p><strong>Categorical recall and n-AFC decisions.</strong> Participants choose one response from a set of categories (n-alternative forced choice), for example the correct item, an item from another position, or an item that was not studied. See the <a href="https://popov-lab.github.io/bmm/articles/bmm_m3.html">M3 article</a>.</p>
 <ul>
-<li><a href="#overview">Overview</a></li>
-<li><a href="#getting-started">Getting started</a></li>
-<li><a href="#how-to-install-bmm">How to install bmm</a></li>
-<li><a href="#available-models">Available models</a></li>
-<li><a href="#fitting-models-using-bmm">Fitting models using <code>bmm</code></a></li>
-<li><a href="#exploring-measurement-models">Exploring measurement models</a></li>
-<li><a href="#the-general-structure-of-the-bmm-package">The general structure of the <code>bmm</code> package</a></li>
-<li><a href="#contributing-to-the-bmm-package">Contributing to the <code>bmm</code> package</a></li>
+<li>
+<a href="https://popov-lab.github.io/bmm/reference/m3.html"><code>m3()</code></a>: The Multinomial / Memory Measurement Model</li>
 </ul>
-</li>
+<p><strong>Detection, recognition and confidence judgments.</strong> Participants decide whether a signal was present or an item was studied, rate their confidence, give Remember/Know judgments, pick the target among several alternatives, or rank the alternatives. One signal detection model per response format, each fit to response counts per participant and condition. See the <a href="https://popov-lab.github.io/bmm/articles/bmm_sdt.html">signal detection article</a> and, for the dual-process and meta-d′ versions of <code><a href="reference/sdt_rating.html">sdt_rating()</a></code> and the Remember/Know model <code><a href="reference/sdt_cdp.html">sdt_cdp()</a></code>, the <a href="https://popov-lab.github.io/bmm/articles/bmm_sdt_dualprocess_metad.html">dual-process and meta-d′ article</a>. The <a href="https://popov-lab.github.io/bmm/articles/bmm.html#detection-recognition-and-confidence-judgments">Get started</a> page has a table of the response formats and the noise distributions each model offers.</p>
+<ul>
+<li>
+<a href="https://popov-lab.github.io/bmm/reference/sdt_cdp.html"><code>sdt_cdp()</code></a>: Continuous Dual-Process Signal Detection Theory (CDP)</li>
+<li>
+<a href="https://popov-lab.github.io/bmm/reference/sdt_mafc.html"><code>sdt_mafc()</code></a>: Signal Detection Theory (m-AFC)</li>
+<li>
+<a href="https://popov-lab.github.io/bmm/reference/sdt_ranking.html"><code>sdt_ranking()</code></a>: Signal Detection Theory (Ranking)</li>
+<li>
+<a href="https://popov-lab.github.io/bmm/reference/sdt_rating.html"><code>sdt_rating()</code></a>: Signal Detection Theory (Confidence Rating)</li>
+<li>
+<a href="https://popov-lab.github.io/bmm/reference/sdt_yn.html"><code>sdt_yn()</code></a>: Signal Detection Theory (Yes/No)</li>
 </ul>
+<p><strong>Choices and response times.</strong> Participants choose between two options and the response time is recorded, either on every trial or as means and variances per condition. See the <a href="https://popov-lab.github.io/bmm/articles/bmm_ddm.html">DDM</a>, <a href="https://popov-lab.github.io/bmm/articles/bmm_cswald.html">censored shifted Wald</a>, <a href="https://popov-lab.github.io/bmm/articles/bmm_ezdm.html">EZ-diffusion</a> and <a href="https://popov-lab.github.io/bmm/articles/bmm_rt_contamination.html">response time contamination</a> articles.</p>
+<ul>
+<li>
+<a href="https://popov-lab.github.io/bmm/reference/cswald.html"><code>cswald()</code></a>: Censored-Shifted Wald Model</li>
+<li>
+<a href="https://popov-lab.github.io/bmm/reference/ddm.html"><code>ddm()</code></a>: Diffusion Decision Model</li>
+<li>
+<a href="https://popov-lab.github.io/bmm/reference/ezdm.html"><code>ezdm()</code></a>: EZ-Diffusion Model</li>
+</ul>
+<p><img src="reference/figures/README-task-map.png" alt="The tasks bmm covers and the models for each" width="100%"></p>
+<p><code><a href="reference/supported_models.html">supported_models()</a></code> prints the same list in R, and <code>?modelname</code> (for example <code><a href="reference/imm.html">?imm</a></code>) documents what data a model expects and what its parameters mean.</p>
 </div>
 <div class="section level2">
-<h2 id="how-to-install-bmm">How to install bmm<a class="anchor" aria-label="anchor" href="#how-to-install-bmm"></a>
+<h2 id="install">Install<a class="anchor" aria-label="anchor" href="#install"></a>
 </h2>
-<p>You can install the latest version of the <code>bmm</code> package from CRAN:</p>
+<p>The released version is on CRAN:</p>
 <div class="sourceCode" id="cb1"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/utils/install.packages.html" class="external-link">install.packages</a></span><span class="op">(</span><span class="st">"bmm"</span><span class="op">)</span></span></code></pre></div>
-<p>Because <code>bmm</code> is based on <code>brms</code> and <code>stan</code> it requires a working C++ compiler. If you have not used <code>brms</code> before, you will need to first install the dependencies. If you are already using <code>brms</code>, you can skip this step.</p>
-<details><summary><b> Install dependencies</b>
-</summary><p></p>
-<ul>
-<li>Install and configure a C++ compiler. Detailed instructions <a href="https://github.com/stan-dev/rstan/wiki/RStan-Getting-Started#configuring-c-toolchain" class="external-link">here</a>
-</li>
-<li>Install <a href="https://github.com/stan-dev/rstan/wiki/RStan-Getting-Started" class="external-link">rstan</a> and/or <a href="https://mc-stan.org/cmdstanr/articles/cmdstanr.html" class="external-link">cmdstanr</a>. We recommend using <code>cmdstanr</code>.</li>
-<li>Install <a href="http://paulbuerkner.com/brms/#installation" class="external-link">brms</a>
-</li>
-</ul></details><p> Alternatively, you can install the development version of the package or a specific version of the package from GitHub:</p>
-<details><summary><b>Install the latest development version of bmm</b>
-</summary><p></p>
+<p>Fitting a model needs a C++ compiler and a Stan backend, <code>cmdstanr</code> or <code>rstan</code>; we recommend <code>cmdstanr</code>. Run <code><a href="reference/bmm_setup.html">bmm_setup()</a></code> to check both. It prints one fix for every check that failed and installs nothing itself:</p>
 <div class="sourceCode" id="cb2"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="fu">bmm</span><span class="fu">::</span><span class="fu"><a href="reference/bmm_setup.html">bmm_setup</a></span><span class="op">(</span><span class="op">)</span></span></code></pre></div>
+<details><summary><b>Install the development version</b>
+</summary><p></p>
+<div class="sourceCode" id="cb3"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="kw">if</span> <span class="op">(</span><span class="op">!</span><span class="fu"><a href="https://rdrr.io/r/base/ns-load.html" class="external-link">requireNamespace</a></span><span class="op">(</span><span class="st">"remotes"</span><span class="op">)</span><span class="op">)</span> <span class="op">{</span></span>
 <span>  <span class="fu"><a href="https://rdrr.io/r/utils/install.packages.html" class="external-link">install.packages</a></span><span class="op">(</span><span class="st">"remotes"</span><span class="op">)</span></span>
 <span><span class="op">}</span></span>
 <span><span class="fu">remotes</span><span class="fu">::</span><span class="fu"><a href="https://remotes.r-lib.org/reference/install_github.html" class="external-link">install_github</a></span><span class="op">(</span><span class="st">"popov-lab/bmm"</span>, upgrade <span class="op">=</span> <span class="st">"never"</span><span class="op">)</span></span></code></pre></div>
 <p><code>upgrade = "never"</code> keeps <code>remotes</code> from updating the packages <code>bmm</code> depends on. Updating <code>Rcpp</code>, <code>StanHeaders</code> or <code>RcppParallel</code> underneath an installed <code>rstan</code> can leave <code>rstan</code> unable to load, in particular on Windows, and <code>brms</code> needs <code>rstan</code> to store the results of every fit, also with the <code>cmdstanr</code> backend.</p>
-</details><details><summary><b>Install the 0.0.1 version of bmm (if following version 6 of the tutorial paper on OSF)</b>
+</details><details><summary><b>Install the 0.0.1 version of bmm (if following version 6 of the tutorial paper on the Open Science Framework)</b>
 </summary><p></p>
 <p>The package was significantly updated on Feb 03, 2024. If you are following older versions (earlier than Version 6) of the <a href="https://osf.io/preprints/psyarxiv/umt57" class="external-link">Tutorial preprint</a>, you need to install the 0.0.1 version of the bmm package with:</p>
-<div class="sourceCode" id="cb3"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb4"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="kw">if</span> <span class="op">(</span><span class="op">!</span><span class="fu"><a href="https://rdrr.io/r/base/ns-load.html" class="external-link">requireNamespace</a></span><span class="op">(</span><span class="st">"remotes"</span><span class="op">)</span><span class="op">)</span> <span class="op">{</span></span>
 <span>  <span class="fu"><a href="https://rdrr.io/r/utils/install.packages.html" class="external-link">install.packages</a></span><span class="op">(</span><span class="st">"remotes"</span><span class="op">)</span></span>
 <span><span class="op">}</span></span>
 <span><span class="fu">remotes</span><span class="fu">::</span><span class="fu"><a href="https://remotes.r-lib.org/reference/install_github.html" class="external-link">install_github</a></span><span class="op">(</span><span class="st">"popov-lab/bmm@v0.0.1"</span>, upgrade <span class="op">=</span> <span class="st">"never"</span><span class="op">)</span></span></code></pre></div>
-</details><div class="section level3">
-<h3 id="check-your-installation">Check your installation<a class="anchor" aria-label="anchor" href="#check-your-installation"></a>
-</h3>
-<p>To find out whether your machine can fit models, run <code><a href="reference/bmm_setup.html">bmm_setup()</a></code>. It checks the C++ toolchain, <code>cmdstanr</code> with CmdStan, and <code>rstan</code>, compiles and samples a small test model, and prints one fix for every check that failed. It installs nothing itself. If your first <code><a href="reference/bmm.html">bmm()</a></code> call fails while compiling or loading the Stan backend, the error message points you there as well.</p>
-<div class="sourceCode" id="cb4"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="fu">bmm</span><span class="fu">::</span><span class="fu"><a href="reference/bmm_setup.html">bmm_setup</a></span><span class="op">(</span><span class="op">)</span></span></code></pre></div>
-</div>
+</details>
 </div>
 <div class="section level2">
-<h2 id="available-models">Available models<a class="anchor" aria-label="anchor" href="#available-models"></a>
+<h2 id="fit-your-first-model">Fit your first model<a class="anchor" aria-label="anchor" href="#fit-your-first-model"></a>
 </h2>
-<p>Currently the <code>bmm</code> package implements models used in the domain of working memory research and evidence accumulation models, such as:</p>
-<p><strong>Decision Making / Response times</strong></p>
-<ul>
-<li>Censored-Shifted Wald Model</li>
-<li>Diffusion Decision Model</li>
-<li>EZ-Diffusion Model</li>
-</ul>
-<p><strong>Visual working memory</strong></p>
-<ul>
-<li>Interference measurement model by Oberauer and Lin (2017).</li>
-<li>Two-parameter mixture model by Zhang and Luck (2008).</li>
-<li>Three-parameter mixture model by Bays et al (2009).</li>
-<li>Signal Discrimination Model (SDM) by Oberauer (2023)</li>
-</ul>
-<p><strong>Working Memory (categorical), Categorical Decision Making</strong></p>
-<ul>
-<li>The Multinomial / Memory Measurement Model</li>
-</ul>
-<p><strong>Perception &amp; Recognition Memory</strong></p>
-<ul>
-<li>Signal Detection Theory (Yes/No)</li>
-</ul>
-<p>However, the <code>bmm</code> package is setup to provide the foundation for the implementation of a broad range of cognitive measurement models. In fact, we are already working on implementing additional models, such as:</p>
-<ul>
-<li>Signal-Detection Models</li>
-<li>further evidence accumulation models, such as the LBA</li>
-</ul>
-<p>If you have suggestions for models that should be added to the package or additional functionality that would improve the usability of the pacakge, feel free to create an <a href="https://github.com/popov-lab/bmm/issues" class="external-link">issue</a>. Ideally this should describe the model, point towards literature that gives details on the model, and if possible link to code that has already implemented the model.</p>
-<p>Given the dynamic nature the <code>bmm</code> package is currently in, you can always view the latest list of supported models by running:</p>
+<p>A fit takes three things: a model object that names the columns of your data, a formula for each parameter written with <code><a href="reference/bmmformula.html">bmf()</a></code> (short for <code><a href="reference/bmmformula.html">bmmformula()</a></code>), and the data. Here we fit a yes/no signal detection model to the recognition data of Broeder and Schuetz (2009) that ships with the package. Its two parameters are the sensitivity <code>d</code> and the response <code>criterion</code>. The data has five conditions that varied the proportion of old items, so we estimate one criterion per condition (<code>0 + condition</code>), and we let both parameters vary between participants (<code>(1 | id)</code>):</p>
 <div class="sourceCode" id="cb5"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="fu">bmm</span><span class="fu">::</span><span class="fu"><a href="reference/supported_models.html">supported_models</a></span><span class="op">(</span><span class="op">)</span></span>
-<span><span class="co">#&gt; The following models are supported:</span></span>
-<span><span class="co">#&gt; </span></span>
-<span><span class="co">#&gt; -  cswald(rt, response, links, version) </span></span>
-<span><span class="co">#&gt; -  ddm(rt, response, links) </span></span>
-<span><span class="co">#&gt; -  ezdm(mean_rt, var_rt, n_upper, n_trials, links, version) </span></span>
-<span><span class="co">#&gt; -  imm(resp_error, nt_features, nt_distances, set_size, regex, version) </span></span>
-<span><span class="co">#&gt; -  m3(resp_cats, num_options, choice_rule, version) </span></span>
-<span><span class="co">#&gt; -  mixture2p(resp_error) </span></span>
-<span><span class="co">#&gt; -  mixture3p(resp_error, nt_features, set_size, regex) </span></span>
-<span><span class="co">#&gt; -  sdm(resp_error, version) </span></span>
-<span><span class="co">#&gt; -  sdt_yn(response, stimulus, n_trials, dist, links) </span></span>
-<span><span class="co">#&gt; </span></span>
-<span><span class="co">#&gt; Type  ?modelname  to get information about a specific model, e.g.  ?imm</span></span></code></pre></div>
-</div>
-<div class="section level2">
-<h2 id="fitting-models-using-bmm">Fitting models using <code>bmm</code>
-<a class="anchor" aria-label="anchor" href="#fitting-models-using-bmm"></a>
-</h2>
-<p>The core function of the <code>bmm</code> package is the <code><a href="reference/bmm.html">bmm()</a></code> function. This function takes:</p>
-<ol style="list-style-type: decimal">
-<li>a <em>linear model formula</em> specifying how parameters of the model should vary as a function of experimental conditions</li>
-<li>
-<em>data</em> containing the dependent variables, the variables predicting model parameters, and potentially additional variables providing information to identify the model</li>
-<li>the <em>model object</em> defining the model that should be fit</li>
-</ol>
-<p>You can get more detailed information on the models implemented in <code>bmm</code> by invoking the documentation of each model typing <code>?bmmodel</code> into your console. For example, calling the information on Interference Measurement Model <code>imm</code> would look like this:</p>
-<div class="sourceCode" id="cb6"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="op">?</span><span class="va">imm</span></span></code></pre></div>
-<p>A complete call to fit a model using <code>bmm</code> could look like this. For this example, we are using the <code>oberauer_lin_2017</code> data that is provided with the package and we will show how to fit the Interference Measurement Model to this data. If you want a detailed description of this model and and in depth explanation of the parameters estimated in the model, please have a look at <a href="https://popov-lab.github.io/bmm/articles/bmm_imm.html">the IMM article</a>.</p>
-<div class="sourceCode" id="cb7"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://github.com/popov-lab/bmm" class="external-link">bmm</a></span><span class="op">)</span></span>
 <span></span>
-<span><span class="va">formula</span> <span class="op">&lt;-</span> <span class="fu"><a href="reference/bmmformula.html">bmmformula</a></span><span class="op">(</span><span class="va">c</span> <span class="op">~</span> <span class="fl">0</span> <span class="op">+</span> <span class="va">set_size</span>,</span>
-<span>                      <span class="va">a</span> <span class="op">~</span> <span class="fl">0</span> <span class="op">+</span> <span class="va">set_size</span>,</span>
-<span>                      <span class="va">s</span> <span class="op">~</span> <span class="fl">0</span> <span class="op">+</span> <span class="va">set_size</span>,</span>
-<span>                      <span class="va">kappa</span> <span class="op">~</span> <span class="fl">0</span> <span class="op">+</span> <span class="va">set_size</span><span class="op">)</span></span>
-<span></span>
-<span><span class="va">model</span> <span class="op">&lt;-</span> <span class="fu"><a href="reference/imm.html">imm</a></span><span class="op">(</span>resp_error <span class="op">=</span> <span class="st">"dev_rad"</span>,</span>
-<span>             nt_features <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/paste.html" class="external-link">paste0</a></span><span class="op">(</span><span class="st">"col_nt"</span>, <span class="fl">1</span><span class="op">:</span><span class="fl">7</span><span class="op">)</span>,</span>
-<span>             nt_distances <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/paste.html" class="external-link">paste0</a></span><span class="op">(</span><span class="st">"dist_nt"</span>,<span class="fl">1</span><span class="op">:</span><span class="fl">7</span><span class="op">)</span>,</span>
-<span>             set_size <span class="op">=</span> <span class="st">"set_size"</span><span class="op">)</span></span>
-<span></span>
-<span><span class="va">fit</span> <span class="op">&lt;-</span> <span class="fu"><a href="reference/bmm.html">bmm</a></span><span class="op">(</span>formula <span class="op">=</span> <span class="va">formula</span>, data <span class="op">=</span> <span class="va">data</span>, model <span class="op">=</span> <span class="va">model</span><span class="op">)</span></span></code></pre></div>
-<p>Using this call, the <code>fit</code> object will save all the information about the fitted model. As <code>bmm</code> calls <code>brms</code> to fit the models, these objects can be handled the same way a normal <code>brmsfit</code> object is handled:</p>
-<div class="sourceCode" id="cb8"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="co"># print summary</span></span>
-<span><span class="fu"><a href="https://rdrr.io/r/base/summary.html" class="external-link">summary</a></span><span class="op">(</span><span class="va">fit</span><span class="op">)</span></span>
-<span></span>
-<span><span class="co"># plot posterior predicitive plot</span></span>
-<span><span class="fu">brms</span><span class="fu">::</span><span class="fu"><a href="https://mc-stan.org/bayesplot/reference/pp_check.html" class="external-link">pp_check</a></span><span class="op">(</span><span class="va">fit</span><span class="op">)</span></span></code></pre></div>
-<p>You can have a look at examples for how to fit all currently implemented models by reading the vignettes for each model <a href="https://popov-lab.github.io/bmm/articles/index.html">here for the released version of the package</a> or <a href="https://popov-lab.github.io/bmm/dev/articles/index.html">here for the development version</a>.</p>
-</div>
-<div class="section level2">
-<h2 id="exploring-measurement-models">Exploring measurement models<a class="anchor" aria-label="anchor" href="#exploring-measurement-models"></a>
-</h2>
-<p>To aid users in improving their intuition about what different models predict for observed data given a certain parameter set, the <code>bmm</code> package also includes density and random generation function for all implemented models.</p>
-<p>These function provide an easy way to see what a model predicts for data given a certain set of parameters. For example you can easily plot the probability density function of the data for the Interference Measurement model using the <code>dimm</code> function. In similar fashion the random generation function included for each model, generates random data based on a set of data generating parameters. For the IMM, you can use <code>rimm</code> to generate data given a set of parameters. Here is an example of how to use these functions. We are ploting a histogram of randomly generated data from the IMM with a setsize of four, and overlaying the probability density function of the model:</p>
-<div class="sourceCode" id="cb9"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://github.com/popov-lab/bmm" class="external-link">bmm</a></span><span class="op">)</span></span>
-<span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://ggplot2.tidyverse.org" class="external-link">ggplot2</a></span><span class="op">)</span></span>
-<span></span>
-<span><span class="va">resp</span> <span class="op">&lt;-</span> <span class="fu"><a href="reference/IMMdist.html">rimm</a></span><span class="op">(</span></span>
-<span>  n <span class="op">=</span> <span class="fl">1000</span>,</span>
-<span>  mu <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">0</span>, <span class="op">-</span><span class="fl">1.5</span>, <span class="fl">2.5</span>, <span class="fl">1</span><span class="op">)</span>,</span>
-<span>  dist <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">0</span>, <span class="fl">2</span>, <span class="fl">0.3</span>, <span class="fl">1</span><span class="op">)</span>,</span>
-<span>  c <span class="op">=</span> <span class="fl">1.5</span>, a <span class="op">=</span> <span class="fl">0.3</span>, b <span class="op">=</span> <span class="fl">0</span>, s <span class="op">=</span> <span class="fl">2</span>, kappa <span class="op">=</span> <span class="fl">10</span></span>
+<span><span class="co"># one row per participant, condition and stimulus type: n_old counts the</span></span>
+<span><span class="co"># "old" responses in that cell, n_trials the items shown, and stimulus is 1</span></span>
+<span><span class="co"># for old items and 0 for new items</span></span>
+<span><span class="va">model</span> <span class="op">&lt;-</span> <span class="fu"><a href="reference/sdt_yn.html">sdt_yn</a></span><span class="op">(</span></span>
+<span>  response <span class="op">=</span> <span class="st">"n_old"</span>,</span>
+<span>  stimulus <span class="op">=</span> <span class="st">"stimulus"</span>,</span>
+<span>  n_trials <span class="op">=</span> <span class="st">"n_trials"</span></span>
 <span><span class="op">)</span></span>
 <span></span>
-<span><span class="fu"><a href="https://rdrr.io/r/graphics/hist.html" class="external-link">hist</a></span><span class="op">(</span><span class="va">resp</span>, freq <span class="op">=</span> <span class="cn">FALSE</span>, breaks <span class="op">=</span> <span class="fl">60</span><span class="op">)</span></span>
-<span><span class="fu"><a href="https://rdrr.io/r/graphics/curve.html" class="external-link">curve</a></span><span class="op">(</span></span>
-<span>  <span class="fu"><a href="reference/IMMdist.html">dimm</a></span><span class="op">(</span><span class="va">x</span>,</span>
-<span>    mu <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">0</span>, <span class="op">-</span><span class="fl">1.5</span>, <span class="fl">2.5</span>, <span class="fl">1</span><span class="op">)</span>, </span>
-<span>    dist <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">0</span>, <span class="fl">2</span>, <span class="fl">0.3</span>, <span class="fl">1</span><span class="op">)</span>, </span>
-<span>    c <span class="op">=</span> <span class="fl">1.5</span>, a <span class="op">=</span> <span class="fl">0.3</span>, b <span class="op">=</span> <span class="fl">0</span>, s <span class="op">=</span> <span class="fl">2</span>, kappa <span class="op">=</span> <span class="fl">10</span></span>
-<span>  <span class="op">)</span>,</span>
-<span>  from <span class="op">=</span> <span class="op">-</span><span class="va">pi</span>, to <span class="op">=</span> <span class="va">pi</span>, add <span class="op">=</span> <span class="cn">TRUE</span></span>
-<span><span class="op">)</span></span></code></pre></div>
-<p><img src="reference/figures/README-unnamed-chunk-4-1.png" alt="" width="400"></p>
+<span><span class="va">formula</span> <span class="op">&lt;-</span> <span class="fu"><a href="reference/bmmformula.html">bmf</a></span><span class="op">(</span></span>
+<span>  <span class="va">d</span> <span class="op">~</span> <span class="fl">1</span> <span class="op">+</span> <span class="op">(</span><span class="fl">1</span> <span class="op">|</span> <span class="va">id</span><span class="op">)</span>,</span>
+<span>  <span class="va">criterion</span> <span class="op">~</span> <span class="fl">0</span> <span class="op">+</span> <span class="va">condition</span> <span class="op">+</span> <span class="op">(</span><span class="fl">1</span> <span class="op">|</span> <span class="va">id</span><span class="op">)</span></span>
+<span><span class="op">)</span></span>
+<span></span>
+<span><span class="va">fit</span> <span class="op">&lt;-</span> <span class="fu"><a href="reference/bmm.html">bmm</a></span><span class="op">(</span><span class="va">formula</span>, data <span class="op">=</span> <span class="va">broeder_schuetz_2009_e3</span>, model <span class="op">=</span> <span class="va">model</span><span class="op">)</span></span>
+<span></span>
+<span><span class="fu"><a href="https://rdrr.io/r/base/summary.html" class="external-link">summary</a></span><span class="op">(</span><span class="va">fit</span><span class="op">)</span></span></code></pre></div>
+<p>The fit is a <code>brms</code> fit with extras, so <code><a href="https://rdrr.io/r/base/summary.html" class="external-link">summary()</a></code>, posterior predictive checks with <code><a href="reference/pp_check.bmmfit.html">pp_check()</a></code> and the rest of the <code>brms</code> toolbox work as usual. The <a href="https://popov-lab.github.io/bmm/articles/bmm.html">Get started</a> page walks through this example line by line, including how to read the summary.</p>
 </div>
 <div class="section level2">
-<h2 id="the-general-structure-of-the-bmm-package">The general structure of the <code>bmm</code> package<a class="anchor" aria-label="anchor" href="#the-general-structure-of-the-bmm-package"></a>
+<h2 id="learn-more">Learn more<a class="anchor" aria-label="anchor" href="#learn-more"></a>
 </h2>
-<p>The main building block of the <code>bmm</code> package is that cognitive measurement models can often be specified as distributional models for which the distributional parameters of the generalized linear mixed model are a function of cognitive measurement model parameters. These functions that translate the cognitive measurement model parameters into distributional parameters is what we implement in the <code>bmm</code> package.</p>
-<p><img src="reference/figures/README-bmmLogic.png" alt="" width="600" style="display: block; margin: auto;"></p>
-<p>As these function can become complicated and their implementation changes with differences in experimental designs, the <code>bmm</code> package provides general translation functions that ease the use of the cognitive measurement models for end users. This way researchers that face challenges in writing their own STAN code to implement such models themselves can still use these models in almost any experimental design.</p>
-<p>Under the hood, the main <code><a href="reference/bmm.html">bmm()</a></code> function will then call the appropriate functions for the specified model and will perform several steps:</p>
-<ol style="list-style-type: decimal">
-<li>Configure the sampler (e.g., set up prallelization &amp; additional settings)</li>
-<li>Check the information passed to the <code><a href="reference/bmm.html">bmm()</a></code> function:
 <ul>
-<li>if the model is installed and all required arguments were provided</li>
-<li>if a valid formula was passed</li>
-<li>if the data contains all necessary variables</li>
+<li>
+<a href="https://popov-lab.github.io/bmm/articles/index.html">Articles</a>: one per model family, plus the <a href="https://popov-lab.github.io/bmm/articles/bmm_bmmformula.html">bmmformula syntax</a> and how to <a href="https://popov-lab.github.io/bmm/articles/bmm_extract_info.html">extract priors, Stan code and Stan data</a> from a model.</li>
+<li><a href="https://popov-lab.github.io/bmm/reference/index.html">Function reference</a></li>
+<li><a href="https://popov-lab.github.io/bmm/news/index.html">Changelog</a></li>
+<li>Something missing or broken? Open an <a href="https://github.com/popov-lab/bmm/issues" class="external-link">issue</a>. For a new model, describe it, point to the literature, and link code that already implements it if there is any.</li>
+<li>Want to add a model yourself? Start with the <a href="https://popov-lab.github.io/bmm/dev-notes/index.html">Developer Notes</a> and the <a href="https://github.com/popov-lab/bmm/blob/develop/.github/CONTRIBUTING.md" class="external-link">Contributor Guidelines</a>.</li>
 </ul>
-</li>
-<li>Configure the called model (including specifying priors were necessary)</li>
-<li>Calling <code>brms</code> and passing the specified arguments</li>
-<li>Post-processing the output and passing it to the user</li>
-</ol>
-<p>This process is illustrated in the Figure below:</p>
-<p><img src="reference/figures/README-fitModel_process.png" alt="" width="600" style="display: block; margin: auto;"></p>
-</div>
-<div class="section level2">
-<h2 id="contributing-to-the-bmm-package">Contributing to the <code>bmm</code> package<a class="anchor" aria-label="anchor" href="#contributing-to-the-bmm-package"></a>
-</h2>
-<p>Should be interested in contributing a model to the <code>bmm</code> package, you should first look into the <a href="https://popov-lab.github.io/bmm/dev/dev-notes/index.html">Developer Notes</a> as well as the <a href="https://github.com/popov-lab/bmm/blob/develop/.github/CONTRIBUTING.md" class="external-link">Contributor Guidelines</a>. These give a more in depth description of the package architecture, the steps necessary to add your own model to the package, and how contributions will be acknowledged.</p>
 </div>
 </div>
   </main><aside class="col-md-3"><div class="links">
@@ -315,12 +222,13 @@
 <div class="dev-status">
 <h2 data-toc-skip>Dev status</h2>
 <ul class="list-unstyled">
+<li><a href="https://popov-lab.github.io/bmm/"><img src="https://img.shields.io/badge/documentation-bmm-blue.svg" alt="Documentation"></a></li>
 <li><a href="https://CRAN.R-project.org/package=bmm" class="external-link"><img src="https://www.r-pkg.org/badges/version/bmm" alt="CRAN status"></a></li>
 <li><a href="https://popov-lab.r-universe.dev/bmm" class="external-link"><img src="https://popov-lab.r-universe.dev/badges/bmm" alt="bmm status badge"></a></li>
 <li><a href="https://github.com/popov-lab/bmm/actions/workflows/R-CMD-check.yaml" class="external-link"><img src="https://github.com/popov-lab/bmm/actions/workflows/R-CMD-check.yaml/badge.svg" alt="R-CMD-check"></a></li>
 <li><a href="https://github.com/popov-lab/bmm/actions/workflows/test-coverage.yaml" class="external-link"><img src="https://github.com/popov-lab/bmm/actions/workflows/test-coverage.yaml/badge.svg" alt="test-coverage"></a></li>
 <li><a href="https://cran.r-project.org/package=bmm" class="external-link"><img src="https://cranlogs.r-pkg.org/badges/bmm" alt="downloads"></a></li>
-<li><a href="#"><img src="https://img.shields.io/badge/dependencies-12/19-orange?style=flat" alt="Dependencies"></a></li>
+<li><a href="#"><img src="https://img.shields.io/badge/dependencies-13/22-orange?style=flat" alt="Dependencies"></a></li>
 </ul>
 </div>
 

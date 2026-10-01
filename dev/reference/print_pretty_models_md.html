@@ -5,9 +5,11 @@
       fontURL: "https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/output/chtml/fonts/woff-v2"
     }
   };
-</script><script src="../deps/jquery-3.6.0/jquery-3.6.0.min.js"></script><meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no"><link href="../deps/bootstrap-5.3.8/bootstrap.min.css" rel="stylesheet"><script src="../deps/bootstrap-5.3.8/bootstrap.bundle.min.js"></script><link href="../deps/font-awesome-6.5.2/css/all.min.css" rel="stylesheet"><link href="../deps/font-awesome-6.5.2/css/v4-shims.min.css" rel="stylesheet"><script src="../deps/headroom-0.11.0/headroom.min.js"></script><script src="../deps/headroom-0.11.0/jQuery.headroom.min.js"></script><script src="../deps/bootstrap-toc-1.0.1/bootstrap-toc.min.js"></script><script src="../deps/clipboard.js-2.0.11/clipboard.min.js"></script><script src="../deps/search-1.0.0/autocomplete.jquery.min.js"></script><script src="../deps/search-1.0.0/fuse.min.js"></script><script src="../deps/search-1.0.0/mark.min.js"></script><!-- pkgdown --><script src="../pkgdown.js"></script><meta property="og:title" content="Generate a markdown list of the measurement models available in bmm — print_pretty_models_md"><meta name="description" content="Used internally to automatically populate information in the
-README file"><meta property="og:description" content="Used internally to automatically populate information in the
-README file"><meta property="og:image" content="https://popov-lab.github.io/bmm/logo.png"><meta name="robots" content="noindex"></head><body>
+</script><script src="../deps/jquery-3.6.0/jquery-3.6.0.min.js"></script><meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no"><link href="../deps/bootstrap-5.3.8/bootstrap.min.css" rel="stylesheet"><script src="../deps/bootstrap-5.3.8/bootstrap.bundle.min.js"></script><link href="../deps/font-awesome-6.5.2/css/all.min.css" rel="stylesheet"><link href="../deps/font-awesome-6.5.2/css/v4-shims.min.css" rel="stylesheet"><script src="../deps/headroom-0.11.0/headroom.min.js"></script><script src="../deps/headroom-0.11.0/jQuery.headroom.min.js"></script><script src="../deps/bootstrap-toc-1.0.1/bootstrap-toc.min.js"></script><script src="../deps/clipboard.js-2.0.11/clipboard.min.js"></script><script src="../deps/search-1.0.0/autocomplete.jquery.min.js"></script><script src="../deps/search-1.0.0/fuse.min.js"></script><script src="../deps/search-1.0.0/mark.min.js"></script><!-- pkgdown --><script src="../pkgdown.js"></script><meta property="og:title" content="Generate a markdown list of the measurement models available in bmm — print_pretty_models_md"><meta name="description" content='Used internally to populate the README and the "Get started"
+article. Models are grouped as in supported_models(), and every model
+links to its reference page on the website.'><meta property="og:description" content='Used internally to populate the README and the "Get started"
+article. Models are grouped as in supported_models(), and every model
+links to its reference page on the website.'><meta property="og:image" content="https://popov-lab.github.io/bmm/logo.png"><meta name="robots" content="noindex"></head><body>
     <a href="#main" class="visually-hidden-focusable">Skip to contents</a>
 
 
@@ -23,7 +25,8 @@ README file"><meta property="og:image" content="https://popov-lab.github.io/bmm/
     </button>
 
     <div id="navbar" class="collapse navbar-collapse ms-3">
-      <ul class="navbar-nav me-auto"><li class="active nav-item"><a class="nav-link" href="../reference/index.html">Functions</a></li>
+      <ul class="navbar-nav me-auto"><li class="nav-item"><a class="nav-link" href="../articles/bmm.html">Get started</a></li>
+<li class="active nav-item"><a class="nav-link" href="../reference/index.html">Functions</a></li>
 <li class="nav-item"><a class="nav-link" href="../articles/index.html">Articles</a></li>
 <li class="nav-item"><a class="nav-link" href="../news/index.html">Changelog</a></li>
 <li class="nav-item"><a class="nav-link" href="https://popov-lab.github.io/bmm/dev-notes/index.html">Develop</a></li>
@@ -44,15 +47,26 @@ README file"><meta property="og:image" content="https://popov-lab.github.io/bmm/
     </div>
 
     <div class="ref-description section level2">
-    <p>Used internally to automatically populate information in the
-README file</p>
+    <p>Used internally to populate the README and the "Get started"
+article. Models are grouped as in <code><a href="supported_models.html">supported_models()</a></code>, and every model
+links to its reference page on the website.</p>
     </div>
 
     <div class="section level2">
     <h2 id="ref-usage">Usage<a class="anchor" aria-label="anchor" href="#ref-usage"></a></h2>
-    <div class="sourceCode"><pre class="sourceCode r"><code><span><span class="fu">print_pretty_models_md</span><span class="op">(</span><span class="op">)</span></span></code></pre></div>
+    <div class="sourceCode"><pre class="sourceCode r"><code><span><span class="fu">print_pretty_models_md</span><span class="op">(</span>group <span class="op">=</span> <span class="cn">NULL</span><span class="op">)</span></span></code></pre></div>
     </div>
 
+    <div class="section level2">
+    <h2 id="arguments">Arguments<a class="anchor" aria-label="anchor" href="#arguments"></a></h2>
+
+
+<dl><dt id="arg-group">group<a class="anchor" aria-label="anchor" href="#arg-group"></a></dt>
+<dd><p>Optional character vector of group labels as printed by
+<code><a href="supported_models.html">supported_models()</a></code>. Only those groups are listed and the group headers
+are omitted, so a document can add its own text per group.</p></dd>
+
+</dl></div>
     <div class="section level2">
     <h2 id="value">Value<a class="anchor" aria-label="anchor" href="#value"></a></h2>
     <p>Markdown code for printing the list of measurement models available
@@ -62,33 +76,36 @@ in <code>bmm</code></p>
     <div class="section level2">
     <h2 id="ref-examples">Examples<a class="anchor" aria-label="anchor" href="#ref-examples"></a></h2>
     <div class="sourceCode"><pre class="sourceCode r"><code><span class="r-in"><span><span class="fu">print_pretty_models_md</span><span class="op">(</span><span class="op">)</span></span></span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> **Decision Making / Response times**</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> **Continuous reproduction**</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> * Censored-Shifted Wald Model </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> * Diffusion Decision Model </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> * EZ-Diffusion Model </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> - [`imm()`](https://popov-lab.github.io/bmm/reference/imm.html): Interference measurement model by Oberauer and Lin (2017)</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> - [`mixture2p()`](https://popov-lab.github.io/bmm/reference/mixture2p.html): Two-parameter mixture model by Zhang and Luck (2008)</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> - [`mixture3p()`](https://popov-lab.github.io/bmm/reference/mixture3p.html): Three-parameter mixture model by Bays et al (2009)</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> - [`sdm()`](https://popov-lab.github.io/bmm/reference/sdm.html): Signal Discrimination Model (SDM) by Oberauer (2023)</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> **Visual working memory**</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> **Categorical recall and n-AFC decisions**</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> * Interference measurement model by Oberauer and Lin (2017). </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> * Two-parameter mixture model by Zhang and Luck (2008). </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> * Three-parameter mixture model by Bays et al (2009). </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> * Signal Discrimination Model (SDM) by Oberauer (2023) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> - [`m3()`](https://popov-lab.github.io/bmm/reference/m3.html): The Multinomial / Memory Measurement Model</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> **Working Memory (categorical), Categorical Decision Making**</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> **Detection, recognition and confidence judgments**</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> * The Multinomial / Memory Measurement Model </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> - [`sdt_cdp()`](https://popov-lab.github.io/bmm/reference/sdt_cdp.html): Continuous Dual-Process Signal Detection Theory (CDP)</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> - [`sdt_mafc()`](https://popov-lab.github.io/bmm/reference/sdt_mafc.html): Signal Detection Theory (m-AFC)</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> - [`sdt_ranking()`](https://popov-lab.github.io/bmm/reference/sdt_ranking.html): Signal Detection Theory (Ranking)</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> - [`sdt_rating()`](https://popov-lab.github.io/bmm/reference/sdt_rating.html): Signal Detection Theory (Confidence Rating)</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> - [`sdt_yn()`](https://popov-lab.github.io/bmm/reference/sdt_yn.html): Signal Detection Theory (Yes/No)</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> **Recognition Memory**</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> **Choices and response times**</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> * Continuous Dual-Process Signal Detection Theory (CDP) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> - [`cswald()`](https://popov-lab.github.io/bmm/reference/cswald.html): Censored-Shifted Wald Model</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> - [`ddm()`](https://popov-lab.github.io/bmm/reference/ddm.html): Diffusion Decision Model</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> - [`ezdm()`](https://popov-lab.github.io/bmm/reference/ezdm.html): EZ-Diffusion Model</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> **Perception &amp; Recognition Memory**</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> * Signal Detection Theory (m-AFC) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> * Signal Detection Theory (Ranking) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> * Signal Detection Theory (Confidence Rating) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> * Signal Detection Theory (Yes/No) </span>
+<span class="r-in"><span><span class="fu">print_pretty_models_md</span><span class="op">(</span>group <span class="op">=</span> <span class="st">"Continuous reproduction"</span><span class="op">)</span></span></span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> - [`imm()`](https://popov-lab.github.io/bmm/reference/imm.html): Interference measurement model by Oberauer and Lin (2017)</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> - [`mixture2p()`](https://popov-lab.github.io/bmm/reference/mixture2p.html): Two-parameter mixture model by Zhang and Luck (2008)</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> - [`mixture3p()`](https://popov-lab.github.io/bmm/reference/mixture3p.html): Three-parameter mixture model by Bays et al (2009)</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> - [`sdm()`](https://popov-lab.github.io/bmm/reference/sdm.html): Signal Discrimination Model (SDM) by Oberauer (2023)</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-in"><span></span></span>
 </code></pre></div>

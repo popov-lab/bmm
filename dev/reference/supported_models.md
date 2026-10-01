@@ -12,14 +12,23 @@ supported_models(print_call = TRUE)
 
 - print_call:
 
-  Logical; If TRUE (default), the function will print information about
-  how each model function should be called and its required arguments.
-  If FALSE, the function will return a character vector with the names
-  of the available models
+  Logical; If TRUE (default), the function prints the models grouped by
+  the task they are meant for, one line per model with its constructor
+  and full name. If FALSE, the function returns a character vector with
+  the names of the available models.
 
 ## Value
 
-A character vector of measurement models available in `bmm`
+If `print_call = FALSE`, a character vector of model names. Otherwise an
+object of class `message` listing the models by group.
+
+## Details
+
+The groups are: continuous reproduction; categorical recall and n-AFC
+decisions; detection, recognition and confidence judgments; choices and
+response times. Type `?modelname` (for example
+[`?imm`](https://popov-lab.github.io/bmm/dev/reference/imm.md)) for the
+arguments of a model.
 
 ## Examples
 
@@ -27,19 +36,34 @@ A character vector of measurement models available in `bmm`
 supported_models()
 #> The following models are supported:
 #> 
-#> -  cswald(rt, response, links, version) 
-#> -  ddm(rt, response, links) 
-#> -  ezdm(mean_rt, var_rt, n_upper, n_trials, links, version) 
-#> -  imm(resp_error, nt_features, nt_distances, set_size, regex, version) 
-#> -  m3(resp_cats, num_options, choice_rule, version) 
-#> -  mixture2p(resp_error) 
-#> -  mixture3p(resp_error, nt_features, set_size, regex) 
-#> -  sdm(resp_error, version) 
-#> -  sdt_cdp(response, stimulus, n_new, n_old, dist, threshold_type, links) 
-#> -  sdt_mafc(response, n_trials, m, dist, links) 
-#> -  sdt_ranking(response, m, dist, links) 
-#> -  sdt_rating(response, stimulus, dist, threshold_type, version, links) 
-#> -  sdt_yn(response, stimulus, n_trials, dist, links) 
+#> Continuous reproduction
+#> 
+#> - imm(): Interference measurement model by Oberauer and Lin (2017)
+#> - mixture2p(): Two-parameter mixture model by Zhang and Luck (2008)
+#> - mixture3p(): Three-parameter mixture model by Bays et al (2009)
+#> - sdm(): Signal Discrimination Model (SDM) by Oberauer (2023)
+#> 
+#> Categorical recall and n-AFC decisions
+#> 
+#> - m3(): The Multinomial / Memory Measurement Model
+#> 
+#> Detection, recognition and confidence judgments
+#> 
+#> - sdt_cdp(): Continuous Dual-Process Signal Detection Theory (CDP)
+#> - sdt_mafc(): Signal Detection Theory (m-AFC)
+#> - sdt_ranking(): Signal Detection Theory (Ranking)
+#> - sdt_rating(): Signal Detection Theory (Confidence Rating)
+#> - sdt_yn(): Signal Detection Theory (Yes/No)
+#> 
+#> Choices and response times
+#> 
+#> - cswald(): Censored-Shifted Wald Model
+#> - ddm(): Diffusion Decision Model
+#> - ezdm(): EZ-Diffusion Model
 #> 
 #> Type  ?modelname  to get information about a specific model, e.g.  ?imm 
+supported_models(print_call = FALSE)
+#>  [1] "cswald"      "ddm"         "ezdm"        "imm"         "m3"         
+#>  [6] "mixture2p"   "mixture3p"   "sdm"         "sdt_cdp"     "sdt_mafc"   
+#> [11] "sdt_ranking" "sdt_rating"  "sdt_yn"     
 ```
