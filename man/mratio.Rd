@@ -10,9 +10,10 @@ mratio(fit, conditions = NULL, probs = c(0.025, 0.975), ...)
 \item{fit}{A \code{bmmfit} object returned by \code{\link[=bmm]{bmm()}} from an SDT model.}
 
 \item{conditions}{Optional data frame of predictor values at which to
-evaluate the model. Column names must match predictor variables used in
-the formula. If \code{NULL} (default), unique predictor combinations are derived
-from the data.}
+evaluate the M-ratio. Its columns must be population-level predictors of
+\code{logmratio} or \code{d} in the formula; grouping variables of random effects
+are refused. If \code{NULL} (default), unique predictor combinations are
+derived from the data, and a fit without such a predictor gives one row.}
 
 \item{probs}{Numeric vector of length 2. Lower and upper quantiles for the
 credible interval (default \code{c(0.025, 0.975)}).}

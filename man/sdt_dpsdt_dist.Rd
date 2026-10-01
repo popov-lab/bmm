@@ -49,8 +49,8 @@ thresholds are on the noise-standardized axis and are not rescaled by
 \item{Ro}{Numeric vector in \verb{[0, 1]}. Recollection probability for old
 (signal) items.}
 
-\item{Rn}{Numeric vector in \verb{[0, 1]}. Recollection (recall-to-reject)
-probability for new (noise) items.}
+\item{Rn}{Numeric vector in \verb{[0, 1]}. Recall-to-reject probability for new
+(noise) items.}
 
 \item{sdratio}{Numeric vector. Ratio of signal to noise standard deviations
 (default 1, i.e., equal variance). Must be positive. Note that this is the

@@ -1263,6 +1263,11 @@ print.bmm_sdt_thresholds <- function(x, ...) {
 #' the midpoint.
 #'
 #' @inheritParams roc_sdt
+#' @param conditions Optional data frame of predictor values at which to
+#'   evaluate the M-ratio. Its columns must be population-level predictors of
+#'   `logmratio` or `d` in the formula; grouping variables of random effects
+#'   are refused. If `NULL` (default), unique predictor combinations are
+#'   derived from the data, and a fit without such a predictor gives one row.
 #' @param probs Numeric vector of length 2. Lower and upper quantiles for the
 #'   credible interval (default `c(0.025, 0.975)`).
 #'

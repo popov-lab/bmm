@@ -743,8 +743,9 @@ configure_model.sdt_rating <- function(model, data, formula) {
 #' @param d,criterion,spacing,sdratio Model parameters (draws-by-observation
 #'   matrices supplied by brms). `d` is d', or d_a when sdratio is not 0;
 #'   `spacing` is `0` for threshold types without it.
-#' @param Ro,Rn Linear-scale recollection parameters for the `dpsdt` version;
-#'   `inv_logit(Ro)`/`inv_logit(Rn)` are the recollection probabilities.
+#' @param Ro,Rn Recollection parameters of the `dpsdt` version on the logit
+#'   (linear-predictor) scale; `inv_logit(Ro)`/`inv_logit(Rn)` are the
+#'   recollection and recall-to-reject probabilities.
 #' @param logmratio Log M-ratio for the `metad` version; meta-d' is recovered
 #'   as `exp(logmratio) * d`, on the same scale as `d`.
 #' @param stimulus Stimulus covariate (0 = noise, 1 = signal).

@@ -2693,8 +2693,8 @@ rsdt_yn <- function(n, n_trials, stimulus, d, criterion,
 #' @inheritParams sdt_rating_dist
 #' @param Ro Numeric vector in `[0, 1]`. Recollection probability for old
 #'   (signal) items.
-#' @param Rn Numeric vector in `[0, 1]`. Recollection (recall-to-reject)
-#'   probability for new (noise) items.
+#' @param Rn Numeric vector in `[0, 1]`. Recall-to-reject probability for new
+#'   (noise) items.
 #'
 #' @return `dsdt_dpsdt` returns the (log-)density (multinomial probability).
 #'   `rsdt_dpsdt` returns an integer matrix with one row per observation and

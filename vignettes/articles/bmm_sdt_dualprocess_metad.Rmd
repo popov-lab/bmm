@@ -80,7 +80,7 @@ the `version` argument of `sdt_rating()`:
 | `version` | extra parameter(s) | captures | reduces to standard when |
 |-----------|--------------------|----------|--------------------------|
 | `"standard"` (default) | — | familiarity / strength only | always |
-| `"dpsdt"` | `Ro`, `Rn` | recollection of old / new items | `Ro`, `Rn` → 0 |
+| `"dpsdt"` | `Ro`, `Rn` | recollection of old items / recall-to-reject (`Rn`) of new items | `Ro`, `Rn` → 0 |
 | `"metad"` | `logmratio` | metacognitive efficiency (log M-ratio) | `logmratio` = 0 |
 
 This article assumes the [core SDT article](bmm_sdt.html): the four-step

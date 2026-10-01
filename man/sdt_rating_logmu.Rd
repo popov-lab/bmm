@@ -65,8 +65,9 @@ matrices supplied by brms). \code{d} is d', or d_a when sdratio is not 0;
 
 \item{...}{Threshold \code{delta} parameters, when the threshold type uses them.}
 
-\item{Ro, Rn}{Linear-scale recollection parameters for the \code{dpsdt} version;
-\code{inv_logit(Ro)}/\code{inv_logit(Rn)} are the recollection probabilities.}
+\item{Ro, Rn}{Recollection parameters of the \code{dpsdt} version on the logit
+(linear-predictor) scale; \code{inv_logit(Ro)}/\code{inv_logit(Rn)} are the
+recollection and recall-to-reject probabilities.}
 
 \item{logmratio}{Log M-ratio for the \code{metad} version; meta-d' is recovered
 as \code{exp(logmratio) * d}, on the same scale as \code{d}.}
