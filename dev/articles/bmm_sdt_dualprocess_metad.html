@@ -625,12 +625,163 @@ constrained — see the threshold-parameterization note above.</p>
 </div>
 </div>
 <div class="section level2" number="4">
-<h2 id="choosing-and-comparing-the-models">
-<span class="header-section-number">4</span> Choosing and comparing the models<a class="anchor" aria-label="anchor" href="#choosing-and-comparing-the-models"></a>
+<h2 id="continuous-dual-process-sdt">
+<span class="header-section-number">4</span> Continuous dual-process SDT<a class="anchor" aria-label="anchor" href="#continuous-dual-process-sdt"></a>
 </h2>
-<p>All three models share the same response interface and the same familiarity
-core, so the choice is about which <em>additional question</em> the data are meant to
-answer:</p>
+<p>The dual-process model above treats recollection as a <em>threshold</em> process: an
+old item is either recollected — landing in the most-confident category — or it
+is not. The <strong>continuous dual-process</strong> (CDP) model <span class="citation">(Wixted and Mickes 2010)</span> keeps
+the dual-process intuition but makes recollection <em>continuous</em>. Every item
+carries a familiarity signal <span class="math inline">\(F\)</span> and a recollection signal <span class="math inline">\(R\)</span>, and the old/new
+confidence rating is driven by their sum, the aggregate memory strength
+<span class="math inline">\(S = F + R\)</span>. What makes it a <em>dual</em>-process model is that the <strong>Remember/Know
+judgment is read off <span class="math inline">\(R\)</span> directly</strong>: an “old” response is called <em>Remember</em> when
+recollection clears a criterion <span class="math inline">\(r\)</span> on the <span class="math inline">\(R\)</span> axis, and <em>Know</em> otherwise.</p>
+<p>This needs a richer response than the rating versions above — not just a
+confidence rating, but a Remember/Know judgment on every “old” response — so bmm
+provides it as a dedicated model, <code><a href="../reference/sdt_cdp.html">sdt_cdp()</a></code>, rather than a <code>version</code> of
+<code><a href="../reference/sdt_rating.html">sdt_rating()</a></code>. For a target, <span class="math inline">\(F \sim \mathrm{Normal}(\mu_F, 1)\)</span> and
+<span class="math inline">\(R \sim \mathrm{Normal}(\mu_R, \sigma_R)\)</span> (lures fix both means to 0 and
+<span class="math inline">\(\sigma_R\)</span> to 1); <code>dfam</code> and <code>drec</code> are the two sensitivities and <code>sigmar</code>
+is <span class="math inline">\(\log \sigma_R\)</span>. Old/new confidence partitions the strength axis <span class="math inline">\(S\)</span> with
+ordered thresholds, exactly as in the rating model, while the Remember/Know split
+is the probability that <span class="math inline">\(R\)</span> exceeds <code>rcrit</code> <em>within</em> each confidence bin — a
+region of the two-dimensional <span class="math inline">\((F, R)\)</span> plane. For the Remember/Know split bmm
+computes it exactly with the bivariate-normal CDF; the Know/Guess split of the
+three-way model adds a numerical integral over the strength bin (20-node
+Gauss-Legendre, accurate to about <span class="math inline">\(10^{-5}\)</span> in the probability).</p>
+<div class="section level3" number="4.1">
+<h3 id="worked-example-rememberknow-in-recognition-memory">
+<span class="header-section-number">4.1</span> Worked example: Remember/Know in recognition memory<a class="anchor" aria-label="anchor" href="#worked-example-rememberknow-in-recognition-memory"></a>
+</h3>
+<p>We fit the model to the group Remember/Know ROC data of <span class="citation">Rotello et al. (2005)</span> (neutral
+condition): a 6-point scale where rating 1 is a confident “new” response and
+ratings 2–6 are “old” responses, each accompanied by a Remember or Know
+judgment. We enter the data in <strong>tidy long</strong> form — one row per combination of
+stimulus class, judgment, and confidence level, with a <code>count</code> column — since
+that is how Remember/Know data typically leave an experiment (trial-level data
+work the same way, just without <code>count</code>):</p>
+<div class="sourceCode" id="cb12"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">rotello_long</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/cbind.html" class="external-link">rbind</a></span><span class="op">(</span></span>
+<span>  <span class="fu"><a href="https://rdrr.io/r/base/data.frame.html" class="external-link">data.frame</a></span><span class="op">(</span>stimulus <span class="op">=</span> <span class="fl">1L</span>, judgment <span class="op">=</span> <span class="st">"new"</span>,      confidence <span class="op">=</span> <span class="fl">1L</span>,  count <span class="op">=</span> <span class="fl">290</span><span class="op">)</span>,</span>
+<span>  <span class="fu"><a href="https://rdrr.io/r/base/data.frame.html" class="external-link">data.frame</a></span><span class="op">(</span>stimulus <span class="op">=</span> <span class="fl">1L</span>, judgment <span class="op">=</span> <span class="st">"know"</span>,     confidence <span class="op">=</span> <span class="fl">2</span><span class="op">:</span><span class="fl">6</span>, count <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">122</span>, <span class="fl">106</span>, <span class="fl">101</span>, <span class="fl">92</span>, <span class="fl">59</span><span class="op">)</span><span class="op">)</span>,</span>
+<span>  <span class="fu"><a href="https://rdrr.io/r/base/data.frame.html" class="external-link">data.frame</a></span><span class="op">(</span>stimulus <span class="op">=</span> <span class="fl">1L</span>, judgment <span class="op">=</span> <span class="st">"remember"</span>, confidence <span class="op">=</span> <span class="fl">2</span><span class="op">:</span><span class="fl">6</span>, count <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">26</span>, <span class="fl">38</span>, <span class="fl">61</span>, <span class="fl">109</span>, <span class="fl">433</span><span class="op">)</span><span class="op">)</span>,</span>
+<span>  <span class="fu"><a href="https://rdrr.io/r/base/data.frame.html" class="external-link">data.frame</a></span><span class="op">(</span>stimulus <span class="op">=</span> <span class="fl">0L</span>, judgment <span class="op">=</span> <span class="st">"new"</span>,      confidence <span class="op">=</span> <span class="fl">1L</span>,  count <span class="op">=</span> <span class="fl">745</span><span class="op">)</span>,</span>
+<span>  <span class="fu"><a href="https://rdrr.io/r/base/data.frame.html" class="external-link">data.frame</a></span><span class="op">(</span>stimulus <span class="op">=</span> <span class="fl">0L</span>, judgment <span class="op">=</span> <span class="st">"know"</span>,     confidence <span class="op">=</span> <span class="fl">2</span><span class="op">:</span><span class="fl">6</span>, count <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">199</span>, <span class="fl">124</span>, <span class="fl">84</span>, <span class="fl">45</span>, <span class="fl">13</span><span class="op">)</span><span class="op">)</span>,</span>
+<span>  <span class="fu"><a href="https://rdrr.io/r/base/data.frame.html" class="external-link">data.frame</a></span><span class="op">(</span>stimulus <span class="op">=</span> <span class="fl">0L</span>, judgment <span class="op">=</span> <span class="st">"remember"</span>, confidence <span class="op">=</span> <span class="fl">2</span><span class="op">:</span><span class="fl">6</span>, count <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">46</span>, <span class="fl">29</span>, <span class="fl">47</span>, <span class="fl">51</span>, <span class="fl">55</span><span class="op">)</span><span class="op">)</span></span>
+<span><span class="op">)</span></span>
+<span><span class="fu"><a href="https://rdrr.io/r/utils/head.html" class="external-link">head</a></span><span class="op">(</span><span class="va">rotello_long</span><span class="op">)</span></span>
+<span><span class="co">#&gt;   stimulus judgment confidence count</span></span>
+<span><span class="co">#&gt; 1        1      new          1   290</span></span>
+<span><span class="co">#&gt; 2        1     know          2   122</span></span>
+<span><span class="co">#&gt; 3        1     know          3   106</span></span>
+<span><span class="co">#&gt; 4        1     know          4   101</span></span>
+<span><span class="co">#&gt; 5        1     know          5    92</span></span>
+<span><span class="co">#&gt; 6        1     know          6    59</span></span></code></pre></div>
+<p>Like <code><a href="../reference/sdt_rating.html">sdt_rating()</a></code>, the model itself is fit to <strong>aggregated counts</strong> — one row
+per cell and one count column per response category.
+<code><a href="../reference/aggregate_sdt_cdp_data.html">aggregate_sdt_cdp_data()</a></code> pivots the long rows into these canonical columns;
+every column other than <code>judgment</code>, <code>confidence</code>, and <code>count</code> (here just
+<code>stimulus</code>) defines the cells and is carried over:</p>
+<div class="sourceCode" id="cb13"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">rotello</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/aggregate_sdt_cdp_data.html">aggregate_sdt_cdp_data</a></span><span class="op">(</span><span class="va">rotello_long</span>, judgment <span class="op">=</span> <span class="st">"judgment"</span>,</span>
+<span>                                  confidence <span class="op">=</span> <span class="st">"confidence"</span>, count <span class="op">=</span> <span class="st">"count"</span><span class="op">)</span></span>
+<span><span class="va">rotello</span></span>
+<span><span class="co">#&gt;   stimulus new1 know2 know3 know4 know5 know6 remember2 remember3 remember4</span></span>
+<span><span class="co">#&gt; 1        1  290   122   106   101    92    59        26        38        61</span></span>
+<span><span class="co">#&gt; 2        0  745   199   124    84    45    13        46        29        47</span></span>
+<span><span class="co">#&gt;   remember5 remember6</span></span>
+<span><span class="co">#&gt; 1       109       433</span></span>
+<span><span class="co">#&gt; 2        51        55</span></span></code></pre></div>
+<p>The 22 long rows collapse to one row per stimulus class, with columns <code>new1</code>
+(the single “new” level) and <code>know2</code>…<code>know6</code> / <code>remember2</code>…<code>remember6</code> on
+the unified confidence scale. This is also the format <code><a href="../reference/sdt_cdp_dist.html">rsdt_cdp()</a></code> simulates
+directly, and if your own wide columns carry a shared prefix (say <code>cdp_new1</code>),
+you declare it once via the constructor’s <code>response</code> argument. The scale is
+asymmetric — one “new” level and five “old” levels — which the constructor is
+told via <code>n_new</code> and <code>n_old</code> (the two need not match). We free <code>sigmar</code> so
+recollection can add variance to the
+old-item strength distribution (the canonical Wixted–Mickes result) and keep
+the familiarity–recollection correlation <code>rho</code> at its default of zero, the
+classic independent-process model:</p>
+<div class="sourceCode" id="cb14"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">model_cdp</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/sdt_cdp.html">sdt_cdp</a></span><span class="op">(</span>stimulus <span class="op">=</span> <span class="st">"stimulus"</span>, n_new <span class="op">=</span> <span class="fl">1</span>, n_old <span class="op">=</span> <span class="fl">5</span><span class="op">)</span></span>
+<span></span>
+<span><span class="va">fit_cdp</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/bmm.html">bmm</a></span><span class="op">(</span></span>
+<span>  formula <span class="op">=</span> <span class="fu"><a href="../reference/bmmformula.html">bmf</a></span><span class="op">(</span><span class="va">dfam</span> <span class="op">~</span> <span class="fl">1</span>, <span class="va">drec</span> <span class="op">~</span> <span class="fl">1</span>, <span class="va">criterion</span> <span class="op">~</span> <span class="fl">1</span>, <span class="va">spacing</span> <span class="op">~</span> <span class="fl">1</span>,</span>
+<span>                <span class="va">rcrit</span> <span class="op">~</span> <span class="fl">1</span>, <span class="va">sigmar</span> <span class="op">~</span> <span class="fl">1</span><span class="op">)</span>,</span>
+<span>  data <span class="op">=</span> <span class="va">rotello</span>, model <span class="op">=</span> <span class="va">model_cdp</span>,</span>
+<span>  backend <span class="op">=</span> <span class="st">"cmdstanr"</span>, cores <span class="op">=</span> <span class="fl">4</span>, chains <span class="op">=</span> <span class="fl">4</span>, iter <span class="op">=</span> <span class="fl">2000</span>,</span>
+<span>  refresh <span class="op">=</span> <span class="fl">0</span>, silent <span class="op">=</span> <span class="fl">2</span>,</span>
+<span>  file <span class="op">=</span> <span class="st">"assets/bmmfit_sdt_cdp_vignette"</span></span>
+<span><span class="op">)</span></span>
+<span><span class="fu"><a href="https://rdrr.io/r/base/summary.html" class="external-link">summary</a></span><span class="op">(</span><span class="va">fit_cdp</span><span class="op">)</span></span></code></pre></div>
+<pre class="fansi fansi-output"><code><span><span class="co">#&gt;   Model: sdt_cdp(stimulus = "stimulus",</span></span>
+<span><span class="co">#&gt;                  n_new = 1,</span></span>
+<span><span class="co">#&gt;                  n_old = 5) </span></span>
+<span><span class="co">#&gt;   Links: dfam = identity; drec = identity; criterion = identity; spacing = identity; rcrit = identity; sigmar = identity; rho = identity; kcrit = identity </span></span>
+<span><span class="co">#&gt; Formula: dfam ~ 1</span></span>
+<span><span class="co">#&gt;          drec ~ 1</span></span>
+<span><span class="co">#&gt;          criterion ~ 1</span></span>
+<span><span class="co">#&gt;          spacing ~ 1</span></span>
+<span><span class="co">#&gt;          rcrit ~ 1</span></span>
+<span><span class="co">#&gt;          sigmar ~ 1</span></span>
+<span><span class="co">#&gt;          rho = 0</span></span>
+<span><span class="co">#&gt;          kcrit = -100 </span></span>
+<span><span class="co">#&gt;    Data: (Number of observations: 2)</span></span>
+<span><span class="co">#&gt;   Draws: 4 chains, each with iter = 2000; warmup = 1000; thin = 1;</span></span>
+<span><span class="co">#&gt;          total post-warmup draws = 4000</span></span>
+<span><span class="co">#&gt; </span></span>
+<span><span class="co">#&gt; Regression Coefficients:</span></span>
+<span><span class="co">#&gt;                     Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS</span></span>
+<span><span class="co">#&gt; dfam_Intercept          0.77      0.06     0.65     0.90 1.00     2613     2490</span></span>
+<span><span class="co">#&gt; drec_Intercept          0.81      0.07     0.68     0.94 1.00     2704     2859</span></span>
+<span><span class="co">#&gt; criterion_Intercept     0.07      0.05    -0.02     0.16 1.00     3025     2575</span></span>
+<span><span class="co">#&gt; spacing_Intercept      -0.37      0.03    -0.42    -0.32 1.00     2595     2587</span></span>
+<span><span class="co">#&gt; rcrit_Intercept         0.92      0.04     0.84     1.01 1.00     2696     2695</span></span>
+<span><span class="co">#&gt; sigmar_Intercept        0.39      0.05     0.28     0.48 1.00     2834     2861</span></span>
+<span><span class="co">#&gt; </span></span>
+<span><span class="co">#&gt; Constant Parameters:</span></span>
+<span><span class="co">#&gt;                       Value</span></span>
+<span><span class="co">#&gt; rho_Intercept          0.00</span></span>
+<span><span class="co">#&gt; kcrit_Intercept     -100.00</span></span>
+<span><span class="co">#&gt; </span></span>
+<span><span class="co">#&gt; Draws were sampled using sample(hmc). For each parameter, Bulk_ESS</span></span>
+<span><span class="co">#&gt; and Tail_ESS are effective sample size measures, and Rhat is the potential</span></span>
+<span><span class="co">#&gt; scale reduction factor on split chains (at convergence, Rhat = 1).</span></span></code></pre>
+<p>Recollection (<code>drec</code> ≈ 0.81) and familiarity
+(<code>dfam</code> ≈ 0.77) contribute comparable
+sensitivities, the Remember criterion sits well into the recollection
+distribution (<code>rcrit</code> ≈ 0.92), and
+<code>exp(sigmar)</code> ≈ 1.47 puts the
+recollection SD above one — the model’s account of the recognition-ROC asymmetry as
+<em>added recollection variance</em> rather than a uniformly wider strength
+distribution. Despite using the two-parameter <code>parsimonious</code> thresholds rather
+than five free criteria, these estimates reproduce the maximum-likelihood values
+<span class="citation">Wixted and Mickes (2010)</span> report for exactly these data (their Table 3:
+<span class="math inline">\(\mu_F = 0.78\)</span>, <span class="math inline">\(\mu_R = 0.81\)</span>, <span class="math inline">\(\sigma_R = 1.48\)</span>, <span class="math inline">\(r = 0.92\)</span>).</p>
+<p>Two further options extend the model, each opt-in. The
+familiarity–recollection correlation is freed with <code>rho ~ 1</code> (and can itself be
+predicted, e.g. <code>rho ~ condition</code>); it is bounded to <span class="math inline">\((-1, 1)\)</span> internally and is
+a <em>within-item</em> correlation, distinct from a between-subject correlation of
+random effects (which you would write as <code>(1 |p| id)</code>). And when the task also
+collects an explicit <em>Guess</em> response, include <code>"guess"</code> judgments in the long
+data: <code><a href="../reference/aggregate_sdt_cdp_data.html">aggregate_sdt_cdp_data()</a></code> turns them into <code>guess</code> count columns, whose
+presence switches on the three-way Remember/Know/Guess model with a familiarity
+criterion <code>kcrit</code> separating Know from Guess (free it with <code>kcrit ~ 1</code>). That
+model has a hard boundary — a Guess response in a confidence bin is possible
+only while <code>rcrit + kcrit</code> exceeds the bin’s lower threshold — and
+hierarchical fits can report divergent transitions near it; <code><a href="../reference/sdt_cdp.html">?sdt_cdp</a></code>
+describes the boundary and what to try.</p>
+</div>
+</div>
+<div class="section level2" number="5">
+<h2 id="choosing-and-comparing-the-models">
+<span class="header-section-number">5</span> Choosing and comparing the models<a class="anchor" aria-label="anchor" href="#choosing-and-comparing-the-models"></a>
+</h2>
+<p>The first three models share the same confidence-rating response interface and
+the same familiarity core, so the choice is about which <em>additional question</em> the
+data are meant to answer:</p>
 <ul>
 <li>Reach for <strong><code>version = "dpsdt"</code></strong> when the question is about <em>recollection</em> —
 whether a threshold retrieval process contributes beyond graded familiarity,
@@ -640,6 +791,9 @@ whether confidence is efficiently calibrated to accuracy.</li>
 <li>Stay with <strong><code>version = "standard"</code></strong> when a single strength process suffices;
 both extensions reduce to it when their extra parameter is switched off
 (<code>Ro</code>, <code>Rn</code> → 0; <code>logmratio</code> = 0, i.e. meta-d′ = <code>d</code>).</li>
+<li>Reach for <strong><code><a href="../reference/sdt_cdp.html">sdt_cdp()</a></code></strong> when the data carry explicit <em>Remember/Know</em>
+judgments: it models that richer response directly — recollection as a
+continuous second axis — rather than collapsing it to a confidence rating.</li>
 </ul>
 <p>Because each extension nests the standard model, the most direct evidence is the
 <strong>posterior of the extra parameter</strong>: is <code>Ro</code> credibly greater than zero, is
@@ -677,6 +831,9 @@ Pratte, Michael S., Jeffrey N. Rouder, and Richard D. Morey. 2010. <span>“Sepa
 </div>
 <div id="ref-Robinson_2023" class="csl-entry">
 Robinson, Maria M., Isabella C. DeStefano, Edward Vul, and Timothy F. Brady. 2023. <span>“How Do People Build up Visual Memory Representations from Sensory Evidence? Revisiting Two Classic Models of Choice.”</span> <em>Journal of Mathematical Psychology</em> 117: 102805. <a href="https://doi.org/10.1016/j.jmp.2023.102805" class="external-link">https://doi.org/10.1016/j.jmp.2023.102805</a>.
+</div>
+<div id="ref-Rotello_2005" class="csl-entry">
+Rotello, Caren M., Neil A. Macmillan, Jeffrey A. Reeder, and Michael Wong. 2005. <span>“The Remember Response: Subject to Bias, Graded, and Not a Process-Pure Indicator of Recollection.”</span> <em>Psychonomic Bulletin &amp; Review</em> 12 (5): 865–73. <a href="https://doi.org/10.3758/BF03196778" class="external-link">https://doi.org/10.3758/BF03196778</a>.
 </div>
 <div id="ref-Wixted_Mickes_2010" class="csl-entry">
 Wixted, John T., and Laura Mickes. 2010. <span>“A Continuous Dual-Process Model of Remember/Know Judgments.”</span> <em>Psychological Review</em> 117 (4): 1025–54. <a href="https://doi.org/10.1037/a0020874" class="external-link">https://doi.org/10.1037/a0020874</a>.

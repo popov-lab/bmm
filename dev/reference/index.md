@@ -140,6 +140,8 @@ Functions for specifying which model to fit
 - [`sdm()`](https://popov-lab.github.io/bmm/dev/reference/sdm.md)
   [`sdmSimple()`](https://popov-lab.github.io/bmm/dev/reference/sdm.md)
   : Signal Discrimination Model (SDM) by Oberauer (2023)
+- [`sdt_cdp()`](https://popov-lab.github.io/bmm/dev/reference/sdt_cdp.md)
+  : Continuous Dual-Process Signal Detection Theory Model
 - [`sdt_mafc()`](https://popov-lab.github.io/bmm/dev/reference/sdt_mafc.md)
   : m-Alternative Forced Choice Signal Detection Theory Model
 - [`sdt_ranking()`](https://popov-lab.github.io/bmm/dev/reference/sdt_ranking.md)
@@ -208,6 +210,10 @@ Functions for special distributions
 - [`rejection_sampling()`](https://popov-lab.github.io/bmm/dev/reference/rejection_sampling.md)
   : Rejection Sampling
 
+- [`dsdt_cdp()`](https://popov-lab.github.io/bmm/dev/reference/sdt_cdp_dist.md)
+  [`rsdt_cdp()`](https://popov-lab.github.io/bmm/dev/reference/sdt_cdp_dist.md)
+  : Distribution functions for Continuous Dual-Process SDT (CDP)
+
 - [`dsdt_dpsdt()`](https://popov-lab.github.io/bmm/dev/reference/sdt_dpsdt_dist.md)
   [`rsdt_dpsdt()`](https://popov-lab.github.io/bmm/dev/reference/sdt_dpsdt_dist.md)
   : Distribution functions for dual-process SDT (DPSDT)
@@ -238,6 +244,12 @@ Utility functions for transforming data and parameters
 
 - [`adjust_ezdm_accuracy()`](https://popov-lab.github.io/bmm/dev/reference/adjust_ezdm_accuracy.md)
   : Adjust Accuracy Counts for Contamination (deprecated)
+
+- [`aggregate_sdt_cdp_data()`](https://popov-lab.github.io/bmm/dev/reference/aggregate_sdt_cdp_data.md)
+  :
+
+  Aggregate long-format Remember/Know data for
+  [`sdt_cdp()`](https://popov-lab.github.io/bmm/dev/reference/sdt_cdp.md)
 
 - [`c_sqrtexp2bessel()`](https://popov-lab.github.io/bmm/dev/reference/c_parametrizations.md)
   [`c_bessel2sqrtexp()`](https://popov-lab.github.io/bmm/dev/reference/c_parametrizations.md)

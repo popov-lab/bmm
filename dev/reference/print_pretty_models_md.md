@@ -34,6 +34,10 @@ print_pretty_models_md()
 #> 
 #> * The Multinomial / Memory Measurement Model 
 #> 
+#> **Recognition Memory**
+#> 
+#> * Continuous Dual-Process Signal Detection Theory (CDP) 
+#> 
 #> **Perception & Recognition Memory**
 #> 
 #> * Signal Detection Theory (m-AFC) 

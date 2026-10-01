@@ -82,6 +82,25 @@
   See
   [`?sdt_rating`](https://popov-lab.github.io/bmm/dev/reference/sdt_rating.md).
   Thanks to [@GidonFrischkorn](https://github.com/GidonFrischkorn)
+- Add **Continuous Dual-Process Signal Detection Theory** (`sdt_cdp`)
+  for old/new recognition with Remember/Know judgments (Wixted & Mickes,
+  2010). It estimates familiarity (`dfam`) and recollection (`drec`)
+  sensitivity, the old/new `criterion`, the confidence thresholds and
+  the Remember criterion (`rcrit`) from aggregated response counts; the
+  recollection SD (`sigmar`), the familiarity-recollection correlation
+  (`rho`) and a Know/Guess criterion (`kcrit`) can be freed through the
+  formula. Also adds
+  [`aggregate_sdt_cdp_data()`](https://popov-lab.github.io/bmm/dev/reference/aggregate_sdt_cdp_data.md),
+  [`dsdt_cdp()`](https://popov-lab.github.io/bmm/dev/reference/sdt_cdp_dist.md)
+  and
+  [`rsdt_cdp()`](https://popov-lab.github.io/bmm/dev/reference/sdt_cdp_dist.md).
+  See
+  [`?sdt_cdp`](https://popov-lab.github.io/bmm/dev/reference/sdt_cdp.md)
+  for the parameters, the response format and how `drec` relates to the
+  sensitivity
+  [`sdt_yn()`](https://popov-lab.github.io/bmm/dev/reference/sdt_yn.md)
+  reports. Thanks to
+  [@GidonFrischkorn](https://github.com/GidonFrischkorn)
 
 #### New datasets
 

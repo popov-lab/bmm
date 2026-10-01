@@ -178,6 +178,8 @@ The following models are supported:
 
 - sdm(resp_error, version)
 
+- sdt_cdp(response, stimulus, n_new, n_old, dist, threshold_type, links)
+
 - sdt_mafc(response, n_trials, m, dist, links)
 
 - sdt_ranking(response, m, dist, links)

@@ -24,6 +24,7 @@
 <url><loc>https://popov-lab.github.io/bmm/dev/reference/SDMdist.html</loc></url>
 <url><loc>https://popov-lab.github.io/bmm/dev/reference/SDTdist.html</loc></url>
 <url><loc>https://popov-lab.github.io/bmm/dev/reference/adjust_ezdm_accuracy.html</loc></url>
+<url><loc>https://popov-lab.github.io/bmm/dev/reference/aggregate_sdt_cdp_data.html</loc></url>
 <url><loc>https://popov-lab.github.io/bmm/dev/reference/apply_links.html</loc></url>
 <url><loc>https://popov-lab.github.io/bmm/dev/reference/auc_sdt.html</loc></url>
 <url><loc>https://popov-lab.github.io/bmm/dev/reference/bmf2bf.html</loc></url>
@@ -93,6 +94,9 @@
 <url><loc>https://popov-lab.github.io/bmm/dev/reference/roc_observed.html</loc></url>
 <url><loc>https://popov-lab.github.io/bmm/dev/reference/roc_sdt.html</loc></url>
 <url><loc>https://popov-lab.github.io/bmm/dev/reference/sdm.html</loc></url>
+<url><loc>https://popov-lab.github.io/bmm/dev/reference/sdt_cdp.html</loc></url>
+<url><loc>https://popov-lab.github.io/bmm/dev/reference/sdt_cdp_dist.html</loc></url>
+<url><loc>https://popov-lab.github.io/bmm/dev/reference/sdt_cdp_logmu.html</loc></url>
 <url><loc>https://popov-lab.github.io/bmm/dev/reference/sdt_dpsdt_dist.html</loc></url>
 <url><loc>https://popov-lab.github.io/bmm/dev/reference/sdt_mafc.html</loc></url>
 <url><loc>https://popov-lab.github.io/bmm/dev/reference/sdt_mafc_dist.html</loc></url>

@@ -613,11 +613,190 @@ pp_check(fit_md, ndraws = 100)
 
 ![](bmm_sdt_dualprocess_metad_files/figure-html/unnamed-chunk-9-1.jpeg)
 
-## 4 Choosing and comparing the models
+## 4 Continuous dual-process SDT
 
-All three models share the same response interface and the same
-familiarity core, so the choice is about which *additional question* the
-data are meant to answer:
+The dual-process model above treats recollection as a *threshold*
+process: an old item is either recollected — landing in the
+most-confident category — or it is not. The **continuous dual-process**
+(CDP) model (Wixted and Mickes 2010) keeps the dual-process intuition
+but makes recollection *continuous*. Every item carries a familiarity
+signal \\F\\ and a recollection signal \\R\\, and the old/new confidence
+rating is driven by their sum, the aggregate memory strength \\S = F +
+R\\. What makes it a *dual*-process model is that the **Remember/Know
+judgment is read off \\R\\ directly**: an “old” response is called
+*Remember* when recollection clears a criterion \\r\\ on the \\R\\ axis,
+and *Know* otherwise.
+
+This needs a richer response than the rating versions above — not just a
+confidence rating, but a Remember/Know judgment on every “old” response
+— so bmm provides it as a dedicated model,
+[`sdt_cdp()`](https://popov-lab.github.io/bmm/dev/reference/sdt_cdp.md),
+rather than a `version` of
+[`sdt_rating()`](https://popov-lab.github.io/bmm/dev/reference/sdt_rating.md).
+For a target, \\F \sim \mathrm{Normal}(\mu_F, 1)\\ and \\R \sim
+\mathrm{Normal}(\mu_R, \sigma_R)\\ (lures fix both means to 0 and
+\\\sigma_R\\ to 1); `dfam` and `drec` are the two sensitivities and
+`sigmar` is \\\log \sigma_R\\. Old/new confidence partitions the
+strength axis \\S\\ with ordered thresholds, exactly as in the rating
+model, while the Remember/Know split is the probability that \\R\\
+exceeds `rcrit` *within* each confidence bin — a region of the
+two-dimensional \\(F, R)\\ plane. For the Remember/Know split bmm
+computes it exactly with the bivariate-normal CDF; the Know/Guess split
+of the three-way model adds a numerical integral over the strength bin
+(20-node Gauss-Legendre, accurate to about \\10^{-5}\\ in the
+probability).
+
+### 4.1 Worked example: Remember/Know in recognition memory
+
+We fit the model to the group Remember/Know ROC data of Rotello et al.
+(2005) (neutral condition): a 6-point scale where rating 1 is a
+confident “new” response and ratings 2–6 are “old” responses, each
+accompanied by a Remember or Know judgment. We enter the data in **tidy
+long** form — one row per combination of stimulus class, judgment, and
+confidence level, with a `count` column — since that is how
+Remember/Know data typically leave an experiment (trial-level data work
+the same way, just without `count`):
+
+``` r
+
+rotello_long <- rbind(
+  data.frame(stimulus = 1L, judgment = "new",      confidence = 1L,  count = 290),
+  data.frame(stimulus = 1L, judgment = "know",     confidence = 2:6, count = c(122, 106, 101, 92, 59)),
+  data.frame(stimulus = 1L, judgment = "remember", confidence = 2:6, count = c(26, 38, 61, 109, 433)),
+  data.frame(stimulus = 0L, judgment = "new",      confidence = 1L,  count = 745),
+  data.frame(stimulus = 0L, judgment = "know",     confidence = 2:6, count = c(199, 124, 84, 45, 13)),
+  data.frame(stimulus = 0L, judgment = "remember", confidence = 2:6, count = c(46, 29, 47, 51, 55))
+)
+head(rotello_long)
+#>   stimulus judgment confidence count
+#> 1        1      new          1   290
+#> 2        1     know          2   122
+#> 3        1     know          3   106
+#> 4        1     know          4   101
+#> 5        1     know          5    92
+#> 6        1     know          6    59
+```
+
+Like
+[`sdt_rating()`](https://popov-lab.github.io/bmm/dev/reference/sdt_rating.md),
+the model itself is fit to **aggregated counts** — one row per cell and
+one count column per response category.
+[`aggregate_sdt_cdp_data()`](https://popov-lab.github.io/bmm/dev/reference/aggregate_sdt_cdp_data.md)
+pivots the long rows into these canonical columns; every column other
+than `judgment`, `confidence`, and `count` (here just `stimulus`)
+defines the cells and is carried over:
+
+``` r
+
+rotello <- aggregate_sdt_cdp_data(rotello_long, judgment = "judgment",
+                                  confidence = "confidence", count = "count")
+rotello
+#>   stimulus new1 know2 know3 know4 know5 know6 remember2 remember3 remember4
+#> 1        1  290   122   106   101    92    59        26        38        61
+#> 2        0  745   199   124    84    45    13        46        29        47
+#>   remember5 remember6
+#> 1       109       433
+#> 2        51        55
+```
+
+The 22 long rows collapse to one row per stimulus class, with columns
+`new1` (the single “new” level) and `know2`…`know6` /
+`remember2`…`remember6` on the unified confidence scale. This is also
+the format
+[`rsdt_cdp()`](https://popov-lab.github.io/bmm/dev/reference/sdt_cdp_dist.md)
+simulates directly, and if your own wide columns carry a shared prefix
+(say `cdp_new1`), you declare it once via the constructor’s `response`
+argument. The scale is asymmetric — one “new” level and five “old”
+levels — which the constructor is told via `n_new` and `n_old` (the two
+need not match). We free `sigmar` so recollection can add variance to
+the old-item strength distribution (the canonical Wixted–Mickes result)
+and keep the familiarity–recollection correlation `rho` at its default
+of zero, the classic independent-process model:
+
+``` r
+
+model_cdp <- sdt_cdp(stimulus = "stimulus", n_new = 1, n_old = 5)
+
+fit_cdp <- bmm(
+  formula = bmf(dfam ~ 1, drec ~ 1, criterion ~ 1, spacing ~ 1,
+                rcrit ~ 1, sigmar ~ 1),
+  data = rotello, model = model_cdp,
+  backend = "cmdstanr", cores = 4, chains = 4, iter = 2000,
+  refresh = 0, silent = 2,
+  file = "assets/bmmfit_sdt_cdp_vignette"
+)
+summary(fit_cdp)
+```
+
+``` fansi
+#>   Model: sdt_cdp(stimulus = "stimulus",
+#>                  n_new = 1,
+#>                  n_old = 5) 
+#>   Links: dfam = identity; drec = identity; criterion = identity; spacing = identity; rcrit = identity; sigmar = identity; rho = identity; kcrit = identity 
+#> Formula: dfam ~ 1
+#>          drec ~ 1
+#>          criterion ~ 1
+#>          spacing ~ 1
+#>          rcrit ~ 1
+#>          sigmar ~ 1
+#>          rho = 0
+#>          kcrit = -100 
+#>    Data: (Number of observations: 2)
+#>   Draws: 4 chains, each with iter = 2000; warmup = 1000; thin = 1;
+#>          total post-warmup draws = 4000
+#> 
+#> Regression Coefficients:
+#>                     Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS
+#> dfam_Intercept          0.77      0.06     0.65     0.90 1.00     2613     2490
+#> drec_Intercept          0.81      0.07     0.68     0.94 1.00     2704     2859
+#> criterion_Intercept     0.07      0.05    -0.02     0.16 1.00     3025     2575
+#> spacing_Intercept      -0.37      0.03    -0.42    -0.32 1.00     2595     2587
+#> rcrit_Intercept         0.92      0.04     0.84     1.01 1.00     2696     2695
+#> sigmar_Intercept        0.39      0.05     0.28     0.48 1.00     2834     2861
+#> 
+#> Constant Parameters:
+#>                       Value
+#> rho_Intercept          0.00
+#> kcrit_Intercept     -100.00
+#> 
+#> Draws were sampled using sample(hmc). For each parameter, Bulk_ESS
+#> and Tail_ESS are effective sample size measures, and Rhat is the potential
+#> scale reduction factor on split chains (at convergence, Rhat = 1).
+```
+
+Recollection (`drec` ≈ 0.81) and familiarity (`dfam` ≈ 0.77) contribute
+comparable sensitivities, the Remember criterion sits well into the
+recollection distribution (`rcrit` ≈ 0.92), and `exp(sigmar)` ≈ 1.47
+puts the recollection SD above one — the model’s account of the
+recognition-ROC asymmetry as *added recollection variance* rather than a
+uniformly wider strength distribution. Despite using the two-parameter
+`parsimonious` thresholds rather than five free criteria, these
+estimates reproduce the maximum-likelihood values Wixted and Mickes
+(2010) report for exactly these data (their Table 3: \\\mu_F = 0.78\\,
+\\\mu_R = 0.81\\, \\\sigma_R = 1.48\\, \\r = 0.92\\).
+
+Two further options extend the model, each opt-in. The
+familiarity–recollection correlation is freed with `rho ~ 1` (and can
+itself be predicted, e.g. `rho ~ condition`); it is bounded to \\(-1,
+1)\\ internally and is a *within-item* correlation, distinct from a
+between-subject correlation of random effects (which you would write as
+`(1 |p| id)`). And when the task also collects an explicit *Guess*
+response, include `"guess"` judgments in the long data:
+[`aggregate_sdt_cdp_data()`](https://popov-lab.github.io/bmm/dev/reference/aggregate_sdt_cdp_data.md)
+turns them into `guess` count columns, whose presence switches on the
+three-way Remember/Know/Guess model with a familiarity criterion `kcrit`
+separating Know from Guess (free it with `kcrit ~ 1`). That model has a
+hard boundary — a Guess response in a confidence bin is possible only
+while `rcrit + kcrit` exceeds the bin’s lower threshold — and
+hierarchical fits can report divergent transitions near it;
+[`?sdt_cdp`](https://popov-lab.github.io/bmm/dev/reference/sdt_cdp.md)
+describes the boundary and what to try.
+
+## 5 Choosing and comparing the models
+
+The first three models share the same confidence-rating response
+interface and the same familiarity core, so the choice is about which
+*additional question* the data are meant to answer:
 
 - Reach for **`version = "dpsdt"`** when the question is about
   *recollection* — whether a threshold retrieval process contributes
@@ -629,6 +808,11 @@ data are meant to answer:
 - Stay with **`version = "standard"`** when a single strength process
   suffices; both extensions reduce to it when their extra parameter is
   switched off (`Ro`, `Rn` → 0; `logmratio` = 0, i.e. meta-d′ = `d`).
+- Reach for
+  **[`sdt_cdp()`](https://popov-lab.github.io/bmm/dev/reference/sdt_cdp.md)**
+  when the data carry explicit *Remember/Know* judgments: it models that
+  richer response directly — recollection as a continuous second axis —
+  rather than collapsing it to a confidence rating.
 
 Because each extension nests the standard model, the most direct
 evidence is the **posterior of the extra parameter**: is `Ro` credibly
@@ -684,6 +868,11 @@ Brady. 2023. “How Do People Build up Visual Memory Representations from
 Sensory Evidence? Revisiting Two Classic Models of Choice.” *Journal of
 Mathematical Psychology* 117: 102805.
 <https://doi.org/10.1016/j.jmp.2023.102805>.
+
+Rotello, Caren M., Neil A. Macmillan, Jeffrey A. Reeder, and Michael
+Wong. 2005. “The Remember Response: Subject to Bias, Graded, and Not a
+Process-Pure Indicator of Recollection.” *Psychonomic Bulletin & Review*
+12 (5): 865–73. <https://doi.org/10.3758/BF03196778>.
 
 Wixted, John T., and Laura Mickes. 2010. “A Continuous Dual-Process
 Model of Remember/Know Judgments.” *Psychological Review* 117 (4):
