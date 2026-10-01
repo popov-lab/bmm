@@ -460,9 +460,11 @@ directly.
 Meta-d′ models must fix the type-2 confidence scale relative to the type-1
 criterion. `bmm` uses the **absolute** convention — the confidence criteria are
 anchored at the same boundary as the old/new decision (meta-$c = c$), as in the
-HMeta-d toolbox [@Fleming_2017]. The literature also describes a **relative**
-convention that scales the anchor with metacognitive efficiency
-(meta-$c = M \cdot c$) [@Maniscalco_Lau_2012; @Maniscalco_Lau_2014]; `bmm` does
+HMeta-d toolbox [@Fleming_2017]. The maximum-likelihood estimator instead
+uses a **relative** convention that scales the anchor with metacognitive
+efficiency (meta-$c' = c'$, i.e. meta-$c = M \cdot c$) [@Maniscalco_Lau_2014];
+@Fleming_2017 states that relative constraint for the maximum-likelihood
+estimator and uses the absolute one in the hierarchical model. `bmm` does
 not currently expose that toggle. The two rarely diverge materially when the
 criterion sits near the centre of the rating scale, but with a strongly biased
 criterion the choice can shift meta-d′, so it is worth keeping in mind when

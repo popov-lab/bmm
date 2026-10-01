@@ -360,6 +360,11 @@ settable_link_functions.sdt_rating <- function(model) {
 #' The type-1 boundary is `criterion`, the middle threshold, so this version
 #' needs an even number of rating categories: with an odd number the middle
 #' category straddles the boundary (see "Where `criterion` sits").
+#' The type-1 criterion is held at the same location in the meta-d' space as
+#' in the type-1 model (the convention of the HMeta-d toolbox; Fleming, 2017).
+#' Maximum-likelihood meta-d' instead constrains meta-c' = c' (Maniscalco &
+#' Lau, 2014), so its estimates differ from bmm's when the criterion is far
+#' from the midpoint.
 #' Extract the M-ratio posterior with [mratio()].
 #' `r model_info(.model_sdt_rating(version = "metad"))`
 #'

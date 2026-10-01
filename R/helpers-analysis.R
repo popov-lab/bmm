@@ -1248,7 +1248,11 @@ print.bmm_sdt_thresholds <- function(x, ...) {
 #' Fleming, 2017): 1 is ideal metacognition, below 1 is inefficiency, and above
 #' 1 is hyper-efficiency. Type-1 and type-2 sensitivity are reported on one
 #' scale, \eqn{d'} or, once `sdratio` is estimated, \eqn{d_a} (see
-#' [sdt_sensitivity()]), so the ratio is unaffected by `sdratio`.
+#' [sdt_sensitivity()]), so the ratio is unaffected by `sdratio`. The type-1
+#' criterion keeps its location in the meta-d' space (the HMeta-d convention;
+#' Fleming, 2017); maximum-likelihood meta-d' constrains meta-c' = c'
+#' (Maniscalco & Lau, 2014), so the two differ when the criterion is far from
+#' the midpoint.
 #'
 #' @inheritParams roc_sdt
 #' @param probs Numeric vector of length 2. Lower and upper quantiles for the
