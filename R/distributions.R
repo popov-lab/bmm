@@ -2682,7 +2682,7 @@ rsdt_yn <- function(n, n_trials, stimulus, d, criterion,
 #'
 #' @description Density and random generation for the dual-process signal
 #'   detection model (Yonelinas, 1994), with recall-to-reject of new items
-#'   (`Rn`; Yonelinas, 2024). Extends rating SDT with recollection
+#'   (`Rn`; as in Yonelinas, 2024). Extends rating SDT with recollection
 #'   probabilities `Ro` (old items recollected as old) and `Rn` (new items
 #'   recall-rejected) that add mass to the most-confident rating category. These
 #'   are the simulation counterparts of the `dpsdt` version of [sdt_rating()];

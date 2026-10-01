@@ -115,8 +115,9 @@ scale:
 
 The classic dual-process model of long-term recognition has recollection for
 old items only [@Wixted_Mickes_2010]. The two-sided version with a
-recall-to-reject term is the threshold model that @Yonelinas_2024 applies to
-visual working memory: in a single-probe test, the item held in memory rejects
+recall-to-reject term is the dual-process model that @Yonelinas_2024 applies to
+visual working memory, where the threshold component carries both terms: in a
+single-probe test, the item held in memory rejects
 a changed probe as readily as it accepts an unchanged one, and in change
 detection with a whole-array probe it is recall-to-reject that recollection
 mainly supports. The probability of each confidence category is then
@@ -488,7 +489,8 @@ HMeta-d toolbox [@Fleming_2017]. The maximum-likelihood estimator instead
 uses a **relative** convention that scales the anchor with metacognitive
 efficiency (meta-$c' = c'$, i.e. meta-$c = M \cdot c$) [@Maniscalco_Lau_2014];
 @Fleming_2017 states that relative constraint for the maximum-likelihood
-estimator and uses the absolute one in the hierarchical model. `bmm` does
+estimator and writes the hierarchical model's type-2 probabilities with the
+type-1 criterion itself (its Appendix). `bmm` does
 not currently expose that toggle. The two rarely diverge materially when the
 criterion sits near the centre of the rating scale, but with a strongly biased
 criterion the choice can shift meta-d′, so it is worth keeping in mind when

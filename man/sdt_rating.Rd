@@ -178,7 +178,7 @@ parameter fixed off, not the interval.
 \item \strong{Name:} Signal Detection Theory (Confidence Rating)
 \item \strong{Citation:}
 \itemize{
-\item Yonelinas, A. P. (1994). Receiver-operating characteristics in recognition memory: Evidence for a dual-process model. Journal of Experimental Psychology: Learning, Memory, and Cognition, 20(6), 1341-1354. https://doi.org/10.1037/0278-7393.20.6.1341; recall-to-reject (Rn): Yonelinas, A. P. (2024). The role of recollection and familiarity in visual working memory: A mixture of threshold and signal detection processes. Psychological Review, 131(2), 321-348. https://doi.org/10.1037/rev0000432
+\item Yonelinas, A. P. (1994). Receiver-operating characteristics in recognition memory: Evidence for a dual-process model. Journal of Experimental Psychology: Learning, Memory, and Cognition, 20(6), 1341-1354. https://doi.org/10.1037/0278-7393.20.6.1341; recall-to-reject (Rn) as in Yonelinas, A. P. (2024). The role of recollection and familiarity in visual working memory: A mixture of threshold and signal detection processes. Psychological Review, 131(2), 321-348. https://doi.org/10.1037/rev0000432
 }
 \item \strong{Version:} dpsdt
 \item \strong{Requirements:}
@@ -270,7 +270,8 @@ The type-1 boundary is \code{criterion}, the middle threshold, so this version
 needs an even number of rating categories: with an odd number the middle
 category straddles the boundary (see "Where \code{criterion} sits").
 The type-1 criterion is held at the same location in the meta-d' space as
-in the type-1 model (the convention of the HMeta-d toolbox; Fleming, 2017).
+in the type-1 model, as the HMeta-d toolbox's model equations do (Fleming,
+2017, Appendix).
 Maximum-likelihood meta-d' instead constrains meta-c' = c' (Maniscalco &
 Lau, 2014), so its estimates differ from bmm's when the criterion is far
 from the midpoint.

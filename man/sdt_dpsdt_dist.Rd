@@ -77,7 +77,7 @@ one rating-count column per category (\code{r1} ... \code{rK}).
 \description{
 Density and random generation for the dual-process signal
 detection model (Yonelinas, 1994), with recall-to-reject of new items
-(\code{Rn}; Yonelinas, 2024). Extends rating SDT with recollection
+(\code{Rn}; as in Yonelinas, 2024). Extends rating SDT with recollection
 probabilities \code{Ro} (old items recollected as old) and \code{Rn} (new items
 recall-rejected) that add mass to the most-confident rating category. These
 are the simulation counterparts of the \code{dpsdt} version of \code{\link[=sdt_rating]{sdt_rating()}};

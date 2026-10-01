@@ -41,10 +41,10 @@ Fleming, 2017): 1 is ideal metacognition, below 1 is inefficiency, and above
 1 is hyper-efficiency. Type-1 and type-2 sensitivity are reported on one
 scale, \eqn{d'} or, once \code{sdratio} is estimated, \eqn{d_a} (see
 \code{\link[=sdt_sensitivity]{sdt_sensitivity()}}), so the ratio is unaffected by \code{sdratio}. The type-1
-criterion keeps its location in the meta-d' space (the HMeta-d convention;
-Fleming, 2017); maximum-likelihood meta-d' constrains meta-c' = c'
-(Maniscalco & Lau, 2014), so the two differ when the criterion is far from
-the midpoint.
+criterion keeps its location in the meta-d' space, as in the HMeta-d model
+equations (Fleming, 2017, Appendix); maximum-likelihood meta-d' constrains
+meta-c' = c' (Maniscalco & Lau, 2014), so the two differ when the criterion
+is far from the midpoint.
 }
 \references{
 Maniscalco, B., & Lau, H. (2012). A signal detection theoretic approach for
