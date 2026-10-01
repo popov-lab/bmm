@@ -13,7 +13,7 @@ badge](https://popov-lab.r-universe.dev/badges/bmm)](https://popov-lab.r-univers
 [![R-CMD-check](https://github.com/popov-lab/bmm/actions/workflows/R-CMD-check.yaml/badge.svg)](https://github.com/popov-lab/bmm/actions/workflows/R-CMD-check.yaml)
 [![test-coverage](https://github.com/popov-lab/bmm/actions/workflows/test-coverage.yaml/badge.svg)](https://github.com/popov-lab/bmm/actions/workflows/test-coverage.yaml)
 [![downloads](https://cranlogs.r-pkg.org/badges/bmm)](https://cran.r-project.org/package=bmm)
-[![Dependencies](https://img.shields.io/badge/dependencies-12/21-orange?style=flat)](#)
+[![Dependencies](https://img.shields.io/badge/dependencies-13/22-orange?style=flat)](#)
 <!-- badges: end -->
 
 *Bayesian Measurement Models for behavioral research in R*
@@ -62,17 +62,27 @@ article](https://popov-lab.github.io/bmm/articles/bmm_m3.html).
 
 **Detection, recognition and confidence judgments.** Participants decide
 whether a signal was present or an item was studied, rate their
-confidence, pick the target among several alternatives, or rank the
-alternatives. One signal detection model per response format, each fit
-to response counts per participant and condition. The [Get
+confidence, give Remember/Know judgments, pick the target among several
+alternatives, or rank the alternatives. One signal detection model per
+response format, each fit to response counts per participant and
+condition. See the [signal detection
+article](https://popov-lab.github.io/bmm/articles/bmm_sdt.html) and, for
+the dual-process, meta-d′ and Remember/Know models, the [dual-process
+and meta-d′
+article](https://popov-lab.github.io/bmm/articles/bmm_sdt_dualprocess_metad.html).
+The [Get
 started](https://popov-lab.github.io/bmm/articles/bmm.html#detection-recognition-and-confidence-judgments)
 page has a table of the response formats and the noise distributions
 each model offers.
 
+- [`sdt_cdp()`](https://popov-lab.github.io/bmm/reference/sdt_cdp.html):
+  Continuous Dual-Process Signal Detection Theory (CDP)
 - [`sdt_mafc()`](https://popov-lab.github.io/bmm/reference/sdt_mafc.html):
   Signal Detection Theory (m-AFC)
 - [`sdt_ranking()`](https://popov-lab.github.io/bmm/reference/sdt_ranking.html):
   Signal Detection Theory (Ranking)
+- [`sdt_rating()`](https://popov-lab.github.io/bmm/reference/sdt_rating.html):
+  Signal Detection Theory (Confidence Rating)
 - [`sdt_yn()`](https://popov-lab.github.io/bmm/reference/sdt_yn.html):
   Signal Detection Theory (Yes/No)
 

@@ -133,11 +133,18 @@ print_pretty_models_md(group = "Categorical recall and n-AFC decisions")
 ## Detection, recognition and confidence judgments
 
 Participants decide whether a signal was present or an item was studied, rate
-their confidence, pick the target among several alternatives, or rank the
-alternatives. Signal detection theory separates sensitivity from response
-bias for each of these response formats, and `bmm` has one model per format.
-The models take response counts per subject and condition; one row per trial
-works as well, as the first fit below shows.
+their confidence, give Remember/Know judgments, pick the target among several
+alternatives, or rank the alternatives. Signal detection theory separates
+sensitivity from response bias for each of these response formats, and `bmm`
+has one model per format. The models take response counts per subject and
+condition; one row per trial works as well, as the first fit below shows. For
+`sdt_cdp()`, `aggregate_sdt_cdp_data()` builds the count columns from
+trial-level data. The
+[signal detection article](https://popov-lab.github.io/bmm/articles/bmm_sdt.html)
+walks through the yes/no, rating, m-AFC and ranking models, and the
+[dual-process and meta-d′ article](https://popov-lab.github.io/bmm/articles/bmm_sdt_dualprocess_metad.html)
+through the `dpsdt` and `metad` versions of `sdt_rating()` and through
+`sdt_cdp()`.
 
 ```{r, results = "asis", echo = FALSE}
 print_pretty_models_md(group = "Detection, recognition and confidence judgments")

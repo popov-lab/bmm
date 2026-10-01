@@ -65,9 +65,13 @@ bmm::print_pretty_models_md(group = "Categorical recall and n-AFC decisions")
 
 **Detection, recognition and confidence judgments.** Participants decide
 whether a signal was present or an item was studied, rate their confidence,
-pick the target among several alternatives, or rank the alternatives. One
-signal detection model per response format, each fit to response counts per
-participant and condition. The
+give Remember/Know judgments, pick the target among several alternatives, or
+rank the alternatives. One signal detection model per response format, each
+fit to response counts per participant and condition. See the
+[signal detection article](https://popov-lab.github.io/bmm/articles/bmm_sdt.html)
+and, for the dual-process, meta-d′ and Remember/Know models, the
+[dual-process and meta-d′ article](https://popov-lab.github.io/bmm/articles/bmm_sdt_dualprocess_metad.html).
+The
 [Get started](https://popov-lab.github.io/bmm/articles/bmm.html#detection-recognition-and-confidence-judgments)
 page has a table of the response formats and the noise distributions each
 model offers.
