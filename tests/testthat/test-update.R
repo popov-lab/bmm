@@ -437,6 +437,17 @@ stored_frame_cases <- function() {
       model = sdt_rating(paste0("r", 1:5), "stimulus", threshold_type = "log_distance"),
       formula = bmf(d ~ 1, criterion ~ 1, delta1 ~ 1, delta2 ~ 1, delta3 ~ 1),
       data = rating_data
+    ),
+    sdt_rating_dpsdt = list(
+      model = sdt_rating(paste0("r", 1:5), "stimulus", version = "dpsdt"),
+      formula = bmf(d ~ 1 + (1 | id), criterion ~ 1, spacing ~ 1, Ro ~ 1),
+      data = rating_data
+    ),
+    # meta-d' needs an even number of categories
+    sdt_rating_metad = list(
+      model = sdt_rating(paste0("r", 1:4), "stimulus", version = "metad"),
+      formula = bmf(d ~ 1, criterion ~ 1, spacing ~ 1, logmratio ~ 1 + (1 | id)),
+      data = rating_data[setdiff(names(rating_data), "r5")]
     )
   )
 }

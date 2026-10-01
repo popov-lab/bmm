@@ -77,7 +77,10 @@ points per posterior draw (returned as the data frame). The smooth
 model-implied curve is traced over a virtual cut from the posterior of
 \code{d} (and \code{sdratio}) and attached as the \code{summary} attribute, with the K-1
 thresholds attached as the \code{points} attribute (labelled \code{t1}..\code{t(K-1)}) so
-they fall on the curve.
+they fall on the curve. For \code{version = "metad"} the smooth curve is the
+type-1 (\code{d}, \code{sdratio}) ROC and the threshold points are the model's
+confidence operating points; they lie inside the curve when the M-ratio is
+below 1, by the amount of the metacognitive inefficiency.
 }
 \examples{
 \dontrun{

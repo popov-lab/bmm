@@ -10,6 +10,7 @@ sdt_rating(
   dist = c("normal", "gumbel_min", "gumbel_max", "logistic"),
   threshold_type = c("parsimonious", "equidistant", "log_distance", "log_ratio",
     "softmax"),
+  version = c("standard", "dpsdt", "metad"),
   links = NULL,
   ...
 )
@@ -56,12 +57,20 @@ the total width out over the intervals through a softmax (each delta
 is the log ratio of its interval to the last one).
 }}
 
+\item{version}{Character. The latent-process version of the rating model.
+One of \code{"standard"} (default, a single familiarity SDT process),
+\code{"dpsdt"} (dual-process SDT with recollection parameters \code{Ro}/\code{Rn}), or
+\code{"metad"} (meta-d' with a metacognitive efficiency parameter \code{logmratio},
+the log M-ratio). All three use the same confidence-rating response
+interface. See Details.}
+
 \item{links}{A named list of link functions for the parameters, e.g.
 \code{links = list(d = "log")}. Only \code{d} and \code{criterion} can be set, to
 \code{"identity"}, \code{"log"}, \code{"softplus"}, \code{"logit"} or \code{"probit"}. \code{sdratio}
 and the threshold parameters keep their identity links, because the model
 reads each of them through \code{exp()} and fixes \code{sdratio} at 0 for equal
-variance.}
+variance. The same holds for \code{Ro} and \code{Rn}, read through \code{inv_logit()}
+and fixed off by default, and for \code{logmratio}, read through \code{exp()}.}
 
 \item{...}{used internally for testing, ignore it}
 }
@@ -72,6 +81,9 @@ An object of class \code{bmmodel}
 Confidence Rating Signal Detection Theory Model
 }
 \details{
+Three versions share the confidence-rating response interface,
+selected with \code{version}:
+\subsection{Version: \code{standard} (default)}{
 \itemize{
 \item \strong{Domain:} Perception & Recognition Memory
 \item \strong{Task:} Signal/Noise or Old/New Recognition
@@ -80,6 +92,7 @@ Confidence Rating Signal Detection Theory Model
 \itemize{
 \item Green, D. M., & Swets, J. A. (1966). Signal detection theory and psychophysics. Wiley.
 }
+\item \strong{Version:} standard
 \item \strong{Requirements:}
 
 Provide pre-aggregated data with the following columns:
@@ -133,10 +146,210 @@ Categories should be ordered: 1 = 'definitely noise' to K = 'definitely signal'
 }
 }
 }
+}
+
+\subsection{Version: \code{dpsdt}}{
+
+Dual-process SDT (Yonelinas, 1994): a familiarity SDT process plus an
+all-or-none recollection process that loads the most-confident category.
+\code{Ro} is recollection of old items (loads the most-confident "signal"
+category), the only recollection term of the classic model; \code{Rn} is
+recall-to-reject of new items (loads the most-confident "noise" category),
+the two-sided extension that Yonelinas (2024) applies to visual working
+memory. \code{inv_logit(Ro)}/\code{inv_logit(Rn)} are the recollection
+probabilities. Both are fixed off by default
+(recovering \code{standard}); add \code{Ro ~ 1} for the one-sided model and
+\verb{Ro ~ 1, Rn ~ 1} for the two-sided model. \code{d} describes the familiarity
+distributions only -- the observed ROC is a mixture of familiarity and
+recollection, so it is not the discriminability of that mixture.
+\code{summary()} reports \code{Ro} and \code{Rn} on the logit scale; \code{\link[=latent_sdt]{latent_sdt()}}
+returns them as probabilities (attribute \code{extra}).
+Two cautions. Freeing \code{sdratio} alongside \code{Ro} is weakly identified from
+a single ROC: in simulation the two are correlated at about -0.8 in the
+posterior and \code{Ro} is pulled down while \code{exp(sdratio)} is pulled above 1;
+keep the familiarity process equal-variance unless the design separates
+them. And a recollection probability near zero is reported as the tail of
+its prior: on the probability scale the interval cannot include 0, so the
+test of "no recollection" is a comparison with the fit that leaves the
+parameter fixed off, not the interval.
+\itemize{
+\item \strong{Domain:} Perception & Recognition Memory
+\item \strong{Task:} Signal/Noise or Old/New Recognition
+\item \strong{Name:} Signal Detection Theory (Confidence Rating)
+\item \strong{Citation:}
+\itemize{
+\item Yonelinas, A. P. (1994). Receiver-operating characteristics in recognition memory: Evidence for a dual-process model. Journal of Experimental Psychology: Learning, Memory, and Cognition, 20(6), 1341-1354. https://doi.org/10.1037/0278-7393.20.6.1341; recall-to-reject (Rn) as in Yonelinas, A. P. (2024). The role of recollection and familiarity in visual working memory: A mixture of threshold and signal detection processes. Psychological Review, 131(2), 321-348. https://doi.org/10.1037/rev0000432
+}
+\item \strong{Version:} dpsdt
+\item \strong{Requirements:}
+
+Provide pre-aggregated data with the following columns:
+}
+\itemize{
+\item Response counts: one column per rating category (K columns)
+\item Stimulus type (stimulus): 0 = noise, 1 = signal
+Categories should be ordered: 1 = 'definitely noise' to K = 'definitely signal'
+}
+\itemize{
+\item \strong{Parameters:}
+\itemize{
+\item \code{d}: Sensitivity: d' under equal variance (the default). When sdratio is estimated, d is d_a, the distance between the signal and noise distributions in units of their root-mean-square SD
+\item \code{criterion}: Response bias, on the noise-standardized axis: the middle threshold (the old/new boundary) for an even number of categories, the centre of the middle category for an odd number
+\item \code{spacing}: Threshold spacing: controls distance between adjacent thresholds (exp(spacing) ensures positive spacing)
+\item \code{sdratio}: Log SD ratio: the log of the signal-to-noise standard deviation ratio, so exp(sdratio) is the ratio itself and 0 means equal variance
+\item \code{Ro}: Recollection of old items: probability inv_logit(Ro) that an old item is recollected as old, loading the most-confident 'signal' category
+\item \code{Rn}: Recollection of new items: probability inv_logit(Rn) that a new item is recall-rejected, loading the most-confident 'noise' category
+}
+\item \strong{Fixed parameters:}
+\itemize{
+\item \code{sdratio} = 0
+\item \code{Ro} = -100
+\item \code{Rn} = -100
+}
+\item \strong{Default parameter links:}
+\itemize{
+\item d = identity; criterion = identity; spacing = identity; sdratio = identity; Ro = identity; Rn = identity
+}
+\item \strong{Default priors:}
+\itemize{
+\item \code{d}:
+\itemize{
+\item \code{main}: normal(1, 1)
+\item \code{effects}: normal(0, 0.5)
+\item \code{sd}: exponential(1)
+}
+\item \code{criterion}:
+\itemize{
+\item \code{main}: normal(0, 1.5)
+\item \code{effects}: normal(0, 0.5)
+\item \code{sd}: exponential(2)
+}
+\item \code{spacing}:
+\itemize{
+\item \code{main}: normal(0, 0.5)
+\item \code{effects}: normal(0, 0.3)
+\item \code{sd}: exponential(2)
+}
+\item \code{sdratio}:
+\itemize{
+\item \code{main}: normal(0, 0.3)
+\item \code{effects}: normal(0, 0.3)
+\item \code{sd}: exponential(2)
+}
+\item \code{Ro}:
+\itemize{
+\item \code{main}: normal(0, 1)
+\item \code{effects}: normal(0, 0.5)
+\item \code{sd}: exponential(1)
+}
+\item \code{Rn}:
+\itemize{
+\item \code{main}: normal(0, 1)
+\item \code{effects}: normal(0, 0.5)
+\item \code{sd}: exponential(1)
+}
+}
+}
+}
+
+\subsection{Version: \code{metad}}{
+
+Meta-d' (Maniscalco & Lau, 2012): a type-2 metacognitive sensitivity governs
+confidence-threshold placement, with the total "old"/"new" response rates
+held to what type-1 \code{d} implies. Rather than estimating meta-d'
+directly, the model estimates \code{logmratio}, the log M-ratio
+\eqn{\log(\mathrm{meta\text{-}d'}/d')}, and recovers meta-d' as
+\code{exp(logmratio) * d}. The M-ratio is the field-standard measure of
+metacognitive efficiency (Maniscalco & Lau, 2012; Fleming, 2017): estimating
+it on the log scale keeps meta-d' positive, regularizes it toward \code{d},
+and anchors the ideal point (meta-d' = \code{d}, perfect metacognition) at
+\code{logmratio = 0}, which recovers \code{standard}. Type-1 and type-2 sensitivity
+share one scale (\eqn{d'}, or \eqn{d_a} when \code{sdratio} is estimated), so the
+M-ratio is unaffected by \code{sdratio}.
+The type-1 boundary is \code{criterion}, the middle threshold, so this version
+needs an even number of rating categories: with an odd number the middle
+category straddles the boundary (see "Where \code{criterion} sits").
+The type-1 criterion is held at the same location in the meta-d' space as
+in the type-1 model, as the HMeta-d toolbox's model equations do (Fleming,
+2017, Appendix).
+Maximum-likelihood meta-d' instead constrains meta-c' = c' (Maniscalco &
+Lau, 2014), so its estimates differ from bmm's when the criterion is far
+from the midpoint.
+Extract the M-ratio posterior with \code{\link[=mratio]{mratio()}}.
+\itemize{
+\item \strong{Domain:} Perception & Recognition Memory
+\item \strong{Task:} Signal/Noise or Old/New Recognition
+\item \strong{Name:} Signal Detection Theory (Confidence Rating)
+\item \strong{Citation:}
+\itemize{
+\item Maniscalco, B., & Lau, H. (2012). A signal detection theoretic approach for estimating metacognitive sensitivity from confidence ratings. Consciousness and Cognition, 21(1), 422-430. https://doi.org/10.1016/j.concog.2011.09.021
+}
+\item \strong{Version:} metad
+\item \strong{Requirements:}
+
+Provide pre-aggregated data with the following columns:
+}
+\itemize{
+\item Response counts: one column per rating category (K columns)
+\item Stimulus type (stimulus): 0 = noise, 1 = signal
+Categories should be ordered: 1 = 'definitely noise' to K = 'definitely signal'
+}
+\itemize{
+\item \strong{Parameters:}
+\itemize{
+\item \code{d}: Sensitivity: d' under equal variance (the default). When sdratio is estimated, d is d_a, the distance between the signal and noise distributions in units of their root-mean-square SD
+\item \code{criterion}: Response bias, on the noise-standardized axis: the middle threshold (the old/new boundary) for an even number of categories, the centre of the middle category for an odd number
+\item \code{spacing}: Threshold spacing: controls distance between adjacent thresholds (exp(spacing) ensures positive spacing)
+\item \code{sdratio}: Log SD ratio: the log of the signal-to-noise standard deviation ratio, so exp(sdratio) is the ratio itself and 0 means equal variance
+\item \code{logmratio}: Log M-ratio, log(meta-d/d): metacognitive efficiency. 0 is ideal metacognition (meta-d = d), negative is inefficiency, positive is hyper-efficiency. meta-d is recovered as exp(logmratio) * d, on the same scale as d
+}
+\item \strong{Fixed parameters:}
+\itemize{
+\item \code{sdratio} = 0
+}
+\item \strong{Default parameter links:}
+\itemize{
+\item d = identity; criterion = identity; spacing = identity; sdratio = identity; logmratio = identity
+}
+\item \strong{Default priors:}
+\itemize{
+\item \code{d}:
+\itemize{
+\item \code{main}: normal(1, 1)
+\item \code{effects}: normal(0, 0.5)
+\item \code{sd}: exponential(1)
+}
+\item \code{criterion}:
+\itemize{
+\item \code{main}: normal(0, 1.5)
+\item \code{effects}: normal(0, 0.5)
+\item \code{sd}: exponential(2)
+}
+\item \code{spacing}:
+\itemize{
+\item \code{main}: normal(0, 0.5)
+\item \code{effects}: normal(0, 0.3)
+\item \code{sd}: exponential(2)
+}
+\item \code{sdratio}:
+\itemize{
+\item \code{main}: normal(0, 0.3)
+\item \code{effects}: normal(0, 0.3)
+\item \code{sd}: exponential(2)
+}
+\item \code{logmratio}:
+\itemize{
+\item \code{main}: normal(0, 0.5)
+\item \code{effects}: normal(0, 0.3)
+\item \code{sd}: exponential(2)
+}
+}
+}
 
 By default, the model assumes equal variance (sdratio fixed to 0). To
 estimate unequal variance, add \code{sdratio ~ 1} (or \code{sdratio ~ predictors})
 to the formula.
+}
 }
 \section{Sensitivity is on the same scale as \code{\link[=sdt_yn]{sdt_yn()}}}{
 
@@ -153,6 +366,10 @@ AUC-equivalent index once \code{sdratio} is estimated.
 The \code{criterion} and the confidence thresholds are \strong{not} rescaled. They stay
 on the noise-standardized axis, so under unequal variance they and \code{d} are
 in different units.
+
+The \code{dpsdt} and \code{metad} versions inherit the same convention: \code{d} there
+describes the familiarity (type-1) distributions, and meta-d' is scaled the
+same way, which leaves the M-ratio invariant to \code{sdratio}.
 }
 
 \section{Where \code{criterion} sits}{
@@ -206,9 +423,43 @@ fit_uv <- bmm(
   cores = 4,
   backend = "cmdstanr"
 )
+
+# Dual-process SDT: free recollection of old items (one-sided) or both
+# old and new items (two-sided) via the formula
+model_dp <- sdt_rating(c("r1", "r2", "r3", "r4"), "stimulus", version = "dpsdt")
+fit_dp <- bmm(bmf(d ~ 1, criterion ~ 1, spacing ~ 1, Ro ~ 1, Rn ~ 1),
+              data = dat, model = model_dp, backend = "cmdstanr")
+
+# Meta-d': estimate metacognitive efficiency (log M-ratio)
+model_md <- sdt_rating(c("r1", "r2", "r3", "r4"), "stimulus", version = "metad")
+fit_md <- bmm(bmf(d ~ 1, criterion ~ 1, spacing ~ 1, logmratio ~ 1),
+              data = dat, model = model_md, backend = "cmdstanr")
+mratio(fit_md) # posterior M-ratio (meta-d'/d')
 }
 }
 \references{
+Yonelinas, A. P. (1994). Receiver-operating characteristics in recognition
+memory: Evidence for a dual-process model. \emph{Journal of Experimental
+Psychology: Learning, Memory, and Cognition}, \emph{20}(6), 1341--1354.
+
+Yonelinas, A. P. (2024). The role of recollection and familiarity in visual
+working memory: A mixture of threshold and signal detection processes.
+\emph{Psychological Review}, \emph{131}(2), 321--348.
+\doi{10.1037/rev0000432}
+
+Maniscalco, B., & Lau, H. (2012). A signal detection theoretic approach for
+estimating metacognitive sensitivity from confidence ratings.
+\emph{Consciousness and Cognition}, \emph{21}(1), 422--430.
+
+Maniscalco, B., & Lau, H. (2014). Signal detection theory analysis of type 1
+and type 2 data: meta-d', response-specific meta-d', and the unequal
+variance SDT model. In S. M. Fleming & C. D. Frith (Eds.), \emph{The
+cognitive neuroscience of metacognition} (pp. 25--66). Springer.
+
+Fleming, S. M. (2017). HMeta-d: hierarchical Bayesian estimation of
+metacognitive efficiency from confidence ratings. \emph{Neuroscience of
+Consciousness}, \emph{2017}(1), nix007. \doi{10.1093/nc/nix007}
+
 Green, D. M., & Swets, J. A. (1966). \emph{Signal detection theory and
 psychophysics}. Wiley.
 

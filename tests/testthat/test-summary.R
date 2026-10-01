@@ -100,6 +100,18 @@ test_that("SDT summaries name d as d_a only when sdratio is not 0", {
   expect_true(any(grepl("sdt_sensitivity()", uv, fixed = TRUE)))
 })
 
+test_that("dual-process SDT summaries note that d is the familiarity sensitivity", {
+  model <- sdt_rating(paste0("r", 1:6), "stimulus", version = "dpsdt")
+  model$fixed_parameters[c("Ro", "Rn")] <- NULL
+  fixed <- make_fixed(c("d_Intercept", "criterion_Intercept", "spacing_Intercept",
+                        "Ro_Intercept", "Rn_Intercept"))
+  formula <- bmf(d ~ 1, criterion ~ 1, spacing ~ 1, Ro ~ 1, Rn ~ 1)
+  out <- capture.output(print(make_bmmsummary(model, formula, fixed), color = FALSE))
+  expect_true(any(grepl("familiarity sensitivity", out)))
+  expect_true(any(grepl("auc_sdt()", out, fixed = TRUE)))
+  expect_false(any(grepl("d is d_a", out)))
+})
+
 test_that("SDT summaries name d as d_a for a user-fixed non-zero sdratio too", {
   model <- sdt_yn(response = "y", stimulus = "s", n_trials = "n")
   model$fixed_parameters$sdratio <- 0.3

@@ -1169,6 +1169,13 @@ log_diff_exp <- function(a, b) {
   a + log1m_exp(b - a)
 }
 
+# elementwise over two vectors; two -Inf terms give -Inf, not the NaN of
+# -Inf - -Inf
+log_sum_exp <- function(a, b) {
+  m <- pmax(a, b)
+  ifelse(m == -Inf, -Inf, m + log1p(exp(-abs(a - b))))
+}
+
 # count * log_prob, treating a zero count as contributing nothing even when the
 # log probability is -Inf. The R counterpart of the `if (y > 0)` guards Stan
 # likelihoods use to keep 0 * -Inf from becoming NaN. Both arguments are
@@ -2673,6 +2680,234 @@ rsdt_yn <- function(n, n_trials, stimulus, d, criterion,
 }
 
 
+#' @title Distribution functions for dual-process SDT (DPSDT)
+#'
+#' @description Density and random generation for the dual-process signal
+#'   detection model (Yonelinas, 1994), with recall-to-reject of new items
+#'   (`Rn`; as in Yonelinas, 2024). Extends rating SDT with recollection
+#'   probabilities `Ro` (old items recollected as old) and `Rn` (new items
+#'   recall-rejected) that add mass to the most-confident rating category. These
+#'   are the simulation counterparts of the `dpsdt` version of [sdt_rating()];
+#'   here `Ro`/`Rn` are supplied directly as probabilities in `[0, 1]`.
+#'
+#' @name sdt_dpsdt_dist
+#'
+#' @inheritParams sdt_rating_dist
+#' @param Ro Numeric vector in `[0, 1]`. Recollection probability for old
+#'   (signal) items.
+#' @param Rn Numeric vector in `[0, 1]`. Recall-to-reject probability for new
+#'   (noise) items. Defaults to 0, the classic one-sided model, as the
+#'   `dpsdt` version fixes it off unless `Rn` is in the formula.
+#'
+#' @return `dsdt_dpsdt` returns the (log-)density (multinomial probability).
+#'   `rsdt_dpsdt` returns an integer matrix with one row per observation and
+#'   one rating-count column per category (`r1` ... `rK`).
+#'
+#' @references
+#' Yonelinas, A. P. (1994). Receiver-operating characteristics in recognition
+#'   memory: Evidence for a dual-process model. \emph{Journal of Experimental
+#'   Psychology: Learning, Memory, and Cognition}, \emph{20}(6), 1341--1354.
+#'   \doi{10.1037/0278-7393.20.6.1341}
+#'
+#' Yonelinas, A. P. (2024). The role of recollection and familiarity in visual
+#'   working memory: A mixture of threshold and signal detection processes.
+#'   \emph{Psychological Review}, \emph{131}(2), 321--348.
+#'   \doi{10.1037/rev0000432}
+#'
+#' @keywords distribution
+#' @export
+#' @examples
+#' # Density for a single observation (K=4) with recollection of old items;
+#' # Rn defaults to 0 (no recall-to-reject), the one-sided model
+#' dsdt_dpsdt(counts = c(2, 8, 20, 70), stimulus = 1,
+#'            d = 1.5, thresholds = c(-0.5, 0.0, 0.5), Ro = 0.3)
+dsdt_dpsdt <- function(counts, stimulus, d, thresholds, Ro, Rn = 0,
+                       sdratio = 1,
+                       dist = c("normal", "gumbel_min", "gumbel_max",
+                                "logistic"),
+                       log = FALSE) {
+  dist <- match.arg(dist)
+  stopif(any(sdratio <= 0), "sdratio must be positive")
+  counts <- rbind(counts)
+  dimnames(counts) <- NULL
+  K <- ncol(counts)
+  thr <- rbind(thresholds)
+  stopif(ncol(thr) != K - 1,
+         "thresholds must have length K - 1 = {K - 1}")
+  stopif(anyNA(counts), "counts must not contain NA")
+  stopif(any(counts < 0), "counts must be non-negative")
+  stopif(any(Ro < 0 | Ro > 1), "Ro must be a probability in [0, 1]")
+  stopif(any(Rn < 0 | Rn > 1), "Rn must be a probability in [0, 1]")
+
+  n <- max(nrow(counts), length(d), length(sdratio), length(stimulus),
+           length(Ro), length(Rn))
+  if (nrow(counts) != n) {
+    counts <- counts[rep_len(seq_len(nrow(counts)), n), , drop = FALSE]
+  }
+  stimulus <- rep_len(stimulus, n)
+  stopif(any(!stimulus %in% c(0L, 1L)),
+         "stimulus must be 0 (noise) or 1 (signal)")
+
+  log_probs <- rbind(.sdt_dpsdt_category_log_probs(
+    thr, rep_len(d, n), rep_len(sdratio, n), stimulus, dist,
+    stats::qlogis(rep_len(Ro, n)), stats::qlogis(rep_len(Rn, n))
+  ))
+  log_dens <- lgamma(rowSums(counts) + 1) - rowSums(lgamma(counts + 1)) +
+    rowSums(ifelse(counts == 0, 0, counts * log_probs))
+  if (log) log_dens else exp(log_dens)
+}
+
+
+#' @rdname sdt_dpsdt_dist
+#' @export
+#' @examples
+#' # Generate DPSDT rating data (K=4) for 10 subjects and both stimulus types
+#' dat <- expand.grid(id = 1:10, stimulus = c(0L, 1L))
+#' dat <- cbind(dat, rsdt_dpsdt(nrow(dat), 100, dat$stimulus, d = 1.5,
+#'                              thresholds = c(-0.5, 0, 0.5),
+#'                              Ro = 0.3, Rn = 0.1))
+#' head(dat)
+rsdt_dpsdt <- function(n, n_trials, stimulus, d, thresholds, Ro, Rn = 0,
+                       sdratio = 1,
+                       dist = c("normal", "gumbel_min", "gumbel_max",
+                                "logistic")) {
+  dist <- match.arg(dist)
+  stopif(length(n) != 1 || n < 1, "n must be a single positive integer")
+  stopif(any(n_trials < 1), "n_trials must be positive")
+  stopif(any(!stimulus %in% c(0L, 1L)),
+         "stimulus must be 0 (noise) or 1 (signal)")
+  stopif(any(Ro < 0 | Ro > 1), "Ro must be a probability in [0, 1]")
+  stopif(any(Rn < 0 | Rn > 1), "Rn must be a probability in [0, 1]")
+  stopif(any(sdratio <= 0), "sdratio must be positive")
+
+  n_trials <- rep_len(as.integer(n_trials), n)
+  probs <- rbind(.sdt_dpsdt_category_probs(rbind(thresholds),
+                                           rep_len(d, n),
+                                           rep_len(sdratio, n),
+                                           rep_len(stimulus, n), dist,
+                                           stats::qlogis(rep_len(Ro, n)),
+                                           stats::qlogis(rep_len(Rn, n))))
+
+  K <- ncol(probs)
+  counts <- matrix(0L, n, K, dimnames = list(NULL, paste0("r", seq_len(K))))
+  for (i in seq_len(n)) {
+    counts[i, ] <- as.integer(stats::rmultinom(1, n_trials[i], probs[i, ]))
+  }
+  counts
+}
+
+
+#' @title Distribution functions for meta-d' SDT
+#'
+#' @description Density and random generation for the meta-d' model
+#'   (Maniscalco & Lau, 2012). Confidence thresholds are placed using the
+#'   metacognitive sensitivity `metad`, then rescaled so the total "old"/"new"
+#'   response rates match what type-1 `d` predicts. These are the simulation
+#'   counterparts of the `metad` version of [sdt_rating()]. The old/new
+#'   boundary is the middle threshold, so the number of rating categories must
+#'   be even (an odd number of `thresholds`).
+#'
+#' @name sdt_metad_dist
+#'
+#' @inheritParams sdt_rating_dist
+#' @param metad Numeric vector. Metacognitive sensitivity (type-2 sensitivity),
+#'   on the same scale as `d` (\eqn{d'}, or \eqn{d_a} when `sdratio` is not
+#'   1), so the M-ratio `metad / d` is
+#'   unaffected by `sdratio`. `metad = d` corresponds to ideal metacognition
+#'   (recovers rating SDT).
+#'
+#' @return `dsdt_metad` returns the (log-)density (multinomial probability).
+#'   `rsdt_metad` returns an integer matrix with one row per observation and
+#'   one rating-count column per category (`r1` ... `rK`).
+#'
+#' @references
+#' Maniscalco, B., & Lau, H. (2012). A signal detection theoretic approach for
+#'   estimating metacognitive sensitivity from confidence ratings.
+#'   \emph{Consciousness and Cognition}, \emph{21}(1), 422--430.
+#'   \doi{10.1016/j.concog.2011.09.021}
+#'
+#' @keywords distribution
+#' @export
+#' @examples
+#' # Density for a single observation (K=4) with imperfect metacognition
+#' dsdt_metad(counts = c(5, 15, 25, 55), stimulus = 1,
+#'            d = 1.5, thresholds = c(-0.5, 0.0, 0.5), metad = 1.0)
+dsdt_metad <- function(counts, stimulus, d, thresholds, metad,
+                       sdratio = 1,
+                       dist = c("normal", "gumbel_min", "gumbel_max",
+                                "logistic"),
+                       log = FALSE) {
+  dist <- match.arg(dist)
+  stopif(any(sdratio <= 0), "sdratio must be positive")
+  counts <- rbind(counts)
+  dimnames(counts) <- NULL
+  K <- ncol(counts)
+  thr <- rbind(thresholds)
+  stopif(ncol(thr) != K - 1,
+         "thresholds must have length K - 1 = {K - 1}")
+  stopif(K %% 2L != 0L,
+         "meta-d' needs an even number of rating categories, one old/new \\
+         boundary with confidence levels on either side; counts has {K}")
+  stopif(anyNA(counts), "counts must not contain NA")
+  stopif(any(counts < 0), "counts must be non-negative")
+
+  n <- max(nrow(counts), length(d), length(metad), length(sdratio),
+           length(stimulus))
+  if (nrow(counts) != n) {
+    counts <- counts[rep_len(seq_len(nrow(counts)), n), , drop = FALSE]
+  }
+  stimulus <- rep_len(stimulus, n)
+  stopif(any(!stimulus %in% c(0L, 1L)),
+         "stimulus must be 0 (noise) or 1 (signal)")
+
+  log_probs <- rbind(.sdt_metad_category_log_probs(
+    thr, rep_len(d, n), rep_len(sdratio, n), stimulus, dist, rep_len(metad, n)
+  ))
+  log_dens <- lgamma(rowSums(counts) + 1) - rowSums(lgamma(counts + 1)) +
+    rowSums(ifelse(counts == 0, 0, counts * log_probs))
+  if (log) log_dens else exp(log_dens)
+}
+
+
+#' @rdname sdt_metad_dist
+#' @export
+#' @examples
+#' # Generate meta-d' rating data (K=4) for 10 subjects and both stimulus types
+#' dat <- expand.grid(id = 1:10, stimulus = c(0L, 1L))
+#' dat <- cbind(dat, rsdt_metad(nrow(dat), 100, dat$stimulus, d = 1.5,
+#'                              thresholds = c(-0.5, 0, 0.5), metad = 1.0))
+#' head(dat)
+rsdt_metad <- function(n, n_trials, stimulus, d, thresholds, metad,
+                       sdratio = 1,
+                       dist = c("normal", "gumbel_min", "gumbel_max",
+                                "logistic")) {
+  dist <- match.arg(dist)
+  stopif(length(n) != 1 || n < 1, "n must be a single positive integer")
+  stopif(any(n_trials < 1), "n_trials must be positive")
+  stopif(any(!stimulus %in% c(0L, 1L)),
+         "stimulus must be 0 (noise) or 1 (signal)")
+  stopif(any(sdratio <= 0), "sdratio must be positive")
+  stopif(ncol(rbind(thresholds)) %% 2L != 1L,
+         "meta-d' needs an even number of rating categories, one old/new \\
+         boundary with confidence levels on either side, so an odd number \\
+         of thresholds")
+
+  n_trials <- rep_len(as.integer(n_trials), n)
+  probs <- rbind(.sdt_metad_category_probs(rbind(thresholds),
+                                           rep_len(d, n),
+                                           rep_len(sdratio, n),
+                                           rep_len(stimulus, n), dist,
+                                           rep_len(metad, n)))
+
+  K <- ncol(probs)
+  counts <- matrix(0L, n, K, dimnames = list(NULL, paste0("r", seq_len(K))))
+  for (i in seq_len(n)) {
+    counts[i, ] <- as.integer(stats::rmultinom(1, n_trials[i], probs[i, ]))
+  }
+  counts
+}
+
+
 #' @title Distribution functions for m-AFC SDT
 #'
 #' @description Density and random generation for m-alternative forced choice
@@ -3026,6 +3261,82 @@ rsdt_ranking <- function(n, n_trials, m, d, sdratio = 1,
 
 .sdt_category_probs <- function(thresholds, d, sdratio, stimulus, dist) {
   exp(.sdt_category_log_probs(thresholds, d, sdratio, stimulus, dist))
+}
+
+
+# Dual-process category log-probabilities (Yonelinas, 1994; recall-to-reject of
+# new items after Yonelinas, 2024): recollection adds mass to the most-confident
+# category -- old items recollected as old (Ro) load the top category, new
+# items recall-rejected (Rn) the bottom one -- on top of
+# the familiarity SDT probabilities. Ro/Rn are on the logit scale, as in the
+# model and in sdt_dpsdt_logmu_cat(), so a recollection probability near 1
+# keeps its complement; the model's default of -100 is numerically 0. `d` is the
+# familiarity distributions' d_a: recollection is a separate threshold process,
+# so the d_a scaling belongs to the familiarity process alone. Vectorized like
+# .sdt_category_log_probs().
+.sdt_dpsdt_category_log_probs <- function(thresholds, d, sdratio, stimulus,
+                                          dist, Ro, Rn) {
+  out <- rbind(.sdt_category_log_probs(thresholds, d, sdratio, stimulus, dist))
+  n <- nrow(out)
+  stimulus <- rep_len(stimulus, n)
+  rec <- ifelse(stimulus == 1, rep_len(Ro, n), rep_len(Rn, n))
+
+  out <- out + stats::plogis(rec, lower.tail = FALSE, log.p = TRUE)
+  loaded <- cbind(seq_len(n), ifelse(stimulus == 1, ncol(out), 1L))
+  out[loaded] <- log_sum_exp(out[loaded], stats::plogis(rec, log.p = TRUE))
+  if (n == 1L && !is.matrix(thresholds)) out[1L, ] else out
+}
+
+.sdt_dpsdt_category_probs <- function(thresholds, d, sdratio, stimulus, dist,
+                                      Ro, Rn) {
+  exp(.sdt_dpsdt_category_log_probs(thresholds, d, sdratio, stimulus, dist,
+                                    Ro, Rn))
+}
+
+
+# Meta-d' category log-probabilities (Maniscalco & Lau, 2012): the confidence
+# thresholds are read off the metacognitive sensitivity metad, then each side of
+# the criterion is rescaled so its summed mass matches what the type-1 d
+# implies. The criterion is threshold K/2, the old/new boundary, which only an
+# even K has; sdt_rating() refuses the metad version at odd K. Each side's
+# normaliser is a ratio of two lower tails ("new" side) or two upper tails
+# ("old" side), taken in log space as in sdt_metad_logmu_cat(). Both d and metad
+# are d_a indices converted by the same root-mean-square factor, which leaves
+# the M-ratio metad/d unchanged and keeps the metad = d reduction to standard
+# rating SDT exact under unequal variance. Vectorized like
+# .sdt_category_log_probs().
+.sdt_metad_category_log_probs <- function(thresholds, d, sdratio, stimulus,
+                                          dist, metad) {
+  thr <- rbind(thresholds)
+  dimnames(thr) <- NULL
+  n <- max(nrow(thr), length(d), length(metad), length(sdratio),
+           length(stimulus))
+  if (nrow(thr) != n) thr <- thr[rep_len(seq_len(nrow(thr)), n), , drop = FALSE]
+  K <- ncol(thr) + 1L
+  mid <- K %/% 2L
+  stimulus <- rep_len(stimulus, n)
+  sdratio <- rep_len(sdratio, n)
+  metad <- rep_len(metad, n)
+
+  half_rms <- .sdt_rms_scale(sdratio) / 2 * (2 * stimulus - 1)
+  scale <- ifelse(stimulus == 1, sdratio, 1)
+  eta_d <- (thr[, mid] - rep_len(d, n) * half_rms) / scale
+  eta_metad <- (thr[, mid] - metad * half_rms) / scale
+  log_norm <- cbind(
+    matrix(.sdt_log_cdf(eta_d, dist) - .sdt_log_cdf(eta_metad, dist), n, mid),
+    matrix(.sdt_log_ccdf(eta_d, dist) - .sdt_log_ccdf(eta_metad, dist), n,
+           K - mid)
+  )
+
+  out <- rbind(.sdt_category_log_probs(thr, metad, sdratio, stimulus, dist)) +
+    log_norm
+  if (n == 1L && !is.matrix(thresholds)) out[1L, ] else out
+}
+
+.sdt_metad_category_probs <- function(thresholds, d, sdratio, stimulus, dist,
+                                      metad) {
+  exp(.sdt_metad_category_log_probs(thresholds, d, sdratio, stimulus, dist,
+                                    metad))
 }
 
 

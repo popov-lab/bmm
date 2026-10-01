@@ -132,7 +132,8 @@ plot.bmm_sdt_roc <- function(x, observed = NULL, condition_col = NULL,
 # as a ribbon + line; the points get crosshair error bars and are coloured by
 # `threshold` (rating: t1..tK-1) or, for binary, the single criterion-level
 # column. Operating points fall on the curve because both are derived from the
-# same probability map in roc_sdt().
+# same probability map in roc_sdt(), except for the metad version, whose points
+# are confidence operating points inside the type-1 curve.
 .plot_roc_curve <- function(p, x, colour_col, ribbon_alpha, point_size,
                             qf = NULL) {
   summ      <- attr(x, "summary")
