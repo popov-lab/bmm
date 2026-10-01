@@ -184,6 +184,8 @@ roc_sdt <- function(fit, conditions = NULL, n_points = 100,
          "ROC curves are not defined for the m-AFC SDT model: it has no response criterion.")
   stopif(inherits(model, "sdt_ranking"),
          "ROC curves are not defined for the ranking SDT model: it has no response criterion.")
+  stopif(inherits(model, "sdt_cdp"),
+         "roc_sdt() is not yet available for the continuous dual-process (sdt_cdp) model.")
 
   is_rating  <- inherits(model, "sdt_rating")
   conditions <- .sdt_resolve_conditions(fit, conditions)
@@ -983,6 +985,8 @@ latent_sdt <- function(fit, conditions = NULL, n_grid = 200,
   model <- fit$bmm$model
   stopif(!inherits(model, "sdt"),
          "latent_sdt() is only available for SDT models")
+  stopif(inherits(model, "sdt_cdp"),
+         "latent_sdt() is not yet available for the continuous dual-process (sdt_cdp) model.")
 
   dist          <- model$other_vars$dist
   pdf           <- .sdt_dists[[dist]]$pdf
@@ -1435,6 +1439,8 @@ auc_sdt <- function(fit, conditions = NULL, probs = c(0.025, 0.975),
          "AUC is not defined for the m-AFC SDT model: it has no response criterion.")
   stopif(inherits(model, "sdt_ranking"),
          "AUC is not defined for the ranking SDT model: it has no response criterion.")
+  stopif(inherits(model, "sdt_cdp"),
+         "auc_sdt() is not yet available for the continuous dual-process (sdt_cdp) model.")
 
   dist        <- model$other_vars$dist
   is_rating   <- inherits(model, "sdt_rating")

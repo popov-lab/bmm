@@ -346,6 +346,22 @@ revert_check_data.sdt_rating <- function(model, data) {
   NextMethod("revert_check_data")
 }
 
+#' @exportS3Method
+revert_check_data.sdt_cdp <- function(model, data) {
+  n_new <- model$other_vars$n_new
+  n_old <- model$other_vars$n_old
+  # check_data() renamed the count columns cdp1 ... cdpK, and whether guess
+  # columns were present is recorded only in how many there are
+  Y <- unclass(data$Y)
+  has_guess <- ncol(Y) == n_new + 3L * n_old
+  resp_cols <- .sdt_cdp_response_cols(n_new, n_old, has_guess,
+                                      model$resp_vars$response)
+  data[resp_cols] <- as.data.frame(Y, col.names = resp_cols)
+  data$Y <- NULL
+  data$nTrials <- NULL
+  NextMethod("revert_check_data")
+}
+
 # brms::update.brmsfit() merges the fit's stored control key by key with the one
 # the call names, and keeps none of it when backend or algorithm changes.
 # update.bmmfit() always names a control, so the rule is applied here. rstan fits

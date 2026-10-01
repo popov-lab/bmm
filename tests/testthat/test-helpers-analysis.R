@@ -27,6 +27,22 @@ test_that("roc_sdt / auc_sdt error for criterion-free models", {
   expect_error(auc_sdt(fake("sdt_ranking")), "not defined")
 })
 
+test_that("every SDT post-processing function refuses an sdt_cdp fit by name", {
+  # none of them models the Remember/Know split, and without the refusal
+  # auc_sdt() reached brms and failed with "Invalid argument 'dpar'"
+  fit <- structure(
+    list(bmm = list(model = sdt_cdp(stimulus = "stimulus", n_new = 3, n_old = 3))),
+    class = c("bmmfit", "brmsfit")
+  )
+  for (f in c("roc_sdt", "auc_sdt", "latent_sdt")) {
+    expect_error(get(f)(fit), "not yet available for the continuous dual-process")
+  }
+  expect_error(sdt_thresholds(fit), "only available for rating SDT models")
+  expect_error(sdt_sensitivity(fit), "requires a model with a sensitivity parameter")
+  expect_error(mratio(fit), "meta-d' version")
+  expect_error(roc_observed(fit), "requires a binary or rating SDT model")
+})
+
 test_that("roc_sdt errors for a non-SDT model", {
   fake <- structure(list(bmm = list(model = structure(list(),
             class = c("bmmodel", "sdm")))), class = c("bmmfit", "brmsfit"))
