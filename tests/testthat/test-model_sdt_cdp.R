@@ -831,3 +831,24 @@ test_that("the Know/Guess switch is checked on update()'s path too", {
   expect_true(attr(cd, "has_guess"))
   expect_error(check_formula(m, cd, f_rk), "kcrit must be estimated")
 })
+
+test_that("check_data.sdt_cdp refuses count columns beyond the declared scale", {
+  # 1 new + 3 old levels in the data, 1 + 2 declared: the know4/remember4
+  # columns used to be dropped without a word, and their trials with them
+  thr <- .cdp_make_thresholds(0.2, -0.2, 1, 3, "parsimonious")
+  dat <- sim_cdp_data(n_subjects = 3, n_trials = 300, n_new = 1, n_old = 3,
+                      thresholds = thr)
+  m <- sdt_cdp(stimulus = "stimulus", n_new = 1, n_old = 2)
+  expect_error(check_data(m, dat, bmf(dfam ~ 1)),
+               "'know4', 'remember4' look like response counts beyond")
+  # the same with a column prefix
+  resp <- grep("new|know|remember", colnames(dat))
+  colnames(dat)[resp] <- paste0("cdp", colnames(dat)[resp])
+  m_p <- sdt_cdp(response = "cdp", stimulus = "stimulus", n_new = 1, n_old = 2)
+  expect_error(check_data(m_p, dat, bmf(dfam ~ 1)), "'cdpknow4', 'cdpremember4'")
+  # a column that only looks similar is left alone
+  dat$new_trials <- 300L
+  dat$knowledge2 <- 1L
+  m_ok <- sdt_cdp(response = "cdp", stimulus = "stimulus", n_new = 1, n_old = 3)
+  expect_equal(ncol(check_data(m_ok, dat, bmf(dfam ~ 1))$Y), 7)
+})

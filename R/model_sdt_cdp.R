@@ -457,6 +457,17 @@ check_data.sdt_cdp <- function(model, data, formula) {
   stopif(length(missing) > 0,
          "Response columns {collapse_comma(missing)} missing in the data. \\
          Use aggregate_sdt_cdp_data() to build them from long-format data")
+  # columns are derived from n_new/n_old, so a count column above the declared
+  # scale was never looked at and its trials silently left the fit
+  extra <- setdiff(
+    grep(paste0("^", prefix, "(new|guess|know|remember)[0-9]+$"),
+         colnames(data), value = TRUE),
+    resp_cols
+  )
+  stopif(length(extra) > 0,
+         "Column(s) {collapse_comma(extra)} look like response counts beyond \\
+         the n_new = {n_new} / n_old = {n_old} scale declared in sdt_cdp(): \\
+         raise n_new/n_old to match the data, or drop the columns")
 
   .validate_sdt_count_cols(data, resp_cols)
 
