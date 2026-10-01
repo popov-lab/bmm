@@ -1720,19 +1720,32 @@ print.bmm_sdt_sensitivity <- function(x, ...) {
       sep = "")
   cat("  da = RMS-SD units (estimated) | dn = noise-SD units (d') |",
       "ds = signal-SD units\n")
+  if ("sdt_rating_dpsdt" %in% attr(x, "model_class")) {
+    cat("  d is the familiarity sensitivity; the observed ROC also carries",
+        "recollection (Ro, Rn): see auc_sdt()\n")
+  }
   print(attr(x, "summary"), digits = 3, row.names = FALSE)
   invisible(x)
 }
 
 
 # `d` reads as d' in the coefficient table, which it only is while sdratio is
-# fixed at 0
+# fixed at 0; in the dual-process version it is the familiarity process alone
 #' @export
 summary_notes.sdt <- function(model, x) {
-  if (.sdt_unit_sdratio(model)) return(NULL)
-  paste(
-    "Note: sdratio is not fixed at 0, so d is d_a (root-mean-square SD units),",
-    "not the noise-standardized d'.\n      sdt_sensitivity() converts it",
-    "to d' (noise SD) and d_S (signal SD)."
-  )
+  notes <- character(0)
+  if (!.sdt_unit_sdratio(model)) {
+    notes <- c(notes, paste(
+      "Note: sdratio is not fixed at 0, so d is d_a (root-mean-square SD units),",
+      "not the noise-standardized d'.\n      sdt_sensitivity() converts it",
+      "to d' (noise SD) and d_S (signal SD)."
+    ))
+  }
+  if (identical(model$version, "dpsdt")) {
+    notes <- c(notes, paste(
+      "Note: d is the familiarity sensitivity; the observed ROC also carries",
+      "recollection (Ro, Rn): see auc_sdt()."
+    ))
+  }
+  if (length(notes)) notes
 }

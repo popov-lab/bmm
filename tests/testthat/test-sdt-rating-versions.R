@@ -503,6 +503,29 @@ test_that("default dpsdt roc_sdt (recollection off) matches the standard roc", {
   expect_lt(abs(summ_dp$Hit_mean[1L]), 1e-40)
 })
 
+test_that("sdt_sensitivity() and summary() note that d is the familiarity sensitivity for dpsdt", {
+  fit_dp <- fake_rating_fit(n_ratings = 6L, version = "dpsdt")
+  local_mocked_bindings(ranef = function(...) list(), .package = "brms")
+  local_mocked_bindings(
+    posterior_linpred = mock_linpred_factory(
+      list(d = 1.2, criterion = 0, spacing = 0,
+           Ro = qlogis(0.4), Rn = qlogis(0.2))),
+    .package = "brms")
+  expect_output(print(sdt_sensitivity(fit_dp)), "familiarity")
+  out_std <- capture.output(print(sdt_sensitivity(fake_rating_fit(n_ratings = 6L))))
+  expect_false(any(grepl("familiarity", out_std)))
+
+  notes_dp <- summary_notes(fit_dp$bmm$model, NULL)
+  expect_length(notes_dp, 1L)
+  expect_match(notes_dp, "familiarity")
+  expect_match(notes_dp, "auc_sdt")
+  expect_null(summary_notes(fake_rating_fit(n_ratings = 6L)$bmm$model, NULL))
+  # an estimated sdratio adds the d_a note ahead of the familiarity note
+  m_uv <- fake_rating_fit(n_ratings = 6L, version = "dpsdt", uv = TRUE)$bmm$model
+  expect_length(summary_notes(m_uv, NULL), 2L)
+  expect_match(summary_notes(m_uv, NULL)[1], "d_a")
+})
+
 test_that("latent_sdt reports the response-process parameters as an attribute", {
   fit_dp <- fake_rating_fit(n_ratings = 6L, version = "dpsdt")
   local_mocked_bindings(ranef = function(...) list(), .package = "brms")
