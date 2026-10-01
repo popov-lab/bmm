@@ -164,6 +164,14 @@ distributions only -- the observed ROC is a mixture of familiarity and
 recollection, so it is not the discriminability of that mixture.
 \code{summary()} reports \code{Ro} and \code{Rn} on the logit scale; \code{\link[=latent_sdt]{latent_sdt()}}
 returns them as probabilities (attribute \code{extra}).
+Two cautions. Freeing \code{sdratio} alongside \code{Ro} is weakly identified from
+a single ROC: in simulation the two are correlated at about -0.8 in the
+posterior and \code{Ro} is pulled down while \code{exp(sdratio)} is pulled above 1;
+keep the familiarity process equal-variance unless the design separates
+them. And a recollection probability near zero is reported as the tail of
+its prior: on the probability scale the interval cannot include 0, so the
+test of "no recollection" is a comparison with the fit that leaves the
+parameter fixed off, not the interval.
 \itemize{
 \item \strong{Domain:} Perception & Recognition Memory
 \item \strong{Task:} Signal/Noise or Old/New Recognition

@@ -344,6 +344,14 @@ settable_link_functions.sdt_rating <- function(model) {
 #' recollection, so it is not the discriminability of that mixture.
 #' `summary()` reports `Ro` and `Rn` on the logit scale; [latent_sdt()]
 #' returns them as probabilities (attribute `extra`).
+#' Two cautions. Freeing `sdratio` alongside `Ro` is weakly identified from
+#' a single ROC: in simulation the two are correlated at about -0.8 in the
+#' posterior and `Ro` is pulled down while `exp(sdratio)` is pulled above 1;
+#' keep the familiarity process equal-variance unless the design separates
+#' them. And a recollection probability near zero is reported as the tail of
+#' its prior: on the probability scale the interval cannot include 0, so the
+#' test of "no recollection" is a comparison with the fit that leaves the
+#' parameter fixed off, not the interval.
 #' `r model_info(.model_sdt_rating(version = "dpsdt"))`
 #'
 #' #### Version: `metad`
