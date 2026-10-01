@@ -716,3 +716,45 @@ test_that("the Stan cdp likelihood has a finite gradient with an unbounded top b
   expect_true(all(is.finite(grad$model)))
   expect_lt(max(abs(grad$error)), 1e-5)
 })
+
+############################################################################# !
+# KNOW/GUESS SWITCH: guess columns and kcrit must agree                   ####
+############################################################################# !
+
+test_that("guess columns without kcrit in the formula are refused, kcrit without guess columns warns", {
+  m <- sdt_cdp(stimulus = "stimulus", n_new = 3, n_old = 3)
+  dat_rk <- sim_cdp_data()
+  dat_rkg <- sim_cdp_data(kcrit = 0.2)
+  f_rk <- bmf(dfam ~ 1, drec ~ 1, criterion ~ 1, spacing ~ 1, rcrit ~ 1)
+  f_rkg <- bmf(dfam ~ 1, drec ~ 1, criterion ~ 1, spacing ~ 1, rcrit ~ 1,
+               kcrit ~ 1)
+  mock <- function(f, d) {
+    bmm(f, d, m, backend = "mock", mock_fit = 1, rename = FALSE)
+  }
+  # the documented R/K formula on R/K/G data: with kcrit fixed at -100 every
+  # Guess category sits at the floor and the fit converges to wrong values
+  expect_error(mock(f_rk, dat_rkg), "kcrit must be estimated")
+  # the mirror: nothing in R/K data identifies kcrit
+  expect_warning(mock(f_rkg, dat_rk), "posterior will equal its prior")
+  # the two intended pairings run
+  expect_silent(mock(f_rkg, dat_rkg))
+  expect_silent(mock(f_rk, dat_rk))
+  # a constant kcrit in the formula is a fixed kcrit, not a free one
+  expect_error(
+    mock(bmf(dfam ~ 1, drec ~ 1, criterion ~ 1, spacing ~ 1, rcrit ~ 1,
+             kcrit = 0.2), dat_rkg),
+    "kcrit must be estimated"
+  )
+})
+
+test_that("the Know/Guess switch is checked on update()'s path too", {
+  # update.bmmfit() runs check_data() and then check_formula() on the new data
+  # with the fit's formula, exactly this call sequence; the guard therefore
+  # fires for update(rk_fit, newdata = <R/K/G data>) as it does for bmm()
+  m <- sdt_cdp(stimulus = "stimulus", n_new = 3, n_old = 3)
+  f_rk <- bmf(dfam ~ 1, drec ~ 1, criterion ~ 1, spacing ~ 1, rcrit ~ 1)
+  m <- check_model(m, sim_cdp_data(), f_rk)
+  cd <- check_data(m, sim_cdp_data(kcrit = 0.2), f_rk)
+  expect_true(attr(cd, "has_guess"))
+  expect_error(check_formula(m, cd, f_rk), "kcrit must be estimated")
+})

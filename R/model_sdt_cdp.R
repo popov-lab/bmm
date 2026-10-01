@@ -480,6 +480,38 @@ check_data.sdt_cdp <- function(model, data, formula) {
 
 
 ############################################################################# !
+# CHECK_FORMULA S3 METHODS                                               ####
+############################################################################# !
+
+# The guess columns switch the Know/Guess split on, but only the formula frees
+# the criterion that split needs: with kcrit at its fixed -100 every Guess
+# category sits at the probability floor and the fit converges, cleanly, to
+# wrong estimates (rcrit 0.538 for a true 0.7 in the #372 review). The mirror
+# case has nothing to identify kcrit, so it returns its prior; that is a
+# warning, as for sdratio on a flat design in check_formula.sdt_yn.
+# update() runs check_data() then check_formula() too, so both paths pass here.
+#' @export
+check_formula.sdt_cdp <- function(model, data, formula) {
+  has_guess <- isTRUE(attr(data, "has_guess"))
+  kcrit_free <- "kcrit" %in% names(formula) && !is_constant(formula)[["kcrit"]]
+  stopif(
+    has_guess && !kcrit_free,
+    "The data contain guess count columns, so the Know/Guess criterion kcrit \\
+    must be estimated: add `kcrit ~ 1` (or `kcrit ~ <predictors>`) to the \\
+    formula. With kcrit fixed, every Guess response has probability 0 and the \\
+    fit converges to wrong estimates."
+  )
+  warnif(
+    !has_guess && kcrit_free,
+    "kcrit is in the formula but the data have no guess count columns, so \\
+    nothing identifies it: its posterior will equal its prior. Drop kcrit from \\
+    the formula, or add the guess<k> columns for the Remember/Know/Guess model."
+  )
+  NextMethod("check_formula")
+}
+
+
+############################################################################# !
 # MULTINOMIAL FORMULA & FAMILY CONSTRUCTION                              ####
 ############################################################################# !
 
