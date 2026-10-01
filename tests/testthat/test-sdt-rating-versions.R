@@ -526,6 +526,56 @@ test_that("sdt_sensitivity() and summary() note that d is the familiarity sensit
   expect_match(summary_notes(m_uv, NULL)[1], "d_a")
 })
 
+test_that("auc_sdt() on a metad fit is the type-1 (d, sdratio) swept area and the points sit inside it", {
+  fit <- fake_rating_fit(n_ratings = 6L, version = "metad")
+  local_mocked_bindings(ranef = function(...) list(), .package = "brms")
+  local_mocked_bindings(
+    posterior_linpred = mock_linpred_factory(
+      list(d = 1.2, criterion = 0.3, spacing = 0.2, logmratio = -0.4)),
+    .package = "brms")
+  auc <- auc_sdt(fit)
+  ref <- bmm:::.sdt_auc_swept(rep(1.2, n_draws_mock), rep(1, n_draws_mock),
+                              "normal", ro = 0, rn = 0)
+  expect_lt(max(abs(auc$AUC - ref)), 1e-10)
+
+  # with logmratio < 0 the confidence operating points lie at or below the
+  # type-1 curve; the criterion (t3) is the one point on it
+  roc  <- roc_sdt(fit, n_points = 1000)
+  summ <- attr(roc, "summary")
+  pts  <- attr(roc, "points")
+  curve_at <- stats::approx(summ$FA, summ$Hit_mean, xout = pts$FA_mean)$y
+  expect_true(all(pts$Hit_mean <= curve_at + 1e-6))
+  expect_gt(max(curve_at - pts$Hit_mean), 1e-3)
+  expect_lt(abs(curve_at[3] - pts$Hit_mean[3]), 1e-6)
+})
+
+test_that("roc_sdt(conditions = ) on a dpsdt fit lifts each level by its own Ro", {
+  fit <- fake_rating_fit(n_ratings = 6L, version = "dpsdt")
+  fit$bmm$user_formula <- bmf(d ~ 1, criterion ~ 1, spacing ~ 1,
+                              Ro ~ 0 + cond, Rn ~ 1)
+  fit$data <- fit$data[rep(1:2, 2), ]
+  fit$data$cond <- rep(c("A", "B"), each = 2)
+  ro <- c(A = 0.2, B = 0.6)
+  local_mocked_bindings(ranef = function(...) list(), .package = "brms")
+  local_mocked_bindings(
+    posterior_linpred = mock_linpred_factory(
+      list(d = 1.2, criterion = 0, spacing = 0,
+           Ro = qlogis(unname(ro)), Rn = qlogis(0.1))),
+    .package = "brms")
+  roc  <- roc_sdt(fit, conditions = data.frame(cond = c("A", "B")),
+                  n_points = 50)
+  summ <- attr(roc, "summary")
+  pts  <- attr(roc, "points")
+  s_a <- summ[summ$cond == "A", ]
+  s_b <- summ[summ$cond == "B", ]
+  expect_lt(abs(s_a$Hit_mean[1] - ro[["A"]]), 1e-10)
+  expect_lt(abs(s_b$Hit_mean[1] - ro[["B"]]), 1e-10)
+  interior <- s_a$Hit_mean < 1
+  expect_true(all(s_b$Hit_mean[interior] > s_a$Hit_mean[interior]))
+  expect_gt(pts$Hit_mean[pts$cond == "B" & pts$threshold == "t5"],
+            pts$Hit_mean[pts$cond == "A" & pts$threshold == "t5"])
+})
+
 test_that("latent_sdt reports the response-process parameters as an attribute", {
   fit_dp <- fake_rating_fit(n_ratings = 6L, version = "dpsdt")
   local_mocked_bindings(ranef = function(...) list(), .package = "brms")
