@@ -111,10 +111,13 @@ scale:
   that a **new** item is recollected as new (its absence from the studied set is
   recollected), producing the most-confident "new" rating.
 
-Classic recognition models keep only recall-to-accept; the symmetric
-recall-to-reject term is motivated by change-detection and working-memory
-paradigms, where recollecting that an item was *not* studied is itself
-diagnostic [@Yonelinas_2023]. The probability of each confidence category is then
+The classic dual-process model of long-term recognition has recollection for
+old items only [@Wixted_Mickes_2010]. The two-sided version with a
+recall-to-reject term is the threshold model that @Yonelinas_2024 applies to
+visual working memory: in a single-probe test, the item held in memory rejects
+a changed probe as readily as it accepts an unchanged one, and in change
+detection with a whole-array probe it is recall-to-reject that recollection
+mainly supports. The probability of each confidence category is then
 a mixture: a recollection component that piles mass on the extreme category, and
 a $(1 - R)$-weighted familiarity component spread across the scale by the
 thresholds.
@@ -217,10 +220,11 @@ high-confidence "old" responses over and above familiarity, the dual-process
 signature. Recall-to-reject (`Rn`), by contrast, is estimated at essentially
 zero. That is exactly what we should expect for standard old/new recognition:
 recollecting that an item was *not* studied has little to work with here. Freeing
-`Rn` does no harm — the two-sided fit simply recovers the classic one-sided model
-— and it becomes diagnostic only in paradigms where the absence of an item is
-itself recollectable, such as change detection and visual working memory
-[@Yonelinas_2023].
+`Rn` does no harm: the two-sided fit simply recovers the classic one-sided model.
+Recall-to-reject is expected to carry weight in single-probe and change-detection
+tests of visual working memory, where memory for the studied item also rejects
+the changed probe, whereas item-recognition tests favour recall-to-accept
+[@Yonelinas_2024].
 
 ## Two accounts of the same asymmetry
 
@@ -271,8 +275,9 @@ are only gently curved, and an unequal-variance Gaussian mimics the dual-process
 shape closely (the same flexibility caveat that applies to the extreme-value vs
 Gaussian comparison in the core article; @MeyerGrant_2026). The choice is best
 driven by theory and by whether parameters stay invariant across conditions —
-for instance whether recollection, but not familiarity, responds to a
-manipulation [@Yonelinas_2023] — rather than by ROC fit alone. The continuous
+for instance whether a manipulation moves recollection but leaves familiarity in
+place, or the reverse, as @Yonelinas_2024 reports for working-memory ROCs —
+rather than by ROC fit alone. The continuous
 dual-process model [@Wixted_Mickes_2010] and finite-mixture SDT [@DeCarlo_2002]
 are further variations on the same theme of a second component shaping the ROC.
 
