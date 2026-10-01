@@ -3596,12 +3596,18 @@ rsdt_rating <- function(n, n_trials, stimulus, d, thresholds,
   4.0601429800386941e-02, 1.7614007139152118e-02
 )
 
-# Bivariate standard-normal CDF P(Z1 <= z1, Z2 <= z2) with correlation rho,
-# from mvtnorm's TVPACK (Genz's bivariate algorithm), which keeps its accuracy
-# at |rho| near 1 where the strength-recollection correlation lives once
-# sigmar is large. It shares no code with the Stan side's Owen's T, so the
-# R companion is also an independent check of the Stan kernel. Vectorized over
-# recycled z1/z2/rho; infinite bounds reduce to closed forms.
+# Bivariate standard-normal CDF P(Z1 <= z1, Z2 <= z2) with correlation rho.
+# Below |rho| = 0.9 it is Genz's (2004) asin transform on 20 Gauss-Legendre
+# nodes, vectorized: on the #372 review's 109,080-cell reference grid the
+# split kernel matches the TVPACK-only one band for band (2.6e-5 in log p in
+# (-30, -15], 7.0e-5 in (-15, -5], 6.4e-6 above), at a fraction of the cost
+# (85% of a TVPACK call is mvtnorm's argument checking). From |rho| = 0.9 up,
+# where the strength-recollection correlation lives once sigmar is large,
+# the quadrature loses accuracy (8e-3 at |rho| = 0.9485, hundreds of nats
+# near 0.99) and each value comes from mvtnorm's TVPACK instead. Neither
+# shares code
+# with the Stan side's Owen's T, so the R companion is also an independent
+# check of the Stan kernel. Infinite bounds reduce to closed forms.
 .cdp_phi2 <- function(z1, z2, rho) {
   n <- max(length(z1), length(z2), length(rho))
   z1 <- rep_len(z1, n)
@@ -3609,7 +3615,18 @@ rsdt_rating <- function(n, n_trials, stimulus, d, thresholds,
   rho <- rep_len(rho, n)
   out <- numeric(n)
   fin <- is.finite(z1) & is.finite(z2)
-  out[fin] <- vapply(which(fin), function(i) {
+  genz <- fin & abs(rho) < 0.9
+  if (any(genz)) {
+    asr <- asin(rho[genz])
+    sn <- sin(outer(asr / 2, .cdp_gl20_nodes + 1))
+    a <- z1[genz]
+    b <- z2[genz]
+    vals <- exp((a * b * sn - (a * a + b * b) / 2) / (1 - sn * sn))
+    out[genz] <- stats::pnorm(a) * stats::pnorm(b) +
+      as.vector(vals %*% .cdp_gl20_weights) * asr / (4 * pi)
+  }
+  tvpack <- fin & !genz
+  out[tvpack] <- vapply(which(tvpack), function(i) {
     as.numeric(mvtnorm::pmvnorm(
       upper = c(z1[i], z2[i]), corr = matrix(c(1, rho[i], rho[i], 1), 2),
       algorithm = mvtnorm::TVPACK()
