@@ -137,6 +137,7 @@ Categorical recall and n-AFC decisions
 
 Detection, recognition and confidence judgments
 \itemize{
+\item sdt_cdp(): Continuous Dual-Process Signal Detection Theory (CDP)
 \item sdt_mafc(): Signal Detection Theory (m-AFC)
 \item sdt_ranking(): Signal Detection Theory (Ranking)
 \item sdt_rating(): Signal Detection Theory (Confidence Rating)

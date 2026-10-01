@@ -40,17 +40,22 @@ fake_binary_fit <- function(uv = FALSE, multi = FALSE, links = NULL) {
 }
 
 fake_rating_fit <- function(uv = FALSE, threshold_type = "parsimonious",
-                            n_ratings = 6L, links = NULL) {
+                            n_ratings = 6L, version = "standard",
+                            links = NULL) {
   resp <- paste0("r", seq_len(n_ratings))
   model <- sdt_rating(response = resp, stimulus = "stimulus",
-                      threshold_type = threshold_type, links = links)
+                      threshold_type = threshold_type, version = version,
+                      links = links)
   if (uv) model$fixed_parameters$sdratio <- NULL
 
   Yn <- c(30, 25, 20, 13, 8, 4)
   Ys <- c(4, 8, 13, 20, 25, 30)
   data <- data.frame(stimulus = c(0, 1), nTrials = c(sum(Yn), sum(Ys)))
   data$Y <- rbind(Yn, Ys)
-  uf <- bmf(d ~ 1, criterion ~ 1, spacing ~ 1)
+  forms <- list(d ~ 1, criterion ~ 1, spacing ~ 1)
+  if (version == "dpsdt") forms <- c(forms, list(Ro ~ 1, Rn ~ 1))
+  if (version == "metad") forms <- c(forms, list(logmratio ~ 1))
+  uf <- do.call(bmf, forms)
   structure(list(data = data, bmm = list(model = model, user_formula = uf)),
             class = c("bmmfit", "brmsfit"))
 }

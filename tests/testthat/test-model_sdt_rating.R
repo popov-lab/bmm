@@ -128,13 +128,20 @@ test_that("sdt_rating offers only the links it can invert in its formula", {
 })
 
 test_that("sdt_rating gives every parameter an sd default prior", {
-  for (tt in c("parsimonious", "log_distance", "softmax")) {
-    model <- sdt_rating(paste0("r", 1:5), "stimulus", threshold_type = tt)
-    sds <- vapply(model$default_priors, function(p) p$sd %||% NA_character_,
-                  character(1))
-    expect_false(anyNA(sds), info = tt)
-    expect_equal(sds[["d"]], "exponential(1)", info = tt)
-    expect_true(all(sds[setdiff(names(sds), "d")] == "exponential(2)"), info = tt)
+  # Ro and Rn are logit-scale probabilities, so they join d at rate 1;
+  # everything else is a log-scale quantity and takes rate 2
+  rate1 <- c("d", "Ro", "Rn")
+  for (v in names(bmm:::.sdt_rating_variants)) {
+    for (tt in c("parsimonious", "log_distance", "softmax")) {
+      model <- sdt_rating(paste0("r", 1:6), "stimulus",
+                          threshold_type = tt, version = v)
+      sds <- vapply(model$default_priors, function(p) p$sd %||% NA_character_,
+                    character(1))
+      info <- paste(v, tt)
+      expect_false(anyNA(sds), info = info)
+      expect_true(all(sds[intersect(names(sds), rate1)] == "exponential(1)"), info = info)
+      expect_true(all(sds[setdiff(names(sds), rate1)] == "exponential(2)"), info = info)
+    }
   }
 })
 
@@ -253,6 +260,36 @@ test_that("sdt_rating check_data validates response columns", {
   expect_true(all(c("Y", "nTrials", "stimulus") %in% colnames(result)))
   expect_equal(ncol(result$Y), 4)
   expect_equal(result$nTrials, c(50, 100))
+})
+
+test_that("sdt_rating check_data refuses non-numeric count columns", {
+  model <- sdt_rating(c("r1", "r2", "r3", "r4"), "stimulus")
+  formula <- bmf(d ~ 1, criterion ~ 1, spacing ~ 1)
+  dat <- data.frame(r1 = c(10, 5), r2 = c(20, 10), r3 = c(15, 30),
+                    r4 = c(5, 55), stimulus = c(0L, 1L))
+
+  for (conv in list(as.character, as.factor)) {
+    bad <- dat
+    bad$r1 <- conv(bad$r1)
+    expect_error(check_data(model, bad, formula),
+                 "Response column 'r1' must be numeric")
+  }
+})
+
+test_that("sdt_rating check_data refuses an all-NA column as NA, not a type", {
+  model <- sdt_rating(c("r1", "r2", "r3", "r4"), "stimulus")
+  dat <- data.frame(r1 = c(10, 5), r2 = c(20, 10), r3 = c(15, 30),
+                    r4 = NA, stimulus = c(0L, 1L))
+  expect_error(check_data(model, dat, bmf(d ~ 1, criterion ~ 1, spacing ~ 1)),
+               "must not contain NA counts")
+})
+
+test_that("sdt_rating check_data still only warns on non-integer counts", {
+  model <- sdt_rating(c("r1", "r2", "r3", "r4"), "stimulus")
+  dat <- data.frame(r1 = c(10.5, 5), r2 = c(20, 10), r3 = c(15, 30),
+                    r4 = c(5, 55), stimulus = c(0L, 1L))
+  expect_warning(check_data(model, dat, bmf(d ~ 1, criterion ~ 1, spacing ~ 1)),
+                 "Response column 'r1' should contain integer counts")
 })
 
 test_that("sdt_rating check_data rejects missing response columns", {
