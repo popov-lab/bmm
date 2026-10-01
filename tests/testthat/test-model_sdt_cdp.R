@@ -890,3 +890,52 @@ test_that("dsdt_cdp, check_data and aggregate_sdt_cdp_data refuse malformed inpu
                                       "judgment", "confidence", "count"),
                "must not contain NA")
 })
+
+test_that("the Stan cdp gradient is right where a threshold meets the strength mean and where rcrit equals kcrit", {
+  # two measure-zero sets that init = 0 starts on: a lure criterion of 0 puts
+  # a threshold exactly on mu_S, so the bivariate-normal CDF sees h = 0; and
+  # rcrit == kcrit on lures makes all three Guess breakpoints coincide. The
+  # values were always right there; the gradients were not (0 for the first,
+  # -3.65 against a finite difference of -1.51 for the second)
+  skip_on_cran()
+  skip_if_not_installed("cmdstanr")
+  skip_if(is.null(cmdstanr::cmdstan_version(error_on_NA = FALSE)))
+
+  program <- paste0(
+    "functions {\n",
+    read_lines2(system.file("stan_chunks", "sdt_cdp_funs.stan", package = "bmm")),
+    "\n}\n",
+    "data { array[2, 12] int y; }\n",
+    "parameters { real dfam; real drec; real criterion; real spacing;\n",
+    "  real rcrit; real kcrit; real rho; }\n",
+    "model {\n",
+    "  array[0] real deltas;\n",
+    "  vector[5] thr = cdp_make_thresholds(criterion, spacing, deltas, 3, 3, 1);\n",
+    "  for (s in 1:2) {\n",
+    "    vector[12] lp;\n",
+    "    for (c in 1:12) lp[c] = log(cdp_category_prob(c, thr, dfam, drec,\n",
+    "      0, rho, rcrit, kcrit, s - 1, 3, 3, 1));\n",
+    "    y[s] ~ multinomial_logit(lp);\n",
+    "  }\n}\n"
+  )
+  y <- rbind(c(60, 50, 40, 12, 10, 3, 8, 15, 20, 4, 10, 30),
+             c(10, 15, 20, 10, 12, 5, 8, 20, 40, 10, 30, 90))
+  model <- cmdstanr::cmdstan_model(cmdstanr::write_stan_file(program))
+  ties <- list(
+    threshold_on_mu_S = list(dfam = 0.8, drec = 1.0, criterion = 0, spacing = -0.3,
+                             rcrit = 0.9, kcrit = 0.2, rho = 0),
+    # lures have beta = 1/2 for every rho, so rcrit == kcrit makes all three
+    # breakpoints coincide; the review measured the defect at rho = 1.5
+    rcrit_equals_kcrit = list(dfam = 0.8, drec = 1.0, criterion = 0.2, spacing = -0.3,
+                              rcrit = 0.9, kcrit = 0.9, rho = 1.5)
+  )
+  for (tie in names(ties)) {
+    # cmdstan exits non-zero when a gradient misses its own error threshold;
+    # the threshold is lifted so the comparison below is the expectation
+    diag <- suppressMessages(model$diagnose(data = list(y = y), init = list(ties[[tie]]),
+                                            error = 100))
+    grad <- diag$gradients()
+    expect_true(all(is.finite(grad$model)), info = tie)
+    expect_lt(max(abs(grad$error)), 1e-5, label = paste(tie, "max |autodiff - finite difference|"))
+  }
+})

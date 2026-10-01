@@ -19,16 +19,27 @@
 // Bivariate standard-normal CDF P(Z1 <= h, Z2 <= k) with correlation r, via
 // Owen's T (Owen, 1956). Where h and k have opposite signs the constant term
 // 0.5 * (Phi(h) + Phi(k) - 1) is written with the complementary Phi of the
-// positive argument, so it does not round away with 1 - Phi. Exact zeros are
-// nudged to avoid the argument in the denominator of the Owen's T argument.
+// positive argument, so it does not round away with 1 - Phi. An argument on
+// its axis takes the limit form below.
 real cdp_Phi2(real h, real k, real r) {
   if (h == negative_infinity() || k == negative_infinity()) return 0;
   if (h == positive_infinity()) return Phi(k);
   if (k == positive_infinity()) return Phi(h);
-  if (h == 0 && k == 0) return 0.25 + asin(r) / (2 * pi());
-  real x = abs(h) < 1e-10 ? (h >= 0 ? 1e-10 : -1e-10) : h;
-  real y = abs(k) < 1e-10 ? (k >= 0 ? 1e-10 : -1e-10) : k;
   real denom = sqrt((1 + r) * (1 - r));
+  // on an axis the Owen's T argument k / h is a limit, not a value:
+  // P(Z1 <= 0, Z2 <= k) = Phi(k) / 2 + T(k, r / denom), and the first-order
+  // term carries the gradient phi(0) Phi(k / denom) that a constant stand-in
+  // for h would lose (the value error is O(h^2), below 1e-20)
+  if (abs(h) < 1e-10) {
+    return 0.5 * Phi(k) + owens_t(k, r / denom)
+           + h * 0.3989422804014327 * Phi(k / denom);
+  }
+  if (abs(k) < 1e-10) {
+    return 0.5 * Phi(h) + owens_t(h, r / denom)
+           + k * 0.3989422804014327 * Phi(h / denom);
+  }
+  real x = h;
+  real y = k;
   real base;
   if (x < 0 && y > 0) {
     base = 0.5 * (Phi(x) - Phi(-y));
@@ -122,20 +133,21 @@ real cdp_region_mass(int region, real c_lo, real c_hi, real mu_S, real sigma_S,
   real total = 0;
   for (e in 1:4) {
     real len = edges[e + 1] - edges[e];
-    if (len > 0) {
-      int np = 1;
-      while (np * sigma_S < len) np += 1;
-      real half = 0.5 * len / np;
-      for (p in 1:np) {
-        real mid = edges[e] + (2 * p - 1) * half;
-        for (i in 1:N_GL) {
-          real s = mid + half * gl_nodes[i];
-          real m = mu_R + beta * (s - mu_S);
-          real pc = region == 1
-                    ? cdp_Phi_interval((s - kcrit - m) / sd_c, (rcrit - m) / sd_c)
-                    : Phi((fmin(rcrit, s - kcrit) - m) / sd_c);
-          total += gl_weights[i] * half * exp(normal_lpdf(s | mu_S, sigma_S)) * pc;
-        }
+    // a zero-length piece between coincident breakpoints adds no mass but
+    // still carries the derivatives of its two edges, which move with
+    // different parameters; skipping it dropped that boundary term
+    int np = 1;
+    while (np * sigma_S < len) np += 1;
+    real half = 0.5 * len / np;
+    for (p in 1:np) {
+      real mid = edges[e] + (2 * p - 1) * half;
+      for (i in 1:N_GL) {
+        real s = mid + half * gl_nodes[i];
+        real m = mu_R + beta * (s - mu_S);
+        real pc = region == 1
+                  ? cdp_Phi_interval((s - kcrit - m) / sd_c, (rcrit - m) / sd_c)
+                  : Phi((fmin(rcrit, s - kcrit) - m) / sd_c);
+        total += gl_weights[i] * half * exp(normal_lpdf(s | mu_S, sigma_S)) * pc;
       }
     }
   }
