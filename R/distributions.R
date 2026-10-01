@@ -2694,7 +2694,8 @@ rsdt_yn <- function(n, n_trials, stimulus, d, criterion,
 #' @param Ro Numeric vector in `[0, 1]`. Recollection probability for old
 #'   (signal) items.
 #' @param Rn Numeric vector in `[0, 1]`. Recall-to-reject probability for new
-#'   (noise) items.
+#'   (noise) items. Defaults to 0, the classic one-sided model, as the
+#'   `dpsdt` version fixes it off unless `Rn` is in the formula.
 #'
 #' @return `dsdt_dpsdt` returns the (log-)density (multinomial probability).
 #'   `rsdt_dpsdt` returns an integer matrix with one row per observation and
@@ -2714,10 +2715,11 @@ rsdt_yn <- function(n, n_trials, stimulus, d, criterion,
 #' @keywords distribution
 #' @export
 #' @examples
-#' # Density for a single observation (K=4) with recollection of old items
+#' # Density for a single observation (K=4) with recollection of old items;
+#' # Rn defaults to 0 (no recall-to-reject), the one-sided model
 #' dsdt_dpsdt(counts = c(2, 8, 20, 70), stimulus = 1,
-#'            d = 1.5, thresholds = c(-0.5, 0.0, 0.5), Ro = 0.3, Rn = 0)
-dsdt_dpsdt <- function(counts, stimulus, d, thresholds, Ro, Rn,
+#'            d = 1.5, thresholds = c(-0.5, 0.0, 0.5), Ro = 0.3)
+dsdt_dpsdt <- function(counts, stimulus, d, thresholds, Ro, Rn = 0,
                        sdratio = 1,
                        dist = c("normal", "gumbel_min", "gumbel_max",
                                 "logistic"),
@@ -2763,7 +2765,7 @@ dsdt_dpsdt <- function(counts, stimulus, d, thresholds, Ro, Rn,
 #'                              thresholds = c(-0.5, 0, 0.5),
 #'                              Ro = 0.3, Rn = 0.1))
 #' head(dat)
-rsdt_dpsdt <- function(n, n_trials, stimulus, d, thresholds, Ro, Rn,
+rsdt_dpsdt <- function(n, n_trials, stimulus, d, thresholds, Ro, Rn = 0,
                        sdratio = 1,
                        dist = c("normal", "gumbel_min", "gumbel_max",
                                 "logistic")) {

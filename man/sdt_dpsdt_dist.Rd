@@ -12,7 +12,7 @@ dsdt_dpsdt(
   d,
   thresholds,
   Ro,
-  Rn,
+  Rn = 0,
   sdratio = 1,
   dist = c("normal", "gumbel_min", "gumbel_max", "logistic"),
   log = FALSE
@@ -25,7 +25,7 @@ rsdt_dpsdt(
   d,
   thresholds,
   Ro,
-  Rn,
+  Rn = 0,
   sdratio = 1,
   dist = c("normal", "gumbel_min", "gumbel_max", "logistic")
 )
@@ -50,7 +50,8 @@ thresholds are on the noise-standardized axis and are not rescaled by
 (signal) items.}
 
 \item{Rn}{Numeric vector in \verb{[0, 1]}. Recall-to-reject probability for new
-(noise) items.}
+(noise) items. Defaults to 0, the classic one-sided model, as the
+\code{dpsdt} version fixes it off unless \code{Rn} is in the formula.}
 
 \item{sdratio}{Numeric vector. Ratio of signal to noise standard deviations
 (default 1, i.e., equal variance). Must be positive. Note that this is the
@@ -83,9 +84,10 @@ are the simulation counterparts of the \code{dpsdt} version of \code{\link[=sdt_
 here \code{Ro}/\code{Rn} are supplied directly as probabilities in \verb{[0, 1]}.
 }
 \examples{
-# Density for a single observation (K=4) with recollection of old items
+# Density for a single observation (K=4) with recollection of old items;
+# Rn defaults to 0 (no recall-to-reject), the one-sided model
 dsdt_dpsdt(counts = c(2, 8, 20, 70), stimulus = 1,
-           d = 1.5, thresholds = c(-0.5, 0.0, 0.5), Ro = 0.3, Rn = 0)
+           d = 1.5, thresholds = c(-0.5, 0.0, 0.5), Ro = 0.3)
 # Generate DPSDT rating data (K=4) for 10 subjects and both stimulus types
 dat <- expand.grid(id = 1:10, stimulus = c(0L, 1L))
 dat <- cbind(dat, rsdt_dpsdt(nrow(dat), 100, dat$stimulus, d = 1.5,

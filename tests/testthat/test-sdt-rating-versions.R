@@ -235,6 +235,22 @@ test_that("dsdt_dpsdt / dsdt_metad return finite densities and validate inputs",
                "single positive integer")
 })
 
+test_that("dsdt_dpsdt() and rsdt_dpsdt() default to Rn = 0, the one-sided model", {
+  thr <- c(-0.5, 0, 0.5)
+  for (stim in c(0L, 1L)) {
+    counts <- if (stim == 1L) c(2, 8, 20, 70) else c(70, 20, 8, 2)
+    expect_equal(dsdt_dpsdt(counts, stim, 1.5, thr, Ro = 0.3),
+                 dsdt_dpsdt(counts, stim, 1.5, thr, Ro = 0.3, Rn = 0),
+                 tolerance = 1e-12)
+  }
+  # noise rows: without recall-to-reject the bottom category keeps its
+  # familiarity mass; 1e5 trials put the sampling error near 1e-3
+  p_bottom <- bmm:::.sdt_dpsdt_category_probs(thr, 1.5, 1, 0L, "normal",
+                                              qlogis(0.3), -Inf)[1]
+  counts_n <- rsdt_dpsdt(1, 1e5, 0L, d = 1.5, thresholds = thr, Ro = 0.3)
+  expect_lt(abs(counts_n[1, 1] / 1e5 - p_bottom), 0.01)
+})
+
 test_that("dsdt version densities match dmultinom and vectorize over rows", {
   thr <- c(-0.5, 0, 0.5)
   p_dp <- bmm:::.sdt_dpsdt_category_probs(thr, 1.5, 1, 1L, "normal",
