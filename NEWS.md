@@ -60,6 +60,9 @@
 * **ddm**, **ezdm** and **cswald** no longer fail before sampling when a parameter gets a link that excludes values its default link allows, such as a `log` or `softplus` link on `drift` (`Variable 'Intercept_drift' has NA values`) (#460).
 
 ### Other changes
+* `supported_models()` now lists the models under four task groups (continuous reproduction; categorical recall and n-AFC decisions; detection, recognition and confidence judgments; choices and response times), one line per model with its constructor and full name. The argument lists are gone from the printout; `?modelname` has them. `supported_models(print_call = FALSE)` is unchanged (#440).
+* The home page of the website and the README now start from your task and list the models for each one, with links to the matching articles. The lists are generated from the package, so they stay current as models are added (#440).
+* New [Get started](https://popov-lab.github.io/bmm/articles/bmm.html) page on the website: install and check your machine with `bmm_setup()`, find the model for your task, including a table of the signal detection models by response format and noise distribution, and fit a first model to `broeder_schuetz_2009_e3` step by step (#440).
 * bmm's own links now point at popov-lab.github.io/bmm instead of venpopov.com/bmm, which currently redirects to the new address. Update bookmarks when convenient (#433).
 * The **cswald** likelihood now evaluates all observations in one call instead of one at a time. This makes fitting faster, improves the accuracy of the gradients the sampler uses, and adds support for within-chain parallelization: `bmm(..., threads = 2)` now works for **cswald** as it does for **sdm**. The posterior is unchanged (#387).
 

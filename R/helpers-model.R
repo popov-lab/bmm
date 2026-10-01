@@ -477,17 +477,69 @@ print.bmmodel <- function(x, ...) {
 # HELPER FUNCTIONS                                                       ####
 ############################################################################# !
 
+# maps the `domain` field of each `.model_*()` constructor to the task group
+# shown by supported_models(); a domain not listed here prints as its own group,
+# so a new model never disappears from the list
+model_groups <- c(
+  "Visual working memory" = "Continuous reproduction",
+  "Working Memory (categorical), Categorical Decision Making" = "Categorical recall and n-AFC decisions",
+  "Perception & Recognition Memory" = "Detection, recognition and confidence judgments",
+  "Recognition Memory" = "Detection, recognition and confidence judgments",
+  "Decision Making / Response times" = "Choices and response times"
+)
+
+model_group <- function(domain) {
+  group <- unname(model_groups[domain])
+  group[is.na(group)] <- domain[is.na(group)]
+  group[group == ""] <- "Other models"
+  group
+}
+
+model_registry <- function(models = supported_models(print_call = FALSE)) {
+  specs <- lapply(models, function(m) get_model(m)())
+  registry <- data.frame(
+    model = models,
+    name = sub("\\.$", "", vapply(specs, `[[`, "", "name")),
+    domain = vapply(specs, `[[`, "", "domain")
+  )
+  registry$group <- model_group(registry$domain)
+  known <- unique(unname(model_groups))
+  group_levels <- c(known, setdiff(registry$group, known))
+  registry[order(match(registry$group, group_levels), registry$model), ]
+}
+
+format_model_list <- function(registry, style = "text", headers = TRUE) {
+  reference <- "https://popov-lab.github.io/bmm/reference/"
+  blocks <- lapply(unique(registry$group), function(group) {
+    rows <- registry[registry$group == group, ]
+    header <- if (!headers) NULL else if (style == "md") glue("**{group}**") else group
+    items <- if (style == "md") {
+      glue("- [`{rows$model}()`]({reference}{rows$model}.html): {rows$name}")
+    } else {
+      glue("- {rows$model}(): {rows$name}")
+    }
+    c(header, if (headers) "", items, "")
+  })
+  unlist(blocks)
+}
+
 #' Measurement models available in `bmm`
 #'
-#' @param print_call Logical; If TRUE (default), the function will print
-#'   information about how each model function should be called and its required
-#'   arguments. If FALSE, the function will return a character vector with the
-#'   names of the available models
-#' @return A character vector of measurement models available in `bmm`
+#' @param print_call Logical; If TRUE (default), the function prints the models
+#'   grouped by the task they are meant for, one line per model with its
+#'   constructor and full name. If FALSE, the function returns a character
+#'   vector with the names of the available models.
+#' @details The groups are: continuous reproduction; categorical recall and
+#'   n-AFC decisions; detection, recognition and confidence judgments; choices
+#'   and response times. Type `?modelname` (for example `?imm`) for the
+#'   arguments of a model.
+#' @return If `print_call = FALSE`, a character vector of model names.
+#'   Otherwise an object of class `message` listing the models by group.
 #' @export
 #'
 #' @examples
 #' supported_models()
+#' supported_models(print_call = FALSE)
 supported_models <- function(print_call = TRUE) {
   supported_models <- lsp("bmm", pattern = "^\\.model_")
   supported_models <- sub("^\\.model_", "", supported_models)
@@ -495,15 +547,14 @@ supported_models <- function(print_call = TRUE) {
     return(supported_models)
   }
 
-  out <- "The following models are supported:\n\n"
-  for (model in supported_models) {
-    args <- methods::formalArgs(get(model))
-    args <- args[!args %in% c("...")]
-    args <- collapse_comma(args)
-    args <- gsub("'", "", args)
-    out <- glue("{out}- `{model}({args})`\n\n")
-  }
-  out <- glue("{out}\nType `?modelname` to get information about a specific model, e.g. `?imm`\n")
+  out <- paste(
+    c(
+      "The following models are supported:", "",
+      format_model_list(model_registry(supported_models), "text"),
+      "Type `?modelname` to get information about a specific model, e.g. `?imm`", ""
+    ),
+    collapse = "\n"
+  )
   out <- gsub("`", " ", out)
   class(out) <- "message"
   out
@@ -511,34 +562,35 @@ supported_models <- function(print_call = TRUE) {
 
 
 #' @title Generate a markdown list of the measurement models available in `bmm`
-#' @description Used internally to automatically populate information in the
-#'   README file
+#' @description Used internally to populate the README and the "Get started"
+#'   article. Models are grouped as in [supported_models()], and every model
+#'   links to its reference page on the website.
+#' @param group Optional character vector of group labels as printed by
+#'   [supported_models()]. Only those groups are listed and the group headers
+#'   are omitted, so a document can add its own text per group.
 #' @return Markdown code for printing the list of measurement models available
 #'   in `bmm`
 #' @export
 #'
 #' @examples
 #' print_pretty_models_md()
+#' print_pretty_models_md(group = "Continuous reproduction")
 #'
 #' @keywords internal
-print_pretty_models_md <- function() {
-  ok_models <- supported_models(print_call = FALSE)
-  domains <- c()
-  models <- c()
-  for (model in ok_models) {
-    m <- get_model(model)()
-    domains <- c(domains, m$domain)
-    models <- c(models, m$name)
+print_pretty_models_md <- function(group = NULL) {
+  registry <- model_registry()
+  stopif(
+    !is.null(group) && length(group) == 0,
+    "`group` must not be empty; omit it to print all groups."
+  )
+  stopif(
+    !all(group %in% registry$group),
+    "Unknown model group(s): {collapse_comma(setdiff(group, registry$group))}"
+  )
+  if (!is.null(group)) {
+    registry <- registry[registry$group %in% group, ]
   }
-  unique_domains <- unique(domains)
-  for (dom in unique_domains) {
-    cat("**", dom, "**\n\n", sep = "")
-    dom_models <- unique(models[domains == dom])
-    for (model in dom_models) {
-      cat("*", model, "\n")
-    }
-    cat("\n")
-  }
+  cat(format_model_list(registry, "md", headers = is.null(group)), sep = "\n")
 }
 
 # used to extract well formatted information from the model object to print
