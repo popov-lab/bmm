@@ -37,7 +37,7 @@ supported_models()
 #> -  sdm(resp_error, version) 
 #> -  sdt_mafc(response, n_trials, m, dist, links) 
 #> -  sdt_ranking(response, m, dist, links) 
-#> -  sdt_rating(response, stimulus, dist, threshold_type, links) 
+#> -  sdt_rating(response, stimulus, dist, threshold_type, version, links) 
 #> -  sdt_yn(response, stimulus, n_trials, dist, links) 
 #> 
 #> Type  ?modelname  to get information about a specific model, e.g.  ?imm 

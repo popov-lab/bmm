@@ -73,6 +73,35 @@ the search path; it is exported for that reason and is not called directly.</p>
 <span>  <span class="va">sdratio</span>,</span>
 <span>  <span class="va">stimulus</span>,</span>
 <span>  <span class="va">...</span></span>
+<span><span class="op">)</span></span>
+<span></span>
+<span><span class="fu">sdt_dpsdt_logmu</span><span class="op">(</span></span>
+<span>  <span class="va">cat</span>,</span>
+<span>  <span class="va">K</span>,</span>
+<span>  <span class="va">dist</span>,</span>
+<span>  <span class="va">thresh</span>,</span>
+<span>  <span class="va">d</span>,</span>
+<span>  <span class="va">criterion</span>,</span>
+<span>  <span class="va">spacing</span>,</span>
+<span>  <span class="va">sdratio</span>,</span>
+<span>  <span class="va">Ro</span>,</span>
+<span>  <span class="va">Rn</span>,</span>
+<span>  <span class="va">stimulus</span>,</span>
+<span>  <span class="va">...</span></span>
+<span><span class="op">)</span></span>
+<span></span>
+<span><span class="fu">sdt_metad_logmu</span><span class="op">(</span></span>
+<span>  <span class="va">cat</span>,</span>
+<span>  <span class="va">K</span>,</span>
+<span>  <span class="va">dist</span>,</span>
+<span>  <span class="va">thresh</span>,</span>
+<span>  <span class="va">d</span>,</span>
+<span>  <span class="va">criterion</span>,</span>
+<span>  <span class="va">spacing</span>,</span>
+<span>  <span class="va">sdratio</span>,</span>
+<span>  <span class="va">logmratio</span>,</span>
+<span>  <span class="va">stimulus</span>,</span>
+<span>  <span class="va">...</span></span>
 <span><span class="op">)</span></span></code></pre></div>
     </div>
 
@@ -108,6 +137,17 @@ matrices supplied by brms). <code>d</code> is d', or d_a when sdratio is not 0;
 
 <dt id="arg--">...<a class="anchor" aria-label="anchor" href="#arg--"></a></dt>
 <dd><p>Threshold <code>delta</code> parameters, when the threshold type uses them.</p></dd>
+
+
+<dt id="arg-ro-rn">Ro, Rn<a class="anchor" aria-label="anchor" href="#arg-ro-rn"></a></dt>
+<dd><p>Recollection parameters of the <code>dpsdt</code> version on the logit
+(linear-predictor) scale; <code>inv_logit(Ro)</code>/<code>inv_logit(Rn)</code> are the
+recollection and recall-to-reject probabilities.</p></dd>
+
+
+<dt id="arg-logmratio">logmratio<a class="anchor" aria-label="anchor" href="#arg-logmratio"></a></dt>
+<dd><p>Log M-ratio for the <code>metad</code> version; meta-d' is recovered
+as <code>exp(logmratio) * d</code>, on the same scale as <code>d</code>.</p></dd>
 
 </dl></div>
     <div class="section level2">

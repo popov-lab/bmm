@@ -36,6 +36,8 @@ Fitting signal detection models and analysing ROC/AUC
 
 - [Signal Detection Theory
   models](https://popov-lab.github.io/bmm/dev/articles/bmm_sdt.md):
+- [Dual-process and meta-d′ signal detection
+  models](https://popov-lab.github.io/bmm/dev/articles/bmm_sdt_dualprocess_metad.md):
 
 ### Evidence accumulation models
 

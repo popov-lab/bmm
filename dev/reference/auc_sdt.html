@@ -5,21 +5,27 @@
       fontURL: "https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/output/chtml/fonts/woff-v2"
     }
   };
-</script><script src="../deps/jquery-3.6.0/jquery-3.6.0.min.js"></script><meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no"><link href="../deps/bootstrap-5.3.8/bootstrap.min.css" rel="stylesheet"><script src="../deps/bootstrap-5.3.8/bootstrap.bundle.min.js"></script><link href="../deps/font-awesome-6.5.2/css/all.min.css" rel="stylesheet"><link href="../deps/font-awesome-6.5.2/css/v4-shims.min.css" rel="stylesheet"><script src="../deps/headroom-0.11.0/headroom.min.js"></script><script src="../deps/headroom-0.11.0/jQuery.headroom.min.js"></script><script src="../deps/bootstrap-toc-1.0.1/bootstrap-toc.min.js"></script><script src="../deps/clipboard.js-2.0.11/clipboard.min.js"></script><script src="../deps/search-1.0.0/autocomplete.jquery.min.js"></script><script src="../deps/search-1.0.0/fuse.min.js"></script><script src="../deps/search-1.0.0/mark.min.js"></script><!-- pkgdown --><script src="../pkgdown.js"></script><meta property="og:title" content="Area under the ROC curve from a fitted SDT model — auc_sdt"><meta name="description" content="Computes the posterior area under the ROC curve (AUC). For Gaussian and
+</script><script src="../deps/jquery-3.6.0/jquery-3.6.0.min.js"></script><meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no"><link href="../deps/bootstrap-5.3.8/bootstrap.min.css" rel="stylesheet"><script src="../deps/bootstrap-5.3.8/bootstrap.bundle.min.js"></script><link href="../deps/font-awesome-6.5.2/css/all.min.css" rel="stylesheet"><link href="../deps/font-awesome-6.5.2/css/v4-shims.min.css" rel="stylesheet"><script src="../deps/headroom-0.11.0/headroom.min.js"></script><script src="../deps/headroom-0.11.0/jQuery.headroom.min.js"></script><script src="../deps/bootstrap-toc-1.0.1/bootstrap-toc.min.js"></script><script src="../deps/clipboard.js-2.0.11/clipboard.min.js"></script><script src="../deps/search-1.0.0/autocomplete.jquery.min.js"></script><script src="../deps/search-1.0.0/fuse.min.js"></script><script src="../deps/search-1.0.0/mark.min.js"></script><!-- pkgdown --><script src="../pkgdown.js"></script><meta property="og:title" content="Area under the ROC curve from a fitted SDT model — auc_sdt"><meta name="description" content='Computes the posterior area under the ROC curve (AUC). For Gaussian and
 Gumbel (min or max) equal-variance binary SDT the AUC is available in
 closed form from the d draws; otherwise it is obtained by trapezoidal
 integration of the model-implied curve (for rating fits, the curve swept
-from the posterior of d and sdratio). The returned AUC is always the
+from the posterior of d and sdratio, lifted by Ro/Rn for
+version = "dpsdt", so the AUC is the area under the predicted mixture ROC
+and not \(\Phi(d/\sqrt{2})\); for version = "metad" it is the type-1
+curve). The returned AUC is always the
 area under the full curve, not the trapezoid of the discrete operating
 points or the K-1 rating thresholds; for binary multi-criteria fits it is
-one value per curve."><meta property="og:description" content="Computes the posterior area under the ROC curve (AUC). For Gaussian and
+one value per curve.'><meta property="og:description" content='Computes the posterior area under the ROC curve (AUC). For Gaussian and
 Gumbel (min or max) equal-variance binary SDT the AUC is available in
 closed form from the d draws; otherwise it is obtained by trapezoidal
 integration of the model-implied curve (for rating fits, the curve swept
-from the posterior of d and sdratio). The returned AUC is always the
+from the posterior of d and sdratio, lifted by Ro/Rn for
+version = "dpsdt", so the AUC is the area under the predicted mixture ROC
+and not \(\Phi(d/\sqrt{2})\); for version = "metad" it is the type-1
+curve). The returned AUC is always the
 area under the full curve, not the trapezoid of the discrete operating
 points or the K-1 rating thresholds; for binary multi-criteria fits it is
-one value per curve."><meta property="og:image" content="https://popov-lab.github.io/bmm/logo.png"><meta name="robots" content="noindex"></head><body>
+one value per curve.'><meta property="og:image" content="https://popov-lab.github.io/bmm/logo.png"><meta name="robots" content="noindex"></head><body>
     <a href="#main" class="visually-hidden-focusable">Skip to contents</a>
 
 
@@ -60,7 +66,10 @@ one value per curve."><meta property="og:image" content="https://popov-lab.githu
 Gumbel (min or max) equal-variance binary SDT the AUC is available in
 closed form from the <code>d</code> draws; otherwise it is obtained by trapezoidal
 integration of the model-implied curve (for rating fits, the curve swept
-from the posterior of <code>d</code> and <code>sdratio</code>). The returned AUC is always the
+from the posterior of <code>d</code> and <code>sdratio</code>, lifted by <code>Ro</code>/<code>Rn</code> for
+<code>version = "dpsdt"</code>, so the AUC is the area under the predicted mixture ROC
+and not \(\Phi(d/\sqrt{2})\); for <code>version = "metad"</code> it is the type-1
+curve). The returned AUC is always the
 area under the full curve, not the trapezoid of the discrete operating
 points or the K-1 rating thresholds; for binary multi-criteria fits it is
 one value per curve.</p>

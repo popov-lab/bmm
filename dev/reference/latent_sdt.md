@@ -84,9 +84,15 @@ decision-boundary positions (columns `position`, `lower`, `upper`,
 `marker`, `level`, plus condition columns), or `NULL` for the
 criterion-free `sdt_mafc`/`sdt_ranking` models. When
 `show_competitors = TRUE`, a `competitors` attribute holds the
-max-of-distractors densities. The object also carries `probs`,
-`model_class`, `dist`, `is_rating` and `conditions` (the conditions of
-the density panels).
+max-of-distractors densities. An `extra` attribute carries the
+response-process parameters of the
+[`sdt_rating()`](https://popov-lab.github.io/bmm/dev/reference/sdt_rating.md)
+versions as a posterior summary (`parameter`, `mean`, `lower`, `upper`,
+plus condition columns): for `version = "dpsdt"`, `Ro` and `Rn` on the
+probability scale; for `version = "metad"`, the M-ratio (`mratio`) and
+meta-d' (`metad`); `NULL` for `version = "standard"`. The object also
+carries `probs`, `model_class`, `dist`, `is_rating` and `conditions`
+(the conditions of the density panels).
 
 ## Details
 

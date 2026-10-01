@@ -65,6 +65,23 @@
   [`sdt_yn()`](https://popov-lab.github.io/bmm/dev/reference/sdt_yn.md)
   reports. Thanks to
   [@GidonFrischkorn](https://github.com/GidonFrischkorn)
+- Add two versions of
+  [`sdt_rating()`](https://popov-lab.github.io/bmm/dev/reference/sdt_rating.md),
+  selected with `version`: `"dpsdt"`, the dual-process model
+  (Yonelinas, 1994) with recollection of old items (`Ro`) and
+  recall-to-reject of new items (`Rn`; as in Yonelinas, 2024), and
+  `"metad"`, the meta-d’ model, which estimates metacognitive efficiency
+  as the log M-ratio `logmratio` (Maniscalco & Lau, 2012). Both reduce
+  to the standard model while their extra parameters are off. Also adds
+  [`mratio()`](https://popov-lab.github.io/bmm/dev/reference/mratio.md),
+  [`dsdt_dpsdt()`](https://popov-lab.github.io/bmm/dev/reference/sdt_dpsdt_dist.md),
+  [`rsdt_dpsdt()`](https://popov-lab.github.io/bmm/dev/reference/sdt_dpsdt_dist.md),
+  [`dsdt_metad()`](https://popov-lab.github.io/bmm/dev/reference/sdt_metad_dist.md)
+  and
+  [`rsdt_metad()`](https://popov-lab.github.io/bmm/dev/reference/sdt_metad_dist.md).
+  See
+  [`?sdt_rating`](https://popov-lab.github.io/bmm/dev/reference/sdt_rating.md).
+  Thanks to [@GidonFrischkorn](https://github.com/GidonFrischkorn)
 
 #### New datasets
 

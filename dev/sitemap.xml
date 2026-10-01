@@ -13,6 +13,7 @@
 <url><loc>https://popov-lab.github.io/bmm/dev/articles/bmm_rt_contamination.html</loc></url>
 <url><loc>https://popov-lab.github.io/bmm/dev/articles/bmm_sdm_simple.html</loc></url>
 <url><loc>https://popov-lab.github.io/bmm/dev/articles/bmm_sdt.html</loc></url>
+<url><loc>https://popov-lab.github.io/bmm/dev/articles/bmm_sdt_dualprocess_metad.html</loc></url>
 <url><loc>https://popov-lab.github.io/bmm/dev/articles/bmm_vwm_crt.html</loc></url>
 <url><loc>https://popov-lab.github.io/bmm/dev/articles/index.html</loc></url>
 <url><loc>https://popov-lab.github.io/bmm/dev/authors.html</loc></url>
@@ -71,6 +72,7 @@
 <url><loc>https://popov-lab.github.io/bmm/dev/reference/mixture2p_dist.html</loc></url>
 <url><loc>https://popov-lab.github.io/bmm/dev/reference/mixture3p.html</loc></url>
 <url><loc>https://popov-lab.github.io/bmm/dev/reference/mixture3p_dist.html</loc></url>
+<url><loc>https://popov-lab.github.io/bmm/dev/reference/mratio.html</loc></url>
 <url><loc>https://popov-lab.github.io/bmm/dev/reference/native_parameters.html</loc></url>
 <url><loc>https://popov-lab.github.io/bmm/dev/reference/native_transform.html</loc></url>
 <url><loc>https://popov-lab.github.io/bmm/dev/reference/oberauer_lewandowsky_2019_e1.html</loc></url>
@@ -91,8 +93,10 @@
 <url><loc>https://popov-lab.github.io/bmm/dev/reference/roc_observed.html</loc></url>
 <url><loc>https://popov-lab.github.io/bmm/dev/reference/roc_sdt.html</loc></url>
 <url><loc>https://popov-lab.github.io/bmm/dev/reference/sdm.html</loc></url>
+<url><loc>https://popov-lab.github.io/bmm/dev/reference/sdt_dpsdt_dist.html</loc></url>
 <url><loc>https://popov-lab.github.io/bmm/dev/reference/sdt_mafc.html</loc></url>
 <url><loc>https://popov-lab.github.io/bmm/dev/reference/sdt_mafc_dist.html</loc></url>
+<url><loc>https://popov-lab.github.io/bmm/dev/reference/sdt_metad_dist.html</loc></url>
 <url><loc>https://popov-lab.github.io/bmm/dev/reference/sdt_ranking.html</loc></url>
 <url><loc>https://popov-lab.github.io/bmm/dev/reference/sdt_ranking_dist.html</loc></url>
 <url><loc>https://popov-lab.github.io/bmm/dev/reference/sdt_ranking_logmu.html</loc></url>

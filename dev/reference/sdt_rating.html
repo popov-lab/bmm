@@ -53,6 +53,7 @@
 <span>  dist <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"normal"</span>, <span class="st">"gumbel_min"</span>, <span class="st">"gumbel_max"</span>, <span class="st">"logistic"</span><span class="op">)</span>,</span>
 <span>  threshold_type <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"parsimonious"</span>, <span class="st">"equidistant"</span>, <span class="st">"log_distance"</span>, <span class="st">"log_ratio"</span>,</span>
 <span>    <span class="st">"softmax"</span><span class="op">)</span>,</span>
+<span>  version <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"standard"</span>, <span class="st">"dpsdt"</span>, <span class="st">"metad"</span><span class="op">)</span>,</span>
 <span>  links <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  <span class="va">...</span></span>
 <span><span class="op">)</span></span></code></pre></div>
@@ -107,13 +108,23 @@ is the log ratio of its interval to the last one).</p></li>
 </ul></dd>
 
 
+<dt id="arg-version">version<a class="anchor" aria-label="anchor" href="#arg-version"></a></dt>
+<dd><p>Character. The latent-process version of the rating model.
+One of <code>"standard"</code> (default, a single familiarity SDT process),
+<code>"dpsdt"</code> (dual-process SDT with recollection parameters <code>Ro</code>/<code>Rn</code>), or
+<code>"metad"</code> (meta-d' with a metacognitive efficiency parameter <code>logmratio</code>,
+the log M-ratio). All three use the same confidence-rating response
+interface. See Details.</p></dd>
+
+
 <dt id="arg-links">links<a class="anchor" aria-label="anchor" href="#arg-links"></a></dt>
 <dd><p>A named list of link functions for the parameters, e.g.
 <code>links = list(d = "log")</code>. Only <code>d</code> and <code>criterion</code> can be set, to
 <code>"identity"</code>, <code>"log"</code>, <code>"softplus"</code>, <code>"logit"</code> or <code>"probit"</code>. <code>sdratio</code>
 and the threshold parameters keep their identity links, because the model
 reads each of them through <code><a href="https://rdrr.io/r/base/Log.html" class="external-link">exp()</a></code> and fixes <code>sdratio</code> at 0 for equal
-variance.</p></dd>
+variance. The same holds for <code>Ro</code> and <code>Rn</code>, read through <code>inv_logit()</code>
+and fixed off by default, and for <code>logmratio</code>, read through <code><a href="https://rdrr.io/r/base/Log.html" class="external-link">exp()</a></code>.</p></dd>
 
 
 <dt id="arg--">...<a class="anchor" aria-label="anchor" href="#arg--"></a></dt>
@@ -126,12 +137,16 @@ variance.</p></dd>
     </div>
     <div class="section level2">
     <h2 id="details">Details<a class="anchor" aria-label="anchor" href="#details"></a></h2>
+    <p>Three versions share the confidence-rating response interface,
+selected with <code>version</code>:</p><div class="section">
+<h3 id="version-standard-default-">Version: <code>standard</code> (default)<a class="anchor" aria-label="anchor" href="#version-standard-default-"></a></h3>
 
 <ul><li><p><strong>Domain:</strong> Perception &amp; Recognition Memory</p></li>
 <li><p><strong>Task:</strong> Signal/Noise or Old/New Recognition</p></li>
 <li><p><strong>Name:</strong> Signal Detection Theory (Confidence Rating)</p></li>
 <li><p><strong>Citation:</strong></p><ul><li><p>Green, D. M., &amp; Swets, J. A. (1966). Signal detection theory and psychophysics. Wiley.</p></li>
 </ul></li>
+<li><p><strong>Version:</strong> standard</p></li>
 <li><p><strong>Requirements:</strong></p>
 <p>Provide pre-aggregated data with the following columns:</p></li>
 </ul><ul><li><p>Response counts: one column per rating category (K columns)</p></li>
@@ -163,9 +178,156 @@ Categories should be ordered: 1 = 'definitely noise' to K = 'definitely signal'<
 <li><p><code>sd</code>: exponential(2)</p></li>
 </ul></li>
 </ul></li>
+</ul></div>
+
+<div class="section">
+<h3 id="version-dpsdt">Version: <code>dpsdt</code><a class="anchor" aria-label="anchor" href="#version-dpsdt"></a></h3>
+
+
+<p>Dual-process SDT (Yonelinas, 1994): a familiarity SDT process plus an
+all-or-none recollection process that loads the most-confident category.
+<code>Ro</code> is recollection of old items (loads the most-confident "signal"
+category), the only recollection term of the classic model; <code>Rn</code> is
+recall-to-reject of new items (loads the most-confident "noise" category),
+the two-sided extension that Yonelinas (2024) applies to visual working
+memory. <code>inv_logit(Ro)</code>/<code>inv_logit(Rn)</code> are the recollection
+probabilities. Both are fixed off by default
+(recovering <code>standard</code>); add <code>Ro ~ 1</code> for the one-sided model and
+<code>Ro ~ 1, Rn ~ 1</code> for the two-sided model. <code>d</code> describes the familiarity
+distributions only – the observed ROC is a mixture of familiarity and
+recollection, so it is not the discriminability of that mixture.
+<code><a href="https://rdrr.io/r/base/summary.html" class="external-link">summary()</a></code> reports <code>Ro</code> and <code>Rn</code> on the logit scale; <code><a href="latent_sdt.html">latent_sdt()</a></code>
+returns them as probabilities (attribute <code>extra</code>).
+Two cautions. Freeing <code>sdratio</code> alongside <code>Ro</code> is weakly identified from
+a single ROC: in simulation the two are correlated at about -0.8 in the
+posterior and <code>Ro</code> is pulled down while <code>exp(sdratio)</code> is pulled above 1;
+keep the familiarity process equal-variance unless the design separates
+them. And a recollection probability near zero is reported as the tail of
+its prior: on the probability scale the interval cannot include 0, so the
+test of "no recollection" is a comparison with the fit that leaves the
+parameter fixed off, not the interval.</p><ul><li><p><strong>Domain:</strong> Perception &amp; Recognition Memory</p></li>
+<li><p><strong>Task:</strong> Signal/Noise or Old/New Recognition</p></li>
+<li><p><strong>Name:</strong> Signal Detection Theory (Confidence Rating)</p></li>
+<li><p><strong>Citation:</strong></p><ul><li><p>Yonelinas, A. P. (1994). Receiver-operating characteristics in recognition memory: Evidence for a dual-process model. Journal of Experimental Psychology: Learning, Memory, and Cognition, 20(6), 1341-1354. https://doi.org/10.1037/0278-7393.20.6.1341; recall-to-reject (Rn) as in Yonelinas, A. P. (2024). The role of recollection and familiarity in visual working memory: A mixture of threshold and signal detection processes. Psychological Review, 131(2), 321-348. https://doi.org/10.1037/rev0000432</p></li>
+</ul></li>
+<li><p><strong>Version:</strong> dpsdt</p></li>
+<li><p><strong>Requirements:</strong></p>
+<p>Provide pre-aggregated data with the following columns:</p></li>
+</ul><ul><li><p>Response counts: one column per rating category (K columns)</p></li>
+<li><p>Stimulus type (stimulus): 0 = noise, 1 = signal
+Categories should be ordered: 1 = 'definitely noise' to K = 'definitely signal'</p></li>
+</ul><ul><li><p><strong>Parameters:</strong></p><ul><li><p><code>d</code>: Sensitivity: d' under equal variance (the default). When sdratio is estimated, d is d_a, the distance between the signal and noise distributions in units of their root-mean-square SD</p></li>
+<li><p><code>criterion</code>: Response bias, on the noise-standardized axis: the middle threshold (the old/new boundary) for an even number of categories, the centre of the middle category for an odd number</p></li>
+<li><p><code>spacing</code>: Threshold spacing: controls distance between adjacent thresholds (exp(spacing) ensures positive spacing)</p></li>
+<li><p><code>sdratio</code>: Log SD ratio: the log of the signal-to-noise standard deviation ratio, so exp(sdratio) is the ratio itself and 0 means equal variance</p></li>
+<li><p><code>Ro</code>: Recollection of old items: probability inv_logit(Ro) that an old item is recollected as old, loading the most-confident 'signal' category</p></li>
+<li><p><code>Rn</code>: Recollection of new items: probability inv_logit(Rn) that a new item is recall-rejected, loading the most-confident 'noise' category</p></li>
+</ul></li>
+<li><p><strong>Fixed parameters:</strong></p><ul><li><p><code>sdratio</code> = 0</p></li>
+<li><p><code>Ro</code> = -100</p></li>
+<li><p><code>Rn</code> = -100</p></li>
+</ul></li>
+<li><p><strong>Default parameter links:</strong></p><ul><li><p>d = identity; criterion = identity; spacing = identity; sdratio = identity; Ro = identity; Rn = identity</p></li>
+</ul></li>
+<li><p><strong>Default priors:</strong></p><ul><li><p><code>d</code>:</p><ul><li><p><code>main</code>: normal(1, 1)</p></li>
+<li><p><code>effects</code>: normal(0, 0.5)</p></li>
+<li><p><code>sd</code>: exponential(1)</p></li>
+</ul></li>
+<li><p><code>criterion</code>:</p><ul><li><p><code>main</code>: normal(0, 1.5)</p></li>
+<li><p><code>effects</code>: normal(0, 0.5)</p></li>
+<li><p><code>sd</code>: exponential(2)</p></li>
+</ul></li>
+<li><p><code>spacing</code>:</p><ul><li><p><code>main</code>: normal(0, 0.5)</p></li>
+<li><p><code>effects</code>: normal(0, 0.3)</p></li>
+<li><p><code>sd</code>: exponential(2)</p></li>
+</ul></li>
+<li><p><code>sdratio</code>:</p><ul><li><p><code>main</code>: normal(0, 0.3)</p></li>
+<li><p><code>effects</code>: normal(0, 0.3)</p></li>
+<li><p><code>sd</code>: exponential(2)</p></li>
+</ul></li>
+<li><p><code>Ro</code>:</p><ul><li><p><code>main</code>: normal(0, 1)</p></li>
+<li><p><code>effects</code>: normal(0, 0.5)</p></li>
+<li><p><code>sd</code>: exponential(1)</p></li>
+</ul></li>
+<li><p><code>Rn</code>:</p><ul><li><p><code>main</code>: normal(0, 1)</p></li>
+<li><p><code>effects</code>: normal(0, 0.5)</p></li>
+<li><p><code>sd</code>: exponential(1)</p></li>
+</ul></li>
+</ul></li>
+</ul></div>
+
+<div class="section">
+<h3 id="version-metad">Version: <code>metad</code><a class="anchor" aria-label="anchor" href="#version-metad"></a></h3>
+
+
+<p>Meta-d' (Maniscalco &amp; Lau, 2012): a type-2 metacognitive sensitivity governs
+confidence-threshold placement, with the total "old"/"new" response rates
+held to what type-1 <code>d</code> implies. Rather than estimating meta-d'
+directly, the model estimates <code>logmratio</code>, the log M-ratio
+\(\log(\mathrm{meta\text{-}d'}/d')\), and recovers meta-d' as
+<code>exp(logmratio) * d</code>. The M-ratio is the field-standard measure of
+metacognitive efficiency (Maniscalco &amp; Lau, 2012; Fleming, 2017): estimating
+it on the log scale keeps meta-d' positive, regularizes it toward <code>d</code>,
+and anchors the ideal point (meta-d' = <code>d</code>, perfect metacognition) at
+<code>logmratio = 0</code>, which recovers <code>standard</code>. Type-1 and type-2 sensitivity
+share one scale (\(d'\), or \(d_a\) when <code>sdratio</code> is estimated), so the
+M-ratio is unaffected by <code>sdratio</code>.
+The type-1 boundary is <code>criterion</code>, the middle threshold, so this version
+needs an even number of rating categories: with an odd number the middle
+category straddles the boundary (see "Where <code>criterion</code> sits").
+The type-1 criterion is held at the same location in the meta-d' space as
+in the type-1 model, as the HMeta-d toolbox's model equations do (Fleming,
+2017, Appendix).
+Maximum-likelihood meta-d' instead constrains meta-c' = c' (Maniscalco &amp;
+Lau, 2014), so its estimates differ from bmm's when the criterion is far
+from the midpoint.
+Extract the M-ratio posterior with <code><a href="mratio.html">mratio()</a></code>.</p><ul><li><p><strong>Domain:</strong> Perception &amp; Recognition Memory</p></li>
+<li><p><strong>Task:</strong> Signal/Noise or Old/New Recognition</p></li>
+<li><p><strong>Name:</strong> Signal Detection Theory (Confidence Rating)</p></li>
+<li><p><strong>Citation:</strong></p><ul><li><p>Maniscalco, B., &amp; Lau, H. (2012). A signal detection theoretic approach for estimating metacognitive sensitivity from confidence ratings. Consciousness and Cognition, 21(1), 422-430. https://doi.org/10.1016/j.concog.2011.09.021</p></li>
+</ul></li>
+<li><p><strong>Version:</strong> metad</p></li>
+<li><p><strong>Requirements:</strong></p>
+<p>Provide pre-aggregated data with the following columns:</p></li>
+</ul><ul><li><p>Response counts: one column per rating category (K columns)</p></li>
+<li><p>Stimulus type (stimulus): 0 = noise, 1 = signal
+Categories should be ordered: 1 = 'definitely noise' to K = 'definitely signal'</p></li>
+</ul><ul><li><p><strong>Parameters:</strong></p><ul><li><p><code>d</code>: Sensitivity: d' under equal variance (the default). When sdratio is estimated, d is d_a, the distance between the signal and noise distributions in units of their root-mean-square SD</p></li>
+<li><p><code>criterion</code>: Response bias, on the noise-standardized axis: the middle threshold (the old/new boundary) for an even number of categories, the centre of the middle category for an odd number</p></li>
+<li><p><code>spacing</code>: Threshold spacing: controls distance between adjacent thresholds (exp(spacing) ensures positive spacing)</p></li>
+<li><p><code>sdratio</code>: Log SD ratio: the log of the signal-to-noise standard deviation ratio, so exp(sdratio) is the ratio itself and 0 means equal variance</p></li>
+<li><p><code>logmratio</code>: Log M-ratio, log(meta-d/d): metacognitive efficiency. 0 is ideal metacognition (meta-d = d), negative is inefficiency, positive is hyper-efficiency. meta-d is recovered as exp(logmratio) * d, on the same scale as d</p></li>
+</ul></li>
+<li><p><strong>Fixed parameters:</strong></p><ul><li><p><code>sdratio</code> = 0</p></li>
+</ul></li>
+<li><p><strong>Default parameter links:</strong></p><ul><li><p>d = identity; criterion = identity; spacing = identity; sdratio = identity; logmratio = identity</p></li>
+</ul></li>
+<li><p><strong>Default priors:</strong></p><ul><li><p><code>d</code>:</p><ul><li><p><code>main</code>: normal(1, 1)</p></li>
+<li><p><code>effects</code>: normal(0, 0.5)</p></li>
+<li><p><code>sd</code>: exponential(1)</p></li>
+</ul></li>
+<li><p><code>criterion</code>:</p><ul><li><p><code>main</code>: normal(0, 1.5)</p></li>
+<li><p><code>effects</code>: normal(0, 0.5)</p></li>
+<li><p><code>sd</code>: exponential(2)</p></li>
+</ul></li>
+<li><p><code>spacing</code>:</p><ul><li><p><code>main</code>: normal(0, 0.5)</p></li>
+<li><p><code>effects</code>: normal(0, 0.3)</p></li>
+<li><p><code>sd</code>: exponential(2)</p></li>
+</ul></li>
+<li><p><code>sdratio</code>:</p><ul><li><p><code>main</code>: normal(0, 0.3)</p></li>
+<li><p><code>effects</code>: normal(0, 0.3)</p></li>
+<li><p><code>sd</code>: exponential(2)</p></li>
+</ul></li>
+<li><p><code>logmratio</code>:</p><ul><li><p><code>main</code>: normal(0, 0.5)</p></li>
+<li><p><code>effects</code>: normal(0, 0.3)</p></li>
+<li><p><code>sd</code>: exponential(2)</p></li>
+</ul></li>
+</ul></li>
 </ul><p>By default, the model assumes equal variance (sdratio fixed to 0). To
 estimate unequal variance, add <code>sdratio ~ 1</code> (or <code>sdratio ~ predictors</code>)
 to the formula.</p>
+</div>
+
     </div>
     <div class="section level2">
     <h2 id="sensitivity-is-on-the-same-scale-as-sdt-yn-">Sensitivity is on the same scale as <code><a href="sdt_yn.html">sdt_yn()</a></code><a class="anchor" aria-label="anchor" href="#sensitivity-is-on-the-same-scale-as-sdt-yn-"></a></h2>
@@ -183,6 +345,9 @@ AUC-equivalent index once <code>sdratio</code> is estimated.</p>
 <p>The <code>criterion</code> and the confidence thresholds are <strong>not</strong> rescaled. They stay
 on the noise-standardized axis, so under unequal variance they and <code>d</code> are
 in different units.</p>
+<p>The <code>dpsdt</code> and <code>metad</code> versions inherit the same convention: <code>d</code> there
+describes the familiarity (type-1) distributions, and meta-d' is scaled the
+same way, which leaves the M-ratio invariant to <code>sdratio</code>.</p>
     </div>
     <div class="section level2">
     <h2 id="where-criterion-sits">Where <code>criterion</code> sits<a class="anchor" aria-label="anchor" href="#where-criterion-sits"></a></h2>
@@ -211,7 +376,24 @@ identification caveats on the <code><a href="sdt_yn.html">sdt_yn()</a></code> pa
     </div>
     <div class="section level2">
     <h2 id="references">References<a class="anchor" aria-label="anchor" href="#references"></a></h2>
-    <p>Green, D. M., &amp; Swets, J. A. (1966). <em>Signal detection theory and
+    <p>Yonelinas, A. P. (1994). Receiver-operating characteristics in recognition
+memory: Evidence for a dual-process model. <em>Journal of Experimental
+Psychology: Learning, Memory, and Cognition</em>, <em>20</em>(6), 1341–1354.</p>
+<p>Yonelinas, A. P. (2024). The role of recollection and familiarity in visual
+working memory: A mixture of threshold and signal detection processes.
+<em>Psychological Review</em>, <em>131</em>(2), 321–348.
+<a href="https://doi.org/10.1037/rev0000432" class="external-link">doi:10.1037/rev0000432</a></p>
+<p>Maniscalco, B., &amp; Lau, H. (2012). A signal detection theoretic approach for
+estimating metacognitive sensitivity from confidence ratings.
+<em>Consciousness and Cognition</em>, <em>21</em>(1), 422–430.</p>
+<p>Maniscalco, B., &amp; Lau, H. (2014). Signal detection theory analysis of type 1
+and type 2 data: meta-d', response-specific meta-d', and the unequal
+variance SDT model. In S. M. Fleming &amp; C. D. Frith (Eds.), <em>The
+cognitive neuroscience of metacognition</em> (pp. 25–66). Springer.</p>
+<p>Fleming, S. M. (2017). HMeta-d: hierarchical Bayesian estimation of
+metacognitive efficiency from confidence ratings. <em>Neuroscience of
+Consciousness</em>, <em>2017</em>(1), nix007. <a href="https://doi.org/10.1093/nc/nix007" class="external-link">doi:10.1093/nc/nix007</a></p>
+<p>Green, D. M., &amp; Swets, J. A. (1966). <em>Signal detection theory and
 psychophysics</em>. Wiley.</p>
 <p>Selker, R., van den Bergh, D., Criss, A. H., &amp; Wagenmakers, E.-J. (2019).
 Parsimonious estimation of signal detection models from confidence ratings.
@@ -250,6 +432,18 @@ ordinal response. <em>PsyArXiv</em>. <a href="https://doi.org/10.31234/osf.io/e7
 <span class="r-in"><span>  cores <span class="op">=</span> <span class="fl">4</span>,</span></span>
 <span class="r-in"><span>  backend <span class="op">=</span> <span class="st">"cmdstanr"</span></span></span>
 <span class="r-in"><span><span class="op">)</span></span></span>
+<span class="r-in"><span></span></span>
+<span class="r-in"><span><span class="co"># Dual-process SDT: free recollection of old items (one-sided) or both</span></span></span>
+<span class="r-in"><span><span class="co"># old and new items (two-sided) via the formula</span></span></span>
+<span class="r-in"><span><span class="va">model_dp</span> <span class="op">&lt;-</span> <span class="fu">sdt_rating</span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"r1"</span>, <span class="st">"r2"</span>, <span class="st">"r3"</span>, <span class="st">"r4"</span><span class="op">)</span>, <span class="st">"stimulus"</span>, version <span class="op">=</span> <span class="st">"dpsdt"</span><span class="op">)</span></span></span>
+<span class="r-in"><span><span class="va">fit_dp</span> <span class="op">&lt;-</span> <span class="fu"><a href="bmm.html">bmm</a></span><span class="op">(</span><span class="fu"><a href="bmmformula.html">bmf</a></span><span class="op">(</span><span class="va">d</span> <span class="op">~</span> <span class="fl">1</span>, <span class="va">criterion</span> <span class="op">~</span> <span class="fl">1</span>, <span class="va">spacing</span> <span class="op">~</span> <span class="fl">1</span>, <span class="va">Ro</span> <span class="op">~</span> <span class="fl">1</span>, <span class="va">Rn</span> <span class="op">~</span> <span class="fl">1</span><span class="op">)</span>,</span></span>
+<span class="r-in"><span>              data <span class="op">=</span> <span class="va">dat</span>, model <span class="op">=</span> <span class="va">model_dp</span>, backend <span class="op">=</span> <span class="st">"cmdstanr"</span><span class="op">)</span></span></span>
+<span class="r-in"><span></span></span>
+<span class="r-in"><span><span class="co"># Meta-d': estimate metacognitive efficiency (log M-ratio)</span></span></span>
+<span class="r-in"><span><span class="va">model_md</span> <span class="op">&lt;-</span> <span class="fu">sdt_rating</span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"r1"</span>, <span class="st">"r2"</span>, <span class="st">"r3"</span>, <span class="st">"r4"</span><span class="op">)</span>, <span class="st">"stimulus"</span>, version <span class="op">=</span> <span class="st">"metad"</span><span class="op">)</span></span></span>
+<span class="r-in"><span><span class="va">fit_md</span> <span class="op">&lt;-</span> <span class="fu"><a href="bmm.html">bmm</a></span><span class="op">(</span><span class="fu"><a href="bmmformula.html">bmf</a></span><span class="op">(</span><span class="va">d</span> <span class="op">~</span> <span class="fl">1</span>, <span class="va">criterion</span> <span class="op">~</span> <span class="fl">1</span>, <span class="va">spacing</span> <span class="op">~</span> <span class="fl">1</span>, <span class="va">logmratio</span> <span class="op">~</span> <span class="fl">1</span><span class="op">)</span>,</span></span>
+<span class="r-in"><span>              data <span class="op">=</span> <span class="va">dat</span>, model <span class="op">=</span> <span class="va">model_md</span>, backend <span class="op">=</span> <span class="st">"cmdstanr"</span><span class="op">)</span></span></span>
+<span class="r-in"><span><span class="fu"><a href="mratio.html">mratio</a></span><span class="op">(</span><span class="va">fit_md</span><span class="op">)</span> <span class="co"># posterior M-ratio (meta-d'/d')</span></span></span>
 <span class="r-in"><span><span class="op">}</span> <span class="co"># }</span></span></span>
 </code></pre></div>
     </div>

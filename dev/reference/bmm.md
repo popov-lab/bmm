@@ -182,7 +182,7 @@ The following models are supported:
 
 - sdt_ranking(response, m, dist, links)
 
-- sdt_rating(response, stimulus, dist, threshold_type, links)
+- sdt_rating(response, stimulus, dist, threshold_type, version, links)
 
 - sdt_yn(response, stimulus, n_trials, dist, links)
 

@@ -24,6 +24,35 @@ sdt_rating_logmu(
   stimulus,
   ...
 )
+
+sdt_dpsdt_logmu(
+  cat,
+  K,
+  dist,
+  thresh,
+  d,
+  criterion,
+  spacing,
+  sdratio,
+  Ro,
+  Rn,
+  stimulus,
+  ...
+)
+
+sdt_metad_logmu(
+  cat,
+  K,
+  dist,
+  thresh,
+  d,
+  criterion,
+  spacing,
+  sdratio,
+  logmratio,
+  stimulus,
+  ...
+)
 ```
 
 ## Arguments
@@ -57,6 +86,17 @@ sdt_rating_logmu(
 - ...:
 
   Threshold `delta` parameters, when the threshold type uses them.
+
+- Ro, Rn:
+
+  Recollection parameters of the `dpsdt` version on the logit
+  (linear-predictor) scale; `inv_logit(Ro)`/`inv_logit(Rn)` are the
+  recollection and recall-to-reject probabilities.
+
+- logmratio:
+
+  Log M-ratio for the `metad` version; meta-d' is recovered as
+  `exp(logmratio) * d`, on the same scale as `d`.
 
 ## Value
 

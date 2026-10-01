@@ -1142,6 +1142,19 @@ models evaluate the accuracy by quadrature while both Gumbel models stay
 in closed form. The set size `m` may be a constant or a data column (for
 mixed set sizes).
 
+One caveat matters when interpreting `d` here. At a single set size,
+percent correct is a single number, and any evidence distribution can
+reproduce it with a suitable `d` — the Gaussian-evidence-plus-max-rule
+assumption is a convention the data at one `m` cannot test. This is a
+general property of best-choice data: choice probabilities
+underdetermine the latent evidence model that generates them (Falmagne
+1978; Kilani and Colonius 2026). What gives the distributional
+assumption empirical content is varying the set size within an
+experiment: different evidence distributions imply different
+accuracy-versus-`m` curves, so passing `m` as a data column with mixed
+set sizes is what makes the choice of evidence distribution testable at
+all.
+
 ``` r
 
 # rsdt_mafc() is vectorised over its arguments; varying d by subject
@@ -1242,6 +1255,22 @@ the native multinomial family with one category per rank position, and
 `meyer_grant_jakob_2025` data (Meyer-Grant and Jakob 2025) illustrate
 the wide format.
 
+Ranking responses are not just another response format — they are
+formally richer than forced-choice responses. Best-choice probabilities
+are marginals of the underlying distribution over rankings, and with
+four or more alternatives infinitely many ranking distributions are
+consistent with the same choice probabilities (Falmagne 1978; Kilani and
+Colonius 2026). A ranking task observes the target’s position in the
+ordering directly rather than only whether it won, which is the formal
+reason the paradigm supports stronger inferences about the evidence
+distribution than m-AFC accuracy does (Meyer-Grant et al. 2026). One
+limit remains even here: rank probabilities identify the distribution
+over orderings, not the joint distribution of the latent evidence behind
+it — in the max-Gumbel (Plackett–Luce) family, for example, independent
+and copula-dependent evidence models produce identical ranking
+probabilities (Kilani 2025). Independence of the evidence samples
+therefore stays a modeling convention in the ranking models too.
+
 ``` r
 
 model <- sdt_ranking(
@@ -1329,8 +1358,21 @@ m-Alternative Forced Choice with Bias, with Maximum Likelihood and
 Bayesian Approaches to Estimation.” *Journal of Mathematical Psychology*
 56 (3): 196–207. <https://doi.org/10.1016/j.jmp.2012.02.004>.
 
+Falmagne, Jean-Claude. 1978. “A Representation Theorem for Finite Random
+Scale Systems.” *Journal of Mathematical Psychology* 18 (1): 52–72.
+<https://doi.org/10.1016/0022-2496(78)90048-2>.
+
 Green, David M., and John A. Swets. 1966. *Signal Detection Theory and
 Psychophysics*. Wiley.
+
+Kilani, Karim. 2025. “A Class of Random Utility Models Yielding the
+Exploded Logit.” *Journal of Mathematical Psychology* 124: 102900.
+<https://doi.org/10.1016/j.jmp.2025.102900>.
+
+Kilani, Karim, and Hans Colonius. 2026. “Representing Choice
+Probabilities by Ranking Probabilities via Entropy Maximization.”
+*Journal of Mathematical Psychology* 128: 102970.
+<https://doi.org/10.1016/j.jmp.2026.102970>.
 
 Macmillan, Neil A., and C. Douglas Creelman. 2005. *Detection Theory: A
 User’s Guide*. 2nd ed. Lawrence Erlbaum Associates.

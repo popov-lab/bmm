@@ -65,6 +65,8 @@ signal detection models
   : Model-implied latent decision-variable distributions
 - [`sdt_thresholds()`](https://popov-lab.github.io/bmm/dev/reference/sdt_thresholds.md)
   : Latent decision thresholds from a fitted rating SDT model
+- [`mratio()`](https://popov-lab.github.io/bmm/dev/reference/mratio.md)
+  : Metacognitive efficiency (M-ratio) from a fitted meta-d' SDT model
 - [`sdt_sensitivity()`](https://popov-lab.github.io/bmm/dev/reference/sdt_sensitivity.md)
   : Sensitivity on the noise, signal, or root-mean-square scale
 - [`plot(`*`<bmm_sdt_roc>`*`)`](https://popov-lab.github.io/bmm/dev/reference/plot.bmm_sdt_roc.md)
@@ -206,9 +208,17 @@ Functions for special distributions
 - [`rejection_sampling()`](https://popov-lab.github.io/bmm/dev/reference/rejection_sampling.md)
   : Rejection Sampling
 
+- [`dsdt_dpsdt()`](https://popov-lab.github.io/bmm/dev/reference/sdt_dpsdt_dist.md)
+  [`rsdt_dpsdt()`](https://popov-lab.github.io/bmm/dev/reference/sdt_dpsdt_dist.md)
+  : Distribution functions for dual-process SDT (DPSDT)
+
 - [`dsdt_mafc()`](https://popov-lab.github.io/bmm/dev/reference/sdt_mafc_dist.md)
   [`rsdt_mafc()`](https://popov-lab.github.io/bmm/dev/reference/sdt_mafc_dist.md)
   : Distribution functions for m-AFC SDT
+
+- [`dsdt_metad()`](https://popov-lab.github.io/bmm/dev/reference/sdt_metad_dist.md)
+  [`rsdt_metad()`](https://popov-lab.github.io/bmm/dev/reference/sdt_metad_dist.md)
+  : Distribution functions for meta-d' SDT
 
 - [`dsdt_ranking()`](https://popov-lab.github.io/bmm/dev/reference/sdt_ranking_dist.md)
   [`rsdt_ranking()`](https://popov-lab.github.io/bmm/dev/reference/sdt_ranking_dist.md)

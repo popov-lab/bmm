@@ -1113,6 +1113,16 @@ noise; see <code><a href="../reference/sdt_mafc.html">?sdt_mafc</a></code>). For
 <span class="math inline">\(\Phi(d/\sqrt{2})\)</span>, and for <span class="math inline">\(m \geq 3\)</span> the Gaussian and logistic models evaluate
 the accuracy by quadrature while both Gumbel models stay in closed form. The set size <code>m</code> may be a constant or a data column (for mixed set
 sizes).</p>
+<p>One caveat matters when interpreting <code>d</code> here. At a single set size,
+percent correct is a single number, and any evidence distribution can reproduce
+it with a suitable <code>d</code> — the Gaussian-evidence-plus-max-rule assumption is
+a convention the data at one <code>m</code> cannot test. This is a general property of
+best-choice data: choice probabilities underdetermine the latent evidence model
+that generates them <span class="citation">(Falmagne 1978; Kilani and Colonius 2026)</span>. What gives the
+distributional assumption empirical content is varying the set size within an
+experiment: different evidence distributions imply different accuracy-versus-<code>m</code>
+curves, so passing <code>m</code> as a data column with mixed set sizes is what makes the
+choice of evidence distribution testable at all.</p>
 <div class="sourceCode" id="cb22"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="co"># rsdt_mafc() is vectorised over its arguments; varying d by subject</span></span>
 <span><span class="co"># gives hierarchical data.</span></span>
@@ -1195,6 +1205,20 @@ multinomial family with one category per rank
 position, and <code>m</code> may again be a constant or a column for mixed set sizes. The
 bundled <code>meyer_grant_jakob_2025</code> data <span class="citation">(Meyer-Grant and Jakob 2025)</span> illustrate the
 wide format.</p>
+<p>Ranking responses are not just another response format — they are formally
+richer than forced-choice responses. Best-choice probabilities are marginals of
+the underlying distribution over rankings, and with four or more alternatives
+infinitely many ranking distributions are consistent with the same choice
+probabilities <span class="citation">(Falmagne 1978; Kilani and Colonius 2026)</span>. A ranking task observes
+the target’s position in the ordering directly rather than only whether it won,
+which is the formal reason the paradigm supports stronger inferences about the
+evidence distribution than m-AFC accuracy does <span class="citation">(Meyer-Grant et al. 2026)</span>. One limit
+remains even here: rank probabilities identify the distribution over orderings,
+not the joint distribution of the latent evidence behind it — in the max-Gumbel
+(Plackett–Luce) family, for example, independent and copula-dependent evidence
+models produce identical ranking probabilities <span class="citation">(Kilani 2025)</span>. Independence of
+the evidence samples therefore stays a modeling convention in the ranking
+models too.</p>
 <div class="sourceCode" id="cb25"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">model</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/sdt_ranking.html">sdt_ranking</a></span><span class="op">(</span></span>
 <span>  response <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"rank1"</span>, <span class="st">"rank2"</span>, <span class="st">"rank3"</span>, <span class="st">"rank4"</span>, <span class="st">"rank5"</span><span class="op">)</span>,</span>
@@ -1316,8 +1340,17 @@ DeCarlo, Lawrence T. 1998. <span>“Signal Detection Theory and Generalized Line
 <div id="ref-DeCarlo_2012" class="csl-entry">
 DeCarlo, Lawrence T. 2012. <span>“On a Signal Detection Approach to m-Alternative Forced Choice with Bias, with Maximum Likelihood and Bayesian Approaches to Estimation.”</span> <em>Journal of Mathematical Psychology</em> 56 (3): 196–207. <a href="https://doi.org/10.1016/j.jmp.2012.02.004" class="external-link">https://doi.org/10.1016/j.jmp.2012.02.004</a>.
 </div>
+<div id="ref-Falmagne_1978" class="csl-entry">
+Falmagne, Jean-Claude. 1978. <span>“A Representation Theorem for Finite Random Scale Systems.”</span> <em>Journal of Mathematical Psychology</em> 18 (1): 52–72. <a href="https://doi.org/10.1016/0022-2496(78)90048-2" class="external-link">https://doi.org/10.1016/0022-2496(78)90048-2</a>.
+</div>
 <div id="ref-Green_Swets_1966" class="csl-entry">
 Green, David M., and John A. Swets. 1966. <em>Signal Detection Theory and Psychophysics</em>. Wiley.
+</div>
+<div id="ref-Kilani_2025" class="csl-entry">
+Kilani, Karim. 2025. <span>“A Class of Random Utility Models Yielding the Exploded Logit.”</span> <em>Journal of Mathematical Psychology</em> 124: 102900. <a href="https://doi.org/10.1016/j.jmp.2025.102900" class="external-link">https://doi.org/10.1016/j.jmp.2025.102900</a>.
+</div>
+<div id="ref-Kilani_Colonius_2026" class="csl-entry">
+Kilani, Karim, and Hans Colonius. 2026. <span>“Representing Choice Probabilities by Ranking Probabilities via Entropy Maximization.”</span> <em>Journal of Mathematical Psychology</em> 128: 102970. <a href="https://doi.org/10.1016/j.jmp.2026.102970" class="external-link">https://doi.org/10.1016/j.jmp.2026.102970</a>.
 </div>
 <div id="ref-Macmillan_Creelman_2005" class="csl-entry">
 Macmillan, Neil A., and C. Douglas Creelman. 2005. <em>Detection Theory: A User’s Guide</em>. 2nd ed. Lawrence Erlbaum Associates.
