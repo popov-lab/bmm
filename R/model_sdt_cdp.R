@@ -89,8 +89,8 @@
     "Provide aggregated data with one row per cell (unique combination of ",
     "predictors and stimulus class) and one integer count column per response ",
     "category:", "\n\n",
-    "  - new1 ... new<n_new> for 'new' judgments", "\n",
-    "  - know<k> and remember<k> (and optionally guess<k>) for 'old' ",
+    "  - `new1` ... `new<n_new>` for 'new' judgments", "\n",
+    "  - `know<k>` and `remember<k>` (and optionally `guess<k>`) for 'old' ",
     "judgments, with k on the unified confidence scale n_new+1 ... ",
     "n_new+n_old", "\n",
     "  - an optional common column prefix is set via `response`", "\n",
@@ -192,9 +192,29 @@ settable_link_functions.sdt_cdp <- function(model) {
 #'     internal `tanh`. This structural, within-item correlation is distinct
 #'     from a between-subject correlation of random effects, which is available
 #'     separately through brms syntax such as `(1 |p| id)` on any parameter.
-#'   \item `kcrit ~ 1` estimates the Know/Guess criterion (requires `"guess"`
-#'     judgments in the data).
+#'   \item `kcrit ~ 1` estimates the Know/Guess criterion. The data must then
+#'     contain the `guess<k>` count columns, and data with those columns must
+#'     free `kcrit`: with `kcrit` at its fixed value every Guess response has
+#'     probability 0, so [bmm()] refuses that combination. The fixed value
+#'     -100 is a sentinel that switches the split off; [dsdt_cdp()] and
+#'     [rsdt_cdp()] use `kcrit = NULL` for the same purpose.
 #' }
+#'
+#' In the three-way model a Guess response in confidence bin k is possible
+#' only while `rcrit + kcrit` exceeds the lower threshold of that bin,
+#' because Guess needs R below `rcrit` and F below `kcrit`, so S = F + R below
+#' their sum. Below that boundary the Guess category has probability 0, and
+#' when `rcrit` (or `kcrit`) varies across participants the posterior explores
+#' it: hierarchical Remember/Know/Guess fits can report divergent transitions
+#' near this boundary without biased estimates. If they do, raise
+#' `adapt_delta` (0.95 or 0.99), give `rcrit` a tighter group-level prior, or
+#' check which participants' Guess counts in the top bins drive it. The
+#' Remember/Know model has no such boundary.
+#'
+#' The kernel's gradient is wrong, with the value right, on two measure-zero
+#' sets that `init = 0` starts on (a threshold exactly on the strength mean,
+#' and `rcrit == kcrit`); bmm's own initial values avoid them, and a fit
+#' started on them walks off in its first step.
 #'
 #' @section Sensitivity scales:
 #' `dfam` and `drec` are the target means \eqn{\mu_F} and \eqn{\mu_R} of
@@ -244,7 +264,9 @@ settable_link_functions.sdt_cdp <- function(model) {
 #'   `"identity"`, the links the model can invert inside its formula. `sigmar`, `rho`,
 #'   `kcrit` and the threshold parameters keep their identity links, because
 #'   their fixed values and the model's own transformations (`exp()`, `tanh()`)
-#'   assume it.
+#'   assume it. A positive-range link (`"log"`, `"softplus"`) on `criterion` or
+#'   `rcrit` states that the criterion is positive: the sampler then starts
+#'   next to 0 on the native scale and cannot reach negative values.
 #' @param ... used internally for testing, ignore it
 #' @return An object of class `bmmodel`
 #' @references
@@ -382,10 +404,10 @@ aggregate_sdt_cdp_data <- function(data, judgment, confidence, count = NULL,
   has_guess <- "guess" %in% judg
 
   conf <- data[[confidence]]
-  warnif(any(conf != round(conf), na.rm = TRUE),
-         "Confidence values should be integers")
+  stopif(anyNA(conf), "Confidence values must not contain NA")
+  warnif(any(conf != round(conf)), "Confidence values should be integers")
   conf <- as.integer(round(conf))
-  stopif(any(conf < 1, na.rm = TRUE), "Confidence values must be >= 1")
+  stopif(any(conf < 1), "Confidence values must be >= 1")
 
   is_new <- judg == "new"
   n_new <- max(conf[is_new])
@@ -400,13 +422,16 @@ aggregate_sdt_cdp_data <- function(data, judgment, confidence, count = NULL,
 
   counts_in <- if (!is.null(count)) {
     vals <- data[[count]]
-    stopif(any(vals < 0, na.rm = TRUE), "Count values must be non-negative")
-    as.integer(vals)
+    stopif(anyNA(vals), "Count values must not contain NA")
+    stopif(any(vals < 0), "Count values must be non-negative")
+    warnif(any(vals != round(vals)),
+           "Count values should be integers; non-integer counts were rounded")
+    as.integer(round(vals))
   } else {
     rep(1L, nrow(data))
   }
 
-  # Canonical category column: new(1..n_new), [guess], know, remember.
+  # the old blocks follow the new levels on one unified category index
   block <- integer(nrow(data))
   if (has_guess) {
     block[judg == "know"] <- 1L
@@ -415,18 +440,18 @@ aggregate_sdt_cdp_data <- function(data, judgment, confidence, count = NULL,
     block[judg == "remember"] <- 1L
   }
   col_idx <- ifelse(is_new, conf, n_new + block * n_old + (conf - n_new))
-  K_cat <- n_new + (if (has_guess) 3L else 2L) * n_old
 
   cell_cols <- setdiff(colnames(data), c(judgment, confidence, count))
   cell_key <- do.call(paste, c(data[cell_cols], sep = "\r"))
   first_idx <- which(!duplicated(cell_key))
   cells <- data[first_idx, cell_cols, drop = FALSE]
   rownames(cells) <- NULL
-  row_of <- match(cell_key, cell_key[first_idx])
 
-  Y <- matrix(0L, nrow = length(first_idx), ncol = K_cat)
-  lin <- (col_idx - 1L) * nrow(Y) + row_of
-  summed <- tapply(counts_in, lin, sum)
+  Y <- matrix(0L, nrow = length(first_idx),
+              ncol = n_new + (if (has_guess) 3L else 2L) * n_old)
+  summed <- tapply(counts_in,
+                   (col_idx - 1L) * nrow(Y) + match(cell_key, cell_key[first_idx]),
+                   sum)
   Y[as.integer(names(summed))] <- as.integer(summed)
   colnames(Y) <- .sdt_cdp_response_cols(n_new, n_old, has_guess, response)
   cbind(cells, as.data.frame(Y))
@@ -535,30 +560,35 @@ check_formula.sdt_cdp <- function(model, data, formula) {
 # (which estimates per-distance deltas appended at the end instead).
 .sdt_cdp_logmu_args <- function(model) {
   ov <- model$other_vars
-  has_spacing <- "spacing" %in% names(model$parameters)
   # the multinomial family has no link of its own for these parameters, so a
   # non-identity link reaches the kernel only by being inverted here
   linked <- vapply(settable_links(model), function(par) {
     deparse(inv_link(par, model$links[[par]]))
   }, character(1))
-  c(ov$n_new, ov$n_old, ov$thresh_type_int, as.integer(ov$has_guess),
+  c(ov$n_new, ov$n_old, ov$thresh_type_int, as.integer(isTRUE(ov$has_guess)),
     linked[c("dfam", "drec", "criterion")],
-    if (has_spacing) "spacing" else "0", linked[["rcrit"]], "sigmar", "rho",
-    "kcrit", ov$stimulus, .sdt_threshold_delta_names(model))
+    if ("spacing" %in% names(model$parameters)) "spacing" else "0",
+    linked[["rcrit"]], "sigmar", "rho", "kcrit", ov$stimulus,
+    .sdt_threshold_delta_names(model))
+}
+
+# the number of response categories; has_guess is bridged onto the model in
+# configure_model(), and before that (bmf2bf() is exported) it is absent
+.sdt_cdp_n_cat <- function(model) {
+  model$other_vars$n_new +
+    (if (isTRUE(model$other_vars$has_guess)) 3L else 2L) * model$other_vars$n_old
 }
 
 #' @export
 bmf2bf.sdt_cdp <- function(model, formula) {
-  K_cat <- model$other_vars$n_new +
-    (if (model$other_vars$has_guess) 3L else 2L) * model$other_vars$n_old
-  resp_cats <- paste0("cdp", seq_len(K_cat))
+  resp_cats <- paste0("cdp", seq_len(.sdt_cdp_n_cat(model)))
   args <- paste(.sdt_cdp_logmu_args(model), collapse = ", ")
 
   bform <- brms::bf(
     glue("Y | trials(nTrials) ~ sdt_cdp_logmu(1, {args})"),
     nl = TRUE
   )
-  for (k in seq_len(K_cat)[-1]) {
+  for (k in seq_along(resp_cats)[-1]) {
     bform <- bform + brms::nlf(stats::as.formula(
       glue("mu{resp_cats[k]} ~ sdt_cdp_logmu({k}, {args})")
     ))
@@ -577,18 +607,17 @@ configure_model.sdt_cdp <- function(model, data, formula) {
   # check_data; bridge it onto the model so bmf2bf can emit the right number
   # of categories.
   model$other_vars$has_guess <- attr(data, "has_guess")
-  K_cat <- model$other_vars$n_new +
-    (if (model$other_vars$has_guess) 3L else 2L) * model$other_vars$n_old
-  resp_cats <- paste0("cdp", seq_len(K_cat))
+  resp_cats <- paste0("cdp", seq_len(.sdt_cdp_n_cat(model)))
 
   formula <- bmf2bf(model, formula)
   formula$family <- brms::multinomial(refcat = NA)
   formula$family$cats <- resp_cats
   formula$family$dpars <- paste0("mu", resp_cats)
 
-  sc_path <- system.file("stan_chunks", package = "bmm")
-  stan_funs <- paste(read_lines2(paste0(sc_path, "/sdt_cdp_funs.stan")),
-                     .sdt_cdp_logmu_stan(model), sep = "\n")
+  stan_funs <- paste(
+    read_lines2(system.file("stan_chunks", "sdt_cdp_funs.stan", package = "bmm")),
+    .sdt_cdp_logmu_stan(model), sep = "\n"
+  )
   stanvars <- brms::stanvar(scode = stan_funs, block = "functions")
 
   nlist(formula, data, stanvars)

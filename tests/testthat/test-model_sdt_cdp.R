@@ -852,3 +852,41 @@ test_that("check_data.sdt_cdp refuses count columns beyond the declared scale", 
   m_ok <- sdt_cdp(response = "cdp", stimulus = "stimulus", n_new = 1, n_old = 3)
   expect_equal(ncol(check_data(m_ok, dat, bmf(dfam ~ 1))$Y), 7)
 })
+
+test_that("dsdt_cdp, check_data and aggregate_sdt_cdp_data refuse malformed input", {
+  thr <- .cdp_make_thresholds(0, -0.3, 3, 3, "parsimonious")
+  cnt <- c(40, 20, 10, 15, 25, 35, 5, 20, 80)
+  expect_error(dsdt_cdp(replace(cnt, 2, -1), 1, 0.8, 1.0, thr, 0.5, n_new = 3),
+               "non-negative")
+  expect_error(dsdt_cdp(cnt, 2, 0.8, 1.0, thr, 0.5, n_new = 3),
+               "stimulus must be 0")
+  # an empty row
+  m <- sdt_cdp(stimulus = "stimulus", n_new = 3, n_old = 3)
+  dat <- sim_cdp_data()
+  dat[1, grep("new|know|remember", colnames(dat))] <- 0L
+  expect_error(check_data(m, dat, bmf(dfam ~ 1)), "no empty rows")
+  # the aggregator's count and confidence checks
+  long <- data.frame(
+    id = 1, stimulus = 1,
+    judgment = c("new", "know", "remember", "guess"),
+    confidence = c(1, 2, 2, 2), count = c(10, 5, 7, 3)
+  )
+  expect_error(aggregate_sdt_cdp_data(replace(long, "count", c(10, -5, 7, 3)),
+                                      "judgment", "confidence", "count"),
+               "non-negative")
+  expect_error(aggregate_sdt_cdp_data(replace(long, "count", c(10, NA, 7, 3)),
+                                      "judgment", "confidence", "count"),
+               "must not contain NA")
+  expect_warning(
+    wide <- aggregate_sdt_cdp_data(replace(long, "count", c(10, 2.5, 7, 3)),
+                                   "judgment", "confidence", "count"),
+    "rounded"
+  )
+  expect_equal(wide$know2, 2L)
+  expect_error(aggregate_sdt_cdp_data(replace(long, "confidence", c(0, 2, 2, 2)),
+                                      "judgment", "confidence", "count"),
+               ">= 1")
+  expect_error(aggregate_sdt_cdp_data(replace(long, "confidence", c(1, NA, 2, 2)),
+                                      "judgment", "confidence", "count"),
+               "must not contain NA")
+})

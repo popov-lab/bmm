@@ -70,9 +70,9 @@ distribution (0 = SD 1).}
 \code{tanh(rho)} is the correlation. 0 (default) = independent processes
 (classic CDP).}
 
-\item{n_new}{Integer number of "new" confidence levels. Defaults to a
-symmetric split of the confidence scale; the number of "old" levels
-follows as \code{length(thresholds) + 1 - n_new}.}
+\item{n_new}{Integer number of "new" confidence levels. Defaults to half
+the number of confidence levels, rounded down (so 3 of 7); the number of
+"old" levels follows as \code{length(thresholds) + 1 - n_new}.}
 
 \item{dist}{Noise distribution. Only \code{"normal"} is currently supported.}
 

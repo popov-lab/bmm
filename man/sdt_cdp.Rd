@@ -44,7 +44,9 @@ can be set, to \code{"log"}, \code{"softplus"}, \code{"logit"}, \code{"probit"} 
 \code{"identity"}, the links the model can invert inside its formula. \code{sigmar}, \code{rho},
 \code{kcrit} and the threshold parameters keep their identity links, because
 their fixed values and the model's own transformations (\code{exp()}, \code{tanh()})
-assume it.}
+assume it. A positive-range link (\code{"log"}, \code{"softplus"}) on \code{criterion} or
+\code{rcrit} states that the criterion is positive: the sampler then starts
+next to 0 on the native scale and cannot reach negative values.}
 
 \item{...}{used internally for testing, ignore it}
 }
@@ -67,8 +69,8 @@ Continuous Dual-Process Signal Detection Theory Model
 
 Provide aggregated data with one row per cell (unique combination of predictors and stimulus class) and one integer count column per response category:
 \itemize{
-\item new1 ... new<n_new> for 'new' judgments
-\item know\if{html}{\out{<k>}} and remember\if{html}{\out{<k>}} (and optionally guess\if{html}{\out{<k>}}) for 'old' judgments, with k on the unified confidence scale n_new+1 ... n_new+n_old
+\item \code{new1} ... \verb{new<n_new>} for 'new' judgments
+\item \verb{know<k>} and \verb{remember<k>} (and optionally \verb{guess<k>}) for 'old' judgments, with k on the unified confidence scale n_new+1 ... n_new+n_old
 \item an optional common column prefix is set via \code{response}
 \item stimulus: 0 = new/lure, 1 = old/target
 }
@@ -183,9 +185,29 @@ accepts predictors (e.g. \code{rho ~ condition}), bounded to (-1, 1) via an
 internal \code{tanh}. This structural, within-item correlation is distinct
 from a between-subject correlation of random effects, which is available
 separately through brms syntax such as \code{(1 |p| id)} on any parameter.
-\item \code{kcrit ~ 1} estimates the Know/Guess criterion (requires \code{"guess"}
-judgments in the data).
+\item \code{kcrit ~ 1} estimates the Know/Guess criterion. The data must then
+contain the \verb{guess<k>} count columns, and data with those columns must
+free \code{kcrit}: with \code{kcrit} at its fixed value every Guess response has
+probability 0, so \code{\link[=bmm]{bmm()}} refuses that combination. The fixed value
+-100 is a sentinel that switches the split off; \code{\link[=dsdt_cdp]{dsdt_cdp()}} and
+\code{\link[=rsdt_cdp]{rsdt_cdp()}} use \code{kcrit = NULL} for the same purpose.
 }
+
+In the three-way model a Guess response in confidence bin k is possible
+only while \code{rcrit + kcrit} exceeds the lower threshold of that bin,
+because Guess needs R below \code{rcrit} and F below \code{kcrit}, so S = F + R below
+their sum. Below that boundary the Guess category has probability 0, and
+when \code{rcrit} (or \code{kcrit}) varies across participants the posterior explores
+it: hierarchical Remember/Know/Guess fits can report divergent transitions
+near this boundary without biased estimates. If they do, raise
+\code{adapt_delta} (0.95 or 0.99), give \code{rcrit} a tighter group-level prior, or
+check which participants' Guess counts in the top bins drive it. The
+Remember/Know model has no such boundary.
+
+The kernel's gradient is wrong, with the value right, on two measure-zero
+sets that \code{init = 0} starts on (a threshold exactly on the strength mean,
+and \code{rcrit == kcrit}); bmm's own initial values avoid them, and a fit
+started on them walks off in its first step.
 }
 \section{Sensitivity scales}{
 

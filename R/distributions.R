@@ -3807,7 +3807,10 @@ rsdt_rating <- function(n, n_trials, stimulus, d, thresholds,
 
 # CDP category probabilities in the canonical order
 #   new(1..n_new), [guess(1..n_old)], know(1..n_old), remember(1..n_old),
-# normalized to a proper pmf. Normal noise only (exact via .cdp_phi2). `rho` is
+# normalized to a proper pmf. Normal noise only: Remember/Know masses are exact
+# bivariate-normal CDFs (.cdp_phi2); Guess and Know-not-Guess masses come from
+# the 20-node band quadrature in .cdp_region_mass_r (about 1e-5 in log p above
+# log p = -30). `rho` is
 # the F-R correlation on the unconstrained scale (tanh applied internally);
 # default 0 = independent CDP. Vectorized over observations like
 # .sdt_category_probs: returns an n-by-K matrix, or a length-K vector when all
@@ -3869,9 +3872,9 @@ rsdt_rating <- function(n, n_trials, stimulus, d, thresholds,
 #' @param rho Numeric vector. F-R correlation on the unconstrained scale;
 #'   `tanh(rho)` is the correlation. 0 (default) = independent processes
 #'   (classic CDP).
-#' @param n_new Integer number of "new" confidence levels. Defaults to a
-#'   symmetric split of the confidence scale; the number of "old" levels
-#'   follows as `length(thresholds) + 1 - n_new`.
+#' @param n_new Integer number of "new" confidence levels. Defaults to half
+#'   the number of confidence levels, rounded down (so 3 of 7); the number of
+#'   "old" levels follows as `length(thresholds) + 1 - n_new`.
 #' @param dist Noise distribution. Only `"normal"` is currently supported.
 #' @param log Logical; if `TRUE` return the log-density (default `FALSE`).
 #' @param n Integer. Number of observations to generate. `n_trials`,
@@ -3927,8 +3930,10 @@ dsdt_cdp <- function(counts, stimulus, dfam, drec, thresholds,
                                          rep_len(sigmar, n), rep_len(rcrit, n),
                                          kcrit, stimulus, n_new, n_old, dist,
                                          rep_len(rho, n)))
+  # the 1e-300 floor in .sdt_cdp_category_prob keeps log(probs) finite, so a
+  # zero count adds 0 without a guard
   log_dens <- lgamma(rowSums(counts) + 1) - rowSums(lgamma(counts + 1)) +
-    rowSums(ifelse(counts == 0, 0, counts * log(probs)))
+    rowSums(counts * log(probs))
   if (log) log_dens else exp(log_dens)
 }
 

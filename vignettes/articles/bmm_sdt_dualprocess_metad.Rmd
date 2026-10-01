@@ -495,8 +495,10 @@ $\sigma_R$ to 1); `dfam` and `drec` are the two sensitivities and `sigmar`
 is $\log \sigma_R$. Old/new confidence partitions the strength axis $S$ with
 ordered thresholds, exactly as in the rating model, while the Remember/Know split
 is the probability that $R$ exceeds `rcrit` *within* each confidence bin — a
-region of the two-dimensional $(F, R)$ plane that bmm computes exactly with the
-bivariate-normal CDF.
+region of the two-dimensional $(F, R)$ plane. For the Remember/Know split bmm
+computes it exactly with the bivariate-normal CDF; the Know/Guess split of the
+three-way model adds a numerical integral over the strength bin (20-node
+Gauss-Legendre, accurate to about $10^{-5}$ in the probability).
 
 ## Worked example: Remember/Know in recognition memory
 
@@ -583,7 +585,11 @@ random effects (which you would write as `(1 |p| id)`). And when the task also
 collects an explicit *Guess* response, include `"guess"` judgments in the long
 data: `aggregate_sdt_cdp_data()` turns them into `guess` count columns, whose
 presence switches on the three-way Remember/Know/Guess model with a familiarity
-criterion `kcrit` separating Know from Guess.
+criterion `kcrit` separating Know from Guess (free it with `kcrit ~ 1`). That
+model has a hard boundary — a Guess response in a confidence bin is possible
+only while `rcrit + kcrit` exceeds the bin's lower threshold — and
+hierarchical fits can report divergent transitions near it; `?sdt_cdp`
+describes the boundary and what to try.
 
 # Choosing and comparing the models
 
