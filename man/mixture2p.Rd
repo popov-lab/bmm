@@ -66,7 +66,7 @@ Two-parameter mixture model by Zhang and Luck (2008).
 \item \code{thetat}:
 \itemize{
 \item \code{main}: logistic(0, 1)
-\item \code{effects}: normal(0, 0.5)
+\item \code{effects}: normal(0, 2.5)
 \item \code{sd}: exponential(1)
 }
 }
