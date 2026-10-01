@@ -162,6 +162,8 @@ probabilities. Both are fixed off by default
 \verb{Ro ~ 1, Rn ~ 1} for the two-sided model. \code{d} describes the familiarity
 distributions only -- the observed ROC is a mixture of familiarity and
 recollection, so it is not the discriminability of that mixture.
+\code{summary()} reports \code{Ro} and \code{Rn} on the logit scale; \code{\link[=latent_sdt]{latent_sdt()}}
+returns them as probabilities (attribute \code{extra}).
 \itemize{
 \item \strong{Domain:} Perception & Recognition Memory
 \item \strong{Task:} Signal/Noise or Old/New Recognition

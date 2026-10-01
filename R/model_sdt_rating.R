@@ -342,6 +342,8 @@ settable_link_functions.sdt_rating <- function(model) {
 #' `Ro ~ 1, Rn ~ 1` for the two-sided model. `d` describes the familiarity
 #' distributions only -- the observed ROC is a mixture of familiarity and
 #' recollection, so it is not the discriminability of that mixture.
+#' `summary()` reports `Ro` and `Rn` on the logit scale; [latent_sdt()]
+#' returns them as probabilities (attribute `extra`).
 #' `r model_info(.model_sdt_rating(version = "dpsdt"))`
 #'
 #' #### Version: `metad`
