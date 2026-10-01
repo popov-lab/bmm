@@ -455,8 +455,9 @@
   ([\#407](https://github.com/popov-lab/bmm/issues/407)).
 - The mixing weights `thetat` (**mixture2p**) and `thetat`/`thetant`
   (**mixture3p**) had no `effects` prior, so any regression coefficient
-  on them was flat. They now get `normal(0, 0.5)` on the logit/softmax
-  scale ([\#305](https://github.com/popov-lab/bmm/issues/305)).
+  on them was flat. They now get `normal(0, 2.5)` on the logit/softmax
+  scale ([\#305](https://github.com/popov-lab/bmm/issues/305),
+  [\#466](https://github.com/popov-lab/bmm/issues/466)).
 - The circular bias parameters `mu` (**sdm**) and `mu1` (**mixture2p**,
   **mixture3p**, **imm**) had a `student_t(1, 0, 1)` intercept prior,
   uniform over the circle under the `tan_half` link, and no `effects`

@@ -86,7 +86,7 @@ An object of class `bmmodel`
 
     - `main`: logistic(0, 1)
 
-    - `effects`: normal(0, 0.5)
+    - `effects`: normal(0, 2.5)
 
     - `sd`: exponential(1)
 
