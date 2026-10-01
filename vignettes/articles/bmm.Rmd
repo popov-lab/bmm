@@ -137,9 +137,10 @@ their confidence, give Remember/Know judgments, pick the target among several
 alternatives, or rank the alternatives. Signal detection theory separates
 sensitivity from response bias for each of these response formats, and `bmm`
 has one model per format. The models take response counts per subject and
-condition; one row per trial works as well, as the first fit below shows. For
-`sdt_cdp()`, `aggregate_sdt_cdp_data()` builds the count columns from
-trial-level data. The
+condition. `sdt_yn()` also accepts one row per trial, as the first fit below
+shows; the rating, ranking and Remember/Know models need one count column per
+response category, which `aggregate_sdt_cdp_data()` builds for `sdt_cdp()`
+from trial-level data whose confidence runs on one old/new scale. The
 [signal detection article](https://popov-lab.github.io/bmm/articles/bmm_sdt.html)
 walks through the yes/no, rating, m-AFC and ranking models, and the
 [dual-process and meta-d′ article](https://popov-lab.github.io/bmm/articles/bmm_sdt_dualprocess_metad.html)
@@ -169,7 +170,7 @@ sdt_models <- list(
        uv = "none"),
   list(format = "ranking", model = "sdt_ranking",
        uv = "`sdratio` (normal noise only)"),
-  list(format = "old/new confidence with remember/know judgments",
+  list(format = "old/new confidence with Remember/Know judgments",
        model = "sdt_cdp", uv = "`sigmar` (recollection)")
 )
 available <- supported_models(print_call = FALSE)
