@@ -413,6 +413,17 @@ lets metacognitive efficiency vary across subjects, so this single fit also give
 a posterior for *individual differences* in metacognition — the question that
 motivates most meta-d′ analyses.
 
+The ROC makes the inefficiency visible. For a `metad` fit the smooth curve
+drawn by `roc_sdt()` is the type-1 (`d`, `sdratio`) ROC, and the threshold
+points are the model's confidence operating points; they lie inside the curve
+when the M-ratio is below 1, by the amount of the metacognitive inefficiency.
+Only the middle threshold, the old/new criterion, sits on the curve, because the
+type-1 rates are held to `d`.
+
+```{r metad-roc, fig.cap = "Meta-d′ fit: the smooth curve is the type-1 ROC implied by d; the confidence operating points (t1 to t5) fall inside it, except the criterion t3, by the metacognitive inefficiency."}
+plot(roc_sdt(fit_md), observed = roc_observed(fit_md))
+```
+
 Recognition ROCs are classically asymmetric, which is usually modelled as
 unequal variance; adding `sdratio ~ 1` to the formula fits an
 **unequal-variance meta-d′** model. In `bmm` the two parameters draw on

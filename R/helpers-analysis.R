@@ -106,7 +106,10 @@
 #' model-implied curve is traced over a virtual cut from the posterior of
 #' `d` (and `sdratio`) and attached as the `summary` attribute, with the K-1
 #' thresholds attached as the `points` attribute (labelled `t1`..`t(K-1)`) so
-#' they fall on the curve.
+#' they fall on the curve. For `version = "metad"` the smooth curve is the
+#' type-1 (`d`, `sdratio`) ROC and the threshold points are the model's
+#' confidence operating points; they lie inside the curve when the M-ratio is
+#' below 1, by the amount of the metacognitive inefficiency.
 #'
 #' @param fit A `bmmfit` object returned by [bmm()] from an SDT model.
 #' @param conditions Optional data frame of predictor values at which to
