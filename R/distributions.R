@@ -2681,7 +2681,8 @@ rsdt_yn <- function(n, n_trials, stimulus, d, criterion,
 #' @title Distribution functions for dual-process SDT (DPSDT)
 #'
 #' @description Density and random generation for the dual-process signal
-#'   detection model (Yonelinas, 1994). Extends rating SDT with recollection
+#'   detection model (Yonelinas, 1994), with recall-to-reject of new items
+#'   (`Rn`; Yonelinas, 2024). Extends rating SDT with recollection
 #'   probabilities `Ro` (old items recollected as old) and `Rn` (new items
 #'   recall-rejected) that add mass to the most-confident rating category. These
 #'   are the simulation counterparts of the `dpsdt` version of [sdt_rating()];
@@ -2704,6 +2705,11 @@ rsdt_yn <- function(n, n_trials, stimulus, d, criterion,
 #'   memory: Evidence for a dual-process model. \emph{Journal of Experimental
 #'   Psychology: Learning, Memory, and Cognition}, \emph{20}(6), 1341--1354.
 #'   \doi{10.1037/0278-7393.20.6.1341}
+#'
+#' Yonelinas, A. P. (2024). The role of recollection and familiarity in visual
+#'   working memory: A mixture of threshold and signal detection processes.
+#'   \emph{Psychological Review}, \emph{131}(2), 321--348.
+#'   \doi{10.1037/rev0000432}
 #'
 #' @keywords distribution
 #' @export
@@ -3250,9 +3256,10 @@ rsdt_ranking <- function(n, n_trials, m, d, sdratio = 1,
 }
 
 
-# Dual-process category log-probabilities (Yonelinas, 1994): recollection adds
-# mass to the most-confident category -- old items recollected as old (Ro) load
-# the top category, new items recall-rejected (Rn) the bottom one -- on top of
+# Dual-process category log-probabilities (Yonelinas, 1994; recall-to-reject of
+# new items after Yonelinas, 2024): recollection adds mass to the most-confident
+# category -- old items recollected as old (Ro) load the top category, new
+# items recall-rejected (Rn) the bottom one -- on top of
 # the familiarity SDT probabilities. Ro/Rn are on the logit scale, as in the
 # model and in sdt_dpsdt_logmu_cat(), so a recollection probability near 1
 # keeps its complement; the model's default of -100 is numerically 0. `d` is the

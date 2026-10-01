@@ -94,7 +94,8 @@ priors, post-processing) carries over unchanged.
 ## The model
 
 Dual-process theory holds that a recognition decision can draw on two separable
-sources [@Yonelinas_1994; @Wixted_Mickes_2010]. *Familiarity* is a graded
+sources [@Yonelinas_1994; the description here follows @Wixted_Mickes_2010].
+*Familiarity* is a graded
 signal-detection process: old and new items generate overlapping Gaussian
 evidence, exactly as in the standard model. *Recollection* is a high-threshold
 process: with some probability the observer retrieves specific details that
@@ -151,8 +152,8 @@ ggplot(dens, aes(x, density, color = dist, fill = dist)) +
 
 Because recollection adds mass at the *high-confidence* ends, its fingerprint is
 a **curved** z-transformed ROC: a pure unequal-variance Gaussian produces a
-*straight* zROC (slope $1/s$), whereas a recollection component bows it
-[@Yonelinas_1994]. We return to this contrast below.
+*straight* zROC (slope $1/s$), whereas a threshold component bends it
+[@Yonelinas_2024]. We return to this contrast below.
 
 `Ro` and `Rn` are **fixed off by default** (a constant near $-\infty$ on the
 logit scale, so recollection probability $\approx 0$ and the model is exactly the

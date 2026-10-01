@@ -113,8 +113,9 @@
 
 # Per-version specification for the rating SDT lattice. `standard` is a single
 # familiarity process; `dpsdt` adds a recollection threshold process (Yonelinas,
-# 1994) whose Ro/Rn are fixed near zero by default (recovering standard SDT) and
-# freed through the formula; `metad` adds a type-2 metacognitive process
+# 1994; recall-to-reject of new items after Yonelinas, 2024) whose Ro/Rn are
+# fixed near zero by default (recovering standard SDT) and freed through the
+# formula; `metad` adds a type-2 metacognitive process
 # (Maniscalco & Lau, 2012) parameterized by the log M-ratio. Each entry carries
 # the extra parameters plus the Stan
 # logmu function name and call the shared multinomial pipeline assembles, so the
@@ -164,7 +165,11 @@
       "Yonelinas, A. P. (1994). Receiver-operating characteristics in ",
       "recognition memory: Evidence for a dual-process model. Journal of ",
       "Experimental Psychology: Learning, Memory, and Cognition, 20(6), ",
-      "1341-1354. https://doi.org/10.1037/0278-7393.20.6.1341"
+      "1341-1354. https://doi.org/10.1037/0278-7393.20.6.1341; ",
+      "recall-to-reject (Rn): Yonelinas, A. P. (2024). The role of ",
+      "recollection and familiarity in visual working memory: A mixture of ",
+      "threshold and signal detection processes. Psychological Review, ",
+      "131(2), 321-348. https://doi.org/10.1037/rev0000432"
     )
   ),
   metad = list(
@@ -325,11 +330,14 @@ settable_link_functions.sdt_rating <- function(model) {
 #' `r model_info(.model_sdt_rating(version = "standard"))`
 #'
 #' #### Version: `dpsdt`
-#' Dual-process SDT (Yonelinas, 1994): a familiarity SDT process plus a
-#' recollection threshold process. `Ro` is recollection of old items (loads the
-#' most-confident "signal" category) and `Rn` is recall-to-reject of new items
-#' (loads the most-confident "noise" category); `inv_logit(Ro)`/`inv_logit(Rn)`
-#' are the recollection probabilities. Both are fixed off by default
+#' Dual-process SDT (Yonelinas, 1994): a familiarity SDT process plus an
+#' all-or-none recollection process that loads the most-confident category.
+#' `Ro` is recollection of old items (loads the most-confident "signal"
+#' category), the only recollection term of the classic model; `Rn` is
+#' recall-to-reject of new items (loads the most-confident "noise" category),
+#' the two-sided extension that Yonelinas (2024) applies to visual working
+#' memory. `inv_logit(Ro)`/`inv_logit(Rn)` are the recollection
+#' probabilities. Both are fixed off by default
 #' (recovering `standard`); add `Ro ~ 1` for the one-sided model and
 #' `Ro ~ 1, Rn ~ 1` for the two-sided model. `d` describes the familiarity
 #' distributions only -- the observed ROC is a mixture of familiarity and
@@ -452,6 +460,11 @@ settable_link_functions.sdt_rating <- function(model) {
 #' Yonelinas, A. P. (1994). Receiver-operating characteristics in recognition
 #'   memory: Evidence for a dual-process model. \emph{Journal of Experimental
 #'   Psychology: Learning, Memory, and Cognition}, \emph{20}(6), 1341--1354.
+#'
+#' Yonelinas, A. P. (2024). The role of recollection and familiarity in visual
+#'   working memory: A mixture of threshold and signal detection processes.
+#'   \emph{Psychological Review}, \emph{131}(2), 321--348.
+#'   \doi{10.1037/rev0000432}
 #'
 #' Maniscalco, B., & Lau, H. (2012). A signal detection theoretic approach for
 #'   estimating metacognitive sensitivity from confidence ratings.
