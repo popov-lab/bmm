@@ -65,8 +65,9 @@ ROC:
 
 - **Dual-process SDT** [@Yonelinas_1994] adds a *recollection* process: besides
   graded familiarity, an item can be consciously recollected, which supports a
-  confident, all-or-none response. Recollection is the textbook account of the
-  recognition ROC's shape.
+  confident, all-or-none response. Recollection is one of the two standard
+  accounts of the recognition ROC's shape, the other being unequal variance
+  [@Wixted_Mickes_2010; @Yonelinas_2024].
 - **Meta-d′** [@Maniscalco_Lau_2012] adds a *metacognitive* read-out: it asks how
   well an observer's confidence tracks whether their decision was actually
   correct, separately from how well they discriminate old from new.
