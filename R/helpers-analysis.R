@@ -493,14 +493,25 @@ roc_sdt <- function(fit, conditions = NULL, n_points = 100,
 # Posterior-mean ROC + quantile band at each swept-cut node, with the (0,0) and
 # (1,1) endpoints appended and any condition columns recycled in. Shared by the
 # binary and rating smooth implied curves so a model's K-1 thresholds (rating) or
-# criterion operating points (binary) fall on the displayed curve.
-.roc_summary_from_mats <- function(fa_mat, hit_mat, probs, cond_row = NULL) {
+# criterion operating points (binary) fall on the displayed curve. Per-draw
+# `start_hit` and `end_fa` move the curve's ends to (0, start_hit) and
+# (end_fa, 1) ahead of the (1, 1) endpoint, where dual-process recollection
+# puts them (the same ends .sdt_auc_swept() integrates); NULL keeps (0, 0).
+.roc_summary_from_mats <- function(fa_mat, hit_mat, probs, cond_row = NULL,
+                                   start_hit = NULL, end_fa = NULL) {
   hit <- .sdt_summarise_draws(hit_mat, probs, prefix = "Hit")
+  start <- if (is.null(start_hit)) {
+    c(0, 0, 0)
+  } else {
+    unlist(.sdt_summarise_draws(start_hit, probs))
+  }
+  end_fa_mean <- if (is.null(end_fa)) numeric(0) else mean(end_fa)
+  end_hit     <- rep(1, length(end_fa_mean))
   summ <- data.frame(
-    FA        = c(0, colMeans(fa_mat), 1),
-    Hit_mean  = c(0, hit$Hit_mean, 1),
-    Hit_lower = c(0, hit$Hit_lower, 1),
-    Hit_upper = c(0, hit$Hit_upper, 1)
+    FA        = c(0, colMeans(fa_mat), end_fa_mean, 1),
+    Hit_mean  = c(start[1L], hit$Hit_mean, end_hit, 1),
+    Hit_lower = c(start[2L], hit$Hit_lower, end_hit, 1),
+    Hit_upper = c(start[3L], hit$Hit_upper, end_hit, 1)
   )
   .sdt_bind_cond(summ, cond_row)
 }
@@ -681,12 +692,16 @@ roc_sdt <- function(fit, conditions = NULL, n_points = 100,
     fa_mat  <- 1 - cdf(outer(sep_vec / 2, t_grid, "+"))
     hit_mat <- 1 - cdf(sweep(outer(-sep_vec / 2, t_grid, "+"), 1L, sr_vec, "/"))
     # Dual-process recollection lifts the smooth curve off the familiarity ROC:
-    # Ro adds a Hit-axis intercept, Rn scales false alarms toward the new end.
+    # Ro adds a Hit-axis intercept, Rn scales false alarms toward the new end,
+    # so the summary curve runs from (0, Ro) to (1 - Rn, 1).
+    start_hit <- end_fa <- NULL
     if (model$version == "dpsdt") {
-      ro_vec  <- stats::plogis(ro_mat[, c_i])
-      rn_vec  <- stats::plogis(rn_mat[, c_i])
-      fa_mat  <- (1 - rn_vec) * fa_mat
-      hit_mat <- ro_vec + (1 - ro_vec) * hit_mat
+      ro_vec    <- stats::plogis(ro_mat[, c_i])
+      rn_vec    <- stats::plogis(rn_mat[, c_i])
+      fa_mat    <- (1 - rn_vec) * fa_mat
+      hit_mat   <- ro_vec + (1 - ro_vec) * hit_mat
+      start_hit <- ro_vec
+      end_fa    <- 1 - rn_vec
     }
 
     pts <- data.frame(
@@ -695,7 +710,8 @@ roc_sdt <- function(fit, conditions = NULL, n_points = 100,
       .sdt_summarise_draws(hit_pts, probs, prefix = "Hit")
     )
     curve_list[[c_i]]   <- .sdt_bind_cond(cond_df, cond_row)
-    summary_list[[c_i]] <- .roc_summary_from_mats(fa_mat, hit_mat, probs, cond_row)
+    summary_list[[c_i]] <- .roc_summary_from_mats(fa_mat, hit_mat, probs,
+                                                  cond_row, start_hit, end_fa)
     points_list[[c_i]]  <- .sdt_bind_cond(pts, cond_row)
   }
 

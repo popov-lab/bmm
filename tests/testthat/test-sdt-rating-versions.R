@@ -418,6 +418,29 @@ test_that("roc_sdt reflects dual-process recollection (higher AUC, lifted curve)
   expect_true(all(attr(roc_dp, "points")$Hit_mean >= -1e-9))
 })
 
+test_that("the dpsdt summary curve runs from (0, Ro) to (1 - Rn, 1), as auc_sdt() integrates", {
+  fit <- fake_rating_fit(n_ratings = 6L, version = "dpsdt")
+  ro <- 0.4
+  rn <- 0.2
+  local_mocked_bindings(
+    posterior_linpred = mock_linpred_factory(
+      list(d = 1.2, criterion = 0, spacing = 0, Ro = qlogis(ro), Rn = qlogis(rn))),
+    ranef = function(...) list(),
+    .package = "brms")
+  summ <- attr(roc_sdt(fit, n_points = 1000), "summary")
+  n <- nrow(summ)
+  # the mock draws are all equal, so mean(plogis(Ro)) over draws is ro
+  expect_lt(abs(summ$Hit_mean[1] - ro), 1e-10)
+  expect_equal(summ$FA[1], 0)
+  expect_lt(abs(summ$FA[n - 1] - (1 - rn)), 1e-10)
+  expect_equal(summ$Hit_mean[n - 1], 1)
+  expect_equal(c(summ$FA[n], summ$Hit_mean[n]), c(1, 1))
+  # plot, summary and AUC are one curve: the trapezoid over the summary curve
+  # is the integrated area
+  trapezoid <- sum(diff(summ$FA) * (summ$Hit_mean[-1] + summ$Hit_mean[-n])) / 2
+  expect_lt(abs(trapezoid - mean(auc_sdt(fit)$AUC)), 1e-3)
+})
+
 test_that("auc_sdt() on a dpsdt fit integrates the recollection-lifted curve", {
   fit <- fake_rating_fit(n_ratings = 6L, version = "dpsdt")
   d_true <- 1.2
@@ -453,8 +476,15 @@ test_that("default dpsdt roc_sdt (recollection off) matches the standard roc", {
     posterior_linpred = mock_linpred_factory(draws_off), .package = "brms")
   roc_dp <- roc_sdt(fit_dp, n_points = 40)
 
-  expect_equal(attr(roc_dp, "summary")$Hit_mean,
-               attr(roc_std, "summary")$Hit_mean, tolerance = 1e-8)
+  summ_dp  <- attr(roc_dp, "summary")
+  summ_std <- attr(roc_std, "summary")
+  # the dpsdt curve ends at (1 - Rn, 1) before (1, 1); with recollection off
+  # that extra node sits at (1, 1) and every other node is the standard curve
+  n <- nrow(summ_dp)
+  expect_equal(n, nrow(summ_std) + 1L)
+  expect_equal(summ_dp$Hit_mean[-(n - 1L)], summ_std$Hit_mean, tolerance = 1e-8)
+  expect_lt(abs(summ_dp$FA[n - 1L] - 1), 1e-40)
+  expect_lt(abs(summ_dp$Hit_mean[1L]), 1e-40)
 })
 
 test_that("latent_sdt reports the response-process parameters as an attribute", {
