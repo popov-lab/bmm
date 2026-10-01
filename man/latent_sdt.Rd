@@ -55,7 +55,12 @@ faceting (density) condition columns. A \code{lines} attribute holds the
 decision-boundary positions (columns \code{position}, \code{lower}, \code{upper}, \code{marker},
 \code{level}, plus condition columns), or \code{NULL} for the criterion-free
 \code{sdt_mafc}/\code{sdt_ranking} models. When \code{show_competitors = TRUE}, a
-\code{competitors} attribute holds the max-of-distractors densities. The object
+\code{competitors} attribute holds the max-of-distractors densities. An \code{extra}
+attribute carries the response-process parameters of the \code{\link[=sdt_rating]{sdt_rating()}}
+versions as a posterior summary (\code{parameter}, \code{mean}, \code{lower}, \code{upper},
+plus condition columns): for \code{version = "dpsdt"}, \code{Ro} and \code{Rn} on the
+probability scale; for \code{version = "metad"}, the M-ratio (\code{mratio}) and
+meta-d' (\code{metad}); \code{NULL} for \code{version = "standard"}. The object
 also carries \code{probs}, \code{model_class}, \code{dist}, \code{is_rating} and \code{conditions}
 (the conditions of the density panels).
 }

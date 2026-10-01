@@ -12,7 +12,7 @@ dsdt_dpsdt(
   d,
   thresholds,
   Ro,
-  Rn,
+  Rn = 0,
   sdratio = 1,
   dist = c("normal", "gumbel_min", "gumbel_max", "logistic"),
   log = FALSE
@@ -25,7 +25,7 @@ rsdt_dpsdt(
   d,
   thresholds,
   Ro,
-  Rn,
+  Rn = 0,
   sdratio = 1,
   dist = c("normal", "gumbel_min", "gumbel_max", "logistic")
 )
@@ -49,8 +49,9 @@ thresholds are on the noise-standardized axis and are not rescaled by
 \item{Ro}{Numeric vector in \verb{[0, 1]}. Recollection probability for old
 (signal) items.}
 
-\item{Rn}{Numeric vector in \verb{[0, 1]}. Recollection (recall-to-reject)
-probability for new (noise) items.}
+\item{Rn}{Numeric vector in \verb{[0, 1]}. Recall-to-reject probability for new
+(noise) items. Defaults to 0, the classic one-sided model, as the
+\code{dpsdt} version fixes it off unless \code{Rn} is in the formula.}
 
 \item{sdratio}{Numeric vector. Ratio of signal to noise standard deviations
 (default 1, i.e., equal variance). Must be positive. Note that this is the
@@ -75,16 +76,18 @@ one rating-count column per category (\code{r1} ... \code{rK}).
 }
 \description{
 Density and random generation for the dual-process signal
-detection model (Yonelinas, 1994). Extends rating SDT with recollection
+detection model (Yonelinas, 1994), with recall-to-reject of new items
+(\code{Rn}; as in Yonelinas, 2024). Extends rating SDT with recollection
 probabilities \code{Ro} (old items recollected as old) and \code{Rn} (new items
 recall-rejected) that add mass to the most-confident rating category. These
 are the simulation counterparts of the \code{dpsdt} version of \code{\link[=sdt_rating]{sdt_rating()}};
 here \code{Ro}/\code{Rn} are supplied directly as probabilities in \verb{[0, 1]}.
 }
 \examples{
-# Density for a single observation (K=4) with recollection of old items
+# Density for a single observation (K=4) with recollection of old items;
+# Rn defaults to 0 (no recall-to-reject), the one-sided model
 dsdt_dpsdt(counts = c(2, 8, 20, 70), stimulus = 1,
-           d = 1.5, thresholds = c(-0.5, 0.0, 0.5), Ro = 0.3, Rn = 0)
+           d = 1.5, thresholds = c(-0.5, 0.0, 0.5), Ro = 0.3)
 # Generate DPSDT rating data (K=4) for 10 subjects and both stimulus types
 dat <- expand.grid(id = 1:10, stimulus = c(0L, 1L))
 dat <- cbind(dat, rsdt_dpsdt(nrow(dat), 100, dat$stimulus, d = 1.5,
@@ -97,5 +100,10 @@ Yonelinas, A. P. (1994). Receiver-operating characteristics in recognition
 memory: Evidence for a dual-process model. \emph{Journal of Experimental
 Psychology: Learning, Memory, and Cognition}, \emph{20}(6), 1341--1354.
 \doi{10.1037/0278-7393.20.6.1341}
+
+Yonelinas, A. P. (2024). The role of recollection and familiarity in visual
+working memory: A mixture of threshold and signal detection processes.
+\emph{Psychological Review}, \emph{131}(2), 321--348.
+\doi{10.1037/rev0000432}
 }
 \keyword{distribution}

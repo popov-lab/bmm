@@ -10,9 +10,10 @@ mratio(fit, conditions = NULL, probs = c(0.025, 0.975), ...)
 \item{fit}{A \code{bmmfit} object returned by \code{\link[=bmm]{bmm()}} from an SDT model.}
 
 \item{conditions}{Optional data frame of predictor values at which to
-evaluate the model. Column names must match predictor variables used in
-the formula. If \code{NULL} (default), unique predictor combinations are derived
-from the data.}
+evaluate the M-ratio. Its columns must be population-level predictors of
+\code{logmratio} or \code{d} in the formula; grouping variables of random effects
+are refused. If \code{NULL} (default), unique predictor combinations are
+derived from the data, and a fit without such a predictor gives one row.}
 
 \item{probs}{Numeric vector of length 2. Lower and upper quantiles for the
 credible interval (default \code{c(0.025, 0.975)}).}
@@ -35,13 +36,22 @@ Extracts the posterior of the M-ratio (\eqn{\mathrm{meta\text{-}d'}/d'}) and
 of meta-d' from a \code{\link[=sdt_rating]{sdt_rating()}} model fit with \code{version = "metad"}. That
 model estimates the log M-ratio (\code{logmratio}) directly, so the M-ratio is
 \code{exp(logmratio)} and meta-d' is \code{exp(logmratio) * d}. The M-ratio is the
-standard measure of metacognitive efficiency (Maniscalco & Lau, 2014;
+standard measure of metacognitive efficiency (Maniscalco & Lau, 2012;
 Fleming, 2017): 1 is ideal metacognition, below 1 is inefficiency, and above
 1 is hyper-efficiency. Type-1 and type-2 sensitivity are reported on one
 scale, \eqn{d'} or, once \code{sdratio} is estimated, \eqn{d_a} (see
-\code{\link[=sdt_sensitivity]{sdt_sensitivity()}}), so the ratio is unaffected by \code{sdratio}.
+\code{\link[=sdt_sensitivity]{sdt_sensitivity()}}), so the ratio is unaffected by \code{sdratio}. The type-1
+criterion keeps its location in the meta-d' space, as in the HMeta-d model
+equations (Fleming, 2017, Appendix); maximum-likelihood meta-d' constrains
+meta-c' = c' (Maniscalco & Lau, 2014), so the two differ when the criterion
+is far from the midpoint.
 }
 \references{
+Maniscalco, B., & Lau, H. (2012). A signal detection theoretic approach for
+estimating metacognitive sensitivity from confidence ratings.
+\emph{Consciousness and Cognition}, \emph{21}(1), 422--430.
+\doi{10.1016/j.concog.2011.09.021}
+
 Maniscalco, B., & Lau, H. (2014). Signal detection theory analysis of type 1
 and type 2 data: meta-d', response-specific meta-d', and the unequal
 variance SDT model. In S. M. Fleming & C. D. Frith (Eds.), \emph{The

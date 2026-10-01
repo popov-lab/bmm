@@ -46,7 +46,10 @@ Computes the posterior area under the ROC curve (AUC). For Gaussian and
 Gumbel (min or max) equal-variance binary SDT the AUC is available in
 closed form from the \code{d} draws; otherwise it is obtained by trapezoidal
 integration of the model-implied curve (for rating fits, the curve swept
-from the posterior of \code{d} and \code{sdratio}). The returned AUC is always the
+from the posterior of \code{d} and \code{sdratio}, lifted by \code{Ro}/\code{Rn} for
+\code{version = "dpsdt"}, so the AUC is the area under the predicted mixture ROC
+and not \eqn{\Phi(d/\sqrt{2})}; for \code{version = "metad"} it is the type-1
+curve). The returned AUC is always the
 area under the full curve, not the trapezoid of the discrete operating
 points or the K-1 rating thresholds; for binary multi-criteria fits it is
 one value per curve.

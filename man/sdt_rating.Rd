@@ -150,22 +150,35 @@ Categories should be ordered: 1 = 'definitely noise' to K = 'definitely signal'
 
 \subsection{Version: \code{dpsdt}}{
 
-Dual-process SDT (Yonelinas, 1994): a familiarity SDT process plus a
-recollection threshold process. \code{Ro} is recollection of old items (loads the
-most-confident "signal" category) and \code{Rn} is recall-to-reject of new items
-(loads the most-confident "noise" category); \code{inv_logit(Ro)}/\code{inv_logit(Rn)}
-are the recollection probabilities. Both are fixed off by default
+Dual-process SDT (Yonelinas, 1994): a familiarity SDT process plus an
+all-or-none recollection process that loads the most-confident category.
+\code{Ro} is recollection of old items (loads the most-confident "signal"
+category), the only recollection term of the classic model; \code{Rn} is
+recall-to-reject of new items (loads the most-confident "noise" category),
+the two-sided extension that Yonelinas (2024) applies to visual working
+memory. \code{inv_logit(Ro)}/\code{inv_logit(Rn)} are the recollection
+probabilities. Both are fixed off by default
 (recovering \code{standard}); add \code{Ro ~ 1} for the one-sided model and
 \verb{Ro ~ 1, Rn ~ 1} for the two-sided model. \code{d} describes the familiarity
 distributions only -- the observed ROC is a mixture of familiarity and
 recollection, so it is not the discriminability of that mixture.
+\code{summary()} reports \code{Ro} and \code{Rn} on the logit scale; \code{\link[=latent_sdt]{latent_sdt()}}
+returns them as probabilities (attribute \code{extra}).
+Two cautions. Freeing \code{sdratio} alongside \code{Ro} is weakly identified from
+a single ROC: in simulation the two are correlated at about -0.8 in the
+posterior and \code{Ro} is pulled down while \code{exp(sdratio)} is pulled above 1;
+keep the familiarity process equal-variance unless the design separates
+them. And a recollection probability near zero is reported as the tail of
+its prior: on the probability scale the interval cannot include 0, so the
+test of "no recollection" is a comparison with the fit that leaves the
+parameter fixed off, not the interval.
 \itemize{
 \item \strong{Domain:} Perception & Recognition Memory
 \item \strong{Task:} Signal/Noise or Old/New Recognition
 \item \strong{Name:} Signal Detection Theory (Confidence Rating)
 \item \strong{Citation:}
 \itemize{
-\item Yonelinas, A. P. (1994). Receiver-operating characteristics in recognition memory: Evidence for a dual-process model. Journal of Experimental Psychology: Learning, Memory, and Cognition, 20(6), 1341-1354. https://doi.org/10.1037/0278-7393.20.6.1341
+\item Yonelinas, A. P. (1994). Receiver-operating characteristics in recognition memory: Evidence for a dual-process model. Journal of Experimental Psychology: Learning, Memory, and Cognition, 20(6), 1341-1354. https://doi.org/10.1037/0278-7393.20.6.1341; recall-to-reject (Rn) as in Yonelinas, A. P. (2024). The role of recollection and familiarity in visual working memory: A mixture of threshold and signal detection processes. Psychological Review, 131(2), 321-348. https://doi.org/10.1037/rev0000432
 }
 \item \strong{Version:} dpsdt
 \item \strong{Requirements:}
@@ -247,7 +260,7 @@ held to what type-1 \code{d} implies. Rather than estimating meta-d'
 directly, the model estimates \code{logmratio}, the log M-ratio
 \eqn{\log(\mathrm{meta\text{-}d'}/d')}, and recovers meta-d' as
 \code{exp(logmratio) * d}. The M-ratio is the field-standard measure of
-metacognitive efficiency (Maniscalco & Lau, 2014; Fleming, 2017): estimating
+metacognitive efficiency (Maniscalco & Lau, 2012; Fleming, 2017): estimating
 it on the log scale keeps meta-d' positive, regularizes it toward \code{d},
 and anchors the ideal point (meta-d' = \code{d}, perfect metacognition) at
 \code{logmratio = 0}, which recovers \code{standard}. Type-1 and type-2 sensitivity
@@ -256,6 +269,12 @@ M-ratio is unaffected by \code{sdratio}.
 The type-1 boundary is \code{criterion}, the middle threshold, so this version
 needs an even number of rating categories: with an odd number the middle
 category straddles the boundary (see "Where \code{criterion} sits").
+The type-1 criterion is held at the same location in the meta-d' space as
+in the type-1 model, as the HMeta-d toolbox's model equations do (Fleming,
+2017, Appendix).
+Maximum-likelihood meta-d' instead constrains meta-c' = c' (Maniscalco &
+Lau, 2014), so its estimates differ from bmm's when the criterion is far
+from the midpoint.
 Extract the M-ratio posterior with \code{\link[=mratio]{mratio()}}.
 \itemize{
 \item \strong{Domain:} Perception & Recognition Memory
@@ -422,6 +441,11 @@ mratio(fit_md) # posterior M-ratio (meta-d'/d')
 Yonelinas, A. P. (1994). Receiver-operating characteristics in recognition
 memory: Evidence for a dual-process model. \emph{Journal of Experimental
 Psychology: Learning, Memory, and Cognition}, \emph{20}(6), 1341--1354.
+
+Yonelinas, A. P. (2024). The role of recollection and familiarity in visual
+working memory: A mixture of threshold and signal detection processes.
+\emph{Psychological Review}, \emph{131}(2), 321--348.
+\doi{10.1037/rev0000432}
 
 Maniscalco, B., & Lau, H. (2012). A signal detection theoretic approach for
 estimating metacognitive sensitivity from confidence ratings.

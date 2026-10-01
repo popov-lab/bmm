@@ -235,6 +235,22 @@ test_that("dsdt_dpsdt / dsdt_metad return finite densities and validate inputs",
                "single positive integer")
 })
 
+test_that("dsdt_dpsdt() and rsdt_dpsdt() default to Rn = 0, the one-sided model", {
+  thr <- c(-0.5, 0, 0.5)
+  for (stim in c(0L, 1L)) {
+    counts <- if (stim == 1L) c(2, 8, 20, 70) else c(70, 20, 8, 2)
+    expect_equal(dsdt_dpsdt(counts, stim, 1.5, thr, Ro = 0.3),
+                 dsdt_dpsdt(counts, stim, 1.5, thr, Ro = 0.3, Rn = 0),
+                 tolerance = 1e-12)
+  }
+  # noise rows: without recall-to-reject the bottom category keeps its
+  # familiarity mass; 1e5 trials put the sampling error near 1e-3
+  p_bottom <- bmm:::.sdt_dpsdt_category_probs(thr, 1.5, 1, 0L, "normal",
+                                              qlogis(0.3), -Inf)[1]
+  counts_n <- rsdt_dpsdt(1, 1e5, 0L, d = 1.5, thresholds = thr, Ro = 0.3)
+  expect_lt(abs(counts_n[1, 1] / 1e5 - p_bottom), 0.01)
+})
+
 test_that("dsdt version densities match dmultinom and vectorize over rows", {
   thr <- c(-0.5, 0, 0.5)
   p_dp <- bmm:::.sdt_dpsdt_category_probs(thr, 1.5, 1, 1L, "normal",
@@ -418,6 +434,29 @@ test_that("roc_sdt reflects dual-process recollection (higher AUC, lifted curve)
   expect_true(all(attr(roc_dp, "points")$Hit_mean >= -1e-9))
 })
 
+test_that("the dpsdt summary curve runs from (0, Ro) to (1 - Rn, 1), as auc_sdt() integrates", {
+  fit <- fake_rating_fit(n_ratings = 6L, version = "dpsdt")
+  ro <- 0.4
+  rn <- 0.2
+  local_mocked_bindings(
+    posterior_linpred = mock_linpred_factory(
+      list(d = 1.2, criterion = 0, spacing = 0, Ro = qlogis(ro), Rn = qlogis(rn))),
+    ranef = function(...) list(),
+    .package = "brms")
+  summ <- attr(roc_sdt(fit, n_points = 1000), "summary")
+  n <- nrow(summ)
+  # the mock draws are all equal, so mean(plogis(Ro)) over draws is ro
+  expect_lt(abs(summ$Hit_mean[1] - ro), 1e-10)
+  expect_equal(summ$FA[1], 0)
+  expect_lt(abs(summ$FA[n - 1] - (1 - rn)), 1e-10)
+  expect_equal(summ$Hit_mean[n - 1], 1)
+  expect_equal(c(summ$FA[n], summ$Hit_mean[n]), c(1, 1))
+  # plot, summary and AUC are one curve: the trapezoid over the summary curve
+  # is the integrated area
+  trapezoid <- sum(diff(summ$FA) * (summ$Hit_mean[-1] + summ$Hit_mean[-n])) / 2
+  expect_lt(abs(trapezoid - mean(auc_sdt(fit)$AUC)), 1e-3)
+})
+
 test_that("auc_sdt() on a dpsdt fit integrates the recollection-lifted curve", {
   fit <- fake_rating_fit(n_ratings = 6L, version = "dpsdt")
   d_true <- 1.2
@@ -453,8 +492,88 @@ test_that("default dpsdt roc_sdt (recollection off) matches the standard roc", {
     posterior_linpred = mock_linpred_factory(draws_off), .package = "brms")
   roc_dp <- roc_sdt(fit_dp, n_points = 40)
 
-  expect_equal(attr(roc_dp, "summary")$Hit_mean,
-               attr(roc_std, "summary")$Hit_mean, tolerance = 1e-8)
+  summ_dp  <- attr(roc_dp, "summary")
+  summ_std <- attr(roc_std, "summary")
+  # the dpsdt curve ends at (1 - Rn, 1) before (1, 1); with recollection off
+  # that extra node sits at (1, 1) and every other node is the standard curve
+  n <- nrow(summ_dp)
+  expect_equal(n, nrow(summ_std) + 1L)
+  expect_equal(summ_dp$Hit_mean[-(n - 1L)], summ_std$Hit_mean, tolerance = 1e-8)
+  expect_lt(abs(summ_dp$FA[n - 1L] - 1), 1e-40)
+  expect_lt(abs(summ_dp$Hit_mean[1L]), 1e-40)
+})
+
+test_that("sdt_sensitivity() and summary() note that d is the familiarity sensitivity for dpsdt", {
+  fit_dp <- fake_rating_fit(n_ratings = 6L, version = "dpsdt")
+  local_mocked_bindings(ranef = function(...) list(), .package = "brms")
+  local_mocked_bindings(
+    posterior_linpred = mock_linpred_factory(
+      list(d = 1.2, criterion = 0, spacing = 0,
+           Ro = qlogis(0.4), Rn = qlogis(0.2))),
+    .package = "brms")
+  expect_output(print(sdt_sensitivity(fit_dp)), "familiarity")
+  out_std <- capture.output(print(sdt_sensitivity(fake_rating_fit(n_ratings = 6L))))
+  expect_false(any(grepl("familiarity", out_std)))
+
+  notes_dp <- summary_notes(fit_dp$bmm$model, NULL)
+  expect_length(notes_dp, 1L)
+  expect_match(notes_dp, "familiarity")
+  expect_match(notes_dp, "auc_sdt")
+  expect_null(summary_notes(fake_rating_fit(n_ratings = 6L)$bmm$model, NULL))
+  # an estimated sdratio adds the d_a note ahead of the familiarity note
+  m_uv <- fake_rating_fit(n_ratings = 6L, version = "dpsdt", uv = TRUE)$bmm$model
+  expect_length(summary_notes(m_uv, NULL), 2L)
+  expect_match(summary_notes(m_uv, NULL)[1], "d_a")
+})
+
+test_that("auc_sdt() on a metad fit is the type-1 (d, sdratio) swept area and the points sit inside it", {
+  fit <- fake_rating_fit(n_ratings = 6L, version = "metad")
+  local_mocked_bindings(ranef = function(...) list(), .package = "brms")
+  local_mocked_bindings(
+    posterior_linpred = mock_linpred_factory(
+      list(d = 1.2, criterion = 0.3, spacing = 0.2, logmratio = -0.4)),
+    .package = "brms")
+  auc <- auc_sdt(fit)
+  ref <- bmm:::.sdt_auc_swept(rep(1.2, n_draws_mock), rep(1, n_draws_mock),
+                              "normal", ro = 0, rn = 0)
+  expect_lt(max(abs(auc$AUC - ref)), 1e-10)
+
+  # with logmratio < 0 the confidence operating points lie at or below the
+  # type-1 curve; the criterion (t3) is the one point on it
+  roc  <- roc_sdt(fit, n_points = 1000)
+  summ <- attr(roc, "summary")
+  pts  <- attr(roc, "points")
+  curve_at <- stats::approx(summ$FA, summ$Hit_mean, xout = pts$FA_mean)$y
+  expect_true(all(pts$Hit_mean <= curve_at + 1e-6))
+  expect_gt(max(curve_at - pts$Hit_mean), 1e-3)
+  expect_lt(abs(curve_at[3] - pts$Hit_mean[3]), 1e-6)
+})
+
+test_that("roc_sdt(conditions = ) on a dpsdt fit lifts each level by its own Ro", {
+  fit <- fake_rating_fit(n_ratings = 6L, version = "dpsdt")
+  fit$bmm$user_formula <- bmf(d ~ 1, criterion ~ 1, spacing ~ 1,
+                              Ro ~ 0 + cond, Rn ~ 1)
+  fit$data <- fit$data[rep(1:2, 2), ]
+  fit$data$cond <- rep(c("A", "B"), each = 2)
+  ro <- c(A = 0.2, B = 0.6)
+  local_mocked_bindings(ranef = function(...) list(), .package = "brms")
+  local_mocked_bindings(
+    posterior_linpred = mock_linpred_factory(
+      list(d = 1.2, criterion = 0, spacing = 0,
+           Ro = qlogis(unname(ro)), Rn = qlogis(0.1))),
+    .package = "brms")
+  roc  <- roc_sdt(fit, conditions = data.frame(cond = c("A", "B")),
+                  n_points = 50)
+  summ <- attr(roc, "summary")
+  pts  <- attr(roc, "points")
+  s_a <- summ[summ$cond == "A", ]
+  s_b <- summ[summ$cond == "B", ]
+  expect_lt(abs(s_a$Hit_mean[1] - ro[["A"]]), 1e-10)
+  expect_lt(abs(s_b$Hit_mean[1] - ro[["B"]]), 1e-10)
+  interior <- s_a$Hit_mean < 1
+  expect_true(all(s_b$Hit_mean[interior] > s_a$Hit_mean[interior]))
+  expect_gt(pts$Hit_mean[pts$cond == "B" & pts$threshold == "t5"],
+            pts$Hit_mean[pts$cond == "A" & pts$threshold == "t5"])
 })
 
 test_that("latent_sdt reports the response-process parameters as an attribute", {

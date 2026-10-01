@@ -113,8 +113,9 @@
 
 # Per-version specification for the rating SDT lattice. `standard` is a single
 # familiarity process; `dpsdt` adds a recollection threshold process (Yonelinas,
-# 1994) whose Ro/Rn are fixed near zero by default (recovering standard SDT) and
-# freed through the formula; `metad` adds a type-2 metacognitive process
+# 1994; recall-to-reject of new items after Yonelinas, 2024) whose Ro/Rn are
+# fixed near zero by default (recovering standard SDT) and freed through the
+# formula; `metad` adds a type-2 metacognitive process
 # (Maniscalco & Lau, 2012) parameterized by the log M-ratio. Each entry carries
 # the extra parameters plus the Stan
 # logmu function name and call the shared multinomial pipeline assembles, so the
@@ -164,7 +165,11 @@
       "Yonelinas, A. P. (1994). Receiver-operating characteristics in ",
       "recognition memory: Evidence for a dual-process model. Journal of ",
       "Experimental Psychology: Learning, Memory, and Cognition, 20(6), ",
-      "1341-1354. https://doi.org/10.1037/0278-7393.20.6.1341"
+      "1341-1354. https://doi.org/10.1037/0278-7393.20.6.1341; ",
+      "recall-to-reject (Rn) as in Yonelinas, A. P. (2024). The role of ",
+      "recollection and familiarity in visual working memory: A mixture of ",
+      "threshold and signal detection processes. Psychological Review, ",
+      "131(2), 321-348. https://doi.org/10.1037/rev0000432"
     )
   ),
   metad = list(
@@ -177,7 +182,7 @@
     # Estimating log(meta-d/d) rather than meta-d directly keeps meta-d
     # positive, regularizes it toward d, and anchors the field-standard
     # metacognitive-efficiency measure (M-ratio) at the ideal point of 0
-    # (Maniscalco & Lau, 2014; Fleming, 2017). Both sensitivities share one
+    # (Maniscalco & Lau, 2012; Fleming, 2017). Both sensitivities share one
     # scale (d', or d_a when sdratio is estimated), so the ratio is invariant to
     # sdratio.
     # logmratio is a log ratio, so its sd rate follows sdratio's 2 rather than
@@ -325,15 +330,28 @@ settable_link_functions.sdt_rating <- function(model) {
 #' `r model_info(.model_sdt_rating(version = "standard"))`
 #'
 #' #### Version: `dpsdt`
-#' Dual-process SDT (Yonelinas, 1994): a familiarity SDT process plus a
-#' recollection threshold process. `Ro` is recollection of old items (loads the
-#' most-confident "signal" category) and `Rn` is recall-to-reject of new items
-#' (loads the most-confident "noise" category); `inv_logit(Ro)`/`inv_logit(Rn)`
-#' are the recollection probabilities. Both are fixed off by default
+#' Dual-process SDT (Yonelinas, 1994): a familiarity SDT process plus an
+#' all-or-none recollection process that loads the most-confident category.
+#' `Ro` is recollection of old items (loads the most-confident "signal"
+#' category), the only recollection term of the classic model; `Rn` is
+#' recall-to-reject of new items (loads the most-confident "noise" category),
+#' the two-sided extension that Yonelinas (2024) applies to visual working
+#' memory. `inv_logit(Ro)`/`inv_logit(Rn)` are the recollection
+#' probabilities. Both are fixed off by default
 #' (recovering `standard`); add `Ro ~ 1` for the one-sided model and
 #' `Ro ~ 1, Rn ~ 1` for the two-sided model. `d` describes the familiarity
 #' distributions only -- the observed ROC is a mixture of familiarity and
 #' recollection, so it is not the discriminability of that mixture.
+#' `summary()` reports `Ro` and `Rn` on the logit scale; [latent_sdt()]
+#' returns them as probabilities (attribute `extra`).
+#' Two cautions. Freeing `sdratio` alongside `Ro` is weakly identified from
+#' a single ROC: in simulation the two are correlated at about -0.8 in the
+#' posterior and `Ro` is pulled down while `exp(sdratio)` is pulled above 1;
+#' keep the familiarity process equal-variance unless the design separates
+#' them. And a recollection probability near zero is reported as the tail of
+#' its prior: on the probability scale the interval cannot include 0, so the
+#' test of "no recollection" is a comparison with the fit that leaves the
+#' parameter fixed off, not the interval.
 #' `r model_info(.model_sdt_rating(version = "dpsdt"))`
 #'
 #' #### Version: `metad`
@@ -343,7 +361,7 @@ settable_link_functions.sdt_rating <- function(model) {
 #' directly, the model estimates `logmratio`, the log M-ratio
 #' \eqn{\log(\mathrm{meta\text{-}d'}/d')}, and recovers meta-d' as
 #' `exp(logmratio) * d`. The M-ratio is the field-standard measure of
-#' metacognitive efficiency (Maniscalco & Lau, 2014; Fleming, 2017): estimating
+#' metacognitive efficiency (Maniscalco & Lau, 2012; Fleming, 2017): estimating
 #' it on the log scale keeps meta-d' positive, regularizes it toward `d`,
 #' and anchors the ideal point (meta-d' = `d`, perfect metacognition) at
 #' `logmratio = 0`, which recovers `standard`. Type-1 and type-2 sensitivity
@@ -352,6 +370,12 @@ settable_link_functions.sdt_rating <- function(model) {
 #' The type-1 boundary is `criterion`, the middle threshold, so this version
 #' needs an even number of rating categories: with an odd number the middle
 #' category straddles the boundary (see "Where `criterion` sits").
+#' The type-1 criterion is held at the same location in the meta-d' space as
+#' in the type-1 model, as the HMeta-d toolbox's model equations do (Fleming,
+#' 2017, Appendix).
+#' Maximum-likelihood meta-d' instead constrains meta-c' = c' (Maniscalco &
+#' Lau, 2014), so its estimates differ from bmm's when the criterion is far
+#' from the midpoint.
 #' Extract the M-ratio posterior with [mratio()].
 #' `r model_info(.model_sdt_rating(version = "metad"))`
 #'
@@ -452,6 +476,11 @@ settable_link_functions.sdt_rating <- function(model) {
 #' Yonelinas, A. P. (1994). Receiver-operating characteristics in recognition
 #'   memory: Evidence for a dual-process model. \emph{Journal of Experimental
 #'   Psychology: Learning, Memory, and Cognition}, \emph{20}(6), 1341--1354.
+#'
+#' Yonelinas, A. P. (2024). The role of recollection and familiarity in visual
+#'   working memory: A mixture of threshold and signal detection processes.
+#'   \emph{Psychological Review}, \emph{131}(2), 321--348.
+#'   \doi{10.1037/rev0000432}
 #'
 #' Maniscalco, B., & Lau, H. (2012). A signal detection theoretic approach for
 #'   estimating metacognitive sensitivity from confidence ratings.
@@ -723,8 +752,9 @@ configure_model.sdt_rating <- function(model, data, formula) {
 #' @param d,criterion,spacing,sdratio Model parameters (draws-by-observation
 #'   matrices supplied by brms). `d` is d', or d_a when sdratio is not 0;
 #'   `spacing` is `0` for threshold types without it.
-#' @param Ro,Rn Linear-scale recollection parameters for the `dpsdt` version;
-#'   `inv_logit(Ro)`/`inv_logit(Rn)` are the recollection probabilities.
+#' @param Ro,Rn Recollection parameters of the `dpsdt` version on the logit
+#'   (linear-predictor) scale; `inv_logit(Ro)`/`inv_logit(Rn)` are the
+#'   recollection and recall-to-reject probabilities.
 #' @param logmratio Log M-ratio for the `metad` version; meta-d' is recovered
 #'   as `exp(logmratio) * d`, on the same scale as `d`.
 #' @param stimulus Stimulus covariate (0 = noise, 1 = signal).

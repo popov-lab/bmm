@@ -2452,6 +2452,8 @@ dsdt_yn <- function(n_old, n_trials, stimulus, d, criterion,
                     dist = c("normal", "gumbel_min", "gumbel_max", "logistic"),
                     log = FALSE) {
   dist <- match.arg(dist)
+  stopif(anyNA(n_old), "n_old must not contain NA")
+  stopif(anyNA(n_trials), "n_trials must not contain NA")
   stopif(any(n_old < 0), "n_old must be non-negative")
   stopif(any(n_trials < 1), "n_trials must be positive")
   stopif(any(n_old > n_trials), "n_old must not exceed n_trials")
@@ -2681,7 +2683,8 @@ rsdt_yn <- function(n, n_trials, stimulus, d, criterion,
 #' @title Distribution functions for dual-process SDT (DPSDT)
 #'
 #' @description Density and random generation for the dual-process signal
-#'   detection model (Yonelinas, 1994). Extends rating SDT with recollection
+#'   detection model (Yonelinas, 1994), with recall-to-reject of new items
+#'   (`Rn`; as in Yonelinas, 2024). Extends rating SDT with recollection
 #'   probabilities `Ro` (old items recollected as old) and `Rn` (new items
 #'   recall-rejected) that add mass to the most-confident rating category. These
 #'   are the simulation counterparts of the `dpsdt` version of [sdt_rating()];
@@ -2692,8 +2695,9 @@ rsdt_yn <- function(n, n_trials, stimulus, d, criterion,
 #' @inheritParams sdt_rating_dist
 #' @param Ro Numeric vector in `[0, 1]`. Recollection probability for old
 #'   (signal) items.
-#' @param Rn Numeric vector in `[0, 1]`. Recollection (recall-to-reject)
-#'   probability for new (noise) items.
+#' @param Rn Numeric vector in `[0, 1]`. Recall-to-reject probability for new
+#'   (noise) items. Defaults to 0, the classic one-sided model, as the
+#'   `dpsdt` version fixes it off unless `Rn` is in the formula.
 #'
 #' @return `dsdt_dpsdt` returns the (log-)density (multinomial probability).
 #'   `rsdt_dpsdt` returns an integer matrix with one row per observation and
@@ -2705,13 +2709,19 @@ rsdt_yn <- function(n, n_trials, stimulus, d, criterion,
 #'   Psychology: Learning, Memory, and Cognition}, \emph{20}(6), 1341--1354.
 #'   \doi{10.1037/0278-7393.20.6.1341}
 #'
+#' Yonelinas, A. P. (2024). The role of recollection and familiarity in visual
+#'   working memory: A mixture of threshold and signal detection processes.
+#'   \emph{Psychological Review}, \emph{131}(2), 321--348.
+#'   \doi{10.1037/rev0000432}
+#'
 #' @keywords distribution
 #' @export
 #' @examples
-#' # Density for a single observation (K=4) with recollection of old items
+#' # Density for a single observation (K=4) with recollection of old items;
+#' # Rn defaults to 0 (no recall-to-reject), the one-sided model
 #' dsdt_dpsdt(counts = c(2, 8, 20, 70), stimulus = 1,
-#'            d = 1.5, thresholds = c(-0.5, 0.0, 0.5), Ro = 0.3, Rn = 0)
-dsdt_dpsdt <- function(counts, stimulus, d, thresholds, Ro, Rn,
+#'            d = 1.5, thresholds = c(-0.5, 0.0, 0.5), Ro = 0.3)
+dsdt_dpsdt <- function(counts, stimulus, d, thresholds, Ro, Rn = 0,
                        sdratio = 1,
                        dist = c("normal", "gumbel_min", "gumbel_max",
                                 "logistic"),
@@ -2757,7 +2767,7 @@ dsdt_dpsdt <- function(counts, stimulus, d, thresholds, Ro, Rn,
 #'                              thresholds = c(-0.5, 0, 0.5),
 #'                              Ro = 0.3, Rn = 0.1))
 #' head(dat)
-rsdt_dpsdt <- function(n, n_trials, stimulus, d, thresholds, Ro, Rn,
+rsdt_dpsdt <- function(n, n_trials, stimulus, d, thresholds, Ro, Rn = 0,
                        sdratio = 1,
                        dist = c("normal", "gumbel_min", "gumbel_max",
                                 "logistic")) {
@@ -2942,6 +2952,9 @@ dsdt_mafc <- function(n_correct, n_trials, m, d,
                                "logistic"),
                       log = FALSE) {
   dist <- match.arg(dist)
+  stopif(anyNA(m), "m must not contain NA")
+  stopif(anyNA(n_correct), "n_correct must not contain NA")
+  stopif(anyNA(n_trials), "n_trials must not contain NA")
   stopif(any(m < 2), "m must be an integer >= 2")
 
   n <- max(lengths(list(n_correct, n_trials, m, d)))
@@ -3146,6 +3159,7 @@ dsdt_ranking <- function(counts, m, d, sdratio = 1,
   stopif(any(sdratio <= 0), "sdratio must be positive")
   counts <- rbind(counts)
   n <- nrow(counts)
+  stopif(anyNA(m), "m must not contain NA")
   m <- rep_len(as.integer(m), n)
   d <- rep_len(d, n)
   sdratio <- rep_len(sdratio, n)
@@ -3250,9 +3264,10 @@ rsdt_ranking <- function(n, n_trials, m, d, sdratio = 1,
 }
 
 
-# Dual-process category log-probabilities (Yonelinas, 1994): recollection adds
-# mass to the most-confident category -- old items recollected as old (Ro) load
-# the top category, new items recall-rejected (Rn) the bottom one -- on top of
+# Dual-process category log-probabilities (Yonelinas, 1994; recall-to-reject of
+# new items after Yonelinas, 2024): recollection adds mass to the most-confident
+# category -- old items recollected as old (Ro) load the top category, new
+# items recall-rejected (Rn) the bottom one -- on top of
 # the familiarity SDT probabilities. Ro/Rn are on the logit scale, as in the
 # model and in sdt_dpsdt_logmu_cat(), so a recollection probability near 1
 # keeps its complement; the model's default of -100 is numerically 0. `d` is the

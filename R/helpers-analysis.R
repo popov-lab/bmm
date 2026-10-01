@@ -106,7 +106,10 @@
 #' model-implied curve is traced over a virtual cut from the posterior of
 #' `d` (and `sdratio`) and attached as the `summary` attribute, with the K-1
 #' thresholds attached as the `points` attribute (labelled `t1`..`t(K-1)`) so
-#' they fall on the curve.
+#' they fall on the curve. For `version = "metad"` the smooth curve is the
+#' type-1 (`d`, `sdratio`) ROC and the threshold points are the model's
+#' confidence operating points; they lie inside the curve when the M-ratio is
+#' below 1, by the amount of the metacognitive inefficiency.
 #'
 #' @param fit A `bmmfit` object returned by [bmm()] from an SDT model.
 #' @param conditions Optional data frame of predictor values at which to
@@ -492,14 +495,25 @@ roc_sdt <- function(fit, conditions = NULL, n_points = 100,
 # Posterior-mean ROC + quantile band at each swept-cut node, with the (0,0) and
 # (1,1) endpoints appended and any condition columns recycled in. Shared by the
 # binary and rating smooth implied curves so a model's K-1 thresholds (rating) or
-# criterion operating points (binary) fall on the displayed curve.
-.roc_summary_from_mats <- function(fa_mat, hit_mat, probs, cond_row = NULL) {
+# criterion operating points (binary) fall on the displayed curve. Per-draw
+# `start_hit` and `end_fa` move the curve's ends to (0, start_hit) and
+# (end_fa, 1) ahead of the (1, 1) endpoint, where dual-process recollection
+# puts them (the same ends .sdt_auc_swept() integrates); NULL keeps (0, 0).
+.roc_summary_from_mats <- function(fa_mat, hit_mat, probs, cond_row = NULL,
+                                   start_hit = NULL, end_fa = NULL) {
   hit <- .sdt_summarise_draws(hit_mat, probs, prefix = "Hit")
+  start <- if (is.null(start_hit)) {
+    c(0, 0, 0)
+  } else {
+    unlist(.sdt_summarise_draws(start_hit, probs))
+  }
+  end_fa_mean <- if (is.null(end_fa)) numeric(0) else mean(end_fa)
+  end_hit     <- rep(1, length(end_fa_mean))
   summ <- data.frame(
-    FA        = c(0, colMeans(fa_mat), 1),
-    Hit_mean  = c(0, hit$Hit_mean, 1),
-    Hit_lower = c(0, hit$Hit_lower, 1),
-    Hit_upper = c(0, hit$Hit_upper, 1)
+    FA        = c(0, colMeans(fa_mat), end_fa_mean, 1),
+    Hit_mean  = c(start[1L], hit$Hit_mean, end_hit, 1),
+    Hit_lower = c(start[2L], hit$Hit_lower, end_hit, 1),
+    Hit_upper = c(start[3L], hit$Hit_upper, end_hit, 1)
   )
   .sdt_bind_cond(summ, cond_row)
 }
@@ -680,12 +694,16 @@ roc_sdt <- function(fit, conditions = NULL, n_points = 100,
     fa_mat  <- 1 - cdf(outer(sep_vec / 2, t_grid, "+"))
     hit_mat <- 1 - cdf(sweep(outer(-sep_vec / 2, t_grid, "+"), 1L, sr_vec, "/"))
     # Dual-process recollection lifts the smooth curve off the familiarity ROC:
-    # Ro adds a Hit-axis intercept, Rn scales false alarms toward the new end.
+    # Ro adds a Hit-axis intercept, Rn scales false alarms toward the new end,
+    # so the summary curve runs from (0, Ro) to (1 - Rn, 1).
+    start_hit <- end_fa <- NULL
     if (model$version == "dpsdt") {
-      ro_vec  <- stats::plogis(ro_mat[, c_i])
-      rn_vec  <- stats::plogis(rn_mat[, c_i])
-      fa_mat  <- (1 - rn_vec) * fa_mat
-      hit_mat <- ro_vec + (1 - ro_vec) * hit_mat
+      ro_vec    <- stats::plogis(ro_mat[, c_i])
+      rn_vec    <- stats::plogis(rn_mat[, c_i])
+      fa_mat    <- (1 - rn_vec) * fa_mat
+      hit_mat   <- ro_vec + (1 - ro_vec) * hit_mat
+      start_hit <- ro_vec
+      end_fa    <- 1 - rn_vec
     }
 
     pts <- data.frame(
@@ -694,7 +712,8 @@ roc_sdt <- function(fit, conditions = NULL, n_points = 100,
       .sdt_summarise_draws(hit_pts, probs, prefix = "Hit")
     )
     curve_list[[c_i]]   <- .sdt_bind_cond(cond_df, cond_row)
-    summary_list[[c_i]] <- .roc_summary_from_mats(fa_mat, hit_mat, probs, cond_row)
+    summary_list[[c_i]] <- .roc_summary_from_mats(fa_mat, hit_mat, probs,
+                                                  cond_row, start_hit, end_fa)
     points_list[[c_i]]  <- .sdt_bind_cond(pts, cond_row)
   }
 
@@ -924,7 +943,12 @@ roc_observed <- function(fit, conditions = NULL) {
 #'   decision-boundary positions (columns `position`, `lower`, `upper`, `marker`,
 #'   `level`, plus condition columns), or `NULL` for the criterion-free
 #'   `sdt_mafc`/`sdt_ranking` models. When `show_competitors = TRUE`, a
-#'   `competitors` attribute holds the max-of-distractors densities. The object
+#'   `competitors` attribute holds the max-of-distractors densities. An `extra`
+#'   attribute carries the response-process parameters of the [sdt_rating()]
+#'   versions as a posterior summary (`parameter`, `mean`, `lower`, `upper`,
+#'   plus condition columns): for `version = "dpsdt"`, `Ro` and `Rn` on the
+#'   probability scale; for `version = "metad"`, the M-ratio (`mratio`) and
+#'   meta-d' (`metad`); `NULL` for `version = "standard"`. The object
 #'   also carries `probs`, `model_class`, `dist`, `is_rating` and `conditions`
 #'   (the conditions of the density panels).
 #'
@@ -1248,13 +1272,22 @@ print.bmm_sdt_thresholds <- function(x, ...) {
 #' of meta-d' from a [sdt_rating()] model fit with `version = "metad"`. That
 #' model estimates the log M-ratio (`logmratio`) directly, so the M-ratio is
 #' `exp(logmratio)` and meta-d' is `exp(logmratio) * d`. The M-ratio is the
-#' standard measure of metacognitive efficiency (Maniscalco & Lau, 2014;
+#' standard measure of metacognitive efficiency (Maniscalco & Lau, 2012;
 #' Fleming, 2017): 1 is ideal metacognition, below 1 is inefficiency, and above
 #' 1 is hyper-efficiency. Type-1 and type-2 sensitivity are reported on one
 #' scale, \eqn{d'} or, once `sdratio` is estimated, \eqn{d_a} (see
-#' [sdt_sensitivity()]), so the ratio is unaffected by `sdratio`.
+#' [sdt_sensitivity()]), so the ratio is unaffected by `sdratio`. The type-1
+#' criterion keeps its location in the meta-d' space, as in the HMeta-d model
+#' equations (Fleming, 2017, Appendix); maximum-likelihood meta-d' constrains
+#' meta-c' = c' (Maniscalco & Lau, 2014), so the two differ when the criterion
+#' is far from the midpoint.
 #'
 #' @inheritParams roc_sdt
+#' @param conditions Optional data frame of predictor values at which to
+#'   evaluate the M-ratio. Its columns must be population-level predictors of
+#'   `logmratio` or `d` in the formula; grouping variables of random effects
+#'   are refused. If `NULL` (default), unique predictor combinations are
+#'   derived from the data, and a fit without such a predictor gives one row.
 #' @param probs Numeric vector of length 2. Lower and upper quantiles for the
 #'   credible interval (default `c(0.025, 0.975)`).
 #'
@@ -1267,6 +1300,11 @@ print.bmm_sdt_thresholds <- function(x, ...) {
 #'
 #' @seealso [sdt_rating()], [latent_sdt()]
 #' @references
+#' Maniscalco, B., & Lau, H. (2012). A signal detection theoretic approach for
+#'   estimating metacognitive sensitivity from confidence ratings.
+#'   \emph{Consciousness and Cognition}, \emph{21}(1), 422--430.
+#'   \doi{10.1016/j.concog.2011.09.021}
+#'
 #' Maniscalco, B., & Lau, H. (2014). Signal detection theory analysis of type 1
 #'   and type 2 data: meta-d', response-specific meta-d', and the unequal
 #'   variance SDT model. In S. M. Fleming & C. D. Frith (Eds.), \emph{The
@@ -1339,7 +1377,10 @@ print.bmm_sdt_mratio <- function(x, ...) {
 #' Gumbel (min or max) equal-variance binary SDT the AUC is available in
 #' closed form from the `d` draws; otherwise it is obtained by trapezoidal
 #' integration of the model-implied curve (for rating fits, the curve swept
-#' from the posterior of `d` and `sdratio`). The returned AUC is always the
+#' from the posterior of `d` and `sdratio`, lifted by `Ro`/`Rn` for
+#' `version = "dpsdt"`, so the AUC is the area under the predicted mixture ROC
+#' and not \eqn{\Phi(d/\sqrt{2})}; for `version = "metad"` it is the type-1
+#' curve). The returned AUC is always the
 #' area under the full curve, not the trapezoid of the discrete operating
 #' points or the K-1 rating thresholds; for binary multi-criteria fits it is
 #' one value per curve.
@@ -1685,19 +1726,32 @@ print.bmm_sdt_sensitivity <- function(x, ...) {
       sep = "")
   cat("  da = RMS-SD units (estimated) | dn = noise-SD units (d') |",
       "ds = signal-SD units\n")
+  if ("sdt_rating_dpsdt" %in% attr(x, "model_class")) {
+    cat("  d is the familiarity sensitivity; the observed ROC also carries",
+        "recollection (Ro, Rn): see auc_sdt()\n")
+  }
   print(attr(x, "summary"), digits = 3, row.names = FALSE)
   invisible(x)
 }
 
 
 # `d` reads as d' in the coefficient table, which it only is while sdratio is
-# fixed at 0
+# fixed at 0; in the dual-process version it is the familiarity process alone
 #' @export
 summary_notes.sdt <- function(model, x) {
-  if (.sdt_unit_sdratio(model)) return(NULL)
-  paste(
-    "Note: sdratio is not fixed at 0, so d is d_a (root-mean-square SD units),",
-    "not the noise-standardized d'.\n      sdt_sensitivity() converts it",
-    "to d' (noise SD) and d_S (signal SD)."
-  )
+  notes <- character(0)
+  if (!.sdt_unit_sdratio(model)) {
+    notes <- c(notes, paste(
+      "Note: sdratio is not fixed at 0, so d is d_a (root-mean-square SD units),",
+      "not the noise-standardized d'.\n      sdt_sensitivity() converts it",
+      "to d' (noise SD) and d_S (signal SD)."
+    ))
+  }
+  if (identical(model$version, "dpsdt")) {
+    notes <- c(notes, paste(
+      "Note: d is the familiarity sensitivity; the observed ROC also carries",
+      "recollection (Ro, Rn): see auc_sdt()."
+    ))
+  }
+  if (length(notes)) notes
 }
