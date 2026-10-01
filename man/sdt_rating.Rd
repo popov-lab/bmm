@@ -250,7 +250,7 @@ held to what type-1 \code{d} implies. Rather than estimating meta-d'
 directly, the model estimates \code{logmratio}, the log M-ratio
 \eqn{\log(\mathrm{meta\text{-}d'}/d')}, and recovers meta-d' as
 \code{exp(logmratio) * d}. The M-ratio is the field-standard measure of
-metacognitive efficiency (Maniscalco & Lau, 2014; Fleming, 2017): estimating
+metacognitive efficiency (Maniscalco & Lau, 2012; Fleming, 2017): estimating
 it on the log scale keeps meta-d' positive, regularizes it toward \code{d},
 and anchors the ideal point (meta-d' = \code{d}, perfect metacognition) at
 \code{logmratio = 0}, which recovers \code{standard}. Type-1 and type-2 sensitivity

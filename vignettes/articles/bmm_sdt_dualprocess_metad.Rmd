@@ -307,7 +307,7 @@ well does the observer tell old from new? That is ordinary sensitivity,
 `d`. *Type-2*: how well does the observer's **confidence** track whether
 each decision was actually correct? That is *metacognitive* sensitivity, and it
 need not match type-1 sensitivity — an observer can discriminate well yet place
-confidence poorly, or vice versa [@Fleming_Lau_2014].
+confidence poorly, or vice versa [@Maniscalco_Lau_2012].
 
 Meta-d′ [@Maniscalco_Lau_2012] expresses type-2 sensitivity in the same units as
 type-1 `d`. It is the sensitivity that a metacognitively *ideal*
@@ -429,7 +429,7 @@ whether confidence is well-calibrated to performance — rather than about
 discrimination itself. Expressing type-2 sensitivity on the `d` scale makes
 the M-ratio comparable across tasks and observers with different type-1
 performance, which is why it has become the standard index of metacognitive
-efficiency [@Fleming_Lau_2014; @Fleming_2017].
+efficiency [@Maniscalco_Lau_2012; @Fleming_2017].
 
 Two cautions carry over from the rest of SDT. First, like all the rating models
 here, meta-d′ is fit to *aggregated counts*, so the type-2 estimate is only as

@@ -182,7 +182,7 @@
     # Estimating log(meta-d/d) rather than meta-d directly keeps meta-d
     # positive, regularizes it toward d, and anchors the field-standard
     # metacognitive-efficiency measure (M-ratio) at the ideal point of 0
-    # (Maniscalco & Lau, 2014; Fleming, 2017). Both sensitivities share one
+    # (Maniscalco & Lau, 2012; Fleming, 2017). Both sensitivities share one
     # scale (d', or d_a when sdratio is estimated), so the ratio is invariant to
     # sdratio.
     # logmratio is a log ratio, so its sd rate follows sdratio's 2 rather than
@@ -351,7 +351,7 @@ settable_link_functions.sdt_rating <- function(model) {
 #' directly, the model estimates `logmratio`, the log M-ratio
 #' \eqn{\log(\mathrm{meta\text{-}d'}/d')}, and recovers meta-d' as
 #' `exp(logmratio) * d`. The M-ratio is the field-standard measure of
-#' metacognitive efficiency (Maniscalco & Lau, 2014; Fleming, 2017): estimating
+#' metacognitive efficiency (Maniscalco & Lau, 2012; Fleming, 2017): estimating
 #' it on the log scale keeps meta-d' positive, regularizes it toward `d`,
 #' and anchors the ideal point (meta-d' = `d`, perfect metacognition) at
 #' `logmratio = 0`, which recovers `standard`. Type-1 and type-2 sensitivity

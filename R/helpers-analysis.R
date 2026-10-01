@@ -1244,7 +1244,7 @@ print.bmm_sdt_thresholds <- function(x, ...) {
 #' of meta-d' from a [sdt_rating()] model fit with `version = "metad"`. That
 #' model estimates the log M-ratio (`logmratio`) directly, so the M-ratio is
 #' `exp(logmratio)` and meta-d' is `exp(logmratio) * d`. The M-ratio is the
-#' standard measure of metacognitive efficiency (Maniscalco & Lau, 2014;
+#' standard measure of metacognitive efficiency (Maniscalco & Lau, 2012;
 #' Fleming, 2017): 1 is ideal metacognition, below 1 is inefficiency, and above
 #' 1 is hyper-efficiency. Type-1 and type-2 sensitivity are reported on one
 #' scale, \eqn{d'} or, once `sdratio` is estimated, \eqn{d_a} (see
@@ -1263,6 +1263,11 @@ print.bmm_sdt_thresholds <- function(x, ...) {
 #'
 #' @seealso [sdt_rating()], [latent_sdt()]
 #' @references
+#' Maniscalco, B., & Lau, H. (2012). A signal detection theoretic approach for
+#'   estimating metacognitive sensitivity from confidence ratings.
+#'   \emph{Consciousness and Cognition}, \emph{21}(1), 422--430.
+#'   \doi{10.1016/j.concog.2011.09.021}
+#'
 #' Maniscalco, B., & Lau, H. (2014). Signal detection theory analysis of type 1
 #'   and type 2 data: meta-d', response-specific meta-d', and the unequal
 #'   variance SDT model. In S. M. Fleming & C. D. Frith (Eds.), \emph{The
