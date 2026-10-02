@@ -122,7 +122,7 @@ default_prior.bmmformula <- function(object, data, model, formula = object, ...)
 #'   Subsetting the report with `[` returns a plain `data.frame`, as the
 #'   report-specific printing depends on columns and attributes that
 #'   subsetting drops.
-#' @seealso [default_prior()], [parameters()]
+#' @seealso [default_prior()], [parameter_info()]
 #' @keywords extract_info
 #' @examplesIf isTRUE(Sys.getenv("BMM_EXAMPLES"))
 #' fit <- bmm(

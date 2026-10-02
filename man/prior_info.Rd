@@ -78,6 +78,6 @@ prior_info(fit, format = "text")
 \dontshow{\}) # examplesIf}
 }
 \seealso{
-\code{\link[=default_prior]{default_prior()}}, \code{\link[=parameters]{parameters()}}
+\code{\link[=default_prior]{default_prior()}}, \code{\link[=parameter_info]{parameter_info()}}
 }
 \keyword{extract_info}
