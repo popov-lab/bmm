@@ -47,6 +47,7 @@ Suggests:
     ggplot2,
     ggthemes,
     knitr,
+    loo (>= 2.10.0),
     mixtur,
     MPTinR,
     pkgbuild,
