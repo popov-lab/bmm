@@ -527,8 +527,9 @@ needs no refit is to compute the Bayes factor separately for each chain. For the
 40,000-draw fit, the four chains of 10,000 draws give $\text{BF}_{10}$ between
 `r round(1 / max(sd_chains$bf01_chain))` and
 `r round(1 / min(sd_chains$bf01_chain))` around the pooled
-`r round(1 / sd_chains$bf01_pooled)`. How large the error is only shows when
-you draw more.
+`r round(1 / sd_chains$bf01_pooled)`, a conservative bound on the pooled
+estimate's error, since each chain holds a quarter of the draws. How large the
+error is only shows when you draw more.
 
 In practice: when a Savage-Dickey Bayes factor is far from 1, refit the model
 with many more draws before you report its size, as
@@ -550,7 +551,9 @@ brms::hypothesis(fit_setsize, "kappa_set_size6 > kappa_set_size8")
 `Post.Prob` is the proportion of posterior draws in
 which the hypothesis holds, and `Evid.Ratio` is the ratio of that proportion to
 its complement. This ratio is the *posterior odds* of the hypothesis, not a
-Bayes factor. The posterior probability of the more probable direction is also
+Bayes factor against zero. (It equals the Bayes factor for a positive against a
+negative difference only when the prior gives both directions equal mass, as
+the implied prior here does.) The posterior probability of the more probable direction is also
 known as the *probability of direction* [@makowskiIndicesEffectExistence2019].
 It is a useful description of the posterior, but it carries no information
 about whether the effect is large enough to matter. For that, you can define a
@@ -771,7 +774,8 @@ other trials of the same participant. The null model has no population-level
 effect of set size, but it keeps the participant-level effects
 `(0 + set_size || ID)`, and these can take over the job: most participants'
 precision at set size 2 is simply estimated to be higher than the common mean
-(`r n_pos_ss2` of 19 here, by `r fmt(mean_r_ss2)` on the log scale on average).
+(`r n_pos_ss2` of 19 here; the 19 deviations average `r fmt(mean_r_ss2)` on
+the log scale).
 You can see this in the estimated standard deviation of these effects at set
 size 2, `r fmt(sd_null_ss2)` in the null model against `r fmt(sd_setsize_ss2)`
 in the set-size model; the other three hardly change:
@@ -838,8 +842,8 @@ Bridge sampling has three requirements:
 
 The code below refits both models with 40,000 draws (4 chains with 10,000
 post-warmup iterations each), fewer than the 72,000 found sufficient above:
-each mixture model refit already takes about half an hour, and the SDM refit of
-Question 3 several hours. It then runs bridge sampling ten times per model. We
+the mixture model refits already take 30 to 50 minutes each, and the SDM refit
+of Question 3 about ten hours. It then runs bridge sampling ten times per model. We
 show the code and load the stored results. `update()` refits the model with the
 new formula, which recompiles it.
 
@@ -904,14 +908,14 @@ repetitions vary more than the Savage-Dickey seeds in Section
 approximation that bridge sampling builds of the posterior. Like the seeds,
 however, all repetitions reuse the same posterior draws, so only a fit with
 more draws shows whether the estimate holds. Here the estimates from 40,000
-draws lie at the lower end of the range from 4,000 draws.
+draws lie at or below the lower end of the range from 4,000 draws.
 
 By the median estimate, the data are `r bf_fmt(q2_long$median_log10_bf)` times
 more probable under the model with a population-level effect of set size on `kappa`
 than under the balanced null model, whereas trial-wise LOO found the two models
 tied. This is not a contradiction. LOO asked whether the population-level
-effect improves the prediction of the next trial of participants already in the
-data, and in the null model the participant-level effects can take over that
+effect improves the prediction of one of the trials of participants already in
+the data, and in the null model the participant-level effects can take over that
 job. The Bayes factor asks how probable all the data are under each model,
 averaged over its priors. Here, a model in which set size shifts `kappa` for
 the whole population makes the data more probable than one in which each
@@ -1106,8 +1110,8 @@ named after the factors and their levels as `fixef()` prints them, for example
 `kappa_a1:b1` for levels `1` of `a` and `1` of `b`. The interaction on `kappa`
 in a 2 $\times$ 2 design is then
 `"(kappa_a1:b1 - kappa_a1:b2) - (kappa_a2:b1 - kappa_a2:b2) = 0"`. Its implied
-prior under cell-means coding has a standard deviation of $2 s$, twice that of
-a pairwise difference.
+prior under cell-means coding has a standard deviation of $2 s$, against
+$\sqrt{2} \cdot s$ for a pairwise difference.
 
 **Reporting.** Report the estimate and CrI with every test. For a Bayes
 factor, report the method, the prior on the tested parameters, the number of
