@@ -95,6 +95,7 @@ settable_links.sdm <- function(model) {
 sdm <- function(resp_error, version = "simple", ...) {
   call <- match.call()
   stop_missing_args()
+  version <- match.arg(version)
   .model_sdm(resp_error = resp_error, version = version, call = call, ...)
 }
 

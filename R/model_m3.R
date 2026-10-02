@@ -203,13 +203,11 @@ settable_link_functions.m3 <- function(model) {
 #' summary(m3_fit)
 #'
 #' @export
-m3 <- function(resp_cats, num_options, choice_rule = "softmax", version = "custom", ...) {
+m3 <- function(resp_cats, num_options, choice_rule = "softmax",
+               version = c("custom", "ss", "cs"), ...) {
   call <- match.call()
   stop_missing_args()
-  stopif(
-    !version %in% c("custom", "cs", "ss"),
-    'Unknown version: {version}. It should be one of "ss", "cs" or "custom"'
-  )
+  version <- match.arg(version)
   stopif(
     !tolower(choice_rule) %in% c("softmax", "simple"),
     'Unsupported choice rule "{choice_rule}. Must be one of "simple" or "softmax"'
