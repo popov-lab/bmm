@@ -567,6 +567,14 @@ data_column_roles <- list(
     resp_cats = "number of responses in each response category, one column per category",
     num_options = "number of candidates in each category (columns, or one number per category)"
   ),
+  m3_ss = c(
+    resp_cats = "number of responses in each of 3 categories, in the order correct, other, not-presented lure (one column each)",
+    num_options = "number of candidates in each category (columns, or one number per category)"
+  ),
+  m3_cs = c(
+    resp_cats = "number of responses in each of 5 categories, in the order correct, distractor close in context, other, other distractor, not-presented lure (one column each)",
+    num_options = "number of candidates in each category (columns, or one number per category)"
+  ),
   mixture2p = c(
     resp_error = "response error relative to the target, in radians"
   ),
@@ -590,11 +598,11 @@ data_column_roles <- list(
     m = "number of alternatives (a column, or one number)"
   ),
   sdt_ranking = c(
-    response = "number of trials with the target at each rank, one column per rank",
+    response = "number of trials with the target at each rank, one column per rank, from rank 1 (most likely target) to rank m",
     m = "number of ranked items (a column, or one number)"
   ),
   sdt_rating = c(
-    response = "number of responses in each rating category, one column per category",
+    response = "number of responses in each rating category, one column per category, ordered from 'definitely noise' to 'definitely signal'",
     stimulus = "stimulus type, 0 = noise/new and 1 = signal/old"
   ),
   sdt_yn = c(

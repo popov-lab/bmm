@@ -81,6 +81,14 @@ test_that("every data argument of every model version has a column role", {
   }
 })
 
+test_that("data_column_roles keys name a model or one of its versions", {
+  valid <- unlist(lapply(supported_models(print_call = FALSE), function(model) {
+    versions <- model_versions(model)
+    c(model, if (!anyNA(versions)) paste0(model, "_", versions))
+  }))
+  expect_equal(setdiff(names(data_column_roles), valid), character(0))
+})
+
 test_that("model_versions() lists the versions a constructor accepts", {
   expect_equal(model_versions("imm"), c("full", "bsc", "abc"))
   expect_equal(model_versions("m3"), c("custom", "ss", "cs"))
@@ -106,6 +114,19 @@ test_that("parameter_label() keeps the name before the first separator", {
   expect_equal(parameter_label("Spatial similarity gradient"), "Spatial similarity gradient")
 })
 
+test_that("estimated parameter labels have balanced parentheses", {
+  for (model in supported_models(print_call = FALSE)) {
+    for (version in model_versions(model)) {
+      spec <- if (is.na(version)) get_model(model)() else get_model(model)(version = version)
+      estimated <- setdiff(names(spec$parameters), names(spec$fixed_parameters))
+      labels <- parameter_label(vapply(spec$parameters[estimated], as.character, ""))
+      open <- lengths(regmatches(labels, gregexpr("(", labels, fixed = TRUE)))
+      close <- lengths(regmatches(labels, gregexpr(")", labels, fixed = TRUE)))
+      expect_equal(open, close, ignore_attr = TRUE)
+    }
+  }
+})
+
 test_that("model_overview() has one row per version with its own columns and parameters", {
   overview <- model_overview()
   n_versions <- sum(lengths(lapply(supported_models(print_call = FALSE), model_versions)))
@@ -127,6 +148,15 @@ test_that("model_overview() has one row per version with its own columns and par
 
   cdp <- overview[grepl("`sdt_cdp()`", overview$Model, fixed = TRUE), ]
   expect_false(grepl("n_new", cdp$`Data columns`, fixed = TRUE))
+  expect_match(cdp$`Data columns`, "`response`:", fixed = TRUE)
+
+  imm_full <- overview[grepl("imm.html), version `full`", overview$Model, fixed = TRUE), ]
+  expect_false(grepl("mu2|kappa2", imm_full$`Key parameters`))
+
+  m3_ss <- overview[grepl("m3.html), version `ss`", overview$Model, fixed = TRUE), ]
+  expect_match(m3_ss$`Data columns`, "correct, other, not-presented lure", fixed = TRUE)
+  m3_cs <- overview[grepl("m3.html), version `cs`", overview$Model, fixed = TRUE), ]
+  expect_match(m3_cs$`Data columns`, "each of 5 categories", fixed = TRUE)
 
   mixture2p <- overview[grepl("`mixture2p()`", overview$Model, fixed = TRUE), ]
   expect_false(grepl("version", mixture2p$Model))
