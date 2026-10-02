@@ -59,6 +59,71 @@ constant_priors <- function(fit) {
   sum(grepl("^constant\\(", as.data.frame(fit$prior)$prior))
 }
 
+test_that("update() stores the formula that bmm() stores for the same inputs", {
+  # brms::combine_models() compares the formula elements by position, so an
+  # updated fit merges with the original only if the element order matches too
+  skip_on_cran()
+  fit1 <- sdm_fixture()
+  bmm_mock <- function(formula) {
+    suppressMessages(bmm(formula, fit1$data, fit1$bmm$model,
+                         backend = "mock", mock_fit = 1, rename = FALSE))
+  }
+
+  expect_equal(formula(update_mock(fit1)),
+               formula(bmm_mock(fit1$bmm$user_formula)),
+               ignore_formula_env = TRUE)
+
+  new_formula <- bmf(c ~ 1, kappa ~ 1)
+  expect_equal(formula(update_mock(fit1, formula. = new_formula)),
+               formula(bmm_mock(new_formula)),
+               ignore_formula_env = TRUE)
+})
+
+test_that("update() stores the formula that bmm() stores, without a fixture", {
+  skip_if_not_installed("rstan")
+  stub <- methods::new("stanfit", sim = list(
+    iter = 10L, warmup = 5L, chains = 1L, thin = 1L,
+    samples = list(structure(list(), args = list(control = list())))
+  ))
+  dat <- data.frame(y = rsdm(60, kappa = 5))
+  bmm_mock <- function(formula) {
+    suppressMessages(bmm(formula, dat, sdm("y"), backend = "mock", mock_fit = stub, rename = FALSE))
+  }
+  fit <- bmm_mock(bmf(c ~ 1, kappa ~ 1))
+  # a mock fit cannot be reused, so update() takes the recompile path
+  update_mock <- function(...) {
+    suppressMessages(update(fit, ..., backend = "mock", mock_fit = stub, rename = FALSE, recompile = TRUE))
+  }
+
+  expect_equal(formula(update_mock()), formula(fit), ignore_formula_env = TRUE)
+
+  new_formula <- bmf(c ~ 1, kappa ~ 1, mu ~ 1)
+  expect_equal(formula(update_mock(formula. = new_formula)),
+               formula(bmm_mock(new_formula)),
+               ignore_formula_env = TRUE)
+})
+
+test_that("brms::combine_models() merges a fit with its update() refit", {
+  skip_on_cran()
+  skip_if_not_installed("cmdstanr")
+  skip_if(is.null(cmdstanr::cmdstan_version(error_on_NA = FALSE)))
+
+  fit_args <- list(chains = 1, iter = 200, warmup = 100, refresh = 0, silent = 2)
+  fit1 <- suppressWarnings(suppressMessages(brms::do_call(bmm, c(list(
+    bmf(thetat ~ 1, kappa ~ 1),
+    oberauer_lin_2017[oberauer_lin_2017$ID == 1, ],
+    mixture2p("dev_rad"),
+    backend = "cmdstanr", seed = 1
+  ), fit_args))))
+  fit2 <- suppressWarnings(suppressMessages(
+    brms::do_call(update, c(list(fit1, seed = 2), fit_args))
+  ))
+
+  combined <- brms::combine_models(fit1, fit2)
+  expect_s3_class(combined, "bmmfit")
+  expect_equal(brms::nchains(combined), 2)
+})
+
 test_that("update.bmmfit frees parameters that the new formula predicts", {
   skip_on_cran()
   fit1 <- sdm_fixture()
