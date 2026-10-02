@@ -61,6 +61,9 @@
 * `imm()`, `sdm()` and `ezdm()` now refuse an unknown `version` when the model is created, with an error that lists the valid ones. Before, `imm()` accepted it and `bmm()` then failed with `no applicable method for 'configure_model'`, `ezdm()` failed only inside `bmm()`, and `sdm()` silently fitted the `"simple"` version, so such `sdm()` fits need no rerun. These three and `m3()` also accept an unambiguous abbreviation, such as `version = "f"` for `"full"` (#467).
 * `brms::combine_models()` now merges a fit with a refit made by `update()`, e.g. `update(fit, seed = 2)` to rerun chains that failed. Before, it stopped with *"Models 1 and 2 have different formulas"*. Both fits must come from the same bmm version, so rerun `update()` refits made with an earlier version (#464).
 
+### Documentation
+* New online [article](https://popov-lab.github.io/bmm/dev/articles/bmm_hypothesis_testing.html) on testing hypotheses and comparing models: testing effects on a parameter with `hypothesis()`, comparing a model with and without a predictor, and comparing different models fitted to the same data, with leave-one-out cross-validation and Bayes factors (#308).
+
 ### Other changes
 * `supported_models()` now lists the models under four task groups (continuous reproduction; categorical recall and n-AFC decisions; detection, recognition and confidence judgments; choices and response times), one line per model with its constructor and full name. The argument lists are gone from the printout; `?modelname` has them. `supported_models(print_call = FALSE)` is unchanged (#440).
 * The home page of the website and the README now start from your task and list the models for each one, with links to the matching articles. The lists are generated from the package, so they stay current as models are added (#440).

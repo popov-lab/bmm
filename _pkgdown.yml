@@ -93,8 +93,10 @@ articles:
     desc: >
        Guides to using various features of the **bmm** package
     contents:
+     - articles/bmm_brms_to_bmm
      - articles/bmm_bmmformula
      - articles/bmm_extract_info
+     - articles/bmm_hypothesis_testing
   - title: Continuous reproduction tasks
     desc: Fitting models to continuous reproduction tasks
     contents:
