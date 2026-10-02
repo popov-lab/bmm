@@ -76,10 +76,10 @@
         list(b = "Background activation. Added to each response category. Fixed for scaling, necessary in all models."),
         .m3_version_table[[version]][["parameters"]]
       ),
+      links = .m3_version_table[[version]][["links"]][[choice_rule]],
       fixed_parameters = list(
         b = if (choice_rule == "softmax") 0 else 0.1
       ),
-      links = .m3_version_table[[version]][["links"]][[choice_rule]],
       default_priors = .m3_version_table[[version]][["priors"]][[choice_rule]]
     ),
     class = c("bmmodel", "m3", paste0("m3_", version)),

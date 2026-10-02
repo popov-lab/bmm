@@ -10,11 +10,11 @@
       domain = "Visual working memory",
       task = "Continuous reproduction",
       name = "Two-parameter mixture model by Zhang and Luck (2008).",
-      version = "NA",
       citation = glue(
         "Zhang, W., & Luck, S. J. (2008). Discrete fixed-resolution \\
         representations in visual working memory. Nature, 453(7192), 233-235"
       ),
+      version = "NA",
       requirements = glue(
         "- The response vairable should be in radians and \\
         represent the angular error relative to the target"

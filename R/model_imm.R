@@ -12,11 +12,11 @@
       domain = "Visual working memory",
       task = "Continuous reproduction",
       name = "Interference measurement model by Oberauer and Lin (2017).",
-      version = version,
       citation = glue(
         "Oberauer, K., & Lin, H.Y. (2017). An interference model \\
           of visual working memory. Psychological Review, 124(1), 21-59"
       ),
+      version = version,
       requirements = glue(
         "- The response vairable should be in radians and \\
           represent the angular error relative to the target

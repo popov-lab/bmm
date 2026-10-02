@@ -11,12 +11,12 @@
       domain = "Visual working memory",
       task = "Continuous reproduction",
       name = "Three-parameter mixture model by Bays et al (2009).",
-      version = "NA",
       citation = glue(
         "Bays, P. M., Catalao, R. F. G., & Husain, M. (2009). \\
         The precision of visual working memory is set by allocation \\
         of a shared resource. Journal of Vision, 9(10), 1-11"
       ),
+      version = "NA",
       requirements = glue(
         "- The response vairable should be in radians and \\
         represent the angular error relative to the target

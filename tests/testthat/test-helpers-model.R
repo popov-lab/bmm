@@ -237,6 +237,41 @@ test_that("generated template code constructs a valid bmmodel", {
   )
 })
 
+test_that("model constructors and the template list their fields in the canonical order", {
+  skip_on_cran()
+  canonical <- c(
+    "resp_vars", "other_vars", "domain", "task", "name", "citation", "version",
+    "requirements", "parameters", "links", "fixed_parameters", "default_priors",
+    "init_ranges"
+  )
+  # m3 builds its inits in create_initfun.m3() and drops an empty default_priors
+  optional <- c("default_priors", "init_ranges")
+  expect_canonical <- function(model, label) {
+    fields <- names(model)
+    expect_identical(fields, intersect(canonical, fields), label = label)
+    expect_in(setdiff(canonical, fields), optional)
+  }
+
+  ns <- asNamespace("bmm")
+  for (constructor in ls(ns, pattern = "^\\.model_", all.names = TRUE)) {
+    expect_canonical(get(constructor, envir = ns)(), constructor)
+  }
+  # user priors on an m3 version without defaults are appended after construction
+  expect_canonical(
+    .model_m3(resp_cats = "a", default_priors = list(a = list(main = "normal(0, 1)"))),
+    ".model_m3 with default_priors"
+  )
+
+  for (versions in list(NULL, c("simple", "full"))) {
+    env <- new.env(parent = ns)
+    eval(
+      parse(text = capture.output(use_model_template("tmpl_order", versions, testing = TRUE))),
+      envir = env
+    )
+    expect_canonical(env$.model_tmpl_order(), "use_model_template() scaffold")
+  }
+})
+
 test_that("stancode() works with brmsformula", {
   ff <- brms::bf(count ~ zAge + zBase * Trt + (1 | patient))
   sd <- stancode(ff, data = brms::epilepsy, family = poisson())

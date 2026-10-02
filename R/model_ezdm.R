@@ -85,10 +85,9 @@
       default_priors = .ezdm_version_table[[version]][["priors"]],
       init_ranges = .ezdm_version_table[[version]][["init_ranges"]]
     ),
-    class = c("bmmodel", "ezdm"),
+    class = c("bmmodel", "ezdm", paste0("ezdm_", version)),
     call = call
   )
-  if (!is.null(version)) class(out) <- c(class(out), paste0("ezdm_", version))
   out <- set_links(out, links)
   out
 }
