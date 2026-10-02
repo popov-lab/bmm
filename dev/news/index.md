@@ -561,6 +561,15 @@
   such as a `log` or `softplus` link on `drift`
   (`Variable 'Intercept_drift' has NA values`)
   ([\#460](https://github.com/popov-lab/bmm/issues/460)).
+- [`brms::combine_models()`](https://paulbuerkner.com/brms/reference/combine_models.html)
+  now merges a fit with a refit made by
+  [`update()`](https://rdrr.io/r/stats/update.html),
+  e.g. `update(fit, seed = 2)` to rerun chains that failed. Before, it
+  stopped with *“Models 1 and 2 have different formulas”*. Both fits
+  must come from the same bmm version, so rerun
+  [`update()`](https://rdrr.io/r/stats/update.html) refits made with an
+  earlier version
+  ([\#464](https://github.com/popov-lab/bmm/issues/464)).
 
 #### Other changes
 
