@@ -73,6 +73,9 @@ dat <- zhang_luck_2008
 head(dat[, c("subID", "setsize", "response_error")])
 ```
 
+`setsize` is a factor. With a numeric column, `0 + setsize` below would fit a
+single slope instead of one value per set size.
+
 The mixture model assumes that a response comes either from memory or from a
 guess. Memory responses scatter around the true color with a von Mises
 distribution, the normal distribution of the circle, whose precision is `kappa`.
@@ -116,12 +119,12 @@ brms_fit <- brm(
 ```
 
 `kappa2` is fixed at -100 because `brms` estimates `kappa` on the log scale, and
-`exp(-100)` is as close to zero as anyone needs. With only eight participants,
-the participant effects on the mixture weight make the sampler take small steps
-in places, so we raise `adapt_delta` from its default of 0.8 to avoid divergent
-transitions; this is a `brms` argument and works the same in `bmm()`. The last
-four priors are not
-the `brms` defaults. They are the priors `bmm` uses for this model, and we pass
+`exp(-100)` is as close to zero as anyone needs. At the default `adapt_delta`
+of 0.8, the sampler occasionally reports a divergent transition for this model,
+so we raise it; this is a `brms` argument and works the same in `bmm()`.
+`file =` saves the fit and loads it on later runs instead of refitting, so
+change the name, or drop the argument, when you change the data or the model.
+The last four priors are not the `brms` defaults. They are the priors `bmm` uses for this model, and we pass
 them here so that both fits are the same model. We come back to them in
 [the section on priors](#why-the-default-priors-are-informative).
 
@@ -162,7 +165,8 @@ bmm_fit$formula
 and `theta1`. `mu1`, `mu2` and `kappa2` are fixed with constant priors, as in
 the `brms` call. Apart from the parameter names, the Stan code of the two fits
 is the same program with the same priors, so the posteriors agree up to the
-noise of the sampler:
+noise of the sampler. Both columns are on the link scale, log `kappa` and logit
+`thetat`, which we explain [below](#which-scale-the-estimates-are-on):
 
 ```{r, message = FALSE}
 brms_est <- fixef(brms_fit)
@@ -189,8 +193,10 @@ comparison <- data.frame(
 knitr::kable(comparison, row.names = FALSE)
 ```
 
-`bmm` does not add anything to the model. It writes the `brms` code, checks the
-data, and picks priors that suit the model, and that is all.
+For this model, `bmm` adds nothing to the Stan program. It writes the `brms`
+code, checks the data, and picks priors and starting values that suit the
+model. For models that `brms` has no family for, such as `sdm()` or
+`cswald()`, `bmm` also supplies the Stan code of the likelihood.
 
 # Where the response lives
 
@@ -331,11 +337,24 @@ kappa_sds <- c(prior_sd(dpr$kappa$main), prior_sd(dpr$kappa$effects))
 kappa_cell_prior <- sprintf(
   "normal(%g, %.2f)", prior_mean(dpr$kappa$main), sqrt(sum(kappa_sds^2))
 )
+kappa_prior_95 <- exp(qnorm(c(0.025, 0.975), prior_mean(dpr$kappa$main),
+                            prior_sd(dpr$kappa$main)))
+# the priors section calls this prior flat on the probability scale
+if (dpr$thetat$main != "logistic(0, 1)") {
+  stop("The thetat default prior changed: revise the priors section.")
+}
+thetat_cell1 <- c(mean(draws_cell$b_thetat_setsize1),
+                  mean(draws_ref$b_thetat_Intercept))
+thetat_diff_gap <- max(abs(vapply(set_sizes[-1], function(s) {
+  mean(draws_cell[[paste0("b_thetat_setsize", s)]] - draws_cell$b_thetat_setsize1) -
+    mean(draws_ref[[paste0("b_thetat_setsize", s)]])
+}, numeric(1))))
 ```
 
-The two codings give the same results. In every cell, the estimates of the two
-fits differ by less than `r ceiling(max(rel_diff) * 1000) / 10`% of their value;
-the largest gap is `r np_cell$parameter[worst]` at set size
+On the scale of the model, the two codings give practically the same estimates.
+In every cell, the estimates of the two fits differ by less than
+`r ceiling(max(rel_diff) * 1000) / 10`% of the `0 + setsize` estimate; the
+largest gap is `r np_cell$parameter[worst]` at set size
 `r np_cell$setsize[worst]`, `r sprintf("%.2f", np_cell$Estimate[worst])` against
 `r sprintf("%.2f", np_ref_matched$Estimate[worst])`. Pick the coding whose
 coefficients you want to read.
@@ -349,12 +368,18 @@ prior for the parameter itself, `r dpr$kappa$main` for `kappa` on the log scale
 and `r dpr$thetat$main` for `thetat`. With `1 + setsize`, only the intercept,
 the reference cell, gets that prior. The differences get the prior for effects,
 `r dpr$kappa$effects` for `kappa` and `r dpr$thetat$effects` for `thetat`. Any
-other cell is the intercept plus a difference, so its prior is the sum of two
-priors. For `kappa`, the two normal priors add up to `r kappa_cell_prior`, whose
+other cell is the intercept plus a difference, so its prior is that of a sum of
+two independent coefficients. For `kappa`, the two normal priors add up to `r kappa_cell_prior`, whose
 standard deviation is the square root of
 `r kappa_sds[1]`² + `r kappa_sds[2]`²: wider than the `r dpr$kappa$main` that
 the same cell gets with `0 + setsize`. With this data set, the table above shows
-that the difference barely matters. With fewer trials per cell, the priors carry
+that the difference barely matters. The exception is `thetat` at set size 1.
+Near a probability of 1, the data say little about the logit, and with
+`1 + setsize` the effects prior, centered on zero, pulls the reference cell
+towards the other set sizes. On the logit scale, the two fits estimate `thetat`
+at set size 1 as `r sprintf("%.2f", thetat_cell1[1])` and
+`r sprintf("%.2f", thetat_cell1[2])`, and the set-size differences of `thetat`
+differ by up to `r sprintf("%.2f", thetat_diff_gap)` logits. With fewer trials per cell, the priors carry
 more weight, and the two codings can give different estimates. So check
 `default_prior()` for the coding you use, as shown in [the section on
 priors](#why-the-default-priors-are-informative), and set your own priors if the
@@ -376,8 +401,9 @@ summary(bmm_fit)
 `kappa` must be positive, and `thetat` turns into a probability. Neither can be
 predicted by a linear model directly, so `bmm` estimates them on an unbounded
 scale and transforms them back. `kappa` has a log link, so the coefficients are
-log precisions. `thetat` has a logit link: the weight of the guessing component
-is fixed at 0 on the same scale, so a `thetat` of 0 means that memory and
+log precisions. `thetat` has a logit link. `brms` fixes the weight of the
+second, guessing component (`theta2`) at 0 on this scale, so a `thetat` of 0
+means that memory and
 guessing are equally likely, and the probability that a response comes from
 memory is `plogis(thetat)`. Every coefficient in the summary, every prior, and every
 value you fix a parameter to lives on this link scale.
@@ -450,15 +476,18 @@ default_prior(
   knitr::kable(row.names = FALSE)
 ```
 
-The `normal(2, 1)` on the log of `kappa` places 95% of its mass between a
-`kappa` of `r round(exp(2 - 1.96), 1)` and `r round(exp(2 + 1.96), 1)`, that
-is, between a circular standard deviation of
-`r round(k2sd(exp(2 - 1.96)) * 180 / pi)` and
-`r round(k2sd(exp(2 + 1.96)) * 180 / pi)` degrees. Values in the thousands,
-which would mean memory accurate to a fraction of a degree, get next to no
-prior mass. The `logistic(0, 1)` on `thetat` is flat on the probability
-scale: before seeing the data, every probability of a memory response between
-0 and 1 is equally likely.
+The `r dpr$kappa$main` on the log of `kappa` places 95% of its mass between a
+`kappa` of `r round(kappa_prior_95[1], 1)` and `r round(kappa_prior_95[2], 1)`,
+that is, between a circular standard deviation of
+`r round(k2sd(kappa_prior_95[1]) * 180 / pi)` and
+`r round(k2sd(kappa_prior_95[2]) * 180 / pi)` degrees. Values in the thousands,
+which would mean a circular standard deviation of
+`r round(k2sd(1000) * 180 / pi, 1)` degrees or less, get next to no prior mass.
+The `r dpr$thetat$main` on `thetat` is flat on the probability scale: before
+seeing the data, every probability of a memory response between 0 and 1 is
+equally likely. It still does work that the `brms` default does not: a flat
+prior on the logit is improper and, on the probability scale, piles its mass at
+0 and 1.
 
 There is a second reason, which has to do with the mixture. When `kappa` comes
 close to 0, the memory distribution becomes as flat as the guessing
@@ -477,7 +506,10 @@ What this means for you:
 - If you know more than the defaults, or something different, set your own
   priors with `prior = ` in `bmm()`. They are `brms` priors on the `bmm`
   parameter names, with `nlpar` or `dpar` as `default_prior()` shows it, for
-  example `prior(normal(1.5, 0.5), class = b, nlpar = kappa)`. The
+  example `prior(normal(1.5, 0.5), class = b, nlpar = kappa)`, again on the log
+  scale. With `0 + setsize`, this sets the prior of every cell of `kappa`. With
+  `1 + setsize`, it sets the prior of the differences only; the intercept takes
+  `coef = "Intercept"`, as `default_prior()` shows for that coding. The
   [article on extracting model information](https://popov-lab.github.io/bmm/articles/bmm_extract_info.html)
   shows the details.
 - Bayes factors depend on the priors much more than estimates do. If you plan to
@@ -490,7 +522,8 @@ on it: `fixef()`, `ranef()`, `as_draws_df()`, `pp_check()`,
 `conditional_effects()`, `hypothesis()`, `loo()` and the rest. As shown above,
 `bmm_fit$formula` holds the `brmsformula` that `bmm` generated, and
 `stancode(bmm_fit)` the Stan code. `summary(bmm_fit, backend = "brms")` prints
-the `brms` summary instead of the `bmm` one. If you want to change a model
+the `brms` summary instead of the `bmm` one. It lists the link of `theta1` as
+`identity`, because `brms` applies the softmax inside the mixture family. If you want to change a model
 beyond what `bmm` offers, these give you the `brms` code to start from.
 
 # Where to go next
