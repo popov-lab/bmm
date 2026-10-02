@@ -80,7 +80,14 @@ check_data.non_targets <- function(model, data, formula) {
   )
 
   ss <- check_var_set_size(model$other_vars$set_size, data)
-  max_set_size <- ss$max_set_size
+  # update() without newdata re-checks the fit's stored frame, from which brms
+  # dropped the NA-response rows: when all responses at the largest set size are
+  # missing, the frame's maximum is smaller than the one the fit was built with,
+  # and only the fit's own LureIdx columns still record it (#459).
+  # revert_check_data() passes that bound on; bmm() and update(newdata = ) never
+  # set it, so the check below still applies in full to the user's data
+  max_set_size <- attr(data, "fit_max_set_size") %||% ss$max_set_size
+  attr(data, "fit_max_set_size") <- NULL
   ss_numeric <- ss$ss_numeric
 
   stopif(

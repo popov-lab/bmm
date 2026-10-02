@@ -497,6 +497,17 @@ test_that("report_priors() reconstructs the defaults of a fit that needs data2",
 })
 
 test_that("report_priors() still reports a fit whose stored frame fails check_data()", {
+  fit <- suppressWarnings(suppressMessages(bmm(
+    bmf(kappa ~ 1, thetat ~ 1), oberauer_lin_2017[oberauer_lin_2017$ID %in% 1:2, ],
+    mixture2p("dev_rad"), backend = "mock", mock_fit = 1, rename = FALSE
+  )))
+  # which stored frames fail the check changes as update() learns to rebuild
+  # them, so the failure is forced rather than taken from one model
+  local_mocked_bindings(check_stored_data = function(...) stop2("frame not rebuilt"))
+  expect_warning(report_priors(fit), "could not be checked again")
+})
+
+test_that("report_priors() re-checks a fit whose largest set size has no response (#459)", {
   lin <- oberauer_lin_2017[oberauer_lin_2017$ID %in% 1:2, ]
   lin$dev_rad[lin$set_size == "8"] <- NA
   fit <- suppressWarnings(suppressMessages(bmm(
@@ -504,7 +515,7 @@ test_that("report_priors() still reports a fit whose stored frame fails check_da
     mixture3p("dev_rad", nt_features = paste0("col_nt", 1:7), set_size = "set_size"),
     backend = "mock", mock_fit = 1, rename = FALSE
   )))
-  expect_warning(report_priors(fit), "could not be checked again")
+  expect_no_warning(report_priors(fit))
 })
 
 test_that("subsetting a report returns a plain data.frame that still prints", {
