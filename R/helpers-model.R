@@ -508,19 +508,164 @@ model_registry <- function(models = supported_models(print_call = FALSE)) {
   registry[order(match(registry$group, group_levels), registry$model), ]
 }
 
+reference_url <- "https://popov-lab.github.io/bmm/reference/"
+
 format_model_list <- function(registry, style = "text", headers = TRUE) {
-  reference <- "https://popov-lab.github.io/bmm/reference/"
   blocks <- lapply(unique(registry$group), function(group) {
     rows <- registry[registry$group == group, ]
     header <- if (!headers) NULL else if (style == "md") glue("**{group}**") else group
     items <- if (style == "md") {
-      glue("- [`{rows$model}()`]({reference}{rows$model}.html): {rows$name}")
+      glue("- [`{rows$model}()`]({reference_url}{rows$model}.html): {rows$name}")
     } else {
       glue("- {rows$model}(): {rows$name}")
     }
     c(header, if (headers) "", items, "")
   })
   unlist(blocks)
+}
+
+# what each data argument of a constructor holds, for the model overview in the
+# Get started article. Kept central for the same reason as
+# response_annotations(); the `@param` text is too long for a table cell. A
+# `<model>_<version>` entry replaces the model's entry for that version, and NA
+# marks an argument that names no data column. A test requires an entry for
+# every argument without a default, so a new model needs its labels here
+data_column_roles <- list(
+  cswald = c(
+    rt = "response time in seconds",
+    response = "choice, 0 = lower and 1 = upper boundary"
+  ),
+  ddm = c(
+    rt = "response time in seconds",
+    response = "choice, 0 = lower and 1 = upper boundary"
+  ),
+  ezdm = c(
+    mean_rt = "mean response time in seconds",
+    var_rt = "variance of the response times in seconds\u00b2",
+    n_upper = "number of upper-boundary responses",
+    n_trials = "number of trials"
+  ),
+  ezdm_4par = c(
+    mean_rt = "mean response time in seconds, one column per boundary (upper, lower)",
+    var_rt = "variance of the response times in seconds\u00b2, one column per boundary (upper, lower)",
+    n_upper = "number of upper-boundary responses",
+    n_trials = "number of trials"
+  ),
+  imm = c(
+    resp_error = "response error relative to the target, in radians",
+    nt_features = "non-target features relative to the target, in radians, one column per non-target",
+    nt_distances = "distance of each non-target to the target, one column per non-target",
+    set_size = "set size (a column, or one number)"
+  ),
+  imm_abc = c(
+    resp_error = "response error relative to the target, in radians",
+    nt_features = "non-target features relative to the target, in radians, one column per non-target",
+    nt_distances = NA,
+    set_size = "set size (a column, or one number)"
+  ),
+  m3 = c(
+    resp_cats = "number of responses in each response category, one column per category",
+    num_options = "number of candidates in each category (columns, or one number per category)"
+  ),
+  mixture2p = c(
+    resp_error = "response error relative to the target, in radians"
+  ),
+  mixture3p = c(
+    resp_error = "response error relative to the target, in radians",
+    nt_features = "non-target features relative to the target, in radians, one column per non-target",
+    set_size = "set size (a column, or one number)"
+  ),
+  sdm = c(
+    resp_error = "response error relative to the target, in radians"
+  ),
+  sdt_cdp = c(
+    response = "prefix of the count columns `new<k>`, `know<k>`, `remember<k>` and optionally `guess<k>`, one per confidence level (default: no prefix)",
+    stimulus = "stimulus type, 0 = new and 1 = old",
+    n_new = NA,
+    n_old = NA
+  ),
+  sdt_mafc = c(
+    response = "number of correct responses",
+    n_trials = "number of trials",
+    m = "number of alternatives (a column, or one number)"
+  ),
+  sdt_ranking = c(
+    response = "number of trials with the target at each rank, one column per rank",
+    m = "number of ranked items (a column, or one number)"
+  ),
+  sdt_rating = c(
+    response = "number of responses in each rating category, one column per category",
+    stimulus = "stimulus type, 0 = noise/new and 1 = signal/old"
+  ),
+  sdt_yn = c(
+    response = "number of 'old'/'signal' responses",
+    stimulus = "stimulus type, 0 = noise/new and 1 = signal/old",
+    n_trials = "number of trials"
+  )
+)
+
+model_versions <- function(model) {
+  version <- formals(get_model2(model))$version
+  if (is.null(version)) NA_character_ else eval(version)
+}
+
+column_roles <- function(model, version) {
+  data_column_roles[[paste0(model, "_", version)]] %||% data_column_roles[[model]]
+}
+
+format_data_columns <- function(roles) {
+  roles <- roles[!is.na(roles)]
+  paste0("`", names(roles), "`: ", roles, collapse = "<br>")
+}
+
+# the part of a parameter description before its first ": ", " = " or ". ",
+# e.g. "Drift rate" from "Drift rate = Average rate of evidence accumulation"
+parameter_label <- function(description) {
+  sub("(: | = |\\. ).*$", "", description)
+}
+
+format_key_parameters <- function(spec) {
+  estimated <- setdiff(names(spec$parameters), names(spec$fixed_parameters))
+  fixed <- intersect(names(spec$fixed_parameters), names(spec$parameters))
+  lines <- if (length(estimated) == 0) {
+    "None by default: your formula defines them"
+  } else {
+    descriptions <- vapply(spec$parameters[estimated], as.character, "")
+    paste0("`", estimated, "`: ", parameter_label(descriptions))
+  }
+  if (length(fixed) > 0) {
+    lines <- c(lines, paste0("Fixed by default: ", paste0("`", fixed, "`", collapse = ", ")))
+  }
+  paste(lines, collapse = "<br>")
+}
+
+# one row per model version, with the data columns it needs and the parameters
+# it estimates; used for the tables of the Get started article
+model_overview <- function(group = NULL) {
+  registry <- model_registry()
+  if (!is.null(group)) {
+    registry <- registry[registry$group %in% group, ]
+  }
+  rows <- lapply(seq_len(nrow(registry)), function(i) {
+    model <- registry$model[i]
+    versions <- model_versions(model)
+    specs <- lapply(versions, function(version) {
+      if (is.na(version)) get_model(model)() else get_model(model)(version = version)
+    })
+    label <- glue("[`{model}()`]({reference_url}{model}.html)")
+    if (length(versions) > 1) {
+      label <- glue("{label}, version `{versions}`")
+    }
+    data.frame(
+      Model = paste0(label, "<br>", registry$name[i]),
+      `Data columns` = vapply(versions, function(version) {
+        format_data_columns(column_roles(model, version))
+      }, "", USE.NAMES = FALSE),
+      `Key parameters` = vapply(specs, format_key_parameters, ""),
+      check.names = FALSE
+    )
+  })
+  do.call(rbind, rows)
 }
 
 #' Measurement models available in `bmm`

@@ -13,7 +13,7 @@ imm(
   nt_distances,
   set_size,
   regex = FALSE,
-  version = "full",
+  version = c("full", "bsc", "abc"),
   ...
 )
 

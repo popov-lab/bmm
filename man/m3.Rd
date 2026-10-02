@@ -4,7 +4,13 @@
 \alias{m3}
 \title{The Multinomial / Memory Measurement Model}
 \usage{
-m3(resp_cats, num_options, choice_rule = "softmax", version = "custom", ...)
+m3(
+  resp_cats,
+  num_options,
+  choice_rule = "softmax",
+  version = c("custom", "ss", "cs"),
+  ...
+)
 }
 \arguments{
 \item{resp_cats}{The variable names that contain the number of responses for each of the

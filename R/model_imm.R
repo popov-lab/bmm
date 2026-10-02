@@ -201,8 +201,10 @@ settable_links.imm <- function(model) {
 #'   backend = "cmdstanr"
 #' )
 #' @export
-imm <- function(resp_error, nt_features, nt_distances, set_size, regex = FALSE, version = "full", ...) {
+imm <- function(resp_error, nt_features, nt_distances, set_size, regex = FALSE,
+                version = c("full", "bsc", "abc"), ...) {
   call <- match.call()
+  version <- match.arg(version)
   dots <- list(...)
   if ("setsize" %in% names(dots)) {
     set_size <- dots$setsize

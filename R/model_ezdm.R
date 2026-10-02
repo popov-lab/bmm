@@ -187,9 +187,11 @@
 #' # True values: drift = 2, bound = 1.5, ndt = 0.3 (on log scale for drift/bound)
 #' exp(brms::fixef(fit))
 #' }
-ezdm <- function(mean_rt, var_rt, n_upper, n_trials, links = NULL, version = "3par", ...) {
+ezdm <- function(mean_rt, var_rt, n_upper, n_trials, links = NULL,
+                 version = c("3par", "4par"), ...) {
   call <- match.call()
   stop_missing_args()
+  version <- match.arg(version)
   .model_ezdm(
     mean_rt = mean_rt, var_rt = var_rt, n_upper = n_upper, n_trials = n_trials,
     links = links, version = version, call = call, ...
