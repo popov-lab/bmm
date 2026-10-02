@@ -4,7 +4,15 @@
 \alias{ezdm}
 \title{EZ-Diffusion Model}
 \usage{
-ezdm(mean_rt, var_rt, n_upper, n_trials, links = NULL, version = "3par", ...)
+ezdm(
+  mean_rt,
+  var_rt,
+  n_upper,
+  n_trials,
+  links = NULL,
+  version = c("3par", "4par"),
+  ...
+)
 }
 \arguments{
 \item{mean_rt}{The names of the variable or variables (for 4par version) coding the mean reaction time in seconds in the data.}

@@ -104,9 +104,14 @@ again. Once every check passes, you are ready to fit models.
 # Which model fits your task
 
 You come to `bmm` with data from a task, so this section is organized by task.
-Each entry lists the models `bmm` provides for it and links to the article that
-walks through them. The lists are generated from the package, so they show the
-models of the version this page was built from.
+Each entry links to the article that walks through the models `bmm` provides
+for the task, and a table lists every model and version with the data columns
+it needs and the parameters it estimates. In the data columns, the name before
+the colon is the argument of the model function that you set to the name of
+your column. Parameters listed as fixed by default are held at a constant
+value; `?modelname` gives that value and what the parameter does. The tables are
+generated from the package, so they show the models of the version this page
+was built from.
 
 ## Continuous reproduction
 
@@ -115,8 +120,8 @@ orientation, and the response error on the circle is the dependent variable.
 The [continuous reproduction article](https://popov-lab.github.io/bmm/articles/bmm_vwm_crt.html)
 describes the task and compares the models.
 
-```{r, results = "asis", echo = FALSE}
-print_pretty_models_md(group = "Continuous reproduction")
+```{r, echo = FALSE}
+knitr::kable(bmm:::model_overview(group = "Continuous reproduction"))
 ```
 
 ## Categorical recall and n-AFC decisions
@@ -126,8 +131,8 @@ correct item, an item from another list position, or an item that was not
 studied. The [M3 article](https://popov-lab.github.io/bmm/articles/bmm_m3.html)
 shows how to set up the response categories and the activation model.
 
-```{r, results = "asis", echo = FALSE}
-print_pretty_models_md(group = "Categorical recall and n-AFC decisions")
+```{r, echo = FALSE}
+knitr::kable(bmm:::model_overview(group = "Categorical recall and n-AFC decisions"))
 ```
 
 ## Detection, recognition and confidence judgments
@@ -147,8 +152,8 @@ walks through the yes/no, rating, m-AFC and ranking models, and the
 through the `dpsdt` and `metad` versions of `sdt_rating()` and through
 `sdt_cdp()`.
 
-```{r, results = "asis", echo = FALSE}
-print_pretty_models_md(group = "Detection, recognition and confidence judgments")
+```{r, echo = FALSE}
+knitr::kable(bmm:::model_overview(group = "Detection, recognition and confidence judgments"))
 ```
 
 The models differ in three respects. The response format is what the
@@ -204,8 +209,8 @@ times and the accuracy per condition. Fast guesses and other contaminant
 responses are the topic of the
 [response time contamination article](https://popov-lab.github.io/bmm/articles/bmm_rt_contamination.html).
 
-```{r, results = "asis", echo = FALSE}
-print_pretty_models_md(group = "Choices and response times")
+```{r, echo = FALSE}
+knitr::kable(bmm:::model_overview(group = "Choices and response times"))
 ```
 
 ```{r other-groups, results = "asis", echo = FALSE}
@@ -218,11 +223,11 @@ other <- setdiff(unique(registry$group), known)
 if (length(other) > 0) {
   cat("## Other models\n\n")
   cat("These models were added after this page was written:\n\n")
-  print_pretty_models_md(group = other)
+  print(knitr::kable(bmm:::model_overview(group = other)))
 }
 ```
 
-You can print the same list in R at any time with `supported_models()`, and
+You can list the models in R at any time with `supported_models()`, and
 `?modelname` (for example `?sdt_yn`) documents the data a model expects, its
 parameters and its default priors, that is, what the model assumes about each
 parameter before it sees the data.

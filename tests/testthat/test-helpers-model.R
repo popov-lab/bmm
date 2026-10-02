@@ -60,6 +60,111 @@ test_that("print_pretty_models_md(group = ) lists one group without headers", {
   expect_error(print_pretty_models_md(group = character(0)), "must not be empty")
 })
 
+test_that("every data argument of every model version has a column role", {
+  for (model in supported_models(print_call = FALSE)) {
+    args <- formals(get_model2(model))
+    no_default <- vapply(args, function(arg) is.symbol(arg) && as.character(arg) == "", TRUE)
+    required <- setdiff(names(args)[no_default], "...")
+    for (version in model_versions(model)) {
+      roles <- column_roles(model, version)
+      unlabeled <- setdiff(required, names(roles))
+      stale <- setdiff(names(roles), names(args))
+      expect(
+        length(unlabeled) == 0,
+        glue::glue("{model} {version}: no entry in data_column_roles for {collapse_comma(unlabeled)}")
+      )
+      expect(
+        length(stale) == 0,
+        glue::glue("{model} {version}: data_column_roles names unknown arguments {collapse_comma(stale)}")
+      )
+    }
+  }
+})
+
+test_that("data_column_roles keys name a model or one of its versions", {
+  valid <- unlist(lapply(supported_models(print_call = FALSE), function(model) {
+    versions <- model_versions(model)
+    c(model, if (!anyNA(versions)) paste0(model, "_", versions))
+  }))
+  expect_equal(setdiff(names(data_column_roles), valid), character(0))
+})
+
+test_that("model_versions() lists the versions a constructor accepts", {
+  expect_equal(model_versions("imm"), c("full", "bsc", "abc"))
+  expect_equal(model_versions("m3"), c("custom", "ss", "cs"))
+  expect_equal(model_versions("ezdm"), c("3par", "4par"))
+  expect_equal(model_versions("mixture2p"), NA_character_)
+})
+
+test_that("imm(), m3(), ezdm() and sdm() refuse an unknown version", {
+  expect_error(sdm("y", version = "xyz"), "should be \"simple\"")
+  expect_error(imm("y", "x", "d", "s", version = "xyz"), "should be one of")
+  expect_error(m3(c("corr", "other"), c(1, 4), version = "xyz"), "should be one of")
+  expect_error(ezdm("m", "v", "n", "t", version = "xyz"), "should be one of")
+})
+
+test_that("parameter_label() keeps the name before the first separator", {
+  expect_equal(parameter_label("Drift rate = Average rate of evidence accumulation"), "Drift rate")
+  expect_equal(parameter_label("Sensitivity: d' under equal variance (the default)."), "Sensitivity")
+  expect_equal(parameter_label("Context activation. Added to the cued item."), "Context activation")
+  expect_equal(
+    parameter_label("d_a sensitivity (= d' when sdratio is fixed): the distance"),
+    "d_a sensitivity (= d' when sdratio is fixed)"
+  )
+  expect_equal(parameter_label("Spatial similarity gradient"), "Spatial similarity gradient")
+})
+
+test_that("estimated parameter labels have balanced parentheses", {
+  for (model in supported_models(print_call = FALSE)) {
+    for (version in model_versions(model)) {
+      spec <- if (is.na(version)) get_model(model)() else get_model(model)(version = version)
+      estimated <- setdiff(names(spec$parameters), names(spec$fixed_parameters))
+      labels <- parameter_label(vapply(spec$parameters[estimated], as.character, ""))
+      open <- lengths(regmatches(labels, gregexpr("(", labels, fixed = TRUE)))
+      close <- lengths(regmatches(labels, gregexpr(")", labels, fixed = TRUE)))
+      expect_equal(open, close, ignore_attr = TRUE)
+    }
+  }
+})
+
+test_that("model_overview() has one row per version with its own columns and parameters", {
+  overview <- model_overview()
+  n_versions <- sum(lengths(lapply(supported_models(print_call = FALSE), model_versions)))
+  expect_equal(nrow(overview), n_versions)
+
+  imm_rows <- overview[grepl("`imm()`", overview$Model, fixed = TRUE), ]
+  expect_equal(nrow(imm_rows), 3)
+  abc <- grepl("version `abc`", imm_rows$Model, fixed = TRUE)
+  expect_false(grepl("nt_distances", imm_rows$`Data columns`[abc]))
+  expect_true(all(grepl("nt_distances", imm_rows$`Data columns`[!abc])))
+  expect_false(grepl("`s`", imm_rows$`Key parameters`[abc]))
+
+  custom <- overview[grepl("version `custom`", overview$Model, fixed = TRUE), ]
+  expect_match(custom$`Key parameters`, "your formula defines them")
+
+  dpsdt <- overview[grepl("version `dpsdt`", overview$Model, fixed = TRUE), ]
+  expect_match(dpsdt$`Key parameters`, "Fixed by default: `sdratio`, `Ro`, `Rn`", fixed = TRUE)
+  expect_false(grepl("`Ro`:", dpsdt$`Key parameters`, fixed = TRUE))
+
+  cdp <- overview[grepl("`sdt_cdp()`", overview$Model, fixed = TRUE), ]
+  expect_false(grepl("n_new", cdp$`Data columns`, fixed = TRUE))
+  expect_match(cdp$`Data columns`, "`response`:", fixed = TRUE)
+
+  imm_full <- overview[grepl("imm.html), version `full`", overview$Model, fixed = TRUE), ]
+  expect_false(grepl("mu2|kappa2", imm_full$`Key parameters`))
+
+  m3_ss <- overview[grepl("m3.html), version `ss`", overview$Model, fixed = TRUE), ]
+  expect_match(m3_ss$`Data columns`, "correct, other list item, not-presented lure", fixed = TRUE)
+  m3_cs <- overview[grepl("m3.html), version `cs`", overview$Model, fixed = TRUE), ]
+  expect_match(m3_cs$`Data columns`, "each of 5 categories", fixed = TRUE)
+
+  mixture2p <- overview[grepl("`mixture2p()`", overview$Model, fixed = TRUE), ]
+  expect_false(grepl("version", mixture2p$Model))
+
+  rt_models <- model_overview(group = "Choices and response times")
+  expect_true(all(grepl("`(ddm|cswald|ezdm)\\(\\)`", rt_models$Model)))
+})
+
 test_that("get_model() returns the correct function", {
   expect_equal(get_model("mixture2p"), .model_mixture2p)
 })
