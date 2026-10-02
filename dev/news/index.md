@@ -586,6 +586,18 @@
   earlier version
   ([\#464](https://github.com/popov-lab/bmm/issues/464)).
 
+#### Documentation
+
+- New online
+  [article](https://popov-lab.github.io/bmm/dev/articles/bmm_hypothesis_testing.html)
+  on testing hypotheses and comparing models: testing effects on a
+  parameter with
+  [`hypothesis()`](https://paulbuerkner.com/brms/reference/hypothesis.brmsfit.html),
+  comparing a model with and without a predictor, and comparing
+  different models fitted to the same data, with leave-one-out
+  cross-validation and Bayes factors
+  ([\#308](https://github.com/popov-lab/bmm/issues/308)).
+
 #### Other changes
 
 - [`supported_models()`](https://popov-lab.github.io/bmm/dev/reference/supported_models.md)

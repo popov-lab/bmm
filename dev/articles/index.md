@@ -10,6 +10,8 @@ Guides to using various features of the **bmm** package
   syntax](https://popov-lab.github.io/bmm/dev/articles/bmm_bmmformula.md):
 - [Extracting default priors, the generated Stan code and Stan
   data](https://popov-lab.github.io/bmm/dev/articles/bmm_extract_info.md):
+- [Testing hypotheses and comparing
+  models](https://popov-lab.github.io/bmm/dev/articles/bmm_hypothesis_testing.md):
 
 ### Continuous reproduction tasks
 
