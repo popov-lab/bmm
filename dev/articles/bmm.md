@@ -412,6 +412,10 @@ pp_check(fit, ndraws = 50)
 
 ## 5 Where to go next
 
+- If you know `brms`, [From brms to
+  bmm](https://popov-lab.github.io/bmm/articles/bmm_brms_to_bmm.html)
+  fits one model in both packages and explains each difference in the
+  code.
 - The [bmmformula
   article](https://popov-lab.github.io/bmm/articles/bmm_bmmformula.html)
   covers the formula syntax: fixed parameters, non-linear predictors,

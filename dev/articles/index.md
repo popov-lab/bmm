@@ -4,6 +4,8 @@
 
 Guides to using various features of the **bmm** package
 
+- [From brms to
+  bmm](https://popov-lab.github.io/bmm/dev/articles/bmm_brms_to_bmm.md):
 - [Introduction to the bmmformula
   syntax](https://popov-lab.github.io/bmm/dev/articles/bmm_bmmformula.md):
 - [Extracting default priors, the generated Stan code and Stan

@@ -166,7 +166,8 @@
   settings do not force a refit — `control = list(adapt_delta = )` in
   particular, and also `iter`, `warmup`, `chains`, `seed`, `init` and
   `save_pars`: rerunning with a higher `adapt_delta` after divergent
-  transitions, or with `save_pars(all = TRUE)` for `loo()`, returns the
+  transitions, or with `save_pars(all = TRUE)` for
+  [`loo()`](https://mc-stan.org/loo/reference/loo.html), returns the
   cached fit unchanged
   ([\#411](https://github.com/popov-lab/bmm/issues/411)).
 - `bmm_options(file_refit = )` accepts the same values as
@@ -235,11 +236,13 @@
   the group value. Every model parameter declares an `sd` entry in its
   `default_priors` (next to `main` and `effects`), applied as a blanket
   `class = "sd"` prior whenever the parameter has random effects. The
-  priors are `exponential()` on the link scale: rate 1 for
-  memory-strength, mixing-weight and identity-linked drift parameters,
-  rate 2 for boundary, non-decision time, start point, contaminant and
-  log-linked drift parameters, rate 4 for the circular bias `mu`/`mu1`.
-  Override by addressing the parameter with `dpar` or `nlpar`,
+  priors are
+  [`exponential()`](https://paulbuerkner.com/brms/reference/brmsfamily.html)
+  on the link scale: rate 1 for memory-strength, mixing-weight and
+  identity-linked drift parameters, rate 2 for boundary, non-decision
+  time, start point, contaminant and log-linked drift parameters, rate 4
+  for the circular bias `mu`/`mu1`. Override by addressing the parameter
+  with `dpar` or `nlpar`,
   e.g. `set_prior("exponential(2)", class = "sd", nlpar = "kappa")`
   ([\#342](https://github.com/popov-lab/bmm/issues/342)).
 - Correlations among random effects now get an `lkj(2)` default prior
@@ -250,7 +253,8 @@
   to `(1 | ID)` or `(x || ID)`. To return to the previous behaviour,
   pass `prior = set_prior("lkj(1)", class = "cor")`.
   [`report_priors()`](https://popov-lab.github.io/bmm/dev/reference/report_priors.md)
-  shows the prior as `lkj(2)`, class `cor`, as written in `set_prior()`
+  shows the prior as `lkj(2)`, class `cor`, as written in
+  [`set_prior()`](https://paulbuerkner.com/brms/reference/set_prior.html)
   ([\#417](https://github.com/popov-lab/bmm/issues/417)).
 - [`bmm()`](https://popov-lab.github.io/bmm/dev/reference/bmm.md) now
   starts every model from tight initial values for its random effects,
@@ -298,11 +302,13 @@
   no longer fails for a fit whose formula needs `data2`,
   e.g. `(1 | gr(ID, cov = A))` (`Object 'A' was not found in 'data2'`).
 - [`report_priors()`](https://popov-lab.github.io/bmm/dev/reference/report_priors.md)
-  now names every kind of correlation prior the way `set_prior()`
+  now names every kind of correlation prior the way
+  [`set_prior()`](https://paulbuerkner.com/brms/reference/set_prior.html)
   documents it, not only the one on group-level effects. A fit with two
-  or more `me()` terms was reported as class `Lme` with
-  `lkj_corr_cholesky(1)`, brms’s internal spelling, instead of `corme`
-  with `lkj(1)`. The same applied to `rescor`, `lncor` and `cortime`.
+  or more [`me()`](https://paulbuerkner.com/brms/reference/me.html)
+  terms was reported as class `Lme` with `lkj_corr_cholesky(1)`, brms’s
+  internal spelling, instead of `corme` with `lkj(1)`. The same applied
+  to `rescor`, `lncor` and `cortime`.
 - [`update()`](https://rdrr.io/r/stats/update.html) with `newdata` or a
   new `formula.` no longer fails before sampling for a model that starts
   from bmm’s initial values (`no more scalars to read` on rstan,
@@ -310,8 +316,10 @@
   the data and formula the update fits; an `init` passed to
   [`update()`](https://rdrr.io/r/stats/update.html) still wins
   ([\#415](https://github.com/popov-lab/bmm/issues/415)).
-- Formulas with `mo()` or `s()` terms no longer start with a partial
-  init list, which made cmdstanr print
+- Formulas with
+  [`mo()`](https://paulbuerkner.com/brms/reference/mo.html) or
+  [`s()`](https://paulbuerkner.com/brms/reference/s.html) terms no
+  longer start with a partial init list, which made cmdstanr print
   `Init values were only set for a subset of parameters`.
   [`extract_parameter_dimensions()`](https://popov-lab.github.io/bmm/dev/reference/extract_parameter_dimensions.md)
   now reads a declaration sized by an element of a data array, such as
@@ -401,10 +409,11 @@
   extreme accuracy were missing.
   [`bmm()`](https://popov-lab.github.io/bmm/dev/reference/bmm.md) now
   keeps them and warns how many there are; refit such models. `newdata`
-  for `log_lik()` or [`predict()`](https://rdrr.io/r/stats/predict.html)
-  now needs the columns `rt_used_upper` and `rt_used_lower`, as in
-  `fit$data`. Where some cells have no usable RT summaries at the upper
-  boundary,
+  for
+  [`log_lik()`](https://mc-stan.org/rstantools/reference/log_lik.html)
+  or [`predict()`](https://rdrr.io/r/stats/predict.html) now needs the
+  columns `rt_used_upper` and `rt_used_lower`, as in `fit$data`. Where
+  some cells have no usable RT summaries at the upper boundary,
   [`pp_check()`](https://popov-lab.github.io/bmm/dev/reference/pp_check.bmmfit.md)
   without `resp_var` leaves those cells out and no longer accepts
   `newdata` or the `loo_*` types
@@ -443,7 +452,8 @@
   4-parameter model returned `NaN` in
   [`dezdm()`](https://popov-lab.github.io/bmm/dev/reference/ezdm_dist.md),
   [`rezdm()`](https://popov-lab.github.io/bmm/dev/reference/ezdm_dist.md),
-  `log_lik()` and
+  [`log_lik()`](https://mc-stan.org/rstantools/reference/log_lik.html)
+  and
   [`pp_check()`](https://popov-lab.github.io/bmm/dev/reference/pp_check.bmmfit.md),
   and both models could return a log-likelihood of `-Inf` when the
   predicted accuracy was very close to 1 but a cell contained errors.
@@ -484,10 +494,13 @@
   [`rmixture2p()`](https://popov-lab.github.io/bmm/dev/reference/mixture2p_dist.md)
   now draw each value from its own parameter values when a parameter has
   one value per draw. Before, every value came from the mix of all
-  parameter values, so `posterior_predict()` and
+  parameter values, so
+  [`posterior_predict()`](https://mc-stan.org/rstantools/reference/posterior_predict.html)
+  and
   [`pp_check()`](https://popov-lab.github.io/bmm/dev/reference/pp_check.bmmfit.md)
   for **sdm** fits were too wide. Fits are unaffected; rerun
-  `posterior_predict()` or
+  [`posterior_predict()`](https://mc-stan.org/rstantools/reference/posterior_predict.html)
+  or
   [`pp_check()`](https://popov-lab.github.io/bmm/dev/reference/pp_check.bmmfit.md).
   [`rsdm()`](https://popov-lab.github.io/bmm/dev/reference/SDMdist.md)
   no longer fails for large `c` and `kappa`, and
@@ -545,11 +558,13 @@
   the order of `x` in
   [`dm3()`](https://popov-lab.github.io/bmm/dev/reference/m3dist.md) now
   follow `resp_cats`.
-- `log_lik()` for **cswald** fits no longer returns `NaN` for a
-  posterior draw whose `ndt` is at or above an observation’s RT, which
-  happens with `newdata` such as held-out folds. Such draws now give
-  `-Inf`, or `0` for errors in the `"simple"` version, matching the
-  likelihood the model was fitted with. `kfold()` and
+- [`log_lik()`](https://mc-stan.org/rstantools/reference/log_lik.html)
+  for **cswald** fits no longer returns `NaN` for a posterior draw whose
+  `ndt` is at or above an observation’s RT, which happens with `newdata`
+  such as held-out folds. Such draws now give `-Inf`, or `0` for errors
+  in the `"simple"` version, matching the likelihood the model was
+  fitted with.
+  [`kfold()`](https://mc-stan.org/loo/reference/kfold-generic.html) and
   [`loo::elpd()`](https://mc-stan.org/loo/reference/elpd.html) no longer
   break on the common case of a few such draws; an observation whose RT
   is below every posterior draw of `ndt` can still return a non-finite
@@ -671,8 +686,9 @@ CRAN release: 2026-09-16
   [`pp_check()`](https://popov-lab.github.io/bmm/dev/reference/pp_check.bmmfit.md)
   for the RT models silently producing a misleading plot with
   `negative_rt = TRUE`: brms forwarded the argument to
-  `posterior_predict()` (signed predicted RTs) while the observed
-  response times stayed unsigned, so the plot looked like severe misfit.
+  [`posterior_predict()`](https://mc-stan.org/rstantools/reference/posterior_predict.html)
+  (signed predicted RTs) while the observed response times stayed
+  unsigned, so the plot looked like severe misfit.
   [`pp_check()`](https://popov-lab.github.io/bmm/dev/reference/pp_check.bmmfit.md)
   now checks the `"signed_rt"` observable (with a message) so both
   halves are signed, and errors for models without signed RTs
@@ -680,7 +696,10 @@ CRAN release: 2026-09-16
 - Remove the unreachable `dv` argument of the internal **ezdm**
   `posterior_predict` functions and its documentation.
   `posterior_predict(fit, dv = "var_rt")` silently returned `mean_rt`:
-  brms forwards `posterior_predict()` dots to `prepare_predictions()`
+  brms forwards
+  [`posterior_predict()`](https://mc-stan.org/rstantools/reference/posterior_predict.html)
+  dots to
+  [`prepare_predictions()`](https://paulbuerkner.com/brms/reference/prepare_predictions.html)
   only, never to the family’s prediction function, so `dv` was dropped
   without a warning and has never worked. Use
   `pp_check(fit, resp_var = ...)` instead
@@ -753,10 +772,13 @@ CRAN release: 2026-09-16
 - [`bmm()`](https://popov-lab.github.io/bmm/dev/reference/bmm.md) now
   warns when a predictor in the formula shares its name with both a
   predicted parameter and a column in the data. Such a predictor was
-  silently treated as a non-linear term (emitted via `nlf()` instead of
-  `lf()`), changing the likelihood without any error. Short parameter
-  names (`c`, `a`, `s`, `b`) collide naturally with condition codes or
-  columns like `accuracy`/`stimulus`
+  silently treated as a non-linear term (emitted via
+  [`nlf()`](https://paulbuerkner.com/brms/reference/brmsformula-helpers.html)
+  instead of
+  [`lf()`](https://paulbuerkner.com/brms/reference/brmsformula-helpers.html)),
+  changing the likelihood without any error. Short parameter names (`c`,
+  `a`, `s`, `b`) collide naturally with condition codes or columns like
+  `accuracy`/`stimulus`
   ([\#378](https://github.com/popov-lab/bmm/issues/378)).
 
 #### Other changes
@@ -767,7 +789,8 @@ CRAN release: 2026-09-16
   [`configure_model()`](https://popov-lab.github.io/bmm/dev/reference/configure_model.md)
   never wires into the formula (neither a dpar nor an nlpar), bmm now
   fails with a clear model-definition error instead of letting a
-  malformed `b_Intercept ~ constant()` prior reach `brm()`. This is a
+  malformed `b_Intercept ~ constant()` prior reach
+  [`brm()`](https://paulbuerkner.com/brms/reference/brm.html). This is a
   safety net for model development; it cannot be reached through the
   normal [`bmm()`](https://popov-lab.github.io/bmm/dev/reference/bmm.md)
   interface, where an unrecognized parameter is already caught earlier

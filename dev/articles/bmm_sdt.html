@@ -192,7 +192,7 @@ this is how <code>sdratio</code> stays at 0 (equal variance) until you add
 …) pass through.</li>
 <li>
 <strong>Post-process.</strong> The fitted object is a <code>brmsfit</code>, so the general <code>brms</code>
-toolkit applies (<code><a href="https://rdrr.io/r/base/summary.html" class="external-link">summary()</a></code>, <code>hypothesis()</code>, <code><a href="https://rdrr.io/pkg/nlme/man/fixed.effects.html" class="external-link">brms::fixef()</a></code>, …). The
+toolkit applies (<code><a href="https://rdrr.io/r/base/summary.html" class="external-link">summary()</a></code>, <code><a href="https://paulbuerkner.com/brms/reference/hypothesis.brmsfit.html" class="external-link">hypothesis()</a></code>, <code><a href="https://rdrr.io/pkg/nlme/man/fixed.effects.html" class="external-link">brms::fixef()</a></code>, …). The
 SDT-specific extractors add the signal-detection views: ROC curves, AUC,
 latent distributions, and threshold locations.</li>
 </ol>
@@ -511,7 +511,7 @@ account of recognition asymmetry than an unequal-variance Gaussian. <code>"logis
 mostly a numerical convenience, and <code>"gumbel_max"</code> covers the rare opposite
 asymmetry. As always, let the data arbitrate: compare candidates with the
 observed-versus-model ROC overlap and AUC shown above, with <code><a href="../reference/pp_check.bmmfit.html">pp_check()</a></code>, or with
-<code>loo()</code> for a formal information criterion.</p>
+<code><a href="https://mc-stan.org/loo/reference/loo.html" class="external-link">loo()</a></code> for a formal information criterion.</p>
 <p>One caution on that comparison: the Gaussian model is the more <em>flexible</em> of the
 two — flexible enough to mimic extreme-value data closely, to the point that in
 simulations it wins on a clear majority of datasets that an extreme-value model
@@ -1062,7 +1062,7 @@ it should be weighed against the gain in fit.</p>
 that trade-off: a parameterization that leaves systematic, one-sided deviations
 is too rigid, while one whose predicted point-ranges sit on the observed bars (as
 here) is adequate. A <em>formal</em> predictive comparison is tempting, but the usual
-<code>loo()</code> is <strong>not</strong> appropriate here: each observation is an aggregated count over
+<code><a href="https://mc-stan.org/loo/reference/loo.html" class="external-link">loo()</a></code> is <strong>not</strong> appropriate here: each observation is an aggregated count over
 many trials, so leaving one out removes a large, highly influential chunk of data
 and the PSIS-LOO approximation becomes unreliable — it flags most observations
 with a high Pareto-<span class="math inline">\(k\)</span>, and (because that reflects heavy-tailed importance weights

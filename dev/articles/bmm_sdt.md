@@ -88,7 +88,8 @@ model; only the ingredients are SDT-specific.
     arguments (`cores`, `iter`, `prior`, `file`, …) pass through.
 4.  **Post-process.** The fitted object is a `brmsfit`, so the general
     `brms` toolkit applies
-    ([`summary()`](https://rdrr.io/r/base/summary.html), `hypothesis()`,
+    ([`summary()`](https://rdrr.io/r/base/summary.html),
+    [`hypothesis()`](https://paulbuerkner.com/brms/reference/hypothesis.brmsfit.html),
     [`brms::fixef()`](https://rdrr.io/pkg/nlme/man/fixed.effects.html),
     …). The SDT-specific extractors add the signal-detection views: ROC
     curves, AUC, latent distributions, and threshold locations.
@@ -441,7 +442,8 @@ opposite asymmetry. As always, let the data arbitrate: compare
 candidates with the observed-versus-model ROC overlap and AUC shown
 above, with
 [`pp_check()`](https://popov-lab.github.io/bmm/dev/reference/pp_check.bmmfit.md),
-or with `loo()` for a formal information criterion.
+or with [`loo()`](https://mc-stan.org/loo/reference/loo.html) for a
+formal information criterion.
 
 One caution on that comparison: the Gaussian model is the more
 *flexible* of the two — flexible enough to mimic extreme-value data
@@ -1072,7 +1074,8 @@ For these models the posterior predictive check is the most practical
 guide to that trade-off: a parameterization that leaves systematic,
 one-sided deviations is too rigid, while one whose predicted
 point-ranges sit on the observed bars (as here) is adequate. A *formal*
-predictive comparison is tempting, but the usual `loo()` is **not**
+predictive comparison is tempting, but the usual
+[`loo()`](https://mc-stan.org/loo/reference/loo.html) is **not**
 appropriate here: each observation is an aggregated count over many
 trials, so leaving one out removes a large, highly influential chunk of
 data and the PSIS-LOO approximation becomes unreliable — it flags most

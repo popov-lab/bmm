@@ -415,9 +415,9 @@ or “low” brightness.</p>
 <span><span class="op">)</span></span>
 <span></span>
 <span><span class="co"># Compare models</span></span>
-<span><span class="va">loo_fixed_zr</span> <span class="op">&lt;-</span> <span class="fu">loo</span><span class="op">(</span><span class="va">fit_fixed_zr</span><span class="op">)</span></span>
-<span><span class="va">loo_free_zr</span> <span class="op">&lt;-</span> <span class="fu">loo</span><span class="op">(</span><span class="va">fit_free_zr</span><span class="op">)</span></span>
-<span><span class="fu">loo_compare</span><span class="op">(</span><span class="va">loo_fixed_zr</span>, <span class="va">loo_free_zr</span><span class="op">)</span></span></code></pre></div>
+<span><span class="va">loo_fixed_zr</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://mc-stan.org/loo/reference/loo.html" class="external-link">loo</a></span><span class="op">(</span><span class="va">fit_fixed_zr</span><span class="op">)</span></span>
+<span><span class="va">loo_free_zr</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://mc-stan.org/loo/reference/loo.html" class="external-link">loo</a></span><span class="op">(</span><span class="va">fit_free_zr</span><span class="op">)</span></span>
+<span><span class="fu"><a href="https://mc-stan.org/loo/reference/loo_compare.html" class="external-link">loo_compare</a></span><span class="op">(</span><span class="va">loo_fixed_zr</span>, <span class="va">loo_free_zr</span><span class="op">)</span></span></code></pre></div>
 <p><strong>When to use starting point bias</strong>:</p>
 <ul>
 <li>When you suspect a priori response preferences</li>
@@ -525,11 +525,11 @@ individual differences.</p>
 <p>Use information criteria to compare model fit:</p>
 <div class="sourceCode" id="cb7"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="co"># Compute LOO for each model</span></span>
-<span><span class="va">loo_fixed_zr</span> <span class="op">&lt;-</span> <span class="fu">loo</span><span class="op">(</span><span class="va">fit_fixed_zr</span><span class="op">)</span></span>
-<span><span class="va">loo_free_zr</span> <span class="op">&lt;-</span> <span class="fu">loo</span><span class="op">(</span><span class="va">fit_free_zr</span><span class="op">)</span></span>
+<span><span class="va">loo_fixed_zr</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://mc-stan.org/loo/reference/loo.html" class="external-link">loo</a></span><span class="op">(</span><span class="va">fit_fixed_zr</span><span class="op">)</span></span>
+<span><span class="va">loo_free_zr</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://mc-stan.org/loo/reference/loo.html" class="external-link">loo</a></span><span class="op">(</span><span class="va">fit_free_zr</span><span class="op">)</span></span>
 <span></span>
 <span><span class="co"># Compare models</span></span>
-<span><span class="fu">loo_compare</span><span class="op">(</span><span class="va">loo_fixed_zr</span>, <span class="va">loo_free_zr</span><span class="op">)</span></span>
+<span><span class="fu"><a href="https://mc-stan.org/loo/reference/loo_compare.html" class="external-link">loo_compare</a></span><span class="op">(</span><span class="va">loo_fixed_zr</span>, <span class="va">loo_free_zr</span><span class="op">)</span></span>
 <span></span>
 <span><span class="co"># Check for influential observations</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">loo_free_zr</span><span class="op">)</span></span></code></pre></div>
@@ -581,13 +581,13 @@ likelihood (see <code>pp_check_vars(fit)</code> for the options):</p>
 <p>Use Bayesian hypothesis testing to compare parameters across conditions:</p>
 <div class="sourceCode" id="cb9"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="co"># Test if drift differs between conditions</span></span>
-<span><span class="fu">hypothesis</span><span class="op">(</span><span class="va">fit_instruction</span>, <span class="st">"driftinstructionspeed &lt; 0"</span><span class="op">)</span></span>
+<span><span class="fu"><a href="https://paulbuerkner.com/brms/reference/hypothesis.brmsfit.html" class="external-link">hypothesis</a></span><span class="op">(</span><span class="va">fit_instruction</span>, <span class="st">"driftinstructionspeed &lt; 0"</span><span class="op">)</span></span>
 <span></span>
 <span><span class="co"># Test if boundary differs between conditions  </span></span>
-<span><span class="fu">hypothesis</span><span class="op">(</span><span class="va">fit_instruction</span>, <span class="st">"boundinstructionspeed &lt; boundinstructionaccuracy"</span><span class="op">)</span></span>
+<span><span class="fu"><a href="https://paulbuerkner.com/brms/reference/hypothesis.brmsfit.html" class="external-link">hypothesis</a></span><span class="op">(</span><span class="va">fit_instruction</span>, <span class="st">"boundinstructionspeed &lt; boundinstructionaccuracy"</span><span class="op">)</span></span>
 <span></span>
 <span><span class="co"># Joint hypothesis about multiple parameters</span></span>
-<span><span class="fu">hypothesis</span><span class="op">(</span><span class="va">fit_instruction</span>, <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span></span>
+<span><span class="fu"><a href="https://paulbuerkner.com/brms/reference/hypothesis.brmsfit.html" class="external-link">hypothesis</a></span><span class="op">(</span><span class="va">fit_instruction</span>, <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span></span>
 <span>  <span class="st">"driftstrength &gt; 0"</span>,</span>
 <span>  <span class="st">"boundinstructionaccuracy &gt; boundinstructionspeed"</span></span>
 <span><span class="op">)</span><span class="op">)</span></span></code></pre></div>
@@ -628,9 +628,9 @@ likelihood (see <code>pp_check_vars(fit)</code> for the options):</p>
 <div class="sourceCode" id="cb11"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="co"># Define custom priors</span></span>
 <span><span class="va">custom_priors</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span></span>
-<span>  <span class="fu">prior</span><span class="op">(</span><span class="fu">normal</span><span class="op">(</span><span class="fl">2</span>, <span class="fl">1</span><span class="op">)</span>, nlpar <span class="op">=</span> <span class="st">"drift"</span>, coef <span class="op">=</span> <span class="st">"Intercept"</span><span class="op">)</span>,</span>
-<span>  <span class="fu">prior</span><span class="op">(</span><span class="fu">normal</span><span class="op">(</span><span class="fl">1</span>, <span class="fl">0.5</span><span class="op">)</span>, nlpar <span class="op">=</span> <span class="st">"bound"</span>, coef <span class="op">=</span> <span class="st">"Intercept"</span><span class="op">)</span>,</span>
-<span>  <span class="fu">prior</span><span class="op">(</span><span class="fu">normal</span><span class="op">(</span><span class="op">-</span><span class="fl">1</span>, <span class="fl">0.3</span><span class="op">)</span>, nlpar <span class="op">=</span> <span class="st">"ndt"</span>, coef <span class="op">=</span> <span class="st">"Intercept"</span><span class="op">)</span>  <span class="co"># on log scale</span></span>
+<span>  <span class="fu"><a href="https://paulbuerkner.com/brms/reference/set_prior.html" class="external-link">prior</a></span><span class="op">(</span><span class="fu">normal</span><span class="op">(</span><span class="fl">2</span>, <span class="fl">1</span><span class="op">)</span>, nlpar <span class="op">=</span> <span class="st">"drift"</span>, coef <span class="op">=</span> <span class="st">"Intercept"</span><span class="op">)</span>,</span>
+<span>  <span class="fu"><a href="https://paulbuerkner.com/brms/reference/set_prior.html" class="external-link">prior</a></span><span class="op">(</span><span class="fu">normal</span><span class="op">(</span><span class="fl">1</span>, <span class="fl">0.5</span><span class="op">)</span>, nlpar <span class="op">=</span> <span class="st">"bound"</span>, coef <span class="op">=</span> <span class="st">"Intercept"</span><span class="op">)</span>,</span>
+<span>  <span class="fu"><a href="https://paulbuerkner.com/brms/reference/set_prior.html" class="external-link">prior</a></span><span class="op">(</span><span class="fu">normal</span><span class="op">(</span><span class="op">-</span><span class="fl">1</span>, <span class="fl">0.3</span><span class="op">)</span>, nlpar <span class="op">=</span> <span class="st">"ndt"</span>, coef <span class="op">=</span> <span class="st">"Intercept"</span><span class="op">)</span>  <span class="co"># on log scale</span></span>
 <span><span class="op">)</span></span>
 <span></span>
 <span><span class="co"># Fit with custom priors</span></span>

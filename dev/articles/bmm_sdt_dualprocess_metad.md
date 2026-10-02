@@ -820,10 +820,11 @@ greater than zero, is `logmratio` credibly different from zero (M-ratio
 different from 1)? That, together with
 [`pp_check()`](https://popov-lab.github.io/bmm/dev/reference/pp_check.bmmfit.md)
 and the ROC/zROC fit, is the practical guide. A *formal* predictive
-comparison via `loo()` is **not** appropriate for these aggregated-count
-models — leaving out one multinomial observation removes a large,
-influential block of data and the PSIS-LOO approximation becomes
-unreliable. The principled alternative is k-fold cross-validation with
+comparison via [`loo()`](https://mc-stan.org/loo/reference/loo.html) is
+**not** appropriate for these aggregated-count models — leaving out one
+multinomial observation removes a large, influential block of data and
+the PSIS-LOO approximation becomes unreliable. The principled
+alternative is k-fold cross-validation with
 [`brms::kfold()`](https://mc-stan.org/loo/reference/kfold-generic.html),
 which refits on held-out folds. As always, let theory and parameter
 invariance across designs — not ROC fit alone — arbitrate between

@@ -801,7 +801,7 @@ continuous second axis — rather than collapsing it to a confidence rating.</li
 <code>logmratio</code> credibly different from zero (M-ratio different from 1)? That,
 together with <code><a href="../reference/pp_check.bmmfit.html">pp_check()</a></code> and the
 ROC/zROC fit, is the practical guide. A <em>formal</em> predictive comparison via
-<code>loo()</code> is <strong>not</strong> appropriate for these aggregated-count models — leaving out one
+<code><a href="https://mc-stan.org/loo/reference/loo.html" class="external-link">loo()</a></code> is <strong>not</strong> appropriate for these aggregated-count models — leaving out one
 multinomial observation removes a large, influential block of data and the
 PSIS-LOO approximation becomes unreliable. The principled alternative is k-fold
 cross-validation with <code><a href="https://mc-stan.org/loo/reference/kfold-generic.html" class="external-link">brms::kfold()</a></code>, which refits on held-out folds. As always,
