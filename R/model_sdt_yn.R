@@ -105,7 +105,7 @@ settable_links.sdt_yn <- function(model) {
 #' @description Estimates sensitivity (`d`, which is \eqn{d'} under equal
 #'   variance and \eqn{d_a} once `sdratio` is estimated) and response bias
 #'   (`criterion`) from yes/no detection or old/new recognition counts.
-#' @details `r model_info(.model_sdt_yn())`
+#' @details `r model_docs(.model_sdt_yn())`
 #' @param response The name of the variable in the dataset containing the
 #'   count of "old"/"signal" responses for each cell.
 #' @param stimulus The name of the variable in the dataset coding the stimulus

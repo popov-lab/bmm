@@ -65,7 +65,7 @@ settable_links.mixture2p <- function(model) {
 # user facing alias
 
 #' @title `r .model_mixture2p()$name`
-#' @details `r model_info(.model_mixture2p())`
+#' @details `r model_docs(.model_mixture2p())`
 #' @param resp_error The name of the variable in the provided dataset containing
 #'   the response error. The response Error should code the response relative to
 #'   the to-be-recalled target in radians. You can transform the response error

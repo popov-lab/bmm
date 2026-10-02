@@ -156,7 +156,7 @@ settable_link_functions.sdt_cdp <- function(model) {
 
 #' @title Continuous Dual-Process Signal Detection Theory Model
 #' @name sdt_cdp
-#' @details `r model_info(.model_sdt_cdp())`
+#' @details `r model_docs(.model_sdt_cdp())`
 #'
 #' The continuous dual-process model (Wixted & Mickes, 2010) assumes two
 #' continuous memory signals per item, Familiarity (F) and Recollection (R),

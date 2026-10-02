@@ -67,7 +67,7 @@
 
 #' @title `r .model_ddm()$name`
 #' @name ddm
-#' @details `r model_info(.model_ddm())`
+#' @details `r model_docs(.model_ddm())`
 #' @param rt Name of the reaction time variable coding reaction time in seconds in the data.
 #' @param response Name of the response variable coding the response numerically (0 = lower response / incorrect, 1 = upper response / correct)
 #' @param links A named list of links for the parameters, e.g.

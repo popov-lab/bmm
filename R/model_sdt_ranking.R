@@ -111,7 +111,7 @@ settable_link_functions.sdt_ranking <- function(model) {
 
 #' @title Ranking Signal Detection Theory Model
 #' @name sdt_ranking
-#' @details `r model_info(.model_sdt_ranking())`
+#' @details `r model_docs(.model_sdt_ranking())`
 #'
 #' Models the rank ordering of `m` items by perceived strength. Only `d`
 #' is estimated (no criterion). Supports `dist = "gumbel_min"` (closed-form via
