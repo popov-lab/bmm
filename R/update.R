@@ -161,10 +161,14 @@ update.bmmfit <- function(object, formula., newdata = NULL, recompile = NULL,
   dots$prior <- NULL
   new_fit_args <- combine_args(nlist(config_args, dots, prior))
 
-  # construct the new formula and data only if they have changed
-  if (!identical(new_fit_args$formula, object$formula)) {
-    formula. <- new_fit_args$formula
-  }
+  # configure_model() always returns the complete brmsformula, so brms has
+  # nothing to merge. Handed over as `formula.`, it would be rebuilt by
+  # update.brmsformula() in another element order than bmm() stores, and
+  # brms::combine_models() would then reject the updated fit as having a
+  # different formula (#464). As the stored formula, it goes through the same
+  # validation in brms as the one bmm() passes to brm()
+  object$formula <- new_fit_args$formula
+  formula. <- NULL
   if (!identical(new_fit_args$data, olddata)) {
     newdata <- new_fit_args$data
   }
