@@ -93,6 +93,7 @@ articles:
     desc: >
        Guides to using various features of the **bmm** package
     contents:
+     - articles/bmm_brms_to_bmm
      - articles/bmm_bmmformula
      - articles/bmm_extract_info
   - title: Continuous reproduction tasks
