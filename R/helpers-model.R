@@ -568,11 +568,11 @@ data_column_roles <- list(
     num_options = "number of candidates in each category (columns, or one number per category)"
   ),
   m3_ss = c(
-    resp_cats = "number of responses in each of 3 categories, in the order correct, other, not-presented lure (one column each)",
+    resp_cats = "number of responses in each of 3 categories, in the order correct, other list item, not-presented lure (one column each)",
     num_options = "number of candidates in each category (columns, or one number per category)"
   ),
   m3_cs = c(
-    resp_cats = "number of responses in each of 5 categories, in the order correct, distractor close in context, other, other distractor, not-presented lure (one column each)",
+    resp_cats = "number of responses in each of 5 categories, in the order correct, distractor close in context, other list item, other distractor, not-presented lure (one column each)",
     num_options = "number of candidates in each category (columns, or one number per category)"
   ),
   mixture2p = c(
@@ -598,7 +598,7 @@ data_column_roles <- list(
     m = "number of alternatives (a column, or one number)"
   ),
   sdt_ranking = c(
-    response = "number of trials with the target at each rank, one column per rank, from rank 1 (most likely target) to rank m",
+    response = "number of trials with the target at each rank, one column per rank, from rank 1 (most likely target) to rank `m`",
     m = "number of ranked items (a column, or one number)"
   ),
   sdt_rating = c(

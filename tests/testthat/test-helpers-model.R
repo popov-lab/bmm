@@ -154,7 +154,7 @@ test_that("model_overview() has one row per version with its own columns and par
   expect_false(grepl("mu2|kappa2", imm_full$`Key parameters`))
 
   m3_ss <- overview[grepl("m3.html), version `ss`", overview$Model, fixed = TRUE), ]
-  expect_match(m3_ss$`Data columns`, "correct, other, not-presented lure", fixed = TRUE)
+  expect_match(m3_ss$`Data columns`, "correct, other list item, not-presented lure", fixed = TRUE)
   m3_cs <- overview[grepl("m3.html), version `cs`", overview$Model, fixed = TRUE), ]
   expect_match(m3_cs$`Data columns`, "each of 5 categories", fixed = TRUE)
 
