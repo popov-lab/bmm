@@ -713,6 +713,7 @@ test_that("a stored frame without the largest set size passes check_data again (
     expect_false(8 %in% fit$data$set_size, label = case_name)
     data <- check_stored_data(case$model, fit$data, fit$bmm$user_formula)
     expect_equal(attr(data, "max_set_size"), 8, label = case_name)
+    expect_null(attr(data, "fit_max_set_size"), label = case_name)
     expect_equal(brms::standata(fit, newdata = data), brms::standata(fit), label = case_name)
   }
 })
