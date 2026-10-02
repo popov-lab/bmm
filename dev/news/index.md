@@ -523,6 +523,13 @@
   value*), and no longer warns for **sdt_yn** fits that the reserved
   column `dist_type` will be overwritten
   ([\#429](https://github.com/popov-lab/bmm/issues/429)).
+- [`update()`](https://rdrr.io/r/stats/update.html) without `newdata` no
+  longer fails for **mixture3p** and **imm** fits in which every
+  response at the largest set size is `NA` (*The number of columns for
+  non-target values in the argument ‘nt_features’ should equal
+  max(set_size)-1*). Fits saved before this fix can be updated as they
+  are; the workaround of passing the original data as `newdata` is no
+  longer needed ([\#459](https://github.com/popov-lab/bmm/issues/459)).
 - **m3** no longer ignores `num_options` when its numbers are named
   after the response categories, as in
   `num_options = c(corr = 1, other = 4, dist = 5, npl = 5)`. Each
