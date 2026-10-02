@@ -414,12 +414,12 @@ bound [@wagenmakersBayesianHypothesisTesting2010, p. 170]. This is why
 `hypothesis()` returns `NA` for `Evid.Ratio` unless every parameter in the
 hypothesis has a proper prior and the model was fitted with
 `sample_prior = "yes"`. Before you report a Bayes factor, look at the prior
-it was computed against. `report_priors()` lists the prior of every parameter
+it was computed against. `prior_info()` lists the prior of every parameter
 on the scale it was sampled on, and flags any parameter left with a flat
 prior:
 
-```{r report-priors}
-report_priors(fit_setsize)
+```{r prior-info}
+prior_info(fit_setsize)
 ```
 
 (`mu1`, the centre of the response distribution, is fixed to zero by default,
@@ -830,7 +830,7 @@ Bridge sampling has three requirements:
    prior integrates to one, and a flat prior does not. This is stricter than
    for the Savage-Dickey method, where only the tested parameters need proper
    priors [@wagenmakersBayesianHypothesisTesting2010, p. 170]. The default
-   priors of `bmm` models are proper, but check with `report_priors()` if you
+   priors of `bmm` models are proper, but check with `prior_info()` if you
    have changed priors or formulas: it flags every parameter with a flat
    prior.
 3. It needs far more posterior draws than estimation, and its result varies
@@ -1136,7 +1136,7 @@ follows:
 > the two-parameter mixture model ($\Delta\text{elpd}$ = `r fmt(abs(q3_diff), 1)`,
 > SE = `r fmt(q3_se, 1)`; all Pareto $k$ < 0.7).
 
-For the methods section, `report_priors(fit, format = "text")` writes the
+For the methods section, `prior_info(fit, format = "text")` writes the
 priors as sentences. Also report the random-effects structure and the
 convergence checks, and cite `bmm` [@frischkornTutorialEstimatingBayesian2025] and `brms`
 [@burknerBrmsPackageBayesian2017].
