@@ -155,9 +155,14 @@ again. Once every check passes, you are ready to fit models.</p>
 <span class="header-section-number">3</span> Which model fits your task<a class="anchor" aria-label="anchor" href="#which-model-fits-your-task"></a>
 </h2>
 <p>You come to <code>bmm</code> with data from a task, so this section is organized by task.
-Each entry lists the models <code>bmm</code> provides for it and links to the article that
-walks through them. The lists are generated from the package, so they show the
-models of the version this page was built from.</p>
+Each entry links to the article that walks through the models <code>bmm</code> provides
+for the task, and a table lists every model and version with the data columns
+it needs and the parameters it estimates. In the data columns, the name before
+the colon is the argument of the model function that you set to the name of
+your column. Parameters listed as fixed by default are held at a constant
+value; <code>?modelname</code> gives that value and what the parameter does. The tables are
+generated from the package, so they show the models of the version this page
+was built from.</p>
 <div class="section level3" number="3.1">
 <h3 id="continuous-reproduction">
 <span class="header-section-number">3.1</span> Continuous reproduction<a class="anchor" aria-label="anchor" href="#continuous-reproduction"></a>
@@ -166,16 +171,74 @@ models of the version this page was built from.</p>
 orientation, and the response error on the circle is the dependent variable.
 The <a href="https://popov-lab.github.io/bmm/articles/bmm_vwm_crt.html">continuous reproduction article</a>
 describes the task and compares the models.</p>
-<ul>
-<li>
-<a href="https://popov-lab.github.io/bmm/reference/imm.html"><code>imm()</code></a>: Interference measurement model by Oberauer and Lin (2017)</li>
-<li>
-<a href="https://popov-lab.github.io/bmm/reference/mixture2p.html"><code>mixture2p()</code></a>: Two-parameter mixture model by Zhang and Luck (2008)</li>
-<li>
-<a href="https://popov-lab.github.io/bmm/reference/mixture3p.html"><code>mixture3p()</code></a>: Three-parameter mixture model by Bays et al (2009)</li>
-<li>
-<a href="https://popov-lab.github.io/bmm/reference/sdm.html"><code>sdm()</code></a>: Signal Discrimination Model (SDM) by Oberauer (2023)</li>
-</ul>
+<table class="table">
+<colgroup>
+<col width="14%">
+<col width="51%">
+<col width="33%">
+</colgroup>
+<thead><tr class="header">
+<th align="left">Model</th>
+<th align="left">Data columns</th>
+<th align="left">Key parameters</th>
+</tr></thead>
+<tbody>
+<tr class="odd">
+<td align="left">
+<a href="https://popov-lab.github.io/bmm/reference/imm.html"><code>imm()</code></a>, version <code>full</code><br>Interference measurement model by Oberauer and Lin (2017)</td>
+<td align="left">
+<code>resp_error</code>: response error relative to the target, in radians<br><code>nt_features</code>: non-target features relative to the target, in radians, one column per non-target<br><code>nt_distances</code>: distance of each non-target to the target, one column per non-target<br><code>set_size</code>: set size (a column, or one number)</td>
+<td align="left">
+<code>kappa</code>: Concentration parameter of the von Mises distribution<br><code>a</code>: General activation of memory items<br><code>c</code>: Context activation<br><code>s</code>: Spatial similarity gradient<br>Fixed by default: <code>mu1</code>
+</td>
+</tr>
+<tr class="even">
+<td align="left">
+<a href="https://popov-lab.github.io/bmm/reference/imm.html"><code>imm()</code></a>, version <code>bsc</code><br>Interference measurement model by Oberauer and Lin (2017)</td>
+<td align="left">
+<code>resp_error</code>: response error relative to the target, in radians<br><code>nt_features</code>: non-target features relative to the target, in radians, one column per non-target<br><code>nt_distances</code>: distance of each non-target to the target, one column per non-target<br><code>set_size</code>: set size (a column, or one number)</td>
+<td align="left">
+<code>kappa</code>: Concentration parameter of the von Mises distribution<br><code>c</code>: Context activation<br><code>s</code>: Spatial similarity gradient<br>Fixed by default: <code>mu1</code>
+</td>
+</tr>
+<tr class="odd">
+<td align="left">
+<a href="https://popov-lab.github.io/bmm/reference/imm.html"><code>imm()</code></a>, version <code>abc</code><br>Interference measurement model by Oberauer and Lin (2017)</td>
+<td align="left">
+<code>resp_error</code>: response error relative to the target, in radians<br><code>nt_features</code>: non-target features relative to the target, in radians, one column per non-target<br><code>set_size</code>: set size (a column, or one number)</td>
+<td align="left">
+<code>kappa</code>: Concentration parameter of the von Mises distribution<br><code>a</code>: General activation of memory items<br><code>c</code>: Context activation<br>Fixed by default: <code>mu1</code>
+</td>
+</tr>
+<tr class="even">
+<td align="left">
+<a href="https://popov-lab.github.io/bmm/reference/mixture2p.html"><code>mixture2p()</code></a><br>Two-parameter mixture model by Zhang and Luck (2008)</td>
+<td align="left">
+<code>resp_error</code>: response error relative to the target, in radians</td>
+<td align="left">
+<code>kappa</code>: Concentration parameter of the von Mises distribution<br><code>thetat</code>: Mixture weight for target responses<br>Fixed by default: <code>mu1</code>
+</td>
+</tr>
+<tr class="odd">
+<td align="left">
+<a href="https://popov-lab.github.io/bmm/reference/mixture3p.html"><code>mixture3p()</code></a><br>Three-parameter mixture model by Bays et al (2009)</td>
+<td align="left">
+<code>resp_error</code>: response error relative to the target, in radians<br><code>nt_features</code>: non-target features relative to the target, in radians, one column per non-target<br><code>set_size</code>: set size (a column, or one number)</td>
+<td align="left">
+<code>kappa</code>: Concentration parameter of the von Mises distribution<br><code>thetat</code>: Mixture weight for target responses<br><code>thetant</code>: Mixture weight for non-target responses<br>Fixed by default: <code>mu1</code>
+</td>
+</tr>
+<tr class="even">
+<td align="left">
+<a href="https://popov-lab.github.io/bmm/reference/sdm.html"><code>sdm()</code></a><br>Signal Discrimination Model (SDM) by Oberauer (2023)</td>
+<td align="left">
+<code>resp_error</code>: response error relative to the target, in radians</td>
+<td align="left">
+<code>c</code>: Memory strength parameter of the SDM distribution<br><code>kappa</code>: Precision parameter of the SDM distribution<br>Fixed by default: <code>mu</code>
+</td>
+</tr>
+</tbody>
+</table>
 </div>
 <div class="section level3" number="3.2">
 <h3 id="categorical-recall-and-n-afc-decisions">
@@ -185,10 +248,46 @@ describes the task and compares the models.</p>
 correct item, an item from another list position, or an item that was not
 studied. The <a href="https://popov-lab.github.io/bmm/articles/bmm_m3.html">M3 article</a>
 shows how to set up the response categories and the activation model.</p>
-<ul>
-<li>
-<a href="https://popov-lab.github.io/bmm/reference/m3.html"><code>m3()</code></a>: The Multinomial / Memory Measurement Model</li>
-</ul>
+<table class="table">
+<colgroup>
+<col width="16%">
+<col width="62%">
+<col width="21%">
+</colgroup>
+<thead><tr class="header">
+<th align="left">Model</th>
+<th align="left">Data columns</th>
+<th align="left">Key parameters</th>
+</tr></thead>
+<tbody>
+<tr class="odd">
+<td align="left">
+<a href="https://popov-lab.github.io/bmm/reference/m3.html"><code>m3()</code></a>, version <code>custom</code><br>The Multinomial / Memory Measurement Model</td>
+<td align="left">
+<code>resp_cats</code>: number of responses in each response category, one column per category<br><code>num_options</code>: number of candidates in each category (columns, or one number per category)</td>
+<td align="left">None by default: your formula defines them<br>Fixed by default: <code>b</code>
+</td>
+</tr>
+<tr class="even">
+<td align="left">
+<a href="https://popov-lab.github.io/bmm/reference/m3.html"><code>m3()</code></a>, version <code>ss</code><br>The Multinomial / Memory Measurement Model</td>
+<td align="left">
+<code>resp_cats</code>: number of responses in each of 3 categories, in the order correct, other list item, not-presented lure (one column each)<br><code>num_options</code>: number of candidates in each category (columns, or one number per category)</td>
+<td align="left">
+<code>c</code>: Context activation<br><code>a</code>: General activation<br>Fixed by default: <code>b</code>
+</td>
+</tr>
+<tr class="odd">
+<td align="left">
+<a href="https://popov-lab.github.io/bmm/reference/m3.html"><code>m3()</code></a>, version <code>cs</code><br>The Multinomial / Memory Measurement Model</td>
+<td align="left">
+<code>resp_cats</code>: number of responses in each of 5 categories, in the order correct, distractor close in context, other list item, other distractor, not-presented lure (one column each)<br><code>num_options</code>: number of candidates in each category (columns, or one number per category)</td>
+<td align="left">
+<code>c</code>: Context activation<br><code>a</code>: General activation<br><code>f</code>: Filtering<br>Fixed by default: <code>b</code>
+</td>
+</tr>
+</tbody>
+</table>
 </div>
 <div class="section level3" number="3.3">
 <h3 id="detection-recognition-and-confidence-judgments">
@@ -208,18 +307,81 @@ walks through the yes/no, rating, m-AFC and ranking models, and the
 <a href="https://popov-lab.github.io/bmm/articles/bmm_sdt_dualprocess_metad.html">dual-process and meta-d′ article</a>
 through the <code>dpsdt</code> and <code>metad</code> versions of <code><a href="../reference/sdt_rating.html">sdt_rating()</a></code> and through
 <code><a href="../reference/sdt_cdp.html">sdt_cdp()</a></code>.</p>
-<ul>
-<li>
-<a href="https://popov-lab.github.io/bmm/reference/sdt_cdp.html"><code>sdt_cdp()</code></a>: Continuous Dual-Process Signal Detection Theory (CDP)</li>
-<li>
-<a href="https://popov-lab.github.io/bmm/reference/sdt_mafc.html"><code>sdt_mafc()</code></a>: Signal Detection Theory (m-AFC)</li>
-<li>
-<a href="https://popov-lab.github.io/bmm/reference/sdt_ranking.html"><code>sdt_ranking()</code></a>: Signal Detection Theory (Ranking)</li>
-<li>
-<a href="https://popov-lab.github.io/bmm/reference/sdt_rating.html"><code>sdt_rating()</code></a>: Signal Detection Theory (Confidence Rating)</li>
-<li>
-<a href="https://popov-lab.github.io/bmm/reference/sdt_yn.html"><code>sdt_yn()</code></a>: Signal Detection Theory (Yes/No)</li>
-</ul>
+<table class="table">
+<colgroup>
+<col width="16%">
+<col width="40%">
+<col width="42%">
+</colgroup>
+<thead><tr class="header">
+<th align="left">Model</th>
+<th align="left">Data columns</th>
+<th align="left">Key parameters</th>
+</tr></thead>
+<tbody>
+<tr class="odd">
+<td align="left">
+<a href="https://popov-lab.github.io/bmm/reference/sdt_cdp.html"><code>sdt_cdp()</code></a><br>Continuous Dual-Process Signal Detection Theory (CDP)</td>
+<td align="left">
+<code>response</code>: prefix of the count columns <code>new&lt;k&gt;</code>, <code>know&lt;k&gt;</code>, <code>remember&lt;k&gt;</code> and optionally <code>guess&lt;k&gt;</code>, one per confidence level (default: no prefix)<br><code>stimulus</code>: stimulus type, 0 = new and 1 = old</td>
+<td align="left">
+<code>dfam</code>: Familiarity sensitivity<br><code>drec</code>: Recollection sensitivity<br><code>criterion</code>: Response bias<br><code>spacing</code>: Threshold spacing<br><code>rcrit</code>: Remember criterion<br>Fixed by default: <code>sigmar</code>, <code>rho</code>, <code>kcrit</code>
+</td>
+</tr>
+<tr class="even">
+<td align="left">
+<a href="https://popov-lab.github.io/bmm/reference/sdt_mafc.html"><code>sdt_mafc()</code></a><br>Signal Detection Theory (m-AFC)</td>
+<td align="left">
+<code>response</code>: number of correct responses<br><code>n_trials</code>: number of trials<br><code>m</code>: number of alternatives (a column, or one number)</td>
+<td align="left">
+<code>d</code>: Sensitivity</td>
+</tr>
+<tr class="odd">
+<td align="left">
+<a href="https://popov-lab.github.io/bmm/reference/sdt_ranking.html"><code>sdt_ranking()</code></a><br>Signal Detection Theory (Ranking)</td>
+<td align="left">
+<code>response</code>: number of trials with the target at each rank, one column per rank, from rank 1 (most likely target) to rank <code>m</code><br><code>m</code>: number of ranked items (a column, or one number)</td>
+<td align="left">
+<code>d</code>: Sensitivity</td>
+</tr>
+<tr class="even">
+<td align="left">
+<a href="https://popov-lab.github.io/bmm/reference/sdt_rating.html"><code>sdt_rating()</code></a>, version <code>standard</code><br>Signal Detection Theory (Confidence Rating)</td>
+<td align="left">
+<code>response</code>: number of responses in each rating category, one column per category, ordered from ‘definitely noise’ to ‘definitely signal’<br><code>stimulus</code>: stimulus type, 0 = noise/new and 1 = signal/old</td>
+<td align="left">
+<code>d</code>: Sensitivity<br><code>criterion</code>: Response bias, on the noise-standardized axis<br><code>spacing</code>: Threshold spacing<br>Fixed by default: <code>sdratio</code>
+</td>
+</tr>
+<tr class="odd">
+<td align="left">
+<a href="https://popov-lab.github.io/bmm/reference/sdt_rating.html"><code>sdt_rating()</code></a>, version <code>dpsdt</code><br>Signal Detection Theory (Confidence Rating)</td>
+<td align="left">
+<code>response</code>: number of responses in each rating category, one column per category, ordered from ‘definitely noise’ to ‘definitely signal’<br><code>stimulus</code>: stimulus type, 0 = noise/new and 1 = signal/old</td>
+<td align="left">
+<code>d</code>: Sensitivity<br><code>criterion</code>: Response bias, on the noise-standardized axis<br><code>spacing</code>: Threshold spacing<br>Fixed by default: <code>sdratio</code>, <code>Ro</code>, <code>Rn</code>
+</td>
+</tr>
+<tr class="even">
+<td align="left">
+<a href="https://popov-lab.github.io/bmm/reference/sdt_rating.html"><code>sdt_rating()</code></a>, version <code>metad</code><br>Signal Detection Theory (Confidence Rating)</td>
+<td align="left">
+<code>response</code>: number of responses in each rating category, one column per category, ordered from ‘definitely noise’ to ‘definitely signal’<br><code>stimulus</code>: stimulus type, 0 = noise/new and 1 = signal/old</td>
+<td align="left">
+<code>d</code>: Sensitivity<br><code>criterion</code>: Response bias, on the noise-standardized axis<br><code>spacing</code>: Threshold spacing<br><code>logmratio</code>: Log M-ratio, log(meta-d/d)<br>Fixed by default: <code>sdratio</code>
+</td>
+</tr>
+<tr class="odd">
+<td align="left">
+<a href="https://popov-lab.github.io/bmm/reference/sdt_yn.html"><code>sdt_yn()</code></a><br>Signal Detection Theory (Yes/No)</td>
+<td align="left">
+<code>response</code>: number of ‘old’/‘signal’ responses<br><code>stimulus</code>: stimulus type, 0 = noise/new and 1 = signal/old<br><code>n_trials</code>: number of trials</td>
+<td align="left">
+<code>d</code>: d_a sensitivity (= d’ when sdratio is fixed)<br><code>criterion</code>: Response bias<br>Fixed by default: <code>sdratio</code>
+</td>
+</tr>
+</tbody>
+</table>
 <p>The models differ in three respects. The response format is what the
 participant produces. The <code>dist</code> argument names the noise distribution assumed
 for the evidence on which the decision is based; the first entry in the table
@@ -291,15 +453,66 @@ covers the case where you only have the mean and variance of the response
 times and the accuracy per condition. Fast guesses and other contaminant
 responses are the topic of the
 <a href="https://popov-lab.github.io/bmm/articles/bmm_rt_contamination.html">response time contamination article</a>.</p>
-<ul>
-<li>
-<a href="https://popov-lab.github.io/bmm/reference/cswald.html"><code>cswald()</code></a>: Censored-Shifted Wald Model</li>
-<li>
-<a href="https://popov-lab.github.io/bmm/reference/ddm.html"><code>ddm()</code></a>: Diffusion Decision Model</li>
-<li>
-<a href="https://popov-lab.github.io/bmm/reference/ezdm.html"><code>ezdm()</code></a>: EZ-Diffusion Model</li>
-</ul>
-<p>You can print the same list in R at any time with <code><a href="../reference/supported_models.html">supported_models()</a></code>, and
+<table class="table">
+<colgroup>
+<col width="12%">
+<col width="55%">
+<col width="31%">
+</colgroup>
+<thead><tr class="header">
+<th align="left">Model</th>
+<th align="left">Data columns</th>
+<th align="left">Key parameters</th>
+</tr></thead>
+<tbody>
+<tr class="odd">
+<td align="left">
+<a href="https://popov-lab.github.io/bmm/reference/cswald.html"><code>cswald()</code></a>, version <code>simple</code><br>Censored-Shifted Wald Model</td>
+<td align="left">
+<code>rt</code>: response time in seconds<br><code>response</code>: choice, 0 = lower and 1 = upper boundary</td>
+<td align="left">
+<code>drift</code>: drift rate<br><code>bound</code>: boundary (distance from starting point to correct boundary)<br><code>ndt</code>: non-decision time<br>Fixed by default: <code>s</code>
+</td>
+</tr>
+<tr class="even">
+<td align="left">
+<a href="https://popov-lab.github.io/bmm/reference/cswald.html"><code>cswald()</code></a>, version <code>crisk</code><br>Censored-Shifted Wald Model</td>
+<td align="left">
+<code>rt</code>: response time in seconds<br><code>response</code>: choice, 0 = lower and 1 = upper boundary</td>
+<td align="left">
+<code>drift</code>: drift rate<br><code>bound</code>: boundary separation (total distance between boundaries)<br><code>ndt</code>: non-decision time<br>Fixed by default: <code>zr</code>, <code>s</code>
+</td>
+</tr>
+<tr class="odd">
+<td align="left">
+<a href="https://popov-lab.github.io/bmm/reference/ddm.html"><code>ddm()</code></a><br>Diffusion Decision Model</td>
+<td align="left">
+<code>rt</code>: response time in seconds<br><code>response</code>: choice, 0 = lower and 1 = upper boundary</td>
+<td align="left">
+<code>drift</code>: Drift rate<br><code>bound</code>: Boundary separation<br><code>ndt</code>: Non-decision time<br>Fixed by default: <code>zr</code>
+</td>
+</tr>
+<tr class="even">
+<td align="left">
+<a href="https://popov-lab.github.io/bmm/reference/ezdm.html"><code>ezdm()</code></a>, version <code>3par</code><br>EZ-Diffusion Model</td>
+<td align="left">
+<code>mean_rt</code>: mean response time in seconds<br><code>var_rt</code>: variance of the response times in seconds²<br><code>n_upper</code>: number of upper-boundary responses<br><code>n_trials</code>: number of trials</td>
+<td align="left">
+<code>drift</code>: Drift rate<br><code>bound</code>: Boundary separation<br><code>ndt</code>: Non-decision time<br>Fixed by default: <code>s</code>
+</td>
+</tr>
+<tr class="odd">
+<td align="left">
+<a href="https://popov-lab.github.io/bmm/reference/ezdm.html"><code>ezdm()</code></a>, version <code>4par</code><br>EZ-Diffusion Model</td>
+<td align="left">
+<code>mean_rt</code>: mean response time in seconds, one column per boundary (upper, lower)<br><code>var_rt</code>: variance of the response times in seconds², one column per boundary (upper, lower)<br><code>n_upper</code>: number of upper-boundary responses<br><code>n_trials</code>: number of trials</td>
+<td align="left">
+<code>drift</code>: Drift rate<br><code>bound</code>: Boundary separation<br><code>ndt</code>: Non-decision time<br><code>zr</code>: Relative starting point<br>Fixed by default: <code>s</code>
+</td>
+</tr>
+</tbody>
+</table>
+<p>You can list the models in R at any time with <code><a href="../reference/supported_models.html">supported_models()</a></code>, and
 <code>?modelname</code> (for example <code><a href="../reference/sdt_yn.html">?sdt_yn</a></code>) documents the data a model expects, its
 parameters and its default priors, that is, what the model assumes about each
 parameter before it sees the data.</p>

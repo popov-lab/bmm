@@ -576,6 +576,25 @@
   such as a `log` or `softplus` link on `drift`
   (`Variable 'Intercept_drift' has NA values`)
   ([\#460](https://github.com/popov-lab/bmm/issues/460)).
+- [`imm()`](https://popov-lab.github.io/bmm/dev/reference/imm.md),
+  [`sdm()`](https://popov-lab.github.io/bmm/dev/reference/sdm.md) and
+  [`ezdm()`](https://popov-lab.github.io/bmm/dev/reference/ezdm.md) now
+  refuse an unknown `version` when the model is created, with an error
+  that lists the valid ones. Before,
+  [`imm()`](https://popov-lab.github.io/bmm/dev/reference/imm.md)
+  accepted it and
+  [`bmm()`](https://popov-lab.github.io/bmm/dev/reference/bmm.md) then
+  failed with `no applicable method for 'configure_model'`,
+  [`ezdm()`](https://popov-lab.github.io/bmm/dev/reference/ezdm.md)
+  failed only inside
+  [`bmm()`](https://popov-lab.github.io/bmm/dev/reference/bmm.md), and
+  [`sdm()`](https://popov-lab.github.io/bmm/dev/reference/sdm.md)
+  silently fitted the `"simple"` version, so such
+  [`sdm()`](https://popov-lab.github.io/bmm/dev/reference/sdm.md) fits
+  need no rerun. These three and
+  [`m3()`](https://popov-lab.github.io/bmm/dev/reference/m3.md) also
+  accept an unambiguous abbreviation, such as `version = "f"` for
+  `"full"` ([\#467](https://github.com/popov-lab/bmm/issues/467)).
 - [`brms::combine_models()`](https://paulbuerkner.com/brms/reference/combine_models.html)
   now merges a fit with a refit made by
   [`update()`](https://rdrr.io/r/stats/update.html),
@@ -620,6 +639,10 @@
   detection models by response format and noise distribution, and fit a
   first model to `broeder_schuetz_2009_e3` step by step
   ([\#440](https://github.com/popov-lab/bmm/issues/440)).
+- The model lists on the Get started page are now tables with one row
+  per model version: the data columns each version needs, by argument,
+  and the parameters it estimates
+  ([\#467](https://github.com/popov-lab/bmm/issues/467)).
 - bmm’s own links now point at popov-lab.github.io/bmm instead of
   venpopov.com/bmm, which currently redirects to the new address. Update
   bookmarks when convenient
