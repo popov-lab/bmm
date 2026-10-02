@@ -59,6 +59,9 @@
 * `log_lik()` for **cswald** fits no longer returns `NaN` for a posterior draw whose `ndt` is at or above an observation's RT, which happens with `newdata` such as held-out folds. Such draws now give `-Inf`, or `0` for errors in the `"simple"` version, matching the likelihood the model was fitted with. `kfold()` and `loo::elpd()` no longer break on the common case of a few such draws; an observation whose RT is below every posterior draw of `ndt` can still return a non-finite estimate, which reports a real mismatch with the data, not this bug. Rerun affected computations (#453).
 * **ddm**, **ezdm** and **cswald** no longer fail before sampling when a parameter gets a link that excludes values its default link allows, such as a `log` or `softplus` link on `drift` (`Variable 'Intercept_drift' has NA values`) (#460).
 
+### Documentation
+* New online [article](https://popov-lab.github.io/bmm/dev/articles/bmm_hypothesis_testing.html) on testing hypotheses and comparing models: testing effects on a parameter with `hypothesis()`, comparing a model with and without a predictor, and comparing different models fitted to the same data, with leave-one-out cross-validation and Bayes factors (#308).
+
 ### Other changes
 * bmm's own links now point at popov-lab.github.io/bmm instead of venpopov.com/bmm, which currently redirects to the new address. Update bookmarks when convenient (#433).
 * The **cswald** likelihood now evaluates all observations in one call instead of one at a time. This makes fitting faster, improves the accuracy of the gradients the sampler uses, and adds support for within-chain parallelization: `bmm(..., threads = 2)` now works for **cswald** as it does for **sdm**. The posterior is unchanged (#387).
