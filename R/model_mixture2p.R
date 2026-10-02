@@ -10,11 +10,11 @@
       domain = "Visual working memory",
       task = "Continuous reproduction",
       name = "Two-parameter mixture model by Zhang and Luck (2008).",
-      version = "NA",
       citation = glue(
         "Zhang, W., & Luck, S. J. (2008). Discrete fixed-resolution \\
         representations in visual working memory. Nature, 453(7192), 233-235"
       ),
+      version = "NA",
       requirements = glue(
         "- The response vairable should be in radians and \\
         represent the angular error relative to the target"
@@ -36,7 +36,10 @@
       default_priors = list(
         mu1 = list(main = "normal(0, 0.5)", effects = "normal(0, 0.25)", sd = "exponential(4)"),
         kappa = list(main = "normal(2, 1)", effects = "normal(0, 1)", sd = "exponential(1)"),
-        thetat = list(main = "logistic(0, 1)", effects = "normal(0, 0.5)", sd = "exponential(1)")
+        # two cells with logistic(0, 1) priors differ by SD pi * sqrt(2 / 3) = 2.57;
+        # narrower effects priors shrink set-size effects from a reference near
+        # ceiling, so 1 + set_size and 0 + set_size disagree (#466)
+        thetat = list(main = "logistic(0, 1)", effects = "normal(0, 2.5)", sd = "exponential(1)")
       ),
       # central 50% of the main default prior on the native scale
       init_ranges = list(

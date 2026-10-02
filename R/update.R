@@ -161,10 +161,16 @@ update.bmmfit <- function(object, formula., newdata = NULL, recompile = NULL,
   dots$prior <- NULL
   new_fit_args <- combine_args(nlist(config_args, dots, prior))
 
-  # construct the new formula and data only if they have changed
-  if (!identical(new_fit_args$formula, object$formula)) {
-    formula. <- new_fit_args$formula
-  }
+  # configure_model() always returns the complete brmsformula, so brms has
+  # nothing to merge. Handed over as `formula.`, it would be rebuilt by
+  # update.brmsformula() in another element order than bmm() stores, and
+  # brms::combine_models() would then reject the updated fit as having a
+  # different formula (#464). As the stored formula, it goes through the same
+  # validation in brms as the one bmm() passes to brm(). `formula.` is set to
+  # NULL because NextMethod() forwards the frame's value, which would otherwise
+  # be the user's bmmformula
+  object$formula <- new_fit_args$formula
+  formula. <- NULL
   if (!identical(new_fit_args$data, olddata)) {
     newdata <- new_fit_args$data
   }
@@ -186,7 +192,7 @@ update.bmmfit <- function(object, formula., newdata = NULL, recompile = NULL,
   # sdm run metadata) were computed for the original data and formula. The
   # named `control` replaces the one in the dots and adds the starting step size
   object <- NextMethod("update", object,
-    formula = formula., newdata = newdata,
+    newdata = newdata,
     prior = prior, recompile = recompile,
     stanvars = new_fit_args$stanvars, init = init,
     control = configure_control(

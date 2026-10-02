@@ -121,20 +121,34 @@ backend interface to Stan.
 }
 \section{Supported Models}{
 The following models are supported:
+
+Continuous reproduction
 \itemize{
-\item cswald(rt, response, links, version)
-\item ddm(rt, response, links)
-\item ezdm(mean_rt, var_rt, n_upper, n_trials, links, version)
-\item imm(resp_error, nt_features, nt_distances, set_size, regex, version)
-\item m3(resp_cats, num_options, choice_rule, version)
-\item mixture2p(resp_error)
-\item mixture3p(resp_error, nt_features, set_size, regex)
-\item sdm(resp_error, version)
-\item sdt_cdp(response, stimulus, n_new, n_old, dist, threshold_type, links)
-\item sdt_mafc(response, n_trials, m, dist, links)
-\item sdt_ranking(response, m, dist, links)
-\item sdt_rating(response, stimulus, dist, threshold_type, version, links)
-\item sdt_yn(response, stimulus, n_trials, dist, links)
+\item imm(): Interference measurement model by Oberauer and Lin (2017)
+\item mixture2p(): Two-parameter mixture model by Zhang and Luck (2008)
+\item mixture3p(): Three-parameter mixture model by Bays et al (2009)
+\item sdm(): Signal Discrimination Model (SDM) by Oberauer (2023)
+}
+
+Categorical recall and n-AFC decisions
+\itemize{
+\item m3(): The Multinomial / Memory Measurement Model
+}
+
+Detection, recognition and confidence judgments
+\itemize{
+\item sdt_cdp(): Continuous Dual-Process Signal Detection Theory (CDP)
+\item sdt_mafc(): Signal Detection Theory (m-AFC)
+\item sdt_ranking(): Signal Detection Theory (Ranking)
+\item sdt_rating(): Signal Detection Theory (Confidence Rating)
+\item sdt_yn(): Signal Detection Theory (Yes/No)
+}
+
+Choices and response times
+\itemize{
+\item cswald(): Censored-Shifted Wald Model
+\item ddm(): Diffusion Decision Model
+\item ezdm(): EZ-Diffusion Model
 }
 
 Type  ?modelname  to get information about a specific model, e.g.  ?imm

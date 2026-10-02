@@ -11,12 +11,12 @@
       domain = "Visual working memory",
       task = "Continuous reproduction",
       name = "Three-parameter mixture model by Bays et al (2009).",
-      version = "NA",
       citation = glue(
         "Bays, P. M., Catalao, R. F. G., & Husain, M. (2009). \\
         The precision of visual working memory is set by allocation \\
         of a shared resource. Journal of Vision, 9(10), 1-11"
       ),
+      version = "NA",
       requirements = glue(
         "- The response vairable should be in radians and \\
         represent the angular error relative to the target
@@ -42,8 +42,11 @@
       default_priors = list(
         mu1 = list(main = "normal(0, 0.5)", effects = "normal(0, 0.25)", sd = "exponential(4)"),
         kappa = list(main = "normal(2, 1)", effects = "normal(0, 1)", sd = "exponential(1)"),
-        thetat = list(main = "logistic(0, 1)", effects = "normal(0, 0.5)", sd = "exponential(1)"),
-        thetant = list(main = "logistic(0, 1)", effects = "normal(0, 0.5)", sd = "exponential(1)")
+        # two cells with logistic(0, 1) priors differ by SD pi * sqrt(2 / 3) = 2.57;
+        # narrower effects priors shrink set-size effects from a reference near
+        # ceiling, so 1 + set_size and 0 + set_size disagree (#466)
+        thetat = list(main = "logistic(0, 1)", effects = "normal(0, 2.5)", sd = "exponential(1)"),
+        thetant = list(main = "logistic(0, 1)", effects = "normal(0, 2.5)", sd = "exponential(1)")
       ),
       # central 50% of the main default prior on the native scale; the softmax
       # weights have no native value of their own, so theirs is on the

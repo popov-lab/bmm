@@ -3,6 +3,63 @@ test_that("supported_models() returns a non-empty character vector", {
   expect_gt(length(supported_models(print_call = FALSE)), 0)
 })
 
+test_that("model_registry() lists every supported model once, grouped in lookup order", {
+  registry <- model_registry()
+  expect_setequal(registry$model, supported_models(print_call = FALSE))
+  expect_false(any(duplicated(registry$model)))
+  expect_false(any(grepl("\\.$", registry$name)))
+  expect_equal(
+    unique(registry$group),
+    intersect(unique(unname(model_groups)), registry$group)
+  )
+  expect_equal(registry$group[registry$model == "imm"], "Continuous reproduction")
+  expect_equal(registry$group[registry$model == "sdt_yn"], "Detection, recognition and confidence judgments")
+  expect_equal(registry$group[registry$model == "ddm"], "Choices and response times")
+})
+
+test_that("model_group() keeps an unknown domain as its own group", {
+  expect_equal(
+    model_group(c("Visual working memory", "Brand new domain", "")),
+    c("Continuous reproduction", "Brand new domain", "Other models")
+  )
+})
+
+test_that("format_model_list() appends unknown groups after the known ones and strips the period", {
+  extra <- data.frame(
+    model = "foo", name = "Foo model", domain = "Foo tasks",
+    group = model_group("Foo tasks")
+  )
+  registry <- rbind(model_registry(), extra)
+  txt <- format_model_list(registry, "text")
+  expect_gt(which(txt == "Foo tasks"), which(txt == "Choices and response times"))
+  expect_true("- foo(): Foo model" %in% txt)
+  md <- format_model_list(registry, "md", headers = FALSE)
+  expect_false(any(grepl("^\\*\\*", md)))
+  expect_true(any(grepl("^- \\[`imm\\(\\)`\\]\\(https://popov-lab.github.io/bmm/reference/imm.html\\)", md)))
+})
+
+test_that("supported_models() prints every model exactly once, without arguments", {
+  out <- as.character(supported_models())
+  for (m in supported_models(print_call = FALSE)) {
+    hits <- gregexpr(glue::glue("- {m}\\(\\): "), out)[[1]]
+    expect_length(hits[hits > 0], 1)
+  }
+  expect_match(out, "Continuous reproduction")
+  expect_match(out, "Type  \\?modelname")
+  expect_no_match(out, "resp_error")
+})
+
+test_that("print_pretty_models_md(group = ) lists one group without headers", {
+  out <- capture.output(print_pretty_models_md(group = "Continuous reproduction"))
+  expect_true(any(grepl("`imm()`", out, fixed = TRUE)))
+  expect_false(any(grepl("`ddm()`", out, fixed = TRUE)))
+  expect_false(any(grepl("**", out, fixed = TRUE)))
+  all_groups <- capture.output(print_pretty_models_md())
+  expect_true(any(grepl("**Choices and response times**", all_groups, fixed = TRUE)))
+  expect_error(print_pretty_models_md(group = "nope"), "Unknown model group")
+  expect_error(print_pretty_models_md(group = character(0)), "must not be empty")
+})
+
 test_that("get_model() returns the correct function", {
   expect_equal(get_model("mixture2p"), .model_mixture2p)
 })
@@ -178,6 +235,41 @@ test_that("generated template code constructs a valid bmmodel", {
     ver$tmpl_build_ver("y", "a", "b", version = "nope"),
     "should be one of"
   )
+})
+
+test_that("model constructors and the template list their fields in the canonical order", {
+  skip_on_cran()
+  canonical <- c(
+    "resp_vars", "other_vars", "domain", "task", "name", "citation", "version",
+    "requirements", "parameters", "links", "fixed_parameters", "default_priors",
+    "init_ranges"
+  )
+  # m3 builds its inits in create_initfun.m3() and drops an empty default_priors
+  optional <- c("default_priors", "init_ranges")
+  expect_canonical <- function(model, label) {
+    fields <- names(model)
+    expect_identical(fields, intersect(canonical, fields), label = label)
+    expect_in(setdiff(canonical, fields), optional)
+  }
+
+  ns <- asNamespace("bmm")
+  for (constructor in ls(ns, pattern = "^\\.model_", all.names = TRUE)) {
+    expect_canonical(get(constructor, envir = ns)(), constructor)
+  }
+  # user priors on an m3 version without defaults are appended after construction
+  expect_canonical(
+    .model_m3(resp_cats = "a", default_priors = list(a = list(main = "normal(0, 1)"))),
+    ".model_m3 with default_priors"
+  )
+
+  for (versions in list(NULL, c("simple", "full"))) {
+    env <- new.env(parent = ns)
+    eval(
+      parse(text = capture.output(use_model_template("tmpl_order", versions, testing = TRUE))),
+      envir = env
+    )
+    expect_canonical(env$.model_tmpl_order(), "use_model_template() scaffold")
+  }
 })
 
 test_that("stancode() works with brmsformula", {
