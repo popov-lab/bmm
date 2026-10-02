@@ -80,7 +80,12 @@ check_data.non_targets <- function(model, data, formula) {
   )
 
   ss <- check_var_set_size(model$other_vars$set_size, data)
-  max_set_size <- ss$max_set_size
+  # brms drops NA-response rows from a fit's stored frame, so the frame's maximum
+  # set size can be below the fit's (#459); revert_check_data() hands over the
+  # fit's bound. Only that function sets it, so data from bmm() and
+  # update(newdata = ) is still checked against its own maximum
+  max_set_size <- attr(data, "fit_max_set_size") %||% ss$max_set_size
+  attr(data, "fit_max_set_size") <- NULL
   ss_numeric <- ss$ss_numeric
 
   stopif(

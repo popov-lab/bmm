@@ -674,3 +674,81 @@ test_that("a user column named LureIdx<n> does not shift the rebuilt set size", 
   data <- check_stored_data(case$model, fit$data, fit$bmm$user_formula)
   expect_equal(data$ss_numeric, set_size)
 })
+
+# brms drops rows whose response is NA, so when every response at the largest
+# set size is missing the stored frame never shows that set size (#459)
+largest_set_size_cases <- function() {
+  cases <- stored_frame_cases()
+  nt_features <- paste0("col_nt", 1:7)
+  nt_distances <- paste0("dist_nt", 1:7)
+  cases <- list(
+    mixture3p = cases$mixture3p,
+    mixture3p_set_size = cases$mixture3p_set_size,
+    imm_full = cases$imm,
+    imm_bsc = list(
+      model = imm("dev_rad",
+        nt_features = nt_features, nt_distances = nt_distances,
+        set_size = "set_size", version = "bsc"
+      ),
+      formula = bmf(c ~ 1, s ~ 1, kappa ~ 1), data = cases$imm$data
+    ),
+    imm_abc = list(
+      model = imm("dev_rad",
+        nt_features = nt_features, set_size = "set_size", version = "abc"
+      ),
+      formula = bmf(c ~ 1, a ~ 1, kappa ~ 1), data = cases$imm$data
+    )
+  )
+  lapply(cases, function(case) {
+    case$data$dev_rad[case$data$set_size == 8] <- NA
+    case
+  })
+}
+
+test_that("a stored frame without the largest set size passes check_data again (#459)", {
+  skip_on_cran()
+  for (case_name in names(largest_set_size_cases())) {
+    case <- largest_set_size_cases()[[case_name]]
+    fit <- stored_frame_fit(case)
+    expect_false(8 %in% fit$data$set_size, label = case_name)
+    data <- check_stored_data(case$model, fit$data, fit$bmm$user_formula)
+    expect_equal(attr(data, "max_set_size"), 8, label = case_name)
+    expect_null(attr(data, "fit_max_set_size"), label = case_name)
+    expect_equal(brms::standata(fit, newdata = data), brms::standata(fit), label = case_name)
+  }
+})
+
+test_that("update() without newdata refits when the largest set size has no response (#459)", {
+  skip_on_cran()
+  skip_if_not_installed("rstan")
+  stub <- methods::new("stanfit", sim = list(
+    iter = 10L, warmup = 5L, chains = 1L, thin = 1L,
+    samples = list(structure(list(), args = list(control = list())))
+  ))
+  stub_fit <- function(case) suppressWarnings(suppressMessages(
+    bmm(case$formula, case$data, case$model, backend = "mock", mock_fit = stub, rename = FALSE)
+  ))
+  # a mock fit cannot be reused, so update() takes the recompile path
+  stub_update <- function(fit, ...) suppressWarnings(suppressMessages(
+    update(fit, ..., backend = "mock", mock_fit = stub, rename = FALSE, recompile = TRUE)
+  ))
+
+  for (case_name in c("mixture3p", "imm_full")) {
+    fit <- stub_fit(largest_set_size_cases()[[case_name]])
+    expect_equal(brms::standata(stub_update(fit)), brms::standata(fit), label = case_name)
+  }
+
+  fit <- stub_fit(largest_set_size_cases()$mixture3p_set_size)
+  up <- stub_update(fit, formula. = bmf(kappa ~ 1, thetat ~ 1, thetant ~ 1))
+  expect_equal(brms::standata(up)$K_thetant, 1)
+})
+
+test_that("data without the largest set size still fail the nt_features check", {
+  skip_on_cran()
+  case <- largest_set_size_cases()$mixture3p
+  fit <- stored_frame_fit(case)
+  short_data <- case$data[case$data$set_size != 8, ]
+  msg <- "'nt_features' should equal max\\(set_size\\)-1"
+  expect_error(bmm(case$formula, short_data, case$model, backend = "mock", mock_fit = 1), msg)
+  expect_error(update_mock(fit, newdata = short_data), msg)
+})
