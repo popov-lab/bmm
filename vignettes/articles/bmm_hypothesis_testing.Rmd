@@ -90,8 +90,8 @@ knitr::kable(
     ),
     Approach = c(
       "Posterior of the difference; Bayes factor via the Savage-Dickey method",
-      "Same model with and without the predictor: Bayes factor via bridge sampling; predictive accuracy (LOO, or leave-one-participant-out for claims about new participants)",
-      "Different models on the same data: predictive accuracy (LOO); Bayes factor only with care"
+      "Same model with and without the predictor: Bayes factor via bridge sampling; predictive accuracy (LOO, or leave-one-participant-out for claims about the population, that is, about new participants)",
+      "Different models on the same data: predictive accuracy (LOO); Bayes factor only with care, because its priors are model-specific"
     ),
     Functions = c(
       "`hypothesis()`",
@@ -124,7 +124,7 @@ different question.
 - **Predictive accuracy**, estimated by leave-one-out cross-validation (LOO),
   asks how well a fitted model would predict *new* observations from the same
   process [@vehtariPracticalBayesianModel2017]. It uses the posterior rather
-  than the prior, so it depends much less on the priors.
+  than the prior, so it usually depends much less on the priors.
 
 <div class="takeaway">
 **Estimate first, test second.** Before asking whether an effect "exists",
@@ -139,7 +139,8 @@ We use the data from @Oberauer_Lin_2017, which ship with `bmm`. Participants
 saw between one and eight coloured squares, and after a short delay reported
 the colour of one cued square on a colour wheel. The response error, in
 radians, is the difference between the reported and the true colour. To keep
-the models quick to fit, we use only the even set sizes (2, 4, 6, and 8).
+the models quick to fit, we use only the even set sizes (2, 4, 6, and 8). Every
+set size has the same number of trials, so this keeps exactly half of them.
 
 ```{r data, message = FALSE, warning = FALSE}
 library(bmm)
@@ -174,7 +175,9 @@ formula_setsize <- bmf(
 ```
 
 The formula `kappa ~ 0 + set_size` estimates one `kappa` for each set size
-(cell-means coding), so that no set size is singled out as a baseline. The term `(0 + set_size || ID)` lets each participant
+(cell-means coding), so that no set size is singled out as a baseline. (`set_size`
+is stored as a factor in the shipped data; with a numeric column, `0 + set_size`
+would fit a single slope instead.) The term `(0 + set_size || ID)` lets each participant
 deviate from these population values, with a separate deviation for each set
 size. The double bar `||` leaves out the correlations between these
 deviations, which keeps the model smaller. With a single bar `|`, they would be
@@ -189,7 +192,9 @@ settings, the sampler had not quite converged for some participant-level
 standard deviations. Keeping every second draw keeps the saved fit small.
 Because the warmup defaults to half of `iter`, this gives 4 chains $\times$
 (3,000 $-$ 1,500 warmup) / 2 = 3,000 posterior draws, a little fewer than the
-4,000 of the default settings.
+4,000 of the default settings. Thinning costs draws, which matters for the Bayes
+factors below; Section \@ref(sd-stability) therefore also uses a refit without
+thinning.
 
 ```{r fit-setsize, message = FALSE, warning = FALSE, results = "hide"}
 fit_setsize <- bmm(
@@ -209,10 +214,11 @@ fit_setsize <- bmm(
 
 Before interpreting any estimate, check that the sampler converged: all
 $\hat{R}$ values should be below 1.01 and the effective sample sizes should be
-large enough (a common rule of thumb is above 400). We checked all models in
-this article in the same way, and all passed.
+large enough (a common rule of thumb is above 400). We checked the two other
+fits of this article in the same way: their largest $\hat{R}$ is below 1.005 and
+their smallest effective sample size above 700.
 
-```{r convergence}
+```{r convergence, message = FALSE}
 draws_summary <- posterior::summarise_draws(
   fit_setsize, "rhat", "ess_bulk", "ess_tail"
 )
@@ -235,7 +241,8 @@ kappa_est <- brms::fixef(fit_setsize)
 kappa_est[grepl("^kappa_", rownames(kappa_est)), ]
 ```
 
-The `grepl()` call keeps the rows whose names start with `kappa_`. `kappa` is
+The `grepl()` call keeps the rows whose names start with `kappa_`; `Q2.5` and
+`Q97.5` are the bounds of the 95% CrI. `kappa` is
 estimated on the log scale, so these numbers are hard to read
 directly. Section \@ref(native-scale) shows how to translate them into a
 more intuitive unit. For now, it is enough to see that the estimates decrease
@@ -283,8 +290,9 @@ How to read the remaining columns:
 - `Estimate` and `Est.Error` are the posterior mean and standard deviation of
   the difference. `CI.Lower` and `CI.Upper` bound its 95% CrI.
 - `Evid.Ratio` is a Bayes factor *in favour of the hypothesis as written*. For
-  `... = 0`, values above 1 favour "no difference" and values below 1 favour a
-  difference (explained below).
+  `... = 0`, the hypothesis as written is "no difference", so values above 1
+  favour "no difference" and values below 1 favour a difference (explained
+  below).
 - `Post.Prob` is the posterior probability of the hypothesis as written,
   computed as if "no difference" and "a difference" had been equally probable
   beforehand. In the first row a small value therefore means evidence
@@ -356,17 +364,21 @@ bf01 <- h$Evid.Ratio
 results <- readRDS("assets/hypothesis_testing_results.rds")
 sd_tab <- results$savage_dickey
 sd_lr <- subset(sd_tab, draws == 40000)
-sd_def <- subset(sd_tab, draws == 4000)
+sd_def <- subset(sd_tab, draws == 3000)
+# per-chain Savage-Dickey estimates from the 40,000-draw fit (see the local
+# long-run script); the posterior-side variability that seeds cannot show
+sd_chains <- results$savage_dickey_chains
+n_near_zero <- sum(draws$b_kappa_set_size2 - draws$b_kappa_set_size8 < 0.1)
 ```
 
 For set size 2 versus 8, $\text{BF}_{01}$ = `r signif(bf01[1], 2)`, so
 $\text{BF}_{10}$ = 1 / `r signif(bf01[1], 2)` $\approx$
 `r signif(1 / bf01[1], 2)`: by this estimate, the data are roughly
 `r signif(1 / bf01[1], 2)` times more probable if precision differs between
-these set sizes than if it does not. This estimate is too small. For a Bayes
-factor this far from 1, 3,000 posterior draws are not enough. With 40,000
-draws, the median of ten estimates is `r round(1 / sd_lr$median_bf01[1])`
-(Section \@ref(sd-stability)). For set size 6 versus 8, $\text{BF}_{01}$ $\approx$
+these set sizes than if it does not. This $\text{BF}_{10}$ of
+`r signif(1 / bf01[1], 2)` is too small. For a Bayes factor this far from 1,
+3,000 posterior draws are not enough. With 40,000 draws, the median of ten
+estimates is `r round(1 / sd_lr$median_bf01[1])` (Section \@ref(sd-stability)). For set size 6 versus 8, $\text{BF}_{01}$ $\approx$
 `r signif(bf01[2], 2)`: here the data are roughly `r signif(bf01[2], 2)` times
 more probable if precision is the *same* at both set sizes. The interval for
 this difference could only tell us that zero is among the plausible values. The
@@ -388,7 +400,8 @@ note below the output says).
   of the effect. It is not a decision rule with a fixed error rate.
 - There is no agreed threshold for Bayes factors that plays the role of
   p < .05. Report the number itself, together with the prior it was computed
-  against, and let readers judge it.
+  against, and let readers judge it. (Words such as "clearly" in this article
+  describe the posterior, not a cut-off for Bayes factors.)
 </div>
 
 Three things about Savage-Dickey Bayes factors are easy to get wrong.
@@ -410,7 +423,7 @@ report_priors(fit_setsize)
 ```
 
 (`mu1`, the centre of the response distribution, is fixed to zero by default,
-so it has no prior.)
+shown as `constant(0)` in the table: no prior is estimated for it.)
 
 With cell-means coding, the prior on a difference is *implied* by the priors
 on the two cell means. For `kappa`, it is a normal distribution centred at
@@ -422,7 +435,8 @@ why it matters for the set size 6 versus 8 result.
 <summary>Under the hood: the prior on a difference, and how it shapes the Bayes factor</summary>
 
 The default prior on each cell mean of `kappa` is
-`r subset(brms::prior_summary(fit_setsize), nlpar == "kappa" & class == "b" & coef == "")$prior`.
+`r subset(brms::prior_summary(fit_setsize), nlpar == "kappa" & class == "b" & coef == "")$prior`
+(`brms` writes priors as mean and standard deviation).
 The difference of two independent normal variables with the same mean and
 standard deviation $s$ is centred at zero, with standard deviation
 $\sqrt{2} \cdot s \approx 1.41 \cdot s$. On the log scale, a difference of
@@ -468,10 +482,12 @@ draws every time (see the next section).
 
 ### How stable are these Bayes factors? {#sd-stability}
 
-We fitted the model once with the default settings (4,000 posterior draws) and
-once with 40,000 posterior draws, and repeated both tests with ten different
-seeds on each fit (Table \@ref(tab:sd-stability-table)). This takes several
-hours, so the results were computed once and stored.
+We repeated both tests with ten different seeds on the fit above (3,000
+posterior draws) and on a refit with 40,000 posterior draws (`fit_setsize_long`
+in Section \@ref(bridge); fewer than the 65,000 to 100,000 recommended above,
+but the refit already takes about half an hour). Table
+\@ref(tab:sd-stability-table) shows the results; they were computed once and
+stored.
 
 ```{r sd-stability-table, echo = FALSE}
 sd_tab |>
@@ -482,29 +498,37 @@ sd_tab |>
   ) |>
   knitr::kable(
     col.names = c("Difference", "Posterior draws", "Median BF01", "Min", "Max"),
-    caption = "Savage-Dickey Bayes factors across ten seeds, with 4,000 and 40,000 posterior draws."
+    caption = "Savage-Dickey Bayes factors across ten seeds, with 3,000 and 40,000 posterior draws."
   )
 ```
 
 For set size 6 versus 8, the number of draws hardly matters: the median
-$\text{BF}_{01}$ is `r fmt(sd_def$median_bf01[2], 1)` with 4,000 draws and
-`r fmt(sd_lr$median_bf01[2], 1)` with 40,000, and the ten seeds agree
-closely with both.
+$\text{BF}_{01}$ is `r fmt(sd_def$median_bf01[2], 1)` with 3,000 draws and
+`r fmt(sd_lr$median_bf01[2], 1)` with 40,000, and the ten seeds stay within
+about 10% of each other. (Our own call above, which evaluated both hypotheses
+with one seed, gave `r fmt(bf01[2])`, a little above the range in the table.
+That is the size of the noise the shuffled prior draws add.)
 
-For set size 2 versus 8, the ten seeds also agree closely with 4,000 draws:
+For set size 2 versus 8, the ten seeds also agree closely with 3,000 draws:
 $\text{BF}_{10}$ ranges from `r round(1 / sd_def$max_bf01[1])` to
 `r round(1 / sd_def$min_bf01[1])`. With 40,000 draws, however, the median
 $\text{BF}_{10}$ is `r round(1 / sd_lr$median_bf01[1])` (range
-`r round(1 / sd_lr$max_bf01[1])` to `r round(1 / sd_lr$min_bf01[1])`),
-`r fmt(sd_def$median_bf01[1] / sd_lr$median_bf01[1], 1)` times larger. The
-estimate from 4,000 draws is not noisy but biased, and repeating it with
-different seeds cannot reveal this, because every repetition uses the same
-posterior draws. The bias lies in the height of the posterior at zero. Zero is
-far in the tail of this posterior, almost no draws fall near it, and the
-density estimate fills the gap by smoothing over the nearest draws. This makes
-the posterior look higher at zero than it is, and the evidence for a
-difference weaker than it is. How large such an error is only shows when you
-draw more.
+`r round(1 / sd_lr$max_bf01[1])` to `r round(1 / sd_lr$min_bf01[1])` across
+seeds), `r fmt(sd_def$median_bf01[1] / sd_lr$median_bf01[1], 1)` times larger.
+Repeating the test with different seeds cannot reveal an error of this size,
+because every repetition uses the same posterior draws, and the seeds only
+reshuffle the prior draws. The error lies in the height of the posterior at
+zero. Zero is far in the tail of this posterior: only `r n_near_zero` of the
+3,000 draws fall below 0.1 (`r sd_chains$n_below_0.1` of the 40,000), and the
+density estimate at zero rests on these few draws. From one fit to the next it
+can therefore be off by a factor of several, in either direction; the kernel
+smoothing of the density estimate adds a smaller error of its own. A check that
+needs no refit is to compute the Bayes factor separately for each chain. For the
+40,000-draw fit, the four chains of 10,000 draws give $\text{BF}_{10}$ between
+`r round(1 / max(sd_chains$bf01_chain))` and
+`r round(1 / min(sd_chains$bf01_chain))` around the pooled
+`r round(1 / sd_chains$bf01_pooled)`. How large the error is only shows when
+you draw more.
 
 In practice: when a Savage-Dickey Bayes factor is far from 1, refit the model
 with many more draws before you report its size, as
@@ -522,7 +546,8 @@ items, that is, `kappa` at set size 6 should be *higher* than at set size 8.
 brms::hypothesis(fit_setsize, "kappa_set_size6 > kappa_set_size8")
 ```
 
-For a one-sided hypothesis, `Post.Prob` is the proportion of posterior draws in
+**Here `Evid.Ratio` means something different.** For a one-sided hypothesis,
+`Post.Prob` is the proportion of posterior draws in
 which the hypothesis holds, and `Evid.Ratio` is the ratio of that proportion to
 its complement. This ratio is the *posterior odds* of the hypothesis, not a
 Bayes factor. The posterior probability of the more probable direction is also
@@ -532,7 +557,13 @@ about whether the effect is large enough to matter. For that, you can define a
 region of values you consider practically equivalent to zero and check whether
 the CrI falls inside or outside it [@kruschkeRejectingAcceptingParameter2018].
 For example, you might decide that a change of less than 0.1 in log-kappa
-(about 10% in `kappa`) is too small to matter.
+(about 10% in `kappa`) is too small to matter. Applied to our set size 6 versus
+8 result, this rule says the data cannot yet decide: the CrI `r crI(2)` reaches
+beyond 0.1 in both directions. The Bayes factor of `r signif(bf01[2], 2)` for
+"no difference" does not conflict with that. It compares a difference of
+exactly zero with the large differences the default prior expected (see the box
+above), whereas the region asks whether the difference is small enough to
+ignore. Say which question you are answering.
 
 Note also that, as the note below the output says, `hypothesis()` reports a
 90% CrI for one-sided hypotheses and a 95% CrI for two-sided ones.
@@ -581,7 +612,7 @@ instead:
 
 ```{r native-wrong}
 kappa_means <- brms::fixef(fit_setsize)[c("kappa_set_size2", "kappa_set_size8"), "Estimate"]
-diff(k2sd(exp(kappa_means)) * 180 / pi)
+unname(diff(k2sd(exp(kappa_means)) * 180 / pi))
 ```
 
 ```{r native-values, include = FALSE}
@@ -594,10 +625,11 @@ memory grows by `r fmt(right_diff, 1)` degrees (posterior mean), and the shortcu
 gives `r fmt(wrong_diff, 1)` degrees. Here the two are close because the
 posteriors are narrow, but they drift apart as posteriors get wider, for
 example with fewer trials or participants: when a conversion is not a straight
-line, the mean of the converted draws is not the conversion of the mean. Medians and quantiles survive a conversion that preserves order (such as
+line, the mean of the converted draws is not the conversion of the mean. Medians and quantiles survive a monotone conversion (such as
 `exp()` or `k2sd()`), but means do not. The safe rule is to *transform first,
 then summarise*. `native_parameters(..., summary = TRUE)` follows this rule
-when you only need summaries of the parameters themselves.
+(its `Estimate` is the mean of the transformed draws) when you only need
+summaries of the parameters themselves.
 
 The same non-linearity has a second consequence: an effect that is constant on
 the log-kappa scale is not constant in degrees. A drop of 0.5 in log-kappa
@@ -639,7 +671,9 @@ In the null model, `kappa ~ 1` estimates a single population value of `kappa`
 for all set sizes. Everything else stays as it was. In particular, we keep the
 random effects `(0 + set_size || ID)` for `kappa`, so that participants can
 still differ in how set size affects them, and the two models differ *only* in
-the population-level effect of set size. Whether a null model should keep these
+the population-level effect of set size. This is the comparison an `lme4` user
+makes when testing a fixed effect while keeping its random slope. Whether a
+null model should keep these
 random effects (a "balanced" null) or drop them as well (a "strict" null) is
 debated, and the answer depends on whether your hypothesis concerns the
 population average or every individual [@vandoornBayesFactorsMixed2023]. For
@@ -678,7 +712,7 @@ fit with a technique called Pareto-smoothed importance sampling (PSIS)
 ```{r loo-code, eval = FALSE}
 loo_setsize <- loo(fit_setsize)
 loo_null <- loo(fit_null)
-loo_compare(loo_setsize, loo_null)
+loo_compare(list(setsize = loo_setsize, null = loo_null))
 ```
 
 ```{r loo-results, echo = FALSE}
@@ -694,6 +728,11 @@ q2_worse <- loo_compare_q2$model[2]
 q2_diff <- loo_compare_q2$elpd_diff[2]
 q2_se <- loo_compare_q2$se_diff[2]
 pareto_ok <- vapply(loo_res, \(x) all(loo::pareto_k_values(x) <= 0.7), logical(1))
+r_null_ss2 <- brms::ranef(fit_null)$ID[, "Estimate", "kappa_set_size2"]
+n_pos_ss2 <- sum(r_null_ss2 > 0)
+mean_r_ss2 <- mean(r_null_ss2)
+sd_null_ss2 <- brms::VarCorr(fit_null)$ID$sd["kappa_set_size2", "Estimate"]
+sd_setsize_ss2 <- brms::VarCorr(fit_setsize)$ID$sd["kappa_set_size2", "Estimate"]
 ```
 
 `loo_compare()` lists the model with the highest elpd first. Its
@@ -703,7 +742,8 @@ worse it predicts, and `se_diff` is the standard error of that difference.
 best one (not a p value), and `diag_diff` flags comparisons for which that
 approximation is unreliable (see `?loo::loo_compare`).
 Here, the `` `r q2_worse` `` model predicts worse by `r fmt(abs(q2_diff), 1)` points,
-with a standard error of `r fmt(q2_se, 1)`.
+with a standard error of `r fmt(q2_se, 1)`, and `diag_diff` says
+`|elpd_diff| < 4`, which is the tie rule below, not a problem with the data.
 
 How to read these numbers:
 
@@ -715,8 +755,10 @@ How to read these numbers:
   in predictive accuracy.
 - Check the Pareto $k$ diagnostic of each `loo` object (printed when you print
   the object). Values above 0.7 mean the approximation may be unreliable for
-  those observations [@vehtariPracticalBayesianModel2017]. For all models in
-  this article, all values are below 0.7`r if (all(pareto_ok)) "" else " (CHECK: not true for all models)"`.
+  those observations [@vehtariPracticalBayesianModel2017].
+  `loo::pareto_k_values(loo_setsize)` returns them. For all models in
+  this article, all values are below 0.7`r if (all(pareto_ok)) "" else " (CHECK: not true for all models)"`;
+  the largest is `r fmt(max(vapply(loo_res, \(x) max(loo::pareto_k_values(x)), numeric(1))), 2)`.
 
 LOO is not a likelihood-ratio test or an AIC comparison, but it plays a
 similar role: it rewards a model for predicting well and penalises it for
@@ -727,10 +769,12 @@ set sizes 2 and 8. It does not, because LOO answers a narrower question than
 it might seem. Leaving out *one trial* means that the model still knows all
 other trials of the same participant. The null model has no population-level
 effect of set size, but it keeps the participant-level effects
-`(0 + set_size || ID)`, and these can take over the job: every participant's
-precision at set size 2 is simply estimated to be higher than the common mean.
-You can see this in the estimated standard deviations of these effects, which
-are larger in the null model than in the set-size model:
+`(0 + set_size || ID)`, and these can take over the job: most participants'
+precision at set size 2 is simply estimated to be higher than the common mean
+(`r n_pos_ss2` of 19 here, by `r fmt(mean_r_ss2)` on the log scale on average).
+You can see this in the estimated standard deviation of these effects at set
+size 2, `r fmt(sd_null_ss2)` in the null model against `r fmt(sd_setsize_ss2)`
+in the set-size model; the other three hardly change:
 
 ```{r q2-ranef}
 sd_kappa <- function(fit) {
@@ -741,10 +785,10 @@ rbind(setsize = sd_kappa(fit_setsize), null = sd_kappa(fit_null))
 ```
 
 So trial-wise LOO asks: *for the participants we already have*, does a
-population-level effect of set size improve the prediction of their next trial?
-Here it barely does. A different question is whether the effect helps to
+population-level effect of set size improve the prediction of one of their
+trials? Here it barely does. A different question is whether the effect helps to
 predict *new participants*. That question requires leaving out all trials of
-one participant at a time, which `loo()` cannot approximate. Instead, the
+one participant at a time, which `loo()` cannot approximate reliably. Instead, the
 model has to be refitted once per participant, that is, 19 times here. We
 show the code but do not run it:
 
@@ -793,8 +837,11 @@ Bridge sampling has three requirements:
    [@schadWorkflowTechniquesRobust2023].
 
 The code below refits both models with 40,000 draws (4 chains with 10,000
-post-warmup iterations each) and runs bridge sampling ten times per model.
-This takes a while, so we show the code and load the stored results.
+post-warmup iterations each), fewer than the 72,000 found sufficient above:
+each mixture model refit already takes about half an hour, and the SDM refit of
+Question 3 several hours. It then runs bridge sampling ten times per model. We
+show the code and load the stored results. `update()` refits the model with the
+new formula, which recompiles it.
 
 ```{r bridge-code, eval = FALSE}
 fit_setsize_long <- bmm(
@@ -802,7 +849,7 @@ fit_setsize_long <- bmm(
   sample_prior = "yes", save_pars = save_pars(all = TRUE),
   warmup = 1000, iter = 11000, cores = 4, backend = "cmdstanr"
 )
-fit_null_long <- update(fit_setsize_long, formula. = formula_null)
+fit_null_long <- update(fit_setsize_long, formula. = formula_null, cores = 4)
 
 bridge_setsize <- bridge_sampler(fit_setsize_long, repetitions = 10)
 bridge_null <- bridge_sampler(fit_null_long, repetitions = 10)
@@ -833,7 +880,7 @@ bf_tab |>
   select(comparison, draws, median, range) |>
   knitr::kable(
     col.names = c("Comparison", "Posterior draws", "Median BF10", "Range across 10 repetitions"),
-    caption = "Bayes factors from bridge sampling, with 4,000 and 40,000 posterior draws."
+    caption = "Bayes factors from bridge sampling, with 4,000 and 40,000 posterior draws. The 4,000-draw rows come from fits with the default settings and `save_pars = save_pars(all = TRUE)`; their convergence was marginal ($\\hat{R}$ up to 1.010), and they are shown only for the comparison of draw counts. The SDM rows use `formula_sdm` with the same two settings."
   )
 ```
 
@@ -950,7 +997,9 @@ native_parameters(fit_setsize, pars = "thetat", re_formula = NA, summary = TRUE)
 ```
 
 In the SDM, larger set sizes mainly reduce the memory strength `c`, whereas
-`kappa` does not decrease. The two models thus tell different stories about
+`kappa` does not decrease. (The SDM's `kappa` sets the width of the activation
+on the wheel, not the precision of a remembered item as in the mixture model,
+so the two should not be compared.) The two models thus tell different stories about
 the same data: the mixture model attributes the set-size effect to less
 precise memories and more guessing, the SDM to a weaker memory signal.
 
@@ -959,7 +1008,7 @@ accuracy in the same way as in Question 2:
 
 ```{r loo-q3-code, eval = FALSE}
 loo_sdm <- loo(fit_sdm)
-loo_compare(loo_setsize, loo_sdm)
+loo_compare(list(mixture2p = loo_setsize, sdm = loo_sdm))
 ```
 
 ```{r loo-q3-results, echo = FALSE}
@@ -1051,14 +1100,20 @@ models can only be compared with LOO or a Bayes factor if they are fitted to
 the same observations in the same format.
 
 **Factorial designs.** With cell-means coding, main effects and interactions
-are contrasts between cell means, written directly in `hypothesis()`. In a 2
-$\times$ 2 design with cells `a1b1`, `a1b2`, `a2b1` and `a2b2`, the
-interaction on `kappa` is
-`"(kappa_a1b1 - kappa_a1b2) - (kappa_a2b1 - kappa_a2b2) = 0"`.
+are contrasts between cell means, written directly in `hypothesis()`. With two
+factors `a` and `b`, `kappa ~ 0 + a:b` estimates one cell mean per combination,
+named after the factors and their levels as `fixef()` prints them, for example
+`kappa_a1:b1` for levels `1` of `a` and `1` of `b`. The interaction on `kappa`
+in a 2 $\times$ 2 design is then
+`"(kappa_a1:b1 - kappa_a1:b2) - (kappa_a2:b1 - kappa_a2:b2) = 0"`. Its implied
+prior under cell-means coding has a standard deviation of $2 s$, twice that of
+a pairwise difference.
 
 **Reporting.** Report the estimate and CrI with every test. For a Bayes
 factor, report the method, the prior on the tested parameters, the number of
-posterior draws, and how much the estimate varied across repetitions. For LOO,
+posterior draws, and how much the estimate varied across repetitions that
+redraw the posterior (for example across chains or refits), not only across
+seeds, which reshuffle the prior draws. For LOO,
 report `elpd_diff`, `se_diff`, and whether the Pareto $k$ diagnostics were
 fine. For example, the results of Questions 1 and 3 could be reported as
 follows:
@@ -1070,9 +1125,9 @@ follows:
 > `r fmt(quantile(sd_deg$sd_diff, 0.975), 1)`]. A Savage-Dickey
 > Bayes factor, computed against the implied prior
 > $\mathcal{N}(0, 1.41^2)$ on this difference, favoured a difference,
-> $\text{BF}_{10}$ = `r round(1 / sd_lr$median_bf01[1])` (median
-> of ten estimates from 40,000 posterior draws, range
-> `r round(1 / sd_lr$max_bf01[1])` to `r round(1 / sd_lr$min_bf01[1])`).
+> $\text{BF}_{10}$ = `r round(1 / sd_lr$median_bf01[1])` (40,000 posterior
+> draws; `r round(1 / max(sd_chains$bf01_chain))` to
+> `r round(1 / min(sd_chains$bf01_chain))` across the four chains).
 > The signal discrimination model predicted the responses better than
 > the two-parameter mixture model ($\Delta\text{elpd}$ = `r fmt(abs(q3_diff), 1)`,
 > SE = `r fmt(q3_se, 1)`; all Pareto $k$ < 0.7).
