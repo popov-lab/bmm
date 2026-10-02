@@ -63,7 +63,7 @@
 * `brms::combine_models()` now merges a fit with a refit made by `update()`, e.g. `update(fit, seed = 2)` to rerun chains that failed. Before, it stopped with *"Models 1 and 2 have different formulas"*. Both fits must come from the same bmm version, so rerun `update()` refits made with an earlier version (#464).
 
 ### Deprecated functions and arguments
-* `parameters()` is deprecated and will be removed in bmm 1.6.0. Use `parameter_info()` instead: it takes the same arguments and returns the same table. Until then `parameters()` keeps working and warns. The **parameters** package exports a function of the same name, so with both packages attached, `parameters()` ran whichever package was attached last (#474).
+* `parameters()` is deprecated and will be removed in bmm 1.6.0. Use `parameter_info()` instead: it takes the same arguments and returns the same table. Until then `parameters()` keeps working and warns. The **parameters** package exports a function of the same name, so with both packages attached, `parameters()` runs whichever package is attached last (#474).
 
 ### Documentation
 * New online [article](https://popov-lab.github.io/bmm/dev/articles/bmm_hypothesis_testing.html) on testing hypotheses and comparing models: testing effects on a parameter with `hypothesis()`, comparing a model with and without a predictor, and comparing different models fitted to the same data, with leave-one-out cross-validation and Bayes factors (#308).
