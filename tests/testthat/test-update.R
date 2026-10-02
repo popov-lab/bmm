@@ -79,6 +79,30 @@ test_that("update() stores the formula that bmm() stores for the same inputs", {
                ignore_formula_env = TRUE)
 })
 
+test_that("update() stores the formula that bmm() stores, without a fixture", {
+  skip_if_not_installed("rstan")
+  stub <- methods::new("stanfit", sim = list(
+    iter = 10L, warmup = 5L, chains = 1L, thin = 1L,
+    samples = list(structure(list(), args = list(control = list())))
+  ))
+  dat <- data.frame(y = rsdm(60, kappa = 5))
+  bmm_mock <- function(formula) {
+    suppressMessages(bmm(formula, dat, sdm("y"), backend = "mock", mock_fit = stub, rename = FALSE))
+  }
+  fit <- bmm_mock(bmf(c ~ 1, kappa ~ 1))
+  # a mock fit cannot be reused, so update() takes the recompile path
+  update_mock <- function(...) {
+    suppressMessages(update(fit, ..., backend = "mock", mock_fit = stub, rename = FALSE, recompile = TRUE))
+  }
+
+  expect_equal(formula(update_mock()), formula(fit), ignore_formula_env = TRUE)
+
+  new_formula <- bmf(c ~ 1, kappa ~ 1, mu ~ 1)
+  expect_equal(formula(update_mock(formula. = new_formula)),
+               formula(bmm_mock(new_formula)),
+               ignore_formula_env = TRUE)
+})
+
 test_that("brms::combine_models() merges a fit with its update() refit", {
   skip_on_cran()
   skip_if_not_installed("cmdstanr")
