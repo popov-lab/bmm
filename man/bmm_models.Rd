@@ -8,8 +8,9 @@ bmm_models()
 }
 \value{
 A character vector of model names with class \code{bmm_models}, which
-prints as the grouped list. Use it like any character vector, in base R
-or in dplyr, e.g. \code{"imm" \%in\% bmm_models()}.
+prints as the grouped list. Use it as a character vector in base R or
+dplyr, e.g. \code{"imm" \%in\% bmm_models()}; \code{as.character()} gives a plain one
+where a function refuses the class.
 }
 \description{
 Measurement models available in \code{bmm}
