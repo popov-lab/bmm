@@ -377,8 +377,7 @@ stancode(bmf(c ~ 0 + set_size, kappa ~ 0 + set_size),
           COSN[i,m] = cos((2*i-1)*pi()/(2*m))-1;
         }
       }
-      // fail fast if the precomputed run metadata does not describe the data Stan
-      // received (it is computed in R and can drift out of sync with the data)
+      // fail fast if the run metadata computed in R does not match the data Stan received
       {
         int sdm_run_total = 0;
         for (g in 1:G_sdm_runs) {
