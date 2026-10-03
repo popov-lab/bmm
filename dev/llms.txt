@@ -316,11 +316,14 @@ stan data, etc.
 - [`native_parameters()`](https://popov-lab.github.io/bmm/dev/reference/native_parameters.md)
   : Posterior draws of model parameters on the native scale
 
+- [`parameter_info()`](https://popov-lab.github.io/bmm/dev/reference/parameter_info.md)
+  : Get parameter information for a bmm model
+
 - [`pp_check_vars()`](https://popov-lab.github.io/bmm/dev/reference/pp_check_vars.md)
   : List the posterior predictive checks available for a model fit
 
-- [`report_priors()`](https://popov-lab.github.io/bmm/dev/reference/report_priors.md)
-  : Report the priors used in a fitted bmm model
+- [`prior_info()`](https://popov-lab.github.io/bmm/dev/reference/prior_info.md)
+  : Priors of a fitted bmm model and where they came from
 
 - [`stancode(`*`<bmmformula>`*`)`](https://popov-lab.github.io/bmm/dev/reference/stancode.bmmformula.md)
   : Generate Stan code for bmm models
@@ -329,9 +332,6 @@ stan data, etc.
   :
 
   Stan data for `bmm` models
-
-- [`parameters()`](https://popov-lab.github.io/bmm/dev/reference/parameters.md)
-  : Get parameter information for a bmm model
 
 ## Specifying models
 

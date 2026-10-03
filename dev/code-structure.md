@@ -129,7 +129,7 @@ definition.
 # information in the title and details sections will be filled in
 # automatically based on the information in the .model_modelname()$info
 #' @title `r .model_my_new_model()name`
-#' @name Model Name#' @details `r model_info(.model_my_new_model())`
+#' @name Model Name#' @details `r model_docs(.model_my_new_model())`
 #' @param resp_var1 A description of the response variable
 #' @param required_arg1 A description of the required argument
 #' @param required_arg2 A description of the required argument

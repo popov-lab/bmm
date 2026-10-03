@@ -146,7 +146,7 @@ deviations typical for working memory data.
 Parameters fixed to a constant are returned at that constant,
 transformed to the native scale. Because `bmm` fixes parameters on the
 *link* scale, the native value can differ from the value shown by
-[`parameters()`](https://popov-lab.github.io/bmm/dev/reference/parameters.md):
+[`parameter_info()`](https://popov-lab.github.io/bmm/dev/reference/parameter_info.md):
 the `ddm` relative starting point `zr` is fixed at `0` under a `logit`
 link and is therefore reported as `0.5`, and the `ezdm` and `cswald`
 diffusion constant `s` is fixed at `0` under a `log` link and is
@@ -200,7 +200,7 @@ filled from the first row of the model data rather than recomputed, and
 
 ## See also
 
-[`parameters()`](https://popov-lab.github.io/bmm/dev/reference/parameters.md),
+[`parameter_info()`](https://popov-lab.github.io/bmm/dev/reference/parameter_info.md),
 [`native_transform()`](https://popov-lab.github.io/bmm/dev/reference/native_transform.md),
 [`conditional_effects.bmmfit()`](https://popov-lab.github.io/bmm/dev/reference/conditional_effects.bmmfit.md)
 

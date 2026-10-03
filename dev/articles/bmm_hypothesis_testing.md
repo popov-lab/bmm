@@ -337,13 +337,13 @@ returns `NA` for `Evid.Ratio` unless every parameter in the hypothesis
 has a proper prior and the model was fitted with `sample_prior = "yes"`.
 Before you report a Bayes factor, look at the prior it was computed
 against.
-[`report_priors()`](https://popov-lab.github.io/bmm/dev/reference/report_priors.md)
+[`prior_info()`](https://popov-lab.github.io/bmm/dev/reference/prior_info.md)
 lists the prior of every parameter on the scale it was sampled on, and
 flags any parameter left with a flat prior:
 
 ``` r
 
-report_priors(fit_setsize)
+prior_info(fit_setsize)
 ```
 
 ``` fansi
@@ -801,7 +801,7 @@ Bridge sampling has three requirements:
     This is stricter than for the Savage-Dickey method, where only the
     tested parameters need proper priors (Wagenmakers et al. 2010, 170).
     The default priors of `bmm` models are proper, but check with
-    [`report_priors()`](https://popov-lab.github.io/bmm/dev/reference/report_priors.md)
+    [`prior_info()`](https://popov-lab.github.io/bmm/dev/reference/prior_info.md)
     if you have changed priors or formulas: it flags every parameter
     with a flat prior.
 3.  It needs far more posterior draws than estimation, and its result
@@ -1094,9 +1094,9 @@ could be reported as follows:
 > model (\\\Delta\text{elpd}\\ = 28.3, SE = 6.7; all Pareto \\k\\ \<
 > 0.7).
 
-For the methods section, `report_priors(fit, format = "text")` writes
-the priors as sentences. Also report the random-effects structure and
-the convergence checks, and cite `bmm` (Frischkorn and Popov 2025) and
+For the methods section, `prior_info(fit, format = "text")` writes the
+priors as sentences. Also report the random-effects structure and the
+convergence checks, and cite `bmm` (Frischkorn and Popov 2025) and
 `brms` (Bürkner 2017).
 
 ### 6.1 Further reading

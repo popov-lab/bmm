@@ -182,7 +182,7 @@
   i.e. after the bmm postprocessing
   ([\#411](https://github.com/popov-lab/bmm/issues/411)).
 - New function
-  [`report_priors()`](https://popov-lab.github.io/bmm/dev/reference/report_priors.md)
+  [`prior_info()`](https://popov-lab.github.io/bmm/dev/reference/prior_info.md)
   reports, for each parameter of a fitted model, its link function, the
   prior actually used on the sampling scale, and whether it was a bmm
   default, a brms default, or user-specified; parameters left with
@@ -252,7 +252,7 @@
   default applies only to models that estimate a correlation matrix, not
   to `(1 | ID)` or `(x || ID)`. To return to the previous behaviour,
   pass `prior = set_prior("lkj(1)", class = "cor")`.
-  [`report_priors()`](https://popov-lab.github.io/bmm/dev/reference/report_priors.md)
+  [`prior_info()`](https://popov-lab.github.io/bmm/dev/reference/prior_info.md)
   shows the prior as `lkj(2)`, class `cor`, as written in
   [`set_prior()`](https://paulbuerkner.com/brms/reference/set_prior.html)
   ([\#417](https://github.com/popov-lab/bmm/issues/417)).
@@ -298,10 +298,10 @@
   rstan backend when a parameter has exactly one slope
   (`no more scalars to read`), nor when their random effects use
   `gr(..., by = )`.
-- [`report_priors()`](https://popov-lab.github.io/bmm/dev/reference/report_priors.md)
+- [`prior_info()`](https://popov-lab.github.io/bmm/dev/reference/prior_info.md)
   no longer fails for a fit whose formula needs `data2`,
   e.g. `(1 | gr(ID, cov = A))` (`Object 'A' was not found in 'data2'`).
-- [`report_priors()`](https://popov-lab.github.io/bmm/dev/reference/report_priors.md)
+- [`prior_info()`](https://popov-lab.github.io/bmm/dev/reference/prior_info.md)
   now names every kind of correlation prior the way
   [`set_prior()`](https://paulbuerkner.com/brms/reference/set_prior.html)
   documents it, not only the one on group-level effects. A fit with two
@@ -611,6 +611,20 @@
   [`update()`](https://rdrr.io/r/stats/update.html) refits made with an
   earlier version
   ([\#464](https://github.com/popov-lab/bmm/issues/464)).
+
+#### Deprecated functions and arguments
+
+- [`parameters()`](https://popov-lab.github.io/bmm/dev/reference/parameters.md)
+  is deprecated and will be removed in bmm 1.6.0. Use
+  [`parameter_info()`](https://popov-lab.github.io/bmm/dev/reference/parameter_info.md)
+  instead: it takes the same arguments and returns the same table. Until
+  then
+  [`parameters()`](https://popov-lab.github.io/bmm/dev/reference/parameters.md)
+  keeps working and warns. The **parameters** package exports a function
+  of the same name, so with both packages attached,
+  [`parameters()`](https://popov-lab.github.io/bmm/dev/reference/parameters.md)
+  calls the function from whichever package is attached last
+  ([\#474](https://github.com/popov-lab/bmm/issues/474)).
 
 #### Documentation
 

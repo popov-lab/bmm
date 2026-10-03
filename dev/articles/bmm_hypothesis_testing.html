@@ -438,11 +438,11 @@ bound <span class="citation">(Wagenmakers et al. 2010, 170)</span>. This is why
 <code><a href="https://paulbuerkner.com/brms/reference/hypothesis.brmsfit.html" class="external-link">hypothesis()</a></code> returns <code>NA</code> for <code>Evid.Ratio</code> unless every parameter in the
 hypothesis has a proper prior and the model was fitted with
 <code>sample_prior = "yes"</code>. Before you report a Bayes factor, look at the prior
-it was computed against. <code><a href="../reference/report_priors.html">report_priors()</a></code> lists the prior of every parameter
+it was computed against. <code><a href="../reference/prior_info.html">prior_info()</a></code> lists the prior of every parameter
 on the scale it was sampled on, and flags any parameter left with a flat
 prior:</p>
 <div class="sourceCode" id="cb7"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="fu"><a href="../reference/report_priors.html">report_priors</a></span><span class="op">(</span><span class="va">fit_setsize</span><span class="op">)</span></span></code></pre></div>
+<code class="sourceCode R"><span><span class="fu"><a href="../reference/prior_info.html">prior_info</a></span><span class="op">(</span><span class="va">fit_setsize</span><span class="op">)</span></span></code></pre></div>
 <pre class="fansi fansi-output"><code><span><span class="co">#&gt; Model:  Two-parameter mixture model by Zhang and Luck (2008). </span></span>
 <span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt;  parameter link     class     prior          source     </span></span>
@@ -872,7 +872,7 @@ probability distribution. An average over the prior is only defined if the
 prior integrates to one, and a flat prior does not. This is stricter than
 for the Savage-Dickey method, where only the tested parameters need proper
 priors <span class="citation">(Wagenmakers et al. 2010, 170)</span>. The default
-priors of <code>bmm</code> models are proper, but check with <code><a href="../reference/report_priors.html">report_priors()</a></code> if you
+priors of <code>bmm</code> models are proper, but check with <code><a href="../reference/prior_info.html">prior_info()</a></code> if you
 have changed priors or formulas: it flags every parameter with a flat
 prior.</li>
 <li>It needs far more posterior draws than estimation, and its result varies
@@ -1167,7 +1167,7 @@ The signal discrimination model predicted the responses better than
 the two-parameter mixture model (<span class="math inline">\(\Delta\text{elpd}\)</span> = 28.3,
 SE = 6.7; all Pareto <span class="math inline">\(k\)</span> &lt; 0.7).</p>
 </blockquote>
-<p>For the methods section, <code>report_priors(fit, format = "text")</code> writes the
+<p>For the methods section, <code>prior_info(fit, format = "text")</code> writes the
 priors as sentences. Also report the random-effects structure and the
 convergence checks, and cite <code>bmm</code> <span class="citation">(Frischkorn and Popov 2025)</span> and <code>brms</code>
 <span class="citation">(Bürkner 2017)</span>.</p>

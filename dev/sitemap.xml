@@ -81,6 +81,7 @@
 <url><loc>https://popov-lab.github.io/bmm/dev/reference/native_transform.html</loc></url>
 <url><loc>https://popov-lab.github.io/bmm/dev/reference/oberauer_lewandowsky_2019_e1.html</loc></url>
 <url><loc>https://popov-lab.github.io/bmm/dev/reference/oberauer_lin_2017.html</loc></url>
+<url><loc>https://popov-lab.github.io/bmm/dev/reference/parameter_info.html</loc></url>
 <url><loc>https://popov-lab.github.io/bmm/dev/reference/parameters.html</loc></url>
 <url><loc>https://popov-lab.github.io/bmm/dev/reference/plot.bmm_sdt_auc.html</loc></url>
 <url><loc>https://popov-lab.github.io/bmm/dev/reference/plot.bmm_sdt_latent.html</loc></url>
@@ -90,8 +91,8 @@
 <url><loc>https://popov-lab.github.io/bmm/dev/reference/pp_check_vars.html</loc></url>
 <url><loc>https://popov-lab.github.io/bmm/dev/reference/pp_observables.html</loc></url>
 <url><loc>https://popov-lab.github.io/bmm/dev/reference/print_pretty_models_md.html</loc></url>
+<url><loc>https://popov-lab.github.io/bmm/dev/reference/prior_info.html</loc></url>
 <url><loc>https://popov-lab.github.io/bmm/dev/reference/rejection_sampling.html</loc></url>
-<url><loc>https://popov-lab.github.io/bmm/dev/reference/report_priors.html</loc></url>
 <url><loc>https://popov-lab.github.io/bmm/dev/reference/restructure.bmmfit.html</loc></url>
 <url><loc>https://popov-lab.github.io/bmm/dev/reference/revert_postprocess_brm.html</loc></url>
 <url><loc>https://popov-lab.github.io/bmm/dev/reference/roc_observed.html</loc></url>
