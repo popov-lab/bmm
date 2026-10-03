@@ -15,12 +15,12 @@
     ),
     priors = list(
       simple = list(
-        a = list(main = "normal(1,0.5)", effects = "normal(0,0.5)"),
-        c = list(main = "normal(1.5,0.5)", effects = "normal(0,0.5)")
+        a = list(main = "normal(0,1)", effects = "normal(0,0.5)", sd = "exponential(1)"),
+        c = list(main = "normal(3,1)", effects = "normal(0,0.5)", sd = "exponential(1)")
       ),
       softmax = list(
-        a = list(main = "normal(2,1)", effects = "normal(0,0.5)"),
-        c = list(main = "normal(3,1)", effects = "normal(0,2)")
+        a = list(main = "normal(3,1)", effects = "normal(0,0.5)", sd = "exponential(1)"),
+        c = list(main = "normal(3,1)", effects = "normal(0,0.5)", sd = "exponential(1)")
       )
     )
   ),
@@ -36,14 +36,14 @@
     ),
     priors = list(
       simple = list(
-        a = list(main = "normal(1,0.5)", effects = "normal(0,.5)"),
-        c = list(main = "normal(1.5,0.5)", effects = "normal(0,.5)"),
-        f = list(main = "logistic(0,1)", effects = "normal(0,1)")
+        a = list(main = "normal(0,1)", effects = "normal(0,0.5)", sd = "exponential(1)"),
+        c = list(main = "normal(3,1)", effects = "normal(0,0.5)", sd = "exponential(1)"),
+        f = list(main = "logistic(0,1)", effects = "normal(0,1)", sd = "exponential(1)")
       ),
       softmax = list(
-        a = list(main = "normal(3,1)", effects = "normal(0,0.5)"),
-        c = list(main = "normal(3,1)", effects = "normal(0,2)"),
-        f = list(main = "logistic(0,1)", effects = "normal(0,1)")
+        a = list(main = "normal(3,1)", effects = "normal(0,0.5)", sd = "exponential(1)"),
+        c = list(main = "normal(3,1)", effects = "normal(0,0.5)", sd = "exponential(1)"),
+        f = list(main = "logistic(0,1)", effects = "normal(0,1)", sd = "exponential(1)")
       )
     )
   )
@@ -63,7 +63,8 @@
       name = "The Multinomial / Memory Measurement Model",
       citation = glue(
         "Oberauer, K., & Lewandowsky, S. (2019). Simple measurement models \\
-        for complex working-memory tasks. Psychological Review, 126."
+        for complex working-memory tasks. Psychological Review, 126(6), \\
+        880-932. https://doi.org/10.1037/rev0000159"
       ),
       version = version,
       requirements = paste0(
@@ -76,20 +77,40 @@
         list(b = "Background activation. Added to each response category. Fixed for scaling, necessary in all models."),
         .m3_version_table[[version]][["parameters"]]
       ),
+      links = .m3_version_table[[version]][["links"]][[choice_rule]],
       fixed_parameters = list(
         b = if (choice_rule == "softmax") 0 else 0.1
       ),
-      links = .m3_version_table[[version]][["links"]][[choice_rule]],
-      default_priors = .m3_version_table[[version]][["priors"]][[choice_rule]],
-      void_mu = FALSE
+      default_priors = .m3_version_table[[version]][["priors"]][[choice_rule]]
     ),
     class = c("bmmodel", "m3", paste0("m3_", version)),
     call = call
   )
 
-  out$links[names(links)] <- links
+  out <- set_links(out, links)
   out$default_priors[names(default_priors)] <- default_priors
   out
+}
+
+# the parameters of a custom m3 are the activation sources of the user's
+# formula, so there is no set of names to check a link target against
+# (check_model.m3_custom refuses a parameter left without a link). The ss and
+# cs versions build their activation functions from the version table, so their
+# parameters are known here. The custom branch is defensive rather than
+# load-bearing: a custom m3 has no links at construction, so names() is already
+# NULL, and check_links() never runs on one because set_links() stored no
+# attribute.
+#' @exportS3Method
+settable_links.m3 <- function(model) {
+  if (model$version == "custom") NULL else names(model$links)
+}
+
+# m3 is the one model that applies its links itself, by substituting the
+# inverse link into the activation formulas (apply_links -> inv_link), so the
+# links it can honour are inv_link()'s, not the ones a brms family can emit
+#' @exportS3Method
+settable_link_functions.m3 <- function(model) {
+  eval(formals(inv_link)$link)
 }
 
 
@@ -113,7 +134,12 @@
 #'   of candidates in the respective response categories are constant across all conditions
 #'   in the experiment. Or a vector specifying the variable names that contain the number of
 #'   candidates in each response category. The order of these variables should be in the
-#'   same order as the names of the response categories passed to `resp_cats`
+#'   same order as the names of the response categories passed to `resp_cats`. Numbers
+#'   named after the response categories, e.g. `c(corr = 1, other = 4)`, are matched to
+#'   the categories by name. Numbers without names, or with other names, are taken in
+#'   the order of `resp_cats`, and other names become the names of the columns
+#'   bmm adds to the data. Column names given category names, e.g.
+#'   `c(other = "n_other", corr = "n_corr")`, are matched by name as well, in any order.
 #' @param choice_rule The choice rule that should be used for the M3. The options are "softmax"
 #'   or "simple". The "softmax" option implements the softmax normalization of activation into
 #'   probabilities for choosing the different response categories. The "simple" option implements
@@ -125,13 +151,13 @@
 #' @param ... used internally for testing, ignore it
 #' @return An object of class `bmmodel`
 #'
-#' @details `r model_info(.model_m3(), components =c('domain', 'task', 'name', 'citation'))`
+#' @details `r model_docs(.model_m3(), components =c('domain', 'task', 'name', 'citation'))`
 #' #### Version: `ss`
-#' `r model_info(.model_m3(version = "ss"), components = c('requirements', 'parameters', 'fixed_parameters', 'links', 'prior'))`
+#' `r model_docs(.model_m3(version = "ss"), components = c('requirements', 'parameters', 'fixed_parameters', 'links', 'prior'))`
 #' #### Version: `cs`
-#' `r model_info(.model_m3(version = "cs"), components =c('requirements', 'parameters', 'fixed_parameters', 'links', 'prior'))`
+#' `r model_docs(.model_m3(version = "cs"), components =c('requirements', 'parameters', 'fixed_parameters', 'links', 'prior'))`
 #' #### Version: `custom`
-#' `r model_info(.model_m3(version = "custom"), components = c('requirements', 'parameters', 'fixed_parameters', 'links', 'prior'))`
+#' `r model_docs(.model_m3(version = "custom"), components = c('requirements', 'parameters', 'fixed_parameters', 'links', 'prior'))`
 #'
 #' @keywords bmmodel
 #'
@@ -178,13 +204,11 @@
 #' summary(m3_fit)
 #'
 #' @export
-m3 <- function(resp_cats, num_options, choice_rule = "softmax", version = "custom", ...) {
+m3 <- function(resp_cats, num_options, choice_rule = "softmax",
+               version = c("custom", "ss", "cs"), ...) {
   call <- match.call()
   stop_missing_args()
-  stopif(
-    !version %in% c("custom", "cs", "ss"),
-    'Unknown version: {version}. It should be one of "ss", "cs" or "custom"'
-  )
+  version <- match.arg(version)
   stopif(
     !tolower(choice_rule) %in% c("softmax", "simple"),
     'Unsupported choice rule "{choice_rule}. Must be one of "simple" or "softmax"'
@@ -192,6 +216,26 @@ m3 <- function(resp_cats, num_options, choice_rule = "softmax", version = "custo
   stopif(
     length(num_options) != length(resp_cats),
     "The option variables should have the same length as the response variables."
+  )
+  stopif(
+    is.character(num_options) && any(num_options %in% resp_cats),
+    "The number of options cannot be read from a response category column: \\
+    {collapse_comma(intersect(num_options, resp_cats))}"
+  )
+  stopif(
+    is.numeric(num_options) && anyNA(num_options),
+    "`num_options` cannot contain missing values."
+  )
+  opt_names <- names(num_options)
+  stopif(
+    !is.null(opt_names) &&
+      (anyNA(opt_names) || any(opt_names == "") || anyDuplicated(opt_names) > 0),
+    "Name either all elements of `num_options` or none, and use each name only once."
+  )
+  stopif(
+    any(opt_names %in% resp_cats) && !setequal(opt_names, resp_cats),
+    "If `num_options` is named after the response categories, it needs one element for each of \\
+    {collapse_comma(resp_cats)}"
   )
 
   .model_m3(
@@ -234,17 +278,19 @@ check_model.m3_custom <- function(model, data = NULL, formula = NULL) {
   additional_priors <- lapply(missing_priors, function(m) {
     if (model$other_vars$choice_rule == "simple") {
       switch(model$links[[m]],
-             log = list(main = "normal(1, 1)", effects = "normal(0, 0.5)"),
-             identity = list(main = "normal(10, 4)", effects = "normal(0, 1)"),
-             logit = list(main = "logistic(0, 1)", effects = "normal(0, 0.5)"),
-             stop2("Invalid link function provided! Please use one of the following link functions: identity, log, logit")
+             log = list(main = "normal(1, 1)", effects = "normal(0, 0.5)", sd = "exponential(1)"),
+             softplus = list(main = "normal(2, 1)", effects = "normal(0, 0.5)", sd = "exponential(1)"),
+             identity = list(main = "normal(10, 4)", effects = "normal(0, 0.5)", sd = "exponential(1)"),
+             logit = list(main = "logistic(0, 1)", effects = "normal(0, 0.5)", sd = "exponential(1)"),
+             stop2("Invalid link function provided! Please use one of the following link functions: identity, log, softplus, logit")
       )
     } else if (model$other_vars$choice_rule == "softmax") {
       switch(model$links[[m]],
-             log = list(main = "normal(0, 1)", effects = "normal(0, 0.5)"),
-             identity = list(main = "normal(1, 1)", effects = "normal(0, 1)"),
-             logit = list(main = "logistic(0, 1)", effects = "normal(0, 0.5)"),
-             stop2("Invalid link function provided! Please use one of the following link functions: identity, log, logit")
+             log = list(main = "normal(0, 1)", effects = "normal(0, 0.5)", sd = "exponential(1)"),
+             softplus = list(main = "normal(1, 1)", effects = "normal(0, 0.5)", sd = "exponential(1)"),
+             identity = list(main = "normal(3, 1)", effects = "normal(0, 0.5)", sd = "exponential(1)"),
+             logit = list(main = "logistic(0, 1)", effects = "normal(0, 0.5)", sd = "exponential(1)"),
+             stop2("Invalid link function provided! Please use one of the following link functions: identity, log, softplus, logit")
       )
     }
   })
@@ -257,10 +303,27 @@ check_model.m3_custom <- function(model, data = NULL, formula = NULL) {
 # CHECK_data S3 methods                                                  ####
 ############################################################################# !
 
+# Counts or column names named after the response categories are labels: they
+# are matched to the categories by name, and counts are stored under the same
+# internal column names as unnamed counts. Used as column names they multiplied each
+# category's activation by itself (#449). Fits from before the fix still carry
+# those names in their stored model, so every reader goes through this helper
+# rather than the constructor renaming them once
+m3_num_options <- function(model) {
+  num_options <- model$other_vars$num_options
+  resp_cats <- model$resp_vars$resp_cats
+  if (!setequal(names(num_options), resp_cats)) {
+    return(num_options)
+  }
+  num_options <- num_options[resp_cats]
+  if (is.numeric(num_options)) names(num_options) <- paste0("n_opt_", resp_cats)
+  num_options
+}
+
 #' @export
 check_data.m3 <- function(model, data, formula) {
   resp_name <- model$resp_vars$resp_cats
-  n_opt_vect <- model$other_vars$num_options
+  n_opt_vect <- m3_num_options(model)
   col_names <- colnames(data)
 
   missing_variables <- setdiff(resp_name, col_names)
@@ -281,9 +344,20 @@ check_data.m3 <- function(model, data, formula) {
   } else if (is.numeric(n_opt_vect)) {
     # n_opt_vect is the *number* of options for each response variable
     opt_vars <- names(n_opt_vect)
+    # the counts become data columns under these names, and the activation
+    # formulas refer to them by name, so any name already in use is taken to
+    # mean the existing column or parameter instead of the count
+    taken <- c(
+      col_names, "Y", "nTrials", paste0("Idx_", resp_name),
+      names(formula), names(model$parameters), names(model$fixed_parameters)
+    )
+    clashes <- intersect(opt_vars, taken)
     stopif(
-      any(opt_vars %in% names(data)),
-      "One of the variables {paste0(opt_vars, collapse = ', ')} already exists in the data. Give explicit names to your num_options vector"
+      length(clashes) > 0,
+      "The column name(s) {collapse_comma(clashes)} that `num_options` would be stored under are \\
+      already taken by a data column, a model parameter, or a column bmm creates (`Y`, `nTrials`, \\
+      `Idx_<category>`). Pass the numbers unnamed, name them after the response categories, or \\
+      choose names that are not taken."
     )
     data[opt_vars] <- rep(n_opt_vect, each = nrow(data))
   } else {
@@ -350,12 +424,8 @@ check_formula.m3_custom <- function(model, data, formula) {
 ############################################################################# !
 #' @export
 bmf2bf.m3 <- function(model, formula) {
-  # retrieve required response arguments
-  if (is.character(model$other_vars$num_options)) {
-    options_vars <- model$other_vars$num_options
-  } else {
-    options_vars <- names(model$other_vars$num_options)
-  }
+  num_options <- m3_num_options(model)
+  options_vars <- if (is.character(num_options)) num_options else names(num_options)
   resp_cats <- model$resp_vars$resp_cats
   n_opt_idx_vars <- paste0("Idx_", resp_cats)
   names(n_opt_idx_vars) <- resp_cats
@@ -412,15 +482,16 @@ configure_model.m3 <- function(model, data, formula) {
   formula$family$cats <- model$resp_vars$resp_cats
   formula$family$dpars <- paste0("mu", model$resp_vars$resp_cats)
 
-  # set initial values to be set to zero if the choice rule is "simple" and "identity"
-  # link functions are used
-  if(model$other_vars$choice_rule == "simple" && any(model$links == "identity")){
-    init <- 0
-  } else {
-    init <- NULL
-  }
+  nlist(formula, data)
+}
 
-  nlist(formula, data, init)
+#' @export
+create_initfun.m3 <- function(model, data, formula, prior = NULL, ...) {
+  # the "simple" choice rule with an identity link samples stably only from zero
+  if (model$other_vars$choice_rule == "simple" && any(model$links == "identity")) {
+    return(0)
+  }
+  NextMethod()
 }
 
 

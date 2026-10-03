@@ -93,3 +93,98 @@
 #' }
 #' @keywords dataset
 "data_color_judgement_task"
+
+
+#' Recognition ROC data from Broeder & Schuetz (2009, Experiment 3)
+#'
+#' Binary old/new recognition data from 40 subjects, aggregated to response
+#' counts. Each subject was tested under five base-rate conditions: the
+#' proportion of old items shifts the decision criterion from conservative
+#' (`br1`) to liberal (`br5`) while leaving sensitivity unchanged, tracing a
+#' five-point binary ROC per subject. That is the cleanest design for estimating
+#' the unequal-variance ratio (`sdratio`) of [sdt_yn()], which needs more than
+#' one operating point: a single condition with no other varying predictor yields
+#' only one hit/false-alarm pair and cannot separate a wider signal distribution
+#' from a larger d'. Counts were digitised from the frequencies reported in the
+#' original article.
+#'
+#' @format ## `broeder_schuetz_2009_e3`
+#' A data frame with 400 rows (40 subjects x 5 conditions x 2 stimulus types)
+#' and 5 columns:
+#' \describe{
+#'   \item{id}{Integer uniquely identifying each subject}
+#'   \item{condition}{Factor with five base-rate conditions, ordered from the
+#'   most conservative (`br1`) to the most liberal (`br5`) induced criterion}
+#'   \item{stimulus}{Integer stimulus type: 0 = new/lure, 1 = old/target}
+#'   \item{n_old}{Integer count of "old" responses in that cell: hits for old
+#'   items (`stimulus == 1`) and false alarms for new items (`stimulus == 0`)}
+#'   \item{n_trials}{Integer number of items presented in that cell}
+#' }
+#' @keywords dataset
+#' @source Broeder, A., & Schuetz, J. (2009). Recognition ROCs are curvilinear---or
+#'   are they? On premature arguments against the two-high-threshold model of
+#'   recognition. \emph{Journal of Experimental Psychology: Learning, Memory, and
+#'   Cognition}, 35(3), 587--606. \doi{10.1037/a0015279}
+#' @examples
+#' \dontrun{
+#' # Unequal-variance yes/no SDT: the criterion varies across base-rate
+#' # conditions, while sensitivity (d) and the signal/noise SD ratio (sdratio)
+#' # are held constant across conditions.
+#' model <- sdt_yn(
+#'   response = "n_old", stimulus = "stimulus", n_trials = "n_trials"
+#' )
+#' fit <- bmm(
+#'   formula = bmf(
+#'     d ~ 1 + (1 | id),
+#'     criterion ~ 0 + condition + (1 | id),
+#'     sdratio ~ 1
+#'   ),
+#'   data = broeder_schuetz_2009_e3,
+#'   model = model,
+#'   backend = "cmdstanr"
+#' )
+#' }
+"broeder_schuetz_2009_e3"
+
+
+#' Ranking recognition data from Meyer-Grant & Jakob (2025)
+#'
+#' Ranking signal-detection data from 60 subjects. On each trial, participants
+#' saw 3, 4, or 5 face images---one a studied target---and ranked them by
+#' perceived oldness; the rank assigned to the target is recorded. The set size
+#' varies across trials, so the data are aggregated to target rank-frequency
+#' counts per subject and set size, in the wide format [sdt_ranking()] consumes:
+#' one count column per rank position, with structural zeros where the rank
+#' exceeds the trial's set size. Fitting all set sizes jointly relies on the
+#' per-row set-size feature of [sdt_ranking()]: pass the set-size column to `m`.
+#'
+#' @format ## `meyer_grant_jakob_2025`
+#' A data frame with 180 rows (60 subjects x set sizes 3, 4, 5) and 7 columns:
+#' \describe{
+#'   \item{id}{Factor with sequential codes `s01`--`s60` assigned by bmm; the
+#'   original participant identifiers are not shipped}
+#'   \item{set_size}{Integer number of ranked items on the trial (3, 4, or 5)}
+#'   \item{rank1, rank2, rank3, rank4, rank5}{Integer number of trials in which
+#'   the target received that rank (rank1 = most likely target). Columns beyond
+#'   `set_size` are structural zeros. The counts sum to 56 within each row.}
+#' }
+#' @keywords dataset
+#' @source Meyer-Grant, C. G., & Jakob, M. (2025). Ranking tasks in recognition
+#'   memory: A direct test of the two-high-threshold contrast model.
+#'   \emph{Journal of Experimental Psychology: General}, 154(5), 1445--1455.
+#'   \doi{10.1037/xge0001700}. Data on OSF: \url{https://osf.io/gtzu7/}.
+#' @examples
+#' \dontrun{
+#' # Ranking SDT with set size varying per row: pass the set-size column to `m`
+#' # so trials with 3, 4, and 5 alternatives are fit jointly.
+#' model <- sdt_ranking(
+#'   response = c("rank1", "rank2", "rank3", "rank4", "rank5"), m = "set_size"
+#' )
+#' fit <- bmm(
+#'   formula = bmf(d ~ 1 + (1 | id)),
+#'   data = meyer_grant_jakob_2025,
+#'   model = model,
+#'   backend = "cmdstanr"
+#' )
+#' }
+"meyer_grant_jakob_2025"

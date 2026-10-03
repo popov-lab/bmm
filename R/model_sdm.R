@@ -11,8 +11,9 @@
       task = "Continuous reproduction",
       name = "Signal Discrimination Model (SDM) by Oberauer (2023)",
       citation = glue(
-        "Oberauer, K. (2023). Measurement models for visual working memory - \\
-        A factorial model comparison. Psychological Review, 130(3), 841-852"
+        "Oberauer, K. (2023). Measurement models for visual working \\
+        memory\u2014A factorial model comparison. Psychological Review, \\
+        130(3), 841-852. https://doi.org/10.1037/rev0000328"
       ),
       version = version,
       requirements = glue(
@@ -32,22 +33,28 @@
       ),
       fixed_parameters = list(mu = 0),
       default_priors = list(
-        mu = list(main = "student_t(1, 0, 1)"),
-        kappa = list(main = "student_t(5, 1.75, 0.75)", effects = "normal(0, 1)"),
-        c = list(main = "student_t(5, 2, 0.75)", effects = "normal(0, 1)")
+        mu = list(main = "normal(0, 0.5)", effects = "normal(0, 0.25)", sd = "exponential(4)"),
+        kappa = list(main = "student_t(5, 1.75, 0.75)", effects = "normal(0, 1)", sd = "exponential(1)"),
+        c = list(main = "student_t(5, 2, 0.75)", effects = "normal(0, 1)", sd = "exponential(1)")
       ),
       init_ranges = list(
         mu = c(-0.5,0.5),
         kappa = c(2.5,3.5),
         c = c(4,6)
-      ),
-      void_mu = FALSE
+      )
     ),
     class = c("bmmodel", "circular", "sdm", paste0("sdm_", version)),
     call = call
   )
-  out$links[names(links)] <- links
+  out <- set_links(out, links)
   out
+}
+
+# configure_model.sdm declares the family links itself, and the log link of `c`
+# is written into the Stan chunk as exp(c), so none of the three can be set
+#' @exportS3Method
+settable_links.sdm <- function(model) {
+  character(0)
 }
 
 # user facing alias
@@ -56,8 +63,8 @@
 
 #' @title `r .model_sdm()$name`
 #' @name sdm
-#' @details see [the online article](https://venpopov.com/bmm/articles/bmm_sdm_simple.html) for a detailed description of the model
-#'   and how to use it. `r model_info(.model_sdm())`
+#' @details see [the online article](https://popov-lab.github.io/bmm/articles/bmm_sdm_simple.html) for a detailed description of the model
+#'   and how to use it. `r model_docs(.model_sdm())`
 #' @param resp_error The name of the variable in the dataset containing the
 #'   response error. The response error should code the response relative to the
 #'   to-be-recalled target in radians. You can transform the response error in
@@ -89,6 +96,7 @@
 sdm <- function(resp_error, version = "simple", ...) {
   call <- match.call()
   stop_missing_args()
+  version <- match.arg(version)
   .model_sdm(resp_error = resp_error, version = version, call = call, ...)
 }
 
@@ -110,6 +118,7 @@ sdmSimple <- function(resp_error, version = "simple", ...) {
 check_data.sdm <- function(model, data, formula) {
   # data sorted by predictors is necessary for speedy computation of normalizing constant
   data <- order_data_query(model, data, formula)
+  attr(data, "sdm_run_metadata") <- sdm_run_metadata(data, formula, model)
   NextMethod("check_data")
 }
 
@@ -130,27 +139,40 @@ configure_model.sdm <- function(model, data, formula) {
     ub = c(NA, NA, NA),
     type = "real", loop = FALSE,
     log_lik = log_lik_sdm_simple,
-    posterior_predict = posterior_predict_sdm_simple
+    posterior_predict = posterior_predict_sdm_simple,
+    posterior_epred = posterior_epred_sdm_simple
   )
 
   # prepare initial stanvars to pass to brms, model formula and priors
   sc_path <- system.file("stan_chunks", package = "bmm")
   stan_funs <- read_lines2(paste0(sc_path, "/sdm_simple_funs.stan"))
   stan_tdata <- read_lines2(paste0(sc_path, "/sdm_simple_tdata.stan"))
-  stan_likelihood <- read_lines2(paste0(sc_path, "/sdm_simple_likelihood.stan"))
+  likelihood_file <- if (brms_slices_likelihood()) {
+    "sdm_simple_likelihood_threaded.stan"
+  } else {
+    "sdm_simple_likelihood.stan"
+  }
+  stan_likelihood <- read_lines2(paste0(sc_path, "/", likelihood_file))
+  stan_tdata_pll_args <- if (brms_slices_likelihood()) {
+    "data matrix COSN"
+  }
+  run_metadata <- attr(data, "sdm_run_metadata")
+  if (is.null(run_metadata)) {
+    # Guard direct configure_model.sdm() calls that bypass check_data.sdm().
+    run_metadata <- sdm_run_metadata(data, formula, model)
+  }
   stanvars <- brms::stanvar(scode = stan_funs, block = "functions") +
-    brms::stanvar(scode = stan_tdata, block = "tdata") +
+    brms::stanvar(scode = stan_tdata, block = "tdata", pll_args = stan_tdata_pll_args) +
+    brms::stanvar(x = run_metadata$G_sdm_runs, name = "G_sdm_runs") +
+    sdm_stanvar_int_array(run_metadata$sdm_run_start, "sdm_run_start", "G_sdm_runs") +
+    sdm_stanvar_int_array(run_metadata$sdm_run_count, "sdm_run_count", "G_sdm_runs") +
     brms::stanvar(scode = stan_likelihood, block = "likelihood", position = "end")
 
   # construct main brms formula from the bmm formula
   formula <- bmf2bf(model, formula)
   formula$family <- sdm_simple
 
-  # set initial values to be sampled between [-1,1] to avoid extreme SDs that
-  # can cause the sampler to fail
-  init <- 1
-
-  nlist(formula, data, stanvars, init)
+  nlist(formula, data, stanvars)
 }
 
 ############################################################################# !
@@ -180,9 +202,46 @@ log_lik_sdm_simple <- function(i, prep) {
   dsdm(y, mu, c, kappa, log = T)
 }
 
+posterior_epred_sdm_simple <- posterior_epred_undefined("sdm")
+
 posterior_predict_sdm_simple <- function(i, prep, ...) {
   mu <- brms::get_dpar(prep, "mu", i = i)
   c <- brms::get_dpar(prep, "c", i = i)
   kappa <- brms::get_dpar(prep, "kappa", i = i)
   rsdm(length(mu), mu, c, kappa)
+}
+
+sdm_run_metadata <- function(data, formula, model) {
+  predictors <- data_predictor_vars(data, formula)
+  # brms excludes rows with missing values in any model variable before
+  # fitting, so run boundaries must be computed on the rows brms will keep
+  model_vars <- unique(c(unlist(model$resp_vars), predictors))
+  model_vars <- model_vars[model_vars %in% colnames(data)]
+  if (length(model_vars) > 0L) {
+    data <- data[stats::complete.cases(data[model_vars]), , drop = FALSE]
+  }
+  if (length(predictors) == 0L) {
+    return(list(
+      G_sdm_runs = 1L,
+      sdm_run_start = 1L,
+      sdm_run_count = nrow(data)
+    ))
+  }
+
+  run_id <- interaction(data[predictors], drop = TRUE, lex.order = TRUE)
+  run_start <- c(1L, which(run_id[-1] != run_id[-length(run_id)]) + 1L)
+  run_count <- diff(c(run_start, nrow(data) + 1L))
+  list(
+    G_sdm_runs = length(run_start),
+    sdm_run_start = as.integer(run_start),
+    sdm_run_count = as.integer(run_count)
+  )
+}
+
+sdm_stanvar_int_array <- function(x, name, size) {
+  x <- array(as.integer(x), dim = length(x))
+  out <- brms::stanvar(x = x, name = name)
+  out[[name]]$scode <- paste0("array[", size, "] int ", name, ";")
+  out[[name]]$pll_args <- paste("data array[] int", name)
+  out
 }

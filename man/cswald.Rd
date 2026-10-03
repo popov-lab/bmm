@@ -19,7 +19,12 @@ automatically.}
 \item{links}{A named list of link functions for the model parameters.
 Available parameters depend on the version: "simple" has \code{drift}, \code{bound},
 \code{ndt}, and \code{s}; "crisk" additionally has \code{zr}. Default links are "log" for
-most parameters and "logit" for \code{zr}.}
+most parameters and "logit" for \code{zr}. For positive parameters, "softplus"
+is available as an alternative to "log" that grows linearly for large
+values and avoids the numerical blow-up of \code{exp()}. A name that is not a
+parameter of the model is an error, and a link that allows values the
+default link excludes (e.g. "identity" for a positive parameter) is a
+warning.}
 
 \item{version}{A character string specifying which version of the cswald
 model to use. Options are:
@@ -38,7 +43,7 @@ Better suited for tasks with substantial error rates. The \code{bound}
 parameter represents the total boundary separation, consistent with
 the diffusion model parameterization.
 }
-For more details, see Miller et al. (2017).}
+For more details, see Miller et al. (2018).}
 
 \item{...}{Additional arguments passed internally (for testing purposes).}
 }
@@ -55,9 +60,7 @@ Censored-Shifted Wald Model
 \item \strong{Name:} Censored-Shifted Wald Model
 \item \strong{Citation:}
 \itemize{
-\item Miller, R., Scherbaum, S., Heck, D. W., Goschke, T., & Enge, S. (2017).
-On the Relation Between the (Censored) Shifted Wald and the Wiener Distribution as Measurement Models
-for Choice Response Times. Applied Psychological Measurement, 42(2), 116-135. https://doi.org/10.1177/0146621617710465
+\item Miller, R., Scherbaum, S., Heck, D. W., Goschke, T., & Enge, S. (2018). On the relation between the (censored) shifted Wald and the Wiener distribution as measurement models for choice response times. Applied Psychological Measurement, 42(2), 116-135. https://doi.org/10.1177/0146621617710465
 }
 \item \strong{Version:} simple
 \item \strong{Requirements:}
@@ -91,21 +94,25 @@ for Choice Response Times. Applied Psychological Measurement, 42(2), 116-135. ht
 \itemize{
 \item \code{main}: normal(0,1)
 \item \code{effects}: normal(0,0.3)
+\item \code{sd}: exponential(2)
 }
 \item \code{bound}:
 \itemize{
 \item \code{main}: normal(0,0.3)
 \item \code{effects}: normal(0,0.3)
+\item \code{sd}: exponential(2)
 }
 \item \code{ndt}:
 \itemize{
 \item \code{main}: normal(-2,0.3)
 \item \code{effects}: normal(0,0.3)
+\item \code{sd}: exponential(2)
 }
 \item \code{s}:
 \itemize{
 \item \code{main}: normal(0,0.3)
 \item \code{effects}: normal(0,0.2)
+\item \code{sd}: exponential(2)
 }
 }
 }

@@ -43,6 +43,21 @@ user-specified priors were passed to the \code{\link[=bmm]{bmm()}} function.
 
 The default priors in \code{bmm} tend to be more informative than the default
 priors in \code{brms}, as we use domain knowledge to specify the priors.
+
+Each model parameter carries three default priors, listed in the
+documentation of the model: \code{main} for the intercept (or for all levels of
+a factor when the intercept is suppressed), \code{effects} for the remaining
+regression coefficients, and \code{sd} for the standard deviations of its random
+effects. The \code{sd} prior is applied as a blanket prior to every random-effects
+standard deviation of that parameter (all grouping factors, intercepts and
+slopes alike) and replaces the \code{student_t(3, 0, 2.5)} default of \code{brms}. To
+override it, address the parameter with \code{dpar} or \code{nlpar} in
+\code{\link[brms:set_prior]{brms::set_prior()}}, e.g. \code{set_prior("exponential(2)", class = "sd", nlpar = "kappa")}.
+
+Correlations among random effects belong to a grouping factor rather than to
+one parameter, so they get a single default for the whole model: \code{lkj(2)}
+instead of the \code{lkj(1)} of \code{brms}, set whenever the model estimates a
+correlation matrix. To override it, use e.g. \code{set_prior("lkj(1)", class = "cor")}.
 }
 \examples{
 default_prior(bmf(c ~ 1, kappa ~ 1),
