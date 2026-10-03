@@ -266,7 +266,7 @@ test_that("use_model_template() generates a flat-defaults unversioned scaffold",
   expect_match(out, ".tmpl_unver_defaults <- list(", fixed = TRUE)
   expect_match(out, 'parameters = .tmpl_unver_defaults[["parameters"]]', fixed = TRUE)
   expect_match(out, 'init_ranges = .tmpl_unver_defaults[["init_ranges"]]', fixed = TRUE)
-  expect_match(out, 'main = "normal(0, 1)", effects = "normal(0, 0.5)"', fixed = TRUE)
+  expect_match(out, 'main = "normal(0, 1)", effects = "normal(0, 0.5)", sd = "exponential(1)"', fixed = TRUE)
   expect_false(grepl("_version_table", out, fixed = TRUE))
   expect_false(grepl("match.arg", out, fixed = TRUE))
   expect_false(grepl("void_mu", out, fixed = TRUE))
@@ -309,8 +309,34 @@ test_that("use_model_template() composes a custom family with versions", {
   expect_match(out, "custom_family(", fixed = TRUE)
   expect_match(out, "_version_table", fixed = TRUE)
   expect_match(out, "match.arg", fixed = TRUE)
-  expect_match(out, "stanvar(", fixed = TRUE)
+  expect_match(out, "brms::stanvar(scode = stan_functions", fixed = TRUE)
+  expect_match(out, "posterior_epred = posterior_epred_tmpl_cf\n", fixed = TRUE)
+  expect_match(out, "posterior_epred_tmpl_cf <- function(prep)", fixed = TRUE)
+  expect_match(out, "log_lik_tmpl_cf <- function(i, prep)", fixed = TRUE)
+  expect_match(out, "posterior_predict_tmpl_cf <- function(i, prep, ...)", fixed = TRUE)
   expect_no_error(parse(text = out))
+})
+
+test_that("use_model_template() gives the alias a roxygen block of its own", {
+  skip_on_cran()
+  skip_if_not_installed("roxygen2")
+  for (versions in list(NULL, c("simple", "full"))) {
+    out <- paste(
+      capture.output(
+        use_model_template("tmpl_rox", versions, custom_family = TRUE,
+                           stanvar_blocks = "functions", testing = TRUE)
+      ),
+      collapse = "\n"
+    )
+    blocks <- roxygen2::parse_text(out, env = NULL)
+    alias <- Filter(
+      function(block) identical(roxygen2::block_get_tag_value(block, "name"), "tmpl_rox"),
+      blocks
+    )
+    expect_length(alias, 1)
+    expect_in("bmmodel", roxygen2::block_get_tag_value(alias[[1]], "keywords"))
+    expect_false(roxygen2::block_has_tags(alias[[1]], "exportS3Method"))
+  }
 })
 
 test_that("generated template code constructs a valid bmmodel", {

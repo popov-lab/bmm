@@ -54,6 +54,7 @@ Suggests:
     pkgbuild,
     remotes,
     rmarkdown,
+    roxygen2,
     rstan,
     stringr,
     testthat (>= 3.0.0),

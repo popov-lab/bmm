@@ -899,7 +899,13 @@ use_model_template <- function(model_name,
     "#############################################################################!
      # MODELS                                                                 ####
      #############################################################################!
-     # see 'R/model_ddm.R' (flat defaults) or 'R/model_cswald.R' (versioned) for examples\n\n\n"
+     # see 'R/model_ddm.R' (flat defaults) or 'R/model_cswald.R' (versioned) for examples
+     #
+     # Besides this file, a new model needs entries in:
+     # - `data_column_roles` in R/helpers-model.R (a test requires it)
+     # - `stored_frame_cases()` in tests/testthat/test-update.R (a test requires it)
+     # - `response_annotations()` in R/helpers-model.R, if the response columns
+     #   need a unit or a coding note in the console output\n\n\n"
   )
 
 
@@ -956,9 +962,12 @@ use_model_template <- function(model_name,
     "  fixed_parameters = list(",
     "    mu = 0",
     "  ),",
+    "  # the sd rate follows the parameter's meaning: 1 for sensitivity, strength,",
+    "  # mixing weights and identity-linked drift; 2 for criteria, thresholds,",
+    "  # boundary, ndt, start point and log-linked drift; 4 for circular bias",
     "  priors = list(",
-    '    par1 = list(main = "normal(0, 1)", effects = "normal(0, 0.5)"),',
-    '    par2 = list(main = "normal(0, 0.5)", effects = "normal(0, 0.5)")',
+    '    par1 = list(main = "normal(0, 1)", effects = "normal(0, 0.5)", sd = "exponential(1)"),',
+    '    par2 = list(main = "normal(0, 0.5)", effects = "normal(0, 0.5)", sd = "exponential(2)")',
     "  ),",
     "  init_ranges = list(",
     "    par1 = c(-1, 1),",
@@ -1012,8 +1021,8 @@ use_model_template <- function(model_name,
       # uncomment if configure_model() builds the links into the family or into
       # the non-linear formulas rather than reading them from the list above,
       # so that a link set by the user is refused instead of silently ignored:
-      #\' @exportS3Method
-      # settable_links.<<model_name>> <- function(model) character(0)\n\n',
+      # #\' @exportS3Method
+      # settable_links.<<model_name>> <- function(model) character(0)',
       .open = "<<", .close = ">>"
     )
   } else {
@@ -1046,8 +1055,8 @@ use_model_template <- function(model_name,
       # uncomment if configure_model() builds the links into the family or into
       # the non-linear formulas rather than reading them from the list above,
       # so that a link set by the user is refused instead of silently ignored:
-      #\' @exportS3Method
-      # settable_links.<<model_name>> <- function(model) character(0)\n\n',
+      # #\' @exportS3Method
+      # settable_links.<<model_name>> <- function(model) character(0)',
       .open = "<<", .close = ">>"
     )
   }
@@ -1103,6 +1112,7 @@ use_model_template <- function(model_name,
     #\' @details `r model_docs(.model_<<model_name>>())`
     <<params_doc>>
     #\' @return An object of class `bmmodel`
+    #\' @keywords bmmodel
     #\' @export
     #\' @examples
     #\' \\dontrun{
@@ -1135,11 +1145,11 @@ use_model_template <- function(model_name,
   # add bmf2bf method if necessary
   bmf2bf_method <- glue("#' @export
     bmf2bf.<<model_name>> <- function(model, formula) {
-       # retrieve required response arguments
+       # retrieve the variables the formula needs
        resp_var1 <- model$resp_vars$resp_var1
-       resp_var2 <- model$resp_vars$resp_arg2\n
-       # set the base brmsformula based
-       brms_formula <- brms::bf(paste0(resp_var1, \" | \", vreal(resp_var2), \" ~ 1\"))\n
+       required_arg1 <- model$other_vars$required_arg1\n
+       # set the base brmsformula with the response and its addition terms
+       brms_formula <- brms::bf(paste0(resp_var1, \" | \", vreal(required_arg1), \" ~ 1\"))\n
        # return the brms_formula to add the remaining bmmformulas to it.
        brms_formula
     }\n\n\n",
@@ -1155,10 +1165,13 @@ use_model_template <- function(model_name,
       "     '<<model_name>>',\n",
       "     dpars = c(),\n",
       "     links = c(),\n",
-      "     lb = c(), # upper bounds for parameters\n",
-      "     ub = c(), # lower bounds for parameters\n",
-      "     type = '', # real for continous dv, int for discrete dv\n",
-      "     loop = TRUE, # is the likelihood vectorized\n",
+      "     lb = c(), # lower bounds for parameters\n",
+      "     ub = c(), # upper bounds for parameters\n",
+      "     type = '', # real for continuous dv, int for discrete dv\n",
+      "     loop = TRUE, # FALSE if the Stan likelihood is vectorized over observations\n",
+      "     log_lik = log_lik_<<model_name>>,\n",
+      "     posterior_predict = posterior_predict_<<model_name>>,\n",
+      "     posterior_epred = posterior_epred_<<model_name>>\n",
       "   )\n   formula$family <- <<model_name>>_family\n\n"
     )
 
@@ -1185,14 +1198,32 @@ use_model_template <- function(model_name,
     i <- 1
     for (stanvar_block in stanvar_blocks) {
       if (i < length(stanvar_blocks)) {
-        stan_vars_template <- paste0(stan_vars_template, "stanvar(scode = stan_", stanvar_block, ", block = '", stanvar_block, "') +\n      ")
+        stan_vars_template <- paste0(stan_vars_template, "brms::stanvar(scode = stan_", stanvar_block, ", block = '", stanvar_block, "') +\n      ")
         i <- i + 1
       } else {
-        stan_vars_template <- paste0(stan_vars_template, "stanvar(scode = stan_", stanvar_block, ", block = '", stanvar_block, "')\n\n")
+        stan_vars_template <- paste0(stan_vars_template, "brms::stanvar(scode = stan_", stanvar_block, ", block = '", stanvar_block, "')\n\n")
       }
     }
     out_template <- "   nlist(formula, data, stanvars)\n"
+
+    family_functions <- paste0(
+      "\n\n#############################################################################!\n",
+      "# LOG_LIK, POSTERIOR_PREDICT & POSTERIOR_EPRED                           ####\n",
+      "#############################################################################!\n",
+      "# see posterior_epred_sdt_yn() in 'R/model_sdt_yn.R' and posterior_epred_ddm()\n",
+      "# in 'R/model_ddm.R' for examples\n\n",
+      "# returns one log-likelihood value per posterior draw for observation i\n",
+      "log_lik_", model_name, " <- function(i, prep) {\n}\n\n",
+      "# returns one simulated response per posterior draw for observation i\n",
+      "posterior_predict_", model_name, " <- function(i, prep, ...) {\n}\n\n",
+      "# returns a draws x observations matrix: build it with .epred_matrix() and\n",
+      "# line up data columns with the draws using .epred_data()\n",
+      "posterior_epred_", model_name, " <- function(prep) {\n}\n",
+      "# if the model's expected response is not meaningful, use instead:\n",
+      "# posterior_epred_", model_name, " <- posterior_epred_undefined(\"", model_name, "\")\n\n\n"
+    )
   } else {
+    family_functions <- ""
     stan_vars_template <- ""
     family_template <- "   formula$family <- NULL\n\n"
     out_template <- "   nlist(formula, data)\n"
@@ -1225,7 +1256,7 @@ use_model_template <- function(model_name,
 
   postprocess_brm_method <- glue(
     "#' @export
-    postprocess_brm.<<model_name>> <- function(model, fit) {
+    postprocess_brm.<<model_name>> <- function(model, fit, ...) {
        # any required postprocessing (if none, delete this section)
        fit
     }\n",
@@ -1236,6 +1267,7 @@ use_model_template <- function(model_name,
     model_header,
     defaults_block,
     model_object,
+    "\n\n",
     user_facing_alias,
     check_data_header,
     check_data_method,
@@ -1243,6 +1275,7 @@ use_model_template <- function(model_name,
     bmf2bf_method,
     configure_model_header,
     configure_model_method,
+    family_functions,
     postprocess_brm_header,
     postprocess_brm_method
   )
