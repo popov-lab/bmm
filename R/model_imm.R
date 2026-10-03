@@ -13,8 +13,9 @@
       task = "Continuous reproduction",
       name = "Interference measurement model by Oberauer and Lin (2017).",
       citation = glue(
-        "Oberauer, K., & Lin, H.Y. (2017). An interference model \\
-          of visual working memory. Psychological Review, 124(1), 21-59"
+        "Oberauer, K., & Lin, H.-Y. (2017). An interference model \\
+          of visual working memory. Psychological Review, 124(1), 21-59. \\
+          https://doi.org/10.1037/rev0000044"
       ),
       version = version,
       requirements = glue(

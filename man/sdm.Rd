@@ -34,7 +34,7 @@ and how to use it. * \strong{Domain:} Visual working memory
 \item \strong{Name:} Signal Discrimination Model (SDM) by Oberauer (2023)
 \item \strong{Citation:}
 \itemize{
-\item Oberauer, K. (2023). Measurement models for visual working memory - A factorial model comparison. Psychological Review, 130(3), 841-852
+\item Oberauer, K. (2023). Measurement models for visual working memory—A factorial model comparison. Psychological Review, 130(3), 841-852. https://doi.org/10.1037/rev0000328
 }
 \item \strong{Version:} simple
 \item \strong{Requirements:}

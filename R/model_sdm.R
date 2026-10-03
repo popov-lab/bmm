@@ -11,8 +11,9 @@
       task = "Continuous reproduction",
       name = "Signal Discrimination Model (SDM) by Oberauer (2023)",
       citation = glue(
-        "Oberauer, K. (2023). Measurement models for visual working memory - \\
-        A factorial model comparison. Psychological Review, 130(3), 841-852"
+        "Oberauer, K. (2023). Measurement models for visual working \\
+        memory\u2014A factorial model comparison. Psychological Review, \\
+        130(3), 841-852. https://doi.org/10.1037/rev0000328"
       ),
       version = version,
       requirements = glue(

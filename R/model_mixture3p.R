@@ -14,7 +14,8 @@
       citation = glue(
         "Bays, P. M., Catalao, R. F. G., & Husain, M. (2009). \\
         The precision of visual working memory is set by allocation \\
-        of a shared resource. Journal of Vision, 9(10), 1-11"
+        of a shared resource. Journal of Vision, 9(10), Article 7. \\
+        https://doi.org/10.1167/9.10.7"
       ),
       version = "NA",
       requirements = glue(
