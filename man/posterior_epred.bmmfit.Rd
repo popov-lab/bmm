@@ -2,9 +2,12 @@
 % Please edit documentation in R/helpers-postprocess.R
 \name{posterior_epred.bmmfit}
 \alias{posterior_epred.bmmfit}
+\alias{fitted.bmmfit}
 \title{Expected response of a fitted bmm model}
 \usage{
 \method{posterior_epred}{bmmfit}(object, ..., dpar = NULL, nlpar = NULL)
+
+\method{fitted}{bmmfit}(object, ..., scale = c("response", "linear"), dpar = NULL, nlpar = NULL)
 }
 \arguments{
 \item{object}{A \code{bmmfit} object.}
@@ -14,6 +17,9 @@
 
 \item{dpar, nlpar}{Name of a distributional or non-linear parameter whose
 draws are returned instead of the expected response.}
+
+\item{scale}{As in \code{\link[brms:fitted.brmsfit]{brms::fitted.brmsfit()}}: \code{"response"} is the expected
+response, \code{"linear"} the linear predictor of \code{mu}.}
 }
 \value{
 A draws by observations matrix (an array with a third dimension for

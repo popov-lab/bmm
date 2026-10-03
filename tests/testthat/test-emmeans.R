@@ -124,3 +124,13 @@ test_that("emmeans(epred = TRUE) refuses a circular model", {
   expect_error(emmeans::emmeans(fit, ~set_size, epred = TRUE),
                "not defined for the sdm model")
 })
+
+test_that("emm_basis.bmmfit() hands brms a fit that stores posterior_epred", {
+  skip_if_not_installed("emmeans")
+  fit <- load_fixture_fit("bmmfit_ddm_ppcheck.rds")
+  # under load_all() brms finds posterior_epred_ddm by name even on a fit
+  # that stores none, so only the object handed on shows that restructure() ran
+  local_mocked_bindings(emm_basis = function(object, ...) object, .package = "emmeans")
+  seen <- emm_basis.bmmfit(fit, trms = NULL, xlev = NULL, grid = NULL, epred = TRUE)
+  expect_true(is.function(seen$formula$family$posterior_epred))
+})

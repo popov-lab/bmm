@@ -66,3 +66,11 @@ test_that("circular models saved under their pre-1.0.1 class refuse as well", {
   expect_true(inherits(fit$bmm$model, "vwm"))
   expect_false(expected_response_defined(fit$bmm$model))
 })
+
+test_that("fitted() refuses the circular models like posterior_epred()", {
+  fit <- load_fixture_fit("mock_bmmfit_mixture2p.rds")
+  # brms computes fitted() on a prep object, where posterior_epred.bmmfit()
+  # is never reached; without its own method a mixture2p fit returns zeros
+  expect_error(fitted(fit), "not defined for the mixture2p model")
+  expect_error(fitted(fit, fit$data), "not defined for the mixture2p model")
+})

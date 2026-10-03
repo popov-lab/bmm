@@ -141,6 +141,20 @@ posterior_epred.bmmfit <- function(object, ..., dpar = NULL, nlpar = NULL) {
   NextMethod()
 }
 
+# brms computes fitted() from a prep object, so posterior_epred.bmmfit() is
+# never reached and a circular mixture would return brms's number
+#' @rdname posterior_epred.bmmfit
+#' @param scale As in [brms::fitted.brmsfit()]: `"response"` is the expected
+#'   response, `"linear"` the linear predictor of `mu`.
+#' @export
+fitted.bmmfit <- function(object, ..., scale = c("response", "linear"),
+                          dpar = NULL, nlpar = NULL) {
+  if (match.arg(scale) == "response" && is.null(dpar) && is.null(nlpar)) {
+    refuse_undefined_epred(object)
+  }
+  NextMethod()
+}
+
 # Stops for a fit whose expected response is not defined. The custom families
 # refuse through the function stored in the family; this also covers the
 # models built on a native brms family, for which brms returns a number of its
