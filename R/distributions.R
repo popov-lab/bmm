@@ -2485,6 +2485,37 @@ validate_rdm_parameters <- function(drift, gap, ndt, s, sp) {
 # log space so that the tails stay finite where the raw forms underflow, and
 # every argument is recycled to a common length so that per-draw parameter
 # vectors line up with t. Keep these in step with rdm_functions.stan.
+#
+# The Stan twins (inst/stan_chunks/rdm_functions.stan) follow the same
+# derivation but spell the normal tails for the gradient:
+# - An upper normal tail is std_normal_lcdf(-z), never std_normal_lccdf(z).
+#   The two are equal on Stan Math 5.4 (CmdStan 2.40), but on 5.3 (rstan /
+#   StanHeaders 2.39) the lccdf is -Inf from z = 8.26 with an infinite partial,
+#   which reached this model as a NaN trial for a loser with drift 5 from
+#   t = 4 s. cogmod 0.3.2 (Makowski) exposed that flaw in bmm's cswald survivor
+#   and spells its own RDM with the reflected lcdf; the derivation here is
+#   bmm's own. A test pins that the chunk calls no lccdf.
+# - log Phi(z) is rdm_log_Phi(). Stan's Phi() evaluates 0.5 (1 + erf(z / sqrt 2))
+#   between -5 and 0, which cancels to a relative error of 1e-16 / Phi(z) (five
+#   digits gone at z = -4.4), and the differences g(beta) - g(alpha) and
+#   Phi(beta) - Phi(alpha) amplify that by their own cancellation (8.5e-7 in a
+#   far-tail log survival, measured). erfc has no such cancellation, its value
+#   is exact to 1e-16 down to its underflow at z = -37.5, and its derivative is
+#   the exact normal density; std_normal_lcdf takes over below, at the cost of
+#   its approximate (1e-5 relative) partial there.
+# - Every log-difference goes through swald_log_diff_exp(): log_diff_exp(x, x)
+#   has infinite partials that poison the gradient of the whole trial even in a
+#   branch whose value is discarded.
+# - rdm_log_g() sums y Phi(y) + phi(y) directly above y = -1 (g(-1) = 0.083, no
+#   cancellation, exact gradient), takes the log-space difference between -12
+#   and -1, and uses the series of .rdm_log_g() below -12. Twelve terms and the
+#   log-space form agree to about 1e-12 at -12.
+# - In rdm_log_surv() the E terms stay single exponents, so that they survive
+#   where exp(2 u drift / s^2) and Phi(.) separately overflow and underflow.
+#   D1, D2 and P are positive because g increases and the Wald reflection
+#   identity signs the derivatives of the survivor's antiderivative pieces.
+# Stan Math has no inverse Gaussian yet (stan-dev/math #3382 adds
+# inv_gaussian_* in log space); nothing here depends on it.
 
 # Below this ratio of start-point range to the diffusion spread s * sqrt(t)
 # the difference quotients over the start point cancel; the plain Wald at the
