@@ -67,6 +67,22 @@ test_that("bmm_models() formats per element and prints modified vectors as plain
   expect_output(print(toupper(models)), "\"CSWALD\"")
 })
 
+test_that("bmm_models() combines with plain character vectors in vctrs and dplyr", {
+  skip_if_not_installed("vctrs")
+  skip_if_not_installed("dplyr")
+  expect_identical(vctrs::vec_c(bmm_models(), "x"), c(model_names(), "x"))
+  expect_identical(vctrs::vec_c("x", bmm_models()), c("x", model_names()))
+  expect_identical(vctrs::vec_c(bmm_models(), bmm_models()), rep(model_names(), 2))
+  joined <- dplyr::left_join(
+    dplyr::tibble(model = bmm_models()),
+    dplyr::tibble(model = "imm", k = 1),
+    by = "model"
+  )
+  expect_identical(joined$model, model_names())
+  expect_equal(joined$k[joined$model == "imm"], 1)
+  expect_equal(sum(!is.na(joined$k)), 1)
+})
+
 test_that("print_pretty_models_md(group = ) lists one group without headers", {
   out <- capture.output(print_pretty_models_md(group = "Continuous reproduction"))
   expect_true(any(grepl("`imm()`", out, fixed = TRUE)))

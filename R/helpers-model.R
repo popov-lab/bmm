@@ -684,8 +684,9 @@ model_overview <- function(group = NULL) {
 #'   response times. Type `?modelname` (for example `?imm`) for the arguments
 #'   of a model.
 #' @return A character vector of model names with class `bmm_models`, which
-#'   prints as the grouped list. Use it like any character vector, e.g.
-#'   `"imm" %in% bmm_models()`.
+#'   prints as the grouped list. Use it like any character vector, in base R
+#'   or in dplyr, e.g. `"imm" %in% bmm_models()`. Combined with other strings
+#'   it becomes a plain character vector.
 #' @export
 #'
 #' @examples
@@ -706,6 +707,20 @@ print.bmm_models <- function(x, ...) {
   cat(models_text(unclass(x)))
   invisible(x)
 }
+
+# vctrs refuses to combine an unknown class with character, so without these
+# dplyr joins, binds and if_else() fail on a bmm_models() column
+#' @exportS3Method vctrs::vec_ptype2 bmm_models.bmm_models
+vec_ptype2.bmm_models.bmm_models <- function(x, y, ...) character()
+
+#' @exportS3Method vctrs::vec_ptype2 bmm_models.character
+vec_ptype2.bmm_models.character <- function(x, y, ...) character()
+
+#' @exportS3Method vctrs::vec_ptype2 character.bmm_models
+vec_ptype2.character.bmm_models <- function(x, y, ...) character()
+
+#' @exportS3Method vctrs::vec_cast character.bmm_models
+vec_cast.character.bmm_models <- function(x, to, ...) unclass(x)
 
 # one string, not one per model, so it is not a format() method: tibble and
 # print.data.frame call format() on columns and expect one string per element
