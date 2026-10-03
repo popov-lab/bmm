@@ -12,6 +12,7 @@
 * `mpt()` gains `covariates`, for data columns used in branch expressions, such as guessing rates fixed by the design; `bmm()` stops when the branches of a row do not sum to 1 with that row's values. `mpt_tree()` gains `impossible`, for response categories a tree cannot produce, such as distractor responses on trials without distractors. `dmpt()` and `rmpt()` take covariate values too. See `?mpt` and `?mpt_tree` (#255). Thanks to @GidonFrischkorn
 * New functions `mpt_from_string()` and `mpt_from_eqn()` build an `mpt()` model from an MPTinR-style model string or from an EQN file. Names in an EQN file that `mpt()` cannot use, such as `D_o`, are renamed and the renaming is reported; restrictions are written with the file's own names. See `?mpt_from_eqn` (#255). Thanks to @GidonFrischkorn
 * `plot()` draws the processing-tree diagram of an `mpt_tree()`, or of every tree of an `mpt()` model, from the branch expressions. See `?plot.mpt_tree` (#255). Thanks to @GidonFrischkorn
+* New article *Multinomial Processing Tree (MPT) models* walks through specifying, fitting and interpreting `mpt()` models, constraining parameters, design-fixed covariates, a fit to real data, non-linear parameters, importing model files and migrating from MPTinR or TreeBUGS (#255). Thanks to @GidonFrischkorn
 
 ### New datasets
 * Add **`broeder_schuetz_2009_e3`**, binary old/new recognition data from Broeder & Schuetz (2009, Exp. 3), with five base-rate conditions from 40 subjects. See `?broeder_schuetz_2009_e3`.
