@@ -146,6 +146,45 @@ test_that(".resolve_pp_conditions() excludes infrastructure columns", {
   expect_false(any(grepl("^n_", conds)))
 })
 
+test_that(".resolve_pp_conditions() works when fit has no group-level effects", {
+  fit <- load_m3_fit()
+  local_mocked_bindings(
+    ranef = function(...) stop("The model does not contain group-level effects."),
+    .package = "brms"
+  )
+  expect_type(.resolve_pp_conditions(fit), "character")
+})
+
+
+# SDT-rating default grouping (.pp_check_resolve_group is the load-bearing seam)
+
+test_that(".pp_check_resolve_group() defaults to stimulus for sdt_rating", {
+  fit <- fake_multinomial_fit(c("sdt", "sdt_rating"))
+  expect_equal(.pp_check_resolve_group(fit, NULL), "stimulus")
+})
+
+test_that(".pp_check_resolve_group() treats NA as the pool-everything opt-out", {
+  fit <- fake_multinomial_fit(c("sdt", "sdt_rating"))
+  expect_null(.pp_check_resolve_group(fit, NA))
+})
+
+test_that(".pp_check_resolve_group() honours an explicit group for sdt_rating", {
+  fit <- fake_multinomial_fit(c("sdt", "sdt_rating"))
+  expect_equal(.pp_check_resolve_group(fit, "condition"), "condition")
+})
+
+test_that(".pp_check_resolve_group() leaves non-rating multinomial ungrouped", {
+  fit <- fake_multinomial_fit("m3")
+  expect_null(.pp_check_resolve_group(fit, NULL))
+})
+
+test_that(".pp_check_restore_set_size() lets sdt_ranking facet by its m column", {
+  fit <- fake_ranking_fit()
+  fit$bmm$model$other_vars$m <- "set_size"
+  fit$data$max_rank <- 3
+  expect_equal(.pp_check_restore_set_size(fit, "set_size")$data$set_size, 3)
+  expect_identical(.pp_check_restore_set_size(fit, "id"), fit)
+})
 
 # Multi-observable checks: pp_check(fit, resp_var = ...) (#401)
 
@@ -326,15 +365,18 @@ test_that("posterior_epred.lnr is deterministic and equals the race mean", {
 
 test_that("pp_check(resp_var) works for the 3par ezdm model", {
   fit <- load_ppcheck_fit("bmmfit_ezdm3_ppcheck.rds")
-  p <- pp_check(fit, resp_var = "mean_pc", ndraws = 5)
+  p <- pp_check(fit, resp_var = "mean_pc", type = "intervals", ndraws = 5)
   expect_s3_class(p, "ggplot")
   expect_equal(p$data$y_obs, fit$data$n_upper / fit$data$n_trials)
   expect_s3_class(pp_check(fit, resp_var = "var_rt", ndraws = 5), "ggplot")
 })
 
-test_that("the ezdm checks default to per-cell intervals", {
+test_that("the ezdm checks show each statistic's distribution across cells", {
   fit <- load_ppcheck_fit("bmmfit_ezdm3_ppcheck.rds")
-  expect_true(all(pp_check_vars(fit)$default_type == "intervals"))
+  expect_identical(pp_check_vars(fit)$default_type,
+                   c("dens_overlay", "dens_overlay", "bars_binned"))
+  p <- pp_check(fit, resp_var = "mean_pc", ndraws = 5)
+  expect_equal(sum(p$data$y_obs), nrow(fit$data))
   p <- pp_check(fit, resp_var = "mean_pc", group = "n_trials", ndraws = 5)
   expect_s3_class(p$facet, "FacetWrap")
 })
@@ -367,6 +409,136 @@ test_that("pp_check(resp_var) retains every defined observation at any ndraws", 
 test_that("pp_check(resp_var = 'all') panels share one set of observations", {
   fit <- load_ppcheck_fit("bmmfit_ezdm4_ppcheck.rds")
   p <- suppressWarnings(pp_check(fit, resp_var = "all", ndraws = 50))
-  n_rows <- vapply(p$bayesplots, function(panel) nrow(panel$data), integer(1))
+  is_density <- vapply(p$bayesplots, function(panel) {
+    "is_y" %in% names(panel$data)
+  }, logical(1))
+  n_observed <- vapply(p$bayesplots, function(panel) {
+    if ("is_y" %in% names(panel$data)) sum(panel$data$is_y) else sum(panel$data$y_obs)
+  }, numeric(1))
+  expect_identical(n_observed, rep(n_observed[[1L]], length(n_observed)))
+  # rows of a density panel are observations x (retained draws + 1)
+  n_rows <- vapply(p$bayesplots[is_density], function(panel) nrow(panel$data),
+                   integer(1))
   expect_identical(n_rows, rep(n_rows[[1L]], length(n_rows)))
+})
+
+
+# Sparse 4par boundaries (#430) -------------------------------------------------
+
+# The fixture's draws on a modified copy of its data. Every parameter is
+# intercept-only, so the draws do not depend on the data.
+mock_ezdm4_fit <- function(data) {
+  old <- load_ppcheck_fit("bmmfit_ezdm4_ppcheck.rds")
+  suppressWarnings(suppressMessages(bmm(
+    old$bmm$user_formula, data, old$bmm$model,
+    backend = "mock", mock_fit = old$fit, rename = FALSE
+  )))
+}
+
+# Five cells made sparse. Rows 1-3 lose the lower summaries (no lower
+# response, one, then enough responses but no summaries, the min_trials case),
+# rows 4-5 the upper ones (one upper response, then no summaries).
+sparse_ezdm4_fit <- function() {
+  data <- load_ppcheck_fit("bmmfit_ezdm4_ppcheck.rds")$data
+  data$n_upper[1:2] <- as.integer(data$n_trials[1:2] - c(0, 1))
+  data$n_upper[4] <- 1L
+  data[1:3, c("mean_rt_lower", "var_rt_lower")] <- NA
+  data[4:5, c("mean_rt_upper", "var_rt_upper")] <- NA
+  rows <- seq_len(nrow(data))
+  list(fit = mock_ezdm4_fit(data), data = data, used_upper = !rows %in% 4:5,
+       used_lower = !rows %in% 1:3)
+}
+
+test_that("pp_check(resp_var) leaves the unused 4par boundaries out", {
+  sparse <- sparse_ezdm4_fit()
+  rt_checks <- c("mean_rt_lower", "var_rt_lower", "mean_rt_upper", "var_rt_upper")
+  for (resp_var in rt_checks) {
+    used <- if (endsWith(resp_var, "lower")) sparse$used_lower else sparse$used_upper
+    out <- collect_warnings(pp_check(sparse$fit, resp_var = resp_var, ndraws = 5))
+    dropped <- paste("Dropped", sum(!used), "of 10 observations")
+    expect_true(any(grepl(dropped, out$warnings, fixed = TRUE)), info = resp_var)
+    y <- out$value$data$value[out$value$data$is_y_label == "italic(y)"]
+    expect_equal(y, sparse$data[[resp_var]][used], info = resp_var)
+    expect_false(any(y == -1), info = resp_var)
+  }
+
+  out <- collect_warnings(pp_check(sparse$fit, resp_var = "all", ndraws = 5))
+  expect_s3_class(out$value, "bayesplot_grid")
+  expect_true(any(grepl("Dropped 5 of 10 observations", out$warnings, fixed = TRUE)))
+})
+
+# brms would plot its Y, the upper mean RT, placeholders included
+test_that("pp_check() without resp_var leaves the placeholders of a 4par fit out", {
+  sparse <- sparse_ezdm4_fit()
+  p <- suppressWarnings(pp_check(sparse$fit, ndraws = 5))
+  expect_s3_class(p, "ggplot")
+  y <- p$data$value[p$data$is_y_label == "italic(y)"]
+  expect_equal(y, sparse$data$mean_rt_upper[sparse$used_upper])
+  expect_false(any(y == -1))
+})
+
+# the user passed no resp_var, so the refusal must not be phrased as if they had
+test_that("pp_check() without resp_var says why a 4par fit with upper placeholders refuses newdata", {
+  fit <- sparse_ezdm4_fit()$fit
+  why <- "cells without an observed 'mean_rt_upper'"
+  expect_error(pp_check(fit, newdata = fit$data, ndraws = 5), why, fixed = TRUE)
+  expect_error(pp_check(fit, type = "loo_pit_overlay", ndraws = 5), why,
+               fixed = TRUE)
+  expect_error(pp_check(fit, resp_var = "mean_rt_upper", newdata = fit$data),
+               "'newdata' is not supported for the 'mean_rt_upper' check",
+               fixed = TRUE)
+})
+
+# placeholders at the lower boundary leave Y an observation in every cell, so
+# the default stays with brms and keeps what only brms offers
+test_that("pp_check() without resp_var plots every cell of a 4par fit with lower placeholders only", {
+  data <- load_ppcheck_fit("bmmfit_ezdm4_ppcheck.rds")$data
+  data[1:3, c("mean_rt_lower", "var_rt_lower")] <- NA
+  fit <- mock_ezdm4_fit(data)
+  expect_identical(fit$data$rt_used_lower[1:3], rep(0L, 3))
+  expect_true(all(fit$data$rt_used_upper == 1L))
+
+  p <- pp_check(fit, ndraws = 5)
+  expect_equal(p$data$value[p$data$is_y_label == "italic(y)"],
+               data$mean_rt_upper)
+  expect_s3_class(pp_check(fit, newdata = fit$data, ndraws = 5), "ggplot")
+})
+
+test_that("pp_check() still checks a 4par fit saved without RT indicators", {
+  fit <- load_ppcheck_fit("bmmfit_ezdm4_ppcheck.rds")
+  expect_false("vint3" %in% names(brms::standata(fit)))
+
+  p <- suppressWarnings(pp_check(fit, ndraws = 5))
+  expect_s3_class(p, "ggplot")
+  expect_equal(p$data$value[p$data$is_y_label == "italic(y)"],
+               fit$data$mean_rt_upper)
+
+  p <- suppressWarnings(pp_check(fit, resp_var = "var_rt_upper", ndraws = 5))
+  expect_equal(p$data$value[p$data$is_y_label == "italic(y)"],
+               fit$data$var_rt_upper)
+
+  # without placeholders in Y there is nothing to leave out, so the default
+  # stays with brms and keeps what only brms offers, such as newdata
+  expect_s3_class(pp_check(fit, newdata = fit$data, ndraws = 5), "ggplot")
+})
+
+# only the ezdm 4par default leaves brms; the other models with declared
+# observables must still plot exactly what brms plots
+test_that("pp_check() without resp_var still delegates to brms for the other RT models", {
+  brms_method <- getS3method("pp_check", "brmsfit", envir = asNamespace("brms"))
+  for (name in c("bmmfit_ezdm3_ppcheck.rds", "bmmfit_ddm_ppcheck.rds")) {
+    fit <- load_ppcheck_fit(name)
+    withr::with_seed(1, mine <- pp_check(fit, ndraws = 5))
+    withr::with_seed(1, theirs <- brms_method(fit, type = "dens_overlay", ndraws = 5))
+    expect_equal(mine$data, theirs$data, info = name)
+  }
+})
+
+test_that("pp_check_vars() lists the same checks for a 4par fit with indicators", {
+  vars <- pp_check_vars(sparse_ezdm4_fit()$fit)
+  expect_identical(
+    vars$resp_var,
+    c("mean_rt_upper", "mean_rt_lower", "var_rt_upper", "var_rt_lower", "mean_pc")
+  )
+  expect_identical(vars$default, c(TRUE, FALSE, FALSE, FALSE, FALSE))
 })

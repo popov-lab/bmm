@@ -61,7 +61,7 @@ print.bmmsummary <- function(x, digits = 2, color = getOption("bmm.color_summary
   cat(style("purple1")("  Links: "))
   cat(summarise_links(x$model$links), "\n")
   cat(style("purple1")("Formula: "))
-  cat(summarise_formula.bmmformula(x$formula, newline = TRUE, wsp = 9, model = x$model), "\n")
+  cat(collapse_lines(summarise_formula(x$formula, model = x$model), wsp = 9), "\n")
   cat(
     style("purple1")("   Data:"), attr(x$data, "data_name"),
     "(Number of observations:", paste0(nrow(x$data), ")")
@@ -102,6 +102,7 @@ print.bmmsummary <- function(x, digits = 2, color = getOption("bmm.color_summary
       cat("\n")
     }
   }
+  for (note in summary_notes(x$model, x)) cat(note, "\n\n", sep = "")
 
   cat(paste0("Draws were sampled using ", x$sampler, ". "))
   if (x$algorithm == "sampling") {
@@ -138,9 +139,20 @@ select_pars <- function(x) {
 # select rows of another parameter such as "kappa_Intercept" (#379). Plain
 # data.frame subsetting with drop = FALSE also keeps a single fixed-effect row
 # intact, which broke the old sapply+apply approach for single-coefficient
-# models such as gumbel-min sdt_ranking (dprime ~ 1) (#369).
+# models such as gumbel-min sdt_ranking (d ~ 1) (#369).
 .summary_fixed_rows <- function(fixed, pars) {
   fixed[sub("_.*$", "", rownames(fixed)) %in% pars, , drop = FALSE]
+}
+
+# Model-specific remarks printed below the coefficient tables, for facts about
+# the estimates that the table itself cannot show
+summary_notes <- function(model, x) {
+  UseMethod("summary_notes")
+}
+
+#' @export
+summary_notes.default <- function(model, x) {
+  NULL
 }
 
 summarise_links <- function(links) {
@@ -148,27 +160,34 @@ summarise_links <- function(links) {
   paste(out, sep = "", collapse = "; ")
 }
 
-summarise_formula.bmmformula <- function(formula, newline = TRUE, wsp = 0, model = NULL) {
-  fixpars <- NULL
+# the formula as text, one element per parameter; with a model, also the
+# parameters the user left out and the constants the model fixes them to
+summarise_formula <- function(formula, model = NULL) {
   if (!is.null(model)) {
     formula <- suppressMessages(add_missing_parameters(model, formula))
     fixpars <- model$fixed_parameters
     fixpars <- fixpars[names(fixpars) %in% names(model$parameters)]
     formula[names(fixpars)] <- fixpars
   }
-  print(formula, newline = newline, wsp = wsp)
+  formula_lines(formula)
 }
 
-#' @export
-print.bmmformula <- function(x, newline = TRUE, wsp = 0, ...) {
-  wspace <- collapse(rep(" ", wsp))
-  sep <- paste0(ifelse(newline, "\n", ","), wspace)
+formula_lines <- function(x) {
   for (i in seq_along(x)) {
     if (is.numeric(x[[i]])) {
       x[[i]] <- paste0(names(x)[i], " = ", x[[i]])
     }
   }
-  cat(paste0(x, collapse = sep))
+  paste0(x)
+}
+
+collapse_lines <- function(lines, newline = TRUE, wsp = 0) {
+  paste0(lines, collapse = paste0(ifelse(newline, "\n", ","), strrep(" ", wsp)))
+}
+
+#' @export
+print.bmmformula <- function(x, newline = TRUE, wsp = 0, ...) {
+  cat(collapse_lines(formula_lines(x), newline, wsp))
 }
 
 summarise_model <- function(model, ...) {

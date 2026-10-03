@@ -38,6 +38,75 @@ test_that("rsdm returns values between -pi and pi", {
   expect_true(all(res >= -pi) && all(res <= pi))
 })
 
+test_that("rsdm draws each value from its own parameter values", {
+  withr::local_seed(445)
+  n <- 20000
+  group <- sample(rep(1:2, n / 2))
+  pars <- data.frame(mu = c(0, 2), c = c(1, 10), kappa = c(2, 30))
+  y <- rsdm(n, pars$mu[group], pars$c[group], pars$kappa[group])
+
+  for (g in 1:2) {
+    err <- y[group == g] - pars$mu[g]
+    ref_cos <- integrate(function(x) cos(x) * dsdm(x, 0, pars$c[g], pars$kappa[g]), -pi, pi)$value
+    expect_lt(abs(mean(cos(err)) - ref_cos), 5 * sd(cos(err)) / sqrt(length(err)))
+    expect_lt(abs(mean(sin(err))), 5 * sd(sin(err)) / sqrt(length(err)))
+  }
+})
+
+test_that("rsdm recycles parameters to n", {
+  draw <- function(...) withr::with_seed(445, rsdm(10, ...))
+  expect_identical(
+    draw(mu = c(0, 2), c = c(2, 10), kappa = c(3, 30)),
+    draw(mu = rep_len(c(0, 2), 10), c = rep_len(c(2, 10), 10), kappa = rep_len(c(3, 30), 10))
+  )
+})
+
+test_that("rsdm returns finite draws when the density peak overflows", {
+  withr::local_seed(445)
+  y <- rsdm(10, c = 100, kappa = 400)
+  expect_true(all(is.finite(y)))
+  expect_lt(max(abs(y)), 0.05)
+})
+
+test_that("rejection_sampling takes arguments of length n per draw", {
+  withr::local_seed(445)
+  n <- 20000
+  group <- sample(rep(1:2, n / 2))
+  shape <- c(1, 9)
+  # Beta(shape, 1): density shape * x^(shape - 1) peaks at shape, mean shape / (shape + 1)
+  y <- rejection_sampling(
+    n,
+    f = function(x, group, shape) shape[group] * x^(shape[group] - 1),
+    max_f = shape[group],
+    proposal_fun = stats::runif,
+    group = group, shape = shape
+  )
+
+  for (g in 1:2) {
+    yg <- y[group == g]
+    expect_lt(abs(mean(yg) - shape[g] / (shape[g] + 1)), 5 * sd(yg) / sqrt(length(yg)))
+  }
+
+  # with n = 1 every argument belongs to the single draw and is passed whole
+  expect_length(rejection_sampling(1, function(x, g) g(x), 1, stats::runif, g = stats::dunif), 1)
+})
+
+test_that("rejection_sampling validates n and max_f", {
+  expect_error(rejection_sampling(2.5, stats::dunif, 1, stats::runif), "whole number")
+  expect_error(rejection_sampling(5, stats::dunif, 0, stats::runif), "max_f")
+  expect_error(rejection_sampling(5, stats::dunif, c(1, 2), stats::runif), "max_f")
+})
+
+test_that("rejection_sampling errors instead of looping forever", {
+  # a regression here hangs; fail the test instead of timing out the CI job
+  setTimeLimit(elapsed = 20, transient = TRUE)
+  withr::defer(setTimeLimit(elapsed = Inf))
+  expect_error(rejection_sampling(5, stats::dunif, Inf, stats::runif), "max_f")
+  expect_error(rsdm(5, mu = NA), "NA")
+  expect_error(rejection_sampling(5, function(x) 0 * x, 1, stats::runif), "accepted")
+  expect_error(rejection_sampling(5, function(x) rep(1, length(x)), 1, function(n) rep(NA_real_, n)), "NA")
+})
+
 test_that("conversion between sdm parametrizations works", {
   kappa <- rnorm(100, 5, 1)
   c_b <- rnorm(100, 5, 1)
@@ -92,6 +161,29 @@ test_that("rmixture2p returns values between -pi and pi", {
     p_mem = runif(1, min = 0, max = 1)
   )
   expect_true(all(res >= -pi) && all(res <= pi))
+})
+
+test_that("rmixture2p draws each value from its own parameter values", {
+  withr::local_seed(445)
+  n <- 20000
+  group <- sample(rep(1:2, n / 2))
+  pars <- data.frame(mu = c(0, 2), kappa = c(2, 30), p_mem = c(0.5, 0.9))
+  y <- rmixture2p(n, pars$mu[group], pars$kappa[group], pars$p_mem[group])
+
+  for (g in 1:2) {
+    err <- y[group == g] - pars$mu[g]
+    ref_cos <- pars$p_mem[g] * besselI(pars$kappa[g], 1, TRUE) / besselI(pars$kappa[g], 0, TRUE)
+    expect_lt(abs(mean(cos(err)) - ref_cos), 5 * sd(cos(err)) / sqrt(length(err)))
+    expect_lt(abs(mean(sin(err))), 5 * sd(sin(err)) / sqrt(length(err)))
+  }
+})
+
+test_that("rmixture2p recycles parameters to n", {
+  draw <- function(...) withr::with_seed(445, rmixture2p(10, ...))
+  expect_identical(
+    draw(mu = c(0, 2), kappa = c(2, 30), p_mem = c(0.5, 0.9)),
+    draw(mu = rep_len(c(0, 2), 10), kappa = rep_len(c(2, 30), 10), p_mem = rep_len(c(0.5, 0.9), 10))
+  )
 })
 
 test_that("rmixture3p returns values between -pi and pi", {
@@ -977,6 +1069,17 @@ test_that("dm3 works with full bmmformula", {
   expect_length(dens, 1)
 })
 
+test_that("dm3 matches activations and num_options by category, not by position", {
+  model <- m3(resp_cats = c("corr", "other", "npl"), num_options = c(1, 4, 5), choice_rule = "simple")
+  pars <- c(a = 1, b = 0.1, c = 2)
+  expected <- dm3(c(20, 10, 10), pars, model, bmf(corr ~ b + a + c, other ~ b + a, npl ~ b))
+  expect_equal(dm3(c(20, 10, 10), pars, model, bmf(npl ~ b, other ~ b + a, corr ~ b + a + c)), expected)
+
+  model$other_vars$num_options <- c(npl = 5, corr = 1, other = 4)
+  expect_equal(dm3(c(20, 10, 10), pars, model, bmf(corr ~ b + a + c, other ~ b + a, npl ~ b)), expected)
+  expect_error(dm3(c(20, 10, 10), pars, model, bmf(corr ~ b + a + c, npl ~ b)), "'other'")
+})
+
 test_that("rm3 errors when full formula has no activation functions", {
   model <- m3(
     resp_cats = c("corr", "other", "npl"),
@@ -1321,6 +1424,57 @@ test_that("dezdm 4par handles edge cases with few responses at boundary", {
     drift = 2, bound = 1.5, ndt = 0.3, zr = 0.7, version = "4par"
   )
   expect_true(is.finite(ll))
+})
+
+# Changing a count to make a boundary sparse would change the binomial term
+# too, so the reference keeps the counts and assembles the density from its
+# parts: the binomial from the Wiener absorption probability, written out
+# here, and each boundary's RT terms from the sampling distribution given in
+# ?ezdm_dist, fed with the cumulants that the tests further down check against
+# high-precision references. What is under test is which terms dezdm() adds;
+# the first row, with every summary present, checks the reference itself.
+test_that("dezdm 4par leaves out the RT terms of a boundary without summaries (#430)", {
+  drift <- 1.2
+  bound <- 1.4
+  ndt <- 0.3
+  zr <- 0.6
+  n_upper <- 18
+  n_trials <- 30
+  moments <- .ezdm_moments_4par(drift, bound, zr, 1)
+  mean_rt <- ndt + c(moments$mdt_upper * 1.03, moments$mdt_lower * 0.97)
+  var_rt <- c(moments$vrt_upper * 1.1, moments$vrt_lower * 0.9)
+
+  p_upper <- (1 - exp(-2 * drift * zr * bound)) / (1 - exp(-2 * drift * bound))
+  binomial <- stats::dbinom(n_upper, n_trials, p_upper, log = TRUE)
+  rt_terms <- function(mean_rt, var_rt, n, mdt, vrt, k3, k4) {
+    W <- k4 / n + 2 * vrt^2 / (n - 1)
+    stats::dgamma(var_rt, shape = vrt^2 / W, rate = vrt / W, log = TRUE) +
+      stats::dnorm(mean_rt, mean = ndt + mdt + k3 / n / W * (var_rt - vrt),
+                   sd = sqrt(vrt / n - (k3 / n)^2 / W), log = TRUE)
+  }
+  upper <- rt_terms(mean_rt[1], var_rt[1], n_upper, moments$mdt_upper,
+                    moments$vrt_upper, moments$k3_upper, moments$k4_upper)
+  lower <- rt_terms(mean_rt[2], var_rt[2], n_trials - n_upper,
+                    moments$mdt_lower, moments$vrt_lower, moments$k3_lower,
+                    moments$k4_lower)
+
+  # rows: all present; no upper summaries; no lower summaries; none; a lower
+  # variance without its mean; a lower mean without its variance
+  mean_rt_obs <- matrix(c(
+    mean_rt, NA, mean_rt[2], mean_rt[1], NA, NA, NA,
+    mean_rt[1], NA, mean_rt
+  ), ncol = 2, byrow = TRUE)
+  var_rt_obs <- matrix(c(
+    var_rt, NA, var_rt[2], var_rt[1], NA, NA, NA,
+    var_rt, var_rt[1], NA
+  ), ncol = 2, byrow = TRUE)
+  ll <- dezdm(mean_rt_obs, var_rt_obs, n_upper, n_trials, drift = drift,
+              bound = bound, ndt = ndt, zr = zr, version = "4par")
+
+  expect_equal(
+    ll, binomial + c(upper + lower, lower, upper, 0, upper, upper),
+    tolerance = 1e-10
+  )
 })
 
 test_that("generated data from rezdm has reasonable density under dezdm", {

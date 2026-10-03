@@ -11,7 +11,7 @@ test_that("default priors are set correctly with fixed effects only", {
   # 1 fixed effect + intercept
   formula <- bmf(kappa ~ set_size, thetat ~ set_size)
   pr <- default_prior(formula, data, model)
-  expect_equal(pr[pr$coef == "" & pr$class == "b", ]$prior, c("normal(0, 1)", "normal(0, 0.5)"))
+  expect_equal(pr[pr$coef == "" & pr$class == "b", ]$prior, c("normal(0, 1)", "normal(0, 2.5)"))
   expect_equal(pr[pr$coef == "Intercept", ]$prior, c("normal(2, 1)", "logistic(0, 1)"))
   expect_true(all(grepl("constant", pr[pr$dpar %in% c("mu1", "mu2", "kappa2"), ]$prior)))
 
@@ -26,13 +26,13 @@ test_that("default priors are set correctly with fixed effects only", {
   formula <- bmf(kappa ~ set_size + session, thetat ~ set_size + session)
   pr <- default_prior(formula, data, model)
   expect_equal(pr[pr$coef == "Intercept", ]$prior, c("normal(2, 1)", "logistic(0, 1)"))
-  expect_equal(pr[pr$coef == "" & pr$class == "b", ]$prior, c("normal(0, 1)", "normal(0, 0.5)"))
+  expect_equal(pr[pr$coef == "" & pr$class == "b", ]$prior, c("normal(0, 1)", "normal(0, 2.5)"))
 
   # 2 fixed effects + intercept suppressed
   formula <- bmf(kappa ~ 0 + set_size + session, thetat ~ 0 + set_size + session)
   pr <- default_prior(formula, data, model)
   expect_equal(pr[pr$coef == "Intercept", ]$prior, character(0))
-  expect_equal(pr[pr$coef == "" & pr$class == "b", ]$prior, c("normal(0, 1)", "normal(0, 0.5)"))
+  expect_equal(pr[pr$coef == "" & pr$class == "b", ]$prior, c("normal(0, 1)", "normal(0, 2.5)"))
   expect_equal(pr[pr$coef == "set_size1" & pr$class == "b", ]$prior, c("normal(2, 1)", "logistic(0, 1)"))
   expect_equal(pr[pr$coef == "session2" & pr$class == "b", ]$prior, c("", ""))
 
@@ -40,13 +40,13 @@ test_that("default priors are set correctly with fixed effects only", {
   formula <- bmf(kappa ~ set_size * session, thetat ~ set_size * session)
   pr <- default_prior(formula, data, model)
   expect_equal(pr[pr$coef == "Intercept", ]$prior, c("normal(2, 1)", "logistic(0, 1)"))
-  expect_equal(pr[pr$coef == "" & pr$class == "b", ]$prior, c("normal(0, 1)", "normal(0, 0.5)"))
+  expect_equal(pr[pr$coef == "" & pr$class == "b", ]$prior, c("normal(0, 1)", "normal(0, 2.5)"))
 
   # 2 fixed effects + interaction + intercept suppressed
   formula <- bmf(kappa ~ 0 + set_size * session, thetat ~ 0 + set_size * session)
   pr <- default_prior(formula, data, model)
   expect_equal(pr[pr$coef == "Intercept", ]$prior, character(0))
-  expect_equal(pr[pr$coef == "" & pr$class == "b", ]$prior, c("normal(0, 1)", "normal(0, 0.5)"))
+  expect_equal(pr[pr$coef == "" & pr$class == "b", ]$prior, c("normal(0, 1)", "normal(0, 2.5)"))
   expect_equal(pr[pr$coef == "set_size1" & pr$class == "b", ]$prior, c("normal(2, 1)", "logistic(0, 1)"))
   expect_equal(pr[pr$coef == "session2" & pr$class == "b", ]$prior, c("", ""))
   expect_equal(pr[pr$coef == "set_size2:session2" & pr$class == "b", ]$prior, c("", ""))
@@ -73,7 +73,7 @@ test_that("default priors are set correctly with random effects", {
   # 1 fixed effect + intercept
   formula <- bmf(kappa ~ set_size + (1 | ID), thetat ~ set_size + (1 | ID))
   pr <- default_prior(formula, data, model)
-  expect_equal(pr[pr$coef == "" & pr$class == "b", ]$prior, c("normal(0, 1)", "normal(0, 0.5)"))
+  expect_equal(pr[pr$coef == "" & pr$class == "b", ]$prior, c("normal(0, 1)", "normal(0, 2.5)"))
   expect_equal(pr[pr$coef == "Intercept" & pr$class == "b", ]$prior, c("normal(2, 1)", "logistic(0, 1)"))
   expect_true(all(grepl("constant", pr[pr$dpar %in% c("mu1", "mu2", "kappa2"), ]$prior)))
   expect_equal(unique(pr[pr$class == "sd", ]$prior), c("", "exponential(1)"))
@@ -90,14 +90,14 @@ test_that("default priors are set correctly with random effects", {
   formula <- bmf(kappa ~ set_size + session + (1 | ID), thetat ~ set_size + session + (1 | ID))
   pr <- default_prior(formula, data, model)
   expect_equal(pr[pr$coef == "Intercept" & pr$class == "b", ]$prior, c("normal(2, 1)", "logistic(0, 1)"))
-  expect_equal(pr[pr$coef == "" & pr$class == "b", ]$prior, c("normal(0, 1)", "normal(0, 0.5)"))
+  expect_equal(pr[pr$coef == "" & pr$class == "b", ]$prior, c("normal(0, 1)", "normal(0, 2.5)"))
   expect_equal(unique(pr[pr$class == "sd", ]$prior), c("", "exponential(1)"))
 
   # 2 fixed effects + intercept suppressed
   formula <- bmf(kappa ~ 0 + set_size + session + (1 | ID), thetat ~ 0 + set_size + session + (1 | ID))
   pr <- default_prior(formula, data, model)
   expect_equal(pr[pr$coef == "Intercept" & pr$class == "b", ]$prior, character(0))
-  expect_equal(pr[pr$coef == "" & pr$class == "b", ]$prior, c("normal(0, 1)", "normal(0, 0.5)"))
+  expect_equal(pr[pr$coef == "" & pr$class == "b", ]$prior, c("normal(0, 1)", "normal(0, 2.5)"))
   expect_equal(pr[pr$coef == "set_size1" & pr$class == "b", ]$prior, c("normal(2, 1)", "logistic(0, 1)"))
   expect_equal(pr[pr$coef == "session2" & pr$class == "b", ]$prior, c("", ""))
   expect_equal(unique(pr[pr$class == "sd", ]$prior), c("", "exponential(1)"))
@@ -106,14 +106,14 @@ test_that("default priors are set correctly with random effects", {
   formula <- bmf(kappa ~ set_size * session + (1 | ID), thetat ~ set_size * session + (1 | ID))
   pr <- default_prior(formula, data, model)
   expect_equal(pr[pr$coef == "Intercept" & pr$class == "b", ]$prior, c("normal(2, 1)", "logistic(0, 1)"))
-  expect_equal(pr[pr$coef == "" & pr$class == "b", ]$prior, c("normal(0, 1)", "normal(0, 0.5)"))
+  expect_equal(pr[pr$coef == "" & pr$class == "b", ]$prior, c("normal(0, 1)", "normal(0, 2.5)"))
   expect_equal(unique(pr[pr$class == "sd", ]$prior), c("", "exponential(1)"))
 
   # 2 fixed effects + interaction + intercept suppressed
   formula <- bmf(kappa ~ 0 + set_size * session + (1 | ID), thetat ~ 0 + set_size * session + (1 | ID))
   pr <- default_prior(formula, data, model)
   expect_equal(pr[pr$coef == "Intercept" & pr$class == "b", ]$prior, character(0))
-  expect_equal(pr[pr$coef == "" & pr$class == "b", ]$prior, c("normal(0, 1)", "normal(0, 0.5)"))
+  expect_equal(pr[pr$coef == "" & pr$class == "b", ]$prior, c("normal(0, 1)", "normal(0, 2.5)"))
   expect_equal(pr[pr$coef == "set_size1" & pr$class == "b", ]$prior, c("normal(2, 1)", "logistic(0, 1)"))
   expect_equal(pr[pr$coef == "session2" & pr$class == "b", ]$prior, c("", ""))
   expect_equal(pr[pr$coef == "set_size2:session2" & pr$class == "b", ]$prior, c("", ""))
@@ -136,14 +136,14 @@ test_that("mixture3p mixing weights get an effects prior on the softmax scale", 
   formula <- bmf(kappa ~ 1, thetat ~ session, thetant ~ 0 + set_size)
   pr <- default_prior(formula, data, model)
   b_rows <- pr[pr$coef == "" & pr$class == "b", ]
-  expect_equal(b_rows[b_rows$nlpar == "thetat", ]$prior, "normal(0, 0.5)")
+  expect_equal(b_rows[b_rows$nlpar == "thetat", ]$prior, "normal(0, 2.5)")
   expect_equal(b_rows[b_rows$nlpar == "thetant", ]$prior, "logistic(0, 1)")
   expect_equal(pr[pr$coef == "set_size1" & pr$nlpar == "thetant", ]$prior, "constant(-100)")
 
   formula <- bmf(kappa ~ 1, thetat ~ 1, thetant ~ 0 + set_size + session)
   pr <- default_prior(formula, data, model)
   b_rows <- pr[pr$coef == "" & pr$class == "b", ]
-  expect_equal(b_rows[b_rows$nlpar == "thetant", ]$prior, "normal(0, 0.5)")
+  expect_equal(b_rows[b_rows$nlpar == "thetant", ]$prior, "normal(0, 2.5)")
   expect_equal(pr[pr$coef == "set_size1" & pr$nlpar == "thetant", ]$prior, "constant(-100)")
   expect_equal(pr[pr$coef == "set_size2" & pr$nlpar == "thetant", ]$prior, "logistic(0, 1)")
 })
@@ -458,6 +458,59 @@ test_that("every model ships an sd default on the link scale of each parameter",
   pr <- default_prior(rt_formula, ez_data, ezdm("mean_rt", "var_rt", "n_upper", "n_trials", version = "3par"))
   expect_equal(sd_default(pr, "drift"), "exponential(1)")
   for (par in c("bound", "ndt")) expect_equal(sd_default(pr, par), "exponential(2)")
+
+  pr <- default_prior(
+    bmf(d ~ 1 + (1 | id), criterion ~ 0 + condition + (1 | id), sdratio ~ 1 + (1 | id)),
+    broeder_schuetz_2009_e3,
+    sdt_yn(response = "n_old", stimulus = "stimulus", n_trials = "n_trials")
+  )
+  expect_equal(sd_default(pr, "d"), "exponential(1)")
+  for (par in c("criterion", "sdratio")) expect_equal(sd_default(pr, par), "exponential(2)")
+
+  mafc_data <- data.frame(
+    n_correct = rep(c(30, 24), 10), n_trials = 40, id = factor(rep(1:10, each = 2))
+  )
+  pr <- default_prior(
+    bmf(d ~ 1 + (1 | id)), mafc_data,
+    sdt_mafc(response = "n_correct", n_trials = "n_trials", m = 4)
+  )
+  expect_equal(sd_default(pr, "d"), "exponential(1)")
+
+  pr <- default_prior(
+    bmf(d ~ 1 + (1 | id), sdratio ~ 1 + (1 | id)), meyer_grant_jakob_2025,
+    sdt_ranking(response = paste0("rank", 1:5), m = "set_size", dist = "normal")
+  )
+  expect_equal(sd_default(pr, "d"), "exponential(1)")
+  expect_equal(sd_default(pr, "sdratio"), "exponential(2)")
+
+  rating_data <- data.frame(
+    r1 = 5, r2 = 8, r3 = 12, r4 = 15, stimulus = rep(0:1, 10),
+    id = factor(rep(1:10, each = 2))
+  )
+  rating_formula <- bmf(d ~ 1 + (1 | id), criterion ~ 1 + (1 | id),
+                        spacing ~ 1 + (1 | id), sdratio ~ 1 + (1 | id))
+  pr <- default_prior(rating_formula, rating_data,
+                      sdt_rating(response = paste0("r", 1:4), stimulus = "stimulus"))
+  expect_equal(sd_default(pr, "d"), "exponential(1)")
+  for (par in c("criterion", "spacing", "sdratio")) {
+    expect_equal(sd_default(pr, par), "exponential(2)")
+  }
+
+  cdp_cols <- c(paste0("new", 1:3), paste0("know", 4:6), paste0("remember", 4:6))
+  cdp_data <- cbind(
+    data.frame(stimulus = rep(0:1, 10), id = factor(rep(1:10, each = 2))),
+    stats::setNames(as.data.frame(matrix(10L, 20, length(cdp_cols))), cdp_cols)
+  )
+  cdp_formula <- bmf(
+    dfam ~ 1 + (1 | id), drec ~ 1 + (1 | id), criterion ~ 1 + (1 | id),
+    spacing ~ 1 + (1 | id), rcrit ~ 1 + (1 | id), sigmar ~ 1 + (1 | id)
+  )
+  pr <- default_prior(cdp_formula, cdp_data,
+                      sdt_cdp(stimulus = "stimulus", n_new = 3, n_old = 3))
+  for (par in c("dfam", "drec")) expect_equal(sd_default(pr, par), "exponential(1)")
+  for (par in c("criterion", "spacing", "rcrit", "sigmar")) {
+    expect_equal(sd_default(pr, par), "exponential(2)")
+  }
 })
 
 test_that("a freed mu / mu1 gets regularizing main, effects and sd priors on the tan_half scale", {
@@ -550,4 +603,15 @@ test_that("default priors work when there are non-linear transformations of defa
   )
   expect_true(!("c" %in% dp$dpar))
   expect_true("nlc" %in% dp$nlpar)
+})
+
+test_that("sdt_yn emits an sd prior only for parameters with random effects", {
+  data <- broeder_schuetz_2009_e3
+  model <- sdt_yn(response = "n_old", stimulus = "stimulus", n_trials = "n_trials")
+
+  # default_prior() alone does not validate a prior against the model, so the
+  # no-random-effects case is only provable through a fit
+  formula_fixed <- bmf(d ~ 1, criterion ~ 0 + condition, sdratio ~ 1)
+  fit <- bmm(formula_fixed, data, model, backend = "mock", mock_fit = 1, rename = FALSE)
+  expect_false(any(fit$prior$class == "sd"))
 })
