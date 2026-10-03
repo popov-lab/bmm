@@ -429,6 +429,9 @@ response_annotations <- function(model) {
       response = "0/1 or logical; 1 = upper boundary"
     ))
   }
+  if (inherits(model, "lnr")) {
+    return(list(rt = "seconds"))
+  }
   if (inherits(model, "ezdm")) {
     return(list(
       mean_rt = "seconds",
@@ -556,6 +559,16 @@ data_column_roles <- list(
     nt_features = "non-target features relative to the target, in radians, one column per non-target",
     nt_distances = "distance of each non-target to the target, one column per non-target",
     set_size = "set size (a column, or one number)"
+  ),
+  lnr_simple = c(
+    rt = "response time in seconds",
+    response = "chosen option, 1 = correct and 2 to `n_choices` = errors",
+    n_choices = NA
+  ),
+  lnr_custom = c(
+    rt = "response time in seconds",
+    response = "chosen category, labelled by the accumulator names in the formula",
+    accumulators = "number of accumulators per category (columns, or one number per category)"
   ),
   imm_abc = c(
     resp_error = "response error relative to the target, in radians",

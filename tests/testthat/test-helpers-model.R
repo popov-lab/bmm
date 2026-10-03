@@ -140,7 +140,10 @@ test_that("model_overview() has one row per version with its own columns and par
   expect_false(grepl("`s`", imm_rows$`Key parameters`[abc]))
 
   custom <- overview[grepl("version `custom`", overview$Model, fixed = TRUE), ]
-  expect_match(custom$`Key parameters`, "your formula defines them")
+  lnr_custom <- grepl("`lnr()`", custom$Model, fixed = TRUE)
+  expect_match(custom$`Key parameters`[!lnr_custom], "your formula defines them")
+  # lnr's formula names the accumulators, but ndt and s exist whatever it says
+  expect_match(custom$`Key parameters`[lnr_custom], "`ndt`.*`s`")
 
   dpsdt <- overview[grepl("version `dpsdt`", overview$Model, fixed = TRUE), ]
   expect_match(dpsdt$`Key parameters`, "Fixed by default: `sdratio`, `Ro`, `Rn`", fixed = TRUE)
@@ -162,7 +165,7 @@ test_that("model_overview() has one row per version with its own columns and par
   expect_false(grepl("version", mixture2p$Model))
 
   rt_models <- model_overview(group = "Choices and response times")
-  expect_true(all(grepl("`(ddm|cswald|ezdm)\\(\\)`", rt_models$Model)))
+  expect_true(all(grepl("`(ddm|cswald|ezdm|lnr)\\(\\)`", rt_models$Model)))
 })
 
 test_that("get_model() returns the correct function", {
