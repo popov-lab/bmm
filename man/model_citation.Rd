@@ -39,7 +39,9 @@ bmm itself is cited separately, see \code{citation("bmm")}.
 }
 \examples{
 model_citation(sdm(resp_error = "y"))
-model_citation(sdt_rating(response = "rating", stimulus = "old", version = "dpsdt"))
+model_citation(
+  sdt_rating(response = paste0("r", 1:4), stimulus = "old", version = "dpsdt")
+)
 }
 \seealso{
 \code{\link[=citation]{citation()}}

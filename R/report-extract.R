@@ -29,7 +29,9 @@
 #' @keywords extract_info
 #' @examples
 #' model_citation(sdm(resp_error = "y"))
-#' model_citation(sdt_rating(response = "rating", stimulus = "old", version = "dpsdt"))
+#' model_citation(
+#'   sdt_rating(response = paste0("r", 1:4), stimulus = "old", version = "dpsdt")
+#' )
 #' @export
 model_citation <- function(x, ...) {
   UseMethod("model_citation")
@@ -37,7 +39,10 @@ model_citation <- function(x, ...) {
 
 #' @export
 model_citation.default <- function(x, ...) {
-  stop2("model_citation() needs a bmmodel or bmmfit object, not an object of class '{class(x)[1]}'.")
+  stop2(
+    "model_citation() needs a bmmodel or bmmfit object, \\
+    not an object of class '{class(x)[1]}'."
+  )
 }
 
 #' @export
@@ -80,20 +85,20 @@ fit_settings <- function(fit) {
   sim <- if (has_draws(fit)) fit$fit@sim else list()
   version <- fit$version
   backend <- fit$backend %||% NA_character_
-  stan_backend <- backend %in% c("rstan", "cmdstanr")
+  stan_field <- c(cmdstanr = "cmdstan", rstan = "stanHeaders")[backend]
   list(
     backend = backend,
     algorithm = fit$algorithm %||% NA_character_,
-    chains = first_or_na(sim$chains),
-    iter = first_or_na(sim$iter),
-    warmup = first_or_na(sim$warmup),
-    thin = first_or_na(sim$thin),
-    ndraws_stored = if (has_draws(fit)) brms::ndraws(fit) else NA_integer_,
+    chains = first_or_na(sim[["chains"]]),
+    iter = first_or_na(sim[["iter"]]),
+    warmup = first_or_na(sim[["warmup"]]),
+    thin = first_or_na(sim[["thin"]]),
+    ndraws_stored = if (has_draws(fit)) as.numeric(brms::ndraws(fit)) else NA_real_,
     versions = c(
       bmm = version_string(version$bmm),
       brms = version_string(version$brms),
-      stan = version_string(if (stan_backend) version[[c(cmdstanr = "cmdstan", rstan = "stanHeaders")[[backend]]]]),
-      backend = version_string(if (stan_backend) version[[backend]])
+      stan = version_string(if (!is.na(stan_field)) version[[stan_field]]),
+      backend = version_string(if (!is.na(stan_field)) version[[backend]])
     ),
     date = if (has_draws(fit)) fit$fit@date else NA_character_
   )
@@ -102,46 +107,57 @@ fit_settings <- function(fit) {
 # R-hat and bulk and tail ESS per variable, without lp__, lprior and constant
 # variables (R-hat NA). The caller decides which parameter classes to report
 convergence_summary <- function(fit) {
+  # without draws, brms fails further down with an error about `@` applied to
+  # a number, which does not say that the fit is a mock
   stopif(!has_draws(fit), "The fit contains no posterior draws (a mock fit?).")
   algorithm <- fit$algorithm
   if (!identical(algorithm, "sampling")) {
-    out <- data.frame(parameter = character(), rhat = numeric(), ess_bulk = numeric(), ess_tail = numeric())
+    out <- data.frame(
+      parameter = character(), rhat = numeric(), ess_bulk = numeric(), ess_tail = numeric()
+    )
     return(structure(out, algorithm = algorithm))
   }
-  conv <- posterior::summarise_draws(brms::as_draws_array(fit), "rhat", "ess_bulk", "ess_tail")
+  conv <- posterior::summarise_draws(
+    brms::as_draws_array(fit), "rhat", "ess_bulk", "ess_tail"
+  )
   conv <- conv[!conv$variable %in% c("lp__", "lprior") & !is.na(conv$rhat), ]
   max_treedepth <- brms::control_params(fit)$max_treedepth
   treedepth <- brms::nuts_params(fit, pars = "treedepth__")$Value
   structure(
-    data.frame(parameter = conv$variable, rhat = conv$rhat, ess_bulk = conv$ess_bulk, ess_tail = conv$ess_tail),
+    data.frame(
+      parameter = conv$variable, rhat = conv$rhat,
+      ess_bulk = conv$ess_bulk, ess_tail = conv$ess_tail
+    ),
     algorithm = algorithm,
     divergent = sum(brms::nuts_params(fit, pars = "divergent__")$Value),
-    max_treedepth_hits = if (is.null(max_treedepth)) NA_integer_ else sum(treedepth >= max_treedepth)
+    max_treedepth_hits = if (is.null(max_treedepth)) NA_real_ else sum(treedepth >= max_treedepth)
   )
 }
 
+# a stanfit without draws comes from chains = 0 or empty = TRUE
 has_draws <- function(fit) {
-  methods::is(fit$fit, "stanfit")
+  methods::is(fit$fit, "stanfit") && length(fit$fit@sim) > 0
 }
 
 first_or_na <- function(x) {
-  if (length(x)) x[[1]] else NA_integer_
+  if (length(x)) as.numeric(x[[1]]) else NA_real_
 }
 
 version_string <- function(x) {
   if (is.null(x)) NA_character_ else as.character(x)
 }
 
-# the model as the installed version of bmm builds it; NULL when no constructor
-# of this version matches the stored model's classes
+# the model as the installed version of bmm builds it; NULL when no current
+# constructor matches the stored model's classes and version. A stored model
+# without a version predates versions and gets the default one
 current_constructor <- function(model) {
   name <- intersect(rev(class(model)), supported_models(print_call = FALSE))[1]
   if (is.na(name)) {
     return(NULL)
   }
-  if (isTRUE(model$version %in% model_versions(name))) {
-    get_model(name)(version = model$version)
-  } else {
-    get_model(name)()
+  versions <- model_versions(name)
+  if (is.null(model$version) || all(is.na(versions))) {
+    return(get_model(name)())
   }
+  if (model$version %in% versions) get_model(name)(version = model$version)
 }

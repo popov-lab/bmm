@@ -18,7 +18,7 @@ test_that("every constructor and version meets the citation contract", {
     label <- class(model)[length(class(model))]
     refs <- model_citation(model)
     expect_identical(class(refs), "character", label = label)
-    expect_gt(length(refs), 0)
+    expect_gt(length(refs), 0, label = label)
     expect_false(any(grepl("\n", refs, fixed = TRUE)), label = label)
     expect_false(any(grepl("^\\s*- ", refs)), label = label)
     expect_true(all(grepl("(\\.|https://doi\\.org/\\S+)$", refs)), label = label)
@@ -77,6 +77,19 @@ test_that("model_citation() falls back to the copy stored on an old fit", {
 test_that("model_citation() falls back when the model has no current constructor", {
   model <- structure(list(citation = "Doe, J. (2020). A model. Journal, 1, 1-2."), class = c("bmmodel", "retired_model"))
   expect_identical(model_citation(model), "Doe, J. (2020). A model. Journal, 1, 1-2.")
+})
+
+test_that("model_citation() falls back for a version the installed constructor dropped", {
+  model <- .model_sdt_rating(version = "dpsdt")
+  model$version <- "retired_version"
+  expect_identical(model_citation(model), as.character(model$citation))
+})
+
+test_that("model_citation() cites the default version of a model stored without a version", {
+  model <- .model_sdm()
+  model$version <- NULL
+  model$citation <- "stale"
+  expect_identical(model_citation(model), model_citation(.model_sdm()))
 })
 
 test_that("model_citation() refuses objects that are not models or fits", {
@@ -166,13 +179,17 @@ test_that("fit_settings() reads the sampler settings and versions stored on the 
   }
 })
 
-test_that("fit_settings() reports a subsampled fit's settings and its stored draws apart", {
+test_that("fit_settings() and convergence_summary() treat a stanfit without draws as a mock", {
   skip_on_cran()
-  path <- test_path("assets/bmmfit_m3_ppcheck.rds")
-  skip_if_not(file.exists(path), "M3 fixture not available (excluded by .Rbuildignore)")
-  settings <- fit_settings(readRDS(path))
-  expect_equal(c(settings$chains, settings$iter, settings$warmup), c(4, 2000, 1000))
-  expect_equal(settings$ndraws_stored, 80)
+  skip_if_not_installed("rstan")
+  path <- test_path("assets/bmmfit_example1.rds")
+  skip_if_not(file.exists(path), "SDM fixture not available (excluded by .Rbuildignore)")
+  fit <- readRDS(path)
+  fit$fit <- methods::new("stanfit")
+  settings <- fit_settings(fit)
+  expect_true(is.na(settings$ndraws_stored))
+  expect_true(is.na(settings$date))
+  expect_error(convergence_summary(fit), "draws")
 })
 
 test_that("fit_settings() works on mock fits, with NA where the fit has no draws", {
