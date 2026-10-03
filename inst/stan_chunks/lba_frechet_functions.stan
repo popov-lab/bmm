@@ -1,14 +1,4 @@
-// Frechet drift d ~ Frechet(shape v, scale s), log F(u) = -(u / s)^-v. The
-// survivor is spelled through this closed form and log1m_exp, never through
-// frechet_lccdf, whose log1m(exp(.)) form is -Inf with an infinite partial
-// once (s / u)^v < 5e-17 (u / s = 113 at shape 8).
-//
-// M has no closed form and is integrated by 16-point Gauss-Legendre in log
-// space. Measured against adaptive quadrature: within 1e-6 nats for
-// A / gap <= 6, 6e-5 at A / gap = 10, 8.7e-3 at 40, 0.84 nats at gap = 1e-3
-// with A = 2; the default priors put A / gap near 0.6. The survivor inherits
-// that error multiplied by (u / s)^-2v, so for slow responses (b / t well
-// below s) it is off by whole nats where its value is already below -100.
+// Frechet drift (shape v, scale s); never frechet_lccdf, see .lba_frechet_log_dF() in R/distributions.R
 
 real lba_frechet_log_F(real x, real v, real s) {
   return -pow(x / s, -v);
@@ -24,6 +14,7 @@ real lba_frechet_log_dF(real lo, real hi, real v, real s) {
   return log_diff_exp(lF_hi, lF_lo);
 }
 
+// M by 16-point Gauss-Legendre in log space; accuracy envelope by .lba_frechet_log_M() in R
 real lba_frechet_log_M(real t, real v, real b, real A, real s) {
   array[16] real nodes = {
     -0.9894009349916499, -0.9445750230732326, -0.8656312023878318,

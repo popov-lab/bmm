@@ -1,7 +1,4 @@
-// Lognormal drift d ~ LN(v, s), so z = (log u - v) / s and F(u) = Phi(z). The
-// width of the interval in z-units is dz = log(b / (b - A)) / s, taken from
-// log1m(A / b) rather than as a difference of two logs so that a tiny A keeps
-// its digits. M = exp(v + s^2 / 2) [Phi(z_hi - s) - Phi(z_lo - s)].
+// Lognormal drift LN(v, s); dz from log1m(A / b) so a tiny A keeps its digits
 
 real lba_lognormal_log_dPhi(real z_lo, real z_hi, real dz) {
   if (dz < 1e-4) return lba_log_phi_int_narrow(z_lo, z_hi);

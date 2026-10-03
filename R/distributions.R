@@ -2429,15 +2429,33 @@ qlba <- function(p, drift, gap, sp, ndt, s = 1,
 ############################################################################# !
 # Single-accumulator kernels, in log space                                ####
 ############################################################################# !
-# Twins of inst/stan_chunks/lba_*_functions.stan, which carry the derivation:
-# one accumulator with threshold b, start point k ~ U(0, A) and drift d
-# finishes at (b - k) / d, so the drifts finishing exactly at t are
-# u in (lo, hi) = ((b - A) / t, b / t); the density is M / A with
-# M = int_{lo}^{hi} u f(u) du and the survivor is (A F(lo) + b [F(hi) - F(lo)]
-# - t M) / A. Every kernel takes equal-length vectors (one call per
-# observation over all posterior draws, the brms log_lik contract), selects
-# its branches by mask, returns NA for an undefined decision time and floors
-# a numerator that has rounded to zero at log(1e-300) as the Stan side does.
+# Twins of inst/stan_chunks/lba_*_functions.stan. One accumulator with
+# threshold b, start point k ~ U(0, A) and drift d finishes at (b - k) / d, so
+# at decision time t the drifts that finish exactly then are u = (b - k) / t
+# in (lo, hi) = ((b - A) / t, b / t). The density is M / A with
+# M = int_{lo}^{hi} u f(u) du, and the survivor is (u_num - t M) / A with
+# u_num = b F(hi) - (b - A) F(lo) = A F(lo) + b (F(hi) - F(lo)), the second
+# form being a sum of positive terms and the one used on both sides.
+#
+# The differences of CDFs are taken from the tail where both terms are small,
+# and where an interval is too narrow for a difference to carry digits the
+# integral is replaced by the midpoint rule with its second-order term. No
+# Stan branch evaluates an expression that can return -Inf with an infinite
+# partial: Stan keeps the adjoint of a discarded branch, so log_diff_exp(x, x)
+# or log(0) poison the gradient of the whole trial even when the value is not
+# used. cogmod 0.3.2 (Makowski) exposed the Phi saturation and the -690 floor
+# of the previous normal-drift kernel; the layouts were derived independently.
+#
+# The floor log(1e-300) is a last resort for a numerator that has rounded to
+# zero or below. On the verification grid (t - ndt down to 1 ms, |z| to 40, A
+# from 1e-8 to 2, gap from 1e-3 to 1.5) no branch reaches it; it is left for
+# parameter values beyond that range (v / s below -37, or a decision time so
+# long that the truncated survivor falls under 1e-300).
+#
+# Every kernel takes equal-length vectors (one call per observation over all
+# posterior draws, the brms log_lik contract), selects its branches by mask,
+# returns NA for an undefined decision time and floors a numerator that has
+# rounded to zero at log(1e-300) as the Stan side does.
 
 .lba_lpdf_single <- function(t, v, b, A, s, distribution) {
   args <- .lba_recycle(t, v, b, A, s)
@@ -2492,7 +2510,10 @@ qlba <- function(p, drift, gap, sp, ndt, s = 1,
   out
 }
 
-# log(Phi(hi) - Phi(lo)), hi > lo, from the tails where both are small
+# log(Phi(hi) - Phi(lo)), hi > lo, from the tails where both are small: the
+# upper tails when the pair sits in the right half. In Stan this is never -Inf
+# for finite arguments, because std_normal_lcdf stays finite where log(Phi())
+# and std_normal_lccdf (Stan Math 5.3) do not
 .lba_log_Phi_diff <- function(lo, hi) {
   upper <- !is.na(lo) & lo + hi >= 0
   out <- log_diff_exp(stats::pnorm(hi, log.p = TRUE), stats::pnorm(lo, log.p = TRUE))
@@ -2503,7 +2524,7 @@ qlba <- function(p, drift, gap, sp, ndt, s = 1,
 }
 
 # int_{z_lo}^{z_hi} phi(z) dz for a narrow interval: midpoint rule with its
-# second-order term
+# second-order term (relative error O((dz max(|z|, 1))^4 / 1920))
 .lba_log_phi_int_narrow <- function(z_lo, z_hi) {
   dz <- z_hi - z_lo
   z_m <- 0.5 * (z_lo + z_hi)
@@ -2513,6 +2534,21 @@ qlba <- function(p, drift, gap, sp, ndt, s = 1,
 
 # --- normal drift, truncated at zero -----------------------------------------
 
+# Normal drift d ~ N(v, s^2) conditional on d > 0 (the posdrift convention of
+# rtdists). In z-units, z = (u - v) / s, with delta = z_hi - z_lo = A / (t s):
+#   M = int_{z_lo}^{z_hi} (v + s z) phi(z) dz = v [Phi(z_hi) - Phi(z_lo)] + s [phi(z_lo) - phi(z_hi)]
+#   S - q = (1/delta) int_{z_lo}^{z_hi} [Phi(z) - Phi(-v/s)] dz,  q = Phi(-v/s)
+# and the truncated density and survivor are M / (A Phi(v/s)) and
+# (S - q) / Phi(v/s). Both Phi differences vanish with delta and both phi
+# differences vanish with delta (z_lo + z_hi); the sum for M can also be a
+# difference of two terms of the same size (v < 0, or v > 0 with the interval
+# left of v). Every piece is therefore assembled in log space from a signed
+# term, or by the midpoint rule below delta = 1e-4, where the direct form has
+# lost four digits and the expansion has ~1e-12 left. In the midpoint branch
+# u_m = v + s z_m is the midpoint of (lo, hi), written without the
+# cancellation of v + s z_m. phi(near) - phi(far) = phi(near) (1 - exp(-x));
+# the term is exactly zero when z_lo = -z_hi. With v < 0, z_lo > 0, so the
+# phi term is positive and the larger one.
 .lba_normal_log_M <- function(t, v, b, A, s) {
   z_lo <- ((b - A) / t - v) / s
   z_hi <- (b / t - v) / s
@@ -2554,6 +2590,12 @@ qlba <- function(p, drift, gap, sp, ndt, s = 1,
   .lba_normal_log_M(t, v, b, A, s) - log(A) - stats::pnorm(v / s, log.p = TRUE)
 }
 
+# S - q is formed in probability space from the exact-gradient Phi(): from the
+# lower tails through g(z) = z Phi(z) + phi(z) when v >= 0 (q < 1/2 is the
+# small term), from the upper tails through h(z) = z Phi(-z) - phi(z) when
+# v < 0 (1 - q and F are the small terms). The remaining cancellation is
+# intrinsic to the closed form and bounded by (S - q) / S, which stays above
+# 1e-5 for any decision time under 30 s with gap >= 1e-3.
 .lba_normal_lsurv <- function(t, v, b, A, s) {
   z_lo <- ((b - A) / t - v) / s
   z_hi <- (b / t - v) / s
@@ -2586,9 +2628,21 @@ qlba <- function(p, drift, gap, sp, ndt, s = 1,
 
 # --- gamma drift -------------------------------------------------------------
 
-# log(F(hi) - F(lo)) of Gamma(alpha, beta): midpoint rule through the density
-# for a narrow interval, the upper-tail pair beyond the mean, the lower-tail
-# pair below it
+# Gamma drift d ~ Gamma(shape v, rate s). M = (v / s) [F(hi; v + 1) - F(lo; v + 1)].
+#
+# Two facts about Stan Math's gamma CDFs bind the Stan twin (stan-dev/math
+# #3408, measured on 5.3.0 and 5.4.0): gamma_lcdf rounds to 0 once log Q < -37,
+# so a difference of two lcdf values is -Inf for every fast response with
+# b / t >= 10, and its shape partial is off by 2.5e-3 at shape 5, by 0.1 to
+# 50 % for shape >= 10 in the lower tail, NaN once P saturates (shape >= 12,
+# s b / t above ~1e3) and an exception above 5e4. gamma_lccdf is finite far
+# beyond exp underflow. So the difference is taken from the upper tail
+# (lccdf pair) beyond the mean, from the lower tail (lcdf pair) below it, and
+# where the interval is narrow the midpoint rule through gamma_lpdf (exact
+# partials) replaces both; the midpoint test uses the rule's expansion
+# parameter, du |d log f / du| at the midpoint. The shape is v + 1 with v an
+# autodiff parameter, and s b / t grows without bound as ndt approaches the
+# fastest response: the gamma drift is the least robust of the four there.
 .lba_gamma_log_dF <- function(lo, hi, alpha, beta) {
   du <- hi - lo
   u_m <- 0.5 * (lo + hi)
@@ -2622,6 +2676,8 @@ qlba <- function(p, drift, gap, sp, ndt, s = 1,
   log(v) - log(s) + .lba_gamma_log_dF((b - A) / t, b / t, v + 1, s) - log(A)
 }
 
+# u_num - t M = t int_{lo}^{hi} F(u) du > 0; the difference loses digits only
+# where the survivor itself is negligible
 .lba_gamma_lsurv <- function(t, v, b, A, s) {
   lo <- (b - A) / t
   hi <- b / t
@@ -2636,6 +2692,10 @@ qlba <- function(p, drift, gap, sp, ndt, s = 1,
 
 # --- lognormal drift ---------------------------------------------------------
 
+# Lognormal drift d ~ LN(v, s), so z = (log u - v) / s and F(u) = Phi(z). The
+# width of the interval in z-units is dz = log(b / (b - A)) / s, taken from
+# log1m(A / b) rather than as a difference of two logs so that a tiny A keeps
+# its digits. M = exp(v + s^2 / 2) [Phi(z_hi - s) - Phi(z_lo - s)].
 .lba_lognormal_log_dPhi <- function(z_lo, z_hi, dz) {
   narrow <- !is.na(dz) & dz < 1e-4
   out <- .lba_log_Phi_diff(z_lo, z_hi)
@@ -2672,6 +2732,11 @@ qlba <- function(p, drift, gap, sp, ndt, s = 1,
   -(x / scale)^(-shape)
 }
 
+# Frechet drift d ~ Frechet(shape v, scale s), log F(u) = -(u / s)^-v. The
+# survivor is spelled through this closed form and log1m_exp, from the upper
+# tail once F(lo) > 1/2, never through Stan's frechet_lccdf, whose
+# log1m(exp(.)) form is -Inf with an infinite partial once (s / u)^v < 5e-17
+# (u / s = 113 at shape 8).
 .lba_frechet_log_dF <- function(lo, hi, shape, scale) {
   lF_lo <- .lba_frechet_log_F(lo, shape, scale)
   lF_hi <- .lba_frechet_log_F(hi, shape, scale)
@@ -2687,6 +2752,13 @@ qlba <- function(p, drift, gap, sp, ndt, s = 1,
 # end point), scaled by that peak. Without the window a fast or slow response
 # concentrates the integrand in a sliver that integrate() cannot see. This is
 # the independent reference for the 16-point rule of the Stan chunk.
+#
+# The Stan chunk integrates M by 16-point Gauss-Legendre in log space.
+# Measured against this adaptive quadrature: within 1e-6 nats for
+# A / gap <= 6, 6e-5 at A / gap = 10, 8.7e-3 at 40, 0.84 nats at gap = 1e-3
+# with A = 2; the default priors put A / gap near 0.6. The survivor inherits
+# that error multiplied by (u / s)^-2v, so for slow responses (b / t well
+# below s) it is off by whole nats where its value is already below -100.
 .lba_frechet_log_M <- function(t, shape, b, A, scale) {
   log_integrand <- function(u, shape, scale) {
     log(shape) - shape * log(u / scale) - (u / scale)^(-shape)

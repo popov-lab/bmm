@@ -1,19 +1,6 @@
-// Gamma drift d ~ Gamma(shape v, rate s). M = (v / s) [F(hi; v + 1) - F(lo; v + 1)].
-//
-// Two facts about Stan Math's gamma CDFs bind here (stan-dev/math #3408,
-// measured on 5.3.0 and 5.4.0): gamma_lcdf rounds to 0 once log Q < -37, so
-// a difference of two lcdf values is -Inf for every fast response with
-// b / t >= 10, and its shape partial is off by 2.5e-3 at shape 5, by 0.1 to
-// 50 % for shape >= 10 in the lower tail, NaN once P saturates (shape >= 12,
-// s b / t above ~1e3) and an exception above 5e4. gamma_lccdf is finite far
-// beyond exp underflow. So the difference is taken from the upper tail
-// (lccdf pair) beyond the mean, from the lower tail (lcdf pair) below it,
-// and where the interval is narrow the midpoint rule through gamma_lpdf
-// (exact partials) replaces both. The shape is v + 1 with v an autodiff
-// parameter, and s b / t grows without bound as ndt approaches the fastest
-// response: the gamma drift is the least robust of the four there.
+// Gamma drift (shape v, rate s); why the tails are split: .lba_gamma_log_dF() in R/distributions.R
 
-// log(F(hi) - F(lo)) of Gamma(alpha, beta), hi > lo
+// log(F(hi) - F(lo)) of Gamma(alpha, beta), hi > lo: midpoint, lccdf pair above the mean, lcdf pair below
 real lba_gamma_log_dF(real lo, real hi, real alpha, real beta) {
   real du = hi - lo;
   real u_m = 0.5 * (lo + hi);
@@ -40,7 +27,6 @@ real lba_gamma_single_lccdf(real t, real v, real b, real A, real s) {
   real hi = b / t;
   real log_tM = log(t) + log(v) - log(s) + lba_gamma_log_dF(lo, hi, v + 1, s);
   real log_u = log_sum_exp(log(A) + gamma_lcdf(lo | v, s), log(b) + lba_gamma_log_dF(lo, hi, v, s));
-  // u_num - t M = t int_{lo}^{hi} F(u) du > 0; the difference loses digits
-  // only where the survivor itself is negligible
+  // u_num - t M > 0; guard before log_diff_exp, never clamp after it
   return (log_u > log_tM ? log_diff_exp(log_u, log_tM) : lba_log_floor()) - log(A);
 }
