@@ -86,10 +86,28 @@ test_that("model_citation() falls back for a version the installed constructor d
 })
 
 test_that("model_citation() cites the default version of a model stored without a version", {
-  model <- .model_sdm()
-  model$version <- NULL
-  model$citation <- "stale"
-  expect_identical(model_citation(model), model_citation(.model_sdm()))
+  for (version in list(NULL, "NA", "", NA_character_)) {
+    model <- .model_sdm()
+    model$version <- version
+    model$citation <- "stale"
+    expect_identical(model_citation(model), model_citation(.model_sdm()), label = deparse(version))
+  }
+})
+
+test_that("model_citation() splits the single string older fits stored into references", {
+  skip_on_cran()
+  paths <- c(
+    cswald = test_path("assets/bmmfit_cswald_ppcheck.rds"),
+    ezdm = test_path("assets/bmmfit_ezdm3_ppcheck.rds")
+  )
+  skip_if_not(all(file.exists(paths)), "Fixtures not available (excluded by .Rbuildignore)")
+  local_mocked_bindings(current_constructor = function(model) NULL)
+  refs <- lapply(paths, function(path) model_citation(readRDS(path)))
+  expect_identical(lengths(refs), c(cswald = 1L, ezdm = 2L))
+  refs <- unlist(refs)
+  expect_false(any(grepl("\n", refs, fixed = TRUE)))
+  expect_false(any(grepl("^\\s*- |  ", refs)))
+  expect_true(all(startsWith(refs, c("Miller, R.", "Wagenmakers, E.-J.", "Chávez De la Peña"))))
 })
 
 test_that("model_citation() refuses objects that are not models or fits", {

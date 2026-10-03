@@ -54,14 +54,22 @@ model_citation.bmmfit <- function(x, ...) {
 model_citation.bmmodel <- function(x, ...) {
   refs <- as.character(current_constructor(x)$citation)
   if (!any(nzchar(refs))) {
-    refs <- as.character(x$citation)
+    refs <- split_stored_citation(x$citation)
   }
   structure(refs[nzchar(refs)], uncited = uncited_part(x))
 }
 
+# models stored before bmm 1.4.0 hold all references in one string, joined by
+# a newline and "- ", with line breaks inside a reference
+split_stored_citation <- function(citation) {
+  trimws(gsub("\\s*\n\\s*", " ", unlist(strsplit(as.character(citation), "\n\\s*-\\s+"))))
+}
+
 # the part of a model whose source bmm cannot know, because the user defines
 # it; a method on the model's class, as the bmmodel class comes first in every
-# model and would shadow a model_citation() method of its own
+# model and would shadow a model_citation() method of its own. Code that needs
+# this (report_methods() in #432) calls the generic directly, because `[`,
+# c() and unique() drop the uncited attribute of model_citation()
 uncited_part <- function(model) {
   UseMethod("uncited_part")
 }
@@ -149,14 +157,15 @@ version_string <- function(x) {
 
 # the model as the installed version of bmm builds it; NULL when no current
 # constructor matches the stored model's classes and version. A stored model
-# without a version predates versions and gets the default one
+# without a version predates versions, and an unversioned model stores "NA";
+# both get the default version, should the model have gained versions since
 current_constructor <- function(model) {
   name <- intersect(rev(class(model)), supported_models(print_call = FALSE))[1]
   if (is.na(name)) {
     return(NULL)
   }
   versions <- model_versions(name)
-  if (is.null(model$version) || all(is.na(versions))) {
+  if (all(model$version %in% c(NA, "NA", "")) || all(is.na(versions))) {
     return(get_model(name)())
   }
   if (model$version %in% versions) get_model(name)(version = model$version)
