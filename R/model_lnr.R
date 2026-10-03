@@ -124,7 +124,7 @@ settable_links.lnr <- function(model) {
 
 #' @title `r .model_lnr()$name`
 #' @name lnr
-#' @details `r model_info(.model_lnr())`
+#' @details `r model_docs(.model_lnr())`
 #' @param rt The name of the variable in the dataset containing the response
 #'   times. Response times should be coded in seconds (not milliseconds).
 #' @param response The name of the variable in the dataset containing the

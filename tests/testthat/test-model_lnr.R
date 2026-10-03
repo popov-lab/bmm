@@ -47,7 +47,7 @@ test_that("lnr refuses a link target it does not have", {
   expect_equal(model$links$target, "log")
 })
 
-test_that("report_priors() does not report the technical mu of the lnr family", {
+test_that("prior_info() does not report the technical mu of the lnr family", {
   skip_on_cran()
 
   dat <- rlnr(n = 100, m = c(-1, 0), s = c(1, 1), ndt = 0.2)
@@ -57,7 +57,7 @@ test_that("report_priors() does not report the technical mu of the lnr family", 
     backend = "mock", mock_fit = 1, rename = FALSE
   )
 
-  out <- report_priors(fit)
+  out <- prior_info(fit)
   expect_false("mu" %in% out$parameter)
   expect_true(all(c("correct", "error", "ndt") %in% out$parameter))
 })
