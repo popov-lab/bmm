@@ -29,8 +29,9 @@ parameter and columns: \code{parameter}, \code{description},
 }
 \description{
 Returns a data frame with information about the model
-parameters, including their descriptions, whether they are fixed,
-their link functions, and optionally their default priors.
+parameters: their descriptions, whether they are fixed (and to which
+value), and their link functions. Use \code{\link[=prior_info]{prior_info()}} for the priors of
+a fitted model.
 }
 \examples{
 # For an unfitted model

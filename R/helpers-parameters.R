@@ -146,8 +146,9 @@ link_transform <- function(values, link, inverse = FALSE) {
 #' Get parameter information for a bmm model
 #'
 #' @description Returns a data frame with information about the model
-#'   parameters, including their descriptions, whether they are fixed,
-#'   their link functions, and optionally their default priors.
+#'   parameters: their descriptions, whether they are fixed (and to which
+#'   value), and their link functions. Use [prior_info()] for the priors of
+#'   a fitted model.
 #'
 #' @param x A \code{bmmodel} object (e.g., \code{sdm(resp_error = "y")}) or a
 #'   \code{bmmfit} object (a fitted model returned by \code{\link{bmm}}).
