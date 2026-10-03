@@ -150,13 +150,13 @@ settable_link_functions.m3 <- function(model) {
 #' @param ... used internally for testing, ignore it
 #' @return An object of class `bmmodel`
 #'
-#' @details `r model_info(.model_m3(), components =c('domain', 'task', 'name', 'citation'))`
+#' @details `r model_docs(.model_m3(), components =c('domain', 'task', 'name', 'citation'))`
 #' #### Version: `ss`
-#' `r model_info(.model_m3(version = "ss"), components = c('requirements', 'parameters', 'fixed_parameters', 'links', 'prior'))`
+#' `r model_docs(.model_m3(version = "ss"), components = c('requirements', 'parameters', 'fixed_parameters', 'links', 'prior'))`
 #' #### Version: `cs`
-#' `r model_info(.model_m3(version = "cs"), components =c('requirements', 'parameters', 'fixed_parameters', 'links', 'prior'))`
+#' `r model_docs(.model_m3(version = "cs"), components =c('requirements', 'parameters', 'fixed_parameters', 'links', 'prior'))`
 #' #### Version: `custom`
-#' `r model_info(.model_m3(version = "custom"), components = c('requirements', 'parameters', 'fixed_parameters', 'links', 'prior'))`
+#' `r model_docs(.model_m3(version = "custom"), components = c('requirements', 'parameters', 'fixed_parameters', 'links', 'prior'))`
 #'
 #' @keywords bmmodel
 #'

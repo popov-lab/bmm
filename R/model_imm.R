@@ -98,13 +98,13 @@ settable_links.imm <- function(model) {
 #' Please use `imm(version = 'full')`, `imm(version = 'bsc')`, or `imm(version = 'abc')` instead.
 #'
 #' @name imm
-#' @details `r model_info(.model_imm(), components =c('domain', 'task', 'name', 'citation'))`
+#' @details `r model_docs(.model_imm(), components =c('domain', 'task', 'name', 'citation'))`
 #' #### Version: `full`
-#' `r model_info(.model_imm(version = "full"), components = c('requirements', 'parameters', 'fixed_parameters', 'links', 'prior'))`
+#' `r model_docs(.model_imm(version = "full"), components = c('requirements', 'parameters', 'fixed_parameters', 'links', 'prior'))`
 #' #### Version: `bsc`
-#' `r model_info(.model_imm(version = "bsc"), components = c('requirements', 'parameters', 'fixed_parameters', 'links', 'prior'))`
+#' `r model_docs(.model_imm(version = "bsc"), components = c('requirements', 'parameters', 'fixed_parameters', 'links', 'prior'))`
 #' #### Version: `abc`
-#' `r model_info(.model_imm(version = "abc"), components =c('requirements', 'parameters', 'fixed_parameters', 'links', 'prior'))`
+#' `r model_docs(.model_imm(version = "abc"), components =c('requirements', 'parameters', 'fixed_parameters', 'links', 'prior'))`
 #'
 #' Additionally, all imm models have an internal parameter that is fixed to 0 to
 #' allow the model to be identifiable. This parameter is not estimated and is not

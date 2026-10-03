@@ -70,12 +70,12 @@ default_prior.bmmformula <- function(object, data, model, formula = object, ...)
   combine_prior(brms_priors, prior_args$prior)
 }
 
-#' @title Report the priors used in a fitted bmm model
-#' @description For each parameter of a fitted bmm model, reports the link
-#'   function, the prior actually applied on the sampling (link) scale, and
-#'   where that prior came from: a bmm default, a brms default, or a
-#'   user-specified prior. Parameters without a proper prior are flagged as
-#'   flat.
+#' @title Priors of a fitted bmm model and where they came from
+#' @description Lists the priors a fitted bmm model was actually sampled
+#'   with and where each one came from: a bmm default, a brms default, or a
+#'   user-specified prior. Each row also gives the link function of the
+#'   parameter, because the prior applies on that sampling scale. Parameters
+#'   without a proper prior are flagged as flat.
 #' @param fit A `bmmfit` object returned by [bmm()]
 #' @param format Character. `"table"` (default) prints the report as a table;
 #'   `"text"` prints sentences ready for a methods section.
@@ -117,12 +117,12 @@ default_prior.bmmformula <- function(object, data, model, formula = object, ...)
 #'   default prior although the sampler holds it at zero. Fixed parameters the
 #'   model does declare are reported, since the user can estimate them: `mu`
 #'   for `sdm()`, `mu1` for the circular mixture models, `zr` for `ddm()`.
-#' @return A `data.frame` of class `bmm_report_priors` with columns
+#' @return A `data.frame` of class `bmm_prior_info` with columns
 #'   `parameter`, `link`, `class`, `coef`, `group`, `prior` and `source`.
 #'   Subsetting the report with `[` returns a plain `data.frame`, as the
 #'   report-specific printing depends on columns and attributes that
 #'   subsetting drops.
-#' @seealso [default_prior()], [parameters()]
+#' @seealso [default_prior()], [parameter_info()]
 #' @keywords extract_info
 #' @examplesIf isTRUE(Sys.getenv("BMM_EXAMPLES"))
 #' fit <- bmm(
@@ -130,17 +130,17 @@ default_prior.bmmformula <- function(object, data, model, formula = object, ...)
 #'   data = oberauer_lin_2017,
 #'   model = sdm(resp_error = "dev_rad")
 #' )
-#' report_priors(fit)
-#' report_priors(fit, format = "text")
+#' prior_info(fit)
+#' prior_info(fit, format = "text")
 #' @export
-report_priors <- function(fit, format = "table") {
+prior_info <- function(fit, format = "table") {
   stopif(!inherits(fit, "bmmfit"), "The fit argument must be a bmmfit object returned by bmm()")
   stopif(is.null(fit$prior), "The fit object contains no prior information")
   format <- match.arg(format, c("table", "text"))
   fit <- restructure(fit)
   structure(
     prior_provenance(fit),
-    class = c("bmm_report_priors", "data.frame"),
+    class = c("bmm_prior_info", "data.frame"),
     model_name = fit$bmm$model$name,
     par_labels = unlist(fit$bmm$model$parameters),
     format = format
@@ -148,16 +148,16 @@ report_priors <- function(fit, format = "table") {
 }
 
 # the report is documented as a data.frame, so subsetting it yields one: the
-# report attributes and the link column that print.bmm_report_priors() needs
+# report attributes and the link column that print.bmm_prior_info() needs
 # do not survive `[`, and keeping the class would dispatch the report printer
 # onto an object that no longer supports it
 #' @export
-"[.bmm_report_priors" <- function(x, ...) {
+"[.bmm_prior_info" <- function(x, ...) {
   as.data.frame(NextMethod())
 }
 
 #' @export
-print.bmm_report_priors <- function(x, ...) {
+print.bmm_prior_info <- function(x, ...) {
   if (identical(attr(x, "format"), "text")) {
     cat(strwrap(prior_report_text(x), width = 80), sep = "\n")
     return(invisible(x))
@@ -783,16 +783,16 @@ combine_prior <- function(prior1, prior2) {
 
 summarise_default_prior <- function(prior_list) {
   pars <- names(prior_list)
-  prior_info <- ""
+  out <- ""
   for (par in pars) {
-    prior_info <- paste0(prior_info, "   - `", par, "`:\n")
+    out <- paste0(out, "   - `", par, "`:\n")
     types <- names(prior_list[[par]])
     for (type in types) {
       prior <- prior_list[[par]][[type]]
-      prior_info <- paste0(prior_info, "      - `", type, "`: ", prior, "\n")
+      out <- paste0(out, "      - `", type, "`: ", prior, "\n")
     }
   }
-  prior_info
+  out
 }
 
 constrain_set_size1_fixef <- function(formula, nlpars, set_size_var, prior_value) {
