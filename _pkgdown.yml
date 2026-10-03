@@ -109,6 +109,7 @@ articles:
     desc: Fitting models to categorical decision tasks (e.g. cued or free recall, n-AFC, etc)
     contents:
     - articles/bmm_m3
+    - articles/bmm_mpt
 
   - title: Signal detection & recognition
     desc: Fitting signal detection models and analysing ROC/AUC
