@@ -111,7 +111,7 @@
 
 #' @title `r .model_cswald()$name`
 #' @name cswald
-#' @details `r model_info(.model_cswald())`
+#' @details `r model_docs(.model_cswald())`
 #' @param rt The name of the variable in the dataset containing the response
 #'   times. Response times should be coded in seconds (not milliseconds).
 #' @param response The name of the variable in the dataset containing the

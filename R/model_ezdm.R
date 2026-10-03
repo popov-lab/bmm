@@ -97,7 +97,7 @@
 
 #' @title `r .model_ezdm()$name`
 #' @name ezdm
-#' @details `r model_info(.model_ezdm(version = "4par"))`
+#' @details `r model_docs(.model_ezdm(version = "4par"))`
 #'
 #'   In version "4par", a boundary reached fewer than twice, or without RT
 #'   summaries (`NA`), enters the model through the response counts only.

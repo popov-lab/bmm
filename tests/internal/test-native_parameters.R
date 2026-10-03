@@ -100,7 +100,7 @@ test_that("native_parameters reports link-scale constants on the native scale", 
   fit <- fit_ddm()
 
   # zr is fixed at 0 on the logit scale, which is an unbiased starting point
-  expect_equal(parameters(fit)$value[parameters(fit)$parameter == "zr"], "0")
+  expect_equal(parameter_info(fit)$value[parameter_info(fit)$parameter == "zr"], "0")
 
   out <- native_parameters(fit, summary = TRUE)
   expect_equal(out$Estimate[out$parameter == "zr"], 0.5)

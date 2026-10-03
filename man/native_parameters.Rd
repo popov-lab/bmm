@@ -114,7 +114,7 @@ deviations typical for working memory data.
 \section{What is returned}{
 Parameters fixed to a constant are returned at that constant, transformed to
 the native scale. Because \code{bmm} fixes parameters on the \emph{link} scale, the
-native value can differ from the value shown by \code{\link[=parameters]{parameters()}}: the \code{ddm}
+native value can differ from the value shown by \code{\link[=parameter_info]{parameter_info()}}: the \code{ddm}
 relative starting point \code{zr} is fixed at \code{0} under a \code{logit} link and is
 therefore reported as \code{0.5}, and the \code{ezdm} and \code{cswald} diffusion constant \code{s}
 is fixed at \code{0} under a \code{log} link and is reported as \code{1}.
@@ -186,6 +186,6 @@ native_parameters(fit, re_formula = NA, summary = TRUE)
 \dontshow{\}) # examplesIf}
 }
 \seealso{
-\code{\link[=parameters]{parameters()}}, \code{\link[=native_transform]{native_transform()}}, \code{\link[=conditional_effects.bmmfit]{conditional_effects.bmmfit()}}
+\code{\link[=parameter_info]{parameter_info()}}, \code{\link[=native_transform]{native_transform()}}, \code{\link[=conditional_effects.bmmfit]{conditional_effects.bmmfit()}}
 }
 \keyword{extract_info}

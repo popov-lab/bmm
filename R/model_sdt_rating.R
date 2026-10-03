@@ -327,7 +327,7 @@ settable_link_functions.sdt_rating <- function(model) {
 #'   selected with `version`:
 #'
 #' #### Version: `standard` (default)
-#' `r model_info(.model_sdt_rating(version = "standard"))`
+#' `r model_docs(.model_sdt_rating(version = "standard"))`
 #'
 #' #### Version: `dpsdt`
 #' Dual-process SDT (Yonelinas, 1994): a familiarity SDT process plus an
@@ -352,7 +352,7 @@ settable_link_functions.sdt_rating <- function(model) {
 #' its prior: on the probability scale the interval cannot include 0, so the
 #' test of "no recollection" is a comparison with the fit that leaves the
 #' parameter fixed off, not the interval.
-#' `r model_info(.model_sdt_rating(version = "dpsdt"))`
+#' `r model_docs(.model_sdt_rating(version = "dpsdt"))`
 #'
 #' #### Version: `metad`
 #' Meta-d' (Maniscalco & Lau, 2012): a type-2 metacognitive sensitivity governs
@@ -377,7 +377,7 @@ settable_link_functions.sdt_rating <- function(model) {
 #' Lau, 2014), so its estimates differ from bmm's when the criterion is far
 #' from the midpoint.
 #' Extract the M-ratio posterior with [mratio()].
-#' `r model_info(.model_sdt_rating(version = "metad"))`
+#' `r model_docs(.model_sdt_rating(version = "metad"))`
 #'
 #' By default, the model assumes equal variance (sdratio fixed to 0). To
 #' estimate unequal variance, add `sdratio ~ 1` (or `sdratio ~ predictors`)

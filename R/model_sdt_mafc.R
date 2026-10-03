@@ -64,7 +64,7 @@ settable_links.sdt_mafc <- function(model) {
 
 #' @title m-Alternative Forced Choice Signal Detection Theory Model
 #' @name sdt_mafc
-#' @details `r model_info(.model_sdt_mafc())`
+#' @details `r model_docs(.model_sdt_mafc())`
 #'
 #' Models accuracy in m-AFC tasks where each trial presents one signal among
 #' `m` alternatives and the observer chooses the strongest one. Only `d`

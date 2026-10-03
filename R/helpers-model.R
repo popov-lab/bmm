@@ -468,7 +468,7 @@ print.bmmodel <- function(x, ...) {
     )
     cat("Fixed:     ", fixed_str, "\n")
   }
-  cat("Use parameters() for more details.\n")
+  cat("Use parameter_info() for more details.\n")
   invisible(x)
 }
 
@@ -748,13 +748,13 @@ print_pretty_models_md <- function(group = NULL) {
 
 # used to extract well formatted information from the model object to print
 # in the @details section for the documentation of each model
-model_info <- function(model, components = "all") {
-  UseMethod("model_info")
+model_docs <- function(model, components = "all") {
+  UseMethod("model_docs")
 }
 
 
 #' @export
-model_info.bmmodel <- function(model, components = "all") {
+model_docs.bmmodel <- function(model, components = "all") {
   pars <- model$parameters
   par_info <- ""
   if (length(pars) > 0) {
@@ -1100,7 +1100,7 @@ use_model_template <- function(model_name,
     # automatically based on the information in the .model_<<model_name>>()$info\n
     #\' @title `r .model_<<model_name>>()$name`
     #\' @name <<model_name>>
-    #\' @details `r model_info(.model_<<model_name>>())`
+    #\' @details `r model_docs(.model_<<model_name>>())`
     <<params_doc>>
     #\' @return An object of class `bmmodel`
     #\' @export

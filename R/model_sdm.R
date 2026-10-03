@@ -63,7 +63,7 @@ settable_links.sdm <- function(model) {
 #' @title `r .model_sdm()$name`
 #' @name sdm
 #' @details see [the online article](https://popov-lab.github.io/bmm/articles/bmm_sdm_simple.html) for a detailed description of the model
-#'   and how to use it. `r model_info(.model_sdm())`
+#'   and how to use it. `r model_docs(.model_sdm())`
 #' @param resp_error The name of the variable in the dataset containing the
 #'   response error. The response error should code the response relative to the
 #'   to-be-recalled target in radians. You can transform the response error in
