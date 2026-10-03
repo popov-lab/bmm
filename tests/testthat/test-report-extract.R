@@ -103,3 +103,30 @@ test_that("use_model_template() scaffolds an empty citation vector", {
     expect_identical(model_citation(env$.model_tmpl_cite()), character(0))
   }
 })
+
+test_that("summarise_formula() returns one line per parameter, constants included", {
+  skip_on_cran()
+  path <- test_path("assets/bmmfit_m3_ppcheck.rds")
+  skip_if_not(file.exists(path), "M3 fixture not available (excluded by .Rbuildignore)")
+  fit <- readRDS(path)
+  lines <- summarise_formula(fit$bmm$user_formula, model = fit$bmm$model)
+  expect_type(lines, "character")
+  expect_false(any(grepl("\n", lines, fixed = TRUE)))
+  constants <- fit$bmm$model$fixed_parameters
+  constants <- constants[names(constants) %in% names(fit$bmm$model$parameters)]
+  expect_true(all(paste0(names(constants), " = ", unlist(constants)) %in% lines))
+  expect_true(all(names(fit$bmm$user_formula) %in% sub(" .*$", "", lines)))
+})
+
+test_that("print(summary()) shows the formula text summarise_formula() returns", {
+  skip_on_cran()
+  fits <- fixture_fits()
+  skip_if(length(fits) == 0, "Fixtures not available (excluded by .Rbuildignore)")
+  for (name in names(fits)) {
+    fit <- fits[[name]]
+    printed <- capture.output(print(suppressWarnings(summary(fit)), color = FALSE))
+    lines <- summarise_formula(fit$bmm$user_formula, model = fit$bmm$model)
+    expect_identical(sub("^Formula: ", "", printed[grep("^Formula: ", printed)]), lines[1], label = name)
+    expect_true(all(paste0(strrep(" ", 9), lines[-1]) %in% printed), label = name)
+  }
+})
