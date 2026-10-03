@@ -87,13 +87,13 @@ uncited_part.m3_custom <- function(model) {
 # Sampler settings and package versions as the fit stores them. The versions
 # describe the compilation: update() without recompiling keeps the stored brms
 # and Stan versions, while the settings and the date describe the last run.
-# rstan fits store no Stan version, only the StanHeaders the model was built
-# with; brms stores no R version at all
+# brms stores no R version at all. ndraws_stored counts the post-warmup draws
+# that summary() and as_draws_array() see; brms::ndraws() reads n_save instead,
+# which can disagree with the stored draws
 fit_settings <- function(fit) {
   sim <- if (has_draws(fit)) fit$fit@sim else list()
   version <- fit$version
   backend <- fit$backend %||% NA_character_
-  stan_field <- c(cmdstanr = "cmdstan", rstan = "stanHeaders")[backend]
   list(
     backend = backend,
     algorithm = fit$algorithm %||% NA_character_,
@@ -101,15 +101,36 @@ fit_settings <- function(fit) {
     iter = first_or_na(sim[["iter"]]),
     warmup = first_or_na(sim[["warmup"]]),
     thin = first_or_na(sim[["thin"]]),
-    ndraws_stored = if (has_draws(fit)) as.numeric(brms::ndraws(fit)) else NA_real_,
+    ndraws_stored = if (has_draws(fit)) {
+      sum(vapply(sim$samples, function(chain) length(chain[[1]]), numeric(1)) - sim$warmup2)
+    } else {
+      NA_real_
+    },
     versions = c(
       bmm = version_string(version$bmm),
       brms = version_string(version$brms),
-      stan = version_string(if (!is.na(stan_field)) version[[stan_field]]),
-      backend = version_string(if (!is.na(stan_field)) version[[backend]])
+      stan = stan_version(fit),
+      backend = version_string(if (backend %in% c("cmdstanr", "rstan")) version[[backend]])
     ),
     date = if (has_draws(fit)) fit$fit@date else NA_character_
   )
+}
+
+# rstan fits store the version of the StanHeaders R package, whose patch level
+# is not Stan's; the stanc3 version that compiled the model is recorded in the
+# model's C++, and older compilers do not write it there
+stan_version <- function(fit) {
+  switch(fit$backend %||% "",
+    cmdstanr = version_string(fit$version$cmdstan),
+    rstan = stanc_version(fit$fit@stanmodel@model_cpp$model_cppcode) %||%
+      version_string(fit$version$stanHeaders),
+    NA_character_
+  )
+}
+
+stanc_version <- function(cpp) {
+  match <- regmatches(cpp, regexec("stanc_version = stanc3 v([0-9][0-9.]*)", cpp))
+  if (length(match) && length(match[[1]])) match[[1]][2]
 }
 
 # R-hat and bulk and tail ESS per variable, without lp__, lprior and constant

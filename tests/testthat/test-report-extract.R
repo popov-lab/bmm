@@ -181,20 +181,41 @@ test_that("fit_settings() reads the sampler settings and versions stored on the 
     expect_equal(settings$iter, sim$iter, label = name)
     expect_equal(settings$warmup, sim$warmup, label = name)
     expect_equal(settings$thin, sim$thin, label = name)
-    expect_equal(settings$ndraws_stored, sum(sim$n_save - sim$warmup2), label = name)
+    expect_equal(settings$ndraws_stored, posterior::ndraws(brms::as_draws_array(fit)), label = name)
     expect_identical(settings$date, fit$fit@date, label = name)
-    stan_field <- if (fit$backend == "cmdstanr") "cmdstan" else "stanHeaders"
     expect_identical(
-      settings$versions,
+      settings$versions[c("bmm", "brms", "backend")],
       c(
         bmm = as.character(fit$version$bmm),
         brms = as.character(fit$version$brms),
-        stan = as.character(fit$version[[stan_field]]),
         backend = as.character(fit$version[[fit$backend]])
       ),
       label = name
     )
+    if (fit$backend == "cmdstanr") {
+      expect_identical(settings$versions[["stan"]], as.character(fit$version$cmdstan), label = name)
+    }
   }
+})
+
+test_that("fit_settings() counts the draws that summary() reports", {
+  skip_on_cran()
+  path <- test_path("assets/bmmfit_m3_ppcheck.rds")
+  skip_if_not(file.exists(path), "M3 fixture not available (excluded by .Rbuildignore)")
+  # n_save of this fixture says 80 draws, but it stores 4000
+  expect_equal(fit_settings(readRDS(path))$ndraws_stored, 4000)
+})
+
+test_that("fit_settings() reads the Stan version of an rstan fit from its compiled model", {
+  skip_on_cran()
+  skip_if_not_installed("rstan")
+  path <- test_path("assets/bmmfit_example1.rds")
+  skip_if_not(file.exists(path), "SDM fixture not available (excluded by .Rbuildignore)")
+  fit <- readRDS(path)
+  # StanHeaders 2.32.7 built this fit, with stanc3 2.32.2
+  expect_identical(fit_settings(fit)$versions[["stan"]], "2.32.2")
+  fit$fit@stanmodel@model_cpp <- list()
+  expect_identical(fit_settings(fit)$versions[["stan"]], as.character(fit$version$stanHeaders))
 })
 
 test_that("fit_settings() and convergence_summary() treat a stanfit without draws as a mock", {
