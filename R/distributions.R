@@ -805,7 +805,8 @@ rm3 <- function(n, size, pars, m3_model, act_funs = NULL, unpack = FALSE,
 #' @param pars A named vector or list with the values of at least the latent
 #'   parameters appearing in the branch expressions of the selected tree, on
 #'   the probability scale. Values for parameters the tree does not use are
-#'   ignored, so one vector can serve every tree of the model.
+#'   ignored, so one vector can serve every tree of the model. Parameters of a
+#'   simplex group must sum to 1.
 #' @param mpt_model A `bmmodel` object created with [mpt()] specifying the
 #'   model that densities or random samples should be generated for.
 #' @param tree Character. For models with multiple trees, the name of the tree
@@ -925,7 +926,8 @@ rmpt <- function(n, size, pars, mpt_model, tree = NULL, unpack = FALSE,
   warnif(
     abs(sum(probs) - 1) > 1e-6,
     "The branch probabilities of tree '{tree}' sum to {signif(sum(probs), 6)} \\
-    instead of 1 for the provided values. Check the parameter values."
+    instead of 1 for the provided values. Check the parameter values (e.g., \\
+    simplex constraints)."
   )
 
   resp_cats <- mpt_model$resp_vars$resp_cats

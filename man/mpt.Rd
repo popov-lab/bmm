@@ -4,7 +4,14 @@
 \alias{mpt}
 \title{Multinomial Processing Tree (MPT) models}
 \usage{
-mpt(trees, tree_id = NULL, links = "logit", ...)
+mpt(
+  trees,
+  tree_id = NULL,
+  simplex = NULL,
+  restrictions = NULL,
+  links = "logit",
+  ...
+)
 }
 \arguments{
 \item{trees}{A single \code{mpt_tree} object or a list of \code{mpt_tree} objects.
@@ -14,6 +21,23 @@ All trees must share the same set of response categories.}
 each observation belongs to; the values must match the tree names. Can be
 omitted for single-tree models. Effects of experimental conditions belong
 in the parameter formulas, not here — see Details.}
+
+\item{simplex}{A character vector, or a list of character vectors, naming
+groups of parameters that are jointly constrained to sum to 1. Each group
+is reparameterized via stick-breaking: the last parameter of each group
+is derived as 1 minus the sum of the other members, and each other member
+\code{p} gets an unconstrained component \code{praw} that predictor formulas for
+\code{p} are applied to.}
+
+\item{restrictions}{Parameter restrictions in the string syntax of MPTinR
+and TreeBUGS, e.g. \code{c("Dn = Do", "g = 0.5")}, or as a named list,
+\code{list(Dn = "Do", g = 0.5)}. A restriction either equates a parameter with
+another one (chains such as \code{"G1 = G2 = G3"} map all earlier names onto
+the last) or fixes it to a numeric constant (\code{"g = 0.5"}, \code{"g = 1/4"}).
+Restrictions are substituted into the branch expressions before the
+parameters are identified, so a restricted parameter is not part of the
+model. Order constraints (\code{"Do > Dn"}) are not supported here; see
+Details.}
 
 \item{links}{Character. The link function for all latent probability
 parameters: \code{"logit"} (default) or \code{"probit"}.}
@@ -79,10 +103,10 @@ Coefficients of the sub-parameters above get \code{normal(0, 0.5)}. A parameter
 switched to the other link after construction (\code{model$links$D <- "probit"}) takes that link's priors unless its default prior was
 replaced. \code{\link[=default_prior]{default_prior()}} lists the rows a given formula produces.
 
-A parameter can be fixed to a probability at fit time, in the formula:
-\code{bmf(D ~ 1, g = 0.5)}. The parameter stays part of the model and can be
-freed again by giving it a formula. The value is mapped to the latent
-scale when the constant prior is built, so
+A parameter can also be fixed to a probability at fit time, in the
+formula: \code{bmf(D ~ 1, g = 0.5)}. Unlike a restriction, the parameter stays
+part of the model and can be freed again by giving it a formula. The
+value is mapped to the latent scale when the constant prior is built, so
 \code{\link[=default_prior]{default_prior()}} shows \code{constant(0)} for a guessing rate of 0.5 under
 the logit link. For the same reason, \code{summary()} lists a fixed \code{g = 0.5}
 as \verb{g_Intercept 0.00} under "Constant Parameters"; \code{\link[=prior_info]{prior_info()}} and
