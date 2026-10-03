@@ -267,6 +267,10 @@ Main functions for model fitting
 - [`pp_check(`*`<bmmfit>`*`)`](https://popov-lab.github.io/bmm/dev/reference/pp_check.bmmfit.md)
   : Posterior predictive check for bmmfit objects
 
+- [`posterior_epred(`*`<bmmfit>`*`)`](https://popov-lab.github.io/bmm/dev/reference/posterior_epred.bmmfit.md)
+  [`fitted(`*`<bmmfit>`*`)`](https://popov-lab.github.io/bmm/dev/reference/posterior_epred.bmmfit.md)
+  : Expected response of a fitted bmm model
+
 ## Model evaluation & post-processing
 
 ROC/AUC, quantile-transformed ROC, and latent-distribution analysis for

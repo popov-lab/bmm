@@ -280,6 +280,21 @@
 
 #### Bug fixes
 
+- [`posterior_epred()`](https://mc-stan.org/rstantools/reference/posterior_epred.html)
+  failed with `object 'posterior_epred_ddm' not found` (or the name of
+  another model) on **ddm**, **cswald**, **ezdm**, **sdt_yn**,
+  **sdt_mafc** and **sdm** fits, and printed the same message inside
+  `performance::model_performance()` and `report::report()`. It now
+  returns the expected response of these models, also for fits saved by
+  earlier versions;
+  [`?posterior_epred.bmmfit`](https://popov-lab.github.io/bmm/dev/reference/posterior_epred.bmmfit.md)
+  says what that is for each model. For **sdm**, **mixture2p**,
+  **mixture3p** and **imm** it and
+  [`fitted()`](https://rdrr.io/r/stats/fitted.values.html) stop with an
+  error pointing to
+  [`native_parameters()`](https://popov-lab.github.io/bmm/dev/reference/native_parameters.md),
+  because the mean of a circular response error is not useful
+  ([\#475](https://github.com/popov-lab/bmm/issues/475)).
 - A name in a model’s `links` argument that names no parameter of that
   model is now an error instead of being added:
   `sdm(resp_error = "y", links = list(kapa = "identity"))` reported a
