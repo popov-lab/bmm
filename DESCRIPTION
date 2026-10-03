@@ -56,6 +56,7 @@ Suggests:
     rmarkdown,
     roxygen2,
     rstan,
+    statmod,
     stringr,
     testthat (>= 3.0.0),
     tidybayes,

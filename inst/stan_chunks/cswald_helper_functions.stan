@@ -81,3 +81,105 @@ vector swald_log_surv_vec(vector t, vector drift, vector bound, vector sigma) {
   }
   return out;
 }
+
+// log-CDF of the shifted Wald as a log-space sum, finite deep in the left tail
+real swald_lcdf(real rt, real drift, real bound, real ndt, real sigma) {
+  real t_shifted = rt - ndt;
+  if (t_shifted <= 0) return negative_infinity();
+
+  real sigma_sqrt_t = sigma * sqrt(t_shifted);
+  real z1 = (drift * t_shifted - bound) / sigma_sqrt_t;
+  real z2 = -(drift * t_shifted + bound) / sigma_sqrt_t;
+  real log_c = 2 * bound * drift / square(sigma);
+
+  return log_sum_exp(swald_log_Phi(z1), log_c + swald_log_Phi(z2));
+}
+
+// integrated survivor G(x) = int_0^x S_W(u) du; mirrors .gwald()
+real swald_gint(real x, real drift, real bound, real sigma) {
+  if (x <= 0) return x;
+
+  real sigma_sq = square(sigma);
+  real sqrt_x = sqrt(x);
+  real dx = drift * x;
+  real z1 = (dx - bound) / (sigma * sqrt_x);
+  real z2 = -(dx + bound) / (sigma * sqrt_x);
+  // q <= F_W(x) <= 1, so the exp cannot overflow
+  real q = exp(2 * bound * drift / sigma_sq + swald_log_Phi(z2));
+  real m1;
+
+  if (abs(drift) < 3e-8 * sigma_sq / bound) {
+    // exact drift = 0 limit of M1, avoiding the 0 * inf cancellation of bound / drift
+    real w = bound / (sigma * sqrt_x);
+    m1 = 2 * bound * (sqrt_x * exp(std_normal_lpdf(w | )) / sigma
+                      - (bound / sigma_sq) * Phi(-w));
+  } else {
+    m1 = (bound / drift) * (Phi(z1) - q);
+  }
+
+  return x * exp(swald_lccdf(x | drift, bound, 0, sigma)) + m1;
+}
+
+// log mean of S_W over [x - sndt, x] by Simpson in log space; mirrors .simpson_log_mean()
+real swald_log_surv_mean(real x, real drift, real bound, real sigma, real sndt) {
+  vector[5] weights = log(to_vector({1, 4, 2, 4, 1}) / 12);
+  vector[5] terms;
+  for (k in 1:5) {
+    terms[k] = swald_lccdf(x - sndt + (k - 1) * sndt / 4 | drift, bound, 0, sigma)
+               + weights[k];
+  }
+  return log_sum_exp(terms);
+}
+
+// log-PDF of the shifted Wald with NDT ~ uniform(ndt, ndt + sndt); mirrors .dwald_sndt(), cutoffs included
+real swald_sndt_lpdf(real rt, real drift, real bound, real ndt, real sndt, real sigma) {
+  if (sndt < 0) return negative_infinity();
+  // continuous at sndt = 0; also the path for the default fixed sndt = 0
+  if (sndt < 1e-8) return swald_lpdf(rt | drift, bound, ndt, sigma);
+
+  real t1 = rt - ndt;
+  if (t1 <= 0) return negative_infinity();
+
+  // strip t1 <= sndt: the earlier survivor is 1, so the density is F_W(t1) / sndt
+  if (t1 <= sndt) return swald_lcdf(rt | drift, bound, ndt, sigma) - log(sndt);
+
+  real surv_early = swald_lccdf(rt | drift, bound, ndt + sndt, sigma);
+  real surv_late = swald_lccdf(rt | drift, bound, ndt, sigma);
+  if (surv_early - surv_late >= 1e-8) {
+    return swald_log_diff_exp(surv_early, surv_late) - log(sndt);
+  }
+
+  // the survivors rounded to the same value: the CDFs still carry the digits
+  real cdf_late = swald_lcdf(rt | drift, bound, ndt, sigma);
+  real cdf_early = swald_lcdf(rt | drift, bound, ndt + sndt, sigma);
+  if (cdf_late - cdf_early >= 1e-8) {
+    return swald_log_diff_exp(cdf_late, cdf_early) - log(sndt);
+  }
+
+  // deep tail of a defective accumulator: Simpson on the density itself
+  vector[5] weights = log(to_vector({1, 4, 2, 4, 1}) / 12);
+  vector[5] terms;
+  for (k in 1:5) {
+    terms[k] = swald_lpdf(t1 - sndt + (k - 1) * sndt / 4 | drift, bound, 0, sigma)
+               + weights[k];
+  }
+  return log_sum_exp(terms);
+}
+
+// log survivor of the shifted Wald with uniform NDT, for censored trials; mirrors .pwald_sndt()
+real swald_sndt_lccdf(real rt, real drift, real bound, real ndt, real sndt, real sigma) {
+  if (sndt < 0) return negative_infinity();
+  if (sndt < 1e-8) return swald_lccdf(rt | drift, bound, ndt, sigma);
+
+  real x1 = rt - ndt;
+  if (x1 <= 0) return 0;
+
+  real g_hi = swald_gint(x1, drift, bound, sigma);
+  real g_lo = swald_gint(x1 - sndt, drift, bound, sigma);
+  real delta = g_hi - g_lo;
+
+  if (delta <= 1e-8 * fmax(abs(g_hi), abs(g_lo))) {
+    return swald_log_surv_mean(x1, drift, bound, sigma, sndt);
+  }
+  return log(delta / sndt);
+}
