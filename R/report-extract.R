@@ -59,8 +59,11 @@ model_citation.bmmodel <- function(x, ...) {
   structure(refs[nzchar(refs)], uncited = uncited_part(x))
 }
 
-# models stored before bmm 1.4.0 hold all references in one string, joined by
-# a newline and "- ", with line breaks inside a reference
+# models stored by the released versions before bmm 1.4.0 hold all references
+# in one string, joined by a newline and "- ", with line breaks inside a
+# reference. Development builds also joined references by a bare newline or by
+# "; ", which this does not split: a bare newline cannot be told from a line
+# break inside a reference, so such text stays one element
 split_stored_citation <- function(citation) {
   trimws(gsub("\\s*\n\\s*", " ", unlist(strsplit(as.character(citation), "\n\\s*-\\s+"))))
 }

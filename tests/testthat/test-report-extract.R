@@ -206,6 +206,26 @@ test_that("fit_settings() counts the draws that summary() reports", {
   expect_equal(fit_settings(readRDS(path))$ndraws_stored, 4000)
 })
 
+test_that("fit_settings() does not count saved warmup draws", {
+  skip_on_cran()
+  skip_if_not_installed("rstan")
+  path <- test_path("assets/bmmfit_example1.rds")
+  skip_if_not(file.exists(path), "SDM fixture not available (excluded by .Rbuildignore)")
+  fit <- readRDS(path)
+  # the fixture saved no warmup; prepend 20 warmup iterations as rstan stores them
+  with_warmup <- function(x) c(x[seq_len(20)], x)
+  fit$fit@sim$samples <- lapply(fit$fit@sim$samples, function(chain) {
+    params <- lapply(attr(chain, "sampler_params"), with_warmup)
+    chain[] <- lapply(chain, with_warmup)
+    attr(chain, "sampler_params") <- params
+    chain
+  })
+  fit$fit@sim$warmup2 <- rep(20L, fit$fit@sim$chains)
+  fit$fit@sim$n_save <- fit$fit@sim$n_save + 20
+  expect_equal(posterior::ndraws(brms::as_draws_array(fit)), 50)
+  expect_equal(fit_settings(fit)$ndraws_stored, 50)
+})
+
 test_that("fit_settings() reads the Stan version of an rstan fit from its compiled model", {
   skip_on_cran()
   skip_if_not_installed("rstan")
@@ -301,10 +321,14 @@ test_that("convergence_summary() marks the parameters that summary() shows", {
     rhat <- unlist(lapply(tables, function(x) x$Rhat))
     expect_equal(sort(conv$rhat[conv$in_summary]), sort(rhat[!is.na(rhat)]), ignore_attr = TRUE, label = name)
   }
-  # distributional parameters without a formula are sampled under their own name
+  # distributional parameters without a formula are sampled under their own name;
+  # a class name only counts as a whole prefix
   expect_identical(
-    grepl(summary_variables_regex(fits[["bmmfit_example1.rds"]]), c("kappa", "c", "Intercept_c", "r_id__c[1,Intercept]")),
-    c(TRUE, TRUE, FALSE, FALSE)
+    grepl(
+      summary_variables_regex(fits[["bmmfit_example1.rds"]]),
+      c("kappa", "c", "Intercept_c", "r_id__c[1,Intercept]", "bQ", "sdx", "cx_Intercept")
+    ),
+    c(TRUE, TRUE, FALSE, FALSE, FALSE, FALSE, FALSE)
   )
 })
 
