@@ -156,9 +156,21 @@ test_that("print(summary()) shows the formula text summarise_formula() returns",
   for (name in names(fits)) {
     fit <- fits[[name]]
     printed <- trimws(capture.output(print(suppressWarnings(summary(fit)), color = FALSE)), "right")
-    lines <- summarise_formula(fit$bmm$user_formula, model = fit$bmm$model)
-    expect_identical(sub("^Formula: ", "", printed[grep("^Formula: ", printed)]), lines[1], label = name)
-    expect_true(all(paste0(strrep(" ", 9), lines[-1]) %in% printed), label = name)
+    # a multivariate fit prints the formula of each component in turn
+    specs <- if (inherits(fit, "mvbmmfit")) {
+      fit$bmm$components
+    } else {
+      list(list(user_formula = fit$bmm$user_formula, model = fit$bmm$model))
+    }
+    formulas <- sub("^Formula: ", "", printed[grep("^Formula: ", printed)])
+    expect_length(formulas, length(specs))
+    for (i in seq_along(specs)) {
+      lines <- summarise_formula(specs[[i]]$user_formula, model = specs[[i]]$model)
+      expect_identical(formulas[i], lines[1], label = name)
+      # recycle0: a one-line formula has no continuation lines to look for
+      continued <- paste0(strrep(" ", 9), lines[-1], recycle0 = TRUE)
+      expect_true(all(continued %in% printed), label = name)
+    }
   }
 })
 
