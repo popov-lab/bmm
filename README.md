@@ -103,6 +103,17 @@ articles.
 - [`ezdm()`](https://popov-lab.github.io/bmm/reference/ezdm.html):
   EZ-Diffusion Model
 
+**Processing-tree models.** Participants give categorical responses, and
+you describe the discrete processes that lead to each response as a
+multinomial processing tree: the two-high-threshold model of
+recognition, the pair-clustering model of free recall, or a tree of your
+own. The model is fit to response counts per participant and condition.
+See the [MPT
+article](https://popov-lab.github.io/bmm/articles/bmm_mpt.html).
+
+- [`mpt()`](https://popov-lab.github.io/bmm/reference/mpt.html):
+  Multinomial Processing Tree (MPT) models
+
 <img src="man/figures/README-task-map.png" alt="The tasks bmm covers and the models for each" width="100%" />
 
 `bmm_models()` prints the same list in R, and `?modelname` (for example
