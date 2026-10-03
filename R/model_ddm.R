@@ -17,10 +17,10 @@
     mu = 0
   ),
   priors = list(
-    drift = list(main = "cauchy(0,1)", effects = "normal(0,0.5)"),
-    bound = list(main = "normal(0,0.5)", effects = "normal(0,0.5)"),
-    ndt   = list(main = "normal(-1.5,0.5)", effects = "normal(0,0.3)"),
-    zr    = list(main = "normal(0,0.5)", effects = "normal(0,0.3)")
+    drift = list(main = "cauchy(0,1)", effects = "normal(0,0.5)", sd = "exponential(1)"),
+    bound = list(main = "normal(0,0.5)", effects = "normal(0,0.5)", sd = "exponential(2)"),
+    ndt   = list(main = "normal(-1.5,0.5)", effects = "normal(0,0.3)", sd = "exponential(2)"),
+    zr    = list(main = "normal(0,0.5)", effects = "normal(0,0.3)", sd = "exponential(2)")
   ),
   init_ranges = list(
     mu = c(-0.1,0.1),
@@ -39,10 +39,11 @@
       domain = "Decision Making / Response times",
       task = "Two-Alternative Force Choice RT",
       name = "Diffusion Decision Model",
-      version = "NA",
       citation = glue(
-        "Ratcliff, R. (1978). A theory of memory retrieval. Psychological Review, 85(2), 59-108. https://doi.org/10/fjwm2f;"
+        "Ratcliff, R. (1978). A theory of memory retrieval. Psychological \\
+        Review, 85(2), 59-108. https://doi.org/10.1037/0033-295X.85.2.59"
       ),
+      version = "NA",
       requirements = glue(
         "- The response time should be in seconds and \\
           represent the time between onset of the target stimulus until the response execution
@@ -58,7 +59,7 @@
     class = c("bmmodel", "ddm"),
     call = call
   )
-  out$links[names(links)] <- links
+  out <- set_links(out, links)
   out
 }
 # user facing alias
@@ -67,13 +68,16 @@
 
 #' @title `r .model_ddm()$name`
 #' @name ddm
-#' @details `r model_info(.model_ddm())`
+#' @details `r model_docs(.model_ddm())`
 #' @param rt Name of the reaction time variable coding reaction time in seconds in the data.
 #' @param response Name of the response variable coding the response numerically (0 = lower response / incorrect, 1 = upper response / correct)
-#' @param links A list of links for the parameters. For positive parameters
+#' @param links A named list of links for the parameters, e.g.
+#'   `links = list(bound = "softplus")`. For positive parameters
 #'   (e.g. `bound`, `ndt`), "softplus" is available as an alternative to the
 #'   default "log" link that grows linearly for large values and avoids the
-#'   numerical blow-up of `exp()`.
+#'   numerical blow-up of `exp()`. A name that is not a parameter of the model
+#'   is an error, and a link that allows values the default link excludes
+#'   (e.g. "identity" for a positive parameter) is a warning.
 #' @section Default behavior:
 #' By default, `zr` is fixed at 0. If you want to estimate `zr`, add a formula
 #' for `zr` in your `bmf()` call.
@@ -259,7 +263,8 @@ configure_model.ddm <- function(model, data, formula) {
       vars = "dec[n]",
       loop = TRUE,
       log_lik = log_lik_ddm,
-      posterior_predict = posterior_predict_ddm
+      posterior_predict = posterior_predict_ddm,
+      posterior_epred = posterior_epred_ddm
     )
   }
 
@@ -304,4 +309,23 @@ posterior_predict_ddm <- function(i, prep, ...) {
   } else {
     out[["rt"]]
   }
+}
+
+# the mean of what posterior_predict_ddm() returns: the RT of either response
+posterior_epred_ddm <- function(prep) {
+  .epred_matrix(with(prep$dpars, .diffusion_mean_rt(drift, bound, ndt, zr, s = 1)), prep)
+}
+
+#############################################################################!
+# PP_CHECK OBSERVABLES                                                    ####
+#############################################################################!
+
+#' @export
+pp_observables.ddm <- function(model) {
+  .pp_spec_rt_response()
+}
+
+#' @export
+pp_simulate.ddm <- function(model, prep) {
+  .pp_simulate_joint(prep, rddm, c("drift", "bound", "ndt", "zr"))
 }

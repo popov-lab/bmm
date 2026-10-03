@@ -21,10 +21,10 @@
       s = 0
     ),
     priors = list(
-      drift = list(main = "normal(0,1)", effects = "normal(0,0.3)"),
-      bound = list(main = "normal(0,0.3)", effects = "normal(0,0.3)"),
-      ndt = list(main = "normal(-2,0.3)", effects = "normal(0,0.3)"),
-      s = list(main = "normal(0,0.3)", effects = "normal(0,0.2)")
+      drift = list(main = "normal(0,1)", effects = "normal(0,0.3)", sd = "exponential(2)"),
+      bound = list(main = "normal(0,0.3)", effects = "normal(0,0.3)", sd = "exponential(2)"),
+      ndt = list(main = "normal(-2,0.3)", effects = "normal(0,0.3)", sd = "exponential(2)"),
+      s = list(main = "normal(0,0.3)", effects = "normal(0,0.2)", sd = "exponential(2)")
     ),
     init_ranges = list(
       mu = c(-0.5, 0.5),
@@ -55,11 +55,11 @@
       s = 0
     ),
     priors = list(
-      drift = list(main = "normal(0,1)", effects = "normal(0,0.5)"),
-      bound = list(main = "normal(0,0.3)", effects = "normal(0,0.3)"),
-      ndt = list(main = "normal(-2,0.3)", effects = "normal(0,0.3)"),
-      zr = list(main = "normal(0,0.3)", effects = "normal(0,0.2)"),
-      s = list(main = "normal(0,0.5)", effects = "normal(0,0.2)")
+      drift = list(main = "normal(0,1)", effects = "normal(0,0.5)", sd = "exponential(1)"),
+      bound = list(main = "normal(0,0.3)", effects = "normal(0,0.3)", sd = "exponential(2)"),
+      ndt = list(main = "normal(-2,0.3)", effects = "normal(0,0.3)", sd = "exponential(2)"),
+      zr = list(main = "normal(0,0.3)", effects = "normal(0,0.2)", sd = "exponential(2)"),
+      s = list(main = "normal(0,0.5)", effects = "normal(0,0.2)", sd = "exponential(2)")
     ),
     init_ranges = list(
       mu = c(-0.5, 0.5),
@@ -87,9 +87,13 @@
       domain = "Decision Making / Response times",
       task = "Choice Reaction Time tasks (with few errors)",
       name = "Censored-Shifted Wald Model",
-      citation = "Miller, R., Scherbaum, S., Heck, D. W., Goschke, T., & Enge, S. (2017).
-        On the Relation Between the (Censored) Shifted Wald and the Wiener Distribution as Measurement Models
-        for Choice Response Times. Applied Psychological Measurement, 42(2), 116-135. https://doi.org/10.1177/0146621617710465",
+      citation = glue(
+        "Miller, R., Scherbaum, S., Heck, D. W., Goschke, T., & Enge, S. (2018). \\
+        On the relation between the (censored) shifted Wald and the Wiener \\
+        distribution as measurement models for choice response times. Applied \\
+        Psychological Measurement, 42(2), 116-135. \\
+        https://doi.org/10.1177/0146621617710465"
+      ),
       version = version,
       requirements = glue(
         "- Reaction times should be passed in seconds", "\n",
@@ -105,13 +109,13 @@
     call = call
   )
 
-  out$links[names(links)] <- links
+  out <- set_links(out, links)
   out
 }
 
 #' @title `r .model_cswald()$name`
 #' @name cswald
-#' @details `r model_info(.model_cswald())`
+#' @details `r model_docs(.model_cswald())`
 #' @param rt The name of the variable in the dataset containing the response
 #'   times. Response times should be coded in seconds (not milliseconds).
 #' @param response The name of the variable in the dataset containing the
@@ -124,7 +128,10 @@
 #'   `ndt`, and `s`; "crisk" additionally has `zr`. Default links are "log" for
 #'   most parameters and "logit" for `zr`. For positive parameters, "softplus"
 #'   is available as an alternative to "log" that grows linearly for large
-#'   values and avoids the numerical blow-up of `exp()`.
+#'   values and avoids the numerical blow-up of `exp()`. A name that is not a
+#'   parameter of the model is an error, and a link that allows values the
+#'   default link excludes (e.g. "identity" for a positive parameter) is a
+#'   warning.
 #' @param version A character string specifying which version of the cswald
 #'   model to use. Options are:
 #'   \itemize{
@@ -142,7 +149,7 @@
 #'       parameter represents the total boundary separation, consistent with
 #'       the diffusion model parameterization.
 #'   }
-#'   For more details, see Miller et al. (2017).
+#'   For more details, see Miller et al. (2018).
 #' @param ... Additional arguments passed internally (for testing purposes).
 #' @return An object of class `bmmodel`
 #' @export
@@ -315,31 +322,29 @@ bmf2bf.cswald <- function(model, formula) {
 # CONFIGURE_MODEL S3 METHODS                                             ####
 ############################################################################# !
 
+# start/end only exist inside partial_log_lik, so the decisions are sliced only
+# where brms really threads (see brms_slices_likelihood)
+cswald_decision_var <- function() {
+  if (brms_slices_likelihood()) "dec[start:end]" else "dec"
+}
+
 #' @export
 configure_model.cswald_simple <- function(model, data, formula) {
   links <- model$links
   formula <- bmf2bf(model, formula)
 
-  cswald_family <- function(link_drift, link_bound, link_ndt, link_s) {
-    brms::custom_family(
-      "cswald",
-      dpars = c("mu", "drift", "bound", "ndt", "s"),
-      links = c("identity", link_drift, link_bound, link_ndt, link_s),
-      ub = c(NA, NA, NA, NA, NA),
-      lb = c(NA, 0, 0, 0, 0),
-      type = "real",
-      vars = "dec[n]",
-      loop = TRUE,
-      log_lik = log_lik_cswald_simple,
-      posterior_predict = posterior_predict_cswald_simple
-    )
-  }
-
-  formula$family <- cswald_family(
-    link_drift = links$drift,
-    link_bound = links$bound,
-    link_ndt = links$ndt,
-    link_s = links$s
+  formula$family <- brms::custom_family(
+    "cswald",
+    dpars = c("mu", "drift", "bound", "ndt", "s"),
+    links = c("identity", links$drift, links$bound, links$ndt, links$s),
+    ub = c(NA, NA, NA, NA, NA),
+    lb = c(NA, 0, 0, 0, 0),
+    type = "real",
+    vars = cswald_decision_var(),
+    loop = FALSE,
+    log_lik = log_lik_cswald_simple,
+    posterior_predict = posterior_predict_cswald_simple,
+    posterior_epred = posterior_epred_cswald
   )
 
   sc_path <- system.file("stan_chunks", package = "bmm")
@@ -376,6 +381,14 @@ posterior_predict_cswald_simple <- function(i, prep, ...) {
   }
 }
 
+# Named after the family, "cswald", rather than the version: restructure()
+# finds the function of a fit saved without one by that name. Like
+# posterior_predict_cswald_simple(), it reads bound as the distance from the
+# start point to either boundary.
+posterior_epred_cswald <- function(prep) {
+  .epred_matrix(with(prep$dpars, .diffusion_mean_rt(drift, bound * 2, ndt, zr = 0.5, s)), prep)
+}
+
 log_lik_cswald_simple <- function(i, prep) {
   drift <- brms::get_dpar(prep, "drift", i = i)
   bound <- brms::get_dpar(prep, "bound", i = i)
@@ -393,26 +406,18 @@ configure_model.cswald_crisk <- function(model, data, formula) {
   links <- model$links
   formula <- bmf2bf(model, formula)
 
-  cswald_crisk_family <- function(link_drift, link_bound, link_ndt, link_zr, link_s) {
-    brms::custom_family(
-      "cswald_crisk",
-      dpars = c("mu", "drift", "bound", "ndt", "zr", "s"),
-      links = c("identity", link_drift, link_bound, link_ndt, link_zr, link_s),
-      ub = c(NA, NA, NA, NA, 1, NA),
-      lb = c(NA, NA, 0, 0, 0, 0),
-      type = "real",
-      vars = "dec[n]",
-      loop = TRUE,
-      log_lik = log_lik_cswald_crisk,
-      posterior_predict = posterior_predict_cswald_crisk
-    )
-  }
-  formula$family <- cswald_crisk_family(
-    link_drift = links$drift,
-    link_bound = links$bound,
-    link_ndt = links$ndt,
-    link_zr = links$zr,
-    link_s = links$s
+  formula$family <- brms::custom_family(
+    "cswald_crisk",
+    dpars = c("mu", "drift", "bound", "ndt", "zr", "s"),
+    links = c("identity", links$drift, links$bound, links$ndt, links$zr, links$s),
+    ub = c(NA, NA, NA, NA, 1, NA),
+    lb = c(NA, NA, 0, 0, 0, 0),
+    type = "real",
+    vars = cswald_decision_var(),
+    loop = FALSE,
+    log_lik = log_lik_cswald_crisk,
+    posterior_predict = posterior_predict_cswald_crisk,
+    posterior_epred = posterior_epred_cswald_crisk
   )
 
   sc_path <- system.file("stan_chunks", package = "bmm")
@@ -438,6 +443,10 @@ log_lik_cswald_crisk <- function(i, prep) {
   .dcswald(rt, response, drift, bound, ndt, zr = zr, s = s, version = "crisk", log = TRUE)
 }
 
+posterior_epred_cswald_crisk <- function(prep) {
+  .epred_matrix(with(prep$dpars, .diffusion_mean_rt(drift, bound, ndt, zr, s)), prep)
+}
+
 posterior_predict_cswald_crisk <- function(i, prep, ...) {
   drift <- brms::get_dpar(prep, "drift", i = i)
   bound <- brms::get_dpar(prep, "bound", i = i)
@@ -460,4 +469,25 @@ posterior_predict_cswald_crisk <- function(i, prep, ...) {
   } else {
     out$rt
   }
+}
+
+############################################################################# !
+# PP_CHECK OBSERVABLES                                                    ####
+############################################################################# !
+
+#' @export
+pp_observables.cswald <- function(model) {
+  .pp_spec_rt_response()
+}
+
+#' @export
+pp_simulate.cswald_simple <- function(model, prep) {
+  # .rcswald() is two-boundary; cswald's bound is the single-boundary distance
+  .pp_simulate_joint(prep, .rcswald, c("drift", "ndt", "s"),
+                     bound = .pp_dpar_vector(prep, "bound") * 2, zr = 0.5)
+}
+
+#' @export
+pp_simulate.cswald_crisk <- function(model, prep) {
+  .pp_simulate_joint(prep, .rcswald, c("drift", "bound", "ndt", "zr", "s"))
 }
