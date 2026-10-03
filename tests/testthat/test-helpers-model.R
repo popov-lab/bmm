@@ -51,8 +51,7 @@ test_that("format_model_list() appends unknown groups after the known ones and s
 test_that("bmm_models() prints every model exactly once, without arguments", {
   expect_output(printed <- print(bmm_models()), "Continuous reproduction")
   expect_s3_class(printed, "bmm_models")
-  out <- format(bmm_models())
-  expect_length(out, 1)
+  out <- paste(capture.output(print(bmm_models())), collapse = "\n")
   for (m in model_names()) {
     hits <- gregexpr(glue::glue("- {m}\\(\\): "), out)[[1]]
     expect_length(hits[hits > 0], 1)
@@ -60,6 +59,12 @@ test_that("bmm_models() prints every model exactly once, without arguments", {
   expect_match(out, "Continuous reproduction")
   expect_match(out, "Type  \\?modelname")
   expect_no_match(out, "resp_error")
+})
+
+test_that("bmm_models() formats per element and prints modified vectors as plain names", {
+  models <- bmm_models()
+  expect_equal(format(models), format(unclass(models)))
+  expect_output(print(toupper(models)), "\"CSWALD\"")
 })
 
 test_that("print_pretty_models_md(group = ) lists one group without headers", {

@@ -119,7 +119,7 @@ check_model.default <- function(model, data = NULL, formula = NULL) {
     The model argument should be a `bmmodel` function.
     You can see the list of supported models by running `bmm_models()`
 
-    {format(bmm_models())}"
+    {models_text()}"
   )
   model
 }
@@ -696,22 +696,29 @@ bmm_models <- function() {
 }
 
 #' @export
-format.bmm_models <- function(x, ...) {
+print.bmm_models <- function(x, ...) {
+  # base functions such as sub() keep the class on vectors that are no longer
+  # model names, so those print as what they are
+  if (!all(x %in% model_names())) {
+    print(unclass(x), ...)
+    return(invisible(x))
+  }
+  cat(models_text(unclass(x)))
+  invisible(x)
+}
+
+# one string, not one per model, so it is not a format() method: tibble and
+# print.data.frame call format() on columns and expect one string per element
+models_text <- function(models = model_names()) {
   out <- paste(
     c(
       "The following models are supported:", "",
-      format_model_list(model_registry(unclass(x)), "text"),
+      format_model_list(model_registry(models), "text"),
       "Type `?modelname` to get information about a specific model, e.g. `?imm`", ""
     ),
     collapse = "\n"
   )
   gsub("`", " ", out)
-}
-
-#' @export
-print.bmm_models <- function(x, ...) {
-  cat(format(x))
-  invisible(x)
 }
 
 # the registry behind bmm_models(), as plain names for internal lookups

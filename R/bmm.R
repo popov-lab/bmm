@@ -75,7 +75,7 @@
 #'
 #' @details # Supported Models
 #'
-#'   `r format(bmm_models())`
+#'   `r models_text()`
 #'
 #'   # bmmformula syntax
 #'
