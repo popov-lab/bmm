@@ -117,11 +117,11 @@ init_fixef_param <- function(spar, types, dim, model, standata_list) {
   index <- if (grepl("^par_b_", spar)) as.integer(sub(".*_", "", spar))
   stan_par <- if (is.null(index)) spar else sub("^par_(.*)_[0-9]+$", "\\1", spar)
   parameter <- match_stan_to_model_par(stan_par, names(model$parameters))
-  init_range <- model$init_ranges[[parameter]]
+  link <- init_link(model$links[[parameter]])
+  init_range <- representable_range(model$init_ranges[[parameter]], link)
   if (is.null(init_range)) {
     return(NULL)
   }
-  link <- init_link(model$links[[parameter]])
   from_range <- function(n) link_transform(runif(n, min = init_range[1], max = init_range[2]), link)
   if (startsWith(stan_par, "Intercept")) {
     return(from_range(1))
@@ -163,6 +163,23 @@ range_coefficients <- function(X, target, centered) {
 # a softmax weight has no native value of its own
 init_link <- function(link) {
   if (identical(link, "softmax")) "identity" else link
+}
+
+# init_ranges are written for a parameter's default link, and a link set by the
+# user can exclude part of them (a softplus criterion cannot start at -0.3),
+# which link_transform() would turn into NaN. Draws are confined to the part of
+# the range the link can represent. What is left of a range may be nothing or a
+# single point, which would start every chain at the same value (or at the
+# link's infinite edge, as log(0)); either is dropped, and the parameter gets
+# the default draw, as without an init_range
+representable_range <- function(init_range, link) {
+  if (is.null(init_range)) {
+    return(NULL)
+  }
+  domain <- .link_ranges[[link %||% "identity"]]
+  lower <- max(init_range[1], domain[1])
+  upper <- min(init_range[2], domain[2])
+  if (lower >= upper) NULL else c(lower, upper)
 }
 
 # Stan draws initial values uniformly on the unconstrained scale and maps them

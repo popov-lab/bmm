@@ -169,7 +169,7 @@ settable_links.lba_custom <- function(model) {
 
 #' @title `r .model_lba()$name`
 #' @name lba
-#' @details `r model_info(.model_lba())`
+#' @details `r model_docs(.model_lba())`
 #' @param rt The name of the variable in the dataset containing the response
 #'   times. Response times should be coded in seconds (not milliseconds).
 #' @param response The name of the variable in the dataset containing the

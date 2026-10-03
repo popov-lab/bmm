@@ -40,7 +40,7 @@ k2sd <- function(K) {
 #'   `c_sqrtexp2bessel` converts from the sqrtexp parametrization to the
 #'   bessel parametrization.
 #' @keywords transform
-#' @details See [the online article](https://venpopov.com/bmm/articles/bmm_sdm_simple.html) for details on the
+#' @details See [the online article](https://popov-lab.github.io/bmm/articles/bmm_sdm_simple.html) for details on the
 #'   parameterization. The sqrtexp parametrization is the default in the
 #'   `bmm` package.
 #' @export
@@ -146,8 +146,9 @@ link_transform <- function(values, link, inverse = FALSE) {
 #' Get parameter information for a bmm model
 #'
 #' @description Returns a data frame with information about the model
-#'   parameters, including their descriptions, whether they are fixed,
-#'   their link functions, and optionally their default priors.
+#'   parameters: their descriptions, whether they are fixed (and to which
+#'   value), and their link functions. Use [prior_info()] for the priors of
+#'   a fitted model.
 #'
 #' @param x A \code{bmmodel} object (e.g., \code{sdm(resp_error = "y")}) or a
 #'   \code{bmmfit} object (a fitted model returned by \code{\link{bmm}}).
@@ -160,25 +161,26 @@ link_transform <- function(values, link, inverse = FALSE) {
 #'   parameter and columns: \code{parameter}, \code{description},
 #'   \code{fixed}, \code{value}, and \code{link}.
 #'
+#' @keywords extract_info
 #' @export
 #' @examples
 #' # For an unfitted model
-#' parameters(sdm(resp_error = "y"))
+#' parameter_info(sdm(resp_error = "y"))
 #'
 #' # For an M3 model
-#' parameters(m3(
+#' parameter_info(m3(
 #'   resp_cats = c("corr", "other", "npl"),
 #'   num_options = c(1, 4, 5),
 #'   version = "ss"
 #' ))
-parameters <- function(x, ...) {
-  UseMethod("parameters")
+parameter_info <- function(x, ...) {
+  UseMethod("parameter_info")
 }
 
 
-#' @rdname parameters
+#' @rdname parameter_info
 #' @export
-parameters.bmmodel <- function(x, formula = NULL, ...) {
+parameter_info.bmmodel <- function(x, formula = NULL, ...) {
   model <- x
 
   if (inherits(model, "m3_custom") && !is.null(formula)) {
@@ -229,11 +231,32 @@ parameters.bmmodel <- function(x, formula = NULL, ...) {
 }
 
 
-#' @rdname parameters
+#' @rdname parameter_info
 #' @export
-parameters.bmmfit <- function(x, ...) {
+parameter_info.bmmfit <- function(x, ...) {
   x <- restructure(x)
-  parameters(x$bmm$model, formula = x$bmm$user_formula, ...)
+  parameter_info(x$bmm$model, formula = x$bmm$user_formula, ...)
+}
+
+
+#' Deprecated: use `parameter_info()`
+#'
+#' @description `parameters()` is deprecated as of bmm 1.4.0 and will be
+#'   removed in bmm 1.6.0. It shares its name with `parameters::parameters()`,
+#'   so whichever of the two packages is attached last decides what
+#'   `parameters()` returns. Use [parameter_info()] instead; it takes the same
+#'   arguments and returns the same table.
+#'
+#' @inheritParams parameter_info
+#' @param ... Passed on to [parameter_info()], e.g. `formula` for a custom M3
+#'   model.
+#' @return The output of [parameter_info()].
+#' @keywords internal
+#' @export
+parameters <- function(x, ...) {
+  warning2("`parameters()` is deprecated as of bmm 1.4.0; use `parameter_info()`. \\
+            It will be removed in 1.6.0.")
+  parameter_info(x, ...)
 }
 
 
@@ -434,7 +457,7 @@ print.bmm_parameters <- function(x, max_desc_width = 50, ...) {
 #'
 #' Parameters fixed to a constant are returned at that constant, transformed to
 #' the native scale. Because `bmm` fixes parameters on the *link* scale, the
-#' native value can differ from the value shown by [parameters()]: the `ddm`
+#' native value can differ from the value shown by [parameter_info()]: the `ddm`
 #' relative starting point `zr` is fixed at `0` under a `logit` link and is
 #' therefore reported as `0.5`, and the `ezdm` and `cswald` diffusion constant `s`
 #' is fixed at `0` under a `log` link and is reported as `1`.
@@ -481,7 +504,7 @@ print.bmm_parameters <- function(x, max_desc_width = 50, ...) {
 #' are filled from the first row of the model data rather than recomputed, and
 #' `native_parameters()` warns when the two disagree.
 #'
-#' @seealso [parameters()], [native_transform()], [conditional_effects.bmmfit()]
+#' @seealso [parameter_info()], [native_transform()], [conditional_effects.bmmfit()]
 #' @keywords extract_info
 #' @export
 #' @examplesIf isTRUE(Sys.getenv("BMM_EXAMPLES"))
@@ -962,7 +985,7 @@ native_transform.non_targets <- function(model, linpred, data, ...) {
     '{x$bmm$model$name}' are declared by the model but do not appear in the fitted \\
     formula, so they cannot be predicted. This usually means a parameter name \\
     collides with a data column or with another parameter's formula. Please report \\
-    this at https://github.com/venpopov/bmm/issues"
+    this at https://github.com/popov-lab/bmm/issues"
   )
   if (length(unresolved) > 0) {
     warning2(

@@ -1,42 +1,25 @@
-  // EZ-Diffusion Model likelihood for aggregated data with a free start point,
-  // zr, given as a proportion of the boundary separation.
-  //
-  // A biased start point makes the decision time depend on which boundary is
-  // hit, so each boundary carries its own cumulants and its own response count,
-  // and the summaries must be supplied separately for the two boundaries. Both
-  // sets come from one function evaluated at the distance from the start point
-  // to the far boundary: zr * bound above, (1 - zr) * bound below.
-  //
-  // A boundary with fewer than two responses has no sample variance and
-  // contributes only through the binomial term. bmm() rarely gets here: brms
-  // drops rows whose summaries are NA, which is how rezdm() and
-  // ezdm_summary_stats() code such a boundary.
-  //
-  // Every ezdm_ function called here is defined in ezdm_cumulants.stan or
-  // ezdm_series.stan, which are assembled before this file; the header of the
-  // former maps the code onto the EZ equations.
-  //
-  // mu is a dummy dpar required by brms and is not used.
+  // EZ-diffusion likelihood for aggregated data, with a free start point zr as a proportion of bound
+  // mu is a dummy dpar required by brms and is not used
   real ezdm_4par_lpdf(real mrt_upper, real mu, real drift, real bound, real ndt,
                       real zr, real s, real mrt_lower, real vrt_upper,
-                      real vrt_lower, int hits, int trials) {
+                      real vrt_lower, int hits, int trials, int rt_upper,
+                      int rt_lower) {
     int misses = trials - hits;
+    // check_data() fills the summaries of an unused boundary with placeholders, so these gate every read
+    int use_upper = rt_upper == 1 && hits >= 2;
+    int use_lower = rt_lower == 1 && misses >= 2;
     real s_sq = square(s);
     real k = drift / s_sq;
     real b_upper = zr * bound;
     real b_lower = bound - b_upper;
 
-    // the logit of the EZ proportion correct for a free start point; at
-    // zr = 0.5 it is drift bound / s^2, the 3par one
+    // the logit of pC for a free start point; at zr = 0.5 it is the 3par one
     real lp = binomial_logit_lpmf(hits | trials, ezdm_logit_pc(b_upper, b_lower, k));
-    if (hits < 2 && misses < 2) {
+    if (!use_upper && !use_lower) {
       return lp;
     }
 
-    // Each cumulant is a term in b minus the same term in b0 = bound. The b0
-    // terms are computed here because both boundaries share them. x0 < 0.49 is
-    // t = bound sqrt(w) < 0.7, where ezdm_cumulants.stan switches from its
-    // closed forms to the series.
+    // both boundaries share the b0 = bound terms; x0 < 0.49 is the seam to the series
     real w = square(k);
     real x0 = square(bound) * w;
     int series = x0 < 0.49;
@@ -62,11 +45,11 @@
       b0_d4 = ezdm_cgf_d4(p0, q0, t0);
     }
 
-    if (hits >= 2) {
+    if (use_upper) {
       lp += ezdm_boundary_lpdf(mrt_upper | vrt_upper, hits, ndt, b_upper, w,
                                s_sq, series, b0_d1, b0_d2, b0_d3, b0_d4);
     }
-    if (misses >= 2) {
+    if (use_lower) {
       lp += ezdm_boundary_lpdf(mrt_lower | vrt_lower, misses, ndt, b_lower, w,
                                s_sq, series, b0_d1, b0_d2, b0_d3, b0_d4);
     }
