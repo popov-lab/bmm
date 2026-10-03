@@ -1487,6 +1487,19 @@ test_that("dmpt matches hand-computed multinomial densities", {
   expect_equal(d_new, dbinom(10, 50, 0.3 * 0.5))
 })
 
+test_that("dmpt evaluates covariates in branch expressions", {
+  tree <- mpt_tree("main", list(
+    correct = "D + (1 - D) * Gcorr",
+    incorrect = "(1 - D) * (1 - Gcorr)"
+  ))
+  model <- mpt(tree, covariates = "Gcorr")
+  d <- dmpt(
+    x = c(30, 10), pars = c(D = 0.6), mpt_model = model,
+    covariates = c(Gcorr = 0.25), log = FALSE
+  )
+  expect_equal(d, dbinom(30, 40, 0.6 + 0.4 * 0.25))
+})
+
 test_that("rmpt generates counts with category names and unpacks", {
   tree <- mpt_tree("study", list(
     C = "cp + (1 - cp) * rp * rp",
@@ -1505,6 +1518,41 @@ test_that("rmpt generates counts with category names and unpacks", {
   )
   expect_named(unpacked, c("C", "E", "U"))
   expect_equal(sum(unpacked), 40)
+})
+
+test_that("dmpt and rmpt give impossible categories zero probability", {
+  model <- mpt(
+    list(
+      mpt_tree("withdist", list(
+        corr = "Pm * 0.5",
+        dist = "(1 - Pm) * 0.5",
+        npl = "Pm * 0.5 + (1 - Pm) * 0.5"
+      )),
+      mpt_tree("nodist", list(
+        corr = "Pm * 0.5",
+        npl = "Pm * 0.5 + (1 - Pm)"
+      ), impossible = "dist")
+    ),
+    tree_id = "cond"
+  )
+
+  probs <- .mpt_probability_vector(c(Pm = 0.4), model, tree = "nodist")
+  expect_named(probs, c("corr", "dist", "npl"))
+  expect_equal(unname(probs), c(0.2, 0, 0.8))
+
+  # the density must reduce to the multinomial over the possible categories
+  expect_equal(
+    dmpt(c(10, 0, 30), pars = c(Pm = 0.4), mpt_model = model, tree = "nodist"),
+    dmultinom(c(10, 30), prob = c(0.2, 0.8), log = TRUE)
+  )
+  expect_equal(
+    dmpt(c(10, 2, 30), pars = c(Pm = 0.4), mpt_model = model, tree = "nodist"),
+    -Inf
+  )
+
+  draws <- rmpt(n = 5, size = 40, pars = c(Pm = 0.4), mpt_model = model, tree = "nodist")
+  expect_equal(colnames(draws), c("corr", "dist", "npl"))
+  expect_true(all(draws[, "dist"] == 0))
 })
 
 test_that("the categorical densities default to the log scale", {

@@ -230,6 +230,7 @@ conditional_effects.bmmfit <- function(x,
   internal_patterns <- c(
     "^LureIdx",
     "^Idx_",
+    "^Poss_",
     "^inv_ss$",
     "^Item[0-9]+_",
     "^expS$"

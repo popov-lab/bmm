@@ -16,12 +16,24 @@
 #' @param branches A named list of character strings. Each element gives the
 #'   branch probability expression for one response category, and the element
 #'   names are the response categories. The expressions can use latent
-#'   parameters (e.g., `"D + (1 - D) * g"`) and numeric constants.
+#'   parameters (e.g., `"D + (1 - D) * g"`), numeric constants, and declared
+#'   covariates (see [mpt()]).
+#' @param impossible Character vector. Response categories that cannot occur in
+#'   this tree, for example distractor responses when no distractors were
+#'   presented. Such categories get no branch expression, and the remaining
+#'   branches must sum to 1 on their own.
 #'
 #' @details Numeric fractions such as `1/4` are folded into decimal literals
 #'   (`0.25`) when the tree is created. Stan compiles a bare integer fraction
 #'   as integer division (`1/4 == 0`), which would silently corrupt the
 #'   likelihood.
+#'
+#'   Categories listed in `impossible` keep their column in the data and their
+#'   place in the response matrix, but their probability is set to zero for the
+#'   observations belonging to this tree. Because the model is estimated on the
+#'   log scale, "zero" is implemented as a large negative linear predictor
+#'   rather than a literal zero; no probability has to be taken away from the
+#'   remaining branches to compensate.
 #'
 #' @return An object of class `mpt_tree`
 #'
@@ -36,8 +48,36 @@
 #'   )
 #' )
 #' tree_old
+#'
+#' # a three-alternative recognition task in which lures are shown on some
+#' # trials only: `lure` responses cannot occur on the others
+#' tree_lures <- mpt_tree(
+#'   name = "lures",
+#'   branches = list(
+#'     target = "D * b + (1 - D) * (1/3)",
+#'     lure   = "D * (1 - b) + (1 - D) * (1/3)",
+#'     new    = "(1 - D) * (1/3)"
+#'   )
+#' )
+#'
+#' # the branches of the lure-free tree sum to 1 without the `lure` category;
+#' # no probability is reserved for it
+#' tree_nolures <- mpt_tree(
+#'   name = "nolures",
+#'   branches = list(
+#'     target = "D + (1 - D) * (1/2)",
+#'     new    = "(1 - D) * (1/2)"
+#'   ),
+#'   impossible = "lure"
+#' )
+#' tree_nolures
+#'
+#' # a `tree` column in the data holds "lures" or "nolures" per observation;
+#' # effects of experimental conditions go in the parameter formulas instead,
+#' # e.g. bmf(D ~ 0 + cond)
+#' model <- mpt(list(tree_lures, tree_nolures), tree_id = "tree")
 #' @export
-mpt_tree <- function(name, branches) {
+mpt_tree <- function(name, branches, impossible = NULL) {
   stop_missing_args()
   stopif(
     !is.character(name) || length(name) != 1L || !nzchar(name),
@@ -58,6 +98,22 @@ mpt_tree <- function(name, branches) {
     "Response category names must be unique within a tree. Branch lines that \\
     terminate in the same response category must be summed into one expression."
   )
+  impossible <- impossible %||% character(0)
+  stopif(
+    !is.character(impossible),
+    "The impossible argument must be a character vector of response category names."
+  )
+  stopif(
+    anyDuplicated(impossible) > 0,
+    "Impossible response categories must be unique within a tree. Duplicated: \\
+    {collapse_comma(unique(impossible[duplicated(impossible)]))}"
+  )
+  impossible_with_branch <- intersect(impossible, resp_cats)
+  stopif(
+    length(impossible_with_branch) > 0,
+    "A response category cannot be both impossible and have a branch \\
+    expression in tree '{name}': {collapse_comma(impossible_with_branch)}"
+  )
   branches[] <- lapply(resp_cats, function(resp_cat) {
     expr <- branches[[resp_cat]]
     stopif(
@@ -76,12 +132,13 @@ mpt_tree <- function(name, branches) {
       length(scientific) > 0,
       "The numeric constant(s) {collapse_comma(scientific)} in tree '{name}' \\
       are too extreme to be written into the generated Stan code (brms emits \\
-      them in scientific notation, which breaks the Stan syntax). Please use \\
-      a larger constant."
+      them in scientific notation, which breaks the Stan syntax). Please \\
+      provide such values as a data column declared in the covariates \\
+      argument, or use a larger constant."
     )
     parsed
   })
-  structure(nlist(name, branches), class = "mpt_tree")
+  structure(nlist(name, branches, impossible), class = "mpt_tree")
 }
 
 #' @export
@@ -89,22 +146,30 @@ print.mpt_tree <- function(x, ...) {
   branch_lines <- glue(
     "  P({names(x$branches)}) = {vapply(x$branches, deparse1, character(1))}"
   )
+  if (length(x$impossible) > 0) {
+    branch_lines <- c(
+      branch_lines, glue("  P({x$impossible}) = 0 (structurally impossible)")
+    )
+  }
   cat(glue("MPT tree '{x$name}':"), branch_lines, sep = "\n")
   invisible(x)
 }
 
-.model_mpt <- function(trees = NULL, tree_id = NULL, simplex = NULL,
-                       restrictions = NULL, links = "logit",
+.model_mpt <- function(trees = NULL, tree_id = NULL, covariates = NULL,
+                       simplex = NULL, restrictions = NULL, links = "logit",
                        default_priors = NULL, call = NULL, ...) {
   trees <- .mpt_as_tree_list(trees)
   if (length(trees)) names(trees) <- vapply(trees, `[[`, character(1), "name")
+  covariates <- covariates %||% character(0)
   simplex <- .mpt_as_simplex_list(simplex)
   resp_cats <- if (length(trees)) {
-    names(trees[[1]]$branches)
+    c(names(trees[[1]]$branches), trees[[1]]$impossible)
   } else {
     character(0)
   }
-  parameters <- unique(unlist(lapply(trees, .mpt_expr_vars)))
+  parameters <- setdiff(
+    unique(unlist(lapply(trees, .mpt_expr_vars))), covariates
+  )
   simplex_pars <- unlist(simplex)
   simplex_raw <- unlist(lapply(simplex, function(grp) {
     free_pars <- grp[-length(grp)]
@@ -113,11 +178,18 @@ print.mpt_tree <- function(x, ...) {
   raw_pars <- unname(simplex_raw)
   standard_pars <- setdiff(parameters, simplex_pars)
 
-  # generated data columns: one 0/1 indicator per tree
+  # generated data columns: one 0/1 indicator per tree, and one per response
+  # category that is impossible in some trees but not others
   tree_indicators <- if (is.null(tree_id) || length(trees) == 0L) {
     NULL
   } else {
     setNames(paste0("Idx_", names(trees)), names(trees))
+  }
+  guarded_cats <- unique(unlist(lapply(trees, `[[`, "impossible")))
+  possible_indicators <- if (length(guarded_cats) == 0L) {
+    NULL
+  } else {
+    setNames(paste0("Poss_", guarded_cats), guarded_cats)
   }
 
   latent_prior <- .mpt_latent_prior(links)
@@ -160,11 +232,12 @@ print.mpt_tree <- function(x, ...) {
       resp_vars = nlist(resp_cats),
       other_vars = list(
         tree_id = tree_id,
+        covariates = covariates,
         trees = trees,
         simplex = simplex,
         restrictions = restrictions,
         link = links,
-        indicators = list(tree = tree_indicators),
+        indicators = list(tree = tree_indicators, possible = possible_indicators),
         simplex_raw = simplex_raw
       ),
       domain = "Categorical decision making, memory, and reasoning",
@@ -182,7 +255,8 @@ print.mpt_tree <- function(x, ...) {
         "  - The data contain one column with aggregated response counts per ",
         "response category, named after the branch names\n",
         "  - For multi-tree models, a column whose values name the tree each ",
-        "observation belongs to, declared via the tree_id argument\n"
+        "observation belongs to, declared via the tree_id argument\n",
+        "  - Data columns used inside branch expressions must be declared via the covariates argument\n"
       ),
       parameters = parameter_info,
       links = link_info,
@@ -232,6 +306,7 @@ settable_link_functions.mpt <- function(model) {
   list(
     trees = unname(model$other_vars$trees),
     tree_id = model$other_vars$tree_id,
+    covariates = model$other_vars$covariates,
     simplex = model$other_vars$simplex,
     links = model$other_vars$link
   )
@@ -256,11 +331,16 @@ settable_link_functions.mpt <- function(model) {
 #' latent scale.
 #'
 #' @param trees A single `mpt_tree` object or a list of `mpt_tree` objects.
-#'   All trees must share the same set of response categories.
+#'   All trees must share the same set of response categories, counting those
+#'   declared impossible.
 #' @param tree_id Character. Name of the data column whose values name the tree
 #'   each observation belongs to; the values must match the tree names. Can be
 #'   omitted for single-tree models. Effects of experimental conditions belong
 #'   in the parameter formulas, not here — see Details.
+#' @param covariates Character vector. Names of data columns that appear in
+#'   branch expressions but are not latent parameters, for example
+#'   design-fixed guessing rates. Covariates pass into the model formulas
+#'   unchanged and have no naming restrictions.
 #' @param simplex A character vector, or a list of character vectors, naming
 #'   groups of parameters that are jointly constrained to sum to 1. Each group
 #'   is reparameterized via stick-breaking: the last parameter of each group
@@ -283,8 +363,9 @@ settable_link_functions.mpt <- function(model) {
 #' @details `r model_info(.model_mpt(), components = c('domain', 'task', 'name', 'citation'))`
 #'
 #'   A separate tree is needed only when the *branch expressions* differ — that
-#'   is, when the trial determines which latent processes apply (old versus
-#'   new probes, inclusion versus exclusion instructions).
+#'   is, when the trial determines which latent processes apply or which
+#'   response categories are reachable (old versus new probes, a response set
+#'   with or without distractors, inclusion versus exclusion instructions).
 #'   Experimental factors whose *effect on the parameters* you want to estimate
 #'   belong in the parameter formulas, exactly as in every other `bmm` model:
 #'   `bmf(D ~ 0 + condition)`. The two roles are independent, and one data
@@ -373,12 +454,13 @@ settable_link_functions.mpt <- function(model) {
 #' summary(fit)
 #'
 #' @export
-mpt <- function(trees, tree_id = NULL, simplex = NULL, restrictions = NULL,
-                links = "logit", ...) {
+mpt <- function(trees, tree_id = NULL, covariates = NULL, simplex = NULL,
+                restrictions = NULL, links = "logit", ...) {
   call <- match.call()
   stop_missing_args()
   links <- match.arg(links, c("logit", "probit"))
   trees <- .mpt_as_tree_list(trees)
+  covariates <- covariates %||% character(0)
   simplex <- .mpt_as_simplex_list(simplex)
   restrictions <- .mpt_parse_restrictions(restrictions)
 
@@ -399,17 +481,25 @@ mpt <- function(trees, tree_id = NULL, simplex = NULL, restrictions = NULL,
     underscores. Please rename: {collapse_comma(bad_tree_names)}"
   )
 
-  tree_cats <- lapply(trees, function(tree) names(tree$branches))
+  tree_cats <- lapply(trees, function(tree) c(names(tree$branches), tree$impossible))
   resp_cats <- tree_cats[[1]]
   cats_match <- vapply(tree_cats, setequal, logical(1), resp_cats)
   stopif(
     !all(cats_match),
-    "All trees must have the same response categories.
+    "All trees must have the same response categories, counting those declared
+    impossible.
     Tree '{trees[[1]]$name}' has: {collapse_comma(resp_cats)}
     Tree '{tree_names[!cats_match][1]}' has: {collapse_comma(tree_cats[!cats_match][[1]])}"
   )
+  always_impossible <- Reduce(intersect, lapply(trees, `[[`, "impossible"))
+  stopif(
+    length(always_impossible) > 0,
+    "The response category(ies) {collapse_comma(always_impossible)} are \\
+    impossible in every tree and are therefore not identified. Please remove \\
+    them from the model."
+  )
   trees <- lapply(trees, function(tree) {
-    tree$branches <- tree$branches[resp_cats]
+    tree$branches <- tree$branches[intersect(resp_cats, names(tree$branches))]
     tree
   })
   names(trees) <- tree_names
@@ -423,13 +513,18 @@ mpt <- function(trees, tree_id = NULL, simplex = NULL, restrictions = NULL,
     !is.null(tree_id) && (!is.character(tree_id) || length(tree_id) != 1L),
     "The tree_id argument must be a single character string naming a data column."
   )
+  stopif(
+    length(covariates) > 0L && !is.character(covariates),
+    "The covariates argument must be a character vector of data column names."
+  )
 
-  trees <- .mpt_restrict_trees(trees, restrictions)
+  trees <- .mpt_restrict_trees(trees, restrictions, covariates)
 
-  parameters <- unique(unlist(lapply(trees, .mpt_expr_vars)))
+  parameters <- setdiff(unique(unlist(lapply(trees, .mpt_expr_vars))), covariates)
   stopif(
     length(parameters) == 0L,
-    "The tree branch expressions contain no latent parameters."
+    "The tree branch expressions contain no latent parameters. Symbols listed \\
+    in the covariates argument are not treated as parameters."
   )
 
   .mpt_check_names(parameters, "parameter")
@@ -441,7 +536,13 @@ mpt <- function(trees, tree_id = NULL, simplex = NULL, restrictions = NULL,
     "Names cannot be used for both a parameter and a response category: \\
     {collapse_comma(par_cat_overlap)}"
   )
-  reserved <- intersect(c(parameters, resp_cats), c("Y", "nTrials"))
+  cov_collisions <- intersect(covariates, c(resp_cats, parameters))
+  stopif(
+    length(cov_collisions) > 0,
+    "Covariate names collide with parameter or response category names: \\
+    {collapse_comma(cov_collisions)}"
+  )
+  reserved <- intersect(c(parameters, resp_cats, covariates), c("Y", "nTrials"))
   stopif(
     length(reserved) > 0,
     "The names 'Y' and 'nTrials' are reserved for the response matrix and \\
@@ -466,7 +567,7 @@ mpt <- function(trees, tree_id = NULL, simplex = NULL, restrictions = NULL,
     "Each simplex group needs at least two parameters."
   )
   raw_pars <- unlist(lapply(simplex, function(grp) paste0(grp[-length(grp)], "raw")))
-  raw_collisions <- intersect(raw_pars, c(parameters, resp_cats))
+  raw_collisions <- intersect(raw_pars, c(parameters, resp_cats, covariates))
   stopif(
     length(raw_collisions) > 0,
     "The stick-breaking components of simplex parameters are named by \\
@@ -474,7 +575,7 @@ mpt <- function(trees, tree_id = NULL, simplex = NULL, restrictions = NULL,
     use: {collapse_comma(raw_collisions)}"
   )
 
-  deviations <- .mpt_tree_sum_deviations(trees, parameters, simplex)
+  deviations <- .mpt_tree_sum_deviations(trees, parameters, covariates, simplex)
   for (tree_name in names(deviations)[!is.na(deviations)]) {
     warning2(
       "The branch probabilities of tree '{tree_name}' sum to \\
@@ -484,14 +585,15 @@ mpt <- function(trees, tree_id = NULL, simplex = NULL, restrictions = NULL,
   }
 
   .model_mpt(
-    trees = trees, tree_id = tree_id, simplex = simplex,
-    restrictions = restrictions, links = links, call = call, ...
+    trees = trees, tree_id = tree_id, covariates = covariates,
+    simplex = simplex, restrictions = restrictions, links = links,
+    call = call, ...
   )
 }
 
 # restrictions are checked against the symbols of the unrestricted trees and
 # then substituted, so every later step sees the restricted model only
-.mpt_restrict_trees <- function(trees, restrictions) {
+.mpt_restrict_trees <- function(trees, restrictions, covariates) {
   if (length(restrictions) == 0L) {
     return(trees)
   }
@@ -501,7 +603,13 @@ mpt <- function(trees, tree_id = NULL, simplex = NULL, restrictions = NULL,
     "Parameters cannot be restricted more than once: \\
     {collapse_comma(unique(restricted[duplicated(restricted)]))}"
   )
-  parameters <- unique(unlist(lapply(trees, .mpt_expr_vars)))
+  restricted_covariates <- intersect(restricted, covariates)
+  stopif(
+    length(restricted_covariates) > 0,
+    "Covariates are data columns and cannot be restricted: \\
+    {collapse_comma(restricted_covariates)}"
+  )
+  parameters <- setdiff(unique(unlist(lapply(trees, .mpt_expr_vars))), covariates)
   restrictions <- .mpt_resolve_restrictions(restrictions)
   targets <- unique(unlist(lapply(restrictions, all.vars)))
   unknown <- setdiff(c(restricted, targets), parameters)
@@ -520,7 +628,8 @@ mpt <- function(trees, tree_id = NULL, simplex = NULL, restrictions = NULL,
     length(scientific) > 0,
     "The restriction constant(s) {collapse_comma(scientific)} are too extreme \\
     to be written into the generated Stan code (brms emits them in scientific \\
-    notation, which breaks the Stan syntax). Please use a larger constant."
+    notation, which breaks the Stan syntax). Please provide such values as a \\
+    data column declared in the covariates argument, or use a larger constant."
   )
   lapply(trees, .mpt_apply_restrictions, restrictions)
 }
@@ -542,7 +651,7 @@ print_model_details.mpt <- function(model, ...) {
     )
   }
   # the classical identifiability bound of MPTinR's check.mpt(): each tree
-  # contributes its number of categories minus one
+  # contributes its number of possible categories minus one
   n_free <- length(model$parameters) - length(unlist(model$other_vars$simplex))
   df <- sum(lengths(lapply(model$other_vars$trees, `[[`, "branches")) - 1L)
   cat(glue(
@@ -639,7 +748,7 @@ check_model.mpt <- function(model, data = NULL, formula = NULL) {
     rhs_vars(nl_formulas),
     c(
       names(nl_formulas), names(model$parameters), colnames(data),
-      model$other_vars$tree_id
+      model$other_vars$covariates, model$other_vars$tree_id
     )
   )
 }
@@ -752,7 +861,100 @@ check_data.mpt <- function(model, data, formula) {
     Please rename them."
   )
 
+  data <- .mpt_possibility_indicators(model, data)
+
+  covariates <- model$other_vars$covariates
+  missing_covariates <- setdiff(covariates, colnames(data))
+  stopif(
+    length(missing_covariates) > 0,
+    "The declared covariates {collapse_comma(missing_covariates)} are missing \\
+    from the data."
+  )
+  non_numeric <- covariates[
+    !vapply(covariates, function(v) is.numeric(data[[v]]), logical(1))
+  ]
+  stopif(
+    length(non_numeric) > 0,
+    "The declared covariates must be numeric data columns. Not numeric: \\
+    {collapse_comma(non_numeric)}"
+  )
+
+  .mpt_validate_covariate_sums(model, data)
+
   NextMethod("check_data")
+}
+
+# structurally impossible categories are switched off per row rather than per
+# tree, because a category can be impossible in some trees and not in others
+.mpt_possibility_indicators <- function(model, data) {
+  poss_vars <- model$other_vars$indicators$possible
+  if (is.null(poss_vars)) {
+    return(data)
+  }
+  poss_collisions <- intersect(poss_vars, colnames(data))
+  stopif(
+    length(poss_collisions) > 0,
+    "The data contain column(s) {collapse_comma(poss_collisions)}, which are \\
+    reserved for the generated indicators of structurally impossible response \\
+    categories. Please rename them."
+  )
+  # a category impossible in every tree is rejected by mpt(), so any model that
+  # reaches here has several trees and therefore tree indicator columns
+  for (resp_cat in names(poss_vars)) {
+    impossible_rows <- logical(nrow(data))
+    for (tree in model$other_vars$trees) {
+      if (!resp_cat %in% tree$impossible) next
+      impossible_rows <- impossible_rows |
+        data[[model$other_vars$indicators$tree[[tree$name]]]] == 1L
+    }
+    observed <- which(impossible_rows & data$Y[, resp_cat] > 0)
+    stopif(
+      length(observed) > 0,
+      "The response category '{resp_cat}' is declared impossible for \\
+      {length(observed)} observation(s), but the data record responses in it \\
+      (first: row {observed[1]}, count {data$Y[observed[1], resp_cat]}). \\
+      Please check the impossible argument of mpt_tree() and the response counts."
+    )
+    data[[poss_vars[[resp_cat]]]] <- as.integer(!impossible_rows)
+  }
+  data
+}
+
+# the construction-time branch-sum validation uses synthetic covariate values;
+# once the data are known, the sum-to-1 property is re-checked row by row with
+# the observed covariate values to catch data-preparation errors
+.mpt_validate_covariate_sums <- function(model, data, tolerance = 1e-6) {
+  covariates <- model$other_vars$covariates
+  if (length(covariates) == 0L) {
+    return(invisible(NULL))
+  }
+  parameters <- names(model$parameters)
+  par_vals <- setNames(rep(0.5, length(parameters)), parameters)
+  for (grp in model$other_vars$simplex) {
+    par_vals[grp] <- 1 / length(grp)
+  }
+
+  idx_vars <- model$other_vars$indicators$tree
+  for (tree in model$other_vars$trees) {
+    rows <- if (is.null(idx_vars)) {
+      seq_len(nrow(data))
+    } else {
+      which(data[[idx_vars[[tree$name]]]] == 1L)
+    }
+    if (length(rows) == 0L) next
+    env <- c(as.list(par_vals), as.list(data[rows, covariates, drop = FALSE]))
+    total <- Reduce(`+`, lapply(tree$branches, eval, envir = env))
+    total <- rep(total, length.out = length(rows))
+    deviates <- is.na(total) | abs(total - 1) > tolerance
+    warnif(
+      any(deviates),
+      "With the covariate values in the data, the branch probabilities of \\
+      tree '{tree$name}' do not sum to 1 for {sum(deviates)} row(s) \\
+      (first: row {rows[deviates][1]}, sum = {signif(total[deviates][1], 6)}).
+      Please check the covariate column(s): {collapse_comma(covariates)}"
+    )
+  }
+  invisible(NULL)
 }
 
 ############################################################################# !
@@ -831,8 +1033,10 @@ check_formula.mpt <- function(model, data, formula) {
   trees <- model$other_vars$trees
   idx_vars <- model$other_vars$indicators$tree
   category_formulas <- lapply(model$resp_vars$resp_cats, function(resp_cat) {
+    # a placeholder keeps log() defined for trees where the category is
+    # impossible; bmf2bf.mpt() overrides the linear predictor for those rows
     terms <- lapply(names(trees), function(tree_name) {
-      branch <- call("(", trees[[tree_name]]$branches[[resp_cat]])
+      branch <- call("(", trees[[tree_name]]$branches[[resp_cat]] %||% 1)
       if (is.null(idx_vars)) {
         branch
       } else {
@@ -886,7 +1090,17 @@ check_formula.mpt <- function(model, data, formula) {
 #' @export
 bmf2bf.mpt <- function(model, formula) {
   resp_cats <- model$resp_vars$resp_cats
-  linpreds <- glue("log({resp_cats})")
+  poss_vars <- model$other_vars$indicators$possible
+
+  # -100 on the log scale is an effectively zero probability that stays finite;
+  # the multinomial family renormalizes, so nothing has to compensate for it
+  linpreds <- vapply(resp_cats, function(resp_cat) {
+    if (!resp_cat %in% names(poss_vars)) {
+      return(glue("log({resp_cat})"))
+    }
+    poss <- poss_vars[[resp_cat]]
+    glue("{poss} * log({resp_cat}) + (1 - {poss}) * (-100)")
+  }, character(1))
 
   brms_formula <- brms::bf(
     glue("Y | trials(nTrials) ~ {linpreds[1]}"),
