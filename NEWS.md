@@ -76,6 +76,7 @@
 * New [Get started](https://popov-lab.github.io/bmm/articles/bmm.html) page on the website: install and check your machine with `bmm_setup()`, find the model for your task, including a table of the signal detection models by response format and noise distribution, and fit a first model to `broeder_schuetz_2009_e3` step by step (#440).
 * The model lists on the Get started page are now tables with one row per model version: the data columns each version needs, by argument, and the parameters it estimates (#467).
 * bmm's own links now point at popov-lab.github.io/bmm instead of venpopov.com/bmm, which currently redirects to the new address. Update bookmarks when convenient (#433).
+* For developers: the model file written by `use_model_template()` now follows the package's current conventions. `document()` runs on it without warnings, the new model passes the website reference check, its default priors include `sd`, and with `custom_family = TRUE` `posterior_epred()` works once the generated stubs are filled in. The file header lists the registries and test fixtures a new model must also update (#490).
 * The **cswald** likelihood now evaluates all observations in one call instead of one at a time. This makes fitting faster, improves the accuracy of the gradients the sampler uses, and adds support for within-chain parallelization: `bmm(..., threads = 2)` now works for **cswald** as it does for **sdm**. The posterior is unchanged (#387).
 
 # bmm 1.3.2
