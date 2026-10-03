@@ -23,7 +23,9 @@ test_that("a missing shared random-effects ID triggers a warning", {
   d2$session <- factor(1:10)
   joint_groups <- bmm_component(bmf(y1 ~ 1 + (1 | p | id)), family = gaussian(), data = d1) +
     bmm_component(bmf(y2 ~ 1 + (1 | p | session)), family = gaussian(), data = d2)
-  expect_warning(configure_fit(joint_groups), "No random-effects ID is shared")
+  # brms itself rejects one label on two grouping factors once the joint model
+  # is built, so the check is called on its own
+  expect_warning(check_shared_random_effects(joint_groups), "No random-effects ID is shared")
 
   shared <- bmm_component(bmf(y1 ~ 1 + (1 | p | id)), family = gaussian(), data = d1) +
     bmm_component(bmf(y2 ~ 1 + (1 | p | id)), family = gaussian(), data = d2)

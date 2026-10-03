@@ -11,8 +11,9 @@
       task = "Continuous reproduction",
       name = "Signal Discrimination Model (SDM) by Oberauer (2023)",
       citation = glue(
-        "Oberauer, K. (2023). Measurement models for visual working memory - \\
-        A factorial model comparison. Psychological Review, 130(3), 841-852"
+        "Oberauer, K. (2023). Measurement models for visual working \\
+        memory\u2014A factorial model comparison. Psychological Review, \\
+        130(3), 841-852. https://doi.org/10.1037/rev0000328"
       ),
       version = version,
       requirements = glue(
@@ -32,9 +33,9 @@
       ),
       fixed_parameters = list(mu = 0),
       default_priors = list(
-        mu = list(main = "student_t(1, 0, 1)"),
-        kappa = list(main = "student_t(5, 1.75, 0.75)", effects = "normal(0, 1)"),
-        c = list(main = "student_t(5, 2, 0.75)", effects = "normal(0, 1)")
+        mu = list(main = "normal(0, 0.5)", effects = "normal(0, 0.25)", sd = "exponential(4)"),
+        kappa = list(main = "student_t(5, 1.75, 0.75)", effects = "normal(0, 1)", sd = "exponential(1)"),
+        c = list(main = "student_t(5, 2, 0.75)", effects = "normal(0, 1)", sd = "exponential(1)")
       ),
       init_ranges = list(
         mu = c(-0.5,0.5),
@@ -45,8 +46,15 @@
     class = c("bmmodel", "circular", "sdm", paste0("sdm_", version)),
     call = call
   )
-  out$links[names(links)] <- links
+  out <- set_links(out, links)
   out
+}
+
+# configure_model.sdm declares the family links itself, and the log link of `c`
+# is written into the Stan chunk as exp(c), so none of the three can be set
+#' @exportS3Method
+settable_links.sdm <- function(model) {
+  character(0)
 }
 
 # user facing alias
@@ -55,8 +63,8 @@
 
 #' @title `r .model_sdm()$name`
 #' @name sdm
-#' @details see [the online article](https://venpopov.com/bmm/articles/bmm_sdm_simple.html) for a detailed description of the model
-#'   and how to use it. `r model_info(.model_sdm())`
+#' @details see [the online article](https://popov-lab.github.io/bmm/articles/bmm_sdm_simple.html) for a detailed description of the model
+#'   and how to use it. `r model_docs(.model_sdm())`
 #' @param resp_error The name of the variable in the dataset containing the
 #'   response error. The response error should code the response relative to the
 #'   to-be-recalled target in radians. You can transform the response error in
@@ -88,6 +96,7 @@
 sdm <- function(resp_error, version = "simple", ...) {
   call <- match.call()
   stop_missing_args()
+  version <- match.arg(version)
   .model_sdm(resp_error = resp_error, version = version, call = call, ...)
 }
 
@@ -130,20 +139,21 @@ configure_model.sdm <- function(model, data, formula) {
     ub = c(NA, NA, NA),
     type = "real", loop = FALSE,
     log_lik = log_lik_sdm_simple,
-    posterior_predict = posterior_predict_sdm_simple
+    posterior_predict = posterior_predict_sdm_simple,
+    posterior_epred = posterior_epred_sdm_simple
   )
 
   # prepare initial stanvars to pass to brms, model formula and priors
   sc_path <- system.file("stan_chunks", package = "bmm")
   stan_funs <- read_lines2(paste0(sc_path, "/sdm_simple_funs.stan"))
   stan_tdata <- read_lines2(paste0(sc_path, "/sdm_simple_tdata.stan"))
-  likelihood_file <- if (sdm_use_threaded_likelihood()) {
+  likelihood_file <- if (brms_slices_likelihood()) {
     "sdm_simple_likelihood_threaded.stan"
   } else {
     "sdm_simple_likelihood.stan"
   }
   stan_likelihood <- read_lines2(paste0(sc_path, "/", likelihood_file))
-  stan_tdata_pll_args <- if (sdm_use_threaded_likelihood()) {
+  stan_tdata_pll_args <- if (brms_slices_likelihood()) {
     "data matrix COSN"
   }
   run_metadata <- attr(data, "sdm_run_metadata")
@@ -192,6 +202,8 @@ log_lik_sdm_simple <- function(i, prep) {
   dsdm(y, mu, c, kappa, log = T)
 }
 
+posterior_epred_sdm_simple <- posterior_epred_undefined("sdm")
+
 posterior_predict_sdm_simple <- function(i, prep, ...) {
   mu <- brms::get_dpar(prep, "mu", i = i)
   c <- brms::get_dpar(prep, "c", i = i)
@@ -232,14 +244,4 @@ sdm_stanvar_int_array <- function(x, name, size) {
   out[[name]]$scode <- paste0("array[", size, "] int ", name, ";")
   out[[name]]$pll_args <- paste("data array[] int", name)
   out
-}
-
-sdm_use_threaded_likelihood <- function() {
-  threads <- getOption("brms.threads", NULL)
-  # brms accepts a bare number for this option, so normalize it the same way
-  # brms::validate_threads() does, else brm() threads while we emit the serial chunk
-  if (is.numeric(threads)) {
-    threads <- brms::threading(threads)
-  }
-  is.list(threads) && isTRUE(threads$threads > 0)
 }
