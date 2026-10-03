@@ -133,8 +133,11 @@ stanc_version <- function(cpp) {
   if (length(match) && length(match[[1]])) match[[1]][2]
 }
 
-# R-hat and bulk and tail ESS per variable, without lp__, lprior and constant
-# variables (R-hat NA). The caller decides which parameter classes to report
+# R-hat and bulk and tail ESS per posterior variable, without lp__, lprior,
+# the prior_* draws of sample_prior = "yes" (draws from the prior) and
+# constant variables (R-hat NA). in_summary marks the variables that brms's
+# summary() shows and checks for its R-hat warning; the others are mostly
+# random effects (r_*) and centred intercepts
 convergence_summary <- function(fit) {
   # without draws, brms fails further down with an error about `@` applied to
   # a number, which does not say that the fit is a mock
@@ -142,25 +145,47 @@ convergence_summary <- function(fit) {
   algorithm <- fit$algorithm
   if (!identical(algorithm, "sampling")) {
     out <- data.frame(
-      parameter = character(), rhat = numeric(), ess_bulk = numeric(), ess_tail = numeric()
+      parameter = character(), rhat = numeric(), ess_bulk = numeric(),
+      ess_tail = numeric(), in_summary = logical()
     )
     return(structure(out, algorithm = algorithm))
   }
   conv <- posterior::summarise_draws(
     brms::as_draws_array(fit), "rhat", "ess_bulk", "ess_tail"
   )
-  conv <- conv[!conv$variable %in% c("lp__", "lprior") & !is.na(conv$rhat), ]
+  conv <- conv[
+    !conv$variable %in% c("lp__", "lprior") & !grepl("^prior_", conv$variable) & !is.na(conv$rhat),
+  ]
   max_treedepth <- brms::control_params(fit)$max_treedepth
-  treedepth <- brms::nuts_params(fit, pars = "treedepth__")$Value
   structure(
     data.frame(
       parameter = conv$variable, rhat = conv$rhat,
-      ess_bulk = conv$ess_bulk, ess_tail = conv$ess_tail
+      ess_bulk = conv$ess_bulk, ess_tail = conv$ess_tail,
+      in_summary = grepl(summary_variables_regex(fit), conv$variable)
     ),
     algorithm = algorithm,
     divergent = sum(brms::nuts_params(fit, pars = "divergent__")$Value),
-    max_treedepth_hits = if (is.null(max_treedepth)) NA_real_ else sum(treedepth >= max_treedepth)
+    max_treedepth_hits = if (is.null(max_treedepth)) {
+      NA_real_
+    } else {
+      sum(brms::nuts_params(fit, pars = "treedepth__")$Value >= max_treedepth)
+    }
   )
+}
+
+# The parameter classes that summary() shows, copied from incl_classes and
+# incl_regex in brms:::summary.brmsfit() of brms 2.23.0; later versions of brms
+# may change them. valid_dpars() is internal to brms, and the exported
+# brmsterms() leaves out the reference theta of mixtures
+summary_variables_regex <- function(fit) {
+  classes <- c(
+    "b", "bs", "bcs", "bsp", "bmo", "bme", "bmi", "bm",
+    utils::getFromNamespace("valid_dpars", "brms")(fit),
+    "delta", "lncor", "rescor", "ar", "ma", "sderr", "cosy", "cortime",
+    "lagsar", "errorsar", "car", "sdcar", "rhocar", "sd", "cor", "df", "sds",
+    "sdgp", "lscale", "simo"
+  )
+  paste0("^((", paste0(classes, collapse = ")|("), "))(_|$|\\[)")
 }
 
 # a stanfit without draws comes from chains = 0 or empty = TRUE

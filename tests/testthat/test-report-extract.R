@@ -257,7 +257,7 @@ test_that("convergence_summary() equals R-hat and ESS computed per variable from
     withr::local_options(list(warn = -1))
     conv <- convergence_summary(fit)
     draws <- brms::as_draws_array(fit)
-    candidates <- setdiff(posterior::variables(draws), c("lp__", "lprior"))
+    candidates <- grep("^prior_", setdiff(posterior::variables(draws), c("lp__", "lprior")), value = TRUE, invert = TRUE)
     by_var <- lapply(candidates, function(v) posterior::extract_variable_matrix(draws, v))
     rhat <- vapply(by_var, posterior::rhat, numeric(1))
     keep <- !is.na(rhat)
@@ -273,6 +273,36 @@ test_that("convergence_summary() equals R-hat and ESS computed per variable from
       label = name
     )
   }
+})
+
+test_that("convergence_summary() leaves out the draws from the prior", {
+  skip_on_cran()
+  path <- test_path("assets/bmmfit_m3_ppcheck.rds")
+  skip_if_not(file.exists(path), "M3 fixture not available (excluded by .Rbuildignore)")
+  withr::local_options(list(warn = -1))
+  fit <- readRDS(path)
+  expect_true(any(grepl("^prior_", posterior::variables(brms::as_draws_array(fit)))))
+  expect_false(any(grepl("^prior_", convergence_summary(fit)$parameter)))
+})
+
+test_that("convergence_summary() marks the parameters that summary() shows", {
+  skip_on_cran()
+  fits <- fixture_fits()
+  skip_if(length(fits) == 0, "Fixtures not available (excluded by .Rbuildignore)")
+  withr::local_options(list(warn = -1))
+  for (name in names(fits)) {
+    fit <- fits[[name]]
+    conv <- convergence_summary(fit)
+    brms_summary <- brms:::summary.brmsfit(fit)
+    tables <- c(list(brms_summary$fixed, brms_summary$spec_pars, brms_summary$cor_pars), brms_summary$random)
+    rhat <- unlist(lapply(tables, function(x) x$Rhat))
+    expect_equal(sort(conv$rhat[conv$in_summary]), sort(rhat[!is.na(rhat)]), ignore_attr = TRUE, label = name)
+  }
+  # distributional parameters without a formula are sampled under their own name
+  expect_identical(
+    grepl(summary_variables_regex(fits[["bmmfit_example1.rds"]]), c("kappa", "c", "Intercept_c", "r_id__c[1,Intercept]")),
+    c(TRUE, TRUE, FALSE, FALSE)
+  )
 })
 
 test_that("convergence_summary() counts divergent and maximum-depth transitions", {
@@ -299,7 +329,7 @@ test_that("convergence_summary() has no rows for algorithms other than sampling"
   fit$algorithm <- "meanfield"
   conv <- convergence_summary(fit)
   expect_identical(nrow(conv), 0L)
-  expect_identical(names(conv), c("parameter", "rhat", "ess_bulk", "ess_tail"))
+  expect_identical(names(conv), c("parameter", "rhat", "ess_bulk", "ess_tail", "in_summary"))
   expect_identical(attr(conv, "algorithm"), "meanfield")
 })
 
