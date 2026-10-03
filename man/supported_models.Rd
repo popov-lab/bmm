@@ -15,14 +15,16 @@ returns the model names as a plain character vector.}
 The output of \code{\link[=bmm_models]{bmm_models()}}, or the model names as a plain
 character vector if \code{print_call = FALSE}. Before bmm 1.4.0 the default
 returned the printed list as one string; use
-\code{capture.output(print(bmm_models()))} for that text, one line per element.
+\code{capture.output(print(bmm_models()))} for the printed list as text,
+one line per element.
 }
 \description{
 \code{supported_models()} is deprecated as of bmm 1.4.0 and will be
 removed in bmm 1.6.0. It shares its name with \code{insight::supported_models()},
 which the \strong{parameters} package re-exports, so whichever package is
-attached last decides what \code{supported_models()} returns. Use
-\code{\link[=bmm_models]{bmm_models()}} instead, with or without \code{print_call = FALSE}; wrap it in
-\code{as.character()} if you need a plain character vector.
+attached last decides what \code{supported_models()} returns. Replace both
+\code{supported_models()} and \code{supported_models(print_call = FALSE)} with
+\code{\link[=bmm_models]{bmm_models()}}; wrap it in \code{as.character()} if you need a plain
+character vector.
 }
 \keyword{internal}
