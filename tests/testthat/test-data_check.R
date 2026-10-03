@@ -166,6 +166,16 @@ test_that("bmm_data_check skips the min_trials note for aggregate-data models", 
   expect_equal(min(res$cells$counts$n), 3)
 })
 
+test_that("bmm_data_check does not count mpt rows as trials", {
+  res <- bmm_data_check(
+    bmf(D ~ 0 + item_type, g ~ 1),
+    mpt_2htm_data(n_id = 4),
+    mpt(mpt_2htm_trees(), tree_id = "item_type")
+  )
+  expect_null(res$pipeline$error)
+  expect_false(any(grepl("fewer than", finding_messages(res))))
+})
+
 test_that("bmm_data_check needs nothing beyond check_data and check_formula", {
   dat <- data.frame(y = runif(40, -3, 3), cond = rep(c("a", "b"), 20))
   model <- sdm(resp_error = "y")

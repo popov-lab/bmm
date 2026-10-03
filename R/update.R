@@ -289,6 +289,28 @@ revert_check_data.m3 <- function(model, data) {
 }
 
 #' @exportS3Method
+revert_check_data.mpt <- function(model, data) {
+  resp_cats <- model$resp_vars$resp_cats
+  data[resp_cats] <- as.data.frame(unclass(data$Y)[, resp_cats, drop = FALSE])
+  data$Y <- NULL
+  data$nTrials <- NULL
+  tree_id <- model$other_vars$tree_id
+  # brms keeps the tree column only when a formula names it; otherwise the
+  # one-hot tree indicators are the record of each row's tree
+  if (!is.null(tree_id) && !tree_id %in% colnames(data)) {
+    idx_vars <- model$other_vars$indicators$tree
+    data[[tree_id]] <- names(idx_vars)[
+      max.col(as.matrix(data[unname(idx_vars)]), ties.method = "first")
+    ]
+    attr(data, "rebuilt") <- c(attr(data, "rebuilt"), tree_id)
+  }
+  # check_data() refuses generated indicator columns it finds in the data, and
+  # rebuilds them from the tree column
+  data[unname(model$other_vars$indicators$tree)] <- NULL
+  NextMethod("revert_check_data")
+}
+
+#' @exportS3Method
 revert_check_data.non_targets <- function(model, data) {
   set_size <- model$other_vars$set_size
   # brms keeps the set_size column only when a formula predicts something with
