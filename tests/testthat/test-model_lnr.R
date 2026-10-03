@@ -552,6 +552,8 @@ test_that(".lnr_stan_code generates valid Stan for 4 categories", {
 })
 
 test_that("LNR generated Stan code uses vectorized custom likelihoods", {
+  # unseeded, 20 draws sometimes held no error and check_data() warned
+  withr::local_seed(352)
   dat <- rlnr(n = 20, m = c(-1, 0), s = c(1, 1), ndt = 0.2)
   simple_model <- lnr(rt = "rt", response = "response", n_choices = 2)
   simple_formula <- bmf(correct ~ 1, error ~ 1, ndt ~ 1)
