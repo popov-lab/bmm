@@ -71,6 +71,67 @@ uncited_part.m3_custom <- function(model) {
   "the user-defined model structure"
 }
 
+# Sampler settings and package versions as the fit stores them. The versions
+# describe the compilation: update() without recompiling keeps the stored brms
+# and Stan versions, while the settings and the date describe the last run.
+# rstan fits store no Stan version, only the StanHeaders the model was built
+# with; brms stores no R version at all
+fit_settings <- function(fit) {
+  sim <- if (has_draws(fit)) fit$fit@sim else list()
+  version <- fit$version
+  backend <- fit$backend %||% NA_character_
+  stan_backend <- backend %in% c("rstan", "cmdstanr")
+  list(
+    backend = backend,
+    algorithm = fit$algorithm %||% NA_character_,
+    chains = first_or_na(sim$chains),
+    iter = first_or_na(sim$iter),
+    warmup = first_or_na(sim$warmup),
+    thin = first_or_na(sim$thin),
+    ndraws_stored = if (has_draws(fit)) brms::ndraws(fit) else NA_integer_,
+    versions = c(
+      bmm = version_string(version$bmm),
+      brms = version_string(version$brms),
+      stan = version_string(if (stan_backend) version[[c(cmdstanr = "cmdstan", rstan = "stanHeaders")[[backend]]]]),
+      backend = version_string(if (stan_backend) version[[backend]])
+    ),
+    date = if (has_draws(fit)) fit$fit@date else NA_character_
+  )
+}
+
+# R-hat and bulk and tail ESS per variable, without lp__, lprior and constant
+# variables (R-hat NA). The caller decides which parameter classes to report
+convergence_summary <- function(fit) {
+  stopif(!has_draws(fit), "The fit contains no posterior draws (a mock fit?).")
+  algorithm <- fit$algorithm
+  if (!identical(algorithm, "sampling")) {
+    out <- data.frame(parameter = character(), rhat = numeric(), ess_bulk = numeric(), ess_tail = numeric())
+    return(structure(out, algorithm = algorithm))
+  }
+  conv <- posterior::summarise_draws(brms::as_draws_array(fit), "rhat", "ess_bulk", "ess_tail")
+  conv <- conv[!conv$variable %in% c("lp__", "lprior") & !is.na(conv$rhat), ]
+  max_treedepth <- brms::control_params(fit)$max_treedepth
+  treedepth <- brms::nuts_params(fit, pars = "treedepth__")$Value
+  structure(
+    data.frame(parameter = conv$variable, rhat = conv$rhat, ess_bulk = conv$ess_bulk, ess_tail = conv$ess_tail),
+    algorithm = algorithm,
+    divergent = sum(brms::nuts_params(fit, pars = "divergent__")$Value),
+    max_treedepth_hits = if (is.null(max_treedepth)) NA_integer_ else sum(treedepth >= max_treedepth)
+  )
+}
+
+has_draws <- function(fit) {
+  methods::is(fit$fit, "stanfit")
+}
+
+first_or_na <- function(x) {
+  if (length(x)) x[[1]] else NA_integer_
+}
+
+version_string <- function(x) {
+  if (is.null(x)) NA_character_ else as.character(x)
+}
+
 # the model as the installed version of bmm builds it; NULL when no constructor
 # of this version matches the stored model's classes
 current_constructor <- function(model) {

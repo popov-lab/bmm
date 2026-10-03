@@ -130,3 +130,125 @@ test_that("print(summary()) shows the formula text summarise_formula() returns",
     expect_true(all(paste0(strrep(" ", 9), lines[-1]) %in% printed), label = name)
   }
 })
+
+nuts_count <- function(fit, par, at_least = 1) {
+  np <- brms::nuts_params(fit, pars = par)
+  sum(np$Value >= at_least)
+}
+
+test_that("fit_settings() reads the sampler settings and versions stored on the fit", {
+  skip_on_cran()
+  fits <- fixture_fits()
+  skip_if(length(fits) == 0, "Fixtures not available (excluded by .Rbuildignore)")
+  for (name in names(fits)) {
+    fit <- fits[[name]]
+    settings <- fit_settings(fit)
+    sim <- fit$fit@sim
+    expect_identical(settings$backend, fit$backend, label = name)
+    expect_identical(settings$algorithm, fit$algorithm, label = name)
+    expect_equal(settings$chains, sim$chains, label = name)
+    expect_equal(settings$iter, sim$iter, label = name)
+    expect_equal(settings$warmup, sim$warmup, label = name)
+    expect_equal(settings$thin, sim$thin, label = name)
+    expect_equal(settings$ndraws_stored, sum(sim$n_save - sim$warmup2), label = name)
+    expect_identical(settings$date, fit$fit@date, label = name)
+    stan_field <- if (fit$backend == "cmdstanr") "cmdstan" else "stanHeaders"
+    expect_identical(
+      settings$versions,
+      c(
+        bmm = as.character(fit$version$bmm),
+        brms = as.character(fit$version$brms),
+        stan = as.character(fit$version[[stan_field]]),
+        backend = as.character(fit$version[[fit$backend]])
+      ),
+      label = name
+    )
+  }
+})
+
+test_that("fit_settings() reports a subsampled fit's settings and its stored draws apart", {
+  skip_on_cran()
+  path <- test_path("assets/bmmfit_m3_ppcheck.rds")
+  skip_if_not(file.exists(path), "M3 fixture not available (excluded by .Rbuildignore)")
+  settings <- fit_settings(readRDS(path))
+  expect_equal(c(settings$chains, settings$iter, settings$warmup), c(4, 2000, 1000))
+  expect_equal(settings$ndraws_stored, 80)
+})
+
+test_that("fit_settings() works on mock fits, with NA where the fit has no draws", {
+  skip_on_cran()
+  path <- test_path("assets/mock_bmmfit_mixture2p.rds")
+  skip_if_not(file.exists(path), "Mock fixture not available (excluded by .Rbuildignore)")
+  settings <- fit_settings(readRDS(path))
+  expect_true(all(is.na(unlist(settings[c("chains", "iter", "warmup", "thin", "ndraws_stored", "date")]))))
+  expect_true(all(is.na(settings$versions)))
+
+  dat <- data.frame(y = c(-1, 0, 1))
+  mock <- bmm(bmf(c ~ 1, kappa ~ 1), dat, sdm("y"), backend = "mock", mock_fit = 1, rename = FALSE)
+  settings <- fit_settings(mock)
+  expect_identical(settings$backend, "mock")
+  expect_identical(settings$versions[["bmm"]], as.character(utils::packageVersion("bmm")))
+  expect_true(is.na(settings$ndraws_stored))
+})
+
+test_that("convergence_summary() equals R-hat and ESS computed per variable from the draws", {
+  skip_on_cran()
+  fits <- fixture_fits()
+  skip_if(length(fits) == 0, "Fixtures not available (excluded by .Rbuildignore)")
+  for (name in names(fits)) {
+    fit <- fits[[name]]
+    # tiny fixture fits: posterior warns that it caps the ESS estimates
+    withr::local_options(list(warn = -1))
+    conv <- convergence_summary(fit)
+    draws <- brms::as_draws_array(fit)
+    candidates <- setdiff(posterior::variables(draws), c("lp__", "lprior"))
+    by_var <- lapply(candidates, function(v) posterior::extract_variable_matrix(draws, v))
+    rhat <- vapply(by_var, posterior::rhat, numeric(1))
+    keep <- !is.na(rhat)
+    expect_identical(conv$parameter, candidates[keep], label = name)
+    expect_equal(conv$rhat, rhat[keep], label = name)
+    expect_equal(conv$ess_bulk, vapply(by_var[keep], posterior::ess_bulk, numeric(1)), label = name)
+    expect_equal(conv$ess_tail, vapply(by_var[keep], posterior::ess_tail, numeric(1)), label = name)
+    expect_identical(attr(conv, "algorithm"), "sampling", label = name)
+    expect_equal(attr(conv, "divergent"), nuts_count(fit, "divergent__"), label = name)
+    expect_equal(
+      attr(conv, "max_treedepth_hits"),
+      nuts_count(fit, "treedepth__", brms::control_params(fit)$max_treedepth),
+      label = name
+    )
+  }
+})
+
+test_that("convergence_summary() counts divergent and maximum-depth transitions", {
+  skip_on_cran()
+  path <- test_path("assets/bmmfit_example1.rds")
+  skip_if_not(file.exists(path), "SDM fixture not available (excluded by .Rbuildignore)")
+  withr::local_options(list(warn = -1))
+  fit <- readRDS(path)
+  params <- attr(fit$fit@sim$samples[[1]], "sampler_params")
+  last <- length(params$divergent__) - 0:2
+  params$divergent__[last] <- 1
+  params$treedepth__[last] <- 10
+  attr(fit$fit@sim$samples[[1]], "sampler_params") <- params
+  conv <- convergence_summary(fit)
+  expect_equal(attr(conv, "divergent"), 3)
+  expect_equal(attr(conv, "max_treedepth_hits"), 3)
+})
+
+test_that("convergence_summary() has no rows for algorithms other than sampling", {
+  skip_on_cran()
+  path <- test_path("assets/bmmfit_example1.rds")
+  skip_if_not(file.exists(path), "SDM fixture not available (excluded by .Rbuildignore)")
+  fit <- readRDS(path)
+  fit$algorithm <- "meanfield"
+  conv <- convergence_summary(fit)
+  expect_identical(nrow(conv), 0L)
+  expect_identical(names(conv), c("parameter", "rhat", "ess_bulk", "ess_tail"))
+  expect_identical(attr(conv, "algorithm"), "meanfield")
+})
+
+test_that("convergence_summary() refuses a mock fit", {
+  dat <- data.frame(y = c(-1, 0, 1))
+  mock <- bmm(bmf(c ~ 1, kappa ~ 1), dat, sdm("y"), backend = "mock", mock_fit = 1, rename = FALSE)
+  expect_error(convergence_summary(mock), "draws")
+})

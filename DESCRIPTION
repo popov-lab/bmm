@@ -33,6 +33,7 @@ Imports:
     methods,
     mvtnorm,
     parallel,
+    posterior (>= 1.6.0),
     rtdists,
     rlang,
     stats,
