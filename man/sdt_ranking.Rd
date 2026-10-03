@@ -47,7 +47,7 @@ Ranking Signal Detection Theory Model
 \item \strong{Name:} Signal Detection Theory (Ranking)
 \item \strong{Citation:}
 \itemize{
-\item Meyer-Grant, C. G., Kellen, D., Harding, S. M., & Singmann, H. (2026). Extreme-value signal detection theory for recognition memory: The parametric road not taken. Psychological Review. https://doi.org/10.1037/rev0000615
+\item Meyer-Grant, C. G., Kellen, D., Harding, S. M., & Singmann, H. (2026). Extreme-value signal detection theory for recognition memory: The parametric road not taken. Psychological Review. Advance online publication. https://doi.org/10.1037/rev0000615
 }
 \item \strong{Requirements:}
 

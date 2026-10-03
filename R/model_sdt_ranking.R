@@ -65,7 +65,8 @@
       citation = glue(
         "Meyer-Grant, C. G., Kellen, D., Harding, S. M., & Singmann, H. ",
         "(2026). Extreme-value signal detection theory for recognition memory: ",
-        "The parametric road not taken. Psychological Review. ",
+        "The parametric road not taken. Psychological Review. Advance online ",
+        "publication. ",
         "https://doi.org/10.1037/rev0000615"
       ),
       version = "NA",
