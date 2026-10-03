@@ -1876,6 +1876,17 @@ rezdm <- function(n, n_trials, drift, bound, ndt, zr = 0.5, s = 1,
 }
 
 
+# Mean RT of the Wiener diffusion process, averaged over both responses: the
+# non-decision time plus each boundary's mean decision time, weighted by the
+# probability of reaching that boundary. bound is the boundary separation and
+# zr the relative starting point, as in rtdists::rdiffusion(), from which the
+# ddm and cswald posterior_predict functions simulate.
+.diffusion_mean_rt <- function(drift, bound, ndt, zr, s) {
+  moments <- .ezdm_moments_4par(drift, bound, zr, s)
+  ndt + moments$pC * moments$mdt_upper + (1 - moments$pC) * moments$mdt_lower
+}
+
+
 # Ex-Gaussian density function
 # @param x Numeric vector of values
 # @param mu Mean of the Gaussian component

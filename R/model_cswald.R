@@ -339,7 +339,8 @@ configure_model.cswald_simple <- function(model, data, formula) {
     vars = cswald_decision_var(),
     loop = FALSE,
     log_lik = log_lik_cswald_simple,
-    posterior_predict = posterior_predict_cswald_simple
+    posterior_predict = posterior_predict_cswald_simple,
+    posterior_epred = posterior_epred_cswald
   )
 
   sc_path <- system.file("stan_chunks", package = "bmm")
@@ -376,6 +377,14 @@ posterior_predict_cswald_simple <- function(i, prep, ...) {
   }
 }
 
+# Named after the family, "cswald", rather than the version: restructure()
+# finds the function of a fit saved without one by that name. Like
+# posterior_predict_cswald_simple(), it reads bound as the distance from the
+# start point to either boundary.
+posterior_epred_cswald <- function(prep) {
+  .epred_matrix(with(prep$dpars, .diffusion_mean_rt(drift, bound * 2, ndt, zr = 0.5, s)), prep)
+}
+
 log_lik_cswald_simple <- function(i, prep) {
   drift <- brms::get_dpar(prep, "drift", i = i)
   bound <- brms::get_dpar(prep, "bound", i = i)
@@ -403,7 +412,8 @@ configure_model.cswald_crisk <- function(model, data, formula) {
     vars = cswald_decision_var(),
     loop = FALSE,
     log_lik = log_lik_cswald_crisk,
-    posterior_predict = posterior_predict_cswald_crisk
+    posterior_predict = posterior_predict_cswald_crisk,
+    posterior_epred = posterior_epred_cswald_crisk
   )
 
   sc_path <- system.file("stan_chunks", package = "bmm")
@@ -427,6 +437,10 @@ log_lik_cswald_crisk <- function(i, prep) {
   response <- rep(prep$data$dec[i], length(drift))
 
   .dcswald(rt, response, drift, bound, ndt, zr = zr, s = s, version = "crisk", log = TRUE)
+}
+
+posterior_epred_cswald_crisk <- function(prep) {
+  .epred_matrix(with(prep$dpars, .diffusion_mean_rt(drift, bound, ndt, zr, s)), prep)
 }
 
 posterior_predict_cswald_crisk <- function(i, prep, ...) {

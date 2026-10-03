@@ -632,3 +632,32 @@ test_that("the gumbel_min logit is -Inf, not NaN, once exp(-d') overflows", {
                }, numeric(1)),
                tolerance = 1e-12)
 })
+
+# posterior_epred (#475) ------------------------------------------------------
+
+test_that("posterior_epred_sdt_mafc() is the mean count posterior_predict_sdt_mafc() simulates", {
+  withr::local_seed(475)
+  sets <- data.frame(d = c(1.5, 0.5, 2, 1))
+  for (dist in .sdt_dist_names) {
+    data <- list(vint1 = c(2, 4, 3, 6), vint2 = rep(.sdt_dist_id(dist), 4),
+                 trials = c(50, 80, 20, 100))
+    res <- epred_vs_predict(sets, posterior_epred_sdt_mafc, posterior_predict_sdt_mafc,
+                            data = data)
+    expect_lt(max(abs(res[, "rel_error"])), 0.02)
+  }
+})
+
+test_that("posterior_epred_sdt_mafc() returns one column per observation", {
+  dpars <- list(d = matrix(c(1.5, 0.5, 2, 1, 0.7, 1.2), 2))
+  data <- list(vint1 = c(2, 4, 6), vint2 = rep(.sdt_dist_id("normal"), 3),
+               trials = c(50, 80, 20))
+  expect_epred_by_cell(posterior_epred_sdt_mafc, dpars, data)
+})
+
+test_that("an sdt_mafc fit stores posterior_epred_sdt_mafc() in its family", {
+  dat <- data.frame(n_trials = rep(100L, 8))
+  dat$n_correct <- rsdt_mafc(nrow(dat), dat$n_trials, m = 4, d = 1.2)
+  fit <- bmm(bmf(d ~ 1), dat, sdt_mafc("n_correct", "n_trials", m = 4),
+             backend = "mock", mock_fit = 1, rename = FALSE)
+  expect_identical(fit$formula$family$posterior_epred, posterior_epred_sdt_mafc)
+})

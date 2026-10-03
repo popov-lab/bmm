@@ -83,8 +83,12 @@ S3method(data_check_findings,non_targets)
 S3method(default_prior,bmmformula)
 S3method(emmeans::emm_basis,bmmfit)
 S3method(emmeans::recover_data,bmmfit)
+S3method(expected_response_defined,circular)
+S3method(expected_response_defined,default)
+S3method(expected_response_defined,vwm)
 S3method(fit_info,brmsfit)
 S3method(fit_info,brmsfit_list)
+S3method(fitted,bmmfit)
 S3method(get_resp_vars,bmmodel)
 S3method(has_intercept,formula)
 S3method(has_intercept,terms)
@@ -109,6 +113,7 @@ S3method(parameter_info,bmmodel)
 S3method(plot,bmm_sdt_auc)
 S3method(plot,bmm_sdt_latent)
 S3method(plot,bmm_sdt_roc)
+S3method(posterior_epred,bmmfit)
 S3method(postprocess_brm,bmmodel)
 S3method(postprocess_brm,default)
 S3method(postprocess_brm,sdm)
@@ -309,6 +314,7 @@ import(stats)
 importFrom(brms,
   conditional_effects,
   default_prior,
+  posterior_epred,
   pp_check,
   restructure,
   stancode,

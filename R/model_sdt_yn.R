@@ -441,6 +441,7 @@ configure_model.sdt_yn <- function(model, data, formula) {
     loop = TRUE,
     log_lik = log_lik_sdt_yn,
     posterior_predict = posterior_predict_sdt_yn,
+    posterior_epred = posterior_epred_sdt_yn,
     vars = c("vint1[n]", "vint2[n]", "trials[n]")
   )
 
@@ -478,4 +479,11 @@ posterior_predict_sdt_yn <- function(i, prep, ...) {
 
   rsdt_yn(length(d), prep$data$trials[i], prep$data$vint1[i],
               d, criterion, sdratio = sdratio, dist = dist)
+}
+
+posterior_epred_sdt_yn <- function(prep) {
+  stimulus <- .epred_data(prep$data$vint1, prep)
+  dist <- .sdt_dist_names[prep$data$vint2[1]]
+  p_old <- with(prep$dpars, exp(.sdt_log_p_old(.sdt_eta(d, criterion, stimulus, sdratio), dist)))
+  .epred_matrix(.epred_data(prep$data$trials, prep) * p_old, prep)
 }

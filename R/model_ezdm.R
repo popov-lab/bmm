@@ -398,6 +398,7 @@ configure_model.ezdm_3par <- function(model, data, formula) {
     type = "real",
     log_lik = log_lik_ezdm_3par,
     posterior_predict = posterior_predict_ezdm_3par,
+    posterior_epred = posterior_epred_ezdm_3par,
     loop = TRUE,
     vars = c("vreal1[n]", "vint1[n]", "trials[n]")
   )
@@ -440,6 +441,13 @@ posterior_predict_ezdm_3par <- function(i, prep, ...) {
   )[["mean_rt"]]
 }
 
+# The mean of the mean RT posterior_predict_ezdm_3par() returns. The simulated
+# mean RT is normal around ndt + MDT plus a slope times the deviation of the
+# simulated variance from VRT, and that variance is a gamma draw with mean VRT.
+posterior_epred_ezdm_3par <- function(prep) {
+  .epred_matrix(with(prep$dpars, ndt + .ezdm_moments_3par(drift, bound, s)$MDT), prep)
+}
+
 #' @export
 configure_model.ezdm_4par <- function(model, data, formula) {
   # construct brms formula from the bmm formula
@@ -456,6 +464,7 @@ configure_model.ezdm_4par <- function(model, data, formula) {
     type = "real", # real for continous dv, int for discrete dv
     log_lik = log_lik_ezdm_4par,
     posterior_predict = posterior_predict_ezdm_4par,
+    posterior_epred = posterior_epred_ezdm_4par,
     loop = TRUE, # is the likelihood vectorized
     vars = c("vreal1[n]", "vreal2[n]", "vreal3[n]", "vint1[n]", "vint2[n]",
              "vint3[n]", "vint4[n]")
@@ -503,6 +512,13 @@ posterior_predict_ezdm_4par <- function(i, prep, ...) {
     s = brms::get_dpar(prep, "s", i = i),
     version = "4par"
   )[["mean_rt_upper"]]
+}
+
+# The mean of the upper-boundary mean RT posterior_predict_ezdm_4par()
+# returns, as for 3par. Cells with fewer than two upper responses simulate NA,
+# but the mean of the others does not depend on their count.
+posterior_epred_ezdm_4par <- function(prep) {
+  .epred_matrix(with(prep$dpars, ndt + .ezdm_moments_4par(drift, bound, zr, s)$mdt_upper), prep)
 }
 
 ############################################################################# !

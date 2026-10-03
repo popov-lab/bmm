@@ -138,7 +138,8 @@ configure_model.sdm <- function(model, data, formula) {
     ub = c(NA, NA, NA),
     type = "real", loop = FALSE,
     log_lik = log_lik_sdm_simple,
-    posterior_predict = posterior_predict_sdm_simple
+    posterior_predict = posterior_predict_sdm_simple,
+    posterior_epred = posterior_epred_sdm_simple
   )
 
   # prepare initial stanvars to pass to brms, model formula and priors
@@ -199,6 +200,8 @@ log_lik_sdm_simple <- function(i, prep) {
   y <- prep$data$Y[i]
   dsdm(y, mu, c, kappa, log = T)
 }
+
+posterior_epred_sdm_simple <- posterior_epred_undefined("sdm")
 
 posterior_predict_sdm_simple <- function(i, prep, ...) {
   mu <- brms::get_dpar(prep, "mu", i = i)
