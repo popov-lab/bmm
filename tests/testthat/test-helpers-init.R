@@ -83,7 +83,11 @@ test_that("create_initfun returns 0 for m3 with simple choice rule and identity 
 
   # an identity link on any parameter requires zeros for stable sampling
   model$links$c <- "identity"
-  expect_equal(configured_initfun(model, ff, dat), 0)
+  expect_warning(
+    init <- configured_initfun(model, ff, dat),
+    "allow values that the model's default"
+  )
+  expect_equal(init, 0)
 })
 
 test_that("m3 with a softmax choice rule gets random-effects inits", {
@@ -499,9 +503,17 @@ test_that("initfun output matches standata dimensions for no-intercept models", 
 # =============================================================================
 
 test_that("create_initfun handles a softplus link override on a positive parameter", {
-  ff <- bmmformula(kappa ~ 1, c ~ 1)
-  dat <- oberauer_lin_2017
-  mod <- sdm(resp_error = "dev_rad", links = list(kappa = "softplus"))
+  ff <- bmmformula(drift ~ 1, bound ~ 1, ndt ~ 1)
+  dat <- data.frame(
+    mean_rt = c(0.50, 0.60, 0.70, 0.55),
+    var_rt = c(0.020, 0.030, 0.025, 0.020),
+    n_upper = c(80, 85, 75, 78),
+    n_trials = 100
+  )
+  mod <- ezdm("mean_rt", "var_rt", "n_upper", "n_trials",
+    links = list(bound = "softplus")
+  )
+  dat <- check_data(mod, dat, ff)
   config_args <- configure_model(mod, data = dat, formula = ff)
 
   init_fun <- create_initfun(mod, dat, config_args$formula)
@@ -982,4 +994,71 @@ test_that("a constant intercept leaves every coefficient of a centred parameter 
   b <- fit$stan_args$init()$b_c
   expect_length(b, 7)
   expect_true(all(abs(b) <= 0.1))
+})
+
+# =============================================================================
+# INIT RANGES THE LINK CAN ONLY PARTLY REPRESENT (#460)
+# =============================================================================
+
+# criterion's range straddles 0, which softplus cannot represent
+softplus_criterion <- list(
+  parameters = list(criterion = ""), init_ranges = list(criterion = c(-0.5, 0.5)),
+  links = list(criterion = "softplus")
+)
+
+test_that("an intercept starts inside the part of its range the link can represent", {
+  withr::local_seed(460)
+  inits <- unlist(lapply(1:200, function(i) {
+    init_fixef_param("Intercept_criterion", "real", 1, softplus_criterion, list())
+  }))
+  expect_true(is.numeric(inits) && all(is.finite(inits)))
+  native <- link_transform(inits, "softplus", inverse = TRUE)
+  expect_true(all(native > 0 & native <= 0.5))
+})
+
+test_that("coefficients start inside the part of the range the link can represent", {
+  withr::local_seed(460)
+  X <- stats::model.matrix(~ 1 + x, data.frame(x = factor(c(1, 2, 2))))
+  expect_no_warning(
+    b <- lapply(1:200, function(i) {
+      init_fixef_param("b_criterion", "vector", 2, softplus_criterion, list(X_criterion = X))
+    })
+  )
+  native <- link_transform(unlist(lapply(b, function(x) X %*% x)), "softplus", inverse = TRUE)
+  expect_true(all(native > 0 & native <= 0.5))
+})
+
+test_that("a range the link cannot represent at all is left to the default draw", {
+  withr::local_seed(460)
+  model <- list(
+    parameters = list(bound = ""), init_ranges = list(bound = c(1.5, 2)),
+    links = list(bound = "logit")
+  )
+  spec <- list(type = "real", types = "real", bounds = NULL, dims = "1")
+  expect_no_warning(
+    inits <- vapply(1:200, function(i) init_stan_param("Intercept_bound", spec, model, list()), numeric(1))
+  )
+  expect_true(all(abs(inits) <= 1))
+})
+
+test_that("sdt_yn with a softplus criterion gets a finite init list", {
+  withr::local_seed(460)
+  dat <- data.frame(y = c(12, 15, 5, 7), stimulus = c(1, 1, 0, 0), n = 20)
+  model <- sdt_yn("y", "stimulus", "n", links = list(criterion = "softplus"))
+  init_fun <- configured_initfun(model, bmf(d ~ 1, criterion ~ 1), dat)
+  expect_no_warning(inits <- lapply(1:50, function(i) init_fun()))
+  expect_true(all(vapply(inits, function(x) "Intercept_criterion" %in% names(x), logical(1))))
+  expect_true(all(is.finite(unlist(inits))))
+})
+
+test_that("a softmax range stays on the sampling scale and a single point is not drawn", {
+  # a softmax weight's range is not a (0, 1) probability, so it is not clipped
+  model <- list(
+    parameters = list(thetat = ""), init_ranges = list(thetat = c(-2, -1)),
+    links = list(thetat = "softmax")
+  )
+  init <- init_fixef_param("Intercept_thetat", "real", 1, model, list())
+  expect_true(init >= -2 && init <= -1)
+  # log(0) is -Inf: the one point log cannot represent leaves nothing to draw from
+  expect_null(representable_range(c(-1, 0), "log"))
 })

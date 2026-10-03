@@ -1,12 +1,10 @@
-// log-PDF of competing risks shifted Wald model. With sndt > 0 each accumulator
-// draws its own non-decision time; see the sndt section of ?cswald
+// log-PDF of the competing risks shifted Wald model; with sndt > 0 each accumulator draws its own ndt
 real cswald_crisk_lpdf(real rt, real mu, real drift, real bound, real ndt,
                        real zr, real s, real sndt, int response) {
-  // compute bounds for upper and lower response
+  // bounds for the upper and lower response
   real bound_upper = bound - zr*bound;
   real bound_lower = zr*bound;
 
-  // compute lpdf dependent on response type
   if (response == 1) {
     return swald_sndt_lpdf(rt | drift, bound_upper, ndt, sndt, s)
            + swald_sndt_lccdf(rt | -drift, bound_lower, ndt, sndt, s);
@@ -16,22 +14,17 @@ real cswald_crisk_lpdf(real rt, real mu, real drift, real bound, real ndt,
   }
 }
 
-// vectorized overload used by the loop = FALSE family: returns the summed
-// log-likelihood, winner's density plus loser's survivor per observation.
-// sndt is unused: configure_model() selects this overload only while sndt is
-// fixed at 0, where the likelihood has this closed form
+// vectorized overload for the loop = FALSE family: winner's density plus loser's survivor
+// sndt is unused: configure_model() selects this overload only while sndt is fixed at 0
 real cswald_crisk_lpdf(vector rt, vector mu, vector drift, vector bound,
                        vector ndt, vector zr, vector s, vector sndt,
                        array[] int dec) {
   int N = rows(rt);
-  // both accumulators share rt - ndt, so a single rt <= ndt makes the winner's
-  // density (and thus the summed target) -inf
+  // both accumulators share rt - ndt, so a single rt <= ndt makes the target -inf
   vector[N] t = rt - ndt;
   if (min(t) <= 0) return negative_infinity();
 
-  // winner = the accumulator matching the decision (drift toward its bound),
-  // loser = the opposite accumulator with mirrored drift; selecting via the
-  // 0/1 data vector w keeps everything vectorized
+  // the winner is the accumulator matching the decision; the 0/1 vector w keeps this vectorized
   vector[N] w = to_vector(dec);
   vector[N] bound_upper = bound - zr .* bound;
   vector[N] bound_lower = zr .* bound;

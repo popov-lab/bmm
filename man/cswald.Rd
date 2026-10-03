@@ -21,7 +21,10 @@ Available parameters depend on the version: "simple" has \code{drift}, \code{bou
 \code{ndt}, \code{s}, and \code{sndt}; "crisk" additionally has \code{zr}. Default links are
 "log" for most parameters and "logit" for \code{zr}. For positive parameters, "softplus"
 is available as an alternative to "log" that grows linearly for large
-values and avoids the numerical blow-up of \code{exp()}.}
+values and avoids the numerical blow-up of \code{exp()}. A name that is not a
+parameter of the model is an error, and a link that allows values the
+default link excludes (e.g. "identity" for a positive parameter) is a
+warning.}
 
 \item{version}{A character string specifying which version of the cswald
 model to use. Options are:
@@ -40,7 +43,7 @@ Better suited for tasks with substantial error rates. The \code{bound}
 parameter represents the total boundary separation, consistent with
 the diffusion model parameterization.
 }
-For more details, see Miller et al. (2017).}
+For more details, see Miller et al. (2018).}
 
 \item{...}{Additional arguments passed internally (for testing purposes).}
 }
@@ -57,9 +60,7 @@ Censored-Shifted Wald Model
 \item \strong{Name:} Censored-Shifted Wald Model
 \item \strong{Citation:}
 \itemize{
-\item Miller, R., Scherbaum, S., Heck, D. W., Goschke, T., & Enge, S. (2017).
-On the Relation Between the (Censored) Shifted Wald and the Wiener Distribution as Measurement Models
-for Choice Response Times. Applied Psychological Measurement, 42(2), 116-135. https://doi.org/10.1177/0146621617710465
+\item Miller, R., Scherbaum, S., Heck, D. W., Goschke, T., & Enge, S. (2018). On the relation between the (censored) shifted Wald and the Wiener distribution as measurement models for choice response times. Applied Psychological Measurement, 42(2), 116-135. https://doi.org/10.1177/0146621617710465
 }
 \item \strong{Version:} simple
 \item \strong{Requirements:}
@@ -142,7 +143,7 @@ pass \code{sndt = 0} explicitly to return to the model without variability.
 
 Without \code{sndt}, the fastest responses cap the \code{ndt} estimate (the
 likelihood requires \code{ndt < min(rt)}), which biases \code{ndt}, \code{drift}, and
-\code{bound} when the true non-decision time varies (Miller et al., 2017,
+\code{bound} when the true non-decision time varies (Miller et al., 2018,
 Fig. 3). Estimating \code{sndt} removes this bias, but \code{sndt} itself is weakly
 identified at typical trial numbers and the prior acts as its regularizer:
 estimate it at the population level only (\code{sndt ~ 1}) and check prior

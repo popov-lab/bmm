@@ -99,9 +99,13 @@
       domain = "Decision Making / Response times",
       task = "Choice Reaction Time tasks (with few errors)",
       name = "Censored-Shifted Wald Model",
-      citation = "Miller, R., Scherbaum, S., Heck, D. W., Goschke, T., & Enge, S. (2017).
-        On the Relation Between the (Censored) Shifted Wald and the Wiener Distribution as Measurement Models
-        for Choice Response Times. Applied Psychological Measurement, 42(2), 116-135. https://doi.org/10.1177/0146621617710465",
+      citation = glue(
+        "Miller, R., Scherbaum, S., Heck, D. W., Goschke, T., & Enge, S. (2018). \\
+        On the relation between the (censored) shifted Wald and the Wiener \\
+        distribution as measurement models for choice response times. Applied \\
+        Psychological Measurement, 42(2), 116-135. \\
+        https://doi.org/10.1177/0146621617710465"
+      ),
       version = version,
       requirements = glue(
         "- Reaction times should be passed in seconds", "\n",
@@ -118,13 +122,12 @@
     call = call
   )
 
-  out$links[names(links)] <- links
-  resolve_fixed_links(out)
+  resolve_fixed_links(set_links(out, links))
 }
 
 #' @title `r .model_cswald()$name`
 #' @name cswald
-#' @details `r model_info(.model_cswald())`
+#' @details `r model_docs(.model_cswald())`
 #' @param rt The name of the variable in the dataset containing the response
 #'   times. Response times should be coded in seconds (not milliseconds).
 #' @param response The name of the variable in the dataset containing the
@@ -137,7 +140,10 @@
 #'   `ndt`, `s`, and `sndt`; "crisk" additionally has `zr`. Default links are
 #'   "log" for most parameters and "logit" for `zr`. For positive parameters, "softplus"
 #'   is available as an alternative to "log" that grows linearly for large
-#'   values and avoids the numerical blow-up of `exp()`.
+#'   values and avoids the numerical blow-up of `exp()`. A name that is not a
+#'   parameter of the model is an error, and a link that allows values the
+#'   default link excludes (e.g. "identity" for a positive parameter) is a
+#'   warning.
 #' @param version A character string specifying which version of the cswald
 #'   model to use. Options are:
 #'   \itemize{
@@ -155,7 +161,7 @@
 #'       parameter represents the total boundary separation, consistent with
 #'       the diffusion model parameterization.
 #'   }
-#'   For more details, see Miller et al. (2017).
+#'   For more details, see Miller et al. (2018).
 #' @param ... Additional arguments passed internally (for testing purposes).
 #' @return An object of class `bmmodel`
 #' @section Trial-to-trial variability in the non-decision time:
@@ -175,7 +181,7 @@
 #'
 #'   Without `sndt`, the fastest responses cap the `ndt` estimate (the
 #'   likelihood requires `ndt < min(rt)`), which biases `ndt`, `drift`, and
-#'   `bound` when the true non-decision time varies (Miller et al., 2017,
+#'   `bound` when the true non-decision time varies (Miller et al., 2018,
 #'   Fig. 3). Estimating `sndt` removes this bias, but `sndt` itself is weakly
 #'   identified at typical trial numbers and the prior acts as its regularizer:
 #'   estimate it at the population level only (`sndt ~ 1`) and check prior
@@ -437,7 +443,8 @@ configure_model.cswald_simple <- function(model, data, formula) {
     vars = family_args$vars,
     loop = family_args$loop,
     log_lik = log_lik_cswald_simple,
-    posterior_predict = posterior_predict_cswald_simple
+    posterior_predict = posterior_predict_cswald_simple,
+    posterior_epred = posterior_epred_cswald
   )
 
   sc_path <- system.file("stan_chunks", package = "bmm")
@@ -476,6 +483,24 @@ posterior_predict_cswald_simple <- function(i, prep, ...) {
   }
 }
 
+# Named after the family, "cswald", rather than the version: restructure()
+# finds the function of a fit saved without one by that name. Like
+# posterior_predict_cswald_simple(), it reads bound as the distance from the
+# start point to either boundary.
+posterior_epred_cswald <- function(prep) {
+  .epred_matrix(
+    with(prep$dpars, .diffusion_mean_rt(drift, bound * 2, ndt, zr = 0.5, s)) +
+      .cswald_mean_sndt(prep),
+    prep
+  )
+}
+
+# ndt is the minimum of Uniform(ndt, ndt + sndt), so the mean RT gains sndt / 2.
+# Fits saved before sndt existed carry no such dpar.
+.cswald_mean_sndt <- function(prep) {
+  (prep$dpars$sndt %||% 0) / 2
+}
+
 log_lik_cswald_simple <- function(i, prep) {
   drift <- brms::get_dpar(prep, "drift", i = i)
   bound <- brms::get_dpar(prep, "bound", i = i)
@@ -511,7 +536,8 @@ configure_model.cswald_crisk <- function(model, data, formula) {
     vars = family_args$vars,
     loop = family_args$loop,
     log_lik = log_lik_cswald_crisk,
-    posterior_predict = posterior_predict_cswald_crisk
+    posterior_predict = posterior_predict_cswald_crisk,
+    posterior_epred = posterior_epred_cswald_crisk
   )
 
   sc_path <- system.file("stan_chunks", package = "bmm")
@@ -537,6 +563,14 @@ log_lik_cswald_crisk <- function(i, prep) {
 
   .dcswald(rt, response, drift, bound, ndt,
     zr = zr, s = s, sndt = sndt, version = "crisk", log = TRUE
+  )
+}
+
+posterior_epred_cswald_crisk <- function(prep) {
+  .epred_matrix(
+    with(prep$dpars, .diffusion_mean_rt(drift, bound, ndt, zr, s)) +
+      .cswald_mean_sndt(prep),
+    prep
   )
 }
 

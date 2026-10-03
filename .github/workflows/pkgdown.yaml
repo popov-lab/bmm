@@ -53,6 +53,7 @@ jobs:
             waldo
             fansi
             rtdists
+            MPTinR
             any::pkgdown
             local::.
 

@@ -19,7 +19,7 @@ Description: Fit computational and measurement models using full Bayesian
     researchers can use it as a new model development framework.
     References: Frischkorn and Popov (2025) <doi:10.3758/s13428-025-02643-0>.
 License: GPL-2
-URL: https://github.com/popov-lab/bmm, https://venpopov.com/bmm/
+URL: https://github.com/popov-lab/bmm, https://popov-lab.github.io/bmm/
 BugReports: https://github.com/popov-lab/bmm/issues
 Depends: 
     R (>= 4.1.0)
@@ -31,7 +31,9 @@ Imports:
     glue,
     matrixStats,
     methods,
+    mvtnorm,
     parallel,
+    posterior (>= 1.6.0),
     rtdists,
     rlang,
     stats,
@@ -46,9 +48,14 @@ Suggests:
     ggplot2,
     ggthemes,
     knitr,
+    loo (>= 2.10.0),
     mixtur,
+    MPTinR,
+    pkgbuild,
     remotes,
     rmarkdown,
+    roxygen2,
+    rstan,
     statmod,
     stringr,
     testthat (>= 3.0.0),

@@ -72,6 +72,7 @@ jobs:
             waldo
             fansi
             yaml
+            roxygen2
 
       # Cache the built CmdStan so it is only compiled when a new version is
       # released (the cache key includes the latest release version)
@@ -125,7 +126,11 @@ jobs:
           )
         shell: Rscript {0}
 
+      # The check takes 7-12 minutes; a hung runner otherwise holds the job,
+      # and the concurrency group's next run, for GitHub's 6-hour default.
+      # The limit sits on this step so a cold CmdStan build cannot trip it.
       - uses: r-lib/actions/check-r-package@v2
+        timeout-minutes: 30
         with:
           build_args: 'c("--no-manual", "--no-build-vignettes")'
           args: 'c("--no-manual", "--as-cran", "--ignore-vignettes")'
