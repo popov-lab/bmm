@@ -562,6 +562,25 @@ stored_frame_cases <- function() {
       ))),
       formula = bmf(cp ~ 1 + (1 | id), rp ~ 1),
       data = data.frame(id = factor(1:6), C = 30:35, E = 20L, U = 10L)
+    ),
+    mpt_impossible = list(
+      model = mpt(mpt_impossible_trees(), tree_id = "tree"),
+      formula = bmf(Pm ~ 1 + (1 | id), Pb ~ 1),
+      data = mpt_impossible_data()
+    ),
+    mpt_covariates = list(
+      model = mpt(
+        mpt_tree("main", list(
+          correct = "D + (1 - D) * Gcorr",
+          incorrect = "(1 - D) * (1 - Gcorr)"
+        )),
+        covariates = "Gcorr"
+      ),
+      formula = bmf(D ~ 1 + (1 | id)),
+      data = data.frame(
+        id = factor(1:10), Gcorr = rep(c(0.25, 0.5), 5),
+        correct = 21:30, incorrect = 19:10
+      )
     )
   )
 }

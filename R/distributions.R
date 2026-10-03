@@ -811,13 +811,16 @@ rm3 <- function(n, size, pars, m3_model, act_funs = NULL, unpack = FALSE,
 #'   model that densities or random samples should be generated for.
 #' @param tree Character. For models with multiple trees, the name of the tree
 #'   to compute probabilities for. Can be omitted for single-tree models.
+#' @param covariates A named vector or list with the values of all covariates
+#'   declared in the model that appear in the branch expressions of the
+#'   selected tree.
 #' @param log Logical; if `TRUE` (default), densities are returned on the log
 #'   scale.
 #' @param unpack Logical; if `TRUE` and `n = 1`, returns a named vector instead
 #'   of a matrix. This allows automatic unpacking of response categories into
 #'   separate columns when used with `dplyr::reframe()`. Default is `FALSE`.
 #' @param ... can be used to pass additional values used in the branch
-#'   expressions.
+#'   expressions, as an alternative to the `covariates` argument.
 #'
 #' @note Unlike the densities of the circular models in this package (`dsdm()`,
 #'   `dmixture2p()`, `dmixture3p()`, `dimm()`) and unlike [stats::dmultinom()],
@@ -852,8 +855,9 @@ rm3 <- function(n, size, pars, m3_model, act_funs = NULL, unpack = FALSE,
 #'   mpt_model = model, tree = "new"
 #' )
 #' @export
-dmpt <- function(x, pars, mpt_model, tree = NULL, log = TRUE, ...) {
-  probs <- .mpt_probability_vector(pars, mpt_model, tree, ...)
+dmpt <- function(x, pars, mpt_model, tree = NULL, covariates = NULL,
+                 log = TRUE, ...) {
+  probs <- .mpt_probability_vector(pars, mpt_model, tree, covariates, ...)
 
   if (!is.null(names(x))) {
     expected_cats <- names(probs)
@@ -870,9 +874,9 @@ dmpt <- function(x, pars, mpt_model, tree = NULL, log = TRUE, ...) {
 
 #' @rdname mptdist
 #' @export
-rmpt <- function(n, size, pars, mpt_model, tree = NULL, unpack = FALSE,
-                 ...) {
-  probs <- .mpt_probability_vector(pars, mpt_model, tree, ...)
+rmpt <- function(n, size, pars, mpt_model, tree = NULL, covariates = NULL,
+                 unpack = FALSE, ...) {
+  probs <- .mpt_probability_vector(pars, mpt_model, tree, covariates, ...)
   result <- t(rmultinom(n, size = size, prob = probs))
   colnames(result) <- names(probs)
 
@@ -885,7 +889,8 @@ rmpt <- function(n, size, pars, mpt_model, tree = NULL, unpack = FALSE,
   result
 }
 
-.mpt_probability_vector <- function(pars, mpt_model, tree = NULL, ...) {
+.mpt_probability_vector <- function(pars, mpt_model, tree = NULL,
+                                    covariates = NULL, ...) {
   stopif(
     !inherits(mpt_model, "mpt"),
     "The mpt_model argument must be a bmmodel object created with mpt()."
@@ -903,7 +908,7 @@ rmpt <- function(n, size, pars, mpt_model, tree = NULL, unpack = FALSE,
     !tree %in% names(trees),
     "Unknown tree '{tree}'. The model contains: {collapse_comma(names(trees))}"
   )
-  values <- c(as.list(pars), list(...))
+  values <- c(as.list(pars), as.list(covariates), list(...))
   required <- .mpt_expr_vars(trees[[tree]])
   missing <- setdiff(required, names(values))
   stopif(
@@ -927,7 +932,7 @@ rmpt <- function(n, size, pars, mpt_model, tree = NULL, unpack = FALSE,
     abs(sum(probs) - 1) > 1e-6,
     "The branch probabilities of tree '{tree}' sum to {signif(sum(probs), 6)} \\
     instead of 1 for the provided values. Check the parameter values (e.g., \\
-    simplex constraints)."
+    simplex constraints) and covariates."
   )
 
   resp_cats <- mpt_model$resp_vars$resp_cats

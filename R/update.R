@@ -312,7 +312,7 @@ revert_check_data.mpt <- function(model, data) {
   }
   # check_data() refuses generated indicator columns it finds in the data, and
   # rebuilds them from the tree column
-  data[unname(model$other_vars$indicators$tree)] <- NULL
+  data[unname(c(model$other_vars$indicators$tree, model$other_vars$indicators$possible))] <- NULL
   NextMethod("revert_check_data")
 }
 

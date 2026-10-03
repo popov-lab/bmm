@@ -68,7 +68,7 @@ test_that("mpt errors when branch probabilities do not sum to 1", {
 
   good_tree <- mpt_tree("u", list(a = "D + (1 - D) * g", b = "(1 - D) * (1 - g)"))
   deviations <- .mpt_tree_sum_deviations(
-    list(t = bad_tree, u = good_tree), c("D", "g"), list()
+    list(t = bad_tree, u = good_tree), c("D", "g"), character(0), list()
   )
   # the branches reduce to g, which takes the second test value first
   expect_equal(deviations[["t"]], 0.421)

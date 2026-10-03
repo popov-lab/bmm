@@ -7,6 +7,7 @@
 mpt(
   trees,
   tree_id = NULL,
+  covariates = NULL,
   simplex = NULL,
   restrictions = NULL,
   links = "logit",
@@ -15,12 +16,18 @@ mpt(
 }
 \arguments{
 \item{trees}{A single \code{mpt_tree} object or a list of \code{mpt_tree} objects.
-All trees must share the same set of response categories.}
+All trees must share the same set of response categories, counting those
+declared impossible.}
 
 \item{tree_id}{Character. Name of the data column whose values name the tree
 each observation belongs to; the values must match the tree names. Can be
 omitted for single-tree models. Effects of experimental conditions belong
 in the parameter formulas, not here — see Details.}
+
+\item{covariates}{Character vector. Names of data columns that appear in
+branch expressions but are not latent parameters, for example
+design-fixed guessing rates. Covariates pass into the model formulas
+unchanged and have no naming restrictions.}
 
 \item{simplex}{A character vector, or a list of character vectors, naming
 groups of parameters that are jointly constrained to sum to 1. Each group
@@ -77,8 +84,9 @@ variable is passed. The \code{tree_id} column names the tree of each row, and
 the counts of a row must come from trials of that tree.
 
 A separate tree is needed only when the \emph{branch expressions} differ — that
-is, when the trial determines which latent processes apply (old versus
-new probes, inclusion versus exclusion instructions).
+is, when the trial determines which latent processes apply or which
+response categories are reachable (old versus new probes, a response set
+with or without distractors, inclusion versus exclusion instructions).
 Experimental factors whose \emph{effect on the parameters} you want to estimate
 belong in the parameter formulas, exactly as in every other \code{bmm} model:
 \code{bmf(D ~ 0 + condition)}. The two roles are independent, and one data

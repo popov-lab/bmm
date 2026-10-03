@@ -206,6 +206,7 @@ test_that("model_overview() has one row per version with its own columns and par
 
   mpt_row <- overview[grepl("`mpt()`", overview$Model, fixed = TRUE), ]
   expect_match(mpt_row$`Data columns`, "`trees`: number of responses in each response category", fixed = TRUE)
+  expect_match(mpt_row$`Data columns`, "`covariates`:", fixed = TRUE)
 
   mixture2p <- overview[grepl("`mixture2p()`", overview$Model, fixed = TRUE), ]
   expect_false(grepl("version", mixture2p$Model))
