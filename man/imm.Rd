@@ -68,7 +68,7 @@ Please use \code{imm(version = 'full')}, \code{imm(version = 'bsc')}, or \code{i
 \item \strong{Name:} Interference measurement model by Oberauer and Lin (2017).
 \item \strong{Citation:}
 \itemize{
-\item Oberauer, K., & Lin, H.Y. (2017). An interference model of visual working memory. Psychological Review, 124(1), 21-59
+\item Oberauer, K., & Lin, H.-Y. (2017). An interference model of visual working memory. Psychological Review, 124(1), 21-59. https://doi.org/10.1037/rev0000044
 }
 }
 \subsection{Version: \code{full}}{

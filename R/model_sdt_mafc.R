@@ -32,13 +32,17 @@
       domain = "Perception & Recognition Memory",
       task = "m-Alternative Forced Choice",
       name = "Signal Detection Theory (m-AFC)",
-      citation = glue(
-        "Green, D. M., & Swets, J. A. (1966). Signal detection theory ",
-        "and psychophysics. Wiley.\n",
-        "DeCarlo, L. T. (2012). On a signal detection approach to ",
-        "m-alternative forced choice with bias, with maximum likelihood ",
-        "and Bayesian approaches to estimation. Journal of Mathematical ",
-        "Psychology, 56(3), 196-207."
+      citation = c(
+        glue(
+          "Green, D. M., & Swets, J. A. (1966). Signal detection theory ",
+          "and psychophysics. Wiley."
+        ),
+        glue(
+          "DeCarlo, L. T. (2012). On a signal detection approach to ",
+          "m-alternative forced choice with bias, with maximum likelihood ",
+          "and Bayesian approaches to estimation. Journal of Mathematical ",
+          "Psychology, 56(3), 196-207. https://doi.org/10.1016/j.jmp.2012.02.004"
+        )
       ),
       version = "NA",
       requirements = requirements,
