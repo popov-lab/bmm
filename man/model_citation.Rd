@@ -27,8 +27,8 @@ corrected references. When the installed version no longer has a
 constructor for the model, or its references are empty, the copy stored
 in the fit or model object is returned instead.
 
-Some versions of a model add the reference that introduced them, for
-example \code{sdt_rating(version = "dpsdt")}.
+Some versions of a model cite the papers that introduced them instead,
+for example \code{sdt_rating(version = "dpsdt")}.
 
 A custom \code{m3()} model is cited with the paper that introduced the M3
 framework. The model structure itself is defined by the user, so its
