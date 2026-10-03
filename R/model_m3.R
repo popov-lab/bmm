@@ -63,7 +63,8 @@
       name = "The Multinomial / Memory Measurement Model",
       citation = glue(
         "Oberauer, K., & Lewandowsky, S. (2019). Simple measurement models \\
-        for complex working-memory tasks. Psychological Review, 126."
+        for complex working-memory tasks. Psychological Review, 126(6), \\
+        880-932. https://doi.org/10.1037/rev0000159"
       ),
       version = version,
       requirements = paste0(
