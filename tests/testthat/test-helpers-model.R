@@ -83,6 +83,9 @@ test_that("bmm_models() combines with and takes plain character values in vctrs 
   expect_equal(sum(!is.na(joined$k)), 1)
   expect_identical(vctrs::vec_c(bmm_models(), factor("x")), c(model_names(), "x"))
   expect_identical(vctrs::vec_c(factor("x"), bmm_models()), c("x", model_names()))
+  expect_identical(vctrs::vec_c(bmm_models(), ordered("x")), c(model_names(), "x"))
+  expect_identical(vctrs::vec_c(ordered("x"), bmm_models()), c("x", model_names()))
+  expect_s3_class(vctrs::vec_cast("x", bmm_models()), "bmm_models")
 
   models <- dplyr::tibble(model = bmm_models())
   models[models$model == "imm", "model"] <- "IMM"

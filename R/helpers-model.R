@@ -730,6 +730,12 @@ vec_ptype2.bmm_models.factor <- function(x, y, ...) character()
 #' @exportS3Method vctrs::vec_ptype2 factor.bmm_models
 vec_ptype2.factor.bmm_models <- function(x, y, ...) character()
 
+#' @exportS3Method vctrs::vec_ptype2 bmm_models.ordered
+vec_ptype2.bmm_models.ordered <- function(x, y, ...) character()
+
+#' @exportS3Method vctrs::vec_ptype2 ordered.bmm_models
+vec_ptype2.ordered.bmm_models <- function(x, y, ...) character()
+
 # one string, not one per model, so it is not a format() method: tibble and
 # print.data.frame call format() on columns and expect one string per element
 models_text <- function(models = model_names()) {
