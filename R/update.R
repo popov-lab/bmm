@@ -296,11 +296,13 @@ revert_check_data.non_targets <- function(model, data) {
   # sums give the set size of each row back, as .np_lure_free_rows() also does.
   # The names come from nt_features rather than from a pattern match, because a
   # user column called LureIdx9 that a formula kept would be summed in too and
-  # the set sizes it shifts are legal integers that nothing downstream rejects
+  # the set sizes it shifts are legal integers that nothing downstream rejects.
+  # A model on a circmix custom family passes ss_numeric to its likelihood, so
+  # its frame holds the set size itself and no LureIdx columns
   if (is.character(set_size) && not_in(set_size, colnames(data))) {
-    data[[set_size]] <- 1 + rowSums(
+    data[[set_size]] <- data$ss_numeric %||% (1 + rowSums(
       data[paste0("LureIdx", seq_along(model$other_vars$nt_features))]
-    )
+    ))
     attr(data, "rebuilt") <- c(attr(data, "rebuilt"), set_size)
   }
   # nt_features passed the check when the fit was made, so the fit's largest set

@@ -35,10 +35,10 @@ test_that("a link target that abbreviates a parameter is read as that parameter"
 })
 
 test_that("a link target that names no single parameter is refused", {
-  # 'b' is one edit from each of imm's a, c and s
+  # 'd' is one edit from each of imm's a, b, c and s
   expect_error(
     imm(resp_error = "y", nt_features = "nt", nt_distances = "d",
-        set_size = "ss", links = list(b = "log")),
+        set_size = "ss", links = list(d = "log")),
     "Unrecognized link target"
   )
   # two entries resolving to the same parameter would silently drop one
@@ -160,11 +160,6 @@ test_that("a link the model does not pass on to the fit is refused", {
     "cannot be changed in sdm\\(\\)"
   )
   expect_error(
-    imm(resp_error = "y", nt_features = "nt", nt_distances = "d",
-        set_size = "ss", links = list(c = "softplus")),
-    "cannot be changed in imm\\(\\)"
-  )
-  expect_error(
     mixture2p(resp_error = "y", links = list(kappa = "softplus")),
     "cannot be changed in mixture2p\\(\\)"
   )
@@ -197,7 +192,7 @@ test_that("the links a model applies are exactly the settable ones", {
 test_that("a refused model builds the same fit whatever its links say", {
   # the refusal is only correct while configure_model() ignores model$links, so
   # that is measured rather than restated: the family carries the links of a
-  # custom or mixture family, the parameter formulas carry imm's log scale
+  # custom or mixture family
   dat <- oberauer_lin_2017
   fingerprint <- function(model, formula) {
     bf <- configure_model(model, check_data(model, dat, formula), formula)$formula
@@ -215,11 +210,6 @@ test_that("a refused model builds the same fit whatever its links say", {
     list(
       mixture3p("dev_rad", nt_features = nt, set_size = "set_size"),
       bmf(thetat ~ 1, thetant ~ 1, kappa ~ 1), "kappa"
-    ),
-    list(
-      imm("dev_rad", nt_features = nt, nt_distances = paste0("dist_nt", 1:7),
-          set_size = "set_size"),
-      bmf(c ~ 1, a ~ 1, s ~ 1, kappa ~ 1), "c"
     )
   )
   for (case in cases) {
@@ -239,6 +229,18 @@ test_that("a custom link set on a model reaches the brms family", {
   )
   family <- configure_model(model, check_data(model, dat, ff), ff)$formula$family
   expect_equal(family$link_bound, "softplus")
+})
+
+test_that("a custom link set on imm reaches its custom family", {
+  ff <- bmmformula(kappa ~ 1, c ~ 1, a ~ 1, s ~ 1)
+  model <- imm("dev_rad", nt_features = paste0("col_nt", 1:7),
+    nt_distances = paste0("dist_nt", 1:7), set_size = "set_size",
+    links = list(c = "softplus")
+  )
+  data <- check_data(model, oberauer_lin_2017, ff)
+  family <- configure_model(model, data, ff)$formula$family
+  expect_equal(family$link_c, "softplus")
+  expect_equal(family$link_a, "log")
 })
 
 test_that("links set after construction are checked by the pipeline", {

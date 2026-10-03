@@ -416,6 +416,13 @@ test_that("every model ships an sd default on the link scale of each parameter",
     imm("dev_rad", nt_features = paste0("col_nt", 1:7), nt_distances = paste0("dist_nt", 1:7), set_size = "set_size")
   )
   for (par in c("kappa", "a", "c", "s")) expect_equal(sd_default(pr, par), "exponential(1)")
+  pr <- default_prior(
+    bmf(kappa ~ 1 + (1 | ID), tau ~ 1 + (1 | ID), c ~ 1, a ~ 1), data,
+    imm("dev_rad", nt_features = paste0("col_nt", 1:7), set_size = "set_size",
+        version = "abc", variable_precision = TRUE)
+  )
+  expect_equal(sd_default(pr, "kappa"), "exponential(1)")
+  expect_equal(sd_default(pr, "tau"), "exponential(2)")
 
   pr <- default_prior(bmf(kappa ~ 1 + (1 | ID), c ~ 1 + (1 | ID)), data, sdm("dev_rad"))
   for (par in c("kappa", "c")) expect_equal(sd_default(pr, par), "exponential(1)")
@@ -547,7 +554,7 @@ test_that("the set-size-1 sd constraint survives next to the blanket sd prior", 
   formula <- bmf(kappa ~ 1, c ~ 1, a ~ 0 + set_size + (0 + set_size | ID), s ~ 0 + set_size + (0 + set_size | ID))
   pr <- default_prior(formula, data, model)
   constraint <- pr[pr$class == "sd" & pr$coef == "set_size1", ]
-  expect_setequal(constraint$nlpar, c("a", "s"))
+  expect_setequal(constraint$dpar, c("a", "s"))
   expect_true(all(constraint$prior == "constant(1e-8)"))
   for (par in c("a", "s")) expect_equal(sd_default(pr, par), "exponential(1)")
 })

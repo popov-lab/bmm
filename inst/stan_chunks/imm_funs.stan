@@ -1,13 +1,4 @@
-  /* Interference measurement model (Oberauer & Lin, 2017). The weights are a
-   * Luce choice over the activations of the target, the ss - 1 active
-   * non-targets, and a background b, which is the theory rather than a link, so
-   * these versions keep it and gain only variable precision.
-   *
-   * c, a, s and b arrive on their natural scale because brms applies the
-   * inverse link before calling the likelihood. The activations are assembled
-   * on the log scale with log_sum_exp rather than as log(c * exp(-s * d) + a),
-   * which is the same quantity without the intermediate exponentials.
-   */
+  // IMM (Oberauer & Lin, 2017); R twin .imm_log_weights() in R/distributions.R
 
   real imm_abc_core(real y, real mu, real kappa, real tau, real c, real a,
                     real b, int ss, vector nt, int nodes, data vector logk,

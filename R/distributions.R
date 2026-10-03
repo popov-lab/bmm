@@ -591,7 +591,13 @@ dimm <- function(x, mu = c(0, 2, -1.5), dist = c(0, 0.5, 2),
 
 # As .imm_item_weights(), but for the reduced versions and with the non-target
 # distances padded to max_set_size - 1. "abc" has no distance gradient at all,
-# and "bsc" no cue-independent activation.
+# and "bsc" no cue-independent activation. Twin of the imm_*_core() functions in
+# inst/stan_chunks/imm_funs.stan. The weights are a Luce choice over the
+# activations of the target, the set_size - 1 active non-targets and the
+# background b; that choice rule is the theory rather than a link, so the
+# versions keep it and gain only variable precision. c, a, s and b reach the
+# Stan likelihood on their natural scale, because brms applies the inverse link
+# before calling it.
 .imm_log_weights <- function(c, a, s, b, set_size, dist, version) {
   n <- length(c)
   log_c <- log(c)

@@ -329,6 +329,28 @@ configure_model.imm <- function(model, data, formula) {
 }
 
 ############################################################################# !
+# CONFIGURE_PRIOR METHODS                                                ####
+############################################################################# !
+
+# A set-size-1 trial has no non-target, so s is absent from its likelihood and
+# a enters only through its sum with c. With set size as a factor, those levels
+# are pinned to a constant, as they were before imm moved to a custom family
+#' @export
+configure_prior.imm <- function(model, data, formula, user_prior, ...) {
+  set_size_var <- model$other_vars$set_size
+  if (!any(data$ss_numeric == 1) || is.numeric(data[[set_size_var]])) {
+    return(NULL)
+  }
+  pars <- intersect(c("a", "s"), names(model$parameters))
+  prior <- brms::empty_prior() +
+    constrain_set_size1_fixef(formula, pars, set_size_var, "constant(0)") +
+    constrain_set_size1_ranef(formula, pars, set_size_var, "constant(1e-8)")
+  prior$dpar <- prior$nlpar
+  prior$nlpar <- rep("", nrow(prior))
+  prior
+}
+
+############################################################################# !
 # POSTPROCESS METHODS                                                    ####
 ############################################################################# !
 

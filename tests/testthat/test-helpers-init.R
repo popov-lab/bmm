@@ -654,7 +654,7 @@ test_that("imm versions carry ranges for exactly their parameters", {
     resp_error = "dev_rad", nt_features = paste0("col_nt", 1:7),
     nt_distances = paste0("dist_nt", 1:7), set_size = "set_size"
   )$init_ranges
-  expect_setequal(names(ranges), c("mu1", "kappa", "a", "c", "s"))
+  expect_setequal(names(ranges), c("mu", "kappa", "a", "c", "s", "b"))
   expect_equal(ranges$a, central_range(0, 1, exp))
   expect_equal(ranges$c, ranges$a)
   expect_equal(ranges$s, ranges$a)
@@ -662,12 +662,12 @@ test_that("imm versions carry ranges for exactly their parameters", {
     resp_error = "dev_rad", nt_features = paste0("col_nt", 1:7),
     set_size = "set_size", version = "abc"
   )$init_ranges
-  expect_setequal(names(abc), c("mu1", "kappa", "a", "c"))
+  expect_setequal(names(abc), c("mu", "kappa", "a", "c", "b"))
   bsc <- imm(
     resp_error = "dev_rad", nt_features = paste0("col_nt", 1:7),
     nt_distances = paste0("dist_nt", 1:7), set_size = "set_size", version = "bsc"
   )$init_ranges
-  expect_setequal(names(bsc), c("mu1", "kappa", "c", "s"))
+  expect_setequal(names(bsc), c("mu", "kappa", "c", "s", "b"))
 })
 
 # =============================================================================
