@@ -182,6 +182,67 @@ test_that("default priors reach the parameters of each version", {
   expect_false(any(priors$class == "b" & priors$coef == "Intercept"))
 })
 
+test_that("every mixture2p parameter gets an sd default on its link scale", {
+  sd_default <- function(pr, par) pr$prior[pr$class == "sd" & pr$coef == "" & pr$group == "" & pr$dpar == par]
+  dat <- oberauer_lin_2017
+
+  pr <- default_prior(
+    bmf(mu ~ 1 + (1 | ID), kappa ~ 1 + (1 | ID), tau ~ 1 + (1 | ID), thetat ~ 1 + (1 | ID)),
+    dat, mixture2p("dev_rad", variable_precision = TRUE)
+  )
+  # brms treats mu as the family's own parameter, so its sd row has an empty dpar
+  expect_equal(sd_default(pr, ""), "exponential(4)")
+  expect_equal(sd_default(pr, "kappa"), "exponential(1)")
+  expect_equal(sd_default(pr, "thetat"), "exponential(1)")
+  expect_equal(sd_default(pr, "tau"), "exponential(2)")
+
+  for (version in c("slot", "slot_averaging")) {
+    pr <- default_prior(
+      bmf(kappa ~ 1 + (1 | ID), K ~ 1 + (1 | ID)), dat,
+      mixture2p("dev_rad", set_size = "set_size", version = version)
+    )
+    expect_equal(sd_default(pr, "kappa"), "exponential(1)")
+    expect_equal(sd_default(pr, "K"), "exponential(2)")
+  }
+})
+
+test_that("mixture2p cites van den Berg et al. only with variable precision", {
+  expect_length(model_citation(mixture2p("y")), 1)
+  vp <- model_citation(mixture2p("y", variable_precision = TRUE))
+  expect_length(vp, 2)
+  expect_match(vp[2], "^van den Berg.*https://doi.org/10.1073/pnas.1117465109$")
+})
+
+test_that("a mixture2p fit refuses posterior_epred() and its family stores the refusal", {
+  dat <- oberauer_lin_2017[oberauer_lin_2017$ID %in% 1:2, ]
+  cases <- list(
+    simple = list(bmf(kappa ~ 1, thetat ~ 1), mixture2p("dev_rad")),
+    slot = list(
+      bmf(kappa ~ 1, K ~ 1),
+      mixture2p("dev_rad", set_size = "set_size", version = "slot")
+    ),
+    slot_averaging = list(
+      bmf(kappa ~ 1, K ~ 1),
+      mixture2p("dev_rad", set_size = "set_size", version = "slot_averaging")
+    )
+  )
+  for (version in names(cases)) {
+    fit <- bmm(cases[[version]][[1]], dat, cases[[version]][[2]],
+      backend = "mock", mock_fit = 1, rename = FALSE
+    )
+    expect_identical(
+      fit$formula$family$posterior_epred,
+      get(paste0("posterior_epred_mixture2p_", version), envir = asNamespace("bmm"))
+    )
+    expect_error(brms::posterior_epred(fit), "not defined for the mixture2p model")
+    expect_error(fitted(fit), "not defined for the mixture2p model")
+    expect_error(
+      fit$formula$family$posterior_epred(NULL),
+      "not defined for the mixture2p model"
+    )
+  }
+})
+
 test_that("the Stan and R likelihoods agree for every version", {
   skip_on_cran()
   skip_if_not(

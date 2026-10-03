@@ -15,3 +15,17 @@ test_that("restructure works", {
   new_fit <- restructure(old_fit)
   expect_equal(new_fit$bmm$model$links, .model_mixture2p()$links)
 })
+
+test_that("restructure() adds posterior_epred to a custom family saved without it", {
+  fit <- load_fixture_fit("bmmfit_example1.rds")
+  expect_null(fit$formula$family$posterior_epred)
+  fit <- restructure(fit)
+  expect_identical(fit$formula$family$posterior_epred, posterior_epred_sdm_simple)
+  expect_identical(fit$family$posterior_epred, posterior_epred_sdm_simple)
+})
+
+test_that("restructure() leaves native brms families without posterior_epred", {
+  fit <- load_fixture_fit("bmmfit_m3_ppcheck.rds")
+  fit <- restructure(fit)
+  expect_null(fit$formula$family$posterior_epred)
+})

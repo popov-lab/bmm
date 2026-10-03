@@ -9,6 +9,20 @@
 
 .mixture2p_concentration <- "Concentration of the von Mises distribution of memory responses"
 
+.mixture2p_priors <- list(
+  mu = list(main = "normal(0, 0.5)", effects = "normal(0, 0.25)", sd = "exponential(4)"),
+  kappa = list(main = "normal(2, 1)", effects = "normal(0, 1)", sd = "exponential(1)")
+)
+
+# central 50% of the main default prior on the native scale
+.mixture2p_init_ranges <- list(mu = c(-0.65, 0.65), kappa = c(3.8, 15))
+
+# K is log-linked like a log-linked drift: an sd of 1 would let individual
+# capacities vary by a factor of e around the group value, so the rate is 2.
+.mixture2p_capacity_prior <- list(
+  main = "normal(1, 0.5)", effects = "normal(0, 0.3)", sd = "exponential(2)"
+)
+
 .mixture2p_version_table <- list(
   simple = list(
     weight_parameter = "thetat",
@@ -23,12 +37,13 @@
     ),
     links = list(mu = "tan_half", kappa = "log", thetat = "logit"),
     fixed_parameters = list(mu = 0),
-    priors = list(
-      mu = list(main = "student_t(1, 0, 1)"),
-      kappa = list(main = "normal(2, 1)", effects = "normal(0, 1)"),
-      thetat = list(main = "logistic(0, 1)")
-    ),
-    init_ranges = list(mu = c(-0.1, 0.1), kappa = c(3, 8), thetat = c(0.6, 0.9))
+    priors = c(.mixture2p_priors, list(
+      # two cells with logistic(0, 1) priors differ by SD pi * sqrt(2 / 3) = 2.57;
+      # narrower effects priors shrink set-size effects from a reference near
+      # ceiling, so 1 + set_size and 0 + set_size disagree (#466)
+      thetat = list(main = "logistic(0, 1)", effects = "normal(0, 2.5)", sd = "exponential(1)")
+    )),
+    init_ranges = c(.mixture2p_init_ranges, list(thetat = c(0.25, 0.75)))
   ),
   slot = list(
     weight_parameter = "K",
@@ -44,12 +59,8 @@
     ),
     links = list(mu = "tan_half", kappa = "log", K = "log"),
     fixed_parameters = list(mu = 0),
-    priors = list(
-      mu = list(main = "student_t(1, 0, 1)"),
-      kappa = list(main = "normal(2, 1)", effects = "normal(0, 1)"),
-      K = list(main = "normal(1, 0.5)", effects = "normal(0, 0.3)")
-    ),
-    init_ranges = list(mu = c(-0.1, 0.1), kappa = c(3, 8), K = c(2, 4))
+    priors = c(.mixture2p_priors, list(K = .mixture2p_capacity_prior)),
+    init_ranges = c(.mixture2p_init_ranges, list(K = c(1.9, 3.8)))
   ),
   slot_averaging = list(
     weight_parameter = "K",
@@ -69,12 +80,8 @@
     ),
     links = list(mu = "tan_half", kappa = "log", K = "log"),
     fixed_parameters = list(mu = 0),
-    priors = list(
-      mu = list(main = "student_t(1, 0, 1)"),
-      kappa = list(main = "normal(2, 1)", effects = "normal(0, 1)"),
-      K = list(main = "normal(1, 0.5)", effects = "normal(0, 0.3)")
-    ),
-    init_ranges = list(mu = c(-0.1, 0.1), kappa = c(3, 8), K = c(2, 4))
+    priors = c(.mixture2p_priors, list(K = .mixture2p_capacity_prior)),
+    init_ranges = c(.mixture2p_init_ranges, list(K = c(1.9, 3.8)))
   )
 )
 
@@ -93,11 +100,22 @@
       domain = "Visual working memory",
       task = "Continuous reproduction",
       name = "Two-parameter mixture model by Zhang and Luck (2008).",
-      version = version,
-      citation = glue(
-        "Zhang, W., & Luck, S. J. (2008). Discrete fixed-resolution \\
-        representations in visual working memory. Nature, 453(7192), 233-235"
+      citation = c(
+        glue(
+          "Zhang, W., & Luck, S. J. (2008). Discrete fixed-resolution \\
+          representations in visual working memory. Nature, 453(7192), 233-235. \\
+          https://doi.org/10.1038/nature06860"
+        ),
+        if (variable_precision) {
+          glue(
+            "van den Berg, R., Shin, H., Chou, W.-C., George, R., & Ma, W. J. \\
+            (2012). Variability in encoding precision accounts for visual \\
+            short-term memory limitations. Proceedings of the National Academy \\
+            of Sciences, 109(22), 8780-8785. https://doi.org/10.1073/pnas.1117465109"
+          )
+        }
       ),
+      version = version,
       requirements = glue(
         "- The response variable should be in radians and represent the \\
         angular error relative to the target", "\n",
@@ -116,14 +134,14 @@
     class = c("bmmodel", "circular", "mixture2p", paste0("mixture2p_", version)),
     call = call
   )
-  out$links[names(links)] <- links
+  out <- set_links(out, links)
   out
 }
 
 # user facing alias
 
 #' @title `r .model_mixture2p()$name`
-#' @details `r model_info(.model_mixture2p())`
+#' @details `r model_docs(.model_mixture2p())`
 #' @param resp_error The name of the variable in the provided dataset containing
 #'   the response error. The response Error should code the response relative to
 #'   the to-be-recalled target in radians. You can transform the response error
@@ -265,7 +283,8 @@ configure_model.mixture2p <- function(model, data, formula) {
     weight_parameters = spec$weight_parameter,
     vint = spec$needs_set_size,
     log_lik = .mixture2p_log_lik(model$version),
-    posterior_predict = .mixture2p_posterior_predict(model$version)
+    posterior_predict = .mixture2p_posterior_predict(model$version),
+    posterior_epred = .mixture2p_posterior_epred(model$version)
   )
 
   nlist(
@@ -296,6 +315,18 @@ configure_model.mixture2p <- function(model, data, formula) {
     slot_averaging = posterior_predict_mixture2p_slot_averaging
   )
 }
+
+.mixture2p_posterior_epred <- function(version) {
+  switch(version,
+    simple = posterior_epred_mixture2p_simple,
+    slot = posterior_epred_mixture2p_slot,
+    slot_averaging = posterior_epred_mixture2p_slot_averaging
+  )
+}
+
+posterior_epred_mixture2p_simple <- posterior_epred_undefined("mixture2p")
+posterior_epred_mixture2p_slot <- posterior_epred_undefined("mixture2p")
+posterior_epred_mixture2p_slot_averaging <- posterior_epred_undefined("mixture2p")
 
 log_lik_mixture2p_simple <- function(i, prep) {
   .dmixture2p_simple(

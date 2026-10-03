@@ -5,39 +5,81 @@
 \alias{pp_check}
 \title{Posterior predictive check for bmmfit objects}
 \usage{
-\method{pp_check}{bmmfit}(object, type = "dens_overlay", ndraws = NULL, group = NULL, ...)
+\method{pp_check}{bmmfit}(
+  object,
+  type = NULL,
+  ndraws = NULL,
+  group = NULL,
+  resp_var = NULL,
+  ...
+)
 }
 \arguments{
 \item{object}{A \code{bmmfit} object returned by \code{\link[=bmm]{bmm()}}.}
 
-\item{type}{Character. Type of pp_check (default \code{"dens_overlay"}). For
-non-multinomial models, passed to \code{\link[brms:pp_check.brmsfit]{brms::pp_check()}}. When \code{group} is
-specified, the grouped variant (e.g., \code{"dens_overlay_grouped"}) is
-auto-selected if available. Multinomial models produce a response
-proportion profile regardless of the value supplied.}
+\item{type}{Character. Type of pp_check. When \code{NULL} (default), resolves to
+\code{"dens_overlay"}, or to the selected observable's default type when
+\code{resp_var} is specified. When \code{group} is specified, the grouped variant
+(e.g., \code{"dens_overlay_grouped"}) is auto-selected if available.
+Multinomial models produce a response proportion profile regardless of
+the value supplied. With \code{resp_var}, \code{type = "bars_binned"} is also
+available: it bins a continuous statistic like a histogram, with bars for
+the observed number of observations per bin and points with intervals
+for the predicted number. It is the default for the \code{\link[=ezdm]{ezdm()}} accuracy
+check.}
 
 \item{ndraws}{Integer. Number of posterior draws. Defaults to \code{100} for
-multinomial models; otherwise passed to \code{\link[brms:pp_check.brmsfit]{brms::pp_check()}}.}
+multinomial models and \code{10} when \code{resp_var} is specified; otherwise
+passed to \code{\link[brms:pp_check]{brms::pp_check()}}.}
 
 \item{group}{Character. Optional grouping variable for faceting. For
-non-multinomial models, passed to \code{\link[brms:pp_check.brmsfit]{brms::pp_check()}}; when specified, the
+non-multinomial models, passed to \code{\link[brms:pp_check]{brms::pp_check()}}; when specified, the
 grouped variant of \code{type} (e.g., \code{"dens_overlay_grouped"}) is auto-selected
-if available. For multinomial models, facets by the named predictor.}
+if available. For multinomial models, facets by the named predictor. For
+the \code{\link[=sdt_rating]{sdt_rating()}} model \code{group} defaults to the \code{stimulus} variable so the
+signal and noise rating distributions are checked separately; pass
+\code{group = NA} to pool them into a single profile. The \code{\link[=sdt_ranking]{sdt_ranking()}} model
+shows the rank positions as the categories of the proportion profile; for
+mixed set sizes, pass the set-size column as \code{group} so each facet has a
+homogeneous denominator. The custom-family
+models \code{\link[=sdt_yn]{sdt_yn()}} and \code{\link[=sdt_mafc]{sdt_mafc()}} delegate to \code{\link[brms:pp_check]{brms::pp_check()}}; for
+their aggregated counts an overlaid empirical CDF (\code{type = "ecdf_overlay"},
+adding \code{group = "stimulus"} for \code{\link[=sdt_yn]{sdt_yn()}}) is usually clearer than the
+default bar view.}
 
-\item{...}{Additional arguments forwarded to \code{\link[brms:pp_check.brmsfit]{brms::pp_check()}} (non-multinomial)
-or to \code{\link[brms:posterior_predict.brmsfit]{brms::posterior_predict()}} (multinomial). For multinomial models,
-\code{probs} (numeric vector of length 2, default \code{c(0.025, 0.975)}) controls the
-credible interval. Both model types accept \code{re_formula} (e.g.,
-\code{re_formula = NA} to predict at the population level, excluding random
-effects).}
+\item{resp_var}{Character. For models that declare several observables,
+the name of the observable to check, or \code{"all"} for a panel of all
+available checks built from one shared simulation. See \code{\link[=pp_check_vars]{pp_check_vars()}}
+for the options of a fitted model. The default \code{NULL} checks the primary
+response via \code{\link[brms:pp_check]{brms::pp_check()}}, except for an \code{ezdm(version = "4par")}
+fit in which some cells have no usable summaries at the upper boundary:
+the primary response, \code{mean_rt_upper}, holds placeholders there, so
+\code{NULL} means \code{resp_var = "mean_rt_upper"}, which leaves those cells out
+but takes neither \code{newdata} nor the \verb{loo_*} types. For the RT models,
+passing \code{negative_rt = TRUE} (a \code{\link[brms:posterior_predict]{brms::posterior_predict()}} argument) is
+redirected to \code{resp_var = "signed_rt"}, so that observed and predicted
+response times are both signed by the response.}
+
+\item{...}{Additional arguments. Without \code{resp_var}, forwarded to
+\code{\link[brms:pp_check]{brms::pp_check()}}, or for multinomial models to
+\code{\link[brms:posterior_predict]{brms::posterior_predict()}} (\code{probs}, a numeric vector of length 2 with
+default \code{c(0.025, 0.975)}, sets the credible interval). With \code{resp_var},
+\code{draw_ids} and \code{re_formula} go to \code{\link[brms:prepare_predictions]{brms::prepare_predictions()}} and the
+rest to the \verb{bayesplot::ppc_*} function. \code{type = "bars_binned"} takes
+\code{breaks} (bin edges that cover the observed and predicted values), \code{prob}
+(interval width, default \code{0.9}) and \code{freq} (\code{FALSE} for proportions
+instead of counts). \code{re_formula = NA} predicts at the population level on
+every path.}
 }
 \value{
-For multinomial models, a \code{ggplot2} object. For other models, the
-result of \code{\link[brms:pp_check.brmsfit]{brms::pp_check()}}.
+For multinomial models, for a 4-parameter \code{\link[=ezdm]{ezdm()}} fit with
+placeholders in \code{mean_rt_upper}, or when \code{resp_var} is specified, a
+\code{ggplot2} object (a \code{bayesplot_grid} for \code{resp_var = "all"}). For other
+models, the result of \code{\link[brms:pp_check]{brms::pp_check()}}.
 }
 \description{
 For models where brms provides \code{pp_check} support, this method delegates to
-\code{\link[brms:pp_check.brmsfit]{brms::pp_check()}}. For models with multinomial families (e.g., the m3
+\code{\link[brms:pp_check]{brms::pp_check()}}. For models with multinomial families (e.g., the m3
 model), brms's \code{pp_check} is unavailable; this method dispatches to a
 model-specific visualisation instead.
 }
@@ -46,7 +88,26 @@ For \strong{multinomial models}, the plot mirrors the bayesplot \code{ppc_bars} 
 observed proportions are shown as bars and posterior predictive medians with
 credible intervals are shown as point-ranges, using the bayesplot default
 colour scheme and theme.
+
+Some models describe several observables jointly (e.g. \code{\link[=ddm]{ddm()}}: response
+times \emph{and} responses; \code{\link[=ezdm]{ezdm()}}: mean RT, RT variance \emph{and} accuracy), but
+brms only ever checks the primary response. For these models the \code{resp_var}
+argument selects which observable to check; \code{\link[=pp_check_vars]{pp_check_vars()}} lists the
+available checks. All selected observables are drawn from \strong{one} joint
+posterior predictive simulation, so \code{resp_var = "all"} panels are mutually
+consistent.
+
+Some observables are undefined for some cells — an \code{\link[=ezdm]{ezdm()}} boundary has no
+mean response time when fewer than two responses reach it. Observations
+whose \emph{observed} value is undefined are dropped from the check; undefined
+values in the \emph{simulated} replicates are absorbed by dropping those
+posterior draws instead, so the number of observations checked does not
+depend on \code{ndraws}. Dropped draws are not missing at random — they are
+draws whose parameters made a boundary sparse — so the retained predictive
+is mildly conditioned; both reductions are reported with a warning. With
+\code{resp_var = "all"} one reduction is shared by every panel, so the panels
+are computed on the same observations and draws.
 }
 \seealso{
-\code{\link[brms:pp_check.brmsfit]{brms::pp_check()}}
+\code{\link[brms:pp_check]{brms::pp_check()}}, \code{\link[=pp_check_vars]{pp_check_vars()}}
 }
