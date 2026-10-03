@@ -685,8 +685,7 @@ model_overview <- function(group = NULL) {
 #'   of a model.
 #' @return A character vector of model names with class `bmm_models`, which
 #'   prints as the grouped list. Use it like any character vector, in base R
-#'   or in dplyr, e.g. `"imm" %in% bmm_models()`. Combined with other strings
-#'   it becomes a plain character vector.
+#'   or in dplyr, e.g. `"imm" %in% bmm_models()`.
 #' @export
 #'
 #' @examples
@@ -709,7 +708,7 @@ print.bmm_models <- function(x, ...) {
 }
 
 # vctrs refuses to combine an unknown class with character, so without these
-# dplyr joins, binds and if_else() fail on a bmm_models() column
+# dplyr joins, binds, if_else() and assignment fail on a bmm_models() column
 #' @exportS3Method vctrs::vec_ptype2 bmm_models.bmm_models
 vec_ptype2.bmm_models.bmm_models <- function(x, y, ...) character()
 
@@ -721,6 +720,15 @@ vec_ptype2.character.bmm_models <- function(x, y, ...) character()
 
 #' @exportS3Method vctrs::vec_cast character.bmm_models
 vec_cast.character.bmm_models <- function(x, to, ...) unclass(x)
+
+#' @exportS3Method vctrs::vec_cast bmm_models.character
+vec_cast.bmm_models.character <- function(x, to, ...) structure(x, class = "bmm_models")
+
+#' @exportS3Method vctrs::vec_ptype2 bmm_models.factor
+vec_ptype2.bmm_models.factor <- function(x, y, ...) character()
+
+#' @exportS3Method vctrs::vec_ptype2 factor.bmm_models
+vec_ptype2.factor.bmm_models <- function(x, y, ...) character()
 
 # one string, not one per model, so it is not a format() method: tibble and
 # print.data.frame call format() on columns and expect one string per element

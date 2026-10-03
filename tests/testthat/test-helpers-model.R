@@ -67,7 +67,7 @@ test_that("bmm_models() formats per element and prints modified vectors as plain
   expect_output(print(toupper(models)), "\"CSWALD\"")
 })
 
-test_that("bmm_models() combines with plain character vectors in vctrs and dplyr", {
+test_that("bmm_models() combines with and takes plain character values in vctrs and dplyr", {
   skip_if_not_installed("vctrs")
   skip_if_not_installed("dplyr")
   expect_identical(vctrs::vec_c(bmm_models(), "x"), c(model_names(), "x"))
@@ -81,6 +81,14 @@ test_that("bmm_models() combines with plain character vectors in vctrs and dplyr
   expect_identical(joined$model, model_names())
   expect_equal(joined$k[joined$model == "imm"], 1)
   expect_equal(sum(!is.na(joined$k)), 1)
+  expect_identical(vctrs::vec_c(bmm_models(), factor("x")), c(model_names(), "x"))
+  expect_identical(vctrs::vec_c(factor("x"), bmm_models()), c("x", model_names()))
+
+  models <- dplyr::tibble(model = bmm_models())
+  models[models$model == "imm", "model"] <- "IMM"
+  expect_identical(as.character(models$model), sub("^imm$", "IMM", model_names()))
+  appended <- dplyr::rows_append(models, dplyr::tibble(model = "x"))
+  expect_identical(as.character(appended$model), c(models$model, "x"))
 })
 
 test_that("print_pretty_models_md(group = ) lists one group without headers", {
