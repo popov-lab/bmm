@@ -511,6 +511,25 @@ test_that("every model ships an sd default on the link scale of each parameter",
   for (par in c("criterion", "spacing", "rcrit", "sigmar")) {
     expect_equal(sd_default(pr, par), "exponential(2)")
   }
+
+  # a meanlog gets the rate of the racing models' accumulator locations, and the
+  # log-link ndt and sdlog the tighter one; the custom version's categories
+  # inherit the meanlog rate
+  lnr_data <- data.frame(rt = rep(c(0.6, 0.8, 1.1, 0.7), 5), response = rep(1:2, 10),
+                         id = factor(rep(1:5, each = 4)))
+  pr <- default_prior(
+    bmf(correct ~ 1 + (1 | id), error ~ 1 + (1 | id), ndt ~ 1 + (1 | id), s ~ 1 + (1 | id)),
+    lnr_data, lnr("rt", "response", n_choices = 2)
+  )
+  for (par in c("correct", "error")) expect_equal(sd_default(pr, par), "exponential(2)")
+  for (par in c("ndt", "s")) expect_equal(sd_default(pr, par), "exponential(4)")
+  lnr_data$label <- c("correct", "other")[lnr_data$response]
+  pr <- default_prior(
+    bmf(correct ~ 1 + (1 | id), other ~ 1 + (1 | id), ndt ~ 1 + (1 | id), s ~ 1 + (1 | id)),
+    lnr_data, lnr("rt", "label", version = "custom")
+  )
+  for (par in c("correct", "other")) expect_equal(sd_default(pr, par), "exponential(2)")
+  for (par in c("ndt", "s")) expect_equal(sd_default(pr, par), "exponential(4)")
 })
 
 test_that("a freed mu / mu1 gets regularizing main, effects and sd priors on the tan_half scale", {
