@@ -271,3 +271,41 @@ test_that("ddm stanvars are correctly added", {
   # Check that custom Stan functions were added
   expect_true(!is.null(fit$stanvars))
 })
+
+# posterior_epred (#475) ------------------------------------------------------
+
+ddm_epred_sets <- data.frame(
+  drift = c(1.5, -0.8, 0, 3),
+  bound = c(1.2, 1.8, 1, 2),
+  ndt = c(0.3, 0.2, 0.25, 0.4),
+  zr = c(0.5, 0.65, 0.3, 0.4)
+)
+
+test_that("posterior_epred_ddm() is the mean RT posterior_predict_ddm() simulates", {
+  skip_on_cran()
+  withr::local_seed(475)
+  res <- epred_vs_predict(ddm_epred_sets, posterior_epred_ddm, posterior_predict_ddm)
+  # the Monte-Carlo SE of each mean is below 0.5% of it at 20000 draws
+  expect_lt(max(abs(res[, "rel_error"])), 0.02)
+})
+
+test_that("posterior_epred_ddm() returns one column per observation", {
+  dpars <- lapply(ddm_epred_sets, matrix, nrow = 2)
+  expect_epred_by_cell(posterior_epred_ddm, dpars)
+})
+
+test_that("a ddm fit stores posterior_epred_ddm() in its family", {
+  skip_on_cran()
+  sim_data <- rddm(50, drift = 2, bound = 1.5, ndt = 0.3)
+  fit <- bmm(bmf(drift ~ 1, bound ~ 1, ndt ~ 1), sim_data, ddm("rt", "response"),
+             backend = "mock", mock = 1, rename = FALSE)
+  expect_identical(fit$formula$family$posterior_epred, posterior_epred_ddm)
+})
+
+test_that("posterior_epred() works on a ddm fit saved without the function", {
+  skip_on_cran()
+  fit <- load_fixture_fit("bmmfit_ddm_ppcheck.rds")
+  epred <- brms::posterior_epred(fit, ndraws = 20)
+  expect_equal(dim(epred), c(20L, nrow(fit$data)))
+  expect_true(all(is.finite(epred)))
+})

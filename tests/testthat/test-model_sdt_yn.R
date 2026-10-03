@@ -877,3 +877,39 @@ test_that("the Stan dist_type branches match the registry order", {
     }
   }
 })
+
+# posterior_epred (#475) ------------------------------------------------------
+
+test_that("posterior_epred_sdt_yn() is the mean count posterior_predict_sdt_yn() simulates", {
+  withr::local_seed(475)
+  sets <- data.frame(
+    d = c(1.5, 0.5, 2, 1),
+    criterion = c(0.2, -0.3, 0.8, 0),
+    sdratio = c(1, 1.3, 0.8, 1.5)
+  )
+  for (dist in .sdt_dist_names) {
+    data <- list(vint1 = c(1, 0, 1, 0), vint2 = rep(.sdt_dist_id(dist), 4),
+                 trials = c(50, 80, 20, 100))
+    res <- epred_vs_predict(sets, posterior_epred_sdt_yn, posterior_predict_sdt_yn,
+                            data = data)
+    expect_lt(max(abs(res[, "rel_error"])), 0.02)
+  }
+})
+
+test_that("posterior_epred_sdt_yn() returns one column per observation", {
+  dpars <- list(d = matrix(c(1.5, 0.5, 2, 1, 0.7, 1.2), 2),
+                criterion = matrix(c(0.2, -0.3, 0.8, 0, 0.1, -0.5), 2),
+                sdratio = matrix(c(1, 1.3, 0.8, 1.5, 1.1, 0.9), 2))
+  # a stimulus that differs across observations but not across draws is what
+  # a data column recycled down the draws gets wrong
+  data <- list(vint1 = c(1, 0, 1), vint2 = rep(.sdt_dist_id("gumbel_min"), 3),
+               trials = c(50, 80, 20))
+  expect_epred_by_cell(posterior_epred_sdt_yn, dpars, data)
+})
+
+test_that("an sdt_yn fit stores posterior_epred_sdt_yn() in its family", {
+  dat <- data.frame(n_old = c(10, 40), stimulus = c(0L, 1L), n_trials = c(50, 50))
+  fit <- bmm(bmf(d ~ 1, criterion ~ 1), dat, sdt_yn("n_old", "stimulus", "n_trials"),
+             backend = "mock", mock_fit = 1, rename = FALSE)
+  expect_identical(fit$formula$family$posterior_epred, posterior_epred_sdt_yn)
+})

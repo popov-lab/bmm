@@ -714,3 +714,61 @@ test_that("swald_log_Phi keeps a finite gradient on its own where Phi() nears un
 
   expect_true(all(is.finite(grad$model)))
 })
+
+# posterior_epred (#475) ------------------------------------------------------
+
+test_that("posterior_epred_cswald() is the mean RT posterior_predict_cswald_simple() simulates", {
+  skip_on_cran()
+  withr::local_seed(475)
+  sets <- data.frame(
+    drift = c(2, 0.5, 4, 1),
+    bound = c(0.75, 1, 0.5, 1.2),
+    ndt = c(0.3, 0.2, 0.25, 0.15),
+    s = c(1, 1, 0.8, 1.3)
+  )
+  res <- epred_vs_predict(sets, posterior_epred_cswald, posterior_predict_cswald_simple)
+  expect_lt(max(abs(res[, "rel_error"])), 0.02)
+})
+
+test_that("posterior_epred_cswald_crisk() is the mean RT posterior_predict_cswald_crisk() simulates", {
+  skip_on_cran()
+  withr::local_seed(475)
+  sets <- data.frame(
+    drift = c(2, -1, 0, 3),
+    bound = c(1.5, 2, 1, 1.2),
+    ndt = c(0.3, 0.2, 0.25, 0.15),
+    zr = c(0.5, 0.7, 0.4, 0.35),
+    s = c(1, 1, 0.8, 1.3)
+  )
+  res <- epred_vs_predict(sets, posterior_epred_cswald_crisk, posterior_predict_cswald_crisk)
+  expect_lt(max(abs(res[, "rel_error"])), 0.02)
+})
+
+test_that("cswald posterior_epred returns one column per observation", {
+  dpars <- list(drift = matrix(c(2, 0.5, 4, 1), 2), bound = matrix(c(0.75, 1, 0.5, 1.2), 2),
+                ndt = matrix(c(0.3, 0.2, 0.25, 0.15), 2), s = matrix(c(1, 1, 0.8, 1.3), 2))
+  expect_epred_by_cell(posterior_epred_cswald, dpars)
+  dpars$zr <- matrix(c(0.5, 0.7, 0.4, 0.35), 2)
+  expect_epred_by_cell(posterior_epred_cswald_crisk, dpars)
+})
+
+test_that("both cswald versions store their posterior_epred in the family", {
+  skip_on_cran()
+  dat <- rcswald(n = 100, drift = 2, bound = 1.5, ndt = 0.3)
+  fit <- bmm(bmf(drift ~ 1, bound ~ 1, ndt ~ 1), dat,
+             cswald(rt = "rt", response = "response", version = "simple"),
+             backend = "mock", mock = 1, rename = FALSE)
+  expect_identical(fit$formula$family$posterior_epred, posterior_epred_cswald)
+  fit <- bmm(bmf(drift ~ 1, bound ~ 1, ndt ~ 1, zr ~ 1), dat,
+             cswald(rt = "rt", response = "response", version = "crisk"),
+             backend = "mock", mock = 1, rename = FALSE)
+  expect_identical(fit$formula$family$posterior_epred, posterior_epred_cswald_crisk)
+})
+
+test_that("posterior_epred() works on a cswald fit saved without the function", {
+  skip_on_cran()
+  fit <- load_fixture_fit("bmmfit_cswald_ppcheck.rds")
+  epred <- brms::posterior_epred(fit, ndraws = 20)
+  expect_equal(dim(epred), c(20L, nrow(fit$data)))
+  expect_true(all(is.finite(epred)))
+})

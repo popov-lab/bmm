@@ -262,7 +262,8 @@ configure_model.ddm <- function(model, data, formula) {
       vars = "dec[n]",
       loop = TRUE,
       log_lik = log_lik_ddm,
-      posterior_predict = posterior_predict_ddm
+      posterior_predict = posterior_predict_ddm,
+      posterior_epred = posterior_epred_ddm
     )
   }
 
@@ -307,6 +308,11 @@ posterior_predict_ddm <- function(i, prep, ...) {
   } else {
     out[["rt"]]
   }
+}
+
+# the mean of what posterior_predict_ddm() returns: the RT of either response
+posterior_epred_ddm <- function(prep) {
+  .epred_matrix(with(prep$dpars, .diffusion_mean_rt(drift, bound, ndt, zr, s = 1)), prep)
 }
 
 #############################################################################!

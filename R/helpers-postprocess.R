@@ -90,3 +90,97 @@ revert_postprocess_brm <- function(model, fit, ...) {
 revert_postprocess_brm.default <- function(model, fit, ...) {
   fit
 }
+
+#' @title Expected response of a fitted bmm model
+#'
+#' @description `posterior_epred()` returns draws of the expected value of the
+#'   response for each observation: the mean of what [brms::posterior_predict()]
+#'   simulates for it. What that is depends on the model:
+#'
+#'   | Model | Expected response |
+#'   |-------|-------------------|
+#'   | `ddm()`, `cswald()` | Mean response time, averaged over both responses, under the diffusion process that `posterior_predict()` simulates from |
+#'   | `ezdm()`, version `"3par"` | Mean response time of the cell |
+#'   | `ezdm()`, version `"4par"` | Mean response time of the cell's upper-boundary responses |
+#'   | `sdt_yn()` | Number of "old"/"signal" responses, the number of trials times their probability |
+#'   | `sdt_mafc()` | Number of correct responses, the number of trials times their probability |
+#'   | `m3()`, `sdt_rating()`, `sdt_ranking()`, `sdt_cdp()` | Expected count of each response category, from the multinomial family of \pkg{brms} |
+#'   | `sdm()`, `mixture2p()`, `mixture3p()`, `imm()` | Not defined: the mean of a circular response error is not a useful quantity, so these models stop with an error |
+#'
+#'   With `dpar` or `nlpar`, `posterior_epred()` returns draws of that model
+#'   parameter for every model, as in \pkg{brms}. [native_parameters()] returns
+#'   the model parameters on their native scale over a grid of predictor values.
+#'
+#' @param object A `bmmfit` object.
+#' @param dpar,nlpar Name of a distributional or non-linear parameter whose
+#'   draws are returned instead of the expected response.
+#' @param ... Further arguments passed to [brms::posterior_epred()], such as
+#'   `newdata` or `ndraws`.
+#'
+#' @return A draws by observations matrix (an array with a third dimension for
+#'   the response categories of the multinomial models).
+#' @seealso [brms::posterior_epred()], [native_parameters()]
+#' @importFrom brms posterior_epred
+#' @export
+#' @examplesIf isTRUE(Sys.getenv("BMM_EXAMPLES"))
+#' fit <- bmm(
+#'   bmf(drift ~ 1, bound ~ 1, ndt ~ 1),
+#'   data = rddm(200, drift = 1.5, bound = 1.2, ndt = 0.3),
+#'   model = ddm(rt = "rt", response = "response"),
+#'   backend = "cmdstanr"
+#' )
+#' # expected response time of each observation, one row per draw
+#' epred <- posterior_epred(fit)
+posterior_epred.bmmfit <- function(object, dpar = NULL, nlpar = NULL, ...) {
+  if (is.null(dpar) && is.null(nlpar) && !expected_response_defined(object$bmm$model)) {
+    model_name <- intersect(class(object$bmm$model), supported_models(print_call = FALSE))
+    posterior_epred_undefined(model_name[1])()
+  }
+  NextMethod()
+}
+
+# Whether the model's response has an expected value worth returning. The
+# custom families refuse through the function stored in the family; this hook
+# also covers the models built on a native brms family, for which brms returns
+# a number of its own.
+expected_response_defined <- function(model) {
+  UseMethod("expected_response_defined")
+}
+
+#' @export
+expected_response_defined.default <- function(model) {
+  TRUE
+}
+
+# brms averages the von Mises locations of the mixtures linearly, which is no
+# circular mean, and for an unbiased model the circular mean is 0 anyway
+#' @export
+expected_response_defined.circular <- function(model) {
+  FALSE
+}
+
+# The posterior_epred function of a custom family whose response has no
+# useful expected value. brms finds a custom family's posterior_epred where the
+# family stores it, and otherwise looks up posterior_epred_<family name> in the
+# family environment, which reset_env() points at the global environment, so a
+# family without one fails with "object not found".
+posterior_epred_undefined <- function(model_name) {
+  force(model_name)
+  function(prep) {
+    stop2("The expected response is not defined for the {model_name} model; \\
+          use native_parameters() for the model parameters.")
+  }
+}
+
+# A custom posterior_epred returns a draws x observations matrix. The moment
+# helpers it calls flatten their arguments column by column, so their result
+# comes back in that order.
+.epred_matrix <- function(x, prep) {
+  matrix(x, nrow = prep$ndraws, ncol = prep$nobs)
+}
+
+# A data column lined up with the draws x observations dpar matrices, which
+# hold the draws of one observation in one column
+.epred_data <- function(x, prep) {
+  rep(x, each = prep$ndraws)
+}

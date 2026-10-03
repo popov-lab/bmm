@@ -216,6 +216,7 @@ configure_model.sdt_mafc <- function(model, data, formula) {
     loop = TRUE,
     log_lik = log_lik_sdt_mafc,
     posterior_predict = posterior_predict_sdt_mafc,
+    posterior_epred = posterior_epred_sdt_mafc,
     vars = c("vint1[n]", "vint2[n]", "trials[n]",
              "gh_nodes", "gh_weights", "gl_nodes", "gl_weights")
   )
@@ -258,4 +259,11 @@ posterior_predict_sdt_mafc <- function(i, prep, ...) {
 
   rsdt_mafc(length(d), prep$data$trials[i], prep$data$vint1[i],
             d, dist = dist)
+}
+
+posterior_epred_sdt_mafc <- function(prep) {
+  m <- as.integer(.epred_data(prep$data$vint1, prep))
+  dist <- .sdt_dist_names[prep$data$vint2[1]]
+  p_correct <- stats::plogis(.mafc_logit_pc_r(as.vector(prep$dpars$d), m, dist))
+  .epred_matrix(.epred_data(prep$data$trials, prep) * p_correct, prep)
 }

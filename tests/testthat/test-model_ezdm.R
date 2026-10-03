@@ -1183,3 +1183,71 @@ test_that("log_lik() of an ezdm 4par fit never reads a placeholder", {
   raw <- transform(sparse, rt_used_upper = 1L, rt_used_lower = 1L)
   expect_identical(brms::log_lik(fit, newdata = raw), brms::log_lik(fit))
 })
+
+# posterior_epred (#475) ------------------------------------------------------
+
+test_that("posterior_epred_ezdm_3par() is the mean of the mean RT posterior_predict simulates", {
+  skip_on_cran()
+  withr::local_seed(475)
+  sets <- data.frame(
+    drift = c(2, -1, 0, 3.5),
+    bound = c(1.5, 2, 1, 1.2),
+    ndt = c(0.3, 0.2, 0.25, 0.15),
+    s = c(1, 1, 0.8, 1.3)
+  )
+  res <- epred_vs_predict(sets, posterior_epred_ezdm_3par, posterior_predict_ezdm_3par,
+                          data = list(trials = c(40, 100, 20, 60)))
+  expect_lt(max(abs(res[, "rel_error"])), 0.02)
+})
+
+test_that("posterior_epred_ezdm_4par() is the mean of the upper mean RT posterior_predict simulates", {
+  skip_on_cran()
+  withr::local_seed(475)
+  sets <- data.frame(
+    drift = c(2, -1, 0, 3.5),
+    bound = c(1.5, 2, 1, 1.2),
+    ndt = c(0.3, 0.2, 0.25, 0.15),
+    zr = c(0.5, 0.7, 0.3, 0.6),
+    s = c(1, 1, 0.8, 1.3)
+  )
+  # cells where fewer than two responses reach the upper boundary simulate NA
+  # and are dropped from the mean, which leaves it unbiased: the mean RT of a
+  # boundary does not depend on how many responses reached it
+  res <- epred_vs_predict(sets, posterior_epred_ezdm_4par, posterior_predict_ezdm_4par,
+                          data = list(vint2 = c(40, 100, 20, 60)))
+  expect_lt(max(abs(res[, "rel_error"])), 0.02)
+})
+
+test_that("ezdm posterior_epred returns one column per observation", {
+  dpars <- list(drift = matrix(c(2, -1, 0, 3.5), 2), bound = matrix(c(1.5, 2, 1, 1.2), 2),
+                ndt = matrix(c(0.3, 0.2, 0.25, 0.15), 2), s = matrix(c(1, 1, 0.8, 1.3), 2))
+  expect_epred_by_cell(posterior_epred_ezdm_3par, dpars)
+  dpars$zr <- matrix(c(0.5, 0.7, 0.3, 0.6), 2)
+  expect_epred_by_cell(posterior_epred_ezdm_4par, dpars)
+})
+
+test_that("both ezdm versions store their posterior_epred in the family", {
+  skip_on_cran()
+  sim_data <- rezdm(10, n_trials = 100, drift = 2, bound = 1.5, ndt = 0.3, version = "3par")
+  fit <- bmm(bmf(drift ~ 1, bound ~ 1, ndt ~ 1), sim_data,
+             ezdm("mean_rt", "var_rt", "n_upper", "n_trials", version = "3par"),
+             backend = "mock", mock = 1, rename = FALSE)
+  expect_identical(fit$formula$family$posterior_epred, posterior_epred_ezdm_3par)
+  sim_data <- withr::with_seed(2, rezdm(10, n_trials = 100, drift = 1, bound = 1.5,
+                                        ndt = 0.3, zr = 0.5, version = "4par"))
+  fit <- bmm(ezdm4_formula, sim_data, ezdm4_model(),
+             backend = "mock", mock = 1, rename = FALSE)
+  expect_identical(fit$formula$family$posterior_epred, posterior_epred_ezdm_4par)
+})
+
+test_that("posterior_epred() works on ezdm fits saved without the function", {
+  skip_on_cran()
+  # these fixtures carry the current development version, so restructure()
+  # has to add the function regardless of the version stamp
+  for (name in c("bmmfit_ezdm3_ppcheck.rds", "bmmfit_ezdm4_ppcheck.rds")) {
+    fit <- load_fixture_fit(name)
+    epred <- brms::posterior_epred(fit, ndraws = 20)
+    expect_equal(dim(epred), c(20L, nrow(fit$data)))
+    expect_true(all(is.finite(epred)))
+  }
+})

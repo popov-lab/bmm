@@ -27,3 +27,26 @@ test_that("sdm posterior_predict draws each prediction from its own posterior dr
   expect_gt(slope, 0.6)
   expect_lt(slope, 1.4)
 })
+
+# posterior_epred (#475) ------------------------------------------------------
+
+test_that("an sdm fit refuses posterior_epred() with a message naming the model", {
+  skip_on_cran()
+  dat <- data.frame(y = rsdm(50))
+  fit <- bmm(bmf(c ~ 1, kappa ~ 1), dat, sdm(resp_error = "y"),
+             backend = "mock", mock = 1, rename = FALSE)
+  expect_true(is.function(fit$formula$family$posterior_epred))
+  expect_error(fit$formula$family$posterior_epred(NULL),
+               "The expected response is not defined for the sdm model")
+})
+
+test_that("posterior_epred() on an sdm fit saved without the function gives the message", {
+  # the fixture's model predates the circular class, so the family function,
+  # which restructure() adds, is what refuses here
+  fit <- load_fixture_fit("bmmfit_example1.rds")
+  expect_error(brms::posterior_epred(fit, ndraws = 5),
+               "The expected response is not defined for the sdm model")
+  # the model parameters stay available
+  expect_equal(dim(brms::posterior_epred(fit, dpar = "c", ndraws = 5)),
+               c(5L, nrow(fit$data)))
+})
