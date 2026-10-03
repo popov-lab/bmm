@@ -10,11 +10,12 @@
       domain = "Visual working memory",
       task = "Continuous reproduction",
       name = "Two-parameter mixture model by Zhang and Luck (2008).",
-      version = "NA",
       citation = glue(
         "Zhang, W., & Luck, S. J. (2008). Discrete fixed-resolution \\
-        representations in visual working memory. Nature, 453(7192), 233-235"
+        representations in visual working memory. Nature, 453(7192), 233-235. \\
+        https://doi.org/10.1038/nature06860"
       ),
+      version = "NA",
       requirements = glue(
         "- The response vairable should be in radians and \\
         represent the angular error relative to the target"
@@ -34,22 +35,38 @@
       ),
       fixed_parameters = list(mu1 = 0, mu2 = 0, kappa2 = -100),
       default_priors = list(
-        mu1 = list(main = "student_t(1, 0, 1)"),
-        kappa = list(main = "normal(2, 1)", effects = "normal(0, 1)"),
-        thetat = list(main = "logistic(0, 1)")
+        mu1 = list(main = "normal(0, 0.5)", effects = "normal(0, 0.25)", sd = "exponential(4)"),
+        kappa = list(main = "normal(2, 1)", effects = "normal(0, 1)", sd = "exponential(1)"),
+        # two cells with logistic(0, 1) priors differ by SD pi * sqrt(2 / 3) = 2.57;
+        # narrower effects priors shrink set-size effects from a reference near
+        # ceiling, so 1 + set_size and 0 + set_size disagree (#466)
+        thetat = list(main = "logistic(0, 1)", effects = "normal(0, 2.5)", sd = "exponential(1)")
+      ),
+      # central 50% of the main default prior on the native scale
+      init_ranges = list(
+        mu1 = c(-0.65, 0.65),
+        kappa = c(3.8, 15),
+        thetat = c(0.25, 0.75)
       )
     ),
     class = c("bmmodel", "circular", "mixture2p"),
     call = call
   )
-  out$links[names(links)] <- links
+  out <- set_links(out, links)
   out
+}
+
+# the links come from the brms::mixture() of von Mises components that
+# configure_model.mixture2p builds, not from this list
+#' @exportS3Method
+settable_links.mixture2p <- function(model) {
+  character(0)
 }
 
 # user facing alias
 
 #' @title `r .model_mixture2p()$name`
-#' @details `r model_info(.model_mixture2p())`
+#' @details `r model_docs(.model_mixture2p())`
 #' @param resp_error The name of the variable in the provided dataset containing
 #'   the response error. The response Error should code the response relative to
 #'   the to-be-recalled target in radians. You can transform the response error
