@@ -60,9 +60,7 @@ Censored-Shifted Wald Model
 \item \strong{Name:} Censored-Shifted Wald Model
 \item \strong{Citation:}
 \itemize{
-\item Miller, R., Scherbaum, S., Heck, D. W., Goschke, T., & Enge, S. (2017).
-On the Relation Between the (Censored) Shifted Wald and the Wiener Distribution as Measurement Models
-for Choice Response Times. Applied Psychological Measurement, 42(2), 116-135. https://doi.org/10.1177/0146621617710465
+\item Miller, R., Scherbaum, S., Heck, D. W., Goschke, T., & Enge, S. (2017). On the relation between the (censored) shifted Wald and the Wiener distribution as measurement models for choice response times. Applied Psychological Measurement, 42(2), 116-135. https://doi.org/10.1177/0146621617710465
 }
 \item \strong{Version:} simple
 \item \strong{Requirements:}

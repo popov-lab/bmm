@@ -87,9 +87,13 @@
       domain = "Decision Making / Response times",
       task = "Choice Reaction Time tasks (with few errors)",
       name = "Censored-Shifted Wald Model",
-      citation = "Miller, R., Scherbaum, S., Heck, D. W., Goschke, T., & Enge, S. (2017).
-        On the Relation Between the (Censored) Shifted Wald and the Wiener Distribution as Measurement Models
-        for Choice Response Times. Applied Psychological Measurement, 42(2), 116-135. https://doi.org/10.1177/0146621617710465",
+      citation = glue(
+        "Miller, R., Scherbaum, S., Heck, D. W., Goschke, T., & Enge, S. (2017). \\
+        On the relation between the (censored) shifted Wald and the Wiener \\
+        distribution as measurement models for choice response times. Applied \\
+        Psychological Measurement, 42(2), 116-135. \\
+        https://doi.org/10.1177/0146621617710465"
+      ),
       version = version,
       requirements = glue(
         "- Reaction times should be passed in seconds", "\n",

@@ -67,9 +67,19 @@
       domain = "Decision Making / Response times",
       task = "Choice Reaction Time tasks",
       name = "EZ-Diffusion Model",
-      citation = glue(
-        "Wagenmakers, E.-J., Van Der Maas, H. L. J., & Grasman, R. P. P. P. (2007). An EZ-diffusion model for response time and accuracy. Psychonomic Bulletin & Review, 14(1), 3-22. https://doi.org/10/fk447c", "\n",
-        "- Ch\u00e1vez De la Pe\u00f1a, A. F., & Vandekerckhove, J. (2025). An EZ Bayesian hierarchical drift diffusion model for response time and accuracy. Psychonomic Bulletin & Review. https://doi.org/10.3758/s13423-025-02729-y"
+      citation = c(
+        glue(
+          "Wagenmakers, E.-J., Van Der Maas, H. L. J., & Grasman, R. P. P. P. \\
+          (2007). An EZ-diffusion model for response time and accuracy. \\
+          Psychonomic Bulletin & Review, 14(1), 3-22. \\
+          https://doi.org/10.3758/BF03194023"
+        ),
+        glue(
+          "Ch\u00e1vez De la Pe\u00f1a, A. F., & Vandekerckhove, J. (2025). An \\
+          EZ Bayesian hierarchical drift diffusion model for response time and \\
+          accuracy. Psychonomic Bulletin & Review, 32(6), 3067-3087. \\
+          https://doi.org/10.3758/s13423-025-02729-y"
+        )
       ),
       version = version,
       requirements = glue(

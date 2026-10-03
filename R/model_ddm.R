@@ -40,7 +40,8 @@
       task = "Two-Alternative Force Choice RT",
       name = "Diffusion Decision Model",
       citation = glue(
-        "Ratcliff, R. (1978). A theory of memory retrieval. Psychological Review, 85(2), 59-108. https://doi.org/10/fjwm2f;"
+        "Ratcliff, R. (1978). A theory of memory retrieval. Psychological \\
+        Review, 85(2), 59-108. https://doi.org/10.1037/0033-295X.85.2.59"
       ),
       version = "NA",
       requirements = glue(
