@@ -357,6 +357,33 @@ revert_check_data.sdt_rating <- function(model, data) {
   NextMethod("revert_check_data")
 }
 
+# check_data() recodes the response into the category code .rdm_cat and the
+# accumulator counts into .rdm_n1 ... .rdm_nK, which are all brms keeps of them.
+# The simple version's code lumps every error into 2, which check_data() reads
+# back to the same code and counts. The response and a column form of
+# `accumulators` are rebuilt only when brms dropped them
+#' @exportS3Method
+revert_check_data.rdm <- function(model, data) {
+  response <- model$resp_vars$response
+  cat_names <- model$other_vars$resp_cats
+  accumulators <- model$other_vars$accumulators
+  if (not_in(response, colnames(data))) {
+    data[[response]] <- if (is.null(cat_names)) data$.rdm_cat else cat_names[data$.rdm_cat]
+    attr(data, "rebuilt") <- c(attr(data, "rebuilt"), response)
+  }
+  if (is.character(accumulators)) {
+    for (i in seq_along(cat_names)) {
+      col <- accumulators[[cat_names[i]]]
+      if (not_in(col, colnames(data))) {
+        data[[col]] <- data[[paste0(".rdm_n", i)]]
+        attr(data, "rebuilt") <- c(attr(data, "rebuilt"), col)
+      }
+    }
+  }
+  data[grep("^\\.rdm_(cat|n[0-9]+)$", colnames(data))] <- NULL
+  NextMethod("revert_check_data")
+}
+
 #' @exportS3Method
 revert_check_data.sdt_cdp <- function(model, data) {
   n_new <- model$other_vars$n_new

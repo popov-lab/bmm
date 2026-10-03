@@ -416,6 +416,13 @@ stored_frame_cases <- function() {
       formula = rt_formula, data = rt_data
     ),
     ddm = list(model = ddm("rt", "response"), formula = rt_formula, data = rt_data),
+    # three alternatives, so the error code check_data() lumps into 2 stands
+    # for two different responses
+    rdm = list(
+      model = rdm("rt", "response", n_choices = 3),
+      formula = bmf(driftc ~ 1 + (1 | id), drifte ~ 1, gap ~ 1, ndt ~ 1),
+      data = transform(rt_data, response = rep(c(1, 2, 3, 1), 5))
+    ),
     ezdm = list(
       model = ezdm("mean_rt", "var_rt", "n_upper", "n_trials", version = "3par"),
       formula = rt_formula, data = ez_data
@@ -649,6 +656,28 @@ test_that("an m3 frame whose Idx_ columns came from the wrong option columns is 
     check_stored_data(case$model, fit$data, fit$bmm$user_formula),
     "refit with `bmm\\(\\)`", ignore.case = TRUE
   )
+})
+
+# The custom rdm names its categories in the formula, so only the fitted model
+# (after check_model()) knows them; the stored-frame loop above checks with the
+# constructor's model and cannot cover this version
+test_that("the stored model frame of a custom rdm passes check_data again", {
+  skip_on_cran()
+  dat <- data.frame(
+    rt = rep(c(0.6, 0.8, 1.1, 0.7), 5),
+    choice = rep(c("left", "right", "right", "left"), 5),
+    n_left = 1, n_right = rep(c(1, 2), 10)
+  )
+  fit <- stored_frame_fit(list(
+    model = rdm("rt", "choice", version = "custom",
+                accumulators = c(left = "n_left", right = "n_right")),
+    formula = bmf(left ~ 1, right ~ 1, gap ~ 1, ndt ~ 1),
+    data = dat
+  ))
+  expect_false(any(c("choice", "n_left", "n_right") %in% colnames(fit$data)))
+  data <- check_stored_data(fit$bmm$model, fit$data, fit$bmm$user_formula)
+  expect_false(any(c("choice", "n_left", "n_right") %in% colnames(data)))
+  expect_equal(brms::standata(fit, newdata = data), brms::standata(fit))
 })
 
 test_that("every column a revert method rebuilds is dropped again", {
