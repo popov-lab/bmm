@@ -29,7 +29,7 @@ test_that("posterior_epred_undefined() builds a refusal that names the model", {
 })
 
 test_that("posterior_epred() refuses the circular mixture models by name", {
-  fit <- readRDS(test_path("assets/mock_bmmfit_mixture2p.rds"))
+  fit <- load_fixture_fit("mock_bmmfit_mixture2p.rds")
   expect_error(brms::posterior_epred(fit),
                "The expected response is not defined for the mixture2p model")
 
@@ -56,7 +56,7 @@ test_that("posterior_epred() of a circular model still returns its parameters", 
 })
 
 test_that("posterior_epred() refuses a circular model with newdata passed by position", {
-  fit <- readRDS(test_path("assets/mock_bmmfit_mixture2p.rds"))
+  fit <- load_fixture_fit("mock_bmmfit_mixture2p.rds")
   expect_error(brms::posterior_epred(fit, fit$data),
                "not defined for the mixture2p model")
 })
