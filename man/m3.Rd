@@ -56,7 +56,7 @@ decision task.
 \item \strong{Name:} The Multinomial / Memory Measurement Model
 \item \strong{Citation:}
 \itemize{
-\item Oberauer, K., & Lewandowsky, S. (2019). Simple measurement models for complex working-memory tasks. Psychological Review, 126.
+\item Oberauer, K., & Lewandowsky, S. (2019). Simple measurement models for complex working-memory tasks. Psychological Review, 126(6), 880-932. https://doi.org/10.1037/rev0000159
 }
 }
 \subsection{Version: \code{ss}}{

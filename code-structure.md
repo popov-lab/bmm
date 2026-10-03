@@ -76,7 +76,7 @@ All models in the package are defined as S3 classes and follow a strict template
       task = "",
       name = "",
       version = "",
-      citation = "",
+      citation = character(),
       requirements = "",
       parameters = list(),
       links = list(),

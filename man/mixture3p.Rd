@@ -40,7 +40,7 @@ Three-parameter mixture model by Bays et al (2009).
 \item \strong{Name:} Three-parameter mixture model by Bays et al (2009).
 \item \strong{Citation:}
 \itemize{
-\item Bays, P. M., Catalao, R. F. G., & Husain, M. (2009). The precision of visual working memory is set by allocation of a shared resource. Journal of Vision, 9(10), 1-11
+\item Bays, P. M., Catalao, R. F. G., & Husain, M. (2009). The precision of visual working memory is set by allocation of a shared resource. Journal of Vision, 9(10), Article 7. https://doi.org/10.1167/9.10.7
 }
 \item \strong{Requirements:}
 \itemize{

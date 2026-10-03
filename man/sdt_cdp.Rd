@@ -63,7 +63,7 @@ Continuous Dual-Process Signal Detection Theory Model
 \item \strong{Name:} Continuous Dual-Process Signal Detection Theory (CDP)
 \item \strong{Citation:}
 \itemize{
-\item Wixted, J. T., & Mickes, L. (2010). A continuous dual-process model of remember/know judgments. Psychological Review, 117(4), 1025-1054.
+\item Wixted, J. T., & Mickes, L. (2010). A continuous dual-process model of remember/know judgments. Psychological Review, 117(4), 1025-1054. https://doi.org/10.1037/a0020874
 }
 \item \strong{Requirements:}
 

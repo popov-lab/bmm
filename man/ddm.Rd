@@ -34,7 +34,7 @@ Diffusion Decision Model
 \item \strong{Name:} Diffusion Decision Model
 \item \strong{Citation:}
 \itemize{
-\item Ratcliff, R. (1978). A theory of memory retrieval. Psychological Review, 85(2), 59-108. https://doi.org/10/fjwm2f;
+\item Ratcliff, R. (1978). A theory of memory retrieval. Psychological Review, 85(2), 59-108. https://doi.org/10.1037/0033-295X.85.2.59
 }
 \item \strong{Requirements:}
 \itemize{
