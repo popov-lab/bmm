@@ -23,6 +23,7 @@ test_that("mpt stores its derived state once and can rebuild itself", {
   model <- mpt(mpt_2htm_trees(), tree_id = "item_type")
   expect_equal(model$other_vars$link, "logit")
   expect_equal(model$other_vars$indicators$tree, c(old = "Idx_old", new = "Idx_new"))
+  expect_null(model$other_vars$simplex_raw)
   expect_setequal(names(model$parameters), c("D", "g"))
   expect_equal(model$links$D, "logit")
   expect_equal(model$default_priors$D$main, "logistic(0, 1)")
@@ -36,11 +37,14 @@ test_that("mpt stores its derived state once and can rebuild itself", {
   rebuilt <- do.call("mpt", .mpt_constructor_args(model))
   expect_equal(without_call(rebuilt), without_call(model))
 
-  single <- mpt(mpt_tree("t", list(A = "p", B = "1 - p")), links = "probit")
+  single <- mpt(mpt_tree("t", list(A = "gA", B = "gB", C = "gC")),
+    simplex = c("gA", "gB", "gC"), links = "probit"
+  )
   expect_null(single$other_vars$indicators$tree)
-  expect_equal(single$links$p, "probit")
-  expect_equal(single$default_priors$p$main, "normal(0, 1)")
-  expect_equal(single$default_priors$p$effects, "normal(0, 1)")
+  expect_equal(single$other_vars$simplex_raw, c(gA = "gAraw", gB = "gBraw"))
+  expect_equal(single$links$gA, "identity")
+  expect_equal(single$default_priors$gAraw$main, "normal(0, 1)")
+  expect_equal(single$default_priors$gAraw$effects, "normal(0, 1)")
   rebuilt_single <- do.call("mpt", .mpt_constructor_args(single))
   expect_equal(without_call(rebuilt_single), without_call(single))
 })
@@ -106,6 +110,31 @@ test_that("mpt errors on name collisions and reserved names", {
   expect_error(mpt(tree_collision), "both a parameter and a response category")
   tree_reserved <- mpt_tree("t", list(Y = "p", other = "1 - p"))
   expect_error(mpt(tree_reserved), "reserved")
+})
+
+test_that("mpt validates simplex groups", {
+  trees <- mpt_2htm_trees()
+  expect_error(
+    mpt(trees, tree_id = "item_type", simplex = c("g", "x")),
+    "Unknown"
+  )
+  expect_error(
+    mpt(trees, tree_id = "item_type", simplex = "g"),
+    "at least two parameters"
+  )
+})
+
+test_that("the links of simplex parameters cannot be changed", {
+  tree <- mpt_tree("src", list(
+    a = "gA", b = "gB", n = "gN"
+  ))
+  model <- mpt(tree, simplex = c("gA", "gB", "gN"))
+  dat <- data.frame(a = 10, b = 5, n = 5)
+  model$links$gA <- "logit"
+  expect_error(
+    suppressMessages(check_model(model, dat, bmf(gA ~ 1))),
+    "cannot be changed"
+  )
 })
 
 test_that("check_formula generates linked category formulas", {
@@ -298,7 +327,7 @@ test_that("the links a non-linear formula switches off survive a second check", 
   expect_equal(rechecked$links, checked$links)
 })
 
-test_that("printing an mpt model lists trees and the identifiability bound", {
+test_that("printing an mpt model lists trees, restrictions and the identifiability bound", {
   model <- mpt(mpt_2htm_trees(), tree_id = "item_type")
   expect_output(print(model), "MPT tree 'old':")
   expect_output(print(model), "P\\(new\\) = \\(1 - D\\) \\* \\(1 - g\\)")
@@ -315,6 +344,58 @@ test_that("printing an mpt model lists trees and the identifiability bound", {
   unidentified <- mpt(trees, tree_id = "item_type")
   expect_output(print(unidentified), "3 free parameter\\(s\\), 2 degrees of freedom")
   expect_output(print(unidentified), "not identified")
+
+  restricted <- mpt(trees, tree_id = "item_type", restrictions = c("Dn = Do", "g = 0.5"))
+  expect_output(print(restricted), "Restrictions: Dn = Do, g = 0.5")
+
+  simplex <- mpt(
+    mpt_tree("t", list(A = "gA", B = "gB", C = "gC")),
+    simplex = c("gA", "gB", "gC")
+  )
+  expect_output(print(simplex), "2 free parameter\\(s\\), 2 degrees of freedom")
+})
+
+test_that("restrictions are substituted into the trees before parameters are identified", {
+  trees <- list(
+    mpt_tree("old", list(yes = "Do + (1 - Do) * g", no = "(1 - Do) * (1 - g)")),
+    mpt_tree("new", list(yes = "(1 - Dn) * g", no = "Dn + (1 - Dn) * (1 - g)"))
+  )
+  equated <- mpt(trees, tree_id = "item_type", restrictions = "Dn = Do")
+  expect_setequal(names(equated$parameters), c("Do", "g"))
+  expect_equal(equated$other_vars$trees$new$branches$yes, quote((1 - Do) * g))
+  expect_equal(equated$other_vars$restrictions, list(Dn = quote(Do)))
+
+  fixed <- mpt(trees, tree_id = "item_type", restrictions = c("g = 0.5", "Dn = Do"))
+  expect_equal(names(fixed$parameters), "Do")
+  expect_equal(
+    dmpt(c(yes = 6, no = 4), pars = c(Do = 0.2), mpt_model = fixed, tree = "old", log = FALSE),
+    dmultinom(c(6, 4), prob = c(0.2 + 0.8 * 0.5, 0.8 * 0.5))
+  )
+  expect_equal(
+    mpt(trees, tree_id = "item_type", restrictions = list(g = 0.5, Dn = "Do"))$other_vars$trees,
+    fixed$other_vars$trees
+  )
+
+  expect_error(
+    mpt(trees, tree_id = "item_type", restrictions = "Do > Dn"),
+    "Order constraints"
+  )
+  expect_error(
+    mpt(trees, tree_id = "item_type", restrictions = "Dn = Dold"),
+    "do not appear"
+  )
+  expect_error(
+    mpt(trees, tree_id = "item_type", restrictions = c("Dn = Do", "Do = Dn")),
+    "circular"
+  )
+  expect_error(
+    mpt(trees, tree_id = "item_type", restrictions = c("g = 0.5", "g = 0.4")),
+    "more than once"
+  )
+  expect_error(
+    mpt(trees, tree_id = "item_type", restrictions = "g = 0.00001"),
+    "scientific"
+  )
 })
 
 test_that("fixed parameter values stay probabilities and reach the prior on the latent scale", {
@@ -336,6 +417,85 @@ test_that("fixed parameter values stay probabilities and reach the prior on the 
   expect_equal(constant_row$prior, glue("constant({qnorm(0.7)})"))
 
   expect_error(check_model(model, dat, bmf(D ~ 1, g = 1.5)), "strictly")
+})
+
+test_that("simplex parameters cannot be fixed to constants", {
+  trees <- list(
+    mpt_tree("A", list(a = "gA", b = "gB", c = "gC")),
+    mpt_tree("B", list(a = "gB", b = "gC", c = "gA"))
+  )
+  model <- mpt(trees, tree_id = "tree", simplex = c("gA", "gB", "gC"))
+  expect_error(
+    check_model(model, formula = bmf(gA = 0.3)),
+    "Fixing simplex parameters"
+  )
+})
+
+test_that("mpt compiles with a simplex group via stick-breaking", {
+  trees <- list(
+    mpt_tree("sourceA", list(
+      A = "dA + (1 - dA) * gA",
+      B = "(1 - dA) * gB",
+      New = "(1 - dA) * gNew"
+    )),
+    mpt_tree("sourceB", list(
+      A = "(1 - dB) * gA",
+      B = "dB + (1 - dB) * gB",
+      New = "(1 - dB) * gNew"
+    )),
+    mpt_tree("new", list(A = "gA", B = "gB", New = "gNew"))
+  )
+  model <- mpt(trees, tree_id = "source", simplex = c("gA", "gB", "gNew"))
+  expect_setequal(
+    names(model$parameters),
+    c("dA", "dB", "gA", "gB", "gNew", "gAraw", "gBraw")
+  )
+  expect_equal(model$links$gA, "identity")
+  expect_equal(model$default_priors$gAraw$main, "logistic(0, 1)")
+  expect_null(model$default_priors[["gA"]])
+
+  dat <- expand.grid(
+    id = factor(1:10), source = c("sourceA", "sourceB", "new"),
+    stringsAsFactors = FALSE
+  )
+  counts <- t(rmultinom(nrow(dat), 30, c(0.4, 0.3, 0.3)))
+  colnames(counts) <- c("A", "B", "New")
+  dat <- cbind(dat, counts)
+  formula <- bmf(dA ~ 1, dB ~ 1, gA ~ 1 + (1 | id), gB ~ 1)
+
+  model_checked <- check_model(model, dat, formula)
+  dat_checked <- check_data(model_checked, dat, formula)
+  formula_checked <- suppressMessages(
+    check_formula(model_checked, dat_checked, formula)
+  )
+  gA_rhs <- paste(deparse(formula_checked$gA[[3]]), collapse = " ")
+  gNew_rhs <- paste(deparse(formula_checked$gNew[[3]]), collapse = " ")
+  expect_true(grepl("inv_logit(gAraw)", gA_rhs, fixed = TRUE))
+  expect_equal(gNew_rhs, "1 - (gA + gB)")
+  gAraw_rhs <- paste(deparse(formula_checked$gAraw[[3]]), collapse = " ")
+  expect_true(grepl("(1 | id)", gAraw_rhs, fixed = TRUE))
+
+  expect_warning(
+    suppressMessages(bmm(
+      formula, dat, model,
+      backend = "mock", mock_fit = 1, rename = FALSE
+    )),
+    "Non-linear transformations"
+  )
+})
+
+test_that("predictors on the derived simplex parameter are rejected", {
+  trees <- list(mpt_tree("t", list(A = "gA", B = "gB", New = "gNew")))
+  model <- mpt(trees, simplex = c("gA", "gB", "gNew"))
+  dat <- data.frame(id = factor(1:5), A = 10, B = 10, New = 10)
+  formula <- bmf(gA ~ 1, gB ~ 1, gNew ~ 1 + (1 | id))
+  expect_error(
+    suppressMessages(bmm(
+      formula, dat, model,
+      backend = "mock", mock_fit = 1, rename = FALSE
+    )),
+    "derived"
+  )
 })
 
 test_that("check_data errors are informative", {
@@ -396,6 +556,58 @@ test_that("mpt category probabilities match the production m3 likelihood", {
   }, numeric(1)))
 
   expect_lt(max_diff, 1e-10)
+})
+
+test_that("simplex predictors may be given on the parameter or its raw component", {
+  trees <- list(mpt_tree("t", list(A = "gA", B = "gB", C = "gC")))
+  model <- mpt(trees, simplex = c("gA", "gB", "gC"))
+  dat <- data.frame(id = factor(1:5), A = 10, B = 10, C = 10)
+
+  # an explicit gA ~ 1 does not override predictors on gAraw
+  on_raw <- suppressMessages(check_formula(
+    model, dat, bmf(gA ~ 1, gAraw ~ 1 + (1 | id), gB ~ 1, gBraw ~ 1)
+  ))
+  expect_equal(deparse1(on_raw$gAraw[[3]]), "1 + (1 | id)")
+  expect_equal(deparse1(on_raw$gA[[3]]), "inv_logit(gAraw)")
+
+  expect_error(
+    suppressMessages(check_formula(
+      model, dat, bmf(gA ~ 0 + id, gAraw ~ 1 + (1 | id), gB ~ 1, gBraw ~ 1)
+    )),
+    "Conflicting"
+  )
+  expect_no_error(suppressMessages(check_formula(
+    model, dat, bmf(gA ~ 0 + id, gAraw ~ 0 + id, gB ~ 1, gBraw ~ 1)
+  )))
+
+  dat$gAraw <- 1
+  expect_error(check_data(model, dat, bmf(gA ~ 1, gB ~ 1)), "stick-breaking")
+})
+
+test_that("mpt supports multiple simplex groups", {
+  tree <- mpt_tree("t", list(
+    A = "m * gA + (1 - m) * hA",
+    B = "m * gB + (1 - m) * hB",
+    C = "m * gC + (1 - m) * hC"
+  ))
+  model <- mpt(
+    tree,
+    simplex = list(c("gA", "gB", "gC"), c("hA", "hB", "hC"))
+  )
+  expect_setequal(
+    names(model$parameters),
+    c("m", "gA", "gB", "gC", "hA", "hB", "hC", "gAraw", "gBraw", "hAraw", "hBraw")
+  )
+
+  dat <- data.frame(id = factor(1:8), A = 10, B = 10, C = 10)
+  formula <- bmf(m ~ 1, gA ~ 1, gB ~ 1, hA ~ 1, hB ~ 1)
+  expect_warning(
+    suppressMessages(bmm(
+      formula, dat, model,
+      backend = "mock", mock_fit = 1, rename = FALSE
+    )),
+    "Non-linear transformations"
+  )
 })
 
 test_that("factor tree identifier columns are matched to tree names", {

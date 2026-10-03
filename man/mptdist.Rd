@@ -17,7 +17,7 @@ order of the categories follows the branch names of the trees.}
 
 \item{pars}{A named vector or list with the values of all latent parameters
 appearing in the branch expressions of the selected tree, on the
-probability scale.}
+probability scale. Parameters of a simplex group must sum to 1.}
 
 \item{mpt_model}{A \code{bmmodel} object created with \code{\link[=mpt]{mpt()}} specifying the
 model that densities or random samples should be generated for.}
