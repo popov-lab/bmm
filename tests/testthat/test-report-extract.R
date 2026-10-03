@@ -124,7 +124,7 @@ test_that("print(summary()) shows the formula text summarise_formula() returns",
   skip_if(length(fits) == 0, "Fixtures not available (excluded by .Rbuildignore)")
   for (name in names(fits)) {
     fit <- fits[[name]]
-    printed <- capture.output(print(suppressWarnings(summary(fit)), color = FALSE))
+    printed <- trimws(capture.output(print(suppressWarnings(summary(fit)), color = FALSE)), "right")
     lines <- summarise_formula(fit$bmm$user_formula, model = fit$bmm$model)
     expect_identical(sub("^Formula: ", "", printed[grep("^Formula: ", printed)]), lines[1], label = name)
     expect_true(all(paste0(strrep(" ", 9), lines[-1]) %in% printed), label = name)
