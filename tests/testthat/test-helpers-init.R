@@ -1012,7 +1012,7 @@ test_that("initfun starts every LBA parameter inside its init range", {
       if (model$links[[par]] == "log") range <- log(range)
       value <- inits[[paste0("Intercept_", par)]]
       expect_true(is.finite(value) && value >= range[1] && value <= range[2],
-                  info = paste(model$distribution, model$version, par))
+                  info = paste(model$other_vars$distribution, model$version, par))
     }
   }
   drifts <- list(normal = c(3, 1.5), gamma = c(2, 3), frechet = c(2, 3),

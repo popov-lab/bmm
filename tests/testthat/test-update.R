@@ -402,6 +402,13 @@ stored_frame_cases <- function() {
     n_correct = c(80, 55, 78, 60, 85, 52, 81, 58), n_trials = 100,
     n_afc = rep(c(2, 4), 4), cond = factor(rep(c("a", "b"), each = 4))
   )
+  lba_data <- data.frame(
+    rt = c(0.6, 0.8, 1.1, 0.7, 0.9, 0.65), response = c(1, 3, 1, 2, 1, 1),
+    choice = c("left", "right", "left", "right", "right", "left"),
+    n_left = c(1L, 1L, 2L, 2L, 1L, 2L), n_right = c(2L, 1L, 1L, 2L, 1L, 1L),
+    cond = factor(rep(c("a", "b"), 3))
+  )
+  lba_custom_formula <- bmf(left ~ 1, right ~ 1 + cond, gap ~ 1, sp ~ 1, ndt ~ 1)
   ranking_data <- meyer_grant_jakob_2025[as.integer(meyer_grant_jakob_2025$id) <= 4, ]
   rating_data <- data.frame(
     stimulus = rep(c(0L, 1L), 4), id = factor(rep(1:4, each = 2)),
@@ -419,6 +426,23 @@ stored_frame_cases <- function() {
     ezdm = list(
       model = ezdm("mean_rt", "var_rt", "n_upper", "n_trials", version = "3par"),
       formula = rt_formula, data = ez_data
+    ),
+    # the frame keeps only the vint() columns: the response and the
+    # accumulator columns come back from them
+    lba = list(
+      model = lba("rt", "response", n_choices = 3),
+      formula = bmf(driftc ~ 1, drifte ~ 1, gap ~ 1, sp ~ 1, ndt ~ 1),
+      data = lba_data
+    ),
+    # update() works on the fit's model, which check_model() has given the
+    # category names of the formula
+    lba_custom = list(
+      model = check_model(
+        lba("rt", "choice", version = "custom",
+            accumulators = c(left = "n_left", right = "n_right")),
+        lba_data, lba_custom_formula
+      ),
+      formula = lba_custom_formula, data = lba_data
     ),
     imm = list(
       model = imm("dev_rad",

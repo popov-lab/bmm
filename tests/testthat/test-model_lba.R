@@ -17,7 +17,7 @@ test_that("lba() creates simple model with correct structure", {
   expect_equal(model$resp_vars$response, "response")
   expect_equal(model$other_vars$n_choices, 2L)
   expect_equal(model$version, "simple")
-  expect_equal(model$distribution, "normal")
+  expect_equal(model$other_vars$distribution, "normal")
 })
 
 test_that("lba simple version has correct parameters", {
@@ -34,7 +34,7 @@ test_that("lba gamma distribution uses consistent drift parameter names", {
 
   expect_true(all(c("driftc", "drifte", "gap", "sp", "ndt", "s") %in%
                     names(model$parameters)))
-  expect_equal(model$distribution, "gamma")
+  expect_equal(model$other_vars$distribution, "gamma")
   expect_equal(model$links$driftc, "log")
 })
 
@@ -494,13 +494,13 @@ test_that("lba simple with predictor runs with mock backend", {
 })
 
 
-test_that("report_priors() omits the technical mu of the LBA family", {
+test_that("prior_info() omits the technical mu of the LBA family", {
   dat <- rlba(n = 60, drift = c(3, 1.5), gap = 0.5, sp = 0.5, ndt = 0.2)
   model <- lba(rt = "rt", response = "response", n_choices = 2)
   formula <- bmf(driftc ~ 1, drifte ~ 1, gap ~ 1, sp ~ 1, ndt ~ 1)
   fit <- bmm(formula, dat, model, backend = "mock", mock_fit = 1, rename = FALSE)
 
-  out <- report_priors(fit)
+  out <- prior_info(fit)
   expect_false("mu" %in% out$parameter)
   expect_true(all(c("driftc", "drifte", "gap", "sp", "ndt") %in% out$parameter))
 })
@@ -747,6 +747,101 @@ test_that("pp_simulate() draws rt and response jointly for the custom version", 
   }, numeric(1)))
   se <- sqrt(int_b * (1 - int_b) / n_draws)
   expect_lt(abs(p_b - int_b), 4 * se)
+})
+
+
+# -----------------------------------------------------------------------------
+# posterior_epred (#475 contract: the mean of what posterior_predict simulates)
+# -----------------------------------------------------------------------------
+
+# the lognormal and gamma races have a finite RT variance, so a Monte-Carlo
+# mean settles; the K = 2 normal race does not (see .lba_posterior_epred())
+test_that("posterior_epred_lba_simple() is the mean RT posterior_predict_lba_simple() simulates", {
+  withr::local_seed(475)
+  n_draws <- 40000
+  cases <- list(
+    list(dist = "lognormal", driftc = 0.8, drifte = 0.2),
+    list(dist = "gamma", driftc = 6, drifte = 4)
+  )
+  for (case in cases) {
+    one <- lba_fake_prep(case$dist, case$driftc, case$drifte, sp = 0.4)
+    many <- lba_fake_prep(case$dist, case$driftc, case$drifte, sp = rep(0.4, n_draws))
+    epred <- posterior_epred_lba_simple(one)[1, 1]
+    mc <- mean(posterior_predict_lba_simple(1, many))
+    expect_lt(abs(mc / epred - 1), 0.01, label = case$dist)
+  }
+})
+
+test_that("posterior_epred_lba_custom() is the mean RT of its race", {
+  withr::local_seed(476)
+  n_draws <- 40000
+  prep <- function(n) {
+    structure(
+      list(
+        ndraws = n, nobs = 1L,
+        dpars = list(
+          a = matrix(0.8, n, 1), b = matrix(0.3, n, 1),
+          gap = matrix(0.5, n, 1), sp = matrix(0.4, n, 1),
+          ndt = matrix(0.2, n, 1), s = matrix(1, n, 1)
+        ),
+        data = list(Y = 0.7, vint1 = 1L, vint2 = 1L, vint3 = 2L),
+        family = list(name = "lba_lognormal_custom",
+                      dpars = c("mu", "a", "b", "gap", "sp", "ndt", "s"))
+      ),
+      class = "brmsprep"
+    )
+  }
+  epred <- posterior_epred_lba_custom(prep(1))[1, 1]
+  mc <- mean(posterior_predict_lba_custom(1, prep(n_draws)))
+  expect_lt(abs(mc / epred - 1), 0.01)
+})
+
+test_that("posterior_epred_lba_simple() returns one column per observation", {
+  ndraws <- 3
+  nobs <- 2
+  dpars <- list(
+    driftc = matrix(c(2.5, 3, 3.5, 2, 2.2, 4), ndraws, nobs),
+    drifte = matrix(c(1, 1.5, 0.5, 1.2, 0.8, 1), ndraws, nobs),
+    gap = matrix(c(0.5, 0.6, 0.4, 0.5, 0.7, 0.45), ndraws, nobs),
+    sp = matrix(c(0.4, 0.3, 0.5, 0.35, 0.4, 0.6), ndraws, nobs),
+    ndt = matrix(c(0.2, 0.25, 0.15, 0.3, 0.2, 0.22), ndraws, nobs),
+    s = matrix(1, ndraws, nobs)
+  )
+  family <- list(name = "lba_normal_simple",
+                 dpars = c("mu", "driftc", "drifte", "gap", "sp", "ndt", "s"))
+  data <- list(Y = c(0.6, 0.8), vint1 = c(1L, 2L), vint2 = c(1L, 1L), vint3 = c(1L, 3L))
+  make_prep <- function(dpars, data, ndraws, nobs) {
+    structure(list(ndraws = ndraws, nobs = nobs, dpars = dpars, data = data, family = family),
+              class = "brmsprep")
+  }
+  out <- posterior_epred_lba_simple(make_prep(dpars, data, ndraws, nobs))
+  expect_equal(dim(out), c(ndraws, nobs))
+  by_cell <- matrix(NA_real_, ndraws, nobs)
+  for (d in seq_len(ndraws)) {
+    for (i in seq_len(nobs)) {
+      cell <- lapply(dpars, function(x) x[d, i, drop = FALSE])
+      by_cell[d, i] <- posterior_epred_lba_simple(
+        make_prep(cell, lapply(data, `[`, i), 1L, 1L)
+      )[1, 1]
+    }
+  }
+  # the survivor integral stops once every draw's integrand is below 1e-7, so
+  # a cell evaluated alongside slower draws may run one decade further
+  expect_equal(out, by_cell, tolerance = 1e-6)
+})
+
+test_that("both lba versions store their posterior_epred in the family", {
+  dat <- rlba(n = 20, drift = c(3, 1.5), gap = 0.5, sp = 0.5, ndt = 0.2)
+  fit <- bmm(bmf(driftc ~ 1, drifte ~ 1, gap ~ 1, sp ~ 1, ndt ~ 1), dat,
+             lba(rt = "rt", response = "response", n_choices = 2),
+             backend = "mock", mock_fit = 1, rename = FALSE)
+  expect_identical(fit$formula$family$posterior_epred, posterior_epred_lba_simple)
+
+  dat$response <- ifelse(dat$response == 1, "hit", "miss")
+  fit <- bmm(bmf(hit ~ 1, miss ~ 1, gap ~ 1, sp ~ 1, ndt ~ 1), dat,
+             lba(rt = "rt", response = "response", version = "custom"),
+             backend = "mock", mock_fit = 1, rename = FALSE)
+  expect_identical(fit$formula$family$posterior_epred, posterior_epred_lba_custom)
 })
 
 

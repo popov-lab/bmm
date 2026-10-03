@@ -191,6 +191,13 @@ test_that("the links a model applies are exactly the settable ones", {
     names(cswald(rt = "rt", response = "resp")$links)
   )
   expect_null(settable_links(m3(resp_cats = c("a", "b"), num_options = c(1, 4))))
+  expect_equal(
+    settable_links(lba(rt = "rt", response = "resp", n_choices = 2)),
+    names(lba(rt = "rt", response = "resp", n_choices = 2)$links)
+  )
+  # the custom version learns its categories from the formula and validates
+  # the links in check_model.lba_custom()
+  expect_null(settable_links(lba(rt = "rt", response = "resp", version = "custom")))
   expect_equal(settable_links(sdm(resp_error = "y")), character(0))
 })
 
@@ -239,6 +246,12 @@ test_that("a custom link set on a model reaches the brms family", {
   )
   family <- configure_model(model, check_data(model, dat, ff), ff)$formula$family
   expect_equal(family$link_bound, "softplus")
+
+  dat <- data.frame(rt = c(0.6, 0.8), response = c(1, 2))
+  ff <- bmmformula(driftc ~ 1, drifte ~ 1, gap ~ 1, sp ~ 1, ndt ~ 1)
+  model <- lba("rt", "response", n_choices = 2, links = list(ndt = "softplus"))
+  family <- configure_model(model, check_data(model, dat, ff), ff)$formula$family
+  expect_equal(family$link_ndt, "softplus")
 })
 
 test_that("links set after construction are checked by the pipeline", {

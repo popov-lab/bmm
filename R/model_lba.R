@@ -56,7 +56,7 @@
 # a shared link but a per-distribution description (added from .lba_dist_specs).
 .lba_shared <- list(
   parameters = list(
-    gap = "threshold gap (b = gap + sp)",
+    gap = "threshold gap: the threshold is b = gap + sp",
     sp = "maximum starting point (uniform on 0 to sp)",
     ndt = "non-decision time"
   ),
@@ -130,15 +130,16 @@
   out <- structure(
     list(
       resp_vars = nlist(rt, response),
-      other_vars = nlist(n_choices, accumulators),
+      other_vars = nlist(n_choices, accumulators, distribution),
       domain = "Decision Making / Response times",
       task = "Choice Reaction Time tasks (multi-alternative)",
       name = "Linear Ballistic Accumulator",
-      citation = "Brown, S. D., & Heathcote, A. (2008). The simplest complete
-        model of choice response time: Linear ballistic accumulation. Cognitive
-        Psychology, 57(3), 153-178. https://doi.org/10.1016/j.cogpsych.2007.12.002",
+      citation = glue(
+        "Brown, S. D., & Heathcote, A. (2008). The simplest complete model of \\
+        choice response time: Linear ballistic accumulation. Cognitive \\
+        Psychology, 57(3), 153-178. https://doi.org/10.1016/j.cogpsych.2007.12.002"
+      ),
       version = version,
-      distribution = distribution,
       requirements = glue(
         "- Reaction times should be passed in seconds", "\n",
         "- For version 'simple': response variable should be integer-coded ",
@@ -374,7 +375,7 @@ check_model.lba_custom <- function(model, data = NULL, formula = NULL) {
       lba() takes links for {collapse_comma(known)}"
     )
 
-    drift <- .lba_dist_specs[[model$distribution]]$drift
+    drift <- .lba_dist_specs[[model$other_vars$distribution]]$drift
     for (p in cat_pars) {
       model$parameters[[p]] <- paste0(drift$desc, " for '", p, "' accumulator")
       if (is.null(model$links[[p]])) model$links[[p]] <- drift$link
@@ -647,7 +648,7 @@ bmf2bf.lba_custom <- function(model, formula) {
 #' @export
 configure_model.lba_simple <- function(model, data, formula) {
   links <- model$links
-  dist <- model$distribution
+  dist <- model$other_vars$distribution
   cat_names <- c("driftc", "drifte")
   formula <- bmf2bf(model, formula)
 
@@ -683,7 +684,7 @@ configure_model.lba_simple <- function(model, data, formula) {
 #' @export
 configure_model.lba_custom <- function(model, data, formula) {
   links <- model$links
-  dist <- model$distribution
+  dist <- model$other_vars$distribution
   cat_names <- model$other_vars$resp_cats
   n_cats <- length(cat_names)
   formula <- bmf2bf(model, formula)
@@ -842,7 +843,7 @@ pp_observables.lba <- function(model) {
 # masks the observations where that accumulator exists.
 .lba_pp_simulate <- function(model, prep) {
   cat_names <- setdiff(names(model$parameters), c("gap", "sp", "ndt", "s"))
-  dist <- model$distribution
+  dist <- model$other_vars$distribution
   n <- prep$ndraws * prep$nobs
   sp <- .pp_dpar_vector(prep, "sp")
   s <- .pp_dpar_vector(prep, "s")

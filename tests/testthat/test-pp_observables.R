@@ -19,7 +19,10 @@ registered_models <- list(
   cswald(rt = "rt", response = "resp", version = "crisk"),
   ezdm(mean_rt = "mrt", var_rt = "vrt", n_upper = "nu", n_trials = "nt"),
   ezdm(mean_rt = c("mu", "ml"), var_rt = c("vu", "vl"), n_upper = "nu",
-       n_trials = "nt", version = "4par")
+       n_trials = "nt", version = "4par"),
+  lba(rt = "rt", response = "resp", n_choices = 3),
+  check_model(lba(rt = "rt", response = "resp", version = "custom"),
+              NULL, bmf(a ~ 1, b ~ 1, gap ~ 1, sp ~ 1, ndt ~ 1))
 )
 
 test_that("declared observables name real standata slots", {
@@ -42,6 +45,12 @@ test_that("declared observables name real standata slots", {
     slots <- names(suppressMessages(standata(bmf(drift ~ 1), case[[2]], case[[1]])))
     expect_true(all(pp_observables(case[[1]])$observed %in% slots))
   }
+  lba_data <- rlba(20, drift = c(2, 1), gap = 0.5, sp = 0.5, ndt = 0.2)
+  slots <- names(suppressMessages(standata(
+    bmf(driftc ~ 1, drifte ~ 1, gap ~ 1, sp ~ 1, ndt ~ 1), lba_data,
+    lba(rt = "rt", response = "response", n_choices = 2)
+  )))
+  expect_true(all(pp_observables(lba(rt = "rt", response = "response", n_choices = 2))$observed %in% slots))
 })
 
 test_that("the default check of every registered spec is the brms Y observable", {
@@ -85,7 +94,7 @@ test_that("every registered compute closure is elementwise", {
       expected[[key]] <- .pp_expand_data(compute(observed), n_draws)
     }
   }
-  expect_length(actual, 17L)
+  expect_length(actual, 21L)
   expect_equal(actual, expected)
 })
 

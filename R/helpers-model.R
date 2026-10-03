@@ -429,6 +429,12 @@ response_annotations <- function(model) {
       response = "0/1 or logical; 1 = upper boundary"
     ))
   }
+  if (inherits(model, "lba")) {
+    return(list(
+      rt = "seconds",
+      response = if (inherits(model, "lba_custom")) "category labels" else "1 = correct, 2 to K = errors"
+    ))
+  }
   if (inherits(model, "ezdm")) {
     return(list(
       mean_rt = "seconds",
@@ -563,6 +569,16 @@ data_column_roles <- list(
     nt_distances = NA,
     set_size = "set size (a column, or one number)"
   ),
+  lba = c(
+    rt = "response time in seconds",
+    response = "choice, 1 = correct and 2 to `n_choices` = errors",
+    n_choices = NA
+  ),
+  lba_custom = c(
+    rt = "response time in seconds",
+    response = "label of the chosen response category, matching the formula's category names",
+    accumulators = "number of accumulators per category (columns, or one number per category)"
+  ),
   m3 = c(
     resp_cats = "number of responses in each response category, one column per category",
     num_options = "number of candidates in each category (columns, or one number per category)"
@@ -639,7 +655,12 @@ format_key_parameters <- function(spec) {
     "None by default: your formula defines them"
   } else {
     descriptions <- vapply(spec$parameters[estimated], as.character, "")
-    paste0("`", estimated, "`: ", parameter_label(descriptions))
+    c(
+      # a custom version takes one parameter per response category from the
+      # formula, next to the ones it always estimates
+      if (identical(spec$version, "custom")) "One per response category: your formula defines them",
+      paste0("`", estimated, "`: ", parameter_label(descriptions))
+    )
   }
   if (length(fixed) > 0) {
     lines <- c(lines, paste0("Fixed by default: ", paste0("`", fixed, "`", collapse = ", ")))

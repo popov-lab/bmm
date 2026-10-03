@@ -396,3 +396,33 @@ carried_control <- function(object, dots) {
   }
   utils::modifyList(stored, dots$control %||% list())
 }
+
+#' @exportS3Method
+revert_check_data.lba <- function(model, data) {
+  response <- model$resp_vars$response
+  n_cats <- sum(grepl("^\\.lba_n[0-9]+$", names(data)))
+  # brms keeps only the vint() columns, so the response comes back from the
+  # winning category. For the simple version that is 1 for correct and 2 for
+  # any error: which error was given is gone, and the likelihood never used it
+  if (not_in(response, colnames(data))) {
+    data[[response]] <- if (inherits(model, "lba_custom")) {
+      model$other_vars$resp_cats[data$.lba_cat]
+    } else {
+      data$.lba_cat
+    }
+    attr(data, "rebuilt") <- c(attr(data, "rebuilt"), response)
+  }
+  accumulators <- model$other_vars$accumulators
+  if (is.character(accumulators)) {
+    cats <- model$other_vars$resp_cats
+    for (i in seq_len(n_cats)) {
+      var <- accumulators[[cats[i]]]
+      if (not_in(var, colnames(data))) {
+        data[[var]] <- data[[paste0(".lba_n", i)]]
+        attr(data, "rebuilt") <- c(attr(data, "rebuilt"), var)
+      }
+    }
+  }
+  data[c(".lba_cat", paste0(".lba_n", seq_len(n_cats)))] <- NULL
+  NextMethod("revert_check_data")
+}

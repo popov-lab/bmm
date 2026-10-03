@@ -83,9 +83,7 @@ Linear Ballistic Accumulator
 \item \strong{Name:} Linear Ballistic Accumulator
 \item \strong{Citation:}
 \itemize{
-\item Brown, S. D., & Heathcote, A. (2008). The simplest complete
-model of choice response time: Linear ballistic accumulation. Cognitive
-Psychology, 57(3), 153-178. https://doi.org/10.1016/j.cogpsych.2007.12.002
+\item Brown, S. D., & Heathcote, A. (2008). The simplest complete model of choice response time: Linear ballistic accumulation. Cognitive Psychology, 57(3), 153-178. https://doi.org/10.1016/j.cogpsych.2007.12.002
 }
 \item \strong{Version:} simple
 \item \strong{Requirements:}
@@ -102,7 +100,7 @@ Psychology, 57(3), 153-178. https://doi.org/10.1016/j.cogpsych.2007.12.002
 \itemize{
 \item \code{driftc}: mean drift rate for correct accumulator
 \item \code{drifte}: mean drift rate for error accumulators
-\item \code{gap}: threshold gap (b = gap + sp)
+\item \code{gap}: threshold gap: the threshold is b = gap + sp
 \item \code{sp}: maximum starting point (uniform on 0 to sp)
 \item \code{ndt}: non-decision time
 \item \code{s}: drift rate SD (fixed to 1 by default)

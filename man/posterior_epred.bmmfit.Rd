@@ -31,6 +31,7 @@ response for each observation: the mean of what \code{\link[brms:posterior_predi
 simulates for it. What that is depends on the model:\tabular{ll}{
    Model \tab Expected response \cr
    \code{ddm()}, \code{cswald()} \tab Mean response time, averaged over both responses, under the diffusion process that \code{posterior_predict()} simulates from \cr
+   \code{lba()} \tab Mean response time, averaged over the responses, computed from the race's survivor function rather than by simulation \cr
    \code{ezdm()}, version \code{"3par"} \tab Mean response time of the cell \cr
    \code{ezdm()}, version \code{"4par"} \tab Mean response time of the cell's upper-boundary responses \cr
    \code{sdt_yn()} \tab Number of "old"/"signal" responses, the number of trials times their probability \cr

@@ -451,6 +451,26 @@ test_that("every model ships an sd default on the link scale of each parameter",
   expect_equal(sd_default(pr, "drift"), "exponential(1)")
   for (par in c("bound", "ndt", "zr")) expect_equal(sd_default(pr, par), "exponential(2)")
 
+  lba_data <- data.frame(rt = rep(c(0.6, 0.8, 1.1, 0.7), 5), response = rep(c(1, 2), 10),
+                         id = factor(rep(1:5, each = 4)))
+  lba_formula <- bmf(driftc ~ 1 + (1 | id), drifte ~ 1 + (1 | id), gap ~ 1 + (1 | id),
+                     sp ~ 1 + (1 | id), ndt ~ 1 + (1 | id))
+  pr <- default_prior(lba_formula, lba_data, lba("rt", "response", n_choices = 2))
+  for (par in c("driftc", "drifte")) expect_equal(sd_default(pr, par), "exponential(1)")
+  for (par in c("gap", "sp", "ndt")) expect_equal(sd_default(pr, par), "exponential(2)")
+  for (dist in c("gamma", "frechet", "lognormal")) {
+    pr <- default_prior(lba_formula, lba_data, lba("rt", "response", n_choices = 2, distribution = dist))
+    for (par in c("driftc", "drifte", "gap", "sp", "ndt")) {
+      expect_equal(sd_default(pr, par), "exponential(2)", label = paste(dist, par))
+    }
+  }
+  lba_data$response <- ifelse(lba_data$response == 1, "hit", "miss")
+  pr <- default_prior(
+    bmf(hit ~ 1 + (1 | id), miss ~ 1 + (1 | id), gap ~ 1, sp ~ 1, ndt ~ 1), lba_data,
+    lba("rt", "response", version = "custom")
+  )
+  for (par in c("hit", "miss")) expect_equal(sd_default(pr, par), "exponential(1)")
+
   ez_data <- data.frame(
     mean_rt = rep(c(0.5, 0.6), 10), var_rt = rep(c(0.02, 0.03), 10),
     n_upper = rep(c(60, 70), 10), n_trials = 100, id = factor(rep(1:10, each = 2))

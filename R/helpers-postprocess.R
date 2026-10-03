@@ -100,6 +100,7 @@ revert_postprocess_brm.default <- function(model, fit, ...) {
 #'   | Model | Expected response |
 #'   |-------|-------------------|
 #'   | `ddm()`, `cswald()` | Mean response time, averaged over both responses, under the diffusion process that `posterior_predict()` simulates from |
+#'   | `lba()` | Mean response time, averaged over the responses, computed from the race's survivor function rather than by simulation |
 #'   | `ezdm()`, version `"3par"` | Mean response time of the cell |
 #'   | `ezdm()`, version `"4par"` | Mean response time of the cell's upper-boundary responses |
 #'   | `sdt_yn()` | Number of "old"/"signal" responses, the number of trials times their probability |
