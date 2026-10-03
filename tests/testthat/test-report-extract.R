@@ -216,6 +216,9 @@ test_that("fit_settings() reads the Stan version of an rstan fit from its compil
   expect_identical(fit_settings(fit)$versions[["stan"]], "2.32.2")
   fit$fit@stanmodel@model_cpp <- list()
   expect_identical(fit_settings(fit)$versions[["stan"]], as.character(fit$version$stanHeaders))
+  # bmm(..., empty = TRUE) leaves no stanfit
+  fit$fit <- NULL
+  expect_identical(fit_settings(fit)$versions[["stan"]], as.character(fit$version$stanHeaders))
 })
 
 test_that("fit_settings() and convergence_summary() treat a stanfit without draws as a mock", {

@@ -118,16 +118,21 @@ fit_settings <- function(fit) {
 
 # rstan fits store the version of the StanHeaders R package, whose patch level
 # is not Stan's; the stanc3 version that compiled the model is recorded in the
-# model's C++, and older compilers do not write it there
+# model's C++, and older compilers do not write it there. empty = TRUE leaves
+# no stanfit at all
 stan_version <- function(fit) {
   switch(fit$backend %||% "",
     cmdstanr = version_string(fit$version$cmdstan),
-    rstan = stanc_version(fit$fit@stanmodel@model_cpp$model_cppcode) %||%
-      version_string(fit$version$stanHeaders),
+    rstan = stanc_version(
+      if (methods::is(fit$fit, "stanfit")) fit$fit@stanmodel@model_cpp$model_cppcode
+    ) %||% version_string(fit$version$stanHeaders),
     NA_character_
   )
 }
 
+# a release writes "stanc3 v2.32.2"; development builds of stanc3 write a commit
+# hash ("stanc3 b2bd1fd") and get NULL, so the caller falls back to
+# StanHeaders; a suffix such as "-rc1" is dropped
 stanc_version <- function(cpp) {
   match <- regmatches(cpp, regexec("stanc_version = stanc3 v([0-9][0-9.]*)", cpp))
   if (length(match) && length(match[[1]])) match[[1]][2]
