@@ -1,4 +1,4 @@
-url: https://venpopov.com/bmm/
+url: https://popov-lab.github.io/bmm/
 template:
   bootstrap: 5
   math-rendering: mathjax
@@ -21,10 +21,10 @@ navbar:
         href: news/index.html
      develop:
         text: Develop
-        href: https://venpopov.com/bmm/dev-notes/index.html
+        href: https://popov-lab.github.io/bmm/dev-notes/index.html
      parameter_recovery:
         text: Parameter recovery
-        href: https://venpopov.com/bmm/parameter-recovery/index.html
+        href: https://popov-lab.github.io/bmm/parameter-recovery/index.html
 
 
 
@@ -35,6 +35,7 @@ reference:
     - "bmm-package"
     - "supported_models"
     - "bmm_options"
+    - "bmm_setup"
   - title: "Fitting models"
     desc: "Main functions for model fitting"
   - contents:
@@ -46,11 +47,24 @@ reference:
     - "conditional_effects.bmmfit"
     - "emmeans-bmmfit"
     - "pp_check.bmmfit"
+    - "posterior_epred.bmmfit"
+  - title: "Model evaluation & post-processing"
+    desc: "ROC/AUC, quantile-transformed ROC, and latent-distribution analysis for signal detection models"
+  - contents:
+    - "roc_sdt"
+    - "roc_observed"
+    - "auc_sdt"
+    - "latent_sdt"
+    - "sdt_thresholds"
+    - "mratio"
+    - "sdt_sensitivity"
+    - "plot.bmm_sdt_roc"
+    - "plot.bmm_sdt_auc"
+    - "plot.bmm_sdt_latent"
   - title: "Extract model information"
     desc: "Utility functions for extracting default priors, generate stan code, stan data, etc."
   - contents:
     - has_keyword("extract_info")
-    - "parameters"
   - title: "Specifying models"
     desc: "Functions for specifying which model to fit"
   - contents:
@@ -80,8 +94,10 @@ articles:
     desc: >
        Guides to using various features of the **bmm** package
     contents:
+     - articles/bmm_brms_to_bmm
      - articles/bmm_bmmformula
      - articles/bmm_extract_info
+     - articles/bmm_hypothesis_testing
   - title: Continuous reproduction tasks
     desc: Fitting models to continuous reproduction tasks
     contents:
@@ -94,6 +110,12 @@ articles:
     desc: Fitting models to categorical decision tasks (e.g. cued or free recall, n-AFC, etc)
     contents:
     - articles/bmm_m3
+
+  - title: Signal detection & recognition
+    desc: Fitting signal detection models and analysing ROC/AUC
+    contents:
+    - articles/bmm_sdt
+    - articles/bmm_sdt_dualprocess_metad
 
   - title: Evidence accumulation models
     desc: Fitting evidence accumulation models to response time and choice data
