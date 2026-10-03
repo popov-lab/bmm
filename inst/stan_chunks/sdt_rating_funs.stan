@@ -1,6 +1,4 @@
-// Confidence-rating SDT threshold builders and per-row likelihood.
-// The noise-distribution dispatch (sdt_log_cumprob, sdt_log_one_minus_cumprob)
-// lives in sdt_dist_funs.stan, which must be loaded before this chunk.
+// confidence-rating SDT thresholds and per-row likelihood; needs sdt_dist_funs.stan
 
 vector sdt_thresholds_parsimonious_rating(real criterion, real spacing,
                                           int K_full) {
@@ -23,13 +21,7 @@ vector sdt_thresholds_equidistant_rating(real criterion, real spacing,
   return thresholds;
 }
 
-// Place K - 1 ordered thresholds from their K - 2 adjacent interval widths
-// (gaps[j] lies between threshold j and j + 1). With an even number of
-// categories the criterion is the middle threshold, the old/new boundary.
-// With an odd number there is no such boundary -- the middle category
-// straddles it -- so the criterion is the centre of that category and the
-// two thresholds around it sit half an interval away. The R counterpart is
-// .sdt_assemble_thresholds(); the two closed forms above agree with it.
+// K - 1 thresholds from K - 2 interval widths, centred on the criterion; R twin: .sdt_assemble_thresholds()
 vector sdt_place_thresholds_rating(real criterion, vector gaps, int K_full) {
   int n_thresh = K_full - 1;
   vector[n_thresh] thresholds;
@@ -71,11 +63,7 @@ vector sdt_thresholds_log_distance_rating(real criterion,
   return sdt_place_thresholds_rating(criterion, gaps, K_full);
 }
 
-// Paulewicz & Blaut (2022) for even K; the odd-K form is bmm's. One interval
-// is the spread, exp(delta): for even K the one just above the middle
-// threshold, for odd K the middle category itself. The first interval on the
-// other side (even K) or on each side (odd K) is a ratio times the spread,
-// and every further interval a ratio times the first interval on its side.
+// log_ratio thresholds (Paulewicz & Blaut, 2022); R twin: .sdt_log_ratio_widths()
 vector sdt_thresholds_log_ratio_rating(real criterion,
                                        array[] real deltas,
                                        int K_full) {
@@ -137,13 +125,8 @@ vector sdt_make_thresholds_rating(real criterion, real spacing,
   return sdt_thresholds_softmax_rating(criterion, spacing, deltas, K_full);
 }
 
-// log probability of rating category `cat` for the multinomial family. The
-// stimulus is a real covariate (brms passes data covariates as reals into
-// non-linear formulas).
-//   d:       sensitivity as d_a; sdt_rms_scale() converts it to noise-SD units
-//            and is 1 when sigma is 1, so equal-variance fits are unchanged
-//   sdratio: log ratio of signal to noise SD (exp(sdratio) = sigma_s / sigma_n)
-// The thresholds are NOT rescaled: they stay on the noise-standardized axis.
+// log probability of rating category `cat`; d is d_a and sdratio the log SD ratio
+// the thresholds are not rescaled: they stay on the noise-standardized axis
 real sdt_rating_logmu_cat(int cat, vector thresholds,
                           real d, real sdratio, real stimulus,
                           int dist_type) {
@@ -161,9 +144,7 @@ real sdt_rating_logmu_cat(int cat, vector thresholds,
     );
   }
 
-  // an interval above 0 is the difference of two upper tails: there both log
-  // cdf values round to 0 (gumbel_min from eta ~ 6.6), and their difference to
-  // -Inf, for a category that still has mass
+  // an interval above 0 is taken from the upper tails, where both log cdf values would round to 0
   real eta_lo = (thresholds[cat - 1] - shift) / scale;
   real eta_hi = (thresholds[cat] - shift) / scale;
   if (eta_lo > 0) {

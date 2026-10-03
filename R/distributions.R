@@ -1209,6 +1209,16 @@ times_nonzero <- function(count, log_prob) {
   if (log.p) log_p else exp(log_p)
 }
 
+# The Stan survivor (cswald_helper_functions.stan) differs from .pwald() for the
+# gradient. It works in probability space, because Phi's derivative is the
+# normal density, whereas std_normal_lcdf's gradient is an approximation with
+# relative error up to ~1e-4. exp(log_c) * Phi(z2) <= Phi(-z1) <= 1, so the exp
+# cannot overflow. Below 1e-300 (z < ~-37.0) it switches to the log-space
+# lcdf, because the reverse pass multiplies an adjoint by 1 / p, which
+# overflows once p nears 1e-308. In swald_log_surv_vec() the fmax/fmin clamps
+# are required: without them a log(0) or exp(Inf) in an element the loop
+# recomputes still injects NaN adjoints into the shared parameters.
+
 
 # Sampling distribution of the two RT summaries of n trials.
 # W = k4 / n + 2 VRT^2 / (n - 1); mean_rt given var_rt is normal with mean
@@ -1640,7 +1650,11 @@ rezdm <- function(n, n_trials, drift, bound, ndt, zr = 0.5, s = 1,
 # these are easy to mistranscribe past j = 8, and a wrong coefficient makes the
 # truncated series diverge instead of failing loudly. The literals of
 # inst/stan_chunks/ezdm_series.stan are generated from the same a_j, and a test
-# compares the two.
+# compares the two. There, G(x) = log(sinh(sqrt x) / sqrt x) = sum_j a_j x^j and
+# C(y) = log cosh(sqrt y) = sum_j a_j (4^j - 1) y^j, and their n-th derivatives
+# are Horner polynomials of the 16 terms a_j j! / (j - n)!, formed in exact
+# rational arithmetic and rounded once. At x <= 0.49 the truncation error is
+# below 1e-13.
 .EZDM_LOG_SINHC_COEF <- c(
   1 / 6,
   -1 / 180,
@@ -1675,6 +1689,29 @@ rezdm <- function(n, n_trials, drift, bound, ndt, zr = 0.5, s = 1,
 # f(w) = log sinh(b sqrt(w)) - log sinh(b0 sqrt(w)). Drift therefore enters only
 # through w: every expression below is even in drift, which is why the model
 # needs neither a soft absolute value nor a zero-drift special case.
+#
+# The Stan code in inst/stan_chunks/ezdm_cumulants.stan maps onto R as follows:
+#   ezdm_summaries_lpdf                        .ez_rt_terms()
+#   ezdm_boundary_lpdf, ezdm_symmetric_lpdf    .ezdm_cumulants()
+#   ezdm_logit_pc                              .ezdm_logit_pc()
+# Its seam t = b0 sqrt(w) = 0.7 appears as x < 0.49 for x = b0^2 w and as
+# y < 0.1225 for y = (b0 / 2)^2 w. Its closed forms are polynomials in
+# p = t coth(t) and q = t^2 csch(t)^2: D1 = p, D2 = -p - q,
+# D3 = 3p + 3q + 2pq, D4 = -(15p + 15q + 12pq + 2q(2t^2 + 3q)), with
+# k_n = (-1)^n (D_n(b) - D_n(b0)) / (s^2 w)^n. It is scalar on purpose: a
+# vector built inside a per-row function is a heap allocation per call, and
+# returning the cumulants as vectors cost ~1.5 times as much per gradient,
+# which is also why the four b0 terms travel as four arguments.
+#
+# R has no counterpart of ezdm_symmetric_lpdf, which takes 3par at b = b0 / 2.
+# There log sinh(t / 2) - log sinh(t) = -log(2 cosh(t / 2)), so
+# f(w) = -C(y) - log 2 with C(y) = log cosh(sqrt y) and y = b^2 w. The closed
+# forms are the ones above with p = u tanh(u), q = u^2 sech(u)^2 and the sign
+# of q reversed. With u = bound drift / (2 s^2) the first two are the EZ
+# equations MDT = bound / (2 drift) tanh(u) and
+# VRT = bound s^2 / (2 drift^3) (tanh(u) - u sech(u)^2). Calling
+# ezdm_boundary_lpdf at b = bound / 2 instead took ~1.6 times as long per
+# gradient.
 .ezdm_cumulants <- function(b, b0, w, s) {
   n <- max(length(b), length(b0), length(w), length(s))
   b <- rep_len(b, n)
@@ -2199,6 +2236,11 @@ neg_loglik <- function(x, params, distribution, weights = NULL) {
 # The list position defines the integer dist_type code passed to Stan --
 # reordering entries changes the R <-> Stan contract.
 #
+# Stan's normal log complementary CDF is std_normal_lcdf(-eta), not
+# std_normal_lccdf(eta): the lccdf passes 1e-6 of error from eta ~ 7 and
+# underflows to -Inf from eta ~ 8.3, which makes the likelihood log(0) for any
+# cell with y < trials. lcdf(-eta) stays exact to 1e-12 out to eta = 45.
+#
 # gumbel_min / gumbel_max follow the extreme-value convention: gumbel_min is
 # the smallest-extreme-value distribution (cloglog link), gumbel_max the largest
 # (loglog link, i.e. evd::pgumbel). Taking the max of gumbel_max variates is what
@@ -2628,6 +2670,15 @@ rsdt_yn <- function(n, n_trials, stimulus, d, criterion,
 # its complement falls under the double epsilon, at which point the density
 # stops responding to d'. Each branch therefore reads log P(correct) and
 # log(1 - P(correct)) off whichever side still resolves it and subtracts.
+#
+# The range that buys is not the range it responds over. Against adaptive
+# integration of log(1 - P(correct)) at m = 4, the Stan normal branch's logit is
+# accurate to about d' = 20 (relative error 4.9e-07; 3.2e-04 at 22, 1.0e-02 at
+# 25, 5.8e-02 at 30, 2.7e-01 at 48), and it is Inf from d' = 48.25. Past 20 its
+# slope is too steep (1.24 times the true slope at 30, 1.52 at 47.5) but keeps
+# the right sign. That is still the better trade: the probability scale it
+# replaced had a flat plateau from d' = 12 with no gradient at all, which a
+# sampler random-walks through instead of rejecting.
 .mafc_logit_pc_r <- function(d, m, dist = "normal") {
   if (dist == "gumbel_max") {
     return(d - log(m - 1))
@@ -3058,6 +3109,15 @@ rsdt_mafc <- function(n, n_trials, m, d,
 # generator, and the sdt_ranking_logmu R companion. Vectorized over d and
 # sdratio (log SD ratio) for a scalar rank_pos and m; the rep(each =) factor
 # aligns per-draw d with the column-major nodes-by-draws matrix.
+#
+# The Stan gumbel_min kernel keeps the four lgamma calls rather than this
+# telescoped form, because the loop costs O(m) per rank. Its lgamma difference
+# cancels once exp(-d) is large: measured on the compiled kernel, log p is off
+# by up to 2.8e-6 at d = -20 and 0.11 at d = -30 (m <= 8; R's lgamma gives
+# 5e-2 there), which the default prior never reaches. The Stan normal kernel
+# takes the upper tail as Phi(-eta), because 1 - Phi(eta) loses its relative
+# precision long before Phi rounds to 1 (log p off by 1.8e-5 at d = 10 for
+# sigma = 0.5, m = 2; 2.3e-6 at sigma = 1).
 .ranking_prob_r <- function(d, rank_pos, m, dist = "gumbel_min",
                             sdratio = 0) {
   if (dist == "gumbel_min") {
@@ -3633,6 +3693,13 @@ rsdt_rating <- function(n, n_trials, stimulus, d, thresholds,
 # near 0.99) and each value comes from mvtnorm's TVPACK instead. Neither
 # shares code with the Stan side's Owen's T, so the R companion is also an
 # independent check of the Stan kernel. Infinite bounds reduce to closed forms.
+#
+# The Stan cdp_Phi2() uses Owen's T (Owen, 1956), which is exact and
+# differentiable, and that is why sdt_cdp supports normal noise only. On an
+# axis the Owen's T argument k / h is a limit, not a value:
+# P(Z1 <= 0, Z2 <= k) = Phi(k) / 2 + T(k, r / denom), and the first-order term
+# h phi(0) Phi(k / denom) carries the gradient a constant stand-in for h would
+# lose (the value error is O(h^2), below 1e-20).
 .cdp_phi2 <- function(z1, z2, rho) {
   n <- max(length(z1), length(z2), length(rho))
   z1 <- rep_len(z1, n)
@@ -3749,7 +3816,15 @@ rsdt_rating <- function(n, n_trials, stimulus, d, thresholds,
 # (c_lo, c_hi), integrated over the strength on the bin with R | S normal.
 # Mirrors Stan cdp_region_mass: the same clipping, breakpoints and pieces of at
 # most one strength SD on 20 Gauss-Legendre nodes, vectorized over observations
-# by looping over piece indices.
+# by looping over piece indices. With R | S = s normal (mean
+# mu_R + beta * (s - mu_S), SD sd_c), Guess is s - kcrit < R < rcrit (R < rcrit
+# and F < kcrit) and Know-not-Guess is R < min(rcrit, s - kcrit); Guess needs
+# S < rcrit + kcrit, so its range is finite. The breakpoints are where the
+# conditional probability steps: its conditional mean crosses rcrit or
+# s - kcrit, and rcrit + kcrit. In Stan a zero-length piece between coincident
+# breakpoints adds no mass, but its two edges move with different parameters,
+# so it carries the boundary term f(e) (e_b' - e_a') of the gradient; R needs
+# no gradient and skips it.
 .cdp_region_mass_r <- function(guess, c_lo, c_hi, mu_S, sigma_S, mu_R, beta,
                                sd_c, rcrit, kcrit) {
   hi <- if (guess) pmin(c_hi, rcrit + kcrit) else c_hi

@@ -1,10 +1,5 @@
-// Shared noise-distribution dispatchers for SDT models
-// dist_type codes follow the position in the .sdt_dists registry
-// (R/distributions.R): 1=Gaussian, 2=Gumbel_min, 3=Gumbel_max, 4=Logistic
-// Gumbel_min is the smallest-extreme-value distribution (cdf 1 - exp(-exp(x))),
-// Gumbel_max the largest (cdf exp(-exp(-x))).
-// Used by every SDT model that needs the noise CDF, log-CDF, log-CCDF, or
-// quantile on the latent evidence scale.
+// noise-distribution dispatchers shared by the SDT models
+// dist_type follows .sdt_dists in R/distributions.R: 1 = normal, 2 = gumbel_min, 3 = gumbel_max, 4 = logistic
 
 // CDF dispatch: F(eta)
 real sdt_cumprob(real eta, int dist_type) {
@@ -16,7 +11,6 @@ real sdt_cumprob(real eta, int dist_type) {
 }
 
 // Log-CDF dispatch: log(F(eta))
-// Uses numerically stable Stan primitives for each distribution
 real sdt_log_cumprob(real eta, int dist_type) {
   if (dist_type == 1) return std_normal_lcdf(eta);
   if (dist_type == 2) return log1m_exp(-exp(eta));       // gumbel_min
@@ -25,20 +19,14 @@ real sdt_log_cumprob(real eta, int dist_type) {
   reject("sdt_log_cumprob: unknown dist_type: ", dist_type);
 }
 
-// Root-mean-square of the noise and signal scales, in noise units. Sensitivity
-// is parameterized as d_a (separation / this factor), which weights the two
-// distributions equally. Returns 1 for sdratio = 1, so every equal-variance
-// model is unaffected. sdratio arrives on the natural scale (log link).
+// converts d_a to noise-SD units (1 at sdratio = 1); takes sdratio on the natural scale
 real sdt_rms_scale(real sdratio) {
   return sqrt((1 + square(sdratio)) / 2);
 }
 
 // Log complementary CDF: log(1 - F(eta))
 real sdt_log_one_minus_cumprob(real eta, int dist_type) {
-  // std_normal_lcdf(-eta), not std_normal_lccdf(eta): the two are equal by
-  // symmetry, but lccdf passes 1e-6 of error from eta ~ 7 and underflows to
-  // -inf from eta ~ 8.3, which makes the likelihood log(0) for any cell with
-  // y < trials. lcdf(-eta) stays exact to 1e-12 out to eta = 45.
+  // std_normal_lccdf(eta) underflows to -inf from eta ~ 8.3, std_normal_lcdf(-eta) does not
   if (dist_type == 1) return std_normal_lcdf(-eta);
   if (dist_type == 2) return -exp(eta);                   // gumbel_min
   if (dist_type == 3) return log1m_exp(-exp(-eta));       // gumbel_max

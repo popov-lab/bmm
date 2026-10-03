@@ -7,8 +7,7 @@ real cswald_lpdf(real rt, real mu, real drift, real bound, real ndt, real s, int
   }
 }
 
-// vectorized overload used by the loop = FALSE family: returns the summed
-// log-likelihood, observed responses via the density, censored via the survivor
+// vectorized overload for the loop = FALSE family: density for responses, survivor for censored trials
 real cswald_lpdf(vector rt, vector mu, vector drift, vector bound,
                  vector ndt, vector s, array[] int dec) {
   int N = rows(rt);
@@ -34,8 +33,7 @@ real cswald_lpdf(vector rt, vector mu, vector drift, vector bound,
   }
 
   if (n0 > 0) {
-    // censored observations with rt <= ndt have survival 1 and contribute 0,
-    // so they are dropped rather than passed to the survivor helper
+    // censored trials with rt <= ndt have survival 1, so they are dropped
     array[n0] int jj = idx0[1:n0];
     vector[n0] t0 = rt[jj] - ndt[jj];
     array[n0] int keep;

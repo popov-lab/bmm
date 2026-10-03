@@ -1,37 +1,5 @@
-// m-AFC SDT likelihood: P(correct | m, d') = integral f(x - d') * F(x)^(m-1) dx
-// over the m latent alternatives (one signal shifted by d', m-1 noise), where
-// the observer picks the maximum. F is the noise CDF (see sdt_dist_funs.stan).
-//
-//   normal     : 40-point Gauss-Hermite quadrature (closed form at m = 2)
-//   gumbel_max : exact softmax 1 / (1 + (m-1) * exp(-d'))
-//   gumbel_min : exact gamma ratio Gamma(1 + e^-d') * Gamma(m) / Gamma(m + e^-d')
-//   logistic   : 64-point Gauss-Legendre on [0, 1] of F(Q(u) + d')^(m-1)
-//
-// The binomial is taken on the logit scale, so this returns logit P(correct)
-// rather than P(correct): on the probability scale P(correct) rounds to 1 as
-// soon as its complement falls under the double epsilon, and the likelihood
-// stops responding to d' well inside the range a log link on d can reach.
-// Each branch therefore reads log P(correct) and log(1 - P(correct)) off
-// whichever side still resolves it and subtracts. The two quadrature branches
-// get both from one sweep of the nodes: log_sum_exp of the weighted log-CDFs
-// keeps its precision as P(correct) -> 0, and the sum of the complements --
-// every term positive, so nothing cancels -- as P(correct) -> 1. Reading
-// either side off the other loses the opposite tail.
-//
-// The range that buys is not the range it responds over. Against adaptive
-// integration of log(1 - P(correct)) at m = 4, the normal branch's logit is
-// accurate to about d' = 20 (relative error 4.9e-07; 3.2e-04 at 22, 1.0e-02 at
-// 25, 5.8e-02 at 30, 2.7e-01 at 48), and it is Inf from d' = 48.25. Past 20 its
-// slope is too steep (1.24 times the true slope at 30, 1.52 at 47.5) but keeps
-// the right sign -- still the better trade, because what it replaces is a flat
-// plateau from d' = 12 with no gradient at all, which a sampler random-walks
-// through instead of rejecting.
-//
-// The quadrature tables are passed in from transformed data
-// (sdt_mafc_tdata.stan); the family loops over rows, so building them here
-// would rebuild 208 doubles per row per gradient evaluation.
-//
-// Reference: DeCarlo (2012); Green & Swets (1966)
+// m-AFC SDT likelihood (Green & Swets, 1966; DeCarlo, 2012): P(correct) is P(signal is the largest of m)
+// returns logit P(correct), because P(correct) rounds to 1 at large d' and the likelihood goes flat
 
 real mafc_logit_pc(real d, int m, int dist_type,
                    data vector gh_nodes, data vector gh_weights,
@@ -39,10 +7,7 @@ real mafc_logit_pc(real d, int m, int dist_type,
   if (dist_type == 3)                                      // gumbel_max: softmax
     return d - log(m - 1);
   if (dist_type == 2) {                                    // gumbel_min: gamma ratio
-    // the gamma ratio telescopes to prod(k / (k + e)), and log1p still resolves
-    // the tiny e = exp(-d') at which the difference of lgammas has cancelled to
-    // zero -- off the telescoped form this branch dies where the probability
-    // scale it is meant to rescue does
+    // telescoped to prod(k / (k + e)), so log1p resolves the tiny e where the lgammas cancel
     real e = exp(-d);
     real log_pc = 0;
     for (k in 1:(m - 1))
@@ -82,9 +47,7 @@ real sdt_mafc_lpmf(int y, real mu, real d, int m, int dist_type, int trials,
                    data vector gl_nodes, data vector gl_weights) {
   real logit_pc = mafc_logit_pc(d, m, dist_type,
                                 gh_nodes, gh_weights, gl_nodes, gl_weights);
-  // binomial_logit_lpmf saturates on a large finite logit but raises a domain
-  // error on an infinite one; past the point where a branch still resolves the
-  // complement, every trial is correct, or none is
+  // binomial_logit_lpmf errors on an infinite logit, where every trial is correct or none is
   if (is_inf(logit_pc))
     return (y == (logit_pc > 0 ? trials : 0)) ? 0.0 : negative_infinity();
   return binomial_logit_lpmf(y | trials, logit_pc);

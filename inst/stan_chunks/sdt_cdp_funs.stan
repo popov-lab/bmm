@@ -1,35 +1,13 @@
-// Continuous Dual-Process (CDP) SDT likelihood (Wixted & Mickes, 2010).
-//
-// Native-multinomial formulation: every response category's logit is set to
-// log(p_cat) so brms' softmax recovers the CDP category probabilities exactly
-// (the category probabilities sum to 1 analytically, and softmax is invariant
-// to the shared normalising constant).
-//
-// Two correlated continuous dimensions per item, Familiarity F and Recollection
-// R, with corr(F, R) = tanh(rho):
-//   target: F ~ N(dfam, 1),  R ~ N(drec, exp(sigmar))
-//   lure:   F ~ N(0, 1),        R ~ N(0, 1)
-// Old/new confidence is read off the aggregate strength S = F + R; the
-// Remember/Know split is read off R against rcrit; the optional Know/Guess split
-// is read off F against kcrit.
-//
-// Normal noise only: the bivariate-normal CDF needed for the Remember/Know split
-// is exact and differentiable via Owen's T (owens_t is a Stan primitive).
+// Continuous dual-process SDT (Wixted & Mickes, 2010): each category logit is log(p_cat) for brms' softmax
+// confidence is read off S = F + R, Remember/Know off R vs rcrit, and Know/Guess off F vs kcrit
 
-// Bivariate standard-normal CDF P(Z1 <= h, Z2 <= k) with correlation r, via
-// Owen's T (Owen, 1956). Where h and k have opposite signs the constant term
-// 0.5 * (Phi(h) + Phi(k) - 1) is written with the complementary Phi of the
-// positive argument, so it does not round away with 1 - Phi. An argument on
-// its axis takes the limit form below.
+// bivariate standard-normal CDF P(Z1 <= h, Z2 <= k) with correlation r, via Owen's T (Owen, 1956)
 real cdp_Phi2(real h, real k, real r) {
   if (h == negative_infinity() || k == negative_infinity()) return 0;
   if (h == positive_infinity()) return Phi(k);
   if (k == positive_infinity()) return Phi(h);
   real denom = sqrt((1 + r) * (1 - r));
-  // on an axis the Owen's T argument k / h is a limit, not a value:
-  // P(Z1 <= 0, Z2 <= k) = Phi(k) / 2 + T(k, r / denom), and the first-order
-  // term carries the gradient phi(0) Phi(k / denom) that a constant stand-in
-  // for h would lose (the value error is O(h^2), below 1e-20)
+  // on an axis Owen's T is a limit; the first-order term keeps the gradient there
   if (abs(h) < 1e-10) {
     return 0.5 * Phi(k) + owens_t(k, r / denom)
            + h * 0.3989422804014327 * Phi(k / denom);
@@ -41,6 +19,7 @@ real cdp_Phi2(real h, real k, real r) {
   real x = h;
   real y = k;
   real base;
+  // with opposite signs, the upper tail of the positive argument keeps 1 - Phi from rounding away
   if (x < 0 && y > 0) {
     base = 0.5 * (Phi(x) - Phi(-y));
   } else if (y < 0 && x > 0) {
@@ -51,10 +30,7 @@ real cdp_Phi2(real h, real k, real r) {
   return base - owens_t(x, (y / x - r) / denom) - owens_t(y, (x / y - r) / denom);
 }
 
-// P(lo < Z < hi) for a standard normal Z, taken from the tail the interval
-// lies in so an interval far above 0 does not cancel as 1 - 1. Infinite
-// bounds never reach Phi(): its zero density times an infinite adjoint would
-// make the gradient NaN.
+// P(lo < Z < hi) from the tail the interval lies in; infinite bounds skip Phi() to keep the gradient finite
 real cdp_Phi_interval(real lo, real hi) {
   if (hi <= lo) return 0;
   if (lo > 0) {
@@ -63,10 +39,7 @@ real cdp_Phi_interval(real lo, real hi) {
   return (is_inf(hi) ? 1 : Phi(hi)) - (is_inf(lo) ? 0 : Phi(lo));
 }
 
-// P(a < X < b, Y < k) (above = 0) or P(a < X < b, Y > k) (above = 1) for a
-// standard bivariate normal with correlation r. Y > k is evaluated as
-// -Y < -k, and a band above 0 as its mirror image below 0, so both CDF
-// values sit on the small side of the distribution.
+// P(a < X < b, Y < k), or Y > k if above = 1, mirrored onto the small side of both axes
 real cdp_rect(real a, real b, real k, real r, int above) {
   real kk = above == 1 ? -k : k;
   real rr = above == 1 ? -r : r;
@@ -80,16 +53,7 @@ real cdp_rect(real a, real b, real k, real r, int above) {
   return cdp_Phi2(hi, kk, rr) - cdp_Phi2(lo, kk, rr);
 }
 
-// Mass of an old-response region inside the strength bin (c_lo, c_hi),
-// integrated over the strength S on the bin itself, with R | S = s normal
-// (mean mu_R + beta * (s - mu_S), SD sd_c):
-//   region 1, Guess:          s - kcrit < R < rcrit  (R < rcrit and F < kcrit)
-//   region 2, Know-not-Guess: R < min(rcrit, s - kcrit)
-// Guess needs S < rcrit + kcrit, so its range is finite. The range is clipped
-// to where the strength density matters, split where the conditional
-// probability steps (its conditional mean crosses rcrit or s - kcrit, and at
-// rcrit + kcrit), and each segment is cut into pieces of at most one strength
-// SD, each on 20 Gauss-Legendre nodes.
+// Guess (region 1) or Know-not-Guess (region 2) mass in the strength bin (c_lo, c_hi), by Gauss-Legendre
 real cdp_region_mass(int region, real c_lo, real c_hi, real mu_S, real sigma_S,
                      real mu_R, real beta, real sd_c, real rcrit, real kcrit) {
   int N_GL = 20;
@@ -149,10 +113,7 @@ real cdp_region_mass(int region, real c_lo, real c_hi, real mu_S, real sigma_S,
         }
       }
     } else {
-      // a zero-length piece between coincident breakpoints adds no mass but
-      // its two edges move with different parameters, so it carries the
-      // boundary term f(e) (e_b' - e_a'); one node holds it exactly, where
-      // the 20-node loop would evaluate the same point twenty times
+      // a zero-length piece adds no mass but carries the gradient's boundary term; one node holds it
       real m = mu_R + beta * (edges[e] - mu_S);
       real pc = region == 1
                 ? cdp_Phi_interval((edges[e] - kcrit - m) / sd_c, (rcrit - m) / sd_c)
@@ -163,12 +124,8 @@ real cdp_region_mass(int region, real c_lo, real c_hi, real mu_S, real sigma_S,
   return total;
 }
 
-// Confidence thresholds on the strength axis S = F + R, anchored so the old/new
-// boundary (between bin n_new and bin n_new + 1) sits at `criterion`, with
-// n_new - 1 thresholds below and n_old - 1 above. Reduces to the symmetric
-// centred construction when n_new == n_old. thresh_type: 1 = parsimonious
-// (Selker et al., 2019), 2 = equidistant, 3 = log_distance (free log widths;
-// deltas[j] is the interval between thresholds j and j + 1, as in sdt_rating).
+// confidence thresholds on S = F + R with the old/new boundary at `criterion`
+// thresh_type: 1 = parsimonious (Selker et al., 2019), 2 = equidistant, 3 = log_distance
 vector cdp_make_thresholds(real criterion, real spacing, array[] real deltas,
                            int n_new, int n_old, int thresh_type) {
   int K_full = n_new + n_old;
@@ -193,8 +150,7 @@ vector cdp_make_thresholds(real criterion, real spacing, array[] real deltas,
   return thr;
 }
 
-// CDP probability for a single response category, ordered
-//   new(1..n_new), [guess(1..n_old)], know(1..n_old), remember(1..n_old).
+// CDP probability of one category, ordered new(1..n_new), [guess], know, remember(1..n_old each)
 real cdp_category_prob(int cat, vector thresholds,
                        real dfam, real drec, real sigmar, real rho,
                        real rcrit, real kcrit, real stimulus,
@@ -226,8 +182,7 @@ real cdp_category_prob(int cat, vector thresholds,
   real corr = tanh(rho);
   real mu_S = mu_F + mu_R;
   real sigma_S = sqrt(square(sd_R + corr) + (1 - square(corr)));
-  // the outer bins' infinite bounds stay constants: derived from mu_S and
-  // sigma_S they would carry infinite partials into the gradient
+  // infinite outer bounds stay constants, or they would carry infinite partials into the gradient
   real z_lo = is_inf(c_lo) ? negative_infinity() : (c_lo - mu_S) / sigma_S;
   real z_hi = is_inf(c_hi) ? positive_infinity() : (c_hi - mu_S) / sigma_S;
 
@@ -235,9 +190,7 @@ real cdp_category_prob(int cat, vector thresholds,
   if (type == 1) {
     p = cdp_Phi_interval(z_lo, z_hi);
   } else if (type == 4 || has_guess == 0) {
-    // the smaller of Remember and Know comes from its own rectangle, the
-    // larger as the rest of the bin, so neither is a difference of two
-    // nearly equal numbers
+    // the smaller of Remember and Know comes from its rectangle, the larger as the rest, so neither cancels
     real rho_RS = (sd_R + corr) / sigma_S;
     real hcrit = (rcrit - mu_R) / sd_R;
     real rem = cdp_rect(z_lo, z_hi, hcrit, rho_RS, 1);
@@ -254,12 +207,8 @@ real cdp_category_prob(int cat, vector thresholds,
     p = cdp_region_mass(type == 2 ? 1 : 2, c_lo, c_hi, mu_S, sigma_S, mu_R,
                         beta, sd_c, rcrit, kcrit);
   }
-  // an empty region (e.g. Guess in a bin above rcrit + kcrit) has mass 0;
-  // the floor keeps its logit finite, so a zero count there adds 0, not NaN
+  // the floor keeps an empty region's logit finite, so a zero count there adds 0, not NaN
   return fmax(p, 1e-300);
 }
 
-// The category logit `sdt_cdp_logmu` is code-generated per model by
-// .sdt_cdp_logmu_stan() (R/model_sdt_cdp.R) so the per-distance log_distance
-// deltas can be passed with a fixed arity, mirroring sdt_rating. It calls the
-// helpers above (cdp_make_thresholds + cdp_category_prob).
+// sdt_cdp_logmu itself is generated per model by .sdt_cdp_logmu_stan() in R/model_sdt_cdp.R

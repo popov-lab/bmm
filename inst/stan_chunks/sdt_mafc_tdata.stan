@@ -1,8 +1,5 @@
-// Quadrature tables for mafc_pc(), mirrored on the R side by .mafc_gh_* and
-// .mafc_gl_* in R/distributions.R (see the table-equality test). They live here
-// rather than in mafc_pc() because the m-AFC family is loop = TRUE: declaring
-// them in the function body rebuilds 208 doubles per row per gradient, which
-// measured ~22% slower per leapfrog step.
+// quadrature tables for mafc_logit_pc(), mirrored by .mafc_gh_* and .mafc_gl_* in R/distributions.R
+// declared here because the loop = TRUE family would rebuild them per row (~22% slower per leapfrog step)
 vector[40] gh_nodes = to_vector({
   -1.14533778415487379e+01, -1.04815605346742640e+01, -9.67355636693402765e+00, -8.94950454385556249e+00,
   -8.27894062365948535e+00, -7.64616376454146440e+00, -7.04173840645382576e+00, -6.45942337758375906e+00,

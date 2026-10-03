@@ -1,12 +1,5 @@
-// Dual-process SDT (Yonelinas, 1994) category log-probability for the
-// multinomial family. Requires sdt_rating_logmu_cat() from sdt_rating_funs.stan.
-// Recollection adds mass to the most-confident category: old items recollected
-// as old (Ro) load the top category, new items recall-rejected (Rn) the bottom.
-// Ro/Rn arrive on the linear scale; inv_logit maps them to probabilities, so
-// fixing them near zero recovers the standard rating likelihood.
-// d is the familiarity distributions' d_a: recollection is a separate threshold
-// process, so the d_a scaling belongs to the familiarity SDT process alone and
-// is applied by sdt_rating_logmu_cat() below.
+// dual-process SDT (Yonelinas, 1994) category log-probability; needs sdt_rating_funs.stan
+// recollection adds mass to the most confident category; d is the d_a of the familiarity process only
 real sdt_dpsdt_logmu_cat(int cat, vector thresholds,
                          real d, real sdratio, real stimulus,
                          int dist_type, real Ro, real Rn) {
