@@ -191,6 +191,10 @@ test_that("the links a model applies are exactly the settable ones", {
     names(cswald(rt = "rt", response = "resp")$links)
   )
   expect_null(settable_links(m3(resp_cats = c("a", "b"), num_options = c(1, 4))))
+  expect_equal(
+    settable_links(utility(resp_cats = c("a", "b"), value_cols = c(a = "V"), utility_fn = "power")),
+    c("gamma", "rho")
+  )
   expect_equal(settable_links(sdm(resp_error = "y")), character(0))
 })
 

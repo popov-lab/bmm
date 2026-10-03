@@ -355,7 +355,7 @@ generic_data_findings <- function(predictors, cells, min_trials) {
 # aggregate-response models code many trials per row, so row counts per
 # design cell say nothing about trial numbers and min_trials does not apply
 uses_aggregate_data <- function(model) {
-  inherits(model, "m3") || inherits(model, "ezdm")
+  inherits(model, c("m3", "utility", "ezdm"))
 }
 
 cell_count_findings <- function(counts, min_trials) {

@@ -410,6 +410,15 @@ stored_frame_cases <- function() {
     r5 = c(10, 40, 10, 38, 9, 38, 12, 37)
   )
 
+  utility_data <- data.frame(
+    corr = rep(c(30, 24, 0, 18), 5), other = rep(c(10, 16, 20, 22), 5),
+    V = rep(c(1, 5), 10), n_c = rep(c(1, 1, 0, 1), 5), n_o = rep(c(2, 6, 4, 3), 5),
+    id = factor(rep(1:5, each = 4))
+  )
+  utility_payoffs <- rbind(
+    corr = c(b = 1, wi = 0, wo = 0), other = c(b = 0.5, wi = 1, wo = 0.4)
+  )
+
   list(
     cswald = list(
       model = cswald("rt", "response", version = "simple"),
@@ -457,6 +466,18 @@ stored_frame_cases <- function() {
         choice_rule = "simple", links = m3_links
       ),
       formula = m3_formula, data = oberauer_lewandowsky_2019_e1
+    ),
+    utility = list(
+      model = utility(c("corr", "other"), num_options = c(1, 3), payoffs = utility_payoffs),
+      formula = bmf(wi ~ 1, wo ~ 1), data = utility_data
+    ),
+    # option columns with a zero count, and the Prelec column check_data() adds
+    utility_value_prelec = list(
+      model = utility(
+        c("corr", "other"), num_options = c("n_c", "n_o"), value_cols = c(corr = "V"),
+        utility_fn = "power", weighting = "prelec"
+      ),
+      formula = bmf(gamma ~ 1 + (1 | id), rho ~ 1, alpha ~ 1), data = utility_data
     ),
     mixture2p = list(
       model = mixture2p("dev_rad"), formula = bmf(kappa ~ 1, thetat ~ 1),

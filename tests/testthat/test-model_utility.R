@@ -28,23 +28,81 @@ test_that("utility() builds the payoff (welfare) model with the right structure"
   m <- welfare_model()
   expect_s3_class(m, "bmmodel")
   expect_s3_class(m, "utility")
-  expect_s3_class(m, "utility_linear")
-  expect_equal(m$version, "linear")
+  expect_equal(class(m), c("bmmodel", "utility"))
+  expect_equal(m$version, "NA")
   expect_equal(names(m$parameters), c("b", "wi", "wo"))
   expect_equal(m$links, list(wi = "identity", wo = "identity"))
   expect_equal(m$fixed_parameters, list(b = 1))
   expect_true(inherits(m, supported_models(print_call = FALSE)))
 })
 
-test_that("utility() derives the version token from utility_fn x weighting", {
-  base_args <- list(resp_cats = c("corr", "other"), value_cols = c(corr = "V"))
-  expect_equal(do.call("utility", base_args)$version, "linear")
-  expect_equal(do.call("utility", c(base_args, utility_fn = "power"))$version, "power")
-  expect_equal(do.call("utility", c(base_args, weighting = "prelec"))$version, "prelec")
-  expect_equal(
-    do.call("utility", c(base_args, utility_fn = "power", weighting = "prelec"))$version,
-    "powerprelec"
+test_that("utility() is one unversioned model whatever utility_fn and weighting say", {
+  expect_equal(model_versions("utility"), NA_character_)
+  m <- utility(
+    resp_cats = c("corr", "other"), value_cols = c(corr = "V"),
+    utility_fn = "power", weighting = "prelec"
   )
+  expect_equal(class(m), c("bmmodel", "utility"))
+  expect_equal(m$other_vars$utility_fn, "power")
+  expect_equal(m$other_vars$weighting, "prelec")
+})
+
+test_that("num_options named after the categories are matched by name", {
+  m <- utility(
+    resp_cats = c("corr", "other"), value_cols = c(corr = "V"),
+    num_options = c(other = 4, corr = 1)
+  )
+  expect_equal(m$other_vars$num_options, c(n_opt_corr = 1, n_opt_other = 4))
+  m <- utility(
+    resp_cats = c("corr", "other"), value_cols = c(corr = "V"),
+    num_options = c(other = "n_o", corr = "n_c")
+  )
+  expect_equal(unname(m$other_vars$num_options), c("n_c", "n_o"))
+})
+
+test_that("payoff rows are matched to the categories by name", {
+  m <- utility(
+    resp_cats = c("nkeep", "ningroup"),
+    payoffs = rbind(ningroup = c(b = 0.5, wi = 1), nkeep = c(b = 1, wi = 0)),
+    choice_rule = "simple"
+  )
+  af <- construct_utility_act_funs(m)
+  expect_equal(rhs_string(af, "nkeep"), "1 * b")
+  expect_equal(rhs_string(af, "ningroup"), "0.5 * b + 1 * wi")
+  expect_error(
+    utility(resp_cats = c("nkeep", "other"),
+            payoffs = rbind(ningroup = c(b = 0.5, wi = 1), nkeep = c(b = 1, wi = 0))),
+    "named after it"
+  )
+})
+
+test_that("links reach the activation formulas and are restricted to inv_link()'s", {
+  m <- utility(
+    resp_cats = c("nkeep", "ningroup", "nuniversal"),
+    payoffs = rbind(
+      nkeep = c(b = 1, wi = 0, wo = 0), ningroup = c(b = 0.5, wi = 1, wo = 0),
+      nuniversal = c(b = 0.3, wi = 0.6, wo = 0.9)
+    ),
+    links = list(wi = "log")
+  )
+  expect_equal(m$links$wi, "log")
+  form <- check_formula(m, welfare_data(), bmf(wi ~ 1, wo ~ 1))
+  expect_match(rhs_string(form, "ningroup"), "exp(wi)", fixed = TRUE)
+  expect_equal(settable_link_functions(m), eval(formals(inv_link)$link))
+})
+
+test_that("the simple rule with identity links starts sampling from zero", {
+  model <- welfare_model("simple")
+  dat <- welfare_data()
+  formula <- bmf(wi ~ 1, wo ~ 1)
+  dat <- check_data(model, dat, formula)
+  formula <- check_formula(model, dat, formula)
+  config <- configure_model(model, dat, formula)
+  expect_equal(create_initfun(model, config$data, config$formula), 0)
+
+  model <- welfare_model("softmax")
+  config <- configure_model(model, dat, check_formula(model, dat, bmf(wi ~ 1, wo ~ 1)))
+  expect_type(create_initfun(model, config$data, config$formula), "closure")
 })
 
 test_that("value_cols parameters carry the correct links", {
@@ -60,18 +118,21 @@ test_that("value_cols parameters carry the correct links", {
 
 # ---- default priors --------------------------------------------------------
 
-test_that("default priors follow the round-5-correct schema", {
+test_that("default priors give every parameter main, effects and sd", {
   mw <- welfare_model()
-  expect_equal(mw$default_priors$wi, list(main = "normal(0, 1)", effects = "normal(0, 0.5)"))
+  slope <- list(main = "normal(0, 1)", effects = "normal(0, 0.5)", sd = "exponential(1)")
+  expect_equal(mw$default_priors$wi, slope)
+  expect_equal(mw$default_priors$wo, slope)
 
   mv <- utility(
     resp_cats = c("corr", "other"), value_cols = c(corr = "V"),
     utility_fn = "power", weighting = "prelec"
   )
-  expect_equal(mv$default_priors$gamma, list(main = "normal(0, 1)", effects = "normal(0, 0.5)"))
+  expect_equal(mv$default_priors$gamma, slope)
   # rho / alpha are normal on the log-link predictor, NOT lognormal
-  expect_equal(mv$default_priors$rho, list(main = "normal(0, 0.5)", effects = "normal(0, 0.5)"))
-  expect_equal(mv$default_priors$alpha, list(main = "normal(0, 0.5)", effects = "normal(0, 0.5)"))
+  curvature <- list(main = "normal(0, 0.5)", effects = "normal(0, 0.5)", sd = "exponential(2)")
+  expect_equal(mv$default_priors$rho, curvature)
+  expect_equal(mv$default_priors$alpha, curvature)
 })
 
 test_that("numeraire fixes b to a constant prior", {
@@ -158,7 +219,7 @@ test_that("configure_model builds a multinomial family with mu<cat> dpars", {
   m <- welfare_model()
   dat <- welfare_data()
   fit <- suppressWarnings(
-    bmm(bmf(wi ~ 1, wo ~ 1), dat, m, backend = "mock", mock = 1, rename = FALSE)
+    bmm(bmf(wi ~ 1, wo ~ 1), dat, m, backend = "mock", mock_fit = 1, rename = FALSE)
   )
   expect_equal(fit$formula$family$family, "multinomial")
   expect_setequal(fit$formula$family$dpars, c("munkeep", "muningroup", "mununiversal"))
@@ -219,12 +280,12 @@ test_that("G1 warns on a narrow power-utility value range", {
 test_that("G4 warns for the simple rule with identity-linked parameters", {
   expect_warning(
     bmm(bmf(wi ~ 1, wo ~ 1), welfare_data(), welfare_model("simple"),
-        backend = "mock", mock = 1, rename = FALSE),
+        backend = "mock", mock_fit = 1, rename = FALSE),
     "simple"
   )
   expect_no_warning(
     bmm(bmf(wi ~ 1, wo ~ 1), welfare_data(), welfare_model("softmax"),
-        backend = "mock", mock = 1, rename = FALSE)
+        backend = "mock", mock_fit = 1, rename = FALSE)
   )
 })
 

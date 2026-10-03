@@ -436,7 +436,7 @@ response_annotations <- function(model) {
       n_upper = "count of upper-boundary responses"
     ))
   }
-  if (inherits(model, "m3")) {
+  if (inherits(model, "m3") || inherits(model, "utility")) {
     return(list(resp_cats = "counts per response category"))
   }
   if (inherits(model, "sdt_yn")) {
@@ -485,7 +485,8 @@ model_groups <- c(
   "Working Memory (categorical), Categorical Decision Making" = "Categorical recall and n-AFC decisions",
   "Perception & Recognition Memory" = "Detection, recognition and confidence judgments",
   "Recognition Memory" = "Detection, recognition and confidence judgments",
-  "Decision Making / Response times" = "Choices and response times"
+  "Decision Making / Response times" = "Choices and response times",
+  "Value-based / economic decision making" = "Categorical recall and n-AFC decisions"
 )
 
 model_group <- function(domain) {
@@ -609,6 +610,12 @@ data_column_roles <- list(
     response = "number of 'old'/'signal' responses",
     stimulus = "stimulus type, 0 = noise/new and 1 = signal/old",
     n_trials = "number of trials"
+  ),
+  utility = c(
+    resp_cats = "number of choices of each response category, one column per category",
+    num_options = "number of options in each category (columns, or one number per category; default 1)",
+    payoffs = "known payoff of each category, per parameter (numbers, or columns that vary by trial)",
+    value_cols = "value of each category (one column per category that carries a value)"
   )
 )
 

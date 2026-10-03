@@ -288,6 +288,25 @@ revert_check_data.m3 <- function(model, data) {
   NextMethod("revert_check_data")
 }
 
+# check_data() packs the counts into Y like m3, and the Prelec version adds the
+# n_opt_total column, which it refuses to find in the data it is given
+#' @exportS3Method
+revert_check_data.utility <- function(model, data) {
+  resp_cats <- model$resp_vars$resp_cats
+  num_options <- model$other_vars$num_options
+  data[resp_cats] <- as.data.frame(data$Y[, resp_cats, drop = FALSE])
+  data$n_opt_total <- NULL
+  if (is.character(num_options)) {
+    no_options <- as.matrix(data[paste0("Idx_", resp_cats)]) == 0
+    data[num_options][no_options] <- 0
+  } else {
+    for (var in names(num_options)) {
+      data[[var]] <- NULL
+    }
+  }
+  NextMethod("revert_check_data")
+}
+
 #' @exportS3Method
 revert_check_data.non_targets <- function(model, data) {
   set_size <- model$other_vars$set_size

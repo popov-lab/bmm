@@ -13,6 +13,7 @@ utility(
   weighting = c("none", "prelec"),
   choice_rule = c("softmax", "simple"),
   numeraire = NULL,
+  links = NULL,
   ...
 )
 }
@@ -47,6 +48,10 @@ over raw utilities).}
 \item{numeraire}{Fixes the scaling weight: \code{"b"} (fixed to 1), \code{c(b = value)},
 or omitted for the path default.}
 
+\item{links}{A named list of link functions for the estimated parameters,
+e.g. \code{list(wi = "log")}. One of the links \code{inv_link()} supports: \code{"log"},
+\code{"softplus"}, \code{"logit"}, \code{"probit"} or \code{"identity"}.}
+
 \item{...}{used internally for testing, ignore it}
 }
 \value{
@@ -71,11 +76,65 @@ that needs a different data interface and is out of scope.
 \item \strong{Name:} Random-Utility Choice Model
 \item \strong{Citation:}
 \itemize{
-\item Gross, J., Gotz, F., Reher, F., & Toscano, H. (2025). Nested social dilemmas. Communications Psychology, 3. McFadden, D. (1974). Conditional logit analysis of qualitative choice behavior.
+\item McFadden, D. (1974). Conditional logit analysis of qualitative choice behavior. In P. Zarembka (Ed.), Frontiers in econometrics (pp. 105-142). Academic Press.
+\item Gross, J., Götz, M., Reher, K., & Toscano, F. (2025). Free mobility across group boundaries promotes intergroup cooperation. Communications Psychology, 3, 10. https://doi.org/10.1038/s44271-025-00192-y
+}
+\item \strong{Requirements:}
+\itemize{
+\item Provide the count columns for each response category (\code{resp_cats}).
+\item Supply either a \code{payoffs} matrix/data.frame (known coefficients) or
+per-trial \code{value_cols} (observed value columns).
+\item Predict the utility parameters (welfare weights / gamma / rho / alpha)
+at least by a fixed intercept, plus any predictors from your data.
 }
 }
 
-Built on the same multinomial-logit likelihood as the \code{\link[=m3]{m3()}} model.
+With \code{payoffs}, the parameters are the column names of the payoff matrix:
+the numeraire column is fixed, and every other column is a welfare weight
+with an identity link and the default priors of \code{gamma} below. With
+\code{value_cols}, the parameters are:
+\itemize{
+\item \strong{Parameters:}
+\itemize{
+\item \code{b}: Background activation. Fixed for scaling; added to each response category.
+\item \code{gamma}: Value sensitivity: marginal (dis)utility per unit value.
+\item \code{rho}: Power-utility curvature. Natural scale is exp(rho).
+\item \code{alpha}: Prelec probability-weighting curvature. Natural scale is exp(alpha).
+}
+\item \strong{Fixed parameters:}
+\itemize{
+\item \code{b} = 0
+}
+\item \strong{Default parameter links:}
+\itemize{
+\item gamma = identity; rho = log; alpha = log
+}
+\item \strong{Default priors:}
+\itemize{
+\item \code{gamma}:
+\itemize{
+\item \code{main}: normal(0, 1)
+\item \code{effects}: normal(0, 0.5)
+\item \code{sd}: exponential(1)
+}
+\item \code{rho}:
+\itemize{
+\item \code{main}: normal(0, 0.5)
+\item \code{effects}: normal(0, 0.5)
+\item \code{sd}: exponential(2)
+}
+\item \code{alpha}:
+\itemize{
+\item \code{main}: normal(0, 0.5)
+\item \code{effects}: normal(0, 0.5)
+\item \code{sd}: exponential(2)
+}
+}
+}
+
+Built on the same multinomial-logit likelihood as the \code{\link[=m3]{m3()}} model. The
+activation formulas the model builds for each category are returned by
+\code{\link[=construct_utility_act_funs]{construct_utility_act_funs()}}.
 }
 \examples{
 \dontshow{if (isTRUE(Sys.getenv("BMM_EXAMPLES"))) withAutoprint(\{ # examplesIf}

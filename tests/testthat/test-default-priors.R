@@ -511,6 +511,25 @@ test_that("every model ships an sd default on the link scale of each parameter",
   for (par in c("criterion", "spacing", "rcrit", "sigmar")) {
     expect_equal(sd_default(pr, par), "exponential(2)")
   }
+
+  utility_data <- data.frame(
+    corr = rep(c(30, 24), 10), other = rep(c(10, 16), 10),
+    V = rep(c(1, 5), 10), n_c = 1, n_o = rep(c(2, 6), each = 10),
+    id = factor(rep(1:10, each = 2))
+  )
+  pr <- default_prior(
+    bmf(gamma ~ 1 + (1 | id), rho ~ 1 + (1 | id), alpha ~ 1 + (1 | id)), utility_data,
+    utility(resp_cats = c("corr", "other"), num_options = c("n_c", "n_o"),
+            value_cols = c(corr = "V"), utility_fn = "power", weighting = "prelec")
+  )
+  expect_equal(sd_default(pr, "gamma"), "exponential(1)")
+  for (par in c("rho", "alpha")) expect_equal(sd_default(pr, par), "exponential(2)")
+  pr <- default_prior(
+    bmf(wi ~ 1 + (1 | id)), utility_data,
+    utility(resp_cats = c("corr", "other"),
+            payoffs = rbind(corr = c(b = 1, wi = 0), other = c(b = 0.5, wi = 1)))
+  )
+  expect_equal(sd_default(pr, "wi"), "exponential(1)")
 })
 
 test_that("a freed mu / mu1 gets regularizing main, effects and sd priors on the tan_half scale", {

@@ -133,6 +133,7 @@ Continuous reproduction
 Categorical recall and n-AFC decisions
 \itemize{
 \item m3(): The Multinomial / Memory Measurement Model
+\item utility(): Random-Utility Choice Model
 }
 
 Detection, recognition and confidence judgments

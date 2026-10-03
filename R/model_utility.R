@@ -14,15 +14,7 @@
                            choice_rule = "softmax", numeraire = NULL,
                            links = NULL, default_priors = NULL,
                            call = NULL, ...) {
-  if (!is.null(num_options)) {
-    names(num_options) <- names(num_options) %||% paste0("n_opt_", resp_cats)
-  }
-
-  token <- paste0(
-    if (utility_fn == "power") "power" else "",
-    if (weighting == "prelec") "prelec" else ""
-  )
-  if (token == "") token <- "linear"
+  num_options <- utility_num_options(num_options, resp_cats)
 
   # numeraire fixes the scaling parameter: "b" (=> 1), c(name = value), or the
   # path default (welfare weights anchor at 1; value designs reuse the m3
@@ -48,12 +40,11 @@
       domain = "Value-based / economic decision making",
       task = "n-alternative categorical choice",
       name = "Random-Utility Choice Model",
-      citation = glue(
-        "Gross, J., Gotz, F., Reher, F., & Toscano, H. (2025). Nested social \\
-        dilemmas. Communications Psychology, 3. McFadden, D. (1974). \\
-        Conditional logit analysis of qualitative choice behavior."
+      citation = c(
+        "McFadden, D. (1974). Conditional logit analysis of qualitative choice behavior. In P. Zarembka (Ed.), Frontiers in econometrics (pp. 105-142). Academic Press.",
+        "Gross, J., G\u00f6tz, M., Reher, K., & Toscano, F. (2025). Free mobility across group boundaries promotes intergroup cooperation. Communications Psychology, 3, 10. https://doi.org/10.1038/s44271-025-00192-y"
       ),
-      version = token,
+      version = "NA",
       requirements = paste0(
         "- Provide the count columns for each response category (`resp_cats`).\n",
         "  - Supply either a `payoffs` matrix/data.frame (known coefficients) or\n",
@@ -62,24 +53,50 @@
         "    at least by a fixed intercept, plus any predictors from your data.\n"
       ),
       parameters = pars$parameters,
-      fixed_parameters = setNames(list(num_value), num_name),
       links = pars$links,
+      fixed_parameters = setNames(list(num_value), num_name),
       default_priors = pars$default_priors,
-      void_mu = FALSE
+      init_ranges = pars$init_ranges
     ),
-    class = c("bmmodel", "utility", paste0("utility_", token)),
+    class = c("bmmodel", "utility"),
     call = call
   )
 
-  out$links[names(links)] <- links
+  out <- set_links(out, links)
   out$default_priors[names(default_priors)] <- default_priors
   out
 }
 
-# Parameter inventory, links, and default priors for the two entry paths. Kept
-# separate from the constructor only because it is the piece a maintainer reads
-# to understand the parameter set per version.
+# Counts or column names named after the response categories are labels, as in
+# m3 (#449): they are matched to the categories by name, and counts get the
+# n_opt_<category> column names, because a column named after a category would
+# multiply that category's activation by itself in the choice kernel
+utility_num_options <- function(num_options, resp_cats) {
+  if (is.null(num_options)) {
+    return(NULL)
+  }
+  if (setequal(names(num_options), resp_cats)) {
+    num_options <- num_options[resp_cats]
+    if (is.numeric(num_options)) names(num_options) <- NULL
+  }
+  if (is.numeric(num_options)) {
+    names(num_options) <- names(num_options) %||% paste0("n_opt_", resp_cats)
+  }
+  num_options
+}
+
+# Parameter inventory, links, default priors and initial-value ranges for the
+# two entry paths. Kept separate from the constructor only because it is the
+# piece a maintainer reads to understand the parameter set per design.
+# sd rates go by meaning: weights and the value slope are strengths (rate 1),
+# the log-linked curvatures rho and alpha are log ratios (rate 2). Initial
+# values span the central 50% of the main prior on the native scale.
 .utility_parameter_spec <- function(payoffs, num_name, utility_fn, weighting) {
+  slope_prior <- list(main = "normal(0, 1)", effects = "normal(0, 0.5)", sd = "exponential(1)")
+  curvature_prior <- list(main = "normal(0, 0.5)", effects = "normal(0, 0.5)", sd = "exponential(2)")
+  slope_init <- c(-0.67, 0.67)
+  curvature_init <- c(0.71, 1.4)
+
   if (!is.null(payoffs)) {
     weight_pars <- setdiff(colnames(payoffs), num_name)
     parameters <- c(
@@ -89,37 +106,46 @@
         weight_pars
       )
     )
-    links <- setNames(as.list(rep("identity", length(weight_pars))), weight_pars)
-    default_priors <- setNames(
-      lapply(weight_pars, function(w) list(main = "normal(0, 1)", effects = "normal(0, 0.5)")),
-      weight_pars
-    )
-    return(nlist(parameters, links, default_priors))
+    by_weight <- function(x) setNames(rep(list(x), length(weight_pars)), weight_pars)
+    return(list(
+      parameters = parameters,
+      links = by_weight("identity"),
+      default_priors = by_weight(slope_prior),
+      init_ranges = by_weight(slope_init)
+    ))
   }
 
   parameters <- setNames(
     list("Background activation. Fixed for scaling; added to each response category."),
     num_name
   )
-  links <- list()
-  default_priors <- list()
-
   parameters$gamma <- "Value sensitivity: marginal (dis)utility per unit value."
-  links$gamma <- "identity"
-  default_priors$gamma <- list(main = "normal(0, 1)", effects = "normal(0, 0.5)")
+  links <- list(gamma = "identity")
+  default_priors <- list(gamma = slope_prior)
+  init_ranges <- list(gamma = slope_init)
 
   if (utility_fn == "power") {
     parameters$rho <- "Power-utility curvature. Natural scale is exp(rho)."
     links$rho <- "log"
-    default_priors$rho <- list(main = "normal(0, 0.5)", effects = "normal(0, 0.5)")
+    default_priors$rho <- curvature_prior
+    init_ranges$rho <- curvature_init
   }
   if (weighting == "prelec") {
     parameters$alpha <- "Prelec probability-weighting curvature. Natural scale is exp(alpha)."
     links$alpha <- "log"
-    default_priors$alpha <- list(main = "normal(0, 0.5)", effects = "normal(0, 0.5)")
+    default_priors$alpha <- curvature_prior
+    init_ranges$alpha <- curvature_init
   }
 
-  nlist(parameters, links, default_priors)
+  nlist(parameters, links, default_priors, init_ranges)
+}
+
+# utility applies its links itself, by substituting the inverse link into the
+# activation formulas (apply_links -> inv_link), as m3 does, so the links it can
+# honour are inv_link()'s
+#' @exportS3Method
+settable_link_functions.utility <- function(model) {
+  eval(formals(inv_link)$link)
 }
 
 #' @title `r .model_utility()$name`
@@ -159,12 +185,24 @@
 #'   over raw utilities).
 #' @param numeraire Fixes the scaling weight: `"b"` (fixed to 1), `c(b = value)`,
 #'   or omitted for the path default.
+#' @param links A named list of link functions for the estimated parameters,
+#'   e.g. `list(wi = "log")`. One of the links `inv_link()` supports: `"log"`,
+#'   `"softplus"`, `"logit"`, `"probit"` or `"identity"`.
 #' @param ... used internally for testing, ignore it
 #' @return An object of class `bmmodel`
 #'
-#' @details `r model_info(.model_utility(), components = c('domain', 'task', 'name', 'citation'))`
+#' @details `r model_docs(.model_utility(), components = c('domain', 'task', 'name', 'citation', 'requirements'))`
 #'
-#' Built on the same multinomial-logit likelihood as the [m3()] model.
+#' With `payoffs`, the parameters are the column names of the payoff matrix:
+#' the numeraire column is fixed, and every other column is a welfare weight
+#' with an identity link and the default priors of `gamma` below. With
+#' `value_cols`, the parameters are:
+#'
+#' `r model_docs(.model_utility(utility_fn = "power", weighting = "prelec"), components = c('parameters', 'fixed_parameters', 'links', 'prior'))`
+#'
+#' Built on the same multinomial-logit likelihood as the [m3()] model. The
+#' activation formulas the model builds for each category are returned by
+#' [construct_utility_act_funs()].
 #'
 #' @keywords bmmodel
 #'
@@ -189,7 +227,7 @@ utility <- function(resp_cats, num_options = NULL,
                     utility_fn = c("linear", "power"),
                     weighting = c("none", "prelec"),
                     choice_rule = c("softmax", "simple"),
-                    numeraire = NULL, ...) {
+                    numeraire = NULL, links = NULL, ...) {
   call <- match.call()
   stop_missing_args()
   utility_fn <- match.arg(utility_fn)
@@ -215,8 +253,9 @@ utility <- function(resp_cats, num_options = NULL,
        (the weight parameters, including the numeraire '{num_name}')."
     )
     stopif(
-      nrow(payoffs) != length(resp_cats),
-      "`payoffs` must have one row per response category."
+      nrow(payoffs) != length(resp_cats) || !setequal(rownames(payoffs), resp_cats),
+      "`payoffs` must have one row per response category, named after it: \\
+       {collapse_comma(resp_cats)}."
     )
     stopif(
       !num_name %in% colnames(payoffs),
@@ -253,7 +292,7 @@ utility <- function(resp_cats, num_options = NULL,
     payoffs = payoffs, value_cols = value_cols,
     utility_fn = utility_fn, weighting = weighting,
     choice_rule = choice_rule, numeraire = numeraire,
-    call = call, ...
+    links = links, call = call, ...
   )
 }
 
@@ -414,18 +453,44 @@ check_formula.utility <- function(model, data, formula) {
   NextMethod("check_formula")
 }
 
-# Generate the per-category activation formulas from the payoff matrix or the
-# value columns. Payoff cells are emitted uniformly as `{cell}*{param}` whether
-# the cell is a constant or the name of a per-trial data column. The Prelec
-# weighting term enters the activation (so apply_links maps alpha -> exp(alpha))
-# and replaces the log(n) count term that the softmax kernel would otherwise add.
+# Payoff cells are emitted uniformly as `{cell}*{param}` whether the cell is a
+# constant or the name of a per-trial data column. The Prelec weighting term
+# enters the activation (so apply_links maps alpha -> exp(alpha)) and replaces
+# the log(n) count term that the softmax kernel would otherwise add.
+
+#' @title Activation functions of a random-utility choice model
+#'
+#' @description Returns the activation formula that a [utility()] model builds
+#'   for each response category, from its `payoffs` matrix or its `value_cols`.
+#'   `bmm()` adds these formulas to the formula you supply, so you only predict
+#'   the parameters.
+#'
+#' @param model A `bmmodel` object created by [utility()].
+#'
+#' @return A `bmmformula` with one activation formula per response category,
+#'   named after the category.
+#'
+#' @examples
+#' model <- utility(
+#'   resp_cats = c("nkeep", "ningroup", "nuniversal"),
+#'   payoffs = rbind(
+#'     nkeep      = c(b = 1.0, wi = 0.0, wo = 0.0),
+#'     ningroup   = c(b = 0.5, wi = 1.0, wo = 0.0),
+#'     nuniversal = c(b = 0.3, wi = 0.6, wo = 0.9)
+#'   ),
+#'   choice_rule = "simple"
+#' )
+#' construct_utility_act_funs(model)
+#' @keywords transform
+#' @export
 construct_utility_act_funs <- function(model) {
+  stopif(!inherits(model, "utility"), "`model` must be created by utility().")
   resp_cats <- model$resp_vars$resp_cats
   o <- model$other_vars
   num_name <- names(model$fixed_parameters)[1]
 
   if (!is.null(o$payoffs)) {
-    payoff_matrix <- as.matrix(o$payoffs)
+    payoff_matrix <- as.matrix(o$payoffs)[resp_cats, , drop = FALSE]
     param_cols <- colnames(payoff_matrix)
     forms <- lapply(seq_len(nrow(payoff_matrix)), function(k) {
       terms <- vapply(seq_along(param_cols), function(j) {
@@ -513,11 +578,14 @@ configure_model.utility <- function(model, data, formula) {
   formula$family$cats <- model$resp_vars$resp_cats
   formula$family$dpars <- paste0("mu", model$resp_vars$resp_cats)
 
-  if (model$other_vars$choice_rule == "simple" && any(model$links == "identity")) {
-    init <- 0
-  } else {
-    init <- NULL
-  }
+  nlist(formula, data)
+}
 
-  nlist(formula, data, init)
+#' @export
+create_initfun.utility <- function(model, data, formula, prior = NULL, ...) {
+  # the "simple" choice rule with an identity link samples stably only from zero
+  if (model$other_vars$choice_rule == "simple" && any(model$links == "identity")) {
+    return(0)
+  }
+  NextMethod()
 }
