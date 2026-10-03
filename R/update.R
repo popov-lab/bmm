@@ -373,6 +373,46 @@ revert_check_data.sdt_cdp <- function(model, data) {
   NextMethod("revert_check_data")
 }
 
+#' @exportS3Method
+revert_check_data.lnr_simple <- function(model, data) {
+  response <- model$resp_vars$response
+  # brms keeps the response column only when a formula predicts something with
+  # it. .lnr_cat records only whether a trial was correct, so every error comes
+  # back as option 2, and check_data() learns from the attribute that the other
+  # error options are pooled rather than never chosen
+  if (not_in(response, colnames(data))) {
+    data[[response]] <- data$.lnr_cat
+    attr(data, "rebuilt") <- c(attr(data, "rebuilt"), response)
+    attr(data, "lnr_errors_pooled") <- TRUE
+  }
+  data[grepl("^\\.lnr_(cat|n[0-9]+)$", colnames(data))] <- NULL
+  NextMethod("revert_check_data")
+}
+
+#' @exportS3Method
+revert_check_data.lnr_custom <- function(model, data) {
+  response <- model$resp_vars$response
+  cats <- model$other_vars$resp_cats
+  if (not_in(response, colnames(data))) {
+    data[[response]] <- cats[data$.lnr_cat]
+    attr(data, "rebuilt") <- c(attr(data, "rebuilt"), response)
+  }
+  # .lnr_n<i> is check_data()'s integer copy of the accumulator column of the
+  # i-th category, which brms keeps only when a formula predicts something with it
+  accumulators <- model$other_vars$accumulators
+  if (is.character(accumulators)) {
+    for (i in seq_along(cats)) {
+      col <- accumulators[[cats[i]]]
+      if (not_in(col, colnames(data))) {
+        data[[col]] <- data[[paste0(".lnr_n", i)]]
+        attr(data, "rebuilt") <- c(attr(data, "rebuilt"), col)
+      }
+    }
+  }
+  data[grepl("^\\.lnr_(cat|n[0-9]+)$", colnames(data))] <- NULL
+  NextMethod("revert_check_data")
+}
+
 # brms::update.brmsfit() merges the fit's stored control key by key with the one
 # the call names, and keeps none of it when backend or algorithm changes.
 # update.bmmfit() always names a control, so the rule is applied here. rstan fits

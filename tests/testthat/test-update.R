@@ -398,6 +398,14 @@ stored_frame_cases <- function() {
     c ~ 1, a ~ 1, d ~ 1
   )
   m3_links <- list(c = "log", a = "log", d = "log")
+  lnr_data <- data.frame(
+    rt = rep(c(0.6, 0.8, 1.1, 0.7, 0.9), 4),
+    choice = rep(1:4, 5),
+    label = rep(c("correct", "similar", "other", "correct", "similar"), 4),
+    n_correct = 1L, n_similar = rep(c(2L, 3L), 10), n_other = 4L,
+    id = factor(rep(1:5, each = 4))
+  )
+  lnr_custom_formula <- bmf(correct ~ 1, similar ~ 1, other ~ 1, ndt ~ 1, s ~ 1)
   mafc_data <- data.frame(
     n_correct = c(80, 55, 78, 60, 85, 52, 81, 58), n_trials = 100,
     n_afc = rep(c(2, 4), 4), cond = factor(rep(c("a", "b"), each = 4))
@@ -457,6 +465,24 @@ stored_frame_cases <- function() {
         choice_rule = "simple", links = m3_links
       ),
       formula = m3_formula, data = oberauer_lewandowsky_2019_e1
+    ),
+    # every option is chosen, so a rebuilt response that lost which error was
+    # made must not report options 3 and 4 as never chosen
+    lnr = list(
+      model = lnr("rt", "choice", n_choices = 4),
+      formula = bmf(correct ~ 1, error ~ 1, ndt ~ 1, s ~ 1), data = lnr_data
+    ),
+    lnr_predictor = list(
+      model = lnr("rt", "choice", n_choices = 4),
+      formula = bmf(correct ~ 1 + id, error ~ 1, ndt ~ 1, s ~ 1), data = lnr_data
+    ),
+    # check_data() reads the categories that check_model() takes from the
+    # formula, and update() passes check_data() the fit's checked model
+    lnr_custom = list(
+      model = check_model(lnr("rt", "label", version = "custom", accumulators = c(
+        correct = "n_correct", similar = "n_similar", other = "n_other"
+      )), formula = lnr_custom_formula),
+      formula = lnr_custom_formula, data = lnr_data
     ),
     mixture2p = list(
       model = mixture2p("dev_rad"), formula = bmf(kappa ~ 1, thetat ~ 1),
@@ -634,6 +660,21 @@ test_that("an m column rebuilt for check_data() stays out of the model frame", {
   expect_false("set_size" %in% colnames(data))
   expect_equal(data$max_rank, as.numeric(case$data$set_size))
   expect_equal(unname(data$Y), unname(as.matrix(case$data[paste0("rank", 1:5)])))
+})
+
+test_that("an lnr response and accumulator columns rebuilt for check_data() stay out of the model frame", {
+  skip_on_cran()
+  for (case_name in c("lnr", "lnr_custom")) {
+    case <- stored_frame_cases()[[case_name]]
+    fit <- stored_frame_fit(case)
+    rebuilt <- c("choice", "label", "n_similar")
+    expect_false(any(rebuilt %in% colnames(fit$data)))
+    expect_no_warning(
+      data <- check_stored_data(case$model, fit$data, fit$bmm$user_formula)
+    )
+    expect_false(any(rebuilt %in% colnames(data)))
+    expect_null(attr(data, "lnr_errors_pooled"))
+  }
 })
 
 test_that("an m3 frame whose Idx_ columns came from the wrong option columns is refused (#457)", {

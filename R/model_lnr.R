@@ -435,7 +435,13 @@ check_data.lnr_simple <- function(model, data, formula) {
   )
   data[, response_var] <- as.integer(data[, response_var])
 
-  never_chosen <- setdiff(seq_len(n_alt), unique(data[, response_var]))
+  chosen <- unique(data[, response_var])
+  # set by revert_check_data() on a fit's stored frame, which codes every error 2
+  if (isTRUE(attr(data, "lnr_errors_pooled")) && 2L %in% chosen) {
+    chosen <- seq_len(n_alt)
+  }
+  attr(data, "lnr_errors_pooled") <- NULL
+  never_chosen <- setdiff(seq_len(n_alt), chosen)
   warnif(
     length(never_chosen) > 0,
     "Response option(s) {collapse_comma(never_chosen)} never occur in \\
