@@ -1,0 +1,214 @@
+// Continuous dual-process SDT (Wixted & Mickes, 2010): each category logit is log(p_cat) for brms' softmax
+// confidence is read off S = F + R, Remember/Know off R vs rcrit, and Know/Guess off F vs kcrit
+
+// bivariate standard-normal CDF P(Z1 <= h, Z2 <= k) with correlation r, via Owen's T (Owen, 1956)
+real cdp_Phi2(real h, real k, real r) {
+  if (h == negative_infinity() || k == negative_infinity()) return 0;
+  if (h == positive_infinity()) return Phi(k);
+  if (k == positive_infinity()) return Phi(h);
+  real denom = sqrt((1 + r) * (1 - r));
+  // on an axis Owen's T is a limit; the first-order term keeps the gradient there
+  if (abs(h) < 1e-10) {
+    return 0.5 * Phi(k) + owens_t(k, r / denom)
+           + h * 0.3989422804014327 * Phi(k / denom);
+  }
+  if (abs(k) < 1e-10) {
+    return 0.5 * Phi(h) + owens_t(h, r / denom)
+           + k * 0.3989422804014327 * Phi(h / denom);
+  }
+  real x = h;
+  real y = k;
+  real base;
+  // with opposite signs, the upper tail of the positive argument keeps 1 - Phi from rounding away
+  if (x < 0 && y > 0) {
+    base = 0.5 * (Phi(x) - Phi(-y));
+  } else if (y < 0 && x > 0) {
+    base = 0.5 * (Phi(y) - Phi(-x));
+  } else {
+    base = 0.5 * (Phi(x) + Phi(y));
+  }
+  return base - owens_t(x, (y / x - r) / denom) - owens_t(y, (x / y - r) / denom);
+}
+
+// P(lo < Z < hi) from the tail the interval lies in; infinite bounds skip Phi() to keep the gradient finite
+real cdp_Phi_interval(real lo, real hi) {
+  if (hi <= lo) return 0;
+  if (lo > 0) {
+    return is_inf(hi) ? Phi(-lo) : Phi(-lo) - Phi(-hi);
+  }
+  return (is_inf(hi) ? 1 : Phi(hi)) - (is_inf(lo) ? 0 : Phi(lo));
+}
+
+// P(a < X < b, Y < k), or Y > k if above = 1, mirrored onto the small side of both axes
+real cdp_rect(real a, real b, real k, real r, int above) {
+  real kk = above == 1 ? -k : k;
+  real rr = above == 1 ? -r : r;
+  real lo = a;
+  real hi = b;
+  if (a > 0) {
+    lo = -b;
+    hi = -a;
+    rr = -rr;
+  }
+  return cdp_Phi2(hi, kk, rr) - cdp_Phi2(lo, kk, rr);
+}
+
+// Guess (region 1) or Know-not-Guess (region 2) mass in the strength bin (c_lo, c_hi), by Gauss-Legendre
+real cdp_region_mass(int region, real c_lo, real c_hi, real mu_S, real sigma_S,
+                     real mu_R, real beta, real sd_c, real rcrit, real kcrit) {
+  int N_GL = 20;
+  vector[N_GL] gl_nodes = to_vector({
+    -9.9312859918509492e-01, -9.6397192727791379e-01,
+    -9.1223442825132591e-01, -8.3911697182221882e-01,
+    -7.4633190646015087e-01, -6.3605368072651512e-01,
+    -5.1086700195082709e-01, -3.7370608871541956e-01,
+    -2.2778585114164508e-01, -7.6526521133497324e-02,
+     7.6526521133497338e-02,  2.2778585114164508e-01,
+     3.7370608871541956e-01,  5.1086700195082709e-01,
+     6.3605368072651512e-01,  7.4633190646015087e-01,
+     8.3911697182221882e-01,  9.1223442825132591e-01,
+     9.6397192727791379e-01,  9.9312859918509492e-01});
+  vector[N_GL] gl_weights = to_vector({
+    1.7614007139152118e-02, 4.0601429800386941e-02,
+    6.2672048334109064e-02, 8.3276741576704749e-02,
+    1.0193011981724044e-01, 1.1819453196151842e-01,
+    1.3168863844917664e-01, 1.4209610931838205e-01,
+    1.4917298647260360e-01, 1.5275338713072585e-01,
+    1.5275338713072585e-01, 1.4917298647260360e-01,
+    1.4209610931838205e-01, 1.3168863844917664e-01,
+    1.1819453196151842e-01, 1.0193011981724044e-01,
+    8.3276741576704749e-02, 6.2672048334109064e-02,
+    4.0601429800386941e-02, 1.7614007139152118e-02});
+
+  real hi = region == 1 ? fmin(c_hi, rcrit + kcrit) : c_hi;
+  hi = fmin(hi, fmax(mu_S + 12 * sigma_S, c_lo + 4 * sigma_S));
+  real lo = fmax(c_lo, fmin(mu_S - 12 * sigma_S, hi - 4 * sigma_S));
+  if (hi <= lo) return 0;
+
+  vector[3] cand;
+  cand[1] = beta != 0 ? mu_S + (rcrit - mu_R) / beta : hi;
+  cand[2] = beta != 1 ? (mu_R - beta * mu_S + kcrit) / (1 - beta) : hi;
+  cand[3] = rcrit + kcrit;
+  for (c in 1:3) {
+    if (!(cand[c] > lo && cand[c] < hi)) cand[c] = hi;
+  }
+  vector[5] edges = append_row(append_row(lo, sort_asc(cand)), hi);
+
+  real total = 0;
+  for (e in 1:4) {
+    real len = edges[e + 1] - edges[e];
+    if (len > 0) {
+      int np = 1;
+      while (np * sigma_S < len) np += 1;
+      real half = 0.5 * len / np;
+      for (p in 1:np) {
+        real mid = edges[e] + (2 * p - 1) * half;
+        for (i in 1:N_GL) {
+          real s = mid + half * gl_nodes[i];
+          real m = mu_R + beta * (s - mu_S);
+          real pc = region == 1
+                    ? cdp_Phi_interval((s - kcrit - m) / sd_c, (rcrit - m) / sd_c)
+                    : Phi((fmin(rcrit, s - kcrit) - m) / sd_c);
+          total += gl_weights[i] * half * exp(normal_lpdf(s | mu_S, sigma_S)) * pc;
+        }
+      }
+    } else {
+      // a zero-length piece adds no mass but carries the gradient's boundary term; one node holds it
+      real m = mu_R + beta * (edges[e] - mu_S);
+      real pc = region == 1
+                ? cdp_Phi_interval((edges[e] - kcrit - m) / sd_c, (rcrit - m) / sd_c)
+                : Phi((fmin(rcrit, edges[e] - kcrit) - m) / sd_c);
+      total += len * exp(normal_lpdf(edges[e] | mu_S, sigma_S)) * pc;
+    }
+  }
+  return total;
+}
+
+// confidence thresholds on S = F + R with the old/new boundary at `criterion`
+// thresh_type: 1 = parsimonious (Selker et al., 2019), 2 = equidistant, 3 = log_distance
+vector cdp_make_thresholds(real criterion, real spacing, array[] real deltas,
+                           int n_new, int n_old, int thresh_type) {
+  int K_full = n_new + n_old;
+  int n_thresh = K_full - 1;
+  vector[n_thresh] thr;
+  real s = exp(spacing);
+  if (thresh_type == 2) {
+    for (k in 1:n_thresh) thr[k] = criterion + (k - n_new) * s;
+  } else if (thresh_type == 3) {
+    thr[n_new] = criterion;
+    for (k in (n_new + 1):n_thresh)
+      thr[k] = thr[k - 1] + exp(deltas[k - 1]);
+    for (k in 1:(n_new - 1)) {
+      int kk = n_new - k;            // Stan counts up: descend n_new-1 .. 1
+      thr[kk] = thr[kk + 1] - exp(deltas[kk]);
+    }
+  } else {
+    real anchor = log(n_new * 1.0 / (K_full - n_new));
+    for (k in 1:n_thresh)
+      thr[k] = criterion + s * (log(k * 1.0 / (K_full - k)) - anchor);
+  }
+  return thr;
+}
+
+// CDP probability of one category, ordered new(1..n_new), [guess], know, remember(1..n_old each)
+real cdp_category_prob(int cat, vector thresholds,
+                       real dfam, real drec, real sigmar, real rho,
+                       real rcrit, real kcrit, real stimulus,
+                       int n_new, int n_old, int has_guess) {
+  int K_full = n_new + n_old;
+  int type;
+  int conf;
+  if (cat <= n_new) {
+    type = 1;
+    conf = cat;
+  } else if (has_guess == 1) {
+    int r = cat - n_new;
+    int block = (r - 1) %/% n_old;          // 0 guess, 1 know, 2 remember
+    type = block == 0 ? 2 : (block == 1 ? 3 : 4);
+    conf = r - block * n_old;
+  } else {
+    int r = cat - n_new;
+    int block = (r - 1) %/% n_old;          // 0 know, 1 remember
+    type = block == 0 ? 3 : 4;
+    conf = r - block * n_old;
+  }
+  int global_k = type == 1 ? conf : (n_new + conf);
+  real c_lo = global_k == 1 ? negative_infinity() : thresholds[global_k - 1];
+  real c_hi = global_k == K_full ? positive_infinity() : thresholds[global_k];
+
+  real mu_F = stimulus > 0.5 ? dfam : 0.0;
+  real mu_R = stimulus > 0.5 ? drec : 0.0;
+  real sd_R = stimulus > 0.5 ? exp(sigmar) : 1.0;
+  real corr = tanh(rho);
+  real mu_S = mu_F + mu_R;
+  real sigma_S = sqrt(square(sd_R + corr) + (1 - square(corr)));
+  // infinite outer bounds stay constants, or they would carry infinite partials into the gradient
+  real z_lo = is_inf(c_lo) ? negative_infinity() : (c_lo - mu_S) / sigma_S;
+  real z_hi = is_inf(c_hi) ? positive_infinity() : (c_hi - mu_S) / sigma_S;
+
+  real p;
+  if (type == 1) {
+    p = cdp_Phi_interval(z_lo, z_hi);
+  } else if (type == 4 || has_guess == 0) {
+    // the smaller of Remember and Know comes from its rectangle, the larger as the rest, so neither cancels
+    real rho_RS = (sd_R + corr) / sigma_S;
+    real hcrit = (rcrit - mu_R) / sd_R;
+    real rem = cdp_rect(z_lo, z_hi, hcrit, rho_RS, 1);
+    real kn = cdp_rect(z_lo, z_hi, hcrit, rho_RS, 0);
+    if (rem <= kn) {
+      kn = cdp_Phi_interval(z_lo, z_hi) - rem;
+    } else {
+      rem = cdp_Phi_interval(z_lo, z_hi) - kn;
+    }
+    p = type == 4 ? rem : kn;
+  } else {
+    real beta = sd_R * (corr + sd_R) / square(sigma_S);
+    real sd_c = sd_R * sqrt(fmax(1 - square(corr), 1e-12)) / sigma_S;
+    p = cdp_region_mass(type == 2 ? 1 : 2, c_lo, c_hi, mu_S, sigma_S, mu_R,
+                        beta, sd_c, rcrit, kcrit);
+  }
+  // the floor keeps an empty region's logit finite, so a zero count there adds 0, not NaN
+  return fmax(p, 1e-300);
+}
+
+// sdt_cdp_logmu itself is generated per model by .sdt_cdp_logmu_stan() in R/model_sdt_cdp.R

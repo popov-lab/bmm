@@ -27,14 +27,14 @@ An object of class \code{bmmodel}
 Signal Discrimination Model (SDM) by Oberauer (2023)
 }
 \details{
-see \href{https://venpopov.com/bmm/articles/bmm_sdm_simple.html}{the online article} for a detailed description of the model
+see \href{https://popov-lab.github.io/bmm/articles/bmm_sdm_simple.html}{the online article} for a detailed description of the model
 and how to use it. * \strong{Domain:} Visual working memory
 \itemize{
 \item \strong{Task:} Continuous reproduction
 \item \strong{Name:} Signal Discrimination Model (SDM) by Oberauer (2023)
 \item \strong{Citation:}
 \itemize{
-\item Oberauer, K. (2023). Measurement models for visual working memory - A factorial model comparison. Psychological Review, 130(3), 841-852
+\item Oberauer, K. (2023). Measurement models for visual working memory—A factorial model comparison. Psychological Review, 130(3), 841-852. https://doi.org/10.1037/rev0000328
 }
 \item \strong{Version:} simple
 \item \strong{Requirements:}
@@ -59,17 +59,21 @@ and how to use it. * \strong{Domain:} Visual working memory
 \itemize{
 \item \code{mu}:
 \itemize{
-\item \code{main}: student_t(1, 0, 1)
+\item \code{main}: normal(0, 0.5)
+\item \code{effects}: normal(0, 0.25)
+\item \code{sd}: exponential(4)
 }
 \item \code{kappa}:
 \itemize{
 \item \code{main}: student_t(5, 1.75, 0.75)
 \item \code{effects}: normal(0, 1)
+\item \code{sd}: exponential(1)
 }
 \item \code{c}:
 \itemize{
 \item \code{main}: student_t(5, 2, 0.75)
 \item \code{effects}: normal(0, 1)
+\item \code{sd}: exponential(1)
 }
 }
 }
