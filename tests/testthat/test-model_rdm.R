@@ -917,6 +917,35 @@ test_that("posterior_epred for rdm is deterministic and integrates the race", {
   }
 })
 
+# brms hands posterior_epred draws x observations dpar matrices. The integration
+# grid of an observation spans the slowest and fastest of all its draws, so a
+# draw evaluated alone sits on another grid and differs by ~1e-7 relative
+# (8.4e-8 measured here); expect_epred_by_cell() compares at 1.5e-8.
+test_that("posterior_epred for rdm lines up draws and observations", {
+  dpars <- list(
+    driftc = matrix(c(3, 2.5, 4, 3.5, 2, 3), 2, 3),
+    drifte = matrix(c(1.5, 1.2, 2, 1, 1.4, 0.8), 2, 3),
+    gap = matrix(c(0.8, 1.2, 0.6, 1, 0.9, 0.7), 2, 3),
+    ndt = matrix(c(0.2, 0.15, 0.25, 0.3, 0.1, 0.2), 2, 3),
+    s = matrix(1, 2, 3),
+    sp = matrix(c(1e-10, 0.3, 0.2, 0.1, 1e-10, 0.4), 2, 3)
+  )
+  data <- list(Y = c(0.6, 0.7, 0.8), vint1 = c(1L, 2L, 1L),
+               vint2 = c(1L, 1L, 1L), vint3 = c(1L, 2L, 3L))
+  out <- posterior_epred_rdm_simple(epred_prep(dpars, data))
+  expect_equal(dim(out), c(2L, 3L))
+  by_cell <- matrix(NA_real_, 2, 3)
+  for (s in 1:2) {
+    for (i in 1:3) {
+      cell <- lapply(dpars, function(x) x[s, i, drop = FALSE])
+      by_cell[s, i] <- posterior_epred_rdm_simple(
+        epred_prep(cell, lapply(data, `[`, i))
+      )[1, 1]
+    }
+  }
+  expect_equal(out, by_cell, tolerance = 1e-6)
+})
+
 # The fake prep above carries every parameter as a draw-length vector; on a real
 # fit brms stores the fixed s and sp as scalars, which only this path grows to
 # ndraws. posterior_epred() picks a random subset of draws unless draw_ids is
