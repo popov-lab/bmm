@@ -13,7 +13,7 @@ imm(
   nt_distances,
   set_size,
   regex = FALSE,
-  version = "full",
+  version = c("full", "bsc", "abc"),
   variable_precision = FALSE,
   vp_nodes = 41L,
   links = NULL,
@@ -84,7 +84,7 @@ Please use \code{imm(version = 'full')}, \code{imm(version = 'bsc')}, or \code{i
 \item \strong{Name:} Interference measurement model by Oberauer and Lin (2017).
 \item \strong{Citation:}
 \itemize{
-\item Oberauer, K., & Lin, H.Y. (2017). An interference model of visual working memory. Psychological Review, 124(1), 21-59
+\item Oberauer, K., & Lin, H.-Y. (2017). An interference model of visual working memory. Psychological Review, 124(1), 21-59. https://doi.org/10.1037/rev0000044
 }
 }
 \subsection{Version: \code{full}}{
@@ -120,31 +120,39 @@ Please use \code{imm(version = 'full')}, \code{imm(version = 'bsc')}, or \code{i
 \itemize{
 \item \code{mu}:
 \itemize{
-\item \code{main}: student_t(1, 0, 1)
+\item \code{main}: normal(0, 0.5)
+\item \code{effects}: normal(0, 0.25)
+\item \code{sd}: exponential(4)
 }
 \item \code{kappa}:
 \itemize{
 \item \code{main}: normal(2, 1)
 \item \code{effects}: normal(0, 1)
+\item \code{sd}: exponential(1)
 }
 \item \code{a}:
 \itemize{
 \item \code{main}: normal(0, 1)
 \item \code{effects}: normal(0, 1)
+\item \code{sd}: exponential(1)
 }
 \item \code{c}:
 \itemize{
 \item \code{main}: normal(0, 1)
 \item \code{effects}: normal(0, 1)
+\item \code{sd}: exponential(1)
 }
 \item \code{s}:
 \itemize{
 \item \code{main}: normal(0, 1)
 \item \code{effects}: normal(0, 1)
+\item \code{sd}: exponential(1)
 }
 \item \code{b}:
 \itemize{
 \item \code{main}: normal(0, 1)
+\item \code{effects}: normal(0, 1)
+\item \code{sd}: exponential(1)
 }
 }
 }
@@ -182,26 +190,33 @@ Please use \code{imm(version = 'full')}, \code{imm(version = 'bsc')}, or \code{i
 \itemize{
 \item \code{mu}:
 \itemize{
-\item \code{main}: student_t(1, 0, 1)
+\item \code{main}: normal(0, 0.5)
+\item \code{effects}: normal(0, 0.25)
+\item \code{sd}: exponential(4)
 }
 \item \code{kappa}:
 \itemize{
 \item \code{main}: normal(2, 1)
 \item \code{effects}: normal(0, 1)
+\item \code{sd}: exponential(1)
 }
 \item \code{c}:
 \itemize{
 \item \code{main}: normal(0, 1)
 \item \code{effects}: normal(0, 1)
+\item \code{sd}: exponential(1)
 }
 \item \code{s}:
 \itemize{
 \item \code{main}: normal(0, 1)
 \item \code{effects}: normal(0, 1)
+\item \code{sd}: exponential(1)
 }
 \item \code{b}:
 \itemize{
 \item \code{main}: normal(0, 1)
+\item \code{effects}: normal(0, 1)
+\item \code{sd}: exponential(1)
 }
 }
 }
@@ -239,35 +254,35 @@ Please use \code{imm(version = 'full')}, \code{imm(version = 'bsc')}, or \code{i
 \itemize{
 \item \code{mu}:
 \itemize{
-\item \code{main}: student_t(1, 0, 1)
+\item \code{main}: normal(0, 0.5)
+\item \code{effects}: normal(0, 0.25)
+\item \code{sd}: exponential(4)
 }
 \item \code{kappa}:
 \itemize{
 \item \code{main}: normal(2, 1)
 \item \code{effects}: normal(0, 1)
+\item \code{sd}: exponential(1)
 }
 \item \code{a}:
 \itemize{
 \item \code{main}: normal(0, 1)
 \item \code{effects}: normal(0, 1)
+\item \code{sd}: exponential(1)
 }
 \item \code{c}:
 \itemize{
 \item \code{main}: normal(0, 1)
 \item \code{effects}: normal(0, 1)
+\item \code{sd}: exponential(1)
 }
 \item \code{b}:
 \itemize{
 \item \code{main}: normal(0, 1)
+\item \code{effects}: normal(0, 1)
+\item \code{sd}: exponential(1)
 }
 }
-}
-
-Additionally, all imm models have an internal parameter that is fixed to 0 to
-allow the model to be identifiable. This parameter is not estimated and is not
-included in the model formula. The parameter is:
-\itemize{
-\item b = "Background activation (internally fixed to 0)"
 }
 }
 }

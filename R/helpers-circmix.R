@@ -86,7 +86,10 @@
 })
 
 # Cubic Hermite interpolation of log kappa against log J, with the exact
-# asymptotics outside the tabulated range. Max relative error 1.7e-11.
+# asymptotics outside the tabulated range: J -> kappa^2 / 2 as kappa -> 0 and
+# J -> kappa - 1/2 as kappa -> infinity. Max relative error 1.7e-11. Stan's
+# circmix_kappa() receives the same table as data, so the R and Stan inverses
+# cannot drift apart.
 .circmix_kappa <- function(J, tab = .circmix_kappa_table()) {
   n <- length(tab$logkappa)
   t <- log(J)
@@ -115,7 +118,8 @@
 # MIXTURE DENSITIES                                                      ####
 ############################################################################# !
 # cosd and logw are n x K matrices holding cos(y - mu_k) and the normalised log
-# weight of each memory component; logw_guess and kappa are length n. cosd is
+# weight of each memory component (exp(logw) and exp(logw_guess) sum to one);
+# logw_guess and kappa are length n. cosd is
 # supplied by the caller because it does not depend on kappa, which is what lets
 # the whole variable-precision grid re-use one set of cosines.
 
@@ -134,7 +138,11 @@
 # Marginalises the Fisher information of the memory components over
 # J ~ gamma(shape = J(kappa) / tau, scale = tau) on a composite Simpson grid in
 # log J. tau = 0 is the point mass at J(kappa), so rows with tau = 0 fall back
-# to the constant-precision density.
+# to the constant-precision density, which is why tau is the parameter
+# variable_precision frees. The nodes are centred on
+# E[log J] = digamma(shape) + log(tau) with half width
+# 8 sd(log J) = 8 sqrt(trigamma(shape)); the offsets are constants, so only the
+# centre and the width depend on parameters, and they do so smoothly.
 .circmix_vp_ld <- function(cosd, logw, logw_guess, kappa, tau, nodes = 41L,
                            tab = .circmix_kappa_table()) {
   out <- .circmix_ld(cosd, logw, logw_guess, kappa)
@@ -289,7 +297,9 @@
   spec$links <- append(spec$links, list(tau = "log"),
     after = which(names(spec$links) == "kappa")
   )
-  spec$priors$tau <- list(main = "normal(0, 1)", effects = "normal(0, 0.5)")
+  spec$priors$tau <- list(
+    main = "normal(0, 1)", effects = "normal(0, 0.5)", sd = "exponential(2)"
+  )
   spec$init_ranges$tau <- c(0.2, 1)
   spec
 }
@@ -329,14 +339,14 @@
 }
 
 # brms wants bounds on the natural scale of each distributional parameter, which
-# the declared link already determines.
+# the declared link already determines. The circular location is left unbounded
+# because tan_half maps onto the open circle, and an infinite end means no bound.
 .circmix_bounds <- function(links) {
-  lower <- c(tan_half = NA, log = 0, softplus = 0, logit = 0, identity = NA)
-  upper <- c(tan_half = NA, log = NA, softplus = NA, logit = 1, identity = NA)
-  list(
-    lb = unname(lower[unlist(links)]),
-    ub = unname(upper[unlist(links)])
-  )
+  ranges <- vapply(unlist(links), function(link) {
+    if (identical(link, "tan_half")) c(NA, NA) else .link_ranges[[link]]
+  }, numeric(2))
+  ranges[is.infinite(ranges)] <- NA
+  list(lb = unname(ranges[1, ]), ub = unname(ranges[2, ]))
 }
 
 # Called from the exported constructors, where bmm validates arguments.
@@ -366,10 +376,12 @@
 # The distributional parameters are always the location, the concentration,
 # optionally tau, and then whatever weights the version uses. core_dpars is
 # carried on the family so that the Stan wrapper can pass a literal zero where a
-# model without variable precision has no tau to pass.
+# model without variable precision has no tau to pass. posterior_epred has no
+# default because brms's prep path fails without one even for these circular
+# models, whose expected response is refused; pass posterior_epred_undefined().
 .circmix_custom_family <- function(model, family, weight_parameters,
                                    vint = FALSE, n_vreal = 0, log_lik,
-                                   posterior_predict) {
+                                   posterior_predict, posterior_epred) {
   variable_precision <- isTRUE(model$variable_precision)
   dpars <- c("mu", "kappa", if (variable_precision) "tau", weight_parameters)
   bounds <- .circmix_bounds(model$links[dpars])
@@ -383,7 +395,8 @@
     vars = .circmix_family_vars(vint = vint, n_vreal = n_vreal),
     loop = TRUE,
     log_lik = log_lik,
-    posterior_predict = posterior_predict
+    posterior_predict = posterior_predict,
+    posterior_epred = posterior_epred
   )
   out$vp_nodes <- model$vp_nodes
   out$core_dpars <- c(

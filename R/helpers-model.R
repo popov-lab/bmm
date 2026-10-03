@@ -127,6 +127,7 @@ check_model.default <- function(model, data = NULL, formula = NULL) {
 
 #' @export
 check_model.bmmodel <- function(model, data = NULL, formula = NULL) {
+  model <- check_links(model)
   model <- replace_regex_variables(model, data)
   model <- update_model_fixed_parameters(model, formula)
   NextMethod("check_model")
@@ -179,6 +180,243 @@ update_model_fixed_parameters <- function(model, formula) {
   model
 }
 
+############################################################################# !
+# LINKS                                                                  ####
+############################################################################# !
+
+# The links bmm can apply, with the range each one confines its parameter to on
+# the native scale. A link is the model's statement about where the parameter
+# lives, which is why widening that range is worth a warning: the sampler is
+# then free to propose values the likelihood is not defined for, and the
+# default priors, which are written on the link scale, no longer imply the same
+# range. Keep in sync with link_transform().
+.link_ranges <- list(
+  identity = c(-Inf, Inf),
+  log = c(0, Inf),
+  softplus = c(0, Inf),
+  # sqrt admits exactly 0, which log does not (link_transform(0, "sqrt",
+  # inverse = TRUE) is 0). The bound below is the closure of that range, so a
+  # log -> sqrt swap does not warn; a single point is not a sampling hazard.
+  sqrt = c(0, Inf),
+  # 1/eta on an unbounded linear predictor is negative for every eta < 0
+  inverse = c(-Inf, Inf),
+  log1p = c(-1, Inf),
+  logm1 = c(1, Inf),
+  logit = c(0, 1),
+  probit = c(0, 1),
+  cloglog = c(0, 1),
+  loglog = c(0, 1),
+  softmax = c(0, 1),
+  tan_half = c(-pi, pi)
+)
+
+# The parameters whose link a model passes on to the fit. Models that build
+# their family from fixed links override this with character(0), so that
+# setting one is refused rather than silently applied to print(), the initial
+# values and the prior scale while the sampler keeps the default. NULL means
+# the model has no closed set of parameters (m3), so no name can be refused.
+# The methods are named for the model rather than for `bmmodel`, which comes
+# first in every class vector and would shadow them.
+settable_links <- function(model) {
+  UseMethod("settable_links")
+}
+
+#' @exportS3Method
+settable_links.default <- function(model) {
+  names(model$links)
+}
+
+# The link functions a model can carry through to its likelihood. .link_ranges
+# is the wider vocabulary of links bmm knows a range for, including the ones a
+# model may declare as its own default but a user cannot ask for: brms writes
+# no inverse-link code for loglog or softmax, so a custom family built with
+# either dies in stancode() with "argument is of length zero". Models that
+# apply their links themselves rather than through a brms family override this.
+settable_link_functions <- function(model) {
+  UseMethod("settable_link_functions")
+}
+
+#' @exportS3Method
+settable_link_functions.default <- function(model) {
+  setdiff(names(.link_ranges), c("loglog", "softmax"))
+}
+
+# Assign user-supplied links onto the model's defaults. A name-indexed
+# assignment appends an unrecognized name instead of refusing it, so a typo
+# used to advertise a parameter the model does not have while the link the user
+# meant was never applied (#420). Every constructor assigns through here.
+set_links <- function(out, links) {
+  attr(out, "links_default") <- out$links
+  attr(out, "links_checked") <- out$links
+  if (length(links) == 0) {
+    return(out)
+  }
+  links <- validate_links(links, out)
+  out$links[names(links)] <- links
+  attr(out, "links_checked") <- out$links
+  out
+}
+
+# Links can also reach a model after construction -- `model$links <- list(...)`
+# is the documented idiom for m3 -- so the pipeline re-checks whatever differs
+# from the state set_links() last signed off on. Diffing against `links_default`
+# instead would re-validate the user's constructor argument and warn a second
+# time. Parameters in `links_fixed` are excluded because the pipeline sets those
+# itself (see resolve_fixed_links). A model that never went through set_links()
+# -- a custom m3, a fit from an older bmm -- carries no attribute and is left
+# alone; for a custom m3 the missing-links check in check_model.m3_custom is
+# what catches a garbage list.
+check_links <- function(model) {
+  default <- attr(model, "links_default")
+  if (is.null(default)) {
+    return(model)
+  }
+  checked <- attr(model, "links_checked") %||% default
+  pars <- setdiff(names(model$links), names(model$links_fixed))
+  changed <- pars[!vapply(pars, function(p) {
+    identical(model$links[[p]], checked[[p]])
+  }, logical(1))]
+  if (length(changed) == 0) {
+    return(model)
+  }
+  # validated against the links the model declared, so that a target the user
+  # just added is not offered back as settable
+  declared <- model
+  declared$links <- default
+  links <- validate_links(model$links[changed], declared)
+  model$links[setdiff(changed, names(links))] <- NULL
+  model$links[names(links)] <- links
+  model
+}
+
+# One set of rules for every path by which a link reaches a model: the name
+# identifies a parameter (a single typo is repaired, with a warning), the model
+# can pass the link on to the fit, the link is one bmm implements, and a link
+# whose range is wider than the declared one is a sampling hazard rather than
+# an error.
+validate_links <- function(links, model) {
+  stopif(
+    !is_namedlist(links) ||
+      !all(vapply(links, function(l) is.character(l) && length(l) == 1, logical(1))),
+    'The `links` argument must be a named list of link functions, \\
+     e.g. links = list(kappa = "log")'
+  )
+  defaults <- attr(model, "links_default") %||% model$links
+  settable <- settable_links(model)
+  # a model built by use_model_template() is not in supported_models() yet
+  model_name <- c(
+    intersect(class(model), supported_models(print_call = FALSE)),
+    class(model)[2]
+  )[1]
+  given <- names(links)
+
+  if (!is.null(settable)) {
+    known <- unique(c(names(model$parameters), names(defaults)))
+    names(links) <- vapply(given, match_link_target, character(1), known = known)
+    unmatched <- given[is.na(names(links))]
+    stopif(
+      length(unmatched) > 0,
+      "Unrecognized link target(s): {collapse_comma(unmatched)}. \\
+       {model_name}() takes links for {collapse_comma(known)}"
+    )
+    duplicates <- given[names(links) %in% names(links)[duplicated(names(links))]]
+    stopif(
+      anyDuplicated(names(links)) > 0,
+      "Several entries of `links` name the same parameter: \\
+       {collapse_comma(duplicates)}"
+    )
+  }
+
+  # a repair is reported before anything is refused, so that a user whose typo
+  # resolved to a parameter they cannot set learns both halves of what happened
+  repaired <- names(links) != given
+  warnif(
+    any(repaired),
+    "Link target(s) {collapse_comma(given[repaired])} read as \\
+     {collapse_comma(names(links)[repaired])}. Check the spelling of your \\
+     `links` argument"
+  )
+
+  # naming the link the model already uses asks for no change, so it is a no-op
+  # and neither the refusals below nor the allow-list applies to it
+  asked <- names(links)[!vapply(names(links), function(p) {
+    identical(links[[p]], defaults[[p]])
+  }, logical(1))]
+
+  if (!is.null(settable)) {
+    settable_str <- if (length(settable) > 0) {
+      glue("Links can be set for {collapse_comma(settable)}")
+    } else {
+      glue("No link of {model_name}() can be set")
+    }
+    scaling <- setdiff(asked, names(defaults))
+    stopif(
+      length(scaling) > 0,
+      "{collapse_comma(scaling)} has no link in {model_name}(): the parameter \\
+       is fixed for scaling. {settable_str}"
+    )
+    fixed <- setdiff(setdiff(asked, settable), scaling)
+    stopif(
+      length(fixed) > 0,
+      "The link of {collapse_comma(fixed)} cannot be changed in {model_name}(): \\
+       the model is written around {summarise_links(defaults[fixed])} -- its \\
+       likelihood, the values it fixes, or both are expressed on that scale -- \\
+       so another link would not give the parameter the meaning \\
+       {model_name}() documents for it. {settable_str}"
+    )
+  }
+
+  offered <- settable_link_functions(model)
+  unsupported <- setdiff(unlist(links[asked]), offered)
+  stopif(
+    length(unsupported) > 0,
+    "Unknown link function(s): {collapse_comma(unsupported)}. \\
+     {model_name}() takes {collapse_comma(offered)}"
+  )
+
+  warn_link_range(links, defaults)
+  links
+}
+
+# "kapa" is not a prefix of "kappa", so R's partial matching does not see it,
+# but a single edit does. A repair must be unique: imm's a, c and s are each
+# one edit apart, so a typo among them identifies no parameter.
+match_link_target <- function(name, known) {
+  if (name %in% known) {
+    return(name)
+  }
+  hit <- known[startsWith(known, name)]
+  if (length(hit) != 1) {
+    distance <- utils::adist(name, known, ignore.case = TRUE)[1, ]
+    hit <- known[distance == min(distance) & distance <= 1]
+  }
+  if (length(hit) == 1) hit else NA_character_
+}
+
+# A link that admits values the default one excludes (log -> identity for a
+# positive parameter) is legal -- it is how a parameter is freed from a bound
+# the model assumes by default -- but the likelihood is written for the default
+# range, so it is flagged.
+warn_link_range <- function(links, defaults) {
+  pars <- intersect(names(links), names(defaults))
+  wider <- vapply(pars, function(p) {
+    given <- .link_ranges[[links[[p]]]]
+    default <- .link_ranges[[defaults[[p]]]]
+    if (is.null(given) || is.null(default)) {
+      return(FALSE)
+    }
+    given[1] < default[1] || given[2] > default[2]
+  }, logical(1))
+  warnif(
+    any(wider),
+    "The link(s) {summarise_links(links[pars[wider]])} allow values that the \\
+     model's default {summarise_links(defaults[pars[wider]])} exclude. \\
+     Sampling a bounded parameter on a wider scale can push the likelihood out \\
+     of its domain, so check that your priors keep \\
+     {collapse_comma(pars[wider])} in range"
+  )
+}
+
 # kept central rather than as a field in each model constructor so the console
 # annotations stay short, uniform and reviewable in one place
 response_annotations <- function(model) {
@@ -200,6 +438,9 @@ response_annotations <- function(model) {
   }
   if (inherits(model, "m3")) {
     return(list(resp_cats = "counts per response category"))
+  }
+  if (inherits(model, "sdt_yn")) {
+    return(list(response = "count of 'old'/'signal' responses per cell"))
   }
   list()
 }
@@ -227,7 +468,7 @@ print.bmmodel <- function(x, ...) {
     )
     cat("Fixed:     ", fixed_str, "\n")
   }
-  cat("Use parameters() for more details.\n")
+  cat("Use parameter_info() for more details.\n")
   invisible(x)
 }
 
@@ -236,17 +477,222 @@ print.bmmodel <- function(x, ...) {
 # HELPER FUNCTIONS                                                       ####
 ############################################################################# !
 
+# maps the `domain` field of each `.model_*()` constructor to the task group
+# shown by supported_models(); a domain not listed here prints as its own group,
+# so a new model never disappears from the list
+model_groups <- c(
+  "Visual working memory" = "Continuous reproduction",
+  "Working Memory (categorical), Categorical Decision Making" = "Categorical recall and n-AFC decisions",
+  "Perception & Recognition Memory" = "Detection, recognition and confidence judgments",
+  "Recognition Memory" = "Detection, recognition and confidence judgments",
+  "Decision Making / Response times" = "Choices and response times"
+)
+
+model_group <- function(domain) {
+  group <- unname(model_groups[domain])
+  group[is.na(group)] <- domain[is.na(group)]
+  group[group == ""] <- "Other models"
+  group
+}
+
+model_registry <- function(models = supported_models(print_call = FALSE)) {
+  specs <- lapply(models, function(m) get_model(m)())
+  registry <- data.frame(
+    model = models,
+    name = sub("\\.$", "", vapply(specs, `[[`, "", "name")),
+    domain = vapply(specs, `[[`, "", "domain")
+  )
+  registry$group <- model_group(registry$domain)
+  known <- unique(unname(model_groups))
+  group_levels <- c(known, setdiff(registry$group, known))
+  registry[order(match(registry$group, group_levels), registry$model), ]
+}
+
+reference_url <- "https://popov-lab.github.io/bmm/reference/"
+
+format_model_list <- function(registry, style = "text", headers = TRUE) {
+  blocks <- lapply(unique(registry$group), function(group) {
+    rows <- registry[registry$group == group, ]
+    header <- if (!headers) NULL else if (style == "md") glue("**{group}**") else group
+    items <- if (style == "md") {
+      glue("- [`{rows$model}()`]({reference_url}{rows$model}.html): {rows$name}")
+    } else {
+      glue("- {rows$model}(): {rows$name}")
+    }
+    c(header, if (headers) "", items, "")
+  })
+  unlist(blocks)
+}
+
+# what each data argument of a constructor holds, for the model overview in the
+# Get started article. Kept central for the same reason as
+# response_annotations(); the `@param` text is too long for a table cell. A
+# `<model>_<version>` entry replaces the model's entry for that version, and NA
+# marks an argument that names no data column. A test requires an entry for
+# every argument without a default, so a new model needs its labels here
+data_column_roles <- list(
+  cswald = c(
+    rt = "response time in seconds",
+    response = "choice, 0 = lower and 1 = upper boundary"
+  ),
+  ddm = c(
+    rt = "response time in seconds",
+    response = "choice, 0 = lower and 1 = upper boundary"
+  ),
+  ezdm = c(
+    mean_rt = "mean response time in seconds",
+    var_rt = "variance of the response times in seconds\u00b2",
+    n_upper = "number of upper-boundary responses",
+    n_trials = "number of trials"
+  ),
+  ezdm_4par = c(
+    mean_rt = "mean response time in seconds, one column per boundary (upper, lower)",
+    var_rt = "variance of the response times in seconds\u00b2, one column per boundary (upper, lower)",
+    n_upper = "number of upper-boundary responses",
+    n_trials = "number of trials"
+  ),
+  imm = c(
+    resp_error = "response error relative to the target, in radians",
+    nt_features = "non-target features relative to the target, in radians, one column per non-target",
+    nt_distances = "distance of each non-target to the target, one column per non-target",
+    set_size = "set size (a column, or one number)"
+  ),
+  imm_abc = c(
+    resp_error = "response error relative to the target, in radians",
+    nt_features = "non-target features relative to the target, in radians, one column per non-target",
+    nt_distances = NA,
+    set_size = "set size (a column, or one number)"
+  ),
+  m3 = c(
+    resp_cats = "number of responses in each response category, one column per category",
+    num_options = "number of candidates in each category (columns, or one number per category)"
+  ),
+  m3_ss = c(
+    resp_cats = "number of responses in each of 3 categories, in the order correct, other list item, not-presented lure (one column each)",
+    num_options = "number of candidates in each category (columns, or one number per category)"
+  ),
+  m3_cs = c(
+    resp_cats = "number of responses in each of 5 categories, in the order correct, distractor close in context, other list item, other distractor, not-presented lure (one column each)",
+    num_options = "number of candidates in each category (columns, or one number per category)"
+  ),
+  mixture2p = c(
+    resp_error = "response error relative to the target, in radians"
+  ),
+  mixture3p = c(
+    resp_error = "response error relative to the target, in radians",
+    nt_features = "non-target features relative to the target, in radians, one column per non-target",
+    set_size = "set size (a column, or one number)"
+  ),
+  sdm = c(
+    resp_error = "response error relative to the target, in radians"
+  ),
+  sdt_cdp = c(
+    response = "prefix of the count columns `new<k>`, `know<k>`, `remember<k>` and optionally `guess<k>`, one per confidence level (default: no prefix)",
+    stimulus = "stimulus type, 0 = new and 1 = old",
+    n_new = NA,
+    n_old = NA
+  ),
+  sdt_mafc = c(
+    response = "number of correct responses",
+    n_trials = "number of trials",
+    m = "number of alternatives (a column, or one number)"
+  ),
+  sdt_ranking = c(
+    response = "number of trials with the target at each rank, one column per rank, from rank 1 (most likely target) to rank `m`",
+    m = "number of ranked items (a column, or one number)"
+  ),
+  sdt_rating = c(
+    response = "number of responses in each rating category, one column per category, ordered from 'definitely noise' to 'definitely signal'",
+    stimulus = "stimulus type, 0 = noise/new and 1 = signal/old"
+  ),
+  sdt_yn = c(
+    response = "number of 'old'/'signal' responses",
+    stimulus = "stimulus type, 0 = noise/new and 1 = signal/old",
+    n_trials = "number of trials"
+  )
+)
+
+model_versions <- function(model) {
+  version <- formals(get_model2(model))$version
+  if (is.null(version)) NA_character_ else eval(version)
+}
+
+column_roles <- function(model, version) {
+  data_column_roles[[paste0(model, "_", version)]] %||% data_column_roles[[model]]
+}
+
+format_data_columns <- function(roles) {
+  roles <- roles[!is.na(roles)]
+  paste0("`", names(roles), "`: ", roles, collapse = "<br>")
+}
+
+# the part of a parameter description before its first ": ", " = " or ". ",
+# e.g. "Drift rate" from "Drift rate = Average rate of evidence accumulation"
+parameter_label <- function(description) {
+  sub("(: | = |\\. ).*$", "", description)
+}
+
+format_key_parameters <- function(spec) {
+  estimated <- setdiff(names(spec$parameters), names(spec$fixed_parameters))
+  fixed <- intersect(names(spec$fixed_parameters), names(spec$parameters))
+  lines <- if (length(estimated) == 0) {
+    "None by default: your formula defines them"
+  } else {
+    descriptions <- vapply(spec$parameters[estimated], as.character, "")
+    paste0("`", estimated, "`: ", parameter_label(descriptions))
+  }
+  if (length(fixed) > 0) {
+    lines <- c(lines, paste0("Fixed by default: ", paste0("`", fixed, "`", collapse = ", ")))
+  }
+  paste(lines, collapse = "<br>")
+}
+
+# one row per model version, with the data columns it needs and the parameters
+# it estimates; used for the tables of the Get started article
+model_overview <- function(group = NULL) {
+  registry <- model_registry()
+  if (!is.null(group)) {
+    registry <- registry[registry$group %in% group, ]
+  }
+  rows <- lapply(seq_len(nrow(registry)), function(i) {
+    model <- registry$model[i]
+    versions <- model_versions(model)
+    specs <- lapply(versions, function(version) {
+      if (is.na(version)) get_model(model)() else get_model(model)(version = version)
+    })
+    label <- glue("[`{model}()`]({reference_url}{model}.html)")
+    if (length(versions) > 1) {
+      label <- glue("{label}, version `{versions}`")
+    }
+    data.frame(
+      Model = paste0(label, "<br>", registry$name[i]),
+      `Data columns` = vapply(versions, function(version) {
+        format_data_columns(column_roles(model, version))
+      }, "", USE.NAMES = FALSE),
+      `Key parameters` = vapply(specs, format_key_parameters, ""),
+      check.names = FALSE
+    )
+  })
+  do.call(rbind, rows)
+}
+
 #' Measurement models available in `bmm`
 #'
-#' @param print_call Logical; If TRUE (default), the function will print
-#'   information about how each model function should be called and its required
-#'   arguments. If FALSE, the function will return a character vector with the
-#'   names of the available models
-#' @return A character vector of measurement models available in `bmm`
+#' @param print_call Logical; If TRUE (default), the function prints the models
+#'   grouped by the task they are meant for, one line per model with its
+#'   constructor and full name. If FALSE, the function returns a character
+#'   vector with the names of the available models.
+#' @details The groups are: continuous reproduction; categorical recall and
+#'   n-AFC decisions; detection, recognition and confidence judgments; choices
+#'   and response times. Type `?modelname` (for example `?imm`) for the
+#'   arguments of a model.
+#' @return If `print_call = FALSE`, a character vector of model names.
+#'   Otherwise an object of class `message` listing the models by group.
 #' @export
 #'
 #' @examples
 #' supported_models()
+#' supported_models(print_call = FALSE)
 supported_models <- function(print_call = TRUE) {
   supported_models <- lsp("bmm", pattern = "^\\.model_")
   supported_models <- sub("^\\.model_", "", supported_models)
@@ -254,15 +700,14 @@ supported_models <- function(print_call = TRUE) {
     return(supported_models)
   }
 
-  out <- "The following models are supported:\n\n"
-  for (model in supported_models) {
-    args <- methods::formalArgs(get(model))
-    args <- args[!args %in% c("...")]
-    args <- collapse_comma(args)
-    args <- gsub("'", "", args)
-    out <- glue("{out}- `{model}({args})`\n\n")
-  }
-  out <- glue("{out}\nType `?modelname` to get information about a specific model, e.g. `?imm`\n")
+  out <- paste(
+    c(
+      "The following models are supported:", "",
+      format_model_list(model_registry(supported_models), "text"),
+      "Type `?modelname` to get information about a specific model, e.g. `?imm`", ""
+    ),
+    collapse = "\n"
+  )
   out <- gsub("`", " ", out)
   class(out) <- "message"
   out
@@ -270,45 +715,46 @@ supported_models <- function(print_call = TRUE) {
 
 
 #' @title Generate a markdown list of the measurement models available in `bmm`
-#' @description Used internally to automatically populate information in the
-#'   README file
+#' @description Used internally to populate the README and the "Get started"
+#'   article. Models are grouped as in [supported_models()], and every model
+#'   links to its reference page on the website.
+#' @param group Optional character vector of group labels as printed by
+#'   [supported_models()]. Only those groups are listed and the group headers
+#'   are omitted, so a document can add its own text per group.
 #' @return Markdown code for printing the list of measurement models available
 #'   in `bmm`
 #' @export
 #'
 #' @examples
 #' print_pretty_models_md()
+#' print_pretty_models_md(group = "Continuous reproduction")
 #'
 #' @keywords internal
-print_pretty_models_md <- function() {
-  ok_models <- supported_models(print_call = FALSE)
-  domains <- c()
-  models <- c()
-  for (model in ok_models) {
-    m <- get_model(model)()
-    domains <- c(domains, m$domain)
-    models <- c(models, m$name)
+print_pretty_models_md <- function(group = NULL) {
+  registry <- model_registry()
+  stopif(
+    !is.null(group) && length(group) == 0,
+    "`group` must not be empty; omit it to print all groups."
+  )
+  stopif(
+    !all(group %in% registry$group),
+    "Unknown model group(s): {collapse_comma(setdiff(group, registry$group))}"
+  )
+  if (!is.null(group)) {
+    registry <- registry[registry$group %in% group, ]
   }
-  unique_domains <- unique(domains)
-  for (dom in unique_domains) {
-    cat("**", dom, "**\n\n", sep = "")
-    dom_models <- unique(models[domains == dom])
-    for (model in dom_models) {
-      cat("*", model, "\n")
-    }
-    cat("\n")
-  }
+  cat(format_model_list(registry, "md", headers = is.null(group)), sep = "\n")
 }
 
 # used to extract well formatted information from the model object to print
 # in the @details section for the documentation of each model
-model_info <- function(model, components = "all") {
-  UseMethod("model_info")
+model_docs <- function(model, components = "all") {
+  UseMethod("model_docs")
 }
 
 
 #' @export
-model_info.bmmodel <- function(model, components = "all") {
+model_docs.bmmodel <- function(model, components = "all") {
   pars <- model$parameters
   par_info <- ""
   if (length(pars) > 0) {
@@ -338,7 +784,7 @@ model_info.bmmodel <- function(model, components = "all") {
     domain = paste0("* **Domain:** ", model$domain, "\n\n"),
     task = paste0("* **Task:** ", model$task, "\n\n"),
     name = paste0("* **Name:** ", model$name, "\n\n"),
-    citation = paste0("* **Citation:** \n\n   - ", model$citation, "\n\n"),
+    citation = paste0("* **Citation:** \n\n", collapse(paste0("   - ", model$citation, "\n")), "\n"),
     version = paste0("* **Version:** ", model$version, "\n\n"),
     requirements = paste0("* **Requirements:** \n\n  ", model$requirements, "\n\n"),
     parameters = paste0("* **Parameters:** \n\n  ", par_info, "\n"),
@@ -453,7 +899,19 @@ use_model_template <- function(model_name,
     "#############################################################################!
      # MODELS                                                                 ####
      #############################################################################!
-     # see 'R/model_ddm.R' (flat defaults) or 'R/model_cswald.R' (versioned) for examples\n\n\n"
+     # see 'R/model_ddm.R' (flat defaults) or 'R/model_cswald.R' (versioned) for examples
+     #
+     # Besides this file, a new model needs entries in:
+     # - `data_column_roles` in R/helpers-model.R (a test requires it)
+     # - `stored_frame_cases()` in tests/testthat/test-update.R (a test requires it)
+     #   plus a `revert_check_data()` method in R/update.R if `check_data()`
+     #   consumes or creates columns
+     # - `response_annotations()` in R/helpers-model.R, if the response columns
+     #   need a unit or a coding note in the console output
+     #
+     # In this file, `citation` needs at least one reference, one per element, each
+     # on a single line without a \"- \" bullet and ending in \".\" or a
+     # https://doi.org/ URL (a test requires it)\n\n\n"
   )
 
 
@@ -510,9 +968,13 @@ use_model_template <- function(model_name,
     "  fixed_parameters = list(",
     "    mu = 0",
     "  ),",
+    "  # pick the sd rate by meaning: 1 for sensitivity, strength, concentration",
+    "  # (kappa), mixing weights and identity-linked drift; 2 for criteria,",
+    "  # thresholds, boundary, ndt, start point, log-linked drift, diffusion",
+    "  # constant, log ratios, log SDs and correlations; 4 for circular bias",
     "  priors = list(",
-    '    par1 = list(main = "normal(0, 1)", effects = "normal(0, 0.5)"),',
-    '    par2 = list(main = "normal(0, 0.5)", effects = "normal(0, 0.5)")',
+    '    par1 = list(main = "normal(0, 1)", effects = "normal(0, 0.5)", sd = "exponential(1)"),',
+    '    par2 = list(main = "normal(0, 0.5)", effects = "normal(0, 0.5)", sd = "exponential(2)")',
     "  ),",
     "  init_ranges = list(",
     "    par1 = c(-1, 1),",
@@ -547,7 +1009,7 @@ use_model_template <- function(model_name,
             domain = "",
             task = "",
             name = "",
-            citation = "",
+            citation = character(),
             version = version,
             requirements = "",
             parameters = .<<model_name>>_version_table[[version]][["parameters"]],
@@ -559,9 +1021,15 @@ use_model_template <- function(model_name,
           class = c("bmmodel", "<<model_name>>", paste0("<<model_name>>_", version)),
           call = call
         )
-        out$links[names(links)] <- links
+        out <- set_links(out, links)
         out
-      }\n\n',
+      }
+
+      # uncomment if configure_model() builds the links into the family or into
+      # the non-linear formulas rather than reading them from the list above,
+      # so that a link set by the user is refused instead of silently ignored:
+      # #\' @exportS3Method
+      # settable_links.<<model_name>> <- function(model) character(0)',
       .open = "<<", .close = ">>"
     )
   } else {
@@ -575,7 +1043,7 @@ use_model_template <- function(model_name,
             domain = "",
             task = "",
             name = "",
-            citation = "",
+            citation = character(),
             version = "NA",
             requirements = "",
             parameters = .<<model_name>>_defaults[["parameters"]],
@@ -587,9 +1055,15 @@ use_model_template <- function(model_name,
           class = c("bmmodel", "<<model_name>>"),
           call = call
         )
-        out$links[names(links)] <- links
+        out <- set_links(out, links)
         out
-      }\n\n',
+      }
+
+      # uncomment if configure_model() builds the links into the family or into
+      # the non-linear formulas rather than reading them from the list above,
+      # so that a link set by the user is refused instead of silently ignored:
+      # #\' @exportS3Method
+      # settable_links.<<model_name>> <- function(model) character(0)',
       .open = "<<", .close = ">>"
     )
   }
@@ -642,9 +1116,10 @@ use_model_template <- function(model_name,
     # automatically based on the information in the .model_<<model_name>>()$info\n
     #\' @title `r .model_<<model_name>>()$name`
     #\' @name <<model_name>>
-    #\' @details `r model_info(.model_<<model_name>>())`
+    #\' @details `r model_docs(.model_<<model_name>>())`
     <<params_doc>>
     #\' @return An object of class `bmmodel`
+    #\' @keywords bmmodel
     #\' @export
     #\' @examples
     #\' \\dontrun{
@@ -677,11 +1152,11 @@ use_model_template <- function(model_name,
   # add bmf2bf method if necessary
   bmf2bf_method <- glue("#' @export
     bmf2bf.<<model_name>> <- function(model, formula) {
-       # retrieve required response arguments
+       # retrieve the variables the formula needs
        resp_var1 <- model$resp_vars$resp_var1
-       resp_var2 <- model$resp_vars$resp_arg2\n
-       # set the base brmsformula based
-       brms_formula <- brms::bf(paste0(resp_var1, \" | \", vreal(resp_var2), \" ~ 1\"))\n
+       required_arg1 <- model$other_vars$required_arg1\n
+       # set the base brmsformula with the response and its addition terms
+       brms_formula <- brms::bf(paste0(resp_var1, \" | vreal(\", required_arg1, \") ~ 1\"))\n
        # return the brms_formula to add the remaining bmmformulas to it.
        brms_formula
     }\n\n\n",
@@ -697,10 +1172,13 @@ use_model_template <- function(model_name,
       "     '<<model_name>>',\n",
       "     dpars = c(),\n",
       "     links = c(),\n",
-      "     lb = c(), # upper bounds for parameters\n",
-      "     ub = c(), # lower bounds for parameters\n",
-      "     type = '', # real for continous dv, int for discrete dv\n",
-      "     loop = TRUE, # is the likelihood vectorized\n",
+      "     lb = c(), # lower bounds for parameters\n",
+      "     ub = c(), # upper bounds for parameters\n",
+      "     type = '', # real for continuous dv, int for discrete dv\n",
+      "     loop = TRUE, # FALSE if the Stan likelihood is vectorized over observations\n",
+      "     log_lik = log_lik_<<model_name>>,\n",
+      "     posterior_predict = posterior_predict_<<model_name>>,\n",
+      "     posterior_epred = posterior_epred_<<model_name>>\n",
       "   )\n   formula$family <- <<model_name>>_family\n\n"
     )
 
@@ -727,14 +1205,32 @@ use_model_template <- function(model_name,
     i <- 1
     for (stanvar_block in stanvar_blocks) {
       if (i < length(stanvar_blocks)) {
-        stan_vars_template <- paste0(stan_vars_template, "stanvar(scode = stan_", stanvar_block, ", block = '", stanvar_block, "') +\n      ")
+        stan_vars_template <- paste0(stan_vars_template, "brms::stanvar(scode = stan_", stanvar_block, ", block = '", stanvar_block, "') +\n      ")
         i <- i + 1
       } else {
-        stan_vars_template <- paste0(stan_vars_template, "stanvar(scode = stan_", stanvar_block, ", block = '", stanvar_block, "')\n\n")
+        stan_vars_template <- paste0(stan_vars_template, "brms::stanvar(scode = stan_", stanvar_block, ", block = '", stanvar_block, "')\n\n")
       }
     }
     out_template <- "   nlist(formula, data, stanvars)\n"
+
+    family_functions <- paste0(
+      "\n\n#############################################################################!\n",
+      "# LOG_LIK, POSTERIOR_PREDICT & POSTERIOR_EPRED                           ####\n",
+      "#############################################################################!\n",
+      "# see posterior_epred_sdt_yn() in 'R/model_sdt_yn.R' and posterior_epred_ddm()\n",
+      "# in 'R/model_ddm.R' for examples\n\n",
+      "# returns one log-likelihood value per posterior draw for observation i\n",
+      "log_lik_", model_name, " <- function(i, prep) {\n}\n\n",
+      "# returns one simulated response per posterior draw for observation i\n",
+      "posterior_predict_", model_name, " <- function(i, prep, ...) {\n}\n\n",
+      "# returns a draws x observations matrix: build it with .epred_matrix() and\n",
+      "# line up data columns with the draws using .epred_data()\n",
+      "posterior_epred_", model_name, " <- function(prep) {\n}\n",
+      "# if the model's expected response is not meaningful, use instead:\n",
+      "# posterior_epred_", model_name, " <- posterior_epred_undefined(\"", model_name, "\")\n\n\n"
+    )
   } else {
+    family_functions <- ""
     stan_vars_template <- ""
     family_template <- "   formula$family <- NULL\n\n"
     out_template <- "   nlist(formula, data)\n"
@@ -767,7 +1263,7 @@ use_model_template <- function(model_name,
 
   postprocess_brm_method <- glue(
     "#' @export
-    postprocess_brm.<<model_name>> <- function(model, fit) {
+    postprocess_brm.<<model_name>> <- function(model, fit, ...) {
        # any required postprocessing (if none, delete this section)
        fit
     }\n",
@@ -778,6 +1274,7 @@ use_model_template <- function(model_name,
     model_header,
     defaults_block,
     model_object,
+    "\n\n",
     user_facing_alias,
     check_data_header,
     check_data_method,
@@ -785,6 +1282,7 @@ use_model_template <- function(model_name,
     bmf2bf_method,
     configure_model_header,
     configure_model_method,
+    family_functions,
     postprocess_brm_header,
     postprocess_brm_method
   )
@@ -839,7 +1337,9 @@ stancode.bmmformula <- function(object, data, model, prior = NULL, ...) {
   config_args <- configure_model(model, data, formula)
 
   # configure the default prior and combine with user-specified prior
-  prior <- configure_prior(model, data, config_args$formula, prior)
+  prior <- brms::do_call(
+    configure_prior, c(list(model, data, config_args$formula, prior), brms_frame_args(dots))
+  )
 
   # extract stan code
   fit_args <- combine_args(nlist(config_args, dots, prior))
@@ -1014,7 +1514,9 @@ extract_stan_blocks <- function(stan_code, blocks = c("functions", "data", "tran
 #' @param parameters_block The parameters block extracted via `extract_stan_blocks`
 #'
 #' @return A list of all parameters, their types, and dimensions as as specified in
-#'   the STAN data generated by bmm and brms
+#'   the STAN data generated by bmm and brms. A declaration whose type this
+#'   function does not model is returned with its name and `NA` for its type and
+#'   dimensions, so that only that parameter is left without initial values
 #'
 #' @keywords extract_info
 #'
@@ -1054,13 +1556,9 @@ parse_parameters_line <- function(x) {
   # 1) optional leading array[...] prefix
   array_dims <- character(0)
   if (grepl("^array\\s*\\[", x, perl = TRUE)) {
-    m <- regexpr("^array\\s*\\[([^\\]]*)\\]\\s*", x, perl = TRUE)
-    if (m > 0) {
-      dims_str <- sub("^array\\s*\\[([^\\]]*)\\]\\s*.*$", "\\1", regmatches(x, m), perl = TRUE)
-      array_dims <- trimws(unlist(strsplit(dims_str, ",")))
-      array_dims <- array_dims[nzchar(array_dims)]
-      x <- sub("^array\\s*\\[[^\\]]*\\]\\s*", "", x, perl = TRUE)
-    }
+    taken <- take_dims(x)
+    array_dims <- taken$dims
+    x <- trimws(taken$rest)
   }
   is_array <- length(array_dims) > 0
 
@@ -1078,7 +1576,15 @@ parse_parameters_line <- function(x) {
       break
     }
   }
-  if (is.null(base_type)) stop2("Unknown or unsupported base type in: {x}")
+  # a declaration of a type Stan has and this parser does not (sum_to_zero_vector,
+  # complex, tuple) is reported without one, so that it costs the sampler's own
+  # initial value for that parameter and not the whole init list
+  if (is.null(base_type)) {
+    return(list(
+      name = sub(".*[ \\]]", "", x, perl = TRUE), type = NA_character_,
+      types = NA_character_, dims = NA_character_, bounds = NULL
+    ))
+  }
 
   # consume the base type token
   x_after_bt <- sub(paste0("^", base_type), "", x, perl = TRUE)
@@ -1092,12 +1598,9 @@ parse_parameters_line <- function(x) {
   # 4) base-type dims [ ... ] (needed for most non-scalars)
   base_dims <- character(0)
   if (grepl("^\\s*\\[", x_after_bt, perl = TRUE)) {
-    m <- regexpr("(?<=\\[)[^\\]]+(?=\\])", x_after_bt, perl = TRUE)
-    if (m[1] == -1) stop2("Could not parse base dimensions.")
-    dims_str <- regmatches(x_after_bt, m)
-    base_dims <- trimws(strsplit(dims_str, ",", fixed = TRUE)[[1]])
-    base_dims <- base_dims[nzchar(base_dims)]
-    x_after_bt <- sub("^\\s*\\[[^\\]]*\\]\\s*", "", x_after_bt, perl = TRUE)
+    taken <- take_dims(x_after_bt)
+    base_dims <- taken$dims
+    x_after_bt <- trimws(taken$rest)
   } else {
     if (base_type %in% c(
       "vector", "row_vector", "matrix",
@@ -1141,6 +1644,18 @@ parse_parameters_line <- function(x) {
     dims    = dims,
     bounds  = bounds
   )
+}
+
+# The dimensions in the leading [...] of a declaration and the text after it.
+# brms sizes the parameters of mo() and s() by an element of a data array
+# (simplex[Jmo_c[1]], vector[knots_kappa_1[1]]), so the closing bracket is the
+# one that balances the opening one, and only a top-level comma separates
+# dimensions
+take_dims <- function(x) {
+  open <- regexpr("[", x, fixed = TRUE)
+  close <- find_matching_brace(x, open, "[", "]")
+  dims <- trimws(strsplit(substr(x, open + 1L, close - 1L), ",(?![^\\[]*\\])", perl = TRUE)[[1]])
+  list(dims = dims[nzchar(dims)], rest = substring(x, close + 1L))
 }
 
 # helper: parse <...> constraints into a named list

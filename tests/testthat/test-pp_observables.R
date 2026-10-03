@@ -1,0 +1,378 @@
+fake_prep <- function(ndraws, nobs, dpars, data = list()) {
+  structure(
+    list(ndraws = ndraws, nobs = nobs,
+         dpars = lapply(dpars, function(v) {
+           if (length(v) == 1L) v else matrix(v, ndraws, nobs)
+         }),
+         data = data),
+    class = "brmsprep"
+  )
+}
+
+fake_bmmfit <- function(model) {
+  structure(list(bmm = list(model = model)), class = "bmmfit")
+}
+
+registered_models <- list(
+  ddm(rt = "rt", response = "resp"),
+  cswald(rt = "rt", response = "resp", version = "simple"),
+  cswald(rt = "rt", response = "resp", version = "crisk"),
+  ezdm(mean_rt = "mrt", var_rt = "vrt", n_upper = "nu", n_trials = "nt"),
+  ezdm(mean_rt = c("mu", "ml"), var_rt = c("vu", "vl"), n_upper = "nu",
+       n_trials = "nt", version = "4par")
+)
+
+test_that("declared observables name real standata slots", {
+  withr::local_seed(1)
+  cases <- list(
+    list(ddm(rt = "rt", response = "response"),
+         rddm(20, drift = 1, bound = 1.5, ndt = 0.3)),
+    list(cswald(rt = "rt", response = "response"),
+         rcswald(20, drift = 2, bound = 1, ndt = 0.3)),
+    list(ezdm(mean_rt = "mean_rt", var_rt = "var_rt", n_upper = "n_upper",
+              n_trials = "n_trials"),
+         rezdm(5, n_trials = 40, drift = 0.3, bound = 1.2, ndt = 0.3)),
+    list(ezdm(mean_rt = c("mean_rt_upper", "mean_rt_lower"),
+              var_rt = c("var_rt_upper", "var_rt_lower"),
+              n_upper = "n_upper", n_trials = "n_trials", version = "4par"),
+         rezdm(5, n_trials = 40, drift = 0.3, bound = 1.2, ndt = 0.3,
+               version = "4par"))
+  )
+  for (case in cases) {
+    slots <- names(suppressMessages(standata(bmf(drift ~ 1), case[[2]], case[[1]])))
+    expect_true(all(pp_observables(case[[1]])$observed %in% slots))
+  }
+})
+
+test_that("the default check of every registered spec is the brms Y observable", {
+  for (model in registered_models) {
+    spec <- pp_observables(model)
+    vars <- pp_check_vars(fake_bmmfit(model))
+    expect_identical(vars$resp_var[vars$default],
+                     names(spec$observed)[spec$observed == "Y"])
+  }
+})
+
+test_that("signed_rt flips the sign of lower-boundary response times", {
+  signed_rt <- .pp_spec_rt_response()$checks$signed_rt$compute
+  expect_identical(signed_rt(list(rt = c(0.5, 0.7, 0.4), response = c(1, 0, 1))),
+                   c(0.5, -0.7, 0.4))
+})
+
+# The closures are called once with length-N vectors (-> y) and once with
+# ndraws x N matrices (-> yrep), so every row of the matrix result must equal
+# the vector result. A closure that aggregates, uses length(), indexes with a
+# scalar, or relies on column-major recycling would misalign y and yrep with
+# no error -- this invariant is what makes the same code serve both halves.
+test_that("every registered compute closure is elementwise", {
+  n_obs <- 7L
+  n_draws <- 4L
+  actual <- expected <- list()
+  for (m in seq_along(registered_models)) {
+    model <- registered_models[[m]]
+    spec <- pp_observables(model)
+    observed <- stats::setNames(
+      lapply(seq_along(spec$observed), function(i) seq_len(n_obs) + i),
+      names(spec$observed)
+    )
+    yrep_inputs <- lapply(observed, .pp_expand_data, ndraws = n_draws)
+    for (nm in names(spec$checks)) {
+      # keyed by position: two versions of one model share model$name, and a
+      # collision here would silently drop a closure from the audit
+      key <- paste(m, utils::tail(class(model), 1L), nm, sep = "/")
+      compute <- spec$checks[[nm]]$compute
+      actual[[key]] <- compute(yrep_inputs)
+      expected[[key]] <- .pp_expand_data(compute(observed), n_draws)
+    }
+  }
+  expect_length(actual, 17L)
+  expect_equal(actual, expected)
+})
+
+test_that(".pp_dpar_vector() rejects a dpar it cannot map onto the grid", {
+  prep <- fake_prep(4L, 3L, dpars = list(drift = rep(1, 12)))
+  prep$dpars$drift <- c(10, 20, 30)
+  expect_error(.pp_dpar_vector(prep, "drift"), "Cannot map dpar 'drift'")
+})
+
+test_that("pp_simulate() errors for a model without a method", {
+  model <- structure(list(name = "fakemodel"), class = c("bmmodel", "fakemodel"))
+  expect_error(pp_simulate(model, fake_prep(2L, 2L, list())),
+               "no pp_simulate")
+})
+
+test_that("pp_simulate.ddm() draws each cell from its own parameters", {
+  withr::local_seed(1)
+  prep <- fake_prep(20L, 6L, dpars = list(
+    drift = rep(c(5, -5), each = 60), bound = 1.5, ndt = 0.2, zr = 0.5
+  ))
+  sims <- pp_simulate(ddm(rt = "rt", response = "resp"), prep)
+  expect_identical(dim(sims$rt), c(20L, 6L))
+  expect_gt(min(colMeans(sims$response)[1:3]), 0.95)
+  expect_lt(max(colMeans(sims$response)[4:6]), 0.05)
+  expect_true(all(sims$rt > 0.2))
+})
+
+# The internal-consistency check below passes just as happily if both sides of
+# the bound * 2 mapping are wrong; this pins pp_simulate against the function
+# whose transform it must mirror. At nobs = 1 both paths make the same single
+# .rcswald() call, so a shared seed makes the streams comparable.
+test_that("pp_simulate.cswald_simple() mirrors posterior_predict_cswald_simple", {
+  prep <- fake_prep(25L, 1L, dpars = list(
+    drift = rep(2, 25), bound = rep(0.8, 25), ndt = rep(0.2, 25), s = rep(1, 25)
+  ))
+  sims <- withr::with_seed(3, pp_simulate(cswald(rt = "rt", response = "r"),
+                                          prep))
+  pp <- withr::with_seed(3, posterior_predict_cswald_simple(1L, prep))
+  expect_equal(as.vector(sims$rt), as.vector(pp))
+})
+
+test_that("cswald simple doubles the bound of the two-boundary generator", {
+  simple <- withr::with_seed(1, pp_simulate(
+    cswald(rt = "rt", response = "r"),
+    fake_prep(3L, 4L, dpars = list(drift = 3, bound = 0.8, ndt = 0.2, s = 1))
+  ))
+  crisk <- withr::with_seed(1, pp_simulate(
+    cswald(rt = "rt", response = "r", version = "crisk"),
+    fake_prep(3L, 4L, dpars = list(drift = 3, bound = 1.6, ndt = 0.2, zr = 0.5,
+                                   s = 1))
+  ))
+  expect_identical(simple, crisk)
+})
+
+test_that("pp_simulate() for ezdm respects per-observation trial counts", {
+  model <- ezdm(mean_rt = "mrt", var_rt = "vrt", n_upper = "nu", n_trials = "nt")
+  n_trials <- c(10L, 20L, 40L)
+  prep <- fake_prep(5L, 3L, dpars = list(
+    drift = rep(2, 15), bound = rep(1.2, 15), ndt = rep(0.3, 15), s = 1
+  ), data = list(trials = n_trials))
+  sims <- pp_simulate(model, prep)
+  expect_identical(dim(sims$n_upper), c(5L, 3L))
+  for (n in 1:3) {
+    expect_true(all(sims$n_upper[, n] <= n_trials[n]))
+  }
+})
+
+test_that("pp_simulate.ezdm_4par() emits NA where a boundary has < 2 responses", {
+  model <- ezdm(mean_rt = c("mu", "ml"), var_rt = c("vu", "vl"), n_upper = "nu",
+                n_trials = "nt", version = "4par")
+  withr::local_seed(42)
+  prep <- fake_prep(30L, 4L, dpars = list(
+    drift = rep(0, 120), bound = rep(1, 120), ndt = rep(0.3, 120),
+    zr = 0.5, s = 1
+  ), data = list(vint2 = rep(3L, 4L)))
+  sims <- pp_simulate(model, prep)
+  expect_identical(is.na(sims$mean_rt_upper), sims$n_upper < 2)
+  expect_identical(is.na(sims$mean_rt_lower), (3L - sims$n_upper) < 2)
+})
+
+# the placeholders check_data() writes into an unused boundary are finite, so
+# the checks read the indicator to leave them out (#430)
+test_that("the 4par RT checks are undefined where the boundary is unused", {
+  spec <- pp_observables(ezdm(
+    mean_rt = c("mu", "ml"), var_rt = c("vu", "vl"), n_upper = "nu",
+    n_trials = "nt", version = "4par"
+  ))
+  expect_identical(
+    unname(spec$observed[c("rt_used_upper", "rt_used_lower")]),
+    c("vint3", "vint4")
+  )
+
+  d <- list(
+    mean_rt_upper = c(0.5, -1, 0.6), mean_rt_lower = c(-1, 0.7, 0.8),
+    var_rt_upper = c(0.02, -1, 0.03), var_rt_lower = c(-1, 0.04, 0.05),
+    n_upper = c(20, 1, 10), n_trials = c(20, 20, 20),
+    rt_used_upper = c(1L, 0L, 1L), rt_used_lower = c(0L, 1L, 1L)
+  )
+  expect_equal(spec$checks$mean_rt_upper$compute(d), c(0.5, NA, 0.6))
+  expect_equal(spec$checks$var_rt_upper$compute(d), c(0.02, NA, 0.03))
+  expect_equal(spec$checks$mean_rt_lower$compute(d), c(NA, 0.7, 0.8))
+  expect_equal(spec$checks$var_rt_lower$compute(d), c(NA, 0.04, 0.05))
+  expect_equal(spec$checks$mean_pc$compute(d), d$n_upper / d$n_trials)
+})
+
+two_checks <- list(
+  a = .pp_observable(function(d) d$a, label = "A"),
+  b = .pp_observable(function(d) d$b, label = "B")
+)
+
+test_that(".pp_reduce_na() drops observations whose observed value is NA", {
+  observed <- list(a = c(1, 2, NA, 4), b = c(1, 2, 3, 4))
+  yrep <- list(a = .pp_expand_data(observed$a, 3L),
+               b = .pp_expand_data(observed$b, 3L))
+  expect_warning(out <- .pp_reduce_na(two_checks["a"], observed, yrep),
+                 "Dropped 1 of 4 observations")
+  expect_identical(out$keep, c(TRUE, TRUE, FALSE, TRUE))
+  expect_identical(out$values$a$y, c(1, 2, 4))
+  expect_identical(dim(out$values$a$yrep), c(3L, 3L))
+})
+
+# the defect this replaces: reducing observations for an NA in any draw made
+# the retained count decay as (1 - p)^ndraws
+test_that(".pp_reduce_na() drops draws, not observations, for NA replicates", {
+  observed <- list(a = c(1, 2, 3, 4), b = c(1, 2, 3, 4))
+  yrep <- list(a = .pp_expand_data(observed$a, 3L),
+               b = .pp_expand_data(observed$b, 3L))
+  yrep$a[2L, 2L] <- NA_real_
+  expect_warning(out <- .pp_reduce_na(two_checks["a"], observed, yrep),
+                 "Dropped 1 of 3 posterior draws")
+  expect_true(all(out$keep))
+  expect_identical(out$values$a$y, observed$a)
+  expect_identical(dim(out$values$a$yrep), c(2L, 4L))
+})
+
+test_that(".pp_reduce_na() shares one reduction across all checks", {
+  observed <- list(a = c(NA, 2, 3, 4), b = c(1, 2, NA, 4))
+  yrep <- list(a = .pp_expand_data(observed$a, 3L),
+               b = .pp_expand_data(observed$b, 3L))
+  yrep$a[1L, 2L] <- NA_real_
+  out <- suppressWarnings(.pp_reduce_na(two_checks, observed, yrep))
+  expect_identical(out$keep, c(FALSE, TRUE, FALSE, TRUE))
+  expect_identical(out$values$a$y, c(2, 4))
+  expect_identical(out$values$b$y, c(2, 4))
+  expect_identical(dim(out$values$a$yrep), dim(out$values$b$yrep))
+  expect_identical(dim(out$values$b$yrep), c(2L, 2L))
+})
+
+test_that(".pp_reduce_na() errors when nothing is left on either dimension", {
+  observed <- list(a = rep(NA_real_, 3), b = c(1, 2, 3))
+  yrep <- list(a = .pp_expand_data(observed$a, 2L),
+               b = .pp_expand_data(observed$b, 2L))
+  expect_error(.pp_reduce_na(two_checks["a"], observed, yrep),
+               "All observations")
+
+  observed$a <- c(1, 2, 3)
+  yrep$a <- .pp_expand_data(observed$a, 2L)
+  yrep$a[, 1L] <- NA_real_
+  expect_error(suppressWarnings(.pp_reduce_na(two_checks["a"], observed, yrep)),
+               "Every posterior draw")
+})
+
+test_that("pp_check_vars() lists the declared checks", {
+  fit <- fake_bmmfit(ddm(rt = "rt", response = "resp"))
+  out <- pp_check_vars(fit)
+  expect_identical(out$resp_var, c("rt", "response", "signed_rt"))
+  expect_identical(out$default, c(TRUE, FALSE, FALSE))
+  expect_identical(out$default_type[out$resp_var == "response"], "bars")
+})
+
+# the reported slots are recovered from the closure, so assert they are both
+# sufficient (the check computes the same value from them alone) and minimal
+# (dropping any one changes the result)
+test_that("pp_check_vars() reports the standata slots each check reads", {
+  for (model in registered_models) {
+    spec <- pp_observables(model)
+    vars <- pp_check_vars(fake_bmmfit(model))
+    d <- stats::setNames(
+      lapply(seq_along(spec$observed), function(i) seq_len(5L) + i),
+      names(spec$observed)
+    )
+    for (i in seq_len(nrow(vars))) {
+      compute <- spec$checks[[vars$resp_var[i]]]$compute
+      slots <- strsplit(vars$slot[i], ", ", fixed = TRUE)[[1L]]
+      reads <- names(spec$observed)[match(slots, spec$observed)]
+      expect_false(anyNA(reads))
+      expect_equal(compute(d[reads]), compute(d))
+      for (dropped in reads) {
+        expect_false(identical(compute(d[setdiff(reads, dropped)]), compute(d)))
+      }
+    }
+  }
+})
+
+test_that("pp_check_vars() messages and returns NULL without a declaration", {
+  fit <- fake_bmmfit(sdm(resp_error = "y"))
+  expect_null(pp_observables(fit$bmm$model))
+  expect_message(out <- pp_check_vars(fit), "no additional observables")
+  expect_null(out)
+})
+
+test_that("pp_check() rejects resp_var for models without a declaration", {
+  fit <- fake_bmmfit(sdm(resp_error = "y"))
+  expect_error(pp_check(fit, resp_var = "rt"), "declares no additional")
+})
+
+test_that("pp_check() rejects an unknown resp_var and lists the options", {
+  fit <- fake_bmmfit(ddm(rt = "rt", response = "resp"))
+  expect_error(pp_check(fit, resp_var = "accuracy"), "'rt', 'response', 'signed_rt'")
+})
+
+test_that("pp_check() rejects negative_rt without a signed_rt observable", {
+  fit <- fake_bmmfit(sdm(resp_error = "y"))
+  expect_error(pp_check(fit, negative_rt = TRUE), "not supported")
+})
+
+test_that(".pp_resolve_type() resolves the check's default and validates it", {
+  check <- .pp_observable(function(d) d$x, label = "X", type = "bars")
+  expect_identical(.pp_resolve_type(NULL, check, NULL), "bars")
+  expect_identical(.pp_resolve_type(NULL, check, "cond"), "bars_grouped")
+  expect_identical(.pp_resolve_type("hist", check, NULL), "hist")
+  expect_error(.pp_resolve_type("no_such_type", check, NULL), "not a supported")
+  expect_error(.pp_resolve_type("loo_pit", check, NULL), "not a supported")
+  expect_warning(resolved <- .pp_resolve_type("hist", NULL, NULL), "ignored")
+  expect_null(resolved)
+})
+
+test_that(".pp_resolve_type() resolves bmm's bars_binned type and its grouped variant", {
+  check <- .pp_observable(function(d) d$x, label = "X", type = "bars_binned")
+  expect_identical(.pp_resolve_type(NULL, check, NULL), "bars_binned")
+  expect_identical(.pp_resolve_type(NULL, check, "cond"), "bars_binned_grouped")
+  expect_error(.pp_resolve_type(1, check, NULL), "not a supported")
+})
+
+test_that(".ppc_bars_binned() counts observations per bin on the statistic's scale", {
+  y <- c(0.1, 0.25, 0.3, 0.6, 1)
+  p <- .ppc_bars_binned(y, rbind(y, y, y), breaks = c(0, 0.25, 0.5, 0.75, 1))
+  expect_equal(p$data$x, c(0.125, 0.375, 0.625, 0.875))
+  expect_equal(p$data$y_obs, c(1, 2, 1, 1))
+  expect_equal(unname(p$data$m), p$data$y_obs)
+  expect_no_error(ggplot2::ggplot_build(p))
+})
+
+test_that(".ppc_bars_binned() gives predicted values outside the observed range a bin", {
+  y <- c(0.6, 0.7, 0.7)
+  yrep <- rbind(c(0.1, 0.7, 0.7), c(0.1, 0.6, 0.7))
+  p <- .ppc_bars_binned(y, yrep)
+  low <- p$data[p$data$lower <= 0.1 & p$data$upper > 0.1, ]
+  expect_equal(nrow(low), 1L)
+  expect_equal(low$y_obs, 0)
+  expect_equal(unname(low$m), 1)
+})
+
+test_that(".ppc_bars_binned() plots a statistic without spread", {
+  p <- .ppc_bars_binned(rep(1, 4), matrix(1, nrow = 3, ncol = 4))
+  expect_equal(p$data$y_obs, 4)
+  expect_no_error(ggplot2::ggplot_build(p))
+})
+
+test_that(".ppc_bars_binned() rejects breaks that do not cover the values", {
+  y <- c(0.1, 0.6)
+  expect_error(.ppc_bars_binned(y, rbind(y), breaks = c(0.2, 0.5, 1)),
+               "must cover")
+})
+
+test_that(".ppc_bars_binned_grouped() counts per group and facets", {
+  y <- c(0.1, 0.2, 0.6, 0.9)
+  p <- .ppc_bars_binned_grouped(y, rbind(y, y), group = c("a", "a", "b", "b"),
+                                breaks = c(0, 0.5, 1))
+  expect_s3_class(p$facet, "FacetWrap")
+  counts <- p$data[p$data$y_obs > 0, ]
+  expect_equal(as.character(counts$group), c("a", "b"))
+  expect_equal(counts$x, c(0.25, 0.75))
+  expect_equal(counts$y_obs, c(2, 2))
+  expect_no_error(ggplot2::ggplot_build(p))
+})
+
+# the fake fit carries no draws, so prepare_predictions() would fail: reaching
+# the type error proves 'type' is validated before anything is simulated
+test_that("pp_check() rejects an unknown type before simulating", {
+  fit <- fake_bmmfit(ddm(rt = "rt", response = "resp"))
+  expect_error(pp_check(fit, resp_var = "rt", type = "no_such_type"),
+               "not a supported")
+})
+
+test_that("pp_check() rejects negative_rt combined with another resp_var", {
+  fit <- fake_bmmfit(ddm(rt = "rt", response = "resp"))
+  expect_error(pp_check(fit, resp_var = "rt", negative_rt = TRUE),
+               "cannot be combined")
+})

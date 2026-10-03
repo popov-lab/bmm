@@ -2,44 +2,25 @@
 % Please edit documentation in R/helpers-parameters.R
 \name{parameters}
 \alias{parameters}
-\alias{parameters.bmmodel}
-\alias{parameters.bmmfit}
-\title{Get parameter information for a bmm model}
+\title{Deprecated: use \code{parameter_info()}}
 \usage{
 parameters(x, ...)
-
-\method{parameters}{bmmodel}(x, formula = NULL, ...)
-
-\method{parameters}{bmmfit}(x, ...)
 }
 \arguments{
 \item{x}{A \code{bmmodel} object (e.g., \code{sdm(resp_error = "y")}) or a
 \code{bmmfit} object (a fitted model returned by \code{\link{bmm}}).}
 
-\item{...}{Additional arguments (currently unused).}
-
-\item{formula}{An optional \code{bmmformula} object. Only relevant for
-M3 custom models, where additional parameters are discovered from
-the formula. Ignored for all other models.}
+\item{...}{Passed on to \code{\link[=parameter_info]{parameter_info()}}, e.g. \code{formula} for a custom M3
+model.}
 }
 \value{
-A data frame of class \code{bmm_parameters} with one row per
-parameter and columns: \code{parameter}, \code{description},
-\code{fixed}, \code{value}, and \code{link}.
+The output of \code{\link[=parameter_info]{parameter_info()}}.
 }
 \description{
-Returns a data frame with information about the model
-parameters, including their descriptions, whether they are fixed,
-their link functions, and optionally their default priors.
+\code{parameters()} is deprecated as of bmm 1.4.0 and will be
+removed in bmm 1.6.0. It shares its name with \code{parameters::parameters()},
+so whichever of the two packages is attached last decides what
+\code{parameters()} returns. Use \code{\link[=parameter_info]{parameter_info()}} instead; it takes the same
+arguments and returns the same table.
 }
-\examples{
-# For an unfitted model
-parameters(sdm(resp_error = "y"))
-
-# For an M3 model
-parameters(m3(
-  resp_cats = c("corr", "other", "npl"),
-  num_options = c(1, 4, 5),
-  version = "ss"
-))
-}
+\keyword{internal}
