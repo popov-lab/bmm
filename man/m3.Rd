@@ -4,7 +4,13 @@
 \alias{m3}
 \title{The Multinomial / Memory Measurement Model}
 \usage{
-m3(resp_cats, num_options, choice_rule = "softmax", version = "custom", ...)
+m3(
+  resp_cats,
+  num_options,
+  choice_rule = "softmax",
+  version = c("custom", "ss", "cs"),
+  ...
+)
 }
 \arguments{
 \item{resp_cats}{The variable names that contain the number of responses for each of the
@@ -14,7 +20,12 @@ response categories used for the M3.}
 of candidates in the respective response categories are constant across all conditions
 in the experiment. Or a vector specifying the variable names that contain the number of
 candidates in each response category. The order of these variables should be in the
-same order as the names of the response categories passed to \code{resp_cats}}
+same order as the names of the response categories passed to \code{resp_cats}. Numbers
+named after the response categories, e.g. \code{c(corr = 1, other = 4)}, are matched to
+the categories by name. Numbers without names, or with other names, are taken in
+the order of \code{resp_cats}, and other names become the names of the columns
+bmm adds to the data. Column names given category names, e.g.
+\code{c(other = "n_other", corr = "n_corr")}, are matched by name as well, in any order.}
 
 \item{choice_rule}{The choice rule that should be used for the M3. The options are "softmax"
 or "simple". The "softmax" option implements the softmax normalization of activation into
@@ -45,7 +56,7 @@ decision task.
 \item \strong{Name:} The Multinomial / Memory Measurement Model
 \item \strong{Citation:}
 \itemize{
-\item Oberauer, K., & Lewandowsky, S. (2019). Simple measurement models for complex working-memory tasks. Psychological Review, 126.
+\item Oberauer, K., & Lewandowsky, S. (2019). Simple measurement models for complex working-memory tasks. Psychological Review, 126(6), 880-932. https://doi.org/10.1037/rev0000159
 }
 }
 \subsection{Version: \code{ss}}{
@@ -77,11 +88,13 @@ decision task.
 \itemize{
 \item \code{main}: normal(3,1)
 \item \code{effects}: normal(0,0.5)
+\item \code{sd}: exponential(1)
 }
 \item \code{c}:
 \itemize{
 \item \code{main}: normal(3,1)
 \item \code{effects}: normal(0,0.5)
+\item \code{sd}: exponential(1)
 }
 }
 }
@@ -117,16 +130,19 @@ decision task.
 \itemize{
 \item \code{main}: normal(3,1)
 \item \code{effects}: normal(0,0.5)
+\item \code{sd}: exponential(1)
 }
 \item \code{c}:
 \itemize{
 \item \code{main}: normal(3,1)
 \item \code{effects}: normal(0,0.5)
+\item \code{sd}: exponential(1)
 }
 \item \code{f}:
 \itemize{
 \item \code{main}: logistic(0,1)
 \item \code{effects}: normal(0,1)
+\item \code{sd}: exponential(1)
 }
 }
 }

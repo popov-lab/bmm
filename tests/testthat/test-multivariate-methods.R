@@ -26,9 +26,23 @@ test_that("unsupported post-processing methods give informative errors", {
   expect_error(conditional_effects(fit), "not yet supported for multivariate")
 })
 
-test_that("parameters() reports all component parameters with their response", {
+test_that("helpers that read a single model refuse a multivariate fit", {
   fit <- mvm_mock_fit()
-  pars <- parameters(fit)
+  expect_error(prior_info(fit), "not yet supported for multivariate")
+  expect_error(native_parameters(fit), "not yet supported for multivariate")
+  expect_error(model_citation(fit), "not yet supported for multivariate")
+})
+
+test_that("the expected response of a component is refused as for the model alone", {
+  fit <- mvm_mock_fit()
+  expect_error(posterior_epred(fit, resp = "error"), "not defined for the mixture2p model")
+  expect_error(fitted(fit, resp = "error"), "not defined for the mixture2p model")
+  expect_error(posterior_epred(fit), "not defined for the mixture2p model")
+})
+
+test_that("parameter_info() reports all component parameters with their response", {
+  fit <- mvm_mock_fit()
+  pars <- parameter_info(fit)
 
   expect_s3_class(pars, "bmm_parameters")
   expect_true(all(c("parameter", "response") %in% names(pars)))
@@ -38,13 +52,13 @@ test_that("parameters() reports all component parameters with their response", {
   expect_output(print(pars), "sigma")
 })
 
-test_that("parameters() skips family components without predicted parameters", {
+test_that("parameter_info() skips family components without predicted parameters", {
   joint <- bmm_component(
     bmf(thetat ~ 1 + (1 | p | id), kappa ~ 1 + (1 | p | id)),
     model = mixture2p(resp_error = "error"), data = mvm_dat_vwm
   ) +
     bmm_component(bmf(rt ~ 1 + (1 | p | id)), family = brms::lognormal(), data = mvm_dat_rt)
   fit <- bmm(joint, backend = "mock", mock_fit = 1, rename = FALSE)
-  pars <- parameters(fit)
+  pars <- parameter_info(fit)
   expect_equal(unique(pars$response), "error")
 })

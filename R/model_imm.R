@@ -12,11 +12,12 @@
       domain = "Visual working memory",
       task = "Continuous reproduction",
       name = "Interference measurement model by Oberauer and Lin (2017).",
-      version = version,
       citation = glue(
-        "Oberauer, K., & Lin, H.Y. (2017). An interference model \\
-          of visual working memory. Psychological Review, 124(1), 21-59"
+        "Oberauer, K., & Lin, H.-Y. (2017). An interference model \\
+          of visual working memory. Psychological Review, 124(1), 21-59. \\
+          https://doi.org/10.1037/rev0000044"
       ),
+      version = version,
       requirements = glue(
         "- The response vairable should be in radians and \\
           represent the angular error relative to the target
@@ -42,11 +43,19 @@
       ),
       fixed_parameters = list(mu1 = 0, mu2 = 0, kappa2 = -100),
       default_priors = list(
-        mu1 = list(main = "student_t(1, 0, 1)"),
-        kappa = list(main = "normal(2, 1)", effects = "normal(0, 1)"),
-        a = list(main = "normal(0, 1)", effects = "normal(0, 1)"),
-        c = list(main = "normal(0, 1)", effects = "normal(0, 1)"),
-        s = list(main = "normal(0, 1)", effects = "normal(0, 1)")
+        mu1 = list(main = "normal(0, 0.5)", effects = "normal(0, 0.25)", sd = "exponential(4)"),
+        kappa = list(main = "normal(2, 1)", effects = "normal(0, 1)", sd = "exponential(1)"),
+        a = list(main = "normal(0, 1)", effects = "normal(0, 1)", sd = "exponential(1)"),
+        c = list(main = "normal(0, 1)", effects = "normal(0, 1)", sd = "exponential(1)"),
+        s = list(main = "normal(0, 1)", effects = "normal(0, 1)", sd = "exponential(1)")
+      ),
+      # central 50% of the main default prior on the native scale
+      init_ranges = list(
+        mu1 = c(-0.65, 0.65),
+        kappa = c(3.8, 15),
+        a = c(0.51, 2),
+        c = c(0.51, 2),
+        s = c(0.51, 2)
       )
     ),
     # attributes
@@ -61,15 +70,25 @@
     out$parameters$s <- NULL
     out$links$s <- NULL
     out$default_priors$s <- NULL
+    out$init_ranges$s <- NULL
     attributes(out)$regex_vars <- c("nt_features")
   } else if (version == "bsc") {
     out$parameters$a <- NULL
     out$links$a <- NULL
     out$default_priors$a <- NULL
+    out$init_ranges$a <- NULL
   }
 
-  out$links[names(links)] <- links
+  out <- set_links(out, links)
   out
+}
+
+# the mixture weights are built from exp(c), exp(a) and exp(-s * d) in the
+# non-linear formulas of configure_model.imm_*, and mu1/kappa from the von
+# Mises components, so none of the links in this list is read at fit time
+#' @exportS3Method
+settable_links.imm <- function(model) {
+  character(0)
 }
 
 # user facing alias
@@ -80,13 +99,13 @@
 #' Please use `imm(version = 'full')`, `imm(version = 'bsc')`, or `imm(version = 'abc')` instead.
 #'
 #' @name imm
-#' @details `r model_info(.model_imm(), components =c('domain', 'task', 'name', 'citation'))`
+#' @details `r model_docs(.model_imm(), components =c('domain', 'task', 'name', 'citation'))`
 #' #### Version: `full`
-#' `r model_info(.model_imm(version = "full"), components = c('requirements', 'parameters', 'fixed_parameters', 'links', 'prior'))`
+#' `r model_docs(.model_imm(version = "full"), components = c('requirements', 'parameters', 'fixed_parameters', 'links', 'prior'))`
 #' #### Version: `bsc`
-#' `r model_info(.model_imm(version = "bsc"), components = c('requirements', 'parameters', 'fixed_parameters', 'links', 'prior'))`
+#' `r model_docs(.model_imm(version = "bsc"), components = c('requirements', 'parameters', 'fixed_parameters', 'links', 'prior'))`
 #' #### Version: `abc`
-#' `r model_info(.model_imm(version = "abc"), components =c('requirements', 'parameters', 'fixed_parameters', 'links', 'prior'))`
+#' `r model_docs(.model_imm(version = "abc"), components =c('requirements', 'parameters', 'fixed_parameters', 'links', 'prior'))`
 #'
 #' Additionally, all imm models have an internal parameter that is fixed to 0 to
 #' allow the model to be identifiable. This parameter is not estimated and is not
@@ -183,8 +202,10 @@
 #'   backend = "cmdstanr"
 #' )
 #' @export
-imm <- function(resp_error, nt_features, nt_distances, set_size, regex = FALSE, version = "full", ...) {
+imm <- function(resp_error, nt_features, nt_distances, set_size, regex = FALSE,
+                version = c("full", "bsc", "abc"), ...) {
   call <- match.call()
+  version <- match.arg(version)
   dots <- list(...)
   if ("setsize" %in% names(dots)) {
     set_size <- dots$setsize

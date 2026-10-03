@@ -91,14 +91,14 @@ merge_stanvars <- function(stanvars_list) {
 # multivariate fit gets its own postprocessing
 #' @export
 configure_fit.mvbmmformula <- function(formula, data = NULL, model = NULL, prior = NULL,
-                                       init = TRUE) {
+                                       init = TRUE, frame_args = list()) {
   spec <- formula
   stopif(
     length(spec) < 2,
     "A multivariate bmm model requires at least two components. Combine \\
     components created by bmm_component() with `+`."
   )
-  components <- lapply(spec, mv_configure_component)
+  components <- lapply(spec, mv_configure_component, frame_args = frame_args)
   validate_component_resps(components)
   check_shared_random_effects(spec)
   warn_factor_level_mismatch(spec)
@@ -115,7 +115,7 @@ configure_fit.mvbmmformula <- function(formula, data = NULL, model = NULL, prior
   component_priors <- Reduce(
     combine_prior,
     lapply(components, function(x) x$prior),
-    init = brms::empty_prior()
+    init = mv_cor_prior(formula, data, frame_args)
   )
   # the global prior is passed through as-is so users can set joint priors
   # such as prior(lkj(2), class = "cor"); component-targeted rows require an
@@ -124,7 +124,7 @@ configure_fit.mvbmmformula <- function(formula, data = NULL, model = NULL, prior
 
   config_args <- nlist(formula, data, stanvars)
   if (init) {
-    config_args$init <- mv_create_initfun(components, formula, data, prior, stanvars)
+    config_args$init <- mv_create_initfun(components, formula, data, prior, stanvars, frame_args)
   }
   components <- lapply(components, function(x) {
     x[c("model", "user_formula", "resp", "resp_name", "subset_var", "data_name")]
@@ -136,9 +136,19 @@ configure_fit.mvbmmformula <- function(formula, data = NULL, model = NULL, prior
   )
 }
 
+# A component's default prior holds the lkj(2) correlation prior only when the
+# component alone estimates a correlation matrix; a matrix that exists only
+# because an |ID| label spans components needs it from the joint model
+mv_cor_prior <- function(formula, data, frame_args) {
+  if (isFALSE(getOption("bmm.default_priors", TRUE))) {
+    return(brms::empty_prior())
+  }
+  brms::do_call(.construct_cor_prior, c(list(formula, data), frame_args))
+}
+
 # The standard univariate pipeline applied to one component, plus the
 # multivariate plumbing: subset() injection and resp-tagged priors
-mv_configure_component <- function(component) {
+mv_configure_component <- function(component, frame_args = list()) {
   user_formula <- component$formula
   model <- check_model(component$model, component$data, user_formula)
   data <- check_data(model, component$data, user_formula)
@@ -163,8 +173,12 @@ mv_configure_component <- function(component) {
   # brms refers to responses by their sanitized name in multivariate models,
   # so priors must be tagged with the sanitized name to reach the component
   resp_name <- sanitize_resp_name(resp)
-  prior <- configure_prior(model, data, cfg$formula, user_prior = component$prior)
-  prior$resp <- rep(resp_name, nrow(prior))
+  prior <- brms::do_call(
+    configure_prior, c(list(model, data, cfg$formula, user_prior = component$prior), frame_args)
+  )
+  # a correlation matrix belongs to a grouping factor, not to a response: brms
+  # rejects a resp on it, and the joint model sets it once (see mv_cor_prior())
+  prior$resp <- ifelse(prior$class == "cor", "", resp_name)
 
   subset_var <- paste0(".subset_", resp)
   cfg$formula <- add_subset(cfg$formula, subset_var)
@@ -208,7 +222,7 @@ validate_component_resps <- function(components) {
 # those ranges and the shared random-effects and correlation parameters
 # generically; the remaining parameters are left to the backend, which accepts
 # a partial init list
-mv_create_initfun <- function(components, formula, data, prior, stanvars) {
+mv_create_initfun <- function(components, formula, data, prior, stanvars, frame_args = list()) {
   needs_init <- vapply(
     components,
     function(x) !is.null(x$model$init_ranges),
@@ -220,8 +234,9 @@ mv_create_initfun <- function(components, formula, data, prior, stanvars) {
 
   # the prior decides which parameters exist: parameters held constant by a
   # fixed_parameters prior are absent from the parameters block
-  standata_list <- standata(formula, data, prior = prior, stanvars = stanvars)
-  stan_code <- stancode(formula, data, prior = prior, stanvars = stanvars)
+  args <- c(list(formula, data, prior = prior, stanvars = stanvars), frame_args)
+  standata_list <- brms::do_call(standata, args)
+  stan_code <- brms::do_call(stancode, args)
   stanpars_list <- extract_parameter_dimensions(extract_stan_blocks(stan_code)$parameters)
   par_matches <- mv_match_stan_parameters(names(stanpars_list), components[needs_init])
 
@@ -229,38 +244,20 @@ mv_create_initfun <- function(components, formula, data, prior, stanvars) {
     force(stanpars_list)
     force(standata_list)
     force(par_matches)
-    force(formula)
-    force(data)
 
-    bterms <- brms::brmsterms(formula)
-    inits <- list()
-    for (spar in names(stanpars_list)) {
+    inits <- lapply(names(stanpars_list), function(spar) {
       spec <- stanpars_list[[spar]]
-      type <- spec$type
       dim <- resolve_stan_dim(spec$dims, standata_list)
-      match <- par_matches[[spar]]
-
-      inits[[spar]] <- if (!is.null(match)) {
-        resp_terms <- bterms$terms[[match$resp_name]]
-        par_bterms <- resp_terms$dpars[[match$parameter]] %||%
-          resp_terms$nlpars[[match$parameter]]
-        switch(type,
-          real = init_real_param(spar, match$range, match$link),
-          vector = init_vector_param(spar, dim, match$range, match$link, par_bterms, data),
-          NULL
-        )
-      } else {
-        switch(type,
-          vector = if (grepl("^sd_", spar)) array(runif(prod(dim), 0.05, 0.1), dim = dim),
-          matrix = if (grepl("^z_", spar)) matrix(runif(prod(dim), -0.5, 0.5), nrow = dim[1]),
-          cholesky_factor_corr = ,
-          cholesky_factor_cov = ,
-          cov_matrix = ,
-          corr_matrix = diag(nrow = dim),
-          NULL
-        )
+      if (anyNA(dim)) {
+        return(NULL)
       }
-    }
+      match <- par_matches[[spar]]
+      if (!is.null(match)) {
+        return(init_fixef_param(spar, spec$types, dim, match$model, standata_list))
+      }
+      init_ranef_param(spar, spec$types, dim)
+    })
+    names(inits) <- names(stanpars_list)
     inits[!vapply(inits, is.null, logical(1))]
   }
 }
@@ -268,7 +265,9 @@ mv_create_initfun <- function(components, formula, data, prior, stanvars) {
 # brms names multivariate Stan parameters b_<resp>_<par> for non-linear
 # parameters, and b_<par>_<resp> / Intercept_<par>_<resp> for distributional
 # parameters; exact matching against these candidates avoids the substring
-# collisions a grepl()-based lookup would produce across components
+# collisions a grepl()-based lookup would produce across components. Each match
+# carries a view of the component model reduced to the matched parameter, so
+# that init_fixef_param() can only resolve the Stan parameter to that one
 mv_match_stan_parameters <- function(spar_names, components) {
   matches <- list()
   for (component in components) {
@@ -284,24 +283,17 @@ mv_match_stan_parameters <- function(spar_names, components) {
         paste0("b_", parameter, "_", resp_name),
         paste0("Intercept_", parameter, "_", resp_name)
       )
+      view <- list(
+        parameters = model$parameters[parameter],
+        links = model$links[parameter],
+        init_ranges = model$init_ranges[parameter]
+      )
       for (spar in intersect(candidates, spar_names)) {
-        matches[[spar]] <- nlist(
-          resp_name, parameter, range,
-          link = model$links[[parameter]]
-        )
+        matches[[spar]] <- nlist(resp_name, parameter, model = view)
       }
     }
   }
   matches
-}
-
-# Stan declarations carry their dimensions either as a literal (scalars) or as
-# the name of a variable in the data block
-resolve_stan_dim <- function(dims, standata_list) {
-  vapply(dims, function(d) {
-    literal <- suppressWarnings(as.numeric(d))
-    if (is.na(literal)) as.numeric(standata_list[[d]])[1] else literal
-  }, numeric(1), USE.NAMES = FALSE)
 }
 
 ############################################################################# !
@@ -329,7 +321,7 @@ stancode.mvbmmformula <- function(object, prior = NULL, ...) {
   withr::local_options(bmm.sort_data = FALSE)
   dots <- list(...)
   local_brms_threads(dots)
-  cfg <- configure_fit(object, prior = prior, init = FALSE)
+  cfg <- configure_fit(object, prior = prior, init = FALSE, frame_args = brms_frame_args(dots))
   add_bmm_version_to_stancode(call_brms_extractor(brms::stancode, cfg, dots))
 }
 
@@ -339,7 +331,7 @@ standata.mvbmmformula <- function(object, ...) {
   withr::local_options(bmm.sort_data = FALSE)
   dots <- list(...)
   local_brms_threads(dots)
-  cfg <- configure_fit(object, init = FALSE)
+  cfg <- configure_fit(object, init = FALSE, frame_args = brms_frame_args(dots))
   call_brms_extractor(brms::standata, cfg, dots, prior = NULL)
 }
 
@@ -347,6 +339,7 @@ standata.mvbmmformula <- function(object, ...) {
 #' @export
 default_prior.mvbmmformula <- function(object, ...) {
   withr::local_options(bmm.sort_data = FALSE)
-  cfg <- configure_fit(object, init = FALSE)
-  combine_prior(call_brms_extractor(brms::default_prior, cfg, list(...)), cfg$prior)
+  dots <- list(...)
+  cfg <- configure_fit(object, init = FALSE, frame_args = brms_frame_args(dots))
+  combine_prior(call_brms_extractor(brms::default_prior, cfg, dots), cfg$prior)
 }
