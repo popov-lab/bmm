@@ -59,6 +59,14 @@ test_that("mpt stores its derived state once and can rebuild itself", {
   expect_equal(with_covariate$other_vars$covariates, "GcorrPi")
 })
 
+test_that("importers record their own call", {
+  model <- mpt_from_string(
+    "D + (1 - D) * g # old\n(1 - D) * (1 - g) # new", tree_names = "old"
+  )
+  expect_equal(deparse(attr(model, "call")[[1]]), "mpt_from_string")
+  expect_output(print(model), "mpt_from_string")
+})
+
 test_that("an empty formula fits every parameter with an intercept", {
   model <- mpt(mpt_2htm_trees(), tree_id = "item_type")
   fit <- suppressMessages(bmm(
