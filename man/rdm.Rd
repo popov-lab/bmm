@@ -70,10 +70,7 @@ Racing Diffusion Model
 \item \strong{Name:} Racing Diffusion Model
 \item \strong{Citation:}
 \itemize{
-\item Tillman, G., Van Zandt, T., & Logan, G. D. (2020).
-Sequential sampling models without random between-trial variability:
-the racing diffusion model of speeded decision making. Psychonomic
-Bulletin & Review, 27, 911-936. https://doi.org/10.3758/s13423-020-01719-6
+\item Tillman, G., Van Zandt, T., & Logan, G. D. (2020). Sequential sampling models without random between-trial variability: the racing diffusion model of speeded decision making. Psychonomic Bulletin & Review, 27, 911-936. https://doi.org/10.3758/s13423-020-01719-6
 }
 \item \strong{Version:} simple
 \item \strong{Requirements:}
@@ -90,7 +87,7 @@ Bulletin & Review, 27, 911-936. https://doi.org/10.3758/s13423-020-01719-6
 \itemize{
 \item \code{driftc}: drift rate for correct accumulator
 \item \code{drifte}: drift rate for error accumulators
-\item \code{gap}: threshold gap (b = gap + sp)
+\item \code{gap}: threshold gap: distance from the top of the start-point range to the threshold (b = gap + sp)
 \item \code{ndt}: non-decision time
 \item \code{s}: diffusion constant
 \item \code{sp}: maximum starting point (uniform on 0 to sp)

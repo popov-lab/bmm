@@ -162,7 +162,7 @@ test_that("model_overview() has one row per version with its own columns and par
   expect_false(grepl("version", mixture2p$Model))
 
   rt_models <- model_overview(group = "Choices and response times")
-  expect_true(all(grepl("`(ddm|cswald|ezdm)\\(\\)`", rt_models$Model)))
+  expect_true(all(grepl("`(ddm|cswald|ezdm|rdm)\\(\\)`", rt_models$Model)))
 })
 
 test_that("get_model() returns the correct function", {

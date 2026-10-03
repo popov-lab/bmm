@@ -563,6 +563,15 @@ data_column_roles <- list(
     nt_distances = NA,
     set_size = "set size (a column, or one number)"
   ),
+  rdm = c(
+    rt = "response time in seconds",
+    response = "choice, 1 = correct and 2 to `n_choices` = errors"
+  ),
+  rdm_custom = c(
+    rt = "response time in seconds",
+    response = "choice, the name of the winning response category",
+    accumulators = "number of accumulators in each category (columns, or one number per category)"
+  ),
   m3 = c(
     resp_cats = "number of responses in each response category, one column per category",
     num_options = "number of candidates in each category (columns, or one number per category)"
@@ -640,6 +649,11 @@ format_key_parameters <- function(spec) {
   } else {
     descriptions <- vapply(spec$parameters[estimated], as.character, "")
     paste0("`", estimated, "`: ", parameter_label(descriptions))
+  }
+  # a custom version that also has parameters of its own, e.g. the rdm's
+  # thresholds next to the drift of each category its formula names
+  if (length(estimated) > 0 && identical(spec$version, "custom")) {
+    lines <- c(lines, "Per-category parameters: your formula defines them")
   }
   if (length(fixed) > 0) {
     lines <- c(lines, paste0("Fixed by default: ", paste0("`", fixed, "`", collapse = ", ")))

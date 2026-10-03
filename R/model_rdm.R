@@ -18,7 +18,7 @@
 # The gap/ndt/s/sp block shared by both versions, declared once.
 .rdm_shared <- list(
   parameters = list(
-    gap = "threshold gap (b = gap + sp)",
+    gap = "threshold gap: distance from the top of the start-point range to the threshold (b = gap + sp)",
     ndt = "non-decision time",
     s = "diffusion constant",
     sp = "maximum starting point (uniform on 0 to sp)"
@@ -105,10 +105,12 @@
       domain = "Decision Making / Response times",
       task = "Choice Reaction Time tasks (multi-alternative)",
       name = "Racing Diffusion Model",
-      citation = "Tillman, G., Van Zandt, T., & Logan, G. D. (2020).
-        Sequential sampling models without random between-trial variability:
-        the racing diffusion model of speeded decision making. Psychonomic
-        Bulletin & Review, 27, 911-936. https://doi.org/10.3758/s13423-020-01719-6",
+      citation = glue(
+        "Tillman, G., Van Zandt, T., & Logan, G. D. (2020). Sequential sampling \\
+        models without random between-trial variability: the racing diffusion \\
+        model of speeded decision making. Psychonomic Bulletin & Review, 27, \\
+        911-936. https://doi.org/10.3758/s13423-020-01719-6"
+      ),
       version = version,
       requirements = glue(
         "- Reaction times should be passed in seconds", "\n",
