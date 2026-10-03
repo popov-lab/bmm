@@ -11,6 +11,7 @@
 * `mpt()` gains `restrictions`, which equates parameters or fixes them to constants in the syntax of MPTinR and TreeBUGS (`c("Dn = Do", "g = 0.5")`), and `simplex`, which declares groups of parameters that sum to 1, such as guessing rates across response options. Printing a model lists its restrictions. See `?mpt` (#255). Thanks to @GidonFrischkorn
 * `mpt()` gains `covariates`, for data columns used in branch expressions, such as guessing rates fixed by the design; `bmm()` warns when the branches of a row do not sum to 1 with that row's values. `mpt_tree()` gains `impossible`, for response categories a tree cannot produce, such as distractor responses on trials without distractors. `dmpt()` and `rmpt()` take covariate values too. See `?mpt` and `?mpt_tree` (#255). Thanks to @GidonFrischkorn
 * New functions `mpt_from_string()` and `mpt_from_eqn()` build an `mpt()` model from an MPTinR-style model string or from an EQN file. Names in an EQN file that `mpt()` cannot use, such as `D_o`, are renamed and the renaming is reported; restrictions are written with the file's own names. See `?mpt_from_eqn` (#255). Thanks to @GidonFrischkorn
+* `plot()` draws the processing-tree diagram of an `mpt_tree()`, or of every tree of an `mpt()` model, from the branch expressions. See `?plot.mpt_tree` (#255). Thanks to @GidonFrischkorn
 
 ### New datasets
 * Add **`broeder_schuetz_2009_e3`**, binary old/new recognition data from Broeder & Schuetz (2009, Exp. 3), with five base-rate conditions from 40 subjects. See `?broeder_schuetz_2009_e3`.
