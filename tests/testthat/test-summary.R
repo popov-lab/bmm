@@ -68,19 +68,56 @@ test_that("print.bmmsummary handles a single regression coefficient row (#369)",
 })
 
 test_that(".summary_fixed_rows keeps a single fixed-effect row", {
-  # gumbel-min sdt_ranking has one population coefficient (dprime_Intercept) but
-  # two printed parameters (dprime, sdratio); the old sapply+apply errored here.
-  one_row <- data.frame(Estimate = 0.6, Rhat = 1, row.names = "dprime_Intercept")
-  out <- .summary_fixed_rows(one_row, c("dprime", "sdratio"))
+  # gumbel-min sdt_ranking has one population coefficient (d_Intercept) but
+  # two printed parameters (d, sdratio); the old sapply+apply errored here.
+  one_row <- data.frame(Estimate = 0.6, Rhat = 1, row.names = "d_Intercept")
+  out <- .summary_fixed_rows(one_row, c("d", "sdratio"))
   expect_s3_class(out, "data.frame")
-  expect_identical(rownames(out), "dprime_Intercept")
+  expect_identical(rownames(out), "d_Intercept")
 })
 
 test_that(".summary_fixed_rows selects all rows matching the printed parameters", {
   fixed <- data.frame(
     Estimate = 1:3, Rhat = c(1, NA, 1),
-    row.names = c("dprime_Intercept", "sdratio_Intercept", "nuisance_Intercept")
+    row.names = c("d_Intercept", "sdratio_Intercept", "nuisance_Intercept")
   )
-  out <- .summary_fixed_rows(fixed, c("dprime", "sdratio"))
-  expect_identical(sort(rownames(out)), c("dprime_Intercept", "sdratio_Intercept"))
+  out <- .summary_fixed_rows(fixed, c("d", "sdratio"))
+  expect_identical(sort(rownames(out)), c("d_Intercept", "sdratio_Intercept"))
+})
+
+test_that("SDT summaries name d as d_a only when sdratio is not 0", {
+  model <- sdt_yn(response = "y", stimulus = "s", n_trials = "n")
+  fixed <- make_fixed(c("d_Intercept", "criterion_Intercept", "sdratio_Intercept"))
+
+  ev <- capture.output(print(make_bmmsummary(model, bmf(d ~ 1, criterion ~ 1), fixed),
+                             color = FALSE))
+  expect_false(any(grepl("d_a", ev)))
+
+  model$fixed_parameters$sdratio <- NULL
+  uv <- capture.output(print(make_bmmsummary(model, bmf(d ~ 1, criterion ~ 1, sdratio ~ 1),
+                                             fixed), color = FALSE))
+  expect_true(any(grepl("d is d_a", uv)))
+  expect_true(any(grepl("sdt_sensitivity()", uv, fixed = TRUE)))
+})
+
+test_that("dual-process SDT summaries note that d is the familiarity sensitivity", {
+  model <- sdt_rating(paste0("r", 1:6), "stimulus", version = "dpsdt")
+  model$fixed_parameters[c("Ro", "Rn")] <- NULL
+  fixed <- make_fixed(c("d_Intercept", "criterion_Intercept", "spacing_Intercept",
+                        "Ro_Intercept", "Rn_Intercept"))
+  formula <- bmf(d ~ 1, criterion ~ 1, spacing ~ 1, Ro ~ 1, Rn ~ 1)
+  out <- capture.output(print(make_bmmsummary(model, formula, fixed), color = FALSE))
+  expect_true(any(grepl("familiarity sensitivity", out)))
+  expect_true(any(grepl("auc_sdt()", out, fixed = TRUE)))
+  expect_false(any(grepl("d is d_a", out)))
+})
+
+test_that("SDT summaries name d as d_a for a user-fixed non-zero sdratio too", {
+  model <- sdt_yn(response = "y", stimulus = "s", n_trials = "n")
+  model$fixed_parameters$sdratio <- 0.3
+  fixed <- make_fixed(c("d_Intercept", "criterion_Intercept"))
+
+  out <- capture.output(print(make_bmmsummary(model, bmf(d ~ 1, criterion ~ 1, sdratio = 0.3),
+                                              fixed), color = FALSE))
+  expect_true(any(grepl("d is d_a", out)))
 })
