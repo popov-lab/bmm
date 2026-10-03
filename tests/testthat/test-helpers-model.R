@@ -1,11 +1,21 @@
-test_that("supported_models() returns a non-empty character vector", {
-  expect_type(supported_models(print_call = FALSE), "character")
-  expect_gt(length(supported_models(print_call = FALSE)), 0)
+test_that("bmm_models() returns the model names as a character vector", {
+  models <- bmm_models()
+  expect_s3_class(models, "bmm_models")
+  expect_type(models, "character")
+  expect_setequal(unclass(models), model_names())
+  expect_true("imm" %in% models)
+})
+
+test_that("supported_models() is deprecated and returns what it did before", {
+  expect_warning(out <- supported_models(), "deprecated.*bmm_models\\(\\)")
+  expect_identical(out, bmm_models())
+  expect_warning(out <- supported_models(print_call = FALSE), "deprecated")
+  expect_identical(out, model_names())
 })
 
 test_that("model_registry() lists every supported model once, grouped in lookup order", {
   registry <- model_registry()
-  expect_setequal(registry$model, supported_models(print_call = FALSE))
+  expect_setequal(registry$model, model_names())
   expect_false(any(duplicated(registry$model)))
   expect_false(any(grepl("\\.$", registry$name)))
   expect_equal(
@@ -38,9 +48,12 @@ test_that("format_model_list() appends unknown groups after the known ones and s
   expect_true(any(grepl("^- \\[`imm\\(\\)`\\]\\(https://popov-lab.github.io/bmm/reference/imm.html\\)", md)))
 })
 
-test_that("supported_models() prints every model exactly once, without arguments", {
-  out <- as.character(supported_models())
-  for (m in supported_models(print_call = FALSE)) {
+test_that("bmm_models() prints every model exactly once, without arguments", {
+  expect_output(printed <- print(bmm_models()), "Continuous reproduction")
+  expect_s3_class(printed, "bmm_models")
+  out <- format(bmm_models())
+  expect_length(out, 1)
+  for (m in model_names()) {
     hits <- gregexpr(glue::glue("- {m}\\(\\): "), out)[[1]]
     expect_length(hits[hits > 0], 1)
   }
@@ -61,7 +74,7 @@ test_that("print_pretty_models_md(group = ) lists one group without headers", {
 })
 
 test_that("every data argument of every model version has a column role", {
-  for (model in supported_models(print_call = FALSE)) {
+  for (model in model_names()) {
     args <- formals(get_model2(model))
     no_default <- vapply(args, function(arg) is.symbol(arg) && as.character(arg) == "", TRUE)
     required <- setdiff(names(args)[no_default], "...")
@@ -82,7 +95,7 @@ test_that("every data argument of every model version has a column role", {
 })
 
 test_that("data_column_roles keys name a model or one of its versions", {
-  valid <- unlist(lapply(supported_models(print_call = FALSE), function(model) {
+  valid <- unlist(lapply(model_names(), function(model) {
     versions <- model_versions(model)
     c(model, if (!anyNA(versions)) paste0(model, "_", versions))
   }))
@@ -115,7 +128,7 @@ test_that("parameter_label() keeps the name before the first separator", {
 })
 
 test_that("estimated parameter labels have balanced parentheses", {
-  for (model in supported_models(print_call = FALSE)) {
+  for (model in model_names()) {
     for (version in model_versions(model)) {
       spec <- if (is.na(version)) get_model(model)() else get_model(model)(version = version)
       estimated <- setdiff(names(spec$parameters), names(spec$fixed_parameters))
@@ -129,7 +142,7 @@ test_that("estimated parameter labels have balanced parentheses", {
 
 test_that("model_overview() has one row per version with its own columns and parameters", {
   overview <- model_overview()
-  n_versions <- sum(lengths(lapply(supported_models(print_call = FALSE), model_versions)))
+  n_versions <- sum(lengths(lapply(model_names(), model_versions)))
   expect_equal(nrow(overview), n_versions)
 
   imm_rows <- overview[grepl("`imm()`", overview$Model, fixed = TRUE), ]
@@ -173,7 +186,7 @@ test_that("check_model() refuses invalid models and accepts valid models", {
   expect_error(check_model("invalid_model"))
   expect_error(check_model(structure(list(), class = "invalid")))
   expect_error(check_model(sdm), "Did you forget")
-  okmodels <- supported_models(print_call = FALSE)
+  okmodels <- model_names()
   for (model in okmodels) {
     if (model == "m3") next
     model <- get_model(model)()
@@ -244,7 +257,7 @@ test_that("check_model() works with regular expressions", {
 
 test_that("use_model_template() prevents duplicate models", {
   skip_on_cran()
-  okmodels <- supported_models(print_call = FALSE)
+  okmodels <- model_names()
   for (model in okmodels) {
     expect_error(use_model_template(model))
   }

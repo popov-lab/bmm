@@ -13,7 +13,7 @@ badge](https://popov-lab.r-universe.dev/badges/bmm)](https://popov-lab.r-univers
 [![R-CMD-check](https://github.com/popov-lab/bmm/actions/workflows/R-CMD-check.yaml/badge.svg)](https://github.com/popov-lab/bmm/actions/workflows/R-CMD-check.yaml)
 [![test-coverage](https://github.com/popov-lab/bmm/actions/workflows/test-coverage.yaml/badge.svg)](https://github.com/popov-lab/bmm/actions/workflows/test-coverage.yaml)
 [![downloads](https://cranlogs.r-pkg.org/badges/bmm)](https://cran.r-project.org/package=bmm)
-[![Dependencies](https://img.shields.io/badge/dependencies-13/22-orange?style=flat)](#)
+[![Dependencies](https://img.shields.io/badge/dependencies-14/24-orange?style=flat)](#)
 <!-- badges: end -->
 
 *Bayesian Measurement Models for behavioral research in R*
@@ -105,9 +105,9 @@ articles.
 
 <img src="man/figures/README-task-map.png" alt="The tasks bmm covers and the models for each" width="100%" />
 
-`supported_models()` prints the same list in R, and `?modelname` (for
-example `?imm`) documents what data a model expects and what its
-parameters mean.
+`bmm_models()` prints the same list in R, and `?modelname` (for example
+`?imm`) documents what data a model expects and what its parameters
+mean.
 
 ## Install
 

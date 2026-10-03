@@ -335,8 +335,7 @@ is_bmmodel <- function(x) {
 }
 
 is_supported_bmmodel <- function(x) {
-  valid_models <- supported_models(print_call = FALSE)
-  is_bmmodel(x) && inherits(x, valid_models)
+  is_bmmodel(x) && inherits(x, model_names())
 }
 
 is_bmmfit <- function(x) {
@@ -475,12 +474,6 @@ stop_missing_args <- function() {
     "The following required arguments are missing in {fun}(): \\
           {paste(missing, collapse = ', ')}"
   )
-}
-
-# custom method form printing nicely formatted character values via cat instead of print
-#' @export
-print.message <- function(x, ...) {
-  cat(x, ...)
 }
 
 # returns either x, or all variables that match the regular expression x

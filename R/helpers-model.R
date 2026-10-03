@@ -104,11 +104,10 @@ check_model <- function(model, data = NULL, formula = NULL) {
 
 #' @export
 check_model.default <- function(model, data = NULL, formula = NULL) {
-  bmm_models <- supported_models(print_call = FALSE)
   if (is.function(model)) {
     fun_name <- as.character(substitute(model))
     stopif(
-      fun_name %in% bmm_models,
+      fun_name %in% model_names(),
       "Did you forget to provide the required arguments to the model function?
       See ?{fun_name} for details on properly specifying the model argument"
     )
@@ -118,9 +117,9 @@ check_model.default <- function(model, data = NULL, formula = NULL) {
     !is_supported_bmmodel(model),
     "You provided an object of class `{class(model)}` to the model argument.
     The model argument should be a `bmmodel` function.
-    You can see the list of supported models by running `supported_models()`
+    You can see the list of supported models by running `bmm_models()`
 
-    {supported_models()}"
+    {format(bmm_models())}"
   )
   model
 }
@@ -303,9 +302,9 @@ validate_links <- function(links, model) {
   )
   defaults <- attr(model, "links_default") %||% model$links
   settable <- settable_links(model)
-  # a model built by use_model_template() is not in supported_models() yet
+  # a model built by use_model_template() is not in bmm_models() yet
   model_name <- c(
-    intersect(class(model), supported_models(print_call = FALSE)),
+    intersect(class(model), model_names()),
     class(model)[2]
   )[1]
   given <- names(links)
@@ -478,7 +477,7 @@ print.bmmodel <- function(x, ...) {
 ############################################################################# !
 
 # maps the `domain` field of each `.model_*()` constructor to the task group
-# shown by supported_models(); a domain not listed here prints as its own group,
+# shown by bmm_models(); a domain not listed here prints as its own group,
 # so a new model never disappears from the list
 model_groups <- c(
   "Visual working memory" = "Continuous reproduction",
@@ -495,7 +494,7 @@ model_group <- function(domain) {
   group
 }
 
-model_registry <- function(models = supported_models(print_call = FALSE)) {
+model_registry <- function(models = model_names()) {
   specs <- lapply(models, function(m) get_model(m)())
   registry <- data.frame(
     model = models,
@@ -678,48 +677,76 @@ model_overview <- function(group = NULL) {
 
 #' Measurement models available in `bmm`
 #'
-#' @param print_call Logical; If TRUE (default), the function prints the models
-#'   grouped by the task they are meant for, one line per model with its
-#'   constructor and full name. If FALSE, the function returns a character
-#'   vector with the names of the available models.
-#' @details The groups are: continuous reproduction; categorical recall and
-#'   n-AFC decisions; detection, recognition and confidence judgments; choices
-#'   and response times. Type `?modelname` (for example `?imm`) for the
-#'   arguments of a model.
-#' @return If `print_call = FALSE`, a character vector of model names.
-#'   Otherwise an object of class `message` listing the models by group.
+#' @details Printed, the result lists the models grouped by the task they are
+#'   meant for, one line per model with its constructor and full name. The
+#'   groups are: continuous reproduction; categorical recall and n-AFC
+#'   decisions; detection, recognition and confidence judgments; choices and
+#'   response times. Type `?modelname` (for example `?imm`) for the arguments
+#'   of a model.
+#' @return A character vector of model names with class `bmm_models`, which
+#'   prints as the grouped list. Use it like any character vector, e.g.
+#'   `"imm" %in% bmm_models()`.
 #' @export
 #'
 #' @examples
-#' supported_models()
-#' supported_models(print_call = FALSE)
-supported_models <- function(print_call = TRUE) {
-  supported_models <- lsp("bmm", pattern = "^\\.model_")
-  supported_models <- sub("^\\.model_", "", supported_models)
-  if (!print_call) {
-    return(supported_models)
-  }
+#' bmm_models()
+#' "imm" %in% bmm_models()
+bmm_models <- function() {
+  structure(model_names(), class = "bmm_models")
+}
 
+#' @export
+format.bmm_models <- function(x, ...) {
   out <- paste(
     c(
       "The following models are supported:", "",
-      format_model_list(model_registry(supported_models), "text"),
+      format_model_list(model_registry(unclass(x)), "text"),
       "Type `?modelname` to get information about a specific model, e.g. `?imm`", ""
     ),
     collapse = "\n"
   )
-  out <- gsub("`", " ", out)
-  class(out) <- "message"
-  out
+  gsub("`", " ", out)
+}
+
+#' @export
+print.bmm_models <- function(x, ...) {
+  cat(format(x))
+  invisible(x)
+}
+
+# the registry behind bmm_models(), as plain names for internal lookups
+model_names <- function() {
+  sub("^\\.model_", "", lsp("bmm", pattern = "^\\.model_"))
+}
+
+#' Deprecated: use `bmm_models()`
+#'
+#' @description `supported_models()` is deprecated as of bmm 1.4.0 and will be
+#'   removed in bmm 1.6.0. It shares its name with `insight::supported_models()`,
+#'   which the **parameters** package re-exports, so whichever package is
+#'   attached last decides what `supported_models()` returns. Use
+#'   [bmm_models()] instead.
+#'
+#' @param print_call Logical. If `TRUE` (default), returns the output of
+#'   [bmm_models()], which prints the models grouped by task. If `FALSE`,
+#'   returns the model names as a plain character vector.
+#' @return The output of [bmm_models()], or the model names if `print_call =
+#'   FALSE`.
+#' @keywords internal
+#' @export
+supported_models <- function(print_call = TRUE) {
+  warning2("`supported_models()` is deprecated as of bmm 1.4.0; use `bmm_models()`. \\
+            It will be removed in 1.6.0.")
+  if (print_call) bmm_models() else model_names()
 }
 
 
 #' @title Generate a markdown list of the measurement models available in `bmm`
 #' @description Used internally to populate the README and the "Get started"
-#'   article. Models are grouped as in [supported_models()], and every model
+#'   article. Models are grouped as in [bmm_models()], and every model
 #'   links to its reference page on the website.
 #' @param group Optional character vector of group labels as printed by
-#'   [supported_models()]. Only those groups are listed and the group headers
+#'   [bmm_models()]. Only those groups are listed and the group headers
 #'   are omitted, so a document can add its own text per group.
 #' @return Markdown code for printing the list of measurement models available
 #'   in `bmm`
@@ -886,7 +913,7 @@ use_model_template <- function(model_name,
   file_name <- paste0("model_", model_name, ".R")
 
   # check if model exists
-  if (model_name %in% supported_models(print_call = FALSE)) {
+  if (model_name %in% model_names()) {
     stop2("Model {model_name} already exists")
   }
   if (file.exists(paste0("R/", file_name))) {
@@ -1312,7 +1339,7 @@ use_model_template <- function(model_name,
 #' @return A character string containing the fully commented Stan code to fit a
 #'   bmm model.
 #'
-#' @seealso [supported_models()], [brms::stancode()]
+#' @seealso [bmm_models()], [brms::stancode()]
 #' @keywords extract_info
 #' @examples
 #' scode1 <- stancode(bmf(c ~ 1, kappa ~ 1),

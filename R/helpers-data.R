@@ -250,7 +250,7 @@ rad2deg <- function(rad) {
 #'   description of [brms::standata()] for more details
 #' @return A named list of objects containing the required data to fit a bmm
 #'   model with Stan.
-#' @seealso [supported_models()], [brms::standata()]
+#' @seealso [bmm_models()], [brms::standata()]
 #' @keywords extract_info
 #' @examples
 #' sdata1 <- standata(bmf(c ~ 1, kappa ~ 1),

@@ -178,7 +178,7 @@ sdt_models <- list(
   list(format = "old/new confidence with Remember/Know judgments",
        model = "sdt_cdp", uv = "`sigmar` (recollection)")
 )
-available <- supported_models(print_call = FALSE)
+available <- bmm_models()
 rows <- lapply(sdt_models, function(m) {
   if (!m$model %in% available) return(NULL)
   f <- formals(get(m$model, asNamespace("bmm")))
@@ -227,7 +227,7 @@ if (length(other) > 0) {
 }
 ```
 
-You can list the models in R at any time with `supported_models()`, and
+You can list the models in R at any time with `bmm_models()`, and
 `?modelname` (for example `?sdt_yn`) documents the data a model expects, its
 parameters and its default priors, that is, what the model assumes about each
 parameter before it sees the data.

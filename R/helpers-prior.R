@@ -38,7 +38,7 @@
 #'   the information on the parameters (or parameter classes) for which priors
 #'   can be specified.
 #'
-#' @seealso [supported_models()], [brms::default_prior()]
+#' @seealso [bmm_models()], [brms::default_prior()]
 #'
 #' @keywords extract_info
 #'

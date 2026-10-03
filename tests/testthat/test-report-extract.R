@@ -4,7 +4,7 @@ fixture_fits <- function() {
 }
 
 all_model_versions <- function() {
-  models <- supported_models(print_call = FALSE)
+  models <- model_names()
   out <- lapply(models, function(m) {
     lapply(model_versions(m), function(v) {
       if (is.na(v)) get_model(m)() else get_model(m)(version = v)

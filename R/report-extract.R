@@ -214,7 +214,7 @@ version_string <- function(x) {
 # without a version predates versions, and an unversioned model stores "NA";
 # both get the default version, should the model have gained versions since
 current_constructor <- function(model) {
-  name <- intersect(rev(class(model)), supported_models(print_call = FALSE))[1]
+  name <- intersect(rev(class(model)), model_names())[1]
   if (is.na(name)) {
     return(NULL)
   }
