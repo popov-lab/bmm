@@ -696,6 +696,15 @@
   venpopov.com/bmm, which currently redirects to the new address. Update
   bookmarks when convenient
   ([\#433](https://github.com/popov-lab/bmm/issues/433)).
+- For developers: the model file written by
+  [`use_model_template()`](https://popov-lab.github.io/bmm/dev/reference/use_model_template.md)
+  now follows the package’s current conventions. `document()` runs on it
+  without warnings, the new model passes the website reference check,
+  its default priors include `sd`, and with `custom_family = TRUE`
+  [`posterior_epred()`](https://mc-stan.org/rstantools/reference/posterior_epred.html)
+  works once the generated stubs are filled in. The file header lists
+  the registries and test fixtures a new model must also update
+  ([\#490](https://github.com/popov-lab/bmm/issues/490)).
 - The **cswald** likelihood now evaluates all observations in one call
   instead of one at a time. This makes fitting faster, improves the
   accuracy of the gradients the sampler uses, and adds support for
