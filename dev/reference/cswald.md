@@ -56,7 +56,7 @@ cswald(rt, response, links = NULL, version = c("simple", "crisk"), ...)
     The `bound` parameter represents the total boundary separation,
     consistent with the diffusion model parameterization.
 
-  For more details, see Miller et al. (2017).
+  For more details, see Miller et al. (2018).
 
 - ...:
 
@@ -77,8 +77,8 @@ An object of class `bmmodel`
 - **Citation:**
 
   - Miller, R., Scherbaum, S., Heck, D. W., Goschke, T., & Enge, S.
-    (2017). On the Relation Between the (Censored) Shifted Wald and the
-    Wiener Distribution as Measurement Models for Choice Response Times.
+    (2018). On the relation between the (censored) shifted Wald and the
+    Wiener distribution as measurement models for choice response times.
     Applied Psychological Measurement, 42(2), 116-135.
     https://doi.org/10.1177/0146621617710465
 

@@ -100,6 +100,9 @@ stan data, etc.
 - [`fit_info()`](https://popov-lab.github.io/bmm/dev/reference/fit_info.md)
   : Extract information from a brmsfit object
 
+- [`model_citation()`](https://popov-lab.github.io/bmm/dev/reference/model_citation.md)
+  : References for a measurement model
+
 - [`native_parameters()`](https://popov-lab.github.io/bmm/dev/reference/native_parameters.md)
   : Posterior draws of model parameters on the native scale
 

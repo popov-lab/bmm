@@ -194,6 +194,19 @@
   [`brms::mixture()`](https://paulbuerkner.com/brms/reference/mixture.html)
   family, and the `theta2` mixture-weight reference the sampler holds at
   zero ([\#391](https://github.com/popov-lab/bmm/issues/391)).
+- New function
+  [`model_citation()`](https://popov-lab.github.io/bmm/dev/reference/model_citation.md)
+  returns the references of a model or a fitted model, one per element,
+  for your reference list. Fits saved with an older version of bmm get
+  the current references. The model references now include their DOIs,
+  and several were corrected, e.g. the year of Miller et al. for
+  [`cswald()`](https://popov-lab.github.io/bmm/dev/reference/cswald.md)
+  is 2018, not 2017. If you copied a reference from a help page, check
+  it again. The help pages of
+  [`ezdm()`](https://popov-lab.github.io/bmm/dev/reference/ezdm.md) and
+  [`sdt_mafc()`](https://popov-lab.github.io/bmm/dev/reference/sdt_mafc.md)
+  list their two references as separate items
+  ([\#476](https://github.com/popov-lab/bmm/issues/476)).
 - New function **native_parameters()** returns posterior draws of the
   model parameters on their native scale, evaluated over a grid of
   predictor values. Because draws are returned rather than summaries,

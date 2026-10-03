@@ -45,8 +45,9 @@ for a detailed description of the model and how to use it. \*
 
 - **Citation:**
 
-  - Oberauer, K. (2023). Measurement models for visual working memory -
-    A factorial model comparison. Psychological Review, 130(3), 841-852
+  - Oberauer, K. (2023). Measurement models for visual working memory—A
+    factorial model comparison. Psychological Review, 130(3), 841-852.
+    https://doi.org/10.1037/rev0000328
 
 - **Version:** simple
 

@@ -102,7 +102,7 @@ this:
       task = "",
       name = "",
       version = "",
-      citation = "",
+      citation = character(),
       requirements = "",
       parameters = list(),
       links = list(),

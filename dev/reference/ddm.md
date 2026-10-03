@@ -50,7 +50,7 @@ An object of class `bmmodel`
 - **Citation:**
 
   - Ratcliff, R. (1978). A theory of memory retrieval. Psychological
-    Review, 85(2), 59-108. https://doi.org/10/fjwm2f;
+    Review, 85(2), 59-108. https://doi.org/10.1037/0033-295X.85.2.59
 
 - **Requirements:**
 
