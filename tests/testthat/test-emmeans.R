@@ -102,3 +102,25 @@ test_that("pairs() produces valid contrast from emmGrid", {
   expect_s4_class(contrasts, "emmGrid")
   expect_true(nrow(as.data.frame(contrasts)) > 0)
 })
+
+# posterior_epred (#475) ------------------------------------------------------
+
+test_that("emmeans(epred = TRUE) works on a fit saved without posterior_epred", {
+  skip_if_not_installed("emmeans")
+  skip_on_cran()
+  fit <- load_fixture_fit("bmmfit_ddm_ppcheck.rds")
+  em <- as.data.frame(emmeans::emmeans(fit, ~1, epred = TRUE))
+  expect_true(is.finite(em$emmean))
+  expect_equal(em$emmean, mean(brms::posterior_epred(fit)), tolerance = 0.05)
+})
+
+test_that("emmeans(epred = TRUE) refuses a circular model", {
+  skip_if_not_installed("emmeans")
+  fit <- load_sdm_fit()
+  class(fit$bmm$model) <- c("bmmodel", "circular", "sdm", "sdm_simple")
+  # a stand-in for the number brms would compute for a native family, so that
+  # only the refusal before brms can produce the expected message
+  fit$formula$family$posterior_epred <- function(prep) stop("reached brms")
+  expect_error(emmeans::emmeans(fit, ~set_size, epred = TRUE),
+               "not defined for the sdm model")
+})

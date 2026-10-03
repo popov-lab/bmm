@@ -1246,6 +1246,7 @@ test_that("posterior_epred() works on ezdm fits saved without the function", {
   # has to add the function regardless of the version stamp
   for (name in c("bmmfit_ezdm3_ppcheck.rds", "bmmfit_ezdm4_ppcheck.rds")) {
     fit <- load_fixture_fit(name)
+    expect_true(is.function(restructure(fit)$formula$family$posterior_epred))
     epred <- brms::posterior_epred(fit, ndraws = 20)
     expect_equal(dim(epred), c(20L, nrow(fit$data)))
     expect_true(all(is.finite(epred)))

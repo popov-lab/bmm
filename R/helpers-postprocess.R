@@ -108,21 +108,23 @@ revert_postprocess_brm.default <- function(model, fit, ...) {
 #'   | `sdm()`, `mixture2p()`, `mixture3p()`, `imm()` | Not defined: the mean of a circular response error is not a useful quantity, so these models stop with an error |
 #'
 #'   With `dpar` or `nlpar`, `posterior_epred()` returns draws of that model
-#'   parameter for every model, as in \pkg{brms}. [native_parameters()] returns
-#'   the model parameters on their native scale over a grid of predictor values.
+#'   parameter for every model, as in \pkg{brms}: a `dpar` on its native scale,
+#'   an `nlpar` on the scale of its link. [native_parameters()] returns the
+#'   model parameters on their native scale over a grid of predictor values.
 #'
 #' @param object A `bmmfit` object.
-#' @param dpar,nlpar Name of a distributional or non-linear parameter whose
-#'   draws are returned instead of the expected response.
 #' @param ... Further arguments passed to [brms::posterior_epred()], such as
 #'   `newdata` or `ndraws`.
+#' @param dpar,nlpar Name of a distributional or non-linear parameter whose
+#'   draws are returned instead of the expected response.
 #'
 #' @return A draws by observations matrix (an array with a third dimension for
 #'   the response categories of the multinomial models).
 #' @seealso [brms::posterior_epred()], [native_parameters()]
 #' @importFrom brms posterior_epred
 #' @export
-#' @examplesIf isTRUE(Sys.getenv("BMM_EXAMPLES"))
+#' @examples
+#' \dontrun{
 #' fit <- bmm(
 #'   bmf(drift ~ 1, bound ~ 1, ndt ~ 1),
 #'   data = rddm(200, drift = 1.5, bound = 1.2, ndt = 0.3),
@@ -131,18 +133,27 @@ revert_postprocess_brm.default <- function(model, fit, ...) {
 #' )
 #' # expected response time of each observation, one row per draw
 #' epred <- posterior_epred(fit)
-posterior_epred.bmmfit <- function(object, dpar = NULL, nlpar = NULL, ...) {
-  if (is.null(dpar) && is.null(nlpar) && !expected_response_defined(object$bmm$model)) {
-    model_name <- intersect(class(object$bmm$model), supported_models(print_call = FALSE))
-    posterior_epred_undefined(model_name[1])()
+#' }
+posterior_epred.bmmfit <- function(object, ..., dpar = NULL, nlpar = NULL) {
+  if (is.null(dpar) && is.null(nlpar)) {
+    refuse_undefined_epred(object)
   }
   NextMethod()
 }
 
-# Whether the model's response has an expected value worth returning. The
-# custom families refuse through the function stored in the family; this hook
-# also covers the models built on a native brms family, for which brms returns
-# a number of its own.
+# Stops for a fit whose expected response is not defined. The custom families
+# refuse through the function stored in the family; this also covers the
+# models built on a native brms family, for which brms returns a number of its
+# own, wherever bmm hands such a fit to brms for an expected response.
+refuse_undefined_epred <- function(object) {
+  if (expected_response_defined(object$bmm$model)) {
+    return(invisible())
+  }
+  model_name <- intersect(class(object$bmm$model), supported_models(print_call = FALSE))
+  posterior_epred_undefined(model_name[1])()
+}
+
+# Whether the model's response has an expected value worth returning
 expected_response_defined <- function(model) {
   UseMethod("expected_response_defined")
 }
@@ -156,6 +167,13 @@ expected_response_defined.default <- function(model) {
 # circular mean, and for an unbiased model the circular mean is 0 anyway
 #' @export
 expected_response_defined.circular <- function(model) {
+  FALSE
+}
+
+# the class of the circular models before bmm 1.0.1 (#216), which restructure()
+# keeps on old fits
+#' @export
+expected_response_defined.vwm <- function(model) {
   FALSE
 }
 

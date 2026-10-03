@@ -768,6 +768,9 @@ test_that("both cswald versions store their posterior_epred in the family", {
 test_that("posterior_epred() works on a cswald fit saved without the function", {
   skip_on_cran()
   fit <- load_fixture_fit("bmmfit_cswald_ppcheck.rds")
+  # under load_all() brms would also find the function by name on the search
+  # path, so the stored function is what shows that restructure() added it
+  expect_true(is.function(restructure(fit)$formula$family$posterior_epred))
   epred <- brms::posterior_epred(fit, ndraws = 20)
   expect_equal(dim(epred), c(20L, nrow(fit$data)))
   expect_true(all(is.finite(epred)))

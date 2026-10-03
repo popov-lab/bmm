@@ -41,9 +41,8 @@ test_that("an sdm fit refuses posterior_epred() with a message naming the model"
 })
 
 test_that("posterior_epred() on an sdm fit saved without the function gives the message", {
-  # the fixture's model predates the circular class, so the family function,
-  # which restructure() adds, is what refuses here
   fit <- load_fixture_fit("bmmfit_example1.rds")
+  expect_true(is.function(restructure(fit)$formula$family$posterior_epred))
   expect_error(brms::posterior_epred(fit, ndraws = 5),
                "The expected response is not defined for the sdm model")
   # the model parameters stay available

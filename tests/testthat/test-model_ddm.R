@@ -305,6 +305,9 @@ test_that("a ddm fit stores posterior_epred_ddm() in its family", {
 test_that("posterior_epred() works on a ddm fit saved without the function", {
   skip_on_cran()
   fit <- load_fixture_fit("bmmfit_ddm_ppcheck.rds")
+  # under load_all() brms would also find the function by name on the search
+  # path, so the stored function is what shows that restructure() added it
+  expect_true(is.function(restructure(fit)$formula$family$posterior_epred))
   epred <- brms::posterior_epred(fit, ndraws = 20)
   expect_equal(dim(epred), c(20L, nrow(fit$data)))
   expect_true(all(is.finite(epred)))

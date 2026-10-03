@@ -4,16 +4,16 @@
 \alias{posterior_epred.bmmfit}
 \title{Expected response of a fitted bmm model}
 \usage{
-\method{posterior_epred}{bmmfit}(object, dpar = NULL, nlpar = NULL, ...)
+\method{posterior_epred}{bmmfit}(object, ..., dpar = NULL, nlpar = NULL)
 }
 \arguments{
 \item{object}{A \code{bmmfit} object.}
 
-\item{dpar, nlpar}{Name of a distributional or non-linear parameter whose
-draws are returned instead of the expected response.}
-
 \item{...}{Further arguments passed to \code{\link[brms:posterior_epred]{brms::posterior_epred()}}, such as
 \code{newdata} or \code{ndraws}.}
+
+\item{dpar, nlpar}{Name of a distributional or non-linear parameter whose
+draws are returned instead of the expected response.}
 }
 \value{
 A draws by observations matrix (an array with a third dimension for
@@ -35,11 +35,12 @@ simulates for it. What that is depends on the model:\tabular{ll}{
 
 
 With \code{dpar} or \code{nlpar}, \code{posterior_epred()} returns draws of that model
-parameter for every model, as in \pkg{brms}. \code{\link[=native_parameters]{native_parameters()}} returns
-the model parameters on their native scale over a grid of predictor values.
+parameter for every model, as in \pkg{brms}: a \code{dpar} on its native scale,
+an \code{nlpar} on the scale of its link. \code{\link[=native_parameters]{native_parameters()}} returns the
+model parameters on their native scale over a grid of predictor values.
 }
 \examples{
-\dontshow{if (isTRUE(Sys.getenv("BMM_EXAMPLES"))) withAutoprint(\{ # examplesIf}
+\dontrun{
 fit <- bmm(
   bmf(drift ~ 1, bound ~ 1, ndt ~ 1),
   data = rddm(200, drift = 1.5, bound = 1.2, ndt = 0.3),
@@ -48,7 +49,7 @@ fit <- bmm(
 )
 # expected response time of each observation, one row per draw
 epred <- posterior_epred(fit)
-\dontshow{\}) # examplesIf}
+}
 }
 \seealso{
 \code{\link[brms:posterior_epred]{brms::posterior_epred()}}, \code{\link[=native_parameters]{native_parameters()}}

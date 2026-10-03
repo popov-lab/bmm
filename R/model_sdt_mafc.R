@@ -261,9 +261,13 @@ posterior_predict_sdt_mafc <- function(i, prep, ...) {
             d, dist = dist)
 }
 
+# one observation at a time: the quadrature holds a node-by-value matrix, which
+# for all draws and observations at once takes gigabytes
 posterior_epred_sdt_mafc <- function(prep) {
-  m <- as.integer(.epred_data(prep$data$vint1, prep))
+  d <- .epred_matrix(prep$dpars$d, prep)
   dist <- .sdt_dist_names[prep$data$vint2[1]]
-  p_correct <- stats::plogis(.mafc_logit_pc_r(as.vector(prep$dpars$d), m, dist))
+  p_correct <- vapply(seq_len(prep$nobs), function(i) {
+    stats::plogis(.mafc_logit_pc_r(d[, i], as.integer(prep$data$vint1[i]), dist))
+  }, numeric(prep$ndraws))
   .epred_matrix(.epred_data(prep$data$trials, prep) * p_correct, prep)
 }
