@@ -794,7 +794,7 @@ configure_model.lnr_custom <- function(model, data, formula) {
 # E[RT] = ndt + int_0^inf prod_j S_j(t)^n_j dt. A Monte-Carlo estimate of this
 # integral moved by several percent between two calls on the same draws, which
 # reached the user as noise on conditional_effects(); the grid is deterministic.
-.lnr_posterior_epred <- function(prep, cat_names, n_cats, ...) {
+.lnr_posterior_epred <- function(prep, cat_names, n_cats) {
   epred <- matrix(NA_real_, nrow = prep$ndraws, ncol = prep$nobs)
   for (i in seq_len(prep$nobs)) {
     d <- .lnr_draw_pars(i, prep, cat_names, n_cats)
@@ -845,17 +845,15 @@ posterior_predict_lnr_custom <- function(i, prep, ...) {
                          n_cats = length(cat_names), ...)
 }
 
-posterior_epred_lnr_simple <- function(prep, ...) {
-  .lnr_posterior_epred(prep, cat_names = c("correct", "error"),
-                       n_cats = 2, ...)
+posterior_epred_lnr_simple <- function(prep) {
+  .lnr_posterior_epred(prep, cat_names = c("correct", "error"), n_cats = 2)
 }
 
-posterior_epred_lnr_custom <- function(prep, ...) {
+posterior_epred_lnr_custom <- function(prep) {
   cat_names <- setdiff(
     prep$family$dpars, c("mu", "ndt", "s")
   )
-  .lnr_posterior_epred(prep, cat_names = cat_names,
-                       n_cats = length(cat_names), ...)
+  .lnr_posterior_epred(prep, cat_names = cat_names, n_cats = length(cat_names))
 }
 
 ############################################################################# !

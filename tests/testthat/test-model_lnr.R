@@ -864,3 +864,100 @@ test_that("lnr custom with predictors runs with mock backend", {
     "No formula for parameter s"
   )
 })
+
+# posterior_epred (#475) ------------------------------------------------------
+
+test_that("posterior_epred_lnr_simple() is the mean RT posterior_predict_lnr_simple() simulates", {
+  skip_on_cran()
+  withr::local_seed(475)
+  sets <- data.frame(
+    correct = c(-1, -0.5, 0, -1.5),
+    error = c(0, -0.2, 0.5, -1),
+    ndt = c(0.3, 0.2, 0.25, 0.15),
+    s = c(0.5, 1, 0.8, 1.3)
+  )
+  # one correct accumulator and K - 1 = 1, 3, 2, 5 error accumulators
+  data <- list(vint1 = rep(1L, 4), vint2 = rep(1L, 4), vint3 = c(1L, 3L, 2L, 5L))
+  res <- epred_vs_predict(sets, posterior_epred_lnr_simple,
+                          posterior_predict_lnr_simple, data = data)
+  expect_lt(max(abs(res[, "rel_error"])), 0.02)
+})
+
+test_that("posterior_epred_lnr_custom() is the mean RT posterior_predict_lnr_custom() simulates", {
+  skip_on_cran()
+  withr::local_seed(475)
+  with_family <- function(fun) {
+    function(...) {
+      args <- list(...)
+      prep <- args[[length(args)]]
+      prep$family <- list(dpars = c("mu", "correct", "similar", "other", "ndt", "s"))
+      args[[length(args)]] <- prep
+      do.call(fun, args)
+    }
+  }
+  sets <- data.frame(
+    correct = c(-1, -0.5, 0),
+    similar = c(-0.5, 0, 0.3),
+    other = c(0, 0.5, -0.4),
+    ndt = c(0.3, 0.2, 0.25),
+    s = c(0.6, 1, 0.8)
+  )
+  # a category with zero accumulators takes no part in the race
+  data <- list(vint1 = rep(1L, 3), vint2 = c(1L, 1L, 2L),
+               vint3 = c(3L, 0L, 1L), vint4 = c(5L, 2L, 0L))
+  res <- epred_vs_predict(sets, with_family(posterior_epred_lnr_custom),
+                          with_family(posterior_predict_lnr_custom), data = data)
+  expect_lt(max(abs(res[, "rel_error"])), 0.02)
+})
+
+# expect_epred_by_cell() asks for exact agreement, but the integration grid of
+# an observation is bracketed by the extreme quantiles over all of its draws, so
+# a cell evaluated alone integrates on a narrower grid and differs by ~1e-7
+test_that("lnr posterior_epred returns one column per observation", {
+  dpars <- list(correct = matrix(c(-1, -0.5, 0, -1.5), 2),
+                error = matrix(c(0, -0.2, 0.5, -1), 2),
+                ndt = matrix(c(0.3, 0.2, 0.25, 0.15), 2),
+                s = matrix(c(0.5, 1, 0.8, 1.3), 2))
+  data <- list(vint1 = c(1L, 2L), vint2 = c(1L, 1L), vint3 = c(1L, 3L))
+  out <- posterior_epred_lnr_simple(epred_prep(dpars, data))
+  expect_equal(dim(out), c(2L, 2L))
+  by_cell <- matrix(NA_real_, 2, 2)
+  for (s in 1:2) {
+    for (i in 1:2) {
+      cell <- lapply(dpars, function(x) x[s, i, drop = FALSE])
+      by_cell[s, i] <- posterior_epred_lnr_simple(
+        epred_prep(cell, lapply(data, `[`, i))
+      )[1, 1]
+    }
+  }
+  expect_equal(unname(out), by_cell, tolerance = 1e-6)
+})
+
+test_that("both lnr versions store their posterior_epred in the family", {
+  skip_on_cran()
+  dat <- rlnr(n = 100, m = c(-1, 0), s = c(1, 1), ndt = 0.2)
+  fit <- bmm(bmf(correct ~ 1, error ~ 1, ndt ~ 1, s ~ 1), dat,
+             lnr(rt = "rt", response = "response", n_choices = 2),
+             backend = "mock", mock_fit = 1, rename = FALSE)
+  expect_identical(fit$formula$family$posterior_epred, posterior_epred_lnr_simple)
+
+  dat$label <- c("correct", "other")[dat$response]
+  fit <- bmm(bmf(correct ~ 1, other ~ 1, ndt ~ 1, s ~ 1), dat,
+             lnr(rt = "rt", response = "label", version = "custom"),
+             backend = "mock", mock_fit = 1, rename = FALSE)
+  expect_identical(fit$formula$family$posterior_epred, posterior_epred_lnr_custom)
+})
+
+test_that("posterior_epred() works on an lnr fit saved without the function", {
+  skip_on_cran()
+  fit <- load_fixture_fit("bmmfit_lnr_ppcheck.rds")
+  fit$formula$family$posterior_epred <- NULL
+  fit$family$posterior_epred <- NULL
+  # under load_all() brms would also find the function by name on the search
+  # path, so the stored function is what shows that restructure() added it
+  expect_identical(restructure(fit)$formula$family$posterior_epred,
+                   posterior_epred_lnr_simple)
+  epred <- brms::posterior_epred(fit, ndraws = 20)
+  expect_equal(dim(epred), c(20L, nrow(fit$data)))
+  expect_true(all(is.finite(epred)))
+})
