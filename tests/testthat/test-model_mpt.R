@@ -20,14 +20,15 @@ test_that("mpt_tree validates its inputs", {
 })
 
 test_that("mpt stores its derived state once and can rebuild itself", {
-  model <- mpt(mpt_2htm_trees(), tree_id = "item_type")
+  model <- mpt(mpt_impossible_trees(), tree_id = "tree")
   expect_equal(model$other_vars$link, "logit")
-  expect_equal(model$other_vars$indicators$tree, c(old = "Idx_old", new = "Idx_new"))
+  expect_equal(model$other_vars$indicators$tree, c(withdist = "Idx_withdist", nodist = "Idx_nodist"))
+  expect_equal(model$other_vars$indicators$possible, c(dist = "Poss_dist"))
   expect_null(model$other_vars$simplex_raw)
-  expect_setequal(names(model$parameters), c("D", "g"))
-  expect_equal(model$links$D, "logit")
-  expect_equal(model$default_priors$D$main, "logistic(0, 1)")
-  expect_equal(model$default_priors$D$effects, "logistic(0, 1)")
+  expect_setequal(names(model$parameters), c("Pm", "Pb"))
+  expect_equal(model$links$Pm, "logit")
+  expect_equal(model$default_priors$Pm$main, "logistic(0, 1)")
+  expect_equal(model$default_priors$Pm$effects, "logistic(0, 1)")
 
   # the recorded call differs by construction; every other field must match
   without_call <- function(m) {
@@ -41,12 +42,21 @@ test_that("mpt stores its derived state once and can rebuild itself", {
     simplex = c("gA", "gB", "gC"), links = "probit"
   )
   expect_null(single$other_vars$indicators$tree)
+  expect_null(single$other_vars$indicators$possible)
   expect_equal(single$other_vars$simplex_raw, c(gA = "gAraw", gB = "gBraw"))
   expect_equal(single$links$gA, "identity")
   expect_equal(single$default_priors$gAraw$main, "normal(0, 1)")
   expect_equal(single$default_priors$gAraw$effects, "normal(0, 1)")
   rebuilt_single <- do.call("mpt", .mpt_constructor_args(single))
   expect_equal(without_call(rebuilt_single), without_call(single))
+
+  covariate_tree <- mpt_tree("main", list(
+    correct = "Pb + (1 - Pb) * Pi * GcorrPi",
+    other = "(1 - Pb) * Pi * (1 - GcorrPi) + (1 - Pb) * (1 - Pi)"
+  ))
+  with_covariate <- mpt(covariate_tree, covariates = "GcorrPi")
+  expect_setequal(names(with_covariate$parameters), c("Pb", "Pi"))
+  expect_equal(with_covariate$other_vars$covariates, "GcorrPi")
 })
 
 test_that("an empty formula fits every parameter with an intercept", {
@@ -202,7 +212,24 @@ test_that("mpt compiles for a single-tree multinomial model", {
   ))
 })
 
-test_that("generated indicator columns do not trigger the clash warning", {
+test_that("mpt compiles with design-fixed covariates", {
+  tree <- mpt_tree("main", list(
+    correct = "D + (1 - D) * Gcorr",
+    incorrect = "(1 - D) * (1 - Gcorr)"
+  ))
+  model <- mpt(tree, covariates = "Gcorr")
+  dat <- data.frame(
+    id = factor(1:10), Gcorr = 0.25,
+    correct = rbinom(10, 40, 0.7), incorrect = 0
+  )
+  dat$incorrect <- 40 - dat$correct
+  expect_silent(bmm(
+    bmf(D ~ 1 + (1 | id)), dat, model,
+    backend = "mock", mock_fit = 1, rename = FALSE
+  ))
+})
+
+test_that("generated indicator and covariate columns do not trigger the clash warning", {
   model <- mpt(mpt_2htm_trees(), tree_id = "item_type")
   dat <- mpt_2htm_data()
   expect_no_warning(bmm(
@@ -396,6 +423,12 @@ test_that("restrictions are substituted into the trees before parameters are ide
     mpt(trees, tree_id = "item_type", restrictions = "g = 0.00001"),
     "scientific"
   )
+
+  cov_tree <- mpt_tree("t", list(a = "D + (1 - D) * gc", b = "(1 - D) * (1 - gc)"))
+  expect_error(
+    mpt(cov_tree, covariates = "gc", restrictions = "gc = 0.5"),
+    "Covariates"
+  )
 })
 
 test_that("fixed parameter values stay probabilities and reach the prior on the latent scale", {
@@ -514,6 +547,17 @@ test_that("check_data errors are informative", {
     check_data(model, dat_bad_cond, bmf(D ~ 1, g ~ 1)),
     "Unmatched values: 'unknown'"
   )
+
+  tree <- mpt_tree("main", list(
+    correct = "D + (1 - D) * Gcorr",
+    incorrect = "(1 - D) * (1 - Gcorr)"
+  ))
+  model_cov <- mpt(tree, covariates = "Gcorr")
+  dat_cov <- data.frame(correct = 10, incorrect = 10)
+  expect_error(
+    check_data(model_cov, dat_cov, bmf(D ~ 1)),
+    "covariates 'Gcorr' are missing"
+  )
 })
 
 test_that("mpt category probabilities match the production m3 likelihood", {
@@ -617,4 +661,245 @@ test_that("factor tree identifier columns are matched to tree names", {
   checked <- check_data(model, dat, bmf(D ~ 1, g ~ 1))
   expect_equal(checked$Idx_old, as.integer(dat$item_type == "old"))
   expect_equal(checked$Idx_new, as.integer(dat$item_type == "new"))
+})
+
+test_that("mpt_tree validates impossible response categories", {
+  branches <- list(a = "D", b = "1 - D")
+  expect_error(
+    mpt_tree("t", branches, impossible = "a"),
+    "cannot be both impossible and have a branch"
+  )
+  expect_error(
+    mpt_tree("t", branches, impossible = c("c", "c")),
+    "must be unique"
+  )
+  expect_error(mpt_tree("t", branches, impossible = 1), "character vector")
+
+  tree <- mpt_tree("t", branches, impossible = "c")
+  expect_equal(tree$impossible, "c")
+  expect_output(print(tree), "P\\(c\\) = 0 \\(structurally impossible\\)")
+})
+
+test_that("mpt requires impossible categories to exist in some other tree", {
+  trees <- list(
+    mpt_tree("one", list(a = "D", b = "1 - D"), impossible = "c"),
+    mpt_tree("two", list(a = "1 - D", b = "D"), impossible = "c")
+  )
+  expect_error(
+    mpt(trees, tree_id = "cond"),
+    "impossible in every tree"
+  )
+  expect_error(
+    mpt(mpt_tree("one", list(a = "D", b = "1 - D"), impossible = "c")),
+    "impossible in every tree"
+  )
+})
+
+test_that("mpt counts impossible categories when comparing trees", {
+  model <- mpt(mpt_impossible_trees(), tree_id = "tree")
+  expect_equal(model$resp_vars$resp_cats, c("corr", "dist", "npl"))
+
+  mismatched <- list(
+    mpt_tree("one", list(a = "D", b = "1 - D"), impossible = "c"),
+    mpt_tree("two", list(a = "D", b = "1 - D", d = "0"))
+  )
+  expect_error(mpt(mismatched, tree_id = "cond"), "same response categories")
+})
+
+test_that("check_data builds possibility indicators for impossible categories", {
+  model <- mpt(mpt_impossible_trees(), tree_id = "tree")
+  dat <- mpt_impossible_data()
+  checked <- check_data(model, dat, bmf(Pm ~ 1, Pb ~ 1))
+  expect_equal(checked$Poss_dist, as.integer(dat$cond == "withdist"))
+
+  dat_collide <- dat
+  dat_collide$Poss_dist <- 1
+  expect_error(check_data(model, dat_collide, bmf(Pm ~ 1, Pb ~ 1)), "reserved")
+
+  dat_observed <- dat
+  dat_observed$dist[dat_observed$cond == "same"][1] <- 3L
+  expect_error(
+    check_data(model, dat_observed, bmf(Pm ~ 1, Pb ~ 1)),
+    "declared impossible for 1 observation"
+  )
+})
+
+test_that("impossible categories are switched off in the linear predictor", {
+  model <- mpt(mpt_impossible_trees(), tree_id = "tree")
+  dat <- mpt_impossible_data()
+  formula <- bmf(Pm ~ 1, Pb ~ 1)
+  checked_data <- check_data(model, dat, formula)
+  checked_formula <- check_formula(model, checked_data, formula)
+
+  # the tree that cannot produce the category contributes a placeholder, so
+  # log() stays defined for its rows
+  expect_match(deparse1(checked_formula$dist[[3]]), "Idx_nodist * (1)", fixed = TRUE)
+
+  brms_formula <- configure_model(model, checked_data, checked_formula)$formula
+  expect_match(
+    deparse1(brms_formula$pforms$mudist[[3]]),
+    "Poss_dist * log(dist) + (1 - Poss_dist) * (-100)",
+    fixed = TRUE
+  )
+  expect_match(deparse1(brms_formula$formula[[3]]), "log(corr)", fixed = TRUE)
+})
+
+test_that("mpt compiles with structurally impossible categories", {
+  expect_silent(bmm(
+    bmf(Pm ~ 1 + (1 | id), Pb ~ 1),
+    mpt_impossible_data(), mpt(mpt_impossible_trees(), tree_id = "tree"),
+    backend = "mock", mock_fit = 1, rename = FALSE
+  ))
+})
+
+test_that("several levels of a factor can share one tree", {
+  model <- mpt(mpt_impossible_trees(), tree_id = "tree")
+  dat <- mpt_impossible_data()
+  checked <- check_data(model, dat, bmf(Pm ~ 0 + cond, Pb ~ 1))
+  expect_equal(checked$Idx_withdist, as.integer(dat$cond == "withdist"))
+  expect_equal(checked$Idx_nodist, as.integer(dat$cond %in% c("reord", "same")))
+
+  # the experimental factor survives untouched for the parameter formulas
+  expect_equal(checked$cond, dat$cond)
+})
+
+test_that("tree identifier values must match tree names", {
+  model <- mpt(mpt_impossible_trees(), tree_id = "tree")
+  dat <- mpt_impossible_data()
+  dat$tree[dat$cond == "reord"] <- "reord"
+  expect_error(
+    check_data(model, dat, bmf(Pm ~ 1, Pb ~ 1)),
+    "Unmatched values: 'reord'"
+  )
+
+  missing_col <- mpt_impossible_data()
+  missing_col$tree <- NULL
+  expect_error(
+    check_data(model, missing_col, bmf(Pm ~ 1, Pb ~ 1)),
+    "not present in the data"
+  )
+})
+
+test_that("check_data validates branch sums with observed covariate values", {
+  # the tree sums to 1 only when Gcorr + Gother = 1, which synthetic test
+  # values at construction cannot verify (mpt() warns there) but the observed
+  # covariate columns can
+  tree <- mpt_tree("main", list(
+    correct = "D + (1 - D) * Gcorr",
+    incorrect = "(1 - D) * Gother"
+  ))
+  model <- suppressWarnings(mpt(tree, covariates = c("Gcorr", "Gother")))
+  dat <- data.frame(
+    id = factor(1:6), Gcorr = 0.25, Gother = 0.75,
+    correct = 10, incorrect = 30
+  )
+  expect_silent(check_data(model, dat, bmf(D ~ 1)))
+
+  dat_bad <- dat
+  dat_bad$Gother[3] <- 0.9
+  expect_warning(
+    check_data(model, dat_bad, bmf(D ~ 1)),
+    "do not sum to 1 for 1 row"
+  )
+
+  dat_na <- dat
+  dat_na$Gcorr[c(2, 5)] <- NA
+  expect_warning(
+    check_data(model, dat_na, bmf(D ~ 1)),
+    "do not sum to 1 for 2 row"
+  )
+})
+
+test_that("covariate sum check respects tree membership", {
+  trees <- list(
+    mpt_tree("cued", list(
+      correct = "D + (1 - D) * Gcorr",
+      incorrect = "(1 - D) * Gother"
+    )),
+    mpt_tree("free", list(
+      correct = "D",
+      incorrect = "1 - D"
+    ))
+  )
+  model <- suppressWarnings(
+    mpt(trees, tree_id = "cond", covariates = c("Gcorr", "Gother"))
+  )
+  dat <- data.frame(
+    cond = rep(c("cued", "free"), each = 3),
+    Gcorr = c(0.25, 0.25, 0.25, 99, 99, 99),
+    Gother = c(0.75, 0.75, 0.75, 99, 99, 99),
+    correct = 10, incorrect = 30
+  )
+  # the invalid covariate values sit in rows of the tree that does not use
+  # the covariates, so no warning should be raised
+  expect_silent(check_data(model, dat, bmf(D ~ 1)))
+})
+
+test_that("the item-memory-first MPT matches the simple-rule m3 with a distractor category", {
+  # bijection for act_funs corr ~ b+a+c, other ~ b+a, dist ~ b+d, npl ~ b
+  # with candidate counts (1, 4, 5, 5) and S = 15b + 5a + c + 5d:
+  #   Pi = (5a + c + 5d)/S, Pb = c/(5a + c + 5d), Pd = d/(a + d)
+  b <- 0.1
+  mpt_dist <- mpt(mpt_tree("newdist", list(
+    corr = "Pi * Pb + Pi * (1 - Pb) * (1 - Pd) * (1/5) + (1 - Pi) * (1/15)",
+    other = "Pi * (1 - Pb) * (1 - Pd) * (4/5) + (1 - Pi) * (4/15)",
+    dist = "Pi * (1 - Pb) * Pd + (1 - Pi) * (5/15)",
+    npl = "(1 - Pi) * (5/15)"
+  )))
+  m3_dist <- m3(
+    resp_cats = c("corr", "other", "dist", "npl"),
+    num_options = c(1, 4, 5, 5), choice_rule = "simple", version = "custom"
+  )
+  acts_dist <- bmf(corr ~ b + a + c, other ~ b + a, dist ~ b + d, npl ~ b)
+
+  grid <- expand.grid(a = c(0.2, 1, 3), c = c(0.5, 2, 6), d = c(0.1, 0.8, 2))
+  max_diff <- max(vapply(seq_len(nrow(grid)), function(i) {
+    a <- grid$a[i]
+    c_par <- grid$c[i]
+    d <- grid$d[i]
+    denom <- 5 * a + c_par + 5 * d
+    p_mpt <- .mpt_probability_vector(
+      pars = c(
+        Pi = denom / (15 * b + denom),
+        Pb = c_par / denom,
+        Pd = d / (a + d)
+      ),
+      mpt_model = mpt_dist
+    )
+    p_m3 <- .compute_m3_probability_vector(
+      pars = c(a = a, c = c_par, d = d, b = b),
+      m3_model = m3_dist, act_funs = acts_dist
+    )
+    max(abs(p_mpt - p_m3))
+  }, numeric(1)))
+  expect_lt(max_diff, 1e-10)
+
+  # no-distractor condition: counts (1, 4, 10), S = 15b + 5a + c
+  mpt_nodist <- mpt(mpt_tree("nodist", list(
+    corr = "Pi * Pb + Pi * (1 - Pb) * (1/5) + (1 - Pi) * (1/15)",
+    other = "Pi * (1 - Pb) * (4/5) + (1 - Pi) * (4/15)",
+    npl = "(1 - Pi) * (10/15)"
+  )))
+  m3_nodist <- m3(
+    resp_cats = c("corr", "other", "npl"),
+    num_options = c(1, 4, 10), choice_rule = "simple", version = "custom"
+  )
+  acts_nodist <- bmf(corr ~ b + a + c, other ~ b + a, npl ~ b)
+  max_diff_nodist <- max(vapply(seq_len(nrow(grid)), function(i) {
+    a <- grid$a[i]
+    c_par <- grid$c[i]
+    p_mpt <- .mpt_probability_vector(
+      pars = c(
+        Pi = (5 * a + c_par) / (15 * b + 5 * a + c_par),
+        Pb = c_par / (5 * a + c_par)
+      ),
+      mpt_model = mpt_nodist
+    )
+    p_m3 <- .compute_m3_probability_vector(
+      pars = c(a = a, c = c_par, b = b),
+      m3_model = m3_nodist, act_funs = acts_nodist
+    )
+    max(abs(p_mpt - p_m3))
+  }, numeric(1)))
+  expect_lt(max_diff_nodist, 1e-10)
 })
