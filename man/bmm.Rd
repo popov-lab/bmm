@@ -135,6 +135,11 @@ Categorical recall and n-AFC decisions
 \item m3(): The Multinomial / Memory Measurement Model
 }
 
+Processing-tree models
+\itemize{
+\item mpt(): Multinomial Processing Tree (MPT) models
+}
+
 Detection, recognition and confidence judgments
 \itemize{
 \item sdt_cdp(): Continuous Dual-Process Signal Detection Theory (CDP)

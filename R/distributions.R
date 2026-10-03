@@ -787,6 +787,137 @@ rm3 <- function(n, size, pars, m3_model, act_funs = NULL, unpack = FALSE,
   }
 
 
+#' @title Distribution functions for Multinomial Processing Tree (MPT) models
+#'
+#' @description Density and random generation functions for multinomial
+#'   processing tree models specified with [mpt()]. Please note that these
+#'   functions are currently not vectorized.
+#'
+#' @name mptdist
+#'
+#' @param x Integer vector of length `K`, where `K` is the number of response
+#'   categories, giving the number of observed responses per category. The
+#'   order of the categories follows the branch names of the trees.
+#' @param n Integer. Number of observations to generate data for.
+#' @param size The total number of observations across all response categories.
+#' @param pars A named vector or list with the values of all latent parameters
+#'   appearing in the branch expressions of the selected tree, on the
+#'   probability scale.
+#' @param mpt_model A `bmmodel` object created with [mpt()] specifying the
+#'   model that densities or random samples should be generated for.
+#' @param tree Character. For models with multiple trees, the name of the tree
+#'   to compute probabilities for. Can be omitted for single-tree models.
+#' @param log Logical; if `TRUE` (default), densities are returned on the log
+#'   scale.
+#' @param unpack Logical; if `TRUE` and `n = 1`, returns a named vector instead
+#'   of a matrix. This allows automatic unpacking of response categories into
+#'   separate columns when used with `dplyr::reframe()`. Default is `FALSE`.
+#' @param ... can be used to pass additional values used in the branch
+#'   expressions.
+#'
+#' @note Unlike the densities of the circular models in this package (`dsdm()`,
+#'   `dmixture2p()`, `dmixture3p()`, `dimm()`) and unlike [stats::dmultinom()],
+#'   `dmpt()` returns the log density by default, matching [dm3()].
+#'
+#' @keywords distribution
+#'
+#' @references Batchelder, W. H., & Riefer, D. M. (1999). Theoretical and
+#'   empirical review of multinomial process tree modeling. Psychonomic
+#'   Bulletin & Review, 6(1), 57-86. https://doi.org/10.3758/BF03210812
+#'
+#' @return `dmpt` gives the multinomial density of a vector of response counts,
+#'   and `rmpt` generates random response counts for the response categories.
+#'
+#' @examples
+#' tree_old <- mpt_tree("old", list(
+#'   old = "D + (1 - D) * g",
+#'   new = "(1 - D) * (1 - g)"
+#' ))
+#' tree_new <- mpt_tree("new", list(
+#'   old = "(1 - D) * g",
+#'   new = "D + (1 - D) * (1 - g)"
+#' ))
+#' model <- mpt(list(tree_old, tree_new), tree_id = "item_type")
+#'
+#' dmpt(
+#'   x = c(35, 15), pars = c(D = 0.7, g = 0.5),
+#'   mpt_model = model, tree = "old"
+#' )
+#' rmpt(
+#'   n = 10, size = 50, pars = c(D = 0.7, g = 0.5),
+#'   mpt_model = model, tree = "new"
+#' )
+#' @export
+dmpt <- function(x, pars, mpt_model, tree = NULL, log = TRUE, ...) {
+  probs <- .mpt_probability_vector(pars, mpt_model, tree, ...)
+  dmultinom(x, prob = probs, log = log)
+}
+
+#' @rdname mptdist
+#' @export
+rmpt <- function(n, size, pars, mpt_model, tree = NULL, unpack = FALSE,
+                 ...) {
+  probs <- .mpt_probability_vector(pars, mpt_model, tree, ...)
+  result <- t(rmultinom(n, size = size, prob = probs))
+  colnames(result) <- names(probs)
+
+  if (unpack && n == 1) {
+    result_vec <- as.vector(result[1, ])
+    names(result_vec) <- colnames(result)
+    return(result_vec)
+  }
+
+  result
+}
+
+.mpt_probability_vector <- function(pars, mpt_model, tree = NULL, ...) {
+  stopif(
+    !inherits(mpt_model, "mpt"),
+    "The mpt_model argument must be a bmmodel object created with mpt()."
+  )
+  trees <- mpt_model$other_vars$trees
+  if (is.null(tree)) {
+    stopif(
+      length(trees) > 1,
+      "The model has multiple trees ({collapse_comma(names(trees))}).
+      Please select one with the tree argument."
+    )
+    tree <- names(trees)[1]
+  }
+  stopif(
+    !tree %in% names(trees),
+    "Unknown tree '{tree}'. The model contains: {collapse_comma(names(trees))}"
+  )
+  values <- c(as.list(pars), list(...))
+  required <- .mpt_expr_vars(trees[[tree]])
+  stopif(
+    !identical(sort(required), sort(names(values))),
+    "The names or number of the provided values mismatch the symbols used in \\
+    the branch expressions of tree '{tree}'.
+    Required: {collapse_comma(required)}
+    Provided: {collapse_comma(names(values))}"
+  )
+
+  par_values <- unlist(values[intersect(names(values), names(mpt_model$parameters))])
+  stopif(
+    any(par_values < 0 | par_values > 1),
+    "All parameter values must be probabilities between 0 and 1."
+  )
+
+  probs <- .mpt_eval_branches(trees[[tree]], values)
+  warnif(
+    abs(sum(probs) - 1) > 1e-6,
+    "The branch probabilities of tree '{tree}' sum to {signif(sum(probs), 6)} \\
+    instead of 1 for the provided values. Check the parameter values."
+  )
+
+  resp_cats <- mpt_model$resp_vars$resp_cats
+  full_probs <- setNames(numeric(length(resp_cats)), resp_cats)
+  full_probs[names(probs)] <- probs
+  full_probs
+}
+
+
 #' @title Distribution function for the Diffusion Decision Model (`ddm`)
 #'
 #' @description
