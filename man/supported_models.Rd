@@ -22,8 +22,8 @@ Measurement models available in \code{bmm}
 \details{
 The groups are: continuous reproduction; categorical recall and
 n-AFC decisions; detection, recognition and confidence judgments; choices
-and response times. Type \code{?modelname} (for example \code{?imm}) for the
-arguments of a model.
+and response times; processing-tree models. Type \code{?modelname} (for
+example \code{?imm}) for the arguments of a model.
 }
 \examples{
 supported_models()
