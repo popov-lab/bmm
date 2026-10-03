@@ -118,7 +118,8 @@
       name = "Continuous Dual-Process Signal Detection Theory (CDP)",
       citation = glue(
         "Wixted, J. T., & Mickes, L. (2010). A continuous dual-process model ",
-        "of remember/know judgments. Psychological Review, 117(4), 1025-1054."
+        "of remember/know judgments. Psychological Review, 117(4), 1025-1054. ",
+        "https://doi.org/10.1037/a0020874"
       ),
       version = "NA",
       requirements = requirements,
