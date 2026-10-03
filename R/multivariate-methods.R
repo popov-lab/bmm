@@ -94,8 +94,54 @@ conditional_effects.mvbmmfit <- function(x, ...) {
   )
 }
 
+# Functions that read the single model in fit$bmm$model stop here: a
+# multivariate fit stores its models in fit$bmm$components, and reporting on
+# the missing model would describe no component or the wrong one
+refuse_mvbmmfit <- function(x, fun) {
+  stopif(
+    inherits(x, "mvbmmfit"),
+    "{fun}() is not yet supported for multivariate bmm models."
+  )
+}
+
 #' @export
-parameters.mvbmmfit <- function(x, ...) {
+model_citation.mvbmmfit <- function(x, ...) {
+  stop2(
+    "model_citation() is not yet supported for multivariate bmm models. Call \\
+    it on the model of each component instead, e.g. \\
+    model_citation(fit$bmm$components[[1]]$model)."
+  )
+}
+
+# The expected response of a component is refused as it is for the same model
+# fitted alone; brms itself requires `resp` for a model that uses subset()
+#' @export
+posterior_epred.mvbmmfit <- function(object, ..., dpar = NULL, nlpar = NULL) {
+  if (is.null(dpar) && is.null(nlpar)) {
+    refuse_undefined_component_epred(object, list(...)$resp)
+  }
+  NextMethod()
+}
+
+#' @export
+fitted.mvbmmfit <- function(object, ..., scale = c("response", "linear"),
+                            dpar = NULL, nlpar = NULL) {
+  if (match.arg(scale) == "response" && is.null(dpar) && is.null(nlpar)) {
+    refuse_undefined_component_epred(object, list(...)$resp)
+  }
+  NextMethod()
+}
+
+refuse_undefined_component_epred <- function(object, resp) {
+  for (comp in object$bmm$components) {
+    if (is.null(resp) || comp$resp_name %in% resp) {
+      refuse_undefined_epred(list(bmm = list(model = comp$model)))
+    }
+  }
+}
+
+#' @export
+parameter_info.mvbmmfit <- function(x, ...) {
   x <- restructure(x)
   tables <- lapply(x$bmm$components, function(comp) {
     # family components without predicted distributional parameters have
@@ -103,7 +149,7 @@ parameters.mvbmmfit <- function(x, ...) {
     if (length(comp$model$parameters) == 0) {
       return(NULL)
     }
-    table <- parameters(comp$model, formula = comp$user_formula, ...)
+    table <- parameter_info(comp$model, formula = comp$user_formula, ...)
     # the sanitized name is the one brms gives the response inside the fit, so
     # it is the value that works in pp_check(resp = ) and brms::log_lik(resp = )
     table$response <- rep(comp$resp_name, nrow(table))
@@ -127,10 +173,10 @@ pp_check.mvbmmfit <- function(object, ..., resp = NULL) {
     not_in(resp, resps),
     "Unknown response '{resp}'. Available responses: {collapse_comma(resps)}"
   )
-  comp <- object$bmm$components[[match(resp, resps)]]
+  # the family brms fitted the component with: m3 and the sdt rating, ranking
+  # and cdp models are multinomial without saying so in the model object
   stopif(
-    identical(comp$model$family$family %||% "", "multinomial") ||
-      inherits(comp$model, "m3"),
+    identical(object$formula$forms[[resp]]$family$family, "multinomial"),
     "pp_check() is not yet supported for multinomial components of \\
     multivariate bmm models."
   )

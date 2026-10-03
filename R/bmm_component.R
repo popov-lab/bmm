@@ -37,7 +37,8 @@
 #'   the components in the joint model (e.g. in priors and post-processing).
 #'
 #'   Current limitations:
-#'   * the `sdm` model is not yet supported in multivariate models
+#'   * the `sdm` and `sdt_mafc` models are not yet supported in multivariate
+#'     models
 #'   * families that require response addition terms (e.g. `binomial`, which
 #'     needs `trials()`) cannot be used as a component family
 #'   * `update()`, `conditional_effects()` and `emmeans()` are not available

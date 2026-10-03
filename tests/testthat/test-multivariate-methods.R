@@ -53,11 +53,37 @@ test_that("pp_check() rejects multinomial components", {
   )
   fit <- suppressMessages(bmm(joint, backend = "mock", mock_fit = 1, rename = FALSE))
   expect_error(pp_check(fit, resp = "Y"), "not yet supported for multinomial")
+
+  rating <- data.frame(
+    ID = rep(unique(m3dat$ID), each = 2), stimulus = 0:1,
+    r1 = 5L, r2 = 6L, r3 = 4L, r4 = 7L
+  )
+  joint <- bmm_component(
+    bmf(d ~ 1 + (1 | p | ID), criterion ~ 1, spacing ~ 1),
+    model = sdt_rating(c("r1", "r2", "r3", "r4"), "stimulus"), data = rating
+  ) +
+    bmm_component(bmf(rt ~ 1 + (1 | p | ID)), family = brms::lognormal(), data = rt_dat)
+  fit <- suppressMessages(bmm(joint, backend = "mock", mock_fit = 1, rename = FALSE))
+  expect_error(pp_check(fit, resp = "Y"), "not yet supported for multinomial")
 })
 
-test_that("parameters() reports all component parameters with their response", {
+test_that("helpers that read a single model refuse a multivariate fit", {
   fit <- mvm_mock_fit()
-  pars <- parameters(fit)
+  expect_error(prior_info(fit), "not yet supported for multivariate")
+  expect_error(native_parameters(fit), "not yet supported for multivariate")
+  expect_error(model_citation(fit), "not yet supported for multivariate")
+})
+
+test_that("the expected response of a component is refused as for the model alone", {
+  fit <- mvm_mock_fit()
+  expect_error(posterior_epred(fit, resp = "error"), "not defined for the mixture2p model")
+  expect_error(fitted(fit, resp = "error"), "not defined for the mixture2p model")
+  expect_error(posterior_epred(fit), "not defined for the mixture2p model")
+})
+
+test_that("parameter_info() reports all component parameters with their response", {
+  fit <- mvm_mock_fit()
+  pars <- parameter_info(fit)
 
   expect_s3_class(pars, "bmm_parameters")
   expect_true(all(c("parameter", "response") %in% names(pars)))
@@ -67,7 +93,7 @@ test_that("parameters() reports all component parameters with their response", {
   expect_output(print(pars), "sigma")
 })
 
-test_that("parameters() reports the response name that pp_check() accepts", {
+test_that("parameter_info() reports the response name that pp_check() accepts", {
   dat_rt <- data.frame(
     id = factor(rep(1:8, each = 10)),
     mean_rt = rlnorm(80, meanlog = -0.5, sdlog = 0.3)
@@ -82,7 +108,7 @@ test_that("parameters() reports the response name that pp_check() accepts", {
   fit <- bmm(joint, backend = "mock", mock_fit = 1, rename = FALSE)
 
   accepted <- vapply(fit$bmm$components, function(x) x$resp_name, character(1))
-  expect_equal(unique(parameters(fit)$response), accepted)
+  expect_equal(unique(parameter_info(fit)$response), accepted)
   expect_equal(accepted, c("error", "meanrt"))
 })
 
@@ -123,13 +149,13 @@ test_that("pp_check() works on a component of a multivariate fit", {
   expect_s3_class(plot, "ggplot")
 })
 
-test_that("parameters() skips family components without predicted parameters", {
+test_that("parameter_info() skips family components without predicted parameters", {
   joint <- bmm_component(
     bmf(thetat ~ 1 + (1 | p | id), kappa ~ 1 + (1 | p | id)),
     model = mixture2p(resp_error = "error"), data = mvm_dat_vwm
   ) +
     bmm_component(bmf(rt ~ 1 + (1 | p | id)), family = brms::lognormal(), data = mvm_dat_rt)
   fit <- bmm(joint, backend = "mock", mock_fit = 1, rename = FALSE)
-  pars <- parameters(fit)
+  pars <- parameter_info(fit)
   expect_equal(unique(pars$response), "error")
 })

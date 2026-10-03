@@ -73,7 +73,8 @@ the components in the joint model (e.g. in priors and post-processing).
 
 Current limitations:
 \itemize{
-\item the \code{sdm} model is not yet supported in multivariate models
+\item the \code{sdm} and \code{sdt_mafc} models are not yet supported in multivariate
+models
 \item families that require response addition terms (e.g. \code{binomial}, which
 needs \code{trials()}) cannot be used as a component family
 \item \code{update()}, \code{conditional_effects()} and \code{emmeans()} are not available

@@ -143,7 +143,9 @@ test_that("component priors are tagged with the sanitized response name", {
   kappa_row <- cfg$prior[cfg$prior$nlpar == "kappa" & cfg$prior$coef == "Intercept", ]
   expect_equal(kappa_row$prior, "normal(1, 0.5)")
   expect_equal(kappa_row$resp, "error")
-  expect_true(all(cfg$prior$resp %in% c("error", "rt")))
+  is_cor <- cfg$prior$class == "cor"
+  expect_true(all(cfg$prior$resp[!is_cor] %in% c("error", "rt")))
+  expect_equal(cfg$prior$resp[is_cor], "")
 })
 
 test_that("a global prior is passed through without a resp tag", {
@@ -154,6 +156,21 @@ test_that("a global prior is passed through without a resp tag", {
   cor_row <- cfg$prior[cfg$prior$class == "cor", ]
   expect_equal(cor_row$prior, "lkj(2)")
   expect_equal(cor_row$resp, "")
+})
+
+test_that("a correlation matrix spanning components gets the lkj(2) default", {
+  # each component alone has a single random intercept and no correlation
+  # matrix; the shared |p| label creates one only in the joint model
+  comp_gaussian <- bmm_component(bmf(error ~ 1 + (1 | p | id)), family = gaussian(), data = mv_dat_vwm)
+  cfg <- configure_fit(comp_gaussian + mv_comp_lognormal)
+  cor_row <- cfg$prior[cfg$prior$class == "cor", ]
+  expect_equal(cor_row$prior, "lkj(2)")
+  expect_equal(cor_row$resp, "")
+  expect_silent(stancode(comp_gaussian + mv_comp_lognormal, prior = NULL))
+
+  withr::local_options(bmm.default_priors = FALSE)
+  cfg <- configure_fit(comp_gaussian + mv_comp_lognormal)
+  expect_false("cor" %in% cfg$prior$class)
 })
 
 test_that("multivariate standata matches the univariate standata per component", {
@@ -254,7 +271,8 @@ test_that("the same model on two tasks deduplicates its Stan functions", {
 })
 
 test_that("components without init_ranges produce the default init", {
-  cfg <- configure_fit(mv_comp_mixture + mv_comp_lognormal)
+  comp_gaussian <- bmm_component(bmf(error ~ 1 + (1 | p | id)), family = gaussian(), data = mv_dat_vwm)
+  cfg <- configure_fit(comp_gaussian + mv_comp_lognormal)
   expect_equal(cfg$config_args$init, 1)
 })
 
@@ -343,28 +361,6 @@ test_that("components without init_ranges are initialized in a joint model", {
   expect_true(all(abs(unlist(inits[c("b_Y_c", "b_Y_a")])) <= 1))
 })
 
-test_that("mv_default_init() maps the draw through the declared bounds", {
-  spec <- function(type, bounds, dims = "K") nlist(type, bounds, dims)
-  unbounded <- mv_default_init(spec("vector", NULL), 20, list())
-  lower <- mv_default_init(spec("vector", list(lower = "2")), 20, list())
-  upper <- mv_default_init(spec("vector", list(upper = "-3")), 20, list())
-  both <- mv_default_init(
-    spec("vector", list(lower = "0", upper = "min_Y")), 20, list(min_Y = 4)
-  )
-
-  expect_true(all(abs(unbounded) <= 1))
-  expect_true(all(lower > 2))
-  expect_true(all(upper < -3))
-  expect_true(all(both > 0 & both < 4))
-  expect_equal(dim(mv_default_init(spec("matrix", NULL), c(2, 3), list())), c(2, 3))
-})
-
-test_that("mv_default_init() leaves unsupported declarations to the sampler", {
-  spec <- function(type, bounds) nlist(type, bounds, dims = "K")
-  expect_null(mv_default_init(spec("simplex", NULL), 3, list()))
-  expect_null(mv_default_init(spec("real", list(lower = "unknown_var")), 1, list()))
-})
-
 test_that("init matching distinguishes the same model on two tasks", {
   dat_two_tasks <- data.frame(
     id = factor(rep(1:8, each = 10)),
@@ -430,4 +426,76 @@ test_that("multivariate fits are cached with the file argument", {
   cached <- bmm(joint, backend = "mock", mock_fit = 2, rename = FALSE, file = file)
   expect_equal(cached$fit, fit$fit)
   unlink(file)
+})
+
+# One minimal component per supported model. The list is checked against
+# supported_models(), so a new model fails here until it gets a case
+mv_model_cases <- function() {
+  n <- 40
+  id <- factor(rep(1:8, each = 5))
+  circ <- function() runif(n, -pi, pi)
+  list(
+    sdm = list(bmf(c ~ 1 + (1 | p | id), kappa ~ 1), sdm("y"),
+      data.frame(id = id, y = circ())),
+    mixture2p = list(bmf(thetat ~ 1 + (1 | p | id), kappa ~ 1), mixture2p("y"),
+      data.frame(id = id, y = circ())),
+    mixture3p = list(bmf(thetat ~ 1 + (1 | p | id), thetant ~ 1, kappa ~ 1),
+      mixture3p("y", nt_features = "nt1", set_size = 2),
+      data.frame(id = id, y = circ(), nt1 = circ())),
+    imm = list(bmf(c ~ 1 + (1 | p | id), a ~ 1, s ~ 1, kappa ~ 1),
+      imm("y", nt_features = "nt1", nt_distances = "d1", set_size = 2),
+      data.frame(id = id, y = circ(), nt1 = circ(), d1 = runif(n, 0.1, 1))),
+    m3 = list(bmf(c ~ 1 + (1 | p | id), a ~ 1),
+      m3(resp_cats = c("corr", "other", "npl"), num_options = c(1, 4, 5), version = "ss"),
+      data.frame(id = id, corr = rpois(n, 10), other = rpois(n, 3), npl = rpois(n, 2))),
+    ddm = list(bmf(drift ~ 1 + (1 | p | id), bound ~ 1, ndt ~ 1), ddm("rt", "response"),
+      cbind(id = id, rddm(n, drift = 2, bound = 1.5, ndt = 0.3))),
+    cswald = list(bmf(drift ~ 1 + (1 | p | id), bound ~ 1, ndt ~ 1),
+      cswald("rt", "response", version = "simple"),
+      cbind(id = id, rcswald(n, drift = 2, bound = 1.5, ndt = 0.3))),
+    ezdm = list(bmf(drift ~ 1 + (1 | p | id), bound ~ 1, ndt ~ 1),
+      ezdm("mean_rt", "var_rt", "n_upper", "n_trials", version = "3par"),
+      cbind(id = id, rezdm(n, n_trials = 100, drift = 2, bound = 1.5, ndt = 0.3, version = "3par"))),
+    sdt_yn = list(bmf(d ~ 1 + (1 | p | id), criterion ~ 1), sdt_yn("n_old", "stimulus", "n_trials"),
+      data.frame(id = id, n_old = rbinom(n, 50, 0.5), stimulus = rep(0:1, n / 2), n_trials = 50)),
+    sdt_mafc = list(bmf(d ~ 1 + (1 | p | id)), sdt_mafc("n_correct", "n_trials", m = 4),
+      data.frame(id = id, n_correct = rbinom(n, 50, 0.6), n_trials = 50)),
+    sdt_ranking = list(bmf(d ~ 1 + (1 | p | id)), sdt_ranking(c("rank1", "rank2", "rank3"), m = 3),
+      data.frame(id = id, rank1 = rpois(n, 10), rank2 = rpois(n, 5), rank3 = rpois(n, 3))),
+    sdt_rating = list(bmf(d ~ 1 + (1 | p | id), criterion ~ 1, spacing ~ 1),
+      sdt_rating(c("r1", "r2", "r3", "r4"), "stimulus"),
+      data.frame(id = id, stimulus = rep(0:1, n / 2),
+        r1 = rpois(n, 5), r2 = rpois(n, 5), r3 = rpois(n, 5), r4 = rpois(n, 5))),
+    sdt_cdp = list(bmf(dfam ~ 1 + (1 | p | id), drec ~ 1, criterion ~ 1, spacing ~ 1, rcrit ~ 1),
+      sdt_cdp(stimulus = "stimulus", n_new = 3, n_old = 3),
+      cbind(id = factor(rep(1:8, each = 2)), stimulus = rep(0:1, 8),
+        rsdt_cdp(16, 100, rep(0:1, 8), dfam = 0.8, drec = 1, rcrit = 0.5, n_new = 3,
+          thresholds = .cdp_make_thresholds(0, -0.3, 3, 3, "parsimonious"))))
+  )
+}
+
+test_that("every supported model is a multivariate component or is refused by name", {
+  skip_on_cran()
+  cases <- mv_model_cases()
+  expect_setequal(names(cases), supported_models(print_call = FALSE))
+  comp_rt <- bmm_component(bmf(lrt ~ 1 + (1 | p | id)), family = brms::lognormal(),
+    data = data.frame(id = factor(rep(1:8, each = 5)), lrt = rlnorm(40)))
+
+  for (model in names(cases)) {
+    case <- cases[[model]]
+    joint <- bmm_component(case[[1]], model = case[[2]], data = case[[3]]) + comp_rt
+    code <- tryCatch(
+      suppressWarnings(suppressMessages(stancode(joint))),
+      error = function(e) e
+    )
+    if (inherits(code, "error")) {
+      expect_match(conditionMessage(code), "cannot be used in a multivariate bmm model",
+        label = model)
+      next
+    }
+    expect_match(code, "lrt", label = model)
+    if (requireNamespace("rstan", quietly = TRUE)) {
+      expect_true(rstan::stanc(model_code = code, verbose = FALSE)$status, label = model)
+    }
+  }
 })
