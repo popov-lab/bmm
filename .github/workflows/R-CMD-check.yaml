@@ -72,6 +72,7 @@ jobs:
             waldo
             fansi
             yaml
+            roxygen2
 
       # Cache the built CmdStan so it is only compiled when a new version is
       # released (the cache key includes the latest release version)

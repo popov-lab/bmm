@@ -904,8 +904,14 @@ use_model_template <- function(model_name,
      # Besides this file, a new model needs entries in:
      # - `data_column_roles` in R/helpers-model.R (a test requires it)
      # - `stored_frame_cases()` in tests/testthat/test-update.R (a test requires it)
+     #   plus a `revert_check_data()` method in R/update.R if `check_data()`
+     #   consumes or creates columns
      # - `response_annotations()` in R/helpers-model.R, if the response columns
-     #   need a unit or a coding note in the console output\n\n\n"
+     #   need a unit or a coding note in the console output
+     #
+     # In this file, `citation` needs at least one reference, one per element, each
+     # on a single line without a \"- \" bullet and ending in \".\" or a
+     # https://doi.org/ URL (a test requires it)\n\n\n"
   )
 
 
@@ -962,9 +968,10 @@ use_model_template <- function(model_name,
     "  fixed_parameters = list(",
     "    mu = 0",
     "  ),",
-    "  # the sd rate follows the parameter's meaning: 1 for sensitivity, strength,",
-    "  # mixing weights and identity-linked drift; 2 for criteria, thresholds,",
-    "  # boundary, ndt, start point and log-linked drift; 4 for circular bias",
+    "  # pick the sd rate by meaning: 1 for sensitivity, strength, concentration",
+    "  # (kappa), mixing weights and identity-linked drift; 2 for criteria,",
+    "  # thresholds, boundary, ndt, start point, log-linked drift, diffusion",
+    "  # constant, log ratios, log SDs and correlations; 4 for circular bias",
     "  priors = list(",
     '    par1 = list(main = "normal(0, 1)", effects = "normal(0, 0.5)", sd = "exponential(1)"),',
     '    par2 = list(main = "normal(0, 0.5)", effects = "normal(0, 0.5)", sd = "exponential(2)")',
@@ -1149,7 +1156,7 @@ use_model_template <- function(model_name,
        resp_var1 <- model$resp_vars$resp_var1
        required_arg1 <- model$other_vars$required_arg1\n
        # set the base brmsformula with the response and its addition terms
-       brms_formula <- brms::bf(paste0(resp_var1, \" | \", vreal(required_arg1), \" ~ 1\"))\n
+       brms_formula <- brms::bf(paste0(resp_var1, \" | vreal(\", required_arg1, \") ~ 1\"))\n
        # return the brms_formula to add the remaining bmmformulas to it.
        brms_formula
     }\n\n\n",

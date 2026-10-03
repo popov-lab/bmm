@@ -267,6 +267,7 @@ test_that("use_model_template() generates a flat-defaults unversioned scaffold",
   expect_match(out, 'parameters = .tmpl_unver_defaults[["parameters"]]', fixed = TRUE)
   expect_match(out, 'init_ranges = .tmpl_unver_defaults[["init_ranges"]]', fixed = TRUE)
   expect_match(out, 'main = "normal(0, 1)", effects = "normal(0, 0.5)", sd = "exponential(1)"', fixed = TRUE)
+  expect_match(out, 'main = "normal(0, 0.5)", effects = "normal(0, 0.5)", sd = "exponential(2)"', fixed = TRUE)
   expect_false(grepl("_version_table", out, fixed = TRUE))
   expect_false(grepl("match.arg", out, fixed = TRUE))
   expect_false(grepl("void_mu", out, fixed = TRUE))
@@ -310,6 +311,8 @@ test_that("use_model_template() composes a custom family with versions", {
   expect_match(out, "_version_table", fixed = TRUE)
   expect_match(out, "match.arg", fixed = TRUE)
   expect_match(out, "brms::stanvar(scode = stan_functions", fixed = TRUE)
+  expect_match(out, "log_lik = log_lik_tmpl_cf,\n", fixed = TRUE)
+  expect_match(out, "posterior_predict = posterior_predict_tmpl_cf,\n", fixed = TRUE)
   expect_match(out, "posterior_epred = posterior_epred_tmpl_cf\n", fixed = TRUE)
   expect_match(out, "posterior_epred_tmpl_cf <- function(prep)", fixed = TRUE)
   expect_match(out, "log_lik_tmpl_cf <- function(i, prep)", fixed = TRUE)
@@ -357,11 +360,24 @@ test_that("generated template code constructs a valid bmmodel", {
   expect_equal(model_u$version, "NA")
   expect_equal(model_u$links$par1, "log")
   expect_false("void_mu" %in% names(model_u))
+  expect_equal(model_u$default_priors$par2$sd, "exponential(2)")
+
+  model_vars <- unver$.model_tmpl_build_unver(resp_var1 = "y", required_arg1 = "v", required_arg2 = "w")
+  expect_identical(
+    deparse1(unver$bmf2bf.tmpl_build_unver(model_vars, bmf(par1 ~ 1))$formula),
+    "y | vreal(v) ~ 1"
+  )
+  # bmm() passes fit_args and other pipeline arguments through ...
+  expect_identical(unver$postprocess_brm.tmpl_build_unver(model_vars, fit = 1, fit_args = list()), 1)
 
   ver <- gen_env("tmpl_build_ver", versions = c("simple", "full"))
   model_v <- ver$.model_tmpl_build_ver(resp_var1 = "y", version = "full")
   expect_equal(class(model_v), c("bmmodel", "tmpl_build_ver", "tmpl_build_ver_full"))
   expect_equal(model_v$version, "full")
+  expect_equal(
+    lapply(model_v$default_priors, `[[`, "sd"),
+    list(par1 = "exponential(1)", par2 = "exponential(2)")
+  )
   expect_error(
     ver$tmpl_build_ver("y", "a", "b", version = "nope"),
     "should be one of"
