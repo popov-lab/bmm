@@ -27,7 +27,7 @@ Two-parameter mixture model by Zhang and Luck (2008).
 \item \strong{Name:} Two-parameter mixture model by Zhang and Luck (2008).
 \item \strong{Citation:}
 \itemize{
-\item Zhang, W., & Luck, S. J. (2008). Discrete fixed-resolution representations in visual working memory. Nature, 453(7192), 233-235
+\item Zhang, W., & Luck, S. J. (2008). Discrete fixed-resolution representations in visual working memory. Nature, 453(7192), 233-235. https://doi.org/10.1038/nature06860
 }
 \item \strong{Requirements:}
 \itemize{
@@ -66,7 +66,7 @@ Two-parameter mixture model by Zhang and Luck (2008).
 \item \code{thetat}:
 \itemize{
 \item \code{main}: logistic(0, 1)
-\item \code{effects}: normal(0, 0.5)
+\item \code{effects}: normal(0, 2.5)
 \item \code{sd}: exponential(1)
 }
 }

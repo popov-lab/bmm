@@ -4,7 +4,15 @@
 \alias{ezdm}
 \title{EZ-Diffusion Model}
 \usage{
-ezdm(mean_rt, var_rt, n_upper, n_trials, links = NULL, version = "3par", ...)
+ezdm(
+  mean_rt,
+  var_rt,
+  n_upper,
+  n_trials,
+  links = NULL,
+  version = c("3par", "4par"),
+  ...
+)
 }
 \arguments{
 \item{mean_rt}{The names of the variable or variables (for 4par version) coding the mean reaction time in seconds in the data.}
@@ -42,13 +50,9 @@ EZ-Diffusion Model
 \item \strong{Name:} EZ-Diffusion Model
 \item \strong{Citation:}
 \itemize{
-\item Wagenmakers, E.-J., Van Der Maas, H. L. J., & Grasman, R. P. P. P. (2007). An EZ-diffusion model for response time and accuracy. Psychonomic Bulletin & Review, 14(1), 3-22. https://doi.org/10/fk447c
+\item Wagenmakers, E.-J., Van Der Maas, H. L. J., & Grasman, R. P. P. P. (2007). An EZ-diffusion model for response time and accuracy. Psychonomic Bulletin & Review, 14(1), 3-22. https://doi.org/10.3758/BF03194023
+\item Chávez De la Peña, A. F., & Vandekerckhove, J. (2025). An EZ Bayesian hierarchical drift diffusion model for response time and accuracy. Psychonomic Bulletin & Review, 32(6), 3067-3087. https://doi.org/10.3758/s13423-025-02729-y
 }
-}
-\itemize{
-\item Chávez De la Peña, A. F., & Vandekerckhove, J. (2025). An EZ Bayesian hierarchical drift diffusion model for response time and accuracy. Psychonomic Bulletin & Review. https://doi.org/10.3758/s13423-025-02729-y
-}
-\itemize{
 \item \strong{Version:} 4par
 \item \strong{Requirements:}
 
@@ -111,6 +115,24 @@ Provide aggregated statistics for each subject and condition that model paramete
 \item \code{sd}: exponential(2)
 }
 }
+
+In version "4par", a boundary reached fewer than twice, or without RT
+summaries (\code{NA}), enters the model through the response counts only.
+\code{bmm()} adds two columns to the data, \code{rt_used_upper} and
+\code{rt_used_lower}, which it sets to 0 for such a boundary and to 1
+otherwise, and replaces the summaries of such a boundary with a
+placeholder the likelihood never reads. A 0 already in these columns is
+kept, so that \code{update()} does not read the placeholders in \code{fit$data} as
+data.
+
+\code{newdata} passed to \code{log_lik()}, \code{predict()} or \code{posterior_predict()}
+needs these columns too. Rows of \code{fit$data} have them. For raw data, set
+both to 1: a boundary reached fewer than twice or with \code{NA} summaries is
+then still left out of the likelihood. brms functions that compare the
+response with predictions, \code{predictive_error()} and
+\code{residuals(method = "posterior_predict")}, read the placeholders as data
+in cells whose \code{rt_used_upper} is 0, so leave those cells out first, for
+example with \code{newdata = subset(fit$data, rt_used_upper == 1)}.
 }
 }
 \examples{

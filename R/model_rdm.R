@@ -149,7 +149,7 @@ settable_link_functions.rdm <- function(model) {
 
 #' @title `r .model_rdm()$name`
 #' @name rdm
-#' @details `r model_info(.model_rdm())`
+#' @details `r model_docs(.model_rdm())`
 #'
 #' The fixed-parameter values above are on the log link: `s = 0` is a
 #' diffusion constant of 1, and `sp = -100` is a starting-point range of

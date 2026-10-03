@@ -87,9 +87,13 @@
       domain = "Decision Making / Response times",
       task = "Choice Reaction Time tasks (with few errors)",
       name = "Censored-Shifted Wald Model",
-      citation = "Miller, R., Scherbaum, S., Heck, D. W., Goschke, T., & Enge, S. (2017).
-        On the Relation Between the (Censored) Shifted Wald and the Wiener Distribution as Measurement Models
-        for Choice Response Times. Applied Psychological Measurement, 42(2), 116-135. https://doi.org/10.1177/0146621617710465",
+      citation = glue(
+        "Miller, R., Scherbaum, S., Heck, D. W., Goschke, T., & Enge, S. (2018). \\
+        On the relation between the (censored) shifted Wald and the Wiener \\
+        distribution as measurement models for choice response times. Applied \\
+        Psychological Measurement, 42(2), 116-135. \\
+        https://doi.org/10.1177/0146621617710465"
+      ),
       version = version,
       requirements = glue(
         "- Reaction times should be passed in seconds", "\n",
@@ -111,7 +115,7 @@
 
 #' @title `r .model_cswald()$name`
 #' @name cswald
-#' @details `r model_info(.model_cswald())`
+#' @details `r model_docs(.model_cswald())`
 #' @param rt The name of the variable in the dataset containing the response
 #'   times. Response times should be coded in seconds (not milliseconds).
 #' @param response The name of the variable in the dataset containing the
@@ -145,7 +149,7 @@
 #'       parameter represents the total boundary separation, consistent with
 #'       the diffusion model parameterization.
 #'   }
-#'   For more details, see Miller et al. (2017).
+#'   For more details, see Miller et al. (2018).
 #' @param ... Additional arguments passed internally (for testing purposes).
 #' @return An object of class `bmmodel`
 #' @export
@@ -339,7 +343,8 @@ configure_model.cswald_simple <- function(model, data, formula) {
     vars = cswald_decision_var(),
     loop = FALSE,
     log_lik = log_lik_cswald_simple,
-    posterior_predict = posterior_predict_cswald_simple
+    posterior_predict = posterior_predict_cswald_simple,
+    posterior_epred = posterior_epred_cswald
   )
 
   sc_path <- system.file("stan_chunks", package = "bmm")
@@ -376,6 +381,14 @@ posterior_predict_cswald_simple <- function(i, prep, ...) {
   }
 }
 
+# Named after the family, "cswald", rather than the version: restructure()
+# finds the function of a fit saved without one by that name. Like
+# posterior_predict_cswald_simple(), it reads bound as the distance from the
+# start point to either boundary.
+posterior_epred_cswald <- function(prep) {
+  .epred_matrix(with(prep$dpars, .diffusion_mean_rt(drift, bound * 2, ndt, zr = 0.5, s)), prep)
+}
+
 log_lik_cswald_simple <- function(i, prep) {
   drift <- brms::get_dpar(prep, "drift", i = i)
   bound <- brms::get_dpar(prep, "bound", i = i)
@@ -403,7 +416,8 @@ configure_model.cswald_crisk <- function(model, data, formula) {
     vars = cswald_decision_var(),
     loop = FALSE,
     log_lik = log_lik_cswald_crisk,
-    posterior_predict = posterior_predict_cswald_crisk
+    posterior_predict = posterior_predict_cswald_crisk,
+    posterior_epred = posterior_epred_cswald_crisk
   )
 
   sc_path <- system.file("stan_chunks", package = "bmm")
@@ -427,6 +441,10 @@ log_lik_cswald_crisk <- function(i, prep) {
   response <- rep(prep$data$dec[i], length(drift))
 
   .dcswald(rt, response, drift, bound, ndt, zr = zr, s = s, version = "crisk", log = TRUE)
+}
+
+posterior_epred_cswald_crisk <- function(prep) {
+  .epred_matrix(with(prep$dpars, .diffusion_mean_rt(drift, bound, ndt, zr, s)), prep)
 }
 
 posterior_predict_cswald_crisk <- function(i, prep, ...) {

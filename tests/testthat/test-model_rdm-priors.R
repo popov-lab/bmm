@@ -1,6 +1,6 @@
 # =============================================================================
 # Tests for rdm() default priors: ndt intercept, group-level sd rates, and
-# that both reach report_priors()/fit$prior and the generated Stan code.
+# that both reach prior_info()/fit$prior and the generated Stan code.
 # =============================================================================
 
 test_that("rdm() default ndt prior is the ddm's normal(-1.5, 0.5)", {
@@ -29,7 +29,7 @@ test_that("custom version inherits the same sd rates for its accumulator paramet
   expect_equal(model$default_priors$sp$sd, "exponential(2)")
 })
 
-test_that("a hierarchical mock fit reports the sd default priors in report_priors() and fit$prior", {
+test_that("a hierarchical mock fit reports the sd default priors in prior_info() and fit$prior", {
   skip_on_cran()
 
   withr::local_seed(1)
@@ -51,7 +51,7 @@ test_that("a hierarchical mock fit reports the sd default priors in report_prior
   expect_equal(sd_rows$prior[sd_rows$dpar == "gap"], "exponential(2)")
   expect_equal(sd_rows$prior[sd_rows$dpar == "ndt"], "exponential(4)")
 
-  out <- report_priors(fit)
+  out <- prior_info(fit)
   sd_out <- out[out$class == "sd", ]
   expect_equal(sd_out$prior[sd_out$parameter == "driftc"], "exponential(2)")
   expect_equal(sd_out$prior[sd_out$parameter == "drifte"], "exponential(2)")

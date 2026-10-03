@@ -1,16 +1,6 @@
-  // Generated, not typed. Do not edit by hand.
-  //
-  // Series of the two functions whose derivatives give the decision-time
-  // cumulants at small drift (see ezdm_cumulants.stan for how they are used):
-  //   G(x) = log(sinh(sqrt x) / sqrt x) = sum_j a_j x^j
-  //   C(y) = log cosh(sqrt y)           = sum_j a_j (4^j - 1) y^j
-  // ezdm_log_sinhc_dn is G^(n) and ezdm_log_cosh_dn is C^(n), n = 1..4, each a
-  // Horner polynomial of the 16 terms a_j j! / (j - n)!. The coefficients are
-  // formed in exact rational arithmetic and rounded once, because a wrong one
-  // makes the truncated series diverge instead of failing loudly. At x <= 0.49
-  // the truncation error is below 1e-13. The a_j are .EZDM_LOG_SINHC_COEF in
-  // R/distributions.R, and a test in tests/testthat/test-model_ezdm.R
-  // recomputes every literal below from them.
+  // Generated, do not edit by hand: a test recomputes every literal from .EZDM_LOG_SINHC_COEF
+  // ezdm_log_sinhc_dn is the n-th derivative of G(x) = log(sinh(sqrt x) / sqrt x) as a Horner series
+  // ezdm_log_cosh_dn is the n-th derivative of C(y) = log cosh(sqrt y) as a Horner series
 
   real ezdm_log_sinhc_d1(real x) {
     real acc = -1.2336844022586037e-16;

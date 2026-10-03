@@ -69,7 +69,7 @@ test_that("combine_prior() treats the classes 'cor' and 'L' as the same prior", 
   expect_equal(nrow(combine_prior(default, by_group)), 2)
 })
 
-test_that("bmm() honours bmm.default_priors = FALSE and report_priors() flags the result as flat", {
+test_that("bmm() honours bmm.default_priors = FALSE and prior_info() flags the result as flat", {
   skip_on_cran()
   withr::local_options(bmm.default_priors = FALSE)
   fit <- bmm(
@@ -77,7 +77,7 @@ test_that("bmm() honours bmm.default_priors = FALSE and report_priors() flags th
     backend = "mock", mock = 1, rename = FALSE
   )
 
-  out <- report_priors(fit)
+  out <- prior_info(fit)
   # c gets no prior at all; kappa falls back to the brms default for the
   # family, which must not be attributed to the user just because the
   # reconstruction (run with defaults forced on) expects the bmm value there
@@ -236,7 +236,7 @@ test_that("classify_priors() maps prior rows to model parameters and links", {
 })
 
 test_that("classify_priors() reports an all-flat fit as flat against non-empty defaults", {
-  # the bmm.default_priors = FALSE case at the level report_priors() sees it:
+  # the bmm.default_priors = FALSE case at the level prior_info() sees it:
   # the fit carries no priors, the reconstruction carries the bmm defaults
   fit_prior <- rbind(
     prior_row("", class = "b", nlpar = "a"),
@@ -270,25 +270,25 @@ test_that("classify_priors() is robust to schema differences across brms version
   expect_equal(res$source, "bmm default")
 })
 
-test_that("report_priors() validates its input", {
-  expect_error(report_priors(1), "bmmfit")
+test_that("prior_info() validates its input", {
+  expect_error(prior_info(1), "bmmfit")
 })
 
-test_that("report_priors() rejects fits without prior information", {
+test_that("prior_info() rejects fits without prior information", {
   skip_on_cran()
   path <- test_path("assets/mock_bmmfit_mixture2p.rds")
   skip_if_not(file.exists(path), "Mock fixture not available (excluded by .Rbuildignore)")
-  expect_error(report_priors(readRDS(path)), "no prior information")
+  expect_error(prior_info(readRDS(path)), "no prior information")
 })
 
-test_that("report_priors() handles models whose data pipeline transforms the response (m3)", {
+test_that("prior_info() handles models whose data pipeline transforms the response (m3)", {
   skip_on_cran()
   path <- test_path("assets/bmmfit_m3_ppcheck.rds")
   skip_if_not(file.exists(path), "M3 fixture not available (excluded by .Rbuildignore)")
   fit <- readRDS(path)
 
-  out <- report_priors(fit)
-  expect_s3_class(out, "bmm_report_priors")
+  out <- prior_info(fit)
+  expect_s3_class(out, "bmm_prior_info")
   # a & c: effects + intercept; d: intercept; b: fixed constant; sd: a, c, d
   expect_equal(nrow(out), 9)
   expect_setequal(out$parameter, c("a", "b", "c", "d"))
@@ -299,15 +299,15 @@ test_that("report_priors() handles models whose data pipeline transforms the res
   expect_false(any(out$source == "flat"))
 })
 
-test_that("report_priors() classifies the fixture fit correctly", {
+test_that("prior_info() classifies the fixture fit correctly", {
   skip_on_cran()
   path <- test_path("assets/bmmfit_example1.rds")
   skip_if_not(file.exists(path), "SDM fixture not available (excluded by .Rbuildignore)")
   fit <- readRDS(path)
 
-  expect_error(report_priors(fit, format = "foo"), "'arg'")
-  expect_silent(out <- report_priors(fit))
-  expect_s3_class(out, "bmm_report_priors")
+  expect_error(prior_info(fit, format = "foo"), "'arg'")
+  expect_silent(out <- prior_info(fit))
+  expect_s3_class(out, "bmm_prior_info")
   expect_s3_class(out, "data.frame")
   expect_equal(nrow(out), 3)
   expect_setequal(out$parameter, c("c", "kappa", "mu"))
@@ -333,7 +333,7 @@ test_that("printed reports annotate constants with their native-scale value", {
   skip_on_cran()
   path <- test_path("assets/bmmfit_example1.rds")
   skip_if_not(file.exists(path), "SDM fixture not available (excluded by .Rbuildignore)")
-  out <- report_priors(readRDS(path))
+  out <- prior_info(readRDS(path))
 
   # sampling-scale footnote is always present when links are non-identity
   expect_true(any(grepl("sampling scale", capture.output(print(out)), fixed = TRUE)))
@@ -348,16 +348,16 @@ test_that("printed reports annotate constants with their native-scale value", {
   expect_match(printed_text, "1 on the native scale")
 })
 
-test_that("report_priors() omits a fixed mu that is not a model parameter", {
+test_that("prior_info() omits a fixed mu that is not a model parameter", {
   skip_on_cran()
   path <- test_path("assets/bmmfit_example1.rds")
   skip_if_not(file.exists(path), "SDM fixture not available (excluded by .Rbuildignore)")
   fit <- readRDS(path)
 
-  expect_true("mu" %in% report_priors(fit)$parameter)
+  expect_true("mu" %in% prior_info(fit)$parameter)
 
   fit$bmm$model$parameters$mu <- NULL
-  out <- report_priors(fit)
+  out <- prior_info(fit)
   expect_setequal(out$parameter, c("c", "kappa"))
 })
 
@@ -378,25 +378,25 @@ test_that("drop_technical_parameters() keeps declared parameters and drops famil
   expect_equal(row.names(res), c("1", "2", "3"))
 })
 
-test_that("report_priors() omits the technical parameters of mixture families", {
+test_that("prior_info() omits the technical parameters of mixture families", {
   skip_on_cran()
   fit <- bmm(
     bmf(kappa ~ 1, thetat ~ 1), oberauer_lin_2017, mixture2p(resp_error = "dev_rad"),
     backend = "mock", mock = 1, rename = FALSE
   )
 
-  out <- report_priors(fit)
+  out <- prior_info(fit)
   # mu2/kappa2 are the second brms::mixture() component, theta2 the softmax
   # reference the sampler holds at zero; none of them is a model parameter
   expect_false(any(c("mu2", "kappa2") %in% out$parameter))
   expect_false(any(grepl("^theta[0-9]+$", out$class)))
   expect_setequal(out$parameter, c("kappa", "thetat", "mu1"))
 
-  text <- paste(capture.output(print(report_priors(fit, format = "text"))), collapse = " ")
+  text <- paste(capture.output(print(prior_info(fit, format = "text"))), collapse = " ")
   expect_false(grepl("kappa2|mu2|theta2", text))
 })
 
-test_that("report_priors() omits the forced mu of a response-time custom family", {
+test_that("prior_info() omits the forced mu of a response-time custom family", {
   skip_on_cran()
   # few errors: the simple version warns above a 20% error rate
   dat <- data.frame(
@@ -410,19 +410,19 @@ test_that("report_priors() omits the forced mu of a response-time custom family"
     backend = "mock", mock = 1, rename = FALSE
   )
 
-  out <- report_priors(fit)
+  out <- prior_info(fit)
   expect_false("mu" %in% out$parameter)
   expect_true(all(c("drift", "bound", "ndt") %in% out$parameter))
 })
 
-test_that("report_priors() collapses group-level effects into a single sd row", {
+test_that("prior_info() collapses group-level effects into a single sd row", {
   skip_on_cran()
   fit <- bmm(
     bmf(c ~ 1 + (1 | ID), kappa ~ 1), oberauer_lin_2017, sdm(resp_error = "dev_rad"),
     backend = "mock", mock = 1, rename = FALSE
   )
 
-  out <- report_priors(fit)
+  out <- prior_info(fit)
   sd_rows <- out[out$class == "sd", ]
   # one blanket sd prior is applied at the class level; the per-group and
   # per-coefficient rows below it are empty and inherit from it, so the report
@@ -464,12 +464,12 @@ test_that("as_prior_table() maps every correlation class brms stores internally"
   expect_equal(as_prior_table(prior_row("exponential(1)", class = "sd"))$class, "sd")
 })
 
-test_that("report_priors() attributes the correlation prior to bmm", {
+test_that("prior_info() attributes the correlation prior to bmm", {
   formula <- bmf(kappa ~ set_size + (set_size | ID), thetat ~ 1)
   fit <- bmm(formula, oberauer_lin_2017, mixture2p("dev_rad"),
     backend = "mock", mock_fit = 1, rename = FALSE
   )
-  cor_row <- report_priors(fit)[report_priors(fit)$class == "cor", ]
+  cor_row <- prior_info(fit)[prior_info(fit)$class == "cor", ]
   expect_equal(nrow(cor_row), 1)
   expect_equal(cor_row$prior, "lkj(2)")
   expect_equal(cor_row$source, "bmm default")
@@ -478,12 +478,12 @@ test_that("report_priors() attributes the correlation prior to bmm", {
     prior = brms::prior_("lkj(4)", class = "cor"),
     backend = "mock", mock_fit = 1, rename = FALSE
   )
-  cor_row <- report_priors(fit)[report_priors(fit)$class == "cor", ]
+  cor_row <- prior_info(fit)[prior_info(fit)$class == "cor", ]
   expect_equal(cor_row$prior, "lkj(4)")
   expect_equal(cor_row$source, "user")
 })
 
-test_that("report_priors() reconstructs the defaults of a fit that needs data2", {
+test_that("prior_info() reconstructs the defaults of a fit that needs data2", {
   dat <- oberauer_lin_2017
   ids <- levels(factor(dat$ID))
   A <- diag(length(ids))
@@ -492,28 +492,50 @@ test_that("report_priors() reconstructs the defaults of a fit that needs data2",
   fit <- bmm(formula, dat, mixture2p("dev_rad"),
     data2 = list(A = A), backend = "mock", mock_fit = 1, rename = FALSE
   )
-  report <- report_priors(fit)
+  report <- prior_info(fit)
   expect_equal(report$source[report$class == "sd"], "bmm default")
+})
+
+test_that("prior_info() still reports a fit whose stored frame fails check_data()", {
+  fit <- suppressWarnings(suppressMessages(bmm(
+    bmf(kappa ~ 1, thetat ~ 1), oberauer_lin_2017[oberauer_lin_2017$ID %in% 1:2, ],
+    mixture2p("dev_rad"), backend = "mock", mock_fit = 1, rename = FALSE
+  )))
+  # which stored frames fail the check changes as update() learns to rebuild
+  # them, so the failure is forced rather than taken from one model
+  local_mocked_bindings(check_stored_data = function(...) stop2("frame not rebuilt"))
+  expect_warning(prior_info(fit), "could not be checked again")
+})
+
+test_that("prior_info() re-checks a fit whose largest set size has no response (#459)", {
+  lin <- oberauer_lin_2017[oberauer_lin_2017$ID %in% 1:2, ]
+  lin$dev_rad[lin$set_size == "8"] <- NA
+  fit <- suppressWarnings(suppressMessages(bmm(
+    bmf(kappa ~ 1, thetat ~ 1, thetant ~ 1), lin,
+    mixture3p("dev_rad", nt_features = paste0("col_nt", 1:7), set_size = "set_size"),
+    backend = "mock", mock_fit = 1, rename = FALSE
+  )))
+  expect_no_warning(prior_info(fit))
 })
 
 test_that("subsetting a report returns a plain data.frame that still prints", {
   skip_on_cran()
   path <- test_path("assets/bmmfit_example1.rds")
   skip_if_not(file.exists(path), "SDM fixture not available (excluded by .Rbuildignore)")
-  out <- report_priors(readRDS(path))
+  out <- prior_info(readRDS(path))
 
   sub <- out[, c("parameter", "prior", "source")]
   expect_s3_class(sub, "data.frame")
-  expect_false(inherits(sub, "bmm_report_priors"))
+  expect_false(inherits(sub, "bmm_prior_info"))
   expect_silent(printed <- capture.output(print(sub)))
   expect_true(any(grepl("bmm default", printed, fixed = TRUE)))
 
   # row subsetting drops the class too, so the report printer never sees a
   # table missing the columns it reads
-  expect_false(inherits(out[1, ], "bmm_report_priors"))
+  expect_false(inherits(out[1, ], "bmm_prior_info"))
 })
 
-test_that("report_priors() detects user-modified priors without refitting", {
+test_that("prior_info() detects user-modified priors without refitting", {
   skip_on_cran()
   path <- test_path("assets/bmmfit_example1.rds")
   skip_if_not(file.exists(path), "SDM fixture not available (excluded by .Rbuildignore)")
@@ -521,24 +543,24 @@ test_that("report_priors() detects user-modified priors without refitting", {
 
   kappa_row <- fit$prior$dpar == "kappa" & fit$prior$class == "Intercept"
   fit$prior$prior[kappa_row] <- "normal(0, 1)"
-  out <- report_priors(fit)
+  out <- prior_info(fit)
   expect_equal(out$source[out$parameter == "kappa"], "user")
   expect_true(all(out$source[out$parameter != "kappa"] == "bmm default"))
 })
 
-test_that("print.bmm_report_priors() renders table and text formats", {
+test_that("print.bmm_prior_info() renders table and text formats", {
   skip_on_cran()
   path <- test_path("assets/bmmfit_example1.rds")
   skip_if_not(file.exists(path), "SDM fixture not available (excluded by .Rbuildignore)")
   fit <- readRDS(path)
 
-  out <- report_priors(fit)
+  out <- prior_info(fit)
   printed <- capture.output(print(out))
   expect_true(any(grepl("bmm default", printed, fixed = TRUE)))
   expect_true(any(grepl("tan_half", printed, fixed = TRUE)))
   expect_false(any(grepl("coef", printed, fixed = TRUE)))
 
-  text_out <- report_priors(fit, format = "text")
+  text_out <- prior_info(fit, format = "text")
   printed_text <- capture.output(print(text_out))
   expect_true(any(grepl("log link", printed_text, fixed = TRUE)))
   expect_true(any(grepl("fixed to 0", printed_text, fixed = TRUE)))

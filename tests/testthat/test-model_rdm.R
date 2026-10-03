@@ -81,7 +81,7 @@ test_that("rdm refuses a link target it does not have", {
   expect_equal(model$links$target, "log")
 })
 
-test_that("report_priors() does not report the technical mu of the rdm family", {
+test_that("prior_info() does not report the technical mu of the rdm family", {
   skip_on_cran()
 
   dat <- rrdm(n = 100, drift = c(3, 1.5), gap = 1, ndt = 0.2)
@@ -91,7 +91,7 @@ test_that("report_priors() does not report the technical mu of the rdm family", 
     backend = "mock", mock_fit = 1, rename = FALSE
   )
 
-  out <- report_priors(fit)
+  out <- prior_info(fit)
   expect_false("mu" %in% out$parameter)
   expect_true(all(c("driftc", "drifte", "gap", "ndt") %in% out$parameter))
 })

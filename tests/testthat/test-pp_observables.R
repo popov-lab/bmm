@@ -194,6 +194,31 @@ test_that("pp_simulate.ezdm_4par() emits NA where a boundary has < 2 responses",
   expect_identical(is.na(sims$mean_rt_lower), (3L - sims$n_upper) < 2)
 })
 
+# the placeholders check_data() writes into an unused boundary are finite, so
+# the checks read the indicator to leave them out (#430)
+test_that("the 4par RT checks are undefined where the boundary is unused", {
+  spec <- pp_observables(ezdm(
+    mean_rt = c("mu", "ml"), var_rt = c("vu", "vl"), n_upper = "nu",
+    n_trials = "nt", version = "4par"
+  ))
+  expect_identical(
+    unname(spec$observed[c("rt_used_upper", "rt_used_lower")]),
+    c("vint3", "vint4")
+  )
+
+  d <- list(
+    mean_rt_upper = c(0.5, -1, 0.6), mean_rt_lower = c(-1, 0.7, 0.8),
+    var_rt_upper = c(0.02, -1, 0.03), var_rt_lower = c(-1, 0.04, 0.05),
+    n_upper = c(20, 1, 10), n_trials = c(20, 20, 20),
+    rt_used_upper = c(1L, 0L, 1L), rt_used_lower = c(0L, 1L, 1L)
+  )
+  expect_equal(spec$checks$mean_rt_upper$compute(d), c(0.5, NA, 0.6))
+  expect_equal(spec$checks$var_rt_upper$compute(d), c(0.02, NA, 0.03))
+  expect_equal(spec$checks$mean_rt_lower$compute(d), c(NA, 0.7, 0.8))
+  expect_equal(spec$checks$var_rt_lower$compute(d), c(NA, 0.04, 0.05))
+  expect_equal(spec$checks$mean_pc$compute(d), d$n_upper / d$n_trials)
+})
+
 two_checks <- list(
   a = .pp_observable(function(d) d$a, label = "A"),
   b = .pp_observable(function(d) d$b, label = "B")
@@ -314,6 +339,56 @@ test_that(".pp_resolve_type() resolves the check's default and validates it", {
   expect_error(.pp_resolve_type("loo_pit", check, NULL), "not a supported")
   expect_warning(resolved <- .pp_resolve_type("hist", NULL, NULL), "ignored")
   expect_null(resolved)
+})
+
+test_that(".pp_resolve_type() resolves bmm's bars_binned type and its grouped variant", {
+  check <- .pp_observable(function(d) d$x, label = "X", type = "bars_binned")
+  expect_identical(.pp_resolve_type(NULL, check, NULL), "bars_binned")
+  expect_identical(.pp_resolve_type(NULL, check, "cond"), "bars_binned_grouped")
+  expect_error(.pp_resolve_type(1, check, NULL), "not a supported")
+})
+
+test_that(".ppc_bars_binned() counts observations per bin on the statistic's scale", {
+  y <- c(0.1, 0.25, 0.3, 0.6, 1)
+  p <- .ppc_bars_binned(y, rbind(y, y, y), breaks = c(0, 0.25, 0.5, 0.75, 1))
+  expect_equal(p$data$x, c(0.125, 0.375, 0.625, 0.875))
+  expect_equal(p$data$y_obs, c(1, 2, 1, 1))
+  expect_equal(unname(p$data$m), p$data$y_obs)
+  expect_no_error(ggplot2::ggplot_build(p))
+})
+
+test_that(".ppc_bars_binned() gives predicted values outside the observed range a bin", {
+  y <- c(0.6, 0.7, 0.7)
+  yrep <- rbind(c(0.1, 0.7, 0.7), c(0.1, 0.6, 0.7))
+  p <- .ppc_bars_binned(y, yrep)
+  low <- p$data[p$data$lower <= 0.1 & p$data$upper > 0.1, ]
+  expect_equal(nrow(low), 1L)
+  expect_equal(low$y_obs, 0)
+  expect_equal(unname(low$m), 1)
+})
+
+test_that(".ppc_bars_binned() plots a statistic without spread", {
+  p <- .ppc_bars_binned(rep(1, 4), matrix(1, nrow = 3, ncol = 4))
+  expect_equal(p$data$y_obs, 4)
+  expect_no_error(ggplot2::ggplot_build(p))
+})
+
+test_that(".ppc_bars_binned() rejects breaks that do not cover the values", {
+  y <- c(0.1, 0.6)
+  expect_error(.ppc_bars_binned(y, rbind(y), breaks = c(0.2, 0.5, 1)),
+               "must cover")
+})
+
+test_that(".ppc_bars_binned_grouped() counts per group and facets", {
+  y <- c(0.1, 0.2, 0.6, 0.9)
+  p <- .ppc_bars_binned_grouped(y, rbind(y, y), group = c("a", "a", "b", "b"),
+                                breaks = c(0, 0.5, 1))
+  expect_s3_class(p$facet, "FacetWrap")
+  counts <- p$data[p$data$y_obs > 0, ]
+  expect_equal(as.character(counts$group), c("a", "b"))
+  expect_equal(counts$x, c(0.25, 0.75))
+  expect_equal(counts$y_obs, c(2, 2))
+  expect_no_error(ggplot2::ggplot_build(p))
 })
 
 # the fake fit carries no draws, so prepare_predictions() would fail: reaching
