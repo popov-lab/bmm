@@ -89,9 +89,12 @@
       domain = "Decision Making / Response times",
       task = "Choice Reaction Time tasks (multi-alternative)",
       name = "Log-Normal Race Model",
-      citation = "Rouder, J. N., Province, J. M., Morey, R. D., Gomez, P., & Heathcote, A. (2015).
-        The Lognormal Race: A Cognitive-Process Model of Choice and Latency with Desirable
-        Psychometric Properties. Psychometrika, 80(2), 491-513. https://doi.org/10.1007/s11336-013-9396-3",
+      citation = glue(
+        "Rouder, J. N., Province, J. M., Morey, R. D., Gomez, P., & Heathcote, A. \\
+        (2015). The Lognormal Race: A Cognitive-Process Model of Choice and \\
+        Latency with Desirable Psychometric Properties. Psychometrika, 80(2), \\
+        491-513. https://doi.org/10.1007/s11336-013-9396-3"
+      ),
       version = version,
       requirements = glue(
         "- Reaction times should be passed in seconds", "\n",
@@ -228,8 +231,8 @@ settable_links.lnr <- function(model) {
 #'
 #' # custom version with named categories
 #' model2 <- lnr(rt = "rt", response = "resp", version = "custom",
-#'               accumulators = c(target = 1, similar = 3, other = 5))
-#' formula2 <- bmf(target ~ 1, similar ~ 1, other ~ 1, ndt ~ 1)
+#'               accumulators = c(correct = 1, similar = 3, other = 5))
+#' formula2 <- bmf(correct ~ 1, similar ~ 1, other ~ 1, ndt ~ 1)
 lnr <- function(rt, response, n_choices = NULL,
                 version = c("simple", "custom"),
                 accumulators = NULL, links = NULL, ...) {
