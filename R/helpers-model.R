@@ -747,13 +747,16 @@ model_names <- function() {
 #'   removed in bmm 1.6.0. It shares its name with `insight::supported_models()`,
 #'   which the **parameters** package re-exports, so whichever package is
 #'   attached last decides what `supported_models()` returns. Use
-#'   [bmm_models()] instead.
+#'   [bmm_models()] instead, with or without `print_call = FALSE`; wrap it in
+#'   `as.character()` if you need a plain character vector.
 #'
 #' @param print_call Logical. If `TRUE` (default), returns the output of
 #'   [bmm_models()], which prints the models grouped by task. If `FALSE`,
 #'   returns the model names as a plain character vector.
-#' @return The output of [bmm_models()], or the model names if `print_call =
-#'   FALSE`.
+#' @return The output of [bmm_models()], or the model names as a plain
+#'   character vector if `print_call = FALSE`. Before bmm 1.4.0 the default
+#'   returned the printed list as one string; use
+#'   `capture.output(print(bmm_models()))` for that text, one line per element.
 #' @keywords internal
 #' @export
 supported_models <- function(print_call = TRUE) {

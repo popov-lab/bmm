@@ -6,7 +6,7 @@ test_that("bmm_models() returns the model names as a character vector", {
   expect_true("imm" %in% models)
 })
 
-test_that("supported_models() is deprecated and returns what it did before", {
+test_that("supported_models() is deprecated and returns bmm_models() or the plain names", {
   expect_warning(out <- supported_models(), "deprecated.*bmm_models\\(\\)")
   expect_identical(out, bmm_models())
   expect_warning(out <- supported_models(print_call = FALSE), "deprecated")
