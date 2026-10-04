@@ -137,7 +137,8 @@
       name = "Three-parameter mixture model by Bays et al (2009).",
       citation = c(
         .mixture3p_citation,
-        if (version != "simple") .mixture3p_capacity_citation
+        if (version != "simple") .mixture3p_capacity_citation,
+        if (variable_precision) .circmix_vp_citation
       ),
       version = version,
       requirements = glue(

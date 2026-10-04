@@ -106,14 +106,7 @@
           representations in visual working memory. Nature, 453(7192), 233-235. \\
           https://doi.org/10.1038/nature06860"
         ),
-        if (variable_precision) {
-          glue(
-            "van den Berg, R., Shin, H., Chou, W.-C., George, R., & Ma, W. J. \\
-            (2012). Variability in encoding precision accounts for visual \\
-            short-term memory limitations. Proceedings of the National Academy \\
-            of Sciences, 109(22), 8780-8785. https://doi.org/10.1073/pnas.1117465109"
-          )
-        }
+        if (variable_precision) .circmix_vp_citation
       ),
       version = version,
       requirements = glue(

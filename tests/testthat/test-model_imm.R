@@ -148,6 +148,18 @@ test_that("a formula naming mu1 still fits, with a warning", {
     "'mu1' were renamed to 'mu'"
   )
   expect_true("mu" %in% names(fit$formula$pforms))
+  # mu is fixed to 0 unless a formula frees it, so a default intercept prior
+  # on the location shows that the mu1 formula reached it
+  mu_rows <- fit$prior[fit$prior$class == "Intercept" & fit$prior$dpar == "", ]
+  expect_equal(mu_rows$prior, "normal(0, 0.5)")
+  expect_false("mu" %in% names(fit$bmm$model$fixed_parameters))
+})
+
+test_that("imm cites van den Berg et al. only with variable precision", {
+  expect_length(model_citation(imm_model()), 1)
+  vp <- model_citation(imm_model(variable_precision = TRUE))
+  expect_length(vp, 2)
+  expect_identical(vp[2], model_citation(mixture2p("y", variable_precision = TRUE))[2])
 })
 
 test_that("each imm family refuses the expected response under its own name", {

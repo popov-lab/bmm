@@ -284,6 +284,13 @@
 # MODEL SPECIFICATION                                                    ####
 ############################################################################# !
 
+.circmix_vp_citation <- glue(
+  "van den Berg, R., Shin, H., Chou, W.-C., George, R., & Ma, W. J. \\
+  (2012). Variability in encoding precision accounts for visual \\
+  short-term memory limitations. Proceedings of the National Academy \\
+  of Sciences, 109(22), 8780-8785. https://doi.org/10.1073/pnas.1117465109"
+)
+
 # tau means the same in every model that offers variable precision, so it is
 # defined once and inserted next to the kappa it modifies.
 .circmix_add_variable_precision <- function(spec) {

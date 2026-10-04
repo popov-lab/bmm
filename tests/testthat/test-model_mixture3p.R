@@ -196,9 +196,12 @@ test_that("every version's family refuses the expected response by name", {
   }
 })
 
-test_that("the capacity versions also cite the slot model", {
+test_that("the capacity versions cite the slot model, variable precision its source", {
   expect_length(model_citation(nt_model()), 1)
   expect_match(model_citation(nt_model(version = "slot"))[2], "Zhang, W., & Luck")
+  vp <- model_citation(nt_model(version = "slot", variable_precision = TRUE))
+  expect_length(vp, 3)
+  expect_identical(vp[3], model_citation(mixture2p("y", variable_precision = TRUE))[2])
 })
 
 test_that("a formula for mu1 still reaches mu, with a warning", {
@@ -212,6 +215,7 @@ test_that("a formula for mu1 still reaches mu, with a warning", {
   # on the location shows that the mu1 formula reached it
   mu_rows <- fit$prior[fit$prior$class == "Intercept" & fit$prior$dpar == "", ]
   expect_equal(mu_rows$prior, "normal(0, 0.5)")
+  expect_false("mu" %in% names(fit$bmm$model$fixed_parameters))
 })
 
 test_that("the Stan and R likelihoods agree for every version", {
