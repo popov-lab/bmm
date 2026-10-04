@@ -672,6 +672,103 @@ rmixture3p <- function(n, mu = c(0, 2, -1.5), kappa = 5, p_mem = 0.6, p_nt = 0.2
   )
 }
 
+#' @title Distribution functions for the three-parameter mixture model for
+#'   change detection (mixture3p_cd)
+#'
+#' @description Probability mass and random generation of "same" (0) and
+#'   "change" (1) responses under the three-parameter mixture model for
+#'   single-probe change detection. The observer retrieves a feature from the
+#'   retrieval mixture of [dmixture3p()] and says "change" when the
+#'   log-likelihood ratio of a change against no change exceeds `criterion`
+#'   (Lin & Oberauer, 2022).
+#'
+#' @name mixture3p_cd_dist
+#'
+#' @param response Vector of responses, 0 for "same" and 1 for "change"
+#' @param n Number of observations to generate data for
+#' @param probe Vector of probe features in radians, in the same frame as `mu`
+#' @param mu Vector of locations. The first value is the location of the
+#'   target item and any further values are the locations of the non-target
+#'   items.
+#' @param kappa Vector of precision values
+#' @param p_mem Vector of probabilities of retrieving the target
+#' @param p_nt Vector of probabilities of retrieving a non-target
+#' @param criterion Vector of decision criteria. 0 is an unbiased observer;
+#'   larger values make "change" responses less likely.
+#' @param tau Vector of scales for trial-to-trial variability in precision. See
+#'   [dmixture3p()].
+#' @param knowledge What the observer knows about the precision of the current
+#'   trial, `"limited"` (default) or `"rich"`. See [mixture3p_cd()].
+#' @param vp_nodes Number of quadrature nodes used when `tau > 0`; must be an
+#'   odd number of at least 41. See [mixture2p()].
+#' @param log Logical; if `TRUE`, values are returned on the log scale.
+#'
+#' @keywords distribution
+#'
+#' @references Lin, H.-Y., & Oberauer, K. (2022). An interference model for
+#'   visual working memory: Applications to the change detection task.
+#'   Cognitive Psychology, 133, 101463.
+#'
+#' @return `dmixture3p_cd` gives the probability of each response and
+#'   `rmixture3p_cd` gives random responses (0 or 1).
+#'
+#' @export
+#'
+#' @examples
+#' # P("change") for a probe at the target, at a non-target and far from both
+#' dmixture3p_cd(1, probe = c(0, 2, -1), mu = c(0, 2, -2.5), kappa = 8,
+#'   p_mem = 0.7, p_nt = 0.1)
+#' mean(rmixture3p_cd(1000, probe = 2, mu = c(0, 2, -2.5), kappa = 8,
+#'   p_mem = 0.7, p_nt = 0.1))
+dmixture3p_cd <- function(response, probe, mu = c(0, 2, -1.5), kappa = 5,
+                          p_mem = 0.6, p_nt = 0.2, criterion = 0, tau = 0,
+                          knowledge = c("limited", "rich"), vp_nodes = 41L,
+                          log = FALSE) {
+  .check_mixture3p_args(kappa, p_mem, p_nt, tau)
+  knowledge <- match.arg(knowledge)
+  stopif(
+    !all(response %in% c(0, 1)),
+    "response must be coded 0 ('same') or 1 ('change')."
+  )
+  n <- max(length(response), length(probe))
+  density <- .cd_bernoulli_ld(
+    rep_len(response, n),
+    .mixture3p_cd_marginal_psame(
+      probe, mu, kappa, p_mem, p_nt, criterion, tau, knowledge, vp_nodes, n
+    )
+  )
+  if (!log) {
+    return(exp(density))
+  }
+  density
+}
+
+#' @rdname mixture3p_cd_dist
+#' @export
+rmixture3p_cd <- function(n, probe, mu = c(0, 2, -1.5), kappa = 5, p_mem = 0.6,
+                          p_nt = 0.2, criterion = 0, tau = 0,
+                          knowledge = c("limited", "rich"), vp_nodes = 41L) {
+  .check_mixture3p_args(kappa, p_mem, p_nt, tau)
+  knowledge <- match.arg(knowledge)
+  p_same <- .mixture3p_cd_marginal_psame(
+    probe, mu, kappa, p_mem, p_nt, criterion, tau, knowledge, vp_nodes, n
+  )
+  stats::rbinom(n, 1, 1 - p_same)
+}
+
+# the observer's prior that the probed item is stored is the target's
+# retrieval weight, p_mem
+.mixture3p_cd_marginal_psame <- function(probe, mu, kappa, p_mem, p_nt,
+                                         criterion, tau, knowledge, vp_nodes, n) {
+  set_size <- length(mu)
+  weights <- .mixture3p_marginal_weights(p_mem, p_nt, set_size, n)
+  .circmix_cd_vp_psame(
+    rep_len(probe, n) - .circmix_locations(rep_len(mu[1], n), mu[-1], set_size),
+    weights$logw, weights$logw_guess, rep_len(kappa, n), rep_len(tau, n),
+    rep_len(criterion, n), exp(weights$logw[, 1]), knowledge == "rich", vp_nodes
+  )
+}
+
 #' @title Distribution functions for the Interference Measurement Model (IMM)
 #'
 #' @description Density, distribution, and random generation functions for the

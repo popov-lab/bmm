@@ -456,6 +456,23 @@ test_that("every model ships an sd default on the link scale of each parameter",
   )
   expect_equal(sd_default(pr, "tau"), "exponential(2)")
 
+  cd_data <- transform(data, change = as.integer(dev_rad > 0), probe = dev_rad, target = 0)
+  for (version in c("simple", "slot")) {
+    weights <- if (version == "simple") c("thetat", "thetant") else c("K", "pnt")
+    pr <- default_prior(
+      bmf(kappa ~ 1 + (1 | ID), tau ~ 1 + (1 | ID), criterion ~ 1 + (1 | ID)) +
+        do.call(bmf, lapply(weights, function(w) stats::as.formula(paste(w, "~ 1 + (1 | ID)")))),
+      cd_data,
+      mixture3p_cd("change", "probe", "target", nt_features = paste0("col_nt", 1:7),
+        set_size = "set_size", version = version, variable_precision = TRUE
+      )
+    )
+    rates <- c(kappa = 1, tau = 2, criterion = 2, thetat = 1, thetant = 1, K = 2, pnt = 1)
+    for (par in c("kappa", "tau", "criterion", weights)) {
+      expect_equal(sd_default(pr, par), paste0("exponential(", rates[[par]], ")"))
+    }
+  }
+
   pr <- default_prior(
     bmf(kappa ~ 1 + (1 | ID), a ~ 1 + (1 | ID), c ~ 1 + (1 | ID), s ~ 1 + (1 | ID)), data,
     imm("dev_rad", nt_features = paste0("col_nt", 1:7), nt_distances = paste0("dist_nt", 1:7), set_size = "set_size")

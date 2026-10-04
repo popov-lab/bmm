@@ -590,6 +590,13 @@ data_column_roles <- list(
     nt_features = "non-target features relative to the target, in radians, one column per non-target",
     set_size = "set size (a column, or one number)"
   ),
+  mixture3p_cd = c(
+    response = "change-detection response, 0 = 'same' and 1 = 'change'",
+    probe = "probe feature, in radians",
+    target = "feature shown at the probed location, in radians",
+    nt_features = "non-target features relative to the target, in radians, one column per non-target",
+    set_size = "set size (a column, or one number)"
+  ),
   sdm = c(
     resp_error = "response error relative to the target, in radians"
   ),

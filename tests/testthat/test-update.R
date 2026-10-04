@@ -474,6 +474,18 @@ stored_frame_cases <- function() {
       model = mixture3p("dev_rad", nt_features = nt_features, set_size = "set_size"),
       formula = bmf(kappa ~ 1, thetat ~ 1, thetant ~ 0 + set_size), data = lin_2017
     ),
+    mixture3p_cd = list(
+      model = mixture3p_cd("change", "probe", "target", nt_features = nt_features, set_size = "set_size"),
+      formula = bmf(kappa ~ 1, thetat ~ 1, thetant ~ 1),
+      data = transform(lin_2017, change = as.integer(dev_rad > 0), probe = col_nt1, target = 0.3)
+    ),
+    mixture3p_cd_slot_averaging = list(
+      model = mixture3p_cd("change", "probe", "target",
+        nt_features = nt_features, set_size = "set_size", version = "slot_averaging"
+      ),
+      formula = bmf(kappa ~ 1, K ~ 1, pnt ~ 1, criterion ~ 1),
+      data = transform(lin_2017, change = as.integer(dev_rad > 0), probe = dev_rad, target = col_nt2)
+    ),
     sdm = list(
       model = sdm("dev_rad"), formula = bmf(c ~ 1, kappa ~ 1),
       data = lin_2017

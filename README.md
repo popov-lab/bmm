@@ -75,6 +75,8 @@ started](https://popov-lab.github.io/bmm/articles/bmm.html#detection-recognition
 page has a table of the response formats and the noise distributions
 each model offers.
 
+- [`mixture3p_cd()`](https://popov-lab.github.io/bmm/reference/mixture3p_cd.html):
+  Three-parameter mixture model for change detection
 - [`sdt_cdp()`](https://popov-lab.github.io/bmm/reference/sdt_cdp.html):
   Continuous Dual-Process Signal Detection Theory (CDP)
 - [`sdt_mafc()`](https://popov-lab.github.io/bmm/reference/sdt_mafc.html):
