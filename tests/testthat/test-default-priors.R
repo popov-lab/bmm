@@ -435,6 +435,17 @@ sd_default <- function(pr, par) {
 test_that("every model ships an sd default on the link scale of each parameter", {
   data <- oberauer_lin_2017
 
+  cd_data <- transform(data, probe = dev_rad, change = rep(0:1, length.out = nrow(data)))
+  pr <- default_prior(
+    bmf(kappa ~ 1 + (1 | ID), tau ~ 1 + (1 | ID), K ~ 1 + (1 | ID), criterion ~ 1 + (1 | ID)),
+    cd_data,
+    mixture2p_cd("change", "probe", "dev_rad", set_size = "set_size", version = "slot",
+      variable_precision = TRUE
+    )
+  )
+  expect_equal(sd_default(pr, "kappa"), "exponential(1)")
+  for (par in c("tau", "K", "criterion")) expect_equal(sd_default(pr, par), "exponential(2)")
+
   pr <- default_prior(
     bmf(kappa ~ 1 + (1 | ID), thetat ~ 1 + (1 | ID), thetant ~ 1 + (1 | ID)), data,
     mixture3p("dev_rad", nt_features = paste0("col_nt", 1:7), set_size = "set_size")

@@ -338,6 +338,17 @@ revert_check_data.change_detection <- function(model, data) {
 
 #' @exportS3Method
 revert_check_data.mixture2p <- function(model, data) {
+  data <- .mixture2p_revert_set_size(model, data)
+  NextMethod("revert_check_data")
+}
+
+#' @exportS3Method
+revert_check_data.mixture2p_cd <- function(model, data) {
+  data <- .mixture2p_revert_set_size(model, data)
+  NextMethod("revert_check_data")
+}
+
+.mixture2p_revert_set_size <- function(model, data) {
   set_size <- model$other_vars$set_size
   # brms keeps the set_size column only when a formula predicts something with
   # it; ss_numeric is check_data()'s numeric copy, kept for the vint() term
@@ -346,7 +357,7 @@ revert_check_data.mixture2p <- function(model, data) {
     data[[set_size]] <- data$ss_numeric
     attr(data, "rebuilt") <- c(attr(data, "rebuilt"), set_size)
   }
-  NextMethod("revert_check_data")
+  data
 }
 
 #' @exportS3Method

@@ -585,6 +585,23 @@ data_column_roles <- list(
     resp_error = "response error relative to the target, in radians",
     set_size = "set size (a column, or one number)"
   ),
+  mixture2p_cd = c(
+    response = "0 = 'same', 1 = 'change'",
+    probe = "probed feature, in radians",
+    target = "feature shown at the probed location, in radians"
+  ),
+  mixture2p_cd_slot = c(
+    response = "0 = 'same', 1 = 'change'",
+    probe = "probed feature, in radians",
+    target = "feature shown at the probed location, in radians",
+    set_size = "set size (a column, or one number)"
+  ),
+  mixture2p_cd_slot_averaging = c(
+    response = "0 = 'same', 1 = 'change'",
+    probe = "probed feature, in radians",
+    target = "feature shown at the probed location, in radians",
+    set_size = "set size (a column, or one number)"
+  ),
   mixture3p = c(
     resp_error = "response error relative to the target, in radians",
     nt_features = "non-target features relative to the target, in radians, one column per non-target",

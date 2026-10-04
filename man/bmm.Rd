@@ -137,6 +137,7 @@ Categorical recall and n-AFC decisions
 
 Detection, recognition and confidence judgments
 \itemize{
+\item mixture2p_cd(): Two-parameter mixture model for single-probe change detection
 \item sdt_cdp(): Continuous Dual-Process Signal Detection Theory (CDP)
 \item sdt_mafc(): Signal Detection Theory (m-AFC)
 \item sdt_ranking(): Signal Detection Theory (Ranking)

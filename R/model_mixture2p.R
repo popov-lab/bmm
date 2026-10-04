@@ -237,8 +237,14 @@ mixture2p <- function(resp_error, set_size = NULL,
 
 #' @export
 check_data.mixture2p <- function(model, data, formula) {
+  data <- .mixture2p_check_set_size(model, data)
+  NextMethod("check_data")
+}
+
+# shared with mixture2p_cd, whose capacity versions read the set size the same way
+.mixture2p_check_set_size <- function(model, data) {
   if (!.mixture2p_version_table[[model$version]]$needs_set_size) {
-    return(NextMethod("check_data"))
+    return(data)
   }
 
   ss <- check_var_set_size(model$other_vars$set_size, data)
@@ -249,8 +255,7 @@ check_data.mixture2p <- function(model, data, formula) {
   )
   data$ss_numeric <- ss$ss_numeric
   attr(data, "max_set_size") <- ss$max_set_size
-
-  NextMethod("check_data")
+  data
 }
 
 ############################################################################# !

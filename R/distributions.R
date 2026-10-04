@@ -466,6 +466,117 @@ rmixture2p <- function(n, mu = 0, kappa = 5, p_mem = 0.6, tau = 0, K = 3,
   )
 }
 
+#' @title Distribution functions for the two-parameter mixture model of change
+#'   detection (mixture2p_cd)
+#'
+#' @description Probability mass and random generation for single-probe change
+#'   detection when memory is the two-parameter mixture model: the observer
+#'   retrieves a feature from [mixture2p_dist] and compares it with the probe,
+#'   following the decision rule of Lin and Oberauer (2022).
+#'
+#' @name mixture2p_cd_dist
+#'
+#' @param response Vector of responses, 0 = "same" and 1 = "change"
+#' @param n Number of observations to generate data for
+#' @param probe Vector of probes in radians, relative to the target (probe
+#'   minus target)
+#' @inheritParams mixture2p_dist
+#' @param criterion Vector of decision criteria. "Change" is the response when
+#'   the log-likelihood ratio of a change against no change exceeds
+#'   `criterion`; 0, the default, is the unbiased observer.
+#' @param knowledge `"limited"` (default) or `"rich"`: whether the observer
+#'   knows only the distribution of precision or the precision of the current
+#'   trial. Matters only when precision varies. See [mixture2p_cd()].
+#' @param log Logical; if `TRUE`, values are returned on the log scale.
+#'
+#' @details "Change" is the response when the retrieved feature falls outside
+#'   an arc around the probe, whose half-width follows from `kappa` and
+#'   `criterion` (Lin & Oberauer, 2022, Appendix B). The probability of "same"
+#'   is the retrieval mass inside that arc.
+#'
+#' @keywords distribution
+#'
+#' @references Lin, H.-Y., & Oberauer, K. (2022). An interference model for
+#'   visual working memory: Applications to the change detection task.
+#'   Cognitive Psychology, 133, 101463.
+#'
+#' @return `dmixture2p_cd` gives the probability (mass) of each response, and
+#'   `rmixture2p_cd` random responses coded 0 ("same") and 1 ("change").
+#'
+#' @export
+#'
+#' @examples
+#' # P("change") grows with the distance of the probe from the target
+#' probe <- seq(0, pi, length.out = 50)
+#' plot(probe, dmixture2p_cd(1, probe, kappa = 8, p_mem = 0.8), type = "l",
+#'      ylab = "P(change)")
+#' mean(rmixture2p_cd(1000, probe = 0, kappa = 8, p_mem = 0.8))
+dmixture2p_cd <- function(response, probe, mu = 0, kappa = 5, p_mem = 0.6,
+                          criterion = 0, tau = 0, K = 3, set_size = 1,
+                          version = "simple", knowledge = "limited",
+                          vp_nodes = 41L, log = FALSE) {
+  version <- match.arg(version, names(.mixture2p_version_table))
+  knowledge <- match.arg(knowledge, c("limited", "rich"))
+  .check_mixture2p_args(kappa, p_mem, tau, K, version)
+  stopif(!all(response %in% c(0, 1)), "response must be 0 ('same') or 1 ('change').")
+
+  args <- .circmix_recycle(
+    response = response, probe = probe, mu = mu, kappa = kappa, p_mem = p_mem,
+    criterion = criterion, tau = tau, K = K, set_size = set_size
+  )
+  p_same <- with(args, .mixture2p_cd_psame(
+    probe, mu, kappa, p_mem, criterion, tau, K, set_size, version,
+    knowledge == "rich", vp_nodes
+  ))
+  out <- .cd_bernoulli_ld(args$response, p_same)
+  if (log) out else exp(out)
+}
+
+#' @rdname mixture2p_cd_dist
+#' @export
+rmixture2p_cd <- function(n, probe, mu = 0, kappa = 5, p_mem = 0.6,
+                          criterion = 0, tau = 0, K = 3, set_size = 1,
+                          version = "simple", knowledge = "limited",
+                          vp_nodes = 41L) {
+  version <- match.arg(version, names(.mixture2p_version_table))
+  knowledge <- match.arg(knowledge, c("limited", "rich"))
+  .check_mixture2p_args(kappa, p_mem, tau, K, version)
+
+  recycle <- function(x) rep_len(x, n)
+  p_same <- .mixture2p_cd_psame(
+    recycle(probe), recycle(mu), recycle(kappa), recycle(p_mem),
+    recycle(criterion), recycle(tau), recycle(K), recycle(set_size), version,
+    knowledge == "rich", vp_nodes
+  )
+  stats::rbinom(n, 1, 1 - p_same)
+}
+
+# P("same") for one row per observation or posterior draw; twin of the
+# mixture2p_cd_<version>_core functions in mixture2p_cd_funs.stan. p_s, the
+# observer's prior that the probed item is stored, is the target's retrieval
+# weight, except under slot averaging (see .circmix_cd_slot_averaging_psame()).
+.mixture2p_cd_psame <- function(probe, mu, kappa, p_mem, criterion, tau, K,
+                                set_size, version, rich, nodes = 41L) {
+  args <- .circmix_recycle(
+    probe = probe, mu = mu, kappa = kappa, p_mem = p_mem, criterion = criterion,
+    tau = tau, K = K, set_size = set_size
+  )
+  d <- matrix(args$probe - args$mu)
+  if (version == "slot_averaging") {
+    return(.circmix_cd_slot_averaging_psame(
+      d, matrix(0, nrow = nrow(d)),
+      .circmix_slot_averaging_branches(args$K, args$set_size, args$kappa),
+      args$tau, args$criterion, rich, nodes
+    ))
+  }
+  p_mem <- if (version == "slot") pmin(1, args$K / args$set_size) else args$p_mem
+  weights <- .mixture2p_weights(p_mem)
+  .circmix_cd_vp_psame(
+    d, weights$logw, weights$logw_guess, args$kappa, args$tau, args$criterion,
+    p_mem, rich, nodes
+  )
+}
+
 #' @title Distribution functions for the three-parameter mixture model (mixture3p)
 #'
 #' @description Density, distribution, and random generation functions for the

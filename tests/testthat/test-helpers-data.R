@@ -186,6 +186,10 @@ test_that("check_data() returns a data.frame()", {
     if (inherits(model, "sdt_cdp")) {
       model <- ml(response = "", stimulus = "stimulus", n_new = 1, n_old = 2)
     }
+    # change detection: a 0/1 response to a probe, both angles in radians
+    if (inherits(model, "mixture2p_cd")) {
+      model <- ml(response = "response", probe = "x", target = "y")
+    }
     expect_s3_class(
       check_data(model, test_data, bmf(kappa ~ 1)),
       "data.frame"
