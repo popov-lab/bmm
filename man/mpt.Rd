@@ -84,7 +84,9 @@ A parameter can be fixed to a probability at fit time, in the formula:
 freed again by giving it a formula. The value is mapped to the latent
 scale when the constant prior is built, so
 \code{\link[=default_prior]{default_prior()}} shows \code{constant(0)} for a guessing rate of 0.5 under
-the logit link.
+the logit link. For the same reason, \code{summary()} lists a fixed \code{g = 0.5}
+as \verb{g_Intercept 0.00} under "Constant Parameters"; \code{\link[=prior_info]{prior_info()}} and
+\code{\link[=parameter_info]{parameter_info()}} show the probability, 0.5.
 
 \code{summary()} reports intercepts and regression coefficients on the latent
 (logit or probit) scale. \code{\link[=native_parameters]{native_parameters()}} returns the posterior

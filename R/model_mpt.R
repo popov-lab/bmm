@@ -268,7 +268,9 @@ settable_link_functions.mpt <- function(model) {
 #'   freed again by giving it a formula. The value is mapped to the latent
 #'   scale when the constant prior is built, so
 #'   [default_prior()] shows `constant(0)` for a guessing rate of 0.5 under
-#'   the logit link.
+#'   the logit link. For the same reason, `summary()` lists a fixed `g = 0.5`
+#'   as `g_Intercept 0.00` under "Constant Parameters"; [prior_info()] and
+#'   [parameter_info()] show the probability, 0.5.
 #'
 #'   `summary()` reports intercepts and regression coefficients on the latent
 #'   (logit or probit) scale. [native_parameters()] returns the posterior
