@@ -693,6 +693,8 @@ bmf2bf.mpt <- function(model, formula) {
 # CONFIGURE_MODEL S3 METHODS                                             ####
 ############################################################################# !
 
+# no expected_response_defined() method: brms's multinomial posterior_epred() gives
+# the expected count per category, trials times the tree's branch probabilities
 #' @export
 configure_model.mpt <- function(model, data, formula) {
   formula <- bmf2bf(model, formula)
