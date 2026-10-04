@@ -394,13 +394,15 @@ test_that("model constructors and the template list their fields in the canonica
   canonical <- c(
     "resp_vars", "other_vars", "domain", "task", "name", "citation", "version",
     "requirements", "parameters", "links", "fixed_parameters", "default_priors",
-    "init_ranges", "deprecated_parameters", "variable_precision", "vp_nodes"
+    "init_ranges", "deprecated_parameters", "variable_precision", "vp_nodes",
+    "knowledge"
   )
   # m3 builds its inits in create_initfun.m3() and drops an empty default_priors;
-  # the last three belong to the circular mixture models only
+  # deprecated_parameters, variable_precision and vp_nodes belong to the
+  # circular mixture models only, knowledge to their change-detection versions
   optional <- c(
     "default_priors", "init_ranges", "deprecated_parameters",
-    "variable_precision", "vp_nodes"
+    "variable_precision", "vp_nodes", "knowledge"
   )
   expect_canonical <- function(model, label) {
     fields <- names(model)

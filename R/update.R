@@ -313,6 +313,30 @@ revert_check_data.non_targets <- function(model, data) {
 }
 
 #' @exportS3Method
+revert_check_data.change_detection <- function(model, data) {
+  # brms keeps only probe_centered = wrap(probe - target), unless a formula
+  # predicts something with the probe or the target. Either one recovers the
+  # other; with neither, the target is put at 0, which check_data() maps back to
+  # the same probe_centered
+  probe <- model$resp_vars$probe
+  target <- model$resp_vars$target
+  has_probe <- probe %in% colnames(data)
+  has_target <- target %in% colnames(data)
+  if (!has_probe && has_target) {
+    data[[probe]] <- wrap(data$probe_centered + data[[target]])
+  } else if (has_probe && !has_target) {
+    data[[target]] <- wrap(data[[probe]] - data$probe_centered)
+  } else if (!has_probe && !has_target) {
+    data[[probe]] <- data$probe_centered
+    data[[target]] <- 0
+  }
+  attr(data, "rebuilt") <- c(
+    attr(data, "rebuilt"), c(probe, target)[!c(has_probe, has_target)]
+  )
+  NextMethod("revert_check_data")
+}
+
+#' @exportS3Method
 revert_check_data.mixture2p <- function(model, data) {
   set_size <- model$other_vars$set_size
   # brms keeps the set_size column only when a formula predicts something with

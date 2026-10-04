@@ -408,9 +408,12 @@
 
 # The non-target locations reach the likelihood as vreal1..vrealK, padded to
 # max_set_size - 1; the likelihood reads only as many as the trial's set size.
-.circmix_prep_nt <- function(prep, i) {
+# skip drops leading vreal columns that are not non-targets, such as the probe
+# of a change-detection model.
+.circmix_prep_nt <- function(prep, i, skip = 0L) {
   columns <- grep("^vreal[0-9]+$", names(prep$data), value = TRUE)
   columns <- columns[order(as.integer(sub("vreal", "", columns)))]
+  columns <- columns[setdiff(seq_along(columns), seq_len(skip))]
   vapply(columns, function(column) prep$data[[column]][i], numeric(1))
 }
 
@@ -426,9 +429,13 @@
 # models, whose expected response is refused; pass posterior_epred_undefined().
 .circmix_custom_family <- function(model, family, weight_parameters,
                                    vint = FALSE, n_vreal = 0, log_lik,
-                                   posterior_predict, posterior_epred) {
+                                   posterior_predict, posterior_epred,
+                                   extra_dpars = character(0), type = "real",
+                                   data = .circmix_table_data()) {
   variable_precision <- isTRUE(model$variable_precision)
-  dpars <- c("mu", "kappa", if (variable_precision) "tau", weight_parameters)
+  dpars <- c(
+    "mu", "kappa", if (variable_precision) "tau", weight_parameters, extra_dpars
+  )
   bounds <- .circmix_bounds(model$links[dpars])
 
   out <- brms::custom_family(
@@ -436,8 +443,8 @@
     dpars = dpars,
     links = unlist(model$links[dpars], use.names = FALSE),
     lb = bounds$lb, ub = bounds$ub,
-    type = "real",
-    vars = .circmix_family_vars(vint = vint, n_vreal = n_vreal),
+    type = type,
+    vars = .circmix_family_vars(vint = vint, n_vreal = n_vreal, data_vars = names(data)),
     loop = TRUE,
     log_lik = log_lik,
     posterior_predict = posterior_predict,
@@ -445,22 +452,36 @@
   )
   out$vp_nodes <- model$vp_nodes
   out$core_dpars <- c(
-    "mu", "kappa", if (variable_precision) "tau" else "0.0", weight_parameters
+    "mu", "kappa", if (variable_precision) "tau" else "0.0", weight_parameters,
+    extra_dpars
   )
   out
 }
 
-.circmix_model_stanvars <- function(model, family, chunk, vint = NULL,
-                                    vreal = list()) {
-  .circmix_stanvars() +
-    .circmix_chunk_stanvar(chunk) +
-    brms::stanvar(
-      scode = .circmix_stan_wrapper(
-        family$name, family$dpars, family$core_dpars,
-        vint = vint, vreal = vreal, nodes = model$vp_nodes
-      ),
-      block = "functions", name = paste0(family$name, "_lpdf")
-    )
+# chunks are the model's own Stan files, in dependency order. The remaining
+# arguments are passed to .circmix_stan_wrapper(); extra_stanvars carries
+# whatever else the likelihood needs, e.g. .cd_stanvars().
+.circmix_model_stanvars <- function(model, family, chunks, vint = NULL,
+                                    vreal = list(), vreal_scalars = character(0),
+                                    literals = character(0),
+                                    data = .circmix_table_data(),
+                                    extra_stanvars = NULL) {
+  out <- .circmix_stanvars()
+  if (!is.null(extra_stanvars)) {
+    out <- out + extra_stanvars
+  }
+  for (chunk in chunks) {
+    out <- out + .circmix_chunk_stanvar(chunk)
+  }
+  out + brms::stanvar(
+    scode = .circmix_stan_wrapper(
+      family$name, family$dpars, family$core_dpars,
+      vint = vint, vreal = vreal, nodes = model$vp_nodes, type = family$type,
+      vreal_scalars = vreal_scalars, literals = literals, data = data
+    ),
+    block = "functions",
+    name = paste0(family$name, if (family$type == "int") "_lpmf" else "_lpdf")
+  )
 }
 
 # Stan functions cannot reach the data block, so the kappa(J) table has to be
@@ -495,18 +516,27 @@
   )
 }
 
+# Stan types of the kappa(J) table the likelihood receives as data
+.circmix_table_data <- function() {
+  c(
+    circmix_logk = "vector", circmix_dlogk = "vector",
+    circmix_logJ_min = "real", circmix_dlogJ = "real"
+  )
+}
+
 .circmix_table_vars <- function() {
-  c("circmix_logk", "circmix_dlogk", "circmix_logJ_min", "circmix_dlogJ")
+  names(.circmix_table_data())
 }
 
 # Only bare `name[n]` entries are rewritten to the global index by brms when
 # threading is on. Anything more elaborate is passed through untouched and would
 # pair each thread's response slice with the top of the data.
-.circmix_family_vars <- function(vint = FALSE, n_vreal = 0) {
+.circmix_family_vars <- function(vint = FALSE, n_vreal = 0,
+                                 data_vars = .circmix_table_vars()) {
   c(
     if (vint) "vint1[n]",
     if (n_vreal > 0) paste0("vreal", seq_len(n_vreal), "[n]"),
-    .circmix_table_vars()
+    data_vars
   )
 }
 
@@ -521,34 +551,42 @@
   glue("{resp} | {paste(terms, collapse = ' + ')} ~ 1")
 }
 
-# brms needs the likelihood to be a single `<family>_lpdf`, whose signature
-# depends on max_set_size because every non-target needs its own vreal term, so
-# this is the one piece of Stan that is generated. It only packs the scalar
-# vreal arguments into the vectors `<family>_core` expects; the arithmetic stays
-# in inst/stan_chunks. core_dpars may hold literals, which is how a
-# constant-precision model passes 0 for the tau its family does not estimate.
+# brms needs the likelihood to be a single `<family>_lpdf` (`_lpmf` for an
+# integer response), whose signature depends on max_set_size because every
+# non-target needs its own vreal term, so this is the one piece of Stan that is
+# generated. It only packs the scalar vreal arguments into the vectors
+# `<family>_core` expects; the arithmetic stays in inst/stan_chunks. core_dpars
+# may hold literals, which is how a constant-precision model passes 0 for the
+# tau its family does not estimate. A group named in vreal_scalars has one
+# member and is passed as a bare real, and literals are passed after the node
+# count, ahead of the data arguments.
 .circmix_stan_wrapper <- function(family, dpars, core_dpars = dpars, vint = NULL,
-                                  vreal = list(), nodes = 41L) {
-  vreal_names <- lapply(names(vreal), function(g) paste0(g, seq_len(vreal[[g]])))
-  vreal_args <- unlist(vreal_names)
+                                  vreal = list(), nodes = 41L, type = "real",
+                                  vreal_scalars = character(0),
+                                  literals = character(0),
+                                  data = .circmix_table_data()) {
+  vreal_names <- lapply(names(vreal), function(g) {
+    if (g %in% vreal_scalars) g else paste0(g, seq_len(vreal[[g]]))
+  })
   args <- c(
-    "real y", paste("real", dpars),
+    paste(type, "y"), paste("real", dpars),
     if (!is.null(vint)) paste("int", vint),
-    if (length(vreal_args)) paste("real", vreal_args),
-    "data vector circmix_logk", "data vector circmix_dlogk",
-    "data real circmix_logJ_min", "data real circmix_dlogJ"
+    if (length(vreal_names)) paste("real", unlist(vreal_names)),
+    paste("data", data, names(data))
   )
-  packed <- vapply(
-    vreal_names,
-    function(x) glue("to_vector({{{paste(x, collapse = ', ')}}})"),
-    character(1)
-  )
+  packed <- vapply(seq_along(vreal_names), function(j) {
+    if (names(vreal)[j] %in% vreal_scalars) {
+      return(vreal_names[[j]])
+    }
+    glue("to_vector({{{paste(vreal_names[[j]], collapse = ', ')}}})")
+  }, character(1))
   call_args <- c(
-    "y", core_dpars, vint, packed, as.character(as.integer(nodes)),
-    .circmix_table_vars()
+    "y", core_dpars, vint, packed, as.character(as.integer(nodes)), literals,
+    names(data)
   )
+  suffix <- if (type == "int") "lpmf" else "lpdf"
   as.character(glue(
-    "  real {family}_lpdf({paste(args, collapse = ', ')}) {{\n",
+    "  real {family}_{suffix}({paste(args, collapse = ', ')}) {{\n",
     "    return {family}_core({paste(call_args, collapse = ', ')});\n",
     "  }}\n"
   ))

@@ -69,6 +69,31 @@ check_data.circular <- function(model, data, formula) {
   NextMethod("check_data")
 }
 
+# Change-detection models respond 0/1 to a probe. probe and target are in
+# radians, and the likelihood takes the probe relative to the target, the
+# frame in which the target is at mu = 0 and the non-targets are given.
+#' @export
+check_data.change_detection <- function(model, data, formula) {
+  vars <- model$resp_vars[c("response", "probe", "target")]
+  missing_vars <- unlist(vars)[!unlist(vars) %in% colnames(data)]
+  stopif(
+    length(missing_vars) > 0,
+    "The following variables are not present in the data: \\
+    {collapse_comma(missing_vars)}"
+  )
+  data <- .cd_check_binary_response(data, vars$response)
+  for (angle in c(vars$probe, vars$target)) {
+    warnif(
+      max(abs(data[[angle]]), na.rm = TRUE) > 2 * pi,
+      "It appears the variable '{angle}' is in degrees. The model requires \\
+      the probe and the target in radians."
+    )
+  }
+  data$probe_centered <- wrap(data[[vars$probe]] - data[[vars$target]])
+
+  NextMethod("check_data")
+}
+
 #' @export
 check_data.non_targets <- function(model, data, formula) {
   nt_features <- model$other_vars$nt_features
