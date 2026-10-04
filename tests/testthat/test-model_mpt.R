@@ -101,6 +101,18 @@ test_that("mpt errors on inconsistent trees and a missing tree_id", {
   expect_error(mpt(dup_trees, tree_id = "cond"), "unique")
 })
 
+test_that("mpt errors on a branch that is the constant 0", {
+  zero_padded <- list(
+    mpt_tree("a", list(x = "D", y = "1 - D", z = "0")),
+    mpt_tree("b", list(x = "1 - 1", y = "g", z = "1 - g"))
+  )
+  expect_error(mpt(zero_padded, tree_id = "t"), "constant 0")
+  expect_error(mpt(zero_padded, tree_id = "t"), "'z' in tree 'a', 'x' in tree 'b'")
+  expect_error(mpt(mpt_tree("c", list(x = "(0)", y = "D + (1 - D)"))), "constant 0")
+  zero_product <- mpt_tree("d", list(x = "0 * D", y = "1 - 0 * D"))
+  expect_s3_class(mpt(zero_product), "mpt")
+})
+
 test_that("mpt errors on name collisions and reserved names", {
   tree_collision <- mpt_tree("t", list(D = "D + g", other = "1 - D - g"))
   expect_error(mpt(tree_collision), "both a parameter and a response category")

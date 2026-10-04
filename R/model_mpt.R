@@ -369,6 +369,20 @@ mpt <- function(trees, tree_id = NULL, links = "logit", ...) {
   })
   names(trees) <- tree_names
 
+  # a zero probability makes log(p) undefined in Stan; a dedicated argument
+  # for impossible categories replaces this guard in a later release
+  zero_branches <- unlist(lapply(trees, function(tree) {
+    is_zero <- vapply(tree$branches, function(b) is.numeric(b) && b == 0, logical(1))
+    glue("'{names(tree$branches)[is_zero]}' in tree '{tree$name}'")
+  }))
+  stopif(
+    length(zero_branches) > 0,
+    "The branch probability of {paste(zero_branches, collapse = ', ')} is the \\
+    constant 0, which makes the likelihood undefined. Response categories that \\
+    a tree cannot produce will be declared with mpt_tree(impossible = ) in a \\
+    later release; this version does not support them."
+  )
+
   stopif(
     length(trees) > 1L && is.null(tree_id),
     "Models with multiple trees require the tree_id argument: the name of the \\
