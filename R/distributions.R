@@ -802,9 +802,10 @@ rm3 <- function(n, size, pars, m3_model, act_funs = NULL, unpack = FALSE,
 #'   the order of the branch names of the selected tree.
 #' @param n Integer. Number of observations to generate data for.
 #' @param size The total number of observations across all response categories.
-#' @param pars A named vector or list with the values of all latent parameters
-#'   appearing in the branch expressions of the selected tree, on the
-#'   probability scale.
+#' @param pars A named vector or list with the values of at least the latent
+#'   parameters appearing in the branch expressions of the selected tree, on
+#'   the probability scale. Values for parameters the tree does not use are
+#'   ignored, so one vector can serve every tree of the model.
 #' @param mpt_model A `bmmodel` object created with [mpt()] specifying the
 #'   model that densities or random samples should be generated for.
 #' @param tree Character. For models with multiple trees, the name of the tree
@@ -903,13 +904,16 @@ rmpt <- function(n, size, pars, mpt_model, tree = NULL, unpack = FALSE,
   )
   values <- c(as.list(pars), list(...))
   required <- .mpt_expr_vars(trees[[tree]])
+  missing <- setdiff(required, names(values))
   stopif(
-    !identical(sort(required), sort(names(values))),
-    "The names or number of the provided values mismatch the symbols used in \\
-    the branch expressions of tree '{tree}'.
+    length(missing) > 0,
+    "The provided values do not cover the symbols used in the branch \\
+    expressions of tree '{tree}'.
+    Missing: {collapse_comma(missing)}
     Required: {collapse_comma(required)}
     Provided: {collapse_comma(names(values))}"
   )
+  values <- values[required]
 
   par_values <- unlist(values[intersect(names(values), names(mpt_model$parameters))])
   stopif(

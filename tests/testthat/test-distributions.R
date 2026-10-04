@@ -1912,3 +1912,28 @@ test_that(".ezdm_logit_pc is the logit of .ezdm_pc and the 3par logit at zr = 0.
   # pC rounds to 1 here and qlogis() of it is Inf
   expect_equal(.ezdm_logit_pc(0.45, bound - 0.45, 30), 2 * 30 * 0.45)
 })
+
+test_that("dmpt and rmpt ignore parameters the selected tree does not use", {
+  model <- mpt(list(
+    mpt_tree("a", list(x = "Do + (1 - Do) * g", y = "(1 - Do) * (1 - g)")),
+    mpt_tree("b", list(x = "(1 - Dn) * g", y = "Dn + (1 - Dn) * (1 - g)"))
+  ), tree_id = "t")
+  all_pars <- c(Do = 0.6, Dn = 0.4, g = 0.3)
+
+  expect_equal(
+    dmpt(c(7, 3), pars = all_pars, mpt_model = model, tree = "a"),
+    dbinom(7, 10, 0.72, log = TRUE)
+  )
+  expect_equal(
+    dmpt(c(7, 3), pars = all_pars, mpt_model = model, tree = "b"),
+    dmpt(c(7, 3), pars = c(Dn = 0.4, g = 0.3), mpt_model = model, tree = "b")
+  )
+  draws <- rmpt(5, size = 20, pars = all_pars, mpt_model = model, tree = "b")
+  expect_equal(dim(draws), c(5, 2))
+  expect_true(all(rowSums(draws) == 20))
+
+  expect_error(
+    dmpt(c(7, 3), pars = c(Dn = 0.4, g = 0.3), mpt_model = model, tree = "a"),
+    "Missing: 'Do'"
+  )
+})
