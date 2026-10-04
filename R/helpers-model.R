@@ -417,8 +417,15 @@ warn_link_range <- function(links, defaults) {
 }
 
 # kept central rather than as a field in each model constructor so the console
-# annotations stay short, uniform and reviewable in one place
+# annotations stay short, uniform and reviewable in one place. A model added
+# since declares its own with a response_annotations.<model> method in its
+# file, so that adding it touches no shared file
 response_annotations <- function(model) {
+  UseMethod("response_annotations")
+}
+
+#' @exportS3Method
+response_annotations.default <- function(model) {
   if (inherits(model, "circular")) {
     return(list(resp_error = "radians in [-pi, pi]"))
   }
@@ -528,7 +535,8 @@ format_model_list <- function(registry, style = "text", headers = TRUE) {
 # response_annotations(); the `@param` text is too long for a table cell. A
 # `<model>_<version>` entry replaces the model's entry for that version, and NA
 # marks an argument that names no data column. A test requires an entry for
-# every argument without a default, so a new model needs its labels here
+# every argument without a default; a model added since gives its labels with a
+# model_column_roles.<model> method in its own file instead
 data_column_roles <- list(
   cswald = c(
     rt = "response time in seconds",
@@ -617,7 +625,21 @@ model_versions <- function(model) {
 }
 
 column_roles <- function(model, version) {
-  data_column_roles[[paste0(model, "_", version)]] %||% data_column_roles[[model]]
+  spec <- if (is.na(version)) get_model(model)() else get_model(model)(version = version)
+  model_column_roles(spec) %||%
+    data_column_roles[[paste0(model, "_", version)]] %||%
+    data_column_roles[[model]]
+}
+
+# the column roles of one model version, as a data_column_roles entry; NULL
+# defers to data_column_roles
+model_column_roles <- function(model) {
+  UseMethod("model_column_roles")
+}
+
+#' @exportS3Method
+model_column_roles.default <- function(model) {
+  NULL
 }
 
 format_data_columns <- function(roles) {
@@ -638,7 +660,12 @@ format_key_parameters <- function(spec) {
     "None by default: your formula defines them"
   } else {
     descriptions <- vapply(spec$parameters[estimated], as.character, "")
-    paste0("`", estimated, "`: ", parameter_label(descriptions))
+    c(
+      # a custom version takes one parameter per response category from the
+      # formula, next to the ones it always estimates
+      if (identical(spec$version, "custom")) "One per response category: your formula defines them",
+      paste0("`", estimated, "`: ", parameter_label(descriptions))
+    )
   }
   if (length(fixed) > 0) {
     lines <- c(lines, paste0("Fixed by default: ", paste0("`", fixed, "`", collapse = ", ")))
@@ -970,13 +997,15 @@ use_model_template <- function(model_name,
      #############################################################################!
      # see 'R/model_ddm.R' (flat defaults) or 'R/model_cswald.R' (versioned) for examples
      #
-     # Besides this file, a new model needs entries in:
-     # - `data_column_roles` in R/helpers-model.R (a test requires it)
-     # - `stored_frame_cases()` in tests/testthat/test-update.R (a test requires it)
-     #   plus a `revert_check_data()` method in R/update.R if `check_data()`
-     #   consumes or creates columns
-     # - `response_annotations()` in R/helpers-model.R, if the response columns
-     #   need a unit or a coding note in the console output
+     # Keep everything the model needs in its own files, so that adding it touches
+     # no shared file. Besides this file, a new model needs:
+     # - a `model_column_roles.<model>()` method saying what each data argument
+     #   holds (a test requires it); see R/helpers-model.R
+     # - a stored-frame case in tests/testthat/helper-model-<model>.R (a test
+     #   requires it); see tests/testthat/helper-model-cases.R. If `check_data()`
+     #   consumes or creates columns, also a `revert_check_data.<model>()` method
+     # - a `response_annotations.<model>()` method, if the response columns need
+     #   a unit or a coding note in the console output
      #
      # In this file, `citation` needs at least one reference, one per element, each
      # on a single line without a \"- \" bullet and ending in \".\" or a
