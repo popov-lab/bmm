@@ -593,6 +593,11 @@ data_column_roles <- list(
   sdm = c(
     resp_error = "response error relative to the target, in radians"
   ),
+  sdm_cd = c(
+    response = "response, 0 = 'same' and 1 = 'change'",
+    probe = "probed feature, in radians",
+    target = "feature of the probed item at encoding, in radians"
+  ),
   sdt_cdp = c(
     response = "prefix of the count columns `new<k>`, `know<k>`, `remember<k>` and optionally `guess<k>`, one per confidence level (default: no prefix)",
     stimulus = "stimulus type, 0 = new and 1 = old",

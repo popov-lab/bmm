@@ -292,6 +292,75 @@ rsdm <- function(n, mu = 0, c = 3, kappa = 3.5, parametrization = "sqrtexp") {
   vectorize.args = c("mu", "c", "kappa", "lower", "upper")
 )
 
+#' @title Distribution functions for the SDM in change detection
+#'
+#' @description Probability of a "change" or "same" response, and random
+#'   generation of responses, in a single-probe change-detection task under the
+#'   Signal Discrimination Model (see [sdm_cd()]). The observer retrieves a
+#'   feature from the SDM density with location `mu`, memory strength `c` and
+#'   precision `kappa`, and answers "change" when the log-likelihood ratio of a
+#'   change against no change exceeds `criterion` (Lin & Oberauer, 2022).
+#'
+#' @name sdm_cd_dist
+#'
+#' @param response Vector of responses, 0 = "same" and 1 = "change"
+#' @param n Number of observations to generate
+#' @param probe Vector of probe values in radians, relative to the target
+#' @param mu Vector of location values in radians
+#' @param c Vector of memory strength values
+#' @param kappa Vector of precision values
+#' @param criterion Vector of decision criteria. Larger values make "change"
+#'   responses less likely; 0 is the unbiased observer.
+#' @param log Logical; if `TRUE`, values are returned on the log scale.
+#' @keywords distribution
+#'
+#' @references Lin, H.-Y., & Oberauer, K. (2022). An interference model for
+#'   visual working memory: Applications to the change detection task.
+#'   Cognitive Psychology, 133, 101463.
+#'   https://doi.org/10.1016/j.cogpsych.2022.101463
+#'
+#'   Oberauer, K. (2023). Measurement models for visual working memory - A
+#'   factorial model comparison. Psychological Review, 130(3), 841-852.
+#'   https://doi.org/10.1037/rev0000328
+#'
+#' @return `dsdm_cd` gives the probability of each response, `rsdm_cd`
+#'   generates responses (1 = "change").
+#'
+#' @export
+#'
+#' @examples
+#' # P("change") rises with the distance between the probe and the target
+#' probe <- seq(0, pi, length.out = 50)
+#' plot(probe, dsdm_cd(1, probe, c = 5, kappa = 4), type = "l",
+#'   xlab = "Probe relative to the target (radians)", ylab = "P('change')"
+#' )
+#'
+#' mean(rsdm_cd(1000, probe = 1, c = 5, kappa = 4))
+dsdm_cd <- function(response, probe, mu = 0, c = 3, kappa = 3.5, criterion = 0,
+                    log = FALSE) {
+  stopif(isTRUE(any(kappa < 0)), "kappa must be non-negative")
+  stopif(isTRUE(any(c < 0)), "c must be non-negative")
+  stopif(!all(response %in% c(0, 1)), "response must be coded 0 ('same') or 1 ('change')")
+  args <- .circmix_recycle(
+    response = response, probe = probe, mu = mu, c = c, kappa = kappa,
+    criterion = criterion
+  )
+  p_same <- .sdm_cd_psame(args$probe, args$mu, args$c, args$kappa, args$criterion)
+  out <- ifelse(args$response == 1, log1p(-p_same), log(p_same))
+  if (log) out else exp(out)
+}
+
+#' @rdname sdm_cd_dist
+#' @export
+rsdm_cd <- function(n, probe, mu = 0, c = 3, kappa = 3.5, criterion = 0) {
+  stopif(isTRUE(any(kappa < 0)), "kappa must be non-negative")
+  stopif(isTRUE(any(c < 0)), "c must be non-negative")
+  stopif(length(n) > 1, "n must be a single integer")
+  args <- .circmix_recycle(probe = probe, mu = mu, c = c, kappa = kappa, criterion = criterion)
+  p_same <- .sdm_cd_psame(args$probe, args$mu, args$c, args$kappa, args$criterion)
+  stats::rbinom(n, 1, 1 - rep_len(p_same, n))
+}
+
 
 #' @title Distribution functions for the two-parameter mixture model (mixture2p)
 #'

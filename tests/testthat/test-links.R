@@ -184,6 +184,7 @@ test_that("the links a model applies are exactly the settable ones", {
   )
   expect_null(settable_links(m3(resp_cats = c("a", "b"), num_options = c(1, 4))))
   expect_equal(settable_links(sdm(resp_error = "y")), character(0))
+  expect_equal(settable_links(sdm_cd("r", probe = "p", target = "t")), character(0))
   expect_equal(
     settable_links(mixture3p(resp_error = "y", nt_features = "nt", set_size = "ss")),
     c("mu", "kappa")
@@ -200,6 +201,10 @@ test_that("a refused model builds the same fit whatever its links say", {
   # that is measured rather than restated: the family carries the links of a
   # custom or mixture family
   dat <- oberauer_lin_2017
+  # sdm_cd reads a 0/1 response and the probe and target features
+  dat$change <- as.integer(abs(dat$dev_rad) > 1)
+  dat$probe <- dat$dev_rad
+  dat$target <- 0
   fingerprint <- function(model, formula) {
     bf <- configure_model(model, check_data(model, dat, formula), formula)$formula
     list(
@@ -210,7 +215,8 @@ test_that("a refused model builds the same fit whatever its links say", {
     )
   }
   cases <- list(
-    list(sdm("dev_rad"), bmf(c ~ 1, kappa ~ 1), "kappa")
+    list(sdm("dev_rad"), bmf(c ~ 1, kappa ~ 1), "kappa"),
+    list(sdm_cd("change", probe = "probe", target = "target"), bmf(c ~ 1, kappa ~ 1), "kappa")
   )
   for (case in cases) {
     model <- case[[1]]

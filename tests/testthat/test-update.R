@@ -478,6 +478,23 @@ stored_frame_cases <- function() {
       model = sdm("dev_rad"), formula = bmf(c ~ 1, kappa ~ 1),
       data = lin_2017
     ),
+    sdm_cd = list(
+      model = sdm_cd("change", probe = "probe", target = "target"),
+      formula = bmf(c ~ 1 + cond + (1 | id), kappa ~ 1, criterion ~ 1),
+      data = data.frame(
+        change = rep(c(0, 1), 10), probe = rep(c(0.4, -2, 1.2, 3), 5),
+        target = rep(c(1, -0.5), 10), cond = factor(rep(c("a", "b"), each = 10)),
+        id = factor(rep(1:5, 4))
+      )
+    ),
+    sdm_cd_predicts_with_probe = list(
+      model = sdm_cd("change", probe = "probe", target = "target"),
+      formula = bmf(c ~ 1, kappa ~ 1 + target),
+      data = data.frame(
+        change = rep(c(0, 1), 10), probe = rep(c(0.4, -2, 1.2, 3), 5),
+        target = rep(c(1, -0.5), 10)
+      )
+    ),
     sdt_yn = list(
       model = sdt_yn(response = "n_old", stimulus = "stimulus", n_trials = "n_trials"),
       formula = bmf(d ~ 1, criterion ~ 1, sdratio ~ 1), data = broeder_schuetz_2009_e3

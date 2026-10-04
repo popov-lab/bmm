@@ -471,6 +471,16 @@ test_that("every model ships an sd default on the link scale of each parameter",
 
   pr <- default_prior(bmf(kappa ~ 1 + (1 | ID), c ~ 1 + (1 | ID)), data, sdm("dev_rad"))
   for (par in c("kappa", "c")) expect_equal(sd_default(pr, par), "exponential(1)")
+  cd_data <- data.frame(
+    change = rep(c(0, 1), 20), probe = rep(c(0.4, -2), 20), target = 0,
+    ID = rep(1:4, each = 10)
+  )
+  pr <- default_prior(
+    bmf(kappa ~ 1 + (1 | ID), c ~ 1 + (1 | ID), criterion ~ 1 + (1 | ID)), cd_data,
+    sdm_cd("change", probe = "probe", target = "target")
+  )
+  for (par in c("kappa", "c")) expect_equal(sd_default(pr, par), "exponential(1)")
+  expect_equal(sd_default(pr, "criterion"), "exponential(2)")
 
   m3_formula <- bmf(c ~ 1 + (1 | ID), a ~ 1 + (1 | ID))
   for (rule in c("simple", "softmax")) {
