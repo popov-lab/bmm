@@ -1,14 +1,3 @@
-fake_prep <- function(ndraws, nobs, dpars, data = list()) {
-  structure(
-    list(ndraws = ndraws, nobs = nobs,
-         dpars = lapply(dpars, function(v) {
-           if (length(v) == 1L) v else matrix(v, ndraws, nobs)
-         }),
-         data = data),
-    class = "brmsprep"
-  )
-}
-
 fake_bmmfit <- function(model) {
   structure(list(bmm = list(model = model)), class = "bmmfit")
 }
