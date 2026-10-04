@@ -472,6 +472,13 @@ check_model.mpt <- function(model, data = NULL, formula = NULL) {
     )
     nl_pars <- intersect(names(formula)[is_nl(formula)], names(model$parameters))
     sub_pars <- .mpt_nl_subparameters(model, formula, data)
+    no_formula <- setdiff(sub_pars, names(formula))
+    stopif(
+      length(no_formula) > 0,
+      "{collapse_comma(no_formula)} in your non-linear formula(s) is neither a \\
+      data column nor a model parameter. Give each new parameter its own \\
+      formula (e.g. {no_formula[1]} ~ 1), or add the column to the data."
+    )
     .mpt_check_names(sub_pars, "parameter")
     if (length(sub_pars) > 0) {
       message2(

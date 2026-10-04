@@ -252,6 +252,26 @@ test_that("the message on non-linear sub-parameters names the sd prior they get"
   expect_message(check_model(model, dat, formula), sd_prior, fixed = TRUE)
 })
 
+test_that("a symbol of a non-linear formula that is neither column nor parameter errors", {
+  model <- mpt(mpt_2htm_trees(), tree_id = "item_type")
+  dat <- mpt_2htm_data(n_id = 4)
+  formula <- bmf(D ~ inv_logit(a + b * x), a ~ 1, b ~ 1, g ~ 1)
+  expect_error(
+    bmm(formula, dat, model, backend = "mock", mock_fit = 1, rename = FALSE),
+    "'x' .* neither a data column nor a model parameter"
+  )
+  # the implicit intercept of a sub-parameter without a formula is gone too
+  expect_error(
+    check_model(model, dat, bmf(D ~ inv_logit(a + c), a ~ 1, g ~ 1)),
+    "neither a data column"
+  )
+  dat$x <- rep(c(0, 1), length.out = nrow(dat))
+  fit <- suppressMessages(
+    bmm(formula, dat, model, backend = "mock", mock_fit = 1, rename = FALSE)
+  )
+  expect_setequal(names(fit$bmm$model$parameters), c("D", "g", "a", "b"))
+})
+
 test_that("links set after construction are checked like any other model's", {
   model <- mpt(mpt_2htm_trees(), tree_id = "item_type")
   dat <- mpt_2htm_data()
