@@ -1,0 +1,709 @@
+############################################################################# !
+# MODELS                                                                 ####
+############################################################################# !
+
+# Drift-rate defaults for the simple driftc/drifte parameters. Per-category
+# parameters discovered in the custom version default to the error-accumulator
+# (drifte) values.
+.rdm_drift_spec <- list(
+  desc = "drift rate",
+  link = "log",
+  priors = list(
+    driftc = list(main = "normal(1, 0.5)", effects = "normal(0, 0.3)", sd = "exponential(2)"),
+    drifte = list(main = "normal(0.5, 0.5)", effects = "normal(0, 0.3)", sd = "exponential(2)")
+  ),
+  inits = list(driftc = c(2, 4), drifte = c(1, 2.5))
+)
+
+# The gap/ndt/s/sp block shared by both versions, declared once.
+.rdm_shared <- list(
+  parameters = list(
+    gap = "threshold gap: distance from the top of the start-point range to the threshold (b = gap + sp)",
+    ndt = "non-decision time",
+    s = "diffusion constant",
+    sp = "maximum starting point (uniform on 0 to sp)"
+  ),
+  links = list(gap = "log", ndt = "log", s = "log", sp = "log"),
+  priors = list(
+    gap = list(main = "normal(0, 0.3)", effects = "normal(0, 0.3)", sd = "exponential(2)"),
+    ndt = list(main = "normal(-1.5, 0.5)", effects = "normal(0, 0.3)", sd = "exponential(4)"),
+    s = list(main = "normal(0, 0.3)", effects = "normal(0, 0.2)", sd = "exponential(4)"),
+    sp = list(main = "normal(-1, 0.5)", effects = "normal(0, 0.3)", sd = "exponential(2)")
+  ),
+  inits = list(
+    mu = c(-0.5, 0.5), gap = c(0.8, 1.2), ndt = c(0.01, 0.05),
+    s = c(0.8, 1.2), sp = c(0.2, 0.5)
+  )
+)
+
+# sp = -100 on the log link (A = exp(-100), zero to double precision) is the
+# constructor's "no start-point variability" default and the only value that
+# takes the plain-Wald fast path in Stan. Any other constant a user writes in
+# bmf() -- sp = log(0.3) -- is honoured as the start-point range it names, on
+# both the Stan side and in every posterior method, which read A = sp as it is.
+.rdm_sp_off <- -100
+
+.rdm_start_var <- function(model) {
+  !identical(model$fixed_parameters$sp, .rdm_sp_off)
+}
+
+# Compose the spec for one version. The posterior methods recover the
+# accumulator names from the family's dpars (everything but mu, gap, ndt, s,
+# sp), in the order check_data() numbered the .rdm_n* count columns.
+.rdm_model_spec <- function(version) {
+  fixed_parameters <- list(mu = 0, s = 0, sp = .rdm_sp_off)
+
+  if (version == "custom") {
+    return(nlist(
+      parameters = .rdm_shared$parameters,
+      links = .rdm_shared$links,
+      fixed_parameters,
+      priors = .rdm_shared$priors,
+      init_ranges = .rdm_shared$inits
+    ))
+  }
+
+  nlist(
+    parameters = c(
+      list(
+        driftc = paste(.rdm_drift_spec$desc, "for correct accumulator"),
+        drifte = paste(.rdm_drift_spec$desc, "for error accumulators")
+      ),
+      .rdm_shared$parameters
+    ),
+    links = c(
+      list(driftc = .rdm_drift_spec$link, drifte = .rdm_drift_spec$link),
+      .rdm_shared$links
+    ),
+    fixed_parameters,
+    priors = c(.rdm_drift_spec$priors, .rdm_shared$priors),
+    init_ranges = c(.rdm_shared$inits, .rdm_drift_spec$inits)
+  )
+}
+
+# the parameters every version has, which a custom version's response
+# categories cannot be named after (see race_reserved_names())
+.rdm_shared_pars <- c("gap", "ndt", "s", "sp")
+
+# the identifiers .rdm_stan_code() declares, which a category would shadow
+# (measured: each made a category and the program handed to stanc)
+.rdm_stan_names <- c("rt", "response", "t", "lp", "i")
+
+.model_rdm <- function(
+    rt = NULL,
+    response = NULL,
+    n_choices = NULL,
+    accumulators = NULL,
+    links = NULL,
+    version = "simple",
+    call = NULL,
+    ...) {
+  vt <- .rdm_model_spec(version)
+  out <- structure(
+    list(
+      resp_vars = nlist(rt, response),
+      other_vars = nlist(n_choices, accumulators),
+      domain = "Decision Making / Response times",
+      task = "Choice Reaction Time tasks (multi-alternative)",
+      name = "Racing Diffusion Model",
+      citation = glue(
+        "Tillman, G., Van Zandt, T., & Logan, G. D. (2020). Sequential sampling \\
+        models without random between-trial variability: the racing diffusion \\
+        model of speeded decision making. Psychonomic Bulletin & Review, 27, \\
+        911-936. https://doi.org/10.3758/s13423-020-01719-6"
+      ),
+      version = version,
+      requirements = glue(
+        "- Reaction times should be passed in seconds", "\n",
+        "- For version 'simple': response variable should be integer-coded ",
+        "(1 = correct, 2:K = errors)", "\n",
+        "- For version 'custom': response variable should contain character ",
+        "labels matching formula parameter names"
+      ),
+      parameters = vt[["parameters"]],
+      links = vt[["links"]],
+      fixed_parameters = vt[["fixed_parameters"]],
+      default_priors = vt[["priors"]],
+      init_ranges = vt[["init_ranges"]]
+    ),
+    class = c("bmmodel", "rdm", paste0("rdm_", version)),
+    call = call
+  )
+
+  set_links(out, links)
+}
+
+# the accumulator parameters of the custom version are the response categories
+# of the user's formula, so at construction there is no set of names to check a
+# link target against (check_model.rdm_custom fills in the default link for a
+# category the user left alone). The simple version's parameters are fixed.
+#' @exportS3Method
+settable_links.rdm <- function(model) {
+  if (model$version == "custom") NULL else names(model$links)
+}
+
+# every parameter is positive and enters the Stan likelihood on the natural
+# scale, so a wider link would reach print(), the initial values and the prior
+# scale but not the sampler
+#' @exportS3Method
+settable_link_functions.rdm <- function(model) {
+  "log"
+}
+
+#' @title `r .model_rdm()$name`
+#' @name rdm
+#' @details `r model_docs(.model_rdm())`
+#'
+#' The fixed-parameter values above are on the log link: `s = 0` is a
+#' diffusion constant of 1, and `sp = -100` is a starting-point range of
+#' essentially 0, i.e. no start-point variability.
+#' @param rt The name of the variable in the dataset containing the response
+#'   times. Response times should be coded in seconds (not milliseconds).
+#' @param response The name of the variable in the dataset containing the
+#'   response/choice. For the `"simple"` version, responses should be
+#'   integer-coded: 1 = correct response, 2 through K = error responses.
+#'   Factor and character-digit responses are accepted and converted
+#'   automatically. For the `"custom"` version, responses should be character
+#'   or factor labels matching the accumulator names in the formula.
+#' @param n_choices An integer specifying the total number of response
+#'   alternatives (K >= 2). Required for `version = "simple"`. Not used for
+#'   `version = "custom"` (inferred from the formula).
+#' @param accumulators For `version = "custom"` only. A named vector
+#'   specifying the number of racing accumulators per response category.
+#'   Can be a named integer vector for constant counts (e.g.,
+#'   `c(correct = 1, other = 3, npl = 5)`) or a named character vector
+#'   of column names for trial-varying counts (e.g.,
+#'   `c(correct = "n_corr", other = "n_other", npl = "n_npl")`). If omitted,
+#'   defaults to 1 accumulator per category.
+#' @param version A character string specifying which version of the RDM to
+#'   use. Options are:
+#'   \itemize{
+#'     \item `"simple"` (default): Two drift parameters — `driftc` for the
+#'       correct accumulator (response = 1) and `drifte` for all error
+#'       accumulators. The diffusion constant `s` is shared and fixed by
+#'       default (s = 1). The start-point range `sp` is fixed to zero by
+#'       default; add `sp ~ 1` to the formula to estimate it.
+#'     \item `"custom"`: Per-category drift parameters. Response categories
+#'       are defined by the formula LHS names (e.g., `correct ~ 1, other ~ 1,
+#'       npl ~ 1`). The response column must contain character labels matching
+#'       these names. Supports per-category `accumulators`.
+#'   }
+#' @param links A named list of link functions for the model parameters.
+#'   For `"simple"`: parameters are `driftc`, `drifte`, `gap`, `ndt`, `s`,
+#'   and `sp`. All positive-valued parameters, including `ndt`, use a "log"
+#'   link and only support that link.
+#' @param ... Additional arguments passed internally (for testing purposes).
+#' @return An object of class `bmmodel`
+#' @details
+#' ## Start-point variability (`sp`)
+#'
+#' Each accumulator starts at a point drawn uniformly from `[0, sp]` and
+#' finishes when it has travelled `gap + sp` minus that start; `sp` is the
+#' range of the start point and `gap` the distance from its top to the
+#' threshold, so the threshold is `b = gap + sp`. By default `sp` is fixed to
+#' `-100` on the log link, i.e. to zero: every accumulator starts at zero and
+#' its finishing time is a plain Wald with threshold `gap`. Write `sp ~ 1` (or
+#' a predictor) in `bmf()` to estimate it, or fix it to another range with a
+#' constant on the log link, e.g. `bmf(..., sp = log(0.3))`, which is honoured
+#' as a start point uniform on `[0, 0.3]` by the sampler and by `log_lik()`,
+#' `posterior_predict()`, `posterior_epred()` and `pp_check()` alike.
+#'
+#' ## Likelihood convention
+#'
+#' `log_lik()`, and therefore `loo()` and `waic()`, use the likelihood of the
+#' *category* that was observed, not of one named accumulator: the winner's
+#' density carries `log(n_j)` for a category raced by `n_j` identical
+#' accumulators. For `version = "simple"` the error category holds all K - 1
+#' error accumulators, so every error trial sits log(K - 1) above a
+#' per-response likelihood. That term does not depend on any parameter, so
+#' posteriors and predictions are unaffected, but `loo()` and `waic()` values
+#' are shifted by it and are not comparable with a `version = "custom"` fit,
+#' which names each accumulator, or with another package that does.
+#' @section Default priors:
+#' `driftc`/`drifte` get `normal(1, 0.5)`/`normal(0.5, 0.5)`, and `gap`/`sp`
+#' get `normal(0, 0.3)`/`normal(-1, 0.5)`, all on the log link.
+#'
+#' `ndt` has `normal(-1.5, 0.5)` on the log link, the prior the **ddm** model
+#' uses, rather than an earlier `normal(-2, 0.3)` whose 95% interval put
+#' `ndt` below 0.244 s and gave P(ndt > 0.3 s) = 0.004, too tight for
+#' multi-alternative choice tasks.
+#'
+#' The group-level standard deviations get one rate per kind of parameter
+#' rather than one per model, shared with the **lnr** and **lba** models: a
+#' drift rate gets `exponential(2)` (median 0.35 on the log link, i.e. a
+#' between-subject ratio around 1.4), `ndt` and `s` get `exponential(4)`
+#' (median 0.17), and `gap`/`sp` get `exponential(2)`. These rates come from
+#' hierarchical fits of simulated multi-subject data for the racing models
+#' (drift/`ndt`/`s` anchored on the **lnr** recovery, `gap`/`sp` reused from
+#' the **lba** model).
+#' @section Identifiability of `s`:
+#' The likelihood is invariant to scaling every drift rate, `gap`, `sp` and
+#' `s` by the same positive constant, so only their ratios are identified.
+#' `s` is fixed to 1 by default (`s = 0` on the log link) to pin that scale.
+#' Freeing `s` with an intercept estimates that scale ray rather than a new
+#' quantity, and `check_formula()` warns when a formula does so; write
+#' `s ~ 0 + condition` instead to estimate contrasts of `s` without freeing
+#' the scale.
+#' @note Both versions describe the same response type (a categorical winner in
+#'   a choice-RT race), so they live in one constructor rather than separate
+#'   model functions: `"simple"` is an accuracy-coded convenience layer (correct
+#'   vs. error) over the general per-accumulator case handled by `"custom"`.
+#' @export
+#' @keywords bmmodel
+#' @seealso [drdm()] and [rrdm()] for the density and random generation
+#'   functions.
+#' @examplesIf isTRUE(Sys.getenv("BMM_EXAMPLES"))
+#' # simple version with 2 alternatives
+#' dat <- rrdm(n = 500, drift = c(3, 1.5), gap = 1, sp = 0, ndt = 0.2)
+#' model <- rdm(rt = "rt", response = "response", n_choices = 2)
+#' formula <- bmf(driftc ~ 1, drifte ~ 1, gap ~ 1, ndt ~ 1)
+#' fit <- bmm(formula, dat, model, cores = 4, backend = "cmdstanr")
+#'
+#' # with starting point variability
+#' formula2 <- bmf(driftc ~ 1, drifte ~ 1, gap ~ 1, ndt ~ 1, sp ~ 1)
+#' fit2 <- bmm(formula2, dat, model, cores = 4, backend = "cmdstanr")
+rdm <- function(rt, response, n_choices = NULL,
+                version = c("simple", "custom"),
+                accumulators = NULL, links = NULL, ...) {
+  call <- match.call()
+  dots <- list(...)
+  if ("n_alternatives" %in% names(dots)) {
+    n_choices <- dots$n_alternatives
+    warning2("The argument 'n_alternatives' is deprecated. Please use 'n_choices' instead.")
+  }
+  if ("num_alternatives" %in% names(dots)) {
+    accumulators <- dots$num_alternatives
+    warning2("The argument 'num_alternatives' is deprecated. Please use 'accumulators' instead.")
+  }
+  stop_missing_args()
+  version <- match.arg(version)
+  if (version == "simple") {
+    stopif(
+      is.null(n_choices) || !is.numeric(n_choices) ||
+        n_choices < 2 || n_choices != round(n_choices),
+      "n_choices must be an integer >= 2 for version 'simple'."
+    )
+    n_choices <- as.integer(n_choices)
+  } else {
+    n_choices <- NULL
+  }
+  .model_rdm(
+    rt = rt,
+    response = response,
+    n_choices = n_choices,
+    accumulators = accumulators,
+    links = links,
+    version = version,
+    call = call
+  )
+}
+
+############################################################################# !
+# CHECK_MODEL S3 methods                                                 ####
+############################################################################# !
+
+#' @export
+check_model.rdm_custom <- function(model, data = NULL, formula = NULL) {
+  if (!is.null(formula)) {
+    cat_pars <- race_category_names(formula, .rdm_shared_pars, .rdm_stan_names)
+
+    for (p in cat_pars) {
+      model$parameters[[p]] <- glue("{.rdm_drift_spec$desc} for '{p}' accumulator")
+      if (is.null(model$links[[p]])) model$links[[p]] <- .rdm_drift_spec$link
+      if (is.null(model$default_priors[[p]])) {
+        model$default_priors[[p]] <- .rdm_drift_spec$priors$drifte
+      }
+      if (is.null(model$init_ranges[[p]])) {
+        model$init_ranges[[p]] <- .rdm_drift_spec$inits$drifte
+      }
+    }
+
+    model$other_vars$resp_cats <- cat_pars
+  }
+
+  NextMethod("check_model")
+}
+
+############################################################################# !
+# CHECK_DATA S3 methods                                                  ####
+############################################################################# !
+
+#' @export
+check_data.rdm <- function(model, data, formula) {
+  race_check_data(model, data)
+  NextMethod("check_data")
+}
+
+#' @export
+check_data.rdm_simple <- function(model, data, formula) {
+  data <- race_code_simple_response(model, data, "rdm")
+  NextMethod("check_data")
+}
+
+#' @export
+check_data.rdm_custom <- function(model, data, formula) {
+  data <- race_code_custom_response(model, data, "rdm", .rdm_shared_pars)
+  model$other_vars$n_choices <- length(model$other_vars$resp_cats)
+  NextMethod("check_data")
+}
+
+############################################################################# !
+# CHECK_FORMULA S3 methods                                               ####
+############################################################################# !
+
+# Scaling drift, gap, sp and s by a common factor leaves the likelihood exactly
+# unchanged, so an intercept for s slides along that ray together with the
+# drifts and the thresholds and none of them is identified. Contrasts of s are
+# identified, because the reference cell pins the scale.
+#' @export
+check_formula.rdm <- function(model, data, formula) {
+  s_form <- formula[["s"]]
+  warnif(
+    is_formula(s_form) && !is_constant(s_form) && has_intercept(s_form),
+    "The formula for 's' has an intercept, so 's' is estimated on the same \\
+    scale as the drift rates, 'gap' and 'sp': multiplying all of them by a \\
+    common factor leaves the likelihood unchanged, so only their ratios are \\
+    identified. Either fix 's' (the default, or to another value with \\
+    s = log(0.9) in bmf()) or suppress the intercept to estimate contrasts of \\
+    's' only, as in s ~ 0 + condition."
+  )
+  NextMethod("check_formula")
+}
+
+############################################################################# !
+# Convert bmmformula to brmsformula methods                              ####
+############################################################################# !
+
+#' @export
+bmf2bf.rdm_simple <- function(model, formula) {
+  race_bf(model, "rdm", 2)
+}
+
+#' @export
+bmf2bf.rdm_custom <- function(model, formula) {
+  race_bf(model, "rdm", length(model$other_vars$resp_cats))
+}
+
+############################################################################# !
+# Stan code generation                                                   ####
+############################################################################# !
+
+# The family's log-likelihood is unrolled over the response categories rather
+# than collecting the per-row drifts and counts into arrays for a per-trial
+# helper: a vector or array temporary in a per-row Stan function is allocated
+# on the autodiff stack for every observation on every leapfrog step, and the
+# unrolled form measured 22% (sp fixed) and 8% (sp free) less time per
+# gradient with bitwise-identical log density and gradients
+# (local/logs/benchmark_rdm_2026-09-25.md). The winner contributes log(n_win)
+# and n_win - 1 survival copies, each loser n_j copies; the strict reps > 0
+# guard keeps zero-count or underflowed survivals out of the sum (0 * -inf
+# would poison the likelihood with NaN). Only the constructor's default sp
+# (see .rdm_start_var) takes the plain-Wald path.
+.rdm_stan_code <- function(family_name, cat_names, start_var) {
+  n_cats <- length(cat_names)
+  cat_args <- paste(paste0("vector ", cat_names), collapse = ", ")
+  n_args <- paste(paste0("array[] int n", seq_len(n_cats)), collapse = ", ")
+  pdf <- if (start_var) {
+    "rdm_log_pdf(t, {cat}[i], gap[i], sp[i], s[i])"
+  } else {
+    "swald_lpdf(rt[i] | {cat}[i], gap[i] + sp[i], ndt[i], s[i])"
+  }
+  surv <- if (start_var) {
+    "rdm_log_surv(t, {cat}[i], gap[i], sp[i], s[i])"
+  } else {
+    "swald_lccdf(rt[i] | {cat}[i], gap[i] + sp[i], ndt[i], s[i])"
+  }
+  per_cat <- function(template, j) glue(template, cat = cat_names[j], j = j)
+  reps <- vapply(seq_len(n_cats), function(j) {
+    per_cat("    int reps{j} = (response[i] == {j}) ? n{j}[i] - 1 : n{j}[i];", j)
+  }, character(1))
+  winner <- vapply(seq_len(n_cats), function(j) {
+    head <- if (n_cats == 1) "   " else if (j == 1) "    if" else if (j < n_cats) "    else if" else "    else"
+    cond <- if (j < n_cats) glue(" (response[i] == {j})") else ""
+    per_cat(paste0(head, cond, " lp = log(n{j}[i]) + ", pdf, ";"), j)
+  }, character(1))
+  survivals <- vapply(seq_len(n_cats), function(j) {
+    per_cat(paste0("    if (reps{j} > 0) lp += reps{j} * ", surv, ";"), j)
+  }, character(1))
+
+  paste(c(
+    glue("real {family_name}_lpdf(vector rt, vector mu, {cat_args}, vector gap, ",
+         "vector ndt, vector s, vector sp, array[] int response, {n_args}) {{"),
+    "  int N = rows(rt);",
+    "  real log_lik = 0;",
+    "  for (i in 1:N) {",
+    "    real t = rt[i] - ndt[i];",
+    "    real lp;",
+    "    if (t <= 0) return negative_infinity();",
+    reps, winner, survivals,
+    "    log_lik += lp;",
+    "  }",
+    "  return log_lik;",
+    "}"
+  ), collapse = "\n")
+}
+
+############################################################################# !
+# CONFIGURE_MODEL S3 METHODS                                             ####
+############################################################################# !
+
+#' @export
+configure_model.rdm_simple <- function(model, data, formula) {
+  cat_names <- c("driftc", "drifte")
+  formula <- bmf2bf(model, formula)
+
+  formula$family <- brms::custom_family(
+    "rdm_simple",
+    dpars = c("mu", cat_names, "gap", "ndt", "s", "sp"),
+    links = c("identity", model$links$driftc, model$links$drifte,
+              model$links$gap, model$links$ndt, model$links$s,
+              model$links$sp),
+    ub = rep(NA, length(cat_names) + 5),
+    lb = c(NA, rep(0, length(cat_names) + 4)),
+    type = "real",
+    vars = race_family_vars(length(cat_names)),
+    loop = FALSE,
+    log_lik = log_lik_rdm_simple,
+    posterior_predict = posterior_predict_rdm_simple,
+    posterior_epred = posterior_epred_rdm_simple
+  )
+
+  stanvars <- brms::stanvar(
+    scode = read_lines2(paste0(
+      system.file("stan_chunks", package = "bmm"),
+      "/cswald_helper_functions.stan"
+    )),
+    block = "functions"
+  ) + brms::stanvar(
+    scode = read_lines2(paste0(
+      system.file("stan_chunks", package = "bmm"),
+      "/rdm_functions.stan"
+    )),
+    block = "functions"
+  ) + brms::stanvar(
+    scode = .rdm_stan_code("rdm_simple", cat_names, .rdm_start_var(model)),
+    block = "functions"
+  )
+
+  nlist(formula, data, stanvars)
+}
+
+#' @export
+configure_model.rdm_custom <- function(model, data, formula) {
+  cat_names <- model$other_vars$resp_cats
+  n_cats <- length(cat_names)
+  formula <- bmf2bf(model, formula)
+
+  n_dpars <- n_cats + 5
+  formula$family <- brms::custom_family(
+    "rdm_custom",
+    dpars = c("mu", cat_names, "gap", "ndt", "s", "sp"),
+    links = c(
+      "identity",
+      vapply(cat_names, function(p) model$links[[p]], character(1)),
+      model$links$gap, model$links$ndt, model$links$s, model$links$sp
+    ),
+    ub = rep(NA, n_dpars),
+    lb = c(NA, rep(0, n_cats), 0, 0, 0, 0),
+    type = "real",
+    vars = race_family_vars(n_cats),
+    loop = FALSE,
+    log_lik = log_lik_rdm_custom,
+    posterior_predict = posterior_predict_rdm_custom,
+    posterior_epred = posterior_epred_rdm_custom
+  )
+
+  stanvars <- brms::stanvar(
+    scode = read_lines2(paste0(
+      system.file("stan_chunks", package = "bmm"),
+      "/cswald_helper_functions.stan"
+    )),
+    block = "functions"
+  ) + brms::stanvar(
+    scode = read_lines2(paste0(
+      system.file("stan_chunks", package = "bmm"),
+      "/rdm_functions.stan"
+    )),
+    block = "functions"
+  ) + brms::stanvar(
+    scode = .rdm_stan_code("rdm_custom", cat_names, .rdm_start_var(model)),
+    block = "functions"
+  )
+
+  nlist(formula, data, stanvars)
+}
+
+############################################################################# !
+# Post-processing functions (shared helpers)                             ####
+############################################################################# !
+
+# The per-draw parameters of one observation as the row-per-draw matrices
+# .rdm_race_lpdf() and .rdm_race() take. get_dpar() returns a scalar for a dpar
+# brms stores fixed, so every vector is grown to ndraws, and the drifts go
+# through matrix() because vapply() returns a bare vector for a single draw.
+.rdm_draw_pars <- function(i, prep, cat_names, n_cats) {
+  n_draws <- prep$ndraws
+  list(
+    rt = prep$data$Y[i],
+    response = prep$data$vint1[i],
+    gap = rep_len(brms::get_dpar(prep, "gap", i = i), n_draws),
+    ndt = rep_len(brms::get_dpar(prep, "ndt", i = i), n_draws),
+    s = rep_len(brms::get_dpar(prep, "s", i = i), n_draws),
+    sp = rep_len(brms::get_dpar(prep, "sp", i = i), n_draws),
+    drift = matrix(vapply(cat_names, function(p) {
+      rep_len(brms::get_dpar(prep, p, i = i), n_draws)
+    }, numeric(n_draws)), nrow = n_draws),
+    counts = matrix(race_counts(prep, i, n_cats), n_draws, n_cats, byrow = TRUE)
+  )
+}
+
+.rdm_log_lik <- function(i, prep, cat_names, n_cats) {
+  d <- .rdm_draw_pars(i, prep, cat_names, n_cats)
+  .rdm_race_lpdf(
+    t = d$rt - d$ndt, response = d$response, drift = d$drift, counts = d$counts,
+    gap = d$gap, A = d$sp, s = d$s
+  )
+}
+
+.rdm_posterior_predict <- function(i, prep, cat_names, n_cats, ...) {
+  d <- .rdm_draw_pars(i, prep, cat_names, n_cats)
+  race <- .rdm_race(drift = d$drift, gap = d$gap, A = d$sp, s = d$s,
+                    counts = d$counts)
+  race$rt + d$ndt
+}
+
+# E[RT] = ndt + int_0^inf prod_j S_j(t)^n_j dt. A Monte-Carlo estimate of this
+# integral moved by several percent between two calls on the same draws, which
+# reached the user as noise on conditional_effects(); the grid is deterministic.
+.rdm_posterior_epred <- function(prep, cat_names, n_cats) {
+  epred <- matrix(NA_real_, nrow = prep$ndraws, ncol = prep$nobs)
+  for (i in seq_len(prep$nobs)) {
+    d <- .rdm_draw_pars(i, prep, cat_names, n_cats)
+    # the counts belong to the observation, not the draw, so every row is the
+    # same and the first one names the categories that race at all
+    racing <- which(d$counts[1, ] > 0)
+
+    log_surv <- function(t) {
+      out <- matrix(0, prep$ndraws, length(t))
+      for (j in racing) {
+        out <- out + d$counts[, j] *
+          wald_log_surv(t, d$drift[, j], d$gap, d$sp, d$s)
+      }
+      out
+    }
+
+    # the race is over once the slowest single accumulator is, so the plain
+    # Wald bound S(t) <= Phi((b - v t) / (s sqrt t)) on the smallest drift and
+    # the full distance b = gap + sp sets t_hi where it falls below 1e-12;
+    # t_lo is where the fastest accumulator's CDF, at the shortest distance
+    # gap, is still that small, so the survivor is 1 below it
+    v_lo <- matrixStats::rowMins(d$drift[, racing, drop = FALSE])
+    v_hi <- matrixStats::rowMaxs(d$drift[, racing, drop = FALSE])
+    root <- 7.1 * d$s
+    t_hi <- max(((root + sqrt(root^2 + 4 * v_lo * (d$gap + d$sp))) /
+                   (2 * v_lo))^2)
+    t_lo <- max(
+      min(((sqrt(root^2 + 4 * v_hi * d$gap) - root) / (2 * v_hi))^2),
+      t_hi * 1e-12
+    )
+
+    epred[, i] <- d$ndt + race_expected_time(log_surv, t_lo, t_hi)
+  }
+  epred
+}
+
+log_lik_rdm_simple <- function(i, prep) {
+  .rdm_log_lik(i, prep, cat_names = c("driftc", "drifte"), n_cats = 2)
+}
+
+posterior_predict_rdm_simple <- function(i, prep, ...) {
+  .rdm_posterior_predict(i, prep, cat_names = c("driftc", "drifte"),
+                         n_cats = 2, ...)
+}
+
+posterior_epred_rdm_simple <- function(prep) {
+  .rdm_posterior_epred(prep, cat_names = c("driftc", "drifte"), n_cats = 2)
+}
+
+log_lik_rdm_custom <- function(i, prep) {
+  cat_names <- setdiff(
+    prep$family$dpars, c("mu", "gap", "ndt", "s", "sp")
+  )
+  .rdm_log_lik(i, prep, cat_names = cat_names, n_cats = length(cat_names))
+}
+
+posterior_predict_rdm_custom <- function(i, prep, ...) {
+  cat_names <- setdiff(
+    prep$family$dpars, c("mu", "gap", "ndt", "s", "sp")
+  )
+  .rdm_posterior_predict(i, prep, cat_names = cat_names,
+                         n_cats = length(cat_names), ...)
+}
+
+posterior_epred_rdm_custom <- function(prep) {
+  cat_names <- setdiff(
+    prep$family$dpars, c("mu", "gap", "ndt", "s", "sp")
+  )
+  .rdm_posterior_epred(prep, cat_names = cat_names, n_cats = length(cat_names))
+}
+
+############################################################################# !
+# PP_CHECK OBSERVABLES                                                    ####
+############################################################################# !
+
+#' @export
+pp_observables.rdm <- function(model) {
+  race_pp_observables(model)
+}
+
+# One method for both versions: the accumulator dpars carry their own order, so
+# nothing here depends on whether they came from n_choices or from the formula.
+# rt and response come out of ONE race, so that a fast trial is a fast trial of
+# the accumulator that actually won it.
+#' @export
+pp_simulate.rdm <- function(model, prep) {
+  cat_names <- setdiff(prep$family$dpars, c("mu", "gap", "ndt", "s", "sp"))
+  n_cats <- length(cat_names)
+  n_row <- prep$ndraws * prep$nobs
+
+  race <- .rdm_race(
+    drift = matrix(vapply(cat_names, .pp_dpar_vector, numeric(n_row),
+                          prep = prep), nrow = n_row),
+    gap = .pp_dpar_vector(prep, "gap"),
+    A = .pp_dpar_vector(prep, "sp"),
+    s = .pp_dpar_vector(prep, "s"),
+    counts = matrix(vapply(seq_len(n_cats), function(j) {
+      rep(prep$data[[paste0("vint", j + 1)]], each = prep$ndraws)
+    }, integer(n_row)), nrow = n_row)
+  )
+
+  list(
+    rt = matrix(race$rt + .pp_dpar_vector(prep, "ndt"), nrow = prep$ndraws),
+    response = matrix(race$response, nrow = prep$ndraws)
+  )
+}
+
+# check_data() codes the response as the category .rdm_cat and the accumulator
+# counts as .rdm_n1 ... .rdm_nK, which are all brms keeps of them. The simple
+# version's code lumps every error into 2, which check_data() reads back to the
+# same code and counts
+#' @exportS3Method
+revert_check_data.rdm <- function(model, data) {
+  data <- race_revert_check_data(model, data, "rdm")
+  NextMethod("revert_check_data")
+}
+
+#' @exportS3Method
+model_column_roles.rdm <- function(model) {
+  if (model$version == "custom") {
+    return(c(
+      rt = "response time in seconds",
+      response = "choice, the name of the winning response category",
+      accumulators = "number of accumulators in each category (columns, or one number per category)"
+    ))
+  }
+  c(
+    rt = "response time in seconds",
+    response = "choice, 1 = correct and 2 to `n_choices` = errors"
+  )
+}
