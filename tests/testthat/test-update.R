@@ -392,6 +392,11 @@ stored_frame_cases <- function() {
   # two participants still carry every set size from 1 to 8, so they exercise
   # the same LureIdx columns at a tenth of the mock-fitting cost
   lin_2017 <- oberauer_lin_2017[oberauer_lin_2017$ID %in% 1:2, ]
+  # imm_cd reads the same trials as a change-detection task with the target at
+  # 0.5, so the stored frame has to rebuild both probe and target
+  lin_2017_cd <- transform(lin_2017,
+    target = 0.5, probe = wrap(dev_rad + 0.5), change = as.integer(abs(dev_rad) > 1)
+  )
   m3_cats <- c("corr", "other", "dist", "npl")
   m3_formula <- bmf(
     corr ~ b + a + c, other ~ b + a, dist ~ b + d, npl ~ b,
@@ -426,6 +431,27 @@ stored_frame_cases <- function() {
         nt_distances = paste0("dist_nt", 1:7), set_size = "set_size"
       ),
       formula = bmf(c ~ 1, a ~ 1, s ~ 1, kappa ~ 1), data = lin_2017
+    ),
+    imm_cd_full = list(
+      model = imm_cd("change", "probe", "target",
+        nt_features = nt_features,
+        nt_distances = paste0("dist_nt", 1:7), set_size = "set_size"
+      ),
+      formula = bmf(c ~ 1, a ~ 1, s ~ 1, kappa ~ 1), data = lin_2017_cd
+    ),
+    imm_cd_bsc = list(
+      model = imm_cd("change", "probe", "target",
+        nt_features = nt_features,
+        nt_distances = paste0("dist_nt", 1:7), set_size = "set_size",
+        version = "bsc"
+      ),
+      formula = bmf(c ~ 1, s ~ 1, kappa ~ 1, criterion ~ 1), data = lin_2017_cd
+    ),
+    imm_cd_abc = list(
+      model = imm_cd("change", "probe", "target",
+        nt_features = nt_features, set_size = "set_size", version = "abc"
+      ),
+      formula = bmf(c ~ 1, a ~ 1, kappa ~ 1), data = lin_2017_cd
     ),
     m3 = list(
       model = m3(

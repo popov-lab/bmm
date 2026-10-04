@@ -469,6 +469,16 @@ test_that("every model ships an sd default on the link scale of each parameter",
   expect_equal(sd_default(pr, "kappa"), "exponential(1)")
   expect_equal(sd_default(pr, "tau"), "exponential(2)")
 
+  cd_data <- transform(data, target = 0, probe = dev_rad, change = as.integer(abs(dev_rad) > 1))
+  pr <- default_prior(
+    bmf(kappa ~ 1 + (1 | ID), a ~ 1 + (1 | ID), c ~ 1 + (1 | ID), s ~ 1 + (1 | ID),
+        criterion ~ 1 + (1 | ID)), cd_data,
+    imm_cd("change", "probe", "target", nt_features = paste0("col_nt", 1:7),
+           nt_distances = paste0("dist_nt", 1:7), set_size = "set_size")
+  )
+  for (par in c("kappa", "a", "c", "s")) expect_equal(sd_default(pr, par), "exponential(1)")
+  expect_equal(sd_default(pr, "criterion"), "exponential(2)")
+
   pr <- default_prior(bmf(kappa ~ 1 + (1 | ID), c ~ 1 + (1 | ID)), data, sdm("dev_rad"))
   for (par in c("kappa", "c")) expect_equal(sd_default(pr, par), "exponential(1)")
 

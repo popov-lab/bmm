@@ -295,6 +295,12 @@ check_data.imm_full <- function(model, data, formula) {
 # without an intercept; with one, brms rejects the pin as matching no parameter
 #' @export
 check_formula.imm <- function(model, data, formula) {
+  .imm_check_set_size_intercept(model, formula)
+  NextMethod("check_formula")
+}
+
+# shared with imm_cd(), whose set-size-1 trials are as uninformative
+.imm_check_set_size_intercept <- function(model, formula) {
   set_size_var <- model$other_vars$set_size
   pred_list <- rhs_vars(formula, collapse = FALSE)
   has_set_size <- vapply(pred_list, function(x) set_size_var %in% x, logical(1))
@@ -307,7 +313,6 @@ check_formula.imm <- function(model, data, formula) {
     that the intercept is supressed when set_size is used as predictor. \\
     Try using 0 + {set_size_var} instead."
   )
-  NextMethod("check_formula")
 }
 
 ############################################################################# !
@@ -363,6 +368,10 @@ configure_model.imm <- function(model, data, formula) {
 # are pinned to a constant, as they were before imm moved to a custom family
 #' @export
 configure_prior.imm <- function(model, data, formula, user_prior, ...) {
+  .imm_set_size1_prior(model, data, formula)
+}
+
+.imm_set_size1_prior <- function(model, data, formula) {
   set_size_var <- model$other_vars$set_size
   if (!any(data$ss_numeric == 1) || is.numeric(data[[set_size_var]])) {
     return(NULL)
@@ -406,9 +415,10 @@ posterior_epred_imm_full <- posterior_epred_undefined("imm")
 posterior_epred_imm_bsc <- posterior_epred_undefined("imm")
 posterior_epred_imm_abc <- posterior_epred_undefined("imm")
 
-# the non-target features come first in the vreal block, the distances after
-.imm_covariates <- function(prep, i, with_distances) {
-  covariates <- .circmix_prep_nt(prep, i)
+# the non-target features come first in the vreal block, the distances after;
+# skip drops the probe of imm_cd()
+.imm_covariates <- function(prep, i, with_distances, skip = 0L) {
+  covariates <- .circmix_prep_nt(prep, i, skip = skip)
   if (!with_distances) {
     return(list(nt = covariates, dist = NULL))
   }

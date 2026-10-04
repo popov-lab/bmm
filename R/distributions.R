@@ -865,6 +865,113 @@ rimm <- function(n, mu = c(0, 2, -1.5), dist = c(0, 0.5, 2),
   )
 }
 
+#' @title Distribution functions for the IMM of change detection
+#'
+#' @description Probability of a "change" or "same" response, and random
+#'   generation of responses, under the interference measurement model for
+#'   single-probe change detection (Lin & Oberauer, 2022). The item activations
+#'   are those of [dimm()]; the observer retrieves a feature from that mixture
+#'   and answers "change" when the log-likelihood ratio of a change against no
+#'   change exceeds `criterion`. See [imm_cd()].
+#'
+#' @name imm_cd_dist
+#'
+#' @param x Vector of responses, 0 for "same" and 1 for "change"
+#' @param n Number of observations to generate data for
+#' @param probe Vector of probe features, in radians, in the same frame as `mu`
+#' @inheritParams IMMdist
+#' @param criterion Vector of decision criteria. 0 is an unbiased observer;
+#'   larger values make "change" responses less likely.
+#' @param knowledge `"limited"` (default) or `"rich"`: whether the observer
+#'   knows only the distribution of precision or the precision of the trial.
+#'   Matters only when `tau > 0`. See [imm_cd()].
+#'
+#' @keywords distribution
+#'
+#' @references Lin, H.-Y., & Oberauer, K. (2022). An interference model for
+#'   visual working memory: Applications to the change detection task.
+#'   Cognitive Psychology, 133, 101463.
+#'
+#' @return `dimm_cd` gives the probability of each response, `rimm_cd`
+#'   simulated responses (1 = "change").
+#'
+#' @export
+#'
+#' @examples
+#' # an identical probe is mostly called "same", a probe far from every item
+#' # mostly "change", and a probe at a non-target falls in between
+#' dimm_cd(1, probe = c(0, pi, 2), mu = c(0, 2, -1.5), dist = c(0, 0.5, 2))
+#' mean(rimm_cd(1000, probe = 2, mu = c(0, 2, -1.5), dist = c(0, 0.5, 2)))
+dimm_cd <- function(x, probe, mu = c(0, 2, -1.5), dist = c(0, 0.5, 2),
+                    c = 5, a = 2, b = 1, s = 2, kappa = 5, criterion = 0,
+                    tau = 0, knowledge = c("limited", "rich"), vp_nodes = 41L,
+                    log = FALSE) {
+  knowledge <- match.arg(knowledge)
+  .check_imm_args(kappa, s, dist, tau, length(mu))
+  stopif(!all(x %in% c(0, 1)), "x must be 0 ('same') or 1 ('change').")
+
+  args <- .circmix_recycle(x = x, probe = probe)
+  p_same <- .imm_cd_item_psame(
+    args$probe, mu, dist, c, a, b, s, kappa, criterion, tau, knowledge, vp_nodes
+  )
+  density <- .cd_bernoulli_ld(args$x, p_same)
+
+  if (!log) {
+    return(exp(density))
+  }
+
+  density
+}
+
+#' @rdname imm_cd_dist
+#' @export
+rimm_cd <- function(n, probe, mu = c(0, 2, -1.5), dist = c(0, 0.5, 2),
+                    c = 5, a = 2, b = 1, s = 2, kappa = 5, criterion = 0,
+                    tau = 0, knowledge = c("limited", "rich"), vp_nodes = 41L) {
+  knowledge <- match.arg(knowledge)
+  .check_imm_args(kappa, s, dist, tau, length(mu))
+
+  p_same <- .imm_cd_item_psame(
+    rep_len(probe, n), mu, dist, c, a, b, s, kappa, criterion, tau, knowledge,
+    vp_nodes
+  )
+  stats::rbinom(n, 1, 1 - p_same)
+}
+
+# The activations of dimm(), with the target first in mu and dist
+.imm_cd_item_psame <- function(probe, mu, dist, c, a, b, s, kappa, criterion,
+                               tau, knowledge, nodes) {
+  n <- length(probe)
+  weights <- .imm_item_weights(
+    rep_len(c, n), rep_len(a, n), rep_len(s, n), rep_len(b, n), dist
+  )
+  .circmix_cd_vp_psame(
+    probe - matrix(mu, nrow = n, ncol = length(mu), byrow = TRUE),
+    weights$logw, weights$logw_guess, rep_len(kappa, n), rep_len(tau, n),
+    rep_len(criterion, n), exp(weights$logw[, 1]), knowledge == "rich", nodes
+  )
+}
+
+# P("same") for one trial layout, as .dimm_version() gives the density; twin of
+# the imm_cd_*_core() functions in inst/stan_chunks/imm_cd_funs.stan. The
+# observer's prior that the probed item is stored is the target's retrieval
+# weight (Lin & Oberauer, 2022, Eq. B.21)
+.imm_cd_psame <- function(probe, mu, kappa, c, a, s, b, criterion, set_size,
+                          nt, dist, tau, nodes, rich, version) {
+  args <- .circmix_recycle(
+    probe = probe, mu = mu, kappa = kappa, c = c, a = a %||% 1, s = s %||% 0,
+    b = b, criterion = criterion, tau = tau
+  )
+  weights <- .imm_log_weights(
+    args$c, args$a, args$s, args$b, set_size, dist, version
+  )
+  .circmix_cd_vp_psame(
+    args$probe - .circmix_locations(args$mu, nt, set_size),
+    weights$logw, weights$logw_guess, args$kappa, args$tau, args$criterion,
+    exp(weights$logw[, 1]), rich, nodes
+  )
+}
+
 #' @title Distribution functions for the Memory Measurement Model (M3)
 #'
 #' @description Density and random generation functions for the memory

@@ -100,6 +100,7 @@ test_that("model_versions() lists the versions a constructor accepts", {
 test_that("imm(), m3(), ezdm() and sdm() refuse an unknown version", {
   expect_error(sdm("y", version = "xyz"), "should be \"simple\"")
   expect_error(imm("y", "x", "d", "s", version = "xyz"), "should be one of")
+  expect_error(imm_cd("r", "p", "t", "x", "d", "s", version = "xyz"), "should be one of")
   expect_error(m3(c("corr", "other"), c(1, 4), version = "xyz"), "should be one of")
   expect_error(ezdm("m", "v", "n", "t", version = "xyz"), "should be one of")
   expect_error(mixture3p("y", "x", "s", version = "xyz"), "should be one of")

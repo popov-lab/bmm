@@ -562,6 +562,22 @@ data_column_roles <- list(
     nt_distances = NA,
     set_size = "set size (a column, or one number)"
   ),
+  imm_cd = c(
+    response = "0 = 'same', 1 = 'change'",
+    probe = "probe feature, in radians",
+    target = "feature of the probed item in the memory array, in radians",
+    nt_features = "non-target features relative to the target, in radians, one column per non-target",
+    nt_distances = "distance of each non-target to the target, one column per non-target",
+    set_size = "set size (a column, or one number)"
+  ),
+  imm_cd_abc = c(
+    response = "0 = 'same', 1 = 'change'",
+    probe = "probe feature, in radians",
+    target = "feature of the probed item in the memory array, in radians",
+    nt_features = "non-target features relative to the target, in radians, one column per non-target",
+    nt_distances = NA,
+    set_size = "set size (a column, or one number)"
+  ),
   m3 = c(
     resp_cats = "number of responses in each response category, one column per category",
     num_options = "number of candidates in each category (columns, or one number per category)"
