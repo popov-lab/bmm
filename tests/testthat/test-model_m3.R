@@ -531,6 +531,28 @@ test_that("m3 refuses data columns it would overwrite (#496)", {
   }
 })
 
+test_that("a response category may be called Y or nTrials, also in the stored frame (#496)", {
+  for (cat in c("Y", "nTrials")) {
+    dat <- oberauer_lewandowsky_2019_e1
+    names(dat)[names(dat) == "corr"] <- cat
+    cats <- c(cat, "other", "npl")
+    fit <- bmm(
+      bmf(c ~ 1, a ~ 1), dat,
+      m3(cats, num_options = c("n_corr", "n_other", "n_npl"), choice_rule = "simple", version = "ss"),
+      backend = "mock", mock_fit = 1, rename = FALSE
+    )
+    stored <- check_stored_data(fit$bmm$model, fit$data, fit$bmm$user_formula)
+    expect_equal(unname(stored$Y[, cats]), unname(as.matrix(dat[cats])))
+  }
+})
+
+test_that("m3 refuses missing option counts (#496)", {
+  dat <- oberauer_lewandowsky_2019_e1
+  dat$n_other[1:3] <- NA
+  dat$n_npl[1] <- NA
+  expect_error(m3_data_fit(dat), "missing values: n_other \\(3 NA\\), n_npl \\(1 NA\\)")
+})
+
 test_that("m3 rejects num_options it cannot map onto the response categories", {
   cats <- c("corr", "other", "npl")
   expect_error(m3(cats, num_options = c(corr = 1, 4, 5)), "all elements")

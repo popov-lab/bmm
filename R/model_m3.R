@@ -348,10 +348,10 @@ check_data.m3 <- function(model, data, formula) {
   missing_variables <- setdiff(resp_name, col_names)
   stopif(length(missing_variables), "The response variable(s) {paste0(missing_variables, collapse = ', ')} missing in the data")
 
-  # response columns are consumed into Y, so only other columns would be lost
+  # Y and nTrials may name a category, whose column is consumed first; brms refuses `_` in category names
   reserved_cols <- intersect(
-    c("Y", "nTrials", paste0("Idx_", resp_name)),
-    setdiff(col_names, resp_name)
+    c(setdiff(c("Y", "nTrials"), resp_name), paste0("Idx_", resp_name)),
+    col_names
   )
   stopif(
     length(reserved_cols) > 0,
@@ -373,6 +373,14 @@ check_data.m3 <- function(model, data, formula) {
     missing_options <- setdiff(n_opt_vect, col_names)
     stopif(length(missing_options), "The variable(s) {paste0(missing_options, collapse = ', ')} missing in the data")
     opt_vars <- n_opt_vect
+    na_counts <- colSums(is.na(data[opt_vars]))
+    na_counts <- na_counts[na_counts > 0]
+    stopif(
+      length(na_counts) > 0,
+      "The option count column(s) contain missing values: \\
+      {paste0(names(na_counts), ' (', na_counts, ' NA)', collapse = ', ')}. \\
+      Give the number of response options for every row, and 0 where the category had none."
+    )
   } else if (is.numeric(n_opt_vect)) {
     # n_opt_vect is the *number* of options for each response variable
     opt_vars <- names(n_opt_vect)
@@ -409,7 +417,7 @@ check_data.m3 <- function(model, data, formula) {
 
   # NA is how a category without options is usually recorded, and there it is
   # the true count; only where the category had options is a count lost
-  n_missing <- sum(missing_counts & as.matrix(data[n_opt_idx_vars]) == 1, na.rm = TRUE)
+  n_missing <- sum(missing_counts & as.matrix(data[n_opt_idx_vars]) == 1)
   warnif(
     n_missing > 0,
     "The response category columns contain {n_missing} missing value(s) in rows \\

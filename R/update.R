@@ -285,8 +285,8 @@ revert_check_data.m3 <- function(model, data) {
     )
     data[num_options][no_options] <- 0
   }
-  # check_data() refuses these as user columns it would overwrite
-  data[setdiff(c("Y", "nTrials", paste0("Idx_", resp_cats)), resp_cats)] <- NULL
+  # check_data() refuses these as user columns, but a category named Y or nTrials was just restored
+  data[c(setdiff(c("Y", "nTrials"), resp_cats), paste0("Idx_", resp_cats))] <- NULL
   NextMethod("revert_check_data")
 }
 
