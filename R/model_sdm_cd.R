@@ -199,7 +199,7 @@ revert_postprocess_brm.sdm_cd <- function(model, fit, ...) {
 
 log_lik_sdm_cd <- function(i, prep) {
   p_same <- .sdm_cd_dpar_psame(prep, i)
-  .cd_bernoulli_ld(rep_len(prep$data$Y[i], length(p_same)), p_same)
+  .cd_bernoulli_ld(prep$data$Y[i], p_same)
 }
 
 posterior_predict_sdm_cd <- function(i, prep, ...) {
