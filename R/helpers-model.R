@@ -699,8 +699,8 @@ model_overview <- function(group = NULL) {
 #'   meant for, one line per model with its constructor and full name. The
 #'   groups are: continuous reproduction; categorical recall and n-AFC
 #'   decisions; detection, recognition and confidence judgments; choices and
-#'   response times. Type `?modelname` (for example `?imm`) for the arguments
-#'   of a model.
+#'   response times; processing-tree models. Type `?modelname` (for example
+#'   `?imm`) for the arguments of a model.
 #' @return A character vector of model names with class `bmm_models`, which
 #'   prints as the grouped list. Use it as a character vector in base R or
 #'   dplyr, e.g. `"imm" %in% bmm_models()`; `as.character()` gives a plain one
