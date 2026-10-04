@@ -447,6 +447,42 @@ test_that("num_options names already taken by a column or parameter give an erro
   expect_error(m3_num_options_fit(c(ID = 1, k2 = 4, k3 = 5, k4 = 5)), "'ID'")
 })
 
+m3_data_fit <- function(data) {
+  bmm(
+    bmf(corr ~ b + a + c, other ~ b + a, dist ~ b + d, npl ~ b, c ~ 1, a ~ 1, d ~ 1),
+    data,
+    m3(
+      resp_cats = c("corr", "other", "dist", "npl"),
+      num_options = c("n_corr", "n_other", "n_dist", "n_npl"),
+      choice_rule = "simple", links = list(c = "log", a = "log", d = "log"),
+      default_priors = list(
+        c = list(main = "normal(2, 0.5)", effects = "normal(0, 0.5)"),
+        a = list(main = "normal(0, 0.5)", effects = "normal(0, 0.5)"),
+        d = list(main = "normal(0, 0.5)", effects = "normal(0, 0.5)")
+      )
+    ),
+    backend = "mock", mock_fit = 1, rename = FALSE
+  )
+}
+
+test_that("m3 warns about missing counts only where the category has options (#496)", {
+  dat <- oberauer_lewandowsky_2019_e1
+  expect_true(all(is.na(dat$dist) == (dat$n_dist == 0)))
+  expect_silent(m3_data_fit(dat))
+
+  dat$other[1:3] <- NA
+  dat$dist[dat$n_dist > 0][1:2] <- NA
+  expect_warning(m3_data_fit(dat), "contain 5 missing value\\(s\\)")
+})
+
+test_that("m3 refuses data columns it would overwrite (#496)", {
+  for (col in c("nTrials", "Y", "Idx_corr")) {
+    dat <- oberauer_lewandowsky_2019_e1
+    dat[[col]] <- 1
+    expect_error(m3_data_fit(dat), glue::glue("'{col}' would be overwritten"))
+  }
+})
+
 test_that("m3 rejects num_options it cannot map onto the response categories", {
   cats <- c("corr", "other", "npl")
   expect_error(m3(cats, num_options = c(corr = 1, 4, 5)), "all elements")

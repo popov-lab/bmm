@@ -338,9 +338,22 @@ check_data.m3 <- function(model, data, formula) {
   missing_variables <- setdiff(resp_name, col_names)
   stopif(length(missing_variables), "The response variable(s) {paste0(missing_variables, collapse = ', ')} missing in the data")
 
+  # response columns are consumed into Y, so only other columns would be lost
+  reserved_cols <- intersect(
+    c("Y", "nTrials", paste0("Idx_", resp_name)),
+    setdiff(col_names, resp_name)
+  )
+  stopif(
+    length(reserved_cols) > 0,
+    "The data column(s) {collapse_comma(reserved_cols)} would be overwritten by \\
+    the response matrix, trial counts and option indicators that bmm builds. \\
+    Please rename them."
+  )
+
   # Transfer all of the response variables to a matrix and name it 'Y'
   resp_matrix <- as.matrix(data[resp_name])
-  resp_matrix[is.na(resp_matrix)] <- 0
+  missing_counts <- is.na(resp_matrix)
+  resp_matrix[missing_counts] <- 0
   data <- data[!col_names %in% resp_name]
   data$nTrials <- rowSums(resp_matrix)
   data$Y <- resp_matrix
@@ -383,6 +396,15 @@ check_data.m3 <- function(model, data, formula) {
   n_opt_idx_vars <- paste0("Idx_", resp_name)
   data[n_opt_idx_vars] <- as.integer(data[opt_vars] > 0)
   data[opt_vars][data[opt_vars] == 0] <- 0.0001
+
+  # NA is how a category without options is usually recorded, and there it is
+  # the true count; only where the category had options is a count lost
+  n_missing <- sum(missing_counts & as.matrix(data[n_opt_idx_vars]) == 1, na.rm = TRUE)
+  warnif(
+    n_missing > 0,
+    "The response category columns contain {n_missing} missing value(s) in rows \\
+    where the category has response options. They are counted as 0 responses."
+  )
 
   NextMethod("check_data")
 }
