@@ -86,6 +86,13 @@ scale when the constant prior is built, so
 \code{\link[=default_prior]{default_prior()}} shows \code{constant(0)} for a guessing rate of 0.5 under
 the logit link.
 
+\code{summary()} reports intercepts and regression coefficients on the latent
+(logit or probit) scale. \code{\link[=native_parameters]{native_parameters()}} returns the posterior
+draws of every parameter on the probability scale for each observed
+combination of the predictors, e.g.
+\code{native_parameters(fit, re_formula = NA, summary = TRUE)}; a difference
+between conditions is the difference of these draws.
+
 Order constraints between parameters (\code{Do > Dn}) are expressed by
 reparameterizing the larger parameter in the model formula, e.g.
 \code{bmf(Do ~ Dn + (1 - Dn) * inv_logit(phi), Dn ~ 1, phi ~ 1)}; the section
@@ -150,6 +157,8 @@ fit <- bmm(
 )
 
 summary(fit)
+# population-level D and g on the probability scale
+native_parameters(fit, re_formula = NA, summary = TRUE)
 }
 
 }

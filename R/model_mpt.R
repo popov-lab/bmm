@@ -270,6 +270,13 @@ settable_link_functions.mpt <- function(model) {
 #'   [default_prior()] shows `constant(0)` for a guessing rate of 0.5 under
 #'   the logit link.
 #'
+#'   `summary()` reports intercepts and regression coefficients on the latent
+#'   (logit or probit) scale. [native_parameters()] returns the posterior
+#'   draws of every parameter on the probability scale for each observed
+#'   combination of the predictors, e.g.
+#'   `native_parameters(fit, re_formula = NA, summary = TRUE)`; a difference
+#'   between conditions is the difference of these draws.
+#'
 #'   Order constraints between parameters (`Do > Dn`) are expressed by
 #'   reparameterizing the larger parameter in the model formula, e.g.
 #'   `bmf(Do ~ Dn + (1 - Dn) * inv_logit(phi), Dn ~ 1, phi ~ 1)`; the section
@@ -337,6 +344,8 @@ settable_link_functions.mpt <- function(model) {
 #' )
 #'
 #' summary(fit)
+#' # population-level D and g on the probability scale
+#' native_parameters(fit, re_formula = NA, summary = TRUE)
 #' }
 #'
 #' @export
