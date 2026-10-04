@@ -300,14 +300,18 @@ mixture3p <- function(resp_error, nt_features, set_size, regex = FALSE,
 
 #' @export
 check_formula.mixture3p <- function(model, data, formula) {
-  swap <- .mixture3p_version_table[[model$version]]$swap_parameter
-  set_size_var <- model$other_vars$set_size
+  .mixture3p_warn_set_size_one(model, data, formula)
+  NextMethod("check_formula")
+}
 
-  # A trial with one item has no non-target to swap to, so that level of the
-  # swap parameter is absent from the likelihood and samples its prior. The
-  # previous mixture implementation hid this by pinning the level to a constant,
-  # which it had to do anyway to switch off the sentinel weight.
-  predicted_by_set_size <- set_size_var %in% rhs_vars(formula[[swap]])
+# A trial with one item has no non-target to swap to, so that level of the
+# swap parameter is absent from the likelihood and samples its prior. The
+# previous mixture implementation hid this by pinning the level to a constant,
+# which it had to do anyway to switch off the sentinel weight. Shared with
+# mixture3p_cd(), whose likelihood has the same gap.
+.mixture3p_warn_set_size_one <- function(model, data, formula) {
+  swap <- .mixture3p_version_table[[model$version]]$swap_parameter
+  predicted_by_set_size <- model$other_vars$set_size %in% rhs_vars(formula[[swap]])
   warnif(
     predicted_by_set_size && isTRUE(any(data[["ss_numeric"]] == 1)),
     "Your data contain trials with a set size of 1, where no swap can occur, \\
@@ -315,8 +319,6 @@ check_formula.mixture3p <- function(model, data, formula) {
     prior. Drop those trials from the formula for '{swap}', or read that level \\
     as prior-only."
   )
-
-  NextMethod("check_formula")
 }
 
 ############################################################################# !
