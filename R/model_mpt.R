@@ -227,6 +227,14 @@ settable_link_functions.mpt <- function(model) {
 #'
 #' @details `r model_docs(.model_mpt(), components = c('domain', 'task', 'name', 'citation'))`
 #'
+#'   The data hold aggregated counts: one row per participant and tree (and
+#'   per condition, if conditions are crossed with the trees), with one count
+#'   column per response category. The count columns must be named exactly
+#'   like the branch names given to [mpt_tree()] (`old` and `new` in the
+#'   example below); `bmm()` finds them by these names, so no response
+#'   variable is passed. The `tree_id` column names the tree of each row, and
+#'   the counts of a row must come from trials of that tree.
+#'
 #'   A separate tree is needed only when the *branch expressions* differ — that
 #'   is, when the trial determines which latent processes apply (old versus
 #'   new probes, inclusion versus exclusion instructions).
@@ -301,7 +309,8 @@ settable_link_functions.mpt <- function(model) {
 #'   tree_id = "item_type"
 #' )
 #'
-#' # simulate data for 20 participants with D = 0.7, g = 0.5
+#' # simulate data for 20 participants with D = 0.7, g = 0.5:
+#' # one row per participant x tree; count columns named after the branches
 #' data <- data.frame(
 #'   id = rep(1:20, each = 2),
 #'   item_type = rep(c("old", "new"), 20)
