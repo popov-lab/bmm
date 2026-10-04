@@ -408,10 +408,11 @@ mpt <- function(trees, tree_id = NULL, links = "logit", ...) {
   }))
   stopif(
     length(zero_branches) > 0,
-    "The branch probability of {paste(zero_branches, collapse = ', ')} is the \\
-    constant 0, which makes the likelihood undefined. Response categories that \\
-    a tree cannot produce will be declared with mpt_tree(impossible = ) in a \\
-    later release; this version does not support them."
+    "Branch probabilities that are the constant 0: \\
+    {paste(zero_branches, collapse = ', ')}. A zero probability makes the \\
+    likelihood undefined. Response categories that a tree cannot produce will \\
+    be declared with mpt_tree(impossible = ) in a later release; this version \\
+    does not support them."
   )
 
   stopif(
