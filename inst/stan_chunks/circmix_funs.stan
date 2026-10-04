@@ -72,13 +72,10 @@
     return i % 2 == 0 ? log(4) : log(2);
   }
 
-  // circmix_ld with J marginalised over gamma(J(kappa) / tau, scale = tau) on a Simpson grid in log J; tau = 0 is constant precision
-  real circmix_vp_ld(vector cosd, vector logw, real logw_guess,
-                     real kappa, real tau, int nodes,
-                     data vector logk, data vector dlogk,
-                     data real logJ_min, data real dlogJ) {
+  // gamma shape J(kappa) / tau of the precision distribution; +Inf when precision is constant (tau = 0 or a grid narrower than 1e-6)
+  real circmix_vp_shape(real kappa, real tau, int nodes) {
     if (tau <= 0) {
-      return circmix_ld(cosd, logw, logw_guess, kappa);
+      return positive_infinity();
     }
     real shape = circmix_J(kappa) / tau;
     if (shape < 40.0 / nodes) {
@@ -87,22 +84,45 @@
              40.0 / nodes, ", but got ", shape,
              ". Raise vp_nodes, or use a more informative prior on tau.");
     }
-    real half_width = 8 * sqrt(trigamma(shape));
-    if (half_width < 1e-6) {
-      return circmix_ld(cosd, logw, logw_guess, kappa);
+    if (8 * sqrt(trigamma(shape)) < 1e-6) {
+      return positive_infinity();
     }
+    return shape;
+  }
+
+  // Simpson grid in log J over gamma(shape, scale = tau): column 1 log J, column 2 log quadrature weight
+  matrix circmix_vp_grid(real shape, real tau, int nodes) {
+    real half_width = 8 * sqrt(trigamma(shape));
     real step = 2 * half_width / (nodes - 1);
     real centre = digamma(shape) + log(tau);
     real rate = inv(tau);
-    vector[nodes] lp;
+    matrix[nodes, 2] grid;
     for (i in 1:nodes) {
       real t = centre - half_width + (i - 1) * step;
-      real J = exp(t);
-      lp[i] = circmix_simpson_lw(i, nodes) + t + gamma_lpdf(J | shape, rate)
-              + circmix_ld(cosd, logw, logw_guess,
-                           circmix_kappa(J, logk, dlogk, logJ_min, dlogJ));
+      grid[i, 1] = t;
+      grid[i, 2] = circmix_simpson_lw(i, nodes) + t + gamma_lpdf(exp(t) | shape, rate)
+                   + log(step / 3);
     }
-    return log_sum_exp(lp) + log(step / 3);
+    return grid;
+  }
+
+  // circmix_ld with J marginalised over gamma(J(kappa) / tau, scale = tau) on a Simpson grid in log J; tau = 0 is constant precision
+  real circmix_vp_ld(vector cosd, vector logw, real logw_guess,
+                     real kappa, real tau, int nodes,
+                     data vector logk, data vector dlogk,
+                     data real logJ_min, data real dlogJ) {
+    real shape = circmix_vp_shape(kappa, tau, nodes);
+    if (is_inf(shape)) {
+      return circmix_ld(cosd, logw, logw_guess, kappa);
+    }
+    matrix[nodes, 2] grid = circmix_vp_grid(shape, tau, nodes);
+    vector[nodes] lp;
+    for (i in 1:nodes) {
+      lp[i] = grid[i, 2]
+              + circmix_ld(cosd, logw, logw_guess,
+                           circmix_kappa(exp(grid[i, 1]), logk, dlogk, logJ_min, dlogJ));
+    }
+    return log_sum_exp(lp);
   }
 
   // slot allocation of capacity K over set size ss: [floor(K / ss), probability of one more slot]
@@ -112,29 +132,44 @@
     return [f, q - f]';
   }
 
+  // slot-averaging branches: [held, kappa_lo, kappa_hi, log P(lo), log P(hi)]; kappa_lo is 0 when no slot is held
+  vector circmix_slot_averaging_branches(real K, int ss, real kappa,
+                                         data vector logk, data vector dlogk,
+                                         data real logJ_min, data real dlogJ) {
+    vector[2] allocation = circmix_slots(K, ss);
+    real slots = allocation[1];
+    real extra = allocation[2];
+    real J1 = circmix_J(kappa);
+    int held = slots >= 0.5;
+    real kappa_lo = 0;
+    if (held) {
+      kappa_lo = circmix_kappa(slots * J1, logk, dlogk, logJ_min, dlogJ);
+    }
+    real kappa_hi = circmix_kappa((slots + 1) * J1, logk, dlogk, logJ_min, dlogJ);
+    return [held, kappa_lo, kappa_hi, log1m(extra), log(extra)]';
+  }
+
   // slot averaging (Zhang & Luck, 2008): a j-slot item has J = j * J(kappa); composes with variable precision via tau
   real circmix_slot_averaging_ld(vector cosd, vector logw, real K, int ss,
                                  real kappa, real tau, int nodes,
                                  data vector logk, data vector dlogk,
                                  data real logJ_min, data real dlogJ) {
-    vector[2] allocation = circmix_slots(K, ss);
-    real slots = allocation[1];
-    real extra = allocation[2];
-    real J1 = circmix_J(kappa);
-
-    real kappa_hi = circmix_kappa((slots + 1) * J1, logk, dlogk, logJ_min, dlogJ);
-    real lp_hi = log(extra)
-                 + circmix_vp_ld(cosd, logw, negative_infinity(), kappa_hi, tau,
+    vector[5] branch = circmix_slot_averaging_branches(K, ss, kappa, logk, dlogk,
+                                                       logJ_min, dlogJ);
+    real lp_hi = branch[5]
+                 + circmix_vp_ld(cosd, logw, negative_infinity(), branch[3], tau,
                                  nodes, logk, dlogk, logJ_min, dlogJ);
-
-    if (slots < 0.5) {
-      return log_sum_exp(log1m(extra) - log(2 * pi()), lp_hi);
+    if (branch[1] == 0) {
+      return log_sum_exp(branch[4] - log(2 * pi()), lp_hi);
     }
-
-    real kappa_lo = circmix_kappa(slots * J1, logk, dlogk, logJ_min, dlogJ);
     return log_sum_exp(
-      log1m(extra) + circmix_vp_ld(cosd, logw, negative_infinity(), kappa_lo,
-                                   tau, nodes, logk, dlogk, logJ_min, dlogJ),
+      branch[4] + circmix_vp_ld(cosd, logw, negative_infinity(), branch[2],
+                                tau, nodes, logk, dlogk, logJ_min, dlogJ),
       lp_hi
     );
+  }
+
+  // target first, then the ss - 1 active non-targets of a trial
+  vector circmix_locations(real mu, vector nt, int ss) {
+    return append_row(mu, head(nt, ss - 1));
   }

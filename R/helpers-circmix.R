@@ -139,44 +139,62 @@
 # J ~ gamma(shape = J(kappa) / tau, scale = tau) on a composite Simpson grid in
 # log J. tau = 0 is the point mass at J(kappa), so rows with tau = 0 fall back
 # to the constant-precision density, which is why tau is the parameter
-# variable_precision frees. The nodes are centred on
-# E[log J] = digamma(shape) + log(tau) with half width
-# 8 sd(log J) = 8 sqrt(trigamma(shape)); the offsets are constants, so only the
-# centre and the width depend on parameters, and they do so smoothly.
+# variable_precision frees.
 .circmix_vp_ld <- function(cosd, logw, logw_guess, kappa, tau, nodes = 41L,
                            tab = .circmix_kappa_table()) {
   out <- .circmix_ld(cosd, logw, logw_guess, kappa)
-  shape <- .circmix_J(kappa) / tau
-  half_width <- 8 * sqrt(trigamma(shape))
-  vp <- which(tau > 0 & is.finite(half_width) & half_width >= 1e-6)
-  if (!length(vp)) {
+  vp <- .circmix_vp_rows(kappa, tau, nodes)
+  if (!length(vp$rows)) {
     return(out)
   }
+  rows <- vp$rows
+  grid <- .circmix_vp_grid(vp$shape, tau[rows], nodes)
+  lp <- vapply(seq_len(nodes), function(i) {
+    grid$lw[, i] + .circmix_ld(
+      cosd[rows, , drop = FALSE], logw[rows, , drop = FALSE], logw_guess[rows],
+      .circmix_kappa(exp(grid$t[, i]), tab)
+    )
+  }, numeric(length(rows)))
+  out[rows] <- matrixStats::rowLogSumExps(matrix(lp, nrow = length(rows)))
+  out
+}
+
+# The rows whose precision varies, with their gamma shapes. A row with tau = 0,
+# or one whose grid would be narrower than 1e-6, is constant precision; this is
+# the R twin of circmix_vp_shape(), which signals those rows with +Inf.
+.circmix_vp_rows <- function(kappa, tau, nodes) {
+  shape <- .circmix_J(kappa) / tau
+  half_width <- 8 * sqrt(trigamma(shape))
+  rows <- which(tau > 0 & is.finite(half_width) & half_width >= 1e-6)
   stopif(
-    any(shape[vp] < 40 / nodes),
+    any(shape[rows] < 40 / nodes),
     "The variable-precision quadrature holds the log density to about 1e-5 \\
     while the gamma shape J(kappa)/tau stays above {40 / nodes}, but the \\
-    smallest value here is {min(shape[vp])}. Raise vp_nodes."
+    smallest value here is {min(shape[rows])}. Raise vp_nodes."
   )
+  list(rows = rows, shape = shape[rows])
+}
 
-  centre <- digamma(shape[vp]) + log(tau[vp])
+# Composite Simpson grid in log J for gamma(shape, scale = tau), one row per
+# shape: t holds log J at each node and lw the log quadrature weight (Simpson
+# coefficient, Jacobian of the log transform, gamma density and step / 3), so
+# any f(J) is marginalised as rowLogSumExps(lw + f(exp(t))). The nodes are
+# centred on E[log J] = digamma(shape) + log(tau) with half width
+# 8 sd(log J) = 8 sqrt(trigamma(shape)); the offsets are constants, so only the
+# centre and the width depend on parameters, and they do so smoothly.
+.circmix_vp_grid <- function(shape, tau, nodes) {
+  half_width <- 8 * sqrt(trigamma(shape))
+  centre <- digamma(shape) + log(tau)
   offsets <- seq(-1, 1, length.out = nodes)
   simpson <- log(c(1, rep(c(4, 2), length.out = nodes - 2), 1))
-  lp <- vapply(seq_len(nodes), function(i) {
-    t <- centre + half_width[vp] * offsets[i]
-    J <- exp(t)
-    simpson[i] + t +
-      stats::dgamma(J, shape = shape[vp], scale = tau[vp], log = TRUE) +
-      .circmix_ld(
-        cosd[vp, , drop = FALSE], logw[vp, , drop = FALSE], logw_guess[vp],
-        .circmix_kappa(J, tab)
-      )
-  }, numeric(length(vp)))
-
-  step <- 2 * half_width[vp] / (nodes - 1)
-  out[vp] <- matrixStats::rowLogSumExps(matrix(lp, nrow = length(vp))) +
-    log(step / 3)
-  out
+  step <- 2 * half_width / (nodes - 1)
+  t <- centre + outer(half_width, offsets)
+  lw <- vapply(seq_len(nodes), function(i) {
+    simpson[i] + t[, i] +
+      stats::dgamma(exp(t[, i]), shape = shape, scale = tau, log = TRUE) +
+      log(step / 3)
+  }, numeric(length(shape)))
+  list(t = t, lw = matrix(lw, nrow = length(shape)))
 }
 
 # Draws from the mixture by picking a component and then sampling from it, which
@@ -230,6 +248,23 @@
   nlist(slots, extra = q - slots)
 }
 
+# The two slot counts the reported item can hold: floor(K / set_size) with
+# probability 1 - extra (kappa_lo; no slot when held is FALSE, and kappa_lo is
+# then 0) and one more with probability extra (kappa_hi). Twin of
+# circmix_slot_averaging_branches().
+.circmix_slot_averaging_branches <- function(K, set_size, kappa) {
+  allocation <- .circmix_slots(K, set_size)
+  single_slot <- .circmix_J(kappa)
+  held <- allocation$slots >= 0.5
+  kappa_lo <- numeric(length(held))
+  kappa_lo[held] <- .circmix_kappa(allocation$slots[held] * single_slot[held])
+  list(
+    held = held, kappa_lo = kappa_lo,
+    kappa_hi = .circmix_kappa((allocation$slots + 1) * single_slot),
+    log_w_lo = log1p(-allocation$extra), log_w_hi = log(allocation$extra)
+  )
+}
+
 # Slot averaging (Zhang & Luck, 2008): the reported item holds floor(K /
 # set_size) or one more slot, and averaging independent samples adds their
 # Fisher information, so a j-slot item has J_j = j * J(kappa) with kappa the
@@ -239,23 +274,18 @@
 # what passing kappa_j with the same tau gives, so the two mechanisms compose
 # without a second quadrature over slot counts.
 .circmix_slot_averaging_ld <- function(cosd, logw, K, set_size, kappa, tau, nodes) {
-  n <- nrow(cosd)
-  allocation <- .circmix_slots(K, set_size)
-  no_guessing <- rep(-Inf, n)
-  single_slot <- .circmix_J(kappa)
+  no_guessing <- rep(-Inf, nrow(cosd))
+  branch <- .circmix_slot_averaging_branches(K, set_size, kappa)
 
-  high <- log(allocation$extra) + .circmix_vp_ld(
-    cosd, logw, no_guessing,
-    .circmix_kappa((allocation$slots + 1) * single_slot), tau, nodes
-  )
+  high <- branch$log_w_hi +
+    .circmix_vp_ld(cosd, logw, no_guessing, branch$kappa_hi, tau, nodes)
 
-  low <- log1p(-allocation$extra) - log(2 * pi)
-  held <- which(allocation$slots >= 0.5)
+  low <- branch$log_w_lo - log(2 * pi)
+  held <- which(branch$held)
   if (length(held)) {
-    low[held] <- log1p(-allocation$extra[held]) + .circmix_vp_ld(
+    low[held] <- branch$log_w_lo[held] + .circmix_vp_ld(
       cosd[held, , drop = FALSE], logw[held, , drop = FALSE], no_guessing[held],
-      .circmix_kappa(allocation$slots[held] * single_slot[held]),
-      tau[held], nodes
+      branch$kappa_lo[held], tau[held], nodes
     )
   }
   matrixStats::rowLogSumExps(cbind(low, high))
@@ -318,16 +348,24 @@
   lapply(args, rep_len, length.out = max(lengths(args)))
 }
 
-# cos(y - mu) for the target and the active non-targets. nt is padded to
-# max_set_size - 1, so only the first set_size - 1 entries are ever read and a
-# trial never pays for components its set size does not have.
+# Component locations of each row: the target, then the set_size - 1 active
+# non-targets. nt is padded to max_set_size - 1, so only the first
+# set_size - 1 entries are ever read and a trial never pays for components its
+# set size does not have. Twin of circmix_locations().
+.circmix_locations <- function(mu, nt, set_size) {
+  locations <- matrix(mu, nrow = length(mu))
+  if (set_size > 1) {
+    locations <- cbind(locations, matrix(
+      nt[seq_len(set_size - 1)],
+      nrow = length(mu), ncol = set_size - 1, byrow = TRUE
+    ))
+  }
+  locations
+}
+
 .circmix_cos <- function(x, mu, nt, set_size) {
   args <- .circmix_recycle(x = x, mu = mu)
-  cosd <- matrix(cos(args$x - args$mu), nrow = length(args$x))
-  for (j in seq_len(set_size - 1)) {
-    cosd <- cbind(cosd, cos(args$x - nt[j]))
-  }
-  cosd
+  cos(args$x - .circmix_locations(args$mu, nt, set_size))
 }
 
 # tau is only a distributional parameter when the model estimates variable

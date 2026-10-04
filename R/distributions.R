@@ -380,13 +380,17 @@ dmixture2p <- function(x, mu = 0, kappa = 5, p_mem = 0.6, tau = 0, K = 3,
   stopif(isTRUE(any(K <= 0)), "K must be positive.")
 }
 
+# R twin of mixture2p_simple_logw(): the target, then guessing
+.mixture2p_weights <- function(p_mem) {
+  list(logw = matrix(log(p_mem)), logw_guess = log1p(-p_mem))
+}
+
 .dmixture2p_simple <- function(x, mu, kappa, p_mem, tau, nodes) {
   args <- .circmix_recycle(x = x, mu = mu, kappa = kappa, p_mem = p_mem, tau = tau)
+  weights <- .mixture2p_weights(args$p_mem)
   .circmix_vp_ld(
-    cosd = matrix(cos(args$x - args$mu)),
-    logw = matrix(log(args$p_mem)),
-    logw_guess = log1p(-args$p_mem),
-    kappa = args$kappa, tau = args$tau, nodes = nodes
+    matrix(cos(args$x - args$mu)), weights$logw, weights$logw_guess,
+    args$kappa, args$tau, nodes
   )
 }
 
@@ -412,11 +416,9 @@ dmixture2p <- function(x, mu = 0, kappa = 5, p_mem = 0.6, tau = 0, K = 3,
 
 .rmixture2p_simple <- function(mu, kappa, p_mem, tau) {
   args <- .circmix_recycle(mu = mu, kappa = kappa, p_mem = p_mem, tau = tau)
+  weights <- .mixture2p_weights(args$p_mem)
   .rcircmix(
-    mu = matrix(args$mu),
-    logw = matrix(log(args$p_mem)),
-    logw_guess = log1p(-args$p_mem),
-    kappa = args$kappa, tau = args$tau
+    matrix(args$mu), weights$logw, weights$logw_guess, args$kappa, args$tau
   )
 }
 
@@ -628,20 +630,9 @@ dmixture3p <- function(x, mu = c(0, 2, -1.5), kappa = 5, p_mem = 0.6, p_nt = 0.2
   )
 }
 
-.mixture3p_locations <- function(mu, nt, set_size) {
-  locations <- matrix(mu, nrow = length(mu))
-  if (set_size > 1) {
-    locations <- cbind(locations, matrix(
-      nt[seq_len(set_size - 1)],
-      nrow = length(mu), ncol = set_size - 1, byrow = TRUE
-    ))
-  }
-  locations
-}
-
 .rmixture3p <- function(mu, nt, set_size, weights, kappa, tau) {
   .rcircmix(
-    .mixture3p_locations(mu, nt, set_size), weights$logw, weights$logw_guess,
+    .circmix_locations(mu, nt, set_size), weights$logw, weights$logw_guess,
     kappa, tau
   )
 }
@@ -649,7 +640,7 @@ dmixture3p <- function(x, mu = c(0, 2, -1.5), kappa = 5, p_mem = 0.6, p_nt = 0.2
 .rmixture3p_slot_averaging <- function(mu, nt, set_size, kappa, K, p_nt, tau) {
   args <- .circmix_recycle(mu = mu, kappa = kappa, K = K, p_nt = p_nt, tau = tau)
   .rcircmix_slot_averaging(
-    .mixture3p_locations(args$mu, nt, set_size),
+    .circmix_locations(args$mu, nt, set_size),
     .mixture3p_swap_weights(args$p_nt, set_size),
     args$K, set_size, args$kappa, args$tau
   )
@@ -836,16 +827,13 @@ dimm <- function(x, mu = c(0, 2, -1.5), dist = c(0, 0.5, 2),
   args <- .circmix_recycle(
     mu = mu, kappa = kappa, c = c, a = a %||% 1, s = s %||% 0, b = b, tau = tau
   )
-  n <- length(args$mu)
   weights <- .imm_log_weights(
     args$c, args$a, args$s, args$b, set_size, dist, version
   )
-
-  locations <- matrix(args$mu, nrow = n)
-  for (j in seq_len(set_size - 1)) {
-    locations <- cbind(locations, nt[j])
-  }
-  .rcircmix(locations, weights$logw, weights$logw_guess, args$kappa, args$tau)
+  .rcircmix(
+    .circmix_locations(args$mu, nt, set_size), weights$logw, weights$logw_guess,
+    args$kappa, args$tau
+  )
 }
 
 #' @rdname IMMdist

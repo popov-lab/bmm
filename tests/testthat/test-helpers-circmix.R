@@ -160,6 +160,30 @@ test_that(".circmix_slot_averaging_ld() sums the information of the slots an ite
   )
 })
 
+test_that(".circmix_slot_averaging_ld() mixes the two slot-count branches", {
+  y <- seq(-pi, pi, length.out = 9)
+  n <- length(y)
+  cosd <- cbind(cos(y), cos(y - 1.4))
+  logw <- matrix(log(c(0.7, 0.3)), nrow = n, ncol = 2, byrow = TRUE)
+  single <- .circmix_J(6)
+  branch_ld <- function(slots) {
+    .circmix_vp_ld(cosd, logw, rep(-Inf, n), rep(.circmix_kappa(slots * single), n),
+                   rep(0.4, n), 41L)
+  }
+  # K = 3.5 over 2 items: 1 slot with probability 0.25, 2 with 0.75
+  expect_equal(
+    .circmix_slot_averaging_ld(cosd, logw, rep(3.5, n), rep(2, n), rep(6, n), rep(0.4, n), 41L),
+    log(0.25 * exp(branch_ld(1)) + 0.75 * exp(branch_ld(2))),
+    tolerance = 1e-12
+  )
+  # K = 3.5 over 4 items: no slot (guessed) with probability 0.125
+  expect_equal(
+    .circmix_slot_averaging_ld(cosd, logw, rep(3.5, n), rep(4, n), rep(6, n), rep(0.4, n), 41L),
+    log(0.125 / (2 * pi) + 0.875 * exp(branch_ld(1))),
+    tolerance = 1e-12
+  )
+})
+
 # Compares the sampler against the density it is meant to draw from. n is large
 # enough that a bin proportion has a standard error near 5e-4, so the tolerance
 # below is about ten standard errors and does not need a seed to be stable.
@@ -402,12 +426,14 @@ circmix_stan_values <- function(data) {
       int NKAP; vector[NKAP] kappa;
       int NJ; vector[NJ] Jtest;
       int NTAU; vector[NTAU] tau; real kappa_vp; int nodes;
-      real K_slots; int ss_slots;
+      real K_slots; int ss_slots; int ss_empty;
+      vector[3] nt_loc; int ss_loc; real grid_shape;
     }
     generated quantities {
       vector[NKAP] out_J; vector[NKAP] out_ld; vector[NJ] out_kappa;
       real out_het; vector[NTAU] out_vp; vector[2] out_slots;
-      vector[NTAU] out_sa;
+      vector[NTAU] out_sa; matrix[nodes, 2] out_grid; vector[5] out_branches;
+      vector[5] out_branches_empty; vector[ss_loc] out_loc; vector[NTAU] out_shape;
       for (i in 1:NKAP) {
         out_J[i] = circmix_J(kappa[i]);
         out_ld[i] = circmix_ld(cosd, logw, logw_guess, kappa[i]);
@@ -424,6 +450,16 @@ circmix_stan_values <- function(data) {
                                               logk, dlogk, logJ_min, dlogJ);
       }
       out_slots = circmix_slots(K_slots, ss_slots);
+      for (i in 1:NTAU) {
+        out_shape[i] = circmix_vp_shape(kappa_vp, tau[i], nodes);
+      }
+      out_grid = circmix_vp_grid(grid_shape, tau[NTAU], nodes);
+      out_branches = circmix_slot_averaging_branches(K_slots, ss_slots, kappa_vp,
+                                                     logk, dlogk, logJ_min, dlogJ);
+      out_branches_empty = circmix_slot_averaging_branches(K_slots, ss_empty,
+                                                           kappa_vp, logk, dlogk,
+                                                           logJ_min, dlogJ);
+      out_loc = circmix_locations(0.3, nt_loc, ss_loc);
     }"
   )
   model <- cmdstanr::cmdstan_model(cmdstanr::write_stan_file(code))
@@ -457,7 +493,8 @@ test_that("the Stan and R implementations of the shared core agree", {
     NC = length(cosd), cosd = cosd, logw = logw, logw_guess = logw_guess,
     kappa_het = kappa_het, NKAP = length(kappa), kappa = kappa,
     NJ = length(Jtest), Jtest = Jtest, NTAU = length(tau), tau = tau,
-    kappa_vp = 10, nodes = 41L, K_slots = 3.5, ss_slots = 2L
+    kappa_vp = 10, nodes = 41L, K_slots = 3.5, ss_slots = 2L, ss_empty = 4L,
+    nt_loc = c(1, 2, 3), ss_loc = 3L, grid_shape = 2.5
   ))
 
   n <- length(kappa)
@@ -495,4 +532,16 @@ test_that("the Stan and R implementations of the shared core agree", {
     }, numeric(1)),
     tolerance = 1e-12
   )
+
+  shape <- .circmix_J(10) / tau
+  expect_equal(stan("out_shape"), c(Inf, shape[-1]), tolerance = 1e-12)
+  grid <- .circmix_vp_grid(2.5, 2, 41L)
+  # Stan's digamma() and trigamma() differ from R's by about 1e-9, which moves
+  # the nodes by that much; the marginal (out_vp above) is insensitive to it
+  expect_equal(stan("out_grid"), c(grid$t, grid$lw), tolerance = 1e-8)
+  for (case in list(list("out_branches", 2L), list("out_branches_empty", 4L))) {
+    branch <- .circmix_slot_averaging_branches(3.5, case[[2]], 10)
+    expect_equal(stan(case[[1]]), as.numeric(unlist(branch)), tolerance = 1e-12)
+  }
+  expect_equal(stan("out_loc"), c(0.3, 1, 2))
 })
