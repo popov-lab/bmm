@@ -22,8 +22,9 @@
   unlist(lapply(as.list(expr)[-1], .mpt_scientific_constants)) %||% numeric(0)
 }
 
-# Stan compiles a bare numeric fraction like 1/4 as integer division (= 0),
-# so constant divisions are folded into decimal literals before emission
+# Stan compiles a bare integer fraction like 1/4 or 1/(2*2) as integer
+# division (= 0), so every variable-free arithmetic subexpression is folded
+# into its numeric value before emission
 .mpt_fold_numeric_division <- function(expr) {
   if (!is.call(expr)) {
     return(expr)
@@ -31,12 +32,12 @@
   for (i in seq_along(expr)[-1]) {
     expr[[i]] <- .mpt_fold_numeric_division(expr[[i]])
   }
-  if (identical(expr[[1]], quote(`(`)) && is.numeric(expr[[2]])) {
-    return(expr[[2]])
-  }
-  if (identical(expr[[1]], quote(`/`)) && length(expr) == 3L &&
-        is.numeric(expr[[2]]) && is.numeric(expr[[3]])) {
-    return(expr[[2]] / expr[[3]])
+  operands <- as.list(expr)[-1]
+  if (is.symbol(expr[[1]]) &&
+        as.character(expr[[1]]) %in% c("(", "+", "-", "*", "/", "^") &&
+        length(operands) %in% 1:2 &&
+        all(vapply(operands, is.numeric, logical(1)))) {
+    return(do.call(as.character(expr[[1]]), operands))
   }
   expr
 }

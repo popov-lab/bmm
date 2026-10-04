@@ -18,10 +18,10 @@
 #'   names are the response categories. The expressions can use latent
 #'   parameters (e.g., `"D + (1 - D) * g"`) and numeric constants.
 #'
-#' @details Numeric fractions such as `1/4` are folded into decimal literals
-#'   (`0.25`) when the tree is created. Stan compiles a bare integer fraction
-#'   as integer division (`1/4 == 0`), which would silently corrupt the
-#'   likelihood.
+#' @details Constant arithmetic such as `1/4` or `1/(2*2)` is folded into a
+#'   decimal literal (`0.25`) when the tree is created. Stan compiles a bare
+#'   integer fraction as integer division (`1/4 == 0`), which would silently
+#'   corrupt the likelihood.
 #'
 #' @return An object of class `mpt_tree`
 #'

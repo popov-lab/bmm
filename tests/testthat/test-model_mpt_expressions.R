@@ -7,6 +7,24 @@ test_that("mpt_tree folds integer fractions into decimal literals", {
   expect_equal(deparse1(tree$branches$b), "(1 - p) * 0.75")
 })
 
+test_that("mpt_tree folds compound integer constants into decimal literals", {
+  tree <- mpt_tree("t", list(
+    a = "p + (1 - p) * (1/(2*2))",
+    b = "(1 - p) * (-1/4)",
+    c = "p * (1/2^2)"
+  ))
+  expect_equal(deparse1(tree$branches$a), "p + (1 - p) * 0.25")
+  expect_equal(deparse1(tree$branches$b), "(1 - p) * -0.25")
+  expect_equal(deparse1(tree$branches$c), "p * 0.25")
+  dat <- data.frame(a = c(30L, 28L), b = c(0L, 2L))
+  code <- stancode(
+    bmf(p ~ 1), data = dat,
+    model = mpt(mpt_tree("t", list(a = "p + (1 - p) * (1/(2*2))", b = "(1 - p) * (1 - 1/(2*2))")))
+  )
+  expect_match(code, "* 0.25", fixed = TRUE)
+  expect_false(grepl("1 / (2 * 2)", code, fixed = TRUE))
+})
+
 test_that("mpt_tree stores branch expressions as parsed calls", {
   tree <- mpt_tree("t", list(a = "D + (1 - D) * g", b = "(1 - D) * (1 - g)"))
   expect_identical(tree$branches$a, quote(D + (1 - D) * g))

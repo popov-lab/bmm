@@ -26,10 +26,10 @@ response category. Trees created with \code{mpt_tree()} are combined into a
 full model specification with \code{\link[=mpt]{mpt()}}.
 }
 \details{
-Numeric fractions such as \code{1/4} are folded into decimal literals
-(\code{0.25}) when the tree is created. Stan compiles a bare integer fraction
-as integer division (\code{1/4 == 0}), which would silently corrupt the
-likelihood.
+Constant arithmetic such as \code{1/4} or \code{1/(2*2)} is folded into a
+decimal literal (\code{0.25}) when the tree is created. Stan compiles a bare
+integer fraction as integer division (\code{1/4 == 0}), which would silently
+corrupt the likelihood.
 }
 \examples{
 tree_old <- mpt_tree(
