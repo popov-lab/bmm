@@ -609,10 +609,22 @@ check_data.mpt <- function(model, data, formula) {
     Missing columns: {collapse_comma(missing_cats)}"
   )
 
+  reserved_cols <- intersect(c("Y", "nTrials"), col_names)
+  stopif(
+    length(reserved_cols) > 0,
+    "The data column(s) {collapse_comma(reserved_cols)} would be overwritten by \\
+    the response matrix and trial counts that bmm builds. Please rename them."
+  )
+
   resp_matrix <- as.matrix(data[resp_cats])
   stopif(
     !is.numeric(resp_matrix) || any(resp_matrix < 0, na.rm = TRUE),
     "The response category columns must contain non-negative response counts."
+  )
+  warnif(
+    anyNA(resp_matrix),
+    "The response count columns contain {sum(is.na(resp_matrix))} missing \\
+    value(s), which are counted as 0 responses."
   )
   resp_matrix[is.na(resp_matrix)] <- 0
   data <- data[!col_names %in% resp_cats]

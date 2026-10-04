@@ -456,6 +456,31 @@ test_that("check_data errors are informative", {
   )
 })
 
+test_that("check_data warns on missing counts and refuses the columns it builds", {
+  model <- mpt(mpt_2htm_trees(), tree_id = "item_type")
+  dat <- mpt_2htm_data()
+
+  dat_na <- dat
+  dat_na$old[c(1, 3)] <- NA
+  expect_warning(
+    checked <- check_data(model, dat_na, bmf(D ~ 1, g ~ 1)),
+    "2 missing value\\(s\\), which are counted as 0"
+  )
+  expect_equal(unname(checked$Y[1, ]), c(0, dat$new[1]))
+
+  dat_reserved <- dat
+  dat_reserved$nTrials <- 50
+  expect_error(
+    check_data(model, dat_reserved, bmf(D ~ 1, g ~ 1)),
+    "'nTrials' would be overwritten"
+  )
+  dat_reserved$Y <- 1
+  expect_error(
+    check_data(model, dat_reserved, bmf(D ~ 1, g ~ 1)),
+    "'Y', 'nTrials'"
+  )
+})
+
 test_that("mpt category probabilities match the production m3 likelihood", {
   # for the simple choice rule with fixed b, list size NL and response-set
   # size N, the simple-span M3 is an MPT with design-fixed guessing rates;
