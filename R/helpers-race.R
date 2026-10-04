@@ -25,8 +25,11 @@ race_reserved_names <- function(shared_pars) {
 }
 
 # The categories of a custom version are the formula's parameters other than
-# the model's shared ones, and each becomes a brms dpar and a Stan identifier
-race_category_names <- function(formula, shared_pars) {
+# the model's shared ones, and each becomes a brms dpar and an argument of the
+# model's generated likelihood. `stan_names` are the identifiers that
+# likelihood declares itself, which a category of the same name would shadow
+# (stanc refuses the program)
+race_category_names <- function(formula, shared_pars, stan_names = character(0)) {
   cat_pars <- setdiff(names(formula), shared_pars)
   stopif(
     length(cat_pars) == 0,
@@ -45,6 +48,14 @@ race_category_names <- function(formula, shared_pars) {
     length(bad_names) > 0,
     "Category names cannot be Stan reserved words: {collapse_comma(bad_names)}. \\
     Please rename the affected response categories."
+  )
+
+  bad_local_names <- intersect(cat_pars, stan_names)
+  stopif(
+    length(bad_local_names) > 0,
+    "Category names cannot be names the model's Stan code uses: \\
+    {collapse_comma(bad_local_names)}. Please rename the affected response \\
+    categories."
   )
 
   bad_dpar_names <- cat_pars[grepl("[0-9]$", cat_pars)]

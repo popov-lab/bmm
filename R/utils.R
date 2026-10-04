@@ -875,7 +875,9 @@ check_rds_file <- function(file) {
 # writes a `lprior` accumulator, and bmm's per-row likelihood declares N.
 # Several C++ keywords that Stan documents as reserved (class, new, template,
 # ...) are accepted by stanc and are deliberately absent. Stan is
-# case-sensitive, so the comparison against this list has to be too.
+# case-sensitive, so the comparison against this list has to be too. The
+# identifiers a model's own likelihood declares (rt, t, lp, ...) collide as
+# well; each race model passes those to race_category_names().
 .stan_reserved <- c(
   "array", "auto", "break", "cholesky_factor_corr", "cholesky_factor_cov",
   "complex", "continue", "corr_matrix", "cov_matrix", "data", "else",

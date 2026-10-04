@@ -109,6 +109,8 @@ test_that("race_category_names() returns the categories and refuses unusable nam
   expect_error(race_category_names(bmf(Y ~ 1), shared), "Stan reserved")
   # Stan is case-sensitive, so only the exact keyword is refused
   expect_equal(race_category_names(bmf(Data ~ 1), shared), "Data")
+  expect_error(race_category_names(bmf(t ~ 1), shared, stan_names = c("t", "lp")), "Stan code uses")
+  expect_equal(race_category_names(bmf(t ~ 1), shared), "t")
   expect_error(race_category_names(bmf(opt2 ~ 1), shared), "end in a number")
   expect_error(race_category_names(bmf(opt_a ~ 1), shared), "underscores")
 })
