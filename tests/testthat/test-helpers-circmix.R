@@ -285,6 +285,30 @@ test_that("the slot-averaging gradient in K is the right-hand slope at a whole K
   expect_equal(diagnosis$gradients()$model, 4 * right_slope + 1, tolerance = 1e-5)
 })
 
+test_that(".circmix_slot_averaging_ld() mixes the two slot-count branches", {
+  y <- seq(-pi, pi, length.out = 9)
+  n <- length(y)
+  cosd <- cbind(cos(y), cos(y - 1.4))
+  logw <- matrix(log(c(0.7, 0.3)), nrow = n, ncol = 2, byrow = TRUE)
+  single <- .circmix_J(6)
+  branch_ld <- function(slots) {
+    .circmix_vp_ld(cosd, logw, rep(-Inf, n), rep(.circmix_kappa(slots * single), n),
+                   rep(0.4, n), 81L)
+  }
+  # K = 3.5 over 2 items: 1 slot with probability 0.25, 2 with 0.75
+  expect_equal(
+    .circmix_slot_averaging_ld(cosd, logw, rep(3.5, n), rep(2, n), rep(6, n), rep(0.4, n), 81L),
+    log(0.25 * exp(branch_ld(1)) + 0.75 * exp(branch_ld(2))),
+    tolerance = 1e-12
+  )
+  # K = 3.5 over 4 items: no slot (guessed) with probability 0.125
+  expect_equal(
+    .circmix_slot_averaging_ld(cosd, logw, rep(3.5, n), rep(4, n), rep(6, n), rep(0.4, n), 81L),
+    log(0.125 / (2 * pi) + 0.875 * exp(branch_ld(1))),
+    tolerance = 1e-12
+  )
+})
+
 # Compares the sampler against the density it is meant to draw from. n is large
 # enough that a bin proportion has a standard error near 5e-4, so the tolerance
 # below is about ten standard errors and does not need a seed to be stable.
@@ -551,13 +575,16 @@ circmix_stan_values <- function(data) {
       int NJ; vector[NJ] Jtest;
       int NTAU; vector[NTAU] tau; real kappa_vp; int nodes;
       int NI0; vector[NI0] kappa_i0;
-      real K_slots; int ss_slots;
+      real K_slots; int ss_slots; int ss_empty;
       vector[2] cosd_far; vector[2] logw_far; real kappa_far; int NFAR; vector[NFAR] tau_far;
+      vector[3] nt_loc; int ss_loc;
     }
     generated quantities {
       vector[NKAP] out_J; vector[NKAP] out_ld; vector[NJ] out_kappa;
       real out_het; vector[NTAU] out_vp; vector[2] out_slots;
       vector[NTAU] out_sa; vector[NFAR] out_far; vector[NI0] out_logi0; real out_vp0;
+      vector[4] out_branches; vector[4] out_branches_empty; vector[ss_loc] out_loc;
+      vector[NTAU] out_shape;
       for (i in 1:NKAP) {
         out_J[i] = circmix_J(kappa[i]);
         out_ld[i] = circmix_ld(cosd, logw, logw_guess, kappa[i]);
@@ -583,6 +610,15 @@ circmix_stan_values <- function(data) {
         out_far[i] = circmix_vp_ld(cosd_far, logw_far, negative_infinity(), kappa_far,
                                    tau_far[i], nodes, logk, dlogk, logJ_min, dlogJ);
       }
+      for (i in 1:NTAU) {
+        out_shape[i] = circmix_vp_shape(kappa_vp, tau[i], nodes);
+      }
+      out_branches = circmix_slot_averaging_branches(K_slots, ss_slots, kappa_vp,
+                                                     logk, dlogk, logJ_min, dlogJ);
+      out_branches_empty = circmix_slot_averaging_branches(K_slots, ss_empty,
+                                                           kappa_vp, logk, dlogk,
+                                                           logJ_min, dlogJ);
+      out_loc = circmix_locations(0.3, nt_loc, ss_loc);
     }"
   )
   model <- cmdstanr::cmdstan_model(cmdstanr::write_stan_file(code))
@@ -629,9 +665,10 @@ test_that("the Stan and R implementations of the shared core agree", {
     kappa_het = kappa_het, NKAP = length(kappa), kappa = kappa,
     NJ = length(Jtest), Jtest = Jtest, NTAU = length(tau), tau = tau,
     NI0 = length(kappa_i0), kappa_i0 = kappa_i0,
-    kappa_vp = 10, nodes = 81L, K_slots = 3.5, ss_slots = 2L,
+    kappa_vp = 10, nodes = 81L, K_slots = 3.5, ss_slots = 2L, ss_empty = 4L,
     cosd_far = cosd_far, logw_far = logw_far, kappa_far = 200,
-    NFAR = length(tau_far), tau_far = tau_far
+    NFAR = length(tau_far), tau_far = tau_far,
+    nt_loc = c(1, 2, 3), ss_loc = 3L
   ))
 
   n <- length(kappa)
@@ -683,6 +720,14 @@ test_that("the Stan and R implementations of the shared core agree", {
     }, numeric(1)),
     tolerance = 1e-12
   )
+
+  shape <- .circmix_J(10) / tau
+  expect_equal(stan("out_shape"), c(Inf, shape[-1]), tolerance = 1e-12)
+  for (case in list(list("out_branches", 2L), list("out_branches_empty", 4L))) {
+    branch <- .circmix_slot_averaging_branches(3.5, case[[2]], 10)
+    expect_equal(stan(case[[1]]), as.numeric(unlist(branch)), tolerance = 1e-12)
+  }
+  expect_equal(stan("out_loc"), c(0.3, 1, 2))
 })
 
 test_that("variable precision says what kappa means, in every model and version", {
