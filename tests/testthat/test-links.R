@@ -159,9 +159,10 @@ test_that("a link the model does not pass on to the fit is refused", {
     sdm(resp_error = "y", links = list(kappa = "softplus")),
     "cannot be changed in sdm\\(\\)"
   )
+  # the softmax over mixture3p's weights is computed inside its likelihood
   expect_error(
     mixture3p(resp_error = "y", nt_features = "nt", set_size = "ss",
-              links = list(kappa = "softplus")),
+              links = list(thetat = "logit")),
     "cannot be changed in mixture3p\\(\\)"
   )
   # naming the link the model already uses asks for no change
@@ -183,6 +184,15 @@ test_that("the links a model applies are exactly the settable ones", {
   )
   expect_null(settable_links(m3(resp_cats = c("a", "b"), num_options = c(1, 4))))
   expect_equal(settable_links(sdm(resp_error = "y")), character(0))
+  expect_equal(
+    settable_links(mixture3p(resp_error = "y", nt_features = "nt", set_size = "ss")),
+    c("mu", "kappa")
+  )
+  expect_equal(
+    settable_links(mixture3p(resp_error = "y", nt_features = "nt", set_size = "ss",
+                             version = "slot")),
+    c("mu", "kappa", "K", "pnt")
+  )
 })
 
 test_that("a refused model builds the same fit whatever its links say", {
@@ -199,13 +209,8 @@ test_that("a refused model builds the same fit whatever its links say", {
       pforms = lapply(bf$pforms, deparse)
     )
   }
-  nt <- paste0("col_nt", 1:7)
   cases <- list(
-    list(sdm("dev_rad"), bmf(c ~ 1, kappa ~ 1), "kappa"),
-    list(
-      mixture3p("dev_rad", nt_features = nt, set_size = "set_size"),
-      bmf(thetat ~ 1, thetant ~ 1, kappa ~ 1), "kappa"
-    )
+    list(sdm("dev_rad"), bmf(c ~ 1, kappa ~ 1), "kappa")
   )
   for (case in cases) {
     model <- case[[1]]
@@ -224,6 +229,21 @@ test_that("a custom link set on a model reaches the brms family", {
   )
   family <- configure_model(model, check_data(model, dat, ff), ff)$formula$family
   expect_equal(family$link_bound, "softplus")
+
+  dat <- oberauer_lin_2017
+  ff <- bmmformula(kappa ~ 1, K ~ 1, pnt ~ 1)
+  model <- mixture3p("dev_rad",
+    nt_features = paste0("col_nt", 1:7), set_size = "set_size", version = "slot",
+    links = list(kappa = "softplus", pnt = "probit")
+  )
+  family <- configure_model(model, check_data(model, dat, ff), ff)$formula$family
+  expect_equal(family$link_kappa, "softplus")
+  expect_equal(family$link_pnt, "probit")
+  # the softmax weights of the simple version reach brms untransformed
+  model <- mixture3p("dev_rad", nt_features = paste0("col_nt", 1:7), set_size = "set_size")
+  ff <- bmmformula(kappa ~ 1, thetat ~ 1, thetant ~ 1)
+  family <- configure_model(model, check_data(model, dat, ff), ff)$formula$family
+  expect_equal(c(family$link_thetat, family$link_thetant), c("identity", "identity"))
 })
 
 test_that("a custom link set on imm reaches its custom family", {

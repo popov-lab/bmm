@@ -166,20 +166,18 @@ test_that("mixture3p mixing weights get an effects prior on the softmax scale", 
 
   # set_size as predictor requires a suppressed intercept in this model
   formula <- bmf(kappa ~ 1, thetat ~ session, thetant ~ 0 + set_size)
-  pr <- default_prior(formula, data, model)
+  pr <- suppressWarnings(default_prior(formula, data, model))
   b_rows <- pr[pr$coef == "" & pr$class == "b", ]
-  expect_equal(b_rows[b_rows$nlpar == "thetat", ]$prior, "normal(0, 2.5)")
-  expect_equal(b_rows[b_rows$nlpar == "thetant", ]$prior, "logistic(0, 1)")
-  expect_equal(pr[pr$coef == "set_size1" & pr$nlpar == "thetant", ]$prior, "constant(-100)")
+  expect_equal(b_rows[b_rows$dpar == "thetat", ]$prior, "normal(0, 2.5)")
+  expect_equal(b_rows[b_rows$dpar == "thetant", ]$prior, "logistic(0, 1)")
+  # the likelihood has no non-target component at set size 1, so nothing pins it
+  expect_false(any(grepl("constant", pr[pr$dpar == "thetant", ]$prior)))
 
   formula <- bmf(kappa ~ 1, thetat ~ 1, thetant ~ 0 + set_size + session)
-  pr <- default_prior(formula, data, model)
+  pr <- suppressWarnings(default_prior(formula, data, model))
   b_rows <- pr[pr$coef == "" & pr$class == "b", ]
-  expect_equal(b_rows[b_rows$nlpar == "thetant", ]$prior, "normal(0, 2.5)")
-  expect_equal(pr[pr$coef == "set_size1" & pr$nlpar == "thetant", ]$prior, "constant(-100)")
-  expect_equal(pr[pr$coef == "set_size2" & pr$nlpar == "thetant", ]$prior, "logistic(0, 1)")
+  expect_equal(b_rows[b_rows$dpar == "thetant", ]$prior, "normal(0, 2.5)")
 })
-
 
 test_that("default priors are set correctly with fixed effects only and sdm model", {
   data <- oberauer_lin_2017
@@ -442,6 +440,21 @@ test_that("every model ships an sd default on the link scale of each parameter",
     mixture3p("dev_rad", nt_features = paste0("col_nt", 1:7), set_size = "set_size")
   )
   for (par in c("kappa", "thetat", "thetant")) expect_equal(sd_default(pr, par), "exponential(1)")
+  for (version in c("slot", "slot_averaging")) {
+    pr <- default_prior(
+      bmf(kappa ~ 1 + (1 | ID), K ~ 1 + session + (1 | ID), pnt ~ 1 + session + (1 | ID)), data,
+      mixture3p("dev_rad", nt_features = paste0("col_nt", 1:7), set_size = "set_size", version = version)
+    )
+    expect_equal(pr[pr$class == "b" & pr$coef == "" & pr$dpar == "K", ]$prior, "normal(0, 0.3)")
+    expect_equal(pr[pr$class == "b" & pr$coef == "" & pr$dpar == "pnt", ]$prior, "normal(0, 0.5)")
+    for (par in c("kappa", "pnt")) expect_equal(sd_default(pr, par), "exponential(1)")
+    expect_equal(sd_default(pr, "K"), "exponential(2)")
+  }
+  pr <- default_prior(
+    bmf(kappa ~ 1, tau ~ 1 + (1 | ID), thetat ~ 1, thetant ~ 1), data,
+    mixture3p("dev_rad", nt_features = paste0("col_nt", 1:7), set_size = "set_size", variable_precision = TRUE)
+  )
+  expect_equal(sd_default(pr, "tau"), "exponential(2)")
 
   pr <- default_prior(
     bmf(kappa ~ 1 + (1 | ID), a ~ 1 + (1 | ID), c ~ 1 + (1 | ID), s ~ 1 + (1 | ID)), data,
@@ -568,20 +581,6 @@ test_that("a freed mu / mu1 gets regularizing main, effects and sd priors on the
 
 test_that("the set-size-1 sd constraint survives next to the blanket sd prior", {
   data <- oberauer_lin_2017
-  model <- mixture3p("dev_rad", nt_features = paste0("col_nt", 1:7), set_size = "set_size")
-  formula <- bmf(kappa ~ 1, thetat ~ 1, thetant ~ 0 + set_size + (0 + set_size | ID))
-
-  pr <- default_prior(formula, data, model)
-  constraint <- pr[pr$class == "sd" & pr$coef == "set_size1" & pr$nlpar == "thetant", ]
-  expect_equal(constraint$prior, "constant(1e-8)")
-  expect_equal(constraint$group, "ID")
-  expect_equal(sd_default(pr, "thetant"), "exponential(1)")
-
-  fit <- bmm(formula, data, model, backend = "mock", mock_fit = 1, rename = FALSE)
-  code <- brms::stancode(fit)
-  expect_match(code, "1e-08", fixed = TRUE)
-  expect_match(code, "exponential_lpdf(sd_1", fixed = TRUE)
-
   model <- imm("dev_rad", nt_features = paste0("col_nt", 1:7), nt_distances = paste0("dist_nt", 1:7), set_size = "set_size")
   formula <- bmf(kappa ~ 1, c ~ 1, a ~ 0 + set_size + (0 + set_size | ID), s ~ 0 + set_size + (0 + set_size | ID))
   pr <- default_prior(formula, data, model)

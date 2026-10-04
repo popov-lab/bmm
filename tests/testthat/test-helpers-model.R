@@ -94,6 +94,7 @@ test_that("model_versions() lists the versions a constructor accepts", {
   expect_equal(model_versions("m3"), c("custom", "ss", "cs"))
   expect_equal(model_versions("ezdm"), c("3par", "4par"))
   expect_equal(model_versions("mixture2p"), c("simple", "slot", "slot_averaging"))
+  expect_equal(model_versions("mixture3p"), c("simple", "slot", "slot_averaging"))
 })
 
 test_that("imm(), m3(), ezdm() and sdm() refuse an unknown version", {
@@ -101,6 +102,7 @@ test_that("imm(), m3(), ezdm() and sdm() refuse an unknown version", {
   expect_error(imm("y", "x", "d", "s", version = "xyz"), "should be one of")
   expect_error(m3(c("corr", "other"), c(1, 4), version = "xyz"), "should be one of")
   expect_error(ezdm("m", "v", "n", "t", version = "xyz"), "should be one of")
+  expect_error(mixture3p("y", "x", "s", version = "xyz"), "should be one of")
 })
 
 test_that("parameter_label() keeps the name before the first separator", {

@@ -173,6 +173,47 @@ test_that("every version runs through the bmm() pipeline", {
   ))
 })
 
+test_that("every version's family refuses the expected response by name", {
+  dat <- oberauer_lin_2017
+  formulas <- list(
+    simple = bmf(kappa ~ 1, thetat ~ 1, thetant ~ 1),
+    slot = bmf(kappa ~ 1, K ~ 1, pnt ~ 1),
+    slot_averaging = bmf(kappa ~ 1, K ~ 1, pnt ~ 1)
+  )
+  for (version in names(formulas)) {
+    fit <- bmm(formulas[[version]], dat, nt_model(version = version),
+      backend = "mock", mock_fit = 1, rename = FALSE
+    )
+    family <- fit$formula$family
+    expect_identical(
+      family$posterior_epred,
+      get(paste0("posterior_epred_mixture3p_", version), envir = asNamespace("bmm"))
+    )
+    expect_error(brms::posterior_epred(fit), "not defined for the mixture3p model")
+    # a fit saved without the function gets it back by family name
+    fit$formula$family$posterior_epred <- NULL
+    expect_identical(add_posterior_epred(fit)$formula$family$posterior_epred, family$posterior_epred)
+  }
+})
+
+test_that("the capacity versions also cite the slot model", {
+  expect_length(model_citation(nt_model()), 1)
+  expect_match(model_citation(nt_model(version = "slot"))[2], "Zhang, W., & Luck")
+})
+
+test_that("a formula for mu1 still reaches mu, with a warning", {
+  expect_warning(
+    fit <- bmm(bmf(kappa ~ 1, thetat ~ 1, thetant ~ 1, mu1 ~ 1), oberauer_lin_2017,
+      nt_model(), backend = "mock", mock_fit = 1, rename = FALSE
+    ),
+    "renamed to 'mu'"
+  )
+  # mu is fixed to 0 unless a formula frees it, so a default intercept prior
+  # on the location shows that the mu1 formula reached it
+  mu_rows <- fit$prior[fit$prior$class == "Intercept" & fit$prior$dpar == "", ]
+  expect_equal(mu_rows$prior, "normal(0, 0.5)")
+})
+
 test_that("the Stan and R likelihoods agree for every version", {
   skip_on_cran()
   skip_if_not(

@@ -149,11 +149,17 @@ replace_regex_variables <- function(model, data) {
 # model object; if they have predicted a parameter that is constant by default,
 # remove it from the model object
 update_model_fixed_parameters <- function(model, formula) {
-  constants <- names(formula)[is_constant(formula)]
-  free <- names(formula)[!is_constant(formula)]
+  # check_formula() renames deprecated parameters only after this step, so a
+  # formula for the old name has to free or fix the new one here
+  pars <- names(formula)
+  old <- pars %in% names(model$deprecated_parameters)
+  pars[old] <- unlist(model$deprecated_parameters[pars[old]], use.names = FALSE)
+  constants <- pars[is_constant(formula)]
+  free <- pars[!is_constant(formula)]
   # add new constants to the model object
   if (length(constants) > 0) {
-    model$fixed_parameters[constants] <- strip_attributes(formula[constants],
+    model$fixed_parameters[constants] <- strip_attributes(
+      formula[is_constant(formula)],
       protect = "names",
       recursive = TRUE
     )

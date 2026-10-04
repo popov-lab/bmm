@@ -292,15 +292,14 @@ revert_check_data.m3 <- function(model, data) {
 revert_check_data.non_targets <- function(model, data) {
   set_size <- model$other_vars$set_size
   # brms keeps the set_size column only when a formula predicts something with
-  # it; LureIdx1..n is the step function check_data() built from it, so its row
-  # sums give the set size of each row back, as .np_lure_free_rows() also does.
-  # The names come from nt_features rather than from a pattern match, because a
-  # user column called LureIdx9 that a formula kept would be summed in too and
-  # the set sizes it shifts are legal integers that nothing downstream rejects.
-  # A model on a circmix custom family passes ss_numeric to its likelihood, so
-  # its frame holds the set size itself and no LureIdx columns
+  # it. A circmix family reads the set size from vint(ss_numeric), so the frame
+  # holds it. Fits made on brms mixtures hold only LureIdx1..n, the step function
+  # check_data() built from it, whose row sums give the set size back. Those
+  # names come from nt_features rather than from a pattern match, because a user
+  # column called LureIdx9 that a formula kept would be summed in too and the set
+  # sizes it shifts are legal integers that nothing downstream rejects
   if (is.character(set_size) && not_in(set_size, colnames(data))) {
-    data[[set_size]] <- data$ss_numeric %||% (1 + rowSums(
+    data[[set_size]] <- data[["ss_numeric"]] %||% (1 + rowSums(
       data[paste0("LureIdx", seq_along(model$other_vars$nt_features))]
     ))
     attr(data, "rebuilt") <- c(attr(data, "rebuilt"), set_size)
