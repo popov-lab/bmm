@@ -293,6 +293,13 @@
 
 #### Bug fixes
 
+- [`native_parameters()`](https://popov-lab.github.io/bmm/dev/reference/native_parameters.md)
+  failed with
+  `Cannot build a prediction grid: variable(s) ... are not columns of the model data`
+  whenever a parameter had a non-linear formula,
+  e.g. `bmf(c ~ exp(nlc), nlc ~ 1 + set_size)`. It now returns the grid
+  over the predictors of every formula involved, as it does for linear
+  formulas.
 - [`posterior_epred()`](https://mc-stan.org/rstantools/reference/posterior_epred.html)
   failed with `object 'posterior_epred_ddm' not found` (or the name of
   another model) on **ddm**, **cswald**, **ezdm**, **sdt_yn**,
