@@ -235,16 +235,14 @@ The order matters for the point estimate. Transforming the summary instead, `plo
 
 ## Participant-level probabilities
 
-`brms::posterior_linpred()` with the `nlpar` argument returns the latent value of one parameter for every row of the data and every posterior draw, population effect and random effect combined. Applying the inverse link and summarizing gives each participant's detection probability. `D` does not depend on the item type, so one row per participant suffices:
+`native_parameters()` returns a parameter on the probability scale, population effects and random effects combined, for every combination of its predictors in the data. `D` depends on the participant only, so this is one row per participant; `summary = TRUE` summarizes the draws after the transformation, in the order recommended above:
 
 ```{r}
-D_latent <- brms::posterior_linpred(fit_2htm, nlpar = "D")
-D_subj <- brms::posterior_summary(plogis(D_latent))
-D_subj <- cbind(dat[c("id", "item_type")], D_subj)
-head(D_subj[D_subj$item_type == "old", ])
+D_subj <- native_parameters(fit_2htm, pars = "D", summary = TRUE)
+head(D_subj)
 ```
 
-The same call with `newdata` predicts for new participants or conditions; see `?brms::posterior_linpred` for the `re_formula` argument that controls which random effects enter the prediction.
+With `newdata`, the same call gives the probabilities for new participants or conditions, and `re_formula = NA` leaves out the random effects. For work on the latent scale, `brms::posterior_linpred()` with the `nlpar` argument returns the latent value of one parameter for every row of the data and every posterior draw.
 
 ## Posterior predictive checks
 
@@ -610,7 +608,7 @@ Importing the model structure is the easy part; what usually needs translating i
 | `fit.mpt()`, `betaMPT()`, `traitMPT()` | `bmm()` with the random-effect structure written in the formula (see below) |
 | `traitMPT(..., predStructure = )`, `covData` | predictors in the parameter formulas, e.g. `D ~ 0 + cond + (1 | id)` |
 | `transformedParameters` | `brms::hypothesis()`, or arithmetic on the posterior draws |
-| `getParam(fit, "theta")` | `brms::posterior_linpred(fit, nlpar = "D")` with the inverse link |
+| `getParam(fit, "theta")` | `native_parameters(fit, pars = "D", summary = TRUE)` |
 | `genTraitMPT()`, `genBetaMPT()` | `rmpt()` inside a small simulation function ([Data format and simulation]) |
 | `PPP()` | `pp_check()` |
 | `WAIC()`, `select.mpt()` | `loo()`, `loo_compare()`, `waic()` from **brms** |
