@@ -353,6 +353,54 @@ test_that("m3_custom refuses an activation symbol that is neither a column nor a
   expect_true("time" %in% names(fit$bmm$model$parameters))
 })
 
+test_that("m3_custom refuses an unknown symbol in an activation without formula parameters (#495)", {
+  expect_error(
+    bmm(
+      bmf(corr ~ b + a + c, other ~ b + a, dist ~ b + dd, npl ~ b, c ~ 1, a ~ 1),
+      oberauer_lewandowsky_2019_e1,
+      m3(c("corr", "other", "dist", "npl"), c(1, 4, 5, 5), links = list(c = "log", a = "log")),
+      backend = "mock", mock_fit = 1, rename = FALSE
+    ),
+    "'dd' in your activation formula\\(s\\) is neither a data column nor a model parameter"
+  )
+
+  err <- expect_error(suppressWarnings(bmm(
+    bmf(corr ~ b + a + c, other ~ b + a, npl ~ b, c ~ 1 + cnd, a ~ 1),
+    oberauer_lewandowsky_2019_e1,
+    m3(c("corr", "other", "npl"), c(1, 4, 5), links = list(c = "log", a = "log")),
+    backend = "mock", mock_fit = 1, rename = FALSE
+  )), "'cnd'")
+  expect_no_match(conditionMessage(err), "activation formula")
+})
+
+test_that("m3_custom activations can use numeric num_options by their names (#495)", {
+  cats <- c("corr", "other", "dist", "npl")
+  counts <- c(1, 4, 5, 5)
+  dat <- as.data.frame(oberauer_lewandowsky_2019_e1)
+  dat[c("n_corr", "n_other", "n_dist", "n_npl")] <- rep(counts, each = nrow(dat))
+  fit_with <- function(count_name, num_options) {
+    suppressWarnings(bmm(
+      bmf(corr ~ b + a + c, other ~ b + a, npl ~ b, c ~ 1, a ~ 1, d ~ 1) +
+        bmf(as.formula(paste("dist ~ b + d *", count_name))),
+      dat,
+      m3(cats, num_options, links = list(c = "log", a = "log", d = "log")),
+      backend = "mock", mock_fit = 1, rename = FALSE
+    ))
+  }
+
+  from_columns <- fit_with("n_dist", c("n_corr", "n_other", "n_dist", "n_npl"))
+  unnamed <- fit_with("n_opt_dist", counts)
+  user_named <- fit_with("k3", setNames(counts, c("k1", "k2", "k3", "k4")))
+  expect_equal(brms::standata(unnamed), brms::standata(from_columns))
+  expect_equal(brms::standata(user_named), brms::standata(from_columns))
+  expect_named(unnamed$bmm$model$parameters, c("b", "c", "a", "d"), ignore.order = TRUE)
+
+  expect_error(
+    fit_with("n_opt_dist", c("n_corr", "n_other", "n_dist", "n_npl")),
+    "'n_opt_dist' in your activation formula\\(s\\) is neither a data column nor a model parameter"
+  )
+})
+
 test_that("m3 with numerical vector as num_options containing 0 returns error", {
   formula <- bmf(
     c ~ 1 + (1 | ID),

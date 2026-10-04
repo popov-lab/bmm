@@ -251,10 +251,20 @@ m3 <- function(resp_cats, num_options, choice_rule = "softmax",
 #' @export
 check_model.m3_custom <- function(model, data = NULL, formula = NULL) {
   if (!is.null(formula)) {
-    user_pars <- rhs_vars(formula[is_nl(formula)])
+    # brms fits every activation as non-linear, also one that is_nl() calls
+    # linear because no other formula parameter appears in it
+    user_pars <- union(
+      rhs_vars(formula[is_nl(formula)]),
+      rhs_vars(formula[intersect(model$resp_vars$resp_cats, names(formula))])
+    )
     user_pars <- setdiff(user_pars, names(formula[is_nl(formula)]))
     user_pars <- setdiff(user_pars, names(model$parameters))
     user_pars <- setdiff(user_pars, colnames(data))
+    # check_data() stores numeric option counts as data columns under these
+    # names, so formulas can use them although the data lacks them here
+    if (is.numeric(model$other_vars$num_options)) {
+      user_pars <- setdiff(user_pars, names(m3_num_options(model)))
+    }
     # a symbol without its own formula is more often a typo or a missing column
     # than a new parameter, and as a parameter it would be fitted silently
     no_formula <- setdiff(user_pars, names(formula))
