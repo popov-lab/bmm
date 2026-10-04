@@ -391,6 +391,17 @@ test_that("a parameter made linear again in a re-check gets back its link and pr
   expect_identical(rechecked$default_priors$D, .mpt_latent_prior("probit"))
 })
 
+test_that("a stick-breaking component made linear again in a re-check gets back its prior", {
+  tree <- mpt_tree("t", list(A = "D * gA", B = "D * gB", C = "D * gC", N = "1 - D"))
+  model <- mpt(tree, simplex = c("gA", "gB", "gC"))
+  dat <- data.frame(id = factor(1:8), x = rep(0:1, 4), A = 10L, B = 10L, C = 10L, N = 10L)
+
+  checked <- suppressMessages(check_model(model, dat, bmf(gAraw ~ a + b * x, a ~ 1, b ~ 1)))
+  rechecked <- check_model(checked, dat, bmf(gAraw ~ 1 + x))
+  expect_equal(rechecked$links$gAraw, "identity")
+  expect_identical(rechecked$default_priors$gAraw, .mpt_latent_prior("logit"))
+})
+
 test_that("update() to a linear formula restores the link and prior of a non-linear parameter", {
   model <- mpt(mpt_2htm_trees(), tree_id = "item_type")
   dat <- mpt_2htm_data()
