@@ -68,7 +68,8 @@ configure_model.mixture3p <- function(model, data, formula) {
     weight_parameters = c("thetat", "thetant"),
     vint = TRUE, n_vreal = n_nt,
     log_lik = log_lik_mixture3p_simple,
-    posterior_predict = posterior_predict_mixture3p_simple
+    posterior_predict = posterior_predict_mixture3p_simple,
+    posterior_epred = posterior_epred_mixture3p_simple
   )
 
   nlist(

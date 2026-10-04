@@ -473,18 +473,18 @@ print.bmm_parameters <- function(x, max_desc_width = 50, ...) {
 #'
 #' # Circular location parameters
 #'
-#' The circular models sample their location parameter (`mu` for `sdm` and
-#' `mixture2p`, `mu1` for `mixture3p` and `imm`) through a `tan_half` link, and it is
+#' The circular models sample their location parameter `mu` through a
+#' `tan_half` link, and it is
 #' returned in radians in `(-pi, pi)` — a response bias relative to the target,
 #' since the response variable is the angular error. It is fixed to `0` unless
-#' the `bmmformula` predicts it explicitly, so an all-zero `mu1` means the model
+#' the `bmmformula` predicts it explicitly, so an all-zero `mu` means the model
 #' never estimated one.
 #'
 #' The inverse link is `2 * atan()`, and the caveat above applies to it with
-#' particular force: `2 * atan(b_mu1_conditionB)` is neither the bias in
+#' particular force: `2 * atan(b_conditionB)` is neither the bias in
 #' condition B nor the difference between conditions. The bias in condition B is
-#' `2 * atan(b_mu1_Intercept + b_mu1_conditionB)`, and the difference between the
-#' conditions is that value minus `2 * atan(b_mu1_Intercept)`, taken draw by
+#' `2 * atan(b_Intercept + b_conditionB)`, and the difference between the
+#' conditions is that value minus `2 * atan(b_Intercept)`, taken draw by
 #' draw.
 #'
 #' # Mixture weights
@@ -760,9 +760,8 @@ native_transform.default <- function(model, linpred, data, ...) {
 #' @rdname native_transform
 #' @export
 native_transform.non_targets <- function(model, linpred, data, ...) {
-  # configure_model.mixture3p() gates each non-target component on its LureIdx, so
-  # where no lure was presented the likelihood holds it at -100 and the weight is
-  # zero rather than whatever the set-size regression extrapolates to
+  # at set size 1 the likelihood has no non-target component, so the weight
+  # there is zero rather than whatever the set-size regression extrapolates to
   non_target <- intersect(.np_softmax_pars(model, names(linpred)), "thetant")
   if (length(non_target) == 0) {
     return(NextMethod())
@@ -775,10 +774,10 @@ native_transform.non_targets <- function(model, linpred, data, ...) {
 #' Grid cells in which no non-target was presented
 #'
 #' @description
-#' The non-target mixture components are switched off in the likelihood wherever
-#' every `LureIdx` is zero (`check_data.non_targets()` sets them from the set
-#' size), so on those rows the model's non-target weight is exactly zero rather
-#' than the value its regression coefficient extrapolates to.
+#' The likelihood has no non-target component on trials with set size 1, so on
+#' those rows the model's non-target weight is exactly zero rather than the
+#' value its regression coefficient extrapolates to. The `LureIdx` columns are
+#' read only from grids of fits made on the earlier `brms::mixture()` families.
 #'
 #' @param model A bmmodel object
 #' @param data The prediction grid

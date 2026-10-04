@@ -36,40 +36,19 @@ example.
 }
 \examples{
 \dontshow{if (isTRUE(Sys.getenv("BMM_EXAMPLES"))) withAutoprint(\{ # examplesIf}
-configure_prior.mixture3p <- function(model, data, formula, user_prior, ...) {
-  # if there is set_size 1 in the data, set constant prior over thetant for set_size1
-  prior <- brms::empty_prior()
+configure_prior.imm <- function(model, data, formula, user_prior, ...) {
+  # a set-size-1 trial has no non-target, so the set-size-1 levels of a and s
+  # are pinned to a constant when set size is a factor
   set_size_var <- model$other_vars$set_size
-  prior_cond <- any(data$ss_numeric == 1) && !is.numeric(data[[set_size_var]])
-
-  thetant_preds <- rhs_vars(formula$pforms$thetant)
-  if (prior_cond && set_size_var \%in\% thetant_preds) {
-    prior <- prior + brms::prior_("constant(-100)",
-      class = "b",
-      coef = paste0(set_size_var, 1),
-      nlpar = "thetant"
-    )
+  if (!any(data$ss_numeric == 1) || is.numeric(data[[set_size_var]])) {
+    return(NULL)
   }
-  # check if there is a random effect on theetant that include set_size as predictor
-  bterms <- brms::brmsterms(formula$pforms$thetant)
-  re_terms <- bterms$dpars$mu$re
-  if (!is.null(re_terms)) {
-    for (i in 1:nrow(re_terms)) {
-      group <- re_terms$group[[i]]
-      form <- re_terms$form[[i]]
-      thetant_preds <- rhs_vars(form)
-
-      if (prior_cond && set_size_var \%in\% thetant_preds) {
-        prior <- prior + brms::prior_("constant(1e-8)",
-          class = "sd",
-          coef = paste0(set_size_var, 1),
-          group = group,
-          nlpar = "thetant"
-        )
-      }
-    }
-  }
-
+  pars <- intersect(c("a", "s"), names(model$parameters))
+  prior <- brms::empty_prior() +
+    constrain_set_size1_fixef(formula, pars, set_size_var, "constant(0)") +
+    constrain_set_size1_ranef(formula, pars, set_size_var, "constant(1e-8)")
+  prior$dpar <- prior$nlpar
+  prior$nlpar <- rep("", nrow(prior))
   prior
 }
 \dontshow{\}) # examplesIf}

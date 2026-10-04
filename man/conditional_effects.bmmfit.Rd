@@ -58,8 +58,10 @@ This method provides a more intuitive interface than directly calling
 
 bmm models use two types of parameters internally:
 \itemize{
-\item \strong{Non-linear parameters (\code{nlpar})}: Core model parameters like \code{kappa}, \code{c}, \code{a}, \code{thetat}
-\item \strong{Distributional parameters (\code{dpar})}: Derived parameters used in brms mixture distributions
+\item \strong{Non-linear parameters (\code{nlpar})}: Parameters of models built from
+non-linear formulas, like \code{c} and \code{a} of \code{m3}
+\item \strong{Distributional parameters (\code{dpar})}: Parameters of models built on
+a custom family, like \code{kappa} and \code{thetat} of \code{mixture2p}
 }
 
 Users should not need to know this distinction - \code{conditional_effects.bmmfit()}

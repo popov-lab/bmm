@@ -46,8 +46,10 @@
 #'
 #' bmm models use two types of parameters internally:
 #' \itemize{
-#'   \item **Non-linear parameters (`nlpar`)**: Core model parameters like `kappa`, `c`, `a`, `thetat`
-#'   \item **Distributional parameters (`dpar`)**: Derived parameters used in brms mixture distributions
+#'   \item **Non-linear parameters (`nlpar`)**: Parameters of models built from
+#'     non-linear formulas, like `c` and `a` of `m3`
+#'   \item **Distributional parameters (`dpar`)**: Parameters of models built on
+#'     a custom family, like `kappa` and `thetat` of `mixture2p`
 #' }
 #'
 #' Users should not need to know this distinction - `conditional_effects.bmmfit()`

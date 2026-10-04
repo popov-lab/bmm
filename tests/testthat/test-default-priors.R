@@ -565,7 +565,7 @@ test_that("every model ships an sd default on the link scale of each parameter",
   }
 })
 
-test_that("a freed mu / mu1 gets regularizing main, effects and sd priors on the tan_half scale", {
+test_that("a freed mu gets regularizing main, effects and sd priors on the tan_half scale", {
   data <- oberauer_lin_2017
 
   pr <- default_prior(bmf(mu ~ 1 + set_size + (1 | ID), c ~ 1, kappa ~ 1), data, sdm("dev_rad"))
