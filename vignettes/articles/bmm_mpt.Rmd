@@ -385,7 +385,7 @@ Only `Pb` and `Pi` are latent parameters; the `Gcorr*` symbols must exist as num
 
 # Fitting real data
 
-The `oberauer_lewandowsky_2019_e1` data set that the [m3 article](https://venpopov.github.io/bmm/articles/bmm_m3.html) analyzes with activation-based measurement models can equally be described by a processing-tree model, which makes for an instructive real-data example. Participants recalled a list item from a set of candidates in three conditions: in the `new distractors` condition the response set additionally contained five distractors, while in the `old reordered` and `old same` conditions no distractors were present. Each row records how often a participant chose the correct item (`corr`, 1 candidate), another list item (`other`, 4 candidates), a distractor (`dist`, 5 or 0 candidates), or a not-presented lure (`npl`, 5 or 10 candidates). The participant column of this data set is called `ID`:
+The `oberauer_lewandowsky_2019_e1` data set that the [m3 article](https://popov-lab.github.io/bmm/articles/bmm_m3.html) analyzes with activation-based measurement models can equally be described by a processing-tree model, which makes for an instructive real-data example. Participants recalled a list item from a set of candidates in three conditions: in the `new distractors` condition the response set additionally contained five distractors, while in the `old reordered` and `old same` conditions no distractors were present. Each row records how often a participant chose the correct item (`corr`, 1 candidate), another list item (`other`, 4 candidates), a distractor (`dist`, 5 or 0 candidates), or a not-presented lure (`npl`, 5 or 10 candidates). The participant column of this data set is called `ID`:
 
 ```{r}
 data_ol <- oberauer_lewandowsky_2019_e1
@@ -512,7 +512,7 @@ The model with condition-specific binding memory is preferred, in line with the 
 
 ## Relation to the m3 model
 
-This MPT is not merely inspired by the [m3 analysis of the same data](https://venpopov.github.io/bmm/articles/bmm_m3.html): under the `simple` choice rule the two models are *the same likelihood* in different parameterizations. With the m3 activations `corr ~ b + a + c`, `other ~ b + a`, `dist ~ b + d`, `npl ~ b` (candidate counts 1, 4, 5, 5 and $S = 15b + 5a + c + 5d$), the mapping is
+This MPT is not merely inspired by the [m3 analysis of the same data](https://popov-lab.github.io/bmm/articles/bmm_m3.html): under the `simple` choice rule the two models are *the same likelihood* in different parameterizations. With the m3 activations `corr ~ b + a + c`, `other ~ b + a`, `dist ~ b + d`, `npl ~ b` (candidate counts 1, 4, 5, 5 and $S = 15b + 5a + c + 5d$), the mapping is
 
 $$
 P_i = \frac{5a + c + 5d}{S}, \qquad
