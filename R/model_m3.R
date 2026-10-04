@@ -255,6 +255,15 @@ check_model.m3_custom <- function(model, data = NULL, formula = NULL) {
     user_pars <- setdiff(user_pars, names(formula[is_nl(formula)]))
     user_pars <- setdiff(user_pars, names(model$parameters))
     user_pars <- setdiff(user_pars, colnames(data))
+    # a symbol without its own formula is more often a typo or a missing column
+    # than a new parameter, and as a parameter it would be fitted silently
+    no_formula <- setdiff(user_pars, names(formula))
+    stopif(
+      length(no_formula) > 0,
+      "{collapse_comma(no_formula)} in your activation formula(s) is neither a \\
+      data column nor a model parameter. Give each new parameter its own \\
+      formula (e.g. {no_formula[1]} ~ 1), or add the column to the data."
+    )
     model$parameters <- c(model$parameters, setNames(user_pars, user_pars))
   }
 

@@ -328,6 +328,30 @@ test_that("m3_custom version works with variables contained in data in the activ
   ))
 })
 
+test_that("m3_custom refuses an activation symbol that is neither a column nor a parameter (#495)", {
+  my_data <- data.frame(corr = c(5, 6), other = c(1, 2), npl = c(1, 2))
+  my_model <- m3(c("corr", "other", "npl"), num_options = c(1, 2, 3))
+  my_model$links <- list(a = "log", cstart = "log", cslope = "log", time = "log")
+  formula <- bmf(
+    corr ~ b + a + cstart + cslope * time,
+    other ~ b + a,
+    npl ~ b,
+    a ~ 1,
+    cstart ~ 1,
+    cslope ~ 1
+  )
+
+  expect_error(
+    bmm(formula, my_data, my_model, backend = "mock", mock_fit = 1, rename = FALSE),
+    "'time' in your activation formula\\(s\\) is neither a data column nor a model parameter"
+  )
+
+  fit <- suppressWarnings(bmm(
+    formula + bmf(time ~ 1), my_data, my_model,
+    backend = "mock", mock_fit = 1, rename = FALSE
+  ))
+  expect_true("time" %in% names(fit$bmm$model$parameters))
+})
 
 test_that("m3 with numerical vector as num_options containing 0 returns error", {
   formula <- bmf(
