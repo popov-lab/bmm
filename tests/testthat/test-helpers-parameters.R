@@ -372,7 +372,7 @@ test_that("native_transform requires a bmmodel", {
 })
 
 test_that("every link declared by a supported model can be transformed", {
-  models <- supported_models(print_call = FALSE)
+  models <- model_names()
   links <- unlist(lapply(models, function(name) {
     constructor <- get_model(name)
     versions <- eval(formals(constructor)$version)

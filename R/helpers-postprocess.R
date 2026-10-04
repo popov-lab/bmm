@@ -163,7 +163,7 @@ refuse_undefined_epred <- function(object) {
   if (expected_response_defined(object$bmm$model)) {
     return(invisible())
   }
-  model_name <- intersect(class(object$bmm$model), supported_models(print_call = FALSE))
+  model_name <- intersect(class(object$bmm$model), model_names())
   posterior_epred_undefined(model_name[1])()
 }
 
