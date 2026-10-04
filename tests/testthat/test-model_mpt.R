@@ -240,10 +240,10 @@ test_that("links set after construction are checked like any other model's", {
   expect_error(check_model(model, dat, formula), "Unknown link function")
 })
 
-test_that("model_info() names no scale that contradicts a switched link", {
+test_that("model_docs() names no scale that contradicts a switched link", {
   model <- mpt(mpt_2htm_trees(), tree_id = "item_type")
   model$links$D <- "probit"
-  expect_no_match(paste(model_info(model), collapse = "\n"), "logit scale")
+  expect_no_match(paste(model_docs(model), collapse = "\n"), "logit scale")
 })
 
 test_that("a per-parameter probit link gets the probit default prior", {

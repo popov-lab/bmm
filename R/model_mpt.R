@@ -225,7 +225,7 @@ settable_link_functions.mpt <- function(model) {
 #'   parameters: `"logit"` (default) or `"probit"`.
 #' @param ... used internally for testing, ignore it
 #'
-#' @details `r model_info(.model_mpt(), components = c('domain', 'task', 'name', 'citation'))`
+#' @details `r model_docs(.model_mpt(), components = c('domain', 'task', 'name', 'citation'))`
 #'
 #'   A separate tree is needed only when the *branch expressions* differ — that
 #'   is, when the trial determines which latent processes apply (old versus
