@@ -35,9 +35,9 @@ test_that("mpt_tree stores branch expressions as parsed calls", {
   )
 })
 
-test_that("mpt warns when branch probabilities do not sum to 1", {
+test_that("mpt errors when branch probabilities do not sum to 1", {
   bad_tree <- mpt_tree("t", list(a = "D * g", b = "(1 - D) * g"))
-  expect_warning(mpt(bad_tree), "sum to")
+  expect_error(mpt(bad_tree), "sum to")
 
   good_tree <- mpt_tree("u", list(a = "D + (1 - D) * g", b = "(1 - D) * (1 - g)"))
   deviations <- .mpt_tree_sum_deviations(

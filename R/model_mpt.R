@@ -403,10 +403,11 @@ mpt <- function(trees, tree_id = NULL, links = "logit", ...) {
 
   deviations <- .mpt_tree_sum_deviations(trees, parameters)
   for (tree_name in names(deviations)[!is.na(deviations)]) {
-    warning2(
+    stop2(
       "The branch probabilities of tree '{tree_name}' sum to \\
       {signif(deviations[[tree_name]], 6)} instead of 1 when evaluated at \\
-      numeric test values. Please check the branch expressions."
+      numeric test values. Please check the branch expressions; restrictions \\
+      between parameters belong in the branch expressions, not in the formula."
     )
   }
 
