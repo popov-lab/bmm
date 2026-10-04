@@ -223,6 +223,7 @@ test_that(".circmix_cd_slot_averaging_psame() judges an item without a slot at k
 test_that(".cd_bernoulli_ld() scores 1 as 'change' and clamps the probability", {
   expect_equal(.cd_bernoulli_ld(c(1, 0), c(0.3, 0.3)), log(c(0.7, 0.3)))
   expect_true(all(is.finite(.cd_bernoulli_ld(c(1, 0), c(1, 0)))))
+  expect_equal(.cd_bernoulli_ld(1, c(0.2, 0.4, 0.6)), log(c(0.8, 0.6, 0.4)))
 })
 
 test_that(".cd_add_criterion() adds a fixed, identity-linked criterion", {
