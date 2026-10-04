@@ -242,7 +242,9 @@ settable_link_functions.mpt <- function(model) {
 #'   `D ~ Dmax * (1 - exp(-rate * ptime))`) are not transformed by the link
 #'   function: the user-supplied expression must keep the parameter within
 #'   (0, 1). Sub-parameters of such formulas (e.g., `Dmax` and `rate`) are
-#'   estimated on the identity scale with `normal(0, 1)` default priors.
+#'   estimated on the identity scale with `normal(0, 1)` default priors. Their
+#'   random-effect SDs keep brms's default prior, `student_t(3, 0, 2.5)`,
+#'   because no single rate fits every scale such a formula can give them.
 #'
 #'   A parameter can be fixed to a probability at fit time, in the formula:
 #'   `bmf(D ~ 1, g = 0.5)`. The parameter stays part of the model and can be
@@ -447,7 +449,8 @@ check_model.mpt <- function(model, data = NULL, formula = NULL) {
       message2(
         "The parameter(s) {collapse_comma(sub_pars)} from your non-linear \\
         formulas are estimated on the identity scale with normal(0, 1) default \\
-        priors. Apply any required transformation inside your formula and \\
+        priors, and their random-effect SDs keep brms's student_t(3, 0, 2.5) \\
+        default. Apply any required transformation inside your formula and \\
         adjust the priors to the scale of your predictors."
       )
     }

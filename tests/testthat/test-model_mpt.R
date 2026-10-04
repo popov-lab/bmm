@@ -229,6 +229,17 @@ test_that("non-linear parameter formulas bypass the link transformation", {
   expect_false(grepl("inv_logit(D)", correct_rhs, fixed = TRUE))
 })
 
+test_that("the message on non-linear sub-parameters names the sd prior they get", {
+  model <- mpt(mpt_2htm_trees(), tree_id = "item_type")
+  dat <- mpt_2htm_data()
+  dat$x <- rep(c(0, 1), length.out = nrow(dat))
+  formula <- bmf(D ~ inv_logit(a + b * x), a ~ 1 + (1 | id), b ~ 1, g ~ 1)
+  priors <- suppressWarnings(suppressMessages(default_prior(formula, dat, model)))
+  sd_prior <- priors$prior[priors$class == "sd" & priors$nlpar == "a" & priors$group == ""]
+  expect_length(sd_prior, 1)
+  expect_message(check_model(model, dat, formula), sd_prior, fixed = TRUE)
+})
+
 test_that("links set after construction are checked like any other model's", {
   model <- mpt(mpt_2htm_trees(), tree_id = "item_type")
   dat <- mpt_2htm_data()

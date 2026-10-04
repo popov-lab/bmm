@@ -59,7 +59,9 @@ right-hand side references other formula parameters, e.g.
 \code{D ~ Dmax * (1 - exp(-rate * ptime))}) are not transformed by the link
 function: the user-supplied expression must keep the parameter within
 (0, 1). Sub-parameters of such formulas (e.g., \code{Dmax} and \code{rate}) are
-estimated on the identity scale with \code{normal(0, 1)} default priors.
+estimated on the identity scale with \code{normal(0, 1)} default priors. Their
+random-effect SDs keep brms's default prior, \code{student_t(3, 0, 2.5)},
+because no single rate fits every scale such a formula can give them.
 
 A parameter can be fixed to a probability at fit time, in the formula:
 \code{bmf(D ~ 1, g = 0.5)}. The parameter stays part of the model and can be
