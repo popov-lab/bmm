@@ -533,6 +533,27 @@ test_that(".np_grid_vars keeps a grouping variable that is also a predictor", {
   expect_setequal(.np_grid_vars(fit, "c", NA), "ID")
 })
 
+test_that(".np_grid_vars spans only data columns for a non-linear formula", {
+  withr::local_options(bmm.silent = 2)
+  fit <- suppressWarnings(bmm(
+    bmf(c ~ exp(nlc), nlc ~ 1 + set_size, kappa ~ 1), oberauer_lin_2017,
+    sdm(resp_error = "dev_rad"), backend = "mock", mock_fit = 1, rename = FALSE
+  ))
+  pars <- names(fit$bmm$model$parameters)
+  expect_setequal(.np_grid_vars(fit, pars, NULL), "set_size")
+  # the sub-parameter's own predictors reach the grid through c's formula
+  expect_setequal(.np_grid_vars(fit, "c", NULL), "set_size")
+  expect_length(.np_grid_vars(fit, "kappa", NULL), 0)
+})
+
+test_that(".np_grid_vars follows sub-parameters to their grouping variables", {
+  fit <- load_np_m3_fit()
+  fit$bmm$user_formula$c <- stats::as.formula(c ~ exp(logc) * cond)
+  fit$bmm$user_formula$logc <- stats::as.formula(logc ~ 1 + (1 | ID))
+  expect_setequal(.np_grid_vars(fit, "c", NULL), c("cond", "ID"))
+  expect_setequal(.np_grid_vars(fit, "c", NA), "cond")
+})
+
 test_that(".np_newdata returns the unique observed cells in a stable order", {
   fit <- load_np_sdm_fit()
   grid <- .np_newdata(fit, "set_size", NULL)
