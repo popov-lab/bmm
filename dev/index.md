@@ -93,7 +93,7 @@ articles.
 ![The tasks bmm covers and the models for
 each](reference/figures/README-task-map.png)
 
-[`supported_models()`](https://popov-lab.github.io/bmm/dev/reference/supported_models.md)
+[`bmm_models()`](https://popov-lab.github.io/bmm/dev/reference/bmm_models.md)
 prints the same list in R, and `?modelname` (for example
 [`?imm`](https://popov-lab.github.io/bmm/dev/reference/imm.md))
 documents what data a model expects and what its parameters mean.

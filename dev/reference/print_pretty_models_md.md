@@ -2,7 +2,7 @@
 
 Used internally to populate the README and the "Get started" article.
 Models are grouped as in
-[`supported_models()`](https://popov-lab.github.io/bmm/dev/reference/supported_models.md),
+[`bmm_models()`](https://popov-lab.github.io/bmm/dev/reference/bmm_models.md),
 and every model links to its reference page on the website.
 
 ## Usage
@@ -16,7 +16,7 @@ print_pretty_models_md(group = NULL)
 - group:
 
   Optional character vector of group labels as printed by
-  [`supported_models()`](https://popov-lab.github.io/bmm/dev/reference/supported_models.md).
+  [`bmm_models()`](https://popov-lab.github.io/bmm/dev/reference/bmm_models.md).
   Only those groups are listed and the group headers are omitted, so a
   document can add its own text per group.
 

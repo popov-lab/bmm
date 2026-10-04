@@ -7,7 +7,7 @@ These pages provide a summary of the functionality available in bmm
 - [`bmm-package`](https://popov-lab.github.io/bmm/dev/reference/bmm-package.md)
   : Easy and Accesible Bayesian Measurement Models Using 'brms'
 
-- [`supported_models()`](https://popov-lab.github.io/bmm/dev/reference/supported_models.md)
+- [`bmm_models()`](https://popov-lab.github.io/bmm/dev/reference/bmm_models.md)
   :
 
   Measurement models available in `bmm`

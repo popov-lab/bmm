@@ -30,8 +30,10 @@ standata(object, data, model, ...)
   [`mixture3p()`](https://popov-lab.github.io/bmm/dev/reference/mixture3p.md)
   function. Every model function has a number of required arguments
   which need to be specified within the function call. Call
-  [`supported_models()`](https://popov-lab.github.io/bmm/dev/reference/supported_models.md)
-  to see the list of supported models and their required arguments
+  [`bmm_models()`](https://popov-lab.github.io/bmm/dev/reference/bmm_models.md)
+  to see the list of supported models, and `?modelname` (for example
+  [`?imm`](https://popov-lab.github.io/bmm/dev/reference/imm.md)) for
+  their required arguments.
 
 - ...:
 
@@ -48,7 +50,7 @@ with Stan.
 
 ## See also
 
-[`supported_models()`](https://popov-lab.github.io/bmm/dev/reference/supported_models.md),
+[`bmm_models()`](https://popov-lab.github.io/bmm/dev/reference/bmm_models.md),
 [`brms::standata()`](https://paulbuerkner.com/brms/reference/standata.html)
 
 ## Examples

@@ -180,7 +180,7 @@ article](https://popov-lab.github.io/bmm/articles/bmm_rt_contamination.html).
 [TABLE]
 
 You can list the models in R at any time with
-[`supported_models()`](https://popov-lab.github.io/bmm/dev/reference/supported_models.md),
+[`bmm_models()`](https://popov-lab.github.io/bmm/dev/reference/bmm_models.md),
 and `?modelname` (for example
 [`?sdt_yn`](https://popov-lab.github.io/bmm/dev/reference/sdt_yn.md))
 documents the data a model expects, its parameters and its default

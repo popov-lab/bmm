@@ -639,6 +639,10 @@
   [`update()`](https://rdrr.io/r/stats/update.html) refits made with an
   earlier version
   ([\#464](https://github.com/popov-lab/bmm/issues/464)).
+- Loading bmm no longer breaks printing a message condition, such as one
+  caught with `tryCatch(message("hi"), message = identity)`. Printing it
+  failed with *argument 1 (type ‘list’) cannot be handled by ‘cat’*
+  ([\#481](https://github.com/popov-lab/bmm/issues/481)).
 
 #### Deprecated functions and arguments
 
@@ -653,6 +657,21 @@
   [`parameters()`](https://popov-lab.github.io/bmm/dev/reference/parameters.md)
   calls the function from whichever package is attached last
   ([\#474](https://github.com/popov-lab/bmm/issues/474)).
+- [`supported_models()`](https://popov-lab.github.io/bmm/dev/reference/supported_models.md)
+  is deprecated and will be removed in bmm 1.6.0. Use
+  [`bmm_models()`](https://popov-lab.github.io/bmm/dev/reference/bmm_models.md)
+  instead. It takes no arguments and returns the model names, which
+  print as the grouped list. `supported_models(print_call = FALSE)`
+  becomes
+  [`bmm_models()`](https://popov-lab.github.io/bmm/dev/reference/bmm_models.md).
+  Until then
+  [`supported_models()`](https://popov-lab.github.io/bmm/dev/reference/supported_models.md)
+  keeps working and warns. The **insight** and **parameters** packages
+  export a function of the same name, so with bmm and either of them
+  attached,
+  [`supported_models()`](https://popov-lab.github.io/bmm/dev/reference/supported_models.md)
+  calls the one attached last
+  ([\#481](https://github.com/popov-lab/bmm/issues/481)).
 
 #### Documentation
 
@@ -668,13 +687,14 @@
 
 #### Other changes
 
-- [`supported_models()`](https://popov-lab.github.io/bmm/dev/reference/supported_models.md)
+- [`bmm_models()`](https://popov-lab.github.io/bmm/dev/reference/bmm_models.md)
+  (formerly
+  [`supported_models()`](https://popov-lab.github.io/bmm/dev/reference/supported_models.md))
   now lists the models under four task groups (continuous reproduction;
   categorical recall and n-AFC decisions; detection, recognition and
   confidence judgments; choices and response times), one line per model
   with its constructor and full name. The argument lists are gone from
-  the printout; `?modelname` has them.
-  `supported_models(print_call = FALSE)` is unchanged
+  the printout; `?modelname` has them
   ([\#440](https://github.com/popov-lab/bmm/issues/440)).
 - The home page of the website and the README now start from your task
   and list the models for each one, with links to the matching articles.

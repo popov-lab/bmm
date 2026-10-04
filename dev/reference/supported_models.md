@@ -1,6 +1,13 @@
-# Measurement models available in `bmm`
+# Deprecated: use `bmm_models()`
 
-Measurement models available in `bmm`
+`supported_models()` is deprecated as of bmm 1.4.0 and will be removed
+in bmm 1.6.0. It shares its name with `insight::supported_models()`,
+which the **parameters** package re-exports, so whichever package is
+attached last decides what `supported_models()` returns. Replace both
+`supported_models()` and `supported_models(print_call = FALSE)` with
+[`bmm_models()`](https://popov-lab.github.io/bmm/dev/reference/bmm_models.md);
+wrap it in [`as.character()`](https://rdrr.io/r/base/character.html) if
+you need a plain character vector.
 
 ## Usage
 
@@ -12,58 +19,16 @@ supported_models(print_call = TRUE)
 
 - print_call:
 
-  Logical; If TRUE (default), the function prints the models grouped by
-  the task they are meant for, one line per model with its constructor
-  and full name. If FALSE, the function returns a character vector with
-  the names of the available models.
+  Logical. If `TRUE` (default), returns the output of
+  [`bmm_models()`](https://popov-lab.github.io/bmm/dev/reference/bmm_models.md),
+  which prints the models grouped by task. If `FALSE`, returns the model
+  names as a plain character vector.
 
 ## Value
 
-If `print_call = FALSE`, a character vector of model names. Otherwise an
-object of class `message` listing the models by group.
-
-## Details
-
-The groups are: continuous reproduction; categorical recall and n-AFC
-decisions; detection, recognition and confidence judgments; choices and
-response times. Type `?modelname` (for example
-[`?imm`](https://popov-lab.github.io/bmm/dev/reference/imm.md)) for the
-arguments of a model.
-
-## Examples
-
-``` r
-supported_models()
-#> The following models are supported:
-#> 
-#> Continuous reproduction
-#> 
-#> - imm(): Interference measurement model by Oberauer and Lin (2017)
-#> - mixture2p(): Two-parameter mixture model by Zhang and Luck (2008)
-#> - mixture3p(): Three-parameter mixture model by Bays et al (2009)
-#> - sdm(): Signal Discrimination Model (SDM) by Oberauer (2023)
-#> 
-#> Categorical recall and n-AFC decisions
-#> 
-#> - m3(): The Multinomial / Memory Measurement Model
-#> 
-#> Detection, recognition and confidence judgments
-#> 
-#> - sdt_cdp(): Continuous Dual-Process Signal Detection Theory (CDP)
-#> - sdt_mafc(): Signal Detection Theory (m-AFC)
-#> - sdt_ranking(): Signal Detection Theory (Ranking)
-#> - sdt_rating(): Signal Detection Theory (Confidence Rating)
-#> - sdt_yn(): Signal Detection Theory (Yes/No)
-#> 
-#> Choices and response times
-#> 
-#> - cswald(): Censored-Shifted Wald Model
-#> - ddm(): Diffusion Decision Model
-#> - ezdm(): EZ-Diffusion Model
-#> 
-#> Type  ?modelname  to get information about a specific model, e.g.  ?imm 
-supported_models(print_call = FALSE)
-#>  [1] "cswald"      "ddm"         "ezdm"        "imm"         "m3"         
-#>  [6] "mixture2p"   "mixture3p"   "sdm"         "sdt_cdp"     "sdt_mafc"   
-#> [11] "sdt_ranking" "sdt_rating"  "sdt_yn"     
-```
+The output of
+[`bmm_models()`](https://popov-lab.github.io/bmm/dev/reference/bmm_models.md),
+or the model names as a plain character vector if `print_call = FALSE`.
+Before bmm 1.4.0 the default returned the printed list as one string;
+use `capture.output(print(bmm_models()))` for the printed list as text,
+one line per element.
