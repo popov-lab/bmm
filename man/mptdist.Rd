@@ -12,8 +12,10 @@ rmpt(n, size, pars, mpt_model, tree = NULL, unpack = FALSE, ...)
 }
 \arguments{
 \item{x}{Integer vector of length \code{K}, where \code{K} is the number of response
-categories, giving the number of observed responses per category. The
-order of the categories follows the branch names of the trees.}
+categories, giving the number of observed responses per category. If
+\code{x} is a named vector, its names are matched to the response categories
+and the vector is reordered accordingly; an unnamed vector is read in
+the order of the branch names of the selected tree.}
 
 \item{pars}{A named vector or list with the values of all latent parameters
 appearing in the branch expressions of the selected tree, on the

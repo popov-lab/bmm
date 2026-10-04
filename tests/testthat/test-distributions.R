@@ -1558,6 +1558,36 @@ test_that("dmpt validates its inputs", {
   )
 })
 
+test_that("dmpt matches named counts to the categories", {
+  tree_old <- mpt_tree("old", list(
+    old = "D + (1 - D) * g",
+    new = "(1 - D) * (1 - g)"
+  ))
+  tree_new <- mpt_tree("new", list(
+    old = "(1 - D) * g",
+    new = "D + (1 - D) * (1 - g)"
+  ))
+  model <- mpt(list(tree_old, tree_new), tree_id = "item_type")
+
+  d_positional <- dmpt(
+    x = c(35, 15), pars = c(D = 0.7, g = 0.5),
+    mpt_model = model, tree = "old"
+  )
+  d_named <- dmpt(
+    x = c(new = 15, old = 35), pars = c(D = 0.7, g = 0.5),
+    mpt_model = model, tree = "old"
+  )
+  expect_equal(d_named, d_positional)
+
+  expect_error(
+    dmpt(
+      x = c(wrong = 15, name = 35), pars = c(D = 0.7, g = 0.5),
+      mpt_model = model, tree = "old"
+    ),
+    "categories"
+  )
+})
+
 # Tests for the ezdm decision-time cumulants (issue #407) ----------------------
 
 # Reference values from local/ezdm/k34_derivation.py: the cumulants of the

@@ -796,8 +796,10 @@ rm3 <- function(n, size, pars, m3_model, act_funs = NULL, unpack = FALSE,
 #' @name mptdist
 #'
 #' @param x Integer vector of length `K`, where `K` is the number of response
-#'   categories, giving the number of observed responses per category. The
-#'   order of the categories follows the branch names of the trees.
+#'   categories, giving the number of observed responses per category. If
+#'   `x` is a named vector, its names are matched to the response categories
+#'   and the vector is reordered accordingly; an unnamed vector is read in
+#'   the order of the branch names of the selected tree.
 #' @param n Integer. Number of observations to generate data for.
 #' @param size The total number of observations across all response categories.
 #' @param pars A named vector or list with the values of all latent parameters
@@ -850,6 +852,17 @@ rm3 <- function(n, size, pars, m3_model, act_funs = NULL, unpack = FALSE,
 #' @export
 dmpt <- function(x, pars, mpt_model, tree = NULL, log = TRUE, ...) {
   probs <- .mpt_probability_vector(pars, mpt_model, tree, ...)
+
+  if (!is.null(names(x))) {
+    expected_cats <- names(probs)
+    stopif(
+      !identical(sort(names(x)), sort(expected_cats)),
+      "The names of x must match the response categories. \\
+      Expected categories: {collapse_comma(expected_cats)}"
+    )
+    x <- x[expected_cats]
+  }
+
   dmultinom(x, prob = probs, log = log)
 }
 
