@@ -119,6 +119,12 @@ update.bmmfit <- function(object, formula., newdata = NULL, recompile = NULL,
   # than the formula covers all three
   old_fixed <- model$fixed_parameters
   model <- update_model_fixed_parameters(model, user_formula)
+  # the stored model was checked with the old formula and keeps what that
+  # formula derived (mpt: the links switched off for non-linear parameters and
+  # their sub-parameters), so a new formula needs a new check
+  if (!missing(formula.)) {
+    model <- check_model(model, newdata %||% olddata, user_formula)
+  }
   changed_pars <- union(names(old_fixed), names(model$fixed_parameters))
   changed_pars <- changed_pars[!vapply(
     changed_pars,

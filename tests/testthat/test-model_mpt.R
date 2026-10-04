@@ -309,6 +309,52 @@ test_that("the links a non-linear formula switches off survive a second check", 
   expect_equal(rechecked$links, checked$links)
 })
 
+test_that("a parameter made linear again in a re-check gets back its link and prior", {
+  model <- mpt(mpt_2htm_trees(), tree_id = "item_type")
+  dat <- mpt_2htm_data()
+  dat$x <- rep(c(0, 1), length.out = nrow(dat))
+  dat$cond <- rep(c("a", "b"), each = 2, length.out = nrow(dat))
+  nl_formula <- bmf(D ~ inv_logit(a + b * x), a ~ 1, b ~ 1, g ~ 1)
+  linear_formula <- bmf(D ~ 1 + cond, g ~ 1)
+
+  checked <- suppressMessages(check_model(model, dat, nl_formula))
+  rechecked <- check_model(checked, dat, linear_formula)
+  expect_setequal(names(rechecked$parameters), c("D", "g"))
+  expect_equal(rechecked$links$D, "logit")
+  expect_identical(rechecked$default_priors$D, .mpt_latent_prior("logit"))
+
+  model$links$D <- "probit"
+  checked <- suppressMessages(check_model(model, dat, nl_formula))
+  rechecked <- check_model(checked, dat, linear_formula)
+  expect_equal(rechecked$links$D, "probit")
+  expect_identical(rechecked$default_priors$D, .mpt_latent_prior("probit"))
+})
+
+test_that("update() to a linear formula restores the link and prior of a non-linear parameter", {
+  model <- mpt(mpt_2htm_trees(), tree_id = "item_type")
+  dat <- mpt_2htm_data()
+  dat$x <- rep(c(0, 1), length.out = nrow(dat))
+  dat$cond <- rep(c("a", "b"), each = 2, length.out = nrow(dat))
+  methods::setClass("bmm_mock_stanfit", representation(sim = "list"))
+  mockfit <- methods::new("bmm_mock_stanfit", sim = list(
+    warmup = 1000, iter = 2000, chains = 1, thin = 1,
+    samples = list(structure(list(), args = list(control = list())))
+  ))
+  fit <- suppressWarnings(suppressMessages(bmm(
+    bmf(D ~ inv_logit(a + b * x), a ~ 1, b ~ 1, g ~ 1), dat, model,
+    backend = "mock", mock_fit = mockfit, rename = FALSE
+  )))
+
+  up <- suppressMessages(update(
+    fit, formula. = bmf(D ~ 1 + cond, g ~ 1), newdata = dat,
+    testmode = TRUE, recompile = FALSE
+  ))
+  expect_setequal(names(up$bmm$model$parameters), c("D", "g"))
+  expect_equal(up$bmm$model$links$D, "logit")
+  intercept <- up$prior$nlpar == "D" & up$prior$coef == "Intercept"
+  expect_equal(up$prior$prior[intercept], .mpt_latent_prior("logit")$main)
+})
+
 test_that("printing an mpt model lists trees and the identifiability bound", {
   model <- mpt(mpt_2htm_trees(), tree_id = "item_type")
   expect_output(print(model), "MPT tree 'old':")

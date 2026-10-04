@@ -432,6 +432,7 @@ print_model_details.mpt <- function(model, ...) {
 
 #' @export
 check_model.mpt <- function(model, data = NULL, formula = NULL) {
+  model <- .mpt_undo_formula_state(model)
   model <- .mpt_match_link_priors(model)
   if (!is.null(formula)) {
     resp_cats <- model$resp_vars$resp_cats
@@ -501,9 +502,29 @@ check_model.mpt <- function(model, data = NULL, formula = NULL) {
   )
 }
 
+# a model checked before (fit$bmm$model, re-checked by update()) carries the
+# bypassed links and the sub-parameters of the formula it was checked with;
+# the new formula may make a parameter linear again or drop a sub-parameter
+.mpt_undo_formula_state <- function(model) {
+  sub_pars <- setdiff(names(model$parameters), names(attr(model, "links_default")))
+  model$parameters[sub_pars] <- NULL
+  model$links[sub_pars] <- NULL
+  model$default_priors[sub_pars] <- NULL
+  # back to the model's latent prior, which check_model.mpt() then matches to
+  # a switched link
+  bypassed <- attr(model, "mpt_bypassed_links")
+  model$links[names(bypassed)] <- bypassed
+  model$default_priors[names(bypassed)] <- list(.mpt_latent_prior(model$other_vars$link))
+  attr(model, "mpt_bypassed_links") <- NULL
+  attr(model, "links_checked") <- model$links
+  model
+}
+
 # parameters with a user-supplied non-linear formula own their (0,1)
-# constraint, so the automatic link transformation is switched off for them
+# constraint, so the automatic link transformation is switched off for them;
+# their links are kept for a later check with another formula
 .mpt_bypass_links <- function(model, pars) {
+  attr(model, "mpt_bypassed_links") <- model$links[pars]
   for (par in pars) {
     model$links[[par]] <- "identity"
     model$default_priors[[par]] <- NULL
