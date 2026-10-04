@@ -174,7 +174,7 @@ Each participant contributes two rows, one per item type, and the counts in the 
 
 # Fitting the model
 
-Model parameters are predicted with the usual `bmmformula` syntax. Here both parameters get a population intercept and a random intercept per participant. The `|` operator estimates the correlation between the two random effects when they share a grouping term, and `||` would leave them uncorrelated; both options are discussed in [Migrating from MPTinR or TreeBUGS].
+Model parameters are predicted with the usual `bmmformula` syntax. Here both parameters get a population intercept and a random intercept per participant. Written as `(1 | id)` in each formula, the two person effects are independent of each other, which matches the simulation above: it draws `D` and `g` independently. A shared label, `(1 |p| id)` in both formulas, would estimate their correlation as well, which is the latent-trait model; [Migrating from MPTinR or TreeBUGS] discusses these options.
 
 ```{r fit-2htm, results = "hide", message = FALSE, warning = FALSE}
 fit_2htm <- bmm(
@@ -252,7 +252,7 @@ Because the model uses a multinomial family, `pp_check()` produces a response-pr
 pp_check(fit_2htm)
 ```
 
-The `group` argument splits the check by a predictor variable of the model. The tree column of this fit is not a predictor (no parameter formula uses it), so the check pools both item types here; the real-data example in [Fitting real data] groups by its condition factor, which also selects the tree. Condition effects, hypothesis tests and model comparison are shown there as well.
+The `group` argument splits the check by a predictor variable of the model. The tree column of this fit is not a predictor (no parameter formula uses it), so the check pools both item types here; the real-data example in [Fitting real data] groups by its condition factor, which also selects the tree. Condition effects, hypothesis tests, a goodness-of-fit statistic and model comparison are shown there as well.
 
 # Constraining parameters
 
@@ -379,7 +379,7 @@ model_ss <- mpt(
 model_ss
 ```
 
-Only `Pb` and `Pi` are latent parameters; the `Gcorr*` symbols must exist as numeric columns in the data (for example, `GcorrPi = 1 / rsizeList`). This mechanism goes beyond what classical MPT software supports, because the guessing rates can vary continuously across trials or conditions. When the data are checked, the branch sums are re-evaluated with the observed covariate values row by row, which catches covariate columns that violate their joint constraints.
+Only `Pb` and `Pi` are latent parameters; the `Gcorr*` symbols must exist as numeric columns in the data (for example, `GcorrPi = 1 / rsizeList`). This mechanism goes beyond what classical MPT software supports, because the guessing rates can vary continuously across trials or conditions. When the data are checked, the branch sums are re-evaluated with the observed covariate values row by row, and `bmm()` stops when covariate columns violate their joint constraints.
 
 # Fitting real data
 
@@ -433,7 +433,7 @@ par(old_par)
 
 ## Condition effects
 
-`Pi` and `Pb` get one population parameter per condition (`0 + cond`) and, per participant, one uncorrelated random effect per condition (`||`); `Pd` exists in one condition only and takes a plain random intercept. Both fits in this section draw 3000 post-warmup samples per chain instead of the default 1000, which gives every parameter, the random effects included, a bulk effective sample size above 400:
+`Pi` and `Pb` get one population parameter per condition (`0 + cond`) and, per participant, one uncorrelated random effect per condition (`||`); `Pd` exists in one condition only and takes a plain random intercept. Without a shared `|p|` label the three parameters' person effects are also uncorrelated with each other. This keeps the model to standard deviations: correlating all seven person effects would add 21 correlations. Both fits in this section draw 3000 post-warmup samples per chain instead of the default 1000, which gives every parameter, the random effects included, a bulk effective sample size above 400:
 
 ```{r fit-ol, results = "hide", message = FALSE, warning = FALSE}
 fit_ol <- bmm(
@@ -482,6 +482,34 @@ The posterior predictive distribution reproduces the response-category proportio
 ```{r fig-ppc-ol, fig.width = 7, fig.asp = 0.7, out.width = "100%"}
 pp_check(fit_ol, group = "cond")
 ```
+
+## Goodness of fit: the T1 statistic
+
+The plot compares proportions by eye. A posterior predictive p-value (PPP) puts a number on it. @klauer2010 proposed the statistic $T_1$, which compares the observed mean frequency of each response category in each tree with the frequency the model expects:
+
+$$
+T_1 = \sum_{k} \frac{(n_k - \hat{n}_k)^2}{\hat{n}_k},
+$$
+
+summed over all categories $k$ of all trees, where $n_k$ is the observed and $\hat{n}_k$ the expected frequency, averaged over participants. $T_1$ is computed once for the observed counts and once for counts simulated from the model, both against the expected counts of the same posterior draw. The PPP is the proportion of draws in which the simulated data deviate more than the observed data. `brms::posterior_predict()` returns the simulated counts and `brms::posterior_epred()` the expected counts, each as draws x rows x categories. Here a cell is one condition, which also fixes the tree; summing instead of averaging over participants scales both statistics alike and leaves the PPP unchanged:
+
+```{r ppp-t1}
+obs <- fit_ol$data$Y
+yrep <- brms::posterior_predict(fit_ol)
+mu <- brms::posterior_epred(fit_ol)
+cell <- fit_ol$data$cond
+
+t1 <- function(o, e) sum((o - e)^2 / e)
+t1_draws <- t(vapply(seq_len(dim(mu)[1]), function(s) {
+  e <- rowsum(mu[s, , ], cell)
+  c(observed = t1(rowsum(obs, cell), e), replicated = t1(rowsum(yrep[s, , ], cell), e))
+}, numeric(2)))
+
+ppp_t1 <- mean(t1_draws[, "replicated"] > t1_draws[, "observed"])
+round(c(apply(t1_draws, 2, median), ppp = ppp_t1), 3)
+```
+
+The PPP of `r round(ppp_t1, 2)` is computed from `r nrow(t1_draws)` draws. A PPP near 0 means that data simulated from the model rarely deviate as much as the observed data, which flags misfit; a value away from 0 means the model reproduces the mean category frequencies. $T_1$ checks means only. @klauer2010 adds $T_2$ for the covariances of the counts across participants.
 
 ## Model comparison
 
