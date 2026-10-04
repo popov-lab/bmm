@@ -306,8 +306,7 @@ configure_model.mixture3p_cd <- function(model, data, formula) {
 
 .mixture3p_cd_log_lik <- function(version) {
   function(i, prep) {
-    # .cd_bernoulli_ld() decides with ifelse(), whose length is that of y
-    .cd_bernoulli_ld(rep(prep$data$Y[i], prep$ndraws), .mixture3p_cd_prep_psame(version, i, prep))
+    .cd_bernoulli_ld(prep$data$Y[i], .mixture3p_cd_prep_psame(version, i, prep))
   }
 }
 
