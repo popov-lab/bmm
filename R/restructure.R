@@ -29,6 +29,9 @@ restructure.bmmfit <- function(x, ...) {
   }
   current_version <- packageVersion("bmm")
   restr_version <- restructure_version.bmm(x)
+  # not gated by version: development fits carry the current version number
+  # and can still predate the function
+  x <- add_posterior_epred(x)
 
   if (restr_version >= current_version) {
     x <- NextMethod("restructure")
@@ -102,6 +105,27 @@ restructure_version.bmm <- function(x) {
     out <- x$version$bmm
   }
   out
+}
+
+# Custom families saved without a posterior_epred function (#475). Without
+# one, brms looks up posterior_epred_<family name> in the family environment,
+# which reset_env() points at the global environment; bmm defines its
+# functions under those names, so the same lookup is done here in bmm.
+add_posterior_epred <- function(x) {
+  family <- x$formula$family
+  if (!inherits(family, "customfamily") || is.function(family$posterior_epred)) {
+    return(x)
+  }
+  fun <- get0(paste0("posterior_epred_", family$name), envir = asNamespace("bmm"),
+              mode = "function", inherits = FALSE)
+  if (is.null(fun)) {
+    return(x)
+  }
+  x$formula$family$posterior_epred <- fun
+  if (inherits(x$family, "customfamily")) {
+    x$family$posterior_epred <- fun
+  }
+  x
 }
 
 add_links <- function(x) {

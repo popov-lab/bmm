@@ -20,21 +20,22 @@
 )
 
 .imm_priors <- list(
-  mu = list(main = "student_t(1, 0, 1)"),
-  kappa = list(main = "normal(2, 1)", effects = "normal(0, 1)"),
-  a = list(main = "normal(0, 1)", effects = "normal(0, 1)"),
-  c = list(main = "normal(0, 1)", effects = "normal(0, 1)"),
-  s = list(main = "normal(0, 1)", effects = "normal(0, 1)"),
-  b = list(main = "normal(0, 1)")
+  mu = list(main = "normal(0, 0.5)", effects = "normal(0, 0.25)", sd = "exponential(4)"),
+  kappa = list(main = "normal(2, 1)", effects = "normal(0, 1)", sd = "exponential(1)"),
+  a = list(main = "normal(0, 1)", effects = "normal(0, 1)", sd = "exponential(1)"),
+  c = list(main = "normal(0, 1)", effects = "normal(0, 1)", sd = "exponential(1)"),
+  s = list(main = "normal(0, 1)", effects = "normal(0, 1)", sd = "exponential(1)"),
+  b = list(main = "normal(0, 1)", effects = "normal(0, 1)", sd = "exponential(1)")
 )
 
 .imm_links <- list(
   mu = "tan_half", kappa = "log", a = "log", c = "log", s = "log", b = "log"
 )
 
+# central 50% of the main default prior on the native scale
 .imm_init_ranges <- list(
-  mu = c(-0.1, 0.1), kappa = c(3, 8), a = c(0.2, 1), c = c(1, 4),
-  s = c(0.5, 2), b = c(0.8, 1.2)
+  mu = c(-0.65, 0.65), kappa = c(3.8, 15), a = c(0.51, 2), c = c(0.51, 2),
+  s = c(0.51, 2), b = c(0.51, 2)
 )
 
 .imm_version_spec <- function(version) {
@@ -73,11 +74,12 @@
       domain = "Visual working memory",
       task = "Continuous reproduction",
       name = "Interference measurement model by Oberauer and Lin (2017).",
-      version = version,
       citation = glue(
-        "Oberauer, K., & Lin, H.Y. (2017). An interference model \\
-          of visual working memory. Psychological Review, 124(1), 21-59"
+        "Oberauer, K., & Lin, H.-Y. (2017). An interference model \\
+          of visual working memory. Psychological Review, 124(1), 21-59. \\
+          https://doi.org/10.1037/rev0000044"
       ),
+      version = version,
       requirements = glue(
         "- The response vairable should be in radians and \\
           represent the angular error relative to the target
@@ -100,7 +102,7 @@
     call = call
   )
 
-  out$links[names(links)] <- links
+  out <- set_links(out, links)
   out
 }
 
@@ -112,19 +114,13 @@
 #' Please use `imm(version = 'full')`, `imm(version = 'bsc')`, or `imm(version = 'abc')` instead.
 #'
 #' @name imm
-#' @details `r model_info(.model_imm(), components =c('domain', 'task', 'name', 'citation'))`
+#' @details `r model_docs(.model_imm(), components =c('domain', 'task', 'name', 'citation'))`
 #' #### Version: `full`
-#' `r model_info(.model_imm(version = "full"), components = c('requirements', 'parameters', 'fixed_parameters', 'links', 'prior'))`
+#' `r model_docs(.model_imm(version = "full"), components = c('requirements', 'parameters', 'fixed_parameters', 'links', 'prior'))`
 #' #### Version: `bsc`
-#' `r model_info(.model_imm(version = "bsc"), components = c('requirements', 'parameters', 'fixed_parameters', 'links', 'prior'))`
+#' `r model_docs(.model_imm(version = "bsc"), components = c('requirements', 'parameters', 'fixed_parameters', 'links', 'prior'))`
 #' #### Version: `abc`
-#' `r model_info(.model_imm(version = "abc"), components =c('requirements', 'parameters', 'fixed_parameters', 'links', 'prior'))`
-#'
-#' Additionally, all imm models have an internal parameter that is fixed to 0 to
-#' allow the model to be identifiable. This parameter is not estimated and is not
-#' included in the model formula. The parameter is:
-#'
-#'   - b = "Background activation (internally fixed to 0)"
+#' `r model_docs(.model_imm(version = "abc"), components =c('requirements', 'parameters', 'fixed_parameters', 'links', 'prior'))`
 #'
 #' @param resp_error The name of the variable in the provided dataset containing
 #'   the response error. The response Error should code the response relative to
@@ -226,9 +222,10 @@
 #' )
 #' @export
 imm <- function(resp_error, nt_features, nt_distances, set_size, regex = FALSE,
-                version = "full", variable_precision = FALSE, vp_nodes = 41L,
+                version = c("full", "bsc", "abc"), variable_precision = FALSE, vp_nodes = 41L,
                 links = NULL, ...) {
   call <- match.call()
+  version <- match.arg(version)
   dots <- list(...)
   if ("setsize" %in% names(dots)) {
     set_size <- dots$setsize
@@ -236,7 +233,6 @@ imm <- function(resp_error, nt_features, nt_distances, set_size, regex = FALSE,
   }
   if (version == "abc") nt_distances <- NULL
   stop_missing_args()
-  version <- match.arg(version, c("full", "bsc", "abc"))
   .circmix_check_variable_precision(variable_precision, vp_nodes)
 
   .model_imm(
@@ -320,7 +316,8 @@ configure_model.imm <- function(model, data, formula) {
     weight_parameters = spec$weight_parameters,
     vint = TRUE, n_vreal = sum(unlist(groups)),
     log_lik = .imm_log_lik(model$version),
-    posterior_predict = .imm_posterior_predict(model$version)
+    posterior_predict = .imm_posterior_predict(model$version),
+    posterior_epred = .imm_posterior_epred(model$version)
   )
 
   nlist(
@@ -329,6 +326,28 @@ configure_model.imm <- function(model, data, formula) {
       vint = "ss", vreal = groups
     )
   )
+}
+
+############################################################################# !
+# CONFIGURE_PRIOR METHODS                                                ####
+############################################################################# !
+
+# A set-size-1 trial has no non-target, so s is absent from its likelihood and
+# a enters only through its sum with c. With set size as a factor, those levels
+# are pinned to a constant, as they were before imm moved to a custom family
+#' @export
+configure_prior.imm <- function(model, data, formula, user_prior, ...) {
+  set_size_var <- model$other_vars$set_size
+  if (!any(data$ss_numeric == 1) || is.numeric(data[[set_size_var]])) {
+    return(NULL)
+  }
+  pars <- intersect(c("a", "s"), names(model$parameters))
+  prior <- brms::empty_prior() +
+    constrain_set_size1_fixef(formula, pars, set_size_var, "constant(0)") +
+    constrain_set_size1_ranef(formula, pars, set_size_var, "constant(1e-8)")
+  prior$dpar <- prior$nlpar
+  prior$nlpar <- rep("", nrow(prior))
+  prior
 }
 
 ############################################################################# !
@@ -347,6 +366,19 @@ configure_model.imm <- function(model, data, formula) {
     abc = posterior_predict_imm_abc
   )
 }
+
+.imm_posterior_epred <- function(version) {
+  switch(version,
+    full = posterior_epred_imm_full, bsc = posterior_epred_imm_bsc,
+    abc = posterior_epred_imm_abc
+  )
+}
+
+# add_posterior_epred() looks these up by family name for fits saved without
+# them
+posterior_epred_imm_full <- posterior_epred_undefined("imm")
+posterior_epred_imm_bsc <- posterior_epred_undefined("imm")
+posterior_epred_imm_abc <- posterior_epred_undefined("imm")
 
 # the non-target features come first in the vreal block, the distances after
 .imm_covariates <- function(prep, i, with_distances) {

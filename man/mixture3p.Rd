@@ -4,17 +4,7 @@
 \alias{mixture3p}
 \title{Three-parameter mixture model by Bays et al (2009).}
 \usage{
-mixture3p(
-  resp_error,
-  nt_features,
-  set_size,
-  regex = FALSE,
-  version = c("simple", "slot", "slot_averaging"),
-  variable_precision = FALSE,
-  vp_nodes = 41L,
-  links = NULL,
-  ...
-)
+mixture3p(resp_error, nt_features, set_size, regex = FALSE, ...)
 }
 \arguments{
 \item{resp_error}{The name of the variable in the dataset containing
@@ -35,35 +25,6 @@ fixed.}
 \item{regex}{Logical. If TRUE, the \code{nt_features} argument is interpreted as
 a regular expression to match the non-target feature columns in the dataset.}
 
-\item{version}{A character string specifying which version of the model to
-use. Options are:
-\itemize{
-\item \code{"simple"} (default): the standard three-parameter mixture model.
-The weights of the target (\code{thetat}), the non-targets (\code{thetant}) and
-guessing are normalised across the components a trial actually has,
-with guessing as the reference.
-\item \code{"slot"}: the probability that a response comes from memory follows
-the fixed-resolution slot model of Zhang and Luck (2008),
-\code{min(1, K / set_size)}, and \code{pnt} is the probability that a remembered
-response reports a non-target.
-\item \code{"slot_averaging"}: as \code{"slot"}, but \code{K} slots are distributed over
-the items and precision grows with the number of slots an item holds.
-}
-Storage and swapping are separate in the capacity versions: the capacity
-rule says how often a response comes from memory and \code{pnt} says which
-stored item is reported. In \code{"simple"} the two are jointly constrained by
-the shared normalisation, so neither weight is separately interpretable.}
-
-\item{variable_precision}{Logical; if \code{TRUE}, the precision of memory varies
-from trial to trial (van den Berg et al., 2012). See \code{\link[=mixture2p]{mixture2p()}} for
-details of the parameterisation.}
-
-\item{vp_nodes}{Number of quadrature nodes used when
-\code{variable_precision = TRUE}; must be an odd number of at least 41. See
-\code{\link[=mixture2p]{mixture2p()}}.}
-
-\item{links}{A named list of link functions for the model parameters.}
-
 \item{...}{used internally for testing, ignore it}
 }
 \value{
@@ -79,9 +40,8 @@ Three-parameter mixture model by Bays et al (2009).
 \item \strong{Name:} Three-parameter mixture model by Bays et al (2009).
 \item \strong{Citation:}
 \itemize{
-\item Bays, P. M., Catalao, R. F. G., & Husain, M. (2009). The precision of visual working memory is set by allocation of a shared resource. Journal of Vision, 9(10), 1-11
+\item Bays, P. M., Catalao, R. F. G., & Husain, M. (2009). The precision of visual working memory is set by allocation of a shared resource. Journal of Vision, 9(10), Article 7. https://doi.org/10.1167/9.10.7
 }
-\item \strong{Version:} simple
 \item \strong{Requirements:}
 \itemize{
 \item The response vairable should be in radians and represent the angular error relative to the target
@@ -93,37 +53,46 @@ Three-parameter mixture model by Bays et al (2009).
 \itemize{
 \item \strong{Parameters:}
 \itemize{
-\item \code{mu}: Location of the von Mises distribution of memory responses (in radians). Fixed internally to 0 by default.
-\item \code{kappa}: Concentration of the von Mises distribution of memory responses
-\item \code{thetat}: Mixture weight for target responses. The weights of the target, the non-targets and guessing are normalised across the components present on a trial, with guessing as the reference, so thetat maps to the probability of a target response only jointly with thetant.
+\item \code{mu1}: Location parameter of the von Mises distribution for memory responses (in radians). Fixed internally to 0 by default.
+\item \code{kappa}: Concentration parameter of the von Mises distribution
+\item \code{thetat}: Mixture weight for target responses
 \item \code{thetant}: Mixture weight for non-target responses
 }
 \item \strong{Fixed parameters:}
 \itemize{
-\item \code{mu} = 0
+\item \code{mu1} = 0
+\item \code{mu2} = 0
+\item \code{kappa2} = -100
 }
 \item \strong{Default parameter links:}
 \itemize{
-\item mu = tan_half; kappa = log; thetat = identity; thetant = identity
+\item mu1 = tan_half; kappa = log; thetat = softmax; thetant = softmax
 }
 \item \strong{Default priors:}
 \itemize{
-\item \code{mu}:
+\item \code{mu1}:
 \itemize{
-\item \code{main}: student_t(1, 0, 1)
+\item \code{main}: normal(0, 0.5)
+\item \code{effects}: normal(0, 0.25)
+\item \code{sd}: exponential(4)
 }
 \item \code{kappa}:
 \itemize{
 \item \code{main}: normal(2, 1)
 \item \code{effects}: normal(0, 1)
+\item \code{sd}: exponential(1)
 }
 \item \code{thetat}:
 \itemize{
 \item \code{main}: logistic(0, 1)
+\item \code{effects}: normal(0, 2.5)
+\item \code{sd}: exponential(1)
 }
 \item \code{thetant}:
 \itemize{
 \item \code{main}: logistic(0, 1)
+\item \code{effects}: normal(0, 2.5)
+\item \code{sd}: exponential(1)
 }
 }
 }
@@ -172,13 +141,5 @@ fit <- bmm(
   backend = "cmdstanr"
 )
 \dontshow{\}) # examplesIf}
-}
-\references{
-Bays, P. M., Catalao, R. F. G., & Husain, M. (2009). The
-precision of visual working memory is set by allocation of a shared
-resource. Journal of Vision, 9(10), 1-11.
-
-Zhang, W., & Luck, S. J. (2008). Discrete fixed-resolution representations
-in visual working memory. Nature, 453(7192), 233-235.
 }
 \keyword{bmmodel}

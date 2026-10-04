@@ -14,8 +14,6 @@ dmixture3p(
   kappa = 5,
   p_mem = 0.6,
   p_nt = 0.2,
-  tau = 0,
-  vp_nodes = 41L,
   log = FALSE
 )
 
@@ -23,7 +21,7 @@ pmixture3p(q, mu = c(0, 2, -1.5), kappa = 5, p_mem = 0.6, p_nt = 0.2)
 
 qmixture3p(p, mu = c(0, 2, -1.5), kappa = 5, p_mem = 0.6, p_nt = 0.2)
 
-rmixture3p(n, mu = c(0, 2, -1.5), kappa = 5, p_mem = 0.6, p_nt = 0.2, tau = 0)
+rmixture3p(n, mu = c(0, 2, -1.5), kappa = 5, p_mem = 0.6, p_nt = 0.2)
 }
 \arguments{
 \item{x}{Vector of observed responses}
@@ -37,14 +35,6 @@ items.}
 \item{p_mem}{Vector of probabilities for memory recall}
 
 \item{p_nt}{Vector of probabilities for swap errors}
-
-\item{tau}{Vector of scales for trial-to-trial variability in precision. The
-Fisher information \code{J} of a memory representation is drawn from
-\code{gamma(mean = J(kappa), scale = tau)}. \code{tau = 0}, the default, is constant
-precision. See \code{\link[=mixture3p]{mixture3p()}}.}
-
-\item{vp_nodes}{Number of quadrature nodes used when \code{tau > 0}; must be an
-odd number of at least 41. See \code{\link[=mixture2p]{mixture2p()}}.}
 
 \item{log}{Logical; if \code{TRUE}, values are returned on the log scale.}
 

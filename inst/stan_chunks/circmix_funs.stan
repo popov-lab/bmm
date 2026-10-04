@@ -1,11 +1,4 @@
-  /* Shared numerics for the circular mixture models (mixture2p, mixture3p, imm).
-   *
-   * Component weights always arrive normalised on the log scale: exp(logw)
-   * together with exp(logw_guess) sums to one. The cosines cos(y - mu_k) are
-   * passed in rather than computed here because they do not depend on kappa,
-   * which is what makes the variable-precision quadrature affordable -- the
-   * whole grid re-uses one set of cosines.
-   */
+  // Shared numerics for mixture2p, mixture3p and imm; derivations sit by the R twins in R/helpers-circmix.R
 
   // Fisher information of a von Mises about its location
   real circmix_J(real kappa) {
@@ -31,13 +24,7 @@
     return lo;
   }
 
-  /* Inverse of circmix_J, by cubic Hermite interpolation on a grid uniform in
-   * log J. Outside the tabulated range the exact asymptotics are used:
-   * J -> kappa^2 / 2 as kappa -> 0, and J -> kappa - 1/2 as kappa -> infinity.
-   * logk and dlogk hold log kappa and d log kappa / d log J at the nodes, and
-   * are built by .circmix_kappa_table() in R and passed in as data, so that the
-   * R and Stan implementations of the inverse cannot drift apart.
-   */
+  // inverse of circmix_J: cubic Hermite on the log J table from .circmix_kappa_table(), exact asymptotics outside it
   real circmix_kappa(real J, data vector logk, data vector dlogk,
                      data real logJ_min, data real dlogJ) {
     int n = num_elements(logk);
@@ -58,8 +45,7 @@
                           + (s3 - s2) * dlogk[i + 1]));
   }
 
-  // log density of a mixture of von Mises sharing one concentration, plus a
-  // uniform guessing component
+  // von Mises mixture sharing one kappa plus uniform guessing; normalised log weights, cosd = cos(y - mu_k)
   real circmix_ld(vector cosd, vector logw, real logw_guess, real kappa) {
     return log_sum_exp(log_sum_exp(logw + kappa * cosd)
                          - log_modified_bessel_first_kind(0, kappa),
@@ -86,17 +72,7 @@
     return i % 2 == 0 ? log(4) : log(2);
   }
 
-  /* Variable precision: the same mixture, with the Fisher information of the
-   * memory components marginalised over J ~ gamma(shape = Jbar / tau, scale =
-   * tau), where Jbar = circmix_J(kappa). tau = 0 leaves a point mass at Jbar,
-   * i.e. the constant-precision model, which is why tau is the parameter the
-   * variable_precision argument frees.
-   *
-   * Nodes sit on a composite Simpson grid in log J, centred on
-   * E[log J] = digamma(shape) + log(tau) with half width
-   * 8 sd(log J) = 8 sqrt(trigamma(shape)). The offsets are constants, so only
-   * the centre and the width depend on parameters, and they do so smoothly.
-   */
+  // circmix_ld with J marginalised over gamma(J(kappa) / tau, scale = tau) on a Simpson grid in log J; tau = 0 is constant precision
   real circmix_vp_ld(vector cosd, vector logw, real logw_guess,
                      real kappa, real tau, int nodes,
                      data vector logk, data vector dlogk,
@@ -129,28 +105,14 @@
     return log_sum_exp(lp) + log(step / 3);
   }
 
-  /* Slot allocation of a capacity K over set size ss. An item receives
-   * floor(K / ss) slots with probability 1 - r and one more with probability r,
-   * which is continuous in K across the integer crossings. Returns
-   * [floor(K / ss), r].
-   */
+  // slot allocation of capacity K over set size ss: [floor(K / ss), probability of one more slot]
   vector circmix_slots(real K, int ss) {
     real q = K * inv(ss);
     real f = floor(q);
     return [f, q - f]';
   }
 
-  /* Slot averaging (Zhang & Luck, 2008): the reported item holds floor(K / ss)
-   * or one more slot, and averaging independent samples adds their Fisher
-   * information, so a j-slot item has J_j = j * J(kappa) with kappa the
-   * precision of a single slot. logw holds the item weights given that the item
-   * is held; an item holding no slot is guessed.
-   *
-   * Under variable precision the sum of j draws from gamma(J(kappa)/tau, tau)
-   * is gamma(j J(kappa)/tau, tau), which is what passing kappa_j with the same
-   * tau gives, so the two mechanisms compose without a second quadrature over
-   * slot counts.
-   */
+  // slot averaging (Zhang & Luck, 2008): a j-slot item has J = j * J(kappa); composes with variable precision via tau
   real circmix_slot_averaging_ld(vector cosd, vector logw, real K, int ss,
                                  real kappa, real tau, int nodes,
                                  data vector logk, data vector dlogk,

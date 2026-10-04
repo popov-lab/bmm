@@ -139,6 +139,54 @@ test_that("every version runs through the bmm() pipeline", {
     backend = "mock", mock_fit = 1, rename = FALSE))
 })
 
+test_that("a formula naming mu1 still fits, with a warning", {
+  expect_warning(
+    fit <- bmm(bmf(mu1 ~ 1, kappa ~ 1, c ~ 1, a ~ 1), oberauer_lin_2017,
+      imm_model("abc"),
+      backend = "mock", mock_fit = 1, rename = FALSE
+    ),
+    "'mu1' were renamed to 'mu'"
+  )
+  expect_true("mu" %in% names(fit$formula$pforms))
+})
+
+test_that("each imm family refuses the expected response under its own name", {
+  formulas <- list(
+    full = bmf(kappa ~ 1, c ~ 1, a ~ 1, s ~ 1),
+    bsc = bmf(kappa ~ 1, c ~ 1, s ~ 1),
+    abc = bmf(kappa ~ 1, c ~ 1, a ~ 1)
+  )
+  for (version in names(formulas)) {
+    model <- check_model(imm_model(version), oberauer_lin_2017, formulas[[version]])
+    data <- check_data(model, oberauer_lin_2017, formulas[[version]])
+    family <- configure_model(model, data, formulas[[version]])$formula$family
+    # add_posterior_epred() finds the function for old fits by the family name
+    expect_identical(
+      family$posterior_epred,
+      get(paste0("posterior_epred_", family$name), envir = asNamespace("bmm"))
+    )
+    expect_error(family$posterior_epred(NULL), "not defined for the imm model")
+  }
+})
+
+test_that("a set-size-1 factor level pins the parameters that trial cannot inform", {
+  formula <- bmf(kappa ~ 1, c ~ 1, a ~ 0 + set_size, s ~ 0 + set_size)
+  pr <- default_prior(formula, oberauer_lin_2017, imm_model())
+  pinned <- pr[pr$class == "b" & pr$coef == "set_size1", ]
+  expect_setequal(pinned$dpar, c("a", "s"))
+  expect_true(all(pinned$prior == "constant(0)"))
+
+  pr <- default_prior(bmf(kappa ~ 1, c ~ 1, s ~ 0 + set_size), oberauer_lin_2017,
+    imm_model("bsc"))
+  expect_equal(pr[pr$coef == "set_size1", ]$dpar, "s")
+
+  # a numeric set size has no set-size-1 level to pin
+  dat <- oberauer_lin_2017
+  dat$set_size <- as.numeric(as.character(dat$set_size))
+  pr <- default_prior(bmf(kappa ~ 1, c ~ 1, a ~ 1, s ~ 0 + set_size), dat, imm_model())
+  expect_false(any(grepl("constant(0)", pr$prior[pr$class == "b"], fixed = TRUE)))
+})
+
 test_that("check_data() still validates the non-target distances", {
   dat <- oberauer_lin_2017
   dat$dist_nt1 <- -1
