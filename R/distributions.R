@@ -1169,11 +1169,48 @@ log_diff_exp <- function(a, b) {
   a + log1m_exp(b - a)
 }
 
-# elementwise over two vectors; two -Inf terms give -Inf, not the NaN of
-# -Inf - -Inf
+# elementwise over two vectors; two infinite terms of one sign give that
+# infinity, not the NaN of Inf - Inf
 log_sum_exp <- function(a, b) {
   m <- pmax(a, b)
-  ifelse(m == -Inf, -Inf, m + log1p(exp(-abs(a - b))))
+  ifelse(is.finite(m), m + log1p(exp(-abs(a - b))), m)
+}
+
+# log_diff_exp() where rounding can leave b >= a: there the difference is taken
+# as `floor` (exp(floor) = 0 for the default) rather than NaN. NA propagates
+log_diff_exp_floored <- function(a, b, floor = -Inf) {
+  out <- rep(floor, length(a))
+  ok <- !is.na(a) & !is.na(b) & a > b
+  out[ok] <- log_diff_exp(a[ok], b[ok])
+  out[is.na(a) | is.na(b)] <- NA_real_
+  out
+}
+
+# log(Phi(hi) - Phi(lo)) for hi > lo, from whichever tail keeps both
+# probabilities away from 1: the lower tails left of zero, the upper tails right
+# of it. A straddling pair has both probabilities O(1) and is exact directly.
+# An empty interval is -Inf, and NA propagates
+log_Phi_diff <- function(lo, hi) {
+  out <- rep(NA_real_, length(lo))
+  known <- !is.na(lo) & !is.na(hi)
+  out[known] <- -Inf
+  lower <- known & hi <= 0
+  upper <- known & lo >= 0
+  mid <- known & !(lower | upper) & hi > lo
+  out[lower] <- log_diff_exp_floored(
+    stats::pnorm(hi[lower], log.p = TRUE), stats::pnorm(lo[lower], log.p = TRUE)
+  )
+  out[upper] <- log_diff_exp_floored(
+    stats::pnorm(-lo[upper], log.p = TRUE), stats::pnorm(-hi[upper], log.p = TRUE)
+  )
+  out[mid] <- log(stats::pnorm(hi[mid]) - stats::pnorm(lo[mid]))
+  out
+}
+
+# the named arguments recycled to the length of the longest, as a named list
+recycle_args <- function(...) {
+  args <- list(...)
+  lapply(args, rep_len, length.out = max(lengths(args)))
 }
 
 # count * log_prob, treating a zero count as contributing nothing even when the
