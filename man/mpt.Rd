@@ -88,7 +88,7 @@ formula produces.
 }
 }
 \examples{
-\dontshow{if (isTRUE(Sys.getenv("BMM_EXAMPLES"))) withAutoprint(\{ # examplesIf}
+\dontrun{
 # two-high-threshold (2HTM) model of recognition memory
 tree_old <- mpt_tree("old", list(
   old = "D + (1 - D) * g",
@@ -131,6 +131,7 @@ fit <- bmm(
 )
 
 summary(fit)
-\dontshow{\}) # examplesIf}
+}
+
 }
 \keyword{bmmodel}

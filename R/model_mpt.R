@@ -139,7 +139,7 @@ print.mpt_tree <- function(x, ...) {
         review of multinomial process tree modeling. Psychonomic Bulletin & \\
         Review, 6(1), 57-86. https://doi.org/10.3758/BF03210812"
       ),
-      version = "",
+      version = "NA",
       requirements = paste0(
         "- One tree per distinct branch structure, created with mpt_tree(); ",
         "all trees share the same response categories\n",
@@ -273,7 +273,8 @@ settable_link_functions.mpt <- function(model) {
 #'
 #' @keywords bmmodel
 #'
-#' @examplesIf isTRUE(Sys.getenv("BMM_EXAMPLES"))
+#' @examples
+#' \dontrun{
 #' # two-high-threshold (2HTM) model of recognition memory
 #' tree_old <- mpt_tree("old", list(
 #'   old = "D + (1 - D) * g",
@@ -316,6 +317,7 @@ settable_link_functions.mpt <- function(model) {
 #' )
 #'
 #' summary(fit)
+#' }
 #'
 #' @export
 mpt <- function(trees, tree_id = NULL, links = "logit", ...) {
