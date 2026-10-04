@@ -393,11 +393,11 @@ test_that("every link declared by a supported model can be transformed", {
 test_that("native_transform inverts the tan_half link at non-zero values", {
   model <- .model_mixture2p()
   eta <- matrix(c(-3, -1, 0, 0.5, 2, 7), nrow = 2)
-  out <- native_transform(model, list(mu1 = eta), data.frame())
+  out <- native_transform(model, list(mu = eta), data.frame())
 
-  expect_equal(out$mu1, 2 * atan(eta))
-  expect_false(isTRUE(all.equal(out$mu1, eta)))
-  expect_true(all(abs(out$mu1) < pi))
+  expect_equal(out$mu, 2 * atan(eta))
+  expect_false(isTRUE(all.equal(out$mu, eta)))
+  expect_true(all(abs(out$mu) < pi))
 })
 
 test_that("native_transform errors when a softmax group is incomplete", {

@@ -242,7 +242,7 @@ prior_provenance <- function(fit) {
 #   - fixed parameters the model never declares: the mu that brms forces on
 #     every custom family (the response-time models), and the second-component
 #     mu2/kappa2 of a brms::mixture() family. Fixed parameters the model does
-#     declare (sdm's mu, mixture2p's mu1) are real and stay.
+#     declare (sdm's and mixture2p's mu) are real and stay.
 #   - the mixture-weight reference component: brms reports a default prior for
 #     the theta<k> it did not linearly predict, but the generated Stan code
 #     sets it to rep_vector(0.0, N) as the softmax reference, so the prior is

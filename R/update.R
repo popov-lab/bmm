@@ -314,6 +314,19 @@ revert_check_data.non_targets <- function(model, data) {
 }
 
 #' @exportS3Method
+revert_check_data.mixture2p <- function(model, data) {
+  set_size <- model$other_vars$set_size
+  # brms keeps the set_size column only when a formula predicts something with
+  # it; ss_numeric is check_data()'s numeric copy, kept for the vint() term
+  if (is.character(set_size) && not_in(set_size, colnames(data)) &&
+    "ss_numeric" %in% colnames(data)) {
+    data[[set_size]] <- data$ss_numeric
+    attr(data, "rebuilt") <- c(attr(data, "rebuilt"), set_size)
+  }
+  NextMethod("revert_check_data")
+}
+
+#' @exportS3Method
 revert_check_data.sdt_yn <- function(model, data) {
   data$dist_type <- NULL
   NextMethod("revert_check_data")

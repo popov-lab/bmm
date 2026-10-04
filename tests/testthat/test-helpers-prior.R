@@ -390,7 +390,7 @@ test_that("prior_info() omits the technical parameters of mixture families", {
   # reference the sampler holds at zero; none of them is a model parameter
   expect_false(any(c("mu2", "kappa2") %in% out$parameter))
   expect_false(any(grepl("^theta[0-9]+$", out$class)))
-  expect_setequal(out$parameter, c("kappa", "thetat", "mu1"))
+  expect_setequal(out$parameter, c("kappa", "thetat", "mu"))
 
   text <- paste(capture.output(print(prior_info(fit, format = "text"))), collapse = " ")
   expect_false(grepl("kappa2|mu2|theta2", text))

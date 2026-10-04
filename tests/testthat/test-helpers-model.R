@@ -93,7 +93,7 @@ test_that("model_versions() lists the versions a constructor accepts", {
   expect_equal(model_versions("imm"), c("full", "bsc", "abc"))
   expect_equal(model_versions("m3"), c("custom", "ss", "cs"))
   expect_equal(model_versions("ezdm"), c("3par", "4par"))
-  expect_equal(model_versions("mixture2p"), NA_character_)
+  expect_equal(model_versions("mixture2p"), c("simple", "slot", "slot_averaging"))
 })
 
 test_that("imm(), m3(), ezdm() and sdm() refuse an unknown version", {
@@ -159,7 +159,10 @@ test_that("model_overview() has one row per version with its own columns and par
   expect_match(m3_cs$`Data columns`, "each of 5 categories", fixed = TRUE)
 
   mixture2p <- overview[grepl("`mixture2p()`", overview$Model, fixed = TRUE), ]
-  expect_false(grepl("version", mixture2p$Model))
+  expect_equal(nrow(mixture2p), 3)
+  slot <- grepl("version `slot", mixture2p$Model, fixed = TRUE)
+  expect_true(all(grepl("set_size", mixture2p$`Data columns`[slot])))
+  expect_false(grepl("set_size", mixture2p$`Data columns`[!slot]))
 
   rt_models <- model_overview(group = "Choices and response times")
   expect_true(all(grepl("`(ddm|cswald|ezdm)\\(\\)`", rt_models$Model)))

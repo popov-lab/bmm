@@ -473,8 +473,8 @@ print.bmm_parameters <- function(x, max_desc_width = 50, ...) {
 #'
 #' # Circular location parameters
 #'
-#' The circular models sample their location parameter (`mu` for `sdm`, `mu1` for
-#' `mixture2p`, `mixture3p` and `imm`) through a `tan_half` link, and it is
+#' The circular models sample their location parameter (`mu` for `sdm` and
+#' `mixture2p`, `mu1` for `mixture3p` and `imm`) through a `tan_half` link, and it is
 #' returned in radians in `(-pi, pi)` — a response bias relative to the target,
 #' since the response variable is the angular error. It is fixed to `0` unless
 #' the `bmmformula` predicts it explicitly, so an all-zero `mu1` means the model

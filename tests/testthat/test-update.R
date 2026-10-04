@@ -462,6 +462,10 @@ stored_frame_cases <- function() {
       model = mixture2p("dev_rad"), formula = bmf(kappa ~ 1, thetat ~ 1),
       data = lin_2017
     ),
+    mixture2p_slot = list(
+      model = mixture2p("dev_rad", set_size = "set_size", version = "slot"),
+      formula = bmf(kappa ~ 1, K ~ 1), data = lin_2017
+    ),
     mixture3p = list(
       model = mixture3p("dev_rad", nt_features = nt_features, set_size = "set_size"),
       formula = bmf(kappa ~ 1, thetat ~ 1, thetant ~ 1), data = lin_2017

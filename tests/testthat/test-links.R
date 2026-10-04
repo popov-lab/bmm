@@ -160,10 +160,6 @@ test_that("a link the model does not pass on to the fit is refused", {
     "cannot be changed in sdm\\(\\)"
   )
   expect_error(
-    mixture2p(resp_error = "y", links = list(kappa = "softplus")),
-    "cannot be changed in mixture2p\\(\\)"
-  )
-  expect_error(
     mixture3p(resp_error = "y", nt_features = "nt", set_size = "ss",
               links = list(kappa = "softplus")),
     "cannot be changed in mixture3p\\(\\)"
@@ -206,7 +202,6 @@ test_that("a refused model builds the same fit whatever its links say", {
   nt <- paste0("col_nt", 1:7)
   cases <- list(
     list(sdm("dev_rad"), bmf(c ~ 1, kappa ~ 1), "kappa"),
-    list(mixture2p("dev_rad"), bmf(thetat ~ 1, kappa ~ 1), "kappa"),
     list(
       mixture3p("dev_rad", nt_features = nt, set_size = "set_size"),
       bmf(thetat ~ 1, thetant ~ 1, kappa ~ 1), "kappa"
@@ -241,6 +236,18 @@ test_that("a custom link set on imm reaches its custom family", {
   family <- configure_model(model, data, ff)$formula$family
   expect_equal(family$link_c, "softplus")
   expect_equal(family$link_a, "log")
+})
+
+test_that("a custom link set on mixture2p reaches its custom family", {
+  dat <- data.frame(y = c(0.1, -0.2, 0.3), ss = c(2, 4, 6))
+  model <- mixture2p("y", set_size = "ss", version = "slot",
+    links = list(kappa = "softplus", K = "softplus")
+  )
+  expect_equal(settable_links(model), c("mu", "kappa", "K"))
+  ff <- bmmformula(kappa ~ 1, K ~ 1)
+  family <- configure_model(model, check_data(model, dat, ff), ff)$formula$family
+  expect_equal(family$link_kappa, "softplus")
+  expect_equal(family$link_K, "softplus")
 })
 
 test_that("links set after construction are checked by the pipeline", {

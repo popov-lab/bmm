@@ -65,6 +65,26 @@ test_that("create_initfun returns a function with random-effects inits for mixtu
     thetat ~ 0 + set_size + (0 + set_size | ID)
   )
   expect_re_inits(configured_initfun(model, formula, dat)())
+
+  # the init ranges are on the native scale and reach Stan on the link scale
+  inits <- init_fun()
+  expect_true(exp(inits$Intercept_kappa) >= 3.8 && exp(inits$Intercept_kappa) <= 15)
+  expect_true(
+    stats::plogis(inits$Intercept_thetat) >= 0.25 &&
+      stats::plogis(inits$Intercept_thetat) <= 0.75
+  )
+})
+
+test_that("create_initfun keeps the variable-precision gamma shape integrable", {
+  dat <- oberauer_lin_2017
+  model <- mixture2p(resp_error = "dev_rad", variable_precision = TRUE)
+  init_fun <- configured_initfun(model, bmf(thetat ~ 1, kappa ~ 1, tau ~ 1), dat)
+
+  shapes <- replicate(50, {
+    inits <- init_fun()
+    .circmix_J(exp(inits$Intercept_kappa)) / exp(inits$Intercept_tau)
+  })
+  expect_true(all(shapes > 40 / model$vp_nodes))
 })
 
 test_that("create_initfun returns 0 for m3 with simple choice rule and identity link", {
@@ -620,19 +640,21 @@ test_that("mixture2p starts inside the central 50% of its default priors", {
   model <- mixture2p("dev_rad")
   ranges <- model$init_ranges
   expect_equal(ranges$kappa, central_range(2, 1, exp))
-  expect_equal(ranges$mu1, central_range(0, 0.5, function(x) 2 * atan(x)))
+  expect_equal(ranges$mu, central_range(0, 0.5, function(x) 2 * atan(x)))
   expect_equal(ranges$thetat, signif(stats::plogis(c(-1, 1) * stats::qlogis(0.75)), 2))
 
-  formula <- bmf(kappa ~ 1 + (1 | ID), thetat ~ 1 + set_size, mu1 ~ 1)
+  formula <- bmf(kappa ~ 1 + (1 | ID), thetat ~ 1 + set_size, mu ~ 1)
   init_fun <- configured_initfun(model, formula, dat)
   for (i in 1:20) {
     inits <- init_fun()
-    # nlpars carry their intercept in the first coefficient
-    expect_true(inits$b_kappa[1] >= log(ranges$kappa[1]) && inits$b_kappa[1] <= log(ranges$kappa[2]))
-    expect_true(inits$b_thetat[1] >= stats::qlogis(ranges$thetat[1]) &&
-      inits$b_thetat[1] <= stats::qlogis(ranges$thetat[2]))
-    expect_true(all(abs(inits$b_thetat[-1]) <= 0.1))
-    expect_true(abs(inits$Intercept_mu1) <= tan(ranges$mu1[2] / 2))
+    # dpars carry their intercept separately from the coefficients
+    expect_true(inits$Intercept_kappa >= log(ranges$kappa[1]) &&
+      inits$Intercept_kappa <= log(ranges$kappa[2]))
+    expect_true(inits$Intercept_thetat >= stats::qlogis(ranges$thetat[1]) &&
+      inits$Intercept_thetat <= stats::qlogis(ranges$thetat[2]))
+    expect_true(all(abs(inits$b_thetat) <= 0.1))
+    # brms names the intercept of the custom family's first parameter, mu, plainly
+    expect_true(abs(inits$Intercept) <= tan(ranges$mu[2] / 2))
   }
 })
 

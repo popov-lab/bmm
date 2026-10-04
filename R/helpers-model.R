@@ -563,6 +563,14 @@ data_column_roles <- list(
   mixture2p = c(
     resp_error = "response error relative to the target, in radians"
   ),
+  mixture2p_slot = c(
+    resp_error = "response error relative to the target, in radians",
+    set_size = "set size (a column, or one number)"
+  ),
+  mixture2p_slot_averaging = c(
+    resp_error = "response error relative to the target, in radians",
+    set_size = "set size (a column, or one number)"
+  ),
   mixture3p = c(
     resp_error = "response error relative to the target, in radians",
     nt_features = "non-target features relative to the target, in radians, one column per non-target",
