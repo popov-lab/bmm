@@ -418,13 +418,16 @@ print_model_details.mpt <- function(model, ...) {
   for (tree in model$other_vars$trees) {
     print(tree)
   }
-  # the classical identifiability bound of MPTinR's check.mpt(): each tree
-  # contributes its number of categories minus one
-  n_free <- length(model$parameters)
+  # classical parameters-versus-categories bound, not the Fisher-information
+  # rank of MPTinR's check.mpt(); each tree contributes categories minus one
+  n_free <- length(setdiff(
+    names(attr(model, "links_default")) %||% names(model$parameters),
+    names(model$fixed_parameters)
+  ))
   df <- sum(lengths(lapply(model$other_vars$trees, `[[`, "branches")) - 1L)
   cat(glue(
-    "Identifiability: {n_free} free parameter(s), {df} degrees of freedom \\
-    (response categories minus 1, summed over trees)"
+    "Identifiability (intercept-only formulas): {n_free} free parameter(s), \\
+    {df} degrees of freedom (response categories minus 1, summed over trees)"
   ), "\n")
   if (n_free > df) {
     cat(

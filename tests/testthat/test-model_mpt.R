@@ -372,6 +372,17 @@ test_that("printing an mpt model lists trees and the identifiability bound", {
   unidentified <- mpt(trees, tree_id = "item_type")
   expect_output(print(unidentified), "3 free parameter\\(s\\), 2 degrees of freedom")
   expect_output(print(unidentified), "not identified")
+
+  dat <- mpt_2htm_data()
+  dat$x <- rep(0:1, length.out = nrow(dat))
+  nonlinear <- suppressMessages(check_model(
+    model, dat, bmf(D ~ inv_logit(a + b * x), a ~ 1, b ~ 1, g ~ 1)
+  ))
+  expect_output(print(nonlinear), "2 free parameter\\(s\\)")
+  expect_no_match(capture.output(print(nonlinear)), "not identified")
+
+  fixed <- suppressMessages(check_model(model, dat, bmf(D ~ 1, g = 0.5)))
+  expect_output(print(fixed), "1 free parameter\\(s\\)")
 })
 
 test_that("fixed parameter values stay probabilities and reach the prior on the latent scale", {
