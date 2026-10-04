@@ -541,15 +541,6 @@ stored_frame_cases <- function() {
   ), model_test_cases("stored_frame"))
 }
 
-stored_frame_fit <- function(case) {
-  # the toy rt_data has a 50% error rate, which cswald "simple" warns about
-  suppressWarnings(suppressMessages(
-    bmm(case$formula, case$data, case$model,
-      backend = "mock", mock_fit = 1, rename = FALSE
-    )
-  ))
-}
-
 test_that("every supported model has a stored-frame case", {
   covered <- unlist(lapply(stored_frame_cases(), function(case) {
     intersect(class(case$model), model_names())

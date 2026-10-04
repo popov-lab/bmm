@@ -15,3 +15,14 @@ model_test_cases <- function(kind) {
   providers <- ls(env, pattern = "^model_cases_")
   unlist(lapply(providers, function(p) env[[p]]()[[kind]]), recursive = FALSE)
 }
+
+# a mock fit of a stored-frame case, whose model frame is what update() and
+# check_stored_data() get back
+stored_frame_fit <- function(case) {
+  # the toy rt_data has a 50% error rate, which cswald "simple" warns about
+  suppressWarnings(suppressMessages(
+    bmm(case$formula, case$data, case$model,
+      backend = "mock", mock_fit = 1, rename = FALSE
+    )
+  ))
+}
