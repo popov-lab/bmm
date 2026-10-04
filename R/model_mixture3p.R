@@ -7,6 +7,38 @@
   Fixed internally to 0 by default."
 )
 
+.mixture3p_citation <- paste(
+  "Bays, P. M., Catalao, R. F. G., & Husain, M. (2009). The precision of",
+  "visual working memory is set by allocation of a shared resource. Journal",
+  "of Vision, 9(10), Article 7. https://doi.org/10.1167/9.10.7"
+)
+
+.mixture3p_capacity_citation <- paste(
+  "Zhang, W., & Luck, S. J. (2008). Discrete fixed-resolution representations",
+  "in visual working memory. Nature, 453(7192), 233-235.",
+  "https://doi.org/10.1038/nature06860"
+)
+
+.mixture3p_location_prior <- list(
+  main = "normal(0, 0.5)", effects = "normal(0, 0.25)", sd = "exponential(4)"
+)
+
+.mixture3p_kappa_prior <- list(
+  main = "normal(2, 1)", effects = "normal(0, 1)", sd = "exponential(1)"
+)
+
+.mixture3p_capacity_priors <- list(
+  mu = .mixture3p_location_prior,
+  kappa = .mixture3p_kappa_prior,
+  K = list(main = "normal(1, 0.5)", effects = "normal(0, 0.3)", sd = "exponential(2)"),
+  pnt = list(main = "logistic(-1, 1)", effects = "normal(0, 0.5)", sd = "exponential(1)")
+)
+
+# central 50% of the main default prior on the native scale
+.mixture3p_capacity_inits <- list(
+  mu = c(-0.65, 0.65), kappa = c(3.8, 15), K = c(1.9, 3.8), pnt = c(0.11, 0.52)
+)
+
 .mixture3p_version_table <- list(
   simple = list(
     weight_parameters = c("thetat", "thetant"),
@@ -23,16 +55,22 @@
       thetant = "Mixture weight for non-target responses"
     ),
     links = list(
-      mu = "tan_half", kappa = "log", thetat = "identity", thetant = "identity"
+      mu = "tan_half", kappa = "log", thetat = "softmax", thetant = "softmax"
     ),
     priors = list(
-      mu = list(main = "student_t(1, 0, 1)"),
-      kappa = list(main = "normal(2, 1)", effects = "normal(0, 1)"),
-      thetat = list(main = "logistic(0, 1)"),
-      thetant = list(main = "logistic(0, 1)")
+      mu = .mixture3p_location_prior,
+      kappa = .mixture3p_kappa_prior,
+      # two cells with logistic(0, 1) priors differ by SD pi * sqrt(2 / 3) = 2.57;
+      # narrower effects priors shrink set-size effects from a reference near
+      # ceiling, so 1 + set_size and 0 + set_size disagree (#466)
+      thetat = list(main = "logistic(0, 1)", effects = "normal(0, 2.5)", sd = "exponential(1)"),
+      thetant = list(main = "logistic(0, 1)", effects = "normal(0, 2.5)", sd = "exponential(1)")
     ),
+    # the softmax weights have no native value of their own, so their ranges
+    # are on the sampling scale
     init_ranges = list(
-      mu = c(-0.1, 0.1), kappa = c(3, 8), thetat = c(1, 2), thetant = c(-1, 0)
+      mu = c(-0.65, 0.65), kappa = c(3.8, 15),
+      thetat = c(-1.1, 1.1), thetant = c(-1.1, 1.1)
     )
   ),
   slot = list(
@@ -52,15 +90,8 @@
       )
     ),
     links = list(mu = "tan_half", kappa = "log", K = "log", pnt = "logit"),
-    priors = list(
-      mu = list(main = "student_t(1, 0, 1)"),
-      kappa = list(main = "normal(2, 1)", effects = "normal(0, 1)"),
-      K = list(main = "normal(1, 0.5)", effects = "normal(0, 0.3)"),
-      pnt = list(main = "logistic(-1, 1)", effects = "normal(0, 0.5)")
-    ),
-    init_ranges = list(
-      mu = c(-0.1, 0.1), kappa = c(3, 8), K = c(2, 4), pnt = c(0.05, 0.2)
-    )
+    priors = .mixture3p_capacity_priors,
+    init_ranges = .mixture3p_capacity_inits
   ),
   slot_averaging = list(
     weight_parameters = c("K", "pnt"),
@@ -83,15 +114,8 @@
       )
     ),
     links = list(mu = "tan_half", kappa = "log", K = "log", pnt = "logit"),
-    priors = list(
-      mu = list(main = "student_t(1, 0, 1)"),
-      kappa = list(main = "normal(2, 1)", effects = "normal(0, 1)"),
-      K = list(main = "normal(1, 0.5)", effects = "normal(0, 0.3)"),
-      pnt = list(main = "logistic(-1, 1)", effects = "normal(0, 0.5)")
-    ),
-    init_ranges = list(
-      mu = c(-0.1, 0.1), kappa = c(3, 8), K = c(2, 4), pnt = c(0.05, 0.2)
-    )
+    priors = .mixture3p_capacity_priors,
+    init_ranges = .mixture3p_capacity_inits
   )
 )
 
@@ -111,12 +135,11 @@
       domain = "Visual working memory",
       task = "Continuous reproduction",
       name = "Three-parameter mixture model by Bays et al (2009).",
-      version = version,
-      citation = glue(
-        "Bays, P. M., Catalao, R. F. G., & Husain, M. (2009). \\
-        The precision of visual working memory is set by allocation \\
-        of a shared resource. Journal of Vision, 9(10), 1-11"
+      citation = c(
+        .mixture3p_citation,
+        if (version != "simple") .mixture3p_capacity_citation
       ),
+      version = version,
       requirements = glue(
         "- The response vairable should be in radians and \\
         represent the angular error relative to the target
@@ -141,14 +164,21 @@
     ),
     call = call
   )
-  out$links[names(links)] <- links
+  out <- set_links(out, links)
   out
+}
+
+# the softmax is computed inside the likelihood, so a softmax weight cannot take
+# another link; every other link reaches the custom family
+#' @exportS3Method
+settable_links.mixture3p <- function(model) {
+  names(model$links)[model$links != "softmax"]
 }
 
 
 # user facing alias
 #' @title `r .model_mixture3p()$name`
-#' @details `r model_info(.model_mixture3p())`
+#' @details `r model_docs(.model_mixture3p())`
 #' @param resp_error The name of the variable in the dataset containing
 #'   the response error. The response error should code the response relative to
 #'   the to-be-recalled target in radians. You can transform the response error
@@ -187,7 +217,9 @@
 #' @param vp_nodes Number of quadrature nodes used when
 #'   `variable_precision = TRUE`; must be an odd number of at least 41. See
 #'   [mixture2p()].
-#' @param links A named list of link functions for the model parameters.
+#' @param links A named list of link functions for the model parameters. The
+#'   links of `thetat` and `thetant` cannot be changed, because the softmax over
+#'   them is part of the likelihood.
 #' @param ... used internally for testing, ignore it
 #' @return An object of class `bmmodel`
 #' @keywords bmmodel
@@ -303,14 +335,20 @@ configure_model.mixture3p <- function(model, data, formula) {
   spec <- .mixture3p_version_table[[model$version]]
   n_nt <- attr(data, "max_set_size") - 1
 
+  # the softmax over the weights is part of the likelihood, so brms passes the
+  # weights through on the scale they are sampled on
+  family_model <- model
+  family_model$links[family_model$links == "softmax"] <- "identity"
+
   formula <- bmf2bf(model, formula)
   formula$family <- .circmix_custom_family(
-    model,
+    family_model,
     family = paste0("mixture3p_", model$version),
     weight_parameters = spec$weight_parameters,
     vint = TRUE, n_vreal = n_nt,
     log_lik = .mixture3p_log_lik(model$version),
-    posterior_predict = .mixture3p_posterior_predict(model$version)
+    posterior_predict = .mixture3p_posterior_predict(model$version),
+    posterior_epred = .mixture3p_posterior_epred(model$version)
   )
 
   nlist(
@@ -340,6 +378,19 @@ configure_model.mixture3p <- function(model, data, formula) {
     slot_averaging = posterior_predict_mixture3p_slot_averaging
   )
 }
+
+.mixture3p_posterior_epred <- function(version) {
+  switch(version,
+    simple = posterior_epred_mixture3p_simple,
+    slot = posterior_epred_mixture3p_slot,
+    slot_averaging = posterior_epred_mixture3p_slot_averaging
+  )
+}
+
+# add_posterior_epred() looks these up by family name for fits saved without one
+posterior_epred_mixture3p_simple <- posterior_epred_undefined("mixture3p")
+posterior_epred_mixture3p_slot <- posterior_epred_undefined("mixture3p")
+posterior_epred_mixture3p_slot_averaging <- posterior_epred_undefined("mixture3p")
 
 log_lik_mixture3p_simple <- function(i, prep) {
   .dmixture3p_simple(

@@ -62,7 +62,9 @@ details of the parameterisation.}
 \code{variable_precision = TRUE}; must be an odd number of at least 41. See
 \code{\link[=mixture2p]{mixture2p()}}.}
 
-\item{links}{A named list of link functions for the model parameters.}
+\item{links}{A named list of link functions for the model parameters. The
+links of \code{thetat} and \code{thetant} cannot be changed, because the softmax over
+them is part of the likelihood.}
 
 \item{...}{used internally for testing, ignore it}
 }
@@ -79,7 +81,7 @@ Three-parameter mixture model by Bays et al (2009).
 \item \strong{Name:} Three-parameter mixture model by Bays et al (2009).
 \item \strong{Citation:}
 \itemize{
-\item Bays, P. M., Catalao, R. F. G., & Husain, M. (2009). The precision of visual working memory is set by allocation of a shared resource. Journal of Vision, 9(10), 1-11
+\item Bays, P. M., Catalao, R. F. G., & Husain, M. (2009). The precision of visual working memory is set by allocation of a shared resource. Journal of Vision, 9(10), Article 7. https://doi.org/10.1167/9.10.7
 }
 \item \strong{Version:} simple
 \item \strong{Requirements:}
@@ -104,26 +106,33 @@ Three-parameter mixture model by Bays et al (2009).
 }
 \item \strong{Default parameter links:}
 \itemize{
-\item mu = tan_half; kappa = log; thetat = identity; thetant = identity
+\item mu = tan_half; kappa = log; thetat = softmax; thetant = softmax
 }
 \item \strong{Default priors:}
 \itemize{
 \item \code{mu}:
 \itemize{
-\item \code{main}: student_t(1, 0, 1)
+\item \code{main}: normal(0, 0.5)
+\item \code{effects}: normal(0, 0.25)
+\item \code{sd}: exponential(4)
 }
 \item \code{kappa}:
 \itemize{
 \item \code{main}: normal(2, 1)
 \item \code{effects}: normal(0, 1)
+\item \code{sd}: exponential(1)
 }
 \item \code{thetat}:
 \itemize{
 \item \code{main}: logistic(0, 1)
+\item \code{effects}: normal(0, 2.5)
+\item \code{sd}: exponential(1)
 }
 \item \code{thetant}:
 \itemize{
 \item \code{main}: logistic(0, 1)
+\item \code{effects}: normal(0, 2.5)
+\item \code{sd}: exponential(1)
 }
 }
 }

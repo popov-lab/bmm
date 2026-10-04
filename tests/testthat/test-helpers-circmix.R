@@ -222,7 +222,8 @@ test_that(".circmix_add_variable_precision() inserts tau next to kappa", {
   expect_equal(names(out$parameters), c("mu", "kappa", "tau", "thetat"))
   expect_equal(names(out$links), c("mu", "kappa", "tau", "thetat"))
   expect_equal(out$links$tau, "log")
-  expect_true(!is.null(out$priors$tau) && !is.null(out$init_ranges$tau))
+  expect_named(out$priors$tau, c("main", "effects", "sd"))
+  expect_false(is.null(out$init_ranges$tau))
 })
 
 test_that(".circmix_recycle() extends every argument to the longest", {
@@ -251,6 +252,10 @@ test_that(".circmix_bounds() derives natural-scale bounds from the links", {
   bounds <- .circmix_bounds(list(mu = "tan_half", kappa = "log", thetat = "logit"))
   expect_equal(bounds$lb, c(NA, 0, 0))
   expect_equal(bounds$ub, c(NA, NA, 1))
+
+  bounds <- .circmix_bounds(list(kappa = "softplus", thetat = "probit", x = "identity"))
+  expect_equal(bounds$lb, c(0, 0, NA))
+  expect_equal(bounds$ub, c(NA, 1, NA))
 })
 
 test_that(".circmix_prep_tau() is zero when the model has no tau parameter", {
@@ -283,17 +288,21 @@ test_that(".circmix_custom_family() adds tau only when the model estimates it", 
   )
   stub_lik <- function(i, prep) NULL
   stub_pred <- function(i, prep, ...) NULL
+  stub_epred <- posterior_epred_undefined("demo")
   constant <- .circmix_custom_family(
     model, "demo", "thetat",
-    log_lik = stub_lik, posterior_predict = stub_pred
+    log_lik = stub_lik, posterior_predict = stub_pred,
+    posterior_epred = stub_epred
   )
+  expect_identical(constant$posterior_epred, stub_epred)
   expect_equal(constant$dpars, c("mu", "kappa", "thetat"))
   expect_equal(constant$core_dpars, c("mu", "kappa", "0.0", "thetat"))
 
   model$variable_precision <- TRUE
   varying <- .circmix_custom_family(
     model, "demo", "thetat",
-    log_lik = stub_lik, posterior_predict = stub_pred
+    log_lik = stub_lik, posterior_predict = stub_pred,
+    posterior_epred = stub_epred
   )
   expect_equal(varying$dpars, c("mu", "kappa", "tau", "thetat"))
   expect_equal(varying$core_dpars, varying$dpars)

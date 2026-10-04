@@ -153,7 +153,9 @@ check_formula.bmmodel <- function(model, data, formula) {
   formula <- rename_deprecated_parameters(model, formula)
 
   wpar <- unrecognized_parameters(model, formula)
-  stopif(length(wpar), "Unrecognized model parameters: {collapse_comma(wpar)}")
+  valid_pars <- collapse_comma(names(model$parameters))
+  stopif(length(wpar), "Unrecognized model parameters: \\
+         {collapse_comma(wpar)}. {model$name} has the parameters {valid_pars}")
 
   formula <- add_missing_parameters(model, formula)
   warn_predictor_parameter_clash(data, formula)
