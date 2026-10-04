@@ -1083,3 +1083,22 @@ test_that("lba refuses a category named after an identifier of its Stan code", {
     "Stan code uses"
   )
 })
+
+# brms hands posterior_predict() a fixed dpar as a single number, and s is
+# fixed by default, so redrawing the non-positive normal drifts has to recycle it
+test_that("posterior_predict_lba_simple() returns with a fixed s and frequent negative drifts", {
+  n_draws <- 200
+  prep <- structure(list(
+    ndraws = n_draws, nobs = 1L,
+    dpars = list(driftc = matrix(0.2, n_draws, 1), drifte = matrix(0.1, n_draws, 1),
+                 gap = matrix(0.5, n_draws, 1), sp = matrix(0.5, n_draws, 1),
+                 ndt = matrix(0.2, n_draws, 1), s = 1),
+    data = list(Y = 0.6, vint1 = 1L, vint2 = 1L, vint3 = 1L),
+    family = list(dpars = c("mu", "driftc", "drifte", "gap", "sp", "ndt", "s"),
+                  name = "lba_normal_simple")
+  ), class = "brmsprep")
+  rt <- withr::with_seed(1, posterior_predict_lba_simple(1L, prep))
+  expect_length(rt, n_draws)
+  expect_true(all(rt > 0.2))
+})
+

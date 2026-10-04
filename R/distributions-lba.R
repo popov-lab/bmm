@@ -169,6 +169,9 @@ qlba <- function(p, drift, gap, sp, ndt, s = 1,
 .rlba_drift <- function(distribution, mean, s) {
   d <- switch(distribution,
     normal = {
+      # brms passes a fixed s as one number, which s[neg] would turn into NA
+      # and the redraw below into an endless loop
+      s <- rep_len(s, length(mean))
       out <- stats::rnorm(length(mean), mean, s)
       neg <- which(out <= 0)
       while (length(neg) > 0) {
