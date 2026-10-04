@@ -288,6 +288,29 @@ check_data.imm_full <- function(model, data, formula) {
 }
 
 ############################################################################# !
+# CHECK_FORMULA METHODS                                                  ####
+############################################################################# !
+
+# configure_prior.imm() pins the set_size1 coefficient, which exists only
+# without an intercept; with one, brms rejects the pin as matching no parameter
+#' @export
+check_formula.imm <- function(model, data, formula) {
+  set_size_var <- model$other_vars$set_size
+  pred_list <- rhs_vars(formula, collapse = FALSE)
+  has_set_size <- vapply(pred_list, function(x) set_size_var %in% x, logical(1))
+  ss_forms <- formula[has_set_size]
+  intercepts <- vapply(ss_forms, has_intercept, logical(1))
+  stopif(
+    any(intercepts),
+    "The formula for parameter(s) {names(ss_forms)[intercepts]} contains \\
+    an intercept and also uses set_size as a predictor. This model requires \\
+    that the intercept is supressed when set_size is used as predictor. \\
+    Try using 0 + {set_size_var} instead."
+  )
+  NextMethod("check_formula")
+}
+
+############################################################################# !
 # CONFIGURE_MODEL METHODS                                                ####
 ############################################################################# !
 # Each model should have a corresponding configure_model.* function. See

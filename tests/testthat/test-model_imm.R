@@ -199,6 +199,17 @@ test_that("a set-size-1 factor level pins the parameters that trial cannot infor
   expect_false(any(grepl("constant(0)", pr$prior[pr$class == "b"], fixed = TRUE)))
 })
 
+test_that("an intercept is still refused when set_size predicts an imm parameter", {
+  # the set-size-1 pin above needs a set_size1 coefficient to exist
+  expect_error(
+    bmm(bmf(kappa ~ 1, c ~ 1, a ~ 1 + set_size, s ~ 0 + set_size),
+      oberauer_lin_2017, imm_model(),
+      backend = "mock", mock_fit = 1, rename = FALSE
+    ),
+    "contains \\s*an intercept"
+  )
+})
+
 test_that("check_data() still validates the non-target distances", {
   dat <- oberauer_lin_2017
   dat$dist_nt1 <- -1
