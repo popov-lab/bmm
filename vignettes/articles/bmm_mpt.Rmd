@@ -433,7 +433,7 @@ par(old_par)
 
 ## Condition effects
 
-`Pi` and `Pb` get one population parameter per condition (`0 + cond`) and, per participant, one uncorrelated random effect per condition (`||`); `Pd` exists in one condition only and takes a plain random intercept:
+`Pi` and `Pb` get one population parameter per condition (`0 + cond`) and, per participant, one uncorrelated random effect per condition (`||`); `Pd` exists in one condition only and takes a plain random intercept. Both fits in this section draw 3000 post-warmup samples per chain instead of the default 1000, which gives every parameter, the random effects included, a bulk effective sample size above 400:
 
 ```{r fit-ol, results = "hide", message = FALSE, warning = FALSE}
 fit_ol <- bmm(
@@ -446,6 +446,8 @@ fit_ol <- bmm(
   model = model_ol,
   backend = "cmdstanr",
   cores = 4,
+  iter = 4000,
+  warmup = 1000,
   refresh = 0
 )
 ```
@@ -496,6 +498,8 @@ fit_ol_pb1 <- bmm(
   model = model_ol,
   backend = "cmdstanr",
   cores = 4,
+  iter = 4000,
+  warmup = 1000,
   refresh = 0
 )
 ```
@@ -506,7 +510,7 @@ loo_ol_pb1 <- brms::loo(fit_ol_pb1)
 brms::loo_compare(loo_ol, loo_ol_pb1)
 ```
 
-The model with condition-specific binding memory is preferred, in line with the hypothesis test above. The Pareto-k warnings are expected with aggregated data: each row carries all trials of one participant in one condition, so leaving it out shifts that participant's random effects considerably, and the importance-sampling approximation flags the row. Here the difference is many standard errors wide and the conclusion does not hinge on the approximation; when it does, `brms::loo(fit, reloo = TRUE)` refits the model without each flagged row, or `brms::kfold()` cross-validates by participant.
+The model with condition-specific binding memory is preferred, in line with the hypothesis test above. `loo()` flags `r sum(loo::pareto_k_values(loo_ol) > 0.7)` of the `r length(loo::pareto_k_values(loo_ol))` rows of `fit_ol` and `r sum(loo::pareto_k_values(loo_ol_pb1) > 0.7)` of `fit_ol_pb1` with a Pareto-k above 0.7. That is expected with aggregated data: each row carries all trials of one participant in one condition, so leaving it out shifts that participant's random effects considerably, and the importance-sampling approximation flags the row. Moment matching does not cure this: refitted with `save_pars = save_pars(all = TRUE)`, `brms::loo(fit_ol, moment_match = TRUE)` still flagged 108 of the 120 rows in our run, after 40 minutes on one core. Here the difference is many standard errors wide and the conclusion does not hinge on the approximation; when it does, `brms::loo(fit, reloo = TRUE)` refits the model without each flagged row, or `brms::kfold()` cross-validates by participant.
 
 ## Relation to the m3 model
 
