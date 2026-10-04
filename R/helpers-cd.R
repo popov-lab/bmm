@@ -272,6 +272,9 @@
 # y = 1 is "change"; the clamp matches machine_precision() in Stan
 .cd_bernoulli_ld <- function(y, p_same) {
   p <- pmin(pmax(p_same, .Machine$double.eps), 1 - .Machine$double.eps)
+  # log_lik passes one observation against a vector of draws; recycle y so
+  # the result has one value per draw, not per observation
+  y <- rep_len(y, max(length(y), length(p)))
   ifelse(y == 1, log1p(-p), log(p))
 }
 
