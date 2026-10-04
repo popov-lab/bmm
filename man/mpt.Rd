@@ -98,6 +98,11 @@ independent across parameters. A shared label, \code{(1 |p| id)} in every
 formula, estimates their correlations (prior \code{lkj(2)}), which
 corresponds to the latent-trait MPT model.
 
+For posterior predictive checks, \code{\link[brms:posterior_predict]{brms::posterior_predict()}} returns
+simulated counts (draws x rows x categories) and \code{\link[brms:posterior_epred]{brms::posterior_epred()}}
+the expected counts; the MPT article computes the T1 statistic and its
+posterior predictive p-value from them.
+
 Order constraints between parameters (\code{Do > Dn}) are expressed by
 reparameterizing the larger parameter in the model formula, e.g.
 \code{bmf(Do ~ Dn + (1 - Dn) * inv_logit(phi), Dn ~ 1, phi ~ 1)}; the section

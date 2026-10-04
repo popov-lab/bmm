@@ -282,6 +282,11 @@ settable_link_functions.mpt <- function(model) {
 #'   formula, estimates their correlations (prior `lkj(2)`), which
 #'   corresponds to the latent-trait MPT model.
 #'
+#'   For posterior predictive checks, [brms::posterior_predict()] returns
+#'   simulated counts (draws x rows x categories) and [brms::posterior_epred()]
+#'   the expected counts; the MPT article computes the T1 statistic and its
+#'   posterior predictive p-value from them.
+#'
 #'   Order constraints between parameters (`Do > Dn`) are expressed by
 #'   reparameterizing the larger parameter in the model formula, e.g.
 #'   `bmf(Do ~ Dn + (1 - Dn) * inv_logit(phi), Dn ~ 1, phi ~ 1)`; the section
