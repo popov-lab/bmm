@@ -635,7 +635,22 @@ mpt <- function(trees, tree_id = NULL, covariates = NULL, simplex = NULL,
   )
 
   deviations <- .mpt_tree_sum_deviations(trees, parameters, covariates, simplex)
-  for (tree_name in names(deviations)[!is.na(deviations)]) {
+  # synthetic covariate values need not form a valid tree (Gcorr + Gother = 1),
+  # so such trees only warn here; check_data() errors on the observed values
+  uses_covariates <- vapply(
+    trees, function(tree) any(.mpt_expr_vars(tree) %in% covariates), logical(1)
+  )
+  deviating <- names(deviations)[!is.na(deviations)]
+  for (tree_name in intersect(deviating, names(trees)[uses_covariates])) {
+    warning2(
+      "The branch probabilities of tree '{tree_name}' sum to \\
+      {signif(deviations[[tree_name]], 6)} instead of 1 when evaluated at \\
+      numeric test values for its parameters and covariates. check_data() \\
+      repeats this check with the covariate values in the data and stops if \\
+      the branches do not sum to 1 there."
+    )
+  }
+  for (tree_name in setdiff(deviating, names(trees)[uses_covariates])) {
     stop2(
       "The branch probabilities of tree '{tree_name}' sum to \\
       {signif(deviations[[tree_name]], 6)} instead of 1 when evaluated at \\
@@ -913,12 +928,8 @@ check_data.mpt <- function(model, data, formula) {
     !is.numeric(resp_matrix) || any(resp_matrix < 0, na.rm = TRUE),
     "The response category columns must contain non-negative response counts."
   )
-  warnif(
-    anyNA(resp_matrix),
-    "The response count columns contain {sum(is.na(resp_matrix))} missing \\
-    value(s), which are counted as 0 responses."
-  )
-  resp_matrix[is.na(resp_matrix)] <- 0
+  missing_counts <- is.na(resp_matrix)
+  resp_matrix[missing_counts] <- 0
   data <- data[!col_names %in% resp_cats]
   data$nTrials <- rowSums(resp_matrix)
   data$Y <- resp_matrix
@@ -969,6 +980,7 @@ check_data.mpt <- function(model, data, formula) {
   )
 
   data <- .mpt_possibility_indicators(model, data)
+  .mpt_warn_missing_counts(model, data, missing_counts)
 
   covariates <- model$other_vars$covariates
   missing_covariates <- setdiff(covariates, colnames(data))
@@ -989,6 +1001,20 @@ check_data.mpt <- function(model, data, formula) {
   .mpt_validate_covariate_sums(model, data)
 
   NextMethod("check_data")
+}
+
+# a missing count in a category that the row's tree cannot produce is a known
+# 0 (the OL2019 data record no distractor count where none was shown)
+.mpt_warn_missing_counts <- function(model, data, missing_counts) {
+  poss_vars <- model$other_vars$indicators$possible
+  for (resp_cat in names(poss_vars)) {
+    missing_counts[data[[poss_vars[[resp_cat]]]] == 0L, resp_cat] <- FALSE
+  }
+  warnif(
+    any(missing_counts),
+    "The response count columns contain {sum(missing_counts)} missing \\
+    value(s), which are counted as 0 responses."
+  )
 }
 
 # structurally impossible categories are switched off per row rather than per
@@ -1053,7 +1079,7 @@ check_data.mpt <- function(model, data, formula) {
     total <- Reduce(`+`, lapply(tree$branches, eval, envir = env))
     total <- rep(total, length.out = length(rows))
     deviates <- is.na(total) | abs(total - 1) > tolerance
-    warnif(
+    stopif(
       any(deviates),
       "With the covariate values in the data, the branch probabilities of \\
       tree '{tree$name}' do not sum to 1 for {sum(deviates)} row(s) \\

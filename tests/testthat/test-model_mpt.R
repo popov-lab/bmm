@@ -876,6 +876,21 @@ test_that("check_data builds possibility indicators for impossible categories", 
   )
 })
 
+test_that("missing counts of an impossible category do not warn", {
+  model <- mpt(mpt_impossible_trees(), tree_id = "tree")
+  dat <- mpt_impossible_data()
+  dat$dist[dat$tree == "nodist"] <- NA
+  expect_silent(checked <- check_data(model, dat, bmf(Pm ~ 1, Pb ~ 1)))
+  expect_true(all(checked$Y[dat$tree == "nodist", "dist"] == 0))
+
+  dat$dist[dat$tree == "withdist"][1] <- NA
+  dat$corr[2] <- NA
+  expect_warning(
+    check_data(model, dat, bmf(Pm ~ 1, Pb ~ 1)),
+    "2 missing value\\(s\\)"
+  )
+})
+
 test_that("impossible categories are switched off in the linear predictor", {
   model <- mpt(mpt_impossible_trees(), tree_id = "tree")
   dat <- mpt_impossible_data()
@@ -935,7 +950,7 @@ test_that("tree identifier values must match tree names", {
 test_that("check_data validates branch sums with observed covariate values", {
   # the tree sums to 1 only when Gcorr + Gother = 1, which synthetic test
   # values at construction cannot verify (mpt() warns there) but the observed
-  # covariate columns can
+  # covariate columns can (check_data() errors there)
   tree <- mpt_tree("main", list(
     correct = "D + (1 - D) * Gcorr",
     incorrect = "(1 - D) * Gother"
@@ -949,14 +964,14 @@ test_that("check_data validates branch sums with observed covariate values", {
 
   dat_bad <- dat
   dat_bad$Gother[3] <- 0.9
-  expect_warning(
+  expect_error(
     check_data(model, dat_bad, bmf(D ~ 1)),
     "do not sum to 1 for 1 row"
   )
 
   dat_na <- dat
   dat_na$Gcorr[c(2, 5)] <- NA
-  expect_warning(
+  expect_error(
     check_data(model, dat_na, bmf(D ~ 1)),
     "do not sum to 1 for 2 row"
   )
