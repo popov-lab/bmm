@@ -246,6 +246,15 @@ settable_link_functions.mpt <- function(model) {
 #'   random-effect SDs keep brms's default prior, `student_t(3, 0, 2.5)`,
 #'   because no single rate fits every scale such a formula can give them.
 #'
+#'   Under the logit link, intercepts and regression coefficients get a
+#'   `logistic(0, 1)` prior and random-effect SDs get `exponential(1)`. Under
+#'   the probit link, intercepts and coefficients get `normal(0, 1)` and SDs
+#'   get `exponential(2)`. Group-level correlation matrices get `lkj(2)`.
+#'   Coefficients of the sub-parameters above get `normal(0, 0.5)`. A parameter
+#'   switched to the other link after construction (`model$links$D <-
+#'   "probit"`) takes that link's priors unless its default prior was
+#'   replaced. [default_prior()] lists the rows a given formula produces.
+#'
 #'   A parameter can be fixed to a probability at fit time, in the formula:
 #'   `bmf(D ~ 1, g = 0.5)`. The parameter stays part of the model and can be
 #'   freed again by giving it a formula. The value is mapped to the latent
