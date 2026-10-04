@@ -277,6 +277,11 @@ settable_link_functions.mpt <- function(model) {
 #'   `native_parameters(fit, re_formula = NA, summary = TRUE)`; a difference
 #'   between conditions is the difference of these draws.
 #'
+#'   Person effects written as `(1 | id)` in each parameter's formula are
+#'   independent across parameters. A shared label, `(1 |p| id)` in every
+#'   formula, estimates their correlations (prior `lkj(2)`), which
+#'   corresponds to the latent-trait MPT model.
+#'
 #'   Order constraints between parameters (`Do > Dn`) are expressed by
 #'   reparameterizing the larger parameter in the model formula, e.g.
 #'   `bmf(Do ~ Dn + (1 - Dn) * inv_logit(phi), Dn ~ 1, phi ~ 1)`; the section
@@ -330,10 +335,11 @@ settable_link_functions.mpt <- function(model) {
 #' }))
 #' data <- cbind(data, counts)
 #'
-#' # predict both parameters by a fixed and random intercept
+#' # predict both parameters by a fixed intercept and correlated random
+#' # intercepts (the shared label |p| estimates the correlation)
 #' formula <- bmf(
-#'   D ~ 1 + (1 | id),
-#'   g ~ 1 + (1 | id)
+#'   D ~ 1 + (1 |p| id),
+#'   g ~ 1 + (1 |p| id)
 #' )
 #'
 #' fit <- bmm(
