@@ -600,6 +600,28 @@
   the order of `x` in
   [`dm3()`](https://popov-lab.github.io/bmm/dev/reference/m3dist.md) now
   follow `resp_cats`.
+- **m3** with `version = "custom"` now stops when a parameter in an
+  activation formula has no formula of its own, such as `c` in
+  `corr ~ b + a + c` without `c ~ 1`. Before, such a parameter was
+  fitted with only an intercept, announced only by the message *“No
+  formula for parameter c provided”*. Scripts that relied on this now
+  fail; add the missing formula, e.g. `c ~ 1`. Numeric `num_options` can
+  be used by name, `n_opt_<category>` unless you named them. Earlier
+  fits are not affected:
+  [`update()`](https://rdrr.io/r/stats/update.html),
+  [`summary()`](https://rdrr.io/r/base/summary.html) and other methods
+  keep working on them
+  ([\#495](https://github.com/popov-lab/bmm/issues/495)).
+- **m3** now warns when a response count is missing (`NA`) in a row
+  where its category has options, and says how many were counted as 0.
+  Missing counts where the category has no options, as for `dist` in
+  `oberauer_lewandowsky_2019_e1`, are still read as 0 without a warning.
+  Data columns named `Y`, `nTrials` or `Idx_<category>` are now refused,
+  not silently replaced; rename them. Response categories may still be
+  called `Y` or `nTrials`. Missing values in `num_options` columns now
+  give an error naming those columns instead of *“missing value where
+  TRUE/FALSE needed”*; enter 0 where there were no options
+  ([\#496](https://github.com/popov-lab/bmm/issues/496)).
 - [`log_lik()`](https://mc-stan.org/rstantools/reference/log_lik.html)
   for **cswald** fits no longer returns `NaN` for a posterior draw whose
   `ndt` is at or above an observation’s RT, which happens with `newdata`
