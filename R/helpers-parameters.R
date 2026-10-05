@@ -154,7 +154,9 @@ link_transform <- function(values, link, inverse = FALSE) {
 #'   \code{bmmfit} object (a fitted model returned by \code{\link{bmm}}).
 #' @param formula An optional \code{bmmformula} object. Only relevant for
 #'   M3 custom models, where additional parameters are discovered from
-#'   the formula. Ignored for all other models.
+#'   the formula. Only activation symbols that have their own formula are
+#'   listed; without data, any other symbol is read as a data column.
+#'   Ignored for all other models.
 #' @param ... Additional arguments (currently unused).
 #'
 #' @return A data frame of class \code{bmm_parameters} with one row per
