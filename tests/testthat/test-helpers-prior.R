@@ -566,3 +566,25 @@ test_that("print.bmm_prior_info() renders table and text formats", {
   expect_true(any(grepl("fixed to 0", printed_text, fixed = TRUE)))
   expect_true(any(grepl("sampling \\(link\\) scale", printed_text)))
 })
+
+test_that("validate_default_priors() warns only when a default prior is dropped", {
+  withr::local_options(bmm.silent = 2)
+  model <- mpt(
+    mpt_tree("t", list(A = "gA", B = "gB", C = "gC")),
+    simplex = c("gA", "gB", "gC")
+  )
+  expect_no_warning(
+    bmm(bmf(), data.frame(A = 5, B = 5, C = 5), model,
+      backend = "mock", mock_fit = 1, rename = FALSE
+    )
+  )
+
+  expect_warning(
+    default_prior(
+      object = bmmformula(c ~ exp(nlc), nlc ~ 1),
+      data = oberauer_lin_2017,
+      model = sdm(resp_error = "dev_rad")
+    ),
+    "Non-linear transformations"
+  )
+})
