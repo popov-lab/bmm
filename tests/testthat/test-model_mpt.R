@@ -270,6 +270,21 @@ test_that("generated indicator and covariate columns do not trigger the clash wa
     bmf(D ~ 1 + (1 | id), g ~ 1), dat, model,
     backend = "mock", mock_fit = 1, rename = FALSE
   ))
+
+  cov_model <- mpt(
+    mpt_tree("main", list(
+      correct = "D + (1 - D) * Gcorr",
+      incorrect = "(1 - D) * (1 - Gcorr)"
+    )),
+    covariates = "Gcorr"
+  )
+  cov_dat <- data.frame(
+    id = factor(1:10), Gcorr = 0.25, correct = 28L, incorrect = 12L
+  )
+  expect_no_warning(bmm(
+    bmf(D ~ 1 + (1 | id)), cov_dat, cov_model,
+    backend = "mock", mock_fit = 1, rename = FALSE
+  ))
 })
 
 test_that("a fixed non-linear sub-parameter reaches the constant prior", {
@@ -964,6 +979,46 @@ test_that("impossible categories are switched off in the linear predictor", {
   expect_match(deparse1(brms_formula$formula[[3]]), "log(corr)", fixed = TRUE)
 })
 
+test_that("the brms formula reproduces the tree probabilities with impossible categories", {
+  model <- mpt(mpt_impossible_trees(), tree_id = "tree")
+  dat <- mpt_impossible_data()
+  formula <- bmf(Pm ~ 1, Pb ~ 1)
+  checked_data <- check_data(model, dat, formula)
+  checked_formula <- check_formula(model, checked_data, formula)
+  brms_formula <- configure_model(model, checked_data, checked_formula)$formula
+  resp_cats <- model$resp_vars$resp_cats
+
+  # intercept-only parameters on the logit scale, evaluated as brms does:
+  # category probabilities first, then the linear predictor of each category
+  pars <- c(Pm = 0.4, Pb = 1.1)
+  env <- c(as.list(checked_data), as.list(pars), list(inv_logit = stats::plogis))
+  probs <- lapply(resp_cats, function(cat) eval(checked_formula[[cat]][[3]], env))
+  names(probs) <- resp_cats
+  env <- c(env, probs)
+  eta <- vapply(resp_cats, function(cat) {
+    rhs <- if (cat == resp_cats[1]) {
+      brms_formula$formula[[3]]
+    } else {
+      brms_formula$pforms[[paste0("mu", cat)]][[3]]
+    }
+    eval(rhs, env)
+  }, numeric(nrow(dat)))
+  softmax <- exp(eta) / rowSums(exp(eta))
+
+  expected <- t(vapply(seq_len(nrow(dat)), function(i) {
+    .mpt_probability_vector(plogis(pars), model, tree = dat$tree[i])[resp_cats]
+  }, numeric(length(resp_cats))))
+  is_impossible <- dat$tree == "nodist"
+  expect_true(all(softmax[is_impossible, "dist"] < 1e-40))
+  expect_equal(
+    unname(softmax[, c("corr", "npl")]), unname(expected[, c("corr", "npl")]),
+    tolerance = 1e-12
+  )
+  expect_equal(unname(softmax[!is_impossible, ]), unname(expected[!is_impossible, ]),
+    tolerance = 1e-12
+  )
+})
+
 test_that("mpt compiles with structurally impossible categories", {
   expect_silent(bmm(
     bmf(Pm ~ 1 + (1 | id), Pb ~ 1),
@@ -1026,8 +1081,250 @@ test_that("check_data validates branch sums with observed covariate values", {
   dat_na$Gcorr[c(2, 5)] <- NA
   expect_error(
     check_data(model, dat_na, bmf(D ~ 1)),
-    "do not sum to 1 for 2 row"
+    "'Gcorr' is missing in row 2 of tree 'main'.*cannot be computed"
   )
+
+  # swapped complements agree at the symmetric point D = 0.5, so the branch
+  # expressions are checked at several parameter values
+  swapped <- suppressWarnings(mpt(mpt_tree("main", list(
+    correct = "D + (1 - D) * Gcorr", incorrect = "D * (1 - Gcorr)"
+  )), covariates = "Gcorr"))
+  dat_swap <- data.frame(Gcorr = 0.25, correct = 10, incorrect = 30)
+  expect_error(check_data(swapped, dat_swap, bmf(D ~ 1)), "do not sum to 1")
+
+  stray <- suppressWarnings(mpt(mpt_tree("main", list(
+    correct = "D + (1 - D) * Gcorr", incorrect = "2 * D * (1 - D) * (1 - Gcorr)"
+  )), covariates = "Gcorr"))
+  expect_error(check_data(stray, dat_swap, bmf(D ~ 1)), "do not sum to 1")
+})
+
+test_that("check_data rejects covariate values that push a branch outside (0, 1]", {
+  model <- suppressWarnings(mpt(mpt_tree("main", list(
+    correct = "D + (1 - D) * G", incorrect = "(1 - D) * (1 - G)"
+  )), covariates = "G"))
+  dat <- data.frame(G = c(0.25, 0.5, 0.75), correct = 10, incorrect = 30)
+  expect_silent(check_data(model, dat, bmf(D ~ 1)))
+
+  expect_silent(check_data(model, transform(dat, G = 0), bmf(D ~ 1)))
+
+  dat_over <- dat
+  dat_over$G[2] <- 1.2
+  expect_error(
+    check_data(model, dat_over, bmf(D ~ 1)),
+    "'correct' in tree 'main' is [0-9.]+ in row 2, outside \\(0, 1\\]"
+  )
+  # no trailing blank when there is no hint about impossible categories
+  expect_error(check_data(model, dat_over, bmf(D ~ 1)), "column\\(s\\): 'G'\\.$")
+
+  # the branch D + (1 - D) * G is negative only for small D, below every
+  # interior test point, so a slightly negative covariate needs the
+  # near-boundary points
+  for (g in c(-0.05, -0.1)) {
+    dat_neg <- dat
+    dat_neg$G[1] <- g
+    expect_error(
+      check_data(model, dat_neg, bmf(D ~ 1)),
+      "'correct' in tree 'main' is -[0-9.]+ in row 1, outside \\(0, 1\\]"
+    )
+  }
+
+  # a branch of exactly 0 is a structurally impossible category
+  dat_one <- dat
+  dat_one$G[3] <- 1
+  expect_error(
+    check_data(model, dat_one, bmf(D ~ 1)),
+    "is 0 in row 3.*mpt_tree\\(impossible = \\)"
+  )
+
+  zero_int <- suppressWarnings(mpt(mpt_tree("main", list(
+    hit = "D * G", miss = "1 - D * G"
+  )), covariates = "G"))
+  dat_int <- data.frame(G = c(1L, 0L), hit = 10, miss = 30)
+  expect_error(
+    check_data(zero_int, dat_int, bmf(D ~ 1)),
+    "'hit' in tree 'main' is 0 in row 2"
+  )
+})
+
+test_that("the near-boundary points accept valid simplex trees with covariates", {
+  tree <- mpt_tree("main", list(
+    hit = "G * D + (1 - G * D) * gA",
+    other = "(1 - G * D) * gB",
+    miss = "(1 - G * D) * gC"
+  ))
+  model <- suppressWarnings(mpt(
+    tree, covariates = "G", simplex = c("gA", "gB", "gC")
+  ))
+  dat <- data.frame(G = c(0.2, 0.5, 0.9), hit = 10, other = 10, miss = 10)
+  expect_silent(check_data(model, dat, bmf(D ~ 1, gA ~ 1, gB ~ 1)))
+  expect_error(
+    check_data(model, transform(dat, G = c(0.2, -0.1, 0.9)), bmf(D ~ 1, gA ~ 1, gB ~ 1)),
+    "in row 2, outside \\(0, 1\\]"
+  )
+})
+
+test_that("an NA covariate in a tree that does not use it is an error, not a dropped row", {
+  trees <- list(
+    mpt_tree("withdist", list(
+      corr = "Pm * Pb + (1 - Pm) * (1 - Gd)",
+      dist = "(1 - Pm) * Gd",
+      npl = "Pm * (1 - Pb)"
+    )),
+    mpt_tree("nodist", list(
+      corr = "Pm * Pb + (1 - Pm) * 0.2",
+      npl = "Pm * (1 - Pb) + (1 - Pm) * 0.8"
+    ), impossible = "dist")
+  )
+  model <- suppressWarnings(mpt(trees, tree_id = "tree", covariates = "Gd"))
+  dat <- mpt_impossible_data()
+  dat$Gd <- ifelse(dat$tree == "withdist", 0.3, 0)
+  expect_silent(check_data(model, dat, bmf(Pm ~ 1, Pb ~ 1)))
+
+  dat_na <- dat
+  dat_na$Gd[dat_na$tree == "nodist"] <- NA
+  first_row <- which(dat_na$tree == "nodist")[1]
+  expect_error(
+    check_data(model, dat_na, bmf(Pm ~ 1, Pb ~ 1)),
+    glue::glue("'Gd' is missing in row {first_row} of tree 'nodist'.*does not use 'Gd'")
+  )
+
+  # in a tree that uses the covariate, the branches cannot be computed
+  dat_used <- dat
+  dat_used$Gd[dat_used$tree == "withdist"][1] <- NA
+  first_used <- which(dat_used$tree == "withdist")[1]
+  expect_error(
+    check_data(model, dat_used, bmf(Pm ~ 1, Pb ~ 1)),
+    glue::glue("'Gd' is missing in row {first_used} of tree 'withdist'.*cannot be computed")
+  )
+})
+
+test_that("the NA advice for an unused covariate does not promise that 0 is safe", {
+  model <- suppressWarnings(mpt(list(
+    mpt_tree("sstree", list(hit = "D + (1 - D) / ss", miss = "(1 - D) * (1 - 1 / ss)")),
+    mpt_tree("plain", list(hit = "D + (1 - D) * g", miss = "(1 - D) * (1 - g)"))
+  ), tree_id = "tree", covariates = "ss"))
+  dat <- data.frame(
+    tree = rep(c("sstree", "plain"), each = 2), ss = c(4, 4, NA, NA),
+    hit = 5, miss = 5
+  )
+  msg <- tryCatch(check_data(model, dat, bmf(D ~ 1, g ~ 1)), error = conditionMessage)
+  expect_match(msg, "does not use 'ss'")
+  expect_match(msg, "0 works unless one of them divides by 'ss'", fixed = TRUE)
+  expect_no_match(msg, "cannot be computed")
+})
+
+test_that("a branch that is undefined on the rows of another tree is an error", {
+  # brms evaluates every tree's branches on every row, so a 0 filled in for a
+  # tree that does not use the covariate breaks a tree that divides by it
+  model <- suppressWarnings(mpt(list(
+    mpt_tree("sstree", list(hit = "D + (1 - D) / ss", miss = "(1 - D) * (1 - 1 / ss)")),
+    mpt_tree("plain", list(hit = "D + (1 - D) * g", miss = "(1 - D) * (1 - g)"))
+  ), tree_id = "tree", covariates = "ss"))
+  formula <- bmf(D ~ 1, g ~ 1)
+  dat <- data.frame(
+    tree = rep(c("sstree", "plain"), each = 2), ss = c(4, 4, 0, 0),
+    hit = 5, miss = 5
+  )
+  expect_error(
+    check_data(model, dat, formula),
+    "'hit' in tree 'sstree' is not finite in row 3.*belongs to tree 'plain'"
+  )
+  dat$ss[3:4] <- 1
+  expect_silent(check_data(model, dat, formula))
+})
+
+test_that("a branch that divides by a covariate equal to 0 in its own tree gets the package message", {
+  model <- suppressWarnings(mpt(mpt_tree("main", list(
+    hit = "D + (1 - D) / ss", miss = "(1 - D) * (1 - 1 / ss)"
+  )), covariates = "ss"))
+  dat <- data.frame(ss = c(4, 0), hit = 5, miss = 5)
+  expect_error(
+    check_data(model, dat, bmf(D ~ 1)),
+    "do not sum to 1.*first: row 2, sum = NaN"
+  )
+})
+
+test_that("a valid branch that underflows to 0 near the boundary is accepted", {
+  model <- suppressWarnings(mpt(mpt_tree("main", list(
+    hit = "1 - (1 - D)^n", miss = "(1 - D)^n"
+  )), covariates = "n"))
+  expect_silent(check_data(model, data.frame(hit = 5L, miss = 5L, n = 200), bmf(D ~ 1)))
+  expect_silent(check_data(model, data.frame(hit = 5L, miss = 5L, n = 2), bmf(D ~ 1)))
+
+  neg <- suppressWarnings(mpt(mpt_tree("main", list(
+    correct = "D + (1 - D) * G", incorrect = "(1 - D) * (1 - G)"
+  )), covariates = "G"))
+  expect_error(
+    check_data(neg, data.frame(G = -0.05, correct = 10, incorrect = 30), bmf(D ~ 1)),
+    "-[0-9.]+ in row 1"
+  )
+})
+
+test_that("the sum and range messages name only the covariates the tree uses", {
+  sums <- suppressWarnings(mpt(mpt_tree("main", list(
+    a = "D", b = "(1 - D) * H"
+  )), covariates = c("G", "H")))
+  msg <- tryCatch(
+    check_data(sums, data.frame(G = 0.5, H = 0.5, a = 5, b = 5), bmf(D ~ 1)),
+    error = conditionMessage
+  )
+  expect_match(msg, "do not sum to 1 for 1 row.*at the test parameter values")
+  expect_match(msg, "column(s): 'H'", fixed = TRUE)
+  expect_no_match(msg, "'G'")
+
+  # a tree without covariates beside a covariate tree: the covariate is not
+  # to blame
+  trees <- list(
+    mpt_tree("t1", list(x = "2 * a", y = "1 - 2 * a")),
+    mpt_tree("t2", list(x = "D + (1 - D) * G", y = "(1 - D) * (1 - G)"))
+  )
+  model <- suppressWarnings(mpt(trees, tree_id = "tree", covariates = "G"))
+  dat <- data.frame(tree = c("t1", "t2"), G = 0.5, x = 5, y = 5)
+  msg <- tryCatch(check_data(model, dat, bmf(a ~ 1, D ~ 1)), error = conditionMessage)
+  expect_match(msg, "tree 't1' is [0-9.]+ in row 1, outside \\(0, 1\\] at the test parameter values")
+  expect_match(msg, "tree, which uses no covariate")
+  expect_no_match(msg, "'G'")
+})
+
+test_that("the data check catches a tree that is right at the first interior and boundary points", {
+  at_first <- sprintf("%.8f", .mpt_test_points("D", list())[[1]][["D"]])
+  model <- suppressWarnings(mpt(mpt_tree("main", list(
+    a = "D",
+    b = glue("1 - D + (D - {at_first}) * (D - 0.001) * (D - 0.999) * G")
+  )), covariates = "G"))
+  expect_error(
+    check_data(model, data.frame(G = 0.5, a = 5, b = 5), bmf(D ~ 1)),
+    "do not sum to 1"
+  )
+})
+
+test_that("an NA in a declared covariate that no branch uses keeps every row", {
+  model <- suppressWarnings(mpt(mpt_tree("main", list(
+    correct = "D + (1 - D) * G", incorrect = "(1 - D) * (1 - G)"
+  )), covariates = c("G", "H")))
+  dat <- data.frame(G = 0.25, H = c(NA, 1, 2, NA), correct = 10, incorrect = 30)
+  expect_silent(checked <- check_data(model, dat, bmf(D ~ 1)))
+  expect_equal(nrow(checked), nrow(dat))
+})
+
+test_that("check_data catches a typo between parameters four places apart", {
+  branches <- list(
+    r1 = "A * B", r2 = "A * (1 - B) * C", r3 = "A * (1 - B) * (1 - C) * E",
+    r4 = "A * (1 - B) * (1 - C) * (1 - E) * G",
+    r5 = "A * (1 - B) * (1 - C) * (1 - E) * (1 - G) + (1 - A) * F"
+  )
+  dat <- data.frame(G = c(0.2, 0.6), r1 = 5, r2 = 5, r3 = 5, r4 = 5, r5 = 5, r6 = 5)
+  formula <- bmf(A ~ 1, B ~ 1, C ~ 1, E ~ 1, F ~ 1)
+
+  good <- suppressWarnings(mpt(
+    mpt_tree("main", c(branches, r6 = "(1 - A) * (1 - F)")), covariates = "G"
+  ))
+  expect_silent(check_data(good, dat, formula))
+
+  typo <- suppressWarnings(mpt(
+    mpt_tree("main", c(branches, r6 = "(1 - A) * (1 - A)")), covariates = "G"
+  ))
+  expect_error(check_data(typo, dat, formula), "do not sum to 1")
 })
 
 test_that("covariate sum check respects tree membership", {
