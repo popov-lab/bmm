@@ -363,7 +363,8 @@ check_data.m3 <- function(model, data, formula) {
   missing_variables <- setdiff(resp_name, col_names)
   stopif(length(missing_variables), "The response variable(s) {paste0(missing_variables, collapse = ', ')} missing in the data")
 
-  # Y and nTrials may name a category, whose column is consumed first; brms refuses `_` in category names
+  # Y and nTrials may name a category, whose column is consumed first; brms
+  # refuses `_` in category names, so Idx_<category> cannot be one
   reserved_cols <- intersect(
     c(setdiff(c("Y", "nTrials"), resp_name), paste0("Idx_", resp_name)),
     col_names
