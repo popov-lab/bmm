@@ -63,7 +63,7 @@
 <div class="section level3">
 <h3 id="package-requirements">Package Requirements<a class="anchor" aria-label="anchor" href="#package-requirements"></a></h3>
 <ul><li>Must pass R CMD CHECK for CRAN (enforced by CI on every commit/PR)</li>
-<li>CI runs on push/PR to <code>master</code> and <code>develop</code> branches</li>
+<li>CI runs on push/PR to <code>master</code>, <code>develop</code> and <code>dev-*</code> branches</li>
 <li>All code changes require corresponding tests in <code>tests/testthat/</code>
 </li>
 <li>Documentation generated from roxygen comments (never edit <code>man/</code> or <code>docs/</code> directly)</li>
@@ -250,7 +250,8 @@ local/               # Machine-local scratch files (not synced, not shared)</cod
 <li>
 <strong>devtools::load_all()</strong> - never use <code><a href="https://github.com/popov-lab/bmm" class="external-link">library(bmm)</a></code> during development</li>
 <li>
-<strong>Git branching</strong> - feature branches → PR to <code>develop</code> (never commit directly to <code>develop</code> or <code>master</code>)</li>
+<strong>Git branching</strong> - feature branches → PR to <code>develop</code>, or to the release’s <code>dev-*</code> integration branch for features planned for a later release (see <code>.dev/decisions/0002-release-integration-branches.md</code>); never commit directly to <code>develop</code>, <code>dev-*</code> or <code>master</code>
+</li>
 <li>
 <strong>Local <code>.gitignore</code> changes</strong> - to ignore files locally without touching the tracked <code>.gitignore</code>, add patterns to <code>.git/info/exclude</code> instead (see <a href="https://venpopov.com/posts/2024/git-local-ignore/" class="external-link">venpopov.com/posts/2024/git-local-ignore</a>)</li>
 </ol></div>

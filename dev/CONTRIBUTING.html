@@ -43,63 +43,105 @@
 
 <div id="contributing-to-bmm" class="section level1">
 
-<p>The <code>bmm</code> package is designed to be community driven and thus we appreciate your input! We attempt to make contributing to <code>bmm</code> as easy and transparent as possible. These contributor guidelines are designed to clarify different types of contributions and how they will be acknowledge in the package publication.</p>
-<p>The following contributions will be acknowledge in the <code>NEWS</code> for each release of the package:</p>
-<ul><li>Reporting a bug</li>
-<li>Submitting a bug fix</li>
-<li>Discussing and proposing improvements on the current state of the code, in particular:</li>
-<li>improving stability of model estimation</li>
-<li>speeding up model estimation</li>
-<li>generalizing functions across multiple already implemented <code>bmmodels</code>
-</li>
-</ul><p>More extensive contributions will be acknowledge by being listed as a contributor in the package documentation. These entail:</p>
-<ul><li>adding a new model to <code>bmm</code>
-</li>
-<li>adding new function that ease the use of multiple models implemented in <code>bmm</code>
-</li>
-<li>adding functions that implement the communication of <code>bmm</code> with other R packages, such as <code>emmeans</code>, <code>tidybayes</code>, <code>bayesplot</code>, etc.</li>
-</ul><div class="section level2">
-<h2 id="package-development-on-github">Package Development on Github<a class="anchor" aria-label="anchor" href="#package-development-on-github"></a></h2>
-<p>We use Github to host all code, track issues and feature requests, as well as accept pull requests. Detailed info on the development process can be found in the <code>bmm</code> <a href="https://popov-lab.github.io/bmm/dev/dev-notes/index.html">Developer Notes</a></p>
-<p>All changes and additions to code have to be submitted via pull requests. We consider all pull requests as propositions for changes to the codebase. Thus, we reserve the right to not merge changes, if we feel that they are in conflict with general principles implemented in the <code>bmm</code> package. To avoid the rejection of pull requests, please consider contacting us before committing changes to <code>bmm</code>, especially if they involve changing a large number of files.</p>
-<p>If you are interested in contributing to <code>bmm</code>, please follow the following steps.</p>
+<p>Thank you for helping with <code>bmm</code>. This page tells you where to branch, what your pull request (PR) must contain, who reviews it and when it merges.</p>
+<div class="section level2">
+<h2 id="ways-to-contribute">Ways to contribute<a class="anchor" aria-label="anchor" href="#ways-to-contribute"></a></h2>
+<ul><li>
+<strong>Report a bug.</strong> Open an <a href="https://github.com/popov-lab/bmm/issues" class="external-link">issue</a> with the bug report template.</li>
+<li>
+<strong>Fix a bug or improve the docs.</strong> Open a PR. For anything larger than a few lines, open an issue first so we can agree on the approach.</li>
+<li>
+<strong>Add a model.</strong> Open an issue with the <code>new_model</code> template first. We decide together whether the model fits the package, and in which release.</li>
+<li>
+<strong>Ask a question or float an idea</strong> in the <a href="https://github.com/popov-lab/bmm/discussions" class="external-link">Discussions</a>.</li>
+</ul><p>We credit every contribution in <code>NEWS.md</code>. Contributors of a new model or a larger feature are also listed with the role <code>ctb</code> in <code>DESCRIPTION</code>.</p>
+</div>
+<div class="section level2">
+<h2 id="which-branch-to-target">Which branch to target<a class="anchor" aria-label="anchor" href="#which-branch-to-target"></a></h2>
 <ol style="list-style-type: decimal"><li>Fork the repo and create your branch from <code>develop</code>. If your change is a feature planned for a later release, branch from that release’s integration branch (<code>dev-1.5.0</code>, <code>dev-1.6.0</code>) instead; the milestone of the issue tells you which release it is planned for. Bug fixes always go to <code>develop</code>.</li>
-<li>If you’ve added code that should be tested, add tests.</li>
-<li>Update the documentation for the changes you implemented.</li>
-<li>Ensure that all unit tests passed.</li>
-<li>Ensure the R CMD Checks passed.</li>
-<li>Issue that pull request!</li>
-</ol></div>
-<div class="section level2">
-<h2 id="use-a-consistent-coding-style">Use a Consistent Coding Style<a class="anchor" aria-label="anchor" href="#use-a-consistent-coding-style"></a></h2>
-<p>Please follow the general coding style used throughout <code>bmm</code>. This entails:</p>
-<ul><li>labeling variables and functions using <code>snake_case</code>
-</li>
-<li>avoid upper case labels in variable and function names</li>
-</ul><p>The <code>bmm</code> <a href="https://popov-lab.github.io/bmm/dev/dev-notes/index.html">Developer Notes</a> provide an introduction into the file organization of the package. Please follow the guidelines where to put functions associated with the different steps in fitting <code>bmmodels</code>. If you have questions or an unsure about where to add code, feel free to ask us. There is a dedicated <a href="https://github.com/popov-lab/bmm/discussions" class="external-link">Discussion</a> page for informal chats and questions.</p>
+<li>Open the PR against the branch you started from.</li>
+</ol><p>The reasoning is in <a href="../.dev/decisions/0002-release-integration-branches.html">ADR 0002</a>. If you are unsure, ask in the issue.</p>
 </div>
 <div class="section level2">
-<h2 id="any-contributions-you-make-will-be-under-the-gpl-2-software-license">Any contributions you make will be under the GPL-2 Software License<a class="anchor" aria-label="anchor" href="#any-contributions-you-make-will-be-under-the-gpl-2-software-license"></a></h2>
-<p>In short, when you submit code changes, your submissions are understood to be under the same <a href="https://choosealicense.com/licenses/gpl-2.0/" class="external-link">GPL-2</a> that covers the project. Feel free to contact us if that’s a concern.</p>
+<h2 id="before-you-open-a-pr">Before you open a PR<a class="anchor" aria-label="anchor" href="#before-you-open-a-pr"></a></h2>
+<p>Run these from the package root and fix what they report:</p>
+<div class="sourceCode" id="cb1"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="fu">devtools</span><span class="fu">::</span><span class="fu">document</span><span class="op">(</span><span class="op">)</span>   <span class="co"># regenerate man/ and NAMESPACE; never edit them by hand</span></span>
+<span><span class="fu">devtools</span><span class="fu">::</span><span class="fu">test</span><span class="op">(</span><span class="op">)</span>       <span class="co"># all tests pass</span></span>
+<span><span class="fu">devtools</span><span class="fu">::</span><span class="fu">check</span><span class="op">(</span><span class="op">)</span>      <span class="co"># 0 errors, 0 warnings; explain any note in the PR</span></span></code></pre></div>
+<p>Your PR also needs:</p>
+<ul><li>
+<strong>Tests</strong> for new behaviour, in <code>tests/testthat/</code>. Test what your code does, not how R subsets a data frame.</li>
+<li>
+<strong>A NEWS bullet</strong> under <code># bmm (development version)</code> for anything users can see. Keep it short: what changes for the user and what they should do. Do not describe how the fix works.</li>
+<li>
+<strong>Documentation</strong> for new or changed exported functions (roxygen).</li>
+<li>
+<strong>For a new model:</strong> read the <a href="https://venpopov.com/bmm/dev/dev-notes/" class="external-link">developer notes</a> and follow the one-constructor-per-response-type rule in <a href="../AGENTS.html">AGENTS.md</a>. Show parameter recovery in the PR description (see below).</li>
+</ul><div class="section level3">
+<h3 id="recovery-evidence-for-new-models">Recovery evidence for new models<a class="anchor" aria-label="anchor" href="#recovery-evidence-for-new-models"></a></h3>
+<p>Until we have a <code>tests/recovery/</code> folder, the PR description shows the result of a parameter recovery for the new model:</p>
+<ul><li>true against recovered values, as a table or a plot;</li>
+<li>a hierarchical recovery with several subjects whose parameters vary;</li>
+<li>data simulated with an independent generator, not the model’s own <code>r*</code> function, so that a bug in the density cannot cancel out.</li>
+</ul><p>Attach the script as a gist or in a collapsed block in the PR.</p>
+</div>
 </div>
 <div class="section level2">
-<h2 id="report-bugs-using-githubs-issues">Report bugs using Github’s <a href="https://github.com/popov-lab/bmm/issues" class="external-link">issues</a>
-<a class="anchor" aria-label="anchor" href="#report-bugs-using-githubs-issues"></a></h2>
-<p>We use GitHub issues to track public bugs. Report a bug by <a href="https://github.com/popov-lab/bmm/issues" class="external-link">opening a new issue</a>; it’s that easy!</p>
+<h2 id="review-and-merging">Review and merging<a class="anchor" aria-label="anchor" href="#review-and-merging"></a></h2>
+<p>How many reviews a PR needs depends on what it touches.</p>
+<table class="table"><colgroup><col width="33%"><col width="33%"><col width="33%"></colgroup><thead><tr><th>Tier</th>
+<th>What it covers</th>
+<th>Reviews</th>
+</tr></thead><tbody><tr><td><strong>Low-risk</strong></td>
+<td>Typos, docs only, CI config, tests only, NEWS only</td>
+<td>None. May merge on green CI by anyone with write access.</td>
+</tr><tr><td><strong>Standard</strong></td>
+<td>Everything else, including bug fixes and new models</td>
+<td>One approving review from someone other than the author.</td>
+</tr><tr><td><strong>Pipeline or exported API</strong></td>
+<td>The shared pipeline files (<code>R/bmm.R</code>, <code>R/bmmformula.R</code>, <code>R/helpers-model.R</code>, <code>R/helpers-data.R</code>, <code>R/helpers-prior.R</code>, <code>R/helpers-postprocess.R</code>, <code>R/helpers-inits.R</code>, <code>R/update.R</code>), or the signature or return value of an exported function</td>
+<td>Two approving reviews.</td>
+</tr></tbody></table><p>A <strong>new model</strong> is a standard PR with one addition: the reviewer works through the reviewer block in the PR template. They read the likelihood against the cited source, run or inspect the recovery, and check the default priors on the natural scale.</p>
+<p>Three rules apply to all tiers:</p>
+<ul><li>All three <code>R-CMD-check</code> jobs (<code>ubuntu-latest</code>, <code>macos-latest</code>, <code>windows-latest</code>, each on <code>release</code>) must pass. CI runs on pushes and PRs to <code>master</code>, <code>develop</code> and <code>dev-*</code>.</li>
+<li>Approvals stay valid after new pushes. If you review a PR and the author pushes afterwards, you can still re-request changes.</li>
+<li>We may decline a PR that conflicts with the principles of the package. Talk to us early, especially if your change touches many files.</li>
+</ul><div class="section level3">
+<h3 id="while-there-is-one-active-maintainer">While there is one active maintainer<a class="anchor" aria-label="anchor" href="#while-there-is-one-active-maintainer"></a></h3>
+<p>At the moment one maintainer does most of the reviewing. So that PRs are not stuck, the maintainer may merge their own PR without a GitHub approval when all of the following hold:</p>
+<ul><li>CI is green.</li>
+<li>An independent review was done, and the PR says what was checked and what changed after it.</li>
+<li>For the pipeline or exported API tier, the PR stays open for at least 72 hours with that summary posted, so others can object.</li>
+</ul><p>PRs from other contributors always need an approval from a maintainer. This fallback ends when a second person takes on regular reviews.</p>
+</div>
 </div>
 <div class="section level2">
-<h2 id="write-bug-reports-with-detail-background-and-sample-code">Write bug reports with detail, background, and sample code<a class="anchor" aria-label="anchor" href="#write-bug-reports-with-detail-background-and-sample-code"></a></h2>
-<p>When reporting a bug, please use the provided template.</p>
-<p><strong>Great Bug Reports</strong> tend to have:</p>
-<ul><li>A quick summary and/or background</li>
-<li>Steps to reproduce
-<ul><li>Be specific!</li>
-<li>Give sample code if you can.</li>
-</ul></li>
-<li>What you expected would happen</li>
-<li>What actually happens</li>
-<li>Notes (including why you think this might be happening, or stuff you tried that didn’t work)</li>
-</ul><p>We appreciate thorough bug reports <em>a lot</em>.</p>
+<h2 id="coding-style">Coding style<a class="anchor" aria-label="anchor" href="#coding-style"></a></h2>
+<ul><li>Name variables and functions in <code>snake_case</code>, without upper case letters.</li>
+<li>Use <code>stopif()</code>, <code>warnif()</code>, <code>stop2()</code> and <code>message2()</code>, not <code><a href="https://rdrr.io/r/base/stopifnot.html" class="external-link">stopifnot()</a></code> or the base R equivalents.</li>
+<li>Use implicit returns. Do not write <code><a href="https://rdrr.io/r/base/function.html" class="external-link">return()</a></code> at the end of a function.</li>
+<li>Write comments that explain why, not what. If code needs a comment to say what it does, rename or restructure the code.</li>
+<li>Validate arguments in exported functions only. Internal helpers trust their callers.</li>
+<li>Call functions as <code>package::function()</code>.</li>
+</ul><p><a href="../AGENTS.html">AGENTS.md</a> has the rest, and the <a href="https://venpopov.com/bmm/dev/dev-notes/" class="external-link">developer notes</a> explain which file holds which step of the fitting pipeline. If you are unsure where code belongs, ask.</p>
+</div>
+<div class="section level2">
+<h2 id="ai-assisted-contributions">AI-assisted contributions<a class="anchor" aria-label="anchor" href="#ai-assisted-contributions"></a></h2>
+<p>You may use AI tools. You are responsible for every line you submit and must be able to explain it in review. Tell us in the PR if a large share was generated.</p>
+</div>
+<div class="section level2">
+<h2 id="licence">Licence<a class="anchor" aria-label="anchor" href="#licence"></a></h2>
+<p>By submitting a change you agree that it is released under the <a href="https://choosealicense.com/licenses/gpl-2.0/" class="external-link">GPL-2</a> licence that covers the package. Contact us if that is a problem.</p>
+</div>
+<div class="section level2">
+<h2 id="bug-reports">Bug reports<a class="anchor" aria-label="anchor" href="#bug-reports"></a></h2>
+<p>Use the bug report template. A good report has:</p>
+<ul><li>a short summary;</li>
+<li>steps to reproduce, ideally with a minimal code example;</li>
+<li>what you expected and what happened instead;</li>
+<li>notes on what you tried, or why you think it happens.</li>
+</ul><p>We appreciate thorough bug reports a lot.</p>
 </div>
 </div>
 

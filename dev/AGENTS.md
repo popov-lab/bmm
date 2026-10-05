@@ -33,7 +33,7 @@ testthat::test_file()     # Run single test file
 ### Package Requirements
 
 - Must pass R CMD CHECK for CRAN (enforced by CI on every commit/PR)
-- CI runs on push/PR to `master` and `develop` branches
+- CI runs on push/PR to `master`, `develop` and `dev-*` branches
 - All code changes require corresponding tests in `tests/testthat/`
 - Documentation generated from roxygen comments (never edit `man/` or
   `docs/` directly)
@@ -268,8 +268,11 @@ developer maintains their own copy.
 5.  **devtools::load_all()** - never use
     [`library(bmm)`](https://github.com/popov-lab/bmm) during
     development
-6.  **Git branching** - feature branches → PR to `develop` (never commit
-    directly to `develop` or `master`)
+6.  **Git branching** - feature branches → PR to `develop`, or to the
+    release’s `dev-*` integration branch for features planned for a
+    later release (see
+    `.dev/decisions/0002-release-integration-branches.md`); never commit
+    directly to `develop`, `dev-*` or `master`
 7.  **Local `.gitignore` changes** - to ignore files locally without
     touching the tracked `.gitignore`, add patterns to
     `.git/info/exclude` instead (see
