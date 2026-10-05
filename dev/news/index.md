@@ -670,6 +670,12 @@
   caught with `tryCatch(message("hi"), message = identity)`. Printing it
   failed with *argument 1 (type ‘list’) cannot be handled by ‘cat’*
   ([\#481](https://github.com/popov-lab/bmm/issues/481)).
+- [`adjust_ezdm_accuracy()`](https://popov-lab.github.io/bmm/dev/reference/adjust_ezdm_accuracy.md)
+  adjusts one cell at a time. Passing vectors failed with an unrelated R
+  error; it now stops with a message that points to
+  [`ezdm_summary_stats()`](https://popov-lab.github.io/bmm/dev/reference/ezdm_summary_stats.md),
+  which handles grouped data. The function remains deprecated
+  ([\#409](https://github.com/popov-lab/bmm/issues/409)).
 
 #### Deprecated functions and arguments
 

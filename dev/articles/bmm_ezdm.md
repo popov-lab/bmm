@@ -212,8 +212,15 @@ EZ-diffusion model requires **aggregated summary statistics**:
 | `n_upper`  | Number of responses hitting the upper boundary |
 | `n_trials` | Total number of trials                         |
 
-For the **3-parameter version**, `mean_rt` and `var_rt` should be
-computed from all correct responses pooled together.
+For the **3-parameter version**, `mean_rt` and `var_rt` are computed
+from all responses in a cell, correct and error pooled together, and
+`n_trials` counts all of them. The original EZ equations above use the
+RTs of correct responses only. Pooling is valid here because the
+starting point is symmetric: the decision time then has the same
+distribution at both boundaries, so every trial informs the same mean
+and variance. The accuracy enters the likelihood through `n_upper`.
+[`ezdm_summary_stats()`](https://popov-lab.github.io/bmm/dev/reference/ezdm_summary_stats.md)
+pools the RTs for you.
 
 For the **4-parameter version**, you need separate statistics for upper
 and lower boundary responses: - `mean_rt_upper`, `var_rt_upper` for
@@ -622,26 +629,26 @@ and Tail_ESS are effective sample size measures, and Rhat is the potential
 scale reduction factor on split chains (at convergence, Rhat = 1).
 ```
 
-To provide stable sampling all parameters use log link functions, so we
-need to exponentiate to get estimates on the natural scale:
+The drift rate has an identity link, so its estimates are already on the
+natural scale. Boundary separation and non-decision time have log links,
+so we exponentiate them:
 
 ``` r
 
 # Extract fixed effects
 fixef_est <- brms::fixef(fit)
 
-# Transform to natural scale
-cat("Drift rate (easy):", exp(fixef_est["drift_conditioneasy", "Estimate"]), "\n")
-#> Drift rate (easy): 15.42381
-cat("Drift rate (hard):", exp(fixef_est["drift_conditionhard", "Estimate"]), "\n")
-#> Drift rate (hard): 3.92211
+cat("Drift rate (easy):", fixef_est["drift_conditioneasy", "Estimate"], "\n")
+#> Drift rate (easy): 2.735912
+cat("Drift rate (hard):", fixef_est["drift_conditionhard", "Estimate"], "\n")
+#> Drift rate (hard): 1.36663
 cat("Boundary:", exp(fixef_est["bound_Intercept", "Estimate"]), "\n")
 #> Boundary: 1.543554
 cat("Non-decision time:", exp(fixef_est["ndt_Intercept", "Estimate"]), "\n")
 #> Non-decision time: 0.2750842
 ```
 
-As you can see, these match the generating values well:
+The generating values were:
 
 ``` r
 
@@ -650,6 +657,13 @@ print(true_params)
 #> 1      easy   3.0   1.5 0.3
 #> 2      hard   1.5   1.5 0.3
 ```
+
+The boundary (1.54) and the non-decision time (0.275) are close to the
+generating values of 1.5 and 0.3. The drift rates (2.74 and 1.37) sit
+below the generating values of 3.0 and 1.5, and the generating values
+lie outside their 95% credible intervals in the summary above. The data
+were simulated with subject-level variation in all three parameters,
+which this model leaves out.
 
 ### 5.6 Visualizing posterior distributions
 
@@ -663,7 +677,7 @@ library(ggplot2)
 # Extract posterior draws
 draws <- tidybayes::tidy_draws(fit) |>
   select(starts_with("b_")) |>
-  mutate(across(everything(), exp))
+  mutate(across(any_of(c("b_bound_Intercept", "b_ndt_Intercept")), exp))
 
 # Rename for plotting
 colnames(draws) <- gsub("b_", "", colnames(draws))
@@ -745,10 +759,10 @@ conditions:
 ``` r
 
 # Test if drift rate is higher in easy vs hard condition
-brms::hypothesis(fit, "exp(drift_conditioneasy) > exp(drift_conditionhard)")
+brms::hypothesis(fit, "drift_conditioneasy > drift_conditionhard")
 #> Hypothesis Tests for class b:
 #>                 Hypothesis Estimate Est.Error CI.Lower CI.Upper Evid.Ratio
-#> 1 (exp(drift_condit... > 0    11.52      0.88    10.14    13.05        Inf
+#> 1 (drift_conditione... > 0     1.37      0.06     1.27     1.47        Inf
 #>   Post.Prob Star
 #> 1         1    *
 #> ---

@@ -313,7 +313,7 @@ clean_data <- flagged_data |> filter(contam_prob < 0.5)
 fit <- bmm(
   formula = bmf(drift ~ condition, bound ~ 1, ndt ~ 1),
   data = clean_data,
-  model = ddm(resp1 = "rt", resp2 = "response")
+  model = ddm(rt = "rt", response = "response")
 )
 ```
 
@@ -506,11 +506,14 @@ the Wiener process. See
 [`?ezdm_summary_stats`](https://popov-lab.github.io/bmm/dev/reference/ezdm_summary_stats.md)
 for details.
 
-Check convergence with `attr(result, "diagnostics")$converged`. When the
-EM fails to converge, it usually means too few trials or bounds that do
-not fit the data well.
+When the EM fails to converge, it usually means too few trials or bounds
+that do not fit the data well.
+[`flag_contaminant_rts()`](https://popov-lab.github.io/bmm/dev/reference/flag_contaminant_rts.md)
+then returns `NA` for every trial of the group, and
+`attr(result, "diagnostics")$converged` is `FALSE`.
 [`ezdm_summary_stats()`](https://popov-lab.github.io/bmm/dev/reference/ezdm_summary_stats.md)
-falls back to simple moments in that case.
+has no such attribute. It warns and falls back to robust moments, and
+`n_upper` and `n_trials` stay the raw counts.
 
 If estimated contamination rates exceed 20%, first check that RTs are in
 seconds, not milliseconds. Then verify your bounds. If the rates still

@@ -145,6 +145,8 @@
 <li>
 <code><a href="https://paulbuerkner.com/brms/reference/combine_models.html" class="external-link">brms::combine_models()</a></code> now merges a fit with a refit made by <code><a href="https://rdrr.io/r/stats/update.html" class="external-link">update()</a></code>, e.g. <code>update(fit, seed = 2)</code> to rerun chains that failed. Before, it stopped with <em>“Models 1 and 2 have different formulas”</em>. Both fits must come from the same bmm version, so rerun <code><a href="https://rdrr.io/r/stats/update.html" class="external-link">update()</a></code> refits made with an earlier version (<a href="https://github.com/popov-lab/bmm/issues/464" class="external-link">#464</a>).</li>
 <li>Loading bmm no longer breaks printing a message condition, such as one caught with <code>tryCatch(message("hi"), message = identity)</code>. Printing it failed with <em>argument 1 (type ‘list’) cannot be handled by ‘cat’</em> (<a href="https://github.com/popov-lab/bmm/issues/481" class="external-link">#481</a>).</li>
+<li>
+<code><a href="../reference/adjust_ezdm_accuracy.html">adjust_ezdm_accuracy()</a></code> adjusts one cell at a time. Passing vectors failed with an unrelated R error; it now stops with a message that points to <code><a href="../reference/ezdm_summary_stats.html">ezdm_summary_stats()</a></code>, which handles grouped data. The function remains deprecated (<a href="https://github.com/popov-lab/bmm/issues/409" class="external-link">#409</a>).</li>
 </ul></div>
 <div class="section level4">
 <h4 id="deprecated-functions-and-arguments-development-version">Deprecated functions and arguments<a class="anchor" aria-label="anchor" href="#deprecated-functions-and-arguments-development-version"></a></h4>

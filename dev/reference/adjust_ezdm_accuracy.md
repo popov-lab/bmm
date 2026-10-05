@@ -23,17 +23,18 @@ adjust_ezdm_accuracy(n_upper, n_trials, contaminant_prop, guess_rate = 0.5)
 
 - n_upper:
 
-  Numeric. Count of upper boundary (correct) responses.
+  Numeric. Count of upper boundary (correct) responses, a single value.
 
 - n_trials:
 
-  Numeric. Total number of trials.
+  Numeric. Total number of trials, a single value.
 
 - contaminant_prop:
 
   Numeric. Estimated proportion of contaminant trials (e.g., from the
   `contaminant_prop` column of
-  [`ezdm_summary_stats()`](https://popov-lab.github.io/bmm/dev/reference/ezdm_summary_stats.md)).
+  [`ezdm_summary_stats()`](https://popov-lab.github.io/bmm/dev/reference/ezdm_summary_stats.md)),
+  a single value.
 
 - guess_rate:
 
@@ -47,6 +48,11 @@ A 1-row `data.frame` with columns `n_upper_adj` and `n_trials_adj`
 original counts unchanged.
 
 ## Details
+
+The function adjusts one cell at a time. Vectors of length greater than
+one are an error; to correct several cells, use
+[`ezdm_summary_stats()`](https://popov-lab.github.io/bmm/dev/reference/ezdm_summary_stats.md)
+on each group.
 
 Uses binomial sampling to estimate the number of contaminant trials and
 contaminant correct responses, then subtracts these from the raw counts.

@@ -77,16 +77,18 @@ for 2AFC tasks).</p>
 
 
 <dl><dt id="arg-n-upper">n_upper<a class="anchor" aria-label="anchor" href="#arg-n-upper"></a></dt>
-<dd><p>Numeric. Count of upper boundary (correct) responses.</p></dd>
+<dd><p>Numeric. Count of upper boundary (correct) responses, a
+single value.</p></dd>
 
 
 <dt id="arg-n-trials">n_trials<a class="anchor" aria-label="anchor" href="#arg-n-trials"></a></dt>
-<dd><p>Numeric. Total number of trials.</p></dd>
+<dd><p>Numeric. Total number of trials, a single value.</p></dd>
 
 
 <dt id="arg-contaminant-prop">contaminant_prop<a class="anchor" aria-label="anchor" href="#arg-contaminant-prop"></a></dt>
 <dd><p>Numeric. Estimated proportion of contaminant trials
-(e.g., from the <code>contaminant_prop</code> column of <code><a href="ezdm_summary_stats.html">ezdm_summary_stats()</a></code>).</p></dd>
+(e.g., from the <code>contaminant_prop</code> column of <code><a href="ezdm_summary_stats.html">ezdm_summary_stats()</a></code>), a
+single value.</p></dd>
 
 
 <dt id="arg-guess-rate">guess_rate<a class="anchor" aria-label="anchor" href="#arg-guess-rate"></a></dt>
@@ -102,7 +104,10 @@ counts unchanged.</p>
     </div>
     <div class="section level2">
     <h2 id="details">Details<a class="anchor" aria-label="anchor" href="#details"></a></h2>
-    <p>Uses binomial sampling to estimate the number of contaminant trials
+    <p>The function adjusts one cell at a time. Vectors of length greater
+than one are an error; to correct several cells, use
+<code><a href="ezdm_summary_stats.html">ezdm_summary_stats()</a></code> on each group.</p>
+<p>Uses binomial sampling to estimate the number of contaminant trials
 and contaminant correct responses, then subtracts these from the raw
 counts. Because of the stochastic sampling, results will vary across
 calls unless a seed is set by the user.</p>

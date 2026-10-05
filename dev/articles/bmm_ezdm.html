@@ -310,7 +310,7 @@ extreme accuracy, and with them information about drift and starting point.</p>
 </tr>
 </tbody>
 </table>
-<p>For the <strong>3-parameter version</strong>, <code>mean_rt</code> and <code>var_rt</code> should be computed from all correct responses pooled together.</p>
+<p>For the <strong>3-parameter version</strong>, <code>mean_rt</code> and <code>var_rt</code> are computed from all responses in a cell, correct and error pooled together, and <code>n_trials</code> counts all of them. The original EZ equations above use the RTs of correct responses only. Pooling is valid here because the starting point is symmetric: the decision time then has the same distribution at both boundaries, so every trial informs the same mean and variance. The accuracy enters the likelihood through <code>n_upper</code>. <code><a href="../reference/ezdm_summary_stats.html">ezdm_summary_stats()</a></code> pools the RTs for you.</p>
 <p>For the <strong>4-parameter version</strong>, you need separate statistics for upper and lower boundary responses:
 - <code>mean_rt_upper</code>, <code>var_rt_upper</code> for upper boundary (correct) responses
 - <code>mean_rt_lower</code>, <code>var_rt_lower</code> for lower boundary (error) responses</p>
@@ -678,26 +678,26 @@ Draws were sampled using sample(hmc). For each parameter, Bulk_ESS
 and Tail_ESS are effective sample size measures, and Rhat is the potential
 scale reduction factor on split chains (at convergence, Rhat = 1).
 </code></pre>
-<p>To provide stable sampling all parameters use log link functions, so we need to exponentiate to get estimates on the natural scale:</p>
+<p>The drift rate has an identity link, so its estimates are already on the natural scale. Boundary separation and non-decision time have log links, so we exponentiate them:</p>
 <div class="sourceCode" id="cb12"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="co"># Extract fixed effects</span></span>
 <span><span class="va">fixef_est</span> <span class="op">&lt;-</span> <span class="fu">brms</span><span class="fu">::</span><span class="fu"><a href="https://rdrr.io/pkg/nlme/man/fixed.effects.html" class="external-link">fixef</a></span><span class="op">(</span><span class="va">fit</span><span class="op">)</span></span>
 <span></span>
-<span><span class="co"># Transform to natural scale</span></span>
-<span><span class="fu"><a href="https://rdrr.io/r/base/cat.html" class="external-link">cat</a></span><span class="op">(</span><span class="st">"Drift rate (easy):"</span>, <span class="fu"><a href="https://rdrr.io/r/base/Log.html" class="external-link">exp</a></span><span class="op">(</span><span class="va">fixef_est</span><span class="op">[</span><span class="st">"drift_conditioneasy"</span>, <span class="st">"Estimate"</span><span class="op">]</span><span class="op">)</span>, <span class="st">"\n"</span><span class="op">)</span></span>
-<span><span class="co">#&gt; Drift rate (easy): 15.42381</span></span>
-<span><span class="fu"><a href="https://rdrr.io/r/base/cat.html" class="external-link">cat</a></span><span class="op">(</span><span class="st">"Drift rate (hard):"</span>, <span class="fu"><a href="https://rdrr.io/r/base/Log.html" class="external-link">exp</a></span><span class="op">(</span><span class="va">fixef_est</span><span class="op">[</span><span class="st">"drift_conditionhard"</span>, <span class="st">"Estimate"</span><span class="op">]</span><span class="op">)</span>, <span class="st">"\n"</span><span class="op">)</span></span>
-<span><span class="co">#&gt; Drift rate (hard): 3.92211</span></span>
+<span><span class="fu"><a href="https://rdrr.io/r/base/cat.html" class="external-link">cat</a></span><span class="op">(</span><span class="st">"Drift rate (easy):"</span>, <span class="va">fixef_est</span><span class="op">[</span><span class="st">"drift_conditioneasy"</span>, <span class="st">"Estimate"</span><span class="op">]</span>, <span class="st">"\n"</span><span class="op">)</span></span>
+<span><span class="co">#&gt; Drift rate (easy): 2.735912</span></span>
+<span><span class="fu"><a href="https://rdrr.io/r/base/cat.html" class="external-link">cat</a></span><span class="op">(</span><span class="st">"Drift rate (hard):"</span>, <span class="va">fixef_est</span><span class="op">[</span><span class="st">"drift_conditionhard"</span>, <span class="st">"Estimate"</span><span class="op">]</span>, <span class="st">"\n"</span><span class="op">)</span></span>
+<span><span class="co">#&gt; Drift rate (hard): 1.36663</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/cat.html" class="external-link">cat</a></span><span class="op">(</span><span class="st">"Boundary:"</span>, <span class="fu"><a href="https://rdrr.io/r/base/Log.html" class="external-link">exp</a></span><span class="op">(</span><span class="va">fixef_est</span><span class="op">[</span><span class="st">"bound_Intercept"</span>, <span class="st">"Estimate"</span><span class="op">]</span><span class="op">)</span>, <span class="st">"\n"</span><span class="op">)</span></span>
 <span><span class="co">#&gt; Boundary: 1.543554</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/cat.html" class="external-link">cat</a></span><span class="op">(</span><span class="st">"Non-decision time:"</span>, <span class="fu"><a href="https://rdrr.io/r/base/Log.html" class="external-link">exp</a></span><span class="op">(</span><span class="va">fixef_est</span><span class="op">[</span><span class="st">"ndt_Intercept"</span>, <span class="st">"Estimate"</span><span class="op">]</span><span class="op">)</span>, <span class="st">"\n"</span><span class="op">)</span></span>
 <span><span class="co">#&gt; Non-decision time: 0.2750842</span></span></code></pre></div>
-<p>As you can see, these match the generating values well:</p>
+<p>The generating values were:</p>
 <div class="sourceCode" id="cb13"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/base/print.html" class="external-link">print</a></span><span class="op">(</span><span class="va">true_params</span><span class="op">)</span></span>
 <span><span class="co">#&gt;   condition drift bound ndt</span></span>
 <span><span class="co">#&gt; 1      easy   3.0   1.5 0.3</span></span>
 <span><span class="co">#&gt; 2      hard   1.5   1.5 0.3</span></span></code></pre></div>
+<p>The boundary (1.54) and the non-decision time (0.275) are close to the generating values of 1.5 and 0.3. The drift rates (2.74 and 1.37) sit below the generating values of 3.0 and 1.5, and the generating values lie outside their 95% credible intervals in the summary above. The data were simulated with subject-level variation in all three parameters, which this model leaves out.</p>
 </div>
 <div class="section level3" number="5.6">
 <h3 id="visualizing-posterior-distributions">
@@ -712,7 +712,7 @@ scale reduction factor on split chains (at convergence, Rhat = 1).
 <span><span class="co"># Extract posterior draws</span></span>
 <span><span class="va">draws</span> <span class="op">&lt;-</span> <span class="fu">tidybayes</span><span class="fu">::</span><span class="fu"><a href="https://mjskay.github.io/tidybayes/reference/tidy_draws.html" class="external-link">tidy_draws</a></span><span class="op">(</span><span class="va">fit</span><span class="op">)</span> <span class="op">|&gt;</span></span>
 <span>  <span class="fu"><a href="https://dplyr.tidyverse.org/reference/select.html" class="external-link">select</a></span><span class="op">(</span><span class="fu"><a href="https://tidyselect.r-lib.org/reference/starts_with.html" class="external-link">starts_with</a></span><span class="op">(</span><span class="st">"b_"</span><span class="op">)</span><span class="op">)</span> <span class="op">|&gt;</span></span>
-<span>  <span class="fu"><a href="https://dplyr.tidyverse.org/reference/mutate.html" class="external-link">mutate</a></span><span class="op">(</span><span class="fu"><a href="https://dplyr.tidyverse.org/reference/across.html" class="external-link">across</a></span><span class="op">(</span><span class="fu"><a href="https://tidyselect.r-lib.org/reference/everything.html" class="external-link">everything</a></span><span class="op">(</span><span class="op">)</span>, <span class="va">exp</span><span class="op">)</span><span class="op">)</span></span>
+<span>  <span class="fu"><a href="https://dplyr.tidyverse.org/reference/mutate.html" class="external-link">mutate</a></span><span class="op">(</span><span class="fu"><a href="https://dplyr.tidyverse.org/reference/across.html" class="external-link">across</a></span><span class="op">(</span><span class="fu"><a href="https://tidyselect.r-lib.org/reference/all_of.html" class="external-link">any_of</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"b_bound_Intercept"</span>, <span class="st">"b_ndt_Intercept"</span><span class="op">)</span><span class="op">)</span>, <span class="va">exp</span><span class="op">)</span><span class="op">)</span></span>
 <span></span>
 <span><span class="co"># Rename for plotting</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/colnames.html" class="external-link">colnames</a></span><span class="op">(</span><span class="va">draws</span><span class="op">)</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/grep.html" class="external-link">gsub</a></span><span class="op">(</span><span class="st">"b_"</span>, <span class="st">""</span>, <span class="fu"><a href="https://rdrr.io/r/base/colnames.html" class="external-link">colnames</a></span><span class="op">(</span><span class="va">draws</span><span class="op">)</span><span class="op">)</span></span>
@@ -763,10 +763,10 @@ scale reduction factor on split chains (at convergence, Rhat = 1).
 <p>As <code>bmm</code> feeds seamlessly into <code>brms</code>, we can use Bayesian hypothesis testing via Savage-Dickey density ratios to compare drift rates between conditions:</p>
 <div class="sourceCode" id="cb17"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="co"># Test if drift rate is higher in easy vs hard condition</span></span>
-<span><span class="fu">brms</span><span class="fu">::</span><span class="fu"><a href="https://paulbuerkner.com/brms/reference/hypothesis.brmsfit.html" class="external-link">hypothesis</a></span><span class="op">(</span><span class="va">fit</span>, <span class="st">"exp(drift_conditioneasy) &gt; exp(drift_conditionhard)"</span><span class="op">)</span></span>
+<span><span class="fu">brms</span><span class="fu">::</span><span class="fu"><a href="https://paulbuerkner.com/brms/reference/hypothesis.brmsfit.html" class="external-link">hypothesis</a></span><span class="op">(</span><span class="va">fit</span>, <span class="st">"drift_conditioneasy &gt; drift_conditionhard"</span><span class="op">)</span></span>
 <span><span class="co">#&gt; Hypothesis Tests for class b:</span></span>
 <span><span class="co">#&gt;                 Hypothesis Estimate Est.Error CI.Lower CI.Upper Evid.Ratio</span></span>
-<span><span class="co">#&gt; 1 (exp(drift_condit... &gt; 0    11.52      0.88    10.14    13.05        Inf</span></span>
+<span><span class="co">#&gt; 1 (drift_conditione... &gt; 0     1.37      0.06     1.27     1.47        Inf</span></span>
 <span><span class="co">#&gt;   Post.Prob Star</span></span>
 <span><span class="co">#&gt; 1         1    *</span></span>
 <span><span class="co">#&gt; ---</span></span>
