@@ -34,17 +34,21 @@ groups of parameters that are jointly constrained to sum to 1. Each group
 is reparameterized via stick-breaking: the last parameter of each group
 is derived as 1 minus the sum of the other members, and each other member
 \code{p} gets an unconstrained component \code{praw} that predictor formulas for
-\code{p} are applied to.}
+\code{p} are applied to. The listing order sets the default prior and the
+meaning of the coefficients; see Details.}
 
 \item{restrictions}{Parameter restrictions in the string syntax of MPTinR
 and TreeBUGS, e.g. \code{c("Dn = Do", "g = 0.5")}, or as a named list,
 \code{list(Dn = "Do", g = 0.5)}. A restriction either equates a parameter with
 another one (chains such as \code{"G1 = G2 = G3"} map all earlier names onto
 the last) or fixes it to a numeric constant (\code{"g = 0.5"}, \code{"g = 1/4"}).
-Restrictions are substituted into the branch expressions before the
-parameters are identified, so a restricted parameter is not part of the
-model. Order constraints (\code{"Do > Dn"}) are not supported here; see
-Details.}
+Constants must lie strictly between 0 and 1. The unnamed list of MPTinR
+and TreeBUGS, \code{list("Dn = Do", "g = 0.5")}, works as well. Restriction
+files are not read: in MPTinR and TreeBUGS a character vector names a
+restrictions file, in \code{bmm} it holds the restrictions. Restrictions are substituted into the
+branch expressions before the parameters are identified, so a restricted
+parameter is not part of the model and cannot be a simplex member. Order
+constraints (\code{"Do > Dn"}) are not supported here; see Details.}
 
 \item{links}{Character. The link function for all latent probability
 parameters: \code{"logit"} (default) or \code{"probit"}.}
@@ -110,6 +114,17 @@ get \code{exponential(2)}. Group-level correlation matrices get \code{lkj(2)}.
 Coefficients of the sub-parameters above get \code{normal(0, 0.5)}. A parameter
 switched to the other link after construction (\code{model$links$D <- "probit"}) takes that link's priors unless its default prior was
 replaced. \code{\link[=default_prior]{default_prior()}} lists the rows a given formula produces.
+
+In a simplex group with intercept-only formulas, the default prior makes
+each stick uniform on (0, 1) under both links. The prior means are therefore 0.50/0.25/0.25 for a
+group of three and 0.50/0.25/0.125/0.125 for a group of four: the member
+listed first always has prior mean 0.5, so the listing order matters. A
+symmetric (uniform Dirichlet) prior would put 1/K on each of K members. A
+predictor on member \code{p} acts on the logit (or probit) of \code{p}'s share of
+the probability left over by the members listed before it. A predictor
+on the first member therefore scales all later members by the same
+factor, leaving their ratios unchanged. Read such effects on the probability scale with
+\code{\link[=native_parameters]{native_parameters()}}.
 
 A parameter can also be fixed to a probability at fit time, in the
 formula: \code{bmf(D ~ 1, g = 0.5)}. Unlike a restriction, the parameter stays

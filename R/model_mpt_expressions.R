@@ -63,6 +63,10 @@
     return(list())
   }
   if (is.null(names(restrictions))) {
+    # MPTinR and TreeBUGS pass inline restrictions as an unnamed list of strings
+    if (is.list(restrictions) && all(vapply(restrictions, is.character, logical(1)))) {
+      restrictions <- unlist(restrictions)
+    }
     stopif(
       !is.character(restrictions),
       "The restrictions argument must be a character vector such as \\
@@ -129,6 +133,14 @@
       is_try_error(value) || !is.numeric(value) || length(value) != 1L ||
         is.na(value),
       "The restriction '{text}' does not evaluate to a single number."
+    )
+    stopif(
+      value <= 0 || value >= 1,
+      "The restriction '{text}' fixes a parameter to {value}. Restriction \\
+      constants must be probabilities strictly between 0 and 1: 0 or 1 turns \\
+      a branch into the constant 0. Leave such branches out of the tree \\
+      expressions, and declare a category no branch reaches with \\
+      mpt_tree(impossible = )."
     )
     return(value)
   }
