@@ -781,10 +781,56 @@ rm3 <- function(n, size, pars, m3_model, act_funs = NULL, unpack = FALSE,
 
     num_options <- m3_num_options(m3_model)
     choice_rule <- tolower(m3_model$other_vars$choice_rule)
+    if (choice_rule == "gaussian") {
+      return(vapply(seq_along(acts), function(k) {
+        exp(.m3_gauss_logp_r(k, as.list(acts), as.list(unname(num_options))))
+      }, numeric(1)))
+    }
     if (choice_rule == "softmax") acts <- exp(acts)
     acts <- acts * num_options
     acts / sum(acts)
   }
+
+# Gaussian (Thurstonian) choice rule of m3: every option of category j draws
+# evidence A_j + N(0, 1) and the largest wins, so with n_j options per category
+#   P(k) = n_k E_z[ Phi(z)^(n_k - 1) prod_{j != k} Phi(z + A_k - A_j)^n_j ],
+# z ~ N(0, 1), by Gauss-Hermite quadrature. Mirrors m3_gauss_logp_vec() in
+# inst/stan_chunks/m3_gaussian_funs.stan. 40 nodes: against an integrate()
+# reference |delta log P| stays below 2e-5 where log P > -5 and 1.2e-4 for
+# categories with 30 options, growing to ~5e-3 only where log P < -20; maximum-
+# likelihood estimates on pooled oberauer_lewandowsky_2019_e1 move by 2e-4
+# standard errors relative to 72 nodes (|delta log P| <= 1e-6), at 40/72 of
+# the cost per gradient. log Phi at the nodes is tabulated for the
+# n_k - 1 competitors inside the chosen category, which sit at difference 0.
+.m3_gauss_rule <- function() {
+  gh <- .gh_rule(40L)
+  list(nodes = gh$nodes, log_w = log(gh$weights),
+       log_Phi = stats::pnorm(gh$nodes, log.p = TRUE))
+}
+
+# k: category index; A, n: lists of K equal-length vectors (activations and
+# option counts). A category without options carries n = 0.0001 from
+# check_data, so counts below 0.5 mean "absent", as in the Stan kernel; its
+# own value is -100, which the formula multiplies by its zero indicator
+.m3_gauss_logp_r <- function(k, A, n) {
+  gh <- .m3_gauss_rule()
+  Q <- length(gh$nodes)
+  len <- length(A[[k]])
+  out <- rep(-100, len)
+  has <- which(n[[k]] >= 0.5)
+  # one quadrature term per element and node; chunked so that draws x N x Q fits in memory
+  for (idx in split(has, ceiling(seq_along(has) / 20000))) {
+    terms <- matrix(gh$log_w, length(idx), Q, byrow = TRUE) + outer(n[[k]][idx] - 1, gh$log_Phi)
+    for (j in setdiff(seq_along(A), k)) {
+      act <- n[[j]][idx] >= 0.5
+      if (!any(act)) next
+      terms[act, ] <- terms[act, ] + n[[j]][idx][act] *
+        stats::pnorm(outer(A[[k]][idx][act] - A[[j]][idx][act], gh$nodes, "+"), log.p = TRUE)
+    }
+    out[idx] <- log(n[[k]][idx]) + matrixStats::rowLogSumExps(terms)
+  }
+  out
+}
 
 
 #' @title Distribution function for the Diffusion Decision Model (`ddm`)

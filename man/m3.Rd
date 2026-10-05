@@ -29,12 +29,19 @@ bmm adds to the data. Column names given category names, e.g.
 Custom activation formulas can use numbers by these column names; numbers
 without names or named after the categories are called \verb{n_opt_<category>}.}
 
-\item{choice_rule}{The choice rule that should be used for the M3. The options are "softmax"
-or "simple". The "softmax" option implements the softmax normalization of activation into
+\item{choice_rule}{The choice rule that should be used for the M3. The options are "softmax",
+"simple", or "gaussian". The "softmax" option implements the softmax normalization of activation into
 probabilities for choosing the different response categories. The "simple" option implements
 a simple normalization of the absolute activations over the sum of all activations. For details
 on the differences of these choice rules please see the appendix of Oberauer & Lewandowsky (2019)
-"Simple measurement models for complex working memory tasks" published in Psychological Review.}
+"Simple measurement models for complex working memory tasks" published in Psychological Review.
+The "gaussian" option adds independent standard normal noise to the activation of every
+candidate and chooses the candidate with the largest value (a Thurstonian rule); "softmax" is
+the same with Gumbel noise. Activations under "gaussian" are on a smaller scale, and the
+difference is not one constant factor: \code{a} shrinks more than \code{c}, so a comparison of \code{c}
+with \code{a}, and effects of conditions that change the number of candidates (such as set
+size), can differ between the two rules. Fits with "gaussian" take much longer than with
+"softmax", because each probability is a numerical integral.}
 
 \item{version}{Character. The version of the M3 model to use. Can be one of
 \code{ss}, \code{cs}, or \code{custom}. The default is \code{custom}.}

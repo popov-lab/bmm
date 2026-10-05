@@ -582,21 +582,23 @@ test_that("m3 rejects num_options it cannot map onto the response categories", {
   expect_error(m3(cats, num_options = cats), "response category column")
 })
 
-test_that("softmax default priors give a and c equal main means (c - a centered at 0)", {
+test_that("softmax and gaussian default priors give a and c equal main means (c - a centered at 0)", {
   for (v in c("ss", "cs")) {
-    p <- m3(
-      resp_cats = if (v == "ss") c("corr", "other", "npl") else
-        c("corr", "dist_context", "other", "dist_other", "npl"),
-      num_options = if (v == "ss") c(1, 2, 3) else c(1, 2, 2, 2, 3),
-      choice_rule = "softmax", version = v
-    )$default_priors
-    expect_identical(p$a$main, p$c$main)
+    for (cr in c("softmax", "gaussian")) {
+      p <- m3(
+        resp_cats = if (v == "ss") c("corr", "other", "npl") else
+          c("corr", "dist_context", "other", "dist_other", "npl"),
+        num_options = if (v == "ss") c(1, 2, 3) else c(1, 2, 2, 2, 3),
+        choice_rule = cr, version = v
+      )$default_priors
+      expect_identical(p$a$main, p$c$main)
+    }
   }
 })
 
 test_that("no activation effect prior is wider than the shared normal(0,0.5)", {
   for (v in c("ss", "cs")) {
-    for (cr in c("simple", "softmax")) {
+    for (cr in c("simple", "softmax", "gaussian")) {
       p <- m3(
         resp_cats = if (v == "ss") c("corr", "other", "npl") else
           c("corr", "dist_context", "other", "dist_other", "npl"),
@@ -607,4 +609,116 @@ test_that("no activation effect prior is wider than the shared normal(0,0.5)", {
       expect_identical(p$c$effects, "normal(0,0.5)")
     }
   }
+})
+
+test_that("m3 runs through the pipeline with the gaussian choice rule in all versions", {
+  ss <- m3(c("corr", "other", "npl"), c("n_corr", "n_other", "n_npl"),
+           choice_rule = "gaussian", version = "ss")
+  expect_silent(bmm(bmf(c ~ 1 + cond + (1 | ID), a ~ 1 + cond + (1 | ID)),
+                    oberauer_lewandowsky_2019_e1, ss, backend = "mock", mock_fit = 1, rename = FALSE))
+
+  cs <- m3(c("corr", "dc", "other", "do", "npl"), c(1, 1, 4, 4, 10),
+           choice_rule = "gaussian", version = "cs")
+  dat <- data.frame(corr = c(50, 40), dc = c(5, 8), other = c(25, 30), do = c(10, 12), npl = c(10, 10))
+  expect_silent(bmm(bmf(c ~ 1, a ~ 1, f ~ 1), dat, cs, backend = "mock", mock_fit = 1, rename = FALSE))
+
+  custom <- m3(c("corr", "other", "dist", "npl"), c("n_corr", "n_other", "n_dist", "n_npl"),
+               choice_rule = "gaussian")
+  custom$links <- list(c = "identity", a = "identity", d = "identity")
+  f <- bmf(corr ~ b + a + c, other ~ b + a, dist ~ b + d, npl ~ b, c ~ 1 + cond, a ~ 1 + cond, d ~ 1)
+  expect_warning(bmm(f, oberauer_lewandowsky_2019_e1, custom, backend = "mock", mock_fit = 1, rename = FALSE),
+                 "Default priors for each parameter")
+})
+
+test_that("the gaussian choice rule fixes b at 0, accepts any case, and puts log P on each category", {
+  model <- m3(c("corr", "other", "npl"), c(1, 4, 10), choice_rule = "Gaussian", version = "ss")
+  expect_identical(model$other_vars$choice_rule, "gaussian")
+  expect_identical(model$fixed_parameters$b, 0)
+  expect_identical(model$default_priors$c$main, "normal(2,1)")
+
+  code <- stancode(bmf(c ~ 1, a ~ 1), data.frame(corr = 50, other = 30, npl = 20), model)
+  expect_match(code, "real m3_gauss_logp(int k, real A1, real A2, real A3, real n1, real n2, real n3)", fixed = TRUE)
+  for (k in 1:3) expect_match(code, paste0("m3_gauss_logp(", k, " , nlp_corr[n] , nlp_other[n] , nlp_npl[n]"), fixed = TRUE)
+  expect_false(grepl("multinomial_logit_lpmf(Y[n] | log", code, fixed = TRUE))
+  expect_error(m3(c("corr", "other", "npl"), c(1, 4, 10), choice_rule = "probit"), "gaussian")
+})
+
+test_that("custom m3 with the gaussian rule centres default identity-link priors on the Gaussian scale", {
+  model <- m3(c("corr", "other", "npl"), c(1, 4, 10), choice_rule = "gaussian")
+  model$links <- list(c = "identity", a = "identity")
+  f <- bmf(corr ~ b + a + c, other ~ b + a, npl ~ b, c ~ 1, a ~ 1)
+  model <- suppressWarnings(check_model(model, data.frame(corr = 1, other = 1, npl = 1), f))
+  expect_identical(model$default_priors$c$main, "normal(2, 1)")
+  expect_identical(model$default_priors$a$main, "normal(2, 1)")
+})
+
+# 40 quadrature nodes hold |delta log P| below 2e-5 where log P > -5, and below
+# 1.2e-4 for categories with 30 options
+test_that("Gaussian-rule probabilities match closed forms and integrate()", {
+  # two categories with one option each: the difference of two N(0, 1) draws has variance 2
+  A <- c(-1, 0, 0.7, 2.5)
+  for (a in A) {
+    expect_lt(abs(m3_gauss_logp(1, a, 0, 1, 1) - stats::pnorm(a / sqrt(2), log.p = TRUE)), 2e-5)
+  }
+  # equal activations: every option is equally likely to win, so P(k) = n_k / sum(n)
+  n <- c(1, 4, 10, 3)
+  lp <- vapply(1:4, function(k) do.call(m3_gauss_logp, as.list(c(k, rep(0.8, 4), n))), numeric(1))
+  expect_lt(max(abs(lp - log(n / sum(n)))), 2e-5)
+
+  ref_logp <- function(k, A, n) {
+    others <- setdiff(seq_along(A), k)
+    f <- function(z) {
+      out <- stats::dnorm(z) * stats::pnorm(z)^(n[k] - 1)
+      for (j in others) out <- out * stats::pnorm(z + A[k] - A[j])^n[j]
+      out
+    }
+    log(n[k]) + log(stats::integrate(f, -Inf, Inf, rel.tol = 1e-12)$value)
+  }
+  cells <- list(list(A = c(3, 1.2, 0), n = c(1, 4, 10)), list(A = c(1, 1.5, 0), n = c(1, 8, 30)),
+                list(A = c(2, 1.5, 0.8, 1, 0), n = c(1, 1, 4, 4, 10)))
+  for (cl in cells) {
+    for (k in seq_along(cl$A)) {
+      lp <- do.call(m3_gauss_logp, as.list(c(k, cl$A, cl$n)))
+      expect_lt(abs(lp - ref_logp(k, cl$A, cl$n)), if (max(cl$n) >= 30) 1.2e-4 else 2e-5)
+    }
+  }
+})
+
+test_that("m3_gauss_logp keeps the draws-by-observation shape and gives absent categories -100", {
+  A <- matrix(c(0.5, 1, 2, 3, 1.5, 0), 2)
+  one <- matrix(1, 2, 3)
+  out <- m3_gauss_logp(1, A, A * 0, A * 0 - 1, one, one * 4, one * 1e-4)
+  expect_identical(dim(out), c(2L, 3L))
+  expect_true(all(out < 0))
+  expect_identical(as.vector(m3_gauss_logp(3, A, A * 0, A * 0, one, one, one * 1e-4)), rep(-100, 6))
+})
+
+test_that("the Stan Gaussian-rule wrapper matches its R companion", {
+  skip_on_cran() # compiles and runs a Stan program
+  skip_if_not_installed("cmdstanr")
+  skip_if(is.null(cmdstanr::cmdstan_version(error_on_NA = FALSE)))
+
+  model <- m3(c("corr", "other", "npl"), c(1, 4, 10), choice_rule = "gaussian", version = "ss")
+  grid <- expand.grid(k = 1:3, A1 = c(-2, 0.5, 4, 40), A2 = c(0, 1.5), n2 = c(1e-4, 1, 8), n3 = c(1, 30))
+  grid$A3 <- 0
+  grid$n1 <- 1
+  program <- paste0(
+    "functions {\n", m3_gaussian_stanvars(model)[[1]]$scode, "\n}\n",
+    "data {\n  int N; array[N] int k; vector[N] A1; vector[N] A2; vector[N] A3;\n",
+    "  vector[N] n1; vector[N] n2; vector[N] n3;\n}\n",
+    "generated quantities {\n  vector[N] lp;\n  for (i in 1:N)\n",
+    "    lp[i] = m3_gauss_logp(k[i], A1[i], A2[i], A3[i], n1[i], n2[i], n3[i]);\n}\n"
+  )
+  fit <- cmdstanr::cmdstan_model(cmdstanr::write_stan_file(program))$sample(
+    data = c(list(N = nrow(grid)), as.list(grid)), fixed_param = TRUE, chains = 1,
+    iter_sampling = 1, iter_warmup = 0, refresh = 0, show_messages = FALSE, sig_figs = 17
+  )
+  csv <- utils::read.csv(fit$output_files()[1], comment.char = "#", check.names = FALSE)
+  stan <- as.numeric(csv[1, paste0("lp.", seq_len(nrow(grid)))])
+  r <- vapply(seq_len(nrow(grid)), function(i) {
+    g <- grid[i, ]
+    m3_gauss_logp(g$k, g$A1, g$A2, g$A3, g$n1, g$n2, g$n3)
+  }, numeric(1))
+  expect_true(all(is.finite(stan)))
+  expect_lt(max(abs(stan - r)), 1e-6)
 })
