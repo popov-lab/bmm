@@ -211,8 +211,9 @@ print.mpt_tree <- function(x, ...) {
     ),
     .mpt_named_list(
       raw_pars,
-      glue("Unconstrained stick-breaking component of a simplex parameter. \\
-           Fitted on the {links} scale.")
+      glue("Unconstrained stick-breaking component of a simplex parameter, \\
+           transformed by the inverse {links} into the stick proportion of the \\
+           remaining probability.")
     )
   )
 
@@ -346,16 +347,20 @@ settable_link_functions.mpt <- function(model) {
 #'   is reparameterized via stick-breaking: the last parameter of each group
 #'   is derived as 1 minus the sum of the other members, and each other member
 #'   `p` gets an unconstrained component `praw` that predictor formulas for
-#'   `p` are applied to.
+#'   `p` are applied to. The listing order sets the default prior and the
+#'   meaning of the coefficients; see Details.
 #' @param restrictions Parameter restrictions in the string syntax of MPTinR
 #'   and TreeBUGS, e.g. `c("Dn = Do", "g = 0.5")`, or as a named list,
 #'   `list(Dn = "Do", g = 0.5)`. A restriction either equates a parameter with
 #'   another one (chains such as `"G1 = G2 = G3"` map all earlier names onto
 #'   the last) or fixes it to a numeric constant (`"g = 0.5"`, `"g = 1/4"`).
-#'   Restrictions are substituted into the branch expressions before the
-#'   parameters are identified, so a restricted parameter is not part of the
-#'   model. Order constraints (`"Do > Dn"`) are not supported here; see
-#'   Details.
+#'   Constants must lie strictly between 0 and 1. The unnamed list of MPTinR
+#'   and TreeBUGS, `list("Dn = Do", "g = 0.5")`, works as well. Restriction
+#'   files are not read: in MPTinR and TreeBUGS a character vector names a
+#'   restrictions file, in `bmm` it holds the restrictions. Restrictions are substituted into the
+#'   branch expressions before the parameters are identified, so a restricted
+#'   parameter is not part of the model and cannot be a simplex member. Order
+#'   constraints (`"Do > Dn"`) are not supported here; see Details.
 #' @param links Character. The link function for all latent probability
 #'   parameters: `"logit"` (default) or `"probit"`.
 #' @param ... used internally for testing, ignore it
@@ -398,6 +403,17 @@ settable_link_functions.mpt <- function(model) {
 #'   switched to the other link after construction (`model$links$D <-
 #'   "probit"`) takes that link's priors unless its default prior was
 #'   replaced. [default_prior()] lists the rows a given formula produces.
+#'
+#'   In a simplex group with intercept-only formulas, the default prior makes
+#'   each stick uniform on (0, 1) under both links. The prior means are therefore 0.50/0.25/0.25 for a
+#'   group of three and 0.50/0.25/0.125/0.125 for a group of four: the member
+#'   listed first always has prior mean 0.5, so the listing order matters. A
+#'   symmetric (uniform Dirichlet) prior would put 1/K on each of K members. A
+#'   predictor on member `p` acts on the logit (or probit) of `p`'s share of
+#'   the probability left over by the members listed before it. A predictor
+#'   on the first member therefore scales all later members by the same
+#'   factor, leaving their ratios unchanged. Read such effects on the probability scale with
+#'   [native_parameters()].
 #'
 #'   A parameter can also be fixed to a probability at fit time, in the
 #'   formula: `bmf(D ~ 1, g = 0.5)`. Unlike a restriction, the parameter stays
@@ -566,7 +582,7 @@ mpt <- function(trees, tree_id = NULL, covariates = NULL, simplex = NULL,
 
   # a zero probability makes log(p) undefined in Stan; mpt_tree(impossible = )
   # switches a category off with a finite linear predictor instead. The guard
-  # runs after the restrictions, which can fold a branch to 0 (a = 0 in "a").
+  # runs after the restrictions, which can fold a branch to 0 (a = 0.5 in "1 - 2 * a").
   zero_branches <- unlist(lapply(trees, function(tree) {
     is_zero <- vapply(tree$branches, function(b) is.numeric(b) && b == 0, logical(1))
     glue("'{names(tree$branches)[is_zero]}' in tree '{tree$name}'")
@@ -614,6 +630,13 @@ mpt <- function(trees, tree_id = NULL, covariates = NULL, simplex = NULL,
     "Parameters cannot appear in more than one simplex group: \\
     {collapse_comma(unique(simplex_pars[duplicated(simplex_pars)]))}"
   )
+  restricted_simplex <- intersect(simplex_pars, names(restrictions))
+  stopif(
+    length(restricted_simplex) > 0,
+    "The simplex parameter(s) {collapse_comma(restricted_simplex)} are also \\
+    restricted, and the restriction removed them from the trees. Restrict \\
+    simplex members only through the group itself."
+  )
   unknown_simplex <- setdiff(simplex_pars, parameters)
   stopif(
     length(unknown_simplex) > 0,
@@ -656,7 +679,9 @@ mpt <- function(trees, tree_id = NULL, covariates = NULL, simplex = NULL,
       {signif(deviations[[tree_name]], 6)} instead of 1 when evaluated at \\
       numeric test values. Please check the branch expressions. To equate \\
       parameters or fix one to a constant, use the restrictions argument \\
-      (e.g. restrictions = 'Dn = Do'), not the branch expressions or the formula."
+      (e.g. restrictions = 'Dn = Do'), not the branch expressions or the formula. \\
+      Parameters that must sum to 1 across branches (e.g. guessing over three \\
+      options) belong in the simplex argument."
     )
   }
 
@@ -689,6 +714,12 @@ mpt <- function(trees, tree_id = NULL, covariates = NULL, simplex = NULL,
   restrictions <- .mpt_resolve_restrictions(restrictions)
   targets <- unique(unlist(lapply(restrictions, all.vars)))
   unknown <- setdiff(c(restricted, targets), parameters)
+  stopif(
+    "FE" %in% setdiff(targets, parameters),
+    "FE is TreeBUGS syntax for a parameter without person effects. In bmm, \\
+    leave the random effects out of that parameter's formula instead \\
+    (e.g. g ~ 1 instead of g ~ 1 + (1 | id))."
+  )
   stopif(
     length(unknown) > 0,
     "Restrictions refer to parameters that do not appear in the tree branch \\
@@ -725,6 +756,15 @@ print_model_details.mpt <- function(model, ...) {
       ),
       "\n"
     )
+  }
+  # the links field lists the sticks as identity because their generated
+  # formulas apply the model link; the display says which one
+  for (grp in model$other_vars$simplex) {
+    cat(glue(
+      "Simplex:    {collapse_comma(grp)} via stick-breaking; the components \\
+      {collapse_comma(model$other_vars$simplex_raw[grp[-length(grp)]])} pass \\
+      through {inv_link('x', model$other_vars$link)[[1]]}()"
+    ), "\n")
   }
   # classical parameters-versus-categories bound, not the Fisher-information
   # rank of MPTinR's check.mpt(); each tree contributes its possible categories
