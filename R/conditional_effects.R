@@ -230,7 +230,6 @@ conditional_effects.bmmfit <- function(x,
   internal_patterns <- c(
     "^LureIdx",
     "^Idx_",
-    "^Poss_",
     "^inv_ss$",
     "^Item[0-9]+_",
     "^expS$"
@@ -246,6 +245,12 @@ conditional_effects.bmmfit <- function(x,
     nt_distances <- model$other_vars$nt_distances
     escaped <- gsub("([][(){}^$*+?.|\\\\])", "\\\\\\1", nt_distances)
     internal_patterns <- c(internal_patterns, paste0("^", escaped, "$"))
+  }
+  if (length(model$other_vars$indicators$possible) > 0) {
+    internal_patterns <- c(
+      internal_patterns,
+      paste0("^", unlist(model$other_vars$indicators$possible, use.names = FALSE), "$")
+    )
   }
   
   effect_names <- names(ce_result)

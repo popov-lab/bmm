@@ -171,21 +171,46 @@
 
 # branches of each tree must sum to 1 for any parameter values; evaluating at
 # several distinct test points catches swapped-complement errors that a single
-# symmetric point (e.g. all 0.5) would miss. Returns the first deviating
-# branch sum per tree, NA where every test point sums to 1.
+# symmetric point (e.g. all 0.5) would miss. A golden-ratio sequence gives
+# every symbol its own value at every point, however many symbols there are
+# (a short cycle of values would equate symbols a fixed number of places apart)
+.mpt_test_points <- function(symbols, simplex) {
+  lapply(1:4, function(point) {
+    vals <- setNames(
+      0.05 + 0.9 * ((seq_along(symbols) * 0.6180339887 + point * 0.2718281828) %% 1),
+      symbols
+    )
+    for (grp in simplex) {
+      vals[grp] <- vals[grp] / sum(vals[grp])
+    }
+    vals
+  })
+}
+
+# all parameters near 0 and all near 1, for the range check of covariate
+# branches. These two corners catch a covariate that pushes a branch out of
+# (0, 1] when the parameters enter the branch with one orientation; branches
+# that mix a parameter with its complement can leave (0, 1] at other vertices,
+# which are not evaluated. A simplex group sits at a corner (one member takes the rest of the
+# mass), so its members stay positive and sum to 1.
+.mpt_boundary_points <- function(symbols, simplex, eps = 0.001) {
+  lapply(c(eps, 1 - eps), function(value) {
+    vals <- setNames(rep(value, length(symbols)), symbols)
+    for (grp in simplex) {
+      big <- if (value < 0.5) 1L else length(grp)
+      vals[grp] <- eps / length(grp)
+      vals[grp[big]] <- 1 - sum(vals[grp[-big]])
+    }
+    vals
+  })
+}
+
+# the first deviating branch sum per tree, NA where every test point sums to 1
 .mpt_tree_sum_deviations <- function(trees, parameters, covariates, simplex,
                                      tolerance = 1e-6) {
-  symbols <- c(parameters, covariates)
-  test_vals <- c(0.137, 0.421, 0.683, 0.852)
+  points <- .mpt_test_points(c(parameters, covariates), simplex)
   vapply(trees, function(tree) {
-    for (shift in seq_along(test_vals)) {
-      vals <- setNames(
-        test_vals[(seq_along(symbols) + shift - 2L) %% length(test_vals) + 1L],
-        symbols
-      )
-      for (grp in simplex) {
-        vals[grp] <- vals[grp] / sum(vals[grp])
-      }
+    for (vals in points) {
       total <- sum(.mpt_eval_branches(tree, as.list(vals)))
       if (abs(total - 1) > tolerance) {
         return(total)

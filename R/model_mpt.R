@@ -1093,21 +1093,31 @@ check_data.mpt <- function(model, data, formula) {
   data
 }
 
-# the construction-time branch-sum validation uses synthetic covariate values;
-# once the data are known, the sum-to-1 property is re-checked row by row with
-# the observed covariate values to catch data-preparation errors
+# the construction-time check cannot use real covariate values, so the sums are
+# re-checked per row with the observed values, at the same parameter test
+# points: a single symmetric point (all 0.5) hides swapped complements. The
+# range is also checked with all parameters near 0 and near 1. Those two
+# corners catch a covariate that pushes a branch out of (0, 1] when the
+# parameters enter the branch with one orientation (all increasing or all
+# decreasing); a branch that mixes complements of parameters is not covered.
+# brms evaluates every tree's branches on every row, so each tree's branches
+# must also be finite on the rows of the other trees.
+# Covariates themselves are not range-checked: one may be a set size entering
+# as 1/ss.
 .mpt_validate_covariate_sums <- function(model, data, tolerance = 1e-6) {
   covariates <- model$other_vars$covariates
   if (length(covariates) == 0L) {
     return(invisible(NULL))
   }
-  parameters <- names(model$parameters)
-  par_vals <- setNames(rep(0.5, length(parameters)), parameters)
-  for (grp in model$other_vars$simplex) {
-    par_vals[grp] <- 1 / length(grp)
-  }
-
+  symbols <- names(model$parameters)
+  simplex <- model$other_vars$simplex
+  interior_points <- .mpt_test_points(symbols, simplex)
+  points <- c(interior_points, .mpt_boundary_points(symbols, simplex))
   idx_vars <- model$other_vars$indicators$tree
+  # a declared covariate that no branch uses never reaches brms
+  used_covariates <- intersect(
+    covariates, unlist(lapply(model$other_vars$trees, .mpt_expr_vars))
+  )
   for (tree in model$other_vars$trees) {
     rows <- if (is.null(idx_vars)) {
       seq_len(nrow(data))
@@ -1115,17 +1125,94 @@ check_data.mpt <- function(model, data, formula) {
       which(data[[idx_vars[[tree$name]]]] == 1L)
     }
     if (length(rows) == 0L) next
-    env <- c(as.list(par_vals), as.list(data[rows, covariates, drop = FALSE]))
-    total <- Reduce(`+`, lapply(tree$branches, eval, envir = env))
-    total <- rep(total, length.out = length(rows))
-    deviates <- is.na(total) | abs(total - 1) > tolerance
-    stopif(
-      any(deviates),
-      "With the covariate values in the data, the branch probabilities of \\
-      tree '{tree$name}' do not sum to 1 for {sum(deviates)} row(s) \\
-      (first: row {rows[deviates][1]}, sum = {signif(total[deviates][1], 6)}).
-      Please check the covariate column(s): {collapse_comma(covariates)}"
-    )
+    na_covariates <- used_covariates[vapply(
+      used_covariates, function(v) anyNA(data[[v]][rows]), logical(1)
+    )]
+    if (length(na_covariates) > 0L) {
+      na_cov <- na_covariates[1]
+      na_row <- rows[is.na(data[[na_cov]][rows])][1]
+      stopif(
+        na_cov %in% .mpt_expr_vars(tree),
+        "The covariate '{na_cov}' is missing in row {na_row} of tree \\
+        '{tree$name}', so the branch probabilities of this tree cannot be \\
+        computed. Please fill in the value."
+      )
+      stop2(
+        "The covariate '{na_cov}' is missing in row {na_row} of tree \\
+        '{tree$name}', and brms would drop that row from the model. Tree \\
+        '{tree$name}' does not use '{na_cov}', so fill in a value that keeps \\
+        the branches of the other trees finite (0 works unless one of them \\
+        divides by '{na_cov}')."
+      )
+    }
+    tree_covariates <- intersect(covariates, .mpt_expr_vars(tree))
+    check_what <- if (length(tree_covariates) > 0L) {
+      paste0(
+        "the branch expressions of this tree and the covariate column(s): ",
+        collapse_comma(tree_covariates)
+      )
+    } else {
+      "the branch expressions of this tree, which uses no covariate"
+    }
+    for (point in seq_along(points)) {
+      env <- c(
+        as.list(points[[point]]), as.list(data[, covariates, drop = FALSE])
+      )
+      all_branches <- lapply(tree$branches, function(branch) {
+        rep(eval(branch, envir = env), length.out = nrow(data))
+      })
+      branches <- lapply(all_branches, `[`, rows)
+      total <- Reduce(`+`, branches)
+      deviates <- is.na(total) | abs(total - 1) > tolerance
+      stopif(
+        any(deviates),
+        "With the covariate values in the data, the branch probabilities of \\
+        tree '{tree$name}' do not sum to 1 for {sum(deviates)} row(s) \\
+        (first: row {rows[deviates][1]}, sum = {signif(total[deviates][1], 6)}) \\
+        at the test parameter values. Please check {check_what}"
+      )
+      undefined <- lapply(all_branches, function(b) {
+        setdiff(which(is.infinite(b) | is.nan(b)), rows)
+      })
+      resp_cat <- names(which(lengths(undefined) > 0L))[1]
+      if (!is.na(resp_cat)) {
+        row <- undefined[[resp_cat]][1]
+        row_tree <- names(idx_vars)[vapply(
+          idx_vars, function(v) data[[v]][row] == 1L, logical(1)
+        )][1]
+        stop2(
+          "With the covariate values in the data, the branch probability of \\
+          category '{resp_cat}' in tree '{tree$name}' is not finite in row \\
+          {row}. That row belongs to tree '{row_tree}', whose covariate \\
+          value makes this branch undefined, and brms evaluates \\
+          every tree's branches on every row. Please check {check_what}"
+        )
+      }
+      # branches that sum to 1 can still be negative or above 1 (e.g. G = 1.2);
+      # near the boundary a valid branch may underflow to exactly 0
+      out_of_range <- lapply(branches, function(b) {
+        which(
+          (if (point <= length(interior_points)) b <= 0 else b < 0) |
+            b > 1 + tolerance
+        )
+      })
+      resp_cat <- names(which(lengths(out_of_range) > 0L))[1]
+      if (!is.na(resp_cat)) {
+        row <- out_of_range[[resp_cat]][1]
+        value <- signif(branches[[resp_cat]][row], 6)
+        zero_hint <- if (value == 0) {
+          " A branch that is exactly 0 belongs in mpt_tree(impossible = )."
+        } else {
+          ""
+        }
+        stop2(
+          "With the covariate values in the data, the branch probability of \\
+          category '{resp_cat}' in tree '{tree$name}' is {value} in row \\
+          {rows[row]}, outside (0, 1] at the test parameter values. Please \\
+          check {check_what}.{zero_hint}"
+        )
+      }
+    }
   }
   invisible(NULL)
 }
