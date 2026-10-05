@@ -264,7 +264,8 @@ check_model.m3_custom <- function(model, data = NULL, formula = NULL) {
       length(no_formula) > 0,
       "{collapse_comma(no_formula)} in your activation formula(s) is neither a \\
       data column nor a model parameter. Give each new parameter its own \\
-      formula (e.g. {no_formula[1]} ~ 1), or add the column to the data."
+      formula (e.g. {no_formula[1]} ~ 1), or add the column to the data (`Y` is \\
+      reserved and cannot be a data column)."
     )
     model$parameters <- c(model$parameters, setNames(user_pars, user_pars))
   }

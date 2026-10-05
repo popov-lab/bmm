@@ -419,7 +419,7 @@ test_that("m3_custom linear activations can use nTrials and Idx_ columns (#495)"
     expect_true("C_dist_1" %in% names(brms::standata(fit)))
   }
   # Y is a matrix column, and as a predictor it breaks the Stan code
-  expect_error(fit_with(dist ~ b + Y), "'Y' in your activation formula")
+  expect_error(fit_with(dist ~ b + Y), "'Y' in your activation formula.*`Y` is reserved")
 })
 
 test_that("m3 with numerical vector as num_options containing 0 returns error", {
