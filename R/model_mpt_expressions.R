@@ -171,21 +171,27 @@
 
 # branches of each tree must sum to 1 for any parameter values; evaluating at
 # several distinct test points catches swapped-complement errors that a single
-# symmetric point (e.g. all 0.5) would miss. Returns the first deviating
-# branch sum per tree, NA where every test point sums to 1.
+# symmetric point (e.g. all 0.5) would miss
+.mpt_test_points <- function(symbols, simplex) {
+  test_vals <- c(0.137, 0.421, 0.683, 0.852)
+  lapply(seq_along(test_vals), function(shift) {
+    vals <- setNames(
+      test_vals[(seq_along(symbols) + shift - 2L) %% length(test_vals) + 1L],
+      symbols
+    )
+    for (grp in simplex) {
+      vals[grp] <- vals[grp] / sum(vals[grp])
+    }
+    vals
+  })
+}
+
+# the first deviating branch sum per tree, NA where every test point sums to 1
 .mpt_tree_sum_deviations <- function(trees, parameters, covariates, simplex,
                                      tolerance = 1e-6) {
-  symbols <- c(parameters, covariates)
-  test_vals <- c(0.137, 0.421, 0.683, 0.852)
+  points <- .mpt_test_points(c(parameters, covariates), simplex)
   vapply(trees, function(tree) {
-    for (shift in seq_along(test_vals)) {
-      vals <- setNames(
-        test_vals[(seq_along(symbols) + shift - 2L) %% length(test_vals) + 1L],
-        symbols
-      )
-      for (grp in simplex) {
-        vals[grp] <- vals[grp] / sum(vals[grp])
-      }
+    for (vals in points) {
       total <- sum(.mpt_eval_branches(tree, as.list(vals)))
       if (abs(total - 1) > tolerance) {
         return(total)

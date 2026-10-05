@@ -1093,20 +1093,15 @@ check_data.mpt <- function(model, data, formula) {
   data
 }
 
-# the construction-time branch-sum validation uses synthetic covariate values;
-# once the data are known, the sum-to-1 property is re-checked row by row with
-# the observed covariate values to catch data-preparation errors
+# the construction-time check cannot use real covariate values, so the sums are
+# re-checked per row with the observed values, at the same parameter test
+# points: a single symmetric point (all 0.5) hides swapped complements
 .mpt_validate_covariate_sums <- function(model, data, tolerance = 1e-6) {
   covariates <- model$other_vars$covariates
   if (length(covariates) == 0L) {
     return(invisible(NULL))
   }
-  parameters <- names(model$parameters)
-  par_vals <- setNames(rep(0.5, length(parameters)), parameters)
-  for (grp in model$other_vars$simplex) {
-    par_vals[grp] <- 1 / length(grp)
-  }
-
+  points <- .mpt_test_points(names(model$parameters), model$other_vars$simplex)
   idx_vars <- model$other_vars$indicators$tree
   for (tree in model$other_vars$trees) {
     rows <- if (is.null(idx_vars)) {
@@ -1115,17 +1110,53 @@ check_data.mpt <- function(model, data, formula) {
       which(data[[idx_vars[[tree$name]]]] == 1L)
     }
     if (length(rows) == 0L) next
-    env <- c(as.list(par_vals), as.list(data[rows, covariates, drop = FALSE]))
-    total <- Reduce(`+`, lapply(tree$branches, eval, envir = env))
-    total <- rep(total, length.out = length(rows))
-    deviates <- is.na(total) | abs(total - 1) > tolerance
-    stopif(
-      any(deviates),
-      "With the covariate values in the data, the branch probabilities of \\
-      tree '{tree$name}' do not sum to 1 for {sum(deviates)} row(s) \\
-      (first: row {rows[deviates][1]}, sum = {signif(total[deviates][1], 6)}).
-      Please check the covariate column(s): {collapse_comma(covariates)}"
-    )
+    for (par_vals in points) {
+      env <- c(as.list(par_vals), as.list(data[rows, covariates, drop = FALSE]))
+      branches <- lapply(tree$branches, function(branch) {
+        rep(eval(branch, envir = env), length.out = length(rows))
+      })
+      total <- Reduce(`+`, branches)
+      deviates <- is.na(total) | abs(total - 1) > tolerance
+      stopif(
+        any(deviates),
+        "With the covariate values in the data, the branch probabilities of \\
+        tree '{tree$name}' do not sum to 1 for {sum(deviates)} row(s) \\
+        (first: row {rows[deviates][1]}, sum = {signif(total[deviates][1], 6)}).
+        Please check the branch expressions of this tree and the covariate \\
+        column(s): {collapse_comma(covariates)}"
+      )
+      # branches that sum to 1 can still be negative or above 1 (e.g. G = 1.2)
+      out_of_range <- lapply(branches, function(b) which(b <= 0 | b > 1 + tolerance))
+      resp_cat <- names(which(lengths(out_of_range) > 0L))[1]
+      if (!is.na(resp_cat)) {
+        row <- out_of_range[[resp_cat]][1]
+        value <- signif(branches[[resp_cat]][row], 6)
+        zero_hint <- if (value == 0) {
+          "A branch that is exactly 0 belongs in mpt_tree(impossible = )."
+        } else {
+          ""
+        }
+        stop2(
+          "With the covariate values in the data, the branch probability of \\
+          category '{resp_cat}' in tree '{tree$name}' is {value} in row \\
+          {rows[row]}, outside (0, 1]. Please check the covariate column(s): \\
+          {collapse_comma(covariates)}. {zero_hint}"
+        )
+      }
+    }
+    na_covariates <- covariates[vapply(
+      covariates, function(v) anyNA(data[[v]][rows]), logical(1)
+    )]
+    if (length(na_covariates) > 0L) {
+      na_cov <- na_covariates[1]
+      na_row <- rows[is.na(data[[na_cov]][rows])][1]
+      stop2(
+        "The covariate '{na_cov}' is missing in row {na_row} of tree \\
+        '{tree$name}', and brms would drop that row from the model. Tree \\
+        '{tree$name}' does not use '{na_cov}', so any finite value (e.g. 0) \\
+        can be filled in."
+      )
+    }
   }
   invisible(NULL)
 }
