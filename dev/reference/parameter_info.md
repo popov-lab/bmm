@@ -33,8 +33,10 @@ parameter_info(x, ...)
 - formula:
 
   An optional `bmmformula` object. Only relevant for M3 custom models,
-  where additional parameters are discovered from the formula. Ignored
-  for all other models.
+  where additional parameters are discovered from the formula. Only
+  activation symbols that have their own formula are listed; without
+  data, any other symbol is read as a data column. Ignored for all other
+  models.
 
 ## Value
 

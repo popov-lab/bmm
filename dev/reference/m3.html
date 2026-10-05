@@ -199,6 +199,19 @@ on the differences of these choice rules please see the appendix of Oberauer &am
 <li><p><strong>Default priors:</strong></p></li>
 </ul></div>
 
+<div class="section">
+<h3 id="missing-values-and-reserved-names">Missing values and reserved names<a class="anchor" aria-label="anchor" href="#missing-values-and-reserved-names"></a></h3>
+
+
+<p>A missing response count (<code>NA</code>) is counted as 0. If the category has options in that
+row, <code><a href="bmm.html">bmm()</a></code> warns and says how many counts were replaced; if it has none (<code>num_options</code>
+is 0 in that row), the 0 is true and there is no warning, as for <code>dist</code> in
+<a href="oberauer_lewandowsky_2019_e1.html">oberauer_lewandowsky_2019_e1</a>. A missing value in a column named in <code>num_options</code> is
+an error: enter 0 where there were no options. Data columns named <code>Y</code>, <code>nTrials</code> or
+<code>Idx_&lt;category&gt;</code> are refused because <code><a href="bmm.html">bmm()</a></code> creates columns with these names; response
+categories may be called <code>Y</code> or <code>nTrials</code>.</p>
+</div>
+
     </div>
 
     <div class="section level2">

@@ -606,11 +606,9 @@
   fitted with only an intercept, announced only by the message *“No
   formula for parameter c provided”*. Scripts that relied on this now
   fail; add the missing formula, e.g. `c ~ 1`. Numeric `num_options` can
-  be used by name, `n_opt_<category>` unless you named them. Earlier
-  fits are not affected:
-  [`update()`](https://rdrr.io/r/stats/update.html),
-  [`summary()`](https://rdrr.io/r/base/summary.html) and other methods
-  keep working on them
+  be used by name, `n_opt_<category>` unless you named them, and
+  `nTrials` and `Idx_<category>` work in non-linear activations. Earlier
+  fits are unaffected
   ([\#495](https://github.com/popov-lab/bmm/issues/495)).
 - **m3** now warns when a response count is missing (`NA`) in a row
   where its category has options, and says how many were counted as 0.
