@@ -188,8 +188,10 @@
 }
 
 # all parameters near 0 and all near 1, for the range check of covariate
-# branches: a branch that is linear in a parameter leaves (0, 1] at a vertex
-# first. A simplex group sits at a corner (one member takes the rest of the
+# branches. These two corners catch a covariate that pushes a branch out of
+# (0, 1] when the parameters enter the branch with one orientation; branches
+# that mix a parameter with its complement can leave (0, 1] at other vertices,
+# which are not evaluated. A simplex group sits at a corner (one member takes the rest of the
 # mass), so its members stay positive and sum to 1.
 .mpt_boundary_points <- function(symbols, simplex, eps = 0.001) {
   lapply(c(eps, 1 - eps), function(value) {
