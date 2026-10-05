@@ -72,6 +72,7 @@ test_that("restriction constants must be strictly between 0 and 1", {
   expect_error(.mpt_parse_restrictions("g = 1.5"), "strictly between 0 and 1")
   expect_error(.mpt_parse_restrictions("g = -0.2"), "strictly between 0 and 1")
   expect_error(.mpt_parse_restrictions("g = 0"), "strictly between 0 and 1")
+  expect_error(.mpt_parse_restrictions("g = 0"), "mpt_tree(impossible = )", fixed = TRUE)
   expect_error(.mpt_parse_restrictions("g = 1"), "strictly between 0 and 1")
   expect_error(.mpt_parse_restrictions(list(g = 1)), "strictly between")
   expect_equal(.mpt_parse_restrictions("g = 0.5"), list(g = 0.5))

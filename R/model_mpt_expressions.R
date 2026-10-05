@@ -137,8 +137,10 @@
     stopif(
       value <= 0 || value >= 1,
       "The restriction '{text}' fixes a parameter to {value}. Restriction \\
-      constants must be probabilities strictly between 0 and 1: 0 or 1 makes \\
-      a branch impossible, which this version does not support."
+      constants must be probabilities strictly between 0 and 1: 0 or 1 turns \\
+      a branch into the constant 0. Leave such branches out of the tree \\
+      expressions, and declare a category no branch reaches with \\
+      mpt_tree(impossible = )."
     )
     return(value)
   }
