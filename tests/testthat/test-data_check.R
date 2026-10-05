@@ -140,6 +140,20 @@ test_that("bmm_data_check flags formula predictors missing from the data", {
   expect_true(any(grepl("neither columns", finding_messages(res))))
 })
 
+test_that("bmm_data_check does not flag the columns m3 adds to the data (#495)", {
+  res <- bmm_data_check(
+    bmf(
+      corr ~ b + a + c, other ~ b + a, npl ~ b, c ~ 1, a ~ 1,
+      dist ~ b + n_opt_dist + nTrials + Idx_dist
+    ),
+    oberauer_lewandowsky_2019_e1,
+    m3(c("corr", "other", "dist", "npl"), c(1, 4, 5, 5), links = list(c = "log", a = "log"))
+  )
+  expect_null(res$pipeline$error)
+  expect_length(res$predictors$unknown_vars, 0)
+  expect_false(any(grepl("neither columns", finding_messages(res))))
+})
+
 test_that("data_check_findings returns an empty list for models without methods", {
   expect_identical(
     data_check_findings(

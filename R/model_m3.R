@@ -140,6 +140,8 @@ settable_link_functions.m3 <- function(model) {
 #'   the order of `resp_cats`, and other names become the names of the columns
 #'   bmm adds to the data. Column names given category names, e.g.
 #'   `c(other = "n_other", corr = "n_corr")`, are matched by name as well, in any order.
+#'   Custom activation formulas can use numbers by these column names; numbers
+#'   without names or named after the categories are called `n_opt_<category>`.
 #' @param choice_rule The choice rule that should be used for the M3. The options are "softmax"
 #'   or "simple". The "softmax" option implements the softmax normalization of activation into
 #'   probabilities for choosing the different response categories. The "simple" option implements
@@ -251,20 +253,10 @@ m3 <- function(resp_cats, num_options, choice_rule = "softmax",
 #' @export
 check_model.m3_custom <- function(model, data = NULL, formula = NULL) {
   if (!is.null(formula)) {
-    # brms fits every activation as non-linear, also one that is_nl() calls
-    # linear because no other formula parameter appears in it
-    user_pars <- union(
-      rhs_vars(formula[is_nl(formula)]),
-      rhs_vars(formula[intersect(model$resp_vars$resp_cats, names(formula))])
+    user_pars <- setdiff(
+      m3_activation_symbols(model, formula),
+      c(colnames(data), built_data_columns(model))
     )
-    user_pars <- setdiff(user_pars, names(formula[is_nl(formula)]))
-    user_pars <- setdiff(user_pars, names(model$parameters))
-    user_pars <- setdiff(user_pars, colnames(data))
-    # check_data() stores numeric option counts as data columns under these
-    # names, so formulas can use them although the data lacks them here
-    if (is.numeric(model$other_vars$num_options)) {
-      user_pars <- setdiff(user_pars, names(m3_num_options(model)))
-    }
     # a symbol without its own formula is more often a typo or a missing column
     # than a new parameter, and as a parameter it would be fitted silently
     no_formula <- setdiff(user_pars, names(formula))
@@ -318,6 +310,18 @@ check_model.m3_custom <- function(model, data = NULL, formula = NULL) {
   NextMethod("check_model")
 }
 
+# Candidates for the parameters a custom m3 adds: symbols in the activation
+# and non-linear formulas that the model does not define already. brms fits
+# every activation as non-linear, also one that is_nl() calls linear because
+# no other formula parameter appears in it
+m3_activation_symbols <- function(model, formula) {
+  symbols <- union(
+    rhs_vars(formula[is_nl(formula)]),
+    rhs_vars(formula[intersect(model$resp_vars$resp_cats, names(formula))])
+  )
+  setdiff(symbols, c(names(formula[is_nl(formula)]), names(model$parameters)))
+}
+
 ############################################################################# !
 # CHECK_data S3 methods                                                  ####
 ############################################################################# !
@@ -337,6 +341,17 @@ m3_num_options <- function(model) {
   num_options <- num_options[resp_cats]
   if (is.numeric(num_options)) names(num_options) <- paste0("n_opt_", resp_cats)
   num_options
+}
+
+# Y is left out: as a matrix column it breaks the Stan code as a predictor
+#' @exportS3Method
+built_data_columns.m3 <- function(model) {
+  num_options <- m3_num_options(model)
+  c(
+    if (is.numeric(num_options)) names(num_options),
+    "nTrials", paste0("Idx_", model$resp_vars$resp_cats),
+    NextMethod("built_data_columns")
+  )
 }
 
 #' @export

@@ -391,14 +391,35 @@ test_that("m3_custom activations can use numeric num_options by their names (#49
   from_columns <- fit_with("n_dist", c("n_corr", "n_other", "n_dist", "n_npl"))
   unnamed <- fit_with("n_opt_dist", counts)
   user_named <- fit_with("k3", setNames(counts, c("k1", "k2", "k3", "k4")))
+  category_named <- fit_with("n_opt_dist", setNames(counts, cats))
   expect_equal(brms::standata(unnamed), brms::standata(from_columns))
   expect_equal(brms::standata(user_named), brms::standata(from_columns))
+  expect_equal(brms::standata(category_named), brms::standata(from_columns))
   expect_named(unnamed$bmm$model$parameters, c("b", "c", "a", "d"), ignore.order = TRUE)
 
   expect_error(
     fit_with("n_opt_dist", c("n_corr", "n_other", "n_dist", "n_npl")),
     "'n_opt_dist' in your activation formula\\(s\\) is neither a data column nor a model parameter"
   )
+})
+
+test_that("m3_custom linear activations can use nTrials and Idx_ columns (#495)", {
+  fit_with <- function(activation) {
+    suppressWarnings(bmm(
+      bmf(corr ~ b + a + c, other ~ b + a, npl ~ b, c ~ 1, a ~ 1) + bmf(activation),
+      oberauer_lewandowsky_2019_e1,
+      m3(c("corr", "other", "dist", "npl"), c(1, 4, 5, 5), links = list(c = "log", a = "log")),
+      backend = "mock", mock_fit = 1, rename = FALSE
+    ))
+  }
+
+  for (activation in c(dist ~ b + nTrials, dist ~ b + Idx_dist)) {
+    fit <- fit_with(activation)
+    expect_named(fit$bmm$model$parameters, c("b", "c", "a"), ignore.order = TRUE)
+    expect_true("C_dist_1" %in% names(brms::standata(fit)))
+  }
+  # Y is a matrix column, and as a predictor it breaks the Stan code
+  expect_error(fit_with(dist ~ b + Y), "'Y' in your activation formula")
 })
 
 test_that("m3 with numerical vector as num_options containing 0 returns error", {
