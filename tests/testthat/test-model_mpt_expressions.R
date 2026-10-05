@@ -43,9 +43,48 @@ test_that("mpt errors when branch probabilities do not sum to 1", {
   deviations <- .mpt_tree_sum_deviations(
     list(t = bad_tree, u = good_tree), c("D", "g")
   )
-  # the branches reduce to g, which takes the second test value first
-  expect_equal(deviations[["t"]], 0.421)
+  # the branches reduce to g, so the first test point reports g's value there
+  expect_equal(
+    deviations[["t"]], .mpt_test_points(c("D", "g"))[[1]][["g"]]
+  )
   expect_true(is.na(deviations[["u"]]))
+})
+
+test_that("test points give every symbol its own interior value at every point", {
+  for (n in c(2, 4, 5, 8, 12, 30)) {
+    symbols <- paste0("p", seq_len(n))
+    points <- .mpt_test_points(symbols)
+    expect_length(points, 4)
+    for (vals in points) {
+      expect_named(vals, symbols)
+      expect_true(all(vals > 0 & vals < 1))
+      expect_equal(anyDuplicated(round(vals, 6)), 0L)
+    }
+    expect_equal(anyDuplicated(round(unlist(lapply(points, `[[`, 1)), 6)), 0L)
+  }
+})
+
+test_that("a typo between parameters four places apart in the symbol order is caught", {
+  # a short cycle of test values would give the first and the fifth parameter
+  # the same value at every point, so (1 - A) * (1 - A) would pass for
+  # (1 - A) * (1 - F)
+  branches <- list(
+    r1 = "A * B", r2 = "A * (1 - B) * C", r3 = "A * (1 - B) * (1 - C) * E",
+    r4 = "A * (1 - B) * (1 - C) * (1 - E)", r5 = "(1 - A) * F"
+  )
+  good <- mpt_tree("main", c(branches, r6 = "(1 - A) * (1 - F)"))
+  typo <- mpt_tree("main", c(branches, r6 = "(1 - A) * (1 - A)"))
+  expect_no_error(mpt(good))
+  expect_error(mpt(typo), "sum to")
+})
+
+test_that("a tree that sums to 1 at only one test point is still caught", {
+  at_first <- sprintf("%.8f", .mpt_test_points("D")[[1]][["D"]])
+  tree <- mpt_tree("t", list(a = "D", b = glue("1 - D + (D - {at_first})")))
+  expect_true(abs(
+    sum(.mpt_eval_branches(tree, as.list(.mpt_test_points("D")[[1]]))) - 1
+  ) < 1e-6)
+  expect_error(mpt(tree), "sum to")
 })
 
 test_that("constants that Stan would receive in scientific notation error", {
