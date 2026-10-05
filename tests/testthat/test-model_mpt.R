@@ -160,6 +160,12 @@ test_that("mpt validates simplex groups", {
     mpt(trees, tree_id = "item_type", simplex = "g"),
     "at least two parameters"
   )
+  three <- mpt_tree("t", list(A = "a", B = "b", C = "c"))
+  expect_error(
+    mpt(three, simplex = c("a", "b", "c"), restrictions = "a = b"),
+    "'a' are also restricted, and the restriction removed them"
+  )
+  expect_error(mpt(three), "belong in the simplex argument")
 })
 
 test_that("the links of simplex parameters cannot be changed", {
@@ -507,6 +513,11 @@ test_that("printing an mpt model lists trees, restrictions and the identifiabili
     simplex = c("gA", "gB", "gC")
   )
   expect_output(print(simplex), "2 free parameter\\(s\\), 2 degrees of freedom")
+  expect_output(print(simplex), "'gAraw', 'gBraw' pass through inv_logit\\(\\)")
+  expect_match(
+    parameter_info(simplex)$description[4],
+    "transformed by the inverse logit into the stick proportion"
+  )
 })
 
 test_that("restrictions are substituted into the trees before parameters are identified", {
@@ -536,7 +547,26 @@ test_that("restrictions are substituted into the trees before parameters are ide
     expect_true(all(is.na(deviations)))
   }
   one_symbol <- mpt_tree("t", list(A = "a", B = "(1 - a) * b", C = "(1 - a) * (1 - b)"))
-  expect_error(mpt(one_symbol, restrictions = "a = 0"), "'A' in tree 't'")
+  expect_error(mpt(one_symbol, restrictions = "a = 0"), "strictly between 0 and 1")
+  for (r in c("g = 1.5", "g = -0.2", "g = 1")) {
+    expect_error(mpt(trees, tree_id = "item_type", restrictions = r), "strictly between 0 and 1")
+  }
+  expect_error(
+    mpt(trees, tree_id = "item_type", restrictions = list(g = 1)),
+    "strictly between 0 and 1"
+  )
+  expect_equal(
+    mpt(trees, tree_id = "item_type", restrictions = list("Dn = Do", "g = 0.5"))$other_vars$trees,
+    mpt(trees, tree_id = "item_type", restrictions = c("Dn = Do", "g = 0.5"))$other_vars$trees
+  )
+  expect_error(
+    mpt(mpt_tree("t", list(A = "a", B = "1 - a")), restrictions = "a = 0.3"),
+    "no latent parameters"
+  )
+  expect_error(
+    mpt(trees, tree_id = "item_type", restrictions = "Do = Dn = FE"),
+    "person effects.*random effects"
+  )
 
   expect_error(
     mpt(trees, tree_id = "item_type", restrictions = "Do > Dn"),
@@ -643,12 +673,27 @@ test_that("mpt compiles with a simplex group via stick-breaking", {
   gAraw_rhs <- paste(deparse(formula_checked$gAraw[[3]]), collapse = " ")
   expect_true(grepl("(1 | id)", gAraw_rhs, fixed = TRUE))
 
-  expect_warning(
+  expect_no_warning(
     suppressMessages(bmm(
       formula, dat, model,
       backend = "mock", mock_fit = 1, rename = FALSE
     )),
-    "Non-linear transformations"
+    message = "Non-linear"
+  )
+})
+
+test_that("stick-breaking members form a simplex for any raw values", {
+  tree <- mpt_tree("t", list(A = "gA", B = "gB", C = "gC", D = "gD"))
+  model <- mpt(tree, simplex = c("gA", "gB", "gC", "gD"))
+  dat <- data.frame(A = 5, B = 5, C = 5, D = 5)
+  formula <- suppressMessages(check_formula(model, dat, bmf(gA ~ 1, gB ~ 1, gC ~ 1)))
+  raw <- list(gAraw = 1.3, gBraw = -0.4, gCraw = 0.7)
+  env <- list2env(c(raw, list(inv_logit = stats::plogis)))
+  for (par in c("gA", "gB", "gC", "gD")) assign(par, eval(formula[[par]][[3]], env), env)
+  s <- unname(stats::plogis(unlist(raw)))
+  expect_equal(
+    unlist(mget(c("gA", "gB", "gC", "gD"), env), use.names = FALSE),
+    c(s[1], (1 - s[1]) * s[2], (1 - s[1]) * (1 - s[2]) * s[3], prod(1 - s))
   )
 })
 
@@ -805,12 +850,12 @@ test_that("mpt supports multiple simplex groups", {
 
   dat <- data.frame(id = factor(1:8), A = 10, B = 10, C = 10)
   formula <- bmf(m ~ 1, gA ~ 1, gB ~ 1, hA ~ 1, hB ~ 1)
-  expect_warning(
+  expect_no_warning(
     suppressMessages(bmm(
       formula, dat, model,
       backend = "mock", mock_fit = 1, rename = FALSE
     )),
-    "Non-linear transformations"
+    message = "Non-linear"
   )
 })
 

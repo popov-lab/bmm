@@ -54,7 +54,29 @@ test_that("restrictions parse from MPTinR strings and named lists alike", {
   expect_error(.mpt_parse_restrictions("Do = Dn * 2"), "does neither")
   expect_error(.mpt_parse_restrictions("Do"), "form")
   expect_error(.mpt_parse_restrictions("Do = "), "parse")
-  expect_error(.mpt_parse_restrictions(list("Do")), "named")
+  expect_error(.mpt_parse_restrictions(list("Do")), "the form")
+})
+
+test_that("an unnamed list of restrictions parses like the character vector", {
+  expect_equal(
+    .mpt_parse_restrictions(list("Dn = Do", "g = 0.5")),
+    .mpt_parse_restrictions(c("Dn = Do", "g = 0.5"))
+  )
+  expect_equal(
+    .mpt_parse_restrictions(list("Dn = Do", "g = 0.5")),
+    list(Dn = quote(Do), g = 0.5)
+  )
+})
+
+test_that("restriction constants must be strictly between 0 and 1", {
+  expect_error(.mpt_parse_restrictions("g = 1.5"), "strictly between 0 and 1")
+  expect_error(.mpt_parse_restrictions("g = -0.2"), "strictly between 0 and 1")
+  expect_error(.mpt_parse_restrictions("g = 0"), "strictly between 0 and 1")
+  expect_error(.mpt_parse_restrictions("g = 0"), "mpt_tree(impossible = )", fixed = TRUE)
+  expect_error(.mpt_parse_restrictions("g = 1"), "strictly between 0 and 1")
+  expect_error(.mpt_parse_restrictions(list(g = 1)), "strictly between")
+  expect_equal(.mpt_parse_restrictions("g = 0.5"), list(g = 0.5))
+  expect_equal(.mpt_parse_restrictions("g = 1/4"), list(g = 0.25))
 })
 
 test_that("restriction chains resolve to their final target", {
