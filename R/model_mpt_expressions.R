@@ -171,16 +171,33 @@
 
 # branches of each tree must sum to 1 for any parameter values; evaluating at
 # several distinct test points catches swapped-complement errors that a single
-# symmetric point (e.g. all 0.5) would miss
+# symmetric point (e.g. all 0.5) would miss. A golden-ratio sequence gives
+# every symbol its own value at every point, however many symbols there are
+# (a short cycle of values would equate symbols a fixed number of places apart)
 .mpt_test_points <- function(symbols, simplex) {
-  test_vals <- c(0.137, 0.421, 0.683, 0.852)
-  lapply(seq_along(test_vals), function(shift) {
+  lapply(1:4, function(point) {
     vals <- setNames(
-      test_vals[(seq_along(symbols) + shift - 2L) %% length(test_vals) + 1L],
+      0.05 + 0.9 * ((seq_along(symbols) * 0.6180339887 + point * 0.2718281828) %% 1),
       symbols
     )
     for (grp in simplex) {
       vals[grp] <- vals[grp] / sum(vals[grp])
+    }
+    vals
+  })
+}
+
+# all parameters near 0 and all near 1, for the range check of covariate
+# branches: a branch that is linear in a parameter leaves (0, 1] at a vertex
+# first. A simplex group sits at a corner (one member takes the rest of the
+# mass), so its members stay positive and sum to 1.
+.mpt_boundary_points <- function(symbols, simplex, eps = 0.001) {
+  lapply(c(eps, 1 - eps), function(value) {
+    vals <- setNames(rep(value, length(symbols)), symbols)
+    for (grp in simplex) {
+      big <- if (value < 0.5) 1L else length(grp)
+      vals[grp] <- eps / length(grp)
+      vals[grp[big]] <- 1 - sum(vals[grp[-big]])
     }
     vals
   })

@@ -247,8 +247,10 @@ conditional_effects.bmmfit <- function(x,
     internal_patterns <- c(internal_patterns, paste0("^", escaped, "$"))
   }
   if (length(model$other_vars$indicators$possible) > 0) {
-    generated <- unlist(model$other_vars$indicators$possible, use.names = FALSE)
-    internal_patterns <- c(internal_patterns, paste0("^", generated, "$"))
+    internal_patterns <- c(
+      internal_patterns,
+      paste0("^", unlist(model$other_vars$indicators$possible, use.names = FALSE), "$")
+    )
   }
   
   effect_names <- names(ce_result)

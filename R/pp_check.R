@@ -400,8 +400,10 @@ pp_check.bmmfit <- function(object, type = NULL, ndraws = NULL,
   is_matrix <- vapply(pred_cols, function(col) is.matrix(data[[col]]), logical(1))
   pred_cols <- pred_cols[!is_matrix]
 
-  generated <- unlist(model$other_vars$indicators$possible, use.names = FALSE)
-  pred_cols <- pred_cols[!grepl("^(Idx_|n_)", pred_cols) & !pred_cols %in% generated]
+  pred_cols <- pred_cols[
+    !grepl("^(Idx_|n_)", pred_cols) &
+      !pred_cols %in% unlist(model$other_vars$indicators$possible, use.names = FALSE)
+  ]
 
   pred_cols
 }

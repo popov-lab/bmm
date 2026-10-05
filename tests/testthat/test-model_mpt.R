@@ -1073,7 +1073,7 @@ test_that("check_data validates branch sums with observed covariate values", {
   dat_na$Gcorr[c(2, 5)] <- NA
   expect_error(
     check_data(model, dat_na, bmf(D ~ 1)),
-    "do not sum to 1 for 2 row"
+    "'Gcorr' is missing in row 2 of tree 'main'.*cannot be computed"
   )
 
   # swapped complements agree at the symmetric point D = 0.5, so the branch
@@ -1097,12 +1097,28 @@ test_that("check_data rejects covariate values that push a branch outside (0, 1]
   dat <- data.frame(G = c(0.25, 0.5, 0.75), correct = 10, incorrect = 30)
   expect_silent(check_data(model, dat, bmf(D ~ 1)))
 
+  expect_silent(check_data(model, transform(dat, G = 0), bmf(D ~ 1)))
+
   dat_over <- dat
   dat_over$G[2] <- 1.2
   expect_error(
     check_data(model, dat_over, bmf(D ~ 1)),
     "'correct' in tree 'main' is [0-9.]+ in row 2, outside \\(0, 1\\]"
   )
+  # no trailing blank when there is no hint about impossible categories
+  expect_error(check_data(model, dat_over, bmf(D ~ 1)), "column\\(s\\): 'G'\\.$")
+
+  # the branch D + (1 - D) * G is negative only for small D, below every
+  # interior test point, so a slightly negative covariate needs the
+  # near-boundary points
+  for (g in c(-0.05, -0.1)) {
+    dat_neg <- dat
+    dat_neg$G[1] <- g
+    expect_error(
+      check_data(model, dat_neg, bmf(D ~ 1)),
+      "'correct' in tree 'main' is -[0-9.]+ in row 1, outside \\(0, 1\\]"
+    )
+  }
 
   # a branch of exactly 0 is a structurally impossible category
   dat_one <- dat
@@ -1119,6 +1135,23 @@ test_that("check_data rejects covariate values that push a branch outside (0, 1]
   expect_error(
     check_data(zero_int, dat_int, bmf(D ~ 1)),
     "'hit' in tree 'main' is 0 in row 2"
+  )
+})
+
+test_that("the near-boundary points accept valid simplex trees with covariates", {
+  tree <- mpt_tree("main", list(
+    hit = "G * D + (1 - G * D) * gA",
+    other = "(1 - G * D) * gB",
+    miss = "(1 - G * D) * gC"
+  ))
+  model <- suppressWarnings(mpt(
+    tree, covariates = "G", simplex = c("gA", "gB", "gC")
+  ))
+  dat <- data.frame(G = c(0.2, 0.5, 0.9), hit = 10, other = 10, miss = 10)
+  expect_silent(check_data(model, dat, bmf(D ~ 1, gA ~ 1, gB ~ 1)))
+  expect_error(
+    check_data(model, transform(dat, G = c(0.2, -0.1, 0.9)), bmf(D ~ 1, gA ~ 1, gB ~ 1)),
+    "in row 2, outside \\(0, 1\\]"
   )
 })
 
@@ -1147,13 +1180,43 @@ test_that("an NA covariate in a tree that does not use it is an error, not a dro
     glue::glue("'Gd' is missing in row {first_row} of tree 'nodist'")
   )
 
-  # in a tree that uses the covariate, the sum check reports it first
+  # in a tree that uses the covariate, the branches cannot be computed
   dat_used <- dat
   dat_used$Gd[dat_used$tree == "withdist"][1] <- NA
+  first_used <- which(dat_used$tree == "withdist")[1]
   expect_error(
     check_data(model, dat_used, bmf(Pm ~ 1, Pb ~ 1)),
-    "do not sum to 1 for 1 row"
+    glue::glue("'Gd' is missing in row {first_used} of tree 'withdist'.*cannot be computed")
   )
+})
+
+test_that("an NA in a declared covariate that no branch uses keeps every row", {
+  model <- suppressWarnings(mpt(mpt_tree("main", list(
+    correct = "D + (1 - D) * G", incorrect = "(1 - D) * (1 - G)"
+  )), covariates = c("G", "H")))
+  dat <- data.frame(G = 0.25, H = c(NA, 1, 2, NA), correct = 10, incorrect = 30)
+  expect_silent(checked <- check_data(model, dat, bmf(D ~ 1)))
+  expect_equal(nrow(checked), nrow(dat))
+})
+
+test_that("check_data catches a typo between parameters four places apart", {
+  branches <- list(
+    r1 = "A * B", r2 = "A * (1 - B) * C", r3 = "A * (1 - B) * (1 - C) * E",
+    r4 = "A * (1 - B) * (1 - C) * (1 - E) * G",
+    r5 = "A * (1 - B) * (1 - C) * (1 - E) * (1 - G) + (1 - A) * F"
+  )
+  dat <- data.frame(G = c(0.2, 0.6), r1 = 5, r2 = 5, r3 = 5, r4 = 5, r5 = 5, r6 = 5)
+  formula <- bmf(A ~ 1, B ~ 1, C ~ 1, E ~ 1, F ~ 1)
+
+  good <- suppressWarnings(mpt(
+    mpt_tree("main", c(branches, r6 = "(1 - A) * (1 - F)")), covariates = "G"
+  ))
+  expect_silent(check_data(good, dat, formula))
+
+  typo <- suppressWarnings(mpt(
+    mpt_tree("main", c(branches, r6 = "(1 - A) * (1 - A)")), covariates = "G"
+  ))
+  expect_error(check_data(typo, dat, formula), "do not sum to 1")
 })
 
 test_that("covariate sum check respects tree membership", {

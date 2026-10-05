@@ -1095,14 +1095,26 @@ check_data.mpt <- function(model, data, formula) {
 
 # the construction-time check cannot use real covariate values, so the sums are
 # re-checked per row with the observed values, at the same parameter test
-# points: a single symmetric point (all 0.5) hides swapped complements
+# points: a single symmetric point (all 0.5) hides swapped complements. The
+# range is also checked with all parameters near 0 and near 1, where a
+# covariate slightly outside [0, 1] first pushes a branch out of (0, 1].
+# Covariates themselves are not range-checked: one may be a set size entering
+# as 1/ss.
 .mpt_validate_covariate_sums <- function(model, data, tolerance = 1e-6) {
   covariates <- model$other_vars$covariates
   if (length(covariates) == 0L) {
     return(invisible(NULL))
   }
-  points <- .mpt_test_points(names(model$parameters), model$other_vars$simplex)
+  symbols <- names(model$parameters)
+  simplex <- model$other_vars$simplex
+  points <- c(
+    .mpt_test_points(symbols, simplex), .mpt_boundary_points(symbols, simplex)
+  )
   idx_vars <- model$other_vars$indicators$tree
+  # a declared covariate that no branch uses never reaches brms
+  used_covariates <- intersect(
+    covariates, unlist(lapply(model$other_vars$trees, .mpt_expr_vars))
+  )
   for (tree in model$other_vars$trees) {
     rows <- if (is.null(idx_vars)) {
       seq_len(nrow(data))
@@ -1110,6 +1122,25 @@ check_data.mpt <- function(model, data, formula) {
       which(data[[idx_vars[[tree$name]]]] == 1L)
     }
     if (length(rows) == 0L) next
+    na_covariates <- used_covariates[vapply(
+      used_covariates, function(v) anyNA(data[[v]][rows]), logical(1)
+    )]
+    if (length(na_covariates) > 0L) {
+      na_cov <- na_covariates[1]
+      na_row <- rows[is.na(data[[na_cov]][rows])][1]
+      stopif(
+        na_cov %in% .mpt_expr_vars(tree),
+        "The covariate '{na_cov}' is missing in row {na_row} of tree \\
+        '{tree$name}', so the branch probabilities of this tree cannot be \\
+        computed. Please fill in the value."
+      )
+      stop2(
+        "The covariate '{na_cov}' is missing in row {na_row} of tree \\
+        '{tree$name}', and brms would drop that row from the model. Tree \\
+        '{tree$name}' does not use '{na_cov}', so any finite value (e.g. 0) \\
+        can be filled in."
+      )
+    }
     for (par_vals in points) {
       env <- c(as.list(par_vals), as.list(data[rows, covariates, drop = FALSE]))
       branches <- lapply(tree$branches, function(branch) {
@@ -1132,7 +1163,7 @@ check_data.mpt <- function(model, data, formula) {
         row <- out_of_range[[resp_cat]][1]
         value <- signif(branches[[resp_cat]][row], 6)
         zero_hint <- if (value == 0) {
-          "A branch that is exactly 0 belongs in mpt_tree(impossible = )."
+          " A branch that is exactly 0 belongs in mpt_tree(impossible = )."
         } else {
           ""
         }
@@ -1140,22 +1171,9 @@ check_data.mpt <- function(model, data, formula) {
           "With the covariate values in the data, the branch probability of \\
           category '{resp_cat}' in tree '{tree$name}' is {value} in row \\
           {rows[row]}, outside (0, 1]. Please check the covariate column(s): \\
-          {collapse_comma(covariates)}. {zero_hint}"
+          {collapse_comma(covariates)}.{zero_hint}"
         )
       }
-    }
-    na_covariates <- covariates[vapply(
-      covariates, function(v) anyNA(data[[v]][rows]), logical(1)
-    )]
-    if (length(na_covariates) > 0L) {
-      na_cov <- na_covariates[1]
-      na_row <- rows[is.na(data[[na_cov]][rows])][1]
-      stop2(
-        "The covariate '{na_cov}' is missing in row {na_row} of tree \\
-        '{tree$name}', and brms would drop that row from the model. Tree \\
-        '{tree$name}' does not use '{na_cov}', so any finite value (e.g. 0) \\
-        can be filled in."
-      )
     }
   }
   invisible(NULL)
