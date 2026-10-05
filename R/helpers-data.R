@@ -40,6 +40,18 @@ check_data.default <- function(model, data, formula) {
   data
 }
 
+# Formulas may use the columns check_data() adds as predictors, so the formula
+# checks and bmm_data_check() must not call them unknown although the user's
+# data lacks them. Methods chain with NextMethod(), as for revert_check_data()
+built_data_columns <- function(model) {
+  UseMethod("built_data_columns")
+}
+
+#' @exportS3Method
+built_data_columns.default <- function(model) {
+  character(0)
+}
+
 #' @export
 check_data.bmmodel <- function(model, data, formula) {
   stopif(missing(data), "Data must be specified using the 'data' argument.")

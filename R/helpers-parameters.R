@@ -184,9 +184,9 @@ parameter_info.bmmodel <- function(x, formula = NULL, ...) {
   model <- x
 
   if (inherits(model, "m3_custom") && !is.null(formula)) {
-    user_pars <- rhs_vars(formula[is_nl(formula)])
-    user_pars <- setdiff(user_pars, names(formula[is_nl(formula)]))
-    user_pars <- setdiff(user_pars, names(model$parameters))
+    # check_model() requires every new parameter to have its own formula, and
+    # without data this is what tells a parameter from a data column
+    user_pars <- intersect(m3_activation_symbols(model, formula), names(formula))
     model$parameters <- c(model$parameters, setNames(
       as.list(user_pars), user_pars
     ))
