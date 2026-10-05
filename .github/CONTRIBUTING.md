@@ -1,66 +1,143 @@
 # Contributing to `bmm`
 
-The `bmm` package is designed to be community driven and thus we appreciate your input! We attempt to make contributing to `bmm` as easy and transparent as possible. These contributor guidelines are designed to clarify different types of contributions and how they will be acknowledge in the package publication.
+Thank you for helping with `bmm`. This page tells you where to branch, what
+your pull request (PR) must contain, who reviews it and when it merges.
 
-The following contributions will be acknowledge in the `NEWS` for each release of the package:
+## Ways to contribute
 
--   Reporting a bug
--   Submitting a bug fix
--   Discussing and proposing improvements on the current state of the code, in particular:
--   improving stability of model estimation
--   speeding up model estimation
--   generalizing functions across multiple already implemented `bmmodels`
+- **Report a bug.** Open an [issue](https://github.com/popov-lab/bmm/issues)
+  with the bug report template.
+- **Fix a bug or improve the docs.** Open a PR. For anything larger than a
+  few lines, open an issue first so we can agree on the approach.
+- **Add a model.** Open an issue with the `new_model` template first. We
+  decide together whether the model fits the package, and in which release.
+- **Ask a question or float an idea** in the
+  [Discussions](https://github.com/popov-lab/bmm/discussions).
 
-More extensive contributions will be acknowledge by being listed as a contributor in the package documentation. These entail:
+We credit every contribution in `NEWS.md`. Contributors of a new model or a
+larger feature are also listed with the role `ctb` in `DESCRIPTION`.
 
--   adding a new model to `bmm`
--   adding new function that ease the use of multiple models implemented in `bmm`
--   adding functions that implement the communication of `bmm` with other R packages, such as `emmeans`, `tidybayes`, `bayesplot`, etc.
+## Which branch to target
 
-## Package Development on Github
+1. Fork the repo and create your branch from `develop`. If your change is a
+   feature planned for a later release, branch from that release's integration
+   branch (`dev-1.5.0`, `dev-1.6.0`) instead; the milestone of the issue tells
+   you which release it is planned for. Bug fixes always go to `develop`.
+2. Open the PR against the branch you started from.
 
-We use Github to host all code, track issues and feature requests, as well as accept pull requests. Detailed info on the development process can be found in the `bmm` [Developer Notes](https://popov-lab.github.io/bmm/dev/dev-notes/index.html)
+The reasoning is in [ADR 0002](../.dev/decisions/0002-release-integration-branches.md).
+If you are unsure, ask in the issue.
 
-All changes and additions to code have to be submitted via pull requests. We consider all pull requests as propositions for changes to the codebase. Thus, we reserve the right to not merge changes, if we feel that they are in conflict with general principles implemented in the `bmm` package. To avoid the rejection of pull requests, please consider contacting us before committing changes to `bmm`, especially if they involve changing a large number of files.
+## Before you open a PR
 
-If you are interested in contributing to `bmm`, please follow the following steps.
+Run these from the package root and fix what they report:
 
-1.  Fork the repo and create your branch from `develop`. If your change is a feature planned for a later release, branch from that release's integration branch (`dev-1.5.0`, `dev-1.6.0`) instead; the milestone of the issue tells you which release it is planned for. Bug fixes always go to `develop`.
-2.  If you've added code that should be tested, add tests.
-3.  Update the documentation for the changes you implemented.
-4.  Ensure that all unit tests passed.
-5.  Ensure the R CMD Checks passed.
-6.  Issue that pull request!
+```r
+devtools::document()   # regenerate man/ and NAMESPACE; never edit them by hand
+devtools::test()       # all tests pass
+devtools::check()      # 0 errors, 0 warnings; explain any note in the PR
+```
 
-## Use a Consistent Coding Style
+Your PR also needs:
 
-Please follow the general coding style used throughout `bmm`. This entails:
+- **Tests** for new behaviour, in `tests/testthat/`. Test what your code does,
+  not how R subsets a data frame.
+- **A NEWS bullet** under `# bmm (development version)` for anything users can
+  see. Keep it short: what changes for the user and what they should do. Do not
+  describe how the fix works.
+- **Documentation** for new or changed exported functions (roxygen).
+- **For a new model:** read the
+  [developer notes](https://venpopov.com/bmm/dev/dev-notes/) and follow the
+  one-constructor-per-response-type rule in [AGENTS.md](../AGENTS.md). Show
+  parameter recovery in the PR description (see below).
 
-- labeling variables and functions using `snake_case`
-- avoid upper case labels in variable and function names
+### Recovery evidence for new models
 
-The `bmm` [Developer Notes](https://popov-lab.github.io/bmm/dev/dev-notes/index.html) provide an introduction into the file organization of the package. Please follow the guidelines where to put functions associated with the different steps in fitting `bmmodels`. If you have questions or an unsure about where to add code, feel free to ask us. There is a dedicated [Discussion](https://github.com/popov-lab/bmm/discussions) page for informal chats and questions.
+Until we have a `tests/recovery/` folder, the PR description shows the result
+of a parameter recovery for the new model:
 
-## Any contributions you make will be under the GPL-2 Software License
+- true against recovered values, as a table or a plot;
+- a hierarchical recovery with several subjects whose parameters vary;
+- data simulated with an independent generator, not the model's own `r*`
+  function, so that a bug in the density cannot cancel out.
 
-In short, when you submit code changes, your submissions are understood to be under the same [GPL-2](https://choosealicense.com/licenses/gpl-2.0/) that covers the project. Feel free to contact us if that's a concern.
+Attach the script as a gist or in a collapsed block in the PR.
 
-## Report bugs using Github's [issues](https://github.com/popov-lab/bmm/issues)
+## Review and merging
 
-We use GitHub issues to track public bugs. Report a bug by [opening a new issue](https://github.com/popov-lab/bmm/issues); it's that easy!
+How many reviews a PR needs depends on what it touches.
 
-## Write bug reports with detail, background, and sample code
+| Tier | What it covers | Reviews |
+|---|---|---|
+| **Low-risk** | Typos, docs only, CI config, tests only, NEWS only | None. May merge on green CI by anyone with write access. |
+| **Standard** | Everything else, including bug fixes and new models | One approving review from someone other than the author. |
+| **Pipeline or exported API** | The shared pipeline files (`R/bmm.R`, `R/bmmformula.R`, `R/helpers-model.R`, `R/helpers-data.R`, `R/helpers-prior.R`, `R/helpers-postprocess.R`, `R/helpers-inits.R`, `R/update.R`), or the signature or return value of an exported function | Two approving reviews. |
 
-When reporting a bug, please use the provided template.
+A **new model** is a standard PR with one addition: the reviewer works through
+the reviewer block in the PR template. They read the likelihood against the
+cited source, run or inspect the recovery, and check the default priors on the
+natural scale.
 
-**Great Bug Reports** tend to have:
+Three rules apply to all tiers:
 
--   A quick summary and/or background
--   Steps to reproduce
-    -   Be specific!
-    -   Give sample code if you can.
--   What you expected would happen
--   What actually happens
--   Notes (including why you think this might be happening, or stuff you tried that didn't work)
+- All three `R-CMD-check` jobs (`ubuntu-latest`, `macos-latest`,
+  `windows-latest`, each on `release`) must pass. CI runs on pushes and PRs to
+  `master`, `develop` and `dev-*`.
+- Approvals stay valid after new pushes. If you review a PR and the author
+  pushes afterwards, you can still re-request changes.
+- We may decline a PR that conflicts with the principles of the package. Talk
+  to us early, especially if your change touches many files.
 
-We appreciate thorough bug reports *a lot*.
+### While there is one active maintainer
+
+At the moment one maintainer does most of the reviewing. So that PRs are not
+stuck, the maintainer may merge their own PR without a GitHub approval when
+all of the following hold:
+
+- CI is green.
+- An independent review was done, and the PR says what was checked and what
+  changed after it.
+- For the pipeline or exported API tier, the PR stays open for at least 72
+  hours with that summary posted, so others can object.
+
+PRs from other contributors always need an approval from a maintainer. This
+fallback ends when a second person takes on regular reviews.
+
+## Coding style
+
+- Name variables and functions in `snake_case`, without upper case letters.
+- Use `stopif()`, `warnif()`, `stop2()` and `message2()`, not `stopifnot()` or
+  the base R equivalents.
+- Use implicit returns. Do not write `return()` at the end of a function.
+- Write comments that explain why, not what. If code needs a comment to say
+  what it does, rename or restructure the code.
+- Validate arguments in exported functions only. Internal helpers trust their
+  callers.
+- Call functions as `package::function()`.
+
+[AGENTS.md](../AGENTS.md) has the rest, and the
+[developer notes](https://venpopov.com/bmm/dev/dev-notes/) explain which file
+holds which step of the fitting pipeline. If you are unsure where code
+belongs, ask.
+
+## AI-assisted contributions
+
+You may use AI tools. You are responsible for every line you submit and must be
+able to explain it in review. Tell us in the PR if a large share was generated.
+
+## Licence
+
+By submitting a change you agree that it is released under the
+[GPL-2](https://choosealicense.com/licenses/gpl-2.0/) licence that covers the
+package. Contact us if that is a problem.
+
+## Bug reports
+
+Use the bug report template. A good report has:
+
+- a short summary;
+- steps to reproduce, ideally with a minimal code example;
+- what you expected and what happened instead;
+- notes on what you tried, or why you think it happens.
+
+We appreciate thorough bug reports a lot.
