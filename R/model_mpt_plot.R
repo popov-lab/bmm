@@ -205,10 +205,36 @@ plot.mpt <- function(x, cex = 0.9, ...) {
   width <- graphics::strwidth(edges$label, units = "inches", cex = cex)
   height <- graphics::strheight(edges$label, units = "inches", cex = cex)
   distance <- 0.4 * height + abs(normal_x) * width / 2 + abs(normal_y) * height / 2
+  x <- edges$x0 + 0.6 * (edges$x1 - edges$x0) + normal_x * distance * x_per_inch
+  y <- edges$y0 + 0.6 * (edges$y1 - edges$y0) + normal_y * distance * y_per_inch
   list(
-    x = edges$x0 + 0.6 * (edges$x1 - edges$x0) + normal_x * distance * x_per_inch,
-    y = edges$y0 + 0.6 * (edges$y1 - edges$y0) + normal_y * distance * y_per_inch
+    x = x,
+    y = .mpt_separate_labels(x / x_per_inch, y / y_per_inch, width, height) * y_per_inch
   )
+}
+
+# labels of neighbouring edges can overprint in a dense tree, where the long
+# restriction labels ("1 - g (g = 0.5)") are wider than the gap between the
+# edges. Overlapping boxes are pushed apart vertically, each by half the
+# overlap, until none overlaps or the passes run out; a box is 50% taller than
+# the text height, which leaves out descenders and parentheses, so that labels
+# end up apart rather than touching. All arguments are in inches
+.mpt_separate_labels <- function(x, y, width, height, max_passes = 100L) {
+  height <- 1.5 * height
+  rank <- seq_along(y)
+  for (pass in seq_len(max_passes)) {
+    overlap_x <- outer(width, width, `+`) / 2 - abs(outer(x, x, `-`))
+    overlap_y <- outer(height, height, `+`) / 2 - abs(outer(y, y, `-`))
+    overlapping <- overlap_x > 0 & overlap_y > 0
+    diag(overlapping) <- FALSE
+    if (!any(overlapping)) {
+      break
+    }
+    above <- sign(outer(y, y, `-`))
+    above[above == 0] <- sign(outer(rank, rank, `-`))[above == 0]
+    y <- y + rowSums(overlapping * above * overlap_y) / 2
+  }
+  y
 }
 
 # the edges leaving a node are the branches of one process step, so their
