@@ -140,6 +140,36 @@ test_that("bmm_data_check flags formula predictors missing from the data", {
   expect_true(any(grepl("neither columns", finding_messages(res))))
 })
 
+test_that("bmm_data_check does not read a correlation ID as a data column", {
+  dat <- data.frame(
+    y = runif(40, -3, 3),
+    cond = rep(c("a", "b"), each = 20),
+    id = rep(1:4, each = 10)
+  )
+  model <- mixture2p(resp_error = "y")
+
+  res <- bmm_data_check(bmf(kappa ~ cond + (1 |p| id), thetat ~ 1 + (1 |p| id)), dat, model)
+  expect_false(any(grepl("neither columns", finding_messages(res))))
+  expect_setequal(res$predictors$coding$variable, c("cond", "id"))
+  expect_false("p" %in% unlist(res$predictors$pred_map))
+
+  # a correlation ID named like a column is a label, not a predictor
+  res_label <- bmm_data_check(
+    bmf(kappa ~ 1 + (1 |cond| id), thetat ~ 1 + (1 |cond| id)), dat, model
+  )
+  expect_setequal(res_label$predictors$coding$variable, "id")
+  expect_equal(res_label$cells$cell_vars, character(0))
+
+  # the same name used as a predictor stays one
+  res_both <- bmm_data_check(bmf(kappa ~ cond + (1 |cond| id), thetat ~ 1), dat, model)
+  expect_setequal(res_both$predictors$coding$variable, c("cond", "id"))
+})
+
+test_that("re_group_vars keeps every column a grouping term names", {
+  f <- bmf(kappa ~ 1 + (1 |p| gr(id, by = grp)), thetat ~ 1 + (1 | mm(g1, g2)))
+  expect_setequal(re_group_vars(f), c("id", "grp", "g1", "g2"))
+})
+
 test_that("bmm_data_check does not flag the columns m3 adds to the data (#495)", {
   res <- bmm_data_check(
     bmf(
