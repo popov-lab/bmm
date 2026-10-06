@@ -195,6 +195,23 @@ test_that("test points give every symbol its own interior value at every point",
   }
 })
 
+test_that("the stick-breaking Jacobian matches central differences of the map", {
+  sticks_to_members <- function(sticks) cumprod(c(1, 1 - sticks)) * c(sticks, 1)
+  for (sticks in list(0.3, c(0.3, 0.6), c(0.3, 0.6, 0.2), c(0.7, 0.2, 0.5, 0.4))) {
+    members <- sticks_to_members(sticks)
+    numeric_map <- vapply(seq_along(sticks), function(m) {
+      step <- replace(numeric(length(sticks)), m, 1e-6)
+      (sticks_to_members(sticks + step) - sticks_to_members(sticks - step)) / 2e-6
+    }, numeric(length(members)))
+    names <- paste0("s", seq_along(sticks))
+    exact <- .mpt_stick_jacobian(diag(length(members)), members, names)
+    expect_equal(
+      unname(exact), matrix(numeric_map, nrow = length(members)), tolerance = 1e-8
+    )
+    expect_equal(colnames(exact), names)
+  }
+})
+
 test_that("no sum of two test values equals another such sum at every point", {
   # a linear sequence in the symbol index gives v_i + v_j == v_k + v_l at
   # every point whenever i + j == k + l, which the rank check would read as a

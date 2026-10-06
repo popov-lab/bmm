@@ -438,8 +438,9 @@ settable_link_functions.mpt <- function(model) {
 #'   are never free parameters; because rows with different covariate values
 #'   can identify what one design cell cannot, the rank is taken over the rows
 #'   of all covariate values in the data (at most 20 per tree) in `bmm()`, and
-#'   over five test values of the covariates when printing. A rank below the number of free parameters means that some
-#'   combination of the listed parameters cannot be estimated from the data,
+#'   over five test values of the covariates when printing. A rank below the
+#'   number of free parameters means that some combination of the listed
+#'   parameters cannot be estimated from the data,
 #'   even when the count passes, and its posterior follows the prior; a
 #'   parameter whose derivatives are zero up to rounding at the test values
 #'   appears not to affect any category probability and is named separately.
@@ -869,21 +870,22 @@ print_model_details.mpt <- function(model, ...) {
   settings <- .mpt_covariate_settings(model, data)
   c(
     .mpt_jacobian_rank(trees, free, fixed, simplex, sticks, settings$values),
-    list(labels = labels, where = settings$where)
+    list(labels = labels, where = settings$where, from_data = settings$from_data)
   )
 }
 
 # covariate values at which the rank is taken, one data frame per tree (a tree
-# without covariates has one empty setting): the distinct values in the tree's
-# rows of the data, at most 20 spread over their range, or five test values
-# when the data cannot provide them (print() has no data; check_data() reports
-# missing or non-numeric covariate columns later)
+# without covariates has one empty setting): the distinct finite values in the
+# tree's rows of the data, at most 20 spread over their range. A tree without
+# rows adds no rows, with or without covariates. Five test values stand in
+# when the data cannot provide them (print() has no data; a missing,
+# non-numeric or non-finite covariate is check_data()'s to report)
 .mpt_covariate_settings <- function(model, data) {
   trees <- model$other_vars$trees
   covariates <- model$other_vars$covariates
   used <- lapply(trees, function(tree) intersect(covariates, .mpt_expr_vars(tree)))
   if (length(unlist(used)) == 0L) {
-    return(list(values = NULL, where = "at interior test values"))
+    return(list(values = NULL, where = "at interior test values", from_data = FALSE))
   }
   empty <- data.frame(row.names = 1L)
   usable <- is.data.frame(data) && all(covariates %in% names(data)) &&
@@ -891,19 +893,31 @@ print_model_details.mpt <- function(model, ...) {
   if (usable) {
     tree_id <- model$other_vars$tree_id
     values <- lapply(names(trees), function(name) {
-      if (length(used[[name]]) == 0L) {
-        return(empty)
+      rows <- if (is.null(tree_id)) {
+        seq_len(nrow(data))
+      } else {
+        which(as.character(data[[tree_id]]) %in% name)
       }
-      rows <- if (is.null(tree_id)) TRUE else as.character(data[[tree_id]]) %in% name
-      settings <- unique(stats::na.omit(data[rows, used[[name]], drop = FALSE]))
+      if (length(used[[name]]) == 0L) {
+        return(empty[seq_len(min(length(rows), 1L)), , drop = FALSE])
+      }
+      settings <- data[rows, used[[name]], drop = FALSE]
+      settings <- unique(settings[rowSums(!is.finite(as.matrix(settings))) == 0L, ,
+        drop = FALSE])
+      # rows without one complete setting leave the data unusable for the rank
+      if (length(rows) > 0L && nrow(settings) == 0L) {
+        return(NULL)
+      }
       settings <- settings[do.call(order, unname(settings)), , drop = FALSE]
       spread <- round(seq(1, nrow(settings), length.out = min(nrow(settings), 20)))
       settings[unique(spread), , drop = FALSE]
     })
-    if (sum(vapply(values, nrow, integer(1))) > 0L) {
+    if (!any(vapply(values, is.null, logical(1))) &&
+          sum(vapply(values, nrow, integer(1))) > 0L) {
       return(list(
         values = values,
-        where = "at interior test values and the covariate values in the data"
+        where = "at interior test values and the covariate values in the data",
+        from_data = TRUE
       ))
     }
   }
@@ -912,7 +926,8 @@ print_model_details.mpt <- function(model, ...) {
     values = lapply(used, function(cov) {
       if (length(cov) == 0L) empty else test_values[cov]
     }),
-    where = "at interior test values and 5 test values of the covariates"
+    where = "at interior test values and 5 test values of the covariates",
+    from_data = FALSE
   )
 }
 
@@ -939,8 +954,8 @@ print_model_details.mpt <- function(model, ...) {
     if (length(absent) > 0) {
       glue(
         "The derivative with respect to {.mpt_labels(absent, labels)} is zero up \\
-        to rounding at the test values, so these parameter(s) appear not to \\
-        affect any category probability."
+        to rounding {identifiability$where}, so these parameter(s) appear not \\
+        to affect any category probability there."
       )
     },
     glue(
@@ -1044,6 +1059,14 @@ check_model.mpt <- function(model, data = NULL, formula = NULL) {
         warning2(
           "{.mpt_rank_deficit_text(identifiability)} Along the non-identified \\
           direction(s), the posterior follows the prior."
+        )
+      } else if (identifiability$from_data) {
+        # print() takes the covariates at test values, so it cannot name the
+        # parameters that the covariate values in the data leave open
+        message2(
+          "{.mpt_rank_deficit_text(identifiability)} Whether the predictors \\
+          on {collapse_comma(with_predictors)} identify it across the cells of \\
+          the design is not checked."
         )
       } else {
         message2(
