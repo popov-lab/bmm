@@ -804,7 +804,8 @@ rm3 <- function(n, size, pars, m3_model, act_funs = NULL, unpack = FALSE,
 #' @param size The total number of observations across all response categories.
 #' @param pars A named vector or list with the values of at least the latent
 #'   parameters appearing in the branch expressions of the selected tree, on
-#'   the probability scale. Values for parameters the tree does not use are
+#'   the probability scale and strictly between 0 and 1, as for fixed
+#'   parameters in [bmm()]. Values for parameters the tree does not use are
 #'   ignored, so one vector can serve every tree of the model.
 #' @param mpt_model A `bmmodel` object created with [mpt()] specifying the
 #'   model that densities or random samples should be generated for.
@@ -916,9 +917,11 @@ rmpt <- function(n, size, pars, mpt_model, tree = NULL, unpack = FALSE,
   values <- values[required]
 
   par_values <- unlist(values[intersect(names(values), names(mpt_model$parameters))])
+  outside <- par_values[par_values <= 0 | par_values >= 1]
   stopif(
-    any(par_values < 0 | par_values > 1),
-    "All parameter values must be probabilities between 0 and 1."
+    length(outside) > 0,
+    "Parameter values must be probabilities strictly between 0 and 1. \\
+    Provided: {paste(names(outside), '=', outside, collapse = ', ')}"
   )
 
   probs <- .mpt_eval_branches(trees[[tree]], values)
