@@ -27,7 +27,10 @@ in the parameter formulas, not here — see Details.}
 \item{covariates}{Character vector. Names of data columns that appear in
 branch expressions but are not latent parameters, for example
 design-fixed guessing rates. Covariates pass into the model formulas
-unchanged and have no naming restrictions.}
+unchanged and have no naming restrictions. \code{bmm()} stops when, with a
+row's covariate values, the branches of a tree do not sum to 1, leave
+(0, 1], are undefined on the rows of another tree, or when a covariate
+that a branch uses is missing.}
 
 \item{simplex}{A character vector, or a list of character vectors, naming
 groups of parameters that are jointly constrained to sum to 1. Each group
@@ -181,7 +184,9 @@ corresponds to the latent-trait MPT model.
 For posterior predictive checks, \code{\link[brms:posterior_predict]{brms::posterior_predict()}} returns
 simulated counts (draws x rows x categories) and \code{\link[brms:posterior_epred]{brms::posterior_epred()}}
 the expected counts; the MPT article computes the T1 statistic and its
-posterior predictive p-value from them.
+posterior predictive p-value from them. With \code{newdata},
+\code{\link[brms:posterior_predict]{brms::posterior_predict()}} needs the columns \code{nTrials}, \verb{Idx_<tree>} and
+\verb{Poss_<category>} that \code{check_data()} builds; \code{fit$data} contains them.
 
 Order constraints between parameters (\code{Do > Dn}) are expressed by
 reparameterizing the larger parameter in the model formula, e.g.

@@ -331,7 +331,10 @@ settable_link_functions.mpt <- function(model) {
 #' @param covariates Character vector. Names of data columns that appear in
 #'   branch expressions but are not latent parameters, for example
 #'   design-fixed guessing rates. Covariates pass into the model formulas
-#'   unchanged and have no naming restrictions.
+#'   unchanged and have no naming restrictions. `bmm()` stops when, with a
+#'   row's covariate values, the branches of a tree do not sum to 1, leave
+#'   (0, 1], are undefined on the rows of another tree, or when a covariate
+#'   that a branch uses is missing.
 #' @param simplex A character vector, or a list of character vectors, naming
 #'   groups of parameters that are jointly constrained to sum to 1. Each group
 #'   is reparameterized via stick-breaking: the last parameter of each group
@@ -460,7 +463,9 @@ settable_link_functions.mpt <- function(model) {
 #'   For posterior predictive checks, [brms::posterior_predict()] returns
 #'   simulated counts (draws x rows x categories) and [brms::posterior_epred()]
 #'   the expected counts; the MPT article computes the T1 statistic and its
-#'   posterior predictive p-value from them.
+#'   posterior predictive p-value from them. With `newdata`,
+#'   [brms::posterior_predict()] needs the columns `nTrials`, `Idx_<tree>` and
+#'   `Poss_<category>` that `check_data()` builds; `fit$data` contains them.
 #'
 #'   Order constraints between parameters (`Do > Dn`) are expressed by
 #'   reparameterizing the larger parameter in the model formula, e.g.
