@@ -347,3 +347,65 @@ test_that("plotting conditional_effects works", {
   p <- plot(ce, plot = FALSE)
   expect_true(length(p) > 0)
 })
+
+# ===========================================================================
+# Tier 3: multinomial-family models (posterior_linpred bypass)
+# ===========================================================================
+
+expect_ce_matches_native <- function(fit, par) {
+  ce <- conditional_effects(fit, par = par, robust = TRUE)$cond
+  np <- native_parameters(fit, pars = par)
+  medians <- c(tapply(np$value, np$cond, stats::median))
+  expect_equal(ce$estimate__, unname(medians[as.character(ce$cond)]), tolerance = 1e-3)
+}
+
+fit_multinomial <- function(formula, data, model) {
+  bmm(formula, data, model, backend = "cmdstanr", chains = 2, iter = 600,
+      init = 0.5, refresh = 0, silent = 2)
+}
+
+two_conditions <- function(make) {
+  rbind(cbind(make(), cond = "a"), cbind(make(), cond = "b"))
+}
+
+test_that("conditional_effects works for sdt_rating", {
+  skip_on_cran()
+  skip_if_not_installed("cmdstanr")
+  dat <- two_conditions(function() {
+    d <- expand.grid(id = 1:2, stimulus = c(0L, 1L))
+    cbind(d, rsdt_rating(nrow(d), 200, d$stimulus, d = 1.5, thresholds = c(-0.5, 0, 0.5)))
+  })
+  fit <- fit_multinomial(
+    bmf(d ~ cond, criterion ~ 1, spacing ~ 1), dat,
+    sdt_rating(response = c("r1", "r2", "r3", "r4"), stimulus = "stimulus")
+  )
+  expect_ce_matches_native(fit, "d")
+})
+
+test_that("conditional_effects works for sdt_ranking", {
+  skip_on_cran()
+  skip_if_not_installed("cmdstanr")
+  dat <- two_conditions(function() {
+    cbind(data.frame(id = 1:4), as.data.frame(rsdt_ranking(4, 200, m = 4, d = 1.4)))
+  })
+  fit <- fit_multinomial(bmf(d ~ cond), dat, sdt_ranking(paste0("rank", 1:4), m = 4))
+  expect_ce_matches_native(fit, "d")
+})
+
+test_that("conditional_effects works for sdt_cdp", {
+  skip_on_cran()
+  skip_if_not_installed("cmdstanr")
+  dat <- two_conditions(function() {
+    d <- expand.grid(id = 1:2, stimulus = c(0L, 1L))
+    cbind(d, rsdt_cdp(
+      nrow(d), 200, d$stimulus, dfam = 0.8, drec = 1.0,
+      thresholds = .cdp_make_thresholds(0, -0.3, 3, 3, "parsimonious"),
+      rcrit = 0.5, n_new = 3
+    ))
+  })
+  fit <- fit_multinomial(
+    bmf(dfam ~ cond, drec ~ 1, criterion ~ 1, spacing ~ 1, rcrit ~ 1), dat,
+    sdt_cdp(stimulus = "stimulus", n_new = 3, n_old = 3)
+  )
+  expect_ce_matches_native(fit, "dfam")
+})

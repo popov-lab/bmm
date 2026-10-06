@@ -167,9 +167,10 @@ conditional_effects.bmmfit <- function(x,
 
 
 .ce_compute_and_transform <- function(x, par, par_info, scale, ...) {
-  # m3 models require categorical = TRUE in brms, which breaks nlpar-level
-  # computation — bypass via posterior_linpred directly
-  ce_result <- if ("m3" %in% class(x$bmm$model)) {
+  # multinomial-family models (m3, the sdt rating models) require
+  # categorical = TRUE in brms, which breaks nlpar-level computation — bypass
+  # via posterior_linpred directly
+  ce_result <- if (identical(stats::family(x)$family, "multinomial")) {
     .compute_multinomial_conditional_effects(x, par, ...)
   } else if (par_info$type == "dpar") {
     .brms_conditional_effects(x, dpar = par_info$brms_name, ...)
