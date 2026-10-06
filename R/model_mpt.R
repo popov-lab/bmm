@@ -334,7 +334,8 @@ settable_link_functions.mpt <- function(model) {
 #'   unchanged and have no naming restrictions. `bmm()` stops when, with a
 #'   row's covariate values, the branches of a tree do not sum to 1, leave
 #'   (0, 1], are undefined on the rows of another tree, or when a covariate
-#'   that a branch uses is missing.
+#'   that a branch uses is missing. Every declared covariate needs a numeric
+#'   column in the data, also one that no branch uses.
 #' @param simplex A character vector, or a list of character vectors, naming
 #'   groups of parameters that are jointly constrained to sum to 1. Each group
 #'   is reparameterized via stick-breaking: the last parameter of each group

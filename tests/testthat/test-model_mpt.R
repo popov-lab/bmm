@@ -1048,6 +1048,20 @@ test_that("check_data errors are informative", {
   )
 })
 
+test_that("check_data requires a column for every declared covariate, used or not", {
+  unused <- mpt(
+    mpt_tree("main", list(correct = "D", incorrect = "1 - D")),
+    covariates = "z"
+  )
+  expect_error(
+    check_data(unused, data.frame(correct = 10, incorrect = 10), bmf(D ~ 1)),
+    "covariates 'z' are missing"
+  )
+  expect_no_error(check_data(
+    unused, data.frame(correct = 10, incorrect = 10, z = 1), bmf(D ~ 1)
+  ))
+})
+
 test_that("check_data warns on missing counts and refuses the columns it builds", {
   model <- mpt(mpt_2htm_trees(), tree_id = "item_type")
   dat <- mpt_2htm_data()
