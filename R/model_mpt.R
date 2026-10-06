@@ -438,8 +438,9 @@ settable_link_functions.mpt <- function(model) {
 #'   are never free parameters; because rows with different covariate values
 #'   can identify what one design cell cannot, the rank is taken over the rows
 #'   of all covariate values in the data (at most 20 per tree) in `bmm()`, and
-#'   over five test values of the covariates when printing. A rank below the number of free parameters means that some
-#'   combination of the listed parameters cannot be estimated from the data,
+#'   over five test values of the covariates when printing. A rank below the
+#'   number of free parameters means that some combination of the listed
+#'   parameters cannot be estimated from the data,
 #'   even when the count passes, and its posterior follows the prior; a
 #'   parameter whose derivatives are zero up to rounding at the test values
 #'   appears not to affect any category probability and is named separately.
