@@ -19,7 +19,7 @@ test_that("mpt_tree validates its inputs", {
   expect_error(mpt_tree("t", list(a = 0.5, b = "x")), "character strings")
 })
 
-test_that("mpt stores its derived state once and can rebuild itself", {
+test_that("mpt stores its derived state once", {
   model <- mpt(mpt_impossible_trees(), tree_id = "tree")
   expect_equal(model$other_vars$link, "logit")
   expect_equal(model$other_vars$indicators$tree, c(withdist = "Idx_withdist", nodist = "Idx_nodist"))
@@ -30,14 +30,6 @@ test_that("mpt stores its derived state once and can rebuild itself", {
   expect_equal(model$default_priors$Pm$main, "logistic(0, 1)")
   expect_equal(model$default_priors$Pm$effects, "logistic(0, 1)")
 
-  # the recorded call differs by construction; every other field must match
-  without_call <- function(m) {
-    attr(m, "call") <- NULL
-    m
-  }
-  rebuilt <- do.call("mpt", .mpt_constructor_args(model))
-  expect_equal(without_call(rebuilt), without_call(model))
-
   single <- mpt(mpt_tree("t", list(A = "gA", B = "gB", C = "gC")),
     simplex = c("gA", "gB", "gC"), links = "probit"
   )
@@ -47,8 +39,6 @@ test_that("mpt stores its derived state once and can rebuild itself", {
   expect_equal(single$links$gA, "identity")
   expect_equal(single$default_priors$gAraw$main, "normal(0, 1)")
   expect_equal(single$default_priors$gAraw$effects, "normal(0, 1)")
-  rebuilt_single <- do.call("mpt", .mpt_constructor_args(single))
-  expect_equal(without_call(rebuilt_single), without_call(single))
 
   covariate_tree <- mpt_tree("main", list(
     correct = "Pb + (1 - Pb) * Pi * GcorrPi",
@@ -1702,4 +1692,61 @@ test_that("the item-memory-first MPT matches the simple-rule m3 with a distracto
     max(abs(p_mpt - p_m3))
   }, numeric(1)))
   expect_lt(max_diff_nodist, 1e-10)
+})
+
+test_that("conditional_effects() shows mpt parameters on the native scale", {
+  skip_on_cran()
+  skip_if_not_installed("cmdstanr")
+
+  # unequal trials per row, with a mean that is not an integer
+  dat <- data.frame(
+    item_type = rep(c("old", "new"), 2), cond = rep(c("x", "y"), each = 2),
+    old = c(70, 20, 45, 30), new = c(30, 61, 15, 70)
+  )
+  fit <- bmm(
+    bmf(D ~ cond, g ~ 1), dat, mpt(mpt_2htm_trees(), "item_type"),
+    backend = "cmdstanr", chains = 2, iter = 1000, refresh = 0, silent = 2
+  )
+
+  ce <- conditional_effects(fit, par = "D", robust = TRUE)
+  np <- native_parameters(fit, pars = "D")
+  medians <- c(tapply(np$value, np$cond, stats::median))
+  expect_equal(ce$cond$estimate__, unname(medians[as.character(ce$cond$cond)]), tolerance = 1e-3)
+  expect_named(conditional_effects(fit), "D.cond")
+})
+
+test_that("conditional_effects() shows simplex members on the probability scale", {
+  skip_on_cran()
+  skip_if_not_installed("cmdstanr")
+
+  trees <- list(
+    mpt_tree("x", list(A = "D + (1 - D) * a", B = "(1 - D) * b", C = "(1 - D) * c")),
+    mpt_tree("y", list(A = "(1 - D) * a", B = "D + (1 - D) * b", C = "(1 - D) * c"))
+  )
+  dat <- data.frame(
+    tt = rep(c("x", "y"), 2), cond = rep(c("p", "q"), each = 2),
+    A = c(60, 15, 50, 30), B = c(25, 55, 20, 40), C = c(15, 21, 30, 35)
+  )
+  fit <- bmm(
+    bmf(D ~ 1, a ~ cond, b ~ cond), dat, mpt(trees, "tt", simplex = c("a", "b", "c")),
+    backend = "cmdstanr", chains = 2, iter = 1000, refresh = 0, silent = 2
+  )
+
+  np <- native_parameters(fit, pars = c("a", "b"))
+  # b = (1 - a) * stick, so its panel depends on both stick-breaking components
+  for (p in c("a", "b")) {
+    ce <- conditional_effects(fit, par = p, robust = TRUE)$cond
+    medians <- c(tapply(np$value[np$parameter == p], np$cond[np$parameter == p], stats::median))
+    expect_true(all(ce$lower__ > 0 & ce$upper__ < 1))
+    expect_equal(ce$estimate__, unname(medians[as.character(ce$cond)]), tolerance = 1e-3)
+  }
+})
+
+test_that("mpt keeps the trees as given before the restrictions", {
+  trees <- setNames(mpt_2htm_trees(), c("old", "new"))
+  restricted <- mpt(trees, tree_id = "item_type", restrictions = "g = 0.5")
+  expect_equal(restricted$other_vars$unrestricted_trees, trees)
+  expect_equal(deparse(restricted$other_vars$trees$old$branches$old), "D + (1 - D) * 0.5")
+  expect_equal(deparse(restricted$other_vars$trees$new$branches$new), "D + (1 - D) * 0.5")
+  expect_null(mpt(trees, tree_id = "item_type")$other_vars$unrestricted_trees)
 })

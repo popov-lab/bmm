@@ -156,7 +156,8 @@ print.mpt_tree <- function(x, ...) {
 }
 
 .model_mpt <- function(trees = NULL, tree_id = NULL, covariates = NULL,
-                       simplex = NULL, restrictions = NULL, links = "logit",
+                       simplex = NULL, restrictions = NULL,
+                       unrestricted_trees = NULL, links = "logit",
                        default_priors = NULL, call = NULL, ...) {
   trees <- .mpt_as_tree_list(trees)
   if (length(trees)) names(trees) <- vapply(trees, `[[`, character(1), "name")
@@ -235,6 +236,7 @@ print.mpt_tree <- function(x, ...) {
         tree_id = tree_id,
         covariates = covariates,
         trees = trees,
+        unrestricted_trees = unrestricted_trees,
         simplex = simplex,
         restrictions = restrictions,
         link = links,
@@ -299,18 +301,6 @@ settable_links.mpt <- function(model) {
 #' @exportS3Method
 settable_link_functions.mpt <- function(model) {
   c("logit", "probit")
-}
-
-# restrictions are already substituted into the stored trees, so they are
-# not passed again
-.mpt_constructor_args <- function(model) {
-  list(
-    trees = unname(model$other_vars$trees),
-    tree_id = model$other_vars$tree_id,
-    covariates = model$other_vars$covariates,
-    simplex = model$other_vars$simplex,
-    links = model$other_vars$link
-  )
 }
 
 # user facing alias
@@ -609,6 +599,8 @@ mpt <- function(trees, tree_id = NULL, covariates = NULL, simplex = NULL,
     "The covariates argument must be a character vector of data column names."
   )
 
+  # plot() labels the restricted edges from the trees as written
+  unrestricted_trees <- if (length(restrictions)) trees
   trees <- .mpt_restrict_trees(trees, restrictions, covariates)
 
   # a zero probability makes log(p) undefined in Stan; mpt_tree(impossible = )
@@ -718,8 +710,8 @@ mpt <- function(trees, tree_id = NULL, covariates = NULL, simplex = NULL,
 
   .model_mpt(
     trees = trees, tree_id = tree_id, covariates = covariates,
-    simplex = simplex, restrictions = restrictions, links = links,
-    call = call, ...
+    simplex = simplex, restrictions = restrictions,
+    unrestricted_trees = unrestricted_trees, links = links, call = call, ...
   )
 }
 
@@ -1217,7 +1209,8 @@ check_data.mpt <- function(model, data, formula) {
   missing_counts <- is.na(resp_matrix)
   resp_matrix[missing_counts] <- 0
   data <- data[!col_names %in% resp_cats]
-  data$nTrials <- rowSums(resp_matrix)
+  # an integer column keeps conditional_effects() grids at a valid trial count
+  data$nTrials <- as.integer(rowSums(resp_matrix))
   data$Y <- resp_matrix
 
   tree_id <- model$other_vars$tree_id
