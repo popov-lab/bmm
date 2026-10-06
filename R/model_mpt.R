@@ -74,10 +74,12 @@ mpt_tree <- function(name, branches) {
     scientific <- .mpt_scientific_constants(parsed)
     stopif(
       length(scientific) > 0,
-      "The numeric constant(s) {collapse_comma(scientific)} in tree '{name}' \\
-      are too extreme to be written into the generated Stan code (brms emits \\
-      them in scientific notation, which breaks the Stan syntax). Please use \\
-      a larger constant."
+      "brms writes the numeric constant(s) \\
+      {collapse_comma(.mpt_written_constants(expr, scientific))} in tree \\
+      '{name}' in scientific notation ({format(scientific[1], scientific = TRUE)}), \\
+      which breaks the generated Stan code. Every spelling of the same number \\
+      is affected (0.00010 is 0.0001), so please rescale the expression \\
+      instead, e.g. write 0.0001 + 0.9999 * p as (1 + 9999 * p) / 10000."
     )
     parsed
   })

@@ -22,6 +22,15 @@
   unlist(lapply(as.list(expr)[-1], .mpt_scientific_constants)) %||% numeric(0)
 }
 
+# the constants as the user wrote them in the branch string; a value folded
+# from constant arithmetic (1/10000) has no written form and is deparsed
+.mpt_written_constants <- function(expr, values) {
+  tokens <- utils::getParseData(parse(text = expr, keep.source = TRUE))
+  written <- tokens$text[tokens$token == "NUM_CONST"]
+  written <- unique(written[suppressWarnings(as.numeric(written)) %in% values])
+  c(written, vapply(setdiff(values, as.numeric(written)), deparse, character(1)))
+}
+
 # Stan compiles a bare integer fraction like 1/4 or 1/(2*2) as integer
 # division (= 0), so every variable-free arithmetic subexpression is folded
 # into its numeric value before emission

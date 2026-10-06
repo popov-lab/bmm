@@ -25,6 +25,26 @@ test_that("mpt_tree folds compound integer constants into decimal literals", {
   expect_false(grepl("1 / (2 * 2)", code, fixed = TRUE))
 })
 
+test_that("mpt_tree says why a constant is refused and which rewrite works", {
+  expect_error(
+    mpt_tree("t", list(a = "0.00010 + 0.9999 * p", b = "0.9999 * (1 - p)")),
+    "'0.00010' in tree 't' in scientific notation \\(1e-04\\).*\\(1 \\+ 9999 \\* p\\) / 10000"
+  )
+  # a folded constant has no written form
+  expect_error(
+    mpt_tree("t", list(a = "1/10000 + 0.9999 * p", b = "0.9999 * (1 - p)")),
+    "'1e-04' in tree 't'"
+  )
+  rescaled <- mpt(mpt_tree("t", list(
+    a = "(1 + 9999 * p) / 10000", b = "9999 * (1 - p) / 10000"
+  )))
+  code <- stancode(
+    bmf(p ~ 1), data = data.frame(a = c(30L, 28L), b = c(0L, 2L)), model = rescaled
+  )
+  expect_match(code, "(1 + 9999 * inv_logit(nlp_p[n])) / 10000", fixed = TRUE)
+  expect_no_match(code, "e - 0")
+})
+
 test_that("mpt_tree stores branch expressions as parsed calls", {
   tree <- mpt_tree("t", list(a = "D + (1 - D) * g", b = "(1 - D) * (1 - g)"))
   expect_identical(tree$branches$a, quote(D + (1 - D) * g))
