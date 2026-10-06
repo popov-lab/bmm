@@ -643,7 +643,7 @@ test_that("edge labels sit beside their edge on the outer side of a fan", {
 test_that("plot.mpt() lays the trees out on the expected grid", {
   withr::local_pdf(NULL)
   grids <- list()
-  local_mocked_bindings(.mpt_plot_tree = function(x, cex, simplex, covariates) {
+  local_mocked_bindings(.mpt_plot_tree = function(x, cex, simplex, covariates, restrictions) {
     grids[[length(grids) + 1]] <<- graphics::par("mfrow")
   })
   for (n_trees in 2:6) {
@@ -670,7 +670,7 @@ test_that("plot.mpt() lays the trees out on the expected grid", {
 test_that("plot.mpt() leaves a multi-panel layout of the user alone", {
   withr::local_pdf(NULL)
   grids <- list()
-  local_mocked_bindings(.mpt_plot_tree = function(x, cex, simplex, covariates) {
+  local_mocked_bindings(.mpt_plot_tree = function(x, cex, simplex, covariates, restrictions) {
     grids[[length(grids) + 1]] <<- graphics::par("mfrow")
   })
   trees <- list(
@@ -718,4 +718,45 @@ test_that("a leaf label wider than the plot still leaves a valid window", {
   withr::with_pdf(NULL, plot(tree), width = 1.5, height = 1.5)
   expect_true(all(is.finite(usr)))
   expect_gt(usr[2], usr[1])
+})
+
+drawn_labels <- function(x) {
+  texts <- character(0)
+  local_mocked_bindings(
+    text = function(x, y = NULL, labels = y, ...) texts <<- c(texts, labels),
+    .package = "graphics"
+  )
+  withr::with_pdf(NULL, expect_no_warning(plot(x)))
+  texts
+}
+
+alias_trees <- function() {
+  list(
+    mpt_tree("old", list(old = "Do + (1 - Do) * g", new = "(1 - Do) * (1 - g)")),
+    mpt_tree("new", list(old = "(1 - Dn) * g", new = "Dn + (1 - Dn) * (1 - g)"))
+  )
+}
+
+test_that("plot() of a model labels the edges of a fixed parameter with the restriction", {
+  fixed <- mpt(mpt_2htm_trees(), tree_id = "item_type", restrictions = "g = 0.5")
+  labels <- drawn_labels(fixed)
+  expect_contains(labels, c("D", "1 - D", "g = 0.5", "1 - g (g = 0.5)"))
+  expect_false("0.5" %in% labels)
+})
+
+test_that("plot() of a model labels the edges of an equated parameter with the restriction", {
+  aliased <- mpt(alias_trees(), tree_id = "item_type", restrictions = "Dn = Do")
+  labels <- drawn_labels(aliased)
+  expect_contains(labels, c("Do", "1 - Do", "Dn (= Do)", "1 - Dn (Dn = Do)", "g", "1 - g"))
+  expect_contains(drawn_labels(alias_trees()[[2]]), c("Dn", "1 - Dn"))
+})
+
+test_that("a restricted constant keeps the multiplicity edge and the sibling sums intact", {
+  restricted <- mpt(pairs_tree(), restrictions = "u = 0.5")
+  expect_contains(drawn_labels(restricted), c(
+    "u^2 (u = 0.5)", "2 * u * (1 - u) (u = 0.5)", "(1 - u)^2 (u = 0.5)", "c", "1 - c"
+  ))
+  # the fan a, 1 - b sums to 1 only once b = a
+  equated <- mpt(mpt_tree("t", list(A = "a", B = "1 - b")), restrictions = "b = a")
+  expect_contains(drawn_labels(equated), c("a", "1 - b (b = a)"))
 })
