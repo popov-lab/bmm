@@ -19,7 +19,8 @@ the order of the branch names of the selected tree.}
 
 \item{pars}{A named vector or list with the values of at least the latent
 parameters appearing in the branch expressions of the selected tree, on
-the probability scale. Values for parameters the tree does not use are
+the probability scale and strictly between 0 and 1, as for fixed
+parameters in \code{\link[=bmm]{bmm()}}. Values for parameters the tree does not use are
 ignored, so one vector can serve every tree of the model.}
 
 \item{mpt_model}{A \code{bmmodel} object created with \code{\link[=mpt]{mpt()}} specifying the

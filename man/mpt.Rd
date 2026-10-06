@@ -104,7 +104,11 @@ until the rank is full. \code{bmm()} warns about a rank deficit when no
 formula uses a data column as a predictor. When one does, a parameter
 that differs between conditions can identify the model across them, so
 \code{bmm()} only says that the model is not identified within one design
-cell and that the predictors were not checked. The
+cell and that the predictors were not checked. The rank covers the
+parameters of the branch expressions only: a non-linear formula that
+ties them together (\code{Dn ~ Do}) or builds one from sub-parameters is not
+analysed, so \code{bmm()} treats a deficit under it the same way, and
+\code{print()} of the checked model says the formula was not analysed. The
 check is local: it holds at the test values, not at the boundaries of
 the parameter space. A branch expression with a function that
 \code{\link[stats:D]{stats::D()}} cannot differentiate leaves the rank uncomputed, and the
