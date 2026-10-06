@@ -1421,6 +1421,7 @@ check_data.mpt <- function(model, data, formula) {
       }
       # branches that sum to 1 can still be negative or above 1 (e.g. G = 1.2);
       # near the boundary a valid branch may underflow to exactly 0
+      # (also at an interior point: (1 - D)^n at D = 0.85 from n = 392, accepted as unrealistic)
       out_of_range <- lapply(branches, function(b) {
         which(
           (if (point <= length(interior_points)) b <= 0 else b < 0) |
