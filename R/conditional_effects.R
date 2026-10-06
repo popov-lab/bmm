@@ -167,12 +167,10 @@ conditional_effects.bmmfit <- function(x,
 
 
 .ce_compute_and_transform <- function(x, par, par_info, scale, ...) {
-  # m3 models require categorical = TRUE in brms, which breaks nlpar-level
-  # computation — bypass via posterior_linpred directly
-  ce_result <- if ("m3" %in% class(x$bmm$model)) {
-    .compute_multinomial_conditional_effects(x, par, ...)
-  } else if (par_info$type == "dpar") {
+  ce_result <- if (par_info$type == "dpar") {
     .brms_conditional_effects(x, dpar = par_info$brms_name, ...)
+  } else if (par_info$type == "nlpar" && .has_category_dpars(x)) {
+    .ce_nlpar_category_family(x, par, par_info$brms_name, ...)
   } else if (par_info$type == "nlpar") {
     .brms_conditional_effects(x, nlpar = par_info$brms_name, ...)
   } else {
@@ -316,104 +314,6 @@ conditional_effects.bmmfit <- function(x,
 }
 
 
-#' Build a prediction grid for conditional effects
-#'
-#' @description
-#' Constructs a prediction grid for computing conditional effects via
-#' [brms::posterior_linpred()]. For each effect variable, creates a data frame
-#' where that variable varies over its range (numeric) or levels (factor) while
-#' all other columns are held at reference values (mean for numeric, first level
-#' for factor).
-#'
-#' @param bmmfit A bmmfit object
-#' @param par Character string. Parameter name whose formula determines the
-#'   predictor variables.
-#' @param effects Character vector. Specific effect variables to include. If
-#'   `NULL`, all RHS variables from the parameter's formula are used.
-#' @param resolution Integer. Number of points for numeric predictors (default
-#'   100).
-#'
-#' @return A named list of data frames, one per effect variable. Empty list if
-#'   no effects are found.
-#'
-#' @keywords internal
-#' @noRd
-.ce_prediction_grid <- function(bmmfit, par, effects = NULL, resolution = 100) {
-  user_formula <- bmmfit$bmm$user_formula
-  par_formula <- user_formula[[par]]
-  if (is.null(par_formula)) {
-    list()
-  } else {
-    .ce_build_grids(bmmfit, par_formula, effects, resolution)
-  }
-}
-
-
-.ce_build_grids <- function(bmmfit, par_formula, effects, resolution) {
-  f <- stats::formula(par_formula)
-  re_groups <- .extract_re_grouping_vars(f)
-  rhs_vars <- all.vars(f[-2])
-  rhs_vars <- setdiff(rhs_vars, c("0", "1", re_groups))
-
-  effect_vars <- if (is.null(effects)) {
-    rhs_vars
-  } else {
-    intersect(unlist(strsplit(as.character(effects), ":")), rhs_vars)
-  }
-
-  if (length(effect_vars) == 0) {
-    list()
-  } else {
-    trials_vars <- all.vars(brms::brmsterms(bmmfit$formula)$adforms$trials)
-    .ce_build_grids_for_vars(bmmfit$data, effect_vars, resolution, trials_vars)
-  }
-}
-
-
-.ce_build_grids_for_vars <- function(orig_data, effect_vars, resolution,
-                                     trials_vars = character(0)) {
-  grids <- list()
-
-  for (var in effect_vars) {
-    col <- orig_data[[var]]
-    if (is.factor(col) || is.character(col)) {
-      varying <- sort(unique(col))
-    } else {
-      rng <- range(col, na.rm = TRUE)
-      varying <- seq(rng[1], rng[2], length.out = resolution)
-    }
-
-    newdata <- data.frame(x__ = varying)
-    names(newdata) <- var
-
-    for (v in setdiff(names(orig_data), var)) {
-      cv <- orig_data[[v]]
-      if (is.matrix(cv)) next
-      # the linear predictor does not depend on the number of trials, but brms
-      # still demands a whole number there; the mean across rows is rarely one.
-      # brms::conditional_effects() uses 1 as well
-      if (v %in% trials_vars) {
-        newdata[[v]] <- 1L
-      } else if (is.factor(cv)) {
-        newdata[[v]] <- factor(levels(cv)[1], levels = levels(cv))
-      } else if (is.character(cv)) {
-        newdata[[v]] <- cv[1]
-      } else if (is.integer(cv)) {
-        newdata[[v]] <- as.integer(round(stats::median(cv, na.rm = TRUE)))
-      } else if (is.numeric(cv)) {
-        newdata[[v]] <- mean(cv, na.rm = TRUE)
-      } else {
-        newdata[[v]] <- cv[1]
-      }
-    }
-
-    grids[[var]] <- newdata
-  }
-
-  grids
-}
-
-
 #' Summarize posterior draws into conditional-effect statistics
 #'
 #' @description
@@ -525,79 +425,119 @@ conditional_effects.bmmfit <- function(x,
 }
 
 
-#' Compute conditional effects for multinomial family models
+#' Does the fit's family have one distributional parameter per category?
 #'
 #' @description
-#' For models using `brms::multinomial()` family (e.g., m3), brms requires
-#' `categorical = TRUE` even when requesting a specific nlpar, which conflicts
-#' with nlpar-level computation. This helper bypasses that check by using
-#' `brms::posterior_linpred()` directly with a manually constructed prediction
-#' grid.
+#' These are the families for which [brms::conditional_effects()] refuses a
+#' request for a non-linear parameter and asks for `categorical = TRUE`
+#' (`conv_cats_dpars()` in brms 2.23.0): **m3** and the **sdt_rating**,
+#' **sdt_cdp** and **sdt_ranking** models, which all use `brms::multinomial()`.
 #'
-#' @param bmmfit A bmmfit object
-#' @param par Character string. Parameter name (nlpar) to compute effects for
-#' @param ... Additional arguments (prob, robust, re_formula, ndraws, effects,
-#'   resolution)
+#' @param x A bmmfit object
 #'
-#' @return A `brms_conditional_effects` object with one element per effect
+#' @return Logical scalar
 #'
 #' @keywords internal
 #' @noRd
-.compute_multinomial_conditional_effects <- function(bmmfit, par, ...) {
-  dots <- list(...)
-  prob <- dots$prob %||% 0.95
-  robust <- dots$robust %||% FALSE
-  re_formula <- dots$re_formula %||% NA
-  ndraws <- dots$ndraws
-  resolution <- dots$resolution %||% 100
-  effects <- dots$effects
-
-  grids <- .ce_prediction_grid(bmmfit, par,
-                               effects = effects,
-                               resolution = resolution)
-  if (length(grids) == 0) {
-    structure(list(), class = c("brms_conditional_effects", "list"))
-  } else {
-    .compute_multinomial_ce_grids(bmmfit, par, grids, prob, robust,
-                                  re_formula, ndraws)
-  }
+.has_category_dpars <- function(x) {
+  x$family$family %in% c("categorical", "multinomial", "dirichlet",
+                         "dirichlet2", "logistic_normal")
 }
 
 
-.compute_multinomial_ce_grids <- function(bmmfit, par, grids, prob, robust,
-                                           re_formula, ndraws) {
-  result <- list()
+#' Conditional effects of a non-linear parameter in a family with category dpars
+#'
+#' @description
+#' brms computes the predictions of an `nlpar` for these families and only then
+#' refuses them, because it expects the categories to be plotted. A non-linear
+#' parameter does not depend on the categories, so brms is asked for one of the
+#' category dpars instead, at a single draw, which gives the conditions grid
+#' with `effects`, `conditions`, `int_conditions`, `re_formula`, `surface` and
+#' `resolution` applied. The parameter is then evaluated on that grid and
+#' summarised as brms would.
+#'
+#' Without `effects`, brms returns the effects of every formula in the model;
+#' only those built from the parameter's own predictors are kept.
+#'
+#' @param x A bmmfit object
+#' @param par Character string. The bmm parameter name.
+#' @param nlpar Character string. The brms name of the parameter.
+#' @param ... Arguments of [brms::conditional_effects()]; those it does not
+#'   name itself reach [brms::posterior_linpred()], as in brms.
+#'
+#' @return A `brms_conditional_effects` object
+#'
+#' @keywords internal
+#' @noRd
+.ce_nlpar_category_family <- function(x, par, nlpar, effects = NULL,
+                                      conditions = NULL, int_conditions = NULL,
+                                      re_formula = NA, spaghetti = FALSE,
+                                      surface = FALSE, resolution = 100,
+                                      select_points = 0, too_far = 0,
+                                      prob = 0.95, probs = NULL, robust = TRUE,
+                                      ndraws = NULL, draw_ids = NULL, ...) {
+  grid <- .brms_conditional_effects(
+    x,
+    dpar = names(brms::brmsterms(x$formula)$dpars)[1],
+    effects = effects, conditions = conditions,
+    int_conditions = int_conditions, re_formula = re_formula,
+    spaghetti = spaghetti, surface = surface, resolution = resolution,
+    select_points = select_points, too_far = too_far, draw_ids = 1, ...
+  )
 
-  for (var in names(grids)) {
-    newdata <- grids[[var]]
-
-    linpred_args <- list(
-      object = bmmfit,
-      newdata = newdata,
-      nlpar = par,
-      re_formula = re_formula,
-      allow_new_levels = TRUE
-    )
-    if (!is.null(ndraws)) linpred_args$ndraws <- ndraws
-
-    draws <- do.call(brms::posterior_linpred, linpred_args)
-
-    summ <- .ce_summarize_draws(draws, prob = prob, robust = robust)
-    newdata$estimate__ <- summ$estimate
-    newdata$lower__ <- summ$lower
-    newdata$upper__ <- summ$upper
-    newdata$se__ <- summ$se
-    newdata$effect1__ <- newdata[[var]]
-    newdata$cond__ <- factor("1")
-
-    attr(newdata, "effects") <- var
-    attr(newdata, "response") <- par
-
-    result[[var]] <- newdata
+  if (is.null(effects)) {
+    own_vars <- .np_grid_vars(x, par, re_formula = NA)
+    grid <- grid[vapply(grid, function(ce) all(attr(ce, "effects") %in% own_vars),
+                        logical(1))]
   }
 
-  class(result) <- c("brms_conditional_effects", "list")
-  result
+  probs <- probs %||% c((1 - prob) / 2, 1 - (1 - prob) / 2)
+  out <- lapply(grid, function(ce) {
+    cond_data <- ce[setdiff(names(ce), c("estimate__", "se__", "lower__", "upper__"))]
+    draws <- brms::posterior_linpred(
+      x, newdata = cond_data, nlpar = nlpar, re_formula = re_formula,
+      allow_new_levels = TRUE, ndraws = ndraws, draw_ids = draw_ids, ...
+    )
+    summ <- brms::posterior_summary(draws, probs = probs, robust = robust)
+    ce$estimate__ <- summ[, 1]
+    ce$se__ <- summ[, 2]
+    ce$lower__ <- summ[, 3]
+    ce$upper__ <- summ[, 4]
+    attr(ce, "response") <- nlpar
+    if (!is.null(attr(ce, "spaghetti"))) {
+      attr(ce, "spaghetti") <- .ce_spaghetti(cond_data, draws, attr(ce, "effects"))
+    }
+    ce
+  })
+  structure(out, class = "brms_conditional_effects")
+}
+
+
+#' Spaghetti lines from the draws of a conditional effect
+#'
+#' @description
+#' Builds the `spaghetti` attribute the way `brms` does: one line per draw,
+#' and per level of the second effect when there is one.
+#'
+#' @param cond_data The conditions grid, without the summary columns
+#' @param draws Matrix of draws (rows = draws, columns = grid rows)
+#' @param effects Character vector of the effect names
+#'
+#' @return A data frame with the grid repeated per draw, plus `estimate__` and
+#'   `sample__`
+#'
+#' @keywords internal
+#' @noRd
+.ce_spaghetti <- function(cond_data, draws, effects) {
+  sample <- rep(seq_len(nrow(draws)), each = ncol(draws))
+  if (length(effects) == 2L) {
+    sample <- paste0(sample, "_", cond_data[[effects[2]]])
+  }
+  cbind(
+    cond_data[rep(seq_len(nrow(cond_data)), times = nrow(draws)), , drop = FALSE],
+    estimate__ = as.numeric(t(draws)),
+    sample__ = factor(sample)
+  )
 }
 
 

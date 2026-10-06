@@ -205,22 +205,41 @@ test_that(".apply_link_transform transforms all elements in list", {
 
 
 # ===========================================================================
-# Tier 1: Unit tests — .ce_prediction_grid()
+# Tier 1: Unit tests — .has_category_dpars()
 # ===========================================================================
 
-test_that("m3 prediction grid is valid brms data when rows differ in trials (#510)", {
-  model <- m3(resp_cats = c("corr", "other", "npl"),
-              num_options = c("n_corr", "n_other", "n_npl"),
-              choice_rule = "simple", version = "ss")
-  fit <- bmm(bmf(c ~ 1 + cond, a ~ 1), oberauer_lewandowsky_2019_e1, model,
-             backend = "mock", mock_fit = 1, rename = FALSE)
-  expect_false(isTRUE(all.equal(mean(fit$data$nTrials), round(mean(fit$data$nTrials)))))
+test_that(".has_category_dpars is TRUE for the multinomial models only (#512)", {
+  mock <- function(formula, data, model) {
+    bmm(formula, data, model, backend = "mock", mock_fit = 1, rename = FALSE)
+  }
+  rating <- cbind(data.frame(stimulus = c(0L, 1L)),
+                  rsdt_rating(2, 50, c(0L, 1L), d = 1, thresholds = c(-0.5, 0, 0.5)))
+  ranking <- as.data.frame(rsdt_ranking(2, 50, m = 4, d = 1))
+  cdp <- cbind(data.frame(stimulus = c(0L, 1L)),
+               rsdt_cdp(2, 50, c(0L, 1L), dfam = 0.8, drec = 1, rcrit = 0.5,
+                        thresholds = .cdp_make_thresholds(0, -0.3, 3, 3, "parsimonious"),
+                        n_new = 3))
 
-  grid <- .ce_prediction_grid(fit, "c")$cond
-  expect_identical(grid$nTrials, rep(1L, nrow(grid)))
-  expect_no_error(brms::standata(
-    fit, newdata = grid, check_response = FALSE, allow_new_levels = TRUE
-  ))
+  expect_true(.has_category_dpars(mock(
+    bmf(c ~ 1, a ~ 1), oberauer_lewandowsky_2019_e1,
+    m3(resp_cats = c("corr", "other", "npl"),
+       num_options = c("n_corr", "n_other", "n_npl"),
+       choice_rule = "simple", version = "ss")
+  )))
+  expect_true(.has_category_dpars(mock(
+    bmf(d ~ 1, criterion ~ 1, spacing ~ 1), rating,
+    sdt_rating(c("r1", "r2", "r3", "r4"), "stimulus")
+  )))
+  expect_true(.has_category_dpars(mock(
+    bmf(d ~ 1), ranking, sdt_ranking(paste0("rank", 1:4), m = 4)
+  )))
+  expect_true(.has_category_dpars(mock(
+    bmf(dfam ~ 1, drec ~ 1, criterion ~ 1, spacing ~ 1, rcrit ~ 1), cdp,
+    sdt_cdp(stimulus = "stimulus", n_new = 3, n_old = 3)
+  )))
+  expect_false(.has_category_dpars(mock(
+    bmf(c ~ 1, kappa ~ 1), oberauer_lin_2017, sdm(resp_error = "dev_rad")
+  )))
 })
 
 
@@ -366,4 +385,90 @@ test_that("plotting conditional_effects works", {
   ce <- conditional_effects(fit, par = "c")
   p <- plot(ce, plot = FALSE)
   expect_true(length(p) > 0)
+})
+
+
+# ===========================================================================
+# Tier 2: Multinomial families (m3 fixture; rows differ in nTrials)
+# ===========================================================================
+
+load_m3_fit <- function() {
+  path <- test_path("assets/bmmfit_m3_ppcheck.rds")
+  skip_if_not(file.exists(path), "m3 fixture not available (excluded by .Rbuildignore)")
+  readRDS(path)
+}
+
+test_that("m3 conditional_effects is the parameter evaluated on the brms grid (#510, #512)", {
+  skip_on_cran()
+  fit <- load_m3_fit()
+  expect_gt(length(unique(fit$data$nTrials)), 1)
+
+  ce <- conditional_effects(fit, par = "c", scale = "sampling")
+  expect_named(ce, "cond")
+  draws <- brms::posterior_linpred(fit, newdata = ce$cond, nlpar = "c",
+                                   re_formula = NA)
+  expect_equal(ce$cond$estimate__, apply(draws, 2, median))
+  expect_equal(attr(ce$cond, "response"), "c")
+})
+
+test_that("m3 conditional_effects applies conditions and re_formula = NULL (#512)", {
+  skip_on_cran()
+  fit <- load_m3_fit()
+
+  ce <- conditional_effects(fit, par = "c", scale = "sampling",
+                            conditions = data.frame(ID = c(1, 2)),
+                            re_formula = NULL)
+  expect_setequal(ce$cond$ID, c(1, 2))
+  draws <- brms::posterior_linpred(fit, newdata = ce$cond, nlpar = "c",
+                                   re_formula = NULL)
+  expect_equal(ce$cond$estimate__, apply(draws, 2, median))
+  by_id <- split(ce$cond$estimate__, ce$cond$ID)
+  expect_false(isTRUE(all.equal(by_id[[1]], by_id[[2]])))
+})
+
+test_that("m3 conditional_effects keeps only effects of the parameter's own predictors", {
+  skip_on_cran()
+  fit <- load_m3_fit()
+
+  expect_setequal(names(conditional_effects(fit)), c("a.cond", "c.cond"))
+  expect_length(conditional_effects(fit, par = "d"), 0)
+})
+
+
+# ===========================================================================
+# Tier 3: Model-fitting integration tests
+# ===========================================================================
+
+test_that("conditional_effects works on sdt_rating fits (#512)", {
+  skip_on_cran()
+  skip_on_ci()
+  skip_if_not_installed("cmdstanr")
+  skip_if(is.null(tryCatch(cmdstanr::cmdstan_version(), error = function(e) NULL)))
+  withr::local_seed(512)
+
+  dat <- expand.grid(id = 1:6, stimulus = c(0L, 1L), cond = c("A", "B"))
+  dat <- cbind(dat, rsdt_rating(nrow(dat), 150, dat$stimulus,
+                                d = ifelse(dat$cond == "A", 1, 2),
+                                thresholds = c(-0.5, 0, 0.5)))
+  dat$x <- stats::rnorm(nrow(dat))
+  model <- sdt_rating(c("r1", "r2", "r3", "r4"), "stimulus")
+  fit <- bmm(bmf(d ~ 1 + cond + x, criterion ~ 1, spacing ~ 1), dat, model,
+             backend = "cmdstanr", chains = 1, iter = 300, warmup = 150,
+             refresh = 0, silent = 2)
+
+  expect_setequal(names(suppressMessages(conditional_effects(fit))),
+                  c("d.cond", "d.x"))
+
+  ce <- suppressMessages(conditional_effects(
+    fit, par = "d", effects = "x:cond", int_conditions = list(cond = "B")
+  ))
+  expect_true(all(ce[[1]]$cond == "B"))
+
+  ce <- suppressMessages(conditional_effects(
+    fit, par = "d", effects = "x", spaghetti = TRUE, draw_ids = 1:10
+  ))
+  draws <- brms::posterior_linpred(fit, newdata = ce$x, nlpar = "d",
+                                   re_formula = NA, draw_ids = 1:10)
+  expect_equal(ce$x$estimate__, apply(draws, 2, median))
+  expect_equal(attr(ce$x, "spaghetti")$estimate__, as.numeric(t(draws)))
 })
