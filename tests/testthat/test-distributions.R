@@ -1656,6 +1656,8 @@ test_that("dmpt and rmpt refuse a value given more than once", {
     rmpt(1, 10, c(D = 0.5, G = 0.8), model, covariates = c(D = 0.4, G = 0.2)),
     "'D', 'G' are given more than once"
   )
+  # unnamed values are not duplicates of each other
+  expect_no_error(dmpt(c(7, 3), c(D = 0.5), model, "t", TRUE, NULL, 0.5, 0.6, G = 0.5))
 })
 
 # Tests for the ezdm decision-time cumulants (issue #407) ----------------------

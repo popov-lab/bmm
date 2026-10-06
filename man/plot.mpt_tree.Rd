@@ -52,8 +52,9 @@ For a model created with \code{\link[=mpt]{mpt()}}, the plot draws the trees as 
 marks restricted parameters: the edge of a fixed parameter reads \code{g = 0.5},
 the edge of an equated parameter \verb{Dn (= Do)}, and an edge that contains a
 restricted parameter shows the restriction in parentheses, as in
-\code{1 - g (g = 0.5)}. Impossible categories are omitted. A literal 0 in an expression (as in \code{D + 0 * x}) is drawn as an edge
-labelled 0. The \code{...} argument is ignored; the title cannot be changed.
+\code{1 - g (g = 0.5)}. Impossible categories are omitted. A literal 0 in an
+expression (as in \code{D + 0 * x}) is drawn as an edge labelled 0. The \code{...}
+argument is ignored; the title cannot be changed.
 Leaf labels wider than about 90\% of a panel are clipped, and long edge
 labels near the root can be clipped earlier, when the leaf labels leave
 little room.

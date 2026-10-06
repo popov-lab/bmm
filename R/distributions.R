@@ -909,7 +909,8 @@ rmpt <- function(n, size, pars, mpt_model, tree = NULL, unpack = FALSE,
     "Unknown tree '{tree}'. The model contains: {collapse_comma(names(trees))}"
   )
   values <- c(as.list(pars), as.list(covariates), list(...))
-  duplicated_names <- unique(names(values)[duplicated(names(values))])
+  value_names <- names(values)[nzchar(names(values))]
+  duplicated_names <- unique(value_names[duplicated(value_names)])
   stopif(
     length(duplicated_names) > 0,
     "The value(s) of {collapse_comma(duplicated_names)} are given more than \\
