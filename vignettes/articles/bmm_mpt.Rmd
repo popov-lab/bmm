@@ -271,7 +271,7 @@ model_2htm_restricted <- mpt(
 model_2htm_restricted
 ```
 
-A constant works the same way, and `dmpt()`, `plot()` and the branch-sum check all see the restricted expressions:
+A constant works the same way. `dmpt()` and the branch-sum check see the restricted expressions, and `plot()` labels the edges of `g` as `g = 0.5`:
 
 ```{r}
 model_2htm_g5 <- mpt(
