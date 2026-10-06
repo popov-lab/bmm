@@ -19,7 +19,7 @@ test_that("mpt_tree validates its inputs", {
   expect_error(mpt_tree("t", list(a = 0.5, b = "x")), "character strings")
 })
 
-test_that("mpt stores its derived state once and can rebuild itself", {
+test_that("mpt stores its derived state once", {
   model <- mpt(mpt_2htm_trees(), tree_id = "item_type")
   expect_equal(model$other_vars$link, "logit")
   expect_equal(model$other_vars$indicators$tree, c(old = "Idx_old", new = "Idx_new"))
@@ -29,14 +29,6 @@ test_that("mpt stores its derived state once and can rebuild itself", {
   expect_equal(model$default_priors$D$main, "logistic(0, 1)")
   expect_equal(model$default_priors$D$effects, "logistic(0, 1)")
 
-  # the recorded call differs by construction; every other field must match
-  without_call <- function(m) {
-    attr(m, "call") <- NULL
-    m
-  }
-  rebuilt <- do.call("mpt", .mpt_constructor_args(model))
-  expect_equal(without_call(rebuilt), without_call(model))
-
   single <- mpt(mpt_tree("t", list(A = "gA", B = "gB", C = "gC")),
     simplex = c("gA", "gB", "gC"), links = "probit"
   )
@@ -45,8 +37,6 @@ test_that("mpt stores its derived state once and can rebuild itself", {
   expect_equal(single$links$gA, "identity")
   expect_equal(single$default_priors$gAraw$main, "normal(0, 1)")
   expect_equal(single$default_priors$gAraw$effects, "normal(0, 1)")
-  rebuilt_single <- do.call("mpt", .mpt_constructor_args(single))
-  expect_equal(without_call(rebuilt_single), without_call(single))
 })
 
 test_that("an empty formula fits every parameter with an intercept", {
@@ -1009,4 +999,25 @@ test_that("factor tree identifier columns are matched to tree names", {
   checked <- check_data(model, dat, bmf(D ~ 1, g ~ 1))
   expect_equal(checked$Idx_old, as.integer(dat$item_type == "old"))
   expect_equal(checked$Idx_new, as.integer(dat$item_type == "new"))
+})
+
+test_that("conditional_effects() shows mpt parameters on the native scale", {
+  skip_on_cran()
+  skip_if_not_installed("cmdstanr")
+
+  # unequal trials per row, with a mean that is not an integer
+  dat <- data.frame(
+    item_type = rep(c("old", "new"), 2), cond = rep(c("x", "y"), each = 2),
+    old = c(70, 20, 45, 30), new = c(30, 61, 15, 70)
+  )
+  fit <- bmm(
+    bmf(D ~ cond, g ~ 1), dat, mpt(mpt_2htm_trees(), "item_type"),
+    backend = "cmdstanr", chains = 2, iter = 1000, refresh = 0, silent = 2
+  )
+
+  ce <- conditional_effects(fit, par = "D", robust = TRUE)
+  np <- native_parameters(fit, pars = "D")
+  medians <- c(tapply(np$value, np$cond, stats::median))
+  expect_equal(ce$cond$estimate__, unname(medians[as.character(ce$cond$cond)]), tolerance = 1e-3)
+  expect_named(conditional_effects(fit), "D.cond")
 })

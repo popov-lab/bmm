@@ -227,17 +227,6 @@ settable_link_functions.mpt <- function(model) {
   c("logit", "probit")
 }
 
-# restrictions are already substituted into the stored trees, so they are
-# not passed again
-.mpt_constructor_args <- function(model) {
-  list(
-    trees = unname(model$other_vars$trees),
-    tree_id = model$other_vars$tree_id,
-    simplex = model$other_vars$simplex,
-    links = model$other_vars$link
-  )
-}
-
 # user facing alias
 # information in the title and details sections will be filled in
 # automatically based on the information in the .model_mpt()
@@ -1016,7 +1005,8 @@ check_data.mpt <- function(model, data, formula) {
   )
   resp_matrix[is.na(resp_matrix)] <- 0
   data <- data[!col_names %in% resp_cats]
-  data$nTrials <- rowSums(resp_matrix)
+  # an integer column keeps conditional_effects() grids at a valid trial count
+  data$nTrials <- as.integer(rowSums(resp_matrix))
   data$Y <- resp_matrix
 
   tree_id <- model$other_vars$tree_id
