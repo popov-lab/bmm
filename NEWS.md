@@ -1,3 +1,8 @@
+# bmm 1.6.0 (development)
+
+### New features
+* New function `bmm_reliability()` reports how reliably a fitted model separates persons on each parameter, from the posterior of the person-level parameters, for trial-level and aggregated data alike. With random effects for sessions or stimuli crossed with persons it also reports generalizability coefficients, and with `retest` the stability of person scores between occasions. `reliability_for_design()` projects the reliability to more trials, sessions or stimuli, or finds the number of trials a target reliability needs. See `?bmm_reliability`. Thanks to @GidonFrischkorn
+
 # bmm (development version)
 
 ### New models

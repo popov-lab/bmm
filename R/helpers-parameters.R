@@ -574,24 +574,7 @@ native_parameters <- function(x, newdata = NULL, pars = NULL, re_formula = NULL,
 
   grid_vars <- .np_grid_vars(x, model_pars, re_formula)
   newdata <- .np_newdata(x, grid_vars, newdata)
-
-  linpred <- .np_linpred(x, model_pars, pars, newdata, re_formula, draw_ids, list(...))
-  if (scale == "native") {
-    transformed <- native_transform(x$bmm$model, linpred, newdata)
-    stopif(
-      !setequal(names(transformed), names(linpred)),
-      "The native_transform() method for model '{x$bmm$model$name}' must return \\
-      one element per parameter it was given."
-    )
-    transformed <- transformed[names(linpred)]
-    stopif(
-      !identical(lapply(transformed, dim), lapply(linpred, dim)),
-      "The native_transform() method for model '{x$bmm$model$name}' must preserve \\
-      the dimensions of the draws it was given."
-    )
-    linpred <- transformed
-  }
-  linpred <- linpred[names(linpred) %in% pars]
+  linpred <- .np_draws(x, model_pars, pars, newdata, re_formula, scale, draw_ids, list(...))
 
   grid <- newdata[, grid_vars, drop = FALSE]
   row.names(grid) <- NULL
@@ -949,6 +932,32 @@ native_transform.non_targets <- function(model, linpred, data, ...) {
     newdata[[var]] <- reference[[var]]
   }
   newdata
+}
+
+
+# Draws of the requested parameters for every row of `newdata`, on the sampling
+# or the native scale. All of `pars` are predicted because native_transform()
+# can need several parameters at once (the softmax of the mixture weights);
+# only `requested` is returned. Shared by native_parameters() and
+# bmm_reliability().
+.np_draws <- function(x, pars, requested, newdata, re_formula, scale, draw_ids, dots) {
+  linpred <- .np_linpred(x, pars, requested, newdata, re_formula, draw_ids, dots)
+  if (scale == "native") {
+    transformed <- native_transform(x$bmm$model, linpred, newdata)
+    stopif(
+      !setequal(names(transformed), names(linpred)),
+      "The native_transform() method for model '{x$bmm$model$name}' must return \\
+      one element per parameter it was given."
+    )
+    transformed <- transformed[names(linpred)]
+    stopif(
+      !identical(lapply(transformed, dim), lapply(linpred, dim)),
+      "The native_transform() method for model '{x$bmm$model$name}' must preserve \\
+      the dimensions of the draws it was given."
+    )
+    linpred <- transformed
+  }
+  linpred[names(linpred) %in% requested]
 }
 
 
