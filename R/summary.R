@@ -92,7 +92,7 @@ print_summary_random <- function(x, digits) {
     for (g in names(x$random)) {
       cat(paste0("~", g, " (Number of levels: ", x$ngrps[[g]], ") \n"))
       re <- x$random[[g]]
-      print_format(re[!is.na(re$Rhat), , drop = FALSE], digits)
+      print_format(re[!is.na(re$Rhat), ], digits)
       cat("\n")
     }
   }
@@ -104,12 +104,12 @@ print_summary_fixed <- function(rows, digits) {
   is_constant <- is.na(rows$Rhat)
   if (any(!is_constant)) {
     cat(style("green")("Regression Coefficients:\n"))
-    print_format(rows[!is_constant, , drop = FALSE], digits)
+    print_format(rows[!is_constant, ], digits)
     cat("\n")
   }
   if (any(is_constant)) {
     cat(style("green")("Constant Parameters:\n"))
-    constants <- rows[is_constant, , drop = FALSE]
+    constants <- rows[is_constant, ]
     print_format(
       data.frame(Value = constants[, 1], row.names = paste0(rownames(constants), "    ")),
       digits

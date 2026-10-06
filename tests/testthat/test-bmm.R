@@ -185,9 +185,75 @@ test_that("check_data() methods see the name of the user's data", {
   my_sdm_data <- data.frame(y = rsdm(10))
   stancode(bmf(c ~ 1, kappa ~ 1), my_sdm_data, sdm("y"))
   expect_equal(seen, "my_sdm_data")
+
+  my_matrix <- as.matrix(data.frame(y = rsdm(10)))
+  seen <- NULL
+  bmm(bmf(kappa ~ 1, c ~ 1), my_matrix, sdm("y"), backend = "mock", mock_fit = 1, rename = FALSE)
+  expect_equal(seen, "my_matrix")
+
+  my_list <- list(y = rsdm(10))
+  seen <- NULL
+  bmm(bmf(kappa ~ 1, c ~ 1), my_list, sdm("y"), backend = "mock", mock_fit = 1, rename = FALSE)
+  expect_equal(seen, "my_list")
+})
+
+test_that("bmm() says when the formula is not a bmmformula", {
+  dat <- data.frame(y = rimm(n = 5))
+  for (f in list(y ~ 1, brms::bf(y ~ 1), list(kappa ~ 1), NULL, "kappa ~ 1")) {
+    expect_error(
+      bmm(f, dat, mixture2p("y"), backend = "mock", mock_fit = 1),
+      "The provided formula is not a bmm formula"
+    )
+  }
+
+  # problems with the model and the data are reported before the formula
+  expect_error(
+    bmm(y ~ 1, data.frame(z = 1:3), mixture2p("y"), backend = "mock", mock_fit = 1),
+    "The response variable 'y' is not present in the data."
+  )
+  expect_error(
+    bmm(y ~ 1, model = mixture2p("y"), backend = "mock", mock_fit = 1),
+    "Data must be specified using the 'data' argument."
+  )
+})
+
+test_that("bmm() says when data is not coercible to a data frame, whatever it is", {
+  f <- bmf(kappa ~ 1, thetat ~ 1)
+  my_env <- new.env()
+  for (bad_data in list(sum, quote(abc), my_env)) {
+    expect_error(
+      bmm(f, bad_data, mixture2p("y"), backend = "mock", mock_fit = 1),
+      "Argument 'data' must be coercible to a data.frame."
+    )
+  }
+  expect_null(attr(my_env, "data_name"))
+})
+
+test_that("bmm() and the extractors say when data is missing", {
+  f <- bmf(c ~ 1, kappa ~ 1)
+  msg <- "Data must be specified using the 'data' argument."
+  expect_error(bmm(f, model = sdm("y"), backend = "mock", mock_fit = 1), msg)
+  expect_error(standata(f, model = sdm("y")), msg)
+  expect_error(stancode(f, model = sdm("y")), msg)
+  expect_error(default_prior(f, model = sdm("y")), msg)
+})
+
+test_that("bmm() stamps the bmm version into the Stan code of the fit", {
+  fit <- bmm(bmf(c ~ 1, kappa ~ 1), data.frame(y = rsdm(10)), sdm("y"),
+    backend = "mock", mock_fit = 1, rename = FALSE
+  )
+  expect_match(fit$model, paste0("brms [0-9.]+ and bmm ", utils::packageVersion("bmm")))
 })
 
 test_that("standata() does not configure the prior, which the Stan data does not use", {
   local_mocked_bindings(configure_prior = function(...) stop2("configure_prior() called"))
   expect_type(standata(bmf(c ~ 1, kappa ~ 1), data.frame(y = rsdm(10)), sdm("y")), "list")
+})
+
+test_that("stancode() and default_prior() do not build the inits, which they do not return", {
+  local_mocked_bindings(create_initfun = function(...) stop2("create_initfun() called"))
+  f <- bmf(c ~ 1, kappa ~ 1)
+  dat <- data.frame(y = rsdm(10))
+  expect_type(stancode(f, dat, sdm("y")), "character")
+  expect_s3_class(default_prior(f, dat, sdm("y")), "brmsprior")
 })

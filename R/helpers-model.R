@@ -1395,10 +1395,11 @@ stancode.bmmformula <- function(object, data, model, prior = NULL, ...) {
   withr::local_options(bmm.sort_data = FALSE)
   dots <- list(...)
   local_brms_threads(dots)
-  cfg <- configure_fit(object, data, model, prior,
-    until = "prior", frame_args = brms_frame_args(dots)
-  )
-  add_bmm_version_to_stancode(call_brms_extractor(brms::stancode, cfg, dots))
+  add_bmm_version_to_stancode(call_brms_extractor(
+    brms::stancode,
+    configure_fit(object, data, model, prior, until = "prior", frame_args = brms_frame_args(dots)),
+    dots
+  ))
 }
 
 # Everything brm() needs to fit a specification: the checked model, the brms
@@ -1423,7 +1424,7 @@ configure_fit.bmmformula <- function(formula, data = NULL, model = NULL, prior =
   # it (order_data_query()), and again after, because some methods rebuild the
   # data frame without it
   data_name <- substitute_name(data, envir = parent.frame())
-  if (!missing(data) && is.data.frame(data)) {
+  if (!missing(data) && !is.null(data) && (is.list(data) || is.atomic(data))) {
     attr(data, "data_name") <- data_name
   }
   model <- check_model(model, data, formula)
@@ -1444,6 +1445,13 @@ configure_fit.bmmformula <- function(formula, data = NULL, model = NULL, prior =
     )
   }
   nlist(config_args, prior, model, user_formula)
+}
+
+#' @export
+configure_fit.default <- function(formula, data = NULL, model = NULL, ...) {
+  model <- check_model(model, data, formula)
+  data <- check_data(model, data, formula)
+  check_formula(model, data, formula)
 }
 
 # The brms extractors take the formula as `object`

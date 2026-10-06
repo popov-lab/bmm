@@ -55,12 +55,12 @@ built_data_columns.default <- function(model) {
 #' @export
 check_data.bmmodel <- function(model, data, formula) {
   stopif(missing(data), "Data must be specified using the 'data' argument.")
+  data_name <- attr(data, "data_name") %||% substitute_name(data, envir = eval(parent.frame()))
   data <- try(as.data.frame(data), silent = TRUE)
   stopif(is_try_error(data), "Argument 'data' must be coercible to a data.frame.")
   stopif(!isTRUE(nrow(data) > 0L), "Argument 'data' does not contain observations.")
 
-  attr(data, "data_name") <- attr(data, "data_name") %||%
-    substitute_name(data, envir = eval(parent.frame()))
+  attr(data, "data_name") <- data_name
   attr(data, "checked") <- TRUE
   NextMethod("check_data")
 }
@@ -277,8 +277,11 @@ standata.bmmformula <- function(object, data, model, ...) {
   dots <- list(...)
   local_brms_threads(dots)
   configure_options(dots)
-  cfg <- configure_fit(object, data, model, until = "model", frame_args = brms_frame_args(dots))
-  call_brms_extractor(brms::standata, cfg, dots)
+  call_brms_extractor(
+    brms::standata,
+    configure_fit(object, data, model, until = "model"),
+    dots
+  )
 }
 
 # check if the data is sorted by the predictors
