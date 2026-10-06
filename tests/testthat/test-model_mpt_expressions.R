@@ -41,14 +41,30 @@ test_that("mpt errors when branch probabilities do not sum to 1", {
   expect_error(mpt(bad_tree), "or tie them in the formula \\(e.g. Dn ~ Do\\)")
 
   good_tree <- mpt_tree("u", list(a = "D + (1 - D) * g", b = "(1 - D) * (1 - g)"))
-  deviations <- .mpt_tree_sum_deviations(
+  branch_errors <- .mpt_tree_branch_errors(
     list(t = bad_tree, u = good_tree), c("D", "g")
   )
   # the branches reduce to g, so the first test point reports g's value there
-  expect_equal(
-    deviations[["t"]], .mpt_test_points(c("D", "g"))[[1]][["g"]]
+  expect_match(
+    branch_errors[["t"]],
+    glue("sum to {signif(.mpt_test_points(c('D', 'g'))[[1]][['g']], 6)} instead of 1")
   )
-  expect_true(is.na(deviations[["u"]]))
+  expect_true(is.na(branch_errors[["u"]]))
+})
+
+test_that("mpt errors when a branch probability leaves (0, 1]", {
+  # the branches sum to 1 for every value of a
+  doubled <- mpt_tree("t", list(yes = "2 * a", no = "1 - 2 * a"))
+  expect_error(
+    mpt(doubled),
+    "category 'yes' in tree 't' is 1\\.7.* at the test values a = 0\\.85.*, outside \\(0, 1\\]"
+  )
+  zero <- mpt_tree("z", list(yes = "a", no = "(1 - a) * 0", maybe = "1 - a"))
+  expect_error(
+    mpt(zero),
+    "category 'no' in tree 'z' is 0 .*outside \\(0, 1\\].*makes the likelihood undefined"
+  )
+  expect_no_error(mpt(mpt_tree("t", list(yes = "a", no = "1 - a"))))
 })
 
 test_that("test points give every symbol its own interior value at every point", {

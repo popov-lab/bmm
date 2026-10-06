@@ -465,16 +465,9 @@ mpt <- function(trees, tree_id = NULL, links = "logit", ...) {
     trial counts. Please rename: {collapse_comma(reserved)}"
   )
 
-  deviations <- .mpt_tree_sum_deviations(trees, parameters)
-  for (tree_name in names(deviations)[!is.na(deviations)]) {
-    stop2(
-      "The branch probabilities of tree '{tree_name}' sum to \\
-      {signif(deviations[[tree_name]], 6)} instead of 1 when evaluated at \\
-      numeric test values. Please check the branch expressions. To equate \\
-      parameters, give them the same name in the branch expressions or tie \\
-      them in the formula (e.g. Dn ~ Do)."
-    )
-  }
+  branch_errors <- .mpt_tree_branch_errors(trees, parameters)
+  branch_errors <- branch_errors[!is.na(branch_errors)]
+  stopif(length(branch_errors) > 0, "{branch_errors[1]}")
 
   .model_mpt(trees = trees, tree_id = tree_id, links = links, call = call, ...)
 }

@@ -159,16 +159,41 @@
   )
 }
 
-# the first deviating branch sum per tree, NA where every test point sums to 1
-.mpt_tree_sum_deviations <- function(trees, parameters, tolerance = 1e-6) {
+# the first branch-sum or branch-range violation per tree, NA where every test
+# point gives branches in (0, 1] that sum to 1. Branches can sum to 1 for every
+# value and still leave (0, 1] (2 * a and 1 - 2 * a); a branch below or at 0 is
+# log(p) of a non-positive number in Stan. All test points are interior, so an
+# exact 0 is a branch that is 0 for every value, e.g. (1 - a) * 0
+.mpt_tree_branch_errors <- function(trees, parameters, tolerance = 1e-6) {
   points <- .mpt_test_points(parameters)
   vapply(trees, function(tree) {
     for (vals in points) {
-      total <- sum(.mpt_eval_branches(tree, as.list(vals)))
-      if (abs(total - 1) > tolerance) {
-        return(total)
+      probs <- .mpt_eval_branches(tree, as.list(vals))
+      if (abs(sum(probs) - 1) > tolerance) {
+        return(glue(
+          "The branch probabilities of tree '{tree$name}' sum to \\
+          {signif(sum(probs), 6)} instead of 1 when evaluated at numeric test \\
+          values. Please check the branch expressions. To equate parameters, \\
+          give them the same name in the branch expressions or tie them in the \\
+          formula (e.g. Dn ~ Do)."
+        ))
+      }
+      outside <- names(probs)[probs <= 0 | probs > 1 + tolerance][1]
+      if (!is.na(outside)) {
+        symbols <- all.vars(tree$branches[[outside]])
+        zero_hint <- if (probs[[outside]] == 0) {
+          " A zero probability makes the likelihood undefined."
+        } else {
+          ""
+        }
+        return(glue(
+          "The branch probability of category '{outside}' in tree \\
+          '{tree$name}' is {signif(probs[[outside]], 6)} at the test values \\
+          {paste(symbols, '=', signif(vals[symbols], 3), collapse = ', ')}, \\
+          outside (0, 1]. Please check the branch expressions.{zero_hint}"
+        ))
       }
     }
-    NA_real_
-  }, numeric(1))
+    NA_character_
+  }, character(1))
 }

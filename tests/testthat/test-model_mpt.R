@@ -99,8 +99,10 @@ test_that("mpt errors on a branch that is the constant 0", {
   expect_error(mpt(zero_padded, tree_id = "t"), "constant 0")
   expect_error(mpt(zero_padded, tree_id = "t"), "'z' in tree 'a', 'x' in tree 'b'")
   expect_error(mpt(mpt_tree("c", list(x = "(0)", y = "D + (1 - D)"))), "constant 0")
+  # not the literal 0 this guard reads, but 0 at every interior test point,
+  # which the range check refuses
   zero_product <- mpt_tree("d", list(x = "0 * D", y = "1 - 0 * D"))
-  expect_s3_class(mpt(zero_product), "mpt")
+  expect_error(mpt(zero_product), "category 'x' in tree 'd' is 0 .*outside \\(0, 1\\]")
 })
 
 test_that("mpt errors on name collisions and reserved names", {
