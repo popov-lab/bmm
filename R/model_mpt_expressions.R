@@ -277,26 +277,34 @@
 # by member), not its members: the member columns are multiplied by the
 # derivative of the members with respect to the sticks, at test points that lie
 # on the simplex. A fixed stick keeps its column out of the free set.
+# Covariates identify parameters through rows with different covariate values,
+# so `settings` (one data frame of covariate values per tree) stacks one block
+# of rows per tree and setting before the decomposition; the degrees of freedom
+# grow with the number of blocks.
 .mpt_jacobian_rank <- function(trees, free, fixed = list(), simplex = list(),
-                               sticks = character(0), tolerance = 1e-8) {
+                               sticks = character(0), settings = NULL,
+                               tolerance = 1e-8) {
   if (length(free) == 0L) {
     return(list(
       rank = 0L, n_free = 0L, free = free,
       involved = character(0), absent = character(0)
     ))
   }
-  branches <- unlist(lapply(unname(trees), `[[`, "branches"), use.names = FALSE)
+  trees <- unname(trees)
   parameters <- c(setdiff(free, sticks), unlist(simplex), names(fixed))
-  derivs <- try(unlist(lapply(branches, function(branch) {
-    lapply(parameters, function(par) {
-      if (par %in% all.vars(branch)) stats::D(branch, par) else 0
-    })
-  }), recursive = FALSE), silent = TRUE)
+  derivs <- try(lapply(trees, function(tree) {
+    unlist(lapply(tree$branches, function(branch) {
+      lapply(parameters, function(par) {
+        if (par %in% all.vars(branch)) stats::D(branch, par) else 0
+      })
+    }), recursive = FALSE)
+  }), silent = TRUE)
   if (is_try_error(derivs)) {
     return(list(error = conditionMessage(attr(derivs, "condition"))))
   }
-  df <- sum(lengths(lapply(trees, `[[`, "branches")) - 1L)
-  symbols <- unique(unlist(lapply(branches, all.vars)))
+  settings <- settings %||% lapply(trees, function(tree) data.frame(row.names = 1L))
+  df <- sum((lengths(lapply(trees, `[[`, "branches")) - 1L) * vapply(settings, nrow, integer(1)))
+  symbols <- unique(unlist(lapply(trees, .mpt_expr_vars)))
   points <- .mpt_test_points(symbols, simplex)
   # one vector per symbol holding its value at every test point, so each
   # derivative is evaluated once for all points
@@ -304,14 +312,20 @@
     vapply(points, `[[`, numeric(1), symbol)
   })
   vals[names(fixed)] <- fixed
-  values <- vapply(derivs, function(deriv) {
-    rep_len(eval(deriv, vals), length(points))
-  }, numeric(length(points)))
+  blocks <- unlist(lapply(seq_along(trees), function(tree) {
+    lapply(seq_len(nrow(settings[[tree]])), function(row) {
+      row_vals <- vals
+      row_vals[names(settings[[tree]])] <- as.list(settings[[tree]][row, , drop = FALSE])
+      vapply(derivs[[tree]], function(deriv) {
+        rep_len(eval(deriv, row_vals), length(points))
+      }, numeric(length(points)))
+    })
+  }), recursive = FALSE)
   decompositions <- lapply(seq_along(points), function(point) {
-    jacobian <- matrix(
-      values[point, ], ncol = length(parameters), byrow = TRUE,
-      dimnames = list(NULL, parameters)
-    )
+    jacobian <- do.call(rbind, lapply(blocks, function(block) {
+      matrix(block[point, ], ncol = length(parameters), byrow = TRUE)
+    }))
+    colnames(jacobian) <- parameters
     for (grp in simplex) {
       jacobian <- cbind(
         jacobian[, setdiff(colnames(jacobian), grp), drop = FALSE],

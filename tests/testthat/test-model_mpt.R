@@ -795,6 +795,51 @@ test_that("the rank check works in the stick-breaking components of a simplex gr
   expect_no_match(sub(".*not identified", "", printed), "raw")
 })
 
+test_that("the rank check stacks rows over covariate values and never frees a covariate", {
+  scaled <- mpt(list(
+    mpt_tree("old", list(yes = "D + (1 - D) * g * x", no = "(1 - D) * (1 - g * x)")),
+    mpt_tree("new", list(yes = "(1 - D) * g * x", no = "D + (1 - D) * (1 - g * x)"))
+  ), tree_id = "item_type", covariates = "x")
+  expect_match(
+    mpt_printed(scaled),
+    "Jacobian rank 2 of 2 at interior test values and 5 test values of the covariates"
+  )
+  dat <- data.frame(item_type = c("old", "new"), x = c(0.5, 1), yes = 5, no = 5)
+  expect_no_warning(expect_no_message(check_model(scaled, dat, bmf(D ~ 1, g ~ 1))))
+
+  # one tree with a 0/1 covariate: a and b are identified only across rows
+  switch_tree <- mpt(
+    mpt_tree("t", list(yes = "x * a + (1 - x) * b", no = "1 - x * a - (1 - x) * b")),
+    covariates = "x"
+  )
+  printed <- mpt_printed(switch_tree)
+  expect_match(printed, "in one design cell; covariate values that differ")
+  expect_match(printed, "Jacobian rank 2 of 2")
+  both <- data.frame(x = c(0, 1, 1), yes = 5, no = 5)
+  expect_no_warning(expect_no_message(check_model(switch_tree, both, bmf(a ~ 1, b ~ 1))))
+  only_a <- data.frame(x = c(1, 1), yes = 5, no = 5)
+  expect_warning(
+    check_model(switch_tree, only_a, bmf(a ~ 1, b ~ 1)),
+    "rank 1 for 2 free parameters at interior test values and the covariate values in the data.*'b' is zero"
+  )
+
+  # a covariate is never listed among the parameters
+  product <- mpt(
+    mpt_tree("t", list(yes = "x * a * b", no = "1 - x * a * b")),
+    covariates = "x"
+  )
+  printed <- mpt_printed(product)
+  expect_match(printed, "rank 1 for 2 free parameters")
+  expect_no_match(printed, "'x'")
+
+  # a residue that cancels stays a zero column when the rows are stacked
+  residue <- mpt(mpt_tree("t", list(
+    yes = "x * (a * b * c * q + c * b * a * (1 - q))",
+    no = "1 - x * (a * b * c * q + c * b * a * (1 - q))"
+  )), covariates = "x")
+  expect_match(mpt_printed(residue), "derivative with respect to 'q' is zero")
+})
+
 test_that("the Jacobian rank is reported as not computed when D() cannot differentiate", {
   model <- mpt(mpt_tree("t", list(x = "plogis(a)", y = "1 - plogis(a)")))
   printed <- mpt_printed(model)

@@ -434,7 +434,11 @@ settable_link_functions.mpt <- function(model) {
 #'   with respect to the free parameters, from exact derivatives at five
 #'   interior test values; parameters fixed in the formula enter at their
 #'   values. A simplex group counts with one free parameter fewer than its
-#'   members, and the printout names the group by its members. A rank below the number of free parameters means that some
+#'   members, and the printout names the group by its members. Covariates
+#'   are never free parameters; because rows with different covariate values
+#'   can identify what one design cell cannot, the rank is taken over the rows
+#'   of all covariate values in the data (at most 20 per tree) in `bmm()`, and
+#'   over five test values of the covariates when printing. A rank below the number of free parameters means that some
 #'   combination of the listed parameters cannot be estimated from the data,
 #'   even when the count passes, and its posterior follows the prior; a
 #'   parameter whose derivatives are zero up to rounding at the test values
@@ -805,7 +809,15 @@ print_model_details.mpt <- function(model, ...) {
     "Identifiability (intercept-only formulas): {n_free} free parameter(s), \\
     {df} degrees of freedom (response categories minus 1, summed over trees)"
   ), "\n")
-  if (n_free > df) {
+  uses_covariates <- any(vapply(model$other_vars$trees, function(tree) {
+    any(.mpt_expr_vars(tree) %in% model$other_vars$covariates)
+  }, logical(1)))
+  if (n_free > df && uses_covariates) {
+    cat(
+      "  More free parameters than degrees of freedom in one design cell;",
+      "covariate values that differ between rows can add information.\n"
+    )
+  } else if (n_free > df) {
     cat(
       "  More free parameters than degrees of freedom: the model is not",
       "identified without further constraints.\n"
@@ -821,8 +833,8 @@ print_model_details.mpt <- function(model, ...) {
     .mpt_rank_deficit_text(identifiability)
   } else {
     glue(
-      "Jacobian rank {identifiability$rank} of {identifiability$n_free} at \\
-      interior test values: locally identified."
+      "Jacobian rank {identifiability$rank} of {identifiability$n_free} \\
+      {identifiability$where}: locally identified."
     )
   }
   cat(strwrap(rank_text, indent = 2, exdent = 4), sep = "\n")
@@ -832,13 +844,14 @@ print_model_details.mpt <- function(model, ...) {
 # rank of the category probabilities in the free tree parameters; a parameter
 # fixed in the formula enters at its value. A simplex group is free through its
 # stick-breaking components, which users never write, so the text names the
-# group's members instead
-.mpt_identifiability <- function(model) {
+# group's members instead. Covariates are data, never free parameters
+.mpt_identifiability <- function(model, data = NULL) {
   trees <- model$other_vars$trees
   simplex <- model$other_vars$simplex
   sticks <- model$other_vars$simplex_raw
   parameters <- setdiff(
-    unique(unlist(lapply(trees, .mpt_expr_vars))), unlist(simplex)
+    unique(unlist(lapply(trees, .mpt_expr_vars))),
+    c(unlist(simplex), model$other_vars$covariates)
   )
   fixed <- model$fixed_parameters[
     intersect(names(model$fixed_parameters), parameters)
@@ -853,7 +866,54 @@ print_model_details.mpt <- function(model, ...) {
       "the simplex group {collapse_comma(grp)}"
     )
   }
-  c(.mpt_jacobian_rank(trees, free, fixed, simplex, sticks), list(labels = labels))
+  settings <- .mpt_covariate_settings(model, data)
+  c(
+    .mpt_jacobian_rank(trees, free, fixed, simplex, sticks, settings$values),
+    list(labels = labels, where = settings$where)
+  )
+}
+
+# covariate values at which the rank is taken, one data frame per tree (a tree
+# without covariates has one empty setting): the distinct values in the tree's
+# rows of the data, at most 20 spread over their range, or five test values
+# when the data cannot provide them (print() has no data; check_data() reports
+# missing or non-numeric covariate columns later)
+.mpt_covariate_settings <- function(model, data) {
+  trees <- model$other_vars$trees
+  covariates <- model$other_vars$covariates
+  used <- lapply(trees, function(tree) intersect(covariates, .mpt_expr_vars(tree)))
+  if (length(unlist(used)) == 0L) {
+    return(list(values = NULL, where = "at interior test values"))
+  }
+  empty <- data.frame(row.names = 1L)
+  usable <- is.data.frame(data) && all(covariates %in% names(data)) &&
+    all(vapply(data[covariates], is.numeric, logical(1)))
+  if (usable) {
+    tree_id <- model$other_vars$tree_id
+    values <- lapply(names(trees), function(name) {
+      if (length(used[[name]]) == 0L) {
+        return(empty)
+      }
+      rows <- if (is.null(tree_id)) TRUE else as.character(data[[tree_id]]) %in% name
+      settings <- unique(stats::na.omit(data[rows, used[[name]], drop = FALSE]))
+      settings <- settings[do.call(order, unname(settings)), , drop = FALSE]
+      spread <- round(seq(1, nrow(settings), length.out = min(nrow(settings), 20)))
+      settings[unique(spread), , drop = FALSE]
+    })
+    if (sum(vapply(values, nrow, integer(1))) > 0L) {
+      return(list(
+        values = values,
+        where = "at interior test values and the covariate values in the data"
+      ))
+    }
+  }
+  test_values <- as.data.frame(do.call(rbind, .mpt_test_points(covariates, list())))
+  list(
+    values = lapply(used, function(cov) {
+      if (length(cov) == 0L) empty else test_values[cov]
+    }),
+    where = "at interior test values and 5 test values of the covariates"
+  )
 }
 
 .mpt_rank_deficit_text <- function(identifiability) {
@@ -867,7 +927,7 @@ print_model_details.mpt <- function(model, ...) {
     glue(
       "The model is not identified: the Jacobian of the category \\
       probabilities has rank {identifiability$rank} for \\
-      {identifiability$n_free} free parameters at interior test values."
+      {identifiability$n_free} free parameters {identifiability$where}."
     ),
     if (n_combinations > 0 && length(entangled) > 0) {
       glue(
@@ -977,7 +1037,7 @@ check_model.mpt <- function(model, data = NULL, formula = NULL) {
     # of the fitted model only when no formula has a data predictor; with
     # predictors, a per-cell deficit is announced but not warned about
     with_predictors <- .mpt_predictor_formulas(formula, names(model$parameters))
-    identifiability <- .mpt_identifiability(model)
+    identifiability <- .mpt_identifiability(model, data)
     if (is.null(identifiability$error) &&
           identifiability$rank < identifiability$n_free) {
       if (length(with_predictors) == 0L) {
