@@ -708,6 +708,37 @@ test_that("a long list of entangled parameters is printed as its complement", {
   )
 })
 
+test_that("the rank check works in the stick-breaking components of a simplex group", {
+  guessing <- mpt(list(
+    mpt_tree("srcA", list(A = "D + (1 - D) * gA", B = "(1 - D) * gB", N = "(1 - D) * gN")),
+    mpt_tree("new", list(A = "gA", B = "gB", N = "gN"))
+  ), tree_id = "tree", simplex = c("gA", "gB", "gN"))
+  printed <- mpt_printed(guessing)
+  expect_match(printed, "3 free parameter\\(s\\), 4 degrees of freedom")
+  expect_match(printed, "Jacobian rank 3 of 3 at interior test values")
+  dat <- data.frame(tree = c("srcA", "new"), A = c(5, 3), B = c(2, 3), N = c(3, 4))
+  expect_no_warning(expect_no_message(
+    check_model(guessing, dat, bmf(D ~ 1, gA ~ 1, gB ~ 1))
+  ))
+
+  # a stick fixed in the formula leaves one free direction in the group
+  fixed <- check_model(guessing, dat, bmf(D ~ 1, gAraw = 0, gB ~ 1))
+  expect_match(mpt_printed(fixed), "Jacobian rank 2 of 2 at interior test values")
+
+  # the members only enter through their sum, which is 1 whatever the sticks
+  sum_only <- mpt(mpt_tree("t", list(
+    A = "D * gA + D * gB + D * gN", B = "(1 - D) * h", N = "(1 - D) * (1 - h)"
+  )), simplex = c("gA", "gB", "gN"))
+  printed <- mpt_printed(sum_only)
+  expect_match(printed, "has rank 2 for 4 free parameters")
+  expect_match(
+    printed,
+    "derivative with respect to the simplex group 'gA', 'gB', 'gN' is zero"
+  )
+  expect_no_match(printed, "combination\\(s\\)")
+  expect_no_match(sub(".*not identified", "", printed), "raw")
+})
+
 test_that("the Jacobian rank is reported as not computed when D() cannot differentiate", {
   model <- mpt(mpt_tree("t", list(x = "plogis(a)", y = "1 - plogis(a)")))
   printed <- mpt_printed(model)
@@ -958,12 +989,16 @@ test_that("mpt supports multiple simplex groups", {
 
   dat <- data.frame(id = factor(1:8), A = 10, B = 10, C = 10)
   formula <- bmf(m ~ 1, gA ~ 1, gB ~ 1, hA ~ 1, hB ~ 1)
-  expect_no_warning(
-    suppressMessages(bmm(
-      formula, dat, model,
-      backend = "mock", mock_fit = 1, rename = FALSE
-    )),
-    message = "Non-linear"
+  # one tree has two degrees of freedom for m and four sticks
+  expect_warning(
+    expect_no_warning(
+      suppressMessages(bmm(
+        formula, dat, model,
+        backend = "mock", mock_fit = 1, rename = FALSE
+      )),
+      message = "Non-linear"
+    ),
+    "rank 2 for 5 free parameters"
   )
 })
 

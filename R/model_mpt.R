@@ -352,7 +352,8 @@ settable_link_functions.mpt <- function(model) {
 #'   It then computes the rank of the Jacobian of all category probabilities
 #'   with respect to the free parameters, from exact derivatives at five
 #'   interior test values; parameters fixed in the formula enter at their
-#'   values. A rank below the number of free parameters means that some
+#'   values. A simplex group counts with one free parameter fewer than its
+#'   members, and the printout names the group by its members. A rank below the number of free parameters means that some
 #'   combination of the listed parameters cannot be estimated from the data,
 #'   even when the count passes, and its posterior follows the prior; a
 #'   parameter whose derivatives are zero up to rounding at the test values
@@ -706,18 +707,35 @@ print_model_details.mpt <- function(model, ...) {
 }
 
 # rank of the category probabilities in the free tree parameters; a parameter
-# fixed in the formula enters at its value
+# fixed in the formula enters at its value. A simplex group is free through its
+# stick-breaking components, which users never write, so the text names the
+# group's members instead
 .mpt_identifiability <- function(model) {
   trees <- model$other_vars$trees
-  parameters <- unique(unlist(lapply(trees, .mpt_expr_vars)))
+  simplex <- model$other_vars$simplex
+  sticks <- model$other_vars$simplex_raw
+  parameters <- setdiff(
+    unique(unlist(lapply(trees, .mpt_expr_vars))), unlist(simplex)
+  )
   fixed <- model$fixed_parameters[
     intersect(names(model$fixed_parameters), parameters)
   ]
-  .mpt_jacobian_rank(trees, setdiff(parameters, names(fixed)), fixed)
+  free <- c(
+    setdiff(parameters, names(fixed)),
+    setdiff(unname(sticks), names(model$fixed_parameters))
+  )
+  labels <- setNames(paste0("'", free, "'"), free)
+  for (grp in simplex) {
+    labels[intersect(free, sticks[grp])] <- glue(
+      "the simplex group {collapse_comma(grp)}"
+    )
+  }
+  c(.mpt_jacobian_rank(trees, free, fixed, simplex, sticks), list(labels = labels))
 }
 
 .mpt_rank_deficit_text <- function(identifiability) {
   free <- identifiability$free
+  labels <- identifiability$labels
   absent <- identifiability$absent
   entangled <- setdiff(identifiability$involved, absent)
   n_combinations <- identifiability$n_free - identifiability$rank -
@@ -731,13 +749,13 @@ print_model_details.mpt <- function(model, ...) {
     if (n_combinations > 0 && length(entangled) > 0) {
       glue(
         "{n_combinations} combination(s) of \\
-        {.mpt_parameter_set(entangled, free)} cannot be estimated from the \\
-        data."
+        {.mpt_parameter_set(entangled, free, labels)} cannot be estimated \\
+        from the data."
       )
     },
     if (length(absent) > 0) {
       glue(
-        "The derivative with respect to {collapse_comma(absent)} is zero up \\
+        "The derivative with respect to {.mpt_labels(absent, labels)} is zero up \\
         to rounding at the test values, so these parameter(s) appear not to \\
         affect any category probability."
       )
@@ -750,15 +768,19 @@ print_model_details.mpt <- function(model, ...) {
 }
 
 # a list longer than half the free parameters reads better as its complement
-.mpt_parameter_set <- function(pars, free) {
+.mpt_parameter_set <- function(pars, free, labels) {
   if (length(pars) <= length(free) / 2) {
-    return(collapse_comma(pars))
+    return(.mpt_labels(pars, labels))
   }
   rest <- setdiff(free, pars)
   if (length(rest) == 0L) {
     return("all free parameters")
   }
-  glue("all free parameters except {collapse_comma(rest)}")
+  glue("all free parameters except {.mpt_labels(rest, labels)}")
+}
+
+.mpt_labels <- function(pars, labels) {
+  paste(unique(labels[pars]), collapse = ", ")
 }
 
 ############################################################################# !

@@ -255,7 +255,12 @@
 # the null space take part in a non-identified combination; zero columns are
 # reported separately as parameters that appear not to affect any category
 # probability.
-.mpt_jacobian_rank <- function(trees, free, fixed = list(), tolerance = 1e-8) {
+# A simplex group is free through its stick-breaking components (`sticks`, named
+# by member), not its members: the member columns are multiplied by the
+# derivative of the members with respect to the sticks, at test points that lie
+# on the simplex. A fixed stick keeps its column out of the free set.
+.mpt_jacobian_rank <- function(trees, free, fixed = list(), simplex = list(),
+                               sticks = character(0), tolerance = 1e-8) {
   if (length(free) == 0L) {
     return(list(
       rank = 0L, n_free = 0L, free = free,
@@ -263,7 +268,7 @@
     ))
   }
   branches <- unlist(lapply(unname(trees), `[[`, "branches"), use.names = FALSE)
-  parameters <- c(free, names(fixed))
+  parameters <- c(setdiff(free, sticks), unlist(simplex), names(fixed))
   derivs <- try(unlist(lapply(branches, function(branch) {
     lapply(parameters, function(par) {
       if (par %in% all.vars(branch)) stats::D(branch, par) else 0
@@ -274,7 +279,7 @@
   }
   df <- sum(lengths(lapply(trees, `[[`, "branches")) - 1L)
   symbols <- unique(unlist(lapply(branches, all.vars)))
-  points <- .mpt_test_points(symbols, list())
+  points <- .mpt_test_points(symbols, simplex)
   # one vector per symbol holding its value at every test point, so each
   # derivative is evaluated once for all points
   vals <- lapply(setNames(nm = symbols), function(symbol) {
@@ -285,11 +290,23 @@
     rep_len(eval(deriv, vals), length(points))
   }, numeric(length(points)))
   decompositions <- lapply(seq_along(points), function(point) {
-    jacobian <- matrix(values[point, ], ncol = length(parameters), byrow = TRUE)
+    jacobian <- matrix(
+      values[point, ], ncol = length(parameters), byrow = TRUE,
+      dimnames = list(NULL, parameters)
+    )
+    for (grp in simplex) {
+      jacobian <- cbind(
+        jacobian[, setdiff(colnames(jacobian), grp), drop = FALSE],
+        .mpt_stick_jacobian(
+          jacobian[, grp, drop = FALSE], points[[point]][grp],
+          sticks[grp[-length(grp)]]
+        )
+      )
+    }
     norms <- sqrt(colSums(jacobian^2))
-    zero <- norms[seq_along(free)] <= 1e-12 * max(norms)
-    jacobian <- jacobian[, seq_along(free), drop = FALSE]
-    norms <- norms[seq_along(free)]
+    zero <- norms[free] <= 1e-12 * max(norms)
+    jacobian <- jacobian[, free, drop = FALSE]
+    norms <- norms[free]
     jacobian[, zero] <- 0
     norms[zero] <- 1
     decomposition <- svd(
@@ -312,6 +329,23 @@
     involved = free[rowSums(abs(null_space) > 1e-6) > 0],
     absent = best$absent
   )
+}
+
+# chain rule through the stick-breaking map: member k is
+# s_k * prod_{j < k} (1 - s_j) and the last member takes the remainder, so
+# d member_k / d s_k is the remainder before k, and every later member falls in
+# proportion to its own value, d member_k / d s_m = -member_k / (1 - s_m)
+.mpt_stick_jacobian <- function(member_jacobian, members, sticks) {
+  n_sticks <- length(sticks)
+  remainder <- 1 - c(0, cumsum(members[seq_len(n_sticks)]))
+  stick_values <- members[seq_len(n_sticks)] / remainder[seq_len(n_sticks)]
+  map <- matrix(0, length(members), n_sticks, dimnames = list(NULL, sticks))
+  for (m in seq_len(n_sticks)) {
+    map[m, m] <- remainder[m]
+    later <- seq.int(m + 1L, length(members))
+    map[later, m] <- -members[later] / (1 - stick_values[m])
+  }
+  member_jacobian %*% map
 }
 
 # the first deviating branch sum per tree, NA where every test point sums to 1
