@@ -137,8 +137,9 @@ It then computes the rank of the Jacobian of all category probabilities
 with respect to the free parameters, from exact derivatives at five
 interior test values; parameters fixed in the formula enter at their
 values. A simplex group counts with one free parameter fewer than its
-members, and the printout names the group by its members. A rank below the number of free parameters means that some
-combination of the listed parameters cannot be estimated from the data,
+members, and the printout names the group by its members. A rank below
+the number of free parameters means that some combination of the listed
+parameters cannot be estimated from the data,
 even when the count passes, and its posterior follows the prior; a
 parameter whose derivatives are zero up to rounding at the test values
 appears not to affect any category probability and is named separately.
