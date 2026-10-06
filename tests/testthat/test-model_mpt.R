@@ -830,6 +830,30 @@ test_that("the rank check stacks rows over covariate values and never frees a co
   expect_match(mpt_printed(residue), "derivative with respect to 'q' is zero")
 })
 
+test_that("the rank check ranks the design over every distinct covariate setting", {
+  # z adds settings but no information about a, b, c; only the single row at
+  # x = 0.5 separates b from the other two, so a spread over a subset loses it
+  bernstein <- mpt(
+    mpt_tree("t", list(
+      yes = "z * (a * (1 - x)^2 + b * 2 * x * (1 - x) + c * x^2) + (1 - z) * 0.5",
+      no = "1 - z * (a * (1 - x)^2 + b * 2 * x * (1 - x) + c * x^2) - (1 - z) * 0.5"
+    )),
+    covariates = c("x", "z")
+  )
+  dat <- rbind(
+    data.frame(x = 0, z = seq(0.2, 0.8, length.out = 30)),
+    data.frame(x = 0.5, z = 0.5),
+    data.frame(x = 1, z = seq(0.2, 0.8, length.out = 30))
+  )
+  dat$yes <- 5
+  dat$no <- 5
+  expect_equal(nrow(bmm:::.mpt_covariate_settings(bernstein, dat)$values[[1]]), 61L)
+  expect_equal(bmm:::.mpt_identifiability(bernstein, dat)$rank, 3L)
+  expect_no_warning(expect_no_message(
+    check_model(bernstein, dat, bmf(a ~ 1, b ~ 1, c ~ 1))
+  ))
+})
+
 test_that("the rank check uses only finite covariate values and the trees with rows", {
   switch_tree <- mpt(
     mpt_tree("t", list(yes = "x * a + (1 - x) * b", no = "1 - x * a - (1 - x) * b")),

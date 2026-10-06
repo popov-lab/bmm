@@ -312,18 +312,28 @@
     vapply(points, `[[`, numeric(1), symbol)
   })
   vals[names(fixed)] <- fixed
-  blocks <- unlist(lapply(seq_along(trees), function(tree) {
-    lapply(seq_len(nrow(settings[[tree]])), function(row) {
-      row_vals <- vals
-      row_vals[names(settings[[tree]])] <- as.list(settings[[tree]][row, , drop = FALSE])
-      vapply(derivs[[tree]], function(deriv) {
-        rep_len(eval(deriv, row_vals), length(points))
-      }, numeric(length(points)))
-    })
-  }), recursive = FALSE)
+  # one matrix per tree: each derivative evaluated once over every setting and
+  # test point, the points varying fastest
+  n_points <- length(points)
+  blocks <- Filter(Negate(is.null), lapply(seq_along(trees), function(tree) {
+    n_rows <- nrow(settings[[tree]])
+    if (n_rows == 0L) {
+      return(NULL)
+    }
+    row_vals <- lapply(vals, rep, times = n_rows)
+    row_vals[names(settings[[tree]])] <- lapply(
+      settings[[tree]], rep, each = n_points
+    )
+    vapply(derivs[[tree]], function(deriv) {
+      rep_len(eval(deriv, row_vals), n_rows * n_points)
+    }, numeric(n_rows * n_points))
+  }))
   decompositions <- lapply(seq_along(points), function(point) {
     jacobian <- do.call(rbind, lapply(blocks, function(block) {
-      matrix(block[point, ], ncol = length(parameters), byrow = TRUE)
+      matrix(
+        t(block[seq(point, nrow(block), by = n_points), , drop = FALSE]),
+        ncol = length(parameters), byrow = TRUE
+      )
     }))
     colnames(jacobian) <- parameters
     for (grp in simplex) {

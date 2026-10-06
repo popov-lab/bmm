@@ -430,7 +430,7 @@ settable_link_functions.mpt <- function(model) {
 #'   members, and the printout names the group by its members. Covariates
 #'   are never free parameters; because rows with different covariate values
 #'   can identify what one design cell cannot, the rank is taken over the rows
-#'   of all covariate values in the data (at most 20 per tree) in `bmm()`, and
+#'   of every distinct covariate setting in the data in `bmm()`, and
 #'   over five test values of the covariates when printing. A rank below the
 #'   number of free parameters means that some combination of the listed
 #'   parameters cannot be estimated from the data,
@@ -864,10 +864,10 @@ print_model_details.mpt <- function(model, ...) {
 
 # covariate values at which the rank is taken, one data frame per tree (a tree
 # without covariates has one empty setting): the distinct finite values in the
-# tree's rows of the data, at most 20 spread over their range. A tree without
-# rows adds no rows, with or without covariates. Five test values stand in
-# when the data cannot provide them (print() has no data; a missing,
-# non-numeric or non-finite covariate is check_data()'s to report)
+# tree's rows of the data. A subset can only lower the rank, so none is dropped.
+# A tree without rows adds no rows, with or without covariates. Five test
+# values stand in when the data cannot provide them (print() has no data; a
+# missing, non-numeric or non-finite covariate is check_data()'s to report)
 .mpt_covariate_settings <- function(model, data) {
   trees <- model$other_vars$trees
   covariates <- model$other_vars$covariates
@@ -896,9 +896,7 @@ print_model_details.mpt <- function(model, ...) {
       if (length(rows) > 0L && nrow(settings) == 0L) {
         return(NULL)
       }
-      settings <- settings[do.call(order, unname(settings)), , drop = FALSE]
-      spread <- round(seq(1, nrow(settings), length.out = min(nrow(settings), 20)))
-      settings[unique(spread), , drop = FALSE]
+      settings
     })
     if (!any(vapply(values, is.null, logical(1))) &&
           sum(vapply(values, nrow, integer(1))) > 0L) {

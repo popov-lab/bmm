@@ -151,7 +151,7 @@ values. A simplex group counts with one free parameter fewer than its
 members, and the printout names the group by its members. Covariates
 are never free parameters; because rows with different covariate values
 can identify what one design cell cannot, the rank is taken over the rows
-of all covariate values in the data (at most 20 per tree) in \code{bmm()}, and
+of every distinct covariate setting in the data in \code{bmm()}, and
 over five test values of the covariates when printing. A rank below the
 number of free parameters means that some combination of the listed
 parameters cannot be estimated from the data,
