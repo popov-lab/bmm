@@ -791,7 +791,8 @@ check_data.mpt <- function(model, data, formula) {
   )
   resp_matrix[is.na(resp_matrix)] <- 0
   data <- data[!col_names %in% resp_cats]
-  data$nTrials <- rowSums(resp_matrix)
+  # an integer column keeps conditional_effects() grids at a valid trial count
+  data$nTrials <- as.integer(rowSums(resp_matrix))
   data$Y <- resp_matrix
 
   tree_id <- model$other_vars$tree_id
