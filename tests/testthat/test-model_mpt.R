@@ -1021,3 +1021,30 @@ test_that("conditional_effects() shows mpt parameters on the native scale", {
   expect_equal(ce$cond$estimate__, unname(medians[as.character(ce$cond$cond)]), tolerance = 1e-3)
   expect_named(conditional_effects(fit), "D.cond")
 })
+
+test_that("conditional_effects() shows simplex members on the probability scale", {
+  skip_on_cran()
+  skip_if_not_installed("cmdstanr")
+
+  trees <- list(
+    mpt_tree("x", list(A = "D + (1 - D) * a", B = "(1 - D) * b", C = "(1 - D) * c")),
+    mpt_tree("y", list(A = "(1 - D) * a", B = "D + (1 - D) * b", C = "(1 - D) * c"))
+  )
+  dat <- data.frame(
+    tt = rep(c("x", "y"), 2), cond = rep(c("p", "q"), each = 2),
+    A = c(60, 15, 50, 30), B = c(25, 55, 20, 40), C = c(15, 21, 30, 35)
+  )
+  fit <- bmm(
+    bmf(D ~ 1, a ~ cond, b ~ cond), dat, mpt(trees, "tt", simplex = c("a", "b", "c")),
+    backend = "cmdstanr", chains = 2, iter = 1000, refresh = 0, silent = 2
+  )
+
+  np <- native_parameters(fit, pars = c("a", "b"))
+  # b = (1 - a) * stick, so its panel depends on both stick-breaking components
+  for (p in c("a", "b")) {
+    ce <- conditional_effects(fit, par = p, robust = TRUE)$cond
+    medians <- c(tapply(np$value[np$parameter == p], np$cond[np$parameter == p], stats::median))
+    expect_true(all(ce$lower__ > 0 & ce$upper__ < 1))
+    expect_equal(ce$estimate__, unname(medians[as.character(ce$cond)]), tolerance = 1e-3)
+  }
+})
