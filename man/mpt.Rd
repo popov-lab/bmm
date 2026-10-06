@@ -38,10 +38,13 @@ the last) or fixes it to a numeric constant (\code{"g = 0.5"}, \code{"g = 1/4"})
 Constants must lie strictly between 0 and 1. The unnamed list of MPTinR
 and TreeBUGS, \code{list("Dn = Do", "g = 0.5")}, works as well. Restriction
 files are not read: in MPTinR and TreeBUGS a character vector names a
-restrictions file, in \code{bmm} it holds the restrictions. Restrictions are substituted into the
-branch expressions before the parameters are identified, so a restricted
-parameter is not part of the model and cannot be a simplex member. Order
-constraints (\code{"Do > Dn"}) are not supported here; see Details.}
+restrictions file, in \code{bmm} it holds the restrictions. To use such a file,
+pass \code{readLines(path)}; blank lines and lines starting with \verb{#} are
+skipped, and a \verb{#} after a restriction starts a comment, as in MPTinR.
+Restrictions are substituted into the branch expressions before the
+parameters are identified, so a restricted parameter is not part of the
+model and cannot be a simplex member. Order constraints (\code{"Do > Dn"}) are
+not supported here; see Details.}
 
 \item{links}{Character. The link function for all latent probability
 parameters: \code{"logit"} (default) or \code{"probit"}.}

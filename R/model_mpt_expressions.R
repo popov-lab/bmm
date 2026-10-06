@@ -72,7 +72,11 @@
       "The restrictions argument must be a character vector such as \\
       c('Dn = Do', 'g = 0.5') or a named list such as list(Dn = 'Do', g = 0.5)."
     )
-    return(do.call(c, lapply(restrictions, .mpt_parse_restriction_string)))
+    # readLines() returns blank and comment lines of a restriction file as is
+    restrictions <- restrictions[!grepl("^\\s*(#|$)", restrictions)]
+    return(Reduce(
+      c, lapply(restrictions, .mpt_parse_restriction_string), list()
+    ))
   }
   stopif(
     any(!nzchar(names(restrictions))),
@@ -95,7 +99,23 @@
 }
 
 .mpt_parse_restriction_string <- function(text) {
+  # a restriction has an `=`, so a line without one that names a file is a path
+  # (the extension is judged without a trailing comment)
+  stopif(
+    !grepl("=", text, fixed = TRUE) &&
+      (file.exists(text) ||
+        grepl(
+          "\\.(restr|txt)\\s*$", sub("#.*$", "", text), ignore.case = TRUE
+        )),
+    "A restriction must not be a file path. bmm does not read restriction \\
+    files; pass readLines({encodeString(text, quote = '\"')}) instead (blank \\
+    and comment lines are skipped)."
+  )
   expr <- try(str2lang(text), silent = TRUE)
+  # R cannot parse a chain such as G1 < G2 < G3
+  if (is_try_error(expr) && grepl("[<>]", text)) {
+    .mpt_stop_order_constraint(text)
+  }
   stopif(is_try_error(expr), "Cannot parse the restriction '{text}'.")
   lhs <- character(0)
   while (is.call(expr) && identical(expr[[1]], quote(`=`))) {
@@ -106,19 +126,24 @@
     lhs <- c(lhs, as.character(expr[[2]]))
     expr <- expr[[3]]
   }
-  stopif(
-    is.call(expr) && as.character(expr[[1]]) %in% c("<", ">", "<=", ">="),
-    "Order constraints such as '{text}' are not supported by the \\
-    restrictions argument. Reparameterize the larger parameter instead, e.g. \\
-    Do ~ Dn + (1 - Dn) * inv_logit(phi) in the model formula; see the section \\
-    'Ordered parameter constraints' of the MPT article."
-  )
+  if (is.call(expr) && as.character(expr[[1]]) %in% c("<", ">", "<=", ">=")) {
+    .mpt_stop_order_constraint(text)
+  }
   stopif(
     length(lhs) == 0L,
     "Each restriction must have the form 'parameter = parameter' or \\
     'parameter = constant', not '{text}'."
   )
   setNames(rep(list(.mpt_restriction_value(expr, text)), length(lhs)), lhs)
+}
+
+.mpt_stop_order_constraint <- function(text) {
+  stop2(
+    "Order constraints such as '{text}' are not supported by the \\
+    restrictions argument. Reparameterize the larger parameter instead, e.g. \\
+    Do ~ Dn + (1 - Dn) * inv_logit(phi) in the model formula; see the section \\
+    'Ordered parameter constraints' of the MPT article."
+  )
 }
 
 # a right-hand side without symbols is a constant (1/4, 1 - 0.75); a single
@@ -135,10 +160,18 @@
       "The restriction '{text}' does not evaluate to a single number."
     )
     stopif(
-      value <= 0 || value >= 1,
-      "The restriction '{text}' fixes a parameter to {value}. Restriction \\
-      constants must be probabilities strictly between 0 and 1: 0 or 1 makes \\
-      a branch impossible, which this version does not support."
+      value < 0 || value > 1,
+      "The restriction '{text}' fixes a parameter to {value}. A constant must \\
+      lie strictly between 0 and 1."
+    )
+    stopif(
+      value == 0 || value == 1,
+      "The restriction '{text}' fixes a parameter to {value}. Constants must \\
+      be strictly between 0 and 1: a constant 0 or 1 can turn a branch \\
+      into 0, which has no log probability. To model a parameter at 0 or 1, \\
+      remove it from the branch expressions (write the reduced tree) and \\
+      declare the categories that no branch reaches with \\
+      mpt_tree(impossible = ), which this version does not provide yet."
     )
     return(value)
   }

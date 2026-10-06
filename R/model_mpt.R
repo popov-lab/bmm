@@ -277,10 +277,13 @@ settable_link_functions.mpt <- function(model) {
 #'   Constants must lie strictly between 0 and 1. The unnamed list of MPTinR
 #'   and TreeBUGS, `list("Dn = Do", "g = 0.5")`, works as well. Restriction
 #'   files are not read: in MPTinR and TreeBUGS a character vector names a
-#'   restrictions file, in `bmm` it holds the restrictions. Restrictions are substituted into the
-#'   branch expressions before the parameters are identified, so a restricted
-#'   parameter is not part of the model and cannot be a simplex member. Order
-#'   constraints (`"Do > Dn"`) are not supported here; see Details.
+#'   restrictions file, in `bmm` it holds the restrictions. To use such a file,
+#'   pass `readLines(path)`; blank lines and lines starting with `#` are
+#'   skipped, and a `#` after a restriction starts a comment, as in MPTinR.
+#'   Restrictions are substituted into the branch expressions before the
+#'   parameters are identified, so a restricted parameter is not part of the
+#'   model and cannot be a simplex member. Order constraints (`"Do > Dn"`) are
+#'   not supported here; see Details.
 #' @param links Character. The link function for all latent probability
 #'   parameters: `"logit"` (default) or `"probit"`.
 #' @param ... used internally for testing, ignore it
