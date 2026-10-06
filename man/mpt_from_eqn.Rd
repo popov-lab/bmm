@@ -11,53 +11,161 @@ mpt_from_eqn(
   tree_id = NULL,
   covariates = NULL,
   simplex = NULL,
-  links = "logit"
+  links = "logit",
+  impossible = NULL,
+  tree_names = NULL
 )
 }
 \arguments{
-\item{file}{Character. Path to the EQN file. A first line that does not
-contain three fields (the line-count header of classical EQN files) is
-skipped.}
+\item{file}{Character. Path to the EQN file. How its first line is read is
+described in Details.}
 
 \item{restrictions}{Parameter restrictions as in \code{\link[=mpt]{mpt()}}, written with the
 parameter names used in the EQN file, e.g. \code{c("D_n = D_o", "g = 0.5")}
 or \code{list(D_n = "D_o", g = 0.5)}. They mirror the \code{restrictions} argument
-of MPTinR and TreeBUGS and are renamed together with the parameters.}
+of MPTinR and TreeBUGS and are renamed together with the parameters.
+Restriction files are not read: pass their lines (the Examples of
+\code{\link[=mpt_from_string]{mpt_from_string()}} read one with \code{\link[=readLines]{readLines()}}).}
 
 \item{categories}{A named character vector mapping response category names
 used in the EQN file onto the shared response categories of the model
-(see Details). Categories not listed keep their (sanitized) name.}
+(see Details), e.g. \code{c(hit = "yes", fa = "yes", miss = "no", cr = "no")}.
+Categories not listed keep their (sanitized) name; labels that only
+carry their tree name as a prefix (\code{WC_Correct}, \code{LC_Correct}) need no
+mapping, because the prefix is removed. Labels that are not valid bmm
+names, such as numeric labels, must be mapped. Mapping two categories of
+the same tree onto one name merges them: their branch lines are summed,
+and a message says so.}
 
 \item{tree_id}{Character. Name of the data column whose values name the tree
-each observation belongs to (see \code{\link[=mpt]{mpt()}}); the tree names come from the
-EQN file.}
+each observation belongs to (see \code{\link[=mpt]{mpt()}}). Add this column to the data
+yourself: for each row it holds the name of the tree the counts come
+from, as printed by the model (the file's label, or its replacement
+from \code{tree_names}).}
 
 \item{covariates, simplex, links}{passed to \code{\link[=mpt]{mpt()}}. Covariate names are
-excluded from the renaming.}
+written as in the EQN file and are excluded from the renaming; simplex
+groups use the bmm names. \code{print(model)} lists the symbols that became
+parameters.}
+
+\item{impossible}{A named list, \verb{list(<tree> = c("<category>", ...))}, of
+the response categories that cannot occur in a tree (see \code{\link[=mpt_tree]{mpt_tree()}}),
+written with the bmm names of the trees and categories, i.e. the
+\code{bmm_name} column of the renaming map; \code{print(model)} lists the shared
+categories under "Response". Trees not listed have no impossible
+categories. When the trees do not share their categories and
+\code{impossible} does not cover the difference, the error names the
+categories each tree lacks.}
+
+\item{tree_names}{A named character vector mapping tree labels of the EQN
+file onto tree names in bmm, e.g. \code{c("1" = "old", "2" = "new")}. bmm tree
+names must start with a letter and contain only letters, digits, or
+underscores, so files with numeric tree labels need this mapping. Labels
+not listed keep their name.}
 }
 \value{
-An object of class \code{bmmodel} (see \code{\link[=mpt]{mpt()}}), with an \code{mpt_renaming}
-attribute holding the applied renaming map.
+An object of class \code{bmmodel} (see \code{\link[=mpt]{mpt()}}), with the attributes
+\code{mpt_renaming} and \code{mpt_source} (see Details).
 }
 \description{
-Reads a model definition in the EQN format used by multiTree,
-MPTinR, and TreeBUGS, and returns the corresponding \code{\link[=mpt]{mpt()}} model object.
-Each line of an EQN file contains three whitespace-separated fields --
-tree, response category, branch probability expression -- and branch
-lines that terminate in the same response category are summed.
+Reads an EQN model file, the format used by multiTree,
+MPTinR, and TreeBUGS, and returns the corresponding \code{\link[=mpt]{mpt()}} model object;
+model files in MPTinR's own "easy" format are read by
+\code{\link[=mpt_from_string]{mpt_from_string()}}. Each line of an EQN file contains three
+whitespace-separated fields -- tree, response category, branch
+probability expression -- and branch lines that terminate in the same
+response category of a tree are summed.
+}
+\details{
+\strong{File format.} Blank lines and lines that start with \verb{#} are
+skipped. If the first remaining line holds a single integer and nothing
+else, it is read as the equation count of classical EQN files and
+skipped, with a warning when it differs from the number of equation
+lines that follow. Any other first line is read as an equation. Note
+that TreeBUGS always ignores the first line of an EQN file, whatever it
+holds, and so does MPTinR with \code{model.type = "eqn"} (its default for
+\code{.eqn} files; with \code{"eqn2"} it reads the first line as the equation
+count). bmm therefore reads a file without a count line in full, while
+those programs drop its first equation; a title line produces an error
+that says to delete it or start it with \verb{#}. A file that starts with the
+equation count, or with a \verb{#} line, is read the same way by all three.
+A line with fewer than three fields, or an expression that cannot be
+parsed, is an error that names the line; a tree whose branches do not
+sum to 1 at numeric test values is an error that names the tree.
 
-In bmm, every observation (row) belongs to one tree, and all trees share
-the same response categories. Classical EQN files often label the
-response categories per tree instead (e.g., \code{hit}/\code{miss} in the old-item
-tree and \code{fa}/\code{cr} in the new-item tree of a recognition model). Use the
-\code{categories} argument to map such tree-specific labels onto the shared
-response categories (e.g., the response options "yes" and "no").
+\strong{Response categories.} In bmm, every observation (row) belongs to one
+tree, and all trees share the same response categories. Classical EQN
+files often label the response categories per tree instead (e.g.,
+\code{hit}/\code{miss} in the old-item tree and \code{fa}/\code{cr} in the new-item tree of
+a recognition model). Use the \code{categories} argument to map such
+tree-specific labels onto the shared response categories (e.g., the
+response options "yes" and "no"). If a category cannot occur in some
+trees (e.g., the pair and singleton trees of the pair-clustering model),
+declare it with the \code{impossible} argument instead.
 
-Because brms does not allow underscores or dots in non-linear parameter
-names, parameter and response category names are sanitized: a leading
-\verb{<tree>_} prefix is removed from category names, and all remaining
-underscores and dots are stripped. The complete renaming map is reported
-and stored in the \code{mpt_renaming} attribute of the returned model.
+\strong{Names.} Because brms does not allow underscores or dots in non-linear
+parameter names, parameter and response category names are sanitized: a
+leading \verb{<tree>_} prefix is removed from category names that are not
+mapped with \code{categories}, and all remaining underscores and dots are
+stripped. Names that would clash after this are an error; names are
+case-sensitive, so \code{P_G1} and \code{P_g1} stay distinct (\code{PG1}, \code{Pg1}). Tree
+labels are kept, unless \code{tree_names} maps them. The formulas passed to
+\code{\link[=bmm]{bmm()}} use the bmm names (\code{bmf(Do ~ 1)} for a file parameter \code{D_o};
+\code{bmf()} is short for \code{\link[=bmmformula]{bmmformula()}}); the \code{parameter} rows of the
+renaming map translate them, and \code{print(model)} lists them. Of the
+arguments that name parameters, only \code{restrictions} and \code{covariates}
+use the file's names.
+
+\strong{Renaming map.} The \code{mpt_renaming} attribute of the returned model is
+a data frame with one row per parameter, per tree, and per category of
+each tree, renamed or not, and the columns \code{kind} (\code{"parameter"},
+\code{"tree"}, or \code{"category"}), \code{tree} (the bmm tree name for categories,
+\code{NA} otherwise), \code{file_name}, \code{bmm_name}, and \code{renamed} (\code{TRUE} where
+the two names differ). The names that changed are also reported in a
+message.
+
+\strong{Data for an imported model.} \code{\link[=bmm]{bmm()}} expects one row per participant
+and tree: a column named by \code{tree_id} holding the bmm tree names, and
+one count column per shared response category, named by \code{bmm_name} in
+the renaming map (see \code{\link[=mpt]{mpt()}}). A category that is \code{impossible} in a
+tree gets 0 (or \code{NA}) in the rows of that tree. TreeBUGS data are wide:
+one row per participant, one column per category label of the EQN file,
+and no participant column, so add an \code{id} column first. The \code{category}
+rows of the renaming map hold every tree with its labels and bmm names,
+so the wide data can be reshaped by name: for each tree, start from a
+block of zeros over all shared categories and fill in the columns of
+that tree (see Examples). MPTinR data for an EQN model are unnamed, and
+their columns do not follow the file: the trees and, within each tree,
+the category labels are sorted (alphabetically, or numerically when they
+are numbers); \code{MPTinR::check.mpt("model.eqn")} returns the order in its
+elements \code{eqn.order.trees} and \code{eqn.order.categories}. (For MPTinR's own
+model format the columns follow the lines instead; see
+\code{\link[=mpt_from_string]{mpt_from_string()}}.) Name the columns by tree and label,
+\code{paste(tree, label, sep = ".")} with the bmm tree names, because trees
+may share labels, and select them with the same key (see Examples).
+
+If \code{categories} merged several labels of a tree onto one name, sum their
+columns in the wide data into the first label's column and drop the map
+rows of the other labels (\code{map[!duplicated(map[c("tree", "bmm_name")]), ]})
+before reshaping; otherwise the recipe fails with "duplicate subscripts".
+
+bmm cannot tell a reshape that swaps tree labels or category columns
+from a correct one: such data fit without an error. The row sums,
+\code{rowSums(long[cats])}, are the trials per row; they cannot show swapped
+columns, and they show swapped tree labels only when the trees differ
+in their number of trials. Comparing the response proportions per tree
+with the design (old items must get more "yes" responses than new
+items) catches swapped tree labels and response columns swapped in
+every tree, but not always a column slipped or a map entry wrong in one
+tree, nor a swap between two trees of the same kind; so also compare
+one participant's long rows with the wide row. \code{\link[=bmm_data_check]{bmm_data_check()}} runs
+the remaining checks (columns, tree labels, counts in impossible cells)
+without a fit and prints \verb{Hard checks: passed} when they hold.
+
+\strong{Provenance.} The returned model carries an \code{mpt_source} attribute,
+\code{list(file = , md5 = , lines = )}: the full path of the EQN file, its MD5
+checksum, and the lines as read, so that a saved fit records which file
+it was built from.
 }
 \examples{
 eqn_file <- tempfile(fileext = ".eqn")
@@ -70,11 +178,64 @@ writeLines(c(
   "new  cr    D_n",
   "new  cr    (1-D_n)*(1-g)"
 ), eqn_file)
+# restrictions use the file's names; the formulas use the bmm names
 model <- mpt_from_eqn(
   eqn_file,
+  restrictions = "D_n = D_o",
   categories = c(hit = "yes", fa = "yes", miss = "no", cr = "no"),
   tree_id = "item_type"
 )
 attr(model, "mpt_renaming")
+
+# TreeBUGS data: one row per participant, columns named by the category
+# labels of the EQN file, no participant column. bmm needs one row per
+# participant and tree, columns named by bmm_name: reshape by name through
+# the map, starting each tree from zeros so that categories the tree
+# cannot produce get 0
+wide <- data.frame(
+  hit = c(30, 25), miss = c(10, 15), fa = c(8, 12), cr = c(32, 28)
+)
+wide$id <- seq_len(nrow(wide))
+map <- attr(model, "mpt_renaming")
+map <- map[map$kind == "category", ]
+cats <- unique(map$bmm_name)
+long <- do.call(rbind, lapply(split(map, map$tree), function(tree_map) {
+  counts <- as.data.frame(matrix(0, nrow(wide), length(cats)))
+  names(counts) <- cats
+  counts[tree_map$bmm_name] <- wide[tree_map$file_name]
+  data.frame(id = wide$id, item_type = tree_map$tree[1], counts)
+}))
+long
+# the row sums are the trials per row (40 here). The proportions catch
+# swapped tree labels and swapped response columns (old items must get
+# more "yes" than new items), but not always a column slipped in one
+# tree: also compare one participant's long rows with the wide row
+rowSums(long[cats])
+tapply(long$yes / rowSums(long[cats]), long$item_type, mean)
+long[long$id == 1, ]
+wide[1, ]
+bmm_data_check(bmf(Do ~ 1, g ~ 1), long, model)
+
+# MPTinR data for an EQN model are unnamed and sorted by tree, then by
+# label: MPTinR::check.mpt(eqn_file)$eqn.order.categories lists the
+# labels (here cr, fa for tree new, then hit, miss for tree old). Name the
+# columns by tree and label, so that a label used in several trees stays
+# apart, and select with the same key
+wide_mptinr <- rbind(c(32, 8, 30, 10), c(28, 12, 25, 15))
+colnames(wide_mptinr) <- c("new.cr", "new.fa", "old.hit", "old.miss")
+long2 <- do.call(rbind, lapply(split(map, map$tree), function(tree_map) {
+  counts <- as.data.frame(matrix(0, nrow(wide_mptinr), length(cats)))
+  names(counts) <- cats
+  key <- paste(tree_map$tree, tree_map$file_name, sep = ".")
+  counts[tree_map$bmm_name] <- wide_mptinr[, key]
+  data.frame(id = seq_len(nrow(wide_mptinr)), item_type = tree_map$tree[1],
+             counts)
+}))
+identical(long2, long)
+}
+\seealso{
+\code{\link[=mpt_from_string]{mpt_from_string()}} for model text in MPTinR's own format;
+\code{\link[=mpt]{mpt()}} and \code{\link[=mpt_tree]{mpt_tree()}} for building the trees in R, including the data
+layout \code{bmm()} expects.
 }
 \keyword{transform}
