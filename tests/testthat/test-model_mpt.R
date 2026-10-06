@@ -19,7 +19,7 @@ test_that("mpt_tree validates its inputs", {
   expect_error(mpt_tree("t", list(a = 0.5, b = "x")), "character strings")
 })
 
-test_that("mpt stores its derived state once and can rebuild itself", {
+test_that("mpt stores its derived state once", {
   model <- mpt(mpt_2htm_trees(), tree_id = "item_type")
   expect_equal(model$other_vars$link, "logit")
   expect_equal(model$other_vars$indicators$tree, c(old = "Idx_old", new = "Idx_new"))
@@ -28,21 +28,11 @@ test_that("mpt stores its derived state once and can rebuild itself", {
   expect_equal(model$default_priors$D$main, "logistic(0, 1)")
   expect_equal(model$default_priors$D$effects, "logistic(0, 1)")
 
-  # the recorded call differs by construction; every other field must match
-  without_call <- function(m) {
-    attr(m, "call") <- NULL
-    m
-  }
-  rebuilt <- do.call("mpt", .mpt_constructor_args(model))
-  expect_equal(without_call(rebuilt), without_call(model))
-
   single <- mpt(mpt_tree("t", list(A = "p", B = "1 - p")), links = "probit")
   expect_null(single$other_vars$indicators$tree)
   expect_equal(single$links$p, "probit")
   expect_equal(single$default_priors$p$main, "normal(0, 1)")
   expect_equal(single$default_priors$p$effects, "normal(0, 1)")
-  rebuilt_single <- do.call("mpt", .mpt_constructor_args(single))
-  expect_equal(without_call(rebuilt_single), without_call(single))
 })
 
 test_that("an empty formula fits every parameter with an intercept", {

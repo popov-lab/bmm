@@ -189,14 +189,6 @@ settable_link_functions.mpt <- function(model) {
   c("logit", "probit")
 }
 
-.mpt_constructor_args <- function(model) {
-  list(
-    trees = unname(model$other_vars$trees),
-    tree_id = model$other_vars$tree_id,
-    links = model$other_vars$link
-  )
-}
-
 # user facing alias
 # information in the title and details sections will be filled in
 # automatically based on the information in the .model_mpt()
