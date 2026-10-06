@@ -755,7 +755,7 @@ mpt_from_eqn <- function(file, restrictions = NULL, categories = NULL,
     file_symbols, names(restrictions), unlist(lapply(restrictions, all.vars))
   ))
   renaming <- .mpt_sanitized_names(setdiff(symbols, covariates))
-  .mpt_check_sanitized_names(renaming)
+  .mpt_check_sanitized_names(renaming, covariates)
   symbol_map <- lapply(renaming, as.name)
   restrictions <- lapply(restrictions, function(value) {
     if (is.language(value)) .mpt_substitute_symbols(value, symbol_map) else value
@@ -854,7 +854,8 @@ mpt_from_eqn <- function(file, restrictions = NULL, categories = NULL,
   no_value <- entry_names[is.na(x) | !nzchar(x)][1]
   if (is.null(x)) {
     ""
-  } else if (is.null(entry_names) || anyNA(entry_names) || !all(nzchar(entry_names))) {
+  } else if (is.null(entry_names) || anyNA(entry_names) ||
+               !all(nzchar(entry_names))) {
     "Every entry needs a name."
   } else if (anyDuplicated(entry_names)) {
     glue("'{entry_names[duplicated(entry_names)][1]}' is given more than once.")
@@ -995,13 +996,18 @@ mpt_from_eqn <- function(file, restrictions = NULL, categories = NULL,
   setNames(as.list(gsub("[._]", "", names)), names)
 }
 
-.mpt_check_sanitized_names <- function(renaming) {
+.mpt_check_sanitized_names <- function(renaming, covariates = character(0)) {
   sanitized <- unlist(renaming)
-  clashes <- sanitized[duplicated(sanitized)]
+  # covariates stay as written, so a sanitized parameter equal to one reads
+  # as that covariate afterwards
+  clashes <- c(
+    sanitized[duplicated(sanitized)], intersect(sanitized, covariates)
+  )
   stopif(
     length(clashes) > 0,
-    "Removing underscores and dots produces duplicated names: \\
-    {collapse_comma(unique(clashes))}. Please rename them in the model file."
+    "Removing underscores and dots produces duplicated names or clashes with \\
+    a covariate: {collapse_comma(unique(clashes))}. Please rename them in the \\
+    model file."
   )
   invisible(NULL)
 }

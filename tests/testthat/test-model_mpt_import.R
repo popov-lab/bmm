@@ -226,6 +226,22 @@ test_that("mpt_from_eqn errors when sanitizing merges categories across trees", 
   )
 })
 
+test_that("mpt_from_eqn errors when a sanitized parameter name equals a covariate", {
+  clash_file <- write_eqn(c("t yes a_b", "t no 1-a_b", "u yes ab*g", "u no 1-ab*g"))
+  expect_error(
+    mpt_from_eqn(clash_file, covariates = "ab", tree_id = "tr"),
+    "duplicated names or clashes with a covariate: 'ab'"
+  )
+  # without the covariate the same file is caught by the duplicate check
+  expect_error(mpt_from_eqn(clash_file, tree_id = "tr"), "duplicated names")
+
+  # a covariate that the sanitizing leaves alone is no clash
+  model <- suppressMessages(mpt_from_eqn(
+    write_eqn(c("t yes a_b*x_1", "t no 1-a_b*x_1")), covariates = "x_1"
+  ))
+  expect_equal(names(model$parameters), "ab")
+})
+
 test_that("mpt_from_eqn skips # comment lines", {
   commented <- suppressMessages(mpt_from_eqn(
     write_eqn(c(
