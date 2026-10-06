@@ -296,10 +296,7 @@ mpt_from_string <- function(text, tree_names, categories = NULL,
   unlabelled_counts <- lengths(unlabelled)[lengths(unlabelled) > 0]
   .mpt_check_import_trees(
     branches, impossible,
-    relabel_hint = paste(
-      "If the trees label the same responses differently (e.g., hit/miss and",
-      "fa/cr for yes/no), give those lines the same category label."
-    ),
+    relabel_remedy = "give those lines the same category label.",
     lead_hint = if (!by_tree && length(unique(unlabelled_counts)) > 1) {
       glue(
         "The trees have different numbers of lines without an inline label \\
@@ -597,11 +594,10 @@ mpt_from_eqn <- function(file, restrictions = NULL, categories = NULL,
   )
   .mpt_check_import_trees(
     branches, impossible,
-    relabel_hint = paste(
-      "If the trees label the same responses differently (e.g., hit/miss and",
-      "fa/cr for yes/no), map the labels onto shared response categories with",
-      "the categories argument, e.g. categories = c(hit = 'yes', fa = 'yes',",
-      "miss = 'no', cr = 'no')."
+    relabel_remedy = paste(
+      "map the labels onto shared response categories with the categories",
+      "argument, e.g. categories = c(hit = 'yes', fa = 'yes', miss = 'no',",
+      "cr = 'no')."
     ),
     # a title forms a tree of its own, which lacks every other category
     lead_hint = if (!anyNA(eqn_file$title_line)) {
@@ -770,10 +766,12 @@ mpt_from_eqn <- function(file, restrictions = NULL, categories = NULL,
     {collapse_comma(unknown)}. Write them as the file does, before \\
     underscores and dots are removed."
   )
-  symbols <- unique(c(
-    file_symbols, names(restrictions), unlist(lapply(restrictions, all.vars))
+  renaming <- .mpt_sanitized_names(setdiff(
+    unique(c(
+      file_symbols, names(restrictions), unlist(lapply(restrictions, all.vars))
+    )),
+    covariates
   ))
-  renaming <- .mpt_sanitized_names(setdiff(symbols, covariates))
   .mpt_check_sanitized_names(renaming, covariates)
   symbol_map <- lapply(renaming, as.name)
   restrictions <- lapply(restrictions, function(value) {
@@ -888,7 +886,7 @@ mpt_from_eqn <- function(file, restrictions = NULL, categories = NULL,
 
 # the importers check impossible and the category sets themselves, so that
 # their errors can point to the importers' arguments, which mpt() does not have
-.mpt_check_import_trees <- function(branches, impossible, relabel_hint,
+.mpt_check_import_trees <- function(branches, impossible, relabel_remedy,
                                     lead_hint = NULL) {
   stopif(
     length(impossible) > 0 && !is_namedlist(impossible),
@@ -929,7 +927,10 @@ mpt_from_eqn <- function(file, restrictions = NULL, categories = NULL,
                ')', collapse = ', '),
         ').'
       ),
-      relabel_hint
+      paste0(
+        'If the trees label the same responses differently (e.g., hit/miss ',
+        'and fa/cr for yes/no), ', relabel_remedy
+      )
     )), collapse = '\\n')}"
   )
   invisible(NULL)
@@ -1002,14 +1003,13 @@ mpt_from_eqn <- function(file, restrictions = NULL, categories = NULL,
 }
 
 .mpt_sum_branch_lines <- function(exprs, categories) {
-  summed <- tapply(exprs, categories, function(branch_lines) {
+  as.list(tapply(exprs, categories, function(branch_lines) {
     if (length(branch_lines) == 1) {
       branch_lines
     } else {
       paste0("(", branch_lines, ")", collapse = " + ")
     }
-  })
-  as.list(summed)[unique(categories)]
+  }))[unique(categories)]
 }
 
 # maps each name to a version without underscores and dots (the brms nlpar
