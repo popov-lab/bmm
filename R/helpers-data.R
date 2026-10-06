@@ -276,8 +276,8 @@ standata.bmmformula <- function(object, data, model, ...) {
   dots <- list(...)
   local_brms_threads(dots)
   configure_options(dots)
-  cfg <- configure_fit(object, data, model, init = FALSE, frame_args = brms_frame_args(dots))
-  call_brms_extractor(brms::standata, cfg, dots, prior = NULL)
+  cfg <- configure_fit(object, data, model, until = "model", frame_args = brms_frame_args(dots))
+  call_brms_extractor(brms::standata, cfg, dots)
 }
 
 # check if the data is sorted by the predictors

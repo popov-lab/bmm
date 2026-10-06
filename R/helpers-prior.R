@@ -51,7 +51,7 @@
 default_prior.bmmformula <- function(object, data, model, formula = object, ...) {
   withr::local_options(bmm.sort_data = FALSE)
   dots <- list(...)
-  cfg <- configure_fit(object, data, model, init = FALSE, frame_args = brms_frame_args(dots))
+  cfg <- configure_fit(object, data, model, until = "prior", frame_args = brms_frame_args(dots))
   combine_prior(call_brms_extractor(brms::default_prior, cfg, dots), cfg$prior)
 }
 
