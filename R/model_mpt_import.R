@@ -258,7 +258,7 @@ mpt_from_string <- function(text, tree_names, categories = NULL,
     tree has {max(tree_sizes)} lines."
   )
 
-  branches <- Map(function(block_lines, tree_name, missing_cats) {
+  labelled <- Map(function(block_lines, tree_name, missing_cats) {
     tree_categories <- if (by_tree) {
       categories[[tree_name]]
     } else {
@@ -272,8 +272,24 @@ mpt_from_string <- function(text, tree_names, categories = NULL,
       categories gives {length(tree_categories)}."
     )
     block_lines$category[missing_cats] <- tree_categories[missing_cats]
-    .mpt_sum_branch_lines(block_lines$expr, block_lines$category)
+    block_lines
   }, tree_lines, tree_names, unlabelled)
+  branches <- lapply(labelled, function(block_lines) {
+    .mpt_sum_branch_lines(block_lines$expr, block_lines$category)
+  })
+  shared <- .mpt_merged_rows(do.call(rbind, Map(function(block_lines, tree) {
+    data.frame(
+      tree = tree, category = paste("line", seq_len(nrow(block_lines))),
+      bmm_category = block_lines$category, prefix = ""
+    )
+  }, labelled, names(labelled))))
+  if (nrow(shared) > 0) {
+    message2(
+      "Several lines of a tree share a response category; their branch lines \\
+      are summed:
+      {.mpt_format_merges(shared)}"
+    )
+  }
 
   # one vector over trees of different lengths gives the shorter trees the
   # leading labels of the longer ones, which is rarely meant
@@ -607,7 +623,10 @@ mpt_from_eqn <- function(file, restrictions = NULL, categories = NULL,
 }
 
 # The helpers below are called only from mpt_from_eqn(), so their errors can
-# speak about the EQN file and the importer's arguments.
+# speak about the EQN file and the importer's arguments. The exceptions are
+# .mpt_check_import_trees(), .mpt_model_from_branches(), .mpt_merged_rows(),
+# .mpt_format_merges() and .mpt_sum_branch_lines(), which mpt_from_string()
+# calls as well.
 
 # reads the equation lines of an EQN file, keeping their line numbers for
 # the error messages
@@ -832,10 +851,7 @@ mpt_from_eqn <- function(file, restrictions = NULL, categories = NULL,
   # only the categories map can merge categories of a tree here: merges by
   # the prefix strip or by sanitizing alone were errors above
   cat_rows <- unique(eqn[c("tree", "category", "bmm_category", "prefix")])
-  merge_key <- cat_rows[c("tree", "bmm_category")]
-  merged <- cat_rows[
-    duplicated(merge_key) | duplicated(merge_key, fromLast = TRUE),
-  ]
+  merged <- .mpt_merged_rows(cat_rows)
   if (nrow(merged) > 0) {
     message2(
       "The categories argument maps several categories of a tree onto one \\
@@ -954,6 +970,12 @@ mpt_from_eqn <- function(file, restrictions = NULL, categories = NULL,
       )
     }, character(1))
   ), collapse = "\n")
+}
+
+# the rows whose bmm category is shared by another row of the same tree
+.mpt_merged_rows <- function(rows) {
+  merge_key <- rows[c("tree", "bmm_category")]
+  rows[duplicated(merge_key) | duplicated(merge_key, fromLast = TRUE), ]
 }
 
 .mpt_format_merges <- function(merged) {

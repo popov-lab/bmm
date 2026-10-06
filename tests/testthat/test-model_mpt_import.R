@@ -13,10 +13,10 @@ test_that("mpt_from_string parses MPTinR-style model definitions", {
   expect_equal(model$other_vars$trees, manual$other_vars$trees)
   expect_equal(names(model$parameters), names(manual$parameters))
 
-  summed <- mpt_from_string(
+  summed <- suppressMessages(mpt_from_string(
     "D # hit\n(1 - D) * g # hit\n(1 - D) * (1 - g) # miss",
     tree_names = "old"
-  )
+  ))
   expect_equal(deparse1(summed$other_vars$trees$old$branches$hit), "(D) + ((1 - D) * g)")
 
   no_comments <- mpt_from_string(
@@ -32,6 +32,32 @@ test_that("mpt_from_string parses MPTinR-style model definitions", {
   expect_error(
     mpt_from_string("D + (1 - D) * g\n(1 - D) * (1 - g)", tree_names = "old"),
     "categories"
+  )
+})
+
+test_that("mpt_from_string says when it sums lines that share a category", {
+  expect_message(
+    mpt_from_string(
+      "D # hit\n(1 - D) * g # hit\n(1 - D) * (1 - g) # miss",
+      tree_names = "old"
+    ),
+    "tree old: 'line 1', 'line 2' -> hit"
+  )
+  # the label may come from the categories argument, and each tree is named
+  expect_message(
+    mpt_from_string(
+      c("D", "(1 - D) * g", "(1 - D) * (1 - g)", "", "g", "1 - g"),
+      tree_names = c("old", "new"), tree_id = "item_type",
+      categories = list(old = c("hit", "hit", "miss"), new = c("hit", "miss"))
+    ),
+    "tree old: 'line 1', 'line 2' -> hit"
+  )
+  expect_no_message(
+    mpt_from_string(
+      "D # hit\n1 - D # miss\n\ng # hit\n1 - g # miss",
+      tree_names = c("old", "new"), tree_id = "item_type"
+    ),
+    message = "share a response category"
   )
 })
 
