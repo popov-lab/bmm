@@ -1644,6 +1644,19 @@ test_that("dmpt and rmpt take log and unpack in the fifth position", {
   expect_named(rmpt(1, 10, c(D = 0.5), model, "t", TRUE, G = 0.5), c("corr", "other"))
 })
 
+test_that("dmpt and rmpt refuse a value given more than once", {
+  model <- mpt(mpt_tree("t", list(
+    corr = "D + (1 - D) * G", other = "(1 - D) * (1 - G)"
+  )), covariates = "G")
+  expect_error(
+    dmpt(c(7, 3), c(D = 0.5), model, covariates = c(G = 0.2), G = 0.8),
+    "'G' are given more than once"
+  )
+  expect_error(
+    rmpt(1, 10, c(D = 0.5, G = 0.8), model, covariates = c(D = 0.4, G = 0.2)),
+    "'D', 'G' are given more than once"
+  )
+})
 
 # Tests for the ezdm decision-time cumulants (issue #407) ----------------------
 
