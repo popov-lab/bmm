@@ -65,6 +65,12 @@ test_that("importers record their own call", {
   )
   expect_equal(deparse(attr(model, "call")[[1]]), "mpt_from_string")
   expect_output(print(model), "mpt_from_string")
+
+  eqn_file <- tempfile(fileext = ".eqn")
+  writeLines(c("t  a  g", "t  b  1 - g"), eqn_file)
+  from_eqn <- mpt_from_eqn(eqn_file)
+  expect_equal(deparse(attr(from_eqn, "call")[[1]]), "mpt_from_eqn")
+  expect_output(print(from_eqn), "mpt_from_eqn")
 })
 
 test_that("an empty formula fits every parameter with an intercept", {
