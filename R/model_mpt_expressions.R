@@ -114,11 +114,15 @@
 # reported separately as parameters that appear not to affect any category
 # probability.
 .mpt_jacobian_rank <- function(trees, free, fixed = list(), tolerance = 1e-8) {
+  # the counts are reported even when the rank cannot be computed
+  counts <- list(
+    n_free = length(free), free = free,
+    df = sum(lengths(lapply(trees, `[[`, "branches")) - 1L)
+  )
   if (length(free) == 0L) {
-    return(list(
-      rank = 0L, n_free = 0L, free = free,
-      involved = character(0), absent = character(0)
-    ))
+    return(c(counts, list(
+      rank = 0L, involved = character(0), absent = character(0)
+    )))
   }
   branches <- unlist(lapply(unname(trees), `[[`, "branches"), use.names = FALSE)
   parameters <- c(free, names(fixed))
@@ -128,9 +132,8 @@
     })
   }), recursive = FALSE), silent = TRUE)
   if (is_try_error(derivs)) {
-    return(list(error = conditionMessage(attr(derivs, "condition"))))
+    return(c(counts, list(error = conditionMessage(attr(derivs, "condition")))))
   }
-  df <- sum(lengths(lapply(trees, `[[`, "branches")) - 1L)
   symbols <- .mpt_tree_parameters(trees)
   points <- .mpt_test_points(symbols)
   # one vector per symbol holding its value at every test point, so each
@@ -154,7 +157,7 @@
       sweep(jacobian, 2, norms, "/"), nu = 0, nv = length(free)
     )
     decomposition$rank <- min(
-      sum(decomposition$d > tolerance * decomposition$d[1]), df
+      sum(decomposition$d > tolerance * decomposition$d[1]), counts$df
     )
     decomposition$absent <- free[zero]
     decomposition
@@ -163,13 +166,11 @@
   n_absent <- lengths(lapply(decompositions, `[[`, "absent"))
   best <- decompositions[[order(-ranks, n_absent)[1]]]
   null_space <- best$v[, seq_along(free) > best$rank, drop = FALSE]
-  list(
+  c(counts, list(
     rank = best$rank,
-    n_free = length(free),
-    free = free,
     involved = free[rowSums(abs(null_space) > 1e-6) > 0],
     absent = best$absent
-  )
+  ))
 }
 
 # the first branch-sum or branch-range violation per tree, NA where every test

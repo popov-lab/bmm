@@ -482,22 +482,18 @@ print_model_details.mpt <- function(model, ...) {
   # the classical parameters-versus-categories bound, followed by the Jacobian
   # rank, which also catches redundant parameters when the count passes; each
   # tree contributes categories minus one
-  n_free <- length(setdiff(
-    names(attr(model, "links_default")) %||% names(model$parameters),
-    names(model$fixed_parameters)
-  ))
-  df <- sum(lengths(lapply(model$other_vars$trees, `[[`, "branches")) - 1L)
+  identifiability <- .mpt_identifiability(model)
   cat(glue(
-    "Identifiability (intercept-only formulas): {n_free} free parameter(s), \\
-    {df} degrees of freedom (response categories minus 1, summed over trees)"
+    "Identifiability (intercept-only formulas): {identifiability$n_free} free \\
+    parameter(s), {identifiability$df} degrees of freedom (response \\
+    categories minus 1, summed over trees)"
   ), "\n")
-  if (n_free > df) {
+  if (identifiability$n_free > identifiability$df) {
     cat(
       "  More free parameters than degrees of freedom: the model is not",
       "identified without further constraints.\n"
     )
   }
-  identifiability <- .mpt_identifiability(model)
   # set by check_model.mpt() for parameters with a non-linear formula
   tied <- names(attr(model, "mpt_bypassed_links"))
   rank_text <- if (!is.null(identifiability$error)) {
