@@ -72,7 +72,11 @@
       "The restrictions argument must be a character vector such as \\
       c('Dn = Do', 'g = 0.5') or a named list such as list(Dn = 'Do', g = 0.5)."
     )
-    return(do.call(c, lapply(restrictions, .mpt_parse_restriction_string)))
+    # readLines() returns blank and comment lines of a restriction file as is
+    restrictions <- restrictions[!grepl("^\\s*(#|$)", restrictions)]
+    return(Reduce(
+      c, lapply(restrictions, .mpt_parse_restriction_string), list()
+    ))
   }
   stopif(
     any(!nzchar(names(restrictions))),
@@ -95,7 +99,23 @@
 }
 
 .mpt_parse_restriction_string <- function(text) {
+  # a restriction has an `=`, so a line without one that names a file is a path
+  # (the extension is judged without a trailing comment)
+  stopif(
+    !grepl("=", text, fixed = TRUE) &&
+      (file.exists(text) ||
+        grepl(
+          "\\.(restr|txt)\\s*$", sub("#.*$", "", text), ignore.case = TRUE
+        )),
+    "A restriction must not be a file path. bmm does not read restriction \\
+    files; pass readLines({encodeString(text, quote = '\"')}) instead (blank \\
+    and comment lines are skipped)."
+  )
   expr <- try(str2lang(text), silent = TRUE)
+  # R cannot parse a chain such as G1 < G2 < G3
+  if (is_try_error(expr) && grepl("[<>]", text)) {
+    .mpt_stop_order_constraint(text)
+  }
   stopif(is_try_error(expr), "Cannot parse the restriction '{text}'.")
   lhs <- character(0)
   while (is.call(expr) && identical(expr[[1]], quote(`=`))) {
@@ -106,19 +126,24 @@
     lhs <- c(lhs, as.character(expr[[2]]))
     expr <- expr[[3]]
   }
-  stopif(
-    is.call(expr) && as.character(expr[[1]]) %in% c("<", ">", "<=", ">="),
-    "Order constraints such as '{text}' are not supported by the \\
-    restrictions argument. Reparameterize the larger parameter instead, e.g. \\
-    Do ~ Dn + (1 - Dn) * inv_logit(phi) in the model formula; see the section \\
-    'Ordered parameter constraints' of the MPT article."
-  )
+  if (is.call(expr) && as.character(expr[[1]]) %in% c("<", ">", "<=", ">=")) {
+    .mpt_stop_order_constraint(text)
+  }
   stopif(
     length(lhs) == 0L,
     "Each restriction must have the form 'parameter = parameter' or \\
     'parameter = constant', not '{text}'."
   )
   setNames(rep(list(.mpt_restriction_value(expr, text)), length(lhs)), lhs)
+}
+
+.mpt_stop_order_constraint <- function(text) {
+  stop2(
+    "Order constraints such as '{text}' are not supported by the \\
+    restrictions argument. Reparameterize the larger parameter instead, e.g. \\
+    Do ~ Dn + (1 - Dn) * inv_logit(phi) in the model formula; see the section \\
+    'Ordered parameter constraints' of the MPT article."
+  )
 }
 
 # a right-hand side without symbols is a constant (1/4, 1 - 0.75); a single
@@ -179,13 +204,21 @@
 # several distinct test points catches swapped-complement errors that a single
 # symmetric point (e.g. all 0.5) would miss. A golden-ratio sequence gives
 # every symbol its own value at every point, however many symbols there are
-# (a short cycle of values would equate symbols a fixed number of places apart)
+# (a short cycle of values would equate symbols a fixed number of places apart).
+# The first four points are linear in the symbol index, so v_i + v_j equals
+# v_k + v_l at all four whenever i + j = k + l; the fifth raises the index to
+# the irrational power sqrt(2), which no such linear relation survives, so the
+# rank check cannot meet the same coincidence at every point. The members of a
+# simplex group are rescaled to sum to 1.
 .mpt_test_points <- function(symbols, simplex) {
-  lapply(1:4, function(point) {
-    vals <- setNames(
-      0.05 + 0.9 * ((seq_along(symbols) * 0.6180339887 + point * 0.2718281828) %% 1),
-      symbols
-    )
+  index <- seq_along(symbols)
+  lapply(1:5, function(point) {
+    position <- if (point < 5) {
+      index * 0.6180339887 + point * 0.2718281828
+    } else {
+      index^1.4142135624 * 0.6180339887
+    }
+    vals <- setNames(0.05 + 0.9 * (position %% 1), symbols)
     for (grp in simplex) {
       vals[grp] <- vals[grp] / sum(vals[grp])
     }
@@ -209,6 +242,128 @@
     }
     vals
   })
+}
+
+# Local identifiability: the rank of the Jacobian of all category probabilities
+# (all trees stacked) with respect to the free parameters, at the interior test
+# points; fixed parameters enter at their values. The maximum rank over the
+# points is reported, so one point on a singular set cannot raise a false alarm,
+# and it is capped at the degrees of freedom, which no Jacobian can exceed.
+# Derivatives are symbolic (stats::D() on the stored calls) rather than finite
+# differences: MPT branches are nearly always polynomials, which D()
+# differentiates exactly, so a null direction has a singular value at rounding
+# level (about 1e-16 relative) instead of the 1e-13 to 1e-11 left by central
+# differences. A branch that D() cannot differentiate (a function outside its
+# table) makes the check unavailable, never a false result.
+# Columns are scaled to unit norm, so a parameter that moves the probabilities
+# little at a test point is not mistaken for a redundant one. A parameter that
+# cancels from every branch can leave a rounding residue instead of an exact
+# zero (D(a * b * c * q + c * b * a * (1 - q), "q") = a * b * c - c * b * a),
+# which scaling would blow up into a full column, so a column at most 1e-12 of
+# the largest column is a zero column. The largest column is taken over the
+# fixed parameters too, so a residue whose partners are all fixed still has a
+# genuine column to be measured against. In every case measured, residues stay
+# at about 1e-16 of the largest column and the genuine columns of a 32-deep
+# chain at about 3e-12 or more. Among the points of maximum rank, the one with
+# the fewest zero columns names the parameters.
+# The relative singular-value tolerance 1e-8 sits eight orders above the null
+# singular values and six below the smallest singular value of the identified
+# imports (hybrid.eqn and unitization.eqn with their design constants fixed:
+# 0.015 and 0.43 relative). Parameters whose unit vector is not orthogonal to
+# the null space take part in a non-identified combination; zero columns are
+# reported separately as parameters that appear not to affect any category
+# probability.
+# A simplex group is free through its stick-breaking components (`sticks`, named
+# by member), not its members: the member columns are multiplied by the
+# derivative of the members with respect to the sticks, at test points that lie
+# on the simplex. A fixed stick keeps its column out of the free set.
+.mpt_jacobian_rank <- function(trees, free, fixed = list(), simplex = list(),
+                               sticks = character(0), tolerance = 1e-8) {
+  if (length(free) == 0L) {
+    return(list(
+      rank = 0L, n_free = 0L, free = free,
+      involved = character(0), absent = character(0)
+    ))
+  }
+  branches <- unlist(lapply(unname(trees), `[[`, "branches"), use.names = FALSE)
+  parameters <- c(setdiff(free, sticks), unlist(simplex), names(fixed))
+  derivs <- try(unlist(lapply(branches, function(branch) {
+    lapply(parameters, function(par) {
+      if (par %in% all.vars(branch)) stats::D(branch, par) else 0
+    })
+  }), recursive = FALSE), silent = TRUE)
+  if (is_try_error(derivs)) {
+    return(list(error = conditionMessage(attr(derivs, "condition"))))
+  }
+  df <- sum(lengths(lapply(trees, `[[`, "branches")) - 1L)
+  symbols <- unique(unlist(lapply(branches, all.vars)))
+  points <- .mpt_test_points(symbols, simplex)
+  # one vector per symbol holding its value at every test point, so each
+  # derivative is evaluated once for all points
+  vals <- lapply(setNames(nm = symbols), function(symbol) {
+    vapply(points, `[[`, numeric(1), symbol)
+  })
+  vals[names(fixed)] <- fixed
+  values <- vapply(derivs, function(deriv) {
+    rep_len(eval(deriv, vals), length(points))
+  }, numeric(length(points)))
+  decompositions <- lapply(seq_along(points), function(point) {
+    jacobian <- matrix(
+      values[point, ], ncol = length(parameters), byrow = TRUE,
+      dimnames = list(NULL, parameters)
+    )
+    for (grp in simplex) {
+      jacobian <- cbind(
+        jacobian[, setdiff(colnames(jacobian), grp), drop = FALSE],
+        .mpt_stick_jacobian(
+          jacobian[, grp, drop = FALSE], points[[point]][grp],
+          sticks[grp[-length(grp)]]
+        )
+      )
+    }
+    norms <- sqrt(colSums(jacobian^2))
+    zero <- norms[free] <= 1e-12 * max(norms)
+    jacobian <- jacobian[, free, drop = FALSE]
+    norms <- norms[free]
+    jacobian[, zero] <- 0
+    norms[zero] <- 1
+    decomposition <- svd(
+      sweep(jacobian, 2, norms, "/"), nu = 0, nv = length(free)
+    )
+    decomposition$rank <- min(
+      sum(decomposition$d > tolerance * decomposition$d[1]), df
+    )
+    decomposition$absent <- free[zero]
+    decomposition
+  })
+  ranks <- vapply(decompositions, `[[`, integer(1), "rank")
+  n_absent <- lengths(lapply(decompositions, `[[`, "absent"))
+  best <- decompositions[[order(-ranks, n_absent)[1]]]
+  null_space <- best$v[, seq_along(free) > best$rank, drop = FALSE]
+  list(
+    rank = best$rank,
+    n_free = length(free),
+    free = free,
+    involved = free[rowSums(abs(null_space) > 1e-6) > 0],
+    absent = best$absent
+  )
+}
+
+# chain rule through the stick-breaking map: member k is
+# s_k * prod_{j < k} (1 - s_j) and the last member takes the remainder, so
+# d member_k / d s_k is the remainder before k, and every later member falls in
+# proportion to its own value, d member_k / d s_m = -member_k / (1 - s_m)
+.mpt_stick_jacobian <- function(member_jacobian, members, sticks) {
+  n_sticks <- length(sticks)
+  remainder <- 1 - c(0, cumsum(members[seq_len(n_sticks)]))
+  stick_values <- members[seq_len(n_sticks)] / remainder[seq_len(n_sticks)]
+  map <- matrix(0, length(members), n_sticks, dimnames = list(NULL, sticks))
+  for (m in seq_len(n_sticks)) {
+    map[m, m] <- remainder[m]
+    later <- seq.int(m + 1L, length(members))
+    map[later, m] <- -members[later] / (1 - stick_values[m])
+  }
+  member_jacobian %*% map
 }
 
 # the first deviating branch sum per tree, NA where every test point sums to 1

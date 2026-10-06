@@ -95,6 +95,67 @@ test_that("an out-of-range constant is not explained with 0/1 branches", {
   }
 })
 
+test_that("a restrictions file path gets a pointer to readLines()", {
+  path <- withr::local_tempfile(fileext = ".restr", lines = "Dn = Do")
+  expect_error(.mpt_parse_restrictions(path), "does not read restriction")
+  expect_error(.mpt_parse_restrictions("models/2htm.restr"), "readLines")
+  expect_error(.mpt_parse_restrictions("models/2htm.txt"), "readLines")
+  expect_error(.mpt_parse_restrictions(list("models/2htm.restr")), "readLines")
+  expect_equal(.mpt_parse_restrictions("Dn = Do"), list(Dn = quote(Do)))
+})
+
+test_that("an existing file without a known extension is recognised", {
+  path <- withr::local_tempfile(lines = "Dn = Do")
+  expect_error(.mpt_parse_restrictions(path), "does not read restriction")
+})
+
+test_that("the path hint quotes the path as valid R and names it once", {
+  msg <- tryCatch(
+    .mpt_parse_restrictions("C:\\models\\2htm.restr"),
+    error = conditionMessage
+  )
+  expect_match(msg, 'readLines("C:\\\\models\\\\2htm.restr")', fixed = TRUE)
+  expect_equal(lengths(regmatches(msg, gregexpr("2htm.restr", msg, fixed = TRUE))), 1L)
+})
+
+test_that("restrictions with a file name in a comment or an existing file are valid", {
+  expect_equal(.mpt_parse_restrictions("g = 0.5 # half.txt"), list(g = 0.5))
+  expect_equal(
+    .mpt_parse_restrictions("Dn = Do # from broeder.2htm.restr"),
+    list(Dn = quote(Do))
+  )
+  expect_equal(
+    .mpt_parse_restrictions("Dn = Do # see notes.TXT "),
+    list(Dn = quote(Do))
+  )
+  withr::with_dir(withr::local_tempdir(), {
+    file.create("g = 0.5")
+    expect_equal(.mpt_parse_restrictions("g = 0.5"), list(g = 0.5))
+  })
+  expect_error(
+    .mpt_parse_restrictions("D1 < D2 # notes.txt"), "Order constraints"
+  )
+})
+
+test_that("blank and comment lines of readLines() are skipped", {
+  path <- withr::local_tempfile(
+    lines = c("# 2HTM", "Dn = Do # equal detection", "", "  ", "g = 0.5", "  # end")
+  )
+  expect_equal(
+    .mpt_parse_restrictions(readLines(path)),
+    list(Dn = quote(Do), g = 0.5)
+  )
+  expect_equal(.mpt_parse_restrictions(c("", "# only a comment")), list())
+})
+
+test_that("chained order constraints get the order-constraint message", {
+  expect_error(.mpt_parse_restrictions("G1 < G2 < G3"), "Order constraints")
+  expect_error(.mpt_parse_restrictions("G1 > G2 > G3"), "Order constraints")
+  expect_error(.mpt_parse_restrictions("D1 <= D2 <= D3"), "Order constraints")
+  expect_error(.mpt_parse_restrictions("D1 < D2 < D3"), "'D1 < D2 < D3'")
+  expect_error(.mpt_parse_restrictions("Do = "), "Cannot parse")
+})
+
 test_that("restriction chains resolve to their final target", {
   resolved <- .mpt_resolve_restrictions(list(A = quote(B), B = quote(C), g = 0.5))
   expect_equal(resolved, list(A = quote(C), B = quote(C), g = 0.5))
@@ -119,7 +180,7 @@ test_that("test points give every symbol its own interior value at every point",
   for (n in c(2, 4, 5, 8, 12, 30)) {
     symbols <- paste0("p", seq_len(n))
     points <- .mpt_test_points(symbols, list())
-    expect_length(points, 4)
+    expect_length(points, 5)
     for (vals in points) {
       expect_named(vals, symbols)
       expect_true(all(vals > 0 & vals < 1))
@@ -132,6 +193,20 @@ test_that("test points give every symbol its own interior value at every point",
   for (vals in points) {
     expect_equal(sum(vals[c("a", "b", "c")]), 1)
   }
+})
+
+test_that("no sum of two test values equals another such sum at every point", {
+  # a linear sequence in the symbol index gives v_i + v_j == v_k + v_l at
+  # every point whenever i + j == k + l, which the rank check would read as a
+  # property of the model
+  n <- 12
+  values <- do.call(rbind, .mpt_test_points(paste0("p", seq_len(n)), list()))
+  pairs <- t(utils::combn(n, 2))
+  sums <- apply(pairs, 1, function(pair) values[, pair[1]] + values[, pair[2]])
+  coincide <- outer(seq_len(nrow(pairs)), seq_len(nrow(pairs)), Vectorize(
+    function(a, b) a < b && all(abs(sums[, a] - sums[, b]) < 1e-9)
+  ))
+  expect_false(any(coincide))
 })
 
 test_that("a typo between parameters four places apart in the symbol order is caught", {

@@ -357,10 +357,13 @@ settable_link_functions.mpt <- function(model) {
 #'   Constants must lie strictly between 0 and 1. The unnamed list of MPTinR
 #'   and TreeBUGS, `list("Dn = Do", "g = 0.5")`, works as well. Restriction
 #'   files are not read: in MPTinR and TreeBUGS a character vector names a
-#'   restrictions file, in `bmm` it holds the restrictions. Restrictions are substituted into the
-#'   branch expressions before the parameters are identified, so a restricted
-#'   parameter is not part of the model and cannot be a simplex member. Order
-#'   constraints (`"Do > Dn"`) are not supported here; see Details.
+#'   restrictions file, in `bmm` it holds the restrictions. To use such a file,
+#'   pass `readLines(path)`; blank lines and lines starting with `#` are
+#'   skipped, and a `#` after a restriction starts a comment, as in MPTinR.
+#'   Restrictions are substituted into the branch expressions before the
+#'   parameters are identified, so a restricted parameter is not part of the
+#'   model and cannot be a simplex member. Order constraints (`"Do > Dn"`) are
+#'   not supported here; see Details.
 #' @param links Character. The link function for all latent probability
 #'   parameters: `"logit"` (default) or `"probit"`.
 #' @param ... used internally for testing, ignore it
@@ -423,6 +426,29 @@ settable_link_functions.mpt <- function(model) {
 #'   the logit link. For the same reason, `summary()` lists a fixed `g = 0.5`
 #'   as `g_Intercept 0.00` under "Constant Parameters"; [prior_info()] and
 #'   [parameter_info()] show the probability, 0.5.
+#'
+#'   Printing the model ends with an identifiability check for intercept-only
+#'   formulas. It first compares the number of free parameters with the
+#'   degrees of freedom (response categories minus one, summed over trees).
+#'   It then computes the rank of the Jacobian of all category probabilities
+#'   with respect to the free parameters, from exact derivatives at five
+#'   interior test values; parameters fixed in the formula enter at their
+#'   values. A simplex group counts with one free parameter fewer than its
+#'   members, and the printout names the group by its members. A rank below the number of free parameters means that some
+#'   combination of the listed parameters cannot be estimated from the data,
+#'   even when the count passes, and its posterior follows the prior; a
+#'   parameter whose derivatives are zero up to rounding at the test values
+#'   appears not to affect any category probability and is named separately.
+#'   Fix parameters in the formula or equate them in the branch expressions
+#'   until the rank is full. `bmm()` warns about a rank deficit when no
+#'   formula uses a data column as a predictor. When one does, a parameter
+#'   that differs between conditions can identify the model across them, so
+#'   `bmm()` only says that the model is not identified within one design
+#'   cell and that the predictors were not checked. The
+#'   check is local: it holds at the test values, not at the boundaries of
+#'   the parameter space. A branch expression with a function that
+#'   [stats::D()] cannot differentiate leaves the rank uncomputed, and the
+#'   printout says so.
 #'
 #'   `summary()` reports intercepts and regression coefficients on the latent
 #'   (logit or probit) scale. [native_parameters()] returns the posterior
@@ -766,10 +792,10 @@ print_model_details.mpt <- function(model, ...) {
       through {inv_link('x', model$other_vars$link)[[1]]}()"
     ), "\n")
   }
-  # classical parameters-versus-categories bound, not the Fisher-information
-  # rank of MPTinR's check.mpt(); each tree contributes its possible categories
-  # minus one. A simplex group counts through its stick-breaking components,
-  # one fewer than its members.
+  # the classical parameters-versus-categories bound, followed by the Jacobian
+  # rank, which also catches redundant parameters when the count passes; each
+  # tree contributes its possible categories minus one. A simplex group counts
+  # through its stick-breaking components, one fewer than its members.
   n_free <- length(setdiff(
     names(attr(model, "links_default")) %||% names(model$parameters),
     c(names(model$fixed_parameters), unlist(model$other_vars$simplex))
@@ -785,7 +811,99 @@ print_model_details.mpt <- function(model, ...) {
       "identified without further constraints.\n"
     )
   }
+  identifiability <- .mpt_identifiability(model)
+  rank_text <- if (!is.null(identifiability$error)) {
+    glue(
+      "Jacobian rank not computed: stats::D() cannot differentiate the branch \\
+      expressions ({identifiability$error})."
+    )
+  } else if (identifiability$rank < identifiability$n_free) {
+    .mpt_rank_deficit_text(identifiability)
+  } else {
+    glue(
+      "Jacobian rank {identifiability$rank} of {identifiability$n_free} at \\
+      interior test values: locally identified."
+    )
+  }
+  cat(strwrap(rank_text, indent = 2, exdent = 4), sep = "\n")
   invisible(NULL)
+}
+
+# rank of the category probabilities in the free tree parameters; a parameter
+# fixed in the formula enters at its value. A simplex group is free through its
+# stick-breaking components, which users never write, so the text names the
+# group's members instead
+.mpt_identifiability <- function(model) {
+  trees <- model$other_vars$trees
+  simplex <- model$other_vars$simplex
+  sticks <- model$other_vars$simplex_raw
+  parameters <- setdiff(
+    unique(unlist(lapply(trees, .mpt_expr_vars))), unlist(simplex)
+  )
+  fixed <- model$fixed_parameters[
+    intersect(names(model$fixed_parameters), parameters)
+  ]
+  free <- c(
+    setdiff(parameters, names(fixed)),
+    setdiff(unname(sticks), names(model$fixed_parameters))
+  )
+  labels <- setNames(paste0("'", free, "'"), free)
+  for (grp in simplex) {
+    labels[intersect(free, sticks[grp])] <- glue(
+      "the simplex group {collapse_comma(grp)}"
+    )
+  }
+  c(.mpt_jacobian_rank(trees, free, fixed, simplex, sticks), list(labels = labels))
+}
+
+.mpt_rank_deficit_text <- function(identifiability) {
+  free <- identifiability$free
+  labels <- identifiability$labels
+  absent <- identifiability$absent
+  entangled <- setdiff(identifiability$involved, absent)
+  n_combinations <- identifiability$n_free - identifiability$rank -
+    length(absent)
+  paste(c(
+    glue(
+      "The model is not identified: the Jacobian of the category \\
+      probabilities has rank {identifiability$rank} for \\
+      {identifiability$n_free} free parameters at interior test values."
+    ),
+    if (n_combinations > 0 && length(entangled) > 0) {
+      glue(
+        "{n_combinations} combination(s) of \\
+        {.mpt_parameter_set(entangled, free, labels)} cannot be estimated \\
+        from the data."
+      )
+    },
+    if (length(absent) > 0) {
+      glue(
+        "The derivative with respect to {.mpt_labels(absent, labels)} is zero up \\
+        to rounding at the test values, so these parameter(s) appear not to \\
+        affect any category probability."
+      )
+    },
+    glue(
+      "Fix parameters in the formula (bmf(name = value)) or equate them in \\
+      the branch expressions."
+    )
+  ), collapse = " ")
+}
+
+# a list longer than half the free parameters reads better as its complement
+.mpt_parameter_set <- function(pars, free, labels) {
+  if (length(pars) <= length(free) / 2) {
+    return(.mpt_labels(pars, labels))
+  }
+  rest <- setdiff(free, pars)
+  if (length(rest) == 0L) {
+    return("all free parameters")
+  }
+  glue("all free parameters except {.mpt_labels(rest, labels)}")
+}
+
+.mpt_labels <- function(pars, labels) {
+  paste(unique(labels[pars]), collapse = ", ")
 }
 
 ############################################################################# !
@@ -853,8 +971,53 @@ check_model.mpt <- function(model, data = NULL, formula = NULL) {
         between 0 and 1. Provided: {value}"
       )
     }
+
+    # population-level predictors can identify a parameter across design
+    # cells that a single cell leaves open, so the per-cell rank is the rank
+    # of the fitted model only when no formula has a data predictor; with
+    # predictors, a per-cell deficit is announced but not warned about
+    with_predictors <- .mpt_predictor_formulas(formula, names(model$parameters))
+    identifiability <- .mpt_identifiability(model)
+    if (is.null(identifiability$error) &&
+          identifiability$rank < identifiability$n_free) {
+      if (length(with_predictors) == 0L) {
+        warning2(
+          "{.mpt_rank_deficit_text(identifiability)} Along the non-identified \\
+          direction(s), the posterior follows the prior."
+        )
+      } else {
+        message2(
+          "The model is not identified within one design cell (Jacobian \\
+          rank {identifiability$rank} for {identifiability$n_free} free \\
+          parameters; print(model) names the parameters involved). Whether \\
+          the predictors on {collapse_comma(with_predictors)} identify it \\
+          across cells is not checked."
+        )
+      }
+    }
   }
   NextMethod("check_model")
+}
+
+# formulas whose population-level terms use a data column; random-effect terms
+# carry a bar, and parameters inside a non-linear formula are not data. A
+# formula terms() cannot read counts as having predictors, which turns the
+# warning into the milder message rather than risking a false one
+.mpt_predictor_formulas <- function(formula, parameters) {
+  formula <- formula[!is_constant(formula)]
+  has_predictors <- vapply(formula, function(par_formula) {
+    formula_terms <- try(stats::terms(par_formula), silent = TRUE)
+    if (is_try_error(formula_terms)) {
+      return(TRUE)
+    }
+    labels <- attr(formula_terms, "term.labels")
+    population_vars <- unlist(lapply(
+      labels[!grepl("|", labels, fixed = TRUE)],
+      function(label) all.vars(str2lang(label))
+    ))
+    length(setdiff(population_vars, c(names(formula), parameters))) > 0
+  }, logical(1))
+  names(formula)[has_predictors]
 }
 
 # a parameter whose link was switched after construction gets the matched
