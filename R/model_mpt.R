@@ -94,7 +94,8 @@ print.mpt_tree <- function(x, ...) {
 }
 
 .model_mpt <- function(trees = NULL, tree_id = NULL, simplex = NULL,
-                       restrictions = NULL, links = "logit",
+                       restrictions = NULL, unrestricted_trees = NULL,
+                       links = "logit",
                        default_priors = NULL, call = NULL, ...) {
   trees <- .mpt_as_tree_list(trees)
   if (length(trees)) names(trees) <- vapply(trees, `[[`, character(1), "name")
@@ -162,6 +163,7 @@ print.mpt_tree <- function(x, ...) {
       other_vars = list(
         tree_id = tree_id,
         trees = trees,
+        unrestricted_trees = unrestricted_trees,
         simplex = simplex,
         restrictions = restrictions,
         link = links,
@@ -500,6 +502,8 @@ mpt <- function(trees, tree_id = NULL, simplex = NULL, restrictions = NULL,
     "The tree_id argument must be a single character string naming a data column."
   )
 
+  # plot() labels the restricted edges from the trees as written
+  unrestricted_trees <- if (length(restrictions)) trees
   trees <- .mpt_restrict_trees(trees, restrictions)
 
   # a zero probability makes log(p) undefined in Stan; a dedicated argument
@@ -588,7 +592,8 @@ mpt <- function(trees, tree_id = NULL, simplex = NULL, restrictions = NULL,
 
   .model_mpt(
     trees = trees, tree_id = tree_id, simplex = simplex,
-    restrictions = restrictions, links = links, call = call, ...
+    restrictions = restrictions, unrestricted_trees = unrestricted_trees,
+    links = links, call = call, ...
   )
 }
 

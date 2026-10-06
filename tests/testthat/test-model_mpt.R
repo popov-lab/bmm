@@ -1048,3 +1048,12 @@ test_that("conditional_effects() shows simplex members on the probability scale"
     expect_equal(ce$estimate__, unname(medians[as.character(ce$cond)]), tolerance = 1e-3)
   }
 })
+
+test_that("mpt keeps the trees as given before the restrictions", {
+  trees <- setNames(mpt_2htm_trees(), c("old", "new"))
+  restricted <- mpt(trees, tree_id = "item_type", restrictions = "g = 0.5")
+  expect_equal(restricted$other_vars$unrestricted_trees, trees)
+  expect_equal(deparse(restricted$other_vars$trees$old$branches$old), "D + (1 - D) * 0.5")
+  expect_equal(deparse(restricted$other_vars$trees$new$branches$new), "D + (1 - D) * 0.5")
+  expect_null(mpt(trees, tree_id = "item_type")$other_vars$unrestricted_trees)
+})
