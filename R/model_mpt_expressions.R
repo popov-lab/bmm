@@ -54,14 +54,109 @@
 # several distinct test points catches swapped-complement errors that a single
 # symmetric point (e.g. all 0.5) would miss. A golden-ratio sequence gives
 # every symbol its own value at every point, however many symbols there are
-# (a short cycle of values would equate symbols a fixed number of places apart)
+# (a short cycle of values would equate symbols a fixed number of places apart).
+# The first four points are linear in the symbol index, so v_i + v_j equals
+# v_k + v_l at all four whenever i + j = k + l; the fifth raises the index to
+# the irrational power sqrt(2), which no such linear relation survives, so the
+# rank check cannot meet the same coincidence at every point
 .mpt_test_points <- function(symbols) {
-  lapply(1:4, function(point) {
-    setNames(
-      0.05 + 0.9 * ((seq_along(symbols) * 0.6180339887 + point * 0.2718281828) %% 1),
-      symbols
-    )
+  index <- seq_along(symbols)
+  lapply(1:5, function(point) {
+    position <- if (point < 5) {
+      index * 0.6180339887 + point * 0.2718281828
+    } else {
+      index^1.4142135624 * 0.6180339887
+    }
+    setNames(0.05 + 0.9 * (position %% 1), symbols)
   })
+}
+
+# Local identifiability: the rank of the Jacobian of all category probabilities
+# (all trees stacked) with respect to the free parameters, at the interior test
+# points; fixed parameters enter at their values. The maximum rank over the
+# points is reported, so one point on a singular set cannot raise a false alarm,
+# and it is capped at the degrees of freedom, which no Jacobian can exceed.
+# Derivatives are symbolic (stats::D() on the stored calls) rather than finite
+# differences: MPT branches are nearly always polynomials, which D()
+# differentiates exactly, so a null direction has a singular value at rounding
+# level (about 1e-16 relative) instead of the 1e-13 to 1e-11 left by central
+# differences. A branch that D() cannot differentiate (a function outside its
+# table) makes the check unavailable, never a false result.
+# Columns are scaled to unit norm, so a parameter that moves the probabilities
+# little at a test point is not mistaken for a redundant one. A parameter that
+# cancels from every branch can leave a rounding residue instead of an exact
+# zero (D(a * b * c * q + c * b * a * (1 - q), "q") = a * b * c - c * b * a),
+# which scaling would blow up into a full column, so a column at most 1e-12 of
+# the largest column is a zero column. The largest column is taken over the
+# fixed parameters too, so a residue whose partners are all fixed still has a
+# genuine column to be measured against. In every case measured, residues stay
+# at about 1e-16 of the largest column and the genuine columns of a 32-deep
+# chain at about 3e-12 or more. Among the points of maximum rank, the one with
+# the fewest zero columns names the parameters.
+# The relative singular-value tolerance 1e-8 sits eight orders above the null
+# singular values and six below the smallest singular value of the identified
+# imports (hybrid.eqn and unitization.eqn with their design constants fixed:
+# 0.015 and 0.43 relative). Parameters whose unit vector is not orthogonal to
+# the null space take part in a non-identified combination; zero columns are
+# reported separately as parameters that appear not to affect any category
+# probability.
+.mpt_jacobian_rank <- function(trees, free, fixed = list(), tolerance = 1e-8) {
+  if (length(free) == 0L) {
+    return(list(
+      rank = 0L, n_free = 0L, free = free,
+      involved = character(0), absent = character(0)
+    ))
+  }
+  branches <- unlist(lapply(unname(trees), `[[`, "branches"), use.names = FALSE)
+  parameters <- c(free, names(fixed))
+  derivs <- try(unlist(lapply(branches, function(branch) {
+    lapply(parameters, function(par) {
+      if (par %in% all.vars(branch)) stats::D(branch, par) else 0
+    })
+  }), recursive = FALSE), silent = TRUE)
+  if (is_try_error(derivs)) {
+    return(list(error = conditionMessage(attr(derivs, "condition"))))
+  }
+  df <- sum(lengths(lapply(trees, `[[`, "branches")) - 1L)
+  symbols <- unique(unlist(lapply(branches, all.vars)))
+  points <- .mpt_test_points(symbols)
+  # one vector per symbol holding its value at every test point, so each
+  # derivative is evaluated once for all points
+  vals <- lapply(setNames(nm = symbols), function(symbol) {
+    vapply(points, `[[`, numeric(1), symbol)
+  })
+  vals[names(fixed)] <- fixed
+  values <- vapply(derivs, function(deriv) {
+    rep_len(eval(deriv, vals), length(points))
+  }, numeric(length(points)))
+  decompositions <- lapply(seq_along(points), function(point) {
+    jacobian <- matrix(values[point, ], ncol = length(parameters), byrow = TRUE)
+    norms <- sqrt(colSums(jacobian^2))
+    zero <- norms[seq_along(free)] <= 1e-12 * max(norms)
+    jacobian <- jacobian[, seq_along(free), drop = FALSE]
+    norms <- norms[seq_along(free)]
+    jacobian[, zero] <- 0
+    norms[zero] <- 1
+    decomposition <- svd(
+      sweep(jacobian, 2, norms, "/"), nu = 0, nv = length(free)
+    )
+    decomposition$rank <- min(
+      sum(decomposition$d > tolerance * decomposition$d[1]), df
+    )
+    decomposition$absent <- free[zero]
+    decomposition
+  })
+  ranks <- vapply(decompositions, `[[`, integer(1), "rank")
+  n_absent <- lengths(lapply(decompositions, `[[`, "absent"))
+  best <- decompositions[[order(-ranks, n_absent)[1]]]
+  null_space <- best$v[, seq_along(free) > best$rank, drop = FALSE]
+  list(
+    rank = best$rank,
+    n_free = length(free),
+    free = free,
+    involved = free[rowSums(abs(null_space) > 1e-6) > 0],
+    absent = best$absent
+  )
 }
 
 # the first deviating branch sum per tree, NA where every test point sums to 1

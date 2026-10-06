@@ -54,7 +54,7 @@ test_that("test points give every symbol its own interior value at every point",
   for (n in c(2, 4, 5, 8, 12, 30)) {
     symbols <- paste0("p", seq_len(n))
     points <- .mpt_test_points(symbols)
-    expect_length(points, 4)
+    expect_length(points, 5)
     for (vals in points) {
       expect_named(vals, symbols)
       expect_true(all(vals > 0 & vals < 1))
@@ -62,6 +62,20 @@ test_that("test points give every symbol its own interior value at every point",
     }
     expect_equal(anyDuplicated(round(unlist(lapply(points, `[[`, 1)), 6)), 0L)
   }
+})
+
+test_that("no sum of two test values equals another such sum at every point", {
+  # a linear sequence in the symbol index gives v_i + v_j == v_k + v_l at
+  # every point whenever i + j == k + l, which the rank check would read as a
+  # property of the model
+  n <- 12
+  values <- do.call(rbind, .mpt_test_points(paste0("p", seq_len(n))))
+  pairs <- t(utils::combn(n, 2))
+  sums <- apply(pairs, 1, function(pair) values[, pair[1]] + values[, pair[2]])
+  coincide <- outer(seq_len(nrow(pairs)), seq_len(nrow(pairs)), Vectorize(
+    function(a, b) a < b && all(abs(sums[, a] - sums[, b]) < 1e-9)
+  ))
+  expect_false(any(coincide))
 })
 
 test_that("a typo between parameters four places apart in the symbol order is caught", {
