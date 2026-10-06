@@ -28,11 +28,33 @@ and the leaves show the response categories. Calling \code{plot()} on a model
 created with \code{\link[=mpt]{mpt()}} draws all trees of the model.
 }
 \details{
-The diagram reflects the branch expressions as written: the first
-factor of each product is the edge leaving the root, the second factor
-the next edge, and so on. Expressions are expanded distributively, so a
-factored subtree like \code{Pm * (Pb + (1 - Pb) * 0.25)} is displayed as two
-paths sharing the \code{Pm} edge.
+Edges are drawn in the order the branch expressions first mention
+them, bare constants included. A complement edge \code{1 - X} is placed directly
+below its sibling \code{X}. A numeric constant factor above 1 is not a separate
+edge: the constant and all factors after it form one edge, as in
+Batchelder & Riefer (1999, Fig. 1). For example, \code{B * 2 * u * (1 - u)} draws
+one edge \code{B}, then one edge \code{2 * u * (1 - u)}. If the constant is at the start
+(\code{2 * u * (1 - u)}), the entire expression is one edge. If it is in the middle
+(\code{u * 2 * (1 - u)}), the constant and the factors after it join into one edge,
+and a trailing constant joins the factor before it.
+Expressions are expanded distributively, so \code{Pm * (Pb + (1 - Pb) * 0.25)}
+displays two paths sharing the \code{Pm} edge.
+
+The plot warns when edges leaving an internal node do not sum to 1, but only
+for nodes whose edge labels are all constants, plain parameters, or
+\code{1 - parameter}; product edges, quotient edges, function calls, and covariate
+fans that lack complements are not checked, nor are nodes with a single edge
+or, when plotting a bare tree, fans of plain parameters (which a model may
+declare as a simplex). Write factors in the same order across all categories
+to avoid mispairing due to different factor orders.
+
+The plot shows the model after restrictions: fixed parameters appear as their
+constants, and equated parameters share one name. Impossible categories are
+omitted. A literal 0 in an expression (as in \code{D + 0 * x}) is drawn as an edge
+labelled 0. The \code{...} argument is ignored; the title cannot be changed.
+Leaf labels wider than about 90\% of a panel are clipped, and long edge
+labels near the root can be clipped earlier, when the leaf labels leave
+little room.
 }
 \examples{
 tree_old <- mpt_tree("old", list(
@@ -52,5 +74,10 @@ model <- mpt(
   tree_id = "item_type"
 )
 plot(model)
+}
+\references{
+Batchelder, W. H., & Riefer, D. M. (1999). Theoretical and
+empirical review of multinomial process tree modeling. Psychonomic
+Bulletin & Review, 6(1), 57-86. https://doi.org/10.3758/BF03210812
 }
 \keyword{transform}
