@@ -144,6 +144,11 @@ Detection, recognition and confidence judgments
 \item sdt_yn(): Signal Detection Theory (Yes/No)
 }
 
+Psychometric functions
+\itemize{
+\item psychometric(): Psychometric function
+}
+
 Choices and response times
 \itemize{
 \item cswald(): Censored-Shifted Wald Model

@@ -321,6 +321,12 @@ revert_check_data.sdt_yn <- function(model, data) {
 }
 
 #' @exportS3Method
+revert_check_data.psychometric <- function(model, data) {
+  data[intersect(.psychometric_reserved_cols, colnames(data))] <- NULL
+  NextMethod("revert_check_data")
+}
+
+#' @exportS3Method
 revert_check_data.sdt_mafc <- function(model, data) {
   m <- model$other_vars$m
   # brms keeps a set-size column named by `m` only when a formula predicts

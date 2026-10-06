@@ -48,7 +48,7 @@ reference:
     - "pp_check.bmmfit"
     - "posterior_epred.bmmfit"
   - title: "Model evaluation & post-processing"
-    desc: "ROC/AUC, quantile-transformed ROC, and latent-distribution analysis for signal detection models"
+    desc: "ROC/AUC, quantile-transformed ROC, and latent-distribution analysis for signal detection models; thresholds and slopes of psychometric functions"
   - contents:
     - "roc_sdt"
     - "roc_observed"
@@ -60,6 +60,7 @@ reference:
     - "plot.bmm_sdt_roc"
     - "plot.bmm_sdt_auc"
     - "plot.bmm_sdt_latent"
+    - "psychometric_threshold"
   - title: "Extract model information"
     desc: "Utility functions for extracting default priors, generate stan code, stan data, etc."
   - contents:

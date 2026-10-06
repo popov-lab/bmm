@@ -104,6 +104,7 @@ revert_postprocess_brm.default <- function(model, fit, ...) {
 #'   | `ezdm()`, version `"4par"` | Mean response time of the cell's upper-boundary responses |
 #'   | `sdt_yn()` | Number of "old"/"signal" responses, the number of trials times their probability |
 #'   | `sdt_mafc()` | Number of correct responses, the number of trials times their probability |
+#'   | `psychometric()` | Number of positive responses, the number of trials (1 for 0/1 data) times the psychometric function at the row's intensity |
 #'   | `m3()`, `sdt_rating()`, `sdt_ranking()`, `sdt_cdp()` | Expected count of each response category, from the multinomial family of \pkg{brms} |
 #'   | `sdm()`, `mixture2p()`, `mixture3p()`, `imm()` | Not defined: the mean of a circular response error is not a useful quantity, so these models stop with an error |
 #'
