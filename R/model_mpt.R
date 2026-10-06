@@ -1354,7 +1354,8 @@ check_data.mpt <- function(model, data, formula) {
     } else {
       which(data[[idx_vars[[tree$name]]]] == 1L)
     }
-    if (length(rows) == 0L) next
+    # a tree without rows skips only its own-row checks (they see no rows);
+    # its branches are still evaluated on the rows of the other trees
     na_covariates <- used_covariates[vapply(
       used_covariates, function(v) anyNA(data[[v]][rows]), logical(1)
     )]

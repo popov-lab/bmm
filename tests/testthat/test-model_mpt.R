@@ -1623,6 +1623,20 @@ test_that("covariate sum check respects tree membership", {
   expect_silent(check_data(model, dat, bmf(D ~ 1)))
 })
 
+test_that("a tree without rows is still checked on the rows of the other trees", {
+  trees <- list(
+    mpt_tree("sstree", list(hit = "D + (1 - D) / ss", miss = "(1 - D) * (1 - 1 / ss)")),
+    mpt_tree("plain", list(hit = "D + (1 - D) * g", miss = "(1 - D) * (1 - g)"))
+  )
+  model <- mpt(trees, tree_id = "tt", covariates = "ss")
+  # brms evaluates the sstree branches on the plain rows, where 1 / 0 is Inf
+  dat <- data.frame(tt = "plain", ss = 0, hit = c(60, 70, 65), miss = c(40, 30, 35))
+  expect_error(
+    suppressWarnings(check_data(model, dat, bmf(D ~ 1, g ~ 1))),
+    "category 'hit' in tree 'sstree' is not finite in row 1"
+  )
+})
+
 test_that("the item-memory-first MPT matches the simple-rule m3 with a distractor category", {
   # bijection for act_funs corr ~ b+a+c, other ~ b+a, dist ~ b+d, npl ~ b
   # with candidate counts (1, 4, 5, 5) and S = 15b + 5a + c + 5d:
