@@ -55,6 +55,10 @@
   unique(unlist(lapply(tree$branches, all.vars)))
 }
 
+.mpt_tree_parameters <- function(trees) {
+  unique(unlist(lapply(trees, .mpt_expr_vars)))
+}
+
 .mpt_eval_branches <- function(tree, values) {
   vapply(tree$branches, function(branch) eval(branch, envir = values), numeric(1))
 }
@@ -127,7 +131,7 @@
     return(list(error = conditionMessage(attr(derivs, "condition"))))
   }
   df <- sum(lengths(lapply(trees, `[[`, "branches")) - 1L)
-  symbols <- unique(unlist(lapply(branches, all.vars)))
+  symbols <- .mpt_tree_parameters(trees)
   points <- .mpt_test_points(symbols)
   # one vector per symbol holding its value at every test point, so each
   # derivative is evaluated once for all points

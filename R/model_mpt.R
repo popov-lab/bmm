@@ -104,7 +104,7 @@ print.mpt_tree <- function(x, ...) {
   } else {
     character(0)
   }
-  parameters <- unique(unlist(lapply(trees, .mpt_expr_vars)))
+  parameters <- .mpt_tree_parameters(trees)
 
   # generated data columns: one 0/1 indicator per tree
   tree_indicators <- if (is.null(tree_id) || length(trees) == 0L) {
@@ -445,7 +445,7 @@ mpt <- function(trees, tree_id = NULL, links = "logit", ...) {
     "The tree_id argument must be a single character string naming a data column."
   )
 
-  parameters <- unique(unlist(lapply(trees, .mpt_expr_vars)))
+  parameters <- .mpt_tree_parameters(trees)
   stopif(
     length(parameters) == 0L,
     "The tree branch expressions contain no latent parameters."
@@ -523,7 +523,7 @@ print_model_details.mpt <- function(model, ...) {
 # fixed in the formula enters at its value
 .mpt_identifiability <- function(model) {
   trees <- model$other_vars$trees
-  parameters <- unique(unlist(lapply(trees, .mpt_expr_vars)))
+  parameters <- .mpt_tree_parameters(trees)
   fixed <- model$fixed_parameters[
     intersect(names(model$fixed_parameters), parameters)
   ]
