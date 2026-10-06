@@ -35,9 +35,11 @@
 #'   declare as a simplex). Write factors in the same order across all categories
 #'   to avoid mispairing due to different factor orders.
 #'
-#'   The plot shows the model after restrictions: fixed parameters appear as their
-#'   constants, and equated parameters share one name. Impossible categories are
-#'   omitted. A literal 0 in an expression (as in `D + 0 * x`) is drawn as an edge
+#'   For a model created with [mpt()], the plot draws the trees as written and
+#'   marks restricted parameters: the edge of a fixed parameter reads `g = 0.5`,
+#'   the edge of an equated parameter `Dn (= Do)`, and an edge that contains a
+#'   restricted parameter shows the restriction in parentheses, as in
+#'   `1 - g (g = 0.5)`. Impossible categories are omitted. A literal 0 in an expression (as in `D + 0 * x`) is drawn as an edge
 #'   labelled 0. The `...` argument is ignored; the title cannot be changed.
 #'   Leaf labels wider than about 90% of a panel are clipped, and long edge
 #'   labels near the root can be clipped earlier, when the leaf labels leave
@@ -84,19 +86,22 @@ plot.mpt <- function(x, cex = 0.9, ...) {
     old_par <- graphics::par(mfrow = c(n_row, ceiling(n_trees / n_row)))
     on.exit(graphics::par(old_par))
   }
-  for (tree in x$other_vars$trees) {
+  for (tree in x$other_vars$unrestricted_trees %||% x$other_vars$trees) {
     .mpt_plot_tree(
       tree, cex,
-      simplex = x$other_vars$simplex, covariates = x$other_vars$covariates
+      simplex = x$other_vars$simplex, covariates = x$other_vars$covariates,
+      restrictions = x$other_vars$restrictions
     )
   }
   invisible(x)
 }
 
 # simplex = NULL means the caller does not know the model's simplex groups
-.mpt_plot_tree <- function(x, cex, simplex, covariates = character(0)) {
+.mpt_plot_tree <- function(x, cex, simplex, covariates = character(0),
+                           restrictions = NULL) {
   graph <- .mpt_tree_graph(x)
-  .mpt_warn_sibling_sums(graph, x$name, simplex, covariates)
+  graph$edges$label <- .mpt_restricted_labels(graph$edges, restrictions)
+  .mpt_warn_sibling_sums(graph, x$name, simplex, covariates, restrictions)
   old_par <- graphics::par(mar = c(0.5, 0.5, 2, 0.5))
   on.exit(graphics::par(old_par))
 
@@ -207,13 +212,20 @@ plot.mpt <- function(x, cex = 0.9, ...) {
 # nodes whose labels are all simple probabilities are checked, see
 # .mpt_node_is_checkable()
 .mpt_warn_sibling_sums <- function(graph, tree_name, simplex, covariates = character(0),
-                                   tolerance = 1e-6) {
+                                   restrictions = NULL, tolerance = 1e-6) {
   edges <- graph$edges
   symbols <- unique(c(
     unlist(lapply(edges$expr, function(e) all.vars(str2lang(e)))),
-    unlist(simplex)
+    unlist(simplex), unlist(lapply(restrictions, all.vars))
   ))
-  points <- .mpt_test_points(symbols, simplex %||% list())
+  # the edges come from the trees before the restrictions, which mpt() checked
+  # only with the restrictions in place (a, 1 - b sums to 1 once b = a)
+  points <- lapply(.mpt_test_points(symbols, simplex %||% list()), function(vals) {
+    for (par in intersect(names(restrictions), symbols)) {
+      vals[[par]] <- eval(restrictions[[par]], as.list(vals))
+    }
+    vals
+  })
   for (node in unique(edges$from)) {
     out <- edges[edges$from == node, ]
     if (!.mpt_node_is_checkable(out$expr, !is.null(simplex), covariates)) next
@@ -291,6 +303,31 @@ plot.mpt <- function(x, cex = 0.9, ...) {
   is_complement <- is.call(parsed) && identical(parsed[[1]], quote(`-`)) &&
     length(parsed) == 3L && identical(.mpt_strip_parens(parsed[[2]]), 1)
   if (is_complement) .mpt_strip_parens(parsed[[3]])
+}
+
+# the diagram keeps a restricted parameter's name, so the restriction is
+# written beside it: "g = 0.5" and "Dn (= Do)" for the parameter itself, and in
+# parentheses after an edge that only contains it ("1 - g (g = 0.5)")
+.mpt_restricted_labels <- function(edges, restrictions) {
+  if (length(restrictions) == 0L) {
+    return(edges$label)
+  }
+  values <- vapply(restrictions, function(value) {
+    if (is.numeric(value)) as.character(signif(value, 3)) else deparse1(value)
+  }, character(1))
+  vapply(seq_len(nrow(edges)), function(i) {
+    parsed <- .mpt_strip_parens(str2lang(edges$expr[i]))
+    restricted <- intersect(all.vars(parsed), names(restrictions))
+    if (length(restricted) == 0L) {
+      edges$label[i]
+    } else if (is.symbol(parsed) && is.numeric(restrictions[[restricted]])) {
+      glue("{restricted} = {values[[restricted]]}")
+    } else if (is.symbol(parsed)) {
+      glue("{restricted} (= {values[[restricted]]})")
+    } else {
+      glue("{edges$label[i]} ({paste(restricted, '=', values[restricted], collapse = ', ')})")
+    }
+  }, character(1))
 }
 
 # names a node by the labels of the edges from the root to it
