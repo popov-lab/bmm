@@ -854,6 +854,23 @@ test_that("the rank check stacks rows over covariate values and never frees a co
   expect_match(mpt_printed(residue), "derivative with respect to 'q' is zero")
 })
 
+test_that("the rank check counts only the categories a tree can produce", {
+  model <- mpt(list(
+    mpt_tree("lure", list(
+      target = "D + (1 - D) * g",
+      lure = "(1 - D) * (1 - g) * l",
+      other = "(1 - D) * (1 - g) * (1 - l)"
+    )),
+    mpt_tree("new", list(
+      target = "(1 - D) * g",
+      other = "D + (1 - D) * (1 - g)"
+    ), impossible = "lure")
+  ), tree_id = "tree")
+  printed <- mpt_printed(model)
+  expect_match(printed, "3 free parameter\\(s\\), 3 degrees of freedom")
+  expect_match(printed, "Jacobian rank 3 of 3 at interior test values")
+})
+
 test_that("the Jacobian rank is reported as not computed when D() cannot differentiate", {
   model <- mpt(mpt_tree("t", list(x = "plogis(a)", y = "1 - plogis(a)")))
   printed <- mpt_printed(model)
