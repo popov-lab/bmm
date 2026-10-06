@@ -727,6 +727,22 @@ test_that("labels of neighbouring edges do not overlap in a dense tree", {
   }
 })
 
+test_that("the plot window makes room for the farthest edge label and no more", {
+  # the room a label needs depends on the window it is placed in, so the window
+  # is found in a few passes; without them the label leaves the plot region
+  root_long <- mpt_tree("root_long", list(
+    a = "Very_Long_Parameter_Name_One_abc * g",
+    b = "Very_Long_Parameter_Name_One_abc * (1 - g)",
+    c = "1 - Very_Long_Parameter_Name_One_abc"
+  ))
+  for (size in list(c(5, 4), c(4.5, 3.5), c(4, 3))) {
+    extents <- label_extents(root_long, size[1], size[2])
+    leftmost <- min(extents$left[extents$kind == "edge"])
+    expect_gte(leftmost, -0.02)
+    expect_lt(leftmost, 0.05)
+  }
+})
+
 test_that("edge labels sit beside their edge on the outer side of a fan", {
   withr::local_pdf(NULL)
   edges <- .mpt_tree_graph(mpt_tree("t", list(
