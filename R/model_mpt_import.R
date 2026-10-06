@@ -218,6 +218,24 @@ mpt_from_string <- function(text, tree_names, categories = NULL,
     categories = list({tree_names[1]} = c('a', 'b'))."
   )
   stopif(
+    by_tree && anyDuplicated(names(categories)) > 0,
+    "The categories list names a tree more than once: \\
+    {collapse_comma(unique(names(categories)[duplicated(names(categories))]))}."
+  )
+  unusable_entries <- if (by_tree) {
+    names(categories)[!vapply(categories, function(entry) {
+      is.character(entry) && !anyNA(entry) && all(nzchar(entry))
+    }, logical(1))]
+  } else {
+    character(0)
+  }
+  stopif(
+    length(unusable_entries) > 0,
+    "The entries of the categories list must be character vectors without \\
+    missing or empty values. Check the entries for \\
+    {collapse_comma(unusable_entries)}."
+  )
+  stopif(
     by_tree && !all(names(categories) %in% tree_names),
     "The categories list names trees that are not in the model: \\
     {collapse_comma(setdiff(names(categories), tree_names))}. The trees are: \\
@@ -508,18 +526,21 @@ mpt_from_eqn <- function(file, restrictions = NULL, categories = NULL,
                          links = "logit", impossible = NULL,
                          tree_names = NULL) {
   stop_missing_args()
+  categories_problem <- .mpt_named_map_problem(categories)
   stopif(
-    !is.null(categories) && !.mpt_is_named_map(categories),
-    "The categories argument must be a named character vector without \\
-    missing values that maps the category names of the EQN file onto \\
-    response categories, e.g. \\
-    categories = c(hit = 'yes', fa = 'yes', miss = 'no', cr = 'no')."
+    nzchar(categories_problem),
+    "The categories argument must be a named character vector, one value \\
+    per name, that maps the category names of the EQN file onto response \\
+    categories, e.g. \\
+    categories = c(hit = 'yes', fa = 'yes', miss = 'no', cr = 'no'). \\
+    {categories_problem}"
   )
+  tree_names_problem <- .mpt_named_map_problem(tree_names)
   stopif(
-    !is.null(tree_names) && !.mpt_is_named_map(tree_names),
-    "The tree_names argument must be a named character vector without \\
-    missing values that maps the tree labels of the EQN file onto tree \\
-    names, e.g. tree_names = c('1' = 'old', '2' = 'new')."
+    nzchar(tree_names_problem),
+    "The tree_names argument must be a named character vector, one value \\
+    per name, that maps the tree labels of the EQN file onto tree names, \\
+    e.g. tree_names = c('1' = 'old', '2' = 'new'). {tree_names_problem}"
   )
   eqn_file <- .mpt_read_eqn(file)
   tree_map <- .mpt_map_eqn_trees(eqn_file$eqn, tree_names, eqn_file$title_line)
@@ -825,9 +846,27 @@ mpt_from_eqn <- function(file, restrictions = NULL, categories = NULL,
   list(eqn = eqn, rows = cat_rows)
 }
 
-.mpt_is_named_map <- function(x) {
-  !is.null(names(x)) && !anyNA(names(x)) && all(nzchar(names(x))) &&
-    !anyNA(x)
+# describes what keeps x from being a named character vector with one
+# non-empty value per unique name; "" when it is one (or NULL)
+.mpt_named_map_problem <- function(x) {
+  entry_names <- names(x)
+  not_one_value <- entry_names[lengths(x) != 1][1]
+  no_value <- entry_names[is.na(x) | !nzchar(x)][1]
+  if (is.null(x)) {
+    ""
+  } else if (is.null(entry_names) || anyNA(entry_names) || !all(nzchar(entry_names))) {
+    "Every entry needs a name."
+  } else if (anyDuplicated(entry_names)) {
+    glue("'{entry_names[duplicated(entry_names)][1]}' is given more than once.")
+  } else if (!is.na(not_one_value)) {
+    glue("Entry '{not_one_value}' has {lengths(x)[not_one_value]} values.")
+  } else if (!is.character(x)) {
+    glue("It is a {class(x)[1]}.")
+  } else if (!is.na(no_value)) {
+    glue("The entry '{no_value}' has no value.")
+  } else {
+    ""
+  }
 }
 
 # the importers check impossible and the category sets themselves, so that
