@@ -855,8 +855,8 @@ rm3 <- function(n, size, pars, m3_model, act_funs = NULL, unpack = FALSE,
 #'   mpt_model = model, tree = "new"
 #' )
 #' @export
-dmpt <- function(x, pars, mpt_model, tree = NULL, covariates = NULL,
-                 log = TRUE, ...) {
+dmpt <- function(x, pars, mpt_model, tree = NULL, log = TRUE,
+                 covariates = NULL, ...) {
   probs <- .mpt_probability_vector(pars, mpt_model, tree, covariates, ...)
 
   if (!is.null(names(x))) {
@@ -874,8 +874,8 @@ dmpt <- function(x, pars, mpt_model, tree = NULL, covariates = NULL,
 
 #' @rdname mptdist
 #' @export
-rmpt <- function(n, size, pars, mpt_model, tree = NULL, covariates = NULL,
-                 unpack = FALSE, ...) {
+rmpt <- function(n, size, pars, mpt_model, tree = NULL, unpack = FALSE,
+                 covariates = NULL, ...) {
   probs <- .mpt_probability_vector(pars, mpt_model, tree, covariates, ...)
   result <- t(rmultinom(n, size = size, prob = probs))
   colnames(result) <- names(probs)
@@ -909,6 +909,13 @@ rmpt <- function(n, size, pars, mpt_model, tree = NULL, covariates = NULL,
     "Unknown tree '{tree}'. The model contains: {collapse_comma(names(trees))}"
   )
   values <- c(as.list(pars), as.list(covariates), list(...))
+  duplicated_names <- unique(names(values)[duplicated(names(values))])
+  stopif(
+    length(duplicated_names) > 0,
+    "The value(s) of {collapse_comma(duplicated_names)} are given more than \\
+    once across pars, covariates and the further arguments. Please give each \\
+    value once."
+  )
   required <- .mpt_expr_vars(trees[[tree]])
   missing <- setdiff(required, names(values))
   stopif(

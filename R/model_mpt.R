@@ -156,7 +156,8 @@ print.mpt_tree <- function(x, ...) {
 }
 
 .model_mpt <- function(trees = NULL, tree_id = NULL, covariates = NULL,
-                       simplex = NULL, restrictions = NULL, links = "logit",
+                       simplex = NULL, restrictions = NULL,
+                       unrestricted_trees = NULL, links = "logit",
                        default_priors = NULL, call = NULL, ...) {
   trees <- .mpt_as_tree_list(trees)
   if (length(trees)) names(trees) <- vapply(trees, `[[`, character(1), "name")
@@ -235,6 +236,7 @@ print.mpt_tree <- function(x, ...) {
         tree_id = tree_id,
         covariates = covariates,
         trees = trees,
+        unrestricted_trees = unrestricted_trees,
         simplex = simplex,
         restrictions = restrictions,
         link = links,
@@ -301,18 +303,6 @@ settable_link_functions.mpt <- function(model) {
   c("logit", "probit")
 }
 
-# restrictions are already substituted into the stored trees, so they are
-# not passed again
-.mpt_constructor_args <- function(model) {
-  list(
-    trees = unname(model$other_vars$trees),
-    tree_id = model$other_vars$tree_id,
-    covariates = model$other_vars$covariates,
-    simplex = model$other_vars$simplex,
-    links = model$other_vars$link
-  )
-}
-
 # user facing alias
 # information in the title and details sections will be filled in
 # automatically based on the information in the .model_mpt()
@@ -341,7 +331,10 @@ settable_link_functions.mpt <- function(model) {
 #' @param covariates Character vector. Names of data columns that appear in
 #'   branch expressions but are not latent parameters, for example
 #'   design-fixed guessing rates. Covariates pass into the model formulas
-#'   unchanged and have no naming restrictions.
+#'   unchanged and have no naming restrictions. `bmm()` stops when, with a
+#'   row's covariate values, the branches of a tree do not sum to 1, leave
+#'   (0, 1], are undefined on the rows of another tree, or when a covariate
+#'   that a branch uses is missing.
 #' @param simplex A character vector, or a list of character vectors, naming
 #'   groups of parameters that are jointly constrained to sum to 1. Each group
 #'   is reparameterized via stick-breaking: the last parameter of each group
@@ -470,7 +463,9 @@ settable_link_functions.mpt <- function(model) {
 #'   For posterior predictive checks, [brms::posterior_predict()] returns
 #'   simulated counts (draws x rows x categories) and [brms::posterior_epred()]
 #'   the expected counts; the MPT article computes the T1 statistic and its
-#'   posterior predictive p-value from them.
+#'   posterior predictive p-value from them. With `newdata`,
+#'   [brms::posterior_predict()] needs the columns `nTrials`, `Idx_<tree>` and
+#'   `Poss_<category>` that `check_data()` builds; `fit$data` contains them.
 #'
 #'   Order constraints between parameters (`Do > Dn`) are expressed by
 #'   reparameterizing the larger parameter in the model formula, e.g.
@@ -609,6 +604,8 @@ mpt <- function(trees, tree_id = NULL, covariates = NULL, simplex = NULL,
     "The covariates argument must be a character vector of data column names."
   )
 
+  # plot() labels the restricted edges from the trees as written
+  unrestricted_trees <- if (length(restrictions)) trees
   trees <- .mpt_restrict_trees(trees, restrictions, covariates)
 
   # a zero probability makes log(p) undefined in Stan; mpt_tree(impossible = )
@@ -690,20 +687,11 @@ mpt <- function(trees, tree_id = NULL, covariates = NULL, simplex = NULL,
 
   deviations <- .mpt_tree_sum_deviations(trees, parameters, covariates, simplex)
   # synthetic covariate values need not form a valid tree (Gcorr + Gother = 1),
-  # so such trees only warn here; check_data() errors on the observed values
+  # so check_data() decides for trees that use covariates, with the observed values
   uses_covariates <- vapply(
     trees, function(tree) any(.mpt_expr_vars(tree) %in% covariates), logical(1)
   )
   deviating <- names(deviations)[!is.na(deviations)]
-  for (tree_name in intersect(deviating, names(trees)[uses_covariates])) {
-    warning2(
-      "The branch probabilities of tree '{tree_name}' sum to \\
-      {signif(deviations[[tree_name]], 6)} instead of 1 when evaluated at \\
-      numeric test values for its parameters and covariates. check_data() \\
-      repeats this check with the covariate values in the data and stops if \\
-      the branches do not sum to 1 there."
-    )
-  }
   for (tree_name in setdiff(deviating, names(trees)[uses_covariates])) {
     stop2(
       "The branch probabilities of tree '{tree_name}' sum to \\
@@ -718,8 +706,8 @@ mpt <- function(trees, tree_id = NULL, covariates = NULL, simplex = NULL,
 
   .model_mpt(
     trees = trees, tree_id = tree_id, covariates = covariates,
-    simplex = simplex, restrictions = restrictions, links = links,
-    call = call, ...
+    simplex = simplex, restrictions = restrictions,
+    unrestricted_trees = unrestricted_trees, links = links, call = call, ...
   )
 }
 
@@ -1217,7 +1205,8 @@ check_data.mpt <- function(model, data, formula) {
   missing_counts <- is.na(resp_matrix)
   resp_matrix[missing_counts] <- 0
   data <- data[!col_names %in% resp_cats]
-  data$nTrials <- rowSums(resp_matrix)
+  # an integer column keeps conditional_effects() grids at a valid trial count
+  data$nTrials <- as.integer(rowSums(resp_matrix))
   data$Y <- resp_matrix
 
   tree_id <- model$other_vars$tree_id
@@ -1370,7 +1359,8 @@ check_data.mpt <- function(model, data, formula) {
     } else {
       which(data[[idx_vars[[tree$name]]]] == 1L)
     }
-    if (length(rows) == 0L) next
+    # a tree without rows skips only its own-row checks (they see no rows);
+    # its branches are still evaluated on the rows of the other trees
     na_covariates <- used_covariates[vapply(
       used_covariates, function(v) anyNA(data[[v]][rows]), logical(1)
     )]
@@ -1436,6 +1426,7 @@ check_data.mpt <- function(model, data, formula) {
       }
       # branches that sum to 1 can still be negative or above 1 (e.g. G = 1.2);
       # near the boundary a valid branch may underflow to exactly 0
+      # (also at an interior point: (1 - D)^n at D = 0.85 from n = 392, accepted as unrealistic)
       out_of_range <- lapply(branches, function(b) {
         which(
           (if (point <= length(interior_points)) b <= 0 else b < 0) |
