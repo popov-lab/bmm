@@ -829,7 +829,10 @@ check_model.mpt <- function(model, data = NULL, formula = NULL) {
     # fixed values from the bmmformula (e.g. g = 0.5) stay on the probability
     # scale in the model object; configure_prior.mpt() maps them to the
     # latent scale when it builds the constant priors
-    fixed_simplex <- intersect(names(model$fixed_parameters), unlist(model$other_vars$simplex))
+    fixed_simplex <- intersect(
+      names(model$fixed_parameters),
+      c(unlist(model$other_vars$simplex), model$other_vars$simplex_raw)
+    )
     stopif(
       length(fixed_simplex) > 0,
       "Fixing simplex parameters to constants is not supported: \\

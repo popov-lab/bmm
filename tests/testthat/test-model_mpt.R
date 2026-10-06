@@ -711,10 +711,6 @@ test_that("the rank check works in the stick-breaking components of a simplex gr
     check_model(guessing, dat, bmf(D ~ 1, gA ~ 1, gB ~ 1))
   ))
 
-  # a stick fixed in the formula leaves one free direction in the group
-  fixed <- check_model(guessing, dat, bmf(D ~ 1, gAraw = 0, gB ~ 1))
-  expect_match(mpt_printed(fixed), "Jacobian rank 2 of 2 at interior test values")
-
   # the members only enter through their sum, which is 1 whatever the sticks
   sum_only <- mpt(mpt_tree("t", list(
     A = "D * gA + D * gB + D * gN", B = "(1 - D) * h", N = "(1 - D) * (1 - h)"
@@ -766,6 +762,10 @@ test_that("simplex parameters cannot be fixed to constants", {
   expect_error(
     check_model(model, formula = bmf(gA = 0.3)),
     "Fixing simplex parameters"
+  )
+  expect_error(
+    check_model(model, formula = bmf(gAraw = 0.3)),
+    "Fixing simplex parameters.*gAraw"
   )
 })
 
