@@ -59,7 +59,8 @@ check_data.bmmodel <- function(model, data, formula) {
   stopif(is_try_error(data), "Argument 'data' must be coercible to a data.frame.")
   stopif(!isTRUE(nrow(data) > 0L), "Argument 'data' does not contain observations.")
 
-  attr(data, "data_name") <- substitute_name(data, envir = eval(parent.frame()))
+  attr(data, "data_name") <- attr(data, "data_name") %||%
+    substitute_name(data, envir = eval(parent.frame()))
   attr(data, "checked") <- TRUE
   NextMethod("check_data")
 }

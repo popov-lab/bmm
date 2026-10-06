@@ -1418,11 +1418,17 @@ configure_fit <- function(formula, data = NULL, model = NULL, prior = NULL, unti
 configure_fit.bmmformula <- function(formula, data = NULL, model = NULL, prior = NULL,
                                      until = "init", frame_args = list()) {
   user_formula <- formula
+  # the user's expression for the data lives in the caller of the generic
+  # (bmm() or an extractor). It is set before check_data(), whose methods print
+  # it (order_data_query()), and again after, because some methods rebuild the
+  # data frame without it
+  data_name <- substitute_name(data, envir = parent.frame())
+  if (!missing(data) && is.data.frame(data)) {
+    attr(data, "data_name") <- data_name
+  }
   model <- check_model(model, data, formula)
   data <- check_data(model, data, formula)
-  # check_data() names the data after the expression in its caller, which is
-  # this frame; the user's expression lives one frame up, in bmm() or the extractor
-  attr(data, "data_name") <- substitute_name(data, envir = parent.frame())
+  attr(data, "data_name") <- data_name
   formula <- check_formula(model, data, formula)
   config_args <- configure_model(model, data, formula)
   if (until == "model") {

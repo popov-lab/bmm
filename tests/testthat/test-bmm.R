@@ -175,3 +175,19 @@ test_that("bmm() stores the name of the data the user passed", {
   )
   expect_equal(attr(fit$data, "data_name"), "counts")
 })
+
+test_that("check_data() methods see the name of the user's data", {
+  seen <- NULL
+  local_mocked_bindings(order_data_query = function(model, data, formula) {
+    seen <<- attr(data, "data_name")
+    data
+  })
+  my_sdm_data <- data.frame(y = rsdm(10))
+  stancode(bmf(c ~ 1, kappa ~ 1), my_sdm_data, sdm("y"))
+  expect_equal(seen, "my_sdm_data")
+})
+
+test_that("standata() does not configure the prior, which the Stan data does not use", {
+  local_mocked_bindings(configure_prior = function(...) stop2("configure_prior() called"))
+  expect_type(standata(bmf(c ~ 1, kappa ~ 1), data.frame(y = rsdm(10)), sdm("y")), "list")
+})
