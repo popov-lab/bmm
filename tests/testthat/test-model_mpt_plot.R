@@ -182,6 +182,62 @@ test_that("a package tree with the constant written first keeps it in one root e
   expect_false("2" %in% graph$edges$label)
 })
 
+test_that("plot() warns once per tree when a constant above 1 hides a later process step", {
+  withr::local_pdf(NULL)
+  swallowed <- mpt_tree("swallowed", list(
+    A = "D * 2 * g * (1 - g) * r",
+    B = "D * 2 * g * (1 - g) * (1 - r)",
+    C = "D * (g^2 + (1 - g)^2)",
+    E = "1 - D"
+  ))
+  messages <- character(0)
+  withCallingHandlers(
+    plot(swallowed),
+    warning = function(w) {
+      messages <<- c(messages, conditionMessage(w))
+      invokeRestart("muffleWarning")
+    }
+  )
+  expect_length(messages, 1)
+  expect_match(messages, "In the tree 'swallowed'", fixed = TRUE)
+  expect_match(messages, "branch 'A': D * 2 * g * (1 - g) * r", fixed = TRUE)
+  expect_match(messages, "branch 'B': D * 2 * g * (1 - g) * (1 - r)", fixed = TRUE)
+  expect_match(messages, "merges the factors after the constant 2", fixed = TRUE)
+
+  # the constant splits a factor from its complement
+  expect_warning(
+    plot(mpt_tree("split", list(a = "u * 2 * (1 - u)", b = "1 - u"))),
+    "branch 'a': u * 2 * (1 - u)", fixed = TRUE
+  )
+})
+
+test_that("plot() warns when a quotient hides a complement", {
+  withr::local_pdf(NULL)
+  quotient <- mpt_tree("quotient", list(
+    a = "(1 - Pi) * 1 / 15", b = "Pi + (1 - Pi) * 14 / 15"
+  ))
+  expect_warning(
+    plot(quotient),
+    "branch 'a': (1 - Pi) * 1/15 is one edge", fixed = TRUE
+  )
+})
+
+test_that("plot() stays silent about constants that merge cleanly", {
+  withr::local_pdf(NULL)
+  silent <- list(
+    pairs_tree(),
+    mpt_tree("leading", list(a = "2 * (1 - c) * u * (1 - u)", b = "c")),
+    mpt_tree("trailing", list(a = "(1 - c) * u * (1 - u) * 2", b = "c")),
+    mpt_tree("single", list(a = "(1 - c) * 3", b = "c")),
+    mpt_tree("one_step", list(a = "D * 2 * r", b = "1 - D")),
+    mpt_tree("constants", list(a = "(1 - Pi) * 10 * (1/15)", b = "Pi")),
+    mpt_tree("folded", list(a = "(1 - Pi) * (1/15)", b = "Pi + (1 - Pi) * (14/15)"))
+  )
+  for (tree in silent) {
+    expect_silent(plot(tree))
+  }
+})
+
 test_that("the Oberauer (2019) tree keeps its structure", {
   graph <- .mpt_tree_graph(oberauer_2019_tree())
   expect_equal(nrow(graph$nodes), 11)
@@ -424,9 +480,6 @@ test_that("valid models whose edges are not simple probabilities plot without a 
   withr::local_pdf(NULL)
   trees <- list(
     complement_of_a_product = mpt_tree("t", list(hit = "D * G", miss = "1 - D * G")),
-    division_by_a_constant = mpt_tree("t", list(
-      a = "D + (1 - D) * g / 2", b = "(1 - D) * g / 2", c = "(1 - D) * (1 - g)"
-    )),
     factor_with_a_constant = mpt_tree("t", list(
       yes = "(Do) + ((1 - Do) * guess * 0.25)", no = "(1 - Do) * (1 - guess * 0.25)"
     )),
@@ -448,10 +501,27 @@ test_that("valid models whose edges are not simple probabilities plot without a 
     hit = "G * D + (1 - G * D) * gA", other = "(1 - G * D) * gB", miss = "(1 - G * D) * gC"
   ))
   expect_silent(plot(mpt(in_a_node, simplex = list(c("gA", "gB", "gC")))))
-  with_covariate <- mpt_tree("t", list(
-    hit = "D + (1 - D)/ss", miss = "(1 - D) * (1 - 1/ss)"
-  ))
-  expect_silent(plot(mpt(with_covariate, covariates = "ss")))
+  # quotient edges are not checked for their sum; the quotient warning is
+  # tested apart
+  quotients <- list(
+    mpt(mpt_tree("t", list(
+      a = "D + (1 - D) * g / 2", b = "(1 - D) * g / 2", c = "(1 - D) * (1 - g)"
+    ))),
+    mpt(mpt_tree("t", list(
+      hit = "D + (1 - D)/ss", miss = "(1 - D) * (1 - 1/ss)"
+    )), covariates = "ss")
+  )
+  for (model in quotients) {
+    messages <- character(0)
+    withCallingHandlers(
+      plot(model),
+      warning = function(w) {
+        messages <<- c(messages, conditionMessage(w))
+        invokeRestart("muffleWarning")
+      }
+    )
+    expect_false(any(grepl("do not sum to 1", messages, fixed = TRUE)))
+  }
 })
 
 test_that("covariates that sum to 1 only in the data are not checked", {

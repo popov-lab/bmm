@@ -23,7 +23,12 @@
 #'   one edge `B`, then one edge `2 * u * (1 - u)`. If the constant is at the start
 #'   (`2 * u * (1 - u)`), the entire expression is one edge. If it is in the middle
 #'   (`u * 2 * (1 - u)`), the constant and the factors after it join into one edge,
-#'   and a trailing constant joins the factor before it.
+#'   and a trailing constant joins the factor before it. The plot warns when this
+#'   merging hides a process step: a factor after the constant that has no
+#'   complement among the merged factors (`D * 2 * g * (1 - g) * r`), a factor
+#'   separated from its complement by the constant (`u * 2 * (1 - u)`), or a
+#'   quotient that contains a complement (`(1 - Pi) * 1 / 15` is one edge; write
+#'   `(1 - Pi) * (1/15)`).
 #'   Expressions are expanded distributively, so `Pm * (Pb + (1 - Pb) * 0.25)`
 #'   displays two paths sharing the `Pm` edge.
 #'
@@ -103,6 +108,7 @@ plot.mpt <- function(x, cex = 0.9, ...) {
   graph <- .mpt_tree_graph(x)
   graph$edges$label <- .mpt_restricted_labels(graph$edges, restrictions)
   .mpt_warn_sibling_sums(graph, x$name, simplex, covariates, restrictions)
+  .mpt_warn_merged_factors(x)
   old_par <- graphics::par(mar = c(0.5, 0.5, 2, 0.5))
   on.exit(graphics::par(old_par))
 
@@ -349,6 +355,10 @@ plot.mpt <- function(x, cex = 0.9, ...) {
 # and any other subexpression (parameters, complements, constants, covariates)
 # is one atomic edge label
 .mpt_branch_paths <- function(expr) {
+  lapply(.mpt_raw_paths(expr), .mpt_collapse_multiplicity)
+}
+
+.mpt_raw_paths <- function(expr) {
   expand <- function(node) {
     if (is.call(node)) {
       op <- if (is.symbol(node[[1]])) as.character(node[[1]]) else ""
@@ -369,7 +379,7 @@ plot.mpt <- function(x, cex = 0.9, ...) {
     }
     list(deparse1(node))
   }
-  lapply(expand(expr), .mpt_collapse_multiplicity)
+  expand(expr)
 }
 
 # a constant factor above 1 (the 2 in 2 * u * (1 - u)) counts outcomes rather
@@ -378,13 +388,22 @@ plot.mpt <- function(x, cex = 0.9, ...) {
 # one edge; written last, it joins the factor before it; otherwise it and
 # every factor after it form one edge
 .mpt_collapse_multiplicity <- function(path) {
-  first <- which(vapply(path, .mpt_is_multiplicity, logical(1)))[1]
-  if (is.na(first) || length(path) == 1L) {
+  first <- .mpt_multiplicity_position(path)
+  if (is.na(first)) {
     return(path)
   }
-  join_from <- if (first == 1L) 1L else if (first == length(path)) first - 1L else first
+  join_from <- if (first == length(path)) first - 1L else first
   edge_factors <- vapply(path[join_from:length(path)], .mpt_parenthesise_sum, character(1))
   c(path[seq_len(join_from - 1L)], paste(edge_factors, collapse = " * "))
+}
+
+# position of the first multiplicity constant, NA if the path has none (a path
+# of one factor is an edge of its own, whatever it is)
+.mpt_multiplicity_position <- function(path) {
+  if (length(path) == 1L) {
+    return(NA_integer_)
+  }
+  which(vapply(path, .mpt_is_multiplicity, logical(1)))[1]
 }
 
 .mpt_is_multiplicity <- function(factor_label) {
@@ -399,6 +418,81 @@ plot.mpt <- function(x, cex = 0.9, ...) {
   is_sum <- is.call(parsed) && is.symbol(parsed[[1]]) &&
     as.character(parsed[[1]]) %in% c("+", "-")
   if (is_sum) paste0("(", factor_label, ")") else factor_label
+}
+
+# the drawing merges the factors after a multiplicity constant, and a quotient
+# is one edge, so some expressions are drawn without a node the writer meant:
+# a factor swallowed by the constant, a factor split from its complement by it,
+# or a complement inside a quotient. One warning per tree lists the paths
+.mpt_warn_merged_factors <- function(tree) {
+  notes <- unlist(lapply(names(tree$branches), function(resp_cat) {
+    paths <- .mpt_raw_paths(tree$branches[[resp_cat]])
+    lapply(paths, function(path) {
+      note <- .mpt_merged_factors_note(path)
+      if (!is.null(note)) {
+        glue("branch '{resp_cat}': {note}")
+      }
+    })
+  }))
+  if (length(notes) == 0L) {
+    return(invisible(NULL))
+  }
+  details <- paste(unique(notes), collapse = "; ")
+  warning2(
+    "In the tree '{tree$name}', the drawing merges factors into one edge where \\
+    the expression may mean separate process steps: {details}. A constant above \\
+    1 takes the factors after it into its edge, and a quotient is a single \\
+    edge. Write the constant directly before the factors it counts, as in \\
+    (1 - c) * 2 * u * (1 - u), and fractions of a path as (1/15)."
+  )
+  invisible(NULL)
+}
+
+# NULL when the path draws as written
+.mpt_merged_factors_note <- function(path) {
+  factors <- lapply(path, function(factor_label) .mpt_strip_parens(str2lang(factor_label)))
+  quotient <- vapply(factors, .mpt_is_quotient_with_complement, logical(1))
+  path_text <- paste(vapply(path, .mpt_parenthesise_sum, character(1)), collapse = " * ")
+  if (any(quotient)) {
+    return(glue("{path_text} is one edge, so the complement it contains is not a node"))
+  }
+  constant <- .mpt_multiplicity_position(path)
+  # a leading constant makes the whole path one edge, as documented
+  if (is.na(constant) || constant == 1L) {
+    return(NULL)
+  }
+  own <- vapply(factors, deparse1, character(1))
+  complement_of <- vapply(factors, function(f) {
+    base <- .mpt_complement_base(f)
+    if (is.null(base)) NA_character_ else deparse1(base)
+  }, character(1))
+  has_partner <- function(i, pool) {
+    any(complement_of[pool] == own[i] | own[pool] == complement_of[i], na.rm = TRUE)
+  }
+  merged <- constant:length(path)
+  merged_steps <- merged[lengths(lapply(factors[merged], all.vars)) > 0L]
+  split_pair <- any(vapply(merged_steps, has_partner, logical(1), pool = seq_len(constant - 1L)))
+  swallowed <- length(merged_steps) >= 2L &&
+    !all(vapply(merged_steps, has_partner, logical(1), pool = merged_steps))
+  if (split_pair || swallowed) {
+    glue("{path_text}, where the drawing merges the factors after the constant {path[constant]} into one edge")
+  }
+}
+
+.mpt_is_quotient_with_complement <- function(parsed) {
+  is_quotient <- is.call(parsed) && identical(parsed[[1]], quote(`/`))
+  if (!is_quotient) {
+    return(FALSE)
+  }
+  numerator_factors <- function(node) {
+    node <- .mpt_strip_parens(node)
+    if (is.call(node) && identical(node[[1]], quote(`*`))) {
+      c(numerator_factors(node[[2]]), numerator_factors(node[[3]]))
+    } else {
+      list(node)
+    }
+  }
+  any(vapply(numerator_factors(parsed[[2]]), function(f) !is.null(.mpt_complement_base(f)), logical(1)))
 }
 
 # merges the paths of all branch expressions into a prefix trie and computes
