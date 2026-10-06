@@ -759,4 +759,10 @@ test_that("a restricted constant keeps the multiplicity edge and the sibling sum
   # the fan a, 1 - b sums to 1 only once b = a
   equated <- mpt(mpt_tree("t", list(A = "a", B = "1 - b")), restrictions = "b = a")
   expect_contains(drawn_labels(equated), c("a", "1 - b (b = a)"))
+
+  # a chain resolves in either order: b = c with c = 0.4 makes the fan c, 1 - b sum to 1
+  chain_tree <- mpt_tree("t", list(A = "a * c", B = "a * (1 - b)", C = "1 - a"))
+  for (order in list(c("b = c", "c = 0.4"), c("c = 0.4", "b = c"))) {
+    expect_contains(drawn_labels(mpt(chain_tree, restrictions = order)), "c = 0.4")
+  }
 })

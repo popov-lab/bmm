@@ -39,8 +39,9 @@
 #'   marks restricted parameters: the edge of a fixed parameter reads `g = 0.5`,
 #'   the edge of an equated parameter `Dn (= Do)`, and an edge that contains a
 #'   restricted parameter shows the restriction in parentheses, as in
-#'   `1 - g (g = 0.5)`. Impossible categories are omitted. A literal 0 in an expression (as in `D + 0 * x`) is drawn as an edge
-#'   labelled 0. The `...` argument is ignored; the title cannot be changed.
+#'   `1 - g (g = 0.5)`. Impossible categories are omitted. A literal 0 in an
+#'   expression (as in `D + 0 * x`) is drawn as an edge labelled 0. The `...`
+#'   argument is ignored; the title cannot be changed.
 #'   Leaf labels wider than about 90% of a panel are clipped, and long edge
 #'   labels near the root can be clipped earlier, when the leaf labels leave
 #'   little room.
@@ -219,7 +220,9 @@ plot.mpt <- function(x, cex = 0.9, ...) {
     unlist(simplex), unlist(lapply(restrictions, all.vars))
   ))
   # the edges come from the trees before the restrictions, which mpt() checked
-  # only with the restrictions in place (a, 1 - b sums to 1 once b = a)
+  # only with the restrictions in place (a, 1 - b sums to 1 once b = a); chains
+  # (b = c, c = 0.4) are resolved first so the order of binding does not matter
+  restrictions <- .mpt_resolve_restrictions(restrictions)
   points <- lapply(.mpt_test_points(symbols, simplex %||% list()), function(vals) {
     for (par in intersect(names(restrictions), symbols)) {
       vals[[par]] <- eval(restrictions[[par]], as.list(vals))
