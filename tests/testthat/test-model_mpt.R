@@ -547,6 +547,174 @@ test_that("restrictions are substituted into the trees before parameters are ide
   )
 })
 
+mpt_printed <- function(model) {
+  gsub("\\s+", " ", paste(capture.output(print(model)), collapse = " "))
+}
+
+test_that("print() names parameters that only enter as a product although the count passes", {
+  # D and r enter only as D * r, so the four parameters fill four degrees of
+  # freedom but leave one combination open
+  model <- mpt(list(
+    mpt_tree("a", list(x = "D * r", y = "(1 - D * r) * g", z = "(1 - D * r) * (1 - g)")),
+    mpt_tree("b", list(x = "g", y = "(1 - g) * h", z = "(1 - g) * (1 - h)"))
+  ), tree_id = "tree")
+  printed <- mpt_printed(model)
+  expect_match(printed, "4 free parameter\\(s\\), 4 degrees of freedom")
+  expect_match(printed, "not identified: .* has rank 3 for 4 free parameters")
+  expect_match(printed, "1 combination\\(s\\) of 'D', 'r' cannot be estimated")
+})
+
+test_that("print() reports full Jacobian rank for identified models", {
+  expect_match(
+    mpt_printed(mpt(mpt_2htm_trees(), tree_id = "item_type")),
+    "Jacobian rank 2 of 2 at interior test values: locally identified"
+  )
+
+  # Do and Dn are identified once the guessing rate varies across two bias trees
+  bias_trees <- lapply(1:2, function(i) {
+    list(
+      mpt_tree(paste0("old", i), list(
+        yes = glue("Do + (1 - Do) * g{i}"), no = glue("(1 - Do) * (1 - g{i})")
+      )),
+      mpt_tree(paste0("new", i), list(
+        yes = glue("(1 - Dn) * g{i}"), no = glue("Dn + (1 - Dn) * (1 - g{i})")
+      ))
+    )
+  })
+  bias <- mpt(unlist(bias_trees, recursive = FALSE), tree_id = "tree")
+  expect_match(mpt_printed(bias), "Jacobian rank 4 of 4 at interior test values")
+
+  # pair-clustering model, pairs tree
+  pair_clustering <- mpt(mpt_tree("pairs", list(
+    adjacent = "c * r",
+    apart = "(1 - c) * u * u",
+    one = "2 * (1 - c) * u * (1 - u)",
+    none = "c * (1 - r) + (1 - c) * (1 - u) * (1 - u)"
+  )))
+  printed <- mpt_printed(pair_clustering)
+  expect_match(printed, "Jacobian rank 3 of 3 at interior test values")
+  expect_no_match(printed, "not identified")
+})
+
+test_that("the identifiability check counts a parameter fixed in the formula as known", {
+  trees <- list(
+    mpt_tree("old", list(yes = "Do + (1 - Do) * g", no = "(1 - Do) * (1 - g)")),
+    mpt_tree("new", list(yes = "(1 - Dn) * g", no = "Dn + (1 - Dn) * (1 - g)"))
+  )
+  model <- mpt(trees, tree_id = "item_type")
+  printed <- mpt_printed(model)
+  expect_match(printed, "More free parameters than degrees of freedom")
+  expect_match(printed, "1 combination\\(s\\) of all free parameters cannot")
+
+  dat <- mpt_2htm_data()
+  expect_warning(
+    check_model(model, dat, bmf(Do ~ 1 + (1 | id), Dn ~ 1, g ~ 1)),
+    "rank 2 for 3 free parameters.*the posterior follows the prior"
+  )
+  fixed <- expect_no_warning(check_model(model, dat, bmf(Do ~ 1, Dn ~ 1, g = 0.5)))
+  expect_match(mpt_printed(fixed), "Jacobian rank 2 of 2 at interior test values")
+
+  # a predictor of the guessing rate can identify the model across cells, so
+  # the per-cell deficit is announced, not warned about
+  dat$bias <- rep(c("low", "high"), length.out = nrow(dat))
+  expect_no_warning(expect_message(
+    check_model(model, dat, bmf(Do ~ 1, Dn ~ 1, g ~ 0 + bias)),
+    "within one design cell.*predictors on 'g' identify it across cells is not checked"
+  ))
+
+  # a non-linear formula without a data column varies nothing between cells
+  expect_warning(
+    suppressMessages(check_model(
+      model, dat, bmf(Do ~ inv_logit(phi), phi ~ 1, Dn ~ 1, g ~ 1)
+    )),
+    "rank 2 for 3 free parameters"
+  )
+})
+
+test_that("deep chains of identified parameters keep full rank", {
+  # category i is reached after i - 1 failures, so the columns of the last
+  # parameters are products of many probabilities but stay identified
+  chain_model <- function(k) {
+    reach <- function(i) if (i > 1) paste0("(1 - a", seq_len(i - 1), ")")
+    branches <- lapply(seq_len(k), function(i) {
+      paste(c(reach(i), paste0("a", i)), collapse = " * ")
+    })
+    branches[[k + 1]] <- paste(reach(k + 1), collapse = " * ")
+    mpt(mpt_tree("t", setNames(branches, paste0("c", seq_len(k + 1)))))
+  }
+  for (k in c(20, 30)) {
+    printed <- mpt_printed(chain_model(k))
+    expect_match(printed, glue("Jacobian rank {k} of {k} at interior test values"))
+    expect_no_match(printed, "zero up to rounding")
+  }
+
+  # each p_i moves 1 - p1 * ... * p30 by 1e-10 only, yet it does move it
+  path <- paste(paste0("p", 1:30), collapse = " * ")
+  product <- mpt(mpt_tree("t", list(
+    x = glue("{path} * q"), y = glue("{path} * (1 - q)"), z = glue("1 - {path}")
+  )))
+  printed <- mpt_printed(product)
+  expect_match(printed, "has rank 2 for 31 free parameters")
+  expect_no_match(printed, "zero up to rounding")
+})
+
+test_that("a parameter that cancels with a rounding residue is not counted as identified", {
+  # D(x, "q") is a * b * c - c * b * a, a residue of 1e-17 at some test points
+  model <- mpt(mpt_tree("t", list(
+    x = "a * b * c * q + c * b * a * (1 - q)",
+    y = "a * (1 - b)", z = "(1 - a) * c",
+    w = "1 - a * b * c - a * (1 - b) - (1 - a) * c"
+  )))
+  printed <- mpt_printed(model)
+  expect_match(printed, "has rank 3 for 4 free parameters")
+  expect_match(printed, "derivative with respect to 'q' is zero up to rounding")
+  expect_no_match(printed, "combination\\(s\\)")
+  expect_warning(
+    check_model(model, data.frame(x = 5, y = 5, z = 5, w = 5), bmf(a ~ 1, b ~ 1, c ~ 1, q ~ 1)),
+    "'q' is zero up to rounding"
+  )
+})
+
+test_that("a residue column stays a zero column when its partners are fixed", {
+  # with a, b and c fixed, q is the only free column and a pure residue: at
+  # these values a * b * c and c * b * a differ in the last bit
+  model <- mpt(mpt_tree("t", list(
+    x = "a * b * c * q + c * b * a * (1 - q)", y = "1 - a * b * c"
+  )))
+  formula <- bmf(q ~ 1, a = 0.11, b = 0.13, c = 0.69)
+  dat <- data.frame(x = 5, y = 5)
+  expect_warning(
+    checked <- check_model(model, dat, formula),
+    "derivative with respect to 'q' is zero up to rounding"
+  )
+  expect_match(mpt_printed(checked), "has rank 0 for 1 free parameters")
+})
+
+test_that("a model whose every free column is exactly zero reports rank 0", {
+  model <- mpt(mpt_tree("t", list(x = "q * 0.25 + (1 - q) * 0.25", y = "0.75")))
+  printed <- mpt_printed(model)
+  expect_match(printed, "has rank 0 for 1 free parameters")
+  expect_match(printed, "derivative with respect to 'q' is zero up to rounding")
+})
+
+test_that("a long list of entangled parameters is printed as its complement", {
+  model <- mpt(list(
+    mpt_tree("a", list(x = "D * r * s", y = "(1 - D * r * s) * g", z = "(1 - D * r * s) * (1 - g)")),
+    mpt_tree("b", list(x = "g", y = "(1 - g) * h", z = "(1 - g) * (1 - h)"))
+  ), tree_id = "tree")
+  expect_match(
+    mpt_printed(model),
+    "2 combination\\(s\\) of all free parameters except 'g', 'h' cannot"
+  )
+})
+
+test_that("the Jacobian rank is reported as not computed when D() cannot differentiate", {
+  model <- mpt(mpt_tree("t", list(x = "plogis(a)", y = "1 - plogis(a)")))
+  printed <- mpt_printed(model)
+  expect_match(printed, "Jacobian rank not computed: .*'plogis'")
+  expect_no_warning(check_model(model, data.frame(x = 1, y = 1), bmf(a ~ 1)))
+})
+
 test_that("fixed parameter values stay probabilities and reach the prior on the latent scale", {
   model <- mpt(mpt_2htm_trees(), tree_id = "item_type")
   dat <- mpt_2htm_data()

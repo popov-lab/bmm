@@ -130,6 +130,28 @@ the logit link. For the same reason, \code{summary()} lists a fixed \code{g = 0.
 as \verb{g_Intercept 0.00} under "Constant Parameters"; \code{\link[=prior_info]{prior_info()}} and
 \code{\link[=parameter_info]{parameter_info()}} show the probability, 0.5.
 
+Printing the model ends with an identifiability check for intercept-only
+formulas. It first compares the number of free parameters with the
+degrees of freedom (response categories minus one, summed over trees).
+It then computes the rank of the Jacobian of all category probabilities
+with respect to the free parameters, from exact derivatives at five
+interior test values; parameters fixed in the formula enter at their
+values. A rank below the number of free parameters means that some
+combination of the listed parameters cannot be estimated from the data,
+even when the count passes, and its posterior follows the prior; a
+parameter whose derivatives are zero up to rounding at the test values
+appears not to affect any category probability and is named separately.
+Fix parameters in the formula or equate them in the branch expressions
+until the rank is full. \code{bmm()} warns about a rank deficit when no
+formula uses a data column as a predictor. When one does, a parameter
+that differs between conditions can identify the model across them, so
+\code{bmm()} only says that the model is not identified within one design
+cell and that the predictors were not checked. The
+check is local: it holds at the test values, not at the boundaries of
+the parameter space. A branch expression with a function that
+\code{\link[stats:D]{stats::D()}} cannot differentiate leaves the rank uncomputed, and the
+printout says so.
+
 \code{summary()} reports intercepts and regression coefficients on the latent
 (logit or probit) scale. \code{\link[=native_parameters]{native_parameters()}} returns the posterior
 draws of every parameter on the probability scale for each observed
