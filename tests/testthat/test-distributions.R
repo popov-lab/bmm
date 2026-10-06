@@ -1636,6 +1636,15 @@ test_that("dmpt matches named counts to the categories", {
   )
 })
 
+test_that("dmpt and rmpt take log and unpack in the fifth position", {
+  model <- mpt(mpt_tree("t", list(
+    corr = "D + (1 - D) * G", other = "(1 - D) * (1 - G)"
+  )), covariates = "G")
+  expect_equal(dmpt(c(7, 3), c(D = 0.5), model, "t", FALSE, G = 0.5), dbinom(7, 10, 0.75))
+  expect_named(rmpt(1, 10, c(D = 0.5), model, "t", TRUE, G = 0.5), c("corr", "other"))
+})
+
+
 # Tests for the ezdm decision-time cumulants (issue #407) ----------------------
 
 # Reference values from local/ezdm/k34_derivation.py: the cumulants of the

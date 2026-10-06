@@ -6,7 +6,7 @@
 \alias{rmpt}
 \title{Distribution functions for Multinomial Processing Tree (MPT) models}
 \usage{
-dmpt(x, pars, mpt_model, tree = NULL, covariates = NULL, log = TRUE, ...)
+dmpt(x, pars, mpt_model, tree = NULL, log = TRUE, covariates = NULL, ...)
 
 rmpt(
   n,
@@ -14,8 +14,8 @@ rmpt(
   pars,
   mpt_model,
   tree = NULL,
-  covariates = NULL,
   unpack = FALSE,
+  covariates = NULL,
   ...
 )
 }
@@ -38,12 +38,12 @@ model that densities or random samples should be generated for.}
 \item{tree}{Character. For models with multiple trees, the name of the tree
 to compute probabilities for. Can be omitted for single-tree models.}
 
+\item{log}{Logical; if \code{TRUE} (default), densities are returned on the log
+scale.}
+
 \item{covariates}{A named vector or list with the values of all covariates
 declared in the model that appear in the branch expressions of the
 selected tree.}
-
-\item{log}{Logical; if \code{TRUE} (default), densities are returned on the log
-scale.}
 
 \item{...}{can be used to pass additional values used in the branch
 expressions, as an alternative to the \code{covariates} argument.}

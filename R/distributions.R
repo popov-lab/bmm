@@ -855,8 +855,8 @@ rm3 <- function(n, size, pars, m3_model, act_funs = NULL, unpack = FALSE,
 #'   mpt_model = model, tree = "new"
 #' )
 #' @export
-dmpt <- function(x, pars, mpt_model, tree = NULL, covariates = NULL,
-                 log = TRUE, ...) {
+dmpt <- function(x, pars, mpt_model, tree = NULL, log = TRUE,
+                 covariates = NULL, ...) {
   probs <- .mpt_probability_vector(pars, mpt_model, tree, covariates, ...)
 
   if (!is.null(names(x))) {
@@ -874,8 +874,8 @@ dmpt <- function(x, pars, mpt_model, tree = NULL, covariates = NULL,
 
 #' @rdname mptdist
 #' @export
-rmpt <- function(n, size, pars, mpt_model, tree = NULL, covariates = NULL,
-                 unpack = FALSE, ...) {
+rmpt <- function(n, size, pars, mpt_model, tree = NULL, unpack = FALSE,
+                 covariates = NULL, ...) {
   probs <- .mpt_probability_vector(pars, mpt_model, tree, covariates, ...)
   result <- t(rmultinom(n, size = size, prob = probs))
   colnames(result) <- names(probs)
