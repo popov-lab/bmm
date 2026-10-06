@@ -280,7 +280,11 @@ settable_link_functions.mpt <- function(model) {
 #'   formula uses a data column as a predictor. When one does, a parameter
 #'   that differs between conditions can identify the model across them, so
 #'   `bmm()` only says that the model is not identified within one design
-#'   cell and that the predictors were not checked. The
+#'   cell and that the predictors were not checked. The rank covers the
+#'   parameters of the branch expressions only: a non-linear formula that
+#'   ties them together (`Dn ~ Do`) or builds one from sub-parameters is not
+#'   analysed, so `bmm()` treats a deficit under it the same way, and
+#'   `print()` of the checked model says the formula was not analysed. The
 #'   check is local: it holds at the test values, not at the boundaries of
 #'   the parameter space. A branch expression with a function that
 #'   [stats::D()] cannot differentiate leaves the rank uncomputed, and the
@@ -466,8 +470,9 @@ mpt <- function(trees, tree_id = NULL, links = "logit", ...) {
     stop2(
       "The branch probabilities of tree '{tree_name}' sum to \\
       {signif(deviations[[tree_name]], 6)} instead of 1 when evaluated at \\
-      numeric test values. Please check the branch expressions; restrictions \\
-      between parameters belong in the branch expressions, not in the formula."
+      numeric test values. Please check the branch expressions. To equate \\
+      parameters, give them the same name in the branch expressions or tie \\
+      them in the formula (e.g. Dn ~ Do)."
     )
   }
 
@@ -498,11 +503,15 @@ print_model_details.mpt <- function(model, ...) {
     )
   }
   identifiability <- .mpt_identifiability(model)
+  # set by check_model.mpt() for parameters with a non-linear formula
+  tied <- names(attr(model, "mpt_bypassed_links"))
   rank_text <- if (!is.null(identifiability$error)) {
     glue(
       "Jacobian rank not computed: stats::D() cannot differentiate the branch \\
       expressions ({identifiability$error})."
     )
+  } else if (length(tied) > 0) {
+    .mpt_tied_rank_text(identifiability, tied)
   } else if (identifiability$rank < identifiability$n_free) {
     .mpt_rank_deficit_text(identifiability)
   } else {
@@ -555,6 +564,29 @@ print_model_details.mpt <- function(model, ...) {
     glue(
       "Fix parameters in the formula (bmf(name = value)) or equate them in \\
       the branch expressions."
+    )
+  ), collapse = " ")
+}
+
+# a non-linear formula can tie tree parameters together (Dn ~ Do) or build one
+# from sub-parameters; the rank of the tree parameters sees neither, so it
+# can neither confirm nor refute identification
+.mpt_tied_rank_text <- function(identifiability, tied) {
+  paste(c(
+    glue(
+      "Jacobian rank {identifiability$rank} of {identifiability$n_free} in \\
+      the tree parameters at interior test values."
+    ),
+    if (identifiability$rank < identifiability$n_free) {
+      glue(
+        "{identifiability$n_free - identifiability$rank} combination(s) of \\
+        {.mpt_parameter_set(identifiability$involved, identifiability$free)} \\
+        are not identified by the branch expressions alone."
+      )
+    },
+    glue(
+      "The non-linear formula(s) for {collapse_comma(tied)} were not \\
+      analysed, so whether the model is identified is not checked."
     )
   ), collapse = " ")
 }
@@ -626,25 +658,40 @@ check_model.mpt <- function(model, data = NULL, formula = NULL) {
     }
 
     # population-level predictors can identify a parameter across design
-    # cells that a single cell leaves open, so the per-cell rank is the rank
-    # of the fitted model only when no formula has a data predictor; with
-    # predictors, a per-cell deficit is announced but not warned about
+    # cells that a single cell leaves open, and a non-linear formula can tie
+    # parameters together, so the rank of the tree parameters is the rank of
+    # the fitted model only when no formula has either; otherwise a deficit
+    # is announced but not warned about
     with_predictors <- .mpt_predictor_formulas(formula, names(model$parameters))
     identifiability <- .mpt_identifiability(model)
     if (is.null(identifiability$error) &&
           identifiability$rank < identifiability$n_free) {
-      if (length(with_predictors) == 0L) {
+      if (length(with_predictors) == 0L && length(nl_pars) == 0L) {
         warning2(
           "{.mpt_rank_deficit_text(identifiability)} Along the non-identified \\
           direction(s), the posterior follows the prior."
         )
       } else {
+        unchecked <- c(
+          if (length(with_predictors) > 0) {
+            glue(
+              "the predictors on {collapse_comma(with_predictors)} identify \\
+              it across cells"
+            )
+          },
+          if (length(nl_pars) > 0) {
+            glue(
+              "the non-linear formula(s) for {collapse_comma(nl_pars)} \\
+              identify it"
+            )
+          }
+        )
         message2(
-          "The model is not identified within one design cell (Jacobian \\
-          rank {identifiability$rank} for {identifiability$n_free} free \\
-          parameters; print(model) names the parameters involved). Whether \\
-          the predictors on {collapse_comma(with_predictors)} identify it \\
-          across cells is not checked."
+          "The tree parameters are not identified within one design cell \\
+          (Jacobian rank {identifiability$rank} for \\
+          {identifiability$n_free} free parameters; print(model) names the \\
+          parameters involved). Whether {paste(unchecked, collapse = ' or ')} \\
+          is not checked."
         )
       }
     }

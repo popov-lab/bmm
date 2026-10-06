@@ -482,12 +482,44 @@ test_that("the identifiability check counts a parameter fixed in the formula as 
     "within one design cell.*predictors on 'g' identify it across cells is not checked"
   ))
 
-  # a non-linear formula without a data column varies nothing between cells
-  expect_warning(
-    suppressMessages(check_model(
-      model, dat, bmf(Do ~ inv_logit(phi), phi ~ 1, Dn ~ 1, g ~ 1)
-    )),
-    "rank 2 for 3 free parameters"
+  # the rank does not read non-linear formulas, so a deficit under one is
+  # announced, not warned about, even when it is real as here
+  expect_no_warning(expect_message(
+    check_model(model, dat, bmf(Do ~ inv_logit(phi), phi ~ 1, Dn ~ 1, g ~ 1)),
+    "rank 2 for 3 free parameters.*formula\\(s\\) for 'Do' identify it is not checked"
+  ))
+})
+
+test_that("a formula that ties parameters together is not reported as a rank deficit", {
+  trees <- list(
+    mpt_tree("old", list(yes = "Do + (1 - Do) * g", no = "(1 - Do) * (1 - g)")),
+    mpt_tree("new", list(yes = "(1 - Dn) * g", no = "Dn + (1 - Dn) * (1 - g)"))
+  )
+  model <- mpt(trees, tree_id = "item_type")
+  dat <- mpt_2htm_data()
+
+  # Dn ~ Do identifies the model; the rank of the tree parameters cannot see it
+  expect_no_warning(expect_message(
+    tied <- check_model(model, dat, bmf(Do ~ 1, Dn ~ Do, g ~ 1)),
+    "non-linear formula\\(s\\) for 'Dn' identify it is not checked"
+  ))
+  printed <- mpt_printed(tied)
+  expect_match(printed, "1 combination\\(s\\) of all free parameters are not identified")
+  expect_no_match(printed, "The model is not identified")
+  expect_match(printed, "formula\\(s\\) for 'Dn' were not analysed")
+
+  expect_silent(check_model(model, dat, bmf(Do ~ 1, Dn = 0.6, g ~ 1)))
+
+  # u and v enter only as u + v, which the tree rank of 'a' cannot see
+  single <- mpt(mpt_tree("x", list(A = "a", B = "1 - a")))
+  sub_pars <- suppressMessages(check_model(
+    single, data.frame(A = 5L, B = 5L), bmf(a ~ inv_logit(u + v), u ~ 1, v ~ 1)
+  ))
+  printed <- mpt_printed(sub_pars)
+  expect_no_match(printed, "locally identified")
+  expect_match(
+    printed,
+    "Jacobian rank 1 of 1 in the tree parameters .* formula\\(s\\) for 'a' were not analysed"
   )
 })
 
