@@ -1417,6 +1417,9 @@ configure_fit.bmmformula <- function(formula, data = NULL, model = NULL, prior =
   user_formula <- formula
   model <- check_model(model, data, formula)
   data <- check_data(model, data, formula)
+  # check_data() names the data after the expression in its caller, which is
+  # this frame; the user's expression lives one frame up, in bmm() or the extractor
+  attr(data, "data_name") <- substitute_name(data, envir = parent.frame())
   formula <- check_formula(model, data, formula)
   config_args <- configure_model(model, data, formula)
   prior <- brms::do_call(

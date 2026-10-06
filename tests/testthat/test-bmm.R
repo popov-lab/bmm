@@ -158,3 +158,20 @@ test_that("bmm() builds the default prior and the inits from the data2 brm() get
   withr::local_options(bmm.default_priors = FALSE)
   expect_true(is.function(mock()$stan_args$init))
 })
+
+test_that("bmm() stores the name of the data the user passed", {
+  withr::local_options("bmm.silent" = 2)
+  my_data <- data.frame(y = rimm(n = 5))
+  fit <- bmm(bmf(kappa ~ 1, thetat ~ 1), my_data, mixture2p("y"),
+    backend = "mock", mock_fit = 1, rename = FALSE
+  )
+  expect_equal(attr(fit$data, "data_name"), "my_data")
+
+  # m3's check_data() rebuilds the data frame after the name is first stored
+  counts <- data.frame(corr = rpois(5, 10), other = rpois(5, 3), npl = rpois(5, 2))
+  fit <- bmm(bmf(c ~ 1, a ~ 1), counts,
+    m3(resp_cats = c("corr", "other", "npl"), num_options = c(1, 4, 5), version = "ss"),
+    backend = "mock", mock_fit = 1, rename = FALSE
+  )
+  expect_equal(attr(fit$data, "data_name"), "counts")
+})
