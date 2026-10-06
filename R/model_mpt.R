@@ -702,11 +702,13 @@ check_model.mpt <- function(model, data = NULL, formula = NULL) {
       return(TRUE)
     }
     labels <- attr(formula_terms, "term.labels")
-    population_vars <- unlist(lapply(
-      labels[!grepl("|", labels, fixed = TRUE)],
-      function(label) all.vars(str2lang(label))
-    ))
-    length(setdiff(population_vars, c(names(formula), parameters))) > 0
+    length(setdiff(
+      unlist(lapply(
+        labels[!grepl("|", labels, fixed = TRUE)],
+        function(label) all.vars(str2lang(label))
+      )),
+      c(names(formula), parameters)
+    )) > 0
   }, logical(1))
   names(formula)[has_predictors]
 }
@@ -968,11 +970,10 @@ configure_prior.mpt <- function(model, data, formula, user_prior, ...) {
   if (length(fixed_pars) == 0L) {
     return(brms::empty_prior())
   }
-  latent <- vapply(fixed_pars, function(par) {
-    link_transform(model$fixed_parameters[[par]], model$links[[par]])
-  }, numeric(1))
   brms::set_prior(
-    glue("constant({latent})"),
+    paste0("constant(", vapply(fixed_pars, function(par) {
+      link_transform(model$fixed_parameters[[par]], model$links[[par]])
+    }, numeric(1)), ")"),
     class = "b", coef = "Intercept", nlpar = fixed_pars
   )
 }

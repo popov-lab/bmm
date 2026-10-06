@@ -875,14 +875,7 @@ rmpt <- function(n, size, pars, mpt_model, tree = NULL, unpack = FALSE,
   probs <- .mpt_probability_vector(pars, mpt_model, tree, ...)
   result <- t(rmultinom(n, size = size, prob = probs))
   colnames(result) <- names(probs)
-
-  if (unpack && n == 1) {
-    result_vec <- as.vector(result[1, ])
-    names(result_vec) <- colnames(result)
-    return(result_vec)
-  }
-
-  result
+  if (unpack && n == 1) result[1, ] else result
 }
 
 .mpt_probability_vector <- function(pars, mpt_model, tree = NULL, ...) {

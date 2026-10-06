@@ -162,9 +162,10 @@
     decomposition$absent <- free[zero]
     decomposition
   })
-  ranks <- vapply(decompositions, `[[`, integer(1), "rank")
-  n_absent <- lengths(lapply(decompositions, `[[`, "absent"))
-  best <- decompositions[[order(-ranks, n_absent)[1]]]
+  best <- decompositions[[order(
+    -vapply(decompositions, `[[`, integer(1), "rank"),
+    lengths(lapply(decompositions, `[[`, "absent"))
+  )[1]]]
   null_space <- best$v[, seq_along(free) > best$rank, drop = FALSE]
   c(counts, list(
     rank = best$rank,
