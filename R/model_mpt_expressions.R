@@ -135,11 +135,17 @@
       "The restriction '{text}' does not evaluate to a single number."
     )
     stopif(
-      value <= 0 || value >= 1,
-      "The restriction '{text}' fixes a parameter to {value}. Restriction \\
-      constants must be probabilities strictly between 0 and 1: 0 or 1 turns \\
-      a branch into the constant 0. Leave such branches out of the tree \\
-      expressions, and declare a category no branch reaches with \\
+      value < 0 || value > 1,
+      "The restriction '{text}' fixes a parameter to {value}. A constant must \\
+      lie strictly between 0 and 1."
+    )
+    stopif(
+      value == 0 || value == 1,
+      "The restriction '{text}' fixes a parameter to {value}. Constants must \\
+      be strictly between 0 and 1: a constant 0 or 1 can turn a branch \\
+      into 0, which has no log probability. To model a parameter at 0 or 1, \\
+      remove it from the branch expressions (write the reduced tree) and \\
+      declare the categories that no branch reaches with \\
       mpt_tree(impossible = )."
     )
     return(value)

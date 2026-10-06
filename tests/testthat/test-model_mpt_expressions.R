@@ -79,6 +79,22 @@ test_that("restriction constants must be strictly between 0 and 1", {
   expect_equal(.mpt_parse_restrictions("g = 1/4"), list(g = 0.25))
 })
 
+test_that("the message for a constant 0 or 1 holds for every model", {
+  for (r in c("D = 0", "D = 1")) {
+    msg <- tryCatch(.mpt_parse_restrictions(r), error = conditionMessage)
+    expect_match(msg, "reduced tree")
+    expect_no_match(msg, "turns a branch into the constant 0")
+  }
+})
+
+test_that("an out-of-range constant is not explained with 0/1 branches", {
+  for (r in c("g = 1.5", "g = -0.2")) {
+    msg <- tryCatch(.mpt_parse_restrictions(r), error = conditionMessage)
+    expect_match(msg, "strictly between 0 and 1")
+    expect_no_match(msg, "branch")
+  }
+})
+
 test_that("restriction chains resolve to their final target", {
   resolved <- .mpt_resolve_restrictions(list(A = quote(B), B = quote(C), g = 0.5))
   expect_equal(resolved, list(A = quote(C), B = quote(C), g = 0.5))
