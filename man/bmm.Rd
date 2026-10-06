@@ -41,8 +41,8 @@ passed to the \code{bmmodel} object for required argurments.}
 \item{model}{A description of the model to be fitted. This is a call to a
 \code{bmmodel} such as \code{mixture3p()} function. Every model function has a
 number of required arguments which need to be specified within the function
-call. Call \code{\link[=supported_models]{supported_models()}} to see the list of supported models and
-their required arguments}
+call. Call \code{\link[=bmm_models]{bmm_models()}} to see the list of supported models, and
+\code{?modelname} (for example \code{?imm}) for their required arguments.}
 
 \item{prior}{One or more \code{brmsprior} objects created by \code{\link[brms:set_prior]{brms::set_prior()}}
 or related functions and combined using the c method or the + operator. See
@@ -195,6 +195,6 @@ Bayesian Measurement Modeling  (bmm) package for R.
 https://doi.org/10.31234/osf.io/umt57
 }
 \seealso{
-\code{\link[=supported_models]{supported_models()}}, \code{\link[brms:brm]{brms::brm()}}, \link[=default_prior.bmmformula]{default_prior()}, \code{\link[=bmmformula]{bmmformula()}}, \link[=stancode.bmmformula]{stancode()}, \link[=standata.bmmformula]{standata()}
+\code{\link[=bmm_models]{bmm_models()}}, \code{\link[brms:brm]{brms::brm()}}, \link[=default_prior.bmmformula]{default_prior()}, \code{\link[=bmmformula]{bmmformula()}}, \link[=stancode.bmmformula]{stancode()}, \link[=standata.bmmformula]{standata()}
 }
 \keyword{deprecated}

@@ -33,7 +33,7 @@ reference:
     desc: "These pages provide a summary of the functionality available in bmm"
   - contents:
     - "bmm-package"
-    - "supported_models"
+    - "bmm_models"
     - "bmm_options"
     - "bmm_setup"
   - title: "Fitting models"

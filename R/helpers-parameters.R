@@ -154,7 +154,9 @@ link_transform <- function(values, link, inverse = FALSE) {
 #'   \code{bmmfit} object (a fitted model returned by \code{\link{bmm}}).
 #' @param formula An optional \code{bmmformula} object. Only relevant for
 #'   M3 custom models, where additional parameters are discovered from
-#'   the formula. Ignored for all other models.
+#'   the formula. Only activation symbols that have their own formula are
+#'   listed; without data, any other symbol is read as a data column.
+#'   Ignored for all other models.
 #' @param ... Additional arguments (currently unused).
 #'
 #' @return A data frame of class \code{bmm_parameters} with one row per
@@ -184,9 +186,9 @@ parameter_info.bmmodel <- function(x, formula = NULL, ...) {
   model <- x
 
   if (inherits(model, "m3_custom") && !is.null(formula)) {
-    user_pars <- rhs_vars(formula[is_nl(formula)])
-    user_pars <- setdiff(user_pars, names(formula[is_nl(formula)]))
-    user_pars <- setdiff(user_pars, names(model$parameters))
+    # check_model() requires every new parameter to have its own formula, and
+    # without data this is what tells a parameter from a data column
+    user_pars <- intersect(m3_activation_symbols(model, formula), names(formula))
     model$parameters <- c(model$parameters, setNames(
       as.list(user_pars), user_pars
     ))
@@ -849,6 +851,8 @@ native_transform.non_targets <- function(model, linpred, data, ...) {
 #' grouping variables are retained according to `re_formula`, so that
 #' `re_formula = NA` collapses the grid across grouping levels. A variable that
 #' is both a grouping variable and a population-level predictor is always kept.
+#' A non-linear formula names other parameters on its right-hand side; those
+#' span no grid themselves, but the predictors of their own formulas do.
 #'
 #' @param x A bmmfit object
 #' @param pars Character vector of parameter names
@@ -865,25 +869,29 @@ native_transform.non_targets <- function(model, linpred, data, ...) {
     character(0)
   }
 
-  vars <- lapply(pars, function(par) {
-    f <- x$bmm$user_formula[[par]]
+  formulas <- x$bmm$user_formula
+  parameters <- c(names(formulas), names(x$bmm$model$parameters))
+  formula_vars <- function(par, seen) {
+    f <- formulas[[par]]
     if (is.null(f) || is_constant(f)) {
       return(character(0))
     }
     rhs <- stats::formula(f)[-2]
     labels <- attr(stats::terms(rhs), "term.labels")
-    fe_vars <- lapply(
+    fe_vars <- unlist(lapply(
       labels[!grepl("|", labels, fixed = TRUE)],
       function(label) all.vars(str2lang(label))
-    )
+    ))
     groups <- .extract_re_grouping_vars(rhs)
+    sub_pars <- setdiff(intersect(fe_vars, parameters), seen)
     c(
-      unlist(fe_vars),
-      if (keep_all_groups) groups else groups[groups %in% keep_groups]
+      setdiff(fe_vars, parameters),
+      if (keep_all_groups) groups else groups[groups %in% keep_groups],
+      unlist(lapply(sub_pars, formula_vars, seen = c(seen, par)))
     )
-  })
+  }
 
-  unique(unlist(vars))
+  unique(unlist(lapply(pars, formula_vars, seen = character(0))))
 }
 
 

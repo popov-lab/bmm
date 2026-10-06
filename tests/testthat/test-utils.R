@@ -535,3 +535,8 @@ test_that("bmm_options(step_size = ) validates and applies the option", {
   suppressMessages(bmm_options(reset_options = TRUE))
   expect_equal(getOption("bmm.step_size"), 0.01)
 })
+
+test_that("bmm does not change how message conditions print", {
+  cnd <- tryCatch(message("hi"), message = identity)
+  expect_output(print(cnd), "simpleMessage")
+})

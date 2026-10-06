@@ -146,8 +146,8 @@ test_that("check_data() returns a data.frame()", {
   # sdt_rating needs one response column per rating category, so
   # it cannot be exercised with the shared single `response` column used here; it
   # is covered with proper count data in test-model_sdt_rating.R.
-  model_names <- setdiff(supported_models(print_call = FALSE), "sdt_rating")
-  mls <- lapply(model_names, get_model)
+  models <- setdiff(model_names(), "sdt_rating")
+  mls <- lapply(models, get_model)
   # test data includes variables for all model types:
   # - y, x, z, w, l, s for circular/mixture models
   # - mean_rt, var_rt, n_upper, n_trials for ezdm 3par
@@ -1088,6 +1088,19 @@ test_that("adjust_ezdm_accuracy() validates inputs", {
       "guess_rate must be between 0 and 1")
     expect_error(adjust_ezdm_accuracy(80, 100, 0.1, guess_rate = 1.5),
       "guess_rate must be between 0 and 1")
+  })
+})
+
+test_that("adjust_ezdm_accuracy() rejects vector input and points to ezdm_summary_stats()", {
+  suppressWarnings({
+    expect_error(
+      adjust_ezdm_accuracy(c(80, 90), c(100, 100), c(0.1, 0.2)),
+      "takes one cell at a time.*ezdm_summary_stats\\(\\)"
+    )
+    expect_error(
+      adjust_ezdm_accuracy(80, 100, c(0.1, 0.2)),
+      "takes one cell at a time"
+    )
   })
 })
 

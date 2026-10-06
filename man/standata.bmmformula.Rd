@@ -17,8 +17,8 @@ passed to the \code{bmmodel} object for required argurments.}
 \item{model}{A description of the model to be fitted. This is a call to a
 \code{bmmodel} such as \code{mixture3p()} function. Every model function has a
 number of required arguments which need to be specified within the function
-call. Call \code{\link[=supported_models]{supported_models()}} to see the list of supported models and
-their required arguments}
+call. Call \code{\link[=bmm_models]{bmm_models()}} to see the list of supported models, and
+\code{?modelname} (for example \code{?imm}) for their required arguments.}
 
 \item{...}{Further arguments passed to \code{\link[brms:standata]{brms::standata()}}. See the
 description of \code{\link[brms:standata]{brms::standata()}} for more details}
@@ -40,6 +40,6 @@ sdata1 <- standata(bmf(c ~ 1, kappa ~ 1),
 str(sdata1)
 }
 \seealso{
-\code{\link[=supported_models]{supported_models()}}, \code{\link[brms:standata]{brms::standata()}}
+\code{\link[=bmm_models]{bmm_models()}}, \code{\link[brms:standata]{brms::standata()}}
 }
 \keyword{extract_info}
