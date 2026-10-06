@@ -682,20 +682,11 @@ mpt <- function(trees, tree_id = NULL, covariates = NULL, simplex = NULL,
 
   deviations <- .mpt_tree_sum_deviations(trees, parameters, covariates, simplex)
   # synthetic covariate values need not form a valid tree (Gcorr + Gother = 1),
-  # so such trees only warn here; check_data() errors on the observed values
+  # so check_data() decides for trees that use covariates, with the observed values
   uses_covariates <- vapply(
     trees, function(tree) any(.mpt_expr_vars(tree) %in% covariates), logical(1)
   )
   deviating <- names(deviations)[!is.na(deviations)]
-  for (tree_name in intersect(deviating, names(trees)[uses_covariates])) {
-    warning2(
-      "The branch probabilities of tree '{tree_name}' sum to \\
-      {signif(deviations[[tree_name]], 6)} instead of 1 when evaluated at \\
-      numeric test values for its parameters and covariates. check_data() \\
-      repeats this check with the covariate values in the data and stops if \\
-      the branches do not sum to 1 there."
-    )
-  }
   for (tree_name in setdiff(deviating, names(trees)[uses_covariates])) {
     stop2(
       "The branch probabilities of tree '{tree_name}' sum to \\
