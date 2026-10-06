@@ -45,10 +45,13 @@ the last) or fixes it to a numeric constant (\code{"g = 0.5"}, \code{"g = 1/4"})
 Constants must lie strictly between 0 and 1. The unnamed list of MPTinR
 and TreeBUGS, \code{list("Dn = Do", "g = 0.5")}, works as well. Restriction
 files are not read: in MPTinR and TreeBUGS a character vector names a
-restrictions file, in \code{bmm} it holds the restrictions. Restrictions are substituted into the
-branch expressions before the parameters are identified, so a restricted
-parameter is not part of the model and cannot be a simplex member. Order
-constraints (\code{"Do > Dn"}) are not supported here; see Details.}
+restrictions file, in \code{bmm} it holds the restrictions. To use such a file,
+pass \code{readLines(path)}; blank lines and lines starting with \verb{#} are
+skipped, and a \verb{#} after a restriction starts a comment, as in MPTinR.
+Restrictions are substituted into the branch expressions before the
+parameters are identified, so a restricted parameter is not part of the
+model and cannot be a simplex member. Order constraints (\code{"Do > Dn"}) are
+not supported here; see Details.}
 
 \item{links}{Character. The link function for all latent probability
 parameters: \code{"logit"} (default) or \code{"probit"}.}
@@ -134,6 +137,33 @@ value is mapped to the latent scale when the constant prior is built, so
 the logit link. For the same reason, \code{summary()} lists a fixed \code{g = 0.5}
 as \verb{g_Intercept 0.00} under "Constant Parameters"; \code{\link[=prior_info]{prior_info()}} and
 \code{\link[=parameter_info]{parameter_info()}} show the probability, 0.5.
+
+Printing the model ends with an identifiability check for intercept-only
+formulas. It first compares the number of free parameters with the
+degrees of freedom (response categories minus one, summed over trees).
+It then computes the rank of the Jacobian of all category probabilities
+with respect to the free parameters, from exact derivatives at five
+interior test values; parameters fixed in the formula enter at their
+values. A simplex group counts with one free parameter fewer than its
+members, and the printout names the group by its members. Covariates
+are never free parameters; because rows with different covariate values
+can identify what one design cell cannot, the rank is taken over the rows
+of all covariate values in the data (at most 20 per tree) in \code{bmm()}, and
+over five test values of the covariates when printing. A rank below the number of free parameters means that some
+combination of the listed parameters cannot be estimated from the data,
+even when the count passes, and its posterior follows the prior; a
+parameter whose derivatives are zero up to rounding at the test values
+appears not to affect any category probability and is named separately.
+Fix parameters in the formula or equate them in the branch expressions
+until the rank is full. \code{bmm()} warns about a rank deficit when no
+formula uses a data column as a predictor. When one does, a parameter
+that differs between conditions can identify the model across them, so
+\code{bmm()} only says that the model is not identified within one design
+cell and that the predictors were not checked. The
+check is local: it holds at the test values, not at the boundaries of
+the parameter space. A branch expression with a function that
+\code{\link[stats:D]{stats::D()}} cannot differentiate leaves the rank uncomputed, and the
+printout says so.
 
 \code{summary()} reports intercepts and regression coefficients on the latent
 (logit or probit) scale. \code{\link[=native_parameters]{native_parameters()}} returns the posterior
