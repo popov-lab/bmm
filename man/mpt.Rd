@@ -153,7 +153,10 @@ members, and the printout names the group by its members. Covariates
 are never free parameters; because rows with different covariate values
 can identify what one design cell cannot, the rank is taken over the rows
 of every distinct covariate setting in the data in \code{bmm()}, and
-over five test values of the covariates when printing. A rank below the
+over five test values of the covariates when printing. In \code{bmm()}, a
+tree without rows in the data adds nothing to the rank. \code{print()} can
+therefore report full rank for a design whose data leave a parameter
+open, and \code{bmm()} then warns. A rank below the
 number of free parameters means that some combination of the listed
 parameters cannot be estimated from the data,
 even when the count passes, and its posterior follows the prior; a
