@@ -574,6 +574,30 @@ test_that("a formula that reaches no parameter of the deficit keeps the warning"
   ))
 })
 
+test_that("a predictor on a parameter outside the deficit is not met with a warning", {
+  # h is identified by tree t2; within one cell D and r enter only through
+  # h * r + (1 - h) * D, but two values of h separate them
+  model <- mpt(list(
+    mpt_tree("t1", list(yes = "h * r + (1 - h) * D", no = "h * (1 - r) + (1 - h) * (1 - D)")),
+    mpt_tree("t2", list(yes = "h", no = "1 - h"))
+  ), tree_id = "tree")
+  dat <- expand.grid(tree = c("t1", "t2"), cond = c("A", "B"), stringsAsFactors = FALSE)
+  dat$yes <- 20L
+  dat$no <- 20L
+
+  expect_no_warning(expect_message(
+    check_model(model, dat, bmf(D ~ 1, r ~ 1, h ~ 0 + cond)),
+    "within one design cell.*predictors on 'h' identify it across cells is not checked"
+  ))
+  expect_no_warning(suppressMessages(
+    check_model(model, dat, bmf(D ~ 1, r ~ 1, h ~ inv_logit(phi), phi ~ cond))
+  ))
+  expect_warning(
+    check_model(model, dat, bmf(D ~ 1, r ~ 1, h ~ 1)),
+    "all free parameters except 'h' cannot be estimated"
+  )
+})
+
 test_that("deep chains of identified parameters keep full rank", {
   # category i is reached after i - 1 failures, so the columns of the last
   # parameters are products of many probabilities but stay identified

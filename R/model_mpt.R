@@ -284,9 +284,9 @@ settable_link_functions.mpt <- function(model) {
 #'   appears not to affect any category probability and is named separately.
 #'   Fix parameters in the formula or equate them in the branch expressions
 #'   until the rank is full. `bmm()` warns about a rank deficit unless a
-#'   formula reaches one of the parameters involved: a data predictor on it,
-#'   or a non-linear formula that defines or reads it. A parameter that
-#'   differs between conditions can identify the model across them, and the
+#'   formula has a data predictor, or a non-linear formula defines or reads
+#'   one of the parameters involved. A parameter that differs between
+#'   conditions can identify the model across them, and the
 #'   rank covers the parameters of the branch expressions only, so a
 #'   non-linear formula that ties them together (`Dn ~ Do`) or builds one
 #'   from sub-parameters is not analysed. In these cases `bmm()` only
@@ -666,19 +666,22 @@ check_model.mpt <- function(model, data = NULL, formula = NULL) {
     }
 
     # population-level predictors can identify a parameter across design
-    # cells that a single cell leaves open, and a non-linear formula can tie
-    # parameters together. A deficit whose parameters no such formula
-    # predicts, defines or reads lies in intercept-only parameters, where it
-    # is certain and warned about; otherwise it is announced only
+    # cells that a single cell leaves open, also when they sit on a parameter
+    # outside the deficit (h ~ cond identifies D and r in h * r + (1 - h) * D),
+    # and a non-linear formula can tie parameters together. Without
+    # predictors there is one cell, so a deficit whose parameters no
+    # non-linear formula defines or reads is certain and warned about;
+    # otherwise it is announced only
     with_predictors <- .mpt_predictor_formulas(formula, names(model$parameters))
     identifiability <- .mpt_identifiability(model)
     reached <- c(
-      with_predictors, nl_pars,
+      nl_pars,
       intersect(rhs_vars(formula[is_nl(formula)]), names(model$parameters))
     )
     if (is.null(identifiability$error) &&
           identifiability$rank < identifiability$n_free) {
-      if (length(intersect(identifiability$involved, reached)) == 0L) {
+      if (length(with_predictors) == 0L &&
+            length(intersect(identifiability$involved, reached)) == 0L) {
         warning2(
           "{.mpt_rank_deficit_text(identifiability)} Along the non-identified \\
           direction(s), the posterior follows the prior."

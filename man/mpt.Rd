@@ -101,9 +101,9 @@ parameter whose derivatives are zero up to rounding at the test values
 appears not to affect any category probability and is named separately.
 Fix parameters in the formula or equate them in the branch expressions
 until the rank is full. \code{bmm()} warns about a rank deficit unless a
-formula reaches one of the parameters involved: a data predictor on it,
-or a non-linear formula that defines or reads it. A parameter that
-differs between conditions can identify the model across them, and the
+formula has a data predictor, or a non-linear formula defines or reads
+one of the parameters involved. A parameter that differs between
+conditions can identify the model across them, and the
 rank covers the parameters of the branch expressions only, so a
 non-linear formula that ties them together (\code{Dn ~ Do}) or builds one
 from sub-parameters is not analysed. In these cases \code{bmm()} only
