@@ -25,7 +25,7 @@ All changes and additions to code have to be submitted via pull requests. We con
 
 If you are interested in contributing to `bmm`, please follow the following steps.
 
-1.  Fork the repo and create your branch from `develop`.
+1.  Fork the repo and create your branch from `develop`. If your change is a feature planned for a later release, branch from that release's integration branch (`dev-1.5.0`, `dev-1.6.0`) instead; the milestone of the issue tells you which release it is planned for. Bug fixes always go to `develop`.
 2.  If you've added code that should be tested, add tests.
 3.  Update the documentation for the changes you implemented.
 4.  Ensure that all unit tests passed.

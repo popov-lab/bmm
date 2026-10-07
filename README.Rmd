@@ -110,7 +110,7 @@ if (length(other) > 0) {
 knitr::include_graphics("man/figures/README-task-map.png")
 ```
 
-`supported_models()` prints the same list in R, and `?modelname` (for
+`bmm_models()` prints the same list in R, and `?modelname` (for
 example `?imm`) documents what data a model expects and what its parameters
 mean.
 

@@ -12,8 +12,8 @@
 #' @param model A description of the model to be fitted. This is a call to a
 #'   `bmmodel` such as `mixture3p()` function. Every model function has a
 #'   number of required arguments which need to be specified within the function
-#'   call. Call [supported_models()] to see the list of supported models and
-#'   their required arguments
+#'   call. Call [bmm_models()] to see the list of supported models, and
+#'   `?modelname` (for example `?imm`) for their required arguments.
 #' @param prior One or more `brmsprior` objects created by [brms::set_prior()]
 #'   or related functions and combined using the c method or the + operator. See
 #'   also [default_prior()] for more help. Not necessary for the default model
@@ -75,7 +75,7 @@
 #'
 #' @details # Supported Models
 #'
-#'   `r a= supported_models(); a`
+#'   `r models_text()`
 #'
 #'   # bmmformula syntax
 #'
@@ -102,7 +102,7 @@
 #'   Bayesian Measurement Modeling  (bmm) package for R.
 #'   https://doi.org/10.31234/osf.io/umt57
 #'
-#' @seealso [supported_models()], [brms::brm()], [default_prior()][default_prior.bmmformula()], [bmmformula()], [stancode()][stancode.bmmformula()], [standata()][standata.bmmformula()]
+#' @seealso [bmm_models()], [brms::brm()], [default_prior()][default_prior.bmmformula()], [bmmformula()], [stancode()][stancode.bmmformula()], [standata()][standata.bmmformula()]
 #'
 #' @export
 #'

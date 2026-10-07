@@ -100,7 +100,7 @@ test_that("a parameter fixed for scaling is refused with its own message", {
   )
 })
 
-test_that("a model outside supported_models() is named by its class", {
+test_that("a model outside bmm_models() is named by its class", {
   # what use_model_template() produces before the model is registered
   model <- structure(
     list(parameters = list(par1 = "", par2 = ""), links = list(par1 = "log")),

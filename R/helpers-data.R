@@ -40,6 +40,18 @@ check_data.default <- function(model, data, formula) {
   data
 }
 
+# Formulas may use the columns check_data() adds as predictors, so the formula
+# checks and bmm_data_check() must not call them unknown although the user's
+# data lacks them. Methods chain with NextMethod(), as for revert_check_data()
+built_data_columns <- function(model) {
+  UseMethod("built_data_columns")
+}
+
+#' @exportS3Method
+built_data_columns.default <- function(model) {
+  character(0)
+}
+
 #' @export
 check_data.bmmodel <- function(model, data, formula) {
   stopif(missing(data), "Data must be specified using the 'data' argument.")
@@ -250,7 +262,7 @@ rad2deg <- function(rad) {
 #'   description of [brms::standata()] for more details
 #' @return A named list of objects containing the required data to fit a bmm
 #'   model with Stan.
-#' @seealso [supported_models()], [brms::standata()]
+#' @seealso [bmm_models()], [brms::standata()]
 #' @keywords extract_info
 #' @examples
 #' sdata1 <- standata(bmf(c ~ 1, kappa ~ 1),

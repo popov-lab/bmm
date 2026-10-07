@@ -552,9 +552,9 @@ stored_frame_fit <- function(case) {
 
 test_that("every supported model has a stored-frame case", {
   covered <- unlist(lapply(stored_frame_cases(), function(case) {
-    intersect(class(case$model), supported_models(print_call = FALSE))
+    intersect(class(case$model), model_names())
   }))
-  uncovered <- setdiff(supported_models(print_call = FALSE), covered)
+  uncovered <- setdiff(model_names(), covered)
   expect(length(uncovered) == 0, glue::glue(
     "No stored-frame case for {collapse_comma(uncovered)}. Add one to stored_frame_cases(); ",
     "a model whose check_data() consumes or creates columns also needs a ",
