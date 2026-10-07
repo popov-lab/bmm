@@ -1059,6 +1059,31 @@ test_that("the Jacobian rank is reported as not computed when D() cannot differe
   expect_no_warning(check_model(model, data.frame(x = 1, y = 1), bmf(a ~ 1)))
 })
 
+test_that("a derivative that is not finite leaves the rank uncomputed and check_data() names the row", {
+  model <- mpt(list(
+    mpt_tree("plain", list(y = "a", n = "1 - a")),
+    mpt_tree("cov", list(y = "b * 0.5 / x", n = "1 - b * 0.5 / x"))
+  ), tree_id = "tr", covariates = "x")
+  dat <- data.frame(tr = c("plain", "cov"), x = c(1, 0), y = 3, n = 3)
+  expect_silent(check_model(model, dat, bmf(a ~ 1, b ~ 1)))
+  expect_error(
+    bmm(bmf(a ~ 1, b ~ 1), dat, model, backend = "mock", mock_fit = 1, rename = FALSE),
+    "branch probabilities of tree 'cov' do not sum to 1 for 1 row\\(s\\) \\(first: row 2, sum = NaN\\)"
+  )
+
+  # without covariates: at the first test point a equals k, where the
+  # derivative of ((a - k)^2)^0.25 is Inf * 0
+  k <- sprintf("%a", bmm:::.mpt_test_points("a", list())[[1]][["a"]])
+  cusp <- mpt(mpt_tree("t", list(
+    yes = glue("0.5 + 0.25 * ((a - {k})^2)^0.25"),
+    no = glue("0.5 - 0.25 * ((a - {k})^2)^0.25")
+  )))
+  expect_match(
+    mpt_printed(cusp),
+    "Jacobian rank not computed: a derivative of the branch expressions is not finite"
+  )
+})
+
 test_that("fixed parameter values stay probabilities and reach the prior on the latent scale", {
   model <- mpt(mpt_2htm_trees(), tree_id = "item_type")
   dat <- mpt_2htm_data()

@@ -322,7 +322,10 @@
     }), recursive = FALSE)
   }), silent = TRUE)
   if (is_try_error(derivs)) {
-    return(c(counts, list(error = conditionMessage(attr(derivs, "condition")))))
+    return(c(counts, list(error = glue(
+      "stats::D() cannot differentiate the branch expressions \\
+      ({conditionMessage(attr(derivs, 'condition'))})"
+    ))))
   }
   settings <- settings %||% lapply(trees, function(tree) data.frame(row.names = 1L))
   # no rank exceeds the rows stacked over every setting
@@ -356,6 +359,15 @@
       block <- vapply(derivs[[tree]], function(deriv) {
         rep_len(eval(deriv, row_vals), length(rows) * n_points)
       }, numeric(length(rows) * n_points))
+      # qr() stops on a non-finite entry with a bare foreign-call error. At a
+      # covariate value in the data, such a derivative mostly comes with
+      # branches that are undefined there, which check_data() reports by row
+      if (!all(is.finite(block))) {
+        return(c(counts, list(error = glue(
+          "a derivative of the branch expressions is not finite at some of \\
+          the test values"
+        ))))
+      }
       for (point in seq_along(points)) {
         factors[[point]] <- qr.R(qr(rbind(factors[[point]], matrix(
           t(block[seq(point, nrow(block), by = n_points), , drop = FALSE]),

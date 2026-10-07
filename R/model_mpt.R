@@ -453,8 +453,8 @@ settable_link_functions.mpt <- function(model) {
 #'   `print()` of the checked model says the formula was not analysed. The
 #'   check is local: it holds at the test values, not at the boundaries of
 #'   the parameter space. A branch expression with a function that
-#'   [stats::D()] cannot differentiate leaves the rank uncomputed, and the
-#'   printout says so.
+#'   [stats::D()] cannot differentiate, or a derivative that is not finite
+#'   at a test value, leaves the rank uncomputed, and the printout says so.
 #'
 #'   `summary()` reports intercepts and regression coefficients on the latent
 #'   (logit or probit) scale. [native_parameters()] returns the posterior
@@ -811,10 +811,7 @@ print_model_details.mpt <- function(model, ...) {
   # set by check_model.mpt() for parameters with a non-linear formula
   tied <- names(attr(model, "mpt_bypassed_links"))
   rank_text <- if (!is.null(identifiability$error)) {
-    glue(
-      "Jacobian rank not computed: stats::D() cannot differentiate the branch \\
-      expressions ({identifiability$error})."
-    )
+    glue("Jacobian rank not computed: {identifiability$error}.")
   } else if (length(tied) > 0) {
     .mpt_tied_rank_text(identifiability, tied)
   } else if (identifiability$rank < identifiability$n_free) {
