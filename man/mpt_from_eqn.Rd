@@ -30,12 +30,13 @@ Restriction files are not read: pass their lines (the Examples of
 \item{categories}{A named character vector mapping response category names
 used in the EQN file onto the shared response categories of the model
 (see Details), e.g. \code{c(hit = "yes", fa = "yes", miss = "no", cr = "no")}.
-Categories not listed keep their (sanitized) name; labels that only
-carry their tree name as a prefix (\code{WC_Correct}, \code{LC_Correct}) need no
-mapping, because the prefix is removed. Labels that are not valid bmm
-names, such as numeric labels, must be mapped. Mapping two categories of
-the same tree onto one name merges them: their branch lines are summed,
-and a message says so.}
+Categories not listed keep their name. Mapped values and unlisted names
+alike are sanitized (underscores and dots removed, see Details), so
+\code{c(hit = "y_es")} gives \code{yes}. Labels that only carry their tree name as
+a prefix (\code{WC_Correct}, \code{LC_Correct}) need no mapping, because the prefix
+is removed. Labels that are not valid bmm names, such as numeric labels,
+must be mapped. Mapping two categories of the same tree onto one name
+merges them: their branch lines are summed, and a message says so.}
 
 \item{tree_id}{Character. Name of the data column whose values name the tree
 each observation belongs to (see \code{\link[=mpt]{mpt()}}). Add this column to the data
@@ -88,7 +89,8 @@ holds, and so does MPTinR with \code{model.type = "eqn"} (its default for
 count). bmm therefore reads a file without a count line in full, while
 those programs drop its first equation; a title line produces an error
 that says to delete it or start it with \verb{#}. A file that starts with the
-equation count, or with a \verb{#} line, is read the same way by all three.
+equation count, or with \verb{#} lines followed by equations, is read the same
+way by all three.
 A line with fewer than three fields, or an expression that cannot be
 parsed, is an error that names the line; a tree whose branches do not
 sum to 1 at numeric test values is an error that names the tree.

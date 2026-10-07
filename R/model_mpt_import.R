@@ -189,6 +189,11 @@ mpt_from_string <- function(text, tree_names, categories = NULL,
     "Found {length(blocks)} tree block(s) separated by blank lines, but \\
     {length(tree_names)} tree_names were supplied."
   )
+  stopif(
+    anyDuplicated(tree_names) > 0,
+    "Each tree needs its own name, but tree_names repeats \\
+    {collapse_comma(unique(tree_names[duplicated(tree_names)]))}."
+  )
 
   tree_lines <- setNames(lapply(blocks, function(block) {
     parts <- strsplit(block, "#", fixed = TRUE)
@@ -221,6 +226,12 @@ mpt_from_string <- function(text, tree_names, categories = NULL,
     by_tree && anyDuplicated(names(categories)) > 0,
     "The categories list names a tree more than once: \\
     {collapse_comma(unique(names(categories)[duplicated(names(categories))]))}."
+  )
+  stopif(
+    !by_tree && length(categories) > 0 && !(is.character(categories) &&
+      !anyNA(categories) && all(nzchar(categories))),
+    "The categories vector must be a character vector without missing or \\
+    empty values."
   )
   unusable_entries <- if (by_tree) {
     names(categories)[!vapply(categories, function(entry) {
@@ -340,12 +351,13 @@ mpt_from_string <- function(text, tree_names, categories = NULL,
 #' @param categories A named character vector mapping response category names
 #'   used in the EQN file onto the shared response categories of the model
 #'   (see Details), e.g. `c(hit = "yes", fa = "yes", miss = "no", cr = "no")`.
-#'   Categories not listed keep their (sanitized) name; labels that only
-#'   carry their tree name as a prefix (`WC_Correct`, `LC_Correct`) need no
-#'   mapping, because the prefix is removed. Labels that are not valid bmm
-#'   names, such as numeric labels, must be mapped. Mapping two categories of
-#'   the same tree onto one name merges them: their branch lines are summed,
-#'   and a message says so.
+#'   Categories not listed keep their name. Mapped values and unlisted names
+#'   alike are sanitized (underscores and dots removed, see Details), so
+#'   `c(hit = "y_es")` gives `yes`. Labels that only carry their tree name as
+#'   a prefix (`WC_Correct`, `LC_Correct`) need no mapping, because the prefix
+#'   is removed. Labels that are not valid bmm names, such as numeric labels,
+#'   must be mapped. Mapping two categories of the same tree onto one name
+#'   merges them: their branch lines are summed, and a message says so.
 #' @param tree_id Character. Name of the data column whose values name the tree
 #'   each observation belongs to (see [mpt()]). Add this column to the data
 #'   yourself: for each row it holds the name of the tree the counts come
@@ -380,7 +392,8 @@ mpt_from_string <- function(text, tree_names, categories = NULL,
 #'   count). bmm therefore reads a file without a count line in full, while
 #'   those programs drop its first equation; a title line produces an error
 #'   that says to delete it or start it with `#`. A file that starts with the
-#'   equation count, or with a `#` line, is read the same way by all three.
+#'   equation count, or with `#` lines followed by equations, is read the same
+#'   way by all three.
 #'   A line with fewer than three fields, or an expression that cannot be
 #'   parsed, is an error that names the line; a tree whose branches do not
 #'   sum to 1 at numeric test values is an error that names the tree.
@@ -646,9 +659,14 @@ mpt_from_eqn <- function(file, restrictions = NULL, categories = NULL,
     "The EQN file '{file}' contains no equation lines."
   )
   fields <- strsplit(lines[line_no], "[[:space:]]+")
-  # a title read as an equation forms a tree of its own
+  # a title read as an equation forms a tree of its own. A first line whose
+  # expression is exactly 1 is a complete one-line tree instead; a title
+  # ending in '1' then loses the hint, but stays an error
   title_line <- if (length(fields) > 1 &&
-                      !fields[[1]][1] %in% vapply(fields[-1], `[`, "", 1)) {
+                      !fields[[1]][1] %in% vapply(fields[-1], `[`, "", 1) &&
+                      !suppressWarnings(as.numeric(sub(
+                        "#.*", "", paste(fields[[1]][-(1:2)], collapse = " ")
+                      ))) %in% 1) {
     line_no[1]
   } else {
     NA_integer_
@@ -678,13 +696,15 @@ mpt_from_eqn <- function(file, restrictions = NULL, categories = NULL,
 
 # TreeBUGS and MPTinR skip the first line of an EQN file, so it may hold a
 # title, which bmm reads as an equation; errors on that line suggest removing it
-.mpt_title_hint <- function(bad_lines, title_line) {
+.mpt_title_hint <- function(bad_lines, title_line, lead = FALSE) {
   # title_line is NA when line 1 does not look like a title; bad_lines are
   # line numbers and never NA
-  if (title_line %in% bad_lines) {
-    paste0("\n", .mpt_title_sentence(title_line))
-  } else {
+  if (!title_line %in% bad_lines) {
     ""
+  } else if (lead) {
+    paste0(.mpt_title_sentence(title_line), "\n")
+  } else {
+    paste0("\n", .mpt_title_sentence(title_line))
   }
 }
 
@@ -724,15 +744,17 @@ mpt_from_eqn <- function(file, restrictions = NULL, categories = NULL,
   # tree_names
   bad_tree_names <- tree_map[!grepl("^[A-Za-z][A-Za-z0-9_]*$", tree_map)]
   bad_lines <- eqn$line[match(names(bad_tree_names), eqn$tree)]
+  # an invalid label on a title line ('6 # count') more likely marks a header
+  # than a tree, so the title hint comes first
   stopif(
     length(bad_tree_names) > 0,
-    "Tree names must start with a letter and contain only letters, digits, \\
+    "{.mpt_title_hint(bad_lines, title_line, lead = TRUE)}\\
+    Tree names must start with a letter and contain only letters, digits, \\
     or underscores. Please rename \\
     {paste0(sQuote(bad_tree_names, FALSE), ' (first on line ', bad_lines, ')',
             collapse = ', ')} \\
     with the tree_names argument, e.g. \\
-    tree_names = c('1' = 'old', '2' = 'new').\\
-    {.mpt_title_hint(bad_lines, title_line)}"
+    tree_names = c('1' = 'old', '2' = 'new')."
   )
   tree_map
 }
@@ -822,8 +844,8 @@ mpt_from_eqn <- function(file, restrictions = NULL, categories = NULL,
     argument."
   )
   cat_renaming <- .mpt_sanitized_names(unique(category_clean))
-  .mpt_check_sanitized_names(cat_renaming)
-  eqn$bmm_category <- unlist(cat_renaming[category_clean], use.names = FALSE)
+  .mpt_check_sanitized_names(cat_renaming, for_categories = TRUE)
+  eqn$bmm_category <- gsub("[._]", "", category_clean)
   eqn$prefix <- ifelse(has_tree_prefix, paste0(eqn$tree, "_"), "")
 
   # checked here rather than left to mpt(), whose message cannot point to
@@ -865,7 +887,6 @@ mpt_from_eqn <- function(file, restrictions = NULL, categories = NULL,
 .mpt_named_map_problem <- function(x) {
   entry_names <- names(x)
   not_one_value <- entry_names[lengths(x) != 1][1]
-  no_value <- entry_names[is.na(x) | !nzchar(x)][1]
   if (is.null(x)) {
     ""
   } else if (is.null(entry_names) || anyNA(entry_names) ||
@@ -877,8 +898,8 @@ mpt_from_eqn <- function(file, restrictions = NULL, categories = NULL,
     glue("Entry '{not_one_value}' has {lengths(x)[not_one_value]} values.")
   } else if (!is.character(x)) {
     glue("It is a {class(x)[1]}.")
-  } else if (!is.na(no_value)) {
-    glue("The entry '{no_value}' has no value.")
+  } else if (anyNA(x) || !all(nzchar(x))) {
+    glue("The entry '{entry_names[is.na(x) | !nzchar(x)][1]}' has no value.")
   } else {
     ""
   }
@@ -889,9 +910,19 @@ mpt_from_eqn <- function(file, restrictions = NULL, categories = NULL,
 .mpt_check_import_trees <- function(branches, impossible, relabel_remedy,
                                     lead_hint = NULL) {
   stopif(
-    length(impossible) > 0 && !is_namedlist(impossible),
+    length(impossible) > 0 &&
+      (!is_namedlist(impossible) || anyDuplicated(names(impossible)) > 0),
     "The impossible argument must be a named list with the categories that \\
-    cannot occur in each tree, e.g. impossible = list(tree1 = c('a', 'b'))."
+    cannot occur in each tree, e.g. impossible = list(tree1 = c('a', 'b')).\\
+    {if (is.list(impossible) && !is_namedlist(impossible)) {
+      ' Every entry needs a name.'
+    } else if (anyDuplicated(names(impossible)) > 0) {
+      paste0(' It names ', collapse_comma(unique(
+        names(impossible)[duplicated(names(impossible))]
+      )), ' more than once.')
+    } else {
+      ''
+    }}"
   )
   unknown_trees <- setdiff(names(impossible), names(branches))
   stopif(
@@ -1018,18 +1049,39 @@ mpt_from_eqn <- function(file, restrictions = NULL, categories = NULL,
   setNames(as.list(gsub("[._]", "", names)), names)
 }
 
-.mpt_check_sanitized_names <- function(renaming, covariates = character(0)) {
+.mpt_check_sanitized_names <- function(renaming, covariates = character(0),
+                                       for_categories = FALSE) {
   sanitized <- unlist(renaming)
+  # an emptied category reaches the bad-name check, which points to the
+  # categories argument
+  emptied <- names(sanitized)[!for_categories & !nzchar(sanitized)]
+  duplicates <- unique(sanitized[duplicated(sanitized) & nzchar(sanitized)])
   # covariates stay as written, so a sanitized parameter equal to one reads
   # as that covariate afterwards
-  clashes <- c(
-    sanitized[duplicated(sanitized)], intersect(sanitized, covariates)
-  )
+  as_covariate <- sanitized %in% covariates
   stopif(
-    length(clashes) > 0,
-    "Removing underscores and dots produces duplicated names or clashes with \\
-    a covariate: {collapse_comma(unique(clashes))}. Please rename them in the \\
-    model file."
+    length(emptied) > 0 || length(duplicates) > 0 || any(as_covariate),
+    "Removing underscores and dots \\
+    {paste(c(
+      if (length(emptied) > 0) {
+        paste('leaves empty names for', collapse_comma(emptied))
+      },
+      if (length(duplicates) > 0) {
+        paste('produces duplicated names:', collapse_comma(duplicates))
+      },
+      if (any(as_covariate)) {
+        paste(
+          'turns parameters into covariate names:',
+          collapse_comma(names(sanitized)[as_covariate]), 'would read as',
+          collapse_comma(sanitized[as_covariate])
+        )
+      }
+    ), collapse = '; ')}. Please rename them in the \\
+    {if (for_categories) {
+      'EQN file or map them with the categories argument'
+    } else {
+      'model file'
+    }}."
   )
   invisible(NULL)
 }
