@@ -164,7 +164,7 @@
     "Order constraints such as '{text}' are not supported by the \\
     restrictions argument. Reparameterize the larger parameter instead, e.g. \\
     Do ~ Dn + (1 - Dn) * inv_logit(phi) in the model formula; see the section \\
-    'Ordered parameter constraints' of the MPT article."
+    'Order constraints' of the MPT article."
   )
 }
 

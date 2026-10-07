@@ -271,7 +271,8 @@ settable_link_functions.mpt <- function(model) {
 #'   and TreeBUGS, e.g. `c("Dn = Do", "g = 0.5")`, or as a named list,
 #'   `list(Dn = "Do", g = 0.5)`. A restriction either equates a parameter with
 #'   another one (chains such as `"G1 = G2 = G3"` map all earlier names onto
-#'   the last) or fixes it to a numeric constant (`"g = 0.5"`, `"g = 1/4"`).
+#'   the last) or fixes it to a numeric constant (`"g = 0.5"`; `bmm` also
+#'   reads fractions such as `"g = 1/4"`, which MPTinR rejects).
 #'   Constants must lie strictly between 0 and 1. The unnamed list of MPTinR
 #'   and TreeBUGS, `list("Dn = Do", "g = 0.5")`, works as well. Restriction
 #'   files are not read: in MPTinR and TreeBUGS a character vector names a
@@ -342,7 +343,9 @@ settable_link_functions.mpt <- function(model) {
 #'   [default_prior()] shows `constant(0)` for a guessing rate of 0.5 under
 #'   the logit link. For the same reason, `summary()` lists a fixed `g = 0.5`
 #'   as `g_Intercept 0.00` under "Constant Parameters"; [prior_info()] and
-#'   [parameter_info()] show the probability, 0.5.
+#'   [parameter_info()] show the probability, 0.5. Members of a `simplex`
+#'   group and their `praw` components cannot be fixed this way; fix parameters
+#'   outside the group instead.
 #'
 #'   Printing the model ends with an identifiability check for intercept-only
 #'   formulas. It first compares the number of free parameters with the
@@ -392,7 +395,7 @@ settable_link_functions.mpt <- function(model) {
 #'   Order constraints between parameters (`Do > Dn`) are expressed by
 #'   reparameterizing the larger parameter in the model formula, e.g.
 #'   `bmf(Do ~ Dn + (1 - Dn) * inv_logit(phi), Dn ~ 1, phi ~ 1)`; the section
-#'   "Ordered parameter constraints" of the MPT article walks through the
+#'   "Order constraints" of the MPT article walks through the
 #'   recipe.
 #'
 #'   Parameter and response category names must start with a letter and may
@@ -873,7 +876,8 @@ check_model.mpt <- function(model, data = NULL, formula = NULL) {
     stopif(
       length(fixed_simplex) > 0,
       "Fixing simplex parameters to constants is not supported: \\
-      {collapse_comma(fixed_simplex)}"
+      {collapse_comma(fixed_simplex)}. Fix parameters outside the group \\
+      instead."
     )
     for (par in .mpt_latent_fixed_pars(model)) {
       value <- model$fixed_parameters[[par]]

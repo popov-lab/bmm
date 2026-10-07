@@ -885,7 +885,7 @@ test_that("simplex parameters cannot be fixed to constants", {
   )
   expect_error(
     check_model(model, formula = bmf(gAraw = 0.3)),
-    "Fixing simplex parameters.*gAraw"
+    "Fixing simplex parameters.*gAraw.*Fix parameters outside the group instead"
   )
 })
 
