@@ -554,6 +554,29 @@ test_that(".np_grid_vars follows sub-parameters to their grouping variables", {
   expect_setequal(.np_grid_vars(fit, "c", NA), "cond")
 })
 
+test_that(".np_grid_vars treats a correlation ID as a label, not a grid variable", {
+  withr::local_options(bmm.silent = 2)
+  fit <- suppressWarnings(bmm(
+    bmf(c ~ 1 + set_size + (1 |p| ID), kappa ~ 1 + (1 |p| ID)), oberauer_lin_2017,
+    sdm(resp_error = "dev_rad"), backend = "mock", mock_fit = 1, rename = FALSE
+  ))
+  pars <- names(fit$bmm$model$parameters)
+  expect_setequal(.np_grid_vars(fit, pars, NULL), c("set_size", "ID"))
+  expect_setequal(.np_grid_vars(fit, pars, NA), "set_size")
+  expect_s3_class(.np_newdata(fit, .np_grid_vars(fit, pars, NULL), NULL), "data.frame")
+})
+
+test_that("native_parameters builds its grid for a formula with a correlation ID", {
+  withr::local_options(bmm.silent = 2)
+  fit <- suppressWarnings(bmm(
+    bmf(c ~ 1 + set_size + (1 |p| ID), kappa ~ 1 + (1 |p| ID)), oberauer_lin_2017,
+    sdm(resp_error = "dev_rad"), backend = "mock", mock_fit = 1, rename = FALSE
+  ))
+  # a mock fit has no draws, so the call fails later; only the grid error matters
+  err <- tryCatch(native_parameters(fit, summary = TRUE), error = conditionMessage)
+  expect_false(is.character(err) && grepl("not columns of the model data", err))
+})
+
 test_that(".np_newdata returns the unique observed cells in a stable order", {
   fit <- load_np_sdm_fit()
   grid <- .np_newdata(fit, "set_size", NULL)
