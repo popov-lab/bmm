@@ -218,23 +218,44 @@ plot.mpt <- function(x, cex = 0.9, ...) {
 # edges. Overlapping boxes are pushed apart vertically, each by half the
 # overlap, until none overlaps or the passes run out; a box is 50% taller than
 # the text height, which leaves out descenders and parentheses, so that labels
-# end up apart rather than touching. All arguments are in inches
+# end up apart rather than touching. All arguments are in inches. Trees of more
+# than 2500 edges (11 multiplied sums) are left alone: the sweep costs more
+# than the drawing then, and no panel makes their labels readable
 .mpt_separate_labels <- function(x, y, width, height, max_passes = 100L) {
+  if (length(y) > 2500L) {
+    return(y)
+  }
   height <- 1.5 * height
-  rank <- seq_along(y)
   for (pass in seq_len(max_passes)) {
-    overlap_x <- outer(width, width, `+`) / 2 - abs(outer(x, x, `-`))
-    overlap_y <- outer(height, height, `+`) / 2 - abs(outer(y, y, `-`))
-    overlapping <- overlap_x > 0 & overlap_y > 0
-    diag(overlapping) <- FALSE
-    if (!any(overlapping)) {
+    pairs <- .mpt_overlapping_labels(x, y, width, height)
+    if (nrow(pairs) == 0L) {
       break
     }
-    above <- sign(outer(y, y, `-`))
-    above[above == 0] <- sign(outer(rank, rank, `-`))[above == 0]
-    y <- y + rowSums(overlapping * above * overlap_y) / 2
+    shift <- (height[pairs[, 1]] + height[pairs[, 2]]) / 2 - (y[pairs[, 2]] - y[pairs[, 1]])
+    moves <- rowsum(c(-shift, shift) / 2, c(pairs[, 1], pairs[, 2]))
+    y[as.integer(rownames(moves))] <- y[as.integer(rownames(moves))] + moves[, 1]
   }
   y
+}
+
+# the pairs of label boxes that overlap, as a matrix with the lower label of
+# each pair first. Labels are swept in order of height, so only labels within
+# one box height of each other are compared; the trees of many multiplied sums
+# have thousands of edges
+.mpt_overlapping_labels <- function(x, y, width, height) {
+  by_y <- order(y)
+  pairs <- matrix(integer(0), ncol = 2)
+  for (step in seq_len(length(y) - 1L)) {
+    lower <- by_y[seq_len(length(y) - step)]
+    upper <- by_y[seq_len(length(y) - step) + step]
+    close <- (height[lower] + height[upper]) / 2 > y[upper] - y[lower]
+    if (!any(close)) {
+      break
+    }
+    overlapping <- close & (width[lower] + width[upper]) / 2 > abs(x[lower] - x[upper])
+    pairs <- rbind(pairs, cbind(lower[overlapping], upper[overlapping]))
+  }
+  pairs
 }
 
 # the edges leaving a node are the branches of one process step, so their

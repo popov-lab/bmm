@@ -743,6 +743,19 @@ test_that("the plot window makes room for the farthest edge label and no more", 
   }
 })
 
+test_that("label boxes are pushed apart vertically and a huge tree is left alone", {
+  y <- .mpt_separate_labels(
+    x = c(0, 0.5, 5), y = c(1, 1.05, 1), width = c(2, 2, 2), height = c(0.1, 0.1, 0.1)
+  )
+  expect_gt(y[2] - y[1], 0.15)
+  expect_equal(y[3], 1)
+  n <- 3000
+  expect_identical(
+    .mpt_separate_labels(rep(0, n), rep(1, n), rep(2, n), rep(0.1, n)),
+    rep(1, n)
+  )
+})
+
 test_that("edge labels sit beside their edge on the outer side of a fan", {
   withr::local_pdf(NULL)
   edges <- .mpt_tree_graph(mpt_tree("t", list(
