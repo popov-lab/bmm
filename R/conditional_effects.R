@@ -352,15 +352,18 @@ conditional_effects.bmmfit <- function(x,
 #' Extract grouping variable names from random effects in a formula
 #'
 #' @description
-#' Parses the RHS of a formula to identify random-effects grouping variables
-#' that should be excluded from conditional effects. Handles all brms grouping
-#' specifications:
+#' Parses the RHS of a formula to identify the data columns that define the
+#' grouping levels of random effects, e.g. to exclude them from conditional
+#' effects. Handles all brms grouping specifications:
 #' \itemize{
 #'   \item Bare names: `(1 | id)`, `(1 || id)`
-#'   \item Correlation IDs: `(1 |ID1| id)` — excludes both `ID1` and `id`
+#'   \item Correlation IDs: `(1 |p| id)` — returns `id` only; `p` labels the
+#'     correlation structure and is not a data column (see
+#'     `.extract_re_cor_ids()`)
 #'   \item `gr()`: `(1 | gr(id, by = exp))` — extracts `id`, not `exp`
 #'   \item `mm()`: `(1 | mm(g1, g2))` — extracts all positional args
-#'   \item Crossed: `(1 | id:group)` — extracts both `id` and `group`
+#'   \item Interaction and nesting: `(1 | id:group)`, `(1 | id/group)` — extracts
+#'     both `id` and `group`, the columns brms combines into the grouping factor
 #' }
 #'
 #' @param formula A formula object
@@ -370,35 +373,97 @@ conditional_effects.bmmfit <- function(x,
 #' @keywords internal
 #' @noRd
 .extract_re_grouping_vars <- function(formula) {
-  rhs_str <- paste(deparse(formula[[length(formula)]]), collapse = " ")
+  .re_bar_parts(formula[[length(formula)]])$groups
+}
 
-  # Match text after each | that is not itself | or )
-  # This captures: bare grouping vars, correlation IDs, and gr()/mm() calls
-  bar_parts <- regmatches(
-    rhs_str, gregexpr("(?<=\\|)[^|)]+", rhs_str, perl = TRUE)
-  )[[1]]
-  bar_parts <- trimws(bar_parts)
-  bar_parts <- bar_parts[nchar(bar_parts) > 0]
 
-  if (length(bar_parts) == 0) {
-    character(0)
-  } else {
-    unlist(lapply(bar_parts, function(part) {
-      if (grepl("^gr\\s*\\(", part)) {
-        # gr(id, ...) — first argument is the grouping variable
-        inner <- sub("^gr\\s*\\(\\s*", "", part)
-        trimws(sub("[,)]+.*", "", inner))
-      } else if (grepl("^mm\\s*\\(", part)) {
-        # mm(g1, g2, ...) — positional args (before named args) are grouping vars
-        inner <- sub("^mm\\s*\\(\\s*", "", part)
-        args <- trimws(strsplit(inner, ",")[[1]])
-        args[!grepl("=", args)]
-      } else {
-        # Bare variable name(s) or correlation ID — split on : only
-        trimws(strsplit(part, ":")[[1]])
-      }
-    }))
+#' Extract correlation IDs from random effects in a formula
+#'
+#' @description
+#' Returns the labels `p` of terms written `(1 |p| id)`. They tie the random
+#' effects of several parameters into one correlation matrix and are not
+#' columns of the data.
+#'
+#' @param formula A formula object
+#'
+#' @return Character vector of correlation IDs
+#'
+#' @keywords internal
+#' @noRd
+.extract_re_cor_ids <- function(formula) {
+  .re_bar_parts(formula[[length(formula)]])$cor_ids
+}
+
+
+# `1 |p| g` parses as `(1 | p) | g`, so a bar whose left side is itself a bar
+# carries a correlation ID. `group_cols` is every column the grouping term
+# names, including `by =` and `weights =` arguments of gr() and mm().
+.re_bar_parts <- function(expr) {
+  none <- list(groups = character(0), cor_ids = character(0), group_cols = character(0))
+  if (!is.call(expr)) {
+    return(none)
   }
+  if (.is_bar_call(expr)) {
+    return(list(
+      groups = .re_group_names(expr[[3]]),
+      cor_ids = if (.is_bar_call(expr[[2]])) deparse(expr[[2]][[3]]) else character(0),
+      group_cols = all.vars(expr[[3]])
+    ))
+  }
+  parts <- lapply(seq_along(expr)[-1], function(i) {
+    if (rlang::is_missing(expr[[i]])) none else .re_bar_parts(expr[[i]])
+  })
+  fields <- names(none)
+  stats::setNames(
+    lapply(fields, function(field) unique(as.character(unlist(lapply(parts, `[[`, field))))),
+    fields
+  )
+}
+
+
+.is_bar_call <- function(expr) {
+  is.call(expr) && is.name(expr[[1]]) && as.character(expr[[1]]) %in% c("|", "||")
+}
+
+
+# `(1 |p| g)` becomes `(1 | g)`: the data columns of a term exclude its
+# correlation ID.
+.drop_re_cor_ids <- function(expr) {
+  if (!is.call(expr)) {
+    return(expr)
+  }
+  if (.is_bar_call(expr) && .is_bar_call(expr[[2]])) {
+    expr[[2]] <- expr[[2]][[2]]
+  }
+  for (i in seq_along(expr)[-1]) {
+    if (!rlang::is_missing(expr[[i]])) {
+      expr[[i]] <- .drop_re_cor_ids(expr[[i]])
+    }
+  }
+  expr
+}
+
+
+.re_group_names <- function(group) {
+  if (is.name(group)) {
+    return(as.character(group))
+  }
+  fun <- if (is.call(group) && is.name(group[[1]])) as.character(group[[1]]) else ""
+  args <- if (is.call(group)) as.list(group)[-1]
+  unnamed <- args[!nzchar(names(args) %||% character(length(args)))]
+  unique(unlist(
+    if (identical(fun, "gr")) {
+      # by = and cor = may precede the grouping variable, which brms takes
+      # from `group =` or else the first unnamed argument
+      .re_group_names(if ("group" %in% names(args)) args$group else unnamed[[1]])
+    } else if (identical(fun, "mm")) {
+      lapply(unnamed, .re_group_names)
+    } else if (fun %in% c(":", "/")) {
+      lapply(args, .re_group_names)
+    } else {
+      all.vars(group)
+    }
+  ))
 }
 
 
