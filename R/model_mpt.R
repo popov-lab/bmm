@@ -72,15 +72,20 @@ mpt_tree <- function(name, branches) {
     )
     parsed <- .mpt_fold_numeric_division(parsed)
     scientific <- .mpt_scientific_constants(parsed)
-    stopif(
-      length(scientific) > 0,
-      "brms writes the numeric constant(s) \\
-      {collapse_comma(.mpt_written_constants(expr, scientific))} in tree \\
-      '{name}' in scientific notation ({format(scientific[1], scientific = TRUE)}), \\
-      which breaks the generated Stan code. Every spelling of the same number \\
-      is affected (0.00010 is 0.0001), so please rescale the expression \\
-      instead, e.g. write 0.0001 + 0.9999 * p as (1 + 9999 * p) / 10000."
-    )
+    if (length(scientific) > 0) {
+      rescaling <- if (any(abs(scientific) < 1)) {
+        "0.0001 + 0.9999 * p as (1 + 9999 * p) / 10000"
+      } else {
+        "p / 100000 as p / 1000 / 100"
+      }
+      stop2(
+        "brms writes the numeric constant(s) \\
+        {paste(.mpt_written_constants(expr, scientific), collapse = ', ')} in \\
+        tree '{name}' in scientific notation, which breaks the generated Stan \\
+        code. Every spelling of the same number is affected, so please \\
+        rescale the expression instead, e.g. write {rescaling}."
+      )
+    }
     parsed
   })
   structure(nlist(name, branches), class = "mpt_tree")

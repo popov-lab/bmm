@@ -22,13 +22,22 @@
   unlist(lapply(as.list(expr)[-1], .mpt_scientific_constants)) %||% numeric(0)
 }
 
-# the constants as the user wrote them in the branch string; a value folded
-# from constant arithmetic (1/10000) has no written form and is deparsed
+# the constants as the user wrote them in the branch string, each followed by
+# the form brms writes when the two differ; a value folded from constant
+# arithmetic (1/10000) has no written form and is shown as brms writes it
 .mpt_written_constants <- function(expr, values) {
+  as_brms_writes <- function(value) {
+    withr::with_options(list(scipen = 0), deparse(value))
+  }
   tokens <- utils::getParseData(parse(text = expr, keep.source = TRUE))
   written <- tokens$text[tokens$token == "NUM_CONST"]
   written <- unique(written[suppressWarnings(as.numeric(written)) %in% values])
-  c(written, vapply(setdiff(values, as.numeric(written)), deparse, character(1)))
+  written <- c(
+    written,
+    vapply(setdiff(values, as.numeric(written)), as_brms_writes, character(1))
+  )
+  emitted <- vapply(as.numeric(written), as_brms_writes, character(1))
+  paste0("'", written, "'", ifelse(written == emitted, "", paste0(" (", emitted, ")")))
 }
 
 # Stan compiles a bare integer fraction like 1/4 or 1/(2*2) as integer
