@@ -433,9 +433,13 @@ settable_link_functions.mpt <- function(model) {
 #'   can identify what one design cell cannot, the rank is taken over the rows
 #'   of every distinct covariate setting in the data in `bmm()`, and
 #'   over five test values of the covariates when printing. In `bmm()`, a
-#'   tree without rows in the data adds nothing to the rank. `print()` can
-#'   therefore report full rank for a design whose data leave a parameter
-#'   open, and `bmm()` then warns. A rank below the
+#'   tree without rows in the data adds nothing to the rank. The two can
+#'   therefore disagree in either direction: `print()` can report full rank
+#'   for a design whose data leave a parameter open, and `bmm()` then reports
+#'   the deficit (a warning, or a message when a formula has predictors or
+#'   is non-linear); five test values of a covariate can leave open what more
+#'   distinct values in the data identify, and `bmm()` then stays silent. A
+#'   rank below the
 #'   number of free parameters means that some combination of the listed
 #'   parameters cannot be estimated from the data,
 #'   even when the count passes, and its posterior follows the prior; a
