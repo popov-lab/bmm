@@ -430,13 +430,13 @@ test_that("a parameter made linear again in a re-check gets back its link and pr
   rechecked <- check_model(checked, dat, linear_formula)
   expect_setequal(names(rechecked$parameters), c("D", "g"))
   expect_equal(rechecked$links$D, "logit")
-  expect_identical(rechecked$default_priors$D, .mpt_latent_prior("logit"))
+  expect_identical(rechecked$default_priors$D, bmm:::.mpt_latent_prior("logit"))
 
   model$links$D <- "probit"
   checked <- suppressMessages(check_model(model, dat, nl_formula))
   rechecked <- check_model(checked, dat, linear_formula)
   expect_equal(rechecked$links$D, "probit")
-  expect_identical(rechecked$default_priors$D, .mpt_latent_prior("probit"))
+  expect_identical(rechecked$default_priors$D, bmm:::.mpt_latent_prior("probit"))
 })
 
 test_that("a stick-breaking component made linear again in a re-check gets back its prior", {
@@ -447,7 +447,7 @@ test_that("a stick-breaking component made linear again in a re-check gets back 
   checked <- suppressMessages(check_model(model, dat, bmf(gAraw ~ a + b * x, a ~ 1, b ~ 1)))
   rechecked <- check_model(checked, dat, bmf(gAraw ~ 1 + x))
   expect_equal(rechecked$links$gAraw, "identity")
-  expect_identical(rechecked$default_priors$gAraw, .mpt_latent_prior("logit"))
+  expect_identical(rechecked$default_priors$gAraw, bmm:::.mpt_latent_prior("logit"))
 })
 
 test_that("update() to a linear formula restores the link and prior of a non-linear parameter", {
@@ -472,7 +472,7 @@ test_that("update() to a linear formula restores the link and prior of a non-lin
   expect_setequal(names(up$bmm$model$parameters), c("D", "g"))
   expect_equal(up$bmm$model$links$D, "logit")
   intercept <- up$prior$nlpar == "D" & up$prior$coef == "Intercept"
-  expect_equal(up$prior$prior[intercept], .mpt_latent_prior("logit")$main)
+  expect_equal(up$prior$prior[intercept], bmm:::.mpt_latent_prior("logit")$main)
 })
 
 test_that("printing an mpt model lists trees, restrictions and the identifiability bound", {
@@ -540,7 +540,7 @@ test_that("restrictions are substituted into the trees before parameters are ide
     fixed$other_vars$trees
   )
   for (restricted in list(equated, fixed)) {
-    branch_errors <- .mpt_tree_branch_errors(
+    branch_errors <- bmm:::.mpt_tree_branch_errors(
       restricted$other_vars$trees, names(restricted$parameters), list()
     )
     expect_true(all(is.na(branch_errors)))
@@ -1307,7 +1307,7 @@ test_that("mpt category probabilities match the production m3 likelihood", {
   max_diff <- max(vapply(seq_len(nrow(grid)), function(i) {
     Pm <- grid$Pm[i]
     Pb <- grid$Pb[i]
-    p_mpt <- .mpt_probability_vector(
+    p_mpt <- bmm:::.mpt_probability_vector(
       pars = c(Pm = Pm, Pb = Pb), mpt_model = mpt_model
     )
     a <- 2 * b * Pm * (1 - Pb) / (1 - Pm)
@@ -1510,7 +1510,7 @@ test_that("the brms formula reproduces the tree probabilities with impossible ca
   softmax <- exp(eta) / rowSums(exp(eta))
 
   expected <- t(vapply(seq_len(nrow(dat)), function(i) {
-    .mpt_probability_vector(plogis(pars), model, tree = dat$tree[i])[resp_cats]
+    bmm:::.mpt_probability_vector(plogis(pars), model, tree = dat$tree[i])[resp_cats]
   }, numeric(length(resp_cats))))
   is_impossible <- dat$tree == "nodist"
   expect_true(all(softmax[is_impossible, "dist"] < 1e-40))
@@ -1871,7 +1871,7 @@ test_that("mpt() alone decides a tree without covariates in a model with covaria
 })
 
 test_that("the data check catches a tree that is right at the first interior and boundary points", {
-  at_first <- sprintf("%.8f", .mpt_test_points("D", list())[[1]][["D"]])
+  at_first <- sprintf("%.8f", bmm:::.mpt_test_points("D", list())[[1]][["D"]])
   model <- mpt(mpt_tree("main", list(
     a = "D",
     b = glue("1 - D + (D - {at_first}) * (D - 0.001) * (D - 0.999) * G")
@@ -1971,7 +1971,7 @@ test_that("the item-memory-first MPT matches the simple-rule m3 with a distracto
     c_par <- grid$c[i]
     d <- grid$d[i]
     denom <- 5 * a + c_par + 5 * d
-    p_mpt <- .mpt_probability_vector(
+    p_mpt <- bmm:::.mpt_probability_vector(
       pars = c(
         Pi = denom / (15 * b + denom),
         Pb = c_par / denom,
@@ -2001,7 +2001,7 @@ test_that("the item-memory-first MPT matches the simple-rule m3 with a distracto
   max_diff_nodist <- max(vapply(seq_len(nrow(grid)), function(i) {
     a <- grid$a[i]
     c_par <- grid$c[i]
-    p_mpt <- .mpt_probability_vector(
+    p_mpt <- bmm:::.mpt_probability_vector(
       pars = c(
         Pi = (5 * a + c_par) / (15 * b + 5 * a + c_par),
         Pb = c_par / (5 * a + c_par)
