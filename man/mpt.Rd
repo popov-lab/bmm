@@ -30,7 +30,8 @@ design-fixed guessing rates. Covariates pass into the model formulas
 unchanged and have no naming restrictions. \code{bmm()} stops when, with a
 row's covariate values, the branches of a tree do not sum to 1, leave
 (0, 1], are undefined on the rows of another tree, or when a covariate
-that a branch uses is missing.}
+that a branch uses is missing. Every declared covariate needs a numeric
+column in the data, also one that no branch uses.}
 
 \item{simplex}{A character vector, or a list of character vectors, naming
 groups of parameters that are jointly constrained to sum to 1. Each group
@@ -151,7 +152,7 @@ values. A simplex group counts with one free parameter fewer than its
 members, and the printout names the group by its members. Covariates
 are never free parameters; because rows with different covariate values
 can identify what one design cell cannot, the rank is taken over the rows
-of all covariate values in the data (at most 20 per tree) in \code{bmm()}, and
+of every distinct covariate setting in the data in \code{bmm()}, and
 over five test values of the covariates when printing. A rank below the
 number of free parameters means that some combination of the listed
 parameters cannot be estimated from the data,
@@ -163,7 +164,11 @@ until the rank is full. \code{bmm()} warns about a rank deficit when no
 formula uses a data column as a predictor. When one does, a parameter
 that differs between conditions can identify the model across them, so
 \code{bmm()} only says that the model is not identified within one design
-cell and that the predictors were not checked. The
+cell and that the predictors were not checked. The rank covers the
+parameters of the branch expressions only: a non-linear formula that
+ties them together (\code{Dn ~ Do}) or builds one from sub-parameters is not
+analysed, so \code{bmm()} treats a deficit under it the same way, and
+\code{print()} of the checked model says the formula was not analysed. The
 check is local: it holds at the test values, not at the boundaries of
 the parameter space. A branch expression with a function that
 \code{\link[stats:D]{stats::D()}} cannot differentiate leaves the rank uncomputed, and the

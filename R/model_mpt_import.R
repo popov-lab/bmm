@@ -218,6 +218,24 @@ mpt_from_string <- function(text, tree_names, categories = NULL,
     categories = list({tree_names[1]} = c('a', 'b'))."
   )
   stopif(
+    by_tree && anyDuplicated(names(categories)) > 0,
+    "The categories list names a tree more than once: \\
+    {collapse_comma(unique(names(categories)[duplicated(names(categories))]))}."
+  )
+  unusable_entries <- if (by_tree) {
+    names(categories)[!vapply(categories, function(entry) {
+      is.character(entry) && !anyNA(entry) && all(nzchar(entry))
+    }, logical(1))]
+  } else {
+    character(0)
+  }
+  stopif(
+    length(unusable_entries) > 0,
+    "The entries of the categories list must be character vectors without \\
+    missing or empty values. Check the entries for \\
+    {collapse_comma(unusable_entries)}."
+  )
+  stopif(
     by_tree && !all(names(categories) %in% tree_names),
     "The categories list names trees that are not in the model: \\
     {collapse_comma(setdiff(names(categories), tree_names))}. The trees are: \\
@@ -240,7 +258,7 @@ mpt_from_string <- function(text, tree_names, categories = NULL,
     tree has {max(tree_sizes)} lines."
   )
 
-  branches <- Map(function(block_lines, tree_name, missing_cats) {
+  labelled <- Map(function(block_lines, tree_name, missing_cats) {
     tree_categories <- if (by_tree) {
       categories[[tree_name]]
     } else {
@@ -254,18 +272,31 @@ mpt_from_string <- function(text, tree_names, categories = NULL,
       categories gives {length(tree_categories)}."
     )
     block_lines$category[missing_cats] <- tree_categories[missing_cats]
-    .mpt_sum_branch_lines(block_lines$expr, block_lines$category)
+    block_lines
   }, tree_lines, tree_names, unlabelled)
+  branches <- lapply(labelled, function(block_lines) {
+    .mpt_sum_branch_lines(block_lines$expr, block_lines$category)
+  })
+  shared <- .mpt_merged_rows(do.call(rbind, Map(function(block_lines, tree) {
+    data.frame(
+      tree = tree, category = paste("line", seq_len(nrow(block_lines))),
+      bmm_category = block_lines$category, prefix = ""
+    )
+  }, labelled, names(labelled))))
+  if (nrow(shared) > 0) {
+    message2(
+      "Several lines of a tree share a response category; their branch lines \\
+      are summed:
+      {.mpt_format_merges(shared)}"
+    )
+  }
 
   # one vector over trees of different lengths gives the shorter trees the
   # leading labels of the longer ones, which is rarely meant
   unlabelled_counts <- lengths(unlabelled)[lengths(unlabelled) > 0]
   .mpt_check_import_trees(
     branches, impossible,
-    relabel_hint = paste(
-      "If the trees label the same responses differently (e.g., hit/miss and",
-      "fa/cr for yes/no), give those lines the same category label."
-    ),
+    relabel_remedy = "give those lines the same category label.",
     lead_hint = if (!by_tree && length(unique(unlabelled_counts)) > 1) {
       glue(
         "The trees have different numbers of lines without an inline label \\
@@ -508,18 +539,21 @@ mpt_from_eqn <- function(file, restrictions = NULL, categories = NULL,
                          links = "logit", impossible = NULL,
                          tree_names = NULL) {
   stop_missing_args()
+  categories_problem <- .mpt_named_map_problem(categories)
   stopif(
-    !is.null(categories) && !.mpt_is_named_map(categories),
-    "The categories argument must be a named character vector without \\
-    missing values that maps the category names of the EQN file onto \\
-    response categories, e.g. \\
-    categories = c(hit = 'yes', fa = 'yes', miss = 'no', cr = 'no')."
+    nzchar(categories_problem),
+    "The categories argument must be a named character vector, one value \\
+    per name, that maps the category names of the EQN file onto response \\
+    categories, e.g. \\
+    categories = c(hit = 'yes', fa = 'yes', miss = 'no', cr = 'no'). \\
+    {categories_problem}"
   )
+  tree_names_problem <- .mpt_named_map_problem(tree_names)
   stopif(
-    !is.null(tree_names) && !.mpt_is_named_map(tree_names),
-    "The tree_names argument must be a named character vector without \\
-    missing values that maps the tree labels of the EQN file onto tree \\
-    names, e.g. tree_names = c('1' = 'old', '2' = 'new')."
+    nzchar(tree_names_problem),
+    "The tree_names argument must be a named character vector, one value \\
+    per name, that maps the tree labels of the EQN file onto tree names, \\
+    e.g. tree_names = c('1' = 'old', '2' = 'new'). {tree_names_problem}"
   )
   eqn_file <- .mpt_read_eqn(file)
   tree_map <- .mpt_map_eqn_trees(eqn_file$eqn, tree_names, eqn_file$title_line)
@@ -560,11 +594,10 @@ mpt_from_eqn <- function(file, restrictions = NULL, categories = NULL,
   )
   .mpt_check_import_trees(
     branches, impossible,
-    relabel_hint = paste(
-      "If the trees label the same responses differently (e.g., hit/miss and",
-      "fa/cr for yes/no), map the labels onto shared response categories with",
-      "the categories argument, e.g. categories = c(hit = 'yes', fa = 'yes',",
-      "miss = 'no', cr = 'no')."
+    relabel_remedy = paste(
+      "map the labels onto shared response categories with the categories",
+      "argument, e.g. categories = c(hit = 'yes', fa = 'yes', miss = 'no',",
+      "cr = 'no')."
     ),
     # a title forms a tree of its own, which lacks every other category
     lead_hint = if (!anyNA(eqn_file$title_line)) {
@@ -586,7 +619,10 @@ mpt_from_eqn <- function(file, restrictions = NULL, categories = NULL,
 }
 
 # The helpers below are called only from mpt_from_eqn(), so their errors can
-# speak about the EQN file and the importer's arguments.
+# speak about the EQN file and the importer's arguments. The exceptions are
+# .mpt_check_import_trees(), .mpt_model_from_branches(), .mpt_merged_rows(),
+# .mpt_format_merges() and .mpt_sum_branch_lines(), which mpt_from_string()
+# calls as well.
 
 # reads the equation lines of an EQN file, keeping their line numbers for
 # the error messages
@@ -730,11 +766,13 @@ mpt_from_eqn <- function(file, restrictions = NULL, categories = NULL,
     {collapse_comma(unknown)}. Write them as the file does, before \\
     underscores and dots are removed."
   )
-  symbols <- unique(c(
-    file_symbols, names(restrictions), unlist(lapply(restrictions, all.vars))
+  renaming <- .mpt_sanitized_names(setdiff(
+    unique(c(
+      file_symbols, names(restrictions), unlist(lapply(restrictions, all.vars))
+    )),
+    covariates
   ))
-  renaming <- .mpt_sanitized_names(setdiff(symbols, covariates))
-  .mpt_check_sanitized_names(renaming)
+  .mpt_check_sanitized_names(renaming, covariates)
   symbol_map <- lapply(renaming, as.name)
   restrictions <- lapply(restrictions, function(value) {
     if (is.language(value)) .mpt_substitute_symbols(value, symbol_map) else value
@@ -811,10 +849,7 @@ mpt_from_eqn <- function(file, restrictions = NULL, categories = NULL,
   # only the categories map can merge categories of a tree here: merges by
   # the prefix strip or by sanitizing alone were errors above
   cat_rows <- unique(eqn[c("tree", "category", "bmm_category", "prefix")])
-  merge_key <- cat_rows[c("tree", "bmm_category")]
-  merged <- cat_rows[
-    duplicated(merge_key) | duplicated(merge_key, fromLast = TRUE),
-  ]
+  merged <- .mpt_merged_rows(cat_rows)
   if (nrow(merged) > 0) {
     message2(
       "The categories argument maps several categories of a tree onto one \\
@@ -825,14 +860,33 @@ mpt_from_eqn <- function(file, restrictions = NULL, categories = NULL,
   list(eqn = eqn, rows = cat_rows)
 }
 
-.mpt_is_named_map <- function(x) {
-  !is.null(names(x)) && !anyNA(names(x)) && all(nzchar(names(x))) &&
-    !anyNA(x)
+# describes what keeps x from being a named character vector with one
+# non-empty value per unique name; "" when it is one (or NULL)
+.mpt_named_map_problem <- function(x) {
+  entry_names <- names(x)
+  not_one_value <- entry_names[lengths(x) != 1][1]
+  no_value <- entry_names[is.na(x) | !nzchar(x)][1]
+  if (is.null(x)) {
+    ""
+  } else if (is.null(entry_names) || anyNA(entry_names) ||
+               !all(nzchar(entry_names))) {
+    "Every entry needs a name."
+  } else if (anyDuplicated(entry_names)) {
+    glue("'{entry_names[duplicated(entry_names)][1]}' is given more than once.")
+  } else if (!is.na(not_one_value)) {
+    glue("Entry '{not_one_value}' has {lengths(x)[not_one_value]} values.")
+  } else if (!is.character(x)) {
+    glue("It is a {class(x)[1]}.")
+  } else if (!is.na(no_value)) {
+    glue("The entry '{no_value}' has no value.")
+  } else {
+    ""
+  }
 }
 
 # the importers check impossible and the category sets themselves, so that
 # their errors can point to the importers' arguments, which mpt() does not have
-.mpt_check_import_trees <- function(branches, impossible, relabel_hint,
+.mpt_check_import_trees <- function(branches, impossible, relabel_remedy,
                                     lead_hint = NULL) {
   stopif(
     length(impossible) > 0 && !is_namedlist(impossible),
@@ -873,7 +927,10 @@ mpt_from_eqn <- function(file, restrictions = NULL, categories = NULL,
                ')', collapse = ', '),
         ').'
       ),
-      relabel_hint
+      paste0(
+        'If the trees label the same responses differently (e.g., hit/miss ',
+        'and fa/cr for yes/no), ', relabel_remedy
+      )
     )), collapse = '\\n')}"
   )
   invisible(NULL)
@@ -916,6 +973,12 @@ mpt_from_eqn <- function(file, restrictions = NULL, categories = NULL,
   ), collapse = "\n")
 }
 
+# the rows whose bmm category is shared by another row of the same tree
+.mpt_merged_rows <- function(rows) {
+  merge_key <- rows[c("tree", "bmm_category")]
+  rows[duplicated(merge_key) | duplicated(merge_key, fromLast = TRUE), ]
+}
+
 .mpt_format_merges <- function(merged) {
   groups <- unique(merged[c("tree", "bmm_category")])
   paste(vapply(seq_len(nrow(groups)), function(i) {
@@ -940,14 +1003,13 @@ mpt_from_eqn <- function(file, restrictions = NULL, categories = NULL,
 }
 
 .mpt_sum_branch_lines <- function(exprs, categories) {
-  summed <- tapply(exprs, categories, function(branch_lines) {
+  as.list(tapply(exprs, categories, function(branch_lines) {
     if (length(branch_lines) == 1) {
       branch_lines
     } else {
       paste0("(", branch_lines, ")", collapse = " + ")
     }
-  })
-  as.list(summed)[unique(categories)]
+  }))[unique(categories)]
 }
 
 # maps each name to a version without underscores and dots (the brms nlpar
@@ -956,13 +1018,18 @@ mpt_from_eqn <- function(file, restrictions = NULL, categories = NULL,
   setNames(as.list(gsub("[._]", "", names)), names)
 }
 
-.mpt_check_sanitized_names <- function(renaming) {
+.mpt_check_sanitized_names <- function(renaming, covariates = character(0)) {
   sanitized <- unlist(renaming)
-  clashes <- sanitized[duplicated(sanitized)]
+  # covariates stay as written, so a sanitized parameter equal to one reads
+  # as that covariate afterwards
+  clashes <- c(
+    sanitized[duplicated(sanitized)], intersect(sanitized, covariates)
+  )
   stopif(
     length(clashes) > 0,
-    "Removing underscores and dots produces duplicated names: \\
-    {collapse_comma(unique(clashes))}. Please rename them in the model file."
+    "Removing underscores and dots produces duplicated names or clashes with \\
+    a covariate: {collapse_comma(unique(clashes))}. Please rename them in the \\
+    model file."
   )
   invisible(NULL)
 }

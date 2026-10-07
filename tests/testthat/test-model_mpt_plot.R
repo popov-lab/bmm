@@ -527,8 +527,10 @@ test_that("valid models whose edges are not simple probabilities plot without a 
   )
   for (name in names(trees)) {
     expect_silent(plot(trees[[name]]))
-    expect_silent(plot(mpt(trees[[name]])))
+    if (name != "zero_product") expect_silent(plot(mpt(trees[[name]])))
   }
+  # mpt() refuses a branch that is 0 for every value; the tree still draws
+  expect_error(mpt(trees$zero_product), "outside \\(0, 1\\]")
   in_a_node <- mpt_tree("t", list(
     hit = "G * D + (1 - G * D) * gA", other = "(1 - G * D) * gB", miss = "(1 - G * D) * gC"
   ))
