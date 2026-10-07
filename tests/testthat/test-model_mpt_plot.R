@@ -102,9 +102,9 @@ label_extents <- function(tree, width, height, cex = 0.9, pointsize = 12) {
 }
 
 # draws the model on a pdf device and returns the pairs of edge labels whose
-# boxes overlap, measured in inches and 30% taller than the text height (which
-# leaves out descenders and parentheses)
-overlapping_edge_labels <- function(model, width, height, cex = 0.9) {
+# boxes overlap, measured in inches and `box` times the text height (the text
+# height leaves out descenders and parentheses)
+overlapping_edge_labels <- function(model, width, height, cex = 0.9, box = 1.3) {
   boxes <- data.frame()
   record <- function(x, y = NULL, labels = y, ...) {
     args <- list(...)
@@ -116,7 +116,7 @@ overlapping_edge_labels <- function(model, width, height, cex = 0.9) {
       x = (x - usr[1]) / (usr[2] - usr[1]) * graphics::par("pin")[1],
       y = (y - usr[3]) / (usr[4] - usr[3]) * graphics::par("pin")[2],
       width = graphics::strwidth(labels, units = "inches", cex = args$cex),
-      height = 1.3 * graphics::strheight(labels, units = "inches", cex = args$cex),
+      height = box * graphics::strheight(labels, units = "inches", cex = args$cex),
       label = labels
     ))
   }
@@ -251,6 +251,56 @@ test_that("plot() warns when a quotient hides a complement", {
   expect_warning(
     plot(quotient),
     "branch 'a': (1 - Pi) * 1/15 is one edge", fixed = TRUE
+  )
+  # a covariate in the denominator does not normalise the complement
+  expect_warning(
+    plot(mpt_tree("covariate", list(a = "(1 - Pi) / N", b = "Pi + (1 - Pi) * (N - 1) / N"))),
+    "branch 'a': (1 - Pi)/N is one edge", fixed = TRUE
+  )
+  # a denominator that normalises only one of two complements hides the other
+  expect_warning(
+    plot(mpt_tree("partial", list(a = "(1 - a) * (1 - b) / (a + 1)", b = "1 - a"))),
+    "is one edge", fixed = TRUE
+  )
+})
+
+test_that("plot() accepts a normalised quotient but still warns on a constant denominator", {
+  withr::local_pdf(NULL)
+  luce <- mpt_tree("luce", list(
+    a = "x * (1 - d) / (x * (1 - d) + y)", b = "y / (x * (1 - d) + y)"
+  ))
+  expect_silent(plot(luce))
+  expect_warning(
+    plot(mpt_tree("constant", list(a = "(1 - Pi) * 1 / 15", b = "Pi + (1 - Pi) * 14 / 15"))),
+    "is one edge", fixed = TRUE
+  )
+})
+
+test_that("plot() warns when two merged steps after a constant have no complements", {
+  withr::local_pdf(NULL)
+  unpaired <- mpt_tree("unpaired", list(
+    A = "D * 2 * g * r", B = "D * 2 * g * (1 - r)", C = "1 - D"
+  ))
+  expect_warning(
+    plot(unpaired),
+    "branch 'A': D * 2 * g * r, where the drawing merges the factors after the constant 2",
+    fixed = TRUE
+  )
+})
+
+test_that("a warning names a node reached through a restricted edge by its restricted label", {
+  withr::local_pdf(NULL)
+  # the fixture warns on purpose: `a` and `b` write their second factor in a
+  # different order (`x` against `1 - y`), which pairs the wrong edges
+  restricted <- mpt(
+    mpt_tree("restricted", list(
+      a = "(1 - g) * x * y", b = "(1 - g) * (1 - y) * x", c = "(1 - g) * (1 - x)", d = "g"
+    )),
+    restrictions = "g = 0.5"
+  )
+  expect_warning(
+    plot(restricted),
+    "the edges leaving the node '1 - g (g = 0.5)' do not sum to 1", fixed = TRUE
   )
 })
 
@@ -724,8 +774,13 @@ test_that("labels of neighbouring edges do not overlap in a dense tree", {
     mpt_tree("dense", as.list(setNames(branches, paste0("c", seq_along(branches))))),
     restrictions = c("B = 0.571", "C = 0.2", "D = 0.125")
   )
-  for (size in list(c(4, 3), c(5, 3), c(6, 4), c(8, 6))) {
+  for (size in list(c(5, 3.5), c(6, 4), c(8, 6))) {
     expect_identical(overlapping_edge_labels(dense, size[1], size[2]), character(0))
+  }
+  # panels too small for the loose spacing still keep every label readable:
+  # the boxes are tightened to the text height before they would overprint
+  for (size in list(c(4, 3), c(5, 3))) {
+    expect_identical(overlapping_edge_labels(dense, size[1], size[2], box = 1), character(0))
   }
 })
 
@@ -750,12 +805,166 @@ test_that("label boxes are pushed apart vertically and a huge tree is left alone
     x = c(0, 0.5, 5), y = c(1, 1.05, 1), width = c(2, 2, 2), height = c(0.1, 0.1, 0.1)
   )
   expect_gt(y[2] - y[1], 0.15)
+  # the lower label keeps its place and the higher one makes room
+  expect_equal(y[1], 1)
   expect_equal(y[3], 1)
+})
+
+test_that("a label equally far from a free height above and below goes above", {
+  # at height 0 the two candidates are exactly symmetric
+  y <- .mpt_separate_labels(x = c(0, 0), y = c(0, 0), width = c(1, 1), height = c(0.1, 0.1))
+  expect_equal(y[1], 0)
+  expect_gt(y[2], 0)
+})
+
+test_that("a tree of 2500 labels is placed and one of 2501 is left alone", {
+  # spread out so that placing is cheap; the labels start above the window, so
+  # only a placed label ends up inside it
+  for (n in c(2500L, 2501L)) {
+    y <- .mpt_separate_labels(
+      x = seq_len(n) * 10, y = rep(100, n), width = rep(1, n), height = rep(0.1, n),
+      limits = c(0, 10)
+    )
+    expect_equal(y, rep(if (n == 2500L) 9.95 else 100, n), label = n)
+  }
+})
+
+test_that("labels stay inside the plot region and overlap before they leave it", {
+  n <- 40
+  y <- .mpt_separate_labels(
+    x = rep(0, n), y = seq(1, 2, length.out = n), width = rep(1, n), height = rep(0.1, n),
+    limits = c(0, 2)
+  )
+  expect_true(all(y >= 0.05 & y <= 1.95))
+  # a free height inside the window is taken even when it is farther away
+  y <- .mpt_separate_labels(
+    x = c(0, 0), y = c(1.94, 1.94), width = c(1, 1), height = c(0.1, 0.1), limits = c(0, 2)
+  )
+  expect_equal(y[1], 1.94)
+  expect_lt(y[2], 1.94 - 0.1)
+})
+
+test_that("a tree of 3000 labels is left alone", {
   n <- 3000
   expect_identical(
     .mpt_separate_labels(rep(0, n), rep(1, n), rep(2, n), rep(0.1, n)),
     rep(1, n)
   )
+})
+
+test_that("edge labels stay inside the plot region of a panel too small for them", {
+  withr::local_pdf(NULL, width = 4, height = 3)
+  steps <- expand.grid(A = 0:1, B = 0:1, C = 0:1, D = 0:1)
+  branches <- apply(steps, 1, function(row) {
+    paste(ifelse(row == 1, names(row), paste0("(1 - ", names(row), ")")), collapse = " * ")
+  })
+  edges <- .mpt_tree_graph(
+    mpt_tree("dense", as.list(setNames(branches, paste0("c", seq_along(branches)))))
+  )$edges
+  edges$label <- paste(edges$label, "(restricted to 0.125)")
+  graphics::plot.new()
+  graphics::plot.window(xlim = c(-0.1, 40), ylim = c(-4, 1))
+  position <- .mpt_edge_label_positions(edges, 0.9)
+  usr <- graphics::par("usr")
+  half <- graphics::strheight(edges$label, cex = 0.9) / 2
+  expect_gte(min(position$y - half), usr[3] - 1e-8)
+  expect_lte(max(position$y + half), usr[4] + 1e-8)
+})
+
+test_that("labels collide by their distance in inches, not in user units", {
+  withr::local_pdf(NULL)
+  # two flat edges whose labels are 0.2 inch apart on a window of 1000 user
+  # units across: far apart in user units, overlapping on the page
+  edges <- data.frame(
+    x0 = c(0, 50), x1 = c(100, 150), y0 = c(0, 0), y1 = c(0, 0), label = c("a long label", "a long label")
+  )
+  graphics::plot.new()
+  graphics::plot.window(xlim = c(0, 1000), ylim = c(-5, 5))
+  position <- .mpt_edge_label_positions(edges, 0.9)
+  y_per_inch <- diff(graphics::par("usr")[3:4]) / graphics::par("pin")[2]
+  height <- graphics::strheight("a long label", units = "inches", cex = 0.9)
+  expect_gte(abs(diff(position$y)) / y_per_inch, 1.5 * height)
+})
+
+test_that("labels side by side keep a gap and a crowded column ends up free of overlap", {
+  # boxes that only touch sideways (x apart = their width) still get a gap
+  y <- .mpt_separate_labels(x = c(0, 1), y = c(1, 1), width = c(1, 1), height = c(0.1, 0.1))
+  expect_gt(abs(y[2] - y[1]), 0.1)
+  # a sideways gap under half a text height does not count as clear
+  y <- .mpt_separate_labels(x = c(0, 1.02), y = c(1, 1), width = c(1, 1), height = c(0.1, 0.1))
+  expect_gt(abs(y[2] - y[1]), 0.1)
+  # a crowd spreads to both sides of where it stands
+  y <- .mpt_separate_labels(rep(0, 5), 1 + 0:4 * 0.01, rep(1, 5), rep(0.1, 5))
+  expect_lt(max(abs(y - (1 + 0:4 * 0.01))), 0.4)
+  # 60 labels on one spot: pairwise pushing never settled on crowds like this
+  n <- 60
+  height <- rep(0.1, n)
+  y <- .mpt_separate_labels(rep(0, n), rep(1, n) + seq_len(n) * 1e-4, rep(1, n), height)
+  expect_gte(min(diff(sort(y))), 1.5 * 0.1)
+})
+
+test_that("a dense tree of hybrid size has no overlapping edge labels where it has room", {
+  # five binary process steps, 32 leaves, four of them with long restricted
+  # labels: the size of a three-level hybrid tree, whose labels still overlapped
+  # in boxes 50% taller than the text
+  steps <- c("PrItemColor", "PrItemLocation", "PrGuessSecondLure", "PrGuessThirdLure", "PrGuessExtra")
+  grid <- expand.grid(rep(list(0:1), length(steps)))
+  names(grid) <- steps
+  branches <- apply(grid, 1, function(row) {
+    paste(ifelse(row == 1, names(row), paste0("(1 - ", names(row), ")")), collapse = " * ")
+  })
+  dense <- mpt(
+    mpt_tree("dense", as.list(setNames(branches, paste0("c", seq_along(branches))))),
+    restrictions = c(
+      "PrItemLocation = 0.571", "PrGuessSecondLure = 0.2",
+      "PrGuessThirdLure = 0.125", "PrGuessExtra = 0.25"
+    )
+  )
+  for (size in list(c(7.7, 13.8), c(8, 10), c(10, 14))) {
+    expect_identical(
+      overlapping_edge_labels(dense, size[1], size[2], box = 1.5), character(0)
+    )
+  }
+})
+
+test_that("leaf labels stay inside the plot region where they fit", {
+  # the leaf padding is a fraction of an inch: the looser 2% tolerance of the
+  # test above would not see it
+  tree <- long_label_tree()
+  for (size in list(c(7, 7), c(6, 4), c(5, 3))) {
+    extents <- label_extents(tree, size[1], size[2])
+    leaves <- extents[extents$kind == "leaf", ]
+    expect_lte(max(leaves$right), leaves$plot_width[1])
+  }
+})
+
+test_that("a label too wide for any window does not stretch the tree past the plot", {
+  # the room for the label cannot be had: the passes must stop instead of
+  # adding ever more of it
+  long_name <- strrep("x", 100)
+  tree <- mpt_tree("wide", list(
+    a = paste0("P", long_name, " * g"),
+    b = paste0("P", long_name, " * (1 - g)"),
+    c = paste0("1 - P", long_name)
+  ))
+  for (size in list(c(2, 2), c(4, 3), c(3, 2.5))) {
+    xs <- NULL
+    usr <- NULL
+    withr::with_pdf(
+      NULL,
+      testthat::with_mocked_bindings(
+        plot(tree),
+        segments = function(x0, y0, x1, y1, ...) {
+          xs <<- range(c(x0, x1))
+          usr <<- graphics::par("usr")
+        },
+        .package = "graphics"
+      ),
+      width = size[1], height = size[2]
+    )
+    expect_gte(xs[1], usr[1])
+    expect_lte(xs[2], usr[2])
+  }
 })
 
 test_that("edge labels sit beside their edge on the outer side of a fan", {

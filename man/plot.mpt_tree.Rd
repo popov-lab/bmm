@@ -30,18 +30,23 @@ created with \code{\link[=mpt]{mpt()}} draws all trees of the model.
 \details{
 Edges are drawn in the order the branch expressions first mention
 them, bare constants included. A complement edge \code{1 - X} is placed directly
-below its sibling \code{X}. A numeric constant factor above 1 is not a separate
+below its sibling \code{X}; the complement of a product, \code{1 - PG1 * PG2}, is one
+atomic edge. A numeric constant factor above 1 is not a separate
 edge: the constant and all factors after it form one edge, as in
 Batchelder & Riefer (1999, Fig. 1). For example, \code{B * 2 * u * (1 - u)} draws
 one edge \code{B}, then one edge \code{2 * u * (1 - u)}. If the constant is at the start
-(\code{2 * u * (1 - u)}), the entire expression is one edge. If it is in the middle
-(\code{u * 2 * (1 - u)}), the constant and the factors after it join into one edge,
-and a trailing constant joins the factor before it. The plot warns when this
-merging hides a process step: a factor after the constant that has no
-complement among the merged factors (\code{D * 2 * g * (1 - g) * r}), a factor
+(\code{2 * (1 - c) * u * (1 - u)}), the entire expression is one root edge beside
+its siblings, drawn without a warning, so write the constant after the
+process steps it follows, as in \code{(1 - c) * 2 * u * (1 - u)}. If it is in the
+middle (\code{u * 2 * (1 - u)}), the constant and the factors after it join into
+one edge, and a trailing constant joins the factor before it. The plot warns
+when this merging hides a process step: a factor after the constant that has
+no complement among the merged factors (\code{D * 2 * g * (1 - g) * r}), a factor
 separated from its complement by the constant (\code{u * 2 * (1 - u)}), or a
-quotient that contains a complement (\code{(1 - Pi) * 1 / 15} is one edge; write
-\code{(1 - Pi) * (1/15)}).
+quotient whose denominator does not contain the complemented parameter
+(\code{(1 - Pi) * 1 / 15} is one edge; write \code{(1 - Pi) * (1/15)}). A quotient
+normalised by a sum that contains the parameter, as in
+\code{x * (1 - d) / (x * (1 - d) + y)}, does not warn.
 Expressions are expanded distributively, so \code{Pm * (Pb + (1 - Pb) * 0.25)}
 displays two paths sharing the \code{Pm} edge.
 
@@ -51,7 +56,11 @@ for nodes whose edge labels are all constants, plain parameters, or
 fans that lack complements are not checked, nor are nodes with a single edge
 or, when plotting a bare tree, fans of plain parameters (which a model may
 declare as a simplex). Write factors in the same order across all categories
-to avoid mispairing due to different factor orders.
+to avoid mispairing due to different factor orders. A bare \code{\link[=mpt_tree]{mpt_tree()}}
+whose constants were already substituted (such as the stored restricted
+trees of a model) does not recognise a complement written as a number
+(\code{0.8} beside \code{0.2}), so those edges keep the order of first mention;
+\code{plot()} of a model draws the unrestricted trees and is not affected.
 
 For a model created with \code{\link[=mpt]{mpt()}}, the plot draws the trees as written and
 marks restricted parameters: the edge of a fixed parameter reads \code{g = 0.5},
