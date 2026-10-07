@@ -230,7 +230,11 @@ summarise_predictor_vars <- function(model, data, formula) {
     summary = vapply(data_vars, function(v) describe_data_column(data[[v]]), character(1)),
     row.names = NULL
   )
-  nlist(pred_map, coding, unknown_vars = setdiff(used_vars, colnames(data)), group_vars)
+  nlist(
+    pred_map, coding,
+    unknown_vars = setdiff(used_vars, c(colnames(data), built_data_columns(model))),
+    group_vars
+  )
 }
 
 re_group_vars <- function(formula) {
