@@ -293,11 +293,14 @@
 # on the simplex. A fixed stick keeps its column out of the free set.
 # Covariates identify parameters through rows with different covariate values,
 # so `settings` (one data frame of covariate values per tree) stacks one block
-# of rows per tree and setting before the decomposition; the degrees of freedom
-# grow with the number of blocks.
+# of rows per tree and setting; the degrees of freedom grow with the number of
+# blocks. The blocks enter `chunk_size` settings at a time through the R factor
+# of a QR decomposition, which leaves the rank, the zero columns and the null
+# space as they are for the full stack (the stick derivative is a
+# right-multiplication, so it applies to R as it would to the stack).
 .mpt_jacobian_rank <- function(trees, free, fixed = list(), simplex = list(),
                                sticks = character(0), settings = NULL,
-                               tolerance = 1e-8) {
+                               tolerance = 1e-8, chunk_size = 2000L) {
   # the counts are reported even when the rank cannot be computed; df is that
   # of one design cell, as print() states it
   counts <- list(
@@ -334,29 +337,35 @@
     vapply(points, `[[`, numeric(1), symbol)
   })
   vals[names(fixed)] <- fixed
-  # one matrix per tree: each derivative evaluated once over every setting and
-  # test point, the points varying fastest
+  # per test point, the R factor of a QR decomposition of the rows stacked so
+  # far: R'R = J'J, so column norms and the singular values of the
+  # column-scaled matrix are those of the full stack, while memory stays bounded
+  # by one chunk of settings. tol = 0 turns off LINPACK's column pivoting, so
+  # the columns stay in parameter order
   n_points <- length(points)
-  blocks <- Filter(Negate(is.null), lapply(seq_along(trees), function(tree) {
+  factors <- vector("list", n_points)
+  for (tree in seq_along(trees)) {
     n_rows <- nrow(settings[[tree]])
-    if (n_rows == 0L) {
-      return(NULL)
-    }
-    row_vals <- lapply(vals, rep, times = n_rows)
-    row_vals[names(settings[[tree]])] <- lapply(
-      settings[[tree]], rep, each = n_points
-    )
-    vapply(derivs[[tree]], function(deriv) {
-      rep_len(eval(deriv, row_vals), n_rows * n_points)
-    }, numeric(n_rows * n_points))
-  }))
-  decompositions <- lapply(seq_along(points), function(point) {
-    jacobian <- do.call(rbind, lapply(blocks, function(block) {
-      matrix(
-        t(block[seq(point, nrow(block), by = n_points), , drop = FALSE]),
-        ncol = length(parameters), byrow = TRUE
+    for (rows in split(seq_len(n_rows), ceiling(seq_len(n_rows) / chunk_size))) {
+      # each derivative evaluated once over the chunk's settings and every test
+      # point, the points varying fastest
+      row_vals <- lapply(vals, rep, times = length(rows))
+      row_vals[names(settings[[tree]])] <- lapply(
+        settings[[tree]], function(column) rep(column[rows], each = n_points)
       )
-    }))
+      block <- vapply(derivs[[tree]], function(deriv) {
+        rep_len(eval(deriv, row_vals), length(rows) * n_points)
+      }, numeric(length(rows) * n_points))
+      for (point in seq_along(points)) {
+        factors[[point]] <- qr.R(qr(rbind(factors[[point]], matrix(
+          t(block[seq(point, nrow(block), by = n_points), , drop = FALSE]),
+          ncol = length(parameters), byrow = TRUE
+        )), tol = 0))
+      }
+    }
+  }
+  decompositions <- lapply(seq_along(points), function(point) {
+    jacobian <- factors[[point]]
     colnames(jacobian) <- parameters
     for (grp in simplex) {
       jacobian <- cbind(

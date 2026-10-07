@@ -897,6 +897,60 @@ test_that("the rank check ranks the design over every distinct covariate setting
   ))
 })
 
+test_that("the rank check gives the same result when the settings come in chunks", {
+  rank_of <- function(model, data, chunk_size) {
+    jacobian_rank <- bmm:::.mpt_jacobian_rank
+    local_mocked_bindings(.mpt_jacobian_rank = function(...) {
+      jacobian_rank(..., chunk_size = chunk_size)
+    })
+    bmm:::.mpt_identifiability(model, data)[c("rank", "involved", "absent")]
+  }
+  expect_chunks_agree <- function(model, data, rank) {
+    whole <- rank_of(model, data, 1e6)
+    expect_equal(whole$rank, rank)
+    expect_identical(rank_of(model, data, 7L), whole)
+  }
+
+  # the single row at x = 0.5 sits in the middle chunk
+  bernstein <- mpt(
+    mpt_tree("t", list(
+      yes = "z * (a * (1 - x)^2 + b * 2 * x * (1 - x) + c * x^2) + (1 - z) * 0.5",
+      no = "1 - z * (a * (1 - x)^2 + b * 2 * x * (1 - x) + c * x^2) - (1 - z) * 0.5"
+    )),
+    covariates = c("x", "z")
+  )
+  dat <- rbind(
+    data.frame(x = 0, z = seq(0.2, 0.8, length.out = 30)),
+    data.frame(x = 0.5, z = 0.5),
+    data.frame(x = 1, z = seq(0.2, 0.8, length.out = 30))
+  )
+  dat$yes <- 5
+  dat$no <- 5
+  expect_chunks_agree(bernstein, dat, 3L)
+
+  settings <- data.frame(x = seq(0.2, 1, length.out = 40), yes = 5, no = 5)
+  residue <- mpt(mpt_tree("t", list(
+    yes = "x * (a * b * c * q + c * b * a * (1 - q))",
+    no = "1 - x * (a * b * c * q + c * b * a * (1 - q))"
+  )), covariates = "x")
+  expect_chunks_agree(residue, settings, 1L)
+  expect_equal(rank_of(residue, settings, 7L)$absent, "q")
+
+  product <- mpt(
+    mpt_tree("t", list(yes = "x * a * b", no = "1 - x * a * b")),
+    covariates = "x"
+  )
+  expect_chunks_agree(product, settings, 1L)
+  expect_equal(rank_of(product, settings, 7L)$involved, c("a", "b"))
+
+  guessing <- mpt(mpt_tree("t", list(
+    A = "D * x + (1 - D * x) * gA", B = "(1 - D * x) * gB", N = "(1 - D * x) * gN"
+  )), simplex = c("gA", "gB", "gN"), covariates = "x")
+  names(settings)[2:3] <- c("A", "B")
+  settings$N <- 5
+  expect_chunks_agree(guessing, settings, 3L)
+})
+
 test_that("the rank check uses only finite covariate values and the trees with rows", {
   switch_tree <- mpt(
     mpt_tree("t", list(yes = "x * a + (1 - x) * b", no = "1 - x * a - (1 - x) * b")),
