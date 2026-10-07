@@ -525,6 +525,33 @@ test_that("a formula that ties parameters together is not reported as a rank def
   )
 })
 
+test_that("a formula that reaches no parameter of the deficit keeps the warning", {
+  model <- mpt(list(
+    mpt_tree("a", list(x = "D * r", y = "(1 - D * r) * g", z = "(1 - D * r) * (1 - g)")),
+    mpt_tree("b", list(x = "g", y = "(1 - g) * h", z = "(1 - g) * (1 - h)"))
+  ), tree_id = "tree")
+  dat <- data.frame(tree = rep(c("a", "b"), each = 3), x = 5L, y = 5L, z = 5L)
+
+  # D and r enter only as D * r; formulas for h cannot separate them
+  expect_warning(
+    suppressMessages(check_model(model, dat, bmf(D ~ 1, r ~ 1, g ~ 1, h ~ inv_logit(k), k ~ 1))),
+    "combination\\(s\\) of 'D', 'r' cannot be estimated"
+  )
+  expect_warning(
+    check_model(model, dat, bmf(D ~ 1, r ~ 1, g ~ 1, h ~ g)),
+    "combination\\(s\\) of 'D', 'r' cannot be estimated"
+  )
+  expect_no_warning(expect_message(
+    check_model(model, dat, bmf(D ~ 1, r ~ D, g ~ 1, h ~ 1)),
+    "non-linear formula\\(s\\) for 'r' identify it is not checked"
+  ))
+  # h ~ D reads D, which tree b identifies through h
+  expect_no_warning(expect_message(
+    check_model(model, dat, bmf(D ~ 1, r ~ 1, g ~ 1, h ~ D)),
+    "non-linear formula\\(s\\) for 'h' identify it is not checked"
+  ))
+})
+
 test_that("deep chains of identified parameters keep full rank", {
   # category i is reached after i - 1 failures, so the columns of the last
   # parameters are products of many probabilities but stay identified
