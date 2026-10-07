@@ -627,7 +627,7 @@ check_model.mpt <- function(model, data = NULL, formula = NULL) {
       Please remove them from the formula(s) for: \\
       {collapse_comma(cat_predictor_formulas)}"
     )
-    nl_pars <-intersect(names(formula)[is_nl(formula)], names(model$parameters))
+    nl_pars <- intersect(names(formula)[is_nl(formula)], names(model$parameters))
     sub_pars <- .mpt_nl_subparameters(model, formula, data)
     no_formula <- setdiff(sub_pars, names(formula))
     stopif(
