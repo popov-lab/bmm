@@ -178,7 +178,9 @@
 # point gives branches in (0, 1] that sum to 1. Branches can sum to 1 for every
 # value and still leave (0, 1] (2 * a and 1 - 2 * a); a branch below or at 0 is
 # log(p) of a non-positive number in Stan. All test points are interior, so an
-# exact 0 is a branch that is 0 for every value, e.g. (1 - a) * 0
+# exact 0 is a branch that is 0 for every value, e.g. (1 - a) * 0, or one that
+# underflows at a test value, e.g. (1 - D)^392 at D = 0.851; refusing the
+# latter too is accepted, as no realistic tree has such a power
 .mpt_tree_branch_errors <- function(trees, parameters, tolerance = 1e-6) {
   points <- .mpt_test_points(parameters)
   vapply(trees, function(tree) {
