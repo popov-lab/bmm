@@ -178,6 +178,14 @@ settable_link_functions.m3 <- function(model) {
 #' `r model_docs(.model_m3(version = "cs"), components =c('requirements', 'parameters', 'fixed_parameters', 'links', 'prior'))`
 #' #### Version: `custom`
 #' `r model_docs(.model_m3(version = "custom"), components = c('requirements', 'parameters', 'fixed_parameters', 'links', 'prior'))`
+#' #### Missing values and reserved names
+#' A missing response count (`NA`) is counted as 0. If the category has options in that
+#' row, `bmm()` warns and says how many counts were replaced; if it has none (`num_options`
+#' is 0 in that row), the 0 is true and there is no warning, as for `dist` in
+#' [oberauer_lewandowsky_2019_e1]. A missing value in a column named in `num_options` is
+#' an error: enter 0 where there were no options. Data columns named `Y`, `nTrials` or
+#' `Idx_<category>` are refused because `bmm()` creates columns with these names; response
+#' categories may be called `Y` or `nTrials`.
 #'
 #' @keywords bmmodel
 #'
@@ -282,7 +290,8 @@ check_model.m3_custom <- function(model, data = NULL, formula = NULL) {
       length(no_formula) > 0,
       "{collapse_comma(no_formula)} in your activation formula(s) is neither a \\
       data column nor a model parameter. Give each new parameter its own \\
-      formula (e.g. {no_formula[1]} ~ 1), or add the column to the data."
+      formula (e.g. {no_formula[1]} ~ 1), or add the column to the data (`Y` is \\
+      reserved and cannot be a data column)."
     )
     model$parameters <- c(model$parameters, setNames(user_pars, user_pars))
   }

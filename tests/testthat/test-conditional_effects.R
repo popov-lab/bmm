@@ -23,11 +23,46 @@ test_that(".extract_re_grouping_vars extracts double-bar grouping var", {
   expect_equal(.extract_re_grouping_vars(f), "id")
 })
 
-test_that(".extract_re_grouping_vars extracts correlation-ID and grouping var", {
-  f <- y ~ x + (1 |ID1| id)
-  result <- .extract_re_grouping_vars(f)
-  expect_true("id" %in% result)
-  expect_true("ID1" %in% result)
+test_that(".extract_re_grouping_vars leaves out the correlation ID", {
+  expect_equal(.extract_re_grouping_vars(y ~ x + (1 |ID1| id)), "id")
+  expect_equal(.extract_re_grouping_vars(~ 1 + (1 |p| id)), "id")
+  expect_equal(.extract_re_grouping_vars(~ 1 + (1 + x |p| id) + (1 |q| g2)), c("id", "g2"))
+  expect_equal(.extract_re_grouping_vars(~ 1 + (1 |1| id)), "id")
+})
+
+test_that(".extract_re_grouping_vars combines a correlation ID with other syntaxes", {
+  expect_equal(.extract_re_grouping_vars(~ 1 + (1 |p| gr(id, by = x))), "id")
+  expect_equal(.extract_re_grouping_vars(~ 1 + (1 |p| gr(id, cor = FALSE))), "id")
+  expect_equal(.extract_re_grouping_vars(~ 1 + (1 |p| mm(g1, g2))), c("g1", "g2"))
+  expect_equal(.extract_re_grouping_vars(~ 1 + (1 |p| g1:g2)), c("g1", "g2"))
+})
+
+test_that(".extract_re_grouping_vars takes the first unnamed gr() argument as the group", {
+  expect_equal(.extract_re_grouping_vars(~ 1 + (1 | gr(by = grp, ID))), "ID")
+  expect_equal(.extract_re_grouping_vars(~ 1 + (1 | gr(cor = FALSE, ID))), "ID")
+  expect_equal(.extract_re_grouping_vars(~ 1 + (1 |p| gr(by = grp, ID))), "ID")
+  expect_equal(.extract_re_grouping_vars(~ 1 + (1 | gr(by = grp, group = ID))), "ID")
+})
+
+test_that(".extract_re_grouping_vars extracts nested grouping vars", {
+  expect_equal(.extract_re_grouping_vars(~ 1 + (1 | g1/g2)), c("g1", "g2"))
+})
+
+test_that(".extract_re_grouping_vars skips named arguments of mm()", {
+  f <- ~ 1 + (1 | mm(g1, g2, weights = cbind(w1, w2), scale = FALSE))
+  expect_equal(.extract_re_grouping_vars(f), c("g1", "g2"))
+})
+
+test_that(".extract_re_grouping_vars ignores bars outside random-effects terms", {
+  expect_equal(.extract_re_grouping_vars(~ 1 + x + (1 | id) + z), "id")
+  expect_equal(.extract_re_grouping_vars(y ~ x[, 1] + (1 | id)), "id")
+})
+
+test_that(".extract_re_cor_ids returns the IDs that tie random effects together", {
+  expect_equal(.extract_re_cor_ids(~ 1 + (1 |p| id)), "p")
+  expect_equal(.extract_re_cor_ids(~ 1 + (1 |p| gr(id, cor = FALSE)) + (x |q| id)), c("p", "q"))
+  expect_equal(.extract_re_cor_ids(~ 1 + (1 | id) + (1 || g2)), character(0))
+  expect_equal(.extract_re_cor_ids(~ 1 + x), character(0))
 })
 
 test_that(".extract_re_grouping_vars extracts gr() grouping var", {
@@ -72,6 +107,15 @@ test_that(".extract_re_grouping_vars returns empty for intercept only", {
   expect_equal(.extract_re_grouping_vars(f), character(0))
 })
 
+
+test_that(".ce_prediction_grid does not offer a correlation ID as an effect", {
+  withr::local_options(bmm.silent = 2)
+  fit <- suppressWarnings(bmm(
+    bmf(c ~ 1 + set_size + (1 |p| ID), kappa ~ 1 + (1 |p| ID)), oberauer_lin_2017,
+    sdm(resp_error = "dev_rad"), backend = "mock", mock_fit = 1, rename = FALSE
+  ))
+  expect_named(.ce_prediction_grid(fit, "c", resolution = 5), "set_size")
+})
 
 # ===========================================================================
 # Tier 1: Unit tests — .ce_summarize_draws()
@@ -201,6 +245,26 @@ test_that(".apply_link_transform transforms all elements in list", {
   result <- .apply_link_transform(ce, "log", inverse = TRUE)
   expect_equal(result[[1]]$estimate__, exp(c(0, 1)), tolerance = 1e-10)
   expect_equal(result[[2]]$estimate__, exp(c(2, 3)), tolerance = 1e-10)
+})
+
+
+# ===========================================================================
+# Tier 1: Unit tests — .ce_prediction_grid()
+# ===========================================================================
+
+test_that("m3 prediction grid is valid brms data when rows differ in trials (#510)", {
+  model <- m3(resp_cats = c("corr", "other", "npl"),
+              num_options = c("n_corr", "n_other", "n_npl"),
+              choice_rule = "simple", version = "ss")
+  fit <- bmm(bmf(c ~ 1 + cond, a ~ 1), oberauer_lewandowsky_2019_e1, model,
+             backend = "mock", mock_fit = 1, rename = FALSE)
+  expect_false(isTRUE(all.equal(mean(fit$data$nTrials), round(mean(fit$data$nTrials)))))
+
+  grid <- .ce_prediction_grid(fit, "c")$cond
+  expect_identical(grid$nTrials, rep(1L, nrow(grid)))
+  expect_no_error(brms::standata(
+    fit, newdata = grid, check_response = FALSE, allow_new_levels = TRUE
+  ))
 })
 
 
