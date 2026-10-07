@@ -154,9 +154,13 @@ are never free parameters; because rows with different covariate values
 can identify what one design cell cannot, the rank is taken over the rows
 of every distinct covariate setting in the data in \code{bmm()}, and
 over five test values of the covariates when printing. In \code{bmm()}, a
-tree without rows in the data adds nothing to the rank. \code{print()} can
-therefore report full rank for a design whose data leave a parameter
-open, and \code{bmm()} then warns. A rank below the
+tree without rows in the data adds nothing to the rank. The two can
+therefore disagree in either direction: \code{print()} can report full rank
+for a design whose data leave a parameter open, and \code{bmm()} then reports
+the deficit (a warning, or a message when a formula has predictors or
+is non-linear); five test values of a covariate can leave open what more
+distinct values in the data identify, and \code{bmm()} then stays silent. A
+rank below the
 number of free parameters means that some combination of the listed
 parameters cannot be estimated from the data,
 even when the count passes, and its posterior follows the prior; a
@@ -174,8 +178,8 @@ analysed, so \code{bmm()} treats a deficit under it the same way, and
 \code{print()} of the checked model says the formula was not analysed. The
 check is local: it holds at the test values, not at the boundaries of
 the parameter space. A branch expression with a function that
-\code{\link[stats:D]{stats::D()}} cannot differentiate leaves the rank uncomputed, and the
-printout says so.
+\code{\link[stats:D]{stats::D()}} cannot differentiate, or a derivative that is not finite
+at a test value, leaves the rank uncomputed, and the printout says so.
 
 \code{summary()} reports intercepts and regression coefficients on the latent
 (logit or probit) scale. \code{\link[=native_parameters]{native_parameters()}} returns the posterior
