@@ -792,10 +792,10 @@ test_that("a model whose every free column is exactly zero reports rank 0", {
 
 test_that("the rank check takes the maximum over the parameter test points", {
   # the derivative of (a - k)^2 vanishes only at the first test point, where a
-  # equals k; R's parser rounds some 17-digit spellings of k off by one ulp
+  # equals k; a decimal spelling of k need not parse back to k, a hex one does
   k <- bmm:::.mpt_test_points("a", list())[[1]][["a"]]
-  spelling <- Find(function(s) str2lang(s) == k, sprintf("%.*g", 15:22, k))
-  expect_false(is.null(spelling))
+  spelling <- sprintf("%a", k)
+  expect_identical(str2lang(spelling), k)
   model <- mpt(mpt_tree("t", list(
     yes = glue("0.5 + 0.5 * (a - {spelling})^2"),
     no = glue("0.5 - 0.5 * (a - {spelling})^2")
@@ -1856,10 +1856,12 @@ test_that("mpt() alone decides a tree without covariates in a model with covaria
 
   # the branches of t2 sum to 1 at every value of D that mpt() tries, and to
   # something else at the values a data check in another symbol order would try
-  # (t2 adds no symbol, so t1 alone sets the order)
-  construction <- .mpt_tree_parameters(list(covariate_tree), "x")
+  # (t2 adds no symbol, so t1 alone sets the order). The bump pins the 7 points
+  # mpt() tries today (5 interior, 2 corners); if mpt() gains test points, t2
+  # is refused at construction and this test must change with them
+  construction <- bmm:::.mpt_tree_parameters(list(covariate_tree), "x")
   checked_d <- c(
-    vapply(.mpt_test_points(construction, list(c("gA", "gB", "gC"))), `[[`, numeric(1), "D"),
+    vapply(bmm:::.mpt_test_points(construction, list(c("gA", "gB", "gC"))), `[[`, numeric(1), "D"),
     0.001, 0.999
   )
   bump <- paste0("(D - ", sprintf("%.10f", checked_d), ")", collapse = " * ")
