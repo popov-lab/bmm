@@ -297,6 +297,35 @@
   no longer fails with `Number of trials must be non-negative integers`
   on **m3** fits whose rows differ in their number of trials
   ([\#510](https://github.com/popov-lab/bmm/issues/510)).
+- [`conditional_effects()`](https://popov-lab.github.io/bmm/dev/reference/conditional_effects.bmmfit.md)
+  on **m3** fits ignored `conditions`, `int_conditions`, `surface`,
+  `spaghetti`, `draw_ids` and `re_formula = NULL` without a warning, and
+  returned a wrong interval for `probs`. They now apply, as they do for
+  **sdt_rating**, **sdt_cdp** and **sdt_ranking**. The estimate is the
+  posterior median and `se__` its MAD, as in `brms`; **m3** used to
+  report the mean and standard deviation, and `robust = FALSE` returns
+  them ([\#512](https://github.com/popov-lab/bmm/issues/512)).
+- `conditional_effects(spaghetti = TRUE)` drew its lines on a different
+  scale than the curve for some parameters: on the sampling scale at the
+  default `scale = "native"` (e.g. `kappa` and `thetat` of
+  **mixture3p**) and on the native scale at `scale = "sampling"`
+  (e.g. `kappa` and `c` of **sdm**). The lines now follow `scale`.
+  Redraw plots made with `spaghetti = TRUE`
+  ([\#512](https://github.com/popov-lab/bmm/issues/512)).
+- On **m3**, **sdt_rating**, **sdt_cdp** and **sdt_ranking** fits,
+  [`conditional_effects()`](https://popov-lab.github.io/bmm/dev/reference/conditional_effects.bmmfit.md)
+  now stops with a message naming the argument if you pass
+  `categorical`, `ordinal`, `select_points`, `transform` or
+  `method = "posterior_predict"`, which do not apply to their latent
+  parameters. **m3** used to ignore them. `plot(points = TRUE)` on
+  **m3** failed with `Column resp__ not found` and now works
+  ([\#512](https://github.com/popov-lab/bmm/issues/512)).
+- [`conditional_effects()`](https://popov-lab.github.io/bmm/dev/reference/conditional_effects.bmmfit.md)
+  on the **mixture3p** parameters `thetat` and `thetant` at the default
+  `scale = "native"` returned `probs` with lower above upper, ignored
+  `draw_ids` and `re_formula = NULL`, and with `ndraws` combined draws
+  that did not belong together. All four now work. Default output is
+  unchanged ([\#512](https://github.com/popov-lab/bmm/issues/512)).
 - [`native_parameters()`](https://popov-lab.github.io/bmm/dev/reference/native_parameters.md)
   failed with
   `Cannot build a prediction grid: variable(s) ... are not columns of the model data`
@@ -722,6 +751,13 @@
 
 #### Documentation
 
+- [`?conditional_effects.bmmfit`](https://popov-lab.github.io/bmm/dev/reference/conditional_effects.bmmfit.md)
+  now says that `se__` is the spread of the draws on the scale `brms` or
+  bmm summarises them on, so with a link other than identity it can sit
+  on a different scale than `estimate__`. Use `lower__` and `upper__`
+  for uncertainty on the scale you asked for. A new section covers
+  models with a multinomial family
+  ([\#512](https://github.com/popov-lab/bmm/issues/512)).
 - New online
   [article](https://popov-lab.github.io/bmm/dev/articles/bmm_hypothesis_testing.html)
   on testing hypotheses and comparing models: testing effects on a

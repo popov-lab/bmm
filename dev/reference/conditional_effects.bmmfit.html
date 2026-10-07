@@ -106,7 +106,9 @@ Common arguments include:</p><ul><li><p><code>effects</code>: Character vector s
 <li><p><code>int_conditions</code>: Conditions for interactions</p></li>
 <li><p><code>prob</code>: Probability mass to include in credible intervals (default 0.95)</p></li>
 <li><p><code>spaghetti</code>: Logical, whether to add spaghetti lines</p></li>
-<li><p><code>method</code>: Method for computing effects ("posterior_predict" or "posterior_epred")</p></li>
+<li><p><code>method</code>: Method for computing effects ("posterior_predict" or
+"posterior_epred"; "posterior_predict" is not available for models with
+a multinomial family, see Details)</p></li>
 </ul></dd>
 
 </dl></div>
@@ -123,8 +125,11 @@ Common arguments include:</p><ul><li><p><code>effects</code>: Character vector s
 <h3 id="parameter-types">Parameter Types<a class="anchor" aria-label="anchor" href="#parameter-types"></a></h3>
 
 
-<p>bmm models use two types of parameters internally:</p><ul><li><p><strong>Non-linear parameters (<code>nlpar</code>)</strong>: Core model parameters like <code>kappa</code>, <code>c</code>, <code>a</code>, <code>thetat</code></p></li>
-<li><p><strong>Distributional parameters (<code>dpar</code>)</strong>: Derived parameters used in brms mixture distributions</p></li>
+<p>bmm models use two types of parameters internally:</p><ul><li><p><strong>Non-linear parameters (<code>nlpar</code>)</strong>: Model parameters that enter the
+likelihood through a non-linear formula, like <code>kappa</code> and <code>thetat</code> of
+<code><a href="mixture3p.html">mixture3p()</a></code> or <code>c</code> and <code>a</code> of <code><a href="m3.html">m3()</a></code></p></li>
+<li><p><strong>Distributional parameters (<code>dpar</code>)</strong>: Parameters of the response
+distribution itself, like <code>kappa</code> and <code>c</code> of <code><a href="sdm.html">sdm()</a></code></p></li>
 </ul><p>Users should not need to know this distinction - <code>conditional_effects.bmmfit()</code>
 automatically routes to the correct parameter type.</p>
 </div>
@@ -139,7 +144,41 @@ applying inverse link transformations:</p><ul><li><p><code>log</code> link → e
 <li><p><code>tan_half</code> link → 2*atan transformation (radians)</p></li>
 <li><p><code>identity</code> link → no transformation</p></li>
 </ul><p>Use <code>scale = "sampling"</code> to see parameters on the scale used during MCMC sampling.</p>
+<p><code>estimate__</code>, <code>lower__</code>, <code>upper__</code> and the spaghetti lines follow <code>scale</code>.
+<code>se__</code> does not: it is the spread of the draws on the scale <code>brms</code> or bmm
+summarises them on, so for a link other than identity it can sit on a
+different scale than <code>estimate__</code>. For example, <code>se__</code> of <code>kappa</code> is on the
+sampling scale in <code><a href="mixture3p.html">mixture3p()</a></code> and on the native scale in <code><a href="sdm.html">sdm()</a></code>, at either
+<code>scale</code>. Use <code>lower__</code> and <code>upper__</code> to describe uncertainty on the requested
+scale. With <code>robust = FALSE</code>, <code>estimate__</code> is the mean and <code>se__</code> the standard
+deviation of the draws on that scale, and <code>estimate__</code> is then mapped to the
+requested scale: at <code>scale = "native"</code> the estimate of a non-linear parameter
+with a log link is the exponential of the mean log value, not the mean of the
+exponentiated draws.</p>
+<p>The default of <code>robust</code> is <code>TRUE</code> (median and MAD), as in <code><a href="https://paulbuerkner.com/brms/reference/conditional_effects.brmsfit.html" class="external-link">brms::conditional_effects()</a></code>,
+with one exception: <code>thetat</code> and <code>thetant</code> of <code><a href="mixture3p.html">mixture3p()</a></code> at
+<code>scale = "native"</code> default to <code>robust = FALSE</code> (mean and standard deviation).</p>
 </div>
+
+<div class="section">
+<h3 id="models-with-a-multinomial-family">Models with a multinomial family<a class="anchor" aria-label="anchor" href="#models-with-a-multinomial-family"></a></h3>
+
+
+<p>In models fitted with a multinomial response (<code><a href="m3.html">m3()</a></code>, <code><a href="sdt_rating.html">sdt_rating()</a></code>,
+<code><a href="sdt_cdp.html">sdt_cdp()</a></code>, <code><a href="sdt_ranking.html">sdt_ranking()</a></code>), the parameters are latent quantities: they
+have no predictive distribution, no response categories and no response
+points. For these models:</p><ul><li><p>The effect is the posterior of the parameter itself, summarised by
+the median and MAD of the draws; use <code>robust = FALSE</code> for their mean and
+standard deviation.</p></li>
+<li><p>The grid of the plotted predictor and the values of all other
+predictors are set by the rules of <code><a href="https://paulbuerkner.com/brms/reference/conditional_effects.brmsfit.html" class="external-link">brms::conditional_effects()</a></code>.</p></li>
+<li><p>Without <code>effects</code>, only the effects <code>brms</code> lists for the parameter's own
+formula are returned. A parameter without predictors has no effects.</p></li>
+<li><p><code>categorical</code>, <code>ordinal</code>, <code>select_points</code> and <code>transform</code> are
+errors, and <code>method</code> must be <code>"posterior_epred"</code> or <code>"posterior_linpred"</code>
+(or an alias <code><a href="https://paulbuerkner.com/brms/reference/conditional_effects.brmsfit.html" class="external-link">brms::conditional_effects()</a></code> reads as one of them, such as
+<code>"fitted"</code>), which agree for a parameter.</p></li>
+</ul></div>
 
     </div>
     <div class="section level2">
