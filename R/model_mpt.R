@@ -449,16 +449,22 @@ settable_link_functions.mpt <- function(model) {
 #'   until the rank is full. `bmm()` warns about a rank deficit when no
 #'   formula uses a data column as a predictor. When one does, a parameter
 #'   that differs between conditions can identify the model across them, so
-#'   `bmm()` only says that the model is not identified within one design
-#'   cell and that the predictors were not checked. The rank covers the
-#'   parameters of the branch expressions only: a non-linear formula that
-#'   ties them together (`Dn ~ Do`) or builds one from sub-parameters is not
-#'   analysed, so `bmm()` treats a deficit under it the same way, and
-#'   `print()` of the checked model says the formula was not analysed. The
-#'   check is local: it holds at the test values, not at the boundaries of
-#'   the parameter space. A branch expression with a function that
-#'   [stats::D()] cannot differentiate, or a derivative that is not finite
-#'   at a test value, leaves the rank uncomputed, and the printout says so.
+#'   `bmm()` instead sends a message that the tree parameters are not
+#'   identified within one design cell and that the predictors were not
+#'   checked. The message names the parameters involved when the rank uses
+#'   the data (covariate values or trees without rows), and otherwise refers
+#'   to `print()`. The rank covers the parameters of the branch expressions
+#'   only: a non-linear formula that ties them together (`Dn ~ Do`) or builds
+#'   one from sub-parameters is not analysed, so `bmm()` treats a deficit
+#'   under it the same way, and `print()` of the checked model says the
+#'   formula was not analysed. The check is local: it holds at the test
+#'   values, not at the boundaries of the parameter space. A test value at
+#'   which a derivative is not finite (in `bmm()`, also at a covariate value
+#'   in the data) is left out, and the printout says how many were. A branch
+#'   expression with a function that [stats::D()] cannot differentiate, or a
+#'   derivative that is not finite at every test value, leaves the rank
+#'   uncomputed, and the printout says so; `bmm()` then reports only the
+#'   count, when the free parameters outnumber the degrees of freedom.
 #'
 #'   `summary()` reports intercepts and regression coefficients on the latent
 #'   (logit or probit) scale. [native_parameters()] returns the posterior
