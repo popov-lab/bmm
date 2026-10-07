@@ -82,6 +82,8 @@
 <div class="section level4">
 <h4 id="bug-fixes-development-version">Bug fixes<a class="anchor" aria-label="anchor" href="#bug-fixes-development-version"></a></h4>
 <ul><li>
+<code><a href="../reference/conditional_effects.bmmfit.html">conditional_effects()</a></code> no longer fails with <code>Number of trials must be non-negative integers</code> on <strong>m3</strong> fits whose rows differ in their number of trials (<a href="https://github.com/popov-lab/bmm/issues/510" class="external-link">#510</a>).</li>
+<li>
 <code><a href="../reference/native_parameters.html">native_parameters()</a></code> failed with <code>Cannot build a prediction grid: variable(s) ... are not columns of the model data</code> whenever a parameter had a non-linear formula, e.g. <code>bmf(c ~ exp(nlc), nlc ~ 1 + set_size)</code>. It now returns the grid over the predictors of every formula involved, as it does for linear formulas.</li>
 <li>
 <code><a href="../reference/native_parameters.html">native_parameters()</a></code> failed with <code>Cannot build a prediction grid: variable(s) 'p' are not columns of the model data</code> for a fit whose formula links random effects across parameters, e.g. <code>(1 |p| id)</code>, and for a nested grouping such as <code>(1 | g1/g2)</code>. For <strong>m3</strong> fits, <code><a href="../reference/conditional_effects.bmmfit.html">conditional_effects()</a></code> also listed the variables of a nested grouping as effects. <code><a href="../reference/bmm_data_check.html">bmm_data_check()</a></code> reported the ID <code>p</code> as a missing data column. All three work now.</li>

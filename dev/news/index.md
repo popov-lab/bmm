@@ -293,6 +293,10 @@
 
 #### Bug fixes
 
+- [`conditional_effects()`](https://popov-lab.github.io/bmm/dev/reference/conditional_effects.bmmfit.md)
+  no longer fails with `Number of trials must be non-negative integers`
+  on **m3** fits whose rows differ in their number of trials
+  ([\#510](https://github.com/popov-lab/bmm/issues/510)).
 - [`native_parameters()`](https://popov-lab.github.io/bmm/dev/reference/native_parameters.md)
   failed with
   `Cannot build a prediction grid: variable(s) ... are not columns of the model data`
