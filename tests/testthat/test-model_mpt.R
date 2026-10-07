@@ -103,8 +103,10 @@ test_that("mpt errors on a branch that is the constant 0", {
   expect_error(mpt(zero_padded, tree_id = "t"), "constant 0")
   expect_error(mpt(zero_padded, tree_id = "t"), "'z' in tree 'a', 'x' in tree 'b'")
   expect_error(mpt(mpt_tree("c", list(x = "(0)", y = "D + (1 - D)"))), "constant 0")
+  # not the literal 0 this guard reads, but 0 at every interior test point,
+  # which the range check refuses
   zero_product <- mpt_tree("d", list(x = "0 * D", y = "1 - 0 * D"))
-  expect_s3_class(mpt(zero_product), "mpt")
+  expect_error(mpt(zero_product), "category 'x' in tree 'd' is 0 .*outside \\(0, 1\\]")
 })
 
 test_that("mpt errors on name collisions and reserved names", {
@@ -488,10 +490,10 @@ test_that("restrictions are substituted into the trees before parameters are ide
     fixed$other_vars$trees
   )
   for (restricted in list(equated, fixed)) {
-    deviations <- .mpt_tree_sum_deviations(
+    branch_errors <- .mpt_tree_branch_errors(
       restricted$other_vars$trees, names(restricted$parameters), list()
     )
-    expect_true(all(is.na(deviations)))
+    expect_true(all(is.na(branch_errors)))
   }
   one_symbol <- mpt_tree("t", list(A = "a", B = "(1 - a) * b", C = "(1 - a) * (1 - b)"))
   expect_error(mpt(one_symbol, restrictions = "a = 0"), "strictly between 0 and 1")
@@ -612,12 +614,57 @@ test_that("the identifiability check counts a parameter fixed in the formula as 
     "within one design cell.*predictors on 'g' identify it across cells is not checked"
   ))
 
-  # a non-linear formula without a data column varies nothing between cells
-  expect_warning(
-    suppressMessages(check_model(
-      model, dat, bmf(Do ~ inv_logit(phi), phi ~ 1, Dn ~ 1, g ~ 1)
-    )),
-    "rank 2 for 3 free parameters"
+  # the rank does not read non-linear formulas, so a deficit under one is
+  # announced, not warned about, even when it is real as here
+  expect_no_warning(expect_message(
+    check_model(model, dat, bmf(Do ~ inv_logit(phi), phi ~ 1, Dn ~ 1, g ~ 1)),
+    "rank 2 for 3 free parameters.*formula\\(s\\) for 'Do' identify it is not checked"
+  ))
+})
+
+test_that("a formula that ties parameters together is not reported as a rank deficit", {
+  trees <- list(
+    mpt_tree("old", list(yes = "Do + (1 - Do) * g", no = "(1 - Do) * (1 - g)")),
+    mpt_tree("new", list(yes = "(1 - Dn) * g", no = "Dn + (1 - Dn) * (1 - g)"))
+  )
+  model <- mpt(trees, tree_id = "item_type")
+  dat <- mpt_2htm_data()
+
+  # Dn ~ Do identifies the model; the rank of the tree parameters cannot see it
+  expect_no_warning(expect_message(
+    tied <- check_model(model, dat, bmf(Do ~ 1, Dn ~ Do, g ~ 1)),
+    "non-linear formula\\(s\\) for 'Dn' identify it is not checked"
+  ))
+  printed <- mpt_printed(tied)
+  expect_match(printed, "1 combination\\(s\\) of all free parameters are not identified")
+  expect_no_match(printed, "The model is not identified")
+  expect_match(printed, "formula\\(s\\) for 'Dn' were not analysed")
+
+  expect_silent(check_model(model, dat, bmf(Do ~ 1, Dn = 0.6, g ~ 1)))
+
+  # u and v enter only as u + v, which the tree rank of 'a' cannot see
+  single <- mpt(mpt_tree("x", list(A = "a", B = "1 - a")))
+  sub_pars <- suppressMessages(check_model(
+    single, data.frame(A = 5L, B = 5L), bmf(a ~ inv_logit(u + v), u ~ 1, v ~ 1)
+  ))
+  printed <- mpt_printed(sub_pars)
+  expect_no_match(printed, "locally identified")
+  expect_match(
+    printed,
+    "Jacobian rank 1 of 1 in the tree parameters .* formula\\(s\\) for 'a' were not analysed"
+  )
+
+  # the deficit text names a simplex group by its members, not its sticks
+  guessing <- mpt(mpt_tree("t", list(
+    A = "D + (1 - D) * gA", B = "(1 - D) * gB", C = "(1 - D) * gC"
+  )), simplex = list(c("gA", "gB", "gC")))
+  tied_simplex <- suppressMessages(check_model(
+    guessing, data.frame(A = 5L, B = 3L, C = 2L),
+    bmf(D ~ inv_logit(phi), phi ~ 1, gA ~ 1, gB ~ 1)
+  ))
+  expect_match(
+    mpt_printed(tied_simplex),
+    "1 combination\\(s\\) of .*the simplex group 'gA', 'gB', 'gC'.* 'D' were not analysed"
   )
 })
 

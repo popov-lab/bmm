@@ -22,6 +22,15 @@
   unlist(lapply(as.list(expr)[-1], .mpt_scientific_constants)) %||% numeric(0)
 }
 
+# the constants as the user wrote them in the branch string; a value folded
+# from constant arithmetic (1/10000) has no written form and is deparsed
+.mpt_written_constants <- function(expr, values) {
+  tokens <- utils::getParseData(parse(text = expr, keep.source = TRUE))
+  written <- tokens$text[tokens$token == "NUM_CONST"]
+  written <- unique(written[suppressWarnings(as.numeric(written)) %in% values])
+  c(written, vapply(setdiff(values, as.numeric(written)), deparse, character(1)))
+}
+
 # Stan compiles a bare integer fraction like 1/4 or 1/(2*2) as integer
 # division (= 0), so every variable-free arithmetic subexpression is folded
 # into its numeric value before emission
@@ -44,6 +53,10 @@
 
 .mpt_expr_vars <- function(tree) {
   unique(unlist(lapply(tree$branches, all.vars)))
+}
+
+.mpt_tree_parameters <- function(trees) {
+  unique(unlist(lapply(trees, .mpt_expr_vars)))
 }
 
 .mpt_substitute_symbols <- function(expr, values) {
@@ -261,11 +274,15 @@
 # on the simplex. A fixed stick keeps its column out of the free set.
 .mpt_jacobian_rank <- function(trees, free, fixed = list(), simplex = list(),
                                sticks = character(0), tolerance = 1e-8) {
+  # the counts are reported even when the rank cannot be computed
+  counts <- list(
+    n_free = length(free), free = free,
+    df = sum(lengths(lapply(trees, `[[`, "branches")) - 1L)
+  )
   if (length(free) == 0L) {
-    return(list(
-      rank = 0L, n_free = 0L, free = free,
-      involved = character(0), absent = character(0)
-    ))
+    return(c(counts, list(
+      rank = 0L, involved = character(0), absent = character(0)
+    )))
   }
   branches <- unlist(lapply(unname(trees), `[[`, "branches"), use.names = FALSE)
   parameters <- c(setdiff(free, sticks), unlist(simplex), names(fixed))
@@ -275,10 +292,9 @@
     })
   }), recursive = FALSE), silent = TRUE)
   if (is_try_error(derivs)) {
-    return(list(error = conditionMessage(attr(derivs, "condition"))))
+    return(c(counts, list(error = conditionMessage(attr(derivs, "condition")))))
   }
-  df <- sum(lengths(lapply(trees, `[[`, "branches")) - 1L)
-  symbols <- unique(unlist(lapply(branches, all.vars)))
+  symbols <- .mpt_tree_parameters(trees)
   points <- .mpt_test_points(symbols, simplex)
   # one vector per symbol holding its value at every test point, so each
   # derivative is evaluated once for all points
@@ -313,22 +329,21 @@
       sweep(jacobian, 2, norms, "/"), nu = 0, nv = length(free)
     )
     decomposition$rank <- min(
-      sum(decomposition$d > tolerance * decomposition$d[1]), df
+      sum(decomposition$d > tolerance * decomposition$d[1]), counts$df
     )
     decomposition$absent <- free[zero]
     decomposition
   })
-  ranks <- vapply(decompositions, `[[`, integer(1), "rank")
-  n_absent <- lengths(lapply(decompositions, `[[`, "absent"))
-  best <- decompositions[[order(-ranks, n_absent)[1]]]
+  best <- decompositions[[order(
+    -vapply(decompositions, `[[`, integer(1), "rank"),
+    lengths(lapply(decompositions, `[[`, "absent"))
+  )[1]]]
   null_space <- best$v[, seq_along(free) > best$rank, drop = FALSE]
-  list(
+  c(counts, list(
     rank = best$rank,
-    n_free = length(free),
-    free = free,
     involved = free[rowSums(abs(null_space) > 1e-6) > 0],
     absent = best$absent
-  )
+  ))
 }
 
 # chain rule through the stick-breaking map: member k is
@@ -348,17 +363,44 @@
   member_jacobian %*% map
 }
 
-# the first deviating branch sum per tree, NA where every test point sums to 1
-.mpt_tree_sum_deviations <- function(trees, parameters, simplex,
-                                     tolerance = 1e-6) {
+# the first branch-sum or branch-range violation per tree, NA where every test
+# point gives branches in (0, 1] that sum to 1. Branches can sum to 1 for every
+# value and still leave (0, 1] (2 * a and 1 - 2 * a); a branch below or at 0 is
+# log(p) of a non-positive number in Stan. All test points are interior, so an
+# exact 0 is a branch that is 0 for every value, e.g. (1 - a) * 0
+.mpt_tree_branch_errors <- function(trees, parameters, simplex,
+                                    tolerance = 1e-6) {
   points <- .mpt_test_points(parameters, simplex)
   vapply(trees, function(tree) {
     for (vals in points) {
-      total <- sum(.mpt_eval_branches(tree, as.list(vals)))
-      if (abs(total - 1) > tolerance) {
-        return(total)
+      probs <- .mpt_eval_branches(tree, as.list(vals))
+      if (abs(sum(probs) - 1) > tolerance) {
+        return(glue(
+          "The branch probabilities of tree '{tree$name}' sum to \\
+          {signif(sum(probs), 6)} instead of 1 when evaluated at numeric test \\
+          values. Please check the branch expressions. To equate parameters or \\
+          fix one to a constant, use the restrictions argument (e.g. \\
+          restrictions = 'Dn = Do'), or tie them in the formula (e.g. Dn ~ Do). \\
+          Parameters that must sum to 1 across branches (e.g. guessing over \\
+          three options) belong in the simplex argument."
+        ))
+      }
+      outside <- names(probs)[probs <= 0 | probs > 1 + tolerance][1]
+      if (!is.na(outside)) {
+        symbols <- all.vars(tree$branches[[outside]])
+        zero_hint <- if (probs[[outside]] == 0) {
+          " A zero probability makes the likelihood undefined."
+        } else {
+          ""
+        }
+        return(glue(
+          "The branch probability of category '{outside}' in tree \\
+          '{tree$name}' is {signif(probs[[outside]], 6)} at the test values \\
+          {paste(symbols, '=', signif(vals[symbols], 3), collapse = ', ')}, \\
+          outside (0, 1]. Please check the branch expressions.{zero_hint}"
+        ))
       }
     }
-    NA_real_
-  }, numeric(1))
+    NA_character_
+  }, character(1))
 }
