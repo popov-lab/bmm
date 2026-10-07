@@ -28,13 +28,21 @@ test_that("mpt_tree folds compound integer constants into decimal literals", {
 test_that("mpt_tree says why a constant is refused and which rewrite works", {
   expect_error(
     mpt_tree("t", list(a = "0.00010 + 0.9999 * p", b = "0.9999 * (1 - p)")),
-    "'0.00010' in tree 't' in scientific notation \\(1e-04\\).*\\(1 \\+ 9999 \\* p\\) / 10000"
+    "'0.00010' \\(1e-04\\) in tree 't' in scientific notation.*\\(1 \\+ 9999 \\* p\\) / 10000"
   )
-  # a folded constant has no written form
+  # a folded constant has no written form, so brms's form is not repeated
   expect_error(
     mpt_tree("t", list(a = "1/10000 + 0.9999 * p", b = "0.9999 * (1 - p)")),
-    "'1e-04' in tree 't'"
+    "constant\\(s\\) '1e-04' in tree 't' in scientific notation, which"
   )
+  # a large constant gets a rewrite for large numbers
+  for (large in c("100000", "1e5")) {
+    expect_error(
+      mpt_tree("t", list(a = glue("p / {large}"), b = glue("1 - p / {large}"))),
+      glue("'{large}' \\(1e\\+05\\) in tree 't'.*write p / 100000 as p / 1000 / 100\\.$")
+    )
+  }
+  expect_no_error(mpt_tree("t", list(a = "p / 1000 / 100", b = "1 - p / 1000 / 100")))
   rescaled <- mpt(mpt_tree("t", list(
     a = "(1 + 9999 * p) / 10000", b = "9999 * (1 - p) / 10000"
   )))

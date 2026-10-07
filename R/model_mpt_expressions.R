@@ -22,13 +22,22 @@
   unlist(lapply(as.list(expr)[-1], .mpt_scientific_constants)) %||% numeric(0)
 }
 
-# the constants as the user wrote them in the branch string; a value folded
-# from constant arithmetic (1/10000) has no written form and is deparsed
+# the constants as the user wrote them in the branch string, each followed by
+# the form brms writes when the two differ; a value folded from constant
+# arithmetic (1/10000) has no written form and is shown as brms writes it
 .mpt_written_constants <- function(expr, values) {
+  as_brms_writes <- function(value) {
+    withr::with_options(list(scipen = 0), deparse(value))
+  }
   tokens <- utils::getParseData(parse(text = expr, keep.source = TRUE))
   written <- tokens$text[tokens$token == "NUM_CONST"]
   written <- unique(written[suppressWarnings(as.numeric(written)) %in% values])
-  c(written, vapply(setdiff(values, as.numeric(written)), deparse, character(1)))
+  written <- c(
+    written,
+    vapply(setdiff(values, as.numeric(written)), as_brms_writes, character(1))
+  )
+  emitted <- vapply(as.numeric(written), as_brms_writes, character(1))
+  paste0("'", written, "'", ifelse(written == emitted, "", paste0(" (", emitted, ")")))
 }
 
 # Stan compiles a bare integer fraction like 1/4 or 1/(2*2) as integer
@@ -367,7 +376,9 @@
 # point gives branches in (0, 1] that sum to 1. Branches can sum to 1 for every
 # value and still leave (0, 1] (2 * a and 1 - 2 * a); a branch below or at 0 is
 # log(p) of a non-positive number in Stan. All test points are interior, so an
-# exact 0 is a branch that is 0 for every value, e.g. (1 - a) * 0
+# exact 0 is a branch that is 0 for every value, e.g. (1 - a) * 0, or one that
+# underflows at a test value, e.g. (1 - D)^392 at D = 0.851; refusing the
+# latter too is accepted, as no realistic tree has such a power
 .mpt_tree_branch_errors <- function(trees, parameters, simplex,
                                     tolerance = 1e-6) {
   points <- .mpt_test_points(parameters, simplex)

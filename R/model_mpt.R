@@ -72,15 +72,20 @@ mpt_tree <- function(name, branches) {
     )
     parsed <- .mpt_fold_numeric_division(parsed)
     scientific <- .mpt_scientific_constants(parsed)
-    stopif(
-      length(scientific) > 0,
-      "brms writes the numeric constant(s) \\
-      {collapse_comma(.mpt_written_constants(expr, scientific))} in tree \\
-      '{name}' in scientific notation ({format(scientific[1], scientific = TRUE)}), \\
-      which breaks the generated Stan code. Every spelling of the same number \\
-      is affected (0.00010 is 0.0001), so please rescale the expression \\
-      instead, e.g. write 0.0001 + 0.9999 * p as (1 + 9999 * p) / 10000."
-    )
+    if (length(scientific) > 0) {
+      rescaling <- if (any(abs(scientific) < 1)) {
+        "0.0001 + 0.9999 * p as (1 + 9999 * p) / 10000"
+      } else {
+        "p / 100000 as p / 1000 / 100"
+      }
+      stop2(
+        "brms writes the numeric constant(s) \\
+        {paste(.mpt_written_constants(expr, scientific), collapse = ', ')} in \\
+        tree '{name}' in scientific notation, which breaks the generated Stan \\
+        code. Every spelling of the same number is affected, so please \\
+        rescale the expression instead, e.g. write {rescaling}."
+      )
+    }
     parsed
   })
   structure(nlist(name, branches), class = "mpt_tree")
@@ -353,15 +358,15 @@ settable_link_functions.mpt <- function(model) {
 #'   parameter whose derivatives are zero up to rounding at the test values
 #'   appears not to affect any category probability and is named separately.
 #'   Fix parameters in the formula or equate them in the branch expressions
-#'   until the rank is full. `bmm()` warns about a rank deficit when no
-#'   formula uses a data column as a predictor. When one does, a parameter
-#'   that differs between conditions can identify the model across them, so
-#'   `bmm()` only says that the model is not identified within one design
-#'   cell and that the predictors were not checked. The rank covers the
-#'   parameters of the branch expressions only: a non-linear formula that
-#'   ties them together (`Dn ~ Do`) or builds one from sub-parameters is not
-#'   analysed, so `bmm()` treats a deficit under it the same way, and
-#'   `print()` of the checked model says the formula was not analysed. The
+#'   until the rank is full. `bmm()` warns about a rank deficit unless a
+#'   formula has a data predictor, or a non-linear formula defines or reads
+#'   one of the parameters involved. A parameter that differs between
+#'   conditions can identify the model across them, and the
+#'   rank covers the parameters of the branch expressions only, so a
+#'   non-linear formula that ties them together (`Dn ~ Do`) or builds one
+#'   from sub-parameters is not analysed. In these cases `bmm()` only
+#'   announces the deficit and says what was not checked, and `print()` of
+#'   the checked model says the formula was not analysed. The
 #'   check is local: it holds at the test values, not at the boundaries of
 #'   the parameter space. A branch expression with a function that
 #'   [stats::D()] cannot differentiate leaves the rank uncomputed, and the
@@ -815,6 +820,17 @@ check_model.mpt <- function(model, data = NULL, formula = NULL) {
       branch expressions and cannot be predicted directly. Please remove the \\
       formula(s) for: {collapse_comma(user_cat_formulas)}"
     )
+    # brms would refuse the circular dependency only after the identifiability
+    # check has read the count column as a predictor
+    rhs_cats <- lapply(rhs_vars(formula, collapse = FALSE), intersect, resp_cats)
+    cat_predictor_formulas <- names(rhs_cats)[lengths(rhs_cats) > 0]
+    stopif(
+      length(cat_predictor_formulas) > 0,
+      "The response counts {collapse_comma(unique(unlist(rhs_cats)))} are what \\
+      the model predicts and cannot be predictors in a parameter formula. \\
+      Please remove them from the formula(s) for: \\
+      {collapse_comma(cat_predictor_formulas)}"
+    )
     nl_pars <- intersect(names(formula)[is_nl(formula)], names(model$parameters))
     nl_simplex <- intersect(nl_pars, unlist(model$other_vars$simplex))
     stopif(
@@ -837,7 +853,8 @@ check_model.mpt <- function(model, data = NULL, formula = NULL) {
         formulas are estimated on the identity scale with normal(0, 1) default \\
         priors, and their random-effect SDs keep brms's student_t(3, 0, 2.5) \\
         default. Apply any required transformation inside your formula and \\
-        adjust the priors to the scale of your predictors."
+        adjust the priors to the scale of your predictors. Whether the data \\
+        identify these parameters is not checked."
       )
     }
     model <- .mpt_bypass_links(model, nl_pars)
@@ -868,15 +885,28 @@ check_model.mpt <- function(model, data = NULL, formula = NULL) {
     }
 
     # population-level predictors can identify a parameter across design
-    # cells that a single cell leaves open, and a non-linear formula can tie
-    # parameters together, so the rank of the tree parameters is the rank of
-    # the fitted model only when no formula has either; otherwise a deficit
-    # is announced but not warned about
+    # cells that a single cell leaves open, also when they sit on a parameter
+    # outside the deficit (h ~ cond identifies D and r in h * r + (1 - h) * D),
+    # and a non-linear formula can tie parameters together. Without
+    # predictors there is one cell, so a deficit whose parameters no
+    # non-linear formula defines or reads is certain and warned about;
+    # otherwise it is announced only
     with_predictors <- .mpt_predictor_formulas(formula, names(model$parameters))
     identifiability <- .mpt_identifiability(model)
+    reached <- c(
+      nl_pars,
+      intersect(rhs_vars(formula[is_nl(formula)]), names(model$parameters))
+    )
+    # a simplex group is free through its sticks, so reaching a member reaches them
+    for (grp in model$other_vars$simplex) {
+      if (any(grp %in% reached)) {
+        reached <- c(reached, unname(model$other_vars$simplex_raw[grp[-length(grp)]]))
+      }
+    }
     if (is.null(identifiability$error) &&
           identifiability$rank < identifiability$n_free) {
-      if (length(with_predictors) == 0L && length(nl_pars) == 0L) {
+      if (length(with_predictors) == 0L &&
+            length(intersect(identifiability$involved, reached)) == 0L) {
         warning2(
           "{.mpt_rank_deficit_text(identifiability)} Along the non-identified \\
           direction(s), the posterior follows the prior."
@@ -896,8 +926,14 @@ check_model.mpt <- function(model, data = NULL, formula = NULL) {
             )
           }
         )
+        # design cells exist only where a formula has a data predictor
+        not_identified <- if (length(with_predictors) > 0) {
+          "within one design cell"
+        } else {
+          "by the branch expressions alone"
+        }
         message2(
-          "The tree parameters are not identified within one design cell \\
+          "The tree parameters are not identified {not_identified} \\
           (Jacobian rank {identifiability$rank} for \\
           {identifiability$n_free} free parameters; print(model) names the \\
           parameters involved). Whether {paste(unchecked, collapse = ' or ')} \\
