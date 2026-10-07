@@ -22,13 +22,22 @@
   unlist(lapply(as.list(expr)[-1], .mpt_scientific_constants)) %||% numeric(0)
 }
 
-# the constants as the user wrote them in the branch string; a value folded
-# from constant arithmetic (1/10000) has no written form and is deparsed
+# the constants as the user wrote them in the branch string, each followed by
+# the form brms writes when the two differ; a value folded from constant
+# arithmetic (1/10000) has no written form and is shown as brms writes it
 .mpt_written_constants <- function(expr, values) {
+  as_brms_writes <- function(value) {
+    withr::with_options(list(scipen = 0), deparse(value))
+  }
   tokens <- utils::getParseData(parse(text = expr, keep.source = TRUE))
   written <- tokens$text[tokens$token == "NUM_CONST"]
   written <- unique(written[suppressWarnings(as.numeric(written)) %in% values])
-  c(written, vapply(setdiff(values, as.numeric(written)), deparse, character(1)))
+  written <- c(
+    written,
+    vapply(setdiff(values, as.numeric(written)), as_brms_writes, character(1))
+  )
+  emitted <- vapply(as.numeric(written), as_brms_writes, character(1))
+  paste0("'", written, "'", ifelse(written == emitted, "", paste0(" (", emitted, ")")))
 }
 
 # Stan compiles a bare integer fraction like 1/4 or 1/(2*2) as integer
@@ -155,7 +164,7 @@
     "Order constraints such as '{text}' are not supported by the \\
     restrictions argument. Reparameterize the larger parameter instead, e.g. \\
     Do ~ Dn + (1 - Dn) * inv_logit(phi) in the model formula; see the section \\
-    'Ordered parameter constraints' of the MPT article."
+    'Order constraints' of the MPT article."
   )
 }
 
@@ -239,9 +248,10 @@
   })
 }
 
-# all parameters near 0 and all near 1, for the range check of covariate
-# branches. These two corners catch a covariate that pushes a branch out of
-# (0, 1] when the parameters enter the branch with one orientation; branches
+# all parameters near 0 and all near 1, for the range checks in mpt() and,
+# with the observed covariate values, in check_data(). These two corners catch
+# a branch (or a covariate) that leaves (0, 1] near the edge of the parameter
+# space when the parameters enter the branch with one orientation; branches
 # that mix a parameter with its complement can leave (0, 1] at other vertices,
 # which are not evaluated. A simplex group sits at a corner (one member takes the rest of the
 # mass), so its members stay positive and sum to 1.
@@ -267,7 +277,14 @@
 # differentiates exactly, so a null direction has a singular value at rounding
 # level (about 1e-16 relative) instead of the 1e-13 to 1e-11 left by central
 # differences. A branch that D() cannot differentiate (a function outside its
-# table) makes the check unavailable, never a false result.
+# table) makes the check unavailable, never a false result. A test point where
+# a derivative is not finite (a cusp such as ((c - k)^2)^0.25 at c = k, here or
+# at one covariate setting) is left out, as a point on a singular set is
+# outvoted, so a deficit at the other points is still reported. Outvoting needs
+# a second point, so with fewer than two points left the check is unavailable;
+# a derivative that is not finite at a covariate value in the data for every
+# point mostly comes with branches that are undefined there, which check_data()
+# reports by row.
 # Columns are scaled to unit norm, so a parameter that moves the probabilities
 # little at a test point is not mistaken for a redundant one. A parameter that
 # cancels from every branch can leave a rounding residue instead of an exact
@@ -292,11 +309,14 @@
 # on the simplex. A fixed stick keeps its column out of the free set.
 # Covariates identify parameters through rows with different covariate values,
 # so `settings` (one data frame of covariate values per tree) stacks one block
-# of rows per tree and setting before the decomposition; the degrees of freedom
-# grow with the number of blocks.
+# of rows per tree and setting; the degrees of freedom grow with the number of
+# blocks. The blocks enter `chunk_size` settings at a time through the R factor
+# of a QR decomposition, which leaves the rank, the zero columns and the null
+# space as they are for the full stack (the stick derivative is a
+# right-multiplication, so it applies to R as it would to the stack).
 .mpt_jacobian_rank <- function(trees, free, fixed = list(), simplex = list(),
                                sticks = character(0), settings = NULL,
-                               tolerance = 1e-8) {
+                               tolerance = 1e-8, chunk_size = 2000L) {
   # the counts are reported even when the rank cannot be computed; df is that
   # of one design cell, as print() states it
   counts <- list(
@@ -305,7 +325,7 @@
   )
   if (length(free) == 0L) {
     return(c(counts, list(
-      rank = 0L, involved = character(0), absent = character(0)
+      rank = 0L, involved = character(0), absent = character(0), left_out = 0L
     )))
   }
   trees <- unname(trees)
@@ -318,7 +338,10 @@
     }), recursive = FALSE)
   }), silent = TRUE)
   if (is_try_error(derivs)) {
-    return(c(counts, list(error = conditionMessage(attr(derivs, "condition")))))
+    return(c(counts, list(error = glue(
+      "stats::D() cannot differentiate the branch expressions \\
+      ({conditionMessage(attr(derivs, 'condition'))})"
+    ))))
   }
   settings <- settings %||% lapply(trees, function(tree) data.frame(row.names = 1L))
   # no rank exceeds the rows stacked over every setting
@@ -333,29 +356,47 @@
     vapply(points, `[[`, numeric(1), symbol)
   })
   vals[names(fixed)] <- fixed
-  # one matrix per tree: each derivative evaluated once over every setting and
-  # test point, the points varying fastest
+  # per test point, the R factor of a QR decomposition of the rows stacked so
+  # far: R'R = J'J, so column norms and the singular values of the
+  # column-scaled matrix are those of the full stack, while memory stays bounded
+  # by one chunk of settings. tol = 0 turns off LINPACK's column pivoting, so
+  # the columns stay in parameter order
   n_points <- length(points)
-  blocks <- Filter(Negate(is.null), lapply(seq_along(trees), function(tree) {
+  factors <- vector("list", n_points)
+  finite <- rep(TRUE, n_points)
+  for (tree in seq_along(trees)) {
     n_rows <- nrow(settings[[tree]])
-    if (n_rows == 0L) {
-      return(NULL)
-    }
-    row_vals <- lapply(vals, rep, times = n_rows)
-    row_vals[names(settings[[tree]])] <- lapply(
-      settings[[tree]], rep, each = n_points
-    )
-    vapply(derivs[[tree]], function(deriv) {
-      rep_len(eval(deriv, row_vals), n_rows * n_points)
-    }, numeric(n_rows * n_points))
-  }))
-  decompositions <- lapply(seq_along(points), function(point) {
-    jacobian <- do.call(rbind, lapply(blocks, function(block) {
-      matrix(
-        t(block[seq(point, nrow(block), by = n_points), , drop = FALSE]),
-        ncol = length(parameters), byrow = TRUE
+    for (rows in split(seq_len(n_rows), ceiling(seq_len(n_rows) / chunk_size))) {
+      # each derivative evaluated once over the chunk's settings and every test
+      # point, the points varying fastest
+      row_vals <- lapply(vals, rep, times = length(rows))
+      row_vals[names(settings[[tree]])] <- lapply(
+        settings[[tree]], function(column) rep(column[rows], each = n_points)
       )
-    }))
+      block <- vapply(derivs[[tree]], function(deriv) {
+        rep_len(eval(deriv, row_vals), length(rows) * n_points)
+      }, numeric(length(rows) * n_points))
+      for (point in which(finite)) {
+        point_block <- block[seq(point, nrow(block), by = n_points), , drop = FALSE]
+        # qr() stops on a non-finite entry with a bare foreign-call error
+        if (!all(is.finite(point_block))) {
+          finite[point] <- FALSE
+          next
+        }
+        factors[[point]] <- qr.R(qr(rbind(factors[[point]], matrix(
+          t(point_block), ncol = length(parameters), byrow = TRUE
+        )), tol = 0))
+      }
+    }
+  }
+  if (sum(finite) < 2L) {
+    return(c(counts, list(error = glue(
+      "at {length(finite) - sum(finite)} of the {length(finite)} interior \\
+      test values some derivative of the branch expressions is not finite"
+    ))))
+  }
+  decompositions <- lapply(which(finite), function(point) {
+    jacobian <- factors[[point]]
     colnames(jacobian) <- parameters
     for (grp in simplex) {
       jacobian <- cbind(
@@ -389,7 +430,8 @@
   c(counts, list(
     rank = best$rank,
     involved = free[rowSums(abs(null_space) > 1e-6) > 0],
-    absent = best$absent
+    absent = best$absent,
+    left_out = sum(!finite), n_points = n_points
   ))
 }
 
@@ -410,17 +452,39 @@
   member_jacobian %*% map
 }
 
-# the first branch-sum or branch-range violation per tree, NA where every test
-# point gives branches in (0, 1] that sum to 1. Branches can sum to 1 for every
-# value and still leave (0, 1] (2 * a and 1 - 2 * a); a branch below or at 0 is
-# log(p) of a non-positive number in Stan. All test points are interior, so an
-# exact 0 is a branch that is 0 for every value, e.g. (1 - a) * 0
+# the first undefined, branch-sum or branch-range violation per tree, NA where
+# every test point gives branches in (0, 1] that sum to 1. A branch that is not
+# a number (0 / 0) is NaN in Stan too. Branches can sum to 1 for every value and
+# still leave (0, 1] (2 * a and 1 - 2 * a); a branch below or at 0 is log(p) of
+# a non-positive number in Stan. At an interior point an exact 0 is a branch
+# that is 0 for every value, e.g. (1 - a) * 0, or one that underflows there,
+# e.g. (1 - D)^392 at D = 0.851; refusing the latter too is accepted, as no
+# realistic tree has such a power. At the two boundary corners a valid branch
+# may underflow to 0 or, written as 1 minus the others, cancel to just below it
+# (-8.5e-20 for seven stages), so only a branch below -tolerance counts there.
+# The corners catch a branch that leaves (0, 1] only near the edge of the
+# parameter space (1.2 * a - 0.2)
 .mpt_tree_branch_errors <- function(trees, parameters, simplex,
                                     tolerance = 1e-6) {
-  points <- .mpt_test_points(parameters, simplex)
+  interior <- .mpt_test_points(parameters, simplex)
+  points <- c(interior, .mpt_boundary_points(parameters, simplex))
   vapply(trees, function(tree) {
-    for (vals in points) {
+    for (point in seq_along(points)) {
+      vals <- points[[point]]
       probs <- .mpt_eval_branches(tree, as.list(vals))
+      at_values <- function(category) {
+        symbols <- all.vars(tree$branches[[category]])
+        paste(symbols, "=", signif(vals[symbols], 3), collapse = ", ")
+      }
+      undefined <- names(probs)[is.na(probs)][1]
+      if (!is.na(undefined)) {
+        return(glue(
+          "The branch probability of category '{undefined}' in tree \\
+          '{tree$name}' is not a number at the test values \\
+          {at_values(undefined)}, so the likelihood is undefined there. \\
+          Please check the branch expressions."
+        ))
+      }
       if (abs(sum(probs) - 1) > tolerance) {
         return(glue(
           "The branch probabilities of tree '{tree$name}' sum to \\
@@ -432,9 +496,9 @@
           three options) belong in the simplex argument."
         ))
       }
-      outside <- names(probs)[probs <= 0 | probs > 1 + tolerance][1]
+      too_low <- if (point <= length(interior)) probs <= 0 else probs < -tolerance
+      outside <- names(probs)[too_low | probs > 1 + tolerance][1]
       if (!is.na(outside)) {
-        symbols <- all.vars(tree$branches[[outside]])
         zero_hint <- if (probs[[outside]] == 0) {
           " A zero probability makes the likelihood undefined."
         } else {
@@ -443,8 +507,8 @@
         return(glue(
           "The branch probability of category '{outside}' in tree \\
           '{tree$name}' is {signif(probs[[outside]], 6)} at the test values \\
-          {paste(symbols, '=', signif(vals[symbols], 3), collapse = ', ')}, \\
-          outside (0, 1]. Please check the branch expressions.{zero_hint}"
+          {at_values(outside)}, outside (0, 1]. Please check the branch \\
+          expressions.{zero_hint}"
         ))
       }
     }
