@@ -681,8 +681,14 @@ check_model.mpt <- function(model, data = NULL, formula = NULL) {
             )
           }
         )
+        # design cells exist only where a formula has a data predictor
+        not_identified <- if (length(with_predictors) > 0) {
+          "within one design cell"
+        } else {
+          "by the branch expressions alone"
+        }
         message2(
-          "The tree parameters are not identified within one design cell \\
+          "The tree parameters are not identified {not_identified} \\
           (Jacobian rank {identifiability$rank} for \\
           {identifiability$n_free} free parameters; print(model) names the \\
           parameters involved). Whether {paste(unchecked, collapse = ' or ')} \\

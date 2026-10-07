@@ -483,12 +483,16 @@ test_that("the identifiability check counts a parameter fixed in the formula as 
     check_model(model, dat, bmf(Do ~ 1, Dn ~ 1, g ~ 0 + bias)),
     "within one design cell.*predictors on 'g' identify it across cells is not checked"
   ))
+  expect_message(
+    check_model(model, dat, bmf(Do ~ 1, Dn ~ Do, g ~ 0 + bias)),
+    "within one design cell.*'g' identify it across cells or the .* for 'Dn'"
+  )
 
   # the rank does not read non-linear formulas, so a deficit under one is
   # announced, not warned about, even when it is real as here
   expect_no_warning(expect_message(
     check_model(model, dat, bmf(Do ~ inv_logit(phi), phi ~ 1, Dn ~ 1, g ~ 1)),
-    "rank 2 for 3 free parameters.*formula\\(s\\) for 'Do' identify it is not checked"
+    "by the branch expressions alone \\(Jacobian rank 2 for 3 free.*'Do' identify it is not checked"
   ))
 })
 
@@ -503,7 +507,7 @@ test_that("a formula that ties parameters together is not reported as a rank def
   # Dn ~ Do identifies the model; the rank of the tree parameters cannot see it
   expect_no_warning(expect_message(
     tied <- check_model(model, dat, bmf(Do ~ 1, Dn ~ Do, g ~ 1)),
-    "non-linear formula\\(s\\) for 'Dn' identify it is not checked"
+    "by the branch expressions alone .*formula\\(s\\) for 'Dn' identify it is not checked"
   ))
   printed <- mpt_printed(tied)
   expect_match(printed, "1 combination\\(s\\) of all free parameters are not identified")
