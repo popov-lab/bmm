@@ -181,10 +181,10 @@ under it the same way, and \code{print()} of the checked model says the
 formula was not analysed. The check is local: it holds at the test
 values, not at the boundaries of the parameter space. A test value at
 which a derivative is not finite (in \code{bmm()}, also at a covariate value
-in the data) is left out, and the printout says how many were. A branch
+in the data) is left out, and the rank text says how many were. A branch
 expression with a function that \code{\link[stats:D]{stats::D()}} cannot differentiate, or a
-derivative that is not finite at every test value, leaves the rank
-uncomputed, and the printout says so; \code{bmm()} then reports only the
+derivative that is not finite at all but one of the test values, leaves
+the rank uncomputed, and the printout says so; \code{bmm()} then reports only the
 count, when the free parameters outnumber the degrees of freedom.
 
 \code{summary()} reports intercepts and regression coefficients on the latent
