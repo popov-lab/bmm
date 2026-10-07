@@ -300,6 +300,16 @@
   e.g. `bmf(c ~ exp(nlc), nlc ~ 1 + set_size)`. It now returns the grid
   over the predictors of every formula involved, as it does for linear
   formulas.
+- [`native_parameters()`](https://popov-lab.github.io/bmm/dev/reference/native_parameters.md)
+  failed with
+  `Cannot build a prediction grid: variable(s) 'p' are not columns of the model data`
+  for a fit whose formula links random effects across parameters,
+  e.g. `(1 |p| id)`, and for a nested grouping such as `(1 | g1/g2)`.
+  For **m3** fits,
+  [`conditional_effects()`](https://popov-lab.github.io/bmm/dev/reference/conditional_effects.bmmfit.md)
+  also listed the variables of a nested grouping as effects.
+  [`bmm_data_check()`](https://popov-lab.github.io/bmm/dev/reference/bmm_data_check.md)
+  reported the ID `p` as a missing data column. All three work now.
 - [`posterior_epred()`](https://mc-stan.org/rstantools/reference/posterior_epred.html)
   failed with `object 'posterior_epred_ddm' not found` (or the name of
   another model) on **ddm**, **cswald**, **ezdm**, **sdt_yn**,
