@@ -181,9 +181,9 @@ plot.mpt <- function(x, cex = 0.9, ...) {
 .mpt_edge_label_overhang <- function(position, labels, cex) {
   usr <- graphics::par("usr")
   x_per_inch <- (usr[2] - usr[1]) / graphics::par("pin")[1]
-  left <- position$x -
-    graphics::strwidth(labels, units = "inches", cex = cex) / 2 * x_per_inch
-  max(0, (usr[1] - min(left)) / x_per_inch)
+  max(0, (usr[1] - min(
+    position$x - graphics::strwidth(labels, units = "inches", cex = cex) / 2 * x_per_inch
+  )) / x_per_inch)
 }
 
 # centers each edge label beside its edge, at a fixed gap from the line: the
@@ -292,11 +292,9 @@ plot.mpt <- function(x, cex = 0.9, ...) {
       sum(vapply(out$expr, function(e) eval(str2lang(e), as.list(vals)), numeric(1)))
     }, numeric(1))
     if (all(abs(sums - 1) <= tolerance)) next
-    where <- .mpt_node_description(edges, node)
-    siblings <- collapse_comma(out$label)
     warning2(
-      "In the tree '{tree_name}', the edges leaving {where} do not sum to 1: \\
-      {siblings}. The diagram follows the order in which the factors are \\
+      "In the tree '{tree_name}', the edges leaving {.mpt_node_description(edges, node)} \\
+      do not sum to 1: {collapse_comma(out$label)}. The diagram follows the order in which the factors are \\
       written, so categories that write their factors in different orders \\
       end up under different nodes. Write the factors of all categories in the \\
       same order to get a tree in which every node's edges sum to 1."
@@ -325,11 +323,10 @@ plot.mpt <- function(x, cex = 0.9, ...) {
     return(FALSE)
   }
   # covariates may sum to 1 in the data only, unless a covariate comes with its complement
-  unpaired <- vapply(seq_along(kinds), function(i) {
+  !any(vapply(seq_along(kinds), function(i) {
     kinds[i] == "symbol" && symbols[i] %in% covariates &&
       !any(symbols[-i] == symbols[i] & kinds[-i] == "complement")
-  }, logical(1))
-  !any(unpaired)
+  }, logical(1)))
 }
 
 # classifies an edge expression as a simple probability: a symbol, a numeric
@@ -443,8 +440,10 @@ plot.mpt <- function(x, cex = 0.9, ...) {
     return(path)
   }
   join_from <- if (first == length(path)) first - 1L else first
-  edge_factors <- vapply(path[join_from:length(path)], .mpt_parenthesise_sum, character(1))
-  c(path[seq_len(join_from - 1L)], paste(edge_factors, collapse = " * "))
+  c(
+    path[seq_len(join_from - 1L)],
+    paste(vapply(path[join_from:length(path)], .mpt_parenthesise_sum, character(1)), collapse = " * ")
+  )
 }
 
 # position of the first multiplicity constant, NA if the path has none (a path
