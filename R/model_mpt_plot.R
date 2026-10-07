@@ -47,6 +47,9 @@
 #'   `1 - g (g = 0.5)`. Impossible categories are omitted. A literal 0 in an
 #'   expression (as in `D + 0 * x`) is drawn as an edge labelled 0. The `...`
 #'   argument is ignored; the title cannot be changed.
+#'   Every product of sums is expanded into all its paths, so each multiplied
+#'   sum such as `(a + b)` doubles the number of paths: trees with more than
+#'   about ten multiplied sums draw slowly.
 #'   Leaf labels wider than about 90% of a panel are clipped, and long edge
 #'   labels near the root can be clipped earlier, when the leaf labels leave
 #'   little room.
