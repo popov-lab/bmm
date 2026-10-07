@@ -256,7 +256,7 @@ test_that("mpt_from_eqn errors when a sanitized parameter name equals a covariat
   clash_file <- write_eqn(c("t yes a_b", "t no 1-a_b", "u yes ab*g", "u no 1-ab*g"))
   expect_error(
     mpt_from_eqn(clash_file, covariates = "ab", tree_id = "tr"),
-    "duplicated names or clashes with a covariate: 'ab'"
+    "turns parameters into covariate names: 'a_b' would read as 'ab'"
   )
   # without the covariate the same file is caught by the duplicate check
   expect_error(mpt_from_eqn(clash_file, tree_id = "tr"), "duplicated names")
@@ -1058,4 +1058,193 @@ test_that("mpt_from_eqn names the prefix strip in a merge message", {
     mpt_from_eqn(merge_file, categories = c(hit = "yes")),
     "tree old: 'old_yes', 'hit' -> yes \\(after removing the prefix 'old_' from 'old_yes'\\)"
   ))
+})
+
+test_that("mpt_from_eqn refuses a category label that is only its tree prefix", {
+  expect_error(
+    mpt_from_eqn(write_eqn(c("a a_ D", "a x 1-D", "b b_ g", "b y 1-g")), tree_id = "tr"),
+    "'a_' \\(becomes '', first on line 1\\)"
+  )
+})
+
+test_that("mpt_from_eqn strips the file's tree label, not the tree_names value", {
+  model <- suppressMessages(mpt_from_eqn(
+    write_eqn(c("1 1_hit D + (1-D)*g", "1 1_miss (1-D)*(1-g)",
+                "2 2_hit (1-D)*g", "2 2_miss D + (1-D)*(1-g)")),
+    tree_names = c("1" = "old", "2" = "new"), tree_id = "tr"
+  ))
+  expect_equal(model$resp_vars$resp_cats, c("hit", "miss"))
+})
+
+test_that("importers refuse factor, missing or empty values in categories", {
+  expect_error(
+    mpt_from_eqn(write_eqn(eqn_2htm_lines),
+                 categories = setNames(factor(eqn_2htm_map), names(eqn_2htm_map))),
+    "It is a factor"
+  )
+  expect_error(
+    mpt_from_string(c("D", "1-D"), tree_names = "t", categories = factor(c("yes", "no"))),
+    "categories vector must be a character vector"
+  )
+  expect_error(
+    mpt_from_string(c("D", "1-D"), tree_names = "t", categories = c("yes", NA)),
+    "categories vector must be a character vector"
+  )
+  expect_error(
+    mpt_from_string(c("D", "1-D"), tree_names = "t", categories = c("yes", "")),
+    "categories vector must be a character vector"
+  )
+})
+
+test_that("a category clash after sanitizing points to categories, not covariates", {
+  clash <- tryCatch(
+    mpt_from_eqn(write_eqn(c("old old_ab D", "old a_b 1-D")), tree_id = "tr"),
+    error = conditionMessage
+  )
+  expect_match(clash, "produces duplicated names: 'ab'")
+  expect_match(clash, "map them with the categories argument")
+  expect_no_match(clash, "covariate")
+})
+
+test_that("mpt_from_eqn names a parameter that sanitizing empties", {
+  expect_error(
+    mpt_from_eqn(write_eqn(c("t a .", "t b 1-.")), tree_id = "tr"),
+    "leaves empty names for '.'", fixed = TRUE
+  )
+})
+
+test_that("mpt_from_eqn leads with the title hint for a header like '6 # count'", {
+  expect_error(
+    mpt_from_eqn(write_eqn(c("6 # count", eqn_2htm_lines)),
+                 categories = eqn_2htm_map),
+    "^If line 1 is a title, delete it or start it with #\\.\nTree names"
+  )
+})
+
+test_that("a first line whose expression is 1 is a tree, not a title", {
+  one_line_tree <- tryCatch(
+    mpt_from_eqn(write_eqn(c(
+      "catch c1 1", "old hit D + (1-D)*g", "old miss (1-D)*(1-g)"
+    )), impossible = list(old = "c1")),
+    error = conditionMessage
+  )
+  expect_match(one_line_tree, "catch: 'hit', 'miss'")
+  expect_no_match(one_line_tree, "title")
+})
+
+test_that("mpt_from_string refuses duplicated tree_names before any message", {
+  expect_no_message(expect_error(
+    mpt_from_string(
+      c("D + (1-D)*g", "(1-D)*(1-g)", "", "(1-D)*g", "D + (1-D)*(1-g)"),
+      tree_names = c("a", "a"), categories = c("yes", "no")
+    ),
+    "tree_names repeats 'a'"
+  ))
+})
+
+test_that("importers refuse a tree named twice in impossible", {
+  expect_error(
+    mpt_from_string(
+      c("u # F1", "1-u # F2", "", "c # E1", "1-c # E2"),
+      tree_names = c("s", "p"),
+      impossible = list(s = "E1", s = "E2", p = c("F1", "F2"))
+    ),
+    "It names 's' more than once"
+  )
+})
+
+test_that("mpt_from_eqn points categories that sanitizing empties to categories", {
+  expect_error(
+    mpt_from_eqn(write_eqn(c("t _ g", "t .. (1-g)*h", "t b (1-g)*(1-h)"))),
+    paste0(
+      "'_' \\(becomes '', first on line 1\\), '..' \\(becomes '', first on ",
+      "line 2\\) valid names with the categories argument"
+    )
+  )
+  expect_error(
+    mpt_from_eqn(write_eqn(c("t a g", "t b 1-g")), categories = c(a = "_")),
+    "'a' \\(becomes '', first on line 1\\) valid names with the categories argument"
+  )
+})
+
+test_that("mpt_from_eqn names every parameter that sanitizing empties", {
+  expect_error(
+    mpt_from_eqn(write_eqn(c("t a .", "t b 1-.", "u a ..", "u b 1-.."))),
+    "leaves empty names for '.', '..'. Please rename", fixed = TRUE
+  )
+})
+
+test_that("mpt_from_eqn reports every sanitizing problem at once", {
+  expect_error(
+    mpt_from_eqn(
+      write_eqn(c(
+        "t x a_b", "t y 1-a_b", "u x a.b*c_d", "u y 1-a.b*c_d",
+        "v x .", "v y 1-.", "w x cd*g", "w y 1-cd*g"
+      )),
+      covariates = "cd"
+    ),
+    paste(
+      "leaves empty names for '.'; produces duplicated names: 'ab';",
+      "turns parameters into covariate names: 'c_d' would read as 'cd'.",
+      "Please rename them in the model file."
+    ),
+    fixed = TRUE
+  )
+})
+
+test_that("only a first-line expression of exactly 1 is read as a tree", {
+  hint <- "If line 1 is a title, delete it or start it with #"
+  expect_error(
+    suppressMessages(mpt_from_eqn(
+      write_eqn(c("Model version 2", eqn_2htm_lines)),
+      categories = eqn_2htm_map, tree_id = "item_type"
+    )),
+    hint, fixed = TRUE
+  )
+  expect_error(
+    suppressMessages(mpt_from_eqn(
+      write_eqn(c("catch c1 0.5", eqn_2htm_lines)),
+      categories = eqn_2htm_map, tree_id = "item_type"
+    )),
+    hint, fixed = TRUE
+  )
+  expect_error(
+    suppressMessages(mpt_from_eqn(
+      write_eqn(c("catch c1 0", eqn_2htm_lines)),
+      categories = eqn_2htm_map, tree_id = "item_type"
+    )),
+    hint, fixed = TRUE
+  )
+  # an inline comment does not hide the 1
+  commented <- tryCatch(
+    mpt_from_eqn(write_eqn(c(
+      "catch c1 1 # one-line tree", "old hit D + (1-D)*g", "old miss (1-D)*(1-g)"
+    )), impossible = list(old = "c1")),
+    error = conditionMessage
+  )
+  expect_match(commented, "catch: 'hit', 'miss'")
+  expect_no_match(commented, "title")
+})
+
+test_that("the title hint does not lead when the bad tree name is on a later line", {
+  expect_no_match(
+    tryCatch(
+      mpt_from_eqn(write_eqn(c("hdr a g", "2 a D", "2 b 1-D"))),
+      error = conditionMessage
+    ),
+    "title"
+  )
+})
+
+test_that("importers ask for names when impossible has empty names", {
+  unnamed <- tryCatch(
+    mpt_from_string(
+      c("u # F1", "1-u # F2", "", "c # E1", "1-c # E2"),
+      tree_names = c("s", "p"),
+      impossible = setNames(list("E1", "F1"), c("", ""))
+    ),
+    error = conditionMessage
+  )
+  expect_match(unnamed, "Every entry needs a name")
+  expect_no_match(unnamed, "more than once")
 })
