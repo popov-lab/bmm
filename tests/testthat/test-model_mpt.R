@@ -149,6 +149,19 @@ test_that("formulas for response categories are rejected", {
   )
 })
 
+test_that("response categories are refused as predictors before brms sees them", {
+  model <- mpt(mpt_2htm_trees(), tree_id = "item_type")
+  dat <- mpt_2htm_data()
+  expect_error(
+    bmm(bmf(D ~ old, g ~ 1), dat, model, backend = "mock", mock_fit = 1, rename = FALSE),
+    "response counts 'old' .* cannot be predictors.*formula\\(s\\) for: 'D'"
+  )
+  expect_error(
+    check_model(model, dat, bmf(D ~ inv_logit(k * new), k ~ 1, g ~ 1)),
+    "response counts 'new' .* cannot be predictors.*formula\\(s\\) for: 'D'"
+  )
+})
+
 test_that("mpt compiles for a multi-tree binary-category model", {
   model <- mpt(mpt_2htm_trees(), tree_id = "item_type")
   dat <- mpt_2htm_data()

@@ -611,7 +611,18 @@ check_model.mpt <- function(model, data = NULL, formula = NULL) {
       branch expressions and cannot be predicted directly. Please remove the \\
       formula(s) for: {collapse_comma(user_cat_formulas)}"
     )
-    nl_pars <- intersect(names(formula)[is_nl(formula)], names(model$parameters))
+    # brms would refuse the circular dependency only after the identifiability
+    # check has read the count column as a predictor
+    rhs_cats <- lapply(rhs_vars(formula, collapse = FALSE), intersect, resp_cats)
+    cat_predictor_formulas <- names(rhs_cats)[lengths(rhs_cats) > 0]
+    stopif(
+      length(cat_predictor_formulas) > 0,
+      "The response counts {collapse_comma(unique(unlist(rhs_cats)))} are what \\
+      the model predicts and cannot be predictors in a parameter formula. \\
+      Please remove them from the formula(s) for: \\
+      {collapse_comma(cat_predictor_formulas)}"
+    )
+    nl_pars <-intersect(names(formula)[is_nl(formula)], names(model$parameters))
     sub_pars <- .mpt_nl_subparameters(model, formula, data)
     no_formula <- setdiff(sub_pars, names(formula))
     stopif(
