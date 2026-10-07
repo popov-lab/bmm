@@ -36,7 +36,12 @@ Batchelder & Riefer (1999, Fig. 1). For example, \code{B * 2 * u * (1 - u)} draw
 one edge \code{B}, then one edge \code{2 * u * (1 - u)}. If the constant is at the start
 (\code{2 * u * (1 - u)}), the entire expression is one edge. If it is in the middle
 (\code{u * 2 * (1 - u)}), the constant and the factors after it join into one edge,
-and a trailing constant joins the factor before it.
+and a trailing constant joins the factor before it. The plot warns when this
+merging hides a process step: a factor after the constant that has no
+complement among the merged factors (\code{D * 2 * g * (1 - g) * r}), a factor
+separated from its complement by the constant (\code{u * 2 * (1 - u)}), or a
+quotient that contains a complement (\code{(1 - Pi) * 1 / 15} is one edge; write
+\code{(1 - Pi) * (1/15)}).
 Expressions are expanded distributively, so \code{Pm * (Pb + (1 - Pb) * 0.25)}
 displays two paths sharing the \code{Pm} edge.
 
@@ -55,6 +60,9 @@ restricted parameter shows the restriction in parentheses, as in
 \code{1 - g (g = 0.5)}. Impossible categories are omitted. A literal 0 in an
 expression (as in \code{D + 0 * x}) is drawn as an edge labelled 0. The \code{...}
 argument is ignored; the title cannot be changed.
+Every product of sums is expanded into all its paths, so each multiplied
+sum such as \code{(a + b)} doubles the number of paths: trees with more than
+about ten multiplied sums draw slowly.
 Leaf labels wider than about 90\% of a panel are clipped, and long edge
 labels near the root can be clipped earlier, when the leaf labels leave
 little room.

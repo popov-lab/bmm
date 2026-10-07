@@ -23,7 +23,12 @@
 #'   one edge `B`, then one edge `2 * u * (1 - u)`. If the constant is at the start
 #'   (`2 * u * (1 - u)`), the entire expression is one edge. If it is in the middle
 #'   (`u * 2 * (1 - u)`), the constant and the factors after it join into one edge,
-#'   and a trailing constant joins the factor before it.
+#'   and a trailing constant joins the factor before it. The plot warns when this
+#'   merging hides a process step: a factor after the constant that has no
+#'   complement among the merged factors (`D * 2 * g * (1 - g) * r`), a factor
+#'   separated from its complement by the constant (`u * 2 * (1 - u)`), or a
+#'   quotient that contains a complement (`(1 - Pi) * 1 / 15` is one edge; write
+#'   `(1 - Pi) * (1/15)`).
 #'   Expressions are expanded distributively, so `Pm * (Pb + (1 - Pb) * 0.25)`
 #'   displays two paths sharing the `Pm` edge.
 #'
@@ -42,6 +47,9 @@
 #'   `1 - g (g = 0.5)`. Impossible categories are omitted. A literal 0 in an
 #'   expression (as in `D + 0 * x`) is drawn as an edge labelled 0. The `...`
 #'   argument is ignored; the title cannot be changed.
+#'   Every product of sums is expanded into all its paths, so each multiplied
+#'   sum such as `(a + b)` doubles the number of paths: trees with more than
+#'   about ten multiplied sums draw slowly.
 #'   Leaf labels wider than about 90% of a panel are clipped, and long edge
 #'   labels near the root can be clipped earlier, when the leaf labels leave
 #'   little room.
@@ -103,6 +111,7 @@ plot.mpt <- function(x, cex = 0.9, ...) {
   graph <- .mpt_tree_graph(x)
   graph$edges$label <- .mpt_restricted_labels(graph$edges, restrictions)
   .mpt_warn_sibling_sums(graph, x$name, simplex, covariates, restrictions)
+  .mpt_warn_merged_factors(x)
   old_par <- graphics::par(mar = c(0.5, 0.5, 2, 0.5))
   on.exit(graphics::par(old_par))
 
@@ -172,9 +181,9 @@ plot.mpt <- function(x, cex = 0.9, ...) {
 .mpt_edge_label_overhang <- function(position, labels, cex) {
   usr <- graphics::par("usr")
   x_per_inch <- (usr[2] - usr[1]) / graphics::par("pin")[1]
-  left <- position$x -
-    graphics::strwidth(labels, units = "inches", cex = cex) / 2 * x_per_inch
-  max(0, (usr[1] - min(left)) / x_per_inch)
+  max(0, (usr[1] - min(
+    position$x - graphics::strwidth(labels, units = "inches", cex = cex) / 2 * x_per_inch
+  )) / x_per_inch)
 }
 
 # centers each edge label beside its edge, at a fixed gap from the line: the
@@ -199,10 +208,57 @@ plot.mpt <- function(x, cex = 0.9, ...) {
   width <- graphics::strwidth(edges$label, units = "inches", cex = cex)
   height <- graphics::strheight(edges$label, units = "inches", cex = cex)
   distance <- 0.4 * height + abs(normal_x) * width / 2 + abs(normal_y) * height / 2
+  x <- edges$x0 + 0.6 * (edges$x1 - edges$x0) + normal_x * distance * x_per_inch
+  y <- edges$y0 + 0.6 * (edges$y1 - edges$y0) + normal_y * distance * y_per_inch
   list(
-    x = edges$x0 + 0.6 * (edges$x1 - edges$x0) + normal_x * distance * x_per_inch,
-    y = edges$y0 + 0.6 * (edges$y1 - edges$y0) + normal_y * distance * y_per_inch
+    x = x,
+    y = .mpt_separate_labels(x / x_per_inch, y / y_per_inch, width, height) * y_per_inch
   )
+}
+
+# labels of neighbouring edges can overprint in a dense tree, where the long
+# restriction labels ("1 - g (g = 0.5)") are wider than the gap between the
+# edges. Overlapping boxes are pushed apart vertically, each by half the
+# overlap, until none overlaps or the passes run out; a box is 50% taller than
+# the text height, which leaves out descenders and parentheses, so that labels
+# end up apart rather than touching. All arguments are in inches. Trees of more
+# than 2500 edges (11 multiplied sums) are left alone: the sweep costs more
+# than the drawing then, and no panel makes their labels readable
+.mpt_separate_labels <- function(x, y, width, height, max_passes = 100L) {
+  if (length(y) > 2500L) {
+    return(y)
+  }
+  height <- 1.5 * height
+  for (pass in seq_len(max_passes)) {
+    pairs <- .mpt_overlapping_labels(x, y, width, height)
+    if (nrow(pairs) == 0L) {
+      break
+    }
+    shift <- (height[pairs[, 1]] + height[pairs[, 2]]) / 2 - (y[pairs[, 2]] - y[pairs[, 1]])
+    moves <- rowsum(c(-shift, shift) / 2, c(pairs[, 1], pairs[, 2]))
+    y[as.integer(rownames(moves))] <- y[as.integer(rownames(moves))] + moves[, 1]
+  }
+  y
+}
+
+# the pairs of label boxes that overlap, as a matrix with the lower label of
+# each pair first. Labels are swept in order of height, so only labels within
+# one box height of each other are compared; the trees of many multiplied sums
+# have thousands of edges
+.mpt_overlapping_labels <- function(x, y, width, height) {
+  by_y <- order(y)
+  pairs <- matrix(integer(0), ncol = 2)
+  for (step in seq_len(length(y) - 1L)) {
+    lower <- by_y[seq_len(length(y) - step)]
+    upper <- by_y[seq_len(length(y) - step) + step]
+    close <- (height[lower] + height[upper]) / 2 > y[upper] - y[lower]
+    if (!any(close)) {
+      break
+    }
+    overlapping <- close & (width[lower] + width[upper]) / 2 > abs(x[lower] - x[upper])
+    pairs <- rbind(pairs, cbind(lower[overlapping], upper[overlapping]))
+  }
+  pairs
 }
 
 # the edges leaving a node are the branches of one process step, so their
@@ -236,11 +292,9 @@ plot.mpt <- function(x, cex = 0.9, ...) {
       sum(vapply(out$expr, function(e) eval(str2lang(e), as.list(vals)), numeric(1)))
     }, numeric(1))
     if (all(abs(sums - 1) <= tolerance)) next
-    where <- .mpt_node_description(edges, node)
-    siblings <- collapse_comma(out$label)
     warning2(
-      "In the tree '{tree_name}', the edges leaving {where} do not sum to 1: \\
-      {siblings}. The diagram follows the order in which the factors are \\
+      "In the tree '{tree_name}', the edges leaving {.mpt_node_description(edges, node)} \\
+      do not sum to 1: {collapse_comma(out$label)}. The diagram follows the order in which the factors are \\
       written, so categories that write their factors in different orders \\
       end up under different nodes. Write the factors of all categories in the \\
       same order to get a tree in which every node's edges sum to 1."
@@ -269,11 +323,10 @@ plot.mpt <- function(x, cex = 0.9, ...) {
     return(FALSE)
   }
   # covariates may sum to 1 in the data only, unless a covariate comes with its complement
-  unpaired <- vapply(seq_along(kinds), function(i) {
+  !any(vapply(seq_along(kinds), function(i) {
     kinds[i] == "symbol" && symbols[i] %in% covariates &&
       !any(symbols[-i] == symbols[i] & kinds[-i] == "complement")
-  }, logical(1))
-  !any(unpaired)
+  }, logical(1)))
 }
 
 # classifies an edge expression as a simple probability: a symbol, a numeric
@@ -349,6 +402,10 @@ plot.mpt <- function(x, cex = 0.9, ...) {
 # and any other subexpression (parameters, complements, constants, covariates)
 # is one atomic edge label
 .mpt_branch_paths <- function(expr) {
+  lapply(.mpt_raw_paths(expr), .mpt_collapse_multiplicity)
+}
+
+.mpt_raw_paths <- function(expr) {
   expand <- function(node) {
     if (is.call(node)) {
       op <- if (is.symbol(node[[1]])) as.character(node[[1]]) else ""
@@ -369,7 +426,7 @@ plot.mpt <- function(x, cex = 0.9, ...) {
     }
     list(deparse1(node))
   }
-  lapply(expand(expr), .mpt_collapse_multiplicity)
+  expand(expr)
 }
 
 # a constant factor above 1 (the 2 in 2 * u * (1 - u)) counts outcomes rather
@@ -378,13 +435,24 @@ plot.mpt <- function(x, cex = 0.9, ...) {
 # one edge; written last, it joins the factor before it; otherwise it and
 # every factor after it form one edge
 .mpt_collapse_multiplicity <- function(path) {
-  first <- which(vapply(path, .mpt_is_multiplicity, logical(1)))[1]
-  if (is.na(first) || length(path) == 1L) {
+  first <- .mpt_multiplicity_position(path)
+  if (is.na(first)) {
     return(path)
   }
-  join_from <- if (first == 1L) 1L else if (first == length(path)) first - 1L else first
-  edge_factors <- vapply(path[join_from:length(path)], .mpt_parenthesise_sum, character(1))
-  c(path[seq_len(join_from - 1L)], paste(edge_factors, collapse = " * "))
+  join_from <- if (first == length(path)) first - 1L else first
+  c(
+    path[seq_len(join_from - 1L)],
+    paste(vapply(path[join_from:length(path)], .mpt_parenthesise_sum, character(1)), collapse = " * ")
+  )
+}
+
+# position of the first multiplicity constant, NA if the path has none (a path
+# of one factor is an edge of its own, whatever it is)
+.mpt_multiplicity_position <- function(path) {
+  if (length(path) == 1L) {
+    return(NA_integer_)
+  }
+  which(vapply(path, .mpt_is_multiplicity, logical(1)))[1]
 }
 
 .mpt_is_multiplicity <- function(factor_label) {
@@ -399,6 +467,81 @@ plot.mpt <- function(x, cex = 0.9, ...) {
   is_sum <- is.call(parsed) && is.symbol(parsed[[1]]) &&
     as.character(parsed[[1]]) %in% c("+", "-")
   if (is_sum) paste0("(", factor_label, ")") else factor_label
+}
+
+# the drawing merges the factors after a multiplicity constant, and a quotient
+# is one edge, so some expressions are drawn without a node the writer meant:
+# a factor swallowed by the constant, a factor split from its complement by it,
+# or a complement inside a quotient. One warning per tree lists the paths
+.mpt_warn_merged_factors <- function(tree) {
+  notes <- unlist(lapply(names(tree$branches), function(resp_cat) {
+    paths <- .mpt_raw_paths(tree$branches[[resp_cat]])
+    lapply(paths, function(path) {
+      note <- .mpt_merged_factors_note(path)
+      if (!is.null(note)) {
+        glue("branch '{resp_cat}': {note}")
+      }
+    })
+  }))
+  if (length(notes) == 0L) {
+    return(invisible(NULL))
+  }
+  details <- paste(unique(notes), collapse = "; ")
+  warning2(
+    "In the tree '{tree$name}', the drawing merges factors into one edge where \\
+    the expression may mean separate process steps: {details}. A constant above \\
+    1 takes the factors after it into its edge, and a quotient is a single \\
+    edge. Write the constant directly before the factors it counts, as in \\
+    (1 - c) * 2 * u * (1 - u), and fractions of a path as (1/15)."
+  )
+  invisible(NULL)
+}
+
+# NULL when the path draws as written
+.mpt_merged_factors_note <- function(path) {
+  factors <- lapply(path, function(factor_label) .mpt_strip_parens(str2lang(factor_label)))
+  quotient <- vapply(factors, .mpt_is_quotient_with_complement, logical(1))
+  path_text <- paste(vapply(path, .mpt_parenthesise_sum, character(1)), collapse = " * ")
+  if (any(quotient)) {
+    return(glue("{path_text} is one edge, so the complement it contains is not a node"))
+  }
+  constant <- .mpt_multiplicity_position(path)
+  # a leading constant makes the whole path one edge, as documented
+  if (is.na(constant) || constant == 1L) {
+    return(NULL)
+  }
+  own <- vapply(factors, deparse1, character(1))
+  complement_of <- vapply(factors, function(f) {
+    base <- .mpt_complement_base(f)
+    if (is.null(base)) NA_character_ else deparse1(base)
+  }, character(1))
+  has_partner <- function(i, pool) {
+    any(complement_of[pool] == own[i] | own[pool] == complement_of[i], na.rm = TRUE)
+  }
+  merged <- constant:length(path)
+  merged_steps <- merged[lengths(lapply(factors[merged], all.vars)) > 0L]
+  split_pair <- any(vapply(merged_steps, has_partner, logical(1), pool = seq_len(constant - 1L)))
+  swallowed <- length(merged_steps) >= 2L &&
+    !all(vapply(merged_steps, has_partner, logical(1), pool = merged_steps))
+  if (split_pair || swallowed) {
+    glue("{path_text}, where the drawing merges the factors after the constant {path[constant]} into one edge")
+  }
+}
+
+.mpt_is_quotient_with_complement <- function(parsed) {
+  is_quotient <- is.call(parsed) && identical(parsed[[1]], quote(`/`))
+  if (!is_quotient) {
+    return(FALSE)
+  }
+  numerator_factors <- function(node) {
+    node <- .mpt_strip_parens(node)
+    if (is.call(node) && identical(node[[1]], quote(`*`))) {
+      c(numerator_factors(node[[2]]), numerator_factors(node[[3]]))
+    } else {
+      list(node)
+    }
+  }
+  any(vapply(numerator_factors(parsed[[2]]), function(f) !is.null(.mpt_complement_base(f)), logical(1)))
 }
 
 # merges the paths of all branch expressions into a prefix trie and computes

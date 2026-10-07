@@ -101,6 +101,38 @@ label_extents <- function(tree, width, height, cex = 0.9, pointsize = 12) {
   extents
 }
 
+# draws the model on a pdf device and returns the pairs of edge labels whose
+# boxes overlap, measured in inches and 30% taller than the text height (which
+# leaves out descenders and parentheses)
+overlapping_edge_labels <- function(model, width, height, cex = 0.9) {
+  boxes <- data.frame()
+  record <- function(x, y = NULL, labels = y, ...) {
+    args <- list(...)
+    if (!is.null(args$pos)) {
+      return(invisible())
+    }
+    usr <- graphics::par("usr")
+    boxes <<- rbind(boxes, data.frame(
+      x = (x - usr[1]) / (usr[2] - usr[1]) * graphics::par("pin")[1],
+      y = (y - usr[3]) / (usr[4] - usr[3]) * graphics::par("pin")[2],
+      width = graphics::strwidth(labels, units = "inches", cex = args$cex),
+      height = 1.3 * graphics::strheight(labels, units = "inches", cex = args$cex),
+      label = labels
+    ))
+  }
+  withr::with_pdf(
+    NULL,
+    testthat::with_mocked_bindings(
+      suppressWarnings(plot(model, cex = cex)), text = record, .package = "graphics"
+    ),
+    width = width, height = height
+  )
+  overlap_x <- outer(boxes$width, boxes$width, `+`) / 2 - abs(outer(boxes$x, boxes$x, `-`))
+  overlap_y <- outer(boxes$height, boxes$height, `+`) / 2 - abs(outer(boxes$y, boxes$y, `-`))
+  pairs <- which(overlap_x > 0 & overlap_y > 0 & upper.tri(overlap_x), arr.ind = TRUE)
+  as.character(paste(boxes$label[pairs[, 1]], "<>", boxes$label[pairs[, 2]])[nrow(pairs) > 0])
+}
+
 test_that("branch expressions expand into root-to-leaf paths", {
   paths <- .mpt_branch_paths(quote(D + (1 - D) * g))
   expect_equal(paths, list("D", c("1 - D", "g")))
@@ -180,6 +212,62 @@ test_that("a package tree with the constant written first keeps it in one root e
   root_edges <- graph$edges[graph$edges$x0 == 0, ]
   expect_setequal(root_edges$label, c("cp", "1 - cp", "2 * (1 - cp) * rp * (1 - rp)"))
   expect_false("2" %in% graph$edges$label)
+})
+
+test_that("plot() warns once per tree when a constant above 1 hides a later process step", {
+  withr::local_pdf(NULL)
+  swallowed <- mpt_tree("swallowed", list(
+    A = "D * 2 * g * (1 - g) * r",
+    B = "D * 2 * g * (1 - g) * (1 - r)",
+    C = "D * (g^2 + (1 - g)^2)",
+    E = "1 - D"
+  ))
+  messages <- character(0)
+  withCallingHandlers(
+    plot(swallowed),
+    warning = function(w) {
+      messages <<- c(messages, conditionMessage(w))
+      invokeRestart("muffleWarning")
+    }
+  )
+  expect_length(messages, 1)
+  expect_match(messages, "In the tree 'swallowed'", fixed = TRUE)
+  expect_match(messages, "branch 'A': D * 2 * g * (1 - g) * r", fixed = TRUE)
+  expect_match(messages, "branch 'B': D * 2 * g * (1 - g) * (1 - r)", fixed = TRUE)
+  expect_match(messages, "merges the factors after the constant 2", fixed = TRUE)
+
+  # the constant splits a factor from its complement
+  expect_warning(
+    plot(mpt_tree("split", list(a = "u * 2 * (1 - u)", b = "1 - u"))),
+    "branch 'a': u * 2 * (1 - u)", fixed = TRUE
+  )
+})
+
+test_that("plot() warns when a quotient hides a complement", {
+  withr::local_pdf(NULL)
+  quotient <- mpt_tree("quotient", list(
+    a = "(1 - Pi) * 1 / 15", b = "Pi + (1 - Pi) * 14 / 15"
+  ))
+  expect_warning(
+    plot(quotient),
+    "branch 'a': (1 - Pi) * 1/15 is one edge", fixed = TRUE
+  )
+})
+
+test_that("plot() stays silent about constants that merge cleanly", {
+  withr::local_pdf(NULL)
+  silent <- list(
+    pairs_tree(),
+    mpt_tree("leading", list(a = "2 * (1 - c) * u * (1 - u)", b = "c")),
+    mpt_tree("trailing", list(a = "(1 - c) * u * (1 - u) * 2", b = "c")),
+    mpt_tree("single", list(a = "(1 - c) * 3", b = "c")),
+    mpt_tree("one_step", list(a = "D * 2 * r", b = "1 - D")),
+    mpt_tree("constants", list(a = "(1 - Pi) * 10 * (1/15)", b = "Pi")),
+    mpt_tree("folded", list(a = "(1 - Pi) * (1/15)", b = "Pi + (1 - Pi) * (14/15)"))
+  )
+  for (tree in silent) {
+    expect_silent(plot(tree))
+  }
 })
 
 test_that("the Oberauer (2019) tree keeps its structure", {
@@ -424,9 +512,6 @@ test_that("valid models whose edges are not simple probabilities plot without a 
   withr::local_pdf(NULL)
   trees <- list(
     complement_of_a_product = mpt_tree("t", list(hit = "D * G", miss = "1 - D * G")),
-    division_by_a_constant = mpt_tree("t", list(
-      a = "D + (1 - D) * g / 2", b = "(1 - D) * g / 2", c = "(1 - D) * (1 - g)"
-    )),
     factor_with_a_constant = mpt_tree("t", list(
       yes = "(Do) + ((1 - Do) * guess * 0.25)", no = "(1 - Do) * (1 - guess * 0.25)"
     )),
@@ -442,16 +527,35 @@ test_that("valid models whose edges are not simple probabilities plot without a 
   )
   for (name in names(trees)) {
     expect_silent(plot(trees[[name]]))
-    expect_silent(plot(mpt(trees[[name]])))
+    if (name != "zero_product") expect_silent(plot(mpt(trees[[name]])))
   }
+  # mpt() refuses a branch that is 0 for every value; the tree still draws
+  expect_error(mpt(trees$zero_product), "outside \\(0, 1\\]")
   in_a_node <- mpt_tree("t", list(
     hit = "G * D + (1 - G * D) * gA", other = "(1 - G * D) * gB", miss = "(1 - G * D) * gC"
   ))
   expect_silent(plot(mpt(in_a_node, simplex = list(c("gA", "gB", "gC")))))
-  with_covariate <- mpt_tree("t", list(
-    hit = "D + (1 - D)/ss", miss = "(1 - D) * (1 - 1/ss)"
-  ))
-  expect_silent(plot(mpt(with_covariate, covariates = "ss")))
+  # quotient edges are not checked for their sum; the quotient warning is
+  # tested apart
+  quotients <- list(
+    mpt(mpt_tree("t", list(
+      a = "D + (1 - D) * g / 2", b = "(1 - D) * g / 2", c = "(1 - D) * (1 - g)"
+    ))),
+    mpt(mpt_tree("t", list(
+      hit = "D + (1 - D)/ss", miss = "(1 - D) * (1 - 1/ss)"
+    )), covariates = "ss")
+  )
+  for (model in quotients) {
+    messages <- character(0)
+    withCallingHandlers(
+      plot(model),
+      warning = function(w) {
+        messages <<- c(messages, conditionMessage(w))
+        invokeRestart("muffleWarning")
+      }
+    )
+    expect_false(any(grepl("do not sum to 1", messages, fixed = TRUE)))
+  }
 })
 
 test_that("covariates that sum to 1 only in the data are not checked", {
@@ -607,6 +711,51 @@ test_that("edge labels and leaf labels stay inside the plot region", {
   expect_gte(min(extents$left), -0.02 * extents$plot_width[1])
   expect_lte(max(extents$right), 1.02 * extents$plot_width[1])
   expect_equal(sum(extents$kind == "edge"), 4)
+})
+
+test_that("labels of neighbouring edges do not overlap in a dense tree", {
+  # four binary process steps with restricted parameters: the long restriction
+  # labels of neighbouring edges used to overprint at these sizes
+  steps <- expand.grid(A = 0:1, B = 0:1, C = 0:1, D = 0:1)
+  branches <- apply(steps, 1, function(row) {
+    paste(ifelse(row == 1, names(row), paste0("(1 - ", names(row), ")")), collapse = " * ")
+  })
+  dense <- mpt(
+    mpt_tree("dense", as.list(setNames(branches, paste0("c", seq_along(branches))))),
+    restrictions = c("B = 0.571", "C = 0.2", "D = 0.125")
+  )
+  for (size in list(c(4, 3), c(5, 3), c(6, 4), c(8, 6))) {
+    expect_identical(overlapping_edge_labels(dense, size[1], size[2]), character(0))
+  }
+})
+
+test_that("the plot window makes room for the farthest edge label and no more", {
+  # the room a label needs depends on the window it is placed in, so the window
+  # is found in a few passes; without them the label leaves the plot region
+  root_long <- mpt_tree("root_long", list(
+    a = "Very_Long_Parameter_Name_One_abc * g",
+    b = "Very_Long_Parameter_Name_One_abc * (1 - g)",
+    c = "1 - Very_Long_Parameter_Name_One_abc"
+  ))
+  for (size in list(c(5, 4), c(4.5, 3.5), c(4, 3))) {
+    extents <- label_extents(root_long, size[1], size[2])
+    leftmost <- min(extents$left[extents$kind == "edge"])
+    expect_gte(leftmost, -0.02)
+    expect_lt(leftmost, 0.05)
+  }
+})
+
+test_that("label boxes are pushed apart vertically and a huge tree is left alone", {
+  y <- .mpt_separate_labels(
+    x = c(0, 0.5, 5), y = c(1, 1.05, 1), width = c(2, 2, 2), height = c(0.1, 0.1, 0.1)
+  )
+  expect_gt(y[2] - y[1], 0.15)
+  expect_equal(y[3], 1)
+  n <- 3000
+  expect_identical(
+    .mpt_separate_labels(rep(0, n), rep(1, n), rep(2, n), rep(0.1, n)),
+    rep(1, n)
+  )
 })
 
 test_that("edge labels sit beside their edge on the outer side of a fan", {

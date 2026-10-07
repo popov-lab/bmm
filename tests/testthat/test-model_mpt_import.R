@@ -13,10 +13,10 @@ test_that("mpt_from_string parses MPTinR-style model definitions", {
   expect_equal(model$other_vars$trees, manual$other_vars$trees)
   expect_equal(names(model$parameters), names(manual$parameters))
 
-  summed <- mpt_from_string(
+  summed <- suppressMessages(mpt_from_string(
     "D # hit\n(1 - D) * g # hit\n(1 - D) * (1 - g) # miss",
     tree_names = "old"
-  )
+  ))
   expect_equal(deparse1(summed$other_vars$trees$old$branches$hit), "(D) + ((1 - D) * g)")
 
   no_comments <- mpt_from_string(
@@ -32,6 +32,32 @@ test_that("mpt_from_string parses MPTinR-style model definitions", {
   expect_error(
     mpt_from_string("D + (1 - D) * g\n(1 - D) * (1 - g)", tree_names = "old"),
     "categories"
+  )
+})
+
+test_that("mpt_from_string says when it sums lines that share a category", {
+  expect_message(
+    mpt_from_string(
+      "D # hit\n(1 - D) * g # hit\n(1 - D) * (1 - g) # miss",
+      tree_names = "old"
+    ),
+    "tree old: 'line 1', 'line 2' -> hit"
+  )
+  # the label may come from the categories argument, and each tree is named
+  expect_message(
+    mpt_from_string(
+      c("D", "(1 - D) * g", "(1 - D) * (1 - g)", "", "g", "1 - g"),
+      tree_names = c("old", "new"), tree_id = "item_type",
+      categories = list(old = c("hit", "hit", "miss"), new = c("hit", "miss"))
+    ),
+    "tree old: 'line 1', 'line 2' -> hit"
+  )
+  expect_no_message(
+    mpt_from_string(
+      "D # hit\n1 - D # miss\n\ng # hit\n1 - g # miss",
+      tree_names = c("old", "new"), tree_id = "item_type"
+    ),
+    message = "share a response category"
   )
 })
 
@@ -224,6 +250,22 @@ test_that("mpt_from_eqn errors when sanitizing merges categories across trees", 
     )), tree_id = "t"),
     "duplicated names"
   )
+})
+
+test_that("mpt_from_eqn errors when a sanitized parameter name equals a covariate", {
+  clash_file <- write_eqn(c("t yes a_b", "t no 1-a_b", "u yes ab*g", "u no 1-ab*g"))
+  expect_error(
+    mpt_from_eqn(clash_file, covariates = "ab", tree_id = "tr"),
+    "duplicated names or clashes with a covariate: 'ab'"
+  )
+  # without the covariate the same file is caught by the duplicate check
+  expect_error(mpt_from_eqn(clash_file, tree_id = "tr"), "duplicated names")
+
+  # a covariate that the sanitizing leaves alone is no clash
+  model <- suppressMessages(mpt_from_eqn(
+    write_eqn(c("t yes a_b*x_1", "t no 1-a_b*x_1")), covariates = "x_1"
+  ))
+  expect_equal(names(model$parameters), "ab")
 })
 
 test_that("mpt_from_eqn skips # comment lines", {
@@ -554,6 +596,74 @@ test_that("mpt_from_eqn errors on an unnamed categories vector", {
   expect_error(
     mpt_from_eqn(eqn_file, categories = c(a = "x", "y")),
     "named character vector"
+  )
+})
+
+test_that("mpt_from_eqn refuses a categories or tree_names map that is not one name per entry", {
+  eqn_file <- write_eqn(c(
+    "old hit D", "old hit (1-D)*g", "old miss (1-D)*(1-g)",
+    "new fa (1-D)*g", "new cr D", "new cr (1-D)*(1-g)"
+  ))
+  expect_error(
+    mpt_from_eqn(eqn_file, categories = list(
+      hit = c("yes", "no"), miss = "no", fa = "yes", cr = "no"
+    )),
+    "categories.*'hit' has 2 values"
+  )
+  expect_error(
+    mpt_from_eqn(eqn_file, categories = as.list(eqn_2htm_map)),
+    "categories.*named character vector.*It is a list"
+  )
+  expect_error(
+    mpt_from_eqn(
+      eqn_file, categories = c(hit = "yes", hit = "no", miss = "no", fa = "yes")
+    ),
+    "categories.*'hit' is given more than once"
+  )
+  expect_error(
+    mpt_from_eqn(eqn_file, categories = c(hit = "", miss = "no")),
+    "categories.*'hit' has no value"
+  )
+  expect_error(
+    mpt_from_eqn(eqn_file, categories = c(hit = "yes", "no")),
+    "categories.*named character vector"
+  )
+
+  numbered <- write_eqn(c("1 yes g", "1 no 1-g", "2 yes h", "2 no 1-h"))
+  expect_error(
+    mpt_from_eqn(numbered, tree_names = list("1" = c("old", "new"))),
+    "tree_names.*'1' has 2 values"
+  )
+  expect_error(
+    mpt_from_eqn(numbered, tree_names = c("1" = "old", "1" = "new")),
+    "tree_names.*'1' is given more than once"
+  )
+  expect_error(
+    mpt_from_eqn(numbered, tree_names = list("1" = "old", "2" = "new")),
+    "tree_names.*named character vector.*It is a list"
+  )
+})
+
+test_that("mpt_from_string checks the entries of a categories list by tree", {
+  model_text <- c("D", "1 - D", "", "g", "1 - g")
+  by_tree <- function(categories) {
+    mpt_from_string(
+      model_text, tree_names = c("old", "new"), tree_id = "item_type",
+      categories = categories
+    )
+  }
+  expect_no_error(by_tree(list(old = c("yes", "no"), new = c("yes", "no"))))
+  expect_error(
+    by_tree(list(old = c("yes", "no"), old = c("no", "yes"), new = c("yes", "no"))),
+    "names a tree more than once: 'old'"
+  )
+  expect_error(
+    by_tree(list(old = c("yes", NA), new = c("yes", "no"))),
+    "character vectors without missing or empty values.*'old'"
+  )
+  expect_error(
+    by_tree(list(old = c("yes", "no"), new = 1:2)),
+    "character vectors without missing or empty values.*'new'"
   )
 })
 
