@@ -249,6 +249,26 @@ test_that(".apply_link_transform transforms all elements in list", {
 
 
 # ===========================================================================
+# Tier 1: Unit tests — .ce_prediction_grid()
+# ===========================================================================
+
+test_that("m3 prediction grid is valid brms data when rows differ in trials (#510)", {
+  model <- m3(resp_cats = c("corr", "other", "npl"),
+              num_options = c("n_corr", "n_other", "n_npl"),
+              choice_rule = "simple", version = "ss")
+  fit <- bmm(bmf(c ~ 1 + cond, a ~ 1), oberauer_lewandowsky_2019_e1, model,
+             backend = "mock", mock_fit = 1, rename = FALSE)
+  expect_false(isTRUE(all.equal(mean(fit$data$nTrials), round(mean(fit$data$nTrials)))))
+
+  grid <- .ce_prediction_grid(fit, "c")$cond
+  expect_identical(grid$nTrials, rep(1L, nrow(grid)))
+  expect_no_error(brms::standata(
+    fit, newdata = grid, check_response = FALSE, allow_new_levels = TRUE
+  ))
+})
+
+
+# ===========================================================================
 # Tier 1: Unit tests — .filter_internal_effects()
 # ===========================================================================
 

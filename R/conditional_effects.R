@@ -429,12 +429,14 @@ conditional_effects.bmmfit <- function(x,
   if (length(effect_vars) == 0) {
     list()
   } else {
-    .ce_build_grids_for_vars(bmmfit$data, effect_vars, resolution)
+    trials_vars <- all.vars(brms::brmsterms(bmmfit$formula)$adforms$trials)
+    .ce_build_grids_for_vars(bmmfit$data, effect_vars, resolution, trials_vars)
   }
 }
 
 
-.ce_build_grids_for_vars <- function(orig_data, effect_vars, resolution) {
+.ce_build_grids_for_vars <- function(orig_data, effect_vars, resolution,
+                                     trials_vars = character(0)) {
   grids <- list()
 
   for (var in effect_vars) {
@@ -452,7 +454,12 @@ conditional_effects.bmmfit <- function(x,
     for (v in setdiff(names(orig_data), var)) {
       cv <- orig_data[[v]]
       if (is.matrix(cv)) next
-      if (is.factor(cv)) {
+      # the linear predictor does not depend on the number of trials, but brms
+      # still demands a whole number there; the mean across rows is rarely one.
+      # brms::conditional_effects() uses 1 as well
+      if (v %in% trials_vars) {
+        newdata[[v]] <- 1L
+      } else if (is.factor(cv)) {
         newdata[[v]] <- factor(levels(cv)[1], levels = levels(cv))
       } else if (is.character(cv)) {
         newdata[[v]] <- cv[1]
