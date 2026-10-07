@@ -790,6 +790,23 @@ test_that("a model whose every free column is exactly zero reports rank 0", {
   expect_match(printed, "derivative with respect to 'q' is zero up to rounding")
 })
 
+test_that("the rank check takes the maximum over the parameter test points", {
+  # the derivative of (a - k)^2 vanishes only at the first test point, where a
+  # equals k; R's parser rounds some 17-digit spellings of k off by one ulp
+  k <- bmm:::.mpt_test_points("a", list())[[1]][["a"]]
+  spelling <- Find(function(s) str2lang(s) == k, sprintf("%.*g", 15:22, k))
+  expect_false(is.null(spelling))
+  model <- mpt(mpt_tree("t", list(
+    yes = glue("0.5 + 0.5 * (a - {spelling})^2"),
+    no = glue("0.5 - 0.5 * (a - {spelling})^2")
+  )))
+  expect_match(
+    mpt_printed(model),
+    "Jacobian rank 1 of 1 at interior test values: locally identified"
+  )
+  expect_no_warning(check_model(model, data.frame(yes = 5, no = 5), bmf(a ~ 1)))
+})
+
 test_that("a long list of entangled parameters is printed as its complement", {
   model <- mpt(list(
     mpt_tree("a", list(x = "D * r * s", y = "(1 - D * r * s) * g", z = "(1 - D * r * s) * (1 - g)")),
