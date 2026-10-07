@@ -202,6 +202,19 @@ test_that("formulas for response categories are rejected", {
   )
 })
 
+test_that("response categories are refused as predictors before brms sees them", {
+  model <- mpt(mpt_2htm_trees(), tree_id = "item_type")
+  dat <- mpt_2htm_data()
+  expect_error(
+    bmm(bmf(D ~ old, g ~ 1), dat, model, backend = "mock", mock_fit = 1, rename = FALSE),
+    "response counts 'old' .* cannot be predictors.*formula\\(s\\) for: 'D'"
+  )
+  expect_error(
+    check_model(model, dat, bmf(D ~ inv_logit(k * new), k ~ 1, g ~ 1)),
+    "response counts 'new' .* cannot be predictors.*formula\\(s\\) for: 'D'"
+  )
+})
+
 test_that("mpt compiles for a multi-tree binary-category model", {
   model <- mpt(mpt_2htm_trees(), tree_id = "item_type")
   dat <- mpt_2htm_data()
@@ -327,6 +340,11 @@ test_that("the message on non-linear sub-parameters names the sd prior they get"
   sd_prior <- priors$prior[priors$class == "sd" & priors$nlpar == "a" & priors$group == ""]
   expect_length(sd_prior, 1)
   expect_message(check_model(model, dat, formula), sd_prior, fixed = TRUE)
+  # the rank covers the tree parameters only, so u + v would pass unnoticed
+  expect_message(
+    check_model(model, dat, formula),
+    "'a', 'b' .*Whether the data identify these parameters is not checked"
+  )
 })
 
 test_that("a symbol of a non-linear formula that is neither column nor parameter errors", {
@@ -669,12 +687,16 @@ test_that("the identifiability check counts a parameter fixed in the formula as 
     check_model(model, dat, bmf(Do ~ 1, Dn ~ 1, g ~ 0 + bias)),
     "within one design cell.*predictors on 'g' identify it across cells is not checked"
   ))
+  expect_message(
+    check_model(model, dat, bmf(Do ~ 1, Dn ~ Do, g ~ 0 + bias)),
+    "within one design cell.*'g' identify it across cells or the .* for 'Dn'"
+  )
 
   # the rank does not read non-linear formulas, so a deficit under one is
   # announced, not warned about, even when it is real as here
   expect_no_warning(expect_message(
     check_model(model, dat, bmf(Do ~ inv_logit(phi), phi ~ 1, Dn ~ 1, g ~ 1)),
-    "rank 2 for 3 free parameters.*formula\\(s\\) for 'Do' identify it is not checked"
+    "by the branch expressions alone \\(Jacobian rank 2 for 3 free.*'Do' identify it is not checked"
   ))
 })
 
@@ -689,7 +711,7 @@ test_that("a formula that ties parameters together is not reported as a rank def
   # Dn ~ Do identifies the model; the rank of the tree parameters cannot see it
   expect_no_warning(expect_message(
     tied <- check_model(model, dat, bmf(Do ~ 1, Dn ~ Do, g ~ 1)),
-    "non-linear formula\\(s\\) for 'Dn' identify it is not checked"
+    "by the branch expressions alone .*formula\\(s\\) for 'Dn' identify it is not checked"
   ))
   printed <- mpt_printed(tied)
   expect_match(printed, "1 combination\\(s\\) of all free parameters are not identified")
@@ -721,6 +743,57 @@ test_that("a formula that ties parameters together is not reported as a rank def
   expect_match(
     mpt_printed(tied_simplex),
     "1 combination\\(s\\) of .*the simplex group 'gA', 'gB', 'gC'.* 'D' were not analysed"
+  )
+})
+
+test_that("a formula that reaches no parameter of the deficit keeps the warning", {
+  model <- mpt(list(
+    mpt_tree("a", list(x = "D * r", y = "(1 - D * r) * g", z = "(1 - D * r) * (1 - g)")),
+    mpt_tree("b", list(x = "g", y = "(1 - g) * h", z = "(1 - g) * (1 - h)"))
+  ), tree_id = "tree")
+  dat <- data.frame(tree = rep(c("a", "b"), each = 3), x = 5L, y = 5L, z = 5L)
+
+  # D and r enter only as D * r; formulas for h cannot separate them
+  expect_warning(
+    suppressMessages(check_model(model, dat, bmf(D ~ 1, r ~ 1, g ~ 1, h ~ inv_logit(k), k ~ 1))),
+    "combination\\(s\\) of 'D', 'r' cannot be estimated"
+  )
+  expect_warning(
+    check_model(model, dat, bmf(D ~ 1, r ~ 1, g ~ 1, h ~ g)),
+    "combination\\(s\\) of 'D', 'r' cannot be estimated"
+  )
+  expect_no_warning(expect_message(
+    check_model(model, dat, bmf(D ~ 1, r ~ D, g ~ 1, h ~ 1)),
+    "non-linear formula\\(s\\) for 'r' identify it is not checked"
+  ))
+  # h ~ D reads D, which tree b identifies through h
+  expect_no_warning(expect_message(
+    check_model(model, dat, bmf(D ~ 1, r ~ 1, g ~ 1, h ~ D)),
+    "non-linear formula\\(s\\) for 'h' identify it is not checked"
+  ))
+})
+
+test_that("a predictor on a parameter outside the deficit is not met with a warning", {
+  # h is identified by tree t2; within one cell D and r enter only through
+  # h * r + (1 - h) * D, but two values of h separate them
+  model <- mpt(list(
+    mpt_tree("t1", list(yes = "h * r + (1 - h) * D", no = "h * (1 - r) + (1 - h) * (1 - D)")),
+    mpt_tree("t2", list(yes = "h", no = "1 - h"))
+  ), tree_id = "tree")
+  dat <- expand.grid(tree = c("t1", "t2"), cond = c("A", "B"), stringsAsFactors = FALSE)
+  dat$yes <- 20L
+  dat$no <- 20L
+
+  expect_no_warning(expect_message(
+    check_model(model, dat, bmf(D ~ 1, r ~ 1, h ~ 0 + cond)),
+    "within one design cell.*predictors on 'h' identify it across cells is not checked"
+  ))
+  expect_no_warning(suppressMessages(
+    check_model(model, dat, bmf(D ~ 1, r ~ 1, h ~ inv_logit(phi), phi ~ cond))
+  ))
+  expect_warning(
+    check_model(model, dat, bmf(D ~ 1, r ~ 1, h ~ 1)),
+    "all free parameters except 'h' cannot be estimated"
   )
 })
 
@@ -1229,7 +1302,7 @@ test_that("simplex parameters cannot be fixed to constants", {
   )
   expect_error(
     check_model(model, formula = bmf(gAraw = 0.3)),
-    "Fixing simplex parameters.*gAraw"
+    "Fixing simplex parameters.*gAraw.*Fix parameters outside the group instead"
   )
 })
 
@@ -1313,6 +1386,20 @@ test_that("predictors on the derived simplex parameter are rejected", {
     )),
     "derived"
   )
+})
+
+test_that("a non-linear formula reading a simplex member announces the sticks' deficit", {
+  trees <- list(mpt_tree("t", list(A = "(a + b) * u", B = "c * u", C = "1 - u")))
+  model <- mpt(trees, simplex = c("a", "b", "c"))
+  dat <- data.frame(A = 10, B = 10, C = 10)
+  expect_warning(
+    check_model(model, dat, bmf(u ~ 1)),
+    "The model is not identified"
+  )
+  expect_no_warning(expect_message(
+    check_model(model, dat, bmf(u ~ a, a ~ 1)),
+    "by the branch expressions alone .*formula\\(s\\) for 'u' identify it is not checked"
+  ))
 })
 
 test_that("check_data errors are informative", {
