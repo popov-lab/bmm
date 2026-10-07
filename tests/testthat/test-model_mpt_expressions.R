@@ -25,6 +25,26 @@ test_that("mpt_tree folds compound integer constants into decimal literals", {
   expect_false(grepl("1 / (2 * 2)", code, fixed = TRUE))
 })
 
+test_that("mpt_tree says why a constant is refused and which rewrite works", {
+  expect_error(
+    mpt_tree("t", list(a = "0.00010 + 0.9999 * p", b = "0.9999 * (1 - p)")),
+    "'0.00010' in tree 't' in scientific notation \\(1e-04\\).*\\(1 \\+ 9999 \\* p\\) / 10000"
+  )
+  # a folded constant has no written form
+  expect_error(
+    mpt_tree("t", list(a = "1/10000 + 0.9999 * p", b = "0.9999 * (1 - p)")),
+    "'1e-04' in tree 't'"
+  )
+  rescaled <- mpt(mpt_tree("t", list(
+    a = "(1 + 9999 * p) / 10000", b = "9999 * (1 - p) / 10000"
+  )))
+  code <- stancode(
+    bmf(p ~ 1), data = data.frame(a = c(30L, 28L), b = c(0L, 2L)), model = rescaled
+  )
+  expect_match(code, "(1 + 9999 * inv_logit(nlp_p[n])) / 10000", fixed = TRUE)
+  expect_no_match(code, "e - 0")
+})
+
 test_that("mpt_tree stores branch expressions as parsed calls", {
   tree <- mpt_tree("t", list(a = "D + (1 - D) * g", b = "(1 - D) * (1 - g)"))
   expect_identical(tree$branches$a, quote(D + (1 - D) * g))
@@ -164,16 +184,34 @@ test_that("restriction chains resolve to their final target", {
 test_that("mpt errors when branch probabilities do not sum to 1", {
   bad_tree <- mpt_tree("t", list(a = "D * g", b = "(1 - D) * g"))
   expect_error(mpt(bad_tree), "sum to")
+  expect_error(mpt(bad_tree), "or tie them in the formula \\(e.g. Dn ~ Do\\)")
+  expect_error(mpt(bad_tree), "use the restrictions argument")
 
   good_tree <- mpt_tree("u", list(a = "D + (1 - D) * g", b = "(1 - D) * (1 - g)"))
-  deviations <- .mpt_tree_sum_deviations(
-    list(t = bad_tree, u = good_tree), c("D", "g"), character(0), list()
+  branch_errors <- .mpt_tree_branch_errors(
+    list(t = bad_tree, u = good_tree), c("D", "g"), list()
   )
   # the branches reduce to g, so the first test point reports g's value there
-  expect_equal(
-    deviations[["t"]], .mpt_test_points(c("D", "g"), list())[[1]][["g"]]
+  expect_match(
+    branch_errors[["t"]],
+    glue("sum to {signif(.mpt_test_points(c('D', 'g'), list())[[1]][['g']], 6)} instead of 1")
   )
-  expect_true(is.na(deviations[["u"]]))
+  expect_true(is.na(branch_errors[["u"]]))
+})
+
+test_that("mpt errors when a branch probability leaves (0, 1]", {
+  # the branches sum to 1 for every value of a
+  doubled <- mpt_tree("t", list(yes = "2 * a", no = "1 - 2 * a"))
+  expect_error(
+    mpt(doubled),
+    "category 'yes' in tree 't' is 1\\.7.* at the test values a = 0\\.85.*, outside \\(0, 1\\]"
+  )
+  zero <- mpt_tree("z", list(yes = "a", no = "(1 - a) * 0", maybe = "1 - a"))
+  expect_error(
+    mpt(zero),
+    "category 'no' in tree 'z' is 0 .*outside \\(0, 1\\].*makes the likelihood undefined"
+  )
+  expect_no_error(mpt(mpt_tree("t", list(yes = "a", no = "1 - a"))))
 })
 
 test_that("test points give every symbol its own interior value at every point", {

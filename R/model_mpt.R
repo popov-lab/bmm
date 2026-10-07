@@ -130,11 +130,13 @@ mpt_tree <- function(name, branches, impossible = NULL) {
     scientific <- .mpt_scientific_constants(parsed)
     stopif(
       length(scientific) > 0,
-      "The numeric constant(s) {collapse_comma(scientific)} in tree '{name}' \\
-      are too extreme to be written into the generated Stan code (brms emits \\
-      them in scientific notation, which breaks the Stan syntax). Please \\
-      provide such values as a data column declared in the covariates \\
-      argument, or use a larger constant."
+      "brms writes the numeric constant(s) \\
+      {collapse_comma(.mpt_written_constants(expr, scientific))} in tree \\
+      '{name}' in scientific notation ({format(scientific[1], scientific = TRUE)}), \\
+      which breaks the generated Stan code. Every spelling of the same number \\
+      is affected (0.00010 is 0.0001), so please rescale the expression \\
+      instead, e.g. write 0.0001 + 0.9999 * p as (1 + 9999 * p) / 10000, or \\
+      provide the value as a data column declared in the covariates argument."
     )
     parsed
   })
@@ -168,9 +170,7 @@ print.mpt_tree <- function(x, ...) {
   } else {
     character(0)
   }
-  parameters <- setdiff(
-    unique(unlist(lapply(trees, .mpt_expr_vars))), covariates
-  )
+  parameters <- .mpt_tree_parameters(trees, covariates)
   simplex_pars <- unlist(simplex)
   simplex_raw <- unlist(lapply(simplex, function(grp) {
     free_pars <- grp[-length(grp)]
@@ -334,7 +334,8 @@ settable_link_functions.mpt <- function(model) {
 #'   unchanged and have no naming restrictions. `bmm()` stops when, with a
 #'   row's covariate values, the branches of a tree do not sum to 1, leave
 #'   (0, 1], are undefined on the rows of another tree, or when a covariate
-#'   that a branch uses is missing.
+#'   that a branch uses is missing. Every declared covariate needs a numeric
+#'   column in the data, also one that no branch uses.
 #' @param simplex A character vector, or a list of character vectors, naming
 #'   groups of parameters that are jointly constrained to sum to 1. Each group
 #'   is reparameterized via stick-breaking: the last parameter of each group
@@ -430,7 +431,7 @@ settable_link_functions.mpt <- function(model) {
 #'   members, and the printout names the group by its members. Covariates
 #'   are never free parameters; because rows with different covariate values
 #'   can identify what one design cell cannot, the rank is taken over the rows
-#'   of all covariate values in the data (at most 20 per tree) in `bmm()`, and
+#'   of every distinct covariate setting in the data in `bmm()`, and
 #'   over five test values of the covariates when printing. A rank below the
 #'   number of free parameters means that some combination of the listed
 #'   parameters cannot be estimated from the data,
@@ -442,7 +443,11 @@ settable_link_functions.mpt <- function(model) {
 #'   formula uses a data column as a predictor. When one does, a parameter
 #'   that differs between conditions can identify the model across them, so
 #'   `bmm()` only says that the model is not identified within one design
-#'   cell and that the predictors were not checked. The
+#'   cell and that the predictors were not checked. The rank covers the
+#'   parameters of the branch expressions only: a non-linear formula that
+#'   ties them together (`Dn ~ Do`) or builds one from sub-parameters is not
+#'   analysed, so `bmm()` treats a deficit under it the same way, and
+#'   `print()` of the checked model says the formula was not analysed. The
 #'   check is local: it holds at the test values, not at the boundaries of
 #'   the parameter space. A branch expression with a function that
 #'   [stats::D()] cannot differentiate leaves the rank uncomputed, and the
@@ -623,7 +628,7 @@ mpt <- function(trees, tree_id = NULL, covariates = NULL, simplex = NULL,
     produce with mpt_tree(impossible = ) instead of giving it a zero branch."
   )
 
-  parameters <- setdiff(unique(unlist(lapply(trees, .mpt_expr_vars))), covariates)
+  parameters <- .mpt_tree_parameters(trees, covariates)
   stopif(
     length(parameters) == 0L,
     "The tree branch expressions contain no latent parameters. Symbols listed \\
@@ -685,24 +690,14 @@ mpt <- function(trees, tree_id = NULL, covariates = NULL, simplex = NULL,
     use: {collapse_comma(raw_collisions)}"
   )
 
-  deviations <- .mpt_tree_sum_deviations(trees, parameters, covariates, simplex)
   # synthetic covariate values need not form a valid tree (Gcorr + Gother = 1),
   # so check_data() decides for trees that use covariates, with the observed values
   uses_covariates <- vapply(
     trees, function(tree) any(.mpt_expr_vars(tree) %in% covariates), logical(1)
   )
-  deviating <- names(deviations)[!is.na(deviations)]
-  for (tree_name in setdiff(deviating, names(trees)[uses_covariates])) {
-    stop2(
-      "The branch probabilities of tree '{tree_name}' sum to \\
-      {signif(deviations[[tree_name]], 6)} instead of 1 when evaluated at \\
-      numeric test values. Please check the branch expressions. To equate \\
-      parameters or fix one to a constant, use the restrictions argument \\
-      (e.g. restrictions = 'Dn = Do'), not the branch expressions or the formula. \\
-      Parameters that must sum to 1 across branches (e.g. guessing over three \\
-      options) belong in the simplex argument."
-    )
-  }
+  branch_errors <- .mpt_tree_branch_errors(trees[!uses_covariates], parameters, simplex)
+  branch_errors <- branch_errors[!is.na(branch_errors)]
+  stopif(length(branch_errors) > 0, "{branch_errors[1]}")
 
   .model_mpt(
     trees = trees, tree_id = tree_id, covariates = covariates,
@@ -729,7 +724,7 @@ mpt <- function(trees, tree_id = NULL, covariates = NULL, simplex = NULL,
     "Covariates are data columns and cannot be restricted: \\
     {collapse_comma(restricted_covariates)}"
   )
-  parameters <- setdiff(unique(unlist(lapply(trees, .mpt_expr_vars))), covariates)
+  parameters <- .mpt_tree_parameters(trees, covariates)
   restrictions <- .mpt_resolve_restrictions(restrictions)
   targets <- unique(unlist(lapply(restrictions, all.vars)))
   unknown <- setdiff(c(restricted, targets), parameters)
@@ -789,35 +784,35 @@ print_model_details.mpt <- function(model, ...) {
   # rank, which also catches redundant parameters when the count passes; each
   # tree contributes its possible categories minus one. A simplex group counts
   # through its stick-breaking components, one fewer than its members.
-  n_free <- length(setdiff(
-    names(attr(model, "links_default")) %||% names(model$parameters),
-    c(names(model$fixed_parameters), unlist(model$other_vars$simplex))
-  ))
-  df <- sum(lengths(lapply(model$other_vars$trees, `[[`, "branches")) - 1L)
+  identifiability <- .mpt_identifiability(model)
   cat(glue(
-    "Identifiability (intercept-only formulas): {n_free} free parameter(s), \\
-    {df} degrees of freedom (response categories minus 1, summed over trees)"
+    "Identifiability (intercept-only formulas): {identifiability$n_free} free \\
+    parameter(s), {identifiability$df} degrees of freedom (response \\
+    categories minus 1, summed over trees)"
   ), "\n")
   uses_covariates <- any(vapply(model$other_vars$trees, function(tree) {
     any(.mpt_expr_vars(tree) %in% model$other_vars$covariates)
   }, logical(1)))
-  if (n_free > df && uses_covariates) {
+  if (identifiability$n_free > identifiability$df && uses_covariates) {
     cat(
       "  More free parameters than degrees of freedom in one design cell;",
       "covariate values that differ between rows can add information.\n"
     )
-  } else if (n_free > df) {
+  } else if (identifiability$n_free > identifiability$df) {
     cat(
       "  More free parameters than degrees of freedom: the model is not",
       "identified without further constraints.\n"
     )
   }
-  identifiability <- .mpt_identifiability(model)
+  # set by check_model.mpt() for parameters with a non-linear formula
+  tied <- names(attr(model, "mpt_bypassed_links"))
   rank_text <- if (!is.null(identifiability$error)) {
     glue(
       "Jacobian rank not computed: stats::D() cannot differentiate the branch \\
       expressions ({identifiability$error})."
     )
+  } else if (length(tied) > 0) {
+    .mpt_tied_rank_text(identifiability, tied)
   } else if (identifiability$rank < identifiability$n_free) {
     .mpt_rank_deficit_text(identifiability)
   } else {
@@ -839,8 +834,7 @@ print_model_details.mpt <- function(model, ...) {
   simplex <- model$other_vars$simplex
   sticks <- model$other_vars$simplex_raw
   parameters <- setdiff(
-    unique(unlist(lapply(trees, .mpt_expr_vars))),
-    c(unlist(simplex), model$other_vars$covariates)
+    .mpt_tree_parameters(trees, model$other_vars$covariates), unlist(simplex)
   )
   fixed <- model$fixed_parameters[
     intersect(names(model$fixed_parameters), parameters)
@@ -864,10 +858,10 @@ print_model_details.mpt <- function(model, ...) {
 
 # covariate values at which the rank is taken, one data frame per tree (a tree
 # without covariates has one empty setting): the distinct finite values in the
-# tree's rows of the data, at most 20 spread over their range. A tree without
-# rows adds no rows, with or without covariates. Five test values stand in
-# when the data cannot provide them (print() has no data; a missing,
-# non-numeric or non-finite covariate is check_data()'s to report)
+# tree's rows of the data. A subset can only lower the rank, so none is dropped.
+# A tree without rows adds no rows, with or without covariates. Five test
+# values stand in when the data cannot provide them (print() has no data; a
+# missing, non-numeric or non-finite covariate is check_data()'s to report)
 .mpt_covariate_settings <- function(model, data) {
   trees <- model$other_vars$trees
   covariates <- model$other_vars$covariates
@@ -896,9 +890,7 @@ print_model_details.mpt <- function(model, ...) {
       if (length(rows) > 0L && nrow(settings) == 0L) {
         return(NULL)
       }
-      settings <- settings[do.call(order, unname(settings)), , drop = FALSE]
-      spread <- round(seq(1, nrow(settings), length.out = min(nrow(settings), 20)))
-      settings[unique(spread), , drop = FALSE]
+      settings
     })
     if (!any(vapply(values, is.null, logical(1))) &&
           sum(vapply(values, nrow, integer(1))) > 0L) {
@@ -949,6 +941,31 @@ print_model_details.mpt <- function(model, ...) {
     glue(
       "Fix parameters in the formula (bmf(name = value)) or equate them in \\
       the branch expressions."
+    )
+  ), collapse = " ")
+}
+
+# a non-linear formula can tie tree parameters together (Dn ~ Do) or build one
+# from sub-parameters; the rank of the tree parameters sees neither, so it
+# can neither confirm nor refute identification
+.mpt_tied_rank_text <- function(identifiability, tied) {
+  paste(c(
+    glue(
+      "Jacobian rank {identifiability$rank} of {identifiability$n_free} in \\
+      the tree parameters {identifiability$where}."
+    ),
+    if (identifiability$rank < identifiability$n_free) {
+      glue(
+        "{identifiability$n_free - identifiability$rank} combination(s) of \\
+        {.mpt_parameter_set(
+          identifiability$involved, identifiability$free, identifiability$labels
+        )} \\
+        are not identified by the branch expressions alone."
+      )
+    },
+    glue(
+      "The non-linear formula(s) for {collapse_comma(tied)} were not \\
+      analysed, so whether the model is identified is not checked."
     )
   ), collapse = " ")
 }
@@ -1020,7 +1037,10 @@ check_model.mpt <- function(model, data = NULL, formula = NULL) {
     # fixed values from the bmmformula (e.g. g = 0.5) stay on the probability
     # scale in the model object; configure_prior.mpt() maps them to the
     # latent scale when it builds the constant priors
-    fixed_simplex <- intersect(names(model$fixed_parameters), unlist(model$other_vars$simplex))
+    fixed_simplex <- intersect(
+      names(model$fixed_parameters),
+      c(unlist(model$other_vars$simplex), model$other_vars$simplex_raw)
+    )
     stopif(
       length(fixed_simplex) > 0,
       "Fixing simplex parameters to constants is not supported: \\
@@ -1036,34 +1056,49 @@ check_model.mpt <- function(model, data = NULL, formula = NULL) {
     }
 
     # population-level predictors can identify a parameter across design
-    # cells that a single cell leaves open, so the per-cell rank is the rank
-    # of the fitted model only when no formula has a data predictor; with
-    # predictors, a per-cell deficit is announced but not warned about
+    # cells that a single cell leaves open, and a non-linear formula can tie
+    # parameters together, so the rank of the tree parameters is the rank of
+    # the fitted model only when no formula has either; otherwise a deficit
+    # is announced but not warned about
     with_predictors <- .mpt_predictor_formulas(formula, names(model$parameters))
     identifiability <- .mpt_identifiability(model, data)
     if (is.null(identifiability$error) &&
           identifiability$rank < identifiability$n_free) {
-      if (length(with_predictors) == 0L) {
+      if (length(with_predictors) == 0L && length(nl_pars) == 0L) {
         warning2(
           "{.mpt_rank_deficit_text(identifiability)} Along the non-identified \\
           direction(s), the posterior follows the prior."
         )
-      } else if (identifiability$from_data) {
+      } else {
+        unchecked <- paste(c(
+          if (length(with_predictors) > 0) {
+            glue(
+              "the predictors on {collapse_comma(with_predictors)} identify \\
+              it across cells"
+            )
+          },
+          if (length(nl_pars) > 0) {
+            glue(
+              "the non-linear formula(s) for {collapse_comma(nl_pars)} \\
+              identify it"
+            )
+          }
+        ), collapse = " or ")
         # print() takes the covariates at test values, so it cannot name the
         # parameters that the covariate values in the data leave open
-        message2(
-          "{.mpt_rank_deficit_text(identifiability)} Whether the predictors \\
-          on {collapse_comma(with_predictors)} identify it across the cells of \\
-          the design is not checked."
-        )
-      } else {
-        message2(
-          "The model is not identified within one design cell (Jacobian \\
-          rank {identifiability$rank} for {identifiability$n_free} free \\
-          parameters; print(model) names the parameters involved). Whether \\
-          the predictors on {collapse_comma(with_predictors)} identify it \\
-          across cells is not checked."
-        )
+        if (identifiability$from_data) {
+          message2(
+            "{.mpt_rank_deficit_text(identifiability)} Whether {unchecked} is \\
+            not checked."
+          )
+        } else {
+          message2(
+            "The tree parameters are not identified within one design cell \\
+            (Jacobian rank {identifiability$rank} for \\
+            {identifiability$n_free} free parameters; print(model) names the \\
+            parameters involved). Whether {unchecked} is not checked."
+          )
+        }
       }
     }
   }
@@ -1082,11 +1117,13 @@ check_model.mpt <- function(model, data = NULL, formula = NULL) {
       return(TRUE)
     }
     labels <- attr(formula_terms, "term.labels")
-    population_vars <- unlist(lapply(
-      labels[!grepl("|", labels, fixed = TRUE)],
-      function(label) all.vars(str2lang(label))
-    ))
-    length(setdiff(population_vars, c(names(formula), parameters))) > 0
+    length(setdiff(
+      unlist(lapply(
+        labels[!grepl("|", labels, fixed = TRUE)],
+        function(label) all.vars(str2lang(label))
+      )),
+      c(names(formula), parameters)
+    )) > 0
   }, logical(1))
   names(formula)[has_predictors]
 }
@@ -1426,7 +1463,7 @@ check_data.mpt <- function(model, data, formula) {
       }
       # branches that sum to 1 can still be negative or above 1 (e.g. G = 1.2);
       # near the boundary a valid branch may underflow to exactly 0
-      # (also at an interior point: (1 - D)^n at D = 0.85 from n = 392, accepted as unrealistic)
+      # (also at an interior point: (1 - D)^n from a few hundred, by the symbol's test value; accepted as unrealistic)
       out_of_range <- lapply(branches, function(b) {
         which(
           (if (point <= length(interior_points)) b <= 0 else b < 0) |
@@ -1641,11 +1678,10 @@ configure_prior.mpt <- function(model, data, formula, user_prior, ...) {
   if (length(fixed_pars) == 0L) {
     return(brms::empty_prior())
   }
-  latent <- vapply(fixed_pars, function(par) {
-    link_transform(model$fixed_parameters[[par]], model$links[[par]])
-  }, numeric(1))
   brms::set_prior(
-    glue("constant({latent})"),
+    paste0("constant(", vapply(fixed_pars, function(par) {
+      link_transform(model$fixed_parameters[[par]], model$links[[par]])
+    }, numeric(1)), ")"),
     class = "b", coef = "Intercept", nlpar = fixed_pars
   )
 }

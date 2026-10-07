@@ -1598,6 +1598,15 @@ test_that("dmpt validates its inputs", {
     dmpt(c(1, 1), pars = c(D = 1.7, g = 0.5), mpt_model = model, tree = "old"),
     "between 0 and 1"
   )
+  # bmm() refuses 0 and 1 as fixed values, so the distribution functions do too
+  expect_error(
+    dmpt(c(1, 1), pars = c(D = 1, g = 0), mpt_model = model, tree = "old"),
+    "strictly between 0 and 1. Provided: D = 1, g = 0"
+  )
+  expect_error(
+    rmpt(1, size = 10, pars = c(D = 0.5, g = 1), mpt_model = model, tree = "new"),
+    "strictly between 0 and 1. Provided: g = 1"
+  )
   expect_error(
     dmpt(c(1, 1), pars = c(D = 0.7, g = 0.5), mpt_model = m3(
       resp_cats = c("a", "b"), num_options = c(1, 1)

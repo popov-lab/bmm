@@ -128,8 +128,10 @@ test_that("mpt refuses a zero branch and points to impossible categories", {
   expect_error(mpt(zero_padded, tree_id = "t"), "'z' in tree 'a', 'x' in tree 'b'")
   expect_error(mpt(zero_padded, tree_id = "t"), "mpt_tree(impossible = )", fixed = TRUE)
   expect_error(mpt(mpt_tree("c", list(x = "(0)", y = "D + (1 - D)"))), "constant 0")
+  # not the literal 0 this guard reads, but 0 at every interior test point,
+  # which the range check refuses
   zero_product <- mpt_tree("d", list(x = "0 * D", y = "1 - 0 * D"))
-  expect_s3_class(mpt(zero_product), "mpt")
+  expect_error(mpt(zero_product), "category 'x' in tree 'd' is 0 .*outside \\(0, 1\\]")
 
   declared <- list(
     mpt_tree("a", list(x = "D", y = "1 - D"), impossible = "z"),
@@ -552,10 +554,10 @@ test_that("restrictions are substituted into the trees before parameters are ide
     fixed$other_vars$trees
   )
   for (restricted in list(equated, fixed)) {
-    deviations <- .mpt_tree_sum_deviations(
-      restricted$other_vars$trees, names(restricted$parameters), character(0), list()
+    branch_errors <- .mpt_tree_branch_errors(
+      restricted$other_vars$trees, names(restricted$parameters), list()
     )
-    expect_true(all(is.na(deviations)))
+    expect_true(all(is.na(branch_errors)))
   }
   one_symbol <- mpt_tree("t", list(A = "a", B = "(1 - a) * b", C = "(1 - a) * (1 - b)"))
   expect_error(mpt(one_symbol, restrictions = "a = 0"), "strictly between 0 and 1")
@@ -682,12 +684,57 @@ test_that("the identifiability check counts a parameter fixed in the formula as 
     "within one design cell.*predictors on 'g' identify it across cells is not checked"
   ))
 
-  # a non-linear formula without a data column varies nothing between cells
-  expect_warning(
-    suppressMessages(check_model(
-      model, dat, bmf(Do ~ inv_logit(phi), phi ~ 1, Dn ~ 1, g ~ 1)
-    )),
-    "rank 2 for 3 free parameters"
+  # the rank does not read non-linear formulas, so a deficit under one is
+  # announced, not warned about, even when it is real as here
+  expect_no_warning(expect_message(
+    check_model(model, dat, bmf(Do ~ inv_logit(phi), phi ~ 1, Dn ~ 1, g ~ 1)),
+    "rank 2 for 3 free parameters.*formula\\(s\\) for 'Do' identify it is not checked"
+  ))
+})
+
+test_that("a formula that ties parameters together is not reported as a rank deficit", {
+  trees <- list(
+    mpt_tree("old", list(yes = "Do + (1 - Do) * g", no = "(1 - Do) * (1 - g)")),
+    mpt_tree("new", list(yes = "(1 - Dn) * g", no = "Dn + (1 - Dn) * (1 - g)"))
+  )
+  model <- mpt(trees, tree_id = "item_type")
+  dat <- mpt_2htm_data()
+
+  # Dn ~ Do identifies the model; the rank of the tree parameters cannot see it
+  expect_no_warning(expect_message(
+    tied <- check_model(model, dat, bmf(Do ~ 1, Dn ~ Do, g ~ 1)),
+    "non-linear formula\\(s\\) for 'Dn' identify it is not checked"
+  ))
+  printed <- mpt_printed(tied)
+  expect_match(printed, "1 combination\\(s\\) of all free parameters are not identified")
+  expect_no_match(printed, "The model is not identified")
+  expect_match(printed, "formula\\(s\\) for 'Dn' were not analysed")
+
+  expect_silent(check_model(model, dat, bmf(Do ~ 1, Dn = 0.6, g ~ 1)))
+
+  # u and v enter only as u + v, which the tree rank of 'a' cannot see
+  single <- mpt(mpt_tree("x", list(A = "a", B = "1 - a")))
+  sub_pars <- suppressMessages(check_model(
+    single, data.frame(A = 5L, B = 5L), bmf(a ~ inv_logit(u + v), u ~ 1, v ~ 1)
+  ))
+  printed <- mpt_printed(sub_pars)
+  expect_no_match(printed, "locally identified")
+  expect_match(
+    printed,
+    "Jacobian rank 1 of 1 in the tree parameters .* formula\\(s\\) for 'a' were not analysed"
+  )
+
+  # the deficit text names a simplex group by its members, not its sticks
+  guessing <- mpt(mpt_tree("t", list(
+    A = "D + (1 - D) * gA", B = "(1 - D) * gB", C = "(1 - D) * gC"
+  )), simplex = list(c("gA", "gB", "gC")))
+  tied_simplex <- suppressMessages(check_model(
+    guessing, data.frame(A = 5L, B = 3L, C = 2L),
+    bmf(D ~ inv_logit(phi), phi ~ 1, gA ~ 1, gB ~ 1)
+  ))
+  expect_match(
+    mpt_printed(tied_simplex),
+    "1 combination\\(s\\) of .*the simplex group 'gA', 'gB', 'gC'.* 'D' were not analysed"
   )
 })
 
@@ -781,10 +828,6 @@ test_that("the rank check works in the stick-breaking components of a simplex gr
     check_model(guessing, dat, bmf(D ~ 1, gA ~ 1, gB ~ 1))
   ))
 
-  # a stick fixed in the formula leaves one free direction in the group
-  fixed <- check_model(guessing, dat, bmf(D ~ 1, gAraw = 0, gB ~ 1))
-  expect_match(mpt_printed(fixed), "Jacobian rank 2 of 2 at interior test values")
-
   # the members only enter through their sum, which is 1 whatever the sticks
   sum_only <- mpt(mpt_tree("t", list(
     A = "D * gA + D * gB + D * gN", B = "(1 - D) * h", N = "(1 - D) * (1 - h)"
@@ -859,6 +902,30 @@ test_that("the rank check counts only the categories a tree can produce", {
   printed <- mpt_printed(model)
   expect_match(printed, "3 free parameter\\(s\\), 3 degrees of freedom")
   expect_match(printed, "Jacobian rank 3 of 3 at interior test values")
+})
+
+test_that("the rank check ranks the design over every distinct covariate setting", {
+  # z adds settings but no information about a, b, c; only the single row at
+  # x = 0.5 separates b from the other two, so a spread over a subset loses it
+  bernstein <- mpt(
+    mpt_tree("t", list(
+      yes = "z * (a * (1 - x)^2 + b * 2 * x * (1 - x) + c * x^2) + (1 - z) * 0.5",
+      no = "1 - z * (a * (1 - x)^2 + b * 2 * x * (1 - x) + c * x^2) - (1 - z) * 0.5"
+    )),
+    covariates = c("x", "z")
+  )
+  dat <- rbind(
+    data.frame(x = 0, z = seq(0.2, 0.8, length.out = 30)),
+    data.frame(x = 0.5, z = 0.5),
+    data.frame(x = 1, z = seq(0.2, 0.8, length.out = 30))
+  )
+  dat$yes <- 5
+  dat$no <- 5
+  expect_equal(nrow(bmm:::.mpt_covariate_settings(bernstein, dat)$values[[1]]), 61L)
+  expect_equal(bmm:::.mpt_identifiability(bernstein, dat)$rank, 3L)
+  expect_no_warning(expect_no_message(
+    check_model(bernstein, dat, bmf(a ~ 1, b ~ 1, c ~ 1))
+  ))
 })
 
 test_that("the rank check uses only finite covariate values and the trees with rows", {
@@ -941,6 +1008,10 @@ test_that("simplex parameters cannot be fixed to constants", {
   expect_error(
     check_model(model, formula = bmf(gA = 0.3)),
     "Fixing simplex parameters"
+  )
+  expect_error(
+    check_model(model, formula = bmf(gAraw = 0.3)),
+    "Fixing simplex parameters.*gAraw"
   )
 })
 
@@ -1053,6 +1124,20 @@ test_that("check_data errors are informative", {
     check_data(model_cov, dat_cov, bmf(D ~ 1)),
     "covariates 'Gcorr' are missing"
   )
+})
+
+test_that("check_data requires a column for every declared covariate, used or not", {
+  unused <- mpt(
+    mpt_tree("main", list(correct = "D", incorrect = "1 - D")),
+    covariates = "z"
+  )
+  expect_error(
+    check_data(unused, data.frame(correct = 10, incorrect = 10), bmf(D ~ 1)),
+    "covariates 'z' are missing"
+  )
+  expect_no_error(check_data(
+    unused, data.frame(correct = 10, incorrect = 10, z = 1), bmf(D ~ 1)
+  ))
 })
 
 test_that("check_data warns on missing counts and refuses the columns it builds", {
@@ -1576,17 +1661,14 @@ test_that("the sum and range messages name only the covariates the tree uses", {
   expect_match(msg, "column(s): 'H'", fixed = TRUE)
   expect_no_match(msg, "'G'")
 
-  # a tree without covariates beside a covariate tree: the covariate is not
-  # to blame
+  # a tree without covariates beside a covariate tree is refused at mpt(),
+  # before any covariate value exists to blame
   trees <- list(
     mpt_tree("t1", list(x = "2 * a", y = "1 - 2 * a")),
     mpt_tree("t2", list(x = "D + (1 - D) * G", y = "(1 - D) * (1 - G)"))
   )
-  model <- mpt(trees, tree_id = "tree", covariates = "G")
-  dat <- data.frame(tree = c("t1", "t2"), G = 0.5, x = 5, y = 5)
-  msg <- tryCatch(check_data(model, dat, bmf(a ~ 1, D ~ 1)), error = conditionMessage)
-  expect_match(msg, "tree 't1' is [0-9.]+ in row 1, outside \\(0, 1\\] at the test parameter values")
-  expect_match(msg, "tree, which uses no covariate")
+  msg <- tryCatch(mpt(trees, tree_id = "tree", covariates = "G"), error = conditionMessage)
+  expect_match(msg, "category 'x' in tree 't1' is [0-9.]+ at the test values a = .*outside \\(0, 1\\]")
   expect_no_match(msg, "'G'")
 })
 
