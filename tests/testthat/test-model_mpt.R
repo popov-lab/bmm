@@ -1115,6 +1115,14 @@ test_that("without a rank, check_model() announces more free parameters than deg
     check_model(with_x, data.frame(x = c(0.2, 0.6), y = 3, n = 3), bmf(a ~ 1, b ~ 1, c ~ 1)),
     "Whether the covariate values in the data identify it is not checked"
   ))
+  # a tie is not a design cell; the reason for the missing rank is given here,
+  # since print() cannot know a reason that comes from the data
+  msg <- expect_no_warning(expect_message(
+    check_model(model, data.frame(y = 3, n = 3), bmf(a ~ 1, b ~ 1, c ~ a)),
+    "^The tree parameters are not identified by the branch expressions alone: 3 free parameters"
+  ))
+  expect_match(conditionMessage(msg), "not computed: stats::D\\(\\) cannot differentiate")
+  expect_no_match(conditionMessage(msg), "print\\(model\\)")
 })
 
 test_that("a test value with a non-finite derivative is left out of the rank", {
@@ -1163,12 +1171,29 @@ test_that("a derivative not finite at every test value leaves the rank uncompute
   expect_silent(check_model(model, dat, bmf(a ~ 1, b ~ 1)))
   expect_match(
     bmm:::.mpt_identifiability(model, dat)$error,
-    "at each interior test value, some derivative of the branch expressions is not finite"
+    "at 5 of the 5 interior test values some derivative of the branch expressions is not finite"
   )
   expect_error(
     bmm(bmf(a ~ 1, b ~ 1), dat, model, backend = "mock", mock_fit = 1, rename = FALSE),
     "branch probabilities of tree 'cov' do not sum to 1 for 1 row\\(s\\) \\(first: row 2, sum = NaN\\)"
   )
+})
+
+test_that("a rank that only one finite test value would give is not computed", {
+  # cusps at four test values of c and a double root at the fifth: the one
+  # point left is singular, so ranking it alone would call c unidentified
+  k <- vapply(bmm:::.mpt_test_points(c("a", "c"), list()), `[[`, numeric(1), "c")
+  cusps <- paste(glue("((c - {sprintf('%a', k[1:4])})^2)^0.25"), collapse = " + ")
+  shape <- glue("(c - {sprintf('%a', k[5])})^2 * (1 + 0.05 * ({cusps}))")
+  model <- mpt(list(
+    mpt_tree("t1", list(y = "a", n = "1 - a")),
+    mpt_tree("t2", list(y = glue("0.3 + 0.2 * {shape}"), n = glue("0.7 - 0.2 * {shape}")))
+  ), tree_id = "tr")
+  expect_match(
+    mpt_printed(model),
+    "Jacobian rank not computed: at 4 of the 5 interior test values some derivative"
+  )
+  expect_no_warning(check_model(model, data.frame(tr = c("t1", "t2"), y = 3, n = 3), bmf(a ~ 1, c ~ 1)))
 })
 
 test_that("fixed parameter values stay probabilities and reach the prior on the latent scale", {

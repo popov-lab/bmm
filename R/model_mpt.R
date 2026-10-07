@@ -460,10 +460,10 @@ settable_link_functions.mpt <- function(model) {
 #'   formula was not analysed. The check is local: it holds at the test
 #'   values, not at the boundaries of the parameter space. A test value at
 #'   which a derivative is not finite (in `bmm()`, also at a covariate value
-#'   in the data) is left out, and the printout says how many were. A branch
+#'   in the data) is left out, and the rank text says how many were. A branch
 #'   expression with a function that [stats::D()] cannot differentiate, or a
-#'   derivative that is not finite at every test value, leaves the rank
-#'   uncomputed, and the printout says so; `bmm()` then reports only the
+#'   derivative that is not finite at all but one of the test values, leaves
+#'   the rank uncomputed, and the printout says so; `bmm()` then reports only the
 #'   count, when the free parameters outnumber the degrees of freedom.
 #'
 #'   `summary()` reports intercepts and regression coefficients on the latent
@@ -1161,12 +1161,18 @@ check_model.mpt <- function(model, data = NULL, formula = NULL) {
       }
     ), collapse = " or ")
     warn <- !nzchar(unchecked)
+    # a non-linear tie is not a design cell; predictors and covariate values are
+    lead <- if (length(with_predictors) > 0 || .mpt_uses_covariates(model)) {
+      "The tree parameters are not identified within one design cell"
+    } else {
+      "The tree parameters are not identified by the branch expressions alone"
+    }
     if (count_only && identifiability$n_free > identifiability$df) {
       count_text <- glue(
         "{identifiability$n_free} free parameters for \\
         {identifiability$df} degrees of freedom (response categories minus 1, \\
-        summed over trees); the Jacobian rank was not computed, print(model) \\
-        says why."
+        summed over trees); the Jacobian rank was not computed: \\
+        {identifiability$error}."
       )
       if (warn) {
         warning2(
@@ -1175,8 +1181,7 @@ check_model.mpt <- function(model, data = NULL, formula = NULL) {
         )
       } else {
         message2(
-          "The tree parameters are not identified within one design cell: \\
-          {count_text} Whether {unchecked} is not checked."
+          "{lead}: {count_text} Whether {unchecked} is not checked."
         )
       }
     } else if (!count_only && identifiability$rank < identifiability$n_free) {
@@ -1190,14 +1195,12 @@ check_model.mpt <- function(model, data = NULL, formula = NULL) {
         # covariate values in the data or a tree without rows leave open
         message2(
           "{.mpt_rank_deficit_text(
-            identifiability,
-            'The tree parameters are not identified within one design cell'
+            identifiability, lead
           )} Whether {unchecked} is not checked."
         )
       } else {
         message2(
-          "The tree parameters are not identified within one design cell \\
-          (Jacobian rank {identifiability$rank} for \\
+          "{lead} (Jacobian rank {identifiability$rank} for \\
           {identifiability$n_free} free parameters; print(model) names the \\
           parameters involved). Whether {unchecked} is not checked."
         )

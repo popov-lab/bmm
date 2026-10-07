@@ -271,10 +271,11 @@
 # table) makes the check unavailable, never a false result. A test point where
 # a derivative is not finite (a cusp such as ((c - k)^2)^0.25 at c = k, here or
 # at one covariate setting) is left out, as a point on a singular set is
-# outvoted, so a deficit at the other points is still reported. Only when every
-# point is left out is the check unavailable: a derivative that is not finite
-# at a covariate value in the data for every point mostly comes with branches
-# that are undefined there, which check_data() reports by row.
+# outvoted, so a deficit at the other points is still reported. Outvoting needs
+# a second point, so with fewer than two points left the check is unavailable;
+# a derivative that is not finite at a covariate value in the data for every
+# point mostly comes with branches that are undefined there, which check_data()
+# reports by row.
 # Columns are scaled to unit norm, so a parameter that moves the probabilities
 # little at a test point is not mistaken for a redundant one. A parameter that
 # cancels from every branch can leave a rounding residue instead of an exact
@@ -379,10 +380,10 @@
       }
     }
   }
-  if (!any(finite)) {
+  if (sum(finite) < 2L) {
     return(c(counts, list(error = glue(
-      "at each interior test value, some derivative of the branch \\
-      expressions is not finite"
+      "at {length(finite) - sum(finite)} of the {length(finite)} interior \\
+      test values some derivative of the branch expressions is not finite"
     ))))
   }
   decompositions <- lapply(which(finite), function(point) {
