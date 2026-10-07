@@ -45,7 +45,8 @@ meaning of the coefficients; see Details.}
 and TreeBUGS, e.g. \code{c("Dn = Do", "g = 0.5")}, or as a named list,
 \code{list(Dn = "Do", g = 0.5)}. A restriction either equates a parameter with
 another one (chains such as \code{"G1 = G2 = G3"} map all earlier names onto
-the last) or fixes it to a numeric constant (\code{"g = 0.5"}, \code{"g = 1/4"}).
+the last) or fixes it to a numeric constant (\code{"g = 0.5"}; \code{bmm} also
+reads fractions such as \code{"g = 1/4"}, which MPTinR rejects).
 Constants must lie strictly between 0 and 1. The unnamed list of MPTinR
 and TreeBUGS, \code{list("Dn = Do", "g = 0.5")}, works as well. Restriction
 files are not read: in MPTinR and TreeBUGS a character vector names a
@@ -140,7 +141,9 @@ value is mapped to the latent scale when the constant prior is built, so
 \code{\link[=default_prior]{default_prior()}} shows \code{constant(0)} for a guessing rate of 0.5 under
 the logit link. For the same reason, \code{summary()} lists a fixed \code{g = 0.5}
 as \verb{g_Intercept 0.00} under "Constant Parameters"; \code{\link[=prior_info]{prior_info()}} and
-\code{\link[=parameter_info]{parameter_info()}} show the probability, 0.5.
+\code{\link[=parameter_info]{parameter_info()}} show the probability, 0.5. Members of a \code{simplex}
+group and their \code{praw} components cannot be fixed this way; fix parameters
+outside the group instead.
 
 Printing the model ends with an identifiability check for intercept-only
 formulas. It first compares the number of free parameters with the
@@ -153,26 +156,43 @@ members, and the printout names the group by its members. Covariates
 are never free parameters; because rows with different covariate values
 can identify what one design cell cannot, the rank is taken over the rows
 of every distinct covariate setting in the data in \code{bmm()}, and
-over five test values of the covariates when printing. A rank below the
+over five test values of the covariates when printing. In \code{bmm()}, a
+tree without rows in the data adds nothing to the rank. The two can
+therefore disagree in either direction: \code{print()} can report full rank
+for a design whose data leave a parameter open, and \code{bmm()} then reports
+the deficit (a warning, or a message when a formula has predictors or
+is non-linear); five test values of a covariate can leave open what more
+distinct values in the data identify, and \code{bmm()} then stays silent. A
+rank below the
 number of free parameters means that some combination of the listed
 parameters cannot be estimated from the data,
 even when the count passes, and its posterior follows the prior; a
 parameter whose derivatives are zero up to rounding at the test values
 appears not to affect any category probability and is named separately.
 Fix parameters in the formula or equate them in the branch expressions
-until the rank is full. \code{bmm()} warns about a rank deficit when no
-formula uses a data column as a predictor. When one does, a parameter
-that differs between conditions can identify the model across them, so
-\code{bmm()} only says that the model is not identified within one design
-cell and that the predictors were not checked. The rank covers the
-parameters of the branch expressions only: a non-linear formula that
-ties them together (\code{Dn ~ Do}) or builds one from sub-parameters is not
-analysed, so \code{bmm()} treats a deficit under it the same way, and
-\code{print()} of the checked model says the formula was not analysed. The
-check is local: it holds at the test values, not at the boundaries of
-the parameter space. A branch expression with a function that
-\code{\link[stats:D]{stats::D()}} cannot differentiate leaves the rank uncomputed, and the
-printout says so.
+until the rank is full. \code{bmm()} warns about a rank deficit unless a
+formula uses a data column as a predictor, or a non-linear formula
+defines or reads one of the parameters the deficit involves. A parameter
+that differs between conditions can identify the model across them, and a
+non-linear formula can tie the parameters of the deficit together, so
+\code{bmm()} then only announces the deficit and says what was not checked; a
+non-linear formula on a parameter outside the deficit keeps the warning.
+The announcement says that the tree parameters are not identified within
+one design cell when predictors make cells, and by the branch expressions
+alone otherwise. It names the parameters involved when the rank uses the
+data (covariate values or trees without rows), and otherwise refers to
+\code{print()}. The rank covers the parameters of the branch expressions only:
+a non-linear formula that ties them together (\code{Dn ~ Do}) or builds one
+from sub-parameters is not analysed, and \code{print()} of the checked model
+says the formula was not analysed. The check is local: it holds at the
+test values, not at the boundaries of the parameter space. A test value
+at which a derivative is not finite (in \code{bmm()}, also at a covariate
+value in the data) is left out, and the rank text says how many were. A
+branch expression with a function that \code{\link[stats:D]{stats::D()}} cannot differentiate,
+or a derivative that is not finite at all but one of the test values,
+leaves the rank uncomputed, and the printout says so; \code{bmm()} then
+reports only the count, when the free parameters outnumber the degrees of
+freedom.
 
 \code{summary()} reports intercepts and regression coefficients on the latent
 (logit or probit) scale. \code{\link[=native_parameters]{native_parameters()}} returns the posterior
@@ -196,7 +216,7 @@ posterior predictive p-value from them. With \code{newdata},
 Order constraints between parameters (\code{Do > Dn}) are expressed by
 reparameterizing the larger parameter in the model formula, e.g.
 \code{bmf(Do ~ Dn + (1 - Dn) * inv_logit(phi), Dn ~ 1, phi ~ 1)}; the section
-"Ordered parameter constraints" of the MPT article walks through the
+"Order constraints" of the MPT article walks through the
 recipe.
 
 Parameter and response category names must start with a letter and may

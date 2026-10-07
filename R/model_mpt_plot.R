@@ -17,18 +17,23 @@
 #'
 #' @details Edges are drawn in the order the branch expressions first mention
 #'   them, bare constants included. A complement edge `1 - X` is placed directly
-#'   below its sibling `X`. A numeric constant factor above 1 is not a separate
+#'   below its sibling `X`; the complement of a product, `1 - PG1 * PG2`, is one
+#'   atomic edge. A numeric constant factor above 1 is not a separate
 #'   edge: the constant and all factors after it form one edge, as in
 #'   Batchelder & Riefer (1999, Fig. 1). For example, `B * 2 * u * (1 - u)` draws
 #'   one edge `B`, then one edge `2 * u * (1 - u)`. If the constant is at the start
-#'   (`2 * u * (1 - u)`), the entire expression is one edge. If it is in the middle
-#'   (`u * 2 * (1 - u)`), the constant and the factors after it join into one edge,
-#'   and a trailing constant joins the factor before it. The plot warns when this
-#'   merging hides a process step: a factor after the constant that has no
-#'   complement among the merged factors (`D * 2 * g * (1 - g) * r`), a factor
+#'   (`2 * (1 - c) * u * (1 - u)`), the entire expression is one root edge beside
+#'   its siblings, drawn without a warning, so write the constant after the
+#'   process steps it follows, as in `(1 - c) * 2 * u * (1 - u)`. If it is in the
+#'   middle (`u * 2 * (1 - u)`), the constant and the factors after it join into
+#'   one edge, and a trailing constant joins the factor before it. The plot warns
+#'   when this merging hides a process step: a factor after the constant that has
+#'   no complement among the merged factors (`D * 2 * g * (1 - g) * r`), a factor
 #'   separated from its complement by the constant (`u * 2 * (1 - u)`), or a
-#'   quotient that contains a complement (`(1 - Pi) * 1 / 15` is one edge; write
-#'   `(1 - Pi) * (1/15)`).
+#'   quotient whose denominator does not contain the complemented parameter
+#'   (`(1 - Pi) * 1 / 15` is one edge; write `(1 - Pi) * (1/15)`). A quotient
+#'   normalised by a sum that contains the parameter, as in
+#'   `x * (1 - d) / (x * (1 - d) + y)`, does not warn.
 #'   Expressions are expanded distributively, so `Pm * (Pb + (1 - Pb) * 0.25)`
 #'   displays two paths sharing the `Pm` edge.
 #'
@@ -38,7 +43,11 @@
 #'   fans that lack complements are not checked, nor are nodes with a single edge
 #'   or, when plotting a bare tree, fans of plain parameters (which a model may
 #'   declare as a simplex). Write factors in the same order across all categories
-#'   to avoid mispairing due to different factor orders.
+#'   to avoid mispairing due to different factor orders. A bare [mpt_tree()]
+#'   whose constants were already substituted (such as the stored restricted
+#'   trees of a model) does not recognise a complement written as a number
+#'   (`0.8` beside `0.2`), so those edges keep the order of first mention;
+#'   `plot()` of a model draws the unrestricted trees and is not affected.
 #'
 #'   For a model created with [mpt()], the plot draws the trees as written and
 #'   marks restricted parameters: the edge of a fixed parameter reads `g = 0.5`,
@@ -212,53 +221,62 @@ plot.mpt <- function(x, cex = 0.9, ...) {
   y <- edges$y0 + 0.6 * (edges$y1 - edges$y0) + normal_y * distance * y_per_inch
   list(
     x = x,
-    y = .mpt_separate_labels(x / x_per_inch, y / y_per_inch, width, height) * y_per_inch
+    y = .mpt_separate_labels(x / x_per_inch, y / y_per_inch, width, height, usr[3:4] / y_per_inch) *
+      y_per_inch
   )
 }
 
 # labels of neighbouring edges can overprint in a dense tree, where the long
 # restriction labels ("1 - g (g = 0.5)") are wider than the gap between the
-# edges. Overlapping boxes are pushed apart vertically, each by half the
-# overlap, until none overlaps or the passes run out; a box is 50% taller than
-# the text height, which leaves out descenders and parentheses, so that labels
-# end up apart rather than touching. All arguments are in inches. Trees of more
-# than 2500 edges (11 multiplied sums) are left alone: the sweep costs more
-# than the drawing then, and no panel makes their labels readable
-.mpt_separate_labels <- function(x, y, width, height, max_passes = 100L) {
+# edges. Labels are placed from the bottom up, each at the height closest to
+# its own that the fewest labels placed before it cover, so a tree with room
+# ends up without overlap. A box is 50% taller than the text height, which
+# leaves out descenders and parentheses, and half a text height wider than the
+# label, so that labels end up apart rather than touching. A label never leaves
+# `limits`, the vertical range of the plot region: where it holds no free
+# height, a label overlaps its neighbours rather than being cut off by the
+# window. All arguments are in inches. Trees of more than 2500 edges (11
+# multiplied sums) are left alone: the placement costs more than the drawing
+# then, and no panel makes their labels readable
+.mpt_separate_labels <- function(x, y, width, height, limits = c(-Inf, Inf)) {
   if (length(y) > 2500L) {
     return(y)
   }
-  height <- 1.5 * height
-  for (pass in seq_len(max_passes)) {
-    pairs <- .mpt_overlapping_labels(x, y, width, height)
-    if (nrow(pairs) == 0L) {
+  width <- width + 0.5 * height
+  lowest <- limits[1] + height / 2
+  highest <- pmax(limits[2] - height / 2, lowest)
+  # tighter boxes only where the window holds no free height for the loose ones
+  for (box in c(1.5, 1.25, 1)) {
+    placement <- .mpt_place_labels(x, y, width, box * height, lowest, highest)
+    if (placement$overlaps == 0L) {
       break
     }
-    shift <- (height[pairs[, 1]] + height[pairs[, 2]]) / 2 - (y[pairs[, 2]] - y[pairs[, 1]])
-    moves <- rowsum(c(-shift, shift) / 2, c(pairs[, 1], pairs[, 2]))
-    y[as.integer(rownames(moves))] <- y[as.integer(rownames(moves))] + moves[, 1]
   }
-  y
+  placement$y
 }
 
-# the pairs of label boxes that overlap, as a matrix with the lower label of
-# each pair first. Labels are swept in order of height, so only labels within
-# one box height of each other are compared; the trees of many multiplied sums
-# have thousands of edges
-.mpt_overlapping_labels <- function(x, y, width, height) {
-  by_y <- order(y)
-  pairs <- matrix(integer(0), ncol = 2)
-  for (step in seq_len(length(y) - 1L)) {
-    lower <- by_y[seq_len(length(y) - step)]
-    upper <- by_y[seq_len(length(y) - step) + step]
-    close <- (height[lower] + height[upper]) / 2 > y[upper] - y[lower]
-    if (!any(close)) {
-      break
+.mpt_place_labels <- function(x, y, width, height, lowest, highest) {
+  overlaps <- 0L
+  placed <- integer(0)
+  for (i in order(y)) {
+    beside <- placed[abs(x[placed] - x[i]) < (width[placed] + width[i]) / 2]
+    candidates <- y[i]
+    if (length(beside) > 0L) {
+      clearance <- (height[beside] + height[i]) / 2
+      margin <- 1.000001 * clearance
+      candidates <- c(candidates, y[beside] + margin, y[beside] - margin)
     }
-    overlapping <- close & (width[lower] + width[upper]) / 2 > abs(x[lower] - x[upper])
-    pairs <- rbind(pairs, cbind(lower[overlapping], upper[overlapping]))
+    candidates <- pmin(pmax(candidates, lowest[i]), highest[i])
+    if (length(beside) > 0L) {
+      covering <- findInterval(candidates, sort(y[beside] - clearance)) -
+        findInterval(candidates, sort(y[beside] + clearance))
+      overlaps <- overlaps + (min(covering) > 0L)
+      candidates <- candidates[covering == min(covering)]
+    }
+    y[i] <- candidates[which.min(abs(candidates - y[i]))]
+    placed <- c(placed, i)
   }
-  pairs
+  list(y = y, overlaps = overlaps)
 }
 
 # the edges leaving a node are the branches of one process step, so their
@@ -541,7 +559,14 @@ plot.mpt <- function(x, cex = 0.9, ...) {
       list(node)
     }
   }
-  any(vapply(numerator_factors(parsed[[2]]), function(f) !is.null(.mpt_complement_base(f)), logical(1)))
+  subexpressions <- function(node) {
+    node <- .mpt_strip_parens(node)
+    c(deparse1(node), if (is.call(node)) unlist(lapply(as.list(node)[-1], subexpressions)))
+  }
+  complements <- Filter(function(f) !is.null(.mpt_complement_base(f)), numerator_factors(parsed[[2]]))
+  # a denominator that carries the complement itself normalises the quotient
+  carried <- vapply(complements, function(f) deparse1(f) %in% subexpressions(parsed[[3]]), logical(1))
+  length(complements) > 0L && !all(carried)
 }
 
 # merges the paths of all branch expressions into a prefix trie and computes
