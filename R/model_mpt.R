@@ -1482,12 +1482,15 @@ check_data.mpt <- function(model, data, formula) {
           every tree's branches on every row. Please check {check_what}"
         )
       }
-      # branches that sum to 1 can still be negative or above 1 (e.g. G = 1.2);
-      # near the boundary a valid branch may underflow to exactly 0
-      # (also at an interior point: (1 - D)^n from a few hundred, by the symbol's test value; accepted as unrealistic)
+      # branches that sum to 1 can still be negative or above 1 (e.g. G = 1.2).
+      # A valid branch may underflow to 0 at the corners (and at an interior
+      # point for (1 - D)^n from a few hundred, by the symbol's test value;
+      # accepted as unrealistic), and one written as 1 minus the others may
+      # cancel to just below 0 at the corners, so only a branch below
+      # -tolerance counts there
       out_of_range <- lapply(branches, function(b) {
         which(
-          (if (point <= length(interior_points)) b <= 0 else b < 0) |
+          (if (point <= length(interior_points)) b <= 0 else b < -tolerance) |
             b > 1 + tolerance
         )
       })

@@ -432,12 +432,14 @@
   member_jacobian %*% map
 }
 
-# the first branch-sum or branch-range violation per tree, NA where every test
-# point gives branches in (0, 1] that sum to 1. Branches can sum to 1 for every
-# value and still leave (0, 1] (2 * a and 1 - 2 * a); a branch below or at 0 is
-# log(p) of a non-positive number in Stan. At an interior point an exact 0 is a
-# branch that is 0 for every value, e.g. (1 - a) * 0; at the two boundary
-# corners a valid branch may underflow to exactly 0, so only a negative one
+# the first undefined, branch-sum or branch-range violation per tree, NA where
+# every test point gives branches in (0, 1] that sum to 1. A branch that is not
+# a number (0 / 0) is NaN in Stan too. Branches can sum to 1 for every value and
+# still leave (0, 1] (2 * a and 1 - 2 * a); a branch below or at 0 is log(p) of
+# a non-positive number in Stan. At an interior point an exact 0 is a branch
+# that is 0 for every value, e.g. (1 - a) * 0; at the two boundary corners a
+# valid branch may underflow to 0 or, written as 1 minus the others, cancel to
+# just below it (-8.5e-20 for seven stages), so only a branch below -tolerance
 # counts there. The corners catch a branch that leaves (0, 1] only near the
 # edge of the parameter space (1.2 * a - 0.2)
 .mpt_tree_branch_errors <- function(trees, parameters, simplex,
@@ -448,6 +450,19 @@
     for (point in seq_along(points)) {
       vals <- points[[point]]
       probs <- .mpt_eval_branches(tree, as.list(vals))
+      at_values <- function(category) {
+        symbols <- all.vars(tree$branches[[category]])
+        paste(symbols, "=", signif(vals[symbols], 3), collapse = ", ")
+      }
+      undefined <- names(probs)[is.na(probs)][1]
+      if (!is.na(undefined)) {
+        return(glue(
+          "The branch probability of category '{undefined}' in tree \\
+          '{tree$name}' is not a number at the test values \\
+          {at_values(undefined)}, so the likelihood is undefined there. \\
+          Please check the branch expressions."
+        ))
+      }
       if (abs(sum(probs) - 1) > tolerance) {
         return(glue(
           "The branch probabilities of tree '{tree$name}' sum to \\
@@ -459,10 +474,9 @@
           three options) belong in the simplex argument."
         ))
       }
-      too_low <- if (point <= length(interior)) probs <= 0 else probs < 0
+      too_low <- if (point <= length(interior)) probs <= 0 else probs < -tolerance
       outside <- names(probs)[too_low | probs > 1 + tolerance][1]
       if (!is.na(outside)) {
-        symbols <- all.vars(tree$branches[[outside]])
         zero_hint <- if (probs[[outside]] == 0) {
           " A zero probability makes the likelihood undefined."
         } else {
@@ -471,8 +485,8 @@
         return(glue(
           "The branch probability of category '{outside}' in tree \\
           '{tree$name}' is {signif(probs[[outside]], 6)} at the test values \\
-          {paste(symbols, '=', signif(vals[symbols], 3), collapse = ', ')}, \\
-          outside (0, 1]. Please check the branch expressions.{zero_hint}"
+          {at_values(outside)}, outside (0, 1]. Please check the branch \\
+          expressions.{zero_hint}"
         ))
       }
     }

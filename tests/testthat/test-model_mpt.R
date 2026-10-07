@@ -1788,6 +1788,46 @@ test_that("mpt() refuses a tree that leaves (0, 1] only at a boundary corner, wi
   expect_silent(mpt(mpt_tree("u", list(hit = "1 - (1 - D)^200", miss = "(1 - D)^200"))))
 })
 
+test_that("a branch that cancels to just below 0 at a corner is accepted", {
+  # 1 minus the other branches is -8.49e-20 at the corner 0.999 for seven
+  # stages, and the expanded (1 - a)^7 is -1.33e-15 there
+  stages <- paste0("p", 1:7)
+  reached <- c("", vapply(1:6, function(i) {
+    paste0(paste0("(1 - ", stages[seq_len(i)], ")", collapse = " * "), " * ")
+  }, character(1)))
+  branches <- paste0(reached, stages)
+  chain <- as.list(setNames(
+    c(branches, paste0("1 - ", paste(branches, collapse = " - "))), paste0("c", 1:8)
+  ))
+  expect_silent(mpt(mpt_tree("t", chain)))
+
+  expanded <- "1 - 7*a + 21*a^2 - 35*a^3 + 35*a^4 - 21*a^5 + 7*a^6 - a^7"
+  expect_silent(mpt(mpt_tree("t", list(y = glue("1 - ({expanded})"), n = expanded))))
+
+  # the same rule holds where the covariate values of the data are checked
+  scaled <- mpt(
+    mpt_tree("t", list(y = glue("1 - x * ({expanded})"), n = glue("x * ({expanded})"))),
+    covariates = "x"
+  )
+  expect_silent(check_data(scaled, data.frame(x = 1, y = 5, n = 5), bmf(a ~ 1)))
+  shifted <- mpt(
+    mpt_tree("t", list(yes = "x * (1.2 * a - 0.2)", no = "1 - x * (1.2 * a - 0.2)")),
+    covariates = "x"
+  )
+  expect_error(
+    check_data(shifted, data.frame(x = 1, yes = 5, no = 5), bmf(a ~ 1)),
+    "category 'yes' in tree 't' is -0.1988 in row 1, outside \\(0, 1\\]"
+  )
+})
+
+test_that("mpt() refuses a branch that is not a number at a test value", {
+  # 0.001^200 underflows to 0, so the ratio is 0 / 0 at the corner
+  expect_error(
+    mpt(mpt_tree("t", list(y = "a^200 / (a^200 + b^200)", n = "b^200 / (a^200 + b^200)"))),
+    "category 'y' in tree 't' is not a number at the test values a = 0.001, b = 0.001"
+  )
+})
+
 test_that("mpt() alone decides a tree without covariates in a model with covariates and a simplex", {
   covariate_tree <- mpt_tree("t1", list(
     A = "gA * D + (1 - D) * x", B = "gB * D", C = "gC * D + (1 - D) * (1 - x)"
