@@ -798,10 +798,7 @@ print_model_details.mpt <- function(model, ...) {
     parameter(s), {identifiability$df} degrees of freedom (response \\
     categories minus 1, summed over trees)"
   ), "\n")
-  uses_covariates <- any(vapply(model$other_vars$trees, function(tree) {
-    any(.mpt_expr_vars(tree) %in% model$other_vars$covariates)
-  }, logical(1)))
-  if (identifiability$n_free > identifiability$df && uses_covariates) {
+  if (identifiability$n_free > identifiability$df && .mpt_uses_covariates(model)) {
     cat(
       "  More free parameters than degrees of freedom in one design cell;",
       "covariate values that differ between rows can add information.\n"
@@ -821,13 +818,35 @@ print_model_details.mpt <- function(model, ...) {
   } else if (identifiability$rank < identifiability$n_free) {
     .mpt_rank_deficit_text(identifiability)
   } else {
-    glue(
-      "Jacobian rank {identifiability$rank} of {identifiability$n_free} \\
-      {identifiability$where}: locally identified."
-    )
+    paste(c(
+      glue(
+        "Jacobian rank {identifiability$rank} of {identifiability$n_free} \\
+        {identifiability$where}: locally identified."
+      ),
+      .mpt_left_out_text(identifiability)
+    ), collapse = " ")
   }
   cat(strwrap(rank_text, indent = 2, exdent = 4), sep = "\n")
   invisible(NULL)
+}
+
+.mpt_uses_covariates <- function(model) {
+  any(vapply(model$other_vars$trees, function(tree) {
+    any(.mpt_expr_vars(tree) %in% model$other_vars$covariates)
+  }, logical(1)))
+}
+
+# the rank holds only at the test values where every derivative is finite
+.mpt_left_out_text <- function(identifiability) {
+  left_out <- identifiability$left_out
+  if (left_out == 0L) {
+    return(NULL)
+  }
+  glue(
+    "At {left_out} of the {identifiability$n_points} interior test values a \\
+    derivative of the branch expressions is not finite, so the rank is taken \\
+    at the other {identifiability$n_points - left_out}."
+  )
 }
 
 # rank of the category probabilities in the free tree parameters; a parameter
@@ -860,10 +879,14 @@ print_model_details.mpt <- function(model, ...) {
   unobserved <- if (settings$from_data) {
     observed <- vapply(settings$values, nrow, integer(1)) > 0L
     covariates <- model$other_vars$covariates
-    intersect(free, setdiff(
+    only_unobserved <- setdiff(
       .mpt_tree_parameters(trees[!observed], covariates),
       .mpt_tree_parameters(trees[observed], covariates)
-    ))
+    )
+    # a simplex group is free through its sticks, which no tree contains
+    intersect(free, c(only_unobserved, unlist(lapply(simplex, function(grp) {
+      if (all(grp %in% only_unobserved)) sticks[grp[-length(grp)]]
+    }))))
   }
   c(
     .mpt_jacobian_rank(trees, free, fixed, simplex, sticks, settings$values),
@@ -954,6 +977,7 @@ print_model_details.mpt <- function(model, ...) {
   free <- identifiability$free
   labels <- identifiability$labels
   absent <- identifiability$absent
+  unobserved <- identifiability$unobserved
   entangled <- setdiff(identifiability$involved, absent)
   n_combinations <- identifiability$n_free - identifiability$rank -
     length(absent)
@@ -970,22 +994,24 @@ print_model_details.mpt <- function(model, ...) {
         from the data."
       )
     },
-    if (length(absent) > 0) {
+    # a parameter only in trees without rows has a zero derivative for that
+    # reason alone, which the next sentence gives
+    if (length(setdiff(absent, unobserved)) > 0) {
       glue(
-        "The derivative with respect to {.mpt_labels(absent, labels)} is zero up \\
-        to rounding {identifiability$where}, so these parameter(s) appear not \\
-        to affect any category probability there."
+        "The derivative with respect to \\
+        {.mpt_labels(setdiff(absent, unobserved), labels)} is zero up to \\
+        rounding {identifiability$where}, so these parameter(s) appear not to \\
+        affect any category probability there."
       )
     },
-    if (length(identifiability$unobserved) > 0) {
-      one <- length(identifiability$unobserved) == 1L
+    if (length(unobserved) > 0) {
       glue(
-        "{.mpt_labels(identifiability$unobserved, labels)} \\
-        {if (one) 'enters' else 'enter'} only trees without rows in the data, \\
-        which check_data() names, so the data leave {if (one) 'it' else 'them'} \\
-        open."
+        "Only trees without rows in the data contain \\
+        {.mpt_labels(unobserved, labels)}, so no row's category probabilities \\
+        depend on {if (length(unique(labels[unobserved])) == 1L) 'it' else 'them'}."
       )
     },
+    .mpt_left_out_text(identifiability),
     glue(
       "Fix parameters in the formula (bmf(name = value)) or equate them in \\
       the branch expressions."
@@ -1011,6 +1037,7 @@ print_model_details.mpt <- function(model, ...) {
         are not identified by the branch expressions alone."
       )
     },
+    .mpt_left_out_text(identifiability),
     glue(
       "The non-linear formula(s) for {collapse_comma(tied)} were not \\
       analysed, so whether the model is identified is not checked."
@@ -1110,45 +1137,64 @@ check_model.mpt <- function(model, data = NULL, formula = NULL) {
     # is announced but not warned about
     with_predictors <- .mpt_predictor_formulas(formula, names(model$parameters))
     identifiability <- .mpt_identifiability(model, data)
-    if (is.null(identifiability$error) &&
-          identifiability$rank < identifiability$n_free) {
-      if (length(with_predictors) == 0L && length(nl_pars) == 0L) {
+    # without a rank, the count bound is all there is; covariate values that
+    # differ between rows can add what one design cell lacks
+    count_only <- !is.null(identifiability$error)
+    unchecked <- paste(c(
+      if (length(with_predictors) > 0) {
+        glue(
+          "the predictors on {collapse_comma(with_predictors)} identify \\
+          it across cells"
+        )
+      },
+      if (length(nl_pars) > 0) {
+        glue("the non-linear formula(s) for {collapse_comma(nl_pars)} identify it")
+      },
+      if (count_only && .mpt_uses_covariates(model)) {
+        "the covariate values in the data identify it"
+      }
+    ), collapse = " or ")
+    warn <- !nzchar(unchecked)
+    if (count_only && identifiability$n_free > identifiability$df) {
+      count_text <- glue(
+        "{identifiability$n_free} free parameters for \\
+        {identifiability$df} degrees of freedom (response categories minus 1, \\
+        summed over trees); the Jacobian rank was not computed, print(model) \\
+        says why."
+      )
+      if (warn) {
+        warning2(
+          "The model is not identified: {count_text} Fix parameters in the \\
+          formula (bmf(name = value)) or equate them in the branch expressions."
+        )
+      } else {
+        message2(
+          "The tree parameters are not identified within one design cell: \\
+          {count_text} Whether {unchecked} is not checked."
+        )
+      }
+    } else if (!count_only && identifiability$rank < identifiability$n_free) {
+      if (warn) {
         warning2(
           "{.mpt_rank_deficit_text(identifiability)} Along the non-identified \\
           direction(s), the posterior follows the prior."
         )
-      } else {
-        unchecked <- paste(c(
-          if (length(with_predictors) > 0) {
-            glue(
-              "the predictors on {collapse_comma(with_predictors)} identify \\
-              it across cells"
-            )
-          },
-          if (length(nl_pars) > 0) {
-            glue(
-              "the non-linear formula(s) for {collapse_comma(nl_pars)} \\
-              identify it"
-            )
-          }
-        ), collapse = " or ")
+      } else if (identifiability$from_data) {
         # print() has no data, so it cannot name the parameters that the
         # covariate values in the data or a tree without rows leave open
-        if (identifiability$from_data) {
-          message2(
-            "{.mpt_rank_deficit_text(
-              identifiability,
-              'The tree parameters are not identified with intercept-only formulas'
-            )} Whether {unchecked} is not checked."
-          )
-        } else {
-          message2(
-            "The tree parameters are not identified within one design cell \\
-            (Jacobian rank {identifiability$rank} for \\
-            {identifiability$n_free} free parameters; print(model) names the \\
-            parameters involved). Whether {unchecked} is not checked."
-          )
-        }
+        message2(
+          "{.mpt_rank_deficit_text(
+            identifiability,
+            'The tree parameters are not identified within one design cell'
+          )} Whether {unchecked} is not checked."
+        )
+      } else {
+        message2(
+          "The tree parameters are not identified within one design cell \\
+          (Jacobian rank {identifiability$rank} for \\
+          {identifiability$n_free} free parameters; print(model) names the \\
+          parameters involved). Whether {unchecked} is not checked."
+        )
       }
     }
   }

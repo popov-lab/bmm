@@ -268,7 +268,13 @@
 # differentiates exactly, so a null direction has a singular value at rounding
 # level (about 1e-16 relative) instead of the 1e-13 to 1e-11 left by central
 # differences. A branch that D() cannot differentiate (a function outside its
-# table) makes the check unavailable, never a false result.
+# table) makes the check unavailable, never a false result. A test point where
+# a derivative is not finite (a cusp such as ((c - k)^2)^0.25 at c = k, here or
+# at one covariate setting) is left out, as a point on a singular set is
+# outvoted, so a deficit at the other points is still reported. Only when every
+# point is left out is the check unavailable: a derivative that is not finite
+# at a covariate value in the data for every point mostly comes with branches
+# that are undefined there, which check_data() reports by row.
 # Columns are scaled to unit norm, so a parameter that moves the probabilities
 # little at a test point is not mistaken for a redundant one. A parameter that
 # cancels from every branch can leave a rounding residue instead of an exact
@@ -309,7 +315,7 @@
   )
   if (length(free) == 0L) {
     return(c(counts, list(
-      rank = 0L, involved = character(0), absent = character(0)
+      rank = 0L, involved = character(0), absent = character(0), left_out = 0L
     )))
   }
   trees <- unname(trees)
@@ -347,6 +353,7 @@
   # the columns stay in parameter order
   n_points <- length(points)
   factors <- vector("list", n_points)
+  finite <- rep(TRUE, n_points)
   for (tree in seq_along(trees)) {
     n_rows <- nrow(settings[[tree]])
     for (rows in split(seq_len(n_rows), ceiling(seq_len(n_rows) / chunk_size))) {
@@ -359,24 +366,26 @@
       block <- vapply(derivs[[tree]], function(deriv) {
         rep_len(eval(deriv, row_vals), length(rows) * n_points)
       }, numeric(length(rows) * n_points))
-      # qr() stops on a non-finite entry with a bare foreign-call error. At a
-      # covariate value in the data, such a derivative mostly comes with
-      # branches that are undefined there, which check_data() reports by row
-      if (!all(is.finite(block))) {
-        return(c(counts, list(error = glue(
-          "a derivative of the branch expressions is not finite at some of \\
-          the test values"
-        ))))
-      }
-      for (point in seq_along(points)) {
+      for (point in which(finite)) {
+        point_block <- block[seq(point, nrow(block), by = n_points), , drop = FALSE]
+        # qr() stops on a non-finite entry with a bare foreign-call error
+        if (!all(is.finite(point_block))) {
+          finite[point] <- FALSE
+          next
+        }
         factors[[point]] <- qr.R(qr(rbind(factors[[point]], matrix(
-          t(block[seq(point, nrow(block), by = n_points), , drop = FALSE]),
-          ncol = length(parameters), byrow = TRUE
+          t(point_block), ncol = length(parameters), byrow = TRUE
         )), tol = 0))
       }
     }
   }
-  decompositions <- lapply(seq_along(points), function(point) {
+  if (!any(finite)) {
+    return(c(counts, list(error = glue(
+      "at each interior test value, some derivative of the branch \\
+      expressions is not finite"
+    ))))
+  }
+  decompositions <- lapply(which(finite), function(point) {
     jacobian <- factors[[point]]
     colnames(jacobian) <- parameters
     for (grp in simplex) {
@@ -411,7 +420,8 @@
   c(counts, list(
     rank = best$rank,
     involved = free[rowSums(abs(null_space) > 1e-6) > 0],
-    absent = best$absent
+    absent = best$absent,
+    left_out = sum(!finite), n_points = n_points
   ))
 }
 

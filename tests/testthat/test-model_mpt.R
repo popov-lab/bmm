@@ -996,8 +996,8 @@ test_that("the rank check uses only finite covariate values and the trees with r
     check_model(mixed, only_old, bmf(Do ~ 1, Dn ~ 1, g ~ 1)),
     paste0(
       "rank 1 for 3 free parameters at interior test values and the covariate ",
-      "values in the trees with rows in the data\\..*'Dn' enters only trees ",
-      "without rows in the data"
+      "values in the trees with rows in the data\\..*Only trees without rows in ",
+      "the data contain 'Dn', so no row's category probabilities depend on it\\."
     )
   )
 
@@ -1009,12 +1009,38 @@ test_that("the rank check uses only finite covariate values and the trees with r
     "the covariate values in the data"
   )
   expect_no_match(conditionMessage(msg), "print\\(model\\)|The model is not identified")
-  expect_match(conditionMessage(msg), "^The tree parameters are not identified with intercept-only formulas")
+  expect_match(conditionMessage(msg), "^The tree parameters are not identified within one design cell: ")
   expect_no_match(conditionMessage(msg), "without rows")
   expect_match(
     conditionMessage(msg),
     "'b' is zero up to rounding at interior test values and the covariate values in the data"
   )
+})
+
+test_that("a parameter only in trees without rows is named once, also as a simplex group or under a tie", {
+  mixed <- mpt(list(
+    mpt_tree("old", list(yes = "Do + (1 - Do) * g * x", no = "(1 - Do) * (1 - g * x)")),
+    mpt_tree("new", list(yes = "(1 - Dn) * g", no = "Dn + (1 - Dn) * (1 - g)"))
+  ), tree_id = "item_type", covariates = "x")
+  only_old <- data.frame(item_type = "old", x = c(1, 1), yes = 5, no = 5)
+  warned <- expect_warning(check_model(mixed, only_old, bmf(Do ~ 1, Dn ~ 1, g ~ 1)))
+  expect_no_match(conditionMessage(warned), "derivative with respect to 'Dn'|check_data")
+  # under a tie Dn still enters only the tree without rows
+  tied <- expect_message(
+    check_model(mixed, only_old, bmf(Do ~ 1, Dn ~ Do, g ~ 1)),
+    "Only trees without rows in the data contain 'Dn', so no row's category probabilities depend on it\\."
+  )
+  expect_no_match(conditionMessage(tied), "check_data|leave it open")
+
+  guessing <- mpt(list(
+    mpt_tree("A", list(x1 = "a", n = "1 - a"), impossible = c("x2", "x3")),
+    mpt_tree("B", list(x1 = "a * g1", x2 = "a * g2", x3 = "a * g3", n = "1 - a"))
+  ), tree_id = "tr", simplex = c("g1", "g2", "g3"))
+  warned <- expect_warning(
+    check_model(guessing, data.frame(tr = "A", x1 = 3, x2 = 0, x3 = 0, n = 3), bmf(a ~ 1)),
+    "Only trees without rows in the data contain the simplex group 'g1', 'g2', 'g3', so no row's category probabilities depend on it\\."
+  )
+  expect_no_match(conditionMessage(warned), "derivative with respect to")
 })
 
 test_that("the rank check drops the trees without rows also when no tree uses a covariate", {
@@ -1044,9 +1070,9 @@ test_that("the rank check drops the trees without rows also when no tree uses a 
     "rank 1 for 2 free parameters at interior test values in the trees with rows in the data"
   )
   expect_no_match(conditionMessage(msg), "print\\(model\\)|covariate values|The model is not identified")
-  expect_match(conditionMessage(msg), "^The tree parameters are not identified with intercept-only formulas")
+  expect_match(conditionMessage(msg), "^The tree parameters are not identified within one design cell: ")
   # D and g both enter the tree with rows
-  expect_no_match(conditionMessage(msg), "enters only trees")
+  expect_no_match(conditionMessage(msg), "Only trees without rows")
 
   # a declared covariate that no branch uses changes nothing
   declared <- mpt(trees, tree_id = "item_type", covariates = "x")
@@ -1065,31 +1091,83 @@ test_that("the Jacobian rank is reported as not computed when D() cannot differe
   model <- mpt(mpt_tree("t", list(x = "plogis(a)", y = "1 - plogis(a)")))
   printed <- mpt_printed(model)
   expect_match(printed, "Jacobian rank not computed: .*'plogis'")
-  expect_no_warning(check_model(model, data.frame(x = 1, y = 1), bmf(a ~ 1)))
+  expect_silent(check_model(model, data.frame(x = 1, y = 1), bmf(a ~ 1)))
 })
 
-test_that("a derivative that is not finite leaves the rank uncomputed and check_data() names the row", {
+test_that("without a rank, check_model() announces more free parameters than degrees of freedom", {
+  scaled <- "a * b * (0.5 + 0.2 * abs(c - 0.5))"
+  model <- mpt(mpt_tree("t", list(y = scaled, n = glue("1 - {scaled}"))))
+  expect_warning(
+    check_model(model, data.frame(y = 3, n = 3), bmf(a ~ 1, b ~ 1, c ~ 1)),
+    paste0(
+      "^The model is not identified: 3 free parameters for 1 degrees of ",
+      "freedom .*the Jacobian rank was not computed"
+    )
+  )
+  msg <- expect_no_warning(expect_message(
+    check_model(model, data.frame(cond = c("p", "q"), y = 3, n = 3), bmf(a ~ 1, b ~ 0 + cond, c ~ 1)),
+    "^The tree parameters are not identified within one design cell: 3 free parameters"
+  ))
+  expect_match(conditionMessage(msg), "Whether the predictors on 'b' identify it across cells is not checked")
+
+  with_x <- mpt(mpt_tree("t", list(y = glue("{scaled} * x"), n = glue("1 - {scaled} * x"))), covariates = "x")
+  expect_no_warning(expect_message(
+    check_model(with_x, data.frame(x = c(0.2, 0.6), y = 3, n = 3), bmf(a ~ 1, b ~ 1, c ~ 1)),
+    "Whether the covariate values in the data identify it is not checked"
+  ))
+})
+
+test_that("a test value with a non-finite derivative is left out of the rank", {
+  # the derivative of ((c - k)^2)^0.25 is Inf * 0 at c = k
+  k <- vapply(bmm:::.mpt_test_points(c("a", "b", "c"), list()), `[[`, numeric(1), "c")[1]
+  cusp_tree <- function(inner) {
+    mpt_tree("t2", list(
+      y = glue("0.3 + 0.2 * (({inner})^2)^0.25"), n = glue("0.7 - 0.2 * (({inner})^2)^0.25")
+    ))
+  }
+  left_out <- "At 1 of the 5 interior test values a derivative .*not finite, so the rank is taken at the other 4"
+  product <- mpt(list(
+    mpt_tree("t1", list(y = "a * b", n = "1 - a * b")), cusp_tree(glue("c - {sprintf('%a', k)}"))
+  ), tree_id = "tr")
+  expect_match(mpt_printed(product), glue("rank 2 for 3 free parameters at interior test values\\..*{left_out}"))
+  expect_warning(
+    check_model(product, data.frame(tr = c("t1", "t2"), y = 3, n = 3), bmf(a ~ 1, b ~ 1, c ~ 1)),
+    glue("rank 2 for 3 free parameters.*{left_out}")
+  )
+  # the test points depend on the symbols, so c takes other values here
+  k_ac <- vapply(bmm:::.mpt_test_points(c("a", "c"), list()), `[[`, numeric(1), "c")[1]
+  identified <- mpt(list(
+    mpt_tree("t1", list(y = "a", n = "1 - a")), cusp_tree(glue("c - {sprintf('%a', k_ac)}"))
+  ), tree_id = "tr")
+  expect_match(mpt_printed(identified), glue("Jacobian rank 2 of 2 at interior test values: locally identified\\. {left_out}"))
+
+  # the cusp at one covariate setting in the data
+  with_x <- mpt(list(
+    mpt_tree("t1", list(y = "a * b", n = "1 - a * b")), cusp_tree("c - x")
+  ), tree_id = "tr", covariates = "x")
+  expect_warning(
+    check_model(
+      with_x, data.frame(tr = c("t1", "t2", "t2"), x = c(0, k, 0.2), y = 3, n = 3),
+      bmf(a ~ 1, b ~ 1, c ~ 1)
+    ),
+    glue("rank 2 for 3 free parameters.*{left_out}")
+  )
+})
+
+test_that("a derivative not finite at every test value leaves the rank uncomputed and check_data() names the row", {
   model <- mpt(list(
     mpt_tree("plain", list(y = "a", n = "1 - a")),
     mpt_tree("cov", list(y = "b * 0.5 / x", n = "1 - b * 0.5 / x"))
   ), tree_id = "tr", covariates = "x")
   dat <- data.frame(tr = c("plain", "cov"), x = c(1, 0), y = 3, n = 3)
   expect_silent(check_model(model, dat, bmf(a ~ 1, b ~ 1)))
+  expect_match(
+    bmm:::.mpt_identifiability(model, dat)$error,
+    "at each interior test value, some derivative of the branch expressions is not finite"
+  )
   expect_error(
     bmm(bmf(a ~ 1, b ~ 1), dat, model, backend = "mock", mock_fit = 1, rename = FALSE),
     "branch probabilities of tree 'cov' do not sum to 1 for 1 row\\(s\\) \\(first: row 2, sum = NaN\\)"
-  )
-
-  # without covariates: at the first test point a equals k, where the
-  # derivative of ((a - k)^2)^0.25 is Inf * 0
-  k <- sprintf("%a", bmm:::.mpt_test_points("a", list())[[1]][["a"]])
-  cusp <- mpt(mpt_tree("t", list(
-    yes = glue("0.5 + 0.25 * ((a - {k})^2)^0.25"),
-    no = glue("0.5 - 0.25 * ((a - {k})^2)^0.25")
-  )))
-  expect_match(
-    mpt_printed(cusp),
-    "Jacobian rank not computed: a derivative of the branch expressions is not finite"
   )
 })
 
