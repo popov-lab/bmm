@@ -860,31 +860,48 @@ print_model_details.mpt <- function(model, ...) {
 # covariate values at which the rank is taken, one data frame per tree (a tree
 # without covariates has one empty setting): the distinct finite values in the
 # tree's rows of the data. A subset can only lower the rank, so none is dropped.
-# A tree without rows adds no rows, with or without covariates. Five test
-# values stand in when the data cannot provide them (print() has no data; a
-# missing, non-numeric or non-finite covariate is check_data()'s to report)
+# A tree without rows adds no rows, with or without covariates; without
+# covariates the data matter only through such a tree, and when every tree or
+# none has rows the rank is the model's. Five test values stand in when the
+# data cannot provide the covariates (print() has no data; a missing,
+# non-numeric or non-finite covariate is check_data()'s to report)
 .mpt_covariate_settings <- function(model, data) {
   trees <- model$other_vars$trees
   covariates <- model$other_vars$covariates
+  tree_id <- model$other_vars$tree_id
   used <- lapply(trees, function(tree) intersect(covariates, .mpt_expr_vars(tree)))
-  if (length(unlist(used)) == 0L) {
-    return(list(values = NULL, where = "at interior test values", from_data = FALSE))
-  }
   empty <- data.frame(row.names = 1L)
-  usable <- is.data.frame(data) && all(covariates %in% names(data)) &&
-    all(vapply(data[covariates], is.numeric, logical(1)))
-  if (usable) {
-    tree_id <- model$other_vars$tree_id
-    values <- lapply(names(trees), function(name) {
-      rows <- if (is.null(tree_id)) {
+  # an absent or non-matching tree_id column leaves every tree without rows;
+  # check_data() names the problem
+  tree_rows <- if (is.data.frame(data)) {
+    lapply(names(trees), function(name) {
+      if (is.null(tree_id)) {
         seq_len(nrow(data))
       } else {
         which(as.character(data[[tree_id]]) %in% name)
       }
-      if (length(used[[name]]) == 0L) {
+    })
+  }
+  if (length(unlist(used)) == 0L) {
+    with_rows <- lengths(tree_rows) > 0L
+    if (all(with_rows) || !any(with_rows)) {
+      return(list(values = NULL, where = "at interior test values", from_data = FALSE))
+    }
+    return(list(
+      values = lapply(tree_rows, function(rows) empty[seq_len(min(length(rows), 1L)), , drop = FALSE]),
+      where = "at interior test values in the trees with rows in the data",
+      from_data = TRUE
+    ))
+  }
+  usable <- is.data.frame(data) && all(covariates %in% names(data)) &&
+    all(vapply(data[covariates], is.numeric, logical(1)))
+  if (usable) {
+    values <- lapply(seq_along(trees), function(tree) {
+      rows <- tree_rows[[tree]]
+      if (length(used[[tree]]) == 0L) {
         return(empty[seq_len(min(length(rows), 1L)), , drop = FALSE])
       }
-      settings <- data[rows, used[[name]], drop = FALSE]
+      settings <- data[rows, used[[tree]], drop = FALSE]
       settings <- unique(settings[rowSums(!is.finite(as.matrix(settings))) == 0L, ,
         drop = FALSE])
       # rows without one complete setting leave the data unusable for the rank
@@ -1085,8 +1102,8 @@ check_model.mpt <- function(model, data = NULL, formula = NULL) {
             )
           }
         ), collapse = " or ")
-        # print() takes the covariates at test values, so it cannot name the
-        # parameters that the covariate values in the data leave open
+        # print() has no data, so it cannot name the parameters that the
+        # covariate values in the data or a tree without rows leave open
         if (identifiability$from_data) {
           message2(
             "{.mpt_rank_deficit_text(identifiability)} Whether {unchecked} is \\

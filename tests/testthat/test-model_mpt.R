@@ -994,6 +994,47 @@ test_that("the rank check uses only finite covariate values and the trees with r
   )
 })
 
+test_that("the rank check drops the trees without rows also when no tree uses a covariate", {
+  trees <- list(
+    mpt_tree("old", list(yes = "D + (1 - D) * g", no = "(1 - D) * (1 - g)")),
+    mpt_tree("new", list(yes = "(1 - D) * g", no = "D + (1 - D) * (1 - g)"))
+  )
+  two_htm <- mpt(trees, tree_id = "item_type")
+  expect_match(
+    mpt_printed(two_htm),
+    "Jacobian rank 2 of 2 at interior test values: locally identified"
+  )
+  both <- data.frame(item_type = factor(c("old", "new")), yes = 5, no = 5)
+  expect_no_warning(expect_no_message(check_model(two_htm, both, bmf(D ~ 1, g ~ 1))))
+
+  # one category pair cannot separate D from g
+  only_old <- data.frame(item_type = "old", yes = 5, no = 5)
+  expect_warning(
+    check_model(two_htm, only_old, bmf(D ~ 1, g ~ 1)),
+    "rank 1 for 2 free parameters at interior test values in the trees with rows in the data\\."
+  )
+  # print() has no data and names the parameters of the full design, so the
+  # message must name them itself
+  with_cond <- data.frame(item_type = "old", cond = c("p", "q"), yes = 5, no = 5)
+  msg <- expect_message(
+    check_model(two_htm, with_cond, bmf(D ~ 1, g ~ 0 + cond)),
+    "rank 1 for 2 free parameters at interior test values in the trees with rows in the data"
+  )
+  expect_no_match(conditionMessage(msg), "print\\(model\\)|covariate values")
+
+  # a declared covariate that no branch uses changes nothing
+  declared <- mpt(trees, tree_id = "item_type", covariates = "x")
+  expect_warning(
+    check_model(declared, cbind(only_old, x = 1), bmf(D ~ 1, g ~ 1)),
+    "rank 1 for 2 free parameters"
+  )
+
+  # without a row for any tree the data say nothing and the model rank stands
+  expect_no_warning(check_model(
+    two_htm, data.frame(item_type = "lure", yes = 5, no = 5), bmf(D ~ 1, g ~ 1)
+  ))
+})
+
 test_that("the Jacobian rank is reported as not computed when D() cannot differentiate", {
   model <- mpt(mpt_tree("t", list(x = "plogis(a)", y = "1 - plogis(a)")))
   printed <- mpt_printed(model)
