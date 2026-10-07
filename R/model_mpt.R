@@ -691,7 +691,8 @@ mpt <- function(trees, tree_id = NULL, covariates = NULL, simplex = NULL,
   )
 
   # synthetic covariate values need not form a valid tree (Gcorr + Gother = 1),
-  # so check_data() decides for trees that use covariates, with the observed values
+  # so check_data() decides for trees that use covariates, with the observed
+  # values; every other tree is decided here, whether covariates are declared or not
   uses_covariates <- vapply(
     trees, function(tree) any(.mpt_expr_vars(tree) %in% covariates), logical(1)
   )
@@ -1365,15 +1366,17 @@ check_data.mpt <- function(model, data, formula) {
   data
 }
 
-# the construction-time check cannot use real covariate values, so the sums are
-# re-checked per row with the observed values, at the same parameter test
-# points: a single symmetric point (all 0.5) hides swapped complements. The
+# the construction-time check skips trees that use covariates, because it
+# cannot use real covariate values, so the sums of those trees are checked per
+# row with the observed values, at several parameter test points: a single
+# symmetric point (all 0.5) hides swapped complements. Trees without covariates
+# are left to mpt() and enter only through the NA check of the covariates. The
 # range is also checked with all parameters near 0 and near 1. Those two
 # corners catch a covariate that pushes a branch out of (0, 1] when the
 # parameters enter the branch with one orientation (all increasing or all
 # decreasing); a branch that mixes complements of parameters is not covered.
-# brms evaluates every tree's branches on every row, so each tree's branches
-# must also be finite on the rows of the other trees.
+# brms evaluates every tree's branches on every row, so the branches of such a
+# tree must also be finite on the rows of the other trees.
 # Covariates themselves are not range-checked: one may be a set size entering
 # as 1/ss.
 .mpt_validate_covariate_sums <- function(model, data, tolerance = 1e-6) {
@@ -1419,14 +1422,15 @@ check_data.mpt <- function(model, data, formula) {
       )
     }
     tree_covariates <- intersect(covariates, .mpt_expr_vars(tree))
-    check_what <- if (length(tree_covariates) > 0L) {
-      paste0(
-        "the branch expressions of this tree and the covariate column(s): ",
-        collapse_comma(tree_covariates)
-      )
-    } else {
-      "the branch expressions of this tree, which uses no covariate"
+    # mpt() checked a tree without covariates at construction, and its
+    # branches take the same values on every row
+    if (length(tree_covariates) == 0L) {
+      next
     }
+    check_what <- paste0(
+      "the branch expressions of this tree and the covariate column(s): ",
+      collapse_comma(tree_covariates)
+    )
     for (point in seq_along(points)) {
       env <- c(
         as.list(points[[point]]), as.list(data[, covariates, drop = FALSE])

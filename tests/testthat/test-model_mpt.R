@@ -1641,6 +1641,47 @@ test_that("the sum and range messages name only the covariates the tree uses", {
   expect_no_match(msg, "'G'")
 })
 
+test_that("mpt() refuses a tree that leaves (0, 1] only at a boundary corner, with or without covariates", {
+  tree <- mpt_tree("t", list(yes = "1.2 * a - 0.2", no = "1.2 - 1.2 * a"))
+  corner_msg <- "category 'yes' in tree 't' is -0.1988 at the test values a = 0.001, outside \\(0, 1\\]"
+  expect_error(mpt(tree), corner_msg)
+  expect_error(mpt(tree, covariates = "G"), corner_msg)
+
+  # 0.001^200 underflows to exactly 0 at the corner D = 0.999
+  expect_silent(mpt(mpt_tree("u", list(hit = "1 - (1 - D)^200", miss = "(1 - D)^200"))))
+})
+
+test_that("mpt() alone decides a tree without covariates in a model with covariates and a simplex", {
+  covariate_tree <- mpt_tree("t1", list(
+    A = "gA * D + (1 - D) * x", B = "gB * D", C = "gC * D + (1 - D) * (1 - x)"
+  ))
+  build <- function(free_tree) {
+    mpt(
+      list(covariate_tree, free_tree),
+      tree_id = "tree", covariates = "x", simplex = c("gA", "gB", "gC")
+    )
+  }
+  expect_error(
+    build(mpt_tree("t2", list(
+      A = "1.25 * D", B = "(1 - 1.25 * D) * 0.5", C = "(1 - 1.25 * D) * 0.5"
+    ))),
+    "category 'A' in tree 't2' is 1.24875 at the test values D = 0.999"
+  )
+
+  # the branches of t2 sum to 1 at every value of D that mpt() tries, and to
+  # something else at the values a data check in another symbol order would try
+  # (t2 adds no symbol, so t1 alone sets the order)
+  construction <- .mpt_tree_parameters(list(covariate_tree), "x")
+  checked_d <- c(
+    vapply(.mpt_test_points(construction, list(c("gA", "gB", "gC"))), `[[`, numeric(1), "D"),
+    0.001, 0.999
+  )
+  bump <- paste0("(D - ", sprintf("%.10f", checked_d), ")", collapse = " * ")
+  model <- build(mpt_tree("t2", list(A = "D", B = glue("1 - D + {bump}")), impossible = "C"))
+  dat <- data.frame(tree = c("t1", "t2"), x = 0.5, A = 3, B = 3, C = c(3, 0))
+  expect_silent(check_data(model, dat, bmf(D ~ 1)))
+})
+
 test_that("the data check catches a tree that is right at the first interior and boundary points", {
   at_first <- sprintf("%.8f", .mpt_test_points("D", list())[[1]][["D"]])
   model <- mpt(mpt_tree("main", list(

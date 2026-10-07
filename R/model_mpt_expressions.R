@@ -239,9 +239,10 @@
   })
 }
 
-# all parameters near 0 and all near 1, for the range check of covariate
-# branches. These two corners catch a covariate that pushes a branch out of
-# (0, 1] when the parameters enter the branch with one orientation; branches
+# all parameters near 0 and all near 1, for the range checks in mpt() and,
+# with the observed covariate values, in check_data(). These two corners catch
+# a branch (or a covariate) that leaves (0, 1] near the edge of the parameter
+# space when the parameters enter the branch with one orientation; branches
 # that mix a parameter with its complement can leave (0, 1] at other vertices,
 # which are not evaluated. A simplex group sits at a corner (one member takes the rest of the
 # mass), so its members stay positive and sum to 1.
@@ -413,13 +414,18 @@
 # the first branch-sum or branch-range violation per tree, NA where every test
 # point gives branches in (0, 1] that sum to 1. Branches can sum to 1 for every
 # value and still leave (0, 1] (2 * a and 1 - 2 * a); a branch below or at 0 is
-# log(p) of a non-positive number in Stan. All test points are interior, so an
-# exact 0 is a branch that is 0 for every value, e.g. (1 - a) * 0
+# log(p) of a non-positive number in Stan. At an interior point an exact 0 is a
+# branch that is 0 for every value, e.g. (1 - a) * 0; at the two boundary
+# corners a valid branch may underflow to exactly 0, so only a negative one
+# counts there. The corners catch a branch that leaves (0, 1] only near the
+# edge of the parameter space (1.2 * a - 0.2)
 .mpt_tree_branch_errors <- function(trees, parameters, simplex,
                                     tolerance = 1e-6) {
-  points <- .mpt_test_points(parameters, simplex)
+  interior <- .mpt_test_points(parameters, simplex)
+  points <- c(interior, .mpt_boundary_points(parameters, simplex))
   vapply(trees, function(tree) {
-    for (vals in points) {
+    for (point in seq_along(points)) {
+      vals <- points[[point]]
       probs <- .mpt_eval_branches(tree, as.list(vals))
       if (abs(sum(probs) - 1) > tolerance) {
         return(glue(
@@ -432,7 +438,8 @@
           three options) belong in the simplex argument."
         ))
       }
-      outside <- names(probs)[probs <= 0 | probs > 1 + tolerance][1]
+      too_low <- if (point <= length(interior)) probs <= 0 else probs < 0
+      outside <- names(probs)[too_low | probs > 1 + tolerance][1]
       if (!is.na(outside)) {
         symbols <- all.vars(tree$branches[[outside]])
         zero_hint <- if (probs[[outside]] == 0) {
