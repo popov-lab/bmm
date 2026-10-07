@@ -638,7 +638,8 @@ check_model.mpt <- function(model, data = NULL, formula = NULL) {
         formulas are estimated on the identity scale with normal(0, 1) default \\
         priors, and their random-effect SDs keep brms's student_t(3, 0, 2.5) \\
         default. Apply any required transformation inside your formula and \\
-        adjust the priors to the scale of your predictors."
+        adjust the priors to the scale of your predictors. Whether the data \\
+        identify these parameters is not checked."
       )
     }
     model <- .mpt_bypass_links(model, nl_pars)

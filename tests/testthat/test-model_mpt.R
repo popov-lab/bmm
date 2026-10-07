@@ -255,6 +255,11 @@ test_that("the message on non-linear sub-parameters names the sd prior they get"
   sd_prior <- priors$prior[priors$class == "sd" & priors$nlpar == "a" & priors$group == ""]
   expect_length(sd_prior, 1)
   expect_message(check_model(model, dat, formula), sd_prior, fixed = TRUE)
+  # the rank covers the tree parameters only, so u + v would pass unnoticed
+  expect_message(
+    check_model(model, dat, formula),
+    "'a', 'b' .*Whether the data identify these parameters is not checked"
+  )
 })
 
 test_that("a symbol of a non-linear formula that is neither column nor parameter errors", {
