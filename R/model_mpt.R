@@ -851,9 +851,22 @@ print_model_details.mpt <- function(model, ...) {
     )
   }
   settings <- .mpt_covariate_settings(model, data)
+  # a tree without rows has no setting; only data on it can inform what no
+  # tree with rows contains
+  unobserved <- if (settings$from_data) {
+    observed <- vapply(settings$values, nrow, integer(1)) > 0L
+    covariates <- model$other_vars$covariates
+    intersect(free, setdiff(
+      .mpt_tree_parameters(trees[!observed], covariates),
+      .mpt_tree_parameters(trees[observed], covariates)
+    ))
+  }
   c(
     .mpt_jacobian_rank(trees, free, fixed, simplex, sticks, settings$values),
-    list(labels = labels, where = settings$where, from_data = settings$from_data)
+    list(
+      labels = labels, where = settings$where, from_data = settings$from_data,
+      unobserved = unobserved
+    )
   )
 }
 
@@ -882,14 +895,17 @@ print_model_details.mpt <- function(model, ...) {
       }
     })
   }
+  # one empty setting for a tree with rows, none for a tree without
+  one_setting <- function(rows) empty[seq_len(min(length(rows), 1L)), , drop = FALSE]
+  with_rows <- lengths(tree_rows) > 0L
+  in_data <- if (all(with_rows)) "in the data" else "in the trees with rows in the data"
   if (length(unlist(used)) == 0L) {
-    with_rows <- lengths(tree_rows) > 0L
     if (all(with_rows) || !any(with_rows)) {
       return(list(values = NULL, where = "at interior test values", from_data = FALSE))
     }
     return(list(
-      values = lapply(tree_rows, function(rows) empty[seq_len(min(length(rows), 1L)), , drop = FALSE]),
-      where = "at interior test values in the trees with rows in the data",
+      values = lapply(tree_rows, one_setting),
+      where = glue("at interior test values {in_data}"),
       from_data = TRUE
     ))
   }
@@ -899,7 +915,7 @@ print_model_details.mpt <- function(model, ...) {
     values <- lapply(seq_along(trees), function(tree) {
       rows <- tree_rows[[tree]]
       if (length(used[[tree]]) == 0L) {
-        return(empty[seq_len(min(length(rows), 1L)), , drop = FALSE])
+        return(one_setting(rows))
       }
       settings <- data[rows, used[[tree]], drop = FALSE]
       settings <- unique(settings[rowSums(!is.finite(as.matrix(settings))) == 0L, ,
@@ -914,7 +930,7 @@ print_model_details.mpt <- function(model, ...) {
           sum(vapply(values, nrow, integer(1))) > 0L) {
       return(list(
         values = values,
-        where = "at interior test values and the covariate values in the data",
+        where = glue("at interior test values and the covariate values {in_data}"),
         from_data = TRUE
       ))
     }
@@ -929,7 +945,8 @@ print_model_details.mpt <- function(model, ...) {
   )
 }
 
-.mpt_rank_deficit_text <- function(identifiability) {
+.mpt_rank_deficit_text <- function(identifiability,
+                                   lead = "The model is not identified") {
   free <- identifiability$free
   labels <- identifiability$labels
   absent <- identifiability$absent
@@ -938,9 +955,9 @@ print_model_details.mpt <- function(model, ...) {
     length(absent)
   paste(c(
     glue(
-      "The model is not identified: the Jacobian of the category \\
-      probabilities has rank {identifiability$rank} for \\
-      {identifiability$n_free} free parameters {identifiability$where}."
+      "{lead}: the Jacobian of the category probabilities has rank \\
+      {identifiability$rank} for {identifiability$n_free} free parameters \\
+      {identifiability$where}."
     ),
     if (n_combinations > 0 && length(entangled) > 0) {
       glue(
@@ -954,6 +971,15 @@ print_model_details.mpt <- function(model, ...) {
         "The derivative with respect to {.mpt_labels(absent, labels)} is zero up \\
         to rounding {identifiability$where}, so these parameter(s) appear not \\
         to affect any category probability there."
+      )
+    },
+    if (length(identifiability$unobserved) > 0) {
+      one <- length(identifiability$unobserved) == 1L
+      glue(
+        "{.mpt_labels(identifiability$unobserved, labels)} \\
+        {if (one) 'enters' else 'enter'} only trees without rows in the data, \\
+        which check_data() names, so the data leave {if (one) 'it' else 'them'} \\
+        open."
       )
     },
     glue(
@@ -1106,8 +1132,10 @@ check_model.mpt <- function(model, data = NULL, formula = NULL) {
         # covariate values in the data or a tree without rows leave open
         if (identifiability$from_data) {
           message2(
-            "{.mpt_rank_deficit_text(identifiability)} Whether {unchecked} is \\
-            not checked."
+            "{.mpt_rank_deficit_text(
+              identifiability,
+              'The tree parameters are not identified with intercept-only formulas'
+            )} Whether {unchecked} is not checked."
           )
         } else {
           message2(

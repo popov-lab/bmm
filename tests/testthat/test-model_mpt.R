@@ -994,7 +994,11 @@ test_that("the rank check uses only finite covariate values and the trees with r
   only_old <- data.frame(item_type = "old", x = c(1, 1), yes = 5, no = 5)
   expect_warning(
     check_model(mixed, only_old, bmf(Do ~ 1, Dn ~ 1, g ~ 1)),
-    "rank 1 for 3 free parameters"
+    paste0(
+      "rank 1 for 3 free parameters at interior test values and the covariate ",
+      "values in the trees with rows in the data\\..*'Dn' enters only trees ",
+      "without rows in the data"
+    )
   )
 
   # with predictors, the message names the parameters itself, because print()
@@ -1004,7 +1008,9 @@ test_that("the rank check uses only finite covariate values and the trees with r
     check_model(switch_tree, only_a, bmf(a ~ 1, b ~ 0 + cond)),
     "the covariate values in the data"
   )
-  expect_no_match(conditionMessage(msg), "print\\(model\\)")
+  expect_no_match(conditionMessage(msg), "print\\(model\\)|The model is not identified")
+  expect_match(conditionMessage(msg), "^The tree parameters are not identified with intercept-only formulas")
+  expect_no_match(conditionMessage(msg), "without rows")
   expect_match(
     conditionMessage(msg),
     "'b' is zero up to rounding at interior test values and the covariate values in the data"
@@ -1037,7 +1043,10 @@ test_that("the rank check drops the trees without rows also when no tree uses a 
     check_model(two_htm, with_cond, bmf(D ~ 1, g ~ 0 + cond)),
     "rank 1 for 2 free parameters at interior test values in the trees with rows in the data"
   )
-  expect_no_match(conditionMessage(msg), "print\\(model\\)|covariate values")
+  expect_no_match(conditionMessage(msg), "print\\(model\\)|covariate values|The model is not identified")
+  expect_match(conditionMessage(msg), "^The tree parameters are not identified with intercept-only formulas")
+  # D and g both enter the tree with rows
+  expect_no_match(conditionMessage(msg), "enters only trees")
 
   # a declared covariate that no branch uses changes nothing
   declared <- mpt(trees, tree_id = "item_type", covariates = "x")
