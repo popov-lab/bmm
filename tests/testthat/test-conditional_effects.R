@@ -1017,8 +1017,9 @@ test_that("the category-family route asks brms for the grid at one draw and eval
   seen <- stub_category_route(grid)
 
   .ce_nlpar_category_family(fit, "d")
-  expect_named(seen$grid[[1]], c("dpar", "re_formula", "draw_ids"),
+  expect_named(seen$grid[[1]], c("dpar", "effects", "re_formula", "draw_ids"),
                ignore.order = TRUE)
+  expect_equal(seen$grid[[1]]$effects, "x")
   dpars <- names(brms::brmsterms(fit$formula)$dpars)
   expect_gt(length(dpars), 1)
   expect_equal(seen$grid[[1]]$dpar, dpars[1])
@@ -1309,12 +1310,18 @@ test_that(".ce_own_effects takes the variables of a term from the arguments that
   )
 })
 
+# The labels of the effects .ce_select_own_effects() keeps of `brms_effects`,
+# in its order
+kept_effects <- function(brms_effects, formula, par) {
+  vapply(.ce_select_own_effects(brms_effects, .ce_own_effects(mock_rating_fit(formula), par)),
+         paste, "", collapse = ":")
+}
+
 test_that("default effects of the category-family route are those brms lists for the parameter's own formula (#512)", {
   kept <- function(formula, par = "d") {
     brms_effects <- list("stimulus", "x", "cond", "cond2", c("x", "cond2"),
                          c("x", "cond"))
-    stub_category_route(stub_grid(brms_effects))
-    names(.ce_nlpar_category_family(mock_rating_fit(formula), par))
+    kept_effects(brms_effects, formula, par)
   }
 
   expect_equal(
@@ -1349,10 +1356,7 @@ test_that("default effects of the category-family route are those brms lists for
 
 test_that("default effects of the category-family route list an effect once, in any variable order (#512)", {
   brms_effects <- list("stimulus", "x", "cond", c("x", "cond"), c("cond", "x"))
-  kept <- function(formula, par = "d") {
-    stub_category_route(stub_grid(brms_effects))
-    names(.ce_nlpar_category_family(mock_rating_fit(formula), par))
-  }
+  kept <- function(formula, par = "d") kept_effects(brms_effects, formula, par)
   formula <- bmf(d ~ 1 + x * cond, criterion ~ 1 + cond * x, spacing ~ 1)
 
   expect_equal(kept(formula, "d"), c("x", "cond", "x:cond"))
@@ -1372,14 +1376,102 @@ test_that("default effects of the category-family route list an effect once, in 
 })
 
 test_that("default effects of the category-family route keep the order of brms's grid (#512)", {
-  stub_category_route(stub_grid(list(
-    "stimulus", "x", "cond", c("x", "cond"), "cond2", c("cond", "x")
+  brms_effects <- list("stimulus", "x", "cond", c("x", "cond"), "cond2", c("cond", "x"))
+  formula <- bmf(d ~ exp(nlc) * cond * x, nlc ~ 1 + cond2, criterion ~ 1 + x * cond,
+                 spacing ~ 1)
+
+  expect_equal(kept_effects(brms_effects, formula, "d"), c("x", "cond", "cond2", "cond:x"))
+})
+
+# The effects brms's own conditional_effects() plots for a fit without `effects`,
+# with each variable in the place brms gives it: brms runs as it is, only the
+# evaluation of each element is replaced by its effects
+brms_default_effects <- function(fit, re_formula = NA) {
+  local_mocked_bindings(
+    contains_draws = function(x) invisible(TRUE),
+    conditional_effects.brmsterms = function(x, fit, cond_data, ...) {
+      list(attr(cond_data, "effects"))
+    },
+    .package = "brms"
+  )
+  suppressMessages(unclass(brms:::conditional_effects.brmsfit(
+    fit, re_formula = re_formula, dpar = names(brms::brmsterms(fit$formula)$dpars)[1]
   )))
-  fit <- mock_rating_fit(
-    bmf(d ~ exp(nlc) * cond * x, nlc ~ 1 + cond2, criterion ~ 1 + x * cond, spacing ~ 1)
+}
+
+test_that(".ce_brms_default_effects lists the effects brms plots by default, in its order and orientation (#512)", {
+  skip_on_cran()
+  formulas <- list(
+    bmf(d ~ 1 + cond * x, criterion ~ 1 + z:x, spacing ~ 1),
+    bmf(d ~ 1 + id:x + cond + (1 | id), criterion ~ 1 + x * z, spacing ~ 1),
+    bmf(d ~ exp(nlc) * cond * x, nlc ~ 1 + ord, criterion ~ 1 + cond:z, spacing ~ 1),
+    bmf(d ~ 1 + s(x, by = cond) + mo(ord), criterion ~ 1, spacing ~ 1)
   )
 
-  expect_named(.ce_nlpar_category_family(fit, "d"), c("x", "cond", "cond2", "cond:x"))
+  for (formula in formulas) {
+    fit <- mock_rating_terms_fit(formula)
+    for (re_formula in list(NA, NULL)) {
+      expect_equal(.ce_brms_default_effects(fit, re_formula),
+                   brms_default_effects(fit, re_formula),
+                   label = deparse1(formula$d))
+    }
+  }
+  # a grouping variable counts as a factor once the random effects are kept
+  fit <- mock_rating_terms_fit(formulas[[2]])
+  expect_contains(.ce_brms_default_effects(fit, NA), list(c("id", "x")))
+  expect_contains(.ce_brms_default_effects(fit, NULL), list(c("x", "id")))
+})
+
+test_that("without effects, the category-family route asks brms only for the parameter's own effects (#512)", {
+  fit <- mock_rating_fit(
+    bmf(d ~ 1 + cond * x, criterion ~ 1 + cond2, spacing ~ exp(nls), nls ~ 1 + x)
+  )
+  seen <- stub_category_route(stub_grid("x"))
+
+  conditional_effects(fit, par = "d")
+  conditional_effects(fit, par = "criterion")
+  conditional_effects(fit, par = "spacing", re_formula = NULL)
+  # brms puts the numeric variable of a factor-by-numeric effect first
+  expect_equal(seen$grid[[1]]$effects, c("cond", "x", "x:cond"))
+  expect_equal(seen$grid[[2]]$effects, "cond2")
+  expect_equal(seen$grid[[3]]$effects, "x")
+  expect_null(seen$grid[[3]]$re_formula)
+
+  seen <- stub_category_route(stub_grid("x"))
+  conditional_effects(fit, par = "d", effects = "cond:x")
+  expect_equal(seen$grid[[1]]$effects, "cond:x")
+})
+
+test_that("a parameter without effects of its own asks brms for no grid and returns no effects (#512)", {
+  local_mocked_bindings(ndraws = function(x) 100L, .package = "brms")
+  fit <- mock_rating_fit(bmf(d ~ 1 + x, criterion ~ 1 + (1 | id), spacing ~ 1))
+  seen <- stub_category_route(stub_grid(list("stimulus", "x")))
+
+  ce <- conditional_effects(fit, par = "criterion")
+  expect_identical(
+    ce, structure(list(), names = character(0), class = "brms_conditional_effects")
+  )
+  expect_identical(conditional_effects(fit, par = "spacing", scale = "sampling"), ce)
+  expect_length(seen$grid, 0)
+  expect_length(seen$linpred, 0)
+  expect_error(conditional_effects(fit, par = "criterion", ndraws = 0),
+               "Argument 'ndraws' should be between 1")
+  expect_error(conditional_effects(fit, par = "criterion", effects = "x"), NA)
+  expect_length(seen$grid, 1)
+})
+
+test_that("a parameter without effects of its own still draws its ids, so the next parameter's draws are unchanged (#512)", {
+  local_mocked_bindings(ndraws = function(x) 100L, .package = "brms")
+  fit <- mock_rating_fit(bmf(d ~ 1, criterion ~ 1 + x, spacing ~ 1))
+  seen <- stub_category_route(stub_grid("x"))
+
+  withr::with_seed(512, conditional_effects(fit, ndraws = 5))
+  expect_length(seen$linpred, 1)
+  expect_equal(seen$linpred[[1]]$draw_ids,
+               withr::with_seed(512, {
+                 sample.int(100, 5)
+                 sample.int(100, 5)
+               }))
 })
 
 test_that(".formula_nodes lists the formulas of a parameter and of the parameters it names (#512)", {
@@ -1866,4 +1958,37 @@ test_that("conditional_effects works on sdt_rating fits (#512)", {
                             draw_ids = draw_ids)
   expect_equal(ce$x$estimate__, exp(apply(draws, 2, median)))
   expect_equal(attr(ce$x, "spaghetti")$estimate__, exp(as.numeric(t(draws))))
+})
+
+test_that("m3 conditional_effects does not evaluate the category dpar on other formulas' effects (#512)", {
+  skip_on_cran()
+  skip_on_ci()
+  skip_if_not_installed("cmdstanr")
+  skip_if(is.null(tryCatch(cmdstanr::cmdstan_version(), error = function(e) NULL)))
+
+  # n_dist is 5, 0, 0 across conditions and enters the first category dpar
+  # through log(), so brms's grid of Idx_dist:n_dist (n_dist at mean - sd < 0)
+  # makes it NaN
+  formula <- bmf(corr ~ b + a + c, dist ~ b + d, other ~ b + a, npl ~ b,
+                 c ~ 0 + cond, a ~ 1, d ~ 1, b = 0)
+  model <- m3(resp_cats = c("dist", "corr", "other", "npl"),
+              num_options = c("n_dist", "n_corr", "n_other", "n_npl"),
+              version = "custom", links = list(a = "log", c = "log", d = "log"))
+  fit <- suppressWarnings(suppressMessages(bmm(
+    formula, oberauer_lewandowsky_2019_e1, model, backend = "cmdstanr",
+    chains = 1, iter = 300, warmup = 150, refresh = 0, silent = 2, seed = 1
+  )))
+
+  expect_no_warning(ce_c <- conditional_effects(fit, par = "c"))
+  expect_no_warning(ce_a <- conditional_effects(fit, par = "a"))
+  expect_no_warning(ce_all <- conditional_effects(fit))
+  expect_equal(ce_c, conditional_effects(fit, par = "c", effects = "cond"))
+  expect_length(ce_a, 0)
+  expect_named(ce_all, "c.cond")
+  expect_equal(
+    .ce_brms_default_effects(fit, NA),
+    unname(lapply(suppressWarnings(suppressMessages(.brms_conditional_effects(
+      fit, dpar = names(brms::brmsterms(fit$formula)$dpars)[1], draw_ids = 1
+    ))), attr, "effects"))
+  )
 })

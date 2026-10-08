@@ -11,7 +11,8 @@
     ),
     links = list(
       simple = list(c = "log", a = "log"),
-      softmax = list(c = "identity", a = "identity")
+      softmax = list(c = "identity", a = "identity"),
+      gaussian = list(c = "identity", a = "identity")
     ),
     priors = list(
       simple = list(
@@ -21,6 +22,10 @@
       softmax = list(
         a = list(main = "normal(3,1)", effects = "normal(0,0.5)", sd = "exponential(1)"),
         c = list(main = "normal(3,1)", effects = "normal(0,0.5)", sd = "exponential(1)")
+      ),
+      gaussian = list(
+        a = list(main = "normal(2,1)", effects = "normal(0,0.5)", sd = "exponential(1)"),
+        c = list(main = "normal(2,1)", effects = "normal(0,0.5)", sd = "exponential(1)")
       )
     )
   ),
@@ -32,7 +37,8 @@
     ),
     links = list(
       simple = list(c = "log", a = "log", f = "logit"),
-      softmax = list(c = "identity", a = "identity", f = "logit")
+      softmax = list(c = "identity", a = "identity", f = "logit"),
+      gaussian = list(c = "identity", a = "identity", f = "logit")
     ),
     priors = list(
       simple = list(
@@ -43,6 +49,11 @@
       softmax = list(
         a = list(main = "normal(3,1)", effects = "normal(0,0.5)", sd = "exponential(1)"),
         c = list(main = "normal(3,1)", effects = "normal(0,0.5)", sd = "exponential(1)"),
+        f = list(main = "logistic(0,1)", effects = "normal(0,1)", sd = "exponential(1)")
+      ),
+      gaussian = list(
+        a = list(main = "normal(2,1)", effects = "normal(0,0.5)", sd = "exponential(1)"),
+        c = list(main = "normal(2,1)", effects = "normal(0,0.5)", sd = "exponential(1)"),
         f = list(main = "logistic(0,1)", effects = "normal(0,1)", sd = "exponential(1)")
       )
     )
@@ -79,7 +90,7 @@
       ),
       links = .m3_version_table[[version]][["links"]][[choice_rule]],
       fixed_parameters = list(
-        b = if (choice_rule == "softmax") 0 else 0.1
+        b = if (choice_rule == "simple") 0.1 else 0
       ),
       default_priors = .m3_version_table[[version]][["priors"]][[choice_rule]]
     ),
@@ -142,12 +153,25 @@ settable_link_functions.m3 <- function(model) {
 #'   `c(other = "n_other", corr = "n_corr")`, are matched by name as well, in any order.
 #'   Custom activation formulas can use numbers by these column names; numbers
 #'   without names or named after the categories are called `n_opt_<category>`.
-#' @param choice_rule The choice rule that should be used for the M3. The options are "softmax"
-#'   or "simple". The "softmax" option implements the softmax normalization of activation into
+#' @param choice_rule The choice rule that should be used for the M3. The options are "softmax",
+#'   "simple", or "gaussian". The "softmax" option implements the softmax normalization of activation into
 #'   probabilities for choosing the different response categories. The "simple" option implements
 #'   a simple normalization of the absolute activations over the sum of all activations. For details
 #'   on the differences of these choice rules please see the appendix of Oberauer & Lewandowsky (2019)
 #'   "Simple measurement models for complex working memory tasks" published in Psychological Review.
+#'   The "gaussian" option adds independent standard normal noise to the activation of every
+#'   candidate and chooses the candidate with the largest value (a Thurstonian rule: the choice is the
+#'   maximum of noisy activations); "softmax" is the same with Gumbel noise. Activations under
+#'   "gaussian" are on a smaller scale, and the difference is not one constant factor: `a` shrinks
+#'   more than `c`, so a comparison of `c` with `a`, and effects of conditions that change the
+#'   number of candidates (such as set size), can differ between the two rules. Sampling under
+#'   "gaussian" costs about 40 times as much per iteration as under "softmax", because each
+#'   probability is a 40-node numerical integral: a 40-subject, three-condition model with random
+#'   intercepts took 15 seconds under "softmax" and about 4 minutes under "gaussian" end to end
+#'   (4 chains, 1000 + 1000 iterations, Stan compilation included), 2.5 minutes with
+#'   `threads = threading(2)`. In versions `ss` and `cs`, `c` and `a` have `normal(3, 1)` main priors
+#'   under "softmax" and `normal(2, 1)` under "gaussian"; under "simple" `c` has `normal(3, 1)` and
+#'   `a` has `normal(0, 1)`, on the log scale.
 #' @param version Character. The version of the M3 model to use. Can be one of
 #'  `ss`, `cs`, or `custom`. The default is `custom`.
 #' @param ... used internally for testing, ignore it
@@ -220,8 +244,8 @@ m3 <- function(resp_cats, num_options, choice_rule = "softmax",
   stop_missing_args()
   version <- match.arg(version)
   stopif(
-    !tolower(choice_rule) %in% c("softmax", "simple"),
-    'Unsupported choice rule "{choice_rule}. Must be one of "simple" or "softmax"'
+    !tolower(choice_rule) %in% c("softmax", "simple", "gaussian"),
+    'Unsupported choice rule "{choice_rule}". Must be one of "simple", "softmax" or "gaussian"'
   )
   stopif(
     length(num_options) != length(resp_cats),
@@ -250,7 +274,7 @@ m3 <- function(resp_cats, num_options, choice_rule = "softmax",
 
   .model_m3(
     resp_cats = resp_cats, num_options = num_options,
-    choice_rule = choice_rule, version = version, call = call, ...
+    choice_rule = tolower(choice_rule), version = version, call = call, ...
   )
 }
 
@@ -304,11 +328,15 @@ check_model.m3_custom <- function(model, data = NULL, formula = NULL) {
              logit = list(main = "logistic(0, 1)", effects = "normal(0, 0.5)", sd = "exponential(1)"),
              stop2("Invalid link function provided! Please use one of the following link functions: identity, log, softplus, logit")
       )
-    } else if (model$other_vars$choice_rule == "softmax") {
+    } else {
       switch(model$links[[m]],
              log = list(main = "normal(0, 1)", effects = "normal(0, 0.5)", sd = "exponential(1)"),
              softplus = list(main = "normal(1, 1)", effects = "normal(0, 0.5)", sd = "exponential(1)"),
-             identity = list(main = "normal(3, 1)", effects = "normal(0, 0.5)", sd = "exponential(1)"),
+             identity = if (model$other_vars$choice_rule == "gaussian") {
+               list(main = "normal(2, 1)", effects = "normal(0, 0.5)", sd = "exponential(1)")
+             } else {
+               list(main = "normal(3, 1)", effects = "normal(0, 0.5)", sd = "exponential(1)")
+             },
              logit = list(main = "logistic(0, 1)", effects = "normal(0, 0.5)", sd = "exponential(1)"),
              stop2("Invalid link function provided! Please use one of the following link functions: identity, log, softplus, logit")
       )
@@ -440,6 +468,14 @@ check_data.m3 <- function(model, data, formula) {
   data[n_opt_idx_vars] <- as.integer(data[opt_vars] > 0)
   data[opt_vars][data[opt_vars] == 0] <- 0.0001
 
+  # the Gaussian kernels treat counts below 0.5 as absent while the indicator says present
+  bad <- opt_vars[colSums(data[opt_vars] != round(data[opt_vars]) & data[n_opt_idx_vars] == 1) > 0]
+  stopif(
+    model$other_vars$choice_rule == "gaussian" && length(bad) > 0,
+    "The Gaussian choice rule needs whole numbers of response options; \\
+    fractional counts in {collapse_comma(bad)}."
+  )
+
   # NA is how a category without options is usually recorded, and there it is
   # the true count; only where the category had options is a count lost
   n_missing <- sum(missing_counts & as.matrix(data[n_opt_idx_vars]) == 1)
@@ -509,7 +545,7 @@ bmf2bf.m3 <- function(model, formula) {
   cat <- resp_cats[1]
   brms_formula <- brms::bf(glue(
     "Y | trials(nTrials) ~
-    {n_opt_idx_vars[cat]} *", glue_choice_rule_functions(model$other_vars$choice_rule, cat, options_vars),
+    {n_opt_idx_vars[cat]} *", glue_choice_rule_functions(model$other_vars$choice_rule, cat, options_vars, resp_cats),
     "+ (1 - {n_opt_idx_vars[cat]}) * (-100)"
   ), nl = TRUE)
 
@@ -518,7 +554,7 @@ bmf2bf.m3 <- function(model, formula) {
   for (cat in resp_cats[-1]) {
     brms_formula <- brms_formula + glue_nlf(
       "mu{cat} ~
-      {n_opt_idx_vars[cat]} *", glue_choice_rule_functions(model$other_vars$choice_rule, cat, options_vars),
+      {n_opt_idx_vars[cat]} *", glue_choice_rule_functions(model$other_vars$choice_rule, cat, options_vars, resp_cats),
       "+ (1 - {n_opt_idx_vars[cat]}) * (-100)"
     )
   }
@@ -528,16 +564,74 @@ bmf2bf.m3 <- function(model, formula) {
 
 #' @title glue the activation functions for the different choice rules
 #'
-#' @param choice_rule The choice rule that should be used for the M3. The options are "softmax" and "simple"
+#' @param choice_rule The choice rule that should be used for the M3: "softmax", "simple" or "gaussian"
 #' @param cat The name of the response category for which the activation function should be generated
 #' @param options_vars The variable names that contain the number of candidates in each response category
+#' @param resp_cats The names of all response categories, in model order
 #' @noRd
-glue_choice_rule_functions <- function(choice_rule, cat, options_vars) {
+glue_choice_rule_functions <- function(choice_rule, cat, options_vars, resp_cats) {
   switch(
     choice_rule,
     simple = glue("log({cat} * {options_vars[cat]})"),
-    softmax = glue("({cat} + log({options_vars[cat]}))")
+    softmax = glue("({cat} + log({options_vars[cat]}))"),
+    # the softmax of log-probabilities that sum to one returns them unchanged, so
+    # the Gaussian rule keeps the multinomial family and puts log P(cat) here
+    gaussian = glue(
+      "m3_gauss_logp({match(cat, resp_cats)}, {paste(resp_cats, collapse = ', ')}, \\
+      {paste(options_vars[resp_cats], collapse = ', ')})"
+    )
   )
+}
+
+# A non-linear formula can name only data columns and parameters, so the
+# quadrature table and the number of categories are written into a generated
+# wrapper with the same name and arguments as the R companion m3_gauss_logp()
+m3_gaussian_stanvars <- function(model) {
+  K <- length(model$resp_vars$resp_cats)
+  gh <- .m3_gauss_rule()
+  literal <- function(x) paste0("[", paste(formatC(x, digits = 17, format = "e"), collapse = ", "), "]'")
+  wrapper <- glue(
+    "real m3_gauss_logp(int k, {paste0('real A', 1:K, collapse = ', ')}, \\
+    {paste0('real n', 1:K, collapse = ', ')}) {{
+      return m3_gauss_logp_vec(k, [{paste0('A', 1:K, collapse = ', ')}]', \\
+    [{paste0('n', 1:K, collapse = ', ')}]',
+        {literal(gh$nodes)},
+        {literal(gh$log_w)},
+        {literal(gh$log_Phi)});
+    }}"
+  )
+  sc_path <- system.file("stan_chunks", package = "bmm")
+  brms::stanvar(
+    scode = paste(read_lines2(paste0(sc_path, "/m3_gaussian_funs.stan")), wrapper, sep = "\n"),
+    block = "functions"
+  )
+}
+
+#' @title Category log-probability under the Gaussian choice rule of `m3()`
+#' @description R companion to the Stan function `m3_gauss_logp` that
+#'   `m3(choice_rule = "gaussian")` places in each category's activation
+#'   formula. `brms` evaluates the non-linear formula in R for `log_lik()`,
+#'   `posterior_predict()` and `posterior_epred()`, looking the function up on
+#'   the search path; it is exported for that reason and is not meant to be
+#'   called directly.
+#' @param k Integer index of the response category.
+#' @param ... The K category activations followed by the K option counts, as
+#'   numbers or draws-by-observation matrices (as supplied by brms).
+#' @return The log probability of category `k`, with the shape of the first
+#'   activation.
+#' @keywords internal
+#' @export
+m3_gauss_logp <- function(k, ...) {
+  args <- list(...)
+  K <- length(args) %/% 2
+  len <- max(lengths(args))
+  out <- .m3_gauss_logp_r(
+    k,
+    lapply(args[seq_len(K)], function(x) rep_len(as.vector(x), len)),
+    lapply(args[K + seq_len(K)], function(x) rep_len(as.vector(x), len))
+  )
+  dim(out) <- dim(args[[1]])
+  out
 }
 
 ############################################################################# !
@@ -556,6 +650,9 @@ configure_model.m3 <- function(model, data, formula) {
   formula$family$cats <- model$resp_vars$resp_cats
   formula$family$dpars <- paste0("mu", model$resp_vars$resp_cats)
 
+  if (model$other_vars$choice_rule == "gaussian") {
+    return(nlist(formula, data, stanvars = m3_gaussian_stanvars(model)))
+  }
   nlist(formula, data)
 }
 
