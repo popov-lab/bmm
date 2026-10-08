@@ -1,0 +1,459 @@
+---
+title: "The Log-Normal Race Model (LNR)"
+output: bookdown::html_document2
+author:
+  - Gidon Frischkorn
+bibliography: REFERENCES.bib
+header-includes:
+  - \usepackage{amsmath}
+vignette: >
+  %\VignetteIndexEntry{The Log-Normal Race Model (LNR)}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+pkgdown:
+  as_is: true
+---
+
+<style type="text/css">
+div.main-container {
+max-width: 800px !important;
+}
+
+p {
+margin-top: 1.5em ;
+margin-bottom: 1.5em ;
+}
+.author{
+    display: none;
+}
+</style>
+
+```{r, include = FALSE}
+options(crayon.enabled = TRUE)
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>",
+  dev = "jpeg",
+  dpi = 100,
+  fig.asp = 0.8,
+  fig.width = 6,
+  out.width = "80%",
+  fig.align = "center"
+)
+fansi::set_knit_hooks(knitr::knit_hooks, which = c("output","message","error"))
+```
+
+```{r setup, message = FALSE}
+library(bmm)
+```
+
+# Introduction to the model
+
+The Log-Normal Race model [LNR; @rouderLognormalRaceCognitiveProcess2015] is
+a race model for choice response time data. Each response option has its own
+accumulator, and these accumulators race to completion. The first accumulator
+to finish determines both the chosen response and the observed response time.
+
+The LNR works with two or more response alternatives and has fewer parameters
+than the Linear Ballistic Accumulator or the Diffusion Decision Model. This
+makes it a good starting point for decomposing RT distributions, especially in
+multi-alternative tasks.
+
+## Model specification
+
+Each response alternative $k$ has an accumulator whose finishing time $T_k$
+follows a lognormal distribution:
+
+$$
+T_k \sim \text{Lognormal}(\mu_k, \sigma)
+$$
+
+where $\mu_k$ is the meanlog parameter (lower values produce faster finishing
+times) and $\sigma$ is the sdlog parameter controlling variability, called `s`
+in `bmm`. The observed response and response time are:
+
+$$
+\text{Response} = \arg\min_k T_k, \quad RT = \min_k T_k + \tau
+$$
+
+where $\tau$ is the non-decision time for stimulus encoding and motor
+execution. Since the lognormal distribution is positively skewed and defined
+on the positive reals, it fits the shape of empirical RT distributions well.
+
+# Parametrization in the `bmm` package
+
+The `bmm` package provides two versions of the LNR.
+
+## Simple version (`version = "simple"`)
+
+The simple version uses two meanlog parameters: one for correct responses
+and one shared across all error responses.
+
+| Parameter | Description | Link function |
+|-----------|-------------|---------------|
+| `correct` | Meanlog for the correct accumulator | identity |
+| `error`   | Meanlog for all error accumulators | identity |
+| `ndt`     | Non-decision time | log |
+| `s`       | Sdlog, shared across accumulators | log |
+
+Responses must be integer-coded: 1 for correct, 2 through K for errors. The
+total number of alternatives is specified via `n_choices`. Use this
+version for standard accuracy-based designs where the distinction between
+correct and error processing is the primary interest.
+
+## Custom version (`version = "custom"`)
+
+The custom version assigns a separate meanlog parameter to each response
+category. Category names are defined in the formula and matched to character
+labels in the response column of the data:
+
+| Parameter | Description | Link function |
+|-----------|-------------|---------------|
+| one per category | Meanlog for that category's accumulator(s) | identity |
+| `ndt`     | Non-decision time | log |
+| `s`       | Sdlog, shared across accumulators | log |
+
+The custom version also supports per-category `accumulators` for tasks
+where categories contain different numbers of items (e.g., 1 target, 3
+similar lures, 5 unrelated distractors). This works analogously to the
+`num_options` argument in the M3 model. Category names should not use
+reserved internal parameter names such as `mu`, `ndt`, or `s`, should not be
+Stan reserved words, should not contain an underscore, and should not end in
+numbers. When supplied directly, `accumulators` must contain positive
+integers; when supplied via columns, those columns must contain positive
+integers on every trial.
+
+## Identifiability
+
+All four parameters are estimated by default, `s` among them. `s` is not a
+scale constraint. That argument belongs to models whose accumulation is
+measured in arbitrary evidence units — in the Linear Ballistic Accumulator,
+multiplying the drift rates and the threshold by the same factor leaves the
+likelihood unchanged, so one of them has to be pinned. Nothing of the sort
+holds here: the finishing times of the LNR *are* the response times, observed
+in seconds, and changing `s` changes both the shape of the predicted RT
+distribution and the predicted accuracy.
+
+The data are in fact quite informative about `s`. The table below profiles the
+negative log-likelihood of 4000 simulated trials over a grid of `s`,
+maximising the two meanlogs and the non-decision time at every grid point:
+
+```{r}
+set.seed(7)
+prof_dat <- rlnr(n = 4000, m = c(-1, -0.5), s = 0.5, ndt = 0.3)
+min_rt <- min(prof_dat$rt)
+
+nll <- function(par, s, dat) {
+  ndt <- min_rt * stats::plogis(par[3])
+  -sum(dlnr(dat$rt, dat$response, m = par[1:2], s = s, ndt = ndt, log = TRUE))
+}
+
+profile_s <- as.data.frame(t(vapply(
+  c(0.3, 0.4, 0.5, 0.6, 0.8, 1.0, 1.5),
+  function(s) {
+    opt <- stats::optim(c(-1, -0.5, 0), nll, s = s, dat = prof_dat)
+    c(s = s, nll = opt$value, correct = opt$par[1], error = opt$par[2],
+      ndt = min_rt * stats::plogis(opt$par[3]))
+  },
+  numeric(5)
+)))
+
+free <- stats::optim(c(-1, -0.5, 0, log(0.5)),
+                     function(par) nll(par[1:3], exp(par[4]), prof_dat))
+
+round(profile_s, 3)
+```
+
+The profile bottoms out at the generating value of `r profile_s$s[which.min(profile_s$nll)]`,
+and the freely estimated `s` lands at `r round(exp(free$par[4]), 3)`. Holding
+`s` at 1 instead is worse by
+`r round(profile_s$nll[profile_s$s == 1] - free$value)` log-likelihood units —
+this is not a flat direction in the likelihood.
+
+The other parameters do not stay put while `s` is held at the wrong value.
+Reading down the table, the non-decision time climbs with `s` until it is
+pressed against the fastest observed response time
+(`r round(min_rt, 3)` s here, against a generating value of 0.3), and both
+meanlogs move with it. That is what makes a wrong `s` expensive: it is paid
+for by the parameters one usually wants to interpret.
+
+You can still fix `s` — to reproduce a published fit that held the sdlog at 1,
+for instance — by writing `s = 0` in the formula:
+`bmf(correct ~ 1, error ~ 1, ndt ~ 1, s = 0)`. Constants in `bmf()` are read on
+the parameter's own link scale, and `s` uses a log link, so `s = 0` means
+sdlog = 1.
+
+# Data requirements
+
+## Simple version
+
+The data must contain:
+
+- An RT column with response times in **seconds**
+- A response column with integer values: 1 = correct, 2:K = errors
+
+```{r}
+set.seed(42)
+m_true <- c(-1, 0)
+s_true <- 0.5
+ndt_true <- 0.2
+
+dat_simple <- rlnr(n = 2000, m = m_true, s = s_true, ndt = ndt_true)
+str(dat_simple)
+```
+
+For a four-choice task, simulate four accumulators. The simple version pools
+responses 2 through 4 into the single `error` parameter, so they share a
+meanlog here as well:
+
+```{r}
+set.seed(43)
+dat_k4 <- rlnr(n = 2000, m = c(-1, -0.2, -0.2, -0.2), s = 0.5, ndt = 0.2)
+table(dat_k4$response)
+```
+
+## Custom version
+
+The data must contain:
+
+- An RT column with response times in **seconds**
+- A response column with **character labels** matching the formula parameters
+
+```{r}
+set.seed(44)
+sim <- rlnr(n = 2000, m = c(-1, -0.5, -0.2), s = 0.5, ndt = 0.15)
+dat_custom <- data.frame(
+  rt = sim$rt,
+  resp = c("recall", "similar", "other")[sim$response]
+)
+str(dat_custom)
+table(dat_custom$resp)
+```
+
+# Fitting the model
+
+## Simple version: two-choice task
+
+```{r, message=FALSE, results='hide'}
+model <- lnr(rt = "rt", response = "response", n_choices = 2)
+
+formula <- bmf(
+  correct ~ 1,
+  error ~ 1,
+  ndt ~ 1,
+  s ~ 1
+)
+
+fit <- bmm(formula, dat_simple, model,
+           cores = 4, backend = "cmdstanr",
+           # Reduce iterations to keep file size manageable
+           iter = 1000,
+           warmup = 500,
+           file = "assets/bmmfit_lnr_simple_vignette.rds")
+```
+
+```{r}
+summary(fit)
+```
+
+`ndt` and `s` use a log link, so they have to be exponentiated before they are
+compared with the values the data were simulated from:
+
+```{r}
+fixef_est <- brms::fixef(fit)
+
+data.frame(
+  parameter = c("correct", "error", "ndt", "s"),
+  true = c(m_true, ndt_true, s_true),
+  estimate = c(
+    fixef_est["correct_Intercept", "Estimate"],
+    fixef_est["error_Intercept", "Estimate"],
+    exp(fixef_est["ndt_Intercept", "Estimate"]),
+    exp(fixef_est["s_Intercept", "Estimate"])
+  ),
+  lower = c(
+    fixef_est["correct_Intercept", "Q2.5"],
+    fixef_est["error_Intercept", "Q2.5"],
+    exp(fixef_est["ndt_Intercept", "Q2.5"]),
+    exp(fixef_est["s_Intercept", "Q2.5"])
+  ),
+  upper = c(
+    fixef_est["correct_Intercept", "Q97.5"],
+    fixef_est["error_Intercept", "Q97.5"],
+    exp(fixef_est["ndt_Intercept", "Q97.5"]),
+    exp(fixef_est["s_Intercept", "Q97.5"])
+  )
+)
+```
+
+## Posterior predictive checks
+
+A race model predicts two things at once, and a model can reproduce the
+response time distribution while getting the choice proportions wrong, so both
+are worth checking. `pp_check_vars()` lists the observables the LNR declares:
+
+```{r}
+pp_check_vars(fit)
+```
+
+The default check plots the response times. Passing `resp_var = "response"`
+checks the winning category instead, as a bar plot of observed against
+predicted response counts:
+
+```{r, message=FALSE}
+pp_check(fit)
+```
+
+```{r, message=FALSE}
+pp_check(fit, resp_var = "response", type = "bars")
+```
+
+## Four-choice task
+
+For a four-choice task, set `n_choices = 4`. Responses 2 through 4 all
+share the `error` parameter:
+
+```{r, message=FALSE, results='hide'}
+model_k4 <- lnr(rt = "rt", response = "response", n_choices = 4)
+
+fit_k4 <- bmm(bmf(correct ~ 1, error ~ 1, ndt ~ 1, s ~ 1),
+              dat_k4, model_k4,
+              cores = 4, backend = "cmdstanr",
+              iter = 1000,
+              warmup = 500,
+              file = "assets/bmmfit_lnr_k4_vignette.rds")
+```
+
+```{r}
+summary(fit_k4)
+```
+
+## Custom version: named categories
+
+```{r, message=FALSE, results='hide'}
+model_custom <- lnr(rt = "rt", response = "resp", version = "custom")
+
+formula_custom <- bmf(
+  recall ~ 1,
+  similar ~ 1,
+  other ~ 1,
+  ndt ~ 1,
+  s ~ 1
+)
+
+fit_custom <- bmm(formula_custom, dat_custom, model_custom,
+                  cores = 4, backend = "cmdstanr",
+                  iter = 1000,
+                  warmup = 500,
+                  file = "assets/bmmfit_lnr_custom_vignette.rds")
+```
+
+```{r}
+summary(fit_custom)
+```
+
+## Per-category accumulator counts
+
+When categories have different numbers of racing accumulators, pass a named
+integer vector to `accumulators`:
+
+```{r}
+model_numalt <- lnr(
+  rt = "rt", response = "resp", version = "custom",
+  accumulators = c(recall = 1, similar = 3, other = 5)
+)
+```
+
+If the number of items per category varies across trials, pass column names
+instead of integers (e.g.,
+`c(recall = "n_recall", similar = "n_similar", other = "n_other")`).
+
+## Hierarchical models
+
+Both versions can be specified with random effects. Earlier versions of this
+article warned that hierarchical LNR fits were fragile, and that divergent
+transitions appeared once the non-decision time came close to the fastest
+observed RT. That was a symptom of the sdlog being held at 1 rather than a
+property of the model: with `s` fixed above its true value, the only way the
+model can reproduce the observed spread of response times is to push `ndt` up
+against the fastest trial, and the sampler then has to work in a corner of the
+parameter space that the data bound from above. With `s` estimated, `ndt`
+stays where the data put it.
+
+Hierarchical fits remain the more demanding case, simply because there are
+more parameters and fewer trials informing each of them. Start with a simple
+random-effects structure and slightly stricter sampler settings such as
+`adapt_delta = 0.95`, and treat convergence diagnostics as a hard requirement
+before interpreting the estimates.
+
+```{r}
+set.seed(45)
+n_id <- 20
+n_trials <- 60
+
+dat_hier <- do.call(rbind, lapply(seq_len(n_id), function(id) {
+  u_correct <- stats::rnorm(1, 0, 0.25)
+  u_error <- stats::rnorm(1, 0, 0.25)
+  u_ndt <- stats::rnorm(1, 0, 0.15)
+  do.call(rbind, lapply(c("easy", "hard"), function(condition) {
+    sim <- rlnr(
+      n = n_trials,
+      m = c(-1 + u_correct + 0.4 * (condition == "hard"), u_error),
+      s = 0.5,
+      ndt = 0.2 * exp(u_ndt)
+    )
+    data.frame(id = id, condition = condition,
+               rt = sim$rt, response = sim$response)
+  }))
+}))
+dat_hier$condition <- factor(dat_hier$condition, levels = c("easy", "hard"))
+str(dat_hier)
+```
+
+```{r, message=FALSE, results='hide'}
+model_hier <- lnr(rt = "rt", response = "response", n_choices = 2)
+
+formula_hier <- bmf(
+  correct ~ 1 + condition + (1 + condition | id),
+  error ~ 1 + (1 | id),
+  ndt ~ 1 + (1 | id),
+  s ~ 1
+)
+
+fit_hier <- bmm(formula_hier, dat_hier, model_hier,
+                cores = 4, backend = "cmdstanr",
+                iter = 1000,
+                warmup = 500,
+                control = list(adapt_delta = 0.95),
+                file = "assets/bmmfit_lnr_hierarchical_vignette.rds")
+```
+
+```{r}
+summary(fit_hier)
+```
+
+# Default priors
+
+| Parameter | Prior | Scale |
+|-----------|-------|-------|
+| `correct` | `normal(-1, 0.5)` | identity (meanlog) |
+| `error` | `normal(0, 0.5)` | identity (meanlog) |
+| `ndt` | `normal(-1.5, 0.5)` | log (median 0.22s on the natural scale) |
+| `s` | `normal(0, 0.5)` | log (median 1, 95% between 0.37 and 2.7) |
+
+For the custom version, category parameters default to `normal(0, 0.5)` on
+the identity scale. The `ndt` prior is the one the **ddm** model uses:
+multi-alternative choice tasks carry longer non-decision times than the
+two-boundary models in `bmm` were first calibrated on, and a prior whose upper
+range sits below the true value drags the meanlogs down with it. The prior on
+`s` puts its median at a sdlog of 1 while leaving room for the values RT data
+are usually fitted at.
+
+Check the priors of a given model and formula with `default_prior()` and
+adjust them as needed:
+
+```{r}
+default_prior(formula, dat_simple, model)
+```
+
+# References
