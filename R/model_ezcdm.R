@@ -58,7 +58,7 @@
     class = c("bmmodel", "ezcdm", paste0("ezcdm_", version)),
     call = call
   )
-  out$links[names(links)] <- links
+  out <- set_links(out, links)
   out
 }
 

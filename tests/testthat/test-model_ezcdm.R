@@ -81,6 +81,15 @@ test_that("ezcdm model accepts custom links", {
   expect_equal(model$links$bound, "log")
 })
 
+test_that("ezcdm validates its links like the other models", {
+  expect_warning(
+    model <- ezcdm_test_model(links = list(bond = "softplus")),
+    "'bond' read as 'bound'"
+  )
+  expect_equal(model$links$bound, "softplus")
+  expect_error(ezcdm_test_model(links = list(ndt = "logg")), "Unknown link function")
+})
+
 test_that("ezcdm check_data accepts valid data", {
   valid_data <- ezcdm_valid_data(
     mean_angle = c(0.1, -0.2, 3),
