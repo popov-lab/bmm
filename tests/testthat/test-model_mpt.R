@@ -2259,6 +2259,26 @@ test_that("conditional_effects() shows mpt parameters on the native scale", {
   expect_named(conditional_effects(fit), "D.cond")
 })
 
+test_that("bmm() stores the name of the data the user passed to an mpt fit", {
+  withr::local_options("bmm.silent" = 2)
+  my_counts <- mpt_2htm_data()
+  fit <- bmm(bmf(D ~ 1, g ~ 1), my_counts, mpt(mpt_2htm_trees(), "item_type"),
+    backend = "mock", mock_fit = 1, rename = FALSE
+  )
+  expect_equal(attr(fit$data, "data_name"), "my_counts")
+})
+
+test_that("bmm_data_check() reads the correlation ID that ?mpt recommends as a label", {
+  dat <- mpt_2htm_data()
+  dat$id <- rep(1:2, length.out = nrow(dat))
+  res <- bmm_data_check(
+    bmf(D ~ 1 + (1 |p| id), g ~ 1 + (1 |p| id)), dat,
+    mpt(mpt_2htm_trees(), "item_type")
+  )
+  expect_setequal(res$predictors$coding$variable, "id")
+  expect_false("p" %in% unlist(res$predictors$pred_map))
+})
+
 test_that("conditional_effects() shows simplex members on the probability scale", {
   skip_on_cran()
   skip_if_not_installed("cmdstanr")

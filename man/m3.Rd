@@ -25,7 +25,9 @@ named after the response categories, e.g. \code{c(corr = 1, other = 4)}, are mat
 the categories by name. Numbers without names, or with other names, are taken in
 the order of \code{resp_cats}, and other names become the names of the columns
 bmm adds to the data. Column names given category names, e.g.
-\code{c(other = "n_other", corr = "n_corr")}, are matched by name as well, in any order.}
+\code{c(other = "n_other", corr = "n_corr")}, are matched by name as well, in any order.
+Custom activation formulas can use numbers by these column names; numbers
+without names or named after the categories are called \verb{n_opt_<category>}.}
 
 \item{choice_rule}{The choice rule that should be used for the M3. The options are "softmax"
 or "simple". The "softmax" option implements the softmax normalization of activation into
@@ -171,6 +173,17 @@ decision task.
 }
 \item \strong{Default priors:}
 }
+}
+
+\subsection{Missing values and reserved names}{
+
+A missing response count (\code{NA}) is counted as 0. If the category has options in that
+row, \code{bmm()} warns and says how many counts were replaced; if it has none (\code{num_options}
+is 0 in that row), the 0 is true and there is no warning, as for \code{dist} in
+\link{oberauer_lewandowsky_2019_e1}. A missing value in a column named in \code{num_options} is
+an error: enter 0 where there were no options. Data columns named \code{Y}, \code{nTrials} or
+\verb{Idx_<category>} are refused because \code{bmm()} creates columns with these names; response
+categories may be called \code{Y} or \code{nTrials}.
 }
 }
 \examples{
