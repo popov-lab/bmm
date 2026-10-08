@@ -1,20 +1,35 @@
-# Run from the repository root. Lists every string literal that an evaluated R
-# chunk of a pkgdown article passes as file = "<relative path>", and fails when
-# that file is missing next to the article or cannot be read, because bmm() and
-# brm() refit a missing fit during the build instead of failing it. Code that an
-# article sources, includes as a child document or computes inline is not seen;
-# a fits/ path that is not a literal file argument fails, inline or in a chunk.
+# Run from the repository root. Checks every string literal that an evaluated R
+# chunk of a pkgdown article passes as file = "<relative path>" to a reader, and
+# fails when that file is missing next to the article or cannot be read, because
+# bmm() and brm() refit a missing fit during the build instead of failing it.
+# Readers are bmm(), brm(), update(), readRDS() and read_rds(); writers are ignored.
+# Any other fits/ path fails, in a chunk or inline, because it cannot be checked.
+# Code that an article sources or includes as a child document is not seen.
 
 chunk_begin <- "^[\t >]*```+\\s*\\{([a-zA-Z0-9_]+( *[ ,].*)?)\\}\\s*$"
 chunk_end <- "^[\t >]*```+\\s*$"
 inline_fits <- "`r[ #][^`]*(fits/|[\"']fits[\"'])"
 fits_path <- "(^|/)fits(/|$)"
 not_evaluated <- "eval\\s*(=|:)\\s*(FALSE|F|false)\\b"
-writers <- c("saveRDS", "save", "write_rds")
+readers <- c("bmm", "brm", "update", "readRDS", "read_rds")
+writers <- c(
+  "saveRDS", "save", "write_rds", "write.csv", "write.table", "writeLines", "cat", "sink",
+  "ggsave", "png", "jpeg", "pdf", "svg"
+)
+# a bare "fits" names the folder only as a path component
+path_builders <- c("file.path", "here", "path")
 
-finding <- function(article, line, kind, text) {
+if (!dir.exists("vignettes")) {
+  cat("::error::No vignettes/ folder in ", getwd(), ", so no article fits can be checked. Run the script from the repository root.\n", sep = "")
+  quit(save = "no", status = 1L)
+}
+
+finding <- function(article, line, kind, text, call = "") {
   n <- length(line)
-  data.frame(article = rep_len(article, n), line = as.integer(line), kind = rep_len(kind, n), text = rep_len(text, n))
+  data.frame(
+    article = rep_len(article, n), line = as.integer(line), kind = rep_len(kind, n),
+    text = rep_len(text, n), call = rep_len(call, n)
+  )
 }
 
 # knitr 1.52 (group_indices(), match_chunk_end()): plain fences are text; a
@@ -100,9 +115,10 @@ check_string <- function(article, line, pd, k) {
   caller <- if (is.na(holder)) enclosing_call_name(pd, literal) else call_name(pd, holder)
   if (caller %in% writers) {
     NULL
-  } else if (after_file_equals(pd, literal) && sum(pd$parent == literal) == 1L && relative_path(value)) {
-    finding(article, line, "reference", value)
-  } else if (grepl(fits_path, value) && (grepl("fits/", value, fixed = TRUE) || !is.na(holder))) {
+  } else if (caller %in% readers && after_file_equals(pd, literal) && sum(pd$parent == literal) == 1L && relative_path(value)) {
+    finding(article, line, "reference", value, caller)
+  } else if (grepl(fits_path, value) && (grepl("fits/", value, fixed = TRUE) || !is.na(holder) ||
+                                         enclosing_call_name(pd, literal) %in% path_builders)) {
     finding(article, line, "problem", paste0(
       "The string \"", value, "\" cannot be checked. Pass the fit as a literal file argument, ",
       "readRDS(file = \"fits/<name>\") or bmm(..., file = \"fits/<name>\"), so that the build can check it."
@@ -135,9 +151,14 @@ check_article <- function(article) {
   )
 }
 
-resolve <- function(article, path) {
+# bmm() and update() append .rds unless the extension is a lower-case rds
+# (check_rds_file()), brm() ignores the case, and the RDS readers take the path
+# as it is written
+resolve <- function(article, path, call) {
   path <- normalize_path(path)
-  file.path(dirname(article), ifelse(tools::file_ext(path) == "rds", path, paste0(path, ".rds")))
+  as_written <- call %in% c("readRDS", "read_rds") | grepl("\\.rds$", path) |
+    (call == "brm" & grepl("\\.rds$", path, ignore.case = TRUE))
+  file.path(dirname(article), ifelse(as_written, path, paste0(path, ".rds")))
 }
 
 file_status <- function(file) {
@@ -166,7 +187,7 @@ articles <- file.path("vignettes", articles[!startsWith(basename(articles), "_")
 findings <- do.call(rbind, c(list(finding(character(), integer(), character(), character())), lapply(articles, check_article)))
 
 references <- findings[findings$kind == "reference", ]
-files <- resolve(references$article, references$text)
+files <- resolve(references$article, references$text, references$call)
 checked <- vapply(unique(files), file_status, character(1))
 status <- unname(checked[match(files, unique(files))])
 bad <- status != "ok"

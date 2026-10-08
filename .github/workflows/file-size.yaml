@@ -3,9 +3,9 @@
 # the branch into the history for good (a squash merge would not, but the check
 # cannot know which method will be used). Article fits go to the `article-fits`
 # release instead (ADR 0003, #438).
-# A blob held anywhere in the history of the base or of develop is already in
-# the protected history and passes, so renames, forward merges and restores of
-# files tracked before this check do not trip it.
+# A blob that is held anywhere in the history of the base or of develop passes,
+# so renames, forward merges and restores of files tracked before this check do
+# not trip it.
 on:
   pull_request:
     branches: [master, develop, 'dev-*']
@@ -60,9 +60,9 @@ jobs:
           candidates=$(mktemp)
           sed 's/^?//; s/ .*//' "$listing" | sort -u | comm -23 - "$held" > "$candidates"
 
-          # One request for all blobs the clone lacks. Looked up one by one,
-          # each blob arrives in its own pack, which takes about 0.4 s and
-          # ends in a fatal error after about 50 packs.
+          # One request for the candidate blobs the clone lacks. Looked up one
+          # by one, each blob arrives in its own pack, which takes about 0.4 s
+          # and ends in a fatal error after about 50 packs.
           missing=$(mktemp)
           sed -n 's/^?//p' "$listing" | sort -u | comm -12 - "$candidates" > "$missing"
           if [ -s "$missing" ]; then

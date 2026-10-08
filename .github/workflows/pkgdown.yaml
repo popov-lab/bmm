@@ -135,10 +135,10 @@ jobs:
           echo "Downloaded ${n} article fits from the ${FITS_TAG} release"
 
       # A fit that an article loads but the build cannot find is refitted
-      # during the build instead of failing it. The script checks every
-      # file = "<relative path>" string literal in the evaluated R chunks of
-      # the articles pkgdown builds (fits/ from the release, assets/ from the
-      # tree) and fails on a fits/ path it cannot list.
+      # during the build instead of failing it. The script checks every literal
+      # file = "<relative path>" passed to bmm(), brm(), update(), readRDS() or
+      # read_rds() in evaluated R chunks: fits/ from the release, any other path
+      # from the tree. A fits/ path it cannot check fails the build.
       - name: Check article fits
         run: Rscript .github/scripts/check-article-fits.R
 
