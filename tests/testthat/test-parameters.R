@@ -93,6 +93,24 @@ test_that("parameter_info() for m3 custom with formula discovers params", {
   expect_null(attr(p, "m3_note"))
 })
 
+test_that("parameter_info() for m3 custom lists data columns and counts not as parameters (#495)", {
+  m <- m3(
+    resp_cats = c("corr", "other", "dist", "npl"),
+    num_options = c(1, 4, 5, 5),
+    links = list(c = "log", a = "log", x = "log")
+  )
+  ff <- bmf(
+    corr ~ b + a + c * time, other ~ b + a, dist ~ b + x * n_opt_dist, npl ~ b,
+    c ~ 1, a ~ 1, x ~ 1
+  )
+  p <- parameter_info(m, formula = ff)
+
+  expect_true("x" %in% p$parameter)
+  expect_false(any(c("time", "n_opt_dist") %in% p$parameter))
+  checked <- suppressWarnings(check_model(m, data.frame(time = 1), ff))
+  expect_setequal(p$parameter, names(checked$parameters))
+})
+
 test_that("parameter_info() identifies free parameters for sdm", {
   m <- sdm(resp_error = "y")
   p <- parameter_info(m)

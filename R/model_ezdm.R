@@ -194,8 +194,11 @@
 #' summary(fit)
 #'
 #' # Extract population-level effects
-#' # True values: drift = 2, bound = 1.5, ndt = 0.3 (on log scale for drift/bound)
-#' exp(brms::fixef(fit))
+#' # True values: drift = 2, bound = 1.5, ndt = 0.3
+#' # drift has an identity link; bound and ndt have log links
+#' fixed_effects <- brms::fixef(fit)
+#' fixed_effects["drift_Intercept", "Estimate"]
+#' exp(fixed_effects[c("bound_Intercept", "ndt_Intercept"), "Estimate"])
 #' }
 ezdm <- function(mean_rt, var_rt, n_upper, n_trials, links = NULL,
                  version = c("3par", "4par"), ...) {

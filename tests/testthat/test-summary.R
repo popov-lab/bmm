@@ -67,6 +67,17 @@ test_that("print.bmmsummary handles a single regression coefficient row (#369)",
   expect_true(any(grepl("kappa_Intercept", out)))
 })
 
+test_that("print.bmmsummary lists only constants when no shown coefficient is estimated", {
+  model <- sdm(resp_error = "y")
+  formula <- bmf(c ~ 1, kappa ~ 1)
+  fixed <- make_fixed(c("c_Intercept", "kappa_Intercept"))
+  fixed$Rhat <- NA
+  out <- capture.output(print(make_bmmsummary(model, formula, fixed), color = FALSE))
+  expect_false(any(grepl("Regression Coefficients", out)))
+  expect_true(any(grepl("Constant Parameters", out)))
+  expect_true(any(grepl("kappa_Intercept", out)))
+})
+
 test_that(".summary_fixed_rows keeps a single fixed-effect row", {
   # gumbel-min sdt_ranking has one population coefficient (d_Intercept) but
   # two printed parameters (d, sdratio); the old sapply+apply errored here.
