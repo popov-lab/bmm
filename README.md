@@ -86,13 +86,15 @@ each model offers.
 - [`sdt_yn()`](https://popov-lab.github.io/bmm/reference/sdt_yn.html):
   Signal Detection Theory (Yes/No)
 
-**Choices and response times.** Participants choose between two options
-and the response time is recorded, either on every trial or as means and
-variances per condition. See the
+**Choices and response times.** Participants choose between two options,
+or report a direction on a circle, and the response time is recorded,
+either on every trial or as means and variances per condition. See the
 [DDM](https://popov-lab.github.io/bmm/articles/bmm_ddm.html), [censored
 shifted Wald](https://popov-lab.github.io/bmm/articles/bmm_cswald.html),
-[EZ-diffusion](https://popov-lab.github.io/bmm/articles/bmm_ezdm.html)
-and [response time
+[EZ-diffusion](https://popov-lab.github.io/bmm/articles/bmm_ezdm.html),
+[EZ circular
+diffusion](https://popov-lab.github.io/bmm/articles/bmm_ezcdm.html) and
+[response time
 contamination](https://popov-lab.github.io/bmm/articles/bmm_rt_contamination.html)
 articles.
 
@@ -100,6 +102,8 @@ articles.
   Censored-Shifted Wald Model
 - [`ddm()`](https://popov-lab.github.io/bmm/reference/ddm.html):
   Diffusion Decision Model
+- [`ezcdm()`](https://popov-lab.github.io/bmm/reference/ezcdm.html): EZ
+  Circular Diffusion Model
 - [`ezdm()`](https://popov-lab.github.io/bmm/reference/ezdm.html):
   EZ-Diffusion Model
 

@@ -546,6 +546,13 @@ data_column_roles <- list(
     rt = "response time in seconds",
     response = "choice, 0 = lower and 1 = upper boundary"
   ),
+  ezcdm = c(
+    mean_angle = "circular mean of the response angles in radians",
+    var_angle = "circular variance of the response angles, in [0, 1]",
+    mean_rt = "mean response time in seconds",
+    var_rt = "variance of the response times in seconds\u00b2",
+    n_trials = "number of trials"
+  ),
   ezdm = c(
     mean_rt = "mean response time in seconds",
     var_rt = "variance of the response times in seconds\u00b2",
