@@ -130,6 +130,99 @@ jobs:
           fi
           echo "Downloaded ${n} article fits from the ${FITS_TAG} release"
 
+      # Every article that loads a fit from fits/ must find it, because a
+      # missing fit is refitted during the build instead of failing it. The
+      # path must be a string literal, so that it can be listed here.
+      - name: Check article fits
+        shell: Rscript {0}
+        run: |
+          articles_dir <- "vignettes/articles"
+          open_fence <- "^\\s*`{3,}\\s*\\{\\s*[rR]([ ,}]|$)"
+          close_fence <- "^\\s*`{3,}\\s*$"
+          fits_path <- "(^|/)fits(/|$)"
+
+          chunks_of <- function(lines) {
+            chunks <- list()
+            first <- NULL
+            for (i in seq_along(lines)) {
+              if (is.null(first) && grepl(open_fence, lines[i])) {
+                first <- i + 1L
+              } else if (!is.null(first) && grepl(close_fence, lines[i])) {
+                chunks[[length(chunks) + 1L]] <- list(first = first, code = if (i - 1L >= first) lines[first:(i - 1L)] else character())
+                first <- NULL
+              }
+            }
+            chunks
+          }
+
+          is_file_argument <- function(pd, id) {
+            parent <- pd$parent[pd$id == id]
+            siblings <- pd[pd$parent == parent, ]
+            siblings <- siblings[order(siblings$line1, siblings$col1), ]
+            at <- which(siblings$id == id)
+            parent > 0 && at > 2L && sum(pd$parent == id) == 1L &&
+              siblings$token[at - 1L] == "EQ_SUB" &&
+              siblings$token[at - 2L] == "SYMBOL_SUB" && siblings$text[at - 2L] == "file"
+          }
+
+          references <- data.frame(article = character(), line = integer(), fit = character())
+          problems <- data.frame(article = character(), line = integer(), message = character())
+          note <- function(article, line, message) {
+            problems[nrow(problems) + 1L, ] <<- list(article, line, gsub("[\r\n]+", " ", message))
+          }
+
+          articles <- list.files(articles_dir, pattern = "\\.[Rr]md$", full.names = TRUE)
+          for (article in articles) {
+            for (chunk in chunks_of(readLines(article, warn = FALSE, encoding = "UTF-8"))) {
+              code <- paste(chunk$code, collapse = "\n")
+              parsed <- tryCatch(parse(text = code, keep.source = TRUE, encoding = "UTF-8"), error = function(e) NULL)
+              if (is.null(parsed)) {
+                if (grepl("[\"']fits[/\"']", code)) {
+                  note(article, chunk$first, "A code chunk that mentions fits/ cannot be parsed, so its fits cannot be checked.")
+                }
+                next
+              }
+              pd <- utils::getParseData(parsed)
+              if (is.null(pd)) next
+              for (k in which(pd$token == "STR_CONST")) {
+                value <- tryCatch(str2lang(pd$text[k]), error = function(e) "")
+                if (!is.character(value) || !grepl(fits_path, value)) next
+                line <- chunk$first + pd$line1[k] - 1L
+                if (is_file_argument(pd, pd$parent[k]) && grepl("^fits/.+", value)) {
+                  references[nrow(references) + 1L, ] <- list(article, line, value)
+                } else {
+                  note(article, line, paste0("The string \"", value, "\" cannot be checked. Pass the fit as a literal, file = \"fits/<name>\", so that the build can check it."))
+                }
+              }
+            }
+          }
+
+          fit_file <- function(fit) {
+            file.path(articles_dir, if (identical(tools::file_ext(fit), "rds")) fit else paste0(fit, ".rds"))
+          }
+          readable <- list()
+          for (fit in unique(references$fit)) {
+            path <- fit_file(fit)
+            readable[[fit]] <- if (!file.exists(path)) {
+              "is not in the article-fits release"
+            } else {
+              tryCatch({ readRDS(path); NULL }, error = function(e) conditionMessage(e), warning = function(w) conditionMessage(w))
+            }
+          }
+          for (k in seq_len(nrow(references))) {
+            reason <- readable[[references$fit[k]]]
+            if (!is.null(reason)) {
+              note(references$article[k], references$line[k],
+                   paste0(basename(references$article[k]), " loads ", references$fit[k], ", which ", if (grepl("^is not", reason)) reason else paste0("cannot be read (", reason, ")"), ". Upload it to the article-fits release before the site is built."))
+            }
+          }
+
+          for (k in seq_len(nrow(problems))) {
+            cat(sprintf("::error file=%s,line=%d::%s\n", problems$article[k], problems$line[k], problems$message[k]))
+          }
+          cat(sprintf("Checked %d fit references in %d articles; %d problems\n", nrow(references), length(articles), nrow(problems)))
+          if (nrow(problems) > 0L) quit(save = "no", status = 1L)
+
       - name: Build site
         run: pkgdown::build_site_github_pages(new_process = FALSE, install = FALSE)
         shell: Rscript {0}
