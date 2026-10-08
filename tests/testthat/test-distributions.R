@@ -923,6 +923,21 @@ test_that("dm3 matches activations and num_options by category, not by position"
   expect_error(dm3(c(20, 10, 10), pars, model, bmf(corr ~ b + a + c, npl ~ b)), "'other'")
 })
 
+test_that("dm3 and rm3 use Gaussian-rule probabilities for choice_rule = 'gaussian'", {
+  model <- m3(resp_cats = c("corr", "other", "npl"), num_options = c(1, 4, 10),
+              choice_rule = "gaussian", version = "ss")
+  probs <- exp(vapply(1:3, function(k) m3_gauss_logp(k, 2.5, 1, 0, 1, 4, 10), numeric(1)))
+  expect_equal(sum(probs), 1, tolerance = 1e-6)
+  expect_equal(dm3(c(60, 25, 15), c(a = 1, c = 1.5), model),
+               stats::dmultinom(c(60, 25, 15), prob = probs, log = TRUE), tolerance = 1e-8)
+  # the softmax rule gives different probabilities for the same activations
+  softmax <- m3(resp_cats = c("corr", "other", "npl"), num_options = c(1, 4, 10), version = "ss")
+  expect_gt(abs(dm3(c(60, 25, 15), c(a = 1, c = 1.5), softmax) - dm3(c(60, 25, 15), c(a = 1, c = 1.5), model)), 0.1)
+  withr::local_seed(1)
+  draws <- rm3(n = 2000, size = 1, pars = c(a = 1, c = 1.5), m3_model = model)
+  expect_lt(max(abs(colMeans(draws) - probs)), 0.04)
+})
+
 test_that("rm3 errors when full formula has no activation functions", {
   model <- m3(
     resp_cats = c("corr", "other", "npl"),
