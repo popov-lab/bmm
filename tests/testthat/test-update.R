@@ -410,7 +410,7 @@ stored_frame_cases <- function() {
     r5 = c(10, 40, 10, 38, 9, 38, 12, 37)
   )
 
-  list(
+  c(list(
     cswald = list(
       model = cswald("rt", "response", version = "simple"),
       formula = rt_formula, data = rt_data
@@ -538,16 +538,7 @@ stored_frame_cases <- function() {
       formula = bmf(d ~ 1, criterion ~ 1, spacing ~ 1, logmratio ~ 1 + (1 | id)),
       data = rating_data[setdiff(names(rating_data), "r5")]
     )
-  )
-}
-
-stored_frame_fit <- function(case) {
-  # the toy rt_data has a 50% error rate, which cswald "simple" warns about
-  suppressWarnings(suppressMessages(
-    bmm(case$formula, case$data, case$model,
-      backend = "mock", mock_fit = 1, rename = FALSE
-    )
-  ))
+  ), model_test_cases("stored_frame"))
 }
 
 test_that("every supported model has a stored-frame case", {
@@ -556,9 +547,10 @@ test_that("every supported model has a stored-frame case", {
   }))
   uncovered <- setdiff(model_names(), covered)
   expect(length(uncovered) == 0, glue::glue(
-    "No stored-frame case for {collapse_comma(uncovered)}. Add one to stored_frame_cases(); ",
+    "No stored-frame case for {collapse_comma(uncovered)}. Register one in the ",
+    "model's tests/testthat/helper-model-<model>.R (see helper-model-cases.R); ",
     "a model whose check_data() consumes or creates columns also needs a ",
-    "revert_check_data() method in R/update.R"
+    "revert_check_data() method"
   ))
 })
 

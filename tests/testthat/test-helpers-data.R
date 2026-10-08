@@ -167,7 +167,14 @@ test_that("check_data() returns a data.frame()", {
     new1 = rep(30L, 50), know2 = rep(10L, 50), know3 = rep(5L, 50),
     remember2 = rep(10L, 50), remember3 = rep(5L, 50)
   )
-  for (ml in mls) {
+  registered <- model_test_cases("check_data")
+  for (m in seq_along(models)) {
+    case <- registered[[models[m]]]
+    if (!is.null(case)) {
+      expect_s3_class(check_data(case$model, case$data, bmf(kappa ~ 1)), "data.frame")
+      next
+    }
+    ml <- mls[[m]]
     model <- ml(
       resp_error = "y", nt_features = "x", set_size = 2,
       nt_distances = "z", resp_cats = c("w", "l"), num_options = c(1, 1),

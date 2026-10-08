@@ -207,7 +207,9 @@ test_that("model_overview() has one row per version with its own columns and par
   expect_false(grepl("version", mixture2p$Model))
 
   rt_models <- model_overview(group = "Choices and response times")
-  expect_true(all(grepl("`(ddm|cswald|ezdm)\\(\\)`", rt_models$Model)))
+  registry <- model_registry()
+  in_group <- registry$model[registry$group == "Choices and response times"]
+  expect_setequal(unique(sub("^\\[`([a-z0-9_]+)\\(\\)`.*$", "\\1", rt_models$Model)), in_group)
 })
 
 test_that("get_model() returns the correct function", {

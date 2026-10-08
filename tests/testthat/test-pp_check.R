@@ -188,12 +188,6 @@ test_that(".pp_check_restore_set_size() lets sdt_ranking facet by its m column",
 
 # Multi-observable checks: pp_check(fit, resp_var = ...) (#401)
 
-load_ppcheck_fit <- function(name) {
-  path <- test_path("assets", name)
-  skip_if_not(file.exists(path), "fixture not available (excluded by .Rbuildignore)")
-  readRDS(path)
-}
-
 # expect_equal rather than expect_setequal: y comes from prep$data while the
 # group vector comes from object$data, so their row alignment is load-bearing
 # and an order-blind comparison would pass through a permutation

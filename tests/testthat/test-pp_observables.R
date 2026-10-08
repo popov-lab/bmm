@@ -1,25 +1,17 @@
-fake_prep <- function(ndraws, nobs, dpars, data = list()) {
-  structure(
-    list(ndraws = ndraws, nobs = nobs,
-         dpars = lapply(dpars, function(v) {
-           if (length(v) == 1L) v else matrix(v, ndraws, nobs)
-         }),
-         data = data),
-    class = "brmsprep"
-  )
-}
-
 fake_bmmfit <- function(model) {
   structure(list(bmm = list(model = model)), class = "bmmfit")
 }
 
-registered_models <- list(
-  ddm(rt = "rt", response = "resp"),
-  cswald(rt = "rt", response = "resp", version = "simple"),
-  cswald(rt = "rt", response = "resp", version = "crisk"),
-  ezdm(mean_rt = "mrt", var_rt = "vrt", n_upper = "nu", n_trials = "nt"),
-  ezdm(mean_rt = c("mu", "ml"), var_rt = c("vu", "vl"), n_upper = "nu",
-       n_trials = "nt", version = "4par")
+registered_models <- c(
+  list(
+    ddm(rt = "rt", response = "resp"),
+    cswald(rt = "rt", response = "resp", version = "simple"),
+    cswald(rt = "rt", response = "resp", version = "crisk"),
+    ezdm(mean_rt = "mrt", var_rt = "vrt", n_upper = "nu", n_trials = "nt"),
+    ezdm(mean_rt = c("mu", "ml"), var_rt = c("vu", "vl"), n_upper = "nu",
+         n_trials = "nt", version = "4par")
+  ),
+  lapply(unname(model_test_cases("observables")), `[[`, "model")
 )
 
 test_that("declared observables name real standata slots", {
@@ -38,8 +30,14 @@ test_that("declared observables name real standata slots", {
          rezdm(5, n_trials = 40, drift = 0.3, bound = 1.2, ndt = 0.3,
                version = "4par"))
   )
+  cases <- c(
+    lapply(cases, function(case) c(case, list(bmf(drift ~ 1)))),
+    lapply(unname(model_test_cases("observables")), function(case) {
+      list(case$model, case$data, case$formula)
+    })
+  )
   for (case in cases) {
-    slots <- names(suppressMessages(standata(bmf(drift ~ 1), case[[2]], case[[1]])))
+    slots <- names(suppressWarnings(suppressMessages(standata(case[[3]], case[[2]], case[[1]]))))
     expect_true(all(pp_observables(case[[1]])$observed %in% slots))
   }
 })
@@ -85,7 +83,11 @@ test_that("every registered compute closure is elementwise", {
       expected[[key]] <- .pp_expand_data(compute(observed), n_draws)
     }
   }
-  expect_length(actual, 17L)
+  # one closure per check of every model: fewer means two keys collided
+  n_checks <- sum(vapply(registered_models, function(model) {
+    length(pp_observables(model)$checks)
+  }, integer(1)))
+  expect_length(actual, n_checks)
   expect_equal(actual, expected)
 })
 
