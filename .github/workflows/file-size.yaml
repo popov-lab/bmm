@@ -1,13 +1,17 @@
 # Fails a pull request when any commit in it adds a file above the size limit,
 # even if a later commit removes the file: a merge commit carries every blob of
-# the branch into the history for good. Article fits go to the `article-fits`
+# the branch into the history for good (a squash merge would not, but the check
+# cannot know which method will be used). Article fits go to the `article-fits`
 # release instead (ADR 0003, #438).
-# A blob that is reachable from the base or from develop is already in the
-# protected history and passes, so renames and forward merges of files tracked
-# before this check do not trip it.
+# A blob held anywhere in the history of the base or of develop is already in
+# the protected history and passes, so renames, forward merges and restores of
+# files tracked before this check do not trip it.
 on:
   pull_request:
     branches: [master, develop, 'dev-*']
+    # A stacked PR is retargeted to develop when its base merges, which is an
+    # `edited` event; without it the check would never run for that PR
+    types: [opened, synchronize, reopened, edited]
 
 name: file-size
 
@@ -33,6 +37,7 @@ jobs:
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         run: |
           set -euo pipefail
+          export LC_ALL=C
           develop=refs/remotes/origin/develop
           git rev-parse --verify --quiet "$develop" > /dev/null ||
             git fetch --quiet --no-tags --filter=blob:none origin "+refs/heads/develop:$develop"
@@ -45,19 +50,27 @@ jobs:
           listing=$(mktemp)
           git rev-list --objects --missing=print "${range[@]}" > "$listing"
 
+          # The exclusions above only drop the trees of the two tips. A blob
+          # that sits elsewhere in their history is still listed, so it is
+          # removed here.
+          held=$(mktemp)
+          git rev-list --objects --missing=print "$BASE_SHA" "$develop" |
+            sed 's/^?//; s/ .*//' | sort -u > "$held"
+          candidates=$(mktemp)
+          sed 's/^?//; s/ .*//' "$listing" | sort -u | comm -23 - "$held" > "$candidates"
+
           # One request for all blobs the clone lacks. Looked up one by one,
           # each blob arrives in its own pack, which takes about 0.4 s and
           # ends in a fatal error after about 50 packs.
           missing=$(mktemp)
-          sed -n 's/^?//p' "$listing" > "$missing"
+          sed -n 's/^?//p' "$listing" | sort -u | comm -12 - "$candidates" > "$missing"
           if [ -s "$missing" ]; then
             git -c fetch.negotiationAlgorithm=noop fetch --quiet --no-tags \
               --no-write-fetch-head --filter=blob:none origin --stdin < "$missing"
           fi
 
           sizes=$(mktemp)
-          sed 's/^?//; s/ .*//' "$listing" | sort -u |
-            git cat-file --batch-check='%(objecttype) %(objectname) %(objectsize)' > "$sizes"
+          git cat-file --batch-check='%(objecttype) %(objectname) %(objectsize)' < "$candidates" > "$sizes"
 
           status=0
           checked=0
@@ -71,7 +84,9 @@ jobs:
             commit=${where%% *}
             path=${where#* }
             [ -n "$where" ] || { commit="an unknown commit"; path="(path not found)"; }
-            echo "::error file=${path}::${path} is ${size} bytes, above the limit of ${MAX_BYTES} (blob ${blob:0:10}, added in ${commit}). Upload article fits to the article-fits release instead of committing them, and drop the commit from the branch even if a later commit removes the file (see CONTRIBUTING)."
+            property=$(printf '%s' "$path" | sed 's/%/%25/g; s/,/%2C/g; s/:/%3A/g')
+            text=$(printf '%s' "$path" | sed 's/%/%25/g')
+            echo "::error file=${property}::${text} is ${size} bytes, above the limit of ${MAX_BYTES} (blob ${blob:0:10}, added in ${commit}). Upload article fits to the article-fits release instead of committing them, and drop the commit from the branch even if a later commit removes the file (see CONTRIBUTING)."
             status=1
           done < "$sizes"
           echo "Checked ${checked} blobs that the pull request adds to the history"
