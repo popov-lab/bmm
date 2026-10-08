@@ -796,10 +796,11 @@ rm3 <- function(n, size, pars, m3_model, act_funs = NULL, unpack = FALSE,
 #   P(k) = n_k E_z[ Phi(z)^(n_k - 1) prod_{j != k} Phi(z + A_k - A_j)^n_j ],
 # z ~ N(0, 1), by Gauss-Hermite quadrature. Mirrors m3_gauss_logp_vec() in
 # inst/stan_chunks/m3_gaussian_funs.stan. 40 nodes: against an integrate()
-# reference |delta log P| stays below 2e-5 where log P > -5 and 1.2e-4 for
-# categories with 30 options, growing to ~5e-3 only where log P < -20; maximum-
-# likelihood estimates on pooled oberauer_lewandowsky_2019_e1 move by 2e-4
-# standard errors relative to 72 nodes (|delta log P| <= 1e-6), at 40/72 of
+# reference |delta log P| is below 2e-5 where log P > -5 for categories with
+# fewer than 30 options and 1.5e-4 with 30 options, and below 2e-5 down to
+# log P = -20 (nothing measured below); maximum-likelihood estimates on pooled
+# oberauer_lewandowsky_2019_e1 move by 2e-4 standard errors relative to 72
+# nodes (|delta log P| <= 1e-6), at 40/72 of
 # the cost per gradient. log Phi at the nodes is tabulated for the
 # n_k - 1 competitors inside the chosen category, which sit at difference 0.
 .m3_gauss_rule <- function() {
