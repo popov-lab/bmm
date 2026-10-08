@@ -304,6 +304,18 @@
 
 #### Bug fixes
 
+- A saved fit, whether through `file =` in
+  [`bmm()`](https://popov-lab.github.io/bmm/dev/reference/bmm.md) or
+  [`update()`](https://rdrr.io/r/stats/update.html) or with
+  [`saveRDS()`](https://rdrr.io/r/base/readRDS.html), held extra copies
+  of the data and of the fitted model. The file could be several times
+  larger than needed, and more so for a data frame with many columns the
+  model does not use. New fits are saved at their own size. A fit saved
+  by an earlier version keeps its size until you refit it with
+  [`bmm()`](https://popov-lab.github.io/bmm/dev/reference/bmm.md) or
+  with `update(recompile = TRUE)`;
+  [`update()`](https://rdrr.io/r/stats/update.html) alone may carry the
+  copies over ([\#518](https://github.com/popov-lab/bmm/issues/518)).
 - [`conditional_effects()`](https://popov-lab.github.io/bmm/dev/reference/conditional_effects.bmmfit.md)
   no longer fails with `Number of trials must be non-negative integers`
   on **m3** fits whose rows differ in their number of trials
