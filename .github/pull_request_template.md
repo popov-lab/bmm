@@ -5,6 +5,7 @@
 - [ ] `devtools::test()` passes locally
 - [ ] `devtools::check()`: 0 errors, 0 warnings (notes explained below)
 - [ ] NEWS bullet added (or: not user-visible)
+- [ ] Deprecates, removes or breaks something: NEWS bullet under "Deprecated functions and arguments", and an issue for a breaking change (CONTRIBUTING, "Deprecations and breaking changes")
 - [ ] Documentation regenerated with `devtools::document()`
 
 ## Scope

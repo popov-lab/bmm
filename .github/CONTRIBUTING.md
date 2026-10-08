@@ -63,6 +63,35 @@ of a parameter recovery for the new model:
 
 Attach the script as a gist or in a collapsed block in the PR.
 
+## Deprecations and breaking changes
+
+Users need to know how long their scripts keep working. From bmm 1.5.0 on,
+changes to exported functions follow three rules.
+
+1. **Deprecate before removing.** A deprecated function or argument keeps
+   working, with a warning, for at least one minor release. Something
+   deprecated in 1.5.0 works in every 1.5.x release and is removed in 1.6.0 at
+   the earliest.
+2. **List it in NEWS.** Every deprecation and every removal gets a bullet
+   under `### Deprecated functions and arguments` in `NEWS.md`.
+3. **Announce breaking changes.** A change is breaking when code that ran
+   before now fails, or has to be edited to do the same thing. Removing a
+   deprecated function counts. We announce each breaking change in a GitHub
+   issue before the release that contains it, with the old and the new code
+   side by side.
+
+If your PR deprecates something:
+
+- Keep the old name or form working by passing it on to the new one, and do
+  not change what it returns.
+- Warn when the old form is used. The warning names the replacement, the
+  version that deprecated it, and the earliest version that may remove it,
+  e.g. "`old_fun()` is deprecated since bmm 1.5.0 and may be removed in 1.6.0.
+  Use `new_fun()` instead."
+- Say the same at the top of its help page.
+- Add a test that the old form still gives the same result as the new one
+  and that it warns.
+
 ## Review and merging
 
 How many reviews a PR needs depends on what it touches.
