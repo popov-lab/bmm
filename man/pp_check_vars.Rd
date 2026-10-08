@@ -11,9 +11,10 @@ pp_check_vars(fit)
 }
 \value{
 A \code{data.frame} with one row per available check (columns \code{resp_var},
-\code{label}, \code{default_type}, and \code{default}, flagging the observable that
-\code{pp_check()} plots when \code{resp_var} is not specified), or \code{NULL} invisibly
-for models without multi-observable support.
+\code{label}, \code{default_type}, \code{slot}, listing the brms standata slots the check
+reads, and \code{default}, flagging the observable that \code{pp_check()} plots when
+\code{resp_var} is not specified), or \code{NULL} invisibly for models without
+multi-observable support.
 }
 \description{
 Lists the values \code{resp_var} accepts in \code{\link[=pp_check.bmmfit]{pp_check.bmmfit()}} for a fitted

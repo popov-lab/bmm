@@ -11,16 +11,21 @@
     ),
     links = list(
       simple = list(c = "log", a = "log"),
-      softmax = list(c = "identity", a = "identity")
+      softmax = list(c = "identity", a = "identity"),
+      gaussian = list(c = "identity", a = "identity")
     ),
     priors = list(
       simple = list(
-        a = list(main = "normal(0,1)", effects = "normal(0,0.5)"),
-        c = list(main = "normal(3,1)", effects = "normal(0,0.5)")
+        a = list(main = "normal(0,1)", effects = "normal(0,0.5)", sd = "exponential(1)"),
+        c = list(main = "normal(3,1)", effects = "normal(0,0.5)", sd = "exponential(1)")
       ),
       softmax = list(
-        a = list(main = "normal(3,1)", effects = "normal(0,0.5)"),
-        c = list(main = "normal(3,1)", effects = "normal(0,0.5)")
+        a = list(main = "normal(3,1)", effects = "normal(0,0.5)", sd = "exponential(1)"),
+        c = list(main = "normal(3,1)", effects = "normal(0,0.5)", sd = "exponential(1)")
+      ),
+      gaussian = list(
+        a = list(main = "normal(2,1)", effects = "normal(0,0.5)", sd = "exponential(1)"),
+        c = list(main = "normal(2,1)", effects = "normal(0,0.5)", sd = "exponential(1)")
       )
     )
   ),
@@ -32,18 +37,24 @@
     ),
     links = list(
       simple = list(c = "log", a = "log", f = "logit"),
-      softmax = list(c = "identity", a = "identity", f = "logit")
+      softmax = list(c = "identity", a = "identity", f = "logit"),
+      gaussian = list(c = "identity", a = "identity", f = "logit")
     ),
     priors = list(
       simple = list(
-        a = list(main = "normal(0,1)", effects = "normal(0,0.5)"),
-        c = list(main = "normal(3,1)", effects = "normal(0,0.5)"),
-        f = list(main = "logistic(0,1)", effects = "normal(0,1)")
+        a = list(main = "normal(0,1)", effects = "normal(0,0.5)", sd = "exponential(1)"),
+        c = list(main = "normal(3,1)", effects = "normal(0,0.5)", sd = "exponential(1)"),
+        f = list(main = "logistic(0,1)", effects = "normal(0,1)", sd = "exponential(1)")
       ),
       softmax = list(
-        a = list(main = "normal(3,1)", effects = "normal(0,0.5)"),
-        c = list(main = "normal(3,1)", effects = "normal(0,0.5)"),
-        f = list(main = "logistic(0,1)", effects = "normal(0,1)")
+        a = list(main = "normal(3,1)", effects = "normal(0,0.5)", sd = "exponential(1)"),
+        c = list(main = "normal(3,1)", effects = "normal(0,0.5)", sd = "exponential(1)"),
+        f = list(main = "logistic(0,1)", effects = "normal(0,1)", sd = "exponential(1)")
+      ),
+      gaussian = list(
+        a = list(main = "normal(2,1)", effects = "normal(0,0.5)", sd = "exponential(1)"),
+        c = list(main = "normal(2,1)", effects = "normal(0,0.5)", sd = "exponential(1)"),
+        f = list(main = "logistic(0,1)", effects = "normal(0,1)", sd = "exponential(1)")
       )
     )
   )
@@ -63,7 +74,8 @@
       name = "The Multinomial / Memory Measurement Model",
       citation = glue(
         "Oberauer, K., & Lewandowsky, S. (2019). Simple measurement models \\
-        for complex working-memory tasks. Psychological Review, 126."
+        for complex working-memory tasks. Psychological Review, 126(6), \\
+        880-932. https://doi.org/10.1037/rev0000159"
       ),
       version = version,
       requirements = paste0(
@@ -76,19 +88,40 @@
         list(b = "Background activation. Added to each response category. Fixed for scaling, necessary in all models."),
         .m3_version_table[[version]][["parameters"]]
       ),
-      fixed_parameters = list(
-        b = if (choice_rule == "softmax") 0 else 0.1
-      ),
       links = .m3_version_table[[version]][["links"]][[choice_rule]],
+      fixed_parameters = list(
+        b = if (choice_rule == "simple") 0.1 else 0
+      ),
       default_priors = .m3_version_table[[version]][["priors"]][[choice_rule]]
     ),
     class = c("bmmodel", "m3", paste0("m3_", version)),
     call = call
   )
 
-  out$links[names(links)] <- links
+  out <- set_links(out, links)
   out$default_priors[names(default_priors)] <- default_priors
   out
+}
+
+# the parameters of a custom m3 are the activation sources of the user's
+# formula, so there is no set of names to check a link target against
+# (check_model.m3_custom refuses a parameter left without a link). The ss and
+# cs versions build their activation functions from the version table, so their
+# parameters are known here. The custom branch is defensive rather than
+# load-bearing: a custom m3 has no links at construction, so names() is already
+# NULL, and check_links() never runs on one because set_links() stored no
+# attribute.
+#' @exportS3Method
+settable_links.m3 <- function(model) {
+  if (model$version == "custom") NULL else names(model$links)
+}
+
+# m3 is the one model that applies its links itself, by substituting the
+# inverse link into the activation formulas (apply_links -> inv_link), so the
+# links it can honour are inv_link()'s, not the ones a brms family can emit
+#' @exportS3Method
+settable_link_functions.m3 <- function(model) {
+  eval(formals(inv_link)$link)
 }
 
 
@@ -112,25 +145,53 @@
 #'   of candidates in the respective response categories are constant across all conditions
 #'   in the experiment. Or a vector specifying the variable names that contain the number of
 #'   candidates in each response category. The order of these variables should be in the
-#'   same order as the names of the response categories passed to `resp_cats`
-#' @param choice_rule The choice rule that should be used for the M3. The options are "softmax"
-#'   or "simple". The "softmax" option implements the softmax normalization of activation into
+#'   same order as the names of the response categories passed to `resp_cats`. Numbers
+#'   named after the response categories, e.g. `c(corr = 1, other = 4)`, are matched to
+#'   the categories by name. Numbers without names, or with other names, are taken in
+#'   the order of `resp_cats`, and other names become the names of the columns
+#'   bmm adds to the data. Column names given category names, e.g.
+#'   `c(other = "n_other", corr = "n_corr")`, are matched by name as well, in any order.
+#'   Custom activation formulas can use numbers by these column names; numbers
+#'   without names or named after the categories are called `n_opt_<category>`.
+#' @param choice_rule The choice rule that should be used for the M3. The options are "softmax",
+#'   "simple", or "gaussian". The "softmax" option implements the softmax normalization of activation into
 #'   probabilities for choosing the different response categories. The "simple" option implements
 #'   a simple normalization of the absolute activations over the sum of all activations. For details
 #'   on the differences of these choice rules please see the appendix of Oberauer & Lewandowsky (2019)
 #'   "Simple measurement models for complex working memory tasks" published in Psychological Review.
+#'   The "gaussian" option adds independent standard normal noise to the activation of every
+#'   candidate and chooses the candidate with the largest value (a Thurstonian rule: the choice is the
+#'   maximum of noisy activations); "softmax" is the same with Gumbel noise. Activations under
+#'   "gaussian" are on a smaller scale, and the difference is not one constant factor: `a` shrinks
+#'   more than `c`, so a comparison of `c` with `a`, and effects of conditions that change the
+#'   number of candidates (such as set size), can differ between the two rules. Sampling under
+#'   "gaussian" costs about 40 times as much per iteration as under "softmax", because each
+#'   probability is a 40-node numerical integral: a 40-subject, three-condition model with random
+#'   intercepts took 15 seconds under "softmax" and about 4 minutes under "gaussian" end to end
+#'   (4 chains, 1000 + 1000 iterations, Stan compilation included), 2.5 minutes with
+#'   `threads = threading(2)`. In versions `ss` and `cs`, `c` and `a` have `normal(3, 1)` main priors
+#'   under "softmax" and `normal(2, 1)` under "gaussian"; under "simple" `c` has `normal(3, 1)` and
+#'   `a` has `normal(0, 1)`, on the log scale.
 #' @param version Character. The version of the M3 model to use. Can be one of
 #'  `ss`, `cs`, or `custom`. The default is `custom`.
 #' @param ... used internally for testing, ignore it
 #' @return An object of class `bmmodel`
 #'
-#' @details `r model_info(.model_m3(), components =c('domain', 'task', 'name', 'citation'))`
+#' @details `r model_docs(.model_m3(), components =c('domain', 'task', 'name', 'citation'))`
 #' #### Version: `ss`
-#' `r model_info(.model_m3(version = "ss"), components = c('requirements', 'parameters', 'fixed_parameters', 'links', 'prior'))`
+#' `r model_docs(.model_m3(version = "ss"), components = c('requirements', 'parameters', 'fixed_parameters', 'links', 'prior'))`
 #' #### Version: `cs`
-#' `r model_info(.model_m3(version = "cs"), components =c('requirements', 'parameters', 'fixed_parameters', 'links', 'prior'))`
+#' `r model_docs(.model_m3(version = "cs"), components =c('requirements', 'parameters', 'fixed_parameters', 'links', 'prior'))`
 #' #### Version: `custom`
-#' `r model_info(.model_m3(version = "custom"), components = c('requirements', 'parameters', 'fixed_parameters', 'links', 'prior'))`
+#' `r model_docs(.model_m3(version = "custom"), components = c('requirements', 'parameters', 'fixed_parameters', 'links', 'prior'))`
+#' #### Missing values and reserved names
+#' A missing response count (`NA`) is counted as 0. If the category has options in that
+#' row, `bmm()` warns and says how many counts were replaced; if it has none (`num_options`
+#' is 0 in that row), the 0 is true and there is no warning, as for `dist` in
+#' [oberauer_lewandowsky_2019_e1]. A missing value in a column named in `num_options` is
+#' an error: enter 0 where there were no options. Data columns named `Y`, `nTrials` or
+#' `Idx_<category>` are refused because `bmm()` creates columns with these names; response
+#' categories may be called `Y` or `nTrials`.
 #'
 #' @keywords bmmodel
 #'
@@ -177,25 +238,43 @@
 #' summary(m3_fit)
 #'
 #' @export
-m3 <- function(resp_cats, num_options, choice_rule = "softmax", version = "custom", ...) {
+m3 <- function(resp_cats, num_options, choice_rule = "softmax",
+               version = c("custom", "ss", "cs"), ...) {
   call <- match.call()
   stop_missing_args()
+  version <- match.arg(version)
   stopif(
-    !version %in% c("custom", "cs", "ss"),
-    'Unknown version: {version}. It should be one of "ss", "cs" or "custom"'
-  )
-  stopif(
-    !tolower(choice_rule) %in% c("softmax", "simple"),
-    'Unsupported choice rule "{choice_rule}. Must be one of "simple" or "softmax"'
+    !tolower(choice_rule) %in% c("softmax", "simple", "gaussian"),
+    'Unsupported choice rule "{choice_rule}". Must be one of "simple", "softmax" or "gaussian"'
   )
   stopif(
     length(num_options) != length(resp_cats),
     "The option variables should have the same length as the response variables."
   )
+  stopif(
+    is.character(num_options) && any(num_options %in% resp_cats),
+    "The number of options cannot be read from a response category column: \\
+    {collapse_comma(intersect(num_options, resp_cats))}"
+  )
+  stopif(
+    is.numeric(num_options) && anyNA(num_options),
+    "`num_options` cannot contain missing values."
+  )
+  opt_names <- names(num_options)
+  stopif(
+    !is.null(opt_names) &&
+      (anyNA(opt_names) || any(opt_names == "") || anyDuplicated(opt_names) > 0),
+    "Name either all elements of `num_options` or none, and use each name only once."
+  )
+  stopif(
+    any(opt_names %in% resp_cats) && !setequal(opt_names, resp_cats),
+    "If `num_options` is named after the response categories, it needs one element for each of \\
+    {collapse_comma(resp_cats)}"
+  )
 
   .model_m3(
     resp_cats = resp_cats, num_options = num_options,
-    choice_rule = choice_rule, version = version, call = call, ...
+    choice_rule = tolower(choice_rule), version = version, call = call, ...
   )
 }
 
@@ -206,10 +285,20 @@ m3 <- function(resp_cats, num_options, choice_rule = "softmax", version = "custo
 #' @export
 check_model.m3_custom <- function(model, data = NULL, formula = NULL) {
   if (!is.null(formula)) {
-    user_pars <- rhs_vars(formula[is_nl(formula)])
-    user_pars <- setdiff(user_pars, names(formula[is_nl(formula)]))
-    user_pars <- setdiff(user_pars, names(model$parameters))
-    user_pars <- setdiff(user_pars, colnames(data))
+    user_pars <- setdiff(
+      m3_activation_symbols(model, formula),
+      c(colnames(data), built_data_columns(model))
+    )
+    # a symbol without its own formula is more often a typo or a missing column
+    # than a new parameter, and as a parameter it would be fitted silently
+    no_formula <- setdiff(user_pars, names(formula))
+    stopif(
+      length(no_formula) > 0,
+      "{collapse_comma(no_formula)} in your activation formula(s) is neither a \\
+      data column nor a model parameter. Give each new parameter its own \\
+      formula (e.g. {no_formula[1]} ~ 1), or add the column to the data (`Y` is \\
+      reserved and cannot be a data column)."
+    )
     model$parameters <- c(model$parameters, setNames(user_pars, user_pars))
   }
 
@@ -233,18 +322,22 @@ check_model.m3_custom <- function(model, data = NULL, formula = NULL) {
   additional_priors <- lapply(missing_priors, function(m) {
     if (model$other_vars$choice_rule == "simple") {
       switch(model$links[[m]],
-             log = list(main = "normal(1, 1)", effects = "normal(0, 0.5)"),
-             softplus = list(main = "normal(2, 1)", effects = "normal(0, 0.5)"),
-             identity = list(main = "normal(10, 4)", effects = "normal(0, 0.5)"),
-             logit = list(main = "logistic(0, 1)", effects = "normal(0, 0.5)"),
+             log = list(main = "normal(1, 1)", effects = "normal(0, 0.5)", sd = "exponential(1)"),
+             softplus = list(main = "normal(2, 1)", effects = "normal(0, 0.5)", sd = "exponential(1)"),
+             identity = list(main = "normal(10, 4)", effects = "normal(0, 0.5)", sd = "exponential(1)"),
+             logit = list(main = "logistic(0, 1)", effects = "normal(0, 0.5)", sd = "exponential(1)"),
              stop2("Invalid link function provided! Please use one of the following link functions: identity, log, softplus, logit")
       )
-    } else if (model$other_vars$choice_rule == "softmax") {
+    } else {
       switch(model$links[[m]],
-             log = list(main = "normal(0, 1)", effects = "normal(0, 0.5)"),
-             softplus = list(main = "normal(1, 1)", effects = "normal(0, 0.5)"),
-             identity = list(main = "normal(3, 1)", effects = "normal(0, 0.5)"),
-             logit = list(main = "logistic(0, 1)", effects = "normal(0, 0.5)"),
+             log = list(main = "normal(0, 1)", effects = "normal(0, 0.5)", sd = "exponential(1)"),
+             softplus = list(main = "normal(1, 1)", effects = "normal(0, 0.5)", sd = "exponential(1)"),
+             identity = if (model$other_vars$choice_rule == "gaussian") {
+               list(main = "normal(2, 1)", effects = "normal(0, 0.5)", sd = "exponential(1)")
+             } else {
+               list(main = "normal(3, 1)", effects = "normal(0, 0.5)", sd = "exponential(1)")
+             },
+             logit = list(main = "logistic(0, 1)", effects = "normal(0, 0.5)", sd = "exponential(1)"),
              stop2("Invalid link function provided! Please use one of the following link functions: identity, log, softplus, logit")
       )
     }
@@ -254,22 +347,76 @@ check_model.m3_custom <- function(model, data = NULL, formula = NULL) {
   NextMethod("check_model")
 }
 
+# Candidates for the parameters a custom m3 adds: symbols in the activation
+# and non-linear formulas that the model does not define already. brms fits
+# every activation as non-linear, also one that is_nl() calls linear because
+# no other formula parameter appears in it
+m3_activation_symbols <- function(model, formula) {
+  symbols <- union(
+    rhs_vars(formula[is_nl(formula)]),
+    rhs_vars(formula[intersect(model$resp_vars$resp_cats, names(formula))])
+  )
+  setdiff(symbols, c(names(formula[is_nl(formula)]), names(model$parameters)))
+}
+
 ############################################################################# !
 # CHECK_data S3 methods                                                  ####
 ############################################################################# !
 
+# Counts or column names named after the response categories are labels: they
+# are matched to the categories by name, and counts are stored under the same
+# internal column names as unnamed counts. Used as column names they multiplied each
+# category's activation by itself (#449). Fits from before the fix still carry
+# those names in their stored model, so every reader goes through this helper
+# rather than the constructor renaming them once
+m3_num_options <- function(model) {
+  num_options <- model$other_vars$num_options
+  resp_cats <- model$resp_vars$resp_cats
+  if (!setequal(names(num_options), resp_cats)) {
+    return(num_options)
+  }
+  num_options <- num_options[resp_cats]
+  if (is.numeric(num_options)) names(num_options) <- paste0("n_opt_", resp_cats)
+  num_options
+}
+
+# Y is left out: as a matrix column it breaks the Stan code as a predictor
+#' @exportS3Method
+built_data_columns.m3 <- function(model) {
+  num_options <- m3_num_options(model)
+  c(
+    if (is.numeric(num_options)) names(num_options),
+    "nTrials", paste0("Idx_", model$resp_vars$resp_cats),
+    NextMethod("built_data_columns")
+  )
+}
+
 #' @export
 check_data.m3 <- function(model, data, formula) {
   resp_name <- model$resp_vars$resp_cats
-  n_opt_vect <- model$other_vars$num_options
+  n_opt_vect <- m3_num_options(model)
   col_names <- colnames(data)
 
   missing_variables <- setdiff(resp_name, col_names)
   stopif(length(missing_variables), "The response variable(s) {paste0(missing_variables, collapse = ', ')} missing in the data")
 
+  # Y and nTrials may name a category, whose column is consumed first; brms
+  # refuses `_` in category names, so Idx_<category> cannot be one
+  reserved_cols <- intersect(
+    c(setdiff(c("Y", "nTrials"), resp_name), paste0("Idx_", resp_name)),
+    col_names
+  )
+  stopif(
+    length(reserved_cols) > 0,
+    "The data column(s) {collapse_comma(reserved_cols)} would be overwritten by \\
+    the response matrix, trial counts and option indicators that bmm builds. \\
+    Please rename them."
+  )
+
   # Transfer all of the response variables to a matrix and name it 'Y'
   resp_matrix <- as.matrix(data[resp_name])
-  resp_matrix[is.na(resp_matrix)] <- 0
+  missing_counts <- is.na(resp_matrix)
+  resp_matrix[missing_counts] <- 0
   data <- data[!col_names %in% resp_name]
   data$nTrials <- rowSums(resp_matrix)
   data$Y <- resp_matrix
@@ -279,12 +426,31 @@ check_data.m3 <- function(model, data, formula) {
     missing_options <- setdiff(n_opt_vect, col_names)
     stopif(length(missing_options), "The variable(s) {paste0(missing_options, collapse = ', ')} missing in the data")
     opt_vars <- n_opt_vect
+    na_counts <- colSums(is.na(data[opt_vars]))
+    na_counts <- na_counts[na_counts > 0]
+    stopif(
+      length(na_counts) > 0,
+      "The option count column(s) contain missing values: \\
+      {paste0(names(na_counts), ' (', na_counts, ' NA)', collapse = ', ')}. \\
+      Give the number of response options for every row, and 0 where the category had none."
+    )
   } else if (is.numeric(n_opt_vect)) {
     # n_opt_vect is the *number* of options for each response variable
     opt_vars <- names(n_opt_vect)
+    # the counts become data columns under these names, and the activation
+    # formulas refer to them by name, so any name already in use is taken to
+    # mean the existing column or parameter instead of the count
+    taken <- c(
+      col_names, "Y", "nTrials", paste0("Idx_", resp_name),
+      names(formula), names(model$parameters), names(model$fixed_parameters)
+    )
+    clashes <- intersect(opt_vars, taken)
     stopif(
-      any(opt_vars %in% names(data)),
-      "One of the variables {paste0(opt_vars, collapse = ', ')} already exists in the data. Give explicit names to your num_options vector"
+      length(clashes) > 0,
+      "The column name(s) {collapse_comma(clashes)} that `num_options` would be stored under are \\
+      already taken by a data column, a model parameter, or a column bmm creates (`Y`, `nTrials`, \\
+      `Idx_<category>`). Pass the numbers unnamed, name them after the response categories, or \\
+      choose names that are not taken."
     )
     data[opt_vars] <- rep(n_opt_vect, each = nrow(data))
   } else {
@@ -301,6 +467,23 @@ check_data.m3 <- function(model, data, formula) {
   n_opt_idx_vars <- paste0("Idx_", resp_name)
   data[n_opt_idx_vars] <- as.integer(data[opt_vars] > 0)
   data[opt_vars][data[opt_vars] == 0] <- 0.0001
+
+  # the Gaussian kernels treat counts below 0.5 as absent while the indicator says present
+  bad <- opt_vars[colSums(data[opt_vars] != round(data[opt_vars]) & data[n_opt_idx_vars] == 1) > 0]
+  stopif(
+    model$other_vars$choice_rule == "gaussian" && length(bad) > 0,
+    "The Gaussian choice rule needs whole numbers of response options; \\
+    fractional counts in {collapse_comma(bad)}."
+  )
+
+  # NA is how a category without options is usually recorded, and there it is
+  # the true count; only where the category had options is a count lost
+  n_missing <- sum(missing_counts & as.matrix(data[n_opt_idx_vars]) == 1)
+  warnif(
+    n_missing > 0,
+    "The response category columns contain {n_missing} missing value(s) in rows \\
+    where the category has response options. They are counted as 0 responses."
+  )
 
   NextMethod("check_data")
 }
@@ -351,12 +534,8 @@ check_formula.m3_custom <- function(model, data, formula) {
 ############################################################################# !
 #' @export
 bmf2bf.m3 <- function(model, formula) {
-  # retrieve required response arguments
-  if (is.character(model$other_vars$num_options)) {
-    options_vars <- model$other_vars$num_options
-  } else {
-    options_vars <- names(model$other_vars$num_options)
-  }
+  num_options <- m3_num_options(model)
+  options_vars <- if (is.character(num_options)) num_options else names(num_options)
   resp_cats <- model$resp_vars$resp_cats
   n_opt_idx_vars <- paste0("Idx_", resp_cats)
   names(n_opt_idx_vars) <- resp_cats
@@ -366,7 +545,7 @@ bmf2bf.m3 <- function(model, formula) {
   cat <- resp_cats[1]
   brms_formula <- brms::bf(glue(
     "Y | trials(nTrials) ~
-    {n_opt_idx_vars[cat]} *", glue_choice_rule_functions(model$other_vars$choice_rule, cat, options_vars),
+    {n_opt_idx_vars[cat]} *", glue_choice_rule_functions(model$other_vars$choice_rule, cat, options_vars, resp_cats),
     "+ (1 - {n_opt_idx_vars[cat]}) * (-100)"
   ), nl = TRUE)
 
@@ -375,7 +554,7 @@ bmf2bf.m3 <- function(model, formula) {
   for (cat in resp_cats[-1]) {
     brms_formula <- brms_formula + glue_nlf(
       "mu{cat} ~
-      {n_opt_idx_vars[cat]} *", glue_choice_rule_functions(model$other_vars$choice_rule, cat, options_vars),
+      {n_opt_idx_vars[cat]} *", glue_choice_rule_functions(model$other_vars$choice_rule, cat, options_vars, resp_cats),
       "+ (1 - {n_opt_idx_vars[cat]}) * (-100)"
     )
   }
@@ -385,16 +564,74 @@ bmf2bf.m3 <- function(model, formula) {
 
 #' @title glue the activation functions for the different choice rules
 #'
-#' @param choice_rule The choice rule that should be used for the M3. The options are "softmax" and "simple"
+#' @param choice_rule The choice rule that should be used for the M3: "softmax", "simple" or "gaussian"
 #' @param cat The name of the response category for which the activation function should be generated
 #' @param options_vars The variable names that contain the number of candidates in each response category
+#' @param resp_cats The names of all response categories, in model order
 #' @noRd
-glue_choice_rule_functions <- function(choice_rule, cat, options_vars) {
+glue_choice_rule_functions <- function(choice_rule, cat, options_vars, resp_cats) {
   switch(
     choice_rule,
     simple = glue("log({cat} * {options_vars[cat]})"),
-    softmax = glue("({cat} + log({options_vars[cat]}))")
+    softmax = glue("({cat} + log({options_vars[cat]}))"),
+    # the softmax of log-probabilities that sum to one returns them unchanged, so
+    # the Gaussian rule keeps the multinomial family and puts log P(cat) here
+    gaussian = glue(
+      "m3_gauss_logp({match(cat, resp_cats)}, {paste(resp_cats, collapse = ', ')}, \\
+      {paste(options_vars[resp_cats], collapse = ', ')})"
+    )
   )
+}
+
+# A non-linear formula can name only data columns and parameters, so the
+# quadrature table and the number of categories are written into a generated
+# wrapper with the same name and arguments as the R companion m3_gauss_logp()
+m3_gaussian_stanvars <- function(model) {
+  K <- length(model$resp_vars$resp_cats)
+  gh <- .m3_gauss_rule()
+  literal <- function(x) paste0("[", paste(formatC(x, digits = 17, format = "e"), collapse = ", "), "]'")
+  wrapper <- glue(
+    "real m3_gauss_logp(int k, {paste0('real A', 1:K, collapse = ', ')}, \\
+    {paste0('real n', 1:K, collapse = ', ')}) {{
+      return m3_gauss_logp_vec(k, [{paste0('A', 1:K, collapse = ', ')}]', \\
+    [{paste0('n', 1:K, collapse = ', ')}]',
+        {literal(gh$nodes)},
+        {literal(gh$log_w)},
+        {literal(gh$log_Phi)});
+    }}"
+  )
+  sc_path <- system.file("stan_chunks", package = "bmm")
+  brms::stanvar(
+    scode = paste(read_lines2(paste0(sc_path, "/m3_gaussian_funs.stan")), wrapper, sep = "\n"),
+    block = "functions"
+  )
+}
+
+#' @title Category log-probability under the Gaussian choice rule of `m3()`
+#' @description R companion to the Stan function `m3_gauss_logp` that
+#'   `m3(choice_rule = "gaussian")` places in each category's activation
+#'   formula. `brms` evaluates the non-linear formula in R for `log_lik()`,
+#'   `posterior_predict()` and `posterior_epred()`, looking the function up on
+#'   the search path; it is exported for that reason and is not meant to be
+#'   called directly.
+#' @param k Integer index of the response category.
+#' @param ... The K category activations followed by the K option counts, as
+#'   numbers or draws-by-observation matrices (as supplied by brms).
+#' @return The log probability of category `k`, with the shape of the first
+#'   activation.
+#' @keywords internal
+#' @export
+m3_gauss_logp <- function(k, ...) {
+  args <- list(...)
+  K <- length(args) %/% 2
+  len <- max(lengths(args))
+  out <- .m3_gauss_logp_r(
+    k,
+    lapply(args[seq_len(K)], function(x) rep_len(as.vector(x), len)),
+    lapply(args[K + seq_len(K)], function(x) rep_len(as.vector(x), len))
+  )
+  dim(out) <- dim(args[[1]])
+  out
 }
 
 ############################################################################# !
@@ -413,11 +650,14 @@ configure_model.m3 <- function(model, data, formula) {
   formula$family$cats <- model$resp_vars$resp_cats
   formula$family$dpars <- paste0("mu", model$resp_vars$resp_cats)
 
+  if (model$other_vars$choice_rule == "gaussian") {
+    return(nlist(formula, data, stanvars = m3_gaussian_stanvars(model)))
+  }
   nlist(formula, data)
 }
 
 #' @export
-create_initfun.m3 <- function(model, data, formula) {
+create_initfun.m3 <- function(model, data, formula, prior = NULL, ...) {
   # the "simple" choice rule with an identity link samples stably only from zero
   if (model$other_vars$choice_rule == "simple" && any(model$links == "identity")) {
     return(0)

@@ -31,7 +31,9 @@
 #'     \item `int_conditions`: Conditions for interactions
 #'     \item `prob`: Probability mass to include in credible intervals (default 0.95)
 #'     \item `spaghetti`: Logical, whether to add spaghetti lines
-#'     \item `method`: Method for computing effects ("posterior_predict" or "posterior_epred")
+#'     \item `method`: Method for computing effects ("posterior_predict" or
+#'       "posterior_epred"; "posterior_predict" is not available for models with
+#'       a multinomial family, see Details)
 #'   }
 #'
 #' @return A `brms_conditional_effects` object (from brms), which can be:
@@ -46,8 +48,11 @@
 #'
 #' bmm models use two types of parameters internally:
 #' \itemize{
-#'   \item **Non-linear parameters (`nlpar`)**: Core model parameters like `kappa`, `c`, `a`, `thetat`
-#'   \item **Distributional parameters (`dpar`)**: Derived parameters used in brms mixture distributions
+#'   \item **Non-linear parameters (`nlpar`)**: Model parameters that enter the
+#'     likelihood through a non-linear formula, like `kappa` and `thetat` of
+#'     [mixture3p()] or `c` and `a` of [m3()]
+#'   \item **Distributional parameters (`dpar`)**: Parameters of the response
+#'     distribution itself, like `kappa` and `c` of [sdm()]
 #' }
 #'
 #' Users should not need to know this distinction - `conditional_effects.bmmfit()`
@@ -65,6 +70,42 @@
 #' }
 #'
 #' Use `scale = "sampling"` to see parameters on the scale used during MCMC sampling.
+#'
+#' `estimate__`, `lower__`, `upper__` and the spaghetti lines follow `scale`.
+#' `se__` does not: it is the spread of the draws on the scale `brms` or bmm
+#' summarises them on, so for a link other than identity it can sit on a
+#' different scale than `estimate__`. For example, `se__` of `kappa` is on the
+#' sampling scale in [mixture3p()] and on the native scale in [sdm()], at either
+#' `scale`. Use `lower__` and `upper__` to describe uncertainty on the requested
+#' scale. With `robust = FALSE`, `estimate__` is the mean and `se__` the standard
+#' deviation of the draws on that scale, and `estimate__` is then mapped to the
+#' requested scale: at `scale = "native"` the estimate of a non-linear parameter
+#' with a log link is the exponential of the mean log value, not the mean of the
+#' exponentiated draws.
+#'
+#' The default of `robust` is `TRUE` (median and MAD), as in [brms::conditional_effects()],
+#' with one exception: `thetat` and `thetant` of [mixture3p()] at
+#' `scale = "native"` default to `robust = FALSE` (mean and standard deviation).
+#'
+#' ## Models with a multinomial family
+#'
+#' In models fitted with a multinomial response (`m3()`, `sdt_rating()`,
+#' `sdt_cdp()`, `sdt_ranking()`), the parameters are latent quantities: they
+#' have no predictive distribution, no response categories and no response
+#' points. For these models:
+#' \itemize{
+#'   \item The effect is the posterior of the parameter itself, summarised by
+#'     the median and MAD of the draws; use `robust = FALSE` for their mean and
+#'     standard deviation.
+#'   \item The grid of the plotted predictor and the values of all other
+#'     predictors are set by the rules of [brms::conditional_effects()].
+#'   \item Without `effects`, only the effects `brms` lists for the parameter's own
+#'     formula are returned. A parameter without predictors has no effects.
+#'   \item `categorical`, `ordinal`, `select_points` and `transform` are
+#'     errors, and `method` must be `"posterior_epred"` or `"posterior_linpred"`
+#'     (or an alias [brms::conditional_effects()] reads as one of them, such as
+#'     `"fitted"`), which agree for a parameter.
+#' }
 #'
 #' @seealso [brms::conditional_effects()] for the underlying brms function
 #'
@@ -115,16 +156,63 @@ conditional_effects.bmmfit <- function(x,
                                        ...) {
   x <- restructure(x)
   scale <- match.arg(scale)
+  stopif(
+    !is.null(par) && (!is.character(par) || length(par) != 1),
+    "Argument 'par' must be a single character string"
+  )
+  if (.has_category_dpars(x)) {
+    .ce_check_category_family_args(x, ...)
+  }
 
   if (is.null(par)) {
     .ce_all_parameters(x, scale, ...)
   } else {
-    stopif(
-      !is.character(par) || length(par) != 1,
-      "Argument 'par' must be a single character string"
-    )
     .ce_single_parameter(x, par, scale, ...)
   }
+}
+
+
+#' Refuse the arguments a parameter of a multinomial-family model cannot honour
+#'
+#' @description
+#' Every parameter of these models is a non-linear parameter, so the check
+#' applies to all of them. `method` is read as brms reads it: its aliases of
+#' "posterior_epred" and "posterior_linpred" are accepted, the predictive ones
+#' are not.
+#'
+#' The arguments are checked here, on the path of the exported method, because
+#' brms cannot check them: the routes ask brms for a category dpar, which accepts
+#' them, and evaluate the parameter themselves.
+#'
+#' @param x A bmmfit object
+#' @param ... Arguments of [brms::conditional_effects()]
+#'
+#' @return `NULL`, or an error that names what to change
+#'
+#' @keywords internal
+#' @noRd
+.ce_check_category_family_args <- function(x, ...) {
+  args <- .ce_match_args(list(...))
+  remove <- c(
+    if (isTRUE(args[["categorical"]])) "categorical",
+    if (isTRUE(args[["ordinal"]])) "ordinal",
+    if (isTRUE(args[["select_points"]] > 0)) "select_points",
+    if (!is.null(args[["transform"]])) "transform"
+  )
+  method_ok <- length(args[["method"]]) <= 1 &&
+    all(args[["method"]] %in% c("posterior_epred", "fitted", "pp_expect",
+                                "posterior_linpred"))
+  fix <- c(
+    if (length(remove) > 0) paste0("Remove ", collapse_comma(remove), "."),
+    if (!method_ok) paste0("Set 'method' to \"posterior_epred\" or ",
+                           "\"posterior_linpred\", which agree for a parameter.")
+  )
+  stopif(
+    length(fix) > 0,
+    "The parameters of the '{intersect(class(x$bmm$model), model_names())[1]}' \\
+    model are latent quantities without predictive distribution, response \\
+    categories or response points. {paste(fix, collapse = ' ')}"
+  )
 }
 
 
@@ -167,12 +255,10 @@ conditional_effects.bmmfit <- function(x,
 
 
 .ce_compute_and_transform <- function(x, par, par_info, scale, ...) {
-  # m3 models require categorical = TRUE in brms, which breaks nlpar-level
-  # computation — bypass via posterior_linpred directly
-  ce_result <- if ("m3" %in% class(x$bmm$model)) {
-    .compute_multinomial_conditional_effects(x, par, ...)
-  } else if (par_info$type == "dpar") {
+  ce_result <- if (par_info$type == "dpar") {
     .brms_conditional_effects(x, dpar = par_info$brms_name, ...)
+  } else if (par_info$type == "nlpar" && .has_category_dpars(x)) {
+    .ce_nlpar_category_family(x, par, ...)
   } else if (par_info$type == "nlpar") {
     .brms_conditional_effects(x, nlpar = par_info$brms_name, ...)
   } else {
@@ -266,15 +352,18 @@ conditional_effects.bmmfit <- function(x,
 #' Extract grouping variable names from random effects in a formula
 #'
 #' @description
-#' Parses the RHS of a formula to identify random-effects grouping variables
-#' that should be excluded from conditional effects. Handles all brms grouping
-#' specifications:
+#' Parses the RHS of a formula to identify the data columns that define the
+#' grouping levels of random effects, e.g. to exclude them from conditional
+#' effects. Handles all brms grouping specifications:
 #' \itemize{
 #'   \item Bare names: `(1 | id)`, `(1 || id)`
-#'   \item Correlation IDs: `(1 |ID1| id)` — excludes both `ID1` and `id`
+#'   \item Correlation IDs: `(1 |p| id)` — returns `id` only; `p` labels the
+#'     correlation structure and is not a data column (see
+#'     `.extract_re_cor_ids()`)
 #'   \item `gr()`: `(1 | gr(id, by = exp))` — extracts `id`, not `exp`
 #'   \item `mm()`: `(1 | mm(g1, g2))` — extracts all positional args
-#'   \item Crossed: `(1 | id:group)` — extracts both `id` and `group`
+#'   \item Interaction and nesting: `(1 | id:group)`, `(1 | id/group)` — extracts
+#'     both `id` and `group`, the columns brms combines into the grouping factor
 #' }
 #'
 #' @param formula A formula object
@@ -284,126 +373,97 @@ conditional_effects.bmmfit <- function(x,
 #' @keywords internal
 #' @noRd
 .extract_re_grouping_vars <- function(formula) {
-  rhs_str <- paste(deparse(formula[[length(formula)]]), collapse = " ")
-
-  # Match text after each | that is not itself | or )
-  # This captures: bare grouping vars, correlation IDs, and gr()/mm() calls
-  bar_parts <- regmatches(
-    rhs_str, gregexpr("(?<=\\|)[^|)]+", rhs_str, perl = TRUE)
-  )[[1]]
-  bar_parts <- trimws(bar_parts)
-  bar_parts <- bar_parts[nchar(bar_parts) > 0]
-
-  if (length(bar_parts) == 0) {
-    character(0)
-  } else {
-    unlist(lapply(bar_parts, function(part) {
-      if (grepl("^gr\\s*\\(", part)) {
-        # gr(id, ...) — first argument is the grouping variable
-        inner <- sub("^gr\\s*\\(\\s*", "", part)
-        trimws(sub("[,)]+.*", "", inner))
-      } else if (grepl("^mm\\s*\\(", part)) {
-        # mm(g1, g2, ...) — positional args (before named args) are grouping vars
-        inner <- sub("^mm\\s*\\(\\s*", "", part)
-        args <- trimws(strsplit(inner, ",")[[1]])
-        args[!grepl("=", args)]
-      } else {
-        # Bare variable name(s) or correlation ID — split on : only
-        trimws(strsplit(part, ":")[[1]])
-      }
-    }))
-  }
+  .re_bar_parts(formula[[length(formula)]])$groups
 }
 
 
-#' Build a prediction grid for conditional effects
+#' Extract correlation IDs from random effects in a formula
 #'
 #' @description
-#' Constructs a prediction grid for computing conditional effects via
-#' [brms::posterior_linpred()]. For each effect variable, creates a data frame
-#' where that variable varies over its range (numeric) or levels (factor) while
-#' all other columns are held at reference values (mean for numeric, first level
-#' for factor).
+#' Returns the labels `p` of terms written `(1 |p| id)`. They tie the random
+#' effects of several parameters into one correlation matrix and are not
+#' columns of the data.
 #'
-#' @param bmmfit A bmmfit object
-#' @param par Character string. Parameter name whose formula determines the
-#'   predictor variables.
-#' @param effects Character vector. Specific effect variables to include. If
-#'   `NULL`, all RHS variables from the parameter's formula are used.
-#' @param resolution Integer. Number of points for numeric predictors (default
-#'   100).
+#' @param formula A formula object
 #'
-#' @return A named list of data frames, one per effect variable. Empty list if
-#'   no effects are found.
+#' @return Character vector of correlation IDs
 #'
 #' @keywords internal
 #' @noRd
-.ce_prediction_grid <- function(bmmfit, par, effects = NULL, resolution = 100) {
-  user_formula <- bmmfit$bmm$user_formula
-  par_formula <- user_formula[[par]]
-  if (is.null(par_formula)) {
-    list()
-  } else {
-    .ce_build_grids(bmmfit, par_formula, effects, resolution)
-  }
+.extract_re_cor_ids <- function(formula) {
+  .re_bar_parts(formula[[length(formula)]])$cor_ids
 }
 
 
-.ce_build_grids <- function(bmmfit, par_formula, effects, resolution) {
-  f <- stats::formula(par_formula)
-  re_groups <- .extract_re_grouping_vars(f)
-  rhs_vars <- all.vars(f[-2])
-  rhs_vars <- setdiff(rhs_vars, c("0", "1", re_groups))
-
-  effect_vars <- if (is.null(effects)) {
-    rhs_vars
-  } else {
-    intersect(unlist(strsplit(as.character(effects), ":")), rhs_vars)
+# `1 |p| g` parses as `(1 | p) | g`, so a bar whose left side is itself a bar
+# carries a correlation ID. `group_cols` is every column the grouping term
+# names, including `by =` and `weights =` arguments of gr() and mm().
+.re_bar_parts <- function(expr) {
+  none <- list(groups = character(0), cor_ids = character(0), group_cols = character(0))
+  if (!is.call(expr)) {
+    return(none)
   }
-
-  if (length(effect_vars) == 0) {
-    list()
-  } else {
-    .ce_build_grids_for_vars(bmmfit$data, effect_vars, resolution)
+  if (.is_bar_call(expr)) {
+    return(list(
+      groups = .re_group_names(expr[[3]]),
+      cor_ids = if (.is_bar_call(expr[[2]])) deparse(expr[[2]][[3]]) else character(0),
+      group_cols = all.vars(expr[[3]])
+    ))
   }
+  parts <- lapply(seq_along(expr)[-1], function(i) {
+    if (rlang::is_missing(expr[[i]])) none else .re_bar_parts(expr[[i]])
+  })
+  fields <- names(none)
+  stats::setNames(
+    lapply(fields, function(field) unique(as.character(unlist(lapply(parts, `[[`, field))))),
+    fields
+  )
 }
 
 
-.ce_build_grids_for_vars <- function(orig_data, effect_vars, resolution) {
-  grids <- list()
+.is_bar_call <- function(expr) {
+  is.call(expr) && is.name(expr[[1]]) && as.character(expr[[1]]) %in% c("|", "||")
+}
 
-  for (var in effect_vars) {
-    col <- orig_data[[var]]
-    if (is.factor(col) || is.character(col)) {
-      varying <- sort(unique(col))
+
+# `(1 |p| g)` becomes `(1 | g)`: the data columns of a term exclude its
+# correlation ID.
+.drop_re_cor_ids <- function(expr) {
+  if (!is.call(expr)) {
+    return(expr)
+  }
+  if (.is_bar_call(expr) && .is_bar_call(expr[[2]])) {
+    expr[[2]] <- expr[[2]][[2]]
+  }
+  for (i in seq_along(expr)[-1]) {
+    if (!rlang::is_missing(expr[[i]])) {
+      expr[[i]] <- .drop_re_cor_ids(expr[[i]])
+    }
+  }
+  expr
+}
+
+
+.re_group_names <- function(group) {
+  if (is.name(group)) {
+    return(as.character(group))
+  }
+  fun <- if (is.call(group) && is.name(group[[1]])) as.character(group[[1]]) else ""
+  args <- if (is.call(group)) as.list(group)[-1]
+  unnamed <- args[!nzchar(names(args) %||% character(length(args)))]
+  unique(unlist(
+    if (identical(fun, "gr")) {
+      # by = and cor = may precede the grouping variable, which brms takes
+      # from `group =` or else the first unnamed argument
+      .re_group_names(if ("group" %in% names(args)) args$group else unnamed[[1]])
+    } else if (identical(fun, "mm")) {
+      lapply(unnamed, .re_group_names)
+    } else if (fun %in% c(":", "/")) {
+      lapply(args, .re_group_names)
     } else {
-      rng <- range(col, na.rm = TRUE)
-      varying <- seq(rng[1], rng[2], length.out = resolution)
+      all.vars(group)
     }
-
-    newdata <- data.frame(x__ = varying)
-    names(newdata) <- var
-
-    for (v in setdiff(names(orig_data), var)) {
-      cv <- orig_data[[v]]
-      if (is.matrix(cv)) next
-      if (is.factor(cv)) {
-        newdata[[v]] <- factor(levels(cv)[1], levels = levels(cv))
-      } else if (is.character(cv)) {
-        newdata[[v]] <- cv[1]
-      } else if (is.integer(cv)) {
-        newdata[[v]] <- as.integer(round(stats::median(cv, na.rm = TRUE)))
-      } else if (is.numeric(cv)) {
-        newdata[[v]] <- mean(cv, na.rm = TRUE)
-      } else {
-        newdata[[v]] <- cv[1]
-      }
-    }
-
-    grids[[var]] <- newdata
-  }
-
-  grids
+  ))
 }
 
 
@@ -416,14 +476,17 @@ conditional_effects.bmmfit <- function(x,
 #' @param draws Matrix. Posterior draws (rows = draws, columns = grid points).
 #' @param prob Numeric. Probability mass for credible intervals (default 0.95).
 #' @param robust Logical. If `TRUE`, use median/MAD instead of mean/SD.
+#' @param probs Numeric vector of the two quantiles bounding the interval. If
+#'   `NULL`, derived from `prob`.
 #'
 #' @return A list with elements `estimate`, `lower`, `upper`, `se` — each a
 #'   numeric vector of length `ncol(draws)`.
 #'
 #' @keywords internal
 #' @noRd
-.ce_summarize_draws <- function(draws, prob = 0.95, robust = FALSE) {
-  probs <- c((1 - prob) / 2, 1 - (1 - prob) / 2)
+.ce_summarize_draws <- function(draws, prob = 0.95, robust = FALSE,
+                                probs = NULL) {
+  probs <- probs %||% c((1 - prob) / 2, 1 - (1 - prob) / 2)
   if (robust) {
     estimate <- apply(draws, 2, stats::median)
     se <- apply(draws, 2, stats::mad)
@@ -446,7 +509,7 @@ conditional_effects.bmmfit <- function(x,
 #'
 #' @param bmmfit A bmmfit object
 #' @param par Character string. Parameter name to return (thetat or thetant)
-#' @param ... Additional arguments passed to brms::conditional_effects()
+#' @param ... Arguments of [brms::conditional_effects()], see `.ce_split_args()`
 #'
 #' @return A brms_conditional_effects object with softmax-transformed values
 #'
@@ -462,135 +525,578 @@ conditional_effects.bmmfit <- function(x,
 
 
 .compute_softmax_ce_inner <- function(bmmfit, par, ...) {
-  ce_par <- .brms_conditional_effects(bmmfit, nlpar = par, ...)
+  args <- .ce_split_args(...)
+  grid <- do.call(.brms_conditional_effects, c(list(bmmfit, nlpar = par), args$grid),
+                  quote = TRUE)
 
-  dots <- list(...)
-  prob <- dots$prob %||% 0.95
-  robust <- dots$robust %||% FALSE
-  re_formula <- dots$re_formula %||% NA
-  ndraws <- dots$ndraws
-
-  result <- lapply(ce_par, function(df) {
-    internal_cols <- grep("__$", names(df), value = TRUE)
-    newdata <- df[, !names(df) %in% internal_cols, drop = FALSE]
-
-    linpred_args <- list(
-      object = bmmfit,
-      newdata = newdata,
-      re_formula = re_formula,
-      allow_new_levels = TRUE
-    )
-    if (!is.null(ndraws)) linpred_args$ndraws <- ndraws
-
-    draws_t <- do.call(
-      brms::posterior_linpred,
-      c(linpred_args, list(nlpar = "thetat"))
-    )
-    draws_nt <- do.call(
-      brms::posterior_linpred,
-      c(linpred_args, list(nlpar = "thetant"))
-    )
-
+  softmax <- function(linpred) {
+    draws_t <- linpred("thetat")
+    draws_nt <- linpred("thetant")
     # numerically stable softmax: subtract max before exponentiating
     shift <- pmax(draws_t, draws_nt, 0)
     exp_t <- exp(draws_t - shift)
     exp_nt <- exp(draws_nt - shift)
-    exp_0 <- exp(-shift)
-    denom <- exp_t + exp_nt + exp_0
-    if (par == "thetat") {
-      softmax_draws <- exp_t / denom
-    } else {
-      softmax_draws <- exp_nt / denom
-    }
-
-    summ <- .ce_summarize_draws(softmax_draws, prob = prob, robust = robust)
-    df$estimate__ <- summ$estimate
-    df$lower__ <- summ$lower
-    df$upper__ <- summ$upper
-    df$se__ <- summ$se
-
-    df
-  })
-
-  names(result) <- names(ce_par)
-  class(result) <- class(ce_par)
-  result
+    denom <- exp_t + exp_nt + exp(-shift)
+    if (par == "thetat") exp_t / denom else exp_nt / denom
+  }
+  structure(
+    .ce_summarise_grid(bmmfit, grid, args, robust = FALSE, draws_of = softmax),
+    class = class(grid)
+  )
 }
 
 
-#' Compute conditional effects for multinomial family models
+#' Does the fit's family have one distributional parameter per category?
 #'
 #' @description
-#' For models using `brms::multinomial()` family (e.g., m3), brms requires
-#' `categorical = TRUE` even when requesting a specific nlpar, which conflicts
-#' with nlpar-level computation. This helper bypasses that check by using
-#' `brms::posterior_linpred()` directly with a manually constructed prediction
-#' grid.
+#' These are the families for which [brms::conditional_effects()] refuses a
+#' request for a non-linear parameter and asks for `categorical = TRUE`
+#' (`conv_cats_dpars()` in brms 2.23.0): the categorical, multinomial and
+#' simplex-valued families. bmm's **m3** and the **sdt_rating**, **sdt_cdp** and
+#' **sdt_ranking** models use `brms::multinomial()`.
 #'
-#' @param bmmfit A bmmfit object
-#' @param par Character string. Parameter name (nlpar) to compute effects for
-#' @param ... Additional arguments (prob, robust, re_formula, ndraws, effects,
-#'   resolution)
+#' @param x A bmmfit object
 #'
-#' @return A `brms_conditional_effects` object with one element per effect
+#' @return Logical scalar
 #'
 #' @keywords internal
 #' @noRd
-.compute_multinomial_conditional_effects <- function(bmmfit, par, ...) {
-  dots <- list(...)
-  prob <- dots$prob %||% 0.95
-  robust <- dots$robust %||% FALSE
-  re_formula <- dots$re_formula %||% NA
-  ndraws <- dots$ndraws
-  resolution <- dots$resolution %||% 100
-  effects <- dots$effects
+.has_category_dpars <- function(x) {
+  x$family$family %in% c("categorical", "dirichlet", "dirichlet_multinomial",
+                         "dirichlet2", "logistic_normal", "multinomial")
+}
 
-  grids <- .ce_prediction_grid(bmmfit, par,
-                               effects = effects,
-                               resolution = resolution)
-  if (length(grids) == 0) {
-    structure(list(), class = c("brms_conditional_effects", "list"))
+
+#' Formals of brms's conditional_effects method
+#'
+#' @return Pairlist, as [formals()]
+#'
+#' @keywords internal
+#' @noRd
+.brms_ce_formals <- function() {
+  formals(utils::getS3method("conditional_effects", "brmsfit"))
+}
+
+
+#' Argument defaults of brms's conditional_effects method
+#'
+#' @param arg Character string. Name of an argument of
+#'   `conditional_effects.brmsfit()`.
+#'
+#' @return The default of `arg`, as brms declares it
+#'
+#' @keywords internal
+#' @noRd
+.brms_ce_default <- function(arg) {
+  .brms_ce_formals()[[arg]]
+}
+
+
+#' Match the arguments of a call to conditional_effects() to brms's formals
+#'
+#' @description
+#' The routes of a multinomial family and of the softmax take their arguments
+#' from `...`. R matches the arguments of a call to the formals of a function
+#' by exact name, then by partial name, then by position, and refuses a partial
+#' name that fits several formals. brms does this in stages: first for the
+#' formals of its conditional_effects method, then, among what remains, for
+#' `ndraws` and `draw_ids` of the prediction method, and then for the deprecated
+#' `nsamples` and `subset`. The routes need the same reading of a call, so R's
+#' [match.call()] does it here, stage by stage, so that `su` is `surface` and
+#' `n` is `ndraws` as in brms.
+#'
+#' The positions count from `effects`, the first formal of brms's method after
+#' `x`: `par` and `scale` are the formals of bmm's own method.
+#'
+#' @param args List of the arguments in `...`, named or not
+#'
+#' @return `args` with the formal names of exact, partial and positional
+#'   matches; a name that matches none is kept
+#'
+#' @keywords internal
+#' @noRd
+.ce_match_args <- function(args) {
+  stages <- list(
+    .brms_ce_formals()[-1],
+    alist(ndraws = , draw_ids = , ... = ),
+    alist(nsamples = , subset = , ... = )
+  )
+  matched <- list()
+  for (formals_ in stages) {
+    stub <- function() NULL
+    formals(stub) <- formals_
+    args <- as.list(match.call(stub, as.call(c(quote(stub), args))))[-1]
+    own <- names(args) %in% setdiff(names(formals_), "...")
+    matched <- c(matched, args[own])
+    args <- args[!own]
+  }
+  c(matched, args)
+}
+
+
+#' Split the arguments of conditional_effects() between brms's grid and draws
+#'
+#' @description
+#' The routes of a multinomial family and of the softmax first let brms build
+#' the conditions grid, then evaluate the parameter on that grid with
+#' [brms::posterior_linpred()]. An argument belongs to one of them:
+#' \itemize{
+#'   \item The arguments of [brms::conditional_effects()] (`conditions`,
+#'     `resolution`, `spaghetti`, `prob`, ...) reach the grid call, where brms
+#'     validates them. The grid does not depend on the draws, so brms builds it
+#'     at one draw.
+#'   \item `ndraws` and `draw_ids` (and their deprecated aliases `nsamples` and
+#'     `subset`) are resolved once per call by `.ce_resolve_draw_ids()`, so that
+#'     every evaluation of one parameter's call, e.g. `thetat` and `thetant`
+#'     of a softmax, uses the same draws. A call for several parameters
+#'     (`par = NULL`) makes this call once per parameter, and `ndraws` then
+#'     draws new ids for each of them.
+#'   \item The remaining arguments prepare the draws (`sample_new_levels`, ...)
+#'     and only reach [brms::posterior_linpred()].
+#' }
+#' `re_formula` reaches all of them, with the default of
+#' [brms::conditional_effects()] if the call has none.
+#'
+#' @param ... Arguments of [brms::conditional_effects()]
+#'
+#' @return List with the argument lists for the `grid` call and for the
+#'   `linpred` calls, the `effects` of the call, its `draws` arguments and the
+#'   `summary` arguments (`prob`, `probs`, `robust`) that were given
+#'
+#' @keywords internal
+#' @noRd
+.ce_split_args <- function(...) {
+  args <- .ce_match_args(list(...))
+  draw_args <- c("ndraws", "draw_ids", "nsamples", "subset")
+  re_formula <- if ("re_formula" %in% names(args)) {
+    args["re_formula"]
   } else {
-    .compute_multinomial_ce_grids(bmmfit, par, grids, prob, robust,
-                                  re_formula, ndraws)
+    list(re_formula = .brms_ce_default("re_formula"))
+  }
+  rest <- args[!names(args) %in% c("re_formula", draw_args)]
+
+  list(
+    grid = c(rest, re_formula, list(draw_ids = 1)),
+    linpred = c(
+      rest[!names(rest) %in% names(.brms_ce_formals())],
+      re_formula,
+      list(allow_new_levels = TRUE)
+    ),
+    effects = args[["effects"]],
+    draws = args[names(args) %in% draw_args],
+    summary = list(
+      prob = args[["prob"]] %||% .brms_ce_default("prob"),
+      probs = args[["probs"]],
+      robust = args[["robust"]]
+    )
+  )
+}
+
+
+#' Resolve and validate the draws a call selects
+#'
+#' @description
+#' Reads `ndraws` and `draw_ids` in the sequence of brms's own check and with
+#' its messages, and draws `ndraws` ids if no `draw_ids` are given. brms
+#' reports a call without draws only when it summarises the draws, so the
+#' message of `posterior_summary()` stands in for that step.
+#'
+#' The draws are validated here and not by brms because the routes of a
+#' multinomial family and of the softmax resolve them themselves, once per call,
+#' and hand brms only the ids; this runs on the path of the exported method.
+#'
+#' @param x A bmmfit object
+#' @param ndraws,draw_ids As in [brms::posterior_linpred()]
+#'
+#' @return Integer vector of draw ids, or `NULL` if the call selects none
+#'
+#' @keywords internal
+#' @noRd
+.validate_draw_ids <- function(x, ndraws = NULL, draw_ids = NULL) {
+  ndraws_total <- brms::ndraws(x)
+  if (is.null(draw_ids) && !is.null(ndraws)) {
+    ndraws <- as_one_integer(ndraws)
+    stopif(
+      ndraws < 1 || ndraws > ndraws_total,
+      "Argument 'ndraws' should be between 1 and the maximum number of draws \\
+      ({ndraws_total})."
+    )
+    draw_ids <- sample.int(ndraws_total, ndraws)
+  }
+  if (!is.null(draw_ids)) {
+    draw_ids <- as.integer(draw_ids)
+    stopif(length(draw_ids) == 0L, "No posterior draws supplied.")
+    stopif(
+      any(draw_ids < 1L) || any(draw_ids > ndraws_total),
+      "Some 'draw_ids' indices are out of range."
+    )
+  }
+  draw_ids
+}
+
+
+#' Resolve the draws of a call into the draw ids to evaluate
+#'
+#' @description
+#' Reads `ndraws` and `draw_ids` as brms does: a deprecated alias that is given
+#' replaces its argument with a warning, and `draw_ids` wins over `ndraws`.
+#'
+#' @param fit A bmmfit object
+#' @param draws The `draws` of `.ce_split_args()`
+#'
+#' @return Integer vector of draw ids, or `NULL` for all draws
+#'
+#' @keywords internal
+#' @noRd
+.ce_resolve_draw_ids <- function(fit, draws) {
+  aliases <- c(nsamples = "ndraws", subset = "draw_ids")
+  for (alias in names(aliases)) {
+    arg <- aliases[[alias]]
+    if (!is.null(draws[[alias]])) {
+      warning2("Argument '{alias}' is deprecated. Please use argument '{arg}' instead.")
+      draws[[arg]] <- draws[[alias]]
+    }
+  }
+  .validate_draw_ids(fit, draws[["ndraws"]], draws[["draw_ids"]])
+}
+
+
+#' Summarise a parameter on the grid of a conditional effect
+#'
+#' @description
+#' Evaluates the parameter on each element of brms's conditions grid with
+#' [brms::posterior_linpred()], on the draws the call selected, and replaces the
+#' summary columns and spaghetti lines of the element by those of the draws.
+#'
+#' @param x A bmmfit object
+#' @param grid A `brms_conditional_effects` object, the conditions grid
+#' @param args The list of `.ce_split_args()`
+#' @param robust Default of `robust` on this route
+#' @param draws_of Function of `linpred`, a function of the name of an `nlpar`
+#'   that returns its draws on the grid element, returning the draws of the
+#'   parameter
+#'
+#' @return Named list with one element per element of `grid`
+#'
+#' @keywords internal
+#' @noRd
+.ce_summarise_grid <- function(x, grid, args, robust, draws_of) {
+  linpred_args <- c(
+    args$linpred, list(draw_ids = .ce_resolve_draw_ids(x, args$draws))
+  )
+  lapply(grid, function(ce) {
+    newdata <- .ce_cond_data(ce)
+    draws <- draws_of(function(nlpar) {
+      do.call(brms::posterior_linpred, c(
+        list(x, newdata = newdata, nlpar = nlpar), linpred_args
+      ), quote = TRUE)
+    })
+    .ce_set_summary(ce, draws, args$summary, robust)
+  })
+}
+
+
+#' Conditional effects of a non-linear parameter in a family with category dpars
+#'
+#' @description
+#' brms computes the predictions of an `nlpar` for these families and only then
+#' refuses them, because it expects the categories to be plotted. A non-linear
+#' parameter does not depend on the categories, so brms is asked for one of the
+#' category dpars instead, at a single draw, which gives the conditions grid
+#' (see `.ce_split_args()`). The parameter is then evaluated on that grid and
+#' summarised as brms would.
+#'
+#' Without `effects`, brms is asked only for those of its default effects that
+#' it would list for the parameter's own formula. The category dpar is evaluated
+#' on every element of the grid, and on the grid of another formula's effect it
+#' can leave its domain: brms holds a numeric moderator at mean ± sd, which is
+#' below 0 for a 0/1 indicator or a count that is mostly 0, and the dpar takes
+#' its log. A parameter without such effects needs no grid.
+#'
+#' @param x A bmmfit object
+#' @param par Character string. The bmm parameter name, which is also its brms
+#'   name.
+#' @param ... Arguments of [brms::conditional_effects()]
+#'
+#' @return A `brms_conditional_effects` object
+#'
+#' @keywords internal
+#' @noRd
+.ce_nlpar_category_family <- function(x, par, ...) {
+  args <- .ce_split_args(...)
+  if (is.null(args$effects)) {
+    args$grid$effects <- vapply(
+      .ce_select_own_effects(.ce_brms_default_effects(x, args$grid$re_formula),
+                             .ce_own_effects(x, par)),
+      paste, "", collapse = ":"
+    )
+  }
+  # an empty `effects` of the user's is for brms to refuse
+  grid <- if (is.null(args$effects) && length(args$grid$effects) == 0) {
+    structure(list(), names = character(0), class = "brms_conditional_effects")
+  } else {
+    .ce_category_grid(x, args$grid)
+  }
+
+  structure(
+    lapply(
+      .ce_summarise_grid(x, grid, args, robust = TRUE,
+                         draws_of = function(linpred) linpred(par)),
+      function(ce) {
+        attr(ce, "response") <- par
+        # a parameter has no observed response, but plot(points = TRUE) needs a
+        # frame with a numeric `resp__`
+        attr(ce, "points") <- attr(ce, "points")[0, ]
+        ce
+      }
+    ),
+    class = "brms_conditional_effects"
+  )
+}
+
+
+#' brms's conditions grid of the first category dpar
+#'
+#' @param x A bmmfit object
+#' @param grid_args The `grid` arguments of `.ce_split_args()`
+#'
+#' @return A `brms_conditional_effects` object
+#'
+#' @keywords internal
+#' @noRd
+.ce_category_grid <- function(x, grid_args) {
+  # the parameter does not depend on the trials that brms sets to 1 for the grid
+  withCallingHandlers(
+    do.call(.brms_conditional_effects, c(
+      list(x, dpar = names(brms::brmsterms(x$formula)$dpars)[1]), grid_args
+    ), quote = TRUE),
+    message = function(m) {
+      if (grepl("Setting all 'trials' variables", conditionMessage(m), fixed = TRUE)) {
+        invokeRestart("muffleMessage")
+      }
+    }
+  )
+}
+
+
+#' The effects brms plots without `effects`, in its order and orientation
+#'
+#' @description
+#' The list `brms::conditional_effects()` builds when it is given no `effects`
+#' (brms 2.23.0): the effects of every formula of the model, each pair with a
+#' numeric variable before a factor or grouping variable, which brms does only
+#' for this list. An `effects` argument is plotted in the order it is written,
+#' so these are the strings that reproduce brms's default grid.
+#'
+#' @param x A bmmfit object
+#' @param re_formula As in [brms::conditional_effects()]
+#'
+#' @return List of character vectors of one or two variable names
+#'
+#' @keywords internal
+#' @noRd
+.ce_brms_default_effects <- function(x, re_formula) {
+  brms_internal <- function(name) utils::getFromNamespace(name, "brms")
+  bterms <- brms::brmsterms(
+    brms_internal("update_re_terms")(x$formula, re_formula = re_formula)
+  )
+  group_vars <- brms_internal("get_group_vars")(bterms)
+  is_like_factor <- brms_internal("is_like_factor")
+  lapply(
+    brms_internal("get_all_effects")(bterms, rsv_vars = brms_internal("rsv_vars")(bterms)),
+    function(effect) {
+      effect[order(vapply(x$data[effect], is_like_factor, logical(1)) |
+                     effect %in% group_vars)]
+    }
+  )
+}
+
+
+#' The conditions grid of a conditional effect, without its summary columns
+#'
+#' @param ce One element of a `brms_conditional_effects` object
+#'
+#' @return A data frame
+#'
+#' @keywords internal
+#' @noRd
+.ce_cond_data <- function(ce) {
+  ce[setdiff(names(ce), c("estimate__", "se__", "lower__", "upper__"))]
+}
+
+
+#' Put the summary of the draws of a parameter into a conditional effect
+#'
+#' @param ce One element of a `brms_conditional_effects` object
+#' @param draws Matrix of draws (rows = draws, columns = grid rows)
+#' @param summary List with `prob`, `probs` and `robust`, see `.ce_split_args()`
+#' @param robust Used if `summary$robust` is `NULL`
+#'
+#' @return `ce`, its summary columns and its spaghetti lines (if it has any)
+#'   replaced by those of `draws`
+#'
+#' @keywords internal
+#' @noRd
+.ce_set_summary <- function(ce, draws, summary, robust) {
+  summ <- .ce_summarize_draws(draws, prob = summary$prob,
+                              robust = summary$robust %||% robust,
+                              probs = summary$probs)
+  ce$estimate__ <- summ$estimate
+  ce$se__ <- summ$se
+  ce$lower__ <- summ$lower
+  ce$upper__ <- summ$upper
+  if (!is.null(attr(ce, "spaghetti"))) {
+    attr(ce, "spaghetti") <- .ce_spaghetti(.ce_cond_data(ce), draws,
+                                           attr(ce, "effects"))
+  }
+  ce
+}
+
+
+#' Keep the effects of brms's default grid that are the parameter's own effects
+#'
+#' @description
+#' An effect that two formulas list with its variables in another order
+#' (`x:z` and `z:x`) is one effect; it is kept in the order the parameter's own
+#' formula lists it, or else the first one. brms plots the first variable on the
+#' x-axis and refuses an effect given twice.
+#'
+#' @param effects List of the effects of brms's default grid, see
+#'   `.ce_brms_default_effects()`
+#' @param own_effects List of the variable sets of the parameter's effects
+#'
+#' @return `effects` without the other elements
+#'
+#' @keywords internal
+#' @noRd
+.ce_select_own_effects <- function(effects, own_effects) {
+  own <- vapply(effects, function(e) any(vapply(own_effects, setequal, logical(1), y = e)),
+                logical(1))
+  in_own_order <- vapply(effects, function(e) any(vapply(own_effects, identical, logical(1), y = e)),
+                         logical(1))
+  set <- vapply(effects, function(e) paste(sort(e), collapse = ":"), "")
+  first <- vapply(unique(set[own]), function(s) {
+    candidates <- which(own & set == s)
+    c(candidates[in_own_order[candidates]], candidates)[1]
+  }, integer(1))
+  effects[sort(first)]
+}
+
+
+#' The effects brms lists for a parameter's own formula
+#'
+#' @description
+#' The variable sets [brms::conditional_effects()] would list by default for a
+#' model with only this parameter's formula, and the formulas of the parameters
+#' it contains. For a linear formula that is one set per fixed-effects term,
+#' and for the variables of a smooth, `gp()` and monotonic or measurement-error
+#' term each of them and each pair of them, see `.ce_term_effects()`. For a
+#' non-linear formula it is each of its data variables and each pair of them.
+#'
+#' @param x A bmmfit object
+#' @param par Character string. The bmm parameter name.
+#'
+#' @return List of character vectors, the effects of one or two variables that
+#'   [brms::conditional_effects()] can plot
+#'
+#' @keywords internal
+#' @noRd
+.ce_own_effects <- function(x, par) {
+  effects <- unname(unlist(lapply(.formula_nodes(x, par), function(node) {
+    if (length(node$sub_pars) == 0) {
+      unlist(Map(.ce_term_effects, node$labels, node$term_vars), recursive = FALSE)
+    } else {
+      .ce_var_combs(unique(unlist(node$term_vars)))
+    }
+  }), recursive = FALSE))
+  unique(effects[lengths(effects) <= 2])
+}
+
+
+#' Each of some variables and each pair of them
+#'
+#' @param vars Character vector of variable names
+#'
+#' @return List of character vectors
+#'
+#' @keywords internal
+#' @noRd
+.ce_var_combs <- function(vars) {
+  c(as.list(vars), if (length(vars) > 1) utils::combn(vars, 2, simplify = FALSE))
+}
+
+
+#' The effects brms lists for one fixed-effects term
+#'
+#' @description
+#' A plain term is one effect of all its variables. brms lists the variables of
+#' the terms `s()`, `t2()`, `te()`, `ti()`, `gp()`, `mo()`, `me()` and `mi()`,
+#' alone and in pairs, and takes them from the arguments that name variables:
+#' `by` and those of the smooth, `gp()` or its first argument.
+#'
+#' @param label A term label of a formula
+#' @param vars The variables of the term
+#'
+#' @return List of character vectors
+#'
+#' @keywords internal
+#' @noRd
+.ce_term_effects <- function(label, vars) {
+  parts <- strsplit(label, ":", fixed = TRUE)[[1]]
+  special <- grepl("^(s|t2|te|ti|gp|mo|me|mi)\\([^:]*\\)$", parts)
+  if (!any(special)) {
+    return(list(vars))
+  }
+  .ce_var_combs(unique(unlist(Map(function(part, is_special) {
+    if (is_special) .ce_special_term_vars(str2lang(part)) else all.vars(str2lang(part))
+  }, parts, special))))
+}
+
+
+#' The variables a special term names
+#'
+#' @param call The call of the term, e.g. `s(x, by = z)` or `mo(x)`
+#'
+#' @return Character vector of variable names: those of the unnamed arguments
+#'   and of `by` for a smooth or `gp()`, the variables of `x` for `mo()`,
+#'   `me()` and `mi()`
+#'
+#' @keywords internal
+#' @noRd
+.ce_special_term_vars <- function(call) {
+  if (as.character(call[[1]]) %in% c("mo", "me", "mi")) {
+    all.vars(match.call(getExportedValue("brms", as.character(call[[1]])), call)$x)
+  } else {
+    all.vars(call[(names(call) %||% character(length(call))) %in% c("", "by")])
   }
 }
 
 
-.compute_multinomial_ce_grids <- function(bmmfit, par, grids, prob, robust,
-                                           re_formula, ndraws) {
-  result <- list()
-
-  for (var in names(grids)) {
-    newdata <- grids[[var]]
-
-    linpred_args <- list(
-      object = bmmfit,
-      newdata = newdata,
-      nlpar = par,
-      re_formula = re_formula,
-      allow_new_levels = TRUE
-    )
-    if (!is.null(ndraws)) linpred_args$ndraws <- ndraws
-
-    draws <- do.call(brms::posterior_linpred, linpred_args)
-
-    summ <- .ce_summarize_draws(draws, prob = prob, robust = robust)
-    newdata$estimate__ <- summ$estimate
-    newdata$lower__ <- summ$lower
-    newdata$upper__ <- summ$upper
-    newdata$se__ <- summ$se
-    newdata$effect1__ <- newdata[[var]]
-    newdata$cond__ <- factor("1")
-
-    attr(newdata, "effects") <- var
-    attr(newdata, "response") <- par
-
-    result[[var]] <- newdata
+#' Spaghetti lines from the draws of a conditional effect
+#'
+#' @description
+#' Builds the `spaghetti` attribute the way `brms` does: one line per draw,
+#' and per level of the second effect when there is one.
+#'
+#' @param cond_data The conditions grid, without the summary columns
+#' @param draws Matrix of draws (rows = draws, columns = grid rows)
+#' @param effects Character vector of the effect names
+#'
+#' @return A data frame with the grid repeated per draw, plus `estimate__` and
+#'   `sample__`
+#'
+#' @keywords internal
+#' @noRd
+.ce_spaghetti <- function(cond_data, draws, effects) {
+  sample <- rep(seq_len(nrow(draws)), each = ncol(draws))
+  if (length(effects) == 2L) {
+    sample <- paste0(sample, "_", cond_data[[effects[2]]])
   }
-
-  class(result) <- c("brms_conditional_effects", "list")
-  result
+  cbind(
+    cond_data[rep(seq_len(nrow(cond_data)), times = nrow(draws)), , drop = FALSE],
+    estimate__ = as.numeric(t(draws)),
+    sample__ = factor(sample)
+  )
 }
 
 
@@ -620,10 +1126,18 @@ conditional_effects.bmmfit <- function(x,
 
 
 .apply_link_transform_inner <- function(ce_object, link, inverse) {
+  transform_cols <- function(d) {
+    cols <- intersect(c("estimate__", "lower__", "upper__"), names(d))
+    d[cols] <- lapply(d[cols], link_transform, link = link, inverse = inverse)
+    d
+  }
+
+  # spaghetti draws live in an attribute, so a column-wise transform misses them
   result <- lapply(ce_object, function(df) {
-    df$estimate__ <- link_transform(df$estimate__, link, inverse = inverse)
-    df$lower__ <- link_transform(df$lower__, link, inverse = inverse)
-    df$upper__ <- link_transform(df$upper__, link, inverse = inverse)
+    df <- transform_cols(df)
+    if (!is.null(attr(df, "spaghetti"))) {
+      attr(df, "spaghetti") <- transform_cols(attr(df, "spaghetti"))
+    }
     df
   })
   

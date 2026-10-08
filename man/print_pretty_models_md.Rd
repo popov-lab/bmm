@@ -4,18 +4,25 @@
 \alias{print_pretty_models_md}
 \title{Generate a markdown list of the measurement models available in \code{bmm}}
 \usage{
-print_pretty_models_md()
+print_pretty_models_md(group = NULL)
+}
+\arguments{
+\item{group}{Optional character vector of group labels as printed by
+\code{\link[=bmm_models]{bmm_models()}}. Only those groups are listed and the group headers
+are omitted, so a document can add its own text per group.}
 }
 \value{
 Markdown code for printing the list of measurement models available
 in \code{bmm}
 }
 \description{
-Used internally to automatically populate information in the
-README file
+Used internally to populate the README and the "Get started"
+article. Models are grouped as in \code{\link[=bmm_models]{bmm_models()}}, and every model
+links to its reference page on the website.
 }
 \examples{
 print_pretty_models_md()
+print_pretty_models_md(group = "Continuous reproduction")
 
 }
 \keyword{internal}

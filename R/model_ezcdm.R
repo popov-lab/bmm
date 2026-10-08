@@ -64,7 +64,7 @@
 
 #' @title `r .model_ezcdm()$name`
 #' @name ezcdm
-#' @details `r model_info(.model_ezcdm(version = "4par"))`
+#' @details `r model_docs(.model_ezcdm(version = "4par"))`
 #'
 #'   The response angle of the circular diffusion model follows a von Mises
 #'   distribution with mean `driftangle` and concentration
@@ -188,7 +188,8 @@ check_data.ezcdm <- function(model, data, formula) {
     "Circular variance (var_angle) must be between 0 and 1."
   )
 
-  check_rt_summary_vars(data, resp_vars$mean_rt, resp_vars$var_rt, n_trials)
+  check_rt_summary_vars(data, resp_vars$mean_rt, resp_vars$var_rt)
+  check_n_trials_var(data, n_trials)
 
   NextMethod("check_data")
 }

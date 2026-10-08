@@ -41,8 +41,8 @@ passed to the \code{bmmodel} object for required argurments.}
 \item{model}{A description of the model to be fitted. This is a call to a
 \code{bmmodel} such as \code{mixture3p()} function. Every model function has a
 number of required arguments which need to be specified within the function
-call. Call \code{\link[=supported_models]{supported_models()}} to see the list of supported models and
-their required arguments}
+call. Call \code{\link[=bmm_models]{bmm_models()}} to see the list of supported models, and
+\code{?modelname} (for example \code{?imm}) for their required arguments.}
 
 \item{prior}{One or more \code{brmsprior} objects created by \code{\link[brms:set_prior]{brms::set_prior()}}
 or related functions and combined using the c method or the + operator. See
@@ -81,14 +81,34 @@ later usage. If the directory of the file does not exist, it will be created.}
 compression algorithms supported by \link{saveRDS} when saving
 the fitted model object.}
 
-\item{file_refit}{Logical or character string. Modifies when the fit stored via the \code{file} argument is
-re-used. Can be set globally for the current R session via the
-\code{"bmm.file_refit"} option (see \link{options}). If \code{TRUE} or "always", the
-model is fitted again. If \code{FALSE} or "never" (the default), the model saved under the name specified in \code{file}
-will be re-used. Note that unlike in \code{brms}, there is no "on_change" option}
+\item{file_refit}{Logical or character string. Modifies when the fit stored
+via the \code{file} argument is re-used. Can be set globally for the current R
+session via the \code{"bmm.file_refit"} option (see \link{options}). If \code{TRUE} or
+"always", the model is fitted again. If \code{FALSE} or "never" (the default),
+the model saved under the name specified in \code{file} will be re-used. If
+"on_change", the saved model is re-used only if the Stan code, the Stan
+data, the factor levels of the model variables and the algorithm are
+unchanged; otherwise the model is fitted again. Because that comparison
+needs the Stan code and data of the current call, "on_change" runs the
+full bmm configuration pipeline, \link[=standata.bmmformula]{standata()} and
+\link[=stancode.bmmformula]{stancode()} even when the cached fit is returned:
+about 0.4 s rather than 0.02 s for an \strong{sdm} model of \code{oberauer_lin_2017},
+much cheaper than compiling and sampling, but not free. Only the four
+things listed above are compared, so sampler settings do \strong{not} force a
+refit -- in particular \code{control = list(adapt_delta = )}, \code{iter}, \code{warmup},
+\code{chains}, \code{seed}, \code{init} and \code{save_pars}. Raising \code{adapt_delta} after
+divergent transitions, or rerunning with \code{save_pars(all = TRUE)} for
+\code{loo()}, therefore returns the cached fit unchanged; delete the file or
+pass \code{file_refit = "always"} for those. Because the row order of the data
+reaches the Stan data, \code{"on_change"} is most predictable with
+\code{sort_data} fixed to \code{TRUE} or \code{FALSE} (globally via
+\code{options(bmm.sort_data = )}): under the default \code{"check"}, answering the
+interactive prompt differently than last time forces a refit.}
 
 \item{...}{Further arguments passed to \code{\link[brms:brm]{brms::brm()}} or Stan. See the
-description of \code{\link[brms:brm]{brms::brm()}} for more details}
+description of \code{\link[brms:brm]{brms::brm()}} for more details. Unless \code{control} names a
+\code{step_size} (\code{stepsize} for the rstan backend), bmm adds the starting step
+size set in \code{\link[=bmm_options]{bmm_options()}} to it; the other entries of \code{control} are kept.}
 }
 \value{
 An object of class brmsfit which contains the posterior draws along
@@ -101,28 +121,48 @@ backend interface to Stan.
 }
 \section{Supported Models}{
 The following models are supported:
+
+Continuous reproduction
 \itemize{
-\item cswald(rt, response, links, version)
-\item ddm(rt, response, links)
-\item ezcdm(mean_angle, var_angle, mean_rt, var_rt, n_trials, links, version)
-\item ezdm(mean_rt, var_rt, n_upper, n_trials, links, version)
-\item imm(resp_error, nt_features, nt_distances, set_size, regex, version)
-\item m3(resp_cats, num_options, choice_rule, version)
-\item mixture2p(resp_error)
-\item mixture3p(resp_error, nt_features, set_size, regex)
-\item sdm(resp_error, version)
+\item imm(): Interference measurement model by Oberauer and Lin (2017)
+\item mixture2p(): Two-parameter mixture model by Zhang and Luck (2008)
+\item mixture3p(): Three-parameter mixture model by Bays et al (2009)
+\item sdm(): Signal Discrimination Model (SDM) by Oberauer (2023)
+}
+
+Categorical recall and n-AFC decisions
+\itemize{
+\item m3(): The Multinomial / Memory Measurement Model
+}
+
+Detection, recognition and confidence judgments
+\itemize{
+\item sdt_cdp(): Continuous Dual-Process Signal Detection Theory (CDP)
+\item sdt_mafc(): Signal Detection Theory (m-AFC)
+\item sdt_ranking(): Signal Detection Theory (Ranking)
+\item sdt_rating(): Signal Detection Theory (Confidence Rating)
+\item sdt_yn(): Signal Detection Theory (Yes/No)
+}
+
+Choices and response times
+\itemize{
+\item cswald(): Censored-Shifted Wald Model
+\item ddm(): Diffusion Decision Model
+\item ezcdm(): EZ Circular Diffusion Model
+\item ezdm(): EZ-Diffusion Model
 }
 
 Type  ?modelname  to get information about a specific model, e.g.  ?imm
 }
 
 \section{bmmformula syntax}{
-see \href{https://venpopov.com/bmm/articles/bmm_bmmformula.html}{this online article} for a detailed description of the syntax and how
+see \href{https://popov-lab.github.io/bmm/articles/bmm_bmmformula.html}{this online article} for a detailed description of the syntax and how
 it differs from the syntax for \strong{brmsformula}
 }
 
 \section{Default priors, Stan code and Stan data}{
-For more information about the default priors in \strong{bmm} and about who to extract the Stan code and data generated by bmm and #'   brms, see \href{https://venpopov.com/bmm/articles/bmm_extract_info.html}{the online article}.
+For more information about the default priors in \strong{bmm} and about who to extract the Stan code and data generated by bmm and
+brms, see \href{https://popov-lab.github.io/bmm/articles/bmm_extract_info.html}{the online article}.
 }
 
 \section{Miscellaneous}{
@@ -156,6 +196,6 @@ Bayesian Measurement Modeling  (bmm) package for R.
 https://doi.org/10.31234/osf.io/umt57
 }
 \seealso{
-\code{\link[=supported_models]{supported_models()}}, \code{\link[brms:brm]{brms::brm()}}, \link[=default_prior.bmmformula]{default_prior()}, \code{\link[=bmmformula]{bmmformula()}}, \link[=stancode.bmmformula]{stancode()}, \link[=standata.bmmformula]{standata()}
+\code{\link[=bmm_models]{bmm_models()}}, \code{\link[brms:brm]{brms::brm()}}, \link[=default_prior.bmmformula]{default_prior()}, \code{\link[=bmmformula]{bmmformula()}}, \link[=stancode.bmmformula]{stancode()}, \link[=standata.bmmformula]{standata()}
 }
 \keyword{deprecated}

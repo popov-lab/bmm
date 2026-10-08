@@ -23,26 +23,55 @@
 #' posterior predictive simulation, so `resp_var = "all"` panels are mutually
 #' consistent.
 #'
+#' Some observables are undefined for some cells — an [ezdm()] boundary has no
+#' mean response time when fewer than two responses reach it. Observations
+#' whose *observed* value is undefined are dropped from the check; undefined
+#' values in the *simulated* replicates are absorbed by dropping those
+#' posterior draws instead, so the number of observations checked does not
+#' depend on `ndraws`. Dropped draws are not missing at random — they are
+#' draws whose parameters made a boundary sparse — so the retained predictive
+#' is mildly conditioned; both reductions are reported with a warning. With
+#' `resp_var = "all"` one reduction is shared by every panel, so the panels
+#' are computed on the same observations and draws.
+#'
 #' @param object A `bmmfit` object returned by [bmm()].
 #' @param type Character. Type of pp_check. When `NULL` (default), resolves to
 #'   `"dens_overlay"`, or to the selected observable's default type when
 #'   `resp_var` is specified. When `group` is specified, the grouped variant
 #'   (e.g., `"dens_overlay_grouped"`) is auto-selected if available.
 #'   Multinomial models produce a response proportion profile regardless of
-#'   the value supplied.
+#'   the value supplied. With `resp_var`, `type = "bars_binned"` is also
+#'   available: it bins a continuous statistic like a histogram, with bars for
+#'   the observed number of observations per bin and points with intervals
+#'   for the predicted number. It is the default for the [ezdm()] accuracy
+#'   check.
 #' @param ndraws Integer. Number of posterior draws. Defaults to `100` for
 #'   multinomial models and `10` when `resp_var` is specified; otherwise
 #'   passed to [brms::pp_check()].
 #' @param group Character. Optional grouping variable for faceting. For
 #'   non-multinomial models, passed to [brms::pp_check()]; when specified, the
 #'   grouped variant of `type` (e.g., `"dens_overlay_grouped"`) is auto-selected
-#'   if available. For multinomial models, facets by the named predictor.
+#'   if available. For multinomial models, facets by the named predictor. For
+#'   the [sdt_rating()] model `group` defaults to the `stimulus` variable so the
+#'   signal and noise rating distributions are checked separately; pass
+#'   `group = NA` to pool them into a single profile. The [sdt_ranking()] model
+#'   shows the rank positions as the categories of the proportion profile; for
+#'   mixed set sizes, pass the set-size column as `group` so each facet has a
+#'   homogeneous denominator. The custom-family
+#'   models [sdt_yn()] and [sdt_mafc()] delegate to [brms::pp_check()]; for
+#'   their aggregated counts an overlaid empirical CDF (`type = "ecdf_overlay"`,
+#'   adding `group = "stimulus"` for [sdt_yn()]) is usually clearer than the
+#'   default bar view.
 #' @param resp_var Character. For models that declare several observables,
 #'   the name of the observable to check, or `"all"` for a panel of all
 #'   available checks built from one shared simulation. See [pp_check_vars()]
 #'   for the options of a fitted model. The default `NULL` checks the primary
-#'   response via [brms::pp_check()]. For the RT models, passing
-#'   `negative_rt = TRUE` (a [brms::posterior_predict()] argument) is
+#'   response via [brms::pp_check()], except for an `ezdm(version = "4par")`
+#'   fit in which some cells have no usable summaries at the upper boundary:
+#'   the primary response, `mean_rt_upper`, holds placeholders there, so
+#'   `NULL` means `resp_var = "mean_rt_upper"`, which leaves those cells out
+#'   but takes neither `newdata` nor the `loo_*` types. For the RT models,
+#'   passing `negative_rt = TRUE` (a [brms::posterior_predict()] argument) is
 #'   redirected to `resp_var = "signed_rt"`, so that observed and predicted
 #'   response times are both signed by the response.
 #' @param ... Additional arguments. Without `resp_var`, forwarded to
@@ -50,11 +79,15 @@
 #'   [brms::posterior_predict()] (`probs`, a numeric vector of length 2 with
 #'   default `c(0.025, 0.975)`, sets the credible interval). With `resp_var`,
 #'   `draw_ids` and `re_formula` go to [brms::prepare_predictions()] and the
-#'   rest to the `bayesplot::ppc_*` function. `re_formula = NA` predicts at
-#'   the population level on every path.
-#' @return For multinomial models or when `resp_var` is specified, a `ggplot2`
-#'   object (a `bayesplot_grid` for `resp_var = "all"`). For other models, the
-#'   result of [brms::pp_check()].
+#'   rest to the `bayesplot::ppc_*` function. `type = "bars_binned"` takes
+#'   `breaks` (bin edges that cover the observed and predicted values), `prob`
+#'   (interval width, default `0.9`) and `freq` (`FALSE` for proportions
+#'   instead of counts). `re_formula = NA` predicts at the population level on
+#'   every path.
+#' @return For multinomial models, for a 4-parameter [ezdm()] fit with
+#'   placeholders in `mean_rt_upper`, or when `resp_var` is specified, a
+#'   `ggplot2` object (a `bayesplot_grid` for `resp_var = "all"`). For other
+#'   models, the result of [brms::pp_check()].
 #' @seealso [brms::pp_check()], [pp_check_vars()]
 #' @aliases pp_check
 #' @importFrom brms pp_check
@@ -77,6 +110,17 @@ pp_check.bmmfit <- function(object, type = NULL, ndraws = NULL,
     resp_var <- "signed_rt"
   }
 
+  if (is.null(resp_var) && !is.null(spec$y_placeholders) &&
+      isTRUE(spec$y_placeholders(object$data))) {
+    resp_var <- names(spec$observed)[spec$observed == "Y"]
+    # refused here, where the reason is known: the checks below would name a
+    # resp_var the user never passed
+    stopif(!is.null(dots$newdata) || grepl("^loo_", type %||% ""),
+           "This {object$bmm$model$name} fit has cells without an observed \\
+            '{resp_var}', so pp_check() checks '{resp_var}' itself, leaving \\
+            those cells out, and does not take 'newdata' or the 'loo_*' types.")
+  }
+
   if (!is.null(resp_var)) {
     stopif(is.null(spec),
            "'resp_var' is not supported for the {object$bmm$model$name}: \\
@@ -90,13 +134,16 @@ pp_check.bmmfit <- function(object, type = NULL, ndraws = NULL,
              !group %in% names(object$data)),
            "'group' must name a column of the model data.")
     stopif(!is.null(dots$newdata),
-           "'newdata' is not supported when 'resp_var' is specified.")
+           "'newdata' is not supported for the '{resp_var}' check.")
     dots$negative_rt <- NULL
+    type <- .pp_resolve_type(type, spec$checks[[resp_var]], group)
     return(.pp_check_observable(object, spec, resp_var, type, ndraws, group,
                                 dots))
   }
 
   if (identical(family(object)$family, "multinomial")) {
+    group <- .pp_check_resolve_group(object, group)
+    object <- .pp_check_restore_set_size(object, group)
     return(.pp_check_multinomial(object, type = type, ndraws = ndraws %||% 100L,
                                  group = group, ...))
   }
@@ -111,17 +158,73 @@ pp_check.bmmfit <- function(object, type = NULL, ndraws = NULL,
 }
 
 
+# the bmm types are reachable only through resp_var: without it, brms resolves
+# 'type' itself. as.character() because a numeric switch() selects by position.
 .ppc_fun <- function(type) {
-  name <- paste0("ppc_", type)
-  if (name %in% as.character(bayesplot::available_ppc(""))) {
-    get(name, asNamespace("bayesplot"))
+  switch(as.character(type),
+    bars_binned = .ppc_bars_binned,
+    bars_binned_grouped = .ppc_bars_binned_grouped,
+    {
+      name <- paste0("ppc_", type)
+      if (name %in% as.character(bayesplot::available_ppc(""))) {
+        get(name, asNamespace("bayesplot"))
+      }
+    }
+  )
+}
+
+
+# Resolve the multinomial pp_check grouping. sdt_rating defaults to faceting by
+# stimulus (signal vs noise — the meaningful SDT check); group = NA is the
+# explicit "pool everything" opt-out. Other multinomial models (e.g. m3) keep
+# the user-supplied group (NULL = pool).
+.pp_check_resolve_group <- function(object, group) {
+  if (length(group) == 1L && is.na(group)) {
+    return(NULL)
   }
+  if (is.null(group) && inherits(object$bmm$model, c("sdt_rating", "sdt_cdp"))) {
+    return(object$bmm$model$other_vars$stimulus)
+  }
+  group
+}
+
+
+# brms keeps only the derived max_rank column of an sdt_ranking fit, not the
+# set-size column the user passed as m, so grouping by that column found
+# nothing to facet by
+.pp_check_restore_set_size <- function(object, group) {
+  m <- object$bmm$model$other_vars$m
+  if (!inherits(object$bmm$model, "sdt_ranking") || !identical(group, m) ||
+      m %in% names(object$data)) {
+    return(object)
+  }
+  object$data[[m]] <- object$data$max_rank
+  object
 }
 
 
 .auto_grouped_type <- function(type) {
   grouped <- paste0(type, "_grouped")
   if (endsWith(type, "_grouped") || is.null(.ppc_fun(grouped))) type else grouped
+}
+
+
+# 'type' defaults to the selected check's own type, so it cannot be resolved
+# before resp_var is known -- but it is still resolved here, at the boundary,
+# rather than after prepare_predictions() and pp_simulate() have run (#401)
+.pp_resolve_type <- function(type, check, group) {
+  if (is.null(check)) {
+    warnif(!is.null(type), "'type' is ignored for resp_var = 'all'; \\
+                            each panel uses its default type.")
+    return(NULL)
+  }
+  type <- type %||% check$type
+  if (!is.null(group)) {
+    type <- .auto_grouped_type(type)
+  }
+  stopif(is.null(.ppc_fun(type)) || startsWith(type, "loo_"),
+         "'{type}' is not a supported pp_check type for resp_var.")
+  type
 }
 
 
@@ -289,7 +392,7 @@ pp_check.bmmfit <- function(object, type = NULL, ndraws = NULL,
   data <- fit$data
   model <- fit$bmm$model
   resp_cols <- unlist(model$resp_vars)
-  re_vars <- names(brms::ranef(fit))
+  re_vars <- .group_vars(fit)
   exclude <- unique(c(resp_cols, "nTrials", re_vars))
 
   pred_cols <- setdiff(names(data), exclude)

@@ -24,6 +24,15 @@
 #'   `names(observed)` and must be elementwise, so the identical closure
 #'   produces `y` from length-N vectors and `yrep` from ndraws x N matrices.
 #'
+#' Two optional elements serve observed data that holds placeholders rather
+#' than observations, such as the summaries of an unused [ezdm()] boundary:
+#' * `defaults`: named vector giving, for observables whose slot a fit saved
+#'   by an older bmm version lacks, the value to use for every observation.
+#' * `y_placeholders`: a function of the fit's data that returns `TRUE` if
+#'   the `"Y"` slot holds placeholders. brms would plot them as data, so
+#'   [pp_check.bmmfit()] without `resp_var` then checks the observable mapped
+#'   to `"Y"` itself.
+#'
 #' A `pp_simulate()` method returns a named list of ndraws x nobs matrices
 #' drawn jointly, typically through the internal `.pp_simulate_joint()` helper
 #' around the model's `r*()` function. Simulating observables independently
@@ -35,8 +44,21 @@
 #' Register exactly one method per model at the most general class level
 #' where the declaration is identical across versions.
 #'
+#' These two generics are exported so that model methods defined outside bmm
+#' can be registered against them, but they are an internal developer
+#' interface documented for bmm's own model authors and carry no stability
+#' guarantee across releases.
+#'
 #' @param model A `bmmodel` object.
 #' @param prep A `brmsprep` object from [brms::prepare_predictions()].
+#' @return `pp_observables()` returns `NULL` for a model that delegates fully
+#'   to [brms::pp_check()], or a list with elements `observed` (a named
+#'   character vector mapping observable names to brms standata slots),
+#'   `checks` (a named list of check definitions, each with a `compute`
+#'   closure, a `label` and a default plot `type`: a bayesplot `ppc_*` type
+#'   or bmm's `"bars_binned"`) and, optionally, `defaults` and
+#'   `y_placeholders` (see Details). `pp_simulate()` returns a named list of
+#'   `ndraws` x `nobs` matrices, one per simulated observable.
 #' @keywords internal developer
 #' @export
 pp_observables <- function(model) {
@@ -66,9 +88,14 @@ pp_simulate.default <- function(model, prep) {
 
 # get_dpar() returns a scalar for dpars that brms stores fixed and an
 # ndraws x nobs matrix otherwise; rep_len() flattens both to one column-major
-# vector
+# vector. Any other length would recycle into the wrong draw-major layout and
+# attribute every simulated value to the wrong observation, silently.
 .pp_dpar_vector <- function(prep, name) {
-  rep_len(as.vector(brms::get_dpar(prep, name)), prep$ndraws * prep$nobs)
+  v <- as.vector(brms::get_dpar(prep, name))
+  stopif(!length(v) %in% c(1L, prep$ndraws * prep$nobs),
+         "Cannot map dpar '{name}' (length {length(v)}) onto \\
+          {prep$ndraws} draws x {prep$nobs} observations.")
+  rep_len(v, prep$ndraws * prep$nobs)
 }
 
 # One RNG call over all draws and observations, reshaped column-major into
@@ -92,9 +119,10 @@ pp_simulate.default <- function(model, prep) {
 #'
 #' @param fit A `bmmfit` object returned by [bmm()].
 #' @return A `data.frame` with one row per available check (columns `resp_var`,
-#'   `label`, `default_type`, and `default`, flagging the observable that
-#'   `pp_check()` plots when `resp_var` is not specified), or `NULL` invisibly
-#'   for models without multi-observable support.
+#'   `label`, `default_type`, `slot`, listing the brms standata slots the check
+#'   reads, and `default`, flagging the observable that `pp_check()` plots when
+#'   `resp_var` is not specified), or `NULL` invisibly for models without
+#'   multi-observable support.
 #' @seealso [pp_check.bmmfit()]
 #' @keywords extract_info
 #' @examples
@@ -116,9 +144,22 @@ pp_check_vars <- function(fit) {
     resp_var = names(spec$checks),
     label = vapply(spec$checks, `[[`, character(1), "label"),
     default_type = vapply(spec$checks, `[[`, character(1), "type"),
+    slot = vapply(spec$checks, .pp_check_slots, character(1),
+                  observed = spec$observed),
     default = names(spec$checks) == names(spec$observed)[spec$observed == "Y"],
     row.names = NULL
   )
+}
+
+# Derived checks read several observables, so the slots are recovered from the
+# closure rather than declared twice. Anchoring on "$" and a trailing word
+# boundary keeps mean_rt from matching d$mean_rt_upper.
+.pp_check_slots <- function(check, observed) {
+  code <- paste(deparse(body(check$compute)), collapse = " ")
+  reads <- vapply(names(observed), function(nm) {
+    grepl(paste0("\\$", nm, "\\b"), code)
+  }, logical(1))
+  paste(observed[reads], collapse = ", ")
 }
 
 .pp_check_observable <- function(object, spec, resp_var, type, ndraws, group,
@@ -131,23 +172,25 @@ pp_check_vars <- function(fit) {
                                     re_formula = dots$re_formula)
 
   observed <- lapply(spec$observed, function(slot) prep$data[[slot]])
+  # a fit saved before its model declared a slot lacks it in the data
+  for (nm in names(spec$defaults)) {
+    observed[[nm]] <- observed[[nm]] %||% rep(spec$defaults[[nm]], prep$nobs)
+  }
   yrep_inputs <- lapply(observed, .pp_expand_data, ndraws = prep$ndraws)
   sims <- pp_simulate(object$bmm$model, prep)
   sims <- sims[intersect(names(sims), names(spec$observed))]
   yrep_inputs[names(sims)] <- sims
 
   all_checks <- identical(resp_var, "all")
-  if (all_checks && !is.null(type)) {
-    warning2("'type' is ignored for resp_var = 'all'; \\
-              each panel uses its default type.")
-    type <- NULL
-  }
   checks <- if (all_checks) spec$checks else spec$checks[resp_var]
-  group_vec <- if (!is.null(group)) object$data[[group]]
   plot_dots <- dots[setdiff(names(dots), c("draw_ids", "re_formula"))]
 
-  plots <- lapply(checks, function(check) {
-    .pp_build_ppc_plot(check, observed, yrep_inputs, type, group_vec, plot_dots)
+  reduced <- .pp_reduce_na(checks, observed, yrep_inputs)
+  group_vec <- if (!is.null(group)) object$data[[group]][reduced$keep]
+
+  plots <- lapply(names(checks), function(nm) {
+    .pp_build_ppc_plot(checks[[nm]], reduced$values[[nm]], type, group_vec,
+                       plot_dots)
   })
   if (all_checks) {
     bayesplot::bayesplot_grid(plots = unname(plots))
@@ -156,25 +199,44 @@ pp_check_vars <- function(fit) {
   }
 }
 
-.pp_build_ppc_plot <- function(check, observed, yrep_inputs, type, group_vec,
-                               plot_dots) {
-  y <- check$compute(observed)
-  yrep <- check$compute(yrep_inputs)
+# A simulated statistic can be undefined (rezdm() returns NA for a boundary's
+# mean RT when fewer than 2 responses reach it). Reducing the OBSERVATION
+# dimension would make the retained count decay as (1 - p)^ndraws, so asking
+# for more draws would check less data; only observations whose observed value
+# is undefined are dropped, and the remaining NAs are absorbed by dropping
+# exchangeable draws. All panels of resp_var = "all" share one reduction so
+# that they are computed on the same observations and draws.
+.pp_reduce_na <- function(checks, observed, yrep_inputs) {
+  label <- collapse_comma(vapply(checks, `[[`, character(1), "label"))
+  values <- lapply(checks, function(check) {
+    list(y = check$compute(observed), yrep = check$compute(yrep_inputs))
+  })
 
-  # a simulated statistic can be undefined for some draws (rezdm() returns NA
-  # for a boundary's mean RT when fewer than 2 responses reach it); y and yrep
-  # must be reduced together or the two halves would be misaligned
-  keep <- !is.na(y) & colSums(is.na(yrep)) == 0L
-  stopif(!any(keep),
-         "All observations of '{check$label}' are undefined in the \\
-          posterior predictive simulation.")
+  keep <- Reduce(`&`, lapply(values, function(v) !is.na(v$y)))
+  stopif(!any(keep), "All observations of {label} are undefined in the data.")
   warnif(!all(keep),
-         "Dropped {sum(!keep)} of {length(keep)} observations from the \\
-          '{check$label}' check because the statistic was undefined for some \\
-          posterior draws (e.g. too few simulated responses at a boundary).")
-  y <- y[keep]
-  yrep <- yrep[, keep, drop = FALSE]
+         "Dropped {sum(!keep)} of {length(keep)} observations because the \\
+          observed {label} is undefined (too few responses at a boundary).")
+  values <- lapply(values, function(v) {
+    list(y = v$y[keep], yrep = v$yrep[, keep, drop = FALSE])
+  })
 
+  keep_draws <- Reduce(`&`, lapply(values, function(v) {
+    rowSums(is.na(v$yrep)) == 0L
+  }))
+  stopif(!any(keep_draws),
+         "Every posterior draw of {label} contains an undefined observation; \\
+          try a model with more trials per cell.")
+  warnif(!all(keep_draws),
+         "Dropped {sum(!keep_draws)} of {length(keep_draws)} posterior draws \\
+          because {label} was undefined for some observations.")
+  values <- lapply(values, function(v) {
+    list(y = v$y, yrep = v$yrep[keep_draws, , drop = FALSE])
+  })
+  nlist(values, keep)
+}
+
+.pp_build_ppc_plot <- function(check, value, type, group_vec, plot_dots) {
   type <- type %||% check$type
   if (!is.null(group_vec)) {
     type <- .auto_grouped_type(type)
@@ -183,12 +245,72 @@ pp_check_vars <- function(fit) {
   stopif(is.null(ppc_fun) || startsWith(type, "loo_"),
          "'{type}' is not a supported pp_check type for resp_var.")
 
-  args <- c(list(y = y, yrep = yrep), plot_dots)
+  args <- c(list(y = value$y, yrep = value$yrep), plot_dots)
   if ("group" %in% names(formals(ppc_fun))) {
     stopif(is.null(group_vec), "Argument 'group' is required for type '{type}'.")
-    args$group <- group_vec[keep]
+    args$group <- group_vec
   }
   do.call(ppc_fun, args) + ggplot2::labs(subtitle = check$label)
+}
+
+# bmm's own plot type (see .ppc_fun()): ppc_bars() for a continuous statistic.
+# bayesplot requires whole numbers there, so the statistic is binned and
+# bayesplot counts the bins; the bars are then drawn on the statistic's scale
+# instead of at bin indices.
+.ppc_bars_binned <- function(y, yrep, ..., breaks = NULL, prob = 0.9,
+                             freq = TRUE) {
+  .pp_binned_bars(y, yrep, group = NULL, breaks, prob, freq)
+}
+
+.ppc_bars_binned_grouped <- function(y, yrep, group, ..., breaks = NULL,
+                                     facet_args = list(), prob = 0.9,
+                                     freq = TRUE) {
+  facet_args$facets <- "group"
+  facet_args$scales <- facet_args$scales %||% "free"
+  .pp_binned_bars(y, yrep, group, breaks, prob, freq) +
+    do.call(ggplot2::facet_wrap, facet_args)
+}
+
+# The default breaks span y and yrep together, so predicted mass outside the
+# observed range gets a bin. User breaks that miss a value would put it in
+# bin 0 or K + 1 and silently drop it from the plot.
+.pp_binned_bars <- function(y, yrep, group, breaks, prob, freq) {
+  values <- c(y, yrep)
+  breaks <- breaks %||% pretty(range(values), n = ceiling(log2(length(y)) + 1))
+  stopif(min(values) < min(breaks) || max(values) > max(breaks),
+         "'breaks' must cover the observed and predicted values \\
+          ({signif(min(values), 3)} to {signif(max(values), 3)}).")
+  bin <- function(x) findInterval(x, breaks, rightmost.closed = TRUE)
+
+  data <- bayesplot::ppc_bars_data(bin(y), matrix(bin(yrep), nrow = nrow(yrep)),
+                                   group = group, prob = prob, freq = freq)
+  data$lower <- breaks[data$x]
+  data$upper <- breaks[data$x + 1L]
+  data$x <- (data$lower + data$upper) / 2
+
+  # y and yrep take the colours of the density panels they share a
+  # resp_var = "all" grid with: y dark, yrep light, both keyed as lines. The
+  # bars are unfilled so that the intervals beneath them stay visible.
+  scheme <- bayesplot::color_scheme_get()
+  ggplot2::ggplot(data, ggplot2::aes(x = .data$x)) +
+    ggplot2::geom_pointrange(
+      ggplot2::aes(y = .data$m, ymin = .data$l, ymax = .data$h,
+                   colour = "yrep"),
+      size = 0.5, linewidth = 1, key_glyph = "path"
+    ) +
+    ggplot2::geom_rect(
+      ggplot2::aes(xmin = .data$lower, xmax = .data$upper, ymin = 0,
+                   ymax = .data$y_obs, colour = "y"),
+      fill = NA, linewidth = 0.8, key_glyph = "path"
+    ) +
+    ggplot2::scale_colour_manual(
+      NULL, breaks = c("y", "yrep"),
+      values = c(y = scheme$dark_highlight, yrep = scheme$light_highlight),
+      labels = c(expression(italic(y)), expression(italic(y)[rep]))
+    ) +
+    ggplot2::scale_y_continuous(expand = ggplot2::expansion(mult = c(0, 0.05))) +
+    ggplot2::labs(x = NULL, y = if (freq) "Count" else "Proportion") +
+    bayesplot::bayesplot_theme_get()
 }
 
 # response is 0/1, so the sign flip is (2 * response - 1): sign(response)

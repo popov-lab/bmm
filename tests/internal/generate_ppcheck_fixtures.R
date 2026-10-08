@@ -30,6 +30,21 @@ ddm_fit <- do.call(bmm, c(list(
 ), fit_args))
 save_fixture(ddm_fit, "bmmfit_ddm_ppcheck.rds")
 
+# cswald: two conditions so the group tests have a predictor column, at an
+# error rate the 'simple' version is meant for (~10%) while still leaving
+# enough lower-boundary responses for the response check
+set.seed(2)
+cswald_data <- rbind(
+  cbind(rcswald(75, drift = 3.0, bound = 0.8, ndt = 0.2), cond = "easy"),
+  cbind(rcswald(75, drift = 2.0, bound = 0.8, ndt = 0.2), cond = "hard")
+)
+cswald_fit <- do.call(bmm, c(list(
+  formula = bmf(drift ~ 0 + cond),
+  data = cswald_data,
+  model = cswald(rt = "rt", response = "response", version = "simple")
+), fit_args))
+save_fixture(cswald_fit, "bmmfit_cswald_ppcheck.rds")
+
 set.seed(3)
 ezdm3_data <- rezdm(10, n_trials = 40, drift = 1.5, bound = 1.2, ndt = 0.3,
                     version = "3par")

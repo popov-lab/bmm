@@ -15,8 +15,8 @@
   startUpMsg <- c(
     paste0(
       "A short introduction to package is available by calling help(\"bmm\"). \n",
-      "More detailed articles on how to fit different models are available online at https://venpopov.com/bmm/articles \n",
-      "You can view the list of currently available models by calling supported_models().\n"
+      "More detailed articles on how to fit different models are available online at https://popov-lab.github.io/bmm/articles \n",
+      "You can view the list of currently available models by calling bmm_models().\n"
     )
   )
 

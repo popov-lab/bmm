@@ -40,14 +40,27 @@ check_data.default <- function(model, data, formula) {
   data
 }
 
+# Formulas may use the columns check_data() adds as predictors, so the formula
+# checks and bmm_data_check() must not call them unknown although the user's
+# data lacks them. Methods chain with NextMethod(), as for revert_check_data()
+built_data_columns <- function(model) {
+  UseMethod("built_data_columns")
+}
+
+#' @exportS3Method
+built_data_columns.default <- function(model) {
+  character(0)
+}
+
 #' @export
 check_data.bmmodel <- function(model, data, formula) {
   stopif(missing(data), "Data must be specified using the 'data' argument.")
+  data_name <- attr(data, "data_name") %||% substitute_name(data, envir = eval(parent.frame()))
   data <- try(as.data.frame(data), silent = TRUE)
   stopif(is_try_error(data), "Argument 'data' must be coercible to a data.frame.")
   stopif(!isTRUE(nrow(data) > 0L), "Argument 'data' does not contain observations.")
 
-  attr(data, "data_name") <- substitute_name(data, envir = eval(parent.frame()))
+  attr(data, "data_name") <- data_name
   attr(data, "checked") <- TRUE
   NextMethod("check_data")
 }
@@ -80,7 +93,12 @@ check_data.non_targets <- function(model, data, formula) {
   )
 
   ss <- check_var_set_size(model$other_vars$set_size, data)
-  max_set_size <- ss$max_set_size
+  # brms drops NA-response rows from a fit's stored frame, so the frame's maximum
+  # set size can be below the fit's (#459); revert_check_data() hands over the
+  # fit's bound. Only that function sets it, so data from bmm() and
+  # update(newdata = ) is still checked against its own maximum
+  max_set_size <- attr(data, "fit_max_set_size") %||% ss$max_set_size
+  attr(data, "fit_max_set_size") <- NULL
   ss_numeric <- ss$ss_numeric
 
   stopif(
@@ -107,10 +125,10 @@ check_data.non_targets <- function(model, data, formula) {
 }
 
 # Shared by the EZ models, whose aggregated RT summaries obey the same rules.
-# Non-integer n_trials is an error rather than a warning because brms's
-# trials() term rejects it one step later with a message that names no column.
-check_rt_summary_vars <- function(data, mean_rt, var_rt, n_trials) {
-  mean_rt_values <- unlist(data[mean_rt])
+# `used` marks the summaries the likelihood reads (ezdm 4par leaves a boundary
+# without responses unused), so placeholders there are not rejected.
+check_rt_summary_vars <- function(data, mean_rt, var_rt, used = TRUE) {
+  mean_rt_values <- as.matrix(data[mean_rt])[used %in% TRUE]
   # typical RTs in seconds are 0.2-3s; values > 10 suggest milliseconds
   warnif(
     any(mean_rt_values > 10, na.rm = TRUE),
@@ -123,10 +141,14 @@ check_rt_summary_vars <- function(data, mean_rt, var_rt, n_trials) {
     "Mean RT values must be positive. Found non-positive values in the data."
   )
   stopif(
-    any(unlist(data[var_rt]) <= 0, na.rm = TRUE),
+    any(as.matrix(data[var_rt])[used %in% TRUE] <= 0, na.rm = TRUE),
     "Variance of RT must be positive. Found non-positive values in the data."
   )
+}
 
+# Non-integer n_trials is an error rather than a warning because brms's
+# trials() term rejects it one step later with a message that names no column.
+check_n_trials_var <- function(data, n_trials) {
   n_trials_values <- data[[n_trials]]
   stopif(
     any(n_trials_values <= 2, na.rm = TRUE),
@@ -277,7 +299,7 @@ rad2deg <- function(rad) {
 #'   description of [brms::standata()] for more details
 #' @return A named list of objects containing the required data to fit a bmm
 #'   model with Stan.
-#' @seealso [supported_models()], [brms::standata()]
+#' @seealso [bmm_models()], [brms::standata()]
 #' @keywords extract_info
 #' @examples
 #' sdata1 <- standata(bmf(c ~ 1, kappa ~ 1),
@@ -290,22 +312,12 @@ rad2deg <- function(rad) {
 standata.bmmformula <- function(object, data, model, ...) {
   dots <- list(...)
   local_brms_threads(dots)
-
-  # check model, formula and data, and transform data if necessary
-  formula <- object
   configure_options(dots)
-  model <- check_model(model, data, formula)
-  data <- check_data(model, data, formula)
-  formula <- check_formula(model, data, formula)
-
-  # generate the model specification to pass to brms later
-  config_args <- configure_model(model, data, formula)
-
-  # extract stan data
-  fit_args <- combine_args(nlist(config_args, dots))
-  fit_args$object <- fit_args$formula
-  fit_args$formula <- NULL
-  brms::do_call(brms::standata, fit_args)
+  call_brms_extractor(
+    brms::standata,
+    configure_fit(object, data, model, until = "model"),
+    dots
+  )
 }
 
 # check if the data is sorted by the predictors
@@ -408,8 +420,13 @@ has_nonconsecutive_duplicates <- function(vec) {
 #'   }
 #'   The buffer extends data-driven bounds to ensure conservative estimates.
 #'   Examples: c(0.1, 3.0), c("min", "max"), c(0.1, "max"), c("min", 3.0)
-#' @param min_trials Integer. Minimum number of trials required for fitting.
-#'   Returns NA if fewer trials are available. Default is 10
+#' @param min_trials Integer. Minimum number of trials required for the RT
+#'   summaries, which are NA with fewer. Compared against the total number of
+#'   trials for `version = "3par"` and against each boundary's own count for
+#'   `version = "4par"`, so the two versions can disagree about whether the
+#'   same cell is corrected. For `version = "4par"`, [bmm()] still fits a cell
+#'   whose summaries at one or both boundaries are NA, through its response
+#'   counts. Default is 10
 #' @param init_contaminant Numeric. Initial proportion of contaminants for EM
 #'   algorithm. Default is 0.05
 #' @param max_contaminant Numeric. Maximum allowed contaminant proportion
@@ -417,11 +434,23 @@ has_nonconsecutive_duplicates <- function(vec) {
 #'   contaminant proportions. Default is 0.5
 #' @param maxit Integer. Maximum number of EM iterations. Default is 100
 #' @param tol Numeric. Convergence tolerance for EM algorithm. Default is 1e-6
+#' @param guess_rate Numeric. Accuracy expected of a contaminant response, used
+#'   to split the estimated contaminants of `version = "3par"` across the two
+#'   boundaries. Default is 0.5, appropriate for a two-choice task; use 0.25 for
+#'   a 4AFC task, or 0 if contaminants are never correct. Ignored for
+#'   `version = "4par"`, which estimates contamination separately per boundary
+#'   and needs no such assumption.
 #'
 #' @return A 1-row `data.frame`. For version = "3par": `mean_rt`, `var_rt`,
 #'   `n_upper`, `n_trials`, `contaminant_prop`. For version = "4par":
 #'   `mean_rt_upper`, `mean_rt_lower`, `var_rt_upper`, `var_rt_lower`,
 #'   `n_upper`, `n_trials`, `contaminant_prop_upper`, `contaminant_prop_lower`.
+#'
+#'   `n_upper` and `n_trials` count the responses the reported moments rest on.
+#'   Whenever a contaminant proportion was estimated, the expected number of
+#'   contaminants is removed from both counts and the result is rounded; with
+#'   `method = "simple"`, `method = "robust"`, or an EM that did not converge,
+#'   they are the raw counts.
 #'
 #' @details RT outliers and contaminant responses (fast guesses, lapses of
 #'   attention) can distort the mean and variance estimates used as input to
@@ -430,14 +459,20 @@ has_nonconsecutive_duplicates <- function(vec) {
 #'   contaminants and a parametric RT distribution for true responses.
 #'   Robust moments are then extracted from the fitted parametric component.
 #'
-#'   This function is designed to work with [dplyr::group_by()] and
-#'   [dplyr::reframe()] for grouped operations. Use [adjust_ezdm_accuracy()]
-#'   as a separate step if you need to adjust accuracy counts for
-#'   contamination.
+#'   The returned counts describe the same responses as the returned moments.
+#'   For `version = "3par"` the estimated contaminants are shared between the
+#'   boundaries at `guess_rate`; a cell whose observed accuracy lies outside
+#'   `[guess_rate * p, 1 - p * (1 - guess_rate)]` for an estimated proportion
+#'   `p` cannot have arisen that way, so the contaminants are removed
+#'   proportionally from both boundaries instead, leaving the observed accuracy
+#'   unchanged apart from rounding, and a warning is issued. For
+#'   `version = "4par"` each boundary is corrected by its own estimate.
 #'
-#' @seealso [adjust_ezdm_accuracy()] for adjusting accuracy counts,
-#'   [flag_contaminant_rts()] for trial-level contamination probabilities,
-#'   [ezdm()] for fitting the EZ-Diffusion Model
+#'   This function is designed to work with [dplyr::group_by()] and
+#'   [dplyr::reframe()] for grouped operations.
+#'
+#' @seealso [flag_contaminant_rts()] for trial-level contamination
+#'   probabilities, [ezdm()] for fitting the EZ-Diffusion Model
 #'
 #' @keywords transform
 #' @export
@@ -472,7 +507,8 @@ ezdm_summary_stats <- function(
     init_contaminant = 0.05,
     max_contaminant = 0.5,
     maxit = 100,
-    tol = 1e-6) {
+    tol = 1e-6,
+    guess_rate = 0.5) {
   stop_missing_args()
   version <- match.arg(version)
   distribution <- match.arg(distribution)
@@ -485,6 +521,11 @@ ezdm_summary_stats <- function(
   .validate_contaminant_bounds(contaminant_bound)
   stopif(!is.numeric(min_trials) || min_trials < 1, "min_trials must be a positive integer")
   .validate_contaminant_params(init_contaminant, max_contaminant)
+  stopif(
+    !is.numeric(guess_rate) || length(guess_rate) != 1L || is.na(guess_rate) ||
+      guess_rate < 0 || guess_rate > 1,
+    "guess_rate must be a single number between 0 and 1"
+  )
 
   complete <- !is.na(rt)
   rt <- rt[complete]
@@ -523,11 +564,14 @@ ezdm_summary_stats <- function(
 
   if (version == "3par") {
     moments <- compute_moments(rt, n_trials)
+    counts <- .contaminant_free_counts(
+      n_upper, n_trials, moments$contaminant_prop, guess_rate
+    )
     data.frame(
       mean_rt = moments$mean,
       var_rt = moments$var,
-      n_upper = n_upper,
-      n_trials = n_trials,
+      n_upper = counts$n_upper,
+      n_trials = counts$n_trials,
       contaminant_prop = moments$contaminant_prop
     )
   } else {
@@ -535,17 +579,75 @@ ezdm_summary_stats <- function(
     rt_lower <- rt[!is_upper]
     moments_upper <- compute_moments(rt_upper, length(rt_upper))
     moments_lower <- compute_moments(rt_lower, length(rt_lower))
+    counts <- .contaminant_free_counts_per_boundary(
+      n_upper, n_trials,
+      moments_upper$contaminant_prop, moments_lower$contaminant_prop
+    )
     data.frame(
       mean_rt_upper = moments_upper$mean,
       mean_rt_lower = moments_lower$mean,
       var_rt_upper = moments_upper$var,
       var_rt_lower = moments_lower$var,
-      n_upper = n_upper,
-      n_trials = n_trials,
+      n_upper = counts$n_upper,
+      n_trials = counts$n_trials,
       contaminant_prop_upper = moments_upper$contaminant_prop,
       contaminant_prop_lower = moments_lower$contaminant_prop
     )
   }
+}
+
+# The EM cleans the RT moments but says nothing about which boundary the
+# contaminants went to, so 3par needs the guess rate and 4par does not.
+.contaminant_free_counts <- function(n_upper, n_trials, contaminant_prop,
+                                     guess_rate) {
+  if (is.na(contaminant_prop) || contaminant_prop <= 0) {
+    return(nlist(n_upper, n_trials))
+  }
+
+  accuracy <- n_upper / n_trials
+  upper_limit <- 1 - contaminant_prop * (1 - guess_rate)
+  lower_limit <- contaminant_prop * guess_rate
+  if (accuracy > upper_limit || accuracy < lower_limit) {
+    warning2(
+      "Observed accuracy ({round(accuracy, 3)}) lies outside \\
+       [{round(lower_limit, 3)}, {round(upper_limit, 3)}], the range a \\
+       contaminant proportion of {round(contaminant_prop, 3)} and a guess \\
+       rate of {guess_rate} can produce. The correction is degraded for this \\
+       cell: the contaminants are removed proportionally from both \\
+       boundaries, which preserves the observed accuracy up to rounding. \\
+       Check that guess_rate matches the task, or that the contaminant \\
+       reaction times are distinguishable from the cognitive ones."
+    )
+    return(list(
+      n_upper = as.integer(round(n_upper * (1 - contaminant_prop))),
+      n_trials = as.integer(round(n_trials * (1 - contaminant_prop)))
+    ))
+  }
+
+  list(
+    n_upper = as.integer(round(n_upper - n_trials * contaminant_prop * guess_rate)),
+    n_trials = as.integer(round(n_trials * (1 - contaminant_prop)))
+  )
+}
+
+# Each boundary is rounded on its own because the 4par likelihood reads hits
+# and trials - hits, not the total, as the two boundaries' sample sizes.
+.contaminant_free_counts_per_boundary <- function(n_upper, n_trials,
+                                                  contaminant_prop_upper,
+                                                  contaminant_prop_lower) {
+  clean_upper <- as.integer(round(
+    .clean_boundary_count(n_upper, contaminant_prop_upper)
+  ))
+  list(
+    n_upper = clean_upper,
+    n_trials = clean_upper + as.integer(round(
+      .clean_boundary_count(n_trials - n_upper, contaminant_prop_lower)
+    ))
+  )
+}
+
+.clean_boundary_count <- function(n, contaminant_prop) {
+  if (is.na(contaminant_prop) || contaminant_prop <= 0) n else n * (1 - contaminant_prop)
 }
 
 .simple_aggregation <- function(x) {
@@ -670,17 +772,24 @@ ezdm_summary_stats <- function(
   )
 }
 
-#' Adjust Accuracy Counts for Contamination
+#' Adjust Accuracy Counts for Contamination (deprecated)
 #'
-#' @description Adjusts accuracy counts (`n_upper`, `n_trials`) by removing
+#' @description **Deprecated.** [ezdm_summary_stats()] now returns
+#'   contaminant-free `n_upper` and `n_trials`, so this second step is no
+#'   longer needed; applying it corrects the same cell twice. Set the guess
+#'   rate with the `guess_rate` argument of [ezdm_summary_stats()] instead.
+#'
+#'   Adjusts accuracy counts (`n_upper`, `n_trials`) by removing
 #'   estimated contaminant trials using binomial sampling. Contaminant trials
 #'   are assumed to produce correct responses at a fixed guess rate (e.g., 0.5
 #'   for 2AFC tasks).
 #'
-#' @param n_upper Numeric. Count of upper boundary (correct) responses.
-#' @param n_trials Numeric. Total number of trials.
+#' @param n_upper Numeric. Count of upper boundary (correct) responses, a
+#'   single value.
+#' @param n_trials Numeric. Total number of trials, a single value.
 #' @param contaminant_prop Numeric. Estimated proportion of contaminant trials
-#'   (e.g., from the `contaminant_prop` column of [ezdm_summary_stats()]).
+#'   (e.g., from the `contaminant_prop` column of [ezdm_summary_stats()]), a
+#'   single value.
 #' @param guess_rate Numeric. Assumed accuracy rate for contaminant trials
 #'   (random guessing). Default is 0.5 (appropriate for 2AFC tasks).
 #'
@@ -688,7 +797,11 @@ ezdm_summary_stats <- function(
 #'   (integers). When `contaminant_prop` is `NA` or <= 0, returns the original
 #'   counts unchanged.
 #'
-#' @details Uses binomial sampling to estimate the number of contaminant trials
+#' @details The function adjusts one cell at a time. Vectors of length greater
+#'   than one are an error; to correct several cells, use
+#'   [ezdm_summary_stats()] on each group.
+#'
+#'   Uses binomial sampling to estimate the number of contaminant trials
 #'   and contaminant correct responses, then subtracts these from the raw
 #'   counts. Because of the stochastic sampling, results will vary across
 #'   calls unless a seed is set by the user.
@@ -700,19 +813,25 @@ ezdm_summary_stats <- function(
 #' @export
 #'
 #' @examples
-#' # Adjust accuracy for estimated 10% contamination
+#' # Deprecated. ezdm_summary_stats() returns contaminant-free counts already:
 #' set.seed(42)
-#' adjust_ezdm_accuracy(n_upper = 80, n_trials = 100, contaminant_prop = 0.1)
-#'
-#' # In a pipeline with ezdm_summary_stats
-#' # library(dplyr)
-#' # mydata |>
-#' #   group_by(subject) |>
-#' #   reframe(ezdm_summary_stats(rt, response)) |>
-#' #   mutate(adjust_ezdm_accuracy(n_upper, n_trials, contaminant_prop))
+#' rt <- c(rnorm(80, 0.55, 0.05), runif(20, 0.1, 4))
+#' response <- c(rbinom(80, 1, 0.85), rbinom(20, 1, 0.5))
+#' ezdm_summary_stats(rt, response, contaminant_bound = c(0.1, 4))
 #'
 adjust_ezdm_accuracy <- function(n_upper, n_trials, contaminant_prop,
                                  guess_rate = 0.5) {
+  warning2("The function `adjust_ezdm_accuracy()` is deprecated. \\
+            `ezdm_summary_stats()` already returns contaminant-free `n_upper` \\
+            and `n_trials`, so applying this correction on top of them counts \\
+            the same contaminants twice. Use its `guess_rate` argument to set \\
+            the accuracy expected of a contaminant response.")
+  stopif(
+    length(n_upper) != 1L || length(n_trials) != 1L || length(contaminant_prop) != 1L,
+    "`adjust_ezdm_accuracy()` takes one cell at a time. `n_upper`, `n_trials` and \\
+     `contaminant_prop` must each be a single value. For a data frame of cells, \\
+     use `ezdm_summary_stats()` per group."
+  )
   stopif(!is.numeric(n_upper), "n_upper must be numeric")
   stopif(!is.numeric(n_trials), "n_trials must be numeric")
   stopif(!is.numeric(guess_rate) || guess_rate < 0 || guess_rate > 1,

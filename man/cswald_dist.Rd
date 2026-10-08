@@ -99,8 +99,8 @@ Default is \code{FALSE}}
 These functions provide the density, distribution, quantile, and random
 generation functions for the censored shifted Wald model: \code{cswald}.
 The random generation (\code{rcswald}) and distribution functions (\code{pcswald},
-\code{qcswald}) use \code{\link[rtdists:Diffusion]{rtdists::rdiffusion()}}, \code{\link[rtdists:Diffusion]{rtdists::pdiffusion()}}, and
-\code{\link[rtdists:Diffusion]{rtdists::qdiffusion()}} internally for the \code{"crisk"} version, which is
+\code{qcswald}) use \code{\link[rtdists:rdiffusion]{rtdists::rdiffusion()}}, \code{\link[rtdists:pdiffusion]{rtdists::pdiffusion()}}, and
+\code{\link[rtdists:qdiffusion]{rtdists::qdiffusion()}} internally for the \code{"crisk"} version, which is
 theoretically consistent since the censored shifted Wald model is an
 approximation to the Wiener diffusion model for tasks with high accuracy
 (few errors).
@@ -117,14 +117,14 @@ For the \code{"crisk"} version (competing risks), the CDF computes the defective
 cumulative distribution P(RT <= q, response = r), which is the probability
 of responding with the specified response by time \code{q}. This uses
 
-\code{\link[rtdists:Diffusion]{rtdists::pdiffusion()}} internally for accurate computation.
+\code{\link[rtdists:pdiffusion]{rtdists::pdiffusion()}} internally for accurate computation.
 
 \strong{Quantile Function (\code{qcswald})}
 
 The quantile function returns the response time \code{q} such that
 P(RT <= q) = p. Similar to the CDF, for the \code{"simple"} version this is only
 defined for \code{response = 1}. For the \code{"crisk"} version, this uses
-\code{\link[rtdists:Diffusion]{rtdists::qdiffusion()}} internally.
+\code{\link[rtdists:qdiffusion]{rtdists::qdiffusion()}} internally.
 }
 \examples{
 dat <- rcswald(n = 1000, drift = 2, bound = 1, ndt = 0.3)
@@ -132,7 +132,7 @@ head(dat)
 hist(dat$rt)
 }
 \seealso{
-\code{\link[rtdists:Diffusion]{rtdists::rdiffusion()}}, \code{\link[rtdists:Diffusion]{rtdists::pdiffusion()}},
-\code{\link[rtdists:Diffusion]{rtdists::qdiffusion()}} for the underlying functions
+\code{\link[rtdists:rdiffusion]{rtdists::rdiffusion()}}, \code{\link[rtdists:pdiffusion]{rtdists::pdiffusion()}},
+\code{\link[rtdists:qdiffusion]{rtdists::qdiffusion()}} for the underlying functions
 }
 \keyword{distribution}
