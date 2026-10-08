@@ -72,29 +72,35 @@ removes the file again, because a merge commit keeps every commit of the PR in
 the history. A squash merge would not, but the check cannot know which one will
 be used ([ADR 0003](../.dev/decisions/0003-model-fit-files.md)). A file whose
 content is already in the history of `develop` or of the PR's base does not
-count, wherever it sits; a changed version of a tracked large file
-counts as new. If the check names a commit of yours, rewrite the branch without
-that file, for example with an interactive rebase.
+count, wherever it sits. A changed version of a tracked large file counts as
+new. If the check names a commit of yours, rewrite the branch without that
+file, for example with an interactive rebase.
 
-- Point `file =` to `fits/<name>`, written as a string literal. The folder
-  `vignettes/articles/fits/` is gitignored. Fits that are already tracked in
-  `assets/` stay there until their article is refitted. Release fits work for
-  articles directly in `vignettes/articles/` only: the build downloads to
-  `vignettes/articles/fits/`, and an article in a subfolder looks for `fits/`
-  next to itself, so it cannot load them.
+- Load a fit with `bmm(..., file = "fits/<name>")` or
+  `readRDS(file = "fits/<name>")`, with the path written as a string literal.
+  The folder `vignettes/articles/fits/` is gitignored. Fits that are already
+  tracked in `assets/` stay there until their article is refitted. Release fits
+  work only for articles directly in `vignettes/articles/`. The build downloads
+  them to `vignettes/articles/fits/`, and an article in a subfolder looks for
+  `fits/` next to itself.
 - Say in the PR where we can get the fit. A maintainer uploads it to the
   `article-fits` release, and the website build downloads it from there.
-- The website build checks every `file = "..."` written as a string literal in
-  the R chunks of an article. A `fits/<name>` file must be in the release, an
-  `assets/<name>` file must be tracked, and both must be readable. The build
-  stops, naming the article and the file, when one is not. A `file =` passed to
-  `saveRDS()` or another writer is ignored. Files that pkgdown does not build
-  (names starting with `_`, `vignettes/tutorials/`) and files loaded by other
-  means, such as sourced code or a child document, are not checked. Chunks are
-  found as knitr finds them: one opens at any line like `` ```{r} ``, also
-  inside a longer fenced block that only means to show it, and `#|` options
-  count only at the top of the chunk. The fit has to be uploaded before the PR
-  is merged into a branch that builds the site.
+- The website build checks every `file = "..."` that an evaluated R chunk
+  passes as a string literal to `bmm()`, `brm()`, `update()`, `readRDS()` or
+  `read_rds()`. A `fits/<name>` file must be in the release. Any other file,
+  such as `assets/<name>`, must be tracked. Both must be readable. The build
+  stops, naming the article and the file, when one is not.
+- A `fits/` path that is not such a literal fails the build, because the check
+  cannot read it. This includes `readRDS("fits/<name>")` without `file =`, a
+  path built with `paste0()` or `file.path()`, and inline code. Paths passed to
+  a writer, such as `saveRDS()`, `write.csv()`, `ggsave()` or `png()`, are
+  ignored. Sourced code and child documents are not checked.
+- Articles that pkgdown does not build (names starting with `_`,
+  `vignettes/tutorials/`) are not checked.
+- Chunks are found as knitr finds them. A chunk opens at any line like
+  `` ```{r} ``, also inside a longer fenced block that only shows it, because
+  knitr runs it there. `#| ` options count only at the top of the chunk.
+- Upload the fit before the PR is merged into a branch that builds the site.
 - Give a refitted fit a new file name instead of replacing the old asset. The
   website builds from `develop` and reads whatever the release holds at that
   moment.
