@@ -81,10 +81,11 @@ example with an interactive rebase.
 - Say in the PR where we can get the fit. A maintainer uploads it to the
   `article-fits` release, and the website build downloads it from there.
 - The website build stops, naming the article and the fit, when a fit that an
-  article loads from `fits/` is missing from the release or cannot be read.
-  It finds the fits by reading `file = "fits/<name>"` in the R chunks of the
-  articles, so a fit that is loaded by other means, such as sourced code or a
-  child document, is not checked. The fit has to be uploaded before the PR is
+  article loads is missing or cannot be read: a `fits/` fit from the release,
+  an `assets/` fit from the tree. It finds the fits by reading the string
+  literals passed as `file =` in the evaluated R chunks of the articles, so a
+  fit that is loaded by other means, such as sourced code or a child document,
+  is not checked. The fit has to be uploaded before the PR is
   merged into a branch that builds the site.
 - Give a refitted fit a new file name instead of replacing the old asset. The
   website builds from `develop` and reads whatever the release holds at that

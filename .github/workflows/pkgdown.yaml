@@ -134,12 +134,11 @@ jobs:
           fi
           echo "Downloaded ${n} article fits from the ${FITS_TAG} release"
 
-      # Every article that loads a fit from fits/ must find it, because a
-      # missing fit is refitted during the build instead of failing it. The
-      # path must be a string literal, so that it can be listed. Only R code
-      # in chunks is read: code that an article sources, includes as a child
-      # document or computes inline is not seen, except for inline code that
-      # names a fits/ path, which fails.
+      # A fit that an article loads but the build cannot find is refitted
+      # during the build instead of failing it. The script checks every
+      # file = "<relative path>" string literal in the evaluated R chunks of
+      # the articles pkgdown builds (fits/ from the release, assets/ from the
+      # tree) and fails on a fits/ path it cannot list.
       - name: Check article fits
         run: Rscript .github/scripts/check-article-fits.R
 
