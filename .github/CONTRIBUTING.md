@@ -66,15 +66,22 @@ Attach the script as a gist or in a collapsed block in the PR.
 ### Model fits for the website articles
 
 The articles load cached fits through `bmm(..., file = )`. Do not commit new
-or refitted fits: a check fails every PR that adds a file larger than 1 MiB,
-or a new version of one
-([ADR 0003](../.dev/decisions/0003-model-fit-files.md)).
+or refitted fits. The `file-size` check fails a PR when any of its commits adds
+a file larger than 1 MiB, or a new version of one, even if a later commit
+removes the file again, because merging the PR keeps every commit in the
+history ([ADR 0003](../.dev/decisions/0003-model-fit-files.md)). Files that are
+already in `develop` do not count. If the check names a commit of yours,
+rewrite the branch without that file, for example with an interactive rebase.
 
-- Point `file =` to `fits/<name>`. The folder `vignettes/articles/fits/` is
-  gitignored. Fits that are already tracked in `assets/` stay there until their
-  article is refitted.
+- Point `file =` to `fits/<name>`, written as a string literal. The folder
+  `vignettes/articles/fits/` is gitignored. Fits that are already tracked in
+  `assets/` stay there until their article is refitted.
 - Say in the PR where we can get the fit. A maintainer uploads it to the
   `article-fits` release, and the website build downloads it from there.
+- The website build stops, naming the article and the fit, when a fit that an
+  article loads from `fits/` is missing from the release or cannot be read.
+  The fit has to be uploaded before the PR is merged into a branch that
+  builds the site.
 - Give a refitted fit a new file name instead of replacing the old asset. The
   website builds from `develop` and reads whatever the release holds at that
   moment.
