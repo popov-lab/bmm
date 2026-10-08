@@ -4140,3 +4140,182 @@ rsdt_cdp <- function(n, n_trials, stimulus, dfam, drec, thresholds,
   }
   counts
 }
+
+
+############################################################################# !
+# PSYCHOMETRIC FUNCTION DISTRIBUTION FUNCTIONS                            ####
+############################################################################# !
+
+# Each sigmoid is a standard CDF from .sdt_dists read on the linear or on the
+# log stimulus axis; weibull is gumbel_min on log intensity, as in psignifit 4.
+# The order is the order of the `sigmoid` argument, normal first as its default.
+.psychometric_sigmoids <- list(
+  normal      = list(dist = "normal",     log_x = FALSE),
+  logistic    = list(dist = "logistic",   log_x = FALSE),
+  gumbel_min  = list(dist = "gumbel_min", log_x = FALSE),
+  gumbel_max  = list(dist = "gumbel_max", log_x = FALSE),
+  weibull     = list(dist = "gumbel_min", log_x = TRUE),
+  lognormal   = list(dist = "normal",     log_x = TRUE),
+  loglogistic = list(dist = "logistic",   log_x = TRUE)
+)
+
+# Standard-axis location of the midpoint (F = 0.5) and the standard-axis span
+# from F = 0.05 to F = 0.95, which `width` covers on the stimulus axis
+.psychometric_z_constants <- function(sigmoid) {
+  qf <- .sdt_dists[[.psychometric_sigmoids[[sigmoid]]$dist]]$qf
+  c(zmid = qf(0.5), zspan = qf(0.95) - qf(0.05))
+}
+
+.psychometric_z <- function(intensity, midpoint, width, sigmoid) {
+  k <- .psychometric_z_constants(sigmoid)
+  dx <- if (.psychometric_sigmoids[[sigmoid]]$log_x) {
+    log(intensity) - log(midpoint)
+  } else {
+    intensity - midpoint
+  }
+  k[["zmid"]] + k[["zspan"]] * dx / width
+}
+
+# Stimulus intensity at which the sigmoid F reaches f, the inverse of
+# .psychometric_z() followed by F
+.psychometric_x_at <- function(f, midpoint, width, sigmoid) {
+  k <- .psychometric_z_constants(sigmoid)
+  qf <- .sdt_dists[[.psychometric_sigmoids[[sigmoid]]$dist]]$qf
+  dx <- (qf(f) - k[["zmid"]]) * width / k[["zspan"]]
+  if (.psychometric_sigmoids[[sigmoid]]$log_x) midpoint * exp(dx) else midpoint + dx
+}
+
+# log P(1) and log P(0) on the log scale, as in psychometric_log_lik() in
+# inst/stan_chunks/psychometric_funs.stan:
+#   psi     = guess + (1 - guess) (1 - lapse) F(z)
+#   1 - psi = (1 - guess) (lapse + (1 - lapse) (1 - F(z)))
+# The probability scale rounds psi to 0 or 1 in the tails, where Stan stays
+# finite, and a guess or lapse of exactly 0 must give log(0) = -Inf, not NaN.
+.psychometric_log_probs <- function(intensity, midpoint, width, guess, lapse,
+                                    sigmoid) {
+  dist <- .sdt_dists[[.psychometric_sigmoids[[sigmoid]]$dist]]
+  z <- .psychometric_z(intensity, midpoint, width, sigmoid)
+  list(
+    one = log_sum_exp(log(guess), log1p(-guess) + log1p(-lapse) + dist$lcdf(z)),
+    zero = log1p(-guess) + log_sum_exp(log(lapse), log1p(-lapse) + dist$lccdf(z))
+  )
+}
+
+.psychometric_check_pars <- function(intensity, midpoint, width, guess, lapse,
+                                     sigmoid) {
+  stopif(anyNA(c(intensity, midpoint, width, guess, lapse)),
+         "intensity, midpoint, width, guess and lapse must not contain NA")
+  stopif(any(width <= 0), "width must be positive")
+  stopif(any(guess < 0 | guess >= 1), "guess must be in [0, 1)")
+  stopif(any(lapse < 0 | lapse >= 1), "lapse must be in [0, 1)")
+  if (.psychometric_sigmoids[[sigmoid]]$log_x) {
+    stopif(any(intensity <= 0),
+           "intensity must be positive for sigmoid = '{sigmoid}', which reads \\
+           it on the log scale")
+    stopif(any(midpoint <= 0),
+           "midpoint must be positive for sigmoid = '{sigmoid}'")
+  }
+}
+
+#' @title Distribution functions for the psychometric function model
+#'
+#' @description Density and random generation for the [psychometric()] model:
+#'   the number of positive responses ("yes", "correct", "longer") out of
+#'   `n_trials` at a stimulus intensity, a binomial with probability
+#'   \deqn{\psi(x) = \gamma + (1 - \gamma)(1 - \lambda) F(x),}{psi(x) = guess + (1 - guess) * (1 - lapse) * F(x),}
+#'   where \eqn{F} is the sigmoid with its midpoint and width.
+#'
+#' @name psychometric_dist
+#'
+#' @param x Integer vector. Number of positive responses, between 0 and
+#'   `n_trials`.
+#' @param intensity Numeric vector. Stimulus intensity. Must be positive for the
+#'   sigmoids that read it on the log scale (`"weibull"`, `"lognormal"`,
+#'   `"loglogistic"`).
+#' @param midpoint Numeric. Intensity at which the sigmoid \eqn{F} is 0.5, in
+#'   the units of `intensity`. Positive for the log-scale sigmoids.
+#' @param width Numeric, positive. Distance on the intensity axis between the
+#'   points where \eqn{F} is 0.05 and 0.95; for the log-scale sigmoids, in log
+#'   units of intensity.
+#' @param guess Numeric in \[0, 1). Guess rate, the lower asymptote: 0.5 in
+#'   2AFC, `1 / m` in m-AFC.
+#' @param lapse Numeric in \[0, 1). Proportion of trials on which the observer
+#'   does not attend and responds at the guess rate. The upper asymptote is
+#'   `1 - lapse * (1 - guess)`.
+#' @param n_trials Integer vector. Number of trials per observation (default
+#'   1, a single binary response).
+#' @param sigmoid The sigmoid \eqn{F}; see [psychometric()].
+#' @param log Logical. If `TRUE`, returns the log-density (default `FALSE`).
+#' @param n Integer. Number of observations to generate. `intensity`,
+#'   `n_trials` and the parameters are recycled to this length.
+#'
+#' @return `dpsychometric()` returns the (log-)density, a binomial probability.
+#'   `rpsychometric()` returns an integer vector with the number of positive
+#'   responses per observation.
+#'
+#' @section Parameter scales:
+#' These functions take every argument on the **natural** scale, while
+#' [psychometric()] *estimates* `width` on the log scale and `guess` and `lapse`
+#' on the logit scale (and `midpoint` on the log scale for the log-scale
+#' sigmoids). Transform a fitted value back before passing it here.
+#'
+#' @references
+#' Schütt, H. H., Harmeling, S., Macke, J. H., & Wichmann, F. A. (2016).
+#'   Painfree and accurate Bayesian estimation of psychometric functions for
+#'   (potentially) overdispersed data. \emph{Vision Research}, \emph{122},
+#'   105--123. \doi{10.1016/j.visres.2016.02.002}
+#'
+#' Wichmann, F. A., & Hill, N. J. (2001). The psychometric function: I.
+#'   Fitting, sampling, and goodness of fit. \emph{Perception & Psychophysics},
+#'   \emph{63}(8), 1293--1313. \doi{10.3758/BF03194544}
+#'
+#' @keywords distribution
+#' @export
+#' @examples
+#' # Probability of 7 correct out of 10 2AFC trials at the midpoint
+#' dpsychometric(7, intensity = 1, midpoint = 1, width = 2, guess = 0.5,
+#'               n_trials = 10)
+#'
+#' # Simulate a method-of-constant-stimuli experiment with a Weibull observer
+#' dat <- data.frame(contrast = rep(c(0.01, 0.02, 0.04, 0.08, 0.16), 4))
+#' dat$n_correct <- rpsychometric(nrow(dat), dat$contrast, midpoint = 0.04,
+#'                                width = 2, guess = 0.5, lapse = 0.02,
+#'                                n_trials = 40, sigmoid = "weibull")
+#' head(dat)
+dpsychometric <- function(x, intensity, midpoint, width, guess = 0, lapse = 0,
+                          n_trials = 1,
+                          sigmoid = c("normal", "logistic", "gumbel_min",
+                                      "gumbel_max", "weibull", "lognormal",
+                                      "loglogistic"),
+                          log = FALSE) {
+  sigmoid <- match.arg(sigmoid)
+  stopif(anyNA(x), "x must not contain NA")
+  stopif(anyNA(n_trials), "n_trials must not contain NA")
+  stopif(any(x < 0), "x must be non-negative")
+  stopif(any(n_trials < 1), "n_trials must be positive")
+  stopif(any(x > n_trials), "x must not exceed n_trials")
+  .psychometric_check_pars(intensity, midpoint, width, guess, lapse, sigmoid)
+
+  lp <- .psychometric_log_probs(intensity, midpoint, width, guess, lapse, sigmoid)
+  out <- lchoose(n_trials, x) +
+    times_nonzero(x, lp$one) +
+    times_nonzero(n_trials - x, lp$zero)
+  if (log) out else exp(out)
+}
+
+
+#' @rdname psychometric_dist
+#' @export
+rpsychometric <- function(n, intensity, midpoint, width, guess = 0, lapse = 0,
+                          n_trials = 1,
+                          sigmoid = c("normal", "logistic", "gumbel_min",
+                                      "gumbel_max", "weibull", "lognormal",
+                                      "loglogistic")) {
+  sigmoid <- match.arg(sigmoid)
+  stopif(length(n) != 1 || n < 1, "n must be a single positive integer")
+  stopif(any(n_trials < 1), "n_trials must be positive")
+  .psychometric_check_pars(intensity, midpoint, width, guess, lapse, sigmoid)
+
+  lp <- .psychometric_log_probs(intensity, midpoint, width, guess, lapse, sigmoid)
+  stats::rbinom(n, rep_len(n_trials, n), rep_len(exp(lp$one), n))
+}

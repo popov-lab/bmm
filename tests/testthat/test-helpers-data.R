@@ -186,6 +186,10 @@ test_that("check_data() returns a data.frame()", {
     if (inherits(model, "sdt_cdp")) {
       model <- ml(response = "", stimulus = "stimulus", n_new = 1, n_old = 2)
     }
+    # stimulus doubles as a two-level intensity here
+    if (inherits(model, "psychometric")) {
+      model <- ml(response = "response", intensity = "stimulus", n_trials = "n_trials")
+    }
     expect_s3_class(
       check_data(model, test_data, bmf(kappa ~ 1)),
       "data.frame"

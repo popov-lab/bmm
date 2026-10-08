@@ -476,6 +476,18 @@ test_that("every model ships an sd default on the link scale of each parameter",
   )
   expect_equal(sd_default(pr, "d"), "exponential(1)")
 
+  # midpoint's rate is scaled to the intensity range, 4 / R with R = 3 here
+  psy_data <- data.frame(x = rep(c(-1, 0, 1, 2), 5), y = rep(c(0L, 1L), 10),
+                         id = factor(rep(1:5, each = 4)))
+  pr <- default_prior(
+    bmf(midpoint ~ 1 + (1 | id), width ~ 1 + (1 | id), guess ~ 1 + (1 | id),
+        lapse ~ 1 + (1 | id)),
+    psy_data, psychometric("y", "x")
+  )
+  expect_equal(sd_default(pr, "midpoint"), "exponential(1.33)")
+  expect_equal(sd_default(pr, "width"), "exponential(2)")
+  for (par in c("guess", "lapse")) expect_equal(sd_default(pr, par), "exponential(1)")
+
   pr <- default_prior(
     bmf(d ~ 1 + (1 | id), sdratio ~ 1 + (1 | id)), meyer_grant_jakob_2025,
     sdt_ranking(response = paste0("rank", 1:5), m = "set_size", dist = "normal")

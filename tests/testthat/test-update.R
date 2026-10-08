@@ -474,6 +474,20 @@ stored_frame_cases <- function() {
       model = sdm("dev_rad"), formula = bmf(c ~ 1, kappa ~ 1),
       data = lin_2017
     ),
+    psychometric = list(
+      model = psychometric("correct", "x"),
+      formula = bmf(midpoint ~ 1, width ~ 1, guess ~ 1, lapse ~ 1),
+      data = data.frame(x = rep(c(-1, 0, 1, 2), 5), correct = rep(c(0L, 1L), 10))
+    ),
+    psychometric_counts = list(
+      model = psychometric("n_correct", "contrast", n_trials = "n_trials",
+                           sigmoid = "weibull", guess = "chance", lapse = 0),
+      formula = bmf(midpoint ~ 1, width ~ 1),
+      data = data.frame(
+        contrast = rep(c(0.01, 0.02, 0.04, 0.08), 4), n_trials = 20L,
+        n_correct = rep(c(9L, 12L, 16L, 19L), 4), chance = rep(c(0.5, 0.25), each = 8)
+      )
+    ),
     sdt_yn = list(
       model = sdt_yn(response = "n_old", stimulus = "stimulus", n_trials = "n_trials"),
       formula = bmf(d ~ 1, criterion ~ 1, sdratio ~ 1), data = broeder_schuetz_2009_e3
