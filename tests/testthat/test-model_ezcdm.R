@@ -480,3 +480,15 @@ test_that("ezcdm_lpdf in Stan matches dezcdm() in R", {
   relative_diff <- abs(stan_lpdf - r_lpdf) / abs(r_lpdf)
   expect_lt(max(relative_diff), 1e-9)
 })
+
+test_that("posterior_epred() and fitted() refuse ezcdm and point to native_parameters()", {
+  path <- test_path("assets", "bmmfit_ezcdm_ppcheck.rds")
+  skip_if_not(file.exists(path), "fixture not available (excluded by .Rbuildignore)")
+  fit <- readRDS(path)
+  expect_error(brms::posterior_epred(fit, ndraws = 5),
+               "not defined for the ezcdm model; use native_parameters()")
+  expect_error(fitted(fit, ndraws = 5), "not defined for the ezcdm model")
+  expect_equal(dim(brms::posterior_epred(fit, dpar = "driftrate", ndraws = 5)),
+               c(5L, nrow(fit$data)))
+  expect_false(expected_response_defined(ezcdm_test_model()))
+})

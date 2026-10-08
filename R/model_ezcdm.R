@@ -224,6 +224,7 @@ configure_model.ezcdm <- function(model, data, formula) {
     type = "real",
     log_lik = log_lik_ezcdm,
     posterior_predict = posterior_predict_ezcdm,
+    posterior_epred = posterior_epred_undefined("ezcdm"),
     loop = TRUE,
     vars = c("vreal1[n]", "vreal2[n]", "vreal3[n]", "trials[n]")
   )
@@ -250,6 +251,14 @@ log_lik_ezcdm <- function(i, prep) {
     ndt = brms::get_dpar(prep, "ndt", i = i),
     log = TRUE
   )
+}
+
+# The brms response is the circular mean of the angles, whose expected value
+# is no more useful than that of the circular models' response errors. The
+# method also covers fits saved before the family stored a posterior_epred.
+#' @export
+expected_response_defined.ezcdm <- function(model) {
+  FALSE
 }
 
 # brms forwards posterior_predict() dots to prepare_predictions() only, never

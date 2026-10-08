@@ -112,6 +112,7 @@ revert_postprocess_brm.default <- function(model, fit, ...) {
 #'   | `sdt_mafc()` | Number of correct responses, the number of trials times their probability |
 #'   | `m3()`, `sdt_rating()`, `sdt_ranking()`, `sdt_cdp()` | Expected count of each response category, from the multinomial family of \pkg{brms} |
 #'   | `sdm()`, `mixture2p()`, `mixture3p()`, `imm()` | Not defined: the mean of a circular response error is not a useful quantity, so these models stop with an error |
+#'   | `ezcdm()` | Not defined, as for the circular models: the response is the circular mean of the response angles |
 #'
 #'   With `dpar` or `nlpar`, `posterior_epred()` returns draws of that model
 #'   parameter for every model, as in \pkg{brms}: a `dpar` on its native scale,
