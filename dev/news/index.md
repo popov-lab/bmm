@@ -326,6 +326,12 @@
   `draw_ids` and `re_formula = NULL`, and with `ndraws` combined draws
   that did not belong together. All four now work. Default output is
   unchanged ([\#512](https://github.com/popov-lab/bmm/issues/512)).
+- [`summary()`](https://rdrr.io/r/base/summary.html) of **m3**,
+  **sdt_rating**, **sdt_ranking** and **sdt_cdp** fits left the name of
+  the data blank (`Data: (Number of observations: 120)`). It now names
+  the data passed to
+  [`bmm()`](https://popov-lab.github.io/bmm/dev/reference/bmm.md). Refit
+  to get the name into the summary; fits saved earlier keep the blank.
 - [`native_parameters()`](https://popov-lab.github.io/bmm/dev/reference/native_parameters.md)
   failed with
   `Cannot build a prediction grid: variable(s) ... are not columns of the model data`
