@@ -1,18 +1,11 @@
-// EZ circular diffusion model: exact von Mises sufficient-statistic term for the
-// angle summaries; for RT variance a Gamma matched to the exact mean VRT and
-// variance W = k4 / n + 2 VRT^2 / (n - 1) of the sample variance; for mean RT a
-// normal conditional on the RT variance with the exact covariance k3 / n, where
-// k3 and k4 are the third and fourth cumulants of the decision time.
+// EZ-CDM summaries, exact von Mises angle term; R twins dezcdm(), .ezcdm_moments(), .ez_rt_terms()
 real ezcdm_lpdf(real mean_angle, real mu, real driftrate, real driftangle,
                 real bound, real ndt,
                 real var_angle, real mean_rt, real var_rt, int trials) {
   real kappa = bound * driftrate;
   real log_I0 = log_modified_bessel_first_kind(0, kappa);
   real k2 = square(kappa);
-  // MRT = ndt + L r, VRT = L^2 v, k3 = L^3 c3, k4 = L^4 c4 with L = bound / driftrate,
-  // except below kappa = 0.01, where L = bound^2 and r, v, c3, c4 are the series
-  // divided by powers of kappa: there R^2 - 1 + 2R/kappa cancels, and L would
-  // overflow when driftrate underflows. Same regimes as .ezcdm_moments().
+  // MRT = ndt + L r, VRT = L^2 v, k3 = L^3 c3, k4 = L^4 c4; regimes and L as in .ezcdm_moments()
   real L;
   real r;
   real v;
@@ -25,8 +18,7 @@ real ezcdm_lpdf(real mean_angle, real mu, real driftrate, real driftangle,
   } else {
     L = bound / driftrate;
     if (kappa > 1000) {
-      // exp(log I1 - log I0) loses ~1e-12, which the cancellation in v amplifies;
-      // the asymptotic expansion is exact to double precision from kappa = 1000
+      // asymptotic I1/I0: exp(log I1 - log I0) loses ~1e-12, which v amplifies
       real u = inv(kappa);
       r = (1 - u * (3.0 / 8 + u * (15.0 / 128 + u * (105.0 / 1024 + u * 14175.0 / 98304))))
           / (1 + u * (1.0 / 8 + u * (9.0 / 128 + u * (75.0 / 1024 + u * 11025.0 / 98304))));
@@ -61,8 +53,7 @@ real ezcdm_lpdf(real mean_angle, real mu, real driftrate, real driftangle,
     }
   }
   real VRT = square(L) * v;
-  // n W / L^4; the Gamma shape is VRT^2 / W and the conditional normal of
-  // mean_rt has slope (k3 / n) / W and variance VRT / n - (k3 / n)^2 / W
+  // nW = n W / L^4, with W and the conditional normal of mean_rt as in .ez_rt_terms()
   real nW = c4 + 2 * trials * square(v) / (trials - 1);
   real shape = trials * square(v) / nW;
   return trials * (kappa * (1 - var_angle) * cos(mean_angle - driftangle) - log_I0)
