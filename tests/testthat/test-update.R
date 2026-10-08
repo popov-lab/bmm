@@ -752,3 +752,24 @@ test_that("data without the largest set size still fail the nt_features check", 
   expect_error(bmm(case$formula, short_data, case$model, backend = "mock", mock_fit = 1), msg)
   expect_error(update_mock(fit, newdata = short_data), msg)
 })
+
+test_that("an updated fit carries nothing from the frame that called update()", {
+  skip_if_not_installed("rstan")
+  stub <- methods::new("stanfit", sim = list(
+    iter = 10L, warmup = 5L, chains = 1L, thin = 1L,
+    samples = list(structure(list(), args = list(control = list())))
+  ))
+  dat <- data.frame(y = rsdm(60, kappa = 5))
+  fit <- suppressMessages(bmm(bmf(c ~ 1, kappa ~ 1), dat, sdm("y"),
+                              backend = "mock", mock_fit = stub, rename = FALSE))
+  # on a recompile, the only route the mock backend runs, brms stores the init
+  # function update() builds in the fit, which saveRDS() would then write with
+  # the caller's frame
+  update_beside <- function(n) {
+    ballast <- runif(n)
+    suppressMessages(update(fit, backend = "mock", mock_fit = stub, rename = FALSE, recompile = TRUE))
+  }
+  # each fit is sized on its own, so that the other one's ballast is not counted
+  serialized_size <- function(n) length(serialize(update_beside(n), NULL))
+  expect_equal(serialized_size(1e6), serialized_size(1))
+})
