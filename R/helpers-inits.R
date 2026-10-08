@@ -34,12 +34,21 @@ create_initfun.default <- function(model, data, formula, prior = NULL, ...) {
   standata_list <- standata(formula, data, formula$family, prior = prior, ...)
   stan_code <- stancode(formula, data, formula$family, prior = prior, ...)
   stanpars_list <- extract_parameter_dimensions(extract_stan_blocks(stan_code)$parameters)
+  new_initfun(stanpars_list, standata_list, model)
+}
+
+# brms stores the init function in the fit, and saveRDS() writes the function's
+# environment with it. A closure made in the method would keep the method's
+# frame, whose generic call environment leads back to the frames of bmm() or
+# update(), with the data and the fitted model. Made here, it keeps only what it
+# reads. The arguments are forced first, because an unforced promise would hold
+# on to the caller's frame until the function's first call
+new_initfun <- function(stanpars_list, standata_list, model) {
+  force(stanpars_list)
+  force(standata_list)
+  force(model)
 
   function() {
-    force(stanpars_list)
-    force(standata_list)
-    force(model)
-
     stan_names <- names(stanpars_list)
     inits <- lapply(stan_names, function(spar) {
       init_stan_param(spar, stanpars_list[[spar]], model, standata_list)
