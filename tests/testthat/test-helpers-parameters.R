@@ -546,6 +546,21 @@ test_that(".np_grid_vars spans only data columns for a non-linear formula", {
   expect_length(.np_grid_vars(fit, "kappa", NULL), 0)
 })
 
+test_that(".np_grid_vars honours the re_formula regimes on a mock fit", {
+  withr::local_options(bmm.silent = 2)
+  fit <- suppressWarnings(bmm(
+    bmf(c ~ 1 + set_size + (1 | ID), kappa ~ 1 + (1 | ID)), oberauer_lin_2017,
+    sdm(resp_error = "dev_rad"), backend = "mock", mock_fit = 1, rename = FALSE
+  ))
+  pars <- names(fit$bmm$model$parameters)
+
+  expect_setequal(.np_grid_vars(fit, pars, NULL), c("set_size", "ID"))
+  expect_setequal(.np_grid_vars(fit, pars, NA), "set_size")
+  expect_setequal(.np_grid_vars(fit, pars, ~ (1 | ID)), c("set_size", "ID"))
+  expect_setequal(.np_grid_vars(fit, pars, ~ (1 | other)), "set_size")
+  expect_equal(.np_grid_vars(fit, "kappa", NA), character(0))
+})
+
 test_that(".np_grid_vars follows sub-parameters to their grouping variables", {
   fit <- load_np_m3_fit()
   fit$bmm$user_formula$c <- stats::as.formula(c ~ exp(logc) * cond)
