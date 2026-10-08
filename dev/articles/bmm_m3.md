@@ -80,8 +80,8 @@ from the context cue of retrieving the cued serial position.
 The activation for each category is then translated into probabilities
 of recalling one item or response from each category with a
 normalization function as a choice rule. In `bmm` we have implemented
-two choice rules, that are different implementations of Luce’s choice
-axiom:
+three choice rules. The first two are different implementations of
+Luce’s choice axiom:
 
 1.  Simple normalization (`"simple"`)
 
@@ -113,6 +113,24 @@ This choice rule can be interpreted as an n-alternative SDT model over
 the different response candidates with a Gumbel (or double-exponential)
 noise distribution.
 
+3.  Gaussian (`"gaussian"`)
+
+The `gaussian` choice rule is the same n-alternative SDT model with
+normally distributed noise: every candidate receives its category’s
+activation plus independent standard normal noise, and the candidate
+with the largest value is recalled. The probability of choosing category
+\\i\\ is
+
+\\ p_i = n_i \int \phi(z) \\ \Phi(z)^{n_i - 1} \prod\_{j \neq i}
+\Phi(z + A_i - A_j)^{n_j} \\ dz \\
+
+where \\\phi\\ and \\\Phi\\ are the standard normal density and
+distribution function. There is no closed form for this integral, so
+`bmm` approximates it numerically, and fits take much longer than with
+`softmax`. The softmax rule is the only rule for which the noise model
+and Luce’s choice axiom coincide (Yellott 1977), so the two rules are
+genuinely different models, not two parameterizations of one.
+
 The two choice rules differ in how they translate the activation sources
 into probabilities, and this has a consequence for comparing activation
 sources. The default priors for the predefined `ss` and `cs` versions
@@ -128,7 +146,14 @@ activations, so context activation has to exceed general activation
 therefore encode `c > a` and are not suited for directly comparing `c`
 and `a`. If your research question concerns the contrast between
 activation sources, use the `softmax` choice rule (or supply your own
-symmetric priors).
+symmetric priors). The `gaussian` rule also has equal default prior
+means for `a` and `c`, but its activations are on a smaller scale than
+under `softmax`, and not by one constant factor: general activation
+shrinks more than context activation. Comparisons of `c` against `a`,
+and effects of conditions that change the number of candidates (for
+example set size), can therefore differ between `softmax` and
+`gaussian`. If such a contrast is your question, it is worth checking
+whether it holds under both rules.
 
 Finally, the model then links the response frequencies \\Y\\ for each
 response category to the probabilities \\p\\ using a multinomial
@@ -209,7 +234,7 @@ parameter `b`. Thus the values of the other parameters should be
 interpreted relative to the background noise. The value `b` will be
 fixed to depends on the choice rule you choose for fitting the model.
 For the `simple` choice rule, `b` will be fixed to `0.1`, for the
-`softmax` choice rule, `b` will be fixed to `0`.
+`softmax` and `gaussian` choice rules, `b` will be fixed to `0`.
 
 We chose two fix the background noise `b` for scaling for two reasons:
 
@@ -757,6 +782,11 @@ ggplot(data = pp_m3,
 Oberauer, Klaus, and Stephan Lewandowsky. 2019. “Simple Measurement
 Models for Complex Working-Memory Tasks.” *Psychological Review* 126
 (6): 880–932. <https://doi.org/10.1037/rev0000159>.
+
+Yellott, John I. 1977. “The Relationship Between Luce’s Choice Axiom,
+Thurstone’s Theory of Comparative Judgment, and the Double Exponential
+Distribution.” *Journal of Mathematical Psychology* 15 (2): 109–44.
+<https://doi.org/10.1016/0022-2496(77)90026-8>.
 
 [^1]: Traditional complex span tasks, such as the operation span or
     reading span task are thus not suited for the `m3`, as the

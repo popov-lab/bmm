@@ -115,6 +115,17 @@
 
 #### New features
 
+- [`m3()`](https://popov-lab.github.io/bmm/dev/reference/m3.md) accepts
+  `choice_rule = "gaussian"`, a Thurstonian rule: every candidate gets
+  independent normal noise and the strongest one is chosen (`"softmax"`
+  is the same with Gumbel noise). Activation estimates are on a smaller
+  scale than under `"softmax"`, and conclusions about `c` against `a`,
+  or about conditions that change the number of candidates such as set
+  size, can differ between the rules. Fits take much longer than with
+  `"softmax"`. The Gaussian rule requires whole numbers of options. See
+  `choice_rule` in
+  [`?m3`](https://popov-lab.github.io/bmm/dev/reference/m3.md). Thanks
+  to [@GidonFrischkorn](https://github.com/GidonFrischkorn)
 - New function
   [`bmm_setup()`](https://popov-lab.github.io/bmm/dev/reference/bmm_setup.md)
   checks whether your machine can fit models: the C++ toolchain,

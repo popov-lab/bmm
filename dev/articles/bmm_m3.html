@@ -119,7 +119,7 @@ npl &amp; = b
 <h3 id="choice-rules-in-the-m3">
 <span class="header-section-number">1.2</span> Choice Rules in the <code>m3</code><a class="anchor" aria-label="anchor" href="#choice-rules-in-the-m3"></a>
 </h3>
-<p>The activation for each category is then translated into probabilities of recalling one item or response from each category with a normalization function as a choice rule. In <code>bmm</code> we have implemented two choice rules, that are different implementations of Luce’s choice axiom:</p>
+<p>The activation for each category is then translated into probabilities of recalling one item or response from each category with a normalization function as a choice rule. In <code>bmm</code> we have implemented three choice rules. The first two are different implementations of Luce’s choice axiom:</p>
 <ol style="list-style-type: decimal">
 <li>Simple normalization (<code>"simple"</code>)</li>
 </ol>
@@ -137,7 +137,15 @@ p_i = \frac{n_i \cdot A_i}{\sum^n_{j = 1} n_j \cdot A_j}
 p_i = \frac{n_i \cdot e^{A_i}}{\sum^n_{j = 1} n_j \cdot e^{A_j}}
 \]</span></p>
 <p>This choice rule can be interpreted as an n-alternative SDT model over the different response candidates with a Gumbel (or double-exponential) noise distribution.</p>
-<p>The two choice rules differ in how they translate the activation sources into probabilities, and this has a consequence for comparing activation sources. The default priors for the predefined <code>ss</code> and <code>cs</code> versions are calibrated so that both rules imply a comparable, broad range of average performance. For the <code>softmax</code> rule the priors for general (<code>a</code>) and context (<code>c</code>) activation share the same mean, so the implied prior on their difference is centered at zero. This makes <code>softmax</code> the appropriate choice rule when you want to compare or test activation sources against each other directly (e.g., whether context activation exceeds general activation). The <code>simple</code> rule normalizes the raw activations, so context activation has to exceed general activation (<code>c &gt; a</code>) for the model to predict accurate recall; its default priors therefore encode <code>c &gt; a</code> and are not suited for directly comparing <code>c</code> and <code>a</code>. If your research question concerns the contrast between activation sources, use the <code>softmax</code> choice rule (or supply your own symmetric priors).</p>
+<ol start="3" style="list-style-type: decimal">
+<li>Gaussian (<code>"gaussian"</code>)</li>
+</ol>
+<p>The <code>gaussian</code> choice rule is the same n-alternative SDT model with normally distributed noise: every candidate receives its category’s activation plus independent standard normal noise, and the candidate with the largest value is recalled. The probability of choosing category <span class="math inline">\(i\)</span> is</p>
+<p><span class="math display">\[
+p_i = n_i \int \phi(z) \, \Phi(z)^{n_i - 1} \prod_{j \neq i} \Phi(z + A_i - A_j)^{n_j} \, dz
+\]</span></p>
+<p>where <span class="math inline">\(\phi\)</span> and <span class="math inline">\(\Phi\)</span> are the standard normal density and distribution function. There is no closed form for this integral, so <code>bmm</code> approximates it numerically, and fits take much longer than with <code>softmax</code>. The softmax rule is the only rule for which the noise model and Luce’s choice axiom coincide <span class="citation">(Yellott 1977)</span>, so the two rules are genuinely different models, not two parameterizations of one.</p>
+<p>The two choice rules differ in how they translate the activation sources into probabilities, and this has a consequence for comparing activation sources. The default priors for the predefined <code>ss</code> and <code>cs</code> versions are calibrated so that both rules imply a comparable, broad range of average performance. For the <code>softmax</code> rule the priors for general (<code>a</code>) and context (<code>c</code>) activation share the same mean, so the implied prior on their difference is centered at zero. This makes <code>softmax</code> the appropriate choice rule when you want to compare or test activation sources against each other directly (e.g., whether context activation exceeds general activation). The <code>simple</code> rule normalizes the raw activations, so context activation has to exceed general activation (<code>c &gt; a</code>) for the model to predict accurate recall; its default priors therefore encode <code>c &gt; a</code> and are not suited for directly comparing <code>c</code> and <code>a</code>. If your research question concerns the contrast between activation sources, use the <code>softmax</code> choice rule (or supply your own symmetric priors). The <code>gaussian</code> rule also has equal default prior means for <code>a</code> and <code>c</code>, but its activations are on a smaller scale than under <code>softmax</code>, and not by one constant factor: general activation shrinks more than context activation. Comparisons of <code>c</code> against <code>a</code>, and effects of conditions that change the number of candidates (for example set size), can therefore differ between <code>softmax</code> and <code>gaussian</code>. If such a contrast is your question, it is worth checking whether it holds under both rules.</p>
 <p>Finally, the model then links the response frequencies <span class="math inline">\(Y\)</span> for each response category to the probabilities <span class="math inline">\(p\)</span> using a multinomial distribution with the total number of trials:</p>
 <p><span class="math display">\[
 Y \sim multinomial(p, trials)
@@ -183,7 +191,7 @@ npi &amp; = b
 <h3 id="parameter-scaling-the-m3">
 <span class="header-section-number">2.3</span> Parameter Scaling the <code>m3</code><a class="anchor" aria-label="anchor" href="#parameter-scaling-the-m3"></a>
 </h3>
-<p>Generally, one of the <code>m3</code> parameters has to be fixed to set the scaling of the model. In <code>bmm</code> the default is to fix the background noise parameter <code>b</code>. Thus the values of the other parameters should be interpreted relative to the background noise. The value <code>b</code> will be fixed to depends on the choice rule you choose for fitting the model. For the <code>simple</code> choice rule, <code>b</code> will be fixed to <code>0.1</code>, for the <code>softmax</code> choice rule, <code>b</code> will be fixed to <code>0</code>.</p>
+<p>Generally, one of the <code>m3</code> parameters has to be fixed to set the scaling of the model. In <code>bmm</code> the default is to fix the background noise parameter <code>b</code>. Thus the values of the other parameters should be interpreted relative to the background noise. The value <code>b</code> will be fixed to depends on the choice rule you choose for fitting the model. For the <code>simple</code> choice rule, <code>b</code> will be fixed to <code>0.1</code>, for the <code>softmax</code> and <code>gaussian</code> choice rules, <code>b</code> will be fixed to <code>0</code>.</p>
 <p>We chose two fix the background noise <code>b</code> for scaling for two reasons:</p>
 <ol style="list-style-type: decimal">
 <li>Fixing the background noise is similar to fixing noise parameters in other cognitive measurement models, such as the diffusion constant <code>s</code>, or the standard deviation of the noise added to the signal or noise distribution in SDT.</li>
@@ -579,6 +587,9 @@ scale reduction factor on split chains (at convergence, Rhat = 1).
 <div id="refs" class="references csl-bib-body hanging-indent">
 <div id="ref-oberauerSimpleMeasurementModels2019" class="csl-entry">
 Oberauer, Klaus, and Stephan Lewandowsky. 2019. <span>“Simple Measurement Models for Complex Working-Memory Tasks.”</span> <em>Psychological Review</em> 126 (6): 880–932. <a href="https://doi.org/10.1037/rev0000159" class="external-link">https://doi.org/10.1037/rev0000159</a>.
+</div>
+<div id="ref-Yellott_1977" class="csl-entry">
+Yellott, John I. 1977. <span>“The Relationship Between <span>Luce</span>’s Choice Axiom, <span>Thurstone</span>’s Theory of Comparative Judgment, and the Double Exponential Distribution.”</span> <em>Journal of Mathematical Psychology</em> 15 (2): 109–44. <a href="https://doi.org/10.1016/0022-2496(77)90026-8" class="external-link">https://doi.org/10.1016/0022-2496(77)90026-8</a>.
 </div>
 </div>
 </div>
