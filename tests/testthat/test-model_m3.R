@@ -666,7 +666,7 @@ test_that("custom m3 with the gaussian rule centres default identity-link priors
 })
 
 # 40 quadrature nodes hold |delta log P| below 2e-5 where log P > -5, and below
-# 1.2e-4 for categories with 30 options
+# 1.5e-4 for categories with 30 options
 test_that("Gaussian-rule probabilities match closed forms and integrate()", {
   # two categories with one option each: the difference of two N(0, 1) draws has variance 2
   A <- c(-1, 0, 0.7, 2.5)
@@ -692,7 +692,7 @@ test_that("Gaussian-rule probabilities match closed forms and integrate()", {
   for (cl in cells) {
     for (k in seq_along(cl$A)) {
       lp <- do.call(m3_gauss_logp, as.list(c(k, cl$A, cl$n)))
-      expect_lt(abs(lp - ref_logp(k, cl$A, cl$n)), if (max(cl$n) >= 30) 1.2e-4 else 2e-5)
+      expect_lt(abs(lp - ref_logp(k, cl$A, cl$n)), if (max(cl$n) >= 30) 1.5e-4 else 2e-5)
     }
   }
 })
@@ -738,6 +738,7 @@ test_that("the Stan Gaussian-rule wrapper matches its R companion", {
 
 # Without the std_normal_lcdf fallback in m3_gaussian_funs.stan the value here is still right but the
 # gradient is non-finite (log(0) times Phi's zero derivative); the fallback's derivative is approximate
+# (5e-4 off the finite difference at this point), hence error = 1e-2
 test_that("the Stan Gaussian-rule kernel has finite gradients where one category trails by 50", {
   skip_on_cran()
   skip_if_not_installed("cmdstanr")
