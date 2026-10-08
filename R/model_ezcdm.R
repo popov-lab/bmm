@@ -9,11 +9,13 @@
   ndt = "Non-decision time = Additional time required beyond the evidence accumulation process"
 )
 
+# sd rates by meaning (#342): 2 for the log-linked drift rate, boundary and
+# non-decision time, 4 for the drift angle, a circular bias like mu
 .ezcdm_priors <- list(
-  driftrate = list(main = "normal(0.5, 1)", effects = "normal(0, 0.5)"),
-  driftangle = list(main = "normal(0, 1)", effects = "normal(0, 0.5)"),
-  bound = list(main = "normal(0.5, 1)", effects = "normal(0, 0.5)"),
-  ndt = list(main = "normal(-1.5, 0.5)", effects = "normal(0, 0.3)")
+  driftrate = list(main = "normal(0.5, 1)", effects = "normal(0, 0.5)", sd = "exponential(2)"),
+  driftangle = list(main = "normal(0, 1)", effects = "normal(0, 0.5)", sd = "exponential(4)"),
+  bound = list(main = "normal(0.5, 1)", effects = "normal(0, 0.5)", sd = "exponential(2)"),
+  ndt = list(main = "normal(-1.5, 0.5)", effects = "normal(0, 0.3)", sd = "exponential(2)")
 )
 
 .ezcdm_links <- list(driftrate = "log", driftangle = "identity", bound = "log", ndt = "log")

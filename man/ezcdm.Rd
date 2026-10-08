@@ -103,21 +103,25 @@ ezcdm_summary_stats() computes all of them from trial-level data.
 \itemize{
 \item \code{main}: normal(0.5, 1)
 \item \code{effects}: normal(0, 0.5)
+\item \code{sd}: exponential(2)
 }
 \item \code{driftangle}:
 \itemize{
 \item \code{main}: normal(0, 1)
 \item \code{effects}: normal(0, 0.5)
+\item \code{sd}: exponential(4)
 }
 \item \code{bound}:
 \itemize{
 \item \code{main}: normal(0.5, 1)
 \item \code{effects}: normal(0, 0.5)
+\item \code{sd}: exponential(2)
 }
 \item \code{ndt}:
 \itemize{
 \item \code{main}: normal(-1.5, 0.5)
 \item \code{effects}: normal(0, 0.3)
+\item \code{sd}: exponential(2)
 }
 }
 

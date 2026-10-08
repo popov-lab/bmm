@@ -459,6 +459,18 @@ test_that("every model ships an sd default on the link scale of each parameter",
   expect_equal(sd_default(pr, "drift"), "exponential(1)")
   for (par in c("bound", "ndt")) expect_equal(sd_default(pr, par), "exponential(2)")
 
+  ezc_data <- data.frame(
+    mean_angle = rep(c(0.1, -0.1), 10), var_angle = rep(c(0.3, 0.4), 10),
+    mean_rt = rep(c(0.8, 0.9), 10), var_rt = rep(c(0.05, 0.06), 10),
+    n_trials = 100, id = factor(rep(1:10, each = 2))
+  )
+  pr <- default_prior(
+    bmf(driftrate ~ 1 + (1 | id), driftangle ~ 1 + (1 | id), bound ~ 1 + (1 | id), ndt ~ 1 + (1 | id)),
+    ezc_data, ezcdm("mean_angle", "var_angle", "mean_rt", "var_rt", "n_trials", version = "4par")
+  )
+  for (par in c("driftrate", "bound", "ndt")) expect_equal(sd_default(pr, par), "exponential(2)")
+  expect_equal(sd_default(pr, "driftangle"), "exponential(4)")
+
   pr <- default_prior(
     bmf(d ~ 1 + (1 | id), criterion ~ 0 + condition + (1 | id), sdratio ~ 1 + (1 | id)),
     broeder_schuetz_2009_e3,
