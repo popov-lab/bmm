@@ -14,6 +14,10 @@ name: pkgdown
 
 jobs:
   pkgdown:
+    # Creating the article-fits release publishes a release event that builds
+    # the tagged commit and deploys it to gh-pages. That release only holds
+    # fits, so its event builds nothing. Versioned releases deploy as before.
+    if: github.event_name != 'release' || github.event.release.tag_name != 'article-fits'
     runs-on: ubuntu-latest
     # Only restrict concurrency for non-PR jobs
     concurrency:
