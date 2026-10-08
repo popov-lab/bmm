@@ -176,6 +176,25 @@ update_model_fixed_parameters <- function(model, formula) {
   if (length(overwrite) > 0) {
     model$fixed_parameters[overwrite] <- NULL
   }
+
+  resolve_fixed_links(model)
+}
+
+# A fixed value is a constant() prior on the link scale, so a parameter fixed at
+# 0 under a log link would silently mean exp(0) = 1. A model's `links_fixed`
+# names the link to use while such a parameter stays fixed; the estimation link
+# is kept in an attribute so that freeing the parameter later restores it.
+resolve_fixed_links <- function(model) {
+  pars <- names(model$links_fixed)
+  if (length(pars) == 0) {
+    return(model)
+  }
+  estimated <- attr(model, "links_estimated") %||% model$links[pars]
+  attr(model, "links_estimated") <- estimated
+
+  model$links[pars] <- estimated[pars]
+  fixed_now <- intersect(pars, names(model$fixed_parameters))
+  model$links[fixed_now] <- model$links_fixed[fixed_now]
   model
 }
 
