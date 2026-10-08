@@ -2,7 +2,7 @@
 # chunk of a pkgdown article passes as file = "<relative path>" to a reader, and
 # fails when that file is missing next to the article or cannot be read, because
 # bmm() and brm() refit a missing fit during the build instead of failing it.
-# Readers are bmm(), brm(), update(), readRDS() and read_rds(); writers are ignored.
+# Readers are bmm(), brm(), readRDS() and read_rds(); writers are ignored.
 # Any other fits/ path fails, in a chunk or inline, because it cannot be checked.
 # Code that an article sources or includes as a child document is not seen.
 
@@ -11,10 +11,11 @@ chunk_end <- "^[\t >]*```+\\s*$"
 inline_fits <- "`r[ #][^`]*(fits/|[\"']fits[\"'])"
 fits_path <- "(^|/)fits(/|$)"
 not_evaluated <- "eval\\s*(=|:)\\s*(FALSE|F|false)\\b"
-readers <- c("bmm", "brm", "update", "readRDS", "read_rds")
+readers <- c("bmm", "brm", "readRDS", "read_rds")
+# update.bmmfit() always refits and only saves to file, so it is a writer
 writers <- c(
-  "saveRDS", "save", "write_rds", "write.csv", "write.table", "writeLines", "cat", "sink",
-  "ggsave", "png", "jpeg", "pdf", "svg"
+  "saveRDS", "save", "write_rds", "update", "write.csv", "write.table", "writeLines", "cat",
+  "sink", "ggsave", "png", "jpeg", "pdf", "svg"
 )
 # a bare "fits" names the folder only as a path component
 path_builders <- c("file.path", "here", "path")
@@ -151,9 +152,8 @@ check_article <- function(article) {
   )
 }
 
-# bmm() and update() append .rds unless the extension is a lower-case rds
-# (check_rds_file()), brm() ignores the case, and the RDS readers take the path
-# as it is written
+# bmm() appends .rds unless the extension is a lower-case rds (check_rds_file()),
+# brm() ignores the case, and the RDS readers take the path as it is written
 resolve <- function(article, path, call) {
   path <- normalize_path(path)
   as_written <- call %in% c("readRDS", "read_rds") | grepl("\\.rds$", path) |

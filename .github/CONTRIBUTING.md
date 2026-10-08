@@ -86,15 +86,15 @@ file, for example with an interactive rebase.
 - Say in the PR where we can get the fit. A maintainer uploads it to the
   `article-fits` release, and the website build downloads it from there.
 - The website build checks every `file = "..."` that an evaluated R chunk
-  passes as a string literal to `bmm()`, `brm()`, `update()`, `readRDS()` or
-  `read_rds()`. A `fits/<name>` file must be in the release. Any other file,
+  passes as a string literal to `bmm()`, `brm()`, `readRDS()` or `read_rds()`.
+  A `fits/<name>` file must be in the release. Any other file,
   such as `assets/<name>`, must be tracked. Both must be readable. The build
   stops, naming the article and the file, when one is not.
 - A `fits/` path that is not such a literal fails the build, because the check
   cannot read it. This includes `readRDS("fits/<name>")` without `file =`, a
   path built with `paste0()` or `file.path()`, and inline code. Paths passed to
-  a writer, such as `saveRDS()`, `write.csv()`, `ggsave()` or `png()`, are
-  ignored. Sourced code and child documents are not checked.
+  a writer, such as `saveRDS()`, `update()`, `write.csv()`, `ggsave()` or
+  `png()`, are ignored. Sourced code and child documents are not checked.
 - Articles that pkgdown does not build (names starting with `_`,
   `vignettes/tutorials/`) are not checked.
 - Chunks are found as knitr finds them. A chunk opens at any line like
