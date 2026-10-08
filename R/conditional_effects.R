@@ -806,8 +806,12 @@ conditional_effects.bmmfit <- function(x,
 #' (see `.ce_split_args()`). The parameter is then evaluated on that grid and
 #' summarised as brms would.
 #'
-#' Without `effects`, brms returns the effects of every formula in the model;
-#' only those brms would list for the parameter's own formula are kept.
+#' Without `effects`, brms is asked only for those of its default effects that
+#' it would list for the parameter's own formula. The category dpar is evaluated
+#' on every element of the grid, and on the grid of another formula's effect it
+#' can leave its domain: brms holds a numeric moderator at mean ± sd, which is
+#' below 0 for a 0/1 indicator or a count that is mostly 0, and the dpar takes
+#' its log. A parameter without such effects needs no grid.
 #'
 #' @param x A bmmfit object
 #' @param par Character string. The bmm parameter name, which is also its brms
@@ -820,20 +824,18 @@ conditional_effects.bmmfit <- function(x,
 #' @noRd
 .ce_nlpar_category_family <- function(x, par, ...) {
   args <- .ce_split_args(...)
-  # the parameter does not depend on the trials that brms sets to 1 for the grid
-  grid <- withCallingHandlers(
-    do.call(.brms_conditional_effects, c(
-      list(x, dpar = names(brms::brmsterms(x$formula)$dpars)[1]), args$grid
-    ), quote = TRUE),
-    message = function(m) {
-      if (grepl("Setting all 'trials' variables", conditionMessage(m), fixed = TRUE)) {
-        invokeRestart("muffleMessage")
-      }
-    }
-  )
-
   if (is.null(args$effects)) {
-    grid <- .ce_select_own_effects(grid, .ce_own_effects(x, par))
+    args$grid$effects <- vapply(
+      .ce_select_own_effects(.ce_brms_default_effects(x, args$grid$re_formula),
+                             .ce_own_effects(x, par)),
+      paste, "", collapse = ":"
+    )
+  }
+  # an empty `effects` of the user's is for brms to refuse
+  grid <- if (is.null(args$effects) && length(args$grid$effects) == 0) {
+    structure(list(), names = character(0), class = "brms_conditional_effects")
+  } else {
+    .ce_category_grid(x, args$grid)
   }
 
   structure(
@@ -849,6 +851,63 @@ conditional_effects.bmmfit <- function(x,
       }
     ),
     class = "brms_conditional_effects"
+  )
+}
+
+
+#' brms's conditions grid of the first category dpar
+#'
+#' @param x A bmmfit object
+#' @param grid_args The `grid` arguments of `.ce_split_args()`
+#'
+#' @return A `brms_conditional_effects` object
+#'
+#' @keywords internal
+#' @noRd
+.ce_category_grid <- function(x, grid_args) {
+  # the parameter does not depend on the trials that brms sets to 1 for the grid
+  withCallingHandlers(
+    do.call(.brms_conditional_effects, c(
+      list(x, dpar = names(brms::brmsterms(x$formula)$dpars)[1]), grid_args
+    ), quote = TRUE),
+    message = function(m) {
+      if (grepl("Setting all 'trials' variables", conditionMessage(m), fixed = TRUE)) {
+        invokeRestart("muffleMessage")
+      }
+    }
+  )
+}
+
+
+#' The effects brms plots without `effects`, in its order and orientation
+#'
+#' @description
+#' The list `brms::conditional_effects()` builds when it is given no `effects`
+#' (brms 2.23.0): the effects of every formula of the model, each pair with a
+#' numeric variable before a factor or grouping variable, which brms does only
+#' for this list. An `effects` argument is plotted in the order it is written,
+#' so these are the strings that reproduce brms's default grid.
+#'
+#' @param x A bmmfit object
+#' @param re_formula As in [brms::conditional_effects()]
+#'
+#' @return List of character vectors of one or two variable names
+#'
+#' @keywords internal
+#' @noRd
+.ce_brms_default_effects <- function(x, re_formula) {
+  brms_internal <- function(name) utils::getFromNamespace(name, "brms")
+  bterms <- brms::brmsterms(
+    brms_internal("update_re_terms")(x$formula, re_formula = re_formula)
+  )
+  group_vars <- brms_internal("get_group_vars")(bterms)
+  is_like_factor <- brms_internal("is_like_factor")
+  lapply(
+    brms_internal("get_all_effects")(bterms, rsv_vars = brms_internal("rsv_vars")(bterms)),
+    function(effect) {
+      effect[order(vapply(x$data[effect], is_like_factor, logical(1)) |
+                     effect %in% group_vars)]
+    }
   )
 }
 
@@ -894,22 +953,23 @@ conditional_effects.bmmfit <- function(x,
 }
 
 
-#' Keep the elements of a conditions grid that are the parameter's own effects
+#' Keep the effects of brms's default grid that are the parameter's own effects
 #'
 #' @description
 #' An effect that two formulas list with its variables in another order
-#' (`x:cond` and `cond:x`) is one effect; the element is kept in the order the
-#' parameter's own formula lists it, or else the first one.
+#' (`x:z` and `z:x`) is one effect; it is kept in the order the parameter's own
+#' formula lists it, or else the first one. brms plots the first variable on the
+#' x-axis and refuses an effect given twice.
 #'
-#' @param grid A `brms_conditional_effects` object
+#' @param effects List of the effects of brms's default grid, see
+#'   `.ce_brms_default_effects()`
 #' @param own_effects List of the variable sets of the parameter's effects
 #'
-#' @return `grid` without the other elements
+#' @return `effects` without the other elements
 #'
 #' @keywords internal
 #' @noRd
-.ce_select_own_effects <- function(grid, own_effects) {
-  effects <- lapply(grid, attr, "effects")
+.ce_select_own_effects <- function(effects, own_effects) {
   own <- vapply(effects, function(e) any(vapply(own_effects, setequal, logical(1), y = e)),
                 logical(1))
   in_own_order <- vapply(effects, function(e) any(vapply(own_effects, identical, logical(1), y = e)),
@@ -919,7 +979,7 @@ conditional_effects.bmmfit <- function(x,
     candidates <- which(own & set == s)
     c(candidates[in_own_order[candidates]], candidates)[1]
   }, integer(1))
-  grid[sort(first)]
+  effects[sort(first)]
 }
 
 
