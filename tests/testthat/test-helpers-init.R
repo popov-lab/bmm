@@ -1080,3 +1080,14 @@ test_that("an init function carries nothing from the frame that built it", {
   expect_type(inits, "list")
   expect_named(inits)
 })
+
+test_that("an init function carries no data column the model does not use", {
+  model <- sdm(resp_error = "dev_rad")
+  formula <- bmf(c ~ 1, kappa ~ 1)
+  serialized_size <- function(dat) {
+    length(serialize(configure_fit(formula, dat, model)$config_args$init, NULL))
+  }
+  # check_data() keeps the 18 columns this model does not read, and a copy of
+  # the data in the closure would make every saved fit grow with them
+  expect_equal(serialized_size(oberauer_lin_2017), serialized_size(oberauer_lin_2017["dev_rad"]))
+})

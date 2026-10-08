@@ -762,8 +762,9 @@ test_that("an updated fit carries nothing from the frame that called update()", 
   dat <- data.frame(y = rsdm(60, kappa = 5))
   fit <- suppressMessages(bmm(bmf(c ~ 1, kappa ~ 1), dat, sdm("y"),
                               backend = "mock", mock_fit = stub, rename = FALSE))
-  # the init function update() builds is stored in the fit, which saveRDS()
-  # would then write with the caller's frame
+  # on a recompile, the only route the mock backend runs, brms stores the init
+  # function update() builds in the fit, which saveRDS() would then write with
+  # the caller's frame
   update_beside <- function(n) {
     ballast <- runif(n)
     suppressMessages(update(fit, backend = "mock", mock_fit = stub, rename = FALSE, recompile = TRUE))

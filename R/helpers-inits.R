@@ -41,9 +41,8 @@ create_initfun.default <- function(model, data, formula, prior = NULL, ...) {
 # environment with it. A closure made in the method would keep the method's
 # frame, whose generic call environment leads back to the frames of bmm() or
 # update(), with the data and the fitted model. Made here, it keeps only what it
-# reads.
-# The arguments are forced first, because an unforced promise would hold on to
-# the caller's frame until the function's first call
+# reads. The arguments are forced first, because an unforced promise would hold
+# on to the caller's frame until the function's first call
 new_initfun <- function(stanpars_list, standata_list, model) {
   force(stanpars_list)
   force(standata_list)
