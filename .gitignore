@@ -18,6 +18,9 @@ inst/doc
 # pkgdown site
 /docs/
 
+# Article fits hosted on the article-fits release (ADR 0003)
+/vignettes/articles/fits/
+
 # Local / private directories
 .claude/
 local/
