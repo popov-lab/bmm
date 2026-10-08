@@ -1971,6 +1971,259 @@ rezdm <- function(n, n_trials, drift, bound, ndt, zr = 0.5, s = 1,
 }
 
 
+#' @title Distribution functions for the EZ Circular Diffusion Model (ezcdm)
+#'
+#' @description Density and random generation functions for the EZ circular
+#'   diffusion model. The model operates on aggregated continuous-report data:
+#'   the circular mean and circular variance of the response angles, and the
+#'   mean and variance of the reaction times, computed over `n_trials` trials
+#'   (see [ezcdm_summary_stats()]).
+#'
+#' @name ezcdm_dist
+#'
+#' @param mean_angle Observed circular mean of the response angles, in radians.
+#' @param var_angle Observed circular variance of the response angles (one
+#'   minus the mean resultant length), in \eqn{[0, 1]}.
+#' @param mean_rt Observed mean reaction time in seconds.
+#' @param var_rt Observed variance of the reaction times in seconds^2
+#'   (denominator `n_trials - 1`).
+#' @param n_trials Number of trials the summary statistics were computed from.
+#'   Must be larger than 2.
+#' @param driftrate Drift rate, the length of the drift vector (positive).
+#' @param driftangle Drift angle, the direction of the drift vector in radians
+#'   (default 0).
+#' @param bound Boundary, the radius of the circular decision boundary
+#'   (positive).
+#' @param ndt Non-decision time in seconds (non-negative).
+#' @param n Number of sets of summary statistics to generate.
+#' @param log Logical; if `TRUE` (default), values are returned on the log
+#'   scale.
+#'
+#' @details In the circular diffusion model without across-trial variability,
+#'   the response angle is independent of the decision time and follows a von
+#'   Mises distribution with mean `driftangle` and concentration
+#'   \eqn{\kappa = a v} (boundary radius times drift rate). The mean cosine and mean
+#'   sine of the angles are therefore sufficient statistics, and the angle term
+#'   of `dezcdm()` is the exact log-likelihood of the `n_trials` angles expressed
+#'   through them,
+#'   \deqn{n \kappa (1 - \mathrm{var\_angle}) \cos(\mathrm{mean\_angle} - \theta_v) - n \log I_0(\kappa),}
+#'   up to the parameter-free constant \eqn{-n \log(2\pi)}. It is the likelihood
+#'   at the sufficient statistic, not a normalised density of
+#'   `(mean_angle, var_angle)`: it is valid for posterior inference and for
+#'   comparing `ezcdm` fits to the same data, but not for comparisons with
+#'   models of other data.
+#'
+#'   The reaction-time terms use the closed-form moments of the EZ approach: with
+#'   \eqn{R = I_1(\kappa) / I_0(\kappa)}, the mean decision time is
+#'   \eqn{(a / v) R} and the variance is
+#'   \eqn{(a / v)^2 (R^2 - 1 + 2R/\kappa)}; MRT is `ndt` plus the mean decision
+#'   time. The observed variance follows a Gamma distribution matched to the
+#'   exact mean and variance of the sample variance of `n_trials` decision
+#'   times, VRT and \eqn{W = \kappa_4 / n + 2\,\mathrm{VRT}^2 / (n - 1)}, that is
+#'   \eqn{\mathrm{Gamma}(\mathrm{VRT}^2 / W, \mathrm{VRT} / W)}. Given the
+#'   observed variance, the observed mean reaction time is normal,
+#'   \deqn{\mathrm{mean\_rt} \mid \mathrm{var\_rt} \sim
+#'   N\left(\mathrm{MRT} + \frac{\kappa_3 / n}{W} (\mathrm{var\_rt} - \mathrm{VRT}),
+#'   \sqrt{\mathrm{VRT} / n - (\kappa_3 / n)^2 / W}\right),}
+#'   so that the variance VRT / `n_trials` of the mean and its covariance
+#'   \eqn{\kappa_3 / n} with the sample variance are exact. \eqn{\kappa_3} and
+#'   \eqn{\kappa_4} are the third and fourth cumulants of the decision time,
+#'   \deqn{\kappa_3 = (a / v)^3 \left(2R^3 + \frac{6R^2}{\kappa} +
+#'   R\left(\frac{8}{\kappa^2} - 2\right) - \frac{4}{\kappa}\right),}
+#'   \deqn{\kappa_4 = (a / v)^4 \left(6R^4 + \frac{24R^3}{\kappa} +
+#'   R^2\left(\frac{44}{\kappa^2} - 8\right) +
+#'   R\left(\frac{48}{\kappa^3} - \frac{20}{\kappa}\right) + 2 -
+#'   \frac{24}{\kappa^2}\right).}
+#'   Decision times are right-skewed (kurtosis 3 + \eqn{\kappa_4 / \mathrm{VRT}^2}
+#'   lies between 3 and 8.5), so the EZ form that assumes normal reaction
+#'   times, independent normal and scaled chi-square
+#'   \eqn{\mathrm{Gamma}((n - 1)/2, (n - 1)/(2\,\mathrm{VRT}))} terms,
+#'   understates the sampling variance of `var_rt` by a factor of up to 3.75
+#'   and ignores the correlation of the two statistics (up to about 0.69); the
+#'   terms above reduce to it when \eqn{\kappa_3 = \kappa_4 = 0}.
+#'
+#'   `rezcdm()` draws `n_trials` exact von Mises angles per replicate and
+#'   summarises them, draws `var_rt` from the moment-matched Gamma distribution
+#'   and then `mean_rt` from the conditional normal, so it simulates the same
+#'   distribution that `dezcdm()` evaluates. Simulated `mean_rt` is not
+#'   truncated at `ndt`; values below it occur only at the smallest trial
+#'   counts, in about 0.2\% of replicates at `n_trials = 3`.
+#'
+#' @keywords distribution
+#'
+#' @references
+#' Qarehdaghi, H., & Amani Rad, J. (2024). EZ-CDM: Fast, simple, robust, and
+#'   accurate estimation of circular diffusion model parameters. Psychonomic
+#'   Bulletin & Review, 31(5), 2058-2091. https://doi.org/10.3758/s13423-024-02483-7
+#'
+#' Smith, P. L. (2016). Diffusion theory of decision making in continuous
+#'   report. Psychological Review, 123(4), 425-451.
+#'   https://doi.org/10.1037/rev0000023
+#'
+#' @return `dezcdm` gives the log-likelihood (or likelihood) of the observed
+#'   summary statistics, and `rezcdm` returns a `data.frame` with `n` rows and
+#'   columns `mean_angle`, `var_angle`, `mean_rt`, `var_rt` and `n_trials`.
+#'
+#' @export
+#'
+#' @examples
+#' dezcdm(
+#'   mean_angle = 0.1, var_angle = 0.2, mean_rt = 0.9, var_rt = 0.1,
+#'   n_trials = 100, driftrate = 2, bound = 1.5, ndt = 0.3
+#' )
+#'
+#' # vectorised over observations
+#' dezcdm(
+#'   mean_angle = c(0.1, -0.2), var_angle = c(0.2, 0.3),
+#'   mean_rt = c(0.9, 1), var_rt = c(0.1, 0.12), n_trials = 100,
+#'   driftrate = 2, driftangle = 0.1, bound = 1.5, ndt = 0.3
+#' )
+#'
+#' # generate random summary statistics
+#' rezcdm(n = 5, n_trials = 100, driftrate = 2, bound = 1.5, ndt = 0.3)
+#'
+dezcdm <- function(mean_angle, var_angle, mean_rt, var_rt, n_trials,
+                   driftrate, driftangle = 0, bound, ndt, log = TRUE) {
+  .check_ezcdm_pars(driftrate, bound, ndt, n_trials)
+  stopif(isTRUE(any(var_angle < 0 | var_angle > 1)), "var_angle must be between 0 and 1")
+  stopif(isTRUE(any(var_rt <= 0)), "var_rt must be positive")
+
+  n <- max(
+    length(mean_angle), length(var_angle), length(mean_rt), length(var_rt),
+    length(n_trials), length(driftrate), length(driftangle),
+    length(bound), length(ndt)
+  )
+  mean_angle <- rep_len(mean_angle, n)
+  var_angle <- rep_len(var_angle, n)
+  mean_rt <- rep_len(mean_rt, n)
+  var_rt <- rep_len(var_rt, n)
+  n_trials <- rep_len(n_trials, n)
+  driftangle <- rep_len(driftangle, n)
+
+  moments <- .ezcdm_moments(
+    rep_len(driftrate, n), rep_len(bound, n), rep_len(ndt, n)
+  )
+
+  rt <- .ez_rt_terms(moments$VRT, moments$k3, moments$k4, n_trials)
+
+  ll <- n_trials * (moments$kappa * (1 - var_angle) * cos(mean_angle - driftangle) - moments$log_I0) +
+    stats::dgamma(var_rt, shape = rt$shape, rate = rt$rate, log = TRUE) +
+    stats::dnorm(mean_rt, mean = moments$MRT + rt$slope * (var_rt - moments$VRT), sd = rt$sd, log = TRUE)
+
+  if (log) ll else exp(ll)
+}
+
+#' @rdname ezcdm_dist
+#' @export
+rezcdm <- function(n, n_trials, driftrate, driftangle = 0, bound, ndt) {
+  stopif(length(n) != 1 || n < 1 || n %% 1 != 0, "n must be a single positive integer")
+  .check_ezcdm_pars(driftrate, bound, ndt, n_trials)
+  stopif(anyNA(n_trials) || any(n_trials %% 1 != 0), "n_trials must be whole numbers, without missing values")
+
+  n_trials <- rep_len(n_trials, n)
+  driftangle <- rep_len(driftangle, n)
+  ndt <- rep_len(ndt, n)
+  moments <- .ezcdm_moments(rep_len(driftrate, n), rep_len(bound, n), ndt)
+
+  angles <- brms::rvon_mises(
+    sum(n_trials),
+    mu = rep(driftangle, n_trials),
+    kappa = rep(moments$kappa, n_trials)
+  )
+  rt <- .ez_rt_terms(moments$VRT, moments$k3, moments$k4, n_trials)
+  var_rt <- stats::rgamma(n, shape = rt$shape, rate = rt$rate)
+  mean_rt <- stats::rnorm(n, mean = moments$MRT + rt$slope * (var_rt - moments$VRT), sd = rt$sd)
+
+  data.frame(
+    .circular_summary(angles, rep(seq_len(n), n_trials)),
+    mean_rt = mean_rt,
+    var_rt = var_rt,
+    n_trials = n_trials
+  )
+}
+
+# Parameter checks shared by dezcdm() and rezcdm(). isTRUE(any()) lets NA
+# parameters through, as the other d*/r* functions do; they propagate as NA.
+.check_ezcdm_pars <- function(driftrate, bound, ndt, n_trials) {
+  stopif(isTRUE(any(driftrate <= 0)), "driftrate must be positive")
+  stopif(isTRUE(any(bound <= 0)), "bound must be positive")
+  stopif(isTRUE(any(ndt < 0)), "ndt must be non-negative")
+  stopif(isTRUE(any(n_trials <= 2)), "n_trials must be larger than 2")
+}
+
+# Internal: moments of the EZ circular diffusion model - vectorized, inputs
+# recycled as in bound * driftrate. Returns the von Mises concentration,
+# log I0(kappa), the mean resultant length R = I1/I0, and the mean, variance,
+# third and fourth cumulant of the response time.
+.ezcdm_moments <- function(driftrate, bound, ndt) {
+  kappa <- bound * driftrate
+  bound <- rep_len(bound, length(kappa))
+  k2 <- kappa^2
+  u <- 1 / kappa
+
+  # regimes and polynomials must match inst/stan_chunks/ezcdm_functions.stan
+  tiny <- kappa < 1e-2
+  series <- kappa < 0.25
+  asymptotic <- kappa > 100
+  # besselI() underflows to 0 from kappa ~ 2e5, while the four-term
+  # asymptotic expansion agrees with 50-digit references to double precision
+  # from kappa = 1000; Stan switches R to the same expansion there
+  huge <- kappa > 1000
+
+  log_I0 <- R <- numeric(length(kappa))
+  uh <- u[huge]
+  s0 <- uh * (1 / 8 + uh * (9 / 128 + uh * (75 / 1024 + uh * 11025 / 98304)))
+  s1 <- -uh * (3 / 8 + uh * (15 / 128 + uh * (105 / 1024 + uh * 14175 / 98304)))
+  log_I0[huge] <- kappa[huge] - 0.5 * log(2 * pi * kappa[huge]) + log1p(s0)
+  R[huge] <- (1 + s1) / (1 + s0)
+  I0_scaled <- besselI(kappa[!huge], 0, expon.scaled = TRUE)
+  log_I0[!huge] <- kappa[!huge] + log(I0_scaled)
+  R[!huge] <- besselI(kappa[!huge], 1, expon.scaled = TRUE) / I0_scaled
+
+  # The decision-time moments are written as MRT = ndt + L r, VRT = L^2 v,
+  # k3 = L^3 c3 and k4 = L^4 c4. The length scale is L = tau = bound / driftrate,
+  # except below kappa = 0.01, where L = bound^2 and r, v, c3, c4 are the
+  # series divided by powers of kappa: there R^2 - 1 + 2R/kappa cancels, and
+  # tau overflows when driftrate underflows, which would give VRT = Inf * 0.
+  L <- bound / driftrate
+  L[tiny] <- bound[tiny]^2
+  r <- R
+  v <- R^2 - 1 + 2 * R * u
+  kt <- k2[tiny]
+  r[tiny] <- 0.5 - kt / 16 + kt^2 / 96
+  v[tiny] <- 1 / 8 - kt / 24
+  R[tiny] <- kappa[tiny] * r[tiny]
+
+  # The closed forms of c3 and c4 in R cancel catastrophically at both ends
+  # (k4: relative error 2e-2 at kappa = 0.01 and 3e-5 at kappa = 5000; k3: 6e-7
+  # and 2e-8), so the power series of log I0 and the asymptotic series of
+  # I1/I0 take over outside [0.25, 100].
+  c3 <- R^2 * (2 * R + 6 * u) + R * (8 * u^2 - 2) - 4 * u
+  c4 <- R^2 * (6 * R^2 + 24 * R * u + 44 * u^2 - 8) + R * u * (48 * u^2 - 20) + 2 - 24 * u^2
+  ua <- u[asymptotic]
+  c3[asymptotic] <- ua^2 * (3 - ua * (4 + ua * (15 / 8 + ua * (3 + ua * (875 / 128 +
+    ua * (39 / 2 + ua * (67599 / 1024 + ua * 515 / 2)))))))
+  c4[asymptotic] <- ua^3 * (15 - ua * (24 + ua * (105 / 8 + ua * (24 + ua * (7875 / 128 +
+    ua * (195 + ua * 743589 / 1024))))))
+  ks <- k2[series]
+  c3[series] <- ifelse(tiny[series], 1, kappa[series] * ks) *
+    (1 / 12 - ks * (11 / 256 - ks * (19 / 1280 - ks * (473 / 110592 -
+      ks * (1145 / 1032192 - ks * (101369 / 377487360 - ks * 946523 / 15288238080))))))
+  c4[series] <- ifelse(tiny[series], 1, ks^2) *
+    (11 / 128 - ks * (19 / 320 - ks * (473 / 18432 - ks * (1145 / 129024 -
+      ks * (101369 / 37748736 - ks * 946523 / 1274019840)))))
+
+  nlist(
+    kappa, log_I0, R,
+    MRT = ndt + L * r,
+    VRT = L^2 * v,
+    k3 = L^3 * c3,
+    k4 = L^4 * c4
+  )
+}
+
+
+
 # Ex-Gaussian density function
 # @param x Numeric vector of values
 # @param mu Mean of the Gaussian component
@@ -2268,6 +2521,148 @@ neg_loglik <- function(x, params, distribution, weights = NULL) {
   )
 }
 
+# Invert the mean resultant length R = I1(kappa) / I0(kappa). Used only for the
+# E-step weights of .fit_ezcdm_mixture(), where an error of 1e-6 in kappa moves
+# the responsibilities by nothing, so it deliberately does not share the regime
+# branches of .ezcdm_moments() and the Stan chunk, which would have to stay in
+# lockstep with them for no gain.
+.vm_kappa_from_R <- function(R) {
+  R <- min(max(R, 0), 1 - 1e-8)
+  if (R == 0) {
+    return(0)
+  }
+
+  kappa <- if (R < 0.53) {
+    2 * R + R^3 + 5 * R^5 / 6
+  } else if (R < 0.85) {
+    -0.4 + 1.39 * R + 0.43 / (1 - R)
+  } else {
+    1 / (R^3 - 4 * R^2 + 3 * R)
+  }
+
+  for (i in 1:2) {
+    kappa <- min(max(kappa, 1e-8), 1e4)
+    A <- besselI(kappa, 1, expon.scaled = TRUE) / besselI(kappa, 0, expon.scaled = TRUE)
+    kappa <- kappa - (A - R) / (1 - A^2 - A / kappa)
+  }
+
+  min(max(kappa, 0), 1e4)
+}
+
+# Log-likelihood of the one-component model, the null the mixture is gated
+# against: same parametric families, every trial a cognitive trial.
+.ezcdm_single_loglik <- function(angle, rt, distribution) {
+  params <- .fit_dist_params(
+    rt, distribution, rep_len(1, length(rt)),
+    .init_dist_params(rt, distribution)
+  )
+  kappa <- .vm_kappa_from_R(sqrt(mean(cos(angle))^2 + mean(sin(angle))^2))
+  mu <- atan2(mean(sin(angle)), mean(cos(angle)))
+  -neg_loglik(rt, params, distribution) +
+    sum(brms::dvon_mises(angle, mu = mu, kappa = kappa, log = TRUE))
+}
+
+# Joint two-component EM over response angles and reaction times: contaminants
+# are uniform on the circle and on the reaction-time bounds, cognitive trials
+# are the parametric RT distribution times a von Mises. The angles identify the
+# contaminant proportion far more sharply than the reaction times alone, which
+# is what makes the corrected circular variance usable; see the roxygen of
+# ezcdm_summary_stats().
+.fit_ezcdm_mixture <- function(angle, rt, distribution, contaminant_bound,
+                               init_contaminant, max_contaminant, maxit, tol) {
+  n <- length(rt)
+  rt_fit <- .fit_rt_mixture(
+    rt, distribution, contaminant_bound,
+    init_contaminant, max_contaminant, maxit, tol
+  )
+
+  dist_params <- rt_fit$params %||% .init_dist_params(rt, distribution)
+  pi_rt_only <- rt_fit$contaminant_prop
+  # a start of exactly zero is absorbing: log(pi_c) = -Inf makes every weight 1
+  pi_c <- if (is.na(pi_rt_only)) init_contaminant else max(pi_rt_only, init_contaminant)
+
+  mu <- atan2(mean(sin(angle)), mean(cos(angle)))
+  kappa <- .vm_kappa_from_R(sqrt(mean(cos(angle))^2 + mean(sin(angle))^2))
+
+  in_bounds <- rt >= contaminant_bound[1] & rt <= contaminant_bound[2]
+  log_uniform <- -log(contaminant_bound[2] - contaminant_bound[1]) - log(2 * pi)
+
+  w <- rep_len(1, n)
+  prev_loglik <- -Inf
+  converged <- FALSE
+
+  for (iter in seq_len(maxit)) {
+    log_rt <- switch(distribution,
+      exgaussian = dexgauss(rt, dist_params["mu"], dist_params["sigma"],
+        dist_params["tau"],
+        log = TRUE
+      ),
+      lognormal = dlnorm(rt, dist_params["mu"], dist_params["sigma"], log = TRUE),
+      invgaussian = dinvgauss(rt, dist_params["mu"], dist_params["lambda"], log = TRUE)
+    )
+    log_rt <- pmax(log_rt, log(1e-300))
+
+    log_c <- log1p(-pi_c) + log_rt +
+      brms::dvon_mises(angle, mu = mu, kappa = kappa, log = TRUE)
+    log_u <- rep_len(-Inf, n)
+    log_u[in_bounds] <- log(pi_c) + log_uniform
+
+    w <- 1 / (1 + exp(log_u - log_c))
+    w[!in_bounds] <- 1
+    if (anyNA(w)) break
+
+    hi <- pmax(log_c, log_u)
+    loglik <- sum(hi + log1p(exp(-abs(log_c - log_u))))
+    if (!is.finite(loglik)) break
+
+    if (abs(loglik - prev_loglik) < tol) {
+      converged <- TRUE
+      break
+    }
+    prev_loglik <- loglik
+
+    pi_c <- min(1 - sum(w) / n, max_contaminant)
+    if (is.na(pi_c) || pi_c < 0) pi_c <- 0
+
+    dist_params <- .fit_dist_params(rt, distribution, w, dist_params)
+    cos_sum <- sum(w * cos(angle))
+    sin_sum <- sum(w * sin(angle))
+    mu <- atan2(sin_sum, cos_sum)
+    kappa <- .vm_kappa_from_R(sqrt(cos_sum^2 + sin_sum^2) / sum(w))
+  }
+
+  if (pi_c >= max_contaminant) {
+    warning2("Contaminant proportion was clipped to max_contaminant \\
+             ({max_contaminant}). This may indicate data quality issues.",
+      env.frame = -1
+    )
+  }
+
+  # A handful of genuinely slow first-passage times look like contaminants to
+  # any parametric RT component, and because var_rt is dominated by its tail,
+  # down-weighting one of them can cut the variance by a quarter. The mixture
+  # therefore has to earn its extra parameter on BIC before it is applied at
+  # all; otherwise the plain statistics are returned unchanged.
+  if (converged && 2 * (loglik - .ezcdm_single_loglik(angle, rt, distribution)) < log(n)) {
+    w <- rep_len(1, n)
+    pi_c <- 0
+  }
+
+  weight_sum <- sum(w)
+  mean_rt <- sum(w * rt) / weight_sum
+  c(
+    as.list(.circular_summary(angle, weights = w)),
+    list(
+      mean_rt = mean_rt,
+      var_rt = sum(w * (rt - mean_rt)^2) / (weight_sum - 1),
+      n_eff = weight_sum,
+      contaminant_prop = 1 - weight_sum / n,
+      contaminant_prop_rt = pi_rt_only,
+      converged = converged,
+      iterations = iter
+    )
+  )
+}
 
 ############################################################################# !
 # SIGNAL DETECTION THEORY (SDT) — SHARED NUMERICS                        ####

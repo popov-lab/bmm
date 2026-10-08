@@ -138,14 +138,16 @@ test_that("model_versions() lists the versions a constructor accepts", {
   expect_equal(model_versions("imm"), c("full", "bsc", "abc"))
   expect_equal(model_versions("m3"), c("custom", "ss", "cs"))
   expect_equal(model_versions("ezdm"), c("3par", "4par"))
+  expect_equal(model_versions("ezcdm"), c("3par", "4par"))
   expect_equal(model_versions("mixture2p"), NA_character_)
 })
 
-test_that("imm(), m3(), ezdm() and sdm() refuse an unknown version", {
+test_that("imm(), m3(), ezdm(), ezcdm() and sdm() refuse an unknown version", {
   expect_error(sdm("y", version = "xyz"), "should be \"simple\"")
   expect_error(imm("y", "x", "d", "s", version = "xyz"), "should be one of")
   expect_error(m3(c("corr", "other"), c(1, 4), version = "xyz"), "should be one of")
   expect_error(ezdm("m", "v", "n", "t", version = "xyz"), "should be one of")
+  expect_error(ezcdm("ma", "va", "m", "v", "t", version = "xyz"), "should be one of")
 })
 
 test_that("parameter_label() keeps the name before the first separator", {
@@ -207,7 +209,7 @@ test_that("model_overview() has one row per version with its own columns and par
   expect_false(grepl("version", mixture2p$Model))
 
   rt_models <- model_overview(group = "Choices and response times")
-  expect_true(all(grepl("`(ddm|cswald|ezdm)\\(\\)`", rt_models$Model)))
+  expect_true(all(grepl("`(ddm|cswald|ezdm|ezcdm)\\(\\)`", rt_models$Model)))
 })
 
 test_that("get_model() returns the correct function", {

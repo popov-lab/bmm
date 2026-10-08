@@ -81,12 +81,13 @@ model offers.
 bmm::print_pretty_models_md(group = "Detection, recognition and confidence judgments")
 ```
 
-**Choices and response times.** Participants choose between two options and
-the response time is recorded, either on every trial or as means and
-variances per condition. See the
+**Choices and response times.** Participants choose between two options, or
+report a direction on a circle, and the response time is recorded, either on
+every trial or as means and variances per condition. See the
 [DDM](https://popov-lab.github.io/bmm/articles/bmm_ddm.html),
 [censored shifted Wald](https://popov-lab.github.io/bmm/articles/bmm_cswald.html),
-[EZ-diffusion](https://popov-lab.github.io/bmm/articles/bmm_ezdm.html) and
+[EZ-diffusion](https://popov-lab.github.io/bmm/articles/bmm_ezdm.html),
+[EZ circular diffusion](https://popov-lab.github.io/bmm/articles/bmm_ezcdm.html) and
 [response time contamination](https://popov-lab.github.io/bmm/articles/bmm_rt_contamination.html)
 articles.
 

@@ -148,6 +148,7 @@ Choices and response times
 \itemize{
 \item cswald(): Censored-Shifted Wald Model
 \item ddm(): Diffusion Decision Model
+\item ezcdm(): EZ Circular Diffusion Model
 \item ezdm(): EZ-Diffusion Model
 }
 

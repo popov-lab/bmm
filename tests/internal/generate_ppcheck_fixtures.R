@@ -73,3 +73,14 @@ ezdm4_fit <- do.call(bmm, c(list(
                n_upper = "n_upper", n_trials = "n_trials", version = "4par")
 ), fit_args))
 save_fixture(ezdm4_fit, "bmmfit_ezdm4_ppcheck.rds")
+
+set.seed(5)
+ezcdm_data <- rezcdm(10, n_trials = 40, driftrate = 2, bound = 1.5, ndt = 0.3)
+ezcdm_fit <- do.call(bmm, c(list(
+  formula = bmf(driftrate ~ 1, bound ~ 1, ndt ~ 1),
+  data = ezcdm_data,
+  model = ezcdm(mean_angle = "mean_angle", var_angle = "var_angle",
+                mean_rt = "mean_rt", var_rt = "var_rt", n_trials = "n_trials",
+                version = "3par")
+), fit_args))
+save_fixture(ezcdm_fit, "bmmfit_ezcdm_ppcheck.rds")

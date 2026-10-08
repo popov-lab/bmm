@@ -435,6 +435,14 @@ response_annotations <- function(model) {
       n_upper = "count of upper-boundary responses"
     ))
   }
+  if (inherits(model, "ezcdm")) {
+    return(list(
+      mean_angle = "circular mean, radians",
+      var_angle = "circular variance in [0, 1]",
+      mean_rt = "seconds",
+      var_rt = "seconds^2"
+    ))
+  }
   if (inherits(model, "m3")) {
     return(list(resp_cats = "counts per response category"))
   }
@@ -537,6 +545,13 @@ data_column_roles <- list(
   ddm = c(
     rt = "response time in seconds",
     response = "choice, 0 = lower and 1 = upper boundary"
+  ),
+  ezcdm = c(
+    mean_angle = "circular mean of the response angles in radians",
+    var_angle = "circular variance of the response angles, in [0, 1]",
+    mean_rt = "mean response time in seconds",
+    var_rt = "variance of the response times in seconds\u00b2",
+    n_trials = "number of trials"
   ),
   ezdm = c(
     mean_rt = "mean response time in seconds",

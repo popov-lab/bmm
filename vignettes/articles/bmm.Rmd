@@ -205,7 +205,11 @@ every trial. The [DDM article](https://popov-lab.github.io/bmm/articles/bmm_ddm.
 and the [censored shifted Wald article](https://popov-lab.github.io/bmm/articles/bmm_cswald.html)
 cover trial-level data. The [EZ-diffusion article](https://popov-lab.github.io/bmm/articles/bmm_ezdm.html)
 covers the case where you only have the mean and variance of the response
-times and the accuracy per condition. Fast guesses and other contaminant
+times and the accuracy per condition. When participants report a direction on
+a circle instead, as in a color-wheel task with response times, the
+[EZ circular diffusion article](https://popov-lab.github.io/bmm/articles/bmm_ezcdm.html)
+covers the circular mean and variance of the responses together with the mean
+and variance of the response times. Fast guesses and other contaminant
 responses are the topic of the
 [response time contamination article](https://popov-lab.github.io/bmm/articles/bmm_rt_contamination.html).
 

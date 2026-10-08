@@ -416,6 +416,15 @@ stored_frame_cases <- function() {
       formula = rt_formula, data = rt_data
     ),
     ddm = list(model = ddm("rt", "response"), formula = rt_formula, data = rt_data),
+    ezcdm = list(
+      model = ezcdm("mean_angle", "var_angle", "mean_rt", "var_rt", "n_trials"),
+      formula = bmf(driftrate ~ 1, bound ~ 1, ndt ~ 1),
+      data = data.frame(
+        mean_angle = rep(c(0.1, -0.1), 10), var_angle = rep(c(0.3, 0.4), 10),
+        mean_rt = rep(c(0.8, 0.9), 10), var_rt = rep(c(0.05, 0.06), 10),
+        n_trials = 100, id = factor(rep(1:10, each = 2))
+      )
+    ),
     ezdm = list(
       model = ezdm("mean_rt", "var_rt", "n_upper", "n_trials", version = "3par"),
       formula = rt_formula, data = ez_data

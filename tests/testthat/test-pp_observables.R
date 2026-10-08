@@ -19,7 +19,11 @@ registered_models <- list(
   cswald(rt = "rt", response = "resp", version = "crisk"),
   ezdm(mean_rt = "mrt", var_rt = "vrt", n_upper = "nu", n_trials = "nt"),
   ezdm(mean_rt = c("mu", "ml"), var_rt = c("vu", "vl"), n_upper = "nu",
-       n_trials = "nt", version = "4par")
+       n_trials = "nt", version = "4par"),
+  ezcdm(mean_angle = "ma", var_angle = "va", mean_rt = "mrt", var_rt = "vrt",
+        n_trials = "nt"),
+  ezcdm(mean_angle = "ma", var_angle = "va", mean_rt = "mrt", var_rt = "vrt",
+        n_trials = "nt", version = "4par")
 )
 
 test_that("declared observables name real standata slots", {
@@ -42,6 +46,15 @@ test_that("declared observables name real standata slots", {
     slots <- names(suppressMessages(standata(bmf(drift ~ 1), case[[2]], case[[1]])))
     expect_true(all(pp_observables(case[[1]])$observed %in% slots))
   }
+
+  ezcdm_model <- ezcdm(mean_angle = "mean_angle", var_angle = "var_angle",
+                       mean_rt = "mean_rt", var_rt = "var_rt",
+                       n_trials = "n_trials")
+  slots <- names(standata(bmf(driftrate ~ 1, bound ~ 1, ndt ~ 1),
+                          rezcdm(5, n_trials = 40, driftrate = 2, bound = 1.5,
+                                 ndt = 0.3),
+                          ezcdm_model))
+  expect_true(all(pp_observables(ezcdm_model)$observed %in% slots))
 })
 
 test_that("the default check of every registered spec is the brms Y observable", {
@@ -85,7 +98,7 @@ test_that("every registered compute closure is elementwise", {
       expected[[key]] <- .pp_expand_data(compute(observed), n_draws)
     }
   }
-  expect_length(actual, 17L)
+  expect_length(actual, 25L)
   expect_equal(actual, expected)
 })
 
@@ -150,6 +163,28 @@ test_that("pp_simulate() for ezdm respects per-observation trial counts", {
   expect_identical(dim(sims$n_upper), c(5L, 3L))
   for (n in 1:3) {
     expect_true(all(sims$n_upper[, n] <= n_trials[n]))
+  }
+})
+
+test_that("pp_simulate() for ezcdm respects per-observation trial counts", {
+  withr::local_seed(7)
+  model <- ezcdm(mean_angle = "ma", var_angle = "va", mean_rt = "mrt",
+                 var_rt = "vrt", n_trials = "nt")
+  n_trials <- c(3L, 30L, 500L)
+  # driftangle as a scalar, the form get_dpar() returns for a fixed dpar
+  prep <- fake_prep(200L, 3L, dpars = list(
+    driftrate = rep(1, 600), driftangle = 0, bound = rep(1.5, 600),
+    ndt = rep(0.3, 600)
+  ), data = list(trials = n_trials))
+  sims <- pp_simulate(model, prep)
+
+  expect_named(sims, c("mean_angle", "var_angle", "mean_rt", "var_rt",
+                       "n_trials"))
+  expect_identical(dim(sims$mean_rt), c(200L, 3L))
+  expect_identical(sims$n_trials, .pp_expand_data(n_trials, 200L))
+  for (stat in c("mean_angle", "var_angle", "mean_rt")) {
+    spread <- apply(sims[[stat]], 2, stats::sd)
+    expect_true(all(diff(spread) < 0), info = stat)
   }
 })
 

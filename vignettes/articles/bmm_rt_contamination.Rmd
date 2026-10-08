@@ -45,6 +45,7 @@ The `bmm` package provides two functions for dealing with contamination, one for
 | Model | Data type | Function | Role |
 |-------|-----------|----------|------|
 | EZDM | Aggregated stats | `ezdm_summary_stats()` | Required during aggregation |
+| EZCDM | Aggregated stats | `ezcdm_summary_stats()` | Required during aggregation |
 | DDM / csWald | Trial-level | `flag_contaminant_rts()` | Optional preprocessing |
 
 Both fit a mixture model via the EM algorithm, separating cognitive RTs from a uniform contaminant distribution [@ratcliff_EstimatingParametersDiffusion_2002]:
@@ -53,7 +54,7 @@ $$
 f(RT) = (1 - \pi) \cdot f_{\text{cognitive}}(RT) + \pi \cdot f_{\text{uniform}}(RT)
 $$
 
-where $\pi$ is the contamination proportion. The cognitive component $f_{\text{cognitive}}$ can be ex-Gaussian (default), log-normal, or inverse Gaussian. For background on the EZ diffusion model, see @Wagenmakers_2007 and @wagenmakers_EZDoesIt_2008; for the full diffusion model, see @Ratcliff_McKoon_2008.
+where $\pi$ is the contamination proportion. The cognitive component $f_{\text{cognitive}}$ can be ex-Gaussian (default), log-normal, or inverse Gaussian. `ezcdm_summary_stats()` extends this mixture to the response angles as well, which is described in its own section below. For background on the EZ diffusion model, see @Wagenmakers_2007 and @wagenmakers_EZDoesIt_2008; for the full diffusion model, see @Ratcliff_McKoon_2008.
 
 ## Contamination handling for EZDM
 
@@ -70,8 +71,8 @@ my_data |>
 | Method | Description | Use when |
 |--------|-------------|----------|
 | `"simple"` | Standard mean/variance | Data is pre-cleaned |
-| `"robust"` | Median + IQR/MAD-based variance [@wagenmakers_EZDoesIt_2008] | Moderate contamination |
-| `"mixture"` | EM mixture modeling [@ratcliff_EstimatingParametersDiffusion_2002] | Default; provides contamination estimates |
+| `"robust"` | Median + IQR/MAD-based variance | Moderate contamination |
+| `"mixture"` | EM mixture modeling [@ratcliff_EstimatingParametersDiffusion_2002; @wagenmakers_EZDoesIt_2008] | Default; provides contamination estimates |
 
 ### Example: method comparison
 
@@ -161,6 +162,34 @@ fit <- bmm(
 For the three-parameter version, splitting the estimated contaminants between the two boundaries requires an assumption about how accurate a contaminant response is. `guess_rate` carries that assumption and defaults to 0.5, the chance level of a two-choice task; set it to 0.25 for a 4AFC task, or to 0 if contaminants are never correct. The four-parameter version estimates contamination separately for each boundary and ignores `guess_rate`.
 
 If a cell's observed accuracy is higher than the estimated contamination and guess rate can produce — 95% correct is impossible when 15% of the trials were coin flips — the split cannot be trusted for that cell. The correction still runs, removing the estimated contaminants proportionally from both `n_upper` and `n_trials` and preserving observed accuracy up to rounding, but it warns. That usually means the guess rate does not match the task, or that the contaminant reaction times were not distinguishable enough from the cognitive ones for the EM to separate them. Both counts are rounded to integers, so the implied accuracy moves by at most one part in the corrected `n_trials`: at the default `max_contaminant`, a percent in a 200-trial cell and a fifth in a cell of ten trials, the default `min_trials`.
+
+---
+
+## Contamination handling for EZCDM
+
+The circular diffusion model is fit to four aggregated statistics: the circular mean and circular variance of the response angles, and the mean and variance of the response times. Contamination reaches all four. A lapse trial produces a response time from some other process *and* a response angle that is unrelated to the target, so the unrelated angles deflate the mean resultant length in addition to the stray response times inflating the variance.
+
+That matters more than it does for EZDM. The mean resultant length identifies $\kappa = a v$ on its own, and the non-decision time is a residual, $MRT - (a/v)R$, so it absorbs whatever the other statistics get wrong. In a simulation with lapse response times uniform on $[0.1, 4]$ s, drift rate 2, boundary 1.5 and non-decision time 0.3 s, 5% contamination already biases the non-decision time by $-55\%$ and 10% by $-84\%$, pushing it onto its lower bound.
+
+`ezcdm_summary_stats()` takes the same three methods, with two differences from `ezdm_summary_stats()`.
+
+**The mixture is joint over response times and angles.** Contaminants are uniform on the contaminant bounds *and* uniform on the circle; cognitive trials follow the chosen response-time distribution and a von Mises in angle. The angles identify the contaminant proportion much more sharply than the response times alone, which is what makes the correction of the circular variance usable.
+
+```{r ezcdm-methods, eval = FALSE}
+summary_data <- trials |>
+  reframe(
+    ezcdm_summary_stats(response, rt, target = target, method = "mixture"),
+    .by = c(id, condition)
+  )
+```
+
+**`n_trials` becomes the effective number of clean trials.** Under `method = "mixture"` the reported `n_trials` is `round(sum(w))` over the mixture responsibilities, not the number of rows. The likelihood uses it as the count the summary statistics rest on, so reporting the raw number of trials after correcting the statistics would make the posterior too narrow. The `contaminant_prop` column reports the estimated proportion.
+
+The `"robust"` method corrects the response times only. The circular variance is a sufficient statistic for $\kappa$, so down-weighting angles that lie far from the mean direction would not remove contaminants; it would remove the tail of the very distribution being estimated and bias $\kappa$ upward. Use `"robust"` when the response times are contaminated but the angles are not, or when the mixture cannot be fitted.
+
+The mixture is applied only if it improves BIC over the one-component model. Decision times are right-skewed, so a few genuinely slow trials look like contaminants to any parametric response-time component, and since `var_rt` is dominated by its tail, down-weighting even one of them can cut the variance substantially. The gate means that on data without contamination `method = "mixture"` returns exactly the same statistics as `method = "simple"`.
+
+One failure mode is worth knowing about. If the contaminant response times are indistinguishable from the cognitive ones, the contaminant proportion rests on the angles alone. The correction then still runs, but it is much noisier than the reported `n_trials` suggests. `ezcdm_summary_stats()` detects this by comparing the joint estimate against a response-time-only fit and warns when they diverge.
 
 ---
 
@@ -370,7 +399,7 @@ The default data-driven bounds (`c("min", "max")`) adapt the uniform component t
 
 The ex-Gaussian distribution is a safe starting point. Try log-normal if you have heavy tails, or inverse Gaussian if you want a closer match to the Wiener process. See `?ezdm_summary_stats` for details.
 
-When the EM fails to converge, it usually means too few trials or bounds that do not fit the data well. `flag_contaminant_rts()` then returns `NA` for every trial of the group, and `attr(result, "diagnostics")$converged` is `FALSE`. `ezdm_summary_stats()` has no such attribute. It warns and falls back to robust moments, and `n_upper` and `n_trials` stay the raw counts.
+When the EM fails to converge, it usually means too few trials or bounds that do not fit the data well. `flag_contaminant_rts()` then returns `NA` for every trial of the group, and `attr(result, "diagnostics")$converged` is `FALSE`. `ezdm_summary_stats()` and `ezcdm_summary_stats()` have no such attribute. They warn and fall back to robust moments, and the trial counts (`n_upper`, `n_trials`) stay the raw counts.
 
 If estimated contamination rates exceed 20%, first check that RTs are in seconds, not milliseconds. Then verify your bounds. If the rates still seem high, the data may genuinely be noisy.
 

@@ -1,3 +1,11 @@
+# bmm 1.5.0 (development)
+
+### New models
+* Add the **EZ Circular Diffusion Model** (`ezcdm`) for continuous-report tasks with response times (Qarehdaghi & Amani Rad, 2024). It estimates drift rate, boundary and non-decision time, and in `version = "4par"` the drift angle, from the circular mean and variance of the response angles and the mean and variance of the response times per participant and condition. `ezcdm_summary_stats()` computes these statistics from trial data and by default corrects them for contaminant trials. Also adds `dezcdm()` and `rezcdm()`. See `?ezcdm` and the EZ circular diffusion article (#150). Thanks to @GidonFrischkorn
+
+### Bug fixes
+* `ezdm` now stops with an error naming the column when `n_trials` holds non-integer values. It used to warn that the counts "should be whole numbers" and continue, after which brms stopped with "Number of trials must be non-negative integers".
+
 # bmm (development version)
 
 ### New models
