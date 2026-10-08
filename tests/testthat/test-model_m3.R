@@ -735,3 +735,24 @@ test_that("the Stan Gaussian-rule wrapper matches its R companion", {
   expect_true(all(is.finite(stan)))
   expect_lt(max(abs(stan - r)), 1e-6)
 })
+
+# Without the std_normal_lcdf fallback in m3_gaussian_funs.stan the value here is still right but the
+# gradient is non-finite (log(0) times Phi's zero derivative); the fallback's derivative is approximate
+test_that("the Stan Gaussian-rule kernel has finite gradients where one category trails by 50", {
+  skip_on_cran()
+  skip_if_not_installed("cmdstanr")
+  skip_if(is.null(cmdstanr::cmdstan_version(error_on_NA = FALSE)))
+
+  model <- m3(c("corr", "other", "npl"), c(1, 4, 10), choice_rule = "gaussian", version = "ss")
+  program <- paste0(
+    "functions {\n", m3_gaussian_stanvars(model)[[1]]$scode, "\n}\n",
+    "data { int k; vector[3] n; }\nparameters { vector[3] A; }\n",
+    "model { target += m3_gauss_logp(k, A[1], A[2], A[3], n[1], n[2], n[3]); }\n"
+  )
+  mod <- cmdstanr::cmdstan_model(cmdstanr::write_stan_file(program))
+  d <- mod$diagnose(
+    data = list(k = 3, n = c(1, 4, 10)), init = list(list(A = c(50, 0, 0))), error = 1e-2
+  )
+  expect_true(is.finite(d$lp()))
+  expect_true(all(is.finite(d$gradients()$model)))
+})
