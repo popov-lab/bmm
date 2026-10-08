@@ -55,11 +55,12 @@ built_data_columns.default <- function(model) {
 #' @export
 check_data.bmmodel <- function(model, data, formula) {
   stopif(missing(data), "Data must be specified using the 'data' argument.")
+  data_name <- attr(data, "data_name") %||% substitute_name(data, envir = eval(parent.frame()))
   data <- try(as.data.frame(data), silent = TRUE)
   stopif(is_try_error(data), "Argument 'data' must be coercible to a data.frame.")
   stopif(!isTRUE(nrow(data) > 0L), "Argument 'data' does not contain observations.")
 
-  attr(data, "data_name") <- substitute_name(data, envir = eval(parent.frame()))
+  attr(data, "data_name") <- data_name
   attr(data, "checked") <- TRUE
   NextMethod("check_data")
 }
@@ -275,22 +276,12 @@ rad2deg <- function(rad) {
 standata.bmmformula <- function(object, data, model, ...) {
   dots <- list(...)
   local_brms_threads(dots)
-
-  # check model, formula and data, and transform data if necessary
-  formula <- object
   configure_options(dots)
-  model <- check_model(model, data, formula)
-  data <- check_data(model, data, formula)
-  formula <- check_formula(model, data, formula)
-
-  # generate the model specification to pass to brms later
-  config_args <- configure_model(model, data, formula)
-
-  # extract stan data
-  fit_args <- combine_args(nlist(config_args, dots))
-  fit_args$object <- fit_args$formula
-  fit_args$formula <- NULL
-  brms::do_call(brms::standata, fit_args)
+  call_brms_extractor(
+    brms::standata,
+    configure_fit(object, data, model, until = "model"),
+    dots
+  )
 }
 
 # check if the data is sorted by the predictors
@@ -757,10 +748,12 @@ ezdm_summary_stats <- function(
 #'   are assumed to produce correct responses at a fixed guess rate (e.g., 0.5
 #'   for 2AFC tasks).
 #'
-#' @param n_upper Numeric. Count of upper boundary (correct) responses.
-#' @param n_trials Numeric. Total number of trials.
+#' @param n_upper Numeric. Count of upper boundary (correct) responses, a
+#'   single value.
+#' @param n_trials Numeric. Total number of trials, a single value.
 #' @param contaminant_prop Numeric. Estimated proportion of contaminant trials
-#'   (e.g., from the `contaminant_prop` column of [ezdm_summary_stats()]).
+#'   (e.g., from the `contaminant_prop` column of [ezdm_summary_stats()]), a
+#'   single value.
 #' @param guess_rate Numeric. Assumed accuracy rate for contaminant trials
 #'   (random guessing). Default is 0.5 (appropriate for 2AFC tasks).
 #'
@@ -768,7 +761,11 @@ ezdm_summary_stats <- function(
 #'   (integers). When `contaminant_prop` is `NA` or <= 0, returns the original
 #'   counts unchanged.
 #'
-#' @details Uses binomial sampling to estimate the number of contaminant trials
+#' @details The function adjusts one cell at a time. Vectors of length greater
+#'   than one are an error; to correct several cells, use
+#'   [ezdm_summary_stats()] on each group.
+#'
+#'   Uses binomial sampling to estimate the number of contaminant trials
 #'   and contaminant correct responses, then subtracts these from the raw
 #'   counts. Because of the stochastic sampling, results will vary across
 #'   calls unless a seed is set by the user.
@@ -793,6 +790,12 @@ adjust_ezdm_accuracy <- function(n_upper, n_trials, contaminant_prop,
             and `n_trials`, so applying this correction on top of them counts \\
             the same contaminants twice. Use its `guess_rate` argument to set \\
             the accuracy expected of a contaminant response.")
+  stopif(
+    length(n_upper) != 1L || length(n_trials) != 1L || length(contaminant_prop) != 1L,
+    "`adjust_ezdm_accuracy()` takes one cell at a time. `n_upper`, `n_trials` and \\
+     `contaminant_prop` must each be a single value. For a data frame of cells, \\
+     use `ezdm_summary_stats()` per group."
+  )
   stopif(!is.numeric(n_upper), "n_upper must be numeric")
   stopif(!is.numeric(n_trials), "n_trials must be numeric")
   stopif(!is.numeric(guess_rate) || guess_rate < 0 || guess_rate > 1,

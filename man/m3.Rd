@@ -174,6 +174,17 @@ decision task.
 \item \strong{Default priors:}
 }
 }
+
+\subsection{Missing values and reserved names}{
+
+A missing response count (\code{NA}) is counted as 0. If the category has options in that
+row, \code{bmm()} warns and says how many counts were replaced; if it has none (\code{num_options}
+is 0 in that row), the 0 is true and there is no warning, as for \code{dist} in
+\link{oberauer_lewandowsky_2019_e1}. A missing value in a column named in \code{num_options} is
+an error: enter 0 where there were no options. Data columns named \code{Y}, \code{nTrials} or
+\verb{Idx_<category>} are refused because \code{bmm()} creates columns with these names; response
+categories may be called \code{Y} or \code{nTrials}.
+}
 }
 \examples{
 \dontshow{if (isTRUE(Sys.getenv("BMM_EXAMPLES"))) withAutoprint(\{ # examplesIf}

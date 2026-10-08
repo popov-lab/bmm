@@ -20,7 +20,9 @@ parameter_info(x, ...)
 
 \item{formula}{An optional \code{bmmformula} object. Only relevant for
 M3 custom models, where additional parameters are discovered from
-the formula. Ignored for all other models.}
+the formula. Only activation symbols that have their own formula are
+listed; without data, any other symbol is read as a data column.
+Ignored for all other models.}
 }
 \value{
 A data frame of class \code{bmm_parameters} with one row per

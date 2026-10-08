@@ -154,7 +154,9 @@ link_transform <- function(values, link, inverse = FALSE) {
 #'   \code{bmmfit} object (a fitted model returned by \code{\link{bmm}}).
 #' @param formula An optional \code{bmmformula} object. Only relevant for
 #'   M3 custom models, where additional parameters are discovered from
-#'   the formula. Ignored for all other models.
+#'   the formula. Only activation symbols that have their own formula are
+#'   listed; without data, any other symbol is read as a data column.
+#'   Ignored for all other models.
 #' @param ... Additional arguments (currently unused).
 #'
 #' @return A data frame of class \code{bmm_parameters} with one row per
@@ -842,6 +844,49 @@ native_transform.non_targets <- function(model, linpred, data, ...) {
 }
 
 
+#' The formulas of a parameter and of the parameters its formula names
+#'
+#' @description
+#' A non-linear formula names other parameters on its right-hand side; each has
+#' a formula of its own. The nodes are listed depth first: the parameter, then
+#' each parameter its formula names with the parameters those name in turn.
+#' Constant parameters and parameters without a formula have no node. `bmm()`
+#' refuses formulas that name each other in a circle, so the recursion ends.
+#'
+#' @param x A bmmfit object
+#' @param par Character string. The parameter name.
+#' @return A list with one element per formula: `rhs`, its right-hand side;
+#'   `labels`, its fixed-effects term labels; `term_vars`, the variables of each
+#'   of them, without parameters; `sub_pars`, the parameters they name.
+#'
+#' @keywords internal
+#' @noRd
+.formula_nodes <- function(x, par) {
+  formulas <- x$bmm$user_formula
+  f <- formulas[[par]]
+  if (is.null(f) || is_constant(f)) {
+    return(list())
+  }
+
+  rhs <- stats::formula(f)[-2]
+  labels <- attr(stats::terms(rhs), "term.labels")
+  labels <- labels[!grepl("|", labels, fixed = TRUE)]
+  term_vars <- lapply(labels, function(label) all.vars(str2lang(label)))
+  parameters <- c(names(formulas), names(x$bmm$model$parameters))
+  sub_pars <- intersect(unlist(term_vars), parameters)
+
+  c(
+    list(list(
+      rhs = rhs,
+      labels = labels,
+      term_vars = lapply(term_vars, setdiff, y = parameters),
+      sub_pars = sub_pars
+    )),
+    unlist(lapply(sub_pars, .formula_nodes, x = x), recursive = FALSE)
+  )
+}
+
+
 #' Variables spanning the prediction grid for a set of parameters
 #'
 #' @description
@@ -867,29 +912,15 @@ native_transform.non_targets <- function(model, linpred, data, ...) {
     character(0)
   }
 
-  formulas <- x$bmm$user_formula
-  parameters <- c(names(formulas), names(x$bmm$model$parameters))
-  formula_vars <- function(par, seen) {
-    f <- formulas[[par]]
-    if (is.null(f) || is_constant(f)) {
-      return(character(0))
-    }
-    rhs <- stats::formula(f)[-2]
-    labels <- attr(stats::terms(rhs), "term.labels")
-    fe_vars <- unlist(lapply(
-      labels[!grepl("|", labels, fixed = TRUE)],
-      function(label) all.vars(str2lang(label))
-    ))
-    groups <- .extract_re_grouping_vars(rhs)
-    sub_pars <- setdiff(intersect(fe_vars, parameters), seen)
-    c(
-      setdiff(fe_vars, parameters),
-      if (keep_all_groups) groups else groups[groups %in% keep_groups],
-      unlist(lapply(sub_pars, formula_vars, seen = c(seen, par)))
-    )
-  }
-
-  unique(unlist(lapply(pars, formula_vars, seen = character(0))))
+  unique(c(character(0), unlist(lapply(pars, function(par) {
+    lapply(.formula_nodes(x, par), function(node) {
+      groups <- .extract_re_grouping_vars(node$rhs)
+      c(
+        unlist(node$term_vars),
+        if (keep_all_groups) groups else groups[groups %in% keep_groups]
+      )
+    })
+  }))))
 }
 
 
