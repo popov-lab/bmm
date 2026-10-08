@@ -1098,6 +1098,19 @@ test_that("adjust_ezdm_accuracy() validates inputs", {
   })
 })
 
+test_that("adjust_ezdm_accuracy() rejects vector input and points to ezdm_summary_stats()", {
+  suppressWarnings({
+    expect_error(
+      adjust_ezdm_accuracy(c(80, 90), c(100, 100), c(0.1, 0.2)),
+      "takes one cell at a time.*ezdm_summary_stats\\(\\)"
+    )
+    expect_error(
+      adjust_ezdm_accuracy(80, 100, c(0.1, 0.2)),
+      "takes one cell at a time"
+    )
+  })
+})
+
 ############################################################################# !
 # FLAG_CONTAMINANT_RTS TESTS                                              ####
 ############################################################################# !

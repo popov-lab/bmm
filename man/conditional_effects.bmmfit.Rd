@@ -32,7 +32,9 @@ Common arguments include:
 \item \code{int_conditions}: Conditions for interactions
 \item \code{prob}: Probability mass to include in credible intervals (default 0.95)
 \item \code{spaghetti}: Logical, whether to add spaghetti lines
-\item \code{method}: Method for computing effects ("posterior_predict" or "posterior_epred")
+\item \code{method}: Method for computing effects ("posterior_predict" or
+"posterior_epred"; "posterior_predict" is not available for models with
+a multinomial family, see Details)
 }}
 }
 \value{
@@ -58,8 +60,11 @@ This method provides a more intuitive interface than directly calling
 
 bmm models use two types of parameters internally:
 \itemize{
-\item \strong{Non-linear parameters (\code{nlpar})}: Core model parameters like \code{kappa}, \code{c}, \code{a}, \code{thetat}
-\item \strong{Distributional parameters (\code{dpar})}: Derived parameters used in brms mixture distributions
+\item \strong{Non-linear parameters (\code{nlpar})}: Model parameters that enter the
+likelihood through a non-linear formula, like \code{kappa} and \code{thetat} of
+\code{\link[=mixture3p]{mixture3p()}} or \code{c} and \code{a} of \code{\link[=m3]{m3()}}
+\item \strong{Distributional parameters (\code{dpar})}: Parameters of the response
+distribution itself, like \code{kappa} and \code{c} of \code{\link[=sdm]{sdm()}}
 }
 
 Users should not need to know this distinction - \code{conditional_effects.bmmfit()}
@@ -78,6 +83,43 @@ applying inverse link transformations:
 }
 
 Use \code{scale = "sampling"} to see parameters on the scale used during MCMC sampling.
+
+\code{estimate__}, \code{lower__}, \code{upper__} and the spaghetti lines follow \code{scale}.
+\code{se__} does not: it is the spread of the draws on the scale \code{brms} or bmm
+summarises them on, so for a link other than identity it can sit on a
+different scale than \code{estimate__}. For example, \code{se__} of \code{kappa} is on the
+sampling scale in \code{\link[=mixture3p]{mixture3p()}} and on the native scale in \code{\link[=sdm]{sdm()}}, at either
+\code{scale}. Use \code{lower__} and \code{upper__} to describe uncertainty on the requested
+scale. With \code{robust = FALSE}, \code{estimate__} is the mean and \code{se__} the standard
+deviation of the draws on that scale, and \code{estimate__} is then mapped to the
+requested scale: at \code{scale = "native"} the estimate of a non-linear parameter
+with a log link is the exponential of the mean log value, not the mean of the
+exponentiated draws.
+
+The default of \code{robust} is \code{TRUE} (median and MAD), as in \code{\link[brms:conditional_effects]{brms::conditional_effects()}},
+with one exception: \code{thetat} and \code{thetant} of \code{\link[=mixture3p]{mixture3p()}} at
+\code{scale = "native"} default to \code{robust = FALSE} (mean and standard deviation).
+}
+
+\subsection{Models with a multinomial family}{
+
+In models fitted with a multinomial response (\code{m3()}, \code{sdt_rating()},
+\code{sdt_cdp()}, \code{sdt_ranking()}), the parameters are latent quantities: they
+have no predictive distribution, no response categories and no response
+points. For these models:
+\itemize{
+\item The effect is the posterior of the parameter itself, summarised by
+the median and MAD of the draws; use \code{robust = FALSE} for their mean and
+standard deviation.
+\item The grid of the plotted predictor and the values of all other
+predictors are set by the rules of \code{\link[brms:conditional_effects]{brms::conditional_effects()}}.
+\item Without \code{effects}, only the effects \code{brms} lists for the parameter's own
+formula are returned. A parameter without predictors has no effects.
+\item \code{categorical}, \code{ordinal}, \code{select_points} and \code{transform} are
+errors, and \code{method} must be \code{"posterior_epred"} or \code{"posterior_linpred"}
+(or an alias \code{\link[brms:conditional_effects]{brms::conditional_effects()}} reads as one of them, such as
+\code{"fitted"}), which agree for a parameter.
+}
 }
 }
 \examples{
