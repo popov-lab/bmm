@@ -1413,27 +1413,71 @@ stancode.bmmformula <- function(object, data, model, prior = NULL, ...) {
   withr::local_options(bmm.sort_data = FALSE)
   dots <- list(...)
   local_brms_threads(dots)
+  add_bmm_version_to_stancode(call_brms_extractor(
+    brms::stancode,
+    configure_fit(object, data, model, prior, until = "prior", frame_args = brms_frame_args(dots)),
+    dots
+  ))
+}
 
-  # check model, formula and data, and transform data if necessary
-  formula <- object
+# Everything brm() needs to fit a specification: the checked model, the brms
+# formula with its stanvars, the prior, and the initial values, plus the model
+# and user formula that postprocess_brm() stores in the fit. Shared by bmm()
+# and the stancode/standata/default_prior extractors. `until` says how far to
+# go, because each step costs a brms frame build: "init" for bmm(), "prior"
+# for stancode() and default_prior(), "model" for standata(), whose Stan data
+# depends on neither. `frame_args` are the brm() arguments besides the formula
+# and data that shape the model frame (see brms_frame_args())
+configure_fit <- function(formula, data = NULL, model = NULL, prior = NULL, until = "init",
+                          frame_args = list()) {
+  UseMethod("configure_fit")
+}
+
+#' @export
+configure_fit.bmmformula <- function(formula, data = NULL, model = NULL, prior = NULL,
+                                     until = "init", frame_args = list()) {
+  user_formula <- formula
+  # the user's expression for the data lives in the caller of the generic
+  # (bmm() or an extractor). It is set before check_data(), whose methods print
+  # it (order_data_query()), and again after, because some methods rebuild the
+  # data frame without it
+  data_name <- substitute_name(data, envir = parent.frame())
+  if (!missing(data) && !is.null(data) && (is.list(data) || is.atomic(data))) {
+    attr(data, "data_name") <- data_name
+  }
   model <- check_model(model, data, formula)
   data <- check_data(model, data, formula)
+  attr(data, "data_name") <- data_name
   formula <- check_formula(model, data, formula)
-
-  # generate the model specification to pass to brms later
   config_args <- configure_model(model, data, formula)
-
-  # configure the default prior and combine with user-specified prior
+  if (until == "model") {
+    return(nlist(config_args, model, user_formula))
+  }
   prior <- brms::do_call(
-    configure_prior, c(list(model, data, config_args$formula, prior), brms_frame_args(dots))
+    configure_prior, c(list(model, data, config_args$formula, prior), frame_args)
   )
+  # the prior decides which parameters exist, so the inits are built from it
+  if (until == "init") {
+    config_args$init <- brms::do_call(
+      create_initfun, c(list(model, data, config_args$formula, prior), frame_args)
+    )
+  }
+  nlist(config_args, prior, model, user_formula)
+}
 
-  # extract stan code
-  fit_args <- combine_args(nlist(config_args, dots, prior))
-  fit_args$object <- fit_args$formula
-  fit_args$formula <- NULL
-  code <- brms::do_call(brms::stancode, fit_args)
-  add_bmm_version_to_stancode(code)
+#' @export
+configure_fit.default <- function(formula, data = NULL, model = NULL, ...) {
+  model <- check_model(model, data, formula)
+  data <- check_data(model, data, formula)
+  check_formula(model, data, formula)
+}
+
+# The brms extractors take the formula as `object`
+call_brms_extractor <- function(fun, cfg, dots) {
+  args <- combine_args(nlist(config_args = cfg$config_args, dots, prior = cfg$prior))
+  args$object <- args$formula
+  args$formula <- NULL
+  brms::do_call(fun, args)
 }
 
 add_bmm_version_to_stancode <- function(stancode) {

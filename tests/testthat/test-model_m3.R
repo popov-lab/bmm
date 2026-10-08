@@ -328,6 +328,99 @@ test_that("m3_custom version works with variables contained in data in the activ
   ))
 })
 
+test_that("m3_custom refuses an activation symbol that is neither a column nor a parameter (#495)", {
+  my_data <- data.frame(corr = c(5, 6), other = c(1, 2), npl = c(1, 2))
+  my_model <- m3(c("corr", "other", "npl"), num_options = c(1, 2, 3))
+  my_model$links <- list(a = "log", cstart = "log", cslope = "log", time = "log")
+  formula <- bmf(
+    corr ~ b + a + cstart + cslope * time,
+    other ~ b + a,
+    npl ~ b,
+    a ~ 1,
+    cstart ~ 1,
+    cslope ~ 1
+  )
+
+  expect_error(
+    bmm(formula, my_data, my_model, backend = "mock", mock_fit = 1, rename = FALSE),
+    "'time' in your activation formula\\(s\\) is neither a data column nor a model parameter"
+  )
+
+  fit <- suppressWarnings(bmm(
+    formula + bmf(time ~ 1), my_data, my_model,
+    backend = "mock", mock_fit = 1, rename = FALSE
+  ))
+  expect_true("time" %in% names(fit$bmm$model$parameters))
+})
+
+test_that("m3_custom refuses an unknown symbol in an activation without formula parameters (#495)", {
+  expect_error(
+    bmm(
+      bmf(corr ~ b + a + c, other ~ b + a, dist ~ b + dd, npl ~ b, c ~ 1, a ~ 1),
+      oberauer_lewandowsky_2019_e1,
+      m3(c("corr", "other", "dist", "npl"), c(1, 4, 5, 5), links = list(c = "log", a = "log")),
+      backend = "mock", mock_fit = 1, rename = FALSE
+    ),
+    "'dd' in your activation formula\\(s\\) is neither a data column nor a model parameter"
+  )
+
+  err <- expect_error(suppressWarnings(bmm(
+    bmf(corr ~ b + a + c, other ~ b + a, npl ~ b, c ~ 1 + cnd, a ~ 1),
+    oberauer_lewandowsky_2019_e1,
+    m3(c("corr", "other", "npl"), c(1, 4, 5), links = list(c = "log", a = "log")),
+    backend = "mock", mock_fit = 1, rename = FALSE
+  )), "'cnd'")
+  expect_no_match(conditionMessage(err), "activation formula")
+})
+
+test_that("m3_custom activations can use numeric num_options by their names (#495)", {
+  cats <- c("corr", "other", "dist", "npl")
+  counts <- c(1, 4, 5, 5)
+  dat <- as.data.frame(oberauer_lewandowsky_2019_e1)
+  dat[c("n_corr", "n_other", "n_dist", "n_npl")] <- rep(counts, each = nrow(dat))
+  fit_with <- function(count_name, num_options) {
+    suppressWarnings(bmm(
+      bmf(corr ~ b + a + c, other ~ b + a, npl ~ b, c ~ 1, a ~ 1, d ~ 1) +
+        bmf(as.formula(paste("dist ~ b + d *", count_name))),
+      dat,
+      m3(cats, num_options, links = list(c = "log", a = "log", d = "log")),
+      backend = "mock", mock_fit = 1, rename = FALSE
+    ))
+  }
+
+  from_columns <- fit_with("n_dist", c("n_corr", "n_other", "n_dist", "n_npl"))
+  unnamed <- fit_with("n_opt_dist", counts)
+  user_named <- fit_with("k3", setNames(counts, c("k1", "k2", "k3", "k4")))
+  category_named <- fit_with("n_opt_dist", setNames(counts, cats))
+  expect_equal(brms::standata(unnamed), brms::standata(from_columns))
+  expect_equal(brms::standata(user_named), brms::standata(from_columns))
+  expect_equal(brms::standata(category_named), brms::standata(from_columns))
+  expect_named(unnamed$bmm$model$parameters, c("b", "c", "a", "d"), ignore.order = TRUE)
+
+  expect_error(
+    fit_with("n_opt_dist", c("n_corr", "n_other", "n_dist", "n_npl")),
+    "'n_opt_dist' in your activation formula\\(s\\) is neither a data column nor a model parameter"
+  )
+})
+
+test_that("m3_custom linear activations can use nTrials and Idx_ columns (#495)", {
+  fit_with <- function(activation) {
+    suppressWarnings(bmm(
+      bmf(corr ~ b + a + c, other ~ b + a, npl ~ b, c ~ 1, a ~ 1) + bmf(activation),
+      oberauer_lewandowsky_2019_e1,
+      m3(c("corr", "other", "dist", "npl"), c(1, 4, 5, 5), links = list(c = "log", a = "log")),
+      backend = "mock", mock_fit = 1, rename = FALSE
+    ))
+  }
+
+  for (activation in c(dist ~ b + nTrials, dist ~ b + Idx_dist)) {
+    fit <- fit_with(activation)
+    expect_named(fit$bmm$model$parameters, c("b", "c", "a"), ignore.order = TRUE)
+    expect_true("C_dist_1" %in% names(brms::standata(fit)))
+  }
+  # Y is a matrix column, and as a predictor it breaks the Stan code
+  expect_error(fit_with(dist ~ b + Y), "'Y' in your activation formula.*`Y` is reserved")
+})
 
 test_that("m3 with numerical vector as num_options containing 0 returns error", {
   formula <- bmf(
@@ -421,6 +514,64 @@ test_that("num_options names already taken by a column or parameter give an erro
   expect_error(m3_num_options_fit(c(nTrials = 1, k2 = 4, k3 = 5, k4 = 5)), "'nTrials'")
   expect_error(m3_num_options_fit(c(Idx_dist = 1, k2 = 4, k3 = 5, k4 = 5)), "'Idx_dist'")
   expect_error(m3_num_options_fit(c(ID = 1, k2 = 4, k3 = 5, k4 = 5)), "'ID'")
+})
+
+m3_data_fit <- function(data) {
+  bmm(
+    bmf(corr ~ b + a + c, other ~ b + a, dist ~ b + d, npl ~ b, c ~ 1, a ~ 1, d ~ 1),
+    data,
+    m3(
+      resp_cats = c("corr", "other", "dist", "npl"),
+      num_options = c("n_corr", "n_other", "n_dist", "n_npl"),
+      choice_rule = "simple", links = list(c = "log", a = "log", d = "log"),
+      default_priors = list(
+        c = list(main = "normal(2, 0.5)", effects = "normal(0, 0.5)"),
+        a = list(main = "normal(0, 0.5)", effects = "normal(0, 0.5)"),
+        d = list(main = "normal(0, 0.5)", effects = "normal(0, 0.5)")
+      )
+    ),
+    backend = "mock", mock_fit = 1, rename = FALSE
+  )
+}
+
+test_that("m3 warns about missing counts only where the category has options (#496)", {
+  dat <- oberauer_lewandowsky_2019_e1
+  expect_true(all(is.na(dat$dist) == (dat$n_dist == 0)))
+  expect_silent(m3_data_fit(dat))
+
+  dat$other[1:3] <- NA
+  dat$dist[dat$n_dist > 0][1:2] <- NA
+  expect_warning(m3_data_fit(dat), "contain 5 missing value\\(s\\)")
+})
+
+test_that("m3 refuses data columns it would overwrite (#496)", {
+  for (col in c("nTrials", "Y", "Idx_corr")) {
+    dat <- oberauer_lewandowsky_2019_e1
+    dat[[col]] <- 1
+    expect_error(m3_data_fit(dat), glue::glue("'{col}' would be overwritten"))
+  }
+})
+
+test_that("a response category may be called Y or nTrials, also in the stored frame (#496)", {
+  for (cat in c("Y", "nTrials")) {
+    dat <- oberauer_lewandowsky_2019_e1
+    names(dat)[names(dat) == "corr"] <- cat
+    cats <- c(cat, "other", "npl")
+    fit <- bmm(
+      bmf(c ~ 1, a ~ 1), dat,
+      m3(cats, num_options = c("n_corr", "n_other", "n_npl"), choice_rule = "simple", version = "ss"),
+      backend = "mock", mock_fit = 1, rename = FALSE
+    )
+    stored <- check_stored_data(fit$bmm$model, fit$data, fit$bmm$user_formula)
+    expect_equal(unname(stored$Y[, cats]), unname(as.matrix(dat[cats])))
+  }
+})
+
+test_that("m3 refuses missing option counts (#496)", {
+  dat <- oberauer_lewandowsky_2019_e1
+  dat$n_other[1:3] <- NA
+  dat$n_npl[1] <- NA
+  expect_error(m3_data_fit(dat), "missing values: n_other \\(3 NA\\), n_npl \\(1 NA\\)")
 })
 
 test_that("m3 rejects num_options it cannot map onto the response categories", {

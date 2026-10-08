@@ -140,6 +140,8 @@ settable_link_functions.m3 <- function(model) {
 #'   the order of `resp_cats`, and other names become the names of the columns
 #'   bmm adds to the data. Column names given category names, e.g.
 #'   `c(other = "n_other", corr = "n_corr")`, are matched by name as well, in any order.
+#'   Custom activation formulas can use numbers by these column names; numbers
+#'   without names or named after the categories are called `n_opt_<category>`.
 #' @param choice_rule The choice rule that should be used for the M3. The options are "softmax"
 #'   or "simple". The "softmax" option implements the softmax normalization of activation into
 #'   probabilities for choosing the different response categories. The "simple" option implements
@@ -158,6 +160,14 @@ settable_link_functions.m3 <- function(model) {
 #' `r model_docs(.model_m3(version = "cs"), components =c('requirements', 'parameters', 'fixed_parameters', 'links', 'prior'))`
 #' #### Version: `custom`
 #' `r model_docs(.model_m3(version = "custom"), components = c('requirements', 'parameters', 'fixed_parameters', 'links', 'prior'))`
+#' #### Missing values and reserved names
+#' A missing response count (`NA`) is counted as 0. If the category has options in that
+#' row, `bmm()` warns and says how many counts were replaced; if it has none (`num_options`
+#' is 0 in that row), the 0 is true and there is no warning, as for `dist` in
+#' [oberauer_lewandowsky_2019_e1]. A missing value in a column named in `num_options` is
+#' an error: enter 0 where there were no options. Data columns named `Y`, `nTrials` or
+#' `Idx_<category>` are refused because `bmm()` creates columns with these names; response
+#' categories may be called `Y` or `nTrials`.
 #'
 #' @keywords bmmodel
 #'
@@ -251,10 +261,20 @@ m3 <- function(resp_cats, num_options, choice_rule = "softmax",
 #' @export
 check_model.m3_custom <- function(model, data = NULL, formula = NULL) {
   if (!is.null(formula)) {
-    user_pars <- rhs_vars(formula[is_nl(formula)])
-    user_pars <- setdiff(user_pars, names(formula[is_nl(formula)]))
-    user_pars <- setdiff(user_pars, names(model$parameters))
-    user_pars <- setdiff(user_pars, colnames(data))
+    user_pars <- setdiff(
+      m3_activation_symbols(model, formula),
+      c(colnames(data), built_data_columns(model))
+    )
+    # a symbol without its own formula is more often a typo or a missing column
+    # than a new parameter, and as a parameter it would be fitted silently
+    no_formula <- setdiff(user_pars, names(formula))
+    stopif(
+      length(no_formula) > 0,
+      "{collapse_comma(no_formula)} in your activation formula(s) is neither a \\
+      data column nor a model parameter. Give each new parameter its own \\
+      formula (e.g. {no_formula[1]} ~ 1), or add the column to the data (`Y` is \\
+      reserved and cannot be a data column)."
+    )
     model$parameters <- c(model$parameters, setNames(user_pars, user_pars))
   }
 
@@ -299,6 +319,18 @@ check_model.m3_custom <- function(model, data = NULL, formula = NULL) {
   NextMethod("check_model")
 }
 
+# Candidates for the parameters a custom m3 adds: symbols in the activation
+# and non-linear formulas that the model does not define already. brms fits
+# every activation as non-linear, also one that is_nl() calls linear because
+# no other formula parameter appears in it
+m3_activation_symbols <- function(model, formula) {
+  symbols <- union(
+    rhs_vars(formula[is_nl(formula)]),
+    rhs_vars(formula[intersect(model$resp_vars$resp_cats, names(formula))])
+  )
+  setdiff(symbols, c(names(formula[is_nl(formula)]), names(model$parameters)))
+}
+
 ############################################################################# !
 # CHECK_data S3 methods                                                  ####
 ############################################################################# !
@@ -320,6 +352,17 @@ m3_num_options <- function(model) {
   num_options
 }
 
+# Y is left out: as a matrix column it breaks the Stan code as a predictor
+#' @exportS3Method
+built_data_columns.m3 <- function(model) {
+  num_options <- m3_num_options(model)
+  c(
+    if (is.numeric(num_options)) names(num_options),
+    "nTrials", paste0("Idx_", model$resp_vars$resp_cats),
+    NextMethod("built_data_columns")
+  )
+}
+
 #' @export
 check_data.m3 <- function(model, data, formula) {
   resp_name <- model$resp_vars$resp_cats
@@ -329,9 +372,23 @@ check_data.m3 <- function(model, data, formula) {
   missing_variables <- setdiff(resp_name, col_names)
   stopif(length(missing_variables), "The response variable(s) {paste0(missing_variables, collapse = ', ')} missing in the data")
 
+  # Y and nTrials may name a category, whose column is consumed first; brms
+  # refuses `_` in category names, so Idx_<category> cannot be one
+  reserved_cols <- intersect(
+    c(setdiff(c("Y", "nTrials"), resp_name), paste0("Idx_", resp_name)),
+    col_names
+  )
+  stopif(
+    length(reserved_cols) > 0,
+    "The data column(s) {collapse_comma(reserved_cols)} would be overwritten by \\
+    the response matrix, trial counts and option indicators that bmm builds. \\
+    Please rename them."
+  )
+
   # Transfer all of the response variables to a matrix and name it 'Y'
   resp_matrix <- as.matrix(data[resp_name])
-  resp_matrix[is.na(resp_matrix)] <- 0
+  missing_counts <- is.na(resp_matrix)
+  resp_matrix[missing_counts] <- 0
   data <- data[!col_names %in% resp_name]
   data$nTrials <- rowSums(resp_matrix)
   data$Y <- resp_matrix
@@ -341,6 +398,14 @@ check_data.m3 <- function(model, data, formula) {
     missing_options <- setdiff(n_opt_vect, col_names)
     stopif(length(missing_options), "The variable(s) {paste0(missing_options, collapse = ', ')} missing in the data")
     opt_vars <- n_opt_vect
+    na_counts <- colSums(is.na(data[opt_vars]))
+    na_counts <- na_counts[na_counts > 0]
+    stopif(
+      length(na_counts) > 0,
+      "The option count column(s) contain missing values: \\
+      {paste0(names(na_counts), ' (', na_counts, ' NA)', collapse = ', ')}. \\
+      Give the number of response options for every row, and 0 where the category had none."
+    )
   } else if (is.numeric(n_opt_vect)) {
     # n_opt_vect is the *number* of options for each response variable
     opt_vars <- names(n_opt_vect)
@@ -374,6 +439,15 @@ check_data.m3 <- function(model, data, formula) {
   n_opt_idx_vars <- paste0("Idx_", resp_name)
   data[n_opt_idx_vars] <- as.integer(data[opt_vars] > 0)
   data[opt_vars][data[opt_vars] == 0] <- 0.0001
+
+  # NA is how a category without options is usually recorded, and there it is
+  # the true count; only where the category had options is a count lost
+  n_missing <- sum(missing_counts & as.matrix(data[n_opt_idx_vars]) == 1)
+  warnif(
+    n_missing > 0,
+    "The response category columns contain {n_missing} missing value(s) in rows \\
+    where the category has response options. They are counted as 0 responses."
+  )
 
   NextMethod("check_data")
 }
