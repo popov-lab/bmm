@@ -10,7 +10,8 @@ on:
   pull_request:
     branches: [master, develop, 'dev-*']
     # A stacked PR is retargeted to develop when its base merges, which is an
-    # `edited` event; without it the check would never run for that PR
+    # `edited` event; without it the check would never run for that PR. The
+    # event also fires for title and body edits, which only rerun the check
     types: [opened, synchronize, reopened, edited]
 
 name: file-size
@@ -72,16 +73,25 @@ jobs:
           sizes=$(mktemp)
           git cat-file --batch-check='%(objecttype) %(objectname) %(objectsize)' < "$candidates" > "$sizes"
 
+          # cat-file prints "<oid> missing" for an object the fetch did not
+          # deliver; the loop below skips such a line, so an unsized candidate
+          # would pass unchecked
           status=0
+          unfetched=$(grep -c ' missing$' "$sizes" || true)
+          if [ "$unfetched" -gt 0 ]; then
+            echo "::error::${unfetched} objects could not be fetched, so their size is unknown. Rerun the check; if it fails again, the remote did not deliver the blobs."
+            status=1
+          fi
           checked=0
           while read -r type blob size; do
             [ "$type" = blob ] || continue
             checked=$((checked + 1))
             [ "$size" -gt "$MAX_BYTES" ] || continue
             where=$(git log -m --reverse --no-renames --raw --no-abbrev \
-              --format='commit %h' --find-object="$blob" "${range[@]}" |
+              --format='commit %H' --find-object="$blob" "${range[@]}" |
               awk -v b="$blob" '/^commit /{c=$2; next} /^:/ && $4==b && !done {split($0,a,"\t"); print c, a[2]; done=1}')
             commit=${where%% *}
+            commit=${commit:0:10}
             path=${where#* }
             [ -n "$where" ] || { commit="an unknown commit"; path="(path not found)"; }
             property=$(printf '%s' "$path" | sed 's/%/%25/g; s/,/%2C/g; s/:/%3A/g')
