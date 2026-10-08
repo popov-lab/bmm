@@ -1,0 +1,103 @@
+# Fails a pull request when any commit in it adds a file above the size limit,
+# even if a later commit removes the file: a merge commit carries every blob of
+# the branch into the history for good (a squash merge would not, but the check
+# cannot know which method will be used). Article fits go to the `article-fits`
+# release instead (ADR 0003, #438).
+# A blob that is held anywhere in the history of the base or of develop passes,
+# so renames, forward merges and restores of files tracked before this check do
+# not trip it.
+on:
+  pull_request:
+    branches: [master, develop, 'dev-*']
+    # A stacked PR is retargeted to develop when its base merges, which is an
+    # `edited` event; without it the check would never run for that PR. The
+    # event also fires for title and body edits, which only rerun the check
+    types: [opened, synchronize, reopened, edited]
+
+name: file-size
+
+jobs:
+  file-size:
+    runs-on: ubuntu-latest
+    env:
+      MAX_BYTES: 1048576
+    steps:
+      # fetch-depth 0 fetches all history of all branches and tags, so
+      # origin/develop and the pull request commits are present; filter
+      # blob:none leaves the blobs out, and the step below fetches the new
+      # ones in a single request
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          filter: blob:none
+
+      - name: Check the size of every blob the pull request adds
+        shell: bash
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          export LC_ALL=C
+          develop=refs/remotes/origin/develop
+          git rev-parse --verify --quiet "$develop" > /dev/null ||
+            git fetch --quiet --no-tags --filter=blob:none origin "+refs/heads/develop:$develop"
+          for sha in "$BASE_SHA" "$HEAD_SHA"; do
+            git cat-file -e "${sha}^{commit}" 2> /dev/null ||
+              git fetch --quiet --no-tags --filter=blob:none origin "$sha"
+          done
+          range=("$HEAD_SHA" "^$BASE_SHA" "^$develop")
+
+          listing=$(mktemp)
+          git rev-list --objects --missing=print "${range[@]}" > "$listing"
+
+          # The exclusions above only drop the trees of the two tips. A blob
+          # that sits elsewhere in their history is still listed, so it is
+          # removed here.
+          held=$(mktemp)
+          git rev-list --objects --missing=print "$BASE_SHA" "$develop" |
+            sed 's/^?//; s/ .*//' | sort -u > "$held"
+          candidates=$(mktemp)
+          sed 's/^?//; s/ .*//' "$listing" | sort -u | comm -23 - "$held" > "$candidates"
+
+          # One request for the candidate blobs the clone lacks. Looked up one
+          # by one, each blob arrives in its own pack, which takes about 0.4 s
+          # and ends in a fatal error after about 50 packs.
+          missing=$(mktemp)
+          sed -n 's/^?//p' "$listing" | sort -u | comm -12 - "$candidates" > "$missing"
+          if [ -s "$missing" ]; then
+            git -c fetch.negotiationAlgorithm=noop fetch --quiet --no-tags \
+              --no-write-fetch-head --filter=blob:none origin --stdin < "$missing"
+          fi
+
+          sizes=$(mktemp)
+          git cat-file --batch-check='%(objecttype) %(objectname) %(objectsize)' < "$candidates" > "$sizes"
+
+          # cat-file prints "<oid> missing" for an object the fetch did not
+          # deliver; the loop below skips such a line, so an unsized candidate
+          # would pass unchecked
+          status=0
+          unfetched=$(grep -c ' missing$' "$sizes" || true)
+          if [ "$unfetched" -gt 0 ]; then
+            echo "::error::${unfetched} objects could not be fetched, so their size is unknown. Rerun the check; if it fails again, the remote did not deliver the blobs."
+            status=1
+          fi
+          checked=0
+          while read -r type blob size; do
+            [ "$type" = blob ] || continue
+            checked=$((checked + 1))
+            [ "$size" -gt "$MAX_BYTES" ] || continue
+            where=$(git log -m --reverse --no-renames --raw --no-abbrev \
+              --format='commit %H' --find-object="$blob" "${range[@]}" |
+              awk -v b="$blob" '/^commit /{c=$2; next} /^:/ && $4==b && !done {split($0,a,"\t"); print c, a[2]; done=1}')
+            commit=${where%% *}
+            commit=${commit:0:10}
+            path=${where#* }
+            [ -n "$where" ] || { commit="an unknown commit"; path="(path not found)"; }
+            property=$(printf '%s' "$path" | sed 's/%/%25/g; s/,/%2C/g; s/:/%3A/g')
+            text=$(printf '%s' "$path" | sed 's/%/%25/g')
+            echo "::error file=${property}::${text} is ${size} bytes, above the limit of ${MAX_BYTES} (blob ${blob:0:10}, added in ${commit}). Upload article fits to the article-fits release instead of committing them, and drop the commit from the branch even if a later commit removes the file (see CONTRIBUTING)."
+            status=1
+          done < "$sizes"
+          echo "Checked ${checked} blobs that the pull request adds to the history"
+          exit "$status"
