@@ -98,7 +98,7 @@ test_that("every registered compute closure is elementwise", {
       expected[[key]] <- .pp_expand_data(compute(observed), n_draws)
     }
   }
-  expect_length(actual, 17L)
+  expect_length(actual, 25L)
   expect_equal(actual, expected)
 })
 
