@@ -65,12 +65,8 @@ EZ Circular Diffusion Model
 \item \strong{Citation:}
 \itemize{
 \item Qarehdaghi, H., & Amani Rad, J. (2024). EZ-CDM: Fast, simple, robust, and accurate estimation of circular diffusion model parameters. Psychonomic Bulletin & Review, 31(5), 2058-2091. https://doi.org/10.3758/s13423-024-02483-7
-}
-}
-\itemize{
 \item Smith, P. L. (2016). Diffusion theory of decision making in continuous report. Psychological Review, 123(4), 425-451. https://doi.org/10.1037/rev0000023
 }
-\itemize{
 \item \strong{Version:} 4par
 \item \strong{Requirements:}
 
