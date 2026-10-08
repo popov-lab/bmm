@@ -3,7 +3,9 @@
 # fails when that file is missing next to the article or cannot be read, because
 # bmm() and brm() refit a missing fit during the build instead of failing it.
 # Readers are bmm(), brm(), readRDS() and read_rds(); writers are ignored.
-# Any other fits/ path fails, in a chunk or inline, because it cannot be checked.
+# Any other string that names a fits/ path fails, in a chunk or inline, because
+# it cannot be checked. A path that reaches a reader only through a variable or
+# a computed value is not seen unless the string itself names fits/.
 # Code that an article sources or includes as a child document is not seen.
 
 chunk_begin <- "^[\t >]*```+\\s*\\{([a-zA-Z0-9_]+( *[ ,].*)?)\\}\\s*$"
@@ -12,11 +14,12 @@ inline_fits <- "`r[ #][^`]*(fits/|[\"']fits[\"'])"
 fits_path <- "(^|/)fits(/|$)"
 not_evaluated <- "eval\\s*(=|:)\\s*(FALSE|F|false)\\b"
 readers <- c("bmm", "brm", "readRDS", "read_rds")
-# update.bmmfit() always refits and only saves to file, so it is a writer
 writers <- c(
-  "saveRDS", "save", "write_rds", "update", "write.csv", "write.table", "writeLines", "cat",
-  "sink", "ggsave", "png", "jpeg", "pdf", "svg"
+  "saveRDS", "save", "write_rds", "write.csv", "write.table", "writeLines", "cat", "sink",
+  "ggsave", "png", "jpeg", "pdf", "svg"
 )
+# update() of a brm() fit reads file, update.bmmfit() only writes it: in neither
+# list, so a fits/ path there cannot be checked and any other path is ignored
 # a bare "fits" names the folder only as a path component
 path_builders <- c("file.path", "here", "path")
 
@@ -122,7 +125,7 @@ check_string <- function(article, line, pd, k) {
                                          enclosing_call_name(pd, literal) %in% path_builders)) {
     finding(article, line, "problem", paste0(
       "The string \"", value, "\" cannot be checked. Pass the fit as a literal file argument, ",
-      "readRDS(file = \"fits/<name>\") or bmm(..., file = \"fits/<name>\"), so that the build can check it."
+      "readRDS(file = \"fits/<name>.rds\") or bmm(..., file = \"fits/<name>\"), so that the build can check it."
     ))
   }
 }

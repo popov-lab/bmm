@@ -77,24 +77,27 @@ new. If the check names a commit of yours, rewrite the branch without that
 file, for example with an interactive rebase.
 
 - Load a fit with `bmm(..., file = "fits/<name>")` or
-  `readRDS(file = "fits/<name>")`, with the path written as a string literal.
-  The folder `vignettes/articles/fits/` is gitignored. Fits that are already
-  tracked in `assets/` stay there until their article is refitted. Release fits
-  work only for articles directly in `vignettes/articles/`. The build downloads
-  them to `vignettes/articles/fits/`, and an article in a subfolder looks for
-  `fits/` next to itself.
+  `readRDS(file = "fits/<name>.rds")`, with the path written as a string
+  literal. The folder `vignettes/articles/fits/` is gitignored. Fits that are
+  already tracked in `assets/` stay there until their article is refitted.
+  Release fits work only for articles directly in `vignettes/articles/`. The
+  build downloads them to `vignettes/articles/fits/`, and an article in a
+  subfolder looks for `fits/` next to itself.
 - Say in the PR where we can get the fit. A maintainer uploads it to the
   `article-fits` release, and the website build downloads it from there.
-- The website build checks every `file = "..."` that an evaluated R chunk
-  passes as a string literal to `bmm()`, `brm()`, `readRDS()` or `read_rds()`.
-  A `fits/<name>` file must be in the release. Any other file,
+- The website build checks every relative `file = "..."` that an evaluated R
+  chunk passes as a string literal to `bmm()`, `brm()`, `readRDS()` or
+  `read_rds()`. A `fits/<name>` file must be in the release. Any other file,
   such as `assets/<name>`, must be tracked. Both must be readable. The build
   stops, naming the article and the file, when one is not.
-- A `fits/` path that is not such a literal fails the build, because the check
-  cannot read it. This includes `readRDS("fits/<name>")` without `file =`, a
-  path built with `paste0()` or `file.path()`, and inline code. Paths passed to
-  a writer, such as `saveRDS()`, `update()`, `write.csv()`, `ggsave()` or
-  `png()`, are ignored. Sourced code and child documents are not checked.
+- A string that names a `fits/` path and is not such a literal fails the
+  build, because the check cannot read it. This includes
+  `readRDS("fits/<name>")` without `file =`, a path built with `paste0()` or
+  `file.path()`, and inline code. Paths passed to a writer, such as
+  `saveRDS()`, `write.csv()`, `ggsave()` or `png()`, are ignored. A path that
+  reaches a reader only through a variable or a computed value is not seen
+  unless the string itself names `fits/`. Sourced code and child documents
+  are not checked.
 - Articles that pkgdown does not build (names starting with `_`,
   `vignettes/tutorials/`) are not checked.
 - Chunks are found as knitr finds them. A chunk opens at any line like
