@@ -46,6 +46,20 @@ test_that("in combine prior, prior2 overwrites only shared components with prior
   expect_equal(dplyr::filter(prior, dpar == "kappa"), dplyr::filter(prior2, dpar == "kappa"))
 })
 
+test_that("combine_prior() handles empty priors", {
+  empty <- brms::empty_prior()
+  expect_equal(nrow(combine_prior(empty, empty)), 0)
+
+  prior <- brms::prior(normal(0, 1), class = "sd", dpar = "c")
+  expect_equal(nrow(combine_prior(empty, prior)), 1)
+  expect_equal(nrow(combine_prior(prior, empty)), 1)
+})
+
+test_that("validate_default_priors() accepts a formula without parameter formulas", {
+  model <- list(default_priors = list())
+  expect_equal(validate_default_priors(model, brms::bf(y ~ 1)), list())
+})
+
 test_that("combine_prior() passes through a NULL side from either argument", {
   prior <- brms::prior(normal(0, 1), class = "sd", dpar = "kappa")
 
