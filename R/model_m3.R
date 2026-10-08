@@ -462,6 +462,14 @@ check_data.m3 <- function(model, data, formula) {
   data[n_opt_idx_vars] <- as.integer(data[opt_vars] > 0)
   data[opt_vars][data[opt_vars] == 0] <- 0.0001
 
+  # the Gaussian kernels treat counts below 0.5 as absent while the indicator says present
+  bad <- opt_vars[colSums(data[opt_vars] != round(data[opt_vars]) & data[n_opt_idx_vars] == 1) > 0]
+  stopif(
+    model$other_vars$choice_rule == "gaussian" && length(bad) > 0,
+    "The Gaussian choice rule needs whole numbers of response options; {collapse_comma(bad)} \\
+    contain fractional counts."
+  )
+
   # NA is how a category without options is usually recorded, and there it is
   # the true count; only where the category had options is a count lost
   n_missing <- sum(missing_counts & as.matrix(data[n_opt_idx_vars]) == 1)

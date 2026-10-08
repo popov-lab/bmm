@@ -643,6 +643,19 @@ test_that("the gaussian choice rule fixes b at 0, accepts any case, and puts log
   expect_error(m3(c("corr", "other", "npl"), c(1, 4, 10), choice_rule = "probit"), "gaussian")
 })
 
+test_that("the gaussian rule refuses fractional option counts", {
+  cats <- c("corr", "other", "npl")
+  opts <- c("n_corr", "n_other", "n_npl")
+  f <- bmf(c ~ 1, a ~ 1)
+  dat <- data.frame(corr = c(50, 40), other = c(20, 30), npl = c(30, 30),
+                    n_corr = 1, n_other = c(0.3, 4), n_npl = 10)
+  gauss <- m3(cats, opts, choice_rule = "gaussian", version = "ss")
+  expect_error(check_data(gauss, dat, f), "whole numbers")
+  expect_s3_class(check_data(m3(cats, opts, choice_rule = "softmax", version = "ss"), dat, f), "data.frame")
+  dat$n_other[1] <- 0
+  expect_silent(check_data(gauss, dat, f))
+})
+
 test_that("custom m3 with the gaussian rule centres default identity-link priors on the Gaussian scale", {
   model <- m3(c("corr", "other", "npl"), c(1, 4, 10), choice_rule = "gaussian")
   model$links <- list(c = "identity", a = "identity")
