@@ -1062,3 +1062,21 @@ test_that("a softmax range stays on the sampling scale and a single point is not
   # log(0) is -Inf: the one point log cannot represent leaves nothing to draw from
   expect_null(representable_range(c(-1, 0), "log"))
 })
+
+test_that("an init function carries nothing from the frame that built it", {
+  dat <- oberauer_lin_2017
+  model <- sdm(resp_error = "dev_rad")
+  formula <- bmf(c ~ 1, kappa ~ 1)
+  # brms stores the init function in the fit, and bmm()'s frame holds the data
+  # and the fit itself, which saveRDS() would then write into the file again
+  init_beside <- function(n) {
+    ballast <- runif(n)
+    configure_fit(formula, dat, model)$config_args$init
+  }
+  # each function is sized on its own, so that the other one's ballast is not counted
+  serialized_size <- function(n) length(serialize(init_beside(n), NULL))
+  expect_equal(serialized_size(1e6), serialized_size(1))
+  inits <- init_beside(1e6)()
+  expect_type(inits, "list")
+  expect_named(inits)
+})
