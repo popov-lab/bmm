@@ -55,11 +55,12 @@ built_data_columns.default <- function(model) {
 #' @export
 check_data.bmmodel <- function(model, data, formula) {
   stopif(missing(data), "Data must be specified using the 'data' argument.")
+  data_name <- attr(data, "data_name") %||% substitute_name(data, envir = eval(parent.frame()))
   data <- try(as.data.frame(data), silent = TRUE)
   stopif(is_try_error(data), "Argument 'data' must be coercible to a data.frame.")
   stopif(!isTRUE(nrow(data) > 0L), "Argument 'data' does not contain observations.")
 
-  attr(data, "data_name") <- substitute_name(data, envir = eval(parent.frame()))
+  attr(data, "data_name") <- data_name
   attr(data, "checked") <- TRUE
   NextMethod("check_data")
 }
@@ -275,22 +276,12 @@ rad2deg <- function(rad) {
 standata.bmmformula <- function(object, data, model, ...) {
   dots <- list(...)
   local_brms_threads(dots)
-
-  # check model, formula and data, and transform data if necessary
-  formula <- object
   configure_options(dots)
-  model <- check_model(model, data, formula)
-  data <- check_data(model, data, formula)
-  formula <- check_formula(model, data, formula)
-
-  # generate the model specification to pass to brms later
-  config_args <- configure_model(model, data, formula)
-
-  # extract stan data
-  fit_args <- combine_args(nlist(config_args, dots))
-  fit_args$object <- fit_args$formula
-  fit_args$formula <- NULL
-  brms::do_call(brms::standata, fit_args)
+  call_brms_extractor(
+    brms::standata,
+    configure_fit(object, data, model, until = "model"),
+    dots
+  )
 }
 
 # check if the data is sorted by the predictors
