@@ -68,10 +68,12 @@ Attach the script as a gist or in a collapsed block in the PR.
 The articles load cached fits through `bmm(..., file = )`. Do not commit new
 or refitted fits. The `file-size` check fails a PR when any of its commits adds
 a file larger than 1 MiB, or a new version of one, even if a later commit
-removes the file again, because merging the PR keeps every commit in the
-history ([ADR 0003](../.dev/decisions/0003-model-fit-files.md)). Files that are
-already in `develop` do not count. If the check names a commit of yours,
-rewrite the branch without that file, for example with an interactive rebase.
+removes the file again, because a merge commit keeps every commit of the PR in
+the history. A squash merge would not, but the check cannot know which one will
+be used ([ADR 0003](../.dev/decisions/0003-model-fit-files.md)). A file that is
+already in the history of `develop` or of the PR's base does not count. If the
+check names a commit of yours, rewrite the branch without that file, for
+example with an interactive rebase.
 
 - Point `file =` to `fits/<name>`, written as a string literal. The folder
   `vignettes/articles/fits/` is gitignored. Fits that are already tracked in
@@ -80,8 +82,10 @@ rewrite the branch without that file, for example with an interactive rebase.
   `article-fits` release, and the website build downloads it from there.
 - The website build stops, naming the article and the fit, when a fit that an
   article loads from `fits/` is missing from the release or cannot be read.
-  The fit has to be uploaded before the PR is merged into a branch that
-  builds the site.
+  It finds the fits by reading `file = "fits/<name>"` in the R chunks of the
+  articles, so a fit that is loaded by other means, such as sourced code or a
+  child document, is not checked. The fit has to be uploaded before the PR is
+  merged into a branch that builds the site.
 - Give a refitted fit a new file name instead of replacing the old asset. The
   website builds from `develop` and reads whatever the release holds at that
   moment.
