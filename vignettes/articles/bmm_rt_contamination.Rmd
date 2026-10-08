@@ -237,7 +237,7 @@ clean_data <- flagged_data |> filter(contam_prob < 0.5)
 fit <- bmm(
   formula = bmf(drift ~ condition, bound ~ 1, ndt ~ 1),
   data = clean_data,
-  model = ddm(resp1 = "rt", resp2 = "response")
+  model = ddm(rt = "rt", response = "response")
 )
 ```
 
@@ -370,7 +370,7 @@ The default data-driven bounds (`c("min", "max")`) adapt the uniform component t
 
 The ex-Gaussian distribution is a safe starting point. Try log-normal if you have heavy tails, or inverse Gaussian if you want a closer match to the Wiener process. See `?ezdm_summary_stats` for details.
 
-Check convergence with `attr(result, "diagnostics")$converged`. When the EM fails to converge, it usually means too few trials or bounds that do not fit the data well. `ezdm_summary_stats()` falls back to simple moments in that case.
+When the EM fails to converge, it usually means too few trials or bounds that do not fit the data well. `flag_contaminant_rts()` then returns `NA` for every trial of the group, and `attr(result, "diagnostics")$converged` is `FALSE`. `ezdm_summary_stats()` has no such attribute. It warns and falls back to robust moments, and `n_upper` and `n_trials` stay the raw counts.
 
 If estimated contamination rates exceed 20%, first check that RTs are in seconds, not milliseconds. Then verify your bounds. If the rates still seem high, the data may genuinely be noisy.
 

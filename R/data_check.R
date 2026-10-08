@@ -211,7 +211,7 @@ describe_data_column <- function(x, max_values = n_discrete_max) {
 
 summarise_predictor_vars <- function(model, data, formula) {
   par_names <- unique(c(names(formula), names(model$parameters)))
-  pred_map <- lapply(rhs_vars(formula, collapse = FALSE), function(vars) {
+  pred_map <- lapply(formula_data_vars(formula), function(vars) {
     setdiff(vars, par_names)
   })
   pred_map <- pred_map[lengths(pred_map) > 0]
@@ -230,7 +230,22 @@ summarise_predictor_vars <- function(model, data, formula) {
     summary = vapply(data_vars, function(v) describe_data_column(data[[v]]), character(1)),
     row.names = NULL
   )
-  nlist(pred_map, coding, unknown_vars = setdiff(used_vars, colnames(data)), group_vars)
+  nlist(
+    pred_map, coding,
+    unknown_vars = setdiff(used_vars, c(colnames(data), built_data_columns(model))),
+    group_vars
+  )
+}
+
+# Unlike rhs_vars(), leaves out the correlation IDs of `(1 |p| id)` terms,
+# which label a correlation structure and are not data columns.
+formula_data_vars <- function(formula) {
+  lapply(formula, function(f) {
+    if (!is_formula(f) || length(f) == 0) {
+      return(character(0))
+    }
+    all.vars(.drop_re_cor_ids(f[[length(f)]]))
+  })
 }
 
 re_group_vars <- function(formula) {
@@ -238,24 +253,17 @@ re_group_vars <- function(formula) {
     if (!is_formula(f) || length(f) == 0) {
       return(character(0))
     }
-    extract_bar_group_vars(f[[length(f)]])
+    .re_bar_parts(f[[length(f)]])$group_cols
   })
   as.character(unique(unlist(vars)))
 }
 
-extract_bar_group_vars <- function(expr) {
-  if (!is.call(expr)) {
-    return(character(0))
-  }
-  if (identical(expr[[1]], quote(`|`)) || identical(expr[[1]], quote(`||`))) {
-    return(all.vars(expr[[3]]))
-  }
-  unique(unlist(lapply(as.list(expr)[-1], extract_bar_group_vars)))
-}
-
 summarise_design_cells <- function(data, formula) {
   group_vars <- intersect(re_group_vars(formula), colnames(data))
-  fixed_vars <- setdiff(intersect(rhs_vars(formula), colnames(data)), group_vars)
+  fixed_vars <- setdiff(
+    intersect(unique(unlist(formula_data_vars(formula))), colnames(data)),
+    group_vars
+  )
   cell_vars <- fixed_vars[vapply(fixed_vars, function(v) {
     is_discrete_var(data[[v]])
   }, logical(1))]

@@ -50,24 +50,9 @@
 #' @export
 default_prior.bmmformula <- function(object, data, model, formula = object, ...) {
   withr::local_options(bmm.sort_data = FALSE)
-
-  formula <- object
-  model <- check_model(model, data, formula)
-  data <- check_data(model, data, formula)
-  formula <- check_formula(model, data, formula)
-  config_args <- configure_model(model, data, formula)
   dots <- list(...)
-  prior <- brms::do_call(
-    configure_prior, c(list(model, data, config_args$formula, user_prior = NULL), brms_frame_args(dots))
-  )
-
-  prior_args <- combine_args(nlist(config_args, dots, prior))
-  prior_args$object <- prior_args$formula
-  prior_args$formula <- NULL
-
-  brms_priors <- brms::do_call(brms::default_prior, prior_args)
-
-  combine_prior(brms_priors, prior_args$prior)
+  cfg <- configure_fit(object, data, model, until = "prior", frame_args = brms_frame_args(dots))
+  combine_prior(call_brms_extractor(brms::default_prior, cfg, dots), cfg$prior)
 }
 
 #' @title Priors of a fitted bmm model and where they came from
@@ -655,7 +640,9 @@ validate_default_priors <- function(model, formula) {
     !is.list(default_priors) || !all(sapply(default_priors, is.list)),
     "The default_priors should be a list of lists"
   )
-  dropped <- intersect(names(which(sapply(formula$pforms, is_nl))), names(default_priors))
+  dropped <- intersect(
+    names(which(vapply(formula$pforms, is_nl, logical(1)))), names(default_priors)
+  )
   default_priors[dropped] <- NULL
   warnif(
     length(dropped) > 0,
