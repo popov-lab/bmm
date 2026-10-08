@@ -63,6 +63,28 @@ of a parameter recovery for the new model:
 
 Attach the script as a gist or in a collapsed block in the PR.
 
+### Model fits for the website articles
+
+The articles load cached fits through `bmm(..., file = )`. Do not commit new
+or refitted fits: a check fails every PR that adds a file larger than 1 MiB,
+or a new version of one
+([ADR 0003](../.dev/decisions/0003-model-fit-files.md)).
+
+- Point `file =` to `fits/<name>`. The folder `vignettes/articles/fits/` is
+  gitignored. Fits that are already tracked in `assets/` stay there until their
+  article is refitted.
+- Say in the PR where we can get the fit. A maintainer uploads it to the
+  `article-fits` release, and the website build downloads it from there.
+- Give a refitted fit a new file name instead of replacing the old asset. The
+  website builds from `develop` and reads whatever the release holds at that
+  moment.
+
+To build the articles locally, download the fits first:
+
+```sh
+gh release download article-fits --dir vignettes/articles/fits --skip-existing
+```
+
 ## Review and merging
 
 How many reviews a PR needs depends on what it touches.

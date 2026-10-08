@@ -1,0 +1,46 @@
+# Fails a pull request that adds a file above the size limit, or a new version
+# of one. Article fits go to the `article-fits` release instead (ADR 0003, #438).
+# A blob the base branch already holds passes, so renames and forward merges of
+# files tracked before this check do not trip it.
+on:
+  pull_request:
+    branches: [master, develop, 'dev-*']
+
+name: file-size
+
+jobs:
+  file-size:
+    runs-on: ubuntu-latest
+    env:
+      MAX_BYTES: 1048576
+    steps:
+      # The full history without blobs is enough for the merge base; the few
+      # blobs the size check reads are fetched on demand
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          filter: blob:none
+
+      - name: Check the size of added and changed files
+        shell: bash
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          base_blobs=$(mktemp)
+          git ls-tree -r "$BASE_SHA" | while read -r _ _ blob _; do
+            echo "$blob"
+          done | sort -u > "$base_blobs"
+          status=0
+          while IFS= read -r -d '' meta && IFS= read -r -d '' path; do
+            read -r _ new_mode _ blob _ <<< "$meta"
+            [ "$new_mode" = "160000" ] && continue
+            grep -qx "$blob" "$base_blobs" && continue
+            size=$(git cat-file -s "$blob")
+            if [ "$size" -gt "$MAX_BYTES" ]; then
+              echo "::error file=${path}::${path} is ${size} bytes, above the limit of ${MAX_BYTES}. Upload article fits to the article-fits release instead of committing them (see CONTRIBUTING)."
+              status=1
+            fi
+          done < <(git diff --raw -z --no-abbrev --no-renames --diff-filter=AM "$BASE_SHA...$HEAD_SHA")
+          exit "$status"

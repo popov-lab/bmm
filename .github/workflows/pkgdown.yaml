@@ -109,6 +109,27 @@ jobs:
           )
         shell: Rscript {0}
 
+      # Fits added or refitted since ADR 0003 are assets of the article-fits
+      # release, not tracked files (#438). Until that release exists the
+      # articles read only the tracked fits; any other API error stops the
+      # build, because a missing fit would be refitted during the build.
+      - name: Download article fits
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          FITS_TAG: article-fits
+        run: |
+          set -euo pipefail
+          err=$(mktemp)
+          if ! n=$(gh api "repos/${GITHUB_REPOSITORY}/releases/tags/${FITS_TAG}" --jq '.assets | length' 2> "$err"); then
+            grep -q 'HTTP 404' "$err" || { cat "$err" >&2; exit 1; }
+            n=0
+          fi
+          if [ "$n" -gt 0 ]; then
+            gh release download "$FITS_TAG" --repo "$GITHUB_REPOSITORY" --dir vignettes/articles/fits --clobber
+          fi
+          echo "Downloaded ${n} article fits from the ${FITS_TAG} release"
+
       - name: Build site
         run: pkgdown::build_site_github_pages(new_process = FALSE, install = FALSE)
         shell: Rscript {0}
