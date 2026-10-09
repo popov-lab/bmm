@@ -770,13 +770,21 @@ mpt <- function(trees, tree_id = NULL, covariates = NULL, simplex = NULL,
     length(circular) > 0,
     "The restrictions on {collapse_comma(circular)} are circular."
   )
-  scientific <- unlist(lapply(restrictions, .mpt_scientific_constants))
+  # a restriction takes only a bare constant, so the rescaling that
+  # mpt_tree() suggests has to move into the branch expressions
+  scientific <- restrictions[
+    lengths(lapply(restrictions, .mpt_scientific_constants)) > 0
+  ]
   stopif(
     length(scientific) > 0,
-    "The restriction constant(s) {collapse_comma(scientific)} are too extreme \\
-    to be written into the generated Stan code (brms emits them in scientific \\
-    notation, which breaks the Stan syntax). Please provide such values as a \\
-    data column declared in the covariates argument, or use a larger constant."
+    "brms writes the constant in the restriction(s) \\
+    {paste(names(scientific), vapply(scientific, deparse1, character(1)),
+           sep = ' = ', collapse = ', ')} in scientific notation, which \\
+    breaks the generated Stan code. Every spelling of the same number is \\
+    affected, so please leave the parameter out of the restrictions and \\
+    write the constant into the branch expressions as a product instead, \\
+    e.g. 0.0002 as 0.02 * 0.01, or provide the value as a data column \\
+    declared in the covariates argument."
   )
   lapply(trees, .mpt_apply_restrictions, restrictions)
 }
