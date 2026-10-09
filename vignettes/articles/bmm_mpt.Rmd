@@ -207,20 +207,7 @@ The default priors are matched to the link function: with the logit link, interc
 default_prior(bmf(D ~ 1, g ~ 1), data = dat, model = model_2htm)
 ```
 
-Note where the intercept prior sits in that table: in the row with `class = "b"` and `coef = "Intercept"`, not in a row of its own class. **brms** has no separate `Intercept` prior class for non-linear parameters, and every MPT parameter is one. This matters when you replace a default, because **brms** resolves the most specific matching row: a prior given only as
-
-```{r, eval = FALSE}
-prior("normal(0, 3.1623)", class = "b", nlpar = "D")
-```
-
-reaches the regression coefficients of `D` but leaves its intercept at the package default. To replace the intercept prior, name the coefficient explicitly, and give both rows if you want to change both:
-
-```{r, eval = FALSE}
-prior("normal(0, 3.1623)", class = "b", coef = "Intercept", nlpar = "D") +
-  prior("normal(0, 3.1623)", class = "b", nlpar = "D")
-```
-
-The behavior depends on the formula, which makes it easy to miss: with `D ~ 0 + condition` there is no coefficient called `Intercept`, so the class-level prior applies to every level and the first form works as expected. `default_prior()` shows which rows a given formula produces; `brms::prior_summary()` on the fitted model shows which priors the fit actually used.
+A prior given as `prior("normal(0, 3.1623)", class = "b", nlpar = "D")` replaces the defaults of every coefficient of `D`, its intercept included; add `coef = "Intercept"` to set the intercept alone.
 
 # Interpreting the estimates
 
@@ -687,7 +674,7 @@ rbind(
 
 The last of these, combined with `links = "probit"`, is the model TreeBUGS fits with `traitMPT()`. Correlations *across* parameters, the defining feature of the latent-trait model, are requested with the `|p|` syntax of **brms**: `D ~ 1 + (1 |p| id)` and `g ~ 1 + (1 |p| id)` share one correlation matrix. Nothing forces `D` and `g` to share a random-effect structure, and parameters that only exist in one condition can simply take `(1 | participant)`.
 
-**Priors need converting from precision to standard deviation.** JAGS parameterizes the normal distribution by precision, Stan by standard deviation, so a JAGS `dnorm(0, 0.1)` on a latent-scale parameter becomes `normal(0, 3.1623)` in `bmm` ($1/\sqrt{0.1}$). Gamma priors carry over unchanged: JAGS `dgamma(1, 0.1)` on a random-effect standard deviation is `gamma(1, 0.1)` here, since both use the shape/rate parameterization. Remember that the intercept prior of an MPT parameter needs `coef = "Intercept"` (see [Default priors]); this is the single most common surprise when porting a prior specification.
+**Priors need converting from precision to standard deviation.** JAGS parameterizes the normal distribution by precision, Stan by standard deviation, so a JAGS `dnorm(0, 0.1)` on a latent-scale parameter becomes `normal(0, 3.1623)` in `bmm` ($1/\sqrt{0.1}$). Gamma priors carry over unchanged: JAGS `dgamma(1, 0.1)` on a random-effect standard deviation is `gamma(1, 0.1)` here, since both use the shape/rate parameterization.
 
 **Group-level estimates are reported on the latent scale.** TreeBUGS reports group means as probabilities, namely the probability of the median participant. To get there from a `bmm` fit, use `native_parameters(fit, re_formula = NA, summary = TRUE)`, as shown under [Population-level probabilities]; it applies the inverse link to the linear predictor, which also covers the probit link and models with predictors.
 
