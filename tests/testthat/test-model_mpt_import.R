@@ -1101,7 +1101,7 @@ test_that("a category clash after sanitizing points to categories, not covariate
     mpt_from_eqn(write_eqn(c("old old_ab D", "old a_b 1-D")), tree_id = "tr"),
     error = conditionMessage
   )
-  expect_match(clash, "produces duplicated names: 'ab'")
+  expect_match(clash, "produces duplicated names: 'old_ab', 'a_b' become 'ab'")
   expect_match(clash, "map them with the categories argument")
   expect_no_match(clash, "covariate")
 })
@@ -1184,7 +1184,8 @@ test_that("mpt_from_eqn reports every sanitizing problem at once", {
       covariates = "cd"
     ),
     paste(
-      "leaves empty names for '.'; produces duplicated names: 'ab';",
+      "leaves empty names for '.'; produces duplicated names: 'a_b', 'a.b'",
+      "become 'ab';",
       "turns parameters into covariate names: 'c_d' would read as 'cd'.",
       "Please rename them in the model file."
     ),

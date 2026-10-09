@@ -844,6 +844,9 @@ mpt_from_eqn <- function(file, restrictions = NULL, categories = NULL,
     argument."
   )
   cat_renaming <- .mpt_sanitized_names(unique(category_clean))
+  # the message names the labels as the EQN file writes them, before the
+  # prefix strip
+  names(cat_renaming) <- eqn$category[match(names(cat_renaming), category_clean)]
   .mpt_check_sanitized_names(cat_renaming, for_categories = TRUE)
   eqn$bmm_category <- gsub("[._]", "", category_clean)
   eqn$prefix <- ifelse(has_tree_prefix, paste0(eqn$tree, "_"), "")
@@ -1067,7 +1070,10 @@ mpt_from_eqn <- function(file, restrictions = NULL, categories = NULL,
         paste('leaves empty names for', collapse_comma(emptied))
       },
       if (length(duplicates) > 0) {
-        paste('produces duplicated names:', collapse_comma(duplicates))
+        paste('produces duplicated names:', paste(vapply(duplicates, function(d) {
+          paste(collapse_comma(names(sanitized)[sanitized == d]), 'become',
+                collapse_comma(d))
+        }, character(1)), collapse = ' and '))
       },
       if (any(as_covariate)) {
         paste(
