@@ -226,19 +226,19 @@ The behavior depends on the formula, which makes it easy to miss: with `D ~ 0 + 
 
 ## Population-level probabilities
 
-The population-level detection and guessing probabilities are recovered by applying the inverse link to the posterior draws and summarizing afterwards:
+`native_parameters()` turns the latent-scale estimates into probabilities. With `re_formula = NA` it sets all person effects to zero, and `summary = TRUE` summarizes the transformed draws:
 
 ```{r}
-brms::posterior_summary(
-  plogis(brms::as_draws_matrix(fit_2htm, variable = "^b_", regex = TRUE))
-)
+native_parameters(fit_2htm, re_formula = NA, summary = TRUE)
 ```
 
-The order matters for the point estimate. Transforming the summary instead, `plogis(brms::fixef(fit_2htm))`, returns the correct interval bounds, because quantiles survive a monotone transformation, but the wrong `Estimate`: the mean of a transformed parameter is not the transform of its mean. The discrepancy is small near a probability of 0.5 and grows towards the boundaries.
+The function applies the inverse link to the linear predictor of each combination of predictors, not to individual coefficients. That is why it also works for models with predictors, where the inverse link applied to an effect coefficient is not a probability, and for the probit link. Summarizing after the transformation matters for the point estimate: transforming the summary of the latent estimates instead returns correct interval bounds, because quantiles survive a monotone transformation, but a wrong `Estimate`, because the mean of a transformed parameter is not the transform of its mean.
+
+These are the probabilities of a participant at the latent mean, that is, of the median participant. They are not the population mean of the participants' probabilities: because the inverse link is non-linear, that mean lies closer to 0.5, and the two differ noticeably when the latent standard deviation is near 1. The median participant is the quantity that TreeBUGS reports as `"mean"` in `getParam()`. `?native_parameters` (section "Group-level effects") explains the distinction.
 
 ## Participant-level probabilities
 
-`native_parameters()` returns a parameter on the probability scale, population effects and random effects combined, for every combination of its predictors in the data. `D` depends on the participant only, so this is one row per participant; `summary = TRUE` summarizes the draws after the transformation, in the order recommended above:
+`native_parameters()` returns a parameter on the probability scale, population effects and random effects combined, for every combination of its predictors in the data. `D` depends on the participant only, so this is one row per participant; `summary = TRUE` summarizes the draws after the transformation, as above:
 
 ```{r}
 D_subj <- native_parameters(fit_2htm, pars = "D", summary = TRUE)
@@ -457,12 +457,10 @@ fit_ol <- bmm(
 ```
 
 ```{r}
-brms::posterior_summary(
-  plogis(brms::as_draws_matrix(fit_ol, variable = "^b_", regex = TRUE))
-)
+native_parameters(fit_ol, re_formula = NA, summary = TRUE)
 ```
 
-Item memory is high in all three conditions (not-presented lures are rarely chosen), while binding memory is clearly higher when the list is re-presented in its original order than in the other two conditions. When item memory succeeds but the binding is unavailable in the distractor condition, distractor activation captures the response about half of the time.
+`Pd` has no predictor, so its single value is repeated for each condition; it is estimated from the `newdist` condition only. Item memory is high in all three conditions (not-presented lures are rarely chosen), while binding memory is clearly higher when the list is re-presented in its original order than in the other two conditions. When item memory succeeds but the binding is unavailable in the distractor condition, distractor activation captures the response about half of the time.
 
 ## Testing differences between conditions
 
@@ -472,11 +470,13 @@ Item memory is high in all three conditions (not-presented lures are rarely chos
 brms::hypothesis(fit_ol, "Pb_condoldsame > Pb_condoldreord")
 ```
 
-`Post.Prob` is the posterior probability that the difference is positive. The same draws give the difference on the probability scale, if that is the quantity to report:
+`Post.Prob` is the posterior probability that the difference is positive. The difference on the probability scale, if that is the quantity to report, is the difference of the probabilities in the two conditions, draw by draw:
 
 ```{r}
-draws_Pb <- plogis(brms::as_draws_matrix(fit_ol, variable = "^b_Pb_", regex = TRUE))
-brms::posterior_summary(draws_Pb[, "b_Pb_condoldsame"] - draws_Pb[, "b_Pb_condoldreord"])
+Pb_draws <- native_parameters(fit_ol, pars = "Pb", re_formula = NA)
+Pb_draws <- Pb_draws[order(Pb_draws$cond, Pb_draws$.draw), ]
+Pb_by_cond <- split(Pb_draws$value, Pb_draws$cond)
+brms::posterior_summary(Pb_by_cond$oldsame - Pb_by_cond$oldreord)
 ```
 
 ## Posterior predictive check
@@ -517,7 +517,7 @@ The PPP of `r round(ppp_t1, 2)` is computed from `r nrow(t1_draws)` draws. A PPP
 
 ## Model comparison
 
-Because a `bmm` fit is a `brmsfit`, `loo()` and `loo_compare()` from **brms** compare models by their expected log predictive density. As an example, a model in which binding memory does not vary across conditions:
+Because a `bmm` fit is a `brmsfit`, the model-comparison tools of **brms** apply to it. Which of them can be trusted depends on the structure of the data: here each row aggregates all trials of one participant in one condition. As an example, take a model in which binding memory does not vary across conditions:
 
 ```{r fit-ol-restricted, results = "hide", message = FALSE, warning = FALSE}
 fit_ol_pb1 <- bmm(
@@ -543,7 +543,11 @@ loo_ol_pb1 <- brms::loo(fit_ol_pb1)
 brms::loo_compare(loo_ol, loo_ol_pb1)
 ```
 
-The model with condition-specific binding memory is preferred, in line with the hypothesis test above. `loo()` flags `r sum(loo::pareto_k_values(loo_ol) > 0.7)` of the `r length(loo::pareto_k_values(loo_ol))` rows of `fit_ol` and `r sum(loo::pareto_k_values(loo_ol_pb1) > 0.7)` of `fit_ol_pb1` with a Pareto-k above 0.7. That is expected with aggregated data: each row carries all trials of one participant in one condition, so leaving it out shifts that participant's random effects considerably, and the importance-sampling approximation flags the row. Moment matching helps only in part. In a separate run of these two models with `save_pars = save_pars(all = TRUE)`, plain `loo()` flagged 120 and 105 rows and `brms::loo(fit, moment_match = TRUE)` lowered this to 108 and 56, took about 40 minutes per model on one core, and left the comparison where it was; the exact counts shift by a few rows between runs. Here the difference is many standard errors wide and the conclusion does not hinge on the approximation; when it does, `brms::loo(fit, reloo = TRUE)` refits the model without each flagged row, or `brms::kfold()` cross-validates by participant.
+`loo()` is a quick screen here, not a result. It flags `r sum(loo::pareto_k_values(loo_ol) > 0.7)` of the `r length(loo::pareto_k_values(loo_ol))` rows of `fit_ol` and `r sum(loo::pareto_k_values(loo_ol_pb1) > 0.7)` of `fit_ol_pb1` with a Pareto-k above 0.7. That is expected with aggregated data: leaving out a row removes all trials of one participant in one condition, which shifts that participant's random effects considerably, and the importance-sampling approximation breaks down. With this many flagged rows, neither the elpd differences nor their standard errors are trustworthy, and the output above should not be reported as evidence for or against the restriction. The hypothesis test above answers the same question directly.
+
+The prediction target that matches the data is a new participant, so cross-validation should leave out all rows of a participant at once. In **brms** this is `kfold(fit, folds = "grouped", group = "ID")`. It does not yet run on a `bmmfit` of an MPT model: `kfold()` hands the model frame of the fit to `update()` as `newdata`, and `update()` rejects it, because it expects the data in the layout given to `bmm()`, with one column of counts per response category, not the count matrix `Y` that the model frame holds. Until this is resolved, `loo()` as a screen and the hypothesis test are what is available for the comparison of nested models in a fit like this one.
+
+Bayes factors between nested models, for example with and without person effects or with and without a condition effect, are available through `brms::bayes_factor()`, which runs bridge sampling [@gronauBridgesamplingPackageEstimating2020] on both fits. This needs two changes to the fitting call. First, `save_pars = save_pars(all = TRUE)`, because the sampler needs the draws of all parameters, including the person effects. Second, many more post-warmup draws than a posterior summary needs, so that the estimate is stable when repeated. The fits in this article were fitted without these settings, so the sampler cannot be run on them here. The [hypothesis testing article](https://popov-lab.github.io/bmm/articles/bmm_hypothesis_testing.html) shows the full workflow.
 
 ## Relation to the m3 model
 
@@ -649,9 +653,13 @@ Importing the model structure is the easy part; what usually needs translating i
 | `traitMPT(..., predStructure = )`, `covData` | predictors in the parameter formulas, e.g. `D ~ 0 + cond + (1 | id)` |
 | `transformedParameters` | `brms::hypothesis()`, or arithmetic on the posterior draws |
 | `getParam(fit, "theta")` | `native_parameters(fit, pars = "D", summary = TRUE)` |
+| `getParam(fit, "mean")` | `native_parameters(fit, re_formula = NA, summary = TRUE)`: the probability of the median participant, as in TreeBUGS ([Population-level probabilities]) |
+| `probitInverse()` | `?native_parameters`, section "Group-level effects" |
 | `genTraitMPT()`, `genBetaMPT()` | `rmpt()` inside a small simulation function ([Data format and simulation]) |
 | `PPP()` | `pp_check()` for the plot; the code in [Goodness of fit: the T1 statistic] for the posterior predictive p-value |
-| `WAIC()`, `select.mpt()` | `loo()`, `loo_compare()`, `waic()` from **brms** |
+| `WAIC()`, `select.mpt()` | `loo()`, `waic()` and `bayes_factor()` from **brms**; for aggregated counts see [Model comparison] before using any of them |
+| `testHetChi()`, `testHetPerm()` | these test raw frequencies before any model is fitted: run them in TreeBUGS on the wide data. In `bmm`, compare models with and without person effects ([Model comparison]) |
+| `BayesFactorMPT()`, `BayesFactorSlope()` | `brms::bayes_factor()` on fits stored with `save_pars = save_pars(all = TRUE)` ([Model comparison]) |
 
 **The data change from wide to long.** A frame in the layout of `genTraitMPT()`'s `data`, one row per participant and one column per EQN category, becomes one row per participant and tree, with the counts under the shared response categories:
 
@@ -675,6 +683,6 @@ The last of these, combined with `links = "probit"`, is the model TreeBUGS fits 
 
 **Priors need converting from precision to standard deviation.** JAGS parameterizes the normal distribution by precision, Stan by standard deviation, so a JAGS `dnorm(0, 0.1)` on a latent-scale parameter becomes `normal(0, 3.1623)` in `bmm` ($1/\sqrt{0.1}$). Gamma priors carry over unchanged: JAGS `dgamma(1, 0.1)` on a random-effect standard deviation is `gamma(1, 0.1)` here, since both use the shape/rate parameterization. Remember that the intercept prior of an MPT parameter needs `coef = "Intercept"` (see [Default priors]); this is the single most common surprise when porting a prior specification.
 
-**Group-level estimates are reported on the latent scale.** TreeBUGS reports group means as probabilities. To get there from a `bmm` fit, transform the posterior draws and summarize afterwards, as shown under [Population-level probabilities], not the other way around.
+**Group-level estimates are reported on the latent scale.** TreeBUGS reports group means as probabilities, namely the probability of the median participant. To get there from a `bmm` fit, use `native_parameters(fit, re_formula = NA, summary = TRUE)`, as shown under [Population-level probabilities]; it applies the inverse link to the linear predictor, which also covers the probit link and models with predictors.
 
 # References
