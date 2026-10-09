@@ -468,7 +468,7 @@ print.bmmodel <- function(x, ...) {
     cat("Fixed:     ", fixed_str, "\n")
   }
   print_model_details(x)
-  cat("Use parameter_info() for more details.\n")
+  cat("Use parameter_info() for parameter descriptions, links and fixed values.\n")
   invisible(x)
 }
 
