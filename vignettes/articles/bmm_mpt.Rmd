@@ -188,7 +188,8 @@ fit_2htm <- bmm(
   model = model_2htm,
   backend = "cmdstanr",
   cores = 4,
-  refresh = 0
+  refresh = 0,
+  file = "fits/mpt_2htm"
 )
 ```
 
@@ -450,7 +451,8 @@ fit_ol <- bmm(
   cores = 4,
   iter = 4000,
   warmup = 1000,
-  refresh = 0
+  refresh = 0,
+  file = "fits/mpt_ol"
 )
 ```
 
@@ -530,7 +532,8 @@ fit_ol_pb1 <- bmm(
   cores = 4,
   iter = 4000,
   warmup = 1000,
-  refresh = 0
+  refresh = 0,
+  file = "fits/mpt_ol_pb1"
 )
 ```
 
