@@ -380,7 +380,11 @@ settable_link_functions.mpt <- function(model) {
 #'   draws of every parameter on the probability scale for each observed
 #'   combination of the predictors, e.g.
 #'   `native_parameters(fit, re_formula = NA, summary = TRUE)`; a difference
-#'   between conditions is the difference of these draws.
+#'   between conditions is the difference of these draws. With
+#'   `re_formula = NA` these are the probabilities of the median participant
+#'   (the quantity TreeBUGS reports as `"mean"`), not the population mean of
+#'   the participants' probabilities; see the section on group-level effects
+#'   in [native_parameters()].
 #'
 #'   Person effects written as `(1 | id)` in each parameter's formula are
 #'   independent across parameters. A shared label, `(1 |p| id)` in every
