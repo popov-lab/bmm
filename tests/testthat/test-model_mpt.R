@@ -603,7 +603,7 @@ test_that("restrictions are substituted into the trees before parameters are ide
   )
   expect_error(
     mpt(trees, tree_id = "item_type", restrictions = "g = 0.00001"),
-    "scientific"
+    "restriction\\(s\\) g = 1e-05 in scientific notation"
   )
 
   cov_tree <- mpt_tree("t", list(a = "D + (1 - D) * gc", b = "(1 - D) * (1 - gc)"))
