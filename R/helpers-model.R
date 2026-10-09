@@ -474,7 +474,18 @@ print.bmmodel <- function(x, ...) {
 
 # print.bmmodel dispatches before any model-specific print method (classes
 # are ordered general to specific), so model-specific lines are added here
-#' @keywords internal
+
+#' Generic S3 method for model-specific lines in `print()` of a model
+#'
+#' Called by `print()` on a `bmmodel` after the lines all models share and
+#' before the closing pointer to [parameter_info()]. The default method prints
+#' nothing.
+#'
+#' @param model A `bmmodel` object
+#' @param ... Unused
+#'
+#' @return Called for its printed output; returns `NULL` invisibly
+#' @keywords internal developer
 print_model_details <- function(model, ...) {
   UseMethod("print_model_details")
 }
