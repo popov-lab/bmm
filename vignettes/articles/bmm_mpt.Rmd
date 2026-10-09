@@ -356,6 +356,12 @@ model_smm
 
 Declaring the group via the `simplex` argument applies a stick-breaking reparameterization: the last parameter of each group is derived as 1 minus the sum of the others, and each remaining parameter `p` is estimated through an unconstrained component `praw`, which is what the `gAraw` and `gBraw` entries in the parameter list are. Predictor formulas are written for the simplex parameters themselves and are applied to the corresponding components; the derived parameter (here `gNew`) cannot receive its own predictors. Several independent simplex groups can be declared by passing a list of character vectors.
 
+By default, the group gets a uniform prior over the simplex, a symmetric Dirichlet(1): every way of splitting the guessing probability among `gA`, `gB` and `gNew` is equally likely a priori, so each has prior mean 1/3, whatever the order in which the group lists them. Under stick breaking this is a Beta(1, 2) prior on the first stick (`gA`'s share) and a Beta(1, 1) prior on the second (`gB`'s share of what `gA` leaves), which `default_prior()` shows on the latent scale as `logitbeta(1, 2)` for `gAraw` and `logistic(0, 1)` for `gBraw`. The 1/3 holds in every cell when the members get cell-means formulas (`gA ~ 0 + cond`); under `gA ~ 1 + cond` it holds in the reference cell only. TreeBUGS has no simplex construct and puts a uniform prior on each branch parameter instead, which here would give prior means of 0.50, 0.25 and 0.25. To match it, replace the first stick's prior:
+
+```{r, eval = FALSE}
+prior_treebugs <- brms::set_prior("logistic(0, 1)", nlpar = "gAraw", coef = "Intercept")
+```
+
 ```{r, eval = FALSE}
 fit_smm <- bmm(
   bmf(dA ~ 1 + (1 | id), dB ~ 1 + (1 | id), gA ~ 1, gB ~ 1),
